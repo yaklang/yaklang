@@ -169,6 +169,10 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 			if directly {
 				answer, err := invoker.DirectlyAnswer(ctx, "在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题", nil)
 				if err != nil {
+					if aicommon.IsDirectlyAnswerDelegatedToMainLoop(err) {
+						operator.Continue()
+						return
+					}
 					operator.Fail(utils.Errorf("DirectlyAnswer failed: %v", err))
 					return
 				}

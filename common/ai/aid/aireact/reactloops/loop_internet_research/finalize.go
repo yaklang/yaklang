@@ -76,6 +76,10 @@ func emitFinalResearchReport(loop *reactloops.ReActLoop, invoker aicommon.AIInvo
 			return true
 		}
 		if err != nil {
+			if aicommon.IsDirectlyAnswerDelegatedToMainLoop(err) {
+				log.Infof("internet research finalize: delegated stage summary to main loop")
+				return true
+			}
 			log.Warnf("internet research finalize: DirectlyAnswer failed, falling back to raw report: %v", err)
 		} else {
 			log.Warnf("internet research finalize: DirectlyAnswer returned empty answer, falling back to raw report")

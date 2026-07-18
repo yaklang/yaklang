@@ -20,6 +20,14 @@ func TestResolveMaxIterations_GoalModeRaisesSmallLimit(t *testing.T) {
 	require.Equal(t, 8, resolveMaxIterations(cfg))
 }
 
+func TestShouldSkipPostIterationSummaryForAsync(t *testing.T) {
+	require.False(t, shouldSkipPostIterationSummaryForAsync(nil))
+	task := aicommon.NewStatefulTaskBase("async-handoff", "运行蓝图", context.Background(), nil, true)
+	require.False(t, shouldSkipPostIterationSummaryForAsync(task))
+	task.SetAsyncMode(true)
+	require.True(t, shouldSkipPostIterationSummaryForAsync(task))
+}
+
 func TestConfigExecutionPolicy(t *testing.T) {
 	cfg := aicommon.NewConfig(
 		context.Background(),

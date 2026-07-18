@@ -45,6 +45,12 @@ const DefaultPeriodicVerificationInterval = 6
 // state.
 const ConfigKeyDisableAIVerification = "disable_ai_verification"
 
+// ConfigKeyDirectlyAnswerViaMainLoop controls the experiment that collapses
+// standalone DirectlyAnswer AI calls into the currently running ReAct loop.
+// The request is written to Timeline and the normal directly_answer action is
+// selected by the next main-loop decision instead of using a separate prompt.
+const ConfigKeyDirectlyAnswerViaMainLoop = "directly_answer_via_main_loop"
+
 // IsAIVerificationDisabled is deliberately defined on KeyValueConfigIf so loop
 // and action implementations can honor the switch without widening the large
 // AICallerConfigIf interface (and breaking lightweight test invokers).
@@ -62,6 +68,18 @@ func IsAIVerificationDisabled(config KeyValueConfigIf) (disabled bool) {
 		}
 	}()
 	return config.GetConfigBool(ConfigKeyDisableAIVerification, false)
+}
+
+func IsDirectlyAnswerViaMainLoopEnabled(config KeyValueConfigIf) (enabled bool) {
+	if utils.IsNil(config) {
+		return false
+	}
+	defer func() {
+		if recover() != nil {
+			enabled = false
+		}
+	}()
+	return config.GetConfigBool(ConfigKeyDirectlyAnswerViaMainLoop, false)
 }
 
 const DefaultGoalMinIterations = 6
@@ -1686,6 +1704,16 @@ func WithDisableToolUse(disable bool) ConfigOption {
 func WithDisableAIVerification(disable bool) ConfigOption {
 	return func(c *Config) error {
 		c.SetConfig(ConfigKeyDisableAIVerification, disable)
+		return nil
+	}
+}
+
+// WithDirectlyAnswerViaMainLoop makes standalone DirectlyAnswer requests join
+// the active ReAct loop. It is intentionally opt-in while cache and completion
+// behavior are being measured.
+func WithDirectlyAnswerViaMainLoop(enable bool) ConfigOption {
+	return func(c *Config) error {
+		c.SetConfig(ConfigKeyDirectlyAnswerViaMainLoop, enable)
 		return nil
 	}
 }
@@ -3978,6 +4006,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Deterministic completion is session-wide. Child ReAct/plan/forge configs
 	// must inherit it or nested loops can silently re-enable verification AI.
 	opts = append(opts, WithDisableAIVerification(IsAIVerificationDisabled(i)))
+	// Keep the answer-routing experiment consistent across plan/forge/sub-loop
+	// configs; otherwise child loops silently recreate standalone answer calls.
+	opts = append(opts, WithDirectlyAnswerViaMainLoop(IsDirectlyAnswerViaMainLoopEnabled(i)))
 
 	// Capability managers: child configs reuse parent instances when present.
 	if i.AiToolManager != nil {

@@ -74,6 +74,7 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		operator.Continue()
 		return
 	}
+	loop.MarkStageSummaryDelivered()
 	invoker := loop.GetInvoker()
 	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
 		if !utils.IsNil(invoker) {

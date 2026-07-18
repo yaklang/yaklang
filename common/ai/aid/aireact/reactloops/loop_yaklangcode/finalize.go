@@ -80,6 +80,10 @@ func tryDeliverYaklangFinalizeViaAI(loop *reactloops.ReActLoop, invoker aicommon
 		aicommon.WithDirectlyAnswerReferenceMaterial(reference, 0),
 	)
 	if err != nil {
+		if aicommon.IsDirectlyAnswerDelegatedToMainLoop(err) {
+			log.Infof("write_yaklang_code finalize: delegated stage summary to main loop")
+			return true
+		}
 		log.Warnf("write_yaklang_code finalize: DirectlyAnswer failed, falling back to lite summary: %v", err)
 		return false
 	}

@@ -80,6 +80,10 @@ func tryDeliverLoopHTTPFuzzFinalizeViaAI(loop *reactloops.ReActLoop, invoker aic
 		aicommon.WithDirectlyAnswerReferenceMaterial(referenceMaterial, 0),
 	)
 	if err != nil {
+		if aicommon.IsDirectlyAnswerDelegatedToMainLoop(err) {
+			log.Infof("http_fuzztest finalize: delegated stage summary to main loop")
+			return true
+		}
 		log.Warnf("http_fuzztest finalize: DirectlyAnswer failed, falling back to lite summary: %v", err)
 		return false
 	}

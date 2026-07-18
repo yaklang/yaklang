@@ -187,6 +187,22 @@ func TestDirectlyAnswerContinue_DisabledVerificationRequiresFinish(t *testing.T)
 	require.True(t, op.IsContinued())
 }
 
+func TestDirectlyAnswerContinue_ClosesPendingStageSummaryRequest(t *testing.T) {
+	loop, _, _, task := newTodoGateTestLoop(t, nil)
+	require.True(t, loop.RequestStageSummary("总结当前结果", "evidence"))
+	require.True(t, loop.HasPendingStageSummaryRequest())
+
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"阶段总结"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+
+	op := NewActionHandlerOperator(task)
+	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
+
+	require.True(t, op.IsContinued())
+	require.False(t, loop.HasPendingStageSummaryRequest())
+}
+
 func TestDirectlyAnswerContinue_AutoFinishesSimpleQuery(t *testing.T) {
 	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
 	loop.Set("intent_hint", loopIntentHintSimpleQuery)

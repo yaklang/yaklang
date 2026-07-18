@@ -254,6 +254,9 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 			// of callback registration order. Without deferral, this callback might
 			// check ShouldIgnoreError() before a later callback has called IgnoreError().
 			operator.DeferAfterCallbacks(func() {
+				if operator.ShouldResumeLoop() {
+					return
+				}
 				// 收尾表态统一交给纯决策函数 ClassifyLoopFinishEmission (便于单测):
 				//   - IgnoreError -> 静默 (隐藏/内部 loop 自管收尾, 不污染 UI);
 				//   - 迭代上限软中断 -> "自然结束"(success), 与具体 loop / 专注模式无关.
@@ -276,6 +279,9 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 				}
 			})
 			operator.DeferAfterCallbacks(func() {
+				if operator.ShouldResumeLoop() {
+					return
+				}
 				if r.memoryTriage == nil {
 					return
 				}

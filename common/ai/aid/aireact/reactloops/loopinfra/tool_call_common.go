@@ -72,6 +72,10 @@ func handleToolCallResult(
 		answer, answerErr := invoker.DirectlyAnswer(ctx,
 			"在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题。一般这种情况出现在用户认为这个任务不应该使用工具或者工具无法满足需求的情况下。", nil)
 		if answerErr != nil {
+			if aicommon.IsDirectlyAnswerDelegatedToMainLoop(answerErr) {
+				operator.Continue()
+				return
+			}
 			operator.Fail(utils.Error("DirectlyAnswer fail, reason: " + answerErr.Error()))
 			return
 		}

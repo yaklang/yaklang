@@ -555,6 +555,10 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		options = append(options, aicommon.WithDisableAIVerification(true))
 	}
 
+	if config.DirectlyAnswerViaMainLoop {
+		options = append(options, aicommon.WithDirectlyAnswerViaMainLoop(true))
+	}
+
 	if config.DisableAIForge {
 		options = append(options, aicommon.WithEnablePlanAndExec(false))
 	} else {

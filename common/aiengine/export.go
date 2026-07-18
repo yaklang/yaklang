@@ -19,6 +19,7 @@ var Exports = map[string]interface{}{
 	"language":                  WithLanguage,
 	"disableToolUse":            WithDisableToolUse,
 	"disableAIVerification":     WithDisableAIVerification,
+	"directlyAnswerViaMainLoop": WithDirectlyAnswerViaMainLoop,
 	"disableAIForge":            WithDisableAIForge,
 	"disableMCPServers":         WithDisableMCPServers,
 	"enableAISearchTool":        WithEnableAISearchTool,

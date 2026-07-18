@@ -75,6 +75,10 @@ func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AII
 			return
 		}
 		if err != nil {
+			if aicommon.IsDirectlyAnswerDelegatedToMainLoop(err) {
+				log.Infof("knowledge enhance finalize: delegated stage summary to main loop")
+				return
+			}
 			log.Warnf("knowledge enhance finalize: DirectlyAnswer failed, falling back to raw report: %v", err)
 		} else {
 			log.Warnf("knowledge enhance finalize: DirectlyAnswer returned empty answer, falling back to raw report")

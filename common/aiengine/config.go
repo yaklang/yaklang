@@ -38,15 +38,16 @@ type AIEngineConfig struct {
 	SessionID    string // 会话 ID，用于持久化
 
 	// 工具配置
-	DisableToolUse        bool     // 禁用工具调用
-	DisableAIVerification bool     // 禁用 AI 满意度验证，仅允许 finish + TODO 状态结束任务
-	DisableAIForge        bool     // 禁用 Forge 调用
-	DisableMCPServers     bool     // 禁用 MCPServers
-	EnableAISearchTool    bool     // 启用 AI 搜索工具
-	EnableForgeSearchTool bool     // 启用 Forge 搜索工具，默认启用
-	IncludeToolNames      []string // 包含的工具名称
-	ExcludeToolNames      []string // 排除的工具名称
-	Keywords              []string // 关键词，用于工具搜索
+	DisableToolUse            bool     // 禁用工具调用
+	DisableAIVerification     bool     // 禁用 AI 满意度验证，仅允许 finish + TODO 状态结束任务
+	DirectlyAnswerViaMainLoop bool     // 独立 DirectlyAnswer 请求回到主循环，由 directly_answer Action 执行
+	DisableAIForge            bool     // 禁用 Forge 调用
+	DisableMCPServers         bool     // 禁用 MCPServers
+	EnableAISearchTool        bool     // 启用 AI 搜索工具
+	EnableForgeSearchTool     bool     // 启用 Forge 搜索工具，默认启用
+	IncludeToolNames          []string // 包含的工具名称
+	ExcludeToolNames          []string // 排除的工具名称
+	Keywords                  []string // 关键词，用于工具搜索
 
 	// ExtraMCPServers 会话级显式挂载的 MCP server（内存态，不读 profile DB、
 	// 不进全局列表）。RestrictToSessionMCP 依赖此列表才能生效。
@@ -305,6 +306,14 @@ func WithDisableToolUse(disable bool) AIEngineConfigOption {
 func WithDisableAIVerification(disable bool) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.DisableAIVerification = disable
+	}
+}
+
+// WithDirectlyAnswerViaMainLoop routes standalone DirectlyAnswer requests into
+// the active ReAct loop as a Timeline stage-summary request.
+func WithDirectlyAnswerViaMainLoop(enable bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.DirectlyAnswerViaMainLoop = enable
 	}
 }
 

@@ -108,6 +108,10 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 
 		directlyAnswerResult, err := invoker.DirectlyAnswer(ctx, rewriteQuery, nil)
 		if err != nil {
+			if aicommon.IsDirectlyAnswerDelegatedToMainLoop(err) {
+				op.Continue()
+				return
+			}
 			log.Warnf("DirectlyAnswer failed after knowledge enhancement: %v", err)
 			invoker.EmitFileArtifactWithExt("directly_answer", ".md", enhancedAnswer)
 			invoker.EmitResultAfterStream(enhancedAnswer)

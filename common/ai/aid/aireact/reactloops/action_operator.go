@@ -156,6 +156,7 @@ type OnPostIterationOperator struct {
 	shouldEndIteration bool
 	endReason          any
 	ignoreError        bool     // 忽略错误，静默退出
+	resumeLoop         bool     // 阶段总结请求接管正常收尾，恢复同一个主循环
 	deferredFuncs      []func() // 在所有回调完成后执行的延迟函数
 }
 
@@ -198,6 +199,17 @@ func (o *OnPostIterationOperator) IgnoreError() {
 // ShouldIgnoreError 返回是否应该忽略错误
 func (o *OnPostIterationOperator) ShouldIgnoreError() bool {
 	return o.ignoreError
+}
+
+// ResumeLoop asks ExecuteWithExistedTask to resume after a normal action Exit.
+// It is used when a legacy standalone DirectlyAnswer finalizer is converted to
+// a Timeline stage-summary request for the ordinary main-loop action schema.
+func (o *OnPostIterationOperator) ResumeLoop() {
+	o.resumeLoop = true
+}
+
+func (o *OnPostIterationOperator) ShouldResumeLoop() bool {
+	return o.resumeLoop
 }
 
 // DeferAfterCallbacks registers a function to run after ALL OnPostIteration

@@ -694,7 +694,9 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	taskStartProcessing := func() {
 		task.SetStatus(aicommon.AITaskState_Processing)
+		r.SetDirectlyAnswerDelegationAllowed(true)
 	}
+	defer r.SetDirectlyAnswerDelegationAllowed(false)
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -1073,7 +1075,11 @@ LOOP:
 				fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
-			r.finishIterationLoopWithError(iterationCount, task, nil)
+			postOp := r.finishIterationLoopWithError(iterationCount, task, nil)
+			if postOp.ShouldResumeLoop() {
+				operator = newLoopActionHandlerOperator(task)
+				continue LOOP
+			}
 			return nil
 		}
 
@@ -1144,7 +1150,11 @@ LOOP:
 				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
-			r.finishIterationLoopWithError(iterationCount, task, nil)
+			postOp := r.finishIterationLoopWithError(iterationCount, task, nil)
+			if postOp.ShouldResumeLoop() {
+				operator = newLoopActionHandlerOperator(task)
+				continue LOOP
+			}
 			return nil
 		}
 
@@ -1241,6 +1251,12 @@ func (r *ReActLoop) callOnPostIteration(current int, task aicommon.AIStatefulTas
 	for _, fn := range r.onPostIteration {
 		fn(r, current, task, isDone, reason, operator)
 	}
+	// A normal finalizer may have converted a legacy standalone DirectlyAnswer
+	// into a Timeline request. Set this before deferred callbacks so success and
+	// memory-finalization hooks do not publish a false terminal event.
+	if isDone && r.HasPendingStageSummaryRequest() && r.IsDirectlyAnswerDelegationAllowed() {
+		operator.ResumeLoop()
+	}
 	// Phase 2: Run deferred functions after ALL callbacks have completed.
 	// This ensures deferred logic can safely check the final operator state
 	// (e.g. ShouldIgnoreError()) regardless of callback registration order.
@@ -1250,6 +1266,11 @@ func (r *ReActLoop) callOnPostIteration(current int, task aicommon.AIStatefulTas
 func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
 	operator := newOnPostIterationOperator()
 	if r.onPostIteration != nil {
+		previousDelegationState := r.IsDirectlyAnswerDelegationAllowed()
+		if err != nil || r.IsMaxIterationInterrupted() {
+			r.SetDirectlyAnswerDelegationAllowed(false)
+		}
+		defer r.SetDirectlyAnswerDelegationAllowed(previousDelegationState)
 		if err != nil {
 			r.callOnPostIteration(current, task, true, utils.Errorf("reason: %v", err), operator)
 		} else {

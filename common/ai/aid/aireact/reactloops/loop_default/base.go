@@ -73,6 +73,10 @@ func buildDefaultReactiveDataBuilder() reactloops.ReActLoopOption {
 	})
 }
 
+func shouldSkipPostIterationSummaryForAsync(task aicommon.AIStatefulTask) bool {
+	return task != nil && task.IsAsyncMode()
+}
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
@@ -93,7 +97,16 @@ func init() {
 					if !isDone {
 						return
 					}
-					if loop.GetLastValidAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+					// Async actions (require_ai_blueprint/request_plan) are handoffs,
+					// not completed conversations. Their downstream runner owns the
+					// eventual user-facing result; generating a summary here either
+					// creates a premature standalone DirectlyAnswer call or leaves an
+					// unconsumable main-loop delegation request behind.
+					if shouldSkipPostIterationSummaryForAsync(task) {
+						log.Infof("iteration %d: async handoff, skip premature post-iteration summary", iteration)
+						return
+					}
+					if last := loop.GetLastValidAction(); last != nil && last.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
 						return
 					}
@@ -102,9 +115,16 @@ func init() {
 						return
 					}
 
-					directlySummary, _ := loop.GetInvoker().DirectlyAnswer(
+					directlySummary, directlyErr := loop.GetInvoker().DirectlyAnswer(
 						task.GetContext(), reActPostSummary, nil, nil,
 					)
+					if aicommon.IsDirectlyAnswerDelegatedToMainLoop(directlyErr) {
+						log.Infof("iteration %d: final summary delegated to the main-loop directly_answer action", iteration)
+						return
+					}
+					if directlyErr != nil {
+						log.Warnf("iteration %d: final summary DirectlyAnswer failed: %v", iteration, directlyErr)
+					}
 					if directlySummary != "" {
 						loop.GetInvoker().AddToTimeline("final_summary", directlySummary)
 					}

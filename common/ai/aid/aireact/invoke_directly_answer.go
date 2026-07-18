@@ -46,6 +46,23 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 		return "", ctx.Err()
 	default:
 	}
+
+	// Experimental convergence path: while a ReAct loop is actively deciding or
+	// normally finalizing, do not build the standalone directly-answer prompt.
+	// Put the request/evidence into Timeline so the next ordinary main-loop call
+	// selects the directly_answer action using the same stable prompt family.
+	if aicommon.IsDirectlyAnswerViaMainLoopEnabled(r.config) {
+		if task := r.GetCurrentTask(); task != nil &&
+			task.GetStatus() == aicommon.AITaskState_Processing &&
+			!task.IsAsyncMode() {
+			if loop := r.GetCurrentLoop(); loop != nil &&
+				loop.IsDirectlyAnswerDelegationAllowed() &&
+				!loop.IsMaxIterationInterrupted() &&
+				loop.RequestStageSummary(query, config.ReferenceMaterial) {
+				return "", aicommon.ErrDirectlyAnswerDelegatedToMainLoop
+			}
+		}
+	}
 	prompt, nonceStr, err := r.promptManager.GenerateDirectlyAnswerPrompt(
 		query,
 		tools,
