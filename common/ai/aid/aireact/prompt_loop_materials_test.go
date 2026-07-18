@@ -26,7 +26,7 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 }
 
 // TestPromptManager_AssembleLoopPrompt_SectionOrder 验证"按稳定性分层"路径
-// 下 6 段顺序: high_static -> frozen_block -> semi_dynamic_1 (Skills + CacheToolCall)
+// 下 6 段顺序: high_static -> frozen_block -> semi_dynamic_1 (Skills)
 // -> semi_dynamic_2 (ExecutionPolicy + TaskInstruction + Schema + OutputExample) -> timeline_open ->
 // dynamic; 以及 frozen_block 段被 AI_CACHE_FROZEN_semi-dynamic 标签包裹,
 // semi_dynamic_1 / semi_dynamic_2 段分别被 AI_CACHE_SEMI / AI_CACHE_SEMI2 包裹.
@@ -125,7 +125,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 
 	// 段顺序 (P1-C3 timeline-open 段内子项重排后): TRAITS -> AI_CACHE_FROZEN(START) ->
 	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
-	// PROMPT_SECTION_semi-dynamic-1 (Skills + CacheToolCall) ->
+	// PROMPT_SECTION_semi-dynamic-1 (Skills) ->
 	// PROMPT_SECTION_semi-dynamic-2 (ExecutionPolicy + Persistent + Schema + OutputExample) ->
 	// PROMPT_SECTION_timeline-open (Timeline open + SessionEvidence +
 	// Workspace + PREV_USER_INPUT + Current Time + PlanContext) ->
@@ -234,7 +234,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 }
 
 // TestPromptManager_RenderLoopSemiDynamic1Section_Order 验证 SEMI-1 段
-// (semi_dynamic_section_1.txt) 仅包含 SkillsContext + RecentToolsCache, 不含
+// (semi_dynamic_section_1.txt) 仅包含 SkillsContext, 不含 RecentToolsCache /
 // Schema / Persistent / OutputExample / Tool / Forge.
 //
 // 关键词: renderLoopSemiDynamic1Section, semi_dynamic_section_1 内容范围, P1.1
@@ -266,10 +266,8 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 	require.NoError(t, err)
 
 	skillsIdx := strings.Index(rendered, "<|SKILLS_CONTEXT_demo|>")
-	cacheIdx := strings.Index(rendered, "<|CACHE_TOOL_CALL_[current-nonce]|>")
 	require.NotEqual(t, -1, skillsIdx)
-	require.NotEqual(t, -1, cacheIdx)
-	require.Less(t, skillsIdx, cacheIdx)
+	require.NotContains(t, rendered, "<|CACHE_TOOL_CALL_[current-nonce]|>")
 	// SEMI-1 段绝对不能含 Schema / Persistent / OutputExample / Tool / Forge.
 	require.NotContains(t, rendered, "<|SCHEMA|>")
 	require.NotContains(t, rendered, "<|PERSISTENT|>")
@@ -730,13 +728,13 @@ func requireMessageHasNoCacheControl(t *testing.T, detail aispec.ChatDetail, lab
 	}
 }
 
-// TestPromptManager_AssembleLoopPrompt_RecentToolsCacheInSemiSegment 验证
+// TestPromptManager_AssembleLoopPrompt_RecentToolsCacheAfterCacheBoundary 验证
 // CACHE_TOOL_CALL 块 (经 LoopPromptAssemblyInput.RecentToolsCache 透传) 物理位置
-// 在 semi-dynamic-1 段 (而不再在 dynamic 段, 也不在 semi-dynamic-2 段),
-// 经 hijacker 切割后位于 user2.
+// 在 timeline-open 段, 经 hijacker 切割后位于最后一个 cache boundary 之后的
+// user4, 避免最近工具集合变化击穿 semi-2 prefix cache.
 //
 // 关键词: TestPromptManager, CACHE_TOOL_CALL 物理迁移, semi-dynamic-1 段, P1.1 主路径
-func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheInSemiSegment(t *testing.T) {
+func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheAfterCacheBoundary(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -783,14 +781,19 @@ func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheInSemiSegment(t *testi
 	require.NotEqual(t, -1, cacheStartIdx, "CACHE_TOOL_CALL must appear in prompt")
 	require.NotEqual(t, -1, cacheEndIdx)
 
-	// 2. 必须位于 PROMPT_SECTION_semi-dynamic-1 段内 (P1.1: CACHE_TOOL_CALL 落在
-	//    semi 第一块, 不在 semi-2 / dynamic 段).
+	// 2. 必须位于 timeline-open 段, 不得再污染 semi-1 / semi-2 cache prefix.
 	semi1Start := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-1|>")
 	semi1End := strings.Index(prompt, "<|PROMPT_SECTION_END_semi-dynamic-1|>")
 	require.NotEqual(t, -1, semi1Start)
 	require.NotEqual(t, -1, semi1End)
-	require.Greater(t, cacheStartIdx, semi1Start, "CACHE_TOOL_CALL must start AFTER semi-dynamic-1 START")
-	require.Less(t, cacheEndIdx, semi1End, "CACHE_TOOL_CALL must end BEFORE semi-dynamic-1 END")
+	semi1Body := prompt[semi1Start:semi1End]
+	require.NotContains(t, semi1Body, "<|CACHE_TOOL_CALL_[current-nonce]|>")
+	timelineStart := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
+	timelineEnd := strings.Index(prompt, "<|PROMPT_SECTION_END_timeline-open|>")
+	require.NotEqual(t, -1, timelineStart)
+	require.NotEqual(t, -1, timelineEnd)
+	require.Greater(t, cacheStartIdx, timelineStart)
+	require.Less(t, cacheEndIdx, timelineEnd)
 
 	// 3. semi-dynamic-2 段绝对不能含 CACHE_TOOL_CALL (P1.1 拆分边界)
 	semi2Start := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-2|>")
@@ -799,9 +802,9 @@ func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheInSemiSegment(t *testi
 	require.NotEqual(t, -1, semi2End)
 	semi2Body := prompt[semi2Start:semi2End]
 	require.NotContains(t, semi2Body, "<|CACHE_TOOL_CALL_[current-nonce]|>",
-		"CACHE_TOOL_CALL must NOT appear in semi-dynamic-2 (belongs to semi-dynamic-1)")
+		"CACHE_TOOL_CALL must NOT appear before the final cache boundary")
 
-	// 4. dynamic 段不应该再含 CACHE_TOOL_CALL (历史位置)
+	// 4. dynamic 段不含 CACHE_TOOL_CALL; 它现在属于 timeline-open 观测段.
 	dynamicStart := strings.Index(prompt, "<|PROMPT_SECTION_dynamic_turnA|>")
 	require.NotEqual(t, -1, dynamicStart)
 	dynamicTail := prompt[dynamicStart:]
@@ -831,8 +834,8 @@ func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheInSemiSegment(t *testi
 
 // TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns 验证
 // 在 turn nonce 不同的两次 AssembleLoopPrompt 调用中, semi-dynamic-1 与
-// semi-dynamic-2 段都跨 turn 字节稳定 (因为 CACHE_TOOL_CALL 已用稳定字面量 nonce
-// 渲染, Schema / Persistent / OutputExample 不依赖 turn nonce).
+// semi-dynamic-2 段都跨 turn 字节稳定。RecentToolsCache 已位于最后 cache
+// boundary 之后, Schema / Persistent / OutputExample 也不依赖 turn nonce.
 //
 // 这是 P1.1 三 cache 边界生效的前提: hijacker 切到 user2 (semi-1) 与 user3
 // (semi-2) 的字节流必须跨 turn 一致, 才能命中 dashscope prefix cache.
@@ -887,7 +890,7 @@ func TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns(t *te
 		return p[startIdx : endIdx+len(endTag)]
 	}
 
-	// SEMI-1 段跨 turn 字节稳定 (Skills + CacheToolCall, [current-nonce] 占位).
+	// SEMI-1 段跨 turn 字节稳定, 且不再包含随最近工具集合变化的 CacheToolCall.
 	semi1Round1 := extractSegment(t, prompt1, "<|AI_CACHE_SEMI_semi|>", "<|AI_CACHE_SEMI_END_semi|>")
 	semi1Round2 := extractSegment(t, prompt2, "<|AI_CACHE_SEMI_semi|>", "<|AI_CACHE_SEMI_END_semi|>")
 	require.Equal(t, semi1Round1, semi1Round2,
@@ -895,8 +898,8 @@ func TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns(t *te
 	require.NotContains(t, semi1Round1, "nonce_round1",
 		"semi-1 segment must NOT contain turn nonce (would break byte stability)")
 	require.NotContains(t, semi1Round1, "nonce_round2_completely_different")
-	require.Contains(t, semi1Round1, "[current-nonce]",
-		"semi-1 segment must use placeholder stable nonce '[current-nonce]'")
+	require.NotContains(t, semi1Round1, "CACHE_TOOL_CALL",
+		"recent tool routing must stay after the final cache boundary")
 
 	// SEMI-2 段跨 turn 字节稳定 (ExecutionPolicy + Persistent + Schema + OutputExample, 无 turn nonce).
 	semi2Round1 := extractSegment(t, prompt1, "<|AI_CACHE_SEMI2_semi|>", "<|AI_CACHE_SEMI2_END_semi|>")

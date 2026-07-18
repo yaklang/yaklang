@@ -22,10 +22,12 @@ type PromptMaterials struct {
 	OutputExample   string
 
 	// SemiDynamic 提示材料:
-	//   - aireact: SkillsContext + RecentToolsCache
+	//   - aireact: SkillsContext
 	//   - aid: PlanHelp / OriginalUserInput / StableInstruction 等 prompt-specific
 	//     但仍属可缓存半动态前缀的内容
-	SkillsContext     string
+	SkillsContext string
+	// RecentToolsCache 的标签 nonce 稳定, 但正文会随着最近使用工具集合变化。
+	// 因此它属于 timeline-open 易变尾段, 不能放在 semi-2 cache boundary 之前。
 	RecentToolsCache  string
 	PlanHelp          string
 	OriginalUserInput string
@@ -94,7 +96,6 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 	}
 	return map[string]any{
 		"SkillsContext":     m.SkillsContext,
-		"RecentToolsCache":  m.RecentToolsCache,
 		"PlanHelp":          m.PlanHelp,
 		"OriginalUserInput": m.OriginalUserInput,
 		"StableInstruction": m.StableInstruction,
@@ -146,7 +147,7 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 
 // TimelineOpenData 供 timeline-open 模板消费, 模板字段渲染顺序 (P1-C3):
 //
-//	Timeline (Open Tail) -> SessionEvidence -> TodoSnapshot -> Workspace ->
+//	Timeline (Open Tail) -> SessionEvidence -> TodoSnapshot -> RecentToolsCache -> Workspace ->
 //	SessionArtifactsOpen -> UserHistory -> Current Time -> PlanContext (末尾)
 //
 // 段内排序原则:
@@ -189,6 +190,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 		"SessionEvidence":        sessionEvidenceOpen,
 		"TodoSnapshot":           m.TodoSnapshot,
+		"RecentToolsCache":       m.RecentToolsCache,
 		"Workspace":              m.Workspace,
 		"OSArch":                 m.OSArch,
 		"WorkingDir":             m.WorkingDir,

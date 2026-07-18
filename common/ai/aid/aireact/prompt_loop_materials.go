@@ -233,8 +233,9 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
 		// 关键词: TodoSnapshot 透传, timeline-open, SessionEvidence 之后
 		materials.TodoSnapshot = input.TodoSnapshot
-		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到 semi-dynamic 段
-		// 关键词: RecentToolsCache 透传, semi-dynamic 段
+		// CACHE_TOOL_CALL 正文会随最近工具集合变化, 放到 timeline-open 尾段,
+		// 保护其前面的 semi-2 cache boundary 不被工具变化击穿。
+		// 关键词: RecentToolsCache 透传, timeline-open, cache boundary 之后
 		materials.RecentToolsCache = input.RecentToolsCache
 		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
 		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
@@ -260,7 +261,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 }
 
 // AssemblePromptPrefix 按"稳定性分层"路径输出 5 段: HighStatic | FrozenBlock |
-// SemiDynamic1 (Skills + CacheToolCall) | SemiDynamic2 (TaskInstruction + Schema +
+// SemiDynamic1 (Skills) | SemiDynamic2 (TaskInstruction + Schema +
 // OutputExample) | TimelineOpen。Prompt 字段是 5 段拼接结果, 调用方拼上 Dynamic
 // 段后形成完整 prompt。
 //
@@ -564,7 +565,7 @@ func renderPlanContextBlock(materials *reactloops.PromptPrefixMaterials) string 
 }
 
 // buildSemiDynamic1Observation 给"PROMPT_SECTION_semi-dynamic-1 段"做观测树:
-// Skills Context + Cache Tool Call. 物理上对应 hijacker 5 段切分中的 user2
+// Skills Context. 物理上对应 hijacker 5 段切分中的 user2
 // (string content, 不打 cc), 与 buildSemiDynamic2Observation 一起被 dashscope
 // 视作合并 prefix cache 计算.
 //
@@ -592,15 +593,6 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			reactloops.PromptSectionRoleSemiDynamic1,
 			true,
 			materials.SkillsContext,
-		),
-		// CACHE_TOOL_CALL 块从 dynamic/REFLECTION 迁到此处, 用稳定 nonce 渲染.
-		// 关键词: Semi Dynamic 1 / Cache Tool Call, RecentToolsCache 观测节点
-		reactloops.NewPromptSectionObservation(
-			"section.semi_dynamic_1.cache_tool_call",
-			"Cache Tool Call",
-			reactloops.PromptSectionRoleSemiDynamic1,
-			true,
-			materials.RecentToolsCache,
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -690,7 +682,7 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 }
 
 // buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + TodoSnapshot + Workspace +
+// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + TodoSnapshot + RecentToolsCache + Workspace +
 // SessionArtifactsOpen + UserHistory + Current Time + PlanContext (末尾)。
 //
 // 段内排序原则 (P1-C3 调整):
@@ -733,7 +725,7 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 	// "Timeline Open & Workspace" 已经表达层级.
 	// 关键词: section.timeline_open 子节点 Name 去前缀, UI 信息密度
 	//
-	// 子节点排列顺序: timeline_open -> session_evidence -> todo_list -> workspace ->
+	// 子节点排列顺序: timeline_open -> session_evidence -> todo_list -> cache_tool_call -> workspace ->
 	// session_artifacts_open -> user_history -> current_time -> plan_context. 该顺序与 timeline_open_section.txt
 	// 模板渲染顺序严格一致, 让"上下文成分"面板看到的层级与实际 prompt 字节
 	// 流顺序保持同步.
@@ -766,6 +758,15 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			materials.TodoSnapshot,
+		),
+		// RecentToolsCache 标签使用稳定 nonce, 但正文随最近使用工具集合变化。
+		// 放在最后 cache boundary 之后, 避免工具集合变化导致 semi-2 前缀冷启动。
+		reactloops.NewPromptSectionObservation(
+			"section.timeline_open.cache_tool_call",
+			"Recent Tool Routing",
+			reactloops.PromptSectionRoleTimelineOpen,
+			true,
+			materials.RecentToolsCache,
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.workspace",
@@ -1150,7 +1151,7 @@ func (pm *PromptManager) renderLoopHighStaticSection(materials *reactloops.Promp
 }
 
 // renderLoopSemiDynamic1Section 渲染 P1.1 拆分后的 semi-dynamic 第一块:
-// SkillsContext + RecentToolsCache. 物理上对应 hijacker 5 段切分中的 user2
+// SkillsContext. 物理上对应 hijacker 5 段切分中的 user2
 // (string content, 不打 cc), 由 wrapAICacheSemi 包一层 AI_CACHE_SEMI 边界.
 //
 // 关键词: renderLoopSemiDynamic1Section, semi_dynamic_section_1.txt, P1.1

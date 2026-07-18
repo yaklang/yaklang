@@ -861,7 +861,7 @@ const (
 // <|AI_CACHE_SEMI2_semi|>...<|AI_CACHE_SEMI2_END_semi|>.
 //
 // 设计意图 (P1.1: 把 SEMI 段拆成两条 user message):
-//   - AI_CACHE_SEMI  (semi-1) -> 无 cc, user2 (Skills + RecentToolsCache)
+//   - AI_CACHE_SEMI  (semi-1) -> 无 cc, user2 (Stable Skills Context)
 //   - AI_CACHE_SEMI2 (semi-2) -> ephemeral cc, user3 (Persistent + Schema + OutputExample)
 //
 // dashscope 命中点: system / system+frozen / system+frozen+semi1+semi2.

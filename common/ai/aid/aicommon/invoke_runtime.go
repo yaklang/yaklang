@@ -208,12 +208,12 @@ type LoopPromptAssemblyInput struct {
 	InjectedMemory string
 
 	// RecentToolsCache 是 CACHE_TOOL_CALL 块的渲染输出 (含 directly_call_tool
-	// routing hint + 最近工具的 schema/footer), 用稳定 nonce 渲染, 字节级跨 turn
-	// 稳定. 物理位置在 semi-dynamic 段, 让其与 Skills + Schema 一起被
-	// AI_CACHE_SEMI 边界包裹进入 prefix cache. 空字符串时模板自动跳过.
+	// routing hint + 最近工具的 schema/footer). 标签 nonce 稳定, 但工具集合正文
+	// 会随任务推进变化, 因此物理位置在 timeline-open 段、最后 cache boundary
+	// 之后, 避免一次工具集合变化击穿 Skills + Schema 的大前缀缓存.
 	//
-	// 关键词: LoopPromptAssemblyInput, RecentToolsCache, semi-dynamic 段,
-	//        AI_CACHE_SEMI prefix cache
+	// 关键词: LoopPromptAssemblyInput, RecentToolsCache, timeline-open 易变尾段,
+	//        cache boundary 之后
 	RecentToolsCache string
 
 	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始

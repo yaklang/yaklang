@@ -64,7 +64,7 @@ type PromptPrefixMaterials = aicommon.PromptMaterials
 //
 // HighStatic / SemiDynamic1 / SemiDynamic2 是兼容字段 (用于老路径与单元测试):
 //   - SemiDynamic1 = semi_dynamic_section_1.txt 完整渲染串
-//     (SkillsContext + RecentToolsCache),
+//     (SkillsContext),
 //     被 wrapAICacheSemi 包一层 AI_CACHE_SEMI 边界, 物理上对应 hijacker 5 段切分
 //     中的 user2 (不打 cc).
 //   - SemiDynamic2 = semi_dynamic_section_2.txt 完整渲染串

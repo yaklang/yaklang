@@ -17,7 +17,7 @@ import "time"
 //     的单一 semi-dynamic 段。
 //   - SectionSemiDynamic1 ("semi-dynamic-1") / SectionSemiDynamic2 ("semi-dynamic-2"):
 //     aireact 新路径 "按稳定性分层 + UI 信息密度" 拆分后的两块 semi 段, 分别
-//     承载 SkillsContext + RecentToolsCache 与 TaskInstruction + Schema +
+//     承载 SkillsContext 与 TaskInstruction + Schema +
 //     OutputExample, 由 hijacker 切成两条 user message (semi-1 不打 cc /
 //     semi-2 打 cc, 合并算 prefix cache).
 //
