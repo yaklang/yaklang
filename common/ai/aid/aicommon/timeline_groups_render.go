@@ -116,7 +116,7 @@ func (m *Timeline) groupByMinutesWithSizer(minutes int, sizer BucketSizer) *Time
 	ids := m.idToTimelineItem.Keys()
 	for _, id := range ids {
 		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
+		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
 		var t time.Time
@@ -208,7 +208,7 @@ func (m *Timeline) groupByMinutesAndBytesLocked(minutes int, bytesPerBucket int6
 	ids := m.idToTimelineItem.Keys()
 	for _, id := range ids {
 		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
+		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
 		var t time.Time

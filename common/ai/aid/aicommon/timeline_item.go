@@ -63,6 +63,13 @@ func (item *TimelineItem) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 		valueJSON = data
+	case *PromotableTimelineItem:
+		typeName = "promotable"
+		data, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		valueJSON = data
 	default:
 		typeName = "raw"
 		valueJSON = []byte(fmt.Sprintf(`"%v"`, v))
@@ -111,6 +118,12 @@ func (item *TimelineItem) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		item.value = &textItem
+	case "promotable":
+		var control PromotableTimelineItem
+		if err := json.Unmarshal(serializable.Value, &control); err != nil {
+			return err
+		}
+		item.value = &control
 	default:
 		// 对于未知类型，尝试作为字符串处理
 		item.value = &TextTimelineItem{
@@ -150,6 +163,8 @@ func (item *TimelineItem) ToTimelineItemOutput() *TimelineItemOutput {
 		typeName = "user_interaction"
 	case *TextTimelineItem:
 		typeName = "text"
+	case *PromotableTimelineItem:
+		typeName = "promotable"
 	default:
 		typeName = "raw"
 	}

@@ -233,9 +233,9 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, reactloops.PromptSectionRoleZHDynamic, sections[5].Children[0].RoleZh)
 }
 
-// TestPromptManager_RenderLoopSemiDynamic1Section_Order 验证 SEMI-1 段
-// (semi_dynamic_section_1.txt) 仅包含 SkillsContext, 不含 RecentToolsCache /
-// Schema / Persistent / OutputExample / Tool / Forge.
+// TestPromptManager_RenderLoopSemiDynamic1Section_Order 验证 SEMI-1 段包含
+// SkillsContext 与 Timeline 晋升状态，但不接受旧 RecentToolsCache 独立输入，
+// 也不包含 Schema / Persistent / OutputExample / Tool / Forge。
 //
 // 关键词: renderLoopSemiDynamic1Section, semi_dynamic_section_1 内容范围, P1.1
 func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
@@ -250,24 +250,29 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 	require.NoError(t, err)
 
 	rendered, err := react.promptManager.renderLoopSemiDynamic1Section(&reactloops.PromptPrefixMaterials{
-		ToolInventory:    true,
-		ToolsCount:       2,
-		TopToolsCount:    1,
-		TopTools:         []*aitool.Tool{aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))},
-		HasMoreTools:     true,
-		ForgeInventory:   true,
-		AIForgeList:      "* `forge-a`: forge a desc",
-		SkillsContext:    "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
-		RecentToolsCache: "<|CACHE_TOOL_CALL_[current-nonce]|>\ncache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
-		Schema:           `{"type":"object","properties":{"@action":{"type":"string"}}}`,
-		TaskInstruction:  "follow task rules",
-		OutputExample:    "example output",
+		ToolInventory:        true,
+		ToolsCount:           2,
+		TopToolsCount:        1,
+		TopTools:             []*aitool.Tool{aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))},
+		HasMoreTools:         true,
+		ForgeInventory:       true,
+		AIForgeList:          "* `forge-a`: forge a desc",
+		SkillsContext:        "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
+		PromotedSemiDynamic1: "<|CACHE_TOOL_CALL_[current-nonce]|>\npromoted cache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
+		RecentToolsCache:     "legacy cache body",
+		Schema:               `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+		TaskInstruction:      "follow task rules",
+		OutputExample:        "example output",
 	})
 	require.NoError(t, err)
 
 	skillsIdx := strings.Index(rendered, "<|SKILLS_CONTEXT_demo|>")
 	require.NotEqual(t, -1, skillsIdx)
-	require.NotContains(t, rendered, "<|CACHE_TOOL_CALL_[current-nonce]|>")
+	promotedIdx := strings.Index(rendered, "<|CACHE_TOOL_CALL_[current-nonce]|>")
+	require.NotEqual(t, -1, promotedIdx)
+	require.Less(t, skillsIdx, promotedIdx)
+	require.Contains(t, rendered, "promoted cache body")
+	require.NotContains(t, rendered, "legacy cache body")
 	// SEMI-1 段绝对不能含 Schema / Persistent / OutputExample / Tool / Forge.
 	require.NotContains(t, rendered, "<|SCHEMA|>")
 	require.NotContains(t, rendered, "<|PERSISTENT|>")
@@ -584,7 +589,7 @@ func TestPromptManager_AssembleLoopPrompt_HijackFiveSegment(t *testing.T) {
 	requireMessageHasNoCacheControl(t, user4, "user4 open+dynamic")
 }
 
-func TestPromptManager_AssembleLoopPrompt_HijackArtifactsFrozenOpenPlacement(t *testing.T) {
+func TestPromptManager_AssembleLoopPrompt_DoesNotRenderSessionArtifacts(t *testing.T) {
 	restore := aicache.SetMinCachableUserSegmentBytesForTest(0)
 	defer restore()
 
@@ -626,14 +631,14 @@ func TestPromptManager_AssembleLoopPrompt_HijackArtifactsFrozenOpenPlacement(t *
 
 	user1Content := chatDetailContentString(hijack.Messages[1])
 	require.Contains(t, user1Content, "<|AI_CACHE_FROZEN_semi-dynamic|>")
-	require.Contains(t, user1Content, "# Session Artifacts (Frozen)")
-	require.Contains(t, user1Content, "task_1-1_done")
+	require.NotContains(t, user1Content, "# Session Artifacts")
+	require.NotContains(t, user1Content, "task_1-1_done")
 	require.NotContains(t, user1Content, "task_1-2_open")
 
 	user4Content := chatDetailContentString(hijack.Messages[4])
 	require.Contains(t, user4Content, "<|PROMPT_SECTION_timeline-open|>")
-	require.Contains(t, user4Content, "# Session Artifacts (Open)")
-	require.Contains(t, user4Content, "task_1-2_open")
+	require.NotContains(t, user4Content, "# Session Artifacts")
+	require.NotContains(t, user4Content, "task_1-2_open")
 	require.NotContains(t, user4Content, "task_1-1_done")
 }
 
@@ -728,13 +733,7 @@ func requireMessageHasNoCacheControl(t *testing.T, detail aispec.ChatDetail, lab
 	}
 }
 
-// TestPromptManager_AssembleLoopPrompt_RecentToolsCacheAfterCacheBoundary 验证
-// CACHE_TOOL_CALL 块 (经 LoopPromptAssemblyInput.RecentToolsCache 透传) 物理位置
-// 在 timeline-open 段, 经 hijacker 切割后位于最后一个 cache boundary 之后的
-// user4, 避免最近工具集合变化击穿 semi-2 prefix cache.
-//
-// 关键词: TestPromptManager, CACHE_TOOL_CALL 物理迁移, semi-dynamic-1 段, P1.1 主路径
-func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheAfterCacheBoundary(t *testing.T) {
+func TestPromptManager_AssembleLoopPrompt_IgnoresLegacyRecentToolsCacheInput(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -775,43 +774,21 @@ func TestPromptManager_AssembleLoopPrompt_RecentToolsCacheAfterCacheBoundary(t *
 
 	prompt := result.Prompt
 
-	// 1. CACHE_TOOL_CALL 必须出现在 prompt 中 (经过模板渲染)
-	cacheStartIdx := strings.Index(prompt, "<|CACHE_TOOL_CALL_[current-nonce]|>")
-	cacheEndIdx := strings.Index(prompt, "<|CACHE_TOOL_CALL_END_[current-nonce]|>")
-	require.NotEqual(t, -1, cacheStartIdx, "CACHE_TOOL_CALL must appear in prompt")
-	require.NotEqual(t, -1, cacheEndIdx)
+	// The old independent source is ignored. Tool schemas now enter via
+	// promotable Timeline items and are projected into Open/Semi1 exactly once.
+	require.NotContains(t, prompt, "<|CACHE_TOOL_CALL_[current-nonce]|>")
+	require.NotContains(t, prompt, "# Fast Tool Routing")
 
-	// 2. 必须位于 timeline-open 段, 不得再污染 semi-1 / semi-2 cache prefix.
 	semi1Start := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-1|>")
 	semi1End := strings.Index(prompt, "<|PROMPT_SECTION_END_semi-dynamic-1|>")
 	require.NotEqual(t, -1, semi1Start)
 	require.NotEqual(t, -1, semi1End)
-	semi1Body := prompt[semi1Start:semi1End]
-	require.NotContains(t, semi1Body, "<|CACHE_TOOL_CALL_[current-nonce]|>")
-	timelineStart := strings.Index(prompt, "<|PROMPT_SECTION_timeline-open|>")
-	timelineEnd := strings.Index(prompt, "<|PROMPT_SECTION_END_timeline-open|>")
-	require.NotEqual(t, -1, timelineStart)
-	require.NotEqual(t, -1, timelineEnd)
-	require.Greater(t, cacheStartIdx, timelineStart)
-	require.Less(t, cacheEndIdx, timelineEnd)
-
-	// 3. semi-dynamic-2 段绝对不能含 CACHE_TOOL_CALL (P1.1 拆分边界)
 	semi2Start := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-2|>")
 	semi2End := strings.Index(prompt, "<|PROMPT_SECTION_END_semi-dynamic-2|>")
 	require.NotEqual(t, -1, semi2Start)
 	require.NotEqual(t, -1, semi2End)
-	semi2Body := prompt[semi2Start:semi2End]
-	require.NotContains(t, semi2Body, "<|CACHE_TOOL_CALL_[current-nonce]|>",
-		"CACHE_TOOL_CALL must NOT appear before the final cache boundary")
 
-	// 4. dynamic 段不含 CACHE_TOOL_CALL; 它现在属于 timeline-open 观测段.
-	dynamicStart := strings.Index(prompt, "<|PROMPT_SECTION_dynamic_turnA|>")
-	require.NotEqual(t, -1, dynamicStart)
-	dynamicTail := prompt[dynamicStart:]
-	require.NotContains(t, dynamicTail, "<|CACHE_TOOL_CALL_[current-nonce]|>",
-		"CACHE_TOOL_CALL must NOT remain in dynamic section after physical migration")
-
-	// 5. semi-1 段必须被 AI_CACHE_SEMI_semi 边界包裹 (P1.1 第一对 cache 边界)
+	// Existing cache wrappers remain structurally unchanged.
 	aiCacheSemiStart := strings.Index(prompt, "<|AI_CACHE_SEMI_semi|>")
 	aiCacheSemiEnd := strings.Index(prompt, "<|AI_CACHE_SEMI_END_semi|>")
 	require.NotEqual(t, -1, aiCacheSemiStart, "P1.1: prompt must contain AI_CACHE_SEMI_semi START")

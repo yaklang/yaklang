@@ -109,6 +109,9 @@ func (m *Timeline) compressForSizeLimit() {
 }
 
 func (m *Timeline) compressForSizeLimitLocked() {
+	// Control-plane mutations must be materialized before ordinary facts are sent
+	// to a reducer. They are excluded from activeIDs and reducer prompts below.
+	m.forcePromoteAllLocked()
 	if m.ai == nil || m.totalDumpContentLimit <= 0 {
 		return
 	}
@@ -452,7 +455,7 @@ func (m *Timeline) getActiveTimelineItemIDs() []int64 {
 	out := make([]int64, 0, len(ids))
 	for _, id := range ids {
 		item, ok := m.idToTimelineItem.Get(id)
-		if !ok || item == nil || item.deleted {
+		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
 		out = append(out, id)

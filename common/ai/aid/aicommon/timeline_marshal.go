@@ -26,6 +26,7 @@ type timelineSerializable struct {
 	ArchiveRefs           map[string]*TimelineArchiveRef   `json:"archive_refs"`
 	PerDumpContentLimit   int64                            `json:"per_dump_content_limit"`
 	TotalDumpContentLimit int64                            `json:"total_dump_content_limit"`
+	PromotedState         *TimelinePromotedState           `json:"promoted_state,omitempty"`
 }
 
 // MarshalTimeline serializes a Timeline into a string.
@@ -88,6 +89,7 @@ func marshalTimelineUnlocked(i *Timeline) (string, error) {
 		ArchiveRefs:           archiveRefsMap,
 		PerDumpContentLimit:   i.perDumpContentLimit,
 		TotalDumpContentLimit: i.totalDumpContentLimit,
+		PromotedState:         cloneTimelinePromotedState(i.promotedState),
 	}
 
 	data, err := json.Marshal(serializable)
@@ -115,6 +117,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
 		compressing:           utils.NewOnce(),
 		branchTimeline:        false,
+		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
 	}
 
 	// 恢复 idToTs

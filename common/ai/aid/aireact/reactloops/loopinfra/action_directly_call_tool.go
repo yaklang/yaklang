@@ -373,9 +373,10 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 				return
 			}
 			if cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(name); lookupErr == nil {
-				loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
 				if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-					realCfg.SaveRecentToolCache()
+					realCfg.RecordRecentlyUsedTool(cachedTool)
+				} else {
+					loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
 				}
 			}
 		}

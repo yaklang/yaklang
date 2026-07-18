@@ -22,31 +22,6 @@ func (r *ReActLoop) shouldRenderTodoSnapshot() bool {
 	return true
 }
 
-// renderRecentToolRoutingHint 渲染"快速工具路由提示", 整体使用占位符字面量
-// nonce (aicommon.RecentToolCacheStableNonce, "[current-nonce]"), 跨 turn
-// 字节稳定, 让该段进入 prefix cache. 占位符语义可让 LLM 自然把它关联到
-// 当前 turn nonce.
-//
-// 历史: 该提示曾使用 turn nonce 渲染, 与 CACHE_TOOL_CALL 一并位于 dynamic 段
-// REFLECTION 内, 每轮变化无法缓存. 现已与 CACHE_TOOL_CALL 一起迁到 semi-dynamic
-// 段并用稳定 nonce 渲染.
-//
-// 关键词: renderRecentToolRoutingHint, DIRECT_TOOL_ROUTING, stable nonce,
-//
-//	semi-dynamic 段
-func renderRecentToolRoutingHint() string {
-	return utils.MustRenderTemplate(`
-<|DIRECT_TOOL_ROUTING_{{ .Nonce }}|>
-# Fast Tool Routing
-- Before using require_tool, check CACHE_TOOL_CALL first.
-- If the exact tool you need is already listed in CACHE_TOOL_CALL, prefer directly_call_tool for faster execution.
-- Use require_tool only when the needed tool is not in the recent cache, or when you still need normal tool discovery.
-<|DIRECT_TOOL_ROUTING_END_{{ .Nonce }}|>
-	`, map[string]any{
-		"Nonce": aicommon.RecentToolCacheStableNonce,
-	})
-}
-
 //go:embed prompts/todo_list.txt
 var todoListTemplate string
 
@@ -261,30 +236,11 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
-	// CACHE_TOOL_CALL 块的标签使用稳定 nonce, 但 Summary 正文会随最近工具集合
-	// 变化。物理位置放在 timeline-open 段、最后 cache boundary 之后, 避免正文
-	// 变化击穿前面的 Skills + Schema prefix cache.
-	//
-	// 关键词: CACHE_TOOL_CALL 物理位置, timeline-open, cache boundary 之后
-	var recentToolsCacheBlock string
+	// Execution authorization remains in AiToolManager. Prompt visibility is now
+	// projected from Timeline Open / promoted Semi1, so do not inject a second
+	// full summary on every prompt build.
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
 		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
-		var sb strings.Builder
-		sb.WriteString(renderRecentToolRoutingHint())
-		// nonce 参数已被 GetRecentToolsSummary 内部忽略, 实际渲染使用稳定 nonce.
-		// 这里仍然传 nonce 仅为了不破坏老接口签名.
-		if summary := tm.GetRecentToolsSummary(tm.GetRecentToolCacheMaxTokens(), nonce); summary != "" {
-			cacheBlock := utils.MustRenderTemplate(`
-<|CACHE_TOOL_CALL_{{ .Nonce }}>
-{{ .Summary }}
-<|CACHE_TOOL_CALL_END_{{ .Nonce }}>
-			`, map[string]interface{}{
-				"Nonce":   aicommon.RecentToolCacheStableNonce,
-				"Summary": summary,
-			})
-			sb.WriteString(cacheBlock)
-		}
-		recentToolsCacheBlock = sb.String()
 	}
 
 	if r.invoker == nil {
@@ -306,7 +262,6 @@ func (r *ReActLoop) generateLoopPrompt(
 		TodoSnapshot:      todoSnapshot,
 		ReactiveData:      reactiveData,
 		InjectedMemory:    memory,
-		RecentToolsCache:  recentToolsCacheBlock,
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")

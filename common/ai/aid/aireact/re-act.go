@@ -840,26 +840,14 @@ func WithBuiltinTools() aicommon.ConfigOption {
 	}
 }
 
-// emitArtifactsSummaryToTimeline pushes a summary of the artifacts directory into the
-// timeline after plan/forge completion, and ensures EmitPinDirectory is called for UI visibility.
-// Prompt visibility is handled by RenderSessionArtifactsFrozenOpen during prompt build.
+// emitArtifactsSummaryToTimeline keeps the legacy call site name but only pins the
+// directory for UI visibility. Mechanical directory listings must not enter Timeline
+// because Timeline is prompt-visible.
 func (r *ReAct) emitArtifactsSummaryToTimeline() {
 	artifactsDir := r.config.GetOrCreateWorkDir()
 	if artifactsDir == "" {
 		return
 	}
-
-	glance := filesys.Glance(artifactsDir)
-	if glance == "" {
-		return
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Artifacts directory: %s\n", artifactsDir))
-	sb.WriteString("Directory structure:\n")
-	sb.WriteString(glance)
-	r.AddToTimeline("artifacts_summary", sb.String())
-	log.Infof("emitted artifacts summary to timeline for dir: %s", artifactsDir)
 
 	// Ensure the artifacts directory is pinned for UI visibility
 	if !r.config.IsArtifactsPinned() {

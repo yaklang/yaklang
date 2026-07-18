@@ -39,6 +39,7 @@ type Timeline struct {
 	// compressedHistory 仅用于追溯，不参与当前并列渲染
 	compressedHistory []*TimelineCompressedHistoryNode
 	archiveRefs       *omap.OrderedMap[int64, *TimelineArchiveRef]
+	promotedState     *TimelinePromotedState
 
 	// this limit is used to limit the timeline dump content size (in tokens).
 	perDumpContentLimit   int64
@@ -182,7 +183,15 @@ func (m *Timeline) GetIdToTimelineItem() *omap.OrderedMap[int64, *TimelineItem] 
 func (m *Timeline) GetTimelineItemIDs() []int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.idToTimelineItem.Keys()
+	ids := make([]int64, 0, m.idToTimelineItem.Len())
+	for _, id := range m.idToTimelineItem.Keys() {
+		item, ok := m.idToTimelineItem.Get(id)
+		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
 }
 
 // GetMaxID 返回当前 timeline 中最大的条目 ID。
@@ -224,6 +233,15 @@ func (m *Timeline) TruncateAfter(checkpointID int64) {
 			}
 		}
 	}
+	limit := int64(0)
+	if m.promotedState != nil && m.promotedState.Watermark > 0 {
+		watermark := m.promotedState.Watermark
+		if watermark > checkpointID {
+			watermark = checkpointID
+		}
+		limit = watermark + 1
+	}
+	m.rebuildPromotedStateLocked(limit, false)
 }
 
 func (m *Timeline) ClearRuntimeConfig() {
@@ -255,6 +273,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		compressedHead:        cloneTimelineCompressedHead(m.compressedHead),
 		compressedHistory:     cloneTimelineCompressedHistory(m.compressedHistory),
 		archiveRefs:           m.archiveRefs.Copy(),
+		promotedState:         cloneTimelinePromotedState(m.promotedState),
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,
@@ -362,6 +381,7 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
 		archiveRefs:      omap.NewOrderedMap(map[int64]*TimelineArchiveRef{}),
+		promotedState:    newTimelinePromotedState(),
 		compressing:      utils.NewOnce(),
 		branchTimeline:   false,
 	}
@@ -527,7 +547,7 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 	// 的高发路径之一: pushTimelineItem 在主流程已结束、outputChan 已被测试关
 	// 闭后仍可能被触发. 即便 Emitter.emit 自身已 defer recover, 这里再加一
 	// 层 recover 形成 belt-and-suspenders, 杜绝因 channel 关闭引起的进程退出.
-	if m.config != nil && m.config.GetEmitter() != nil {
+	if !isPromotableTimelineItem(item) && m.config != nil && m.config.GetEmitter() != nil {
 		emitter := m.config.GetEmitter()
 		go func() {
 			defer func() {
@@ -587,6 +607,9 @@ func (m *Timeline) calculateActualContentSizeLocked() int64 {
 	count := 0
 
 	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		if isPromotableTimelineItem(item) {
+			return true
+		}
 		initOnce.Do(func() {
 			buf.WriteString("timeline:\n")
 		})
@@ -652,6 +675,7 @@ func (m *Timeline) emergencyCompressLocked(targetSize int) {
 	if m == nil {
 		return
 	}
+	m.forcePromoteAllLocked()
 
 	// Calculate current size
 	tlstr, err := marshalTimelineUnlocked(m)
@@ -669,7 +693,7 @@ func (m *Timeline) emergencyCompressLocked(targetSize int) {
 	// Get all item IDs ordered by timestamp (oldest first)
 	var itemIDs []int64
 	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
-		if item == nil || item.deleted {
+		if item == nil || item.deleted || isPromotableTimelineItem(item) {
 			return true
 		}
 		itemIDs = append(itemIDs, id)
@@ -1279,6 +1303,10 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 
 	// Track old ID to new ID mapping for compressedHead remapping
 	oldToNewID := make(map[int64]int64)
+	oldPromotionWatermark := int64(0)
+	if m.promotedState != nil {
+		oldPromotionWatermark = m.promotedState.Watermark
+	}
 
 	var lastID int64
 	// Reassign IDs in order, skipping soft-deleted (inactive) items
@@ -1299,6 +1327,8 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 		case *UserInteraction:
 			v.ID = newID
 		case *TextTimelineItem:
+			v.ID = newID
+		case *PromotableTimelineItem:
 			v.ID = newID
 		default:
 			log.Warnf("unknown timeline item value type: %T", v)
@@ -1328,6 +1358,15 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 			h.CoveredEndItemID = mapped
 		}
 	}
+	if oldPromotionWatermark > 0 {
+		var newWatermark int64
+		for oldID, newID := range oldToNewID {
+			if oldID <= oldPromotionWatermark && newID > newWatermark {
+				newWatermark = newID
+			}
+		}
+		m.rebuildPromotedStateLocked(newWatermark+1, false)
+	}
 
 	log.Infof("reassigned IDs for %d timeline items, last ID: %d", len(orderedItems), lastID)
 	return lastID
@@ -1343,22 +1382,17 @@ func (m *Timeline) GetTimelineOutput() []*TimelineItemOutput {
 
 func (m *Timeline) ToTimelineItemOutputLastN(n int) []*TimelineItemOutput {
 	l := m.tsToTimelineItem.Len()
-	if l == 0 {
+	if l == 0 || n <= 0 {
 		return nil
 	}
 
-	var result []*TimelineItemOutput
-	start := l - n
-	if start < 0 {
-		start = 0
-	}
-
-	for i := start; i < l; i++ {
+	result := make([]*TimelineItemOutput, 0, n)
+	for i := l - 1; i >= 0 && len(result) < n; i-- {
 		item, ok := m.tsToTimelineItem.GetByIndex(i)
-		if !ok {
+		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
-		result = append(result, item.ToTimelineItemOutput())
+		result = append([]*TimelineItemOutput{item.ToTimelineItemOutput()}, result...)
 	}
 
 	return result

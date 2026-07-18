@@ -46,7 +46,7 @@ const toolParamAITagActionKeyPrefix = "__aitag__"
 //   - 即使 LLM 不替换、直接照抄字面量输出, ActionMaker 端通过 ExtraNonces
 //     双注册也能命中 (turn nonce + [current-nonce] 同时注册 callback)
 //
-// 必须与渲染侧 (buildinaitools.GetRecentToolsSummary) 与解析侧
+// 必须与渲染侧 (Timeline promoted recent-tool-cache state) 与解析侧
 // (reactloops.syncRecentToolParamAITagFields 注册的 LoopAITagField.ExtraNonces)
 // 保持一致, 否则字面量被改变后任一侧落后都会导致解析丢失.
 //

@@ -25,9 +25,11 @@ type PromptMaterials struct {
 	//   - aireact: SkillsContext
 	//   - aid: PlanHelp / OriginalUserInput / StableInstruction 等 prompt-specific
 	//     但仍属可缓存半动态前缀的内容
-	SkillsContext string
-	// RecentToolsCache 的标签 nonce 稳定, 但正文会随着最近使用工具集合变化。
-	// 因此它属于 timeline-open 易变尾段, 不能放在 semi-2 cache boundary 之前。
+	SkillsContext        string
+	PromotedSemiDynamic1 string
+	// Deprecated: recent-tool prompt visibility is projected from Timeline
+	// promotion state. This field remains only for source compatibility and is
+	// intentionally ignored by all shared templates.
 	RecentToolsCache  string
 	PlanHelp          string
 	OriginalUserInput string
@@ -67,8 +69,7 @@ type PromptMaterials struct {
 	WorkingDir             string
 	WorkingDirGlance       string
 
-	// Deprecated: SessionArtifactsListing 保留给旧测试 / 兼容调用面。新 prompt
-	// 主路径使用 SessionArtifactsFrozen / SessionArtifactsOpen 两个一级字段。
+	// Deprecated: Session Artifacts no longer participate in prompt construction.
 	SessionArtifactsListing string
 	// Deprecated: SessionEvidence 保留给旧调用路径 fallback。新主路径使用
 	// SessionEvidenceFrozen / SessionEvidenceOpen 两个一级字段。
@@ -95,10 +96,11 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"SkillsContext":     m.SkillsContext,
-		"PlanHelp":          m.PlanHelp,
-		"OriginalUserInput": m.OriginalUserInput,
-		"StableInstruction": m.StableInstruction,
+		"SkillsContext":        m.SkillsContext,
+		"PromotedSemiDynamic1": m.PromotedSemiDynamic1,
+		"PlanHelp":             m.PlanHelp,
+		"OriginalUserInput":    m.OriginalUserInput,
+		"StableInstruction":    m.StableInstruction,
 	}
 }
 
@@ -138,7 +140,6 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 		"ForgeInventory":         m.ForgeInventory,
 		"AIForgeList":            m.AIForgeList,
 		"FrozenPartitions":       NormalizeFrozenBlockPartitions(m.FrozenPartitions),
-		"SessionArtifactsFrozen": m.SessionArtifactsFrozen,
 		"SessionEvidenceFrozen":  m.SessionEvidenceFrozen,
 		"TimelineFrozen":         m.TimelineFrozen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
@@ -147,8 +148,8 @@ func (m *PromptMaterials) FrozenBlockData() map[string]any {
 
 // TimelineOpenData 供 timeline-open 模板消费, 模板字段渲染顺序 (P1-C3):
 //
-//	Timeline (Open Tail) -> SessionEvidence -> TodoSnapshot -> RecentToolsCache -> Workspace ->
-//	SessionArtifactsOpen -> UserHistory -> Current Time -> PlanContext (末尾)
+//	Timeline (Open Tail) -> SessionEvidence -> TodoSnapshot -> Workspace ->
+//	UserHistory -> Current Time -> PlanContext (末尾)
 //
 // 段内排序原则:
 //  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
@@ -190,12 +191,10 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 		"SessionEvidence":        sessionEvidenceOpen,
 		"TodoSnapshot":           m.TodoSnapshot,
-		"RecentToolsCache":       m.RecentToolsCache,
 		"Workspace":              m.Workspace,
 		"OSArch":                 m.OSArch,
 		"WorkingDir":             m.WorkingDir,
 		"WorkingDirGlance":       m.WorkingDirGlance,
-		"SessionArtifactsOpen":   m.SessionArtifactsOpen,
 		"UserHistory":            m.UserHistory,
 		"CurrentTime":            m.CurrentTime,
 		"PlanContext":            m.FrozenUserContext,
@@ -203,9 +202,10 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 }
 
 type TimelineFrozenOpenBlocks struct {
-	Frozen         string
-	Open           string
-	FrozenTimeUnix int64
+	Frozen               string
+	Open                 string
+	PromotedSemiDynamic1 string
+	FrozenTimeUnix       int64
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
@@ -213,23 +213,44 @@ func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
 		return TimelineFrozenOpenBlocks{}
 	}
 	rb := timeline.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
+	var sealedBeforeID int64
+	for _, block := range rb {
+		interval, ok := block.(*TimelineIntervalBlock)
+		if !ok || interval == nil || !interval.Open || len(interval.Items) == 0 {
+			continue
+		}
+		sealedBeforeID = interval.Items[0].GetID()
+		break
+	}
+	promotedSemi1, openDeltas := timeline.projectPromoted(sealedBeforeID)
+	open := rb.RenderOpenOnly(TimelineDumpDefaultAITagName)
+	if openDeltas != "" {
+		if open != "" {
+			open += "\n\n"
+		}
+		open += openDeltas
+	}
 	return TimelineFrozenOpenBlocks{
-		Frozen:         rb.RenderFrozenOnly(TimelineDumpDefaultAITagName),
-		Open:           rb.RenderOpenOnly(TimelineDumpDefaultAITagName),
-		FrozenTimeUnix: timelineFrozenTimeUnixFromRenderable(rb),
+		Frozen:               rb.RenderFrozenOnly(TimelineDumpDefaultAITagName),
+		Open:                 open,
+		PromotedSemiDynamic1: promotedSemi1,
+		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
 	}
 }
 
 type PromptFrozenOpenMaterials struct {
 	TimelineFrozen         string
 	TimelineOpen           string
+	PromotedSemiDynamic1   string
 	TimelineFrozenTimeUnix int64
 	FrozenPartitions       []FrozenBlockPartition
-
+	// Deprecated compatibility fields. Prompt construction no longer scans or
+	// renders Session Artifacts.
 	SessionArtifactsFrozen string
 	SessionArtifactsOpen   string
-	SessionEvidenceFrozen  string
-	SessionEvidenceOpen    string
+
+	SessionEvidenceFrozen string
+	SessionEvidenceOpen   string
 }
 
 func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
@@ -241,15 +262,13 @@ func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptF
 		nonce = openNonce[0]
 	}
 	timelineBlocks := RenderTimelineFrozenOpen(config.GetTimeline())
-	artifactBlocks := RenderSessionArtifactsFrozenOpen(config, timelineBlocks.FrozenTimeUnix)
 	evidenceBlocks := config.GetSessionPromptState().GetSessionEvidenceFrozenOpenBlocks(timelineBlocks.FrozenTimeUnix, nonce)
 	return PromptFrozenOpenMaterials{
 		TimelineFrozen:         timelineBlocks.Frozen,
 		TimelineOpen:           timelineBlocks.Open,
+		PromotedSemiDynamic1:   timelineBlocks.PromotedSemiDynamic1,
 		TimelineFrozenTimeUnix: timelineBlocks.FrozenTimeUnix,
 		FrozenPartitions:       FrozenBlockPartitionsFromConfig(config),
-		SessionArtifactsFrozen: artifactBlocks.Frozen,
-		SessionArtifactsOpen:   artifactBlocks.Open,
 		SessionEvidenceFrozen:  evidenceBlocks.Frozen,
 		SessionEvidenceOpen:    evidenceBlocks.Open,
 	}
@@ -261,10 +280,9 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	}
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
+	materials.PromotedSemiDynamic1 = frozenOpen.PromotedSemiDynamic1
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
-	materials.SessionArtifactsFrozen = frozenOpen.SessionArtifactsFrozen
-	materials.SessionArtifactsOpen = frozenOpen.SessionArtifactsOpen
 	materials.SessionEvidenceFrozen = frozenOpen.SessionEvidenceFrozen
 	materials.SessionEvidenceOpen = frozenOpen.SessionEvidenceOpen
 }

@@ -67,9 +67,10 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		// cache tool on successful execution (before satisfaction check)
 		if callErr == nil && result != nil {
 			if cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload); lookupErr == nil {
-				loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
 				if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-					realCfg.SaveRecentToolCache()
+					realCfg.RecordRecentlyUsedTool(cachedTool)
+				} else {
+					loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
 				}
 			}
 		}

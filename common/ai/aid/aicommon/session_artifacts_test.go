@@ -152,11 +152,11 @@ func TestBuildPromptFrozenOpenMaterialsCoordinatesTimelineAndArtifacts(t *testin
 	require.Contains(t, materials.TimelineOpen, "verify-ok")
 	require.Len(t, materials.FrozenPartitions, 1)
 	require.Equal(t, "plan_facts", materials.FrozenPartitions[0].ID)
-	require.Contains(t, materials.SessionArtifactsFrozen, "task_1-1_scan")
-	require.Contains(t, materials.SessionArtifactsOpen, "task_1-2_verify")
+	require.Empty(t, materials.SessionArtifactsFrozen)
+	require.Empty(t, materials.SessionArtifactsOpen)
 }
 
-func TestSessionArtifactsTemplatesPlacement(t *testing.T) {
+func TestSessionArtifactsAreNotRenderedByPromptTemplates(t *testing.T) {
 	materials := &PromptMaterials{
 		SessionArtifactsFrozen: "artifacts_dir: /tmp/session\ntotal_files: 1\n\n### task_1-1_done\n- result.txt (1B, 00:00:00)\n",
 		SessionArtifactsOpen:   "artifacts_dir: /tmp/session\ntotal_files: 1\n\n### task_1-2_open\n- result.txt (1B, 00:00:00)\n",
@@ -170,15 +170,11 @@ func TestSessionArtifactsTemplatesPlacement(t *testing.T) {
 	open, err := RenderPromptTemplate("test-open-artifacts", SharedTimelineOpenTemplate, materials.TimelineOpenData())
 	require.NoError(t, err)
 
-	require.Contains(t, frozen, "# Session Artifacts (Frozen)")
-	require.Contains(t, frozen, "task_1-1_done")
-	require.Contains(t, open, "# Session Artifacts (Open)")
-	require.Contains(t, open, "task_1-2_open")
-	require.NotContains(t, open, "## Session Artifacts")
-
-	workspaceIdx := strings.Index(open, "# Workspace Context")
-	artifactsIdx := strings.Index(open, "# Session Artifacts (Open)")
-	require.Greater(t, artifactsIdx, workspaceIdx)
+	require.NotContains(t, frozen, "Session Artifacts")
+	require.NotContains(t, frozen, "task_1-1_done")
+	require.NotContains(t, open, "Session Artifacts")
+	require.NotContains(t, open, "task_1-2_open")
+	require.Contains(t, open, "# Workspace Context")
 }
 
 func TestPromptTimelineAfterCompression_KeepsQuarterAndSingleHead(t *testing.T) {

@@ -207,13 +207,8 @@ type LoopPromptAssemblyInput struct {
 	ReactiveData   string
 	InjectedMemory string
 
-	// RecentToolsCache 是 CACHE_TOOL_CALL 块的渲染输出 (含 directly_call_tool
-	// routing hint + 最近工具的 schema/footer). 标签 nonce 稳定, 但工具集合正文
-	// 会随任务推进变化, 因此物理位置在 timeline-open 段、最后 cache boundary
-	// 之后, 避免一次工具集合变化击穿 Skills + Schema 的大前缀缓存.
-	//
-	// 关键词: LoopPromptAssemblyInput, RecentToolsCache, timeline-open 易变尾段,
-	//        cache boundary 之后
+	// Deprecated: ignored by prompt assembly. Recent tool schemas are supplied by
+	// Timeline promotion state so they have exactly one prompt source.
 	RecentToolsCache string
 
 	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始

@@ -162,12 +162,10 @@ reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *
 
 **特殊：CACHE_TOOL_CALL**
 
-`generateLoopPrompt` 内部还会自动追加：
-
-- `renderRecentToolRoutingHint(nonce)`：教 LLM 优先用 `directly_call_tool` 命中缓存
-- `tm.GetRecentToolsSummary(...)` 包成 `<|CACHE_TOOL_CALL_<nonce>|>`：列出最近用过的工具及参数
-
-这部分**不需要 loop 关心**，只要 `aiToolManager.HasRecentlyUsedTools()` 为真就自动生效。
+最近工具不再由 `generateLoopPrompt` 每轮独立追加。工具成功执行后会写入 Timeline
+晋升事件：尚未 Seal 时作为 Timeline Open 增量可见，Seal 后物化到 Semi Dynamic 1，
+并以稳定顺序渲染 `<|CACHE_TOOL_CALL_[current-nonce]|>`。重复使用且 Schema 未变化时
+不会改变 Prompt。
 
 ## 3.6 `OutputExample`：输出示例与反思格式
 

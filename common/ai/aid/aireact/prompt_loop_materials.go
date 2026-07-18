@@ -233,10 +233,6 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		// prompt 任何一次 iteration 都能看到当前 TODO 全貌.
 		// 关键词: TodoSnapshot 透传, timeline-open, SessionEvidence 之后
 		materials.TodoSnapshot = input.TodoSnapshot
-		// CACHE_TOOL_CALL 正文会随最近工具集合变化, 放到 timeline-open 尾段,
-		// 保护其前面的 semi-2 cache boundary 不被工具变化击穿。
-		// 关键词: RecentToolsCache 透传, timeline-open, cache boundary 之后
-		materials.RecentToolsCache = input.RecentToolsCache
 		// PE-TASK PLAN 产物 (PARENT_TASK + CURRENT_TASK + INSTRUCTION) 通过
 		// FrozenUserContext 字段透传, 渲染时位于 timeline-open 段最末尾
 		// (UserHistory 之后), 落在所有 cache 边界之外。早期版本曾尝试
@@ -324,38 +320,35 @@ func (pm *PromptManager) AssemblePromptPrefix(materials *aicommon.PromptMaterial
 
 func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) map[string]any {
 	data := map[string]any{
-		"Nonce":                   "",
-		"UserQuery":               "",
-		"TaskInstruction":         "",
-		"OutputExample":           "",
-		"Schema":                  "",
-		"SkillsContext":           "",
-		"ExtraCapabilities":       "",
-		"SessionEvidence":         "",
-		"TodoSnapshot":            "",
-		"ReactiveData":            "",
-		"InjectedMemory":          "",
-		"AllowPlanAndExec":        false,
-		"AllowToolCall":           false,
-		"HasLoadCapability":       false,
-		"ShowForgeInventory":      false,
-		"CurrentTime":             "",
-		"OSArch":                  "",
-		"WorkingDir":              "",
-		"WorkingDirGlance":        "",
-		"SessionArtifactsListing": "",
-		"SessionArtifactsFrozen":  "",
-		"SessionArtifactsOpen":    "",
-		"Workspace":               false,
-		"AutoContext":             "",
-		"UserHistory":             "",
-		"ToolsCount":              0,
-		"TopToolsCount":           0,
-		"TopTools":                []*aitool.Tool{},
-		"HasMoreTools":            false,
-		"ToolInventory":           false,
-		"AIForgeList":             "",
-		"ForgeInventory":          false,
+		"Nonce":              "",
+		"UserQuery":          "",
+		"TaskInstruction":    "",
+		"OutputExample":      "",
+		"Schema":             "",
+		"SkillsContext":      "",
+		"ExtraCapabilities":  "",
+		"SessionEvidence":    "",
+		"TodoSnapshot":       "",
+		"ReactiveData":       "",
+		"InjectedMemory":     "",
+		"AllowPlanAndExec":   false,
+		"AllowToolCall":      false,
+		"HasLoadCapability":  false,
+		"ShowForgeInventory": false,
+		"CurrentTime":        "",
+		"OSArch":             "",
+		"WorkingDir":         "",
+		"WorkingDirGlance":   "",
+		"Workspace":          false,
+		"AutoContext":        "",
+		"UserHistory":        "",
+		"ToolsCount":         0,
+		"TopToolsCount":      0,
+		"TopTools":           []*aitool.Tool{},
+		"HasMoreTools":       false,
+		"ToolInventory":      false,
+		"AIForgeList":        "",
+		"ForgeInventory":     false,
 	}
 	if base != nil {
 		data["Nonce"] = base.Nonce
@@ -377,8 +370,6 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["ToolInventory"] = base.AllowToolCall && base.ToolsCount > 0
 		data["AIForgeList"] = base.AIForgeList
 		data["ForgeInventory"] = base.ShowForgeInventory && strings.TrimSpace(base.AIForgeList) != ""
-		data["SessionArtifactsFrozen"] = base.SessionArtifactsFrozen
-		data["SessionArtifactsOpen"] = base.SessionArtifactsOpen
 	}
 	if input != nil {
 		data["Nonce"] = input.Nonce
@@ -504,13 +495,6 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 	}
 	children = append(children,
 		reactloops.NewPromptSectionObservation(
-			"section.frozen_block.session_artifacts_frozen",
-			"Session Artifacts (Frozen)",
-			reactloops.PromptSectionRoleFrozenBlock,
-			true,
-			renderSessionArtifactsFrozenBlock(materials),
-		),
-		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.session_evidence_frozen",
 			"Session Evidence (Frozen)",
 			reactloops.PromptSectionRoleFrozenBlock,
@@ -593,6 +577,13 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			reactloops.PromptSectionRoleSemiDynamic1,
 			true,
 			materials.SkillsContext,
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_1.promoted_state",
+			"Promoted State",
+			reactloops.PromptSectionRoleSemiDynamic1,
+			true,
+			materials.PromotedSemiDynamic1,
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -682,8 +673,8 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 }
 
 // buildTimelineOpenObservation 给"PROMPT_SECTION_timeline-open 段"做观测树:
-// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + TodoSnapshot + RecentToolsCache + Workspace +
-// SessionArtifactsOpen + UserHistory + Current Time + PlanContext (末尾)。
+// Timeline 末桶 (+ midterm 检索结果) + SessionEvidence + TodoSnapshot + Workspace +
+// UserHistory + Current Time + PlanContext (末尾)。
 //
 // 段内排序原则 (P1-C3 调整):
 //  1. Timeline (Open Tail) 在最前: 时间线最末桶是模型理解"刚发生了什么"的
@@ -694,14 +685,12 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 //  3. TodoSnapshot 紧跟 SessionEvidence, 暴露全局待办状态。
 //  4. Workspace 居中: OS/Arch + working dir + glance 是相对静态的环境标识,
 //     既不属于"刚发生", 也不属于"用户视角", 居中过渡。
-//  5. Session Artifacts (Open) 在 Workspace 之后: 最近 task group 与 root files
-//     仍属易变尾段, 不污染 frozen prefix。
-//  6. User History 在 Artifacts 之后: PREV_USER_INPUT 是用户历史输入轨迹,
+//  5. User History 在 Workspace 之后: PREV_USER_INPUT 是用户历史输入轨迹,
 //     与 Current Time 一起构成"时序前缀", 紧贴当前时间。
-//  7. Current Time 紧跟 User History: 当前时间是最末稳定的时序锚点, 放在
+//  6. Current Time 紧跟 User History: 当前时间是最末稳定的时序锚点, 放在
 //     User History 之后形成"历史输入 -> 现在"的时间递进, 同时与下方
 //     PlanContext (任务规划) 形成"时间 -> 任务"的语义衔接。
-//  8. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换),
+//  7. Plan Context 末尾: PE-TASK PLAN 产物本质易变 (子任务切换),
 //     放最末让其落在所有 cache
 //     边界外, 不污染上游 system / frozen / semi 三段缓存命中率。
 //
@@ -710,7 +699,7 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 //
 // 关键词: buildTimelineOpenObservation, Timeline 末桶, SessionEvidence,
 //
-//	Workspace, SessionArtifactsOpen, UserHistory, Current Time, PlanContext 末尾,
+//	Workspace, UserHistory, Current Time, PlanContext 末尾,
 //	段内排序原则, P1-C3 顺序调整, 缓存边界外
 func (pm *PromptManager) buildTimelineOpenObservation(
 	materials *reactloops.PromptPrefixMaterials,
@@ -759,28 +748,12 @@ func (pm *PromptManager) buildTimelineOpenObservation(
 			true,
 			materials.TodoSnapshot,
 		),
-		// RecentToolsCache 标签使用稳定 nonce, 但正文随最近使用工具集合变化。
-		// 放在最后 cache boundary 之后, 避免工具集合变化导致 semi-2 前缀冷启动。
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.cache_tool_call",
-			"Recent Tool Routing",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			materials.RecentToolsCache,
-		),
 		reactloops.NewPromptSectionObservation(
 			"section.timeline_open.workspace",
 			"Workspace",
 			reactloops.PromptSectionRoleTimelineOpen,
 			true,
 			renderWorkspaceBlock(materials),
-		),
-		reactloops.NewPromptSectionObservation(
-			"section.timeline_open.session_artifacts_open",
-			"Session Artifacts (Open)",
-			reactloops.PromptSectionRoleTimelineOpen,
-			true,
-			renderSessionArtifactsOpenBlock(materials),
 		),
 		// P1-C3: UserHistory 在 Workspace 之后, 与下方 Current Time 共同
 		// 构成"用户输入历史 -> 现在"的时序前缀.
@@ -965,10 +938,8 @@ func renderSchemaBlock(schema string) string {
 
 // renderWorkspaceBlock 渲染 timeline-open 段中 Workspace 子块.
 //
-// SessionArtifacts 已迁出 Workspace，作为 SessionArtifactsFrozen /
-// SessionArtifactsOpen 一级块渲染。Workspace 只保留 OS / working dir / glance。
-//
-// 关键词: renderWorkspaceBlock, Workspace 不再内嵌 Session Artifacts
+// Session Artifacts no longer participate in prompt construction. Workspace
+// only contains OS / working dir / glance.
 func renderWorkspaceBlock(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
@@ -1015,20 +986,6 @@ func renderFrozenPartitionBlock(partition aicommon.FrozenBlockPartition) string 
 		partition.ID,
 		partition.Nonce,
 	)
-}
-
-func renderSessionArtifactsFrozenBlock(materials *reactloops.PromptPrefixMaterials) string {
-	if materials == nil || strings.TrimSpace(materials.SessionArtifactsFrozen) == "" {
-		return ""
-	}
-	return "# Session Artifacts (Frozen)\n" + materials.SessionArtifactsFrozen
-}
-
-func renderSessionArtifactsOpenBlock(materials *reactloops.PromptPrefixMaterials) string {
-	if materials == nil || strings.TrimSpace(materials.SessionArtifactsOpen) == "" {
-		return ""
-	}
-	return "# Session Artifacts (Open)\n" + materials.SessionArtifactsOpen
 }
 
 func renderSessionEvidenceFrozenBlock(materials *reactloops.PromptPrefixMaterials) string {

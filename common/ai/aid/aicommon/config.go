@@ -683,9 +683,9 @@ func newConfig(ctx context.Context) *Config {
 	// NOTE: session_artifacts provider is intentionally NOT registered into
 	// ContextProviderManager. Routing the artifacts listing through Pure
 	// Dynamic / AutoContext flooded the dynamic segment with file metadata
-	// every turn. Prompt materials now render artifacts through first-class
-	// frozen/open blocks via RenderSessionArtifactsFrozenOpen.
-	// 关键词: session_artifacts 反注册, 一级 frozen/open, Pure Dynamic 反污染
+	// every turn. Artifact files remain available to the UI and download paths,
+	// but are intentionally absent from ordinary prompt construction.
+	// 关键词: session_artifacts 反注册, prompt 移除, Pure Dynamic 反污染
 
 	// Initialize emitter
 	config.Emitter = NewEmitter(id, func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
@@ -1335,6 +1335,50 @@ func (c *Config) SaveRecentToolCache() {
 	cacheJSON := tm.ExportRecentToolCache()
 	if err := yakit.UpdateAIAgentRuntimeRecentToolsCache(db, c.PersistentSessionId, cacheJSON); err != nil {
 		log.Warnf("failed to save recent tool cache for session [%s]: %v", c.PersistentSessionId, err)
+	}
+}
+
+// RecordRecentlyUsedTool keeps execution authorization in AiToolManager while
+// recording only prompt-visible mutations in Timeline Open.
+func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.RecentToolCacheMutation {
+	var mutation buildinaitools.RecentToolCacheMutation
+	if c == nil || tool == nil || c.GetAiToolManager() == nil {
+		return mutation
+	}
+	mutation = c.GetAiToolManager().AddRecentlyUsedTool(tool)
+	timeline := c.GetTimeline()
+	if timeline != nil && mutation.Upsert != nil {
+		timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
+			mutation.Upsert.Name, TimelinePromotedOperationUpsert,
+			buildinaitools.RenderRecentToolEntryForPromotion(mutation.Upsert))
+	}
+	if timeline != nil {
+		for _, deleted := range mutation.Deleted {
+			if deleted == nil {
+				continue
+			}
+			timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
+				deleted.Name, TimelinePromotedOperationDelete, "")
+		}
+	}
+	c.SaveRecentToolCache()
+	return mutation
+}
+
+func (c *Config) bootstrapRecentToolsIntoTimeline() {
+	if c == nil || c.GetTimeline() == nil || c.GetAiToolManager() == nil || c.GetTimeline().HasPromotableKind(TimelinePromotedKindRecentTool) {
+		return
+	}
+	entries := c.GetAiToolManager().GetRecentToolEntries()
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		c.GetTimeline().PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
+			entry.Name, TimelinePromotedOperationUpsert, buildinaitools.RenderRecentToolEntryForPromotion(entry))
+	}
+	if len(entries) > 0 {
+		c.GetTimeline().ForcePromoteAll()
 	}
 }
 
@@ -3852,6 +3896,7 @@ func (c *Config) restorePersistentSession() {
 	if runtime.RecentToolsCache != "" {
 		if tm := c.GetAiToolManager(); tm != nil {
 			tm.ImportRecentToolCache(runtime.RecentToolsCache)
+			c.bootstrapRecentToolsIntoTimeline()
 			log.Infof("restored recent tool cache from persistent session [%s]", c.PersistentSessionId)
 		}
 	}
