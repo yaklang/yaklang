@@ -65,6 +65,14 @@ type RecentToolEntry struct {
 	Size          int    `json:"size"`
 }
 
+// RecentToolCacheMutation is the prompt-visible delta caused by an LRU update.
+// Reusing an unchanged tool may still refresh execution-side LRU order, but
+// intentionally returns no Upsert so the prompt prefix remains byte-stable.
+type RecentToolCacheMutation struct {
+	Upsert  *RecentToolEntry
+	Deleted []*RecentToolEntry
+}
+
 // AiToolManager 是工具管理器的默认实现
 type AiToolManager struct {
 	toolsGetter           func() []*aitool.Tool
@@ -532,9 +540,10 @@ func (m *AiToolManager) totalCacheSize() int {
 
 // AddRecentlyUsedTool caches a tool for later directly_call_tool usage.
 // Duplicates are moved to the tail (most recent); FIFO eviction when over budget.
-func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) {
+func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) RecentToolCacheMutation {
+	var mutation RecentToolCacheMutation
 	if tool == nil {
-		return
+		return mutation
 	}
 	m.recentToolsMu.Lock()
 	defer m.recentToolsMu.Unlock()
@@ -547,9 +556,12 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) {
 
 	// remove existing entry with same name (will be re-appended at tail)
 	filtered := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
+	var previous *RecentToolEntry
 	for _, e := range m.recentToolsCache {
 		if e.Name != name {
 			filtered = append(filtered, e)
+		} else {
+			previous = e
 		}
 	}
 	m.recentToolsCache = filtered
@@ -562,11 +574,52 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) {
 		Size:          entrySize,
 	}
 	m.recentToolsCache = append(m.recentToolsCache, newEntry)
+	if previous == nil || previous.Description != newEntry.Description || previous.SchemaSnippet != newEntry.SchemaSnippet || previous.Usage != newEntry.Usage {
+		cp := *newEntry
+		mutation.Upsert = &cp
+	}
 
 	maxTokens := m.getMaxCacheTokens()
 	for m.totalCacheSize() > maxTokens && len(m.recentToolsCache) > 1 {
+		evicted := m.recentToolsCache[0]
 		m.recentToolsCache = m.recentToolsCache[1:]
+		if evicted != nil && evicted.Name != name {
+			cp := *evicted
+			mutation.Deleted = append(mutation.Deleted, &cp)
+		}
 	}
+	return mutation
+}
+
+// GetRecentToolEntries returns a defensive snapshot in execution-side LRU order.
+func (m *AiToolManager) GetRecentToolEntries() []*RecentToolEntry {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	out := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
+	for _, entry := range m.recentToolsCache {
+		if entry == nil {
+			continue
+		}
+		cp := *entry
+		out = append(out, &cp)
+	}
+	return out
+}
+
+// RenderRecentToolEntryForPromotion renders one stable, params-only schema.
+// Collection ordering and the shared routing instructions are owned by the
+// Timeline promoted-state projection.
+func RenderRecentToolEntryForPromotion(entry *RecentToolEntry) string {
+	if entry == nil {
+		return ""
+	}
+	return strings.TrimSpace(utils.MustRenderTemplate(recentToolEntryTemplate, map[string]interface{}{
+		"Name":                 entry.Name,
+		"Nonce":                RecentToolCacheStableNonce,
+		"Description":          entry.Description,
+		"DisplaySchemaSnippet": renderDirectlyCallParamsSchema(entry.SchemaSnippet),
+		"Usage":                entry.Usage,
+	}))
 }
 
 func (m *AiToolManager) IsRecentlyUsedTool(name string) bool {

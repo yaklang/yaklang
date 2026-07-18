@@ -122,7 +122,7 @@ func TestReAct_DirectlyCallTool_Basic(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			if isPrimaryDecisionPrompt(r.GetPrompt()) {
-				require.Contains(t, r.GetPrompt(), "If the exact tool you need is already listed in CACHE_TOOL_CALL, prefer directly_call_tool for faster execution.")
+				require.Contains(t, r.GetPrompt(), "If the exact tool you need is already listed above, prefer directly_call_tool for faster execution.")
 			}
 			return mockedDirectlyCallTool(i, r, "sleep_test")
 		}),
@@ -135,7 +135,7 @@ func TestReAct_DirectlyCallTool_Basic(t *testing.T) {
 	require.NoError(t, err)
 
 	// pre-populate the cache so directly_call_tool is available
-	react.config.GetAiToolManager().AddRecentlyUsedTool(sleepTool)
+	react.config.RecordRecentlyUsedTool(sleepTool)
 
 	go func() {
 		in <- &ypb.AIInputEvent{
@@ -208,7 +208,7 @@ func TestReAct_DirectlyCallTool_LegacyWrappedParams(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	react.config.GetAiToolManager().AddRecentlyUsedTool(sleepTool)
+	react.config.RecordRecentlyUsedTool(sleepTool)
 
 	go func() {
 		in <- &ypb.AIInputEvent{
@@ -284,7 +284,7 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	react.config.GetAiToolManager().AddRecentlyUsedTool(bashTool)
+	react.config.RecordRecentlyUsedTool(bashTool)
 
 	go func() {
 		in <- &ypb.AIInputEvent{

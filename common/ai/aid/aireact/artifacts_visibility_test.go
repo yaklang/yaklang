@@ -199,7 +199,8 @@ WAIT_SECOND:
 		}
 	}
 
-	// Verify the prompt from the second input contains the artifacts information
+	// Artifact files remain available through directory/UI surfaces, while the
+	// recursive listing is intentionally absent from subsequent prompts.
 	promptMu.Lock()
 	defer promptMu.Unlock()
 
@@ -209,18 +210,10 @@ WAIT_SECOND:
 
 	secondPrompt := capturedPrompts[len(capturedPrompts)-1]
 
-	assert.Contains(t, secondPrompt, "Session Artifacts",
-		"subsequent conversation prompt should still surface Session Artifacts as a first-class prompt block")
-	assert.Contains(t, secondPrompt, "task_1-1_network_scan",
-		"subsequent conversation prompt should contain task_1-1 directory name")
-	assert.Contains(t, secondPrompt, "task_1-2_vuln_analysis",
-		"subsequent conversation prompt should contain task_1-2 directory name")
-	assert.Contains(t, secondPrompt, "1_bash_nmap_scan.md",
-		"subsequent conversation prompt should contain tool call filename")
-	assert.Contains(t, secondPrompt, "task_1_1_network_scan_timeline_diff.txt",
-		"subsequent conversation prompt should contain timeline diff filename")
-	assert.Contains(t, secondPrompt, "task_1_1_network_scan_result_summary.txt",
-		"subsequent conversation prompt should contain result summary filename")
+	assert.NotContains(t, secondPrompt, "Session Artifacts")
+	assert.NotContains(t, secondPrompt, "1_bash_nmap_scan.md")
+	assert.NotContains(t, secondPrompt, "task_1_1_network_scan_timeline_diff.txt")
+	assert.NotContains(t, secondPrompt, "task_1_1_network_scan_result_summary.txt")
 
 	// 反向断言: Pure Dynamic / AutoContext 段对应的 <|AUTO_PROVIDE_CTX_*|> tag
 	// 不应再含 Session Artifacts; 通过裁切验证: 若 Session Artifacts
@@ -235,30 +228,11 @@ WAIT_SECOND:
 		}
 	}
 
-	// Workspace 与 Session Artifacts 都在 timeline-open 段, 但 Artifacts 是
-	// Workspace 后面的一级块，不再作为 Workspace 子段。
-	wsIdx := strings.Index(secondPrompt, "# Workspace Context")
-	saIdx := strings.Index(secondPrompt, "# Session Artifacts (Open)")
-	if wsIdx >= 0 && saIdx >= 0 {
-		assert.Greater(t, saIdx, wsIdx,
-			"Session Artifacts should render after Workspace Context")
-		assert.NotContains(t, secondPrompt[wsIdx:saIdx], "## Session Artifacts",
-			"Workspace Context must not contain the legacy Session Artifacts subsection")
-	}
-
-	t.Logf("artifacts section found in prompt (extracting Workspace portion):")
-	if idx := strings.Index(secondPrompt, "Session Artifacts"); idx >= 0 {
-		end := idx + 2000
-		if end > len(secondPrompt) {
-			end = len(secondPrompt)
-		}
-		t.Logf("%s", secondPrompt[idx:end])
-	}
 }
 
-// TestArtifactsVisibility_TimelineContainsArtifactsSummary verifies that after plan/forge
-// execution, the timeline contains an artifacts_summary entry with the directory structure.
-func TestArtifactsVisibility_TimelineContainsArtifactsSummary(t *testing.T) {
+// TestArtifactsVisibility_ArtifactsStayOutOfTimeline verifies that plan artifacts
+// remain on disk and pinned without leaking a recursive listing into prompt-visible Timeline.
+func TestArtifactsVisibility_ArtifactsStayOutOfTimeline(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 200)
 
@@ -333,20 +307,20 @@ WAIT:
 		}
 	}
 
-	// Check timeline for artifacts_summary entry
+	// The filesystem/UI surface survives, but the prompt-visible timeline does not
+	// receive a mechanical artifact summary.
 	timeline := reactIns.config.Timeline
 	require.NotNil(t, timeline)
 
 	timelineDump := timeline.Dump()
 	t.Logf("timeline dump:\n%s", utils.ShrinkString(timelineDump, 2000))
 
-	assert.Contains(t, timelineDump, "artifacts_summary",
-		"timeline should contain artifacts_summary entry after plan completion")
-
-	// The timeline should contain the actual workdir path
+	assert.NotContains(t, timelineDump, "artifacts_summary")
 	workDir := reactIns.config.GetOrCreateWorkDir()
-	assert.Contains(t, timelineDump, workDir,
-		"timeline should contain the artifacts directory path")
+	assert.NotContains(t, timelineDump, workDir)
+	assert.True(t, reactIns.config.IsArtifactsPinned())
+	_, statErr := os.Stat(filepath.Join(workDir, "task_1-1_timeline_test", "result.txt"))
+	require.NoError(t, statErr)
 }
 
 // TestArtifactsVisibility_EmitPinDirectory verifies that EmitPinDirectory is called

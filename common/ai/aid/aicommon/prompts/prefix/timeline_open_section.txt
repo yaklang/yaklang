@@ -4,6 +4,9 @@
 请把它作为"目前已经做了什么"的事实依据：判断任务进度、确认已经尝试过哪些路径、避免重复发起同一工具调用。若条目以 "midterm-memory:" 起头，则是引擎按当前主题从更早的归档时间线中召回的相关旧片段，不是本回合新发生的事件。
 
 {{ .TimelineOpen }}{{ end }}
+{{ if .PromotedTimelineOpen }}
+
+{{ .PromotedTimelineOpen }}{{ end }}
 
 {{ if .SessionEvidence }}
 
@@ -19,11 +22,6 @@
 {{ .TodoSnapshot }}
 {{ end }}
 
-{{ if .RecentToolsCache }}
-
-{{ .RecentToolsCache }}
-{{ end }}
-
 {{ if .Workspace }}# Workspace Context
 
 工作区上下文给出 Agent 当前运行环境的"物理坐标"：操作系统 / 架构、当前工作目录的绝对路径、该目录顶层结构概览。
@@ -33,9 +31,6 @@ OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}
 {{ end }}{{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}
 {{ end }}{{ end }}
-
-{{ if .SessionArtifactsOpen }}# Session Artifacts (Open)
-{{ .SessionArtifactsOpen }}{{ end }}
 
 {{ if .UserHistory }}
 以下 PREV_USER_INPUT 块是当前会话内用户在此前各轮的原始输入文本，按时间先后给出，用于跨回合维持上下文连贯：理解用户的真实意图、追溯尚未完成的请求、避免反复询问用户早已明确说过的信息。

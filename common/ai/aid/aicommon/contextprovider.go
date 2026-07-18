@@ -461,8 +461,8 @@ const ArtifactsContextMaxTokens = 8 * 1024
 
 // ArtifactsContextProvider is a thin wrapper around RenderSessionArtifactsListing
 // that adds the legacy "# Session Artifacts" heading expected by older callers
-// and existing tests. New prompt code should call RenderSessionArtifactsFrozenOpen
-// and render artifacts as first-class frozen/open blocks.
+// and existing tests. New prompt code must not call it during ordinary prompt
+// construction; artifact files remain accessible through UI/download surfaces.
 //
 // Deprecated: this provider used to be registered into ContextProviderManager
 // (which routed it into Pure Dynamic / AutoContext). That registration has been

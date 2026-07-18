@@ -55,6 +55,36 @@ func TestRecentToolCache_Dedup(t *testing.T) {
 	assert.Equal(t, len(names), 1, "duplicate adds should not create multiple entries")
 }
 
+func TestRecentToolCacheMutationOnlyChangesPromptStateWhenContentChanges(t *testing.T) {
+	mgr := newManagerWithCache(0)
+	original := makeTool("read_file", "Read file", aitool.WithStringParam("path"))
+	first := mgr.AddRecentlyUsedTool(original)
+	assert.Check(t, first.Upsert != nil)
+	assert.Equal(t, len(first.Deleted), 0)
+
+	repeated := mgr.AddRecentlyUsedTool(original)
+	assert.Check(t, repeated.Upsert == nil, "unchanged LRU touch must not mutate prompt state")
+	assert.Equal(t, len(repeated.Deleted), 0)
+
+	changed := makeTool("read_file", "Read file", aitool.WithStringParam("path"), aitool.WithBoolParam("raw"))
+	updated := mgr.AddRecentlyUsedTool(changed)
+	assert.Check(t, updated.Upsert != nil, "schema change must emit upsert")
+	assert.Check(t, strings.Contains(RenderRecentToolEntryForPromotion(updated.Upsert), `"raw"`))
+}
+
+func TestRecentToolCacheMutationReportsEviction(t *testing.T) {
+	probeMgr := newManagerWithCache(0)
+	probe := makeTool("probe", "same", aitool.WithStringParam("x"))
+	probeMgr.AddRecentlyUsedTool(probe)
+	mgr := newManagerWithCache(probeMgr.totalCacheSize() + 5)
+
+	mgr.AddRecentlyUsedTool(makeTool("first", "same", aitool.WithStringParam("x")))
+	mutation := mgr.AddRecentlyUsedTool(makeTool("second", "same", aitool.WithStringParam("x")))
+	assert.Check(t, mutation.Upsert != nil)
+	assert.Equal(t, len(mutation.Deleted), 1)
+	assert.Equal(t, mutation.Deleted[0].Name, "first")
+}
+
 func TestRecentToolCache_SizeLimit(t *testing.T) {
 	// measure a single entry size first
 	probe := makeTool("probe", "probe description",

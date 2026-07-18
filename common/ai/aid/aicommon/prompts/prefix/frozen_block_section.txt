@@ -32,9 +32,6 @@ You have access to {{ .ToolsCount }} built-in tools. Below are {{ .TopToolsCount
 {{ end }}
 {{ end }}
 
-{{ if .SessionArtifactsFrozen }}# Session Artifacts (Frozen)
-{{ .SessionArtifactsFrozen }}{{ end }}
-
 {{ if .SessionEvidenceFrozen }}# Session Evidence (Frozen)
 {{ .SessionEvidenceFrozen }}{{ end }}
 

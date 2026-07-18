@@ -128,7 +128,9 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		parent.idToTimelineItem.OrderInsert(active.id, active.item, lessInt64)
 		parent.idToTs.Set(active.id, ts)
 		parent.tsToTimelineItem.OrderInsert(ts, active.item, lessInt64)
-		result.ActiveItemsMerged++
+		if !isPromotableTimelineItem(active.item) {
+			result.ActiveItemsMerged++
+		}
 	}
 
 	if compressedHead != nil && compressedHead.head != nil {

@@ -156,12 +156,13 @@ func PreloadSingleRecommendedTool(loop *ReActLoop, recommendedCaps []string) boo
 	if err != nil || tool == nil {
 		return false
 	}
-	mgr.AddRecentlyUsedTool(tool)
-	if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
-		realCfg.SaveRecentToolCache()
-	}
 	if invoker := loop.GetInvoker(); invoker != nil {
 		invoker.AddToTimeline("recent_tool_preloaded", fmt.Sprintf("精准推荐仅命中一个工具，已自动加入最近工具缓存: %s", toolName))
+	}
+	if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
+		realCfg.RecordRecentlyUsedTool(tool)
+	} else {
+		mgr.AddRecentlyUsedTool(tool)
 	}
 	return true
 }

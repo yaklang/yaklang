@@ -189,12 +189,12 @@ LOOP:
 }
 
 // TestReAct_PersistentSession_WorkDir tests that Session Artifacts (WorkDir) persist
-// across persistent sessions, just like Timeline does. It runs a full Plan execution
+// across persistent sessions without being injected into Timeline. It runs a full Plan execution
 // in Session 1 that produces artifacts, then creates Session 2 with the same
 // persistent session ID and verifies that:
 // 1. The WorkDir is restored (same path as Session 1)
 // 2. Plan-produced artifact files are accessible
-// 3. Timeline with artifacts_summary is restored
+// 3. Mechanical artifact summaries remain absent from Timeline
 // 4. The new runtime's DB record has the restored WorkDir
 // 5. A session without persistent ID gets no WorkDir
 func TestReAct_PersistentSession_WorkDir(t *testing.T) {
@@ -341,8 +341,8 @@ WAIT_PLAN:
 	_, err = os.Stat(filepath.Join(session1WorkDir, "task_1-2_vuln_analysis"))
 	require.NoError(t, err, "task_1-2_vuln_analysis dir should exist in session 1 WorkDir")
 
-	// Note: artifacts_summary in timeline is timing-dependent due to save throttle (3s).
-	// This is separately tested by TestArtifactsVisibility_TimelineContainsArtifactsSummary.
+	assert.NotContains(t, reactIns.DumpTimeline(), "artifacts_summary",
+		"mechanical artifact summaries must stay out of Timeline")
 
 	// Verify Session 1 WorkDir is saved in DB
 	runtime1, err := yakit.GetLatestAIAgentRuntimeByPersistentSession(consts.GetGormProjectDatabase(), pid)
@@ -406,14 +406,9 @@ WAIT_PLAN:
 	// Verify: Timeline is restored from persistent session
 	require.True(t, ins2.getTimelineTotal() > 0,
 		"session 2 should have restored timeline items from persistent session")
-	// Note: artifacts_summary content in timeline is timing-dependent (save throttle is 3s).
-	// The content assertion is covered by TestArtifactsVisibility_TimelineContainsArtifactsSummary.
 	session2Timeline := ins2.DumpTimeline()
-	if strings.Contains(session2Timeline, "artifacts_summary") {
-		log.Infof("restored timeline contains artifacts_summary (throttle flush completed)")
-	} else {
-		log.Infof("restored timeline does not contain artifacts_summary (throttle flush may not have completed, acceptable)")
-	}
+	assert.NotContains(t, session2Timeline, "artifacts_summary",
+		"restored Timeline must not contain mechanical artifact summaries")
 
 	// === Session 3: Create instance WITHOUT persistent session ===
 	in3 := make(chan *ypb.AIInputEvent, 10)

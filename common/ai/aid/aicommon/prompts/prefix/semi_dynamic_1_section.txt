@@ -1,1 +1,4 @@
 {{ if .SkillsContext }}{{ .SkillsContext }}{{ end }}
+{{ if .PromotedSemiDynamic1 }}
+
+{{ .PromotedSemiDynamic1 }}{{ end }}
