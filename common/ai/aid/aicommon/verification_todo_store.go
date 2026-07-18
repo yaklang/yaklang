@@ -109,10 +109,10 @@ func (s *VerificationTodoStore) Clone() *VerificationTodoStore {
 }
 
 // VerificationTodoApplyResult reports the outcome of applying one
-// next_movements op under the supplied task scope. Every movement yields a
-// result entry — successful or not — so callers can render a uniform per-op
-// summary instead of only seeing the failures. When Success is false, Reason
-// carries the human-readable failure explanation.
+// next_movements op under the supplied task scope. Applied movements and real
+// failures yield result entries so callers can render a uniform per-op summary.
+// Idempotent DOING heartbeats are intentionally omitted. When Success is false,
+// Reason carries the human-readable failure explanation.
 //
 // 关键词: VerificationTodoApplyResult, Success, per-op 结果, 方便结果输出
 type VerificationTodoApplyResult struct {
@@ -216,13 +216,14 @@ func FormatVerificationTodoApplyErrors(results []VerificationTodoApplyResult) st
 // 吞掉. 成功应用的 op 以 Success=true 的结果条目返回, 让调用方可以做统一的
 // per-op 结果输出 (见 FormatVerificationTodoApplyResults).
 //
-// 冗余更新视为失败: 当一个 op 应用前后 TODO 的状态 (status / content) 完全
+// 冗余更新通常视为失败: 当一个 op 应用前后 TODO 的状态 (status / content) 完全
 // 不变时, 视为冗余更新, 返回 Success=false 并给出 "redundant <op>: ..." 的
 // Reason, 不推进 UpdatedAt. 典型场景: 重复 add 同 id 同 content 的 PENDING
 // 任务、对已经 DONE 的 TODO 再次 done、对已经 DELETED / SKIPPED 的 TODO 再次
-// delete / skip. 这让调用方可以识别"AI 没有实际推进 TODO"的空转轮次.
+// delete / skip. 唯一例外是重复 doing/pending: 它只是无害的进行中状态心跳,
+// Apply 会静默丢弃, 不生成成功或失败噪声.
 //
-// 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip, per-op 结果, 冗余更新即失败
+// 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip, per-op 结果, redundant doing 静默
 func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
 	if s == nil {
 		return nil
@@ -246,6 +247,12 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 			result = s.applyAdd(movement, scope, id, roundIndex)
 		case "doing", "pending":
 			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDoing, true, roundIndex)
+			// Reasserting DOING without changing content is an idempotent heartbeat,
+			// not a failed movement. Drop it entirely so it produces neither
+			// `FAILED DOING[...]` nor an equally-unhelpful success line.
+			if !result.Success && result.Reason == redundantTodoMutationReason(VerificationTodoStatusDoing) {
+				continue
+			}
 		case "done":
 			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDone, false, roundIndex)
 		case "delete":

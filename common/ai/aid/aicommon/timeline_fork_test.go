@@ -113,6 +113,39 @@ func TestTimelineFork_ConvertConfigToOptionsSharesSeqIdProvider(t *testing.T) {
 	require.Greater(t, id2, id1)
 }
 
+func TestTimelineFork_RenderKeepsMergedTaskBoundariesWithoutRepeatingItemLabels(t *testing.T) {
+	parent := NewTimeline(nil, nil)
+	parent.PushText(1, "[doing] [task:task-root]:\nroot")
+
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true), WithSequence(100))
+	firstFork, err := parent.ForkForTask("1-1", "first", cfg, cfg)
+	require.NoError(t, err)
+	secondFork, err := parent.ForkForTask("1-2", "second", cfg, cfg)
+	require.NoError(t, err)
+
+	firstID := cfg.AcquireId()
+	secondID := cfg.AcquireId()
+	firstFork.Branch.PushText(firstID, "[doing] [task:task-child-a]:\nchild-a")
+	secondFork.Branch.PushText(secondID, "[doing] [task:task-child-b]:\nchild-b")
+	_, err = firstFork.MergeBack()
+	require.NoError(t, err)
+	_, err = secondFork.MergeBack()
+	require.NoError(t, err)
+
+	rendered := parent.GroupByMinutesAndBytes(3, -1).GetBlocks().Render("TIMELINE")
+	require.Equal(t, 1, strings.Count(rendered, "task-root"))
+	require.Equal(t, 1, strings.Count(rendered, "task-child-a"))
+	require.Equal(t, 1, strings.Count(rendered, "task-child-b"))
+	require.NotContains(t, rendered, "[task:")
+
+	parent.mu.RLock()
+	mergedItem, ok := parent.idToTimelineItem.Get(firstID)
+	parent.mu.RUnlock()
+	require.True(t, ok)
+	require.Equal(t, "task-child-a", ParseTimelineItemHumanReadable(mergedItem).TaskID,
+		"fork merge and structured TaskID parsing must remain untouched")
+}
+
 func TestTimelineFork_InheritedCompressedHeadNotMerged(t *testing.T) {
 	parent := NewTimeline(nil, nil)
 	parent.PushText(1, "parent-A")

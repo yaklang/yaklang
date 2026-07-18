@@ -20,15 +20,26 @@ func TestByteBucket_EstimateMatchesRender(t *testing.T) {
 	blocks := tl.GroupByMinutesAndBytes(3, 20000).GetBlocks()
 	require.GreaterOrEqual(t, len(blocks), 1)
 	for _, b := range blocks {
-		est := intervalBlockHeaderByteLen(b.BucketStart, b.BucketEnd, b.IntervalMinutes)
-		first := true
-		for _, it := range b.Items {
-			est += timelineEntryAppendByteLen(it, b.BucketStart, first)
-			first = false
-		}
 		rendered := b.Render()
-		require.Equal(t, len(rendered), est, "estimate must match Render byte length for block")
+		require.Equal(t, len(rendered), timelineIntervalBlockRenderedByteLen(b), "estimate must match Render byte length for block")
 	}
+}
+
+func TestByteBucket_TaskContextCarriedIntoToolFirstSubBucket(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	text := &TextTimelineItem{ID: 1, Text: "[doing] [task:task-a]:\n" + strings.Repeat("A", 4000)}
+	injectTimelineItem(tl, 1, base.Add(10*time.Second), text)
+	injectTimelineItem(tl, 2, base.Add(20*time.Second), makeToolResult(2, "scan", true, strings.Repeat("B", 4000)))
+
+	blocks := tl.GroupByMinutesAndBytes(3, 5000).GetBlocks()
+	require.Len(t, blocks, 2)
+	require.Contains(t, strings.Split(blocks[0].Render(), "\n")[0], "task=task-a")
+	require.Contains(t, strings.Split(blocks[1].Render(), "\n")[0], "task=task-a",
+		"a sub-bucket beginning with a tool result must inherit the preceding task context")
+	require.Contains(t, blocks[1].Render(), "[tool/scan ok]")
+	require.NotContains(t, blocks[0].Render(), "[task:task-a]")
+	require.Contains(t, text.Text, "[task:task-a]", "render-only optimization must preserve the stored event")
 }
 
 func TestByteBucket_NoSplitWhenUnderK(t *testing.T) {

@@ -300,7 +300,13 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 
 	// Always attach the param-gen builder so fallbackToRequire can reuse this card
 	// and switch to the AI param-generation path.
-	toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, true)
+	toolCaller, err := r.newToolCallerForCall(
+		ctx,
+		currentTask,
+		toolName,
+		true,
+		aicommon.WithToolCaller_OmitResultParamsInTimeline(),
+	)
 	if err != nil {
 		return nil, false, err
 	}

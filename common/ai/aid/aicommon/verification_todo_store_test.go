@@ -146,9 +146,9 @@ func TestVerificationTodoStore_Apply_RedundantUpdateIsFailure(t *testing.T) {
 		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
 			{Op: "doing", ID: "x"},
 		})
-		require.Len(t, results, 1)
-		require.False(t, results[0].Success)
-		require.Contains(t, results[0].Reason, "redundant doing")
+		require.Empty(t, results, "redundant doing should be silently ignored")
+		require.Empty(t, FormatVerificationTodoApplyResults(results))
+		require.Empty(t, FormatVerificationTodoApplyErrors(results))
 	})
 
 	t.Run("doing with new content is not redundant", func(t *testing.T) {

@@ -1,12 +1,35 @@
 package aitool
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+func TestToolResult_DumpTimelineItem_ParamsOption(t *testing.T) {
+	tr := &ToolResult{
+		Name:  "direct_tool",
+		Param: map[string]any{"secret_marker": "only-once"},
+		Data:  map[string]any{"result": "ok"},
+	}
+
+	withParams := bytes.NewBuffer(nil)
+	tr.DumpTimelineItem(withParams)
+	require.Contains(t, withParams.String(), "param:")
+	require.Contains(t, withParams.String(), "secret_marker")
+
+	withoutParams := bytes.NewBuffer(nil)
+	tr.DumpTimelineItem(withoutParams, WithToolResultDumpParams(false))
+	require.NotContains(t, withoutParams.String(), "param:")
+	require.NotContains(t, withoutParams.String(), "secret_marker")
+	require.Contains(t, withoutParams.String(), "result:")
+
+	tr.OmitParamsInTimeline = true
+	require.Equal(t, withoutParams.String(), tr.String())
+}
 
 // TestToolResult_String_YAMLParamFlushLeft 验证 ToolResult.String() 的 yaml param
 // 块顶层 key 顶头 (无外层 "  " 缩进), 节省 prompt token; yaml 自身的 block scalar
