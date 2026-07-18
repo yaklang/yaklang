@@ -188,7 +188,14 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 }
 
 type LoopPromptAssemblyInput struct {
-	Nonce             string
+	Nonce string
+
+	// Lightweight selects the bounded speed-priority projection: the full
+	// frozen session history is replaced by a recent Timeline window and large
+	// auxiliary context fields are capped. The action schema remains intact so
+	// execution semantics do not change.
+	Lightweight bool
+
 	UserQuery         string
 	TaskInstruction   string
 	OutputExample     string

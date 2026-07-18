@@ -427,6 +427,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"provider_name":           provider,
 					"cache_hit_token":         cacheHitTokens,
 					"token_source":            usageMetrics.TokenSource,
+					"caller_label":            callerLabel,
 				})
 				c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
 					"ms":                      du.Milliseconds(),

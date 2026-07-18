@@ -17,17 +17,15 @@ var selfReflectionTemplate string
 // buildReflectionPrompt 构建反思 prompt.
 //
 // 设计要点:
-//   - 反思 prompt 的"前缀"(high-static + frozen-block + timeline-open) 直接
-//     复用主循环最近一次 prompt 的对应段, 用同一套 boundary 标签 (AI_CACHE_SYSTEM /
-//     AI_CACHE_FROZEN / PROMPT_SECTION) 套回, 字节对齐, 享受 LLM provider 侧
-//     的 prefix cache 命中, 显著降低反思 AI 调用的 token 成本与首字延迟.
+//   - 反思走 speed-priority 模型，只读取受硬预算约束的最近 Timeline，不继承
+//     主循环的 high-static / frozen-block 全会话前缀。
 //   - 反思特有内容 (action 详情 + SPIN 检测信息 + 输出 schema) 单独走 dynamic
-//     段, 用反思 goroutine 自己的 nonce 包裹, 不影响 prefix cache.
+//     段, 用反思 goroutine 自己的 nonce 包裹。
 //   - 去掉了历史的 RelevantMemories / PreviousReflections / EnvironmentalImpact
 //     大段, 减少 cache 杀手 — SPIN 决策的核心依据是 timeline-open + 最近 action
 //     历史, 这两者已经在 prefix + dynamic 段里覆盖.
 //
-// 关键词: buildReflectionPrompt, prefix cache 复用, dynamic 段隔离,
+// 关键词: buildReflectionPrompt, speed-priority, recent timeline, dynamic 段隔离,
 //
 //	反思 prompt 精简
 func (r *ReActLoop) buildReflectionPrompt(
@@ -61,13 +59,14 @@ func (r *ReActLoop) buildReflectionPrompt(
 		return "", utils.Wrap(err, "render self-reflection template failed")
 	}
 
-	// 复用主循环最近一次 prompt 的 high-static / frozen-block / timeline-open
-	// 三段, 与主循环保持字节对齐. semi-dynamic 段反思场景不需要, 留空让
-	// BuildTaggedPromptSections 自然过滤.
-	highStatic, frozenBlock, timelineOpen := r.getCachedPrefixBodies()
+	const reflectionRecentTimelineTokens = 4096
+	timelineOpen := ""
+	if cfg, ok := r.GetConfig().(interface{ GetTimeline() *aicommon.Timeline }); ok && cfg.GetTimeline() != nil {
+		timelineOpen = cfg.GetTimeline().DumpRecentForPrompt(reflectionRecentTimelineTokens)
+	}
 	prompt := aicommon.BuildTaggedPromptSections(
-		highStatic,
-		frozenBlock,
+		"",
+		"",
 		"", // semi-dynamic-1 (反思不需要 SkillsContext)
 		"", // semi-dynamic-2 (反思不需要主循环的 TaskInstruction / Schema)
 		timelineOpen,

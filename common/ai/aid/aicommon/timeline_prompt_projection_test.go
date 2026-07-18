@@ -99,6 +99,42 @@ func TestTimelinePromptProjectionKeepsRealAndDropsOnlyRedundantErrorLines(t *tes
 	require.Nil(t, projectTimelineItemForPrompt(onlyRedundant))
 }
 
+func TestTimelineDumpRecentForPromptKeepsNewestCompleteItemsWithinBudget(t *testing.T) {
+	base := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
+	tl := NewTimeline(nil, nil)
+	injectTimelineItem(tl, 1, base, &TextTimelineItem{ID: 1, Text: "[note]:\nANCIENT " + strings.Repeat("old ", 3000)})
+	injectTimelineItem(tl, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[NEXT_MOVEMENTS]:\nDROP_BOOKKEEPING"})
+	injectTimelineItem(tl, 3, base.Add(2*time.Second), &TextTimelineItem{ID: 3, Text: "[note]:\nRECENT_FACT_ONE"})
+	injectTimelineItem(tl, 4, base.Add(3*time.Second), &TextTimelineItem{ID: 4, Text: "[note]:\nRECENT_FACT_TWO"})
+
+	const budget = 128
+	prompt := tl.DumpRecentForPrompt(budget)
+	require.LessOrEqual(t, MeasureTokens(prompt), budget)
+	require.Contains(t, prompt, "<|TIMELINE_RECENT|>")
+	require.Contains(t, prompt, "RECENT_FACT_ONE")
+	require.Contains(t, prompt, "RECENT_FACT_TWO")
+	require.NotContains(t, prompt, "ANCIENT")
+	require.NotContains(t, prompt, "DROP_BOOKKEEPING")
+
+	// Prompt projection must not modify the raw Timeline.
+	raw := tl.Dump()
+	require.Contains(t, raw, "ANCIENT")
+	require.Contains(t, raw, "DROP_BOOKKEEPING")
+}
+
+func TestTimelineDumpRecentForPromptBoundsOversizedNewestItem(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	injectTimelineItem(tl, 1, time.Now(), &TextTimelineItem{
+		ID: 1, Text: "[tool_result]:\nHEAD " + strings.Repeat("payload ", 5000) + " TAIL",
+	})
+
+	const budget = 96
+	prompt := tl.DumpRecentForPrompt(budget)
+	require.LessOrEqual(t, MeasureTokens(prompt), budget)
+	require.Contains(t, prompt, "HEAD")
+	require.Contains(t, prompt, "TAIL")
+}
+
 func TestTimelineBatchReducerPromptUsesProjectionWithoutRewritingToolData(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	toCompress := []*TimelineItem{

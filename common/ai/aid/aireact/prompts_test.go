@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -1358,6 +1359,42 @@ func TestGenerateIntervalReviewPrompt_IncludesConcreteStringGuidance(t *testing.
 	) {
 		t.Fatalf("interval review prompt should contain anti-schema guidance and concrete example. Got:\n%s", prompt)
 	}
+}
+
+func TestGenerateIntervalReviewPrompt_UsesOnlyBoundedRecentTimeline(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"interval-toolcall-review","decision":"continue"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	react.AddToTimeline("note", "ANCIENT_INTERVAL_CONTEXT "+strings.Repeat("old ", 12000))
+	react.AddToTimeline("note", "RECENT_INTERVAL_FACT")
+
+	tool := aitool.NewWithoutCallback(
+		"network_diagnose",
+		aitool.WithDescription(strings.Repeat("description ", 4000)),
+		aitool.WithStringParam("target"),
+	)
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool,
+		aitool.InvokeParams{"target": strings.Repeat("127.0.0.1 ", 4000)},
+		[]byte(strings.Repeat("stdout ", 4000)),
+		[]byte(strings.Repeat("stderr ", 4000)),
+		time.Unix(0, 0),
+		1,
+		strings.Repeat("expectation ", 4000),
+	)
+	require.NoError(t, err)
+	require.Contains(t, prompt, "RECENT_INTERVAL_FACT")
+	require.NotContains(t, prompt, "ANCIENT_INTERVAL_CONTEXT")
+	require.NotContains(t, prompt, "Timeline Memory (Frozen)")
+	promptTokens := aicommon.MeasureTokens(prompt)
+	t.Logf("bounded interval-review prompt tokens: %d", promptTokens)
+	require.LessOrEqual(t, promptTokens, 9000)
 }
 
 func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {

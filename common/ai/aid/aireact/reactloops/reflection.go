@@ -291,11 +291,9 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 	task := r.GetCurrentTask()
 	nonce := utils.RandStringBytes(4)
 
-	// 反思 prompt 构建: 复用主循环 prefix cache (high-static / frozen-block /
-	// timeline-open), dynamic 段只放反思特有内容 (action 详情 + SPIN + schema).
-	// 去掉 RelevantMemories / PreviousReflections — 它们是 cache 杀手, 且 SPIN
-	// 决策的真正依据已经在 timeline-open + action 历史里覆盖.
-	// 关键词: 反思 prompt 复用 prefix cache, 去内存噪声
+	// 反思 prompt 构建: speed-priority 路径只带受限的最近 Timeline，dynamic
+	// 段放 action 详情 + SPIN + schema，不继承主循环完整冻结前缀。
+	// 关键词: 反思 prompt recent timeline, 去全会话前缀
 	prompt, err := r.buildReflectionPrompt(reflection, nonce)
 	if err != nil {
 		log.Errorf("failed to build reflection prompt: %v", err)

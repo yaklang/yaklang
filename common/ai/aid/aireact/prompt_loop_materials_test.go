@@ -25,6 +25,42 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 	return sections
 }
 
+func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	react.AddToTimeline("note", "ANCIENT_LIGHTWEIGHT_CONTEXT "+strings.Repeat("old ", 20000))
+	react.AddToTimeline("note", "RECENT_LIGHTWEIGHT_FACT")
+
+	result, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:             "light-1",
+		Lightweight:       true,
+		UserQuery:         strings.Repeat("query ", 5000),
+		TaskInstruction:   "keep the task protocol",
+		Schema:            `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+		SkillsContext:     strings.Repeat("skill ", 5000),
+		TodoSnapshot:      strings.Repeat("todo ", 5000),
+		ReactiveData:      strings.Repeat("reactive ", 5000),
+		InjectedMemory:    strings.Repeat("memory ", 5000),
+		SessionEvidence:   strings.Repeat("evidence ", 5000),
+		FrozenUserContext: strings.Repeat("plan ", 5000),
+	})
+	require.NoError(t, err)
+	require.Contains(t, result.Prompt, "RECENT_LIGHTWEIGHT_FACT")
+	require.NotContains(t, result.Prompt, "ANCIENT_LIGHTWEIGHT_CONTEXT")
+	require.NotContains(t, result.Prompt, "evidence evidence evidence")
+	require.NotContains(t, result.Prompt, "Timeline Memory (Frozen)")
+	promptTokens := ytoken.CalcTokenCount(result.Prompt)
+	t.Logf("bounded lightweight loop prompt tokens: %d", promptTokens)
+	require.LessOrEqual(t, promptTokens, 30000)
+}
+
 // TestPromptManager_AssembleLoopPrompt_SectionOrder 验证"按稳定性分层"路径
 // 下 6 段顺序: high_static -> frozen_block -> semi_dynamic_1 (Skills)
 // -> semi_dynamic_2 (ExecutionPolicy + TaskInstruction + Schema + OutputExample) -> timeline_open ->

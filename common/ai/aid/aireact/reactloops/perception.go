@@ -52,9 +52,10 @@ const (
 	perceptionMaxContextTokens          = 500
 	perceptionKnowledgeMaxContextTokens = 15 * 1024
 
-	// perceptionMaxInputTokens is the token budget for the entire perception input.
+	// perceptionMaxInputTokens is the token budget for the entire speed-priority
+	// perception input. Keep it well below the main model context.
 	// Fields exceeding their share will be shrunk via ShrinkTextBlockByTokens.
-	perceptionMaxInputTokens = 30000
+	perceptionMaxInputTokens = 20000
 )
 
 // IntentShift 取值约定 — 描述本轮 perception 与上一轮相比意图的"方向性"变化粒度.
@@ -293,8 +294,8 @@ func (pc *perceptionController) getCurrent() *PerceptionState {
 	return pc.current
 }
 
-// buildPerceptionInput assembles input for the perception model with a generous
-// token budget (~30K tokens). Individual sections are shrunk only when the total
+// buildPerceptionInput assembles input for the perception model with a bounded
+// token budget (~20K tokens). Individual sections are shrunk only when the total
 // would exceed perceptionMaxInputTokens.
 // It returns the core input string and a map of extra template variables
 // (BaseFrame, Facts, Evidence, DynamicContext) for the prompt template.
@@ -308,7 +309,7 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 		userInput = task.GetUserInput()
 	}
 	if userInput != "" {
-		userInput = aicommon.ShrinkTextBlockByTokens(userInput, 8000)
+		userInput = aicommon.ShrinkTextBlockByTokens(userInput, 4000)
 	}
 	buf.WriteString(fmt.Sprintf("User Goal: %s\n", userInput))
 	buf.WriteString(fmt.Sprintf("Loop: %s, iteration %d/%d\n", r.loopName, r.currentIterationIndex, r.maxIterations))
@@ -379,7 +380,11 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 	}
 	if v, ok := baseFrame["Timeline"]; ok {
 		timeline := fmt.Sprintf("%v", v)
-		timeline = aicommon.ShrinkTextBlockByTokens(timeline, 3000)
+		if cfg, ok := r.config.(interface{ GetTimeline() *aicommon.Timeline }); ok && cfg.GetTimeline() != nil {
+			timeline = cfg.GetTimeline().DumpRecentForPrompt(2048)
+		} else {
+			timeline = aicommon.ShrinkTextBlockByTokens(timeline, 2048)
+		}
 		baseFrameBuf.WriteString(fmt.Sprintf("Timeline:\n%s\n", timeline))
 	}
 	if baseFrameStr := baseFrameBuf.String(); baseFrameStr != "" {
@@ -387,12 +392,12 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 	}
 
 	if facts := strings.TrimSpace(r.Get("plan_facts")); facts != "" {
-		facts = aicommon.ShrinkTextBlockByTokens(facts, 4000)
+		facts = aicommon.ShrinkTextBlockByTokens(facts, 2048)
 		extra["Facts"] = facts
 	}
 
 	if evidence := strings.TrimSpace(r.Get("plan_evidence")); evidence != "" {
-		evidence = aicommon.ShrinkTextBlockByTokens(evidence, 4000)
+		evidence = aicommon.ShrinkTextBlockByTokens(evidence, 2048)
 		extra["Evidence"] = evidence
 	}
 
@@ -401,7 +406,7 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 		if cpm := cfg.GetContextProviderManager(); cpm != nil {
 			dynCtx := cpm.Execute(cfg, r.emitter)
 			if dynCtx = strings.TrimSpace(dynCtx); dynCtx != "" {
-				dynCtx = aicommon.ShrinkTextBlockByTokens(dynCtx, 4000)
+				dynCtx = aicommon.ShrinkTextBlockByTokens(dynCtx, 2048)
 				extra["DynamicContext"] = dynCtx
 			}
 		}
