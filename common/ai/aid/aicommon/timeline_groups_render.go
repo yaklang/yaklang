@@ -26,6 +26,9 @@ type TimelineIntervalBlock struct {
 	Open            bool            // 仅整条 timeline 最末一个 interval 子桶为 true
 	SeqInBucket     int             // 同一时间日历桶内子桶序号，从 0 起
 	TotalInBucket   int             // 该日历桶内子桶总数；1 表示未拆子桶
+	// initialTaskID 只服务于渲染：字节切桶时，子桶可能从 tool/user item 开始，
+	// 需要继承前一子桶的 task context。它不改变原始 TimelineItem，也不参与持久化。
+	initialTaskID string
 }
 
 // TimelineIntervalBlocks 是按时间顺序排列的 block 切片
@@ -288,10 +291,12 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 	if len(items) == 0 {
 		return nil
 	}
-	hl := intervalBlockHeaderByteLen(bs, be, intervalMinutes)
 	var out []*TimelineIntervalBlock
 	var cur []*TimelineItem
 	var curBytes int
+	var curInitialTaskID string
+	var curRenderState timelineTaskRenderState
+	var carriedTaskID string
 
 	flush := func() {
 		if len(cur) == 0 {
@@ -303,32 +308,42 @@ func packTimelineIntervalSubBlocks(bs, be time.Time, intervalMinutes int, items 
 			IntervalMinutes: intervalMinutes,
 			Items:           append([]*TimelineItem(nil), cur...),
 			Open:            false,
+			initialTaskID:   curInitialTaskID,
 		}
 		out = append(out, blk)
 		cur = nil
 		curBytes = 0
+		curInitialTaskID = ""
+	}
+	start := func(item *TimelineItem) {
+		curInitialTaskID = carriedTaskID
+		headerTaskID := timelineBlockHeaderTaskID(curInitialTaskID, []*TimelineItem{item})
+		curRenderState = timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
+		cur = []*TimelineItem{item}
+		curBytes = len(renderTimelineIntervalHeader(bs, be, intervalMinutes, headerTaskID)) +
+			len(renderTimelineEntry(item, bs, &curRenderState))
+		advanceTimelineTaskContext(&carriedTaskID, item)
 	}
 
 	for _, item := range items {
 		if item == nil || item.deleted {
 			continue
 		}
-		entFirst := timelineEntryAppendByteLen(item, bs, true)
-		entCont := timelineEntryAppendByteLen(item, bs, false)
-
 		if len(cur) == 0 {
-			cur = []*TimelineItem{item}
-			curBytes = hl + entFirst
+			start(item)
 			continue
 		}
-		if int64(curBytes+entCont) > bytesPerBucket {
+		candidateState := curRenderState
+		entry := renderTimelineEntry(item, bs, &candidateState)
+		if int64(curBytes+len(entry)) > bytesPerBucket {
 			flush()
-			cur = []*TimelineItem{item}
-			curBytes = hl + timelineEntryAppendByteLen(item, bs, true)
+			start(item)
 			continue
 		}
 		cur = append(cur, item)
-		curBytes += entCont
+		curBytes += len(entry)
+		curRenderState = candidateState
+		advanceTimelineTaskContext(&carriedTaskID, item)
 	}
 	flush()
 
@@ -354,10 +369,12 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 	if sizer == nil {
 		return packTimelineIntervalSubBlocks(bs, be, intervalMinutes, items, TimelineDumpDefaultBucketByteSize)
 	}
-	hl := intervalBlockHeaderByteLen(bs, be, intervalMinutes)
 	var out []*TimelineIntervalBlock
 	var cur []*TimelineItem
 	var curBytes int
+	var curInitialTaskID string
+	var curRenderState timelineTaskRenderState
+	var carriedTaskID string
 	// recentEntrySamples 用于让 sizer 看到最近若干 entry 的平均字节
 	const recentN = 8
 	var recentSizes []int
@@ -372,18 +389,30 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 			IntervalMinutes: intervalMinutes,
 			Items:           append([]*TimelineItem(nil), cur...),
 			Open:            false,
+			initialTaskID:   curInitialTaskID,
 		}
 		out = append(out, blk)
 		cur = nil
 		curBytes = 0
+		curInitialTaskID = ""
+	}
+	start := func(item *TimelineItem) {
+		curInitialTaskID = carriedTaskID
+		headerTaskID := timelineBlockHeaderTaskID(curInitialTaskID, []*TimelineItem{item})
+		curRenderState = timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
+		cur = []*TimelineItem{item}
+		curBytes = len(renderTimelineIntervalHeader(bs, be, intervalMinutes, headerTaskID)) +
+			len(renderTimelineEntry(item, bs, &curRenderState))
+		advanceTimelineTaskContext(&carriedTaskID, item)
 	}
 
 	for _, item := range items {
 		if item == nil || item.deleted {
 			continue
 		}
-		entFirst := timelineEntryAppendByteLen(item, bs, true)
-		entCont := timelineEntryAppendByteLen(item, bs, false)
+		sampleHeaderTaskID := timelineBlockHeaderTaskID(carriedTaskID, []*TimelineItem{item})
+		sampleState := timelineTaskRenderState{activeTaskID: sampleHeaderTaskID, firstEntry: true}
+		entFirst := len(renderTimelineEntry(item, bs, &sampleState))
 
 		// 更新最近样本
 		recentSizes = append(recentSizes, entFirst)
@@ -418,18 +447,20 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 		}
 
 		if len(cur) == 0 {
-			cur = []*TimelineItem{item}
-			curBytes = hl + entFirst
+			start(item)
 			continue
 		}
-		if int64(curBytes+entCont) > budget {
+		candidateState := curRenderState
+		entry := renderTimelineEntry(item, bs, &candidateState)
+		if int64(curBytes+len(entry)) > budget {
 			flush()
-			cur = []*TimelineItem{item}
-			curBytes = hl + timelineEntryAppendByteLen(item, bs, true)
+			start(item)
 			continue
 		}
 		cur = append(cur, item)
-		curBytes += entCont
+		curBytes += len(entry)
+		curRenderState = candidateState
+		advanceTimelineTaskContext(&carriedTaskID, item)
 	}
 	flush()
 
@@ -441,25 +472,104 @@ func packTimelineIntervalSubBlocksWithSizer(bs, be time.Time, intervalMinutes in
 	return out
 }
 
-func intervalBlockHeaderByteLen(bucketStart, bucketEnd time.Time, intervalMinutes int) int {
-	s := fmt.Sprintf("# bucket=%s-%s interval=%dm\n",
+func renderTimelineIntervalHeader(bucketStart, bucketEnd time.Time, intervalMinutes int, taskID string) string {
+	header := fmt.Sprintf("# bucket=%s-%s interval=%dm",
 		bucketStart.Format(utils.DefaultTimeFormat3),
 		bucketEnd.Format("15:04:05"),
 		intervalMinutes,
 	)
-	return len(s)
+	if taskID != "" {
+		header += " task=" + taskID
+	}
+	return header + "\n"
 }
 
-// timelineEntryAppendByteLen 估算 Render 中单个 entry 的字节贡献（与 TimelineIntervalBlock.Render 对齐）。
-// isFirstEntry 表示当前子桶内是否为第一条 entry（无前置换行）。
-// 关键词: timelineEntryAppendByteLen, 字节估算
-func timelineEntryAppendByteLen(item *TimelineItem, bucketStart time.Time, isFirstEntry bool) int {
-	if item == nil || item.deleted {
-		return 0
+type timelineTaskRenderState struct {
+	activeTaskID string
+	firstEntry   bool
+}
+
+// timelineItemTaskContext 只从 TextTimelineItem 的原始文本读取 task context。
+// 原文保持不变，ParseTimelineItemHumanReadable / emitter / marshal 仍能取得逐条 TaskID。
+func timelineItemTaskContext(item *TimelineItem) (taskID string, explicit bool) {
+	if item == nil || item.value == nil {
+		return "", false
 	}
-	var n int
-	if !isFirstEntry {
-		n++
+	text, ok := item.value.(*TextTimelineItem)
+	if !ok {
+		return "", false
+	}
+	if matches := withTaskRegex.FindStringSubmatch(text.Text); len(matches) > 2 {
+		taskID = strings.TrimSpace(matches[2])
+		if taskID == "" || strings.ContainsAny(taskID, "\r\n") {
+			return "", false
+		}
+		return taskID, true
+	}
+	if withoutTaskRegex.MatchString(text.Text) {
+		return "", true
+	}
+	return "", false
+}
+
+func advanceTimelineTaskContext(activeTaskID *string, item *TimelineItem) {
+	if activeTaskID == nil {
+		return
+	}
+	if taskID, explicit := timelineItemTaskContext(item); explicit {
+		*activeTaskID = taskID
+	}
+}
+
+// timelineBlockHeaderTaskID 把 block 第一条有效 item 的 task 提升到 bucket header。
+// 若子桶从 tool/user 开始，则沿用字节切桶时带入的 initialTaskID。
+func timelineBlockHeaderTaskID(initialTaskID string, items []*TimelineItem) string {
+	for _, item := range items {
+		if item == nil || item.deleted {
+			continue
+		}
+		if taskID, explicit := timelineItemTaskContext(item); explicit {
+			return taskID
+		}
+		return initialTaskID
+	}
+	return initialTaskID
+}
+
+func stripTimelineTaskLabel(content, taskID string) string {
+	if content == "" || taskID == "" {
+		return content
+	}
+	matches := withTaskRegex.FindStringSubmatchIndex(content)
+	if len(matches) < 6 || matches[0] != 0 {
+		return content
+	}
+	if strings.TrimSpace(content[matches[4]:matches[5]]) != taskID {
+		return content
+	}
+	return "[" + content[matches[2]:matches[3]] + "]:" + content[matches[1]:]
+}
+
+// renderTimelineEntry 渲染一个 entry，并推进仅在当前 block 内使用的 task state。
+// 同 task 的逐条 [task:...] 标签从渲染结果中折叠；task 切换只输出一次边界。
+func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timelineTaskRenderState) string {
+	if item == nil || item.deleted {
+		return ""
+	}
+	if state == nil {
+		state = &timelineTaskRenderState{firstEntry: true}
+	}
+	var buf bytes.Buffer
+	taskID, explicitTask := timelineItemTaskContext(item)
+	if !state.firstEntry {
+		buf.WriteByte('\n')
+	}
+	if explicitTask && taskID != state.activeTaskID {
+		if taskID == "" {
+			buf.WriteString("# task=-\n")
+		} else {
+			buf.WriteString("# task=" + taskID + "\n")
+		}
 	}
 	var ts time.Time
 	if !item.createdAt.IsZero() {
@@ -468,11 +578,17 @@ func timelineEntryAppendByteLen(item *TimelineItem, bucketStart time.Time, isFir
 		ts = bucketStart
 	}
 	hh, mm, ss := ts.Clock()
-	header := fmt.Sprintf("%02d:%02d:%02d [%s]", hh, mm, ss, renderItemTypeVerbose(item))
-	n += len(header)
+	buf.WriteString(fmt.Sprintf("%02d:%02d:%02d [%s]", hh, mm, ss, renderItemTypeVerbose(item)))
+	state.firstEntry = false
+	if explicitTask {
+		state.activeTaskID = taskID
+	}
 	content := selectShrunkContent(item)
+	if explicitTask && taskID != "" {
+		content = stripTimelineTaskLabel(content, taskID)
+	}
 	if content == "" {
-		return n
+		return buf.String()
 	}
 	var prevBlank bool
 	for _, line := range utils.ParseStringToRawLines(content) {
@@ -482,12 +598,25 @@ func timelineEntryAppendByteLen(item *TimelineItem, bucketStart time.Time, isFir
 				continue
 			}
 			prevBlank = true
-			n++
+			buf.WriteByte('\n')
 			continue
 		}
 		prevBlank = false
-		n++
-		n += len(line)
+		buf.WriteByte('\n')
+		buf.WriteString(line)
+	}
+	return buf.String()
+}
+
+func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
+	if block == nil || len(block.Items) == 0 {
+		return 0
+	}
+	headerTaskID := timelineBlockHeaderTaskID(block.initialTaskID, block.Items)
+	n := len(renderTimelineIntervalHeader(block.BucketStart, block.BucketEnd, block.IntervalMinutes, headerTaskID))
+	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
+	for _, item := range block.Items {
+		n += len(renderTimelineEntry(item, block.BucketStart, &state))
 	}
 	return n
 }
@@ -525,53 +654,11 @@ func (b *TimelineIntervalBlock) Render() string {
 		return ""
 	}
 	var buf bytes.Buffer
-	// 首行 metadata：bucket 时间范围 + interval。同一桶永远不变，可作稳定前缀
-	buf.WriteString(fmt.Sprintf("# bucket=%s-%s interval=%dm\n",
-		b.BucketStart.Format(utils.DefaultTimeFormat3),
-		b.BucketEnd.Format("15:04:05"),
-		b.IntervalMinutes,
-	))
-
-	first := true
+	headerTaskID := timelineBlockHeaderTaskID(b.initialTaskID, b.Items)
+	buf.WriteString(renderTimelineIntervalHeader(b.BucketStart, b.BucketEnd, b.IntervalMinutes, headerTaskID))
+	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
 	for _, item := range b.Items {
-		if item == nil || item.deleted {
-			continue
-		}
-		var ts time.Time
-		if !item.createdAt.IsZero() {
-			ts = item.createdAt
-		} else {
-			ts = b.BucketStart
-		}
-		hh, mm, ss := ts.Clock()
-		typeVerbose := renderItemTypeVerbose(item)
-		if !first {
-			buf.WriteByte('\n')
-		}
-		// 行头：HH:MM:SS [type/verbose]
-		buf.WriteString(fmt.Sprintf("%02d:%02d:%02d [%s]", hh, mm, ss, typeVerbose))
-		first = false
-
-		content := selectShrunkContent(item)
-		if content == "" {
-			continue
-		}
-		// 折叠多个连续空行为单空行；不加任何缩进
-		var prevBlank bool
-		for _, line := range utils.ParseStringToRawLines(content) {
-			line = strings.TrimRight(line, " \t\r")
-			if strings.TrimSpace(line) == "" {
-				if prevBlank {
-					continue
-				}
-				prevBlank = true
-				buf.WriteByte('\n')
-				continue
-			}
-			prevBlank = false
-			buf.WriteByte('\n')
-			buf.WriteString(line)
-		}
+		buf.WriteString(renderTimelineEntry(item, b.BucketStart, &state))
 	}
 	return strings.TrimRight(buf.String(), "\n")
 }

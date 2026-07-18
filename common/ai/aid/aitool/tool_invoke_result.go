@@ -29,44 +29,50 @@ type ToolResult struct {
 	ShrinkResult string `json:"shrink_result,omitempty"`
 
 	CallExpectations string `json:"call_expectations,omitempty"`
+
+	// OmitParamsInTimeline indicates that the params have already been emitted as
+	// a dedicated timeline item (for example [DIRECT_CALL_PARAMS]) and should not
+	// be duplicated when this result is rendered into the timeline.
+	OmitParamsInTimeline bool `json:"omit_params_in_timeline,omitempty"`
 }
 
-func (t *ToolResult) DumpTimelineItem(buf io.Writer) {
-
+type ToolResultDumpOptions struct {
+	IncludeParams bool
 }
 
-func (t *ToolResult) GetShrinkResult() string {
-	if t.ShrinkResult != "" {
-		return t.ShrinkResult
+type ToolResultDumpOption func(*ToolResultDumpOptions)
+
+func WithToolResultDumpParams(include bool) ToolResultDumpOption {
+	return func(opts *ToolResultDumpOptions) {
+		opts.IncludeParams = include
 	}
-	return t.ShrinkSimilarResult
 }
 
-func (t *ToolResult) SetShrinkResult(i string) {
-	t.ShrinkResult = i
-}
-
-func (t *ToolResult) GetShrinkSimilarResult() string {
-	if t.ShrinkSimilarResult != "" {
-		return t.ShrinkSimilarResult
+func (t *ToolResult) DumpTimelineItem(buf io.Writer, options ...ToolResultDumpOption) {
+	opts := &ToolResultDumpOptions{IncludeParams: true}
+	for _, option := range options {
+		option(opts)
 	}
-	return t.ShrinkResult
-}
-
-func (t *ToolResult) String() string {
-	buf := bytes.NewBuffer(nil)
 	if t.ID > 0 {
-		buf.WriteString(fmt.Sprintf("id: %v; ", t.ID))
+		fmt.Fprintf(buf, "id: %v; ", t.ID)
 	}
-	buf.WriteString(fmt.Sprintf("tool_name: %#v\n", t.Name))
+	fmt.Fprintf(buf, "tool_name: %#v\n", t.Name)
 
 	if t.CallExpectations != "" {
-		buf.WriteString(fmt.Sprintf("call_expectations: %s\n", t.CallExpectations))
+		fmt.Fprintf(buf, "call_expectations: %s\n", t.CallExpectations)
 	}
 
+	if opts.IncludeParams {
+		t.dumpTimelineParams(buf)
+	}
+
+	t.dumpTimelineResult(buf)
+}
+
+func (t *ToolResult) dumpTimelineParams(buf io.Writer) {
 	paramParsed := utils.InterfaceToGeneralMap(t.Param)
 	if len(paramParsed) > 0 {
-		buf.WriteString("param:\n")
+		fmt.Fprintln(buf, "param:")
 		out, err := yaml.Marshal(paramParsed)
 		if err != nil {
 			// 旧实现给 fallback 行加 '  - ' 前缀, 配合 yaml-marshal 路径的统一
@@ -74,7 +80,7 @@ func (t *ToolResult) String() string {
 			// 是合法 yaml.
 			// 关键词: ToolResult.String fallback 去外层缩进
 			for k, v := range paramParsed {
-				buf.WriteString(fmt.Sprintf("- %v: %s\n", k, v))
+				fmt.Fprintf(buf, "- %v: %s\n", k, v)
 			}
 		} else {
 			// yaml.Marshal 自身已经产生合法相对缩进 (顶层 key 顶头, 嵌套 value
@@ -84,11 +90,15 @@ func (t *ToolResult) String() string {
 			// 进 (yaml 4 + 外套 2). 直接拼 yaml 原文, 既减 token 又仍可被
 			// yaml.Unmarshal 正确解析. yaml.Marshal 输出末尾自带 '\n'.
 			// 关键词: ToolResult.String yaml 顶层不再外套 '  ', timeline prompt 紧凑
-			buf.Write(out)
+			_, _ = buf.Write(out)
 		}
 	} else {
-		buf.WriteString(fmt.Sprintf("param: %s\n", utils.Jsonify(t.Param)))
+		fmt.Fprintf(buf, "param: %s\n", utils.Jsonify(t.Param))
 	}
+}
+
+func (t *ToolResult) dumpTimelineResult(writer io.Writer) {
+	buf := bytes.NewBuffer(nil)
 
 	if t.ShrinkResult != "" { // shrink result preface
 		buf.WriteString(fmt.Sprintf("shrink_result: %#v\n", t.ShrinkResult))
@@ -154,6 +164,30 @@ func (t *ToolResult) String() string {
 		buf.WriteString(fmt.Sprintf("err: %s\n", t.Error))
 	}
 
+	_, _ = writer.Write(buf.Bytes())
+}
+
+func (t *ToolResult) GetShrinkResult() string {
+	if t.ShrinkResult != "" {
+		return t.ShrinkResult
+	}
+	return t.ShrinkSimilarResult
+}
+
+func (t *ToolResult) SetShrinkResult(i string) {
+	t.ShrinkResult = i
+}
+
+func (t *ToolResult) GetShrinkSimilarResult() string {
+	if t.ShrinkSimilarResult != "" {
+		return t.ShrinkSimilarResult
+	}
+	return t.ShrinkResult
+}
+
+func (t *ToolResult) String() string {
+	buf := bytes.NewBuffer(nil)
+	t.DumpTimelineItem(buf, WithToolResultDumpParams(!t.OmitParamsInTimeline))
 	return buf.String()
 }
 

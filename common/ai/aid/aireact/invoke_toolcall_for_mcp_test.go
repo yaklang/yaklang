@@ -384,8 +384,8 @@ LOOP:
 	if !strings.Contains(tl, `mocked thought for mcp tool calling`) {
 		t.Fatal("timeline does not contain mocked thought for mcp tool calling")
 	}
-	if !utils.MatchAllOfSubString(tl, `system-question`, "user-answer", "when review") {
-		t.Fatal("timeline does not contain system-question")
+	if strings.Contains(tl, `when review`) {
+		t.Fatal("auto-continue review must not pollute the timeline")
 	}
 	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
 		t.Fatal("timeline does not contain ReAct iteration")

@@ -14,13 +14,14 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 	// 添加一些数据
 	for i := 1; i <= 3; i++ {
 		originalTimeline.PushToolResult(&aitool.ToolResult{
-			ID:          int64(100 + i),
-			Name:        "test_tool",
-			Description: "test description",
-			Param:       map[string]any{"param": i},
-			Success:     true,
-			Data:        i,
-			Error:       "",
+			ID:                   int64(100 + i),
+			Name:                 "test_tool",
+			Description:          "test description",
+			Param:                map[string]any{"param": i},
+			Success:              true,
+			Data:                 i,
+			Error:                "",
+			OmitParamsInTimeline: i == 1,
 		})
 	}
 

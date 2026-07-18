@@ -259,7 +259,8 @@ type ToolCaller struct {
 
 	paramAugment func(aitool.InvokeParams) aitool.InvokeParams // optional merge before tool execution
 
-	callExpectations string
+	callExpectations           string
+	omitResultParamsInTimeline bool
 }
 
 const ReservedKeyCallExpectations = "__call_expectations__"
@@ -270,6 +271,16 @@ type ToolCallerOption func(tc *ToolCaller)
 func WithToolCaller_CallExpectations(expectations string) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.callExpectations = expectations
+	}
+}
+
+// WithToolCaller_OmitResultParamsInTimeline is used when the final params were
+// already recorded by an earlier, dedicated timeline item. It only affects the
+// timeline rendering hint on the returned ToolResult; invocation and persisted
+// tool-call reports still retain the complete params.
+func WithToolCaller_OmitResultParamsInTimeline() ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.omitResultParamsInTimeline = true
 	}
 }
 
@@ -685,6 +696,9 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 
 	// 4. run the post-card flow. sync.Once ensures start is not re-emitted.
 	if fallback {
+		// The direct params were rejected and the require path generated a new set,
+		// so the final result remains the only authoritative timeline copy.
+		t.omitResultParamsInTimeline = false
 		return t.CallToolWithExistedParams(tool, false, nil)
 	}
 	if finalParams == nil {
@@ -1148,14 +1162,17 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 		// wait for agree
 		config.DoWaitAgree(t.ctx, ep)
+		reviewDecidedAt := time.Now()
 		params := ep.GetParams()
 		t.emitter.EmitInteractiveRelease(ep.GetId(), params)
 		config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-		config.CallAfterReview(
-			ep.GetSeq(),
-			reviewQuestion,
-			params,
-		)
+		if !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
+			config.CallAfterReview(
+				ep.GetSeq(),
+				reviewQuestion,
+				params,
+			)
+		}
 		if params == nil {
 			// 价值评估: 用户取消工具审批 (空响应释放) 是高价值的人工否决信号, 不能漏采.
 			if cfg, ok := config.(*Config); ok {
@@ -1273,6 +1290,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", tool.Name, err)
 		toolResult.Success = false
 	}
+	if toolResult != nil {
+		toolResult.OmitParamsInTimeline = t.omitResultParamsInTimeline
+	}
 
 	// Close pipe writers to signal end of tool output. This triggers ThrottledCopy's
 	// final flush of any remaining buffered data. The deferred Close calls are still
@@ -1300,6 +1320,24 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	NotifySessionSnapshotToolCall(t.config, toolResult)
 
 	return toolResult, false, nil
+}
+
+const fastNoopContinueReviewThreshold = 500 * time.Millisecond
+
+// isFastNoopContinueReview recognizes an automatic/default pass-through: the
+// endpoint was released within 0.5s and the response contains only the default
+// "continue" suggestion. Such a response carries no user-authored information,
+// so recording it as user/review only adds noise to the timeline.
+func isFastNoopContinueReview(ep *Endpoint, params aitool.InvokeParams, decidedAt time.Time) bool {
+	if ep == nil || len(params) != 1 || !strings.EqualFold(strings.TrimSpace(params.GetString("suggestion")), "continue") {
+		return false
+	}
+	createdAtMs := ep.GetCreatedAtMs()
+	if createdAtMs <= 0 {
+		return false
+	}
+	duration := decidedAt.Sub(time.UnixMilli(createdAtMs))
+	return duration >= 0 && duration <= fastNoopContinueReviewThreshold
 }
 
 // markdownCodeFence is 10 backticks used as code fence in markdown to safely nest any content

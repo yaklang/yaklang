@@ -231,6 +231,61 @@ func TestGroupByMinutes_TypeVerbose(t *testing.T) {
 	require.Contains(t, rendered, "[tool/scanY fail]")
 }
 
+func TestTimelineRender_TaskHeaderDeduplicatesSameTask(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	first := &TextTimelineItem{ID: 1, Text: "[doing] [task:task-a]:\nfirst"}
+	second := &TextTimelineItem{ID: 2, Text: "[note] [task:task-a]:\nsecond"}
+	injectTimelineItem(tl, 1, base.Add(10*time.Second), first)
+	injectTimelineItem(tl, 2, base.Add(20*time.Second), second)
+
+	rendered := tl.GroupByMinutesAndBytes(3, -1).GetBlocks()[0].Render()
+	require.Contains(t, strings.Split(rendered, "\n")[0], "task=task-a")
+	require.Equal(t, 1, strings.Count(rendered, "task-a"), "same task should appear only once in the bucket header")
+	require.NotContains(t, rendered, "[task:")
+	require.Contains(t, rendered, "[doing]:\nfirst")
+	require.Contains(t, rendered, "[note]:\nsecond")
+
+	parsed := ParseTimelineItemHumanReadable(tl.GroupByMinutesAndBytes(3, -1).GetBlocks()[0].Items[0])
+	require.Equal(t, "task-a", parsed.TaskID)
+	require.Contains(t, first.Text, "[task:task-a]", "stored text must remain unchanged")
+}
+
+func TestTimelineRender_TaskSwitchAndUnscopedReset(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	injectTimelineItem(tl, 1, base.Add(10*time.Second), &TextTimelineItem{ID: 1, Text: "[doing] [task:task-a]:\na"})
+	injectTimelineItem(tl, 2, base.Add(20*time.Second), makeToolResult(2, "a-tool", true, "tool-a"))
+	injectTimelineItem(tl, 3, base.Add(30*time.Second), &TextTimelineItem{ID: 3, Text: "[doing] [task:task-b]:\nb"})
+	injectTimelineItem(tl, 4, base.Add(40*time.Second), makeToolResult(4, "b-tool", true, "tool-b"))
+	injectTimelineItem(tl, 5, base.Add(50*time.Second), &TextTimelineItem{ID: 5, Text: "[note]:\nunscoped"})
+	injectTimelineItem(tl, 6, base.Add(60*time.Second), &TextTimelineItem{ID: 6, Text: "[doing] [task:task-a]:\na-again"})
+
+	rendered := tl.GroupByMinutesAndBytes(3, -1).GetBlocks()[0].Render()
+	require.Contains(t, strings.Split(rendered, "\n")[0], "task=task-a")
+	require.Equal(t, 2, strings.Count(rendered, "task-a"), "task-a appears in header and once when switching back")
+	require.Equal(t, 1, strings.Count(rendered, "# task=task-b"))
+	require.Equal(t, 1, strings.Count(rendered, "# task=-"))
+	require.NotContains(t, rendered, "[task:")
+
+	b := strings.Index(rendered, "# task=task-b")
+	reset := strings.Index(rendered, "# task=-")
+	back := strings.LastIndex(rendered, "# task=task-a")
+	require.True(t, b > 0 && reset > b && back > reset, "task boundaries must follow event order")
+}
+
+func TestTimelineRender_LateTaskDoesNotRewriteBucketHeader(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	base := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	injectTimelineItem(tl, 1, base.Add(10*time.Second), makeToolResult(1, "setup", true, "ready"))
+	injectTimelineItem(tl, 2, base.Add(20*time.Second), &TextTimelineItem{ID: 2, Text: "[doing] [task:task-a]:\nrun"})
+
+	rendered := tl.GroupByMinutesAndBytes(3, -1).GetBlocks()[0].Render()
+	require.NotContains(t, strings.Split(rendered, "\n")[0], "task=")
+	require.Equal(t, 1, strings.Count(rendered, "# task=task-a"))
+	require.Less(t, strings.Index(rendered, "[tool/setup ok]"), strings.Index(rendered, "# task=task-a"))
+}
+
 // TestGroupByMinutes_TagWrapping 验证 aitag 兼容包裹格式
 // 关键词: GroupByMinutes aitag 包裹, TAG_END_<nonce>, 稳定 nonce
 func TestGroupByMinutes_TagWrapping(t *testing.T) {
