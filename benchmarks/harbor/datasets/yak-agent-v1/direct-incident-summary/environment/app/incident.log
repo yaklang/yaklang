@@ -1,0 +1,6 @@
+2026-01-18T03:14:02Z event=evt-101 account=svc-export src=10.20.1.7 endpoint=/login status=401
+2026-01-18T03:14:04Z event=evt-102 account=svc-export src=10.20.1.7 endpoint=/login status=401
+2026-01-18T03:14:06Z event=evt-103 account=svc-export src=10.20.1.7 endpoint=/login status=401
+2026-01-18T03:14:11Z event=evt-104 account=svc-export src=10.20.1.7 endpoint=/admin/export status=200 bytes=91822
+2026-01-18T03:14:15Z event=evt-105 account=health-check src=10.20.1.9 endpoint=/health status=200
+

@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "required": ["account", "source_ip", "successful_endpoint", "classification", "evidence"],
+  "properties": {
+    "account": {"type": "string"},
+    "source_ip": {"type": "string"},
+    "successful_endpoint": {"type": "string"},
+    "classification": {"enum": ["credential-stuffing", "malware", "benign"]},
+    "evidence": {"type": "array", "items": {"type": "string"}}
+  }
+}
+
