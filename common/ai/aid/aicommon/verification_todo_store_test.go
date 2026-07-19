@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -26,9 +27,11 @@ func TestVerificationTodoStore_ApplyAndRender(t *testing.T) {
 	})
 
 	rendered := store.Render()
-	require.Contains(t, rendered, "- [x]: [id: collect_signal]: 收集页面响应信号")
-	require.Contains(t, rendered, "- [DELETED]: [id: fix_title]: 修正标题")
+	require.Contains(t, rendered, "- DONE (1): collect_signal")
+	require.Contains(t, rendered, "- DELETED (1): fix_title")
 	require.Contains(t, rendered, "- [ ]: [id: replay_payload]: 使用新 payload 复测")
+	require.NotContains(t, rendered, "收集页面响应信号")
+	require.NotContains(t, rendered, "修正标题")
 }
 
 // TestVerificationTodoStore_Apply_ReportsSuccessPerOp 验证 Apply 现在为每个
@@ -233,7 +236,8 @@ func TestVerificationTodoStore_ExplicitSkipOpMarksSkipped(t *testing.T) {
 		"explicit skip must keep the original content so the prompt can still describe what was skipped")
 
 	rendered := store.Render()
-	require.Contains(t, rendered, "- [SKIPPED]: [id: stale_idea]: 本次范围内不打算继续推进")
+	require.Contains(t, rendered, "- SKIPPED (1): stale_idea")
+	require.NotContains(t, rendered, "本次范围内不打算继续推进")
 }
 
 // TestVerificationTodoStore_ExplicitSkipOpCanUpdateContent 验证 skip op 与
@@ -486,8 +490,42 @@ func TestVerificationTodoStore_RenderWithCurrentScope_SplitsCurrentAndOther(t *t
 	require.Contains(t, rendered, "- [DOING]: [id: todo_1_2]: 子任务 1-2 的待办")
 	require.Contains(t, rendered, "### OTHER TASKS (read-only context)")
 	require.Contains(t, rendered, "#### task_index=1-1, task_id=task-1")
-	require.Contains(t, rendered, "- [x]: [id: todo_1_1]: 子任务 1-1 的待办")
+	require.Contains(t, rendered, "- DONE (1): todo_1_1")
+	require.NotContains(t, rendered, "子任务 1-1 的待办")
 	require.NotContains(t, rendered, "- [DOING]: [id: todo_1_1]")
+}
+
+func TestVerificationTodoStore_PromptKeepsActiveContentAndCompactsClosedHistory(t *testing.T) {
+	longActiveContent := strings.Repeat("active-detail-", 80)
+	store := &VerificationTodoStore{Items: []*VerificationTodoItem{
+		{ID: "active-old", Content: "older active", Status: VerificationTodoStatusPending, CreatedAt: 1, UpdatedAt: 1},
+		{ID: "done-old", Content: "CLOSED_CONTENT_MUST_NOT_RENDER", Status: VerificationTodoStatusDone, CreatedAt: 2, UpdatedAt: 2},
+		{ID: "active-new", Content: longActiveContent, Status: VerificationTodoStatusDoing, CreatedAt: 3, UpdatedAt: 3},
+	}}
+
+	rendered := store.Render()
+	require.Contains(t, rendered, longActiveContent)
+	require.Contains(t, rendered, "- DONE (1): done-old")
+	require.NotContains(t, rendered, "CLOSED_CONTENT_MUST_NOT_RENDER")
+	require.Less(t, strings.Index(rendered, "active-new"), strings.Index(rendered, "active-old"))
+	require.Less(t, strings.Index(rendered, "active-old"), strings.Index(rendered, "DONE (1)"))
+}
+
+func TestVerificationTodoStore_ClosedSummaryCapsIDsAndReportsOmitted(t *testing.T) {
+	store := NewVerificationTodoStore()
+	for i := 0; i < 70; i++ {
+		store.Items = append(store.Items, &VerificationTodoItem{
+			ID:        fmt.Sprintf("done-%02d", i),
+			Content:   "closed content should not render",
+			Status:    VerificationTodoStatusDone,
+			CreatedAt: i,
+			UpdatedAt: i,
+		})
+	}
+	rendered := store.Render()
+	require.Contains(t, rendered, "- DONE (70): done-69, done-68")
+	require.Contains(t, rendered, "+6 omitted")
+	require.NotContains(t, rendered, "closed content should not render")
 }
 
 func TestSessionPromptState_GetVerificationTodoMarkdownDelta_IsPreview(t *testing.T) {

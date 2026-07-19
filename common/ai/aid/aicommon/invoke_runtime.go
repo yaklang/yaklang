@@ -188,7 +188,14 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 }
 
 type LoopPromptAssemblyInput struct {
-	Nonce             string
+	Nonce string
+
+	// Lightweight selects the bounded speed-priority projection: the full
+	// frozen session history is replaced by a recent Timeline window and large
+	// auxiliary context fields are capped. The action schema remains intact so
+	// execution semantics do not change.
+	Lightweight bool
+
 	UserQuery         string
 	TaskInstruction   string
 	OutputExample     string
@@ -206,10 +213,6 @@ type LoopPromptAssemblyInput struct {
 	TodoSnapshot   string
 	ReactiveData   string
 	InjectedMemory string
-
-	// Deprecated: ignored by prompt assembly. Recent tool schemas are supplied by
-	// Timeline promotion state so they have exactly one prompt source.
-	RecentToolsCache string
 
 	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始
 	// 输入"两类只读上下文。注: 命名虽为 "Frozen", 但实际并不放入冻结段;

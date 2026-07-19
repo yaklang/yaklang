@@ -209,23 +209,10 @@ func (r *ReActLoop) getTimelineContentForSpinDetection() string {
 		return ""
 	}
 
-	// 获取最近的 Timeline 条目（限制数量以避免过长）
-	// 获取最近 20 条 Timeline 条目用于分析
-	outputs := timeline.ToTimelineItemOutputLastN(20)
-	if len(outputs) == 0 {
-		return ""
-	}
-
-	var content strings.Builder
-	content.WriteString("最近的 Timeline 条目：\n\n")
-	for i, output := range outputs {
-		content.WriteString(fmt.Sprintf("%d. [%s] %s\n", i+1, output.Type, output.Content))
-		if i >= 19 { // 限制最多 20 条
-			break
-		}
-	}
-
-	return content.String()
+	// Item count cannot bound a single huge tool result. Use the shared recent
+	// projection so reflection remains cheap even when the latest observation is
+	// large, while still preferring the newest facts.
+	return timeline.DumpRecentForPrompt(2048)
 }
 
 // buildSpinDetectionPrompt 构建 SPIN 检测的 prompt

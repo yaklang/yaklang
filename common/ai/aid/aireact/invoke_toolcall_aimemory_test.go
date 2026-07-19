@@ -375,8 +375,18 @@ LOOP:
 		if err := db.Where("session_id = ?", sessionID).Find(&memoryEntities).Error; err != nil {
 			t.Fatalf("Failed to query memory entities: %v", err)
 		}
-		return len(memoryEntities) > 0
-	}, 5*time.Second, 50*time.Millisecond, "Expected to find memory entities in database, but found none")
+		foundToolRejection := false
+		foundSystemBehavior := false
+		for _, entity := range memoryEntities {
+			if utils.MatchAllOfSubString(entity.Content, "拒绝", "sleep") {
+				foundToolRejection = true
+			}
+			if utils.MatchAllOfSubString(entity.Content, "ReAct", "直接回答") {
+				foundSystemBehavior = true
+			}
+		}
+		return foundToolRejection && foundSystemBehavior
+	}, 5*time.Second, 50*time.Millisecond, "Expected both memory entities to be persisted")
 	fmt.Printf("Found %d memory entities in database\n", len(memoryEntities))
 
 	// 验证 memory entities 的内容

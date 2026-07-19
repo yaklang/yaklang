@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -841,7 +842,7 @@ func (m *Timeline) renderSummaryPrompt(result *TimelineItem) string {
 	var nonce = strings.ToLower(utils.RandStringBytes(6))
 
 	// Get timeline dump and truncate if too large
-	timelineDump := m.Dump()
+	timelineDump := m.DumpForPrompt()
 	if len(timelineDump) > MaxSummaryPromptTimelineSize {
 		log.Warnf("summary prompt: timeline dump too large (%d > %d), truncating",
 			len(timelineDump), MaxSummaryPromptTimelineSize)
@@ -914,6 +915,113 @@ func (m *Timeline) Dump() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.dumpLocked()
+}
+
+// DumpForPrompt renders the same raw bucket topology as Dump while applying
+// prompt-only bookkeeping noise reduction to interval items.
+func (m *Timeline) DumpForPrompt() string {
+	if m == nil {
+		return ""
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	blocks := m.groupByMinutesAndBytesLocked(TimelineDumpDefaultIntervalMinutes, m.getEffectiveBucketByteSize()).GetAllRenderable()
+	return projectTimelineRenderableBlocksForPrompt(blocks).RenderWithFrozenBoundary(
+		TimelineDumpDefaultAITagName,
+		TimelineFrozenBoundaryTagName,
+		TimelineFrozenBoundaryNonce,
+	)
+}
+
+// DumpRecentForPrompt renders the newest prompt-visible Timeline items within
+// a strict token budget. It is intended for speed-priority helper calls that
+// only need the latest execution facts and must not inherit the full frozen
+// session prefix.
+//
+// Selection happens from newest to oldest, but the returned items retain their
+// original chronological order. Prompt-only noise projection is applied before
+// accounting, and raw Timeline state is never mutated. If the newest single
+// item exceeds the whole budget, only that item's head and tail are retained so
+// the helper prompt remains bounded.
+func (m *Timeline) DumpRecentForPrompt(tokenLimit int) string {
+	if m == nil || tokenLimit <= 0 {
+		return ""
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	const (
+		header    = "<|TIMELINE_RECENT|>\n"
+		footer    = "\n<|TIMELINE_RECENT_END|>"
+		truncated = "[older timeline entries omitted]\n"
+	)
+	baseTokens := MeasureTokens(header + footer)
+	if baseTokens >= tokenLimit {
+		return ""
+	}
+
+	remaining := tokenLimit - baseTokens
+	selected := make([]string, 0)
+	omitted := false
+	for i := m.tsToTimelineItem.Len() - 1; i >= 0; i-- {
+		item, ok := m.tsToTimelineItem.GetByIndex(i)
+		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
+			continue
+		}
+		projected := projectTimelineItemForPrompt(item)
+		if projected == nil {
+			continue
+		}
+		content := strings.TrimSpace(projected.String())
+		if content == "" {
+			continue
+		}
+		cost := MeasureTokens(content)
+		if len(selected) > 0 {
+			cost += MeasureTokens("\n\n")
+		}
+		if cost > remaining {
+			omitted = true
+			if len(selected) == 0 {
+				markerTokens := MeasureTokens(truncated)
+				if remaining > markerTokens {
+					shrunk := strings.TrimSpace(ShrinkTextBlockByTokens(content, remaining-markerTokens))
+					if shrunk != "" {
+						selected = append(selected, shrunk)
+					}
+				}
+			}
+			break
+		}
+		remaining -= cost
+		selected = append([]string{content}, selected...)
+	}
+	if len(selected) == 0 {
+		return ""
+	}
+
+	body := strings.Join(selected, "\n\n")
+	if omitted {
+		body = truncated + body
+	}
+	result := header + body + footer
+	// Tokenizers can merge differently across concatenation boundaries. Keep a
+	// final guard so the public contract remains a hard upper bound.
+	if MeasureTokens(result) > tokenLimit {
+		bodyBudget := tokenLimit - baseTokens
+		for bodyBudget > 0 && MeasureTokens(result) > tokenLimit {
+			bodyBudget--
+			body = strings.TrimSpace(ShrinkTextBlockByTokens(body, bodyBudget))
+			if body == "" {
+				return ""
+			}
+			result = header + body + footer
+		}
+	}
+	if MeasureTokens(result) > tokenLimit {
+		return ""
+	}
+	return result
 }
 
 func (m *Timeline) dumpLocked() string {
@@ -1291,6 +1399,15 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 	m.tsToTimelineItem.ForEach(func(ts int64, item *TimelineItem) bool {
 		orderedItems = append(orderedItems, itemWithTs{ts: ts, item: item})
 		return true
+	})
+	// UnmarshalTimeline rebuilds this ordered map from JSON object keys, whose
+	// iteration order is intentionally undefined. Sort explicitly so restored
+	// IDs, promotion watermarks and pending journal order remain deterministic.
+	sort.SliceStable(orderedItems, func(i, j int) bool {
+		if orderedItems[i].ts == orderedItems[j].ts {
+			return orderedItems[i].item.GetID() < orderedItems[j].item.GetID()
+		}
+		return orderedItems[i].ts < orderedItems[j].ts
 	})
 
 	if len(orderedItems) == 0 {

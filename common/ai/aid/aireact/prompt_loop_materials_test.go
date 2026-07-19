@@ -25,6 +25,42 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 	return sections
 }
 
+func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	react.AddToTimeline("note", "ANCIENT_LIGHTWEIGHT_CONTEXT "+strings.Repeat("old ", 20000))
+	react.AddToTimeline("note", "RECENT_LIGHTWEIGHT_FACT")
+
+	result, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:             "light-1",
+		Lightweight:       true,
+		UserQuery:         strings.Repeat("query ", 5000),
+		TaskInstruction:   "keep the task protocol",
+		Schema:            `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+		SkillsContext:     strings.Repeat("skill ", 5000),
+		TodoSnapshot:      strings.Repeat("todo ", 5000),
+		ReactiveData:      strings.Repeat("reactive ", 5000),
+		InjectedMemory:    strings.Repeat("memory ", 5000),
+		SessionEvidence:   strings.Repeat("evidence ", 5000),
+		FrozenUserContext: strings.Repeat("plan ", 5000),
+	})
+	require.NoError(t, err)
+	require.Contains(t, result.Prompt, "RECENT_LIGHTWEIGHT_FACT")
+	require.NotContains(t, result.Prompt, "ANCIENT_LIGHTWEIGHT_CONTEXT")
+	require.NotContains(t, result.Prompt, "evidence evidence evidence")
+	require.NotContains(t, result.Prompt, "Timeline Memory (Frozen)")
+	promptTokens := ytoken.CalcTokenCount(result.Prompt)
+	t.Logf("bounded lightweight loop prompt tokens: %d", promptTokens)
+	require.LessOrEqual(t, promptTokens, 30000)
+}
+
 // TestPromptManager_AssembleLoopPrompt_SectionOrder 验证"按稳定性分层"路径
 // 下 6 段顺序: high_static -> frozen_block -> semi_dynamic_1 (Skills)
 // -> semi_dynamic_2 (ExecutionPolicy + TaskInstruction + Schema + OutputExample) -> timeline_open ->
@@ -182,7 +218,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "Tool Inventory", sections[1].Children[0].Label)
 	require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, sections[1].Children[0].Role)
 
-	// semi_dynamic_1 段子结构: skills_context (本用例 RecentToolsCache 为空被过滤).
+	// semi_dynamic_1 段子结构: skills_context。
 	// 关键词: semi_dynamic_1 children, skills_context, Name 去前缀
 	require.Len(t, sections[2].Children, 1)
 	require.Equal(t, "section.semi_dynamic_1.skills_context", sections[2].Children[0].Key)
@@ -234,7 +270,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 }
 
 // TestPromptManager_RenderLoopSemiDynamic1Section_Order 验证 SEMI-1 段包含
-// SkillsContext 与 Timeline 晋升状态，但不接受旧 RecentToolsCache 独立输入，
+// SkillsContext 与 Timeline 晋升状态，
 // 也不包含 Schema / Persistent / OutputExample / Tool / Forge。
 //
 // 关键词: renderLoopSemiDynamic1Section, semi_dynamic_section_1 内容范围, P1.1
@@ -259,7 +295,6 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 		AIForgeList:          "* `forge-a`: forge a desc",
 		SkillsContext:        "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
 		PromotedSemiDynamic1: "<|CACHE_TOOL_CALL_[current-nonce]|>\npromoted cache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
-		RecentToolsCache:     "legacy cache body",
 		Schema:               `{"type":"object","properties":{"@action":{"type":"string"}}}`,
 		TaskInstruction:      "follow task rules",
 		OutputExample:        "example output",
@@ -272,7 +307,6 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 	require.NotEqual(t, -1, promotedIdx)
 	require.Less(t, skillsIdx, promotedIdx)
 	require.Contains(t, rendered, "promoted cache body")
-	require.NotContains(t, rendered, "legacy cache body")
 	// SEMI-1 段绝对不能含 Schema / Persistent / OutputExample / Tool / Forge.
 	require.NotContains(t, rendered, "<|SCHEMA|>")
 	require.NotContains(t, rendered, "<|PERSISTENT|>")
@@ -298,11 +332,10 @@ func TestPromptManager_RenderLoopSemiDynamic2Section_Order(t *testing.T) {
 	require.NoError(t, err)
 
 	rendered, err := react.promptManager.renderLoopSemiDynamic2Section(&reactloops.PromptPrefixMaterials{
-		SkillsContext:    "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
-		RecentToolsCache: "<|CACHE_TOOL_CALL_[current-nonce]|>\ncache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
-		Schema:           `{"type":"object","properties":{"@action":{"type":"string"}}}`,
-		TaskInstruction:  "follow task rules",
-		OutputExample:    "example output",
+		SkillsContext:   "<|SKILLS_CONTEXT_demo|>\nskill body\n<|SKILLS_CONTEXT_END_demo|>",
+		Schema:          `{"type":"object","properties":{"@action":{"type":"string"}}}`,
+		TaskInstruction: "follow task rules",
+		OutputExample:   "example output",
 	})
 	require.NoError(t, err)
 
@@ -733,86 +766,10 @@ func requireMessageHasNoCacheControl(t *testing.T, detail aispec.ChatDetail, lab
 	}
 }
 
-func TestPromptManager_AssembleLoopPrompt_IgnoresLegacyRecentToolsCacheInput(t *testing.T) {
-	react, err := NewTestReAct(
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"ok"},"cumulative_summary":"ok","human_readable_thought":"ok"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	require.NoError(t, err)
-
-	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
-
-	// 模拟 reactloops/prompt.go 中给 RecentToolsCache 注入的 CACHE_TOOL_CALL 块,
-	// 用占位符字面量 nonce "[current-nonce]" 渲染, 跨轮字节稳定.
-	// 关键词: CACHE_TOOL_CALL 物理迁移, [current-nonce] 占位符 nonce
-	cacheBlock := strings.Join([]string{
-		"<|DIRECT_TOOL_ROUTING_[current-nonce]|>",
-		"# Fast Tool Routing",
-		"Recent tools available via directly_call_tool.",
-		"<|DIRECT_TOOL_ROUTING_END_[current-nonce]|>",
-		"",
-		"<|CACHE_TOOL_CALL_[current-nonce]|>",
-		"<|TOOL_bash_[current-nonce]|>",
-		"## Tool: bash",
-		"<|TOOL_bash_END_[current-nonce]|>",
-		"<|CACHE_TOOL_CALL_END_[current-nonce]|>",
-	}, "\n")
-
-	result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
-		Nonce:            "turnA",
-		UserQuery:        "user query",
-		TaskInstruction:  "task rules",
-		Schema:           `{"type":"object"}`,
-		SkillsContext:    "<|SKILLS_CONTEXT_demo|>\nskill\n<|SKILLS_CONTEXT_END_demo|>",
-		RecentToolsCache: cacheBlock,
-	})
-	require.NoError(t, err)
-
-	prompt := result.Prompt
-
-	// The old independent source is ignored. Tool schemas now enter via
-	// promotable Timeline items and are projected into Open/Semi1 exactly once.
-	require.NotContains(t, prompt, "<|CACHE_TOOL_CALL_[current-nonce]|>")
-	require.NotContains(t, prompt, "# Fast Tool Routing")
-
-	semi1Start := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-1|>")
-	semi1End := strings.Index(prompt, "<|PROMPT_SECTION_END_semi-dynamic-1|>")
-	require.NotEqual(t, -1, semi1Start)
-	require.NotEqual(t, -1, semi1End)
-	semi2Start := strings.Index(prompt, "<|PROMPT_SECTION_semi-dynamic-2|>")
-	semi2End := strings.Index(prompt, "<|PROMPT_SECTION_END_semi-dynamic-2|>")
-	require.NotEqual(t, -1, semi2Start)
-	require.NotEqual(t, -1, semi2End)
-
-	// Existing cache wrappers remain structurally unchanged.
-	aiCacheSemiStart := strings.Index(prompt, "<|AI_CACHE_SEMI_semi|>")
-	aiCacheSemiEnd := strings.Index(prompt, "<|AI_CACHE_SEMI_END_semi|>")
-	require.NotEqual(t, -1, aiCacheSemiStart, "P1.1: prompt must contain AI_CACHE_SEMI_semi START")
-	require.NotEqual(t, -1, aiCacheSemiEnd, "P1.1: prompt must contain AI_CACHE_SEMI_semi END")
-	require.Less(t, aiCacheSemiStart, semi1Start,
-		"AI_CACHE_SEMI START must wrap PROMPT_SECTION_semi-dynamic-1")
-	require.Greater(t, aiCacheSemiEnd, semi1End,
-		"AI_CACHE_SEMI END must wrap PROMPT_SECTION_semi-dynamic-1")
-
-	// 6. semi-2 段必须被 AI_CACHE_SEMI2_semi 边界包裹 (P1.1 第二对 cache 边界)
-	aiCacheSemi2Start := strings.Index(prompt, "<|AI_CACHE_SEMI2_semi|>")
-	aiCacheSemi2End := strings.Index(prompt, "<|AI_CACHE_SEMI2_END_semi|>")
-	require.NotEqual(t, -1, aiCacheSemi2Start, "P1.1: prompt must contain AI_CACHE_SEMI2_semi START")
-	require.NotEqual(t, -1, aiCacheSemi2End, "P1.1: prompt must contain AI_CACHE_SEMI2_semi END")
-	require.Less(t, aiCacheSemi2Start, semi2Start,
-		"AI_CACHE_SEMI2 START must wrap PROMPT_SECTION_semi-dynamic-2")
-	require.Greater(t, aiCacheSemi2End, semi2End,
-		"AI_CACHE_SEMI2 END must wrap PROMPT_SECTION_semi-dynamic-2")
-}
-
 // TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns 验证
 // 在 turn nonce 不同的两次 AssembleLoopPrompt 调用中, semi-dynamic-1 与
-// semi-dynamic-2 段都跨 turn 字节稳定。RecentToolsCache 已位于最后 cache
-// boundary 之后, Schema / Persistent / OutputExample 也不依赖 turn nonce.
+// semi-dynamic-2 段都跨 turn 字节稳定。Schema / Persistent /
+// OutputExample 也不依赖 turn nonce.
 //
 // 这是 P1.1 三 cache 边界生效的前提: hijacker 切到 user2 (semi-1) 与 user3
 // (semi-2) 的字节流必须跨 turn 一致, 才能命中 dashscope prefix cache.
@@ -831,25 +788,13 @@ func TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns(t *te
 
 	tool := aitool.NewWithoutCallback("tool-a", aitool.WithDescription("tool a desc"))
 
-	cacheBlock := strings.Join([]string{
-		"<|DIRECT_TOOL_ROUTING_[current-nonce]|>",
-		"# Fast Tool Routing",
-		"<|DIRECT_TOOL_ROUTING_END_[current-nonce]|>",
-		"<|CACHE_TOOL_CALL_[current-nonce]|>",
-		"<|TOOL_bash_[current-nonce]|>",
-		"## Tool: bash",
-		"<|TOOL_bash_END_[current-nonce]|>",
-		"<|CACHE_TOOL_CALL_END_[current-nonce]|>",
-	}, "\n")
-
 	mk := func(turnNonce string, userQuery string) string {
 		result, err := react.promptManager.AssembleLoopPrompt([]*aitool.Tool{tool}, &reactloops.LoopPromptAssemblyInput{
-			Nonce:            turnNonce,
-			UserQuery:        userQuery,
-			TaskInstruction:  "task rules",
-			Schema:           `{"type":"object"}`,
-			SkillsContext:    "<|SKILLS_CONTEXT_demo|>\nskill\n<|SKILLS_CONTEXT_END_demo|>",
-			RecentToolsCache: cacheBlock,
+			Nonce:           turnNonce,
+			UserQuery:       userQuery,
+			TaskInstruction: "task rules",
+			Schema:          `{"type":"object"}`,
+			SkillsContext:   "<|SKILLS_CONTEXT_demo|>\nskill\n<|SKILLS_CONTEXT_END_demo|>",
 		})
 		require.NoError(t, err)
 		return result.Prompt

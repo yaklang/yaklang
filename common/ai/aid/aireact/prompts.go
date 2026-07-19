@@ -461,7 +461,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	prefixMaterials.SkillsContext = ""
 	prefixMaterials.PromotedSemiDynamic1 = ""
 	prefixMaterials.PromotedTimelineOpen = ""
-	prefixMaterials.RecentToolsCache = ""
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
@@ -523,7 +522,6 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 	prefixMaterials.SkillsContext = ""
 	prefixMaterials.PromotedSemiDynamic1 = ""
 	prefixMaterials.PromotedTimelineOpen = ""
-	prefixMaterials.RecentToolsCache = ""
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
@@ -922,17 +920,18 @@ func (pm *PromptManager) GenerateIntervalReviewPrompt(
 	return pm.GenerateIntervalReviewPromptWithContext(tool, params, stdoutSnapshot, stderrSnapshot, time.Time{}, 0, "")
 }
 
-// GenerateIntervalReviewPromptWithContext generates interval review prompt with shared prompt
-// prefix assembly.
+// GenerateIntervalReviewPromptWithContext generates a dedicated bounded prompt
+// for speed-priority progress review.
 //
-// aicache 命中率优化:
-//   - 复用 preparePromptPrefixMaterials + assemblePromptWithDynamicSection
+// 轻量上下文控制:
+//   - 不继承主循环的 high-static / frozen Timeline / promoted state
+//   - 只读取最近 2048 tokens 的 prompt-visible Timeline
 //   - 审核规则 / schema / valid output example 固定在 semi-dynamic-2
-//   - 当前时间、运行时长、stdout/stderr 快照、额外提示等高抖动字段保留在 dynamic
+//   - dynamic 各字段独立限额，整条 prompt 设置 9000-token 硬上限
 //
-// 关键词: GenerateIntervalReviewPromptWithContext, interval-review,
+// 关键词: GenerateIntervalReviewPromptWithContext, interval-review, recent timeline,
 //
-//	preparePromptPrefixMaterials, assemblePromptWithDynamicSection
+//	lightweight prompt budget
 func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 	tool *aitool.Tool,
 	params aitool.InvokeParams,
@@ -942,50 +941,43 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 	callExpectations string,
 ) (string, error) {
 	nonceString := nonce()
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  nonceString,
-		Schema: intervalReviewSchemaJSON,
-	})
-	if err != nil {
-		return "", err
-	}
-	prefixMaterials.AllowToolCall = false
-	prefixMaterials.AllowPlanAndExec = false
-	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(intervalReviewInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(intervalReviewOutputExampleText)
-	prefixMaterials.ToolInventory = false
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
-	prefixMaterials.SkillsContext = ""
-	prefixMaterials.PromotedSemiDynamic1 = ""
-	prefixMaterials.PromotedTimelineOpen = ""
-	prefixMaterials.RecentToolsCache = ""
+	const (
+		intervalReviewMaxPromptTokens        = 9000
+		intervalReviewTimelineTokens         = 2048
+		intervalReviewUserQueryTokens        = 1024
+		intervalReviewTaskGoalTokens         = 256
+		intervalReviewToolDescriptionTokens  = 512
+		intervalReviewToolNameTokens         = 128
+		intervalReviewToolParamsTokens       = 1536
+		intervalReviewStdoutTokens           = 1024
+		intervalReviewStderrTokens           = 512
+		intervalReviewCallExpectationTokens  = 512
+		intervalReviewExtraInstructionTokens = 512
+	)
 
 	userQuery := ""
 	taskGoal := ""
 	if task := pm.react.GetCurrentTask(); task != nil {
-		userQuery = task.GetUserInput()
-		taskGoal = task.GetName()
+		userQuery = aicommon.ShrinkTextBlockByTokens(task.GetUserInput(), intervalReviewUserQueryTokens)
+		taskGoal = aicommon.ShrinkTextBlockByTokens(task.GetName(), intervalReviewTaskGoalTokens)
 	}
 
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: userQuery,
-	})
-	dynamicData["ToolName"] = tool.Name
-	dynamicData["ToolDescription"] = tool.Description
-	dynamicData["ToolParams"] = params.Dump()
+	dynamicData := map[string]any{
+		"Nonce":     nonceString,
+		"UserQuery": userQuery,
+	}
+	dynamicData["ToolName"] = aicommon.ShrinkStringByTokens(tool.Name, intervalReviewToolNameTokens)
+	dynamicData["ToolDescription"] = aicommon.ShrinkTextBlockByTokens(tool.Description, intervalReviewToolDescriptionTokens)
+	dynamicData["ToolParams"] = aicommon.ShrinkTextBlockByTokens(params.Dump(), intervalReviewToolParamsTokens)
 	dynamicData["CurrentTime"] = time.Now().Format("2006-01-02 15:04:05")
 	dynamicData["ReviewCount"] = reviewCount
-	dynamicData["StdoutSnapshot"] = utils.ShrinkString(string(stdoutSnapshot), 3000)
-	dynamicData["StderrSnapshot"] = utils.ShrinkString(string(stderrSnapshot), 1500)
-	dynamicData["CallExpectations"] = callExpectations
-	dynamicData["ExtraPrompt"] = strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt))
+	dynamicData["StdoutSnapshot"] = aicommon.ShrinkTextBlockByTokens(string(stdoutSnapshot), intervalReviewStdoutTokens)
+	dynamicData["StderrSnapshot"] = aicommon.ShrinkTextBlockByTokens(string(stderrSnapshot), intervalReviewStderrTokens)
+	dynamicData["CallExpectations"] = aicommon.ShrinkTextBlockByTokens(callExpectations, intervalReviewCallExpectationTokens)
+	dynamicData["ExtraPrompt"] = aicommon.ShrinkTextBlockByTokens(
+		strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt)),
+		intervalReviewExtraInstructionTokens,
+	)
 	dynamicData["TaskGoal"] = taskGoal
 
 	if !startTime.IsZero() {
@@ -997,12 +989,42 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 		dynamicData["StartTime"] = "unknown"
 	}
 
-	return pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"interval-review-dynamic",
-		intervalReviewDynamicTemplate,
-		dynamicData,
+	dynamic, err := aicommon.RenderPromptTemplate("interval-review-dynamic", intervalReviewDynamicTemplate, dynamicData)
+	if err != nil {
+		return "", err
+	}
+	semiDynamic2, err := aicommon.RenderPromptTemplate(
+		"interval-review-semi-dynamic-2",
+		aicommon.SharedTaskInstructionSchemaExampleTemplate,
+		(&aicommon.PromptMaterials{
+			TaskInstruction: strings.TrimSpace(intervalReviewInstructionText),
+			Schema:          strings.TrimSpace(intervalReviewSchemaJSON),
+			OutputExample:   strings.TrimSpace(intervalReviewOutputExampleText),
+		}).SemiDynamic2Data(),
 	)
+	if err != nil {
+		return "", err
+	}
+	recentTimeline := ""
+	if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
+		recentTimeline = pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens)
+	}
+	if recentTimeline == "" {
+		recentTimeline = "<|TIMELINE_RECENT|>\n(no recent Timeline items)\n<|TIMELINE_RECENT_END|>"
+	}
+	prompt := aicommon.BuildTaggedPromptSections(
+		"You are performing a bounded progress review for one running tool call.",
+		"",
+		"",
+		semiDynamic2,
+		recentTimeline,
+		dynamic,
+		nonceString,
+	)
+	if tokens := aicommon.MeasureTokens(prompt); tokens > intervalReviewMaxPromptTokens {
+		return "", fmt.Errorf("interval review prompt exceeds %d-token hard limit: %d", intervalReviewMaxPromptTokens, tokens)
+	}
+	return prompt, nil
 }
 
 // formatDuration formats a duration into a human-readable string

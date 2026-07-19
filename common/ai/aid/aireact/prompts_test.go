@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -1174,8 +1175,8 @@ func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 		"# TODO:",
 		"- [ ]: [id: verify_file]: 检查 A.md 是否已写入预期内容",
 		"- [ ]: [id: create_file]: 创建一个 A.md 文件",
-		"- [DELETED]: [id: obsolete_step]: 不再需要的临时步骤",
-		"- [x]: [id: rename_file]: 将临时文件改名为最终文件名",
+		"- DONE (1): rename_file",
+		"- DELETED (1): obsolete_step",
 		"next_movements 只输出增量",
 		"{\"op\": \"doing\", \"id\": \"stable_id\"}",
 		"{\"op\": \"delete\", \"id\": \"stable_id\"}",
@@ -1229,8 +1230,7 @@ func TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied(t *testi
 
 	if !utils.MatchAllOfSubString(
 		prompt,
-		"- [SKIPPED]: [id: collect_signal]: 收集页面回显信号",
-		"- [SKIPPED]: [id: retry_payload]: 更换 payload 再次验证",
+		"- SKIPPED (2): collect_signal, retry_payload",
 		"必须被显式关闭",
 		"系统不再自动把剩余未关闭 TODO 标记为 `SKIPPED`",
 	) {
@@ -1359,6 +1359,42 @@ func TestGenerateIntervalReviewPrompt_IncludesConcreteStringGuidance(t *testing.
 	) {
 		t.Fatalf("interval review prompt should contain anti-schema guidance and concrete example. Got:\n%s", prompt)
 	}
+}
+
+func TestGenerateIntervalReviewPrompt_UsesOnlyBoundedRecentTimeline(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"interval-toolcall-review","decision":"continue"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	react.AddToTimeline("note", "ANCIENT_INTERVAL_CONTEXT "+strings.Repeat("old ", 12000))
+	react.AddToTimeline("note", "RECENT_INTERVAL_FACT")
+
+	tool := aitool.NewWithoutCallback(
+		"network_diagnose",
+		aitool.WithDescription(strings.Repeat("description ", 4000)),
+		aitool.WithStringParam("target"),
+	)
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool,
+		aitool.InvokeParams{"target": strings.Repeat("127.0.0.1 ", 4000)},
+		[]byte(strings.Repeat("stdout ", 4000)),
+		[]byte(strings.Repeat("stderr ", 4000)),
+		time.Unix(0, 0),
+		1,
+		strings.Repeat("expectation ", 4000),
+	)
+	require.NoError(t, err)
+	require.Contains(t, prompt, "RECENT_INTERVAL_FACT")
+	require.NotContains(t, prompt, "ANCIENT_INTERVAL_CONTEXT")
+	require.NotContains(t, prompt, "Timeline Memory (Frozen)")
+	promptTokens := aicommon.MeasureTokens(prompt)
+	t.Logf("bounded interval-review prompt tokens: %d", promptTokens)
+	require.LessOrEqual(t, promptTokens, 9000)
 }
 
 func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {

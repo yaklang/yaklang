@@ -157,13 +157,17 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	if err != nil {
 		return nil, err
 	}
+	effectiveInput := input
+	if input.Lightweight {
+		base, effectiveInput = pm.projectLightweightLoopMaterials(base, input)
+	}
 
-	prefixMaterials := pm.NewPromptMaterials(base, input)
+	prefixMaterials := pm.NewPromptMaterials(base, effectiveInput)
 	prefix, err := pm.AssemblePromptPrefix(prefixMaterials)
 	if err != nil {
 		return nil, err
 	}
-	dynamicData := pm.buildLoopPromptSectionData(base, input)
+	dynamicData := pm.buildLoopPromptSectionData(base, effectiveInput)
 	dynamic, err := pm.renderLoopDynamicSection(dynamicData)
 	if err != nil {
 		return nil, err
@@ -171,7 +175,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 
 	sections := make([]*reactloops.PromptSectionObservation, 0, len(prefix.Sections))
 	sections = append(sections, prefix.Sections...)
-	if dynamicSection := pm.buildDynamicObservation(base, input, dynamic); dynamicSection != nil {
+	if dynamicSection := pm.buildDynamicObservation(base, effectiveInput, dynamic); dynamicSection != nil {
 		sections = append(sections, dynamicSection)
 	}
 
@@ -188,6 +192,74 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		Prompt:   prompt,
 		Sections: sections,
 	}, nil
+}
+
+const (
+	lightweightLoopRecentTimelineTokens  = 4096
+	lightweightLoopUserQueryTokens       = 2048
+	lightweightLoopTaskInstructionTokens = 6144
+	lightweightLoopOutputExampleTokens   = 1024
+	lightweightLoopSkillsTokens          = 1024
+	lightweightLoopSkillBodyTokens       = 2048
+	lightweightLoopPlanContextTokens     = 2048
+	lightweightLoopTodoTokens            = 2048
+	lightweightLoopExtraTokens           = 1024
+	lightweightLoopReactiveTokens        = 3072
+	lightweightLoopMemoryTokens          = 1024
+)
+
+// projectLightweightLoopMaterials keeps the ReAct protocol and task-specific
+// schema intact while removing the full-session context that is uneconomical
+// for speed-priority models. The recent Timeline window is the sole historical
+// execution source; volatile auxiliary fields receive explicit budgets.
+func (pm *PromptManager) projectLightweightLoopMaterials(
+	base *reactloops.LoopPromptBaseMaterials,
+	input *reactloops.LoopPromptAssemblyInput,
+) (*reactloops.LoopPromptBaseMaterials, *reactloops.LoopPromptAssemblyInput) {
+	if base == nil || input == nil {
+		return base, input
+	}
+	lightBase := *base
+	lightBase.PromptFrozenOpenMaterials = aicommon.PromptFrozenOpenMaterials{}
+	if pm != nil && pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
+		lightBase.TimelineOpen = pm.react.config.GetTimeline().DumpRecentForPrompt(lightweightLoopRecentTimelineTokens)
+	}
+	lightBase.AutoContext = ""
+	lightBase.UserHistory = ""
+	lightBase.ShowForgeInventory = false
+	lightBase.AIForgeList = ""
+	lightBase.TopTools = aicommon.SelectToolsByTokenBudget(lightBase.TopTools, 2048, 0)
+	lightBase.TopToolsCount = len(lightBase.TopTools)
+	lightBase.HasMoreTools = lightBase.ToolsCount > lightBase.TopToolsCount
+	lightBase.MoreToolsCount = lightBase.ToolsCount - lightBase.TopToolsCount
+
+	lightInput := *input
+	lightInput.UserQuery = aicommon.ShrinkTextBlockByTokens(input.UserQuery, lightweightLoopUserQueryTokens)
+	lightInput.TaskInstruction = boundedLightweightPromptBlock(input.TaskInstruction, lightweightLoopTaskInstructionTokens, "task instruction")
+	lightInput.OutputExample = boundedLightweightPromptBlock(input.OutputExample, lightweightLoopOutputExampleTokens, "output example")
+	lightInput.SkillsContext = boundedLightweightPromptBlock(input.SkillsContext, lightweightLoopSkillsTokens, "skills context")
+	lightInput.ForcedSkills = boundedLightweightPromptBlock(input.ForcedSkills, lightweightLoopSkillBodyTokens, "forced skill body")
+	lightInput.AutoLoadedSkills = boundedLightweightPromptBlock(input.AutoLoadedSkills, lightweightLoopSkillBodyTokens, "auto-loaded skill body")
+	lightInput.FrozenUserContext = boundedLightweightPromptBlock(input.FrozenUserContext, lightweightLoopPlanContextTokens, "plan context")
+	lightInput.FrozenPartitions = nil
+	lightInput.SessionEvidence = ""
+	lightInput.TodoSnapshot = boundedLightweightPromptBlock(input.TodoSnapshot, lightweightLoopTodoTokens, "TODO snapshot")
+	lightInput.ExtraCapabilities = aicommon.ShrinkTextBlockByTokens(input.ExtraCapabilities, lightweightLoopExtraTokens)
+	lightInput.ReactiveData = aicommon.ShrinkTextBlockByTokens(input.ReactiveData, lightweightLoopReactiveTokens)
+	lightInput.InjectedMemory = aicommon.ShrinkTextBlockByTokens(input.InjectedMemory, lightweightLoopMemoryTokens)
+	return &lightBase, &lightInput
+}
+
+func boundedLightweightPromptBlock(content string, tokenLimit int, label string) string {
+	if strings.TrimSpace(content) == "" {
+		return ""
+	}
+	if aicommon.MeasureTokens(content) <= tokenLimit {
+		return content
+	}
+	// These inputs often already contain AITAG wrappers. Cutting through them
+	// creates malformed prompt structure, so omit an oversized block atomically.
+	return fmt.Sprintf("[%s omitted from lightweight prompt: exceeds %d-token budget]", label, tokenLimit)
 }
 
 func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMaterials, input *reactloops.LoopPromptAssemblyInput) *aicommon.PromptMaterials {

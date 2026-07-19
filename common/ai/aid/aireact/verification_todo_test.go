@@ -41,9 +41,12 @@ func TestRenderVerificationTodoSnapshot_AggregatesStatuses(t *testing.T) {
 	}
 
 	snapshot := renderVerificationTodoSnapshot(history)
-	require.Contains(t, snapshot, "- [x]: [id: collect_signal]: 收集页面响应信号")
-	require.Contains(t, snapshot, "- [DELETED]: [id: fix_title]: 修正标题")
-	require.Contains(t, snapshot, "- [SKIPPED]: [id: replay_payload]: 使用新 payload 复测")
+	require.Contains(t, snapshot, "- DONE (1): collect_signal")
+	require.Contains(t, snapshot, "- DELETED (1): fix_title")
+	require.Contains(t, snapshot, "- SKIPPED (1): replay_payload")
+	require.NotContains(t, snapshot, "收集页面响应信号")
+	require.NotContains(t, snapshot, "修正标题")
+	require.NotContains(t, snapshot, "使用新 payload 复测")
 }
 
 func TestRenderVerificationTodoSnapshot_PrioritizesActiveItemsUnderLimit(t *testing.T) {

@@ -124,7 +124,7 @@ LOOP:
 					log.Errorf("failed to parse pressure event: %v", err)
 					continue
 				}
-				requiredFields := []string{"current_cost_token_size", "pressure_token_size", "model_tier"}
+				requiredFields := []string{"current_cost_token_size", "pressure_token_size", "model_tier", "caller_label"}
 				for _, field := range requiredFields {
 					if _, ok := data[field]; !ok {
 						t.Fatalf("pressure event missing '%s' field", field)

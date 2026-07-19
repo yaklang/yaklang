@@ -65,7 +65,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	elapsed := time.Since(startTime)
 	log.Infof("toolcall interval review #%d triggered for tool [%s], elapsed: %v", reviewCount, tool.Name, elapsed)
 
-	// Generate the interval review prompt with full context
+	// Generate a bounded speed-priority prompt from the newest Timeline facts.
 	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContext(
 		tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations,
 	)
