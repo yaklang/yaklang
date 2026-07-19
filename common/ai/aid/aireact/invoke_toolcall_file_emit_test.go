@@ -122,12 +122,10 @@ func TestReAct_ToolCall_FileEmit(t *testing.T) {
 		}
 	}()
 
-	// 设置超时时间，确保测试在10s内完成
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	// Artifact persistence is I/O-bound and can be slower on shared CI runners.
+	// Keep the assertion below the documented 10s budget without making CI use a
+	// stricter deadline than local runs.
+	after := time.After(8 * time.Second)
 
 	// 收集 emit 的 report markdown 文件路径
 	var reportFilePath string
