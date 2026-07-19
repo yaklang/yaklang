@@ -142,30 +142,76 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 		if !skipInformational || rsp.StatusCode < 100 || rsp.StatusCode >= 200 || rsp.StatusCode == http.StatusSwitchingProtocols {
 			break
 		}
+		// Only skip well-known interim responses (100/102/103). Other 1xx may be
+		// standalone packets (e.g. traffic generators) and must parse as themselves.
+		if rsp.StatusCode != 100 && rsp.StatusCode != 102 && rsp.StatusCode != 103 {
+			break
+		}
 		informationalResponses++
 		if informationalResponses >= 16 {
 			return nil, Error("too many informational HTTP responses")
 		}
 
 		// Informational responses have no body. Consume their header section and
-		// continue with the next response on the same connection.
+		// continue with the next response on the same connection — but only when a
+		// real following HTTP response exists. Otherwise rewind and keep this 1xx.
+		var headerBlock bytes.Buffer
+		canSkip := true
 		for {
-			firstLine, err = ReadLine(headerReader)
-			if err != nil {
-				return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
-			}
-			if len(bytes.TrimSpace(firstLine)) == 0 {
+			line, lineErr := ReadLine(headerReader)
+			if lineErr != nil {
+				canSkip = false
+				if len(bytes.TrimSpace(line)) > 0 {
+					headerBlock.Write(line)
+				}
 				break
+			}
+			if len(bytes.TrimSpace(line)) == 0 {
+				break
+			}
+			headerBlock.Write(line)
+			headerBlock.WriteString(CRLF)
+		}
+		var nextFirst []byte
+		nextFirstHadEOL := false
+		if canSkip {
+			for {
+				line, lineErr := ReadLine(headerReader)
+				if len(bytes.TrimSpace(line)) > 0 {
+					nextFirst = line
+					nextFirstHadEOL = lineErr == nil
+					if lineErr != nil {
+						canSkip = false
+					}
+					break
+				}
+				if lineErr != nil {
+					canSkip = false
+					break
+				}
 			}
 		}
-		for {
-			firstLine, err = ReadLine(headerReader)
-			if err != nil {
-				return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
+		if canSkip {
+			proto, code, _, parsed := ParseHTTPResponseLine(string(nextFirst))
+			if parsed && strings.HasPrefix(proto, "HTTP/") && code >= 100 {
+				firstLine = nextFirst
+				continue
 			}
-			if len(bytes.TrimSpace(firstLine)) > 0 {
-				break
+			canSkip = false
+		}
+		if !canSkip {
+			// Put consumed bytes back so this 1xx can be parsed as the final response.
+			var rewind bytes.Buffer
+			rewind.Write(headerBlock.Bytes())
+			rewind.WriteString(CRLF)
+			if len(nextFirst) > 0 {
+				rewind.Write(nextFirst)
+				if nextFirstHadEOL {
+					rewind.WriteString(CRLF)
+				}
 			}
+			headerReader = io.MultiReader(bytes.NewReader(rewind.Bytes()), headerReader)
+			break
 		}
 	}
 	rawPacket.Write(firstLine)

@@ -16,7 +16,7 @@ const Fallback modifier.Modifier = 1 << 20
 var defaultRandom = map[modifier.Modifier]regen.Generator{
 	modifier.HTTPMethod:   MustGenerator(`^(GET|POST|HEAD|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)`),
 	modifier.HTTPUri:      MustGenerator(`^(\/[a-zA-Z0-9]{3,10}){2,5}`),
-	modifier.HTTPStatCode: MustGenerator(`^[1-5][0-1][0-9]`),
+	modifier.HTTPStatCode: MustGenerator(`^[2-5][0-5][0-9]`),
 	modifier.HTTPStatMsg:  MustGenerator(`^[A-Z][a-zA-Z]{2,5}`),
 	modifier.HTTPHost:     MustGenerator(`^([a-zA-Z0-9]{3,6}\.){2,}[a-zA-Z0-9]{3,6}`),
 	modifier.HTTPProtocol: MustGenerator(`^HTTP\/1\.1`),
