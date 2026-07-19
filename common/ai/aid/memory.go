@@ -204,7 +204,7 @@ func (m *PromptContextProvider) TimelineDump() string {
 }
 
 // TimelineDumpFrozenOpen 把 timeline 拆成 frozen / open 两半返回,
-// 提供给 LiteForge 等 5 段稳定性分层模板把 frozen 段塞进
+// 提供给需要完整 Timeline 的 5 段稳定性分层模板把 frozen 段塞进
 // <|AI_CACHE_FROZEN_semi-dynamic|> 块, open 段塞进
 // <|PROMPT_SECTION_timeline-open|> 块。
 //
@@ -213,7 +213,7 @@ func (m *PromptContextProvider) TimelineDump() string {
 //
 // 关键词: PromptContextProvider.TimelineDumpFrozenOpen, 5 段稳定性分层,
 //
-//	LiteForge timeline 拆分, frozen open
+//	full timeline 拆分, frozen open
 func (m *PromptContextProvider) TimelineDumpFrozenOpen() (frozen string, open string) {
 	if m == nil || m.timeline == nil {
 		return "", ""

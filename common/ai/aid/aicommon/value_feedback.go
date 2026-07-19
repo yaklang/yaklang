@@ -43,7 +43,22 @@ const (
 	// "该漏洞是否为误报" 的反馈. 误报信号可来自 AI 自判 (source=model_judge) 或
 	// 人工确认 (source=human), 由 RiskFeedback.Source 区分.
 	ValueFeedbackTriggerRiskFeedback = "risk_feedback"
+
+	// ValueFeedbackRecentTimelineTokens bounds the trace sent to the
+	// speed-priority value evaluator. Value feedback is emitted repeatedly
+	// during a session, so using Timeline.Dump here makes every lightweight
+	// request grow with the entire session and eventually creates the periodic
+	// context spikes it is meant to observe. The persisted Timeline remains
+	// complete; only this evaluator projection is recent-only.
+	ValueFeedbackRecentTimelineTokens = 2048
 )
+
+func recentTimelineForValueFeedback(timeline *Timeline) string {
+	if timeline == nil {
+		return ""
+	}
+	return timeline.DumpRecentForPrompt(ValueFeedbackRecentTimelineTokens)
+}
 
 // ValueFeedbackAction 是一次动作的轻量表示 (避免 aicommon 反向依赖 reactloops
 // 的 ActionRecord). 由上层把 ActionRecord 转换成该结构填入.
@@ -59,20 +74,20 @@ type ValueFeedbackAction struct {
 // 的依据是 source=human, 而非 execution_policy.
 const (
 	ApprovalSourceHuman           = "human"            // 真人工裁决
-	ApprovalSourcePolicy          = "policy"            // 策略自动放行 (yolo/auto)
-	ApprovalSourceModelJudge      = "model_judge"       // AI 风控/助手判定
-	ApprovalSourceRule            = "rule"              // 规则判定
-	ApprovalSourceTimeoutFallback = "timeout_fallback"  // 超时兜底放行
+	ApprovalSourcePolicy          = "policy"           // 策略自动放行 (yolo/auto)
+	ApprovalSourceModelJudge      = "model_judge"      // AI 风控/助手判定
+	ApprovalSourceRule            = "rule"             // 规则判定
+	ApprovalSourceTimeoutFallback = "timeout_fallback" // 超时兜底放行
 )
 
 // approval.decision 枚举: 描述审批的客观结果.
 const (
-	ApprovalDecisionApprove        = "approve"           // 同意 (未改参数)
+	ApprovalDecisionApprove         = "approve"           // 同意 (未改参数)
 	ApprovalDecisionApproveWithEdit = "approve_with_edit" // 同意但修改了参数
-	ApprovalDecisionReject         = "reject"            // 拒绝
-	ApprovalDecisionCancel         = "cancel"            // 取消 (无最终参数)
-	ApprovalDecisionTimeout        = "timeout"           // 超时
-	ApprovalDecisionNotRequired    = "not_required"      // 无需审批 (策略自动放行)
+	ApprovalDecisionReject          = "reject"            // 拒绝
+	ApprovalDecisionCancel          = "cancel"            // 取消 (无最终参数)
+	ApprovalDecisionTimeout         = "timeout"           // 超时
+	ApprovalDecisionNotRequired     = "not_required"      // 无需审批 (策略自动放行)
 )
 
 // ValueFeedbackApproval 描述一次审批决策 (记录事实, 不预先下训练标签).
@@ -361,7 +376,7 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 		UserQuery: c.firstUserQuery(),
 	}
 	if c.Timeline != nil {
-		record.TimelineDump = c.Timeline.Dump()
+		record.TimelineDump = recentTimelineForValueFeedback(c.Timeline)
 	}
 	SubmitValueFeedback(c, record)
 }
@@ -444,7 +459,7 @@ func (c *Config) SubmitToolRiskFeedback(focusMode string, risks []*schema.Risk) 
 		},
 	}
 	if c.Timeline != nil {
-		record.TimelineDump = c.Timeline.Dump()
+		record.TimelineDump = recentTimelineForValueFeedback(c.Timeline)
 	}
 	SubmitValueFeedback(c, record)
 }

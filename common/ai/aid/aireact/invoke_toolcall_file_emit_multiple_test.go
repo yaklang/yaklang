@@ -141,15 +141,14 @@ LOOP:
 	for {
 		select {
 		case e := <-out:
-			// 检查文件 emit 事件 - 新格式: tool_calls/{n}_{tool}_{id}.md
+			// 检查文件 emit 事件 - 新格式: tool_calls/{n}_{tool}_{id}/report.md
 			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
 				content := string(e.GetContent())
 				filePath := utils.InterfaceToString(jsonpath.FindFirst(content, "$.path"))
 				if filePath != "" && strings.HasSuffix(filePath, ".md") && strings.Contains(filePath, "tool_calls") {
-					// 从文件名中提取调用次数
-					filename := filepath.Base(filePath)
-					nameWithoutExt := strings.TrimSuffix(filename, ".md")
-					parts := strings.Split(nameWithoutExt, "_")
+					// 从 bundle 目录名中提取调用次数
+					bundleName := filepath.Base(filepath.Dir(filePath))
+					parts := strings.Split(bundleName, "_")
 					if len(parts) >= 2 {
 						callNumber := utils.InterfaceToInt(parts[0])
 						if callNumber > 0 {
@@ -207,14 +206,15 @@ LOOP:
 			continue
 		}
 
-		// 验证文件名格式: {n}_{tool}_{identifier}.md
+		// 验证 bundle 格式: {n}_{tool}_{identifier}/report.md
 		filename := filepath.Base(filePath)
-		if !strings.HasPrefix(filename, fmt.Sprintf("%d_", callNumber)) {
-			t.Errorf("Report for call %d should start with '%d_', got: %s", callNumber, callNumber, filename)
+		bundleName := filepath.Base(filepath.Dir(filePath))
+		if filename != "report.md" || !strings.HasPrefix(bundleName, fmt.Sprintf("%d_", callNumber)) {
+			t.Errorf("Bundle for call %d should start with '%d_', got: %s", callNumber, callNumber, bundleName)
 		}
-		// 验证文件名包含 identifier
-		if !strings.Contains(filename, fmt.Sprintf("call_%d_test", callNumber)) {
-			t.Errorf("Report for call %d should contain identifier 'call_%d_test', got: %s", callNumber, callNumber, filename)
+		// 验证 bundle 目录名包含 identifier
+		if !strings.Contains(bundleName, fmt.Sprintf("call_%d_test", callNumber)) {
+			t.Errorf("Bundle for call %d should contain identifier 'call_%d_test', got: %s", callNumber, callNumber, bundleName)
 		}
 
 		// 验证 report 内容包含关键部分

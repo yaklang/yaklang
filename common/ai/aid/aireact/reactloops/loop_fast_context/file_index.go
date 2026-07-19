@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -23,17 +22,11 @@ const (
 // Allow optional log prefixes (e.g. "[info]   ") before "[file N]".
 var grepFileLinePattern = regexp.MustCompile(`\[file\s+\d+\]\s+(.+?)\s+\(\d+\s+matches\)\s*$`)
 
-// toolOutputString extracts capture stdout from a tool result Data payload.
-// InterfaceToString(*ToolExecutionResult) JSON-marshals the struct and breaks line parsers.
+// toolOutputString returns the bounded ToolResult.Data preview. Full output is
+// intentionally available only through the artifact paths embedded in it.
 func toolOutputString(data any) string {
 	if data == nil {
 		return ""
-	}
-	if exec, ok := data.(*aitool.ToolExecutionResult); ok {
-		if exec.CombinedOutput != "" {
-			return exec.CombinedOutput
-		}
-		return exec.Stdout + exec.Stderr
 	}
 	return utils.InterfaceToString(data)
 }

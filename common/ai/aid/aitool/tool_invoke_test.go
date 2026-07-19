@@ -1,6 +1,7 @@
 package aitool
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -617,13 +618,43 @@ func TestInvokeWithParamsLargeContent(t *testing.T) {
 	require.True(t, ok, "结果类型错误，期望 *ToolExecutionResult")
 
 	// CombinedOutput 应该包含完整的 stdout 和 stderr 内容
-	// (InvokeWithParams 不再做截断，截断在 saveToolCallFiles 层完成)
+	// (InvokeWithParams 保留底层完整结果；AI 编排层会将结果外置到 Artifact，
+	// 并在进入 Timeline 前生成受 token 上限约束的字符串 Data。)
 	require.Contains(t, execResult.CombinedOutput, strings.Repeat("A", 100), "合并输出应包含 stdout 内容")
 	require.Contains(t, execResult.CombinedOutput, strings.Repeat("B", 100), "合并输出应包含 stderr 内容")
 
 	// stdout 和 stderr 仍然分别保留
 	require.Contains(t, execResult.Stdout, strings.Repeat("A", 100), "stdout 应包含 stdout 内容")
 	require.Contains(t, execResult.Stderr, strings.Repeat("B", 100), "stderr 应包含 stderr 内容")
+}
+
+func TestInvokeWithParamsCanDisableInMemoryOutputCapture(t *testing.T) {
+	tool, err := New("artifact-owned-output",
+		WithSimpleCallback(func(_ InvokeParams, stdout, stderr io.Writer) (any, error) {
+			_, _ = io.WriteString(stdout, "stdout-owned-by-artifact")
+			_, _ = io.WriteString(stderr, "stderr-owned-by-artifact")
+			return map[string]any{"status": "ok"}, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	var stdout, stderr bytes.Buffer
+	result, err := tool.InvokeWithParams(
+		map[string]any{},
+		WithStdout(&stdout),
+		WithStderr(&stderr),
+		WithOutputCapture(false),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "stdout-owned-by-artifact", stdout.String())
+	require.Equal(t, "stderr-owned-by-artifact", stderr.String())
+
+	execution, ok := result.Data.(*ToolExecutionResult)
+	require.True(t, ok)
+	require.Empty(t, execution.Stdout)
+	require.Empty(t, execution.Stderr)
+	require.Empty(t, execution.CombinedOutput)
+	require.Equal(t, map[string]any{"status": "ok"}, execution.Result)
 }
 
 func TestApplyDefault_NestedArrayWithNilPropertyTypesDoesNotPanic(t *testing.T) {

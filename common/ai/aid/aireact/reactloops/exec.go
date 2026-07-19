@@ -1029,7 +1029,7 @@ LOOP:
 
 		// Temporarily sync the invoker's currentTask with this loop's task so that
 		// any tool call made inside the action handler (via ExecuteToolRequiredAndCallWithoutRequired)
-		// writes its log files (saveToolCallFiles) into the sub-task's directory instead of
+		// writes its tool-call Artifact bundle into the sub-task's directory instead of
 		// the top-level orchestrator task's directory.
 		func() {
 			invoker := r.GetInvoker()

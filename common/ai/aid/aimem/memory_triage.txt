@@ -17,8 +17,6 @@ You are an AI Memory Triage System. Your task is to analyze user input and gener
 <|AI_CACHE_SYSTEM_END_high-static|>
 
 <|PROMPT_SECTION_semi-dynamic|>
-{{ .Basic }}
-
 ## Hard Rules:
 - Do NOT create memory for one-off events, transient execution logs, tool call traces, temporary states, or pure process observations.
 - Do NOT store exact timestamps, per-visit browsing records, or single-use operational facts such as "the user visited a URL at 10:20".

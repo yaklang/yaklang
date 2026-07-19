@@ -3845,6 +3845,13 @@ func (c *Config) restorePersistentSession() {
 		}
 	}
 
+	// Historical Timeline entries may still contain the complete structured
+	// ToolExecutionResult. Once the original workdir is known, externalize those
+	// envelopes exactly once and persist the canonical bounded string Data.
+	if timelineInstance.migrateLegacyToolResults(c.GetOrCreateWorkDir()) {
+		timelineInstance.Save(c.GetDB(), c.PersistentSessionId)
+	}
+
 	// Restore loaded skill names from previous session
 	if runtime.LoadedSkillNames != "" {
 		names := strings.Split(runtime.LoadedSkillNames, ",")

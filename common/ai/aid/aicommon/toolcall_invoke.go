@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,20 +28,28 @@ const (
 )
 
 type toolOutputBuffer struct {
-	mu  sync.RWMutex
-	buf bytes.Buffer
+	mu      sync.Mutex
+	sampler *boundedHeadTailBuffer
 }
 
 func (b *toolOutputBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.Write(p)
+	if b.sampler == nil {
+		b.sampler = newBoundedHeadTailBuffer(toolOutputSnapshotMaxBytes)
+	}
+	sampler := b.sampler
+	b.mu.Unlock()
+	return sampler.Write(p)
 }
 
 func (b *toolOutputBuffer) Snapshot() []byte {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return bytes.Clone(b.buf.Bytes())
+	b.mu.Lock()
+	sampler := b.sampler
+	b.mu.Unlock()
+	if sampler == nil {
+		return nil
+	}
+	return sampler.Snapshot()
 }
 
 func (b *toolOutputBuffer) Bytes() []byte {
@@ -50,9 +57,13 @@ func (b *toolOutputBuffer) Bytes() []byte {
 }
 
 func (b *toolOutputBuffer) Len() int {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.buf.Len()
+	b.mu.Lock()
+	sampler := b.sampler
+	b.mu.Unlock()
+	if sampler == nil {
+		return 0
+	}
+	return sampler.Len()
 }
 
 func staticSnapshot(snapshot []byte) func() []byte {
@@ -143,14 +154,28 @@ func (a *ToolCaller) invoke(
 	reportError func(err any),
 	stdoutWriter, stderrWriter io.Writer,
 	stdoutSnapshotBuffer, stderrSnapshotBuffer *toolOutputBuffer,
+	finalizeResults ...func(*aitool.ToolResult) error,
 ) (*aitool.ToolResult, error) {
 	c := a.config
 	e := a.emitter
+	var finalizeResult func(*aitool.ToolResult) error
+	if len(finalizeResults) > 0 {
+		finalizeResult = finalizeResults[0]
+	}
 
 	seq := c.AcquireId()
 	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.GetRuntimeId(), seq); ok {
 		if ret.Finished {
-			return aiddb.AiCheckPointGetToolResult(ret), nil
+			res := aiddb.AiCheckPointGetToolResult(ret)
+			if finalizeResult != nil && res != nil {
+				if err := finalizeResult(res); err != nil {
+					return res, err
+				}
+				if err := c.SubmitCheckpointResponse(ret, res); err != nil {
+					return res, err
+				}
+			}
+			return res, nil
 		}
 	}
 	toolCheckpoint := c.CreateToolCallCheckpoint(seq)
@@ -195,10 +220,6 @@ func (a *ToolCaller) invoke(
 		res := newToolCallRes()
 		res.Success = true
 		res.Data = result
-		err = c.SubmitCheckpointResponse(toolCheckpoint, res)
-		if err != nil {
-			return nil, err
-		}
 		return res, nil
 	}
 
@@ -233,8 +254,6 @@ func (a *ToolCaller) invoke(
 	if noRuntimeId {
 		params.Set("runtime_id", a.runtimeId)
 	}
-
-	stdoutWriter.Write([]byte(fmt.Sprintf("invoking tool[%v] ...\n", tool.Name))) // 确保触发执行卡片，优化体验
 
 	log.Infof("start to invoke tool[%s] with params: %v", tool.Name, params)
 
@@ -302,29 +321,29 @@ func (a *ToolCaller) invoke(
 		RuntimeID:             a.callToolId,
 		BrowserSessionTracker: browserTracker,
 		FeedBacker: func(result *ypb.ExecResult) error {
-				// 处理 risk 消息
-				risk, _ := handleRiskMessage(result)
-				if risk != nil {
-					e.EmitYakitRisk(risk.ID, risk.Title, risk.RuntimeId)
-					boundRisksMu.Lock()
-					boundRisks = append(boundRisks, risk)
-					boundRisksMu.Unlock()
-				}
-				httpFlow, _ := handleHTTPFlowMessage(result)
-				if httpFlow != nil {
-					e.EmitYakitHTTPFlow(httpFlow.RuntimeId, httpFlow.HiddenIndex)
-					return nil
-				}
-				if path, ok := handleFileWriteMessage(result); ok {
-					NotifySessionSnapshotFileWrite(a.config, path)
-				}
-				// 过滤文件 Stat/Read 等高频消息，避免对前端造成压力
-				if shouldIgnoreExecResultForEmit(result) {
-					return nil
-				}
-				e.EmitYakitExecResult(result)
+			// 处理 risk 消息
+			risk, _ := handleRiskMessage(result)
+			if risk != nil {
+				e.EmitYakitRisk(risk.ID, risk.Title, risk.RuntimeId)
+				boundRisksMu.Lock()
+				boundRisks = append(boundRisks, risk)
+				boundRisksMu.Unlock()
+			}
+			httpFlow, _ := handleHTTPFlowMessage(result)
+			if httpFlow != nil {
+				e.EmitYakitHTTPFlow(httpFlow.RuntimeId, httpFlow.HiddenIndex)
 				return nil
-			},
+			}
+			if path, ok := handleFileWriteMessage(result); ok {
+				NotifySessionSnapshotFileWrite(a.config, path)
+			}
+			// 过滤文件 Stat/Read 等高频消息，避免对前端造成压力
+			if shouldIgnoreExecResultForEmit(result) {
+				return nil
+			}
+			e.EmitYakitExecResult(result)
+			return nil
+		},
 	}
 	execResult, execErr := tool.InvokeWithParams(
 		params,
@@ -335,7 +354,26 @@ func (a *ToolCaller) invoke(
 		aitool.WithResultCallback(toolCallSuccess),
 		aitool.WithCancelCallback(toolCallCancel),
 		aitool.WithRuntimeConfig(runtimeCfg),
+		aitool.WithOutputCapture(false),
 	)
+	if execResult != nil && finalizeResult != nil {
+		if finalizeErr := finalizeResult(execResult); finalizeErr != nil {
+			if execErr == nil {
+				execErr = finalizeErr
+			} else {
+				execErr = errors.Join(execErr, finalizeErr)
+			}
+		}
+	}
+	if execResult != nil {
+		if checkpointErr := c.SubmitCheckpointResponse(toolCheckpoint, execResult); checkpointErr != nil {
+			if execErr == nil {
+				execErr = checkpointErr
+			} else {
+				execErr = errors.Join(execErr, checkpointErr)
+			}
+		}
+	}
 
 	// 工具调用结束、runtime 已绑定漏洞之后, 异步提交 risk_feedback 价值反馈 (AI 自判).
 	// 这是对 cybersecurity-risk 等 "报漏洞" 工具插件的通用埋点, 与 loop 内 generate_risk

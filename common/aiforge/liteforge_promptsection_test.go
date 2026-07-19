@@ -7,9 +7,33 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicache"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func TestLiteForgeRecentTimelineIsBoundedAndExcludesOldHistory(t *testing.T) {
+	timeline := aicommon.NewTimeline(nil, nil)
+	timeline.PushText(1, "OLD_SENTINEL "+strings.Repeat("old-history ", 12000))
+	timeline.PushText(2, "NEW_SENTINEL "+strings.Repeat("recent-context ", 6000))
+
+	recent := liteForgeRecentTimeline(timeline)
+	require.NotEmpty(t, recent)
+	require.LessOrEqual(t, ytoken.CalcTokenCount(recent), liteForgeRecentTimelineTokens)
+	require.Contains(t, recent, "NEW_SENTINEL")
+	require.NotContains(t, recent, "OLD_SENTINEL")
+	require.Contains(t, recent, "older timeline entries omitted")
+}
+
+func TestLiteForgeRecentTimelineHandlesNil(t *testing.T) {
+	require.Empty(t, liteForgeRecentTimeline(nil))
+}
+
+func TestLiteForgeDisableTimelineOption(t *testing.T) {
+	forge, err := NewLiteForge("bounded-trace", WithLiteForge_DisableTimeline())
+	require.NoError(t, err)
+	require.True(t, forge.DisableTimeline)
+}
 
 // TestLiteForgePrompt_SplitsIntoFourSections 验证 LiteForge 模板能被 aicache.Split 切成预期的 4 段
 // B 档语义：StaticInstruction -> high-static 段；Prompt -> dynamic 段

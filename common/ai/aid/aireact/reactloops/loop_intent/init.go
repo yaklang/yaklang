@@ -129,14 +129,14 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("recommended_forges", "")
 		loop.Set("context_enrichment", "")
 
-		// Build full capability catalog for anti-hallucination matching
+		// Build the catalog locally only. Semantic matching is handled by the
+		// bounded BM25 action; here we recognize identifiers explicitly named
+		// by the user without sending the 30KB+ catalog to another model.
 		catalog := BuildCapabilityCatalog(r)
 		if catalog != "" {
-			loop.Set("capability_catalog", catalog)
 			log.Infof("intent init: built capability catalog (%d bytes)", len(catalog))
 
-			// Run AI catalog matching concurrently to pre-identify relevant identifiers
-			preMatched := MatchIdentifiersFromCatalog(r, catalog, userQuery)
+			preMatched := MatchExplicitIdentifiersFromCatalog(catalog, userQuery)
 			if len(preMatched) > 0 {
 				verified := VerifyIdentifiers(loop, preMatched)
 				if len(verified) > 0 {

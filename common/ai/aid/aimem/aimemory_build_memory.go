@@ -1,13 +1,9 @@
 package aimem
 
-// TODO: migrate to AssembleLoopPrompt for prefix cache reuse
-//
-// AddRawText 仍走老的 GetBasicPromptInfo + aireact/prompts/base/base.txt 路径,
-// 是当前 aireact 中唯一一处未接入 aicommon.NewDefaultPromptPrefixBuilder 5 段
-// prefix cache 的入口。后续应改造为复用 AssembleLoopPrompt, 让 memory triage
-// 也能命中跨 turn 的 prefix cache。
-//
-// 关键词: aimem 老路径迁移, AssembleLoopPrompt, prefix cache 复用, 待治理
+// Memory triage intentionally does not embed the main ReAct base prompt. The
+// triage instruction below is self-contained; importing GetBasicPromptInfo
+// used to duplicate the complete tool inventory and session Timeline in every
+// speed-priority request.
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -20,21 +16,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// Memory triage extracts durable facts from a Timeline delta. It does not need
+// an entire oversized tool preview to make that decision, and its lightweight
+// request must stay bounded as the parent session grows.
+const memoryTriageInputTokenLimit = 4 * 1024
+
 // AddRawText 从原始文本生成记忆条目
 func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) {
-	temp, infos, err := r.invoker.GetBasicPromptInfo(nil)
-	if err != nil {
-		return nil, utils.Errorf("GetBasicPromptInfo failed: %v", err)
-	}
-	basic, err := utils.RenderTemplate(temp, infos)
-	if err != nil {
-		return nil, utils.Errorf("RenderTemplate failed: %v", err)
-	}
-
 	nonce := utils.RandStringBytes(4)
+	i = aicommon.ShrinkTextBlockByTokens(i, memoryTriageInputTokenLimit)
 
 	var dynContext string
 	if r.contextProvider != nil {
+		var err error
 		dynContext, err = r.contextProvider()
 		if err != nil {
 			return nil, utils.Errorf("contextProvider failed: %v", err)
@@ -48,7 +42,6 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 	dynContext += existedTag
 
 	promptResult, err := utils.RenderTemplate(memoryTriagePrompt, map[string]any{
-		"Basic":              basic,
 		"Nonce":              nonce,
 		"Query":              i,
 		"HaveDynamicContext": dynContext != "",
@@ -80,7 +73,7 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 			aitool.WithNumberParam("r", aitool.WithParam_Description("相关性评分，这个信息对用户的目的有多关键？无关紧要？锦上添花？还是成败在此一举？"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 			aitool.WithNumberParam("c", aitool.WithParam_Description("关联度评分，这个记忆与其他记忆如何关联？这是一个一次性事实，几乎与其他事实没有什么关联程度"), aitool.WithParam_Min(0.0), aitool.WithParam_Max(1.0)),
 		),
-	})
+	}, aicommon.WithLiteForgeDisableTimeline())
 	if err != nil {
 		return nil, utils.Errorf("InvokeLiteForge failed: %v", err)
 	}

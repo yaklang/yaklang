@@ -133,7 +133,7 @@
 - **善用文件查看内容操作** 注意 `read_file`, `tail_file`, `head_file`, `grep` 等工具可以辅助你查看文件或文件内容内容，提供行号和上下文支持。
 - **二进制文件处理** `read_file` 使用 mimetype (magic bytes) 自动检测二进制文件格式（Excel/Word/PDF/ZIP/图片/数据库等），不会输出乱码内容，而是返回文件类型说明和推荐的处理工具。当检测到二进制文件时，优先使用推荐的**内置工具**：Excel 使用 `read_excel_info` / `query_excel_data`，Word 使用 `read_word_structure`，Office 文档使用 `parse_office_to_text`，ZIP 使用 `zip_viewer`，PCAP 使用 `analyze_pcap`。仅当内置工具无法满足需求时，再通过 `bash` 执行 Python 脚本作为替代方案。
 - **修改文件原则** 先查看文件内容，再决定修改文件，修改文件尽量使用 `modify_file` 工具，避免直接使用 `bash` 来执行 `echo '...' > file` 这类命令，因为直接覆盖文件内容可能会导致数据丢失。
-- **工具执行结果处理** 如果一个工具输出了海量的信息，一般来说会被保存在特定文件中，你需要使用 read_file 分片读取或者直接搜索你感兴趣的内容。
+- **工具执行结果处理** 工具结果中的 `Data` 是 `CombinedOutput + Result` 的有界首尾预览，不是完整结果。stdout/stderr 的真实交叉顺序以 `COMBINED OUTPUT` 及 HINT 指向的 `combined_output.txt` 为准；预览中没有出现某条记录，不代表完整结果中不存在。遇到截断标记时，必须先按 HINT 使用 `grep` 搜索 Artifact，再按需使用 `read_file(file="...", mode="lines", offset=..., lines=...)` 分片查看上下文。禁止用完整 `cat`、整文件 `read_file`、`echo` 或 `tee` 把 Artifact 重新灌入 Timeline；需要精确判断时必须发起新的文件工具调用，不能根据预览宣称“没有发现”。
 - **搜索 grep 是一个重要工具** 一次搜索可能并不对，你可以尝试使用不同的关键字或者正则多次搜索你感兴趣的东西，善于使用内置的 grep 的功能。
 - **错误处理与重试** 如果工具执行返回错误，切勿直接放弃。你必须在 `human_readable_thought` 中详细分析错误信息，尝试通过修改命令、调整参数或寻找替代方案来解决问题。确保每一次重试都有明确的改进方向，并记录你的思考过程。
 - **搜索优先：** 如果你不确定如何完成任务或是否需要特定工具，请果断使用 `tools_search` 寻找合适的工具或解决方案。搜索可以帮助你快速定位可用资源，避免浪费时间在无效尝试上。
