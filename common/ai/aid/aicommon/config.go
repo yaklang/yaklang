@@ -333,7 +333,7 @@ type Config struct {
 	// By default, AI will periodically review tool execution progress
 	// Set DisableIntervalReview to true to disable this feature
 	DisableIntervalReview             bool          // Disable interval review during tool execution (default: false, meaning enabled)
-	IntervalReviewDuration            time.Duration // Duration between reviews (default 20s)
+	IntervalReviewDuration            time.Duration // Duration between reviews (default 60s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
 	ToolComposeConcurrency            int           // Max concurrent tool calls in tool_compose DAG (default 2)
 	PlanExecTaskConcurrency           int           // Max concurrent executable tasks per PE DAG stage (default 1)
@@ -2250,14 +2250,14 @@ func WithDisableToolCallerIntervalReview(disable bool) ConfigOption {
 }
 
 // WithToolCallerIntervalReviewDuration sets the duration between interval reviews during tool execution.
-// Default is 20 seconds if not set.
+// Default is DefaultToolCallIntervalReviewDuration if not set.
 func WithToolCallerIntervalReviewDuration(duration time.Duration) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
 		if duration <= 0 {
-			duration = time.Second * 20
+			duration = DefaultToolCallIntervalReviewDuration
 		}
 		c.m.Lock()
 		c.IntervalReviewDuration = duration

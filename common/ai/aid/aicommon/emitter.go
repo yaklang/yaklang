@@ -533,6 +533,29 @@ func (r *Emitter) EmitToolCallStatus(callToolId string, status string) (*schema.
 	})
 }
 
+// ToolCallProgressReviewPayload describes one lifecycle transition of the
+// periodic AI review for a long-running tool. Output bodies are deliberately
+// excluded: the event is for observability and must not duplicate tool data.
+type ToolCallProgressReviewPayload struct {
+	CallToolID         string  `json:"call_tool_id"`
+	Tool               string  `json:"tool"`
+	Phase              string  `json:"phase"`
+	ReviewCount        int     `json:"review_count"`
+	IntervalSeconds    float64 `json:"interval_seconds"`
+	ElapsedSeconds     float64 `json:"elapsed_seconds"`
+	ReviewDurationMS   int64   `json:"review_duration_ms,omitempty"`
+	StdoutSnapshotSize int     `json:"stdout_snapshot_bytes,omitempty"`
+	StderrSnapshotSize int     `json:"stderr_snapshot_bytes,omitempty"`
+	Decision           string  `json:"decision,omitempty"`
+	Error              string  `json:"error,omitempty"`
+	NextReviewAtMS     int64   `json:"next_review_at_ms,omitempty"`
+}
+
+func (r *Emitter) EmitToolCallProgressReview(callToolID string, payload ToolCallProgressReviewPayload) (*schema.AiOutputEvent, error) {
+	payload.CallToolID = callToolID
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_PROGRESS_REVIEW, callToolID, payload)
+}
+
 func (r *Emitter) EmitToolCallDone(callToolId string, endTime time.Time, startTime time.Time, purePluginDuration time.Duration) (*schema.AiOutputEvent, error) {
 	if purePluginDuration < 0 {
 		purePluginDuration = 0

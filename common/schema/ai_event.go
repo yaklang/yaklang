@@ -139,17 +139,25 @@ const (
 	// contains score, reason, and other information to help uesr interactivation
 	EVENT_TYPE_RISK_CONTROL_PROMPT = "risk_control_prompt"
 
-	EVENT_TOOL_CALL_START       = "tool_call_start"       // tool call start event, used to emit the tool call start information
-	EVENT_TOOL_CALL_STATUS      = "tool_call_status"      // tool call status event, used to emit the tool call status information
-	EVENT_TOOL_CALL_USER_CANCEL = "tool_call_user_cancel" // tool call user cancel event, used to emit the tool call user cancel information
-	EVENT_TOOL_CALL_DONE        = "tool_call_done"        // tool call end event, used to emit the tool call end information
-	EVENT_TOOL_CALL_ERROR       = "tool_call_error"       // tool call error event, used to emit the tool call error information
-	EVENT_TOOL_CALL_SUMMARY     = "tool_call_summary"     // tool call summary event, used to emit the tool call summary information
-	EVENT_TOOL_CALL_DECISION    = "tool_call_decision"    // tool call decision event, used to emit the tool call decision information
-	EVENT_TOOL_CALL_RESULT      = "tool_call_result"      // tool call result event, used to emit the tool call result information
-	EVENT_TOOL_CALL_PARAM       = "tool_call_param"       // tool call param event, used to emit the final invoke params bound to call tool id
-	EVENT_TOOL_CALL_LOG_DIR     = "tool_call_log_dir"     // tool call log dir event, used to emit the tool call log dir information
-	EVENT_TOOL_CALL_REASON      = "tool_call_reason"      // tool call reason event, used to emit the human-readable reason of this tool call
+	EVENT_TOOL_CALL_START           = "tool_call_start"           // tool call start event, used to emit the tool call start information
+	EVENT_TOOL_CALL_STATUS          = "tool_call_status"          // tool call status event, used to emit the tool call status information
+	EVENT_TOOL_CALL_USER_CANCEL     = "tool_call_user_cancel"     // tool call user cancel event, used to emit the tool call user cancel information
+	EVENT_TOOL_CALL_DONE            = "tool_call_done"            // tool call end event, used to emit the tool call end information
+	EVENT_TOOL_CALL_ERROR           = "tool_call_error"           // tool call error event, used to emit the tool call error information
+	EVENT_TOOL_CALL_SUMMARY         = "tool_call_summary"         // tool call summary event, used to emit the tool call summary information
+	EVENT_TOOL_CALL_DECISION        = "tool_call_decision"        // tool call decision event, used to emit the tool call decision information
+	EVENT_TOOL_CALL_RESULT          = "tool_call_result"          // tool call result event, used to emit the tool call result information
+	EVENT_TOOL_CALL_PARAM           = "tool_call_param"           // tool call param event, used to emit the final invoke params bound to call tool id
+	EVENT_TOOL_CALL_LOG_DIR         = "tool_call_log_dir"         // tool call log dir event, used to emit the tool call log dir information
+	EVENT_TOOL_CALL_REASON          = "tool_call_reason"          // tool call reason event, used to emit the human-readable reason of this tool call
+	EVENT_TOOL_CALL_PROGRESS_REVIEW = "tool_call_progress_review" // periodic AI progress review lifecycle for long-running tools
+)
+
+const (
+	TOOL_CALL_PROGRESS_REVIEW_PHASE_SCHEDULED = "scheduled"
+	TOOL_CALL_PROGRESS_REVIEW_PHASE_STARTED   = "started"
+	TOOL_CALL_PROGRESS_REVIEW_PHASE_COMPLETED = "completed"
+	TOOL_CALL_PROGRESS_REVIEW_PHASE_FAILED    = "failed"
 )
 
 // ToolCallStatus is the in-progress status carried by EVENT_TOOL_CALL_STATUS (json field "status").

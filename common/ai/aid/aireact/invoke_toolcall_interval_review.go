@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -71,8 +70,8 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	)
 	if err != nil {
 		log.Errorf("failed to generate interval review prompt: %v", err)
-		// If we can't generate the prompt, continue by default
-		return true, nil
+		// The scheduler reports the failure and continues by default.
+		return true, fmt.Errorf("generate interval review prompt: %w", err)
 	}
 
 	var shouldContinue = true
@@ -110,8 +109,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 			)
 			if err != nil {
 				log.Errorf("failed to extract interval review action: %v", err)
-				// If extraction fails, continue by default
-				return nil
+				return fmt.Errorf("extract interval review action: %w", err)
 			}
 
 			decision := action.GetString("decision")
@@ -147,8 +145,8 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 
 	if transErr != nil {
 		log.Errorf("interval review transaction failed: %v", transErr)
-		// If the transaction fails, continue by default
-		return true, nil
+		// The scheduler reports the failure and continues by default.
+		return true, fmt.Errorf("interval review transaction: %w", transErr)
 	}
 
 	return shouldContinue, nil
@@ -163,20 +161,23 @@ func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *ai
 		return nil
 	}
 
-	// State maintained in closure
-	var startTime time.Time
-	var reviewCount int32
+	// The scheduler injects the actual tool execution start and review count via
+	// context. Keep local fallbacks for direct handler callers and old tests.
+	fallbackStartTime := time.Now()
+	var fallbackReviewCount int
 
 	return func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
-		// Initialize start time on first call
-		if startTime.IsZero() {
-			startTime = time.Now()
+		startTime := fallbackStartTime
+		reviewCount := 0
+		if metadata, ok := aicommon.ToolCallIntervalReviewMetadataFromContext(ctx); ok {
+			startTime = metadata.ToolExecutionStartedAt
+			reviewCount = metadata.ReviewCount
+		} else {
+			fallbackReviewCount++
+			reviewCount = fallbackReviewCount
 		}
 
-		// Increment review count
-		count := int(atomic.AddInt32(&reviewCount, 1))
-
-		return r._invokeToolCall_IntervalReviewWithContext(ctx, tool, params, stdoutSnapshot, stderrSnapshot, startTime, count, callExpectations)
+		return r._invokeToolCall_IntervalReviewWithContext(ctx, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)
 	}
 }
 
@@ -187,7 +188,7 @@ func (r *ReAct) GetIntervalReviewDuration() time.Duration {
 		return 0
 	}
 	if r.config.IntervalReviewDuration <= 0 {
-		return time.Second * 20 // default 20 seconds
+		return aicommon.DefaultToolCallIntervalReviewDuration
 	}
 	return r.config.IntervalReviewDuration
 }

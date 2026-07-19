@@ -95,6 +95,12 @@ func TestConfig_DefaultPlanExecTaskConcurrency(t *testing.T) {
 	require.Equal(t, 1, config.PlanExecTaskConcurrency)
 }
 
+func TestConfig_InvalidIntervalReviewDurationUsesSharedDefault(t *testing.T) {
+	config := NewConfig(context.Background(), WithToolCallerIntervalReviewDuration(0))
+	require.Equal(t, DefaultToolCallIntervalReviewDuration, config.IntervalReviewDuration)
+	require.Equal(t, 60*time.Second, config.IntervalReviewDuration)
+}
+
 func TestConfig_PlanExecTaskConcurrencyPropagation(t *testing.T) {
 	parent := NewConfig(context.Background(), WithPlanExecTaskConcurrency(3))
 	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)

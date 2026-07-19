@@ -98,29 +98,92 @@ func (a *ToolCaller) intervalReviewContext(
 	}
 
 	reviewDuration := a.GetIntervalReviewDuration()
+	startedAt := time.Now()
+	reviewCount := 0
+	toolName := ""
+	if tool != nil && tool.Tool != nil {
+		toolName = tool.Name
+	}
+	emitProgressReview := func(payload ToolCallProgressReviewPayload) {
+		if a.emitter == nil {
+			return
+		}
+		payload.Tool = toolName
+		payload.IntervalSeconds = reviewDuration.Seconds()
+		payload.ElapsedSeconds = time.Since(startedAt).Seconds()
+		if _, err := a.emitter.EmitToolCallProgressReview(a.callToolId, payload); err != nil {
+			log.Warnf("emit tool progress review event failed: %v", err)
+		}
+	}
+	emitProgressReview(ToolCallProgressReviewPayload{
+		Phase:          schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_SCHEDULED,
+		NextReviewAtMS: startedAt.Add(reviewDuration).UnixMilli(),
+	})
+
+	timer := time.NewTimer(reviewDuration)
+	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
-			time.Sleep(reviewDuration)
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				shouldContinue, err := a.intervalReviewHandler(ctx, tool, params, stdoutSnapshot(), stderrSnapshot(), a.callExpectations)
-				if err != nil {
-					log.Errorf("interval review handler failed: %v", err)
-					continue
-				}
-				if !shouldContinue {
-					reviewCancel()
-					if !utils.IsNil(onAICanceled) {
-						onAICanceled(fmt.Sprintf("interval review handler failed: %v", err))
-					}
+		case <-timer.C:
+			reviewCount++
+			stdout := stdoutSnapshot()
+			stderr := stderrSnapshot()
+			reviewStartedAt := time.Now()
+			emitProgressReview(ToolCallProgressReviewPayload{
+				Phase:              schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_STARTED,
+				ReviewCount:        reviewCount,
+				StdoutSnapshotSize: len(stdout),
+				StderrSnapshotSize: len(stderr),
+			})
+
+			reviewCtx := withToolCallIntervalReviewMetadata(ctx, ToolCallIntervalReviewMetadata{
+				ToolExecutionStartedAt: startedAt,
+				ReviewCount:            reviewCount,
+			})
+			shouldContinue, err := a.intervalReviewHandler(reviewCtx, tool, params, stdout, stderr, a.callExpectations)
+			reviewDurationMS := time.Since(reviewStartedAt).Milliseconds()
+			if err != nil {
+				log.Errorf("interval review handler failed: %v", err)
+				emitProgressReview(ToolCallProgressReviewPayload{
+					Phase:            schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_FAILED,
+					ReviewCount:      reviewCount,
+					ReviewDurationMS: reviewDurationMS,
+					Decision:         "continue",
+					Error:            utils.ShrinkString(err.Error(), 480),
+					NextReviewAtMS:   time.Now().Add(reviewDuration).UnixMilli(),
+				})
+				if ctx.Err() != nil {
 					return
 				}
+				timer.Reset(reviewDuration)
+				continue
 			}
+
+			decision := "continue"
+			if !shouldContinue {
+				decision = "cancel"
+			}
+			nextReviewAtMS := int64(0)
+			if shouldContinue {
+				nextReviewAtMS = time.Now().Add(reviewDuration).UnixMilli()
+			}
+			emitProgressReview(ToolCallProgressReviewPayload{
+				Phase:            schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_COMPLETED,
+				ReviewCount:      reviewCount,
+				ReviewDurationMS: reviewDurationMS,
+				Decision:         decision,
+				NextReviewAtMS:   nextReviewAtMS,
+			})
+			if !shouldContinue {
+				reviewCancel()
+				if !utils.IsNil(onAICanceled) {
+					onAICanceled("tool execution cancelled by interval progress review")
+				}
+				return
+			}
+			timer.Reset(reviewDuration)
 		}
 	}
 }
