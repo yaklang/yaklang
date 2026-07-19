@@ -5,10 +5,44 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 
 	"github.com/google/uuid"
 )
+
+func TestAddRawText_BoundsMemoryTriageInput(t *testing.T) {
+	sessionID := "handle-bounded-input-test-" + uuid.New().String()
+	defer cleanupEntryTestData(t, sessionID)
+
+	mockInvoker := NewAdvancedMockInvoker(context.Background())
+	mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
+		queryStart := strings.Index(prompt, "<|QUERY_")
+		if queryStart < 0 {
+			return false
+		}
+		queryStart = strings.Index(prompt[queryStart:], "|>\n") + queryStart + len("|>\n")
+		queryEnd := strings.Index(prompt[queryStart:], "\n<|QUERY_END_")
+		if queryStart < len("|>\n") || queryEnd < 0 {
+			return false
+		}
+		query := prompt[queryStart : queryStart+queryEnd]
+		return ytoken.CalcTokenCount(query) <= memoryTriageInputTokenLimit &&
+			strings.Contains(query, "HEAD_SENTINEL") &&
+			strings.Contains(query, "TAIL_SENTINEL") &&
+			!strings.Contains(query, "MIDDLE_SENTINEL")
+	})
+
+	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	require.NoError(t, err)
+	defer memory.Close()
+
+	input := "HEAD_SENTINEL\n" + strings.Repeat("head material ", 8000) +
+		"\nMIDDLE_SENTINEL\n" + strings.Repeat("tail material ", 8000) + "\nTAIL_SENTINEL"
+	_, err = memory.AddRawText(input)
+	require.NoError(t, err)
+}
 
 func TestHandleMemory_Basic(t *testing.T) {
 	sessionID := "handle-memory-test-" + uuid.New().String()

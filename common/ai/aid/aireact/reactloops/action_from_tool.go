@@ -138,8 +138,8 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				invokeParams[aicommon.ReservedKeyCallExpectations] = callExpectations
 			}
 
-			// Pass identifier so ToolCaller.saveToolCallFiles can use it for tool_calls/ filename,
-			// producing {N}_{toolName}_{identifier}.md matching the crawl_web naming convention.
+			// Pass identifier so ToolCaller can use it for the tool_calls/ artifact bundle directory,
+			// producing {N}_{toolName}_{identifier}/report.md for easy call identification.
 			if identifier := action.GetString("identifier"); identifier != "" {
 				invokeParams[aicommon.ReservedKeyIdentifier] = identifier
 			}

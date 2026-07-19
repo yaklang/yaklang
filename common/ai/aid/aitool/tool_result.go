@@ -99,15 +99,24 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	// 创建stdout和stderr的缓冲区
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
-	if stdout != nil {
-		stdout = io.MultiWriter(stdout, stdoutBuf, combinedBuf)
+	if config.ShouldCaptureOutput() {
+		if stdout != nil {
+			stdout = io.MultiWriter(stdout, stdoutBuf, combinedBuf)
+		} else {
+			stdout = io.MultiWriter(stdoutBuf, combinedBuf)
+		}
+		if stderr != nil {
+			stderr = io.MultiWriter(stderr, stderrBuf, combinedBuf)
+		} else {
+			stderr = io.MultiWriter(stderrBuf, combinedBuf)
+		}
 	} else {
-		stdout = io.MultiWriter(stdoutBuf, combinedBuf)
-	}
-	if stderr != nil {
-		stderr = io.MultiWriter(stderr, stderrBuf, combinedBuf)
-	} else {
-		stderr = io.MultiWriter(stderrBuf, combinedBuf)
+		if stdout == nil {
+			stdout = io.Discard
+		}
+		if stderr == nil {
+			stderr = io.Discard
+		}
 	}
 	var res any
 	var err error

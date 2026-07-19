@@ -39,6 +39,15 @@ func WithLiteForgeStaticInstruction(s string) GeneralKVConfigOption {
 	}
 }
 
+// WithLiteForgeDisableTimeline prevents a LiteForge helper from automatically
+// appending recent parent Timeline context. Use it when the prompt already
+// contains a deliberately bounded task-specific trace.
+func WithLiteForgeDisableTimeline() GeneralKVConfigOption {
+	return func(c *GeneralKVConfig) {
+		c.config.Set("liteForgeDisableTimeline", true)
+	}
+}
+
 // StreamableFieldCallback is a callback function that handles streaming field data during LiteForge execution.
 // key: the field key that matches one of the monitored fields
 // r: io.Reader containing the streaming data for that field

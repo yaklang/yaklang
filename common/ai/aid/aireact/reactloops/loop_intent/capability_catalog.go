@@ -1,23 +1,18 @@
 package loop_intent
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
-
-const catalogChunkSize = 30 * 1024
 
 // BuildCapabilityCatalog collects all available tools, forges, skills, and focus modes,
 // formats each as a single-line entry for AI consumption.
@@ -96,125 +91,60 @@ func BuildCapabilityCatalog(r aicommon.AIInvokeRuntime) string {
 	return sb.String()
 }
 
-// MatchIdentifiersFromCatalog uses aireducer-style chunking + concurrent LiteForge
-// to find matching identifiers from the capability catalog for a user query.
-// If the catalog fits in one chunk (<=catalogChunkSize), a single AI call is made.
-// Otherwise, the catalog is split and processed concurrently.
-func MatchIdentifiersFromCatalog(
-	r aicommon.AIInvokeRuntime,
-	catalog string,
-	userQuery string,
-) []string {
+// MatchExplicitIdentifiersFromCatalog recognizes capability identifiers that
+// the user wrote verbatim. Semantic matching belongs to the bounded BM25
+// query_capabilities action; sending the entire catalog through one or more
+// LiteForge calls made a short request create 20-40KB lightweight spikes.
+func MatchExplicitIdentifiersFromCatalog(catalog string, userQuery string) []string {
 	if catalog == "" || userQuery == "" {
 		return nil
 	}
-
-	chunks := splitCatalogIntoChunks(catalog, catalogChunkSize)
-	if len(chunks) == 0 {
-		return nil
-	}
-
-	ctx := r.GetConfig().GetContext()
-
-	var mu sync.Mutex
-	var allIdentifiers []string
-	var wg sync.WaitGroup
-
-	for i, chunk := range chunks {
-		wg.Add(1)
-		go func(idx int, chunkData string) {
-			defer wg.Done()
-			ids := matchChunk(ctx, r, chunkData, userQuery, idx)
-			if len(ids) > 0 {
-				mu.Lock()
-				allIdentifiers = append(allIdentifiers, ids...)
-				mu.Unlock()
-			}
-		}(i, chunk)
-	}
-
-	wg.Wait()
-
-	seen := make(map[string]bool, len(allIdentifiers))
-	var deduped []string
-	for _, id := range allIdentifiers {
-		id = strings.TrimSpace(id)
-		if id != "" && !seen[id] {
-			seen[id] = true
-			deduped = append(deduped, id)
+	query := strings.ToLower(userQuery)
+	seen := make(map[string]struct{})
+	var matched []string
+	for _, line := range strings.Split(catalog, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "[") {
+			continue
 		}
+		end := strings.IndexByte(line, ']')
+		colon := strings.IndexByte(line, ':')
+		if end <= colon+1 || colon < 1 {
+			continue
+		}
+		identifier := strings.TrimSpace(line[colon+1 : end])
+		if identifier == "" || !containsExplicitIdentifier(query, strings.ToLower(identifier)) {
+			continue
+		}
+		if _, ok := seen[identifier]; ok {
+			continue
+		}
+		seen[identifier] = struct{}{}
+		matched = append(matched, identifier)
 	}
-	return deduped
+	return matched
 }
 
-func splitCatalogIntoChunks(catalog string, maxChunkBytes int) []string {
-	if len(catalog) <= maxChunkBytes {
-		return []string{catalog}
-	}
-
-	lines := strings.Split(catalog, "\n")
-	var chunks []string
-	var current strings.Builder
-
-	for _, line := range lines {
-		if current.Len()+len(line)+1 > maxChunkBytes && current.Len() > 0 {
-			chunks = append(chunks, current.String())
-			current.Reset()
+func containsExplicitIdentifier(query, identifier string) bool {
+	for from := 0; from < len(query); {
+		idx := strings.Index(query[from:], identifier)
+		if idx < 0 {
+			return false
 		}
-		current.WriteString(line)
-		current.WriteString("\n")
+		start := from + idx
+		end := start + len(identifier)
+		leftOK := start == 0 || !isIdentifierByte(query[start-1])
+		rightOK := end == len(query) || !isIdentifierByte(query[end])
+		if leftOK && rightOK {
+			return true
+		}
+		from = start + 1
 	}
-	if current.Len() > 0 {
-		chunks = append(chunks, current.String())
-	}
-	return chunks
+	return false
 }
 
-func matchChunk(
-	ctx context.Context,
-	r aicommon.AIInvokeRuntime,
-	chunkData string,
-	userQuery string,
-	chunkIdx int,
-) []string {
-	nonce := utils.RandStringBytes(6)
-	prompt := fmt.Sprintf(`<|INSTRUCTION_%s|>
-You are a capability matcher. Given a user query and a catalog of available capabilities,
-select ALL capabilities that are relevant to the user's intent.
-
-CRITICAL RULES:
-- You MUST ONLY select identifiers that appear in the catalog below. Do NOT invent or fabricate any identifier.
-- If the user's input directly contains a capability identifier (e.g., user says "run hostscan"), that identifier MUST be included.
-- Consider both Chinese and English meanings when matching.
-- Select capabilities that could help accomplish the user's goal, even indirectly.
-- Return ONLY the identifier part (the text after the type prefix, e.g., "web_search" from "[tool:web_search]").
-<|INSTRUCTION_END_%s|>
-
-<|USER_QUERY_%s|>
-%s
-<|USER_QUERY_END_%s|>
-
-<|CAPABILITY_CATALOG_%s|>
-%s
-<|CAPABILITY_CATALOG_END_%s|>`, nonce, nonce, nonce, userQuery, nonce, nonce, chunkData, nonce)
-
-	schema := []aitool.ToolOption{
-		aitool.WithStringArrayParamEx("matched_identifiers", []aitool.PropertyOption{
-			aitool.WithParam_Description("List of matched capability identifiers from the catalog. Only include identifiers that actually exist in the catalog."),
-			aitool.WithParam_Required(true),
-		}),
-	}
-
-	forgeResult, err := r.InvokeSpeedPriorityLiteForge(ctx, "capability-catalog-match", prompt, schema)
-	if err != nil {
-		log.Warnf("capability catalog match chunk %d failed: %v", chunkIdx, err)
-		return nil
-	}
-	if forgeResult == nil {
-		return nil
-	}
-
-	return forgeResult.GetStringSlice("matched_identifiers")
+func isIdentifierByte(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || b == '_' || b == '-'
 }
 
 // VerifyIdentifiers filters a list of identifier names through ResolveIdentifier,

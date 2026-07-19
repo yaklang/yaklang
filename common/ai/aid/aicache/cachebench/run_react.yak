@@ -48,6 +48,8 @@ timeoutSec = cli.Int("timeout", cli.setDefault(60*20),
     cli.setHelp("aim.InvokeReAct 与单次 LLM 调用超时, 默认 1200 秒"))
 maxIter    = cli.Int("max-iteration", cli.setDefault(15),
     cli.setHelp("React 循环最大迭代次数"))
+disablePlan = cli.Bool("disable-plan",
+    cli.setHelp("关闭 plan/AIForge 入口，直接测 ReAct 主循环与轻量 helper（默认关闭）"))
 maxPrompts = cli.Int("max-prompts", cli.setDefault(0),
     cli.setHelp("收集到 N 次 LLM prompt usage 后立即 cancel context 提前退出 (0 = 不限制)"))
 // 关键词: cachebench max-intelligent-prompts, intelligent-only sample 截断
@@ -98,8 +100,8 @@ if sessionID == "" {
     sessionID = sprintf("cachebench-%d-%d", time.Now().Unix(), os.Getpid())
 }
 
-log.info("aicache cachebench - input=%s ai-type=%s session-id=%s max-iteration=%d max-prompts=%d max-intelligent-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v fatal-error-threshold=%d",
-    inputText, aiType, sessionID, maxIter, maxPrompts, maxIntelligentPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError, fatalErrorThreshold)
+log.info("aicache cachebench - input=%s ai-type=%s session-id=%s disable-plan=%v max-iteration=%d max-prompts=%d max-intelligent-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v fatal-error-threshold=%d",
+    inputText, aiType, sessionID, disablePlan, maxIter, maxPrompts, maxIntelligentPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError, fatalErrorThreshold)
 
 // =============================================================================
 // 取消上下文 (用于 max-prompts 限流 / max-duration 时间硬截断)
@@ -496,6 +498,7 @@ err = aim.InvokeReAct(
     aim.sessionID(sessionID),
     aim.timeout(timeoutSec),
     aim.maxIteration(maxIter),
+    aim.disableAIForge(disablePlan),
     aim.language(language),
     aim.yoloMode(),
     aim.allowUserInteract(false),
@@ -566,6 +569,7 @@ benchReport["durationSec"] = durationSec
 benchReport["aiType"] = aiType
 benchReport["aiModel"] = aiModel
 benchReport["maxIteration"] = maxIter
+benchReport["disablePlan"] = disablePlan
 benchReport["maxPrompts"] = maxPrompts
 benchReport["maxPromptsTriggered"] = maxPromptsTriggered
 benchReport["maxIntelligentPrompts"] = maxIntelligentPrompts

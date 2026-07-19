@@ -8,13 +8,14 @@ import (
 type ToolCallCancelCallback func(result *ToolExecutionResult, err error) (*ToolExecutionResult, error)
 
 type ToolInvokeConfig struct {
-	ctx            context.Context
-	stdout         io.Writer
-	stderr         io.Writer
-	errCallback    func(error) (*ToolResult, error)
-	resCallback    func(result *ToolExecutionResult) (*ToolResult, error)
-	cancelCallback ToolCallCancelCallback
-	runtimeConfig  *ToolRuntimeConfig
+	ctx                  context.Context
+	stdout               io.Writer
+	stderr               io.Writer
+	errCallback          func(error) (*ToolResult, error)
+	resCallback          func(result *ToolExecutionResult) (*ToolResult, error)
+	cancelCallback       ToolCallCancelCallback
+	runtimeConfig        *ToolRuntimeConfig
+	disableOutputCapture bool
 }
 
 func (i *ToolInvokeConfig) GetErrCallback() func(error) (*ToolResult, error) {
@@ -107,4 +108,18 @@ func WithRuntimeConfig(config *ToolRuntimeConfig) ToolInvokeOptions {
 	return func(toolConfig *ToolInvokeConfig) {
 		toolConfig.runtimeConfig = config
 	}
+}
+
+// WithOutputCapture controls whether ExecuteToolWithCapture keeps complete
+// stdout/stderr/combined copies in memory. AI orchestration disables this after
+// installing its artifact writers, so the transient ToolExecutionResult only
+// carries the callback result.
+func WithOutputCapture(enabled bool) ToolInvokeOptions {
+	return func(config *ToolInvokeConfig) {
+		config.disableOutputCapture = !enabled
+	}
+}
+
+func (i *ToolInvokeConfig) ShouldCaptureOutput() bool {
+	return i == nil || !i.disableOutputCapture
 }

@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -107,6 +108,16 @@ func (t *ToolResult) dumpTimelineResult(writer io.Writer) {
 	} else {
 		// 处理工具执行结果
 		switch ret := t.Data.(type) {
+		case string:
+			if ret == "" {
+				buf.WriteString("no output\n")
+			} else {
+				buf.WriteString("data:\n")
+				buf.WriteString(ret)
+				if !strings.HasSuffix(ret, "\n") {
+					buf.WriteByte('\n')
+				}
+			}
 		case *ToolExecutionResult:
 			// 优先使用 CombinedOutput；兼容旧消费者回退到 stdout/stderr
 			combined := ret.CombinedOutput

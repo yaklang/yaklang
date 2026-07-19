@@ -227,6 +227,7 @@ func submitValueFeedbackInternal(ctx context.Context, cfg *aicommon.Config, reco
 	forge, err := aiforge.NewLiteForge(
 		valueFeedbackActionName,
 		aiforge.WithLiteForge_Prompt(prompt),
+		aiforge.WithLiteForge_DisableTimeline(),
 		aiforge.WithLiteForge_OutputSchemaRaw(valueFeedbackActionName, outputSchema),
 		aiforge.WithLiteForge_SpeedPriority(),
 		aiforge.WithExtendLiteForge_AIOption(aicommon.WithFastAICallback(cb)),

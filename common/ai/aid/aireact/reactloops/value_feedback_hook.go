@@ -7,6 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
+const valueFeedbackRecentActionLimit = 32
+
 // value_feedback_hook.go 在 reactloops 这一最底层基础设施上自动注入价值评估埋点.
 //
 // 每个通过 NewReActLoop 创建的 loop 都会在 onPostIteration 回调里组装一条
@@ -78,8 +80,8 @@ func (r *ReActLoop) submitValueFeedbackSignal(trigger string) {
 
 // submitValueFeedbackWithTrigger 组装并提交一条价值评估记录 (统一装配逻辑).
 //
-// iteration 是本条记录对应的轮次序号; 核心 trace 用完整 timeline dump (而非 diff),
-// 保证每条记录都能被后端独立复盘 "到底发生了什么".
+// iteration 是本条记录对应的轮次序号; 核心 trace 使用最近 Timeline 投影.
+// Value feedback 是高频轻模型调用，携带完整会话会使输入随会话长度线性增长。
 func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon.AIStatefulTask, iteration int) {
 	cfg, ok := r.config.(*aicommon.Config)
 	if !ok || cfg == nil {
@@ -97,14 +99,17 @@ func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon
 		SessionID:        cfg.PersistentSessionId,
 		IterationIndex:   iteration,
 	}
-	// 核心 trace: 完整 timeline dump. Timeline 缺失时退化为 diff, 保证不空手而归.
+	// 核心 trace: 只给轻模型最近窗口。原始 Timeline 本身不受影响。
 	if cfg.Timeline != nil {
-		record.TimelineDump = cfg.Timeline.Dump()
+		record.TimelineDump = cfg.Timeline.DumpRecentForPrompt(aicommon.ValueFeedbackRecentTimelineTokens)
 	} else {
-		record.TimelineDump = r.GetTimelineDiffWithoutUpdate()
+		record.TimelineDump = aicommon.ShrinkTextBlockByTokens(
+			r.GetTimelineDiffWithoutUpdate(),
+			aicommon.ValueFeedbackRecentTimelineTokens,
+		)
 	}
 
-	actions := r.GetAllExistedActionRecord()
+	actions := recentValueFeedbackActions(r.GetAllExistedActionRecord())
 	for _, a := range actions {
 		if a == nil {
 			continue
@@ -178,13 +183,13 @@ func (r *ReActLoop) SubmitRiskFeedback(riskIDs []string, riskType, severity stri
 		},
 	}
 	if cfg.Timeline != nil {
-		record.TimelineDump = cfg.Timeline.Dump()
+		record.TimelineDump = cfg.Timeline.DumpRecentForPrompt(aicommon.ValueFeedbackRecentTimelineTokens)
 	}
 	if task := r.GetCurrentTask(); !isNilTask(task) {
 		record.TaskID = task.GetId()
 		record.UserQuery = task.GetUserInput()
 	}
-	record.WhatHappenedSummary = summarizeValueFeedbackActions(r.GetAllExistedActionRecord())
+	record.WhatHappenedSummary = summarizeValueFeedbackActions(recentValueFeedbackActions(r.GetAllExistedActionRecord()))
 
 	aicommon.SubmitValueFeedback(cfg, record)
 }
@@ -206,6 +211,13 @@ func summarizeValueFeedbackActions(actions []*ActionRecord) string {
 		parts = append(parts, seg)
 	}
 	return strings.Join(parts, " -> ")
+}
+
+func recentValueFeedbackActions(actions []*ActionRecord) []*ActionRecord {
+	if len(actions) <= valueFeedbackRecentActionLimit {
+		return actions
+	}
+	return actions[len(actions)-valueFeedbackRecentActionLimit:]
 }
 
 func isNilTask(task aicommon.AIStatefulTask) bool {

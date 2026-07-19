@@ -259,7 +259,7 @@ raw/noise 主要由 6 个无 wrapper 模板贡献:
 | --- | --- | --- |
 | schema / static instruction 在 high-static 段内 | 跨 forge high-static distinct=16 | 下移到 semi-dynamic, high-static 仅留 `# Preset` + `# Output Formatter` (`liteforge.go:367+`) |
 | `PersistentMemory` 用 `time.Now().String()` (纳秒) | semi-dynamic distinct=91 | 改为 `time.Now().Format("2006-01-02 15:04")` (`memory.go:395-405`) |
-| timeline 不拆 frozen + open | frozen 段每次失效 | 调 `RenderWithFrozenBoundary` 拆 frozen + open (`liteforge.go` + `TimelineDumpFrozenOpen`) |
+| LiteForge 继承完整父 Timeline | 轻模型输入随会话线性增长 | 仅注入有 4K token 硬上限的 recent Timeline；完整 frozen/open 只属于主循环 |
 | 调用方 INSTRUCTION 走 `WithLiteForge_Prompt` 进 dynamic | 静态指令每次重发 | 用 `WithLiteForge_StaticInstruction` 提到 semi-dynamic (各 forge 调用方迁移) |
 
 ### 9.4 P1-C: dynamic 段拆分 (回收主 React loop 9.46 MB)
@@ -637,4 +637,3 @@ prompt (timeline init 不再是瓶颈, AI 调用本身才是节奏决定因素).
 | --- | --- |
 | `common/ai/aid/aicache/cachebench/run_react.yak` | 新增 `--session-id` flag + 自动隔离 + 调用链注入 `aim.sessionID` |
 | `common/ai/aid/aicache/CACHE_HIT_BENCHMARK.md` | 9.10 节 (本节) |
-

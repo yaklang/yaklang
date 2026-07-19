@@ -634,9 +634,9 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			rsp := i.NewAIResponse()
 			// Return satisfied only if tool execution succeeded
 			if toolExecutionSucceeded.IsSet() {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "tool executed successfully"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "tool executed successfully"}`))
 			} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "tool execution failed, need to retry"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "tool execution failed, need to retry"}`))
 			}
 			rsp.Close()
 			return rsp, nil
@@ -892,7 +892,7 @@ LOOP:
 					t.Fatalf("call tool id mismatch: should only have one callToolID, but got %s and %s", callToolID, e.CallToolID)
 				}
 				toolCallResult = true
-				result := jsonpath.FindFirst(e.GetContent(), "$..result.result")
+				result := jsonpath.FindFirst(e.GetContent(), "$.result")
 				recivedToolCallResultFlag = utils.InterfaceToString(result)
 				break LOOP
 			}
@@ -905,8 +905,8 @@ LOOP:
 		t.Fatal("tool call result not found")
 	}
 
-	if recivedToolCallResultFlag != callToolResultFlag {
-		t.Fatalf("call tool result mismatch: %s != %s", recivedToolCallResultFlag, callToolResultFlag)
+	if !strings.Contains(recivedToolCallResultFlag, callToolResultFlag) {
+		t.Fatalf("call tool result does not contain flag: %s", recivedToolCallResultFlag)
 	}
 
 	db := consts.GetGormProjectDatabase()
@@ -927,8 +927,8 @@ LOOP:
 	var hasFlag bool
 	for _, event := range event {
 		if event.Type == schema.EVENT_TOOL_CALL_RESULT {
-			result := jsonpath.FindFirst(string(event.Content), "$..result.result")
-			if utils.InterfaceToString(result) == callToolResultFlag {
+			result := jsonpath.FindFirst(string(event.Content), "$.result")
+			if strings.Contains(utils.InterfaceToString(result), callToolResultFlag) {
 				hasFlag = true
 				break
 			}

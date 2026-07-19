@@ -83,3 +83,15 @@ func (g *GeneralKVConfig) GetLiteForgeStaticInstruction() string {
 	}
 	return s
 }
+
+// GetLiteForgeDisableTimeline reports whether this one-shot LiteForge call has
+// already supplied all of the context it needs. These calls must not append the
+// parent session Timeline a second time.
+func (g *GeneralKVConfig) GetLiteForgeDisableTimeline() bool {
+	result, ok := g.config.Get("liteForgeDisableTimeline")
+	if !ok {
+		return false
+	}
+	disabled, _ := result.(bool)
+	return disabled
+}

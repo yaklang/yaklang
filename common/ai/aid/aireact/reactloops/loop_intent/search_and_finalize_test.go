@@ -227,6 +227,25 @@ func TestCapabilityDetailsJSON_EmptyAndNil(t *testing.T) {
 	}
 }
 
+func TestMatchExplicitIdentifiersFromCatalogDoesNotUseSemanticSubstring(t *testing.T) {
+	catalog := strings.Join([]string{
+		"[tool:hostscan]: Host Scan - inspect a host",
+		"[tool:syn_scan_tcp_port]: SYN Scanner - scan TCP ports",
+		"[focus_mode:smart_qa]: Smart QA - answer questions",
+	}, "\n")
+
+	matched := MatchExplicitIdentifiersFromCatalog(
+		catalog,
+		"请运行 hostscan 和 SYN_SCAN_TCP_PORT，不要仅凭 scan 这个泛词扩展其他能力",
+	)
+	if got, want := strings.Join(matched, ","), "hostscan,syn_scan_tcp_port"; got != want {
+		t.Fatalf("unexpected explicit identifier matches: got %q want %q", got, want)
+	}
+	if got := MatchExplicitIdentifiersFromCatalog(catalog, "对目标执行渗透测试和端口扫描"); len(got) != 0 {
+		t.Fatalf("semantic query must be left to bounded BM25 search, got %v", got)
+	}
+}
+
 func TestFormatRecommendedCapabilitiesDisplay_HidesEmptyArray(t *testing.T) {
 	if got := formatRecommendedCapabilitiesDisplay("[]"); got != "" {
 		t.Fatalf("expected empty output, got: %q", got)

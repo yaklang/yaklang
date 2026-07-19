@@ -20,6 +20,12 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// liteForgeRecentTimelineTokens keeps one-shot LiteForge helpers lightweight.
+// LiteForge callers already pass the task-specific material in Prompt/Params;
+// the parent Timeline is only supporting context and must not grow with the
+// lifetime of a persistent session.
+const liteForgeRecentTimelineTokens = 4 * 1024
+
 func init() {
 	utils.Debug(func() {
 		log.Info("liteforge.go is already registered aicommon.LiteForgeExecuteCallback")
@@ -59,6 +65,7 @@ type LiteForge struct {
 	OutputSchema        string
 	OutputActionName    string
 	PreferSpeedPriority bool
+	DisableTimeline     bool
 	ExtendAIDOptions    []aicommon.ConfigOption
 
 	streamFields         *omap.OrderedMap[string, *streamableField]
@@ -121,6 +128,16 @@ func WithLiteForge_FieldStreamEmitterCallback(fieldKeys []string, callback Field
 }
 
 type LiteForgeOption func(*LiteForge) error
+
+// WithLiteForge_DisableTimeline is for callers whose dynamic prompt already
+// carries a deliberately bounded trace. It prevents LiteForge from appending
+// a second recent Timeline copy to the same lightweight request.
+func WithLiteForge_DisableTimeline() LiteForgeOption {
+	return func(l *LiteForge) error {
+		l.DisableTimeline = true
+		return nil
+	}
+}
 
 func WithLiteForge_SpeedPriority(b ...bool) LiteForgeOption {
 	return func(l *LiteForge) error {
@@ -342,7 +359,16 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	call := callBuffer.String()
 
-	timelineFrozen, timelineOpen := cod.ContextProvider.TimelineDumpFrozenOpen()
+	// A LiteForge created with the parent persistent-session ID restores the
+	// parent's Timeline. Feeding its complete Frozen/Open projection here made
+	// every speed-priority helper call grow with the whole session, even though
+	// the ReAct lightweight loop itself was already bounded. Keep only a recent
+	// prompt projection and deliberately leave the frozen block empty: this is a
+	// one-shot helper context, not a second copy of the main loop's history.
+	var timelineOpen string
+	if !l.DisableTimeline {
+		timelineOpen = liteForgeRecentTimeline(cod.ContextProvider.GetTimelineInstance())
+	}
 	rendered, err := renderLiteForgePrompt(liteForgePromptParams{
 		Nonce:               nonce,
 		Prompt:              string(l.Prompt),
@@ -350,7 +376,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		Params:              call,
 		Schema:              string(l.OutputSchema),
 		PersistentMemory:    cod.ContextProvider.PersistentMemory(),
-		TimelineFrozenBlock: timelineFrozen,
+		TimelineFrozenBlock: "",
 		TimelineOpen:        timelineOpen,
 	})
 	if err != nil {
@@ -436,6 +462,13 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	result := &ForgeResult{Action: action}
 	return result, nil
+}
+
+func liteForgeRecentTimeline(timeline *aicommon.Timeline) string {
+	if timeline == nil {
+		return ""
+	}
+	return timeline.DumpRecentForPrompt(liteForgeRecentTimelineTokens)
 }
 
 // liteForgePromptParams 是 LiteForge prompt 渲染时传入模板的字段集合。

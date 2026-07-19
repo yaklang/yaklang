@@ -34,6 +34,9 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	if staticInstruction := gconfig.GetLiteForgeStaticInstruction(); staticInstruction != "" {
 		fopts = append(fopts, aiforge.WithLiteForge_StaticInstruction(staticInstruction))
 	}
+	if gconfig.GetLiteForgeDisableTimeline() {
+		fopts = append(fopts, aiforge.WithLiteForge_DisableTimeline())
+	}
 	for _, i := range gconfig.GetStreamableFields() {
 		fopts = append(fopts, aiforge.WithLiteForge_StreamableFieldWithAINodeId(i.AINodeId(), i.FieldKey()))
 	}

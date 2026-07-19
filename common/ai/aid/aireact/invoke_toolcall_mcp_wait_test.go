@@ -50,12 +50,8 @@ func TestExecuteToolCallInternal_WaitsForMCPStubBeforeInvoke(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.True(t, result.Success)
-	switch data := result.Data.(type) {
-	case string:
-		assert.Equal(t, "live-ok", data)
-	case *aitool.ToolExecutionResult:
-		assert.Equal(t, "live-ok", data.Result)
-	default:
-		t.Fatalf("unexpected result data type: %T", result.Data)
-	}
+	data, ok := result.Data.(string)
+	require.True(t, ok, "AI orchestration must expose the canonical bounded string Data")
+	assert.Contains(t, data, "COMBINED OUTPUT:\nlive-ok")
+	assert.Contains(t, data, "HINT:\nComplete tool output is stored in artifacts:")
 }

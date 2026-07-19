@@ -543,6 +543,8 @@ func IsTongyiExplicitCacheModel(providerType, model string) bool  // tongyi + wh
 - [ ] **timeline 必须拆 frozen + open**: 用 `TimelineDumpFrozenOpen` 接口拿到
       frozen / open 字符串, 分别送进 `<|AI_CACHE_FROZEN_semi-dynamic|>` 与
       `<|PROMPT_SECTION_timeline-open|>`, 不要再用单一 `<|PROMPT_SECTION_timeline|>`
+      。例外：LiteForge 等一次性轻量 helper 只注入有硬上限的 recent Timeline，
+      不得为了 frozen cache 重复携带完整父会话历史
 - [ ] **时间戳必须分钟粒度**: `time.Now().Format("2006-01-02 15:04")`, 严禁用
       `time.Now().String()` (会带纳秒, 必然击穿 high-static / semi-dynamic 缓存)
 - [ ] **加 splitter 单测**: 至少 1 条 `TestSplit_<TemplateName>_*`, 断言
@@ -810,5 +812,4 @@ dynamic 段尺寸并提升缓存命中:
   本次 P2.1 不动; 若 cachebench 仍发现 finish 跳变是主要 churn 源, 再考虑
   把 `finish` 也保留 + ReactiveData 段加 "[do not use finish in this turn]"
   约束转移。先观察 P2.1 单点改动收益再决定。
-
 

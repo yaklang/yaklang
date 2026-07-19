@@ -193,16 +193,14 @@ LOOP:
 	require.Contains(t, contentStr, "## Basic Info")
 	require.Contains(t, contentStr, "## Parameters")
 	require.Contains(t, contentStr, "## Execution Result")
-	// STDOUT/STDERR 已合并为单个 OUTPUT 段
-	require.Contains(t, contentStr, "## OUTPUT")
-	require.NotContains(t, contentStr, "## STDOUT")
-	require.NotContains(t, contentStr, "## STDERR")
+	require.Contains(t, contentStr, "## Execution Result Preview")
+	require.Contains(t, contentStr, "## Artifact Files")
 
 	// 验证参数内容 (YAML 格式)
 	require.Contains(t, contentStr, "message")
 	require.Contains(t, contentStr, "output_lines")
 
-	// 验证 stdout 内容(已合入 OUTPUT)
+	// 验证 stdout/stderr 内容出现在压缩预览中
 	require.Contains(t, contentStr, "stdout line")
 
 	// 验证 stderr 内容(已合入 OUTPUT)
@@ -211,18 +209,21 @@ LOOP:
 	// 验证 result 内容
 	require.Contains(t, contentStr, "success")
 
-	// 验证文件名格式: {n}_{toolName}_{identifier}.md
+	// 新格式固定使用 report.md，调用标识位于父 bundle 目录名。
 	filename := filepath.Base(reportFilePath)
-	require.True(t, strings.HasSuffix(filename, ".md"))
-	require.Contains(t, filename, "test_file_output", "filename should contain identifier")
+	require.Equal(t, "report.md", filename)
+	require.Contains(t, filepath.Base(filepath.Dir(reportFilePath)), "test_file_output", "bundle directory should contain identifier")
 
-	// 验证路径结构: task_{index}/tool_calls/{n}_{tool}_{id}.md
+	// 验证路径结构: task_{index}/tool_calls/{n}_{tool}_{id}/report.md
 	require.Contains(t, reportFilePath, "tool_calls")
+	for _, artifact := range []string{"combined_output.txt", "stdout.txt", "stderr.txt", "result.json", "manifest.json"} {
+		require.FileExists(t, filepath.Join(filepath.Dir(reportFilePath), artifact))
+	}
 	require.Contains(t, reportFilePath, "task_")
 
-	// 验证文件名第一部分是数字
-	parts := strings.Split(strings.TrimSuffix(filename, ".md"), "_")
-	require.GreaterOrEqual(t, len(parts), 2, "filename should have format '{n}_{tool}_{id}.md'")
+	// bundle 目录名第一部分是调用序号
+	parts := strings.Split(filepath.Base(filepath.Dir(reportFilePath)), "_")
+	require.GreaterOrEqual(t, len(parts), 2, "bundle directory should have format '{n}_{tool}_{id}'")
 	require.True(t, utils.MatchAllOfRegexp(parts[0], `^\d+$`), "filename first part should be numeric, got: %s", parts[0])
 
 	log.Infof("✓ Report file emitted successfully: %s", reportFilePath)
@@ -370,7 +371,7 @@ LOOP:
 		t.Fatal("Task was not completed")
 	}
 
-	// 验证 report 文件存在且包含完整的大数据
+	// report 只保留压缩预览，完整 result 只存在 bundle Artifact。
 	require.NotEmpty(t, reportFilePath, "report file should be emitted")
 	require.True(t, utils.FileExists(reportFilePath), "report file should exist")
 
@@ -378,13 +379,14 @@ LOOP:
 	require.NoError(t, err)
 
 	contentStr := string(content)
-	// 验证文件包含完整的大数据（应该包含 "AAAA..."）
-	require.Contains(t, contentStr, "AAAAAAAAAA", "report should contain large data")
+	require.Contains(t, contentStr, "AAAAAAAAAA", "report should contain a head/tail preview")
+	require.Less(t, len(content), 512*1024, "report must not duplicate the complete 5MB result")
+	resultPath := filepath.Join(filepath.Dir(reportFilePath), "result.json")
+	resultContent, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	require.Greater(t, len(resultContent), 4*1024*1024, "result artifact should retain the complete output")
 
-	// 验证文件大小合理（应该接近 5MB，至少大于 4MB，有 markdown 开销）
-	require.Greater(t, len(content), 4*1024*1024, "report file should be large (>= 4MB), but got %d bytes", len(content))
-
-	log.Infof("✓ Large result report emitted successfully: %s (%d bytes)", reportFilePath, len(content))
+	log.Infof("✓ Large result artifact emitted successfully: %s (%d bytes)", resultPath, len(resultContent))
 
 	// 清理
 	defer func() {
@@ -542,15 +544,14 @@ LOOP:
 	require.NoError(t, err)
 	contentStr := string(reportContent)
 
-	// 验证合并后的 OUTPUT 部分标记为 (empty)
-	// STDOUT/STDERR 已合并为单个 OUTPUT 段，空输出显示为 "(empty)"
-	require.Contains(t, contentStr, "## OUTPUT")
-	require.NotContains(t, contentStr, "## STDOUT")
-	require.NotContains(t, contentStr, "## STDERR")
+	// 空 stdout/stderr 仍在统一预览中明确标记。
+	require.Contains(t, contentStr, "## Execution Result Preview")
+	require.Contains(t, contentStr, "COMBINED OUTPUT:")
+	require.Contains(t, contentStr, "(empty)")
 
 	// 验证仍然包含参数和结果
 	require.Contains(t, contentStr, "## Parameters")
-	require.Contains(t, contentStr, "## Execution Result")
+	require.Contains(t, contentStr, "## Execution Result Preview")
 	require.Contains(t, contentStr, "success")
 
 	log.Infof("✓ Empty stdout/stderr test passed: report contains (empty) sections")
@@ -702,18 +703,19 @@ LOOP:
 	require.NotEmpty(t, reportFilePath, "report file should be emitted")
 	require.True(t, utils.FileExists(reportFilePath), "report file should exist")
 
-	// Verify filename contains the identifier
+	// report 文件名固定，identifier 存在于 bundle 目录名。
 	filename := filepath.Base(reportFilePath)
-	require.Contains(t, filename, customIdentifier, "filename should contain identifier '%s', got: %s", customIdentifier, filename)
+	require.Equal(t, "report.md", filename)
+	bundleName := filepath.Base(filepath.Dir(reportFilePath))
+	require.Contains(t, bundleName, customIdentifier, "bundle directory should contain identifier '%s', got: %s", customIdentifier, bundleName)
 
 	// Verify path structure: task_{index}/tool_calls/{n}_{tool}_{identifier}.md
 	require.Contains(t, reportFilePath, "task_")
 	require.Contains(t, reportFilePath, "tool_calls")
 
-	// Verify filename format: {number}_{toolname}_{identifier}.md
-	nameWithoutExt := strings.TrimSuffix(filename, ".md")
-	parts := strings.Split(nameWithoutExt, "_")
-	require.GreaterOrEqual(t, len(parts), 3, "filename should have format '{n}_{tool}_{id}.md', got: %s", filename)
+	// Verify bundle format: {number}_{toolname}_{identifier}/report.md
+	parts := strings.Split(bundleName, "_")
+	require.GreaterOrEqual(t, len(parts), 3, "bundle should have format '{n}_{tool}_{id}', got: %s", bundleName)
 	require.True(t, utils.MatchAllOfRegexp(parts[0], `^\d+$`), "filename first part should be a number, got: %s", parts[0])
 
 	log.Infof("✓ Identifier test passed: %s", reportFilePath)
@@ -857,17 +859,17 @@ LOOP:
 	require.NotEmpty(t, reportFilePath, "report file should be emitted")
 	require.True(t, utils.FileExists(reportFilePath), "report file should exist")
 
-	// Verify filename format: {number}_{toolname}.md (without identifier)
+	// Verify bundle format: {number}_{toolname}/report.md (without identifier)
 	filename := filepath.Base(reportFilePath)
-	require.True(t, strings.HasSuffix(filename, ".md"))
+	require.Equal(t, "report.md", filename)
 
 	// Verify path structure
 	require.Contains(t, reportFilePath, "task_")
 	require.Contains(t, reportFilePath, "tool_calls")
 
-	nameWithoutExt := strings.TrimSuffix(filename, ".md")
-	parts := strings.Split(nameWithoutExt, "_")
-	require.GreaterOrEqual(t, len(parts), 2, "filename should have format '{n}_{tool}.md', got: %s", filename)
+	bundleName := filepath.Base(filepath.Dir(reportFilePath))
+	parts := strings.Split(bundleName, "_")
+	require.GreaterOrEqual(t, len(parts), 2, "bundle should have format '{n}_{tool}', got: %s", bundleName)
 	require.True(t, utils.MatchAllOfRegexp(parts[0], `^\d+$`), "filename first part should be a number, got: %s", parts[0])
 
 	log.Infof("✓ No-identifier test passed: %s", reportFilePath)
@@ -1007,7 +1009,8 @@ LOOP:
 	// Verify path structure
 	require.Contains(t, toolCallLogPath, "tool_calls")
 	require.Contains(t, toolCallLogPath, "task_")
-	require.Contains(t, filepath.Base(toolCallLogPath), "test_file_output", "filename should contain identifier")
+	require.Equal(t, "report.md", filepath.Base(toolCallLogPath))
+	require.Contains(t, filepath.Base(filepath.Dir(toolCallLogPath)), "test_file_output", "bundle directory should contain identifier")
 
 	// Verify pinned file matches the log path
 	require.NotEmpty(t, reportFilePath, "report file should be pinned")
