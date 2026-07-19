@@ -334,16 +334,9 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 			reason = aicommon.ShrinkTextBlockByTokens(reason, 1000)
 		}
 		buf.WriteString(fmt.Sprintf("Last Verification: %s - %s\n", satisfied, reason))
-		if len(lastSat.NextMovements) > 0 {
-			buf.WriteString("Next Movements:\n")
-			for _, nm := range lastSat.NextMovements {
-				content := nm.Content
-				if len(content) > 1000 {
-					content = aicommon.ShrinkTextBlockByTokens(content, 500)
-				}
-				buf.WriteString(fmt.Sprintf("  - %s\n", content))
-			}
-		}
+		// 注: verification 收缩为纯观测角色后不再产出 NextMovements, 这里不再
+		// 渲染 "Next Movements" 段 (TODO 推进交由主循环 adjust_todolist).
+		// satisfied + reasoning 仍是 perception 需要感知的观测信号.
 	}
 
 	diff, _ := r.GetTimelineDiff()

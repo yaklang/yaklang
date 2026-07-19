@@ -80,7 +80,11 @@ func (t *AiTask) execute() error {
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
-				nextMovements = aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements)
+				// 注: verification 收缩为纯观测角色后不再产出 NextMovements,
+				// nextMovements 保持空串 (TODO 推进交由主循环 adjust_todolist).
+				// 下游 generateTaskSummary / updateProcessingStatus / saveTaskArtifacts
+				// 都有 `if nextMovements != ""` 守卫, 空串会被优雅跳过.
+				// Evidence 仍是 verification 的核心产出, 保留.
 
 				var allOps []aicommon.EvidenceOperation
 				allOps = append(allOps, lastRecord.EvidenceOps...)
@@ -164,10 +168,9 @@ func (t *AiTask) execute() error {
 
 			var lastVerificationInfo string
 			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
+				// 注: verification 收缩为纯观测角色后不再产出 NextMovements,
+				// 这里只沉淀 satisfied + reasoning 作为观测信号.
 				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
-				if summary := aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements); summary != "" {
-					lastVerificationInfo += fmt.Sprintf(", next_movements=%s", summary)
-				}
 			}
 
 			var recentActionsSummary string

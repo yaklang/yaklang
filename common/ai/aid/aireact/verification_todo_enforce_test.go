@@ -304,42 +304,9 @@ func TestEnforceTodoCompletionBeforeSatisfaction_IgnoresSiblingTaskTodos(t *test
 	require.NotContains(t, dumpReactTimeline(t, react), "[VERIFICATION_TODO_INCOMPLETE]")
 }
 
-// TestVerifyUserSatisfaction_KeepsSatisfiedWhenAITouchesAllTodos 端到端
-// 验证: mock AI 在同一轮内通过 next_movements 显式关闭所有残留 TODO 并
-// 声明 user_satisfied=true 时, 结果应保持 Satisfied=true. 这是 prompt 中
-// 引导 AI 走的"宣告完成前同轮先清理 TODO"路径.
-//
-// 关键词: 同轮关闭 TODO + Satisfied=true 直通, prompt 引导路径
-func TestVerifyUserSatisfaction_KeepsSatisfiedWhenAITouchesAllTodos(t *testing.T) {
-	react, err := NewTestReAct(
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(
-				`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"all closed, done","completed_task_index":"1-1","next_movements":[{"op":"done","id":"finished_step"},{"op":"skip","id":"obsolete_step"}]}`,
-			))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	require.NoError(t, err)
-	setVerificationTestCurrentTask(react, context.Background(), "current-task")
-
-	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-		Satisfied: false,
-		NextMovements: []aicommon.VerifyNextMovement{
-			{Op: "add", ID: "finished_step", Content: "已完成的步骤"},
-			{Op: "add", ID: "obsolete_step", Content: "本次范围内放弃推进的步骤"},
-		},
-	})
-
-	result, verifyErr := react.VerifyUserSatisfaction(context.Background(), "demo-query", false, "demo-payload")
-	require.NoError(t, verifyErr)
-	require.NotNil(t, result)
-	require.True(t, result.Satisfied,
-		"when AI explicitly closes every active TODO in the same round, Satisfied=true must survive")
-	require.Equal(t, "all closed, done", result.Reasoning,
-		"reasoning must NOT be wrapped with [OVERRIDE] when no override happened")
-
-	dumped := dumpReactTimeline(t, react)
-	require.NotContains(t, dumped, "[VERIFICATION_TODO_INCOMPLETE]")
-}
+// 注: 原 TestVerifyUserSatisfaction_KeepsSatisfiedWhenAITouchesAllTodos 已移除.
+// 该测试验证"mock AI 在同一轮内通过 next_movements 显式关闭所有残留 TODO 后
+// satisfied=true 直通", 但 verification 收缩为纯观测角色后不再解析/应用
+// next_movements (TODO 关闭职责移交给主循环的 adjust_todolist action), 这条
+// 路径已不存在. 残留 TODO 的关闭现在由 adjust_todolist 完成, 下一轮 verification
+// 再确认 satisfied. 关键词: next_movements 路径移除, verification 不关 TODO

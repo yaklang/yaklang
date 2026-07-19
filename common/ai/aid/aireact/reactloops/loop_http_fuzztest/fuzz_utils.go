@@ -1222,9 +1222,6 @@ func verifyFuzzCompletion(loop *reactloops.ReActLoop, taskCtx context.Context, a
 	verifySummary.WriteString("=== Verification ===\n")
 	verifySummary.WriteString(fmt.Sprintf("Satisfied: %v\n", verifyResult.Satisfied))
 	verifySummary.WriteString(fmt.Sprintf("Reasoning: %s\n", verifyResult.Reasoning))
-	if next := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements); next != "" {
-		verifySummary.WriteString(fmt.Sprintf("Next Steps: %s\n", next))
-	}
 	if representativeHiddenIndex != "" {
 		verifySummary.WriteString(fmt.Sprintf("Representative HTTPFlow: %s\n", representativeHiddenIndex))
 	}
@@ -1466,11 +1463,9 @@ func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloo
 		verifyResult.Evidence,
 		verifyResult.EvidenceOps,
 	)
-
-	if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
-		operator.Exit()
-		return
-	}
+	// verification 现在是纯观测调用, 不再决定退出. satisfied 仅作为观测信号
+	// 沉淀, 退出唯一由 AI 主动 finish action 决定.
+	// 关键词: verification 不退, 退出只走 finished, 纯观测角色
 
 	operator.Feedback(diffResult)
 	operator.Continue()

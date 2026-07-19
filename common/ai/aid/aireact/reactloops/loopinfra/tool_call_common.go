@@ -120,15 +120,13 @@ func handleToolCallResult(
 		return
 	}
 
-	if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
-		operator.Exit()
-		return
+	// verification 现在是纯观测调用, 不再决定退出. 当本轮触发了 verification
+	// 且观测到未满足时, 把 reasoning 作为 feedback 沉淀给下一轮; satisfied
+	// 时也只继续, 退出唯一由 AI 主动 finish action 决定.
+	// 关键词: verification 不退, 退出只走 finished, 纯观测角色
+	if !verifyResult.Satisfied {
+		feedbackMsg := fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning)
+		operator.Feedback(feedbackMsg)
 	}
-
-	feedbackMsg := fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning)
-	if summary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements); summary != "" {
-		feedbackMsg += fmt.Sprintf("\nNext Steps: %s", summary)
-	}
-	operator.Feedback(feedbackMsg)
 	operator.Continue()
 }
