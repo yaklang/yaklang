@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,28 @@ type verificationGateTestInvoker struct {
 	// 显式区分, 用于验证 "fire 完成后用真实结束时刻作为新基线" 的清零语义.
 	// 关键词: verifyDelay, fire 开始/结束时间差, 基线时刻验证
 	verifyDelay time.Duration
+	// timelineMu / timelineEntries 记录 AddToTimeline 调用, 供 watchdog
+	// nudge 断言使用 (MockInvoker.AddToTimeline 是空实现).
+	timelineMu      sync.Mutex
+	timelineEntries []string
+}
+
+func (i *verificationGateTestInvoker) AddToTimeline(entry, content string) {
+	i.timelineMu.Lock()
+	i.timelineEntries = append(i.timelineEntries, entry)
+	i.timelineMu.Unlock()
+	i.MockInvoker.AddToTimeline(entry, content)
+}
+
+func (i *verificationGateTestInvoker) hasTimelineEntry(entry string) bool {
+	i.timelineMu.Lock()
+	defer i.timelineMu.Unlock()
+	for _, e := range i.timelineEntries {
+		if e == entry {
+			return true
+		}
+	}
+	return false
 }
 
 func (i *verificationGateTestInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
@@ -402,11 +425,21 @@ func TestVerificationWatchdog_TriggersAfterIdle(t *testing.T) {
 	loop.startVerificationWatchdog(task)
 	defer loop.stopVerificationWatchdogForTask(task)
 
+	// verification 收缩为纯观测角色后, watchdog 不再自动 task.Finish (退出职责
+	// 完全迁移到 AI 主动 finish + maxIter 软中断). watchdog 满意时改为写一条
+	// [VERIFICATION_WATCHDOG_SUGGEST_FINISH] timeline nudge, 推动 AI 自己 finish.
+	// 因此这里断言: verification 被调用了, 但 task 未被 watchdog 终结, 且
+	// timeline 里出现了 SUGGEST_FINISH nudge.
 	require.Eventually(t, func() bool {
-		return task.IsFinished()
+		return invoker.verifyCalls >= 1
 	}, time.Second, 10*time.Millisecond)
-	require.GreaterOrEqual(t, invoker.verifyCalls, 1)
-	require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
+	require.False(t, task.IsFinished(),
+		"watchdog must NOT auto-finish the task anymore; exit is delegated to the AI's finish action")
+	// nudge 应写入 invoker timeline
+	require.Eventually(t, func() bool {
+		return invoker.hasTimelineEntry("[VERIFICATION_WATCHDOG_SUGGEST_FINISH]")
+	}, time.Second, 10*time.Millisecond,
+		"watchdog should emit a SUGGEST_FINISH nudge timeline entry when verification observes satisfied")
 }
 
 func TestVerificationWatchdog_SuppressedDuringToolBlocking(t *testing.T) {

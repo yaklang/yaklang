@@ -61,9 +61,12 @@ func TestRequestVerification_Handler_UsesExplicitPayloadAndForcesVerification(t 
 	assert.Equal(t, task.GetUserInput(), invoker.verifyQuery)
 	assert.Equal(t, "implemented the current change and want explicit acceptance now", invoker.verifyPayload)
 	assert.False(t, invoker.verifyIsToolCall)
+	// verification 收缩为纯观测角色后, satisfied=true 不再触发 operator.Exit
+	// (退出职责迁移到 AI 主动 finish). satisfied 仅作为观测信号沉淀, operator
+	// 不应被终止.
 	terminated, err := op.IsTerminated()
 	require.NoError(t, err)
-	assert.True(t, terminated)
+	assert.False(t, terminated, "verification satisfied must NOT terminate the operator anymore")
 }
 
 func TestRequestVerification_Handler_BuildsDefaultPayloadWhenEmpty(t *testing.T) {

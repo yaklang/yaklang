@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,7 +18,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedToolCallingWrongTool_Abandon(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+// mockedToolCallingWrongTool_Abandon 模拟 wrong-tool → abandon 流程.
+// abandon 处理发生在 require-tool 分支 (不在 primary decision), 用户中断
+// 后 primary decision 第 2 次命中时主动 finish 收口, 让 abandon 信号先沉
+// 淀到 timeline 再退出, 不破坏中断流程语义.
+//
+// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 工具调用
+// 过后主动 finish 收口.
+func mockedToolCallingWrongTool_Abandon(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, decisionCount *int32) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isToolCallReasonLiteForgePrompt(prompt) {
 		rsp := i.NewAIResponse()
@@ -27,6 +35,14 @@ func mockedToolCallingWrongTool_Abandon(i aicommon.AICallerConfigIf, req *aicomm
 	}
 
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
+		// 工具调用过一次后(decisionCount>=2), 主循环再次决策时主动 finish.
+		if atomic.AddInt32(decisionCount, 1) >= 2 {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after abandon"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -64,10 +80,13 @@ func mockedToolCallingWrongTool_Abandon(i aicommon.AICallerConfigIf, req *aicomm
 		return rsp, nil
 	}
 
-	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
+	// 用户中断 (abandon) 后, 系统会进入 DirectlyAnswer 路径, 这里必须返回
+	// 带 answer_payload 的 directly_answer, 否则 DirectlyAnswer 会因缺字段
+	// 触发 AITAG 重试到失败. directly_answer 本身就会终止任务, 不需要额外
+	// finish.
 	if strings.Contains(prompt, "用户中断了工具执行") || strings.Contains(prompt, "请根据你刚才执行的所有步骤") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after abandon / interruption"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -90,6 +109,8 @@ func TestReAct_ToolUse_WrongTool_Abondon(t *testing.T) {
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
+
+	var wrongToolAbandonDecisionCount int32
 
 	sleepToolCalled := false
 	sleepTool, err := aitool.New(
@@ -127,7 +148,7 @@ func TestReAct_ToolUse_WrongTool_Abondon(t *testing.T) {
 
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCallingWrongTool_Abandon(i, r, "sleep")
+			return mockedToolCallingWrongTool_Abandon(i, r, "sleep", &wrongToolAbandonDecisionCount)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
