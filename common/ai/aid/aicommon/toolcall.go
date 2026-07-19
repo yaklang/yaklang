@@ -249,7 +249,7 @@ type ToolCaller struct {
 	onCallToolEnd   func(callToolId string)
 
 	intervalReviewHandler  func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error)
-	intervalReviewDuration time.Duration // interval duration for review, default is 20 seconds
+	intervalReviewDuration time.Duration // interval duration for review, default is DefaultToolCallIntervalReviewDuration
 
 	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
@@ -262,6 +262,34 @@ type ToolCaller struct {
 
 const ReservedKeyCallExpectations = "__call_expectations__"
 const ReservedKeyIdentifier = "__identifier__"
+
+// DefaultToolCallIntervalReviewDuration limits how often a long-running tool
+// wakes the speed-priority model for a progress review. Keep every fallback on
+// this shared value so Config, ReAct, and ToolCaller cannot drift apart.
+const DefaultToolCallIntervalReviewDuration = 60 * time.Second
+
+type toolCallIntervalReviewMetadataContextKey struct{}
+
+// ToolCallIntervalReviewMetadata carries scheduler-owned timing into the
+// review handler without changing the long-standing handler signature.
+type ToolCallIntervalReviewMetadata struct {
+	ToolExecutionStartedAt time.Time
+	ReviewCount            int
+}
+
+func withToolCallIntervalReviewMetadata(ctx context.Context, metadata ToolCallIntervalReviewMetadata) context.Context {
+	return context.WithValue(ctx, toolCallIntervalReviewMetadataContextKey{}, metadata)
+}
+
+// ToolCallIntervalReviewMetadataFromContext returns the actual tool execution
+// start and scheduler review count for the current progress check.
+func ToolCallIntervalReviewMetadataFromContext(ctx context.Context) (ToolCallIntervalReviewMetadata, bool) {
+	if ctx == nil {
+		return ToolCallIntervalReviewMetadata{}, false
+	}
+	metadata, ok := ctx.Value(toolCallIntervalReviewMetadataContextKey{}).(ToolCallIntervalReviewMetadata)
+	return metadata, ok
+}
 
 type ToolCallerOption func(tc *ToolCaller)
 
@@ -448,7 +476,7 @@ func WithToolCaller_IntervalReviewHandler(
 }
 
 // WithToolCaller_IntervalReviewDuration sets the interval duration for the review handler.
-// Default value is 20 seconds if not set.
+// Default value is DefaultToolCallIntervalReviewDuration if not set.
 func WithToolCaller_IntervalReviewDuration(duration time.Duration) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.intervalReviewDuration = duration
@@ -568,10 +596,10 @@ func (t *ToolCaller) GetEmitter() *Emitter {
 }
 
 // GetIntervalReviewDuration returns the interval review duration.
-// If not set, returns the default value of 20 seconds.
+// If not set, returns DefaultToolCallIntervalReviewDuration.
 func (t *ToolCaller) GetIntervalReviewDuration() time.Duration {
 	if t.intervalReviewDuration <= 0 {
-		return time.Second * 20
+		return DefaultToolCallIntervalReviewDuration
 	}
 	return t.intervalReviewDuration
 }

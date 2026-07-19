@@ -2,6 +2,9 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 const (
@@ -22,10 +26,10 @@ const (
 
 // TestGetIntervalReviewDuration tests the GetIntervalReviewDuration method
 func TestGetIntervalReviewDuration(t *testing.T) {
-	t.Run("default duration is 20 seconds", func(t *testing.T) {
+	t.Run("default duration is 60 seconds", func(t *testing.T) {
 		tc := &ToolCaller{}
 		duration := tc.GetIntervalReviewDuration()
-		require.Equal(t, time.Second*20, duration, "default duration should be 20 seconds")
+		require.Equal(t, time.Second*60, duration, "default duration should be 60 seconds")
 	})
 
 	t.Run("zero duration returns default", func(t *testing.T) {
@@ -33,7 +37,7 @@ func TestGetIntervalReviewDuration(t *testing.T) {
 			intervalReviewDuration: 0,
 		}
 		duration := tc.GetIntervalReviewDuration()
-		require.Equal(t, time.Second*20, duration, "zero duration should return default 20 seconds")
+		require.Equal(t, time.Second*60, duration, "zero duration should return default 60 seconds")
 	})
 
 	t.Run("negative duration returns default", func(t *testing.T) {
@@ -41,7 +45,7 @@ func TestGetIntervalReviewDuration(t *testing.T) {
 			intervalReviewDuration: -time.Second,
 		}
 		duration := tc.GetIntervalReviewDuration()
-		require.Equal(t, time.Second*20, duration, "negative duration should return default 20 seconds")
+		require.Equal(t, time.Second*60, duration, "negative duration should return default 60 seconds")
 	})
 
 	t.Run("custom duration is preserved", func(t *testing.T) {
@@ -139,7 +143,9 @@ func TestIntervalReviewContext(t *testing.T) {
 
 	t.Run("exits when context is cancelled", func(t *testing.T) {
 		tc := &ToolCaller{
-			intervalReviewDuration: testMediumInterval,
+			// Deliberately much longer than the assertion timeout: cancellation
+			// must interrupt the wait rather than linger until the next review.
+			intervalReviewDuration: 5 * time.Second,
 			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				return true, nil
 			},
@@ -202,6 +208,7 @@ func TestIntervalReviewContext(t *testing.T) {
 		var callCount int32
 		var reviewCancelCalled bool
 		var userCancelCalled bool
+		var userCancelReason any
 		var userCancelMu sync.Mutex
 
 		tc := &ToolCaller{
@@ -225,6 +232,7 @@ func TestIntervalReviewContext(t *testing.T) {
 		userCancel := func(reason any) {
 			userCancelMu.Lock()
 			userCancelCalled = true
+			userCancelReason = reason
 			userCancelMu.Unlock()
 		}
 
@@ -239,6 +247,7 @@ func TestIntervalReviewContext(t *testing.T) {
 			require.True(t, reviewCancelCalled, "reviewCancel should be called when handler returns false")
 			userCancelMu.Lock()
 			require.True(t, userCancelCalled, "userCancel should be called when handler returns false")
+			require.Equal(t, "tool execution cancelled by interval progress review", userCancelReason)
 			userCancelMu.Unlock()
 		case <-time.After(testQuickTimeout):
 			t.Fatal("intervalReviewContext should exit after handler returns false")
@@ -380,6 +389,123 @@ func TestIntervalReviewContext(t *testing.T) {
 		case <-time.After(testQuickTimeout):
 			t.Fatal("intervalReviewContext should observe updated buffer content")
 		}
+	})
+
+	t.Run("emits bounded progress review lifecycle events", func(t *testing.T) {
+		var eventsMu sync.Mutex
+		var payloads []ToolCallProgressReviewPayload
+		emitter := NewEmitter("test-progress-review", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+			if event.Type != schema.EVENT_TOOL_CALL_PROGRESS_REVIEW {
+				return event, nil
+			}
+			var payload ToolCallProgressReviewPayload
+			require.NoError(t, json.Unmarshal(event.Content, &payload))
+			eventsMu.Lock()
+			payloads = append(payloads, payload)
+			eventsMu.Unlock()
+			return event, nil
+		})
+
+		tc := &ToolCaller{
+			callToolId:             "call-progress-review",
+			emitter:                emitter,
+			intervalReviewDuration: testShortInterval,
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
+				metadata, ok := ToolCallIntervalReviewMetadataFromContext(ctx)
+				require.True(t, ok)
+				require.False(t, metadata.ToolExecutionStartedAt.IsZero())
+				require.Equal(t, 1, metadata.ReviewCount)
+				return false, nil
+			},
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), testWaitTimeout)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			tc.intervalReviewContext(
+				ctx, cancel,
+				aitool.NewWithoutCallback("long-running-tool"), nil,
+				staticSnapshot([]byte("stdout")), staticSnapshot([]byte("stderr")), nil,
+			)
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(testQuickTimeout):
+			t.Fatal("intervalReviewContext should finish after cancel decision")
+		}
+
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		require.Len(t, payloads, 3)
+		require.Equal(t, []string{
+			schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_SCHEDULED,
+			schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_STARTED,
+			schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_COMPLETED,
+		}, []string{
+			payloads[0].Phase, payloads[1].Phase, payloads[2].Phase,
+		})
+		require.Equal(t, "call-progress-review", payloads[0].CallToolID)
+		require.Equal(t, "long-running-tool", payloads[1].Tool)
+		require.Equal(t, 1, payloads[1].ReviewCount)
+		require.Equal(t, len("stdout"), payloads[1].StdoutSnapshotSize)
+		require.Equal(t, len("stderr"), payloads[1].StderrSnapshotSize)
+		require.Equal(t, "cancel", payloads[2].Decision)
+		require.Zero(t, payloads[2].NextReviewAtMS)
+	})
+
+	t.Run("emits failed review and continues to next check", func(t *testing.T) {
+		var eventsMu sync.Mutex
+		var payloads []ToolCallProgressReviewPayload
+		emitter := NewEmitter("test-progress-review-failure", func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+			if event.Type == schema.EVENT_TOOL_CALL_PROGRESS_REVIEW {
+				var payload ToolCallProgressReviewPayload
+				require.NoError(t, json.Unmarshal(event.Content, &payload))
+				eventsMu.Lock()
+				payloads = append(payloads, payload)
+				eventsMu.Unlock()
+			}
+			return event, nil
+		})
+
+		var calls int32
+		tc := &ToolCaller{
+			callToolId:             "call-progress-review-failure",
+			emitter:                emitter,
+			intervalReviewDuration: testShortInterval,
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
+				if atomic.AddInt32(&calls, 1) == 1 {
+					return true, errors.New(strings.Repeat("review failure ", 100))
+				}
+				return false, nil
+			},
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), testWaitTimeout)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			tc.intervalReviewContext(ctx, cancel, aitool.NewWithoutCallback("tool"), nil, nil, nil, nil)
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(testQuickTimeout):
+			t.Fatal("intervalReviewContext should continue after failure and then cancel")
+		}
+
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		require.Len(t, payloads, 5)
+		require.Equal(t, schema.TOOL_CALL_PROGRESS_REVIEW_PHASE_FAILED, payloads[2].Phase)
+		require.Equal(t, "continue", payloads[2].Decision)
+		require.NotEmpty(t, payloads[2].Error)
+		require.LessOrEqual(t, len(payloads[2].Error), 512)
+		require.Positive(t, payloads[2].NextReviewAtMS)
+		require.Equal(t, 2, payloads[3].ReviewCount)
+		require.Equal(t, "cancel", payloads[4].Decision)
 	})
 }
 
