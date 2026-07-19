@@ -146,8 +146,9 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 	rsp := i.NewAIResponse()
-	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: db tool done"}`))
 	rsp.Close()
 	return rsp, nil
 }
@@ -784,8 +785,9 @@ func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicom
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 	rsp := i.NewAIResponse()
-	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: yakscript plugin done"}`))
 	rsp.Close()
 	return rsp, nil
 }
@@ -978,8 +980,9 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 				return rsp, nil
 			}
 
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: native yakscript plugin done"}`))
 			rsp.Close()
 			return rsp, nil
 		}),

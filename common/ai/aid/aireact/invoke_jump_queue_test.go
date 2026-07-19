@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,8 +21,43 @@ import (
 
 // mockedToolCallingForJump 模拟AI响应，用于插队测试
 func mockedToolCallingForJump(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+	// 用 isPrimaryDecisionPrompt 精确匹配主循环决策 prompt (而非宽泛子串匹配),
+	// 避免 verification 之后的非主决策 prompt 误命中工具调用分支导致死循环.
+	// verification 收缩为纯观测角色后, 工具调用过一次后的下一轮主循环决策会
+	// 带着工具结果, 此时改返回 finish 收口 (模拟 "AI 判断任务完成后主动调
+	// finish" 的新行为).
+	//
+	// 跨任务隔离: 插队场景下 slow_task 被取消后 fast_task 启动, fast_task 的
+	// prompt 会带上 slow_task 的 timeline (含其 human_readable_thought /
+	// ReAct iteration 标记). 所以用 prompt 内子串计数无法区分 "本任务已调过
+	// 工具" 与 "上一任务残留 timeline". 这里改为外部传入的 *int32 toolCalled
+	// 计数器 (由测试在 call-tool 时自增, 跨任务隔离), 用计数 >= 1 判定
+	// "本任务至少调过一次工具". 默认传 nil 时回退到 prompt 子串检测 (单任务).
+	return mockedToolCallingForJumpWithCounter(i, req, toolName, nil)
+}
+
+// mockedToolCallingForJumpWithCounter 是 mockedToolCallingForJump 的计数器版本.
+// toolCalled 非 nil 时, 用其值检测 "本任务工具已调过"; 为 nil 时回退到 prompt
+// 子串检测 (单任务场景).
+func mockedToolCallingForJumpWithCounter(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, toolCalled *int32) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 工具调用
+		// 过一轮后主动 finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
+		// 用外部传入的 toolCalled 计数器实现跨任务隔离 (插队场景 slow_task 残留
+		// timeline 不会污染 fast_task 的判定).
+		alreadyCalled := false
+		if toolCalled != nil {
+			alreadyCalled = atomic.LoadInt32(toolCalled) >= 1
+		} else {
+			alreadyCalled = strings.Count(prompt, "mocked thought for tool calling") >= 1
+		}
+		if alreadyCalled {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -41,22 +78,19 @@ func mockedToolCallingForJump(i aicommon.AICallerConfigIf, req *aicommon.AIReque
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
-		rsp.Close()
-		return rsp, nil
-	}
-
-	fmt.Println("Unexpected prompt:", prompt)
-	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 兜底返回
+	// finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
+	rsp.Close()
+	return rsp, nil
 }
 
 // TestReAct_JumpQueue_StatusChanges 测试插队对任务状态的影响
@@ -70,12 +104,19 @@ func TestReAct_JumpQueue_StatusChanges(t *testing.T) {
 	fastToolCalled := false
 	fastToolCompleted := false
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 跨任务隔离
+	// 计数器: 用 atomic int32 跟踪每个任务调过工具的次数, 插队场景下 slow_task
+	// 被取消后 fast_task 启动, 两者计数互不污染 (各自在工具 callback 里自增).
+	var slowTaskCallCount int32
+	var fastTaskCallCount int32
+
 	// 创建慢任务工具
 	slowTool, err := aitool.New(
 		"slow_task",
 		aitool.WithNumberParam("seconds"),
 		aitool.WithNoRuntimeCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			slowToolCalled = true
+			atomic.AddInt32(&slowTaskCallCount, 1)
 			sleepDuration := params.GetFloat("seconds", 3.0)
 
 			fmt.Printf("Slow task started, will run for %.1f seconds\n", sleepDuration)
@@ -105,6 +146,7 @@ func TestReAct_JumpQueue_StatusChanges(t *testing.T) {
 		aitool.WithNumberParam("seconds"),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			fastToolCalled = true
+			atomic.AddInt32(&fastTaskCallCount, 1)
 			sleepDuration := params.GetFloat("seconds", 0.1)
 			time.Sleep(time.Duration(sleepDuration) * time.Second)
 			fastToolCompleted = true
@@ -121,10 +163,10 @@ func TestReAct_JumpQueue_StatusChanges(t *testing.T) {
 			prompt := r.GetPrompt()
 			// 根据用户输入决定使用哪个工具
 			if utils.MatchAnyOfSubString(prompt, "run fast task") {
-				return mockedToolCallingForJump(i, r, "fast_task")
+				return mockedToolCallingForJumpWithCounter(i, r, "fast_task", &fastTaskCallCount)
 			}
 			// 默认使用 slow_task
-			return mockedToolCallingForJump(i, r, "slow_task")
+			return mockedToolCallingForJumpWithCounter(i, r, "slow_task", &slowTaskCallCount)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

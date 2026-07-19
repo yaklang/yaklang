@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -54,8 +53,11 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 		return rsp, nil
 	}
 
-	fmt.Println("Unexpected prompt:", prompt)
-	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+	rsp.Close()
+	return rsp, nil
 }
 
 func TestReAct_ToolUse_CallExpectations_InIntervalReview(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -62,12 +63,21 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 			prompt := req.GetPrompt()
 
 			switch {
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. plan
+			// 执行完成后 outer ReAct 再次进入主决策, 此时第一轮触发 request_plan_and_execution
+			// 时产出的 human_readable_thought="delegate" 会出现在 timeline-open 段.
+			// 检测到它说明 plan 已触发过一轮, 主动 finish 收口.
+			case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") &&
+				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") &&
+				strings.Contains(prompt, "plan-exec-delegate-marker"):
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after plan execution"}`))
+
 			// Outer ReAct: first free-input → trigger plan-and-execute
 			case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "execute callback inherit test" },
-"human_readable_thought": "delegate", "cumulative_summary": "delegate to plan execution"}
+"human_readable_thought": "plan-exec-delegate-marker", "cumulative_summary": "delegate to plan execution"}
 `))
 
 			// Plan LiteForge: generate plan from document (action name = plan_from_document)
@@ -84,7 +94,18 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
   ]
 }`))
 
-			// Inner: subtask ReAct loop → require tool
+			// Inner: subtask ReAct loop → require tool (first iteration)
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 内层
+			// 子任务在工具执行完毕后 (prompt 中出现 "tool/<name> ok" 标记) 再次进入
+			// 主决策时, 主动 finish 收口子任务.
+			case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool") &&
+				strings.Contains(prompt, "tool/mock_callback_inherit_tool ok"):
+				rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "finish",
+  "human_readable_thought": "mocked: subtask tool done"
+}`))
+
+			// Inner: subtask ReAct loop → require tool (no tool output yet)
 			case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_callback_inherit_tool" },
@@ -124,17 +145,19 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 }`))
 
 			// Outer / inner: final answer
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 			case utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") &&
 				!utils.MatchAllOfSubString(prompt, "require_tool"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`{
-  "@action": "directly_answer",
-  "answer_payload": "done"
+  "@action": "finish",
+  "human_readable_thought": "done"
 }`))
 
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 			default:
 				rsp.EmitOutputStream(bytes.NewBufferString(`{
-  "@action": "directly_answer",
-  "answer_payload": "fallback"
+  "@action": "finish",
+  "human_readable_thought": "fallback"
 }`))
 			}
 

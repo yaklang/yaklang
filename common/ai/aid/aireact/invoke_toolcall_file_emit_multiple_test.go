@@ -23,6 +23,16 @@ import (
 func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, callCount *int) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+		// (作为 timeline-open 段内容). 用 callCount 跨步决定 "继续 require_tool" 还是
+		// "finish 收口": callCount < 2 时继续调用 (测试期望恰好 2 次), 达到 2 次主动 finish.
+		if *callCount >= 2 {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -55,9 +65,11 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. FINAL_ANSWER
+	// 分支改返回 finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}

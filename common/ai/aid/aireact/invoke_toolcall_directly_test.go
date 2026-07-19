@@ -23,6 +23,15 @@ func mockedDirectlyCallTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 	prompt := req.GetPrompt()
 
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 直接
+		// 工具执行后 timeline 会出现 [DIRECT_CALL_PARAMS], 检测到它说明已调
+		// 过工具, 此时主动 finish 收口, 模拟 "AI 判断任务完成后主动调 finish".
+		if strings.Contains(prompt, "[DIRECT_CALL_PARAMS]") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "sleep_briefly", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"seconds": 0.1} },
@@ -39,8 +48,11 @@ func mockedDirectlyCallTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 工具调用过
+	// 一次后主循环再次决策时主动 finish 收口 (模拟 "AI 判断任务完成后主动调
+	// finish" 的新正确行为).
 	rsp := i.NewAIResponse()
-	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 	rsp.Close()
 	return rsp, nil
 }
@@ -49,6 +61,14 @@ func mockedDirectlyCallToolLegacyWrapped(i aicommon.AICallerConfigIf, req *aicom
 	prompt := req.GetPrompt()
 
 	if isPrimaryDecisionPrompt(prompt) {
+		// 同 mockedDirectlyCallTool: 检测到 [DIRECT_CALL_PARAMS] 说明已调过
+		// 工具, 主动 finish 收口 (verification 不再自动退出).
+		if strings.Contains(prompt, "[DIRECT_CALL_PARAMS]") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "sleep_briefly", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"@action": "call-tool", "tool": "` + toolName + `", "params": {"seconds": 0.1}} },
@@ -65,8 +85,11 @@ func mockedDirectlyCallToolLegacyWrapped(i aicommon.AICallerConfigIf, req *aicom
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 工具调用过
+	// 一次后主循环再次决策时主动 finish 收口 (模拟 "AI 判断任务完成后主动调
+	// finish" 的新正确行为).
 	rsp := i.NewAIResponse()
-	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 	rsp.Close()
 	return rsp, nil
 }
@@ -75,6 +98,14 @@ func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.
 	prompt := req.GetPrompt()
 
 	if isPrimaryDecisionPrompt(prompt) {
+		// 同 mockedDirectlyCallTool: 检测到 [DIRECT_CALL_PARAMS] 说明已调过
+		// 工具, 主动 finish 收口 (verification 不再自动退出).
+		if strings.Contains(prompt, "[DIRECT_CALL_PARAMS]") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		nonce := aicommon.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -96,8 +127,11 @@ echo hello direct call
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 工具调用过
+	// 一次后主循环再次决策时主动 finish 收口 (模拟 "AI 判断任务完成后主动调
+	// finish" 的新正确行为).
 	rsp := i.NewAIResponse()
-	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 	rsp.Close()
 	return rsp, nil
 }
@@ -379,6 +413,15 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			if isPrimaryDecisionPrompt(prompt) {
+				// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 工具
+				// 调用过 require+direct 两轮 (toolCallCount >= 2) 后, 下一轮主决策
+				// 主动 finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
+				if atomic.LoadInt32(&toolCallCount) >= 2 {
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after require+direct"}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				rsp := i.NewAIResponse()
 				if atomic.LoadInt32(&toolCallCount) == 0 {
 					rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -414,8 +457,10 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 				return rsp, nil
 			}
 
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 兜底
+			// 分支也返回 finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -489,6 +534,18 @@ func TestReAct_DirectlyCallTool_PersistentSession(t *testing.T) {
 
 	react1, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. mockedToolCalling
+			// 在 isPrimaryDecisionPrompt 总是返回 require_tool, 工具执行一轮后会无限循环.
+			// 这里在 isPrimaryDecisionPrompt 分支检测到 "mocked thought for tool calling" 已
+			// 存在于 prompt (作为 timeline-open 段内容), 说明工具已执行过, 主动 finish 收口
+			// (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
+			if isPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "mocked thought for tool calling") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+				rsp.Close()
+				return rsp, nil
+			}
 			return mockedToolCalling(i, r, "sleep_test")
 		}),
 		aicommon.WithEventInputChan(in1),

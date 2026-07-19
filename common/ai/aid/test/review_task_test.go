@@ -1,24 +1,32 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 func TestCoordinator_TaskReview(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
+	// toolCalled 记录是否已经完成过一次工具调用. verification 收缩为纯观测
+	// 角色后, 任务退出由 AI 主动 finish 决定 (不再由 verification 满意即退);
+	// 本测试的 mock 在工具调用过一次后, 下一轮 next-action 直接 finish, 模拟
+	// "AI 判断任务完成后主动调 finish"的新正确行为.
+	var toolCalled int32
 	coordinator, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
@@ -27,7 +35,19 @@ func TestCoordinator_TaskReview(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCalling(i, r, "now", `{"@action": "call-tool", "tool": "now", "params": {}}`)
+			prompt := r.GetPrompt()
+			// 工具已调用过一次后, 主循环再问 next-action 时主动 finish 收口
+			if isNextActionDecisionPrompt(prompt) && atomic.LoadInt32(&toolCalled) > 0 {
+				rsp := i.NewAIResponse()
+				defer rsp.Close()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after one tool call"}`))
+				return rsp, nil
+			}
+			rsp, err := mockedToolCalling(i, r, "now", `{"@action": "call-tool", "tool": "now", "params": {}}`)
+			if err == nil && isToolParamGenerationPrompt(prompt, "now") {
+				atomic.AddInt32(&toolCalled, 1)
+			}
+			return rsp, err
 		}))
 	if err != nil {
 		t.Fatalf("NewCoordinator failed: %v", err)
