@@ -159,7 +159,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if len(plainRequest) <= 0 {
 				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
 				plainRequest = decoded
-				if _, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded); len(body) <= yakit.MaxHTTPFlowRequestBodyInDBBytes {
+				if _, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded); len(body) <= yakit.GetMaxHTTPFlowRequestBodyInDBBytes() {
 					httpctx.SetPlainRequestBytes(req, decoded)
 				}
 			}

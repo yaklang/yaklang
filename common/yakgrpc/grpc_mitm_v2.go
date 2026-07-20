@@ -122,7 +122,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if len(plainRequest) <= 0 {
 				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
 				plainRequest = decoded
-				if _, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded); len(body) <= yakit.MaxHTTPFlowRequestBodyInDBBytes {
+				if _, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded); len(body) <= yakit.GetMaxHTTPFlowRequestBodyInDBBytes() {
 					httpctx.SetPlainRequestBytes(req, decoded)
 				}
 			}

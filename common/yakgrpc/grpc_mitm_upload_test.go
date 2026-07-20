@@ -13,12 +13,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/multipart"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -95,6 +97,10 @@ func TestMITM_UploadFile(t *testing.T) {
 }
 
 func TestMITM_LargeRequestWireForward(t *testing.T) {
+	prev := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(uint64(yakit.MaxHTTPFlowRequestBodyInDBBytes))
+	defer consts.SetGlobalMaxContentLength(prev)
+
 	const bodySize = 300 * 1024
 	token := uuid.New().String()
 	var receivedBodyLen atomic.Int64
