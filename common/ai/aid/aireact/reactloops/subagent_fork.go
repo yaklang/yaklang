@@ -20,15 +20,12 @@ func RunForkInvokerCallback(
 	if fn == nil {
 		return utils.Error("fork invoker callback is nil")
 	}
-	childInvoker, childTask, fork, jobCancel, err := PrepareForkedSubAgent(parentInvoker, parentTask, job)
-	if jobCancel != nil {
-		defer jobCancel()
-	}
+	child, err := prepareForkedChild(parentInvoker, parentTask, job)
 	if err != nil {
 		return err
 	}
-	_ = fork
-	return fn(childInvoker, childTask)
+	defer child.release()
+	return fn(child.invoker, child.task)
 }
 
 // RunForkJob 在 timeline fork 出的子 Agent 中运行一个 ReAct loop。
@@ -43,37 +40,34 @@ func RunForkJob(
 		return nil, utils.Error("fork sub-loop factory is nil")
 	}
 
-	childInvoker, subTask, fork, jobCancel, err := PrepareForkedSubAgent(parentInvoker, parentTask, job)
-	if jobCancel != nil {
-		defer jobCancel()
-	}
+	child, err := prepareForkedChild(parentInvoker, parentTask, job)
 	if err != nil {
-		return &SubAgentResult{SubAgentJob: job, ExecErr: err, DurationMs: time.Since(startedAt).Milliseconds()}, nil
+		return &SubAgentResult{SubAgentJob: job, ExecErr: err, Duration: time.Since(startedAt)}, nil
+	}
+	defer child.release()
+
+	subLoop, err := factory(child.invoker, job)
+	if err != nil {
+		return buildForkJobResult(job, *child, nil, err, startedAt), nil
 	}
 
-	subLoop, err := factory(childInvoker, job)
-	if err != nil {
-		return &SubAgentResult{
-			SubAgentJob: job,
-			SubTaskID:   subTask.GetId(),
-			SubTask:     subTask,
-			Fork:        fork,
-			ExecErr:     err,
-			DurationMs:  time.Since(startedAt).Milliseconds(),
-		}, nil
-	}
+	child.task.SetStatus(aicommon.AITaskState_Processing)
+	execErr := subLoop.ExecuteWithExistedTask(child.task)
+	return buildForkJobResult(job, *child, subLoop, execErr, startedAt), nil
+}
 
-	subTask.SetStatus(aicommon.AITaskState_Processing)
-	execErr := subLoop.ExecuteWithExistedTask(subTask)
+// buildForkJobResult 统一构造 fork 路径（RunForkJob）的 SubAgentResult，避免多处
+// 手写字段、Duration 口径不一。
+func buildForkJobResult(job SubAgentJob, child forkedChild, subLoop *ReActLoop, execErr error, startedAt time.Time) *SubAgentResult {
 	return &SubAgentResult{
 		SubAgentJob: job,
-		SubTaskID:   subTask.GetId(),
-		SubTask:     subTask,
+		SubTaskID:   child.task.GetId(),
+		SubTask:     child.task,
 		SubLoop:     subLoop,
-		Fork:        fork,
+		Fork:        child.fork,
 		ExecErr:     execErr,
-		DurationMs:  time.Since(startedAt).Milliseconds(),
-	}, nil
+		Duration:    time.Since(startedAt),
+	}
 }
 
 // RunForkJobsConcurrently 通过 worker 池并发运行多个 fork 子 loop。
@@ -112,6 +106,42 @@ func RunForkJobsConcurrently(
 		}
 	}
 	return runJobsConcurrently(ctx, wrapped, concurrency, runSingle)
+}
+
+// forkedChild 把 PrepareForkedSubAgent 的返回值打包，并接管 jobCancel 的释放，
+// 消除 4 处重复的 "if jobCancel != nil { defer jobCancel() }" 样板。调用方
+// 应通过 prepareForkedChild 获取，并在结束调用 child.release()。
+type forkedChild struct {
+	invoker  aicommon.AITaskInvokeRuntime
+	task     aicommon.AIStatefulTask
+	fork     *aicommon.TimelineFork
+	jobCancel context.CancelFunc
+}
+
+// release 取消子 job context。安全可重复调用。
+func (c *forkedChild) release() {
+	if c == nil || c.jobCancel == nil {
+		return
+	}
+	c.jobCancel()
+}
+
+// prepareForkedChild 是 PrepareForkedSubAgent 的便捷包装：fork 失败时直接返回
+// err（调用方据此构造失败 SubAgentResult 或返回 err），成功时返回打包好的
+// forkedChild，调用方 defer child.release() 即可。
+func prepareForkedChild(
+	parentInvoker aicommon.AIInvokeRuntime,
+	parentTask aicommon.AIStatefulTask,
+	job SubAgentJob,
+) (*forkedChild, error) {
+	invoker, task, fork, jobCancel, err := PrepareForkedSubAgent(parentInvoker, parentTask, job)
+	if err != nil {
+		if jobCancel != nil {
+			jobCancel()
+		}
+		return nil, err
+	}
+	return &forkedChild{invoker: invoker, task: task, fork: fork, jobCancel: jobCancel}, nil
 }
 
 // PrepareForkedSubAgent fork 父 timeline 并返回子 invoker 和子任务。调用方可在

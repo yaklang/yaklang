@@ -53,9 +53,7 @@ type SubAgentResult struct {
 	Fork *aicommon.TimelineFork
 	// ExecErr 是执行错误，成功时为 nil。
 	ExecErr error
-	// DurationMs 是运行时长（毫秒，fork 路径）。
-	DurationMs int64
-	// Duration 是运行时长（nested 路径）。
+	// Duration 是运行时长。
 	Duration time.Duration
 	// Record 是结构化 timeline 记录（dispatch 路径）。
 	Record TimelineRecord
