@@ -25,6 +25,15 @@ import (
 func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
+		if strings.Contains(prompt, "mocked thought for tool calling file emit test") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -51,7 +60,7 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -265,6 +274,15 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 			if isPrimaryDecisionPrompt(prompt) {
+				// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
+				// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+				// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
+				if strings.Contains(prompt, "mocked thought for large result test") {
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -291,7 +309,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 
 			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -396,6 +414,15 @@ LOOP:
 func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
+		if strings.Contains(prompt, "mocked thought for empty output test") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -422,7 +449,7 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -564,6 +591,15 @@ LOOP:
 func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName, identifier string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
+		if strings.Contains(prompt, "mocked thought for identifier test") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -590,7 +626,7 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -746,10 +782,19 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 	mockedWithoutIdentifier := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
 		if isPrimaryDecisionPrompt(prompt) {
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
+			// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+			// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
+			if strings.Contains(prompt, "mocked-no-id-thought") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+				rsp.Close()
+				return rsp, nil
+			}
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
-"human_readable_thought": "mocked", "cumulative_summary": "..mocked.."}
+"human_readable_thought": "mocked-no-id-thought", "cumulative_summary": "..mocked.."}
 `, toolName)))
 			rsp.Close()
 			return rsp, nil
@@ -772,7 +817,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 
 		if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
 			rsp.Close()
 			return rsp, nil
 		}

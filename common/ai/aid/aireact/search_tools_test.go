@@ -269,8 +269,9 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 				return rsp, nil
 			}
 
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after tools search"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -391,8 +392,9 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 				return rsp, nil
 			}
 
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after forge search"}`))
 			rsp.Close()
 			return rsp, nil
 		}),

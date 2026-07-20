@@ -213,7 +213,11 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 
 	taskExecRequestCount := 0
 	echoToolRequestCount := 0
-	decisionRequestCount := 0
+
+	// per-subtask 工具序列计数: 用于在 verification 收缩后控制每个子任务的
+	// 工具调用节奏 (子任务退出改由 AI 主动 finish 决定).
+	lastSubTaskName := ""
+	subTaskToolSeq := 0
 
 	firstSummary := true
 	task1Summary := uuid.NewString()
@@ -269,15 +273,42 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 					// 移除长时间 sleep，避免测试卡住
 				}
 
-				toolName := "echo"
-
-				if taskExecRequestCount >= 3 { //  前三次echo调用工具
-					toolName = "error"
+				// verification 收缩为纯观测角色后, 子任务退出由 AI 主动 finish
+				// 决定 (不再由 verification 满意即退). 用 per-subtask 工具计数
+				// 控制节奏: 每个非"步骤三"的子任务调够 2 次工具后 finish.
+				// 步骤序列: 子任务1 = echo,echo,finish; 子任务2 = echo,error,finish.
+				// 通过跟踪当前任务名, 在子任务切换时重置 per-subtask 计数.
+				currentTaskName := extractSubTaskNameFromPrompt(prompt)
+				if currentTaskName != lastSubTaskName {
+					lastSubTaskName = currentTaskName
+					subTaskToolSeq = 0
 				}
-				rsp.EmitOutputStream(bytes.NewBufferString(`
+				if currentTaskName == "步骤三" {
+					// 第三个子任务本测试不验证其工具调用 (sync 检查只看 t1/t2),
+					// 直接 finish 跳过.
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: skip step three"}`))
+					return rsp, nil
+				}
+				switch subTaskToolSeq {
+				case 0:
+					rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "echo" },
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+				case 1:
+					// 子任务1 第 2 次: echo; 子任务2 第 2 次: error. 用 task1/tool 计数区分.
+					toolName := "echo"
+					if taskExecRequestCount >= 3 {
+						toolName = "error"
+					}
+					rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
+				default: // 2 次工具调完, 主动 finish 收口当前子任务
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: subtask tool sequence done"}`))
+				}
+				subTaskToolSeq++
 				taskExecRequestCount++
 				return rsp, nil
 			}
@@ -295,13 +326,12 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-				if decisionRequestCount%2 == 0 { // 隔一次 continue一次
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "abc-mocked-reason"}`))
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
-				}
-				decisionRequestCount++
+			// 注: verification 收缩为纯观测角色后, satisfied 不再推进/结束子任务,
+			// 但 verification 仍会被作为观测调用, 需要返回合法的 verify-satisfaction
+			// 响应 (避免落到兜底 finish). 子任务退出改由上面的 next-action finish 控制.
+			// 这里返回固定的 satisfied=false, 纯观测用.
+			if isVerifySatisfactionPrompt(prompt) {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "mocked-observation"}`))
 				return rsp, nil
 			}
 
@@ -397,4 +427,21 @@ LOOP:
 			t.Fatal("timeout")
 		}
 	}
+}
+
+// extractSubTaskNameFromPrompt 从 ReAct 主循环 prompt 里提取当前子任务名.
+// prompt 里子任务以 "任务名称: <name>" 形式出现. 用于 TestCoordinator_SyncTask_Upgrade
+// 在 verification 收缩为纯观测角色后, 按子任务控制工具调用节奏.
+func extractSubTaskNameFromPrompt(prompt string) string {
+	for _, prefix := range []string{"任务名称: ", "任务名称:"} {
+		if idx := strings.Index(prompt, prefix); idx >= 0 {
+			rest := prompt[idx+len(prefix):]
+			// 取到换行或下一个空白分隔为止
+			if nl := strings.IndexAny(rest, "\n\r"); nl >= 0 {
+				return strings.TrimSpace(rest[:nl])
+			}
+			return strings.TrimSpace(rest)
+		}
+	}
+	return ""
 }

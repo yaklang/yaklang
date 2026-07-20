@@ -205,27 +205,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				r.AddToTimeline("evidence_ops", strings.Join(opSummary, "; "))
 			}
 
-			nextMovements := normalizeVerifyNextMovements(action)
-			// Store next_movements in result for status tracking.
-			//
-			// 注意: 旧版本会把 nextMovements 整段 JSON 通过 AddToTimeline 写入
-			// Timeline. 251cb078e 重构后已移除"整段 JSON"的写法, 因为：
-			//   1. 全局 TODO 列表已由 SessionPromptState.VerificationTodoStore
-			//      在 loop prompt 的 timeline-open 段独立渲染 (任何 iteration
-			//      都能看到), Timeline 中的逐轮 JSON 流水属于重复表达;
-			//   2. EVENT_TYPE_TODO_LIST_UPDATE 结构化事件 (见
-			//      AppendVerificationHistory 之后) 携带完整 items + stats +
-			//      applied_ops, 是前端 TODO 面板的权威来源.
-			// 但保留一条 NEXT_MOVEMENTS delta breadcrumb, 形态是 "OP[id]:
-			// content" 一行一个, 和 evidence_ops 形成对偶事件流, 用于失败
-			// 回放与测试观察. 这条必须**写在 transaction callback 内部**,
-			// 与 result.NextMovements 赋值同位; 写在 CallAITransaction 返回
-			// 之后会引入与 stream 事件不可控的时序窗口 (CI 超时偶发会让
-			// 消费者侧观察不到 timeline 已写入). 关键词: NEXT_MOVEMENTS
-			// timeline delta breadcrumb 同位 stream, 事件流时序保证, CI
-			// 时序敏感.
-			result.NextMovements = nextMovements
-			r.addNextMovementsBreadcrumb(result)
+			// verification 不再产出 next_movements: TODO 维护职责完全交给
+			// 主循环的 adjust_todolist action 和 next_movements 兜底入口.
+			// verification 收缩为纯观测角色, 只产出 evidence + satisfied/
+			// reasoning/completed_task_index 作为观测信号.
+			// 关键词: verification 纯观测, 不写 next_movements, 不维护 TODO,
+			// adjust_todolist 是 TODO 权威入口
 
 			emitVerificationReferenceMaterials(boundEmitter, rawResponse.String())
 			return nil
@@ -255,9 +240,14 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		}
 		return nil, transErr
 	}
-	r.AppendVerificationHistory(result)
+	// verification 不再写 TODO store (AppendVerificationHistory 已移除):
+	// satisfied 作为观测信号沉淀到 satisfaction record (由调用方
+	// PushSatisfactionRecord* 完成), Evidence 由调用方 ApplySessionEvidenceOps
+	// 写入. enforceTodoCompletionBeforeSatisfaction 第二道仍保留, 用 store 残留
+	// TODO 作为客观门推翻 AI 的 satisfied=true 主观声明 (store 由
+	// adjust_todolist / 主循环兜底维护).
+	// 关键词: verification 不写 store, satisfied 客观门第二道保留
 	r.enforceTodoCompletionBeforeSatisfaction(result)
-	r.emitTodoListUpdate(result)
 
 	return result, nil
 }
@@ -281,6 +271,11 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 //   - result.Reasoning 前缀注入 [OVERRIDE]，保留 AI 原文于 [AI ORIGINAL]
 //   - timeline 写入 [VERIFICATION_TODO_INCOMPLETE], 列出残留 TODO 摘要
 //
+// 注: 原第一道 (检查 result.NextMovements 里有没有 add op) 已移除 ——
+// verification 不再产出 next_movements, 这道永远不触发. TODO store 的写入
+// 现在由 adjust_todolist action 和主循环 next_movements 兜底入口承担, 本
+// 函数只做第二道: 读 store 残留 TODO 作为客观门.
+//
 // 关键词: enforceTodoCompletionBeforeSatisfaction, Satisfied 兜底回退,
 //
 //	[VERIFICATION_TODO_INCOMPLETE], 闭环反馈, 客观 TODO 反馈推翻主观声明
@@ -292,21 +287,6 @@ func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifyS
 		return
 	}
 	if r.config == nil {
-		return
-	}
-
-	if aicommon.HasNewTodoAddOps(result.NextMovements) {
-		msg := "AI declared user_satisfied=true but simultaneously added new TODO(s) via next_movements. " +
-			"This is contradictory: user_satisfied has been force-overridden to false."
-		result.Satisfied = false
-		originalReasoning := strings.TrimSpace(result.Reasoning)
-		if originalReasoning == "" {
-			result.Reasoning = "[OVERRIDE] " + msg
-		} else {
-			result.Reasoning = "[OVERRIDE] " + msg + "\n\n[AI ORIGINAL] " + originalReasoning
-		}
-		r.AddToTimeline("[VERIFICATION_TODO_INCOMPLETE]", msg)
-		log.Warnf("verification satisfied override: new TODO add ops found in next_movements, forcing user_satisfied=false")
 		return
 	}
 
@@ -348,67 +328,14 @@ func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifyS
 	log.Warnf("verification satisfied override: %d active TODO(s) remain, forcing user_satisfied=false", activeTotal)
 }
 
-// addNextMovementsBreadcrumb writes a compact one-line-per-op timeline entry
-// summarising the next_movements applied in this verification round. The
-// full TODO snapshot remains the responsibility of
-// SessionPromptState.VerificationTodoStore (rendered into the prompt's
-// timeline-open section every iteration). This breadcrumb only captures the
-// delta and is the chronological signal consumers (UI / test / log analysis)
-// rely on to answer "when was the TODO updated?".
+// addNextMovementsBreadcrumb / emitTodoListUpdate 已随 verification 不再产出
+// next_movements 一并移除. verification 收缩为纯观测角色后:
+//   - 不再写 NEXT_MOVEMENTS timeline breadcrumb (TODO 增量由 adjust_todolist
+//     主循环通道自行写 timeline);
+//   - 不再发 EVENT_TYPE_TODO_LIST_UPDATE (前端 TODO 面板的权威更新源改为
+//     adjust_todolist / 主循环 next_movements 兜底入口).
 //
-// 必须在 transaction callback 内部、与 result.NextMovements 赋值同位调用;
-// 否则会和 stream 事件之间形成不可控的时序窗口 (CI 超时偶发会让消费者侧观
-// 察不到 timeline 已写入).
-//
-// 实际格式化交给 aicommon.FormatNextMovementsBreadcrumb, 该函数也被
-// adjust_todolist 主循环路径复用, 保证两条通道写出的 timeline breadcrumb
-// 字节一致.
-//
-// 关键词: addNextMovementsBreadcrumb, delta-only timeline 事件, TODO 时间戳信号
-func (r *ReAct) addNextMovementsBreadcrumb(result *aicommon.VerifySatisfactionResult) {
-	if r == nil || result == nil {
-		return
-	}
-	line := aicommon.FormatNextMovementsBreadcrumb(result.NextMovements)
-	if line == "" {
-		return
-	}
-	r.AddToTimeline("NEXT_MOVEMENTS", line)
-}
-
-// emitTodoListUpdate publishes the post-commit TODO snapshot as a structured
-// EVENT_TYPE_TODO_LIST_UPDATE so the frontend can render a persistent TODO
-// panel. The payload carries the full items list (already mutated by
-// AppendVerificationHistory above), aggregated stats, the increment that
-// triggered this update, and minimal context (satisfied flag, current
-// iteration index, task id).
-//
-// 关键词: emitTodoListUpdate, 全局 TODO 通道, 结构化事件, 前端 TODO 面板
-func (r *ReAct) emitTodoListUpdate(result *aicommon.VerifySatisfactionResult) {
-	if r == nil || r.config == nil || result == nil {
-		return
-	}
-	emitter := r.config.GetEmitter()
-	if emitter == nil {
-		return
-	}
-
-	payload := aicommon.TodoListUpdatePayload{
-		Items:      r.config.SnapshotVerificationTodoItems(),
-		Stats:      r.config.GetVerificationTodoStats(),
-		AppliedOps: append([]aicommon.VerifyNextMovement(nil), result.NextMovements...),
-		Satisfied:  result.Satisfied,
-	}
-	if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
-		payload.IterationIndex = currentLoop.GetCurrentIterationIndex()
-	}
-	if currentTask := r.GetCurrentTask(); currentTask != nil {
-		payload.TaskID = currentTask.GetId()
-		payload.TaskIndex = currentTask.GetIndex()
-	}
-
-	emitter.EmitTodoListUpdates(r.config, r.GetCurrentTask(), payload)
-}
+// 关键词: verification 不写 next_movements breadcrumb, 不发 TodoListUpdate
 
 // writeNextMovementsDisplayStream / formatNextMovementDisplayLine 都已经
 // 抽到 aicommon 包成为公开 helper, 这里保留 package-local 薄包装是为了:

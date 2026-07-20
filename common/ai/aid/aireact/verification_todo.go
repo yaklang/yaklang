@@ -32,9 +32,16 @@ const verificationTodoSnapshotLimit = aicommon.VerificationTodoSnapshotLimit
 // prompt (timeline-open section) on every subsequent iteration, not only
 // inside the next Verify call.
 //
-// 关键词: AppendVerificationHistory, SessionPromptState 写入,
+// 注意: verification 主流程 (VerifyUserSatisfaction) 已不再调用本函数 ——
+// verification 收缩为纯观测角色后不再产出 next_movements, TODO 维护职责
+// 完全交给主循环的 adjust_todolist action 和 next_movements 兜底入口. 本
+// 函数现在仅作为测试 helper 保留, 用于在单测里构造 TODO store 状态以覆盖
+// enforceTodoCompletionBeforeSatisfaction 第二道 (store 残留 TODO 推翻
+// satisfied) 这类仍生效的逻辑. 运行时请勿再调用.
 //
-//	Loop prompt TODO 可见性, 全局 TODO
+// 关键词: AppendVerificationHistory 测试 helper, verification 不再写 store,
+//
+//	adjust_todolist 是 TODO 权威入口
 func (r *ReAct) AppendVerificationHistory(result *aicommon.VerifySatisfactionResult) {
 	if r == nil || result == nil {
 		return

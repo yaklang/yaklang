@@ -197,6 +197,11 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 	decisionStageIdx := 0
 	toolParamStageIdx := 0
 	progressStageIdx := 0
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动结束子任务.
+	// 用 awaitingSubtaskFinish 标志: verification 返回 satisfied=true 后置位,
+	// 下一次主循环子任务决策 (PROGRESS_TASK_ 分支) 命中时主动 finish 收口,
+	// 让 plan coordinator 推进 progress 流程.
+	awaitingSubtaskFinish := false
 
 	mockTool, err := aitool.New(
 		toolName,
@@ -306,6 +311,11 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 			})), nil
 
 		case isVerifySatisfactionPrompt(prompt):
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
+			// 置位 awaitingSubtaskFinish, 让下一次子任务主循环决策主动 finish.
+			stageCursorMu.Lock()
+			awaitingSubtaskFinish = true
+			stageCursorMu.Unlock()
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action":        "verify-satisfaction",
 				"user_satisfied": true,
@@ -314,6 +324,16 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 
 		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
 			stageCursorMu.Lock()
+			if awaitingSubtaskFinish {
+				// 本子任务 verification 已观测到 satisfied, 主动 finish 收口,
+				// 让 plan coordinator 推进 progress 流程.
+				awaitingSubtaskFinish = false
+				stageCursorMu.Unlock()
+				return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
+					"@action":               "finish",
+					"human_readable_thought": "mocked: subtask done after verification satisfied",
+				})), nil
+			}
 			if decisionStageIdx >= len(stages) {
 				stageCursorMu.Unlock()
 				return nil, utils.Errorf("unexpected intelligent subtask decision prompt overflow: %s", utils.ShrinkString(prompt, 240))

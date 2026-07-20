@@ -66,7 +66,17 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
     }
   ]
 }`))
-		// Inner subtask ReAct loop: require tool
+		// Inner subtask ReAct loop: tool already executed → finish the subtask.
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 内层
+		// 子任务在工具执行完毕后 (prompt 中出现 "tool/<name> ok" 标记) 再次进入
+		// 主决策时, 主动 finish 收口子任务.
+		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool") &&
+			strings.Contains(prompt, "tool/mock_plan_exec_tool ok"):
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "finish",
+  "human_readable_thought": "mocked: subtask tool done"
+}`))
+		// Inner subtask ReAct loop: require tool (no tool output yet)
 		case utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", "directly_answer", "require_tool"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "mock_plan_exec_tool" },
@@ -91,10 +101,12 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 		case utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "task completed"}`))
 		// Final answer
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 		case utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool"):
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "summary"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "summary"}`))
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 		default:
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "fallback"}`))
 		}
 
 		rsp.Close()

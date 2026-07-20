@@ -246,8 +246,11 @@ func TestLoadCapability_Handler_Tool_Success(t *testing.T) {
 	assert.True(t, invoker.toolCallCalled, "tool should be called")
 	assert.Equal(t, "my-tool", invoker.toolCallName)
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再触发 operator.Exit
+	// (退出职责迁移到 AI 主动 finish). load_capability 走 tool_call_common
+	// 路径, satisfied 仅作为观测信号, operator 不应被终止.
 	terminated, err := op.IsTerminated()
-	assert.True(t, terminated, "should exit on satisfied")
+	assert.False(t, terminated, "should NOT exit on satisfied anymore; exit is delegated to AI finish")
 	assert.NoError(t, err)
 }
 

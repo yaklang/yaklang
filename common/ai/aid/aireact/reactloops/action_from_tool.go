@@ -214,10 +214,12 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				operator.Fail(err)
 				return
 			}
-			if triggered && verifyResult != nil && verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
-				operator.Exit()
-				return
-			}
+			// verification 现在是纯观测调用, 不再决定退出. satisfied 仅作为
+			// 观测信号沉淀 (MaybeVerifyUserSatisfaction 内部已落 timeline /
+			// satisfaction record), 退出唯一由 AI 主动 finish action 决定.
+			// 关键词: verification 不退, 退出只走 finished, 纯观测角色
+			_ = verifyResult
+			_ = triggered
 
 			// Continue to next action
 			operator.Continue()

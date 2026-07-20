@@ -162,12 +162,12 @@ func mockedToolCallingWithAIMemory2(i aicommon.AICallerConfigIf, req *aicommon.A
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 	if isDirectAnswerPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after tool require / reject"}`))
 		rsp.Close()
 		return rsp, nil
-
 	}
 
 	if utils.MatchAllOfSubString(prompt, `<|TAGS_END_`, `<|INPUT_END`, `<|INPUT_`) {

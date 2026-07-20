@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,7 +20,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+// mockedToolCallingWrongParam_Normal 模拟 "工具参数错误 → 重新生成 → 成功"
+// 流程. wrong-params 路径会让工具被 review/重生成多次, 因此不能像普通
+// require_tool mock 那样"调过一次就 finish". 这里用 *int32 计数器跟踪
+// isPrimaryDecisionPrompt 命中次数: 前若干次返回 require_tool (让 wrong-params
+// review 流程走完), 之后主动 finish 收口.
+//
+// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 工具调用
+// 过后主动 finish 收口.
+func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, decisionCount *int32) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isToolCallReasonLiteForgePrompt(prompt) {
 		rsp := i.NewAIResponse()
@@ -29,6 +38,17 @@ func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicomm
 	}
 
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
+		// 工具调用过一次后(decisionCount>=2), 主循环再次决策时主动 finish.
+		// 阈值取 2: 第 1 次返回 require_tool 触发 wrong-params review 流程,
+		// 第 2 次起收口 finish, 让测试断言 (sleepToolCalled / normalReview /
+		// reActFinished) 都能成立.
+		if atomic.AddInt32(decisionCount, 1) >= 2 {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after wrong param retry"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -73,12 +93,12 @@ func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicomm
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 	if isDirectAnswerPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after wrong param"}`))
 		rsp.Close()
 		return rsp, nil
-
 	}
 
 	fmt.Println("Unexpected prompt:", prompt)
@@ -91,6 +111,8 @@ func TestReAct_ToolUse_WrongParams(t *testing.T) {
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
+
+	var wrongParamDecisionCount int32
 
 	sleepToolCalled := false
 	sleepTool, err := aitool.New(
@@ -128,7 +150,7 @@ func TestReAct_ToolUse_WrongParams(t *testing.T) {
 
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCallingWrongParam_Normal(i, r, "sleep")
+			return mockedToolCallingWrongParam_Normal(i, r, "sleep", &wrongParamDecisionCount)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -265,6 +287,8 @@ func TestReAct_ToolUse_EmitFinalInvokeParams(t *testing.T) {
 	toolName := "echo_" + ksuid.New().String()
 	expectedInput := "param_" + ksuid.New().String()
 
+	var finalDecisionCount int32
+
 	var invokedParams aitool.InvokeParams
 	var toolCalled bool
 	echoTool, err := aitool.New(
@@ -297,6 +321,15 @@ func TestReAct_ToolUse_EmitFinalInvokeParams(t *testing.T) {
 			}
 
 			if isPrimaryDecisionPrompt(prompt) {
+				// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
+				// 工具调用过一次后(finalDecisionCount>=2), 主循环再次决策时
+				// 主动 finish 收口.
+				if atomic.AddInt32(&finalDecisionCount, 1) >= 2 {
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after final invoke params"}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -320,9 +353,10 @@ func TestReAct_ToolUse_EmitFinalInvokeParams(t *testing.T) {
 				return rsp, nil
 			}
 
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 			if isDirectAnswerPrompt(prompt) {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "done"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after final invoke params"}`))
 				rsp.Close()
 				return rsp, nil
 			}

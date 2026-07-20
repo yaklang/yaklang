@@ -56,15 +56,18 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 工具调用过
+	// 一次后主循环再次决策时主动 finish 收口 (模拟 "AI 判断任务完成后主动调
+	// finish" 的新正确行为). FINAL_ANSWER / 兜底分支都返回 finish.
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
 	rsp := i.NewAIResponse()
-	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 	rsp.Close()
 	return rsp, nil
 }
@@ -613,6 +616,16 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 	mockedToolCallingWithToolStatus := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
 		if isPrimaryDecisionPrompt(prompt) {
+			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
+			// 工具调用过一次后(toolExecutionSucceeded 已置位), 主循环再次决策
+			// 时主动 finish 收口. Phase 1 工具不存在/未成功时仍返回 require_tool,
+			// 让 LOOP1 能检测到 TOOL_EXECUTION_ERROR; Phase 2 工具成功后 finish.
+			if toolExecutionSucceeded.IsSet() {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+				rsp.Close()
+				return rsp, nil
+			}
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -652,13 +665,14 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 
 		if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
 			rsp.Close()
 			return rsp, nil
 		}
 
+		// verification 收缩为纯观测角色后, 兜底改返回 finish 收口.
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 		rsp.Close()
 		return rsp, nil
 	}

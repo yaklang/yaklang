@@ -129,22 +129,18 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
 		}
 
-		if verifyResult.Satisfied && !aicommon.HasNewTodoAddOps(verifyResult.NextMovements) {
+		// verification 现在是纯观测调用, 不再决定退出. satisfied 仅作为观测
+		// 信号沉淀, 退出唯一由 AI 主动 finish action 决定.
+		// 关键词: verification 不退, 退出只走 finished, 纯观测角色
+		if verifyResult.Satisfied {
 			invoker.AddToTimeline("knowledge_enhance_satisfied", `** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **`)
-			op.Exit()
+			op.Continue()
 			return
 		}
-		if verifyResult.Satisfied {
-			log.Warnf("knowledge_enhance: AI said satisfied but new TODOs were added, continuing instead of exiting")
-			verifyResult.Satisfied = false
-		}
-
-		nextStepsSummary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements)
 
 		invoker.AddToTimeline("knowledge_enhance_not_satisfied",
 			"Knowledge enhancement did NOT satisfy the query '"+rewriteQuery+"'. "+
 				"Reasoning: "+verifyResult.Reasoning+". "+
-				"Suggested next steps: "+nextStepsSummary+". "+
 				"If the knowledge base lacks relevant information, "+
 				"you MUST try web_search or internet_research to search the internet. "+
 				"Do NOT retry knowledge_enhance_answer with the same approach.")

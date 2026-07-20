@@ -431,9 +431,15 @@ func (r *ReActLoop) triggerVerificationWatchdog(task aicommon.AIStatefulTask) {
 	if result == nil {
 		return
 	}
-	if result.Satisfied && !aicommon.HasNewTodoAddOps(result.NextMovements) {
-		task.Finish(nil)
-		r.stopVerificationWatchdogForTask(task)
+	// watchdog 不再替 AI 收口 (退出职责已完全迁移到 AI 主动 finish action +
+	// maxIter 软中断兜底). verification 现在是纯观测/建议角色: 无论观测结果
+	// 如何, 都只写一条 timeline nudge, 推动 AI 自己决定是否调 finish.
+	// 关键词: watchdog nudge, 不再自动 task.Finish, 退出只走 finished,
+	// verification 纯观测角色
+	if result.Satisfied {
+		r.GetInvoker().AddToTimeline("[VERIFICATION_WATCHDOG_SUGGEST_FINISH]",
+			"verification observed that the current task goal appears achieved (reasoning: "+
+				result.Reasoning+"). If you confirm there is no remaining work, call the `finish` action to terminate the ReAct loop; otherwise keep pushing execution forward.")
 		return
 	}
 	r.GetInvoker().AddToTimeline("verification_watchdog_unsatisfied", result.Reasoning)

@@ -1133,110 +1133,15 @@ func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testin
 	}
 }
 
-func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
-	react, err := NewTestReAct(
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create ReAct instance: %v", err)
-	}
-
-	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-		Satisfied: false,
-		Reasoning: "任务未完成",
-		NextMovements: []aicommon.VerifyNextMovement{
-			{Op: "add", ID: "create_file", Content: "创建一个 A.md 文件"},
-			{Op: "add", ID: "rename_file", Content: "将临时文件改名为最终文件名"},
-			{Op: "add", ID: "obsolete_step", Content: "不再需要的临时步骤"},
-		},
-	})
-	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-		Satisfied: false,
-		Reasoning: "阶段推进",
-		NextMovements: []aicommon.VerifyNextMovement{
-			{Op: "done", ID: "rename_file"},
-			{Op: "delete", ID: "obsolete_step"},
-			{Op: "add", ID: "verify_file", Content: "检查 A.md 是否已写入预期内容"},
-		},
-	})
-
-	prompt, _, err := react.promptManager.GenerateVerificationPrompt("请创建并验证 A.md", true, "tool executed: create file")
-	if err != nil {
-		t.Fatalf("Failed to generate verification prompt: %v", err)
-	}
-
-	if !utils.MatchAllOfSubString(
-		prompt,
-		"# TODO:",
-		"- [ ]: [id: verify_file]: 检查 A.md 是否已写入预期内容",
-		"- [ ]: [id: create_file]: 创建一个 A.md 文件",
-		"- DONE (1): rename_file",
-		"- DELETED (1): obsolete_step",
-		"next_movements 只输出增量",
-		"{\"op\": \"doing\", \"id\": \"stable_id\"}",
-		"{\"op\": \"delete\", \"id\": \"stable_id\"}",
-		// 新增 skip op 必须出现在 verification prompt 的 op 清单中, 否则
-		// AI 无从得知"如何主动跳过 TODO", 兜底机制就会反复触发.
-		// 关键词: prompt skip op 清单, AI 关闭 TODO 通道
-		"{\"op\": \"skip\", \"id\": \"stable_id\"}",
-		"{\"op\": \"add\", \"id\": \"stable_id\", \"content\": \"新增一个短链路 TODO\"}",
-	) {
-		t.Fatalf("verification prompt should contain structured TODO snapshot and incremental instructions. Got:\n%s", prompt)
-	}
-}
-
-func TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied(t *testing.T) {
-	react, err := NewTestReAct(
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create ReAct instance: %v", err)
-	}
-
-	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-		Satisfied: false,
-		Reasoning: "任务未完成",
-		NextMovements: []aicommon.VerifyNextMovement{
-			{Op: "add", ID: "collect_signal", Content: "收集页面回显信号"},
-			{Op: "add", ID: "retry_payload", Content: "更换 payload 再次验证"},
-		},
-	})
-	// AI 主动 skip 两条残留 TODO, 这是新机制下唯一能让残留项进入 SKIPPED
-	// 状态的路径; 旧版本依赖 Satisfied=true 自动翻 SKIPPED, 该语义已废弃.
-	// 关键词: 显式 skip op + Satisfied=true 同轮关闭 + prompt 渲染
-	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-		Satisfied: true,
-		Reasoning: "目标达成；同时主动跳过未推进的 TODO",
-		NextMovements: []aicommon.VerifyNextMovement{
-			{Op: "skip", ID: "collect_signal"},
-			{Op: "skip", ID: "retry_payload"},
-		},
-	})
-
-	prompt, _, err := react.promptManager.GenerateVerificationPrompt("观察页面回显", false, "已成功得到完整响应")
-	if err != nil {
-		t.Fatalf("Failed to generate verification prompt: %v", err)
-	}
-
-	if !utils.MatchAllOfSubString(
-		prompt,
-		"- SKIPPED (2): collect_signal, retry_payload",
-		"必须被显式关闭",
-		"系统不再自动把剩余未关闭 TODO 标记为 `SKIPPED`",
-	) {
-		t.Fatalf("verification prompt should render explicitly-skipped TODO items and the new no-auto-skip guidance. Got:\n%s", prompt)
-	}
-}
+// 注: TestGenerateVerificationPrompt_RendersTodoSnapshot 和
+// TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied 已移除.
+// 这两个测试断言 verification prompt 包含 next_movements 操作语法指引
+// (op: doing/done/delete/skip/add 等) 和 "satisfied 时同轮关闭 TODO" 的
+// instruction 文本. verification 收缩为纯观测角色后不再产出/维护
+// next_movements (schema 已删 next_movements 字段, instruction 已删相关
+// 指引), TODO 维护职责移交 adjust_todolist, 这两个测试验证的内容已不存在.
+// TodoSnapshot 的渲染本身仍由 TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus
+// 覆盖 (store 由 adjust_todolist 维护, verification prompt 仍展示当前 TODO).
 
 func TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus(t *testing.T) {
 	react, err := NewTestReAct(

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,7 +18,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+// mockedToolCallingWrongTool 模拟 wrong-tool → re-select (echo) 流程.
+// re-select 发生在 require-tool 分支里 (不在 primary decision), 所以
+// primary decision 用 *int32 计数器收口是安全的: 第 1 次返回 require_tool,
+// 第 2 次起主动 finish.
+//
+// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 工具调用
+// 过后主动 finish 收口.
+func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, decisionCount *int32) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isToolCallReasonLiteForgePrompt(prompt) {
 		rsp := i.NewAIResponse()
@@ -27,6 +35,14 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 	}
 
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出.
+		// 工具调用过一次后(decisionCount>=2), 主循环再次决策时主动 finish.
+		if atomic.AddInt32(decisionCount, 1) >= 2 {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after wrong tool re-select"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -64,19 +80,20 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 	if strings.Contains(prompt, "用户中断了工具执行") || strings.Contains(prompt, "请根据你刚才执行的所有步骤") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after wrong tool / interruption"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
+	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 	if isDirectAnswerPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after wrong tool / direct answer"}`))
 		rsp.Close()
 		return rsp, nil
-
 	}
 
 	fmt.Println("Unexpected prompt:", prompt)
@@ -89,6 +106,8 @@ func TestReAct_ToolUse_WrongTool(t *testing.T) {
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
+
+	var wrongToolDecisionCount int32
 
 	sleepToolCalled := false
 	sleepTool, err := aitool.New(
@@ -126,7 +145,7 @@ func TestReAct_ToolUse_WrongTool(t *testing.T) {
 
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCallingWrongTool(i, r, "sleep")
+			return mockedToolCallingWrongTool(i, r, "sleep", &wrongToolDecisionCount)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
