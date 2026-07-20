@@ -3,9 +3,38 @@ package subdomain
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
+)
+
+// aRecordQuerier is the minimal surface of the scanner used by brute force
+// and wildcard detection to issue A-record queries. It is an interface so the
+// wildcard algorithm can be unit-tested with a fake resolver instead of real
+// DNS (which is non-deterministic, network-bound, and unreliable in CI).
+type aRecordQuerier interface {
+	QueryA(ctx context.Context, domain string) (ip string, server string, _ error)
+}
+
+// WildcardMode classifies the outcome of wildcard DNS detection.
+type WildcardMode int
+
+const (
+	// WildcardNone: random probes do not resolve (or only some resolve).
+	// The target is treated as non-wildcard; brute force proceeds normally.
+	WildcardNone WildcardMode = iota
+	// WildcardSingleIP: all probes resolve and every probe returns the *same*
+	// IP. This is the classic operator/self-configured wildcard (泛解析),
+	// pointing all non-existent labels at a single landing IP. Brute force
+	// proceeds with that IP blacklisted (unless WildCardToStop is set).
+	WildcardSingleIP
+	// WildcardHijacked: all probes resolve but return *multiple distinct* IPs.
+	// This indicates DNS has been taken over / hijacked (e.g. a local TUN mode
+	// intercepting DNS). Brute force is meaningless: dictionary results would
+	// all be forged and none would be filtered by a fixed blacklist. The
+	// scan is aborted with a clear reason.
+	WildcardHijacked
 )
 
 func (s *SubdomainScanner) brute(
@@ -30,6 +59,11 @@ func (s *SubdomainScanner) brute(
 		}
 	}
 
+	querier := s.aRecordQuerier()
+	if querier == nil {
+		querier = s
+	}
+
 	wg := sync.WaitGroup{}
 	for line := range handler(ctx) {
 
@@ -46,7 +80,7 @@ func (s *SubdomainScanner) brute(
 			target := fmt.Sprintf("%s.%s", raw, domain)
 			target = formatDomain(target)
 			s.logger.Debugf("start to query %s", target)
-			ip, server, err := s.QueryA(ctx, target)
+			ip, server, err := querier.QueryA(ctx, target)
 			if err != nil {
 				s.logger.Debugf("query [%s] A failed: %s", target, err)
 				return
@@ -78,23 +112,33 @@ func (s *SubdomainScanner) BruteWithSubDictionarySelection(ctx context.Context, 
 
 	target = formatDomain(target)
 
-	var (
-		ok                  bool
-		tested, blacklistIP []string
-	)
-
 	if ctx.Err() != nil {
 		return
 	}
 
 	s.logger.Infof("start to checking wildcard for %s", target)
-	if ok, tested, blacklistIP = s.isWildCard(ctx, target); ok {
+	mode, tested, blacklistIP := s.isWildCard(ctx, target)
+	switch mode {
+	case WildcardHijacked:
+		// DNS 疑似被劫持/接管（例如本地开启了 TUN 模式劫持 DNS）：
+		// 所有不存在的随机子域名都解析成功，但返回的 IP 各不相同，
+		// 说明真实字典的爆破结果也会被伪造且无法通过固定黑名单过滤，
+		// 继续爆破没有意义。立即中止并通知调用方。
+		reason := fmt.Sprintf(
+			"subdomain brute aborted for %s: all %d random probes resolved but returned %d distinct IPs (e.g. %s) — DNS appears to be hijacked/taken over (e.g. local TUN mode). Brute force is meaningless here.",
+			target, len(tested), len(blacklistIP), strings.Join(tested, ", "),
+		)
+		s.logger.Errorf(reason)
+		s.onScanAborted(reason)
+		return
+	case WildcardSingleIP:
 		s.logger.Infof("maybe %s has dns wildcard resolving setting, tested: [%s]", target, strings.Join(tested, "|"))
-		s.logger.Infof("we detected blacklist ip [%s]", strings.Join(blacklistIP, " | "))
-
+		s.logger.Infof("we detected wildcard ip blacklist [%s]", strings.Join(blacklistIP, " | "))
 		if s.config.WildCardToStop {
 			return
 		}
+	case WildcardNone:
+		// 无泛解析，正常爆破
 	}
 
 	if ctx.Err() != nil {
@@ -137,16 +181,51 @@ func (s *SubdomainScanner) BruteWithSubDictionarySelection(ctx context.Context, 
 	wg.Wait()
 }
 
-func (s *SubdomainScanner) isWildCard(ctx context.Context, target string) (ok bool, tested []string, blacklist []string) {
-	result := sync.Map{}
+// aRecordQuerier returns the override querier if set, otherwise nil.
+// nil callers fall back to the scanner itself (which implements QueryA).
+func (s *SubdomainScanner) aRecordQuerier() aRecordQuerier {
+	return s.querierOverride
+}
+
+// isWildCard probes a target with several random, guaranteed-not-to-exist
+// subdomains and classifies the wildcard behavior.
+//
+// Decision tree (N = probe count, resolved = how many probes returned an A
+// record, distinctIPs = number of distinct IPs among those):
+//
+//	resolved == 0              -> WildcardNone (no wildcard)
+//	0 < resolved < N           -> WildcardNone (partial hit, avoid false positive)
+//	resolved == N, distinct==1 -> WildcardSingleIP (classic 泛解析)
+//	resolved == N, distinct>1  -> WildcardHijacked (DNS taken over / hijacked)
+//
+// For WildcardSingleIP the blacklist is [the single IP]; for WildcardHijacked
+// the blacklist is the set of distinct IPs (returned for diagnostics only —
+// the caller aborts and does not use it as a filter); for WildcardNone it is
+// empty.
+func (s *SubdomainScanner) isWildCard(ctx context.Context, target string) (mode WildcardMode, tested []string, blacklist []string) {
+	n := s.config.WildCardProbeCount
+	if n <= 0 {
+		n = 10
+	}
+
+	querier := s.aRecordQuerier()
+	if querier == nil {
+		querier = s
+	}
+
+	var (
+		mu         sync.Mutex
+		ipSet      = map[string]struct{}{}
+		testedOnce []string
+	)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < n; i++ {
 		payload := fmt.Sprintf("%s.%s", utils.RandStringBytes(16), target)
 
 		err := s.dnsQuerierSwg.AddWithContext(ctx)
 		if err != nil {
-			return false, nil, nil
+			return WildcardNone, nil, nil
 		}
 
 		wg.Add(1)
@@ -154,26 +233,49 @@ func (s *SubdomainScanner) isWildCard(ctx context.Context, target string) (ok bo
 			defer s.dnsQuerierSwg.Done()
 			defer wg.Done()
 
-			ip, _, err := s.QueryA(ctx, payload)
+			ip, _, err := querier.QueryA(ctx, payload)
 			if err != nil {
 				s.logger.Debugf("wildcard detected: checking %s failed: %s", payload, err)
 				return
 			}
-			tested = append(tested, payload)
 
-			result.Store(ip, 0)
+			mu.Lock()
+			testedOnce = append(testedOnce, payload)
+			ipSet[ip] = struct{}{}
+			mu.Unlock()
 		}()
 	}
 
 	wg.Wait()
 
-	result.Range(func(key, value interface{}) bool {
-		blacklist = append(blacklist, key.(string))
-		return true
-	})
-
-	if len(tested) >= 5 {
-		return true, tested, blacklist
+	if len(testedOnce) == 0 {
+		return WildcardNone, nil, nil
 	}
-	return false, []string{}, []string{}
+
+	for ip := range ipSet {
+		blacklist = append(blacklist, ip)
+	}
+
+	// 全部命中 -> 泛解析或劫持
+	if len(testedOnce) == n {
+		if len(ipSet) == 1 {
+			// 经典泛解析：所有不存在子域名都指向同一个 IP
+			return WildcardSingleIP, testedOnce, blacklist
+		}
+		// 所有不存在子域名都解析成功但 IP 各不相同 -> DNS 被接管/劫持
+		return WildcardHijacked, testedOnce, blacklist
+	}
+
+	// 部分命中：可能是偶发，避免误报，视为无泛解析
+	return WildcardNone, testedOnce, []string{}
 }
+
+// UseQuerier installs an override A-record querier used by brute force and
+// wildcard detection. It is primarily intended for tests; production code
+// should leave it unset so the scanner queries real DNS via QueryA.
+func (s *SubdomainScanner) UseQuerier(q aRecordQuerier) {
+	s.querierOverride = q
+}
+
+// querierOverride holds an optional A-record querier override (see UseQuerier).
+var _ aRecordQuerier = (*SubdomainScanner)(nil)
