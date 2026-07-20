@@ -71,22 +71,14 @@ func runAllCategoryScans(
 
 	var scanStates sync.Map
 
-	forkResults := reactloops.RunForkJobsConcurrently(
-		r, task, jobs, concurrency,
-		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.SubAgentJob) (*reactloops.ReActLoop, error) {
-			catJob, ok := catalog[job.Identifier]
-			if !ok {
-				return nil, fmt.Errorf("unknown category job %q", job.Identifier)
-			}
-			catLoop, scan, err := buildSingleCategoryScanLoop(
-				childInvoker, state, catJob.category, catJob.index, catJob.total, nil, artifacts,
-			)
-			if scan != nil {
-				scanStates.Store(catJob.category.ID, scan)
-			}
-			return catLoop, err
+	forkResults := reactloops.DispatchSubAgents(r, task, jobs, reactloops.SubAgentOptions{
+		ParentLoop:         loop,
+		TimelineMode:       reactloops.SubAgentTimelineFork,
+		ExecuteConcurrency: concurrency,
+		LoopBuilder: phase2CategoryLoopBuilder{
+			state: state, catalog: catalog, artifacts: artifacts, scanStates: &scanStates,
 		},
-	)
+	})
 
 	sort.Slice(forkResults, func(i, j int) bool {
 		return forkResults[i].Order < forkResults[j].Order
@@ -212,20 +204,24 @@ func tryResumeCategoryScanPhaseB(
 		TaskName:   resumeGoal,
 		Goal:       resumeGoal,
 	}
-	resumeResult, resumeErr := reactloops.RunForkJob(r, task, resumeJob, func(childInvoker aicommon.AIInvokeRuntime, _ reactloops.SubAgentJob) (*reactloops.ReActLoop, error) {
-		catLoop, scan, err := buildSingleCategoryScanLoop(childInvoker, state, category, catJob.index, catJob.total, scanState, artifacts)
-		if scan != nil {
-			scanStates.Store(category.ID, scan)
-		}
-		return catLoop, err
+	resumeResults := reactloops.DispatchSubAgents(r, task, []reactloops.SubAgentJob{resumeJob}, reactloops.SubAgentOptions{
+		ParentLoop:   loop,
+		TimelineMode: reactloops.SubAgentTimelineFork,
+		LoopBuilder: phase2CategoryResumeLoopBuilder{
+			state: state, category: category, catJob: catJob, scanState: scanState,
+			artifacts: artifacts, scanStates: scanStates,
+		},
 	})
-	if resumeErr != nil {
-		log.Warnf("[CodeAudit/Phase2] Category '%s' resume fork failed: %v", category.ID, resumeErr)
-		return false
+	var resumeResult *reactloops.SubAgentResult
+	var resumeErr error
+	if len(resumeResults) > 0 {
+		resumeResult = resumeResults[0]
 	}
 	if resumeResult != nil && resumeResult.ExecErr != nil {
+		resumeErr = resumeResult.ExecErr
 		log.Warnf("[CodeAudit/Phase2] Category '%s' resume scan failed: %v", category.ID, resumeResult.ExecErr)
 	}
+	_ = resumeErr
 	return true
 }
 
@@ -237,4 +233,49 @@ func countScanObservationsForCategory(state *model.AuditState, categoryID string
 		}
 	}
 	return count
+}
+
+
+// phase2CategoryLoopBuilder 是 phase2 fork 子 Agent 的自定义 LoopBuilder，
+// 替代原 fork 子 Agent 入口的 loop 构造回调。
+type phase2CategoryLoopBuilder struct {
+	state      *model.AuditState
+	catalog    map[string]categoryScanJob
+	artifacts  *categoryArtifactStore
+	scanStates *sync.Map
+}
+
+func (b phase2CategoryLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) (*reactloops.ReActLoop, error) {
+	job := prepared.Job
+	catJob, ok := b.catalog[job.Identifier]
+	if !ok {
+		return nil, fmt.Errorf("unknown category job %q", job.Identifier)
+	}
+	catLoop, scan, err := buildSingleCategoryScanLoop(
+		prepared.Invoker, b.state, catJob.category, catJob.index, catJob.total, nil, b.artifacts,
+	)
+	if scan != nil {
+		b.scanStates.Store(catJob.category.ID, scan)
+	}
+	return catLoop, err
+}
+
+
+// phase2CategoryResumeLoopBuilder 是 phase2 单个 category resume 子 Agent 的
+// 自定义 LoopBuilder，替代原 fork 子 Agent 入口的 loop 构造回调。
+type phase2CategoryResumeLoopBuilder struct {
+	state     *model.AuditState
+	category  model.VulnCategory
+	catJob    categoryScanJob
+	scanState *ScanState
+	artifacts *categoryArtifactStore
+	scanStates *sync.Map
+}
+
+func (b phase2CategoryResumeLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) (*reactloops.ReActLoop, error) {
+	catLoop, scan, err := buildSingleCategoryScanLoop(prepared.Invoker, b.state, b.category, b.catJob.index, b.catJob.total, b.scanState, b.artifacts)
+	if scan != nil {
+		b.scanStates.Store(b.category.ID, scan)
+	}
+	return catLoop, err
 }

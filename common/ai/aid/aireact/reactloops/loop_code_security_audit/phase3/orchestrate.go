@@ -82,18 +82,12 @@ func runAllFindingVerifications(
 
 	artifacts := newFindingArtifactStore(state)
 
-	forkResults := reactloops.RunForkJobsConcurrently(
-		r, task, jobs, concurrency,
-		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.SubAgentJob) (*reactloops.ReActLoop, error) {
-			verifyJob, ok := catalog[job.Identifier]
-			if !ok {
-				return nil, fmt.Errorf("unknown finding job %q", job.Identifier)
-			}
-			return buildSingleFindingVerifyLoop(
-				childInvoker, state, verifyJob.finding, verifyJob.index, verifyJob.total,
-			)
-		},
-	)
+	forkResults := reactloops.DispatchSubAgents(r, task, jobs, reactloops.SubAgentOptions{
+		ParentLoop:         loop,
+		TimelineMode:       reactloops.SubAgentTimelineFork,
+		ExecuteConcurrency: concurrency,
+		LoopBuilder: phase3FindingLoopBuilder{state: state, catalog: catalog},
+	})
 
 	sort.Slice(forkResults, func(i, j int) bool {
 		return forkResults[i].Order < forkResults[j].Order
@@ -160,4 +154,23 @@ func finalizeFindingVerifyAfterFork(
 		incomplete: incomplete,
 		execErr:    forkResult.ExecErr,
 	}
+}
+
+
+// phase3FindingLoopBuilder 是 phase3 fork 子 Agent 的自定义 LoopBuilder，
+// 替代原 fork 子 Agent 入口的 loop 构造回调。
+type phase3FindingLoopBuilder struct {
+	state   *model.AuditState
+	catalog map[string]findingVerifyJob
+}
+
+func (b phase3FindingLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) (*reactloops.ReActLoop, error) {
+	job := prepared.Job
+	verifyJob, ok := b.catalog[job.Identifier]
+	if !ok {
+		return nil, fmt.Errorf("unknown finding job %q", job.Identifier)
+	}
+	return buildSingleFindingVerifyLoop(
+		prepared.Invoker, b.state, verifyJob.finding, verifyJob.index, verifyJob.total,
+	)
 }

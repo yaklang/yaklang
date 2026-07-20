@@ -27,7 +27,11 @@ type SearchResult struct {
 	Error     error
 }
 
-// RunFastContextSearch runs fast_context as a nested sub-loop under the parent TaskId.
+// RunFastContextSearch runs fast_context as a sub-agent with a CLEAN timeline
+// (no inheritance of the parent's timeline snapshot). The parent passes any
+// context the sub-agent needs (query, work dir, reference material) explicitly
+// via SearchInput / job.UserInput / ConfigureSubLoop; the sub-agent's timeline
+// is fully isolated and never merged back into the parent.
 //
 // parentLoop is the enclosing ReActLoop (used to register the fast_context
 // sub-agent into the parent's ProgressRegistry so the stall-heartbeat sub-agent
@@ -51,35 +55,45 @@ func RunFastContextSearch(
 		return SearchResult{Error: utils.Error("parent task is nil")}
 	}
 
-	result, err := reactloops.RunNestedJobWithProgress(
-		invoker,
-		parentLoop,
-		parentTask,
-		reactloops.SubAgentJob{
-			Order:        1,
-			Identifier:  "fast-context",
-			TaskName:    "fast-context",
-			LoopName:    schema.AI_REACT_LOOP_NAME_FAST_CONTEXT,
-			ForkTimeline: false,
+	// 显式上下文：fast_context 使用 Clean timeline，不继承父 timeline 条目；
+	// 必要上下文通过 UserInput 显式传入（查询目标 + 工作目录 + 参考资料）。
+	userInput := strings.TrimSpace(query)
+	if ref := strings.TrimSpace(input.ReferenceMaterial); ref != "" {
+		userInput += "\n\n## Reference Material\n\n" + ref
+	}
+	if wd := strings.TrimSpace(input.WorkDir); wd != "" {
+		userInput += "\n\n## Working Directory\n\n" + wd
+	}
+
+	results := reactloops.DispatchSubAgents(
+		invoker, parentTask,
+		[]reactloops.SubAgentJob{{
+			Order:     1,
+			Identifier: "fast-context",
+			TaskName:   "fast-context",
+			LoopName:   schema.AI_REACT_LOOP_NAME_FAST_CONTEXT,
+			UserInput:  userInput,
+		}},
+		reactloops.SubAgentOptions{
+			ParentLoop:    parentLoop,
+			TimelineMode:  reactloops.SubAgentTimelineClean,
+			ConfigureLoop: func(loop *reactloops.ReActLoop) {
+				ConfigureSubLoop(loop, input)
+			},
+			ExtraLoopOpts: []reactloops.ReActLoopOption{withFastContextToolPool(invoker)},
 		},
-		func(loop *reactloops.ReActLoop) {
-			ConfigureSubLoop(loop, input)
-		},
-		withFastContextToolPool(invoker),
 	)
-	if err != nil {
-		return SearchResult{Error: utils.Wrap(err, "fast_context nested run")}
+	if len(results) == 0 || results[0] == nil {
+		return SearchResult{Error: utils.Error("fast_context sub-agent returned no result")}
 	}
-	if result == nil {
-		return SearchResult{Error: utils.Error("fast_context nested run returned nil result")}
-	}
+	result := results[0]
 	if result.ExecErr != nil {
-		return SearchResult{Error: utils.Wrap(result.ExecErr, "fast_context nested run")}
+		return SearchResult{Error: utils.Wrap(result.ExecErr, "fast_context sub-agent run")}
 	}
 	subLoop := result.SubLoop
 
 	searchResult := ExtractSearchResult(subLoop)
-	log.Infof("[FastContext] nested search done paths=%d err=%v", len(searchResult.FilePaths), searchResult.Error)
+	log.Infof("[FastContext] sub-agent search done paths=%d err=%v", len(searchResult.FilePaths), searchResult.Error)
 	return searchResult
 }
 
