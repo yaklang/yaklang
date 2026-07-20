@@ -13,6 +13,8 @@ const (
 	codePatchUpdateFile  = "*** Update File:"
 	codePatchAddFile     = "*** Add File:"
 	codePatchDeleteFile  = "*** Delete File:"
+
+	codePatchEscapeHint = "HINT: preview 含 \\n/\\r\\n 字面量。请从 CURRENT_CODE 逐字符复制 context/- 行；禁止把 \\n 展开成真实换行，也禁止写成 \\\\n（多一层反斜杠）。"
 )
 
 // CodePatchHunk is one @@-delimited change block inside a Cursor-style Apply Patch.
@@ -139,14 +141,27 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 }
 
 // ApplyCodePatch applies hunks to fullCode. Every hunk's OldText must match
-// exactly once. If byte-for-byte matching misses, a safe normalized match is
-// attempted (line endings and trailing horizontal whitespace only).
+// exactly once. Matching order:
+//  1. exact bytes
+//  2. CRLF/CR + trailing whitespace normalization
+//  3. one retry after collapsing over-escaped \\n / \\r\\n → \n / \r\n
+//
+// Replacement text adopts the matched region's line-ending style (LF vs CRLF)
+// so applied hunks do not mix endings inside the file.
 func ApplyCodePatch(fullCode string, hunks []CodePatchHunk) (string, error) {
+	result, _, err := ApplyCodePatchWithWarnings(fullCode, hunks)
+	return result, err
+}
+
+// ApplyCodePatchWithWarnings is like ApplyCodePatch but also returns soft warnings
+// (e.g. matched only after collapsing over-escaped newlines).
+func ApplyCodePatchWithWarnings(fullCode string, hunks []CodePatchHunk) (string, []string, error) {
 	if len(hunks) == 0 {
-		return "", utils.Error("no hunks to apply")
+		return "", nil, utils.Error("no hunks to apply")
 	}
 
 	plans := make([]codePatchPlan, 0, len(hunks))
+	var warnings []string
 
 	for i, h := range hunks {
 		oldText := h.OldText
@@ -159,23 +174,29 @@ func ApplyCodePatch(fullCode string, hunks []CodePatchHunk) (string, error) {
 				plans = append(plans, codePatchPlan{start: 0, end: 0, newText: newText, hunkIdx: i})
 				continue
 			}
-			return "", utils.Errorf("hunk %d (@@ %s): empty old text — add context/- lines to locate the insert", i+1, h.Header)
+			return "", warnings, utils.Errorf("hunk %d (@@ %s): empty old text — add context/- lines to locate the insert", i+1, h.Header)
 		}
 
-		matches := findCodeMatchRanges(fullCode, oldText)
+		matches, usedCollapse := findCodeMatchRangesWithEscapeRetry(fullCode, oldText)
+		if usedCollapse {
+			newText = collapseOverEscapedNewlines(newText)
+			warnings = append(warnings, fmt.Sprintf(
+				"hunk %d (@@ %s): matched after collapsing \\\\n/\\\\r\\\\n → \\n/\\r\\n (model over-escaped); prefer copying CURRENT_CODE verbatim next time",
+				i+1, h.Header))
+		}
 		if len(matches) == 0 {
-			return "", utils.Errorf("hunk %d (@@ %s): old text not found.\nPreview:\n%s",
-				i+1, h.Header, utils.ShrinkTextBlock(oldText, 300))
+			return "", warnings, formatOldTextNotFound(i+1, h.Header, oldText)
 		}
 		if len(matches) > 1 {
-			return "", utils.Errorf("hunk %d (@@ %s): old text matched %d times — enlarge @@ context for uniqueness",
+			return "", warnings, utils.Errorf("hunk %d (@@ %s): old text matched %d times — enlarge @@ context for uniqueness",
 				i+1, h.Header, len(matches))
 		}
 		match := matches[0]
+		matchedOriginal := fullCode[match.start:match.end]
 		plans = append(plans, codePatchPlan{
 			start:   match.start,
 			end:     match.end,
-			newText: newText,
+			newText: adaptNewTextLineEndings(matchedOriginal, newText),
 			hunkIdx: i,
 		})
 	}
@@ -186,7 +207,7 @@ func ApplyCodePatch(fullCode string, hunks []CodePatchHunk) (string, error) {
 	for _, p := range plans {
 		result = result[:p.start] + p.newText + result[p.end:]
 	}
-	return result, nil
+	return result, warnings, nil
 }
 
 // ApplyCodePatchFromString parses then applies a patch body onto fullCode.
@@ -256,6 +277,24 @@ func findAllSubstrings(haystack, needle string) []int {
 type codeTextRange struct {
 	start int
 	end   int
+}
+
+// findCodeMatchRangesWithEscapeRetry tries normal matching first, then one
+// collapse of over-escaped \\n/\\r\\n. Does NOT expand literal \n into real newlines.
+func findCodeMatchRangesWithEscapeRetry(fullCode, oldText string) (matches []codeTextRange, usedCollapse bool) {
+	matches = findCodeMatchRanges(fullCode, oldText)
+	if len(matches) > 0 {
+		return matches, false
+	}
+	collapsed := collapseOverEscapedNewlines(oldText)
+	if collapsed == oldText {
+		return nil, false
+	}
+	matches = findCodeMatchRanges(fullCode, collapsed)
+	if len(matches) == 0 {
+		return nil, false
+	}
+	return matches, true
 }
 
 // findCodeMatchRanges first uses exact byte matching. Only when there are no
@@ -334,6 +373,49 @@ func normalizeCodeForMatchWithOffsets(s string) (string, []int) {
 	}
 
 	return b.String(), offsets
+}
+
+// collapseOverEscapedNewlines turns model over-escapes into source-literal form:
+// "\\r\\n" → "\r\n", "\\n" → "\n", "\\r" → "\r" (character sequences, not real newlines).
+func collapseOverEscapedNewlines(s string) string {
+	if !strings.Contains(s, `\\`) {
+		return s
+	}
+	s = strings.ReplaceAll(s, `\\r\\n`, `\r\n`)
+	s = strings.ReplaceAll(s, `\\n`, `\n`)
+	s = strings.ReplaceAll(s, `\\r`, `\r`)
+	return s
+}
+
+// adaptNewTextLineEndings rewrites structural newlines in newText to match the
+// matched original segment (CRLF vs LF). Literal backslash-n sequences are untouched
+// because they are not U+000A.
+func adaptNewTextLineEndings(matchedOriginal, newText string) string {
+	if newText == "" {
+		return newText
+	}
+	useCRLF := strings.Contains(matchedOriginal, "\r\n")
+	// Normalize any accidental CRLF in newText to LF first.
+	normalized := strings.ReplaceAll(newText, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	if !useCRLF {
+		return normalized
+	}
+	return strings.ReplaceAll(normalized, "\n", "\r\n")
+}
+
+func formatOldTextNotFound(hunkIdx int, header, oldText string) error {
+	msg := fmt.Sprintf("hunk %d (@@ %s): old text not found.\nPreview:\n%s",
+		hunkIdx, header, utils.ShrinkTextBlock(oldText, 300))
+	if looksLikeEscapeNoise(oldText) {
+		msg += "\n\n" + codePatchEscapeHint
+	}
+	return utils.Error(msg)
+}
+
+func looksLikeEscapeNoise(s string) bool {
+	// Detect literal backslash-n / backslash-r sequences (common in HTTP mock strings).
+	return strings.Contains(s, `\n`) || strings.Contains(s, `\r`)
 }
 
 type codePatchPlan struct {
