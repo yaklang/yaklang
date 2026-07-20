@@ -3,6 +3,9 @@ name: Prepare Embed Docs
 # Generate platform-specific doc.gob.zst (linux/windows/darwin) + shared codec.gob.zst,
 # hash with `yak sha256`, and upload to OSS only when hashes change.
 #
+# Always build from the latest origin/main tip (not the triggering branch SHA),
+# so merge/dispatch never packages stale or branch-local code.
+#
 # OSS layout:
 #   yak/embed-docs/latest/{linux,windows,darwin}/doc.gob.zst(+.sha256.txt)
 #   yak/embed-docs/latest/codec.gob.zst(+.sha256.txt)
@@ -26,6 +29,11 @@ on:
         type: boolean
         default: false
 
+# Only the newest run should publish; older queued runs are cancelled.
+concurrency:
+  group: prepare-embed-docs-main
+  cancel-in-progress: true
+
 jobs:
   generate:
     strategy:
@@ -41,6 +49,19 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync to latest origin/main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          echo "Building embed docs from:"
+          git log -1 --oneline
+          git rev-parse HEAD
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -153,6 +174,17 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync to latest origin/main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          git log -1 --oneline
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
