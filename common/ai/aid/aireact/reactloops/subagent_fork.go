@@ -105,7 +105,13 @@ func RunForkJobsConcurrently(
 		}
 		return result
 	}
-	return runJobsConcurrently(wrapped, concurrency, runSingle)
+	ctx := context.Background()
+	if parentTask != nil {
+		if c := parentTask.GetContext(); c != nil {
+			ctx = c
+		}
+	}
+	return runJobsConcurrently(ctx, wrapped, concurrency, runSingle)
 }
 
 // PrepareForkedSubAgent fork 父 timeline 并返回子 invoker 和子任务。调用方可在

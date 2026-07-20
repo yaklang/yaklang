@@ -148,17 +148,24 @@ func RunJobsConcurrently(
 	runSingle := func(r *SubAgentResult) *SubAgentResult {
 		result, err := runner.Run(parentInvoker, parentLoop, parentTask, r.SubAgentJob, registry)
 		if err != nil {
-			return failedJobResult(parentTask, r.SubAgentJob, err)
+			return setupFailedJobResult(parentTask, r.SubAgentJob, err)
 		}
 		return result
 	}
-	return runJobsConcurrently(wrapped, concurrency, runSingle)
+	ctx := context.Background()
+	if parentTask != nil {
+		if c := parentTask.GetContext(); c != nil {
+			ctx = c
+		}
+	}
+	return runJobsConcurrently(ctx, wrapped, concurrency, runSingle)
 }
 
-// failedJobResult 构建一个描述任务在产出正常结果前就已失败的 SubAgentResult
-//（如 fork 准备阶段出错）。供 RunJobsConcurrently 及需要暴露 setup 级错误的
-// runner 共用。
-func failedJobResult(parentTask aicommon.AIStatefulTask, job SubAgentJob, err error) *SubAgentResult {
+// setupFailedJobResult 构建一个描述任务在产出正常结果前就已失败的 SubAgentResult
+//（如 fork 准备阶段出错）。与 subagent_concurrency.go 中内部用的 failedJobResult
+// 不同：这里需要根据 parentTask 生成稳定的 SubAgentID（BuildForkTaskID），并
+// 使用 "failed" 状态，供 RunJobsConcurrently 暴露 setup 级错误。
+func setupFailedJobResult(parentTask aicommon.AIStatefulTask, job SubAgentJob, err error) *SubAgentResult {
 	return &SubAgentResult{
 		SubAgentJob: job,
 		Record: TimelineRecord{
@@ -578,7 +585,13 @@ func RunNestedJobsConcurrentlyWithProgress(
 		return result
 	}
 
-	results := runJobsConcurrently(wrapped, concurrency, runSingle)
+	ctx := context.Background()
+	if parentTask != nil {
+		if c := parentTask.GetContext(); c != nil {
+			ctx = c
+		}
+	}
+	results := runJobsConcurrently(ctx, wrapped, concurrency, runSingle)
 	sortSubAgentResultsByOrder(results)
 	return results
 }
