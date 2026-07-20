@@ -98,13 +98,12 @@ func RunForkedJob(
 		TaskName:   job.TaskName,
 	}
 
-	childInvoker, subTask, fork, jobCancel, err := PrepareForkedSubAgent(parentInvoker, parentTask, forkJob)
-	if jobCancel != nil {
-		defer jobCancel()
-	}
+	child, err := prepareForkedChild(parentInvoker, parentTask, forkJob)
 	if err != nil {
 		return nil, err
 	}
+	defer child.release()
+	childInvoker, subTask, fork := child.invoker, child.task, child.fork
 
 	// 在子 Agent 运行前，把简要意图（job.Goal）润色成完整、自包含的 goal 加上
 	// result contract。
@@ -121,7 +120,7 @@ func RunForkedJob(
 
 	subLoop, execErr := runSubLoopWithHandle(
 		childInvoker, job.LoopName, subTask, job.Identifier, registry, startedAt,
-		DefaultForkOptions(), nil,
+		nil, nil,
 	)
 	result, _ := BuildJobResult(job, startedAt, subTask, subLoop, fork, execErr)
 	return result, nil
@@ -199,6 +198,7 @@ func BuildJobResult(
 		Goal:       job.Goal,
 		DurationMs: time.Since(startedAt).Milliseconds(),
 	}
+	duration := time.Since(startedAt)
 
 	if execErr != nil {
 		record.Status = "failed"
@@ -224,8 +224,9 @@ func BuildJobResult(
 
 	return &SubAgentResult{
 		SubAgentJob: job,
-		Record:   record,
-		Feedback: feedback,
+		Record:      record,
+		Feedback:    feedback,
+		Duration:    duration,
 	}, nil
 }
 

@@ -138,7 +138,6 @@ func buildSingleFindingVerifyLoop(
 		registerPhase3ReadReconNotesAction(r, state),
 	}
 
-	preset = append(preset, reactloops.DefaultForkOptions()...)
 
 	loopName := fmt.Sprintf("code_audit_verify_%s", finding.ID)
 	return reactloops.NewReActLoop(loopName, r, preset...)

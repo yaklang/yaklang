@@ -85,7 +85,12 @@ func runSubLoopWithHandle(
 ) (subLoop *ReActLoop, execErr error) {
 	handle := registerHandle(registry, subTask.GetId(), identifier, subTask, startedAt)
 
-	loop, createErr := CreateLoopByName(loopName, invoker, opts...)
+	// 统一追加子 Agent 默认选项（depth / 关闭 dispatch / plan / forge / loading
+	// 状态），调用方无需各自 append。注意：走 factory 自建 loop 的 fork 路径
+	//（RunForkJob）不经过此处，factory 需自行追加 DefaultForkOptions。
+	allOpts := append([]ReActLoopOption{}, opts...)
+	allOpts = append(allOpts, DefaultForkOptions()...)
+	loop, createErr := CreateLoopByName(loopName, invoker, allOpts...)
 	if createErr != nil {
 		unregisterHandle(handle, registry, subTask.GetId(), createErr)
 		return nil, createErr
@@ -147,21 +152,29 @@ func runNestedForked(
 	opts []ReActLoopOption,
 	startedAt time.Time,
 ) (*SubAgentResult, error) {
-	childInvoker, subTask, fork, jobCancel, err := PrepareForkedSubAgent(parentInvoker, parentTask, forkJobFromNested(job))
-	if jobCancel != nil {
-		defer jobCancel()
-	}
+	child, err := prepareForkedChild(parentInvoker, parentTask, forkJobFromNested(job))
 	if err != nil {
 		return &SubAgentResult{SubAgentJob: job, ExecErr: err, Duration: time.Since(startedAt)}, nil
 	}
+	defer child.release()
+
 	subLoop, execErr := runSubLoopWithHandle(
-		childInvoker, job.LoopName, subTask, job.Identifier, registry, startedAt,
-		append(opts, DefaultForkOptions()...), configure,
+		child.invoker, job.LoopName, child.task, job.Identifier, registry, startedAt,
+		opts, configure,
 	)
-	_ = fork
+	return buildNestedResult(job, child.task, subLoop, execErr, startedAt), nil
+}
+
+// buildNestedResult 统一构造 nested 路径（forked / in-place）的 SubAgentResult，
+// 避免两处手写字段、口径不一。
+func buildNestedResult(job SubAgentJob, subTask aicommon.AIStatefulTask, subLoop *ReActLoop, execErr error, startedAt time.Time) *SubAgentResult {
 	return &SubAgentResult{
-		SubAgentJob: job, SubLoop: subLoop, SubTask: subTask, ExecErr: execErr, Duration: time.Since(startedAt),
-	}, nil
+		SubAgentJob: job,
+		SubTask:     subTask,
+		SubLoop:     subLoop,
+		ExecErr:     execErr,
+		Duration:    time.Since(startedAt),
+	}
 }
 
 // runNestedInPlace 在父 timeline 上（不 fork）运行一个 SubAgentJob，运行结束后
@@ -196,11 +209,9 @@ func runNestedInPlace(
 	o := runWithCurrentTask(parentInvoker, nestedTask, func() out {
 		loop, execErr := runSubLoopWithHandle(
 			parentInvoker, job.LoopName, nestedTask, job.Identifier, registry, startedAt,
-			append(opts, DefaultForkOptions()...), configure,
+			opts, configure,
 		)
 		return out{loop, execErr}
 	})
-	return &SubAgentResult{
-		SubAgentJob: job, SubLoop: o.loop, SubTask: nestedTask, ExecErr: o.execErr, Duration: time.Since(startedAt),
-	}, nil
+	return buildNestedResult(job, nestedTask, o.loop, o.execErr, startedAt), nil
 }

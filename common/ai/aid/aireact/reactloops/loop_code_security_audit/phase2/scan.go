@@ -917,7 +917,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 	}
 
 	preset = append(preset, buildPhase2WhitelistFSToolOptions(r)...)
-	preset = append(preset, reactloops.DefaultForkOptions()...)
 
 	loopName := fmt.Sprintf("code_audit_scan_%s", category.ID)
 	loop, err := reactloops.NewReActLoop(loopName, r, preset...)
