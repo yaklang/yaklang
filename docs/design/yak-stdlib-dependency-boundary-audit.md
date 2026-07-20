@@ -134,7 +134,7 @@ Important shortest paths:
 ```text
 runtime_go -> common/yak/yaklang/lib/builtin -> common/yak/yaklang -> common/yak/yaklib -> common/cybertunnel -> github.com/yaklang/pcap
 runtime_go -> common/yak/yaklang/lib/builtin -> common/utils -> common/yakgrpc/ypb -> google.golang.org/grpc
-runtime_go -> common/yak/ssaapi -> common/syntaxflow/sfvm -> github.com/antlr/antlr4/runtime/Go/antlr/v4
+runtime_go -> common/yak/ssaapi -> common/syntaxflow/sfvm -> github.com/yaklang/antlr/v4
 runtime_go -> common/yak/ssaapi -> common/yak/java/java2ssa -> common/sca
 runtime_go -> common/yak/ssaapi -> common/utils/yakgit -> github.com/go-git/go-git/v5
 runtime_go -> common/yak/ssaapi -> common/utils/yakgit -> github.com/go-git/go-git/v5 -> github.com/ProtonMail/go-crypto/openpgp
@@ -458,7 +458,7 @@ Evidence:
   - `runtime_go -> common/yak/ssaapi -> common/yak/java/java2ssa -> common/sca`
   - `runtime_go -> common/yak/ssaapi -> common/utils/yakgit -> github.com/go-git/go-git/v5`
   - `runtime_go -> common/yak/ssaapi -> common/yakgrpc/yakit -> common/cybertunnel -> github.com/yaklang/pcap`
-  - `runtime_go -> common/yak/ssaapi -> common/syntaxflow/sfvm -> github.com/antlr/antlr4/runtime/Go/antlr/v4`
+  - `runtime_go -> common/yak/ssaapi -> common/syntaxflow/sfvm -> github.com/yaklang/antlr/v4`
 - Shortest paths:
   - `runtime_go -> common/yak/ssaapi -> common/syntaxflow/sfvm`
   - `runtime_go -> common/yak/ssaapi -> common/yakgrpc/yakit -> common/ai/aispec`
