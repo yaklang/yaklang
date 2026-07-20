@@ -271,7 +271,7 @@ func TestWriteAction_OnFileChanged_BlockingDisallowExit(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	loop, factory, task := newLoopAndFactory(t, runtime,
 		WithActionSuffix("code"),
-		WithFileChanged(func(content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
+		WithFileChanged(func(loop *reactloops.ReActLoop, content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
 			return "lint: blocking issue", true
 		}),
 	)

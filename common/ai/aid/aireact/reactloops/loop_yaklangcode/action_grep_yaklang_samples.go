@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -592,7 +593,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			// 检查是否有语法错误 - 参考 action_modify_code.go 的实现
 			fullcode := loop.Get("full_code")
 			if fullcode != "" {
-				errMsg, hasBlockingErrors := checkCodeAndFormatErrors(fullcode)
+				errMsg, hasBlockingErrors := checkCodeAndFormatErrors(fullcode, loop.GetInt(loopinfra.LoopVarCodeLineBase))
 				if hasBlockingErrors {
 					reactloops.EmitStatus(loop, "检测到语法错误，修复中 / Syntax error detected, fixing...")
 					op.DisallowNextLoopExit()

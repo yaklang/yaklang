@@ -49,9 +49,10 @@ func NormalizeActionLineNumber(loop *reactloops.ReActLoop, fullCodeVar string, l
 	return line
 }
 
-// FileChangedCallback is called after file content is modified
+// FileChangedCallback is called after file content is modified.
+// loop may be nil in tests; callers that need code_line_base should read it from loop.
 // Returns: (errorMessage string, hasBlockingErrors bool)
-type FileChangedCallback func(content string, operator *reactloops.LoopActionHandlerOperator) (string, bool)
+type FileChangedCallback func(loop *reactloops.ReActLoop, content string, operator *reactloops.LoopActionHandlerOperator) (string, bool)
 
 // PostSyntaxCleanHook runs after static lint passes and before the loop may exit on clean syntax.
 // Return (feedback, blockExit): when blockExit is true, feedback is sent to the model and the loop continues.
@@ -235,13 +236,76 @@ func (f *SingleFileModificationSuiteFactory) ShouldDeferDiskWrite() bool {
 	return f.deferDiskWrite
 }
 
+// buildSyntaxVerifyFailureActionLog builds the user-visible verify failure log.
+// Prefer concise [Severity] issue lines (line + reason); fall back to a shrunk full message.
+func buildSyntaxVerifyFailureActionLog(errMsg string) string {
+	var b strings.Builder
+	b.WriteString("验证失败: 语法/静态分析错误 / Verification failed: syntax or static analysis errors\n")
+	if summary := extractSyntaxLintIssueLines(errMsg); summary != "" {
+		b.WriteString(summary)
+		return b.String()
+	}
+	if trimmed := strings.TrimSpace(errMsg); trimmed != "" {
+		b.WriteString(utils.ShrinkTextBlock(trimmed, 1500))
+		if !strings.HasSuffix(trimmed, "\n") {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+func extractSyntaxLintIssueLines(errMsg string) string {
+	var issues []string
+	for _, line := range strings.Split(errMsg, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "[Error]") ||
+			strings.HasPrefix(line, "[Warning]") ||
+			strings.HasPrefix(line, "[Info]") ||
+			strings.HasPrefix(line, "[Hint]") {
+			issues = append(issues, line)
+		}
+	}
+	if len(issues) == 0 {
+		return ""
+	}
+	const maxShow = 5
+	var b strings.Builder
+	for i, iss := range issues {
+		if i >= maxShow {
+			remain := len(issues) - maxShow
+			b.WriteString(fmt.Sprintf("... 还有 %d 个问题 / ... and %d more issue(s)\n", remain, remain))
+			break
+		}
+		b.WriteString(fmt.Sprintf("%d. %s\n", i+1, iss))
+	}
+	return b.String()
+}
+
+func firstSyntaxLintIssueLine(errMsg string) string {
+	for _, line := range strings.Split(errMsg, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[Error]") ||
+			strings.HasPrefix(line, "[Warning]") ||
+			strings.HasPrefix(line, "[Info]") ||
+			strings.HasPrefix(line, "[Hint]") {
+			return line
+		}
+	}
+	return ""
+}
+
 // applySyntaxLintResult runs static verification, then optional postSyntaxCleanHook (e.g. YAK_MAIN self-test).
 // Returns true when postSyntaxCleanHook blocked loop exit (runtime/self-test failure).
+// errMsg is the formatted lint output (line numbers + reasons) shown to users on failure.
 func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	loop *reactloops.ReActLoop,
 	op *reactloops.LoopActionHandlerOperator,
 	hasBlockingErrors bool,
 	exitOnClean bool,
+	errMsg string,
 ) (postHookBlocked bool) {
 	lintStatusVar := f.GetLintStatusVariableName()
 	reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "开始静态分析与语法检查 / Starting static analysis and syntax check...")
@@ -249,8 +313,13 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 
 	if hasBlockingErrors {
 		loop.Set(lintStatusVar, "false")
-		reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "验证失败: 语法/静态分析错误 / Verification failed: syntax or static analysis errors")
-		reactloops.EmitStatus(loop, "验证代码失败，修复中 / Code verification failed, fixing...")
+		reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, buildSyntaxVerifyFailureActionLog(errMsg))
+		status := "验证代码失败，修复中 / Code verification failed, fixing..."
+		if first := firstSyntaxLintIssueLine(errMsg); first != "" {
+			status = fmt.Sprintf("验证失败: %s / Verification failed: %s",
+				utils.ShrinkTextBlock(first, 96), utils.ShrinkTextBlock(first, 96))
+		}
+		reactloops.EmitStatus(loop, status)
 		op.DisallowNextLoopExit()
 		op.Continue()
 		return false
@@ -293,9 +362,9 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	}
 	loop.Set(f.GetFullCodeVariableName(), fullCode)
 
-	errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+	errMsg, hasBlockingErrors := f.OnFileChanged(loop, fullCode, op)
 	// modify 操作不自动退出循环：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
-	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
+	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 
 	loop.GetEmitter().EmitPinFilename(filename)
 	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
@@ -588,11 +657,11 @@ func (f *SingleFileModificationSuiteFactory) GetEventType() string {
 
 // OnFileChanged calls the file changed callback if configured
 // Returns (errorMessage, hasBlockingErrors)
-func (f *SingleFileModificationSuiteFactory) OnFileChanged(content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
+func (f *SingleFileModificationSuiteFactory) OnFileChanged(loop *reactloops.ReActLoop, content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
 	if f.fileChangedCb == nil {
 		return "", false
 	}
-	return f.fileChangedCb(content, operator)
+	return f.fileChangedCb(loop, content, operator)
 }
 
 // PrettifyCode calls the code prettify callback

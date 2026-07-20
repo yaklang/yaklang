@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func pythonLintCheck(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+func pythonLintCheck(_ *reactloops.ReActLoop, content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 	if strings.TrimSpace(content) == "" {
 		return "", false
 	}
