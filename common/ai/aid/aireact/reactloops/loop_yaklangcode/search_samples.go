@@ -448,6 +448,10 @@ func shortSemanticSuggestion(count int) string {
 }
 
 func rejectDuplicateQuery(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator, timelineKey, queryKey, currentQuery, msg string) bool {
+	// Allow re-running the same grep/semantic query while fixing blocking lint errors.
+	if hasBlockingLintErrors(loop) {
+		return false
+	}
 	last := loop.Get(queryKey)
 	if last == "" || last != currentQuery {
 		return false

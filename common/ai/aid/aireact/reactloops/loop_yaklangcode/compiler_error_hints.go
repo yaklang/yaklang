@@ -125,17 +125,17 @@ func formatCompilerErrorHint(pattern compilerErrorHint) string {
 func lookupCompilerErrorFallback(normalizedMessage string) string {
 	switch {
 	case strings.HasPrefix(normalizedMessage, "基础语法错误"):
-		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、是否误用了 Go/JavaScript 语法；若 Init 样例未覆盖该写法，再用 grep_yaklang_samples 搜索相似写法。"
+		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、是否误用了 Go/JavaScript 语法。下一动作必须先 grep_yaklang_samples 对照样例，禁止连续盲目 modify_code。"
 	case strings.Contains(normalizedMessage, "no viable alternative"):
-		return "语法解析失败（no viable alternative）。常见原因：Go 风格类型声明、import/package、泛型或不被 Yaklang 支持的语法。请对照 Yaklang DSL 改写。"
+		return "语法解析失败（no viable alternative）。常见原因：Go 风格类型声明（如 var(...)）、import/package、泛型或不被 Yaklang 支持的语法。必须先 grep_yaklang_samples 再改。"
 	case strings.Contains(normalizedMessage, "mismatched input"):
-		return "语法 token 不匹配（mismatched input）。检查是否缺少括号、逗号、运算符，或混入了 Go/Java 语法。"
+		return "语法 token 不匹配（mismatched input）。检查括号/逗号；用 grep_yaklang_samples 对照完整语句写法后再 modify_code。"
 	case strings.Contains(normalizedMessage, "extraneous input"):
-		return "存在多余 token（extraneous input）。删除多余符号，或检查语句是否写完整。"
+		return "存在多余 token（extraneous input）。删除多余符号；若不确定合法写法，先 grep_yaklang_samples。"
 	case strings.Contains(normalizedMessage, "expecting"):
-		return "语法不完整（expecting ...）。补全缺失的括号、分号或语句结束符。"
+		return "语法不完整（expecting ...）。补全缺失符号；复杂结构先 grep_yaklang_samples 再改。"
 	default:
-		return "编译器/静态分析报错。请根据上方错误信息定位行号，优先 modify_code（old_snippet 或行号）；API 问题用 yakdoc_*；若 Init 样例未覆盖，语法样例用 grep_yaklang_samples。"
+		return "编译器/静态分析报错。API 问题用 yakdoc_*；语法/未定义符号用 grep_yaklang_samples。禁止在未检索的情况下连续猜测式 modify_code。"
 	}
 }
 
@@ -151,7 +151,7 @@ var compilerErrorHints = []compilerErrorHint{
 	{
 		Name:     "ValueUndefined",
 		Contains: []string{"Value undefined:"},
-		Hint:     "引用了未定义的变量/函数/库。确认名称拼写；标准库 API 用 yakdoc_search / yakdoc_function_details 查询，不要臆造名称。",
+		Hint:     "引用了未定义的变量/函数/库。确认名称拼写；下一动作必须先 grep_yaklang_samples 或 yakdoc_search，不要臆造名称后连续 modify_code。",
 	},
 	{
 		Name:     "InvalidField",
