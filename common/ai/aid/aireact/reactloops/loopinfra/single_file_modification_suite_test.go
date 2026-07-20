@@ -79,16 +79,34 @@ func TestGetActions_ReturnsFourActions(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestBuildSyntaxVerifyFailureActionLog(t *testing.T) {
+	errMsg := `[Error]: 基础语法错误（Syntax Error）：missing ')' at 'println' in [3:1 -- 3:8] from compiler
+AI助手提示: something
+
+[Warning]: unused var in [10:2 -- 10:5] from ssa
+`
+	out := buildSyntaxVerifyFailureActionLog(errMsg)
+	assert.Contains(t, out, "验证失败: 语法/静态分析错误")
+	assert.Contains(t, out, "1. [Error]: 基础语法错误")
+	assert.Contains(t, out, "in [3:1 -- 3:8]")
+	assert.Contains(t, out, "2. [Warning]: unused var")
+	assert.NotContains(t, out, "AI助手提示")
+
+	empty := buildSyntaxVerifyFailureActionLog("")
+	assert.Contains(t, empty, "验证失败: 语法/静态分析错误")
+	assert.Equal(t, "[Error]: boom in [1:1 -- 1:2] from compiler", firstSyntaxLintIssueLine("[Error]: boom in [1:1 -- 1:2] from compiler\nother"))
+}
+
 func TestOnFileChanged_DefaultAndConfigured(t *testing.T) {
 	f := newFactoryForSuiteTest(t)
-	msg, blocking := f.OnFileChanged("abc", nil)
+	msg, blocking := f.OnFileChanged(nil, "abc", nil)
 	assert.Equal(t, "", msg)
 	assert.False(t, blocking)
 
-	f2 := newFactoryForSuiteTest(t, WithFileChanged(func(content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
+	f2 := newFactoryForSuiteTest(t, WithFileChanged(func(loop *reactloops.ReActLoop, content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
 		return "lint failed", true
 	}))
-	msg, blocking = f2.OnFileChanged("abc", nil)
+	msg, blocking = f2.OnFileChanged(nil, "abc", nil)
 	assert.Equal(t, "lint failed", msg)
 	assert.True(t, blocking)
 }
@@ -194,7 +212,7 @@ func TestApplySyntaxLintResult_PostSyntaxCleanHookBlocksExit(t *testing.T) {
 	task := newTestTaskForSingleFile(context.Background())
 
 	op := reactloops.NewActionHandlerOperator(task)
-	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true)
+	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true, "")
 
 	require.True(op.IsContinued())
 	terminated, termErr := op.IsTerminated()
@@ -220,7 +238,7 @@ func TestApplySyntaxLintResult_PostSyntaxCleanHookAllowsExit(t *testing.T) {
 	task := newTestTaskForSingleFile(context.Background())
 
 	op := reactloops.NewActionHandlerOperator(task)
-	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true)
+	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true, "")
 
 	require.False(op.IsContinued())
 	terminated, termErr := op.IsTerminated()

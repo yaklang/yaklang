@@ -14,9 +14,17 @@ import (
 	resultSpec "github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
-// checkCodeAndFormatErrors performs static analysis and formats error messages
+// checkCodeAndFormatErrors performs static analysis and formats error messages.
+// codeLineBase is the 0-based offset from snippet-relative lines to absolute editor lines
+// (LoopVarCodeLineBase). Displayed Start/End line numbers are shifted by this base so they
+// match CurrentCodeWithLineNumber; memedit context still uses relative positions.
 // Returns: errorMessages string, hasBlockingErrors bool
-func checkCodeAndFormatErrors(code string) (string, bool) {
+func checkCodeAndFormatErrors(code string, codeLineBase ...int) (string, bool) {
+	lineBase := 0
+	if len(codeLineBase) > 0 && codeLineBase[0] > 0 {
+		lineBase = codeLineBase[0]
+	}
+
 	result := static_analyzer.YaklangScriptChecking(code, "yak")
 	if len(result) <= 0 {
 		return "", false
@@ -81,7 +89,12 @@ func checkCodeAndFormatErrors(code string) (string, bool) {
 	}
 
 	for _, msg := range result {
-		buf.WriteString(msg.String() + "\n")
+		display := *msg
+		if lineBase > 0 {
+			display.StartLineNumber += int64(lineBase)
+			display.EndLineNumber += int64(lineBase)
+		}
+		buf.WriteString(display.String() + "\n")
 
 		// Add intelligent error hints for common Yaklang DSL issues
 		intelligentHint := getIntelligentErrorHint(msg, me)
@@ -95,7 +108,7 @@ func checkCodeAndFormatErrors(code string) (string, bool) {
 					memedit.NewPosition(int(msg.StartLineNumber), int(msg.StartColumn)),
 					memedit.NewPosition(int(msg.EndLineNumber), int(msg.EndColumn)),
 				),
-				3, msg.String(),
+				3, display.String(),
 			)
 			if markedErr != "" {
 				buf.WriteString(markedErr)
