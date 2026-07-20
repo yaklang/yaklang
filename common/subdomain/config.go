@@ -59,6 +59,17 @@ type SubdomainScannerConfig struct {
 	//   探测数量越大判断越稳，但耗时越长。
 	WildCardProbeCount int
 
+	// 泛解析 sinkhole 验证
+	//   当泛解析探测全部命中且返回同一个 IP（经典泛解析特征）时，
+	//   额外抽样几个真实子域名前缀（如 www/mail/ftp）验证：
+	//     - 若抽样词也都解析到同一个 wildcard IP，说明 DNS 被劫持到
+	//       单一 sinkhole IP（常见于本地 TUN 模式劫持 DNS），爆破无意义，
+	//       会被判定为 WildcardHijacked 并中止。
+	//     - 若抽样词解析到不同 IP 或解析失败（NXDOMAIN），说明是真实泛解析，
+	//       保持 WildcardSingleIP 语义并按黑名单过滤。
+	//   默认值为 true（默认生效）。
+	WildCardSinkholeVerify bool
+
 	// 进行各种数据源搜索的时候，需要设置的 HTTP 超时时间
 	// 默认 10s
 	TimeoutForEachHTTPSearch time.Duration
@@ -77,6 +88,7 @@ func (s *SubdomainScannerConfig) init() {
 	s.TimeoutForEachQuery = 3 * time.Second
 	s.WildCardToStop = false
 	s.WildCardProbeCount = 10
+	s.WildCardSinkholeVerify = true
 	s.TimeoutForEachHTTPSearch = 10 * time.Second
 }
 
@@ -233,6 +245,25 @@ func WithWildCardProbeCount(c int) ConfigOption {
 			c = 10
 		}
 		s.WildCardProbeCount = c
+	}
+}
+
+// wildcardSinkholeVerify 是一个选项参数，是否在判定为经典泛解析（单 IP）
+// 后再抽样几个真实子域名前缀验证，若全部解析到同一个 wildcard IP 则判定为
+// DNS 被劫持到单一 sinkhole（如本地 TUN 模式劫持 DNS）并中止，默认为 true
+// 参数:
+//   - b: 是否开启 sinkhole 验证
+//
+// 返回值:
+//   - 一个 subdomain.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.wildcardSinkholeVerify(false))
+// ```
+func WithWildCardSinkholeVerify(b bool) ConfigOption {
+	return func(s *SubdomainScannerConfig) {
+		s.WildCardSinkholeVerify = b
 	}
 }
 

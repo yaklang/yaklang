@@ -58,10 +58,21 @@ func _subdomainScan(target interface{}, opts ...subdomain.ConfigOption) (chan *s
 		case chRes <- result:
 		}
 	})
-	// 当爆破因 DNS 被劫持/接管（如本地 TUN 模式劫持 DNS）而中止时，
-	// 把中止原因以错误日志形式抛出，便于调用方排查。
+	// 当爆破因 DNS 被劫持/接管（如本地 TUN 模式劫持 DNS）而中止时：
+	//   1. 以错误日志形式抛出（引擎日志）；
+	//   2. 向结果 channel 非阻塞推一条“中止哨兵”结果，让 yak 脚本/AI
+	//      在遍历结果时能感知到中止原因并报错（否则只会看到空结果）。
 	scanner.OnScanAborted(func(reason string) {
 		log.Errorf("subdomain scan aborted: %s", reason)
+		sentinel := &subdomain.SubdomainResult{
+			Aborted:     true,
+			AbortReason: reason,
+		}
+		select {
+		case chRes <- sentinel:
+		default:
+			// channel 已满，丢弃哨兵避免阻塞扫描收尾；错误日志已抛出。
+		}
 	})
 
 	go func() {
@@ -156,16 +167,17 @@ var SubDomainExports = map[string]interface{}{
 	"Scan": _subdomainScan,
 
 	// 选项
-	"wildcardToStop":     subdomain.WithWildCardToStop,
-	"wildcardProbeCount": subdomain.WithWildCardProbeCount,
-	"recursive":          subdomain.WithAllowToRecursive,
-	"workerConcurrent":   subdomain.WithWorkerCount,
-	"dnsServer":          subdomain.WithDNSServers,
-	"maxDepth":            subdomain.WithMaxDepth,
-	"targetConcurrent":   subdomain.WithParallelismTasksCount,
-	"targetTimeout":      withTargetTimeout,
-	"eachQueryTimeout":   withEachQueryTimeout,
-	"eachSearchTimeout":  withEachSearchTimeout,
+	"wildcardToStop":         subdomain.WithWildCardToStop,
+	"wildcardProbeCount":     subdomain.WithWildCardProbeCount,
+	"wildcardSinkholeVerify": subdomain.WithWildCardSinkholeVerify,
+	"recursive":              subdomain.WithAllowToRecursive,
+	"workerConcurrent":       subdomain.WithWorkerCount,
+	"dnsServer":              subdomain.WithDNSServers,
+	"maxDepth":               subdomain.WithMaxDepth,
+	"targetConcurrent":       subdomain.WithParallelismTasksCount,
+	"targetTimeout":          withTargetTimeout,
+	"eachQueryTimeout":       withEachQueryTimeout,
+	"eachSearchTimeout":      withEachSearchTimeout,
 
 	"mainDict":      withMainDict,
 	"recursiveDict": withRecursiveDict,

@@ -259,7 +259,17 @@ func (s *SubdomainScanner) isWildCard(ctx context.Context, target string) (mode 
 	// 全部命中 -> 泛解析或劫持
 	if len(testedOnce) == n {
 		if len(ipSet) == 1 {
-			// 经典泛解析：所有不存在子域名都指向同一个 IP
+			// 经典泛解析：所有不存在子域名都指向同一个 IP。
+			// 但需进一步排除“单 IP sinkhole 劫持”（如本地 TUN 模式
+			// 把所有 DNS 都劫持到同一个伪 IP）：抽样几个真实子域名前缀，
+			// 若也都解析到同一个 wildcard IP，则升级为 WildcardHijacked。
+			var wildcardIP string
+			for ip := range ipSet {
+				wildcardIP = ip
+			}
+			if s.config.WildCardSinkholeVerify && s.isSinkholeHijack(ctx, querier, target, wildcardIP) {
+				return WildcardHijacked, testedOnce, blacklist
+			}
 			return WildcardSingleIP, testedOnce, blacklist
 		}
 		// 所有不存在子域名都解析成功但 IP 各不相同 -> DNS 被接管/劫持
@@ -268,6 +278,55 @@ func (s *SubdomainScanner) isWildCard(ctx context.Context, target string) (mode 
 
 	// 部分命中：可能是偶发，避免误报，视为无泛解析
 	return WildcardNone, testedOnce, []string{}
+}
+
+// sinkholeSampleLabels 是用于 sinkhole 验证的“真实子域名前缀”抽样。
+// 这些是公共互联网上极常见的标签，合法域名往往有其中至少一个解析到
+// 与泛解析落地 IP 不同的地址；若全部都解析到同一个 wildcard IP，
+// 则强烈提示 DNS 被劫持到单一 sinkhole。
+var sinkholeSampleLabels = []string{"www", "mail", "ftp", "ns1"}
+
+// isSinkholeHijack 在经典泛解析（单 IP）判定后做抽样验证：
+// 取几个真实子域名前缀并发查询 A 记录，若全部解析到同一个 wildcardIP，
+// 则认为是单 IP sinkhole 劫持，返回 true（调用方据此升级为 WildcardHijacked）。
+// 只要有一个抽样词解析失败或解析到不同 IP，就认为是真实泛解析，返回 false。
+func (s *SubdomainScanner) isSinkholeHijack(ctx context.Context, querier aRecordQuerier, target, wildcardIP string) bool {
+	var (
+		mu      sync.Mutex
+		allSame = true
+	)
+	wg := sync.WaitGroup{}
+	for _, label := range sinkholeSampleLabels {
+		payload := fmt.Sprintf("%s.%s", label, target)
+
+		if err := s.dnsQuerierSwg.AddWithContext(ctx); err != nil {
+			// 受限退出时无法判定，保守视为非 sinkhole（不误报）。
+			return false
+		}
+
+		wg.Add(1)
+		go func(p string) {
+			defer s.dnsQuerierSwg.Done()
+			defer wg.Done()
+
+			ip, _, err := querier.QueryA(ctx, p)
+			if err != nil {
+				// 真实子域名解析失败（NXDOMAIN）-> 不是 sinkhole 劫持。
+				mu.Lock()
+				allSame = false
+				mu.Unlock()
+				return
+			}
+			if ip != wildcardIP {
+				// 解析到不同 IP -> 是真实泛解析（有真实记录）。
+				mu.Lock()
+				allSame = false
+				mu.Unlock()
+			}
+		}(payload)
+	}
+	wg.Wait()
+	return allSame
 }
 
 // UseQuerier installs an override A-record querier used by brute force and
