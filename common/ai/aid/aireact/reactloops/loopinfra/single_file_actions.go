@@ -105,8 +105,8 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			loop.Set(f.GetFullCodeVariableName(), code)
 
 			// Call file changed callback
-			errMsg, blocking := f.OnFileChanged(code, operator)
-			runBlocked := f.applySyntaxLintResult(loop, operator, blocking, f.ShouldExitAfterWrite() || f.ShouldExitWhenSyntaxClean())
+			errMsg, blocking := f.OnFileChanged(loop, code, operator)
+			runBlocked := f.applySyntaxLintResult(loop, operator, blocking, f.ShouldExitAfterWrite() || f.ShouldExitWhenSyntaxClean(), errMsg)
 
 			msg := utils.ShrinkTextBlock(code, 256)
 			if errMsg != "" {
@@ -338,9 +338,9 @@ GEN_CODE 解析行号：[%d-%d]
 			})
 
 			// Call file changed callback
-			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+			errMsg, hasBlockingErrors := f.OnFileChanged(loop, fullCode, op)
 			// modify 操作不自动退出：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
-			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 
 			// Check for spinning behavior
 			isSpinning, spinReason := f.DetectSpinning(loop, modifyStartLine, modifyEndLine)
@@ -512,9 +512,9 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			})
 
 			// Call file changed callback
-			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+			errMsg, hasBlockingErrors := f.OnFileChanged(loop, fullCode, op)
 			// insert 操作不自动退出：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
-			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("inserted at line[%v]:\n", insertLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
@@ -652,9 +652,9 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			})
 
 			// Call file changed callback
-			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+			errMsg, hasBlockingErrors := f.OnFileChanged(loop, fullCode, op)
 			// delete 操作不自动退出：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
-			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 
 			if deleteEndLine > 0 {
 				msg = fmt.Sprintf("deleted lines[%v-%v]", deleteStartLine, deleteEndLine)

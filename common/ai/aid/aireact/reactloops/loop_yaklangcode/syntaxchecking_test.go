@@ -199,3 +199,17 @@ func test(param string) {
 		assert.True(t, hasRelevantHint, "Should contain at least one relevant hint")
 	}
 }
+
+func TestCheckCodeAndFormatErrors_CodeLineBaseOffsetsDisplayedLines(t *testing.T) {
+	code := "func bad(x string) {\n}\n"
+	baseMsg, blocking := checkCodeAndFormatErrors(code)
+	assert.True(t, blocking)
+	assert.NotEmpty(t, baseMsg)
+
+	offsetMsg, offsetBlocking := checkCodeAndFormatErrors(code, 27)
+	assert.Equal(t, blocking, offsetBlocking)
+	assert.NotEmpty(t, offsetMsg)
+	// Displayed ranges should shift by code_line_base while still reporting the same error text.
+	assert.Contains(t, offsetMsg, "from compiler")
+	assert.NotEqual(t, baseMsg, offsetMsg)
+}

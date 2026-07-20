@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -114,7 +115,7 @@ func buildYaklangFinalizeReference(loop *reactloops.ReActLoop, task aicommon.AIS
 	code := loop.Get("full_code")
 	if strings.TrimSpace(code) != "" {
 		lineCount := strings.Count(code, "\n") + 1
-		errMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
+		errMsg, hasBlockingErrors := checkCodeAndFormatErrors(code, loop.GetInt(loopinfra.LoopVarCodeLineBase))
 		if hasBlockingErrors {
 			out.WriteString(fmt.Sprintf("## 语法状态【系统编译器权威结论，以此为准】\n\n仍存在语法/编译错误(%d 行代码)\n", lineCount))
 			if strings.TrimSpace(errMsg) != "" {
@@ -163,7 +164,7 @@ func buildYaklangFinalizeQuery(loop *reactloops.ReActLoop, task aicommon.AIState
 	verdict := ""
 	if loop != nil {
 		if code := loop.Get("full_code"); strings.TrimSpace(code) != "" {
-			if _, hasBlockingErrors := checkCodeAndFormatErrors(code); hasBlockingErrors {
+			if _, hasBlockingErrors := checkCodeAndFormatErrors(code, loop.GetInt(loopinfra.LoopVarCodeLineBase)); hasBlockingErrors {
 				verdict = "【权威结论】最终代码仍有阻塞性语法/编译错误，未通过语法检查。"
 			} else {
 				verdict = "【权威结论】最终代码已通过语法检查、零阻塞错误。时间线里之前的报错都是中间过程且已修复，绝对不要据此说\"仍有错误/未通过\"。"
@@ -204,7 +205,7 @@ func generateYaklangFinalizeLiteSummary(loop *reactloops.ReActLoop, reason any) 
 	code := loop.Get("full_code")
 	if strings.TrimSpace(code) != "" {
 		lineCount := strings.Count(code, "\n") + 1
-		_, hasBlockingErrors := checkCodeAndFormatErrors(code)
+		_, hasBlockingErrors := checkCodeAndFormatErrors(code, loop.GetInt(loopinfra.LoopVarCodeLineBase))
 		if hasBlockingErrors {
 			parts = append(parts, fmt.Sprintf("已生成 Yaklang 脚本(%d 行)，但仍有语法错误待修复", lineCount))
 		} else {
