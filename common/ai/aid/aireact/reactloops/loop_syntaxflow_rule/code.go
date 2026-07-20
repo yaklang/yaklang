@@ -111,7 +111,7 @@ func init() {
 				loopinfra.WithActionSuffix("rule"), // write_rule, modify_rule, insert_rule, delete_rule
 				loopinfra.WithAITagConfig("GEN_RULE", "sf_rule", "syntaxflow-rule", "text/syntaxflow"),
 				loopinfra.WithFileExtension(".sf"),
-				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+				loopinfra.WithFileChanged(func(loop *reactloops.ReActLoop, content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 					errMsg, blocking := checkSyntaxFlowAndFormatErrors(content)
 					if blocking && errMsg != "" {
 						errMsg += "\n\n【必须验证】修改后请立即调用 check-syntaxflow-syntax 验证（传入 path 或 syntaxflow-code），禁止在未验证的情况下再次 modify_rule。"

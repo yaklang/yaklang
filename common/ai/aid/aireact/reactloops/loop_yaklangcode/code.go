@@ -235,8 +235,12 @@ func init() {
 				loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
 				loopinfra.WithFileExtension(".yak"),
 				loopinfra.WithExitWhenSyntaxClean(true),
-				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
-					return checkCodeAndFormatErrors(content)
+				loopinfra.WithFileChanged(func(loop *reactloops.ReActLoop, content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+					lineBase := 0
+					if loop != nil {
+						lineBase = loop.GetInt(loopinfra.LoopVarCodeLineBase)
+					}
+					return checkCodeAndFormatErrors(content, lineBase)
 				}),
 				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r)),
 			)
