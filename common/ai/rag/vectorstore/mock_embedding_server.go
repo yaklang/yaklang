@@ -267,69 +267,118 @@ func (c *MockEmbeddingClient) GenerateRandomWord(wordCount int) []string {
 	return selectedWords
 }
 
-// GenerateSimilarText 生成一个与基础文本相似度高于或等于阈值的文本。
+// GenerateSimilarText 生成与基础文本相似度落在 [threshold, min(1, threshold+0.05)]
+// 的文本。采用「取 base 词子集」逼近目标相似度（二元 bag-of-words 下
+// cos ≈ sqrt(k/n)），避免无节制堆词后再大量稀释，导致跨文档串味。
 func (c *MockEmbeddingClient) GenerateSimilarText(baseText string, threshold float64) (string, error) {
 	if threshold < 0.0 || threshold > 1.0 {
 		return "", fmt.Errorf("阈值必须在 [0.0, 1.0] 之间")
 	}
 	baseVec, _ := c.Embedding(baseText)
-	baseNorm := hnsw.Norm(baseVec)
-	if baseNorm == 0 {
+	if hnsw.Norm(baseVec) == 0 {
 		return "", fmt.Errorf("基础文本不包含任何词典中的关键词，无法生成相似文本")
 	}
 
+	seen := make(map[string]bool)
 	var baseWords []string
 	for _, word := range c.vocabulary {
-		if strings.Contains(baseText, word) {
+		if strings.Contains(baseText, word) && !seen[word] {
+			seen[word] = true
 			baseWords = append(baseWords, word)
 		}
 	}
-
-	newWords := make(map[string]bool)
-	for _, w := range baseWords {
-		newWords[w] = true
+	if len(baseWords) == 0 {
+		return "", fmt.Errorf("基础文本不包含任何词典中的关键词，无法生成相似文本")
 	}
-	var generatedText string
-	var currentSimilarity float64
-	// 随机化添加顺序
-	shuffledVocab := make([]string, c.dimension)
-	copy(shuffledVocab, c.vocabulary)
+
+	baseWordSet := make(map[string]bool, len(baseWords))
+	for _, w := range baseWords {
+		baseWordSet[w] = true
+	}
+	var otherWords []string
+	for _, v := range c.vocabulary {
+		if !baseWordSet[v] {
+			otherWords = append(otherWords, v)
+		}
+	}
 
 	source := rand.NewSource(time.Now().UnixNano())
 	rng := rand.New(source)
-	rng.Shuffle(len(shuffledVocab), func(i, j int) {
-		shuffledVocab[i], shuffledVocab[j] = shuffledVocab[j], shuffledVocab[i]
+	rng.Shuffle(len(baseWords), func(i, j int) {
+		baseWords[i], baseWords[j] = baseWords[j], baseWords[i]
 	})
-	maxIterations := c.dimension * 3
-	for i := 0; i < maxIterations; i++ {
-		newVec, _ := c.Embedding(generatedText)
-		sim, _ := hnsw.CosineSimilarity(baseVec, newVec)
-		if sim >= threshold {
-			return generatedText, nil
-		}
-		currentSimilarity = sim
 
-		// 策略：优先重复 baseText 中的词来提高相似度，如果不够再添加新词
-		if rng.Float64() < 0.7 && len(baseWords) > 0 { // 70% 的概率重复旧词
-			wordToRepeat := baseWords[rng.Intn(len(baseWords))]
-			generatedText += " " + wordToRepeat
-		} else { // 30%的概率添加一个不相关的词（这会轻微降低相似度，但增加文本多样性）
-			var otherWords []string
-			baseWordSet := make(map[string]bool)
-			for _, w := range baseWords {
-				baseWordSet[w] = true
-			}
-			for _, v := range c.vocabulary {
-				if !baseWordSet[v] {
-					otherWords = append(otherWords, v)
-				}
-			}
-			if len(otherWords) > 0 {
-				generatedText += " " + otherWords[rng.Intn(len(otherWords))]
-			}
+	const maxOvershoot = 0.05
+	upper := threshold + maxOvershoot
+	if upper > 1.0 {
+		upper = 1.0
+	}
+
+	similarityOf := func(words []string) float64 {
+		vec, _ := c.Embedding(strings.Join(words, " "))
+		sim, _ := hnsw.CosineSimilarity(baseVec, vec)
+		return sim
+	}
+
+	// Binary-ish: for equal-weight bag vectors, cos(subset_k, full_n) ≈ sqrt(k/n).
+	n := len(baseWords)
+	k := int(threshold*threshold*float64(n) + 0.5)
+	if k < 1 {
+		k = 1
+	}
+	if k > n {
+		k = n
+	}
+
+	var best []string
+	bestSim := -1.0
+	for attempt := 0; attempt < n*2; attempt++ {
+		if k < 1 {
+			k = 1
+		}
+		if k > n {
+			k = n
+		}
+		candidate := append([]string{}, baseWords[:k]...)
+		// Tiny jitter: optionally repeat one base word (keeps support set, slight weight change).
+		if rng.Float64() < 0.3 {
+			candidate = append(candidate, baseWords[rng.Intn(k)])
+		}
+		sim := similarityOf(candidate)
+		if sim >= threshold && sim <= upper {
+			return strings.Join(candidate, " "), nil
+		}
+		if sim >= threshold && (bestSim < threshold || sim < bestSim) {
+			best = candidate
+			bestSim = sim
+		}
+		if sim < threshold {
+			k++
+		} else {
+			// Over target band — shrink subset.
+			k--
 		}
 	}
-	return "", utils.Errorf("无法生成相似度 > %.2f 的文本，当前最大可达 %.4f", threshold, currentSimilarity)
+
+	if bestSim >= threshold {
+		// Soften overshoot with a few unrelated words (bounded), staying >= threshold.
+		words := append([]string{}, best...)
+		for i := 0; i < 32 && bestSim > upper && len(otherWords) > 0; i++ {
+			trial := append(append([]string{}, words...), otherWords[rng.Intn(len(otherWords))])
+			sim := similarityOf(trial)
+			if sim < threshold {
+				break
+			}
+			words = trial
+			bestSim = sim
+			if sim <= upper {
+				return strings.Join(words, " "), nil
+			}
+		}
+		return strings.Join(words, " "), nil
+	}
+
+	return "", utils.Errorf("无法生成相似度 ∈ [%.2f, %.2f] 的文本，当前最佳 %.4f", threshold, upper, bestSim)
 }
 
 type MockEmbedder struct {
