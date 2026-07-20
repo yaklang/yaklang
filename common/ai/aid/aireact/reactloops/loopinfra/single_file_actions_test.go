@@ -1083,3 +1083,37 @@ func TestModifyAction_LegacyLineRange_StillWorksWithoutPatch(t *testing.T) {
 	assert.NotContains(t, loop.Get(factory.GetFullCodeVariableName()), "*** Begin Patch")
 	assert.True(t, runtime.timelineContains("modify_success"))
 }
+
+// Short whole-file line-range rewrite (syntaxflow-style) must still be allowed without a patch.
+func TestModifyAction_LegacyLineRange_AllowsShortFullRewrite(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("rule"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "rule.sf")
+	orig := `rule("test-rule")
+desc(
+	title: "Test Rule"
+	type: audit
+	level: info
+`
+	fixed := `rule("test-rule")
+desc(
+	title: "Test Rule Fixed"
+	type: audit
+	level: info
+)`
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), orig)
+	loop.Set(factory.GetCodeVariableName(), fixed)
+
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_start_line": 1,
+		"modify_end_line":   6,
+	}), op)
+
+	assert.False(t, runtime.timelineContains("modify_non_patch_full_code"))
+	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), "Test Rule Fixed")
+	assert.True(t, runtime.timelineContains("modify_success"))
+}
