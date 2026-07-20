@@ -2,6 +2,7 @@ package rag
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -385,9 +386,14 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	MidSimilarThresh := 0.6
 	LowSimilarThresh := 0.4
 
-	contentHypotheticalAnswer := mockEmbedding.GenerateRandomText(40)
-	contentGeneralizeQuery := mockEmbedding.GenerateRandomText(40)
-	contentSplitQuery := mockEmbedding.GenerateRandomText(40)
+	// 三个集合使用互不重叠的词表，避免增强查询稀释/随机词串味到其他集合。
+	disjointWords := mockEmbedding.GenerateRandomWord(120)
+	if len(disjointWords) < 120 {
+		t.Fatalf("expected at least 120 mock vocabulary words, got %d", len(disjointWords))
+	}
+	contentHypotheticalAnswer := strings.Join(disjointWords[0:40], " ")
+	contentGeneralizeQuery := strings.Join(disjointWords[40:80], " ")
+	contentSplitQuery := strings.Join(disjointWords[80:120], " ")
 
 	uuidHypotheticalAnswer := uuid.NewString()
 	uuidGeneralizeQuery := uuid.NewString()

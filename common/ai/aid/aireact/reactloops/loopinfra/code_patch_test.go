@@ -87,7 +87,8 @@ func TestApply_NormalizesLineEndingsAndTrailingWhitespace(t *testing.T) {
 
 	out, err := ApplyCodePatchFromString(full, patch)
 	require.NoError(t, err)
-	assert.Equal(t, "before\nx = 42\nafter\r\n", out)
+	// Matched region used CRLF — replacement must keep CRLF, not mix LF into the middle.
+	assert.Equal(t, "before\r\nx = 42\r\nafter\r\n", out)
 }
 
 func TestApply_NormalizedMatchStillRequiresUniqueness(t *testing.T) {
@@ -101,6 +102,41 @@ func TestApply_NormalizedMatchStillRequiresUniqueness(t *testing.T) {
 	_, err := ApplyCodePatchFromString(full, patch)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "matched 2 times")
+}
+
+func TestApply_CollapseOverEscapedNewlines(t *testing.T) {
+	// Source has literal \r\n (one backslash each); model over-escaped as \\r\\n in the patch.
+	full := "raw = \"A\\r\\nB\"\n"
+	patch := "*** Begin Patch\n@@ http mock\n" +
+		"-raw = \"A\\\\r\\\\nB\"\n" +
+		"+raw = \"A\\\\r\\\\nC\"\n" +
+		"*** End Patch\n"
+
+	out, warnings, err := ApplyCodePatchWithWarnings(full, mustParsePatch(t, patch))
+	require.NoError(t, err)
+	assert.Equal(t, "raw = \"A\\r\\nC\"\n", out)
+	require.NotEmpty(t, warnings)
+	assert.Contains(t, warnings[0], "collapsing")
+}
+
+func TestApply_NotFound_HintsEscapeNoise(t *testing.T) {
+	full := "a = 1\n"
+	patch := "*** Begin Patch\n@@ miss\n" +
+		"-raw = \"x\\r\\n\"\n" +
+		"+raw = \"y\"\n" +
+		"*** End Patch\n"
+	_, err := ApplyCodePatchFromString(full, patch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+	assert.Contains(t, err.Error(), "CURRENT_CODE")
+	assert.Contains(t, err.Error(), `\\n`)
+}
+
+func mustParsePatch(t *testing.T, patch string) []CodePatchHunk {
+	t.Helper()
+	hunks, err := ParseCodePatch(patch)
+	require.NoError(t, err)
+	return hunks
 }
 
 func TestApply_DeletionHunk(t *testing.T) {

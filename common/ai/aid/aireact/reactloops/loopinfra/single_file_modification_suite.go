@@ -352,16 +352,21 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	}
 
 	fullCode := loop.Get(fullCodeVar)
-	newFull, err := ApplyCodePatch(fullCode, hunks)
+	newFull, warnings, err := ApplyCodePatchWithWarnings(fullCode, hunks)
 	if err != nil {
 		msg := fmt.Sprintf(`【modify_code 失败】Patch 应用失败（文件未改动）: %v
 
-请基于本轮 CURRENT_CODE 重新生成 Patch：context 与 '-' 行必须从最新代码原样复制，不要复用 rebase/上一轮修改前的旧片段。
-系统已尝试兼容 CRLF/LF 与行尾空格；若仍失败，请加长 @@ 上下文确保唯一匹配。`, err)
+请基于本轮 CURRENT_CODE 重新生成 Patch：context 与 '-' 行必须从最新代码【逐字符】复制，不要复用 rebase/上一轮修改前的旧片段。
+字符串里的 \n/\r\n 禁止展开成真实换行，也禁止再加一层反斜杠写成 \\n。
+系统已尝试兼容 CRLF/LF、行尾空格，以及一次 \\n→\n 过转义纠正；若仍失败，请加长 @@ 上下文确保唯一匹配。`, err)
 		invoker.AddToTimeline("modify_patch_apply_failed", msg)
 		op.Feedback(msg)
 		op.Continue()
 		return
+	}
+	for _, w := range warnings {
+		invoker.AddToTimeline("modify_patch_warning", w)
+		op.Feedback("[patch warning] " + w)
 	}
 
 	invoker.AddToTimeline("modify_code", fmt.Sprintf("applied patch (%d hunk(s))", len(hunks)))

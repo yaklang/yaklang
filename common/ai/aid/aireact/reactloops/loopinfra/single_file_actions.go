@@ -203,7 +203,10 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 			}
 
 			generatedCode := loop.Get(codeVar)
-			if looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode) {
+			oldSnippet := strings.TrimSpace(action.GetString("old_snippet"))
+			modifyStartParam := action.GetInt("modify_start_line")
+			modifyEndParam := action.GetInt("modify_end_line")
+			if looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode, modifyStartParam, modifyEndParam) {
 				msg := fmt.Sprintf(`【modify_code 失败】检测到 GEN_CODE 是完整文件或大段源码，但缺少 *** Begin Patch。
 
 modify_code 必须输出 Cursor 风格 Patch；禁止直接输出完整 beforeRequest、runSelfTest、完整函数或整份脚本。
@@ -223,13 +226,13 @@ GEN_CODE 预览：
 				return
 			}
 
-			if strings.TrimSpace(action.GetString("old_snippet")) != "" {
+			if oldSnippet != "" {
 				f.handleModifyByOldSnippet(loop, action, op, actionName, filename, fullCodeVar, codeVar)
 				return
 			}
 
-			start := action.GetInt("modify_start_line")
-			end := action.GetInt("modify_end_line")
+			start := modifyStartParam
+			end := modifyEndParam
 			if start <= 0 || end <= 0 || end < start {
 				msg := fmt.Sprintf(`【modify_code 失败】GEN_CODE 不是 Patch（缺少 *** Begin Patch），且未提供 old_snippet / 有效行号。
 
@@ -390,8 +393,9 @@ GEN_CODE 解析行号：[%d-%d]
 
 // looksLikeLargeNonPatchModify protects existing files from accidental full-file
 // or whole-function replacement when the model omitted the required patch envelope.
-// Legacy old_snippet/line-range mode remains available for genuinely small edits.
-func looksLikeLargeNonPatchModify(fullCode, generated string) bool {
+// Explicit line-range replaces whose body size fits the declared range are allowed
+// (e.g. syntaxflow rewrite of a short rule via modify_start_line/modify_end_line).
+func looksLikeLargeNonPatchModify(fullCode, generated string, startLine, endLine int) bool {
 	generated = strings.TrimSpace(generated)
 	if generated == "" || LooksLikeCodePatch(generated) {
 		return false
@@ -401,6 +405,16 @@ func looksLikeLargeNonPatchModify(fullCode, generated string) bool {
 	}
 
 	generatedLines := countNonEmptyLines(generated)
+
+	// Explicit line-range: allow when GEN_CODE roughly fits the declared span.
+	if startLine > 0 && endLine >= startLine {
+		rangeLines := endLine - startLine + 1
+		if generatedLines <= rangeLines+3 {
+			return false
+		}
+		return generatedLines >= 8 && generatedLines > rangeLines*2
+	}
+
 	fullLines := countNonEmptyLines(fullCode)
 	if generatedLines >= 8 {
 		return true
