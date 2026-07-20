@@ -588,17 +588,17 @@ func readHNSWIndexFromStream(reader io.Reader) ([]byte, error) {
 	return hnswIndex, nil
 }
 
-// ImportRAGFromFile 从二进制文件导入RAG数据，支持从文件路径导入
+// ImportRAGFromFile 从二进制文件导入RAG数据，支持从文件路径导入。
+// 兼容 raw .rag 与 gzip（.rag.gz / 按魔数识别）。
 func ImportRAGFromFile(inputPath string, optFuncs ...RAGExportOptionFunc) error {
-	// 读取二进制文件
-	file, err := os.Open(inputPath)
+	reader, err := utils.OpenFileAutoGzip(inputPath, "YAKRAG")
 	if err != nil {
 		return utils.Wrap(err, "failed to open input file")
 	}
-	defer file.Close()
+	defer reader.Close()
 
 	// 加载RAG数据
-	ragData, err := LoadRAGFromBinary(file)
+	ragData, err := LoadRAGFromBinary(reader)
 	if err != nil {
 		return utils.Wrap(err, "failed to load RAG binary data")
 	}
