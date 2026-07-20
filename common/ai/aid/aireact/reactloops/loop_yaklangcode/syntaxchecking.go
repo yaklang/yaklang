@@ -153,7 +153,15 @@ func getIntelligentErrorHint(msg *resultSpec.StaticAnalyzeResult, me *memedit.Me
 	}
 
 	coreMessage := extractCoreCompilerMessage(msg.Message)
-	return lookupCompilerErrorHint(coreMessage, lineContent)
+	hint := lookupCompilerErrorHint(coreMessage, lineContent)
+	recovery := buildActionableRecoveryHint(coreMessage, lineContent)
+	if hint == "" {
+		return strings.TrimSpace(recovery)
+	}
+	if recovery == "" {
+		return hint
+	}
+	return hint + recovery
 }
 
 // safeGlobMatch performs glob matching with error handling to avoid panics
