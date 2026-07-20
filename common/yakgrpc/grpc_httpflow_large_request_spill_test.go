@@ -15,11 +15,15 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTPFlow_LargeRequest_Spill(t *testing.T) {
+	prev := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(uint64(yakit.MaxHTTPFlowRequestBodyInDBBytes))
+	defer consts.SetGlobalMaxContentLength(prev)
+
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
 	token := utils.RandStringBytes(12)
-	body := strings.Repeat("X", 300*1024) // 300KB > 200KB threshold
+	body := strings.Repeat("X", 300*1024) // 300KB > 200KB spill threshold
 	reqRaw := []byte("POST /" + token + " HTTP/1.1\r\nHost: spill.test\r\n\r\n" + body)
 	rspRaw := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
 

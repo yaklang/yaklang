@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,10 +17,20 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
-// MaxHTTPFlowRequestBodyInDBBytes aligns with History list preview (200KB).
+// MaxHTTPFlowRequestBodyInDBBytes is the fallback spill threshold (200KB),
+// aligned with History list preview. Used when global MaxContentLength is unset.
 const MaxHTTPFlowRequestBodyInDBBytes = 200 * 1024
 
-const maxHTTPFlowRequestBodyInDBBytes = MaxHTTPFlowRequestBodyInDBBytes
+// GetMaxHTTPFlowRequestBodyInDBBytes returns the request-body spill threshold.
+// It follows global MaxContentLength (全局配置「转储数据包大小」);
+// when unset (0), falls back to MaxHTTPFlowRequestBodyInDBBytes (200KB).
+func GetMaxHTTPFlowRequestBodyInDBBytes() int {
+	n := consts.GetGlobalMaxContentLength()
+	if n == 0 {
+		return MaxHTTPFlowRequestBodyInDBBytes
+	}
+	return int(n)
+}
 
 var (
 	largeRequestNotifyMu       sync.Mutex
@@ -95,7 +106,7 @@ func spillLargeHTTPFlowRequestIfNeeded(packet []byte) (largeRequestSpillResult, 
 
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 	res.OriginalBodyLen = len(body)
-	if len(body) <= maxHTTPFlowRequestBodyInDBBytes {
+	if len(body) <= GetMaxHTTPFlowRequestBodyInDBBytes() {
 		return res, nil
 	}
 
