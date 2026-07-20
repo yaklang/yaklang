@@ -301,3 +301,16 @@ func (r *ProgressRegistry) WaitForIdentifiers(ctx context.Context, identifiers [
 	}
 	return nil
 }
+
+// ProgressRegistry.Unregister 移除 handle 并标记为已完成。
+func registerHandle(
+	registry *ProgressRegistry,
+	subTaskID, identifier string,
+	subTask aicommon.AIStatefulTask,
+	startedAt time.Time,
+) *SubAgentHandle {
+	if registry == nil {
+		return nil
+	}
+	return registry.Register(NewSubAgentHandle(subTaskID, identifier, subTask, startedAt))
+}

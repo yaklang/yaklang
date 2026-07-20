@@ -51,6 +51,14 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	}, nil
 }
 
+// MergeBack 把分支 timeline 中新增的条目合并回父 timeline。
+//
+// 注意：sub agent 场景下【禁止】调用此方法。sub agent 的不变量是 timeline
+// 隔离——子的运行轨迹必须留在自己的 timeline 容器里，绝不写回父 timeline；
+// 父只通过结果记录（SubAgentResult.Record）看到结果。MergeBack 会把子的全部
+// 中间条目灌回父，彻底破坏隔离语义。reactloops 包内的 TimelineHandle 明确不
+// 暴露 MergeBack 路径；仅 aid/runtime.go 的 stage 编排（非 sub agent 语义）
+// 使用此方法。
 func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	if f == nil || f.Parent == nil || f.Branch == nil {
 		return nil, nil

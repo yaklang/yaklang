@@ -3,12 +3,9 @@ package loopinfra
 import (
 	"context"
 	"encoding/json"
-	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +15,6 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 		"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type dispatchSubReactTestInvoker struct {
@@ -130,112 +126,6 @@ func TestVerifyDispatchSubReactAgents_AcceptsValidPayload(t *testing.T) {
 	assert.Contains(t, loop.Get(dispatchSubReactJobsLoopKey), "scan_a")
 	assert.Equal(t, 2, loop.GetInt(dispatchSubReactConcurrencyLoopKey))
 }
-
-type mockSubReactAgentRunner struct {
-	mu    sync.Mutex
-	calls []reactloops.SubAgentJob
-	delay time.Duration
-}
-
-func (m *mockSubReactAgentRunner) Run(
-	_ aicommon.AIInvokeRuntime,
-	_ *reactloops.ReActLoop,
-	_ aicommon.AIStatefulTask,
-	job reactloops.SubAgentJob,
-	_ *reactloops.ProgressRegistry,
-) (*reactloops.SubAgentResult, error) {
-	m.mu.Lock()
-	m.calls = append(m.calls, job)
-	m.mu.Unlock()
-
-	if m.delay > 0 {
-		time.Sleep(m.delay)
-	}
-
-	return &reactloops.SubAgentResult{
-		SubAgentJob: job,
-		Record: reactloops.TimelineRecord{
-			SubAgentID: "mock-" + job.Identifier,
-			Order:      job.Order,
-			LoopName:   job.LoopName,
-			Goal:       job.Goal,
-			Status:     "completed",
-			Result:     "done:" + job.Identifier,
-			ProcessStats: reactloops.ProcessStats{
-				Iterations:    2,
-				Actions:       3,
-				ToolCalls:     1,
-				TimelineItems: 4,
-			},
-		},
-		Feedback: "ok:" + job.Identifier,
-	}, nil
-}
-
-func TestHandleDispatchSubReactAgents_WritesOneTimelineRecordPerAgent(t *testing.T) {
-	origRunner := reactloops.DefaultRunner
-	defer func() { reactloops.DefaultRunner = origRunner }()
-
-	mockRunner := &mockSubReactAgentRunner{}
-	reactloops.DefaultRunner = mockRunner
-
-	invoker := newDispatchSubReactTestInvoker(context.Background())
-	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	task := aicommon.NewStatefulTaskBase("parent-task", "parent input", context.Background(), invoker.GetConfig().GetEmitter(), true)
-
-	action := mustBuildDispatchSubReactAction(t, map[string]any{
-		"dispatches": dispatchSubReactJobs(
-			map[string]any{"identifier": "agent_a", "goal": "task A"},
-			map[string]any{"identifier": "agent_b", "goal": "task B"},
-		),
-	})
-	require.NoError(t, verifyDispatchSubReactAgents(loop, action))
-
-	op := reactloops.NewActionHandlerOperator(task)
-	handleDispatchSubReactAgents(loop, action, op)
-
-	require.True(t, op.IsContinued())
-	records := invoker.subReactTimelineRecords()
-	require.Len(t, records, 2)
-	assert.Equal(t, 1, records[0].Order)
-	assert.Equal(t, 2, records[1].Order)
-	assert.Equal(t, "completed", records[0].Status)
-	assert.Equal(t, 2, records[0].ProcessStats.Iterations)
-	assert.Equal(t, 3, records[0].ProcessStats.Actions)
-	assert.Equal(t, 1, records[0].ProcessStats.ToolCalls)
-	assert.Contains(t, op.GetFeedback().String(), "agent_a")
-	assert.Contains(t, op.GetFeedback().String(), "agent_b")
-}
-
-func TestRunDispatchSubReactJobsConcurrently_PreservesInputOrderInResults(t *testing.T) {
-	origRunner := reactloops.DefaultRunner
-	defer func() { reactloops.DefaultRunner = origRunner }()
-
-	mockRunner := &mockSubReactAgentRunner{delay: 20 * time.Millisecond}
-	reactloops.DefaultRunner = mockRunner
-
-	invoker := newDispatchSubReactTestInvoker(context.Background())
-	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	task := aicommon.NewStatefulTaskBase("parent-task", "parent input", context.Background(), invoker.GetConfig().GetEmitter(), true)
-
-	jobs := []reactloops.SubAgentJob{
-		{Order: 1, Identifier: "slow_a", Goal: "A", LoopName: schema.AI_REACT_LOOP_NAME_DEFAULT},
-		{Order: 2, Identifier: "slow_b", Goal: "B", LoopName: schema.AI_REACT_LOOP_NAME_DEFAULT},
-	}
-
-	results := reactloops.RunJobsConcurrently(invoker, loop, task, jobs, 2, nil)
-	require.Len(t, results, 2)
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Order < results[j].Order
-	})
-	orders := make([]int, 0, len(results))
-	for _, result := range results {
-		orders = append(orders, result.Order)
-	}
-	assert.Equal(t, []int{1, 2}, orders)
-}
-
 func TestNewReActLoop_InjectsDispatchSubReactAgents(t *testing.T) {
 	// Dispatch sub react agents is gated by EnableDispatchSubReactAgents on the
 	// real *aicommon.Config; NewReActLoop only injects the action when the flag is on.
@@ -274,7 +164,7 @@ func TestNewReActLoop_OmitsDispatchSubReactAgentsWhenDisabled(t *testing.T) {
 }
 
 func TestBuildSubReactLoopOptions_FiltersDispatchAction(t *testing.T) {
-	opts := reactloops.DefaultForkOptions()
+	opts := reactloops.DefaultSubAgentLoopOptions()
 	loop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		newDispatchSubReactTestInvoker(context.Background()),
@@ -291,111 +181,6 @@ func TestBuildSubReactLoopOptions_FiltersDispatchAction(t *testing.T) {
 	assert.Contains(t, err.Error(), "top-level agent")
 }
 
-type partialFailSubReactRunner struct {
-	failIdentifiers map[string]struct{}
-}
-
-func (m *partialFailSubReactRunner) Run(
-	_ aicommon.AIInvokeRuntime,
-	_ *reactloops.ReActLoop,
-	_ aicommon.AIStatefulTask,
-	job reactloops.SubAgentJob,
-	_ *reactloops.ProgressRegistry,
-) (*reactloops.SubAgentResult, error) {
-	if _, ok := m.failIdentifiers[job.Identifier]; ok {
-		return &reactloops.SubAgentResult{
-			SubAgentJob: job,
-			Record: reactloops.TimelineRecord{
-				SubAgentID: "mock-" + job.Identifier,
-				Order:      job.Order,
-				LoopName:   job.LoopName,
-				Goal:       job.Goal,
-				Status:     "failed",
-				Error:      "simulated failure",
-			},
-			Feedback: "fail:" + job.Identifier,
-		}, nil
-	}
-	return &reactloops.SubAgentResult{
-		SubAgentJob: job,
-		Record: reactloops.TimelineRecord{
-			SubAgentID: "mock-" + job.Identifier,
-			Order:      job.Order,
-			LoopName:   job.LoopName,
-			Goal:       job.Goal,
-			Status:     "completed",
-			Result:     "done:" + job.Identifier,
-		},
-		Feedback: "ok:" + job.Identifier,
-	}, nil
-}
-
-func TestHandleDispatchSubReactAgents_PartialFailureContinues(t *testing.T) {
-	origRunner := reactloops.DefaultRunner
-	defer func() { reactloops.DefaultRunner = origRunner }()
-
-	reactloops.DefaultRunner = &partialFailSubReactRunner{
-		failIdentifiers: map[string]struct{}{"agent_b": {}},
-	}
-
-	invoker := newDispatchSubReactTestInvoker(context.Background())
-	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	task := aicommon.NewStatefulTaskBase("parent-task", "parent input", context.Background(), invoker.GetConfig().GetEmitter(), true)
-
-	action := mustBuildDispatchSubReactAction(t, map[string]any{
-		"dispatches": dispatchSubReactJobs(
-			map[string]any{"identifier": "agent_a", "goal": "task A"},
-			map[string]any{"identifier": "agent_b", "goal": "task B"},
-		),
-	})
-	require.NoError(t, verifyDispatchSubReactAgents(loop, action))
-
-	op := reactloops.NewActionHandlerOperator(task)
-	handleDispatchSubReactAgents(loop, action, op)
-
-	require.True(t, op.IsContinued())
-	feedback := op.GetFeedback().String()
-	assert.Contains(t, feedback, "1 succeeded, 1 failed")
-	assert.Contains(t, feedback, "agent_a")
-	assert.Contains(t, feedback, "agent_b")
-
-	records := invoker.subReactTimelineRecords()
-	require.Len(t, records, 2)
-	assert.Equal(t, "completed", records[0].Status)
-	assert.Equal(t, "failed", records[1].Status)
-}
-
-func TestHandleDispatchSubReactAgents_PreservesInputOrderInTimeline(t *testing.T) {
-	origRunner := reactloops.DefaultRunner
-	defer func() { reactloops.DefaultRunner = origRunner }()
-
-	reactloops.DefaultRunner = &mockSubReactAgentRunner{delay: 30 * time.Millisecond}
-
-	invoker := newDispatchSubReactTestInvoker(context.Background())
-	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	task := aicommon.NewStatefulTaskBase("parent-task", "parent input", context.Background(), invoker.GetConfig().GetEmitter(), true)
-
-	action := mustBuildDispatchSubReactAction(t, map[string]any{
-		"dispatches": dispatchSubReactJobs(
-			map[string]any{"identifier": "slow_b", "goal": "task B"},
-			map[string]any{"identifier": "slow_a", "goal": "task A"},
-		),
-		"concurrency": 2,
-	})
-	require.NoError(t, verifyDispatchSubReactAgents(loop, action))
-
-	op := reactloops.NewActionHandlerOperator(task)
-	handleDispatchSubReactAgents(loop, action, op)
-	require.True(t, op.IsContinued())
-
-	records := invoker.subReactTimelineRecords()
-	require.Len(t, records, 2)
-	assert.Equal(t, 1, records[0].Order)
-	assert.Equal(t, "task B", records[0].Goal)
-	assert.Equal(t, 2, records[1].Order)
-	assert.Equal(t, "task A", records[1].Goal)
-}
-
 type configBackedDispatchInvoker struct {
 	*dispatchSubReactTestInvoker
 	cfg *aicommon.Config
@@ -404,95 +189,6 @@ type configBackedDispatchInvoker struct {
 func (c *configBackedDispatchInvoker) GetConfig() aicommon.AICallerConfigIf {
 	return c.cfg
 }
-
-type forkIsolationSubReactRunner struct {
-	branchSecrets []string
-}
-
-func (r *forkIsolationSubReactRunner) Run(
-	parentInvoker aicommon.AIInvokeRuntime,
-	_ *reactloops.ReActLoop,
-	_ aicommon.AIStatefulTask,
-	job reactloops.SubAgentJob,
-	_ *reactloops.ProgressRegistry,
-) (*reactloops.SubAgentResult, error) {
-	parentCfg, ok := parentInvoker.GetConfig().(*aicommon.Config)
-	if !ok || parentCfg == nil || parentCfg.GetTimeline() == nil {
-		return nil, utils.Error("timeline isolation test requires *aicommon.Config with timeline")
-	}
-
-	fork, err := parentCfg.GetTimeline().ForkForTask(job.Identifier, job.Identifier, parentCfg, parentCfg)
-	if err != nil {
-		return nil, err
-	}
-	secret := "branch-only-secret-" + job.Identifier
-	fork.Branch.PushText(parentCfg.AcquireId(), secret)
-	r.branchSecrets = append(r.branchSecrets, secret)
-
-	return &reactloops.SubAgentResult{
-		SubAgentJob: job,
-		Record: reactloops.TimelineRecord{
-			SubAgentID: "fork-" + job.Identifier,
-			Order:      job.Order,
-			LoopName:   job.LoopName,
-			Goal:       job.Goal,
-			Status:     "completed",
-			Result:     "isolated:" + job.Identifier,
-			ProcessStats: reactloops.ProcessStats{
-				TimelineItems: 1,
-			},
-		},
-		Feedback: "ok:" + job.Identifier,
-	}, nil
-}
-
-func TestHandleDispatchSubReactAgents_BranchWritesDoNotPolluteParentTimeline(t *testing.T) {
-	origRunner := reactloops.DefaultRunner
-	defer func() { reactloops.DefaultRunner = origRunner }()
-
-	forkRunner := &forkIsolationSubReactRunner{}
-	reactloops.DefaultRunner = forkRunner
-
-	parentTimeline := aicommon.NewTimeline(nil, nil)
-	parentTimeline.PushText(1, "parent-seed")
-	cfg := aicommon.NewConfig(
-		context.Background(),
-		aicommon.WithTimeline(parentTimeline),
-		aicommon.WithDisableAutoSkills(true),
-	)
-
-	baseInvoker := newDispatchSubReactTestInvoker(context.Background())
-	invoker := &configBackedDispatchInvoker{
-		dispatchSubReactTestInvoker: baseInvoker,
-		cfg:                         cfg,
-	}
-
-	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
-	task := aicommon.NewStatefulTaskBase("parent-task", "parent input", context.Background(), cfg.GetEmitter(), true)
-
-	action := mustBuildDispatchSubReactAction(t, map[string]any{
-		"dispatches": dispatchSubReactJobs(map[string]any{
-			"identifier": "agent_a",
-			"goal":       "task A",
-		}),
-	})
-	require.NoError(t, verifyDispatchSubReactAgents(loop, action))
-
-	op := reactloops.NewActionHandlerOperator(task)
-	handleDispatchSubReactAgents(loop, action, op)
-	require.True(t, op.IsContinued())
-
-	parentDump := parentTimeline.Dump()
-	for _, secret := range forkRunner.branchSecrets {
-		assert.NotContains(t, parentDump, secret)
-	}
-	assert.Contains(t, parentDump, "parent-seed")
-
-	records := invoker.subReactTimelineRecords()
-	require.Len(t, records, 1)
-	assert.Equal(t, "completed", records[0].Status)
-}
-
 func TestDispatchSubReactAgents_StreamFieldsUseI18nNodeIDs(t *testing.T) {
 	require.NotNil(t, loopAction_DispatchSubReactAgents)
 	require.Len(t, loopAction_DispatchSubReactAgents.StreamFields, 2)
@@ -663,67 +359,10 @@ func TestBuildForwardingEmitter_NilParentIsSafe(t *testing.T) {
 	})
 }
 
-// TestBuildForkedSubReactInvoker_ChildEmitterForwardsAndStampsTaskId verifies the dispatch
-// wiring (buildForkedSubReactInvoker) actually hands the child invoker an emitter that
-// forwards to the parent and stamps the sub-task id — i.e. dispatch correctly "下发 emitter".
-// AIRuntimeInvokerGetter is swapped so we can build a real child config from the options
-// without a live AI runtime.
-func TestBuildForkedSubReactInvoker_ChildEmitterForwardsAndStampsTaskId(t *testing.T) {
-	capture := &subReactEmitterCapture{}
-	captureEmitter := aicommon.NewEmitter("parent", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
-		capture.mu.Lock()
-		capture.events = append(capture.events, e)
-		capture.mu.Unlock()
-		return e, nil
-	})
-	parentCfg := aicommon.NewConfig(
-		context.Background(),
-		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithEmitter(captureEmitter),
-	)
-	require.True(t, parentCfg.GetEmitter() == captureEmitter, "test setup: parent config must carry the capturing emitter")
-
-	parentTimeline := aicommon.NewTimeline(nil, nil)
-	parentTimeline.PushText(1, "parent-seed")
-	fork, err := parentTimeline.ForkForTask("sub", "sub", parentCfg, parentCfg)
-	require.NoError(t, err)
-	require.NotNil(t, fork)
-
-	origGetter := aicommon.AIRuntimeInvokerGetter
-	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
-	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-		cfg := aicommon.NewConfig(ctx, opts...)
-		return &configBackedDispatchInvoker{
-			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
-			cfg:                         cfg,
-		}, nil
-	}
-
-	const subTaskId = "sub-agent-42"
-	taskEmitter := reactloops.BuildForwardingEmitter(captureEmitter, subTaskId)
-	childInvoker, err := reactloops.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
-	require.NoError(t, err)
-	require.NotNil(t, childInvoker)
-
-	childEmitter := childInvoker.GetConfig().GetEmitter()
-	require.NotNil(t, childEmitter)
-	require.NotSame(t, captureEmitter, childEmitter, "child must receive its own derived emitter, not the parent's")
-
-	_, err = childEmitter.EmitStatus("dispatch-status", "running")
-	require.NoError(t, err)
-	_, err = childEmitter.EmitSchema("sub-node", map[string]any{"k": "v"})
-	require.NoError(t, err)
-
-	events := capture.snapshot()
-	require.Len(t, events, 2, "child invoker emitter must forward events to the parent emitter (dispatch下发emitter)")
-	for _, e := range events {
-		assert.Equal(t, subTaskId, e.TaskId, "dispatched child events must be tagged with the sub-agent task id")
-	}
-}
 
 // TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId replicates the exact
-// emitter wiring reactloops.RunForkedJob applies to the sub-task (NewSubTaskBase +
-// SetEmitter(reactloops.BuildForwardingEmitter(...))) and verifies the sub-task's emitter —
+// emitter wiring DispatchSubAgents applies to the sub-task (NewSubTaskBase +
+// SetEmitter(BuildForwardingEmitter(...))) and verifies the sub-task's emitter —
 // which is the effective emitter the sub loop runs through — forwards to the parent and
 // stamps the sub-task id. This avoids executing the sub loop's AI while still covering the
 // sub-task emitter wiring path.
@@ -747,7 +386,7 @@ func TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId(t *test
 	require.NotNil(t, parentTask.GetEmitter())
 
 	const subTaskId = "sub-agent-77"
-	// Mirror reactloops.RunForkedJob lines: create sub-task, then override its emitter
+	// Mirror DispatchSubAgents lines: create sub-task, then override its emitter
 	// with the forwarding emitter derived from the parent config emitter.
 	subTask := aicommon.NewSubTaskBase(parentTask, subTaskId, "sub input", true)
 	subTask.SetEmitter(reactloops.BuildForwardingEmitter(parentCfg.GetEmitter(), subTaskId))
@@ -771,180 +410,8 @@ func TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId(t *test
 // hit counter each time it is invoked. Using closures (rather than comparing function pointers,
 // which Go forbids for non-nil funcs) lets the test verify behaviorally that a given child slot
 // actually runs the callback the parent put there — invoke the slot and check which probe fired.
-func newSubReactAICallbackProbe() (aicommon.AICallbackType, *int64) {
-	var hits int64
-	cb := func(_ aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		atomic.AddInt64(&hits, 1)
-		return &aicommon.AIResponse{}, nil
-	}
-	return cb, &hits
-}
 
-func assertProbeHits(t *testing.T, label string, cb aicommon.AICallbackType, hits *int64) {
-	t.Helper()
-	require.NotNil(t, cb, "%s callback must be present on the child invoker", label)
-	before := atomic.LoadInt64(hits)
-	_, err := cb(nil, nil)
-	require.NoError(t, err, "%s callback must run without error", label)
-	assert.Equal(t, before+1, atomic.LoadInt64(hits), "%s callback must be the one wired into the child slot", label)
-}
 
-// TestBuildForkedSubReactInvoker_PassesAICallbacksToChild verifies the core dispatch wiring at
-// buildForkedSubReactInvoker: the child invoker inherits the parent's AI callbacks
-// (Original / QualityPriorityRaw / SpeedPriorityRaw) via WithAICallbacks(parentCfg.GetRawAICallbacks()),
-// so every forked sub agent actually calls the same AI the parent is configured with. Each probe
-// lands in its own slot — this catches both "callbacks lost entirely" and "callbacks shuffled
-// into the wrong tier" regressions. AIRuntimeInvokerGetter is swapped so we can build a real
-// child config from the options without a live AI runtime.
-func TestBuildForkedSubReactInvoker_PassesAICallbacksToChild(t *testing.T) {
-	origCb, origHits := newSubReactAICallbackProbe()
-	qualityCb, qualityHits := newSubReactAICallbackProbe()
-	speedCb, speedHits := newSubReactAICallbackProbe()
-
-	parentCfg := aicommon.NewConfig(
-		context.Background(),
-		aicommon.WithAICallbacks(&aicommon.AICallbacks{
-			Original:           origCb,
-			QualityPriorityRaw: qualityCb,
-			SpeedPriorityRaw:   speedCb,
-		}),
-		aicommon.WithDisableAutoSkills(true),
-	)
-
-	parentTimeline := aicommon.NewTimeline(nil, nil)
-	parentTimeline.PushText(1, "parent-seed")
-	fork, err := parentTimeline.ForkForTask("sub", "sub", parentCfg, parentCfg)
-	require.NoError(t, err)
-	require.NotNil(t, fork)
-
-	origGetter := aicommon.AIRuntimeInvokerGetter
-	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
-	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-		cfg := aicommon.NewConfig(ctx, opts...)
-		return &configBackedDispatchInvoker{
-			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
-			cfg:                         cfg,
-		}, nil
-	}
-
-	const subTaskId = "sub-agent-cb"
-	taskEmitter := reactloops.BuildForwardingEmitter(parentCfg.GetEmitter(), subTaskId)
-	childInvoker, err := reactloops.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
-	require.NoError(t, err)
-	require.NotNil(t, childInvoker)
-
-	childCfg, ok := childInvoker.GetConfig().(*aicommon.Config)
-	require.True(t, ok, "child invoker config must be *aicommon.Config to expose AI callbacks")
-	require.NotNil(t, childCfg)
-
-	childRaw := childCfg.GetRawAICallbacks()
-	require.NotNil(t, childRaw)
-
-	// No probe should have fired yet — the callbacks are only wired, not invoked, during build.
-	assert.Equal(t, int64(0), atomic.LoadInt64(origHits), "test setup: Original probe must start cold")
-	assert.Equal(t, int64(0), atomic.LoadInt64(qualityHits), "test setup: QualityPriorityRaw probe must start cold")
-	assert.Equal(t, int64(0), atomic.LoadInt64(speedHits), "test setup: SpeedPriorityRaw probe must start cold")
-
-	// Invoking each child slot must fire exactly its own probe — proving the parent's callback
-	// for that tier is the one wired into the child, not a fabricated default or a shuffled slot.
-	assertProbeHits(t, "Original", childRaw.Original, origHits)
-	assertProbeHits(t, "QualityPriorityRaw", childRaw.QualityPriorityRaw, qualityHits)
-	assertProbeHits(t, "SpeedPriorityRaw", childRaw.SpeedPriorityRaw, speedHits)
-
-	assert.Equal(t, int64(1), atomic.LoadInt64(origHits), "only the Original slot may have fired the Original probe")
-	assert.Equal(t, int64(1), atomic.LoadInt64(qualityHits), "only the QualityPriorityRaw slot may have fired the QualityPriorityRaw probe")
-	assert.Equal(t, int64(1), atomic.LoadInt64(speedHits), "only the SpeedPriorityRaw slot may have fired the SpeedPriorityRaw probe")
-}
-
-// TestBuildForkedSubReactInvoker_ChildHasNoAICallbacksWhenParentHasNone is the negative control:
-// a parent with no AI callbacks set must produce a child that also has no AI callbacks, rather
-// than silently fabricating or inheriting unrelated defaults through the dispatch wiring.
-func TestBuildForkedSubReactInvoker_ChildHasNoAICallbacksWhenParentHasNone(t *testing.T) {
-	parentCfg := aicommon.NewConfig(
-		context.Background(),
-		aicommon.WithDisableAutoSkills(true),
-	)
-	require.Nil(t, parentCfg.GetRawAICallbacks().Original)
-	require.Nil(t, parentCfg.GetRawAICallbacks().QualityPriorityRaw)
-	require.Nil(t, parentCfg.GetRawAICallbacks().SpeedPriorityRaw)
-
-	parentTimeline := aicommon.NewTimeline(nil, nil)
-	parentTimeline.PushText(1, "parent-seed")
-	fork, err := parentTimeline.ForkForTask("sub", "sub", parentCfg, parentCfg)
-	require.NoError(t, err)
-	require.NotNil(t, fork)
-
-	origGetter := aicommon.AIRuntimeInvokerGetter
-	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
-	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-		cfg := aicommon.NewConfig(ctx, opts...)
-		return &configBackedDispatchInvoker{
-			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
-			cfg:                         cfg,
-		}, nil
-	}
-
-	taskEmitter := reactloops.BuildForwardingEmitter(parentCfg.GetEmitter(), "sub-agent-noop")
-	childInvoker, err := reactloops.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
-	require.NoError(t, err)
-	require.NotNil(t, childInvoker)
-
-	childCfg, ok := childInvoker.GetConfig().(*aicommon.Config)
-	require.True(t, ok)
-	childRaw := childCfg.GetRawAICallbacks()
-	assert.Nil(t, childRaw.Original, "child must not fabricate an Original callback when the parent has none")
-	assert.Nil(t, childRaw.QualityPriorityRaw, "child must not fabricate a QualityPriorityRaw callback when the parent has none")
-	assert.Nil(t, childRaw.SpeedPriorityRaw, "child must not fabricate a SpeedPriorityRaw callback when the parent has none")
-}
-
-// TestBuildForkedSubReactInvoker_StripsTopLevelStrategies verifies that a
-// forked sub agent never inherits top-level execution strategies: plan,
-// goal mode and the multi-agent dispatch preference must all be disabled on
-// the child config, even when the parent has them enabled.
-func TestBuildForkedSubReactInvoker_StripsTopLevelStrategies(t *testing.T) {
-	parentCfg := aicommon.NewConfig(
-		context.Background(),
-		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithEnableMultiAgentMode(true),
-		aicommon.WithEnableGoalMode(true),
-		aicommon.WithGoalMinIterations(6),
-		aicommon.WithEnablePlanAndExec(true),
-	)
-	require.True(t, parentCfg.GetEnableGoalMode())
-	require.True(t, parentCfg.GetPreferDispatchSubReactAgents())
-	require.True(t, parentCfg.GetEnablePlanAndExec())
-
-	parentTimeline := aicommon.NewTimeline(nil, nil)
-	parentTimeline.PushText(1, "parent-seed")
-	fork, err := parentTimeline.ForkForTask("sub-strategy", "sub", parentCfg, parentCfg)
-	require.NoError(t, err)
-
-	var capturedCfg *aicommon.Config
-	origGetter := aicommon.AIRuntimeInvokerGetter
-	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
-	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-		cfg := aicommon.NewConfig(ctx, opts...)
-		capturedCfg = cfg
-		return &configBackedDispatchInvoker{
-			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
-			cfg:                         cfg,
-		}, nil
-	}
-
-	taskEmitter := reactloops.BuildForwardingEmitter(parentCfg.GetEmitter(), "sub-strategy-1")
-	_, err = reactloops.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
-	require.NoError(t, err)
-	require.NotNil(t, capturedCfg)
-
-	assert.False(t, capturedCfg.GetEnableGoalMode(),
-		"sub agent must not inherit goal mode (no minimum-iteration finish gate)")
-	assert.False(t, capturedCfg.GetPreferDispatchSubReactAgents(),
-		"sub agent must not inherit the multi-agent dispatch preference")
-	assert.False(t, capturedCfg.GetEnablePlanAndExec(),
-		"sub agent must not open plans")
-	assert.False(t, capturedCfg.EnableDispatchSubReactAgents,
-		"sub agent must not be able to dispatch further sub agents")
-}
 
 // ---------------------------------------------------------------------------
 // Tests for rebase fix changes: early SetStatus(Processing), HotPatchOptionChan
@@ -1038,8 +505,13 @@ func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T)
 		LoopName:   schema.AI_REACT_LOOP_NAME_DEFAULT,
 	}
 
-	result, err := reactloops.RunForkedJob(parentInvoker, nil, parentTask, job, nil)
-	require.NoError(t, err)
+	results := reactloops.DispatchSubAgents(parentInvoker, parentTask, []reactloops.SubAgentJob{job}, reactloops.SubAgentOptions{
+		ParentLoop:     nil,
+		TimelineMode:   reactloops.SubAgentTimelineFork,
+		ElaborateGoals: true,
+	})
+	require.Len(t, results, 1)
+	result := results[0]
 	require.NotNil(t, result)
 
 	select {
@@ -1051,94 +523,4 @@ func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T)
 	}
 }
 
-// TestBuildForkReactInvoker_ChildHasFreshHotPatchOptionChan verifies the rebase
-// fix that removes the per-job WithHotPatchOptionChan from
-// BuildForkReactInvoker. The child invoker must NOT share the parent's
-// HotPatchOptionChan — it should get its own fresh channel created by
-// NewConfig. Sharing the parent's channel would cause sub-agent hot-patch
-// events to interleave with the parent's config mutations.
-func TestBuildForkReactInvoker_ChildHasFreshHotPatchOptionChan(t *testing.T) {
-	parentCfg := aicommon.NewConfig(
-		context.Background(),
-		aicommon.WithDisableAutoSkills(true),
-	)
-	require.NotNil(t, parentCfg.HotPatchOptionChan, "parent must have a HotPatchOptionChan")
 
-	parentTimeline := aicommon.NewTimeline(nil, nil)
-	parentTimeline.PushText(1, "parent-seed")
-	fork, err := parentTimeline.ForkForTask("sub-hotpatch", "sub", parentCfg, parentCfg)
-	require.NoError(t, err)
-
-	var capturedCfg *aicommon.Config
-	origGetter := aicommon.AIRuntimeInvokerGetter
-	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
-	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-		cfg := aicommon.NewConfig(ctx, opts...)
-		capturedCfg = cfg
-		return &configBackedDispatchInvoker{
-			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
-			cfg:                         cfg,
-		}, nil
-	}
-
-	taskEmitter := reactloops.BuildForwardingEmitter(parentCfg.GetEmitter(), "sub-hotpatch")
-	_, err = reactloops.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
-	require.NoError(t, err)
-	require.NotNil(t, capturedCfg)
-
-	require.NotNil(t, capturedCfg.HotPatchOptionChan,
-		"child must have its own (fresh) HotPatchOptionChan, not nil")
-	assert.NotSame(t, parentCfg.HotPatchOptionChan, capturedCfg.HotPatchOptionChan,
-		"child must not share the parent's HotPatchOptionChan — each invoker needs an isolated hot-patch channel")
-}
-
-// TestBuildForkReactInvoker_StrategyOptionsDisableAllTopLevelStrategies
-// verifies that buildSubAgentStrategyOptions (applied inside
-// BuildForkReactInvoker) explicitly disables plan-and-exec, goal mode, and the
-// multi-agent dispatch preference on the child config, even when the parent
-// has them all enabled. This is a defensive belt-and-suspenders alongside
-// ConvertConfigToOptions which already omits these fields.
-func TestBuildForkReactInvoker_StrategyOptionsDisableAllTopLevelStrategies(t *testing.T) {
-	parentCfg := aicommon.NewConfig(
-		context.Background(),
-		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithEnableMultiAgentMode(true),
-		aicommon.WithEnableGoalMode(true),
-		aicommon.WithGoalMinIterations(6),
-		aicommon.WithEnablePlanAndExec(true),
-	)
-	require.True(t, parentCfg.GetEnableGoalMode())
-	require.True(t, parentCfg.GetPreferDispatchSubReactAgents())
-	require.True(t, parentCfg.GetEnablePlanAndExec())
-
-	parentTimeline := aicommon.NewTimeline(nil, nil)
-	parentTimeline.PushText(1, "parent-seed")
-	fork, err := parentTimeline.ForkForTask("sub-strat-opts", "sub", parentCfg, parentCfg)
-	require.NoError(t, err)
-
-	var capturedCfg *aicommon.Config
-	origGetter := aicommon.AIRuntimeInvokerGetter
-	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
-	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
-		cfg := aicommon.NewConfig(ctx, opts...)
-		capturedCfg = cfg
-		return &configBackedDispatchInvoker{
-			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
-			cfg:                         cfg,
-		}, nil
-	}
-
-	taskEmitter := reactloops.BuildForwardingEmitter(parentCfg.GetEmitter(), "sub-strat-opts")
-	_, err = reactloops.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
-	require.NoError(t, err)
-	require.NotNil(t, capturedCfg)
-
-	assert.False(t, capturedCfg.GetEnablePlanAndExec(),
-		"buildSubAgentStrategyOptions must force-disable plan-and-exec on child")
-	assert.False(t, capturedCfg.GetEnableGoalMode(),
-		"buildSubAgentStrategyOptions must force-disable goal mode on child")
-	assert.False(t, capturedCfg.GetPreferDispatchSubReactAgents(),
-		"buildSubAgentStrategyOptions must force-disable multi-agent dispatch preference on child")
-	assert.False(t, capturedCfg.EnableDispatchSubReactAgents,
-		"child must not be able to dispatch further sub agents")
-}

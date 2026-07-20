@@ -72,27 +72,23 @@ func handleDispatchSubReactAgents(
 		concurrency = reactloops.ParseConcurrency(action, len(jobs))
 	}
 
-	// Create or reuse a sub-agent progress registry on the parent loop so
-	// stall heartbeat and verification watchdog can observe sub-agent activity
-	// while this action handler blocks waiting for all sub-agents to finish.
-	registry := loop.GetSubAgentProgressRegistry()
-	if registry == nil {
-		registry = reactloops.NewProgressRegistry()
-		loop.SetSubAgentProgressRegistry(registry)
-	}
-
 	loopInfraStatus(loop, "子 Agent 执行中/ Sub Agents Running...")
 
 	// Pause the verification watchdog while sub-agents are running. This is a
 	// double-insurance alongside the sub-agent progress bypass in
 	// triggerVerificationWatchdog: even if the watchdog timer fires during
-	// the blocking RunJobsConcurrently call, the suppression depth > 0
+	// the blocking DispatchSubAgents call, the suppression depth > 0
 	// prevents it from triggering a premature task.Finish.
 	// 关键词: dispatch watchdog suppression, begin/end pair
 	loop.BeginVerificationWatchdogToolSuppression()
 	defer loop.EndVerificationWatchdogToolSuppression()
 
-	results := reactloops.RunJobsConcurrently(invoker, loop, parentTask, jobs, concurrency, registry)
+	results := reactloops.DispatchSubAgents(invoker, parentTask, jobs, reactloops.SubAgentOptions{
+		ParentLoop:         loop,
+		TimelineMode:       reactloops.SubAgentTimelineFork,
+		ElaborateGoals:     true,
+		ExecuteConcurrency: concurrency,
+	})
 
 	reactloops.SortJobResults(results)
 
@@ -105,7 +101,7 @@ func handleDispatchSubReactAgents(
 		if result.Record.Status == "completed" {
 			successCount++
 		}
-		writeSubReactAgentTimelineRecord(invoker, loop, result.Record)
+		writeSubReactAgentTimelineRecord(invoker, result.Record)
 		feedbackLines = append(feedbackLines, result.Feedback)
 	}
 
@@ -120,29 +116,17 @@ func handleDispatchSubReactAgents(
 	operator.Continue()
 }
 
+// writeSubReactAgentTimelineRecord 把阶段 3 已构造好的 TimelineRecord 写进父
+// timeline。reference 落盘已在 DispatchSubAgents 的阶段 3 完成，这里只负责把
+// record JSON 写入父 timeline 条目。
 func writeSubReactAgentTimelineRecord(
 	invoker aicommon.AIInvokeRuntime,
-	parentLoop *reactloops.ReActLoop,
 	record reactloops.TimelineRecord,
 ) {
 	if invoker == nil {
 		return
 	}
-
-	payload := record
-	if strings.TrimSpace(payload.Result) != "" {
-		if parentLoop != nil {
-			ref, preview := loopInfraSaveReference(parentLoop, "sub_react_agent_"+record.SubAgentID, payload.Result, 800)
-			if ref != "" {
-				payload.ResultReference = ref
-				payload.Result = preview
-			}
-		} else {
-			payload.Result = utils.ShrinkTextBlock(payload.Result, 800)
-		}
-	}
-
-	raw, err := json.MarshalIndent(payload, "", "  ")
+	raw, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		log.Warnf("dispatch_sub_react_agents: marshal timeline record failed: %v", err)
 		invoker.AddToTimeline(schema.AI_TIMELINE_ITEM_TYPE_SUB_REACT_AGENT_RESULT, utils.InterfaceToString(record))
