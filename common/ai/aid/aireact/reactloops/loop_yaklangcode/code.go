@@ -236,6 +236,11 @@ func init() {
 				loopinfra.WithFileExtension(".yak"),
 				loopinfra.WithExitWhenSyntaxClean(true),
 				loopinfra.WithFileChanged(func(loop *reactloops.ReActLoop, content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+					// Code just changed: invalidate prior YAK_MAIN self-test result.
+					// yak_run_ok is only re-set by postSyntaxCleanHook after lint passes.
+					if loop != nil {
+						resetYakRunStatusAfterCodeChange(loop)
+					}
 					lineBase := 0
 					if loop != nil {
 						lineBase = loop.GetInt(loopinfra.LoopVarCodeLineBase)
@@ -254,7 +259,7 @@ func init() {
 					}
 					return errMsg, blocking
 				}),
-				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r)),
+				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r, holder)),
 			)
 
 			// 创建预设选项
