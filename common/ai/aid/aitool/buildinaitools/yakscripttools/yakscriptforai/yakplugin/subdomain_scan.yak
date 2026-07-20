@@ -29,6 +29,12 @@ if err != nil {
 }
 
 for result = range res {
+    if result.Aborted {
+        // 扫描因 DNS 被劫持/接管（如本地 TUN 模式劫持 DNS）而中止，
+        // 继续爆破没有意义。向 AI/用户报错并退出。
+        yakit.Error("子域名扫描中止: %s", result.AbortReason)
+        break
+    }
     ip = result.IP
     yakit.Info("域名: %v, IP: %v" % [result.Domain,result.IP])
 }

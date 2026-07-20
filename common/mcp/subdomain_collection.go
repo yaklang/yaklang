@@ -59,6 +59,26 @@ func handleSubdomainCollection(s *MCPServer) server.ToolHandlerFunc {
 
 					content := string(exec.Message)
 					content = handleExecMessage(content)
+
+					// 放行 error 级消息（如子域名扫描因 DNS 被劫持而中止的报错）：
+					// 这类消息没有 data.Domain 字段，但需要让 AI/用户看到中止原因，
+					// 否则只会看到空结果而无任何提示。
+					if gjson.Get(content, "content.level").String() == "error" {
+						errData := gjson.Get(content, "content.data").String()
+						if errData == "" {
+							errData = content
+						}
+						results = append(results, mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("[Error] %s", errData),
+						})
+						s.notificationServer(ctx).SendNotificationToClient("notifications/message", map[string]any{
+							"level": "error",
+							"data":  errData,
+						})
+						continue
+					}
+
 					if !gjson.Get(content, "data.Domain").Exists() {
 						continue
 					}
