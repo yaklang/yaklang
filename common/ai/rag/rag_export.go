@@ -2,7 +2,6 @@ package rag
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
 	"errors"
@@ -498,6 +497,26 @@ func writeEntityToBinary(writer io.Writer, entity *schema.ERModelEntity) error {
 	return nil
 }
 
+// OpenRAGImportReader opens a RAG export file and returns a reader of the raw YAKRAG payload.
+// Compatible cases:
+//  1. Raw .rag (starts with magic "YAKRAG")
+//  2. gzip-compressed payload (.rag.gz / *.gz), detected by gzip magic 0x1f8b
+//  3. gzip payload without .gz suffix (same magic detection)
+//  4. Misnamed *.gz that is actually raw YAKRAG (no decompress; magic takes priority)
+func OpenRAGImportReader(path string) (io.ReadCloser, error) {
+	return utils.OpenFileAutoGzip(path, "YAKRAG")
+}
+
+// LoadRAGFileHeaderFromPath loads the RAG file header from a path, supporting raw and gzip forms.
+func LoadRAGFileHeaderFromPath(path string) (*RAGBinaryData, error) {
+	reader, err := OpenRAGImportReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	return LoadRAGFileHeader(reader)
+}
+
 func LoadRAGFileHeader(reader io.Reader) (*RAGBinaryData, error) {
 	// 读取魔数头
 	magic := make([]byte, 6)
@@ -979,23 +998,12 @@ func readHNSWIndexFromStream(reader io.Reader) ([]byte, error) {
 // rag.Import("/tmp/my-collection.rag", rag.importName("imported-collection"))~
 // ```
 func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
-	// 读取二进制文件（支持 .gz）
-	file, err := os.Open(inputPath)
+	// 读取二进制文件（兼容 raw .rag / .rag.gz / 按魔数识别的 gzip）
+	reader, err := OpenRAGImportReader(inputPath)
 	if err != nil {
-		return utils.Wrap(err, "failed to open input file")
+		return err
 	}
-	defer file.Close()
-
-	var gzReader *gzip.Reader
-	reader := io.Reader(file)
-	if strings.HasSuffix(strings.ToLower(inputPath), ".gz") {
-		gzReader, err = gzip.NewReader(file)
-		if err != nil {
-			return utils.Wrap(err, "failed to open gzip reader")
-		}
-		reader = gzReader
-		defer gzReader.Close()
-	}
+	defer reader.Close()
 
 	ragData, err := LoadRAGFileHeader(reader)
 	if err != nil {
@@ -1545,18 +1553,18 @@ func VerifyImportFile(importFile string) error {
 	if !utils.FileExists(importFile) {
 		return utils.Error("import file not found")
 	}
-	file, err := os.Open(importFile)
+	reader, err := OpenRAGImportReader(importFile)
 	if err != nil {
 		return utils.Wrap(err, "open import file")
 	}
-	defer file.Close()
-	header, err := LoadRAGFileHeader(file)
+	defer reader.Close()
+	header, err := LoadRAGFileHeader(reader)
 	if err != nil {
 		return utils.Wrap(err, "load rag file header")
 	}
 
 	// 读取文档数据
-	documents, err := readDocumentsFromStream(file, nil)
+	documents, err := readDocumentsFromStream(reader, nil)
 	if err != nil {
 		return utils.Wrap(err, "read documents")
 	}
