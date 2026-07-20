@@ -33,6 +33,10 @@ var (
 	reIdentDotIdent      = regexp.MustCompile(`\b([A-Za-z_][\w]*)\.([A-Za-z_][\w]*)\b`)
 	reBareIdent          = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]{2,})\b`)
 	reErrLineRange       = regexp.MustCompile(`in \[(\d+):`)
+	reCannotFindMethod   = regexp.MustCompile(`(?i)cannot find built-in method\s+(\w+)`)
+	reCannotCallUndefined = regexp.MustCompile(`(?i)cannot call undefined`)
+	reYakVMPanic         = regexp.MustCompile(`(?i)YakVM Panic[:\s]+(.+)`)
+	reMultiAssignFailed  = regexp.MustCompile(`(?i)multi-assign failed`)
 )
 
 // deriveRecoverySuggestions extracts actionable grep/yakdoc follow-ups from a compiler error.
@@ -247,7 +251,7 @@ func formatRecoveryNextStepBlock(suggestions []recoverySuggestion) string {
 			b.WriteString(fmt.Sprintf("   {\"@action\":\"yakdoc_module_overview\",\"library\":%q}\n", s.Library))
 		}
 	}
-	b.WriteString("说明：lint 失败时 Init 已覆盖的 pattern 也可再次 grep；检索结果会出现在下一轮 Feedback/时间线。\n")
+	b.WriteString("说明：lint/自测失败时 Init 已覆盖的 pattern 也可再次 grep；检索结果会出现在下一轮 Feedback/时间线。\n")
 	return b.String()
 }
 
@@ -256,14 +260,175 @@ func buildActionableRecoveryHint(normalizedMessage, lineContent string) string {
 	return formatRecoveryNextStepBlock(deriveRecoverySuggestions(normalizedMessage, lineContent))
 }
 
+// deriveRuntimeRecoverySuggestions extracts grep/yakdoc follow-ups from YAK_MAIN self-test failures.
+// Covers common panics: wrong member on []byte/slice, undefined call, assert, multi-assign, etc.
+func deriveRuntimeRecoverySuggestions(errText, output, code string) []recoverySuggestion {
+	blob := strings.TrimSpace(errText + "\n" + output)
+	if blob == "" {
+		return nil
+	}
+	var out []recoverySuggestion
+
+	if m := reCannotFindMethod.FindStringSubmatch(blob); len(m) == 2 {
+		method := m[1]
+		out = append(out, recoverySuggestion{
+			Kind: "grep", Pattern: regexp.QuoteMeta(method),
+			Reason: fmt.Sprintf("运行时报「无方法 %s」——多半对错了类型（如对 []byte 调对象字段）；grep 正确取原始报文/字段写法", method),
+		})
+		// Common fuzz HTTP request helpers that return bytes vs object.
+		if strings.Contains(blob, "slice") || strings.Contains(blob, "[]byte") || strings.Contains(blob, "bytes") {
+			out = append(out,
+				recoverySuggestion{
+					Kind: "grep", Pattern: `GetFirstFuzzHTTPRequest|FuzzHTTPRequest|RequestRaw|GetBytes`,
+					Reason: "对照 FuzzHTTPRequest 返回值是对象还是 []byte，以及如何取原始报文",
+				},
+				recoverySuggestion{
+					Kind: "yakdoc_search", Pattern: "FuzzHTTPRequest",
+					Reason: "查 FuzzHTTPRequest 相关 API 权威签名",
+				},
+			)
+		}
+	}
+
+	if reCannotCallUndefined.MatchString(blob) {
+		out = append(out, recoverySuggestion{
+			Kind: "grep", Pattern: `func\s+runSelfTest\s*\(`,
+			Reason: "cannot call undefined：确认 runSelfTest 等函数已在同文件定义",
+		})
+	}
+
+	if reMultiAssignFailed.MatchString(blob) {
+		out = append(out, recoverySuggestion{
+			Kind: "grep", Pattern: `=\s*\w+\[["']|in\s+\w+`,
+			Reason: "Yaklang 不支持 Go 的 map comma-ok；grep 正确单赋值写法",
+		})
+	}
+
+	if m := reYakVMPanic.FindStringSubmatch(blob); len(m) == 2 {
+		panicMsg := strings.TrimSpace(m[1])
+		if ids := reIdentDotIdent.FindAllStringSubmatch(panicMsg+"\n"+blob, 4); len(ids) > 0 {
+			for _, p := range ids {
+				lib, member := p[1], p[2]
+				if isYaklangNoiseIdent(lib) {
+					continue
+				}
+				out = append(out,
+					recoverySuggestion{
+						Kind: "grep", Pattern: regexp.QuoteMeta(lib+"."+member),
+						Reason: fmt.Sprintf("panic 涉及 %s.%s，检索真实用法", lib, member),
+					},
+					recoverySuggestion{
+						Kind: "yakdoc_function", Library: lib, Func: member,
+						Reason: "确认返回类型与成员",
+					},
+				)
+			}
+		}
+	}
+
+	// Pull dotted API names from failure text and nearby code (self-test body).
+	searchBlob := blob
+	if code != "" && strings.Contains(code, "runSelfTest") {
+		searchBlob += "\n" + extractRunSelfTestSnippet(code)
+	}
+	if pairs := reIdentDotIdent.FindAllStringSubmatch(searchBlob, 8); len(pairs) > 0 {
+		for _, p := range pairs {
+			lib, member := p[1], p[2]
+			if isYaklangNoiseIdent(lib) || isYaklangNoiseIdent(member) {
+				continue
+			}
+			// Prefer fuzz/mutate/poc helpers that often cause self-test API thrash.
+			if utils.MatchAnyOfSubString(strings.ToLower(lib+"."+member),
+				"fuzz", "mutate", "poc.", "http", "request", "getfirst", "rawpacket", "getbytes") {
+				out = append(out,
+					recoverySuggestion{
+						Kind: "grep", Pattern: regexp.QuoteMeta(lib+"."+member) + "|" + regexp.QuoteMeta(member),
+						Reason: fmt.Sprintf("自测失败关联 API %s.%s，先对照样例再改", lib, member),
+					},
+					recoverySuggestion{
+						Kind: "yakdoc_function", Library: lib, Func: member,
+						Reason: "查返回类型，禁止猜字段名",
+					},
+				)
+			}
+		}
+	}
+
+	if strings.Contains(blob, "assert") && (strings.Contains(blob, "failed") || strings.Contains(blob, "want") || strings.Contains(blob, "got")) {
+		out = append(out, recoverySuggestion{
+			Kind: "grep", Pattern: `assert\.(True|Equal|Equal|Nil)|assert\s+`,
+			Reason: "assert 失败：对照断言写法与期望值，勿只改无关 API",
+		})
+	}
+
+	if len(out) == 0 {
+		out = append(out, recoverySuggestion{
+			Kind: "grep", Pattern: `runSelfTest|YAK_MAIN|GetFirstFuzzHTTPRequest|RawPacket`,
+			Reason: "自测失败但未能解析具体 API：先检索自测/报文处理样例，禁止连续猜字段 modify_code",
+		})
+	}
+
+	return dedupeRecoverySuggestions(out)
+}
+
+func extractRunSelfTestSnippet(code string) string {
+	idx := strings.Index(code, "func runSelfTest")
+	if idx < 0 {
+		return ""
+	}
+	snip := code[idx:]
+	if len(snip) > 2500 {
+		snip = snip[:2500]
+	}
+	return snip
+}
+
+// enrichRunFailureWithRecovery appends 【下一步·强制】 and optional auto AIKB samples to self-test feedback.
+func enrichRunFailureWithRecovery(feedback, code string, searcher *ziputil.ZipGrepSearcher) string {
+	if strings.TrimSpace(feedback) == "" {
+		return feedback
+	}
+	sugs := deriveRuntimeRecoverySuggestions(feedback, "", code)
+	block := formatRecoveryNextStepBlock(sugs)
+	if block != "" {
+		// Soften wording for runtime: still force research before blind patch.
+		block = strings.Replace(block,
+			"再基于结果做一次 modify_code；禁止继续盲目 patch。",
+			"再基于结果做一次 modify_code；禁止继续猜测字段/返回类型。",
+			1)
+		feedback += block
+	}
+	patterns := grepPatternsFromSuggestions(sugs)
+	if extra := autoGrepSamplesForPatterns(searcher, patterns, "当前自测运行错误"); extra != "" {
+		feedback += extra
+	}
+	return feedback
+}
+
+func grepPatternsFromSuggestions(sugs []recoverySuggestion) []string {
+	seen := make(map[string]struct{})
+	var patterns []string
+	for _, s := range sugs {
+		if s.Kind != "grep" || s.Pattern == "" {
+			continue
+		}
+		if _, ok := seen[s.Pattern]; ok {
+			continue
+		}
+		seen[s.Pattern] = struct{}{}
+		patterns = append(patterns, s.Pattern)
+	}
+	return patterns
+}
+
 // autoGrepSamplesForLintErrors runs a lightweight AIKB grep for derived patterns and
 // appends top hits into Feedback so the model sees real samples without an extra turn.
 func autoGrepSamplesForLintErrors(searcher *ziputil.ZipGrepSearcher, errMsg, code string) string {
-	if searcher == nil || strings.TrimSpace(errMsg) == "" {
-		return ""
-	}
-	patterns := collectGrepPatternsFromErrMsg(errMsg, code)
-	if len(patterns) == 0 {
+	return autoGrepSamplesForPatterns(searcher, collectGrepPatternsFromErrMsg(errMsg, code), "当前语法错误")
+}
+
+func autoGrepSamplesForPatterns(searcher *ziputil.ZipGrepSearcher, patterns []string, reasonLabel string) string {
+	if searcher == nil || len(patterns) == 0 {
 		return ""
 	}
 	if len(patterns) > autoRecoveryMaxPatterns {
@@ -300,7 +465,7 @@ func autoGrepSamplesForLintErrors(searcher *ziputil.ZipGrepSearcher, errMsg, cod
 	}
 
 	body := utils.ShrinkTextBlock(strings.Join(blocks, "\n"), autoRecoverySampleMaxBytes)
-	return "\n【自动检索样例·系统已代查 AIKB】下列片段按当前语法错误自动 grep，请对照改写；若仍不够，用【下一步·强制】中的 pattern 再调 grep_yaklang_samples / yakdoc。\n" + body
+	return fmt.Sprintf("\n【自动检索样例·系统已代查 AIKB】下列片段按%s自动 grep，请对照改写；若仍不够，用【下一步·强制】中的 pattern 再调 grep_yaklang_samples / yakdoc。\n%s", reasonLabel, body)
 }
 
 func collectGrepPatternsFromErrMsg(errMsg, code string) []string {

@@ -9,12 +9,14 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
 const yaklangNodeRunSelfTest = "yaklang-run-self-test"
 
 // buildYaklangPostSyntaxCleanRunHook runs YAK_MAIN self-test after static lint passes.
-func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime) loopinfra.PostSyntaxCleanHook {
+// holder may be nil (tests); when set, failed runs auto-inject AIKB samples + recovery recipes.
+func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime, holder *searcherHolder) loopinfra.PostSyntaxCleanHook {
 	cfg := r.GetConfig()
 	return func(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 		if loop == nil || op == nil {
@@ -78,10 +80,15 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime) loopinfra.Po
 		}
 
 		feedback := FormatRunFailureForAI(result, err)
+		var searcher *ziputil.ZipGrepSearcher
+		if holder != nil {
+			searcher = holder.getGrep()
+		}
+		feedback = enrichRunFailureWithRecovery(feedback, code, searcher)
 		loop.Set(loopVarYakRunOK, "false")
 		loop.Set(loopVarYakRunOutput, result.Output)
 		loop.Set(loopVarYakRunLastFeedback, feedback)
-		r.AddToTimeline("run_failed", utils.ShrinkTextBlock(feedback, 512))
+		r.AddToTimeline("run_failed", utils.ShrinkTextBlock(feedback, 1024))
 		log.Warnf("yaklang self-test failed: %v", err)
 		return feedback, true
 	}
