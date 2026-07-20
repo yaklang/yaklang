@@ -68,12 +68,22 @@ type SubdomainScanner struct {
 	dnsQuerierSwg *utils.SizedWaitGroup
 	dnsClient     *dns.Client
 
+	// querierOverride optionally overrides A-record resolution used by brute
+	// force and wildcard detection. When nil, the scanner queries real DNS via
+	// its own QueryA (the scanner satisfies aRecordQuerier). Mainly for tests.
+	querierOverride aRecordQuerier
+
 	// 结果回调函数
 	resultCallbacks []ResultCallback
 
 	// 解析失败回调
 	// 解析失败不是由爆破调用的，这个调用链只会涉及到搜索以及域传送
 	resultFailedCallbacks []ResultCallback
+
+	// 扫描中止回调
+	// 当爆破因 DNS 被劫持/接管而无法继续时被调用，参数为中止原因
+	// 调用方可以据此向用户给出清晰提示
+	scanAbortedCallbacks []func(reason string)
 
 	resultCacher *sync.Map
 }
@@ -216,5 +226,18 @@ func (s *SubdomainScanner) OnResolveFailedResult(cb ResultCallback) {
 func (s *SubdomainScanner) onResolveFailedResult(result *SubdomainResult) {
 	for _, cb := range s.resultFailedCallbacks {
 		cb(result)
+	}
+}
+
+// 设置扫描中止回调函数
+// 当爆破因 DNS 被劫持/接管（如本地 TUN 模式劫持 DNS）而无法继续时被调用，
+// 参数 reason 为中止原因，调用方可据此向用户给出清晰提示。
+func (s *SubdomainScanner) OnScanAborted(cb func(reason string)) {
+	s.scanAbortedCallbacks = append(s.scanAbortedCallbacks, cb)
+}
+
+func (s *SubdomainScanner) onScanAborted(reason string) {
+	for _, cb := range s.scanAbortedCallbacks {
+		cb(reason)
 	}
 }

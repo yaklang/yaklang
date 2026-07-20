@@ -52,6 +52,13 @@ type SubdomainScannerConfig struct {
 	//   默认值为 false
 	WildCardToStop bool
 
+	// 泛解析探测次数
+	//   检测泛解析时生成的随机不存在的子域名数量，默认为 10
+	//   这些探测结果会用来判断是“经典泛解析”（全部命中且 IP 相同），
+	//   还是“DNS 被劫持/接管”（全部命中但 IP 各不相同）。
+	//   探测数量越大判断越稳，但耗时越长。
+	WildCardProbeCount int
+
 	// 进行各种数据源搜索的时候，需要设置的 HTTP 超时时间
 	// 默认 10s
 	TimeoutForEachHTTPSearch time.Duration
@@ -69,6 +76,7 @@ func (s *SubdomainScannerConfig) init() {
 	s.SubDictionary = DefaultSubDictionary
 	s.TimeoutForEachQuery = 3 * time.Second
 	s.WildCardToStop = false
+	s.WildCardProbeCount = 10
 	s.TimeoutForEachHTTPSearch = 10 * time.Second
 }
 
@@ -205,6 +213,26 @@ func WithTimeoutForEachQuery(timeout time.Duration) ConfigOption {
 func WithWildCardToStop(t bool) ConfigOption {
 	return func(s *SubdomainScannerConfig) {
 		s.WildCardToStop = t
+	}
+}
+
+// wildcardProbeCount 是一个选项参数，设置泛解析探测时生成的随机不存在的子域名数量，默认为 10
+// 参数:
+//   - c: 泛解析探测次数，必须大于 0
+//
+// 返回值:
+//   - 一个 subdomain.Scan 可接收的配置选项
+//
+// Example:
+// ```
+// subdomain.Scan("example.com", subdomain.wildcardProbeCount(20))
+// ```
+func WithWildCardProbeCount(c int) ConfigOption {
+	return func(s *SubdomainScannerConfig) {
+		if c <= 0 {
+			c = 10
+		}
+		s.WildCardProbeCount = c
 	}
 }
 

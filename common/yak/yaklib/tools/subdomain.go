@@ -58,6 +58,11 @@ func _subdomainScan(target interface{}, opts ...subdomain.ConfigOption) (chan *s
 		case chRes <- result:
 		}
 	})
+	// 当爆破因 DNS 被劫持/接管（如本地 TUN 模式劫持 DNS）而中止时，
+	// 把中止原因以错误日志形式抛出，便于调用方排查。
+	scanner.OnScanAborted(func(reason string) {
+		log.Errorf("subdomain scan aborted: %s", reason)
+	})
 
 	go func() {
 		defer close(chRes)
@@ -151,15 +156,16 @@ var SubDomainExports = map[string]interface{}{
 	"Scan": _subdomainScan,
 
 	// 选项
-	"wildcardToStop":    subdomain.WithWildCardToStop,
-	"recursive":         subdomain.WithAllowToRecursive,
-	"workerConcurrent":  subdomain.WithWorkerCount,
-	"dnsServer":         subdomain.WithDNSServers,
-	"maxDepth":          subdomain.WithMaxDepth,
-	"targetConcurrent":  subdomain.WithParallelismTasksCount,
-	"targetTimeout":     withTargetTimeout,
-	"eachQueryTimeout":  withEachQueryTimeout,
-	"eachSearchTimeout": withEachSearchTimeout,
+	"wildcardToStop":     subdomain.WithWildCardToStop,
+	"wildcardProbeCount": subdomain.WithWildCardProbeCount,
+	"recursive":          subdomain.WithAllowToRecursive,
+	"workerConcurrent":   subdomain.WithWorkerCount,
+	"dnsServer":          subdomain.WithDNSServers,
+	"maxDepth":            subdomain.WithMaxDepth,
+	"targetConcurrent":   subdomain.WithParallelismTasksCount,
+	"targetTimeout":      withTargetTimeout,
+	"eachQueryTimeout":   withEachQueryTimeout,
+	"eachSearchTimeout":  withEachSearchTimeout,
 
 	"mainDict":      withMainDict,
 	"recursiveDict": withRecursiveDict,
