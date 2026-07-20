@@ -64,11 +64,40 @@ func TestCollectGrepPatternsFromErrMsg(t *testing.T) {
 	assert.Contains(t, joined, "sync")
 }
 
-func TestRejectDuplicateQuery_BypassWhenLintFailed(t *testing.T) {
-	loop := mapGet{"yak_lint_ok": "false"}
-	assert.True(t, hasBlockingLintErrors(loop))
+func TestDeriveRuntimeRecoverySuggestions_CannotFindMethod(t *testing.T) {
+	errText := `cannot find built-in method FirstHTTPRequestBytes of slice type`
+	code := `
+func runSelfTest() {
+    freq = mutate.GetFirstFuzzHTTPRequest(raw)
+    b = freq.FirstHTTPRequestBytes
+}
+`
+	sugs := deriveRuntimeRecoverySuggestions(errText, "", code)
+	require.NotEmpty(t, sugs)
+	block := formatRecoveryNextStepBlock(sugs)
+	assert.Contains(t, block, "【下一步·强制】")
+	assert.Contains(t, block, "grep_yaklang_samples")
+	joined := ""
+	for _, s := range sugs {
+		joined += s.Pattern + " " + s.Func + " "
+	}
+	assert.True(t, strings.Contains(joined, "FirstHTTPRequestBytes") || strings.Contains(joined, "GetFirstFuzzHTTPRequest") || strings.Contains(joined, "FuzzHTTP"),
+		"expected fuzz-related pattern, got %q", joined)
+}
+
+func TestEnrichRunFailureWithRecovery(t *testing.T) {
+	base := "YAK_MAIN 自测运行失败。\n--- runtime error ---\ncannot find built-in method RequestRaw of slice type\n"
+	code := "func runSelfTest() {\n  x = mutate.GetFirstFuzzHTTPRequest(r)\n  _ = x.RequestRaw\n}\n"
+	out := enrichRunFailureWithRecovery(base, code, nil)
+	assert.Contains(t, out, "【下一步·强制】")
+	assert.Contains(t, out, "grep_yaklang_samples")
+}
+
+func TestNeedsSampleResearch_RunFailed(t *testing.T) {
+	loop := mapGet{loopVarYakRunOK: "false"}
+	assert.True(t, needsSampleResearch(loop))
 	covered, _ := GrepAlreadyCovered(loop, "servicescan\\.Scan")
-	assert.False(t, covered, "lint failure must unlock grep even for init-covered patterns")
+	assert.False(t, covered)
 }
 
 type mapGet map[string]string
