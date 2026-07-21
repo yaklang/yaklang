@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
-func withRequestSpillLimit(t *testing.T, limit uint64) {
+func withGlobalMaxContentLength(t *testing.T, limit uint64) {
 	t.Helper()
 	prev := consts.GetGlobalMaxContentLength()
 	consts.SetGlobalMaxContentLength(limit)
@@ -24,18 +24,22 @@ func withRequestSpillLimit(t *testing.T, limit uint64) {
 }
 
 func TestGetMaxHTTPFlowRequestBodyInDBBytes_FallbackAndGlobal(t *testing.T) {
-	t.Run("fallback_when_unset", func(t *testing.T) {
-		withRequestSpillLimit(t, 0)
+	t.Run("default_is_preview_cap", func(t *testing.T) {
+		withGlobalMaxContentLength(t, 10*1024*1024)
 		require.Equal(t, MaxHTTPFlowRequestBodyInDBBytes, GetMaxHTTPFlowRequestBodyInDBBytes())
 	})
-	t.Run("follows_global", func(t *testing.T) {
-		withRequestSpillLimit(t, 1024*1024)
-		require.Equal(t, 1024*1024, GetMaxHTTPFlowRequestBodyInDBBytes())
+	t.Run("fallback_when_unset", func(t *testing.T) {
+		withGlobalMaxContentLength(t, 0)
+		require.Equal(t, MaxHTTPFlowRequestBodyInDBBytes, GetMaxHTTPFlowRequestBodyInDBBytes())
+	})
+	t.Run("global_can_only_lower", func(t *testing.T) {
+		withGlobalMaxContentLength(t, 64*1024)
+		require.Equal(t, 64*1024, GetMaxHTTPFlowRequestBodyInDBBytes())
 	})
 }
 
 func TestSpillLargeHTTPFlowRequestIfNeeded_Small(t *testing.T) {
-	withRequestSpillLimit(t, MaxHTTPFlowRequestBodyInDBBytes)
+	withGlobalMaxContentLength(t, 10*1024*1024)
 	packet := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\nhello")
 	res, err := spillLargeHTTPFlowRequestIfNeeded(packet)
 	require.NoError(t, err)
@@ -45,7 +49,7 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_Small(t *testing.T) {
 }
 
 func TestSpillLargeHTTPFlowRequestIfNeeded_Large(t *testing.T) {
-	withRequestSpillLimit(t, MaxHTTPFlowRequestBodyInDBBytes)
+	withGlobalMaxContentLength(t, 10*1024*1024)
 	body := strings.Repeat("A", MaxHTTPFlowRequestBodyInDBBytes+1024)
 	packet := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
 	res, err := spillLargeHTTPFlowRequestIfNeeded(packet)
@@ -65,19 +69,20 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_Large(t *testing.T) {
 	require.Equal(t, body, string(rawBody))
 }
 
-func TestSpillLargeHTTPFlowRequestIfNeeded_RespectsGlobalMaxContentLength(t *testing.T) {
-	// 300KB body should stay in DB when global dump size is 10M (default).
-	withRequestSpillLimit(t, 10*1024*1024)
-	body := strings.Repeat("D", 300*1024)
+func TestSpillLargeHTTPFlowRequestIfNeeded_RespectsLowerGlobalMaxContentLength(t *testing.T) {
+	// Global below preview cap can tighten spill further.
+	withGlobalMaxContentLength(t, 64*1024)
+	body := strings.Repeat("D", 100*1024)
 	packet := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
 	res, err := spillLargeHTTPFlowRequestIfNeeded(packet)
 	require.NoError(t, err)
-	require.False(t, res.IsTooLarge)
-	require.Equal(t, packet, res.StoredPacket)
+	require.True(t, res.IsTooLarge)
+	defer os.Remove(res.HeaderFile)
+	defer os.Remove(res.BodyFile)
 }
 
 func TestPrepareLargeHTTPFlowRequest_Idempotent(t *testing.T) {
-	withRequestSpillLimit(t, MaxHTTPFlowRequestBodyInDBBytes)
+	withGlobalMaxContentLength(t, 10*1024*1024)
 	body := strings.Repeat("C", MaxHTTPFlowRequestBodyInDBBytes+2048)
 	packet := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
 	req, err := http.NewRequest("POST", "http://example.com/upload", strings.NewReader(body))
@@ -123,7 +128,7 @@ func TestSyncLargeHTTPFlowFlagsFromStoredPacket(t *testing.T) {
 }
 
 func TestCreateHTTPFlow_LargeRequestSpill(t *testing.T) {
-	withRequestSpillLimit(t, MaxHTTPFlowRequestBodyInDBBytes)
+	withGlobalMaxContentLength(t, 10*1024*1024)
 	body := strings.Repeat("B", MaxHTTPFlowRequestBodyInDBBytes+4096)
 	reqRaw := []byte("POST /big HTTP/1.1\r\nHost: test.local\r\n\r\n" + body)
 	flow, err := CreateHTTPFlow(

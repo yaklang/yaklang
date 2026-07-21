@@ -13,14 +13,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/multipart"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -97,12 +95,7 @@ func TestMITM_UploadFile(t *testing.T) {
 }
 
 func TestMITM_LargeRequestWireForward(t *testing.T) {
-	// Spill threshold follows GlobalMaxContentLength; keep MITM read/forward limit
-	// separate via CaseWithMaxContentLength so lowering dump size does not cap wire I/O.
-	prev := consts.GetGlobalMaxContentLength()
-	consts.SetGlobalMaxContentLength(uint64(yakit.MaxHTTPFlowRequestBodyInDBBytes))
-	defer consts.SetGlobalMaxContentLength(prev)
-
+	// Default spill cap is 200KB (History preview); GlobalMaxContentLength stays at ~10MB for MITM I/O.
 	const bodySize = 300 * 1024
 	token := uuid.New().String()
 	var receivedBodyLen atomic.Int64
@@ -121,14 +114,15 @@ func TestMITM_LargeRequestWireForward(t *testing.T) {
 
 	NewMITMTestCase(t,
 		CaseWithContext(ctx),
-		CaseWithMaxContentLength(10*1024*1024-1), // must be < 10MiB to apply on proxy
 		CaseWithPort(func(i int) { mitmPort = i }),
 		CaseWithServerStart(func() {
+			defer cancel()
 			_, _, err := poc.DoPOST(
 				"http://"+target+"/"+token,
 				poc.WithBody(body),
 				poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(mitmPort)),
 				poc.WithSave(false),
+				poc.WithTimeout(15),
 			)
 			require.NoError(t, err)
 			require.GreaterOrEqual(t, receivedBodyLen.Load(), int64(bodySize))
@@ -139,8 +133,7 @@ func TestMITM_LargeRequestWireForward(t *testing.T) {
 			}, 1)
 			require.NoError(t, err)
 			require.Len(t, flowMsg.Data, 1)
-			require.True(t, flowMsg.Data[0].IsTooLargeRequest)
-			cancel()
+			require.True(t, flowMsg.Data[0].IsTooLargeRequest, "300KB body should spill at 200KB History threshold without lowering GlobalMaxContentLength")
 		}),
 	)
 }

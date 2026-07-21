@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -94,5 +95,19 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 			}
 		}
 	}
-	startedWg.Wait()
+
+	done := make(chan struct{})
+	go func() {
+		startedWg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-config.Context.Done():
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Fatal("OnServerStarted did not finish after MITM context canceled")
+		}
+	}
 }
