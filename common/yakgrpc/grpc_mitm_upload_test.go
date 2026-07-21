@@ -97,6 +97,8 @@ func TestMITM_UploadFile(t *testing.T) {
 }
 
 func TestMITM_LargeRequestWireForward(t *testing.T) {
+	// Spill threshold follows GlobalMaxContentLength; keep MITM read/forward limit
+	// separate via CaseWithMaxContentLength so lowering dump size does not cap wire I/O.
 	prev := consts.GetGlobalMaxContentLength()
 	consts.SetGlobalMaxContentLength(uint64(yakit.MaxHTTPFlowRequestBodyInDBBytes))
 	defer consts.SetGlobalMaxContentLength(prev)
@@ -119,6 +121,7 @@ func TestMITM_LargeRequestWireForward(t *testing.T) {
 
 	NewMITMTestCase(t,
 		CaseWithContext(ctx),
+		CaseWithMaxContentLength(10*1024*1024-1), // must be < 10MiB to apply on proxy
 		CaseWithPort(func(i int) { mitmPort = i }),
 		CaseWithServerStart(func() {
 			_, _, err := poc.DoPOST(

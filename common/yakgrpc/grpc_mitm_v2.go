@@ -1723,9 +1723,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else {
 				if flow.IsTooLargeRequest && yakit.ShouldNotifyLargeHTTPFlowRequest() {
-					sendLogged(&ypb.MITMV2Response{
+					// Async: mirror runs before writing the client response; a blocking
+					// stream.Send here deadlocks when the MITM client is not Recv-ing.
+					notice := []byte(yakit.LargeHTTPFlowRequestUserNotice(flow))
+					go sendLogged(&ypb.MITMV2Response{
 						HaveNotification:    true,
-						NotificationContent: []byte(yakit.LargeHTTPFlowRequestUserNotice(flow)),
+						NotificationContent: notice,
 					})
 				}
 				if needUpdate {
