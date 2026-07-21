@@ -1,0 +1,14 @@
+{
+  "version": "0",
+  "base_program_name": "ci-yaklang-base",
+  "main_sha": "",
+  "overlay_depth": 0,
+  "yak_version": "",
+  "database": {
+    "url": "https://PLACEHOLDER/not-published-yet.db.zst",
+    "sha256": "",
+    "size_bytes": 0,
+    "compression": "zst"
+  },
+  "updated_at": ""
+}

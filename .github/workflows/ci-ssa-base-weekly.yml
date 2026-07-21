@@ -1,0 +1,79 @@
+name: CI SSA Base Weekly
+
+on:
+  schedule:
+    # Friday 20:00 UTC
+    - cron: "0 20 * * 5"
+  workflow_dispatch:
+
+concurrency:
+  # Shared with ci-ssa-base-promote.yml so DB writers do not race
+  group: ci-ssa-database
+  cancel-in-progress: false
+
+jobs:
+  compile-base:
+    runs-on: [self-hosted, linux, ssa-ci]
+    env:
+      SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+      CI_SSA_BASE_PROGRAM: ci-yaklang-base
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Prepare CI scripts
+        run: chmod +x ./scripts/ci-ssa/*.sh
+
+      - name: Export SSA database paths
+        run: |
+          source ./scripts/ci-ssa/export-ssa-db-env.sh
+          echo "SSA_CI_DATA_DIR=$SSA_CI_DATA_DIR" >> $GITHUB_ENV
+          echo "SSA_DATABASE_RAW=$SSA_DATABASE_RAW" >> $GITHUB_ENV
+          echo "CI_SSA_BASE_PROGRAM=$CI_SSA_BASE_PROGRAM" >> $GITHUB_ENV
+
+      - name: Install Yak
+        run: bash ./scripts/ci-ssa/install-yak-ci.sh
+
+      - name: Import CI SyntaxFlow rules
+        run: yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
+
+      - name: Full compile, verify, flatten (DB write-locked)
+        run: |
+          set -euo pipefail
+          # Acquire DB write lock for the whole compile→verify→flatten section.
+          # GitHub concurrency.group is a soft, single-runner assumption; flock
+          # guards the SQLite file when multiple self-hosted runners share the
+          # `ssa-ci` label. fd 9 stays open for this single step's lifetime.
+          source ./scripts/ci-ssa/acquire-db-lock.sh
+
+          echo "::group::Full compile yaklang base (golang)"
+          export CI_SSA_BASE_PROGRAM=ci-yaklang-base
+          yak ssa-compile \
+            --config ./scripts/ci-ssa/ci-yaklang-base-compile.json \
+            --database "$SSA_DATABASE_RAW" \
+            --re-compile
+          echo "::endgroup::"
+
+          echo "::group::Verify base program in database"
+          ./scripts/ci-ssa/ensure-base-program.sh
+          echo "::endgroup::"
+
+          echo "::group::Reset base pointer, write local manifest, cleanup overlays"
+          MAIN_SHA=$(git rev-parse HEAD)
+          # Flatten: pointer back to weekly full program; drop promote/diff layers
+          bash ./scripts/ci-ssa/write-local-manifest.sh \
+            "$MAIN_SHA" \
+            ci-yaklang-base \
+            ./scripts/ci-ssa/manifest.json
+          bash ./scripts/ci-ssa/cleanup-stale-overlay-programs.sh
+          echo "::endgroup::"
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-ssa-manifest
+          path: scripts/ci-ssa/manifest.json
+          retention-days: 90
