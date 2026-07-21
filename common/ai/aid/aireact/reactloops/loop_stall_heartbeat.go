@@ -16,23 +16,24 @@ import (
 var (
 	// loopStallHeartbeatInterval 是心跳检查间隔. 每隔这么久, heartbeat
 	// goroutine 比对一次 r.lastIterationTickAt 是否前进.
-	loopStallHeartbeatInterval = 30 * time.Second
+	loopStallHeartbeatInterval = 2 * time.Minute
 
 	// loopStallStuckThreshold 是 "无推进就视为卡死" 的阈值. 一旦距离上一次
 	// iteration 推进超过这个时长, 写一条 [LOOP_STALL_DETECTED] timeline +
-	// dump goroutine stack 到日志. 默认 90s 保守一些, 比 watchdog (2min)
-	// 早一步给出信号.
-	loopStallStuckThreshold = 90 * time.Second
+	// dump goroutine stack 到日志. 默认 10 分钟, 仍早于硬抢断阈值 (30min)
+	// 给出信号, 同时远大于 verification watchdog (2min) 周期, 避免误报.
+	loopStallStuckThreshold = 10 * time.Minute
 
 	// loopStallHardAbortThreshold 是 "硬抢断" 阈值. 一旦主循环超过这个时长仍
 	// 无推进, heartbeat 协程视为已经无法靠 watchdog/验证 等异步机制自救, 主动
 	// 调用 task.Cancel() 把主循环踢出来, 让 ReAct 走 abort 流程.
 	//
-	// 默认 8 分钟, 显著大于 verification watchdog 周期 (2min) 与单次 AI/工具
-	// 调用的常见耗时, 避免误伤. 若 <= 0 则表示禁用硬抢断, 保持纯观察行为.
+	// 默认 30 分钟, 显著大于 stuckThreshold (10min) 与 verification watchdog
+	// 周期 (2min) 及单次 AI/工具调用的常见耗时, 避免误伤. 若 <= 0 则表示
+	// 禁用硬抢断, 保持纯观察行为.
 	//
 	// 关键词: 硬卡死阈值, task.Cancel, 主循环抢断兜底, hard abort
-	loopStallHardAbortThreshold = 8 * time.Minute
+	loopStallHardAbortThreshold = 30 * time.Minute
 
 	// loopStallStackBudget 控制 dump 的 goroutine stack 字节上限, 防止
 	// 单条 timeline 撑爆前端面板; 一般来说 64KB 已经够看清主要 goroutine.
@@ -51,7 +52,7 @@ type stallHeartbeatTimeProvider interface {
 
 type realStallHeartbeatClock struct{}
 
-func (realStallHeartbeatClock) Now() time.Time                       { return time.Now() }
+func (realStallHeartbeatClock) Now() time.Time                         { return time.Now() }
 func (realStallHeartbeatClock) NewTicker(d time.Duration) *time.Ticker { return time.NewTicker(d) }
 
 // recordIterationTick 在主循环每轮 iteration 开始时调用, 让 stall heartbeat
@@ -70,7 +71,7 @@ func (r *ReActLoop) recordIterationTick() {
 // 等待 ctx.Done 才退出.
 //
 // 实现要点:
-//   - 在 stuckThreshold (默认 90s) ~ hardAbortThreshold (默认 8min) 区间内
+//   - 在 stuckThreshold (默认 10min) ~ hardAbortThreshold (默认 30min) 区间内
 //     仅写 log + timeline, 是观察者. 这一段保持原有 "不主动 abort" 的语义,
 //     给 verification watchdog (2min) 留出自救窗口.
 //   - 一旦 gap >= hardAbortThreshold, heartbeat 视为已经无法靠异步机制自救,
@@ -82,7 +83,8 @@ func (r *ReActLoop) recordIterationTick() {
 //   - 复用 task 的 context, 任务取消立刻退出.
 //
 // 关键词: startStallHeartbeat, 主循环卡死兜底, [LOOP_STALL_DETECTED],
-//   [LOOP_STALL_HARD_ABORT], task.Cancel
+//
+//	[LOOP_STALL_HARD_ABORT], task.Cancel
 func (r *ReActLoop) startStallHeartbeat(ctx context.Context, task aicommon.AIStatefulTask) func() {
 	return r.startStallHeartbeatWithClock(
 		ctx, task, realStallHeartbeatClock{},
@@ -201,7 +203,8 @@ func (r *ReActLoop) reportLoopStall(task aicommon.AIStatefulTask, gap time.Durat
 // 在现有架构中已经成立, 不需要本函数额外接线.
 //
 // 关键词: hardAbortLoopStall, [LOOP_STALL_HARD_ABORT], task.Cancel,
-//   主循环抢断兜底
+//
+//	主循环抢断兜底
 func (r *ReActLoop) hardAbortLoopStall(task aicommon.AIStatefulTask, gap time.Duration) {
 	iteration := r.GetCurrentIterationIndex()
 	taskID := "<unknown>"
