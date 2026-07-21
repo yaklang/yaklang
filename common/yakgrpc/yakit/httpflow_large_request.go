@@ -113,6 +113,21 @@ func spillLargeHTTPFlowRequestIfNeeded(packet []byte) (largeRequestSpillResult, 
 		return res, nil
 	}
 
+	// Multipart/form-data uploads carrying file parts are skeletonized: each
+	// file part spills to its own disk file and the in-DB body keeps only an
+	// editable skeleton with placeholders. Falls back to flat spill when the
+	// body is not multipart or carries no file part.
+	if mpRes, err := spillMultipartFilesIfNeeded(packet); err != nil {
+		log.Errorf("spill multipart request failed: %s, fall back to flat spill", err)
+	} else if mpRes.IsTooLarge {
+		res.StoredPacket = mpRes.StoredPacket
+		res.IsTooLarge = true
+		res.HeaderFile = mpRes.HeaderFile
+		res.BodyFile = mpRes.BodyFile
+		res.OriginalBodyLen = mpRes.OriginalBodyLen
+		return res, nil
+	}
+
 	uid := ksuid.New().String()
 	suffix := fmt.Sprintf(`%v_%v`, time.Now().Format(utils.DatetimePretty()), uid)
 

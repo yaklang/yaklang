@@ -831,6 +831,12 @@ func GetHTTPFlowByHiddenIndex(db *gorm.DB, index string) (*schema.HTTPFlow, erro
 }
 
 func DeleteHTTPFlowByID(db *gorm.DB, id int64) error {
+	// Clean up multipart sidecar parts derived from the spilled body file
+	// before the row is removed, since the body file path lives only on the
+	// flow record. (Flat spill file cleanup is a separate concern.)
+	if flow, err := GetHTTPFlow(db, id); err == nil && flow != nil {
+		cleanupMultipartSidecar(flow.TooLargeRequestBodyFile)
+	}
 	if db := db.Model(&schema.HTTPFlow{}).Where(
 		"id = ?", id,
 	).Unscoped().Delete(&schema.HTTPFlow{}); db.Error != nil {
