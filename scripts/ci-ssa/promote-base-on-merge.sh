@@ -80,7 +80,7 @@ fi
 
 echo "::group::Generating filesystem diff ($OLD_SHA..$NEW_SHA)"
 rm -f "$FS_ZIP"
-if ! yak gitefs --start "$OLD_SHA" --end "$NEW_SHA" --output "$FS_ZIP"; then
+if ! ./yak gitefs --start "$OLD_SHA" --end "$NEW_SHA" --output "$FS_ZIP"; then
   echo "::error::yak gitefs failed"
   exit 1
 fi
@@ -124,7 +124,7 @@ jq \
 
 echo "::group::Incremental promote compile -> $NEW_PROG (base=$CI_SSA_BASE_PROGRAM)"
 cat "$PROMOTE_CONFIG"
-if ! yak ssa-compile \
+if ! ./yak ssa-compile \
   --config "$PROMOTE_CONFIG" \
   --database "$SSA_DATABASE_RAW" \
   --file-perf-log; then
@@ -134,7 +134,7 @@ if ! yak ssa-compile \
 fi
 echo "::endgroup::"
 
-if ! yak ssa-program "$NEW_PROG" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$NEW_PROG"; then
+if ! ./yak ssa-program "$NEW_PROG" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$NEW_PROG"; then
   echo "::error::Promote program '$NEW_PROG' not found in database after compile"
   exit 1
 fi
@@ -157,7 +157,7 @@ if [ "$NEW_DEPTH" -gt "$OVERLAY_DEPTH_LIMIT" ]; then
   FLAT_NAME="ci-yaklang-flat-${SHORT_SHA}"
   FLATTEN_SCRIPT="$SCRIPT_DIR/flatten-overlay.yak"
   if [ -f "$FLATTEN_SCRIPT" ]; then
-    if yak "$FLATTEN_SCRIPT" \
+    if ./yak "$FLATTEN_SCRIPT" \
       --program "$NEW_PROG" \
       --output "$FLAT_NAME" \
       --database "$SSA_DATABASE_RAW" \

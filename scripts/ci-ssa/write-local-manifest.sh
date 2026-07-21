@@ -12,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=export-ssa-db-env.sh
 source "$SCRIPT_DIR/export-ssa-db-env.sh"
 
-YAK_VER=$(yak version 2>/dev/null | head -1 || echo "")
+YAK_VER=$(./yak version 2>/dev/null | head -1 || echo "")
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 DB_SIZE=0
 if [ -f "$SSA_DATABASE_RAW" ]; then

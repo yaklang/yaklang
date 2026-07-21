@@ -115,9 +115,9 @@ if err != nil {
     println(sprintf("::error::Failed to read config template %s: %v", configFile, err))
     os.Exit(1)
 }
-configObj, err = json.loads(string(configBytes))
-if err != nil {
-    println(sprintf("::error::Failed to parse config JSON: %v", err))
+configObj = json.loads(string(configBytes))
+if configObj == nil {
+    println(sprintf("::error::Failed to parse config JSON: %s", configFile))
     os.Exit(1)
 }
 

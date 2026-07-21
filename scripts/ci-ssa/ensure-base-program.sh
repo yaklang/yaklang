@@ -22,7 +22,7 @@ fi
 export SSA_DATABASE_RAW
 
 # 1. The effective base program must exist in the database.
-if ! yak ssa-program "$BASE_PROGRAM" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$BASE_PROGRAM"; then
+if ! ./yak ssa-program "$BASE_PROGRAM" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$BASE_PROGRAM"; then
   echo "::error::Base program '$BASE_PROGRAM' not in database $SSA_DATABASE_RAW"
   echo "::error::Run workflow 'CI SSA Base Weekly' (schedule Friday or workflow_dispatch)."
   exit 1

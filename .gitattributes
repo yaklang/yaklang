@@ -1,0 +1,7 @@
+# Ensure CI-SSA shell/yak scripts always use LF line endings.
+# CRLF breaks `set -euo pipefail` (becomes `pipefail\r: invalid option name`)
+# when scripts are edited on Windows and run on Linux self-hosted runners.
+# Scope: only files under scripts/ci-ssa/ to avoid touching the rest of the repo.
+scripts/ci-ssa/*.sh  text eol=lf
+scripts/ci-ssa/*.yak text eol=lf
+scripts/ci-ssa/*.json text eol=lf

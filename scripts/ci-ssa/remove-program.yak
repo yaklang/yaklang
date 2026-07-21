@@ -1,0 +1,29 @@
+// remove-program.yak — Remove a program from a specific SSA database.
+//
+// yak ssa-remove does not accept --database; it always targets the default
+// YAKIT_HOME database. CI uses a separate database path (SSA_DATABASE_RAW),
+// so removal must go through ssa.SetDatabase + ssa.DeleteProgram instead.
+//
+// Usage:
+//   yak remove-program.yak --database <DSN> --program <name>
+//
+// DSN format: "sqlite:///path/to/default-yakssa.db"
+//   (single slash for relative, triple slash for absolute; see consts.SetGormSSAProjectDatabaseByInfo)
+
+database = cli.String("database", cli.setRequired(true), cli.setHelp("SSA database DSN, e.g. sqlite:///data/ci-ssa/default-yakssa.db"))
+name = cli.String("program", cli.setRequired(true), cli.setHelp("program name to remove"))
+cli.check()
+
+err = ssa.SetDatabase(database)
+if err != nil {
+    println(sprintf("::error::failed to set database %s: %v", database, err))
+    os.Exit(1)
+}
+
+println(sprintf("Removing: %s", name))
+err = ssa.DeleteProgram(name)
+if err != nil {
+    println(sprintf("::warning::Failed to remove %s: %v", name, err))
+    os.Exit(1)
+}
+println("done")

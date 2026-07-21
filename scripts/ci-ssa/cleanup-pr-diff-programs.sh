@@ -13,8 +13,9 @@ PATTERN="^ci-yaklang-diff-pr-${PR_NUMBER}-"
 echo "Cleaning PR #$PR_NUMBER diff programs matching: $PATTERN"
 
 mapfile -t NAMES < <(
-  yak ssa-program --database "$SSA_DATABASE_RAW" 2>/dev/null \
+  ./yak ssa-program --database "$SSA_DATABASE_RAW" 2>/dev/null \
     | sed -n 's/^[[:space:]]*\[[^]]*\]:[[:space:]]*//p' \
+    | sed 's/[[:space:]]*$//' \
     | grep -E "$PATTERN" || true
 )
 
@@ -25,7 +26,9 @@ fi
 
 for name in "${NAMES[@]}"; do
   echo "Removing: $name"
-  yak ssa-remove "$name" || echo "::warning::Failed to remove $name"
+  ./yak "$SCRIPT_DIR/remove-program.yak" \
+    --database "sqlite://$SSA_DATABASE_RAW" \
+    --program "$name" || echo "::warning::Failed to remove $name"
 done
 
 echo "Cleanup done (${#NAMES[@]} program(s))"
