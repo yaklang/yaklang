@@ -77,6 +77,7 @@ func RunFastContextSearch(
 		reactloops.SubAgentOptions{
 			ParentLoop:    parentLoop,
 			TimelineMode:  reactloops.SubAgentTimelineClean,
+			InheritEmitter: true,
 			ConfigureLoop: func(loop *reactloops.ReActLoop) {
 				ConfigureSubLoop(loop, input)
 			},

@@ -118,7 +118,7 @@ func prepareSubAgents(
 			continue
 		}
 
-		invoker, task, release, err := buildSubAgentRuntime(parentInvoker, parentTask, job, handle)
+		invoker, task, release, err := buildSubAgentRuntime(parentInvoker, parentTask, job, handle, opts)
 		if err != nil {
 			log.Warnf("subagent: build runtime for %q failed: %v", job.Identifier, err)
 			handle.Release()
@@ -802,6 +802,20 @@ type SubAgentOptions struct {
 
 	// ExtraLoopOpts 追加到 loop 创建选项（如 tool pool 限制）。
 	ExtraLoopOpts []ReActLoopOption
+
+	// InheritEmitter 控制子 Agent 的 emitter 是否直接继承父任务的 emitter。
+	//
+	// 为 true 时：子 Agent 直接复用父任务的 emitter，共用父任务的
+	// TaskId/TaskUUID，不打子任务 ID、不发 react_task_created 卡片。前端表现
+	// 为父任务自身的流，用户不会看到额外的子任务卡片——适用于希望"子 Agent
+	// 对用户不可见"的场景（如 fast_context：它只是父任务内部的一个搜索步骤，
+	// 不应让用户以为是两个任务在跑）。
+	//
+	// 为 false 时（默认）：子 Agent 的事件经转发 emitter（BuildForwardingEmitterForTask）
+	// 打上子 TaskId/TaskUUID，前端会显示子 Agent 卡片（react_task_created），
+	// 用户看到的是一个独立子任务在运行——适用于需要 UI 区分父子任务的场景
+	// （如 dispatch）。
+	InheritEmitter bool
 
 	// ParentLoop 是父 loop，用于挂载 ProgressRegistry 使 stall heartbeat /
 	// verification watchdog 能观察子 Agent 活动。可为 nil（跳过注册，但会

@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
-		"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const defaultCategoryScanConcurrency = 3
@@ -235,7 +235,6 @@ func countScanObservationsForCategory(state *model.AuditState, categoryID string
 	return count
 }
 
-
 // phase2CategoryLoopBuilder 是 phase2 fork 子 Agent 的自定义 LoopBuilder，
 // 替代原 fork 子 Agent 入口的 loop 构造回调。
 type phase2CategoryLoopBuilder struct {
@@ -260,15 +259,14 @@ func (b phase2CategoryLoopBuilder) Build(prepared *reactloops.PreparedSubAgent) 
 	return catLoop, err
 }
 
-
 // phase2CategoryResumeLoopBuilder 是 phase2 单个 category resume 子 Agent 的
 // 自定义 LoopBuilder，替代原 fork 子 Agent 入口的 loop 构造回调。
 type phase2CategoryResumeLoopBuilder struct {
-	state     *model.AuditState
-	category  model.VulnCategory
-	catJob    categoryScanJob
-	scanState *ScanState
-	artifacts *categoryArtifactStore
+	state      *model.AuditState
+	category   model.VulnCategory
+	catJob     categoryScanJob
+	scanState  *ScanState
+	artifacts  *categoryArtifactStore
 	scanStates *sync.Map
 }
 
