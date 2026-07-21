@@ -1527,8 +1527,11 @@ Content-Type: image/jpeg
 	if flow.TooLargeRequestBodyFile == "" {
 		t.Fatal("too large request body file path missing")
 	}
-	if !strings.Contains(string(flow.Request), "request too large") {
-		t.Fatal("GetHTTPFlowById should return header with truncate notice, got: " + utils.ByteSize(uint64(len(flow.Request))))
+	// Oversized multipart requests carrying a file part are skeletonized: the
+	// in-DB request holds an editable multipart skeleton with a per-file
+	// placeholder, not the flat "request too large" truncate notice.
+	if !strings.Contains(string(flow.Request), "multipart file spilled") {
+		t.Fatal("GetHTTPFlowById should return multipart skeleton with spilled-file placeholder, got: " + utils.ByteSize(uint64(len(flow.Request))))
 	}
 
 	bodyStream, err := client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
