@@ -97,6 +97,29 @@ def get_main_head_from_worktree(worktree: Path) -> str:
         return ""
 
 
+def get_compare_commits(repo: str, old_sha: str, new_sha: str, token: str | None) -> list[dict]:
+    """
+    Get the ordered list of commits from old_sha (exclusive) to new_sha (inclusive)
+    using the GitHub compare API. Returns list of {sha, message}.
+    Falls back to [new_sha] if the API fails (single-range promote).
+    """
+    url = f"{GITHUB_API}/repos/{repo}/compare/{old_sha}...{new_sha}"
+    try:
+        r = requests.get(url, headers=github_headers(token), timeout=30)
+        if r.status_code != 200:
+            log(f"compare API returned {r.status_code}, using single range", "WARN")
+            return [{"sha": new_sha, "message": ""}]
+        data = r.json()
+        commits = data.get("commits", [])
+        if not commits:
+            log("compare returned 0 commits; using single range", "WARN")
+            return [{"sha": new_sha, "message": ""}]
+        return [{"sha": c["sha"], "message": c.get("commit", {}).get("message", "")} for c in commits]
+    except Exception as e:
+        log(f"compare API exception: {e}, using single range", "WARN")
+        return [{"sha": new_sha, "message": ""}]
+
+
 def get_merged_prs_in_range(repo: str, old_sha: str, new_sha: str, token: str | None) -> list[dict]:
     """
     Fetch PRs merged between old_sha and new_sha.
@@ -156,10 +179,15 @@ def read_manifest(data_dir: Path) -> dict | None:
 
 def prepare_clone(worktree: Path, new_sha: str) -> Path | None:
     """
-    Create a shallow plain clone of the worktree's repo for running promote.
-    yak gitefs uses go-git which can't resolve refs in a worktree (gitdir:
-    pointer to .bare); a plain clone fixes this. The clone shares the same
-    object store as the worktree so it's fast.
+    Create a plain clone of the worktree's repo for running promote.
+    We use a full clone (no --depth) and fetch origin/main so that:
+      1. In method-B (GitHub compare+blobs API) the clone is just an isolated
+         CWD — full history not strictly needed, but harmless.
+      2. When the GitHub API is rate-limited and we fall back to letting the
+         promote script run `yak gitefs --start X --end Y`, the clone must
+         contain both SHAs' full history or gitefs fails with
+         "not a valid commit name".
+    The clone is local (from the worktree), so it's fast.
     Returns the clone path, or None on failure.
     """
     clone_dir = Path(f"/tmp/ci-promote-clone-{new_sha[:8]}")
@@ -169,22 +197,15 @@ def prepare_clone(worktree: Path, new_sha: str) -> Path | None:
 
     log(f"Creating plain clone for promote: {clone_dir}")
     try:
-        # Clone from the worktree (local, fast)
         result = subprocess.run(
-            ["git", "clone", "--depth", "50", str(worktree), str(clone_dir)],
-            capture_output=True, text=True, timeout=120, check=True,
+            ["git", "clone", str(worktree), str(clone_dir)],
+            capture_output=True, text=True, timeout=300, check=True,
         )
-        # Fetch the new SHA into the clone (in case it's not in depth-50)
+        # Fetch full main history so yak gitefs fallback can resolve any SHA.
         subprocess.run(
             ["git", "fetch", "origin", "main"],
             cwd=str(clone_dir), capture_output=True, text=True,
-            timeout=60, check=False,
-        )
-        # Create local main branch tracking origin/main
-        subprocess.run(
-            ["git", "branch", "-f", "main", "origin/main"],
-            cwd=str(clone_dir), capture_output=True, text=True,
-            timeout=10, check=False,
+            timeout=120, check=False,
         )
         return clone_dir
     except Exception as e:
@@ -194,20 +215,157 @@ def prepare_clone(worktree: Path, new_sha: str) -> Path | None:
         return None
 
 
-def run_promote(worktree: Path, data_dir: Path, new_sha: str, pr_number: str) -> bool:
+def build_fs_zip_from_compare(
+    repo: str, old_sha: str, new_sha: str, token: str | None, out_path: Path
+) -> int:
     """
-    Run promote-base-on-merge.sh to simulate the CI promote flow.
-    Creates a plain clone first (yak gitefs needs a real .git dir, not a
-    worktree gitdir pointer), then runs the promote script there with
-    symlinks to the yak binary and ci-ssa-data.
-    Returns True on success.
+    Build fs.zip for the range old_sha..new_sha using the GitHub compare API
+    and the git blobs API. This replaces `yak gitefs --start X --end Y` when the
+    local clone does not have the full main history (worktree on a feature
+    branch, shallow clone, etc.).
+    Returns the number of file entries written to the zip.
+
+    Flow:
+      1. GET /repos/{repo}/compare/{old}...{new} -> files[] with {filename, sha, status}
+      2. For added/modified: GET /repos/{repo}/git/blobs/{sha} (base64 content)
+      3. Write a zip with only the added/modified files. Removed files are
+         skipped (the SSA diff engine treats missing files in newFS as deleted
+         relative to the base program).
+    """
+    import base64
+    import zipfile
+
+    url = f"{GITHUB_API}/repos/{repo}/compare/{old_sha}...{new_sha}"
+    r = requests.get(url, headers=github_headers(token), timeout=30)
+    if r.status_code != 200:
+        log(f"compare API returned {r.status_code}: {r.text[:200]}", "ERROR")
+        return -1
+    data = r.json()
+    files = data.get("files", [])
+    log(f"compare {old_sha[:8]}...{new_sha[:8]}: status={data.get('status')} "
+        f"ahead={data.get('ahead_by')} files={len(files)}")
+
+    written = 0
+    skipped = 0
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            name = f.get("filename", "")
+            status = f.get("status", "")
+            blob_sha = f.get("sha", "")
+            if not name or not blob_sha:
+                skipped += 1
+                continue
+            if status in ("removed",):
+                # Removed files: skip. The diff engine sees them as deleted in
+                # newFS relative to baseFS, which is handled by calculateFileSystemDiff.
+                skipped += 1
+                continue
+            if status not in ("added", "modified", "renamed", "changed"):
+                log(f"  skip {name}: unknown status={status}", "WARN")
+                skipped += 1
+                continue
+            # Fetch blob content
+            blob_url = f"{GITHUB_API}/repos/{repo}/git/blobs/{blob_sha}"
+            br = requests.get(blob_url, headers=github_headers(token), timeout=30)
+            if br.status_code != 200:
+                log(f"  blob {name} ({blob_sha[:8]}) returned {br.status_code}, skip", "WARN")
+                skipped += 1
+                continue
+            blob = br.json()
+            content_b64 = blob.get("content", "")
+            try:
+                content = base64.b64decode(content_b64.replace("\n", ""))
+            except Exception as e:
+                log(f"  decode {name} failed: {e}, skip", "WARN")
+                skipped += 1
+                continue
+            zf.writestr(name, content)
+            written += 1
+
+    log(f"fs.zip built: {written} files written, {skipped} skipped -> {out_path}")
+    return written
+
+
+def run_promote_once(
+    clone_dir: Path,
+    script: Path,
+    new_sha: str,
+    pr_number: str,
+    fs_zip_path: Path | None,
+    base_program: str,
+    clone_data: Path,
+    worktree: Path,
+) -> bool:
+    """
+    Run promote-base-on-merge.sh once for a single range. If fs_zip_path is
+    given, it is copied into the clone CWD and FS_ZIP_PREBUILT=1 is set so the
+    promote script skips `yak gitefs`. Returns True on success.
+    """
+    env = os.environ.copy()
+    env["SSA_CI_DATA_DIR"] = str(clone_data)
+    env["SSA_DATABASE_RAW"] = str(clone_data / "default-yakssa.db")
+    env["CI_SSA_BASE_PROGRAM"] = base_program
+    env["PATH"] = env.get("PATH", "") + ":/usr/local/go/bin:" + os.path.expanduser("~/.local/bin") + ":" + os.path.expanduser("~/go/bin")
+    # Disable the promote script's own catch-up loop: the monitor drives the
+    # loop per-range (because in method-B we must rebuild fs.zip per range).
+    env["CI_SSA_PROMOTE_CATCH_UP"] = "0"
+    if fs_zip_path is not None:
+        env["FS_ZIP_PREBUILT"] = "1"
+
+    log(f"Running promote: {new_sha[:8]} (PR={pr_number or 'none'}, "
+        f"fs_zip={'prebuilt' if fs_zip_path else 'yak gitefs'})")
+    cmd = ["bash", str(script), new_sha, pr_number]
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(clone_dir),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if result.stdout:
+            for line in result.stdout.splitlines():
+                print(f"  [promote] {line}", flush=True)
+        if result.stderr:
+            for line in result.stderr.splitlines()[-10:]:
+                print(f"  [promote:err] {line}", flush=True)
+
+        if result.returncode != 0:
+            log(f"promote failed (exit {result.returncode})", "ERROR")
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        log("promote timed out after 600s", "ERROR")
+        return False
+    except Exception as e:
+        log(f"promote exception: {e}", "ERROR")
+        return False
+
+
+def run_promote(
+    repo: str,
+    worktree: Path,
+    data_dir: Path,
+    old_sha: str,
+    new_sha: str,
+    pr_number: str,
+    token: str | None,
+) -> bool:
+    """
+    Run promote for the range old_sha..new_sha. Uses method-B (GitHub compare
+    + blobs API) to build fs.zip per intermediate range, so no local main
+    history is needed. If the range spans multiple commits (multiple PRs merged
+    between runs), walk each commit individually so each PR's diff lands in
+    its own overlay layer (matches CI behavior).
+    Returns True if the final manifest sha == new_sha.
     """
     script = worktree / "scripts" / "ci-ssa" / "promote-base-on-merge.sh"
     if not script.exists():
         log(f"promote script not found: {script}", "ERROR")
         return False
 
-    # 1. Create a plain clone for gitefs to work
+    # 1. Create a plain clone (isolated CWD with symlinks)
     clone_dir = prepare_clone(worktree, new_sha)
     if clone_dir is None:
         log("Failed to prepare clone, aborting promote", "ERROR")
@@ -230,43 +388,55 @@ def run_promote(worktree: Path, data_dir: Path, new_sha: str, pr_number: str) ->
     if not clone_data.exists():
         clone_data.symlink_to(data_dir.resolve())
 
-    # 3. Run promote in the clone
-    env = os.environ.copy()
-    env["SSA_CI_DATA_DIR"] = str(clone_data)
-    env["SSA_DATABASE_RAW"] = str(clone_data / "default-yakssa.db")
-    env["CI_SSA_BASE_PROGRAM"] = (data_dir / "base-program-name").read_text().strip() if (data_dir / "base-program-name").exists() else "ci-yaklang-base"
-    env["PATH"] = env.get("PATH", "") + ":/usr/local/go/bin:" + os.path.expanduser("~/.local/bin") + ":" + os.path.expanduser("~/go/bin")
+    # 3. Resolve the intermediate commit chain from old_sha to new_sha.
+    commits = get_compare_commits(repo, old_sha, new_sha, token)
+    ranges = []
+    cur = old_sha
+    for c in commits:
+        nxt = c["sha"]
+        if nxt == cur:
+            continue
+        ranges.append((cur, nxt, c.get("message", "").splitlines()[0][:60] if c.get("message") else ""))
+        cur = nxt
+    if cur != new_sha:
+        # compare API was partial; append a final catch-all range
+        ranges.append((cur, new_sha, "(final catch-all)"))
 
-    log(f"Running promote in clone: {new_sha[:8]} (PR={pr_number or 'none'})")
-    cmd = ["bash", str(script), new_sha, pr_number]
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=str(clone_dir),
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=600,  # 10 min max (incremental promote should be fast)
-        )
-        # Print output
-        if result.stdout:
-            for line in result.stdout.splitlines():
-                print(f"  [promote] {line}", flush=True)
-        if result.stderr:
-            for line in result.stderr.splitlines()[-10:]:
-                print(f"  [promote:err] {line}", flush=True)
+    log(f"Promote plan: {len(ranges)} range(s) from {old_sha[:8]} to {new_sha[:8]}")
+    for i, (a, b, msg) in enumerate(ranges, 1):
+        log(f"  [{i}/{len(ranges)}] {a[:8]}..{b[:8]}  {msg}")
 
-        if result.returncode != 0:
-            log(f"promote failed (exit {result.returncode})", "ERROR")
+    # 4. Walk each range: build fs.zip via compare+blobs API, run promote once.
+    for i, (a, b, msg) in enumerate(ranges, 1):
+        log(f"=== Range [{i}/{len(ranges)}]: {a[:8]}..{b[:8]} ({msg}) ===")
+        fs_zip_path = clone_dir / "fs.zip"
+        # Re-read base program from pointer each iteration (promote updated it)
+        base_program = (data_dir / "base-program-name").read_text().strip() if (data_dir / "base-program-name").exists() else "ci-yaklang-base"
+        count = build_fs_zip_from_compare(repo, a, b, token, fs_zip_path)
+        if count < 0:
+            # Method-B failed (usually GitHub API rate limit). Fall back to
+            # letting the promote script build fs.zip itself via `yak gitefs`.
+            # This needs the clone to have both SHAs in its history (full
+            # clone + fetch origin main, see prepare_clone).
+            log(f"build_fs_zip failed ({count}); falling back to yak gitefs for {a[:8]}..{b[:8]}", "WARN")
+            ok = run_promote_once(
+                clone_dir, script, b, pr_number,
+                None,  # fs_zip_path=None -> promote uses yak gitefs
+                base_program, clone_data, worktree,
+            )
+        else:
+            ok = run_promote_once(
+                clone_dir, script, b, pr_number,
+                fs_zip_path,
+                base_program, clone_data, worktree,
+            )
+        if not ok:
+            log(f"promote failed at range {a[:8]}..{b[:8]}", "ERROR")
             return False
-        log("promote completed successfully")
-        return True
-    except subprocess.TimeoutExpired:
-        log("promote timed out after 600s", "ERROR")
-        return False
-    except Exception as e:
-        log(f"promote exception: {e}", "ERROR")
-        return False
+        log(f"Range [{i}/{len(ranges)}] complete")
+
+    log("promote completed successfully")
+    return True
 
 
 def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | None) -> bool:
@@ -318,7 +488,7 @@ def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | No
     # 5. Run promote for the new HEAD
     # Use the last PR number if available (cleanup targets that PR's diff programs)
     pr_number = str(merged_prs[-1]["number"]) if merged_prs else ""
-    success = run_promote(worktree, data_dir, main_head, pr_number)
+    success = run_promote(repo, worktree, data_dir, manifest_sha, main_head, pr_number, token)
 
     # 6. Verify: read manifest again
     new_manifest = read_manifest(data_dir)
