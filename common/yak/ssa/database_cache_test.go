@@ -703,7 +703,7 @@ func TestFlushResidentOnCloseDoesNotReloadRelationInstructions(t *testing.T) {
 	prog.Cache.deleteInstructionByID(keyID)
 	require.False(t, prog.Cache.hasResidentInstruction(keyID), "test setup should remove relation key from resident cache")
 
-	require.NoError(t, prog.Cache.instructions.flushResidentOnCloseOnly())
+	require.NoError(t, prog.Cache.instructions.residentCache.Flush(true))
 	require.False(t, prog.Cache.hasResidentInstruction(keyID), "close flush should not reload relation key instructions just to expand resident state")
 
 	objectIR := ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, objectID)
