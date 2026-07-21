@@ -37,6 +37,8 @@ const (
 	Yak_Exec_FullMethodName                                       = "/ypb.Yak/Exec"
 	Yak_QueryExecHistory_FullMethodName                           = "/ypb.Yak/QueryExecHistory"
 	Yak_RemoveExecHistory_FullMethodName                          = "/ypb.Yak/RemoveExecHistory"
+	Yak_SavePluginExecutionHistory_FullMethodName                 = "/ypb.Yak/SavePluginExecutionHistory"
+	Yak_GetPluginExecutionUsageRanking_FullMethodName             = "/ypb.Yak/GetPluginExecutionUsageRanking"
 	Yak_LoadNucleiTemplates_FullMethodName                        = "/ypb.Yak/LoadNucleiTemplates"
 	Yak_AutoUpdateYakModule_FullMethodName                        = "/ypb.Yak/AutoUpdateYakModule"
 	Yak_ExecYakScript_FullMethodName                              = "/ypb.Yak/ExecYakScript"
@@ -677,6 +679,10 @@ type YakClient interface {
 	Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	QueryExecHistory(ctx context.Context, in *ExecHistoryRequest, opts ...grpc.CallOption) (*ExecHistoryRecordResponse, error)
 	RemoveExecHistory(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// 保存插件执行历史（前端执行结束 POST 回来，B 方案）
+	SavePluginExecutionHistory(ctx context.Context, in *SavePluginExecutionHistoryRequest, opts ...grpc.CallOption) (*Empty, error)
+	// 插件使用次数排行（按 plugin 分组 count 降序）
+	GetPluginExecutionUsageRanking(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginExecutionUsageRankingResponse, error)
 	LoadNucleiTemplates(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	AutoUpdateYakModule(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	ExecYakScript(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
@@ -1654,6 +1660,26 @@ func (c *yakClient) RemoveExecHistory(ctx context.Context, in *Empty, opts ...gr
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_RemoveExecHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SavePluginExecutionHistory(ctx context.Context, in *SavePluginExecutionHistoryRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_SavePluginExecutionHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetPluginExecutionUsageRanking(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginExecutionUsageRankingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginExecutionUsageRankingResponse)
+	err := c.cc.Invoke(ctx, Yak_GetPluginExecutionUsageRanking_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8709,6 +8735,10 @@ type YakServer interface {
 	Exec(*ExecRequest, grpc.ServerStreamingServer[ExecResult]) error
 	QueryExecHistory(context.Context, *ExecHistoryRequest) (*ExecHistoryRecordResponse, error)
 	RemoveExecHistory(context.Context, *Empty) (*Empty, error)
+	// 保存插件执行历史（前端执行结束 POST 回来，B 方案）
+	SavePluginExecutionHistory(context.Context, *SavePluginExecutionHistoryRequest) (*Empty, error)
+	// 插件使用次数排行（按 plugin 分组 count 降序）
+	GetPluginExecutionUsageRanking(context.Context, *Empty) (*PluginExecutionUsageRankingResponse, error)
 	LoadNucleiTemplates(context.Context, *Empty) (*Empty, error)
 	AutoUpdateYakModule(*Empty, grpc.ServerStreamingServer[ExecResult]) error
 	ExecYakScript(*ExecRequest, grpc.ServerStreamingServer[ExecResult]) error
@@ -9544,6 +9574,12 @@ func (UnimplementedYakServer) QueryExecHistory(context.Context, *ExecHistoryRequ
 }
 func (UnimplementedYakServer) RemoveExecHistory(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveExecHistory not implemented")
+}
+func (UnimplementedYakServer) SavePluginExecutionHistory(context.Context, *SavePluginExecutionHistoryRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SavePluginExecutionHistory not implemented")
+}
+func (UnimplementedYakServer) GetPluginExecutionUsageRanking(context.Context, *Empty) (*PluginExecutionUsageRankingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPluginExecutionUsageRanking not implemented")
 }
 func (UnimplementedYakServer) LoadNucleiTemplates(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method LoadNucleiTemplates not implemented")
@@ -11665,6 +11701,42 @@ func _Yak_RemoveExecHistory_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).RemoveExecHistory(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SavePluginExecutionHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SavePluginExecutionHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SavePluginExecutionHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SavePluginExecutionHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SavePluginExecutionHistory(ctx, req.(*SavePluginExecutionHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetPluginExecutionUsageRanking_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetPluginExecutionUsageRanking(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetPluginExecutionUsageRanking_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetPluginExecutionUsageRanking(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -21878,6 +21950,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveExecHistory",
 			Handler:    _Yak_RemoveExecHistory_Handler,
+		},
+		{
+			MethodName: "SavePluginExecutionHistory",
+			Handler:    _Yak_SavePluginExecutionHistory_Handler,
+		},
+		{
+			MethodName: "GetPluginExecutionUsageRanking",
+			Handler:    _Yak_GetPluginExecutionUsageRanking_Handler,
 		},
 		{
 			MethodName: "LoadNucleiTemplates",
