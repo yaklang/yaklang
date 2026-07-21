@@ -14,5 +14,5 @@ jobs:
     uses: ./.github/workflows/reuse-build-sfweb.yml
     with:
       os: linux-amd64
-      update: true
+      update: false
     secrets: inherit
