@@ -4,7 +4,7 @@
     "language": "golang"
   },
   "CodeSource": {
-    "kind": "local",
+    "kind": "compression",
     "local_file": "./fs.zip"
   },
   "SSACompile": {

@@ -5,3 +5,4 @@
 scripts/ci-ssa/*.sh  text eol=lf
 scripts/ci-ssa/*.yak text eol=lf
 scripts/ci-ssa/*.json text eol=lf
+scripts/ci-ssa/*.py  text eol=lf
