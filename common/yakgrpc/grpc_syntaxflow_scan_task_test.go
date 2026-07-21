@@ -568,19 +568,21 @@ alert $high for {
 		ExpectedTasks: []TaskResultConfig{
 			// 当前 QuerySyntaxFlowScanTask 的项目级查询会返回同项目下的 base/diff 两个任务，
 			// 但这里不会把 diff 相对 base 的新增风险单独计入 New*Count。
+			// RiskCount 来自规则 `exec(* #-> as $high)` 的数据流节点数；
+			// pair-first member relations 后中间 member 边更干净，稳定为 5（此前为 7）。
 			{
 				Programs:     []string{diffProgID},
 				Status:       "done",
-				RiskCount:    7,
-				HighCount:    7,
+				RiskCount:    5,
+				HighCount:    5,
 				NewRiskCount: 0,
 				NewHighCount: 0,
 			},
 			{
 				Programs:     []string{baseProgID},
 				Status:       "done",
-				RiskCount:    7,
-				HighCount:    7,
+				RiskCount:    5,
+				HighCount:    5,
 				NewRiskCount: 0,
 				NewHighCount: 0,
 			},
