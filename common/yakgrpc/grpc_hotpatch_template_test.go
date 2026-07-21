@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/bytedance/mockey"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"

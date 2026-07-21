@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/bytedance/mockey"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"

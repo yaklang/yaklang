@@ -27,7 +27,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/crep/trafficguard"
 	"github.com/yaklang/yaklang/common/go-funk"

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 
 	uuid "github.com/google/uuid"

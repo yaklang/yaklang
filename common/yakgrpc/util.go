@@ -19,7 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/pkg/errors"
 	"github.com/segmentio/ksuid"
 	log "github.com/yaklang/yaklang/common/log"

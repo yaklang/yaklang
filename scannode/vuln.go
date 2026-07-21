@@ -1,8 +1,8 @@
 package scannode
 
 import (
-	"github.com/jinzhu/gorm"
-	"github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/gorm/dialects/postgres"
 )
 
 type VulnTargetType string

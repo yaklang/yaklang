@@ -5,7 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"

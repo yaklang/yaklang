@@ -3,7 +3,7 @@ package schema
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 // AIStatsEntityHit 是 per-entity 的命中计数表 (用户级 profile DB).

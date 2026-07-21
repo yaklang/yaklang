@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 // AISkill represents a registered AI skill in the profile database.

@@ -11,7 +11,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 
 	"github.com/gorilla/mux"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"

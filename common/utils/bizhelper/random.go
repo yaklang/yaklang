@@ -1,7 +1,7 @@
 package bizhelper
 
 import (
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"math/rand"
 	"time"
 )

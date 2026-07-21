@@ -5,7 +5,7 @@ import (
 	"github.com/samber/lo"
 	"strings"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 

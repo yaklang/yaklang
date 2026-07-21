@@ -3,7 +3,7 @@ package schema
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 // AiMirrorRule represents a mirror rule used by aibalance to forward a snapshot

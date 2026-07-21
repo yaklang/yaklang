@@ -1,7 +1,7 @@
 package vulinbox
 
 import (
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	// uuid "github.com/google/uuid"
 )
 

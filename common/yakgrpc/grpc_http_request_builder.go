@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"google.golang.org/grpc"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"

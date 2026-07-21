@@ -1,7 +1,7 @@
 package auditlog
 
 import (
-	"github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/yaklang/gorm/dialects/postgres"
 )
 
 type Level string

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 // sanitizeStringForPG removes NUL bytes (\x00) from a string.

@@ -15,7 +15,7 @@ import (
 
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"

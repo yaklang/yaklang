@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"

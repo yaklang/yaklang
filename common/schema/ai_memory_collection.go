@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 // AIMemoryCollection 存储AI记忆的HNSW索引信息

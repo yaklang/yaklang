@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"

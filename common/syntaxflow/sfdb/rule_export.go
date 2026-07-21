@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
 	"github.com/tidwall/sjson"
 	"github.com/yaklang/yaklang/common/schema"
