@@ -1,0 +1,21 @@
+name: CI SSA Base Promote Trigger
+
+# When a PR merges into main, trigger the incremental promote in
+# yaklang/yaklang-ci-infra. The promote compiles the merged tip relative to
+# the last maintained base, switches the base pointer, and cleans up the
+# PR's diff programs.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+    paths:
+      - "common/**"
+
+jobs:
+  promote:
+    if: github.event.pull_request.merged == true
+    uses: yaklang/yaklang-ci-infra/.github/workflows/ci-ssa-base-promote.yml@main
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
