@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
-		"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const DefaultFindingVerifyConcurrency = 5
@@ -86,7 +86,7 @@ func runAllFindingVerifications(
 		ParentLoop:         loop,
 		TimelineMode:       reactloops.SubAgentTimelineFork,
 		ExecuteConcurrency: concurrency,
-		LoopBuilder: phase3FindingLoopBuilder{state: state, catalog: catalog},
+		LoopBuilder:        phase3FindingLoopBuilder{state: state, catalog: catalog},
 	})
 
 	sort.Slice(forkResults, func(i, j int) bool {
@@ -155,7 +155,6 @@ func finalizeFindingVerifyAfterFork(
 		execErr:    forkResult.ExecErr,
 	}
 }
-
 
 // phase3FindingLoopBuilder 是 phase3 fork 子 Agent 的自定义 LoopBuilder，
 // 替代原 fork 子 Agent 入口的 loop 构造回调。

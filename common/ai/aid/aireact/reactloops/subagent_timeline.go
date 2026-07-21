@@ -96,6 +96,7 @@ func buildSubAgentRuntime(
 	parentTask aicommon.AIStatefulTask,
 	job SubAgentJob,
 	handle *TimelineHandle,
+	opts SubAgentOptions,
 ) (invoker aicommon.AITaskInvokeRuntime, task aicommon.AIStatefulTask, release func(), err error) {
 	parentCfg, ok := parentInvoker.GetConfig().(*aicommon.Config)
 	if !ok || parentCfg == nil {
@@ -129,15 +130,34 @@ func buildSubAgentRuntime(
 
 	// 子 task 的 context 派生自 jobCtx，但子 task 完成不会取消 jobCtx
 	//（避免一个子任务完成时连带取消同一 job scope 上的其他工作）。
-	subTask := aicommon.NewSubTaskBaseWithOptions(
-		parentTask,
-		subTaskID,
-		userInput,
+	//
+	// InheritEmitter=true：子 Agent 直接复用父任务的 emitter，共用父任务的
+	// TaskId/TaskUUID，不发 react_task_created 卡片——前端表现为父任务自身
+	// 的流，用户不会看到额外的子任务卡片（适用于 fast_context 等"子 Agent
+	// 对用户不可见"的场景）。
+	// InheritEmitter=false（默认）：派生转发 emitter，打上子 TaskId/TaskUUID，
+	// 前端显示独立子 Agent 卡片（适用于 dispatch 等需要 UI 区分父子任务的
+	// 场景）。
+	subTaskOpts := []aicommon.StatefulTaskBaseOption{
 		aicommon.WithStatefulTaskBaseName(subTaskName),
 		aicommon.WithStatefulTaskBaseSubAgent(),
 		aicommon.WithStatefulTaskBaseContext(jobCtx),
-	)
-	taskEmitter := BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
+	}
+	if opts.InheritEmitter {
+		// 继承 emitter：跳过 react_task_created 卡片，复用父任务 emitter。
+		subTaskOpts = append(subTaskOpts, aicommon.WithStatefulTaskBaseSkipTaskStatusChangeEmit())
+	}
+	subTask := aicommon.NewSubTaskBaseWithOptions(parentTask, subTaskID, userInput, subTaskOpts...)
+	var taskEmitter *aicommon.Emitter
+	if opts.InheritEmitter {
+		// 复用父任务的 emitter，事件保持父任务的 TaskId，前端不出现新卡片。
+		taskEmitter = subTask.GetEmitter()
+		if taskEmitter == nil {
+			taskEmitter = parentCfg.GetEmitter()
+		}
+	} else {
+		taskEmitter = BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
+	}
 	subTask.SetEmitter(taskEmitter)
 
 	childInvoker, err := buildSubAgentInvoker(parentCfg, handle, subTask.GetContext(), taskEmitter)
@@ -327,14 +347,15 @@ func PrepareForkedSubAgent(
 		userInput = buildForkUserInput(job)
 	}
 
-	subTask := aicommon.NewSubTaskBaseWithOptions(
-		parentTask,
-		subTaskID,
-		userInput,
+	// PrepareForkedSubAgent 路径始终使用转发 emitter（InheritEmitter=false 语义，
+	// 即子 Agent 拥有独立 TaskId/TaskUUID，前端显示子卡片）。它服务于
+	// RunForkInvokerCallback 的轻量 fork 场景。
+	subTaskOpts := []aicommon.StatefulTaskBaseOption{
 		aicommon.WithStatefulTaskBaseName(subTaskName),
 		aicommon.WithStatefulTaskBaseSubAgent(),
 		aicommon.WithStatefulTaskBaseContext(jobCtx),
-	)
+	}
+	subTask := aicommon.NewSubTaskBaseWithOptions(parentTask, subTaskID, userInput, subTaskOpts...)
 	taskEmitter := BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
 	subTask.SetEmitter(taskEmitter)
 
