@@ -6,7 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"

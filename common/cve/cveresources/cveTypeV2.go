@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 )
 

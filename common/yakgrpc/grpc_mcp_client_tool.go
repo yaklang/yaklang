@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/consts"

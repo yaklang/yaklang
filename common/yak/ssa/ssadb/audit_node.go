@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/oklog/ulid"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )

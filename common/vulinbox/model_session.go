@@ -2,7 +2,7 @@ package vulinbox
 
 import (
 	uuid "github.com/google/uuid"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 type Session struct {

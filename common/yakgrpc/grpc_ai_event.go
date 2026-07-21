@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 func GormTransaction(db *gorm.DB, callback func(tx *gorm.DB) error) (err error) {

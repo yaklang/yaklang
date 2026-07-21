@@ -3,7 +3,7 @@ package vulinbox
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 type VulinVisitor struct {

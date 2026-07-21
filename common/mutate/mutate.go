@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 type RegexpMutateCondition struct {

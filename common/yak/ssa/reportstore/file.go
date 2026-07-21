@@ -1,6 +1,6 @@
 package reportstore
 
-import "github.com/jinzhu/gorm"
+import "github.com/yaklang/gorm"
 
 const (
 	SSAReportRecordFileTableName = "ssa_report_record_files"

@@ -3,7 +3,7 @@ package yakit
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 )
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/yaklang/gorm/dialects/postgres"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/spec"

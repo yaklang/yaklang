@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/mockey"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"google.golang.org/grpc"

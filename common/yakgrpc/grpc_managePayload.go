@@ -20,7 +20,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"

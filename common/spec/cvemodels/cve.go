@@ -2,7 +2,7 @@ package cvemodels
 
 import (
 	"encoding/json"
-	"github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/yaklang/gorm/dialects/postgres"
 	"github.com/pkg/errors"
 	"strings"
 	"time"

@@ -13,7 +13,7 @@ import (
 	"reflect"
 	"unicode"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/segmentio/ksuid"
 	"github.com/xdg-go/pbkdf2"
 	"github.com/yaklang/yaklang/common/gmsm/sm4"

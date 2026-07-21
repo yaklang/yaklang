@@ -3,7 +3,7 @@ package schema
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 // AISession stores basic metadata for an AI chat session.

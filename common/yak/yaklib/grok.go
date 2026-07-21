@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/bcicen/jstream"
-	"github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/yaklang/gorm/dialects/postgres"
 	"github.com/pkg/errors"
 	"github.com/vjeantet/grok"
 	"github.com/yaklang/yaklang/common/log"

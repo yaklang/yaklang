@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 )
 

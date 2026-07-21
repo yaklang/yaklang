@@ -1,6 +1,6 @@
 package yakit
 
-import "github.com/jinzhu/gorm"
+import "github.com/yaklang/gorm"
 
 type EnterpriseDetails struct {
 	gorm.Model

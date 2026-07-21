@@ -7,7 +7,7 @@ import (
 	"io"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"

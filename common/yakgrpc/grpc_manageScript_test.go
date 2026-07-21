@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -18,8 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/yaklang/gorm"
+	_ "github.com/yaklang/gorm/dialects/sqlite"
 )
 
 // createTestAIMemory 创建用于测试的AIMemory实例

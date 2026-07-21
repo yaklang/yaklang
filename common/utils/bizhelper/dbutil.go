@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/yaklang/gorm"
+	_ "github.com/yaklang/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"

@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"sort"

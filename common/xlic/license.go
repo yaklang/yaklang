@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"sync"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 //go:embed certs

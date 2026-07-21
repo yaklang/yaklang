@@ -3,7 +3,7 @@ package schema
 import (
 	"errors"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 

@@ -1,6 +1,6 @@
 package schema
 
-import "github.com/jinzhu/gorm"
+import "github.com/yaklang/gorm"
 
 type Progress struct {
 	gorm.Model

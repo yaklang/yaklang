@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/log"
 )

@@ -3,7 +3,7 @@ package schema
 import (
 	"strings"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 )
 
 func IsSQLite(db *gorm.DB) bool {

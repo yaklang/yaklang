@@ -3,7 +3,7 @@ package yakit
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"

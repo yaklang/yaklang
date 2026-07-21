@@ -13,7 +13,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
