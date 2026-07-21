@@ -17,16 +17,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
-// MaxHTTPFlowRequestBodyInDBBytes is the fallback spill threshold (200KB),
-// aligned with History list preview. Used when global MaxContentLength is unset.
+// MaxHTTPFlowRequestBodyInDBBytes is the DB spill / History-preview threshold (200KB).
+// Request bodies larger than this are spilled to disk instead of stored in SQLite.
 const MaxHTTPFlowRequestBodyInDBBytes = 200 * 1024
 
-// GetMaxHTTPFlowRequestBodyInDBBytes returns the request-body spill threshold.
-// It follows global MaxContentLength (全局配置「转储数据包大小」);
-// when unset (0), falls back to MaxHTTPFlowRequestBodyInDBBytes (200KB).
+// GetMaxHTTPFlowRequestBodyInDBBytes returns the request-body spill threshold for HTTPFlow DB.
+//
+// Spill is capped at MaxHTTPFlowRequestBodyInDBBytes (History list preview size).
+// GlobalMaxContentLength (「转储数据包大小」) may only LOWER the threshold when set below
+// 200KB; it must NOT raise spill into the multi-MB range, because that value also drives
+// MITM/lowhttp MaxContentLength and would couple DB policy to wire I/O limits.
 func GetMaxHTTPFlowRequestBodyInDBBytes() int {
 	n := consts.GetGlobalMaxContentLength()
-	if n == 0 {
+	if n == 0 || int(n) >= MaxHTTPFlowRequestBodyInDBBytes {
 		return MaxHTTPFlowRequestBodyInDBBytes
 	}
 	return int(n)

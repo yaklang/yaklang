@@ -15,10 +15,6 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTPFlow_LargeRequest_Spill(t *testing.T) {
-	prev := consts.GetGlobalMaxContentLength()
-	consts.SetGlobalMaxContentLength(uint64(yakit.MaxHTTPFlowRequestBodyInDBBytes))
-	defer consts.SetGlobalMaxContentLength(prev)
-
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 

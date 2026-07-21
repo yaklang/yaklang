@@ -17,10 +17,6 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTP_QueryHTTPFlow_Oversize_Request(t *testing.T) {
-	prev := consts.GetGlobalMaxContentLength()
-	consts.SetGlobalMaxContentLength(uint64(yakit.MaxHTTPFlowRequestBodyInDBBytes))
-	defer consts.SetGlobalMaxContentLength(prev)
-
 	var client, err = NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
