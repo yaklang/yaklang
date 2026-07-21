@@ -31,7 +31,7 @@ on:
 
 jobs:
   build_and_upload_asset:
-    runs-on: ${{ contains(inputs.os, 'windows') && 'windows-latest' || 'macos-14' }}
+    runs-on: ${{ (inputs.os == 'windows' || inputs.os == 'windows7') && 'windows-latest' || (inputs.os == 'linux-amd64' && 'ubuntu-22.04') || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm') || 'macos-14' }}
     steps:
       - uses: actions/checkout@v4
       
@@ -61,19 +61,9 @@ jobs:
           cd ${{ github.workspace }}
 
 
-      - name: Download CrossBuild GCC(Linux x64 / MacOS x64)
-        if: inputs.os == 'linux-amd64' || inputs.os == 'darwin-amd64'
-        run: |
-          brew tap messense/macos-cross-toolchains
-          brew install x86_64-unknown-linux-gnu
-          x86_64-linux-gnu-gcc -v
-
-      - name: Download CrossBuild GCC(Linux arm64)
-        if: inputs.os == 'linux-arm64' 
-        run: |
-          brew tap messense/macos-cross-toolchains
-          brew install aarch64-unknown-linux-gnu
-          aarch64-linux-gnu-gcc -v
+      - name: Go module download (Linux)
+        if: startsWith(inputs.os, 'linux')
+        run: go mod download
 
       - name: Build for Windows
         if: contains(inputs.os, 'windows')
@@ -86,20 +76,17 @@ jobs:
 
       - name: Build for Non-Windows
         if: ${{ !contains(inputs.os, 'windows') }}
+        shell: bash
         run: |
           export GOOS=$(echo ${{ inputs.os }} | cut -d'-' -f1)
           export GOARCH=$(echo ${{ inputs.os }} | cut -d'-' -f2)
           export OUTPUT_NAME="sfweb_${GOOS}_${GOARCH}"
           export CGO_ENABLED=1
-          if [ "${{ inputs.os }}" = "linux-amd64" ]; then
-            export CC=x86_64-linux-gnu-gcc
-          elif [ "${{ inputs.os }}" = "linux-arm64" ]; then
-            export CC=aarch64-linux-gnu-gcc
-          fi
 
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o $OUTPUT_NAME -v common/sfwebrunner/main.go && ls
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o "$OUTPUT_NAME" -v common/sfwebrunner/main.go
+          ls -lh "$OUTPUT_NAME"
 
-          echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
+          echo "OUTPUT_NAME=$OUTPUT_NAME" >> "$GITHUB_ENV"
 
       - name: Setup SSH
         if:  inputs.update == true 
