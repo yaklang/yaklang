@@ -2,10 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+	"sync"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
 )
 
 type MITMTestConfig struct {
@@ -70,6 +72,9 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 		MaxContentLength: int64(config.MaxContentLength),
 	})
 
+	// OnServerStarted must not run inline in the Recv loop: MITM may stream.Send
+	// (e.g. large-request notification) while the callback waits on poc/HTTP.
+	var startedWg sync.WaitGroup
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -80,9 +85,14 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 			t.Logf("message: %s", msg)
 			if strings.Contains(string(msg), `starting mitm server`) {
 				if config.OnServerStarted != nil {
-					config.OnServerStarted()
+					startedWg.Add(1)
+					go func() {
+						defer startedWg.Done()
+						config.OnServerStarted()
+					}()
 				}
 			}
 		}
 	}
+	startedWg.Wait()
 }
