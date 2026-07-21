@@ -402,8 +402,6 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
 	prefixMaterials.OutputExample = ""
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
@@ -451,13 +449,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(verificationInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(verificationOutputExampleText)
-	prefixMaterials.ToolInventory = false
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
 	prefixMaterials.PromotedSemiDynamic1 = ""
 	prefixMaterials.PromotedTimelineOpen = ""
@@ -476,7 +467,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		dynamicData["MaxIterations"] = currentLoop.GetMaxIterations()
 	}
 
-	aicommon.PopulateToolInventoryFromConfig(prefixMaterials, pm.react.config) // verification prompt 也展示工具列表, 避免ai cache出现连锁反应
 	prompt, err := pm.assemblePromptWithDynamicSection(
 		prefixMaterials,
 		"verification-dynamic",
@@ -512,13 +502,6 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(aiReviewInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(aiReviewOutputExampleText)
-	prefixMaterials.ToolInventory = false
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
 	prefixMaterials.PromotedSemiDynamic1 = ""
 	prefixMaterials.PromotedTimelineOpen = ""
@@ -556,13 +539,6 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(directlyAnswerInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(directlyAnswerOutputExampleText)
-	prefixMaterials.ToolInventory = false
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
@@ -601,13 +577,6 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongToolInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(wrongToolOutputExampleText)
-	prefixMaterials.ToolInventory = len(toolList) > 0
-	prefixMaterials.ToolsCount = len(toolList)
-	prefixMaterials.TopToolsCount = len(toolList)
-	prefixMaterials.TopTools = append([]*aitool.Tool{}, toolList...)
-	prefixMaterials.HasMoreTools = false
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
@@ -666,8 +635,6 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongParamsInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(wrongParamsOutputExampleText)
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
@@ -728,13 +695,6 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(changeBlueprintInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(changeBlueprintOutputExampleText)
-	prefixMaterials.ToolInventory = false
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
-	prefixMaterials.ForgeInventory = strings.TrimSpace(forgeList) != ""
-	prefixMaterials.AIForgeList = forgeList
 	prefixMaterials.SkillsContext = ""
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
@@ -793,13 +753,6 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(blueprintParamsInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(blueprintParamsOutputExampleText)
-	prefixMaterials.ToolInventory = false
-	prefixMaterials.ToolsCount = 0
-	prefixMaterials.TopToolsCount = 0
-	prefixMaterials.TopTools = nil
-	prefixMaterials.HasMoreTools = false
-	prefixMaterials.ForgeInventory = false
-	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
