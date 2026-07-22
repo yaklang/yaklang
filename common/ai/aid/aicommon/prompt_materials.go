@@ -106,8 +106,7 @@ func (m *PromptMaterials) SemiDynamic1Data() map[string]any {
 	return m.SemiDynamicData()
 }
 
-// SemiDynamic2Data 供 TaskInstruction -> ExecutionPolicy -> Schema ->
-// OutputExample 半动态段消费, 尾部追加 AutoLoadedSkills (AI 意图驱动加载 SKILL).
+// SemiDynamic2Data 供 TaskInstruction -> OutputExample -> Schema 半动态段消费, 尾部追加 AutoLoadedSkills (AI 意图驱动加载 SKILL).
 func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 	if m == nil {
 		return map[string]any{}
