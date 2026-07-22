@@ -1008,6 +1008,23 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, params.GetTags(), false)
 	}
 
+	if len(params.GetExcludeTags()) > 0 {
+		// 排除 tags 列里包含这些 tag 的流量（与 Tags 的 LIKE 语义对称，用 NOT LIKE）
+		var conds []string
+		var items []interface{}
+		for _, tag := range params.GetExcludeTags() {
+			tag = strings.TrimSpace(tag)
+			if tag == "" {
+				continue
+			}
+			conds = append(conds, "( tags NOT LIKE ? )")
+			items = append(items, fmt.Sprintf("%%%s%%", tag))
+		}
+		if len(conds) > 0 {
+			db = db.Where(strings.Join(conds, " AND "), items...)
+		}
+	}
+
 	if len(params.GetColor()) > 0 {
 		const yakitColorNone = "YAKIT_COLOR_NONE"
 

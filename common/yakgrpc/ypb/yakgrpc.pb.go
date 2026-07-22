@@ -51239,8 +51239,11 @@ type QueryHTTPFlowRequest struct {
 	// 高级配置的hostname过滤（模糊匹配）
 	HostnameFilter                 []string                             `protobuf:"bytes,49,rep,name=HostnameFilter,proto3" json:"HostnameFilter,omitempty"`
 	MitmExtractAggregateFilterRows []*MITMExtractAggregateFlowFilterRow `protobuf:"bytes,50,rep,name=MitmExtractAggregateFilterRows,proto3" json:"MitmExtractAggregateFilterRows,omitempty"`
-	unknownFields                  protoimpl.UnknownFields
-	sizeCache                      protoimpl.SizeCache
+	// 排除包含这些 tag 的流量（用于"仅保留收藏"：删除不带收藏 tag 的流量时，
+	// 把收藏 tag 填入此处，筛选出非收藏流量后批量删除）
+	ExcludeTags   []string `protobuf:"bytes,51,rep,name=ExcludeTags,proto3" json:"ExcludeTags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *QueryHTTPFlowRequest) Reset() {
@@ -51605,6 +51608,13 @@ func (x *QueryHTTPFlowRequest) GetHostnameFilter() []string {
 func (x *QueryHTTPFlowRequest) GetMitmExtractAggregateFilterRows() []*MITMExtractAggregateFlowFilterRow {
 	if x != nil {
 		return x.MitmExtractAggregateFilterRows
+	}
+	return nil
+}
+
+func (x *QueryHTTPFlowRequest) GetExcludeTags() []string {
+	if x != nil {
+		return x.ExcludeTags
 	}
 	return nil
 }
@@ -77175,7 +77185,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"g\n" +
 	"!MITMExtractAggregateFlowFilterRow\x12 \n" +
 	"\vRuleVerbose\x18\x01 \x01(\tR\vRuleVerbose\x12 \n" +
-	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\xe7\r\n" +
+	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\x89\x0e\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -77235,7 +77245,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\x12,\n" +
 	"\x11ExcludeStatusCode\x180 \x01(\tR\x11ExcludeStatusCode\x12&\n" +
 	"\x0eHostnameFilter\x181 \x03(\tR\x0eHostnameFilter\x12n\n" +
-	"\x1eMitmExtractAggregateFilterRows\x182 \x03(\v2&.ypb.MITMExtractAggregateFlowFilterRowR\x1eMitmExtractAggregateFilterRows\"\xdc\x01\n" +
+	"\x1eMitmExtractAggregateFilterRows\x182 \x03(\v2&.ypb.MITMExtractAggregateFlowFilterRowR\x1eMitmExtractAggregateFilterRows\x12 \n" +
+	"\vExcludeTags\x183 \x03(\tR\vExcludeTags\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
