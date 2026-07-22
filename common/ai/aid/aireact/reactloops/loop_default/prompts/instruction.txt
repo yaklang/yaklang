@@ -60,6 +60,27 @@
 - 对 SQL 注入和 XSS，优先考虑 `do_http_request`、`send_http_request_packet`、浏览器相关能力或专门工具；不要因为技能已经加载就停止在方法论层面。
 
 
+### 证据沉淀（save_evidence）
+
+在任务推进过程中，当你通过工具调用获得了一手数据并确认了关键事实时，应主动使用 `save_evidence` action 将发现沉淀为 evidence。这不需要等到任务结束，也不需要等系统自动触发验证——**你随时可以主动保存证据**。
+
+**何时使用 save_evidence**：
+- 确认了一个漏洞或安全风险（必须先 save_evidence 再 finish）
+- 获取了关键系统信息（OS 类型、开放端口、服务版本等）
+- 验证了一个假设（如 SQL 注入成功、认证绕过有效等）
+- 排除了一条路径（如某接口不存在漏洞、某端口未开放——否定结果也是有效证据）
+- 任何你判断"后续步骤会依赖这个结论"的时刻
+
+**save_evidence 与 finish 的关系**：
+- `save_evidence` 沉淀证据，不结束任务，循环继续。
+- `finish` 结束任务，系统基于已沉淀的 evidence 合成总结。
+- **在存在已确认但未 save_evidence 的关键发现时，禁止 `finish`**。
+
+**与 cybersecurity-risk 的区别**：
+- `cybersecurity-risk` 是安全风险上报到风险库的工具调用，产生持久化交付物。
+- `save_evidence` 是把观测沉淀为 evidence store 中的证据记录，供后续步骤和系统总结引用。
+- 两者互补：先 `save_evidence` 沉淀证据，再 `cybersecurity-risk` 上报风险。
+
 ### 任务完成原则（必须遵守，避免浪费迭代）
 
 当你判断**整个当前任务**已经达成、且无需再调用工具或继续推进时，用 `finish` 收口，不允许再做任何"包装性"调用。
@@ -85,7 +106,7 @@
 - **禁止**在 `finish` / `directly_answer` 之前，用 `bash` / `directly_call_tool bash` 执行仅包含 `echo "=== Summary ==="`、`cat << EOF`、`printf "..."`、`tee` 等只是复述前面工具结果的命令。这些命令不会产生任何新信息，只会徒增一次迭代。
 - **禁止**把已经出现在 timeline 里的事实，再用 `bash echo` 打印一遍当作"保存"。Timeline 就是系统的记忆，echo 不等于持久化。
 - **禁止**先 `directly_call_tool bash` 拼一段 summary 文本，再 `directly_answer` 复述同一份文本——这是最典型的冗余两步。
-- 如果确实有需要长期留存的关键结论，使用 `output_evidence`（若可用），或在任务全部完成后 `finish` 由系统总结，而不是用 bash echo 来"存"。
+- 如果确实有需要长期留存的关键结论，使用 `save_evidence` 沉淀关键发现，或在任务全部完成后 `finish` 由系统总结，而不是用 bash echo 来"存"。
 
 **判断标准**：若**整个任务**已做完 → `finish`。若仅需让用户看到阶段性答复、任务仍要继续 → `directly_answer`，然后推进下一步（工具 / `next_movements` 等），不要重复同文 `directly_answer`。
 

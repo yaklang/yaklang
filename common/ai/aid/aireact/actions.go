@@ -12,6 +12,6 @@ const (
 	ActionRequestPlanExecution    ActionType = schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION
 	ActionAskForClarification     ActionType = schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION
 	ActionKnowledgeEnhanceAnswer  ActionType = schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE
-	ActionRequestVerification     ActionType = schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION
+	ActionSaveEvidence     ActionType = schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE
 	ActionWriteYaklangCode        ActionType = "write_yaklang_code"
 )

@@ -156,6 +156,7 @@ AITAG 只作为字段内容承载方式，不作为推理对象。
 - EVIDENCE 跨子任务共享. 并行 Plan 中每条必须能改变后续动作或边界判断.
 - EVIDENCE 四要素. 主体 (接口 / URL / 文件 / 进程)、动作 (方法 / payload / 命令)、观测 (响应码 / 片段 / 字段差异)、控制含义. 缺一不写.
 - EVIDENCE 增量. op=add / update / delete; 试错 / 空跑 / 未稳定观测不写.
+- EVIDENCE 主动沉淀. 确认关键事实 / 漏洞 / 路径排除时, 主动调 save_evidence 沉淀, 不等系统自动触发.
 - 主/子身份. PARENT-TASK 存在即当前是子任务, 完成判定只对 CURRENT-TASK 生效, 不解 PARENT-TASK 目标; PARENT-TASK 缺失即主任务, 完成判定对 USER-ORIGINAL-QUERY 生效.
 - 边界即止. 子任务完成立刻按 schema 收口动作收口, 不替系统调度兄弟 / 父节点; 跨节点决策权在 coordinator.
 
