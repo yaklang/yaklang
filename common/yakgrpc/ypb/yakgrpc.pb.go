@@ -43968,9 +43968,12 @@ type QueryYakScriptRequest struct {
 	FieldKeywords            string                 `protobuf:"bytes,21,opt,name=FieldKeywords,proto3" json:"FieldKeywords,omitempty"`
 	VectorSearchContent      string                 `protobuf:"bytes,22,opt,name=VectorSearchContent,proto3" json:"VectorSearchContent,omitempty"`
 	// 为 true 时仅返回 enable_for_ai=true 的插件
-	EnableForAI   bool `protobuf:"varint,23,opt,name=EnableForAI,proto3" json:"EnableForAI,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	EnableForAI bool `protobuf:"varint,23,opt,name=EnableForAI,proto3" json:"EnableForAI,omitempty"`
+	// 为 true 时按插件使用次数（exec_histories 按 plugin_id 聚合 count）降序排序，
+	// 供"编辑常用插件"页按使用频次展示。优先级高于 Pagination.OrderBy。
+	SortByUsageCount bool `protobuf:"varint,24,opt,name=SortByUsageCount,proto3" json:"SortByUsageCount,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *QueryYakScriptRequest) Reset() {
@@ -44160,6 +44163,13 @@ func (x *QueryYakScriptRequest) GetVectorSearchContent() string {
 func (x *QueryYakScriptRequest) GetEnableForAI() bool {
 	if x != nil {
 		return x.EnableForAI
+	}
+	return false
+}
+
+func (x *QueryYakScriptRequest) GetSortByUsageCount() bool {
+	if x != nil {
+		return x.SortByUsageCount
 	}
 	return false
 }
@@ -76464,7 +76474,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bProgress\x18\x02 \x01(\x01R\bProgress\"O\n" +
 	"\x1dGetAllPayloadFromFileResponse\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x12\n" +
-	"\x04Data\x18\x02 \x01(\fR\x04Data\"\xd4\x06\n" +
+	"\x04Data\x18\x02 \x01(\fR\x04Data\"\x80\a\n" +
 	"\x15QueryYakScriptRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -76491,7 +76501,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x12IsMITMParamPlugins\x18\x14 \x01(\x03R\x12IsMITMParamPlugins\x12$\n" +
 	"\rFieldKeywords\x18\x15 \x01(\tR\rFieldKeywords\x120\n" +
 	"\x13VectorSearchContent\x18\x16 \x01(\tR\x13VectorSearchContent\x12 \n" +
-	"\vEnableForAI\x18\x17 \x01(\bR\vEnableForAI\"g\n" +
+	"\vEnableForAI\x18\x17 \x01(\bR\vEnableForAI\x12*\n" +
+	"\x10SortByUsageCount\x18\x18 \x01(\bR\x10SortByUsageCount\"g\n" +
 	"\vPluginGroup\x12\x1e\n" +
 	"\n" +
 	"UnSetGroup\x18\x01 \x01(\bR\n" +

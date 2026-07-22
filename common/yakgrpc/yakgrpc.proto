@@ -6164,6 +6164,9 @@ message QueryYakScriptRequest {
   string VectorSearchContent = 22;
   // 为 true 时仅返回 enable_for_ai=true 的插件
   bool EnableForAI = 23;
+  // 为 true 时按插件使用次数（exec_histories 按 plugin_id 聚合 count）降序排序，
+  // 供"编辑常用插件"页按使用频次展示。优先级高于 Pagination.OrderBy。
+  bool SortByUsageCount = 24;
 }
 
 message PluginGroup {

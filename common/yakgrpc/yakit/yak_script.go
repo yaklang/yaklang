@@ -556,7 +556,14 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		}
 	}
 	p := params.Pagination
-	db = bizhelper.OrderByPaging(db, p)
+	// 按插件使用次数排序：exec_histories 按 plugin_id 聚合 count，降序。
+	// 用标量子查询作为 ORDER BY，避免 JOIN 影响 Paging 的 count 计算。
+	// 优先级高于 Pagination.OrderBy/Order。
+	if params.GetSortByUsageCount() {
+		db = db.Order("(SELECT COUNT(*) FROM exec_histories WHERE exec_histories.plugin_id = yak_scripts.id) DESC, updated_at DESC")
+	} else {
+		db = bizhelper.OrderByPaging(db, p)
+	}
 	db = FilterYakScript(db, params) // .LogMode(true).Debug()
 	var ret []*schema.YakScript
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
