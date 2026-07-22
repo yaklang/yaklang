@@ -177,6 +177,79 @@ def read_manifest(data_dir: Path) -> dict | None:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Event log — append PR lifecycle events to ci-ssa-data/events.json for
+# external dashboards / auditing. Keeps the most recent 200 entries.
+# ---------------------------------------------------------------------------
+
+MAX_EVENTS = 200
+
+
+def append_event(data_dir: Path, event: dict) -> None:
+    """Append an event to events.json, trimming to MAX_EVENTS entries."""
+    events_path = data_dir / "events.json"
+    events = []
+    if events_path.exists():
+        try:
+            events = json.loads(events_path.read_text())
+            if not isinstance(events, list):
+                events = []
+        except Exception:
+            events = []
+    event["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    events.append(event)
+    # Trim to most recent MAX_EVENTS
+    if len(events) > MAX_EVENTS:
+        events = events[-MAX_EVENTS:]
+    try:
+        events_path.write_text(json.dumps(events, indent=2, ensure_ascii=False) + "\n")
+    except Exception as e:
+        log(f"Failed to write events.json: {e}", "ERROR")
+
+
+def check_closed_prs(repo: str, token: str | None, data_dir: Path) -> None:
+    """
+    Check for recently closed (non-merged) PRs and log them as 'closed' events.
+    Uses the search API; records only PRs not already in events.json as closed.
+    """
+    events_path = data_dir / "events.json"
+    seen_closed = set()
+    if events_path.exists():
+        try:
+            for ev in json.loads(events_path.read_text()):
+                if ev.get("type") == "closed":
+                    seen_closed.add(ev.get("pr_number"))
+        except Exception:
+            pass
+
+    search_url = f"{GITHUB_API}/search/issues"
+    params = {
+        "q": f"repo:{repo} is:pr is:closed base:main sort:updated",
+        "per_page": 10,
+    }
+    try:
+        r = requests.get(search_url, headers=github_headers(token), params=params, timeout=30)
+        if r.status_code != 200:
+            return
+        for item in r.json().get("items", []):
+            # Skip merged PRs (those are tracked as 'merged' events)
+            if item.get("pull_request", {}).get("merged_at"):
+                continue
+            pr_number = item["number"]
+            if pr_number in seen_closed:
+                continue
+            append_event(data_dir, {
+                "type": "closed",
+                "pr_number": pr_number,
+                "title": item.get("title", ""),
+                "html_url": item.get("html_url", ""),
+            })
+            log(f"PR #{pr_number} closed: {item.get('title', '')[:50]}")
+            seen_closed.add(pr_number)
+    except Exception as e:
+        log(f"check_closed_prs failed: {e}", "WARN")
+
+
 def prepare_clone(worktree: Path, new_sha: str) -> Path | None:
     """
     Create a plain clone of the worktree's repo for running promote.
@@ -482,13 +555,35 @@ def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | No
     if merged_prs:
         pr_list = ", ".join(f"#{p['number']} ({p['title'][:40]})" for p in merged_prs)
         log(f"Found {len(merged_prs)} merged PR(s): {pr_list}")
+        # Record merge events
+        for pr in merged_prs:
+            append_event(data_dir, {
+                "type": "merged",
+                "pr_number": pr["number"],
+                "title": pr.get("title", ""),
+                "sha": pr.get("merge_commit_sha", main_head),
+                "html_url": pr.get("html_url", ""),
+            })
     else:
         log(f"No PRs found in range {manifest_sha[:8]}...{main_head[:8]} (may be direct push or search miss)")
 
     # 5. Run promote for the new HEAD
     # Use the last PR number if available (cleanup targets that PR's diff programs)
     pr_number = str(merged_prs[-1]["number"]) if merged_prs else ""
+    # Record CI running event
+    append_event(data_dir, {
+        "type": "ci_running",
+        "pr_number": int(pr_number) if pr_number else None,
+        "sha": main_head,
+    })
     success = run_promote(repo, worktree, data_dir, manifest_sha, main_head, pr_number, token)
+    # Record CI done event
+    append_event(data_dir, {
+        "type": "ci_done",
+        "pr_number": int(pr_number) if pr_number else None,
+        "sha": main_head,
+        "success": success,
+    })
 
     # 6. Verify: read manifest again
     new_manifest = read_manifest(data_dir)
@@ -536,6 +631,7 @@ def main():
     while True:
         try:
             check_and_promote(args.repo, worktree, data_dir, token)
+            check_closed_prs(args.repo, token, data_dir)
         except KeyboardInterrupt:
             log("Interrupted by user, exiting")
             break
