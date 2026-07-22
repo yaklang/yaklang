@@ -2,6 +2,7 @@ package dbcache_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -21,15 +22,16 @@ type TestItem struct {
 func TestNewSaver(t *testing.T) {
 	// Test with default options
 	savedItems := make([]TestItem, 0)
-	saveFn := func(items []TestItem) {
+	saveFn := func(items []TestItem) error {
 		savedItems = append(savedItems, items...)
+		return nil
 	}
 
 	saver := dbcache.NewSave(saveFn)
 	require.NotNil(t, saver)
 	// We can't directly access internal fields of Saver from the test package
 	// Just verify that the saver is created successfully and can be closed
-	saver.Close()
+	require.NoError(t, saver.Close())
 
 	// Test with custom options
 	ctx := context.Background()
@@ -40,16 +42,17 @@ func TestNewSaver(t *testing.T) {
 	)
 	require.NotNil(t, saver)
 	// Can't access internal field wg
-	saver.Close()
+	require.NoError(t, saver.Close())
 }
 
 func TestSaver_Save(t *testing.T) {
 	savedItems := []TestItem{}
 	saveMutex := &sync.Mutex{}
-	saveFn := func(items []TestItem) {
+	saveFn := func(items []TestItem) error {
 		saveMutex.Lock()
 		defer saveMutex.Unlock()
 		savedItems = append(savedItems, items...)
+		return nil
 	}
 
 	ttl := 100 * time.Millisecond
@@ -107,10 +110,11 @@ func TestSaver_Save(t *testing.T) {
 func TestSaver_Close(t *testing.T) {
 	savedItems := []TestItem{}
 	saveMutex := &sync.Mutex{}
-	saveFn := func(items []TestItem) {
+	saveFn := func(items []TestItem) error {
 		saveMutex.Lock()
 		defer saveMutex.Unlock()
 		savedItems = append(savedItems, items...)
+		return nil
 	}
 
 	saver := dbcache.NewSave(saveFn)
@@ -127,7 +131,7 @@ func TestSaver_Close(t *testing.T) {
 	}
 
 	// Then close, should process remaining items
-	saver.Close()
+	require.NoError(t, saver.Close())
 
 	saveMutex.Lock()
 	require.GreaterOrEqual(t, len(savedItems), 3, "Should have saved at least one item")
@@ -137,10 +141,11 @@ func TestSaver_Close(t *testing.T) {
 func TestSaver_WithCustomContext(t *testing.T) {
 	savedItems := []TestItem{}
 	saveMutex := &sync.Mutex{}
-	saveFn := func(items []TestItem) {
+	saveFn := func(items []TestItem) error {
 		saveMutex.Lock()
 		defer saveMutex.Unlock()
 		savedItems = append(savedItems, items...)
+		return nil
 	}
 
 	// Create a context that can be canceled
@@ -188,11 +193,12 @@ func TestSaveAutoSaveSize(t *testing.T) {
 	var savedItemSize []int
 	var mu sync.Mutex
 
-	saveFn := func(items []int) {
+	saveFn := func(items []int) error {
 		mu.Lock()
 		defer mu.Unlock()
 		savedItemSize = append(savedItemSize, len(items))
 		// Make a copy of the slice
+		return nil
 	}
 
 	save := dbcache.NewSave(saveFn,
@@ -220,7 +226,7 @@ func TestSaver_SaveRunsSerially(t *testing.T) {
 	var active atomic.Int32
 	var maxActive atomic.Int32
 
-	saveFn := func(items []int) {
+	saveFn := func(items []int) error {
 		current := active.Add(1)
 		for {
 			maxSeen := maxActive.Load()
@@ -230,6 +236,7 @@ func TestSaver_SaveRunsSerially(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 		active.Add(-1)
+		return nil
 	}
 
 	saver := dbcache.NewSave(saveFn,
@@ -246,15 +253,16 @@ func TestSaver_SaveRunsSerially(t *testing.T) {
 
 func TestSaver_Stats(t *testing.T) {
 	var batches int
-	saver := dbcache.NewSave(func(items []int) {
+	saver := dbcache.NewSave(func(items []int) error {
 		batches++
 		time.Sleep(10 * time.Millisecond)
+		return nil
 	}, dbcache.WithSaveSize(2), dbcache.WithSaveTimeout(30*time.Millisecond))
 
 	saver.Save(1)
 	saver.Save(2)
 	saver.Save(3)
-	saver.Close()
+	require.NoError(t, saver.Close())
 
 	stats := saver.Stats()
 	require.Equal(t, 3, int(stats.BatchItemsTotal))
@@ -263,4 +271,48 @@ func TestSaver_Stats(t *testing.T) {
 	require.GreaterOrEqual(t, int(stats.MaxBatchSize), 1)
 	require.GreaterOrEqual(t, stats.SaveTimeTotal, 10*time.Millisecond)
 	require.Equal(t, int(stats.BatchCount), batches)
+}
+
+func TestSaver_CloseReturnsError(t *testing.T) {
+	wantErr := errors.New("db write failed")
+	saver := dbcache.NewSave(func(items []TestItem) error {
+		return wantErr
+	}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond))
+
+	saver.Save(TestItem{ID: 1, Data: "trigger"})
+	err := saver.Close()
+	require.Error(t, err)
+	require.ErrorIs(t, err, wantErr)
+}
+
+func TestSaver_FlushReturnsError(t *testing.T) {
+	wantErr := errors.New("flush write failed")
+	saver := dbcache.NewSave(func(items []TestItem) error {
+		return wantErr
+	}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond))
+
+	saver.Save(TestItem{ID: 1, Data: "trigger"})
+	err := saver.Flush()
+	require.Error(t, err)
+	require.ErrorIs(t, err, wantErr)
+	_ = saver.Close()
+}
+
+func TestSaver_PanicRecordedAsError(t *testing.T) {
+	saver := dbcache.NewSave(func(items []TestItem) error {
+		panic("boom in save callback")
+	}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond))
+
+	saver.Save(TestItem{ID: 1, Data: "trigger"})
+	err := saver.Close()
+	require.Error(t, err)
+}
+
+func TestSaver_CloseNoErrorOnSuccess(t *testing.T) {
+	saver := dbcache.NewSave(func(items []TestItem) error {
+		return nil
+	}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond))
+
+	saver.Save(TestItem{ID: 1, Data: "ok"})
+	require.NoError(t, saver.Close())
 }

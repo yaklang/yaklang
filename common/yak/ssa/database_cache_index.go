@@ -42,7 +42,7 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 		return store
 	}
 
-	store.indexSaver = dbcache.NewSave(func(indices []*ssadb.IrIndex) {
+	store.indexSaver = dbcache.NewSave(func(indices []*ssadb.IrIndex) error {
 		saveStep := func() error {
 			return utils.GormTransaction(db, func(tx *gorm.DB) error {
 				batch := make([]*ssadb.IrIndex, 0, len(indices))
@@ -55,19 +55,19 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 				return nil
 			})
 		}
-		store.diagnosticsTrack("ssa.Database.SaveIrIndexBatch", saveStep)
+		return store.diagnosticsTrackErr("ssa.Database.SaveIrIndexBatch", saveStep)
 	},
 		dbcache.WithSaveSize(saveSize),
 		dbcache.WithSaveTimeout(saveTime),
 		dbcache.WithName("IrIndex"),
 	)
-	store.offsetSaver = dbcache.NewSave(func(offsets []*ssadb.IrOffset) {
+	store.offsetSaver = dbcache.NewSave(func(offsets []*ssadb.IrOffset) error {
 		saveStep := func() error {
 			return utils.GormTransaction(db, func(tx *gorm.DB) error {
 				return ssadb.SaveIrOffsetBatch(tx, offsets)
 			})
 		}
-		store.diagnosticsTrack("ssa.Database.SaveIrOffsetBatch", saveStep)
+		return store.diagnosticsTrackErr("ssa.Database.SaveIrOffsetBatch", saveStep)
 	},
 		dbcache.WithSaveSize(saveSize),
 		dbcache.WithSaveTimeout(saveTime),
@@ -76,28 +76,40 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 	return store
 }
 
-func (s *indexStore) Close() {
+func (s *indexStore) Close() error {
 	if s == nil {
-		return
+		return nil
 	}
+	var errs []error
 	if s.indexSaver != nil {
-		s.indexSaver.Close()
+		if err := s.indexSaver.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if s.offsetSaver != nil {
-		s.offsetSaver.Close()
+		if err := s.offsetSaver.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
+	return utils.JoinErrors(errs...)
 }
 
-func (s *indexStore) Flush() {
+func (s *indexStore) Flush() error {
 	if s == nil {
-		return
+		return nil
 	}
+	var errs []error
 	if s.indexSaver != nil {
-		s.indexSaver.Flush()
+		if err := s.indexSaver.Flush(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if s.offsetSaver != nil {
-		s.offsetSaver.Flush()
+		if err := s.offsetSaver.Flush(); err != nil {
+			errs = append(errs, err)
+		}
 	}
+	return utils.JoinErrors(errs...)
 }
 
 func (s *indexStore) AddInstructionOffsets(inst Instruction) {
@@ -218,15 +230,21 @@ func (s *indexStore) FindByVariableEx(mod ssadb.MatchMode, checkValue func(strin
 }
 
 func (s *indexStore) diagnosticsTrack(name string, steps ...func() error) {
+	_ = s.diagnosticsTrackErr(name, steps...)
+}
+
+func (s *indexStore) diagnosticsTrackErr(name string, steps ...func() error) error {
 	if s == nil || s.program == nil {
 		for _, step := range steps {
 			if step != nil {
-				_ = step()
+				if err := step(); err != nil {
+					return err
+				}
 			}
 		}
-		return
+		return nil
 	}
-	s.program.DiagnosticsTrack(name, steps...)
+	return s.program.DiagnosticsTrackErr(name, steps...)
 }
 
 func (s *indexStore) SaveVariableOffset(variable *Variable, rng *memedit.Range) {
