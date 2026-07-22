@@ -30,6 +30,9 @@ func nonce() string {
 //go:embed prompts/tool-params/instruction.txt
 var toolParamsInstructionText string
 
+//go:embed prompts/tool-params/output_example.txt
+var toolParamsOutputExampleText string
+
 //go:embed prompts/tool-params/dynamic.txt
 var toolParamsDynamicTemplate string
 
@@ -63,14 +66,8 @@ var wrongToolOutputExampleText string
 //go:embed prompts/tool/wrong-tool_dynamic.txt
 var wrongToolDynamicTemplate string
 
-//go:embed prompts/tool/wrong-params_instruction.txt
-var wrongParamsInstructionText string
 
-//go:embed prompts/tool/wrong-params_output_example.txt
-var wrongParamsOutputExampleText string
 
-//go:embed prompts/tool/wrong-params_dynamic.txt
-var wrongParamsDynamicTemplate string
 
 //go:embed prompts/tool/interval-review_instruction.txt
 var intervalReviewInstructionText string
@@ -84,14 +81,8 @@ var intervalReviewDynamicTemplate string
 //go:embed prompts/tool/interval-review.json
 var intervalReviewSchemaJSON string
 
-//go:embed prompts/tool-params/blueprint-params_instruction.txt
-var blueprintParamsInstructionText string
 
-//go:embed prompts/tool-params/blueprint-params_output_example.txt
-var blueprintParamsOutputExampleText string
 
-//go:embed prompts/tool-params/blueprint-params_dynamic.txt
-var blueprintParamsDynamicTemplate string
 
 //go:embed prompts/change-blueprint/instruction.txt
 var changeBlueprintInstructionText string
@@ -327,7 +318,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
-	prefixMaterials.OutputExample = ""
+	prefixMaterials.OutputExample = strings.TrimSpace(toolParamsOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
@@ -502,8 +493,8 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	}
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongParamsInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(wrongParamsOutputExampleText)
+	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(toolParamsOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
@@ -518,8 +509,8 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
 		prefixMaterials,
-		"wrong-params-dynamic",
-		wrongParamsDynamicTemplate,
+		"tool-params-dynamic",
+		toolParamsDynamicTemplate,
 		dynamicData,
 	)
 	if err != nil {
@@ -620,28 +611,29 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = true
 	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(blueprintParamsInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(blueprintParamsOutputExampleText)
+	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
+	prefixMaterials.OutputExample = strings.TrimSpace(toolParamsOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
 	})
-	dynamicData["BlueprintName"] = ins.ForgeName
-	dynamicData["BlueprintDescription"] = ins.Description
+	dynamicData["ToolName"] = ins.ForgeName
+	dynamicData["ToolDescription"] = ins.Description
 	dynamicData["OldParams"] = ""
 	if !utils.IsNil(oldParams) && len(oldParams) > 0 {
 		dynamicData["OldParams"] = oldParams.Dump()
 	}
+	dynamicData["IsBlueprint"] = true
 	dynamicData["ExtraPrompt"] = extraPrompt
 	dynamicData["CurrentIteration"] = pm.react.currentIteration
 	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
 
 	return pm.assemblePromptWithDynamicSection(
 		prefixMaterials,
-		"blueprint-params-dynamic",
-		blueprintParamsDynamicTemplate,
+		"tool-params-dynamic",
+		toolParamsDynamicTemplate,
 		dynamicData,
 	)
 }
