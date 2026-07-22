@@ -1,7 +1,6 @@
 package ssadb
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/gorm"
@@ -9,14 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-// irOffsetInsertColumns are the IrOffset application columns written by the
-// batched multi-row INSERT below (gorm.Model fields left to SQLite defaults,
-// matching the prior per-row db.Save-on-zero-PK = INSERT behavior).
-var irOffsetInsertColumns = []string{
-	"program_name", "file_hash", "start_offset", "end_offset", "variable_name", "value_id",
-}
-
-// irOffsetBatchChunk bounds rows per multi-row INSERT under SQLite's ~999
+// irOffsetBatchChunk bounds rows per CreateInBatches call under SQLite's ~999
 // host-parameter limit: 150 rows * 6 cols = 900.
 const irOffsetBatchChunk = 150
 
@@ -53,7 +45,7 @@ func SaveIrOffset(db *gorm.DB, idx *IrOffset) {
 	_ = db.Save(idx).Error
 }
 
-// SaveIrOffsetBatch issues chunked multi-row INSERTs for a batch of offsets.
+// SaveIrOffsetBatch issues chunked batched INSERTs for a batch of offsets.
 // ir_offsets has no UNIQUE constraint and recompile deletes the program's rows
 // first (ssadb.DeleteProgramIrCode), so this is a pure INSERT — not an upsert —
 // matching the prior per-row SaveIrOffset path, but in one statement per chunk
@@ -68,46 +60,10 @@ func SaveIrOffsetBatch(db *gorm.DB, items []*IrOffset) error {
 			clean = append(clean, it)
 		}
 	}
-	for start := 0; start < len(clean); start += irOffsetBatchChunk {
-		end := start + irOffsetBatchChunk
-		if end > len(clean) {
-			end = len(clean)
-		}
-		if err := bulkInsertIrOffset(db, clean[start:end]); err != nil {
-			return err
-		}
+	if r := db.CreateInBatches(clean, irOffsetBatchChunk); r.Error != nil {
+		return r.Error
 	}
 	return nil
-}
-
-// bulkInsertIrOffset issues a single multi-row INSERT for one chunk.
-//
-// TODO(gorm-v2): once the gorm v1->v2 migration (commit 178272476, not yet on
-// this branch) lands, replace this hand-built multi-row INSERT with
-// db.CreateInBatches(items, irOffsetBatchChunk). gorm v1 (v1.9.2) panics on
-// Create(slice), so raw Exec is the only way to batch INSERT here.
-func bulkInsertIrOffset(db *gorm.DB, items []*IrOffset) error {
-	if len(items) == 0 {
-		return nil
-	}
-	cols := len(irOffsetInsertColumns)
-	placeholder := "(" + strings.Repeat("?,", cols-1) + "?)"
-	values := make([]string, 0, len(items))
-	args := make([]interface{}, 0, len(items)*cols)
-	for _, it := range items {
-		values = append(values, placeholder)
-		args = append(args,
-			it.ProgramName, it.FileHash, it.StartOffset, it.EndOffset,
-			it.VariableName, it.ValueID,
-		)
-	}
-	sql := fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES %s",
-		TableIrOffsets,
-		strings.Join(irOffsetInsertColumns, ","),
-		strings.Join(values, ","),
-	)
-	return db.Exec(sql, args...).Error
 }
 
 func GetOffsetByVariable(name string, valueID int64, programName string) []*IrOffset {

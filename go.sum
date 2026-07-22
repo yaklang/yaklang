@@ -568,8 +568,8 @@ github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f h1:YuuIpas5z91t2S6
 github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
 github.com/yaklang/go-sqlite3 v0.0.1 h1:IXdqvUAct8FygqoQ3XgWBqw8Bh7qQFa0miTl4cM4B+4=
 github.com/yaklang/go-sqlite3 v0.0.1/go.mod h1:RCLoOuANeSNMmFMCABJyusomiGXnZjkLk20oZSAAh5U=
-github.com/yaklang/gorm v0.0.0-20260721083933-0690a52e12b7 h1:9se6ilhtgDtUvaMaNvsMchgOez+/Rff4PduXxbvWRyE=
-github.com/yaklang/gorm v0.0.0-20260721083933-0690a52e12b7/go.mod h1:MLz7D6W16O5pjnGfTxqZ0YWe44UGSKtVLEKASORxXT8=
+github.com/yaklang/gorm v1.9.17-0.20260722090800-a3b2235d9c1f h1:1KrKwkkHBq39Jakr1OTNGwymW8dWi5oF3A73cKhvT9U=
+github.com/yaklang/gorm v1.9.17-0.20260722090800-a3b2235d9c1f/go.mod h1:MLz7D6W16O5pjnGfTxqZ0YWe44UGSKtVLEKASORxXT8=
 github.com/yaklang/javajive v0.1.2 h1:sAE/UruiNqcjCrEK1wyp3E3ooHJPwWHdXnNUbybxHvA=
 github.com/yaklang/javajive v0.1.2/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
 github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80 h1:ZSw9udYCWovKLhUQhoNurjaEvX+HroS6il3hE3ulTC4=

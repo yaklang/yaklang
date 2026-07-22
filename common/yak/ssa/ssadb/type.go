@@ -1,22 +1,12 @@
 package ssadb
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/yaklang/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// irTypeInsertColumns are the IrType application columns written by the batched
-// multi-row INSERT below (gorm.Model fields left to SQLite defaults, matching
-// the prior UpsertIrType FirstOrCreate = insert-after-delete path).
-var irTypeInsertColumns = []string{
-	"type_id", "kind", "program_name", "string", "extra_information",
-}
-
-// irTypeBatchChunk bounds rows per multi-row INSERT under SQLite's ~999
+// irTypeBatchChunk bounds rows per CreateInBatches call under SQLite's ~999
 // host-parameter limit: 150 rows * 5 cols = 750.
 const irTypeBatchChunk = 150
 
@@ -108,15 +98,9 @@ func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 }
 
 // bulkUpsertIrType deletes the batch's (program_name, type_id) rows (chunked
-// at 999 to respect SQLite's host-parameter limit) then issues a single
-// multi-row INSERT. Must run inside the caller's transaction so the delete +
+// at 999 to respect SQLite's host-parameter limit) then bulk-inserts them via
+// CreateInBatches. Must run inside the caller's transaction so the delete +
 // insert are atomic.
-//
-// TODO(gorm-v2): once the gorm v1->v2 migration (commit 178272476, not yet on
-// this branch) lands, the multi-row INSERT here can be replaced with
-// db.CreateInBatches(items, irTypeBatchChunk); the DELETE chunking would still
-// be manual until gorm v2 upsert support is available. gorm v1 (v1.9.2) panics
-// on Create(slice), so raw Exec is the only way to batch INSERT here.
 func bulkUpsertIrType(db *gorm.DB, items []*IrType) error {
 	if len(items) == 0 {
 		return nil
@@ -141,21 +125,10 @@ func bulkUpsertIrType(db *gorm.DB, items []*IrType) error {
 		}
 	}
 
-	cols := len(irTypeInsertColumns)
-	placeholder := "(" + strings.Repeat("?,", cols-1) + "?)"
-	values := make([]string, 0, len(items))
-	args := make([]interface{}, 0, len(items)*cols)
-	for _, it := range items {
-		values = append(values, placeholder)
-		args = append(args, it.TypeId, it.Kind, it.ProgramName, it.String, it.ExtraInformation)
+	if r := db.CreateInBatches(items, irTypeBatchChunk); r.Error != nil {
+		return r.Error
 	}
-	sql := fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES %s",
-		TableIrTypes,
-		strings.Join(irTypeInsertColumns, ","),
-		strings.Join(values, ","),
-	)
-	return db.Exec(sql, args...).Error
+	return nil
 }
 
 func EmptyIrType(progName string, id uint64) *IrType {
