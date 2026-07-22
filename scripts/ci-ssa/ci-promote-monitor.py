@@ -549,8 +549,12 @@ def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | No
 
     log(f"main advanced: {manifest_sha[:8]} -> {main_head[:8]} (depth={manifest_depth})")
 
-    # 4. Fetch merged PRs in range
-    merged_prs = get_merged_prs_in_range(repo, manifest_sha, main_head, token)
+    # 4. Fetch merged PRs in range (network errors → empty list, promote still runs)
+    try:
+        merged_prs = get_merged_prs_in_range(repo, manifest_sha, main_head, token)
+    except Exception as e:
+        log(f"get_merged_prs failed ({e}), proceeding without PR info", "WARN")
+        merged_prs = []
     if merged_prs:
         pr_list = ", ".join(f"#{p['number']}" for p in merged_prs)
         log(f"merged PRs: {pr_list}")
