@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"bytes"
+	"io"
 	"mime"
 	"mime/multipart"
 	"net/textproto"
@@ -94,13 +95,23 @@ func TestSpillMultipartFilesIfNeeded_SingleFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, fileContent, got)
 
-	// Rebuilt body file parses back to the same parts.
-	bodyOnDisk, err := os.ReadFile(res.BodyFile)
-	require.NoError(t, err)
-	parts := parseMultipartParts(t, bodyOnDisk, boundaryFromBodyPacket(t, packet))
+	// Rebuilt complete body (on demand) parses back to the same parts.
+	_, skeletonBody := lowhttp.SplitHTTPPacketFast(res.StoredPacket)
+	rebuilt := readAll(t, rebuildMultipartBodyToReader(skeletonBody, res.MultipartDir))
+	parts := parseMultipartParts(t, rebuilt, boundaryFromBodyPacket(t, packet))
 	require.Len(t, parts, 2)
 	require.Equal(t, "hello", string(parts["desc"].body))
 	require.Equal(t, fileContent, parts["filename"].body)
+
+	// BodyFile is now a 0-byte placeholder (real content is in the sidecar).
+	fi, err := os.Stat(res.BodyFile)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), fi.Size(), "BodyFile should be 0-byte placeholder")
+	// manifest.json lives in the sidecar directory.
+	manifest, err := loadMultipartManifest(res.MultipartDir)
+	require.NoError(t, err)
+	require.Len(t, manifest, 1)
+	require.Equal(t, "Yakit-1.4.8.exe", manifest[0].Filename)
 }
 
 func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
@@ -152,11 +163,11 @@ func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
 	// No raw file bytes leak into the skeleton.
 	require.NotContains(t, skel, string(f1[:64]))
 
-	// Rebuilt body file parses back to all parts with correct contents.
+	// Rebuilt complete body (on demand) parses back to all parts with correct contents.
 	boundary := boundaryFromBodyPacket(t, packet)
-	bodyOnDisk, err := os.ReadFile(res.BodyFile)
-	require.NoError(t, err)
-	parts := parseMultipartParts(t, bodyOnDisk, boundary)
+	_, skeletonBody := lowhttp.SplitHTTPPacketFast(res.StoredPacket)
+	rebuilt := readAll(t, rebuildMultipartBodyToReader(skeletonBody, res.MultipartDir))
+	parts := parseMultipartParts(t, rebuilt, boundary)
 	require.Len(t, parts, 5)
 	require.Equal(t, "abc", string(parts["token"].body))
 	require.Equal(t, "safe", string(parts["case"].body))
@@ -224,11 +235,11 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_MultipartRoute(t *testing.T) {
 	require.Contains(t, string(res.StoredPacket), multipartSkeletonMarker)
 	require.NotContains(t, string(res.StoredPacket), "request too large(")
 
-	// Rebuilt body file parses back to the original parts.
+	// Rebuilt complete body (on demand) parses back to the original parts.
 	boundary := boundaryFromBodyPacket(t, packet)
-	bodyOnDisk, err := os.ReadFile(res.BodyFile)
-	require.NoError(t, err)
-	parts := parseMultipartParts(t, bodyOnDisk, boundary)
+	_, skeletonBody := lowhttp.SplitHTTPPacketFast(res.StoredPacket)
+	rebuilt := readAll(t, rebuildMultipartBodyToReader(skeletonBody, multipartSidecarDirFromBodyFile(res.BodyFile)))
+	parts := parseMultipartParts(t, rebuilt, boundary)
 	require.Equal(t, "v", string(parts["n"].body))
 	require.Equal(t, fileContent, parts["up"].body)
 }
@@ -287,6 +298,14 @@ func readAllPart(t *testing.T, p *multipart.Part) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	_, err := buf.ReadFrom(p)
 	return buf.Bytes(), err
+}
+
+// readAll reads all bytes from r, failing the test on read error.
+func readAll(t *testing.T, r io.Reader) []byte {
+	t.Helper()
+	b, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return b
 }
 
 func boundaryFromBodyPacket(t *testing.T, packet []byte) string {

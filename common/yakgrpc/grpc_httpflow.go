@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"golang.org/x/exp/slices"
 	"io"
@@ -137,18 +138,52 @@ func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream y
 		if r.IsRisk {
 			packet = risk.QuotedRequest
 		} else if flow.TooLargeRequestBodyFile != "" {
-			fh, err := os.Open(flow.TooLargeRequestBodyFile)
-			if err != nil {
-				return utils.Wrap(err, "GetHTTPFlowBodyById: open request body file error")
-			}
-			defer fh.Close()
-			reader = fh
-			u := utils.ParseStringToUrl(flow.Url)
-			base := path.Base(u.Path)
-			if base != "" && base != "." && base != "/" {
-				filename = base
+			// Multipart-spilled request: per-part files live in the sidecar
+			// directory and the body file is a 0-byte placeholder. Either
+			// stream a single part (PartIndex >= 0) or rebuild the complete
+			// multipart body on demand (PartIndex < 0).
+			if yakit.FlowIsMultipartSpill(flow) {
+				if r.PartIndex != nil {
+					partIdx := int(*r.PartIndex)
+					fh, partFilename, ferr := yakit.OpenFlowMultipartPart(flow, partIdx)
+					if ferr != nil {
+						return utils.Wrap(ferr, "GetHTTPFlowBodyById: open multipart part file error")
+					}
+					defer fh.Close()
+					reader = fh
+					if partFilename != "" {
+						filename = partFilename
+					} else {
+						filename = fmt.Sprintf("part-%d.bin", partIdx)
+					}
+				} else {
+					rr, rerr := yakit.RebuildFlowMultipartBody(flow)
+					if rerr != nil {
+						return utils.Wrap(rerr, "GetHTTPFlowBodyById: rebuild multipart body error")
+					}
+					reader = rr
+					u := utils.ParseStringToUrl(flow.Url)
+					base := path.Base(u.Path)
+					if base != "" && base != "." && base != "/" {
+						filename = base
+					} else {
+						filename = "multipart-body.bin"
+					}
+				}
 			} else {
-				filename = "request-body.bin"
+				fh, err := os.Open(flow.TooLargeRequestBodyFile)
+				if err != nil {
+					return utils.Wrap(err, "GetHTTPFlowBodyById: open request body file error")
+				}
+				defer fh.Close()
+				reader = fh
+				u := utils.ParseStringToUrl(flow.Url)
+				base := path.Base(u.Path)
+				if base != "" && base != "." && base != "/" {
+					filename = base
+				} else {
+					filename = "request-body.bin"
+				}
 			}
 		} else {
 			packet = flow.Request
