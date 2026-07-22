@@ -51,6 +51,7 @@ DEFAULT_REPO = "yaklang/yaklang"
 DEFAULT_INTERVAL = 300  # 5 minutes
 DEFAULT_WORKTREE = os.path.expanduser("~/yaklang_workspace/yhellow-ssa-incremental")
 DEFAULT_DATA_DIR = "./ci-ssa-data"
+GITHUB_API_FILE_LIMIT = 30  # Above this, skip blob API and use yak gitefs
 
 
 def log(msg: str, level: str = "INFO") -> None:
@@ -310,51 +311,59 @@ def build_fs_zip_from_compare(
     import base64
     import zipfile
 
-    url = f"{GITHUB_API}/repos/{repo}/compare/{old_sha}...{new_sha}"
-    r = requests.get(url, headers=github_headers(token), timeout=30)
-    if r.status_code != 200:
-        log(f"compare API returned {r.status_code}: {r.text[:200]}", "ERROR")
+    try:
+        url = f"{GITHUB_API}/repos/{repo}/compare/{old_sha}...{new_sha}"
+        r = requests.get(url, headers=github_headers(token), timeout=30)
+        if r.status_code != 200:
+            log(f"compare API returned {r.status_code}: {r.text[:200]}", "ERROR")
+            return -1
+        data = r.json()
+        files = data.get("files", [])
+        log(f"compare {old_sha[:8]}...{new_sha[:8]}: ahead={data.get('ahead_by')} files={len(files)}")
+
+        # If too many files, fall back to yak gitefs (each blob = 1 API request,
+        # and the network to api.github.com may be slow/unstable).
+        if len(files) > GITHUB_API_FILE_LIMIT:
+            log(f"file count {len(files)} > limit {GITHUB_API_FILE_LIMIT}, fallback to yak gitefs", "WARN")
+            return -1
+
+        written = 0
+        skipped = 0
+        with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in files:
+                name = f.get("filename", "")
+                status = f.get("status", "")
+                blob_sha = f.get("sha", "")
+                if not name or not blob_sha:
+                    skipped += 1
+                    continue
+                if status in ("removed",):
+                    skipped += 1
+                    continue
+                if status not in ("added", "modified", "renamed", "changed"):
+                    skipped += 1
+                    continue
+                # Fetch blob content
+                blob_url = f"{GITHUB_API}/repos/{repo}/git/blobs/{blob_sha}"
+                br = requests.get(blob_url, headers=github_headers(token), timeout=30)
+                if br.status_code != 200:
+                    skipped += 1
+                    continue
+                blob = br.json()
+                content_b64 = blob.get("content", "")
+                try:
+                    content = base64.b64decode(content_b64.replace("\n", ""))
+                except Exception:
+                    skipped += 1
+                    continue
+                zf.writestr(name, content)
+                written += 1
+
+        log(f"fs.zip built: {written} files written, {skipped} skipped")
+        return written
+    except Exception as e:
+        log(f"build_fs_zip exception: {e}", "WARN")
         return -1
-    data = r.json()
-    files = data.get("files", [])
-    log(f"compare {old_sha[:8]}...{new_sha[:8]}: ahead={data.get('ahead_by')} files={len(files)}")
-
-    written = 0
-    skipped = 0
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for f in files:
-            name = f.get("filename", "")
-            status = f.get("status", "")
-            blob_sha = f.get("sha", "")
-            if not name or not blob_sha:
-                skipped += 1
-                continue
-            if status in ("removed",):
-                # Removed files: skip. The diff engine sees them as deleted in
-                # newFS relative to baseFS, which is handled by calculateFileSystemDiff.
-                skipped += 1
-                continue
-            if status not in ("added", "modified", "renamed", "changed"):
-                skipped += 1
-                continue
-            # Fetch blob content
-            blob_url = f"{GITHUB_API}/repos/{repo}/git/blobs/{blob_sha}"
-            br = requests.get(blob_url, headers=github_headers(token), timeout=30)
-            if br.status_code != 200:
-                skipped += 1
-                continue
-            blob = br.json()
-            content_b64 = blob.get("content", "")
-            try:
-                content = base64.b64decode(content_b64.replace("\n", ""))
-            except Exception:
-                skipped += 1
-                continue
-            zf.writestr(name, content)
-            written += 1
-
-    log(f"fs.zip built: {written} files written, {skipped} skipped")
-    return written
 
 
 def run_promote_once(
