@@ -37,7 +37,7 @@ type HTTPFlow struct {
 	BodyLength         int64  `json:"body_length,omitempty"`
 	ContentType        string `json:"content_type,omitempty"`
 	StatusCode         int64  `json:"status_code,omitempty"`
-	SourceType         string `json:"source_type,omitempty"`
+	SourceType         string `json:"source_type,omitempty" gorm:"index"`
 	Request            string `json:"request,omitempty"`
 	Response           string `json:"response,omitempty"`
 	Duration           int64  `json:"duration,omitempty"`
