@@ -277,40 +277,32 @@ type ToolParamsPromptResult struct {
 // GenerateToolParamsPromptWithMeta generates tool parameter generation prompt with metadata for AITAG parsing
 func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
 	generatedNonce := nonce()
-	data := &ToolParamsPromptData{
-		ToolName:        tool.Name,
-		ToolDescription: tool.Description,
-		ToolUsage:       tool.Usage,
-		DynamicContext:  pm.DynamicContextWithNonce(generatedNonce),
-		Nonce:           generatedNonce, // Generate nonce for AITAG format
-	}
 
-	// Set tool schema if available
+	// Extract tool schema and param names
+	toolSchema := ""
+	paramNames := []string{}
 	if tool.Tool != nil {
-		data.ToolSchema = tool.ToJSONSchemaString()
-		// Extract parameter names for AITAG hints
+		toolSchema = tool.ToJSONSchemaString()
 		if tool.Tool.InputSchema.Properties != nil {
 			tool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
-				data.ParamNames = append(data.ParamNames, name)
+				paramNames = append(paramNames, name)
 				return true
 			})
-			sort.Strings(data.ParamNames)
+			sort.Strings(paramNames)
 		}
 	}
 
-	// Extract context data from memory without lock (assume caller already holds lock)
+	// Extract original query from current task
+	originalQuery := ""
 	if pm.react.config.GetTimeline() != nil {
 		if task := pm.react.GetCurrentTask(); task != nil {
-			data.OriginalQuery = task.GetUserInput()
+			originalQuery = task.GetUserInput()
 		}
-		data.Timeline = pm.timelineDumpForPrompt()
 	}
-	data.CurrentIteration = pm.react.currentIteration
-	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:  generatedNonce,
-		Schema: strings.TrimSpace(data.ToolSchema),
+		Schema: strings.TrimSpace(toolSchema),
 	})
 	if err != nil {
 		return nil, err
@@ -321,11 +313,24 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	prefixMaterials.OutputExample = strings.TrimSpace(toolParamsOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
+	// Build dynamic data using buildLoopPromptSectionData for UserQuery/AutoContext/UserHistory
+	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     generatedNonce,
+		UserQuery: originalQuery,
+	})
+	dynamicData["ToolName"] = tool.Name
+	dynamicData["ToolDescription"] = tool.Description
+	dynamicData["ToolUsage"] = tool.Usage
+	dynamicData["ParamNames"] = paramNames
+	dynamicData["OriginalQuery"] = originalQuery
+	dynamicData["CurrentIteration"] = pm.react.currentIteration
+	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
+
 	prompt, err := pm.assemblePromptWithDynamicSection(
 		prefixMaterials,
 		"tool-params-dynamic",
 		toolParamsDynamicTemplate,
-		data,
+		dynamicData,
 	)
 	if err != nil {
 		return nil, err
@@ -334,7 +339,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,
 		Nonce:      generatedNonce,
-		ParamNames: data.ParamNames,
+		ParamNames: paramNames,
 	}, nil
 }
 
