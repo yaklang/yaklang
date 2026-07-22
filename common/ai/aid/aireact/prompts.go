@@ -138,36 +138,6 @@ func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 	}
 }
 
-// LoopPromptData contains data for the main loop prompt template
-type LoopPromptData struct {
-	AllowAskForClarification       bool
-	AllowPlan                      bool
-	AllowKnowledgeEnhanceAnswer    bool
-	AllowWriteYaklangCode          bool
-	AskForClarificationCurrentTime int64
-	AskForClarificationMaxTimes    int64
-
-	CurrentTime      string
-	OSArch           string
-	WorkingDir       string
-	WorkingDirGlance string
-	AIForgeList      string
-	ShowForgeList    bool
-	Tools            []*aitool.Tool
-	ToolsCount       int
-	TopTools         []*aitool.Tool
-	TopToolsCount    int
-	HasMoreTools     bool
-	Timeline         string
-	UserQuery        string
-	Nonce            string
-	Language         string
-	Schema           string
-	DynamicContext   string
-	TaskType         string
-	ForgeName        string
-}
-
 // ToolParamsPromptData contains data for tool parameter generation prompt
 type ToolParamsPromptData struct {
 	ToolName         string
@@ -181,29 +151,6 @@ type ToolParamsPromptData struct {
 	DynamicContext   string
 	Nonce            string   // Nonce for AITAG format
 	ParamNames       []string // List of parameter names for AITAG hints
-}
-
-// YaklangCodeActionLoopPromptData contains data for Yaklang code generation action loop prompt
-type YaklangCodeActionLoopPromptData struct {
-	CurrentTime               string
-	OSArch                    string
-	WorkingDir                string
-	WorkingDirGlance          string
-	Timeline                  string
-	Nonce                     string
-	UserQuery                 string
-	CurrentCode               string
-	CurrentCodeWithLineNumber string
-	IterationCount            int
-	ErrorMessages             string
-	Language                  string
-	DynamicContext            string
-	Schema                    string
-	Tools                     []*aitool.Tool
-	ToolsCount                int
-	TopTools                  []*aitool.Tool
-	TopToolsCount             int
-	HasMoreTools              bool
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
