@@ -243,14 +243,27 @@ promote_once() {
     "$TEMPLATE" > "$PROMOTE_CONFIG"
 
   echo "::group::Incremental promote compile -> $NEW_PROG (base=$CI_SSA_BASE_PROGRAM)"
-  if ! ./yak ssa-compile \
+  local COMPILE_OUTPUT COMPILE_RC
+  COMPILE_OUTPUT=$(./yak ssa-compile \
     --config "$PROMOTE_CONFIG" \
     --database "$SSA_DATABASE_RAW" \
-    --file-perf-log; then
+    --file-perf-log 2>&1) && COMPILE_RC=0 || COMPILE_RC=$?
+  echo "$COMPILE_OUTPUT"
+  echo "::endgroup::"
+
+  if [ "$COMPILE_RC" -ne 0 ]; then
+    # "not found can compiled file" = diff only had non-code files (docs, config, etc.)
+    if echo "$COMPILE_OUTPUT" | grep -q "not found can compiled file"; then
+      echo "No compilable files in this diff; advancing manifest without new overlay"
+      write_manifest "$NEW_SHA" "$CI_SSA_BASE_PROGRAM" "$OLD_DEPTH"
+      if [ -n "$PR_NUM" ]; then
+        "$SCRIPT_DIR/cleanup-programs.sh" pr "$PR_NUM" || true
+      fi
+      return 0
+    fi
     echo "::error::Promote incremental compile failed"
     return 1
   fi
-  echo "::endgroup::"
 
   if ! ./yak ssa-program "$NEW_PROG" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$NEW_PROG"; then
     echo "::error::Promote program '$NEW_PROG' not found after compile"
