@@ -54,8 +54,8 @@ type MemoryFlushBuffer struct {
 
 func DefaultMemoryFlushBufferConfig() MemoryFlushBufferConfig {
 	return MemoryFlushBufferConfig{
-		MaxPendingIterations: 8,
-		MaxPendingBytes:      16 * 1024,
+		MaxPendingIterations: 20,
+		MaxPendingBytes:      64 * 1024,
 	}
 }
 

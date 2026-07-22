@@ -563,6 +563,10 @@ func TestMaybeTriggerPerceptionAfterAction_SyncPerceptionTriggerRunsInline(t *te
 	loop.actionHistory = make([]*ActionRecord, 0)
 	loop.actionHistoryMutex = new(sync.Mutex)
 
+	repeated := &aitool.ToolResult{Name: "query", Success: true, Data: "same result"}
+	loop.ObserveToolInformationGain("query", repeated)
+	loop.ObserveToolInformationGain("query", repeated)
+	loop.ObserveToolInformationGain("query", repeated)
 	loop.MaybeTriggerPerceptionAfterAction(2)
 	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
 }

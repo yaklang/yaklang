@@ -232,6 +232,9 @@ func (r *ReAct) finalizeToolCallResult(currentTask aicommon.AIStatefulTask, resu
 		if result.GetID() <= 0 {
 			result.ID = r.config.AcquireId()
 		}
+		if compact := result.CompactForTimeline(64*1024, 24*1024); compact != "" {
+			result.SetShrinkResult(compact)
+		}
 		// task save call tool result
 		currentTask.PushToolCallResult(result)
 		// Store the result in memory

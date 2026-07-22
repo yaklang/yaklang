@@ -1036,12 +1036,14 @@ func (r *ReActLoop) invokePerceptionTrigger(reason string, force bool) {
 }
 
 // MaybeTriggerPerceptionAfterAction conditionally triggers perception after an
-// action completes. Respects iteration interval and time-based throttling.
+// action completes. Routine progress does not need a second model call:
+// post-action perception is reserved for a measured low-information-gain path.
+// Forced, spin and post-verification triggers keep their existing semantics.
 func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
 	if r.perception == nil {
 		return
 	}
-	if !r.perception.shouldTriggerOnIteration(iterationIndex) {
+	if !r.HasNewLowInformationGainSignal() {
 		return
 	}
 	r.invokePerceptionTrigger(PerceptionTriggerPostAction, false)

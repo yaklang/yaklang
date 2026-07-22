@@ -386,7 +386,6 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.OriginalQuery = task.GetUserInput()
 		}
-		data.Timeline = pm.timelineDumpForPrompt()
 	}
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())

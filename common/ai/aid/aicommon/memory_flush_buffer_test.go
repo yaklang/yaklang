@@ -104,6 +104,10 @@ func TestMemoryFlushBuffer_FlushOnEndIterationMilestone(t *testing.T) {
 }
 
 func TestMemoryFlushBuffer_DefaultDoesNotFlushEveryIterationEnd(t *testing.T) {
+	defaults := DefaultMemoryFlushBufferConfig()
+	if defaults.MaxPendingIterations != 20 || defaults.MaxPendingBytes != 64*1024 {
+		t.Fatalf("unexpected batching defaults: %#v", defaults)
+	}
 	timeline := NewTimeline(nil, nil)
 	differ := NewTimelineDiffer(timeline)
 	differ.SetBaseline()

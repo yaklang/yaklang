@@ -306,7 +306,8 @@ func TestAIMemoryTriage_AddRawText(t *testing.T) {
 		mockInvoker.SetPromptValidator("memory-triage", func(prompt string) bool {
 			// 验证prompt包含关键信息
 			return strings.Contains(prompt, "C.O.R.E. P.A.C.T.") &&
-				strings.Contains(prompt, "Go语言并发编程")
+				strings.Contains(prompt, "Go语言并发编程") &&
+				!strings.Contains(prompt, "Mock Basic Prompt Template")
 		})
 
 		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))

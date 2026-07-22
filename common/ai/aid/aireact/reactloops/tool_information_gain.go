@@ -33,6 +33,25 @@ type ToolInformationGainObservation struct {
 	Hint          string
 }
 
+// HasLowInformationGainSignal reports whether the latest tool path has already
+// produced three semantically equivalent results. It lets expensive control
+// plane calls react to evidence instead of waking up on a fixed iteration.
+func (r *ReActLoop) HasLowInformationGainSignal() bool {
+	if r == nil {
+		return false
+	}
+	state, _ := r.GetVariable(toolInformationGainStateKey).(*toolInformationGainState)
+	return state != nil && state.Consecutive >= 3
+}
+
+func (r *ReActLoop) HasNewLowInformationGainSignal() bool {
+	if r == nil {
+		return false
+	}
+	state, _ := r.GetVariable(toolInformationGainStateKey).(*toolInformationGainState)
+	return state != nil && state.Consecutive == 3
+}
+
 func normalizeToolResultForInformationGain(result *aitool.ToolResult) string {
 	if result == nil {
 		return "nil"

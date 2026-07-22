@@ -1,14 +1,5 @@
 package aimem
 
-// TODO: migrate to AssembleLoopPrompt for prefix cache reuse
-//
-// AddRawText 仍走老的 GetBasicPromptInfo + aireact/prompts/base/base.txt 路径,
-// 是当前 aireact 中唯一一处未接入 aicommon.NewDefaultPromptPrefixBuilder 5 段
-// prefix cache 的入口。后续应改造为复用 AssembleLoopPrompt, 让 memory triage
-// 也能命中跨 turn 的 prefix cache。
-//
-// 关键词: aimem 老路径迁移, AssembleLoopPrompt, prefix cache 复用, 待治理
-
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
@@ -22,19 +13,11 @@ import (
 
 // AddRawText 从原始文本生成记忆条目
 func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) {
-	temp, infos, err := r.invoker.GetBasicPromptInfo(nil)
-	if err != nil {
-		return nil, utils.Errorf("GetBasicPromptInfo failed: %v", err)
-	}
-	basic, err := utils.RenderTemplate(temp, infos)
-	if err != nil {
-		return nil, utils.Errorf("RenderTemplate failed: %v", err)
-	}
-
 	nonce := utils.RandStringBytes(4)
 
 	var dynContext string
 	if r.contextProvider != nil {
+		var err error
 		dynContext, err = r.contextProvider()
 		if err != nil {
 			return nil, utils.Errorf("contextProvider failed: %v", err)
@@ -48,7 +31,6 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 	dynContext += existedTag
 
 	promptResult, err := utils.RenderTemplate(memoryTriagePrompt, map[string]any{
-		"Basic":              basic,
 		"Nonce":              nonce,
 		"Query":              i,
 		"HaveDynamicContext": dynContext != "",

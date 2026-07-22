@@ -8,6 +8,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestToolResultCompactForTimelineKeepsHeadTailAndFullData(t *testing.T) {
+	fullOutput := "HEAD-" + strings.Repeat("x", 70*1024) + "-TAIL"
+	result := &ToolResult{
+		Name:    "large-output",
+		Success: true,
+		Data:    &ToolExecutionResult{CombinedOutput: fullOutput},
+	}
+
+	compact := result.CompactForTimeline(64*1024, 24*1024)
+	if compact == "" {
+		t.Fatal("expected large result to be compacted")
+	}
+	if !strings.Contains(compact, "HEAD-") || !strings.Contains(compact, "-TAIL") {
+		t.Fatal("compacted result should preserve both head and tail evidence")
+	}
+	if !strings.Contains(compact, "full result retained") {
+		t.Fatal("compacted result should explain where full evidence remains")
+	}
+	if got := result.Data.(*ToolExecutionResult).CombinedOutput; got != fullOutput {
+		t.Fatal("compaction must not mutate full tool data")
+	}
+}
+
 // TestToolResult_String_YAMLParamFlushLeft 验证 ToolResult.String() 的 yaml param
 // 块顶层 key 顶头 (无外层 "  " 缩进), 节省 prompt token; yaml 自身的 block scalar
 // 相对缩进保留, 仍可被 yaml.Unmarshal 正确解析.

@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -44,6 +45,30 @@ func (t *ToolResult) GetShrinkResult() string {
 
 func (t *ToolResult) SetShrinkResult(i string) {
 	t.ShrinkResult = i
+}
+
+// CompactForTimeline keeps large tool evidence in Data while returning a
+// bounded head/tail view for the model-facing timeline. The tail is important
+// for command summaries and errors that are commonly emitted after bulk data.
+func (t *ToolResult) CompactForTimeline(maxFullBytes, compactBytes int) string {
+	if t == nil || t.ShrinkResult != "" || maxFullBytes <= 0 || compactBytes <= 0 {
+		return ""
+	}
+	full := t.String()
+	if len(full) <= maxFullBytes {
+		return ""
+	}
+	if compactBytes >= len(full) {
+		return full
+	}
+	headBytes := compactBytes / 2
+	tailBytes := compactBytes - headBytes
+	head := strings.ToValidUTF8(full[:headBytes], "")
+	tail := strings.ToValidUTF8(full[len(full)-tailBytes:], "")
+	return fmt.Sprintf(
+		"%s\n\n[tool result compacted for prompt: %d bytes total; full result retained in the tool result/report]\n\n%s",
+		head, len(full), tail,
+	)
 }
 
 func (t *ToolResult) GetShrinkSimilarResult() string {

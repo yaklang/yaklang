@@ -354,6 +354,9 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 	if strings.Contains(prompt, "<|TOOL_PARAM_SCHEMA|>") {
 		t.Fatalf("tool schema should now be rendered in static schema block instead of dynamic tags. Got:\n%s", prompt)
 	}
+	if got := strings.Count(prompt, "timeline content"); got != 1 {
+		t.Fatalf("tool params prompt should render timeline exactly once, got %d", got)
+	}
 }
 
 func TestPromptManager_GenerateToolParamsPromptWithMeta_IncludesLoadedSkillsContext(t *testing.T) {
