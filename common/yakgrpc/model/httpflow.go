@@ -452,14 +452,13 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool,
 const modelMultipartSkeletonMarker = "[[yakit: multipart file spilled"
 
 // modelMultipartSidecarDirFromBodyFile mirrors yakit.multipartSidecarDirFromBodyFile.
+// For multipart spills the body file is the first spilled part file, so its
+// parent directory is the sidecar.
 func modelMultipartSidecarDirFromBodyFile(bodyFile string) string {
 	if bodyFile == "" {
 		return ""
 	}
-	dir := filepath.Dir(bodyFile)
-	base := filepath.Base(bodyFile)
-	stem := strings.TrimSuffix(base, filepath.Ext(base))
-	return filepath.Join(dir, stem+"-parts")
+	return filepath.Dir(bodyFile)
 }
 
 // manifestJSONEntry mirrors yakit.manifestJSONEntry (on-disk manifest.json).
@@ -501,6 +500,9 @@ func loadFlowMultipartFiles(f *schema.HTTPFlow) []*ypb.MultipartFileInfo {
 			Filename:    utf8safe(e.Filename),
 			ContentType: utf8safe(e.ContentType),
 			Size:        e.Size,
+			// Absolute on-disk path so the frontend can open it directly via
+			// openABSFileLocated, mirroring the existing "view body" flow.
+			FilePath: utf8safe(filepath.Join(dir, e.File)),
 		})
 	}
 	return out
