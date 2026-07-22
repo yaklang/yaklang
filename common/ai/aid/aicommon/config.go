@@ -36,8 +36,8 @@ import (
 // 首次提前门 (iter=3) 配合, 形成 "6 iter 1 次基础 verify, 中间不超过 1 次
 // 加速器 verify, 首次反馈在 iter=3 提前到位" 的整体节流模型. 详见
 // reactloops/docs/16-verification-frequency-experiment.md.
-// 关键词: DefaultPeriodicVerificationInterval 12, iter 门基础节拍, verification 节流
-const DefaultPeriodicVerificationInterval = 12
+// 关键词: DefaultPeriodicVerificationInterval 20, iter 门基础节拍, verification 节流
+const DefaultPeriodicVerificationInterval = 20
 const DefaultGoalMinIterations = 6
 const GoalModeIterationBuffer = 2
 
