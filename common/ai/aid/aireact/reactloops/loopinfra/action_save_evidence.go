@@ -40,13 +40,13 @@ func buildDefaultVerificationPayload(loop *reactloops.ReActLoop) string {
 	return strings.Join(parts, "\n")
 }
 
-var loopAction_RequestVerification = &reactloops.LoopAction{
-	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION,
-	Description: "Actively trigger a verification pass to check whether the current work already satisfies the task goal.",
+var loopAction_SaveEvidence = &reactloops.LoopAction{
+	ActionType:  schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE,
+	Description: "Save evidence observations from the current step. Use this action when you have discovered key findings, confirmed facts, or identified significant state changes that should be persisted as evidence for future reference. This action triggers a verification pass that deposits your observations into the evidence store.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"verification_payload",
-			aitool.WithParam_Description("Optional concise summary of the current progress, deliverables, or observations that should be used as the direct verification input. If omitted, the runtime will build a default checkpoint summary from recent actions."),
+			aitool.WithParam_Description("A concise summary of the key findings, confirmed facts, or observations you want to save as evidence. Describe what was discovered, how it was confirmed, and why it matters for the task."),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
@@ -63,7 +63,7 @@ var loopAction_RequestVerification = &reactloops.LoopAction{
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		task := loop.GetCurrentTask()
 		if task == nil {
-			operator.Feedback("request_verification requires an active task context")
+			operator.Feedback("save_evidence requires an active task context")
 			operator.Continue()
 			return
 		}
@@ -74,7 +74,7 @@ var loopAction_RequestVerification = &reactloops.LoopAction{
 		}
 
 		invoker := loop.GetInvoker()
-		invoker.AddToTimeline("[REQUEST_VERIFICATION]", payload)
+		invoker.AddToTimeline("[SAVE_EVIDENCE]", payload)
 
 		ctx := invoker.GetConfig().GetContext()
 		if task.GetContext() != nil {

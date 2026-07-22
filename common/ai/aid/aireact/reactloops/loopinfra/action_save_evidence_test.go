@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-type requestVerificationTestInvoker struct {
+type saveEvidenceTestInvoker struct {
 	*testInvoker
 	verifyQuery      string
 	verifyPayload    string
@@ -19,7 +19,7 @@ type requestVerificationTestInvoker struct {
 	verifyCalls      int
 }
 
-func (t *requestVerificationTestInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
+func (t *saveEvidenceTestInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.verifyCalls++
@@ -29,17 +29,17 @@ func (t *requestVerificationTestInvoker) VerifyUserSatisfaction(ctx context.Cont
 	return t.verifySatisfactionResult, nil
 }
 
-func buildRequestVerificationAction(payload string) *aicommon.Action {
-	action, err := aicommon.ExtractAction(payload, schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION)
+func buildSaveEvidenceAction(payload string) *aicommon.Action {
+	action, err := aicommon.ExtractAction(payload, schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE)
 	if err != nil {
 		panic(err)
 	}
 	return action
 }
 
-func TestRequestVerification_Handler_UsesExplicitPayloadAndForcesVerification(t *testing.T) {
+func TestSaveEvidence_Handler_UsesExplicitPayloadAndForcesVerification(t *testing.T) {
 	ctx := context.Background()
-	invoker := &requestVerificationTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker := &saveEvidenceTestInvoker{testInvoker: newTestInvoker(ctx)}
 	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
 
 	task := newTestTask(ctx)
@@ -48,14 +48,14 @@ func TestRequestVerification_Handler_UsesExplicitPayloadAndForcesVerification(t 
 	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.SetCurrentTask(task)
 
-	action := buildRequestVerificationAction(`{
-		"@action": "request_verification",
+	action := buildSaveEvidenceAction(`{
+		"@action": "save_evidence",
 		"verification_payload": "implemented the current change and want explicit acceptance now"
 	}`)
 
-	require.NoError(t, loopAction_RequestVerification.ActionVerifier(loop, action))
+	require.NoError(t, loopAction_SaveEvidence.ActionVerifier(loop, action))
 	op := reactloops.NewActionHandlerOperator(task)
-	loopAction_RequestVerification.ActionHandler(loop, action, op)
+	loopAction_SaveEvidence.ActionHandler(loop, action, op)
 
 	assert.Equal(t, 1, invoker.verifyCalls)
 	assert.Equal(t, task.GetUserInput(), invoker.verifyQuery)
@@ -69,9 +69,9 @@ func TestRequestVerification_Handler_UsesExplicitPayloadAndForcesVerification(t 
 	assert.False(t, terminated, "verification satisfied must NOT terminate the operator anymore")
 }
 
-func TestRequestVerification_Handler_BuildsDefaultPayloadWhenEmpty(t *testing.T) {
+func TestSaveEvidence_Handler_BuildsDefaultPayloadWhenEmpty(t *testing.T) {
 	ctx := context.Background()
-	invoker := &requestVerificationTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker := &saveEvidenceTestInvoker{testInvoker: newTestInvoker(ctx)}
 	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(false, "need one more step", "")
 
 	task := newTestTask(ctx)
@@ -80,10 +80,10 @@ func TestRequestVerification_Handler_BuildsDefaultPayloadWhenEmpty(t *testing.T)
 	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.SetCurrentTask(task)
 
-	action := buildRequestVerificationAction(`{"@action": "request_verification"}`)
-	require.NoError(t, loopAction_RequestVerification.ActionVerifier(loop, action))
+	action := buildSaveEvidenceAction(`{"@action": "save_evidence"}`)
+	require.NoError(t, loopAction_SaveEvidence.ActionVerifier(loop, action))
 	op := reactloops.NewActionHandlerOperator(task)
-	loopAction_RequestVerification.ActionHandler(loop, action, op)
+	loopAction_SaveEvidence.ActionHandler(loop, action, op)
 
 	assert.Equal(t, 1, invoker.verifyCalls)
 	assert.Contains(t, invoker.verifyPayload, "Agent explicitly requested verification")

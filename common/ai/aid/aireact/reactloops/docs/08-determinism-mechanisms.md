@@ -248,9 +248,9 @@ WithUseSpeedPriorityAICallback(true)         // 用 speed 模型（默认 qualit
 
 | 方法 | 触发主体 | 节流 | 用途 |
 |------|----------|------|------|
-| `VerifyUserSatisfactionNow` | 显式调用 | 无 | AI 主动调 `request_verification` action |
+| `VerifyUserSatisfactionNow` | 显式调用 | 无 | AI 主动调 `save_evidence` action |
 | `MaybeVerifyUserSatisfaction` | tool / action 后自动 | 有（节流） | 减少冗余验证 |
-| `request_verification` action | LLM 自己 | 无 | LLM 觉得任务完成时主动验证 |
+| `save_evidence` action | LLM 自己 | 无 | LLM 觉得任务完成时主动验证 |
 | `Watchdog` 定时器 | 系统兜底 | 2 分钟无活动 | 防 idle 空转 |
 
 ### `MaybeVerifyUserSatisfaction` 的节流条件
@@ -445,7 +445,7 @@ WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicomm
    - Reflection 默认 Minimal（成本控制）
    - Spin 阈值 = 3（同样的 fuzz 参数 3 次就警告）
 3. **触发 spin**：自动 perception(forced) 重看任务、Standard reflection 让 LLM 反思
-4. **Verify**：每 2 轮自动验证。AI 也可以主动 `request_verification` 提前 ack
+4. **Verify**：每 2 轮自动验证。AI 也可以主动 `save_evidence` 提前 ack
 5. **Finalize**：`OnPostIteraction(isDone=true)` 不论是否 verify 都生成总结
 
 各机制各司其职，组合起来既不会漏掉关键判断，也不会狂烧 token。
