@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	customMultipart "github.com/yaklang/yaklang/common/utils/multipart"
@@ -42,13 +44,17 @@ var multipartSpillMarkerPattern = regexp.MustCompile(
 // multipart/form-data body carrying at least one file part, and:
 //   - StoredPacket is the in-DB skeleton (header + skeleton body with
 //     placeholders) — small and editable.
-//   - HeaderFile / BodyFile follow the same contract as the flat spill path:
-//     HeaderFile holds the request headers, BodyFile holds the *rebuilt*
-//     complete multipart body (skeleton text fields + spilled file parts
-//     streamed back from disk). This keeps GetHTTPFlowBodyById unchanged.
-//   - MultipartDir is the sidecar directory containing the per-part files.
-//     It is always filepath.Dir(BodyFile); kept here for convenience.
-//   - Manifest lists every file part, primarily for tests/diagnostics.
+//   - HeaderFile holds the request headers (same contract as flat spill).
+//   - BodyFile is a 0-byte placeholder: the real file contents live in the
+//     sidecar part files (MultipartDir). The complete multipart body is
+//     rebuilt on demand by GetHTTPFlowBodyById via io.Pipe streaming. The
+//     placeholder name anchors the sidecar directory derivation
+//     (multipartSidecarDirFromBodyFile) so cleanup/locating parts work from
+//     the persisted TooLargeRequestBodyFile path alone.
+//   - MultipartDir is the sidecar directory containing the per-part files
+//     and manifest.json.
+//   - Manifest lists every file part; also persisted to manifest.json in
+//     MultipartDir for downstream readers.
 type multipartSpillResult struct {
 	StoredPacket    []byte
 	IsTooLarge      bool
@@ -71,8 +77,9 @@ type multipartPartMeta struct {
 
 // spillMultipartFilesIfNeeded inspects an oversized request packet and, when
 // it is a multipart/form-data body carrying at least one file part, spills each
-// file part to a sidecar file, writes the rebuilt complete body to a temp body
-// file, and returns a skeleton packet safe to store in the DB.
+// file part to a sidecar file, writes manifest.json, leaves a 0-byte body
+// placeholder, and returns a skeleton packet safe to store in the DB. The
+// complete multipart body is rebuilt on demand by GetHTTPFlowBodyById.
 //
 // When the packet is not multipart or carries no file part, IsTooLarge is false
 // and the caller falls back to the flat large-request spill path.
@@ -242,10 +249,21 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	headerPath := headerFP.Name()
 	headerFP.Close()
 
-	// Rebuild the complete body into the body file: stream file parts back
-	// from disk alongside the skeleton's text fields. The body file name
-	// matches the base used to derive the sidecar directory so cleanup can
-	// locate the parts from the persisted body file path.
+	// Write manifest.json into the sidecar directory so downstream readers
+	// (toHTTPFlowGRPCModel, GetHTTPFlowBodyById) can enumerate file parts
+	// without re-parsing the skeleton.
+	if err := writeMultipartManifest(dir, res.Manifest); err != nil {
+		_ = os.RemoveAll(dir)
+		_ = os.Remove(headerPath)
+		return res, err
+	}
+
+	// BodyFile is a 0-byte placeholder: the real file contents live in the
+	// sidecar part files, and the complete multipart body is rebuilt on demand
+	// by GetHTTPFlowBodyById (streamed via io.Pipe). The placeholder name is
+	// the anchor from which the sidecar directory is derived
+	// (multipartSidecarDirFromBodyFile), so cleanup and locating parts work
+	// from the persisted TooLargeRequestBodyFile path alone.
 	bodyFP, err := utils.OpenTempFile(bodyFileRel)
 	if err != nil {
 		_ = os.RemoveAll(dir)
@@ -253,13 +271,6 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 		return res, err
 	}
 	bodyPath := bodyFP.Name()
-	if err := rebuildMultipartBodyToWriter(skeletonBuf.Bytes(), dir, bodyFP); err != nil {
-		bodyFP.Close()
-		_ = os.RemoveAll(dir)
-		_ = os.Remove(headerPath)
-		_ = os.Remove(bodyPath)
-		return res, err
-	}
 	bodyFP.Close()
 
 	stored := lowhttp.ReplaceHTTPPacketBody([]byte(header), skeletonBuf.Bytes(), false)
@@ -388,6 +399,80 @@ func containsMultipartSpillMarker(packet []byte) bool {
 	return bytes.Contains(packet, []byte(multipartSkeletonMarker))
 }
 
+// FlowIsMultipartSpill reports whether a stored HTTPFlow's request was
+// skeletonized as a multipart spill: the request is marked too-large and the
+// in-DB skeleton carries the multipart placeholder.
+func FlowIsMultipartSpill(flow *schema.HTTPFlow) bool {
+	if flow == nil || !flow.IsTooLargeRequest || flow.TooLargeRequestBodyFile == "" {
+		return false
+	}
+	return containsMultipartSpillMarker([]byte(flow.GetRequest()))
+}
+
+// FlowMultipartSidecarDir returns the sidecar directory path for a flow's
+// spilled multipart parts, derived from TooLargeRequestBodyFile. Returns ""
+// when not applicable.
+func FlowMultipartSidecarDir(flow *schema.HTTPFlow) string {
+	if flow == nil {
+		return ""
+	}
+	return multipartSidecarDirFromBodyFile(flow.TooLargeRequestBodyFile)
+}
+
+// LoadFlowMultipartManifest loads the part manifest for a flow from its
+// sidecar directory. Returns nil when the flow is not a multipart spill or
+// the manifest is absent.
+func LoadFlowMultipartManifest(flow *schema.HTTPFlow) ([]multipartPartMeta, error) {
+	if !FlowIsMultipartSpill(flow) {
+		return nil, nil
+	}
+	return loadMultipartManifest(FlowMultipartSidecarDir(flow))
+}
+
+// FlowMultipartSkeletonBody returns the skeleton body (headers stripped) of a
+// multipart-spilled flow, used as the template for on-demand rebuild.
+func FlowMultipartSkeletonBody(flow *schema.HTTPFlow) []byte {
+	if !FlowIsMultipartSpill(flow) {
+		return nil
+	}
+	_, body := lowhttp.SplitHTTPPacketFast(flow.GetRequest())
+	return []byte(body)
+}
+
+// OpenFlowMultipartPart opens one spilled part file by manifest entry index.
+// partIndex must match a manifest entry's PartIndex.
+func OpenFlowMultipartPart(flow *schema.HTTPFlow, partIndex int) (*os.File, string, error) {
+	manifest, err := LoadFlowMultipartManifest(flow)
+	if err != nil {
+		return nil, "", err
+	}
+	var meta *multipartPartMeta
+	for i := range manifest {
+		if manifest[i].Index == partIndex {
+			meta = &manifest[i]
+			break
+		}
+	}
+	if meta == nil {
+		return nil, "", utils.Errorf("multipart part %d not found in manifest", partIndex)
+	}
+	f, err := openMultipartPart(FlowMultipartSidecarDir(flow), *meta)
+	if err != nil {
+		return nil, "", err
+	}
+	return f, meta.Filename, nil
+}
+
+// RebuildFlowMultipartBody returns a reader streaming the complete rebuilt
+// multipart body for a flow (skeleton text fields + spilled file parts from
+// disk), via io.Pipe so large parts never load fully into memory.
+func RebuildFlowMultipartBody(flow *schema.HTTPFlow) (io.Reader, error) {
+	if !FlowIsMultipartSpill(flow) {
+		return nil, utils.Error("flow is not a multipart spill")
+	}
+	return rebuildMultipartBodyToReader(FlowMultipartSkeletonBody(flow), FlowMultipartSidecarDir(flow)), nil
+}
+
 // sanitizeFilename strips path separators and other filesystem-unsafe chars
 // from a part filename so it can be used as a disk filename inside the
 // sidecar directory.
@@ -440,4 +525,106 @@ func cleanupMultipartSidecar(bodyFile string) {
 	if info, err := os.Stat(dir); err == nil && info.IsDir() {
 		_ = os.RemoveAll(dir)
 	}
+}
+
+// manifestFileName is the sidecar file recording the per-part metadata so
+// downstream readers can enumerate file parts without re-parsing the skeleton.
+const manifestFileName = "manifest.json"
+
+// writeMultipartManifest persists the manifest entries as JSON into sidecarDir.
+func writeMultipartManifest(sidecarDir string, manifest []multipartPartMeta) error {
+	if sidecarDir == "" {
+		return utils.Error("empty sidecar dir")
+	}
+	data, err := jsonMarshalManifest(manifest)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(sidecarDir, manifestFileName), data, 0o644)
+}
+
+// loadMultipartManifest reads manifest.json from sidecarDir. Returns nil
+// manifest and no error when the file is absent (e.g. flat spill or legacy).
+func loadMultipartManifest(sidecarDir string) ([]multipartPartMeta, error) {
+	if sidecarDir == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(filepath.Join(sidecarDir, manifestFileName))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return jsonUnmarshalManifest(data)
+}
+
+// openMultipartPart opens the on-disk file for one spilled part.
+func openMultipartPart(sidecarDir string, meta multipartPartMeta) (*os.File, error) {
+	if sidecarDir == "" {
+		return nil, utils.Error("empty sidecar dir")
+	}
+	return os.Open(filepath.Join(sidecarDir, meta.File))
+}
+
+// manifestJSONEntry is the on-disk JSON representation of a part meta. Field
+// names are stable and lowerCamel to match the gRPC MultipartFileInfo shape.
+type manifestJSONEntry struct {
+	PartIndex    int    `json:"partIndex"`
+	FieldName    string `json:"fieldName"`
+	Filename     string `json:"filename"`
+	ContentType  string `json:"contentType"`
+	Size         int64  `json:"size"`
+	File         string `json:"file"`
+}
+
+func jsonMarshalManifest(manifest []multipartPartMeta) ([]byte, error) {
+	entries := make([]manifestJSONEntry, len(manifest))
+	for i, m := range manifest {
+		entries[i] = manifestJSONEntry{
+			PartIndex:   m.Index,
+			FieldName:   m.FieldName,
+			Filename:    m.Filename,
+			ContentType: m.ContentType,
+			Size:        m.Size,
+			File:        m.File,
+		}
+	}
+	return json.MarshalIndent(entries, "", "  ")
+}
+
+func jsonUnmarshalManifest(data []byte) ([]multipartPartMeta, error) {
+	var entries []manifestJSONEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, err
+	}
+	out := make([]multipartPartMeta, len(entries))
+	for i, e := range entries {
+		out[i] = multipartPartMeta{
+			Index:       e.PartIndex,
+			FieldName:   e.FieldName,
+			Filename:    e.Filename,
+			ContentType: e.ContentType,
+			Size:        e.Size,
+			File:        e.File,
+		}
+	}
+	return out, nil
+}
+
+// rebuildMultipartBodyToReader returns a reader that streams the complete
+// multipart body rebuilt from the skeleton (text fields verbatim) plus the
+// spilled file parts (streamed from disk). It uses an io.Pipe so large file
+// parts never need to be fully loaded into memory: a goroutine writes into the
+// pipe while the caller reads from the returned reader.
+//
+// If the rebuild fails, the goroutine closes the pipe with the error and the
+// caller's Read will surface it.
+func rebuildMultipartBodyToReader(skeletonBody []byte, sidecarDir string) io.Reader {
+	pr, pw := io.Pipe()
+	go func() {
+		err := rebuildMultipartBodyToWriter(skeletonBody, sidecarDir, pw)
+		_ = pw.CloseWithError(err)
+	}()
+	return pr
 }

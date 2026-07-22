@@ -2,7 +2,10 @@ package model
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -182,6 +185,13 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 			return utf8safe(i)
 		}),
 		Host: f.Host,
+	}
+
+	// Fill MultipartFiles for multipart-spilled requests so the frontend can
+	// render a per-file download dropdown. The manifest lives next to the
+	// 0-byte body placeholder in the sidecar directory.
+	if mpFiles := loadFlowMultipartFiles(f); len(mpFiles) > 0 {
+		flow.MultipartFiles = mpFiles
 	}
 	// 设置 title
 	var (
@@ -433,4 +443,65 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool,
 		}
 	}
 	return p
+}
+
+// multipartSkeletonMarker mirrors yakit.multipartSkeletonMarker — the prefix
+// of the in-DB skeleton placeholder for a spilled file part. Duplicated here
+// because model cannot import yakit (yakit imports model); keeping the marker
+// literal in sync is the only coupling.
+const modelMultipartSkeletonMarker = "[[yakit: multipart file spilled"
+
+// modelMultipartSidecarDirFromBodyFile mirrors yakit.multipartSidecarDirFromBodyFile.
+func modelMultipartSidecarDirFromBodyFile(bodyFile string) string {
+	if bodyFile == "" {
+		return ""
+	}
+	dir := filepath.Dir(bodyFile)
+	base := filepath.Base(bodyFile)
+	stem := strings.TrimSuffix(base, filepath.Ext(base))
+	return filepath.Join(dir, stem+"-parts")
+}
+
+// manifestJSONEntry mirrors yakit.manifestJSONEntry (on-disk manifest.json).
+type manifestJSONEntry struct {
+	PartIndex   int    `json:"partIndex"`
+	FieldName   string `json:"fieldName"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"contentType"`
+	Size        int64  `json:"size"`
+	File        string `json:"file"`
+}
+
+// loadFlowMultipartFiles reads the sidecar manifest.json for a multipart-
+// spilled request and converts it to gRPC MultipartFileInfo entries for the
+// frontend dropdown. Returns nil when the flow is not a multipart spill or the
+// manifest is absent.
+func loadFlowMultipartFiles(f *schema.HTTPFlow) []*ypb.MultipartFileInfo {
+	if f == nil || !f.IsTooLargeRequest || f.TooLargeRequestBodyFile == "" {
+		return nil
+	}
+	if !bytes.Contains([]byte(f.GetRequest()), []byte(modelMultipartSkeletonMarker)) {
+		return nil
+	}
+	dir := modelMultipartSidecarDirFromBodyFile(f.TooLargeRequestBodyFile)
+	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return nil
+	}
+	var entries []manifestJSONEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		log.Errorf("load multipart manifest failed: %s", err)
+		return nil
+	}
+	out := make([]*ypb.MultipartFileInfo, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, &ypb.MultipartFileInfo{
+			PartIndex:   int32(e.PartIndex),
+			FieldName:   utf8safe(e.FieldName),
+			Filename:    utf8safe(e.Filename),
+			ContentType: utf8safe(e.ContentType),
+			Size:        e.Size,
+		})
+	}
+	return out
 }

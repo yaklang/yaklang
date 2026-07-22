@@ -15,6 +15,13 @@ func LoadHTTPFlowRequestPacket(flow *schema.HTTPFlow) ([]byte, error) {
 	if flow == nil {
 		return nil, utils.Error("flow is nil")
 	}
+	// Multipart-spilled request: in-DB skeleton carries placeholders; rebuild
+	// the complete body on demand from the sidecar part files. This loads the
+	// full body into memory and is only used by caller-driven paths (HAR
+	// export, encode-to-file), never by list queries.
+	if FlowIsMultipartSpill(flow) {
+		return loadMultipartSpillRequestPacket(flow)
+	}
 	if flow.Request != "" {
 		reqRaw, err := strconv.Unquote(flow.Request)
 		if err != nil {
@@ -28,6 +35,24 @@ func LoadHTTPFlowRequestPacket(flow *schema.HTTPFlow) ([]byte, error) {
 		return readHTTPFlowSpillPacket(flow.TooLargeRequestHeaderFile, flow.TooLargeRequestBodyFile)
 	}
 	return nil, nil
+}
+
+// loadMultipartSpillRequestPacket reconstructs the full request packet for a
+// multipart-spilled flow: header file + rebuilt complete multipart body.
+func loadMultipartSpillRequestPacket(flow *schema.HTTPFlow) ([]byte, error) {
+	header, err := os.ReadFile(flow.TooLargeRequestHeaderFile)
+	if err != nil {
+		return nil, utils.Wrap(err, "read multipart spill header file failed")
+	}
+	rr, err := RebuildFlowMultipartBody(flow)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(rr)
+	if err != nil {
+		return nil, utils.Wrap(err, "rebuild multipart body failed")
+	}
+	return append(header, body...), nil
 }
 
 func LoadHTTPFlowResponsePacket(flow *schema.HTTPFlow) ([]byte, error) {
@@ -111,6 +136,22 @@ func ExtractHTTPPacketPart(packet []byte, flow *schema.HTTPFlow, isRequest bool,
 		return []byte(header), nil
 	case "body":
 		if flow != nil {
+			// Multipart-spilled request: body file is a 0-byte placeholder;
+			// rebuild the complete multipart body from the sidecar parts.
+			if isRequest && FlowIsMultipartSpill(flow) {
+				rr, rerr := RebuildFlowMultipartBody(flow)
+				if rerr != nil {
+					return nil, rerr
+				}
+				body, berr := io.ReadAll(rr)
+				if berr != nil {
+					return nil, berr
+				}
+				if len(body) == 0 {
+					return nil, utils.Error("empty rebuilt multipart body")
+				}
+				return body, nil
+			}
 			bodyFile := flow.TooLargeRequestBodyFile
 			if !isRequest {
 				bodyFile = flow.TooLargeResponseBodyFile
