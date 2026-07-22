@@ -150,27 +150,29 @@ func DeleteProgramIrCode(db *gorm.DB, program string) {
 }
 
 func deleteProgramCodeOnly(db *gorm.DB, program string) {
-	// delete the program
-	// code
 	deleteCache(program)
-	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
-	db.Model(&IrIndex{}).Where("program_name = ?", program).Unscoped().Delete(&IrIndex{})
-	db.Model(&IrNamePool{}).Where("program_name = ?", program).Unscoped().Delete(&IrNamePool{})
-	db.Model(&IrSource{}).Where("program_name = ?", program).Unscoped().Delete(&IrSource{})
-	db.Model(&IrSource{}).Where("folder_path = ? AND file_name = ?", "/", program).Unscoped().Delete(&IrSource{})
-	db.Model(&IrType{}).Where("program_name = ?", program).Unscoped().Delete(&IrType{})
-	db.Model(&IrOffset{}).Where("program_name = ?", program).Unscoped().Delete(&IrOffset{})
+	// Batch all DELETEs into a single Exec call to reduce round-trips.
+	// Each DELETE is still a separate statement but they're sent in one
+	// batch to SQLite, cutting 7 round-trips to 1.
+	db.Exec(`DELETE FROM `+TableIrCodes+` WHERE program_name = ?;
+DELETE FROM `+TableIrIndices+` WHERE program_name = ?;
+DELETE FROM `+TableIrNamePool+` WHERE program_name = ?;
+DELETE FROM `+TableIrSources+` WHERE program_name = ?;
+DELETE FROM `+TableIrSources+` WHERE folder_path = ? AND file_name = ?;
+DELETE FROM `+TableIrTypes+` WHERE program_name = ?;
+DELETE FROM `+TableIrOffsets+` WHERE program_name = ?;`,
+		program, program, program, program, "/", program, program, program)
 }
 
 func deleteProgramAuditResult(db *gorm.DB, program string) {
-	// analyze result
-	db.Model(&AuditResult{}).Where("program_name = ?", program).Unscoped().Delete(&AuditResult{})
-	db.Model(&AuditNode{}).Where("program_name = ?", program).Unscoped().Delete(&AuditNode{})
-	db.Model(&AuditEdge{}).Where("program_name = ?", program).Unscoped().Delete(&AuditEdge{})
+	db.Exec(`DELETE FROM `+TableAuditResults+` WHERE program_name = ?;
+DELETE FROM `+TableAuditNodes+` WHERE program_name = ?;
+DELETE FROM `+TableAuditEdges+` WHERE program_name = ?;`,
+		program, program, program)
 }
 
 func deleteProgramRiskAndScanTask(db *gorm.DB, program string) {
-	// risk and scan task
-	db.Model(&schema.SSARisk{}).Where("program_name = ?", program).Unscoped().Delete(&schema.SSARisk{})
-	db.Model(&schema.SyntaxFlowScanTask{}).Where("programs = ?", program).Unscoped().Delete(&schema.SyntaxFlowScanTask{})
+	db.Exec(`DELETE FROM `+schema.TableSSARisks+` WHERE program_name = ?;
+DELETE FROM `+schema.TableSyntaxFlowScanTask+` WHERE programs = ?;`,
+		program, program)
 }
