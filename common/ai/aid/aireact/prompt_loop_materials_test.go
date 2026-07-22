@@ -63,7 +63,7 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 
 // TestPromptManager_AssembleLoopPrompt_SectionOrder 验证"按稳定性分层"路径
 // 下 6 段顺序: high_static -> frozen_block -> semi_dynamic_1 (Skills)
-// -> semi_dynamic_2 (ExecutionPolicy + TaskInstruction + Schema + OutputExample) -> timeline_open ->
+// -> semi_dynamic_2 (ExecutionPolicy + TaskInstruction + OutputExample + Schema) -> timeline_open ->
 // dynamic; 以及 frozen_block 段被 AI_CACHE_FROZEN_semi-dynamic 标签包裹,
 // semi_dynamic_1 / semi_dynamic_2 段分别被 AI_CACHE_SEMI / AI_CACHE_SEMI2 包裹.
 //
@@ -162,7 +162,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	// 段顺序 (P1-C3 timeline-open 段内子项重排后): TRAITS -> AI_CACHE_FROZEN(START) ->
 	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
 	// PROMPT_SECTION_semi-dynamic-1 (Skills) ->
-	// PROMPT_SECTION_semi-dynamic-2 (ExecutionPolicy + Persistent + Schema + OutputExample) ->
+	// PROMPT_SECTION_semi-dynamic-2 (ExecutionPolicy + Persistent + OutputExample + Schema) ->
 	// PROMPT_SECTION_timeline-open (Timeline open + SessionEvidence +
 	// Workspace + PREV_USER_INPUT + Current Time + PlanContext) ->
 	// Dynamic (UserQuery + AutoCtx + ...)
@@ -201,12 +201,12 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Contains(t, prompt, "<|SCHEMA|>")
 	require.NotContains(t, prompt, "<|SCHEMA_n123|>")
 
-	// OUTPUT_EXAMPLE 必须出现在 semi-dynamic 段 (schema 之后, timeline-open 之前),
-	// 不允许再回到 high-static 段污染缓存边界.
+	// OUTPUT_EXAMPLE 必须出现在 semi-dynamic 段 (schema 之前, timeline-open 之前),
+	// schema 移到 semi-2 末尾后, example 在 schema 之前. 不允许回到 high-static 段.
 	// 关键词: OUTPUT_EXAMPLE 段位置断言, high-static 反污染验证
 	outputExampleIdx := strings.Index(prompt, "<|OUTPUT_EXAMPLE|>")
 	require.NotEqual(t, -1, outputExampleIdx)
-	require.Less(t, schemaIdx, outputExampleIdx)
+	require.Greater(t, schemaIdx, outputExampleIdx)
 	require.Less(t, outputExampleIdx, timelineOpenSectionIdx)
 
 	// frozen_block 段子结构: tool_inventory + forge_inventory (本用例 forge 关闭) +
@@ -316,7 +316,7 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 }
 
 // TestPromptManager_RenderLoopSemiDynamic2Section_Order 验证 SEMI-2 段
-// (semi_dynamic_section_2.txt) 渲染顺序为 Persistent -> Schema -> OutputExample,
+// (semi_dynamic_section_2.txt) 渲染顺序为 Persistent -> OutputExample -> Schema,
 // 且不含 SkillsContext / CacheToolCall / Tool / Forge.
 //
 // 关键词: renderLoopSemiDynamic2Section, semi_dynamic_section_2 顺序, P1.1
@@ -346,7 +346,7 @@ func TestPromptManager_RenderLoopSemiDynamic2Section_Order(t *testing.T) {
 	require.NotEqual(t, -1, schemaIdx)
 	require.NotEqual(t, -1, outputExampleIdx)
 	require.Less(t, persistentIdx, schemaIdx)
-	require.Less(t, schemaIdx, outputExampleIdx)
+	require.Greater(t, schemaIdx, outputExampleIdx)
 	// SEMI-2 段绝对不能含 SkillsContext / CacheToolCall / Tool / Forge.
 	require.NotContains(t, rendered, "<|SKILLS_CONTEXT_demo|>")
 	require.NotContains(t, rendered, "<|CACHE_TOOL_CALL_[current-nonce]|>")
@@ -503,7 +503,7 @@ func TestPromptManager_NewPromptMaterials_ConfigFrozenPartitionProducer(t *testi
 //   - user2: 含 AI_CACHE_SEMI_semi 完整闭合块 (PROMPT_SECTION_semi-dynamic-1 +
 //     Skills + CacheToolCall), 字节边界稳定, *不* 打 cc (string content)
 //   - user3: 含 AI_CACHE_SEMI2_semi 完整闭合块 (PROMPT_SECTION_semi-dynamic-2 +
-//     ExecutionPolicy + TaskInstruction + Schema + OutputExample), 字节边界稳定, 主动 cc
+//     ExecutionPolicy + TaskInstruction + OutputExample + Schema), 字节边界稳定, 主动 cc
 //   - user4: 含 PROMPT_SECTION_timeline-open + Dynamic 段, 不打 cc
 //
 // 这是 P1.1 三 cache 边界的核心收益: dashscope 同时命中 system 短前缀、
@@ -823,7 +823,7 @@ func TestPromptManager_AssembleLoopPrompt_SemiSegmentByteStableAcrossTurns(t *te
 	require.NotContains(t, semi1Round1, "CACHE_TOOL_CALL",
 		"recent tool routing must stay after the final cache boundary")
 
-	// SEMI-2 段跨 turn 字节稳定 (ExecutionPolicy + Persistent + Schema + OutputExample, 无 turn nonce).
+	// SEMI-2 段跨 turn 字节稳定 (ExecutionPolicy + Persistent + OutputExample + Schema, 无 turn nonce).
 	semi2Round1 := extractSegment(t, prompt1, "<|AI_CACHE_SEMI2_semi|>", "<|AI_CACHE_SEMI2_END_semi|>")
 	semi2Round2 := extractSegment(t, prompt2, "<|AI_CACHE_SEMI2_semi|>", "<|AI_CACHE_SEMI2_END_semi|>")
 	require.Equal(t, semi2Round1, semi2Round2,

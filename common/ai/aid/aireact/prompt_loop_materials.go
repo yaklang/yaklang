@@ -341,7 +341,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 // SemiDynamic 段 P1.1 拆成两块:
 //   - SemiDynamic1 (Skills + CacheToolCall): 被 <|AI_CACHE_SEMI_semi|>...END 包裹,
 //     由 hijacker 切到 user2 (string content, 不打 cc).
-//   - SemiDynamic2 (TaskInstruction + Schema + OutputExample): 被
+//   - SemiDynamic2 (TaskInstruction + OutputExample + Schema): 被
 //     <|AI_CACHE_SEMI2_semi|>...END 包裹, 由 hijacker 切到 user3 (ephemeral cc),
 //     让 dashscope 把 semi-1+semi-2 合并算 prefix cache.
 //
@@ -469,7 +469,7 @@ func (pm *PromptManager) buildHighStaticObservation(
 		reactloops.PromptSectionRoleHighStatic,
 	)
 	// section.high_static 已重构为完全无变量的纯静态系统提示词:
-	//   - OutputExample (caller-specific) 已迁到 semi-dynamic 段 Schema 之后
+	//   - OutputExample (caller-specific) 在 semi-dynamic 段 Schema 之前
 	//   - TaskInstruction (PERSISTENT, caller-specific) 已迁到 semi-dynamic 段
 	//   - AllowToolCall / AllowPlanAndExec / HasLoadCapability 三个能力开关已移除,
 	//     新模板无条件介绍全部能力, 实际可用性以 SCHEMA enum 为准
@@ -666,7 +666,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 }
 
 // buildSemiDynamic2Observation 给"PROMPT_SECTION_semi-dynamic-2 段"做观测树:
-// TaskInstruction + Schema + OutputExample. 物理上对应 hijacker 5 段切分中的
+// TaskInstruction + OutputExample + Schema. 物理上对应 hijacker 5 段切分中的
 // user3 (ephemeral cc), 与 buildSemiDynamic1Observation 一起被 dashscope 视作
 // 合并 prefix cache 计算 (cc 锚点落在本段末尾, prefix 跨过 semi-1).
 //
@@ -727,7 +727,7 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
 		),
 		// section.semi_dynamic_2.auto_loaded_skills: AI 意图驱动加载的 SKILL 段 (尾部).
-		// 物理位置在 OutputExample 之后, 保 TaskInstr/Schema/Example 前缀字节稳定 →
+		// 物理位置在 OutputExample 之后 Schema 之前, 保 TaskInstr/Example 前缀字节稳定 →
 		// AI_CACHE_SEMI2 前缀缓存命中, 仅尾部变化.
 		reactloops.NewPromptSectionObservation(
 			"section.semi_dynamic_2.auto_loaded_skills",
@@ -1196,7 +1196,7 @@ func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.Pro
 }
 
 // renderLoopSemiDynamic2Section 渲染 P1.1 拆分后的 semi-dynamic 第二块:
-// TaskInstruction + Schema + OutputExample. 物理上对应 hijacker 5 段切分中的
+// TaskInstruction + OutputExample + Schema. 物理上对应 hijacker 5 段切分中的
 // user3 (ephemeral cc), 由 wrapAICacheSemi2 包一层 AI_CACHE_SEMI2 边界, dashscope
 // 把 semi-1+semi-2 视作合并 prefix cache 计算.
 //
