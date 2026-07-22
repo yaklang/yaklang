@@ -24,8 +24,8 @@ SSA_CI_DATA_DIR="${SSA_CI_DATA_DIR:-/data/ci-ssa}"
 export SSA_CI_DATA_DIR
 export SSA_DATABASE_RAW="${SSA_DATABASE_RAW:-$SSA_CI_DATA_DIR/default-yakssa.db}"
 mkdir -p "$(dirname "$SSA_DATABASE_RAW")" "$SSA_CI_DATA_DIR"
+POINTER="$SSA_CI_DATA_DIR/base-program-name"
 if [ -z "${CI_SSA_BASE_PROGRAM:-}" ]; then
-  POINTER="$SSA_CI_DATA_DIR/base-program-name"
   if [ -f "$POINTER" ]; then
     CI_SSA_BASE_PROGRAM="$(tr -d '[:space:]' < "$POINTER")"
   fi
