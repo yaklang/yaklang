@@ -593,15 +593,19 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				}
 			}
 
-			for _, v := range data.WebsocketFlowsList {
-				if db1 := tx.Create(&schema.WebsocketFlow{
-					WebsocketRequestHash: v.WebsocketRequestHash,
-					FrameIndex:           v.FrameIndex,
-					FromServer:           v.FromServer,
-					QuotedData:           string(v.QuotedData),
-					MessageType:          v.MessageType,
-					Hash:                 v.Hash,
-				}); db1.Error != nil {
+			if len(data.WebsocketFlowsList) > 0 {
+				wsFlows := make([]*schema.WebsocketFlow, 0, len(data.WebsocketFlowsList))
+				for _, v := range data.WebsocketFlowsList {
+					wsFlows = append(wsFlows, &schema.WebsocketFlow{
+						WebsocketRequestHash: v.WebsocketRequestHash,
+						FrameIndex:           v.FrameIndex,
+						FromServer:           v.FromServer,
+						QuotedData:           string(v.QuotedData),
+						MessageType:          v.MessageType,
+						Hash:                 v.Hash,
+					})
+				}
+				if db1 := tx.CreateInBatches(wsFlows, 500); db1.Error != nil {
 					return utils.Errorf("WebsocketFlow failed: %s", db1.Error)
 				}
 			}
