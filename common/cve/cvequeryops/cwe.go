@@ -592,14 +592,25 @@ func DownloadCWE() (string, error) {
 // SaveCWE saves CWE entries to database, checking for important field changes
 // and clearing Chinese translations if the source content has changed
 func SaveCWE(db *gorm.DB, cwes []*cveresources.CWE) {
-	for _, newCWE := range cwes {
-		// Check if CWE already exists
-		var existingCWE cveresources.CWE
-		err := db.Where("id_str = ?", newCWE.IdStr).First(&existingCWE).Error
+	// Batch query all existing CWEs to avoid N+1 First calls.
+	idStrs := make([]string, 0, len(cwes))
+	for _, c := range cwes {
+		idStrs = append(idStrs, c.IdStr)
+	}
+	existingMap := make(map[string]*cveresources.CWE, len(cwes))
+	if len(idStrs) > 0 {
+		var existingCWEs []*cveresources.CWE
+		db.Where("id_str IN (?)", idStrs).Find(&existingCWEs)
+		for _, e := range existingCWEs {
+			existingMap[e.IdStr] = e
+		}
+	}
 
-		if err == nil {
+	for _, newCWE := range cwes {
+		existingCWE, exists := existingMap[newCWE.IdStr]
+		if exists {
 			// CWE exists, check if important fields have changed
-			fieldsChanged := hasImportantFieldsChanged(&existingCWE, newCWE)
+			fieldsChanged := hasImportantFieldsChanged(existingCWE, newCWE)
 			if fieldsChanged {
 				// Clear Chinese translations when source content changed
 				log.Infof("CWE-%s: important fields changed, clearing Chinese translations for incremental update", newCWE.IdStr)

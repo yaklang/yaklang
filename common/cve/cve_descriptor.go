@@ -95,14 +95,14 @@ func _migrateTable() error {
 	for result := range YieldCVEDescriptions(srcDB, context.Background()) {
 		batch = append(batch, result)
 		if len(batch) >= 500 {
-			if err := dstDB.CreateInBatches(batch, 500).Error; err != nil {
+			if err := dstDB.CreateInBatches(batch).Error; err != nil {
 				return err
 			}
 			batch = batch[:0]
 		}
 	}
 	if len(batch) > 0 {
-		if err := dstDB.CreateInBatches(batch, 500).Error; err != nil {
+		if err := dstDB.CreateInBatches(batch).Error; err != nil {
 			return err
 		}
 	}
