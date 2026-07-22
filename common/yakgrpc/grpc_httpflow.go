@@ -566,9 +566,9 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				IsReadTooSlowResponse:      data.IsReadTooSlowResponse,
 				TooLargeResponseHeaderFile: data.TooLargeResponseHeaderFile,
 				TooLargeResponseBodyFile:   data.TooLargeResponseBodyFile,
-				IsTooLargeRequest:         data.IsTooLargeRequest,
-				TooLargeRequestHeaderFile: data.TooLargeRequestHeaderFile,
-				TooLargeRequestBodyFile:   data.TooLargeRequestBodyFile,
+				IsTooLargeRequest:          data.IsTooLargeRequest,
+				TooLargeRequestHeaderFile:  data.TooLargeRequestHeaderFile,
+				TooLargeRequestBodyFile:    data.TooLargeRequestBodyFile,
 				Host:                       data.Host,
 			}
 			yakit.SyncLargeHTTPFlowFlagsFromStoredPacket(shareHttpFlow, shareHttpFlow.RequestLength, shareHttpFlow.BodyLength)
@@ -605,7 +605,7 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 						Hash:                 v.Hash,
 					})
 				}
-				if db1 := tx.CreateInBatches(wsFlows, 500); db1.Error != nil {
+				if db1 := tx.CreateInBatches(wsFlows); db1.Error != nil {
 					return utils.Errorf("WebsocketFlow failed: %s", db1.Error)
 				}
 			}
@@ -775,9 +775,9 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		IsReadTooSlowResponse:      httpFlow.IsReadTooSlowResponse,
 		TooLargeResponseHeaderFile: httpFlow.TooLargeResponseHeaderFile,
 		TooLargeResponseBodyFile:   httpFlow.TooLargeResponseBodyFile,
-		IsTooLargeRequest:         httpFlow.IsTooLargeRequest,
-		TooLargeRequestHeaderFile: httpFlow.TooLargeRequestHeaderFile,
-		TooLargeRequestBodyFile:   httpFlow.TooLargeRequestBodyFile,
+		IsTooLargeRequest:          httpFlow.IsTooLargeRequest,
+		TooLargeRequestHeaderFile:  httpFlow.TooLargeRequestHeaderFile,
+		TooLargeRequestBodyFile:    httpFlow.TooLargeRequestBodyFile,
 		Host:                       httpFlow.Host,
 	}
 	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}

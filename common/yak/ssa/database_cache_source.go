@@ -220,7 +220,7 @@ func (s *sourceStore) Flush() {
 	}
 
 	saveErr := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-		if err := tx.CreateInBatches(toSave, 500).Error; err != nil {
+		if err := tx.CreateInBatches(toSave).Error; err != nil {
 			return err
 		}
 		return nil
