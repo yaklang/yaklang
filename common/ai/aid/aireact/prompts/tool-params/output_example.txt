@@ -1,0 +1,40 @@
+# Example 1: Simple JSON Params (Tool)
+```json
+{
+  "@action": "call-tool",
+  "identifier": "list_directory",
+  "params": {
+    "path": "./workspace"
+  },
+  "call_expectations": "~3s, success when the target directory listing is returned"
+}
+```
+
+# Example 2: JSON + AITAG Hybrid (Tool)
+```json
+{
+  "@action": "call-tool",
+  "identifier": "run_script",
+  "params": {
+    "timeout": 30
+  }
+}
+```
+
+```text
+<|TOOL_PARAM_script|>
+... raw block content ...
+<|TOOL_PARAM_script_END|>
+```
+
+# Example 3: AI Blueprint Params
+```json
+{
+  "@action": "call-ai-blueprint",
+  "blueprint": "blueprint_name",
+  "params": {
+    "param1": "value1",
+    "param2": "value2"
+  }
+}
+```

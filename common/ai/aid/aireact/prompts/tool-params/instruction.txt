@@ -1,14 +1,15 @@
-# Tool Parameter Generation
-你负责为一个即将执行的工具调用生成参数，目标是产出一个可直接进入后续评估与执行流程的调用载荷。
-Generate appropriate parameters for this tool call based on the context above.
+# Parameter Generation
+你负责为一个即将执行的工具或 AI Blueprint 调用生成参数，目标是产出一个可直接进入后续评估与执行流程的调用载荷。
+Generate appropriate parameters based on the context above and the schema.
 
 ## Core Rules
 - 参数必须服务于当前整体任务推进，而不是孤立地拼装字段
 - 优先产出最小必要参数，不补无依据的字段
-- `identifier` 应使用简短的 `snake_case`，表达本次工具调用的目的
+- `identifier` 应使用简短的 `snake_case`，表达本次调用的目的
 - `call_expectations` 用于描述耗时预估、成功标准和异常处理，可简短但要可执行
 - 简单参数直接写入 JSON `params`
 - 多行文本、脚本、长配置、复杂转义内容，改用 AITAG 承载
+- 如果提供了旧参数，需要基于旧参数的失败原因重新生成，不要简单复制
 
 ## Shell Safety Rules
 如果目标工具会执行 shell / cmd / powershell，请遵守下面约束：
@@ -28,7 +29,7 @@ Generate appropriate parameters for this tool call based on the context above.
 
 ## Response Patterns
 
-### Pattern 1: Simple JSON Params
+### Pattern 1: Simple JSON Params (Tool)
 ```json
 {
   "@action": "call-tool",
@@ -40,7 +41,7 @@ Generate appropriate parameters for this tool call based on the context above.
 }
 ```
 
-### Pattern 2: JSON + AITAG Hybrid
+### Pattern 2: JSON + AITAG Hybrid (Tool)
 ```json
 {
   "@action": "call-tool",
@@ -57,4 +58,16 @@ Generate appropriate parameters for this tool call based on the context above.
 <|TOOL_PARAM_<param_name>_<current_nonce>|>
 ... raw block content ...
 <|TOOL_PARAM_<param_name>_END_<current_nonce>|>
+```
+
+### Pattern 3: AI Blueprint Params
+```json
+{
+  "@action": "call-ai-blueprint",
+  "blueprint": "blueprint_name",
+  "params": {
+    "param1": "value1",
+    "param2": "value2"
+  }
+}
 ```
