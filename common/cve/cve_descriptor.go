@@ -90,8 +90,21 @@ func _migrateTable() error {
 		return utils.Error("no dst cve desc db")
 	}
 
+	// Batch save: collect results and flush in chunks of 500.
+	batch := make([]*CVEDescription, 0, 500)
 	for result := range YieldCVEDescriptions(srcDB, context.Background()) {
-		dstDB.Save(result)
+		batch = append(batch, result)
+		if len(batch) >= 500 {
+			if err := dstDB.CreateInBatches(batch, 500).Error; err != nil {
+				return err
+			}
+			batch = batch[:0]
+		}
+	}
+	if len(batch) > 0 {
+		if err := dstDB.CreateInBatches(batch, 500).Error; err != nil {
+			return err
+		}
 	}
 	return nil
 }
