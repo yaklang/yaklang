@@ -9558,12 +9558,12 @@ type AITool struct {
 	Keywords        []string               `protobuf:"bytes,5,rep,name=Keywords,proto3" json:"Keywords,omitempty"`
 	IsFavorite      bool                   `protobuf:"varint,6,opt,name=IsFavorite,proto3" json:"IsFavorite,omitempty"`
 	ID              int64                  `protobuf:"varint,7,opt,name=ID,proto3" json:"ID,omitempty"`
-	VerboseName     string                 `protobuf:"bytes,8,opt,name=VerboseName,proto3" json:"VerboseName,omitempty"` // string 英文展示名；事件里同名 JSON 也是 string，双语见 VerboseNameI18n / verbose_name_i18n
+	VerboseName     string                 `protobuf:"bytes,8,opt,name=VerboseName,proto3" json:"VerboseName,omitempty"` // 英文展示名（兼容旧前端 / 检索）；UI 语言切换请用 VerboseNameI18n
 	Author          string                 `protobuf:"bytes,9,opt,name=Author,proto3" json:"Author,omitempty"`
 	CreatedAt       int64                  `protobuf:"varint,10,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
 	UpdatedAt       int64                  `protobuf:"varint,11,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	IsBuiltin       bool                   `protobuf:"varint,12,opt,name=IsBuiltin,proto3" json:"IsBuiltin,omitempty"`
-	VerboseNameI18N *I18N                  `protobuf:"bytes,13,opt,name=VerboseNameI18n,proto3" json:"VerboseNameI18n,omitempty"` // GetAIToolList 双语；TOOL_CALL_START 对应 tool.verbose_name_i18n（勿占用 verbose_name）
+	VerboseNameI18N *I18N                  `protobuf:"bytes,13,opt,name=VerboseNameI18n,proto3" json:"VerboseNameI18n,omitempty"` // 中英双语展示名
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -50897,8 +50897,11 @@ type QueryHTTPFlowRequest struct {
 	// 高级配置的hostname过滤（模糊匹配）
 	HostnameFilter                 []string                             `protobuf:"bytes,49,rep,name=HostnameFilter,proto3" json:"HostnameFilter,omitempty"`
 	MitmExtractAggregateFilterRows []*MITMExtractAggregateFlowFilterRow `protobuf:"bytes,50,rep,name=MitmExtractAggregateFilterRows,proto3" json:"MitmExtractAggregateFilterRows,omitempty"`
-	unknownFields                  protoimpl.UnknownFields
-	sizeCache                      protoimpl.SizeCache
+	// 排除包含这些 tag 的流量（用于"仅保留收藏"：删除不带收藏 tag 的流量时，
+	// 把收藏 tag 填入此处，筛选出非收藏流量后批量删除）
+	ExcludeTags   []string `protobuf:"bytes,51,rep,name=ExcludeTags,proto3" json:"ExcludeTags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *QueryHTTPFlowRequest) Reset() {
@@ -51263,6 +51266,13 @@ func (x *QueryHTTPFlowRequest) GetHostnameFilter() []string {
 func (x *QueryHTTPFlowRequest) GetMitmExtractAggregateFilterRows() []*MITMExtractAggregateFlowFilterRow {
 	if x != nil {
 		return x.MitmExtractAggregateFilterRows
+	}
+	return nil
+}
+
+func (x *QueryHTTPFlowRequest) GetExcludeTags() []string {
+	if x != nil {
+		return x.ExcludeTags
 	}
 	return nil
 }
@@ -76783,7 +76793,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"g\n" +
 	"!MITMExtractAggregateFlowFilterRow\x12 \n" +
 	"\vRuleVerbose\x18\x01 \x01(\tR\vRuleVerbose\x12 \n" +
-	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\xe7\r\n" +
+	"\vDisplayData\x18\x02 \x01(\tR\vDisplayData\"\x89\x0e\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -76843,7 +76853,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\x12,\n" +
 	"\x11ExcludeStatusCode\x180 \x01(\tR\x11ExcludeStatusCode\x12&\n" +
 	"\x0eHostnameFilter\x181 \x03(\tR\x0eHostnameFilter\x12n\n" +
-	"\x1eMitmExtractAggregateFilterRows\x182 \x03(\v2&.ypb.MITMExtractAggregateFlowFilterRowR\x1eMitmExtractAggregateFilterRows\"\xdc\x01\n" +
+	"\x1eMitmExtractAggregateFilterRows\x182 \x03(\v2&.ypb.MITMExtractAggregateFlowFilterRowR\x1eMitmExtractAggregateFilterRows\x12 \n" +
+	"\vExcludeTags\x183 \x03(\tR\vExcludeTags\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
