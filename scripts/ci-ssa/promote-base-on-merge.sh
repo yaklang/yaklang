@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Promote CI SSA base after a PR merges into main.
-# Relative to the last manifest main_sha, incremental-compile tip into a new
-# overlay program and switch the base pointer (scheme A).
 #
-# Catch-up mode: if multiple PRs merged between runs (GitHub concurrency.group
-# drops queued promotes, so only the last PR's promote actually executes), this
-# loop advances manifest.main_sha one commit at a time until it reaches
-# NEW_SHA. Each iteration compiles the diff for one commit range and stacks the
-# overlay. This keeps every PR's diff in its own layer instead of collapsing
-# multiple PRs into one giant diff.
+# Relative to the last manifest main_sha, incremental-compile tip into a new
+# overlay program and switch the base pointer. When overlay depth exceeds the
+# limit, flatten the chain into a single program.
+#
+# Catch-up mode: if multiple PRs merged between runs, this loop advances
+# manifest.main_sha one commit at a time until it reaches NEW_SHA. Each
+# iteration compiles the diff for one commit range and stacks the overlay.
 #
 # Usage: promote-base-on-merge.sh <new_main_sha> [pr_number]
 set -euo pipefail
@@ -17,9 +16,24 @@ NEW_SHA_TARGET="${1:?new main sha required}"
 PR_NUMBER="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=export-ssa-db-env.sh
-source "$SCRIPT_DIR/export-ssa-db-env.sh"
-export SSA_DATABASE_RAW
+
+# ---------------------------------------------------------------------------
+# Inline: export-ssa-db-env.sh — shared env bootstrap
+# ---------------------------------------------------------------------------
+SSA_CI_DATA_DIR="${SSA_CI_DATA_DIR:-/data/ci-ssa}"
+export SSA_CI_DATA_DIR
+export SSA_DATABASE_RAW="${SSA_DATABASE_RAW:-$SSA_CI_DATA_DIR/default-yakssa.db}"
+mkdir -p "$(dirname "$SSA_DATABASE_RAW")" "$SSA_CI_DATA_DIR"
+if [ -z "${CI_SSA_BASE_PROGRAM:-}" ]; then
+  POINTER="$SSA_CI_DATA_DIR/base-program-name"
+  if [ -f "$POINTER" ]; then
+    CI_SSA_BASE_PROGRAM="$(tr -d '[:space:]' < "$POINTER")"
+  fi
+  if [ -z "${CI_SSA_BASE_PROGRAM:-}" ]; then
+    CI_SSA_BASE_PROGRAM="ci-yaklang-base"
+  fi
+fi
+export CI_SSA_BASE_PROGRAM
 
 MANIFEST="$SSA_CI_DATA_DIR/manifest.json"
 TEMPLATE="$SCRIPT_DIR/ci-yaklang-promote-compile.json"
@@ -28,87 +42,156 @@ FS_ZIP="./fs.zip"
 
 if [ ! -f "$MANIFEST" ]; then
   echo "::error::Local manifest not found: $MANIFEST"
-  echo "::error::Run workflow 'CI SSA Base Weekly' once so promote can track main_sha."
+  echo "::error::Run weekly full compile first so promote can track main_sha."
   exit 1
 fi
 
-# Acquire DB write lock before any compile/cleanup. GitHub concurrency group is
-# a soft, single-runner assumption; flock guards the SQLite file when multiple
-# self-hosted runners share the `ssa-ci` label. Must be sourced (not executed)
-# so fd 9 stays open for this script's lifetime and the lock is not released
-# when the helper subshell exits.
-# shellcheck source=acquire-db-lock.sh
-source "$SCRIPT_DIR/acquire-db-lock.sh"
+# ---------------------------------------------------------------------------
+# Inline: acquire-db-lock.sh — flock exclusive lock for DB writes
+# ---------------------------------------------------------------------------
+LOCK_FILE="${SSA_DATABASE_RAW}.lock"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK_FILE"
+  LOCK_TIMEOUT="${CI_SSA_DB_LOCK_TIMEOUT_SEC:-3600}"
+  if ! flock --exclusive --timeout "$LOCK_TIMEOUT" 9; then
+    echo "::error::Could not acquire DB lock $LOCK_FILE within ${LOCK_TIMEOUT}s."
+    exit 1
+  fi
+  echo "Acquired DB write lock: $LOCK_FILE (timeout ${LOCK_TIMEOUT}s)"
+else
+  echo "::warning::flock not found; relying on single-process serialization only."
+fi
 
-"$SCRIPT_DIR/ensure-base-program.sh"
+# ---------------------------------------------------------------------------
+# Inline: ensure-base-program.sh — verify base program exists + pointer consistency
+# ---------------------------------------------------------------------------
+BASE_PROGRAM="${CI_SSA_BASE_PROGRAM:-ci-yaklang-base}"
+if [ ! -f "$SSA_DATABASE_RAW" ]; then
+  echo "::error::SSA database not found: $SSA_DATABASE_RAW"
+  exit 1
+fi
+if ! ./yak ssa-program "$BASE_PROGRAM" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$BASE_PROGRAM"; then
+  echo "::error::Base program '$BASE_PROGRAM' not in database $SSA_DATABASE_RAW"
+  echo "::error::Run weekly full compile first."
+  exit 1
+fi
+# Cross-check manifest / pointer / env for drift.
+MANIFEST_BASE=""
+if [ -f "$MANIFEST" ]; then
+  MANIFEST_BASE=$(jq -r '.base_program_name // empty' "$MANIFEST" 2>/dev/null || true)
+fi
+POINTER_BASE=""
+if [ -f "$POINTER" ]; then
+  POINTER_BASE="$(tr -d '[:space:]' < "$POINTER")"
+fi
+DRIFT=0
+if [ -n "$MANIFEST_BASE" ] && [ "$MANIFEST_BASE" != "null" ] && [ "$MANIFEST_BASE" != "$BASE_PROGRAM" ]; then
+  echo "::error::manifest.base_program_name='$MANIFEST_BASE' != effective base '$BASE_PROGRAM'"
+  DRIFT=1
+fi
+if [ -n "$POINTER_BASE" ] && [ "$POINTER_BASE" != "$BASE_PROGRAM" ]; then
+  echo "::error::pointer='$POINTER_BASE' != effective base '$BASE_PROGRAM'"
+  DRIFT=1
+fi
+if [ -n "$MANIFEST_BASE" ] && [ "$MANIFEST_BASE" != "null" ] && [ -n "$POINTER_BASE" ] && [ "$MANIFEST_BASE" != "$POINTER_BASE" ]; then
+  echo "::error::manifest='$MANIFEST_BASE' != pointer='$POINTER_BASE'"
+  DRIFT=1
+fi
+if [ "$DRIFT" -ne 0 ]; then
+  echo "::error::Base pointer drift. Run weekly full compile to re-flatten."
+  exit 1
+fi
+echo "Base program OK: $BASE_PROGRAM"
+
+# ---------------------------------------------------------------------------
+# Inline: write-local-manifest.sh — write manifest + pointer file
+# ---------------------------------------------------------------------------
+write_manifest() {
+  local M_SHA="$1"
+  local M_BASE="$2"
+  local M_DEPTH="${3:-0}"
+  local YAK_VER
+  YAK_VER=$(./yak version 2>/dev/null | head -1 || echo "")
+  local NOW
+  NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  local DB_SIZE=0
+  if [ -f "$SSA_DATABASE_RAW" ]; then
+    DB_SIZE=$(stat -c%s "$SSA_DATABASE_RAW" 2>/dev/null || stat -f%z "$SSA_DATABASE_RAW" 2>/dev/null || echo 0)
+  fi
+  local OUT="$SSA_CI_DATA_DIR/manifest.json"
+  jq -n \
+    --arg version "1" \
+    --arg base "$M_BASE" \
+    --arg sha "$M_SHA" \
+    --arg yak "$YAK_VER" \
+    --arg path "$SSA_DATABASE_RAW" \
+    --argjson size "$DB_SIZE" \
+    --argjson depth "$M_DEPTH" \
+    --arg now "$NOW" \
+    '{
+      version: $version,
+      base_program_name: $base,
+      main_sha: $sha,
+      overlay_depth: $depth,
+      yak_version: $yak,
+      database: { url: ("local://" + $path), sha256: "", size_bytes: $size, compression: "none" },
+      updated_at: $now
+    }' > "$OUT"
+  printf '%s\n' "$M_BASE" > "$SSA_CI_DATA_DIR/base-program-name"
+  echo "Wrote manifest: base=$M_BASE main_sha=$M_SHA depth=$M_DEPTH"
+}
 
 # ---------------------------------------------------------------------------
 # promote_once: advance base by one range (OLD_SHA..NEW_SHA), stack a new
 # overlay layer, update manifest, clean that PR's diff programs.
-# Args: <new_sha> [pr_number]
-# Globals read: MANIFEST, FS_ZIP_PREBUILT, TEMPLATE, PROMOTE_CONFIG, FS_ZIP
 # ---------------------------------------------------------------------------
 promote_once() {
   local NEW_SHA="$1"
   local PR_NUM="${2:-}"
 
-  # Re-read manifest each iteration: the previous iteration (or a concurrent
-  # writer) may have advanced main_sha. Catch-up loops on the updated value.
+  # Re-read manifest each iteration: the previous iteration may have advanced.
   local OLD_SHA OLD_BASE OLD_DEPTH
   OLD_SHA=$(jq -r '.main_sha // empty' "$MANIFEST")
   OLD_BASE=$(jq -r '.base_program_name // empty' "$MANIFEST")
   OLD_DEPTH=$(jq -r '.overlay_depth // 0' "$MANIFEST" 2>/dev/null || echo 0)
   case "$OLD_DEPTH" in ''|*[!0-9]*|null) OLD_DEPTH=0 ;; esac
   if [ -z "$OLD_SHA" ] || [ "$OLD_SHA" = "null" ]; then
-    echo "::error::manifest.main_sha is empty; run CI SSA Base Weekly first"
+    echo "::error::manifest.main_sha is empty; run weekly full compile first"
     return 1
   fi
   if [ -z "$OLD_BASE" ] || [ "$OLD_BASE" = "null" ]; then
     OLD_BASE="${CI_SSA_BASE_PROGRAM:-ci-yaklang-base}"
   fi
 
-  # Overlay chain depth guard. Each successful promote adds one layer on top of
-  # the effective base. When the chain exceeds the limit, flatten it into a
-  # single self-contained program via flatten-overlay.yak (recompiles the
-  # aggregated filesystem, so this is heavy — only triggers past the threshold).
   local OVERLAY_DEPTH_LIMIT="${CI_SSA_OVERLAY_DEPTH_LIMIT:-5}"
   local NEW_DEPTH=$((OLD_DEPTH + 1))
-  if [ "$NEW_DEPTH" -gt "$OVERLAY_DEPTH_LIMIT" ]; then
-    echo "::notice::Overlay chain depth $NEW_DEPTH exceeds limit $OVERLAY_DEPTH_LIMIT; will flatten after promote."
-    echo "::notice::flatten-overlay.yak recompiles the aggregated filesystem into a single program."
-  fi
 
   echo "Promote: $OLD_SHA ($OLD_BASE) -> $NEW_SHA"
 
   if [ "$OLD_SHA" = "$NEW_SHA" ]; then
     echo "Already at tip; no promote compile needed"
     if [ -n "$PR_NUM" ]; then
-      "$SCRIPT_DIR/cleanup-pr-diff-programs.sh" "$PR_NUM" || true
+      "$SCRIPT_DIR/cleanup-programs.sh" pr "$PR_NUM" || true
     fi
     return 0
   fi
 
   if ! git cat-file -e "${OLD_SHA}^{commit}" 2>/dev/null; then
-    echo "::error::Old base sha $OLD_SHA not in this clone; fetch depth too shallow or history rewritten"
+    echo "::error::Old base sha $OLD_SHA not in this clone"
     return 1
   fi
   if ! git merge-base --is-ancestor "$OLD_SHA" "$NEW_SHA"; then
-    echo "::error::Base sha $OLD_SHA is not an ancestor of $NEW_SHA"
-    echo "::error::History likely rewritten; run 'CI SSA Base Weekly' full recompile"
+    echo "::error::Base sha $OLD_SHA is not an ancestor of $NEW_SHA; history rewritten?"
     return 1
   fi
 
   echo "::group::Generating filesystem diff ($OLD_SHA..$NEW_SHA)"
   if [ "${FS_ZIP_PREBUILT:-0}" = "1" ]; then
-    # Caller (e.g., ci-promote-monitor.py) pre-built fs.zip from the GitHub
-    # compare API for THIS range only. In catch-up mode the monitor must
-    # rebuild fs.zip per iteration; this script does not rebuild it.
-    # Do NOT rm -f here: the caller already wrote fs.zip into our CWD.
     if [ ! -f "$FS_ZIP" ]; then
       echo "::error::FS_ZIP_PREBUILT=1 but $FS_ZIP not found"
       return 1
     fi
-    echo "Using prebuilt $FS_ZIP (FS_ZIP_PREBUILT=1)"
+    echo "Using prebuilt $FS_ZIP"
   else
     rm -f "$FS_ZIP"
     if ! ./yak gitefs --start "$OLD_SHA" --end "$NEW_SHA" --output "$FS_ZIP"; then
@@ -121,7 +204,6 @@ promote_once() {
     return 1
   fi
 
-  # Count file entries in zip (directories end with /)
   local FILE_COUNT=0
   if command -v unzip >/dev/null 2>&1; then
     FILE_COUNT=$(unzip -Z1 "$FS_ZIP" 2>/dev/null | grep -cvE '/$' || true)
@@ -132,32 +214,24 @@ promote_once() {
 
   if [ "$FILE_COUNT" -eq 0 ]; then
     local ZIP_SIZE
-    ZIP_SIZE=$(stat -c%s "$FS_ZIP" 2>/dev/null || stat -f%z "$FS_ZIP" || echo 0)
+    ZIP_SIZE=$(stat -c%s "$FS_ZIP" 2>/dev/null || stat -f%z "$FS_ZIP" 2>/dev/null || echo 0)
     if [ "${ZIP_SIZE:-0}" -lt 64 ]; then
       echo "Empty diff; advancing manifest.main_sha without new overlay"
-      "$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$CI_SSA_BASE_PROGRAM" "" "$OLD_DEPTH"
+      write_manifest "$NEW_SHA" "$CI_SSA_BASE_PROGRAM" "$OLD_DEPTH"
       if [ -n "$PR_NUM" ]; then
-        "$SCRIPT_DIR/cleanup-pr-diff-programs.sh" "$PR_NUM" || true
+        "$SCRIPT_DIR/cleanup-programs.sh" pr "$PR_NUM" || true
       fi
       return 0
     fi
-    echo "::warning::Could not enumerate zip entries but archive size=${ZIP_SIZE}; attempting promote compile"
   fi
 
   local SHORT_SHA="${NEW_SHA:0:8}"
   local NEW_PROG="ci-yaklang-promote-${SHORT_SHA}"
 
-  # Retry / recovery safety: if a previous promote for this SHA compiled the
-  # program but failed before updating the manifest (or the manifest was rolled
-  # back for re-testing), the program already exists in the DB and ssa-compile
-  # refuses to overwrite it. Drop the stale program first so the compile below
-  # starts clean. This also matches the "re-compile" semantics the error
-  # message suggests, without forcing --re-compile on every run.
+  # Remove stale program if it exists (retry safety).
   if ./yak ssa-program "$NEW_PROG" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$NEW_PROG"; then
     echo "Removing stale '$NEW_PROG' from DB before re-compile"
-    ./yak "$SCRIPT_DIR/remove-program.yak" \
-      --database "sqlite://$SSA_DATABASE_RAW" \
-      --program "$NEW_PROG" || echo "::warning::Failed to remove stale $NEW_PROG"
+    "$SCRIPT_DIR/cleanup-programs.sh" name "$NEW_PROG" || true
   fi
 
   jq \
@@ -169,35 +243,30 @@ promote_once() {
     "$TEMPLATE" > "$PROMOTE_CONFIG"
 
   echo "::group::Incremental promote compile -> $NEW_PROG (base=$CI_SSA_BASE_PROGRAM)"
-  cat "$PROMOTE_CONFIG"
   if ! ./yak ssa-compile \
     --config "$PROMOTE_CONFIG" \
     --database "$SSA_DATABASE_RAW" \
     --file-perf-log; then
     echo "::error::Promote incremental compile failed"
-    echo "::error::If base drifted too far, run 'CI SSA Base Weekly'"
     return 1
   fi
   echo "::endgroup::"
 
   if ! ./yak ssa-program "$NEW_PROG" --database "$SSA_DATABASE_RAW" 2>/dev/null | grep -qF "$NEW_PROG"; then
-    echo "::error::Promote program '$NEW_PROG' not found in database after compile"
+    echo "::error::Promote program '$NEW_PROG' not found after compile"
     return 1
   fi
 
   export CI_SSA_BASE_PROGRAM="$NEW_PROG"
-  "$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$NEW_PROG" "" "$NEW_DEPTH"
+  write_manifest "$NEW_SHA" "$NEW_PROG" "$NEW_DEPTH"
 
   if [ -n "$PR_NUM" ]; then
-    "$SCRIPT_DIR/cleanup-pr-diff-programs.sh" "$PR_NUM" || true
+    "$SCRIPT_DIR/cleanup-programs.sh" pr "$PR_NUM" || true
   fi
 
   echo "Promote complete: effective base is now $NEW_PROG @ $NEW_SHA"
 
-  # If the overlay chain exceeds the depth limit, flatten it into a single
-  # self-contained program. This is a heavy full recompile (same order as
-  # weekly), so it only runs past the threshold. After flatten the effective
-  # base is a single-layer program and overlay_depth resets to 0.
+  # Flatten if overlay chain exceeds depth limit.
   if [ "$NEW_DEPTH" -gt "$OVERLAY_DEPTH_LIMIT" ]; then
     echo "::group::Flattening overlay chain (depth=$NEW_DEPTH > limit=$OVERLAY_DEPTH_LIMIT)"
     local FLAT_NAME="ci-yaklang-flat-${SHORT_SHA}"
@@ -208,30 +277,23 @@ promote_once() {
         --output "$FLAT_NAME" \
         --database "$SSA_DATABASE_RAW" \
         --config "$SCRIPT_DIR/ci-yaklang-base-compile.json"; then
-        # Flatten succeeded: update pointer to the single-layer program, reset depth.
         export CI_SSA_BASE_PROGRAM="$FLAT_NAME"
-        "$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$FLAT_NAME" "" "0"
+        write_manifest "$NEW_SHA" "$FLAT_NAME" "0"
         echo "::endgroup::"
-        echo "Flatten complete: effective base is now $FLAT_NAME @ $NEW_SHA (single-layer, depth=0)"
+        echo "Flatten complete: base is now $FLAT_NAME (single-layer, depth=0)"
       else
         echo "::endgroup::"
         echo "::warning::Flatten failed; keeping overlay chain at depth $NEW_DEPTH."
-        echo "::warning::PR scans will still work but will load $NEW_DEPTH layers. Next weekly will re-flatten."
       fi
     else
       echo "::endgroup::"
-      echo "::warning::flatten-overlay.yak not found at $FLATTEN_SCRIPT; skipping flatten."
+      echo "::warning::flatten-overlay.yak not found; skipping flatten."
     fi
   fi
 }
 
 # ---------------------------------------------------------------------------
-# Catch-up loop. GitHub concurrency.group drops queued promotes when a newer
-# trigger arrives (cancel-in-progress: false only protects the running job).
-# So when N PRs merge in quick succession, only the last PR's promote runs,
-# and it must advance the base from manifest.main_sha (the oldest un-promoted
-# tip) all the way to NEW_SHA_TARGET — one commit-range at a time so each PR's
-# diff stays in its own overlay layer instead of collapsing into one big diff.
+# Catch-up loop
 # ---------------------------------------------------------------------------
 CATCH_UP_MODE="${CI_SSA_PROMOTE_CATCH_UP:-1}"
 
@@ -242,41 +304,26 @@ if [ "$CATCH_UP_MODE" = "1" ]; then
     ITERATION=$((ITERATION + 1))
     MANIFEST_SHA_NOW=$(jq -r '.main_sha // empty' "$MANIFEST")
     if [ "$MANIFEST_SHA_NOW" = "$CURRENT_TARGET" ]; then
-      echo "Catch-up complete: manifest.main_sha == target $CURRENT_TARGET"
+      echo "Catch-up complete: manifest.main_sha == target"
       break
     fi
     if [ "$ITERATION" -gt 50 ]; then
-      echo "::error::Catch-up looped $ITERATION times without converging; aborting"
-      echo "::error::manifest.main_sha=$MANIFEST_SHA_NOW target=$CURRENT_TARGET"
+      echo "::error::Catch-up looped $ITERATION times; aborting"
       exit 1
     fi
-    # In FS_ZIP_PREBUILT mode the monitor prebuilds one fs.zip per range; it
-    # cannot prebuild multiple ranges in one invocation. When catch-up would
-    # require >1 range, fall back to non-prebuilt (yak gitefs) if available,
-    # or error out asking the caller to run per-range.
     if [ "${FS_ZIP_PREBUILT:-0}" = "1" ] && [ "$ITERATION" -gt 1 ]; then
       echo "::error::FS_ZIP_PREBUILT=1 but catch-up needs iteration $ITERATION (multiple ranges)."
-      echo "::error::Monitor must invoke promote once per range, or unset FS_ZIP_PREBUILT and use yak gitefs."
+      echo "::error::Monitor must invoke promote once per range, or use yak gitefs."
       exit 1
     fi
-    echo "=== Catch-up iteration $ITERATION (manifest=$MANIFEST_SHA_NOW target=$CURRENT_TARGET) ==="
+    echo "=== Catch-up iteration $ITERATION ==="
     if ! promote_once "$CURRENT_TARGET" "$PR_NUMBER"; then
       echo "::error::promote_once failed on iteration $ITERATION"
       exit 1
     fi
   done
 else
-  # Single-shot mode (legacy): one range, no loop.
   promote_once "$NEW_SHA_TARGET" "$PR_NUMBER"
 fi
-
-# Note: residual ci-yaklang-diff-pr-{N}-* programs from PRs whose own promote
-# was dropped by the concurrency.group queue are NOT swept here. The promote
-# overlay chain depends on every intermediate ci-yaklang-promote-* program
-# staying in the DB (each promote's base is the previous promote program), so
-# cleanup-stale-overlay-programs.sh (which removes all promote/diff layers)
-# must only run after a weekly full recompile flattens the chain back to
-# ci-yaklang-base. Residual diff programs are harmless (they just take DB
-# space) and get removed by the next 'CI SSA Base Weekly' run.
 
 echo "All promote work complete: base @ $NEW_SHA_TARGET"

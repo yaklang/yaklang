@@ -58,6 +58,12 @@ def log(msg: str, level: str = "INFO") -> None:
     print(f"[{ts}] [{level}] {msg}", flush=True)
 
 
+def log_short(msg: str) -> None:
+    """Compact one-liner for routine idle polls (no level tag)."""
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{ts}] {msg}", flush=True)
+
+
 def github_headers(token: str | None) -> dict:
     h = {"Accept": "application/vnd.github+json.v3"}
     if token:
@@ -92,8 +98,7 @@ def get_main_head_from_worktree(worktree: Path) -> str:
             check=True,
         )
         return out.stdout.strip()
-    except Exception as e:
-        log(f"git fetch failed: {e}", "ERROR")
+    except Exception:
         return ""
 
 
@@ -107,16 +112,16 @@ def get_compare_commits(repo: str, old_sha: str, new_sha: str, token: str | None
     try:
         r = requests.get(url, headers=github_headers(token), timeout=30)
         if r.status_code != 200:
-            log(f"compare API returned {r.status_code}, using single range", "WARN")
+            log(f"compare API {r.status_code}, single range", "WARN")
             return [{"sha": new_sha, "message": ""}]
         data = r.json()
         commits = data.get("commits", [])
         if not commits:
-            log("compare returned 0 commits; using single range", "WARN")
+            log("compare returned 0 commits, single range", "WARN")
             return [{"sha": new_sha, "message": ""}]
         return [{"sha": c["sha"], "message": c.get("commit", {}).get("message", "")} for c in commits]
     except Exception as e:
-        log(f"compare API exception: {e}, using single range", "WARN")
+        log(f"compare API exception: {e}, single range", "WARN")
         return [{"sha": new_sha, "message": ""}]
 
 
@@ -130,7 +135,7 @@ def get_merged_prs_in_range(repo: str, old_sha: str, new_sha: str, token: str | 
     url = f"{GITHUB_API}/repos/{repo}/compare/{old_sha}...{new_sha}"
     r = requests.get(url, headers=github_headers(token), timeout=30)
     if r.status_code != 200:
-        log(f"compare API returned {r.status_code}, falling back to empty PR list", "WARN")
+        log(f"compare API {r.status_code}, no PR list", "WARN")
         return []
     data = r.json()
     commits = data.get("commits", [])
@@ -149,7 +154,7 @@ def get_merged_prs_in_range(repo: str, old_sha: str, new_sha: str, token: str | 
     }
     r = requests.get(search_url, headers=github_headers(token), params=params, timeout=30)
     if r.status_code != 200:
-        log(f"search API returned {r.status_code}", "WARN")
+        log(f"search API {r.status_code}", "WARN")
         return []
 
     for item in r.json().get("items", []):
@@ -246,8 +251,8 @@ def check_closed_prs(repo: str, token: str | None, data_dir: Path) -> None:
             })
             log(f"PR #{pr_number} closed: {item.get('title', '')[:50]}")
             seen_closed.add(pr_number)
-    except Exception as e:
-        log(f"check_closed_prs failed: {e}", "WARN")
+    except Exception:
+        pass
 
 
 def prepare_clone(worktree: Path, new_sha: str) -> Path | None:
@@ -265,16 +270,13 @@ def prepare_clone(worktree: Path, new_sha: str) -> Path | None:
     """
     clone_dir = Path(f"/tmp/ci-promote-clone-{new_sha[:8]}")
     if clone_dir.exists():
-        log(f"Reusing existing clone: {clone_dir}")
         return clone_dir
 
-    log(f"Creating plain clone for promote: {clone_dir}")
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["git", "clone", str(worktree), str(clone_dir)],
             capture_output=True, text=True, timeout=300, check=True,
         )
-        # Fetch full main history so yak gitefs fallback can resolve any SHA.
         subprocess.run(
             ["git", "fetch", "origin", "main"],
             cwd=str(clone_dir), capture_output=True, text=True,
@@ -315,8 +317,7 @@ def build_fs_zip_from_compare(
         return -1
     data = r.json()
     files = data.get("files", [])
-    log(f"compare {old_sha[:8]}...{new_sha[:8]}: status={data.get('status')} "
-        f"ahead={data.get('ahead_by')} files={len(files)}")
+    log(f"compare {old_sha[:8]}...{new_sha[:8]}: ahead={data.get('ahead_by')} files={len(files)}")
 
     written = 0
     skipped = 0
@@ -334,28 +335,25 @@ def build_fs_zip_from_compare(
                 skipped += 1
                 continue
             if status not in ("added", "modified", "renamed", "changed"):
-                log(f"  skip {name}: unknown status={status}", "WARN")
                 skipped += 1
                 continue
             # Fetch blob content
             blob_url = f"{GITHUB_API}/repos/{repo}/git/blobs/{blob_sha}"
             br = requests.get(blob_url, headers=github_headers(token), timeout=30)
             if br.status_code != 200:
-                log(f"  blob {name} ({blob_sha[:8]}) returned {br.status_code}, skip", "WARN")
                 skipped += 1
                 continue
             blob = br.json()
             content_b64 = blob.get("content", "")
             try:
                 content = base64.b64decode(content_b64.replace("\n", ""))
-            except Exception as e:
-                log(f"  decode {name} failed: {e}, skip", "WARN")
+            except Exception:
                 skipped += 1
                 continue
             zf.writestr(name, content)
             written += 1
 
-    log(f"fs.zip built: {written} files written, {skipped} skipped -> {out_path}")
+    log(f"fs.zip built: {written} files written, {skipped} skipped")
     return written
 
 
@@ -385,7 +383,7 @@ def run_promote_once(
     if fs_zip_path is not None:
         env["FS_ZIP_PREBUILT"] = "1"
 
-    log(f"Running promote: {new_sha[:8]} (PR={pr_number or 'none'}, "
+    log(f"promote: {new_sha[:8]} (PR={pr_number or 'none'}, "
         f"fs_zip={'prebuilt' if fs_zip_path else 'yak gitefs'})")
     cmd = ["bash", str(script), new_sha, pr_number]
     try:
@@ -397,14 +395,14 @@ def run_promote_once(
             text=True,
             timeout=600,
         )
-        if result.stdout:
-            for line in result.stdout.splitlines():
-                print(f"  [promote] {line}", flush=True)
-        if result.stderr:
-            for line in result.stderr.splitlines()[-10:]:
-                print(f"  [promote:err] {line}", flush=True)
-
         if result.returncode != 0:
+            # On failure: dump stdout (last 10 lines) + stderr (last 10 lines)
+            if result.stdout:
+                for line in result.stdout.splitlines()[-10:]:
+                    print(f"  [promote] {line}", flush=True)
+            if result.stderr:
+                for line in result.stderr.splitlines()[-10:]:
+                    print(f"  [promote:err] {line}", flush=True)
             log(f"promote failed (exit {result.returncode})", "ERROR")
             return False
         return True
@@ -475,13 +473,10 @@ def run_promote(
         # compare API was partial; append a final catch-all range
         ranges.append((cur, new_sha, "(final catch-all)"))
 
-    log(f"Promote plan: {len(ranges)} range(s) from {old_sha[:8]} to {new_sha[:8]}")
-    for i, (a, b, msg) in enumerate(ranges, 1):
-        log(f"  [{i}/{len(ranges)}] {a[:8]}..{b[:8]}  {msg}")
+    log(f"Promote plan: {len(ranges)} range(s) {old_sha[:8]}..{new_sha[:8]}")
 
     # 4. Walk each range: build fs.zip via compare+blobs API, run promote once.
     for i, (a, b, msg) in enumerate(ranges, 1):
-        log(f"=== Range [{i}/{len(ranges)}]: {a[:8]}..{b[:8]} ({msg}) ===")
         fs_zip_path = clone_dir / "fs.zip"
         # Re-read base program from pointer each iteration (promote updated it)
         base_program = (data_dir / "base-program-name").read_text().strip() if (data_dir / "base-program-name").exists() else "ci-yaklang-base"
@@ -489,9 +484,7 @@ def run_promote(
         if count < 0:
             # Method-B failed (usually GitHub API rate limit). Fall back to
             # letting the promote script build fs.zip itself via `yak gitefs`.
-            # This needs the clone to have both SHAs in its history (full
-            # clone + fetch origin main, see prepare_clone).
-            log(f"build_fs_zip failed ({count}); falling back to yak gitefs for {a[:8]}..{b[:8]}", "WARN")
+            log(f"build_fs_zip failed; fallback to yak gitefs for {a[:8]}..{b[:8]}", "WARN")
             ok = run_promote_once(
                 clone_dir, script, b, pr_number,
                 None,  # fs_zip_path=None -> promote uses yak gitefs
@@ -506,7 +499,6 @@ def run_promote(
         if not ok:
             log(f"promote failed at range {a[:8]}..{b[:8]}", "ERROR")
             return False
-        log(f"Range [{i}/{len(ranges)}] complete")
 
     log("promote completed successfully")
     return True
@@ -521,14 +513,12 @@ def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | No
     main_head = ""
     try:
         main_head = get_main_head(repo, token)
-        log(f"GitHub main HEAD: {main_head[:12]}")
     except Exception as e:
         log(f"GitHub API failed ({e}), falling back to git fetch", "WARN")
         main_head = get_main_head_from_worktree(worktree)
         if not main_head:
             log("Could not determine main HEAD", "ERROR")
             return False
-        log(f"Local origin/main HEAD: {main_head[:12]}")
 
     # 2. Read manifest
     manifest = read_manifest(data_dir)
@@ -537,25 +527,24 @@ def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | No
         return False
 
     manifest_sha = manifest.get("main_sha", "")
-    manifest_base = manifest.get("base_program_name", "ci-yaklang-base")
     manifest_depth = manifest.get("overlay_depth", 0)
-    log(f"Manifest: sha={manifest_sha[:12]} base={manifest_base} depth={manifest_depth}")
 
-    # 3. Compare
+    # 3. Compare — idle case (most common): one compact line
     if main_head == manifest_sha:
-        log("main HEAD == manifest sha, nothing to promote")
+        log_short(f"idle: main={main_head[:8]} depth={manifest_depth}")
         return False
 
     if not manifest_sha:
         log("manifest main_sha is empty, nothing to compare", "WARN")
         return False
 
+    log(f"main advanced: {manifest_sha[:8]} -> {main_head[:8]} (depth={manifest_depth})")
+
     # 4. Fetch merged PRs in range
     merged_prs = get_merged_prs_in_range(repo, manifest_sha, main_head, token)
     if merged_prs:
-        pr_list = ", ".join(f"#{p['number']} ({p['title'][:40]})" for p in merged_prs)
-        log(f"Found {len(merged_prs)} merged PR(s): {pr_list}")
-        # Record merge events
+        pr_list = ", ".join(f"#{p['number']}" for p in merged_prs)
+        log(f"merged PRs: {pr_list}")
         for pr in merged_prs:
             append_event(data_dir, {
                 "type": "merged",
@@ -565,19 +554,16 @@ def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | No
                 "html_url": pr.get("html_url", ""),
             })
     else:
-        log(f"No PRs found in range {manifest_sha[:8]}...{main_head[:8]} (may be direct push or search miss)")
+        log(f"no PRs found in range (may be direct push or search miss)", "WARN")
 
     # 5. Run promote for the new HEAD
-    # Use the last PR number if available (cleanup targets that PR's diff programs)
     pr_number = str(merged_prs[-1]["number"]) if merged_prs else ""
-    # Record CI running event
     append_event(data_dir, {
         "type": "ci_running",
         "pr_number": int(pr_number) if pr_number else None,
         "sha": main_head,
     })
     success = run_promote(repo, worktree, data_dir, manifest_sha, main_head, pr_number, token)
-    # Record CI done event
     append_event(data_dir, {
         "type": "ci_done",
         "pr_number": int(pr_number) if pr_number else None,
@@ -589,13 +575,11 @@ def check_and_promote(repo: str, worktree: Path, data_dir: Path, token: str | No
     new_manifest = read_manifest(data_dir)
     if new_manifest:
         new_sha = new_manifest.get("main_sha", "")
-        new_base = new_manifest.get("base_program_name", "")
         new_depth = new_manifest.get("overlay_depth", 0)
-        log(f"Post-promote manifest: sha={new_sha[:12]} base={new_base} depth={new_depth}")
         if new_sha == main_head:
-            log("✅ Promote verified: manifest sha matches main HEAD")
+            log(f"✅ promote verified: main={new_sha[:8]} depth={new_depth}")
         else:
-            log(f"⚠️ Manifest sha {new_sha[:12]} != main HEAD {main_head[:12]}", "WARN")
+            log(f"⚠️ manifest sha {new_sha[:8]} != main HEAD {main_head[:8]}", "WARN")
 
     return True
 
@@ -613,13 +597,8 @@ def main():
     data_dir = Path(os.path.expanduser(args.data_dir))
     token = os.environ.get("GITHUB_TOKEN", "")
 
-    log(f"CI Promote Monitor started")
-    log(f"  repo:      {args.repo}")
-    log(f"  worktree:  {worktree}")
-    log(f"  data_dir:  {data_dir}")
-    log(f"  interval:  {args.interval}s")
-    log(f"  mode:      {'once' if args.once else 'poll'}")
-    log(f"  token:     {'yes' if token else 'no (unauthenticated, 60 req/hr)'}")
+    log(f"CI Promote Monitor started | repo={args.repo} interval={args.interval}s "
+        f"mode={'once' if args.once else 'poll'} token={'yes' if token else 'no'}")
 
     if not worktree.exists():
         log(f"worktree not found: {worktree}", "ERROR")
@@ -640,7 +619,6 @@ def main():
 
         if args.once:
             break
-        log(f"Next check in {args.interval}s...")
         try:
             time.sleep(args.interval)
         except KeyboardInterrupt:

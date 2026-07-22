@@ -1,10 +1,17 @@
 # CI 基础设施（SSA 增量扫描）— 本地监控模式
 
-在 **本地机器** 上通过 `ci-promote-monitor.py` 监控 yaklang main 分支，自动执行 SSA 增量 promote，不依赖 GitHub Actions self-hosted runner。
+在 **本地机器** 上通过 `ci-promote-monitor.py` 监控 yaklang main 分支，自动执行 SSA 增量 promote，不依赖 GitHub Actions。
 
-- **全量基线**：手动运行 `yak ssa-compile` 生成 `ci-yaklang-base`
-- **PR 合并后**：monitor 检测到 main 推进，自动增量 promote，切换有效基线 pointer
-- **事件记录**：PR 合并 / CI 运行 / CI 完成 / PR 关闭 事件写入 `events.json`
+## 语义
+
+| 事件 | 动作 | 脚本 |
+|------|------|------|
+| 新 PR 开启 | 对最新 main 做 diff 增量扫描 | `generate-diff-scan-config.sh` + `diff-code-scan.json` |
+| PR 合并到 main | 增量编译 overlay → 合并到基线 → 更新本地 main | `promote-base-on-merge.sh` |
+| 每周五 | 全量编译 `ci-yaklang-base`（手动/计划任务） | `ci-yaklang-base-compile.json` |
+| 日常维护 | overlay 链过深时压平；清理残留 program | `flatten-overlay.yak` / `cleanup-programs.sh` |
+
+> Monitor 自动处理「PR 合并」；「新 PR 增量扫描」和「周五全量编译」需手动或通过外部调度触发。
 
 ---
 
@@ -24,11 +31,11 @@ GitHub main ──poll──> ci-promote-monitor.py (每 5 分钟)
 
 | 角色 | 名称 | 含义 |
 |------|------|------|
-| 全量基线 program | `ci-yaklang-base` | 手动全量编译；weekly 后 pointer 指向它 |
+| 全量基线 program | `ci-yaklang-base` | 全量编译产物；周五全量后 pointer 指向它 |
 | 有效基线 | `base-program-name` 文件 | 当前 promote / 扫描使用的 program 名 |
 | Promote program | `ci-yaklang-promote-{sha8}` | PR 合并后增量编译出的新基线 |
 | SSA 库文件 | `default-yakssa.db` | SQLite SSA 数据库 |
-| 本地 manifest | `manifest.json` | 记录 `main_sha` / `base_program_name` / `overlay_depth` |
+| 本地 manifest | `manifest.json` | 数据目录中，记录 `main_sha` / `base_program_name` / `overlay_depth` |
 | 事件日志 | `events.json` | PR 生命周期事件（merged/ci_running/ci_done/closed） |
 
 ---
@@ -90,15 +97,16 @@ python3 -u scripts/ci-ssa/ci-promote-monitor.py --interval 300
 
 ## Promote 流程
 
-[promote-base-on-merge.sh](../../scripts/ci-ssa/promote-base-on-merge.sh) 执行步骤：
+[promote-base-on-merge.sh](./promote-base-on-merge.sh) 执行步骤：
 
-1. 读取 `manifest.json` 的 `main_sha` / `overlay_depth`
+1. 导出环境变量（`SSA_CI_DATA_DIR` / `SSA_DATABASE_RAW` / `CI_SSA_BASE_PROGRAM`）
 2. 获取 DB 写锁（flock 排他锁）
 3. 校验基线 program 存在且 manifest/pointer/DB 一致
 4. 生成 fs.zip（monitor 预建 或 `yak gitefs`）
 5. 增量编译 `ci-yaklang-promote-{sha8}`（base = 当前 pointer）
 6. 更新 pointer + manifest（`overlay_depth + 1`）
 7. 清理该 PR 的 diff program
+8. 如果 `overlay_depth` 超过阈值，触发 `flatten-overlay.yak` 压平
 
 ### Catch-up 模式
 
@@ -106,7 +114,7 @@ python3 -u scripts/ci-ssa/ci-promote-monitor.py --interval 300
 
 ### Overlay Flatten
 
-`overlay_depth` 超过阈值（默认 5）时，promote 自动触发 [flatten-overlay.yak](../../scripts/ci-ssa/flatten-overlay.yak)：
+`overlay_depth` 超过阈值（默认 5）时，promote 自动触发 [flatten-overlay.yak](./flatten-overlay.yak)：
 - 提取 overlay 聚合文件系统
 - 全量重编译为单层 program
 - 重置 `overlay_depth=0`
@@ -122,26 +130,19 @@ yak scripts/ci-ssa/flatten-overlay.yak \
 
 ---
 
-## `scripts/ci-ssa/` 文件说明
+## 文件说明
 
 | 文件 | 类型 | 说明 |
 |------|------|------|
-| [ci-promote-monitor.py](../../scripts/ci-ssa/ci-promote-monitor.py) | Python | 主监控脚本 |
-| [promote-base-on-merge.sh](../../scripts/ci-ssa/promote-base-on-merge.sh) | Shell | 增量 promote + catch-up + retry |
-| [export-ssa-db-env.sh](../../scripts/ci-ssa/export-ssa-db-env.sh) | Shell | 导出 DB 路径与有效基线环境变量 |
-| [acquire-db-lock.sh](../../scripts/ci-ssa/acquire-db-lock.sh) | Shell | flock 排他锁 |
-| [ensure-base-program.sh](../../scripts/ci-ssa/ensure-base-program.sh) | Shell | 校验基线 program 存在 + pointer 一致性 |
-| [write-local-manifest.sh](../../scripts/ci-ssa/write-local-manifest.sh) | Shell | 写 manifest + pointer |
-| [generate-diff-scan-config.sh](../../scripts/ci-ssa/generate-diff-scan-config.sh) | Shell | 生成 PR 扫描 config |
-| [cleanup-pr-diff-programs.sh](../../scripts/ci-ssa/cleanup-pr-diff-programs.sh) | Shell | 清理某 PR 的 diff program |
-| [cleanup-stale-overlay-programs.sh](../../scripts/ci-ssa/cleanup-stale-overlay-programs.sh) | Shell | 清理 stale overlay/diff |
-| [install-yak-ci.sh](../../scripts/ci-ssa/install-yak-ci.sh) | Shell | 下载安装 yak |
-| [flatten-overlay.yak](../../scripts/ci-ssa/flatten-overlay.yak) | Yak | overlay 链压平 |
-| [remove-program.yak](../../scripts/ci-ssa/remove-program.yak) | Yak | 删除指定 program（支持 --database） |
-| [ci-yaklang-base-compile.json](../../scripts/ci-ssa/ci-yaklang-base-compile.json) | 配置 | 全量编译 |
-| [ci-yaklang-promote-compile.json](../../scripts/ci-ssa/ci-yaklang-promote-compile.json) | 配置 | Promote 增量编译 |
-| [diff-code-scan.json](../../scripts/ci-ssa/diff-code-scan.json) | 配置 | PR 增量扫描 |
-| [manifest.json](../../scripts/ci-ssa/manifest.json) | 元数据 | 仓库内占位；真实以数据目录为准 |
+| [ci-promote-monitor.py](./ci-promote-monitor.py) | Python | 主监控脚本：轮询 main，检测合并，触发 promote |
+| [promote-base-on-merge.sh](./promote-base-on-merge.sh) | Shell | 核心：PR 合并 → 增量编译 → 更新基线（自包含 env/lock/check/manifest） |
+| [cleanup-programs.sh](./cleanup-programs.sh) | Shell | 清理 program：`pr <N>` / `stale` / `name <prog>` |
+| [generate-diff-scan-config.sh](./generate-diff-scan-config.sh) | Shell | 生成 PR 增量扫描 config |
+| [flatten-overlay.yak](./flatten-overlay.yak) | Yak | overlay 链压平为单层 program |
+| [remove-program.yak](./remove-program.yak) | Yak | 删除指定 program（支持 `--database`） |
+| [ci-yaklang-base-compile.json](./ci-yaklang-base-compile.json) | 配置 | 全量编译模板 |
+| [ci-yaklang-promote-compile.json](./ci-yaklang-promote-compile.json) | 配置 | promote 增量编译模板 |
+| [diff-code-scan.json](./diff-code-scan.json) | 配置 | PR 增量扫描模板 |
 
 ### manifest 字段
 
