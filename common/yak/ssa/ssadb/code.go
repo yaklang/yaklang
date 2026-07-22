@@ -13,9 +13,9 @@ import (
 
 type IrCode struct {
 	gorm.Model
-	CodeID int64 `json:"code_id" gorm:"index"`
+	CodeID int64 `json:"code_id" gorm:"index:idx_ircode_program_codeid;index"`
 
-	ProgramName string `json:"program_name" gorm:"index"`
+	ProgramName string `json:"program_name" gorm:"index:idx_ircode_program_codeid;index:idx_ircode_program_opcode;index"`
 	Version     string `json:"package_version" gorm:"index"`
 
 	// source code
@@ -24,7 +24,7 @@ type IrCode struct {
 	SourceCodeHash        string `json:"source_code_hash"` // default md5
 
 	// opcode
-	Opcode     int64  `json:"opcode"`
+	Opcode     int64  `json:"opcode" gorm:"index:idx_ircode_program_opcode"`
 	OpcodeName string `json:"opcode_name"`
 
 	// just for binary and unary operator
