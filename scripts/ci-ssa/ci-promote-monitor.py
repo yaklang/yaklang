@@ -211,20 +211,23 @@ def get_merged_prs_in_range(repo: str, old_sha: str, new_sha: str, token: str | 
 
 
 def get_open_prs(repo: str, token: str | None) -> list[dict]:
-    """Fetch currently open PRs targeting main via search API."""
-    search_url = f"{GITHUB_API}/search/issues"
+    """Fetch currently open PRs targeting main via pulls API (includes head SHA)."""
+    pulls_url = f"{GITHUB_API}/repos/{repo}/pulls"
     params = {
-        "q": f"repo:{repo} is:pr is:open base:main sort:updated",
+        "state": "open",
+        "base": "main",
+        "sort": "updated",
+        "direction": "desc",
         "per_page": 30,
     }
-    r = api_request_with_retry(search_url, token, params=params)
+    r = api_request_with_retry(pulls_url, token, params=params)
     if r is None:
         return []
-    items = r.json().get("items", [])
+    items = r.json()
     return [{
         "number": item["number"],
         "title": item["title"],
-        "head_sha": item.get("pull_request", {}).get("head", {}).get("sha", ""),
+        "head_sha": item.get("head", {}).get("sha", ""),
         "html_url": item["html_url"],
     } for item in items]
 
