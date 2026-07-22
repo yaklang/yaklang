@@ -53113,6 +53113,7 @@ type MultipartFileInfo struct {
 	Filename      string                 `protobuf:"bytes,3,opt,name=Filename,proto3" json:"Filename,omitempty"`       // Content-Disposition: filename（原始文件名）
 	ContentType   string                 `protobuf:"bytes,4,opt,name=ContentType,proto3" json:"ContentType,omitempty"` // 该 part 的 Content-Type
 	Size          int64                  `protobuf:"varint,5,opt,name=Size,proto3" json:"Size,omitempty"`              // 该 part 内容字节数
+	FilePath      string                 `protobuf:"bytes,6,opt,name=FilePath,proto3" json:"FilePath,omitempty"`       // 该 part 落盘文件的绝对路径，前端可直接 openABSFileLocated 打开
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53180,6 +53181,13 @@ func (x *MultipartFileInfo) GetSize() int64 {
 		return x.Size
 	}
 	return 0
+}
+
+func (x *MultipartFileInfo) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
 }
 
 type FuzzableParam struct {
@@ -77499,13 +77507,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x19TooLargeRequestHeaderFile\x187 \x01(\tR\x19TooLargeRequestHeaderFile\x128\n" +
 	"\x17TooLargeRequestBodyFile\x188 \x01(\tR\x17TooLargeRequestBodyFile\x12,\n" +
 	"\x11IsRequestOversize\x189 \x01(\bR\x11IsRequestOversize\x12>\n" +
-	"\x0eMultipartFiles\x18: \x03(\v2\x16.ypb.MultipartFileInfoR\x0eMultipartFiles\"\xa1\x01\n" +
+	"\x0eMultipartFiles\x18: \x03(\v2\x16.ypb.MultipartFileInfoR\x0eMultipartFiles\"\xbd\x01\n" +
 	"\x11MultipartFileInfo\x12\x1c\n" +
 	"\tPartIndex\x18\x01 \x01(\x05R\tPartIndex\x12\x1c\n" +
 	"\tFieldName\x18\x02 \x01(\tR\tFieldName\x12\x1a\n" +
 	"\bFilename\x18\x03 \x01(\tR\bFilename\x12 \n" +
 	"\vContentType\x18\x04 \x01(\tR\vContentType\x12\x12\n" +
-	"\x04Size\x18\x05 \x01(\x03R\x04Size\"\xa9\x01\n" +
+	"\x04Size\x18\x05 \x01(\x03R\x04Size\x12\x1a\n" +
+	"\bFilePath\x18\x06 \x01(\tR\bFilePath\"\xa9\x01\n" +
 	"\rFuzzableParam\x12\x1a\n" +
 	"\bPosition\x18\x01 \x01(\tR\bPosition\x12\x1c\n" +
 	"\tParamName\x18\x02 \x01(\tR\tParamName\x12 \n" +

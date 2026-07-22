@@ -103,15 +103,20 @@ func TestSpillMultipartFilesIfNeeded_SingleFile(t *testing.T) {
 	require.Equal(t, "hello", string(parts["desc"].body))
 	require.Equal(t, fileContent, parts["filename"].body)
 
-	// BodyFile is now a 0-byte placeholder (real content is in the sidecar).
+	// BodyFile points at the first spilled part file (a real file, not a
+	// placeholder). Its parent dir is the sidecar directory.
+	require.NotEmpty(t, res.BodyFile)
+	require.Equal(t, res.MultipartDir, filepath.Dir(res.BodyFile))
 	fi, err := os.Stat(res.BodyFile)
 	require.NoError(t, err)
-	require.Equal(t, int64(0), fi.Size(), "BodyFile should be 0-byte placeholder")
+	require.Greater(t, fi.Size(), int64(0), "BodyFile should be the real first part file")
 	// manifest.json lives in the sidecar directory.
 	manifest, err := loadMultipartManifest(res.MultipartDir)
 	require.NoError(t, err)
 	require.Len(t, manifest, 1)
 	require.Equal(t, "Yakit-1.4.8.exe", manifest[0].Filename)
+	// Part files use the .txt suffix to match the flat spill naming style.
+	require.True(t, strings.HasSuffix(manifest[0].File, ".txt"), "part file should end with .txt, got %s", manifest[0].File)
 }
 
 func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
@@ -245,13 +250,13 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_MultipartRoute(t *testing.T) {
 }
 
 func TestCleanupMultipartSidecar_DerivesFromBodyFile(t *testing.T) {
-	// Create a fake sidecar dir derived from a body file path and confirm
-	// cleanup removes it.
-	dir := t.TempDir()
-	bodyFile := filepath.Join(dir, "large-request-body-test.txt")
-	partsDir := filepath.Join(dir, "large-request-body-test-parts")
+	// For a multipart spill the body file is the first part file inside the
+	// sidecar dir; cleanup removes that dir (and all parts inside).
+	partsDir := t.TempDir()
+	partsDir = filepath.Join(filepath.Dir(partsDir), "large-request-body-test-parts")
 	require.NoError(t, os.MkdirAll(partsDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(partsDir, "part-0-x.bin"), []byte("x"), 0o644))
+	bodyFile := filepath.Join(partsDir, "part-0-yak.bin.txt")
+	require.NoError(t, os.WriteFile(bodyFile, []byte("x"), 0o644))
 	require.DirExists(t, partsDir)
 
 	cleanupMultipartSidecar(bodyFile)
@@ -259,12 +264,15 @@ func TestCleanupMultipartSidecar_DerivesFromBodyFile(t *testing.T) {
 }
 
 func TestCleanupMultipartSidecar_FlatBodyFileNoop(t *testing.T) {
+	// A flat (non-multipart) spill body file lives in the shared temp root;
+	// its parent dir name does not end with "-parts", so cleanup must NOT
+	// touch the directory (it would otherwise nuke the shared temp root).
 	dir := t.TempDir()
 	bodyFile := filepath.Join(dir, "large-request-body-flat.txt")
 	require.NoError(t, os.WriteFile(bodyFile, []byte("flat"), 0o644))
-	// No sidecar dir exists; cleanup must not remove the body file or error.
 	cleanupMultipartSidecar(bodyFile)
 	require.FileExists(t, bodyFile)
+	require.DirExists(t, dir)
 }
 
 // --- helpers ---

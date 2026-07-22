@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -832,10 +833,13 @@ func GetHTTPFlowByHiddenIndex(db *gorm.DB, index string) (*schema.HTTPFlow, erro
 
 func DeleteHTTPFlowByID(db *gorm.DB, id int64) error {
 	// Clean up multipart sidecar parts derived from the spilled body file
-	// before the row is removed, since the body file path lives only on the
-	// flow record. (Flat spill file cleanup is a separate concern.)
+	// before the row is removed, since the body/header file paths live only
+	// on the flow record. (Flat spill file cleanup is a separate concern.)
 	if flow, err := GetHTTPFlow(db, id); err == nil && flow != nil {
 		cleanupMultipartSidecar(flow.TooLargeRequestBodyFile)
+		if flow.TooLargeRequestHeaderFile != "" {
+			_ = os.Remove(flow.TooLargeRequestHeaderFile)
+		}
 	}
 	if db := db.Model(&schema.HTTPFlow{}).Where(
 		"id = ?", id,

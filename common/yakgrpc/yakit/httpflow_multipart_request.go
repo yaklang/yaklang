@@ -144,17 +144,13 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 		return res, nil
 	}
 
-	// Prepare sidecar directory for per-part files. It is derived from the
-	// body file name (see multipartSidecarDirFromBodyFile) so cleanup can
-	// locate it from the persisted TooLargeRequestBodyFile path alone.
+	// Prepare sidecar directory for per-part files. Its name is derived from
+	// the spill suffix so cleanup can locate it from the persisted
+	// TooLargeRequestBodyFile path (its parent dir) without extra state.
 	uid := ksuid.New().String()
 	suffix := fmt.Sprintf("%v_%v", time.Now().Format(utils.DatetimePretty()), uid)
-	bodyFileBase := fmt.Sprintf("large-request-body-%v.txt", suffix)
-	bodyFileRel := bodyFileBase
-	// Defer the real creation until after we know the temp dir, but we need
-	// the dir up front for part files. Use the same base dir as OpenTempFile.
 	tempDir := consts.GetDefaultYakitBaseTempDir()
-	dir := filepath.Join(tempDir, strings.TrimSuffix(bodyFileBase, filepath.Ext(bodyFileBase))+"-parts")
+	dir := filepath.Join(tempDir, fmt.Sprintf("large-request-body-%v-parts", suffix))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return res, err
 	}
@@ -195,7 +191,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 				contentType = "application/octet-stream"
 			}
 
-			partFileName := fmt.Sprintf("part-%d-%s", partIndex, sanitizeFilename(filename))
+			partFileName := fmt.Sprintf("part-%d-%s.txt", partIndex, sanitizeFilename(filename))
 			partPath := filepath.Join(dir, partFileName)
 			f, err := os.Create(partPath)
 			if err != nil {
@@ -258,20 +254,13 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 		return res, err
 	}
 
-	// BodyFile is a 0-byte placeholder: the real file contents live in the
-	// sidecar part files, and the complete multipart body is rebuilt on demand
-	// by GetHTTPFlowBodyById (streamed via io.Pipe). The placeholder name is
-	// the anchor from which the sidecar directory is derived
-	// (multipartSidecarDirFromBodyFile), so cleanup and locating parts work
-	// from the persisted TooLargeRequestBodyFile path alone.
-	bodyFP, err := utils.OpenTempFile(bodyFileRel)
-	if err != nil {
-		_ = os.RemoveAll(dir)
-		_ = os.Remove(headerPath)
-		return res, err
-	}
-	bodyPath := bodyFP.Name()
-	bodyFP.Close()
+	// TooLargeRequestBodyFile points at the first spilled part file. It is a
+	// real file (not a placeholder), serves as the anchor from which the
+	// sidecar directory is derived (its parent dir), and keeps
+	// IsTooLargeRequest / non-multipart read paths consistent. The complete
+	// multipart body is rebuilt on demand by GetHTTPFlowBodyById (streamed via
+	// io.Pipe) and LoadHTTPFlowRequestPacket.
+	bodyPath := filepath.Join(dir, res.Manifest[0].File)
 
 	stored := lowhttp.ReplaceHTTPPacketBody([]byte(header), skeletonBuf.Bytes(), false)
 	res.StoredPacket = stored
@@ -340,7 +329,7 @@ func rebuildMultipartBodyToWriter(skeletonBody []byte, sidecarDir string, dst io
 		}
 		isFile := p.FileName() != ""
 		if isFile {
-			partFileName := fmt.Sprintf("part-%d-%s", partIndex, sanitizeFilename(p.FileName()))
+			partFileName := fmt.Sprintf("part-%d-%s.txt", partIndex, sanitizeFilename(p.FileName()))
 			partPath := filepath.Join(sidecarDir, partFileName)
 			f, ferr := os.Open(partPath)
 			if ferr != nil {
@@ -501,25 +490,28 @@ func copyMIMEHeader(h textproto.MIMEHeader) textproto.MIMEHeader {
 }
 
 // multipartSidecarDirFromBodyFile derives the per-part sidecar directory path
-// from the persisted TooLargeRequestBodyFile path. The sidecar directory is
-// the body file name with its extension replaced by "-parts", sitting next to
-// the body file in the same temp dir. Returns "" when bodyFile is empty.
+// from the persisted TooLargeRequestBodyFile path. For multipart spills the
+// body file is the first spilled part file, so its parent directory is the
+// sidecar. Returns "" when bodyFile is empty.
 func multipartSidecarDirFromBodyFile(bodyFile string) string {
 	if bodyFile == "" {
 		return ""
 	}
-	dir := filepath.Dir(bodyFile)
-	base := filepath.Base(bodyFile)
-	stem := strings.TrimSuffix(base, filepath.Ext(base))
-	return filepath.Join(dir, stem+"-parts")
+	return filepath.Dir(bodyFile)
 }
 
-// cleanupMultipartSidecar removes the per-part sidecar directory derived from
-// bodyFile. Safe to call when bodyFile is a flat spill file (no sidecar
-// directory exists).
+// cleanupMultipartSidecar removes the per-part sidecar directory holding the
+// spilled file parts (and manifest.json) for a multipart flow. The body file
+// for a multipart spill is the first part file, so the sidecar is its parent
+// directory. To avoid nuking the shared temp root for flat (non-multipart)
+// spills — whose body file also lives in the temp root — only a directory
+// whose base name ends with "-parts" is removed. Safe to call for any flow.
 func cleanupMultipartSidecar(bodyFile string) {
 	dir := multipartSidecarDirFromBodyFile(bodyFile)
 	if dir == "" {
+		return
+	}
+	if !strings.HasSuffix(filepath.Base(dir), "-parts") {
 		return
 	}
 	if info, err := os.Stat(dir); err == nil && info.IsDir() {
