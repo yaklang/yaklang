@@ -375,9 +375,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(verificationInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(verificationOutputExampleText)
-	prefixMaterials.SkillsContext = ""
-	prefixMaterials.PromotedSemiDynamic1 = ""
-	prefixMaterials.PromotedTimelineOpen = ""
+	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
@@ -419,7 +417,7 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(directlyAnswerInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(directlyAnswerOutputExampleText)
-	prefixMaterials.SkillsContext = ""
+	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
@@ -457,7 +455,7 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongToolInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(wrongToolOutputExampleText)
-	prefixMaterials.SkillsContext = ""
+	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
@@ -566,7 +564,7 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(changeBlueprintInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(changeBlueprintOutputExampleText)
-	prefixMaterials.SkillsContext = ""
+	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
@@ -624,7 +622,7 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(blueprintParamsInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(blueprintParamsOutputExampleText)
-	prefixMaterials.SkillsContext = ""
+	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
