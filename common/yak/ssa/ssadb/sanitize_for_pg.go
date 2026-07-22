@@ -3,34 +3,60 @@ package ssadb
 import (
 	"reflect"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yaklang/gorm"
 )
 
-// sanitizeStringForPG removes NUL bytes (\x00) from a string.
+// sanitizeStringForPG removes bytes that PostgreSQL rejects at the
+// wire-protocol level from a string. Two classes of bytes are stripped:
 //
-// PostgreSQL rejects NUL bytes at the wire-protocol level — they never reach
-// column validation, triggers, or CHECK constraints. Any Go string that
-// contains a NUL byte and is sent through libpq (e.g. via GORM tx.Save) will
-// fail with: "pq: invalid byte sequence for encoding \"UTF8\": 0x00".
+//  1. NUL bytes (\x00) — PG aborts with
+//     `pq: invalid byte sequence for encoding "UTF8": 0x00`.
+//  2. Invalid UTF-8 byte sequences — PG aborts with the same error family,
+//     e.g. `pq: invalid byte sequence for encoding "UTF8": 0xa0` or
+//     `... 0xe8 0x07 0x10`. A lone continuation byte (0xa0) or a 3-byte
+//     leader (0xe8) followed by non-continuation bytes (0x07 0x10) are not
+//     valid UTF-8 and PG rejects the whole batch.
 //
-// MySQL (utf8mb4) and SQLite tolerate NUL bytes, so this is a PostgreSQL-only
-// concern. SSA string constants derived from source code (e.g. binary resource
-// files parsed as constants) can carry NUL bytes; without stripping, the
-// entire batch write aborts and the scan fails at the compile phase.
+// Both failures abort the entire dbcache save batch, which on a large project
+// compile leaves hundreds of thousands of resident IR items unpersisted and
+// fails the scan at the compile phase with `resident items were not persisted
+// on close`.
 //
-// NUL bytes have no semantic value in SSA IR (they are never part of valid
-// source identifiers, type names, or instruction strings), so stripping is
-// lossless from the perspective of vulnerability detection.
+// MySQL (utf8mb4) and SQLite tolerate these bytes, so this is a
+// PostgreSQL-only concern. SSA string constants derived from source code
+// (e.g. binary resource files parsed as constants, non-UTF-8 source files)
+// can carry these bytes; stripping them is lossless from the perspective of
+// vulnerability detection — invalid bytes are never part of valid source
+// identifiers, type names, or instruction strings, and valid multi-byte UTF-8
+// content (CJK, emoji) is preserved by strings.ToValidUTF8.
+//
+// Invalid bytes are dropped (replaced with the empty string, not U+FFFD) to
+// keep IR string equality stable across re-compiles.
 func sanitizeStringForPG(s string) string {
-	if !strings.ContainsRune(s, 0) {
+	if !strings.ContainsRune(s, 0) && utf8.ValidString(s) {
 		return s
 	}
-	return strings.ReplaceAll(s, "\x00", "")
+	// strings.ToValidUTF8 replaces each invalid byte sequence with the given
+	// replacement; "" drops the invalid bytes entirely. It does NOT remove
+	// NUL bytes (NUL is a valid 1-byte UTF-8 rune), so strip NUL explicitly.
+	cleaned := strings.ToValidUTF8(s, "")
+	if strings.ContainsRune(cleaned, 0) {
+		cleaned = strings.ReplaceAll(cleaned, "\x00", "")
+	}
+	return cleaned
 }
 
-// sanitizeStructStringsForPG uses reflection to strip NUL bytes from every
-// string field (and every element of []string fields) on a struct. This
+// needsSanitize reports whether a string contains bytes PG would reject
+// (NUL or invalid UTF-8). Used as a fast path so clean strings — the common
+// case — are not copied.
+func needsSanitize(s string) bool {
+	return strings.ContainsRune(s, 0) || !utf8.ValidString(s)
+}
+
+// sanitizeStructStringsForPG uses reflection to strip PG-rejected bytes from
+// every string field (and every element of []string fields) on a struct. This
 // automatically covers newly added string fields without manual maintenance.
 //
 // It handles:
@@ -64,7 +90,7 @@ func sanitizeStructFieldsForPG(rv reflect.Value) {
 		switch field.Kind() {
 		case reflect.String:
 			s := field.String()
-			if strings.ContainsRune(s, 0) {
+			if needsSanitize(s) {
 				field.SetString(sanitizeStringForPG(s))
 			}
 		case reflect.Slice:
@@ -86,8 +112,8 @@ func sanitizeStructFieldsForPG(rv reflect.Value) {
 	}
 }
 
-// sanitizeStringSliceForPG strips NUL bytes from every element of a []string
-// slice (including the StringSlice custom type).
+// sanitizeStringSliceForPG strips PG-rejected bytes from every element of a
+// []string slice (including the StringSlice custom type).
 func sanitizeStringSliceForPG(field reflect.Value) {
 	if field.Type().Elem().Kind() != reflect.String {
 		return
@@ -96,7 +122,7 @@ func sanitizeStringSliceForPG(field reflect.Value) {
 	for i := 0; i < n; i++ {
 		elem := field.Index(i)
 		s := elem.String()
-		if strings.ContainsRune(s, 0) {
+		if needsSanitize(s) {
 			elem.SetString(sanitizeStringForPG(s))
 		}
 	}
@@ -106,7 +132,7 @@ func sanitizeStringSliceForPG(field reflect.Value) {
 //
 // These hooks fire on every GORM write path: tx.Save, db.Save, db.Create,
 // and db.Where().Assign().FirstOrCreate() (used by UpsertIrCode). They run
-// before the row is sent to PostgreSQL, stripping NUL bytes that PG would
+// before the row is sent to PostgreSQL, stripping bytes that PG would
 // reject at the protocol level.
 
 func (r *IrCode) BeforeSave(tx *gorm.DB) error {
