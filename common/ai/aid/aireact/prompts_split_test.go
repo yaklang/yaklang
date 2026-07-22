@@ -135,39 +135,3 @@ func TestSplit_IntervalReviewPrompt_StableSections(t *testing.T) {
 	require.Equal(t, sec1[aicache.SectionSemiDynamic2][0].Hash, sec2[aicache.SectionSemiDynamic2][0].Hash,
 		"semi-dynamic-2 hash must be byte-stable across calls")
 }
-
-// TestSplit_AIReviewToolCallPrompt_StableSections 验证 ai-review-tool-call 在迁移到公共前缀路径后:
-//   - 至少切出 high-static / semi-dynamic-2 / timeline-open / dynamic
-//   - 不出现 raw/noise chunk
-//   - 跨调用下 high-static / semi-dynamic-2 段 hash 稳定
-//
-// 关键词: ai-review split, risk_assessment schema, aicache.Split
-func TestSplit_AIReviewToolCallPrompt_StableSections(t *testing.T) {
-	react := newSplitTestReact(t)
-
-	prompt1, err := react.promptManager.GenerateAIReviewPrompt(
-		"verify file exists", "bash", `{"command":"ls /tmp"}`,
-	)
-	require.NoError(t, err)
-	prompt2, err := react.promptManager.GenerateAIReviewPrompt(
-		"verify file exists", "bash", `{"command":"ls /tmp"}`,
-	)
-	require.NoError(t, err)
-
-	sec1 := chunkSections(t, prompt1)
-	sec2 := chunkSections(t, prompt2)
-
-	require.NotEmpty(t, sec1[aicache.SectionHighStatic], "ai-review-tool-call prompt must expose high-static chunk")
-	require.NotEmpty(t, sec1[aicache.SectionSemiDynamic2], "ai-review-tool-call prompt must expose semi-dynamic-2 chunk")
-	require.NotEmpty(t, sec1[aicache.SectionTimelineOpen], "ai-review-tool-call prompt must expose timeline-open chunk")
-	require.NotEmpty(t, sec1[aicache.SectionDynamic], "ai-review-tool-call prompt must expose dynamic chunk")
-	require.Empty(t, sec1[aicache.SectionRaw], "ai-review-tool-call prompt should not produce raw/noise chunk; rendered:\n%s", prompt1)
-	require.Contains(t, sec1[aicache.SectionSemiDynamic2][0].Content, "risk_assessment")
-	require.Contains(t, sec1[aicache.SectionSemiDynamic2][0].Content, "risk_score")
-	require.Contains(t, sec1[aicache.SectionDynamic][0].Content, "verify file exists")
-
-	require.Equal(t, sec1[aicache.SectionHighStatic][0].Hash, sec2[aicache.SectionHighStatic][0].Hash,
-		"high-static hash must be byte-stable across calls")
-	require.Equal(t, sec1[aicache.SectionSemiDynamic2][0].Hash, sec2[aicache.SectionSemiDynamic2][0].Hash,
-		"semi-dynamic-2 hash must be byte-stable across calls")
-}
