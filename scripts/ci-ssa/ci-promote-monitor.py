@@ -616,6 +616,12 @@ def main():
         log(f"data_dir not found: {data_dir}", "ERROR")
         sys.exit(1)
 
+    # Clear events.json on each fresh start
+    events_path = data_dir / "events.json"
+    if events_path.exists():
+        events_path.unlink()
+        log("Cleared events.json")
+
     while True:
         try:
             check_and_promote(args.repo, worktree, data_dir, token)
