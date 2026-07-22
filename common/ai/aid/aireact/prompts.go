@@ -45,18 +45,6 @@ var verificationDynamicTemplate string
 //go:embed prompts/verification/verification.json
 var verificationSchemaJSON string
 
-//go:embed prompts/review/ai-review-tool-call_instruction.txt
-var aiReviewInstructionText string
-
-//go:embed prompts/review/ai-review-tool-call_output_example.txt
-var aiReviewOutputExampleText string
-
-//go:embed prompts/review/ai-review-tool-call_dynamic.txt
-var aiReviewDynamicTemplate string
-
-//go:embed prompts/review/ai-review-tool-call.json
-var aiReviewSchemaJSON string
-
 //go:embed prompts/answer/instruction.txt
 var directlyAnswerInstructionText string
 
@@ -412,52 +400,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		dynamicData,
 	)
 	return prompt, nonceString, err
-}
-
-// GenerateAIReviewPrompt generates AI tool call review prompt using shared prompt
-// prefix assembly.
-//
-// aicache 命中率优化:
-//   - 复用 preparePromptPrefixMaterials + assemblePromptWithDynamicSection
-//   - 风险评估规则 / schema / 示例输出下沉到 semi-dynamic-2
-//   - 用户 query、待审核实体与语言偏好留在 dynamic，timeline/workspace 复用公共前缀
-//
-// 关键词: GenerateAIReviewPrompt, ai-review, preparePromptPrefixMaterials,
-//
-//	assemblePromptWithDynamicSection
-func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params string) (string, error) {
-	nonceString := nonce()
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: userQuery,
-		Schema:    aiReviewSchemaJSON,
-	})
-	if err != nil {
-		return "", err
-	}
-	prefixMaterials.AllowToolCall = false
-	prefixMaterials.AllowPlanAndExec = false
-	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(aiReviewInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(aiReviewOutputExampleText)
-	prefixMaterials.SkillsContext = ""
-	prefixMaterials.PromotedSemiDynamic1 = ""
-	prefixMaterials.PromotedTimelineOpen = ""
-
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     nonceString,
-		UserQuery: userQuery,
-	})
-	dynamicData["Title"] = toolOrTitle
-	dynamicData["Details"] = params
-	dynamicData["Language"] = pm.react.config.GetLanguage()
-
-	return pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"ai-review-dynamic",
-		aiReviewDynamicTemplate,
-		dynamicData,
-	)
 }
 
 // GenerateDirectlyAnswerPrompt generates directly answer prompt using template
