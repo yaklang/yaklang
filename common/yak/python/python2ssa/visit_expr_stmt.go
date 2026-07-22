@@ -744,7 +744,7 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 	}
 	if value == nil {
 		if t, ok := lib.GetExportType(bindingName); ok {
-			if bp, ok := ssa.ToClassBluePrintType(t); ok && bp != nil {
+			if bp, ok := ssa.ToBluePrintType(t); ok && bp != nil {
 				if c := bp.Container(); c != nil {
 					value = c
 					lib.SetExportValue(bindingName, value)
@@ -759,7 +759,7 @@ func (b *singleFileBuilder) bindImportedName(bindingName, sourceName, packagePat
 		if v := app.GetExportValue(bindingName); v != nil && !isPythonImportPlaceholderValue(v) {
 			value = v
 		} else if t, ok := app.GetExportType(bindingName); ok {
-			if bp, ok := ssa.ToClassBluePrintType(t); ok && bp != nil {
+			if bp, ok := ssa.ToBluePrintType(t); ok && bp != nil {
 				if c := bp.Container(); c != nil {
 					value = c
 				}
@@ -1341,7 +1341,7 @@ func (b *singleFileBuilder) extractAssignTargetFromExpr(raw pythonparser.IExprCo
 			}
 		}
 		if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-			if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
+			if blueprint, ok := ssa.ToBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
 				return assignTarget{varName: syntheticName}
 			}
 		}

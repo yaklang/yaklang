@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,12 +17,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 		log.Warnf("setMemberCallRelationship empty key obj=%s typ=%v member=%s", obj.GetVerboseName(), obj.GetType(), member.GetVerboseName())
 	}
 	obj.AddMember(key, member)
-	if memberObj := member.GetObject(); utils.IsNil(memberObj) || memberObj.GetId() == obj.GetId() {
-		member.SetObject(obj)
-	}
-	if memberKey := member.GetKey(); utils.IsNil(memberKey) {
-		member.SetKey(key)
-	}
+	AddObjectKeyPair(member, obj, key)
 	if user, ok := obj.(User); ok {
 		key.AddUser(user)
 	}
@@ -38,7 +32,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 			if !ok || edgeValue == nil {
 				continue
 			}
-			if _, ok := edgeValue.GetMember(key); ok { // 避免循环
+			if _, ok := GetLatestMemberByKey(edgeValue, key); ok { // 避免循环
 				continue
 			}
 			if _, ok := edgeValue.(*Call); ok {
@@ -88,18 +82,25 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	ret.exist = true
 	valueType := value.GetType()
 	ret.ObjType = valueType
-	keyText := key.String()
+	keyText := GetKeyString(key)
+	if keyText == "" {
+		keyText = key.String()
+	}
 	if constInst, ok := ToConstInst(key); ok {
 		if constInst.IsNumber() {
-			ret.name = "#" + strconv.FormatInt(value.GetId(), 10) + "[" + strconv.FormatInt(constInst.Number(), 10) + "]"
+			ret.name = fmt.Sprintf("#%d[%d]", value.GetId(), constInst.Number())
 		}
 		if constInst.IsString() {
-			ret.name = "#" + strconv.FormatInt(value.GetId(), 10) + "." + keyText
+			ret.name = fmt.Sprintf("#%d.%s", value.GetId(), keyText)
 		}
 	} else {
 		// key is not const value
 		// can't get member value
-		ret.name = "#" + strconv.FormatInt(value.GetId(), 10) + ".#" + strconv.FormatInt(key.GetId(), 10) + ""
+		if keyText != "" {
+			ret.name = fmt.Sprintf("#%d.%s", value.GetId(), keyText)
+		} else {
+			ret.name = fmt.Sprintf("#%d.#%d", value.GetId(), key.GetId())
+		}
 		switch valueType.GetTypeKind() {
 		case SliceTypeKind, MapTypeKind:
 			objTyp, _ := ToObjectType(valueType)
@@ -122,10 +123,12 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		ret.typ = method.GetType()
 		return
 	}
-	if blueprint, b := ToClassBluePrintType(valueType); b {
-		if method := blueprint.GetStaticMethod(keyText); !utils.IsNil(method) {
-			ret.typ = method.GetType()
-			return
+	if blueprint, b := ToBluePrintType(valueType); b {
+		if isBlueprintStaticAccessValue(value, blueprint) {
+			if method := blueprint.GetStaticMethod(keyText); !utils.IsNil(method) {
+				ret.typ = method.GetType()
+				return
+			}
 		}
 	}
 	if len(function) > 0 && function[0] {
@@ -224,13 +227,19 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		return
 	case ClassBluePrintTypeKind:
 		class := valueType.(*Blueprint)
-		if member := class.GetStaticMember(keyText); !utils.IsNil(member) {
-			ret.typ = member.GetType()
+		if method := class.GetNormalMethod(keyText); !utils.IsNil(method) {
+			ret.typ = method.GetType()
 			return
 		}
 		if member := class.GetNormalMember(keyText); !utils.IsNil(member) {
 			ret.typ = member.GetType()
 			return
+		}
+		if isBlueprintStaticAccessValue(value, class) {
+			if member := class.GetStaticMember(keyText); !utils.IsNil(member) {
+				ret.typ = member.GetType()
+				return
+			}
 		}
 	case OrTypeKind:
 		// 拆开 OrType
@@ -263,11 +272,11 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	default:
 	}
 	//保底操作，从val-member中获取
-	if member, exist := value.GetMember(key); exist {
+	if member, exist := GetLatestMemberByKey(value, key); exist {
 		ret.typ = member.GetType()
 		return
 	}
-	member, exist := value.GetStringMember(keyText)
+	member, exist := GetLatestMemberByKeyString(value, keyText)
 	if exist {
 		ret.typ = member.GetType()
 		return
@@ -276,18 +285,55 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	return
 }
 
-func getMemberVerboseName(obj, key Value) string {
-	if utils.IsNil(obj) {
-		return GetKeyString(key)
+func isBlueprintStaticAccessValue(value Value, blueprint *Blueprint) bool {
+	if utils.IsNil(value) || blueprint == nil {
+		return false
 	}
-	return fmt.Sprintf("%s.%s", obj.GetVerboseName(), GetKeyString(key))
+	if container := blueprint.Container(); !utils.IsNil(container) && container.GetId() == value.GetId() {
+		return true
+	}
+	if un, ok := ToUndefined(value); ok && un.Kind == UndefinedValueInValid && un.GetName() == blueprint.Name {
+		return true
+	}
+	return false
+}
+
+func getMemberVerboseName(obj, key Value) string {
+	keyName := GetKeyString(key)
+	if utils.IsNil(obj) {
+		return keyName
+	}
+	objName := obj.GetVerboseName()
+	if objName == "" {
+		if variable := obj.GetLastVariable(); variable != nil {
+			objName = variable.GetName()
+		}
+	}
+	if objName == "" {
+		if keyName == "" {
+			return ""
+		}
+		return fmt.Sprintf(".%s", keyName)
+	}
+	if keyName == "" {
+		return objName
+	}
+	if strings.HasPrefix(keyName, objName+".") {
+		return keyName
+	}
+	return fmt.Sprintf("%s.%s", objName, keyName)
 }
 
 func setMemberVerboseName(member Value) {
 	if !member.IsMember() {
 		return
 	}
-	text := getMemberVerboseName(member.GetObject(), member.GetKey())
+	obj := GetLatestObject(member)
+	key := GetLatestKey(member)
+	if utils.IsNil(obj) || utils.IsNil(key) {
+		return
+	}
+	text := getMemberVerboseName(obj, key)
 	member.SetVerboseName(text)
 }
 
