@@ -14,8 +14,14 @@ import (
 
 // Save provides a way to collect items and save them in batches using a background goroutine.
 // It buffers items and periodically passes them to a save function for processing.
+//
+// Errors returned by the save callback are accumulated and surfaced via Close/Flush.
+// The saver records only the first error (set-once semantics); subsequent errors are
+// logged but do not overwrite the recorded one. This ensures that a batch write failure
+// (e.g. PG rejects a value, connection drop) is not silently swallowed — callers can
+// check the return value of Close/Flush and abort the overall operation.
 type Save[T any] struct {
-	saveToDB func([]T) // Function to save items to the database
+	saveToDB func([]T) error // Function to save items to the database
 
 	buffer *chanx.UnlimitedChan[T] // Channel for buffering items
 	flush  chan flushRequest
@@ -29,6 +35,11 @@ type Save[T any] struct {
 	cancel  context.CancelFunc // Function to cancel the context
 
 	metrics saveMetrics
+
+	// firstErr holds the first error returned by a save callback. Set-once via
+	// CompareAndSwap; subsequent errors are logged but not stored. Read by
+	// Close/Flush to report failures to the caller.
+	firstErr atomic.Pointer[error]
 }
 
 // SaveStats is a compact debug snapshot of the async saver state.
@@ -141,12 +152,20 @@ func resetTimer(timer *time.Timer, duration time.Duration) {
 
 // flushRequest asks the saver goroutine to synchronously drain buffered items;
 // it closes done once all queued items have been handed to the save function.
-type flushRequest struct{ done chan struct{} }
+// err is a pointer so the goroutine can write the result back to the caller's
+// flushRequest copy (the channel passes a struct value, so a non-pointer field
+// would be isolated to the receiver's copy).
+type flushRequest struct {
+	done chan struct{}
+	err  *error
+}
 
 // NewSave creates a new Saver with the specified buffer size and save function.
 // It starts a background goroutine to process items from the buffer.
+// The saveToDB callback must return an error if the batch write fails; this
+// error is accumulated and surfaced via Close/Flush.
 func NewSave[T any](
-	saveToDB func([]T),
+	saveToDB func([]T) error,
 	opt ...Option,
 ) *Save[T] {
 	cfg := NewConfig(opt...)
@@ -154,7 +173,7 @@ func NewSave[T any](
 }
 
 func NewSaveWithConfig[T any](
-	saveToDB func([]T),
+	saveToDB func([]T) error,
 	cfg *config,
 ) *Save[T] {
 	if utils.IsNil(saveToDB) {
@@ -229,6 +248,9 @@ func (s *Save[T]) processBuffer() {
 			items = make([]T, 0, saveSize)
 			resetTimer(timer, saveTime)
 			s.saveWG.Wait()
+			if req.err != nil {
+				*req.err = s.recordedErr()
+			}
 			close(req.done)
 		case item, ok := <-s.buffer.OutputChannel():
 			if !ok {
@@ -297,24 +319,30 @@ func (s *Save[T]) Save(item T) {
 // Flush synchronously persists all items queued so far and returns once they
 // have been handed to the save function. The caller MUST NOT call Save
 // concurrently with Flush. Flush is safe to call after Close returns (it is a
-// no-op once the context is cancelled).
-func (s *Save[T]) Flush() {
+// no-op once the context is cancelled). It returns the first error recorded by
+// any save callback, or nil if all batches succeeded.
+func (s *Save[T]) Flush() error {
 	if s == nil {
-		return
+		return nil
 	}
-	req := flushRequest{done: make(chan struct{})}
+	var flushErr error
+	req := flushRequest{done: make(chan struct{}), err: &flushErr}
 	select {
 	case s.flush <- req:
 		<-req.done
+		return flushErr
 	case <-s.ctx.Done():
+		return s.recordedErr()
 	}
 }
 
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
-func (s *Save[T]) Close() {
+// It returns the first error recorded by any save callback, or nil if all
+// batches succeeded.
+func (s *Save[T]) Close() error {
 	if s == nil {
-		return
+		return nil
 	}
 	s.buffer.Close() // Close the buffer
 	s.wg.Wait()      // Wait for the background goroutine to finish
@@ -322,6 +350,7 @@ func (s *Save[T]) Close() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+	return s.recordedErr()
 }
 
 func (s *Save[T]) Stats() SaveStats {
@@ -354,11 +383,36 @@ func (s *Save[T]) dispatchSave(ts []T) {
 func (s *Save[T]) runSave(ts []T) {
 	start := time.Now()
 	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("dbcache batch save panic: %v", err)
+		if r := recover(); r != nil {
+			log.Errorf("dbcache batch save panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
+			s.recordErr(fmt.Errorf("dbcache batch save panic: %v", r))
 		}
 		s.metrics.recordBatch(len(ts), time.Since(start))
 	}()
-	s.saveToDB(ts)
+	if err := s.saveToDB(ts); err != nil {
+		log.Errorf("dbcache batch save failed (%s): %v", s.config.name, err)
+		s.recordErr(err)
+	}
+}
+
+// recordErr stores the first error using set-once semantics. Subsequent calls
+// are no-ops so the earliest failure is preserved.
+func (s *Save[T]) recordErr(err error) {
+	if err == nil {
+		return
+	}
+	// Don't overwrite if we already have a recorded error.
+	if s.firstErr.Load() != nil {
+		return
+	}
+	s.firstErr.CompareAndSwap(nil, &err)
+}
+
+// recordedErr returns the first recorded error, or nil.
+func (s *Save[T]) recordedErr() error {
+	if p := s.firstErr.Load(); p != nil {
+		return *p
+	}
+	return nil
 }

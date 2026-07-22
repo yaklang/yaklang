@@ -66,7 +66,7 @@ func NewAsyncStreamImporter(db *gorm.DB, programName string, config *StreamImpor
 	}
 
 	importer.fileSaver = dbcache.NewSave(
-		func(files []*File) {
+		func(files []*File) error {
 			start := time.Now()
 			importer.batchSaveFiles(db, files)
 			if len(files) > 0 {
@@ -77,6 +77,7 @@ func NewAsyncStreamImporter(db *gorm.DB, programName string, config *StreamImpor
 				log.Infof("[Perf] Files: saved batch=%d, total=%d, took=%v, rate=%.1f/s",
 					len(files), total, duration, float64(len(files))/duration.Seconds())
 			}
+			return nil
 		},
 		dbcache.WithContext(ctx),
 		dbcache.WithSaveSize(config.BatchSize),
@@ -85,7 +86,7 @@ func NewAsyncStreamImporter(db *gorm.DB, programName string, config *StreamImpor
 	)
 
 	importer.riskSaver = dbcache.NewSave(
-		func(risks []*riskWithDataflow) {
+		func(risks []*riskWithDataflow) error {
 			start := time.Now()
 			importer.batchSaveRisks(db, risks)
 			if len(risks) > 0 {
@@ -96,6 +97,7 @@ func NewAsyncStreamImporter(db *gorm.DB, programName string, config *StreamImpor
 				log.Infof("[Perf] Risks: saved batch=%d, total=%d, took=%v, rate=%.1f/s",
 					len(risks), total, duration, float64(len(risks))/duration.Seconds())
 			}
+			return nil
 		},
 		dbcache.WithContext(ctx),
 		dbcache.WithSaveSize(config.BatchSize),
@@ -178,10 +180,14 @@ func (i *AsyncStreamImporter) recordError(err error) {
 
 func (i *AsyncStreamImporter) Close() error {
 	if i.fileSaver != nil {
-		i.fileSaver.Close()
+		if err := i.fileSaver.Close(); err != nil {
+			i.recordError(utils.Wrap(err, "file saver close failed"))
+		}
 	}
 	if i.riskSaver != nil {
-		i.riskSaver.Close()
+		if err := i.riskSaver.Close(); err != nil {
+			i.recordError(utils.Wrap(err, "risk saver close failed"))
+		}
 	}
 	i.cancel()
 
@@ -189,6 +195,9 @@ func (i *AsyncStreamImporter) Close() error {
 	defer i.mu.Unlock()
 	log.Infof("AsyncStreamImporter closed: files=%d, risks=%d, errors=%d",
 		i.filesWritten, i.risksWritten, len(i.errors))
+	if len(i.errors) > 0 {
+		return utils.JoinErrors(i.errors...)
+	}
 	return nil
 }
 

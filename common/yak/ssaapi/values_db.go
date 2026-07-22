@@ -132,7 +132,9 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 		database := newAuditDatabase(saveValueConfig.ctx, db, defaultSize)
 		saveValueConfig.database = database
 		defer func() {
-			database.Close()
+			if err := database.Close(); err != nil {
+				log.Errorf("audit database close failed: %v", err)
+			}
 		}()
 	}
 
@@ -301,10 +303,24 @@ func (a *auditDatabase) SaveIrSource(editor *ssadb.IrSource) {
 	a.editorSave.Save(editor)
 }
 
-func (a *auditDatabase) Close() {
-	a.nodeSave.Close()
-	a.edgeSave.Close()
-	a.editorSave.Close()
+func (a *auditDatabase) Close() error {
+	var errs []error
+	if a.nodeSave != nil {
+		if err := a.nodeSave.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if a.edgeSave != nil {
+		if err := a.edgeSave.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if a.editorSave != nil {
+		if err := a.editorSave.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utils.JoinErrors(errs...)
 }
 
 func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase {
@@ -312,49 +328,46 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 
 	saveSize := size * 2
 
-	ret.nodeSave = dbcache.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
+	ret.nodeSave = dbcache.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) error {
 		if len(ae) == 0 {
-			return
+			return nil
 		}
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
+		return utils.GormTransaction(db, func(tx *gorm.DB) error {
 			for _, e := range ae {
-				if ret := tx.Save(e).Error; ret != nil {
-					log.Errorf("save AuditNode failed: %v", ret)
+				if err := tx.Save(e).Error; err != nil {
+					return utils.Errorf("save AuditNode failed: %w", err)
 				}
 			}
 			return nil
 		})
-		return
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditNode"))
 
-	ret.edgeSave = dbcache.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
+	ret.edgeSave = dbcache.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) error {
 		if len(ae) == 0 {
-			return
+			return nil
 		}
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
+		return utils.GormTransaction(db, func(tx *gorm.DB) error {
 			for _, e := range ae {
-				if ret := tx.Save(e).Error; ret != nil {
-					log.Errorf("save AuditEdge failed: %v", ret)
+				if err := tx.Save(e).Error; err != nil {
+					return utils.Errorf("save AuditEdge failed: %w", err)
 				}
 			}
 			return nil
 		})
-		return
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditEdge"))
 
-	ret.editorSave = dbcache.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
+	ret.editorSave = dbcache.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) error {
 		if len(ae) == 0 {
-			return
+			return nil
 		}
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
+		return utils.GormTransaction(db, func(tx *gorm.DB) error {
 			for _, e := range ae {
-				if ret := tx.Save(e).Error; ret != nil {
-					log.Errorf("save AuditEdge failed: %v", ret)
+				if err := tx.Save(e).Error; err != nil {
+					return utils.Errorf("save IrSource failed: %w", err)
 				}
 			}
 			return nil
 		})
-		return
 	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(size), dbcache.WithName("SourceFile"))
 
 	return ret
