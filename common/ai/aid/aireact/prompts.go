@@ -348,15 +348,6 @@ type ToolParamsPromptResult struct {
 	Identifier string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
 }
 
-// GenerateToolParamsPrompt generates tool parameter generation prompt using template
-func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, error) {
-	result, err := pm.GenerateToolParamsPromptWithMeta(tool)
-	if err != nil {
-		return "", err
-	}
-	return result.Prompt, nil
-}
-
 // GenerateToolParamsPromptWithMeta generates tool parameter generation prompt with metadata for AITAG parsing
 func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
 	generatedNonce := nonce()
@@ -597,15 +588,6 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 		wrongToolDynamicTemplate,
 		dynamicData,
 	)
-}
-
-// GenerateReGenerateToolParamsPrompt generates tool parameter regeneration prompt using template
-func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (string, error) {
-	result, err := pm.GenerateReGenerateToolParamsPromptWithMeta(userQuery, oldParams, oldTool)
-	if err != nil {
-		return "", err
-	}
-	return result.Prompt, nil
 }
 
 // GenerateReGenerateToolParamsPromptWithMeta generates tool parameter regeneration prompt with AITAG metadata
@@ -862,15 +844,6 @@ func (pm *PromptManager) renderSkillsContextForPrompt() string {
 		return ""
 	}
 	return mgr.RenderStable()
-}
-
-// GenerateIntervalReviewPrompt generates interval review prompt for long-running tool execution
-func (pm *PromptManager) GenerateIntervalReviewPrompt(
-	tool *aitool.Tool,
-	params aitool.InvokeParams,
-	stdoutSnapshot, stderrSnapshot []byte,
-) (string, error) {
-	return pm.GenerateIntervalReviewPromptWithContext(tool, params, stdoutSnapshot, stderrSnapshot, time.Time{}, 0, "")
 }
 
 // GenerateIntervalReviewPromptWithContext generates a dedicated bounded prompt
