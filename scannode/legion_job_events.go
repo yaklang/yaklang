@@ -161,6 +161,25 @@ func (p *jobEventPublisher) PublishArtifactReady(
 	})
 }
 
+func (p *jobEventPublisher) PublishArtifactUploadFailed(
+	ctx context.Context,
+	ref jobExecutionRef,
+	objectKey string,
+	errorCode string,
+	errorMessage string,
+	uploadedBytes uint64,
+	metricsJSON []byte,
+) error {
+	return p.publish(ctx, legionEventArtifactUploadFailed, ref, uuid.NewString(), &jobv1.JobArtifactUploadFailed{
+		Job:           p.jobRef(ref),
+		ObjectKey:     objectKey,
+		ErrorCode:     errorCode,
+		ErrorMessage:  errorMessage,
+		UploadedBytes: uploadedBytes,
+		MetricsJson:   cloneBytes(metricsJSON),
+	})
+}
+
 func (p *jobEventPublisher) PublishSucceeded(
 	ctx context.Context,
 	ref jobExecutionRef,

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/spec"
 )
 
 const legionProgressTotalUnits = 10000
@@ -314,6 +315,29 @@ func (r *ScannerAgentReporter) PublishSSAArtifactReady(
 		ssaSizeToUint64(event.UncompressedSize),
 		ssaSizeToUint64(event.CompressedSize),
 		metricsJSON,
+	)
+}
+
+func (r *ScannerAgentReporter) PublishSSAArtifactUploadFailed(
+	failedEvent *spec.SSAArtifactUploadFailedEvent,
+) error {
+	if failedEvent == nil {
+		return nil
+	}
+
+	publisher, ref, ok, err := r.legionPublisher()
+	if err != nil || !ok {
+		return err
+	}
+	r.touchActiveAttempt()
+	return publisher.PublishArtifactUploadFailed(
+		r.agent.node.GetRootContext(),
+		*ref,
+		failedEvent.ObjectKey,
+		failedEvent.ErrorCode,
+		failedEvent.ErrorMessage,
+		failedEvent.UploadedBytes,
+		failedEvent.Metrics,
 	)
 }
 
