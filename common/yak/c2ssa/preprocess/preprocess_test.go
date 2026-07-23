@@ -238,6 +238,95 @@ int y = F(1);
 	require.Contains(t, out, "F(1)")
 }
 
+// TestHeaderMacroCache_MultiTUStable locks include-agnostic header macros + project-level cache:
+// multiple TUs on one project must see the same header macros and stable PreprocessTU output.
+func TestHeaderMacroCache_MultiTUStable(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	require.NoError(t, fs.WriteFile("include/common.h", []byte("#define MAGIC 42\n#define TWICE(x) ((x)+(x))\n"), 0o644))
+	srcA := "int a = MAGIC;\nint b = TWICE(3);\n"
+	srcB := "int c = MAGIC;\nint d = TWICE(MAGIC);\n"
+	require.NoError(t, fs.WriteFile("apps/a.c", []byte(srcA), 0o644))
+	require.NoError(t, fs.WriteFile("apps/b.c", []byte(srcB), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.IncludeDirs = []string{"include"}
+	project := BuildProject(fs, cfg)
+
+	outA1, err := project.PreprocessTU("apps/a.c", srcA)
+	require.NoError(t, err)
+	outA2, err := project.PreprocessTU("apps/a.c", srcA)
+	require.NoError(t, err)
+	require.Equal(t, outA1, outA2, "repeated PreprocessTU on same TU must be byte-identical")
+
+	outB, err := project.PreprocessTU("apps/b.c", srcB)
+	require.NoError(t, err)
+
+	require.Contains(t, outA1, "42")
+	require.Contains(t, outA1, "((3)+(3))")
+	require.Contains(t, outB, "42")
+	require.Contains(t, outB, "((42)+(42))")
+
+	// Header tables computed once; both TUs merge the same cached headers.
+	tablesA := project.buildMacroTables("apps/a.c", srcA)
+	tablesB := project.buildMacroTables("apps/b.c", srcB)
+	require.Equal(t, "42", tablesA.Object["MAGIC"])
+	require.Equal(t, "42", tablesB.Object["MAGIC"])
+	require.Equal(t, tablesA.Function["TWICE"], tablesB.Function["TWICE"])
+}
+
+// TestExpandPath_DefineUndefInterleaved ensures reused expandEnv stays correct across #define/#undef.
+func TestExpandPath_DefineUndefInterleaved(t *testing.T) {
+	fs := filesys.NewVirtualFs()
+	require.NoError(t, fs.WriteFile("include/empty.h", []byte("/* no macros */\n"), 0o644))
+	src := strings.Join([]string{
+		"#define X 1",
+		"int a = X;",
+		"#undef X",
+		"#define X 2",
+		"int b = X;",
+		"#define Y X",
+		"int c = Y;",
+		"#undef Y",
+		"int d = X;",
+	}, "\n")
+	require.NoError(t, fs.WriteFile("apps/interleaved.c", []byte(src), 0o644))
+
+	cfg := DefaultConfig()
+	cfg.IncludeDirs = []string{"include"}
+	project := BuildProject(fs, cfg)
+
+	out1, err := project.PreprocessTU("apps/interleaved.c", src)
+	require.NoError(t, err)
+	out2, err := project.PreprocessTU("apps/interleaved.c", src)
+	require.NoError(t, err)
+	require.Equal(t, out1, out2)
+
+	require.Contains(t, out1, "int a = 1;")
+	require.Contains(t, out1, "int b = 2;")
+	require.Contains(t, out1, "int c = 2;")
+	require.Contains(t, out1, "int d = 2;")
+	require.NotContains(t, out1, "int a = X;")
+	require.NotContains(t, out1, "int b = X;")
+}
+
+func TestLookupObject_ChainMatchesFlatten(t *testing.T) {
+	parent := NewMacroEnvironment(nil)
+	parent.tables.Object["A"] = "1"
+	parent.tables.Object["B"] = "parentB"
+
+	child := NewMacroEnvironment(parent)
+	child.tables.Object["B"] = "childB"
+	child.tables.Object["C"] = "3"
+
+	for _, name := range []string{"A", "B", "C", "missing"} {
+		flat := child.Flatten()
+		want, wantOK := flat.Object[name]
+		got, gotOK := child.LookupObject(name)
+		require.Equal(t, wantOK, gotOK, "name=%s", name)
+		require.Equal(t, want, got, "name=%s", name)
+	}
+}
+
 func ppMustRead(fs *filesys.VirtualFS, path string) string {
 	data, err := fs.ReadFile(path)
 	if err != nil {

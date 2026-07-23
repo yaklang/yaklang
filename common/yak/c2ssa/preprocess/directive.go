@@ -29,6 +29,17 @@ func (e *MacroEnvironment) Flatten() MacroTables {
 	return out
 }
 
+// LookupObject finds an object-like macro in this environment (child overrides parent).
+// Equivalent to Flatten().Object[name] without allocating a full merged table.
+func (e *MacroEnvironment) LookupObject(name string) (string, bool) {
+	for cur := e; cur != nil; cur = cur.parent {
+		if v, ok := cur.tables.Object[name]; ok {
+			return v, true
+		}
+	}
+	return "", false
+}
+
 func (e *MacroEnvironment) ApplyDefineLine(line string) bool {
 	return ApplyDefineLine(line, &e.tables, false)
 }
