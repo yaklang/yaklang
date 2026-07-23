@@ -27,10 +27,11 @@ func ExpandFunctionMacrosWithTables(src string, base MacroTables) (string, error
 }
 
 type macroEnv struct {
-	tables           macroTables
-	depth            int
-	maxDepth         int
-	objectBodyTokens map[string][]macroToken // session cache: tokenize only, not full expand
+	tables             macroTables
+	depth              int
+	maxDepth           int
+	objectBodyTokens   map[string][]macroToken // session cache: tokenize only
+	functionBodyTokens map[string][]macroToken
 }
 
 func newMacroEnvFromTables(tables MacroTables) *macroEnv {
@@ -43,6 +44,7 @@ func newMacroEnvFromTables(tables MacroTables) *macroEnv {
 func (e *macroEnv) setTables(tables macroTables) {
 	e.tables = tables
 	e.objectBodyTokens = nil
+	e.functionBodyTokens = nil
 }
 
 func (e *macroEnv) getObjectBodyTokens(name, body string) []macroToken {
@@ -55,6 +57,50 @@ func (e *macroEnv) getObjectBodyTokens(name, body string) []macroToken {
 	toks := tokenizeMacroSource(body)
 	e.objectBodyTokens[name] = toks
 	return toks
+}
+
+func (e *macroEnv) getFunctionBodyTokens(name string, fm functionMacro) []macroToken {
+	if e.functionBodyTokens == nil {
+		e.functionBodyTokens = make(map[string][]macroToken)
+	}
+	if toks, ok := e.functionBodyTokens[name]; ok {
+		return toks
+	}
+	toks := tokenizeMacroSource(fm.body)
+	e.functionBodyTokens[name] = toks
+	return toks
+}
+
+// lineMayNeedExpand cheaply checks whether line contains an identifier that is a known macro.
+// False positives are safe (full expand still correct); false negatives must be avoided.
+func (e *macroEnv) lineMayNeedExpand(line string) bool {
+	if len(e.tables.function) == 0 && len(e.tables.object) == 0 {
+		return false
+	}
+	for i := 0; i < len(line); {
+		c := line[i]
+		if isMacroIdentStart(rune(c)) {
+			start := i
+			i++
+			for i < len(line) {
+				r := rune(line[i])
+				if !isMacroIdentPart(r) {
+					break
+				}
+				i++
+			}
+			name := line[start:i]
+			if _, ok := e.tables.object[name]; ok {
+				return true
+			}
+			if _, ok := e.tables.function[name]; ok {
+				return true
+			}
+			continue
+		}
+		i++
+	}
+	return false
 }
 
 func (e *macroEnv) expandSource(src string) string {
@@ -105,7 +151,7 @@ func (e *macroEnv) expandOnce(tokens []macroToken) ([]macroToken, bool) {
 						for ai, arg := range args {
 							expandedArgs[ai] = e.expandTokens(arg)
 						}
-						repl := e.substituteMacro(fm, expandedArgs)
+						repl := e.substituteMacro(name, fm, expandedArgs)
 						repl = e.expandTokens(repl)
 						e.depth--
 						out = append(out, repl...)
@@ -169,8 +215,8 @@ func trimArgTokens(tokens []macroToken) []macroToken {
 	return tokens[start:end]
 }
 
-func (e *macroEnv) substituteMacro(fm functionMacro, args [][]macroToken) []macroToken {
-	body := tokenizeMacroSource(fm.body)
+func (e *macroEnv) substituteMacro(name string, fm functionMacro, args [][]macroToken) []macroToken {
+	body := e.getFunctionBodyTokens(name, fm)
 	argMap := make(map[string][]macroToken, len(fm.params))
 	for i, p := range fm.params {
 		if i < len(args) {

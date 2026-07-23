@@ -121,11 +121,55 @@ func JoinLogicalLines(src string) []string {
 }
 
 // ApplyDefineLine applies a #define/#undef line to tables; returns true if a define was consumed.
+// Mutates Function/Object maps in place (does not replace the map pointers), so shared
+// MacroTables references stay consistent after updates.
 func ApplyDefineLine(line string, tables *MacroTables, strip bool) bool {
-	internal := exportToMacroTables(*tables)
-	removed := applyDirectiveToTables(line, internal, strip)
-	*tables = MacroTablesFromInternal(internal)
-	return removed
+	if tables == nil {
+		return false
+	}
+	if tables.Function == nil {
+		tables.Function = make(map[string]FunctionMacro)
+	}
+	if tables.Object == nil {
+		tables.Object = make(map[string]string)
+	}
+
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || !strings.HasPrefix(trimmed, "#") {
+		return false
+	}
+	directive := strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+	if directive == "" {
+		return false
+	}
+	parts := strings.Fields(directive)
+	if len(parts) == 0 {
+		return false
+	}
+	switch parts[0] {
+	case "define":
+		if name, fm, ok := parseFunctionDefineSafe(directive); ok {
+			tables.Function[name] = FunctionMacro{
+				Params:   fm.params,
+				Variadic: fm.variadic,
+				Body:     fm.body,
+			}
+			delete(tables.Object, name)
+			return strip
+		}
+		if name, body, ok := parseObjectDefineSafe(directive); ok {
+			tables.Object[name] = body
+			delete(tables.Function, name)
+			return strip
+		}
+	case "undef":
+		if len(parts) >= 2 {
+			name := parts[1]
+			delete(tables.Function, name)
+			delete(tables.Object, name)
+		}
+	}
+	return false
 }
 
 // ParseIncludePath extracts the path from #include "..." or #include <...>.
