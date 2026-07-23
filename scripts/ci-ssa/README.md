@@ -1,32 +1,43 @@
 # CI 基础设施（SSA 增量扫描）— 本地监控模式
 
-在 **本地机器** 上通过 `ci-promote-monitor.py` 监控 yaklang main 分支，自动执行 SSA 增量 promote，不依赖 GitHub Actions。
+在 **本地机器** 上通过 `ci-promote-monitor.py` 监控 yaklang PR 生命周期事件，自动执行 SSA 增量扫描和 promote，不依赖 GitHub Actions。
 
 ## 语义
 
+Monitor 只处理**运行期间新变化**的 PR（启动时记录基线，后续对比找新增）：
+
 | 事件 | 动作 | 脚本 |
 |------|------|------|
-| 新 PR 开启 | 对最新 main 做 diff 增量扫描 | `generate-diff-scan-config.sh` + `diff-code-scan.json` |
-| PR 合并到 main | 增量编译 overlay → 合并到基线 → 更新本地 main | `promote-base-on-merge.sh` |
-| 每周五 | 全量编译 `ci-yaklang-base`（手动/计划任务） | `ci-yaklang-base-compile.json` |
+| **open** — 新 PR 开启 | 对最新 main 做 diff 增量扫描（CI） | `generate-diff-scan-config.sh` + `diff-code-scan.json` |
+| **merge** — PR 合并到 main | 增量编译 overlay → 合并到基线 → 更新 pointer | `promote-base-on-merge.sh` |
+| **close** — PR 关闭（非合并） | 仅记录事件，不处理 | — |
 | 日常维护 | overlay 链过深时压平；清理残留 program | `flatten-overlay.yak` / `cleanup-programs.sh` |
 
-> Monitor 自动处理「PR 合并」；「新 PR 增量扫描」和「周五全量编译」需手动或通过外部调度触发。
+> **merge 跳过逻辑**：如果 merged PR 没有对应的 diff program（即没跑过 CI scan），跳过 promote。
+> 全量编译 `ci-yaklang-base` 需手动执行或通过外部调度触发。
 
 ---
 
 ## 架构
 
 ```
-GitHub main ──poll──> ci-promote-monitor.py (每 5 分钟)
-                         │
-                         ├─ main HEAD == manifest sha? → 无操作
-                         │
-                         └─ main HEAD != manifest sha?
-                              ├─ GitHub compare+blobs API 构建 fs.zip
-                              ├─ promote-base-on-merge.sh 增量编译
-                              ├─ 更新 manifest + pointer
-                              └─ 记录事件到 events.json
+GitHub main + PRs ──poll──> ci-promote-monitor.py (每 5 分钟)
+                               │
+                               ├─ 新 PR open?
+                               │    └─ 构建 fs.zip → 增量扫描 (code-scan)
+                               │
+                               ├─ PR closed (非合并)?
+                               │    └─ 记录 close 事件
+                               │
+                               └─ main HEAD 推进?
+                                    ├─ 查找 merged PR
+                                    ├─ 检查是否有 diff program (CI 已跑)
+                                    │    ├─ 有 → promote-base-on-merge.sh
+                                    │    │      ├─ 增量编译 overlay
+                                    │    │      ├─ 更新 manifest + pointer
+                                    │    │      └─ 清理该 PR diff program
+                                    │    └─ 无 → 跳过 promote
+                                    └─ 记录 merge 事件到 events.json
 ```
 
 | 角色 | 名称 | 含义 |
@@ -134,13 +145,14 @@ yak scripts/ci-ssa/flatten-overlay.yak \
 
 | 文件 | 类型 | 说明 |
 |------|------|------|
-| [ci-promote-monitor.py](./ci-promote-monitor.py) | Python | 主监控脚本：轮询 main，检测合并，触发 promote |
+| [ci-promote-monitor.py](./ci-promote-monitor.py) | Python | 主监控脚本：轮询 PR 事件（open/merge/close），触发 scan 或 promote |
 | [promote-base-on-merge.sh](./promote-base-on-merge.sh) | Shell | 核心：PR 合并 → 增量编译 → 更新基线（自包含 env/lock/check/manifest） |
 | [cleanup-programs.sh](./cleanup-programs.sh) | Shell | 清理 program：`pr <N>` / `stale` / `name <prog>` |
 | [generate-diff-scan-config.sh](./generate-diff-scan-config.sh) | Shell | 生成 PR 增量扫描 config |
 | [flatten-overlay.yak](./flatten-overlay.yak) | Yak | overlay 链压平为单层 program |
 | [remove-program.yak](./remove-program.yak) | Yak | 删除指定 program（支持 `--database`） |
-| [ci-yaklang-base-compile.json](./ci-yaklang-base-compile.json) | 配置 | 全量编译模板 |
+| [ssa-tree.py](./ssa-tree.py) | Python | 诊断工具：打印 DB 中 program 树形结构（手动运行） |
+| [ci-yaklang-base-compile.json](./ci-yaklang-base-compile.json) | 配置 | 全量编译模板（flatten 用） |
 | [ci-yaklang-promote-compile.json](./ci-yaklang-promote-compile.json) | 配置 | promote 增量编译模板 |
 | [diff-code-scan.json](./diff-code-scan.json) | 配置 | PR 增量扫描模板 |
 
@@ -162,10 +174,9 @@ yak scripts/ci-ssa/flatten-overlay.yak \
 
 | type | 字段 | 说明 |
 |------|------|------|
-| `merged` | pr_number, title, sha, html_url | PR 合并到 main |
-| `ci_running` | pr_number, sha | promote 开始执行 |
-| `ci_done` | pr_number, sha, success | promote 完成（success: true/false） |
-| `closed` | pr_number, title, html_url | PR 关闭（非合并） |
+| `open` | pr_number, title, sha, html_url | 新 PR 开启 → 运行 CI 扫描 |
+| `merge` | pr_number, title, sha, html_url, has_ci | PR 合并到 main → 运行 promote（has_ci=false 时跳过） |
+| `close` | pr_number, title, html_url | PR 关闭（非合并）→ 仅记录 |
 
 ---
 
