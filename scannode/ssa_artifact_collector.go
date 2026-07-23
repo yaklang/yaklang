@@ -1417,6 +1417,20 @@ func (c *SSAArtifactCollector) BuildReadyEvent(result *SSAArtifactBuildResult, t
 	}
 }
 
+func (c *SSAArtifactCollector) BuildUploadFailedEvent(errorCode, errorMessage string, uploadedBytes uint64) *spec.SSAArtifactUploadFailedEvent {
+	if c == nil {
+		return nil
+	}
+	metrics := c.snapshotUploadMetrics()
+	metricsJSON, _ := json.Marshal(metrics)
+	return &spec.SSAArtifactUploadFailedEvent{
+		ErrorCode:     errorCode,
+		ErrorMessage:  errorMessage,
+		UploadedBytes: uploadedBytes,
+		Metrics:       metricsJSON,
+	}
+}
+
 func (c *SSAArtifactCollector) Cleanup() {
 	if c == nil {
 		return
