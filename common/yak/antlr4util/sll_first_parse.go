@@ -96,9 +96,13 @@ func SLLFirstCountersSnapshot() SLLFirstCounters {
 //  1. Try SLL + BailErrorStrategy (fast, low alloc, no recovery)
 //  2. If cancelled, retry LL + DefaultErrorStrategy (correctness + recovery)
 //
+// On SLL→LL fallback the lexed CommonTokenStream is reused (Seek(0) only;
+// Reset is avoided because it clears tokens). This skips a second full lex
+// of the source while preserving parse results.
+//
 // It also:
 //   - Attaches the yak ErrorListener to both lexer and parser
-//   - Detaches lexer tokenSource from tokens after parse to reduce retention
+//   - Detaches lexer tokenSource from tokens after the final parse to reduce retention
 //
 // setup is optional and can be used to apply per-language settings such as ANTLR caches.
 //
@@ -116,22 +120,24 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	statsEnabled := SLLFirstStatsEnabled()
 	diagnosticEnabled := antlrDiagnosticEnabledNow()
 	shouldLogFallback := statsEnabled || diagnosticEnabled
-	run := func(predictionMode int, errHandler antlr.ErrorStrategy) (ast T, parseErr error, cancelled bool, elapsed time.Duration) {
+
+	lexer := newLexer(antlr.NewInputStream(src))
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	if decorateTokenSource != nil {
+		tokenStream.SetTokenSource(decorateTokenSource(lexer))
+	}
+
+	run := func(predictionMode int, errHandler antlr.ErrorStrategy) (ast T, parseErr error, cancelled bool, elapsed time.Duration, parser P) {
 		start := time.Now()
 		defer func() {
 			elapsed = time.Since(start)
 		}()
 
 		errListener := NewErrorListener()
-		lexer := newLexer(antlr.NewInputStream(src))
 		lexer.RemoveErrorListeners()
 		lexer.AddErrorListener(errListener)
 
-		tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-		if decorateTokenSource != nil {
-			tokenStream.SetTokenSource(decorateTokenSource(lexer))
-		}
-		parser := newParser(tokenStream)
+		parser = newParser(tokenStream)
 		if setup != nil {
 			setup(lexer, parser)
 		}
@@ -169,24 +175,29 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 			ast = entry(parser)
 		}()
 
+		return ast, errListener.Error(), cancelled, elapsed, parser
+	}
+
+	finish := func(parser P) {
 		DetachParserATNSimulatorCaches(parser)
 		DetachLexerTokenSource(lexer)
-		return ast, errListener.Error(), cancelled, elapsed
 	}
 
 	if !SLLFirstEnabled() {
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstLLOnly, 1)
 		}
-		ast, err, _, _ := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+		ast, err, _, _, parser := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+		finish(parser)
 		return ast, err
 	}
 
 	if statsEnabled {
 		atomic.AddUint64(&sllFirstSLLAttempts, 1)
 	}
-	ast, err, cancelled, sllElapsed := run(antlr.PredictionModeSLL, NewBailErrorStrategy())
+	ast, err, cancelled, sllElapsed, sllParser := run(antlr.PredictionModeSLL, NewBailErrorStrategy())
 	if !cancelled && err == nil {
+		finish(sllParser)
 		return ast, nil
 	}
 
@@ -209,9 +220,17 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		}
 	}
 
-	ast, err, _, llElapsed := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+	// Drop SLL parser caches; keep lexer + token stream for LL retry.
+	DetachParserATNSimulatorCaches(sllParser)
+
+	// Finish lexing once, then rewind. Do NOT call Reset() — it clears tokens.
+	tokenStream.Fill()
+	tokenStream.Seek(0)
+
+	ast, err, _, llElapsed, llParser := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+	finish(llParser)
 	if shouldLogFallback {
-		log.Infof("[antlr-sll-first] LL completed: src_len=%d ll_elapsed=%s", len(src), llElapsed)
+		log.Infof("[antlr-sll-first] LL completed: src_len=%d ll_elapsed=%s reused_tokens=1", len(src), llElapsed)
 	}
 	return ast, err
 }
