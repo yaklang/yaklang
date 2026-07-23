@@ -4,9 +4,15 @@ ci-promote-monitor.py — Monitor yaklang/yaklang for PR lifecycle events and
 run SSA incremental compile / promote flows locally.
 
 Event-driven model (only processes PRs that change *during* monitoring):
-  - open  : new PR opened during monitoring  → run incremental diff scan (CI)
+  - open  : PR first seen during monitoring → record hash, no CI (initialization)
+  - push  : open PR's head SHA changed (new commits pushed) → run incremental diff scan (CI)
   - merge : PR merged into main during monitoring → run promote (update base)
   - close : PR closed (non-merge) during monitoring → record only, no action
+
+Each open PR is tracked by its head SHA. When the SHA changes (simulating a
+PR pushing new commits), a new CI scan is triggered. Old diff programs for
+that PR are cleaned up at the start of the new scan (Stage 0). The first
+time a PR is seen, its hash is recorded but no CI runs (zero→one init).
 
 Usage:
   python3 ci-promote-monitor.py [--once] [--interval 300] [--repo yaklang/yaklang]
@@ -830,47 +836,84 @@ def check_merge_and_promote(
 
 
 # ---------------------------------------------------------------------------
-# Check new open PRs — run CI scan
+# Check open PRs for hash changes — run CI scan on push
 # ---------------------------------------------------------------------------
 
-def check_new_open_prs(
+def check_open_pr_pushes(
     repo: str,
     worktree: Path,
     data_dir: Path,
     token: str | None,
-    known_open_prs: set[int],
-) -> set[int]:
+    pr_hashes: dict[int, str],
+) -> dict[int, str]:
     """
-    Detect newly opened PRs since last check.
-    Runs CI scan for each new PR.
-    Returns updated known_open_prs set.
+    Check all currently open PRs for head SHA changes.
+    - First time a PR is seen: record its hash (initialization, no CI).
+    - If an open PR's hash changed: record 'push' event, run CI scan.
+    - If a previously-open PR is no longer open: it was merged or closed
+      (handled by merge/close checks), remove from tracking.
+    Returns updated pr_hashes dict.
     """
     current_open = get_open_prs(repo, token)
     current_open_numbers = {pr["number"] for pr in current_open}
 
-    # Find new PRs (in current but not in known)
-    new_prs = [pr for pr in current_open if pr["number"] not in known_open_prs]
-
-    for pr in new_prs:
-        log(f"PR #{pr['number']} opened: {pr.get('title', '')[:50]}")
-        append_event(data_dir, {
-            "type": "open",
-            "pr_number": pr["number"],
-            "title": pr.get("title", ""),
-            "sha": pr.get("head_sha", ""),
-            "html_url": pr.get("html_url", ""),
-        })
-        # Run CI scan
+    for pr in current_open:
+        pr_number = pr["number"]
         head_sha = pr.get("head_sha", "")
-        if head_sha:
-            success = run_pr_scan(repo, worktree, data_dir, pr["number"], head_sha, token)
-            log(f"PR #{pr['number']} scan {'succeeded' if success else 'failed'}")
-        else:
-            log(f"PR #{pr['number']} has no head SHA, skipping scan", "WARN")
+        old_sha = pr_hashes.get(pr_number)
 
-    # Update known set
-    known_open_prs.update(current_open_numbers)
-    return known_open_prs
+        if old_sha is None:
+            # First time seeing this PR — record hash, no CI (zero→one init)
+            pr_hashes[pr_number] = head_sha
+            log(f"PR #{pr_number} opened: {pr.get('title', '')[:50]} "
+                f"sha={head_sha[:8]} (init, no CI)")
+            append_event(data_dir, {
+                "type": "open",
+                "pr_number": pr_number,
+                "title": pr.get("title", ""),
+                "sha": head_sha,
+                "html_url": pr.get("html_url", ""),
+            })
+        elif old_sha != head_sha:
+            # Hash changed — new commits pushed to this PR
+            log(f"PR #{pr_number} pushed: {old_sha[:8]} -> {head_sha[:8]} "
+                f"{pr.get('title', '')[:40]}")
+            append_event(data_dir, {
+                "type": "push",
+                "pr_number": pr_number,
+                "title": pr.get("title", ""),
+                "old_sha": old_sha,
+                "new_sha": head_sha,
+                "html_url": pr.get("html_url", ""),
+            })
+            # Update hash before scan
+            pr_hashes[pr_number] = head_sha
+            # Run CI scan (Stage 0 cleans up previous diff programs for this PR)
+            if head_sha:
+                success = run_pr_scan(repo, worktree, data_dir, pr_number, head_sha, token)
+                log(f"PR #{pr_number} scan {'succeeded' if success else 'failed'}")
+            else:
+                log(f"PR #{pr_number} has no head SHA, skipping scan", "WARN")
+        else:
+            # Hash unchanged — no action
+            pass
+
+    # Log a compact summary of all open PRs and their hashes
+    if pr_hashes:
+        summary_parts = []
+        for pr in sorted(current_open, key=lambda p: p["number"]):
+            n = pr["number"]
+            h = pr_hashes.get(n, "")[:8]
+            summary_parts.append(f"#{n}={h}")
+        log_short(f"open PRs ({len(current_open)}): {' '.join(summary_parts)}")
+
+    # Remove PRs that are no longer open (merged or closed — handled elsewhere)
+    gone = set(pr_hashes.keys()) - current_open_numbers
+    for n in gone:
+        old = pr_hashes.pop(n)
+        log(f"PR #{n} no longer open (was {old[:8]}), removed from tracking")
+
+    return pr_hashes
 
 
 # ---------------------------------------------------------------------------
@@ -945,22 +988,24 @@ def main():
 
     # Initialize baselines: record current state so we only process NEW changes
     log("Initializing PR baseline...")
-    known_open_prs: set[int] = set()
+    pr_hashes: dict[int, str] = {}  # PR number → head SHA
     known_closed_prs: set[int] = set()
 
     initial_open = get_open_prs(args.repo, token)
     for pr in initial_open:
-        known_open_prs.add(pr["number"])
+        pr_hashes[pr["number"]] = pr.get("head_sha", "")
     initial_closed = get_recently_closed_prs(args.repo, token)
     for pr in initial_closed:
         known_closed_prs.add(pr["number"])
-    log(f"Baseline: {len(known_open_prs)} open PRs, {len(known_closed_prs)} closed PRs")
+    log(f"Baseline: {len(pr_hashes)} open PRs, {len(known_closed_prs)} closed PRs")
+    for n in sorted(pr_hashes):
+        log(f"  PR #{n} init sha={pr_hashes[n][:8]}")
 
     while True:
         try:
-            # 1. Check for new open PRs → run CI scan
-            known_open_prs = check_new_open_prs(
-                args.repo, worktree, data_dir, token, known_open_prs,
+            # 1. Check open PRs for hash changes → run CI scan on push
+            pr_hashes = check_open_pr_pushes(
+                args.repo, worktree, data_dir, token, pr_hashes,
             )
 
             # 2. Check for closed PRs → record close events
@@ -978,7 +1023,7 @@ def main():
                 manifest = read_manifest(data_dir)
                 depth = manifest.get("overlay_depth", 0) if manifest else 0
                 main_sha = manifest.get("main_sha", "????????")[:8] if manifest else "????????"
-                log_short(f"idle: main={main_sha} depth={depth} open_prs={len(known_open_prs)}")
+                log_short(f"idle: main={main_sha} depth={depth} open_prs={len(pr_hashes)}")
 
         except KeyboardInterrupt:
             log("Interrupted by user, exiting")
