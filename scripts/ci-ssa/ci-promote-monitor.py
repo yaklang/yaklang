@@ -271,6 +271,36 @@ def read_manifest(data_dir: Path) -> dict | None:
         return None
 
 
+def list_programs(worktree: Path, data_dir: Path) -> list[str]:
+    """List all program names in the SSA database."""
+    yak_bin = worktree / "yak"
+    db_path = data_dir / "default-yakssa.db"
+    if not yak_bin.exists() or not db_path.exists():
+        return []
+    try:
+        result = subprocess.run(
+            [str(yak_bin), "ssa-program", "--database", str(db_path)],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+        programs = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("[golang]:"):
+                name = line.replace("[golang]:", "").strip()
+                if name:
+                    programs.append(name)
+        return programs
+    except Exception:
+        return []
+
+
+def pr_has_diff_program(worktree: Path, data_dir: Path, pr_number: int) -> bool:
+    """Check if a diff program exists in the DB for this PR number."""
+    programs = list_programs(worktree, data_dir)
+    prefix = f"ci-yaklang-diff-pr-{pr_number}-"
+    return any(p.startswith(prefix) for p in programs)
+
+
 # ---------------------------------------------------------------------------
 # Event log — append PR lifecycle events to events.json (max 200)
 # ---------------------------------------------------------------------------
@@ -750,19 +780,40 @@ def check_merge_and_promote(
     if merged_prs:
         pr_list = ", ".join(f"#{p['number']}" for p in merged_prs)
         log(f"merged PRs: {pr_list}")
+        # Check which merged PRs have a corresponding diff program (ran CI)
+        prs_with_ci = [pr for pr in merged_prs if pr_has_diff_program(worktree, data_dir, pr["number"])]
+        prs_without_ci = [pr for pr in merged_prs if not pr_has_diff_program(worktree, data_dir, pr["number"])]
+
         for pr in merged_prs:
+            has_ci = pr in prs_with_ci
             append_event(data_dir, {
                 "type": "merge",
                 "pr_number": pr["number"],
                 "title": pr.get("title", ""),
                 "sha": pr.get("merge_commit_sha", main_head),
                 "html_url": pr.get("html_url", ""),
+                "has_ci": has_ci,
             })
+
+        # If no merged PR has a diff program, skip promote
+        if not prs_with_ci:
+            log(f"no merged PR has diff program (CI not run), skipping promote", "WARN")
+            for pr in prs_without_ci:
+                log(f"  PR #{pr['number']} merged but no diff program found, skipped")
+            return False
+
+        # Use the last PR that has a diff program for cleanup targeting
+        pr_number = str(prs_with_ci[-1]["number"])
+        if prs_without_ci:
+            skipped = ", ".join("#{}".format(p["number"]) for p in prs_without_ci)
+            log(f"skipping {len(prs_without_ci)} PR(s) without diff program: {skipped}")
     else:
         log("no PRs found in range (may be direct push or search miss)", "WARN")
+        # Direct push — no PR to check, skip promote
+        log("no merged PR identified, skipping promote", "WARN")
+        return False
 
     # 5. Run promote
-    pr_number = str(merged_prs[-1]["number"]) if merged_prs else ""
     success = run_promote(repo, worktree, data_dir, manifest_sha, main_head, pr_number, token)
 
     # 6. Verify
