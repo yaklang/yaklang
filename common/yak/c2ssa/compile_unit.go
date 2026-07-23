@@ -1,14 +1,12 @@
 package c2ssa
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
-
-var cIncludeRe = regexp.MustCompile(`(?m)^\s*#\s*include\s+[<"]([^>"]+)[>"]`)
 
 // cIncludeExtCandidates are extensions tried when an include path has no
 // extension (e.g. `#include "util"`).
@@ -28,8 +26,11 @@ func (*SSABuilder) CompileUnitDependencies(fs filesys_interface.FileSystem, unit
 				continue
 			}
 			src := ssa.ReadUnitSource(fs, file)
-			for _, match := range cIncludeRe.FindAllStringSubmatch(src, -1) {
-				raw := match[1]
+			for _, line := range preprocess.JoinLogicalLines(src) {
+				raw, _, ok := preprocess.ParseIncludePath(line)
+				if !ok {
+					continue
+				}
 				if to := resolveCInclude(fs, fileToKey, pathToKey, file, raw); to != "" && to != unit.Key {
 					edges = append(edges, ssa.UnitRef{From: unit.Key, To: to, Kind: "include", Raw: raw})
 				}
@@ -55,7 +56,8 @@ func resolveCInclude(fs filesys_interface.FileSystem, fileToKey, pathToKey map[s
 		ssa.CleanUnitPath(fs, fs.Join(importerDir, raw)),
 	}
 	lookup := func(p string) string {
-		if key := fileToKey[ssa.NormalizeUnitPath(fs, p)]; key != "" {
+		norm := ssa.NormalizeUnitPath(fs, p)
+		if key := fileToKey[norm]; key != "" {
 			return key
 		}
 		if fs.Ext(p) == "" {
