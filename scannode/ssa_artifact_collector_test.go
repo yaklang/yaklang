@@ -185,3 +185,55 @@ func valuesAfterFlag(args []string, flag string) []string {
 	}
 	return values
 }
+
+func TestUploadMetricsAccumulation(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+
+	c.recordUploadMs(500)
+	c.recordUploadMs(300)
+	c.recordTicketFetchMs(120)
+	c.recordTicketFetchMs(80)
+	c.recordRetry()
+	c.recordRetry()
+	c.recordRetry()
+	c.recordSegment()
+	c.recordSegment()
+
+	m := c.snapshotUploadMetrics()
+	if m.totalUploadMs != 800 {
+		t.Errorf("totalUploadMs = %d, want 800", m.totalUploadMs)
+	}
+	if m.ticketFetchMs != 200 {
+		t.Errorf("ticketFetchMs = %d, want 200", m.ticketFetchMs)
+	}
+	if m.retries != 3 {
+		t.Errorf("retries = %d, want 3", m.retries)
+	}
+	if m.segments != 2 {
+		t.Errorf("segments = %d, want 2", m.segments)
+	}
+}
+
+func TestUploadMetricsConcurrency(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+
+	done := make(chan struct{})
+	for i := 0; i < 100; i++ {
+		go func() {
+			c.recordUploadMs(1)
+			c.recordRetry()
+			done <- struct{}{}
+		}()
+	}
+	for i := 0; i < 100; i++ {
+		<-done
+	}
+
+	m := c.snapshotUploadMetrics()
+	if m.totalUploadMs != 100 {
+		t.Errorf("totalUploadMs = %d, want 100", m.totalUploadMs)
+	}
+	if m.retries != 100 {
+		t.Errorf("retries = %d, want 100", m.retries)
+	}
+}
