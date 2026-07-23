@@ -106,6 +106,16 @@ message JobArtifactReady {
   bytes metrics_json = 10;
 }
 
+message JobArtifactUploadFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  string object_key = 3;
+  string error_code = 4;
+  string error_message = 5;
+  uint64 uploaded_bytes = 6;
+  bytes metrics_json = 7;
+}
+
 message JobSucceeded {
   legion.node.v1.EventMetadata metadata = 1;
   JobRef job = 2;

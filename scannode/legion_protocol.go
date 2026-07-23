@@ -88,6 +88,7 @@ const (
 	legionEventRisk                                       = "job.risk"
 	legionEventReport                                     = "job.report"
 	legionEventArtifactReady                              = "job.artifact_ready"
+	legionEventArtifactUploadFailed                        = "job.artifact_upload_failed"
 	legionEventSucceeded                                  = "job.succeeded"
 	legionEventFailed                                     = "job.failed"
 	legionEventCancelled                                  = "job.cancelled"
