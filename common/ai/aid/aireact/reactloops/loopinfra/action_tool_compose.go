@@ -283,25 +283,24 @@ Example - Sequential file operations(With AI-Tag tags):
 		// Verify user satisfaction
 		task := loop.GetCurrentTask()
 		if task != nil {
-			verifyResult, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, payload)
+			verifyResult, tirggered, err := loop.MaybeVerifyUserSatisfaction(ctx, task.GetUserInput(), true, payload)
 			if err != nil {
 				operator.Fail(err)
 				return
 			}
-			loop.PushSatisfactionRecordWithCompletedTaskIndex(
-				verifyResult.Satisfied,
-				verifyResult.Reasoning,
-				verifyResult.CompletedTaskIndex,
-				verifyResult.NextMovements,
-				verifyResult.Evidence,
-				verifyResult.EvidenceOps,
-			)
-			if len(verifyResult.EvidenceOps) > 0 {
-				loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
+			if tirggered {
+				loop.PushSatisfactionRecordWithCompletedTaskIndex(
+					verifyResult.Satisfied,
+					verifyResult.Reasoning,
+					verifyResult.CompletedTaskIndex,
+					verifyResult.NextMovements,
+					verifyResult.Evidence,
+					verifyResult.EvidenceOps,
+				)
+				if len(verifyResult.EvidenceOps) > 0 {
+					loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
+				}
 			}
-			// verification 现在是纯观测调用, 不再决定退出. satisfied 仅作为
-			// 观测信号沉淀, 退出唯一由 AI 主动 finish action 决定.
-			// 关键词: verification 不退, 退出只走 finished, 纯观测角色
 		}
 
 		// If there were any errors during execution, provide feedback

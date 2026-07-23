@@ -577,15 +577,16 @@ func (r *ReActLoop) GetBaseFrameContext() map[string]any {
 // It sets up config, invoker, and emitter but skips full action registration.
 func NewMinimalReActLoop(cfg aicommon.AICallerConfigIf, invoker aicommon.AIInvokeRuntime) *ReActLoop {
 	return &ReActLoop{
-		config:                     cfg,
-		invoker:                    invoker,
-		emitter:                    cfg.GetEmitter(),
-		verificationMutex:          new(sync.Mutex),
-		vars:                       omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:                  new(sync.Mutex),
-		historySatisfactionReasons: make([]*SatisfactionRecord, 0),
-		actionHistory:              make([]*ActionRecord, 0),
-		actionHistoryMutex:         new(sync.Mutex),
+		config:                       cfg,
+		invoker:                      invoker,
+		emitter:                      cfg.GetEmitter(),
+		periodicVerificationInterval: 0, // 测试默认: 禁用节流, 每次 iter 都 fire
+		verificationMutex:            new(sync.Mutex),
+		vars:                         omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:                    new(sync.Mutex),
+		historySatisfactionReasons:   make([]*SatisfactionRecord, 0),
+		actionHistory:                make([]*ActionRecord, 0),
+		actionHistoryMutex:           new(sync.Mutex),
 	}
 }
 
@@ -602,7 +603,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		config:                       config,
 		emitter:                      config.GetEmitter(),
 		maxIterations:                100,
-		periodicVerificationInterval: verificationIterationTriggerInterval,
+		periodicVerificationInterval: 0,
 		verificationMutex:            new(sync.Mutex),
 		actions:                      omap.NewEmptyOrderedMap[string, *LoopAction](),
 		loopActions:                  omap.NewEmptyOrderedMap[string, LoopActionFactory](),

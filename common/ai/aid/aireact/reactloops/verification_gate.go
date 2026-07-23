@@ -9,27 +9,23 @@ import (
 )
 
 const (
-	// verificationAutoTriggerMaxSnapshotAge 控制"距上次 verification 多久后强制再跑"的时间门.
-	// AI 主循环通过 save_evidence action 主动沉淀 evidence
+	// verificationAutoTriggerMaxSnapshotAge 是时间门阈值: 距上次 verification
+	// 完成超过该时长后, 由看门狗强制再跑一次. 时间门由 watchdog 承担, 起算
+	// 点是上次 verification 真正完成的时刻 (snapshot.GeneratedAt), 不论该次
+	// verification 是自动 token 门、save_evidence 显式动作还是看门狗自身触发的.
 	verificationAutoTriggerMaxSnapshotAge = 1800 * time.Second
 
 	// verificationAutoTriggerMinPromptDelta 控制软 token 门 (加速器门) 的触发阈值.
 	verificationAutoTriggerMinPromptDelta = 10 * 1024
 
-	// verificationIterationTriggerInterval 控制 iter 门 (每 N 轮强制 verify 兜底).
-	verificationIterationTriggerInterval = 30
-
-	// verificationTokenGateMinIterCooldown 控制软 token 门的"冷静期".
-	verificationTokenGateMinIterCooldown = 10
-
-	// verificationAutoTriggerHardPromptDelta 是 token 门的"硬阈值"上界.
-	verificationAutoTriggerHardPromptDelta = 5 * 1024
-
-	// verificationFirstFireIterationThreshold 控制 baseline 未建立时的"首次提前触发"门.
-	verificationFirstFireIterationThreshold = 20
+	// verificationAutoTriggerHardPromptDelta 是 token 门的"硬阈值"上界,
+	// 设为软门的 2 倍, 单次超大 token 增量时立即 fire.
+	verificationAutoTriggerHardPromptDelta = 2 * verificationAutoTriggerMinPromptDelta
 )
 
-var verificationWatchdogIdleTimeout = 2 * time.Minute
+// verificationWatchdogMinInterval 是看门狗 timer 的最小兜底间隔, 防止在
+// 剩余时间 ≈ 0 (刚 verify 完不久) 时 timer 被立即触发而狂调 verification.
+var verificationWatchdogMinInterval = 2 * time.Minute
 
 type VerificationRuntimeSnapshot struct {
 	GeneratedAt      time.Time `json:"generated_at"`
@@ -98,22 +94,6 @@ func (r *ReActLoop) getVerificationRuntimePromptTokens() int {
 		return status.PromptTokens
 	}
 	return 0
-}
-
-// ShouldTriggerPeriodicCheckpointOnIteration reports whether periodic
-// checkpoints such as perception/verification should run on this iteration.
-func (r *ReActLoop) ShouldTriggerPeriodicCheckpointOnIteration(iterationIndex int) bool {
-	if r == nil {
-		return false
-	}
-	interval := r.periodicVerificationInterval
-	if interval <= 0 {
-		return true
-	}
-	if iterationIndex > 0 && iterationIndex%interval == 0 {
-		return true
-	}
-	return r.maxIterations > 0 && iterationIndex > 0 && iterationIndex == r.maxIterations
 }
 
 // ApplyVerificationResult stores verification side effects in the loop state.
@@ -215,16 +195,15 @@ func (r *ReActLoop) EndVerificationWatchdogToolSuppression() {
 	if task == nil {
 		return
 	}
-	if r.verificationWatchdogTimer != nil {
-		r.verificationWatchdogTimer.Stop()
-		r.verificationWatchdogTimer = nil
-	}
-	r.verificationWatchdogTimer = time.AfterFunc(verificationWatchdogIdleTimeout, func() {
-		r.triggerVerificationWatchdog(task)
-	})
+	r.rescheduleVerificationWatchdog(task)
 }
 
-// MaybeVerifyUserSatisfaction gates generic automatic verification. 并发模型:
+// MaybeVerifyUserSatisfaction gates generic automatic verification.
+// 自动门只负责 token 维度 (硬门 + 软门) 与末轮兜底; 时间门由看门狗
+// (startVerificationWatchdog / rescheduleVerificationWatchdog) 基于
+// snapshot.GeneratedAt 承担.
+//
+// 并发模型:
 //   - verificationMutex 仍保留, 但作用域缩窄到 snapshot/throttle 双检, 不再
 //     覆盖 AI 调用本身. 既有测试中对 verificationMutex 字段存在的依赖不受
 //     影响.
@@ -232,15 +211,13 @@ func (r *ReActLoop) EndVerificationWatchdogToolSuppression() {
 //     watchdog 在 verification 跑飞时能立刻感知而不阻塞.
 //
 // 清零语义 (与 VerifyUserSatisfactionNow 显式路径对齐):
-//   - 触发 fire 前的 currentSnapshot 仅用于"门判断", 不再作为新基线落盘
-//   - fire 完成后, 用 fire 结束时刻的实时 snapshot 替换 prev (时间 / iter /
-//     token 三维度统一清零), 让多门交叉触发后下一轮 verification 节奏
-//     稳定公平, 不会被 AI 调用耗时白送给时间门
+//   - 触发 fire 前的 currentSnapshot 仅用于"门判断", 不作为新基线落盘
+//   - fire 完成后, 用 fire 结束时刻的实时 snapshot 替换 prev, 让下次
+//     时间门 (看门狗) / token 门都从"上次 verify 真正完成"那一刻起算
 //
-// 关键词: MaybeVerifyUserSatisfaction watchdog 解锁, verificationInFlight CAS,
+// 关键词: MaybeVerifyUserSatisfaction 自动 token 门, 时间门归 watchdog,
 //
-//	verificationMutex 缩窄作用域, fire 完成后清零基线统一,
-//	时间门 iter 门冷静期同步清零
+//	verificationInFlight CAS, fire 完成后清零基线
 func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	ctx context.Context,
 	originalQuery string,
@@ -280,32 +257,55 @@ func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	if err != nil {
 		return nil, true, err
 	}
-	// fire 完成后, 用 fire 结束时刻的实时 snapshot 替换 prev, 而不是 fire
-	// 开始前计算的 currentSnapshot. 这样 prev.GeneratedAt / prev.IterationIndex
-	// / prev.LoopPromptTokens 三个维度都以 fire 完成时刻为新基线, 让时间门
-	// (180s) / iter 门 (6) / 冷静期 (3 iter) 下次判断都从"上次 verify 真正
-	// 结束"那一刻起算, 而不是被 AI 调用耗时 (常 5-30s) 白送给时间门.
-	//
-	// 修复前问题: 自动路径用 fire 开始前的 currentSnapshot, 显式路径
-	// (VerifyUserSatisfactionNow) 用 fire 结束后的 buildVerificationRuntimeSnapshot
-	// (time.Now()), 两条路径"清零"语义不一致. 在多门交叉触发场景下, 自动
-	// 路径会让 prev.GeneratedAt 比真实 fire 完成时间早 AI 调用耗时那么多,
-	// 进而让下一轮时间门 (180s) 比期望提前到位, 各门接力交叉触发, verify
-	// 频率不公平地被推高.
-	//
-	// 修复后: 两条路径统一以"fire 结束时刻"为新基线, 任意一个门触发后,
-	// 时间/iter/token 三个维度都被同步、及时地清零, 多门交叉触发后下一
-	// 轮 verification 节奏稳定可预期.
-	//
-	// 注意: 主循环 fire 期间是同步阻塞的, currentIterationIndex 与
-	// LoopPromptTokens 不会变化, 所以这两个字段的值与 currentSnapshot
-	// 一致; 唯一变化的是 GeneratedAt (从 fire 开始时间 -> fire 完成时间).
-	// 关键词: setVerificationRuntimeSnapshot fire 完成后基线, 交叉触发节流公平,
-	//        自动路径与显式路径一致, 时间门 iter 门冷静期统一清零,
-	//        AI 调用耗时不再白送时间门, 多门交叉触发节奏修复
+	// fire 完成后, 用 fire 结束时刻的实时 snapshot 替换 prev. 这样
+	// prev.GeneratedAt / prev.IterationIndex / prev.LoopPromptTokens
+	// 都以 fire 完成时刻为新基线, 让下次时间门 (看门狗, 基于
+	// verificationAutoTriggerMaxSnapshotAge) / token 门都从"上次 verify
+	// 真正完成"那一刻起算, 不被 AI 调用耗时 (常 5-30s) 白送给时间门.
+	// 主循环 fire 期间同步阻塞, currentIterationIndex 与 LoopPromptTokens
+	// 不变, 唯一变化的是 GeneratedAt.
+	// 关键词: setVerificationRuntimeSnapshot fire 完成后基线,
+	//        时间门归 watchdog, token 门归自动门, 清零统一
 	r.setVerificationRuntimeSnapshot(r.buildVerificationRuntimeSnapshot(time.Now()))
 	r.ApplyVerificationResult(result)
 	return result, true, nil
+}
+
+// nextVerificationWatchdogDelay 计算看门狗 timer 下次触发的等待时长.
+// 时间门由看门狗承担: 距上次 verification 完成时刻 (snapshot.GeneratedAt)
+// 已经过的时间从 verificationAutoTriggerMaxSnapshotAge 中扣除, 剩余时间
+// 即为下次应触发的延迟. 不论上次 verification 是自动 token 门、save_evidence
+// 显式动作还是看门狗自身触发的, 都以 snapshot.GeneratedAt 为唯一起算点.
+// 剩余时间过小 (刚 verify 完) 时用 verificationWatchdogMinInterval 兜底,
+// 防止 timer 立即触发而狂调 verification.
+func (r *ReActLoop) nextVerificationWatchdogDelay() time.Duration {
+	previous := r.GetVerificationRuntimeSnapshot()
+	if previous == nil || previous.GeneratedAt.IsZero() {
+		// baseline 未建立, 用最小兜底间隔尽快触发首次 verification.
+		return verificationWatchdogMinInterval
+	}
+	elapsed := time.Since(previous.GeneratedAt)
+	remaining := verificationAutoTriggerMaxSnapshotAge - elapsed
+	if remaining < verificationWatchdogMinInterval {
+		return verificationWatchdogMinInterval
+	}
+	return remaining
+}
+
+// rescheduleVerificationWatchdog 重置看门狗 timer 为基于上次 verification
+// 完成时刻计算的剩余等待时间. 调用方须已持有 verificationMutex.
+func (r *ReActLoop) rescheduleVerificationWatchdog(task aicommon.AIStatefulTask) {
+	if r == nil || task == nil || r.verificationMutex == nil {
+		return
+	}
+	if r.verificationWatchdogTimer != nil {
+		r.verificationWatchdogTimer.Stop()
+		r.verificationWatchdogTimer = nil
+	}
+	delay := r.nextVerificationWatchdogDelay()
+	r.verificationWatchdogTimer = time.AfterFunc(delay, func() {
+		r.triggerVerificationWatchdog(task)
+	})
 }
 
 func (r *ReActLoop) startVerificationWatchdog(task aicommon.AIStatefulTask) {
@@ -317,12 +317,7 @@ func (r *ReActLoop) startVerificationWatchdog(task aicommon.AIStatefulTask) {
 	if r.verificationWatchdogToolSuppressionDepth > 0 {
 		return
 	}
-	if r.verificationWatchdogTimer != nil {
-		r.verificationWatchdogTimer.Stop()
-	}
-	r.verificationWatchdogTimer = time.AfterFunc(verificationWatchdogIdleTimeout, func() {
-		r.triggerVerificationWatchdog(task)
-	})
+	r.rescheduleVerificationWatchdog(task)
 }
 
 func (r *ReActLoop) touchVerificationWatchdog() {
@@ -435,24 +430,17 @@ func (r *ReActLoop) buildVerificationWatchdogPayload(task aicommon.AIStatefulTas
 }
 
 // shouldTriggerAutomaticVerification 决定本轮是否需要发起一次自动 verification.
-// 5 个门按角色分层 (与原 OR 关系不同, 新版有优先级 + 冷静期):
+// 自动门只负责 token 维度 (硬门 + 软门) 与末轮兜底; 时间门已迁移到看门狗
+// (startVerificationWatchdog / rescheduleVerificationWatchdog), 由 watchdog
+// 基于 snapshot.GeneratedAt 计算距上次 verification 完成的剩余时间来承担.
 //
 //  1. 末轮兜底: iter == maxIterations 必触发, 保证最终一定有一次 verify.
-//  2. 首次提前门: baseline 未建立 (previous == nil) 且当前 iter
-//     >= verificationFirstFireIterationThreshold 时立即 fire, 让 AI
-//     能尽早拿到一次反馈建立 baseline, 避免错误方向跑满 iter 门才被纠正.
-//  3. 基础节拍 (时间门): now - prevGeneratedAt >= verificationAutoTriggerMaxSnapshotAge,
-//     保证长时间无 verify 不会被遗忘.
-//  4. 基础节拍 (iter 门): iter 差 >= periodicVerificationInterval, 默认 6 轮一兜底.
-//  5. 硬兜底 (硬 token 门): 单次 token 增量 >= verificationAutoTriggerHardPromptDelta
-//     立即 fire, 不被冷静期压制, 用于单次超大爆炸场景.
-//  6. 加速器 (软 token 门): 仅当 iter 差 >= verificationTokenGateMinIterCooldown 时,
-//     token 差 >= verificationAutoTriggerMinPromptDelta 才允许 fire. 冷静期内即使
-//     软门触发也不 fire, 避免数据爆炸阶段反复打断 iter 基础节拍.
+//  2. 硬 token 门: token delta >= verificationAutoTriggerHardPromptDelta 立即 fire.
+//  3. 软 token 门: token delta >= verificationAutoTriggerMinPromptDelta 作为加速器.
 //
-// 关键词: shouldTriggerAutomaticVerification 节流分层, 首次提前门,
+// 关键词: shouldTriggerAutomaticVerification 仅 token 门, 时间门归 watchdog,
 //
-//	token 门冷静期, 硬门豁免, iter 基础节拍优先
+//	末轮兜底保留
 func (r *ReActLoop) shouldTriggerAutomaticVerification(current *VerificationRuntimeSnapshot) bool {
 	if r == nil || current == nil {
 		return false
@@ -461,37 +449,20 @@ func (r *ReActLoop) shouldTriggerAutomaticVerification(current *VerificationRunt
 	if r.maxIterations > 0 && current.IterationIndex == r.maxIterations {
 		return true
 	}
+	// 当 periodicVerificationInterval <= 0 表示 "禁用节流, 每次 iter 都 fire"
+	// 的测试/调试模式, 直接 fire.
+	if r.periodicVerificationInterval <= 0 {
+		return true
+	}
 	previous := r.GetVerificationRuntimeSnapshot()
 	if previous == nil {
-		// 当 periodicVerificationInterval <= 0 时表示 "禁用节流, 每次 iter
-		// 都 fire" 的测试/调试模式 (语义与 ShouldTriggerPeriodicCheckpointOnIteration
-		// 保持一致), 直接 fire 兼容旧行为, 不走首次提前门阈值.
-		// 关键词: periodicVerificationInterval 0 退化为每次 fire, 测试兼容
-		if r.periodicVerificationInterval <= 0 {
-			return true
-		}
-		// 首次提前门: baseline 未建立时, iter >= 阈值 (3) 即 fire,
-		// 让 AI 早期校准方向. 不再等到 iter 门 (6) 才首次 verify.
-		return current.IterationIndex >= verificationFirstFireIterationThreshold
+		// baseline 未建立, 等 token 门自然触发; 时间门由 watchdog 负责.
+		return false
 	}
-	// 基础节拍: 时间门 (180s)
-	if current.GeneratedAt.Sub(previous.GeneratedAt) >= verificationAutoTriggerMaxSnapshotAge {
-		return true
-	}
-	// 基础节拍: iter 门 (6)
-	iterDelta := current.IterationIndex - previous.IterationIndex
-	if iterDelta >= r.getVerificationIterationTriggerInterval() {
-		return true
-	}
-	// 硬兜底: 单次超大爆炸豁免冷静期 (>= 5000 tokens)
+	// token 门 (硬门 + 软门)
 	tokenDelta := verificationPromptTokenDelta(previous, current)
 	if tokenDelta >= verificationAutoTriggerHardPromptDelta {
 		return true
-	}
-	// 加速器: 冷静期 (< 3 iter) 内抑制软 token 门,
-	// 修复数据爆炸阶段每个工具调用都 verify 的尖峰问题.
-	if iterDelta < verificationTokenGateMinIterCooldown {
-		return false
 	}
 	return tokenDelta >= verificationAutoTriggerMinPromptDelta
 }
@@ -505,11 +476,4 @@ func verificationPromptTokenDelta(previous *VerificationRuntimeSnapshot, current
 		return -delta
 	}
 	return delta
-}
-
-func (r *ReActLoop) getVerificationIterationTriggerInterval() int {
-	if r == nil {
-		return verificationIterationTriggerInterval
-	}
-	return r.periodicVerificationInterval
 }
