@@ -1,5 +1,7 @@
 package spec
 
+import "encoding/json"
+
 const (
 	// SSAArtifactFormatPartsNDJSONV1 stores a sequence of SSAResultParts JSON
 	// objects (one per line/record), then applies outer codec compression.
@@ -53,5 +55,6 @@ type SSAArtifactReadyEvent struct {
 	FileCount   int64  `json:"file_count,omitempty"`
 	FlowCount   int64  `json:"flow_count,omitempty"`
 
-	ProducedAt int64 `json:"produced_at"`
+	ProducedAt int64           `json:"produced_at"`
+	Metrics    json.RawMessage `json:"metrics,omitempty"`
 }

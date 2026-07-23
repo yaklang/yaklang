@@ -200,17 +200,17 @@ func TestUploadMetricsAccumulation(t *testing.T) {
 	c.recordSegment()
 
 	m := c.snapshotUploadMetrics()
-	if m.totalUploadMs != 800 {
-		t.Errorf("totalUploadMs = %d, want 800", m.totalUploadMs)
+	if m.TotalUploadMs != 800 {
+		t.Errorf("totalUploadMs = %d, want 800", m.TotalUploadMs)
 	}
-	if m.ticketFetchMs != 200 {
-		t.Errorf("ticketFetchMs = %d, want 200", m.ticketFetchMs)
+	if m.TicketFetchMs != 200 {
+		t.Errorf("ticketFetchMs = %d, want 200", m.TicketFetchMs)
 	}
-	if m.retries != 3 {
-		t.Errorf("retries = %d, want 3", m.retries)
+	if m.Retries != 3 {
+		t.Errorf("retries = %d, want 3", m.Retries)
 	}
-	if m.segments != 2 {
-		t.Errorf("segments = %d, want 2", m.segments)
+	if m.Segments != 2 {
+		t.Errorf("segments = %d, want 2", m.Segments)
 	}
 }
 
@@ -230,10 +230,52 @@ func TestUploadMetricsConcurrency(t *testing.T) {
 	}
 
 	m := c.snapshotUploadMetrics()
-	if m.totalUploadMs != 100 {
-		t.Errorf("totalUploadMs = %d, want 100", m.totalUploadMs)
+	if m.TotalUploadMs != 100 {
+		t.Errorf("totalUploadMs = %d, want 100", m.TotalUploadMs)
 	}
-	if m.retries != 100 {
-		t.Errorf("retries = %d, want 100", m.retries)
+	if m.Retries != 100 {
+		t.Errorf("retries = %d, want 100", m.Retries)
+	}
+}
+
+func TestBuildReadyEventPopulatesMetrics(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+	c.recordUploadMs(1500)
+	c.recordTicketFetchMs(200)
+	c.recordSegment()
+	c.recordRetry()
+	c.setUploadBytes(102400, 32000)
+
+	build := &SSAArtifactBuildResult{
+		ObjectKey:        "ssa/task-1/artifact",
+		Codec:            "zstd",
+		ArtifactFormat:   "ssa-result-segments-manifest-v1",
+		CompressedSize:   32000,
+		UncompressedSize: 102400,
+		SHA256:           "abc123",
+	}
+	event := c.BuildReadyEvent(build, 5000, 42)
+	if event == nil {
+		t.Fatal("BuildReadyEvent returned nil")
+	}
+	if len(event.Metrics) == 0 {
+		t.Fatal("event.Metrics is empty, expected upload metrics JSON")
+	}
+
+	var metrics map[string]any
+	if err := json.Unmarshal(event.Metrics, &metrics); err != nil {
+		t.Fatalf("failed to parse metrics JSON: %v", err)
+	}
+	if metrics["total_upload_ms"] != float64(1500) {
+		t.Errorf("metrics.total_upload_ms = %v, want 1500", metrics["total_upload_ms"])
+	}
+	if metrics["ticket_fetch_ms"] != float64(200) {
+		t.Errorf("metrics.ticket_fetch_ms = %v, want 200", metrics["ticket_fetch_ms"])
+	}
+	if metrics["segments"] != float64(1) {
+		t.Errorf("metrics.segments = %v, want 1", metrics["segments"])
+	}
+	if metrics["retries"] != float64(1) {
+		t.Errorf("metrics.retries = %v, want 1", metrics["retries"])
 	}
 }
