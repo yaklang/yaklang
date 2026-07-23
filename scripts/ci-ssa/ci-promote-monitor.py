@@ -576,7 +576,7 @@ def run_pr_scan(
         log("manifest main_sha is empty, cannot run PR scan", "ERROR")
         return False
 
-    # CI log dir for this PR
+    # CI log dir for this PR (use absolute paths for everything yak sees)
     ci_dir = ci_log_dir(data_dir, pr_number)
     short_sha = pr_head_sha[:8] if pr_head_sha else "unknown"
     scan_log = ci_dir / f"scan_{timestamp_str()}_{short_sha}.log"
@@ -585,28 +585,36 @@ def run_pr_scan(
     scan_result = ci_dir / "scan-result"
     scan_result.mkdir(parents=True, exist_ok=True)
 
+    # Absolute paths for yak (yak resolves --config/--database relative to cwd)
+    worktree_abs = worktree.resolve()
+    data_dir_abs = data_dir.resolve()
+    ci_dir_abs = ci_dir.resolve()
+    fs_zip_abs = fs_zip_path.resolve()
+    scan_config_abs = scan_config.resolve()
+    db_path_abs = data_dir_abs / "default-yakssa.db"
+
     # Stage 1: build fs.zip
     log(f"PR #{pr_number} scan: building fs.zip {main_sha[:8]}...{short_sha}")
-    count = build_fs_zip_from_compare(repo, main_sha, pr_head_sha, token, fs_zip_path)
+    count = build_fs_zip_from_compare(repo, main_sha, pr_head_sha, token, fs_zip_abs)
     if count < 0:
         log(f"PR #{pr_number} scan: build_fs_zip failed", "ERROR")
         return False
 
     # Stage 2: generate scan config
-    gen_script = worktree / "scripts" / "ci-ssa" / "generate-diff-scan-config.sh"
+    gen_script = worktree_abs / "scripts" / "ci-ssa" / "generate-diff-scan-config.sh"
     if not gen_script.exists():
         log(f"generate-diff-scan-config.sh not found: {gen_script}", "ERROR")
         return False
 
     env = os.environ.copy()
-    env["SSA_CI_DATA_DIR"] = str(data_dir)
-    env["SSA_DATABASE_RAW"] = str(data_dir / "default-yakssa.db")
+    env["SSA_CI_DATA_DIR"] = str(data_dir_abs)
+    env["SSA_DATABASE_RAW"] = str(db_path_abs)
     env["PATH"] = env.get("PATH", "") + ":/usr/local/go/bin:" + os.path.expanduser("~/.local/bin") + ":" + os.path.expanduser("~/go/bin")
 
     try:
         result = subprocess.run(
-            ["bash", str(gen_script), str(pr_number), short_sha, str(scan_config)],
-            cwd=str(worktree),
+            ["bash", str(gen_script), str(pr_number), short_sha, str(scan_config_abs)],
+            cwd=str(worktree_abs),
             env=env,
             capture_output=True,
             text=True,
@@ -617,16 +625,15 @@ def run_pr_scan(
         log(f"PR #{pr_number} scan: generate config failed: {e}", "ERROR")
         return False
 
-    # Stage 3: run scan
-    db_path = data_dir / "default-yakssa.db"
+    # Stage 3: run scan — cwd = ci_dir_abs so fs.zip (./fs.zip in config) resolves
     log(f"PR #{pr_number} scan: running yak ssa-compile...")
     try:
         result = subprocess.run(
-            [str(worktree / "yak"), "ssa-compile",
-             "--config", str(scan_config),
-             "--database", str(db_path),
+            [str(worktree_abs / "yak"), "ssa-compile",
+             "--config", str(scan_config_abs),
+             "--database", str(db_path_abs),
              "--file-perf-log"],
-            cwd=str(ci_dir),
+            cwd=str(ci_dir_abs),
             env=env,
             capture_output=True,
             text=True,
