@@ -625,19 +625,23 @@ def run_pr_scan(
         log(f"PR #{pr_number} scan: generate config failed: {e}", "ERROR")
         return False
 
-    # Stage 3: run scan — cwd = ci_dir_abs so fs.zip (./fs.zip in config) resolves
-    log(f"PR #{pr_number} scan: running yak ssa-compile...")
+    # Stage 3: run scan — use code-scan (compile + SyntaxFlow rules + report)
+    # code-scan compiles the diff, applies SyntaxFlow rules, and outputs a report.
+    # cwd = ci_dir_abs so fs.zip (./fs.zip in config) resolves correctly.
+    scan_output = ci_dir_abs / "scan-result.json"
+    log(f"PR #{pr_number} scan: running yak code-scan...")
     try:
         result = subprocess.run(
-            [str(worktree_abs / "yak"), "ssa-compile",
+            [str(worktree_abs / "yak"), "code-scan",
              "--config", str(scan_config_abs),
              "--database", str(db_path_abs),
+             "--output", str(scan_output),
              "--file-perf-log"],
             cwd=str(ci_dir_abs),
             env=env,
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=600,
         )
         # Write to scan log
         with open(scan_log, "w") as f:
