@@ -41,6 +41,17 @@ type SSAArtifactUploadConfig struct {
 	STSExpiresAt    int64
 }
 
+// ssaUploadMetrics accumulates upload-phase observability data across the
+// collector's lifetime. All fields are accessed under the collector's mutex.
+type ssaUploadMetrics struct {
+	totalUploadMs   int64  `json:"total_upload_ms"`
+	ticketFetchMs   int64  `json:"ticket_fetch_ms"`
+	segments        int    `json:"segments"`
+	retries         int    `json:"retries"`
+	rawBytes        uint64 `json:"raw_bytes"`
+	compressedBytes uint64 `json:"compressed_bytes"`
+}
+
 type SSAArtifactBuildResult struct {
 	ObjectKey        string
 	Codec            string
@@ -88,6 +99,8 @@ type SSAArtifactCollector struct {
 	continuousClosed   bool
 	continuousErr      error
 	continuousBuild    *SSAArtifactBuildResult
+
+	uploadMetrics ssaUploadMetrics
 }
 
 const (
@@ -195,6 +208,61 @@ func NewSSAArtifactCollector(taskID, runtimeID, subTaskID string) *SSAArtifactCo
 		c.initErr = err
 	}
 	return c
+}
+
+func (c *SSAArtifactCollector) recordUploadMs(ms int64) {
+	if c == nil || ms <= 0 {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.totalUploadMs += ms
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) recordTicketFetchMs(ms int64) {
+	if c == nil || ms <= 0 {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.ticketFetchMs += ms
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) recordRetry() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.retries++
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) recordSegment() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.segments++
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) setUploadBytes(raw, compressed uint64) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.rawBytes = raw
+	c.uploadMetrics.compressedBytes = compressed
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) snapshotUploadMetrics() ssaUploadMetrics {
+	if c == nil {
+		return ssaUploadMetrics{}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.uploadMetrics
 }
 
 func (c *SSAArtifactCollector) initSpoolLocked() error {
