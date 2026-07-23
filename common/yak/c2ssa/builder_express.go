@@ -17,6 +17,41 @@ func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
 	return v
 }
 
+// hasBinaryExpr is cheaper than len(ast.AllExpression()) >= 2 (avoids child slice alloc).
+func hasBinaryExpr(ast *cparser.ExpressionContext) bool {
+	return ast.Expression(0) != nil && ast.Expression(1) != nil
+}
+
+func (b *astbuilder) applyAssignmentOp(opText string, right, newRight ssa.Value) ssa.Value {
+	switch opText {
+	case "=":
+		return newRight
+	case "*=":
+		return b.EmitBinOp(ssa.OpMul, right, newRight)
+	case "/=":
+		return b.EmitBinOp(ssa.OpDiv, right, newRight)
+	case "%=":
+		return b.EmitBinOp(ssa.OpMod, right, newRight)
+	case "+=":
+		return b.EmitBinOp(ssa.OpAdd, right, newRight)
+	case "-=":
+		return b.EmitBinOp(ssa.OpSub, right, newRight)
+	case "<<=":
+		return b.EmitBinOp(ssa.OpShl, right, newRight)
+	case ">>=":
+		return b.EmitBinOp(ssa.OpShr, right, newRight)
+	case "&=":
+		return b.EmitBinOp(ssa.OpAnd, right, newRight)
+	case "^=":
+		return b.EmitBinOp(ssa.OpXor, right, newRight)
+	case "|=":
+		return b.EmitBinOp(ssa.OpOr, right, newRight)
+	default:
+		b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find: %s", opText))
+		return newRight
+	}
+}
+
 func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
@@ -43,16 +78,15 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 			b.AssignVariable(variable, v)
 		})
 		ifb.Build()
-		// generator phi instruction
 		v := b.ReadValue(id)
-		v.SetName(ast.GetText())
 		return v
 	}
 
 	// 1. 一元运算符: unary_op = (Plus | Minus | Not | Caret | Star | And) expression
 	if ast.GetUnary_op() != nil && ast.Expression(0) != nil {
 		op := ast.GetUnary_op().GetText()
-		right, left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
+		needLeft := op == "&"
+		right, left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), needLeft)
 		if right != nil {
 			switch op {
 			case "+":
@@ -70,8 +104,8 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 					return right, left
 				}
 			case "&":
-				if _, op1Var := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), true); op1Var != nil {
-					return b.EmitConstPointer(op1Var), nil
+				if left != nil {
+					return b.EmitConstPointer(left), nil
 				}
 			}
 		}
@@ -79,7 +113,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 	}
 
 	// 2. 乘法/除法/取模/位移/按位与: expression mul_op = (Star | Div | Mod | LeftShift | RightShift | And) expression
-	if ast.GetMul_op() != nil && len(ast.AllExpression()) >= 2 {
+	if ast.GetMul_op() != nil && hasBinaryExpr(ast) {
 		op := ast.GetMul_op().GetText()
 		op1, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
 		op2, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
@@ -103,7 +137,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 	}
 
 	// 3. 加法/减法/按位或/按位异或: expression add_op = (Plus | Minus | Or | Caret) expression
-	if ast.GetAdd_op() != nil && len(ast.AllExpression()) >= 2 {
+	if ast.GetAdd_op() != nil && hasBinaryExpr(ast) {
 		op := ast.GetAdd_op().GetText()
 		op1, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
 		op2, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
@@ -123,7 +157,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 	}
 
 	// 4. 关系运算符: expression rel_op = (Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual) expression
-	if ast.GetRel_op() != nil && len(ast.AllExpression()) >= 2 {
+	if ast.GetRel_op() != nil && hasBinaryExpr(ast) {
 		op := ast.GetRel_op().GetText()
 		op1, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
 		op2, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
@@ -146,24 +180,42 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 		return op1, nil
 	}
 
-	// 5. 逻辑与: expression AndAnd expression
-	if ast.AndAnd() != nil && len(ast.AllExpression()) >= 2 {
-		left, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
-		right, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
-		if left != nil && right != nil {
-			return b.EmitBinOp(ssa.OpLogicAnd, left, right), nil
+	// 5. 逻辑与: a && b  →  if a { result = b } else { result = a }  (short-circuit)
+	if ast.AndAnd() != nil && hasBinaryExpr(ast) {
+		leftExpr := ast.Expression(0).(*cparser.ExpressionContext)
+		rightExpr := ast.Expression(1).(*cparser.ExpressionContext)
+		left, _ := b.buildExpression(leftExpr, false)
+		if left == nil {
+			return nil, nil
 		}
-		return left, nil
+		return handlerJumpExpression(
+			func(id string) ssa.Value { return left },
+			func() ssa.Value {
+				right, _ := b.buildExpression(rightExpr, false)
+				return b.ensureValue(right)
+			},
+			func() ssa.Value { return left },
+			ssa.AndExpressionVariable,
+		), nil
 	}
 
-	// 6. 逻辑或: expression OrOr expression
-	if ast.OrOr() != nil && len(ast.AllExpression()) >= 2 {
-		left, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
-		right, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
-		if left != nil && right != nil {
-			return b.EmitBinOp(ssa.OpLogicOr, left, right), nil
+	// 6. 逻辑或: a || b  →  if a { result = a } else { result = b }  (short-circuit)
+	if ast.OrOr() != nil && hasBinaryExpr(ast) {
+		leftExpr := ast.Expression(0).(*cparser.ExpressionContext)
+		rightExpr := ast.Expression(1).(*cparser.ExpressionContext)
+		left, _ := b.buildExpression(leftExpr, false)
+		if left == nil {
+			return nil, nil
 		}
-		return left, nil
+		return handlerJumpExpression(
+			func(id string) ssa.Value { return left },
+			func() ssa.Value { return left },
+			func() ssa.Value {
+				right, _ := b.buildExpression(rightExpr, false)
+				return b.ensureValue(right)
+			},
+			ssa.OrExpressionVariable,
+		), nil
 	}
 
 	// 7. 括号表达式
@@ -180,22 +232,25 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 		}
 	}
 
-	// 8. 三元表达式: expression ('?' expression ':' expression)
+	// 8. 三元表达式: expression ('?' expression ':' expression) — defer branches for short-circuit
 	if ast.Question() != nil {
-		condition, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
-		value1, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
-		value2, _ := b.buildExpression(ast.Expression(2).(*cparser.ExpressionContext), false)
+		condExpr := ast.Expression(0).(*cparser.ExpressionContext)
+		trueAst := ast.Expression(1).(*cparser.ExpressionContext)
+		falseAst := ast.Expression(2).(*cparser.ExpressionContext)
+		condition, _ := b.buildExpression(condExpr, false)
 		return handlerJumpExpression(
 			func(id string) ssa.Value {
 				return condition
 			},
 			func() ssa.Value {
-				return value1
+				value1, _ := b.buildExpression(trueAst, false)
+				return b.ensureValue(value1)
 			},
 			func() ssa.Value {
-				return value2
+				value2, _ := b.buildExpression(falseAst, false)
+				return b.ensureValue(value2)
 			},
-			ssa.AndExpressionVariable,
+			ssa.TernaryExpressionVariable,
 		), nil
 	}
 
@@ -320,33 +375,7 @@ func (b *astbuilder) applyAssignmentFromStarCast(
 		right = newRight
 	}
 
-	switch op.GetText() {
-	case "=":
-		right = newRight
-	case "*=":
-		right = b.EmitBinOp(ssa.OpMul, right, newRight)
-	case "/=":
-		right = b.EmitBinOp(ssa.OpDiv, right, newRight)
-	case "%=":
-		right = b.EmitBinOp(ssa.OpMod, right, newRight)
-	case "+=":
-		right = b.EmitBinOp(ssa.OpAdd, right, newRight)
-	case "-=":
-		right = b.EmitBinOp(ssa.OpSub, right, newRight)
-	case "<<=":
-		right = b.EmitBinOp(ssa.OpShl, right, newRight)
-	case ">>=":
-		right = b.EmitBinOp(ssa.OpShr, right, newRight)
-	case "&=":
-		right = b.EmitBinOp(ssa.OpAnd, right, newRight)
-	case "^=":
-		right = b.EmitBinOp(ssa.OpXor, right, newRight)
-	case "|=":
-		right = b.EmitBinOp(ssa.OpOr, right, newRight)
-	default:
-		right = newRight
-		b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find: %s", op.GetText()))
-	}
+	right = b.applyAssignmentOp(op.GetText(), right, newRight)
 	if left != nil {
 		b.AssignVariable(left, right)
 		right.SetType(newRight.GetType())
@@ -422,7 +451,7 @@ func (b *astbuilder) buildPostfixSuffixLvalueFromPostfixSuffix(
 				if t := right.GetType(); isPointer && t != nil && t.GetTypeKind() == ssa.PointerKind {
 					right = b.GetOriginValue(right)
 				}
-				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
+				right = b.ReadMemberCallValue(right, b.emitMemberKey(key))
 			}
 			if left != nil {
 				member := b.PeekValue(left.GetName())
@@ -445,7 +474,7 @@ func (b *astbuilder) buildPostfixSuffixLvalueFromPostfixSuffix(
 					member = b.GetOriginValue(member)
 					setReference = true
 				}
-				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+				left = b.CreateMemberCallVariable(member, b.emitMemberKey(key))
 				checkParameter(left.GetName())
 				_ = setReference
 			}
@@ -483,33 +512,7 @@ func (b *astbuilder) applyAssignmentFromCast(
 		right = newRight
 	}
 
-	switch op.GetText() {
-	case "=":
-		right = newRight
-	case "*=":
-		right = b.EmitBinOp(ssa.OpMul, right, newRight)
-	case "/=":
-		right = b.EmitBinOp(ssa.OpDiv, right, newRight)
-	case "%=":
-		right = b.EmitBinOp(ssa.OpMod, right, newRight)
-	case "+=":
-		right = b.EmitBinOp(ssa.OpAdd, right, newRight)
-	case "-=":
-		right = b.EmitBinOp(ssa.OpSub, right, newRight)
-	case "<<=":
-		right = b.EmitBinOp(ssa.OpShl, right, newRight)
-	case ">>=":
-		right = b.EmitBinOp(ssa.OpShr, right, newRight)
-	case "&=":
-		right = b.EmitBinOp(ssa.OpAnd, right, newRight)
-	case "^=":
-		right = b.EmitBinOp(ssa.OpXor, right, newRight)
-	case "|=":
-		right = b.EmitBinOp(ssa.OpOr, right, newRight)
-	default:
-		right = newRight
-		b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find: %s", op.GetText()))
-	}
+	right = b.applyAssignmentOp(op.GetText(), right, newRight)
 	if left != nil {
 		b.AssignVariable(left, right)
 		right.SetType(newRight.GetType())
@@ -550,33 +553,7 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 				}
 
 				op := a.(*cparser.AssignmentOperatorContext).GetText()
-				switch op {
-				case "=":
-					right = newRight
-				case "*=":
-					right = b.EmitBinOp(ssa.OpMul, right, newRight)
-				case "/=":
-					right = b.EmitBinOp(ssa.OpDiv, right, newRight)
-				case "%=":
-					right = b.EmitBinOp(ssa.OpMod, right, newRight)
-				case "+=":
-					right = b.EmitBinOp(ssa.OpAdd, right, newRight)
-				case "-=":
-					right = b.EmitBinOp(ssa.OpSub, right, newRight)
-				case "<<=":
-					right = b.EmitBinOp(ssa.OpShl, right, newRight)
-				case ">>=":
-					right = b.EmitBinOp(ssa.OpShr, right, newRight)
-				case "&=":
-					right = b.EmitBinOp(ssa.OpAnd, right, newRight)
-				case "^=":
-					right = b.EmitBinOp(ssa.OpXor, right, newRight)
-				case "|=":
-					right = b.EmitBinOp(ssa.OpOr, right, newRight)
-				default:
-					right = newRight
-					b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find: %s", op))
-				}
+				right = b.applyAssignmentOp(op, right, newRight)
 				if left != nil {
 					b.AssignVariable(left, right)
 					right.SetType(newRight.GetType())
@@ -786,14 +763,14 @@ func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right
 				if t := right.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
 					right = b.GetOriginValue(right)
 				}
-				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
+				right = b.ReadMemberCallValue(right, b.emitMemberKey(key))
 			}
 			if left != nil {
 				member := b.ReadValue(left.GetName())
 				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
 					member = b.GetOriginValue(member)
 				}
-				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+				left = b.CreateMemberCallVariable(member, b.emitMemberKey(key))
 				if isPointer {
 					if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
 						b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
@@ -1052,7 +1029,7 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 		isPointer := ast.Arrow() != nil
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
-			memberKey := b.EmitConstInst(key)
+			memberKey := b.emitMemberKey(key)
 
 			var member ssa.Value
 			if left != nil {
@@ -1111,6 +1088,7 @@ func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 	if id := ast.Identifier(); id != nil {
 		text := id.GetText()
 
+		// CreateVariable before PeekValue preserves existing scope/binding behavior.
 		left := b.CreateVariable(text)
 		right := b.PeekValue(text)
 		if right != nil {

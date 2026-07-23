@@ -131,8 +131,22 @@ type astbuilder struct {
 	labels         map[string]*ssa.LabelBuilder
 	specialValues  map[string]ssa.Value
 	specialTypes   map[string]ssa.Type
+	memberKeys     map[string]ssa.Value // interned field-name consts for this file build
 	pkgNameCurrent string
 	SetGlobal      bool
+}
+
+// emitMemberKey returns a reused ConstInst for struct/union member names.
+func (b *astbuilder) emitMemberKey(key string) ssa.Value {
+	if b.memberKeys == nil {
+		b.memberKeys = make(map[string]ssa.Value)
+	}
+	if v, ok := b.memberKeys[key]; ok {
+		return v
+	}
+	v := b.EmitConstInst(key)
+	b.memberKeys[key] = v
+	return v
 }
 
 func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContext, error) {
