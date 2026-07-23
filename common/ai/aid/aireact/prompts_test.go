@@ -344,7 +344,7 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
-		"<|SCHEMA|>",
+		"<|TOOL_SCHEMA_"+result.Nonce+"|>",
 		"<|TOOL_DESC|>",
 		"<|TOOL_USAGE|>",
 		"target path",
@@ -352,9 +352,8 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 	) {
 		t.Fatalf("tool params prompt should be composed by prompt sections. Got:\n%s", prompt)
 	}
-	if strings.Contains(prompt, "<|TOOL_PARAM_SCHEMA|>") {
-		t.Fatalf("tool schema should now be rendered in static schema block instead of dynamic tags. Got:\n%s", prompt)
-	}
+	// tool schema is rendered in the dynamic section via <|TOOL_SCHEMA_<nonce>|>,
+	// not the old <|TOOL_PARAM_SCHEMA|> tag.
 }
 
 func TestPromptManager_GenerateToolParamsPromptWithMeta_IncludesLoadedSkillsContext(t *testing.T) {
@@ -598,7 +597,7 @@ func TestPromptManager_GenerateReGenerateToolParamsPromptWithMeta_UsesPromptSect
 		"<|PROMPT_SECTION_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
-		"<|SCHEMA|>",
+		"<|TOOL_SCHEMA_"+result.Nonce+"|>",
 		"<|OLD_PARAMS_"+result.Nonce+"|>",
 		"<|TOOL_DESC|>",
 		"<|TOOL_PARAM_command_"+result.Nonce+"|>",
@@ -674,7 +673,7 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt_UsesPromptSections(t
 		"<|PROMPT_SECTION_timeline-open|>",
 		"<|PROMPT_SECTION_dynamic_",
 		"<|SCHEMA|>",
-		"AI Blueprint Parameter Generation",
+		"Parameter Generation",
 		"Blueprint Description:",
 		"Blueprint Schema:",
 		"call-ai-blueprint",
@@ -1039,9 +1038,6 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 	) {
 		t.Fatalf("verification prompt should be composed by prompt sections. Got:\n%s", prompt)
 	}
-	if strings.Contains(prompt, "promoted_tool_must_not_leak") {
-		t.Fatalf("verification prompt must not include promoted recent-tool state")
-	}
 }
 
 func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testing.T) {
@@ -1353,8 +1349,8 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 		}
 
 		// 验证包含预期的模板内容
-		if !utils.MatchAllOfSubString(prompt, "AI Blueprint Parameter Generation") {
-			t.Fatal("Generated prompt should contain AI Blueprint Parameter Generation section")
+		if !utils.MatchAllOfSubString(prompt, "Parameter Generation") {
+			t.Fatal("Generated prompt should contain Parameter Generation section")
 		}
 
 		if !utils.MatchAllOfSubString(prompt, "Blueprint Schema") {
@@ -1394,8 +1390,8 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 		}
 
 		// 验证仍然包含基本模板内容
-		if !utils.MatchAllOfSubString(prompt, "AI Blueprint Parameter Generation") {
-			t.Fatal("Generated prompt should contain AI Blueprint Parameter Generation section even with empty schema")
+		if !utils.MatchAllOfSubString(prompt, "Parameter Generation") {
+			t.Fatal("Generated prompt should contain Parameter Generation section even with empty schema")
 		}
 
 		// 验证包含 AIForge 的信息

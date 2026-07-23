@@ -1,13 +1,11 @@
 package aireact
 
 import (
-	"bytes"
 	_ "embed"
 	"fmt"
 	"runtime"
 	"sort"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -66,9 +64,6 @@ var wrongToolOutputExampleText string
 //go:embed prompts/tool/wrong-tool_dynamic.txt
 var wrongToolDynamicTemplate string
 
-
-
-
 //go:embed prompts/tool/interval-review_instruction.txt
 var intervalReviewInstructionText string
 
@@ -80,9 +75,6 @@ var intervalReviewDynamicTemplate string
 
 //go:embed prompts/tool/interval-review.json
 var intervalReviewSchemaJSON string
-
-
-
 
 //go:embed prompts/change-blueprint/instruction.txt
 var changeBlueprintInstructionText string
@@ -99,46 +91,34 @@ var basePrompt string
 //go:embed prompts/utils/conversation_title.txt
 var conversationTitlePrompt string
 
-// PromptManager manages ReAct prompt templates
+// PromptManager owns the embedded ReAct prompt templates and produces the
+// five-section prefix + dynamic prompt for every AI call path in the engine.
 type PromptManager struct {
-	cpm           *aicommon.ContextProviderManager
+	cpm   *aicommon.ContextProviderManager
+	react *ReAct
+
 	workdir       string
 	glanceWorkdir string
-	react         *ReAct
 }
 
-// NewPromptManager creates a new prompt manager
 func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 	return &PromptManager{
-		cpm:           aicommon.NewContextProviderManager(),
-		workdir:       workdir,
-		glanceWorkdir: "",
-		react:         react,
+		cpm:     aicommon.NewContextProviderManager(),
+		react:   react,
+		workdir: workdir,
 	}
 }
 
-// ToolParamsPromptData contains data for tool parameter generation prompt
-type ToolParamsPromptData struct {
-	ToolName         string
-	ToolDescription  string
-	ToolUsage        string // Usage instructions disclosed at param generation stage (2-phase disclosure)
-	ToolSchema       string
-	OriginalQuery    string
-	CurrentIteration int
-	MaxIterations    int
-	Timeline         string
-	DynamicContext   string
-	Nonce            string   // Nonce for AITAG format
-	ParamNames       []string // List of parameter names for AITAG hints
-}
-
+// GetGlanceWorkdir caches and returns the directory listing snapshot used by
+// workspace-aware prompts.
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
 	pm.glanceWorkdir = filesys.Glance(wd)
 	return pm.glanceWorkdir
 }
 
+// GetAvailableAIForgeBlueprints returns the forge inventory rendered for the
+// base prompt; empty on any manager failure so callers can degrade gracefully.
 func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
-	// use getter and nil-check for safety
 	mgr := pm.react.config.GetAIForgeManager()
 	if mgr == nil {
 		log.Warnf("cannot query any ai-forge manager: nil manager")
@@ -157,11 +137,68 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 	return result
 }
 
+// currentUserInput returns the originating user query for the active task, or
+// "" when no task is running. Centralised so every prompt builder shares one
+// retrieval path.
+func (pm *PromptManager) currentUserInput() string {
+	if task := pm.react.GetCurrentTask(); task != nil {
+		return task.GetUserInput()
+	}
+	return ""
+}
+
+// currentLoopInstructionAndExample fetches the persistent instruction and
+// output example injected by the active ReActLoop, falling back to the
+// supplied defaults when the loop has none.
+func (pm *PromptManager) currentLoopInstructionAndExample(
+	fallbackInstruction, fallbackExample string,
+) (instruction, example string) {
+	instruction = fallbackInstruction
+	example = fallbackExample
+	if loop := pm.react.GetCurrentLoop(); loop != nil {
+		if v := loop.GetPersistentInstruction(); v != "" {
+			instruction = v
+		}
+		if v := loop.GetOutputExample(); v != "" {
+			example = v
+		}
+	}
+	return instruction, example
+}
+
+// currentLoopSchema returns the schema recorded by the most recent main loop
+// prompt generation, so sub-role prompts reuse R1's semi-dynamic-2 schema for
+// prefix cache alignment.
+func (pm *PromptManager) currentLoopSchema() string {
+	if loop := pm.react.GetCurrentLoop(); loop != nil {
+		return loop.GetLastLoopSchema()
+	}
+	return ""
+}
+
+// toolParamNames extracts and sorts the input parameter names declared on a
+// tool's JSON schema, used to render AITAG hints for the parameter generation
+// prompt.
+func toolParamNames(tool *aitool.Tool) []string {
+	var names []string
+	if tool.Tool != nil && tool.Tool.InputSchema.Properties != nil {
+		tool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
+			names = append(names, name)
+			return true
+		})
+		sort.Strings(names)
+	}
+	return names
+}
+
+// GetBasicPromptInfo renders the legacy base.txt template map. It is the only
+// remaining consumer of base.txt and is used by loop-level persistent
+// instruction / output-example providers that render caller-specific templates
+// against the full environment+tool+timeline context.
 func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
 	result := make(map[string]any)
-	// P1-C1: CurrentTime 改为分钟粒度, 让 base.txt 渲染产物在同一分钟内 byte-stable.
-	// 历史使用 "2006-01-02 15:04:05" 秒级粒度会让 ReActLoop / aimemory 路径下的
-	// .Background 段每秒变化, 直接打散 PROMPT_SECTION_semi-dynamic 段命中率.
+	// Minute-granularity timestamp keeps base.txt byte-stable within a minute,
+	// preserving prefix cache hits for the surrounding sections.
 	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04")
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
@@ -178,25 +215,20 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	}
 	result["TaskType"] = taskType
 
-	// Use getters instead of direct field access
-
 	allowPlanAndExec := pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
-
 	result["AllowPlan"] = allowPlanAndExec
 	if allowPlanAndExec {
 		result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	}
-	// ShowForgeList controls whether forge list is rendered in base prompt
-	// Default false: forges are discoverable via search_capabilities instead of being listed in prompt
 	result["ShowForgeList"] = pm.react.config.GetShowForgeListInPrompt()
 	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
-	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil || !pm.react.config.GetDisableEnhanceDirectlyAnswer()
+	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil ||
+		!pm.react.config.GetDisableEnhanceDirectlyAnswer()
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
 	result["AskForClarificationMaxTimes"] = pm.react.config.GetUserInteractiveLimitedTimes()
+
 	if len(tools) > 0 {
-		// caller 已经指定了一个工具子集, 直接全量展示, 不走 token 预算裁剪 -
-		// 这种调用方通常是测试 / 老路径自定义 prompt, 工具集本身就是它筛过的.
-		// 关键词: GetBasicPromptInfo caller-supplied tools, 不二次裁剪
+		// caller-supplied subset: render verbatim, no token-budget trimming.
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
 		result["TopToolsCount"] = len(tools)
@@ -204,18 +236,16 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		result["HasMoreTools"] = false
 		result["MoreToolsCount"] = 0
 	} else {
-		var err error
-		// use getter for ai tool manager and handle nil
 		toolMgr := pm.react.config.GetAiToolManager()
 		if toolMgr == nil {
 			return "", nil, fmt.Errorf("ai tool manager is nil")
 		}
-		tools, err = toolMgr.GetEnableTools()
+		available, err := toolMgr.GetEnableTools()
 		if err != nil {
 			return "", nil, err
 		}
-		tools = aicommon.ResolvePromptCandidateTools(pm.react.config, tools)
-		selection := aicommon.ResolvePromptToolInventory(pm.react.config, tools, nil, true)
+		available = aicommon.ResolvePromptCandidateTools(pm.react.config, available)
+		selection := aicommon.ResolvePromptToolInventory(pm.react.config, available, nil, true)
 		result["Tools"] = selection.VisibleTools
 		result["ToolsCount"] = len(selection.VisibleTools)
 		if len(selection.VisibleTools) > 0 {
@@ -231,11 +261,15 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		}
 	}
 
-	// use timeline getter
 	result["Timeline"] = pm.timelineDumpForPrompt()
 	return basePrompt, result, nil
 }
 
+// preparePromptPrefixMaterials builds the shared five-section prefix
+// materials (base + PromptMaterials) used by every Generate* method. The
+// caller customises TaskInstruction / OutputExample / Schema / capability
+// flags on the returned PromptMaterials before handing it to
+// assemblePromptWithDynamicSection.
 func (pm *PromptManager) preparePromptPrefixMaterials(
 	tools []*aitool.Tool,
 	input *reactloops.LoopPromptAssemblyInput,
@@ -243,7 +277,6 @@ func (pm *PromptManager) preparePromptPrefixMaterials(
 	if input == nil {
 		return nil, nil, fmt.Errorf("prompt assembly input is nil")
 	}
-
 	base, err := pm.GetLoopPromptBaseMaterials(tools, input.Nonce)
 	if err != nil {
 		return nil, nil, err
@@ -251,6 +284,8 @@ func (pm *PromptManager) preparePromptPrefixMaterials(
 	return base, pm.NewPromptMaterials(base, input), nil
 }
 
+// assemblePromptWithDynamicSection renders the dynamic tail and joins it with
+// the shared prefix sections, producing the final tagged prompt string.
 func (pm *PromptManager) assemblePromptWithDynamicSection(
 	materials *aicommon.PromptMaterials,
 	dynamicTemplateName string,
@@ -266,56 +301,54 @@ func (pm *PromptManager) assemblePromptWithDynamicSection(
 	)
 }
 
-// ToolParamsPromptResult contains the generated prompt and metadata for AITAG parsing
+// applyLoopInstructionAndExample fills TaskInstruction / OutputExample on the
+// prefix materials from the active loop, falling back to the caller-supplied
+// defaults. It also attaches the skills context rendered from the loop's
+// SkillsContextManager.
+func (pm *PromptManager) applyLoopInstructionAndExample(
+	materials *aicommon.PromptMaterials,
+	fallbackInstruction, fallbackExample string,
+) {
+	instruction, example := pm.currentLoopInstructionAndExample(fallbackInstruction, fallbackExample)
+	materials.TaskInstruction = instruction
+	materials.OutputExample = example
+	materials.SkillsContext = pm.renderSkillsContextForPrompt()
+}
+
+// ToolParamsPromptResult contains the generated prompt and metadata for AITAG
+// parsing.
 type ToolParamsPromptResult struct {
 	Prompt     string
 	Nonce      string
 	ParamNames []string
-	Identifier string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
 }
 
-// GenerateToolParamsPromptWithMeta generates tool parameter generation prompt with metadata for AITAG parsing
+// GenerateToolParamsPromptWithMeta generates the tool parameter generation
+// prompt. It reuses the main loop's schema/instruction/example for R1→R2
+// prefix cache alignment; the tool-specific schema lives in the dynamic
+// section.
 func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
-	generatedNonce := nonce()
-
-	// Extract tool schema and param names
+	nonceString := nonce()
 	toolSchema := ""
-	paramNames := []string{}
 	if tool.Tool != nil {
 		toolSchema = tool.ToJSONSchemaString()
-		if tool.Tool.InputSchema.Properties != nil {
-			tool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
-				paramNames = append(paramNames, name)
-				return true
-			})
-			sort.Strings(paramNames)
-		}
 	}
+	paramNames := toolParamNames(tool)
+	originalQuery := pm.currentUserInput()
 
-	// Extract original query from current task
-	originalQuery := ""
-	if pm.react.config.GetTimeline() != nil {
-		if task := pm.react.GetCurrentTask(); task != nil {
-			originalQuery = task.GetUserInput()
-		}
-	}
-
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  generatedNonce,
-		Schema: strings.TrimSpace(toolSchema),
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:  nonceString,
+		Schema: pm.currentLoopSchema(),
 	})
 	if err != nil {
 		return nil, err
 	}
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(toolParamsOutputExampleText)
-	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
+	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)
 
-	// Build dynamic data using buildLoopPromptSectionData for UserQuery/AutoContext/UserHistory
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     generatedNonce,
+	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
 		UserQuery: originalQuery,
 	})
 	dynamicData["ToolName"] = tool.Name
@@ -325,41 +358,29 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	dynamicData["OriginalQuery"] = originalQuery
 	dynamicData["CurrentIteration"] = pm.react.currentIteration
 	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
+	dynamicData["ToolSchema"] = toolSchema
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"tool-params-dynamic",
-		toolParamsDynamicTemplate,
-		dynamicData,
+		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
 	)
 	if err != nil {
 		return nil, err
 	}
-
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,
-		Nonce:      generatedNonce,
+		Nonce:      nonceString,
 		ParamNames: paramNames,
 	}, nil
 }
 
-// GenerateVerificationPrompt generates verification prompt using shared prompt
-// prefix assembly.
-//
-// aicache 命中率优化:
-//   - 复用 preparePromptPrefixMaterials + assemblePromptWithDynamicSection,
-//     与 directly-answer / tool-params 走同一套前缀拼装路径
-//   - verification 专属规则与 few-shot 落在 semi-dynamic-2
-//     (TaskInstruction + Schema + OutputExample)
-//   - OriginalQuery / INPUT / TODO 快照 / 迭代上下文 / EnhanceData 留在 dynamic
-//     尾段, 避免污染上游 prefix cache
-//
-// 关键词: GenerateVerificationPrompt, preparePromptPrefixMaterials,
-//
-//	assemblePromptWithDynamicSection, verification semi-dynamic-2
-func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, string, error) {
+// GenerateVerificationPrompt generates the verification prompt using the shared
+// prefix assembly path. Verification-specific rules and few-shot live in
+// semi-dynamic-2; volatile per-iteration data lives in the dynamic tail.
+func (pm *PromptManager) GenerateVerificationPrompt(
+	originalQuery string, isToolResult bool, payload string, enhanceData ...string,
+) (string, string, error) {
 	nonceString := nonce()
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:  nonceString,
 		Schema: verificationSchemaJSON,
 	})
@@ -372,7 +393,8 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	prefixMaterials.TaskInstruction = strings.TrimSpace(verificationInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(verificationOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+
+	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
 	})
@@ -388,22 +410,18 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	}
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"verification-dynamic",
-		verificationDynamicTemplate,
-		dynamicData,
+		prefixMaterials, "verification-dynamic", verificationDynamicTemplate, dynamicData,
 	)
 	return prompt, nonceString, err
 }
 
-// GenerateDirectlyAnswerPrompt generates directly answer prompt using template
+// GenerateDirectlyAnswerPrompt generates the directly-answer prompt using the
+// shared prefix assembly path.
 func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool) (string, string, error) {
-	var directlyAnswerSchema = getDirectlyAnswer()
-
 	nonceString := utils.RandStringBytes(4)
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(tools, &reactloops.LoopPromptAssemblyInput{
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(tools, &reactloops.LoopPromptAssemblyInput{
 		Nonce:  nonceString,
-		Schema: directlyAnswerSchema,
+		Schema: getDirectlyAnswer(),
 	})
 	if err != nil {
 		return "", "", err
@@ -415,30 +433,27 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	prefixMaterials.OutputExample = strings.TrimSpace(directlyAnswerOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: userQuery,
 	})
 	dynamicData["Language"] = pm.react.config.GetLanguage()
 
-	result, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"directly-answer-dynamic",
-		directlyAnswerDynamicTemplate,
-		dynamicData,
+	prompt, err := pm.assemblePromptWithDynamicSection(
+		prefixMaterials, "directly-answer-dynamic", directlyAnswerDynamicTemplate, dynamicData,
 	)
-	return result, nonceString, err
+	return prompt, nonceString, err
 }
 
-// GenerateToolReSelectPrompt generates tool reselection prompt using template
-func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool) (string, error) {
+// GenerateToolReSelectPrompt generates the tool reselection prompt used when a
+// previously chosen tool is deemed wrong for the task.
+func (pm *PromptManager) GenerateToolReSelectPrompt(
+	noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool,
+) (string, error) {
 	nonceString := utils.RandStringBytes(4)
-	userQuery := ""
-	if r := pm.react.GetCurrentTask(); r != nil {
-		userQuery = r.GetUserInput()
-	}
+	userQuery := pm.currentUserInput()
 
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(toolList, &reactloops.LoopPromptAssemblyInput{
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(toolList, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: userQuery,
 		Schema:    getReSelectTool(noUserInteract),
@@ -453,7 +468,7 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	prefixMaterials.OutputExample = strings.TrimSpace(wrongToolOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
 
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: userQuery,
 	})
@@ -466,44 +481,34 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	}
 
 	return pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"wrong-tool-dynamic",
-		wrongToolDynamicTemplate,
-		dynamicData,
+		prefixMaterials, "wrong-tool-dynamic", wrongToolDynamicTemplate, dynamicData,
 	)
 }
 
-// GenerateReGenerateToolParamsPromptWithMeta generates tool parameter regeneration prompt with AITAG metadata
-func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (*ToolParamsPromptResult, error) {
-	generatedNonce := nonce()
+// GenerateReGenerateToolParamsPromptWithMeta generates a tool parameter
+// regeneration prompt (retry after invalid params), reusing the main loop's
+// schema/instruction/example for R1→R3 prefix cache alignment.
+func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(
+	userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool,
+) (*ToolParamsPromptResult, error) {
+	nonceString := nonce()
 	schemaString := oldTool.ToJSONSchemaString()
 	oldParamsDump := oldParams.Dump()
-	paramNames := []string{}
+	paramNames := toolParamNames(oldTool)
 
-	// Extract parameter names for AITAG hints
-	if oldTool.Tool != nil && oldTool.Tool.InputSchema.Properties != nil {
-		oldTool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
-			paramNames = append(paramNames, name)
-			return true
-		})
-		sort.Strings(paramNames)
-	}
-
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
-		Nonce:  generatedNonce,
-		Schema: schemaString,
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:  nonceString,
+		Schema: pm.currentLoopSchema(),
 	})
 	if err != nil {
 		return nil, err
 	}
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(toolParamsOutputExampleText)
-	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
+	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)
 
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
-		Nonce:     generatedNonce,
+	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:     nonceString,
 		UserQuery: userQuery,
 	})
 	dynamicData["ToolName"] = oldTool.Name
@@ -511,43 +516,33 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	dynamicData["ToolUsage"] = oldTool.Usage
 	dynamicData["OldParams"] = oldParamsDump
 	dynamicData["ParamNames"] = paramNames
+	dynamicData["ToolSchema"] = schemaString
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"tool-params-dynamic",
-		toolParamsDynamicTemplate,
-		dynamicData,
+		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
 	)
 	if err != nil {
 		return nil, err
 	}
-
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,
-		Nonce:      generatedNonce,
+		Nonce:      nonceString,
 		ParamNames: paramNames,
 	}, nil
 }
 
+// GenerateChangeAIBlueprintPrompt generates the prompt that asks the model to
+// switch to a different AI Forge blueprint.
 func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
-	ins *schema.AIForge,
-	forgeList string,
-	oldParams aitool.InvokeParams,
-	extraPrompt string,
+	ins *schema.AIForge, forgeList string, oldParams aitool.InvokeParams, extraPrompt string,
 ) (string, error) {
 	nonceString := utils.RandStringBytes(4)
 	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
 		oldParams = nil
 	}
+	userQuery := pm.currentUserInput()
 
-	userQuery := ""
-	if pm.react.config.GetTimeline() != nil {
-		if task := pm.react.GetCurrentTask(); task != nil {
-			userQuery = task.GetUserInput()
-		}
-	}
-
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: userQuery,
 		Schema:    getChangeAIBlueprintSchema(),
@@ -561,8 +556,12 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	prefixMaterials.TaskInstruction = strings.TrimSpace(changeBlueprintInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(changeBlueprintOutputExampleText)
 	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
+	// Surface the forge inventory passed by the caller in the frozen-block so the
+	// change-blueprint instruction can reference it ("from the inventory above").
+	prefixMaterials.ForgeInventory = strings.TrimSpace(forgeList) != ""
+	prefixMaterials.AIForgeList = forgeList
 
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: userQuery,
 	})
@@ -577,35 +576,20 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	}
 
 	return pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"change-blueprint-dynamic",
-		changeBlueprintDynamicTemplate,
-		dynamicData,
+		prefixMaterials, "change-blueprint-dynamic", changeBlueprintDynamicTemplate, dynamicData,
 	)
 }
 
+// GenerateAIBlueprintForgeParamsPromptEx generates a blueprint parameter
+// generation (or regeneration) prompt, reusing the main loop's
+// schema/instruction/example for R1→R5 prefix cache alignment.
 func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
-	ins *schema.AIForge,
-	blueprintSchema string,
-	oldParams aitool.InvokeParams,
-	extraPrompt string,
+	ins *schema.AIForge, blueprintSchema string, oldParams aitool.InvokeParams, extraPrompt string,
 ) (string, error) {
 	nonceString := utils.RandStringBytes(4)
-	originalQuery := ""
-	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
-		oldParams = nil
-	} else {
-		// keep oldParams for dynamic rendering below
-	}
+	originalQuery := pm.currentUserInput()
 
-	// Extract context data from memory without lock (assume caller already holds lock)
-	if pm.react.config.GetTimeline() != nil {
-		if task := pm.react.GetCurrentTask(); task != nil {
-			originalQuery = task.GetUserInput()
-		}
-	}
-
-	base, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
 		Schema:    blueprintSchema,
@@ -616,11 +600,9 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = true
 	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(toolParamsInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(toolParamsOutputExampleText)
-	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
+	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)
 
-	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
+	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: originalQuery,
 	})
@@ -634,46 +616,34 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	dynamicData["ExtraPrompt"] = extraPrompt
 	dynamicData["CurrentIteration"] = pm.react.currentIteration
 	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
-
 	return pm.assemblePromptWithDynamicSection(
-		prefixMaterials,
-		"tool-params-dynamic",
-		toolParamsDynamicTemplate,
-		dynamicData,
+		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
 	)
 }
 
-// GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
-func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForge, blueprintSchema string) (string, error) {
+// GenerateAIBlueprintForgeParamsPrompt is the zero-extra-prompt convenience
+// wrapper around GenerateAIBlueprintForgeParamsPromptEx.
+func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(
+	ins *schema.AIForge, blueprintSchema string,
+) (string, error) {
 	return pm.GenerateAIBlueprintForgeParamsPromptEx(ins, blueprintSchema, nil, "")
 }
 
-// GenerateRequireConversationTitlePrompt intentionally keeps direct template rendering.
-// This utility prompt is short and almost entirely driven by volatile timeline/current-input
-// content, without a schema or reusable few-shot block, so the shared prefix path would add
-// section overhead without meaningful prefix-cache benefit.
+// GenerateRequireConversationTitlePrompt renders the short conversation-title
+// utility prompt directly. It has no schema or reusable few-shot block, so the
+// shared prefix path would add overhead without cache benefit.
 func (pm *PromptManager) GenerateRequireConversationTitlePrompt(timeline string, userInput string) (string, error) {
-	data := map[string]interface{}{
+	return pm.executeTemplate("conversation-title", conversationTitlePrompt, map[string]interface{}{
 		"Timeline":     timeline,
 		"CurrentInput": userInput,
-	}
-	return pm.executeTemplate("conversation-title", conversationTitlePrompt, data)
+	})
 }
 
-// executeTemplate executes a template with the given data
+// executeTemplate renders a named text/template. Kept as a method so
+// prompt_loop_materials.go can reuse it; prefer aicommon.RenderPromptTemplate
+// for new callers.
 func (pm *PromptManager) executeTemplate(name, templateContent string, data interface{}) (string, error) {
-	tmpl, err := template.New(name).Parse(templateContent)
-	if err != nil {
-		return "", fmt.Errorf("error parsing %s template: %w", name, err)
-	}
-
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, data)
-	if err != nil {
-		return "", fmt.Errorf("error executing %s template: %w", name, err)
-	}
-
-	return buf.String(), nil
+	return aicommon.RenderPromptTemplate(name, templateContent, data)
 }
 
 func (pm *PromptManager) timelineDumpForPrompt() string {
@@ -687,18 +657,24 @@ func (pm *PromptManager) timelineDumpForPrompt() string {
 	return buildTimelineDumpWithMidtermMemory(pm.react, timeline)
 }
 
+// DynamicContext returns the concatenation of auto (provider) context and user
+// history context without a nonce. Used by tests and legacy diagnostics.
 func (pm *PromptManager) DynamicContext() string {
 	baseContext := pm.AutoContext()
 	historyContext := pm.UserHistoryContext()
-	if baseContext == "" {
+	switch {
+	case baseContext == "":
 		return historyContext
-	}
-	if historyContext == "" {
+	case historyContext == "":
 		return baseContext
+	default:
+		return baseContext + "\n\n" + historyContext
 	}
-	return baseContext + "\n\n" + historyContext
 }
 
+// DynamicContextWithNonce returns the nonce-tagged concatenation of auto
+// (provider) context and user history context, used by the live prompt
+// builders.
 func (pm *PromptManager) DynamicContextWithNonce(nonce string) string {
 	baseContext := pm.AutoContextWithNonce(nonce)
 	historyContext := pm.UserHistoryContextWithNonce(nonce)
@@ -712,9 +688,8 @@ func (pm *PromptManager) DynamicContextWithNonce(nonce string) string {
 	}
 }
 
-// renderSkillsContextForPrompt mirrors the main ReAct loop skills block so tool
-// parameter generation can reuse loaded SKILL.md guidance instead of guessing CLI
-// commands from task context alone.
+// renderSkillsContextForPrompt mirrors the main ReAct loop skills block so
+// tool parameter generation can reuse loaded SKILL.md guidance.
 func (pm *PromptManager) renderSkillsContextForPrompt() string {
 	if pm == nil || pm.react == nil {
 		return ""
@@ -731,17 +706,14 @@ func (pm *PromptManager) renderSkillsContextForPrompt() string {
 }
 
 // GenerateIntervalReviewPromptWithContext generates a dedicated bounded prompt
-// for speed-priority progress review.
+// for speed-priority progress review of one running tool call.
 //
-// 轻量上下文控制:
-//   - 不继承主循环的 high-static / frozen Timeline / promoted state
-//   - 只读取最近 2048 tokens 的 prompt-visible Timeline
-//   - 审核规则 / schema / valid output example 固定在 semi-dynamic-2
-//   - dynamic 各字段独立限额，整条 prompt 设置 9000-token 硬上限
-//
-// 关键词: GenerateIntervalReviewPromptWithContext, interval-review, recent timeline,
-//
-//	lightweight prompt budget
+// Lightweight context control:
+//   - does not inherit the main loop's high-static / frozen Timeline / promoted state
+//   - reads only the most recent 2048 tokens of prompt-visible Timeline
+//   - review rules / schema / example are pinned in semi-dynamic-2
+//   - each dynamic field has an independent token budget; the whole prompt has
+//     a 9000-token hard cap
 func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 	tool *aitool.Tool,
 	params aitool.InvokeParams,
@@ -837,20 +809,16 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 	return prompt, nil
 }
 
-// formatDuration formats a duration into a human-readable string
+// formatDuration formats a duration into a human-readable string.
 func formatDuration(d time.Duration) string {
-	if d < time.Second {
+	switch {
+	case d < time.Second:
 		return fmt.Sprintf("%d ms", d.Milliseconds())
-	}
-	if d < time.Minute {
+	case d < time.Minute:
 		return fmt.Sprintf("%.1f seconds", d.Seconds())
+	case d < time.Hour:
+		return fmt.Sprintf("%d min %d sec", int(d.Minutes()), int(d.Seconds())%60)
+	default:
+		return fmt.Sprintf("%d hour %d min", int(d.Hours()), int(d.Minutes())%60)
 	}
-	if d < time.Hour {
-		minutes := int(d.Minutes())
-		seconds := int(d.Seconds()) % 60
-		return fmt.Sprintf("%d min %d sec", minutes, seconds)
-	}
-	hours := int(d.Hours())
-	minutes := int(d.Minutes()) % 60
-	return fmt.Sprintf("%d hour %d min", hours, minutes)
 }
