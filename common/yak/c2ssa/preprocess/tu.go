@@ -9,17 +9,9 @@ type macroCollector struct {
 
 // buildMacroTables collects macros from all project headers and the entry translation unit.
 // Macro expansion is include-agnostic: headers do not need to be #included to contribute macros.
+// Header contribution is cached on the project; only the TU is rescanned per call.
 func (p *CPreprocessProject) buildMacroTables(entryPath, src string) MacroTables {
-	out := NewMacroTables()
-	seen := make(map[string]bool)
-	for _, entry := range p.registry.UniqueEntries() {
-		if entry == nil || seen[entry.Path] {
-			continue
-		}
-		seen[entry.Path] = true
-		tables := p.collectMacrosFromSource(entry.Path, string(entry.Content))
-		out.MergeFrom(tables)
-	}
+	out := p.getHeaderMacroTables().Clone()
 	out.MergeFrom(p.collectMacrosFromSource(entryPath, src))
 	return out
 }

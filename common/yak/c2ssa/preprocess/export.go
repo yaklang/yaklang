@@ -93,10 +93,7 @@ func ExpandSourceWithTables(src string, tables MacroTables) string {
 
 // ExpandSourceWithTablesState expands macros while preserving block-comment state across calls.
 func ExpandSourceWithTablesState(src string, tables MacroTables, st *macroScanState) string {
-	env := &macroEnv{
-		tables:   exportToMacroTables(tables),
-		maxDepth: maxMacroExpandDepth,
-	}
+	env := newMacroEnvFromTables(tables)
 	expanded := env.expandSourceWithState(src, st)
 	return CollapsePreprocessorContinuations(expanded)
 }
