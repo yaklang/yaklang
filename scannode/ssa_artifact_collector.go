@@ -44,12 +44,12 @@ type SSAArtifactUploadConfig struct {
 // ssaUploadMetrics accumulates upload-phase observability data across the
 // collector's lifetime. All fields are accessed under the collector's mutex.
 type ssaUploadMetrics struct {
-	totalUploadMs   int64  `json:"total_upload_ms"`
-	ticketFetchMs   int64  `json:"ticket_fetch_ms"`
-	segments        int    `json:"segments"`
-	retries         int    `json:"retries"`
-	rawBytes        uint64 `json:"raw_bytes"`
-	compressedBytes uint64 `json:"compressed_bytes"`
+	TotalUploadMs   int64  `json:"total_upload_ms"`
+	TicketFetchMs   int64  `json:"ticket_fetch_ms"`
+	Segments        int    `json:"segments"`
+	Retries         int    `json:"retries"`
+	RawBytes        uint64 `json:"raw_bytes"`
+	CompressedBytes uint64 `json:"compressed_bytes"`
 }
 
 type SSAArtifactBuildResult struct {
@@ -215,7 +215,7 @@ func (c *SSAArtifactCollector) recordUploadMs(ms int64) {
 		return
 	}
 	c.mu.Lock()
-	c.uploadMetrics.totalUploadMs += ms
+	c.uploadMetrics.TotalUploadMs += ms
 	c.mu.Unlock()
 }
 
@@ -224,7 +224,7 @@ func (c *SSAArtifactCollector) recordTicketFetchMs(ms int64) {
 		return
 	}
 	c.mu.Lock()
-	c.uploadMetrics.ticketFetchMs += ms
+	c.uploadMetrics.TicketFetchMs += ms
 	c.mu.Unlock()
 }
 
@@ -233,7 +233,7 @@ func (c *SSAArtifactCollector) recordRetry() {
 		return
 	}
 	c.mu.Lock()
-	c.uploadMetrics.retries++
+	c.uploadMetrics.Retries++
 	c.mu.Unlock()
 }
 
@@ -242,7 +242,7 @@ func (c *SSAArtifactCollector) recordSegment() {
 		return
 	}
 	c.mu.Lock()
-	c.uploadMetrics.segments++
+	c.uploadMetrics.Segments++
 	c.mu.Unlock()
 }
 
@@ -251,8 +251,8 @@ func (c *SSAArtifactCollector) setUploadBytes(raw, compressed uint64) {
 		return
 	}
 	c.mu.Lock()
-	c.uploadMetrics.rawBytes = raw
-	c.uploadMetrics.compressedBytes = compressed
+	c.uploadMetrics.RawBytes = raw
+	c.uploadMetrics.CompressedBytes = compressed
 	c.mu.Unlock()
 }
 
@@ -1397,6 +1397,8 @@ func (c *SSAArtifactCollector) BuildReadyEvent(result *SSAArtifactBuildResult, t
 	if riskCountHint <= 0 {
 		riskCountHint = result.RiskCount
 	}
+	metrics := c.snapshotUploadMetrics()
+	metricsJSON, _ := json.Marshal(metrics)
 	return &spec.SSAArtifactReadyEvent{
 		ObjectKey:        objectKey,
 		Codec:            codec,
@@ -1411,6 +1413,7 @@ func (c *SSAArtifactCollector) BuildReadyEvent(result *SSAArtifactBuildResult, t
 		FileCount:        result.FileCount,
 		FlowCount:        result.FlowCount,
 		ProducedAt:       time.Now().Unix(),
+		Metrics:          metricsJSON,
 	}
 }
 
