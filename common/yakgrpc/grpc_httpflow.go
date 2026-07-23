@@ -1138,6 +1138,12 @@ func (s *Server) ImportHTTPFlowStream(req *ypb.ImportHTTPFlowStreamRequest, stre
 			}
 			flow.ID = 0
 			flow.HiddenIndex = ksuid.New().String()
+			// 外部工具导出的 HAR 没有 metaData，SourceType 为空，会落在 MITM/插件/爬虫三个分类之外而无法被检索。
+			// 这里把这类流量归入插件分类(scan)，并打上 HAR 标识 tag，便于在插件标签下搜索、并按内置标签区分来源。
+			if flow.SourceType == "" {
+				flow.SourceType = schema.HTTPFlow_SourceType_SCAN
+				flow.AddTag(yakit.HTTPFlowTagHAR)
+			}
 			flow.Hash = flow.CalcHash()
 			err = yakit.SaveHTTPFlow(tx, flow)
 			if err != nil {
