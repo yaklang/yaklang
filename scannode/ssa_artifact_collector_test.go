@@ -279,3 +279,36 @@ func TestBuildReadyEventPopulatesMetrics(t *testing.T) {
 		t.Errorf("metrics.retries = %v, want 1", metrics["retries"])
 	}
 }
+
+func TestBuildUploadFailedEvent(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+	c.recordUploadMs(500)
+	c.recordRetry()
+	c.setUploadBytes(12000, 4000)
+
+	event := c.BuildUploadFailedEvent("sts_expired", "sts token expired at 2026-07-22T10:00:00Z", 12000)
+	if event == nil {
+		t.Fatal("BuildUploadFailedEvent returned nil")
+	}
+	if event.ErrorCode != "sts_expired" {
+		t.Errorf("ErrorCode = %q, want sts_expired", event.ErrorCode)
+	}
+	if event.ErrorMessage == "" {
+		t.Error("ErrorMessage is empty")
+	}
+	if event.UploadedBytes != 12000 {
+		t.Errorf("UploadedBytes = %d, want 12000", event.UploadedBytes)
+	}
+	if len(event.Metrics) == 0 {
+		t.Error("Metrics is empty, expected partial upload metrics")
+	}
+
+	// Verify the metrics JSON contains the accumulated values
+	var metrics map[string]any
+	if err := json.Unmarshal(event.Metrics, &metrics); err != nil {
+		t.Fatalf("failed to parse metrics JSON: %v", err)
+	}
+	if metrics["total_upload_ms"] != float64(500) {
+		t.Errorf("metrics.total_upload_ms = %v, want 500", metrics["total_upload_ms"])
+	}
+}
