@@ -81,6 +81,8 @@ var ProfileTables = []interface{}{
 	&SSAProject{},
 	&ProxyEndpoint{},
 	&ProxyRoute{},
+	// 插件使用次数全局计数（与 yak_scripts 同库，供 QueryYakScript 按使用次数排序）
+	&PluginUsageCount{},
 }
 
 var databaseSchemas = map[uint8][]any{
