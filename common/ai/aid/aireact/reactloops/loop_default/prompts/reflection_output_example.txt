@@ -31,3 +31,16 @@
 * 只有一个工具调用却使用 `tool_compose`
 * 把 Blueprint 当普通工具节点塞进 `tool_compose`
 {{end}}
+
+*. 当你在下方动态段看到 `# Tool Context` 或 `<|TOOL_SCHEMA_...|>` 时，说明系统要求你为指定工具生成参数：
+    * 简单参数直接写入 `params`：
+      `{"@action": "call-tool", "identifier": "scan_target", "params": {"target": "example.com"}, "call_expectations": "~5s, success when results are returned"}`
+    * 多行/复杂参数使用 AITAG 承载：
+      `{"@action": "call-tool", "identifier": "run_script", "params": {"timeout": 30}}`
+      然后在 JSON 之后附加 AITAG 块（nonce 见动态段）：
+      `<|TOOL_PARAM_script_CURRENT_NONCE|>`
+      ...raw content...
+      `<|TOOL_PARAM_script_END_CURRENT_NONCE|>`
+    * 为 AI Blueprint 生成参数：
+      `{"@action": "call-ai-blueprint", "blueprint": "blueprint_name", "params": {"key": "value"}}`
+    * 如果动态段提供了旧参数（`<|OLD_PARAMS_...|>`），请基于失败原因重新生成，不要原样复制

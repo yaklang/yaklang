@@ -50,7 +50,7 @@ Current iteration: {{ .CurrentIteration }}/{{ .MaxIterations }}
 This call is part of a multi-step ReAct process. Generate parameters that help the overall task continue to converge.
 
 # Current Response Contract
-- 如果参数足够简单，直接返回符合上方 schema 的 JSON
+- 如果参数足够简单，直接返回符合下方 Parameter Schema 的 JSON
 - 如果参数需要多行块内容或复杂转义，使用当前 nonce 对应的 AITAG
 - AITAG 内的内容按原样写入，不需要 JSON 转义
 - 绝不能复用历史 nonce、示例 nonce、timeline nonce 或其它旧 nonce
@@ -70,3 +70,12 @@ This call is part of a multi-step ReAct process. Generate parameters that help t
 - {{ . }}: `<|TOOL_PARAM_{{ . }}_{{ $.Nonce }}|>...<|TOOL_PARAM_{{ . }}_END_{{ $.Nonce }}|>`
 {{- end }}
 {{ end }}
+
+{{ if .ToolSchema }}# Tool/Blueprint Parameter Schema
+你需要为上方指定的工具或蓝图生成参数，请遵循以下 Schema：
+
+<|TOOL_SCHEMA_{{ .Nonce }}|>
+```jsonschema
+{{ .ToolSchema }}
+```
+<|TOOL_SCHEMA_END_{{ .Nonce }}|>{{ end }}

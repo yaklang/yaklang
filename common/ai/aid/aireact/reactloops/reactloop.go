@@ -65,6 +65,7 @@ type ReActLoop struct {
 	loopName string
 
 	persistentInstructionProvider   ContextProviderFunc
+	lastLoopSchema                  string
 	reflectionOutputExampleProvider ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
 
@@ -1143,4 +1144,42 @@ func LoadEnabledForges(cfg *aicommon.Config, loop *ReActLoop, names []string) {
 	if len(loaded) > 0 {
 		log.Infof("loaded %d forges from enabled capabilities: %v", len(loaded), loaded)
 	}
+}
+
+// GetPersistentInstruction returns the persistent instruction content
+// from the loop's persistentInstructionProvider. This allows sub-role
+// prompt generators (e.g. tool-params) to reuse the main loop's instruction
+// for semi-dynamic-2 prefix cache alignment.
+func (r *ReActLoop) GetPersistentInstruction() string {
+	if r == nil || r.persistentInstructionProvider == nil {
+		return ""
+	}
+	s, err := r.persistentInstructionProvider(r, "")
+	if err != nil {
+		return ""
+	}
+	return s
+}
+
+// GetOutputExample returns the output example content from the loop's
+// reflectionOutputExampleProvider. Same purpose as GetPersistentInstruction.
+func (r *ReActLoop) GetOutputExample() string {
+	if r == nil || r.reflectionOutputExampleProvider == nil {
+		return ""
+	}
+	s, err := r.reflectionOutputExampleProvider(r, "")
+	if err != nil {
+		return ""
+	}
+	return s
+}
+
+// GetLastLoopSchema returns the schema string from the most recent main loop
+// prompt generation. This allows sub-role prompt generators (e.g. tool-params)
+// to reuse the main loop's schema for semi-dynamic-2 prefix cache alignment.
+func (r *ReActLoop) GetLastLoopSchema() string {
+	if r == nil {
+		return ""
+	}
+	return r.lastLoopSchema
 }

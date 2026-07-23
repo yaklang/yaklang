@@ -167,11 +167,13 @@ func (r *ReActLoop) generateLoopPrompt(
 	if err != nil {
 		return "", err
 	}
+	r.lastLoopSchema = schema
 
 	var persistent string
 	if r.persistentInstructionProvider != nil {
 		persistent, err = r.persistentInstructionProvider(r, "") // persistent context not use nonce
 		if err != nil {
+			r.lastLoopSchema = schema
 			return "", utils.Wrap(err, "build persistent context failed")
 		}
 	}
