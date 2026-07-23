@@ -192,12 +192,12 @@ func trimDirectiveLine(line string) string {
 
 func splitDirectiveFields(directive string) []string {
 	var parts []string
-	var cur string
+	var cur strings.Builder
 	inQuote := byte(0)
 	for i := 0; i < len(directive); i++ {
 		c := directive[i]
 		if inQuote != 0 {
-			cur += string(c)
+			cur.WriteByte(c)
 			if c == inQuote && (i == 0 || directive[i-1] != '\\') {
 				inQuote = 0
 			}
@@ -206,23 +206,20 @@ func splitDirectiveFields(directive string) []string {
 		switch c {
 		case '"', '<':
 			inQuote = c
-			if c == '<' {
-				// angle path ends with >
-			}
-			cur += string(c)
+			cur.WriteByte(c)
 		case '>':
-			cur += string(c)
+			cur.WriteByte(c)
 		case ' ', '\t':
-			if cur != "" {
-				parts = append(parts, cur)
-				cur = ""
+			if cur.Len() > 0 {
+				parts = append(parts, cur.String())
+				cur.Reset()
 			}
 		default:
-			cur += string(c)
+			cur.WriteByte(c)
 		}
 	}
-	if cur != "" {
-		parts = append(parts, cur)
+	if cur.Len() > 0 {
+		parts = append(parts, cur.String())
 	}
 	return parts
 }
