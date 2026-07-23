@@ -23,15 +23,18 @@ func (b *astbuilder) build(ast *cparser.CompilationUnitContext) {
 	defer recoverRange()
 
 	exportHandler := func() {
+		// Types are already written to ExportType during prebuild (SetExportType).
+		// Re-copying via GetStructAll/GetAliasAll is a no-op; only sync globals.
 		lib := b.GetProgram()
-		for structName, structType := range b.GetStructAll() {
-			lib.SetExportType(structName, structType)
+		if lib.GlobalVariablesBlueprint == nil {
+			return
 		}
-		for aliasName, aliasType := range b.GetAliasAll() {
-			lib.SetExportType(aliasName, aliasType)
+		container := lib.GlobalVariablesBlueprint.Container()
+		if container == nil {
+			return
 		}
-		for globalName, globalValue := range b.GetGlobalVariables() {
-			lib.SetExportValue(globalName, globalValue)
+		for key, val := range container.GetAllMember() {
+			lib.SetExportValue(key.String(), val)
 		}
 	}
 
@@ -102,6 +105,11 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 	var retType ssa.Type
 	var paramTypes ssa.Types
 
+	// Capture return type once in prebuild; lazy body only rebuilds declarator for params.
+	if ds := ast.DeclarationSpecifier(); ds != nil {
+		retType = b.buildDeclarationSpecifier(ds.(*cparser.DeclarationSpecifierContext))
+	}
+
 	if de := ast.Declarator(); de != nil {
 		var base ssa.Value
 		_, base, _ = b.buildDeclarator(de.(*cparser.DeclaratorContext), FUNC_KIND)
@@ -152,9 +160,7 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 				b.FunctionBuilder = b.PushFunction(newFunc)
 				b.SupportClosure = false
 
-				if ds := capturedDef.DeclarationSpecifier(); ds != nil {
-					retType = b.buildDeclarationSpecifier(ds.(*cparser.DeclarationSpecifierContext))
-				}
+				// retType already captured in prebuild; rebuild declarator only for NewParam + types.
 				_, _, paramTypes = b.buildDeclarator(de.(*cparser.DeclaratorContext), FUNC_KIND)
 
 				handleFunctionType(b.Function)
@@ -217,6 +223,12 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 			// 函数类型：根据 kind 创建函数
 			// 重用 buildIdentifierDeclarator 的逻辑，只取 value 部分
 			_, value, _ = b.buildIdentifierDeclarator(identifierName, kind)
+			if kind == FUNC_KIND && b.PreHandler() {
+				// Prebuild only needs the Function object. Parameter NewParam calls belong
+				// in the lazy body (after PushFunction); skipping here avoids orphan params
+				// on the file-level builder and a redundant parameter-list walk.
+				return variable, value, nil
+			}
 		} else {
 			// 未知类型，使用默认处理
 			value = b.EmitConstInst(identifierName)

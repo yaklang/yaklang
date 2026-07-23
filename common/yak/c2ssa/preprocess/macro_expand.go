@@ -27,9 +27,34 @@ func ExpandFunctionMacrosWithTables(src string, base MacroTables) (string, error
 }
 
 type macroEnv struct {
-	tables   macroTables
-	depth    int
-	maxDepth int
+	tables           macroTables
+	depth            int
+	maxDepth         int
+	objectBodyTokens map[string][]macroToken // session cache: tokenize only, not full expand
+}
+
+func newMacroEnvFromTables(tables MacroTables) *macroEnv {
+	return &macroEnv{
+		tables:   exportToMacroTables(tables),
+		maxDepth: maxMacroExpandDepth,
+	}
+}
+
+func (e *macroEnv) setTables(tables macroTables) {
+	e.tables = tables
+	e.objectBodyTokens = nil
+}
+
+func (e *macroEnv) getObjectBodyTokens(name, body string) []macroToken {
+	if e.objectBodyTokens == nil {
+		e.objectBodyTokens = make(map[string][]macroToken)
+	}
+	if toks, ok := e.objectBodyTokens[name]; ok {
+		return toks
+	}
+	toks := tokenizeMacroSource(body)
+	e.objectBodyTokens[name] = toks
+	return toks
 }
 
 func (e *macroEnv) expandSource(src string) string {
@@ -90,7 +115,7 @@ func (e *macroEnv) expandOnce(tokens []macroToken) ([]macroToken, bool) {
 					}
 				}
 			} else if body, ok := e.tables.object[name]; ok {
-				repl := tokenizeMacroSource(body)
+				repl := e.getObjectBodyTokens(name, body)
 				repl = e.expandTokens(repl)
 				out = append(out, repl...)
 				i++

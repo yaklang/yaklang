@@ -1,6 +1,8 @@
 package preprocess
 
 import (
+	"sync"
+
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
@@ -10,6 +12,11 @@ type CPreprocessProject struct {
 	registry *HeaderRegistry
 	resolver *IncludeResolver
 	config   PreprocessConfig
+
+	// headerMacroTables caches macros collected from all project headers (include-agnostic).
+	// Built once per project; TUs clone and merge their own #define/#undef on top.
+	headerMacroOnce   sync.Once
+	headerMacroTables MacroTables
 }
 
 // BuildProject constructs a preprocessor project from fs and config.
@@ -30,6 +37,24 @@ func BuildProject(fs fi.FileSystem, config PreprocessConfig) *CPreprocessProject
 		resolver: NewIncludeResolver(reg, config),
 		config:   config,
 	}
+}
+
+// getHeaderMacroTables returns macros from all registered headers, computed once per project.
+func (p *CPreprocessProject) getHeaderMacroTables() MacroTables {
+	p.headerMacroOnce.Do(func() {
+		out := NewMacroTables()
+		seen := make(map[string]bool)
+		for _, entry := range p.registry.UniqueEntries() {
+			if entry == nil || seen[entry.Path] {
+				continue
+			}
+			seen[entry.Path] = true
+			tables := p.collectMacrosFromSource(entry.Path, string(entry.Content))
+			out.MergeFrom(tables)
+		}
+		p.headerMacroTables = out
+	})
+	return p.headerMacroTables
 }
 
 // Registry returns the header registry.

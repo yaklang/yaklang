@@ -30,10 +30,8 @@ func (e *ppExprEnv) lookupObject(name string) (string, bool) {
 		}
 	}
 	if e.global != nil {
-		flat := e.global.Flatten()
-		if v, ok := flat.Object[name]; ok {
-			return v, true
-		}
+		// Chain walk is equivalent to Flatten().Object[name] without full-table Clone.
+		return e.global.LookupObject(name)
 	}
 	return "", false
 }
