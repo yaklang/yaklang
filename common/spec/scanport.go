@@ -56,6 +56,10 @@ const (
 
 	// SSA 对象已上传，等待服务端异步导入
 	ScanResult_SSAArtifactReady ScanResultType = "ssa-artifact-ready"
+
+	// SSA artifact upload failed; server should mark the scan as failed with the
+	// provided error_code and error_message.
+	ScanResult_SSAArtifactUploadFailed ScanResultType = "ssa-artifact-upload-failed"
 )
 
 type ScanResult struct {
