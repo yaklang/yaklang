@@ -336,6 +336,16 @@ def prepare_clone(worktree: Path, new_sha: str) -> Path | None:
         return None
 
 
+def clean_old_clones(keep: Path) -> None:
+    """Remove all /tmp/ci-promote-clone-* dirs except the one given."""
+    import glob
+    for d in glob.glob("/tmp/ci-promote-clone-*"):
+        p = Path(d)
+        if p != keep and p.is_dir():
+            subprocess.run(["rm", "-rf", str(p)], check=False)
+            log(f"Cleaned old clone: {p}")
+
+
 # ---------------------------------------------------------------------------
 # Build fs.zip via GitHub compare + blobs API (with progress + retry)
 # ---------------------------------------------------------------------------
@@ -545,6 +555,10 @@ def run_promote(
     if sys.stdout.isatty():
         print(flush=True)  # newline after progress bar
     log("promote completed successfully")
+
+    # Clean up old clone directories (keep only the latest one for debugging)
+    clean_old_clones(clone_dir)
+
     return True
 
 
@@ -562,9 +576,10 @@ def run_pr_scan(
 ) -> bool:
     """
     Run incremental diff scan for a newly opened PR.
-    1. Build fs.zip from main..pr_head via GitHub API
-    2. Generate scan config via generate-diff-scan-config.sh
-    3. Run yak ssa-compile with scan config
+    1. Clean up any previous diff programs for this PR (stale CI results)
+    2. Build fs.zip from main..pr_head via GitHub API
+    3. Generate scan config via generate-diff-scan-config.sh
+    4. Run yak code-scan (compile + SyntaxFlow rules + report)
     """
     # Get current main HEAD (from manifest, it's the promoted base)
     manifest = read_manifest(data_dir)
@@ -582,8 +597,6 @@ def run_pr_scan(
     scan_log = ci_dir / f"scan_{timestamp_str()}_{short_sha}.log"
     fs_zip_path = ci_dir / "fs.zip"
     scan_config = ci_dir / "scan-config.json"
-    scan_result = ci_dir / "scan-result"
-    scan_result.mkdir(parents=True, exist_ok=True)
 
     # Absolute paths for yak (yak resolves --config/--database relative to cwd)
     worktree_abs = worktree.resolve()
@@ -592,6 +605,27 @@ def run_pr_scan(
     fs_zip_abs = fs_zip_path.resolve()
     scan_config_abs = scan_config.resolve()
     db_path_abs = data_dir_abs / "default-yakssa.db"
+
+    env = os.environ.copy()
+    env["SSA_CI_DATA_DIR"] = str(data_dir_abs)
+    env["SSA_DATABASE_RAW"] = str(db_path_abs)
+    env["PATH"] = env.get("PATH", "") + ":/usr/local/go/bin:" + os.path.expanduser("~/.local/bin") + ":" + os.path.expanduser("~/go/bin")
+
+    # Stage 0: Clean up previous diff programs for this PR.
+    # If the PR was scanned before (new push, retry, etc.), old diff programs
+    # (ci-yaklang-diff-pr-{N}-*) are stale and must be removed before re-scan.
+    cleanup_script = worktree_abs / "scripts" / "ci-ssa" / "cleanup-programs.sh"
+    if cleanup_script.exists():
+        log(f"PR #{pr_number} scan: cleaning previous diff programs")
+        subprocess.run(
+            ["bash", str(cleanup_script), "pr", str(pr_number)],
+            cwd=str(worktree_abs),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
 
     # Stage 1: build fs.zip
     log(f"PR #{pr_number} scan: building fs.zip {main_sha[:8]}...{short_sha}")
@@ -606,13 +640,8 @@ def run_pr_scan(
         log(f"generate-diff-scan-config.sh not found: {gen_script}", "ERROR")
         return False
 
-    env = os.environ.copy()
-    env["SSA_CI_DATA_DIR"] = str(data_dir_abs)
-    env["SSA_DATABASE_RAW"] = str(db_path_abs)
-    env["PATH"] = env.get("PATH", "") + ":/usr/local/go/bin:" + os.path.expanduser("~/.local/bin") + ":" + os.path.expanduser("~/go/bin")
-
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["bash", str(gen_script), str(pr_number), short_sha, str(scan_config_abs)],
             cwd=str(worktree_abs),
             env=env,
@@ -661,7 +690,7 @@ def run_pr_scan(
         log(f"PR #{pr_number} scan completed, see {scan_log}")
         return True
     except subprocess.TimeoutExpired:
-        log(f"PR #{pr_number} scan timed out after 300s", "ERROR")
+        log(f"PR #{pr_number} scan timed out after 600s", "ERROR")
         return False
     except Exception as e:
         log(f"PR #{pr_number} scan exception: {e}", "ERROR")
