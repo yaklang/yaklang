@@ -10,30 +10,25 @@ import (
 
 const (
 	// verificationAutoTriggerMaxSnapshotAge 控制"距上次 verification 多久后强制再跑"的时间门.
-	// 调整自 600s -> 1800s (30 分钟), verification 仅作最终兜底, 几乎不在任务中途自动触发.
-	// AI 主循环通过 save_evidence action 主动沉淀 evidence, 自动验证频率大幅降低.
+	// AI 主循环通过 save_evidence action 主动沉淀 evidence
 	verificationAutoTriggerMaxSnapshotAge = 1800 * time.Second
 
 	// verificationAutoTriggerMinPromptDelta 控制软 token 门 (加速器门) 的触发阈值.
-	// 调整自 3000 -> 8000, 只在非常大的上下文增长时才触发.
-	verificationAutoTriggerMinPromptDelta = 8000
+	verificationAutoTriggerMinPromptDelta = 10 * 1024
 
 	// verificationIterationTriggerInterval 控制 iter 门 (每 N 轮强制 verify 兜底).
-	// 调整自 12 -> 20, 让主循环有充足的连续迭代空间.
-	verificationIterationTriggerInterval = 20
+	verificationIterationTriggerInterval = 30
 
 	// verificationTokenGateMinIterCooldown 控制软 token 门的"冷静期".
-	// 调整自 6 -> 10, 与 iter 门 20 形成 1:2 节拍.
 	verificationTokenGateMinIterCooldown = 10
 
 	// verificationAutoTriggerHardPromptDelta 是 token 门的"硬阈值"上界.
-	// 调整自 10000 -> 20000, 仅在单次超大爆炸 (如抓回 20000+ token) 时才豁免冷静期.
-	verificationAutoTriggerHardPromptDelta = 20000
+	verificationAutoTriggerHardPromptDelta = 5 * 1024
 
 	// verificationFirstFireIterationThreshold 控制 baseline 未建立时的"首次提前触发"门.
-	// 调整自 6 -> 10, 不再过早首次触发, 让 AI 先积累足够数据再验证.
-	verificationFirstFireIterationThreshold = 10
+	verificationFirstFireIterationThreshold = 20
 )
+
 var verificationWatchdogIdleTimeout = 2 * time.Minute
 
 type VerificationRuntimeSnapshot struct {
