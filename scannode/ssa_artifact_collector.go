@@ -159,10 +159,16 @@ func (c *SSAArtifactCollector) startContinuousUploadIfNeeded() error {
 	c.mu.Unlock()
 
 	go func() {
-		build, err := runContinuousSegmentedUpload(codec, provider, taskID, programName, reportType, input)
+		build, err := runContinuousSegmentedUpload(codec, provider, taskID, programName, reportType, input, func(uploadMs int64) {
+			c.recordUploadMs(uploadMs)
+			c.recordSegment()
+		})
 		c.mu.Lock()
 		c.continuousBuild = build
 		c.continuousErr = err
+		if build != nil {
+			c.setUploadBytes(uint64(build.UncompressedSize), uint64(build.CompressedSize))
+		}
 		close(done)
 		c.mu.Unlock()
 	}()
@@ -182,6 +188,12 @@ func (c *SSAArtifactCollector) enqueueContinuousPayload(payload []byte) error {
 	}
 	if closed || input == nil || done == nil {
 		return nil
+	}
+
+	if queueCap := cap(input); queueCap > 0 {
+		if queueLen := len(input); queueLen >= queueCap*9/10 {
+			log.Warnf("upload_queue_backlog task=%s len=%d cap=%d", c.taskID, queueLen, queueCap)
+		}
 	}
 
 	select {
@@ -488,7 +500,7 @@ func readSSASegmentFlushInterval() time.Duration {
 	return time.Duration(sec) * time.Second
 }
 
-func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte) (*SSAArtifactBuildResult, error) {
+func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte, onSegment func(uploadMs int64)) (*SSAArtifactBuildResult, error) {
 	if provider == nil {
 		return nil, utils.Errorf("empty upload config provider")
 	}
@@ -565,8 +577,11 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 			return err
 		}
 		uploadMS := time.Since(uploadStart).Milliseconds()
-		log.Infof("ssa artifact segment uploaded task=%s seq=%d key=%s codec=%s raw=%d compressed=%d",
-			taskID, seq, segmentKey, uploadCodec, rawBytes, compressedSize)
+		log.Infof("ssa artifact segment uploaded task=%s seq=%d key=%s codec=%s raw=%d compressed=%d upload_ms=%d",
+			taskID, seq, segmentKey, uploadCodec, rawBytes, compressedSize, uploadMS)
+		if onSegment != nil {
+			onSegment(uploadMS)
+		}
 		segments = append(segments, spec.SSAArtifactSegment{
 			Seq:              seq,
 			ObjectKey:        segmentKey,
@@ -1223,6 +1238,10 @@ func (c *SSAArtifactCollector) UploadBySTSWithProvider(artifactPath string, size
 	partSize := readSSAMultipartPartSize()
 	if size <= partSize {
 		for attempt := 0; attempt < 2; attempt++ {
+			if attempt > 0 {
+				c.recordRetry()
+			}
+			uploadStart := time.Now()
 			cfg, err := provider(attempt == 1)
 			if err != nil {
 				return err
@@ -1240,12 +1259,16 @@ func (c *SSAArtifactCollector) UploadBySTSWithProvider(artifactPath string, size
 				f,
 				size,
 				minio.PutObjectOptions{ContentType: "application/octet-stream"})
+			uploadMs := time.Since(uploadStart).Milliseconds()
+			c.recordUploadMs(uploadMs)
 			if err == nil {
+				log.Infof("upload_attempt task=%s attempt=%d key=%s duration_ms=%d", c.taskID, attempt, cfg.ObjectKey, uploadMs)
 				if info.Size > 0 && info.Size != size {
 					return utils.Errorf("uploaded size mismatch expect=%d got=%d", size, info.Size)
 				}
 				return nil
 			}
+			log.Warnf("upload_attempt_failed task=%s attempt=%d key=%s duration_ms=%d error=%q", c.taskID, attempt, cfg.ObjectKey, uploadMs, err.Error())
 			if !isSSACredentialError(err) || attempt > 0 {
 				return err
 			}
