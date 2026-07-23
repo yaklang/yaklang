@@ -311,6 +311,27 @@ func (s *ScanNode) executeScript(
 	return cmd.Run()
 }
 
+// classifyUploadError maps an upload error message to a structured error code
+// for the SSAArtifactUploadFailed event.
+func classifyUploadError(errMsg string) string {
+	lower := strings.ToLower(errMsg)
+	if strings.Contains(lower, "deadline exceeded") || strings.Contains(lower, "timeout") {
+		if strings.Contains(lower, "ticket") || strings.Contains(lower, "artifact-ticket") {
+			return "ticket_timeout"
+		}
+	}
+	credMarkers := []string{"expiredtoken", "expired token", "accessdenied", "access denied", "invalidsecuritytoken", "invalid security"}
+	for _, m := range credMarkers {
+		if strings.Contains(lower, m) {
+			return "sts_expired"
+		}
+	}
+	if strings.Contains(lower, "multipart") || strings.Contains(lower, "complete") {
+		return "multipart_failed"
+	}
+	return "put_failed"
+}
+
 func (s *ScanNode) finalizeSSAArtifactUpload(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
@@ -335,6 +356,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 		provider,
 	)
 	if err != nil {
+		s.emitSSAArtifactUploadFailed(reporter, err, "")
 		return err
 	}
 	if build == nil {
@@ -364,6 +386,39 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 		event.FlowCount,
 	)
 	return nil
+}
+
+// emitSSAArtifactUploadFailed constructs and publishes an upload-failed event
+// from the collector's accumulated metrics. The objectKey is the intended
+// object key (may be empty if the failure happened before the key was known).
+func (s *ScanNode) emitSSAArtifactUploadFailed(
+	reporter *ScannerAgentReporter,
+	uploadErr error,
+	objectKey string,
+) {
+	if reporter == nil || reporter.ssaCollector == nil || uploadErr == nil {
+		return
+	}
+	errorCode := classifyUploadError(uploadErr.Error())
+	metrics := reporter.ssaCollector.snapshotUploadMetrics()
+	failedEvent := reporter.ssaCollector.BuildUploadFailedEvent(
+		errorCode,
+		uploadErr.Error(),
+		metrics.CompressedBytes,
+	)
+	if failedEvent == nil {
+		return
+	}
+	if objectKey != "" {
+		failedEvent.ObjectKey = objectKey
+	}
+	if err := reporter.PublishSSAArtifactUploadFailed(failedEvent); err != nil {
+		log.Errorf("publish ssa artifact upload failed event: %v", err)
+	}
+	log.Infof(
+		"ssa artifact upload failed task=%s error_code=%s error=%s uploaded_bytes=%d",
+		reporter.TaskId, errorCode, uploadErr.Error(), metrics.CompressedBytes,
+	)
 }
 
 func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
@@ -460,9 +515,14 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 	if event == nil {
 		return json.Marshal(map[string]int64{})
 	}
-	return json.Marshal(map[string]int64{
-		"risk_count":     event.RiskCount,
-		"file_count":     event.FileCount,
-		"dataflow_count": event.FlowCount,
-	})
+	merged := make(map[string]any)
+	// Start with the upload metrics from the collector (upload_ms, ticket_fetch_ms, etc.)
+	if len(event.Metrics) > 0 {
+		_ = json.Unmarshal(event.Metrics, &merged)
+	}
+	// Add risk/file/flow counts
+	merged["risk_count"] = event.RiskCount
+	merged["file_count"] = event.FileCount
+	merged["dataflow_count"] = event.FlowCount
+	return json.Marshal(merged)
 }
