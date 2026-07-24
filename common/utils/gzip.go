@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"compress/zlib"
 	"io"
-	"os"
 )
 
 // Compress 使用 gzip 压缩数据，返回压缩后的字节与错误
@@ -127,70 +126,4 @@ func IsGzipBytes(i interface{}) bool {
 		var buf = bytes.NewBuffer(InterfaceToBytes(i))
 		return IsGzipBytes(buf)
 	}
-}
-
-type autoGzipCloser struct {
-	r       io.Reader
-	closers []io.Closer
-}
-
-func (c *autoGzipCloser) Read(p []byte) (int, error) { return c.r.Read(p) }
-
-func (c *autoGzipCloser) Close() error {
-	var err error
-	for i := len(c.closers) - 1; i >= 0; i-- {
-		if e := c.closers[i].Close(); e != nil && err == nil {
-			err = e
-		}
-	}
-	return err
-}
-
-// OpenFileAutoGzip opens a file and transparently decompresses gzip payloads.
-// Detection is by content magic (0x1f 0x8b), not only by ".gz" suffix.
-// If any rawMagic is provided and the file already starts with that magic, gzip
-// decompression is skipped (handles misnamed *.gz that is actually raw content).
-func OpenFileAutoGzip(path string, rawMagic ...string) (io.ReadCloser, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, Wrap(err, "open file")
-	}
-
-	peekLen := 2
-	for _, m := range rawMagic {
-		if n := len(m); n > peekLen {
-			peekLen = n
-		}
-	}
-	if peekLen < 2 {
-		peekLen = 2
-	}
-
-	hdr := make([]byte, peekLen)
-	n, readErr := io.ReadFull(f, hdr)
-	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
-		_ = f.Close()
-		return nil, Wrap(readErr, "peek file header")
-	}
-	hdr = hdr[:n]
-	base := io.MultiReader(bytes.NewReader(hdr), f)
-	closers := []io.Closer{f}
-
-	for _, m := range rawMagic {
-		if m != "" && n >= len(m) && string(hdr[:len(m)]) == m {
-			return &autoGzipCloser{r: base, closers: closers}, nil
-		}
-	}
-
-	if n >= 2 && hdr[0] == 0x1f && hdr[1] == 0x8b {
-		gz, err := gzip.NewReader(base)
-		if err != nil {
-			_ = f.Close()
-			return nil, Wrap(err, "open gzip reader")
-		}
-		closers = append(closers, gz)
-		return &autoGzipCloser{r: gz, closers: closers}, nil
-	}
-
-	return &autoGzipCloser{r: base, closers: closers}, nil
 }

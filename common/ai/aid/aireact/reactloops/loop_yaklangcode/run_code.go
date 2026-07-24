@@ -203,7 +203,7 @@ func writeSelfTestScriptFile(code, absPath string) (scriptPath string, cleanup f
 // FormatRunFailureForAI builds AI-facing feedback when self-test fails.
 func FormatRunFailureForAI(result YakRunResult, err error) string {
 	var b strings.Builder
-	b.WriteString("YAK_MAIN 自测运行失败。请先按下方【下一步·强制】检索 API/样例，再 modify_code 修复（禁止 write_code 重置；禁止连续猜测字段/返回类型）。\n\n")
+	b.WriteString("YAK_MAIN 自测运行失败。请用 modify_code（Cursor Patch）修复；禁止 write_code 重置。不确定 API 时先 grep_yaklang_samples / yakdoc_*。\n\n")
 	if err != nil {
 		b.WriteString("--- runtime error ---\n")
 		b.WriteString(strings.TrimSpace(err.Error()))
