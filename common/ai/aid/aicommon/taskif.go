@@ -144,6 +144,10 @@ type AIStatefulTaskBase struct {
 	cancelReason string
 
 	userCancelled bool
+
+	// parentTask records the task that created this one via NewSubTaskBase*.
+	// It is used to emit explicit parent links in the react_task_created event.
+	parentTask AIStatefulTask
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
@@ -698,6 +702,7 @@ func NewSubTaskBaseWithOptions(
 	baseOpts := []StatefulTaskBaseOption{
 		WithStatefulTaskBaseContext(parentCtx),
 		WithStatefulTaskBaseEmitter(emitter),
+		WithStatefulTaskBaseParent(parentTask),
 	}
 	baseOpts = append(baseOpts, opts...)
 	return newStatefulTaskBase(subTaskId, userInput, baseOpts...)
@@ -748,6 +753,10 @@ func newStatefulTaskBase(taskId string, userInput string, opts ...StatefulTaskBa
 			return event
 		})
 		if !base.skipTaskStatusChangeEmit {
+			parentTaskID := ""
+			if base.parentTask != nil {
+				parentTaskID = base.parentTask.GetId()
+			}
 			base.Emitter.EmitStructured(
 				"react_task_created",
 				map[string]any{
@@ -757,6 +766,7 @@ func newStatefulTaskBase(taskId string, userInput string, opts ...StatefulTaskBa
 					"react_task_uuid":         base.GetUUID(),
 					"react_task_name":         base.GetName(),
 					"react_task_is_sub_agent": base.IsSubAgent(),
+					"react_parent_task_id":    parentTaskID,
 				},
 			)
 		}
@@ -823,5 +833,14 @@ func WithStatefulTaskBaseSubAgent() StatefulTaskBaseOption {
 			return
 		}
 		task.isSubAgent = true
+	}
+}
+
+func WithStatefulTaskBaseParent(parent AIStatefulTask) StatefulTaskBaseOption {
+	return func(task *AIStatefulTaskBase) {
+		if task == nil {
+			return
+		}
+		task.parentTask = parent
 	}
 }
