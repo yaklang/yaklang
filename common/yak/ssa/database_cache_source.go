@@ -170,28 +170,28 @@ func (s *sourceStore) markPersisted(hashes ...string) {
 	}
 }
 
-func (s *sourceStore) Close() {
+func (s *sourceStore) Close() error {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
-		return
+		return nil
 	}
 	defer s.releaseEditors()
-	s.Flush()
+	return s.Flush()
 }
 
-func (s *sourceStore) Flush() {
+func (s *sourceStore) Flush() error {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
-		return
+		return nil
 	}
 
 	sources, hashes := s.collectRegisteredSources()
 	if len(sources) == 0 {
-		return
+		return nil
 	}
 
 	existing, err := s.lookupPersistedHashes(hashes)
 	if err != nil {
 		log.Errorf("DATABASE: lookup ir source in database error: %v", err)
-		return
+		return err
 	}
 	if len(existing) > 0 {
 		s.markPersisted(existing...)
@@ -216,7 +216,7 @@ func (s *sourceStore) Flush() {
 		savedHashes = append(savedHashes, hash)
 	}
 	if len(toSave) == 0 {
-		return
+		return nil
 	}
 
 	saveErr := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
@@ -227,9 +227,10 @@ func (s *sourceStore) Flush() {
 	})
 	if saveErr != nil {
 		log.Errorf("DATABASE: save ir source to database error: %v", saveErr)
-		return
+		return saveErr
 	}
 	s.markPersisted(savedHashes...)
+	return nil
 }
 
 func (s *sourceStore) ReleasePersistedEditors() int {

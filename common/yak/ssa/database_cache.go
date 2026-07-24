@@ -176,14 +176,18 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 	steps := []func() error{
 		func() error {
 			if c.types != nil {
-				c.types.close()
+				if err := c.types.close(); err != nil {
+					return err
+				}
 				log.Infof("Type Cache closed")
 			}
 			return nil
 		},
 		func() error {
 			if c.indexes != nil {
-				c.indexes.Close()
+				if err := c.indexes.Close(); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -198,7 +202,9 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 		},
 		func() error {
 			if c.sources != nil {
-				c.sources.Close()
+				if err := c.sources.Close(); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -284,10 +290,14 @@ func (c *ProgramCache) FlushAuxSavers() {
 		return
 	}
 	if c.indexes != nil {
-		c.indexes.Flush() // indexStore.Flush -> indexSaver.Flush + offsetSaver.Flush
+		if err := c.indexes.Flush(); err != nil {
+			log.Errorf("FlushAuxSavers: index store flush failed: %v", err)
+		}
 	}
 	if c.types != nil {
-		c.types.flush() // typeStore.flush: marshal+batch-INSERT resident types, keeps resident map
+		if err := c.types.flush(); err != nil {
+			log.Errorf("FlushAuxSavers: type store flush failed: %v", err)
+		}
 	}
 }
 

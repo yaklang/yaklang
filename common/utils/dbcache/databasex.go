@@ -127,8 +127,8 @@ func NewCache[T MemoryItem, D any](
 			}, nil
 		})
 
-		cache.saver = NewSave(func(tasks []*saveTask[D]) {
-			cache.handleSaveBatch(tasks, save)
+		cache.saver = NewSave(func(tasks []*saveTask[D]) error {
+			return cache.handleSaveBatch(tasks, save)
 		},
 			WithContext(ctx),
 			WithSaveSize(cfg.saveSize),
@@ -221,7 +221,7 @@ func (c *Cache[T, D]) FlushKeys(keys []int64, reason utils.EvictionReason) {
 	}
 	if len(keys) == 0 {
 		if c.saver != nil {
-			c.saver.Flush()
+			_ = c.saver.Flush()
 		}
 		return
 	}
@@ -235,7 +235,7 @@ func (c *Cache[T, D]) FlushKeys(keys []int64, reason utils.EvictionReason) {
 	defer ticker.Stop()
 	for {
 		if c.saver != nil {
-			c.saver.Flush()
+			_ = c.saver.Flush()
 		}
 		select {
 		case <-done:
@@ -292,7 +292,7 @@ func (c *Cache[T, D]) Close() error {
 	}
 	c.wg.Wait()
 	if c.saver != nil {
-		c.saver.Close()
+		closeErr = utils.JoinErrors(closeErr, c.saver.Close())
 	}
 	remaining := 0
 	if c.resident != nil {
@@ -419,7 +419,7 @@ func (c *Cache[T, D]) CloseWithoutSave() {
 	}
 	c.wg.Wait()
 	if c.saver != nil {
-		c.saver.Close()
+		_ = c.saver.Close()
 	}
 	if c.cancel != nil {
 		c.cancel()
@@ -447,9 +447,9 @@ func (c *Cache[T, D]) IsSaveDisabled() bool {
 	return c.resident.IsSaveDisabled()
 }
 
-func (c *Cache[T, D]) handleSaveBatch(tasks []*saveTask[D], save SaveFunc[D]) {
+func (c *Cache[T, D]) handleSaveBatch(tasks []*saveTask[D], save SaveFunc[D]) error {
 	if c == nil || c.resident == nil {
-		return
+		return nil
 	}
 
 	saveTasks := make([]*saveTask[D], 0, len(tasks))
@@ -468,13 +468,13 @@ func (c *Cache[T, D]) handleSaveBatch(tasks []*saveTask[D], save SaveFunc[D]) {
 	}
 
 	if len(saveTasks) == 0 {
-		return
+		return nil
 	}
 	if save == nil {
 		for _, task := range saveTasks {
 			c.resident.FinishPersist(task.request.key, task.request.generation, false)
 		}
-		return
+		return nil
 	}
 
 	if err := save(saveData); err != nil {
@@ -482,9 +482,10 @@ func (c *Cache[T, D]) handleSaveBatch(tasks []*saveTask[D], save SaveFunc[D]) {
 		for _, task := range saveTasks {
 			c.resident.FinishPersist(task.request.key, task.request.generation, false)
 		}
-		return
+		return err
 	}
 	for _, task := range saveTasks {
 		c.resident.FinishPersist(task.request.key, task.request.generation, true)
 	}
+	return nil
 }

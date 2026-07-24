@@ -81,13 +81,13 @@ func (s *typeStore) get(id int64) (Type, bool) {
 	return typ, true
 }
 
-func (s *typeStore) close() {
-	s.flush()
+func (s *typeStore) close() error {
+	return s.flush()
 }
 
-func (s *typeStore) flush() {
+func (s *typeStore) flush() error {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
-		return
+		return nil
 	}
 
 	types := make([]Type, 0, s.resident.Count())
@@ -98,17 +98,21 @@ func (s *typeStore) flush() {
 		return true
 	})
 	if len(types) == 0 {
-		return
+		return nil
 	}
 
 	saveBatch := saveIrType(s.program, s.db)
 	batch := make([]*ssadb.IrType, 0, s.saveSize)
+	var firstErr error
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
 		if err := saveBatch(batch); err != nil {
 			log.Errorf("save ir type batch failed: %v", err)
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 		batch = make([]*ssadb.IrType, 0, s.saveSize)
 	}
@@ -117,6 +121,9 @@ func (s *typeStore) flush() {
 		irType, err := marshalIrType(s.programName)(typ, utils.EvictionReasonDeleted)
 		if err != nil {
 			log.Errorf("marshal ir type failed: %v", err)
+			if firstErr == nil {
+				firstErr = err
+			}
 			continue
 		}
 		if utils.IsNil(irType) {
@@ -128,6 +135,7 @@ func (s *typeStore) flush() {
 		}
 	}
 	flush()
+	return firstErr
 }
 
 func saveTypeWithValue(value Value, typ Type) {

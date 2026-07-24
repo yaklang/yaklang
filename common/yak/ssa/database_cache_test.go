@@ -1,11 +1,13 @@
 package ssa
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -1139,4 +1141,53 @@ func TestInstructionCache_SaveDeduplicatesSourcesWithinBatch(t *testing.T) {
 		Count(&count).Error
 	require.NoError(t, err)
 	require.Equal(t, 1, count, "same editor hash should only be persisted once per batch")
+}
+
+// TestIndexStore_ClosePropagatesSaverError verifies that indexStore.Close
+// returns the error from a failing index/offset saver, rather than silently
+// swallowing it. This is the regression test for the "async saver swallows
+// errors" bug — a failed batch write must surface so that SaveToDatabase can
+// return an error and trigger DeleteProgram cleanup.
+func TestIndexStore_ClosePropagatesSaverError(t *testing.T) {
+	wantErr := errors.New("simulated db write failure")
+
+	store := &indexStore{
+		mode:    ProgramCacheDBWrite,
+		indexSaver: dbcache.NewSave(func(indices []*ssadb.IrIndex) error {
+			return wantErr
+		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),
+		offsetSaver: dbcache.NewSave(func(offsets []*ssadb.IrOffset) error {
+			return nil
+		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),
+	}
+
+	// Trigger a save batch
+	store.indexSaver.Save(ssadb.CreateIndex("test-prog"))
+	err := store.Close()
+	require.Error(t, err)
+	require.ErrorIs(t, err, wantErr)
+}
+
+// TestIndexStore_FlushPropagatesSaverError verifies Flush also surfaces errors.
+func TestIndexStore_FlushPropagatesSaverError(t *testing.T) {
+	wantErr := errors.New("simulated flush failure")
+
+	store := &indexStore{
+		mode:    ProgramCacheDBWrite,
+		indexSaver: dbcache.NewSave(func(indices []*ssadb.IrIndex) error {
+			return nil
+		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),
+		offsetSaver: dbcache.NewSave(func(offsets []*ssadb.IrOffset) error {
+			return wantErr
+		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),
+	}
+
+	store.offsetSaver.Save(&ssadb.IrOffset{})
+	// Wait for the timer-triggered save to record the error before flushing,
+	// so the test is not racy under load.
+	time.Sleep(50 * time.Millisecond)
+	err := store.Flush()
+	require.Error(t, err)
+	require.ErrorIs(t, err, wantErr)
+	_ = store.Close()
 }
