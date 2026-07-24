@@ -24,19 +24,17 @@ func init() {
 				mcp.Required(),
 			),
 			mcp.WithStringArray("targets",
-				mcp.Description("Targets for the brute force attack"),
+				mcp.Description("Targets for the brute force attack (e.g. [\"127.0.0.1:22\", \"192.168.1.1:21\"])"),
 			),
 			mcp.WithString("targetFile",
 				mcp.Description("File containing targets for the brute force attack"),
 			),
 			mcp.WithBool("replaceDefaultUsernameDict",
 				mcp.Description("If false, default username dictionary will be added"),
-				mcp.Required(),
 				mcp.Default(true),
 			),
 			mcp.WithBool("replaceDefaultPasswordDict",
 				mcp.Description("If false, default password dictionary will be added"),
-				mcp.Required(),
 				mcp.Default(true),
 			),
 			mcp.WithStringArray("usernames",
@@ -51,14 +49,8 @@ func init() {
 			mcp.WithString("passwordFile",
 				mcp.Description("File containing passwords for the brute force attack"),
 			),
-			mcp.WithNumber("timeout",
-				mcp.Description("Timeout for the brute force attack"),
-			),
 			mcp.WithNumber("concurrent",
 				mcp.Description("Concurrency level between targets"),
-			),
-			mcp.WithNumber("retry",
-				mcp.Description("Number of retries for the brute force attack"),
 			),
 			mcp.WithNumber("targetTaskConcurrent",
 				mcp.Description("Concurrency level within target tasks"),
@@ -83,39 +75,36 @@ func handleBrute(s *MCPServer) server.ToolHandlerFunc {
 		ctx context.Context,
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
-	args := request.Params.Arguments
-	targets := utils.MapGetStringSlice(args, "targets")
-	targetFile := utils.MapGetString(args, "targetFile")
-	if len(targets) == 0 && targetFile == "" {
-		return nil, utils.Error("invalid argument: target is required (provide targets or targetFile)")
-	}
-	usernames := utils.MapGetStringSlice(args, "usernames")
-	usernameFile := utils.MapGetString(args, "usernameFile")
-	passwords := utils.MapGetStringSlice(args, "passwords")
-	passwordFile := utils.MapGetString(args, "passwordFile")
-	if (len(usernames) == 0 && usernameFile == "") || (len(passwords) == 0 && passwordFile == "") {
-		return nil, utils.Error("invalid argument: user-dict and pass-dict are required")
-	}
+		args := request.Params.Arguments
+		targets := utils.MapGetStringSlice(args, "targets")
+		targetFile := utils.MapGetString(args, "targetFile")
+		if len(targets) == 0 && targetFile == "" {
+			return nil, utils.Error("invalid argument: target is required (provide targets or targetFile)")
+		}
+		usernames := utils.MapGetStringSlice(args, "usernames")
+		usernameFile := utils.MapGetString(args, "usernameFile")
+		passwords := utils.MapGetStringSlice(args, "passwords")
+		passwordFile := utils.MapGetString(args, "passwordFile")
+		if (len(usernames) == 0 && usernameFile == "") || (len(passwords) == 0 && passwordFile == "") {
+			return nil, utils.Error("invalid argument: user-dict and pass-dict are required")
+		}
 
-	req := ypb.StartBruteParams{
-		Type:                       utils.MapGetString(args, "type"),
-		Targets:                    strings.Join(targets, "\n"),
-		TargetFile:                 targetFile,
-		Usernames:                  usernames,
-		UsernameFile:               usernameFile,
-		Passwords:                  passwords,
-		PasswordFile:               passwordFile,
-		ReplaceDefaultUsernameDict: utils.MapGetBool(args, "replaceDefaultUsernameDict"),
-		ReplaceDefaultPasswordDict: utils.MapGetBool(args, "replaceDefaultPasswordDict"),
-		Timeout:                    float32(utils.InterfaceToFloat64(utils.MapGetRaw(args, "timeout"))),
-		Concurrent:                 utils.MapGetInt64(args, "concurrent"),
-		Retry:                      utils.MapGetInt64(args, "retry"),
-		TargetTaskConcurrent:       utils.MapGetInt64(args, "targetTaskConcurrent"),
-		OkToStop:                   utils.MapGetBool(args, "okToStop"),
-		DelayMin:                   utils.MapGetInt64(args, "delayMin"),
-		DelayMax:                   utils.MapGetInt64(args, "delayMax"),
-	}
-
+		req := ypb.StartBruteParams{
+			Type:                       utils.MapGetString(args, "type"),
+			Targets:                    strings.Join(targets, "\n"),
+			TargetFile:                 targetFile,
+			Usernames:                  usernames,
+			UsernameFile:               usernameFile,
+			Passwords:                  passwords,
+			PasswordFile:               passwordFile,
+			ReplaceDefaultUsernameDict: utils.MapGetBoolOr(args, "replaceDefaultUsernameDict", true),
+			ReplaceDefaultPasswordDict: utils.MapGetBoolOr(args, "replaceDefaultPasswordDict", true),
+			Concurrent:                 utils.MapGetInt64(args, "concurrent"),
+			TargetTaskConcurrent:       utils.MapGetInt64(args, "targetTaskConcurrent"),
+			OkToStop:                   utils.MapGetBool(args, "okToStop"),
+			DelayMin:                   utils.MapGetInt64(args, "delayMin"),
+			DelayMax:                   utils.MapGetInt64(args, "delayMax"),
+		}
 
 		var progressToken mcp.ProgressToken
 		meta := request.Params.Meta

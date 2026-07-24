@@ -20,9 +20,9 @@ func init() {
 		),
 		WithTool(
 			mcp.NewTool("set_system_proxy",
-				mcp.WithDescription("Get system proxy"),
+				mcp.WithDescription("Set system proxy"),
 				mcp.WithString("httpProxy", mcp.Description("Proxy address"), mcp.Required()),
-				mcp.WithBool("enable", mcp.Description("Enable or disable proxy"), mcp.Default(true), mcp.Required()),
+				mcp.WithBool("enable", mcp.Description("Enable or disable proxy"), mcp.Default(true)),
 			),
 			handleSetSystemProxy,
 		),

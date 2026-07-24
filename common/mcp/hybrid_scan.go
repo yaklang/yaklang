@@ -48,7 +48,6 @@ func init() {
 			mcp.WithNumber("concurrent",
 				mcp.Description("Number of concurrent scans"),
 				mcp.Default(20),
-				mcp.Required(),
 			),
 			mcp.WithNumber("totalTimeoutSecond",
 				mcp.Description("Total timeout in seconds for the scan"),

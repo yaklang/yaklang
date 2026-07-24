@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/go-viper/mapstructure/v2"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
@@ -237,7 +236,7 @@ func handleExecYakScript(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.DebugPluginRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -298,7 +297,7 @@ func handleQueryYakScript(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.QueryYakScriptRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -316,7 +315,7 @@ func handleCreateYakScriptGroup(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.SetGroupRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -334,7 +333,7 @@ func handleListYakScriptGroup(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.QueryYakScriptGroupRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -352,7 +351,7 @@ func handleQueryYakScriptGroup(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.QueryYakScriptRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -370,7 +369,7 @@ func handleSetGroupForYakScript(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.SaveYakScriptGroupRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -388,7 +387,7 @@ func handleRenameYakScriptGroup(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.RenameYakScriptGroupRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -406,7 +405,7 @@ func handleDeleteYakScriptGroup(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.DeleteYakScriptGroupRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -424,7 +423,7 @@ func handleQueryOnlinePlugins(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.QueryOnlinePluginsRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
@@ -442,7 +441,7 @@ func handleDownloadOnlinePlugins(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.DownloadOnlinePluginsRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := decodeYakRequest(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
