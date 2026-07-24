@@ -467,32 +467,30 @@ def run_promote_once(
 
     cmd = ["bash", str(script), new_sha, pr_number]
     try:
-        result = subprocess.run(
+        # Real-time log: stream stdout+stderr to file only (not terminal)
+        if log_file:
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+        proc = subprocess.Popen(
             cmd,
             cwd=str(clone_dir),
             env=env,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=600,
         )
-        # Write output to isolated log file
-        if log_file:
-            log_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(log_file, "w") as f:
-                f.write(f"=== promote {new_sha[:8]} (PR={pr_number or 'none'}) ===\n")
-                f.write(f"=== exit code: {result.returncode} ===\n\n")
-                f.write("--- stdout ---\n")
-                f.write(result.stdout or "")
-                f.write("\n--- stderr ---\n")
-                f.write(result.stderr or "")
-        if result.returncode != 0:
-            if result.stderr:
-                for line in result.stderr.splitlines()[-10:]:
-                    print(f"  [promote:err] {line}", flush=True)
-            log(f"promote failed (exit {result.returncode}), see {log_file}", "ERROR") if log_file else log(f"promote failed (exit {result.returncode})", "ERROR")
+        with open(log_file, "w") if log_file else open(os.devnull, "w") as f:
+            f.write(f"=== promote {new_sha[:8]} (PR={pr_number or 'none'}) ===\n\n")
+            for line in proc.stdout:
+                f.write(line)
+                f.flush()
+            proc.wait(timeout=600)
+        rc = proc.returncode
+        if rc != 0:
+            log(f"promote failed (exit {rc}), see {log_file}", "ERROR") if log_file else log(f"promote failed (exit {rc})", "ERROR")
             return False
         return True
     except subprocess.TimeoutExpired:
+        proc.kill()
         log("promote timed out after 600s", "ERROR")
         return False
     except Exception as e:
@@ -696,7 +694,8 @@ def run_pr_scan(
     scan_output = ci_dir_abs / "scan-result.json"
     log(f"PR #{pr_number} scan: running yak code-scan...")
     try:
-        result = subprocess.run(
+        # Real-time log: stream stdout+stderr to file only (not terminal)
+        proc = subprocess.Popen(
             [str(worktree_abs / "yak"), "code-scan",
              "--config", str(scan_config_abs),
              "--database", str(db_path_abs),
@@ -704,28 +703,25 @@ def run_pr_scan(
              "--file-perf-log"],
             cwd=str(ci_dir_abs),
             env=env,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=600,
         )
-        # Write to scan log
         with open(scan_log, "w") as f:
-            f.write(f"=== scan PR#{pr_number} {short_sha} ===\n")
-            f.write(f"=== exit code: {result.returncode} ===\n\n")
-            f.write("--- stdout ---\n")
-            f.write(result.stdout or "")
-            f.write("\n--- stderr ---\n")
-            f.write(result.stderr or "")
+            f.write(f"=== scan PR#{pr_number} {short_sha} ===\n\n")
+            for line in proc.stdout:
+                f.write(line)
+                f.flush()
+            proc.wait(timeout=600)
+        rc = proc.returncode
 
-        if result.returncode != 0:
-            if result.stderr:
-                for line in result.stderr.splitlines()[-10:]:
-                    print(f"  [scan:err] {line}", flush=True)
-            log(f"PR #{pr_number} scan failed (exit {result.returncode}), see {scan_log}", "ERROR")
+        if rc != 0:
+            log(f"PR #{pr_number} scan failed (exit {rc}), see {scan_log}", "ERROR")
             return False
         log(f"PR #{pr_number} scan completed, see {scan_log}")
         return True
     except subprocess.TimeoutExpired:
+        proc.kill()
         log(f"PR #{pr_number} scan timed out after 600s", "ERROR")
         return False
     except Exception as e:
