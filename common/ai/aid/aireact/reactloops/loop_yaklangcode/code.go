@@ -235,10 +235,19 @@ func init() {
 				loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
 				loopinfra.WithFileExtension(".yak"),
 				loopinfra.WithExitWhenSyntaxClean(true),
-				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
-					return checkCodeAndFormatErrors(content)
+				loopinfra.WithFileChanged(func(loop *reactloops.ReActLoop, content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+					// Code just changed: invalidate prior YAK_MAIN self-test result.
+					// yak_run_ok is only re-set by postSyntaxCleanHook after lint passes.
+					if loop != nil {
+						resetYakRunStatusAfterCodeChange(loop)
+					}
+					lineBase := 0
+					if loop != nil {
+						lineBase = loop.GetInt(loopinfra.LoopVarCodeLineBase)
+					}
+					return checkCodeAndFormatErrors(content, lineBase)
 				}),
-				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r)),
+				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r, holder)),
 			)
 
 			// 创建预设选项

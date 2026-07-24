@@ -361,12 +361,22 @@ func hasBlockingLintErrors(loop interface{ Get(string) string }) bool {
 	return loop.Get("yak_lint_ok") == "false"
 }
 
+// hasFailedSelfTest is true when the last YAK_MAIN self-test failed.
+func hasFailedSelfTest(loop interface{ Get(string) string }) bool {
+	return loop.Get(loopVarYakRunOK) == "false"
+}
+
+// needsSampleResearch unlocks mid-loop grep/yakdoc re-query after lint or self-test failure.
+func needsSampleResearch(loop interface{ Get(string) string }) bool {
+	return hasBlockingLintErrors(loop) || hasFailedSelfTest(loop)
+}
+
 func loadSearchManifest(loop interface{ Get(string) string }) SearchManifest {
 	return ParseSearchManifest(loop.Get("init_search_manifest"))
 }
 
 func GrepAlreadyCovered(loop interface{ Get(string) string }, pattern string) (bool, string) {
-	if hasBlockingLintErrors(loop) {
+	if needsSampleResearch(loop) {
 		return false, ""
 	}
 	if !hasInitialSamples(loop) {
@@ -391,7 +401,7 @@ func GrepAlreadyCovered(loop interface{ Get(string) string }, pattern string) (b
 }
 
 func SemanticAlreadyCovered(loop interface{ Get(string) string }, questions []string) (bool, string) {
-	if hasBlockingLintErrors(loop) {
+	if needsSampleResearch(loop) {
 		return false, ""
 	}
 	if !hasInitialSamples(loop) {
@@ -448,6 +458,10 @@ func shortSemanticSuggestion(count int) string {
 }
 
 func rejectDuplicateQuery(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator, timelineKey, queryKey, currentQuery, msg string) bool {
+	// Allow re-running the same grep/semantic/yakdoc query while fixing lint or self-test failures.
+	if needsSampleResearch(loop) {
+		return false
+	}
 	last := loop.Get(queryKey)
 	if last == "" || last != currentQuery {
 		return false

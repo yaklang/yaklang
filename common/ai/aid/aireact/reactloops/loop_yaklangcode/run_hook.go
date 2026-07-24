@@ -14,7 +14,9 @@ import (
 const yaklangNodeRunSelfTest = "yaklang-run-self-test"
 
 // buildYaklangPostSyntaxCleanRunHook runs YAK_MAIN self-test after static lint passes.
-func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime) loopinfra.PostSyntaxCleanHook {
+// holder may be nil (tests); reserved for future AIKB-backed run diagnostics.
+func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime, holder *searcherHolder) loopinfra.PostSyntaxCleanHook {
+	_ = holder
 	cfg := r.GetConfig()
 	return func(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 		if loop == nil || op == nil {
@@ -81,7 +83,7 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime) loopinfra.Po
 		loop.Set(loopVarYakRunOK, "false")
 		loop.Set(loopVarYakRunOutput, result.Output)
 		loop.Set(loopVarYakRunLastFeedback, feedback)
-		r.AddToTimeline("run_failed", utils.ShrinkTextBlock(feedback, 512))
+		r.AddToTimeline("run_failed", utils.ShrinkTextBlock(feedback, 1024))
 		log.Warnf("yaklang self-test failed: %v", err)
 		return feedback, true
 	}

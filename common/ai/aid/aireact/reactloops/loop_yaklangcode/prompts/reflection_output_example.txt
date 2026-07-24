@@ -53,15 +53,22 @@ if YAK_MAIN {
 }
 <|GEN_CODE_END_CURRENT_NONCE|>
 
-### 2. modify_code（精确替换现有代码）—— 必须带 GEN_CODE 代码块
-优先 old_snippet 精确匹配；行号替换用 modify_start_line/modify_end_line。
+### 2. modify_code（精确替换现有代码）—— GEN_CODE 必须是 Patch
+GEN_CODE 内必须写 `*** Begin Patch` … `*** End Patch`（系统应用到 full_code 后再投递完整源码给前端）。禁止直接输出完整脚本或完整函数；context 与 `-` 行必须从本轮 CURRENT_CODE **逐字符**复制（字符串里的 `\n`/`\r\n` 禁止展开、禁止写成 `\\n`）。
 ```json
-{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 22, "modify_code_reason": "类型不匹配：poc.Split 收 []byte，把 rsp 改为 rsp.RawPacket"}
+{"@action": "modify_code", "modify_code_reason": "类型不匹配：poc.Split 收 []byte，把 rsp 改为 rsp.RawPacket"}
 ```
 <|GEN_CODE_CURRENT_NONCE|>
-header, body := poc.Split(rsp.RawPacket)
-yakit.Info("body len: %d", len(body))
+*** Begin Patch
+*** Update File: current
+@@ poc.Split
+-header, body := poc.Split(rsp)
++header, body := poc.Split(rsp.RawPacket)
+ yakit.Info("body len: %d", len(body))
+*** End Patch
 <|GEN_CODE_END_CURRENT_NONCE|>
+
+扩充 `runSelfTest` 等已有函数时，同样使用 Patch，在 hunk 中保留函数声明和目标 case 附近的唯一上下文；不要把整个 `func runSelfTest(){...}` 重新输出。
 
 ### 3. grep_yaklang_samples（查样例）—— 不需要代码块
 ```json

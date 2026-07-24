@@ -30,6 +30,20 @@ const (
 	loopVarYakRunLastFeedback = "yak_run_last_feedback"
 )
 
+// resetYakRunStatusAfterCodeChange clears self-test results whenever code changes.
+// Previous yak_run_ok must not survive write/modify/insert/delete; only
+// postSyntaxCleanHook (after lint pass) may set it again.
+func resetYakRunStatusAfterCodeChange(loop interface {
+	Set(string, any)
+}) {
+	if loop == nil {
+		return
+	}
+	loop.Set(loopVarYakRunOK, "")
+	loop.Set(loopVarYakRunOutput, "")
+	loop.Set(loopVarYakRunLastFeedback, "")
+}
+
 // YakRunResult captures stdout/logs from a YAK_MAIN self-test execution.
 type YakRunResult struct {
 	Output    string
@@ -189,7 +203,7 @@ func writeSelfTestScriptFile(code, absPath string) (scriptPath string, cleanup f
 // FormatRunFailureForAI builds AI-facing feedback when self-test fails.
 func FormatRunFailureForAI(result YakRunResult, err error) string {
 	var b strings.Builder
-	b.WriteString("YAK_MAIN 自测运行失败。请根据下面的运行输出/panic 信息用 modify_code 修复（禁止 write_code 重置）。\n\n")
+	b.WriteString("YAK_MAIN 自测运行失败。请用 modify_code（Cursor Patch）修复；禁止 write_code 重置。不确定 API 时先 grep_yaklang_samples / yakdoc_*。\n\n")
 	if err != nil {
 		b.WriteString("--- runtime error ---\n")
 		b.WriteString(strings.TrimSpace(err.Error()))

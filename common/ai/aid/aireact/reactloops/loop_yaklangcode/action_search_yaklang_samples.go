@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
@@ -450,7 +451,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			// 检查是否有语法错误 - 参考 action_modify_code.go 的实现
 			fullcode := loop.Get("full_code")
 			if fullcode != "" {
-				errMsg, hasBlockingErrors := checkCodeAndFormatErrors(fullcode)
+				errMsg, hasBlockingErrors := checkCodeAndFormatErrors(fullcode, loop.GetInt(loopinfra.LoopVarCodeLineBase))
 				if hasBlockingErrors {
 					reactloops.EmitStatus(loop, "检测到语法错误，修复中 / Syntax error detected, fixing...")
 					op.DisallowNextLoopExit()

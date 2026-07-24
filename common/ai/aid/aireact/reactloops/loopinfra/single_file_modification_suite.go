@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 // LoopVarCodeLineBase is the loop variable storing the 0-based offset between full_code line
@@ -50,9 +49,10 @@ func NormalizeActionLineNumber(loop *reactloops.ReActLoop, fullCodeVar string, l
 	return line
 }
 
-// FileChangedCallback is called after file content is modified
+// FileChangedCallback is called after file content is modified.
+// loop may be nil in tests; callers that need code_line_base should read it from loop.
 // Returns: (errorMessage string, hasBlockingErrors bool)
-type FileChangedCallback func(content string, operator *reactloops.LoopActionHandlerOperator) (string, bool)
+type FileChangedCallback func(loop *reactloops.ReActLoop, content string, operator *reactloops.LoopActionHandlerOperator) (string, bool)
 
 // PostSyntaxCleanHook runs after static lint passes and before the loop may exit on clean syntax.
 // Return (feedback, blockExit): when blockExit is true, feedback is sent to the model and the loop continues.
@@ -236,13 +236,76 @@ func (f *SingleFileModificationSuiteFactory) ShouldDeferDiskWrite() bool {
 	return f.deferDiskWrite
 }
 
+// buildSyntaxVerifyFailureActionLog builds the user-visible verify failure log.
+// Prefer concise [Severity] issue lines (line + reason); fall back to a shrunk full message.
+func buildSyntaxVerifyFailureActionLog(errMsg string) string {
+	var b strings.Builder
+	b.WriteString("验证失败: 语法/静态分析错误 / Verification failed: syntax or static analysis errors\n")
+	if summary := extractSyntaxLintIssueLines(errMsg); summary != "" {
+		b.WriteString(summary)
+		return b.String()
+	}
+	if trimmed := strings.TrimSpace(errMsg); trimmed != "" {
+		b.WriteString(utils.ShrinkTextBlock(trimmed, 1500))
+		if !strings.HasSuffix(trimmed, "\n") {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+func extractSyntaxLintIssueLines(errMsg string) string {
+	var issues []string
+	for _, line := range strings.Split(errMsg, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "[Error]") ||
+			strings.HasPrefix(line, "[Warning]") ||
+			strings.HasPrefix(line, "[Info]") ||
+			strings.HasPrefix(line, "[Hint]") {
+			issues = append(issues, line)
+		}
+	}
+	if len(issues) == 0 {
+		return ""
+	}
+	const maxShow = 5
+	var b strings.Builder
+	for i, iss := range issues {
+		if i >= maxShow {
+			remain := len(issues) - maxShow
+			b.WriteString(fmt.Sprintf("... 还有 %d 个问题 / ... and %d more issue(s)\n", remain, remain))
+			break
+		}
+		b.WriteString(fmt.Sprintf("%d. %s\n", i+1, iss))
+	}
+	return b.String()
+}
+
+func firstSyntaxLintIssueLine(errMsg string) string {
+	for _, line := range strings.Split(errMsg, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[Error]") ||
+			strings.HasPrefix(line, "[Warning]") ||
+			strings.HasPrefix(line, "[Info]") ||
+			strings.HasPrefix(line, "[Hint]") {
+			return line
+		}
+	}
+	return ""
+}
+
 // applySyntaxLintResult runs static verification, then optional postSyntaxCleanHook (e.g. YAK_MAIN self-test).
 // Returns true when postSyntaxCleanHook blocked loop exit (runtime/self-test failure).
+// errMsg is the formatted lint output (line numbers + reasons) shown to users on failure.
 func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	loop *reactloops.ReActLoop,
 	op *reactloops.LoopActionHandlerOperator,
 	hasBlockingErrors bool,
 	exitOnClean bool,
+	errMsg string,
 ) (postHookBlocked bool) {
 	lintStatusVar := f.GetLintStatusVariableName()
 	reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "开始静态分析与语法检查 / Starting static analysis and syntax check...")
@@ -250,8 +313,13 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 
 	if hasBlockingErrors {
 		loop.Set(lintStatusVar, "false")
-		reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "验证失败: 语法/静态分析错误 / Verification failed: syntax or static analysis errors")
-		reactloops.EmitStatus(loop, "验证代码失败，修复中 / Code verification failed, fixing...")
+		reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, buildSyntaxVerifyFailureActionLog(errMsg))
+		status := "验证代码失败，修复中 / Code verification failed, fixing..."
+		if first := firstSyntaxLintIssueLine(errMsg); first != "" {
+			status = fmt.Sprintf("验证失败: %s / Verification failed: %s",
+				utils.ShrinkTextBlock(first, 96), utils.ShrinkTextBlock(first, 96))
+		}
+		reactloops.EmitStatus(loop, status)
 		op.DisallowNextLoopExit()
 		op.Continue()
 		return false
@@ -294,9 +362,9 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	}
 	loop.Set(f.GetFullCodeVariableName(), fullCode)
 
-	errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+	errMsg, hasBlockingErrors := f.OnFileChanged(loop, fullCode, op)
 	// modify 操作不自动退出循环：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
-	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
+	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 
 	loop.GetEmitter().EmitPinFilename(filename)
 	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
@@ -315,6 +383,94 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 		op.Feedback(errMsg)
 	}
 	return nil
+}
+
+// handleModifyByPatch applies a Cursor-style Apply Patch from GEN_CODE onto full_code.
+// Frontend / yaklang_code_change always receive the merged full file — never raw patch text.
+func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
+	loop *reactloops.ReActLoop,
+	action *aicommon.Action,
+	op *reactloops.LoopActionHandlerOperator,
+	actionName, filename, fullCodeVar, codeVar string,
+) {
+	runtime := f.GetRuntime()
+	invoker := loop.GetInvoker()
+	reason := action.GetString("modify_code_reason")
+	patchBody := loop.Get(codeVar)
+
+	_, _, codeSegment, fixedCode := f.PrettifyCode(patchBody)
+	if fixedCode {
+		patchBody = codeSegment
+	}
+
+	if strings.TrimSpace(patchBody) == "" {
+		msg := "modify_code(patch) GEN_CODE empty"
+		runtime.AddToTimeline("error", msg)
+		op.Feedback(msg + "\n\n请在同一次回复中输出完整的 *** Begin Patch ... *** End Patch 块。")
+		op.Continue()
+		return
+	}
+
+	hunks, err := ParseCodePatch(patchBody)
+	if err != nil {
+		msg := fmt.Sprintf("【modify_code 失败】Patch 解析失败: %v", err)
+		invoker.AddToTimeline("modify_patch_parse_failed", msg)
+		op.Feedback(msg)
+		op.Continue()
+		return
+	}
+
+	fullCode := loop.Get(fullCodeVar)
+	newFull, warnings, err := ApplyCodePatchWithWarnings(fullCode, hunks)
+	if err != nil {
+		msg := fmt.Sprintf(`【modify_code 失败】Patch 应用失败（文件未改动）: %v
+
+请基于本轮 CURRENT_CODE 重新生成 Patch：context 与 '-' 行必须从最新代码【逐字符】复制，不要复用 rebase/上一轮修改前的旧片段。
+字符串里的 \n/\r\n 禁止展开成真实换行，也禁止再加一层反斜杠写成 \\n。
+系统已尝试兼容 CRLF/LF、行尾空格，以及一次 \\n→\n 过转义纠正；若仍失败，请加长 @@ 上下文确保唯一匹配。`, err)
+		invoker.AddToTimeline("modify_patch_apply_failed", msg)
+		op.Feedback(msg)
+		op.Continue()
+		return
+	}
+	for _, w := range warnings {
+		invoker.AddToTimeline("modify_patch_warning", w)
+		op.Feedback("[patch warning] " + w)
+	}
+
+	invoker.AddToTimeline("modify_code", fmt.Sprintf("applied patch (%d hunk(s))", len(hunks)))
+	if reason != "" {
+		runtime.AddToTimeline("modify_reason", reason)
+	}
+
+	loopInfraActionStart(loop, loopInfraNodeSingleFileModify,
+		fmt.Sprintf("Patch 修改文件: %s (%d hunks) / Patch modify: %s (%d hunks)", filename, len(hunks), filename, len(hunks)),
+		"修改文件中 / Modifying File...")
+
+	editorSummary := SummarizeAppliedPatch(hunks)
+	successMsg := fmt.Sprintf("SUCCESS: applied patch (%d hunks), wrote %d bytes to file: %s", len(hunks), len(newFull), filename)
+	if err := f.CommitAfterCodeEdit(
+		loop, op, filename, newFull, actionName, reason, editorSummary,
+		"modify_success", "modify_write_failed", successMsg,
+		BuildYaklangPatchFull(newFull),
+	); err != nil {
+		op.Fail(fmt.Sprintf("failed to write patched content: %v", err))
+		return
+	}
+
+	loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+		Op:         "modify",
+		Filename:   filename,
+		NewSegment: editorSummary,
+		Deferred:   f.ShouldDeferDiskWrite(),
+	})
+
+	log.Infof("modify_code (patch) done: %d hunks", len(hunks))
+	loopInfraStatus(loop, "文件修改完成 / File Modify Complete")
+	loopInfraActionFinish(loop, loopInfraNodeSingleFileModify,
+		fmt.Sprintf("Patch 修改完成: %s / Patch applied: %s", filename, filename),
+		utils.ShrinkTextBlock(editorSummary, 256))
+	op.Continue()
 }
 
 // handleModifyByOldSnippet replaces exact text matches via modify_code + old_snippet.
@@ -369,19 +525,13 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
 	}
 
 	fullCode := loop.Get(fullCodeVar)
-	editor := memedit.NewMemEditor(fullCode)
-
-	var matches []*memedit.Range
-	_ = editor.FindStringRange(oldSnippet, func(r *memedit.Range) error {
-		matches = append(matches, r)
-		return nil
-	})
+	matches := findCodeMatchRanges(fullCode, oldSnippet)
 
 	if len(matches) == 0 {
 		msg := fmt.Sprintf(`【modify_code 失败】未找到 old_snippet。
 
-请确保 old_snippet 与 full_code 完全一致（含空格与换行）。
-可改用行号 modify_start_line/modify_end_line，或扩大上下文后重试。
+请基于本轮 CURRENT_CODE 重新生成 Cursor Patch；不要复用修改前或 rebase 前的旧片段。
+系统已尝试兼容 CRLF/LF 与行尾空格差异，但仍未找到唯一对应内容。
 
 old_snippet 预览：
 %s`, utils.ShrinkTextBlock(oldSnippet, 300))
@@ -394,8 +544,8 @@ old_snippet 预览：
 	if len(matches) > 1 && !replaceAll {
 		var lines []string
 		for i, r := range matches {
-			pos := editor.GetPositionByOffset(r.GetStartOffset())
-			lines = append(lines, fmt.Sprintf("  match %d: line %d", i+1, pos.GetLine()))
+			line := strings.Count(fullCode[:r.start], "\n") + 1
+			lines = append(lines, fmt.Sprintf("  match %d: line %d", i+1, line))
 		}
 		msg := fmt.Sprintf(`【modify_code 失败】old_snippet 匹配 %d 处，不唯一。
 
@@ -408,21 +558,14 @@ old_snippet 预览：
 		return
 	}
 
-	if replaceAll {
-		for i := len(matches) - 1; i >= 0; i-- {
-			if err := editor.UpdateTextByRange(matches[i], newCode); err != nil {
-				op.Fail("failed to replace snippet: " + err.Error())
-				return
-			}
-		}
-	} else {
-		if err := editor.UpdateTextByRange(matches[0], newCode); err != nil {
-			op.Fail("failed to replace snippet: " + err.Error())
-			return
-		}
+	if !replaceAll {
+		matches = matches[:1]
 	}
-
-	fullCode = editor.GetSourceCode()
+	// Apply from the end so offsets of earlier matches remain stable.
+	for i := len(matches) - 1; i >= 0; i-- {
+		r := matches[i]
+		fullCode = fullCode[:r.start] + newCode + fullCode[r.end:]
+	}
 
 	// 成功修改后重置空代码计数器
 	emptyCountVar := actionName + "_empty_modify_snippet_count"
@@ -514,11 +657,11 @@ func (f *SingleFileModificationSuiteFactory) GetEventType() string {
 
 // OnFileChanged calls the file changed callback if configured
 // Returns (errorMessage, hasBlockingErrors)
-func (f *SingleFileModificationSuiteFactory) OnFileChanged(content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
+func (f *SingleFileModificationSuiteFactory) OnFileChanged(loop *reactloops.ReActLoop, content string, operator *reactloops.LoopActionHandlerOperator) (string, bool) {
 	if f.fileChangedCb == nil {
 		return "", false
 	}
-	return f.fileChangedCb(content, operator)
+	return f.fileChangedCb(loop, content, operator)
 }
 
 // PrettifyCode calls the code prettify callback

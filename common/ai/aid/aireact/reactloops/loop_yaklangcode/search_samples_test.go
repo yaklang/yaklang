@@ -118,6 +118,17 @@ func TestGrepAlreadyCovered_BypassWhenLintFailed(t *testing.T) {
 	assert.False(t, covered)
 }
 
+func TestGrepAlreadyCovered_BypassWhenSelfTestFailed(t *testing.T) {
+	loop := &stubLoopKV{data: map[string]string{
+		"init_samples_ready":   "true",
+		"initial_code_samples": "sample",
+		"init_search_manifest": NewSearchManifest([]string{"servicescan\\.Scan"}, nil).JSON(),
+		"yak_run_ok":           "false",
+	}}
+	covered, _ := GrepAlreadyCovered(loop, "servicescan\\.Scan")
+	assert.False(t, covered)
+}
+
 func TestSemanticAlreadyCovered_BypassWhenLintFailed(t *testing.T) {
 	loop := &stubLoopKV{data: map[string]string{
 		"init_samples_ready":   "true",
