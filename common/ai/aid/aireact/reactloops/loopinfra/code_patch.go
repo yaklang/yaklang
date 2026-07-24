@@ -2,6 +2,7 @@ package loopinfra
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,7 +55,6 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 	var hunks []CodePatchHunk
 	var cur *CodePatchHunk
 	var oldLines, newLines []string
-	seenFileHeader := false
 
 	flush := func() {
 		if cur == nil {
@@ -93,7 +93,6 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 			strings.HasPrefix(trimmed, codePatchAddFile) ||
 			strings.HasPrefix(trimmed, codePatchDeleteFile):
 			flush()
-			seenFileHeader = true
 		case strings.HasPrefix(trimmed, "@@"):
 			header := strings.TrimSpace(strings.TrimPrefix(trimmed, "@@"))
 			startHunk(header)
@@ -129,7 +128,6 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 			}
 		default:
 			// Ignore stray text before first hunk / file header.
-			_ = seenFileHeader
 		}
 	}
 	flush()
@@ -202,7 +200,7 @@ func ApplyCodePatchWithWarnings(fullCode string, hunks []CodePatchHunk) (string,
 	}
 
 	// Apply from end to start so earlier offsets stay valid.
-	sortPlansByStartDesc(plans)
+	sort.Slice(plans, func(i, j int) bool { return plans[i].start > plans[j].start })
 	result := fullCode
 	for _, p := range plans {
 		result = result[:p.start] + p.newText + result[p.end:]
@@ -422,14 +420,4 @@ type codePatchPlan struct {
 	start, end int
 	newText    string
 	hunkIdx    int
-}
-
-func sortPlansByStartDesc(plans []codePatchPlan) {
-	for i := 0; i < len(plans); i++ {
-		for j := i + 1; j < len(plans); j++ {
-			if plans[j].start > plans[i].start {
-				plans[i], plans[j] = plans[j], plans[i]
-			}
-		}
-	}
 }

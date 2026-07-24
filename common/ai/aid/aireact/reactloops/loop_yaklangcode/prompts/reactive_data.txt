@@ -18,7 +18,7 @@
 
 {{ end }}{{ if .HasInitialSamples }}## 预检索代码样例（Init 已完成）
 以下样例已在初始化阶段注入。语法通过时**禁止对相同 pattern/question 重复 grep/semantic**。
-若本轮存在【编译反馈】且 `yak_lint_ok=false`，或【运行反馈】且 `yak_run_ok=false`，允许用【下一步·强制】中的 pattern 再次 `grep_yaklang_samples` / `yakdoc_*` 补样例。
+若本轮存在【编译反馈】且 `yak_lint_ok=false`，或【运行反馈】且 `yak_run_ok=false`，允许再次 `grep_yaklang_samples` / `yakdoc_*` 补样例。
 
 {{ .InitialCodeSamples }}
 {{ if .InitSearchManifest }}已覆盖检索：{{ .InitSearchManifest }}
@@ -48,9 +48,8 @@
 <|ERR/LINT_WARNING_END_{{ .Nonce }}|>
 
 按 persistent 指令里的「编译错误处理规则」对症处理：
-1. **先检索、再修改**：若 Feedback 含【下一步·强制】或【自动检索样例】，下一动作必须先执行其中的 `grep_yaklang_samples` / `yakdoc_*`（或直接对照已注入的自动样例），**禁止立刻又一次盲目 `modify_code`**。
-2. 类型1 API不存在→读附加文档/`yakdoc_*`；类型2 SyntaxError→`grep_yaklang_samples`；类型3 undefined→`grep`；类型4 参数类型/个数错→`yakdoc_function_details` 后改实参。
-3. 检索完成后再 **一次** `modify_code` 改对。lint 失败时允许重复 Init 已用过的 pattern。**禁止连续猜测**。
+1. API 不存在→`yakdoc_*`；SyntaxError / undefined→`grep_yaklang_samples`；参数类型/个数错→`yakdoc_function_details`。
+2. 检索（如需）后再 **一次** `modify_code`（Cursor Patch）改对。lint 失败时允许重复 Init 已用过的 pattern。
 {{ end }}{{ if .NeedsSelfTestBlock }}## 缺少 YAK_MAIN 自测块（语法已通过，系统无法自动运行验证）
 检测到脚本类型：`{{ .ScriptKind }}`。请用 `modify_code` 在文件末尾追加 `func runSelfTest(){...}` 与 `if YAK_MAIN { runSelfTest() }`（禁止 write_code 重置）。
 
@@ -61,9 +60,8 @@
 {{ .RunFeedback }}
 <|RUNTIME_ERR_END_{{ .Nonce }}|>
 
-语法已通过但自测运行失败。若 Feedback 含【下一步·强制】或【自动检索样例】：
-1. **下一动作必须先** `grep_yaklang_samples` / `yakdoc_*`（或对照已注入自动样例），弄清返回类型/字段后再改；
-2. 禁止连续猜测 `RequestRaw` / `GetBytes` / `FirstHTTPRequestBytes` 等字段名；
-3. 检索后再 **一次** `modify_code`（**禁止** `write_code` 重置）。
+语法已通过但自测运行失败：
+1. 不确定 API/字段时先 `grep_yaklang_samples` / `yakdoc_*`，再 `modify_code`；
+2. **禁止** `write_code` 重置。
 常见：assert 失败、mock 报文 `\r\n` 用了反引号、map comma-ok、未定义 `runSelfTest`、对 `[]byte` 误调对象方法。
 {{ end }}

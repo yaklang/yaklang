@@ -245,19 +245,7 @@ func init() {
 					if loop != nil {
 						lineBase = loop.GetInt(loopinfra.LoopVarCodeLineBase)
 					}
-					errMsg, blocking := checkCodeAndFormatErrors(content, lineBase)
-					// On blocking lint: auto-inject AIKB sample snippets + keep mid-loop
-					// grep/yakdoc available (GrepAlreadyCovered unlocks when yak_lint_ok=false).
-					if blocking {
-						if searcher := holder.getGrep(); searcher != nil {
-							if extra := autoGrepSamplesForLintErrors(searcher, errMsg, content); extra != "" {
-								errMsg += extra
-							}
-						} else if loop != nil && loop.Get("aikb_available") == "false" {
-							errMsg += "\n【提示】AIKB 不可用：请用 yakdoc_* 查 API；无法 grep 样例时只能按【下一步·强制】中的 yakdoc 动作补全。\n"
-						}
-					}
-					return errMsg, blocking
+					return checkCodeAndFormatErrors(content, lineBase)
 				}),
 				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r, holder)),
 			)
