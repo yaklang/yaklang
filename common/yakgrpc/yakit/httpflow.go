@@ -1378,45 +1378,28 @@ func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 	for _, v := range model.GlobalHTTPFlowCache.GetAll() {
 		for _, tag := range strings.Split(v.Tags, "|") {
 			tag = strings.TrimSpace(tag)
-			if tag != "" {
+			if tag != "" && !strings.HasPrefix(tag, schema.COLORPREFIX) {
 				tagCounts[tag]++
 			}
 		}
 	}
-	tags := make([]*TagAndStatusCode, 0)
-	for k, v := range tagCounts {
-		if !strings.HasPrefix(k, schema.COLORPREFIX) {
-			tags = append(tags, &TagAndStatusCode{
-				Value:   k,
-				Count:   v,
-				Builtin: IsHTTPFlowBuiltinTag(k),
-			})
-		}
-	}
-	return tags, nil
+	return HTTPFlowTagsFromCounts(tagCounts), nil
 }
 
 func QueryHTTPFlowTags() ([]*TagAndStatusCode, error) {
-	tagSet := make(map[string]struct{})
+	tagCounts := make(map[string]int)
 	db := consts.GetGormProjectDatabase().Model(&schema.HTTPFlow{}).Select("id, tags").Where("tags IS NOT NULL AND tags != ''")
 	for flow := range YieldHTTPFlows(db, context.Background()) {
 		parts := strings.Split(flow.Tags, "|")
 		for _, part := range parts {
 			part = strings.TrimSpace(part)
 			if part != "" && !strings.HasPrefix(part, schema.COLORPREFIX) {
-				tagSet[part] = struct{}{}
+				// IsAll 只收集出现过的 tag，不统计次数
+				tagCounts[part] = 0
 			}
 		}
 	}
-
-	tags := make([]*TagAndStatusCode, 0)
-	for tag := range tagSet {
-		tags = append(tags, &TagAndStatusCode{
-			Value:   tag,
-			Builtin: IsHTTPFlowBuiltinTag(tag),
-		})
-	}
-	return tags, nil
+	return HTTPFlowTagsFromCounts(tagCounts), nil
 }
 
 func HTTPFlowSuffixes() ([]*TagAndStatusCode, error) {

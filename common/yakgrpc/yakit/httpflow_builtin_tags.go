@@ -35,3 +35,26 @@ func IsHTTPFlowBuiltinTag(tag string) bool {
 	}
 	return strings.HasPrefix(tag, HTTPFlowTagResend)
 }
+
+// HTTPFlowTagsFromCounts 从 tag 计数构建返回结果，并补齐全部内置 tag（缺失 Count=0）。
+func HTTPFlowTagsFromCounts(tagCounts map[string]int) []*TagAndStatusCode {
+	tags := make([]*TagAndStatusCode, 0, len(tagCounts)+len(HTTPFlowBuiltinTags))
+	for k, v := range tagCounts {
+		tags = append(tags, &TagAndStatusCode{
+			Value:   k,
+			Count:   v,
+			Builtin: IsHTTPFlowBuiltinTag(k),
+		})
+	}
+	for tag := range HTTPFlowBuiltinTags {
+		if _, ok := tagCounts[tag]; ok {
+			continue
+		}
+		tags = append(tags, &TagAndStatusCode{
+			Value:   tag,
+			Count:   0,
+			Builtin: true,
+		})
+	}
+	return tags
+}
