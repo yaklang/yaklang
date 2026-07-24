@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/gorm"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/yaklang/yaklang/common/consts"
