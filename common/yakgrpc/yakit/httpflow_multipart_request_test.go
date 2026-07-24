@@ -58,7 +58,7 @@ func buildMultipartRequest(t *testing.T, textFields map[string]string, fileParts
 }
 
 func TestSpillMultipartFilesIfNeeded_SingleFile(t *testing.T) {
-	fileContent := bytes.Repeat([]byte("X"), maxHTTPFlowRequestBodyInDBBytes+1024)
+	fileContent := bytes.Repeat([]byte("X"), MaxHTTPFlowRequestBodyInDBBytes+1024)
 	packet, _ := buildMultipartRequest(t, map[string]string{"desc": "hello"}, map[string]struct {
 		Filename    string
 		ContentType string
@@ -120,8 +120,8 @@ func TestSpillMultipartFilesIfNeeded_SingleFile(t *testing.T) {
 }
 
 func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
-	f1 := bytes.Repeat([]byte("A"), maxHTTPFlowRequestBodyInDBBytes/2)
-	f2 := bytes.Repeat([]byte("B"), maxHTTPFlowRequestBodyInDBBytes/2)
+	f1 := bytes.Repeat([]byte("A"), MaxHTTPFlowRequestBodyInDBBytes/2)
+	f2 := bytes.Repeat([]byte("B"), MaxHTTPFlowRequestBodyInDBBytes/2)
 	f3 := bytes.Repeat([]byte("C"), 1024)
 	packet, _ := buildMultipartRequest(t,
 		map[string]string{"token": "abc", "case": "safe"},
@@ -184,7 +184,7 @@ func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
 func TestSpillMultipartFilesIfNeeded_TextOnlyNotSpilled(t *testing.T) {
 	// Oversized multipart but no file parts: must NOT skeletonize; fall back
 	// to flat spill is handled by the caller, so here IsTooLarge is false.
-	big := bytes.Repeat([]byte("z"), maxHTTPFlowRequestBodyInDBBytes+512)
+	big := bytes.Repeat([]byte("z"), MaxHTTPFlowRequestBodyInDBBytes+512)
 	packet, _ := buildMultipartRequest(t, map[string]string{"blob": string(big)}, nil)
 
 	res, err := spillMultipartFilesIfNeeded(packet)
@@ -207,7 +207,7 @@ func TestSpillMultipartFilesIfNeeded_SmallMultipartNotSpilled(t *testing.T) {
 }
 
 func TestSpillMultipartFilesIfNeeded_NonMultipartNotSpilled(t *testing.T) {
-	body := bytes.Repeat([]byte("Q"), maxHTTPFlowRequestBodyInDBBytes+64)
+	body := bytes.Repeat([]byte("Q"), MaxHTTPFlowRequestBodyInDBBytes+64)
 	packet := []byte("POST /up HTTP/1.1\r\nHost: a\r\nContent-Type: application/json\r\nContent-Length: " +
 		strconv.Itoa(len(body)) + "\r\n\r\n" + string(body))
 	res, err := spillMultipartFilesIfNeeded(packet)
@@ -216,7 +216,7 @@ func TestSpillMultipartFilesIfNeeded_NonMultipartNotSpilled(t *testing.T) {
 }
 
 func TestSpillLargeHTTPFlowRequestIfNeeded_MultipartRoute(t *testing.T) {
-	fileContent := bytes.Repeat([]byte("M"), maxHTTPFlowRequestBodyInDBBytes+2048)
+	fileContent := bytes.Repeat([]byte("M"), MaxHTTPFlowRequestBodyInDBBytes+2048)
 	packet, _ := buildMultipartRequest(t, map[string]string{"n": "v"}, map[string]struct {
 		Filename    string
 		ContentType string
