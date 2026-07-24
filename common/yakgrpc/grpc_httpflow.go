@@ -987,6 +987,52 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 	return nil
 }
 
+func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.BatchSetHTTPFlowIssueFieldsRequest) (*ypb.BatchSetHTTPFlowIssueFieldsResponse, error) {
+	updates := map[string]interface{}{}
+	if v := strings.TrimSpace(req.IssueType); v != "" {
+		updates["issue_type"] = v
+	}
+	if v := strings.TrimSpace(req.Severity); v != "" {
+		updates["severity"] = v
+	}
+	if v := strings.TrimSpace(req.Status); v != "" {
+		updates["status"] = v
+	}
+	if v := strings.TrimSpace(req.StatusReason); v != "" {
+		updates["status_reason"] = v
+	}
+	if len(updates) == 0 {
+		return nil, utils.Errorf("all issue fields are empty")
+	}
+	updates["upload_online"] = false
+
+	db := s.GetProjectDatabase().Model(&schema.HTTPFlow{})
+
+	// 优先级：Ids > Hashes > Filter，均无则全量更新
+	switch {
+	case len(req.GetIds()) > 0:
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds())
+	case len(req.GetHashes()) > 0:
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", req.GetHashes())
+	case req.GetFilter() != nil:
+		// 复用 QueryHTTPFlow 的过滤条件，仅用筛选不取数据
+		queryDB := yakit.BuildHTTPFlowQuery(db, req.Filter)
+		// 禁用分页，避免只更新第一页
+		queryDB = queryDB.Limit(-1).Offset(-1)
+		db = queryDB
+	default:
+		// 全量更新
+	}
+
+	result := db.Updates(updates)
+	if result.Error != nil {
+		return nil, utils.Errorf("batch set httpflow issue fields failed: %s", result.Error)
+	}
+	return &ypb.BatchSetHTTPFlowIssueFieldsResponse{
+		UpdatedCount: result.RowsAffected,
+	}, nil
+}
+
 func (s *Server) doUpdateHTTPFlowIssueFields(ctx context.Context, db *gorm.DB, items []*yaklib.OnlineHTTPFlowItem) (updated int64, skipped int64) {
 	if len(items) == 0 {
 		return 0, 0
