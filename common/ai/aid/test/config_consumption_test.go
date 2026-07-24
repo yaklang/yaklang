@@ -27,12 +27,7 @@ func isTaskSummaryPrompt(prompt string) bool {
 }
 
 func isTestToolParamPrompt(prompt string) bool {
-	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
-		return true
-	}
-
-	return strings.Contains(prompt, "Generate appropriate parameters for this tool call") &&
-		strings.Contains(prompt, "call-tool")
+	return aicommon.IsToolParamGenPrompt(prompt)
 }
 
 func TestCoordinator_Consumption_SingleTime(t *testing.T) {
