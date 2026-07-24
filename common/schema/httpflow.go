@@ -107,6 +107,12 @@ type HTTPFlow struct {
 	// 同步到企业端
 	UploadOnline bool   `json:"upload_online,omitempty"`
 	Host         string `json:"host,omitempty"`
+
+	// 标识字段：问题类型 / 严重程度 / 处置状态 / 处置说明（原因）
+	IssueType    string `gorm:"index" json:"issue_type,omitempty"`
+	Severity     string `gorm:"index" json:"severity,omitempty"`
+	Status       string `gorm:"index" json:"status,omitempty"`
+	StatusReason string `json:"status_reason,omitempty"`
 }
 
 func (f *HTTPFlow) GetRequest() string {

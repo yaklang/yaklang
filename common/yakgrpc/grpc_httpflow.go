@@ -919,6 +919,119 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 	return httpFlowShare, extractedData, websocketFlowsData, projectGeneralStorage
 }
 
+func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream ypb.Yak_HTTPFlowsFromOnlineServer) error {
+	if req.Token == "" {
+		return utils.Errorf("params empty")
+	}
+
+	if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
+		return utils.Errorf("download failed: %s", err.Error())
+	}
+
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	ch := client.DownloadOnlineHTTPFlows(stream.Context(), req.Token)
+	if ch == nil {
+		return utils.Error("BUG: download stream error: empty")
+	}
+
+	var (
+		progress     float64
+		count        float64
+		updatedCount int64
+		skippedCount int64
+		batch        []*yaklib.OnlineHTTPFlowItem
+		batchSize    = 100
+	)
+
+	stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+		Progress: 0,
+		Log:      "initializing",
+	})
+	defer func() {
+		stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+			Progress: 1,
+			Log:      fmt.Sprintf("finished, updated: %d, skipped: %d", updatedCount, skippedCount),
+		})
+	}()
+
+	db := s.GetProjectDatabase()
+	for item := range ch.Chan {
+		total := item.Total
+		if total > 0 {
+			progress = count / float64(total)
+		}
+		count++
+
+		batch = append(batch, item.Flow)
+		if len(batch) >= batchSize {
+			u, sk := s.doUpdateHTTPFlowIssueFields(stream.Context(), db, batch)
+			updatedCount += u
+			skippedCount += sk
+			batch = batch[:0]
+			_ = stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+				Progress: progress,
+				Log:      fmt.Sprintf("processing: updated %d, skipped %d", updatedCount, skippedCount),
+			})
+		}
+	}
+	if len(batch) > 0 {
+		u, sk := s.doUpdateHTTPFlowIssueFields(stream.Context(), db, batch)
+		updatedCount += u
+		skippedCount += sk
+	}
+
+	stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+		Progress: 1,
+		Log:      fmt.Sprintf("sync finished, updated: %d, skipped: %d", updatedCount, skippedCount),
+	})
+	return nil
+}
+
+func (s *Server) doUpdateHTTPFlowIssueFields(ctx context.Context, db *gorm.DB, items []*yaklib.OnlineHTTPFlowItem) (updated int64, skipped int64) {
+	if len(items) == 0 {
+		return 0, 0
+	}
+	hashes := make([]string, 0, len(items))
+	for _, item := range items {
+		hashes = append(hashes, item.Hash)
+	}
+
+	var localFlows []*schema.HTTPFlow
+	if err := db.Model(&schema.HTTPFlow{}).Where("hash in (?)", hashes).Find(&localFlows).Error; err != nil {
+		log.Errorf("query local httpflow by hash failed: %s", err)
+		return 0, int64(len(items))
+	}
+	existMap := make(map[string]struct{}, len(localFlows))
+	for _, f := range localFlows {
+		existMap[f.Hash] = struct{}{}
+	}
+
+	for _, item := range items {
+		select {
+		case <-ctx.Done():
+			return updated, skipped + int64(len(items)) - updated
+		default:
+		}
+
+		if _, ok := existMap[item.Hash]; !ok {
+			skipped++
+			continue
+		}
+		if err := db.Model(&schema.HTTPFlow{}).Where("hash = ?", item.Hash).Update(map[string]interface{}{
+			"issue_type":    item.IssueType,
+			"severity":      item.Severity,
+			"status":        item.Status,
+			"status_reason": item.StatusReason,
+		}).Error; err != nil {
+			log.Errorf("update httpflow issue fields failed [%s]: %s", item.Hash, err)
+			skipped++
+			continue
+		}
+		updated++
+	}
+	return updated, skipped
+}
+
 func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest) (*ypb.Empty, error) {
 	if req.Token == "" || req.ProjectName == "" {
 		return nil, utils.Errorf("params empty")
