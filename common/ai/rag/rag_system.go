@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -83,7 +84,12 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 
 	runImported := false
 	importFile := func(force bool) error {
-		header, err := LoadRAGFileHeaderFromPath(config.importFile)
+		file, err := os.Open(config.importFile)
+		if err != nil {
+			return utils.Wrap(err, "failed to open aikb file")
+		}
+		defer file.Close()
+		header, err := LoadRAGFileHeader(file)
 		if err != nil {
 			return utils.Wrap(err, "failed to import rag collection")
 		}

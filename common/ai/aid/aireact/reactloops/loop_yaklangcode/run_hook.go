@@ -9,14 +9,14 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
 const yaklangNodeRunSelfTest = "yaklang-run-self-test"
 
 // buildYaklangPostSyntaxCleanRunHook runs YAK_MAIN self-test after static lint passes.
-// holder may be nil (tests); when set, failed runs auto-inject AIKB samples + recovery recipes.
+// holder may be nil (tests); reserved for future AIKB-backed run diagnostics.
 func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime, holder *searcherHolder) loopinfra.PostSyntaxCleanHook {
+	_ = holder
 	cfg := r.GetConfig()
 	return func(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 		if loop == nil || op == nil {
@@ -80,11 +80,6 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime, holder *sear
 		}
 
 		feedback := FormatRunFailureForAI(result, err)
-		var searcher *ziputil.ZipGrepSearcher
-		if holder != nil {
-			searcher = holder.getGrep()
-		}
-		feedback = enrichRunFailureWithRecovery(feedback, code, searcher)
 		loop.Set(loopVarYakRunOK, "false")
 		loop.Set(loopVarYakRunOutput, result.Output)
 		loop.Set(loopVarYakRunLastFeedback, feedback)
