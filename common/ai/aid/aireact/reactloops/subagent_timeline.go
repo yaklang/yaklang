@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // TimelineHandle 封装子 Agent 的 timeline 容器，屏蔽 Fork / Clean 差异。
@@ -151,10 +151,7 @@ func buildSubAgentRuntime(
 	var taskEmitter *aicommon.Emitter
 	if opts.InheritEmitter {
 		// 复用父任务的 emitter，事件保持父任务的 TaskId，前端不出现新卡片。
-		taskEmitter = subTask.GetEmitter()
-		if taskEmitter == nil {
-			taskEmitter = parentCfg.GetEmitter()
-		}
+		taskEmitter = parentCfg.GetEmitter()
 	} else {
 		taskEmitter = BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
 	}
@@ -211,7 +208,6 @@ func buildSubAgentInvoker(
 	}
 	return childInvoker, nil
 }
-
 
 // buildSubAgentStrategyOptions 返回子 Agent 强制关闭的顶层策略选项。子 Agent
 // 不得继承 plan / goal mode / dispatch / increase iteration。
