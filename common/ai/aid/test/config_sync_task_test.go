@@ -267,7 +267,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 			rsp := config.NewAIResponse()
 			defer rsp.Close()
 
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				if utils.MatchAllOfSubString(request.GetPrompt(), "任务名称: 步骤三") {
 					canSync = true
 					// 移除长时间 sleep，避免测试卡住

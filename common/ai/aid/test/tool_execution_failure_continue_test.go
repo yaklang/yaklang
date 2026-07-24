@@ -68,7 +68,7 @@ func TestReActLoop_ToolNotFound_ShouldContinue(t *testing.T) {
 			}
 
 			// Main loop - select tool
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				if firstToolCall {
 					firstToolCall = false
 					// First: try nonexistent tool
@@ -82,7 +82,7 @@ func TestReActLoop_ToolNotFound_ShouldContinue(t *testing.T) {
 			}
 
 			// Generate params
-			if utils.MatchAllOfSubString(prompt, "generate parameters", "call-tool") {
+			if aicommon.IsToolParamGenerationPrompt(prompt, "") {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": {"input": "test"}}`))
 				rsp.Close()
 				return rsp, nil
@@ -174,7 +174,7 @@ func TestReActLoop_ToolExecutionError_ShouldContinue(t *testing.T) {
 			}
 
 			// Main loop - select tool
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				if firstToolCall {
 					firstToolCall = false
 					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "failing_tool"}, "human_readable_thought": "trying failing", "cumulative_summary": "test"}`))
@@ -186,7 +186,7 @@ func TestReActLoop_ToolExecutionError_ShouldContinue(t *testing.T) {
 			}
 
 			// Generate params
-			if utils.MatchAllOfSubString(prompt, "generate parameters", "call-tool") {
+			if aicommon.IsToolParamGenPrompt(prompt) {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": {"input": "test"}}`))
 				rsp.Close()
 				return rsp, nil

@@ -174,7 +174,7 @@ func (s *KeywordScenarios) loadBuiltInResponses() {
 	// 3. 工具参数生成 - call-tool (sleep params)
 	s.AddResponse(
 		"call_tool_params",
-		[]string{"Generate appropriate parameters for this tool call based on the context above", "call-tool"},
+		[]string{"# Parameter Generation Task", "call-tool"},
 		BuildSleepToolParams(0.1),
 		"Generate parameters for tool calling",
 	)

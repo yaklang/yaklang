@@ -134,7 +134,7 @@ Remember: This persistent instruction should only appear ONCE in context.`, pers
 				currentPersistentCount, currentInitCount, currentUserQueryCount)
 
 			// Handle ReAct main loop - request blueprint
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", testForgeName) &&
+			if aicommon.IsPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "\"require_ai_blueprint\"") &&
 				strings.Contains(prompt, userQueryMarker) {
 				log.Infof("ReAct main loop: requesting forge %s", testForgeName)
 				rsp := i.NewAIResponse()
@@ -147,7 +147,7 @@ Remember: This persistent instruction should only appear ONCE in context.`, pers
 			}
 
 			// Handle Blueprint parameter generation
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
+			if aicommon.IsToolParamGenPromptForBlueprint(prompt, testForgeName) {
 				log.Infof("Blueprint parameter generation for %s", testForgeName)
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
@@ -181,7 +181,7 @@ Remember: This persistent instruction should only appear ONCE in context.`, pers
 			}
 
 			// Handle default ReAct loop (first call without forge name yet)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool", "\"require_ai_blueprint\"") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "%s" },
