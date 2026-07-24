@@ -230,6 +230,7 @@ service Yak {
   rpc QueryHTTPFlowsProcessNames(QueryHTTPFlowRequest) returns (QueryHTTPFlowsProcessNamesResponse);
   rpc HTTPFlowsToOnlineBatch(HTTPFlowsToOnlineBatchRequest) returns (HTTPFlowsToOnlineBatchResponse);
   rpc HTTPFlowsFromOnline(HTTPFlowsFromOnlineRequest) returns (stream HTTPFlowsFromOnlineProgress);
+  rpc BatchSetHTTPFlowIssueFields(BatchSetHTTPFlowIssueFieldsRequest) returns (BatchSetHTTPFlowIssueFieldsResponse);
 
 
   // 流量分析器
@@ -7399,6 +7400,22 @@ message HTTPFlowsFromOnlineRequest {
 message HTTPFlowsFromOnlineProgress {
   double Progress = 1;
   string Log = 2;
+}
+
+message BatchSetHTTPFlowIssueFieldsRequest {
+  QueryHTTPFlowRequest Filter = 1;
+  string IssueType = 2;
+  string Severity = 3;
+  string Status = 4;
+  string StatusReason = 5;
+  // 按 ID 批量更新
+  repeated int64 Ids = 6;
+  // 按 Hash 批量更新
+  repeated string Hashes = 7;
+}
+
+message BatchSetHTTPFlowIssueFieldsResponse {
+  int64 UpdatedCount = 1;
 }
 
 message AnalyzeHTTPFlowRequest{
