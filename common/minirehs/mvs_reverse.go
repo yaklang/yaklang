@@ -98,7 +98,9 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 	nword := nfa.nword
 	prev = prev[:nword]
 	cand = cand[:nword]
-	active = active[:nword]
+	// active 保留在签名中以复用调用方 scratch 的 API；反向执行器直接覆写 prev，
+	// 无需每 rune 先写 active 再 copy 到 prev。
+	_ = active
 	for w := 0; w < nword; w++ {
 		prev[w] = 0
 	}
@@ -113,10 +115,19 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 
 	i := alignRuneStart(data, maxHi) // 自最高匹配终点候选 (rune 边界) 起, 向头扫.
 	for i > 0 {
-		r, size := utf8.DecodeLastRune(data[:i])
 		runeEnd := i
-		j := i - size
-		sym := nfa.symbolOf(r)
+		// 与正向锚定一致的 ASCII 快路径：绝大多数报文是 ASCII，直接从
+		// data[i-1] 取得完整 rune 与压缩符号，省去 DecodeLastRune 的尾部
+		// 回溯和 symbolOf 的切点二分。非 ASCII / 非法 UTF-8 保持标准库语义。
+		var j, sym int
+		if c := data[i-1]; c < utf8.RuneSelf {
+			j = i - 1
+			sym = int(nfa.asciiSym[c])
+		} else {
+			r, size := utf8.DecodeLastRune(data[:i])
+			j = i - size
+			sym = nfa.symbolOf(r)
+		}
 
 		// 定位包含 runeEnd 的 span (descending): 跳过 lo 高于 runeEnd 的 span.
 		for si >= 0 && runeEnd < int(spans[si].lo) {
@@ -132,14 +143,19 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 			}
 		}
 		if hasActive {
+			carry := uint64(0)
 			for w := 0; w < nword; w++ {
-				pw := prev[w]
-				for pw != 0 {
-					p := w*64 + bits.TrailingZeros64(pw)
-					pw &= pw - 1
-					fp := nfa.follow[p]
+				v := prev[w]
+				shifted := (v << 1) | carry
+				carry = v >> 63
+				cand[w] |= shifted & nfa.chainTarget[w]
+			}
+			for w := 0; w < nword; w++ {
+				for ex := prev[w] & nfa.excMask[w]; ex != 0; ex &= ex - 1 {
+					p := w*64 + bits.TrailingZeros64(ex)
+					ef := nfa.excFollow[p]
 					for k := 0; k < nword; k++ {
-						cand[k] |= fp[k]
+						cand[k] |= ef[k]
 					}
 				}
 			}
@@ -149,7 +165,7 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 		var anyActive uint64
 		for w := 0; w < nword; w++ {
 			v := cand[w] & rc[w]
-			active[w] = v
+			prev[w] = v
 			anyActive |= v
 			if v&nfa.lastAny[w] != 0 {
 				return true
@@ -161,7 +177,103 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 		if !hasActive && (si < 0 || j < firstLo) {
 			return false
 		}
-		copy(prev, active)
+		// 大空洞跳跃 (反向): 活跃集空且当前 runeEnd 在 span 之上 (runeEnd > spans[si].hi), 且距下一个
+		// span (si-1) 的 hi > gapJumpMin 字节时, 跳到下一个 span 的 hi 的 rune 边界. 反向扫描中 si 递减,
+		// "下一个 span" 是 spans[si-1]. 向头跳 = 减小 i 到 spans[si-1].hi (rune 对齐: 用 i 之前的位置).
+		if !hasActive && si >= 0 && runeEnd > int(spans[si].hi)+gapJumpMin {
+			if si > 0 {
+				targetHi := int(spans[si-1].hi)
+				if targetHi < j && targetHi > 0 {
+					jump := targetHi
+					// 向左吸附到 rune 起始 (反向扫需对齐: jump 处是某 rune 的结尾, alignRuneStart 吸附到其起始).
+					jump = alignRuneStart(data, jump)
+					if jump > 0 && jump < i {
+						i = jump
+						continue
+					}
+				}
+			}
+		}
+		i = j
+	}
+	return false
+}
+
+// existsInReverseAnchored2 是 nword==2 的寄存器快路径。双向锚定的真实热点中，反向 NFA
+// 很多仅刚好跨过 64 个位置；通用版为它们仍承担三层 word 循环和 []uint64 写回。把两个字
+// 拆开后，follow 的二维行访问与通用版完全同构，语义保持一致。
+func (nfa *mvsNFA) existsInReverseAnchored2(data []byte, spans []anchorSpan) bool {
+	if len(spans) == 0 {
+		return false
+	}
+	first := nfa.first
+	lastAny := nfa.lastAny
+	reach := nfa.reach
+	n := len(data)
+	firstLo := int(spans[0].lo)
+	maxHi := int(spans[len(spans)-1].hi)
+	if maxHi > n {
+		maxHi = n
+	}
+	si := len(spans) - 1
+	var prev0, prev1 uint64
+	hasActive := false
+
+	i := alignRuneStart(data, maxHi)
+	for i > 0 {
+		runeEnd := i
+		var j, sym int
+		if c := data[i-1]; c < utf8.RuneSelf {
+			j = i - 1
+			sym = int(nfa.asciiSym[c])
+		} else {
+			r, size := utf8.DecodeLastRune(data[:i])
+			j = i - size
+			sym = nfa.symbolOf(r)
+		}
+
+		for si >= 0 && runeEnd < int(spans[si].lo) {
+			si--
+		}
+		var cand0, cand1 uint64
+		if si >= 0 && runeEnd >= int(spans[si].lo) && runeEnd <= int(spans[si].hi) {
+			cand0, cand1 = first[0], first[1]
+		}
+		if hasActive {
+			cand0 |= (prev0 << 1) & nfa.chainTarget[0]
+			cand1 |= ((prev1 << 1) | (prev0 >> 63)) & nfa.chainTarget[1]
+			for ex := prev0 & nfa.excMask[0]; ex != 0; ex &= ex - 1 {
+				ef := nfa.excFollow[bits.TrailingZeros64(ex)]
+				cand0 |= ef[0]
+				cand1 |= ef[1]
+			}
+			for ex := prev1 & nfa.excMask[1]; ex != 0; ex &= ex - 1 {
+				ef := nfa.excFollow[64+bits.TrailingZeros64(ex)]
+				cand0 |= ef[0]
+				cand1 |= ef[1]
+			}
+		}
+		rc := reach[sym]
+		active0, active1 := cand0&rc[0], cand1&rc[1]
+		if active0&lastAny[0] != 0 || active1&lastAny[1] != 0 {
+			return true
+		}
+		hasActive = active0|active1 != 0
+		if !hasActive && (si < 0 || j < firstLo) {
+			return false
+		}
+		if !hasActive && si >= 0 && runeEnd > int(spans[si].hi)+gapJumpMin && si > 0 {
+			targetHi := int(spans[si-1].hi)
+			if targetHi < j && targetHi > 0 {
+				jump := alignRuneStart(data, targetHi)
+				if jump > 0 && jump < i {
+					prev0, prev1 = 0, 0
+					i = jump
+					continue
+				}
+			}
+		}
+		prev0, prev1 = active0, active1
 		i = j
 	}
 	return false
@@ -174,7 +286,6 @@ func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) boo
 	}
 	first := nfa.first1
 	lastAny := nfa.lastAny1
-	follow := nfa.follow1
 	reach := nfa.reach1
 	n := len(data)
 	firstLo := int(spans[0].lo)
@@ -188,10 +299,16 @@ func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) boo
 
 	i := alignRuneStart(data, maxHi)
 	for i > 0 {
-		r, size := utf8.DecodeLastRune(data[:i])
 		runeEnd := i
-		j := i - size
-		sym := nfa.symbolOf(r)
+		var j, sym int
+		if c := data[i-1]; c < utf8.RuneSelf {
+			j = i - 1
+			sym = int(nfa.asciiSym[c])
+		} else {
+			r, size := utf8.DecodeLastRune(data[:i])
+			j = i - size
+			sym = nfa.symbolOf(r)
+		}
 
 		for si >= 0 && runeEnd < int(spans[si].lo) {
 			si--
@@ -201,8 +318,14 @@ func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) boo
 			cand = first
 		}
 		if hasActive {
-			for pw := prev; pw != 0; pw &= pw - 1 {
-				cand |= follow[bits.TrailingZeros64(pw)]
+			// LimEx: 链边用左移批量推进; 异常边逐个 OR.
+			cand |= (prev << 1) & nfa.chainTarget1
+			if exc := prev & nfa.excMask1; exc != 0 {
+				for exc != 0 {
+					p := bits.TrailingZeros64(exc)
+					exc &= exc - 1
+					cand |= nfa.excFollow1[p]
+				}
 			}
 		}
 		active := cand & reach[sym]
@@ -212,6 +335,20 @@ func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) boo
 		hasActive = active != 0
 		if !hasActive && (si < 0 || j < firstLo) {
 			return false
+		}
+		// 大空洞跳跃 (反向单字版, 同多字版逻辑).
+		if !hasActive && si >= 0 && runeEnd > int(spans[si].hi)+gapJumpMin {
+			if si > 0 {
+				targetHi := int(spans[si-1].hi)
+				if targetHi < j && targetHi > 0 {
+					jump := alignRuneStart(data, targetHi)
+					if jump > 0 && jump < i {
+						prev = 0
+						i = jump
+						continue
+					}
+				}
+			}
 		}
 		prev = active
 		i = j

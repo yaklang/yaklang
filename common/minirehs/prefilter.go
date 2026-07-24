@@ -72,11 +72,7 @@ func (p *scalarPrefilter) simd() bool { return false }
 func (p *scalarPrefilter) release() {}
 
 func (p *scalarPrefilter) scanHits(data []byte, sc *scratch) []litHit {
-	lower := asciiLowerInto(data, &sc.lower)
-	sc.hits = sc.hits[:0]
-	p.ac.scan(lower, func(litID int32, end int) {
-		sc.hits = append(sc.hits, litHit{litID: litID, end: int32(end)})
-	})
+	sc.hits = p.ac.scanHitsFoldASCII(data, sc.hits[:0])
 	return sc.hits
 }
 

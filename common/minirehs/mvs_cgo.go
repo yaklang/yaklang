@@ -19,9 +19,39 @@ import "C"
 
 import (
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
+
+// anchSpanPool 复用锚定式 spans 的 lo/hi []int32 切片, 避免 cgo 热路径每次分配.
+// 锚定批处理每报文每 pattern 调用 nfaExistsAnchored, 若每次 make 会成为分配大头.
+var anchSpanPool = sync.Pool{
+	New: func() interface{} {
+		return &anchSpanBufs{lo: make([]int32, 0, 16), hi: make([]int32, 0, 16)}
+	},
+}
+
+type anchSpanBufs struct {
+	lo, hi []int32
+}
+
+// anchSpanBuf 取一对容量 >= n 的 lo/hi 切片 (复用池). 调用方在 cgo 调用后须调 anchSpanPut 归还.
+func anchSpanBuf(n int) *anchSpanBufs {
+	b := anchSpanPool.Get().(*anchSpanBufs)
+	if cap(b.lo) < n {
+		b.lo = make([]int32, n)
+		b.hi = make([]int32, n)
+	} else {
+		b.lo = b.lo[:n]
+		b.hi = b.hi[:n]
+	}
+	return b
+}
+
+func anchSpanPut(b *anchSpanBufs) {
+	anchSpanPool.Put(b)
+}
 
 // 本文件是纯 C99 运行期内核 (native/mvscan) 的 cgo 薄封装 (范式同 prefilter_cgo.go):
 // Go 把编译产物序列化为平台无关 blob 传入 C, C 出力做位并行存在性扫描. 只要启用 CGO
@@ -50,7 +80,7 @@ func newMVSKernel(d *mvsDB) *mvsKernel {
 	if d == nil {
 		return nil
 	}
-	blob := buildMVSBlob(d.nfas, d.merged)
+	blob := buildMVSBlob(d.nfas, d.merged, d.assertNecFactor, d.hasLiterals)
 	return openMVSKernel(blob, d.n)
 }
 
@@ -86,6 +116,365 @@ func (k *mvsKernel) nfaExists(idx int, data []byte) bool {
 // nfaExistsScalar 强制走 C 标量孪生 (绕过 SIMD 分发), 仅供差分测试.
 func (k *mvsKernel) nfaExistsScalar(idx int, data []byte) bool {
 	return k.nfaExistsImpl(idx, data, true)
+}
+
+// findAllLoc 在 C 内核中枚举 lean NFA 的 leftmost-longest 非重叠定位。
+// C 先前只做存在性判定，命中后 Go 会再次整段扫描以取 span；此入口把两段扫描收敛为
+// 一次 C 定位。返回 false 表示该 NFA 不适用，调用方必须安全回退 Go 定位器。
+func (k *mvsKernel) findAllLoc(idx int, data []byte, sc *scratch) ([]int32, bool) {
+	if k == nil || k.db == nil || len(data) == 0 || sc == nil {
+		return nil, false
+	}
+	const initialPairs = 16
+	if cap(sc.cLocs) < initialPairs*2 {
+		sc.cLocs = make([]int32, initialPairs*2)
+	} else {
+		sc.cLocs = sc.cLocs[:initialPairs*2]
+	}
+	for {
+		capPairs := len(sc.cLocs) / 2
+		got := int32(C.mvscan_db_nfa_find_all(k.db, C.int32_t(idx),
+			(*C.uint8_t)(unsafe.Pointer(&data[0])), C.size_t(len(data)),
+			(*C.int32_t)(unsafe.Pointer(&sc.cLocs[0])), C.int32_t(capPairs)))
+		keepAlive(data)
+		runtime.KeepAlive(sc.cLocs)
+		if got < 0 {
+			return nil, false
+		}
+		if int(got) <= capPairs {
+			return sc.cLocs[:int(got)*2], true
+		}
+		need := int(got) * 2
+		sc.cLocs = make([]int32, need)
+	}
+}
+
+// nfaExistsAnchored 判定 pattern idx 的 NFA 是否在 data 中存在命中, 但仅在 spans
+// 注入区间内注入起点 (锚定式语义, 对应 Go existsInAnchored). spans 须已排序合并.
+// 与 Go existsInAnchored 逐位一致 (差分护栏). 返回 true 命中.
+func (k *mvsKernel) nfaExistsAnchored(idx int, data []byte, spans []anchorSpan) bool {
+	return k.nfaExistsAnchoredImpl(idx, data, spans, false)
+}
+
+// nfaExistsAnchoredScalar 强制走 C 标量孪生, 仅供差分测试.
+func (k *mvsKernel) nfaExistsAnchoredScalar(idx int, data []byte, spans []anchorSpan) bool {
+	return k.nfaExistsAnchoredImpl(idx, data, spans, true)
+}
+
+func (k *mvsKernel) nfaExistsAnchoredImpl(idx int, data []byte, spans []anchorSpan, scalar bool) bool {
+	if k == nil || k.db == nil || len(spans) == 0 {
+		return false
+	}
+	// 把 Go anchorSpan (lo,hi int32) 拆为两个 []int32 传 C, 避免 C.mvs_span 的 Go 分配.
+	// 用 sync.Pool 复用 lo/hi 切片, 消除热路径 make 开销 (cgo 调用后归还).
+	n := len(spans)
+	buf := anchSpanBuf(n)
+	lo, hi := buf.lo, buf.hi
+	for i, s := range spans {
+		lo[i] = int32(s.lo)
+		hi[i] = int32(s.hi)
+	}
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var r C.int
+	if scalar {
+		r = C.mvscan_db_nfa_exists_anchored_scalar(k.db, C.int32_t(idx), dptr, C.size_t(len(data)),
+			(*C.int32_t)(unsafe.Pointer(&lo[0])), (*C.int32_t)(unsafe.Pointer(&hi[0])), C.int32_t(n))
+	} else {
+		r = C.mvscan_db_nfa_exists_anchored(k.db, C.int32_t(idx), dptr, C.size_t(len(data)),
+			(*C.int32_t)(unsafe.Pointer(&lo[0])), (*C.int32_t)(unsafe.Pointer(&hi[0])), C.int32_t(n))
+	}
+	keepAlive(data)
+	runtime.KeepAlive(lo)
+	runtime.KeepAlive(hi)
+	anchSpanPut(buf)
+	return r == 1
+}
+
+// nfaExistsAssert 判定断言 NFA (hasAssert) 在 data 中是否存在命中 (C 实现).
+// bound 为预算的共享边界数组 (computeBoundariesC). 与 Go existsInAssertShared1 逐位一致.
+// 返回 true 命中 / false 不命中或无 C 断言 NFA.
+func (k *mvsKernel) nfaExistsAssert(idx int, data []byte, bound []byte) bool {
+	if k == nil || k.db == nil || len(data) == 0 || len(bound) < len(data)+1 {
+		return false
+	}
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var bptr *C.uint8_t
+	if len(bound) > 0 {
+		bptr = (*C.uint8_t)(unsafe.Pointer(&bound[0]))
+	}
+	r := C.mvscan_db_nfa_exists_assert(k.db, C.int32_t(idx), dptr, C.size_t(len(data)), bptr)
+	keepAlive(data)
+	runtime.KeepAlive(bound)
+	return r == 1
+}
+
+// nfaExistsAssertSelf 自包含断言扫描 — C 内部预算边界, 省去 Go 侧 sharedBound 一次 cgo.
+func (k *mvsKernel) nfaExistsAssertSelf(idx int, data []byte, boundBuf []byte) bool {
+	if k == nil || k.db == nil || len(data) == 0 {
+		return false
+	}
+	if cap(boundBuf) < len(data)+1 {
+		boundBuf = make([]byte, len(data)+1)
+	} else {
+		boundBuf = boundBuf[:len(data)+1]
+	}
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var bptr *C.uint8_t
+	bptr = (*C.uint8_t)(unsafe.Pointer(&boundBuf[0]))
+	r := C.mvscan_db_nfa_exists_assert_self(k.db, C.int32_t(idx), dptr, C.size_t(len(data)), bptr)
+	keepAlive(data)
+	runtime.KeepAlive(boundBuf)
+	return r == 1
+}
+
+// nfaExistsAssertOnline 把多字断言的边界生成与 NFA 递推融合为单次 C 遍历。
+func (k *mvsKernel) nfaExistsAssertOnline(idx int, data []byte) bool {
+	if k == nil || k.db == nil || len(data) == 0 {
+		return false
+	}
+	dptr := (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	r := C.mvscan_db_nfa_exists_assert_online(k.db, C.int32_t(idx), dptr, C.size_t(len(data)))
+	keepAlive(data)
+	return r == 1
+}
+
+// nfaExistsAssertMany 一次 cgo、一次数据遍历推进多条断言 always-on NFA.
+// rune 解码与零宽断言边界在线共享，省去边界物化和逐 NFA 重复扫描.
+// 结果复用 sc.assertBatchOut (len==len(idxs), 1 命中/0 不命中).
+// dfaScanBatch 在单次 cgo 调用中对多个 DFA 模式扫描同一段 data.
+// 返回命中的 pattern idx 列表.
+func (k *mvsKernel) dfaScanBatch(idxs []int32, data []byte, sc *scratch) []int32 {
+	if k == nil || k.db == nil || len(idxs) == 0 || len(data) == 0 {
+		return nil
+	}
+	capOut := len(idxs)
+	if cap(sc.cmerged) < capOut {
+		sc.cmerged = make([]int32, capOut)
+	} else {
+		sc.cmerged = sc.cmerged[:capOut]
+	}
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var iptr *C.int32_t
+	if len(idxs) > 0 {
+		iptr = (*C.int32_t)(unsafe.Pointer(&idxs[0]))
+	}
+	var optr *C.int32_t
+	if len(sc.cmerged) > 0 {
+		optr = (*C.int32_t)(unsafe.Pointer(&sc.cmerged[0]))
+	}
+	got := int32(C.mvscan_db_dfa_scan_batch(k.db, dptr, C.size_t(len(data)),
+		iptr, C.int(len(idxs)), optr, C.int(capOut)))
+	keepAlive(data)
+	runtime.KeepAlive(idxs)
+	runtime.KeepAlive(sc.cmerged)
+	return sc.cmerged[:got]
+}
+
+func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) []byte {
+	if k == nil || k.db == nil || len(idxs) == 0 {
+		return nil
+	}
+	if cap(sc.assertBatchOut) < len(idxs) {
+		sc.assertBatchOut = make([]byte, len(idxs))
+	} else {
+		sc.assertBatchOut = sc.assertBatchOut[:len(idxs)]
+	}
+	out := sc.assertBatchOut
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var iptr *C.int32_t
+	if len(idxs) > 0 {
+		iptr = (*C.int32_t)(unsafe.Pointer(&idxs[0]))
+	}
+	var optr *C.uint8_t
+	if len(out) > 0 {
+		optr = (*C.uint8_t)(unsafe.Pointer(&out[0]))
+	}
+	C.mvscan_db_nfa_exists_assert_online_many(k.db, dptr, C.size_t(len(data)),
+		iptr, C.int32_t(len(idxs)), optr)
+	keepAlive(data)
+	runtime.KeepAlive(idxs)
+	runtime.KeepAlive(out)
+	return out
+}
+
+// combinedScan: 单次数据遍历同时跑 merged NFA + assert NFA.
+// 返回 (mergedHits, assertHits).
+func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, keepBound bool, sc *scratch) ([]int, []int) {
+	sc.mergedHits = sc.mergedHits[:0]
+	sc.assertHits = sc.assertHits[:0]
+	if k == nil || k.db == nil || len(data) == 0 {
+		return sc.mergedHits, sc.assertHits
+	}
+	n := len(data)
+	// mergedSeen
+	if cap(sc.cseen) < k.npat {
+		sc.cseen = make([]byte, k.npat)
+	} else {
+		sc.cseen = sc.cseen[:k.npat]
+		for i := range sc.cseen {
+			sc.cseen[i] = 0
+		}
+	}
+	// mergedOut
+	mergedCap := k.npat
+	if cap(sc.cmerged) < mergedCap {
+		sc.cmerged = make([]int32, mergedCap)
+	}
+	// 只有后续 Go 多字断言仍会消费边界数组时才物化；C 内的 single-word
+	// assert 直接使用在线生成的 bpre/bpost，无需每字节写回内存。
+	if keepBound {
+		if cap(sc.assertBound) < n+1 {
+			sc.assertBound = make([]byte, n+1)
+		} else {
+			sc.assertBound = sc.assertBound[:n+1]
+		}
+	}
+	// assertOut (复用 scratch 缓冲)
+	assertCap := len(assertIdxs)
+	if assertCap < 1 {
+		assertCap = 1
+	}
+	if cap(sc.assertBatchOutIdx) < assertCap {
+		sc.assertBatchOutIdx = make([]int32, assertCap)
+	} else {
+		sc.assertBatchOutIdx = sc.assertBatchOutIdx[:assertCap]
+	}
+	assertOutBuf := sc.assertBatchOutIdx
+
+	// assertIdxs C pointer
+	var assertPtr *C.int32_t
+	if len(assertIdxs) > 0 {
+		assertPtr = (*C.int32_t)(unsafe.Pointer(&assertIdxs[0]))
+	}
+
+	sc.cmergedTotal = 0
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var mergedSeenPtr *C.uint8_t
+	if len(sc.cseen) > 0 {
+		mergedSeenPtr = (*C.uint8_t)(unsafe.Pointer(&sc.cseen[0]))
+	}
+	var mergedOutPtr *C.int32_t
+	if len(sc.cmerged) > 0 {
+		mergedOutPtr = (*C.int32_t)(unsafe.Pointer(&sc.cmerged[0]))
+	}
+	var boundPtr *C.uint8_t
+	if keepBound && len(sc.assertBound) > 0 {
+		boundPtr = (*C.uint8_t)(unsafe.Pointer(&sc.assertBound[0]))
+	}
+	var assertOutPtr *C.int32_t
+	if len(assertOutBuf) > 0 {
+		assertOutPtr = (*C.int32_t)(unsafe.Pointer(&assertOutBuf[0]))
+	}
+
+	assertTotal := int32(C.mvscan_db_combined_scan(k.db, dptr, C.size_t(len(data)),
+		mergedSeenPtr, C.int32_t(k.npat),
+		mergedOutPtr, C.int32_t(mergedCap),
+		(*C.int32_t)(unsafe.Pointer(&sc.cmergedTotal)),
+		assertPtr, C.int32_t(len(assertIdxs)),
+		boundPtr,
+		assertOutPtr, C.int32_t(assertCap)))
+
+	keepAlive(data)
+	runtime.KeepAlive(sc.cseen)
+	runtime.KeepAlive(sc.cmerged)
+	runtime.KeepAlive(sc.assertBound)
+	runtime.KeepAlive(assertIdxs)
+	runtime.KeepAlive(assertOutBuf)
+
+	for i := int32(0); i < sc.cmergedTotal && i < int32(mergedCap); i++ {
+		sc.mergedHits = append(sc.mergedHits, int(sc.cmerged[i]))
+	}
+	for i := int32(0); i < assertTotal && i < int32(assertCap); i++ {
+		sc.assertHits = append(sc.assertHits, int(assertOutBuf[i]))
+	}
+	return sc.mergedHits, sc.assertHits
+}
+
+// buf 容量须 >= len(data)+1. 返回 buf[:len(data)+1].
+func (k *mvsKernel) computeBoundariesC(data []byte, buf []byte) []byte {
+	if len(data) == 0 {
+		if cap(buf) >= 1 {
+			buf = buf[:1]
+		} else {
+			buf = make([]byte, 1)
+		}
+	} else {
+		if cap(buf) < len(data)+1 {
+			buf = make([]byte, len(data)+1)
+		} else {
+			buf = buf[:len(data)+1]
+		}
+	}
+	if len(data) == 0 {
+		// 空输入: 文本始=文本末
+		buf[0] = 0x01 | 0x02 | 0x04 | 0x08 | 0x20 // BeginText|EndText|BeginLine|EndLine|NoWordBoundary
+		return buf
+	}
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var bptr *C.uint8_t
+	bptr = (*C.uint8_t)(unsafe.Pointer(&buf[0]))
+	C.mvscan_compute_boundaries_pub(dptr, C.size_t(len(data)), bptr)
+	keepAlive(data)
+	runtime.KeepAlive(buf)
+	return buf
+}
+
+// nfaExistsAnchoredMany 一次 cgo 调用对多条 anchorable pattern 各自做锚定式存在性,
+// 摊薄 "每 pattern 一次 cgo" 的跨界开销 (锚定批处理 cgo 次数从 O(触发数) 降到 O(1)).
+// idxs[i] 为 pattern 下标, patSpanOff[i+1]-patSpanOff[i] 为其 spans 数, spansLo/Hi 平铺.
+// 结果复用 scratch 返回 (len==len(idxs), 1 命中/0 不命中). 由 A/B 门控的 backend
+// 把同一报文所有 lean anchored verifier 合并为一次跨界；默认路径仍可保守回退 Go gap-jump。
+func (k *mvsKernel) nfaExistsAnchoredMany(idxs []int32, data []byte,
+	patSpanOff []int32, spansLo, spansHi []int32, sc *scratch) []byte {
+	if k == nil || k.db == nil || len(idxs) == 0 {
+		return nil
+	}
+	if cap(sc.anchorBatchOut) < len(idxs) {
+		sc.anchorBatchOut = make([]byte, len(idxs))
+	} else {
+		sc.anchorBatchOut = sc.anchorBatchOut[:len(idxs)]
+	}
+	out := sc.anchorBatchOut
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var idxPtr *C.int32_t
+	if len(idxs) > 0 {
+		idxPtr = (*C.int32_t)(unsafe.Pointer(&idxs[0]))
+	}
+	var offPtr *C.int32_t
+	if len(patSpanOff) > 0 {
+		offPtr = (*C.int32_t)(unsafe.Pointer(&patSpanOff[0]))
+	}
+	var loPtr, hiPtr *C.int32_t
+	if len(spansLo) > 0 {
+		loPtr = (*C.int32_t)(unsafe.Pointer(&spansLo[0]))
+		hiPtr = (*C.int32_t)(unsafe.Pointer(&spansHi[0]))
+	}
+	C.mvscan_db_nfa_exists_anchored_many(k.db, dptr, C.size_t(len(data)),
+		idxPtr, C.int32_t(len(idxs)),
+		offPtr, loPtr, hiPtr, C.int32_t(len(spansLo)),
+		(*C.uint8_t)(unsafe.Pointer(&out[0])))
+	keepAlive(data)
+	runtime.KeepAlive(idxs)
+	runtime.KeepAlive(patSpanOff)
+	runtime.KeepAlive(spansLo)
+	runtime.KeepAlive(spansHi)
+	return out
 }
 
 // simdEnabled 报告 C 内核是否编入 SIMD 加速档.
@@ -141,6 +530,47 @@ func (k *mvsKernel) nfaExistsMany(idxs []int32, data []byte, sc *scratch) []byte
 // fullDone; 跨步去重由调用方完成). 复用 sc.cseen / sc.cmerged / sc.mergedHits 缓冲.
 func (k *mvsKernel) mergedScan(data []byte, sc *scratch) []int {
 	return k.mergedScanImpl(data, sc, false)
+}
+
+// mergedScanBatch 批量扫描多条记录 (拼接为一个 buffer), 一次 cgo 调用.
+// recOff 长度 nrec+1: 第 i 条 = data[recOff[i]..recOff[i+1]).
+// 返回 (recIdx, memberIdx) 对列表.
+func (k *mvsKernel) mergedScanBatch(data []byte, recOff []int32, sc *scratch) [][2]int32 {
+	if k == nil || k.db == nil || C.mvscan_db_has_merged(k.db) == 0 || len(recOff) <= 1 {
+		return nil
+	}
+	nrec := int32(len(recOff) - 1)
+	capPairs := nrec * 8
+	if capPairs < 64 {
+		capPairs = 64
+	}
+	if cap(sc.cpairs) < int(capPairs)*2 {
+		sc.cpairs = make([]int32, capPairs*2)
+	} else {
+		sc.cpairs = sc.cpairs[:capPairs*2]
+	}
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var optr *C.int32_t
+	var recOffPtr *C.int32_t
+	if len(recOff) > 0 {
+		recOffPtr = (*C.int32_t)(unsafe.Pointer(&recOff[0]))
+	}
+	if len(sc.cpairs) > 0 {
+		optr = (*C.int32_t)(unsafe.Pointer(&sc.cpairs[0]))
+	}
+	got := int32(C.mvscan_db_merged_scan_batch(k.db, dptr, C.size_t(len(data)),
+		recOffPtr, C.int(nrec), optr, C.int(capPairs)))
+	keepAlive(data)
+	runtime.KeepAlive(recOff)
+	runtime.KeepAlive(sc.cpairs)
+	out := make([][2]int32, 0, got)
+	for i := int32(0); i < got; i++ {
+		out = append(out, [2]int32{sc.cpairs[i*2], sc.cpairs[i*2+1]})
+	}
+	return out
 }
 
 // mergedScanScalar 强制走 C 标量孪生, 仅供差分测试.

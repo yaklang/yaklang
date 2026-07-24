@@ -2,6 +2,7 @@ package minirehs
 
 import (
 	"regexp/syntax"
+	"sort"
 	"strings"
 )
 
@@ -43,6 +44,110 @@ func extractRequiredLiterals(re *syntax.Regexp, minLen int) []string {
 		}
 		seen[low] = struct{}{}
 		out = append(out, low)
+	}
+	return out
+}
+
+// extractRequiredLiteralFactors 把正则可证明的必需字面量编成合取范式。
+//
+// 返回值的每一项是一个 OR 因子：其中任一 literal 出现即可满足该因子；所有因子都必须
+// 满足，regex 才有可能命中。例如 foo.*bar 编成 {{"foo"}, {"bar"}}，而
+// (foo|bar).*baz 编成 {{"foo", "bar"}, {"baz"}}。这是 Rose 风格 trigger 图的
+// 编译期输入：运行期可先淘汰缺任一必要因子的记录，再把余下命中交给精确 verifier。
+//
+// 该函数只丢弃无法证明或短于 minLen 的因子，绝不把非必要 literal 加入条件；因此仅会
+// 少过滤，不会造成假阴。返回 nil 表示退回 extractRequiredLiterals 的旧 OR 语义。
+func extractRequiredLiteralFactors(re *syntax.Regexp, minLen int) [][]string {
+	raw := requiredLiteralFactorsOf(re)
+	var out [][]string
+	seenFactor := make(map[string]struct{})
+	for _, f := range raw {
+		if len(f) == 0 {
+			continue
+		}
+		norm := make([]string, 0, len(f))
+		seen := make(map[string]struct{}, len(f))
+		valid := true
+		for _, lit := range f {
+			if len([]byte(lit)) < minLen && !isRareAnchorLiteral(lit) {
+				valid = false
+				break
+			}
+			low := strings.ToLower(lit)
+			if _, duplicate := seen[low]; duplicate {
+				continue
+			}
+			seen[low] = struct{}{}
+			norm = append(norm, low)
+		}
+		if !valid || len(norm) == 0 {
+			continue
+		}
+		sort.Strings(norm)
+		key := strings.Join(norm, "\x00")
+		if _, duplicate := seenFactor[key]; duplicate {
+			continue
+		}
+		seenFactor[key] = struct{}{}
+		out = append(out, norm)
+	}
+	return out
+}
+
+// requiredLiteralFactorsOf 递归求未规整的必需字面量 CNF。它与 requiredLiterals 的区别是
+// Concat 保留全部子项的必要条件，而不是只保留最长的一项；Alternate 则退化为单个 OR
+// 因子，避免把分支特有 literal 错当成全局必需条件。
+func requiredLiteralFactorsOf(re *syntax.Regexp) [][]string {
+	switch re.Op {
+	case syntax.OpLiteral:
+		if len(re.Rune) == 0 {
+			return nil
+		}
+		if re.Flags&syntax.FoldCase != 0 {
+			for _, r := range re.Rune {
+				if r > 127 {
+					return nil
+				}
+			}
+		}
+		return [][]string{{string(re.Rune)}}
+	case syntax.OpConcat:
+		var all [][]string
+		for _, sub := range re.Sub {
+			all = append(all, requiredLiteralFactorsOf(sub)...)
+		}
+		return all
+	case syntax.OpAlternate:
+		lits := requiredLiterals(re)
+		if len(lits) == 0 {
+			return nil
+		}
+		return [][]string{lits}
+	case syntax.OpCapture, syntax.OpPlus:
+		if len(re.Sub) == 1 {
+			return requiredLiteralFactorsOf(re.Sub[0])
+		}
+	case syntax.OpRepeat:
+		if re.Min >= 1 && len(re.Sub) == 1 {
+			return requiredLiteralFactorsOf(re.Sub[0])
+		}
+	}
+	return nil
+}
+
+// flattenLiteralFactors 返回所有因子的去重并集，供既有 literalIndex 扫描。因子为空时
+// 返回 nil；runtime 将把它视为旧版单 OR trigger，不改变原有正确性退化路径。
+func flattenLiteralFactors(factors [][]string) []string {
+	var out []string
+	seen := make(map[string]struct{})
+	for _, factor := range factors {
+		for _, lit := range factor {
+			if _, duplicate := seen[lit]; duplicate {
+				continue
+			}
+			seen[lit] = struct{}{}
+			out = append(out, lit)
+		}
 	}
 	return out
 }

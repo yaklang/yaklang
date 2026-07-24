@@ -3,6 +3,9 @@ package minirehs
 import (
 	"regexp"
 	"regexp/syntax"
+	"runtime"
+	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
@@ -14,6 +17,17 @@ type Scratch interface {
 	Close() error
 }
 
+// BatchMatchHandler 接收批扫描中的记录下标及其匹配。ScanBatch 保证按 records
+// 的输入顺序串行调用 handler，因此 handler 无需承担并发同步。
+type BatchMatchHandler func(record int, match Match) bool
+
+const maxBatchLanes = 4
+
+type batchMatch struct {
+	record int
+	match  Match
+}
+
 // scratch 是 Scratch 的内部实现, 持有可复用缓冲区.
 type scratch struct {
 	lower      []byte                // ASCII 小写化数据缓冲 (供大小写无关的字面量预过滤复用)
@@ -22,12 +36,15 @@ type scratch struct {
 	dedup      map[matchKey]struct{} // 邻域窗口验证的去重集合 (跨多次命中)
 	fullDone   []bool                // 非窗口候选 pattern 是否已做过整段验证 (按 idx)
 	mergedHits []int                 // mvs 合并 always-on 自动机单趟命中的成员 idx 缓冲 (复用)
+	assertHits []int                 // combined scanner 的断言命中成员 idx 缓冲 (复用)
 
 	// mvs 合并 always-on 单趟扫描的"成员级去重"缓冲 (按成员 idx 去重, 不触碰 fullDone;
 	// 跨步去重由调用方用 fullDone 完成). mergedSeen 供纯 Go 路径, cseen/cmerged 供 C 内核路径.
-	mergedSeen []bool  // 纯 Go scanExist 的成员去重位图 (长度 npat)
-	cseen      []byte  // C 合并 scan 的去重位图 (uint8, 长度 npat)
-	cmerged    []int32 // C 返回命中成员 idx 的 int32 缓冲
+	mergedSeen   []bool  // 纯 Go scanExist 的成员去重位图 (长度 npat)
+	cseen        []byte  // C 合并 scan 的去重位图 (uint8, 长度 npat)
+	cmerged      []int32 // C 返回命中成员 idx 的 int32 缓冲
+	cmergedTotal int32   // combinedScan C 输出计数，置于 scratch 避免每次取局部地址逃逸
+	cLocs        []int32 // C 单字 NFA 定位返回的平铺 (from,to) 对，按报文复用
 
 	// mvs 存在性快路径"按报文批处理 cgo"缓冲 (Phase 2): batchIdx 收集本报文触发的、可走 C 内核
 	// per-pattern 存在性的 pattern idx (去重), 一次 cgo 调用 nfaExistsMany 后, batchOut[i] 回写
@@ -63,6 +80,23 @@ type scratch struct {
 	anchorCand   []uint64
 	anchorActive []uint64
 
+	// C 锚定批处理的平铺视图。每条 lean pattern 的已合并 spans 连续写入
+	// anchorSpansLo/Hi，anchorSpanOff 划分各 pattern 的子区间；避免在热路径为
+	// []anchorSpan -> C 平行数组做逐条分配/跨界。
+	anchorCIdx     []int32
+	anchorSpanOff  []int32
+	anchorSpansLo  []int32
+	anchorSpansHi  []int32
+	anchorBatchOut []byte
+
+	// 断言 always-on C 批量扫描的输出缓冲 (nfaExistsAssertMany).
+	assertBatchOut    []byte
+	assertBatchOutIdx []int32 // combinedScan 的 assert 命中 idx 输出缓冲
+
+	// R1 anchored merged scan 的每报文成员 span 视图。元素只借用 anchorRanges 中
+	// 已合并的切片，不复制 span；扫描结束后下次 reset 时覆盖。
+	anchorMergedSpans [][]anchorSpan
+
 	// 双向锚定 (Rose-lite 完全体) 每报文缓冲: biSeen 标记某 idx 是否已入双向锚定批; biFwdRanges[idx]
 	// 累积前向注入区间 [h.end-headF, h.end] (头有界字面量), biRevRanges[idx] 累积反向注入区间
 	// [h.end, h.end+tailR] (尾有界字面量); biBatch 收集本报文触发的双向锚定 pattern idx. 位并行状态
@@ -85,9 +119,102 @@ type scratch struct {
 	statWindowVerify int64 // 邻域窗口验证次数
 	statFullScan     int64 // 非窗口 exact (有字面量) 命中字面量后触发的整段验证次数
 	statAlwaysScan   int64 // 无字面量 exact + regexp2-only 的逐条整段扫描次数
+
+	// always-on merged、always-on assert 与字面量候选验证可并行执行。两个内部
+	// scratch 与结果通道均由每个 Scratch 独占；短生命周期 worker 返回前必收拢。
+	alwaysMergedScratch *scratch
+	alwaysAssertScratch *scratch
+	alwaysMergedRes     chan []int
+	alwaysAssertRes     chan []byte
+
+	// RE2-only 存在性模式下，把字面量命中循环中的 gated/assert 立即验证移出调用线程，
+	// 与窗口及 anchored 阶段重叠；worker 使用独占 Scratch，handler 仍只在调用线程执行。
+	gateTasks        []gateTask
+	gateAsyncScratch *scratch
+	gateAsyncOut     []byte
+	gateAsyncRes     chan []byte
+
+	anchoredAsyncScratch *scratch
+	anchoredAnchorOut    []byte
+	anchoredBiOut        []byte
+	anchoredAsyncRes     chan anchoredResult
+
+	// ScanBatch 使用最多四个独占子 Scratch 并行处理动态记录块。结果按 lane 复用，扫描
+	// 收拢后再按 record 顺序串行重放 handler，避免并发回调改变现有使用习惯。
+	batchLanes   [maxBatchLanes]*scratch
+	batchResults [maxBatchLanes][]batchMatch
+
+	workerOnce      sync.Once
+	workerCloseOnce sync.Once
+	workerWG        sync.WaitGroup
+	mergedTasks     chan alwaysMergedTask
+	assertTasks     chan alwaysAssertTask
+	gatedTasks      chan gatedWorkerTask
+	anchoredTasks   chan anchoredWorkerTask
 }
 
-func (s *scratch) Close() error { return nil }
+type gateTask struct {
+	idx   int32
+	winLo int32 // >=0: verifyGateLocalized；-1: verifyOne 等价存在性判定
+}
+
+type anchoredResult struct {
+	anchor []byte
+	bi     []byte
+}
+
+type alwaysMergedTask struct {
+	kernel  *mvsKernel
+	data    []byte
+	scratch *scratch
+	result  chan<- []int
+}
+
+type alwaysAssertTask struct {
+	kernel  *mvsKernel
+	data    []byte
+	idxs    []int32
+	scratch *scratch
+	result  chan<- []byte
+}
+
+type gatedWorkerTask struct {
+	db      *mvsDB
+	data    []byte
+	tasks   []gateTask
+	scratch *scratch
+	out     []byte
+	result  chan<- []byte
+}
+
+type anchoredWorkerTask struct {
+	db                   *mvsDB
+	data                 []byte
+	anchorBatch, biBatch []int32
+	owner, scratch       *scratch
+	anchorOut, biOut     []byte
+	result               chan<- anchoredResult
+}
+
+func (s *scratch) Close() error {
+	s.workerCloseOnce.Do(func() {
+		for i := range s.batchLanes {
+			if s.batchLanes[i] != nil {
+				_ = s.batchLanes[i].Close()
+				s.batchLanes[i] = nil
+			}
+		}
+		if s.mergedTasks == nil {
+			return
+		}
+		close(s.mergedTasks)
+		close(s.assertTasks)
+		close(s.gatedTasks)
+		close(s.anchoredTasks)
+		s.workerWG.Wait()
+	})
+	return nil
+}
 
 // Database 是编译产物, 不可变、并发安全 (只读), 可被多 goroutine 共享.
 type Database interface {
@@ -95,6 +222,9 @@ type Database interface {
 	NewScratch() (Scratch, error)
 	// Scan 对完整 data 做 block 扫描, 每命中一次调用 handler; handler 返回 false 提前终止.
 	Scan(data []byte, s Scratch, handler MatchHandler) error
+	// ScanBatch 以 1-4 个独占 lane 并行扫描多条独立记录。handler 按 records 输入顺序
+	// 串行重放；返回 false 停止后续回调，但已经启动的记录扫描会安全收拢。
+	ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error
 	// Info 返回该 db 的元信息.
 	Info() DatabaseInfo
 	// Close 释放后端持有的本地资源 (纯 Go 后端为 no-op).
@@ -253,6 +383,124 @@ func (d *database) Scan(data []byte, s Scratch, handler MatchHandler) error {
 	}
 	_, err := d.primary.scan(data, sc, handler)
 	return err
+}
+
+func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error {
+	if len(records) == 0 {
+		return nil
+	}
+	root, ok := s.(*scratch)
+	if !ok || root == nil {
+		ns, err := d.NewScratch()
+		if err != nil {
+			return err
+		}
+		root = ns.(*scratch)
+		defer root.Close()
+	}
+	if handler == nil {
+		handler = func(int, Match) bool { return true }
+	}
+	totalBytes := 0
+	for _, rec := range records {
+		totalBytes += len(rec)
+	}
+	if len(records) == 1 || totalBytes < 32*1024 || runtime.GOMAXPROCS(0) < 2 {
+		for i, rec := range records {
+			stop := false
+			err := d.Scan(rec, root, func(m Match) bool {
+				if !handler(i, m) {
+					stop = true
+					return false
+				}
+				return true
+			})
+			if err != nil || stop {
+				return err
+			}
+		}
+		return nil
+	}
+
+	lanes := runtime.GOMAXPROCS(0) / 2
+	if lanes < 1 {
+		lanes = 1
+	} else if lanes > len(root.batchLanes) {
+		lanes = len(root.batchLanes)
+	}
+	for lane := 0; lane < lanes; lane++ {
+		if root.batchLanes[lane] == nil {
+			ns, err := d.NewScratch()
+			if err != nil {
+				return err
+			}
+			root.batchLanes[lane] = ns.(*scratch)
+		}
+		root.batchResults[lane] = root.batchResults[lane][:0]
+	}
+	var wg sync.WaitGroup
+	var laneErr [maxBatchLanes]error
+	var nextRecord int64
+	const batchChunk = int64(8)
+	wg.Add(lanes)
+	for lane := 0; lane < lanes; lane++ {
+		go func(lane int) {
+			defer wg.Done()
+			laneSc := root.batchLanes[lane]
+			out := root.batchResults[lane]
+			for {
+				start := int(atomic.AddInt64(&nextRecord, batchChunk) - batchChunk)
+				if start >= len(records) {
+					break
+				}
+				end := start + int(batchChunk)
+				if end > len(records) {
+					end = len(records)
+				}
+				for i := start; i < end; i++ {
+					err := d.Scan(records[i], laneSc, func(m Match) bool {
+						out = append(out, batchMatch{record: i, match: m})
+						return true
+					})
+					if err != nil {
+						laneErr[lane] = err
+						root.batchResults[lane] = out
+						return
+					}
+				}
+			}
+			root.batchResults[lane] = out
+		}(lane)
+	}
+	wg.Wait()
+
+	var resultPos [maxBatchLanes]int
+	for {
+		minLane := -1
+		for lane := 0; lane < lanes; lane++ {
+			if resultPos[lane] >= len(root.batchResults[lane]) {
+				continue
+			}
+			if minLane < 0 ||
+				root.batchResults[lane][resultPos[lane]].record < root.batchResults[minLane][resultPos[minLane]].record {
+				minLane = lane
+			}
+		}
+		if minLane < 0 {
+			break
+		}
+		next := root.batchResults[minLane][resultPos[minLane]]
+		resultPos[minLane]++
+		if !handler(next.record, next.match) {
+			return nil
+		}
+	}
+	for lane := 0; lane < lanes; lane++ {
+		if laneErr[lane] != nil {
+			return laneErr[lane]
+		}
+	}
+	return nil
 }
 
 func (d *database) Info() DatabaseInfo { return d.info }

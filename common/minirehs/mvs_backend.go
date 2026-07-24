@@ -2,8 +2,52 @@ package minirehs
 
 import (
 	"regexp/syntax"
+	"runtime"
 	"strings"
 )
+
+func (s *scratch) startWorkers() {
+	s.workerOnce.Do(func() {
+		s.mergedTasks = make(chan alwaysMergedTask, 1)
+		s.assertTasks = make(chan alwaysAssertTask, 1)
+		s.gatedTasks = make(chan gatedWorkerTask, 1)
+		s.anchoredTasks = make(chan anchoredWorkerTask, 1)
+		s.workerWG.Add(4)
+		go func() {
+			defer s.workerWG.Done()
+			for task := range s.mergedTasks {
+				task.result <- task.kernel.mergedScan(task.data, task.scratch)
+			}
+		}()
+		go func() {
+			defer s.workerWG.Done()
+			for task := range s.assertTasks {
+				task.result <- task.kernel.nfaExistsAssertMany(task.idxs, task.data, task.scratch)
+			}
+		}()
+		go func() {
+			defer s.workerWG.Done()
+			for task := range s.gatedTasks {
+				for i, gate := range task.tasks {
+					if task.db.existsNoReport(int(gate.idx), task.data, int(gate.winLo), task.scratch) {
+						task.out[i] = 1
+					} else {
+						task.out[i] = 0
+					}
+				}
+				task.result <- task.out
+			}
+		}()
+		go func() {
+			defer s.workerWG.Done()
+			for task := range s.anchoredTasks {
+				task.db.scanAnchoredNoReport(task.data, task.anchorBatch, task.biBatch,
+					task.owner, task.scratch, task.anchorOut, task.biOut)
+				task.result <- anchoredResult{anchor: task.anchorOut, bi: task.biOut}
+			}
+		}()
+	})
+}
 
 // mvsBackend 是自托管 mvscan 引擎的纯 Go 参考实现 (M1): 把每条 RE2 pattern 编译为字节级
 // Glushkov 位并行 NFA, 扫描时做存在性判定 (命中 From/To=-1). 无法编入 NFA 的 pattern
@@ -21,21 +65,21 @@ func (b *mvsBackend) simd() bool        { return false }
 
 func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiledDB, error) {
 	db := &mvsDB{
-		all:       patterns,
-		n:         len(patterns),
-		nfas:       make([]*mvsNFA, len(patterns)),
-		gate:       make([]bool, len(patterns)),
-		re2Loc:     make([]bool, len(patterns)),
-		windowable: make([]bool, len(patterns)),
-		batchable:  make([]bool, len(patterns)),
-		anchorable: make([]bool, len(patterns)),
-		win:        make([]litWindow, len(patterns)),
-		gateHead:   make([]int32, len(patterns)),
+		all:          patterns,
+		n:            len(patterns),
+		nfas:         make([]*mvsNFA, len(patterns)),
+		gate:         make([]bool, len(patterns)),
+		re2Loc:       make([]bool, len(patterns)),
+		windowable:   make([]bool, len(patterns)),
+		batchable:    make([]bool, len(patterns)),
+		anchorable:   make([]bool, len(patterns)),
+		win:          make([]litWindow, len(patterns)),
+		gateHead:     make([]int32, len(patterns)),
 		biAnchorable: make([]bool, len(patterns)),
 		revNFAs:      make([]*mvsNFA, len(patterns)),
-		reportLoc:  cfg.reportLocation,
+		reportLoc:    cfg.reportLocation,
 	}
-	perPatHeads := make(map[int]map[string]int32, len(patterns))         // 锚定式 pattern 的 per-literal head
+	perPatHeads := make(map[int]map[string]int32, len(patterns))        // 锚定式 pattern 的 per-literal head
 	perPatBiCover := make(map[int]map[string]litBiCover, len(patterns)) // 双向锚定 pattern 的 per-literal headF/tailR
 	for i := range db.win {
 		db.win[i] = litWindow{head: -1, tail: -1} // 默认不收窄 (整段)
@@ -175,9 +219,21 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		// 无 NFA (regexp2/RE2 兜底) 逐条验证.
 		switch {
 		case nfa != nil && nfa.hasAssert:
-			db.assertAlwaysOn = append(db.assertAlwaysOn, cp.idx)
+			if kind := mvsSpecializedExpr(cp.expr); kind != mvsSpecializedNone {
+				db.specializedAlwaysOn = append(db.specializedAlwaysOn, mvsSpecializedAlwaysOn{idx: cp.idx, kind: kind})
+				db.specializedMask |= uint64(1) << kind
+			} else {
+				db.assertAlwaysOn = append(db.assertAlwaysOn, cp.idx)
+			}
 		case nfa != nil:
-			mergeMembers = append(mergeMembers, mergeMember{idx: cp.idx, nfa: nfa})
+			if kind := mvsSpecializedExpr(cp.expr); kind != mvsSpecializedNone {
+				db.specializedAlwaysOn = append(db.specializedAlwaysOn, mvsSpecializedAlwaysOn{idx: cp.idx, kind: kind})
+				db.specializedMask |= uint64(1) << kind
+			} else {
+				// DFA 拆分经 A/B 测试为净回归: 即使 batch (1 次 cgo), 2 次数据遍历 (DFA + merged)
+				// 仍比 1 次 merged NFA 遍历慢 (cache miss on second pass). 基建保留.
+				mergeMembers = append(mergeMembers, mergeMember{idx: cp.idx, nfa: nfa})
+			}
 		default:
 			db.otherAlwaysOn = append(db.otherAlwaysOn, cp.idx)
 		}
@@ -218,7 +274,82 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	}
 	db.merged = buildMergedNFA(mergeMembers)
 	db.mergedCount = len(mergeMembers)
+	// 必要条件预过滤: 对 always-on NFA (merged + assert) 从 RE2 表达式提取必要条件,
+	// 运行期先做廉价字节检查, 不满足则跳过整段 NFA 扫描 (绝不假阴).
+	if len(mergeMembers) > 0 {
+		factors := make([]necFactor, len(mergeMembers))
+		for mi, mem := range mergeMembers {
+			cp := patterns[mem.idx]
+			anchoredStart := false
+			requireEnd := false
+			if nfa := db.nfas[mem.idx]; nfa != nil {
+				anchoredStart = nfa.anchoredStart
+				requireEnd = nfa.requireEnd
+			}
+			factors[mi] = extractNecFactor(analysisExprFor(cp), anchoredStart, requireEnd)
+		}
+		db.mergedNecFactor = mergeNecFactorsDisj(factors)
+	}
+	if len(db.assertAlwaysOn) > 0 {
+		db.assertNecFactor = make([]necFactor, db.n)
+		for _, idx := range db.assertAlwaysOn {
+			cp := patterns[idx]
+			nfa := db.nfas[idx]
+			anchoredStart := false
+			requireEnd := false
+			if nfa != nil {
+				anchoredStart = nfa.anchoredStart
+				requireEnd = nfa.requireEnd
+			}
+			db.assertNecFactor[idx] = extractNecFactor(analysisExprFor(cp), anchoredStart, requireEnd)
+		}
+	}
+	// R2: 把无字面量的断言 always-on NFA 合并为单趟扫描 (共享边界条件),
+	// 替代逐条 existsInAssertShared 整段扫 (省 K-1 趟全量扫描 + K-1 次 make).
+	// 注: 实测合并后 nword 1→2 净回归 (见 assertMergedEnabled), 仅在 A/B 开关开启时构建.
+	if assertMergedEnabled && len(db.assertAlwaysOn) >= 2 {
+		var assertMembers []mergeMember
+		for _, idx := range db.assertAlwaysOn {
+			if nfa := db.nfas[idx]; nfa != nil && nfa.hasAssert {
+				assertMembers = append(assertMembers, mergeMember{idx: idx, nfa: nfa})
+			}
+		}
+		if len(assertMembers) >= 2 {
+			db.assertMerged = buildAssertMergedNFA(assertMembers)
+		}
+	}
+	// R1：把可 forward-anchor 的 lean NFA 编成一个 span-injected 不相交并集。
+	// 只在 A/B 开关开启时构建，避免尚未验收的全局位集给默认数据库增加内存与编译成本。
+	var anchorMembers []mergeMember
+	for idx, nfa := range db.nfas {
+		if nfa != nil && db.anchorable[idx] && !nfa.hasAssert {
+			anchorMembers = append(anchorMembers, mergeMember{idx: idx, nfa: nfa})
+		}
+	}
+	if anchorMergedEnabled && len(anchorMembers) >= 2 {
+		db.anchoredMerged = buildMergedAnchoredNFA(anchorMembers)
+		db.anchorMergedSlot = make([]int, db.n)
+		for i := range db.anchorMergedSlot {
+			db.anchorMergedSlot[i] = -1
+		}
+		for mi, idx := range db.anchoredMerged.memIdx {
+			db.anchorMergedSlot[idx] = mi
+		}
+	}
 	db.nfaCount = nfaCount
+	// 构建 hasLiterals (用于 DFA: 有字面量的 pattern 不构建 DFA).
+	db.hasLiterals = make([]bool, db.n)
+	for _, cp := range patterns {
+		db.hasLiterals[cp.idx] = len(cp.literals) > 0
+	}
+	// 预计算 assert always-on 中 single (nword==1) 的 C 批量扫描 idx 数组.
+	for _, idx := range db.assertAlwaysOn {
+		if nfa := db.nfas[idx]; nfa != nil && nfa.hasAssert && nfa.single {
+			db.assertAlwaysOnCIdxs = append(db.assertAlwaysOnCIdxs, int32(idx))
+		} else {
+			db.assertAlwaysOnGoIdxs = append(db.assertAlwaysOnGoIdxs, idx)
+		}
+	}
 
 	// P4 (M2): minirehs_mvs 构建下, 把 per-pattern NFA + 合并 always-on 序列化为平台无关
 	// blob, 交纯 C99 运行期内核执行存在性扫描 (与纯 Go 参考执行器逐位一致). 非该构建返回 nil,
@@ -322,12 +453,12 @@ func compileExprToNFA(expr string) *mvsNFA {
 type mvsDB struct {
 	all        []*compiledPattern // 按 idx 索引
 	n          int
-	nfas       []*mvsNFA // 按 idx; nil 表示该 pattern 走 verifier 兜底
-	gate       []bool    // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
-	re2Loc     []bool    // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
-	windowable []bool    // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
-	batchable  []bool    // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
-	anchorable []bool    // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
+	nfas       []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
+	gate       []bool      // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
+	re2Loc     []bool      // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
+	windowable []bool      // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
+	batchable  []bool      // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
+	anchorable []bool      // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
 	win        []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
 	nfaCount   int
 
@@ -360,10 +491,35 @@ type mvsDB struct {
 	pf       prefilter // 可能为 nil (无任何字面量 pattern)
 	litToPat [][]int32 // litID -> pattern idx
 
-	merged         *mvsMergedNFA // 无字面量且可编入 lean NFA 的 always-on 合并为单趟自动机
-	mergedCount    int           // 合并成员数
-	assertAlwaysOn []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
-	otherAlwaysOn  []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
+	merged      *mvsMergedNFA // 无字面量且可编入 lean NFA 的 always-on 合并为单趟自动机
+	mergedCount int           // 合并成员数
+
+	// assertMerged 是无字面量的断言 NFA always-on (hasAssert) 的单趟合并自动机 (R2),
+	// 共享 computeBoundaries 预算的边界条件, 替代逐条 existsInAssertShared 整段扫.
+	// 仅在有 >=2 条断言 always-on 时构建 (单条直接走 verifyOne 逐条). 不影响命中语义.
+	assertMerged *mvsAssertMergedNFA
+
+	// mergedNecFactor 是合并 always-on NFA 的必要条件预过滤 (所有成员必要条件的"最宽松交集").
+	// scan() 中, merged_scan 前先 check; check==false 则跳过 cgo 调用 (绝不假阴).
+	mergedNecFactor necFactor
+	// assertNecFactor 按 idx: 断言 always-on NFA 的 per-pattern 必要条件预过滤.
+	// scan() 中, 对每条 assert always-on 先 check; check==false 则跳过 existsInAssertShared.
+	assertNecFactor []necFactor
+	// hasLiterals 按 idx: true=该 pattern 有必需字面量 (不构建 DFA).
+	hasLiterals []bool
+	// dfaAlwaysOnIdxs: 从 merged NFA 中拆出的 DFA always-on pattern idx 列表.
+	// 这些 pattern 通过 nfaExists (DFA 路径, 293 MB/s) 单独扫描, 不参与 merged scan.
+	dfaAlwaysOnIdxs []int32
+	// assertAlwaysOnCIdxs 是 assertAlwaysOn 中 single (nword==1) 断言 NFA 的 idx 数组 (C 内核批量用).
+	// 预计算一次, scan 中复用 (零分配).
+	assertAlwaysOnCIdxs  []int32
+	assertAlwaysOnGoIdxs []int
+	specializedAlwaysOn  []mvsSpecializedAlwaysOn // rigid exact structures with allocation-free existence scans
+	specializedMask      uint64
+	anchoredMerged       *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
+	anchorMergedSlot     []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
+	assertAlwaysOn       []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
+	otherAlwaysOn        []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
 
 	reportLoc bool // 命中是否上报精确偏移与内容 (见 WithReportLocation)
 
@@ -373,12 +529,32 @@ type mvsDB struct {
 }
 
 func (d *mvsDB) numAlwaysOn() int {
-	return d.mergedCount + len(d.assertAlwaysOn) + len(d.otherAlwaysOn)
+	return d.mergedCount + len(d.assertAlwaysOn) + len(d.specializedAlwaysOn) + len(d.otherAlwaysOn)
 }
 
 // gateSupersetPrecheck 控制可局部化超集门复核前是否先跑超集 NFA 存在性预检 (见 verifyGateLocalized).
-// PCRE2 (go-pcre2-lite) 线性复核后该预检对 gate 几乎不过滤、反成净开销, 故默认关闭; 仅 A/B 基准临时开。
+// 真实全语料 A/B 显示，门已被字面量局部化后，额外的超集 NFA 预检会重复扫描同一窗口，
+// 其过滤收益不足以覆盖扫描成本；默认关闭，直接进入权威 verifier。保留开关供规则集变化后复测。
 var gateSupersetPrecheck = false
+
+// anchorMergedEnabled 控制 R1 span-injected merged verifier 的运行期接线。保守起见默认
+// 关闭，直到真实语料的 oracle 与基准都证明其全局位集成本低于逐条 gap-jump 路径。
+var anchorMergedEnabled = false
+
+// assertMergedEnabled 控制 R2 断言 NFA 合并单趟的运行期接线。实测合并后 nword 1→2,
+// 多字循环开销 > 省的趟数 (与 lean 合并的 A/B 结论一致), 默认关闭保留作差分护栏.
+var assertMergedEnabled = false
+
+// necPrefilterEnabled 控制必要条件字节预过滤的运行期接线. A/B 实测: micro-benchmark 下
+// 预检 ~267 MB/s vs NFA ~149 MB/s, 但端到端基准仍净回归 (-2~3%): LimEx NFA (excCount=0)
+// 每字节仅 shift+AND (3 操作), 与 digit-run 检查 (4 操作/字节) 相当; 高 skip rate 省下的
+// NFA 扫描抵不过每记录额外的预检扫描 + 分支开销. 需 C 内核 SIMD 预检才净赚. 默认关闭.
+var necPrefilterEnabled = false
+
+// anchorCBatchEnabled 控制 C anchored-many 接线。它与 Go gap-jump 路径语义等价，
+// 但真实规则集上 C 对大量单字 NFA 的逐条重扫目前慢于 Go 标量快路径；默认关闭，保留作
+// C 侧 trigger/event 融合完成前的差分护栏和 A/B 基线。
+var anchorCBatchEnabled = false
 
 // cgo 调用诊断计数器 (仅 cgoDiagEnabled=true 时累加, 默认关闭, 近零开销). 用于量化
 // "cgo 跨界次数 vs 实际扫描字节" 以判定瓶颈是跨界开销还是扫描工作量 (见 TestMVSCgoCallDiag).
@@ -404,6 +580,35 @@ func (d *mvsDB) close() error {
 
 func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	d.resetScratch(sc)
+	asyncAlways := false
+	asyncConsumed := false
+	if runtime.GOMAXPROCS(0) > 1 && len(data) >= 512 && d.kernel != nil && d.merged != nil &&
+		len(d.assertAlwaysOnCIdxs) > 0 && len(d.assertAlwaysOnGoIdxs) == 0 {
+		if sc.alwaysMergedScratch == nil {
+			sc.alwaysMergedScratch = &scratch{}
+			sc.alwaysAssertScratch = &scratch{}
+			sc.alwaysMergedRes = make(chan []int, 1)
+			sc.alwaysAssertRes = make(chan []byte, 1)
+		}
+		sc.startWorkers()
+		sc.mergedTasks <- alwaysMergedTask{
+			kernel: d.kernel, data: data,
+			scratch: sc.alwaysMergedScratch, result: sc.alwaysMergedRes,
+		}
+		sc.assertTasks <- alwaysAssertTask{
+			kernel: d.kernel, data: data, idxs: d.assertAlwaysOnCIdxs,
+			scratch: sc.alwaysAssertScratch, result: sc.alwaysAssertRes,
+		}
+		asyncAlways = true
+		defer func() {
+			// handler 可能在候选阶段要求提前停止；仍须收走本报文结果，保证
+			// 两个常驻 worker 不再访问本次 data 后，本次 Scan 才返回。
+			if !asyncConsumed {
+				<-sc.alwaysMergedRes
+				<-sc.alwaysAssertRes
+			}
+		}()
+	}
 
 	// 1) 字面量预过滤: 命中某 pattern 的必需字面量, 才对其做一次存在性验证.
 	//    存在性快门档 (!reportLoc) 下, 有界宽 lean NFA 走"邻域窗口"验证: 任一匹配必含必需字面量,
@@ -417,6 +622,8 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		anchorBatch := sc.anchorBatch[:0]
 		sc.anchorSeen = resetBoolBuf(sc.anchorSeen, d.n)
 		biBatch := sc.biBatch[:0]
+		gateTasks := sc.gateTasks[:0]
+		deferGated := runtime.GOMAXPROCS(0) > 1 && !d.reportLoc && d.kernel != nil
 		if d.hasBiAnchor {
 			sc.biSeen = resetBoolBuf(sc.biSeen, d.n)
 		}
@@ -511,9 +718,17 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 						winLo = 0
 					}
 					winLo = alignRuneStart(data, winLo)
+					if deferGated {
+						gateTasks = append(gateTasks, gateTask{idx: idx, winLo: int32(winLo)})
+						continue
+					}
 					if stop := d.verifyGateLocalized(int(idx), data, winLo, sc, handler); stop {
 						return true, nil
 					}
+					continue
+				}
+				if deferGated {
+					gateTasks = append(gateTasks, gateTask{idx: idx, winLo: -1})
 					continue
 				}
 				// 其余 (无内核 / 断言 NFA / 无 NFA 兜底): 立即逐条验证.
@@ -523,84 +738,344 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			}
 		}
 		sc.batchIdx = batch
+		sc.gateTasks = gateTasks
+		asyncGated := false
+		asyncGatedConsumed := false
+		if len(gateTasks) > 0 {
+			if sc.gateAsyncScratch == nil {
+				sc.gateAsyncScratch = &scratch{}
+				sc.gateAsyncRes = make(chan []byte, 1)
+			}
+			if cap(sc.gateAsyncOut) < len(gateTasks) {
+				sc.gateAsyncOut = make([]byte, len(gateTasks))
+			} else {
+				sc.gateAsyncOut = sc.gateAsyncOut[:len(gateTasks)]
+			}
+			workerSc := sc.gateAsyncScratch
+			workerSc.assertBoundReady = false
+			sc.startWorkers()
+			sc.gatedTasks <- gatedWorkerTask{
+				db: d, data: data, tasks: gateTasks, scratch: workerSc,
+				out: sc.gateAsyncOut, result: sc.gateAsyncRes,
+			}
+			asyncGated = true
+			defer func() {
+				if !asyncGatedConsumed {
+					<-sc.gateAsyncRes
+				}
+			}()
+		}
+		sc.anchorBatch = anchorBatch
+		sc.biBatch = biBatch
+		asyncAnchored := false
+		asyncAnchoredConsumed := false
+		if !d.reportLoc && d.kernel != nil && !anchorCBatchEnabled && !anchorMergedEnabled &&
+			(len(anchorBatch) > 0 || len(biBatch) > 0) {
+			if sc.anchoredAsyncScratch == nil {
+				sc.anchoredAsyncScratch = &scratch{}
+				sc.anchoredAsyncRes = make(chan anchoredResult, 1)
+			}
+			if cap(sc.anchoredAnchorOut) < len(anchorBatch) {
+				sc.anchoredAnchorOut = make([]byte, len(anchorBatch))
+			} else {
+				sc.anchoredAnchorOut = sc.anchoredAnchorOut[:len(anchorBatch)]
+			}
+			if cap(sc.anchoredBiOut) < len(biBatch) {
+				sc.anchoredBiOut = make([]byte, len(biBatch))
+			} else {
+				sc.anchoredBiOut = sc.anchoredBiOut[:len(biBatch)]
+			}
+			workerSc := sc.anchoredAsyncScratch
+			workerSc.assertBoundReady = false
+			workerSc.anchorPrev = ensureU64(workerSc.anchorPrev, d.maxAnchorNword)
+			workerSc.anchorCand = ensureU64(workerSc.anchorCand, d.maxAnchorNword)
+			workerSc.anchorActive = ensureU64(workerSc.anchorActive, d.maxAnchorNword)
+			sc.startWorkers()
+			sc.anchoredTasks <- anchoredWorkerTask{
+				db: d, data: data, anchorBatch: anchorBatch, biBatch: biBatch,
+				owner: sc, scratch: workerSc, anchorOut: sc.anchoredAnchorOut,
+				biOut: sc.anchoredBiOut, result: sc.anchoredAsyncRes,
+			}
+			asyncAnchored = true
+			defer func() {
+				if !asyncAnchoredConsumed {
+					<-sc.anchoredAsyncRes
+				}
+			}()
+		}
 		for _, idx32 := range batch {
 			idx := int(idx32)
 			sc.fullDone[idx] = true
 			lo, hi := int(sc.winLo[idx]), int(sc.winHi[idx])
 			if d.kernel.nfaExists(idx, data[lo:hi]) {
-				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+				// litSpan 的 union 已覆盖任一包含本 pattern 必需字面量的完整匹配；
+				// 因此定位无需退回整段 data 重扫。对需 verifier 的规则由 helper 安全回退。
+				if stop := d.finalizeHitWindow(idx, data, lo, hi, sc, handler); stop {
 					return true, nil
 				}
 			}
 		}
-		// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
-		sc.anchorBatch = anchorBatch
-		for _, idx32 := range anchorBatch {
-			idx := int(idx32)
-			sc.fullDone[idx] = true
-			spans := mergeAnchorSpans(sc.anchorRanges[idx])
-			nfa := d.nfas[idx]
-			var hit bool
-			// nword==1 (绝大多数真实 pattern) 走标量零分配快路径, 否则走多字通用版.
-			switch {
-			case nfa.hasAssert && nfa.single:
-				hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, sc), spans)
-			case nfa.hasAssert:
-				hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
-			case nfa.single:
-				hit = nfa.existsInAnchored1(data, spans)
-			default:
-				hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
-			}
-			if hit {
-				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+		if asyncAnchored {
+			res := <-sc.anchoredAsyncRes
+			asyncAnchoredConsumed = true
+			for i, idx32 := range anchorBatch {
+				idx := int(idx32)
+				sc.fullDone[idx] = true
+				if res.anchor[i] != 0 && d.finalizeHit(idx, data, sc, handler) {
 					return true, nil
 				}
 			}
-		}
-		// 双向锚定批处理: 前向锚定 (头有界出现处) ∪ 反向锚定 (尾有界出现处) 替换整段 batch. 任一向命中
-		// 即真匹配 (子串/邻域关系无假阳); 二者并集覆盖全部匹配 (每出现处至少一侧有界, 无假阴).
-		sc.biBatch = biBatch
-		for _, idx32 := range biBatch {
-			idx := int(idx32)
-			sc.fullDone[idx] = true
-			var hit bool
-			if fwdSpans := mergeAnchorSpans(sc.biFwdRanges[idx]); len(fwdSpans) > 0 {
-				fwd := d.nfas[idx]
-				if fwd.single {
-					hit = fwd.existsInAnchored1(data, fwdSpans)
-				} else {
-					hit = fwd.existsInAnchored(data, fwdSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+			for i, idx32 := range biBatch {
+				idx := int(idx32)
+				sc.fullDone[idx] = true
+				if res.bi[i] != 0 && d.finalizeHit(idx, data, sc, handler) {
+					return true, nil
 				}
 			}
-			if !hit {
-				if revSpans := mergeAnchorSpans(sc.biRevRanges[idx]); len(revSpans) > 0 {
-					rev := d.revNFAs[idx]
-					if rev.single {
-						hit = rev.existsInReverseAnchored1(data, revSpans)
-					} else {
-						hit = rev.existsInReverseAnchored(data, revSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+		} else {
+			// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
+			// lean anchored NFA 已在 C blob 中。把本报文所有 pattern 的 spans 平铺后一次跨界；
+			// C 内仍按 pattern 独立执行相同的提前消亡递推，但避免 Go 热循环和 O(pattern) cgo。
+			// 含零宽断言的 NFA 不入 blob，必须留在下方 Go 路径以复用真实边界 guard。
+			if anchorCBatchEnabled && d.kernel != nil && !anchorMergedEnabled && len(anchorBatch) > 0 {
+				sc.anchorCIdx = sc.anchorCIdx[:0]
+				sc.anchorSpanOff = sc.anchorSpanOff[:0]
+				sc.anchorSpansLo = sc.anchorSpansLo[:0]
+				sc.anchorSpansHi = sc.anchorSpansHi[:0]
+				for _, idx32 := range anchorBatch {
+					idx := int(idx32)
+					nfa := d.nfas[idx]
+					if nfa == nil || nfa.hasAssert {
+						continue
+					}
+					spans := mergeAnchorSpans(sc.anchorRanges[idx])
+					if len(spans) == 0 {
+						continue
+					}
+					sc.anchorCIdx = append(sc.anchorCIdx, idx32)
+					sc.anchorSpanOff = append(sc.anchorSpanOff, int32(len(sc.anchorSpansLo)))
+					for _, span := range spans {
+						sc.anchorSpansLo = append(sc.anchorSpansLo, span.lo)
+						sc.anchorSpansHi = append(sc.anchorSpansHi, span.hi)
+					}
+				}
+				if len(sc.anchorCIdx) > 0 {
+					sc.anchorSpanOff = append(sc.anchorSpanOff, int32(len(sc.anchorSpansLo)))
+					out := d.kernel.nfaExistsAnchoredMany(sc.anchorCIdx, data, sc.anchorSpanOff,
+						sc.anchorSpansLo, sc.anchorSpansHi, sc)
+					for i, hit := range out {
+						idx := int(sc.anchorCIdx[i])
+						sc.fullDone[idx] = true
+						if hit != 0 && d.finalizeHit(idx, data, sc, handler) {
+							return true, nil
+						}
 					}
 				}
 			}
-			if hit {
-				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+			if anchorMergedEnabled && d.anchoredMerged != nil {
+				if cap(sc.anchorMergedSpans) < d.anchoredMerged.nmem {
+					sc.anchorMergedSpans = make([][]anchorSpan, d.anchoredMerged.nmem)
+				} else {
+					sc.anchorMergedSpans = sc.anchorMergedSpans[:d.anchoredMerged.nmem]
+					for i := range sc.anchorMergedSpans {
+						sc.anchorMergedSpans[i] = nil
+					}
+				}
+				mergedAny := false
+				for _, idx32 := range anchorBatch {
+					idx := int(idx32)
+					mi := d.anchorMergedSlot[idx]
+					if mi < 0 {
+						continue // 断言 NFA 仍由下方单条 guarded verifier 执行
+					}
+					spans := mergeAnchorSpans(sc.anchorRanges[idx])
+					sc.anchorMergedSpans[mi] = spans
+					sc.fullDone[idx] = true
+					mergedAny = true
+				}
+				if mergedAny {
+					sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
+					sc.mergedHits = d.anchoredMerged.scanExistAnchored(data, sc.anchorMergedSpans, sc.mergedSeen, sc.mergedHits[:0])
+					for _, idx := range sc.mergedHits {
+						if stop := d.finalizeHit(idx, data, sc, handler); stop {
+							return true, nil
+						}
+					}
+				}
+			}
+			for _, idx32 := range anchorBatch {
+				idx := int(idx32)
+				if anchorCBatchEnabled && d.kernel != nil && !anchorMergedEnabled && d.nfas[idx] != nil && !d.nfas[idx].hasAssert {
+					continue // 已由上方 C anchored-many 精确判定
+				}
+				if anchorMergedEnabled && d.anchoredMerged != nil && d.anchorMergedSlot[idx] >= 0 {
+					continue // 已由上方 merged verifier 精确判定
+				}
+				sc.fullDone[idx] = true
+				spans := mergeAnchorSpans(sc.anchorRanges[idx])
+				nfa := d.nfas[idx]
+				var hit bool
+				switch {
+				case nfa.hasAssert && nfa.single:
+					hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, sc), spans)
+				case nfa.hasAssert:
+					hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
+				case d.kernel != nil:
+					// C anchored 与 Go 执行器有随机、定向及真实流量逐条等价护栏；直接采用
+					// 权威结果，避免 C 命中后再做一遍完全相同的 Go 位递推。
+					hit = d.kernel.nfaExistsAnchored(idx, data, spans)
+				case nfa.single:
+					hit = nfa.existsInAnchored1(data, spans)
+				case nfa.nword == 2:
+					hit = nfa.existsInAnchored2(data, spans)
+				default:
+					hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+				}
+				if hit {
+					if stop := d.finalizeHit(idx, data, sc, handler); stop {
+						return true, nil
+					}
+				}
+			}
+			// 双向锚定批处理: 前向锚定 (头有界出现处) ∪ 反向锚定 (尾有界出现处) 替换整段 batch. 任一向命中
+			// 即真匹配 (子串/邻域关系无假阳); 二者并集覆盖全部匹配 (每出现处至少一侧有界, 无假阴).
+			for _, idx32 := range biBatch {
+				idx := int(idx32)
+				sc.fullDone[idx] = true
+				var hit bool
+				if fwdSpans := mergeAnchorSpans(sc.biFwdRanges[idx]); len(fwdSpans) > 0 {
+					fwd := d.nfas[idx]
+					if d.kernel != nil {
+						hit = d.kernel.nfaExistsAnchored(idx, data, fwdSpans)
+					} else if fwd.single {
+						hit = fwd.existsInAnchored1(data, fwdSpans)
+					} else if fwd.nword == 2 {
+						hit = fwd.existsInAnchored2(data, fwdSpans)
+					} else {
+						hit = fwd.existsInAnchored(data, fwdSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+					}
+				}
+				if !hit {
+					if revSpans := mergeAnchorSpans(sc.biRevRanges[idx]); len(revSpans) > 0 {
+						rev := d.revNFAs[idx]
+						if rev.single {
+							hit = rev.existsInReverseAnchored1(data, revSpans)
+						} else if rev.nword == 2 {
+							hit = rev.existsInReverseAnchored2(data, revSpans)
+						} else {
+							hit = rev.existsInReverseAnchored(data, revSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+						}
+					}
+				}
+				if hit {
+					if stop := d.finalizeHit(idx, data, sc, handler); stop {
+						return true, nil
+					}
+				}
+			}
+		}
+		if asyncGated {
+			out := <-sc.gateAsyncRes
+			asyncGatedConsumed = true
+			for i, hit := range out {
+				if hit != 0 && !handler(Match{ID: d.all[gateTasks[i].idx].id, From: -1, To: -1}) {
 					return true, nil
 				}
 			}
 		}
 	}
 
-	// 2) 无字面量且可编入 NFA 的 always-on: 合并自动机单趟扫描得命中集合, 命中后逐个定位上报.
-	//    有 C 内核时单趟扫描走 C (返回去重后的成员 idx, 再用 fullDone 跨步去重); 否则走纯 Go.
-	if d.merged != nil {
+	// 2+3) 合并扫描 + 断言扫描合并为单次 C 数据遍历 (消除第二次 traversal).
+	// 有 C 内核且 merged != nil 时走 combinedScan (merged + single-word assert 在一次遍历内).
+	// 多字 assert NFA 回退逐条 verifyOne (需要共享边界, 不适合 combined).
+	if d.kernel != nil && d.merged != nil && len(d.assertAlwaysOn) > 0 {
+		// 两组下标在编译期预计算，避免每条报文重复分类和分配切片。
+		assertCIdxs := d.assertAlwaysOnCIdxs
+		assertGoIdxs := d.assertAlwaysOnGoIdxs
+		if len(assertCIdxs) > 0 {
+			keepBound := len(assertGoIdxs) > 0
+			var mHits, aHits []int
+			if asyncAlways {
+				mHits = <-sc.alwaysMergedRes
+				assertBits := <-sc.alwaysAssertRes
+				asyncConsumed = true
+				sc.assertHits = sc.assertHits[:0]
+				for i, hit := range assertBits {
+					if hit != 0 {
+						sc.assertHits = append(sc.assertHits, int(assertCIdxs[i]))
+					}
+				}
+				aHits = sc.assertHits
+			} else {
+				mHits, aHits = d.kernel.combinedScan(data, assertCIdxs, keepBound, sc)
+			}
+			sc.assertBoundReady = keepBound
+			// 处理 merged 命中
+			for _, idx := range mHits {
+				if sc.fullDone[idx] {
+					continue
+				}
+				sc.fullDone[idx] = true
+				if stop := d.reportLocated(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+			// 处理 assert 命中
+			for _, idx := range aHits {
+				sc.fullDone[idx] = true
+				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+			// 标记未命中的 assert (已由 combinedScan 判定)
+			for _, idx := range assertCIdxs {
+				sc.fullDone[int(idx)] = true
+			}
+			// Go 逐条处理多字 assert
+			for _, idx := range assertGoIdxs {
+				if sc.fullDone[idx] {
+					continue
+				}
+				sc.fullDone[idx] = true
+				if stop := d.verifyOne(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+		} else {
+			// 无 single-word assert, 走原路径
+			if d.merged != nil {
+				hits := d.kernel.mergedScan(data, sc)
+				for _, idx := range hits {
+					if sc.fullDone[idx] {
+						continue
+					}
+					sc.fullDone[idx] = true
+					if stop := d.reportLocated(idx, data, sc, handler); stop {
+						return true, nil
+					}
+				}
+			}
+			for _, idx := range d.assertAlwaysOn {
+				if sc.fullDone[idx] {
+					continue
+				}
+				sc.fullDone[idx] = true
+				if stop := d.verifyOne(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+		}
+	} else if d.merged != nil {
+		// 无 assert always-on 或无 C 内核: 原路径
 		var hits []int
 		if d.kernel != nil {
 			hits = d.kernel.mergedScan(data, sc)
 		} else {
-			sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
-			sc.mergedHits = d.merged.scanExist(data, sc.mergedSeen, sc.mergedHits[:0])
-			hits = sc.mergedHits
+			if !d.mergedNecFactor.hasFactor || d.mergedNecFactor.check(data) {
+				sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
+				sc.mergedHits = d.merged.scanExist(data, sc.mergedSeen, sc.mergedHits[:0])
+				hits = sc.mergedHits
+			}
 		}
 		for _, idx := range hits {
 			if sc.fullDone[idx] {
@@ -611,15 +1086,42 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				return true, nil
 			}
 		}
+		// 3) assert always-on
+		for _, idx := range d.assertAlwaysOn {
+			if sc.fullDone[idx] {
+				continue
+			}
+			sc.fullDone[idx] = true
+			if stop := d.verifyOne(idx, data, sc, handler); stop {
+				return true, nil
+			}
+		}
+	} else {
+		// 无 merged: 仅 assert always-on
+		for _, idx := range d.assertAlwaysOn {
+			if sc.fullDone[idx] {
+				continue
+			}
+			sc.fullDone[idx] = true
+			if stop := d.verifyOne(idx, data, sc, handler); stop {
+				return true, nil
+			}
+		}
 	}
 
-	// 3) 无字面量的断言 NFA always-on: existsInAssertShared 位并行门控 (共享边界), 命中后交 verifier 定位.
-	for _, idx := range d.assertAlwaysOn {
-		if sc.fullDone[idx] {
+	// Rigid always-on assertions that were recognized at compile time. A
+	// positive existence result still uses finalizeHit, preserving located-mode
+	// verifier semantics.
+	var specializedFound uint64
+	if d.specializedMask != 0 {
+		specializedFound = mvsSpecializedMask(data, d.specializedMask)
+	}
+	for _, fast := range d.specializedAlwaysOn {
+		if sc.fullDone[fast.idx] {
 			continue
 		}
-		sc.fullDone[idx] = true
-		if stop := d.verifyOne(idx, data, sc, handler); stop {
+		sc.fullDone[fast.idx] = true
+		if specializedFound&(uint64(1)<<fast.kind) != 0 && d.finalizeHit(fast.idx, data, sc, handler) {
 			return true, nil
 		}
 	}
@@ -679,9 +1181,70 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 		// regexp2-origin (语言等价) 或断言 NFA: 精确定位交 verifier.
 		return d.reportViaVerifier(cp, data, handler)
 	}
+	// 单字 lean NFA 是真实规则集的主力。已由 C 存在性门确认命中时，直接在 C 侧枚举
+	// leftmost-longest spans，避免 Go 再完整扫描一遍；C 内核不适用或异常空结果时回退
+	// 已验证的 Go 定位器，绝不因优化漏报。
+	if d.kernel != nil {
+		if locs, ok := d.kernel.findAllLoc(idx, data, sc); ok && len(locs) > 0 {
+			for i := 0; i < len(locs); i += 2 {
+				if !handler(Match{ID: cp.id, From: int(locs[i]), To: int(locs[i+1])}) {
+					return true
+				}
+			}
+			return false
+		}
+	}
 	stopped := false
 	nfa.findAllLoc(data, sc, func(from, to int) bool {
 		if !handler(Match{ID: cp.id, From: from, To: to}) {
+			stopped = true
+			return false
+		}
+		return true
+	})
+	return stopped
+}
+
+// finalizeHitWindow 是已被字面量窗口验证命中的定位出口。对 exact lean NFA，窗口 union
+// 覆盖本报文所有可能匹配，故在 data[lo:hi] 内枚举并将偏移平移回原文即可；这消除过去
+// “局部 existsIn 后又整段 findAllLoc” 的重复扫描。gate、re2Loc、断言仍保留原出口，
+// 因为其定位语义依赖 verifier 或边界 guard，不能假设普通子串等价。
+func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch, handler MatchHandler) bool {
+	if lo < 0 || hi > len(data) || lo >= hi {
+		return d.finalizeHit(idx, data, sc, handler)
+	}
+	cp := d.all[idx]
+	nfa := d.nfas[idx]
+	if d.gate[idx] || nfa == nil || nfa.hasAssert {
+		return d.finalizeHit(idx, data, sc, handler)
+	}
+	if !d.reportLoc {
+		return !handler(Match{ID: cp.id, From: -1, To: -1})
+	}
+	sub := data[lo:hi]
+	// re2Loc 的语言与 NFA 相等，但为保持原 regexp2 的 leftmost 语义仍必须交 verifier。
+	// litSpan 已完整覆盖每个匹配，故 verifier 同样可在子串运行；将相对偏移平移回原文。
+	if d.re2Loc[idx] {
+		for _, loc := range cp.v.findAll(sub) {
+			if !handler(Match{ID: cp.id, From: lo + loc[0], To: lo + loc[1]}) {
+				return true
+			}
+		}
+		return false
+	}
+	if d.kernel != nil {
+		if locs, ok := d.kernel.findAllLoc(idx, sub, sc); ok && len(locs) > 0 {
+			for i := 0; i < len(locs); i += 2 {
+				if !handler(Match{ID: cp.id, From: lo + int(locs[i]), To: lo + int(locs[i+1])}) {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	stopped := false
+	nfa.findAllLoc(sub, sc, func(from, to int) bool {
+		if !handler(Match{ID: cp.id, From: lo + from, To: lo + to}) {
 			stopped = true
 			return false
 		}
@@ -705,6 +1268,12 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 		// 后者复核已收窄到 data[winLo:] 廉价, 故移除预检为净赚)。真正的杠杆是把该 gate 也局部化 (gateHead>=0)。
 		var hit bool
 		switch {
+		case nfa.hasAssert && nfa.single && d.kernel != nil:
+			// 断言 NFA 单字: C 内核扫描 (共享边界, 每报文一次).
+			hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
+		case nfa.hasAssert && d.kernel != nil:
+			// 多字断言在线生成边界并递推，避免 bound 物化后二次遍历。
+			hit = d.kernel.nfaExistsAssertOnline(idx, data)
 		case nfa.hasAssert && nfa.single:
 			hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
 		case nfa.hasAssert:
@@ -724,11 +1293,135 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 	return d.reportViaVerifier(cp, data, handler)
 }
 
+func (d *mvsDB) scanAnchoredNoReport(data []byte, anchorBatch, biBatch []int32,
+	owner, work *scratch, anchorOut, biOut []byte,
+) {
+	for i, idx32 := range anchorBatch {
+		idx := int(idx32)
+		spans := mergeAnchorSpans(owner.anchorRanges[idx])
+		nfa := d.nfas[idx]
+		var hit bool
+		switch {
+		case nfa.hasAssert && nfa.single:
+			hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, work), spans)
+		case nfa.hasAssert:
+			hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, work), spans, work.anchorPrev, work.anchorCand)
+		case d.kernel != nil:
+			hit = d.kernel.nfaExistsAnchored(idx, data, spans)
+		case nfa.single:
+			hit = nfa.existsInAnchored1(data, spans)
+		case nfa.nword == 2:
+			hit = nfa.existsInAnchored2(data, spans)
+		default:
+			hit = nfa.existsInAnchored(data, spans, work.anchorPrev, work.anchorCand, work.anchorActive)
+		}
+		if hit {
+			anchorOut[i] = 1
+		} else {
+			anchorOut[i] = 0
+		}
+	}
+	for i, idx32 := range biBatch {
+		idx := int(idx32)
+		var hit bool
+		if fwdSpans := mergeAnchorSpans(owner.biFwdRanges[idx]); len(fwdSpans) > 0 {
+			fwd := d.nfas[idx]
+			if d.kernel != nil {
+				hit = d.kernel.nfaExistsAnchored(idx, data, fwdSpans)
+			} else if fwd.single {
+				hit = fwd.existsInAnchored1(data, fwdSpans)
+			} else if fwd.nword == 2 {
+				hit = fwd.existsInAnchored2(data, fwdSpans)
+			} else {
+				hit = fwd.existsInAnchored(data, fwdSpans, work.anchorPrev, work.anchorCand, work.anchorActive)
+			}
+		}
+		if !hit {
+			if revSpans := mergeAnchorSpans(owner.biRevRanges[idx]); len(revSpans) > 0 {
+				rev := d.revNFAs[idx]
+				if rev.single {
+					hit = rev.existsInReverseAnchored1(data, revSpans)
+				} else if rev.nword == 2 {
+					hit = rev.existsInReverseAnchored2(data, revSpans)
+				} else {
+					hit = rev.existsInReverseAnchored(data, revSpans, work.anchorPrev, work.anchorCand, work.anchorActive)
+				}
+			}
+		}
+		if hit {
+			biOut[i] = 1
+		} else {
+			biOut[i] = 0
+		}
+	}
+}
+
+// existsNoReport 是存在性流水 worker 的纯判定入口。它复刻 verifyOne / verifyGateLocalized
+// 的门控语义，但不调用 handler；调用线程收拢结果后统一上报，避免并发 handler。
+func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) bool {
+	if winLo >= 0 {
+		sub := data
+		if winLo > 0 {
+			sub = data[winLo:]
+		}
+		if gateSupersetPrecheck {
+			nfa := d.nfas[idx]
+			var hit bool
+			switch {
+			case nfa.hasAssert && !nfa.single && d.kernel != nil:
+				hit = d.kernel.nfaExistsAssertOnline(idx, sub)
+			case nfa.hasAssert && nfa.single:
+				sc.gateBound = computeBoundaries(sub, sc.gateBound)
+				hit = nfa.existsInAssertShared1(sub, sc.gateBound)
+			case nfa.hasAssert:
+				sc.gateBound = computeBoundaries(sub, sc.gateBound)
+				hit = nfa.existsInAssertShared(sub, sc.gateBound)
+			case d.kernel != nil:
+				hit = d.kernel.nfaExists(idx, sub)
+			default:
+				hit = nfa.existsIn(sub)
+			}
+			if !hit {
+				return false
+			}
+		}
+		return len(d.all[idx].v.findAll(sub)) > 0
+	}
+
+	nfa := d.nfas[idx]
+	if nfa == nil {
+		return len(d.all[idx].v.findAll(data)) > 0
+	}
+	var hit bool
+	switch {
+	case nfa.hasAssert && !nfa.single && d.kernel != nil:
+		hit = d.kernel.nfaExistsAssertOnline(idx, data)
+	case nfa.hasAssert && d.kernel != nil:
+		hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
+	case nfa.hasAssert && nfa.single:
+		hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
+	case nfa.hasAssert:
+		hit = nfa.existsInAssertShared(data, d.sharedBound(data, sc))
+	case d.kernel != nil:
+		hit = d.kernel.nfaExists(idx, data)
+	default:
+		hit = nfa.existsIn(data)
+	}
+	if !hit {
+		return false
+	}
+	if d.gate[idx] {
+		return len(d.all[idx].v.findAll(data)) > 0
+	}
+	return true
+}
+
 // verifyGateLocalized 对可局部化超集门做"收窄到 data[winLo:]"的存在性门 + regexp2 复核.
 // winLo 已 rune 对齐且满足 winLo < 任一原匹配起点、winLo 前无该门字面量可达 (见 computeGateHead),
 // 故 data[winLo:] 上的判定与整段一致:
 //   - 无假阴: regexp2 真匹配整体落在 [winLo, n) 内 (其字面量结尾 >= firstHitEnd > winLo+head);
 //   - 无假阳: 子切片首位 (winLo) 起不了匹配 (前方 head 距内无该门字面量), 内部命中左上下文真实。
+//
 // gate 的 verifier 命中报 -1/-1, 偏移无需换算; 与整段 reportViaVerifier 同上报。
 func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch, handler MatchHandler) bool {
 	sub := data
@@ -743,6 +1436,8 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 		nfa := d.nfas[idx]
 		var hit bool
 		switch {
+		case nfa.hasAssert && !nfa.single && d.kernel != nil:
+			hit = d.kernel.nfaExistsAssertOnline(idx, sub)
 		case nfa.hasAssert && nfa.single:
 			sc.gateBound = computeBoundaries(sub, sc.gateBound)
 			hit = nfa.existsInAssertShared1(sub, sc.gateBound)
@@ -843,7 +1538,12 @@ func ensureInt32(buf []int32, n int) []int32 {
 // 仅在首条断言 NFA 需要门控时触发; 无断言命中的报文完全不计算 (零开销).
 func (d *mvsDB) sharedBound(data []byte, sc *scratch) []uint8 {
 	if !sc.assertBoundReady {
-		sc.assertBound = computeBoundaries(data, sc.assertBound)
+		// 有 C 内核时用 C 侧 computeBoundaries (省 Go 逐字节循环), 否则纯 Go.
+		if d.kernel != nil {
+			sc.assertBound = d.kernel.computeBoundariesC(data, sc.assertBound)
+		} else {
+			sc.assertBound = computeBoundaries(data, sc.assertBound)
+		}
 		sc.assertBoundReady = true
 	}
 	return sc.assertBound

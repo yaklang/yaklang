@@ -80,6 +80,12 @@ func TestMVSReverseNFADifferential(t *testing.T) {
 					t.Fatalf("REVERSE1 mismatch expr=%q input=%q: rev1=%v fwd=%v", expr, in, got1, want)
 				}
 			}
+			if rev.nword == 2 {
+				got2 := rev.existsInReverseAnchored2(in, fullRevSpans(len(in)))
+				if got2 != want {
+					t.Fatalf("REVERSE2 mismatch expr=%q input=%q: rev2=%v fwd=%v", expr, in, got2, want)
+				}
+			}
 		}
 	}
 	t.Logf("reverse NFA differential: tested=%d skipped=%d", tested, skipped)
