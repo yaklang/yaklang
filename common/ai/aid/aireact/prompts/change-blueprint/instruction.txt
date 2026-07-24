@@ -1,4 +1,4 @@
-# Change AI Blueprint
+# Change AI Blueprint Task
 你需要基于当前任务上下文，重新选择一个更适合继续执行的 AI Blueprint。
 
 ## Core Rules

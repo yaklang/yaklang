@@ -129,7 +129,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 			}
 
 			// Blueprint 参数生成 - 精确匹配本测试的 testForgeName
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
+			if isToolParamGenPromptForBlueprint(prompt, testForgeName) {
 				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -152,7 +152,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 			}
 
 			// ReAct 主循环的响应 - 请求 blueprint (forge)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", "ask_for_clarification") &&
+			if isPrimaryDecisionPrompt(prompt) &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`

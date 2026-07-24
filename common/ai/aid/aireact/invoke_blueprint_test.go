@@ -21,7 +21,7 @@ import (
 func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string, forgeName string) (*aicommon.AIResponse, error) {
 
 	rsp := config.NewAIResponse()
-	if utils.MatchAllOfSubString(req.GetPrompt(), `require_ai_blueprint`, `require_tool`, "USER_QUERY", `directly_answer`, `ask_for_clarification`) {
+	if isPrimaryDecisionPrompt(req.GetPrompt()) {
 		rs := bytes.NewBufferString(`
 {"@action": "object", "next_action": {
 	"type": "require_ai_blueprint",
@@ -224,7 +224,7 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 	aiforgeExecuteConfirmed := false
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if utils.MatchAllOfSubString(r.GetPrompt(), forgeName, "Blueprint Schema:", `call-ai-blueprint`) {
+			if isToolParamGenPromptForBlueprint(r.GetPrompt(), forgeName) {
 				aiforgeExecuteConfirmed = true
 			}
 			return mockedRequireBlueprint_BASIC(i, r, flag, forgeName)

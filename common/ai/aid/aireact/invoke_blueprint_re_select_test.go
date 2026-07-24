@@ -22,7 +22,7 @@ import (
 func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string, forgeName1 string, forgeName2 string) (*aicommon.AIResponse, error) {
 
 	rsp := config.NewAIResponse()
-	if utils.MatchAllOfSubString(req.GetPrompt(), `require_ai_blueprint`, `require_tool`, "USER_QUERY", `directly_answer`, `ask_for_clarification`) {
+	if isPrimaryDecisionPrompt(req.GetPrompt()) {
 		rs := bytes.NewBufferString(`
 {"@action": "object", "next_action": {
 	"type": "require_ai_blueprint",
@@ -36,11 +36,7 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 
 	prompt := req.GetPrompt()
 
-	if utils.MatchAllOfSubString(
-		req.GetPrompt(), forgeName1,
-		"Blueprint Schema:", `Blueprint Description:`,
-		`call-ai-blueprint`,
-	) && !utils.MatchAllOfSubString(prompt, `<|OLD_PARAMS_`) {
+	if isToolParamGenPromptForBlueprint(prompt, forgeName1) && !isToolParamGenPromptWithOldParams(prompt) {
 		rs := bytes.NewBufferString(`
 {"@action": "call-ai-blueprint", "params": {
 	"query": "...[` + codec.Sha256(flag) + `]...",
@@ -51,10 +47,7 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(
-		req.GetPrompt(), "<|OLD_PARAMS_", "Current AI Blueprint", "change-ai-blueprint",
-		"reasoning", "new_blueprint",
-	) {
+	if isChangeBlueprintPrompt(prompt) {
 		rs := bytes.NewBufferString(`
 {"@action": "change-ai-blueprint", "reasoning": "...[` + codec.Sha1(flag) + `]...",
 "new_blueprint": "` + forgeName2 + `"}
@@ -64,13 +57,13 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") {
+	if isDirectAnswerPrompt(prompt) {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") {
+	if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "completed"}`))
 		rsp.Close()
 		return rsp, nil

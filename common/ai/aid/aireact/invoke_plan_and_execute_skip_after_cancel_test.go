@@ -133,7 +133,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
+			if isToolParamGenPromptForBlueprint(prompt, testForgeName) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"target": "http://example.com", "query": "test"},
@@ -153,7 +153,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", "ask_for_clarification") &&
+			if isPrimaryDecisionPrompt(prompt) &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`

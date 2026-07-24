@@ -34,7 +34,7 @@ func mockedToolCallingForRemove(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 		rsp.Close()
 		return rsp, nil
 	}
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		if strings.Contains(prompt, "assistant output") {
 			rsp.EmitOutputStream(bytes.NewBufferString(`

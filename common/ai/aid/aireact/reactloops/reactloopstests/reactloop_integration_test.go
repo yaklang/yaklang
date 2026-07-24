@@ -58,11 +58,11 @@ func TestReActLoop_BasicExecution(t *testing.T) {
 }
 
 func isRequireToolParamPrompt(prompt string) bool {
-	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
+	if aicommon.IsToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
 		return true
 	}
 
-	return strings.Contains(prompt, "Generate appropriate parameters for this tool call") &&
+	return strings.Contains(prompt, "# Tool Context") &&
 		strings.Contains(prompt, "call-tool")
 }
 
@@ -96,7 +96,7 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				iterationCount++
 
 				if iterationCount > 3 {
@@ -186,7 +186,7 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },

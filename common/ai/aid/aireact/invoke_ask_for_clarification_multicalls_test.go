@@ -24,7 +24,7 @@ func askForClarificationInSchema(prompt string) bool {
 func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	fmt.Println(prompt)
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") && !askForClarificationInSchema(prompt) {
+	if isPrimaryDecisionPrompt(prompt) && !askForClarificationInSchema(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "...mocked-directly-answer-` + flag + `" },
@@ -34,7 +34,7 @@ func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
-	if askForClarificationInSchema(prompt) && utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if askForClarificationInSchema(prompt) && isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": {"question": "...mocked question...", "options": ["` + flag + `", "option2", "option3"]} },

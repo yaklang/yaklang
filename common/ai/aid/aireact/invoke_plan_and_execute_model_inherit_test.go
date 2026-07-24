@@ -47,7 +47,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 		prompt := req.GetPrompt()
 		switch {
 		// Outer ReAct: trigger plan-and-execute (exclude inner subtask loops)
-		case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") &&
+		case isPrimaryDecisionPrompt(prompt) &&
 			!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "execute mock tool in aid" },
@@ -83,7 +83,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 "human_readable_thought": "call delegated tool", "cumulative_summary": "call delegated tool"}
 `))
 		// Tool parameter generation
-		case utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above"):
+		case utils.MatchAllOfSubString(prompt, "# Tool Context"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-tool", "tool": "mock_plan_exec_tool", "params": {}}
 `))
@@ -135,7 +135,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
     }
   ]
 }`))
-		case utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above"):
+		case utils.MatchAllOfSubString(prompt, "# Tool Context"):
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-tool", "tool": "mock_plan_exec_tool", "params": {}}
 `))

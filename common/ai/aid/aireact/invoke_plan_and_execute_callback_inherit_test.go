@@ -67,13 +67,13 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 			// 执行完成后 outer ReAct 再次进入主决策, 此时第一轮触发 request_plan_and_execution
 			// 时产出的 human_readable_thought="delegate" 会出现在 timeline-open 段.
 			// 检测到它说明 plan 已触发过一轮, 主动 finish 收口.
-			case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") &&
+			case isPrimaryDecisionPrompt(prompt) &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") &&
 				strings.Contains(prompt, "plan-exec-delegate-marker"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after plan execution"}`))
 
 			// Outer ReAct: first free-input → trigger plan-and-execute
-			case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") &&
+			case isPrimaryDecisionPrompt(prompt) &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "execute callback inherit test" },
@@ -113,7 +113,7 @@ func TestReAct_PlanAndExecute_InheritsDistinctCallbacks(t *testing.T) {
 `))
 
 			// Inner: tool parameter generation
-			case utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above"):
+			case utils.MatchAllOfSubString(prompt, "# Tool Context") || utils.MatchAllOfSubString(prompt, "Generate appropriate parameters"):
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-tool", "tool": "mock_callback_inherit_tool", "params": {}}
 `))

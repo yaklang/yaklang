@@ -16,7 +16,7 @@ import (
 
 func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", "ask_for_clarification") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": {"question": "...mocked question...", "options": ["` + flag + `", "option2", "option3"]} },
