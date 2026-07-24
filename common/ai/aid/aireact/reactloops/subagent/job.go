@@ -13,6 +13,10 @@ type ForkJob struct {
 	TaskName       string
 	UserInput      string
 	ResultContract string
+	// LoopName is the ReAct loop that will run inside the forked sub-agent.
+	// It is stored here so PrepareForkedSubAgent can emit explicit loop metadata
+	// for viz trajectory reconstruction.
+	LoopName string
 }
 
 // ForkLoopFactory builds the ReAct loop executed inside a forked sub-agent.

@@ -26,6 +26,12 @@ type TimelineItemHumanReadable struct {
 	TaskID    string `json:"task_id,omitempty"`    // 任务ID
 	Content   string `json:"content"`              // 实际内容
 
+	// 以下字段供 viz 还原执行轨迹，对旧消费者透明（可选 JSON 字段）
+	LoopName     string `json:"loop_name,omitempty"`      // loop 名称（如 dir_explore）
+	LoopKind     string `json:"loop_kind,omitempty"`      // orchestrator | phase | loop | subagent | nested_loop
+	ParentTaskID string `json:"parent_task_id,omitempty"` // 父任务 task id
+	PhaseName    string `json:"phase_name,omitempty"`     // 阶段名（如 phase1/phase2）
+
 	// 原始文本（用于调试）
 	RawText string `json:"raw_text,omitempty"`
 

@@ -219,6 +219,29 @@ func PrepareForkedSubAgent(
 	parentInvoker.AddRuntimeTask(subTask)
 	childInvoker.SetCurrentTask(subTask)
 
+	// Emit explicit sub-agent lifecycle metadata for viz trajectory reconstruction.
+	// The event carries the sub-task id, its human-readable name, the loop it will
+	// run, and the parent task id so the frontend can build the execution stack
+	// without guessing from task id strings.
+	if taskEmitter := subTask.GetEmitter(); taskEmitter != nil {
+		parentTaskID := ""
+		if parentTask != nil {
+			parentTaskID = parentTask.GetId()
+		}
+		loopName := strings.TrimSpace(job.LoopName)
+		if loopName == "" {
+			loopName = "subagent"
+		}
+		_, _ = taskEmitter.EmitStructured("loop_marker", map[string]any{
+			"loop_kind":      "subagent",
+			"loop_name":      loopName,
+			"task_id":        subTask.GetId(),
+			"task_name":      subTask.GetName(),
+			"parent_task_id": parentTaskID,
+			"marker":         "enter",
+		})
+	}
+
 	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
 

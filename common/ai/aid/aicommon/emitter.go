@@ -27,6 +27,17 @@ type BaseEmitter func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error)
 type EventProcesser func(e *schema.AiOutputEvent) *schema.AiOutputEvent
 type AIEventMetaProvider func() AIEventMeta
 
+// appendVizSource 把字段来源附加到 ContentType 的 viz-source 后缀，供 viz 前端识别。
+func appendVizSource(contentType, source string) string {
+	if source == "" {
+		return contentType
+	}
+	if contentType == "" {
+		return "default;viz-source=" + source
+	}
+	return contentType + ";viz-source=" + source
+}
+
 // AIEventMeta carries the runtime AI metadata that should be attached to
 // events emitted within a specific AI call scope.
 type AIEventMeta struct {
@@ -961,10 +972,14 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 	if e.isReason {
 		e.isSystem = false
 		e.nodeId = "re-act-loop-thought"
+		// model provider 原生 reasoning_content（如 deepseek-r1 / qwen-qwq）
+		// 在 viz 里需要与 human_readable_thought 等字段区分开，所以标记来源。
+		e.contentType = appendVizSource(e.contentType, "reason_content")
 	}
 
 	if e.nodeId == "thought" {
 		e.nodeId = "re-act-loop-thought"
+		e.contentType = appendVizSource(e.contentType, "reason_content")
 	}
 
 	schema.EnsureStreamNodeIdI18n(e.nodeId, r.streamNodeIdI18nProvider)

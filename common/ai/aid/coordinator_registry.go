@@ -36,3 +36,9 @@ func snapshotRunningCoordinators() []*Coordinator {
 	})
 	return coordinators
 }
+
+// GetRunningCoordinators returns a snapshot of all currently-running coordinators.
+// 关键词: coordinator registry, live agents, snapshot
+func GetRunningCoordinators() []*Coordinator {
+	return snapshotRunningCoordinators()
+}

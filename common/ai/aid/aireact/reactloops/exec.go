@@ -59,6 +59,15 @@ func isJSONEmbeddedAITagPrefix(peeked []byte, wrapperToken string) bool {
 	return bytes.HasPrefix(peeked[i:], []byte(wrapperToken))
 }
 
+// appendVizSource 把字段名作为 viz-source 后缀附加到 ContentType，供 viz 前端识别流来源。
+// 保持主 mime 类型不变，避免破坏现有渲染逻辑。
+func appendVizSource(contentType, fieldName string) string {
+	if fieldName == "" {
+		return contentType
+	}
+	return contentType + ";viz-source=" + fieldName
+}
+
 // waitReadableStream blocks until the stream yields at least one byte or closes.
 // It lets callers avoid creating frontend stream cards for empty streams while
 // still preserving the first byte for later emit.
@@ -371,6 +380,16 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 						if fieldIns.AINodeId != "" {
 							defaultNodeId = fieldIns.AINodeId
 						}
+						// 把字段名编码到 ContentType 的 viz-source 后缀，让 viz 前端能区分
+						// 这条 think/assistant 流来自 AI 响应中的哪个字段（如 human_readable_thought
+						// 还是 modify_code_reason）。不改变 NodeId，避免破坏现有 i18n/测试。
+						contentType := fieldIns.ContentType
+						if contentType == "" {
+							contentType = "text/plain"
+						}
+						if fieldIns.FieldName != "" {
+							contentType = appendVizSource(contentType, fieldIns.FieldName)
+						}
 						preparedReader, readable, readableErr := waitReadableStream(pr)
 						if readableErr != nil {
 							log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
@@ -387,7 +406,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							defaultNodeId,
 							preparedReader,
 							resp.GetTaskIndex(),
-							fieldIns.ContentType,
+							contentType,
 							fieldIns.IsSystem,
 							func() {
 								log.Debugf("stream emit callback for field [%s] triggered", key)
@@ -580,6 +599,26 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	r.SetCurrentTask(task)
 	r.ensureLoopDirectory(task)
+
+	// Emit loop-enter lifecycle marker. This records the loop name, the task it
+	// is executing on, and the parent task (if known) so that viz can reconstruct
+	// the real execution stack without inferring relationships from task id strings.
+	parentTaskID := ""
+	if inv := r.GetInvoker(); inv != nil {
+		if parentTask := inv.GetCurrentTask(); parentTask != nil && parentTask.GetId() != task.GetId() {
+			parentTaskID = parentTask.GetId()
+		}
+	}
+	if emitter := r.GetEmitter(); emitter != nil {
+		_, _ = emitter.EmitStructured("loop_marker", map[string]any{
+			"loop_kind":      "loop",
+			"loop_name":      r.GetLoopName(),
+			"task_id":        task.GetId(),
+			"task_name":      task.GetName(),
+			"parent_task_id": parentTaskID,
+			"marker":         "enter",
+		})
+	}
 
 	// Initialize action constraints from init handler
 	var initOperator *InitTaskOperator

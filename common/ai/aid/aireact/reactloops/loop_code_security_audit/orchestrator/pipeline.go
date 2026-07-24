@@ -100,10 +100,42 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 }
 
 // runPhase1 leverage dir_explore loop to generate an outline for the target project
+func emitPhaseMarker(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, kind, loopName, phaseLabel, parentTaskID string) {
+	if loop == nil {
+		return
+	}
+	emitter := loop.GetEmitter()
+	if emitter == nil {
+		return
+	}
+	if parentTaskID == "" {
+		if task != nil {
+			parentTaskID = task.GetId()
+		}
+	}
+	payload := map[string]any{
+		"loop_kind": kind,
+		"loop_name": loopName,
+		"marker":    "enter",
+	}
+	if task != nil {
+		payload["task_id"] = task.GetId()
+		payload["task_name"] = task.GetName()
+	}
+	if parentTaskID != "" {
+		payload["parent_task_id"] = parentTaskID
+	}
+	if phaseLabel != "" {
+		payload["phase_name"] = phaseLabel
+	}
+	_, _ = emitter.EmitStructured("loop_marker", payload)
+}
+
 func runPhase1(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string, ws *reactloops.WorkspaceAttachedContext, op *reactloops.InitTaskOperator) {
 	log.Infof("[CodeAudit] Starting Phase 1 (Recon via dir_explore)")
 	reactloops.EmitStatus(loop, "Phase 1：项目探索中 / Phase 1: Project exploration...")
 	r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：项目探索（使用 dir_explore loop）")
+	emitPhaseMarker(loop, task, "phase", "dir_explore", "Phase 1：项目探索", "")
 
 	reconFilePath := filepath.Join(auditDirPath, "recon_notes.md")
 	exploreOpts := []reactloops.ReActLoopOption{
@@ -176,6 +208,9 @@ func runPhase2(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	log.Infof("[CodeAudit] Starting Phase 2")
 	reactloops.EmitActionLog(loop, util.ScanNodeID, "Phase 2：代码审计扫描 / Phase 2: Code audit scan")
 	reactloops.EmitStatus(loop, "Phase 2：漏洞扫描中 / Phase 2: Vulnerability scanning...")
+	r.AddToTimeline("[PHASE2_START]", "开始 Phase 2：代码审计扫描")
+	emitPhaseMarker(loop, task, "phase", "code_audit_phase2_orchestrator", "Phase 2：代码审计扫描", task.GetId())
+
 	scanLoop, err := phase2.BuildAllCategoriesLoop(r, state, nil)
 	if err != nil {
 		log.Errorf("[CodeAudit] Failed to build Phase 2 loop: %v", err)
@@ -202,6 +237,7 @@ func runPhase3(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	log.Infof("[CodeAudit] Starting Phase 3 (Verify), %d findings", len(findings))
 	reactloops.EmitActionLog(loop, util.VerifyNodeID, "Phase 3：漏洞验证 / Phase 3: Vulnerability verification")
 	r.AddToTimeline("[PHASE3_START]", fmt.Sprintf("开始 Phase 3：fork 子 Agent 并行验证 %d 个 finding（并发 %d）", len(findings), phase3.DefaultFindingVerifyConcurrency))
+	emitPhaseMarker(loop, task, "phase", "code_audit_phase3_orchestrator", "Phase 3：漏洞验证", task.GetId())
 	verifyLoop, err := phase3.BuildVerifyLoop(r, state)
 	if err != nil {
 		log.Errorf("[CodeAudit] Failed to build Phase 3 loop: %v", err)
@@ -231,6 +267,7 @@ func runPhase4(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	reactloops.EmitActionLog(loop, util.ReportNodeID, "Phase 4：审计报告 / Phase 4: Audit report")
 	reactloops.EmitStatus(loop, "Phase 4：报告生成中 / Phase 4: Generating report...")
 	r.AddToTimeline("[PHASE4_START]", "开始 Phase 4：报告生成")
+	emitPhaseMarker(loop, task, "phase", "code_audit_phase4_report", "Phase 4：审计报告", task.GetId())
 	reportLoop, err := phase4.BuildReportLoop(r, state)
 	if err != nil {
 		log.Errorf("[CodeAudit] Failed to build Phase 4 loop: %v", err)

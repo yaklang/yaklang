@@ -144,6 +144,19 @@ func broadcastRunningSessionEvent(sessionID string, event *schema.AiOutputEvent)
 	rs.broadcast(event)
 }
 
+// EnumerateRunningSessions returns the session IDs of all currently-running ReAct sessions.
+// 关键词: enumerate sessions, live sessions, session registry
+func EnumerateRunningSessions() []string {
+	var ids []string
+	globalRunningSessions.Range(func(key, value any) bool {
+		if s, ok := key.(string); ok && s != "" {
+			ids = append(ids, s)
+		}
+		return true
+	})
+	return ids
+}
+
 func (r *ReAct) installRunningSessionRegistry() {
 	sessionID := strings.TrimSpace(r.config.PersistentSessionId)
 	if sessionID == "" {
@@ -153,7 +166,7 @@ func (r *ReAct) installRunningSessionRegistry() {
 	prevStart := r.config.EventLoopStartHook
 	prevDone := r.config.EventLoopDoneHook
 	prevHandler := r.config.EventHandler
-	
+
 	r.config.EventLoopStartHook = func() {
 		if prevStart != nil {
 			prevStart()

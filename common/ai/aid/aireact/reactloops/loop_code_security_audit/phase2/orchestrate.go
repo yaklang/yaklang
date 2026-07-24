@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 const defaultCategoryScanConcurrency = 3
@@ -51,6 +52,7 @@ func runAllCategoryScans(
 			Identifier: category.ID,
 			TaskName:   goal,
 			Goal:       goal,
+			LoopName:   schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT,
 		})
 		catalog[category.ID] = categoryScanJob{
 			category: category,
