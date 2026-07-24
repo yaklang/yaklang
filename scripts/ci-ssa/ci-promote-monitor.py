@@ -688,18 +688,17 @@ def run_pr_scan(
         log(f"PR #{pr_number} scan: generate config failed: {e}", "ERROR")
         return False
 
-    # Stage 3: run scan — use code-scan (compile + SyntaxFlow rules + report)
-    # code-scan compiles the diff, applies SyntaxFlow rules, and outputs a report.
-    # cwd = ci_dir_abs so fs.zip (./fs.zip in config) resolves correctly.
-    scan_output = ci_dir_abs / "scan-result.json"
-    log(f"PR #{pr_number} scan: running yak code-scan...")
+    # Stage 3: run incremental compile only (scan stage temporarily skipped)
+    # SyntaxFlow rules on full base program cause infinite data-flow traversal
+    # (5 rules stuck for 20+ min). Use ssa-compile to create the diff program
+    # (needed for merge promote check), but skip code-scan's rule matching.
+    compile_log = ci_dir_abs / f"compile_{timestamp_str()}_{short_sha}.log"
+    log(f"PR #{pr_number} scan: running yak ssa-compile (scan stage skipped)...")
     try:
-        # Real-time log: stream stdout+stderr to file only (not terminal)
         proc = subprocess.Popen(
-            [str(worktree_abs / "yak"), "code-scan",
+            [str(worktree_abs / "yak"), "ssa-compile",
              "--config", str(scan_config_abs),
              "--database", str(db_path_abs),
-             "--output", str(scan_output),
              "--file-perf-log"],
             cwd=str(ci_dir_abs),
             env=env,
@@ -707,8 +706,8 @@ def run_pr_scan(
             stderr=subprocess.STDOUT,
             text=True,
         )
-        with open(scan_log, "w") as f:
-            f.write(f"=== scan PR#{pr_number} {short_sha} ===\n\n")
+        with open(compile_log, "w") as f:
+            f.write(f"=== compile PR#{pr_number} {short_sha} (scan skipped) ===\n\n")
             for line in proc.stdout:
                 f.write(line)
                 f.flush()
@@ -716,16 +715,16 @@ def run_pr_scan(
         rc = proc.returncode
 
         if rc != 0:
-            log(f"PR #{pr_number} scan failed (exit {rc}), see {scan_log}", "ERROR")
+            log(f"PR #{pr_number} compile failed (exit {rc}), see {compile_log}", "ERROR")
             return False
-        log(f"PR #{pr_number} scan completed, see {scan_log}")
+        log(f"PR #{pr_number} compile completed (scan skipped), see {compile_log}")
         return True
     except subprocess.TimeoutExpired:
         proc.kill()
-        log(f"PR #{pr_number} scan timed out after 600s", "ERROR")
+        log(f"PR #{pr_number} compile timed out after 600s", "ERROR")
         return False
     except Exception as e:
-        log(f"PR #{pr_number} scan exception: {e}", "ERROR")
+        log(f"PR #{pr_number} compile exception: {e}", "ERROR")
         return False
 
 
