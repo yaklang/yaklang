@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
@@ -74,6 +75,14 @@ func main() {
 		cli.IntFlag{
 			Name: "duration-days,d",
 		},
+		// products: comma-separated product keys to entitle in the license.
+		// Known keys: hids, ssa, memfit, scan_center. The list is embedded as
+		// an "entitlements" JSON in license.Params, consumed by the legion
+		// license service to gate product visibility. Empty = legacy behavior
+		// (no entitlements, equivalent to "no products").
+		cli.StringFlag{
+			Name: "products",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
@@ -96,10 +105,43 @@ func main() {
 			return err
 		}
 
+		// Build the entitlements params from --products (comma-separated keys).
+		// Unknown keys are rejected to catch typos at signing time.
+		var params map[string]string
+		if productsFlag := strings.TrimSpace(c.String("products")); productsFlag != "" {
+			validProducts := map[string]bool{
+				"hids":        true,
+				"ssa":         true,
+				"memfit":      true,
+				"scan_center": true,
+			}
+			var products []string
+			for _, p := range strings.Split(productsFlag, ",") {
+				p = strings.TrimSpace(p)
+				if p == "" {
+					continue
+				}
+				if !validProducts[p] {
+					return utils.Errorf("unknown product key: %s (valid: hids, ssa, memfit, scan_center)", p)
+				}
+				products = append(products, p)
+			}
+			if len(products) > 0 {
+				entitlementsJSON, err := json.Marshal(map[string]any{
+					"products": products,
+					"version":  1,
+				})
+				if err != nil {
+					return utils.Errorf("marshal entitlements: %s", err)
+				}
+				params = map[string]string{"entitlements": string(entitlementsJSON)}
+			}
+		}
+
 		resp, err := m.SignLicense(
 			strings.TrimSpace(string(raw)), org,
 			time.Duration(c.Int64("duration-days"))*(time.Hour*24),
-			nil)
+			params)
 		if err != nil {
 			return err
 		}
