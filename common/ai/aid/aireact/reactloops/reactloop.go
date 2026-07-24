@@ -513,6 +513,13 @@ func (r *ReActLoop) GetEmitter() *aicommon.Emitter {
 	return r.emitter
 }
 
+func (r *ReActLoop) GetLoopName() string {
+	if r == nil {
+		return ""
+	}
+	return r.loopName
+}
+
 func (r *ReActLoop) GetConfig() aicommon.AICallerConfigIf {
 	return r.config
 }
