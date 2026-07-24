@@ -4,15 +4,18 @@ ci-promote-monitor.py — Monitor yaklang/yaklang for PR lifecycle events and
 run SSA incremental compile / promote flows locally.
 
 Event-driven model (only processes PRs that change *during* monitoring):
-  - open  : PR first seen during monitoring → record hash, no CI (initialization)
+  - open  : PR first seen during monitoring
+            - startup baseline: record hash only, no CI (zero→one init)
+            - new PR after startup: record hash + run CI
   - push  : open PR's head SHA changed (new commits pushed) → run incremental diff scan (CI)
   - merge : PR merged into main during monitoring → run promote (update base)
   - close : PR closed (non-merge) during monitoring → record only, no action
 
 Each open PR is tracked by its head SHA. When the SHA changes (simulating a
 PR pushing new commits), a new CI scan is triggered. Old diff programs for
-that PR are cleaned up at the start of the new scan (Stage 0). The first
-time a PR is seen, its hash is recorded but no CI runs (zero→one init).
+that PR are cleaned up at the start of the new scan (Stage 0). PRs open at
+startup have their hashes recorded without running CI (baseline init); new
+PRs that appear during monitoring run CI on first detection.
 
 Usage:
   python3 ci-promote-monitor.py [--once] [--interval 300] [--repo yaklang/yaklang]
@@ -840,10 +843,14 @@ def check_open_pr_pushes(
     data_dir: Path,
     token: str | None,
     pr_hashes: dict[int, str],
+    baseline_prs: set[int],
 ) -> dict[int, str]:
     """
     Check all currently open PRs for head SHA changes.
-    - First time a PR is seen: record its hash (initialization, no CI).
+    - First time a PR is seen during monitoring (new PR):
+      record hash + run CI (it's a new PR that needs scanning).
+    - First time a PR is seen during baseline init (already open at startup):
+      record hash, no CI (zero→one init from baseline).
     - If an open PR's hash changed: record 'push' event, run CI scan.
     - If a previously-open PR is no longer open: it was merged or closed
       (handled by merge/close checks), remove from tracking.
@@ -858,17 +865,35 @@ def check_open_pr_pushes(
         old_sha = pr_hashes.get(pr_number)
 
         if old_sha is None:
-            # First time seeing this PR — record hash, no CI (zero→one init)
+            # First time seeing this PR
             pr_hashes[pr_number] = head_sha
-            log(f"PR #{pr_number} opened: {pr.get('title', '')[:50]} "
-                f"sha={head_sha[:8]} (init, no CI)")
-            append_event(data_dir, {
-                "type": "open",
-                "pr_number": pr_number,
-                "title": pr.get("title", ""),
-                "sha": head_sha,
-                "html_url": pr.get("html_url", ""),
-            })
+            if pr_number in baseline_prs:
+                # Part of startup baseline — record hash only, no CI
+                log(f"PR #{pr_number} opened: {pr.get('title', '')[:50]} "
+                    f"sha={head_sha[:8]} (baseline init, no CI)")
+                append_event(data_dir, {
+                    "type": "open",
+                    "pr_number": pr_number,
+                    "title": pr.get("title", ""),
+                    "sha": head_sha,
+                    "html_url": pr.get("html_url", ""),
+                })
+            else:
+                # New PR appeared during monitoring — run CI
+                log(f"PR #{pr_number} opened: {pr.get('title', '')[:50]} "
+                    f"sha={head_sha[:8]} (new PR, running CI)")
+                append_event(data_dir, {
+                    "type": "open",
+                    "pr_number": pr_number,
+                    "title": pr.get("title", ""),
+                    "sha": head_sha,
+                    "html_url": pr.get("html_url", ""),
+                })
+                if head_sha:
+                    success = run_pr_scan(repo, worktree, data_dir, pr_number, head_sha, token)
+                    log(f"PR #{pr_number} scan {'succeeded' if success else 'failed'}")
+                else:
+                    log(f"PR #{pr_number} has no head SHA, skipping scan", "WARN")
         elif old_sha != head_sha:
             # Hash changed — new commits pushed to this PR
             log(f"PR #{pr_number} pushed: {old_sha[:8]} -> {head_sha[:8]} "
@@ -984,11 +1009,13 @@ def main():
     # Initialize baselines: record current state so we only process NEW changes
     log("Initializing PR baseline...")
     pr_hashes: dict[int, str] = {}  # PR number → head SHA
+    baseline_prs: set[int] = set()  # PRs open at startup (skip first CI)
     known_closed_prs: set[int] = set()
 
     initial_open = get_open_prs(args.repo, token)
     for pr in initial_open:
         pr_hashes[pr["number"]] = pr.get("head_sha", "")
+        baseline_prs.add(pr["number"])
     initial_closed = get_recently_closed_prs(args.repo, token)
     for pr in initial_closed:
         known_closed_prs.add(pr["number"])
@@ -1000,7 +1027,7 @@ def main():
         try:
             # 1. Check open PRs for hash changes → run CI scan on push
             pr_hashes = check_open_pr_pushes(
-                args.repo, worktree, data_dir, token, pr_hashes,
+                args.repo, worktree, data_dir, token, pr_hashes, baseline_prs,
             )
 
             # 2. Check for closed PRs → record close events
