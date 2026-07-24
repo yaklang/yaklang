@@ -93,10 +93,7 @@ func ExpandSourceWithTables(src string, tables MacroTables) string {
 
 // ExpandSourceWithTablesState expands macros while preserving block-comment state across calls.
 func ExpandSourceWithTablesState(src string, tables MacroTables, st *macroScanState) string {
-	env := &macroEnv{
-		tables:   exportToMacroTables(tables),
-		maxDepth: maxMacroExpandDepth,
-	}
+	env := newMacroEnvFromTables(tables)
 	expanded := env.expandSourceWithState(src, st)
 	return CollapsePreprocessorContinuations(expanded)
 }
@@ -124,11 +121,55 @@ func JoinLogicalLines(src string) []string {
 }
 
 // ApplyDefineLine applies a #define/#undef line to tables; returns true if a define was consumed.
+// Mutates Function/Object maps in place (does not replace the map pointers), so shared
+// MacroTables references stay consistent after updates.
 func ApplyDefineLine(line string, tables *MacroTables, strip bool) bool {
-	internal := exportToMacroTables(*tables)
-	removed := applyDirectiveToTables(line, internal, strip)
-	*tables = MacroTablesFromInternal(internal)
-	return removed
+	if tables == nil {
+		return false
+	}
+	if tables.Function == nil {
+		tables.Function = make(map[string]FunctionMacro)
+	}
+	if tables.Object == nil {
+		tables.Object = make(map[string]string)
+	}
+
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || !strings.HasPrefix(trimmed, "#") {
+		return false
+	}
+	directive := strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+	if directive == "" {
+		return false
+	}
+	parts := strings.Fields(directive)
+	if len(parts) == 0 {
+		return false
+	}
+	switch parts[0] {
+	case "define":
+		if name, fm, ok := parseFunctionDefineSafe(directive); ok {
+			tables.Function[name] = FunctionMacro{
+				Params:   fm.params,
+				Variadic: fm.variadic,
+				Body:     fm.body,
+			}
+			delete(tables.Object, name)
+			return strip
+		}
+		if name, body, ok := parseObjectDefineSafe(directive); ok {
+			tables.Object[name] = body
+			delete(tables.Function, name)
+			return strip
+		}
+	case "undef":
+		if len(parts) >= 2 {
+			name := parts[1]
+			delete(tables.Function, name)
+			delete(tables.Object, name)
+		}
+	}
+	return false
 }
 
 // ParseIncludePath extracts the path from #include "..." or #include <...>.
@@ -195,12 +236,12 @@ func trimDirectiveLine(line string) string {
 
 func splitDirectiveFields(directive string) []string {
 	var parts []string
-	var cur string
+	var cur strings.Builder
 	inQuote := byte(0)
 	for i := 0; i < len(directive); i++ {
 		c := directive[i]
 		if inQuote != 0 {
-			cur += string(c)
+			cur.WriteByte(c)
 			if c == inQuote && (i == 0 || directive[i-1] != '\\') {
 				inQuote = 0
 			}
@@ -209,23 +250,20 @@ func splitDirectiveFields(directive string) []string {
 		switch c {
 		case '"', '<':
 			inQuote = c
-			if c == '<' {
-				// angle path ends with >
-			}
-			cur += string(c)
+			cur.WriteByte(c)
 		case '>':
-			cur += string(c)
+			cur.WriteByte(c)
 		case ' ', '\t':
-			if cur != "" {
-				parts = append(parts, cur)
-				cur = ""
+			if cur.Len() > 0 {
+				parts = append(parts, cur.String())
+				cur.Reset()
 			}
 		default:
-			cur += string(c)
+			cur.WriteByte(c)
 		}
 	}
-	if cur != "" {
-		parts = append(parts, cur)
+	if cur.Len() > 0 {
+		parts = append(parts, cur.String())
 	}
 	return parts
 }

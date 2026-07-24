@@ -1,7 +1,6 @@
 package c2ssa
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -74,16 +73,12 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 	if !ok {
 		return utils.Errorf("invalid AST type")
 	}
-	SpecialTypes := map[string]ssa.Type{
-		"void":    ssa.CreateAnyType(),
-		"bool":    ssa.CreateBooleanType(),
-		"complex": ssa.CreateAnyType(),
-	}
-	SpecialValue := map[string]ssa.Value{}
 
 	builder.SupportClosure = false
 	builder.WithExternValue(cBuildIn)
-	builder.WithExternSideEffect(cSideEffect)
+	// Reuse prebuilt handlers; avoid WithExternSideEffect rebuilding ~100 entries per file.
+	builder.GetProgram().ExternSideEffect = cSideEffect
+	builder.WithExternBuildValueHandler(cSideEffectHandlers)
 
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
@@ -92,13 +87,13 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 		result:          map[string][]string{},
 		tpHandler:       map[string]func(){},
 		labels:          map[string]*ssa.LabelBuilder{},
-		specialValues:   SpecialValue,
-		specialTypes:    SpecialTypes,
+		specialValues:   map[string]ssa.Value{},
+		specialTypes:    cSpecialTypes,
 		pkgNameCurrent:  "",
 	}
 	// log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
-	fmt.Printf("Program: %v done\n", astBuilder.pkgNameCurrent)
+	log.Debugf("Program: %v done", astBuilder.pkgNameCurrent)
 	return nil
 }
 
@@ -136,8 +131,22 @@ type astbuilder struct {
 	labels         map[string]*ssa.LabelBuilder
 	specialValues  map[string]ssa.Value
 	specialTypes   map[string]ssa.Type
+	memberKeys     map[string]ssa.Value // interned field-name consts for this file build
 	pkgNameCurrent string
 	SetGlobal      bool
+}
+
+// emitMemberKey returns a reused ConstInst for struct/union member names.
+func (b *astbuilder) emitMemberKey(key string) ssa.Value {
+	if b.memberKeys == nil {
+		b.memberKeys = make(map[string]ssa.Value)
+	}
+	if v, ok := b.memberKeys[key]; ok {
+		return v
+	}
+	v := b.EmitConstInst(key)
+	b.memberKeys[key] = v
+	return v
 }
 
 func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContext, error) {
@@ -404,6 +413,21 @@ var cSideEffect = map[string][]uint{
 	"va_arg":   {0, 0}, // ap input, typeSize input
 	"va_end":   {0},    // ap input
 	"va_copy":  {0, 0}, // dest input, src input
+}
+
+// cSideEffectHandlers is built once; WithExternSideEffect would rebuild this map per file.
+var cSideEffectHandlers = func() map[string]func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
+	m := make(map[string]func(b *ssa.FunctionBuilder, id string, v any) ssa.Value, len(cSideEffect))
+	for n := range cSideEffect {
+		m[n] = ssa.BuildFunctionWithSideEffect
+	}
+	return m
+}()
+
+var cSpecialTypes = map[string]ssa.Type{
+	"void":    ssa.CreateAnyType(),
+	"bool":    ssa.CreateBooleanType(),
+	"complex": ssa.CreateAnyType(),
 }
 
 // cBuildIn defines common C standard library functions with proper pointer types

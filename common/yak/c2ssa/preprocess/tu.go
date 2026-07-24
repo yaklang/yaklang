@@ -2,24 +2,16 @@ package preprocess
 
 type macroCollector struct {
 	project   *CPreprocessProject
-	env       *MacroEnvironment
+	tables    MacroTables
 	depth     int
 	seenFiles map[string]bool
 }
 
 // buildMacroTables collects macros from all project headers and the entry translation unit.
 // Macro expansion is include-agnostic: headers do not need to be #included to contribute macros.
+// Header contribution is cached on the project; only the TU is rescanned per call.
 func (p *CPreprocessProject) buildMacroTables(entryPath, src string) MacroTables {
-	out := NewMacroTables()
-	seen := make(map[string]bool)
-	for _, entry := range p.registry.UniqueEntries() {
-		if entry == nil || seen[entry.Path] {
-			continue
-		}
-		seen[entry.Path] = true
-		tables := p.collectMacrosFromSource(entry.Path, string(entry.Content))
-		out.MergeFrom(tables)
-	}
+	out := p.getHeaderMacroTables().Clone()
 	out.MergeFrom(p.collectMacrosFromSource(entryPath, src))
 	return out
 }
@@ -32,11 +24,11 @@ func (p *CPreprocessProject) collectMacroEnvironment(entryPath, src string) Macr
 func (p *CPreprocessProject) collectMacrosFromSource(filePath, src string) MacroTables {
 	mc := &macroCollector{
 		project:   p,
-		env:       NewMacroEnvironment(nil),
+		tables:    NewMacroTables(),
 		seenFiles: make(map[string]bool),
 	}
 	mc.scanSource(filePath, src, p.config.Defines)
-	return mc.env.Flatten()
+	return mc.tables
 }
 
 func (mc *macroCollector) scanSource(filePath, src string, defs map[string]string) {
@@ -50,8 +42,11 @@ func (mc *macroCollector) scanSource(filePath, src string, defs map[string]strin
 	mc.seenFiles[norm] = true
 	mc.depth++
 
-	localEnv := NewMacroEnvironment(mc.env)
-	cond := NewConditionalStackWithGlobal(localEnv, mc.env, defs)
+	// Flat local tables for this file — no nested MacroEnvironment Flatten/Clone.
+	// Includes are skipped during collection; #if only sees this file's macros + config.Defines.
+	local := NewMacroTables()
+	localEnv := &MacroEnvironment{tables: local}
+	cond := NewConditionalStackWithGlobal(localEnv, nil, defs)
 
 	for _, line := range JoinLogicalLines(src) {
 		if handleCondDirective(cond, line) {
@@ -65,16 +60,17 @@ func (mc *macroCollector) scanSource(filePath, src string, defs map[string]strin
 		}
 		switch DirectiveName(line) {
 		case "define":
-			localEnv.ApplyDefineLine(line)
+			ApplyDefineLine(line, &local, false)
 		case "undef":
 			macro := ppFirstIdent(DirectiveRest(line))
 			if macro != "" {
-				localEnv.ApplyUndef(macro)
+				delete(local.Function, macro)
+				delete(local.Object, macro)
 			}
 		}
 	}
 
-	mc.env.MergeFrom(localEnv)
+	mc.tables.MergeFrom(local)
 	mc.depth--
 }
 
