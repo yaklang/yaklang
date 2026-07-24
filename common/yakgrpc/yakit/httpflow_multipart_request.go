@@ -92,7 +92,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 	res.OriginalBodyLen = len(body)
 	// Only engage for oversized bodies; small multiparts take the normal path.
-	if len(body) <= maxHTTPFlowRequestBodyInDBBytes {
+	if len(body) <= MaxHTTPFlowRequestBodyInDBBytes {
 		return res, nil
 	}
 
