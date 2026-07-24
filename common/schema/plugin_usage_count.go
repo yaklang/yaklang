@@ -1,6 +1,6 @@
 package schema
 
-import "github.com/jinzhu/gorm"
+import "github.com/yaklang/gorm"
 
 // PluginUsageCount 记录插件的全局使用次数，注册在 profile 库（与 yak_scripts 同库），
 // 供 QueryYakScript 按使用次数排序（单库子查询，避免跨库 JOIN）。
