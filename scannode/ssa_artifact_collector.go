@@ -41,6 +41,17 @@ type SSAArtifactUploadConfig struct {
 	STSExpiresAt    int64
 }
 
+// ssaUploadMetrics accumulates upload-phase observability data across the
+// collector's lifetime. All fields are accessed under the collector's mutex.
+type ssaUploadMetrics struct {
+	TotalUploadMs   int64  `json:"total_upload_ms"`
+	TicketFetchMs   int64  `json:"ticket_fetch_ms"`
+	Segments        int    `json:"segments"`
+	Retries         int    `json:"retries"`
+	RawBytes        uint64 `json:"raw_bytes"`
+	CompressedBytes uint64 `json:"compressed_bytes"`
+}
+
 type SSAArtifactBuildResult struct {
 	ObjectKey        string
 	Codec            string
@@ -88,6 +99,8 @@ type SSAArtifactCollector struct {
 	continuousClosed   bool
 	continuousErr      error
 	continuousBuild    *SSAArtifactBuildResult
+
+	uploadMetrics ssaUploadMetrics
 }
 
 const (
@@ -146,10 +159,16 @@ func (c *SSAArtifactCollector) startContinuousUploadIfNeeded() error {
 	c.mu.Unlock()
 
 	go func() {
-		build, err := runContinuousSegmentedUpload(codec, provider, taskID, programName, reportType, input)
+		build, err := runContinuousSegmentedUpload(codec, provider, taskID, programName, reportType, input, func(uploadMs int64) {
+			c.recordUploadMs(uploadMs)
+			c.recordSegment()
+		})
 		c.mu.Lock()
 		c.continuousBuild = build
 		c.continuousErr = err
+		if build != nil {
+			c.setUploadBytes(uint64(build.UncompressedSize), uint64(build.CompressedSize))
+		}
 		close(done)
 		c.mu.Unlock()
 	}()
@@ -169,6 +188,12 @@ func (c *SSAArtifactCollector) enqueueContinuousPayload(payload []byte) error {
 	}
 	if closed || input == nil || done == nil {
 		return nil
+	}
+
+	if queueCap := cap(input); queueCap > 0 {
+		if queueLen := len(input); queueLen >= queueCap*9/10 {
+			log.Warnf("upload_queue_backlog task=%s len=%d cap=%d", c.taskID, queueLen, queueCap)
+		}
 	}
 
 	select {
@@ -195,6 +220,61 @@ func NewSSAArtifactCollector(taskID, runtimeID, subTaskID string) *SSAArtifactCo
 		c.initErr = err
 	}
 	return c
+}
+
+func (c *SSAArtifactCollector) recordUploadMs(ms int64) {
+	if c == nil || ms <= 0 {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.TotalUploadMs += ms
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) recordTicketFetchMs(ms int64) {
+	if c == nil || ms <= 0 {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.TicketFetchMs += ms
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) recordRetry() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.Retries++
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) recordSegment() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.Segments++
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) setUploadBytes(raw, compressed uint64) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.uploadMetrics.RawBytes = raw
+	c.uploadMetrics.CompressedBytes = compressed
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) snapshotUploadMetrics() ssaUploadMetrics {
+	if c == nil {
+		return ssaUploadMetrics{}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.uploadMetrics
 }
 
 func (c *SSAArtifactCollector) initSpoolLocked() error {
@@ -420,7 +500,7 @@ func readSSASegmentFlushInterval() time.Duration {
 	return time.Duration(sec) * time.Second
 }
 
-func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte) (*SSAArtifactBuildResult, error) {
+func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte, onSegment func(uploadMs int64)) (*SSAArtifactBuildResult, error) {
 	if provider == nil {
 		return nil, utils.Errorf("empty upload config provider")
 	}
@@ -497,8 +577,11 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 			return err
 		}
 		uploadMS := time.Since(uploadStart).Milliseconds()
-		log.Infof("ssa artifact segment uploaded task=%s seq=%d key=%s codec=%s raw=%d compressed=%d",
-			taskID, seq, segmentKey, uploadCodec, rawBytes, compressedSize)
+		log.Infof("ssa artifact segment uploaded task=%s seq=%d key=%s codec=%s raw=%d compressed=%d upload_ms=%d",
+			taskID, seq, segmentKey, uploadCodec, rawBytes, compressedSize, uploadMS)
+		if onSegment != nil {
+			onSegment(uploadMS)
+		}
 		segments = append(segments, spec.SSAArtifactSegment{
 			Seq:              seq,
 			ObjectKey:        segmentKey,
@@ -1155,6 +1238,10 @@ func (c *SSAArtifactCollector) UploadBySTSWithProvider(artifactPath string, size
 	partSize := readSSAMultipartPartSize()
 	if size <= partSize {
 		for attempt := 0; attempt < 2; attempt++ {
+			if attempt > 0 {
+				c.recordRetry()
+			}
+			uploadStart := time.Now()
 			cfg, err := provider(attempt == 1)
 			if err != nil {
 				return err
@@ -1172,12 +1259,16 @@ func (c *SSAArtifactCollector) UploadBySTSWithProvider(artifactPath string, size
 				f,
 				size,
 				minio.PutObjectOptions{ContentType: "application/octet-stream"})
+			uploadMs := time.Since(uploadStart).Milliseconds()
+			c.recordUploadMs(uploadMs)
 			if err == nil {
+				log.Infof("upload_attempt task=%s attempt=%d key=%s duration_ms=%d", c.taskID, attempt, cfg.ObjectKey, uploadMs)
 				if info.Size > 0 && info.Size != size {
 					return utils.Errorf("uploaded size mismatch expect=%d got=%d", size, info.Size)
 				}
 				return nil
 			}
+			log.Warnf("upload_attempt_failed task=%s attempt=%d key=%s duration_ms=%d error=%q", c.taskID, attempt, cfg.ObjectKey, uploadMs, err.Error())
 			if !isSSACredentialError(err) || attempt > 0 {
 				return err
 			}
@@ -1329,6 +1420,8 @@ func (c *SSAArtifactCollector) BuildReadyEvent(result *SSAArtifactBuildResult, t
 	if riskCountHint <= 0 {
 		riskCountHint = result.RiskCount
 	}
+	metrics := c.snapshotUploadMetrics()
+	metricsJSON, _ := json.Marshal(metrics)
 	return &spec.SSAArtifactReadyEvent{
 		ObjectKey:        objectKey,
 		Codec:            codec,
@@ -1343,6 +1436,21 @@ func (c *SSAArtifactCollector) BuildReadyEvent(result *SSAArtifactBuildResult, t
 		FileCount:        result.FileCount,
 		FlowCount:        result.FlowCount,
 		ProducedAt:       time.Now().Unix(),
+		Metrics:          metricsJSON,
+	}
+}
+
+func (c *SSAArtifactCollector) BuildUploadFailedEvent(errorCode, errorMessage string, uploadedBytes uint64) *spec.SSAArtifactUploadFailedEvent {
+	if c == nil {
+		return nil
+	}
+	metrics := c.snapshotUploadMetrics()
+	metricsJSON, _ := json.Marshal(metrics)
+	return &spec.SSAArtifactUploadFailedEvent{
+		ErrorCode:     errorCode,
+		ErrorMessage:  errorMessage,
+		UploadedBytes: uploadedBytes,
+		Metrics:       metricsJSON,
 	}
 }
 

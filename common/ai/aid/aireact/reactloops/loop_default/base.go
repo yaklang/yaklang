@@ -40,32 +40,10 @@ const reActPostSummary = `
 
 `
 
-// resolveMaxIterations computes the iteration ceiling for a loop from the
-// caller config. When goal mode is enabled it raises a too-small ceiling to
-// GoalMinIterations + buffer via EnsureGoalModeMaxIterations, so the finish
-// gate can actually open before the loop exhausts its iterations. This is the
-// single loop-level resolution point; the gRPC entry point
-// (ConvertYPBAIStartParamsToReActConfig) performs the same bump on the config
-// field as an idempotent safety net, so both programmatic and gRPC entry paths
-// are covered regardless of which one runs first.
-func resolveMaxIterations(cfg aicommon.AICallerConfigIf) int {
-	if cfg == nil {
-		return 100
-	}
-	maxIterations := cfg.GetMaxIterationCount()
-	if typedCfg, ok := cfg.(*aicommon.Config); ok && typedCfg.GetEnableGoalMode() {
-		maxIterations = aicommon.EnsureGoalModeMaxIterations(maxIterations, typedCfg.GetGoalMinIterations())
-	}
-	if maxIterations <= 0 {
-		return 100
-	}
-	return int(maxIterations)
-}
-
 func buildDefaultReactiveDataBuilder() reactloops.ReActLoopOption {
 	return reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 		renderMap := map[string]any{
-			"Nonce":            nonce,
+			"Nonce":           nonce,
 			"FeedbackMessages": feedbacker.String(),
 			"IsLastIteration":  loop.GetCurrentIterationIndex()+1 >= loop.GetMaxIterations(),
 		}
@@ -85,15 +63,20 @@ func init() {
 				reactloops.WithPlanExecActionType(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
-				reactloops.WithPersistentInstruction(instruction),
+				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
+			reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),
 				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 					if !isDone {
 						return
 					}
-					if loop.GetLastValidAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+					lastAction := loop.GetLastAction()
+					if lastAction == nil {
+						log.Warnf("iteration %d: skip final summary because last action is empty", iteration)
+						return
+					}
+					if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
 						return
 					}
@@ -144,11 +127,11 @@ func init() {
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildPETaskInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
+				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
-				buildDefaultReactiveDataBuilder(),
-			}
+			reactloops.WithReflectionOutputExample(outputExample),
+			buildDefaultReactiveDataBuilder(),
+		}
 
 			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
 			if config := r.GetConfig(); config != nil {

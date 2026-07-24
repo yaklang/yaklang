@@ -1,5 +1,7 @@
 package spec
 
+import "encoding/json"
+
 const (
 	// SSAArtifactFormatPartsNDJSONV1 stores a sequence of SSAResultParts JSON
 	// objects (one per line/record), then applies outer codec compression.
@@ -53,5 +55,17 @@ type SSAArtifactReadyEvent struct {
 	FileCount   int64  `json:"file_count,omitempty"`
 	FlowCount   int64  `json:"flow_count,omitempty"`
 
-	ProducedAt int64 `json:"produced_at"`
+	ProducedAt int64           `json:"produced_at"`
+	Metrics    json.RawMessage `json:"metrics,omitempty"`
+}
+
+// SSAArtifactUploadFailedEvent is sent by ScanNode when the SSA artifact upload
+// fails. It carries the error code, human-readable message, bytes uploaded before
+// failure, and partial upload metrics for diagnostics.
+type SSAArtifactUploadFailedEvent struct {
+	ObjectKey     string          `json:"object_key,omitempty"`
+	ErrorCode     string          `json:"error_code"`
+	ErrorMessage  string          `json:"error_message"`
+	UploadedBytes uint64          `json:"uploaded_bytes,omitempty"`
+	Metrics       json.RawMessage `json:"metrics,omitempty"`
 }

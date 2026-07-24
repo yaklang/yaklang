@@ -1,0 +1,528 @@
+package scannode
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
+
+type ScriptExecutionRequest struct {
+	TaskID          string
+	RuntimeID       string
+	SubTaskID       string
+	ScriptContent   string
+	ScriptJSONParam string
+	ScriptLabels    map[string]string
+}
+
+type ScriptExecutionResult struct {
+	Data any `json:"data,omitempty"`
+}
+
+func (s *ScanNode) executeScriptTask(
+	ctx context.Context,
+	input ScriptExecutionRequest,
+) (*ScriptExecutionResult, error) {
+	if strings.TrimSpace(input.ScriptContent) == "" {
+		return nil, utils.Error("empty script_content")
+	}
+
+	taskID := taskIDForSubtask(input.SubTaskID)
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	s.manager.Add(taskID, newScriptTask(
+		taskCtx,
+		cancel,
+		taskID,
+		input.TaskID,
+		input.SubTaskID,
+		input.RuntimeID,
+	))
+	defer s.manager.Remove(taskID)
+
+	reporter := NewScannerAgentReporter(
+		input.TaskID,
+		input.SubTaskID,
+		input.RuntimeID,
+		legionJobExecutionRefFromContext(taskCtx),
+		s,
+	)
+	keyValues := s.parseScriptParams(input.ScriptJSONParam)
+	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
+	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
+	if reporter.ssaCollector != nil {
+		defer reporter.ssaCollector.Cleanup()
+	}
+	ssaDBEnv := extractSSADatabaseEnv(keyValues)
+	result := &ScriptExecutionResult{}
+	yakitServer := s.createYakitServer(reporter, result)
+	yakitServer.Start()
+	defer yakitServer.Shutdown()
+
+	s.syncRulesIfNeeded(taskCtx, keyValues, input.ScriptLabels)
+
+	scriptFile, err := s.createTempScriptFile(input.ScriptContent)
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(scriptFile)
+
+	params := s.buildScriptParams(yakitServer.Addr(), input.RuntimeID, keyValues)
+	scanNodePath, err := os.Executable()
+	if err != nil {
+		return nil, utils.Errorf("fetch node path err: %s", err)
+	}
+	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, ssaDBEnv); err != nil {
+		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
+		return nil, s.handleScriptFailure(err, result, taskID)
+	}
+	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
+	if err := s.finalizeSSAArtifactUpload(taskCtx, reporter, result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func newScriptTask(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	taskID string,
+	jobID string,
+	subtaskID string,
+	attemptID string,
+) *Task {
+	return &Task{
+		TaskType:  "script-task",
+		TaskId:    taskID,
+		JobID:     jobID,
+		SubtaskID: subtaskID,
+		AttemptID: attemptID,
+		Ctx:       ctx,
+		Cancel:    cancel,
+	}
+}
+
+func (s *ScanNode) buildScriptParams(
+	webhookAddr string,
+	runtimeID string,
+	keyValues map[string]any,
+) []string {
+	params := buildScriptBaseParams(webhookAddr, runtimeID)
+	return s.appendKeyValueParams(params, keyValues)
+}
+
+func (s *ScanNode) handleScriptFailure(
+	err error,
+	result *ScriptExecutionResult,
+	taskID string,
+) error {
+	if err == nil {
+		return nil
+	}
+	if reason := s.cancelReasonForTask(taskID); reason != "" {
+		return &TaskCancelledError{Reason: reason}
+	}
+	if errors.Is(err, context.Canceled) {
+		return &TaskCancelledError{}
+	}
+	if detailedError := extractScriptError(result); detailedError != "" {
+		return utils.Errorf("%s", detailedError)
+	}
+	return utils.Errorf("exec yak script failed: %s", err)
+}
+
+func (s *ScanNode) cancelReasonForTask(taskID string) string {
+	task, err := s.manager.GetTaskById(taskID)
+	if err != nil {
+		return ""
+	}
+	return task.CancelReason()
+}
+
+func extractScriptError(result *ScriptExecutionResult) string {
+	if result == nil || result.Data == nil {
+		return ""
+	}
+
+	dataMap, ok := result.Data.(map[string]any)
+	if !ok {
+		return ""
+	}
+	errMsg, ok := dataMap["error"].(string)
+	if !ok || errMsg == "" {
+		return ""
+	}
+	return errMsg
+}
+
+func (s *ScanNode) parseScriptParams(jsonParam string) map[string]any {
+	params := make(map[string]any)
+	if strings.TrimSpace(jsonParam) == "" {
+		return params
+	}
+
+	var raw any
+	if err := json.Unmarshal([]byte(jsonParam), &raw); err != nil {
+		return params
+	}
+
+	for key, value := range utils.InterfaceToGeneralMap(raw) {
+		if key == "__DEFAULT__" {
+			continue
+		}
+		params[key] = value
+	}
+	return params
+}
+
+func (s *ScanNode) syncRulesIfNeeded(
+	ctx context.Context,
+	params map[string]any,
+	labels map[string]string,
+) {
+	snapshotID := resolveRuleSyncSnapshotID(params, labels)
+	if snapshotID == "" {
+		return
+	}
+
+	if s == nil || s.ruleSyncClient == nil || s.ruleSyncClient.HasLocalSnapshot(snapshotID) {
+		return
+	}
+
+	log.Infof("auto-syncing rules for snapshot: %s", snapshotID)
+	ruleCount, err := s.ruleSyncClient.SyncSnapshot(ctx, snapshotID)
+	if err != nil {
+		log.Warnf("auto-sync rules failed: %v, will continue with local rules", err)
+		return
+	}
+	log.Infof("auto-synced %d rules from snapshot %s", ruleCount, snapshotID)
+}
+
+func resolveRuleSyncSnapshotID(params map[string]any, labels map[string]string) string {
+	if labels != nil {
+		if snapshotID := strings.TrimSpace(labels["rule_snapshot_id"]); snapshotID != "" {
+			return snapshotID
+		}
+	}
+	if snapshotID, ok := params["rule_snapshot_id"].(string); ok {
+		return strings.TrimSpace(snapshotID)
+	}
+	return ""
+}
+
+func buildScriptBaseParams(webhookAddr string, runtimeID string) []string {
+	params := []string{"--yakit-webhook", webhookAddr}
+	if runtimeID != "" {
+		params = append(params, "--runtime_id", runtimeID)
+	}
+	return params
+}
+
+func (s *ScanNode) appendKeyValueParams(params []string, keyValues map[string]any) []string {
+	for key, value := range keyValues {
+		if strings.HasPrefix(strings.TrimSpace(key), scannodeInternalParamPrefix) {
+			continue
+		}
+		name := strings.TrimLeft(key, "-")
+		params = appendCLIParamValue(params, "--"+name, value)
+	}
+	return params
+}
+
+func appendCLIParamValue(params []string, flag string, value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		for _, item := range typed {
+			params = append(params, flag, item)
+		}
+	case []any:
+		for _, item := range typed {
+			params = append(params, flag, utils.InterfaceToString(item))
+		}
+	default:
+		params = append(params, flag, utils.InterfaceToString(value))
+	}
+	return params
+}
+
+func (s *ScanNode) createTempScriptFile(content string) (string, error) {
+	f, err := createDistributedScriptTempFile()
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(content); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
+}
+
+func createDistributedScriptTempFile() (*os.File, error) {
+	const pattern = "distributed-yakcode-*.yak"
+
+	f, err := consts.TempFile(pattern)
+	if err == nil {
+		return f, nil
+	}
+	yakitTempErr := err
+
+	f, err = os.CreateTemp("", pattern)
+	if err != nil {
+		return nil, utils.Errorf(
+			"create distributed script temp file failed: yakit temp: %v; system temp: %v",
+			yakitTempErr,
+			err,
+		)
+	}
+	log.Warnf("fallback to system temp for distributed script: yakit temp unavailable: %v", yakitTempErr)
+	return f, nil
+}
+
+func (s *ScanNode) executeScript(
+	ctx context.Context,
+	scanNodePath string,
+	scriptFile string,
+	params []string,
+	runtimeID string,
+	extraEnv []string,
+) error {
+	baseCmd := []string{"distyak", scriptFile}
+	log.Infof("yak %v %v", scriptFile, params)
+
+	cmd := exec.CommandContext(ctx, scanNodePath, append(baseCmd, params...)...)
+	env := append(os.Environ(),
+		fmt.Sprintf("YAKIT_HOME=%v", os.Getenv("YAKIT_HOME")),
+		fmt.Sprintf("YAK_RUNTIME_ID=%v", runtimeID),
+	)
+	env = append(env, extraEnv...)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// classifyUploadError maps an upload error message to a structured error code
+// for the SSAArtifactUploadFailed event.
+func classifyUploadError(errMsg string) string {
+	lower := strings.ToLower(errMsg)
+	if strings.Contains(lower, "deadline exceeded") || strings.Contains(lower, "timeout") {
+		if strings.Contains(lower, "ticket") || strings.Contains(lower, "artifact-ticket") {
+			return "ticket_timeout"
+		}
+	}
+	credMarkers := []string{"expiredtoken", "expired token", "accessdenied", "access denied", "invalidsecuritytoken", "invalid security"}
+	for _, m := range credMarkers {
+		if strings.Contains(lower, m) {
+			return "sts_expired"
+		}
+	}
+	if strings.Contains(lower, "multipart") || strings.Contains(lower, "complete") {
+		return "multipart_failed"
+	}
+	return "put_failed"
+}
+
+func (s *ScanNode) finalizeSSAArtifactUpload(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	result *ScriptExecutionResult,
+) error {
+	if reporter == nil || reporter.ssaCollector == nil {
+		return nil
+	}
+
+	meta := parseSSAResultMeta(result)
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		if reporter.ssaCollector.HasData() {
+			return utils.Errorf("ssa artifact upload config missing")
+		}
+		return nil
+	}
+
+	provider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, cfg)
+	build, err := reporter.ssaCollector.FinalizeUploadWithProvider(
+		normalizeArtifactCodec(cfg.Codec),
+		provider,
+	)
+	if err != nil {
+		s.emitSSAArtifactUploadFailed(reporter, err, "")
+		return err
+	}
+	if build == nil {
+		return nil
+	}
+	if build.ProgramName == "" {
+		build.ProgramName = meta.ProgramName
+	}
+
+	event := reporter.ssaCollector.BuildReadyEvent(build, meta.TotalLines, meta.RiskCount)
+	if event == nil {
+		return nil
+	}
+	if err := reporter.PublishSSAArtifactReady(event); err != nil {
+		return err
+	}
+
+	log.Infof(
+		"ssa artifact uploaded task=%s key=%s codec=%s raw=%d stored=%d risks=%d files=%d flows=%d",
+		reporter.TaskId,
+		build.ObjectKey,
+		build.Codec,
+		build.UncompressedSize,
+		build.CompressedSize,
+		event.RiskCount,
+		event.FileCount,
+		event.FlowCount,
+	)
+	return nil
+}
+
+// emitSSAArtifactUploadFailed constructs and publishes an upload-failed event
+// from the collector's accumulated metrics. The objectKey is the intended
+// object key (may be empty if the failure happened before the key was known).
+func (s *ScanNode) emitSSAArtifactUploadFailed(
+	reporter *ScannerAgentReporter,
+	uploadErr error,
+	objectKey string,
+) {
+	if reporter == nil || reporter.ssaCollector == nil || uploadErr == nil {
+		return
+	}
+	errorCode := classifyUploadError(uploadErr.Error())
+	metrics := reporter.ssaCollector.snapshotUploadMetrics()
+	failedEvent := reporter.ssaCollector.BuildUploadFailedEvent(
+		errorCode,
+		uploadErr.Error(),
+		metrics.CompressedBytes,
+	)
+	if failedEvent == nil {
+		return
+	}
+	if objectKey != "" {
+		failedEvent.ObjectKey = objectKey
+	}
+	if err := reporter.PublishSSAArtifactUploadFailed(failedEvent); err != nil {
+		log.Errorf("publish ssa artifact upload failed event: %v", err)
+	}
+	log.Infof(
+		"ssa artifact upload failed task=%s error_code=%s error=%s uploaded_bytes=%d",
+		reporter.TaskId, errorCode, uploadErr.Error(), metrics.CompressedBytes,
+	)
+}
+
+func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	baseCfg *SSAArtifactUploadConfig,
+) ssaUploadConfigProvider {
+	if baseCfg == nil {
+		return nil
+	}
+
+	current := *baseCfg
+	taskID := ""
+	if reporter != nil {
+		taskID = strings.TrimSpace(reporter.TaskId)
+	}
+
+	var mu sync.Mutex
+	return func(force bool) (*SSAArtifactUploadConfig, error) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if !force && !current.NeedSTSRefresh(600) {
+			cp := current
+			return &cp, nil
+		}
+
+		if s == nil {
+			return nil, utils.Errorf("scannode not ready")
+		}
+		if taskID == "" {
+			return nil, utils.Errorf("ssa artifact task id missing")
+		}
+
+		objectKey := strings.TrimSpace(current.ObjectKey)
+		if objectKey == "" {
+			return nil, utils.Errorf("ssa artifact object key missing")
+		}
+
+		refreshCtx := ctx
+		if refreshCtx == nil {
+			refreshCtx = context.Background()
+		}
+		fresh, err := s.fetchSSAArtifactUploadTicket(refreshCtx, taskID, objectKey)
+		if err != nil {
+			return nil, err
+		}
+		if fresh == nil {
+			return nil, utils.Errorf("empty upload ticket")
+		}
+		if strings.TrimSpace(fresh.ObjectKey) == "" {
+			fresh.ObjectKey = objectKey
+		}
+		if strings.TrimSpace(fresh.Codec) == "" {
+			fresh.Codec = current.Codec
+		}
+		current = *fresh
+
+		cp := current
+		return &cp, nil
+	}
+}
+
+type ssaResultMeta struct {
+	ProgramName string
+	TotalLines  int64
+	RiskCount   int64
+}
+
+func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
+	meta := ssaResultMeta{}
+	if result == nil || result.Data == nil {
+		return meta
+	}
+
+	dataMap, ok := result.Data.(map[string]any)
+	if !ok || dataMap == nil {
+		return meta
+	}
+
+	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(
+		utils.MapGetFirstRaw(dataMap, "program_name", "programName", "ProgramName"),
+	))
+	meta.TotalLines = int64(utils.InterfaceToFloat64(
+		utils.MapGetFirstRaw(dataMap, "total_lines", "totalLines", "TotalLines"),
+	))
+	meta.RiskCount = int64(utils.InterfaceToFloat64(
+		utils.MapGetFirstRaw(dataMap, "risk_count", "riskCount", "RiskCount"),
+	))
+	return meta
+}
+
+func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error) {
+	if event == nil {
+		return json.Marshal(map[string]int64{})
+	}
+	merged := make(map[string]any)
+	// Start with the upload metrics from the collector (upload_ms, ticket_fetch_ms, etc.)
+	if len(event.Metrics) > 0 {
+		_ = json.Unmarshal(event.Metrics, &merged)
+	}
+	// Add risk/file/flow counts
+	merged["risk_count"] = event.RiskCount
+	merged["file_count"] = event.FileCount
+	merged["dataflow_count"] = event.FlowCount
+	return json.Marshal(merged)
+}

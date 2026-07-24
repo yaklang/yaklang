@@ -22,6 +22,60 @@ type DataFlowPath struct {
 	Nodes       []*NodeInfo `json:"nodes"`
 	Edges       []*EdgeInfo `json:"edges"`
 	DotGraph    string      `json:"dot_graph,omitempty"`
+	Paths       [][]string  `json:"paths,omitempty"`
+}
+
+type DataflowDetailLevel string
+
+const (
+	DataflowDetailMinimal DataflowDetailLevel = "minimal"
+	DataflowDetailFull    DataflowDetailLevel = "full"
+)
+
+// MarshalDataFlowPath serializes a DataFlowPath according to the given detail level.
+// Minimal mode strips DotGraph and CodeRange; full mode preserves them.
+func MarshalDataFlowPath(p *DataFlowPath, level DataflowDetailLevel) ([]byte, error) {
+	if p == nil {
+		return nil, nil
+	}
+	if level == DataflowDetailMinimal {
+		return MarshalMinimalDataFlowPath(p)
+	}
+
+	nodes := make([]*NodeInfo, 0, len(p.Nodes))
+	for _, n := range p.Nodes {
+		if n == nil {
+			continue
+		}
+		nodes = append(nodes, &NodeInfo{
+			NodeID:       n.NodeID,
+			IRCode:       n.IRCode,
+			IRSourceHash: n.IRSourceHash,
+			StartOffset:  n.StartOffset,
+			EndOffset:    n.EndOffset,
+			IsEntryNode:  n.IsEntryNode,
+			CodeRange:    n.CodeRange,
+		})
+	}
+	edges := make([]*EdgeInfo, 0, len(p.Edges))
+	for _, e := range p.Edges {
+		if e == nil {
+			continue
+		}
+		edges = append(edges, e)
+	}
+
+	if len(nodes) == 0 && len(edges) == 0 {
+		return nil, nil
+	}
+
+	return json.Marshal(&DataFlowPath{
+		Description: p.Description,
+		Nodes:       nodes,
+		Edges:       edges,
+		DotGraph:    p.DotGraph,
+		Paths:       p.Paths,
+	})
 }
 
 type NodeInfo struct {
@@ -125,7 +179,68 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, minimal bool, values ...*ssa
 	if !minimal {
 		path.DotGraph = dotGraph.String()
 	}
+	path.Paths = computeDataFlowPaths(nodes, edges)
 	return path, irSourceHashes, nil
+}
+
+func computeDataFlowPaths(nodes []*NodeInfo, edges []*EdgeInfo) [][]string {
+	adj := make(map[string][]string)
+	for _, e := range edges {
+		if e == nil {
+			continue
+		}
+		adj[e.FromNodeID] = append(adj[e.FromNodeID], e.ToNodeID)
+	}
+
+	var entryNodeID string
+	for _, n := range nodes {
+		if n != nil && n.IsEntryNode {
+			entryNodeID = n.NodeID
+			break
+		}
+	}
+	if entryNodeID == "" && len(nodes) > 0 && nodes[0] != nil {
+		entryNodeID = nodes[0].NodeID
+	}
+	if entryNodeID == "" {
+		return nil
+	}
+
+	hasOutgoing := make(map[string]bool)
+	for _, e := range edges {
+		if e != nil {
+			hasOutgoing[e.FromNodeID] = true
+		}
+	}
+
+	var paths [][]string
+	visited := make(map[string]bool)
+
+	var dfs func(nodeID string, current []string)
+	dfs = func(nodeID string, current []string) {
+		if visited[nodeID] {
+			return
+		}
+		visited[nodeID] = true
+		current = append(current, nodeID)
+
+		neighbors := adj[nodeID]
+		isSink := !hasOutgoing[nodeID]
+		if isSink || len(neighbors) == 0 {
+			pathCopy := make([]string, len(current))
+			copy(pathCopy, current)
+			paths = append(paths, pathCopy)
+		} else {
+			for _, next := range neighbors {
+				dfs(next, current)
+			}
+		}
+
+		visited[nodeID] = false
+	}
+
+	dfs(entryNodeID, []string{})
+	return paths
 }
 
 func generatePathDescription(risk *schema.SSARisk) string {

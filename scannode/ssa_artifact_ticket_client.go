@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -32,7 +33,16 @@ type ssaArtifactTicketResponse struct {
 	STSExpiresAt    int64  `json:"sts_expires_at"`
 }
 
-func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, objectKey string) (*SSAArtifactUploadConfig, error) {
+func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, objectKey string) (cfg *SSAArtifactUploadConfig, err error) {
+	fetchStart := time.Now()
+	defer func() {
+		fetchMs := time.Since(fetchStart).Milliseconds()
+		if err != nil {
+			log.Warnf("ticket_fetch_failed task=%s duration_ms=%d error=%q", taskID, fetchMs, err.Error())
+		} else {
+			log.Infof("ticket_fetch_ok task=%s duration_ms=%d", taskID, fetchMs)
+		}
+	}()
 	if s == nil || s.node == nil {
 		return nil, utils.Errorf("scannode not ready")
 	}
@@ -41,7 +51,7 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 		return nil, utils.Errorf("task id required")
 	}
 
-	baseURL := strings.TrimRight(strings.TrimSpace(s.getServerHTTPURL()), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(s.resolvePlatformAPIBaseURL()), "/")
 	if baseURL == "" {
 		return nil, utils.Errorf("server http url unavailable")
 	}
@@ -99,7 +109,7 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 			}
 		}
 	}
-	cfg := &SSAArtifactUploadConfig{
+	cfg = &SSAArtifactUploadConfig{
 		ObjectKey:       strings.TrimSpace(ticket.ObjectKey),
 		Codec:           strings.TrimSpace(ticket.Codec),
 		Endpoint:        strings.TrimSpace(ticket.Endpoint),
@@ -121,4 +131,15 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 		return nil, utils.Errorf("invalid upload ticket: missing sts credentials")
 	}
 	return cfg, nil
+}
+
+func (s *ScanNode) resolvePlatformAPIBaseURL() string {
+	if s == nil {
+		return ""
+	}
+	client, ok := s.ruleSyncClient.(*RuleSyncClient)
+	if !ok || client == nil || client.config == nil {
+		return ""
+	}
+	return strings.TrimSpace(client.config.ServerURL)
 }

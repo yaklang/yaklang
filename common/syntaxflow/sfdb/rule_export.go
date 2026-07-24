@@ -106,7 +106,7 @@ func ExportRulesToZip(ctx context.Context, db *gorm.DB, targetPath string, opts 
 
 	// 获取规则数量
 	var ruleCount int
-	if err := db.Count(&ruleCount).Error; err != nil {
+	if err := db.Model(&schema.SyntaxFlowRule{}).Count(&ruleCount).Error; err != nil {
 		return nil, utils.Wrap(err, "get syntax flow rule count failed")
 	}
 	if ruleCount == 0 {
