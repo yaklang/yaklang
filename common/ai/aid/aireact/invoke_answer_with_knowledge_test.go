@@ -175,7 +175,7 @@ func newMockedAnswerWithKnowledgeUnsatisfied(token, okToken string) aicommon.AIC
 			return rsp, nil
 		}
 
-		if utils.MatchAllOfSubString(prompt, "directly_answer", "knowledge_enhance") {
+		if isPrimaryDecisionPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "knowledge_enhance_answer", "answer_payload": "Go is statically typed.", "knowledge_payload": "Go typing" },

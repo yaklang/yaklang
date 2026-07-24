@@ -17,12 +17,15 @@ import (
 )
 
 func isLoadCapabilityToolParamPrompt(prompt string) bool {
-	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
+	// R2 now reuses R1 instruction; identify via dynamic-section markers.
+	if strings.Contains(prompt, "# Tool Context") && strings.Contains(prompt, "call-tool") {
 		return true
 	}
-
-	return strings.Contains(prompt, "Generate appropriate parameters for this tool call") &&
-		strings.Contains(prompt, "call-tool")
+	// Fallback: tool-params instruction still has "Generate appropriate parameters".
+	if strings.Contains(prompt, "Generate appropriate parameters") && strings.Contains(prompt, "call-tool") {
+		return true
+	}
+	return false
 }
 
 // TestReActLoop_LoadCapability_ToolEquivalence verifies that using load_capability
@@ -58,7 +61,7 @@ func TestReActLoop_LoadCapability_ToolEquivalence(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "load_capability") {
+			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				iterationCount++
 
 				if iterationCount > 3 {
@@ -151,7 +154,7 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "load_capability") {
+			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				// THE KEY DIFFERENCE: use load_capability instead of require_tool
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`

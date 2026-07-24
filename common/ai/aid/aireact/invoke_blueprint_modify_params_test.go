@@ -22,7 +22,7 @@ import (
 func mockedRequireBlueprint_ModifyParams(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string, forgeName string) (*aicommon.AIResponse, error) {
 
 	rsp := config.NewAIResponse()
-	if utils.MatchAllOfSubString(req.GetPrompt(), `require_ai_blueprint`, `require_tool`, "USER_QUERY", `directly_answer`, `ask_for_clarification`) {
+	if isPrimaryDecisionPrompt(req.GetPrompt()) {
 		rs := bytes.NewBufferString(`
 {"@action": "object", "next_action": {
 	"type": "require_ai_blueprint",
@@ -36,11 +36,7 @@ func mockedRequireBlueprint_ModifyParams(config aicommon.AICallerConfigIf, req *
 
 	prompt := req.GetPrompt()
 
-	if utils.MatchAllOfSubString(
-		req.GetPrompt(), forgeName,
-		"Blueprint Schema:", `Blueprint Description:`,
-		`call-ai-blueprint`,
-	) && !utils.MatchAllOfSubString(prompt, `<|OLD_PARAMS_`) {
+	if isToolParamGenPromptForBlueprint(prompt, forgeName) && !isToolParamGenPromptWithOldParams(prompt) {
 		rs := bytes.NewBufferString(`
 {"@action": "call-ai-blueprint", "params": {
 	"query": "...[` + flag + `]...",
@@ -51,11 +47,7 @@ func mockedRequireBlueprint_ModifyParams(config aicommon.AICallerConfigIf, req *
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(
-		req.GetPrompt(), forgeName,
-		"Blueprint Schema:", `Blueprint Description:`,
-		`call-ai-blueprint`, "<|OLD_PARAMS_",
-	) {
+	if isToolParamGenPromptForBlueprintWithOldParams(prompt, forgeName) {
 		rs := bytes.NewBufferString(`
 {"@action": "call-ai-blueprint", "params": {
 	"query": "...[` + codec.Sha256(flag) + `]...",

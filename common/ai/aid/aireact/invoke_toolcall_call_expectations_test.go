@@ -30,9 +30,7 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "call-tool") &&
-		(utils.MatchAllOfSubString(prompt, "需要为 '"+toolName+"' 生成参数") ||
-			utils.MatchAllOfSubString(prompt, "Tool Parameter Generation", toolName)) {
+	if isToolParamGenPromptForTool(prompt, toolName) && strings.Contains(prompt, "call-tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }, "call_expectations": "` + testCallExpectations + `"}`))
 		rsp.Close()

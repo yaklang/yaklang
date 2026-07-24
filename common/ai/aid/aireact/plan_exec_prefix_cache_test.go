@@ -281,7 +281,7 @@ func TestPlanExec_PrefixCacheStableWithMockedTieredAI(t *testing.T) {
 				},
 			})), nil
 
-		case utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") &&
+		case isPrimaryDecisionPrompt(prompt) &&
 			!strings.Contains(prompt, "PROGRESS_TASK_"):
 			return newMockAIResponse(i, intelligentModel, mustJSONString(map[string]any{
 				"@action": "object",

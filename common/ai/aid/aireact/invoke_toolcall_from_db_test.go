@@ -551,8 +551,13 @@ func hardDeleteMockYakScriptPlugin(db *gorm.DB, name string) {
 func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
+		if strings.Contains(prompt, "yakscript plugin executed successfully") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: yakscript plugin done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
 "human_readable_thought": "calling YakScript plugin", "cumulative_summary": "testing yakscript plugin integration"}
@@ -561,7 +566,7 @@ func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicom
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
+	if isToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "url": "http://127.0.0.1:9999/test" }}`))
 		rsp.Close()
@@ -742,7 +747,7 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + pluginName + `" },
@@ -752,7 +757,7 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
+			if isToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
 				rsp := i.NewAIResponse()
 				// Verify secondary disclosure: the prompt should contain __USAGE__ content
 				if strings.Contains(prompt, "Scan a target host") {

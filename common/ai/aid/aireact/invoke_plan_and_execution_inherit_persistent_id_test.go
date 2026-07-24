@@ -40,7 +40,7 @@ func TestReAct_PlanAndExecute_InheritPersistentId(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// ReAct 主循环的响应 - 请求 plan and execution
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + planPayload + `" },
@@ -212,7 +212,7 @@ func TestReAct_Forge_InheritPersistentId(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// ReAct 主循环的响应 - 请求 plan execution (和第一个测试一样)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + planPayload + `" },
@@ -387,7 +387,7 @@ func TestReAct_ForgeExecution_UserQueryContext(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// ReAct 主循环的响应 - 请求 blueprint (forge)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				// 验证用户输入在 prompt 中
 				if strings.Contains(prompt, userOriginalQuery) {
 					log.Infof("✓ User query found in ReAct main loop prompt")
@@ -405,7 +405,7 @@ func TestReAct_ForgeExecution_UserQueryContext(t *testing.T) {
 		}
 
 		// Blueprint 参数生成
-		if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", forgeName) {
+		if isToolParamGenPromptForBlueprint(prompt, forgeName) {
 			// 关键验证点：在生成 blueprint 参数的 prompt 中，用户原始输入必须存在
 			if strings.Contains(prompt, userOriginalQuery) {
 				userQueryFoundInPrompt = true
@@ -628,7 +628,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// ReAct main loop - match action keywords that are always in the JSON schema
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", "ask_for_clarification") &&
+			if isPrimaryDecisionPrompt(prompt) &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
 				log.Infof("✓ User query found in ReAct main loop prompt")
 
@@ -642,7 +642,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 			}
 
 			// Blueprint 参数生成 - 精确匹配本测试的 testForgeName
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
+			if isToolParamGenPromptForBlueprint(prompt, testForgeName) {
 				// 关键验证点：在生成 blueprint 参数的 prompt 中，用户原始输入必须存在
 				if strings.Contains(prompt, userOriginalQuery) {
 					userQueryFoundInCallAiBlueprintPrompt = true

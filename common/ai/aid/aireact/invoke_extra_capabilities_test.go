@@ -119,7 +119,7 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 			// ---- Phase 3: Main loop ----
 			// The main loop prompt contains directly_answer, but should not be confused
 			// with the intent loop or the capability matcher helper.
-			if utils.MatchAllOfSubString(prompt, "directly_answer") &&
+			if isPrimaryDecisionPrompt(prompt) &&
 				!utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
 				!utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
 				n := atomic.AddInt32(&mainLoopCalled, 1)

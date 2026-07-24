@@ -93,8 +93,8 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Intent loop (during PE task init)
-			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+			if isIntentEnrichmentPrompt(prompt) &&
+				!strings.Contains(prompt, "PROGRESS_TASK_") {
 				count := atomic.AddInt32(&intentLoopCalled, 1)
 				log.Infof("intent loop called during PE task init (count=%d)", count)
 				rsp := i.NewAIResponse()
@@ -111,29 +111,8 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 				return rsp, nil
 			}
 
-			// Phase: Tool parameter generation
-			if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "call-tool", "tool": "noop", "params": {}}
-`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: Blueprint parameter generation
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"query": "test"},
-"human_readable_thought": "calling blueprint", "cumulative_summary": "blueprint params"}
-`))
-				rsp.Close()
-				return rsp, nil
-			}
-
 			// Phase: PE task execution (contains PROGRESS_TASK_ and planFlag)
-			if utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", planFlag) {
+			if strings.Contains(prompt, "PROGRESS_TASK_") && strings.Contains(prompt, planFlag) {
 				atomic.AddInt32(&peTaskCalled, 1)
 				log.Infof("PE task main loop called")
 				rsp := i.NewAIResponse()
@@ -148,8 +127,41 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 				return rsp, nil
 			}
 
+			// Phase: Main loop - request blueprint
+			if isPrimaryDecisionPrompt(prompt) &&
+				!strings.Contains(prompt, "PROGRESS_TASK_") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
+"human_readable_thought": "requesting blueprint", "cumulative_summary": "test"}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: Tool parameter generation
+			if isToolParamGenPromptForTool(prompt, "") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "call-tool", "tool": "noop", "params": {}}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: Blueprint parameter generation
+			if isToolParamGenPromptForBlueprint(prompt, testForgeName) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"query": "test"},
+"human_readable_thought": "calling blueprint", "cumulative_summary": "blueprint params"}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// Phase: Task summary
-			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+			if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") && !strings.Contains(prompt, "PROGRESS_TASK_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 				rsp.Close()
@@ -157,21 +169,9 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: FINAL_ANSWER (post-iteration DirectlyAnswer)
-			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+			if isDirectAnswerPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Phase: Main loop - request blueprint (use action keywords always in JSON schema)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", "ask_for_clarification") &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
-"human_readable_thought": "requesting blueprint", "cumulative_summary": "test"}
-`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -280,8 +280,8 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Intent loop (during plan or PE task init)
-			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") &&
+			if isIntentEnrichmentPrompt(prompt) &&
+				!strings.Contains(prompt, "PROGRESS_TASK_") &&
 				!strings.Contains(prompt, "search_knowledge") {
 				count := atomic.AddInt32(&intentLoopCalled, 1)
 				log.Infof("intent loop called (count=%d)", count)
@@ -300,10 +300,10 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Plan loop (contains search_knowledge + plan actions)
-			if utils.MatchAllOfSubString(prompt, "search_knowledge") &&
+			if strings.Contains(prompt, "search_knowledge") &&
 				strings.Contains(prompt, "plan") &&
-				!utils.MatchAllOfSubString(prompt, "directly_answer") &&
-				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				!strings.Contains(prompt, "directly_answer") &&
+				!strings.Contains(prompt, "PROGRESS_TASK_") {
 				atomic.AddInt32(&planLoopCalled, 1)
 				log.Infof("plan loop AI called")
 				rsp := i.NewAIResponse()
@@ -320,7 +320,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: PE task execution
-			if utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+			if strings.Contains(prompt, "PROGRESS_TASK_") {
 				atomic.AddInt32(&peTaskCalled, 1)
 				log.Infof("PE task main loop called")
 				rsp := i.NewAIResponse()
@@ -332,15 +332,27 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Satisfaction verification
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if isVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
+			// Phase: Main loop → request_plan_and_execution
+			if isPrimaryDecisionPrompt(prompt) &&
+				!strings.Contains(prompt, "PROGRESS_TASK_") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + planPayload + `" },
+"human_readable_thought": "requesting plan execution", "cumulative_summary": "plan exec test"}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// Phase: Task summary
-			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+			if strings.Contains(prompt, "任务执行引擎") && strings.Contains(prompt, "task_long_summary") && !strings.Contains(prompt, "PROGRESS_TASK_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
 				rsp.Close()
@@ -348,7 +360,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: FINAL_ANSWER (post-iteration DirectlyAnswer)
-			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+			if isDirectAnswerPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
 				rsp.Close()
@@ -356,7 +368,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Main loop → request_plan_and_execution
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + planPayload + `" },

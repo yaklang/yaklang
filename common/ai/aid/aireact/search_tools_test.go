@@ -134,7 +134,7 @@ func TestReAct_SearchTools_InPrompt(t *testing.T) {
 			}
 
 			// Mock response - directly answer
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": {"type": "directly_answer"}, "answer_payload": "Test completed", 

@@ -85,7 +85,7 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 	// Mock decision to call tool - continue until we reach 10 iterations (>= 8 to trigger SPIN
 	// at default threshold). After SPIN triggers (iter > 5 && consecutive >= 8), reflection
 	// will be fired asynchronously.
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		iterationMutex.Lock()
 		iterationCount++
 		currentIter := iterationCount
@@ -113,7 +113,7 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 	}
 
 	// Mock tool parameter generation
-	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
+	if isToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test_message_` + nonce + `" }}`))
 		rsp.Close()

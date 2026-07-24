@@ -24,7 +24,7 @@ import (
 // Priority order (first match wins):
 //   1. verify-satisfaction  — "verify-satisfaction" + "user_satisfied" + "reasoning"
 //   2. self-reflection      — "SELF_REFLECTION_TASK"
-//   3. call-tool params     — "Generate appropriate parameters for this tool call based on the context above" + "call-tool"
+//   3. call-tool params     — "# Tool Context" + "call-tool" (R2 reuses R1 instruction)
 //   4. main ReAct prompt    — "directly_answer" + "SCHEMA" + "USER_QUERY"
 //   5. unknown / fallback
 //
@@ -91,7 +91,7 @@ func classifyPrompt(prompt string) promptType {
 	}
 
 	// 3. call-tool params: two markers that uniquely identify it
-	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
+	if aicommon.IsToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
 		return promptCallToolParams
 	}
 
@@ -99,7 +99,7 @@ func classifyPrompt(prompt string) promptType {
 	//    - "directly_answer": always present as an action type in the schema
 	//    - "SCHEMA": static schema block unique to main prompt
 	//    - "USER_QUERY": nonce-tagged user query block unique to main prompt
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "SCHEMA", "USER_QUERY") {
+	if aicommon.IsPrimaryDecisionPrompt(prompt) {
 		return promptMainReAct
 	}
 
