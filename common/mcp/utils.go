@@ -53,6 +53,12 @@ func decodeHookGenerator(sep string) func(from reflect.Type, to reflect.Type, v 
 	return func(from reflect.Type, to reflect.Type, v any) (any, error) {
 		if to.Kind() == reflect.String {
 			if from.Kind() == reflect.Slice {
+				// If the source is already a []byte (e.g. from normalizeMCPArguments
+				// base64-decoding), convert directly instead of treating each byte as
+				// a separate slice element.
+				if from.Elem().Kind() == reflect.Uint8 {
+					return string(v.([]byte)), nil
+				}
 				slice := utils.InterfaceToSliceInterface(v)
 				stringSlice := lo.Map(slice, func(item any, _ int) string {
 					return utils.InterfaceToString(item)
@@ -61,6 +67,11 @@ func decodeHookGenerator(sep string) func(from reflect.Type, to reflect.Type, v 
 			}
 		} else if to.Kind() == reflect.Slice && to.Elem().Kind() == reflect.Uint8 {
 			if from.Kind() == reflect.Slice {
+				// If the source is already []byte, pass it through unchanged.
+				// Otherwise (e.g. []string) join the elements with the separator.
+				if from.Elem().Kind() == reflect.Uint8 {
+					return v, nil
+				}
 				slice := utils.InterfaceToSliceInterface(v)
 				bytesSlice := lo.Map(slice, func(item any, _ int) []byte {
 					return utils.InterfaceToBytes(item)
@@ -74,6 +85,16 @@ func decodeHookGenerator(sep string) func(from reflect.Type, to reflect.Type, v 
 
 func decodeHook(from reflect.Type, to reflect.Type, v any) (any, error) {
 	return decodeHookGenerator("\n")(from, to, v)
+}
+
+// decodeHookComma is a variant of decodeHook that joins slice-to-string
+// conversions with a comma. Many proto string fields (e.g. PortScanRequest.Ports)
+// are parsed downstream by functions that only split on "," (e.g.
+// utils.ParseStringToPorts). Using the default "\n" separator causes
+// multi-element arrays like [80, 443] to become "80\n443", which those
+// parsers cannot split, silently dropping all values.
+func decodeHookComma(from reflect.Type, to reflect.Type, v any) (any, error) {
+	return decodeHookGenerator(",")(from, to, v)
 }
 
 func handleExecMessage(content string) string {

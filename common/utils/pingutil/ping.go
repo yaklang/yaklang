@@ -39,6 +39,23 @@ func PingAutoConfig(ip string, opts ...PingConfigOpt) *PingResult {
 	timeout := config.timeout
 	parentCtx := config.Ctx
 
+	// Loopback addresses (127.0.0.0/8, ::1) are always alive — they are the
+	// local machine itself. Running ICMP/TCP probing against them is unreliable:
+	// netstack ICMP ping times out on some platforms, and TCP-ping on default
+	// ports (22/80/443) fails when those ports aren't listening. This would
+	// cause the host to be judged dead and the entire downstream scan to be
+	// skipped. Return alive immediately — but only for the default auto-probe
+	// path (no forceTcpPing, no custom handlers, no proxy), so tests that
+	// inject handlers to exercise error paths are unaffected.
+	if utils.IsLoopback(ip) && !config.forceTcpPing && config.pingNativeHandler == nil && config.tcpDialHandler == nil && len(proxies) == 0 {
+		return &PingResult{
+			IP:     ip,
+			Ok:     true,
+			RTT:    0,
+			Reason: "loopback",
+		}
+	}
+
 	start := time.Now()
 	defer func() {
 		if time.Since(start).Seconds() > 6 {

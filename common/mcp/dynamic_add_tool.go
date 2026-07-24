@@ -103,9 +103,15 @@ func (s *MCPServer) execYakScriptWrapper(toolName, content string) server.ToolHa
 				}
 				break
 			}
+			if !exec.IsMessage {
+				continue
+			}
 
 			content := string(exec.Message)
 			content = handleExecMessage(content)
+			if content == "" {
+				continue
+			}
 
 			results = append(results, mcp.TextContent{
 				Type: "text",

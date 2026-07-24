@@ -40,14 +40,6 @@ var mitmSetFilterToolOptions = []mcp.ToolOption{
 		mcp.Description("MITM traffic filter rules"),
 		mcp.Required(),
 	}, mitmFilterDataToolOptions...),
-	mcp.WithStringArray("includeHostname", mcp.Description("Legacy flat hostname include list")),
-	mcp.WithStringArray("excludeHostname", mcp.Description("Legacy flat hostname exclude list")),
-	mcp.WithStringArray("includeSuffix", mcp.Description("Legacy flat suffix include list")),
-	mcp.WithStringArray("excludeSuffix", mcp.Description("Legacy flat suffix exclude list")),
-	mcp.WithStringArray("excludeMethod", mcp.Description("Legacy flat HTTP method exclude list")),
-	mcp.WithStringArray("excludeContentTypes", mcp.Description("Legacy flat content-type exclude list")),
-	mcp.WithStringArray("excludeUri", mcp.Description("Legacy flat URI exclude list")),
-	mcp.WithStringArray("includeUri", mcp.Description("Legacy flat URI include list")),
 }
 
 var mitmContentReplacerToolOptions = []mcp.ToolOption{
