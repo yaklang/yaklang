@@ -2255,19 +2255,37 @@ func BuildTrajectory(sessionID string, events []*schema.AiOutputEvent) *Trajecto
 
 	// Attach spawned nested loop nodes under their carrier task.
 	for parentTask, loops := range nestedLoops {
-		parent := nodeOf[parentTask]
-		if parent == nil || parentTask == rootTaskID {
-			// Carrier unknown or the session root: phase/loop markers emitted on
-			// the root task belong under the top-level audit loop (their real
-			// container), not directly under the session node.
-			if topLevelLoop != nil {
-				parent = topLevelLoop
-			} else {
-				parent = root
-			}
-		}
 		for _, lp := range loops {
-			parent.Children = append(parent.Children, lp)
+			attachTarget := nodeOf[parentTask]
+			if attachTarget == nil || parentTask == rootTaskID {
+				if topLevelLoop != nil {
+					attachTarget = topLevelLoop
+				} else {
+					attachTarget = root
+				}
+			}
+			// Cross-task nesting: if the carrier task is a nested sub-task whose
+			// parent has a loop node that temporally contains this loop (the parent
+			// loop started before and ends after this loop's enter line), attach
+			// under that parent's loop node. For example, fast_context may run on
+			// a "-sub-fast-context-xxx" sub-task whose parent is the category scan
+			// task carrying code_audit_scan_*; we want fast_context to nest inside
+			// the scan loop.
+			carrierParent := resolveParent(parentTask)
+			if carrierParent != "" && carrierParent != rootTaskID && carrierParent != parentTask {
+				for _, lp2 := range taskLoops[carrierParent] {
+					if lp2.Kind != "loop" {
+						continue
+					}
+					if lp2.EnterLine > 0 && lp2.EnterLine <= lp.EnterLine {
+						if lp2.ExitLine == 0 || lp2.ExitLine >= lp.ExitLine {
+							attachTarget = lp2
+							break
+						}
+					}
+				}
+			}
+			attachTarget.Children = append(attachTarget.Children, lp)
 		}
 	}
 

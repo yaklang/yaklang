@@ -34,7 +34,14 @@ func (s *VizHTTPServer) handleSessionTimeline(w http.ResponseWriter, r *http.Req
 		}
 		taskIdx := e.TaskIndex
 		if taskIdx == "" {
-			taskIdx = "default"
+			// Some events (e.g. short-lived verify sub-agents) may not carry a
+			// task_index. Fall back to task_id so they get their own timeline
+			// group instead of being lumped into "default" with unrelated events.
+			if e.TaskId != "" {
+				taskIdx = e.TaskId
+			} else {
+				taskIdx = "default"
+			}
 		}
 
 		task, exists := taskMap[taskIdx]
