@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/samber/lo"
 
@@ -46,6 +47,37 @@ var eventTypeNotSaveBlackList = []EventType{
 	EVENT_TYPE_VALUE_FEEDBACK,
 }
 
+// eventTypeDebugOnly lists event types that are only persisted when debug
+// mode is enabled. These events are voluminous (prompt_profile carries the
+// full prompt section text ~200KB each; reference_material carries full
+// referenced file content) and are primarily useful for the viz observe
+// window's prompt-inspection feature. In normal operation they are streamed
+// to the frontend via SSE for live display but skipped from DB persistence
+// to avoid multi-hundred-MB session bloat.
+var eventTypeDebugOnly = []EventType{
+	EVENT_TYPE_PROMPT_PROFILE,
+	EVENT_TYPE_REFERENCE_MATERIAL,
+}
+
+// debugEventPersistence controls whether debug-only event types (prompt_profile,
+// reference_material) are persisted to the database. Disabled by default; enable
+// via SetDebugEventPersistence(true) when you need full prompt-content history
+// for the viz observe window.
+var debugEventPersistence atomic.Bool
+
+// SetDebugEventPersistence enables or disables persistence of debug-only event
+// types (prompt_profile, reference_material). When disabled (default), these
+// events are still streamed live to the frontend but not saved to the DB,
+// keeping session sizes manageable.
+func SetDebugEventPersistence(enable bool) {
+	debugEventPersistence.Store(enable)
+}
+
+// IsDebugEventPersistence returns whether debug-only event persistence is on.
+func IsDebugEventPersistence() bool {
+	return debugEventPersistence.Load()
+}
+
 var structuredNodeIDNotSaveBlackList = []string{
 	"status",
 	// 关键词: structured system 不保存默认行为, pop_task / push_task 特例保存
@@ -80,7 +112,7 @@ const (
 	AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES      = "load_skill_resources"
 	AI_REACT_LOOP_ACTION_LOAD_CAPABILITY           = "load_capability"
 	AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL        = "directly_call_tool"
-	AI_REACT_LOOP_ACTION_SAVE_EVIDENCE      = "save_evidence"
+	AI_REACT_LOOP_ACTION_SAVE_EVIDENCE             = "save_evidence"
 	AI_REACT_LOOP_ACTION_ADJUST_TODOLIST           = "adjust_todolist"
 	AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS         = "query_mcp_servers"
 	AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS           = "query_mcp_tools"
@@ -402,7 +434,19 @@ func (e *AiOutputEvent) ShouldSave() bool {
 	return e != nil &&
 		e.saveAllowedByFlags() &&
 		e.saveAllowedByType() &&
-		e.saveAllowedByNodeID()
+		e.saveAllowedByNodeID() &&
+		e.saveAllowedByDebugMode()
+}
+
+// saveAllowedByDebugMode rejects debug-only event types (prompt_profile,
+// reference_material) unless SetDebugEventPersistence(true) has been called.
+// These events can be hundreds of MB per session and are only needed for the
+// viz observe window's full-prompt-inspection feature.
+func (e *AiOutputEvent) saveAllowedByDebugMode() bool {
+	if debugEventPersistence.Load() {
+		return true
+	}
+	return !lo.Contains(eventTypeDebugOnly, e.Type)
 }
 
 func (e *AiOutputEvent) saveAllowedByFlags() bool {
