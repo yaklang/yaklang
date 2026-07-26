@@ -27,6 +27,7 @@ type streamEvent struct {
 	taskIndex          string
 	disableMarkdown    bool
 	contentType        string
+	vizSource          string // 流来源标签，落库到 AiOutputEvent.VizSource 供 viz 使用，不污染 ContentType
 	emitFinishCallback []func()
 
 	// throttleInterval controls the flush interval for rate-limiting high-frequency streams.
@@ -63,6 +64,7 @@ func newStreamAIOutputEventWriter(
 		eventWriterID:        eventWriterID,
 		taskIndex:            taskIndex,
 		contentType:          event.contentType,
+		vizSource:            event.vizSource,
 		disableRecoveryBlock: event.disableRecoveryBlock,
 	}
 }
@@ -75,6 +77,7 @@ type streamAIOutputEventWriter struct {
 	coordinatorId        string
 	nodeId               string
 	contentType          string
+	vizSource            string
 	taskIndex            string
 	handler              BaseEmitter
 	timeStamp            int64
@@ -104,6 +107,7 @@ func (e *streamAIOutputEventWriter) Write(b []byte) (int, error) {
 		TaskIndex:       e.taskIndex,
 		DisableMarkdown: e.disableMarkdown,
 		ContentType:     e.contentType,
+		VizSource:       e.vizSource,
 	}
 	if !e.disableRecoveryBlock {
 		event.RecoveryIndexID = e.eventWriterID

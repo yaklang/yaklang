@@ -49,12 +49,6 @@ func NewVizHTTPServer(opts ...Option) (*VizHTTPServer, error) {
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	schema.ApplyPatches(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 
-	// Enable persistence of debug-only events (prompt_profile, reference_material)
-	// so the viz observe window can show full prompt content and reconstructed
-	// context for both live and historical sessions. Without this, those events
-	// are streamed live via SSE but not saved to the DB.
-	schema.SetDebugEventPersistence(true)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &VizHTTPServer{
 		config: config,

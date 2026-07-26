@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -63,7 +62,7 @@ func TestSmartQAFinalAnswerEmitsMarkdownStreamAndSkipsDirectlyAnswer(t *testing.
 	var sawAnswerStream bool
 	var sawResult bool
 	for _, e := range events {
-		if e.NodeId == "re-act-loop-answer-payload" && e.IsStream && strings.HasPrefix(e.ContentType, aicommon.TypeTextMarkdown) {
+		if e.NodeId == "re-act-loop-answer-payload" && e.IsStream && e.ContentType == aicommon.TypeTextMarkdown {
 			sawAnswerStream = true
 		}
 		if e.NodeId == "result" {

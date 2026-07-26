@@ -27,17 +27,6 @@ type BaseEmitter func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error)
 type EventProcesser func(e *schema.AiOutputEvent) *schema.AiOutputEvent
 type AIEventMetaProvider func() AIEventMeta
 
-// appendVizSource 把字段来源附加到 ContentType 的 viz-source 后缀，供 viz 前端识别。
-func appendVizSource(contentType, source string) string {
-	if source == "" {
-		return contentType
-	}
-	if contentType == "" {
-		return "default;viz-source=" + source
-	}
-	return contentType + ";viz-source=" + source
-}
-
 // AIEventMeta carries the runtime AI metadata that should be attached to
 // events emitted within a specific AI call scope.
 type AIEventMeta struct {
@@ -885,6 +874,24 @@ func (r *Emitter) EmitStreamEventWithContentType(nodeId string, reader io.Reader
 	return r.EmitStreamEventWithContentTypeEx(nodeId, reader, taskIndex, contentType, false, finishCallback...)
 }
 
+// EmitStreamEventWithVizSource 同 EmitStreamEventWithContentTypeEx，但额外携带 vizSource
+// 流来源标签（如 human_readable_thought / modify_code_reason），落库到 VizSource 字段，
+// 供 viz 区分流字段来源，不污染 ContentType。
+func (r *Emitter) EmitStreamEventWithVizSource(nodeId string, reader io.Reader, taskIndex string, contentType string, vizSource string, isSystem bool, finishCallback ...func()) (*schema.AiOutputEvent, error) {
+	return r.emitStreamEvent(&streamEvent{
+		disableMarkdown:    true,
+		startTime:          time.Now(),
+		isSystem:           isSystem,
+		isReason:           false,
+		reader:             reader,
+		nodeId:             nodeId,
+		contentType:        contentType,
+		vizSource:          vizSource,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
+}
+
 func (r *Emitter) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool, finishCallback ...func()) (*schema.AiOutputEvent, error) {
 	reader = utils.UTF8Reader(reader)
 
@@ -954,6 +961,7 @@ func (r *Emitter) emitStartStreamEvent(ts int64, er *streamAIOutputEventWriter) 
 		TaskIndex:       er.taskIndex,
 		DisableMarkdown: true,
 		ContentType:     er.contentType,
+		VizSource:       er.vizSource,
 	}
 	if !er.disableRecoveryBlock {
 		event.IsRecoveryBlock = true
@@ -974,12 +982,12 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 		e.nodeId = "re-act-loop-thought"
 		// model provider 原生 reasoning_content（如 deepseek-r1 / qwen-qwq）
 		// 在 viz 里需要与 human_readable_thought 等字段区分开，所以标记来源。
-		e.contentType = appendVizSource(e.contentType, "reason_content")
+		e.vizSource = "reason_content"
 	}
 
 	if e.nodeId == "thought" {
 		e.nodeId = "re-act-loop-thought"
-		e.contentType = appendVizSource(e.contentType, "reason_content")
+		e.vizSource = "reason_content"
 	}
 
 	schema.EnsureStreamNodeIdI18n(e.nodeId, r.streamNodeIdI18nProvider)
