@@ -49,7 +49,7 @@ type ProjectedBlock struct {
 	Summary string `json:"summary,omitempty"`
 
 	// 来源字段/流标识，例如 human_readable_thought、modify_code_reason 等。
-	// 由 AI 核心 emit 时写入 ContentType 的 viz-source 后缀，viz 解析后暴露给前端。
+	// 由 AI 核心 emit 时写入 VizSource 字段，viz 直接透传给前端。
 	Source string `json:"source,omitempty"`
 
 	// Tool call 块特有
@@ -607,7 +607,7 @@ func (p *ContextProjector) mergeToolLogsIntoCalls(blocks []ProjectedBlock) []Pro
 
 // mergeCrossSourceReasoning 把同一次 AI 调用里多个来源的 reasoning 合并成一个 think 块。
 // 有些 thinking 模型会同时输出 reason_content 和 human_readable_thought；在 UI 上我们
-// 把它们视为一次思考，并保留 viz-source 元数据。
+// 把它们视为一次思考，并保留来源（Source）元数据。
 func (p *ContextProjector) mergeCrossSourceReasoning(blocks []ProjectedBlock) []ProjectedBlock {
 	if len(blocks) < 2 {
 		return blocks
@@ -655,7 +655,7 @@ func mergeReasoningText(a, b string) string {
 	return a + "\n" + b
 }
 
-// mergeSource 合并两个 viz-source 标签，避免重复。
+// mergeSource 合并两个来源标签（Source），避免重复。
 func mergeSource(a, b string) string {
 	if a == "" {
 		return b
@@ -1064,10 +1064,10 @@ func (p *ContextProjector) projectStreamStart(st *agentProjectionState, e *schem
 	if e.IsReason || e.NodeId == "re-act-loop-thought" {
 		role = ProjectedThink
 	}
-	// 解析 ContentType 中的 viz-source 后缀，供后续块继承 Source。
+	// 流来源标签（如 human_readable_thought）由 AI 核心 emit 时写入 VizSource 字段。
 	// 如果 node_id 是 directly_call_tool_params，也显式标记来源，因为 fixture 中
-	// 这类流的 content_type 可能是 default。
-	source := extractVizSource(e.ContentType)
+	// 这类流的 VizSource 可能为空。
+	source := e.VizSource
 	if source == "" && e.NodeId == "directly_call_tool_params" {
 		source = "directly_call_tool_params"
 	}
@@ -1088,7 +1088,7 @@ func (p *ContextProjector) projectStreamChunk(st *agentProjectionState, e *schem
 		if e.IsReason || e.NodeId == "re-act-loop-thought" {
 			role = ProjectedThink
 		}
-		source := extractVizSource(e.ContentType)
+		source := e.VizSource
 		if source == "" && e.NodeId == "directly_call_tool_params" {
 			source = "directly_call_tool_params"
 		}
@@ -1103,20 +1103,6 @@ func (p *ContextProjector) projectStreamChunk(st *agentProjectionState, e *schem
 	if e.StreamDelta != nil {
 		buf.parts = append(buf.parts, string(e.StreamDelta))
 	}
-}
-
-// extractVizSource 从 ContentType 中提取 viz-source 后缀。
-// e.g. "text/plain;viz-source=human_readable_thought" -> "human_readable_thought"
-func extractVizSource(contentType string) string {
-	idx := strings.Index(contentType, "viz-source=")
-	if idx < 0 {
-		return ""
-	}
-	s := contentType[idx+len("viz-source="):]
-	if i := strings.IndexAny(s, ";,"); i >= 0 {
-		s = s[:i]
-	}
-	return strings.TrimSpace(s)
 }
 
 // projectStreamDone 关闭一个流缓冲区并生成最终块。
@@ -1242,7 +1228,7 @@ func (p *ContextProjector) projectThink(st *agentProjectionState, e *schema.AiOu
 		AgentName:  st.name,
 		IsSubAgent: st.isSub,
 		Content:    content,
-		Source:     extractVizSource(e.ContentType),
+		Source:     e.VizSource,
 		LoopName:   loopName,
 		Nonce:      nonce,
 		LineNo:     lineNo,

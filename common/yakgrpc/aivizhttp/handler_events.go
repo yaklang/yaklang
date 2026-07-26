@@ -172,6 +172,7 @@ func eventToItem(e *schema.AiOutputEvent) EventItem {
 		IsReason:        e.IsReason,
 		IsJson:          e.IsJson,
 		ContentType:     e.ContentType,
+		VizSource:       e.VizSource,
 		AIService:       e.AIService,
 		AIModelName:     e.AIModelName,
 		EventUUID:       e.EventUUID,

@@ -59,15 +59,6 @@ func isJSONEmbeddedAITagPrefix(peeked []byte, wrapperToken string) bool {
 	return bytes.HasPrefix(peeked[i:], []byte(wrapperToken))
 }
 
-// appendVizSource 把字段名作为 viz-source 后缀附加到 ContentType，供 viz 前端识别流来源。
-// 保持主 mime 类型不变，避免破坏现有渲染逻辑。
-func appendVizSource(contentType, fieldName string) string {
-	if fieldName == "" {
-		return contentType
-	}
-	return contentType + ";viz-source=" + fieldName
-}
-
 // waitReadableStream blocks until the stream yields at least one byte or closes.
 // It lets callers avoid creating frontend stream cards for empty streams while
 // still preserving the first byte for later emit.
@@ -380,15 +371,12 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 						if fieldIns.AINodeId != "" {
 							defaultNodeId = fieldIns.AINodeId
 						}
-						// 把字段名编码到 ContentType 的 viz-source 后缀，让 viz 前端能区分
+						// 把字段名作为流来源记录到 VizSource，让 viz 前端能区分
 						// 这条 think/assistant 流来自 AI 响应中的哪个字段（如 human_readable_thought
-						// 还是 modify_code_reason）。不改变 NodeId，避免破坏现有 i18n/测试。
+						// 还是 modify_code_reason）。不污染 ContentType，避免破坏前端按 MIME 主类型解析。
 						contentType := fieldIns.ContentType
 						if contentType == "" {
 							contentType = "text/plain"
-						}
-						if fieldIns.FieldName != "" {
-							contentType = appendVizSource(contentType, fieldIns.FieldName)
 						}
 						preparedReader, readable, readableErr := waitReadableStream(pr)
 						if readableErr != nil {
@@ -402,11 +390,12 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							return
 						}
 
-						event, emitErr := boundEmitter.EmitStreamEventWithContentTypeEx(
+						event, emitErr := boundEmitter.EmitStreamEventWithVizSource(
 							defaultNodeId,
 							preparedReader,
 							resp.GetTaskIndex(),
 							contentType,
+							fieldIns.FieldName,
 							fieldIns.IsSystem,
 							func() {
 								log.Debugf("stream emit callback for field [%s] triggered", key)

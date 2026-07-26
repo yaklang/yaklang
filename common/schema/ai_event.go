@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync/atomic"
 
 	"github.com/samber/lo"
 
@@ -45,37 +44,6 @@ var eventTypeNotSaveBlackList = []EventType{
 	EVENT_TYPE_MEMORY_CONTEXT,
 	// 价值评估结果只回吐前端展示, 不落本地数据库
 	EVENT_TYPE_VALUE_FEEDBACK,
-}
-
-// eventTypeDebugOnly lists event types that are only persisted when debug
-// mode is enabled. These events are voluminous (prompt_profile carries the
-// full prompt section text ~200KB each; reference_material carries full
-// referenced file content) and are primarily useful for the viz observe
-// window's prompt-inspection feature. In normal operation they are streamed
-// to the frontend via SSE for live display but skipped from DB persistence
-// to avoid multi-hundred-MB session bloat.
-var eventTypeDebugOnly = []EventType{
-	EVENT_TYPE_PROMPT_PROFILE,
-	EVENT_TYPE_REFERENCE_MATERIAL,
-}
-
-// debugEventPersistence controls whether debug-only event types (prompt_profile,
-// reference_material) are persisted to the database. Disabled by default; enable
-// via SetDebugEventPersistence(true) when you need full prompt-content history
-// for the viz observe window.
-var debugEventPersistence atomic.Bool
-
-// SetDebugEventPersistence enables or disables persistence of debug-only event
-// types (prompt_profile, reference_material). When disabled (default), these
-// events are still streamed live to the frontend but not saved to the DB,
-// keeping session sizes manageable.
-func SetDebugEventPersistence(enable bool) {
-	debugEventPersistence.Store(enable)
-}
-
-// IsDebugEventPersistence returns whether debug-only event persistence is on.
-func IsDebugEventPersistence() bool {
-	return debugEventPersistence.Load()
 }
 
 var structuredNodeIDNotSaveBlackList = []string{
@@ -360,6 +328,7 @@ type AiOutputEvent struct {
 	ProcessesId []string `gorm:"-"`
 
 	ContentType        string
+	VizSource          string // 流来源标签（如 reason_content / human_readable_thought），仅供 viz 区分流字段，不影响前端渲染
 	AIService          string
 	AIModelName        string
 	AIModelVerboseName string
@@ -434,19 +403,7 @@ func (e *AiOutputEvent) ShouldSave() bool {
 	return e != nil &&
 		e.saveAllowedByFlags() &&
 		e.saveAllowedByType() &&
-		e.saveAllowedByNodeID() &&
-		e.saveAllowedByDebugMode()
-}
-
-// saveAllowedByDebugMode rejects debug-only event types (prompt_profile,
-// reference_material) unless SetDebugEventPersistence(true) has been called.
-// These events can be hundreds of MB per session and are only needed for the
-// viz observe window's full-prompt-inspection feature.
-func (e *AiOutputEvent) saveAllowedByDebugMode() bool {
-	if debugEventPersistence.Load() {
-		return true
-	}
-	return !lo.Contains(eventTypeDebugOnly, e.Type)
+		e.saveAllowedByNodeID()
 }
 
 func (e *AiOutputEvent) saveAllowedByFlags() bool {

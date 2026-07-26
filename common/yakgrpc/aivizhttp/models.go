@@ -40,6 +40,7 @@ type EventItem struct {
 	Content         string `json:"content,omitempty"`
 	StreamDelta     string `json:"stream_delta,omitempty"`
 	ContentType     string `json:"content_type,omitempty"`
+	VizSource       string `json:"viz_source,omitempty"`
 	AIService       string `json:"ai_service,omitempty"`
 	AIModelName     string `json:"ai_model_name,omitempty"`
 	EventUUID       string `json:"event_uuid,omitempty"`
