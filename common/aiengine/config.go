@@ -37,6 +37,12 @@ type AIEngineConfig struct {
 	MaxIteration int    // 最大迭代次数，默认 10
 	SessionID    string // 会话 ID，用于持久化
 
+	// Stateless 为 true 时,引擎不持久化会话历史/memory/timeline 到本地 DB。
+	// 每轮由服务端打包 ContextPackage 注入历史,turn 完销毁引擎实例。
+	// 用于 S3c 无状态引擎路径。buildReActOptions 据此短路 PersistentSessionId/
+	// MemoryTriageId/TimelineArchiveStore/SaveTimeline 四个落盘分支。
+	Stateless bool
+
 	// 工具配置
 	DisableToolUse        bool     // 禁用工具调用
 	DisableAIForge        bool     // 禁用 Forge 调用
@@ -239,6 +245,15 @@ func WithMaxIteration(max int) AIEngineConfigOption {
 func WithSessionID(sessionID string) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.SessionID = sessionID
+	}
+}
+
+// WithStateless 启用或禁用无状态模式。无状态模式下引擎不持久化任何跨轮状态
+// (PersistentSessionId/MemoryTriageId 留空,MemoryTriage 注入 no-op),
+// re-act.go 的四个落盘分支全部短路。用于 S3c scannode 无状态引擎路径。
+func WithStateless(enabled bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.Stateless = enabled
 	}
 }
 
