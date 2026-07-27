@@ -69,7 +69,7 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 	// 分支改返回 finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}

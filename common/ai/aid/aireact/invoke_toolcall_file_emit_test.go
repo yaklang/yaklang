@@ -60,7 +60,7 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -309,7 +309,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 
 			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -449,7 +449,7 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -626,7 +626,7 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 
 	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -817,7 +817,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 
 		if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 			rsp.Close()
 			return rsp, nil
 		}
