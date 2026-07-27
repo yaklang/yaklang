@@ -202,7 +202,7 @@ for result in results { yakit.Info("%v", result.String()) }
 
 **标准结构（以 mirrorNewWebsitePath 为例）：**
 ```
-mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {
+mirrorNewWebsitePath = func(...) { // 形参以 grep_yaklang_samples 样例为准，禁止臆造/套用
     // ... 业务逻辑(如收集/探测)
 }
 
