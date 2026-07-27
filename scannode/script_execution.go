@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -81,7 +83,9 @@ func (s *ScanNode) executeScriptTask(
 	if err != nil {
 		return nil, utils.Errorf("fetch node path err: %s", err)
 	}
-	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, ssaDBEnv); err != nil {
+	taskLogWriter, taskLogClose := openTaskLogWriter(input.TaskID, input.SubTaskID, input.RuntimeID)
+	defer taskLogClose()
+	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, ssaDBEnv, taskLogWriter); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
 		return nil, s.handleScriptFailure(err, result, taskID)
 	}
@@ -295,6 +299,7 @@ func (s *ScanNode) executeScript(
 	params []string,
 	runtimeID string,
 	extraEnv []string,
+	taskLogWriter io.Writer,
 ) error {
 	baseCmd := []string{"distyak", scriptFile}
 	log.Infof("yak %v %v", scriptFile, params)
@@ -306,9 +311,58 @@ func (s *ScanNode) executeScript(
 	)
 	env = append(env, extraEnv...)
 	cmd.Env = env
+	// 默认子进程 stdout/stderr 直通父进程（维持原行为）。当调用方传入
+	// per-task 日志 writer（开发测试调优：SCANNODE_TASK_LOG_DIR 开启时），
+	// 同时 tee 到该 writer，使单个扫描任务的 yak 引擎执行日志单独落盘，
+	// 便于按任务回溯调优，主日志仍保留完整视图。
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	if taskLogWriter != nil {
+		cmd.Stdout = io.MultiWriter(os.Stdout, taskLogWriter)
+		cmd.Stderr = io.MultiWriter(os.Stderr, taskLogWriter)
+	}
 	return cmd.Run()
+}
+
+// openTaskLogWriter 按环境变量 SCANNODE_TASK_LOG_DIR 为单个扫描任务打开
+// 独立的日志文件，用于开发测试调优场景下的任务级日志隔离。返回的 writer
+// 为 nil 表示未启用（生产默认），调用方应原样传给 executeScript，后者会
+// 走原直通路径。返回的 close 函数保证可安全调用（nil 时为 no-op）。
+//
+// 文件名格式：<JobID>_<SubTaskID>_<AttemptID>.log，缺失字段用 "_" 占位。
+// 任一失败（目录不存在/无权限）均降级为 nil 并打 warn 日志，不阻断扫描。
+func openTaskLogWriter(jobID, subTaskID, runtimeID string) (io.Writer, func()) {
+	dir := os.Getenv("SCANNODE_TASK_LOG_DIR")
+	if strings.TrimSpace(dir) == "" {
+		return nil, func() {}
+	}
+	name := fmt.Sprintf("%s_%s_%s.log",
+		sanitizeLogName(jobID),
+		sanitizeLogName(subTaskID),
+		sanitizeLogName(runtimeID),
+	)
+	path := filepath.Join(dir, name)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Warnf("open per-task log file failed (fallback to stdout only): %s: %v", path, err)
+		return nil, func() {}
+	}
+	return f, func() { _ = f.Close() }
+}
+
+// sanitizeLogName 把任务标识里的路径分隔符/空字符等替换为 "_"，避免注入
+// 到 per-task 日志文件名中造成路径穿越或文件名异常。
+func sanitizeLogName(s string) string {
+	if s == "" {
+		return "_"
+	}
+	r := strings.NewReplacer("/", "_", "\\", "_", string(os.PathSeparator), "_", "\x00", "_")
+	out := r.Replace(s)
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return "_"
+	}
+	return out
 }
 
 // classifyUploadError maps an upload error message to a structured error code
