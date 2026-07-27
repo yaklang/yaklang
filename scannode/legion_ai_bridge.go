@@ -67,9 +67,10 @@ type aiSessionRuntimeBindOptions struct {
 }
 
 type aiSessionInput struct {
-	Ref         aiSessionCommandRef
-	InputType   string
-	PayloadJSON []byte
+	Ref            aiSessionCommandRef
+	InputType      string
+	PayloadJSON    []byte
+	ContextPackage *aiv1.ContextPackage // S3c: per-turn server-assembled context (history/tools/user_input)
 }
 
 type aiSessionContextUpdate struct {
@@ -80,11 +81,12 @@ type aiSessionContextUpdate struct {
 }
 
 type acceptedAISessionInput struct {
-	ref         aiSessionCommandRef
-	seq         uint64
-	inputType   string
-	payloadJSON []byte
-	handle      aiSessionRuntimeHandle
+	ref            aiSessionCommandRef
+	seq            uint64
+	inputType      string
+	payloadJSON    []byte
+	handle         aiSessionRuntimeHandle
+	contextPackage *aiv1.ContextPackage // S3c: carried through to handle.SendInput
 }
 
 type acceptedAISessionContextUpdate struct {
@@ -223,11 +225,12 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 		inputType = "message"
 	}
 	return acceptedAISessionInput{
-		ref:         ref,
-		seq:         seq,
-		inputType:   inputType,
-		payloadJSON: payload,
-		handle:      handle,
+		ref:            ref,
+		seq:            seq,
+		inputType:      inputType,
+		payloadJSON:    payload,
+		handle:         handle,
+		contextPackage: command.GetContextPackage(),
 	}, nil
 }
 
@@ -398,9 +401,10 @@ func (b *legionJobBridge) handleAISessionInput(ctx context.Context, raw []byte) 
 		return nil
 	}
 	if err := accepted.handle.SendInput(ctx, aiSessionInput{
-		Ref:         accepted.ref,
-		InputType:   accepted.inputType,
-		PayloadJSON: accepted.payloadJSON,
+		Ref:            accepted.ref,
+		InputType:      accepted.inputType,
+		PayloadJSON:    accepted.payloadJSON,
+		ContextPackage: accepted.contextPackage,
 	}); err != nil {
 		return b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
 	}

@@ -897,3 +897,52 @@ func (h *recordingAISessionRuntimeHandle) Close(reason string) {
 	defer h.driver.mu.Unlock()
 	h.driver.closes = append(h.driver.closes, reason)
 }
+
+func TestHandleAISessionInputCarriesContextPackage(t *testing.T) {
+	t.Parallel()
+
+	bridge, _, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+
+	cmd := validAISessionInputCommand()
+	cmd.ContextPackage = &aiv1.ContextPackage{
+		SessionId: "ai-session-1",
+		UserInput: "hello",
+		Messages: []*aiv1.ContextMessage{
+			{Role: "user", Content: "prior question"},
+			{Role: "assistant", Content: "prior answer"},
+		},
+	}
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, cmd)); err != nil {
+		t.Fatalf("handle ai input: %v", err)
+	}
+
+	driver.mu.Lock()
+	inputs := len(driver.inputs)
+	var gotCP *aiv1.ContextPackage
+	if inputs > 0 {
+		gotCP = driver.inputs[0].ContextPackage
+	}
+	driver.mu.Unlock()
+
+	if inputs != 1 {
+		t.Fatalf("expected 1 recorded input, got %d", inputs)
+	}
+	if gotCP == nil {
+		t.Fatal("ContextPackage not carried through to handle.SendInput")
+	}
+	if gotCP.SessionId != "ai-session-1" || gotCP.UserInput != "hello" {
+		t.Fatalf("context package session/user_input wrong: %#v", gotCP)
+	}
+	if len(gotCP.Messages) != 2 {
+		t.Fatalf("expected 2 context messages, got %d", len(gotCP.Messages))
+	}
+	if gotCP.Messages[0].Role != "user" || gotCP.Messages[0].Content != "prior question" {
+		t.Fatalf("first context message wrong: %#v", gotCP.Messages[0])
+	}
+	if gotCP.Messages[1].Role != "assistant" || gotCP.Messages[1].Content != "prior answer" {
+		t.Fatalf("second context message wrong: %#v", gotCP.Messages[1])
+	}
+}
