@@ -522,8 +522,8 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		aicommon.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 
 		// 会话配置
-		aicommon.WithPersistentSessionId(config.SessionID),
-		aicommon.WithMemoryTriageId(config.SessionID),
+		// S3c: PersistentSessionId/MemoryTriageId 移到字面量后 append,以便
+		// 无状态模式短路(留空 → re-act.go 四个落盘分支跳过)。
 		aicommon.WithEnableSelfReflection(true),
 		aicommon.WithEnablePETaskAnalyze(true),
 
@@ -664,6 +664,24 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 	}
 
 	options = append(options, config.ExtOptions...)
+
+	// S3c: 会话持久化 ID + 无状态模式短路。
+	// 有状态(默认):传 config.SessionID,re-act.go 正常落盘
+	//   (EnsureAISessionMeta/TimelineArchiveStore/SaveTimeline/DB MemoryTriage)。
+	// 无状态(Stateless=true):传空 ID,四个落盘分支因 ID 为空跳过;
+	//   再注入 no-op MemoryTriage,阻止 re-act.go:246-256 在 MemoryTriageId 为空时
+	//   退回 NewAIMemory("default") 构建 DB-backed memory。
+	persistentID := config.SessionID
+	memoryTriageID := config.SessionID
+	if config.Stateless {
+		persistentID = ""
+		memoryTriageID = ""
+		options = append(options, aicommon.WithMemoryTriage(aicommon.NewNoOpMemoryTriage()))
+	}
+	options = append(options,
+		aicommon.WithPersistentSessionId(persistentID),
+		aicommon.WithMemoryTriageId(memoryTriageID),
+	)
 
 	return options
 }
