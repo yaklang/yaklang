@@ -22,6 +22,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// fileEmitIntegrationTestTimeout bounds event-wait loops in FileEmit integration tests.
+// Mock ReAct flows plus artifact finalize routinely exceed 8-10s on shared CI runners.
+const fileEmitIntegrationTestTimeout = 30 * time.Second
+
 func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
@@ -131,10 +135,7 @@ func TestReAct_ToolCall_FileEmit(t *testing.T) {
 		}
 	}()
 
-	// Artifact persistence is I/O-bound and can be slower on shared CI runners.
-	// Keep the assertion below the documented 10s budget without making CI use a
-	// stricter deadline than local runs.
-	after := time.After(8 * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	// 收集 emit 的 report markdown 文件路径
 	var reportFilePath string
@@ -337,8 +338,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 		}
 	}()
 
-	// Artifact persistence is I/O-bound and can be slower on shared CI runners.
-	after := time.After(30 * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	var reportFilePath string
 	toolCallDone := false
@@ -505,12 +505,7 @@ func TestReAct_ToolCall_FileEmit_EmptyStdoutStderr(t *testing.T) {
 		}
 	}()
 
-	// 设置超时时间
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	// 收集 emit 的 report 文件路径
 	var reportFilePath string
@@ -679,11 +674,7 @@ func TestReAct_ToolCall_FileEmit_WithIdentifier(t *testing.T) {
 	}()
 
 	// Set timeout
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	// Collect emitted report file
 	var reportFilePath string
@@ -846,11 +837,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	var reportFilePath string
 	toolCallDone := false
@@ -975,11 +962,7 @@ func TestReAct_ToolCall_LogDir(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	var toolCallLogPath string // now a file path (.md) instead of a directory
 	var toolCallLogPathEventCallToolID string

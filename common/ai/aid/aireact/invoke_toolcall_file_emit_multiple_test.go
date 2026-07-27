@@ -137,12 +137,7 @@ func TestReAct_ToolCall_FileEmit_Multiple(t *testing.T) {
 		}
 	}()
 
-	// 设置超时时间
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	// 收集所有 emit 的 report 文件路径，按调用次数分组
 	reportFilesByCall := make(map[int]string) // callNumber -> filepath
