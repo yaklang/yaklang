@@ -47,6 +47,55 @@ message PushAISessionInputCommand {
   string owner_user_id = 3;
   string input_type = 4;
   bytes input_json = 5;
+  // S3a: per-turn server-assembled context. Optional — callers that do not
+  // set it produce the same wire bytes as before (proto3 message default).
+  // The stateless engine (S3c) consumes this; the stateful engine ignores it.
+  ContextPackage context_package = 6;
+}
+
+// ContextPackage is the per-turn, server-assembled context injected into the
+// stateless engine. The engine holds zero cross-turn state; every turn the
+// legion server (internal/aicoordinator, S3b) rebuilds this package from
+// ai_session_event history + aiyaktool definitions + provider config, and
+// sends it inline on PushAISessionInputCommand. See S3 spec §4.
+message ContextPackage {
+  string session_id = 1;                      // log/trace only; engine does not store
+  string system_prompt = 2;                   // empty in MVP → engine uses its PromptPrefixBuilder
+  repeated ContextMessage messages = 3;       // replayed conversation history (user + assistant only)
+  repeated ContextTool tools = 4;             // tool definitions enabled for this session (metadata only)
+  repeated ContextKbFragment kb_fragments = 5; // RAG retrieval results; always empty in S3 MVP
+  string user_input = 6;                      // this turn's user input text
+  bytes provider_policy_snapshot_json = 7;    // model provider config (API key, base URL, headers)
+  bytes runtime_option_snapshot_json = 8;     // temperature, max_tokens, etc.
+}
+
+// ContextMessage is one replayed conversation turn. Only user inputs and
+// assistant final replies are injected; thought/tool_call/tool_result/delta
+// are ReAct-internal steps, not conversation history (S3 spec §5.1).
+message ContextMessage {
+  string role = 1;            // "user" | "assistant"
+  string content = 2;         // message text
+  int64 emitted_at_ms = 3;    // original ai_session_event emitted_at, for ordering/debug
+}
+
+// ContextTool is a tool definition's metadata. The tool's executable code is
+// NOT carried here — the container pulls tool code at bootstrap (unchanged
+// bind flow). ContextPackage.tools carries only what the LLM needs to decide
+// tool calls: name, description, input schema.
+message ContextTool {
+  string tool_id = 1;
+  string name = 2;
+  string description = 3;
+  bytes params_json = 4;      // input schema (JSON Schema or equivalent)
+}
+
+// ContextKbFragment is one RAG retrieval hit. Always empty in S3 MVP
+// (kb_fragments is a reserved field for the future server-side RAG sub-project).
+message ContextKbFragment {
+  string kb_id = 1;
+  string text = 2;
+  float score = 3;
+  string source = 4;
 }
 
 message AppendAISessionContextCommand {
