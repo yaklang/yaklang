@@ -18,6 +18,14 @@ func TestStdlibCompileFromGomodsrcTree(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("ssa2llvm native runtime build/link is not supported on windows in this test")
 	}
+	// This test exercises the legacy on-demand pruned-runtime build path
+	// (BuildPrunedRuntimeArchiveFromSourceTreeWithDeps), which requires the
+	// Go toolchain + clang at test time. The self-contained build mode embeds
+	// the runtime and does not use this path; the test is retained for
+	// environments that still have clang installed, but skipped otherwise.
+	if _, err := exec.LookPath("clang"); err != nil {
+		t.Skip("clang not available; self-contained mode uses the embedded runtime instead")
+	}
 
 	repoRoot := RepoRoot(t)
 

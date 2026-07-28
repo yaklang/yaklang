@@ -9,11 +9,6 @@ replace github.com/wenlng/go-captcha-assets v1.0.5 => github.com/wenlng/go-captc
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
 replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.1
 
-// Use the locally enhanced go-llvm (TargetMachine AOT emit + in-process lld link)
-// during development of the self-contained ssa2llvm build. Remove before publishing
-// a yaklang release that depends on a published go-llvm version.
-replace github.com/yaklang/go-llvm => /home/wlz/Developer/work/go-llvm
-
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.7.2
@@ -128,7 +123,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
-	github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f
+	github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33
 	github.com/yaklang/gorm v0.0.0-20260723082407-eba53e567325
 	github.com/yaklang/javajive v0.1.2
 	github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80
