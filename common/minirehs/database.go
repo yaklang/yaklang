@@ -222,8 +222,8 @@ type Database interface {
 	NewScratch() (Scratch, error)
 	// Scan 对完整 data 做 block 扫描, 每命中一次调用 handler; handler 返回 false 提前终止.
 	Scan(data []byte, s Scratch, handler MatchHandler) error
-	// ScanBatch 以 1-4 个独占 lane 并行扫描多条独立记录。handler 按 records 输入顺序
-	// 串行重放；返回 false 停止后续回调，但已经启动的记录扫描会安全收拢。
+	// ScanBatch 以 1-4 个独占 lane 并行扫描多条独立记录。并行路径先完成全部扫描，再按
+	// records 输入顺序串行重放 handler；返回 false 仅停止后续回调，不取消已完成的扫描工作。
 	ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error
 	// Info 返回该 db 的元信息.
 	Info() DatabaseInfo
@@ -377,6 +377,7 @@ func (d *database) Scan(data []byte, s Scratch, handler MatchHandler) error {
 			return err
 		}
 		sc = ns.(*scratch)
+		defer sc.Close()
 	}
 	if handler == nil {
 		handler = func(Match) bool { return true }
