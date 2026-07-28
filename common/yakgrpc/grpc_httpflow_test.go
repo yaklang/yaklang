@@ -1561,6 +1561,71 @@ func TestHTTPFlowFieldGroup(t *testing.T) {
 	}
 }
 
+func TestHTTPFlowsFieldGroup_IsAllCountsAndBuiltin(t *testing.T) {
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+
+	db := server.GetProjectDatabase()
+	oldDB := consts.GetGormProjectDatabase()
+	oldPath := consts.GetCurrentProjectDatabasePath()
+	consts.BindProjectDatabase(db, "httpflow-fieldgroup-temp")
+	t.Cleanup(func() {
+		if oldDB != nil {
+			consts.BindProjectDatabase(oldDB, oldPath)
+		}
+	})
+
+	// 无数据时：全部 builtin 都必须存在，且 Total=0
+	emptyRsp, err := client.HTTPFlowsFieldGroup(context.Background(), &ypb.HTTPFlowsFieldGroupRequest{IsAll: true})
+	require.NoError(t, err)
+	emptyByValue := make(map[string]*ypb.TagsCode, len(emptyRsp.Tags))
+	for _, tag := range emptyRsp.Tags {
+		emptyByValue[tag.Value] = tag
+	}
+	for builtin := range yakit.HTTPFlowBuiltinTags {
+		got, ok := emptyByValue[builtin]
+		require.True(t, ok, "empty IsAll missing builtin %s", builtin)
+		require.True(t, got.Builtin)
+		require.Equal(t, int32(0), got.Total, "empty IsAll builtin %s should be 0", builtin)
+	}
+
+	customTag := "isall-custom-" + uuid.NewString()
+	token := uuid.NewString()
+	insert := func(tags string) {
+		flow, err := yakit.CreateHTTPFlow(
+			yakit.CreateHTTPFlowWithURL(fmt.Sprintf("http://example.com/%s", token)),
+			yakit.CreateHTTPFlowWithTags(tags),
+		)
+		require.NoError(t, err)
+		require.NoError(t, yakit.InsertHTTPFlow(db, flow))
+	}
+	insert(customTag)
+	insert(customTag)
+	insert(yakit.HTTPFlowTagDiscarded)
+	insert(customTag + "|" + yakit.HTTPFlowTagDiscarded)
+
+	rsp, err := client.HTTPFlowsFieldGroup(context.Background(), &ypb.HTTPFlowsFieldGroupRequest{IsAll: true})
+	require.NoError(t, err)
+	byValue := make(map[string]*ypb.TagsCode, len(rsp.Tags))
+	for _, tag := range rsp.Tags {
+		byValue[tag.Value] = tag
+	}
+
+	require.Equal(t, int32(3), byValue[customTag].Total)
+	require.False(t, byValue[customTag].Builtin)
+	require.Equal(t, int32(2), byValue[yakit.HTTPFlowTagDiscarded].Total)
+	require.True(t, byValue[yakit.HTTPFlowTagDiscarded].Builtin)
+
+	for builtin := range yakit.HTTPFlowBuiltinTags {
+		got, ok := byValue[builtin]
+		require.True(t, ok, "IsAll missing builtin %s", builtin)
+		require.True(t, got.Builtin)
+		if builtin != yakit.HTTPFlowTagDiscarded {
+			require.Equal(t, int32(0), got.Total, "unused builtin %s should be 0", builtin)
+		}
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFFlow_KeyWord_Search(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)

@@ -1373,31 +1373,35 @@ const (
 	return statusCode, nil
 }*/
 
+func accumulateHTTPFlowTagField(rawTags string, tagCounts map[string]int) {
+	for _, tag := range strings.Split(rawTags, "|") {
+		tag = strings.TrimSpace(tag)
+		if tag != "" && !strings.HasPrefix(tag, schema.COLORPREFIX) {
+			tagCounts[tag]++
+		}
+	}
+}
+
+// HTTPFlowTags 从内存缓存统计 tag。
+// refreshRequest 为历史兼容参数，当前未使用。
 func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
+	_ = refreshRequest
 	tagCounts := make(map[string]int)
 	for _, v := range model.GlobalHTTPFlowCache.GetAll() {
-		for _, tag := range strings.Split(v.Tags, "|") {
-			tag = strings.TrimSpace(tag)
-			if tag != "" && !strings.HasPrefix(tag, schema.COLORPREFIX) {
-				tagCounts[tag]++
-			}
+		if v == nil {
+			continue
 		}
+		accumulateHTTPFlowTagField(v.Tags, tagCounts)
 	}
 	return HTTPFlowTagsFromCounts(tagCounts), nil
 }
 
+// QueryHTTPFlowTags 从项目库全量统计 tag。
 func QueryHTTPFlowTags() ([]*TagAndStatusCode, error) {
 	tagCounts := make(map[string]int)
 	db := consts.GetGormProjectDatabase().Model(&schema.HTTPFlow{}).Select("id, tags").Where("tags IS NOT NULL AND tags != ''")
 	for flow := range YieldHTTPFlows(db, context.Background()) {
-		parts := strings.Split(flow.Tags, "|")
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part != "" && !strings.HasPrefix(part, schema.COLORPREFIX) {
-				// IsAll 只收集出现过的 tag，不统计次数
-				tagCounts[part] = 0
-			}
-		}
+		accumulateHTTPFlowTagField(flow.Tags, tagCounts)
 	}
 	return HTTPFlowTagsFromCounts(tagCounts), nil
 }
