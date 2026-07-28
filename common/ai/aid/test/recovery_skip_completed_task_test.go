@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -734,4 +735,145 @@ func TestRecovery_CancelledTaskPersistsAbortedState(t *testing.T) {
 	require.NotNil(t, inMemoryRoot)
 	require.Len(t, inMemoryRoot.Subtasks, 1)
 	require.Equal(t, aicommon.AITaskState_Aborted, inMemoryRoot.Subtasks[0].GetStatus(), "cancelled task should remain aborted in coordinator rootTask")
+}
+
+// TestRecovery_ConcurrentSameStageAllTasksExecute verifies that when a
+// recovered plan has multiple executable tasks in the same stage and the
+// coordinator runs with concurrency > 1, every task in that stage is
+// executed exactly once and the active set is drained afterwards.
+// This exercises the finishActiveTask(TaskId) path under the concurrent
+// branch of executeStageWithHandler with node.id == TaskId.
+func TestRecovery_ConcurrentSameStageAllTasksExecute(t *testing.T) {
+	// Use a writable temp DB so recovery persistence works in restricted sandboxes.
+	dbDir := t.TempDir()
+	tempDBPath := filepath.Join(dbDir, "recovery-concurrent-test.db")
+	tempDB, err := consts.CreateProjectDatabase(tempDBPath)
+	require.NoError(t, err)
+	consts.BindProjectDatabase(tempDB, tempDBPath)
+	db := consts.GetGormProjectDatabase()
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+
+	sessionID := uuid.NewString()
+
+	root := newRawTaskForRecovery("root", "root-goal")
+	markers := make([]string, 4)
+	tasks := make([]*aid.AiTask, 4)
+	for i := 0; i < 4; i++ {
+		markers[i] = uuid.NewString()
+		tasks[i] = newRawTaskForRecovery("task-"+markers[i], "goal-"+markers[i])
+		tasks[i].ParentTask = root
+	}
+	root.Subtasks = tasks
+	root.GenerateIndex()
+
+	t.Cleanup(func() {
+		_ = db.Unscoped().
+			Where("session_id = ?", sessionID).
+			Delete(&schema.AISessionPlanAndExec{}).Error
+	})
+
+	coordinatorID := uuid.NewString()
+	record := &schema.AISessionPlanAndExec{
+		SessionID:     sessionID,
+		CoordinatorID: coordinatorID,
+		TaskTree:      string(utils.Jsonify(root)),
+		TaskProgress:  string(utils.Jsonify(&aid.PlanAndExecProgress{Phase: "executing"})),
+	}
+	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, record))
+
+	var (
+		mu       sync.Mutex
+		pushed   = make(map[string]int)
+		popped   = make(map[string]int)
+		aiCalls  = make(map[string]int)
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	ins, err := aid.NewCoordinator(
+		"recovery-concurrent-same-stage",
+		aicommon.WithContext(ctx),
+		aicommon.WithID(coordinatorID),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithPersistentSessionId(sessionID),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithPlanExecTaskConcurrency(3),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event == nil || event.Type != schema.EVENT_TYPE_STRUCTURED {
+				return
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(event.Content, &payload); err != nil {
+				return
+			}
+			eventType := utils.InterfaceToString(payload["type"])
+			if eventType != "push_task" && eventType != "pop_task" {
+				return
+			}
+			taskMap, ok := payload["task"].(map[string]any)
+			if !ok {
+				return
+			}
+			idx := utils.InterfaceToString(taskMap["index"])
+			if idx == "" {
+				return
+			}
+			mu.Lock()
+			if eventType == "push_task" {
+				pushed[idx]++
+			} else {
+				popped[idx]++
+			}
+			mu.Unlock()
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			block := extractCurrentTaskContent(request.GetPrompt())
+			mu.Lock()
+			for i, m := range markers {
+				if strings.Contains(block, m) {
+					aiCalls[tasks[i].Index]++
+					break
+				}
+			}
+			mu.Unlock()
+
+			rsp := config.NewAIResponse()
+			if utils.MatchAllOfSubString(request.GetPrompt(), "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "summary",
+    "status_summary": "ok",
+    "task_short_summary": "ok",
+    "task_long_summary": "ok"
+}`))
+			} else {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "object",
+    "next_action": {"type": "finish"},
+    "human_readable_thought": "ok"
+}`))
+			}
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, ins.Run())
+
+	inMemoryRoot := coordinatorRootTaskForTest(t, ins)
+	require.NotNil(t, inMemoryRoot)
+	require.Len(t, inMemoryRoot.Subtasks, 4)
+
+	mu.Lock()
+	defer mu.Unlock()
+	for i, task := range tasks {
+		require.Equalf(t, 1, pushed[task.Index], "task %s should be pushed exactly once", task.Index)
+		require.Equalf(t, 1, popped[task.Index], "task %s should be popped exactly once", task.Index)
+		require.Greaterf(t, aiCalls[task.Index], 0, "task %s should trigger at least one AI call", task.Index)
+		require.Equalf(t, aicommon.AITaskState_Completed, inMemoryRoot.Subtasks[i].GetStatus(),
+			"task %s should be completed after recovery run", task.Index)
+	}
 }
