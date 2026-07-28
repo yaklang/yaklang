@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -78,7 +79,7 @@ var filterOnlinePluginToolOptions = []mcp.ToolOption{
 func init() {
 	AddGlobalToolSet("yak_script",
 		WithTool(mcp.NewTool("static_analyze_yak_script",
-			mcp.WithDescription("Static analysis yak script for syntax error and other issues"),
+			mcp.WithDescription("Validate Yak/plugin source via yaklang engine static analysis and return AI-readable issues. Workflow: AI writes code → static_analyze_yak_script → fix until ok=true → save_yak_script. Response: ok, hasBlockingErrors, issues[].message (plain text), formatted."),
 			mcp.WithString("code",
 				mcp.Description("The yak script content to be analyzed"),
 				mcp.Required(),
@@ -86,7 +87,7 @@ func init() {
 			mcp.WithString("pluginType",
 				mcp.Description("The type of the yak script"),
 				mcp.Required(),
-				mcp.Enum("yak", "mitm", "port_scan", "codec", "syntaxflow"),
+				mcp.Enum("yak", "mitm", "port-scan", "port_scan", "codec", "syntaxflow"),
 			),
 		), handleStaticAnalyzeYakScript),
 
@@ -114,7 +115,7 @@ func init() {
 		), handleExecYakScript),
 
 		WithTool(mcp.NewTool("save_yak_script",
-			mcp.WithDescription("Create or update a local Yakit plugin (YakScript). Recommended workflow for AI clients: write code → static_analyze_yak_script → optional exec_yak_script → save_yak_script. Pass id>0 to update an existing plugin; omit id (or id=0) to create. Types: yak, mitm, codec, nuclei, port-scan."),
+			mcp.WithDescription("Create or update a local Yakit plugin (YakScript). Runs yaklang engine static analysis first for yak/mitm/port-scan/codec; blocking Error results refuse save and return readable issues for the AI to fix. Prefer: write code → static_analyze_yak_script → save_yak_script. Pass id>0 to update; omit id (or 0) to create."),
 			mcp.WithString("scriptName",
 				mcp.Description("Plugin name (unique). Required."),
 				mcp.Required(),
@@ -143,18 +144,11 @@ func init() {
 			mcp.WithStringArray("pluginEnvKey",
 				mcp.Description("Optional plugin environment variable keys used by the script"),
 			),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.SaveNewYakScriptRequest) (any, error) {
-			if strings.TrimSpace(req.GetScriptName()) == "" {
-				return nil, utils.Error("scriptName is required")
-			}
-			if strings.TrimSpace(req.GetType()) == "" {
-				return nil, utils.Error("type is required")
-			}
-			if strings.TrimSpace(req.GetContent()) == "" {
-				return nil, utils.Error("content is required")
-			}
-			return s.grpcClient.SaveNewYakScript(ctx, req)
-		}, "failed to save yak script")),
+			mcp.WithBool("skipStaticAnalyze",
+				mcp.Description("If true, skip pre-save static analysis gate (not recommended for AI). Default false."),
+				mcp.Default(false),
+			),
+		), handleSaveYakScript),
 
 		WithTool(mcp.NewTool("create_yak_script_group",
 			mcp.WithDescription("Create a new Yak script group"),
@@ -260,18 +254,140 @@ func handleStaticAnalyzeYakScript(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		args := request.Params.Arguments
-		req := ypb.StaticAnalyzeErrorRequest{
-			Code:       []byte(utils.MapGetString(args, "code")),
-			PluginType: utils.MapGetString(args, "pluginType"),
+		code := utils.MapGetString(args, "code")
+		pluginType := utils.MapGetString(args, "pluginType")
+		if strings.TrimSpace(pluginType) == "" {
+			return nil, utils.Error("pluginType is required")
 		}
-
-		rsp, err := s.grpcClient.StaticAnalyzeError(ctx, &req)
+		result, err := analyzeYakScriptForAI(ctx, s, code, pluginType)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to static analyze yak script")
 		}
-		return NewCommonCallToolResult((rsp.Result))
+		return NewCommonCallToolResult(result)
+	}
+}
+
+func handleSaveYakScript(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := request.Params.Arguments
+		var req ypb.SaveNewYakScriptRequest
+		if err := decodeYakRequest(args, &req); err != nil {
+			return nil, utils.Wrap(err, "invalid argument")
+		}
+		if strings.TrimSpace(req.GetScriptName()) == "" {
+			return nil, utils.Error("scriptName is required")
+		}
+		if strings.TrimSpace(req.GetType()) == "" {
+			return nil, utils.Error("type is required")
+		}
+		if strings.TrimSpace(req.GetContent()) == "" {
+			return nil, utils.Error("content is required")
+		}
+
+		skipAnalyze := utils.MapGetBool(args, "skipStaticAnalyze")
+		if !skipAnalyze && shouldStaticAnalyzeBeforeSave(req.GetType()) {
+			analysis, err := analyzeYakScriptForAI(ctx, s, req.GetContent(), req.GetType())
+			if err != nil {
+				return nil, utils.Wrap(err, "failed to static analyze before save")
+			}
+			if analysis.HasBlockingErrors {
+				return nil, utils.Errorf("static analyze failed (refusing save): %s", analysis.Formatted)
+			}
+		}
+
+		rsp, err := s.grpcClient.SaveNewYakScript(ctx, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to save yak script")
+		}
+		return NewCommonCallToolResult(rsp)
+	}
+}
+
+// yakScriptAnalyzeIssue is an AI-friendly static-analysis finding (plain-text message, not []byte/base64).
+type yakScriptAnalyzeIssue struct {
+	Message         string `json:"message"`
+	Severity        string `json:"severity"`
+	StartLineNumber int64  `json:"startLineNumber"`
+	EndLineNumber   int64  `json:"endLineNumber"`
+	StartColumn     int64  `json:"startColumn"`
+	EndColumn       int64  `json:"endColumn"`
+	Tag             string `json:"tag,omitempty"`
+}
+
+// yakScriptAnalyzeResult is returned by static_analyze_yak_script for external AI clients.
+type yakScriptAnalyzeResult struct {
+	OK                bool                    `json:"ok"`
+	HasBlockingErrors bool                    `json:"hasBlockingErrors"`
+	IssueCount        int                     `json:"issueCount"`
+	PluginType        string                  `json:"pluginType"`
+	Issues            []yakScriptAnalyzeIssue `json:"issues"`
+	Formatted         string                  `json:"formatted"`
+}
+
+func normalizeStaticAnalyzePluginType(pluginType string) string {
+	switch strings.ToLower(strings.TrimSpace(pluginType)) {
+	case "port_scan", "portscan":
+		return "port-scan"
+	default:
+		return strings.TrimSpace(pluginType)
+	}
+}
+
+func shouldStaticAnalyzeBeforeSave(pluginType string) bool {
+	switch normalizeStaticAnalyzePluginType(pluginType) {
+	case "yak", "mitm", "port-scan", "codec":
+		return true
+	default:
+		return false
+	}
+}
+
+func analyzeYakScriptForAI(ctx context.Context, s *MCPServer, code, pluginType string) (*yakScriptAnalyzeResult, error) {
+	pluginType = normalizeStaticAnalyzePluginType(pluginType)
+	req := &ypb.StaticAnalyzeErrorRequest{
+		Code:       []byte(code),
+		PluginType: pluginType,
+	}
+	rsp, err := s.grpcClient.StaticAnalyzeError(ctx, req)
+	if err != nil {
+		return nil, err
 	}
 
+	issues := make([]yakScriptAnalyzeIssue, 0, len(rsp.GetResult()))
+	var buf bytes.Buffer
+	hasBlocking := false
+	for _, item := range rsp.GetResult() {
+		msg := string(item.GetMessage())
+		sev := item.GetSeverity()
+		issue := yakScriptAnalyzeIssue{
+			Message:         msg,
+			Severity:        sev,
+			StartLineNumber: item.GetStartLineNumber(),
+			EndLineNumber:   item.GetEndLineNumber(),
+			StartColumn:     item.GetStartColumn(),
+			EndColumn:       item.GetEndColumn(),
+			Tag:             item.GetTag(),
+		}
+		issues = append(issues, issue)
+		if strings.EqualFold(sev, "Error") {
+			hasBlocking = true
+		}
+		fmt.Fprintf(&buf, "[%s] L%d:%d-L%d:%d %s\n",
+			sev,
+			item.GetStartLineNumber(), item.GetStartColumn(),
+			item.GetEndLineNumber(), item.GetEndColumn(),
+			msg,
+		)
+	}
+
+	return &yakScriptAnalyzeResult{
+		OK:                !hasBlocking,
+		HasBlockingErrors: hasBlocking,
+		IssueCount:        len(issues),
+		PluginType:        pluginType,
+		Issues:            issues,
+		Formatted:         strings.TrimSpace(buf.String()),
+	}, nil
 }
 
 func handleExecYakScript(s *MCPServer) server.ToolHandlerFunc {

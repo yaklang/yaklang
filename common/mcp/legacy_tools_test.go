@@ -820,14 +820,47 @@ func legacyYakScriptToolCases() map[string][]legacyToolCase {
 				"pluginType": "yak",
 			},
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
+				var result map[string]any
+				decodeToolResultJSON(t, text, &result)
+				assert.Equal(t, true, result["ok"])
+				assert.Equal(t, false, result["hasBlockingErrors"])
+				assert.Equal(t, "yak", result["pluginType"])
+			},
+		},
+		{
+			name: "invalid_mitm_returns_readable_errors",
+			args: map[string]any{
+				"code":       `mirrorNewWebsitePath = func( {`,
+				"pluginType": "mitm",
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var result map[string]any
+				decodeToolResultJSON(t, text, &result)
+				assert.Equal(t, false, result["ok"])
+				assert.Equal(t, true, result["hasBlockingErrors"])
+				assert.Equal(t, "mitm", result["pluginType"])
+				formatted, _ := result["formatted"].(string)
+				require.NotEmpty(t, formatted)
+				assert.NotContains(t, formatted, "5Z+") // must not be base64-only blob
+				assert.Contains(t, strings.ToLower(formatted), "error")
+				issues, ok := result["issues"].([]any)
+				require.True(t, ok)
+				require.NotEmpty(t, issues)
+				first, ok := issues[0].(map[string]any)
+				require.True(t, ok)
+				msg, _ := first["message"].(string)
+				require.NotEmpty(t, msg)
+				assert.NotContains(t, msg, "5Z+")
 			},
 		},
 		{
 			name: "empty_code_returns_analysis_result",
 			args: map[string]any{"pluginType": "yak"},
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotNil(t, text)
+				var result map[string]any
+				decodeToolResultJSON(t, text, &result)
+				_, hasOK := result["ok"]
+				assert.True(t, hasOK)
 			},
 		},
 	},
@@ -976,7 +1009,7 @@ func legacyYakScriptToolCases() map[string][]legacyToolCase {
 				"content":    `mirrorNewWebsitePath = func( {`,
 			},
 			wantErr:     true,
-			errContains: []string{"invalid", "save plugin failed"},
+			errContains: []string{"static analyze failed", "invalid", "save plugin failed"},
 		},
 		{
 			name:    "reject_missing_script_name",
