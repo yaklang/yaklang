@@ -203,10 +203,12 @@ func handlePortScan(s *MCPServer) server.ToolHandlerFunc {
 			return nil, utils.Wrap(err, "failed to query yak script")
 		}
 		results := make([]any, 0, 4)
+		hasStreamError := false
 		for {
 			exec, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
+					hasStreamError = true
 					results = append(results, mcp.TextContent{
 						Type: "text",
 						Text: fmt.Sprintf("[Error] %v", err),
@@ -274,6 +276,7 @@ func handlePortScan(s *MCPServer) server.ToolHandlerFunc {
 
 		return &mcp.CallToolResult{
 			Content: results,
+			IsError: hasStreamError,
 		}, nil
 	}
 }
