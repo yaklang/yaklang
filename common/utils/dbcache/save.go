@@ -231,21 +231,51 @@ func (s *Save[T]) processBuffer() {
 			// Synchronous flush: save the current batch, then drain
 			// everything still buffered before acking. Callers MUST NOT
 			// call Save concurrently with Flush.
+			//
+			// UnlimitedChan.Len() is approximate (items can be in-flight
+			// between innerIn/buf/innerOut), so after the Len()-based drain
+			// we keep blocking until metrics.pending hits zero.
 			save(items)
 			items = make([]T, 0, saveSize)
-			for s.buffer.Len() > 0 {
-				item, ok := <-s.buffer.OutputChannel()
-				if !ok {
+			for {
+				for s.buffer.Len() > 0 {
+					item, ok := <-s.buffer.OutputChannel()
+					if !ok {
+						save(items)
+						items = make([]T, 0, saveSize)
+						goto flushAck
+					}
+					items = append(items, item)
+					if len(items) >= currentSaveSize {
+						save(items)
+						items = make([]T, 0, saveSize)
+					}
+				}
+				save(items)
+				items = make([]T, 0, saveSize)
+				s.saveWG.Wait()
+				if s.metrics.pending.Load() == 0 {
 					break
 				}
-				items = append(items, item)
-				if len(items) >= currentSaveSize {
+				select {
+				case item, ok := <-s.buffer.OutputChannel():
+					if !ok {
+						save(items)
+						items = make([]T, 0, saveSize)
+						goto flushAck
+					}
+					items = append(items, item)
+					if len(items) >= currentSaveSize {
+						save(items)
+						items = make([]T, 0, saveSize)
+					}
+				case <-s.ctx.Done():
 					save(items)
 					items = make([]T, 0, saveSize)
+					goto flushAck
 				}
 			}
-			save(items)
-			items = make([]T, 0, saveSize)
+		flushAck:
 			resetTimer(timer, saveTime)
 			s.saveWG.Wait()
 			if req.err != nil {
@@ -406,7 +436,10 @@ func (s *Save[T]) recordErr(err error) {
 	if s.firstErr.Load() != nil {
 		return
 	}
-	s.firstErr.CompareAndSwap(nil, &err)
+	// Copy to a new variable so the stored pointer always refers to a
+	// heap-escaped error value, not the stack slot of the parameter.
+	errCopy := err
+	s.firstErr.CompareAndSwap(nil, &errCopy)
 }
 
 // recordedErr returns the first recorded error, or nil.
