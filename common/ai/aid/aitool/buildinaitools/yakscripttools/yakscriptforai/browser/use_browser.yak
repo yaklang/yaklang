@@ -1,12 +1,18 @@
 __DESC__ = <<<DESC_BLOCK
-Browser automation tool (go-rod/CDP). Two interaction strategies:
+Browser automation tool (go-rod/CDP) for controlling a real Chrome/Chromium instance.
+Use this tool ONLY when the task explicitly requires browser interaction (e.g. clicking buttons,
+filling forms on a live page, taking screenshots, handling dialogs in a rendered page).
+Do NOT use this tool for HTTP requests, API scanning, port scanning, or static content analysis --
+use http.request, http.scan, or other appropriate tools instead.
+
+Two interaction strategies:
 
 1. Snapshot strategy: open -> snapshot (get @eN refs) -> fill/click using refs.
    Works for simple static pages. If snapshot returns 0 refs, DO NOT retry -- switch to JS strategy.
 
-2. JavaScript strategy (PREFERRED for login/form pages): open -> eval JS to discover selectors ->
+2. JavaScript strategy: open -> eval JS to discover selectors ->
    fill/click using CSS selectors, OR do everything in a single eval call.
-   More reliable for SPA/React/Vue/dynamic pages. A single eval can fill a form and submit it.
+   More reliable for SPA/React/Vue/dynamic pages.
 
 Both "target" for click/fill accept @eN refs AND CSS selectors (e.g. "input[name=username]").
 The browser instance persists across tool calls via session ID.
@@ -16,7 +22,7 @@ op=handle_dialog action=accept|dismiss (value for prompt). Do NOT ignore blockin
 DESC_BLOCK
 __VERBOSE_NAME__ = "Browser Automation Tool"
 __VERBOSE_NAME_ZH__ = "浏览器自动化工具"
-__KEYWORDS__ = "browser,chrome,automation,click,fill,type,snapshot,screenshot,navigate,scrape,web,form,login,CDP,headless,accessibility,ref,DOM,page,wait,scroll,eval,tab,cookie,selector,javascript"
+__KEYWORDS__ = "browser,chrome,CDP,headless,screenshot,snapshot,click,fill,form,login,tab,dialog,scroll,DOM-accessibility-ref"
 
 __USAGE__ = <<<USAGE_BLOCK
 Browser Automation Tool - Usage Guide
@@ -27,7 +33,7 @@ Browser Automation Tool - Usage Guide
   open -> snapshot (get @e1, @e2 refs) -> fill/click using refs -> re-snapshot
   Good for: static HTML pages where snapshot returns interactive element refs.
 
-### Strategy B: JavaScript-First (RECOMMENDED for login/form/SPA pages)
+### Strategy B: JavaScript-First (for login/form/SPA pages)
   open -> eval JS to extract selectors -> fill/click using CSS selectors
   OR: open -> eval JS that fills form + clicks submit in one call
   Good for: SPA, React, Vue, dynamic pages, pages where snapshot returns 0 refs.
@@ -68,9 +74,9 @@ Optional:
   exe-path  (string)  Chrome/Chromium executable path. Defaults to yakit "global-chrome-path" config.
                      When set, this path is used instead of auto-detecting Chrome on the system.
 
-## JavaScript-First Strategy (RECOMMENDED for Login/Form Pages)
+## JavaScript-First Strategy (for Login/Form Pages)
 
-For login pages, forms, and dynamic content, using op=eval with JavaScript is MORE RELIABLE
+For login pages, forms, and dynamic content, using op=eval with JavaScript is more reliable
 than snapshot+fill+click. A single eval call can:
   - Discover all form fields
   - Fill username and password
