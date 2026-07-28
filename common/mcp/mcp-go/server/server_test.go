@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -15,6 +17,54 @@ func TestMCPServer_NewMCPServer(t *testing.T) {
 	assert.NotNil(t, server)
 	assert.Equal(t, "test-server", server.name)
 	assert.Equal(t, "1.0.0", server.version)
+}
+
+func TestMCPServerToolCallObserver(t *testing.T) {
+	tests := []struct {
+		name       string
+		handlerErr error
+	}{
+		{name: "success"},
+		{name: "handler error", handlerErr: errors.New("execution failed")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var observed bool
+			server := NewMCPServer(
+				"observer-test",
+				"1.0.0",
+				WithToolCallObserver(func(
+					_ context.Context,
+					request mcp.CallToolRequest,
+					result *mcp.CallToolResult,
+					err error,
+					_ time.Duration,
+				) {
+					observed = true
+					assert.Equal(t, "observed-tool", request.Params.Name)
+					assert.Equal(t, test.handlerErr, err)
+					if test.handlerErr == nil {
+						assert.NotNil(t, result)
+					}
+				}),
+			)
+			server.AddTool(mcp.NewTool("observed-tool"), func(
+				_ context.Context,
+				_ mcp.CallToolRequest,
+			) (*mcp.CallToolResult, error) {
+				if test.handlerErr != nil {
+					return nil, test.handlerErr
+				}
+				return &mcp.CallToolResult{}, nil
+			})
+
+			request := mcp.CallToolRequest{}
+			request.Params.Name = "observed-tool"
+			server.handleToolCall(context.Background(), 1, request)
+			assert.True(t, observed)
+		})
+	}
 }
 
 func TestMCPServer_Capabilities(t *testing.T) {

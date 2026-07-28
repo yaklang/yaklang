@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
@@ -36,10 +37,22 @@ type PromptHandlerFunc func(ctx context.Context, request mcp.GetPromptRequest) (
 // ToolHandlerFunc handles tool calls with given arguments.
 type ToolHandlerFunc func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error)
 
+// ToolCallObserver receives the outcome of every tool request that reaches a handler.
+// Observers must return quickly because they run before the JSON-RPC response is sent.
+type ToolCallObserver func(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+	result *mcp.CallToolResult,
+	err error,
+	duration time.Duration,
+)
+
 // NotificationContext provides client identification for notifications
 type NotificationContext struct {
-	ClientID  string
-	SessionID string
+	ClientID      string
+	SessionID     string
+	ClientName    string
+	ClientVersion string
 }
 
 // ServerNotification combines the notification with client context
@@ -127,6 +140,7 @@ type MCPServer struct {
 	currentClient        NotificationContext
 	notificationHub      *notificationHub
 	initialized          *atomic.Bool
+	toolCallObserver     ToolCallObserver
 }
 
 // serverKey is the context key for storing the server instance
@@ -261,6 +275,23 @@ func WithLogging() ServerOption {
 	return func(s *MCPServer) {
 		s.capabilities.logging = true
 	}
+}
+
+// WithToolCallObserver registers a single observer for tool invocation auditing.
+func WithToolCallObserver(observer ToolCallObserver) ServerOption {
+	return func(s *MCPServer) {
+		s.toolCallObserver = observer
+	}
+}
+
+// SetToolCallObserver replaces the observer after server construction.
+func (s *MCPServer) SetToolCallObserver(observer ToolCallObserver) {
+	s.toolCallObserver = observer
+}
+
+// CurrentClientContext returns the client metadata associated with this server scope.
+func (s *MCPServer) CurrentClientContext() NotificationContext {
+	return s.currentClient
 }
 
 // NewMCPServer creates a new MCP server instance with the given name, version and options
@@ -560,6 +591,13 @@ func (s *MCPServer) handleInitialize(
 		)
 	}
 
+	// The transport owns the session identity, while initialize provides the
+	// human-readable Agent identity. Store both on the session-scoped server.
+	if scoped := ServerFromContext(ctx); scoped != nil {
+		scoped.currentClient.ClientName = request.Params.ClientInfo.Name
+		scoped.currentClient.ClientVersion = request.Params.ClientInfo.Version
+	}
+
 	capabilities := mcp.ServerCapabilities{}
 
 	capabilities.Resources = &struct {
@@ -785,7 +823,11 @@ func (s *MCPServer) handleToolCall(
 		)
 	}
 
+	startedAt := time.Now()
 	result, err := handler(ctx, request)
+	if s.toolCallObserver != nil {
+		s.toolCallObserver(ctx, request, result, err, time.Since(startedAt))
+	}
 	if err != nil {
 		return createErrorResponse(id, mcp.INTERNAL_ERROR, err.Error())
 	}

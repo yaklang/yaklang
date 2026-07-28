@@ -37,6 +37,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec/codegrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/grpc"
 )
 
 // ---------------------------------------------------------------------------
@@ -604,6 +605,65 @@ func TestSetSystemProxyDescription(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Issue 7 – port_scan returns no results even when open ports exist
 // ---------------------------------------------------------------------------
+
+type portScanStreamErrorClient struct {
+	YakClientInterface
+	streamError error
+}
+
+func (c *portScanStreamErrorClient) PortScan(
+	context.Context,
+	*ypb.PortScanRequest,
+	...grpc.CallOption,
+) (grpc.ServerStreamingClient[ypb.ExecResult], error) {
+	return &portScanErrorStream{
+		streamError: c.streamError,
+	}, nil
+}
+
+type portScanErrorStream struct {
+	grpc.ClientStream
+	streamError error
+}
+
+func (s *portScanErrorStream) Recv() (*ypb.ExecResult, error) {
+	return nil, s.streamError
+}
+
+// TestPortScan_InvalidTargetReturnsMCPError verifies that a server-streaming
+// gRPC failure is represented as an MCP error result, not successful text.
+func TestPortScan_InvalidTargetReturnsMCPError(t *testing.T) {
+	client := &portScanStreamErrorClient{
+		streamError: fmt.Errorf(
+			`rpc error: code = Unknown desc = invalid target: "invalid target!@#"; input must be ip, domain or cidr`,
+		),
+	}
+	srv, err := NewMCPServer(
+		WithEnablePortScanToolSet(),
+		WithGRPCClient(client),
+	)
+	require.NoError(t, err)
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := CallBuiltinTool(srv, ctx, "port_scan", map[string]any{
+		"targets": []any{"invalid target!@#"},
+		"ports":   "abc",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.True(t, result.IsError)
+
+	var combined strings.Builder
+	for _, content := range result.Content {
+		if textContent, ok := content.(mcp.TextContent); ok {
+			combined.WriteString(textContent.Text)
+		}
+	}
+	require.Contains(t, combined.String(), "invalid target")
+}
 
 // TestPortScan_ReturnsOpenPort verifies that scanning a real, locally-listening
 // mock HTTP port through the port_scan MCP tool surfaces the open port in the

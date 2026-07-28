@@ -31,9 +31,20 @@ type StreamableHTTPServer struct {
 type streamableHTTPSession struct {
 	id              string
 	protocolVersion string
+	clientName      string
+	clientVersion   string
 	streams         sync.Map
 	closeOnce       sync.Once
 	done            chan struct{}
+}
+
+func (s *streamableHTTPSession) notificationContext() NotificationContext {
+	return NotificationContext{
+		ClientID:      s.id,
+		SessionID:     s.id,
+		ClientName:    s.clientName,
+		ClientVersion: s.clientVersion,
+	}
 }
 
 func (s *streamableHTTPSession) Close() {
@@ -353,6 +364,11 @@ func (s *StreamableHTTPServer) handlePost(
 
 	ctx := withTransportContext(r.Context(), streamableHTTPTransport)
 	if hasSession {
+		ctx = s.server.WithContext(ctx, session.notificationContext())
+	} else if base.Method == "initialize" {
+		// Allocate the session identity before initialize so clientInfo can be
+		// attached to the same scoped context and persisted with later calls.
+		sessionID = uuid.NewString()
 		ctx = s.server.WithContext(ctx, NotificationContext{
 			ClientID:  sessionID,
 			SessionID: sessionID,
@@ -372,9 +388,18 @@ func (s *StreamableHTTPServer) handlePost(
 			_ = json.NewEncoder(w).Encode(response)
 			return
 		}
+		clientContext := NotificationContext{
+			ClientID:  sessionID,
+			SessionID: sessionID,
+		}
+		if scoped := ServerFromContext(ctx); scoped != nil {
+			clientContext = scoped.CurrentClientContext()
+		}
 		session = &streamableHTTPSession{
-			id:              uuid.NewString(),
+			id:              sessionID,
 			protocolVersion: protocolVersionFromResponse(response),
+			clientName:      clientContext.ClientName,
+			clientVersion:   clientContext.ClientVersion,
 			done:            make(chan struct{}),
 		}
 		s.sessions.Store(session.id, session)

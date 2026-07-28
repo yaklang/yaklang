@@ -2,14 +2,17 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type MCPServer struct {
@@ -50,6 +53,7 @@ func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
 	s.projectDB = cfg.projectDB
 	s.profileDBProvider = cfg.profileDBProvider
 	s.projectDBProvider = cfg.projectDBProvider
+	s.server.SetToolCallObserver(s.recordToolCall)
 	cfg.ApplyConfig(s)
 	if cfg.grpcClient != nil {
 		s.grpcClient = cfg.grpcClient
@@ -57,6 +61,87 @@ func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
 
 	s.server.AddNotificationHandler("notification", s.handleNotification)
 	return s, nil
+}
+
+func (s *MCPServer) getProfileDatabase() *gorm.DB {
+	if s.profileDBProvider != nil {
+		return s.profileDBProvider()
+	}
+	return s.profileDB
+}
+
+func marshalMCPHistoryValue(value any) (string, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return "null", err
+	}
+	return string(data), nil
+}
+
+func mcpToolResultErrorMessage(result *mcp.CallToolResult) string {
+	if result == nil {
+		return "MCP tool returned an empty error result"
+	}
+	for _, content := range result.Content {
+		if textContent, ok := mcp.AsTextContent(content); ok && textContent.Text != "" {
+			return textContent.Text
+		}
+		if value, ok := content.(map[string]any); ok {
+			if text, ok := value["text"].(string); ok && text != "" {
+				return text
+			}
+		}
+	}
+	return "MCP tool returned an error result"
+}
+
+func (s *MCPServer) recordToolCall(
+	ctx context.Context,
+	request mcp.CallToolRequest,
+	result *mcp.CallToolResult,
+	callErr error,
+	duration time.Duration,
+) {
+	db := s.getProfileDatabase()
+	if db == nil {
+		log.Warn("skip mcp tool call history: profile database is unavailable")
+		return
+	}
+
+	arguments, argumentsErr := marshalMCPHistoryValue(request.Params.Arguments)
+	if argumentsErr != nil {
+		log.Errorf("serialize mcp tool call arguments failed: %v", argumentsErr)
+	}
+	resultJSON, resultErr := marshalMCPHistoryValue(result)
+	if resultErr != nil {
+		log.Errorf("serialize mcp tool call result failed: %v", resultErr)
+	}
+
+	clientContext := server.ServerFromContext(ctx)
+	history := &schema.MCPToolCallHistory{
+		ToolName:       request.Params.Name,
+		Arguments:      arguments,
+		Result:         resultJSON,
+		Success:        callErr == nil && result != nil && !result.IsError,
+		DurationMillis: duration.Milliseconds(),
+	}
+	if callErr != nil {
+		history.ErrorMessage = callErr.Error()
+	} else if result != nil && result.IsError {
+		history.ErrorMessage = mcpToolResultErrorMessage(result)
+	} else if result == nil {
+		history.ErrorMessage = "MCP tool returned an empty result"
+	}
+	if clientContext != nil {
+		notificationContext := clientContext.CurrentClientContext()
+		history.ClientID = notificationContext.ClientID
+		history.SessionID = notificationContext.SessionID
+		history.ClientName = notificationContext.ClientName
+		history.ClientVersion = notificationContext.ClientVersion
+	}
+	if err := db.Create(history).Error; err != nil {
+		log.Errorf("record mcp tool call history failed: %v", err)
+	}
 }
 
 func (s *MCPServer) ServeSSE(addr, baseURL string) (err error) {

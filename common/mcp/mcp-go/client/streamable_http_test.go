@@ -11,11 +11,26 @@ import (
 )
 
 func TestStreamableHTTPMCPClient(t *testing.T) {
+	observedClientCh := make(chan server.NotificationContext, 1)
 	mcpServer := server.NewMCPServer(
 		"test-server",
 		"1.0.0",
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
+		server.WithToolCallObserver(func(
+			ctx context.Context,
+			_ mcp.CallToolRequest,
+			_ *mcp.CallToolResult,
+			_ error,
+			_ time.Duration,
+		) {
+			scoped := server.ServerFromContext(ctx)
+			require.NotNil(t, scoped)
+			select {
+			case observedClientCh <- scoped.CurrentClientContext():
+			default:
+			}
+		}),
 	)
 
 	mcpServer.AddTool(
@@ -87,6 +102,15 @@ func TestStreamableHTTPMCPClient(t *testing.T) {
 	callResult, err := client.CallTool(ctx, callRequest)
 	require.NoError(t, err)
 	require.Len(t, callResult.Content, 1)
+
+	select {
+	case observedClient := <-observedClientCh:
+		require.Equal(t, "test-client", observedClient.ClientName)
+		require.Equal(t, "1.0.0", observedClient.ClientVersion)
+		require.NotEmpty(t, observedClient.SessionID)
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for streamable http tool observer")
+	}
 
 	select {
 	case notification := <-notificationCh:
