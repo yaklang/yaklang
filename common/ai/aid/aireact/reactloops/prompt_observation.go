@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -27,6 +26,7 @@ const defaultPromptSummaryBytes = 0
 
 const lastPromptObservationLoopKey = "last_ai_decision_prompt_observation"
 const lastPromptObservationStatusLoopKey = "last_ai_decision_prompt_observation_status"
+const lastPromptTokenLoopKey = "last_ai_decision_prompt_token"
 const ReActPromptObservationStatusKey = "re-act-prompt-observation-status"
 
 type PromptSectionRole string
@@ -202,7 +202,7 @@ func buildPromptObservation(loopName string, nonce string, prompt string, sectio
 		Nonce:        nonce,
 		GeneratedAt:  time.Now(),
 		PromptBytes:  len(prompt),
-		PromptTokens: ytoken.CalcTokenCount(prompt),
+		PromptTokens: estimateTokenCount(prompt),
 		PromptLines:  countPromptLines(prompt),
 		Stats:        newPromptObservationStats(),
 		Sections:     sections,
@@ -244,7 +244,7 @@ func collectPromptObservationStats(section *PromptSectionObservation, observatio
 	bytes := section.ContentBytes()
 	tokens := section.EstimatedTokens
 	if tokens == 0 && strings.TrimSpace(section.Content) != "" {
-		tokens = ytoken.CalcTokenCount(section.Content)
+		tokens = estimateTokenCount(section.Content)
 	}
 	observation.Stats.RoleStats = addPromptObservationRoleBytes(observation.Stats.RoleStats, section.Role, bytes)
 	observation.Stats.RoleStats = addPromptObservationRoleTokens(observation.Stats.RoleStats, section.Role, tokens)
@@ -271,7 +271,7 @@ func (s *PromptSectionObservation) refreshMetrics() {
 	s.Included = strings.TrimSpace(s.Content) != ""
 	s.EstimatedTokens = 0
 	if len(s.Children) == 0 {
-		s.EstimatedTokens = ytoken.CalcTokenCount(s.Content)
+		s.EstimatedTokens = estimateTokenCount(s.Content)
 		return
 	}
 	for _, child := range s.Children {
@@ -735,7 +735,7 @@ func buildPromptSectionStatus(section *PromptSectionObservation, maxSummaryBytes
 		SummaryTruncated: truncated,
 		BytesPercent:     bytesPercentOfTotal(bytesValue, totalPromptBytes),
 		EstimatedTokens:  section.EstimatedTokens,
-		ContentHash:      contentHash8(section.Content),
+		ContentHash:      cachedContentHash8(section.Content),
 	}
 	for _, child := range section.Children {
 		if childStatus := buildPromptSectionStatus(child, maxSummaryBytes, totalPromptBytes); childStatus != nil {
@@ -1001,6 +1001,23 @@ func (r *ReActLoop) SetLastPromptObservationStatus(status *PromptObservationStat
 		return
 	}
 	r.Set(lastPromptObservationStatusLoopKey, status)
+}
+
+// SetLastPromptToken 同步存储当前 prompt 的 token 估算值，供 verification
+// gate 的 token 门判断使用。这是 observation 异步化后唯一的同步副产物。
+func (r *ReActLoop) SetLastPromptToken(tokens int) {
+	if r == nil {
+		return
+	}
+	r.Set(lastPromptTokenLoopKey, tokens)
+}
+
+func (r *ReActLoop) GetLastPromptToken() int {
+	if r == nil {
+		return 0
+	}
+	tokens, _ := r.GetVariable(lastPromptTokenLoopKey).(int)
+	return tokens
 }
 
 func (r *ReActLoop) GetLastPromptObservationStatus() *PromptObservationStatus {

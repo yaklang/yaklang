@@ -272,18 +272,36 @@ func (r *ReActLoop) generateLoopPrompt(
 	if result == nil {
 		return "", utils.Error("assemble loop prompt returned nil result")
 	}
-	observation := BuildPromptObservation(r.loopName, nonce, result.Prompt, getLoopPromptObservationSections(result))
-	r.SetLastPromptObservation(observation)
-	// 传 0 走 defaultPromptSummaryBytes; 当前默认 = 0 = 段内容完整透传.
-	// 用户实测段体量在数 KB ~ 数十 KB 量级, 本地 ipc 完全可承受;
-	// 想换成截断模式时改成显式正数即可.
-	// 关键词: BuildStatus 不截断, 上下文成分完整展示
-	status := observation.BuildStatus(0)
-	r.SetLastPromptObservationStatus(status)
-	r.emitPromptObservationStatus(status)
-	if r.isDebugModeEnabled() {
-		log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
-	}
+	// observation（UI 上下文成分面板）是旁路需求，不参与 AI call 主流程。
+	// 同步只写入 PromptTokens 供 verification gate 使用，完整 observation
+	// 构建 + BuildStatus + emit 全部异步执行，不阻塞主循环。
+	_promptTokens := estimateTokenCount(result.Prompt)
+	r.SetLastPromptToken(_promptTokens)
+
+	// 异步旁路：构建完整 observation + BuildStatus + emit + debug report
+	_asyncSections := getLoopPromptObservationSections(result)
+	_promptCopy := result.Prompt
+	_loopName := r.loopName
+	_nonce := nonce
+	_debugMode := r.isDebugModeEnabled()
+	_emitter := r.emitter
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Warnf("async observation build panic recovered: %v", rec)
+			}
+		}()
+		observation := BuildPromptObservation(_loopName, _nonce, _promptCopy, _asyncSections)
+		status := observation.BuildStatus(0)
+		r.SetLastPromptObservation(observation)
+		r.SetLastPromptObservationStatus(status)
+		if _emitter != nil {
+			_emitter.EmitPromptProfile(status)
+		}
+		if _debugMode {
+			log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
+		}
+	}()
 	return result.Prompt, nil
 }
 

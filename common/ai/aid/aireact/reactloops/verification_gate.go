@@ -87,6 +87,11 @@ func (r *ReActLoop) getVerificationRuntimePromptTokens() int {
 	if r == nil {
 		return 0
 	}
+	// observation 异步化后，同步路径只写 lastPromptTokenLoopKey。
+	// 异步 observation 完成后 observation/status 也可读，做兜底兼容。
+	if tokens := r.GetLastPromptToken(); tokens > 0 {
+		return tokens
+	}
 	if observation := r.GetLastPromptObservation(); observation != nil {
 		return observation.PromptTokens
 	}
