@@ -316,9 +316,15 @@ type SyntaxFlowRule struct {
 	// 可选值: audit（审计）、vuln（漏洞）、config（配置）、security（安全）
 	Purpose SyntaxFlowRulePurposeType
 
-	// Tag 规则标签
-	// 用于分类和筛选，可包含多个标签，如 "injection,security,owasp"
+	// Tag 遗留字段：路径导入时的 "|" 拼接串。新逻辑以 Tags 为准，写入时会同步。
 	Tag string
+
+	// Tags 原子标签列表（标准短标 + 用户自定义），如 cwe:89 / spring / sqli
+	// 不含 language / severity / purpose（这些用列字段）。
+	Tags StringArray `gorm:"type:text" json:"tags"`
+
+	// PackageName 所属规则包（互斥归属）
+	PackageName string `gorm:"index" json:"package_name"`
 
 	// CWE 通用弱点枚举列表
 	// Common Weakness Enumeration，如 ["CWE-89", "CWE-564"]
@@ -411,13 +417,50 @@ type SyntaxFlowRule struct {
 func (s *SyntaxFlowRule) CalcHash() string {
 	// 注意：不包含 OpCodes，因为 OpCodes 是编译后的派生数据，不应该影响规则的 hash
 	// 如果包含 OpCodes，即使规则内容没有改变，hash 也会因为编译器版本、编译时间等因素而改变
-	s.Hash = utils.CalcSha256(s.RuleId, s.RuleName, s.Content, s.Tag)
+	s.SyncLegacyTagField()
+	s.Hash = utils.CalcSha256(s.RuleId, s.RuleName, s.Content, s.Tag, s.PackageName)
 	return s.Hash
+}
+
+// GetAtomicTags returns structured tags; falls back to parsing legacy Tag.
+func (s *SyntaxFlowRule) GetAtomicTags() []string {
+	if s == nil {
+		return nil
+	}
+	if len(s.Tags) > 0 {
+		return []string(s.Tags)
+	}
+	if s.Tag == "" {
+		return nil
+	}
+	parts := utils.PrettifyListFromStringSplitEx(s.Tag, "|", ",", " ")
+	return parts
+}
+
+// SetAtomicTags sets Tags and mirrors into legacy Tag for compatibility/hash.
+func (s *SyntaxFlowRule) SetAtomicTags(tags ...string) {
+	tags = utils.StringArrayFilterEmpty(utils.RemoveRepeatedWithStringSlice(tags))
+	s.Tags = StringArray(tags)
+	s.SyncLegacyTagField()
+}
+
+// SyncLegacyTagField mirrors Tags into Tag using "|".
+func (s *SyntaxFlowRule) SyncLegacyTagField() {
+	if s == nil {
+		return
+	}
+	if len(s.Tags) > 0 {
+		s.Tag = strings.Join(s.Tags, "|")
+		return
+	}
 }
 
 func (s *SyntaxFlowRule) BeforeSave() error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
+	}
+	if s.PackageName == "" {
+		s.PackageName = SyntaxFlowPackageCustom
 	}
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
@@ -429,6 +472,9 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 func (s *SyntaxFlowRule) BeforeCreate() error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
+	}
+	if s.PackageName == "" {
+		s.PackageName = SyntaxFlowPackageCustom
 	}
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
@@ -504,6 +550,10 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 		IncludedName:  s.IncludedName,
 		Hash:          s.Hash,
 		Tag:           s.Tag,
+		Tags:          s.GetAtomicTags(),
+		PackageName:   s.PackageName,
+		RuleId:        s.RuleId,
+		Version:       s.Version,
 		GroupName:     groupNames,
 		AlertMsg:      alertmsg,
 	}

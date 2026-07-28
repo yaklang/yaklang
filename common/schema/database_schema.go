@@ -59,7 +59,8 @@ var ProfileTables = []interface{}{
 	&GeneralRuleGroup{},
 	//syntaxFlow rule
 	&SyntaxFlowRule{},
-	&SyntaxFlowGroup{},
+	&SyntaxFlowGroup{}, // deprecated: kept for DB migrate; sync no longer writes groups
+	&SyntaxFlowPackage{},
 	&PluginEnv{},
 	&HotPatchTemplate{},
 	&AIForge{},

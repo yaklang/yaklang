@@ -6,26 +6,22 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin/standards"
 )
 
-// enrichRuleGroups 为规则生成增强的分组列表
-// 基于 CWE、文件路径等信息自动匹配标准分组（OWASP、框架等）
+// enrichRuleTags builds atomic tags for a rule (replaces enrichRuleGroups).
+func enrichRuleTags(rule *schema.SyntaxFlowRule, filePath string) []string {
+	enricher, err := standards.GetGlobalEnricher()
+	if err != nil {
+		log.Warnf("get metadata enricher failed: %v, skip tag enrichment", err)
+		return nil
+	}
+	return enricher.EnrichAtomicTags(rule.RuleName, filePath, rule.CWE)
+}
+
+// enrichRuleGroups is deprecated; kept for tests that still call the old path.
 func enrichRuleGroups(rule *schema.SyntaxFlowRule, filePath string) []string {
-	// 获取全局元数据增强器
 	enricher, err := standards.GetGlobalEnricher()
 	if err != nil {
 		log.Warnf("get metadata enricher failed: %v, skip group enrichment", err)
 		return nil
 	}
-
-	// 调用增强器生成分组名称
-	enrichedGroups := enricher.EnrichGroupNames(
-		rule.RuleName,
-		filePath,
-		rule.CWE,
-	)
-
-	if len(enrichedGroups) > 0 {
-		log.Debugf("enriched %d groups for rule %s: %v", len(enrichedGroups), rule.RuleName, enrichedGroups)
-	}
-
-	return enrichedGroups
+	return enricher.EnrichGroupNames(rule.RuleName, filePath, rule.CWE)
 }
