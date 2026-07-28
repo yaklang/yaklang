@@ -107,7 +107,7 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	info := func(s string, items ...interface{}) {
 		var msg string
 		if len(items) > 0 {
-			msg = fmt.Sprintf(s, items)
+			msg = fmt.Sprintf(s, items...)
 		} else {
 			msg = s
 		}

@@ -153,7 +153,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 	info := func(progress float64, s string, items ...interface{}) {
 		var msg string
 		if len(items) > 0 {
-			msg = fmt.Sprintf(s, items)
+			msg = fmt.Sprintf(s, items...)
 		} else {
 			msg = s
 		}
