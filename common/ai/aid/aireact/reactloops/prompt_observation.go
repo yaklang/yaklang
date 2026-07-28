@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -202,7 +204,7 @@ func buildPromptObservation(loopName string, nonce string, prompt string, sectio
 		Nonce:        nonce,
 		GeneratedAt:  time.Now(),
 		PromptBytes:  len(prompt),
-		PromptTokens: estimateTokenCount(prompt),
+		PromptTokens: ytoken.CalcTokenCount(prompt),
 		PromptLines:  countPromptLines(prompt),
 		Stats:        newPromptObservationStats(),
 		Sections:     sections,
@@ -244,7 +246,7 @@ func collectPromptObservationStats(section *PromptSectionObservation, observatio
 	bytes := section.ContentBytes()
 	tokens := section.EstimatedTokens
 	if tokens == 0 && strings.TrimSpace(section.Content) != "" {
-		tokens = estimateTokenCount(section.Content)
+		tokens = ytoken.CalcTokenCount(section.Content)
 	}
 	observation.Stats.RoleStats = addPromptObservationRoleBytes(observation.Stats.RoleStats, section.Role, bytes)
 	observation.Stats.RoleStats = addPromptObservationRoleTokens(observation.Stats.RoleStats, section.Role, tokens)
@@ -271,7 +273,7 @@ func (s *PromptSectionObservation) refreshMetrics() {
 	s.Included = strings.TrimSpace(s.Content) != ""
 	s.EstimatedTokens = 0
 	if len(s.Children) == 0 {
-		s.EstimatedTokens = estimateTokenCount(s.Content)
+		s.EstimatedTokens = ytoken.CalcTokenCount(s.Content)
 		return
 	}
 	for _, child := range s.Children {
@@ -802,6 +804,32 @@ func contentHash8(content string) string {
 	}
 	sum := sha1.Sum([]byte(content))
 	return hex.EncodeToString(sum[:])[:8]
+}
+
+// contentHash8Cache 缓存 sha1 结果，避免对相同 section 内容重复计算。
+var (
+	contentHash8CacheMu sync.RWMutex
+	contentHash8Cache   = map[string]string{}
+)
+
+func cachedContentHash8(content string) string {
+	if content == "" {
+		return ""
+	}
+	contentHash8CacheMu.RLock()
+	if h, ok := contentHash8Cache[content]; ok {
+		contentHash8CacheMu.RUnlock()
+		return h
+	}
+	contentHash8CacheMu.RUnlock()
+	h := contentHash8(content)
+	contentHash8CacheMu.Lock()
+	if len(contentHash8Cache) > 512 {
+		contentHash8Cache = map[string]string{}
+	}
+	contentHash8Cache[content] = h
+	contentHash8CacheMu.Unlock()
+	return h
 }
 
 func appendPromptSectionCLI(buf *strings.Builder, section *PromptSectionObservation, prefix string, isLast bool, maxPreviewBytes int) {

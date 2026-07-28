@@ -275,7 +275,8 @@ func (r *ReActLoop) generateLoopPrompt(
 	// observation（UI 上下文成分面板）是旁路需求，不参与 AI call 主流程。
 	// 同步只写入 PromptTokens 供 verification gate 使用，完整 observation
 	// 构建 + BuildStatus + emit 全部异步执行，不阻塞主循环。
-	_promptTokens := estimateTokenCount(result.Prompt)
+	// verification gate 的 token 门阈值为 10K/20K 量级，粗估 len/4 即可。
+	_promptTokens := len(result.Prompt) / 4
 	r.SetLastPromptToken(_promptTokens)
 
 	// 异步旁路：构建完整 observation + BuildStatus + emit + debug report
