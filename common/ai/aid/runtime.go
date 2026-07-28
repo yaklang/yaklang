@@ -494,7 +494,7 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 			}
 			collected = append(collected, result)
 			if result.task != nil {
-				r.finishActiveTask(result.task.Index)
+				r.finishActiveTask(result.task.TaskId)
 			}
 			r.config.planLoadingStatus(fmt.Sprintf(
 				"执行进度: %d/%d - 当前阶段 %d/%d / Progress: %d/%d - Stage %d/%d",
@@ -561,7 +561,7 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 		result := <-results
 		collected = append(collected, result)
 		if result.task != nil {
-			r.finishActiveTask(result.task.Index)
+			r.finishActiveTask(result.task.TaskId)
 		}
 		r.config.planLoadingStatus(fmt.Sprintf(
 			"执行进度: %d/%d - 当前阶段 %d/%d / Progress: %d/%d - Stage %d/%d",
