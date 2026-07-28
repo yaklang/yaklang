@@ -1,177 +1,134 @@
 # 扫描策略配置
-# 定义预设策略及其对应的规则组映射关系
+# Policy = 预设 Filter（标准 Tag + 列字段条件）
+# 见 docs/design/rule-package.md
 
-version: "1.0"
-updated_at: "2026-02-02"
+version: "2.0"
+updated_at: "2026-07-24"
 
-# 策略列表
 policies:
-  # OWASP Top 10 合规扫描
   owasp-web:
-    name: "🛡️ OWASP Top 10 合规扫描"
-    description: "覆盖 OWASP Top 10 所有安全风险类别"
-    icon: "🛡️"
-    rule_groups:
-      - "OWASP 2021 A01:Broken Access Control"
-      - "OWASP 2021 A02:Cryptographic Failures"
-      - "OWASP 2021 A03:Injection"
-      - "OWASP 2021 A04:Insecure Design"
-      - "OWASP 2021 A05:Security Misconfiguration"
-      - "OWASP 2021 A06:Vulnerable and Outdated Components"
-      - "OWASP 2021 A07:Identification and Authentication Failures"
-      - "OWASP 2021 A08:Software and Data Integrity Failures"
-      - "OWASP 2021 A09:Security Logging and Monitoring Failures"
-      - "OWASP 2021 A10:Server-Side Request Forgery"
+    name: "OWASP Top 10 合规扫描"
+    description: "按 OWASP Top 10 相关 CWE 原子标签筛选规则"
+    icon: "shield"
+    # 代表性 CWE（完整映射由 enricher/mappings 维护；此处为策略选中的原子 Tag）
+    tags:
+      - cwe:22
+      - cwe:77
+      - cwe:78
+      - cwe:79
+      - cwe:89
+      - cwe:90
+      - cwe:94
+      - cwe:200
+      - cwe:259
+      - cwe:287
+      - cwe:352
+      - cwe:434
+      - cwe:502
+      - cwe:601
+      - cwe:611
+      - cwe:798
+      - cwe:862
+      - cwe:863
+      - cwe:918
+      - cwe:1336
 
-  # 严重+高危漏洞快速扫描
   critical-high:
-    name: "🚀 高危漏洞快速扫描"
-    description: "仅扫描严重和高危级别漏洞，快速定位关键风险"
-    icon: "🚀"
-    rule_groups:
-      - "critical"
-      - "high"
+    name: "高危漏洞快速扫描"
+    description: "仅扫描严重和高危级别漏洞"
+    icon: "rocket"
+    severity:
+      - critical
+      - high
 
-  # 全栈深度扫描
   fullstack:
-    name: "☕ 全栈深度扫描"
-    description: "包含语言特性、框架漏洞、依赖组件等全方位检测"
-    icon: "☕"
-    rule_groups:
-      # 严重性等级
-      - "critical"
-      - "high"
-      - "middle"
-      # 语言
-      - "java"
-      - "go"
-      - "php"
-      - "javascript"
-      - "python"
-      # 框架
-      - "Framework - Spring"
-      - "Framework - Apache Shiro"
-      - "Framework - ThinkPHP"
-      # SCA
-      - "SCA - Dependency Check"
+    name: "全栈深度扫描"
+    description: "高危等级 + 常见框架/SCA 标签"
+    icon: "stack"
+    severity:
+      - critical
+      - high
+      - middle
+    tags:
+      - spring
+      - shiro
+      - thinkphp
+      - sca
 
-  # CWE Top 25 扫描
   cwe-top25:
-    name: "⚠️ CWE Top 25"
-    description: "最危险的软件缺陷类型，基于 MITRE CWE 排名"
-    icon: "⚠️"
-    rule_groups:
-      - "CWE Top 25 (2023)"
+    name: "CWE Top 25"
+    description: "CWE Top 25 (2023) 相关规则"
+    icon: "warning"
+    tags:
+      - cwe:787
+      - cwe:79
+      - cwe:89
+      - cwe:416
+      - cwe:78
+      - cwe:20
+      - cwe:125
+      - cwe:22
+      - cwe:352
+      - cwe:434
+      - cwe:862
+      - cwe:476
+      - cwe:287
+      - cwe:190
+      - cwe:502
+      - cwe:77
+      - cwe:119
+      - cwe:798
+      - cwe:918
+      - cwe:306
+      - cwe:362
+      - cwe:269
+      - cwe:94
+      - cwe:863
+      - cwe:276
 
-  # 自定义策略（占位符，实际规则组由用户选择）
   custom:
-    name: "⚙️ 自定义规则"
-    description: "手动选择规则集"
-    icon: "⚙️"
-    rule_groups: []  # 空列表，由用户动态指定
+    name: "自定义规则"
+    description: "手动选择 Tag / 等级 / 用途"
+    icon: "settings"
+    tags: []
 
-# 策略分类（用于前端UI分组展示）
 categories:
   - id: "compliance"
     name: "合规扫描"
     policies: ["owasp-web", "cwe-top25"]
-  
   - id: "quick"
     name: "快速扫描"
     policies: ["critical-high"]
-  
   - id: "comprehensive"
     name: "全面扫描"
     policies: ["fullstack"]
-  
   - id: "custom"
     name: "自定义"
     policies: ["custom"]
 
-# 自定义规则组分类（用于自定义策略的规则选择器）
-# 前端通过 API 获取此配置动态渲染规则组选择器
-custom_rule_groups:
-  # 合规规则（基于行业标准）
-  compliance_rules:
-    - category: "OWASP Top 10 (2021)"
-      groups:
-        - name: "OWASP 2021 A01:Broken Access Control"
-          display_name: "A01: 失效的访问控制"
-        - name: "OWASP 2021 A02:Cryptographic Failures"
-          display_name: "A02: 加密机制失败"
-        - name: "OWASP 2021 A03:Injection"
-          display_name: "A03: 注入"
-        - name: "OWASP 2021 A04:Insecure Design"
-          display_name: "A04: 不安全设计"
-        - name: "OWASP 2021 A05:Security Misconfiguration"
-          display_name: "A05: 安全配置错误"
-        - name: "OWASP 2021 A06:Vulnerable and Outdated Components"
-          display_name: "A06: 易受攻击和过时的组件"
-        - name: "OWASP 2021 A07:Identification and Authentication Failures"
-          display_name: "A07: 识别和认证失败"
-        - name: "OWASP 2021 A08:Software and Data Integrity Failures"
-          display_name: "A08: 软件和数据完整性故障"
-        - name: "OWASP 2021 A09:Security Logging and Monitoring Failures"
-          display_name: "A09: 安全日志和监控失败"
-        - name: "OWASP 2021 A10:Server-Side Request Forgery"
-          display_name: "A10: 服务器端请求伪造"
-    
-    - category: "CWE"
-      groups:
-        - name: "CWE Top 25 (2023)"
-          display_name: "CWE Top 25 (2023)"
-  
-  # 技术栈规则（语言、框架、组件）
-  tech_stack_rules:
-    - category: "语言"
-      groups:
-        - name: "java"
-          display_name: "Java"
-        - name: "go"
-          display_name: "Golang"
-        - name: "php"
-          display_name: "PHP"
-        - name: "javascript"
-          display_name: "JavaScript"
-        - name: "python"
-          display_name: "Python"
-        - name: "c"
-          display_name: "C"
-    
-    - category: "框架/组件"
-      groups:
-        - name: "Framework - Spring"
-          display_name: "Spring"
-        - name: "Framework - Apache Shiro"
-          display_name: "Apache Shiro"
-        - name: "Framework - ThinkPHP"
-          display_name: "ThinkPHP"
-    
-    - category: "组件扫描"
-      groups:
-        - name: "SCA - Dependency Check"
-          display_name: "依赖组件检查"
-  
-  # 特殊规则（严重性、用途等）
-  special_rules:
-    - category: "严重性"
-      groups:
-        - name: "critical"
-          display_name: "严重"
-        - name: "high"
-          display_name: "高危"
-        - name: "middle"
-          display_name: "中危"
-        - name: "low"
-          display_name: "低危"
-    
-    - category: "检测目的"
-      groups:
-        - name: "audit"
-          display_name: "审计"
-        - name: "vuln"
-          display_name: "漏洞检测"
-        - name: "config"
-          display_name: "配置检查"
-        - name: "security"
-          display_name: "安全检查"
+# 自定义策略可选的标准 Tag（前端标签选择器）
+custom_rule_tags:
+  framework:
+    - name: spring
+      display_name: "Spring"
+    - name: shiro
+      display_name: "Apache Shiro"
+    - name: thinkphp
+      display_name: "ThinkPHP"
+    - name: sca
+      display_name: "依赖组件 (SCA)"
+  tech_point:
+    - name: sqli
+      display_name: "SQL 注入"
+    - name: xss
+      display_name: "XSS"
+    - name: ssrf
+      display_name: "SSRF"
+    - name: rce
+      display_name: "命令/代码执行"
+    - name: xxe
+      display_name: "XXE"
+    - name: deserialization
+      display_name: "反序列化"
+    - name: path-traversal
+      display_name: "路径穿越"

@@ -140,7 +140,11 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 	}
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguage())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", filter.GetPurpose())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "syntax_flow_rules.tag", filter.GetTag())
+	if len(filter.GetTag()) > 0 {
+		// Tags are stored in tags (comma) and mirrored to tag (pipe); match substring.
+		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"syntax_flow_rules.tags", "syntax_flow_rules.tag"}, filter.GetTag(), false)
+	}
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "package_name", filter.GetPackageNames())
 	//if !params.GetIncludeLibraryRule() {
 	//	db = db.Where("allow_included = ?", false)
 	//}

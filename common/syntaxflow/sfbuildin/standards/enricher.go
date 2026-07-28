@@ -75,13 +75,8 @@ func NewRuleMetadataEnricher() (*RuleMetadataEnricher, error) {
 	}, nil
 }
 
-// EnrichGroupNames 为规则增强分组名称
-// 参数:
-//   - ruleName: 规则名称（如 "java-sql-injection.sf"）
-//   - ruleFilePath: 规则文件的相对路径（如 "buildin/java/cwe-89-sql-injection/java-sql-injection.sf"）
-//   - cwes: 规则关联的 CWE 列表（来自规则本身或从路径提取）
-//
-// 返回: 应该关联的分组名称列表
+// EnrichGroupNames 为规则增强分组名称（已废弃：请使用 EnrichAtomicTags）
+// 保留供迁移期测试；sync 路径不再写入 Group。
 func (e *RuleMetadataEnricher) EnrichGroupNames(
 	ruleName string,
 	ruleFilePath string,
@@ -109,6 +104,107 @@ func (e *RuleMetadataEnricher) EnrichGroupNames(
 	groupNames = utils.RemoveRepeatedWithStringSlice(groupNames)
 
 	return groupNames
+}
+
+// EnrichAtomicTags builds standard short tags for a rule (docs/design/rule-package.md):
+//   - cwe:<num> for each CWE (preferred vuln dimension)
+//   - framework/component short tags (spring, shiro, sca, ...)
+//   - tech-point tags (sqli, xss, ...) only when no CWE is present
+// Never emits language / severity / purpose.
+func (e *RuleMetadataEnricher) EnrichAtomicTags(
+	ruleName string,
+	ruleFilePath string,
+	cwes []string,
+) []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	var tags []string
+	hasCWE := false
+	for _, cwe := range cwes {
+		formatted := formatCWENumber(cwe)
+		if formatted == "" {
+			continue
+		}
+		hasCWE = true
+		num := strings.TrimPrefix(formatted, "CWE-")
+		tags = append(tags, "cwe:"+num)
+	}
+
+	normalizedPath := filepath.ToSlash(strings.ToLower(ruleFilePath))
+	for _, fg := range e.mappings.FrameworkGroups {
+		matched := false
+		for _, pattern := range fg.PathPatterns {
+			if matchPathPattern(normalizedPath, strings.ToLower(pattern)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		if short := frameworkShortTag(fg.GroupName); short != "" {
+			tags = append(tags, short)
+		}
+		// keep non-language tags from mapping (e.g. sca, dependency, framework)
+		for _, t := range fg.Tags {
+			t = strings.ToLower(strings.TrimSpace(t))
+			if t == "" || t == "language" || t == "java" || t == "php" || t == "python" || t == "golang" || t == "javascript" {
+				continue
+			}
+			tags = append(tags, t)
+		}
+	}
+
+	if !hasCWE {
+		tags = append(tags, inferTechPointTags(ruleFilePath, ruleName)...)
+	}
+
+	return utils.RemoveRepeatedWithStringSlice(tags)
+}
+
+func frameworkShortTag(groupName string) string {
+	name := strings.TrimSpace(groupName)
+	lower := strings.ToLower(name)
+	switch {
+	case strings.Contains(lower, "shiro"):
+		return "shiro"
+	case strings.Contains(lower, "spring"):
+		return "spring"
+	case strings.Contains(lower, "struts"):
+		return "struts"
+	case strings.Contains(lower, "laravel"):
+		return "laravel"
+	case strings.Contains(lower, "thinkphp"):
+		return "thinkphp"
+	case strings.Contains(lower, "django"):
+		return "django"
+	case strings.Contains(lower, "sca"):
+		return "sca"
+	default:
+		return ""
+	}
+}
+
+func inferTechPointTags(ruleFilePath, ruleName string) []string {
+	blob := strings.ToLower(ruleFilePath + " " + ruleName)
+	var tags []string
+	add := func(cond bool, tag string) {
+		if cond {
+			tags = append(tags, tag)
+		}
+	}
+	add(strings.Contains(blob, "sql-injection") || strings.Contains(blob, "sqli") || strings.Contains(blob, "sql_inject"), "sqli")
+	add(strings.Contains(blob, "xss") || strings.Contains(blob, "cross-site"), "xss")
+	add(strings.Contains(blob, "ssrf"), "ssrf")
+	add(strings.Contains(blob, "xxe") || strings.Contains(blob, "xml-external"), "xxe")
+	add(strings.Contains(blob, "rce") || strings.Contains(blob, "command-inject") || strings.Contains(blob, "os-command"), "rce")
+	add(strings.Contains(blob, "path-traversal") || strings.Contains(blob, "path_traversal") || strings.Contains(blob, "lfi"), "path-traversal")
+	add(strings.Contains(blob, "deserialize") || strings.Contains(blob, "unserialize") || strings.Contains(blob, "pickle"), "deserialization")
+	add(strings.Contains(blob, "open-redirect") || strings.Contains(blob, "redirect"), "open-redirect")
+	add(strings.Contains(blob, "ssti") || strings.Contains(blob, "template-injection"), "ssti")
+	add(strings.Contains(blob, "ldap"), "ldap-injection")
+	return tags
 }
 
 // mapCWEToOWASP 将 CWE 列表映射到 OWASP 分组

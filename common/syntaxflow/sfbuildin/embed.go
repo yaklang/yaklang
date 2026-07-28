@@ -18,6 +18,7 @@ import (
 )
 
 //go:embed buildin/***
+//go:embed agent/***
 var ruleFS embed.FS
 
 var (

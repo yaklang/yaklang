@@ -5,18 +5,13 @@ package sfbuildin
 import (
 	"embed"
 	"errors"
-	"fmt"
-	"io/fs"
-	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -38,76 +33,9 @@ func SyncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 	var notify func(process float64, ruleName string)
 	if len(notifies) != 0 {
 		notify = notifies[0]
-		defer notify(1, "同步SyntaxFlow规则成功！")
+		defer notify(1, "同步SyntaxFlow规则包成功！")
 	}
-
-	var (
-		handledCount float64
-		totalCount   float64
-	)
-	filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-		if strings.HasSuffix(info.Name(), ".sf") {
-			totalCount++
-		}
-		return nil
-	}))
-
-	// 导入规则
-	err = filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-		dirName, name := fsInstance.PathSplit(s)
-		if !strings.HasSuffix(name, ".sf") {
-			return nil
-		}
-		raw, err := fsInstance.ReadFile(s)
-		if err != nil {
-			return utils.Wrapf(err, "read file[%s] error", s)
-		}
-
-		var tags []string
-		for _, block := range utils.PrettifyListFromStringSplitEx(dirName, "/", "\\", ",", "|") {
-			block = strings.ToLower(block)
-			if block == "buildin" {
-				continue
-			}
-			if strings.HasPrefix(block, "cwe-") {
-				result, err := regexp_utils.NewYakRegexpUtils(`(cwe-\d+)(-(.*))?`).FindStringSubmatch(block)
-				if err != nil {
-					continue
-				}
-				tags = append(tags, strings.ToUpper(result[1]))
-				tags = append(tags, result[3])
-				continue
-			} else if strings.HasPrefix(block, "cve-") {
-				result, err := regexp_utils.NewYakRegexpUtils(`(cve-\d+-\d+)([_-\.](.*))?`).FindStringSubmatch(block)
-				if err != nil {
-					continue
-				}
-				tags = append(tags, strings.ToUpper(result[1]))
-				tags = append(tags, result[3])
-				continue
-			}
-			tags = append(tags, block)
-		}
-		content := string(raw)
-		// import builtin rule (传递文件路径用于元数据增强)
-		_, err = sfdb.ImportRuleWithoutValidExWithDB(db, name, content, s, buildin, tags...)
-		if err != nil {
-			log.Warnf("import rule %s error: %s", name, err)
-			return err
-		}
-		handledCount++
-		if notify != nil {
-			if totalCount > 0 {
-				notify(handledCount/totalCount, fmt.Sprintf("更新内置SyntaxFlow规则:%s ", info.Name()))
-			} else {
-				notify(1, "没有内置SyntaxFlow规则需要更新。")
-			}
-		}
-
-		return nil
-	}))
-
-	return err
+	return syncAllEmbedPackagesToDB(db, fsInstance, buildin, notify)
 }
 
 func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {

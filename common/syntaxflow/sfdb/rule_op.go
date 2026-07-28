@@ -196,6 +196,11 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 // CreateRuleByContentEx 创建规则（扩展版本，支持元数据增强）
 // filePath: 规则文件的相对路径，用于元数据增强
 func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	return CreateRuleByContentExWithDBAndPackage(db, ruleFileName, content, filePath, buildIn, "", tags...)
+}
+
+// CreateRuleByContentExWithDBAndPackage imports a rule into a named package.
+func CreateRuleByContentExWithDBAndPackage(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, packageName string, tags ...string) (*schema.SyntaxFlowRule, error) {
 	if db == nil {
 		return nil, utils.Errorf("profile db is nil")
 	}
@@ -215,10 +220,13 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 
 	cweList := make([]string, 0)
 
-	// 从tags中提取CWE
+	// 从tags中提取CWE（兼容路径遗留 CWE-89 与标准 cwe:89）
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "CWE-") {
-			cweList = append(cweList, tag)
+		upper := strings.ToUpper(tag)
+		if strings.HasPrefix(upper, "CWE-") {
+			cweList = append(cweList, upper)
+		} else if strings.HasPrefix(strings.ToLower(tag), "cwe:") {
+			cweList = append(cweList, "CWE-"+strings.TrimPrefix(strings.ToLower(tag), "cwe:"))
 		}
 	}
 
@@ -237,7 +245,14 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
 	rule.Language = language
-	rule.Tag = strings.Join(tags, "|")
+	if packageName == "" {
+		if buildIn {
+			packageName = schema.SyntaxFlowPackageBuiltin
+		} else {
+			packageName = schema.SyntaxFlowPackageCustom
+		}
+	}
+	rule.PackageName = packageName
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersionFromEmbed(rule.RuleId)
 	if err == nil {
@@ -254,14 +269,39 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 			rule.RuleName = rule.Title
 		}
 	}
+
+	// atomic tags: path crumbs cleaned + enricher
+	atomicTags := make([]string, 0, len(tags))
+	for _, t := range tags {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		lower := strings.ToLower(t)
+		// drop language / severity / purpose mirrors
+		if lower == string(rule.Language) || lower == string(rule.Severity) || lower == string(rule.Purpose) {
+			continue
+		}
+		if lower == "java" || lower == "php" || lower == "python" || lower == "golang" || lower == "go" || lower == "javascript" || lower == "c" {
+			continue
+		}
+		if lower == "info" || lower == "low" || lower == "middle" || lower == "high" || lower == "critical" {
+			continue
+		}
+		if lower == "audit" || lower == "vuln" || lower == "config" || lower == "security" {
+			continue
+		}
+		atomicTags = append(atomicTags, t)
+	}
+	atomicTags = append(atomicTags, enrichRuleTags(rule, filePath)...)
+	rule.SetAtomicTags(atomicTags...)
+
 	err = MigrateSyntaxFlowWithDB(db, rule.CalcHash(), rule)
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")
 	}
-
-	// ⭐ 使用元数据增强器自动生成分组，同时添加默认的语言/严重性/目的分组
-	enrichedGroups := enrichRuleGroups(rule, filePath)
-	addGroupsForRule(db, rule, true, enrichedGroups...)
+	// Groups are deprecated: do not auto-attach language/severity/purpose/OWASP groups.
+	db.Where("rule_name = ?", rule.RuleName).Preload("Groups").First(&rule)
 	return rule, nil
 }
 
@@ -276,7 +316,11 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 // ImportRuleWithoutValidEx 导入规则（扩展版本，支持文件路径）
 // filePath: 规则文件的相对路径，用于元数据增强（匹配框架分组）
 func ImportRuleWithoutValidExWithDB(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
-	rule, err := CreateRuleByContentExWithDB(db, ruleName, content, filePath, buildin, tags...)
+	return ImportRuleWithoutValidExWithDBAndPackage(db, ruleName, content, filePath, buildin, "", tags...)
+}
+
+func ImportRuleWithoutValidExWithDBAndPackage(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, packageName string, tags ...string) (*schema.SyntaxFlowRule, error) {
+	rule, err := CreateRuleByContentExWithDBAndPackage(db, ruleName, content, filePath, buildin, packageName, tags...)
 	if err != nil {
 		return nil, utils.Errorf("create build in rule failed: %s", err)
 	}
