@@ -820,6 +820,15 @@ service Yak {
   rpc SyntaxFlowRuleToOnline(SyntaxFlowRuleToOnlineRequest) returns (stream SyntaxFlowRuleOnlineProgress);
   rpc DownloadSyntaxFlowRule(DownloadSyntaxFlowRuleRequest) returns (stream SyntaxFlowRuleOnlineProgress);
 
+  // SyntaxFlow rule packages (docs/design/rule-package.md)
+  rpc QuerySyntaxFlowPackages(QuerySyntaxFlowPackagesRequest) returns (QuerySyntaxFlowPackagesResponse);
+  rpc CreateSyntaxFlowPackage(CreateSyntaxFlowPackageRequest) returns (DbOperateMessage);
+  rpc UpdateSyntaxFlowPackage(UpdateSyntaxFlowPackageRequest) returns (DbOperateMessage);
+  rpc DeleteSyntaxFlowPackage(DeleteSyntaxFlowPackageRequest) returns (DbOperateMessage);
+  rpc ExportSyntaxFlowPackage(ExportSyntaxFlowPackageRequest) returns (stream SyntaxFlowPackageProgress);
+  rpc ImportSyntaxFlowPackage(ImportSyntaxFlowPackageRequest) returns (stream SyntaxFlowPackageProgress);
+  rpc SyncSyntaxFlowPackage(SyncSyntaxFlowPackageRequest) returns (stream SyntaxFlowPackageProgress);
+
   // syntaxflow scan
   rpc SyntaxFlowScan(stream SyntaxFlowScanRequest) returns (stream SyntaxFlowScanResponse);
   rpc QuerySyntaxFlowScanTask(QuerySyntaxFlowScanTaskRequest) returns (QuerySyntaxFlowScanTaskResponse);
@@ -8202,6 +8211,7 @@ message SyntaxFlowRule{
   bool Verified = 11;
   bool AllowIncluded = 12;
   string IncludedName = 13;
+  // Tag: legacy pipe-joined string; prefer Tags
   string Tag = 14;
 
 
@@ -8210,9 +8220,16 @@ message SyntaxFlowRule{
 
   string Hash = 16;
 
+  // GroupName: deprecated (rule groups removed); kept for wire compat
   repeated string GroupName = 17;
 
   map<string, AlertMessage> AlertMsg = 19;
+
+  // Rule package model (docs/design/rule-package.md)
+  string RuleId = 20;
+  string Version = 21;
+  string PackageName = 22;
+  repeated string Tags = 23;
 }
 
 message AlertMessage{
@@ -8234,14 +8251,17 @@ message  SyntaxFlowRuleInput{
   string Content = 2;
   string Language = 3;
   repeated string Tags = 4;
+  // GroupNames: deprecated
   repeated string GroupNames = 5;
   string Description = 6;
   map<string, AlertMessage> AlertMsg = 7;
+  string PackageName = 8;
 }
 
 message SyntaxFlowRuleFilter {
   repeated string RuleNames = 1;
   repeated string Language = 2;
+  // GroupNames: deprecated; prefer Tags / PackageNames
   repeated string GroupNames = 3;
   repeated string Severity = 4;
   repeated string Purpose = 5;
@@ -8258,6 +8278,7 @@ message SyntaxFlowRuleFilter {
   string FilterLibRuleKind = 14; // "lib"library规则，"noLib"非library规则，空为所有规则
   repeated string RuleIds = 15;
   repeated uint64 Ids = 16 ;
+  repeated string PackageNames = 17;
 }
 
 message SSAProgram{
@@ -8465,6 +8486,90 @@ message SyntaxFlowRuleOnlineProgress {
 message DownloadSyntaxFlowRuleRequest {
   string Token = 1;
   SyntaxFlowRuleFilter Filter = 2;
+}
+
+// ========== SyntaxFlow Package ==========
+
+message SyntaxFlowPackage {
+  string Name = 1;
+  string Version = 2;
+  string Description = 3;
+  string Source = 4; // embed | online | local | user
+  bool IsBuiltin = 5;
+  string Hash = 6;
+  int32 RuleCount = 7;
+}
+
+message SyntaxFlowPackageFilter {
+  repeated string Names = 1;
+  repeated string Sources = 2;
+  string Keyword = 3;
+  string FilterBuiltinKind = 4; // "builtin" | "unBuiltin" | ""
+}
+
+message QuerySyntaxFlowPackagesRequest {
+  SyntaxFlowPackageFilter Filter = 1;
+  Paging Pagination = 2;
+}
+
+message QuerySyntaxFlowPackagesResponse {
+  repeated SyntaxFlowPackage Packages = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+message CreateSyntaxFlowPackageRequest {
+  string Name = 1;
+  string Description = 2;
+  string Version = 3; // optional, default 0.1.0
+}
+
+message UpdateSyntaxFlowPackageRequest {
+  string Name = 1; // current name (key)
+  string NewName = 2; // optional rename
+  string Description = 3;
+  string Version = 4;
+}
+
+message DeleteSyntaxFlowPackageRequest {
+  repeated string Names = 1;
+  bool DeleteRules = 2; // if true, delete rules in package
+}
+
+message ExportSyntaxFlowPackageRequest {
+  string Name = 1;
+  string TargetPath = 2;
+  string Password = 3;
+}
+
+message ImportSyntaxFlowPackageRequest {
+  string InputPath = 1;
+  string Password = 2;
+  string Name = 3; // optional override / required for legacy zip without package.yaml
+  bool ForceOverwriteConflicts = 4;
+}
+
+message SyncSyntaxFlowPackageRequest {
+  repeated string Names = 1; // empty = all embed packages
+  bool Force = 2;
+}
+
+message SyntaxFlowPackageConflict {
+  string RuleId = 1;
+  string RuleName = 2;
+  string LocalVersion = 3;
+  string RemoteVersion = 4;
+  string Reason = 5; // id_name_mismatch | name_collision | ...
+  string PackageName = 6;
+}
+
+message SyntaxFlowPackageProgress {
+  double Progress = 1;
+  string Message = 2;
+  string MessageType = 3; // info | error | conflict | success
+  SyntaxFlowPackageConflict Conflict = 4;
+  string PackageName = 5;
+  string PackageVersion = 6;
 }
 
 message SyntaxFlowScanRequest{
