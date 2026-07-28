@@ -310,6 +310,34 @@ func TestMVSReportLocationToggle(t *testing.T) {
 	mvsAssertSameIDSet(t, idsLoc, idsExist, "report-location-toggle")
 }
 
+func TestMVSVerifierFallbackUsesLongestLocation(t *testing.T) {
+	expr := `^[^,]*?\b(?:foo|bar)\b`
+	data := []byte("x foo y bar")
+	db, err := Compile([]Pattern{{ID: 1, Expr: expr}}, WithBackend(BackendMVS))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	sc, err := db.NewScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sc.Close()
+	var got [][2]int
+	if err := db.Scan(data, sc, func(m Match) bool {
+		got = append(got, [2]int{m.From, m.To})
+		return true
+	}); err != nil {
+		t.Fatal(err)
+	}
+	re := regexp.MustCompile(expr)
+	re.Longest()
+	want := longestFindAll(re, data)
+	if !sameSpans(got, want) {
+		t.Fatalf("verifier fallback mixed location semantics: got=%v want=%v", got, want)
+	}
+}
+
 func truncForLog(b []byte) string {
 	const maxN = 64
 	if len(b) <= maxN {

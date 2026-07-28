@@ -94,3 +94,22 @@ func asciiLowerInto(data []byte, buf *[]byte) []byte {
 	}
 	return out
 }
+
+// asciiLowerString 与 asciiLowerInto 使用完全相同的规范化规则，供编译期字面量及其
+// 窗口分析使用。不能使用 strings.ToLower：它会改写非 ASCII rune（例如 Ã -> ã），
+// 而运行期为保持字节偏移只折叠 ASCII，二者不一致会让预过滤产生假阴。
+func asciiLowerString(s string) string {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 'A' || s[i] > 'Z' {
+			continue
+		}
+		out := []byte(s)
+		for j := i; j < len(out); j++ {
+			if out[j] >= 'A' && out[j] <= 'Z' {
+				out[j] += 'a' - 'A'
+			}
+		}
+		return string(out)
+	}
+	return s
+}

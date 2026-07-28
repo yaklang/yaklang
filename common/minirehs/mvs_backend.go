@@ -92,6 +92,15 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	assertCount := 0
 	gateCount := 0
 	for _, cp := range patterns {
+		// MVS 定位语义统一为 leftmost-longest。lean NFA 自定位天然使用该语义；
+		// 含断言或无法编入 NFA 的 RE2 pattern 会退回 verifier，必须在编译期同步
+		// 切换，否则同一数据库会因规则路由不同混用 leftmost-first/longest。
+		// compiledPattern 仅归当前 Database 所有，此处修改不会影响独立的 stdlib/engine DB。
+		if cfg.reportLocation {
+			if v, ok := cp.v.(*re2Verifier); ok {
+				v.re.Longest()
+			}
+		}
 		nfa, gate, re2Loc := tryCompileNFA(cp)
 		if nfa != nil {
 			db.nfas[cp.idx] = nfa

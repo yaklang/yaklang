@@ -38,7 +38,7 @@ func extractRequiredLiterals(re *syntax.Regexp, minLen int) []string {
 			// always-on (命中集合不变, 仅扫描更少记录), 故正确性不受影响而显著省整段扫.
 			return nil
 		}
-		low := strings.ToLower(l)
+		low := asciiLowerString(l)
 		if _, ok := seen[low]; ok {
 			continue
 		}
@@ -73,7 +73,7 @@ func extractRequiredLiteralFactors(re *syntax.Regexp, minLen int) [][]string {
 				valid = false
 				break
 			}
-			low := strings.ToLower(lit)
+			low := asciiLowerString(lit)
 			if _, duplicate := seen[low]; duplicate {
 				continue
 			}

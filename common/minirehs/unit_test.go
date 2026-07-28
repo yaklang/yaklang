@@ -672,6 +672,24 @@ func TestRegexp2VerifierNoMatch(t *testing.T) {
 	}
 }
 
+func TestNonASCIILiteralPrefilterKeepsByteIdentity(t *testing.T) {
+	expr := `(?s)^[\x20-\x7e]+?.{8}\xc3\x70`
+	data := []byte("7A7中7中77AÃp")
+	for _, backend := range []BackendKind{BackendEngine, BackendMVS} {
+		t.Run(backend.String(), func(t *testing.T) {
+			db, err := Compile([]Pattern{{ID: 1, Expr: expr}},
+				WithBackend(backend), WithReportLocation(false), WithLogger(silentLogger{}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			if got := collectMatches(t, db, data); len(got) != 1 || got[0].ID != 1 {
+				t.Fatalf("non-ASCII literal was lost by prefilter: got=%v", got)
+			}
+		})
+	}
+}
+
 // ---------- DatabaseInfo / Reports ----------
 
 func TestCompileReports(t *testing.T) {
