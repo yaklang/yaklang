@@ -2167,6 +2167,7 @@ var SSACompilerCommands = []*cli.Command{
 	syntaxflowTestCasesCompletion, // complete test cases with AI
 	syntaxFlowSave,                // save rule to database
 	syntaxFlowEvaluate,            // evaluate rule quality
+	syntaxFlowPackageCommand,      // rule packages
 	syntaxFlowExport,              // export rule to file
 	syntaxFlowImport,              // import rule from file
 	syncRule,                      // sync rule from embed to database
