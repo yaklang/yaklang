@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
@@ -111,6 +112,49 @@ func init() {
 			mcp.WithKVPairs("execParams",
 				mcp.Description(`Parameters for the yak script, check script content for the required parameters.Please check the use of all cli libraries, for example: cli.Int("a") means that there is a parameter with key "a" and type int`)),
 		), handleExecYakScript),
+
+		WithTool(mcp.NewTool("save_yak_script",
+			mcp.WithDescription("Create or update a local Yakit plugin (YakScript). Recommended workflow for AI clients: write code → static_analyze_yak_script → optional exec_yak_script → save_yak_script. Pass id>0 to update an existing plugin; omit id (or id=0) to create. Types: yak, mitm, codec, nuclei, port-scan."),
+			mcp.WithString("scriptName",
+				mcp.Description("Plugin name (unique). Required."),
+				mcp.Required(),
+			),
+			mcp.WithString("type",
+				mcp.Description("Plugin type"),
+				mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
+				mcp.Required(),
+			),
+			mcp.WithString("content",
+				mcp.Description("Full Yak/plugin source code to save"),
+				mcp.Required(),
+			),
+			mcp.WithString("help",
+				mcp.Description("Plugin description / help text shown in Yakit"),
+			),
+			mcp.WithString("tags",
+				mcp.Description("Comma-separated tags, e.g. mitm,filter,mcp"),
+			),
+			mcp.WithString("level",
+				mcp.Description("Optional risk/severity level label"),
+			),
+			mcp.WithNumber("id",
+				mcp.Description("Existing plugin id for update; omit or 0 to create a new plugin"),
+			),
+			mcp.WithStringArray("pluginEnvKey",
+				mcp.Description("Optional plugin environment variable keys used by the script"),
+			),
+		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.SaveNewYakScriptRequest) (any, error) {
+			if strings.TrimSpace(req.GetScriptName()) == "" {
+				return nil, utils.Error("scriptName is required")
+			}
+			if strings.TrimSpace(req.GetType()) == "" {
+				return nil, utils.Error("type is required")
+			}
+			if strings.TrimSpace(req.GetContent()) == "" {
+				return nil, utils.Error("content is required")
+			}
+			return s.grpcClient.SaveNewYakScript(ctx, req)
+		}, "failed to save yak script")),
 
 		WithTool(mcp.NewTool("create_yak_script_group",
 			mcp.WithDescription("Create a new Yak script group"),

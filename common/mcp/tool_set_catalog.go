@@ -42,7 +42,7 @@ var mcpToolSetCatalog = []MCPToolSetCatalogEntry{
 	{Name: "hybrid_scan", Tier: ToolSetTierOptional, Summary: "Combined hybrid scan; long-running, task-oriented"},
 	{Name: "payload", Tier: ToolSetTierOptional, Summary: "Payload dictionary CRUD; Yakit dictionary UI workflow"},
 	{Name: "yak_document", Tier: ToolSetTierOptional, Summary: "Yak API/library documentation lookup for script authors"},
-	{Name: "yak_script", Tier: ToolSetTierOptional, Summary: "Yak script query/group/online sync; exec_yak_script hidden over SSE"},
+	{Name: "yak_script", Tier: ToolSetTierOptional, Summary: "Yak script query/save/group/online sync; exec_yak_script hidden over SSE"},
 	{Name: "brute", Tier: ToolSetTierOptional, Summary: "Credential brute force; scenario-specific"},
 	{Name: "subdomain", Tier: ToolSetTierOptional, Summary: "Subdomain collection; recon-specific"},
 	{Name: "crawler", Tier: ToolSetTierOptional, Summary: "Web crawler; recon-specific"},
