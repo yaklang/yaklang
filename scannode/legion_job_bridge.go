@@ -49,7 +49,7 @@ func newLegionJobBridge(agent *ScanNode) *legionJobBridge {
 		hidsDryRunPublisher:    capabilityPublisher,
 		ruleSyncPublisher:      newSSARuleSyncEventPublisher(agent.node),
 		aiPublisher:            newAISessionEventPublisher(agent.node),
-		aiRuntime:              newAISessionRuntimeManager(newYakAIEngineRuntimeDriver()),
+		aiRuntime:              newAISessionRuntimeManager(selectAISessionRuntimeDriver()),
 		aiLocalModelOps:        newAILocalModelOperationManager(),
 		aiKnowledgeBaseQueries: newAIKnowledgeBaseQueryManager(),
 		aiKnowledgeBaseQuestionIndexes: newAIKnowledgeBaseQueryManager(),
