@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const (
@@ -87,7 +88,11 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 	h.mu.Unlock()
 
 	if interactive {
-		if err := h.engine.SendInteractiveResponse(content); err != nil {
+		event, eventErr := buildYakAIInterventionEvent(input)
+		if eventErr != nil {
+			return eventErr
+		}
+		if err := h.engine.SendInputEvent(event); err != nil {
 			return fmt.Errorf("send yak ai interactive response: %w", err)
 		}
 		return nil
@@ -798,6 +803,68 @@ func yakAIInputContent(input aiSessionInput) (string, bool, *yakAISyncEvent, []a
 		}
 		return content, false, nil, yakAIInputAttachedResourceOptions(payload), nil
 	}
+}
+
+func buildYakAIInterventionEvent(input aiSessionInput) (*ypb.AIInputEvent, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(input.PayloadJSON, &payload); err != nil {
+		return nil, fmt.Errorf("decode ai session intervention payload: %w", err)
+	}
+	interactiveID := interactiveIDFromPayload(payload)
+	interactiveJSON := string(input.PayloadJSON)
+	if interactiveID != "" {
+		if explicitJSON := firstNonEmptyString(payload, "interactive_json_input", "response"); explicitJSON != "" {
+			interactiveJSON = explicitJSON
+		}
+		return &ypb.AIInputEvent{
+			IsInteractiveMessage: true,
+			InteractiveId:        interactiveID,
+			InteractiveJSONInput: interactiveJSON,
+		}, nil
+	}
+
+	content := firstNonEmptyString(payload, "content", "message", "text", "free_input")
+	if content != "" {
+		var nested map[string]any
+		if err := json.Unmarshal([]byte(content), &nested); err == nil {
+			interactiveID = interactiveIDFromPayload(nested)
+			if interactiveID != "" {
+				interactiveJSON = content
+			}
+		}
+	}
+	if interactiveID != "" {
+		return &ypb.AIInputEvent{
+			IsInteractiveMessage: true,
+			InteractiveId:        interactiveID,
+			InteractiveJSONInput: interactiveJSON,
+		}, nil
+	}
+	if !strings.EqualFold(strings.TrimSpace(input.InputType), "user_intervention") {
+		return nil, fmt.Errorf("ai session interactive id is required")
+	}
+	if content == "" && input.ContextPackage != nil {
+		content = input.ContextPackage.UserInput
+	}
+	if content == "" {
+		return nil, fmt.Errorf("ai session intervention content is required")
+	}
+	return &ypb.AIInputEvent{
+		IsFreeInput: true,
+		FreeInput:   content,
+	}, nil
+}
+
+func interactiveIDFromPayload(payload map[string]any) string {
+	return firstNonEmptyString(
+		payload,
+		"id",
+		"ID",
+		"interactive_id",
+		"interactiveId",
+		"interactiveID",
+		"InteractiveId",
+	)
 }
 
 func yakAIInputAttachedResourceOptions(payload map[string]any) []aiengine.AIEngineConfigOption {

@@ -261,6 +261,82 @@ func TestYakAIInputContentTreatsUserInterventionAsInteractivePayload(t *testing.
 	assertJSONEqualRuntimeYak(t, []byte(content), string(payload))
 }
 
+func TestBuildYakAIInterventionEventCarriesEndpointID(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte(`{"id":"interactive-1","suggestion":"continue","review_type":"tool_use_review_require"}`)
+	event, err := buildYakAIInterventionEvent(aiSessionInput{
+		InputType:   "user_intervention",
+		PayloadJSON: payload,
+	})
+	if err != nil {
+		t.Fatalf("buildYakAIInterventionEvent() error = %v", err)
+	}
+	if !event.GetIsInteractiveMessage() {
+		t.Fatal("expected interactive input event")
+	}
+	if event.GetInteractiveId() != "interactive-1" {
+		t.Fatalf("unexpected interactive id: %q", event.GetInteractiveId())
+	}
+	assertJSONEqualRuntimeYak(t, []byte(event.GetInteractiveJSONInput()), string(payload))
+}
+
+func TestBuildYakAIInterventionEventUnwrapsComposerReviewPayload(t *testing.T) {
+	t.Parallel()
+
+	event, err := buildYakAIInterventionEvent(aiSessionInput{
+		InputType: "user_intervention",
+		PayloadJSON: []byte(`{
+			"content":"{\"id\":\"interactive-nested\",\"suggestion\":\"enough-cancel\"}",
+			"showQS":"Stop tool"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("buildYakAIInterventionEvent() error = %v", err)
+	}
+	if event.GetInteractiveId() != "interactive-nested" {
+		t.Fatalf("unexpected interactive id: %q", event.GetInteractiveId())
+	}
+	assertJSONEqualRuntimeYak(
+		t,
+		[]byte(event.GetInteractiveJSONInput()),
+		`{"id":"interactive-nested","suggestion":"enough-cancel"}`,
+	)
+}
+
+func TestBuildYakAIInterventionEventMapsFreeInputWithoutEndpointID(t *testing.T) {
+	t.Parallel()
+
+	event, err := buildYakAIInterventionEvent(aiSessionInput{
+		InputType:   "user_intervention",
+		PayloadJSON: []byte(`{"content":"check the authorization path too"}`),
+	})
+	if err != nil {
+		t.Fatalf("buildYakAIInterventionEvent() error = %v", err)
+	}
+	if !event.GetIsFreeInput() {
+		t.Fatal("expected free input event")
+	}
+	if event.GetFreeInput() != "check the authorization path too" {
+		t.Fatalf("unexpected free input: %q", event.GetFreeInput())
+	}
+	if event.GetIsInteractiveMessage() {
+		t.Fatal("free input must not be marked interactive")
+	}
+}
+
+func TestBuildYakAIInterventionEventRejectsReviewWithoutEndpointID(t *testing.T) {
+	t.Parallel()
+
+	_, err := buildYakAIInterventionEvent(aiSessionInput{
+		InputType:   "review_response",
+		PayloadJSON: []byte(`{"content":"continue"}`),
+	})
+	if err == nil || !strings.Contains(err.Error(), "interactive id is required") {
+		t.Fatalf("expected missing interactive id error, got %v", err)
+	}
+}
+
 func TestYakAIInputContentMapsAttachedResources(t *testing.T) {
 	t.Parallel()
 
