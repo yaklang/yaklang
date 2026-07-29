@@ -1,9 +1,32 @@
 __DESC__ = <<<DESC_BLOCK
 Browser automation tool (go-rod/CDP) for controlling a real Chrome/Chromium instance.
-Use this tool ONLY when the task explicitly requires browser interaction (e.g. clicking buttons,
-filling forms on a live page, taking screenshots, handling dialogs in a rendered page).
-Do NOT use this tool for HTTP requests, API scanning, port scanning, or static content analysis --
-use http.request, http.scan, or other appropriate tools instead.
+
+*** CRITICAL LIMITATION: This tool CANNOT see raw HTTP responses ***
+A browser renders pages and gives you the RENDERED DOM, but it does NOT expose raw HTTP traffic:
+  - NO raw response headers / status line / Set-Cookie in their original wire form.
+  - NO raw response body bytes — you only get the browser's parsed/modified DOM, not the source.
+  - NO request inspection — you cannot see what was actually sent on the wire.
+  - NO network-level timing / redirect chain / proxy-level visibility.
+If you need ANY of the above (and most CTF / recon / injection tasks do), use an HTTP request tool
+instead — it returns the true raw response with headers, status, body, and timing. Only use this
+browser tool when JS rendering or real interaction is strictly required.
+
+*** WHEN TO USE THIS TOOL (strict gate — read before calling) ***
+Use this tool ONLY when the task explicitly requires a REAL browser to:
+  - Render JavaScript that produces the page content (SPA / React / Vue / dynamic pages)
+  - Click buttons, fill forms, or interact with a live rendered page
+  - Handle native JS dialogs (alert / confirm / prompt)
+  - Take screenshots of a rendered page
+op=open already returns a page recon (title/url/forms/links/scripts/comments/text from the rendered DOM),
+so a SINGLE op=open is usually enough to inspect a page — you rarely need a second call.
+
+*** DO NOT USE THIS TOOL FOR (use lighter tools instead) ***
+- Fetching a page body / sending headers / seeing the raw response -> use an HTTP request tool
+- Port scanning / service probing -> use a port scan tool
+- Static HTML / source analysis / regex on response -> use an HTTP request tool then analyze the text
+- CTF recon that only needs to READ a page (no clicking/rendered JS) -> use an HTTP request tool first;
+  only switch to this browser tool when the response is JS-rendered or you must interact with the page.
+- Fingerprinting / vulnerability scanning -> use a fingerprint matching or poc tool
 
 Two interaction strategies:
 
@@ -27,14 +50,30 @@ __KEYWORDS__ = "browser,chrome,CDP,headless,screenshot,snapshot,click,fill,form,
 __USAGE__ = <<<USAGE_BLOCK
 Browser Automation Tool - Usage Guide
 
+## Decision Gate: Do You Even Need a Browser?
+  Before calling this tool, ask: can an HTTP request tool get what I need?
+  - Just reading a page / sending headers / seeing the raw response / scanning -> use an HTTP request tool. Do NOT call this browser tool.
+  - Page is JS-rendered, or you must click/fill/screenshot in a real browser -> use this browser tool.
+  - For CTF / recon of an unknown target: try an HTTP request tool FIRST; only escalate to this browser tool
+    when the response clearly needs JS rendering or real interaction.
+  - Remember: this browser tool CANNOT give you raw HTTP responses (headers, status line, raw body).
+    If your task depends on inspecting the raw response, an HTTP request tool is the only correct choice.
+
+## op=open Returns a One-Shot Page Recon
+  op=open does NOT just open a page. After loading, it automatically evaluates a recon script
+  and returns: title, url, html size, HTML comments, forms (with field names/types), unique links
+  (up to 30), external script srcs, meta tags, and a 600-char text preview.
+  => In most cases ONE op=open is enough to understand the page. Avoid chaining open->get->snapshot
+     just to "see" the page; the recon summary already has what you need.
+
 ## Two Strategies (Choose Based on Page Type)
 
 ### Strategy A: Snapshot + Refs (simple static pages)
-  open -> snapshot (get @e1, @e2 refs) -> fill/click using refs -> re-snapshot
+  open (already returns recon) -> snapshot (get @e1, @e2 refs) -> fill/click using refs -> re-snapshot
   Good for: static HTML pages where snapshot returns interactive element refs.
 
 ### Strategy B: JavaScript-First (for login/form/SPA pages)
-  open -> eval JS to extract selectors -> fill/click using CSS selectors
+  open (recon) -> eval JS to extract selectors -> fill/click using CSS selectors
   OR: open -> eval JS that fills form + clicks submit in one call
   Good for: SPA, React, Vue, dynamic pages, pages where snapshot returns 0 refs.
 
@@ -430,6 +469,22 @@ case "open":
     yakit.Info("page opened and snapshot taken (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
 
     reportPendingDialog(page)
+
+    // ========== 一次性页面侦察 (recon) ==========
+    // 在 open 时主动提取 title/url/forms/links/scripts/comments/text 概要，
+    // 一次调用即返回足够信息，避免 AI 为"看页面内容"反复调用 snapshot/get。
+    reconJS = "(function(){try{var t=document.title||\"\";var u=location.href||\"\";var h=document.documentElement?document.documentElement.outerHTML:\"\";var st=\"(rendered; no raw HTTP status in browser)\";var cm=[];var w=document.createTreeWalker(document.body||document.documentElement,NodeFilter.SHOW_COMMENT,null);var n;while((n=w.nextNode())){var x=(n.nodeValue||\"\").trim();if(x)cm.push(x);}if(cm.length>20)cm=cm.slice(0,20);var fs=Array.from(document.querySelectorAll(\"form\")).map(function(f){return{action:f.action||f.getAttribute(\"action\")||\"\",method:(f.method||\"\").toUpperCase(),fields:Array.from(f.querySelectorAll(\"input,select,textarea,button\")).map(function(el){return{tag:el.tagName.toLowerCase(),type:el.type||\"\",name:el.name||\"\",id:el.id||\"\",placeholder:el.placeholder||\"\"};})};});var lk=Array.from(document.querySelectorAll(\"a[href]\")).map(function(a){return a.getAttribute(\"href\");}).filter(function(h){return h&&h.indexOf(\"javascript:\")!==0;});var ul=Array.from(new Set(lk));if(ul.length>30)ul=ul.slice(0,30);var sc=Array.from(document.querySelectorAll(\"script[src]\")).map(function(s){return s.getAttribute(\"src\");});var mt=Array.from(document.querySelectorAll(\"meta\")).map(function(m){return(m.getAttribute(\"name\")||m.getAttribute(\"property\")||\"\")+\"=\"+(m.getAttribute(\"content\")||\"\");}).filter(function(x){return x!==\"=\";});var tx=(document.body?document.body.innerText:\"\").replace(/\\s+/g,\" \").trim();if(tx.length>600)tx=tx.slice(0,600)+\"...\";return JSON.stringify({title:t,url:u,httpStatus:st,htmlSize:h.length,comments:cm,forms:fs,links:ul,scripts:sc,metaTags:mt,textPreview:tx},null,2);}catch(e){return \"recon error: \"+e.message;}})()"
+    reconResult, reconErr = page.Evaluate(reconJS)
+    if reconErr != nil {
+        yakit.Warn("auto-recon eval failed: %v (snapshot info above is still valid)", reconErr)
+    } else {
+        reconStr = sprint(reconResult)
+        if len(reconStr) > 6000 {
+            reconStr = reconStr[:6000] + "\n... (recon truncated)"
+        }
+        yakit.Info("===== PAGE RECON (one-shot summary) =====\n%v\n===== END RECON =====", reconStr)
+        yakit.Info("TIP: This recon already contains title/url/forms/links/comments/text. Decide your next action from it; do NOT call op=get for html/text unless you need the full raw body.")
+    }
 
     if snap.RefMap.Count() <= 0 {
         yakit.Info("WARNING: snapshot returned 0 interactive element refs on this page.")
