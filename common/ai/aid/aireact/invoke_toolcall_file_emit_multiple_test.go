@@ -22,6 +22,9 @@ import (
 
 func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, callCount *int) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+	if rsp, ok := mockPostIterationDirectAnswer(i, prompt); ok {
+		return rsp, nil
+	}
 	if isPrimaryDecisionPrompt(prompt) {
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
 		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
@@ -61,15 +64,6 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 		} else {
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
 		}
-		rsp.Close()
-		return rsp, nil
-	}
-
-	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. FINAL_ANSWER
-	// 分支改返回 finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
-	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -137,10 +131,10 @@ func TestReAct_ToolCall_FileEmit_Multiple(t *testing.T) {
 		}
 	}()
 
-	// 设置超时时间
-	du := time.Duration(8)
+	// verification 重构后完成 2 次工具调用需要多轮 ReAct + directly-answer 收尾.
+	du := time.Duration(20)
 	if utils.InGithubActions() {
-		du = time.Duration(5)
+		du = time.Duration(15)
 	}
 	after := time.After(du * time.Second)
 
