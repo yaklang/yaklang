@@ -87,7 +87,7 @@ func init() {
 			mcp.WithString("pluginType",
 				mcp.Description("The type of the yak script"),
 				mcp.Required(),
-				mcp.Enum("yak", "mitm", "port-scan", "port_scan", "codec", "syntaxflow"),
+				mcp.Enum("yak", "mitm", "port-scan", "codec", "syntaxflow"),
 			),
 		), handleStaticAnalyzeYakScript),
 
@@ -285,13 +285,16 @@ func handleSaveYakScript(s *MCPServer) server.ToolHandlerFunc {
 		}
 
 		skipAnalyze := utils.MapGetBool(args, "skipStaticAnalyze")
-		if !skipAnalyze && shouldStaticAnalyzeBeforeSave(req.GetType()) {
-			analysis, err := analyzeYakScriptForAI(ctx, s, req.GetContent(), req.GetType())
-			if err != nil {
-				return nil, utils.Wrap(err, "failed to static analyze before save")
-			}
-			if analysis.HasBlockingErrors {
-				return nil, utils.Errorf("static analyze failed (refusing save): %s", analysis.Formatted)
+		if !skipAnalyze {
+			switch strings.TrimSpace(req.GetType()) {
+			case "yak", "mitm", "port-scan", "codec":
+				analysis, err := analyzeYakScriptForAI(ctx, s, req.GetContent(), req.GetType())
+				if err != nil {
+					return nil, utils.Wrap(err, "failed to static analyze before save")
+				}
+				if analysis.HasBlockingErrors {
+					return nil, utils.Errorf("static analyze failed (refusing save): %s", analysis.Formatted)
+				}
 			}
 		}
 
@@ -324,26 +327,7 @@ type yakScriptAnalyzeResult struct {
 	Formatted         string                  `json:"formatted"`
 }
 
-func normalizeStaticAnalyzePluginType(pluginType string) string {
-	switch strings.ToLower(strings.TrimSpace(pluginType)) {
-	case "port_scan", "portscan":
-		return "port-scan"
-	default:
-		return strings.TrimSpace(pluginType)
-	}
-}
-
-func shouldStaticAnalyzeBeforeSave(pluginType string) bool {
-	switch normalizeStaticAnalyzePluginType(pluginType) {
-	case "yak", "mitm", "port-scan", "codec":
-		return true
-	default:
-		return false
-	}
-}
-
 func analyzeYakScriptForAI(ctx context.Context, s *MCPServer, code, pluginType string) (*yakScriptAnalyzeResult, error) {
-	pluginType = normalizeStaticAnalyzePluginType(pluginType)
 	req := &ypb.StaticAnalyzeErrorRequest{
 		Code:       []byte(code),
 		PluginType: pluginType,
