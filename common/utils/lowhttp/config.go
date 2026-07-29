@@ -97,6 +97,17 @@ type LowhttpExecConfig struct {
 	// request context and both views must remain immutable.
 	BorrowConnPoolResponsePacket bool
 
+	// BorrowFixedRequestPacket lets an internal immutable caller retain the
+	// input packet and reuse it when CRLF/content-length normalization is an
+	// exact no-op. The default keeps LowhttpResponse.RawRequest independently
+	// owned for backward compatibility.
+	BorrowFixedRequestPacket bool
+
+	// BorrowFixedResponsePacket lets an internal immutable caller reuse the wire
+	// packet when response fixing is a byte-for-byte no-op. The default keeps
+	// LowhttpResponse.RawPacket independently owned for backward compatibility.
+	BorrowFixedResponsePacket bool
+
 	// DefaultBufferSize means unexpected situation's buffer size
 	DefaultBufferSize int
 
@@ -430,6 +441,18 @@ func WithDiscardIntermediateResponseBody(b bool) LowhttpOpt {
 func WithBorrowConnPoolResponsePacket(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.BorrowConnPoolResponsePacket = b
+	}
+}
+
+func WithBorrowFixedRequestPacket(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.BorrowFixedRequestPacket = b
+	}
+}
+
+func WithBorrowFixedResponsePacket(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.BorrowFixedResponsePacket = b
 	}
 }
 

@@ -134,24 +134,25 @@ type TagAndStatusCode struct {
 }
 
 type CreateHTTPFlowConfig struct {
-	isHttps            bool
-	reqRaw             []byte
-	rspRaw             []byte
-	bareRspRaw         []byte // wire packet; sidecar KV when it differs from display response
-	fixRspRaw          []byte // 如果设置了，则不会再修复rspRaw
-	noFixContentLength bool   // keep wire in DB (NoFix / 不修复数据包)
-	source             string
-	url                string
-	remoteAddr         string
-	duration           time.Duration
-	reqIns             *http.Request // 如果设置了，则不会再解析reqRaw
-	hiddenIndex        string
-	runtimeID          string
-	tags               string
-	tooLargeHeaderFile string
-	tooLargeBodyFile   string
-	fromPlugin         string
-	afterSaveHandlers  []func(*schema.HTTPFlow)
+	isHttps                   bool
+	reqRaw                    []byte
+	rspRaw                    []byte
+	bareRspRaw                []byte // wire packet; sidecar KV when it differs from display response
+	fixRspRaw                 []byte // 如果设置了，则不会再修复rspRaw
+	noFixContentLength        bool   // keep wire in DB (NoFix / 不修复数据包)
+	source                    string
+	url                       string
+	remoteAddr                string
+	duration                  time.Duration
+	reqIns                    *http.Request // 如果设置了，则不会再解析reqRaw
+	hiddenIndex               string
+	runtimeID                 string
+	tags                      string
+	tooLargeHeaderFile        string
+	tooLargeBodyFile          string
+	fromPlugin                string
+	afterSaveHandlers         []func(*schema.HTTPFlow)
+	reusablePacketQuoteBuffer bool
 }
 
 type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
@@ -168,6 +169,18 @@ func CreateHTTPFlowWithAfterSave(handlers ...func(*schema.HTTPFlow)) CreateHTTPF
 			return
 		}
 		c.afterSaveHandlers = append(c.afterSaveHandlers, handlers...)
+	}
+}
+
+// CreateHTTPFlowWithReusablePacketQuoteBuffer enables bounded buffer reuse for
+// the quoted Request and Response stored by HTTPFlow. The returned flow is
+// one-shot: its Request and Response fields remain valid through persistence
+// and AfterSaveHandlers, then are cleared when the buffers are released.
+//
+// This is intended for internal high-throughput capture paths such as MITM V2.
+func CreateHTTPFlowWithReusablePacketQuoteBuffer() CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.reusablePacketQuoteBuffer = true
 	}
 }
 
@@ -383,7 +396,13 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 
 	_ = header
 	_ = body
-	requestRaw := quoteHTTPPacket(reqRaw)
+	requestRaw := ""
+	var requestQuote reusableHTTPPacketQuote
+	if c.reusablePacketQuoteBuffer {
+		requestRaw, requestQuote = quoteHTTPPacketReusable(reqRaw)
+	} else {
+		requestRaw = quoteHTTPPacket(reqRaw)
+	}
 	if strings.HasPrefix(requestRaw, `"HTTP/1.`) {
 		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
 		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
@@ -406,7 +425,13 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		}
 	})
 	_ = header
-	responseRaw := quoteHTTPPacket(rspRaw)
+	responseRaw := ""
+	var responseQuote reusableHTTPPacketQuote
+	if c.reusablePacketQuoteBuffer {
+		responseRaw, responseQuote = quoteHTTPPacketReusable(rspRaw)
+	} else {
+		responseRaw = quoteHTTPPacket(rspRaw)
+	}
 
 	if storeBareWire {
 		c.afterSaveHandlers = append(c.afterSaveHandlers, afterSaveHTTPFlowBareResponse(wireRsp))
@@ -445,6 +470,16 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	if len(c.afterSaveHandlers) > 0 {
 		flow.AfterSaveHandlers = append([]func(*schema.HTTPFlow){}, c.afterSaveHandlers...)
 	}
+	if c.reusablePacketQuoteBuffer {
+		flow.AfterPersistCleanups = append(flow.AfterPersistCleanups, func(saved *schema.HTTPFlow) {
+			if saved != nil {
+				saved.Request = ""
+				saved.Response = ""
+			}
+			requestQuote.release()
+			responseQuote.release()
+		})
+	}
 
 	// 如果设置了 reqIns，则不会再解析 reqRaw
 	paramRequest := reqIns
@@ -481,6 +516,78 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 
 func quoteHTTPPacket(packet []byte) string {
 	quotedBytes := make([]byte, 0, quoteHTTPPacketCapacity(packet))
+	quotedBytes = appendQuoteHTTPPacket(quotedBytes, packet)
+	// quotedBytes is freshly allocated and never mutated after this handoff.
+	return utils.UnsafeBytesToString(quotedBytes)
+}
+
+const reusableHTTPPacketQuotePoolSlots = 8
+
+type reusableHTTPPacketQuotePool struct {
+	capacity int
+	buffers  chan []byte
+}
+
+type reusableHTTPPacketQuote struct {
+	buffer []byte
+	pool   *reusableHTTPPacketQuotePool
+}
+
+var reusableHTTPPacketQuotePools = [...]reusableHTTPPacketQuotePool{
+	{capacity: 4 * 1024, buffers: make(chan []byte, reusableHTTPPacketQuotePoolSlots)},
+	{capacity: 16 * 1024, buffers: make(chan []byte, reusableHTTPPacketQuotePoolSlots)},
+	{capacity: 64 * 1024, buffers: make(chan []byte, reusableHTTPPacketQuotePoolSlots)},
+	{capacity: 256 * 1024, buffers: make(chan []byte, reusableHTTPPacketQuotePoolSlots)},
+	{capacity: 512 * 1024, buffers: make(chan []byte, reusableHTTPPacketQuotePoolSlots)},
+	{capacity: 1024 * 1024, buffers: make(chan []byte, reusableHTTPPacketQuotePoolSlots)},
+}
+
+func acquireReusableHTTPPacketQuoteBuffer(capacity int) ([]byte, *reusableHTTPPacketQuotePool) {
+	for idx := range reusableHTTPPacketQuotePools {
+		pool := &reusableHTTPPacketQuotePools[idx]
+		if capacity > pool.capacity {
+			continue
+		}
+		select {
+		case buffer := <-pool.buffers:
+			if cap(buffer) >= capacity {
+				return buffer[:0], pool
+			}
+		default:
+		}
+		return make([]byte, 0, pool.capacity), pool
+	}
+	return make([]byte, 0, capacity), nil
+}
+
+func releaseReusableHTTPPacketQuoteBuffer(buffer []byte, pool *reusableHTTPPacketQuotePool) {
+	if pool == nil || cap(buffer) > pool.capacity {
+		return
+	}
+	clear(buffer)
+	select {
+	case pool.buffers <- buffer[:0]:
+	default:
+	}
+}
+
+func quoteHTTPPacketReusable(packet []byte) (string, reusableHTTPPacketQuote) {
+	quotedBytes, pool := acquireReusableHTTPPacketQuoteBuffer(quoteHTTPPacketCapacity(packet))
+	quotedBytes = appendQuoteHTTPPacket(quotedBytes, packet)
+	quoted := utils.UnsafeBytesToString(quotedBytes)
+	return quoted, reusableHTTPPacketQuote{buffer: quotedBytes, pool: pool}
+}
+
+func (quote *reusableHTTPPacketQuote) release() {
+	if quote == nil || quote.buffer == nil {
+		return
+	}
+	releaseReusableHTTPPacketQuoteBuffer(quote.buffer, quote.pool)
+	quote.buffer = nil
+	quote.pool = nil
+}
+
+func appendQuoteHTTPPacket(quotedBytes []byte, packet []byte) []byte {
 	if quoteHTTPPacketSampleIsASCII(packet) {
 		var ascii bool
 		quotedBytes, ascii = appendQuotedASCII(quotedBytes, packet)
@@ -490,10 +597,8 @@ func quoteHTTPPacket(packet []byte) string {
 	} else {
 		quotedBytes = strconv.AppendQuote(quotedBytes, utils.UnsafeBytesToString(packet))
 	}
-	// quotedBytes is freshly allocated and never mutated after this handoff.
-	quoted := utils.UnsafeBytesToString(quotedBytes)
 	runtime.KeepAlive(packet)
-	return quoted
+	return quotedBytes
 }
 
 func quoteHTTPPacketSampleIsASCII(packet []byte) bool {
@@ -778,6 +883,7 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 			debug.PrintStack()
 		}
 	}()
+	defer releaseHTTPFlowPersistResources(i)
 
 	i.ID = 0
 	if timing := i.RuntimeTiming; timing != nil {
@@ -851,6 +957,7 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 			fErr = utils.Errorf("met panic error: %v", err)
 		}
 	}()
+	defer releaseHTTPFlowPersistResources(i)
 
 	if i.PathSuffix == "" && i.Path != "" {
 		i.PathSuffix = lowhttp.GetPathSuffix(i.Path)
@@ -865,6 +972,7 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 }
 
 func SaveHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) error {
+	defer releaseHTTPFlowPersistResources(i)
 	if db := db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
 		return db.Error
 	}
@@ -888,6 +996,33 @@ func callHTTPFlowAfterSaveHandlers(flow *schema.HTTPFlow) {
 				}
 			}()
 			handler(flow)
+		}()
+	}
+}
+
+// ReleaseHTTPFlowPersistResources releases one-shot runtime resources when a
+// flow is deliberately discarded before it reaches a persistence function.
+func ReleaseHTTPFlowPersistResources(flow *schema.HTTPFlow) {
+	releaseHTTPFlowPersistResources(flow)
+}
+
+func releaseHTTPFlowPersistResources(flow *schema.HTTPFlow) {
+	if flow == nil || len(flow.AfterPersistCleanups) == 0 {
+		return
+	}
+	cleanups := flow.AfterPersistCleanups
+	flow.AfterPersistCleanups = nil
+	for _, cleanup := range cleanups {
+		if cleanup == nil {
+			continue
+		}
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("httpflow after-persist cleanup panic: %v", err)
+				}
+			}()
+			cleanup(flow)
 		}()
 	}
 }

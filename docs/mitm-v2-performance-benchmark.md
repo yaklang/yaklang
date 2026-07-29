@@ -4614,3 +4614,81 @@ removed afterward. The managed Yak cache remains about `1.4 GiB`, global Go
 cache about `183 MiB`, and disk free space about `839 GiB`, with no Electron,
 Yak, or ChromeDriver process remaining. These post-cleanup values do not revise
 the historical 290 GiB Go cache incident.
+
+## Closing the Remaining Packet Grow and Quote Hotspots
+
+The Phase 83 forced-GC profile leaves two dominant flat nodes:
+`bytes.growSlice` at `96,197,205 B (52.0%)` and `quoteHTTPPacket` at
+`51,610,569 B (27.9%)`. The closing work keeps the public lowhttp APIs owned
+and enables borrowing only on the minimartian/MITM V2 path. A request or
+response can be borrowed only when the relevant header, body, length, and
+backing-storage contracts hold. Transform, chunking, decoding, and foreign-body
+paths retain the previous copy behavior.
+
+The 64 KiB request no-op benchmark changes from roughly `271 KiB/op` to
+`0.9 KiB/op`. The 256 KiB response no-op changes from roughly `293 KiB/op` to
+`22 KiB/op`. A valid response whose Content-Length header is not in the
+canonical final position is also borrowed by the internal API. This preserves
+the original valid header order; the generic `FixHTTPResponsePacket` API still
+returns the byte-identical canonical owned result. The targeted response-fix
+caller is `32,062,300 B` before that final path and falls below the report
+threshold afterward.
+
+The quoted HTTPFlow database representation remains exact `strconv.Quote`
+TEXT. MITM V2 opts into a one-shot lifecycle whose request and response
+strings stay valid through hashing, plugins, SQLite insertion, and after-save
+callbacks, then release their buffers. The pool has fixed size classes,
+eight slots per class, a maximum pooled packet of 1 MiB, and approximately
+`14.7 MiB` maximum retained capacity. Oversized or grown buffers are not
+pooled. Dropped flows, persistence failures, panics, plugin replacement, and
+live-summary copies have explicit cleanup coverage.
+
+Compatibility tests assert SQLite TEXT affinity, exact quoted bytes, LIKE
+queries, unquoted model reads, full protobuf conversion, callback ordering,
+failure cleanup, and the unchanged default owned lifecycle. The 256 KiB quote
+benchmark changes from `216–227 us/op`, `270,336 B/op`, and one allocation to
+`176–193 us/op`, zero bytes, and zero allocations. The complete 64 KiB
+request plus 256 KiB response flow benchmark median changes from
+`1.596 ms / 856,960 B` to `1.477 ms / 512,955 B`, reducing allocation by
+`40.1%`.
+
+The final matched diagnostic artifacts are:
+
+- Phase 83 baseline: `2026-07-28T10-49-57-181Z`.
+- Borrowed request/response packet: `2026-07-29T03-14-04-256Z`.
+- Bounded quoted-TEXT reuse: `2026-07-29T03-47-31-376Z`.
+- Valid response-header-order borrowing: `2026-07-29T04-04-30-580Z`.
+
+From the Phase 83 baseline to the final profile, sampled allocation changes
+from `184,998,744` to `113,860,780 B (-38.5%)`, `bytes.growSlice` from
+`96,197,205` to `60,674,353 B (-36.9%)`, and the old
+`quoteHTTPPacket 51,610,569 B` node becomes `6,812,006 B` of bounded initial
+pool acquisition (approximately `-86.8%`). Post-live heap changes adversely
+from `259,080,023` to `278,410,057 B`; roughly 6.8 MiB is directly attributable
+to the intentionally retained quote pool, and the remaining one-shot
+startup/profile variance prevents a resident-memory improvement claim.
+
+The final three-run unprofiled candidate is
+`body-2026-07-29T04-11-53-733Z`. Its comparison against Phase 83
+`body-2026-07-28T11-10-17-929Z` is
+`comparison-vs-phase83-final-hotspots.{json,md}` and passes with no
+configuration, diagnostic, or metric-coverage differences. Every run
+completes exact 120/120 producer, target, database, and unique counts with
+64 KiB requests, 256 KiB responses, direct-stream, detail, virtual-scroll,
+CPU-recovery, and cleanup gates.
+
+Candidate medians move throughput by `+38.6%`, request p95 by `-26.3%`,
+request/response-to-React by `-7.1%/-3.0%`, Yak CPU p50 by `-2.4%`, and Yak
+peak working set by `-1.3%`. Database catch-up/drain, persist-to-React,
+Renderer drain, and Yak CPU p95 move adversely by `7.6%/5.9%/28.5%/3.9%/1.2%`.
+The matrix is therefore a no-obvious-regression gate, not a claim that every
+WSL product metric improved.
+
+The complete lowhttp and yakit suites, focused minimartian/yakit tests,
+concurrent quote race, response-borrow race, and full yakgrpc compile check
+pass. Task-specific caches end at approximately 12 KiB each, and the global
+Go build cache is explicitly cleaned from about 3.9 GiB to under 1 MiB.
+No Electron, Yak, WDIO, or ChromeDriver process remains. With the two
+compatible large allocation targets closed, the remaining dominant grow is
+primarily first network-packet materialization; removing it would require a
+different packet/body ownership contract and is outside this low-risk phase.

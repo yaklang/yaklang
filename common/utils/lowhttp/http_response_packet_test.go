@@ -193,6 +193,55 @@ func TestFixHTTPResponsePacketMatchesLegacy(t *testing.T) {
 	}
 }
 
+func TestFixHTTPResponsePacketBorrowing(t *testing.T) {
+	tests := []struct {
+		name           string
+		packet         []byte
+		wantAlias      bool
+		wantEqualOwned bool
+	}{
+		{
+			name:           "exact-noop",
+			packet:         []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 7\r\n\r\npayload"),
+			wantAlias:      true,
+			wantEqualOwned: true,
+		},
+		{
+			name:           "valid-content-length-original-order",
+			packet:         []byte("HTTP/1.1 200 OK\r\nContent-Length: 7\r\nContent-Type: application/octet-stream\r\n\r\npayload"),
+			wantAlias:      true,
+			wantEqualOwned: false,
+		},
+		{
+			name:           "wrong-content-length",
+			packet:         []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 99\r\n\r\npayload"),
+			wantAlias:      false,
+			wantEqualOwned: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			want, wantErr := FixHTTPResponsePacket(test.packet)
+			got, gotErr := FixHTTPResponsePacketBorrowed(test.packet)
+			if (gotErr != nil) != (wantErr != nil) {
+				t.Fatalf("error mismatch: borrowed=%v owned=%v", gotErr, wantErr)
+			}
+			if bytes.Equal(got, want) != test.wantEqualOwned {
+				t.Fatalf("borrowed/owned equality = %v, want %v\ngot:  %q\nwant: %q", bytes.Equal(got, want), test.wantEqualOwned, got, want)
+			}
+			aliases := len(got) > 0 && len(test.packet) > 0 && &got[0] == &test.packet[0]
+			if aliases != test.wantAlias {
+				t.Fatalf("aliases input = %v, want %v", aliases, test.wantAlias)
+			}
+			_, body := SplitHTTPHeadersAndBodyFromPacketView(got)
+			if string(body) != "payload" {
+				t.Fatalf("borrowed body changed: %q", body)
+			}
+		})
+	}
+}
+
 func TestFixHTTPResponseLegacyBodyOwnership(t *testing.T) {
 	input := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 7\r\n\r\npayload")
 	fixed, body, err := FixHTTPResponse(input)
@@ -236,6 +285,7 @@ func TestParseBytesToHTTPResponseDoesNotRetainInput(t *testing.T) {
 func BenchmarkFixHTTPResponse256K(b *testing.B) {
 	body := bytes.Repeat([]byte("x"), 256*1024)
 	packet := append([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 262144\r\n\r\n"), body...)
+	reorderedPacket := append([]byte("HTTP/1.1 200 OK\r\nContent-Length: 262144\r\nContent-Type: application/octet-stream\r\n\r\n"), body...)
 	b.SetBytes(int64(len(packet)))
 
 	b.Run("LegacyWithBody", func(b *testing.B) {
@@ -254,6 +304,26 @@ func BenchmarkFixHTTPResponse256K(b *testing.B) {
 			benchmarkFixedHTTPResponse, benchmarkFixedHTTPResponseErr = FixHTTPResponsePacket(packet)
 			if benchmarkFixedHTTPResponseErr != nil || len(benchmarkFixedHTTPResponse) == 0 {
 				b.Fatal("unexpected packet-only result")
+			}
+		}
+	})
+
+	b.Run("BorrowedNoop", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchmarkFixedHTTPResponse, benchmarkFixedHTTPResponseErr = FixHTTPResponsePacketBorrowed(packet)
+			if benchmarkFixedHTTPResponseErr != nil || len(benchmarkFixedHTTPResponse) == 0 {
+				b.Fatal("unexpected borrowed result")
+			}
+		}
+	})
+
+	b.Run("BorrowedValidOriginalOrder", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchmarkFixedHTTPResponse, benchmarkFixedHTTPResponseErr = FixHTTPResponsePacketBorrowed(reorderedPacket)
+			if benchmarkFixedHTTPResponseErr != nil || len(benchmarkFixedHTTPResponse) == 0 {
+				b.Fatal("unexpected borrowed original-order result")
 			}
 		}
 	})

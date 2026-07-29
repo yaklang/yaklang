@@ -1355,3 +1355,38 @@ forced-GC heap `2026-07-28T06-23-26-506Z -> 2026-07-28T07-17-18-286Z` 中，`Cou
 正式无 profile 3+3 为 `body-2026-07-28T11-05-00-470Z -> body-2026-07-28T11-10-17-929Z`，比较文件 `comparison-vs-phase82-prefilter-pair-cap.{json,md}` passed。候选中位吞吐 `+6.4%`、response -> React `-25.2%`、Long Task total `-49.5%`、Yak drain CPU p95 `-22.8%`；Yak CPU p50/p95 与 RSS 近中性。DB/Renderer drain `+26.5%/+22.7%`、duplex p95 `+68.7%` 反向且各轮离散较大，因此不作统一产品提速结论。
 
 六轮每轮 producer/target/database/unique 均精确 `120/120`，request body `7,864,320 B`，detail 阶段再次校验 64 KiB request/256 KiB response；fallback、gap、缺序、重复、乱序、replay、recovery、unavailable 和 cleanup error 为 0。前端产品、协议、proto、schema、数据库、GORM 和 driver 未变化。隔离测试/E2E build/tmp 已清理，Yak 缓存仍为最多 6 份/约 1.4 GiB，全局 Go cache 约 183 MiB、磁盘可用约 839 GiB，无 Electron/Yak/chromedriver 残留；这些仍不能覆盖历史 290 GiB Go cache 事故。下一阶段继续从最新 profile 选择有直接 caller 证据的后端点，不破坏 packet/body 独立性。
+
+## 52. 第八十四轮：MITM 内部固定包借用（2026-07-29）
+
+第八十三轮 heap 的两个最大 flat 节点是 `bytes.growSlice 96,197,205 B / 52.0%` 和 `quoteHTTPPacket 51,610,569 B / 27.9%`。本轮先处理 grow：通用 lowhttp API 继续返回独立 owned packet，只给 minimartian/MITM V2 内部链路增加显式 borrowed 配置。请求或响应只有在 Header、Body、长度和 backing identity 均满足契约时才返回输入 view；任何修复、解压、转码、chunk 变化或 foreign Body 都回退旧 owned 路径。
+
+64 KiB request no-op 的定点基准从约 `271 KiB/op` 降到约 `0.9 KiB/op`；256 KiB response no-op 从约 `293 KiB/op` 降到约 `22 KiB/op`。首份双向大 Body heap 为 `2026-07-29T03-14-04-256Z`：整窗 allocation `184,998,744 -> 145,183,904 B (-21.5%)`，`bytes.growSlice 96,197,205 -> 70,269,449 B (-27.0%)`。120 条 producer/target/database/unique、详情 Body、stream 与清理门禁全部通过。
+
+该候选不改 proto、数据库列、migration 或默认 owned API。后续 profile 发现 Node 响应通常把合法 `Content-Length` 放在其他 Header 之前，旧 canonical builder 仅为把它移到末尾仍复制 256 KiB 整包。最终 borrowed API 因此允许在 Content-Length 唯一且精确、Body 与其他 Header 未变化时保留原始 Header 顺序；通用 `FixHTTPResponsePacket` 的 canonical owned 输出仍逐字节不变。这个变化只影响新 MITM 内部未修改响应的 Header 顺序，保留更接近 wire 的表示，不影响 HTTP 语义、旧行读取或数据库格式。
+
+## 53. 第八十五轮：HTTPFlow quoted TEXT 有界复用（2026-07-29）
+
+`quoteHTTPPacket` 的输出必须继续是精确 `strconv.Quote` TEXT，不能改成 BLOB，也不能改 proto。候选为 MITM V2 单次持久化路径增加显式 reusable quote option：Request/Response 在 hash、插件、GORM、SQLite 和全部 after-save callback 完成前保持有效，随后清空 runtime field 并归还有界分档 buffer。默认 CreateHTTPFlow 仍拥有并永久保留自己的 quoted string。
+
+buffer pool 使用固定 8 slot、4 KiB～1 MiB 档位，最大理论保留约 `14.7 MiB`；大于 1 MiB 或 append 扩容越级的 buffer 不进入 pool，避免突发队列结束后无界滞留。插件替换 flow 时 engine cleanup 被保留，主动 drop、落库失败和 panic 路径也会释放；live summary 明确移除 cleanup closure，避免运行期副本延长 buffer 生命周期。
+
+兼容测试验证 SQLite `typeof(request/response) = text`、落盘内容逐字节等于旧 quoted string、`LIKE` 查询、GetHTTPFlow unquote 和完整 proto 转换均还原精确 Request/Response；after-save callback 在 cleanup 前仍能读取包，默认非 opt-in flow 落库后仍保留字段。256 KiB quote 生命周期五次基准从约 `216～227 us / 270,336 B / 1 alloc` 降到 `176～193 us / 0 B / 0 alloc`。完整 64 KiB request + 256 KiB response 建流中位约从 `1.596 -> 1.477 ms/op (-7.5%)`、`856,960 -> 512,955 B/op (-40.1%)`。
+
+heap `2026-07-29T03-14-04-256Z -> 2026-07-29T03-47-31-376Z` 中旧 `quoteHTTPPacket 41,310,256 B` 消失，首次/并发 pool acquisition 为 `6,975,180 B (-83.1%)`，整窗 allocation `145,183,904 -> 126,936,300 B (-12.6%)`。pool acquisition 在 forced-GC 后仍约 7 MiB 是有界复用的预期常驻代价，不描述成泄漏或零内存成本。
+
+## 54. 第八十六轮：最终 grow/quote 收口与端到端验收（2026-07-29）
+
+第二份 heap 暴露的 `FixHTTPResponsePacketBorrowed -> replaceHTTPPacketBodyExWithBorrow 32,062,300 B` 在合法 Header 顺序快路径后降到报告阈值以下。最终 heap `2026-07-29T04-04-30-580Z` 对第八十三轮基线的结果为：
+
+- 整窗 sampled allocation：`184,998,744 -> 113,860,780 B (-38.5%)`。
+- `bytes.growSlice`：`96,197,205 -> 60,674,353 B (-36.9%)`；剩余最大 caller 主要是首次网络响应 packet 构造，不再把它误报成可直接删除的重复副本。
+- quoted packet 输出：`51,610,569 B` 的旧节点变为 `6,812,006 B` 有界 pool acquisition（约 `-86.8%`）。
+- post-live heap：`259,080,023 -> 278,410,057 B (+7.5%)`，其中约 6.8 MiB 可直接归因于有界 quote pool，其余仍受启动期 SSA/plugin 与 heap 大对象采样影响；因此不宣称常驻内存全面下降。
+
+最终无 profiler 3 次矩阵为 `body-2026-07-29T04-11-53-733Z`，对第八十三轮 `body-2026-07-28T11-10-17-929Z` 的比较文件是 `comparison-vs-phase83-final-hotspots.{json,md}`。比较器 passed，配置、诊断和 metric coverage 差异为空。三轮均精确完成 120/120、64 KiB request、256 KiB response、数据库唯一 ID、direct stream、详情、虚拟滚动、CPU 恢复和进程清理。
+
+产品中位方向为吞吐 `+38.6%`、request p95 `-26.3%`、request/response → React `-7.1%/-3.0%`、Yak CPU p50 `-2.4%`、Yak RSS `-1.3%`；反向项包括 DB catch-up/drain `+7.6%/+5.9%`、persist → React `+28.5%`、Renderer drain `+3.9%` 和 Yak CPU p95 `+1.2%`。这组只作为没有明显整机回退的门禁，不把 WSL 短窗包装成稳定的所有指标提速。
+
+完整 lowhttp（`186.652 s`）、完整 yakit（`68.573 s`）、聚焦 minimartian/yakit、quote 并发 race、response borrowed race 和 yakgrpc 全包编译检查均通过。所有专用 Go cache 已清到约 12 KiB，全局 Go build cache 从本轮峰值约 3.9 GiB 主动清到约 768 KiB；E2E build/tmp 与 Electron/Yak/WDIO/chromedriver 无残留，受管 Yak 二进制缓存约 1.5 GiB，磁盘可用约 838 GiB。这些仍不能覆盖历史 290 GiB 事故。
+
+至此，当前 profile 中两个经确认可兼容处理的大头已经完成：避免的 grow copy 与 quoted TEXT 输出分配均有微基准、heap caller、race、数据库/proto 兼容和 3 次产品门禁证据。剩余 grow 主要是网络首次物化，继续删除需要改变 packet/body ownership 或协议行为，不再作为本轮低风险优化继续追逐；MITM 性能专项可在此阶段性收口。

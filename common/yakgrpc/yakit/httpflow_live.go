@@ -188,6 +188,7 @@ func (b *httpFlowLiveBroker) publishCommitted(flow *schema.HTTPFlow) (HTTPFlowLi
 	summary.Response = ""
 	summary.Payload = ""
 	summary.AfterSaveHandlers = nil
+	summary.AfterPersistCleanups = nil
 	summary.RuntimeTiming = nil
 
 	b.mu.Lock()

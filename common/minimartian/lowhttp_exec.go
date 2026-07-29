@@ -70,7 +70,7 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	if len(requestBytes) == 0 {
 		requestBytes = httpctx.GetPlainRequestBytes(req)
 	}
-	reqBytes := lowhttp.FixHTTPRequest(requestBytes)
+	reqBytes := lowhttp.FixHTTPRequestBorrowed(requestBytes)
 
 	isHttps := httpctx.GetRequestHTTPS(req)
 
@@ -119,6 +119,8 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		lowhttp.WithNativeHTTPRequestInstance(req),
 		lowhttp.WithDiscardIntermediateResponseBody(true),
 		lowhttp.WithBorrowConnPoolResponsePacket(true),
+		lowhttp.WithBorrowFixedRequestPacket(true),
+		lowhttp.WithBorrowFixedResponsePacket(true),
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
 

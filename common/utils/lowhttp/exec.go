@@ -267,8 +267,8 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		gmTLS                   = option.GmTLS
 		onlyGMTLS               = option.GmTLSOnly
 		preferGMTLS             = option.GmTLSPrefer
-		gmTLSCipherSuites           = option.GmTLSCipherSuites
-		gmTLSDisableCompatMode      = option.GmTLSDisableCompatMode
+		gmTLSCipherSuites       = option.GmTLSCipherSuites
+		gmTLSDisableCompatMode  = option.GmTLSDisableCompatMode
 		host                    = option.Host
 		port                    = option.Port
 		requestPacket           = option.Packet
@@ -624,7 +624,11 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	response.FromPlugin = option.FromPlugin
 
 	// fix CRLF
-	requestPacket = FixHTTPPacketCRLF(requestPacket, noFixContentLength)
+	if option.BorrowFixedRequestPacket {
+		requestPacket = FixHTTPPacketCRLFBorrowed(requestPacket, noFixContentLength)
+	} else {
+		requestPacket = FixHTTPPacketCRLF(requestPacket, noFixContentLength)
+	}
 
 	if fixQueryEscape {
 		requestPacket = FixHTTPPacketQueryEscape(requestPacket)
@@ -1266,7 +1270,13 @@ RECONNECT:
 		/*
 			todo: need split fix http response, fix content-type need as option
 		*/
-		rspRaw, err := FixHTTPResponsePacket(rawBytes)
+		var rspRaw []byte
+		var err error
+		if option.BorrowFixedResponsePacket {
+			rspRaw, err = FixHTTPResponsePacketBorrowed(rawBytes)
+		} else {
+			rspRaw, err = FixHTTPResponsePacket(rawBytes)
+		}
 		if err != nil {
 			log.Errorf("fix http response failed: %s", err)
 			response.RawPacket = rawBytes

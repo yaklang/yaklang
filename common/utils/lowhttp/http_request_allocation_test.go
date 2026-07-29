@@ -69,6 +69,54 @@ func TestFixHTTPPacketCRLFBodyViewMatchesCopyPath(t *testing.T) {
 	}
 }
 
+func TestFixHTTPPacketCRLFBorrowedMatchesOwnedResult(t *testing.T) {
+	tests := []struct {
+		name        string
+		packet      []byte
+		noFixLength bool
+		wantAlias   bool
+	}{
+		{
+			name:        "canonical-post",
+			packet:      []byte("POST /upload HTTP/1.1\r\nHost: example.test\r\nContent-Length: 7\r\n\r\npayload"),
+			wantAlias:   true,
+			noFixLength: false,
+		},
+		{
+			name:        "canonical-get",
+			packet:      []byte("GET / HTTP/1.1\r\nHost: example.test\r\n\r\n"),
+			wantAlias:   true,
+			noFixLength: false,
+		},
+		{
+			name:        "wrong-content-length",
+			packet:      []byte("POST /upload HTTP/1.1\r\nHost: example.test\r\nContent-Length: 99\r\n\r\npayload"),
+			wantAlias:   false,
+			noFixLength: false,
+		},
+		{
+			name:        "lf-only",
+			packet:      []byte("POST /upload HTTP/1.1\nHost: example.test\nContent-Length: 7\n\npayload"),
+			wantAlias:   false,
+			noFixLength: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			want := FixHTTPPacketCRLF(test.packet, test.noFixLength)
+			got := FixHTTPPacketCRLFBorrowed(test.packet, test.noFixLength)
+			if !bytes.Equal(got, want) {
+				t.Fatalf("borrowed result differs from owned result\ngot:  %q\nwant: %q", got, want)
+			}
+			aliases := len(got) > 0 && len(test.packet) > 0 && &got[0] == &test.packet[0]
+			if aliases != test.wantAlias {
+				t.Fatalf("aliases input = %v, want %v", aliases, test.wantAlias)
+			}
+		})
+	}
+}
+
 func BenchmarkFixHTTPPacketCRLFLargeBody(b *testing.B) {
 	body := bytes.Repeat([]byte("0123456789abcdef"), 16*1024)
 	packet := append(
@@ -86,6 +134,11 @@ func BenchmarkFixHTTPPacketCRLFLargeBody(b *testing.B) {
 	b.Run("body-view", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			benchmarkSplitHTTPBody = fixHTTPPacketCRLF(packet, false, false)
+		}
+	})
+	b.Run("borrowed-noop", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			benchmarkSplitHTTPBody = FixHTTPPacketCRLFBorrowed(packet, false)
 		}
 	})
 }

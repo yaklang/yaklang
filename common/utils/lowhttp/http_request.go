@@ -80,6 +80,13 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	return fixHTTPPacketCRLF(raw, noFixLength, false)
 }
 
+// FixHTTPPacketCRLFBorrowed preserves FixHTTPPacketCRLF's byte-for-byte result,
+// but may return an immutable view of raw when normalization is an exact no-op.
+// Callers must keep raw alive and must not mutate the returned packet.
+func FixHTTPPacketCRLFBorrowed(raw []byte, noFixLength bool) []byte {
+	return fixHTTPPacketCRLFWithBorrow(raw, noFixLength, false, true)
+}
+
 // HTTP header names and the tokens inspected below are ASCII. Preserve the
 // legacy Unicode/invalid-UTF-8 behavior by falling back to strings.ToLower for
 // non-ASCII input while keeping the normal path allocation-free.
@@ -119,6 +126,10 @@ func isASCIIBytes(value string) bool {
 }
 
 func fixHTTPPacketCRLF(raw []byte, noFixLength bool, cloneBody bool) []byte {
+	return fixHTTPPacketCRLFWithBorrow(raw, noFixLength, cloneBody, false)
+}
+
+func fixHTTPPacketCRLFWithBorrow(raw []byte, noFixLength bool, cloneBody bool, allowBorrow bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftCRLF(raw)
 	if raw == nil || len(raw) == 0 {
@@ -255,6 +266,15 @@ func fixHTTPPacketCRLF(raw []byte, noFixLength bool, cloneBody bool) []byte {
 		header = strings.Replace(header, plrand, strconv.Itoa(len(body)), 1)
 	}
 
+	if allowBorrow &&
+		len(restBody) == 0 &&
+		len(header) <= len(raw) &&
+		len(header)+len(body) == len(raw) &&
+		header == utils.UnsafeBytesToString(raw[:len(header)]) &&
+		(len(body) == 0 || &body[0] == &raw[len(header)]) {
+		return raw
+	}
+
 	var buf bytes.Buffer
 	buf.Write([]byte(header))
 	if len(body) > 0 {
@@ -326,6 +346,12 @@ func FixHTTPPacketQueryEscape(raw []byte) []byte {
 // ```
 func FixHTTPRequest(raw []byte) []byte {
 	return FixHTTPPacketCRLF(raw, false)
+}
+
+// FixHTTPRequestBorrowed is the immutable-input variant used by forwarding
+// paths that only need a normalized packet for the duration of the call.
+func FixHTTPRequestBorrowed(raw []byte) []byte {
+	return FixHTTPPacketCRLFBorrowed(raw, false)
 }
 
 func DeletePacketEncoding(raw []byte) []byte {

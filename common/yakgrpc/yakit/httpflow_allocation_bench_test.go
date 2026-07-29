@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -43,6 +44,62 @@ func TestQuoteHTTPPacketMatchesStrconvQuoteAndOwnsResult(t *testing.T) {
 		if got != want {
 			t.Fatal("quoted result aliases input packet")
 		}
+	}
+}
+
+func TestQuoteHTTPPacketReusableMatchesStrconvQuote(t *testing.T) {
+	allBytes := make([]byte, 256)
+	for i := range allBytes {
+		allBytes[i] = byte(i)
+	}
+	tests := [][]byte{
+		nil,
+		{},
+		[]byte("GET / HTTP/1.1\r\nHost: example.test\r\n\r\n"),
+		[]byte("中文\x00\t\r\n"),
+		{0xff, 0xfe, 'a', 0xc3, 0x28},
+		allBytes,
+		benchmarkHTTPFlowResponsePacket(256 * 1024),
+	}
+	for _, input := range tests {
+		want := strconv.Quote(string(input))
+		got, quote := quoteHTTPPacketReusable(input)
+		if got != want {
+			t.Fatalf("reusable quoted packet mismatch:\nwant=%q\ngot =%q", want, got)
+		}
+		quote.release()
+		quote.release()
+	}
+}
+
+func TestQuoteHTTPPacketReusableConcurrent(t *testing.T) {
+	const (
+		workers    = 12
+		iterations = 100
+	)
+	packet := benchmarkHTTPFlowResponsePacket(64 * 1024)
+	want := strconv.Quote(string(packet))
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for iteration := 0; iteration < iterations; iteration++ {
+				got, quote := quoteHTTPPacketReusable(packet)
+				if got != want {
+					errCh <- fmt.Errorf("reusable quote mismatch at iteration %d", iteration)
+					quote.release()
+					return
+				}
+				quote.release()
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
 	}
 }
 
@@ -152,6 +209,16 @@ func BenchmarkQuoteHTTPPacket256K(b *testing.B) {
 			benchmarkQuotedHTTPPacket = quoteHTTPPacket(packet)
 		}
 	})
+	b.Run("bounded-reusable-lifecycle", func(b *testing.B) {
+		b.SetBytes(int64(len(packet)))
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			quoted, quote := quoteHTTPPacketReusable(packet)
+			benchmarkQuotedHTTPPacket = quoted
+			benchmarkQuotedHTTPPacket = ""
+			quote.release()
+		}
+	})
 }
 
 func BenchmarkQuoteHTTPPacketCapacityMatrix256K(b *testing.B) {
@@ -257,6 +324,55 @@ func BenchmarkCreateHTTPFlowBodyMatrix64K256K(b *testing.B) {
 		}
 		benchmarkCreatedHTTPFlow = flow
 	}
+}
+
+func BenchmarkCreateHTTPFlowReusableQuoteLifecycle64K256K(b *testing.B) {
+	requestBody := bytes.Repeat([]byte("r"), 64*1024)
+	responseBody := bytes.Repeat([]byte("s"), 256*1024)
+	request := append(
+		[]byte(fmt.Sprintf(
+			"POST /reusable-quote HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n",
+			len(requestBody),
+		)),
+		requestBody...,
+	)
+	response := append(
+		[]byte(fmt.Sprintf(
+			"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n",
+			len(responseBody),
+		)),
+		responseBody...,
+	)
+
+	benchmark := func(b *testing.B, reusable bool) {
+		b.SetBytes(int64(len(request) + len(response)))
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			opts := []CreateHTTPFlowOptions{
+				CreateHTTPFlowWithRequestRaw(request),
+				CreateHTTPFlowWithResponseRaw(response),
+				CreateHTTPFlowWithBareResponseRaw(response),
+				CreateHTTPFlowWithSource(schema.HTTPFlow_SourceType_MITM),
+				CreateHTTPFlowWithURL("http://example.test/reusable-quote"),
+				CreateHTTPFlowWithRemoteAddr("127.0.0.1:80"),
+			}
+			if reusable {
+				opts = append(opts, CreateHTTPFlowWithReusablePacketQuoteBuffer())
+			}
+			flow, err := CreateHTTPFlow(opts...)
+			if err != nil {
+				b.Fatal(err)
+			}
+			benchmarkCreatedHTTPFlow = flow
+			if reusable {
+				ReleaseHTTPFlowPersistResources(flow)
+			}
+		}
+	}
+
+	b.Run("owned-output", func(b *testing.B) { benchmark(b, false) })
+	b.Run("bounded-reusable-lifecycle", func(b *testing.B) { benchmark(b, true) })
 }
 
 func BenchmarkCreateHTTPFlowResponseFixProvenance256K(b *testing.B) {

@@ -1639,14 +1639,24 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			flow    *schema.HTTPFlow
 			flowErr error
 		)
+		reusableQuoteOpt := yakit.CreateHTTPFlowWithReusablePacketQuoteBuffer()
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
-			flow, flowErr = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(saveIsHttps, req, "mitm", reqUrl, remoteAddr)
+			flow, flowErr = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(saveIsHttps, req, "mitm", reqUrl, remoteAddr, reusableQuoteOpt)
 		} else {
 			var duration time.Duration
 			if i, ok := httpctx.GetResponseTraceInfo(req).(*lowhttp.LowhttpTraceInfo); ok {
 				duration = i.TotalTime
 			}
-			flow, flowErr = yakit.CreateHTTPFlowFromHTTPWithBodySaved(saveIsHttps, req, rsp, "mitm", reqUrl, remoteAddr, yakit.CreateHTTPFlowWithDuration(duration)) // , !responseOverSize)
+			flow, flowErr = yakit.CreateHTTPFlowFromHTTPWithBodySaved(
+				saveIsHttps,
+				req,
+				rsp,
+				"mitm",
+				reqUrl,
+				remoteAddr,
+				yakit.CreateHTTPFlowWithDuration(duration),
+				reusableQuoteOpt,
+			) // , !responseOverSize)
 		}
 		if flowErr != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, flowErr)
@@ -1705,6 +1715,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		hijackedFlowMutex := new(sync.Mutex)
 		isDroppedSaveFlow := utils.NewBool(false)
+		afterPersistCleanups := flow.AfterPersistCleanups
 
 		pluginCh := make(chan struct{})
 		hotPatchPipeline.HijackSaveHTTPFlowEx(
@@ -1721,6 +1732,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				defer hijackedFlowMutex.Unlock()
 
 				*flow = *replaced
+				// Runtime cleanup belongs to the engine-owned one-shot quote
+				// buffers and must survive plugin replacement of the public model.
+				flow.AfterPersistCleanups = afterPersistCleanups
 			},
 			func() {
 				isDroppedSaveFlow.Set()
@@ -1830,6 +1844,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+		} else {
+			yakit.ReleaseHTTPFlowPersistResources(flow)
 		}
 	}
 	// 核心 MITM 服务器

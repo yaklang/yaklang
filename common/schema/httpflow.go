@@ -83,6 +83,9 @@ type HTTPFlow struct {
 	// AfterSaveHandlers are runtime-only callbacks triggered after the flow is
 	// successfully persisted. They are not stored in the database.
 	AfterSaveHandlers []func(*HTTPFlow) `json:"-" gorm:"-"`
+	// AfterPersistCleanups release runtime-only resources after persistence and
+	// all AfterSaveHandlers finish. They also run when persistence fails.
+	AfterPersistCleanups []func(*HTTPFlow) `json:"-" gorm:"-"`
 	// RuntimeTiming is populated only for bounded performance diagnostics. It
 	// never changes the database schema or the serialized HTTPFlow model.
 	RuntimeTiming *HTTPFlowRuntimeTiming `json:"-" gorm:"-"`
