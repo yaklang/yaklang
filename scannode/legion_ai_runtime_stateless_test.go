@@ -243,6 +243,7 @@ func TestStatelessDriverRunsTurnAsyncAndRoutesInteractiveResponseToActiveEngine(
 	returned := make(chan error, 1)
 	go func() {
 		returned <- sh.SendInput(context.Background(), aiSessionInput{
+			Ref:         aiSessionCommandRef{CommandID: "turn-command-1"},
 			InputType:   "message",
 			PayloadJSON: []byte(`{"content":"run a reviewed tool"}`),
 			ContextPackage: &aiv1.ContextPackage{
@@ -269,6 +270,8 @@ func TestStatelessDriverRunsTurnAsyncAndRoutesInteractiveResponseToActiveEngine(
 	err = sh.SendInput(context.Background(), aiSessionInput{
 		InputType:   "user_intervention",
 		PayloadJSON: []byte(`{"id":"review-async-1","suggestion":"continue"}`),
+		ReviewID:    "review-async-1",
+		TurnID:      "turn-command-1",
 	})
 	if err != nil {
 		t.Fatalf("interactive response: %v", err)
@@ -284,6 +287,60 @@ func TestStatelessDriverRunsTurnAsyncAndRoutesInteractiveResponseToActiveEngine(
 		}
 	case <-time.After(time.Second):
 		t.Fatal("active turn did not receive interactive response")
+	}
+	close(engine.release)
+}
+
+func TestStatelessDriverFencesReviewByTurnAndReviewID(t *testing.T) {
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:                        aiSessionCommandRef{SessionID: "s-stateless-fenced-review", OwnerUserID: "u1"},
+		ProviderPolicySnapshotJSON: []byte(`{}`),
+		RuntimeOptionSnapshotJSON:  []byte(`{}`),
+	}, noopEmitter{})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-live"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"start"}`),
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("turn did not start")
+	}
+
+	err = sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "user_intervention",
+		PayloadJSON: []byte(`{"id":"review-live","suggestion":"continue"}`),
+		ReviewID:    "review-other",
+		TurnID:      "turn-live",
+	})
+	if err == nil || !contains(err.Error(), "review id mismatch") {
+		t.Fatalf("expected review id fence, got %v", err)
+	}
+	err = sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "user_intervention",
+		PayloadJSON: []byte(`{"id":"review-live","suggestion":"continue"}`),
+		ReviewID:    "review-live",
+		TurnID:      "turn-stale",
+	})
+	if err == nil || !contains(err.Error(), "turn id mismatch") {
+		t.Fatalf("expected turn id fence, got %v", err)
+	}
+	select {
+	case event := <-engine.events:
+		t.Fatalf("fenced review reached active engine: %#v", event)
+	default:
 	}
 	close(engine.release)
 }

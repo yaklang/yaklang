@@ -264,6 +264,73 @@ func TestHandleAISessionInputPublishesRuntimeEvent(t *testing.T) {
 	driver.assertInput(t, 0, "hello")
 }
 
+func TestHandleAISessionInputDeduplicatesRedeliveredCommand(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+	raw := mustMarshalProto(t, validAISessionInputCommand())
+	if err := bridge.handleAISessionInput(context.Background(), raw); err != nil {
+		t.Fatalf("handle first input: %v", err)
+	}
+	if err := bridge.handleAISessionInput(context.Background(), raw); err != nil {
+		t.Fatalf("handle duplicate input: %v", err)
+	}
+
+	driver.mu.Lock()
+	inputCount := len(driver.inputs)
+	driver.mu.Unlock()
+	if inputCount != 1 {
+		t.Fatalf("duplicate command reached runtime %d times", inputCount)
+	}
+	fakeJS.mu.Lock()
+	eventCount := len(fakeJS.publish)
+	fakeJS.mu.Unlock()
+	if eventCount != 1 {
+		t.Fatalf("duplicate command published %d input events", eventCount)
+	}
+}
+
+func TestHandleAISessionReviewRejectsStaleNodeSession(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+	command := validAISessionInputCommand()
+	command.InputType = "user_intervention"
+	command.InputJson = []byte(`{"id":"review-fenced","suggestion":"continue"}`)
+	command.ReviewId = "review-fenced"
+	command.TurnId = "turn-command"
+	command.ExpectedNodeSessionId = "stale-node-session"
+
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("fenced review should publish a terminal command failure: %v", err)
+	}
+	driver.mu.Lock()
+	inputCount := len(driver.inputs)
+	driver.mu.Unlock()
+	if inputCount != 0 {
+		t.Fatalf("fenced review reached runtime %d times", inputCount)
+	}
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	if msg.Subject != "legion.event.ai.session.failed" {
+		t.Fatalf("unexpected fenced review event subject: %s", msg.Subject)
+	}
+	var failed aiv1.AISessionFailed
+	if err := proto.Unmarshal(msg.Data, &failed); err != nil {
+		t.Fatalf("unmarshal fenced failure: %v", err)
+	}
+	if failed.GetErrorCode() != "ai_session_review_fenced" {
+		t.Fatalf("unexpected fenced failure: %#v", &failed)
+	}
+}
+
 func TestHandleAISessionInputPublishesSyncEventPayload(t *testing.T) {
 	t.Parallel()
 

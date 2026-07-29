@@ -354,8 +354,12 @@ type PushAISessionInputCommand struct {
 	// set it produce the same wire bytes as before (proto3 message default).
 	// The stateless engine (S3c) consumes this; the stateful engine ignores it.
 	ContextPackage *ContextPackage `protobuf:"bytes,6,opt,name=context_package,json=contextPackage,proto3" json:"context_package,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// S3g approval fencing. Empty for ordinary user input.
+	ReviewId              string `protobuf:"bytes,7,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
+	TurnId                string `protobuf:"bytes,8,opt,name=turn_id,json=turnId,proto3" json:"turn_id,omitempty"`
+	ExpectedNodeSessionId string `protobuf:"bytes,9,opt,name=expected_node_session_id,json=expectedNodeSessionId,proto3" json:"expected_node_session_id,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *PushAISessionInputCommand) Reset() {
@@ -428,6 +432,27 @@ func (x *PushAISessionInputCommand) GetContextPackage() *ContextPackage {
 		return x.ContextPackage
 	}
 	return nil
+}
+
+func (x *PushAISessionInputCommand) GetReviewId() string {
+	if x != nil {
+		return x.ReviewId
+	}
+	return ""
+}
+
+func (x *PushAISessionInputCommand) GetTurnId() string {
+	if x != nil {
+		return x.TurnId
+	}
+	return ""
+}
+
+func (x *PushAISessionInputCommand) GetExpectedNodeSessionId() string {
+	if x != nil {
+		return x.ExpectedNodeSessionId
+	}
+	return ""
 }
 
 // ContextPackage is the per-turn, server-assembled context injected into the
@@ -18859,7 +18884,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x1cruntime_option_snapshot_json\x18\b \x01(\fR\x19runtimeOptionSnapshotJson\x12F\n" +
 	"\vattachments\x18\t \x03(\v2$.legion.ai.v1.AISessionAttachmentRefR\vattachments\x12M\n" +
 	"\x0fcredential_refs\x18\n" +
-	" \x03(\v2$.legion.ai.v1.AISessionCredentialRefR\x0ecredentialRefs\"\xb7\x02\n" +
+	" \x03(\v2$.legion.ai.v1.AISessionCredentialRefR\x0ecredentialRefs\"\xa6\x03\n" +
 	"\x19PushAISessionInputCommand\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x124\n" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12\"\n" +
@@ -18868,7 +18893,10 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"input_type\x18\x04 \x01(\tR\tinputType\x12\x1d\n" +
 	"\n" +
 	"input_json\x18\x05 \x01(\fR\tinputJson\x12E\n" +
-	"\x0fcontext_package\x18\x06 \x01(\v2\x1c.legion.ai.v1.ContextPackageR\x0econtextPackage\"\xa6\x03\n" +
+	"\x0fcontext_package\x18\x06 \x01(\v2\x1c.legion.ai.v1.ContextPackageR\x0econtextPackage\x12\x1b\n" +
+	"\treview_id\x18\a \x01(\tR\breviewId\x12\x17\n" +
+	"\aturn_id\x18\b \x01(\tR\x06turnId\x127\n" +
+	"\x18expected_node_session_id\x18\t \x01(\tR\x15expectedNodeSessionId\"\xa6\x03\n" +
 	"\x0eContextPackage\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12#\n" +
