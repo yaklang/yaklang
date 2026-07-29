@@ -18,24 +18,30 @@ func TestSelectAISessionRuntimeDriverStateless(t *testing.T) {
 	}
 }
 
-// TestSelectAISessionRuntimeDriverDefaultStateful verifies that the default
-// (env unset or any non-"stateless" value) selects the legacy stateful driver,
-// preserving the rollback path.
-func TestSelectAISessionRuntimeDriverDefaultStateful(t *testing.T) {
+func TestSelectAISessionRuntimeDriverDefaultStateless(t *testing.T) {
 	cases := map[string]string{
-		"unset":        "",
-		"empty":        "   ",
-		"stateful":     "stateful",
-		"garbage":      "something-else",
+		"unset":    "",
+		"empty":    "   ",
+		"explicit": "STATELESS",
+		"invalid":  "something-else",
 	}
 	for name, val := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Setenv("LEGION_AI_RUNTIME", val)
 			d := selectAISessionRuntimeDriver()
 			got := fmt.Sprintf("%T", d)
-			if got != "scannode.yakAIEngineRuntimeDriver" {
-				t.Fatalf("LEGION_AI_RUNTIME=%q: expected yakAIEngineRuntimeDriver, got %s", val, got)
+			if got != "scannode.statelessAIEngineRuntimeDriver" {
+				t.Fatalf("LEGION_AI_RUNTIME=%q: expected statelessAIEngineRuntimeDriver, got %s", val, got)
 			}
 		})
+	}
+}
+
+func TestSelectAISessionRuntimeDriverExplicitStatefulRollback(t *testing.T) {
+	t.Setenv("LEGION_AI_RUNTIME", " STATEFUL ")
+	d := selectAISessionRuntimeDriver()
+	got := fmt.Sprintf("%T", d)
+	if got != "scannode.yakAIEngineRuntimeDriver" {
+		t.Fatalf("explicit stateful rollback: expected yakAIEngineRuntimeDriver, got %s", got)
 	}
 }
