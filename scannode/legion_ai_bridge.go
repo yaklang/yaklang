@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 
@@ -12,6 +13,19 @@ import (
 
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
+
+// selectAISessionRuntimeDriver picks the AI runtime driver based on the
+// LEGION_AI_RUNTIME env var (S3d). "stateless" → statelessAIEngineRuntimeDriver
+// (S3c, per-turn engine, no persistence); any other value or unset →
+// yakAIEngineRuntimeDriver (legacy stateful). This is the behavior-cutover
+// switch point: rolling back is a sessionmgr config change + container restart,
+// no code revert needed.
+func selectAISessionRuntimeDriver() aiSessionRuntimeDriver {
+	if strings.TrimSpace(os.Getenv("LEGION_AI_RUNTIME")) == "stateless" {
+		return newStatelessAIEngineRuntimeDriver()
+	}
+	return newYakAIEngineRuntimeDriver()
+}
 
 const aiSessionRuntimeEventInput = "ai.session.input"
 const aiSessionRuntimeEventContextUpdated = "ai.session.context_updated"
@@ -511,7 +525,7 @@ func (b *legionJobBridge) ensureAIRuntime() *aiSessionRuntimeManager {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.aiRuntime == nil {
-		b.aiRuntime = newAISessionRuntimeManager(newYakAIEngineRuntimeDriver())
+		b.aiRuntime = newAISessionRuntimeManager(selectAISessionRuntimeDriver())
 	}
 	return b.aiRuntime
 }
