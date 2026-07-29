@@ -12,20 +12,46 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/yaklang/yaklang/common/log"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
 
 // selectAISessionRuntimeDriver picks the AI runtime driver based on the
-// LEGION_AI_RUNTIME env var (S3d). "stateless" → statelessAIEngineRuntimeDriver
-// (S3c, per-turn engine, no persistence); any other value or unset →
-// yakAIEngineRuntimeDriver (legacy stateful). This is the behavior-cutover
-// switch point: rolling back is a sessionmgr config change + container restart,
-// no code revert needed.
+// LEGION_AI_RUNTIME env var. Stateless is the default; stateful remains as an
+// explicit rollback mode that takes effect after the container is restarted.
 func selectAISessionRuntimeDriver() aiSessionRuntimeDriver {
-	if strings.TrimSpace(os.Getenv("LEGION_AI_RUNTIME")) == "stateless" {
-		return newStatelessAIEngineRuntimeDriver()
+	rawMode := os.Getenv("LEGION_AI_RUNTIME")
+	mode, invalid := normalizeAISessionRuntimeMode(rawMode)
+	if invalid {
+		log.Warnf(
+			"unsupported LEGION_AI_RUNTIME=%q; defaulting to %s",
+			rawMode,
+			aiSessionRuntimeModeStateless,
+		)
+	} else {
+		log.Infof("selected AI session runtime: mode=%s", mode)
 	}
-	return newYakAIEngineRuntimeDriver()
+	if mode == aiSessionRuntimeModeStateful {
+		log.Warn("legacy AI session runtime rollback enabled explicitly")
+		return newYakAIEngineRuntimeDriver()
+	}
+	return newStatelessAIEngineRuntimeDriver()
+}
+
+const (
+	aiSessionRuntimeModeStateless = "stateless"
+	aiSessionRuntimeModeStateful  = "stateful"
+)
+
+func normalizeAISessionRuntimeMode(rawMode string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(rawMode)) {
+	case "", aiSessionRuntimeModeStateless:
+		return aiSessionRuntimeModeStateless, false
+	case aiSessionRuntimeModeStateful:
+		return aiSessionRuntimeModeStateful, false
+	default:
+		return aiSessionRuntimeModeStateless, true
+	}
 }
 
 const aiSessionRuntimeEventInput = "ai.session.input"
