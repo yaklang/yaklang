@@ -1,9 +1,6 @@
 package minirehs
 
-import (
-	"regexp/syntax"
-	"strings"
-)
+import "regexp/syntax"
 
 // 本文件实现 Rose-lite 双向锚定的编译期"可救性分析": 对每个必需字面量, 按其在 AST 中的 *每个出现处*
 // 分别判定 head (match-start 到字面量结尾) 与 tail (字面量结尾到 match-end) 是否有界, 据此给出
@@ -84,7 +81,7 @@ func (a *biCoverAcc) record(lit string, litLen, pre int, preB bool, suf int, suf
 func (a *biCoverAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		s := strings.ToLower(string(re.Rune))
+		s := asciiLowerString(string(re.Rune))
 		if _, ok := a.set[s]; ok {
 			a.record(s, len(string(re.Rune)), pre, preB, suf, sufB)
 		}

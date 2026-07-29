@@ -1,9 +1,6 @@
 package minirehs
 
-import (
-	"regexp/syntax"
-	"strings"
-)
+import "regexp/syntax"
 
 // 本文件实现"存在性验证本地化"的编译期分析: 为每条 (RE2-exact, 无位置锚) 且有必需字面量的
 // pattern 计算"命中字面量结尾"的两侧上下文界 (headMax/tailMax), 使运行期可把 per-pattern 的
@@ -96,7 +93,7 @@ func (a *litWindowAcc) record(litLen, pre int, preB bool, suf int, sufB bool) {
 func (a *litWindowAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		s := strings.ToLower(string(re.Rune))
+		s := asciiLowerString(string(re.Rune))
 		if _, ok := a.set[s]; ok {
 			a.record(len(string(re.Rune)), pre, preB, suf, sufB)
 		}
@@ -109,8 +106,8 @@ func (a *litWindowAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB
 	case syntax.OpConcat:
 		k := len(re.Sub)
 		for i, sub := range re.Sub {
-			lw, lb := sumWidthRange(re.Sub, 0, i)      // 左兄弟总宽 (0..i-1)
-			rw, rb := sumWidthRange(re.Sub, i+1, k)    // 右兄弟总宽 (i+1..k-1)
+			lw, lb := sumWidthRange(re.Sub, 0, i)   // 左兄弟总宽 (0..i-1)
+			rw, rb := sumWidthRange(re.Sub, i+1, k) // 右兄弟总宽 (i+1..k-1)
 			a.walk(sub, addSat(pre, lw), preB && lb, addSat(suf, rw), sufB && rb)
 		}
 
@@ -197,7 +194,7 @@ func (a *litHeadAcc) record(lit string, litLen, pre int, preB bool) {
 func (a *litHeadAcc) walk(re *syntax.Regexp, pre int, preB bool) {
 	switch re.Op {
 	case syntax.OpLiteral:
-		s := strings.ToLower(string(re.Rune))
+		s := asciiLowerString(string(re.Rune))
 		if _, ok := a.set[s]; ok {
 			a.record(s, len(string(re.Rune)), pre, preB)
 		}

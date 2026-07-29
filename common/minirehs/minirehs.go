@@ -82,7 +82,9 @@ type Pattern struct {
 	OnUnsupported UnsupportedPolicy // 零值为 DefaultPolicy, 即采用全局默认策略 (默认 Reject)
 }
 
-// Match 是一次命中. 语义对齐 stdlib regexp 的 FindAllIndex: [From, To) 为命中字节区间.
+// Match 是一次命中，[From, To) 为命中字节区间。Engine/Stdlib 后端沿用 regexp.FindAllIndex
+// 的 leftmost-first 语义；MVS 定位模式使用其文档约定的 leftmost-longest 语义。
+// MVS 仅存在性模式及 regexp2-only 规则返回 [-1,-1)。
 type Match struct {
 	ID   PatternID
 	From int

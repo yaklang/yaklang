@@ -22,6 +22,18 @@ func (k *mvsKernel) close() {}
 
 func (k *mvsKernel) nfaExists(idx int, data []byte) bool { return false }
 
+func (k *mvsKernel) nfaExistsAssertOnline(idx int, data []byte) bool { return false }
+
+func (k *mvsKernel) nfaExistsAnchored(idx int, data []byte, spans []anchorSpan) bool { return false }
+
+func (k *mvsKernel) nfaExistsAnchoredMany(idxs []int32, data []byte, patSpanOff []int32, spansLo, spansHi []int32, sc *scratch) []byte {
+	return nil
+}
+
 func (k *mvsKernel) nfaExistsMany(idxs []int32, data []byte, sc *scratch) []byte { return nil }
 
 func (k *mvsKernel) mergedScan(data []byte, sc *scratch) []int { return sc.mergedHits[:0] }
+
+func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, keepBound bool, sc *scratch) ([]int, []int) {
+	return sc.mergedHits[:0], sc.assertHits[:0]
+}

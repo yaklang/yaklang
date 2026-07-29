@@ -72,11 +72,7 @@ func (p *scalarPrefilter) simd() bool { return false }
 func (p *scalarPrefilter) release() {}
 
 func (p *scalarPrefilter) scanHits(data []byte, sc *scratch) []litHit {
-	lower := asciiLowerInto(data, &sc.lower)
-	sc.hits = sc.hits[:0]
-	p.ac.scan(lower, func(litID int32, end int) {
-		sc.hits = append(sc.hits, litHit{litID: litID, end: int32(end)})
-	})
+	sc.hits = p.ac.scanHitsFoldASCII(data, sc.hits[:0])
 	return sc.hits
 }
 
@@ -97,4 +93,23 @@ func asciiLowerInto(data []byte, buf *[]byte) []byte {
 		out[i] = c
 	}
 	return out
+}
+
+// asciiLowerString 与 asciiLowerInto 使用完全相同的规范化规则，供编译期字面量及其
+// 窗口分析使用。不能使用 strings.ToLower：它会改写非 ASCII rune（例如 Ã -> ã），
+// 而运行期为保持字节偏移只折叠 ASCII，二者不一致会让预过滤产生假阴。
+func asciiLowerString(s string) string {
+	for i := 0; i < len(s); i++ {
+		if s[i] < 'A' || s[i] > 'Z' {
+			continue
+		}
+		out := []byte(s)
+		for j := i; j < len(out); j++ {
+			if out[j] >= 'A' && out[j] <= 'Z' {
+				out[j] += 'a' - 'A'
+			}
+		}
+		return string(out)
+	}
+	return s
 }

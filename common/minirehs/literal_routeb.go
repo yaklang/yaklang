@@ -14,9 +14,13 @@ import (
 // 健全性 (绝不漏报) 的关键: 改写只做"放大语言"的等价或超集变换 ——
 //   - 移除零宽断言 (?=...) (?!...) (?<=...) (?<!...): 去掉约束 => 语言变大 (超集).
 //   - backreference \1..\9 / \k<name> -> [\s\S]* (匹配任意串, 含空): 放宽 => 超集.
+//   - \g 系列数字/命名引用与子程序调用 -> [\s\S]*: 放宽 => 超集.
+//   - PCRE2_UCP 的 \d/\s/\w、\h/\v、\p、\R、\X 等 -> 保守的任意 rune/串: 避免 RE2 同名语义缩窄.
+//   - \b/\B/\G/\Z/$ 等零宽位置约束移除；\K 仅改变上报起点，也移除: 放宽 => 超集.
 //   - 原子组 (?>...) -> (?:...): 去掉占有式回溯限制 => 超集.
 //   - 命名捕获 (?<name>...) / (?P<name>...) / (?'name'...) -> (?:...): 同语言.
 //   - \uXXXX -> \x{XXXX}: 同一码点, 同语言.
+//   - \Q...\E 整段原样复制，防止引用区内的元字符被误改写.
 // 任何无法确定为"超集/等价"的构造一律 bail (返回 ok=false), 该 pattern 保持 always-on.
 // 因 R_super ⊇ R_orig, "R_super 的任一匹配必含字面量 L" 蕴含 "R_orig 的任一匹配必含 L", 故 L
 // 用作 R_orig 的预过滤必需字面量是安全的 (只可能多验证, 绝不漏).
@@ -78,6 +82,12 @@ func re2SupersetEx(expr string) (string, bool, bool) {
 				return "", false, false
 			}
 			i = j
+		case '$':
+			// PCRE2 的 $ 默认也可在末尾换行之前匹配，而 Go/RE2 的 $
+			// 只匹配文本末尾。原样保留会把超集错误缩小；移除锚点只会放大语言。
+			widened = true
+			b.WriteString("(?:)")
+			i++
 		default:
 			b.WriteByte(c)
 			i++
@@ -95,6 +105,17 @@ func rewriteEscape(s string, i int, inClass bool, b *strings.Builder, widened *b
 	}
 	nc := s[i+1]
 	switch {
+	case nc == 'Q':
+		// \Q...\E 内的所有元字符都按字面量处理。必须整体复制，
+		// 不能让外层扫描器把其中的 $, (, \v, \1 等误当语法改写。
+		if rel := strings.Index(s[i+2:], `\E`); rel >= 0 {
+			end := i + 2 + rel + 2
+			b.WriteString(s[i:end])
+			return end, true
+		}
+		// PCRE2 与 RE2 都允许省略 \E，此时引用持续到 pattern 末尾。
+		b.WriteString(s[i:])
+		return n, true
 	case nc == 'u':
 		// \uXXXX -> \x{XXXX} (同一码点). 必须恰好 4 个十六进制位.
 		if i+6 > n || !isHex(s[i+2:i+6]) {
@@ -104,6 +125,93 @@ func rewriteEscape(s string, i int, inClass bool, b *strings.Builder, widened *b
 		b.WriteString(s[i+2 : i+6])
 		b.WriteByte('}')
 		return i + 6, true
+	case !inClass && strings.ContainsRune("dDsSwWhHvVN", rune(nc)):
+		// regexp2 后端以 PCRE2_UTF+UCP 编译，因此 \d/\s/\w 等按
+		// Unicode 属性匹配；Go/RE2 的同名 Perl 类主要是 ASCII 语义。
+		// \h/\v/\N 也与 RE2 的接受范围不同。统一放大为任意单个
+		// rune，避免 route-B 门把 PCRE2 真匹配滤掉。
+		*widened = true
+		b.WriteString("[\\s\\S]")
+		return i + 2, true
+	case !inClass && (nc == 'b' || nc == 'B'):
+		*widened = true
+		// UCP 的 Unicode word boundary 不能由 RE2 的 ASCII \b/\B
+		// 普遍表达；移除零宽约束只会放大语言。
+		b.WriteString("(?:)")
+		return i + 2, true
+	case !inClass && (nc == 'K' || nc == 'G' || nc == 'Z'):
+		// \G/\Z 是位置约束；\K 只重置上报的 match start。
+		// route-B 仅作存在性超集门，移除它们是安全放大。
+		*widened = true
+		b.WriteString("(?:)")
+		return i + 2, true
+	case !inClass && nc == 'R':
+		// PCRE2 \R 可消费一个 Unicode 换行或两个 rune 的 CRLF。
+		*widened = true
+		b.WriteString("[\\s\\S]{1,2}")
+		return i + 2, true
+	case !inClass && nc == 'X':
+		// 一个扩展 grapheme cluster 至少含一个 rune，可能含多个。
+		*widened = true
+		b.WriteString("[\\s\\S]+")
+		return i + 2, true
+	case !inClass && (nc == 'p' || nc == 'P'):
+		// PCRE2 与当前 Go 运行时可能使用不同 Unicode 数据版本，且
+		// PCRE2 还支持 Script_Extensions 等 RE2 不认识的属性名。
+		// 属性转义总是消费一个码点，放大为任意 rune。
+		j := i + 2
+		if j >= n || s[j] != '{' {
+			return 0, false
+		}
+		j++
+		for j < n && s[j] != '}' {
+			j++
+		}
+		if j >= n {
+			return 0, false
+		}
+		*widened = true
+		b.WriteString("[\\s\\S]")
+		return j + 1, true
+	case !inClass && nc == 'g':
+		// PCRE2 的 \g 家族覆盖数字/相对/命名 backreference，以及
+		// Oniguruma 风格 subroutine call。两类都消费某个（可能为空）
+		// 子串，用任意串是保守超集。
+		j := i + 2
+		if j >= n {
+			return 0, false
+		}
+		switch s[j] {
+		case '{', '<', '\'':
+			closer := byte('}')
+			if s[j] == '<' {
+				closer = '>'
+			} else if s[j] == '\'' {
+				closer = '\''
+			}
+			j++
+			for j < n && s[j] != closer {
+				j++
+			}
+			if j >= n {
+				return 0, false
+			}
+			j++
+		default:
+			if s[j] == '+' || s[j] == '-' {
+				j++
+			}
+			start := j
+			for j < n && s[j] >= '0' && s[j] <= '9' {
+				j++
+			}
+			if j == start {
+				return 0, false
+			}
+		}
+		*widened = true
+		b.WriteString("[\\s\\S]*")
+		return j, true
 	case !inClass && nc >= '1' && nc <= '9':
 		// 反向引用 \1..\9 -> [\s\S]* (任意串, 超集). 多位反向引用 (\12) 与八进制歧义, 保守 bail.
 		if i+2 < n && s[i+2] >= '0' && s[i+2] <= '9' {
@@ -115,12 +223,14 @@ func rewriteEscape(s string, i int, inClass bool, b *strings.Builder, widened *b
 	case !inClass && nc == 'k':
 		// 命名反向引用 \k<name> / \k'name' -> [\s\S]*.
 		j := i + 2
-		if j >= n || (s[j] != '<' && s[j] != '\'') {
+		if j >= n || (s[j] != '<' && s[j] != '\'' && s[j] != '{') {
 			return 0, false
 		}
 		closer := byte('>')
 		if s[j] == '\'' {
 			closer = '\''
+		} else if s[j] == '{' {
+			closer = '}'
 		}
 		j++
 		for j < n && s[j] != closer {
@@ -134,7 +244,13 @@ func rewriteEscape(s string, i int, inClass bool, b *strings.Builder, widened *b
 		b.WriteString("[\\s\\S]*")
 		return j, true
 	default:
-		// 其它转义 (\d \w \s \. \b \\ 等) 原样拷贝; 若 RE2 不认 (如 \Z \Q) 后续 parse 失败即 bail.
+		if inClass && strings.ContainsRune("dDsSwWhHvVpP", rune(nc)) {
+			// 字符类（尤其是否定类）中不能用一个通配集合局部替换而
+			// 保证仍为超集；宁可放弃 route-B，回到 always-on verifier。
+			return 0, false
+		}
+		// 其它转义 (\. \\ 等) 原样拷贝；若 RE2 不认则后续 parse
+		// 失败并安全放弃 route-B。
 		b.WriteByte('\\')
 		b.WriteByte(nc)
 		return i + 2, true
@@ -169,6 +285,11 @@ func copyClass(s string, i int, b *strings.Builder, widened *bool) (int, bool) {
 		if c == ']' {
 			b.WriteByte(']')
 			return j + 1, true
+		}
+		if c == '[' && j+1 < n && s[j+1] == ':' {
+			// PCRE2 在 UCP 模式下的 POSIX 类可能是 Unicode 集合，而
+			// RE2 的 POSIX 类是 ASCII；保守放弃，避免缩小语言。
+			return 0, false
 		}
 		b.WriteByte(c)
 		j++

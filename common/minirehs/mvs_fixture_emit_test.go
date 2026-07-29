@@ -65,7 +65,7 @@ func TestMVSEmitKernelFixture(t *testing.T) {
 	defer db.Close()
 	mdb := digMVSDB(t, db)
 
-	blob := buildMVSBlob(mdb.nfas, mdb.merged)
+	blob := buildMVSBlob(mdb.nfas, mdb.merged, mdb.assertNecFactor, mdb.hasLiterals)
 	if len(blob) == 0 {
 		t.Fatal("empty blob")
 	}
