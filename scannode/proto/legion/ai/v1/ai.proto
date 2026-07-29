@@ -51,6 +51,10 @@ message PushAISessionInputCommand {
   // set it produce the same wire bytes as before (proto3 message default).
   // The stateless engine (S3c) consumes this; the stateful engine ignores it.
   ContextPackage context_package = 6;
+  // S3g approval fencing. Empty for ordinary user input.
+  string review_id = 7;
+  string turn_id = 8;
+  string expected_node_session_id = 9;
 }
 
 // ContextPackage is the per-turn, server-assembled context injected into the

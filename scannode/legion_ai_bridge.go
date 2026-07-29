@@ -3,6 +3,7 @@ package scannode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -29,6 +30,8 @@ func selectAISessionRuntimeDriver() aiSessionRuntimeDriver {
 
 const aiSessionRuntimeEventInput = "ai.session.input"
 const aiSessionRuntimeEventContextUpdated = "ai.session.context_updated"
+
+var errAISessionInputInFlight = errors.New("ai session input command is already in flight")
 
 type aiSessionRuntimeDriver interface {
 	Bind(context.Context, aiSessionBinding, aiSessionRuntimeEmitter) (aiSessionRuntimeHandle, error)
@@ -85,6 +88,8 @@ type aiSessionInput struct {
 	InputType      string
 	PayloadJSON    []byte
 	ContextPackage *aiv1.ContextPackage // S3c: per-turn server-assembled context (history/tools/user_input)
+	ReviewID       string
+	TurnID         string
 }
 
 type aiSessionContextUpdate struct {
@@ -101,6 +106,9 @@ type acceptedAISessionInput struct {
 	payloadJSON    []byte
 	handle         aiSessionRuntimeHandle
 	contextPackage *aiv1.ContextPackage // S3c: carried through to handle.SendInput
+	reviewID       string
+	turnID         string
+	duplicate      bool
 }
 
 type acceptedAISessionContextUpdate struct {
@@ -131,13 +139,16 @@ type aiSessionRuntimeManager struct {
 }
 
 type aiSessionRuntime struct {
-	mu        sync.Mutex
-	ref       aiSessionCommandRef
-	projectID string
-	title     string
-	seq       uint64
-	cancel    context.CancelFunc
-	handle    aiSessionRuntimeHandle
+	mu                     sync.Mutex
+	ref                    aiSessionCommandRef
+	projectID              string
+	title                  string
+	seq                    uint64
+	cancel                 context.CancelFunc
+	handle                 aiSessionRuntimeHandle
+	processedInputCommands map[string]struct{}
+	processedInputOrder    []string
+	inFlightInputCommands  map[string]struct{}
 }
 
 func newAISessionRuntimeManager(driver aiSessionRuntimeDriver) *aiSessionRuntimeManager {
@@ -173,10 +184,12 @@ func (m *aiSessionRuntimeManager) Bind(
 
 	ctx, cancel := context.WithCancel(parent)
 	runtime := &aiSessionRuntime{
-		ref:       ref,
-		projectID: strings.TrimSpace(command.GetProjectId()),
-		title:     strings.TrimSpace(command.GetTitle()),
-		cancel:    cancel,
+		ref:                    ref,
+		projectID:              strings.TrimSpace(command.GetProjectId()),
+		title:                  strings.TrimSpace(command.GetTitle()),
+		cancel:                 cancel,
+		processedInputCommands: make(map[string]struct{}),
+		inFlightInputCommands:  make(map[string]struct{}),
 	}
 	runtime.handle = noopAISessionRuntimeHandle{}
 	handle, err := m.driver.Bind(ctx, aiSessionBinding{
@@ -227,6 +240,16 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 	}
 
 	session.mu.Lock()
+	if _, ok := session.processedInputCommands[ref.CommandID]; ok {
+		ref.RunID = session.ref.RunID
+		session.mu.Unlock()
+		return acceptedAISessionInput{ref: ref, duplicate: true}, nil
+	}
+	if _, ok := session.inFlightInputCommands[ref.CommandID]; ok {
+		session.mu.Unlock()
+		return acceptedAISessionInput{ref: ref}, errAISessionInputInFlight
+	}
+	session.inFlightInputCommands[ref.CommandID] = struct{}{}
 	session.seq++
 	ref.RunID = session.ref.RunID
 	session.ref.CommandID = ref.CommandID
@@ -245,7 +268,36 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 		payloadJSON:    payload,
 		handle:         handle,
 		contextPackage: command.GetContextPackage(),
+		reviewID:       strings.TrimSpace(command.GetReviewId()),
+		turnID:         strings.TrimSpace(command.GetTurnId()),
 	}, nil
+}
+
+func (m *aiSessionRuntimeManager) CompleteInput(sessionID, commandID string, succeeded bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	session, ok := m.sessions[strings.TrimSpace(sessionID)]
+	if !ok {
+		return
+	}
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	commandID = strings.TrimSpace(commandID)
+	delete(session.inFlightInputCommands, commandID)
+	if !succeeded || commandID == "" {
+		return
+	}
+	if _, exists := session.processedInputCommands[commandID]; exists {
+		return
+	}
+	session.processedInputCommands[commandID] = struct{}{}
+	session.processedInputOrder = append(session.processedInputOrder, commandID)
+	const processedInputLimit = 1024
+	if len(session.processedInputOrder) > processedInputLimit {
+		oldest := session.processedInputOrder[0]
+		session.processedInputOrder = session.processedInputOrder[1:]
+		delete(session.processedInputCommands, oldest)
+	}
 }
 
 func (m *aiSessionRuntimeManager) AcceptContextUpdate(
@@ -397,11 +449,33 @@ func (b *legionJobBridge) handleAISessionInput(ctx context.Context, raw []byte) 
 	if err := validateAISessionInputCommand(&command); err != nil {
 		return b.publishAISessionCommandFailure(ctx, ref, "invalid_ai_session_input_command", err)
 	}
+	if expected := strings.TrimSpace(command.GetExpectedNodeSessionId()); expected != "" {
+		nodeSession, ok := b.agent.node.GetSessionState()
+		if !ok || strings.TrimSpace(nodeSession.SessionID) != expected {
+			return b.publishAISessionCommandFailure(
+				ctx,
+				ref,
+				"ai_session_review_fenced",
+				fmt.Errorf("ai session review expected node session %s", expected),
+			)
+		}
+	}
 
-	accepted, err := b.ensureAIRuntime().AcceptInput(&command)
+	runtime := b.ensureAIRuntime()
+	accepted, err := runtime.AcceptInput(&command)
 	if err != nil {
+		if errors.Is(err, errAISessionInputInFlight) {
+			return err
+		}
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_input_failed", err)
 	}
+	if accepted.duplicate {
+		return nil
+	}
+	succeeded := false
+	defer func() {
+		runtime.CompleteInput(accepted.ref.SessionID, accepted.ref.CommandID, succeeded)
+	}()
 	if err := b.ensureAIPublisher().PublishEvent(
 		ctx,
 		accepted.ref,
@@ -412,6 +486,7 @@ func (b *legionJobBridge) handleAISessionInput(ctx context.Context, raw []byte) 
 		return err
 	}
 	if accepted.handle == nil {
+		succeeded = true
 		return nil
 	}
 	if err := accepted.handle.SendInput(ctx, aiSessionInput{
@@ -419,9 +494,14 @@ func (b *legionJobBridge) handleAISessionInput(ctx context.Context, raw []byte) 
 		InputType:      accepted.inputType,
 		PayloadJSON:    accepted.payloadJSON,
 		ContextPackage: accepted.contextPackage,
+		ReviewID:       accepted.reviewID,
+		TurnID:         accepted.turnID,
 	}); err != nil {
-		return b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
+		failureErr := b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
+		succeeded = failureErr == nil
+		return failureErr
 	}
+	succeeded = true
 	return nil
 }
 
@@ -618,6 +698,12 @@ func validateAISessionInputCommand(command *aiv1.PushAISessionInputCommand) erro
 		return fmt.Errorf("ai session input session_id is required")
 	case strings.TrimSpace(command.GetOwnerUserId()) == "":
 		return fmt.Errorf("ai session input owner_user_id is required")
+	case strings.TrimSpace(command.GetReviewId()) != "" &&
+		strings.TrimSpace(command.GetTurnId()) == "":
+		return fmt.Errorf("ai session review turn_id is required")
+	case strings.TrimSpace(command.GetReviewId()) != "" &&
+		strings.TrimSpace(command.GetExpectedNodeSessionId()) == "":
+		return fmt.Errorf("ai session review expected_node_session_id is required")
 	default:
 		_, err := normalizeAISessionInputPayload(command.GetInputType(), command.GetInputJson())
 		return err
