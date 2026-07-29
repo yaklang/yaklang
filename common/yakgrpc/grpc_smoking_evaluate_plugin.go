@@ -29,6 +29,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/format"
 	_ "github.com/yaklang/yaklang/common/yak/static_analyzer/score_rules"
 	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -166,17 +167,21 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	defer netx.DeleteHost(testDomain)
 	target := fmt.Sprintf("http://%s:%d", testDomain, port)
 	var results []*ypb.SmokingEvaluateResult
-	pushSuggestion := func(item string, suggestion string, R *ypb.Range, severity string, i ...[]byte) {
+	pushSuggestion := func(item string, suggestion string, R *ypb.Range, severity string, formattedCopy string, i ...[]byte) {
 		var buf bytes.Buffer
 		for _, d := range i {
 			buf.Write(d)
 		}
+		if formattedCopy == "" {
+			formattedCopy = buildSmokingEvaluateCopyText(item, suggestion, R)
+		}
 		results = append(results, &ypb.SmokingEvaluateResult{
-			Item:       item,
-			Suggestion: suggestion,
-			ExtraInfo:  buf.Bytes(),
-			Range:      R,
-			Severity:   severity,
+			Item:              item,
+			Suggestion:        suggestion,
+			ExtraInfo:         buf.Bytes(),
+			Range:             R,
+			Severity:          severity,
+			FormattedCopyText: formattedCopy,
 		})
 	}
 	fp.SetMatchResultCache(utils.HostPort(testDomain, port), MockPluginTestingFpResult(testDomain, pluginTestingServer))
@@ -193,7 +198,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	if pluginType != schema.SCRIPT_TYPE_NUCLEI {
 		prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
 		if err != nil {
-			pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
+			pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error, "")
 		} else {
 			parameters, _, _ := information.ParseCliParameter(prog)
 			if len(parameters) > 0 {
@@ -219,11 +224,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 					EndLine:     int64(sRes.EndLineNumber),
 					EndColumn:   int64(sRes.EndColumn),
 				}
+				copyOpts := format.CopyAllDefaults(pluginType)
 				switch sRes.Severity {
 				case result.Error:
-					pushSuggestion(`静态代码检测失败`, sRes.Message, R, Error, []byte(sRes.From))
+					pushSuggestion(`静态代码检测失败`, sRes.Message, R, Error, format.FormatSingleForCopy(pluginCode, sRes, copyOpts...), []byte(sRes.From))
 				case result.Warn:
-					pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, []byte(sRes.From))
+					pushSuggestion(`静态代码检测警告`, sRes.Message, R, Warning, format.FormatSingleForCopy(pluginCode, sRes, copyOpts...), []byte(sRes.From))
 				}
 			}
 			if score < 60 {
@@ -273,7 +279,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		if err != nil {
 			score -= 60
 			log.Errorf("debugScript failed: %v", err)
-			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error(), nil, Error)
+			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error(), nil, Error, "")
 		}
 		riskCount, err := yakit.CountRiskByRuntimeId(s.GetProjectDatabase(), runtimeId)
 		if err != nil {
@@ -282,7 +288,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		}
 		if riskCount > 0 {
 			score -= 50
-			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil, Error)
+			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil, Error, "")
 			err := yakit.DeleteRisk(s.GetProjectDatabase(), &ypb.QueryRisksRequest{RuntimeId: runtimeId})
 			if err != nil {
 				log.Errorf("delete plugin testing risk error: %v", err)
@@ -295,7 +301,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 			count := yakit.CountHTTPFlowByRuntimeID(s.GetProjectDatabase(), runtimeId)
 			if count < wantCount {
 				score -= 50
-				pushSuggestion("逻辑测试失败[logic Test]", `请检查插件是否正常发起请求`, nil, Error)
+				pushSuggestion("逻辑测试失败[logic Test]", `请检查插件是否正常发起请求`, nil, Error, "")
 			}
 		}
 	}
@@ -308,6 +314,23 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		Score:   int64(score),
 		Results: results,
 	}, nil
+}
+
+func buildSmokingEvaluateCopyText(item, suggestion string, r *ypb.Range) string {
+	var b strings.Builder
+	if item != "" {
+		b.WriteString(item)
+	}
+	if suggestion != "" {
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(suggestion)
+	}
+	if r != nil && r.StartLine > 0 {
+		b.WriteString(fmt.Sprintf("\n[%d:%d-%d:%d]", r.StartLine, r.StartColumn, r.EndLine, r.EndColumn))
+	}
+	return b.String()
 }
 
 func MockPluginTestingFpResult(testDomain string, pluginTestingServer *PluginTestingEchoServer) *fp.MatchResult {
