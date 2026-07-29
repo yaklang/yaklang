@@ -10,7 +10,7 @@
 #
 # sessionmgr 起容器时注入环境变量：
 #   LEGION_NATS_URL, LEGION_API_URL, LEGION_ENROLLMENT_TOKEN,
-#   LEGION_SESSIONMGR_URL, LEGION_AI_SESSION_ID
+#   LEGION_SESSIONMGR_URL, LEGION_AI_SESSION_ID, LEGION_AI_RUNTIME
 # 并通过 -agent-installation-id ai-session-<sessionID> 传 ephemeral identity。
 
 # ---------- 构建阶段 ----------
@@ -20,7 +20,8 @@ WORKDIR /src
 COPY . .
 
 # 编译 legion-smoke-node（ai_session 容器不需要 HIDS tag，精简依赖）。
-RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /out/legion-session-runtime ./cmd/legion-smoke-node
+# Yaklang's embedded pcre2 and pcap dependencies require CGO.
+RUN CGO_ENABLED=1 go build -ldflags "-s -w" -o /out/legion-session-runtime ./cmd/legion-smoke-node
 
 # ---------- 运行阶段 ----------
 FROM debian:bookworm-slim
@@ -31,6 +32,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/legion-session-runtime /usr/local/bin/legion-session-runtime
+
+# Keep standalone container launches aligned with sessionmgr. Set this to
+# "stateful" only for a temporary rollback.
+ENV LEGION_AI_RUNTIME=stateless
 
 # 默认入口：作为 ai_session 容器 runtime 启动。
 # sessionmgr 起容器时会覆盖 command 注入 -api-url / -enrollment-token /
