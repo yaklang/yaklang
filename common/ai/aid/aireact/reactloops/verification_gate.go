@@ -120,7 +120,6 @@ func (r *ReActLoop) ApplyVerificationResult(result *aicommon.VerifySatisfactionR
 	if cfg != nil && len(result.EvidenceOps) > 0 {
 		cfg.ApplySessionEvidenceOps(result.EvidenceOps)
 	}
-	r.MaybeTriggerPerceptionAfterVerification()
 }
 
 // VerifyUserSatisfactionNow forces a verification pass immediately, bypassing

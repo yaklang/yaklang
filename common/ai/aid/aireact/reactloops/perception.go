@@ -21,34 +21,30 @@ import (
 
 const (
 	PerceptionTriggerPostAction   = "post_action"
-	PerceptionTriggerVerification = "verification"
 	PerceptionTriggerForced       = "forced"
 	PerceptionTriggerSpinDetected = "spin_detected"
 	PerceptionTriggerLoopSwitch   = "loop_switch"
 
 	// perceptionDefaultMinInterval 是两次 perception AI 调用之间的最小时间间隔.
-	// 调整自 30s -> 120s (v2 进一步加大), 依据 redhaze 案例扩展仿真
-	// (docs/15-perception-frequency-experiment.md):
+	// v4: 调整自 180s -> 5min, 配合 iter=8 进一步压低调用频率.
 	// 意图感知主要服务于 capability/SKILL/knowledge 补充, 大方向不变时
-	// 频繁感知反而是负担. 120s 阈值刚好让紧邻的同阶段 drift 候选 (iter 间隔
-	// <100s) 被跳过, 而阶段切换 (iter 间隔 >150s) 仍可触发. 在 realistic 画像
-	// 下与 iter=3 配合达到 100% 命中 (fired=updated=4, wasted=0), 同时 noisy
-	// 上界也从 10 降到 4 (-60%).
-	// 关键词: perceptionDefaultMinInterval v2 默认值调整, 120s 节流,
-	//        drift 跳过 pivot 保留, capability 补充语义
-	perceptionDefaultMinInterval = 120 * time.Second
-	perceptionMaxInterval        = 5 * time.Minute
+	// 频繁感知反而是负担. 删除 afterVerification 入口后, perception 只由
+	// post_action (iter 门) + SPIN forced 触发, 再叠加更长的 minInterval,
+	// 让同阶段内紧邻的 drift 候选 (iter 间隔 <150s) 被跳过, 仅阶段切换
+	// (iter 间隔 >5min) 触发.
+	// 关键词: perceptionDefaultMinInterval v4 默认值, 5min 节流,
+	//        afterVerification 删除, drift 跳过 pivot 保留
+	perceptionDefaultMinInterval = 5 * time.Minute
+	perceptionMaxInterval        = 15 * time.Minute
 	// perceptionDefaultIterationInterval 控制每隔几个 iter 触发一次 post_action 感知.
-	// 调整自 2 -> 3, 依据 redhaze 案例仿真:
-	//   iter=2 min=30s: 13 分钟内 10 次 AI 调用, realistic 浪费率 60%
-	//   iter=3 min=60s: 6 次 AI 调用 (-40%), 浪费率 33%
-	//   iter=3 min=120s: 4 次 AI 调用 (-60%), 浪费率 0%, 仍覆盖全部 4 个 phase pivot (最优)
-	//   iter=4: 5 次, 但首次感知推迟到 iter 4 (~150s) 错过 phase 1 recon
-	//   iter=6: 3 次, 但首次感知推迟到 iter 6 (~240s) 太晚
-	// iter=3 在 first-fire 响应性 (iter 3, ~40s) 与节流之间取得最佳平衡.
-	// 关键词: perceptionDefaultIterationInterval 默认值调整, iter=3 节流甜点,
-	//        响应性平衡, phase pivot 全覆盖
-	perceptionDefaultIterationInterval  = 4
+	// v4: 调整自 6 -> 8, 配合 minInterval=5min 压低频率:
+	//   iter=4 min=120s: 仍偏密, 删除 verification 入口后实测仍有冗余
+	//   iter=6 min=180s: 首次感知推迟到 iter 6, 但 SPIN forced 仍可兜底,
+	//                    同阶段 drift 被 iter 门 + 时间门双跳过, 仅 pivot 放行
+	// 注意: SPIN forced 路径绕过 interval 门, 不会因 iter=8 而漏掉紧急刷新.
+	// 关键词: perceptionDefaultIterationInterval v4 默认值, iter=8 节流,
+	//        SPIN forced 兜底, 双门控
+	perceptionDefaultIterationInterval  = 8
 	perceptionMaxContextTokens          = 500
 	perceptionKnowledgeMaxContextTokens = 15 * 1024
 
@@ -278,7 +274,11 @@ func (pc *perceptionController) applyResult(newState *PerceptionState) (*Percept
 		pc.current.LastUpdateAt = newState.LastUpdateAt
 		pc.current.LastTrigger = newState.LastTrigger
 		pc.consecutiveUnchanged++
-		if pc.consecutiveUnchanged >= 2 {
+		// 退避: 连续未变化时加倍下次 interval, 让节流更快收紧.
+		// v3: 阈值从 2 降到 1, 第一次 unchanged 即开始退避, 配合 minInterval=5min
+		// 让同方向任务的 perception 间隔迅速爬到 maxInterval, 减少无谓调用.
+		// 关键词: consecutiveUnchanged 退避阈值 1, 立即退避, 节流收紧
+		if pc.consecutiveUnchanged >= 1 {
 			pc.currentInterval *= 2
 			if pc.currentInterval > pc.maxInterval {
 				pc.currentInterval = pc.maxInterval
@@ -1045,14 +1045,6 @@ func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
 	r.invokePerceptionTrigger(PerceptionTriggerPostAction, false)
 }
 
-// MaybeTriggerPerceptionAfterVerification triggers perception after a verification
-// result. Async by default; synchronous when SyncPerceptionTrigger is enabled on config.
-func (r *ReActLoop) MaybeTriggerPerceptionAfterVerification() {
-	if r.perception == nil {
-		return
-	}
-	r.invokePerceptionTrigger(PerceptionTriggerVerification, false)
-}
 
 // TriggerPerceptionOnSpin forces a perception update when SPIN is detected,
 // providing fresh context that may help the loop break out of a repeating pattern.
