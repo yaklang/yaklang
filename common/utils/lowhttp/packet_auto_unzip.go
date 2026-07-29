@@ -5,9 +5,11 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"compress/zlib"
+	"encoding/binary"
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
@@ -17,6 +19,43 @@ import (
 )
 
 const _autoUnzipMaxDecodedBodyBytes = 32 << 20
+
+// A gzip trailer can provide a useful output-size hint, but it is untrusted
+// until the reader reaches EOF and verifies the stream. Bound speculative
+// allocation independently from the decoded-body limit.
+const _decodedBodyInitialCapacityLimit = 1 << 20
+
+type _pooledGzipReader struct {
+	reader gzip.Reader
+	source bytes.Reader
+}
+
+var _gzipReaderPool sync.Pool
+
+func _acquireGzipReader(body []byte) (*_pooledGzipReader, error) {
+	pooled, _ := _gzipReaderPool.Get().(*_pooledGzipReader)
+	if pooled == nil {
+		pooled = new(_pooledGzipReader)
+	}
+	pooled.source.Reset(body)
+	if err := pooled.reader.Reset(&pooled.source); err != nil {
+		_releaseGzipReader(pooled)
+		return nil, err
+	}
+	return pooled, nil
+}
+
+func _releaseGzipReader(pooled *_pooledGzipReader) {
+	if pooled == nil {
+		return
+	}
+	_ = pooled.reader.Close()
+	pooled.source.Reset(nil)
+	// Reset clears gzip header state and points the retained flate reader at the
+	// now-empty owned source, so the pool cannot retain the compressed packet.
+	_ = pooled.reader.Reset(&pooled.source)
+	_gzipReaderPool.Put(pooled)
+}
 
 type _contentAlgo uint8
 
@@ -125,7 +164,10 @@ func _unzipPacketEncodingInternal(raw []byte, cfg _unzipPacketEncodingConfig, op
 		buf              bytes.Buffer
 	)
 
-	_, body := SplitHTTPPacket(raw,
+	// Detection and decoding only read the packet body. Keep a view here: the
+	// no-op/conservative paths return raw itself, while every successful
+	// transform builds an independently owned decoded packet below.
+	_, body := splitHTTPPacketEx(raw,
 		func(method string, requestUri string, proto string) error {
 			buf.WriteString(method + " " + requestUri + " " + proto + CRLF)
 			return nil
@@ -134,6 +176,8 @@ func _unzipPacketEncodingInternal(raw []byte, cfg _unzipPacketEncodingConfig, op
 			buf.WriteString(proto + " " + strconv.Itoa(code) + " " + codeMsg + CRLF)
 			return nil
 		},
+		nil,
+		false,
 		func(line string) string {
 			k, v := SplitHTTPHeader(line)
 			switch strings.ToLower(strings.TrimSpace(k)) {
@@ -157,15 +201,21 @@ func _unzipPacketEncodingInternal(raw []byte, cfg _unzipPacketEncodingConfig, op
 
 	// Unchunk first.
 	unchunkedApplied := false
+	bodyIndependentlyOwned := false
 	if isChunked {
-		unchunked, chunkErr := codec.HTTPChunkedDecode(body)
+		// HTTPChunkedDecode truncates its diagnostic input on some malformed
+		// packets. Preserve the original wire packet by retaining the historical
+		// body copy for this branch only.
+		unchunked, chunkErr := codec.HTTPChunkedDecode(bytes.Clone(body))
 		if unchunked != nil {
 			body = unchunked
 			unchunkedApplied = true
+			bodyIndependentlyOwned = true
 		} else {
 			if chunkErr == nil {
 				body = []byte{}
 				unchunkedApplied = true
+				bodyIndependentlyOwned = true
 			} else if cfg.conservative {
 				return raw, nil, false
 			}
@@ -181,6 +231,7 @@ func _unzipPacketEncodingInternal(raw []byte, cfg _unzipPacketEncodingConfig, op
 			body = decoded
 			detected = algo
 			contentDecoded = true
+			bodyIndependentlyOwned = true
 		} else if cfg.conservative {
 			return raw, nil, false
 		}
@@ -192,6 +243,7 @@ func _unzipPacketEncodingInternal(raw []byte, cfg _unzipPacketEncodingConfig, op
 					body = decoded
 					detected = algo
 					contentDecoded = true
+					bodyIndependentlyOwned = true
 				} else if cfg.conservative {
 					return raw, nil, false
 				}
@@ -204,7 +256,11 @@ func _unzipPacketEncodingInternal(raw []byte, cfg _unzipPacketEncodingConfig, op
 		return raw, nil, false
 	}
 
-	plain = ReplaceHTTPPacketBody(buf.Bytes(), body, false)
+	if bodyIndependentlyOwned {
+		plain = replaceHTTPPacketBodyExOwned(buf.Bytes(), body, false, false)
+	} else {
+		plain = ReplaceHTTPPacketBody(buf.Bytes(), body, false)
+	}
 	state = &PacketEncodingState{
 		ContentEncoding:  encoding,
 		TransferEncoding: transferEncoding,
@@ -320,16 +376,52 @@ func AutoZipPacketEncoding(plain []byte, state *PacketEncodingState) (encoded []
 }
 
 func _readAllLimited(r io.Reader, max int) ([]byte, bool) {
+	return _readAllLimitedWithHint(r, max, 0)
+}
+
+func _readAllLimitedWithHint(r io.Reader, max int, sizeHint int) ([]byte, bool) {
 	maxInt := int(^uint(0) >> 1)
+	var reader io.Reader = r
+	limited := max > 0 && max < maxInt
+	if limited {
+		reader = io.LimitReader(r, int64(max)+1)
+	}
+
+	if sizeHint > 0 {
+		if sizeHint > _decodedBodyInitialCapacityLimit {
+			sizeHint = _decodedBodyInitialCapacityLimit
+		}
+		if limited && sizeHint > max {
+			sizeHint = max
+		}
+		// bytes.Buffer.ReadFrom asks for another bytes.MinRead-sized region in
+		// order to observe EOF. Leave that slack so an exact hint does not force
+		// one final geometric growth.
+		capacity := sizeHint
+		if capacity <= maxInt-bytes.MinRead {
+			capacity += bytes.MinRead
+		}
+		var buf bytes.Buffer
+		buf.Grow(capacity)
+		if _, err := buf.ReadFrom(reader); err != nil {
+			return nil, false
+		}
+		raw := buf.Bytes()
+		if limited && len(raw) > max {
+			return nil, false
+		}
+		return raw, true
+	}
+
 	if max <= 0 || max >= maxInt {
-		raw, err := io.ReadAll(r)
+		raw, err := io.ReadAll(reader)
 		if err != nil {
 			return nil, false
 		}
 		return raw, true
 	}
 
-	raw, err := io.ReadAll(io.LimitReader(r, int64(max)+1))
+	raw, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, false
 	}
@@ -337,6 +429,20 @@ func _readAllLimited(r io.Reader, max int) ([]byte, bool) {
 		return nil, false
 	}
 	return raw, true
+}
+
+func _gzipDecodedSizeHint(bodyRaw []byte) int {
+	if len(bodyRaw) < 4 {
+		return 0
+	}
+	size := uint64(binary.LittleEndian.Uint32(bodyRaw[len(bodyRaw)-4:]))
+	if size == 0 {
+		return 0
+	}
+	if size > _decodedBodyInitialCapacityLimit {
+		return _decodedBodyInitialCapacityLimit
+	}
+	return int(size)
 }
 
 func _isZlibHeader(body []byte) bool {
@@ -423,12 +529,12 @@ func _decodeBody(algo _contentAlgo, bodyRaw []byte, maxDecoded int) (finalResult
 
 	switch algo {
 	case _contentAlgoGzip:
-		r, err := gzip.NewReader(bytes.NewReader(bodyRaw))
+		pooled, err := _acquireGzipReader(bodyRaw)
 		if err != nil {
 			return bodyRaw, false
 		}
-		defer r.Close()
-		if out, ok := _readAllLimited(r, maxDecoded); ok {
+		defer _releaseGzipReader(pooled)
+		if out, ok := _readAllLimitedWithHint(&pooled.reader, maxDecoded, _gzipDecodedSizeHint(bodyRaw)); ok {
 			return out, true
 		}
 		return bodyRaw, false

@@ -206,7 +206,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	retryHandler := option.RetryHandler
 	retry := func(rsp *LowhttpResponse, rawBytes []byte, retryTimes int) bool {
 		if retryHandler != nil {
-			rspRaw, _, err := FixHTTPResponse(rawBytes)
+			rspRaw, err := FixHTTPResponsePacket(rawBytes)
 			if err != nil {
 				rspRaw = rawBytes
 			}
@@ -1129,9 +1129,16 @@ RECONNECT:
 
 		traceInfo.ServerTime = time.Since(serverTimeStart)
 
-		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
+		if option.DiscardIntermediateResponseBody {
+			firstResponse, err = utils.ReadHTTPResponseMetadataFromBufioReader(httpResponseReader, reqIns, responseRaw.Grow)
+		} else {
+			firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
+		}
 		if err != nil {
 			log.Warnf("[lowhttp] read response failed: %s", err)
+		}
+		if utils.HTTPResponseHasDiscardedIntermediateBody(firstResponse) {
+			firstResponse.Body = http.NoBody
 		}
 
 		if firstAuth && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {
@@ -1218,7 +1225,7 @@ RECONNECT:
 	}
 
 	if option.EnableMaxContentLength && maxContentLength > 0 {
-		if body := GetHTTPPacketBody(rawBytes); len(body) > maxContentLength {
+		if _, body := SplitHTTPHeadersAndBodyFromPacketView(rawBytes); len(body) > maxContentLength {
 			rawBytes = ReplaceHTTPPacketBodyRaw(rawBytes, body[:maxContentLength], true)
 		}
 	}
@@ -1259,7 +1266,7 @@ RECONNECT:
 		/*
 			todo: need split fix http response, fix content-type need as option
 		*/
-		rspRaw, _, err := FixHTTPResponse(rawBytes)
+		rspRaw, err := FixHTTPResponsePacket(rawBytes)
 		if err != nil {
 			log.Errorf("fix http response failed: %s", err)
 			response.RawPacket = rawBytes
@@ -1273,6 +1280,7 @@ RECONNECT:
 			response.FixContentType = fixHeader
 		}
 		response.RawPacket = rspRaw
+		response.ResponsePacketFixed = true
 
 		err = failureChecker(response)
 		return response, err

@@ -6,8 +6,8 @@
  *  1) Teddy (主力, 见 build_teddy / teddy_scan_*): 真正的 Teddy 指纹算法. 取每条字面量
  *     前 M 个字节 (M=min(最短字面量, 4), 要求 >=2) 作"指纹", 把字面量分到 8 个桶, 用 PSHUFB
  *     (x86 SSSE3) / TBL (arm64 NEON) 对每 16 字节窗口的 lo/hi nibble 做并行成员查表, 一次
- *     得到 16 个起始位置各自"可能命中的桶位图". 仅在位图非零处做 memcmp 确认 (confirm) 并
- *     产出精确命中. 跨块用"重叠非对齐读"取 M 个偏移向量按位与 (规避跨 lane 移位的进位易错点),
+ *     得到 16 个起始位置各自"可能命中的桶位图". 仅在位图非零处做 ASCII 无关大小写的精确确认
+ *     (confirm) 并产出命中. 跨块用"重叠非对齐读"取 M 个偏移向量按位与 (规避跨 lane 移位的进位易错点),
  *     正确性等价于标量逐位置查表.
  *
  *  2) Aho-Corasick + shufti (回退, 见 mrehs_pf_scan 的 ac 分支): 当 Teddy 不适用 (存在长度 1
@@ -18,7 +18,8 @@
  * skip_to_active 标量尾) 既是非 SIMD 架构的实现, 也是 SIMD 路径的差分参照.
  *
  * 正确性: 预过滤只产出候选 (允许假阳, 绝无假阴), 真伪由 Go 侧完整正则验证判定. Teddy 的指纹
- * 过滤是保守的 (匹配指纹才确认), confirm 用 memcmp 精确比对, 故与 AC 产出同一命中集合.
+ * 过滤是保守的 (匹配指纹才确认), 扫描时只折叠 ASCII A-Z 且 confirm 精确比对, 故与先小写
+ * 整份输入再扫描的 AC 产出同一命中集合，同时避免为每个并发正文分配等长副本.
  *
  * 关键词: minirehs, prefilter, Teddy, fingerprint, SIMD, shufti, PSHUFB, NEON, Aho-Corasick
  */
@@ -42,6 +43,7 @@
 
 #define TEDDY_BUCKETS 8 /* 1 字节位图 = 8 个桶 */
 #define TEDDY_MAXM 4    /* 指纹最大长度 */
+#define TEDDY_PREFIX2_WORDS 1024 /* 65536 个双字节前缀的精确位图 (8 KiB) */
 
 typedef struct mrehs_pf {
     int32_t  *next;     /* AC: numStates * 256 转移表 */
@@ -61,11 +63,48 @@ typedef struct mrehs_pf {
     int32_t   teddyM;         /* 指纹长度 1..4 */
     uint8_t   tLo[TEDDY_MAXM][16]; /* tLo[m][nibble] = 第 m 指纹字节低半字节命中的桶位图 */
     uint8_t   tHi[TEDDY_MAXM][16];
+    /*
+     * nibble 指纹允许假阳。低熵输入 (如连续 'a') 可能让每个 lane 都进入
+     * teddy_confirm，即使没有任何字面量以 "aa" 开头。这个精确双字节前缀位图
+     * 在 confirm 前排除该退化路径；Teddy 仅在最短字面量 >=2 时启用，因此真
+     * 命中的前两个字节必在位图中，过滤不会产生假阴。
+     */
+    uint64_t  prefix2[TEDDY_PREFIX2_WORDS];
     uint8_t  *litBytes;       /* 拼接的字面量字节 (已小写) */
     int32_t  *litOff;         /* numLit+1 偏移; 第 j 条 = litBytes[litOff[j]..litOff[j+1]) */
     int32_t   bkOff[TEDDY_BUCKETS + 1]; /* 桶 -> bkLit 区间 */
     int32_t  *bkLit;          /* 按桶分组的字面量 id (长度 numLit) */
 } mrehs_pf;
+
+static inline uint8_t ascii_lower_byte(uint8_t c) {
+    if (c >= (uint8_t)'A' && c <= (uint8_t)'Z') return (uint8_t)(c + ('a' - 'A'));
+    return c;
+}
+
+static inline int ascii_equal_lower(const uint8_t *data, const uint8_t *lower, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        if (ascii_lower_byte(data[i]) != lower[i]) return 0;
+    }
+    return 1;
+}
+
+#if defined(MREHS_X86_SSSE3)
+__attribute__((target("ssse3")))
+static inline __m128i ascii_lower_ssse3(__m128i v) {
+    __m128i afterA = _mm_cmpgt_epi8(v, _mm_set1_epi8('A' - 1));
+    __m128i beforeZ = _mm_cmpgt_epi8(_mm_set1_epi8('Z' + 1), v);
+    __m128i upper = _mm_and_si128(afterA, beforeZ);
+    return _mm_or_si128(v, _mm_and_si128(upper, _mm_set1_epi8(0x20)));
+}
+#endif
+
+#if defined(MREHS_ARM64)
+static inline uint8x16_t ascii_lower_neon(uint8x16_t v) {
+    uint8x16_t upper = vandq_u8(vcgeq_u8(v, vdupq_n_u8('A')),
+                                vcleq_u8(v, vdupq_n_u8('Z')));
+    return vorrq_u8(v, vandq_u8(upper, vdupq_n_u8(0x20)));
+}
+#endif
 
 /* ---- AC 回退的 shufti 根跳过表 ---- */
 static void build_shufti(mrehs_pf *pf) {
@@ -115,6 +154,7 @@ static void build_teddy(mrehs_pf *pf, const uint8_t *litFlat, const int32_t *lit
     pf->teddyM = M;
     memset(pf->tLo, 0, sizeof(pf->tLo));
     memset(pf->tHi, 0, sizeof(pf->tHi));
+    memset(pf->prefix2, 0, sizeof(pf->prefix2));
 
     /* 桶计数 -> 偏移 (bucket = j % 8). */
     int32_t cnt[TEDDY_BUCKETS] = {0};
@@ -128,6 +168,8 @@ static void build_teddy(mrehs_pf *pf, const uint8_t *litFlat, const int32_t *lit
         int b = (int)(j % TEDDY_BUCKETS);
         pf->bkLit[fill[b]++] = j;
         const uint8_t *p = pf->litBytes + litOff[j];
+        uint16_t prefix = (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
+        pf->prefix2[prefix >> 6] |= (uint64_t)1u << (prefix & 63);
         uint8_t bit = (uint8_t)(1u << b);
         for (int m = 0; m < M; m++) {
             uint8_t by = p[m];
@@ -182,11 +224,17 @@ void mrehs_pf_free(mrehs_pf *pf) {
     free(pf);
 }
 
-/* confirm: 在位置 pos 对 bucketmap 中每个桶的字面量做 memcmp, 命中写入 (end,litID).
+/* confirm: 在位置 pos 对 bucketmap 中每个桶的字面量做 ASCII 无关大小写精确比较, 命中写入 (end,litID).
  * 返回新的 total (可能 > cap, 表示截断). */
 static inline int32_t teddy_confirm(const mrehs_pf *pf, const uint8_t *data, size_t len,
                                     size_t pos, uint8_t bucketmap,
                                     int32_t *out, int32_t cap, int32_t total) {
+    uint8_t prefix0 = ascii_lower_byte(data[pos]);
+    uint8_t prefix1 = ascii_lower_byte(data[pos + 1]);
+    uint16_t prefix = (uint16_t)(((uint16_t)prefix0 << 8) | prefix1);
+    if ((pf->prefix2[prefix >> 6] & ((uint64_t)1u << (prefix & 63))) == 0) {
+        return total;
+    }
     while (bucketmap) {
         int b = __builtin_ctz((unsigned)bucketmap);
         bucketmap &= (uint8_t)(bucketmap - 1);
@@ -195,7 +243,7 @@ static inline int32_t teddy_confirm(const mrehs_pf *pf, const uint8_t *data, siz
             int32_t j = pf->bkLit[jj];
             int32_t off = pf->litOff[j];
             int32_t l = pf->litOff[j + 1] - off;
-            if (pos + (size_t)l <= len && memcmp(data + pos, pf->litBytes + off, (size_t)l) == 0) {
+            if (pos + (size_t)l <= len && ascii_equal_lower(data + pos, pf->litBytes + off, (size_t)l)) {
                 if (total < cap) {
                     out[total * 2] = (int32_t)(pos + (size_t)l); /* end (exclusive) */
                     out[total * 2 + 1] = j;                      /* litID == 字面量下标 */
@@ -216,7 +264,7 @@ static int32_t teddy_scan_scalar(const mrehs_pf *pf, const uint8_t *data, size_t
     for (size_t pos = 0; pos + (size_t)M <= len; pos++) {
         uint8_t bm = 0xff;
         for (int m = 0; m < M; m++) {
-            uint8_t by = data[pos + (size_t)m];
+            uint8_t by = ascii_lower_byte(data[pos + (size_t)m]);
             bm &= (uint8_t)(pf->tLo[m][by & 0xf] & pf->tHi[m][(by >> 4) & 0xf]);
             if (bm == 0) break;
         }
@@ -246,7 +294,7 @@ static int32_t teddy_scan_ssse3(const mrehs_pf *pf, const uint8_t *data, size_t 
     while (i + 16 + (size_t)(M - 1) <= len) {
         __m128i cand = ones;
         for (int m = 0; m < M; m++) {
-            __m128i v = _mm_loadu_si128((const __m128i *)(data + i + (size_t)m));
+            __m128i v = ascii_lower_ssse3(_mm_loadu_si128((const __m128i *)(data + i + (size_t)m)));
             __m128i lo = _mm_and_si128(v, lowNib);
             __m128i hi = _mm_and_si128(_mm_srli_epi16(v, 4), lowNib);
             __m128i rl = _mm_shuffle_epi8(loV[m], lo);
@@ -267,7 +315,7 @@ static int32_t teddy_scan_ssse3(const mrehs_pf *pf, const uint8_t *data, size_t 
     for (; i + (size_t)M <= len; i++) {
         uint8_t bm = 0xff;
         for (int m = 0; m < M; m++) {
-            uint8_t by = data[i + (size_t)m];
+            uint8_t by = ascii_lower_byte(data[i + (size_t)m]);
             bm &= (uint8_t)(pf->tLo[m][by & 0xf] & pf->tHi[m][(by >> 4) & 0xf]);
             if (bm == 0) break;
         }
@@ -294,7 +342,7 @@ static int32_t teddy_scan_neon(const mrehs_pf *pf, const uint8_t *data, size_t l
     while (i + 16 + (size_t)(M - 1) <= len) {
         uint8x16_t cand = vdupq_n_u8(0xff);
         for (int m = 0; m < M; m++) {
-            uint8x16_t v = vld1q_u8(data + i + (size_t)m);
+            uint8x16_t v = ascii_lower_neon(vld1q_u8(data + i + (size_t)m));
             uint8x16_t lo = vandq_u8(v, lowNib);
             uint8x16_t hi = vandq_u8(vshrq_n_u8(v, 4), lowNib);
             uint8x16_t rl = vqtbl1q_u8(loV[m], lo);
@@ -313,7 +361,7 @@ static int32_t teddy_scan_neon(const mrehs_pf *pf, const uint8_t *data, size_t l
     for (; i + (size_t)M <= len; i++) {
         uint8_t bm = 0xff;
         for (int m = 0; m < M; m++) {
-            uint8_t by = data[i + (size_t)m];
+            uint8_t by = ascii_lower_byte(data[i + (size_t)m]);
             bm &= (uint8_t)(pf->tLo[m][by & 0xf] & pf->tHi[m][(by >> 4) & 0xf]);
             if (bm == 0) break;
         }
@@ -348,7 +396,7 @@ static size_t skip_to_active_ssse3(const mrehs_pf *pf, const uint8_t *data,
     __m128i lowNibMask = _mm_set1_epi8(0x0f);
     __m128i zero = _mm_setzero_si128();
     while (i + 16 <= len) {
-        __m128i v = _mm_loadu_si128((const __m128i *)(data + i));
+        __m128i v = ascii_lower_ssse3(_mm_loadu_si128((const __m128i *)(data + i)));
         __m128i lo = _mm_and_si128(v, lowNibMask);
         __m128i hi = _mm_and_si128(_mm_srli_epi16(v, 4), lowNibMask);
         __m128i a = _mm_shuffle_epi8(loV, lo);
@@ -358,13 +406,13 @@ static size_t skip_to_active_ssse3(const mrehs_pf *pf, const uint8_t *data,
         int mask = _mm_movemask_epi8(eqz);
         if (mask != 0xffff) {
             for (int k = 0; k < 16; k++) {
-                if (pf->active[data[i + k]]) return i + k;
+                if (pf->active[ascii_lower_byte(data[i + k])]) return i + k;
             }
         }
         i += 16;
     }
     while (i < len) {
-        if (pf->active[data[i]]) return i;
+        if (pf->active[ascii_lower_byte(data[i])]) return i;
         i++;
     }
     return len;
@@ -378,13 +426,13 @@ static inline size_t skip_to_active(const mrehs_pf *pf, const uint8_t *data,
         return skip_to_active_ssse3(pf, data, i, len);
     }
     while (i < len) {
-        if (pf->active[data[i]]) return i;
+        if (pf->active[ascii_lower_byte(data[i])]) return i;
         i++;
     }
     return len;
 #elif defined(MREHS_X86)
     while (i < len) {
-        if (pf->active[data[i]]) return i;
+        if (pf->active[ascii_lower_byte(data[i])]) return i;
         i++;
     }
     return len;
@@ -393,7 +441,7 @@ static inline size_t skip_to_active(const mrehs_pf *pf, const uint8_t *data,
     uint8x16_t hiV = vld1q_u8(pf->hiMask);
     uint8x16_t lowNib = vdupq_n_u8(0x0f);
     while (i + 16 <= len) {
-        uint8x16_t v = vld1q_u8(data + i);
+        uint8x16_t v = ascii_lower_neon(vld1q_u8(data + i));
         uint8x16_t lo = vandq_u8(v, lowNib);
         uint8x16_t hi = vandq_u8(vshrq_n_u8(v, 4), lowNib);
         uint8x16_t a = vqtbl1q_u8(loV, lo);
@@ -401,14 +449,14 @@ static inline size_t skip_to_active(const mrehs_pf *pf, const uint8_t *data,
         uint8x16_t r = vandq_u8(a, b);
         if (vmaxvq_u8(r) != 0) {
             for (int k = 0; k < 16; k++) {
-                if (pf->active[data[i + k]]) return i + k;
+                if (pf->active[ascii_lower_byte(data[i + k])]) return i + k;
             }
         }
         i += 16;
     }
 #endif
     while (i < len) {
-        if (pf->active[data[i]]) return i;
+        if (pf->active[ascii_lower_byte(data[i])]) return i;
         i++;
     }
     return len;
@@ -427,7 +475,7 @@ static int32_t ac_scan(const mrehs_pf *pf, const uint8_t *data, size_t len,
             i = skip_to_active(pf, data, i, len);
             if (i >= len) break;
         }
-        state = next[(state << 8) | data[i]];
+        state = next[(state << 8) | ascii_lower_byte(data[i])];
         int32_t off = outOff[state];
         int32_t end = outOff[state + 1];
         for (; off < end; off++) {

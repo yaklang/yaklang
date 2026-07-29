@@ -3,6 +3,7 @@ package consts
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -32,6 +33,15 @@ const (
 )
 
 var RegisterDriverOnce = new(sync.Once)
+
+type databaseOpenOptions struct {
+	sqliteMaxOpenConns int
+	sqlitePrivateCache bool
+}
+
+func defaultDatabaseOpenOptions() databaseOpenOptions {
+	return databaseOpenOptions{sqliteMaxOpenConns: 1}
+}
 
 func DeleteDatabaseFile(path string) error {
 	err := os.RemoveAll(path)
@@ -90,6 +100,10 @@ func GetTempTestDatabase() (string, *gorm.DB, error) {
 }
 
 func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
+	return createAndConfigDatabaseWithOptions(path, defaultDatabaseOpenOptions(), drivers...)
+}
+
+func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions, drivers ...string) (*gorm.DB, error) {
 	if path == "" {
 		return nil, utils.Errorf("database path is empty")
 	}
@@ -105,7 +119,18 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	purePath := path
 	switch driver {
 	case SQLiteExtend, SQLite:
-		path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
+		cacheMode := "shared"
+		if options.sqlitePrivateCache {
+			cacheMode = "private"
+		}
+		params := url.Values{
+			"mode":          []string{"rwc"},
+			"cache":         []string{cacheMode},
+			"_busy_timeout": []string{"10000"},
+			"_synchronous":  []string{"OFF"},
+			"_cache_size":   []string{"8000"},
+		}
+		path = fmt.Sprintf("%s?%s", path, params.Encode())
 	case MySQL:
 		path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
 	default:
@@ -123,21 +148,59 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	configureAndOptimizeDB(driver, db)
+	configureAndOptimizeDBWithOptions(driver, db, options)
+	return db, nil
+}
+
+func createSQLiteReadOnlyDatabase(path string, maxOpenConns int) (*gorm.DB, error) {
+	if path == "" {
+		return nil, utils.Errorf("database path is empty")
+	}
+	if maxOpenConns < 1 {
+		return nil, utils.Errorf("read-only SQLite max open connections must be positive")
+	}
+	RegisterDriverOnce.Do(registerDriver)
+	params := url.Values{
+		"mode":          []string{"ro"},
+		"cache":         []string{"private"},
+		"_query_only":   []string{"1"},
+		"_busy_timeout": []string{"10000"},
+		"_cache_size":   []string{"8000"},
+	}
+	db, err := gorm.Open(SQLite, fmt.Sprintf("%s?%s", path, params.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	db.DB().SetConnMaxLifetime(time.Hour)
+	db.DB().SetMaxOpenConns(maxOpenConns)
+	db.DB().SetMaxIdleConns(maxOpenConns)
+	if err := db.DB().Ping(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return db, nil
 }
 
 func configureAndOptimizeDB(drive string, db *gorm.DB) {
+	configureAndOptimizeDBWithOptions(drive, db, defaultDatabaseOpenOptions())
+}
+
+func configureAndOptimizeDBWithOptions(drive string, db *gorm.DB, options databaseOpenOptions) {
 	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
 	db.DB().SetConnMaxLifetime(time.Hour)
-	db.DB().SetMaxIdleConns(10)
 	// SQLite must keep a single writer connection to avoid "database is locked" under concurrent writes.
 	// For server databases (MySQL/Postgres), allow a small pool for throughput.
 	switch drive {
 	case SQLiteExtend, SQLite:
-		db.DB().SetMaxOpenConns(1)
+		maxOpenConns := options.sqliteMaxOpenConns
+		if maxOpenConns < 1 {
+			maxOpenConns = 1
+		}
+		db.DB().SetMaxOpenConns(maxOpenConns)
+		db.DB().SetMaxIdleConns(maxOpenConns)
 	default:
 		db.DB().SetMaxOpenConns(20)
+		db.DB().SetMaxIdleConns(10)
 	}
 
 	if drive == SQLiteExtend || drive == SQLite {

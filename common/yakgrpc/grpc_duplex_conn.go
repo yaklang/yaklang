@@ -99,10 +99,32 @@ func broadcastHTTPFlowSlowQuerySQL(avgCost time.Duration, items []*yakit.LongSQL
 	return true
 }
 
+type databaseTableWatchCursor struct {
+	current     int64
+	initialized bool
+}
+
+func (cursor *databaseTableWatchCursor) advance(current int64) (previous int64, changed bool) {
+	previous = cursor.current
+	cursor.current = current
+	if !cursor.initialized {
+		cursor.initialized = true
+		return previous, false
+	}
+	return previous, current != previous
+}
+
 func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	id := uuid.New().String()
 	yakit.RegisterServerPushCallback(id, stream)
 	defer yakit.UnRegisterServerPushCallback(id)
+
+	// Establish table baselines before advertising server push. Any insert that
+	// races with the handshake is then observed as a cursor transition instead
+	// of being swallowed by the watcher's initial snapshot.
+	initialHTTPFlowsSeq, _ := WatchDatabaseTableMeta(nil, 0, stream.Context(), "http_flows")
+	aiMemoryPrototype := &schema.AIMemoryEntity{}
+	initialAIMemorySeq, _ := WatchDatabaseTableMeta(nil, 0, stream.Context(), aiMemoryPrototype.TableName())
 
 	yakit.BroadcastData(yakit.ServerPushType_Global, map[string]any{
 		"config": map[string]any{
@@ -112,51 +134,48 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 
 	// http flow  server push
 	{
-		var httpFlowsSeq int64
-		var changed bool
 		go func() {
+			cursor := &databaseTableWatchCursor{current: initialHTTPFlowsSeq, initialized: true}
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
 			for {
+				current, _ := WatchDatabaseTableMeta(nil, cursor.current, stream.Context(), "http_flows")
+				previous, changed := cursor.advance(current)
+				if changed {
+					binding := consts.CaptureProjectDatabaseBinding()
+					yakit.RecordHTTPFlowChangeDetected(
+						yakit.HTTPFlowDatabaseIdentity(binding.Path),
+						binding.Generation,
+						uint64(previous),
+						uint64(current),
+						time.Now(),
+					)
+					yakit.BroadcastData(yakit.ServerPushType_HttpFlow, "create")
+				}
 				select {
 				case <-stream.Context().Done():
 					return
-				default:
-					if httpFlowsSeq == 0 {
-						httpFlowsSeq, _ = WatchDatabaseTableMeta(nil, 0, stream.Context(), "http_flows")
-						time.Sleep(time.Second)
-						continue
-					}
-
-					httpFlowsSeq, changed = WatchDatabaseTableMeta(nil, httpFlowsSeq, stream.Context(), "http_flows")
-					if changed {
-						yakit.BroadcastData(yakit.ServerPushType_HttpFlow, "create")
-					}
-					time.Sleep(time.Second)
+				case <-ticker.C:
 				}
 			}
 		}()
 	}
 
 	{
-		var aiMemorySeq int64
-		var changed bool
 		go func() {
+			cursor := &databaseTableWatchCursor{current: initialAIMemorySeq, initialized: true}
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
 			for {
+				current, _ := WatchDatabaseTableMeta(nil, cursor.current, stream.Context(), aiMemoryPrototype.TableName())
+				_, changed := cursor.advance(current)
+				if changed {
+					yakit.BroadcastData(yakit.ServerPushType_AIMemory, "create")
+				}
 				select {
 				case <-stream.Context().Done():
 					return
-				default:
-					prototype := &schema.AIMemoryEntity{}
-					if aiMemorySeq == 0 {
-						aiMemorySeq, _ = WatchDatabaseTableMeta(nil, 0, stream.Context(), prototype.TableName())
-						time.Sleep(time.Second)
-						continue
-					}
-
-					aiMemorySeq, changed = WatchDatabaseTableMeta(nil, aiMemorySeq, stream.Context(), prototype.TableName())
-					if changed {
-						yakit.BroadcastData(yakit.ServerPushType_AIMemory, "create")
-					}
-					time.Sleep(time.Second)
+				case <-ticker.C:
 				}
 			}
 		}()
@@ -233,7 +252,15 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		})
 	}
 
-	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream)
+	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream, func(_ context.Context, req *ypb.DuplexConnectionRequest) error {
+		switch req.GetMessageType() {
+		case yakit.ServerPushType_HTTPFlowCommittedSubscribe:
+			yakit.SetServerPushSubscription(id, yakit.ServerPushType_HTTPFlowCommitted, true)
+		case yakit.ServerPushType_HTTPFlowCommittedUnsubscribe:
+			yakit.SetServerPushSubscription(id, yakit.ServerPushType_HTTPFlowCommitted, false)
+		}
+		return nil
+	})
 	return stream.Context().Err()
 }
 

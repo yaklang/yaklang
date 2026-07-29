@@ -3,7 +3,10 @@ package consts
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,6 +14,11 @@ import (
 	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/log"
+)
+
+const (
+	YakitSQLiteProjectMaxOpenConnsEnv  = "YAKIT_SQLITE_PROJECT_MAX_OPEN_CONNS"
+	YakitSQLiteProjectReadPoolConnsEnv = "YAKIT_SQLITE_PROJECT_READ_POOL_CONNS"
 )
 
 var (
@@ -22,7 +30,45 @@ var (
 	debugProfileDatabase       = false
 	currentProjectDatabasePath string // 当前项目 SQLite 路径，在设置/初始化时写入，供慢 SQL 等在各创建处使用
 	currentProfileDatabasePath string // 当前 profile SQLite 路径，在初始化时写入，供非 project 的慢 SQL 在各创建处使用
+
+	projectDatabaseBinding    atomic.Pointer[ProjectDatabaseBinding]
+	projectDatabaseGeneration atomic.Uint64
 )
+
+// ProjectDatabaseBinding is an immutable snapshot of the active project DB.
+// Readers use one atomic load so a project switch cannot pair an old handle
+// with a new path or generation.
+type ProjectDatabaseBinding struct {
+	Database     *gorm.DB
+	ReadDatabase *gorm.DB
+	Path         string
+	Generation   uint64
+}
+
+func publishProjectDatabaseBinding(
+	db *gorm.DB,
+	readDB *gorm.DB,
+	path string,
+	forceNewGeneration bool,
+) ProjectDatabaseBinding {
+	if !forceNewGeneration {
+		if current := projectDatabaseBinding.Load(); current != nil && current.Database == db &&
+			current.ReadDatabase == readDB && current.Path == path {
+			return *current
+		}
+	}
+	binding := &ProjectDatabaseBinding{
+		Database:     db,
+		ReadDatabase: readDB,
+		Path:         path,
+		Generation:   projectDatabaseGeneration.Add(1),
+	}
+	// Queued writes and in-flight queries can retain the previous generation.
+	// Its writer already follows this deferred lifecycle, so the optional reader
+	// must not be closed eagerly during an atomic project rebind either.
+	projectDatabaseBinding.Store(binding)
+	return *binding
+}
 
 func DebugProjectDatabase() {
 	debugProjectDatabase = true
@@ -33,14 +79,80 @@ func DebugProfileDatabase() {
 }
 
 func CreateProjectDatabase(path string) (*gorm.DB, error) {
-	db, err := createAndConfigDatabase(path)
+	options, err := projectDatabaseOpenOptions()
 	if err != nil {
 		return nil, err
+	}
+	if _, err := projectDatabaseReadPoolConns(); err != nil {
+		return nil, err
+	}
+	db, err := createAndConfigDatabaseWithOptions(path, options)
+	if err != nil {
+		return nil, err
+	}
+	if options.sqliteMaxOpenConns > 1 {
+		log.Infof(
+			"project SQLite read concurrency enabled: max_open_connections=%d cache=private",
+			options.sqliteMaxOpenConns,
+		)
 	}
 	TuneSQLiteByDatabaseFileSize(db, path)
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	schema.ApplyPatches(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	return db, nil
+}
+
+// CreateProjectDatabaseReadOnly opens the optional query-only pool used by
+// QueryHTTPFlows experiments. A nil result means the feature is disabled.
+func CreateProjectDatabaseReadOnly(path string) (*gorm.DB, error) {
+	maxOpenConns, err := projectDatabaseReadPoolConns()
+	if err != nil || maxOpenConns == 0 {
+		return nil, err
+	}
+	db, err := createSQLiteReadOnlyDatabase(path, maxOpenConns)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof(
+		"project SQLite dedicated read pool enabled: max_open_connections=%d mode=ro query_only=1 cache=private",
+		maxOpenConns,
+	)
+	return db, nil
+}
+
+func projectDatabaseOpenOptions() (databaseOpenOptions, error) {
+	options := defaultDatabaseOpenOptions()
+	raw := strings.TrimSpace(os.Getenv(YakitSQLiteProjectMaxOpenConnsEnv))
+	if raw == "" {
+		return options, nil
+	}
+	maxOpenConns, err := strconv.Atoi(raw)
+	if err != nil || maxOpenConns < 1 || maxOpenConns > 8 {
+		return options, utils.Errorf(
+			"%s must be an integer between 1 and 8, got %q",
+			YakitSQLiteProjectMaxOpenConnsEnv,
+			raw,
+		)
+	}
+	options.sqliteMaxOpenConns = maxOpenConns
+	options.sqlitePrivateCache = maxOpenConns > 1
+	return options, nil
+}
+
+func projectDatabaseReadPoolConns() (int, error) {
+	raw := strings.TrimSpace(os.Getenv(YakitSQLiteProjectReadPoolConnsEnv))
+	if raw == "" {
+		return 0, nil
+	}
+	maxOpenConns, err := strconv.Atoi(raw)
+	if err != nil || maxOpenConns < 0 || maxOpenConns > 4 {
+		return 0, utils.Errorf(
+			"%s must be an integer between 0 and 4, got %q",
+			YakitSQLiteProjectReadPoolConnsEnv,
+			raw,
+		)
+	}
+	return maxOpenConns, nil
 }
 
 func CreateProfileDatabase(path string) (*gorm.DB, error) {
@@ -58,7 +170,12 @@ func SetGormProjectDatabase(path string) error {
 	if err != nil {
 		return err
 	}
-	BindProjectDatabase(d, path)
+	readDB, err := CreateProjectDatabaseReadOnly(path)
+	if err != nil {
+		_ = d.Close()
+		return err
+	}
+	BindProjectDatabaseWithReader(d, readDB, path)
 	schema.AutoMigrate(d, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	return nil
 }
@@ -66,9 +183,20 @@ func SetGormProjectDatabase(path string) error {
 // BindProjectDatabase registers an already-open project DB as the global project handle.
 // Used by grpc test servers so DBSaveAsyncChannel and Server.GetProjectDatabase() share one SQLite file.
 func BindProjectDatabase(db *gorm.DB, path string) {
+	readDB, err := CreateProjectDatabaseReadOnly(path)
+	if err != nil {
+		log.Warnf("open project SQLite dedicated read pool failed, falling back to writer handle: %v", err)
+	}
+	BindProjectDatabaseWithReader(db, readDB, path)
+}
+
+// BindProjectDatabaseWithReader registers an already-open writer and optional
+// query-only reader as one coherent project generation.
+func BindProjectDatabaseWithReader(db *gorm.DB, readDB *gorm.DB, path string) {
 	projectDataBase = db
 	currentProjectDatabasePath = path
 	schema.SetGormProjectDatabase(db)
+	publishProjectDatabaseBinding(db, readDB, path, true)
 }
 
 // BindProfileDatabase registers an already-open profile DB as the global profile handle.
@@ -94,6 +222,12 @@ func GetGormProfileDatabase() *gorm.DB {
 }
 
 func GetGormProjectDatabase() *gorm.DB {
+	if binding := projectDatabaseBinding.Load(); binding != nil && binding.Database != nil {
+		if debugProjectDatabase {
+			return binding.Database.Debug()
+		}
+		return binding.Database
+	}
 	if projectDataBase != nil {
 		if debugProjectDatabase {
 			return projectDataBase.Debug()
@@ -109,6 +243,9 @@ func GetGormProjectDatabase() *gorm.DB {
 
 // GetCurrentProjectDatabasePath 返回当前项目 SQLite 数据库文件路径；仅在慢 SQL 等使用 project DB 的创建处调用
 func GetCurrentProjectDatabasePath() string {
+	if binding := projectDatabaseBinding.Load(); binding != nil && binding.Path != "" {
+		return binding.Path
+	}
 	if currentProjectDatabasePath != "" {
 		return currentProjectDatabasePath
 	}
@@ -117,6 +254,19 @@ func GetCurrentProjectDatabasePath() string {
 		return currentProjectDatabasePath
 	}
 	return GetDefaultYakitProjectDatabase(GetDefaultYakitBaseDir())
+}
+
+// CaptureProjectDatabaseBinding returns a coherent DB/path/generation tuple.
+// Generation changes on every explicit bind, including reopening the same path.
+func CaptureProjectDatabaseBinding() ProjectDatabaseBinding {
+	if binding := projectDatabaseBinding.Load(); binding != nil && binding.Database != nil {
+		return *binding
+	}
+	_ = initYakitDatabase()
+	if binding := projectDatabaseBinding.Load(); binding != nil {
+		return *binding
+	}
+	return publishProjectDatabaseBinding(projectDataBase, nil, currentProjectDatabasePath, false)
 }
 
 // GetCurrentProfileDatabasePath 返回当前 profile SQLite 数据库文件路径；仅在慢 SQL 等使用 profile DB 的创建处调用
@@ -161,12 +311,12 @@ func InitializeYakitDatabase(projectDB string, profileDB string, ssaDB string) e
 
 // initializeYakitDirectories 确保所有必要的Yakit目录在项目初始化时就被创建
 func initializeYakitDirectories() {
-	GetDefaultYakitProjectsDir() // yakit-projects/projects
-	GetDefaultYakitPayloadsDir() // yakit-projects/payloads
-	GetDefaultYakitEngineDir()   // yakit-projects/yak-engine
-	GetDefaultYakitPprofDir()    // yakit-projects/pprof-log
-	GetDefaultYakitBaseTempDir() // yakit-projects/temp
-	GetDefaultAISkillsDir()      // yakit-projects/ai-skills
+	GetDefaultYakitProjectsDir()         // yakit-projects/projects
+	GetDefaultYakitPayloadsDir()         // yakit-projects/payloads
+	GetDefaultYakitEngineDir()           // yakit-projects/yak-engine
+	GetDefaultYakitPprofDir()            // yakit-projects/pprof-log
+	GetDefaultYakitBaseTempDir()         // yakit-projects/temp
+	GetDefaultAISkillsDir()              // yakit-projects/ai-skills
 	GetDefaultYakitOpenAPIDocumentsDir() // yakit-projects/openapi-documents
 
 	utils.RegisterTempFileOpener(func(name string) (*os.File, error) {
@@ -204,6 +354,7 @@ func initYakitDatabase() error {
 		schema.SetGormProfileDatabase(profileDatabase)
 
 		/* 再创建项目数据库 */
+		var projectReadDatabase *gorm.DB
 		if projectDataBase == nil {
 			projectDataBase, err = CreateProjectDatabase(projectDatabaseName)
 			if err != nil {
@@ -213,7 +364,16 @@ func initYakitDatabase() error {
 			}
 			currentProjectDatabasePath = projectDatabaseName
 		}
+		if projectDataBase != nil {
+			projectReadDatabase, err = CreateProjectDatabaseReadOnly(currentProjectDatabasePath)
+			if err != nil {
+				err = utils.Errorf("init project read-db[%v] failed: %s", currentProjectDatabasePath, err)
+				log.Errorf("%s", err)
+				initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
+			}
+		}
 		schema.SetGormProjectDatabase(projectDataBase)
+		publishProjectDatabaseBinding(projectDataBase, projectReadDatabase, currentProjectDatabasePath, false)
 
 		/* 创建SSA数据库 */
 		ssaDatabaseDialect, ssaDatabaseRaw := GetSSADataBaseInfo()

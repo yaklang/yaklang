@@ -15,8 +15,8 @@ import (
 
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -1037,8 +1037,12 @@ func (m *MitmReplacer) HookColorWs(rawPacket []byte, flow *schema.WebsocketFlow)
 	)
 
 	defer func() {
-		StringForSettingColor(colorName, flow)
-		flow.AddTag(tagNames...)
+		if len(colorName) > 0 {
+			StringForSettingColor(colorName, flow)
+		}
+		if len(tagNames) > 0 {
+			flow.AddTag(tagNames...)
+		}
 	}()
 
 	// WebSocket 整帧匹配 (MatchRawSimple 对整帧做 MatchString), 故对原始字节直接做一次统一预过滤即可,
@@ -1082,8 +1086,6 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 		return nil
 	}
 
-	skipResponseRuleMatch := shouldSkipResponseRuleMatch(response)
-
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
@@ -1097,11 +1099,33 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 	)
 
 	defer func() {
-		StringForSettingColor(colorName, flow)
-		flow.AddTag(tagNames...)
+		if len(colorName) > 0 {
+			StringForSettingColor(colorName, flow)
+		}
+		if len(tagNames) > 0 {
+			flow.AddTag(tagNames...)
+		}
 	}()
+	appendMatchedRuleMetadata := func() {
+		if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
+			lastRule := ret[len(ret)-1]
+			if lastRule.Color != "" {
+				colorName = append(colorName, lastRule.Color)
+			}
+			tagNames = append(lastRule.ExtraTag, tagNames...)
+		}
+	}
+
+	// With no enabled rules there is nothing to parse or prefilter. A rule may
+	// still have matched before a concurrent hot reload, so preserve its
+	// already-recorded color and tags without copying either packet body.
+	if len(m._mirrorRules) == 0 && len(m._hijackingRules) == 0 {
+		appendMatchedRuleMetadata()
+		return nil
+	}
 
 	ph := BuildMITMExtractPlaceholders(req, flow)
+	skipResponseRuleMatch := shouldSkipResponseRuleMatch(response)
 
 	// 每报文一次: 切包(含解码) + 统一 Group 预过滤, 供下面 mirror/hijack 两轮规则复用。
 	reqInfo, rspInfo, candidateMask := m.prepareColorMatch(request, response, skipResponseRuleMatch)
@@ -1111,18 +1135,12 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
 		reqInfo, rspInfo, req, flow.HiddenIndex, m._hijackingRules, false, candidateMask, extracted, colorName, tagNames, ph)
 	// 将替换的规则提前，因为一般来说比较重要
-	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
-		lastRule := ret[len(ret)-1]
-		if lastRule.Color != "" {
-			colorName = append(colorName, lastRule.Color)
-		}
-		tagNames = append(lastRule.ExtraTag, tagNames...) // merge tag name
-	}
+	appendMatchedRuleMetadata()
 	return extracted
 }
 
 func (m *MitmReplacer) HaveRules() bool {
-	return m.rules != nil
+	return len(m.rules) > 0
 }
 
 func (m *MitmReplacer) HaveHijackingRules() bool {
@@ -1450,8 +1468,6 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 	if m == nil {
 		return nil
 	}
-	skipResponseRuleMatch := shouldSkipResponseRuleMatch(response)
-
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
@@ -1465,11 +1481,30 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 	)
 
 	defer func() {
-		StringForSettingColor(colorName, flow)
-		flow.AddTags(tagNames...)
+		if len(colorName) > 0 {
+			StringForSettingColor(colorName, flow)
+		}
+		if len(tagNames) > 0 {
+			flow.AddTags(tagNames...)
+		}
 	}()
+	appendMatchedRuleMetadata := func() {
+		if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
+			lastRule := ret[len(ret)-1]
+			if lastRule.Color != "" {
+				colorName = append(colorName, lastRule.Color)
+			}
+			tagNames = append(lastRule.ExtraTag, tagNames...)
+		}
+	}
+
+	if len(m._mirrorRules) == 0 && len(m._hijackingRules) == 0 {
+		appendMatchedRuleMetadata()
+		return nil
+	}
 
 	ph := BuildMITMExtractPlaceholdersLowhttp(req, flow.Url)
+	skipResponseRuleMatch := shouldSkipResponseRuleMatch(response)
 
 	// 每报文一次: 切包(含解码) + 统一 Group 预过滤, 供下面 mirror/hijack 两轮规则复用。
 	reqInfo, rspInfo, candidateMask := m.prepareColorMatch(request, response, skipResponseRuleMatch)
@@ -1479,13 +1514,7 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
 		reqInfo, rspInfo, req, flow.HiddenIndex, m._hijackingRules, false, candidateMask, extracted, colorName, tagNames, ph)
 	// 将替换的规则提前，因为一般来说比较重要
-	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
-		lastRule := ret[len(ret)-1]
-		if lastRule.Color != "" {
-			colorName = append(colorName, lastRule.Color)
-		}
-		tagNames = append(lastRule.ExtraTag, tagNames...) // merge tag name
-	}
+	appendMatchedRuleMetadata()
 	return extracted
 }
 

@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	utls2 "github.com/refraction-networking/utls"
 
@@ -46,7 +45,24 @@ func ParseHTTPResponseLine(line string) (string, int, string, bool) {
 }
 
 func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true, false, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	rsp.Request = req
+	return rsp, nil
+}
+
+// ReadHTTPResponseMetadataFromBufioReader consumes a response for callers that
+// separately capture the complete wire packet and only need transport metadata
+// from this temporary response. For a bounded Content-Length response without
+// streaming/large-body callbacks, Body is deliberately not retained while the
+// parser-owned final bare response is still stored in req. All other response
+// shapes keep the normal parser behavior. prepareBodyCapacity, when non-nil,
+// lets the caller reserve
+// space in its already-existing wire capture before the body is drained.
+func ReadHTTPResponseMetadataFromBufioReader(reader io.Reader, req *http.Request, prepareBodyCapacity func(int)) (*http.Response, error) {
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true, true, prepareBodyCapacity, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +74,7 @@ func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http
 // including informational responses. Most callers should use
 // ReadHTTPResponseFromBufioReader, which skips non-terminal 1xx responses.
 func ReadSingleHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, false)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, false, false, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +112,32 @@ func OpenTempFile(s string) (*os.File, error) {
 }
 
 func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, false, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	rsp.Request = req
+	return rsp, nil
+}
+
+// ReadHTTPResponseMetadataFromBufioReaderConn is the connection-aware variant
+// of ReadHTTPResponseMetadataFromBufioReader.
+func ReadHTTPResponseMetadataFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request, prepareBodyCapacity func(int)) (*http.Response, error) {
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, true, prepareBodyCapacity, nil)
+	if err != nil {
+		return nil, err
+	}
+	rsp.Request = req
+	return rsp, nil
+}
+
+// ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacket is the narrow
+// connection-pool variant used when the transport already owns a complete wire
+// capture. borrowFinalPacket must return an immutable view of the final response
+// suffix with exactly the requested size. The view is stored in req without a
+// clone; the capture owner must keep it alive and unchanged while req is used.
+func ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacket(reader io.Reader, conn net.Conn, req *http.Request, prepareBodyCapacity func(int), borrowFinalPacket func(int) []byte) (*http.Response, error) {
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, true, prepareBodyCapacity, borrowFinalPacket)
 	if err != nil {
 		return nil, err
 	}
@@ -105,11 +146,46 @@ func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *h
 }
 
 func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(bytes.NewReader(raw), true, req, nil, true)
+	rsp, err := readHTTPResponseFromBufioReader(bytes.NewReader(raw), true, req, nil, true, false, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 	rsp.Request = req
+	return rsp, nil
+}
+
+type httpResponseBytesBodyViewReader struct {
+	packet []byte
+	reader bytes.Reader
+}
+
+func newHTTPResponseBytesBodyViewReader(packet []byte) *httpResponseBytesBodyViewReader {
+	r := &httpResponseBytesBodyViewReader{packet: packet}
+	r.reader.Reset(packet)
+	return r
+}
+
+func (r *httpResponseBytesBodyViewReader) Read(p []byte) (int, error) {
+	return r.reader.Read(p)
+}
+
+func (r *httpResponseBytesBodyViewReader) takeRemainingBodyView() []byte {
+	remaining := r.reader.Len()
+	offset := len(r.packet) - remaining
+	_, _ = r.reader.Seek(0, io.SeekEnd)
+	return r.packet[offset:]
+}
+
+// ReadHTTPResponseFromBytesWithBodyView parses an immutable complete response
+// packet without copying its remaining body. The returned Body retains and
+// aliases raw; callers must keep raw unchanged until the response is no longer
+// used. ReadHTTPResponseFromBytes keeps its historical independent-Body
+// ownership and remains the default for shared or externally mutable packets.
+func ReadHTTPResponseFromBytesWithBodyView(raw []byte) (*http.Response, error) {
+	rsp, err := readHTTPResponseFromBufioReader(newHTTPResponseBytesBodyViewReader(raw), true, nil, nil, true, false, nil, nil)
+	if err != nil {
+		return nil, err
+	}
 	return rsp, nil
 }
 
@@ -119,8 +195,126 @@ func responseStatusHasNoBody(statusCode int) bool {
 		statusCode == http.StatusNotModified
 }
 
-func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn, skipInformational bool) (*http.Response, error) {
-	rawPacket := new(bytes.Buffer)
+// Keep the common MITM body path single-allocation without trusting an
+// unbounded peer-provided Content-Length. Larger bodies retain the progressive
+// io.ReadAll behavior.
+const httpResponseBodyPreallocateLimit = 1 << 20
+
+func readHTTPResponseBodyWithLimit(reader io.Reader, limit int) ([]byte, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	if limit > httpResponseBodyPreallocateLimit {
+		return io.ReadAll(io.LimitReader(reader, int64(limit)))
+	}
+
+	body := make([]byte, limit)
+	n, err := io.ReadFull(reader, body)
+	switch err {
+	case nil:
+		return body, nil
+	case io.EOF, io.ErrUnexpectedEOF:
+		return body[:n], nil
+	default:
+		return body[:n], err
+	}
+}
+
+func readHTTPResponseBodyToEOF(reader io.Reader) ([]byte, error) {
+	if viewReader, ok := reader.(interface{ takeRemainingBodyView() []byte }); ok {
+		return viewReader.takeRemainingBodyView(), nil
+	}
+	if bytesReader, ok := reader.(*bytes.Reader); ok {
+		return readHTTPResponseBodyWithLimit(bytesReader, bytesReader.Len())
+	}
+	return io.ReadAll(reader)
+}
+
+func writeHTTPResponseBody(packet *bytes.Buffer, body []byte) {
+	if packet == nil || len(body) == 0 {
+		return
+	}
+	if len(body) <= httpResponseBodyPreallocateLimit {
+		packet.Grow(len(body))
+	}
+	_, _ = packet.Write(body)
+}
+
+func padHTTPResponseBody(body []byte, size int) []byte {
+	if size <= len(body) {
+		return body
+	}
+	bodyLen := len(body)
+	if cap(body) >= size {
+		body = body[:size]
+	} else {
+		padded := make([]byte, size)
+		copy(padded, body)
+		body = padded
+	}
+	for i := bodyLen; i < size; i++ {
+		body[i] = '\n'
+	}
+	return body
+}
+
+// ownedHTTPResponseBody keeps the parser-owned body immutable while allowing
+// package-internal dumpers to consume the remaining bytes without allocating a
+// second temporary slice. It intentionally exposes only io.ReadCloser and
+// io.WriterTo behavior to callers.
+type ownedHTTPResponseBody struct {
+	data   []byte
+	reader *bytes.Reader
+}
+
+func newOwnedHTTPResponseBody(body []byte) *ownedHTTPResponseBody {
+	return &ownedHTTPResponseBody{data: body, reader: bytes.NewReader(body)}
+}
+
+func (b *ownedHTTPResponseBody) Read(p []byte) (int, error) {
+	return b.reader.Read(p)
+}
+
+func (b *ownedHTTPResponseBody) WriteTo(w io.Writer) (int64, error) {
+	return b.reader.WriteTo(w)
+}
+
+func (b *ownedHTTPResponseBody) Close() error {
+	return nil
+}
+
+func (b *ownedHTTPResponseBody) takeRemainingView() []byte {
+	offset, _ := b.reader.Seek(0, io.SeekCurrent)
+	_, _ = b.reader.Seek(0, io.SeekEnd)
+	return b.data[offset:]
+}
+
+type discardedIntermediateHTTPResponseBody struct{}
+
+func (discardedIntermediateHTTPResponseBody) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (discardedIntermediateHTTPResponseBody) Close() error {
+	return nil
+}
+
+// HTTPResponseHasDiscardedIntermediateBody reports whether a metadata-only
+// parser consumed the body without retaining it. Transport callers should
+// replace the sentinel with http.NoBody before exposing the response.
+func HTTPResponseHasDiscardedIntermediateBody(rsp *http.Response) bool {
+	if rsp == nil || rsp.Body == nil {
+		return false
+	}
+	_, ok := rsp.Body.(discardedIntermediateHTTPResponseBody)
+	return ok
+}
+
+func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn, skipInformational bool, discardIntermediateBody bool, prepareBodyCapacity func(int), borrowFinalPacket func(int) []byte) (*http.Response, error) {
+	var rawPacket *bytes.Buffer
+	if req != nil {
+		rawPacket = new(bytes.Buffer)
+	}
 	var nobodyReqMethod bool
 	if req != nil { // some request method will not have body
 		nobodyReqMethod = strings.EqualFold(req.Method, http.MethodHead) ||
@@ -214,8 +408,10 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			break
 		}
 	}
-	rawPacket.Write(firstLine)
-	rawPacket.WriteString(CRLF)
+	if rawPacket != nil {
+		rawPacket.Write(firstLine)
+		rawPacket.WriteString(CRLF)
+	}
 	rsp.Status = fmt.Sprintf("%v %s", rsp.StatusCode, statusText)
 	_, after, _ := strings.Cut(rsp.Proto, "/")
 	major, minor, _ := strings.Cut(after, ".")
@@ -234,22 +430,19 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 	defaultClose := (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
 
 	err = ScanHTTPHeaderWithHeaderFolding(headerReader, func(rawHeader []byte) {
+		if rawPacket != nil {
+			if len(rawHeader) <= 0 {
+				rawPacket.WriteString(CRLF)
+			} else {
+				rawPacket.Write(rawHeader)
+				rawPacket.WriteString(CRLF)
+			}
+		}
 		if len(rawHeader) <= 0 {
-			rawPacket.WriteString(CRLF)
 			return
 		}
-		rawPacket.Write(rawHeader)
-		rawPacket.WriteString(CRLF)
 
-		before, after, _ := bytes.Cut(rawHeader, []byte{':'})
-		keyStr := string(before)
-		valStr := strings.TrimLeftFunc(string(after), unicode.IsSpace)
-
-		if _, isCommonHeader := commonHeader[keyStr]; isCommonHeader {
-			keyStr = http.CanonicalHeaderKey(keyStr)
-		}
-
-		lowerKey := strings.ToLower(keyStr)
+		keyStr, lowerKey, valStr := parseOwnedHTTPHeaderLine(rawHeader)
 		if ret := httpctx.GetResponseHeaderParsed(req); ret != nil {
 			ret(lowerKey, valStr)
 		}
@@ -298,6 +491,19 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 	}
 
 	noBodyBuffer := httpctx.GetNoBodyBuffer(req)
+	discardBoundedBody := discardIntermediateBody &&
+		!fixContentLength &&
+		!noBodyBuffer &&
+		!nobodyReqMethod &&
+		useContentLength &&
+		!useTransferEncodingChunked &&
+		contentLengthInt > 0 &&
+		contentLengthInt <= httpResponseBodyPreallocateLimit &&
+		httpctx.GetResponseHeaderCallback(req) == nil &&
+		!httpctx.GetResponseTooLarge(req)
+	if maxContentLength := httpctx.GetResponseMaxContentLength(req); maxContentLength > 0 && contentLengthInt >= maxContentLength {
+		discardBoundedBody = false
+	}
 
 	var bodyReader io.Reader = originReader
 	if ret := httpctx.GetResponseHeaderCallback(req); ret != nil {
@@ -315,7 +521,8 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 		}
 	}()
 
-	bodyRawBuf := new(bytes.Buffer)
+	var responseBody []byte
+	var discardedBodyBytes int
 	if responseStatusHasNoBody(rsp.StatusCode) {
 		rsp.ContentLength = 0
 	} else if fixContentLength {
@@ -325,15 +532,15 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 		if noBodyBuffer {
 			io.Copy(io.Discard, bodyReader)
 		} else {
-			raw, _ = io.ReadAll(io.NopCloser(bodyReader))
+			raw, _ = readHTTPResponseBodyToEOF(bodyReader)
 		}
-		rawPacket.Write(raw)
+		writeHTTPResponseBody(rawPacket, raw)
 		if useContentLength && !useTransferEncodingChunked {
 			rsp.ContentLength = int64(len(raw))
 			shrinkHeader(rsp.Header, "content-length")
 			rsp.Header.Set("Content-Length", strconv.Itoa(len(raw)))
 		}
-		bodyRawBuf.Write(raw)
+		responseBody = raw
 	} else {
 		// HEAD, TRACE, CONNECT requests should not have response body
 		if nobodyReqMethod {
@@ -365,13 +572,10 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 				if noBodyBuffer {
 					io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
 				} else {
-					bodyRaw, _ = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+					bodyRaw, _ = readHTTPResponseBodyWithLimit(bodyReader, contentLengthInt)
 				}
-				rawPacket.Write(bodyRaw)
-				bodyRawBuf.Write(bodyRaw)
-				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
-					bodyRawBuf.WriteString(strings.Repeat("\n", ret))
-				}
+				writeHTTPResponseBody(rawPacket, bodyRaw)
+				responseBody = padHTTPResponseBody(bodyRaw, contentLengthInt)
 			} else {
 				// chunked
 				var fixed []byte
@@ -381,11 +585,11 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 				} else {
 					_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
 				}
-				rawPacket.Write(fixed)
+				writeHTTPResponseBody(rawPacket, fixed)
 				if err != nil {
 					return nil, errors.Wrap(err, "chunked decoder error")
 				}
-				bodyRawBuf.Write(fixed)
+				responseBody = fixed
 			}
 		} else if !useContentLength && useTransferEncodingChunked {
 			// handle chunked
@@ -396,12 +600,12 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			} else {
 				_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
 			}
-			rawPacket.Write(fixed)
+			writeHTTPResponseBody(rawPacket, fixed)
 			if err != nil {
 				return nil, errors.Wrap(err, "chunked decoder error")
 			}
 			if len(fixed) > 0 {
-				bodyRawBuf.Write(fixed)
+				responseBody = fixed
 			}
 		} else {
 			// handle content-length as default
@@ -413,26 +617,47 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 					bodyRaw := []byte{}
 					if noBodyBuffer {
 						io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+					} else if discardBoundedBody {
+						if prepareBodyCapacity != nil {
+							prepareBodyCapacity(contentLengthInt)
+						}
+						discardReader := bodyReader
+						if rawPacket != nil && borrowFinalPacket == nil {
+							rawPacket.Grow(contentLengthInt)
+							discardReader = io.TeeReader(bodyReader, rawPacket)
+						}
+						var copied int64
+						copied, err = io.Copy(io.Discard, io.LimitReader(discardReader, int64(contentLengthInt)))
+						discardedBodyBytes = int(copied)
 					} else {
-						bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+						bodyRaw, err = readHTTPResponseBodyWithLimit(bodyReader, contentLengthInt)
 					}
-					rawPacket.Write(bodyRaw)
+					writeHTTPResponseBody(rawPacket, bodyRaw)
 					if err != nil && err != io.EOF {
 						return nil, errors.Wrap(err, "read body error")
 					}
-					bodyLen := len(bodyRaw)
-					bodyRawBuf.Write(bodyRaw)
-					bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
+					if !discardBoundedBody {
+						responseBody = padHTTPResponseBody(bodyRaw, contentLengthInt)
+					}
 				}
 			}
 		}
 	}
-	bodySize := bodyRawBuf.Len()
-	if bodySize == 0 {
+	bodySize := len(responseBody)
+	if discardBoundedBody {
+		// Preserve the temporary response's historical padded Content-Length
+		// accounting even though its Body is not retained.
+		bodySize = contentLengthInt
+	}
+	if bodySize > 0 {
+		httpctx.SetResponseBodySize(req, int64(bodySize))
+	}
+	if discardBoundedBody {
+		rsp.Body = discardedIntermediateHTTPResponseBody{}
+	} else if len(responseBody) == 0 {
 		rsp.Body = http.NoBody
 	} else {
-		httpctx.SetResponseBodySize(req, int64(bodySize))
-		rsp.Body = io.NopCloser(bodyRawBuf)
+		rsp.Body = newOwnedHTTPResponseBody(responseBody)
 	}
 	if req != nil {
 		// set too large if greater than max content length
@@ -453,12 +678,24 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			}
 			fp, _ = OpenTempFile(fmt.Sprintf("large-response-body-%v.txt", suffix))
 			if fp != nil {
-				fp.Write(bodyRawBuf.Bytes())
+				fp.Write(responseBody)
 				fp.Close()
 				httpctx.SetResponseTooLargeBodyFile(req, fp.Name())
 			}
 		} else {
-			httpctx.SetBareResponseBytesForce(req, rawPacket.Bytes())
+			if discardBoundedBody && borrowFinalPacket != nil {
+				finalPacketSize := rawPacket.Len() + discardedBodyBytes
+				borrowedPacket := borrowFinalPacket(finalPacketSize)
+				if len(borrowedPacket) != finalPacketSize {
+					return nil, Errorf("invalid borrowed HTTP response packet: got %d bytes, want %d", len(borrowedPacket), finalPacketSize)
+				}
+				httpctx.SetBareResponseBytesForceBorrowed(req, borrowedPacket)
+			} else {
+				// rawPacket is local to this parser and is not accessed after the
+				// return. Transfer it to httpctx without cloning; rsp.Body owns a
+				// separate responseBody allocation.
+				httpctx.SetBareResponseBytesForceOwned(req, rawPacket.Bytes())
+			}
 		}
 	}
 	return rsp, nil
@@ -596,6 +833,14 @@ func ScanHTTPHeaderWithHeaderFolding(reader io.Reader, headerCallback func(rawHe
 	}
 
 	pushHeaderRawData := func(raw []byte) {
+		if len(headerRawCache) == 0 {
+			// ReadLine returns a distinct allocation for each line. Retain that
+			// allocation directly until the following line proves whether this
+			// header is folded, instead of copying every ordinary header once
+			// more into headerRawCache.
+			headerRawCache = raw
+			return
+		}
 		headerRawCache = append(headerRawCache, raw...)
 	}
 
@@ -642,7 +887,8 @@ func ScanHTTPHeaderWithHeaderFolding(reader io.Reader, headerCallback func(rawHe
 		case HeaderCheckStat:
 			checkLine := bytes.TrimPrefix(lineBytes, headerFoldingPrefix)
 			if len(checkLine) > 0 && (checkLine[0] == ' ' || checkLine[0] == '\t') {
-				pushHeaderRawData(append([]byte(CRLF), checkLine...))
+				headerRawCache = append(headerRawCache, '\r', '\n')
+				headerRawCache = append(headerRawCache, checkLine...)
 			} else {
 				emitHeaderRaw()
 				setCurrentStat(CommonHeaderStat)

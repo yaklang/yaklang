@@ -55,6 +55,10 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 	return p.execLowhttp(ctx, req)
 }
 
+func parseLowHTTPResponsePacket(packet []byte) (*http.Response, error) {
+	return utils.ReadHTTPResponseFromBytesWithBodyView(packet)
+}
+
 func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, error) {
 	// PlainRequestBytes is the decoded representation used by the UI, history,
 	// and plugins. It must not replace the wire packet during transparent
@@ -113,6 +117,8 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		lowhttp.WithExtendReadDeadline(true),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
+		lowhttp.WithDiscardIntermediateResponseBody(true),
+		lowhttp.WithBorrowConnPoolResponsePacket(true),
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
 
@@ -269,11 +275,24 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		req.RemoteAddr = lowHttpResp.RemoteAddr
 	}
 
-	rsp, err := lowhttp.ParseBytesToHTTPResponse(lowHttpResp.RawPacket)
+	rsp, err := parseLowHTTPResponsePacket(lowHttpResp.RawPacket)
 	if rsp != nil {
 		rsp.Request = req
+		if err == nil {
+			transferFixedResponsePacket(req, lowHttpResp)
+		}
 	}
 
 	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
 	return rsp, err
+}
+
+func transferFixedResponsePacket(req *http.Request, response *lowhttp.LowhttpResponse) {
+	if req == nil || response == nil || httpctx.GetResponseIsModified(req) || !response.ResponsePacketFixed || len(response.RawPacket) == 0 {
+		return
+	}
+	packet := response.RawPacket
+	response.RawPacket = nil
+	response.ResponsePacketFixed = false
+	httpctx.SetFixedResponseBytesOwned(req, packet)
 }

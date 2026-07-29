@@ -222,6 +222,14 @@ func SetBareRequestBytes(r *http.Request, bytes []byte) {
 	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes, bytes)
 }
 
+// SetBareRequestBytesOwned stores a request packet without cloning it. The
+// caller must transfer exclusive ownership and must not access or mutate bytes
+// after this call. Keep this narrow API for parser-created buffers; use
+// SetBareRequestBytes for shared or externally owned input.
+func SetBareRequestBytesOwned(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes, bytes)
+}
+
 func GetNoBodyBuffer(r *http.Request) bool {
 	return GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_KEY_NoBodyBuffer)
 }
@@ -236,6 +244,25 @@ func GetBareRequestBytes(r *http.Request) []byte {
 
 func SetPlainRequestBytes(r *http.Request, bytes []byte) {
 	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes, bytes)
+}
+
+// SetPlainRequestBytesOwned stores an independently owned decoded request
+// packet without cloning it. The caller must transfer exclusive ownership.
+func SetPlainRequestBytesOwned(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes, bytes)
+}
+
+// SetPlainRequestBytesBorrowedFromBare stores an immutable plain-packet view
+// only when it is the exact request-owned bare packet already retained by the
+// context. It returns false without changing the plain packet for every other
+// input; callers must then use a cloning or independently-owned setter.
+func SetPlainRequestBytesBorrowedFromBare(r *http.Request, value []byte) bool {
+	bare := GetBareRequestBytes(r)
+	if len(value) == 0 || len(value) != len(bare) || &value[0] != &bare[0] {
+		return false
+	}
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes, value)
+	return true
 }
 
 func SetHijackedRequestBytes(r *http.Request, bytes []byte) {
@@ -277,8 +304,35 @@ func GetPlainResponseBytes(r *http.Request) []byte {
 	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes)
 }
 
+func GetFixedResponseBytes(r *http.Request) []byte {
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseFixedBytes)
+}
+
+// SetFixedResponseBytesOwned stores a successful FixHTTPResponsePacket result
+// without cloning it. The caller must transfer exclusive ownership and must not
+// access or mutate bytes after this call.
+func SetFixedResponseBytesOwned(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseFixedBytes, bytes)
+}
+
+// TakeFixedResponseBytes removes and returns the owned fixed response packet.
+func TakeFixedResponseBytes(r *http.Request) []byte {
+	value, ok := GetContextInfoMap(r).LoadAndDelete(REQUEST_CONTEXT_KEY_ResponseFixedBytes)
+	if !ok {
+		return nil
+	}
+	bytes, _ := value.([]byte)
+	return bytes
+}
+
 func SetPlainResponseBytes(r *http.Request, bytes []byte) {
 	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes, bytes)
+}
+
+// SetPlainResponseBytesOwned stores an independently owned decoded response
+// packet without cloning it. The caller must transfer exclusive ownership.
+func SetPlainResponseBytesOwned(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes, bytes)
 }
 
 func SetBareResponseBytes(r *http.Request, bytes []byte) {
@@ -291,6 +345,22 @@ func SetBareResponseBytes(r *http.Request, bytes []byte) {
 
 func SetBareResponseBytesForce(r *http.Request, bytes []byte) {
 	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, bytes)
+}
+
+// SetBareResponseBytesForceOwned stores a response packet without cloning it.
+// The caller must transfer exclusive ownership and must not access or mutate
+// bytes after this call. Keep this narrow API for parser-created buffers; use
+// SetBareResponseBytesForce for shared or externally owned input.
+func SetBareResponseBytesForceOwned(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, bytes)
+}
+
+// SetBareResponseBytesForceBorrowed stores an immutable response packet view
+// without cloning it. The owner must keep the packet alive and unchanged while
+// the request context can be observed. Prefer the owned or cloning setters
+// unless the caller controls the complete packet lifetime.
+func SetBareResponseBytesForceBorrowed(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, bytes)
 }
 
 const REQUEST_CONTEXT_INFOMAP = "InfoMap"
@@ -323,6 +393,7 @@ const (
 	REQUEST_CONTEXT_KEY_RequestPlainBytes            = "requestPlainBytes"
 	REQUEST_CONTEXT_KEY_ResponseBareBytes            = "responseBareBytes"
 	REQUEST_CONTEXT_KEY_ResponsePlainBytes           = "responsePlainBytes"
+	REQUEST_CONTEXT_KEY_ResponseFixedBytes           = "responseFixedBytes"
 	REQUEST_CONTEXT_KEY_ResponseHijackedBytes        = "responseHijackedBytes"
 	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
@@ -670,6 +741,7 @@ func GetUpstreamPortIsModified(req *http.Request) bool {
 
 func SetResponseModified(req *http.Request, by ...string) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseIsModified, true)
+	GetContextInfoMap(req).Delete(REQUEST_CONTEXT_KEY_ResponseFixedBytes)
 	modified := GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseModifiedBy)
 	if modified != "" {
 		by = append(by, modified)

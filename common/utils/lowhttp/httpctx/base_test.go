@@ -85,4 +85,79 @@ func TestContextBytesStorage(t *testing.T) {
 		require.Equal(t, []byte("legacy-response"), GetPlainResponseBytes(req))
 		require.Equal(t, []byte("legacy-mock"), GetMockResponseBytes(req))
 	})
+
+	t.Run("fixed response owned setter transfers without cloning", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		responseRaw := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+
+		SetFixedResponseBytesOwned(req, responseRaw)
+		stored := TakeFixedResponseBytes(req)
+
+		require.Equal(t, responseRaw, stored)
+		require.NotEmpty(t, stored)
+		require.True(t, &responseRaw[0] == &stored[0], "owned setter unexpectedly cloned its input")
+		require.Empty(t, GetFixedResponseBytes(req))
+	})
+
+	t.Run("bare request owned setter transfers without cloning", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		requestRaw := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+
+		SetBareRequestBytesOwned(req, requestRaw)
+		stored := GetBareRequestBytes(req)
+
+		require.Equal(t, requestRaw, stored)
+		require.NotEmpty(t, stored)
+		require.True(t, &requestRaw[0] == &stored[0], "owned setter unexpectedly cloned its input")
+	})
+
+	t.Run("plain packet owned setters transfer without cloning", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		requestRaw := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+		responseRaw := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+
+		SetPlainRequestBytesOwned(req, requestRaw)
+		SetPlainResponseBytesOwned(req, responseRaw)
+
+		storedRequest := GetPlainRequestBytes(req)
+		storedResponse := GetPlainResponseBytes(req)
+		require.Same(t, &requestRaw[0], &storedRequest[0])
+		require.Same(t, &responseRaw[0], &storedResponse[0])
+	})
+
+	t.Run("plain request may borrow only the exact context-owned bare packet", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		external := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+		SetBareRequestBytes(req, external)
+		bare := GetBareRequestBytes(req)
+
+		require.False(t, SetPlainRequestBytesBorrowedFromBare(req, external))
+		require.Empty(t, GetPlainRequestBytes(req))
+		require.True(t, SetPlainRequestBytesBorrowedFromBare(req, bare))
+		require.Same(t, &bare[0], &GetPlainRequestBytes(req)[0])
+
+		external[0] = 'X'
+		require.Equal(t, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n", string(GetPlainRequestBytes(req)))
+	})
+
+	t.Run("borrowed bare response setter keeps immutable view", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		responseRaw := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+
+		SetBareResponseBytesForceBorrowed(req, responseRaw)
+		stored := GetBareResponseBytes(req)
+
+		require.Equal(t, responseRaw, stored)
+		require.NotEmpty(t, stored)
+		require.Same(t, &responseRaw[0], &stored[0])
+	})
+
+	t.Run("marking response modified releases fixed packet", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		SetFixedResponseBytesOwned(req, []byte("fixed-response"))
+
+		SetResponseModified(req, "test")
+
+		require.Empty(t, GetFixedResponseBytes(req))
+	})
 }

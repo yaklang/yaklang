@@ -992,6 +992,27 @@ func (m *MixPluginCaller) MirrorHTTPFlowWithCtx(
 	m.mirrorHTTPFlow(runtimeCtx, false, true, isHttps, u, req, rsp, body, filters...)
 }
 
+func (m *MixPluginCaller) HasMirrorHTTPFlowHooks() bool {
+	if m == nil || m.callers == nil {
+		return false
+	}
+	for _, hookName := range []string{
+		HOOK_MirrorHTTPFlow,
+		HOOK_PortScanHandle,
+		HOOK_MirrorNewWebsite,
+		HOOK_MirrorNewWebsitePath,
+		HOOK_MirrorNewWebsitePathParams,
+		HOOK_MirrorFilteredHTTPFlow,
+		HOOK_NucleiScanHandle,
+		HOOK_NaslScanHandle,
+	} {
+		if m.callers.ShouldCallByName(hookName) {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *MixPluginCaller) MirrorHTTPFlow(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,

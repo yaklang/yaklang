@@ -188,6 +188,7 @@ func FilterDataToMatchers(data []*ypb.FilterDataItem, expandCommaSeparated ...bo
 			MatcherType: datum.MatcherType,
 			Group:       group,
 		}
+		matcher.PrecompileStaticGlobRules()
 		matchers = append(matchers, matcher)
 	}
 	if len(matchers) == 0 {

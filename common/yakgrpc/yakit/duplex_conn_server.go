@@ -30,7 +30,11 @@ func (s *DuplexConnectionServer) UnRegisterHandler(handlerName string) {
 	delete(s.Handlers, handlerName)
 }
 
-func (s *DuplexConnectionServer) Server(ctx context.Context, stream ypb.Yak_DuplexConnectionServer) {
+func (s *DuplexConnectionServer) Server(
+	ctx context.Context,
+	stream ypb.Yak_DuplexConnectionServer,
+	connectionHandlers ...DuplexConnectionHandler,
+) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -41,7 +45,19 @@ func (s *DuplexConnectionServer) Server(ctx context.Context, stream ypb.Yak_Dupl
 				log.Errorf("DuplexConnectionServer Failed to receive request: %v", err)
 				return
 			}
-			if handler, ok := s.Handlers[req.GetMessageType()]; ok {
+			for _, handler := range connectionHandlers {
+				if handler == nil {
+					continue
+				}
+				if err := handler(ctx, req); err != nil {
+					log.Errorf("handle connection request error: %v", err)
+				}
+			}
+
+			s.serverHandlerMutex.Lock()
+			handler, ok := s.Handlers[req.GetMessageType()]
+			s.serverHandlerMutex.Unlock()
+			if ok {
 				err := handler(ctx, req)
 				if err != nil {
 					log.Errorf("handle process request error : %v", err)

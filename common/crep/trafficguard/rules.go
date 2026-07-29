@@ -6,10 +6,10 @@ package trafficguard
 // 覆盖流量中"最高危"的凭证 / 密钥泄漏特征。每条规则都满足:
 //
 //  1. 高危: 命中即可判定为敏感凭证泄漏(强厂商前缀、固定格式私钥、带口令的连接串等);
-//  2. 精准: 拥有稳定的必需字面量(供 minirehs Aho-Corasick 预过滤快速排除无命中输入),
-//     并以字符集 + 定长约束把误报压到极低;
-//  3. 低开销: 全部 RE2 兼容(无 backreference / lookaround / 无界 .* 跨行),可被 minirehs
-//     MVS 后端编译为位并行 NFA 一次扫描全部规则,避免逐条正则的 O(N x L) 开销;
+//  2. 精准: 每条规则拥有稳定的必需字面量或固定形态门禁(见 scanner.go),并以字符集 + 定长约束
+//     把误报压到极低;
+//  3. 低开销: minirehs MVS 一次扫描必需字面量以筛出候选规则,仅对候选运行原始 PCRE2
+//     精确提取,避免对纯净流量逐条执行正则;
 //  4. 危险度可衡量: 每条规则显式标注 Severity(critical/high/warning) 与类别; 但落库 Risk 的
 //     严重度统一受 SeverityCeiling 上限约束(最高中危), 因为本组定位是"辅助人工判真假的线索"。
 //
@@ -66,8 +66,8 @@ type rule struct {
 	RedactTail int
 }
 
-// builtinRules 是内置超级正则组。顺序即 minirehs BuildGroup 的 pattern 下标,
-// 命中后通过下标回指本表拿到规则的元信息。
+// builtinRules 是内置精确规则组。scanner.go 会把每条规则展开为一个或多个候选字面量,
+// 并保存候选下标到本表下标的映射。
 //
 // 编写约定:
 //   - 能用厂商固定前缀(AKIA/AIza/ghp_/eyJ/sk_live_/-----BEGIN)就用前缀,保证预过滤命中;

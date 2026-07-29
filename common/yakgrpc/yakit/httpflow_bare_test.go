@@ -1,16 +1,20 @@
 package yakit
 
 import (
+	"bytes"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -72,6 +76,76 @@ func TestResolveHTTPFlowStoredResponse(t *testing.T) {
 	t.Run("no_fix", func(t *testing.T) {
 		stored := resolveHTTPFlowStoredResponse(wire, fixed, nil, true)
 		require.Equal(t, string(wire), string(stored))
+	})
+
+	t.Run("no_fix_ignores_pre_fixed_packet", func(t *testing.T) {
+		stored := resolveHTTPFlowStoredResponse(wire, fixed, fixed, true)
+		require.Equal(t, string(wire), string(stored))
+	})
+}
+
+func TestCreateHTTPFlowFromHTTPResponseFixProvenance(t *testing.T) {
+	newRequest := func(t *testing.T, token string) *http.Request {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/"+token, nil)
+		httpctx.SetPlainRequestBytes(req, testHTTPFlowScanRequest(t, token))
+		return req
+	}
+
+	t.Run("unmodified_reuses_fixed_packet", func(t *testing.T) {
+		token := uuid.NewString()
+		wire := testHTTPFlowGBKWirePacket(t)
+		fixed, err := lowhttp.FixHTTPResponsePacket(wire)
+		require.NoError(t, err)
+		expected := bytes.Clone(fixed)
+		rsp, err := lowhttp.ParseBytesToHTTPResponse(fixed)
+		require.NoError(t, err)
+		req := newRequest(t, token)
+		httpctx.SetBareResponseBytesForce(req, wire)
+		httpctx.SetFixedResponseBytesOwned(req, fixed)
+
+		flow, err := CreateHTTPFlowFromHTTPWithBodySaved(false, req, rsp, "mitm", "", "127.0.0.1:80")
+		require.NoError(t, err)
+		require.Equal(t, expected, []byte(flow.GetResponse()))
+	})
+
+	t.Run("modified_ignores_stale_fixed_packet", func(t *testing.T) {
+		token := uuid.NewString()
+		wire := testHTTPFlowJSONWirePacket(`{"value":"wire"}`)
+		fixed, err := lowhttp.FixHTTPResponsePacket(wire)
+		require.NoError(t, err)
+		rsp, err := lowhttp.ParseBytesToHTTPResponse(fixed)
+		require.NoError(t, err)
+		req := newRequest(t, token)
+		httpctx.SetBareResponseBytesForce(req, wire)
+		httpctx.SetFixedResponseBytesOwned(req, fixed)
+		hijacked := testHTTPFlowJSONWirePacket(`{"value":"hijacked"}`)
+		httpctx.SetHijackedResponseBytes(req, hijacked)
+		httpctx.SetResponseModified(req, "test")
+
+		flow, err := CreateHTTPFlowFromHTTPWithBodySaved(false, req, rsp, "mitm", "", "127.0.0.1:80")
+		require.NoError(t, err)
+		require.Contains(t, flow.GetResponse(), "hijacked")
+		require.NotContains(t, flow.GetResponse(), `"value":"wire"`)
+	})
+
+	t.Run("no_fix_ignores_context_fixed_packet", func(t *testing.T) {
+		token := uuid.NewString()
+		wire := testHTTPFlowGBKWirePacket(t)
+		fixed, err := lowhttp.FixHTTPResponsePacket(wire)
+		require.NoError(t, err)
+		rsp, err := lowhttp.ParseBytesToHTTPResponse(fixed)
+		require.NoError(t, err)
+		req := newRequest(t, token)
+		httpctx.SetBareResponseBytesForce(req, wire)
+		httpctx.SetFixedResponseBytesOwned(req, fixed)
+
+		flow, err := CreateHTTPFlowFromHTTPWithBodySaved(
+			false, req, rsp, "mitm", "", "127.0.0.1:80",
+			CreateHTTPFlowWithNoFixContentLength(true),
+		)
+		require.NoError(t, err)
+		require.Equal(t, wire, []byte(flow.GetResponse()))
 	})
 }
 

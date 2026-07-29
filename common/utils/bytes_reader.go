@@ -483,6 +483,10 @@ func BufioReadLineString(reader *bufio.Reader) (string, error) {
 }
 
 func ReadLine(reader io.Reader) ([]byte, error) {
+	if bufferedReader, ok := reader.(*bufio.Reader); ok {
+		lineRaw, err := bufferedReader.ReadBytes('\n')
+		return bytes.TrimRight(lineRaw, "\r\n"), err
+	}
 	lineRaw, err := ReadUntilStableEx(reader, true, nil, 0, 0, '\n')
 	if err != nil {
 		return lineRaw, err

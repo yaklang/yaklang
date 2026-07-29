@@ -88,12 +88,14 @@ func resetYakitDatabaseForBindTest(t *testing.T) {
 	oldProjectDB := projectDataBase
 	oldProfilePath := currentProfileDatabasePath
 	oldProjectPath := currentProjectDatabasePath
+	oldProjectBinding := projectDatabaseBinding.Load()
 	t.Cleanup(func() {
 		initYakitDatabaseOnce = oldOnce
 		profileDatabase = oldProfileDB
 		projectDataBase = oldProjectDB
 		currentProfileDatabasePath = oldProfilePath
 		currentProjectDatabasePath = oldProjectPath
+		projectDatabaseBinding.Store(oldProjectBinding)
 		schema.SetGormProfileDatabase(oldProfileDB)
 		schema.SetGormProjectDatabase(oldProjectDB)
 	})
@@ -103,4 +105,32 @@ func resetYakitDatabaseForBindTest(t *testing.T) {
 	projectDataBase = nil
 	currentProfileDatabasePath = ""
 	currentProjectDatabasePath = ""
+	projectDatabaseBinding.Store(nil)
+}
+
+func TestProjectDatabaseBindingGenerationChangesOnRebind(t *testing.T) {
+	resetYakitDatabaseForBindTest(t)
+
+	dir := t.TempDir()
+	firstPath := filepath.Join(dir, "first.db")
+	firstDB, err := CreateProjectDatabase(firstPath)
+	if err != nil {
+		t.Fatalf("create first project db: %v", err)
+	}
+	BindProjectDatabase(firstDB, firstPath)
+	first := CaptureProjectDatabaseBinding()
+	if first.Database != firstDB || first.Path != firstPath || first.Generation == 0 {
+		t.Fatalf("unexpected first binding: %#v", first)
+	}
+
+	secondPath := filepath.Join(dir, "second.db")
+	secondDB, err := CreateProjectDatabase(secondPath)
+	if err != nil {
+		t.Fatalf("create second project db: %v", err)
+	}
+	BindProjectDatabase(secondDB, secondPath)
+	second := CaptureProjectDatabaseBinding()
+	if second.Database != secondDB || second.Path != secondPath || second.Generation <= first.Generation {
+		t.Fatalf("unexpected second binding: first=%#v second=%#v", first, second)
+	}
 }

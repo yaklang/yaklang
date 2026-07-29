@@ -140,13 +140,40 @@ func ToHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 	return toHTTPFlowGRPCModel(f, full)
 }
 
+// ToHTTPFlowGRPCModelWithoutResponseRaw keeps list metadata while omitting the
+// raw response and response-header expansion. Projected rows bypass the
+// canonical cache so a live list cannot retain every response for ten minutes.
+func ToHTTPFlowGRPCModelWithoutResponseRaw(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
+	return buildHTTPFlowGRPCModel(f, full, false, false, true)
+}
+
+// ToHTTPFlowGRPCModelWithListProjection omits packet bytes that a list caller
+// explicitly does not need. Detail RPCs continue to use the canonical model.
+func ToHTTPFlowGRPCModelWithListProjection(f *schema.HTTPFlow, full, excludeRequestRaw, excludeResponseRaw bool) (*ypb.HTTPFlow, error) {
+	return buildHTTPFlowGRPCModel(f, full, false, excludeRequestRaw, excludeResponseRaw)
+}
+
 func ToHTTPFlowGRPCModelFull(f *schema.HTTPFlow) (*ypb.HTTPFlow, error) {
 	return toHTTPFlowGRPCModel(f, true)
 }
 
 func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
-	if flow := getCacheHTTPFlowGRPCModel(f, full); flow != nil {
-		return flow, nil
+	return buildHTTPFlowGRPCModel(f, full, true, false, false)
+}
+
+func buildHTTPFlowGRPCModel(f *schema.HTTPFlow, full, useCache, excludeRequestRaw, excludeResponseRaw bool) (*ypb.HTTPFlow, error) {
+	if useCache {
+		if flow := getCacheHTTPFlowGRPCModel(f, full); flow != nil {
+			return flow, nil
+		}
+	}
+	if f == nil {
+		return nil, nil
+	}
+	if (excludeRequestRaw || excludeResponseRaw) && full {
+		// Full controls expensive detail fields. A response-raw projection is a
+		// list contract, so never perform full response extraction accidentally.
+		full = false
 	}
 	flow := &ypb.HTTPFlow{
 		FromPlugin:                 f.FromPlugin,
@@ -207,7 +234,11 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 			unquotedResponse = f.Response
 		}
 	}
-	flow.HtmlTitle = utf8safe(strings.TrimSpace(utils.ExtractTitleFromHTMLTitle(unquotedResponse, "")))
+	if f.HtmlTitle.Valid {
+		flow.HtmlTitle = utf8safe(f.HtmlTitle.String)
+	} else {
+		flow.HtmlTitle = utf8safe(schema.ExtractHTTPFlowHTMLTitle(unquotedResponse))
+	}
 
 	if f.UpdatedAt.IsZero() {
 		flow.UpdatedAt = time.Now().Unix()
@@ -242,8 +273,8 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 	// RequestSizeVerbose 使用 RequestLength 计算，与 BodySizeVerbose 风格统一
 	flow.RequestSizeVerbose = utf8safe(utils.ByteSize(uint64(flow.RequestLength)))
 
-	requireRequest := full || (!f.IsRequestOversize && !f.IsTooLargeRequest)
-	requireResponse := full || !f.IsResponseOversize
+	requireRequest := !excludeRequestRaw && (full || (!f.IsRequestOversize && !f.IsTooLargeRequest))
+	requireResponse := !excludeResponseRaw && (full || !f.IsResponseOversize)
 	isStandardRequest := !flow.NoFixContentLength
 
 	haveRequest := lo.IsNotEmpty(unquotedRequest)
@@ -395,7 +426,9 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 			flow.JsonObjects = append(flow.JsonObjects, utf8safe(j))
 		}
 	}
-	SetHTTPFlowCacheGRPCModel(f, full, flow)
+	if useCache {
+		SetHTTPFlowCacheGRPCModel(f, full, flow)
+	}
 	return flow, nil
 }
 

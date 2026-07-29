@@ -33,16 +33,16 @@ func httpFlowShouldStoreBareWire(wire, display []byte, noFixContentLength bool) 
 
 // httpFlowAutoFixedCharset detects FixHTTPResponse charset/body conversion (not header-only or replacer edits).
 func httpFlowAutoFixedCharset(wire, display []byte) bool {
-	_, wireBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(wire)
-	_, displayBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(display)
+	wireBody, wireContentType := httpFlowBodyAndContentType(wire)
+	displayBody, displayContentType := httpFlowBodyAndContentType(display)
 	if bytes.Equal(wireBody, displayBody) {
 		return false
 	}
 	if len(displayBody) > 0 && utf8.Valid(displayBody) && len(wireBody) > 0 && !utf8.Valid(wireBody) {
 		return true
 	}
-	wct := strings.ToLower(lowhttp.GetHTTPPacketHeader(wire, "Content-Type"))
-	dct := strings.ToLower(lowhttp.GetHTTPPacketHeader(display, "Content-Type"))
+	wct := strings.ToLower(wireContentType)
+	dct := strings.ToLower(displayContentType)
 	if wct == dct {
 		return false
 	}
@@ -50,15 +50,26 @@ func httpFlowAutoFixedCharset(wire, display []byte) bool {
 		(strings.Contains(wct, "charset=gbk") || strings.Contains(wct, "charset=gb2312") || strings.Contains(wct, "charset:gbk"))
 }
 
+func httpFlowBodyAndContentType(packet []byte) ([]byte, string) {
+	var contentType string
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet, func(line string) {
+		key, value := lowhttp.SplitHTTPHeader(line)
+		if strings.EqualFold(key, "content-type") {
+			contentType = value
+		}
+	})
+	return body, contentType
+}
+
 func resolveHTTPFlowStoredResponse(wire, rspRaw, fixRspRaw []byte, noFixContentLength bool) []byte {
-	if len(fixRspRaw) > 0 {
-		return fixRspRaw
-	}
 	if noFixContentLength {
 		if len(wire) > 0 {
 			return wire
 		}
 		return rspRaw
+	}
+	if len(fixRspRaw) > 0 {
+		return fixRspRaw
 	}
 	fixSource := wire
 	if len(rspRaw) > 0 && len(wire) > 0 && !bytes.Equal(wire, rspRaw) {
@@ -70,7 +81,7 @@ func resolveHTTPFlowStoredResponse(wire, rspRaw, fixRspRaw []byte, noFixContentL
 	if len(fixSource) == 0 {
 		return nil
 	}
-	fixed, _, err := lowhttp.FixHTTPResponse(fixSource)
+	fixed, err := lowhttp.FixHTTPResponsePacket(fixSource)
 	if err != nil || len(fixed) == 0 {
 		return fixSource
 	}

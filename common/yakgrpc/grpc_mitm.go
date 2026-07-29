@@ -157,11 +157,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		} else {
 			plainRequest = httpctx.GetPlainRequestBytes(req)
 			if len(plainRequest) <= 0 {
-				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
-				plainRequest = decoded
-				if _, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded); len(body) <= yakit.GetMaxHTTPFlowRequestBodyInDBBytes() {
-					httpctx.SetPlainRequestBytes(req, decoded)
-				}
+				plainRequest = decodeAndCachePlainRequestBytesIfStorable(req, httpctx.GetBareRequestBytes(req))
 			}
 		}
 		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
@@ -173,9 +169,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		} else {
 			plainResponse = httpctx.GetPlainResponseBytes(req)
 			if len(plainResponse) <= 0 {
-				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
-				httpctx.SetPlainResponseBytes(req, decoded)
-				plainResponse = decoded
+				plainResponse = decodeAndCachePlainResponseBytes(req, httpctx.GetBareResponseBytes(req))
 			}
 		}
 		return plainResponse

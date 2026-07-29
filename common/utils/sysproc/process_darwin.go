@@ -108,6 +108,16 @@ func findProcessName(network string, ip netip.Addr, port int) (uint32, string, e
 	return 0, "", ErrNotFound
 }
 
+func findProcessNameByEndpoints(
+	network string,
+	srcIP netip.Addr,
+	srcPort int,
+	dstIP netip.Addr,
+	dstPort int,
+) (uint32, string, error) {
+	return findProcessName(network, srcIP, srcPort)
+}
+
 func getExecPathFromPID(pid uint32) (string, error) {
 	buf := make([]byte, procpidpathinfosize)
 	_, _, errno := syscall.Syscall6(

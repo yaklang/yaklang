@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/textproto"
@@ -13,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -27,6 +27,35 @@ const (
 )
 
 var validPathSuffixRegexp = regexp.MustCompile(`^\.[A-Za-z0-9]+$`)
+
+type splitHTTPPacketReaderState struct {
+	packet bytes.Reader
+	reader *bufio.Reader
+}
+
+var splitHTTPPacketReaderPool = sync.Pool{
+	New: func() any {
+		state := &splitHTTPPacketReaderState{}
+		state.reader = bufio.NewReader(&state.packet)
+		return state
+	},
+}
+
+func acquireSplitHTTPPacketReader(raw []byte) *splitHTTPPacketReaderState {
+	state := splitHTTPPacketReaderPool.Get().(*splitHTTPPacketReaderState)
+	state.packet.Reset(raw)
+	state.reader.Reset(&state.packet)
+	return state
+}
+
+func releaseSplitHTTPPacketReader(state *splitHTTPPacketReaderState) {
+	// Do not keep the potentially large packet alive while the reader is idle
+	// in the pool. Resetting the bufio.Reader also drops its interface reference
+	// before the state becomes available to another goroutine.
+	state.packet.Reset(nil)
+	state.reader.Reset(&state.packet)
+	splitHTTPPacketReaderPool.Put(state)
+}
 
 // pathExtModifierChars 是 CDN/图片服务在 path 扩展名后常加的修饰符字符。
 // 例如 a.png!cc_218x300 中的 !、.jpg@100w 中的 @。提取“真实扩展名”时需在此类字符处截断，
@@ -542,22 +571,117 @@ func MergeCookies(cookies ...*http.Cookie) string {
 // }
 
 func SplitHTTPHeadersAndBodyFromPacketEx(raw []byte, mf func(method string, requestUri string, proto string) error, hook ...func(line string)) (string, []byte) {
+	return splitHTTPHeadersAndBodyFromPacket(raw, mf, true, hook...)
+}
+
+// SplitHTTPHeadersAndBodyFromPacketViewEx parses the packet without copying its
+// body. The returned body aliases raw and is read-only; callers that mutate or
+// retain it independently must clone it first.
+func SplitHTTPHeadersAndBodyFromPacketViewEx(raw []byte, mf func(method string, requestUri string, proto string) error, hook ...func(line string)) (string, []byte) {
+	return splitHTTPHeadersAndBodyFromPacket(raw, mf, false, hook...)
+}
+
+func splitHTTPHeadersAndBodyFromPacket(raw []byte, mf func(method string, requestUri string, proto string) error, cloneBody bool, hook ...func(line string)) (string, []byte) {
+	if !cloneBody {
+		if headers, body, ok := splitCanonicalHTTPPacketView(raw, mf, hook...); ok {
+			return headers, body
+		}
+	}
 	if len(hook) > 0 {
-		return SplitHTTPPacket(raw, mf, nil, func(line string) (ret string) {
-			ret = line
-			defer func() {
-				if err := recover(); err != nil {
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-				ret = line
-			}()
-			for _, h := range hook {
-				h(line)
-			}
-			return ret
+		return splitHTTPPacketEx(raw, mf, nil, nil, cloneBody, func(line string) (ret string) {
+			return callHTTPHeaderHooks(line, hook)
 		})
 	}
-	return SplitHTTPPacket(raw, mf, nil)
+	return splitHTTPPacketEx(raw, mf, nil, nil, cloneBody)
+}
+
+func callHTTPHeaderHooks(line string, hooks []func(string)) (ret string) {
+	ret = line
+	defer func() {
+		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+		ret = line
+	}()
+	for _, hook := range hooks {
+		hook(line)
+	}
+	return ret
+}
+
+// splitCanonicalHTTPPacketView avoids line-by-line reconstruction for ordinary
+// CRLF packets. Noncanonical packets retain the legacy parser's normalization,
+// folding and prefix handling.
+func splitCanonicalHTTPPacketView(raw []byte, reqFirstLine func(method string, requestURI string, proto string) error, headerHooks ...func(string)) (string, []byte, bool) {
+	headerEnd := bytes.Index(raw, []byte(DoubleCRLF))
+	if headerEnd <= 0 {
+		return "", nil, false
+	}
+
+	header := raw[:headerEnd]
+	firstLineEnd := bytes.Index(header, []byte(CRLF))
+	if firstLineEnd <= 0 {
+		return "", nil, false
+	}
+	firstLine := header[:firstLineEnd]
+	if bytes.IndexAny(firstLine, "\r\n") >= 0 || !bytes.Equal(firstLine, TrimSpaceHTTPPacket(firstLine)) {
+		return "", nil, false
+	}
+
+	isResp := bytes.HasPrefix(firstLine, []byte("HTTP/")) || bytes.HasPrefix(firstLine, []byte("RTSP/"))
+	haveContentLength := false
+	remaining := header[firstLineEnd+len(CRLF):]
+	for len(remaining) > 0 {
+		lineEnd := bytes.Index(remaining, []byte(CRLF))
+		line := remaining
+		if lineEnd >= 0 {
+			line = remaining[:lineEnd]
+			remaining = remaining[lineEnd+len(CRLF):]
+		} else {
+			remaining = nil
+		}
+		if bytes.IndexAny(line, "\r\n") >= 0 || (!isResp && len(bytes.TrimSpace(line)) == 0) {
+			return "", nil, false
+		}
+		if len(headerHooks) > 0 && isResp && len(line) > 0 && (line[0] == ' ' || line[0] == '\t') {
+			return "", nil, false
+		}
+		if separator := bytes.IndexByte(line, ':'); separator >= 0 {
+			key := bytes.TrimSpace(line[:separator])
+			if len(key) == len("content-length") && bytes.EqualFold(key, []byte("content-length")) {
+				haveContentLength = true
+			}
+		}
+	}
+
+	headers := string(raw[:headerEnd+len(DoubleCRLF)])
+	if !isResp && reqFirstLine != nil {
+		method, requestURI, proto, _ := utils.ParseHTTPRequestLine(headers[:firstLineEnd])
+		if err := reqFirstLine(method, requestURI, proto); err != nil && err.Error() != "normal abort" {
+			log.Debugf("reqHeader error: %s", err)
+			return "", nil, true
+		}
+	}
+	if len(headerHooks) > 0 {
+		remainingHeaders := headers[firstLineEnd+len(CRLF) : headerEnd]
+		for len(remainingHeaders) > 0 {
+			lineEnd := strings.Index(remainingHeaders, CRLF)
+			line := remainingHeaders
+			if lineEnd >= 0 {
+				line = remainingHeaders[:lineEnd]
+				remainingHeaders = remainingHeaders[lineEnd+len(CRLF):]
+			} else {
+				remainingHeaders = ""
+			}
+			callHTTPHeaderHooks(line, headerHooks)
+		}
+	}
+
+	body := raw[headerEnd+len(DoubleCRLF):]
+	if len(bytes.TrimSpace(body)) == 0 && !haveContentLength {
+		body = nil
+	}
+	return headers, body, true
 }
 
 func SplitHTTPPacketFast(raw any) (string, []byte) {
@@ -588,15 +712,32 @@ func SplitHTTPPacketEx(
 	rawFistLine func(string) error,
 	hook ...func(line string) string,
 ) (string, []byte) {
-	reader := bufio.NewReader(bytes.NewBuffer(raw))
+	return splitHTTPPacketEx(raw, reqFirstLine, rspFirstLine, rawFistLine, true, hook...)
+}
+
+func splitHTTPPacketEx(
+	raw []byte,
+	reqFirstLine func(method string, requestUri string, proto string) error,
+	rspFirstLine func(proto string, code int, codeMsg string) error,
+	rawFistLine func(string) error,
+	cloneBody bool,
+	hook ...func(line string) string,
+) (string, []byte) {
+	readerState := acquireSplitHTTPPacketReader(raw)
+	defer releaseSplitHTTPPacketReader(readerState)
+	reader := readerState.reader
 	firstLineBytes, err := utils.BufioReadLine(reader)
 	if err != nil {
 		return "", nil
 	}
 	prefix, firstLineBytes, _ := utils.CutBytesPrefixFunc(firstLineBytes, utils.NotSpaceRune)
 	firstLineBytes = TrimSpaceHTTPPacket(firstLineBytes)
+	// BufioReadLine returns a parser-owned allocation. Reuse it for every
+	// first-line callback and for the reconstructed header instead of copying
+	// the same line into multiple strings.
+	firstLine := utils.UnsafeBytesToString(firstLineBytes)
 	if rawFistLine != nil {
-		err := rawFistLine(string(firstLineBytes))
+		err := rawFistLine(firstLine)
 		if err != nil {
 			log.Debugf("rawFistLine error: %s", err)
 			return "", nil
@@ -606,7 +747,7 @@ func SplitHTTPPacketEx(
 	if isResp {
 		// rsp
 		if rspFirstLine != nil {
-			proto, code, codeMsg, _ := utils.ParseHTTPResponseLine(string(firstLineBytes))
+			proto, code, codeMsg, _ := utils.ParseHTTPResponseLine(firstLine)
 			err := rspFirstLine(proto, code, codeMsg)
 			if err != nil {
 				log.Debugf("rspHeader error: %s", err)
@@ -616,7 +757,7 @@ func SplitHTTPPacketEx(
 	} else {
 		// req
 		if reqFirstLine != nil {
-			method, requestURI, proto, _ := utils.ParseHTTPRequestLine(string(firstLineBytes))
+			method, requestURI, proto, _ := utils.ParseHTTPRequestLine(firstLine)
 			err := reqFirstLine(method, requestURI, proto)
 			if err != nil && err.Error() != "normal abort" {
 				log.Debugf("reqHeader error: %s", err)
@@ -626,13 +767,16 @@ func SplitHTTPPacketEx(
 	}
 
 	var headers []string
-	headers = append(headers, string(firstLineBytes))
+	headers = append(headers, firstLine)
 	haveCl := false
 	err = utils.ScanHTTPHeader(reader, func(rawHeader []byte) {
 		if len(rawHeader) == 0 {
 			return
 		}
-		line := string(rawHeader)
+		// ScanHTTPHeader gives this callback an independent line allocation and
+		// never mutates it afterwards. The hook and reconstructed header can
+		// therefore retain a zero-copy string view safely.
+		line := utils.UnsafeBytesToString(rawHeader)
 		skipHeader := false
 		for _, h := range hook {
 			hooked := h(line)
@@ -648,15 +792,21 @@ func SplitHTTPPacketEx(
 			return
 		}
 		k, _ := SplitHTTPHeader(line)
-		if strings.ToLower(k) == "content-length" {
+		if equalASCIIFoldOrLower(k, "content-length") {
 			haveCl = true
 		}
 		headers = append(headers, line)
 	}, prefix, isResp)
 	headersRaw := strings.Join(headers, CRLF) + CRLF + CRLF
-	bodyRaw, _ := ioutil.ReadAll(reader)
-	if bodyRaw == nil {
-		return headersRaw, nil
+	// The reader is backed by the input packet, so its unread bytes are exactly
+	// the body. The public legacy API preserves its independent-copy contract;
+	// the explicit View API returns the same region without copying.
+	bodyLen := reader.Buffered() + readerState.packet.Len()
+	bodyView := raw[len(raw)-bodyLen:]
+	bodyRaw := bodyView
+	if cloneBody {
+		bodyRaw = make([]byte, bodyLen)
+		copy(bodyRaw, bodyView)
 	}
 
 	if len(bytes.TrimSpace(bodyRaw)) == 0 && !haveCl {
@@ -689,6 +839,12 @@ func SplitHTTPPacketEx(
 // ```
 func SplitHTTPHeadersAndBodyFromPacket(raw []byte, hook ...func(line string)) (headers string, body []byte) {
 	return SplitHTTPHeadersAndBodyFromPacketEx(raw, nil, hook...)
+}
+
+// SplitHTTPHeadersAndBodyFromPacketView is the read-only, zero-body-copy form
+// of SplitHTTPHeadersAndBodyFromPacket. The returned body aliases raw.
+func SplitHTTPHeadersAndBodyFromPacketView(raw []byte, hook ...func(line string)) (headers string, body []byte) {
+	return SplitHTTPHeadersAndBodyFromPacketViewEx(raw, nil, hook...)
 }
 
 func RemoveZeroContentLengthHTTPHeader(raw []byte) []byte {

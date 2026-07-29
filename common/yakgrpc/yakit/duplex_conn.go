@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -17,14 +18,29 @@ func init() {
 	schema.SetBroadCast_Data(BroadcastData)
 }
 
+const (
+	serverPushQueueCapacity  = 128
+	serverPushEnqueueTimeout = 50 * time.Millisecond
+)
+
 type serverPushDescription struct {
-	Name   string
-	Handle func(response *ypb.DuplexConnectionResponse)
+	Name string
+
+	queue chan *ypb.DuplexConnectionResponse
+	done  chan struct{}
+	send  func(*ypb.DuplexConnectionResponse) error
+
+	stopOnce sync.Once
+	pending  map[string]*ypb.DuplexConnectionResponse
+	pendingM sync.Mutex
+
+	subscriptions  map[string]struct{}
+	subscriptionsM sync.RWMutex
 }
 
 var (
-	serverPushMutex    = new(sync.Mutex)
-	serverPushCallback = make(map[string]serverPushDescription)
+	serverPushMutex    = new(sync.RWMutex)
+	serverPushCallback = make(map[string]*serverPushDescription)
 
 	broadcastWithTypeMutex   = new(sync.Mutex)
 	broadcastTypeCallerTable = make(map[string]func(func()))
@@ -53,6 +69,196 @@ var (
 	ServerPushType_SlowQuerySQL  = "httpflow_slow_query_sql"
 	ServerPushType_SlowRuleHook  = "mitm_slow_rule_hook"
 )
+
+func newServerPushDescription(
+	name string,
+	queueCapacity int,
+	send func(*ypb.DuplexConnectionResponse) error,
+) *serverPushDescription {
+	if queueCapacity < 1 {
+		queueCapacity = 1
+	}
+	return &serverPushDescription{
+		Name:          name,
+		queue:         make(chan *ypb.DuplexConnectionResponse, queueCapacity),
+		done:          make(chan struct{}),
+		send:          send,
+		pending:       make(map[string]*ypb.DuplexConnectionResponse),
+		subscriptions: make(map[string]struct{}),
+	}
+}
+
+func (s *serverPushDescription) setSubscription(name string, enabled bool) {
+	if name == "" {
+		return
+	}
+	s.subscriptionsM.Lock()
+	defer s.subscriptionsM.Unlock()
+	if enabled {
+		s.subscriptions[name] = struct{}{}
+		return
+	}
+	delete(s.subscriptions, name)
+}
+
+func (s *serverPushDescription) hasSubscription(name string) bool {
+	s.subscriptionsM.RLock()
+	defer s.subscriptionsM.RUnlock()
+	_, ok := s.subscriptions[name]
+	return ok
+}
+
+func (s *serverPushDescription) stop() {
+	s.stopOnce.Do(func() {
+		close(s.done)
+	})
+}
+
+func (s *serverPushDescription) next(ctx context.Context) (*ypb.DuplexConnectionResponse, bool) {
+	select {
+	case <-ctx.Done():
+		return nil, false
+	case <-s.done:
+		return nil, false
+	default:
+	}
+
+	// Preserve FIFO delivery for queued frames. Coalesced invalidations were
+	// received only after this queue filled, so they must be delivered later.
+	select {
+	case response := <-s.queue:
+		return response, true
+	default:
+	}
+
+	s.pendingM.Lock()
+	for messageType, response := range s.pending {
+		delete(s.pending, messageType)
+		s.pendingM.Unlock()
+		return response, true
+	}
+	s.pendingM.Unlock()
+
+	select {
+	case <-ctx.Done():
+		return nil, false
+	case <-s.done:
+		return nil, false
+	case response := <-s.queue:
+		return response, true
+	}
+}
+
+func (s *serverPushDescription) run(ctx context.Context) {
+	defer s.stop()
+	for {
+		response, ok := s.next(ctx)
+		if !ok {
+			return
+		}
+		if err := s.send(response); err != nil {
+			return
+		}
+	}
+}
+
+func isCoalescibleServerPush(messageType string) bool {
+	switch messageType {
+	case ServerPushType_Global,
+		ServerPushType_HttpFlow,
+		ServerPushType_HTTPFlowCommitted,
+		ServerPushType_YakScript,
+		ServerPushType_Risk,
+		ServerPushType_AIMemory,
+		ServerPushType_RPS,
+		ServerPushType_CPS:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *serverPushDescription) enqueue(response *ypb.DuplexConnectionResponse) bool {
+	if response == nil {
+		return false
+	}
+	select {
+	case <-s.done:
+		return false
+	default:
+	}
+	select {
+	case s.queue <- response:
+		return true
+	default:
+	}
+
+	if isCoalescibleServerPush(response.GetMessageType()) {
+		s.pendingM.Lock()
+		s.pending[response.GetMessageType()] = response
+		s.pendingM.Unlock()
+		return true
+	}
+
+	timer := time.NewTimer(serverPushEnqueueTimeout)
+	defer timer.Stop()
+	select {
+	case <-s.done:
+		return false
+	case s.queue <- response:
+		return true
+	case <-timer.C:
+		log.Warnf("drop server push frame for slow client %s: type=%s queue_capacity=%d",
+			s.Name, response.GetMessageType(), cap(s.queue))
+		return false
+	}
+}
+
+const broadcastThrottleInterval = time.Second
+
+// newLeadingTrailingThrottle sends the first invalidation immediately and
+// keeps only the newest callback for the end of each throttle window. This is
+// used for HTTP flow creation notifications so a burst cannot lose its final
+// wake-up while still bounding the notification rate.
+func newLeadingTrailingThrottle(wait time.Duration) func(func()) {
+	var mutex sync.Mutex
+	var timer *time.Timer
+	var pending func()
+	var flush func()
+
+	flush = func() {
+		mutex.Lock()
+		callback := pending
+		pending = nil
+		if callback == nil {
+			timer = nil
+			mutex.Unlock()
+			return
+		}
+		timer = time.AfterFunc(wait, flush)
+		mutex.Unlock()
+		callback()
+	}
+
+	return func(callback func()) {
+		mutex.Lock()
+		if timer == nil {
+			timer = time.AfterFunc(wait, flush)
+			mutex.Unlock()
+			callback()
+			return
+		}
+		pending = callback
+		mutex.Unlock()
+	}
+}
+
+func newBroadcastTypeCaller(typeString string, wait time.Duration) func(func()) {
+	if typeString == ServerPushType_HttpFlow {
+		return newLeadingTrailingThrottle(wait)
+	}
+	return utils.NewThrottle(wait.Seconds())
+}
 
 type WebFuzzerTabPush struct {
 	OpenFlag bool                `json:"openFlag"` // 创建 Web Fuzzer Tab 之后，要不要把左侧一级菜单切到「Web Fuzzer」并聚焦新 Tab
@@ -89,34 +295,104 @@ func BroadcastProjectChanged(action string, id int64, projectName, projectType s
 }
 
 func RegisterServerPushCallback(id string, stream ypb.Yak_DuplexConnectionServer) {
+	registerServerPushCallback(id, stream.Context(), serverPushQueueCapacity, stream.Send)
+}
+
+func registerServerPushCallback(
+	id string,
+	ctx context.Context,
+	queueCapacity int,
+	send func(*ypb.DuplexConnectionResponse) error,
+) {
+	description := newServerPushDescription(id, queueCapacity, send)
 	serverPushMutex.Lock()
-	defer serverPushMutex.Unlock()
-
-	log.Infof("Register server push callback: %v", id)
-
-	serverPushCallback[id] = serverPushDescription{
-		Name: id,
-		Handle: func(response *ypb.DuplexConnectionResponse) {
-			_ = stream.Send(response)
-		},
+	previous := serverPushCallback[id]
+	serverPushCallback[id] = description
+	serverPushMutex.Unlock()
+	if previous != nil {
+		previous.stop()
 	}
+	log.Infof("Register server push callback: %v", id)
+	go description.run(ctx)
 }
 
 func UnRegisterServerPushCallback(id string) {
 	serverPushMutex.Lock()
-	defer serverPushMutex.Unlock()
-
-	log.Infof("UnRegister server push callback: %v", id)
+	description := serverPushCallback[id]
 	delete(serverPushCallback, id)
+	serverPushMutex.Unlock()
+	if description != nil {
+		description.stop()
+	}
+	log.Infof("UnRegister server push callback: %v", id)
+}
+
+func SetServerPushSubscription(id, subscription string, enabled bool) bool {
+	serverPushMutex.RLock()
+	description := serverPushCallback[id]
+	serverPushMutex.RUnlock()
+	if description == nil {
+		return false
+	}
+	description.setSubscription(subscription, enabled)
+	return true
 }
 
 func broadcastRaw(data *ypb.DuplexConnectionResponse) {
-	serverPushMutex.Lock()
-	defer serverPushMutex.Unlock()
-
+	serverPushMutex.RLock()
+	callbacks := make([]*serverPushDescription, 0, len(serverPushCallback))
 	for _, item := range serverPushCallback {
-		item.Handle(data)
+		callbacks = append(callbacks, item)
 	}
+	serverPushMutex.RUnlock()
+
+	for _, item := range callbacks {
+		item.enqueue(data)
+	}
+}
+
+func broadcastRawToSubscribers(subscription string, data *ypb.DuplexConnectionResponse) {
+	callbacks := snapshotServerPushSubscribers(subscription)
+	for _, item := range callbacks {
+		item.enqueue(data)
+	}
+}
+
+func snapshotServerPushSubscribers(subscription string) []*serverPushDescription {
+	serverPushMutex.RLock()
+	callbacks := make([]*serverPushDescription, 0, len(serverPushCallback))
+	for _, item := range serverPushCallback {
+		if item.hasSubscription(subscription) {
+			callbacks = append(callbacks, item)
+		}
+	}
+	serverPushMutex.RUnlock()
+	return callbacks
+}
+
+func BroadcastDataToSubscribers(subscription, typeString string, msg any) {
+	broadcastDataToSubscribersLazy(subscription, typeString, func() any { return msg })
+}
+
+// broadcastDataToSubscribersLazy avoids constructing and serializing a
+// high-frequency frame when no connected client negotiated the subscription.
+func broadcastDataToSubscribersLazy(subscription, typeString string, build func() any) bool {
+	if subscription == "" || typeString == "" {
+		return false
+	}
+	callbacks := snapshotServerPushSubscribers(subscription)
+	if len(callbacks) == 0 || build == nil {
+		return false
+	}
+	data := &ypb.DuplexConnectionResponse{
+		Data:        utils.Jsonify(build()),
+		MessageType: typeString,
+		Timestamp:   time.Now().UnixNano(),
+	}
+	for _, item := range callbacks {
+		item.enqueue(data)
+	}
+	return true
 }
 
 func BroadcastData(typeString string, msg any) {
@@ -144,7 +420,7 @@ func BroadcastData(typeString string, msg any) {
 			broadcastRaw(data)
 		})
 	} else {
-		broadcastTypeCallerTable[hash] = utils.NewThrottle(1)
+		broadcastTypeCallerTable[hash] = newBroadcastTypeCaller(typeString, broadcastThrottleInterval)
 		broadcastTypeCallerTable[hash](func() {
 			broadcastRaw(data)
 		})
@@ -152,10 +428,12 @@ func BroadcastData(typeString string, msg any) {
 }
 
 func signalRaw(id string, data *ypb.DuplexConnectionResponse) {
-	serverPushMutex.Lock()
-	defer serverPushMutex.Unlock()
-
-	serverPushCallback[id].Handle(data)
+	serverPushMutex.RLock()
+	callback := serverPushCallback[id]
+	serverPushMutex.RUnlock()
+	if callback != nil {
+		callback.enqueue(data)
+	}
 }
 
 func SignalDate(id string, typeString string, data any) {

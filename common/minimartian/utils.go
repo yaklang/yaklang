@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
@@ -17,6 +16,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -27,14 +27,138 @@ const (
 	PROTO_TUNNEL = "TUNNEL"
 )
 
+type emptyProxyHandleReader struct{}
+
+func (emptyProxyHandleReader) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+type proxyHandleBuffers struct {
+	brw              *bufio.ReadWriter
+	contextIOBinding *proxyHandleContextIOBinding
+}
+
+var proxyHandleBufferPool sync.Pool
+
+type proxyHandleContextIO struct {
+	net.Conn
+	ctx context.Context
+}
+
+func (c *proxyHandleContextIO) Read(packet []byte) (int, error) {
+	n, err := c.Conn.Read(packet)
+	if ctxErr := c.ctx.Err(); ctxErr != nil {
+		return n, ctxErr
+	}
+	return n, err
+}
+
+func (c *proxyHandleContextIO) Write(packet []byte) (int, error) {
+	n, err := c.Conn.Write(packet)
+	if ctxErr := c.ctx.Err(); ctxErr != nil {
+		return n, ctxErr
+	}
+	return n, err
+}
+
+type proxyHandleContextIOBinding struct {
+	stop chan struct{}
+	done chan struct{}
+}
+
+func bindProxyHandleContextIO(ctx context.Context, conn net.Conn) (*proxyHandleContextIO, *proxyHandleContextIOBinding) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	contextIO := &proxyHandleContextIO{Conn: conn, ctx: ctx}
+	if ctx.Done() == nil {
+		return contextIO, nil
+	}
+
+	binding := &proxyHandleContextIOBinding{
+		stop: make(chan struct{}),
+		done: make(chan struct{}),
+	}
+	go func() {
+		defer close(binding.done)
+		select {
+		case <-ctx.Done():
+			// release may race with cancellation while an HTTP or SOCKS
+			// session is being rebuilt. A released binding must not poison the
+			// connection that the next session is about to reuse.
+			select {
+			case <-binding.stop:
+				return
+			default:
+			}
+			if err := conn.SetDeadline(time.Now()); err != nil {
+				// A net.Conn that cannot honor deadlines must be closed to
+				// preserve the old context wrapper's prompt cancellation.
+				_ = conn.Close()
+			}
+		case <-binding.stop:
+		}
+	}()
+	return contextIO, binding
+}
+
+func (b *proxyHandleContextIOBinding) stopAndWait() {
+	if b == nil {
+		return
+	}
+	close(b.stop)
+	<-b.done
+}
+
+func acquireProxyHandleBuffers(reader io.Reader, writer io.Writer) *proxyHandleBuffers {
+	buffers, _ := proxyHandleBufferPool.Get().(*proxyHandleBuffers)
+	if buffers == nil {
+		buffers = &proxyHandleBuffers{
+			brw: bufio.NewReadWriter(
+				bufio.NewReader(emptyProxyHandleReader{}),
+				bufio.NewWriter(io.Discard),
+			),
+		}
+	}
+	buffers.brw.Reader.Reset(reader)
+	buffers.brw.Writer.Reset(writer)
+	return buffers
+}
+
+func releaseProxyHandleBuffers(buffers *proxyHandleBuffers) {
+	if buffers == nil || buffers.brw == nil {
+		return
+	}
+	buffers.contextIOBinding.stopAndWait()
+	buffers.contextIOBinding = nil
+	// Do not retain the connection, context, or any buffered packet while the
+	// pair waits in the pool. Reset also discards unread/read-ahead bytes from
+	// the connection that has just finished.
+	buffers.brw.Reader.Reset(emptyProxyHandleReader{})
+	buffers.brw.Writer.Reset(io.Discard)
+	proxyHandleBufferPool.Put(buffers)
+}
+
+func releaseProxyHandleContext(ctx *Context) {
+	if ctx == nil {
+		return
+	}
+	ctx.Session().releaseProxyHandleBuffers()
+}
+
 func CreateProxyHandleContext(ctx context.Context, conn net.Conn) (*Context, error) {
-	brw := bufio.NewReadWriter(bufio.NewReader(ctxio.NewReader(ctx, conn)), bufio.NewWriter(ctxio.NewWriter(ctx, conn)))
-	s, err := newSession(conn, brw)
+	contextIO, binding := bindProxyHandleContextIO(ctx, conn)
+	buffers := acquireProxyHandleBuffers(contextIO, contextIO)
+	buffers.contextIOBinding = binding
+	s, err := newSession(conn, buffers.brw)
 	if err != nil {
+		releaseProxyHandleBuffers(buffers)
 		return nil, utils.Errorf("mitm: failed to create session: %v", err)
 	}
+	s.proxyHandleBuffers = buffers
 	proxyContext, err := withSession(s)
 	if err != nil {
+		s.releaseProxyHandleBuffers()
 		return nil, utils.Errorf("mitm: failed to build new context: %v", err)
 	}
 	return proxyContext, nil

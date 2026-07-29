@@ -118,9 +118,137 @@ type YakMatcher struct {
 
 	// record poc name / script name or some verbose
 	TemplateName string
+
+	// staticGlobRules is populated before a matcher is published for concurrent
+	// use. The map is immutable afterwards, so matching only performs concurrent
+	// reads. Patterns that are added by mutating Group after preparation still
+	// use the legacy compile-on-execute path.
+	staticGlobRules map[string]glob.Glob
+
+	// staticMIMEGlobRules applies the same ownership model to MIME matchers.
+	// MIME matching has legacy branch-specific semantics, so the compiled rule
+	// retains those semantics instead of treating the complete value as a glob.
+	staticMIMEGlobRules map[string]*staticMIMEGlobRule
 }
 
 var matcherResponseCache = utils.NewTTLCache[string](1 * time.Minute)
+
+type staticMIMEGlobRule struct {
+	rule           string
+	ruleHasSlash   bool
+	ruleHasStar    bool
+	ruleParts      [2]string
+	partHasStar    [2]bool
+	componentGlobs [2]glob.Glob
+	singleGlob     glob.Glob
+}
+
+func compileStaticMIMEGlobRule(rule string) *staticMIMEGlobRule {
+	compiled := &staticMIMEGlobRule{
+		rule:         rule,
+		ruleHasSlash: strings.Contains(rule, "/"),
+		ruleHasStar:  strings.Contains(rule, "*"),
+	}
+	if compiled.ruleHasSlash {
+		compiled.ruleParts[0], compiled.ruleParts[1], _ = strings.Cut(rule, "/")
+		for i, part := range compiled.ruleParts {
+			compiled.partHasStar[i] = strings.Contains(part, "*")
+			if compiled.partHasStar[i] {
+				compiled.componentGlobs[i], _ = glob.Compile(part)
+			}
+		}
+	} else if compiled.ruleHasStar {
+		compiled.singleGlob, _ = glob.Compile(rule)
+	}
+	return compiled
+}
+
+func (r *staticMIMEGlobRule) Match(target string) bool {
+	targetHasSlash := strings.Contains(target, "/")
+	if r.ruleHasSlash && targetHasSlash {
+		targetType, targetSubtype, _ := strings.Cut(target, "/")
+		targetParts := [2]string{targetType, targetSubtype}
+		for i, rulePart := range r.ruleParts {
+			if r.partHasStar[i] {
+				if r.componentGlobs[i] == nil || !r.componentGlobs[i].Match(targetParts[i]) {
+					return false
+				}
+			} else if rulePart != targetParts[i] {
+				return false
+			}
+		}
+		return true
+	}
+
+	if !r.ruleHasSlash && !targetHasSlash {
+		if r.ruleHasStar {
+			return r.singleGlob != nil && r.singleGlob.Match(target)
+		}
+		return utils.IContains(target, r.rule)
+	}
+
+	if targetHasSlash && !r.ruleHasSlash {
+		targetType, targetSubtype, _ := strings.Cut(target, "/")
+		targetParts := [2]string{targetType, targetSubtype}
+		for _, targetPart := range targetParts {
+			if r.ruleHasStar {
+				if r.singleGlob != nil && r.singleGlob.Match(targetPart) {
+					return true
+				}
+			} else if r.rule == targetPart {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// PrecompileStaticGlobRules prepares literal glob and MIME groups for repeated matching.
+// Call this while constructing the matcher, before publishing it to concurrent
+// readers. Encoded groups retain the legacy decode-then-compile path.
+func (y *YakMatcher) PrecompileStaticGlobRules() {
+	if y == nil {
+		return
+	}
+	for _, matcher := range y.SubMatchers {
+		matcher.PrecompileStaticGlobRules()
+	}
+	if strings.TrimSpace(y.GroupEncoding) != "" {
+		return
+	}
+
+	switch y.MatcherType {
+	case MATCHER_TYPE_GLOB:
+		rules := make(map[string]glob.Glob, len(y.Group))
+		for _, pattern := range y.Group {
+			rule, err := glob.Compile(pattern)
+			if err != nil {
+				continue
+			}
+			rules[pattern] = rule
+		}
+		if len(rules) > 0 {
+			y.staticGlobRules = rules
+		}
+	case MATCHER_TYPE_MIME:
+		rules := make(map[string]*staticMIMEGlobRule, len(y.Group))
+		for _, pattern := range y.Group {
+			rules[pattern] = compileStaticMIMEGlobRule(pattern)
+		}
+		if len(rules) > 0 {
+			y.staticMIMEGlobRules = rules
+		}
+	}
+}
+
+func (y *YakMatcher) getGlobRule(pattern string) (glob.Glob, error) {
+	if y != nil {
+		if rule, ok := y.staticGlobRules[pattern]; ok {
+			return rule, nil
+		}
+	}
+	return glob.Compile(pattern)
+}
 
 func cacheHash(req, rsp []byte, location string) string {
 	return utils.CalcSha1(req, rsp, location)
@@ -219,6 +347,12 @@ func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet [
 		}
 		var material string
 		scope := strings.ToLower(y.Scope)
+		if scope == "" || scope == SCOPE_RAW {
+			// Raw material is consumed synchronously by matcherFunc below. It
+			// does not need an owned copy or the response cache: hashing the
+			// complete packet costs more than returning this read-only view.
+			return utils.UnsafeBytesToString(packet)
+		}
 		scopeHash := cacheHash(reqPacket, packet, scope)
 
 		material, ok := matcherResponseCache.Get(scopeHash)
@@ -334,6 +468,7 @@ func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet [
 	}
 
 	condition := strings.TrimSpace(strings.ToLower(y.Condition))
+	groupEncoding := strings.TrimSpace(strings.ToLower(y.GroupEncoding))
 	switch y.MatcherType {
 	case MATCHER_TYPE_STATUS_CODE, "status":
 		statusCode := lowhttp.ExtractStatusCodeFromResponse(packet)
@@ -391,6 +526,7 @@ func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet [
 		}
 	case MATCHER_TYPE_BIN:
 		y.GroupEncoding = "hex"
+		groupEncoding = GROUP_ENCODING_HEX
 		fallthrough
 	case MATCHER_TYPE_WORD, "contains":
 		matcherFunc = func(s string, sub string) bool {
@@ -409,7 +545,14 @@ func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet [
 	case MATCHER_TYPE_SUFFIX:
 		matcherFunc = strings.HasSuffix
 	case MATCHER_TYPE_MIME:
-		matcherFunc = utils.MIMEGlobRuleCheck
+		matcherFunc = func(target string, rule string) bool {
+			if groupEncoding == "" {
+				if compiled, ok := y.staticMIMEGlobRules[rule]; ok {
+					return compiled.Match(target)
+				}
+			}
+			return utils.MIMEGlobRuleCheck(target, rule)
+		}
 	case MATCHER_TYPE_REGEXP, "re", "regex":
 		matcherFunc = func(s string, sub string) bool {
 			regUtils := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(sub)
@@ -422,7 +565,7 @@ func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet [
 		}
 	case MATCHER_TYPE_GLOB:
 		matcherFunc = func(s string, sub string) bool {
-			globRule, err := glob.Compile(sub)
+			globRule, err := y.getGlobRule(sub)
 			if err != nil {
 				log.Errorf("[%v] glob match failed: %s, origin glob: %v", name, err, sub)
 				return false
@@ -458,26 +601,31 @@ func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet [
 	}
 
 	material := getMaterial()
-	var groups []string
-	for _, wordRaw := range y.Group {
-		word := wordRaw
-		switch strings.TrimSpace(strings.ToLower(y.GroupEncoding)) {
-		case GROUP_ENCODING_HEX:
-			raw, err := codec.DecodeHex(wordRaw)
-			if err != nil {
-				log.Warnf("decode yak matcher hex failed: %s", err)
-				continue
+	groups := y.Group
+	if groupEncoding != "" {
+		groups = make([]string, 0, len(y.Group))
+		for _, wordRaw := range y.Group {
+			var word string
+			switch groupEncoding {
+			case GROUP_ENCODING_HEX:
+				raw, err := codec.DecodeHex(wordRaw)
+				if err != nil {
+					log.Warnf("decode yak matcher hex failed: %s", err)
+					continue
+				}
+				word = string(raw)
+			case GROUP_ENCODING_BASE64:
+				raw, err := codec.DecodeBase64(wordRaw)
+				if err != nil {
+					log.Warnf("decode yak matcher base64 failed: %s", err)
+					continue
+				}
+				word = string(raw)
+			default:
+				word = wordRaw
 			}
-			word = string(raw)
-		case GROUP_ENCODING_BASE64:
-			raw, err := codec.DecodeBase64(wordRaw)
-			if err != nil {
-				log.Warnf("decode yak matcher base64 failed: %s", err)
-				continue
-			}
-			word = string(raw)
+			groups = append(groups, word)
 		}
-		groups = append(groups, word)
 	}
 
 	switch condition {

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -616,6 +617,105 @@ func (f *FuzzHTTPRequest) GetOriginHTTPRequest() (*http.Request, error) {
 	return req, nil
 }
 
+// CountHTTPRequestParams returns the same totals as the three public
+// fuzz-parameter lists without constructing FuzzHTTPRequestParam objects. It
+// reuses but does not retain req. Post-body inspection consumes and restores
+// req.Body in the same way as GetPostCommonParams.
+func CountHTTPRequestParams(req *http.Request) (get, post, cookie int) {
+	if req == nil {
+		return 0, 0, 0
+	}
+	get = countQueryParams(req.URL.RawQuery)
+	post = countPostParams(req)
+	cookie = countCookieParams(req)
+	return
+}
+
+func countJSONParams(value gjson.Result) int {
+	count := 0
+	value.ForEach(func(_ gjson.Result, val gjson.Result) bool {
+		count++
+		if val.IsObject() || val.IsArray() {
+			count += countJSONParams(val)
+		}
+		return true
+	})
+	return count
+}
+
+func countQueryParams(raw string) int {
+	count := 0
+	vals := lowhttp.ParseQueryParams(raw)
+	filtered := make(map[string]struct{})
+
+	for _, item := range vals.Items {
+		key, value := item.Key, item.Value
+		if _, ok := filtered[key]; ok {
+			continue
+		}
+		filtered[key] = struct{}{}
+		if key == "" {
+			key = item.Raw
+		}
+		if !strVisible(key) {
+			continue
+		}
+
+		if jsonRaw, ok := utils.IsJSON(value); ok {
+			count += countJSONParams(gjson.Parse(jsonRaw))
+		}
+		if base64Raw, ok := IsStrictBase64(value); ok && govalidator.IsPrintableASCII(base64Raw) {
+			if jsonRaw, ok := utils.IsJSON(base64Raw); ok {
+				count += countJSONParams(gjson.Parse(jsonRaw))
+			}
+			count++
+		}
+		count++
+	}
+	return count
+}
+
+func countPostParams(req *http.Request) int {
+	bodyRaw := httpRequestReadBody(req)
+	if httpRequestBodyIsJSONObjectOrArray(bodyRaw) {
+		return countJSONParams(gjson.ParseBytes(bodyRaw))
+	}
+
+	if bytes.IndexByte(bodyRaw, '<') >= 0 {
+		if rootNode, err := xmlquery.Parse(bytes.NewReader(bodyRaw)); err == nil {
+			count := 0
+			RecursiveXMLNode(rootNode, func(_ *xmlquery.Node) {
+				count++
+			})
+			if count > 0 {
+				return count
+			}
+		}
+	}
+	return countQueryParams(utils.UnsafeBytesToString(bodyRaw))
+}
+
+func countCookieParams(req *http.Request) int {
+	count := 0
+	for _, cookie := range req.Cookies() {
+		if ShouldIgnoreCookie(cookie.Name) {
+			continue
+		}
+
+		if jsonRaw, ok := utils.IsJSON(cookie.Value); ok {
+			count += countJSONParams(gjson.Parse(jsonRaw))
+		}
+		if base64Raw, ok := IsStrictBase64(cookie.Value); ok && govalidator.IsPrintableASCII(base64Raw) {
+			if jsonRaw, ok := utils.IsJSON(base64Raw); ok {
+				count += countJSONParams(gjson.Parse(jsonRaw))
+			}
+			count++
+		}
+		count++
+	}
+	return count
+}
+
 func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
@@ -701,28 +801,42 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 
 func (f *FuzzHTTPRequest) GetPostCommonParams() []*FuzzHTTPRequestParam {
 	req, err := f.GetOriginHTTPRequest()
-	if err == nil && httpRequestBodyIsJSONObjectOrArray(req) {
-		return f.GetPostJsonParams()
+	if err != nil {
+		return nil
 	}
-	postParams := f.GetPostXMLParams()
+	bodyRaw := httpRequestReadBody(req)
+	if httpRequestBodyIsJSONObjectOrArray(bodyRaw) {
+		return f.getPostJsonParamsFromBody(bodyRaw, true)
+	}
+	postParams := f.getPostXMLParamsFromBody(bodyRaw)
 	if len(postParams) <= 0 {
-		postParams = f.GetPostParams()
+		postParams = f.getPostParamsFromBody(bodyRaw)
 	}
 	return postParams
 }
 
-func httpRequestBodyIsJSONObjectOrArray(r *http.Request) bool {
-	bodyRaw := httpRequestReadBody(r)
+func httpRequestBodyIsJSONObjectOrArray(bodyRaw []byte) bool {
 	if bodyRaw == nil || len(bodyRaw) == 0 {
 		return false
 	}
-	_, ok := utils.IsJSON(string(bytes.TrimSpace(bodyRaw)))
+	trimmed := bytes.TrimSpace(bodyRaw)
+	// IsJSON also accepts URL-escaped JSON. A valid object/array therefore has
+	// a literal opening delimiter or at least one percent escape. Avoid a
+	// request-sized string conversion and URL-unescape attempt for ordinary
+	// opaque bodies while keeping the accepted input set unchanged.
+	if bytes.IndexAny(trimmed, "{[%") < 0 {
+		return false
+	}
+	_, ok := utils.IsJSON(utils.UnsafeBytesToString(trimmed))
 	return ok
 }
 
 func httpRequestReadBody(r *http.Request) []byte {
 	if r.Body == nil {
 		return nil
+	}
+	if body, ok := utils.ReadOwnedHTTPRequestBodyView(r); ok {
+		return body
 	}
 	var buf bytes.Buffer
 	_, err := io.Copy(&buf, r.Body)
@@ -786,17 +900,20 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 	if err != nil {
 		return nil
 	}
-
-	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
-
 	bodyRaw := httpRequestReadBody(req)
+	return f.getPostJsonParamsFromBody(bodyRaw, false)
+}
 
+func (f *FuzzHTTPRequest) getPostJsonParamsFromBody(bodyRaw []byte, validated bool) []*FuzzHTTPRequestParam {
+	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
 	if bodyRaw == nil || len(bodyRaw) == 0 {
 		return fuzzParams
 	}
 	bodyStr := string(bytes.TrimSpace(bodyRaw))
-	if _, ok := utils.IsJSON(bodyStr); !ok {
-		return fuzzParams
+	if !validated {
+		if _, ok := utils.IsJSON(bodyStr); !ok {
+			return fuzzParams
+		}
 	}
 	call := func(key, val gjson.Result, gPath, jPath string) {
 		var paramValue interface{}
@@ -828,7 +945,13 @@ func (f *FuzzHTTPRequest) GetPostXMLParams() []*FuzzHTTPRequestParam {
 		return nil
 	}
 	bodyRaw := httpRequestReadBody(req)
+	return f.getPostXMLParamsFromBody(bodyRaw)
+}
 
+func (f *FuzzHTTPRequest) getPostXMLParamsFromBody(bodyRaw []byte) []*FuzzHTTPRequestParam {
+	if bytes.IndexByte(bodyRaw, '<') < 0 {
+		return nil
+	}
 	rootNode, err := xmlquery.Parse(bytes.NewReader(bodyRaw))
 	if err != nil {
 		return nil
@@ -852,9 +975,16 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 	if err != nil {
 		return nil
 	}
-
 	body := httpRequestReadBody(req)
-	bodyStr := string(body)
+	return f.getPostParamsFromBody(body)
+}
+
+func (f *FuzzHTTPRequest) getPostParamsFromBody(body []byte) []*FuzzHTTPRequestParam {
+	// The body is an owned snapshot installed back on the parsed request by
+	// httpRequestReadBody. Query parsing is synchronous and strings returned from
+	// it keep the same backing storage alive, so another request-sized copy is not
+	// needed merely to provide an immutable parser input.
+	bodyStr := utils.UnsafeBytesToString(body)
 	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
 
 	vals := lowhttp.ParseQueryParams(bodyStr)
@@ -928,6 +1058,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 		}
 		fuzzParams = append(fuzzParams, param)
 	}
+	runtime.KeepAlive(body)
 	return fuzzParams
 }
 

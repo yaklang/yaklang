@@ -1,19 +1,24 @@
 package yakit
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
 	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
 	BARE_REQUEST_GROUP  = "FLOW_ID_TO_BARE_REQUEST"
 	BARE_RESPONSE_GROUP = "FLOW_ID_TO_BARE_RESPONSE"
+
+	// This is limited to the fixed project schema and never used by generic KV groups.
+	sqliteBareProjectStorageUpsertSQL = `INSERT INTO "project_general_storages" ("created_at", "updated_at", "key", "value", "group")
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT("key") DO UPDATE SET "value"=excluded."value", "group"=excluded."group", "updated_at"=excluded."updated_at"`
 )
 
 func init() {
@@ -72,6 +77,13 @@ func SetProjectKeyWithGroup(db *gorm.DB, key interface{}, value interface{}, gro
 	valueStr := ""
 	if value != "" {
 		valueStr = strconv.Quote(utils.InterfaceToString(value))
+	}
+	if db.Dialect().GetName() == "sqlite3" && (group == BARE_REQUEST_GROUP || group == BARE_RESPONSE_GROUP) {
+		now := gorm.NowFunc()
+		if _, err := db.CommonDB().Exec(sqliteBareProjectStorageUpsertSQL, now, now, keyStr, valueStr, group); err != nil {
+			return utils.Errorf("upsert project storage kv failed: %s", err)
+		}
+		return nil
 	}
 	if db := db.Model(&schema.ProjectGeneralStorage{}).Where(`key = ?`, keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "value": valueStr, "group": group,

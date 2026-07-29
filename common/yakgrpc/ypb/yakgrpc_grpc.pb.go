@@ -649,6 +649,7 @@ const (
 	Yak_StopIMControl_FullMethodName                              = "/ypb.Yak/StopIMControl"
 	Yak_SubscribeIMControlState_FullMethodName                    = "/ypb.Yak/SubscribeIMControlState"
 	Yak_UpdateIMControlConfig_FullMethodName                      = "/ypb.Yak/UpdateIMControlConfig"
+	Yak_SubscribeHTTPFlows_FullMethodName                         = "/ypb.Yak/SubscribeHTTPFlows"
 )
 
 // YakClient is the client API for Yak service.
@@ -1455,6 +1456,8 @@ type YakClient interface {
 	SubscribeIMControlState(ctx context.Context, in *SubscribeIMControlStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[IMControlStateEvent], error)
 	// 热更新 IM 回复配置（转发回复开关 / 回复颗粒度），无需重启 IM Engine。
 	UpdateIMControlConfig(ctx context.Context, in *UpdateIMControlConfigRequest, opts ...grpc.CallOption) (*UpdateIMControlConfigResponse, error)
+	// MITM 实时流量摘要。数据库查询仍负责初始化、历史分页和 Gap 恢复。
+	SubscribeHTTPFlows(ctx context.Context, in *SubscribeHTTPFlowsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[HTTPFlowLiveEvent], error)
 }
 
 type yakClient struct {
@@ -8707,6 +8710,25 @@ func (c *yakClient) UpdateIMControlConfig(ctx context.Context, in *UpdateIMContr
 	return out, nil
 }
 
+func (c *yakClient) SubscribeHTTPFlows(ctx context.Context, in *SubscribeHTTPFlowsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[HTTPFlowLiveEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[116], Yak_SubscribeHTTPFlows_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SubscribeHTTPFlowsRequest, HTTPFlowLiveEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SubscribeHTTPFlowsClient = grpc.ServerStreamingClient[HTTPFlowLiveEvent]
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -9511,6 +9533,8 @@ type YakServer interface {
 	SubscribeIMControlState(*SubscribeIMControlStateRequest, grpc.ServerStreamingServer[IMControlStateEvent]) error
 	// 热更新 IM 回复配置（转发回复开关 / 回复颗粒度），无需重启 IM Engine。
 	UpdateIMControlConfig(context.Context, *UpdateIMControlConfigRequest) (*UpdateIMControlConfigResponse, error)
+	// MITM 实时流量摘要。数据库查询仍负责初始化、历史分页和 Gap 恢复。
+	SubscribeHTTPFlows(*SubscribeHTTPFlowsRequest, grpc.ServerStreamingServer[HTTPFlowLiveEvent]) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -11410,6 +11434,9 @@ func (UnimplementedYakServer) SubscribeIMControlState(*SubscribeIMControlStateRe
 }
 func (UnimplementedYakServer) UpdateIMControlConfig(context.Context, *UpdateIMControlConfigRequest) (*UpdateIMControlConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateIMControlConfig not implemented")
+}
+func (UnimplementedYakServer) SubscribeHTTPFlows(*SubscribeHTTPFlowsRequest, grpc.ServerStreamingServer[HTTPFlowLiveEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeHTTPFlows not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -21892,6 +21919,17 @@ func _Yak_UpdateIMControlConfig_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_SubscribeHTTPFlows_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SubscribeHTTPFlowsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).SubscribeHTTPFlows(m, &grpc.GenericServerStream[SubscribeHTTPFlowsRequest, HTTPFlowLiveEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SubscribeHTTPFlowsServer = grpc.ServerStreamingServer[HTTPFlowLiveEvent]
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -24552,6 +24590,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "SubscribeIMControlState",
 			Handler:       _Yak_SubscribeIMControlState_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "SubscribeHTTPFlows",
+			Handler:       _Yak_SubscribeHTTPFlows_Handler,
 			ServerStreams: true,
 		},
 	},

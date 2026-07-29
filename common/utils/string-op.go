@@ -379,11 +379,10 @@ func RemoveRepeatedWithStringSlice(slice []string) []string {
 
 var titleRegexp = regexp.MustCompile(`(?is)\<title\>(.*?)\</?title\>`)
 
-func ExtractTitleFromHTMLTitle(s string, defaultValue string) string {
+func extractTitleFromHTMLTitleMatch(match []byte, defaultValue string) string {
 	var title string
-	l := titleRegexp.FindString(s)
-	if len(l) > 15 {
-		title = EscapeInvalidUTF8Byte([]byte(l))[7 : len(l)-8]
+	if len(match) > 15 {
+		title = EscapeInvalidUTF8Byte(match)[7 : len(match)-8]
 	}
 	titleRunes := []rune(title)
 	if len(titleRunes) > 128 {
@@ -395,4 +394,14 @@ func ExtractTitleFromHTMLTitle(s string, defaultValue string) string {
 	}
 
 	return title
+}
+
+func ExtractTitleFromHTMLTitle(s string, defaultValue string) string {
+	return extractTitleFromHTMLTitleMatch([]byte(titleRegexp.FindString(s)), defaultValue)
+}
+
+// ExtractTitleFromHTMLTitleBytes avoids materializing a full string when the
+// caller already owns the response as bytes.
+func ExtractTitleFromHTMLTitleBytes(s []byte, defaultValue string) string {
+	return extractTitleFromHTMLTitleMatch(titleRegexp.Find(s), defaultValue)
 }

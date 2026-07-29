@@ -1,6 +1,9 @@
 package trafficguard
 
 import (
+	"bytes"
+	"fmt"
+	"regexp"
 	"sync"
 	"unicode/utf8"
 
@@ -9,29 +12,200 @@ import (
 	"github.com/yaklang/yaklang/common/minirehs"
 )
 
-// Scanner 是 trafficguard 超级正则组的编译产物, 采用两阶段架构以实现最低热路径开销:
+// Scanner 是 trafficguard 凭证规则组的编译产物, 采用两阶段架构以降低热路径开销:
 //
-//  阶段一 (热路径): 把全部高危正则统一编译为一个 minirehs MVS existence-only 数据库,
-      // 对输入只扫描一次即可判定"是否有可能命中" (走纯位运算快路径 + Aho-Corasick 字面量预过滤)。
-      // 纯净流量(绝大多数)在这一步即可快速排除, 代价极低。
+//	阶段一 (热路径): 把每条高危正则必然包含的字面量编译为 minirehs MVS existence-only 数据库,
 //
-//  阶段二 (冷路径): 仅当阶段一报告"有命中"时, 对命中的具体规则用 go-pcre2-lite 的底层接口
-      // (pcre2lite: cgo PCRE2 解释器, 字节级偏移) 精确定位并提取命中值(用于脱敏展示与指纹)。
-      // PCRE2 支持完整正则语法且线性时间、低回溯, 比 stdlib RE2 表达力更强、更精准。
-      // 由于真实命中极少, 这一步的开销可忽略。
+// 对输入只扫描一次即可判定"哪些规则有可能命中" (走纯位运算快路径 + Aho-Corasick 字面量预过滤)。
+// 纯净流量(绝大多数)在这一步即可快速排除, 代价极低。
+//
+//	阶段二 (冷路径): 仅当阶段一报告"有命中"时, 对命中的具体规则用 go-pcre2-lite 的底层接口
+//
+// (pcre2lite: cgo PCRE2 解释器, 字节级偏移) 精确定位并提取命中值(用于脱敏展示与指纹)。
+// PCRE2 支持完整正则语法且线性时间、低回溯, 比 stdlib RE2 表达力更强、更精准。
+// 候选字面量只是无漏报的宽松门禁, 最终结果始终以原始 PCRE2 规则和校验器为准。
 //
 // 这正是任务书要求的"existence-only 快速候选扫描 -> 命中后再精确定位"模型,
 // 保证 MITM 实时热路径: 纯净流量一次扫描快速排除, 命中流量额外只付出极少定位开销。
 //
 // 该功能默认随 MITM 开启, 当前不提供关闭开关 —— 详见 DefaultScanner 与 grpc_mitm 集成点。
 type Scanner struct {
-	// exist: 阶段一 existence-only MVS 数据库, 只判"哪些规则命中", 不取字节偏移。
-	exist *minirehs.Group
-	// rules 与 exist pattern 下标一一对应。
-	rules []rule
+	// exist scans mandatory literals only. candidateRuleIndexes maps each
+	// existence pattern back to the exact PCRE2 rule it gates.
+	exist                *minirehs.Group
+	rules                []rule
+	candidateRuleIndexes []int
+	discordRuleIndex     int
 	// extractors[i] 是 rules[i].Regex 的 PCRE2 编译(pcre2lite 底层接口), 仅供阶段二精确定位用。
 	extractors []*pcre2.Regexp
 	initErr    error
+}
+
+// requiredLiterals returns a conservative OR-list: every match of the rule
+// contains at least one item. The candidate scan is case-insensitive; exact
+// casing and structure are still enforced by the rule's PCRE2 extractor.
+func requiredLiterals(ruleID int) []string {
+	switch ruleID {
+	case 1:
+		return []string{"private key-----"}
+	case 2:
+		return []string{"akia", "asia", "aida", "aroa", "aipa", "anpa", "agpa", "acca"}
+	case 3:
+		return []string{"aws_secret_access_key", "aws_secret_key", "secret_access_key"}
+	case 4:
+		return []string{"aiza"}
+	case 5:
+		return []string{"ya29."}
+	case 6:
+		return []string{"accountkey="}
+	case 7:
+		return []string{"ghp_", "gho_", "ghu_", "ghs_", "ghr_"}
+	case 8:
+		return []string{"glpat-"}
+	case 9:
+		return []string{"xoxb-", "xoxa-", "xoxp-", "xoxr-", "xoxs-"}
+	case 10:
+		return []string{"https://hooks.slack.com/services/t"}
+	case 11:
+		return []string{"sk_live_", "rk_live_"}
+	case 12:
+		return []string{"sk-"}
+	case 13:
+		return []string{"sg."}
+	case 14:
+		return []string{"sk"}
+	case 15:
+		return []string{"key-"}
+	case 16:
+		return []string{"sq0atp-", "sq0csp-"}
+	case 17:
+		return []string{"amzn.mws."}
+	case 18:
+		return nil // Discord tokens are gated by hasDiscordTokenCandidate.
+	case 19:
+		return []string{"eyj"}
+	case 22:
+		return []string{"mongo", "postgres", "mysql", "redis", "amqp", "mssql", "db2", "nacos"}
+	case 23:
+		return []string{"pass", "pwd", "secret", "api", "access", "client", "auth"}
+	case 24:
+		return []string{"api", "access", "client", "secret"}
+	case 25:
+		return []string{"api", "auth", "secret"}
+	default:
+		return nil
+	}
+}
+
+func isTokenAlphabet(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-'
+}
+
+func hasDiscordTokenCandidateAt(data []byte, start int) bool {
+	const tokenLength = 24 + 1 + 6 + 1 + 27
+	if start < 0 || start+tokenLength > len(data) || data[start] != 'M' && data[start] != 'N' {
+		return false
+	}
+	for index := start + 1; index < start+24; index++ {
+		if !isTokenAlphabet(data[index]) {
+			return false
+		}
+	}
+	if data[start+24] != '.' {
+		return false
+	}
+	for index := start + 25; index < start+31; index++ {
+		if !isTokenAlphabet(data[index]) {
+			return false
+		}
+	}
+	if data[start+31] != '.' {
+		return false
+	}
+	for index := start + 32; index < start+tokenLength; index++ {
+		if !isTokenAlphabet(data[index]) {
+			return false
+		}
+	}
+	return true
+}
+
+func hasDiscordTokenCandidateLinear(data []byte) bool {
+	const tokenLength = 24 + 1 + 6 + 1 + 27
+	for start := 0; start+tokenLength <= len(data); start++ {
+		if data[start] != 'M' && data[start] != 'N' {
+			continue
+		}
+		valid := true
+		for index := start + 1; index < start+24; index++ {
+			if !isTokenAlphabet(data[index]) {
+				valid = false
+				break
+			}
+		}
+		if !valid || data[start+24] != '.' {
+			continue
+		}
+		for index := start + 25; index < start+31; index++ {
+			if !isTokenAlphabet(data[index]) {
+				valid = false
+				break
+			}
+		}
+		if !valid || data[start+31] != '.' {
+			continue
+		}
+		for index := start + 32; index < start+tokenLength; index++ {
+			if !isTokenAlphabet(data[index]) {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			return true
+		}
+	}
+	return false
+}
+
+// hasDiscordTokenCandidate is equivalent to rule 18's fixed character shape.
+// It avoids making a one-byte dot literal an always-on NFA for every response.
+func hasDiscordTokenCandidate(data []byte) bool {
+	const (
+		tokenLength              = 24 + 1 + 6 + 1 + 27
+		densePrefixWindowMatches = 8
+		densePrefixWindowBytes   = 256
+	)
+	limit := len(data) - tokenLength + 1
+	if limit <= 0 || bytes.IndexByte(data, '.') < 0 {
+		return false
+	}
+	for _, prefix := range []byte{'M', 'N'} {
+		windowMatches := 0
+		windowStart := 0
+		for offset := 0; offset < limit; {
+			index := bytes.IndexByte(data[offset:limit], prefix)
+			if index < 0 {
+				break
+			}
+			start := offset + index
+			if hasDiscordTokenCandidateAt(data, start) {
+				return true
+			}
+			if windowMatches == 0 {
+				windowStart = start
+			}
+			windowMatches++
+			if windowMatches == densePrefixWindowMatches {
+				if start-windowStart <= densePrefixWindowBytes {
+					return hasDiscordTokenCandidateLinear(data)
+				}
+				windowMatches = 0
+			}
+			offset = start + 1
+		}
+	}
+	return false
 }
 
 var (
@@ -61,10 +235,23 @@ func DefaultScanner() *Scanner {
 // NewScanner 用内置超级正则组编译一个新的 Scanner。
 func NewScanner() (*Scanner, error) {
 	rules := builtinRules
-	exprs := make([]string, len(rules))
+	var candidateExprs []string
+	var candidateRuleIndexes []int
+	discordRuleIndex := -1
 	extractors := make([]*pcre2.Regexp, len(rules))
 	for i, r := range rules {
-		exprs[i] = r.Regex
+		if r.ID == 18 {
+			discordRuleIndex = i
+		} else {
+			literals := requiredLiterals(r.ID)
+			if len(literals) == 0 {
+				return nil, fmt.Errorf("trafficguard: rule %d has no mandatory literal gate", r.ID)
+			}
+			for _, literal := range literals {
+				candidateExprs = append(candidateExprs, regexp.QuoteMeta(literal))
+				candidateRuleIndexes = append(candidateRuleIndexes, i)
+			}
+		}
 		// 阶段二用 PCRE2 精确定位。inline (?i) 等修饰由 PCRE2 原生支持, 无需转换。
 		re, err := pcre2.Compile(r.Regex, pcre2.CompileOptions{UTF: true, UCP: true})
 		if err != nil {
@@ -73,13 +260,13 @@ func NewScanner() (*Scanner, error) {
 		}
 		extractors[i] = re
 	}
-	// 阶段一: MVS existence-only, minLiteralLen=2 让更多规则获得字面量预过滤(always-on 最小化)。
-	exist, err := minirehs.BuildGroup(exprs,
+	// Stage one scans only mandatory literals. Case-insensitive candidates are a
+	// safe superset; the original PCRE2 regex below remains authoritative.
+	exist, err := minirehs.BuildGroup(candidateExprs,
 		minirehs.WithGroupBackend("mvs"),
 		minirehs.WithGroupExistenceOnly(true),
-		// minLiteralLen=4: 实测在真实流量上字面量预过滤选择性最佳, 吞吐 ~17MB/s(远高于 2/3 的 ~5MB/s),
-		// 同时不丢任何命中(命中率一致)。短字面量规则(如 "sk"/"SG.")会退为 always-on, 但条数受控。
-		minirehs.WithGroupMinLiteralLen(4),
+		minirehs.WithGroupCaseInsensitive(true),
+		minirehs.WithGroupMinLiteralLen(2),
 	)
 	if err != nil {
 		// 编译失败也要释放已编译的 PCRE2 资源。
@@ -90,7 +277,13 @@ func NewScanner() (*Scanner, error) {
 		}
 		return nil, err
 	}
-	return &Scanner{exist: exist, rules: rules, extractors: extractors}, nil
+	return &Scanner{
+		exist:                exist,
+		rules:                rules,
+		extractors:           extractors,
+		candidateRuleIndexes: candidateRuleIndexes,
+		discordRuleIndex:     discordRuleIndex,
+	}, nil
 }
 
 // Len 返回编译进组的规则条数。
@@ -107,7 +300,34 @@ func (s *Scanner) NumAlwaysOn() int {
 // Ready 表示 Scanner 是否编译成功可用。
 func (s *Scanner) Ready() bool { return s != nil && s.exist != nil && s.initErr == nil }
 
-// scanBuffer 两/三阶段扫描单个缓冲区。
+func (s *Scanner) candidateRules(data []byte) []int {
+	matchedCandidates := s.exist.MatchedIndexes(data)
+	discordCandidate := s.discordRuleIndex >= 0 && hasDiscordTokenCandidate(data)
+	if len(matchedCandidates) == 0 && !discordCandidate {
+		return nil
+	}
+
+	matchedRules := make([]int, 0, len(matchedCandidates)+1)
+	appendRule := func(ruleIndex int) {
+		for _, seen := range matchedRules {
+			if seen == ruleIndex {
+				return
+			}
+		}
+		matchedRules = append(matchedRules, ruleIndex)
+	}
+	for _, candidateIndex := range matchedCandidates {
+		if candidateIndex >= 0 && candidateIndex < len(s.candidateRuleIndexes) {
+			appendRule(s.candidateRuleIndexes[candidateIndex])
+		}
+	}
+	if discordCandidate {
+		appendRule(s.discordRuleIndex)
+	}
+	return matchedRules
+}
+
+// scanBuffer 三阶段扫描单个缓冲区。
 //
 // 阶段一: exist.MatchedIndexes(data) -> 若无命中直接返回(纯净流量快路径)。
 // 阶段二: 仅对阶段一命中的规则, 用 PCRE2 底层接口精确定位提取命中值。
@@ -118,10 +338,10 @@ func (s *Scanner) scanBuffer(host string, data []byte, direction, surface string
 	if len(data) == 0 {
 		return out
 	}
-	// 阶段一: existence-only 快速候选, 纯位运算 + 字面量预过滤(minLiteralLen=4 调优后吞吐最佳)。
-	// 纯净流量(绝大多数)在预过滤阶段即被排除, NFA 不需推进, 开销极低。
-	matched := s.exist.MatchedIndexes(data)
-	if len(matched) == 0 {
+	// 阶段一: existence-only 必需字面量候选扫描, 外加 Discord 固定形态门禁。
+	// 纯净流量(绝大多数)在这里直接排除, 不进入逐规则 PCRE2 提取。
+	matchedRules := s.candidateRules(data)
+	if len(matchedRules) == 0 {
 		return out
 	}
 	// Extractors are compiled in PCRE2 UTF mode. Binary HTTP bodies may pass
@@ -131,8 +351,8 @@ func (s *Scanner) scanBuffer(host string, data []byte, direction, surface string
 	if !utf8.Valid(data) {
 		return out
 	}
-	// 阶段二: 对命中的规则精确定位(冷路径, 命中极少)。
-	for _, idx := range matched {
+	// 阶段二: 对候选规则精确定位(冷路径, 命中极少)。
+	for _, idx := range matchedRules {
 		if idx < 0 || idx >= len(s.rules) || idx >= len(s.extractors) || s.extractors[idx] == nil {
 			continue
 		}

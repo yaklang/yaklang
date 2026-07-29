@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"net"
 	"net/http"
@@ -12,8 +14,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 )
+
+func TestReadLineBufferedMatchesGenericSemantics(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     string
+		want      string
+		wantError error
+	}{
+		{name: "crlf", input: "header: value\r\nrest", want: "header: value"},
+		{name: "lf", input: "header: value\nrest", want: "header: value"},
+		{name: "empty", input: "\r\nrest", want: ""},
+		{name: "trailing carriage returns", input: "value\r\r\n", want: "value"},
+		{name: "partial eof", input: "partial", want: "partial", wantError: io.EOF},
+		{name: "empty eof", input: "", want: "", wantError: io.EOF},
+		{name: "long line", input: strings.Repeat("x", 16*1024) + "\r\n", want: strings.Repeat("x", 16*1024)},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			genericLine, genericErr := ReadLine(bytes.NewReader([]byte(testCase.input)))
+			bufferedLine, bufferedErr := ReadLine(bufio.NewReaderSize(strings.NewReader(testCase.input), 32))
+			if string(genericLine) != testCase.want || string(bufferedLine) != testCase.want {
+				t.Fatalf("unexpected lines: generic=%q buffered=%q want=%q", genericLine, bufferedLine, testCase.want)
+			}
+			if !errors.Is(genericErr, testCase.wantError) || !errors.Is(bufferedErr, testCase.wantError) {
+				t.Fatalf("unexpected errors: generic=%v buffered=%v want=%v", genericErr, bufferedErr, testCase.wantError)
+			}
+		})
+	}
+}
 
 func TestReadConnWithContextTimeout(t *testing.T) {
 	host, port := DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

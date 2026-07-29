@@ -254,9 +254,11 @@ func SaveWebFuzzerResponseEx(taskId int, hiddenIndex string, rsp *ypb.FuzzerResp
 	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
 		SaveWebFuzzerResponse(consts.GetGormProjectDatabase(), taskId, hiddenIndex, rsp)
 	} else {
-		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+		if err := EnqueueDBSave(func(db *gorm.DB) error {
 			SaveWebFuzzerResponse(db, taskId, hiddenIndex, rsp)
 			return nil
+		}); err != nil {
+			log.Errorf("enqueue web fuzzer response save failed: %s", err)
 		}
 	}
 }

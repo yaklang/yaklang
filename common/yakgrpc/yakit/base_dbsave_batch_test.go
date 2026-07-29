@@ -11,22 +11,16 @@ import (
 
 func TestDrainDBSaveBatchCoalescesWhenIdle(t *testing.T) {
 	ch := make(chan DbExecFunc, 8)
-	orig := DBSaveAsyncChannel
-	DBSaveAsyncChannel = ch
-	defer func() { DBSaveAsyncChannel = orig }()
 
 	first := func(db *gorm.DB) error { return nil }
 	ch <- first
 
-	batch := drainDBSaveBatch(<-ch)
+	batch := drainDBSaveBatch(ch, <-ch)
 	require.Len(t, batch, 1)
 }
 
 func TestDrainDBSaveBatchPullsMultiple(t *testing.T) {
 	ch := make(chan DbExecFunc, 8)
-	orig := DBSaveAsyncChannel
-	DBSaveAsyncChannel = ch
-	defer func() { DBSaveAsyncChannel = orig }()
 
 	var n atomic.Int32
 	for i := 0; i < 5; i++ {
@@ -36,9 +30,33 @@ func TestDrainDBSaveBatchPullsMultiple(t *testing.T) {
 		}
 	}
 
-	batch := drainDBSaveBatch(<-ch)
+	batch := drainDBSaveBatch(ch, <-ch)
 	require.GreaterOrEqual(t, len(batch), 2)
 	require.LessOrEqual(t, len(batch), 5)
+}
+
+func TestDrainDBSaveBatchDoesNotWaitForFutureItems(t *testing.T) {
+	ch := make(chan DbExecFunc)
+	first := func(db *gorm.DB) error { return nil }
+
+	startedAt := time.Now()
+	batch := drainDBSaveBatch(ch, first)
+	require.Len(t, batch, 1)
+	require.Less(t, time.Since(startedAt), 50*time.Millisecond)
+}
+
+func TestEnqueuedDBSaveRemainsBoundToOriginalDatabase(t *testing.T) {
+	originalDB := &gorm.DB{}
+	otherDB := &gorm.DB{}
+	called := false
+	bound := bindDBSaveFunc(originalDB, func(db *gorm.DB) error {
+		called = true
+		require.Same(t, originalDB, db)
+		return nil
+	})
+
+	require.NoError(t, bound(otherDB))
+	require.True(t, called)
 }
 
 func TestExecDBSaveBatchUsesTransaction(t *testing.T) {

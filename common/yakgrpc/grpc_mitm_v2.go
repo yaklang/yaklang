@@ -58,11 +58,88 @@ var (
 	Hijack_Status_WS       = "hijacking ws"
 )
 
+const mitmRequestHijackAtTimingKey = "yakit_mitm_request_hijack_at_unix_ms"
+
+func cacheModifiedPlainResponseBytes(req *http.Request, plainResponse []byte) {
+	if len(plainResponse) == 0 || !httpctx.GetResponseIsModified(req) {
+		return
+	}
+	httpctx.SetPlainResponseBytes(req, plainResponse)
+}
+
+func splitMITMMirrorResponseView(plainResponse []byte) (string, []byte) {
+	return lowhttp.SplitHTTPHeadersAndBodyFromPacketView(plainResponse)
+}
+
+func snapshotMITMMirrorHookBody(bodyView []byte) []byte {
+	return bytes.Clone(bodyView)
+}
+
+func newMITMPlainResponseLoader(req *http.Request) func() []byte {
+	var (
+		once          sync.Once
+		plainResponse []byte
+	)
+	return func() []byte {
+		once.Do(func() {
+			if httpctx.GetResponseIsModified(req) {
+				plainResponse = httpctx.GetHijackedResponseBytes(req)
+			} else {
+				plainResponse = httpctx.GetPlainResponseBytes(req)
+				if len(plainResponse) <= 0 {
+					plainResponse = decodeAndCachePlainResponseBytes(req, httpctx.GetBareResponseBytes(req))
+				}
+			}
+			cacheModifiedPlainResponseBytes(req, plainResponse)
+		})
+		return plainResponse
+	}
+}
+
+func getMITMMirrorPlainResponseBytes(req *http.Request, requireIndependent bool) []byte {
+	if !requireIndependent && !httpctx.GetResponseIsModified(req) {
+		if plainResponse := httpctx.GetPlainResponseBytes(req); len(plainResponse) > 0 {
+			return plainResponse
+		}
+		if fixedResponse := httpctx.GetFixedResponseBytes(req); len(fixedResponse) > 0 {
+			return fixedResponse
+		}
+	}
+	return newMITMPlainResponseLoader(req)()
+}
+
 var (
-	mitmPluginCallerGlobal *yak.MixPluginCaller
+	mitmPluginCallerGlobalMu sync.RWMutex
+	mitmPluginCallerGlobal   *yak.MixPluginCaller
 	// 添加生命周期通知机制
 	mitmPluginCallerNotifyChan chan struct{}
 )
+
+func registerMITMPluginCallerGlobal(caller *yak.MixPluginCaller) chan struct{} {
+	notify := make(chan struct{})
+	mitmPluginCallerGlobalMu.Lock()
+	mitmPluginCallerGlobal = caller
+	mitmPluginCallerNotifyChan = notify
+	mitmPluginCallerGlobalMu.Unlock()
+	return notify
+}
+
+func unregisterMITMPluginCallerGlobal(caller *yak.MixPluginCaller, notify chan struct{}) {
+	mitmPluginCallerGlobalMu.Lock()
+	if mitmPluginCallerGlobal == caller && mitmPluginCallerNotifyChan == notify {
+		mitmPluginCallerGlobal = nil
+		mitmPluginCallerNotifyChan = nil
+	}
+	mitmPluginCallerGlobalMu.Unlock()
+	close(notify)
+}
+
+func loadMITMPluginCallerGlobal() (*yak.MixPluginCaller, chan struct{}) {
+	mitmPluginCallerGlobalMu.RLock()
+	caller, notify := mitmPluginCallerGlobal, mitmPluginCallerNotifyChan
+	mitmPluginCallerGlobalMu.RUnlock()
+	return caller, notify
+}
 
 func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	defer func() {
@@ -120,30 +197,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		} else {
 			plainRequest = httpctx.GetPlainRequestBytes(req)
 			if len(plainRequest) <= 0 {
-				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
-				plainRequest = decoded
-				if _, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded); len(body) <= yakit.GetMaxHTTPFlowRequestBodyInDBBytes() {
-					httpctx.SetPlainRequestBytes(req, decoded)
-				}
+				plainRequest = decodeAndCachePlainRequestBytesIfStorable(req, httpctx.GetBareRequestBytes(req))
 			}
 		}
 		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
 	}
-	getPlainResponseBytes := func(req *http.Request) []byte {
-		var plainResponse []byte
-		if httpctx.GetResponseIsModified(req) {
-			plainResponse = httpctx.GetHijackedResponseBytes(req)
-		} else {
-			plainResponse = httpctx.GetPlainResponseBytes(req)
-			if len(plainResponse) <= 0 {
-				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
-				httpctx.SetPlainResponseBytes(req, decoded)
-				plainResponse = decoded
-			}
-		}
-		return plainResponse
-	}
-
 	firstReq, err := stream.Recv()
 	if err != nil {
 		return utils.Errorf("recv first req failed: %s", err)
@@ -390,11 +448,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	mitmPluginCaller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 
-	mitmPluginCallerGlobal = mitmPluginCaller
-	mitmPluginCallerNotifyChan = make(chan struct{})
+	mitmPluginCallerNotify := registerMITMPluginCallerGlobal(mitmPluginCaller)
 	defer func() {
-		close(mitmPluginCallerNotifyChan)
-		mitmPluginCallerGlobal = nil
+		unregisterMITMPluginCallerGlobal(mitmPluginCaller, mitmPluginCallerNotify)
 	}()
 
 	allProxies := append([]string{}, downstreamProxy...)
@@ -561,14 +617,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if script != nil {
 					if script.Type == "mitm" || script.Type == "port-scan" {
 						log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
-						err = mitmPluginCaller.LoadPluginEx(streamCtx, script, reqInstance.GetYakScriptParams()...)
-						if err != nil {
+						loadErr := mitmPluginCaller.LoadPluginEx(streamCtx, script, reqInstance.GetYakScriptParams()...)
+						if loadErr != nil {
 							if len(script.GetParams()) > 0 {
 								sendLogged(&ypb.MITMV2Response{HaveNotification: true, NotificationContent: []byte(fmt.Sprintf(
 									"加载插件【%s】，参数【%v】失败", script.ScriptName, reqInstance.GetYakScriptParams(),
 								))})
 							}
-							log.Error(err)
+							log.Error(loadErr)
 						}
 					}
 				} else if reqInstance.GetYakScriptContent() != "" {
@@ -848,10 +904,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				hijackRsp = newHijackRsp
 			}
 		}()
-		plainResponse := getPlainResponseBytes(req)
-		if len(plainResponse) > 0 {
-			httpctx.SetPlainResponseBytes(req, plainResponse)
-		}
+		loadPlainResponse := newMITMPlainResponseLoader(req)
 
 		// use handled request
 		plainRequest := getPlainRequestBytes(req)
@@ -860,9 +913,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		hotPatchPipeline.CallHijackResponseExWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
 			return plainRequest
 		}, func() interface{} {
-			return plainResponse
+			return loadPlainResponse()
 		}, constClujore(func(i interface{}) {
-			if ret := codec.AnyToBytes(i); packetModified(plainRequest, ret) {
+			plainResponse := loadPlainResponse()
+			if ret := codec.AnyToBytes(i); packetModified(plainResponse, ret) {
 				httpctx.SetResponseModified(req, "yaklang.hook(ex)")
 				httpctx.SetHijackedResponseBytes(req, ret)
 			}
@@ -877,9 +931,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if httpctx.GetResponseIsModified(req) {
 					return httpctx.GetHijackedResponseBytes(req)
 				} else {
-					return plainResponse
+					return loadPlainResponse()
 				}
 			}, constClujore(func(i interface{}) {
+				plainResponse := loadPlainResponse()
 				if ret := codec.AnyToBytes(i); packetModified(ret, plainResponse) {
 					httpctx.SetResponseModified(req, "yaklang.hook")
 					httpctx.SetHijackedResponseBytes(req, ret)
@@ -1026,7 +1081,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 					httpctx.SetResponseModified(req, "manual")
 					httpctx.SetHijackedResponseBytes(req, response)
-					httpctx.SetPlainResponseBytes(req, lowhttp.DeletePacketEncoding(response))
+					decodeAndCachePlainResponseBytes(req, response)
 
 					rspModified, _, err := lowhttp.FixHTTPResponse(response)
 					if err != nil {
@@ -1141,6 +1196,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) (hijackReq []byte) {
+		if httpctx.GetContextAnyFromRequest(originReqIns, mitmRequestHijackAtTimingKey) == nil {
+			httpctx.SetContextValueInfoFromRequest(originReqIns, mitmRequestHijackAtTimingKey, time.Now().UnixMilli())
+		}
 		setModifiedRequest := func(id string, req []byte) {
 			httpctx.SetRequestModified(originReqIns, id)
 			httpctx.SetHijackedRequestBytes(originReqIns, req)
@@ -1166,8 +1224,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		})
 
 		httpctx.SetMatchedRule(originReqIns, make([]*ypb.MITMContentReplacer, 0))
-		fixReq := lowhttp.FixHTTPRequest(req)
-		fixReqIns, _ := lowhttp.ParseBytesToHttpRequest(fixReq)
 		method := originReqIns.Method
 
 		// handle rules
@@ -1397,7 +1453,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false) // 设置无需劫持resp
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 					startCreateFlow := time.Now()
-					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(httpctx.GetRequestHTTPSWithFallback(originReqIns) || enableGMTLS, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, yakit.CreateHTTPFlowWithRequestIns(fixReqIns))
+					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(httpctx.GetRequestHTTPSWithFallback(originReqIns) || enableGMTLS, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr)
 					if err != nil {
 						log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
 						return nil
@@ -1412,13 +1468,18 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					flow.Hash = flow.CalcHash()
 					flow.StatusCode = 200 // 这里先设置成200
 					flow.Response = ""
+					requestHijackAt, _ := httpctx.GetContextAnyFromRequest(originReqIns, mitmRequestHijackAtTimingKey).(int64)
+					flow.RuntimeTiming = &schema.HTTPFlowRuntimeTiming{
+						RequestHijackAtUnixMs: requestHijackAt,
+						FlowBuiltAtUnixMs:     time.Now().UnixMilli(),
+					}
 					for i := 0; i < 3; i++ {
 						startCreateFlow = time.Now()
 						// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
-						err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+						insertErr := yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
 						log.Debugf("insert http flow %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
-						if err != nil {
-							log.Errorf("create / save httpflow from mirror error: %s", err)
+						if insertErr != nil {
+							log.Errorf("create / save httpflow from mirror error: %s", insertErr)
 							time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
 							continue
 						}
@@ -1462,6 +1523,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
+		responseMirrorAtUnixMs := time.Now().UnixMilli()
 		addCounter()
 
 		// 不符合劫持条件就不劫持
@@ -1475,12 +1537,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		isModified := isRequestModified || isResponseModified
 
 		plainRequest := getPlainRequestBytes(req)
-		plainResponse := getPlainResponseBytes(req)
+		hasMirrorHTTPFlowHooks := hotPatchPipeline.HasMirrorHTTPFlowHooks()
+		plainResponse := getMITMMirrorPlainResponseBytes(req, hasMirrorHTTPFlowHooks)
 		responseOverSize := false
 		if len(plainResponse) > packetLimit {
 			responseOverSize = true
 		}
-		header, body := lowhttp.SplitHTTPPacketFast(plainResponse)
+		// The synchronous filters below only read the body. Keep a view for the
+		// common no-plugin path and snapshot it only when an asynchronous mirror
+		// hook needs the historical independently owned body.
+		header, body := splitMITMMirrorResponseView(plainResponse)
 		if responseOverSize {
 			plainResponse = []byte(header)
 		}
@@ -1532,9 +1598,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		shouldBeHijacked := !isFiltered
 
 		pluginCtx := httpctx.GetPluginContext(req)
-		go func() {
-			hotPatchPipeline.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
-		}()
+		if hasMirrorHTTPFlowHooks {
+			mirrorBody := snapshotMITMMirrorHookBody(body)
+			go func() {
+				hotPatchPipeline.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, mirrorBody, shouldBeHijacked)
+			}()
+		}
 		// 劫持过滤: 被过滤且未命中敏感信息的流量直接丢弃; 命中敏感信息的过滤流量继续走保存(以插件流量形式)。
 		if isFiltered && !tgSaveAsPlugin {
 			return
@@ -1566,21 +1635,33 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		saveIsHttps := httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS
 		log.Debugf("start to create httpflow from mitm[%v %v]", req.Method, truncate(reqUrl))
 		startCreateFlow := time.Now()
-		var flow *schema.HTTPFlow
+		var (
+			flow    *schema.HTTPFlow
+			flowErr error
+		)
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(saveIsHttps, req, "mitm", reqUrl, remoteAddr)
-			flow.StatusCode = 200 // 先设置成200
+			flow, flowErr = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(saveIsHttps, req, "mitm", reqUrl, remoteAddr)
 		} else {
 			var duration time.Duration
 			if i, ok := httpctx.GetResponseTraceInfo(req).(*lowhttp.LowhttpTraceInfo); ok {
 				duration = i.TotalTime
 			}
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(saveIsHttps, req, rsp, "mitm", reqUrl, remoteAddr, yakit.CreateHTTPFlowWithDuration(duration)) // , !responseOverSize)
+			flow, flowErr = yakit.CreateHTTPFlowFromHTTPWithBodySaved(saveIsHttps, req, rsp, "mitm", reqUrl, remoteAddr, yakit.CreateHTTPFlowWithDuration(duration)) // , !responseOverSize)
 		}
-		if err != nil {
-			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)
+		if flowErr != nil {
+			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, flowErr)
 			return
 		}
+		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
+			flow.StatusCode = 200 // 先设置成200
+		}
+		requestHijackAt, _ := httpctx.GetContextAnyFromRequest(req, mitmRequestHijackAtTimingKey).(int64)
+		runtimeTiming := &schema.HTTPFlowRuntimeTiming{
+			RequestHijackAtUnixMs:  requestHijackAt,
+			ResponseMirrorAtUnixMs: responseMirrorAtUnixMs,
+			FlowBuiltAtUnixMs:      time.Now().UnixMilli(),
+		}
+		flow.RuntimeTiming = runtimeTiming
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
 		// 额外，获取进程名
@@ -1654,7 +1735,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		var extracted []*schema.ExtractedData
 
 		// replacer hook color
-		if replacer != nil {
+		if replacer != nil && replacer.HaveRules() {
 			go func() {
 				hookStart := time.Now()
 				ruleCount := len(replacer.GetMirrorRules())
@@ -1682,9 +1763,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				}
 
 				for _, e := range extracted {
-					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
-					if err != nil {
-						log.Errorf("save hookcolor error: %s", err)
+					persistErr := yakit.CreateOrUpdateExtractedDataEx(-1, e)
+					if persistErr != nil {
+						log.Errorf("save hookcolor error: %s", persistErr)
 					}
 				}
 			}()
@@ -1708,6 +1789,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		if !isDroppedSaveFlow.IsSet() {
+			// A hijackSaveHTTPFlow plugin may replace the public flow model. Keep
+			// process-local diagnostics owned by the engine and out of plugin data.
+			flow.RuntimeTiming = runtimeTiming
 			// 额外添加用户手动设置的标签，确保其优先级最高
 			userTags := httpctx.GetFlowTags(req)
 			if len(userTags) > 0 {
@@ -1783,8 +1867,20 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
 		crep.MITM_SetDownstreamProxyRoutes(downstreamProxyRoutes),
-		crep.MITM_SetHTTPResponseHijackRaw(handleHijackResponse),
-		crep.MITM_SetHTTPRequestHijackRaw(handleHijackRequest),
+		crep.MITM_SetHTTPResponseHijackRawWithModification(func(
+			isHTTPS bool,
+			req *http.Request,
+			rsp *http.Response,
+			packet []byte,
+			remoteAddr string,
+		) ([]byte, bool) {
+			result := handleHijackResponse(isHTTPS, req, rsp, packet, remoteAddr)
+			return result, httpctx.GetResponseIsModified(req)
+		}),
+		crep.MITM_SetHTTPRequestHijackRawWithModification(func(isHTTPS bool, req *http.Request, packet []byte) ([]byte, bool) {
+			result := handleHijackRequest(isHTTPS, req, packet)
+			return result, httpctx.GetRequestIsModified(req)
+		}),
 		crep.MITM_SetWebsocketRequestHijackRaw(handleHijackWsRequest),
 		crep.MITM_SetWebsocketResponseHijackRaw(handleHijackWsResponse),
 		crep.MITM_SetHTTPResponseMirror(handleMirrorResponse),
@@ -2062,12 +2158,15 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 		Success:      false,
 	}
 
-	var mitmPluginCaller *yak.MixPluginCaller
+	var (
+		mitmPluginCaller       *yak.MixPluginCaller
+		mitmPluginCallerNotify chan struct{}
+	)
 
 	// 检测MixPluginCaller是否可用，不可用则定期检测
 	for {
-		mitmPluginCaller = mitmPluginCallerGlobal
-		if mitmPluginCaller == nil || mitmPluginCallerNotifyChan == nil {
+		mitmPluginCaller, mitmPluginCallerNotify = loadMITMPluginCallerGlobal()
+		if mitmPluginCaller == nil || mitmPluginCallerNotify == nil {
 			log.Debug("MITM 插件管理器未初始化，返回空trace列表，等待后端启动MITMv2...")
 			_ = stream.Send(emptyResp)
 			// 等待1秒后重试
@@ -2086,9 +2185,10 @@ func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
 
 	go func() {
 		select {
-		case <-mitmPluginCallerNotifyChan:
+		case <-mitmPluginCallerNotify:
 			log.Info("plugin trace shutdown due to MITM closed")
 			cancel()
+		case <-ctx.Done():
 		}
 	}()
 

@@ -63,6 +63,95 @@ func unzipDeflateRaw(t *testing.T, raw []byte) []byte {
 	return out
 }
 
+func BenchmarkDeletePacketEncodingUnencoded256K(b *testing.B) {
+	body := bytes.Repeat([]byte("x"), 256*1024)
+	packet := append([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 262144\r\n\r\n"), body...)
+	b.SetBytes(int64(len(packet)))
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		plain := DeletePacketEncoding(packet)
+		if len(plain) != len(packet) || &plain[0] != &packet[0] {
+			b.Fatal("unencoded packet did not preserve the original packet")
+		}
+	}
+}
+
+func TestDeletePacketEncodingWithOwnership(t *testing.T) {
+	t.Run("unencoded packet remains borrowed", func(t *testing.T) {
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\npayload")
+		plain, independentlyOwned := DeletePacketEncodingWithOwnership(packet)
+		require.False(t, independentlyOwned)
+		require.Same(t, &packet[0], &plain[0])
+	})
+
+	t.Run("decoded packet is independently owned", func(t *testing.T) {
+		body := []byte("decoded-gzip-body")
+		compressed := gzipBytes(t, body)
+		packet := append([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n", len(compressed))), compressed...)
+
+		plain, independentlyOwned := DeletePacketEncodingWithOwnership(packet)
+		require.True(t, independentlyOwned)
+		require.NotSame(t, &packet[0], &plain[0])
+		_, plainBody := SplitHTTPHeadersAndBodyFromPacketView(plain)
+		require.Equal(t, body, plainBody)
+	})
+}
+
+func TestAutoUnzipPacketEncodingPreservesInputAndOutputOwnership(t *testing.T) {
+	t.Run("unencoded returns original", func(t *testing.T) {
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\npayload")
+		want := bytes.Clone(packet)
+
+		plain, state, ok := AutoUnzipPacketEncoding(packet)
+		require.False(t, ok)
+		require.Nil(t, state)
+		require.Equal(t, want, packet)
+		require.Equal(t, &packet[0], &plain[0])
+	})
+
+	t.Run("gzip output is independent", func(t *testing.T) {
+		body := []byte("decoded-gzip-body")
+		compressed := gzipBytes(t, body)
+		packet := append([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n", len(compressed))), compressed...)
+		wantPacket := bytes.Clone(packet)
+
+		plain, state, ok := AutoUnzipPacketEncoding(packet)
+		require.True(t, ok)
+		require.NotNil(t, state)
+		require.Equal(t, wantPacket, packet)
+		_, plainBody := SplitHTTPHeadersAndBodyFromPacketView(plain)
+		require.Equal(t, body, plainBody)
+
+		packet[len(packet)-1] ^= 0xff
+		_, plainBody = SplitHTTPHeadersAndBodyFromPacketView(plain)
+		require.Equal(t, body, plainBody)
+	})
+
+	t.Run("invalid encoding returns original", func(t *testing.T) {
+		packet := []byte("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 8\r\n\r\nnot-gzip")
+		want := bytes.Clone(packet)
+
+		plain, state, ok := AutoUnzipPacketEncoding(packet)
+		require.False(t, ok)
+		require.Nil(t, state)
+		require.Equal(t, want, packet)
+		require.Equal(t, &packet[0], &plain[0])
+	})
+
+	t.Run("invalid chunked body cannot mutate input", func(t *testing.T) {
+		packet := append([]byte("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"), bytes.Repeat([]byte("x"), 256)...)
+		want := bytes.Clone(packet)
+
+		plain, state, ok := AutoUnzipPacketEncoding(packet)
+		require.False(t, ok)
+		require.Nil(t, state)
+		require.Equal(t, want, packet)
+		require.Equal(t, &packet[0], &plain[0])
+	})
+}
+
 func TestAutoUnzipAndZipPacketEncoding_Gzip(t *testing.T) {
 	plainBody := []byte("hello yak")
 	gz := gzipBytes(t, plainBody)
