@@ -11908,7 +11908,10 @@ type AISessionFilter struct {
 	SessionID []string               `protobuf:"bytes,1,rep,name=SessionID,proto3" json:"SessionID,omitempty"`
 	Keyword   string                 `protobuf:"bytes,2,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
 	// 按会话来源筛选（OR，与 SessionID / Keyword 条件 AND 组合）
-	Source        []string `protobuf:"bytes,3,rep,name=Source,proto3" json:"Source,omitempty"`
+	Source []string `protobuf:"bytes,3,rep,name=Source,proto3" json:"Source,omitempty"`
+	// 按 IM 平台筛选（如 feishu / dingtalk），仅当 Source 含 "im" 时有意义；
+	// 匹配 ai_sessions_v1.im_source JSON 内的 platform 字段。
+	Platform      []string `protobuf:"bytes,4,rep,name=Platform,proto3" json:"Platform,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -11960,6 +11963,13 @@ func (x *AISessionFilter) GetKeyword() string {
 func (x *AISessionFilter) GetSource() []string {
 	if x != nil {
 		return x.Source
+	}
+	return nil
+}
+
+func (x *AISessionFilter) GetPlatform() []string {
+	if x != nil {
+		return x.Platform
 	}
 	return nil
 }
@@ -12396,7 +12406,10 @@ type DeleteAISessionFilter struct {
 	AfterTimestamp  int64                  `protobuf:"varint,2,opt,name=AfterTimestamp,proto3" json:"AfterTimestamp,omitempty"`
 	BeforeTimestamp int64                  `protobuf:"varint,3,opt,name=BeforeTimestamp,proto3" json:"BeforeTimestamp,omitempty"`
 	// 删除 source 匹配的会话（OR，可与 SessionID / 时间范围 AND 组合）
-	Source        []string `protobuf:"bytes,4,rep,name=Source,proto3" json:"Source,omitempty"`
+	Source []string `protobuf:"bytes,4,rep,name=Source,proto3" json:"Source,omitempty"`
+	// 按 IM 平台删除（如 feishu / dingtalk），仅当 Source 含 "im" 时有意义；
+	// 匹配 ai_sessions_v1.im_source JSON 内的 platform 字段。
+	Platform      []string `protobuf:"bytes,5,rep,name=Platform,proto3" json:"Platform,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -12455,6 +12468,13 @@ func (x *DeleteAISessionFilter) GetBeforeTimestamp() int64 {
 func (x *DeleteAISessionFilter) GetSource() []string {
 	if x != nil {
 		return x.Source
+	}
+	return nil
+}
+
+func (x *DeleteAISessionFilter) GetPlatform() []string {
+	if x != nil {
+		return x.Platform
 	}
 	return nil
 }
@@ -73835,11 +73855,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x10\n" +
 	"\x03Seq\x18\x03 \x01(\x03R\x03Seq\x12\x1c\n" +
 	"\tUserInput\x18\x04 \x01(\tR\tUserInput\x12\x1c\n" +
-	"\tForgeName\x18\x05 \x01(\tR\tForgeName\"a\n" +
+	"\tForgeName\x18\x05 \x01(\tR\tForgeName\"}\n" +
 	"\x0fAISessionFilter\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x03(\tR\tSessionID\x12\x18\n" +
 	"\aKeyword\x18\x02 \x01(\tR\aKeyword\x12\x16\n" +
-	"\x06Source\x18\x03 \x03(\tR\x06Source\"\x8a\x03\n" +
+	"\x06Source\x18\x03 \x03(\tR\x06Source\x12\x1a\n" +
+	"\bPlatform\x18\x04 \x03(\tR\bPlatform\"\x8a\x03\n" +
 	"\tAISession\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tSessionID\x18\x02 \x01(\tR\tSessionID\x12\x14\n" +
@@ -73879,12 +73900,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"SenderName\x18\x04 \x01(\tR\n" +
 	"SenderName\x12\x1a\n" +
-	"\bThreadID\x18\x05 \x01(\tR\bThreadID\"\x9f\x01\n" +
+	"\bThreadID\x18\x05 \x01(\tR\bThreadID\"\xbb\x01\n" +
 	"\x15DeleteAISessionFilter\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x03(\tR\tSessionID\x12&\n" +
 	"\x0eAfterTimestamp\x18\x02 \x01(\x03R\x0eAfterTimestamp\x12(\n" +
 	"\x0fBeforeTimestamp\x18\x03 \x01(\x03R\x0fBeforeTimestamp\x12\x16\n" +
-	"\x06Source\x18\x04 \x03(\tR\x06Source\"j\n" +
+	"\x06Source\x18\x04 \x03(\tR\x06Source\x12\x1a\n" +
+	"\bPlatform\x18\x05 \x03(\tR\bPlatform\"j\n" +
 	"\x16DeleteAISessionRequest\x122\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x1a.ypb.DeleteAISessionFilterR\x06Filter\x12\x1c\n" +
 	"\tDeleteAll\x18\x02 \x01(\bR\tDeleteAll\"\xcd\x01\n" +
