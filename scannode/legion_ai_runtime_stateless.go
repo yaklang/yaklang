@@ -55,6 +55,7 @@ type statelessTurnEngine interface {
 
 type statelessAITurn struct {
 	engine    statelessTurnEngine
+	turnID    string
 	closeOnce sync.Once
 }
 
@@ -149,7 +150,7 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 		h.mu.Unlock()
 		return fmt.Errorf("stateless sendinput: new engine returned nil")
 	}
-	turn := &statelessAITurn{engine: engine}
+	turn := &statelessAITurn{engine: engine, turnID: strings.TrimSpace(input.Ref.CommandID)}
 	h.activeTurn = turn
 	h.mu.Unlock()
 
@@ -181,6 +182,20 @@ func (h *statelessAIEngineRuntimeHandle) sendInterventionInput(input aiSessionIn
 			return false, nil
 		}
 		return true, err
+	}
+	if input.ReviewID != "" && event.GetInteractiveId() != input.ReviewID {
+		return true, fmt.Errorf(
+			"stateless sendinput: review id mismatch: expected %s, got %s",
+			input.ReviewID,
+			event.GetInteractiveId(),
+		)
+	}
+	if input.TurnID != "" && turn.turnID != input.TurnID {
+		return true, fmt.Errorf(
+			"stateless sendinput: turn id mismatch: expected %s, active %s",
+			input.TurnID,
+			turn.turnID,
+		)
 	}
 	if err := turn.engine.SendInputEvent(event); err != nil {
 		return true, fmt.Errorf("stateless sendinput: send user intervention: %w", err)
