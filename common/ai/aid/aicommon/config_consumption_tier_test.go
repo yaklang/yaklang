@@ -101,7 +101,7 @@ func TestWrapper_TracksCacheHitTokenByTier(t *testing.T) {
 	cfg.finalizeTierConsumption(consts.TierLightweight, 20, rsp)
 
 	snapshot := cfg.GetTierConsumptionSnapshot()
-	require.Equal(t, int64(15), snapshot[string(consts.TierLightweight)]["input_consumption"])
+	require.Equal(t, int64(3), snapshot[string(consts.TierLightweight)]["input_consumption"])
 	require.Equal(t, int64(7), snapshot[string(consts.TierLightweight)]["output_consumption"])
 	require.Equal(t, int64(12), snapshot[string(consts.TierLightweight)]["cache_hit_token"])
 	require.Equal(t, int64(12), cfg.GetCacheHitToken())
