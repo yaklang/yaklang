@@ -315,6 +315,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_RULE(t *testing.T) {
 	}
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	echoReceived := make(chan struct{}, 1)
 	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
 		stream.Send(&ypb.MITMRequest{
 			Host:        "127.0.0.1",
@@ -359,19 +360,27 @@ Accept: */*
 `, token2, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy), lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
 			if string(bytes) == "server: "+token {
 				log.Infof("client recv: %s", bytes)
-				cancel()
+				select {
+				case echoReceived <- struct{}{}:
+				default:
+				}
 			}
 		}))
 		if err != nil {
 			t.Fatalf("send websocket request err: %v", err)
 		}
 		wsClient.Start()
+		defer wsClient.WriteClose()
 		err = wsClient.WriteText([]byte(token))
 		log.Infof("client send: %s", token)
 		if err != nil {
 			t.Fatalf("send websocket request err: %v", err)
 		}
-		defer wsClient.WriteClose()
+		select {
+		case <-echoReceived:
+		case <-ctx.Done():
+			t.Errorf("timed out waiting for websocket echo: %v", ctx.Err())
+		}
 	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
 
 	})
@@ -388,7 +397,7 @@ Accept: */*
 	err = utils.AttemptWithDelayFast(func() error {
 		_, wsFlows, err = yakit.QueryWebsocketFlowByWebsocketHash(consts.GetGormProjectDatabase(), hash, 1, 10)
 		if len(wsFlows) != 2 {
-			return utils.Errorf("len(wsFlows) != 6, got %d", len(wsFlows))
+			return utils.Errorf("len(wsFlows) != 2, got %d", len(wsFlows))
 		}
 		return err
 	})

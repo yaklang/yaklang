@@ -3,13 +3,30 @@ package bizhelper
 import (
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 )
 
 type paginationTestItem struct {
 	gorm.Model
 	Name string
+}
+
+func TestCreateTempTestDatabaseIsIsolated(t *testing.T) {
+	firstDB, err := createTempTestDatabase()
+	require.NoError(t, err)
+	defer firstDB.Close()
+	secondDB, err := createTempTestDatabase()
+	require.NoError(t, err)
+	defer secondDB.Close()
+
+	require.NoError(t, firstDB.AutoMigrate(&paginationTestItem{}).Error)
+	require.NoError(t, secondDB.AutoMigrate(&paginationTestItem{}).Error)
+	require.NoError(t, firstDB.Create(&paginationTestItem{Name: "first-only"}).Error)
+
+	var count int
+	require.NoError(t, secondDB.Model(&paginationTestItem{}).Count(&count).Error)
+	require.Zero(t, count)
 }
 
 func TestNewPaginationReturnsQueryError(t *testing.T) {

@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -87,6 +88,36 @@ func TestBorrowConnPoolResponsePacketUsesImmutableTransportView(t *testing.T) {
 	require.Equal(t, response.BareResponse, bareContext)
 	require.Same(t, &response.BareResponse[0], &bareContext[0])
 	require.NotSame(t, &response.RawPacket[0], &bareContext[0], "fixed public packet must retain independent ownership")
+}
+
+func TestBorrowConnPoolResponsePacketFallsBackForLFOnlyResponse(t *testing.T) {
+	body := []byte("lf-only-response")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	host, port := utils.DebugMockHTTPExContext(ctx, func([]byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\nContent-Length: %d\nX-Test: yak\n\n%s", len(body), body))
+	})
+	require.NoError(t, utils.WaitConnect(utils.HostPort(host, port), 3))
+
+	req := &http.Request{Method: http.MethodGet}
+	response, err := HTTPWithoutRedirect(
+		WithRequest("GET / HTTP/1.1\r\nHost: "+utils.HostPort(host, port)+"\r\n\r\n"),
+		WithNativeHTTPRequestInstance(req),
+		WithConnPool(true),
+		WithDiscardIntermediateResponseBody(true),
+		WithBorrowConnPoolResponsePacket(true),
+		WithMaxContentLength(1<<20),
+		WithSaveHTTPFlow(false),
+		WithTimeout(3*time.Second),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.Equal(t, body, GetHTTPPacketBody(response.BareResponse))
+	require.Equal(
+		t,
+		[]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\nX-Test: yak\r\n\r\n%s", len(body), body)),
+		httpctx.GetBareResponseBytes(req),
+	)
 }
 
 func TestBorrowConnPoolResponsePacketDoesNotChangeNonPoolOwnership(t *testing.T) {

@@ -93,8 +93,10 @@ type LowhttpExecConfig struct {
 	// BorrowConnPoolResponsePacket lets an internal immutable consumer reuse the
 	// connection pool's wire capture as the request context's bare response. It is
 	// only effective with DiscardIntermediateResponseBody on the bounded
-	// Content-Length fast path. LowhttpResponse.BareResponse then aliases the
-	// request context and both views must remain immutable.
+	// Content-Length fast path. Exact single-response wire packets then alias
+	// LowhttpResponse.BareResponse and both views must remain immutable. Responses
+	// with informational prefixes or headers requiring normalization fall back to
+	// an owned context packet.
 	BorrowConnPoolResponsePacket bool
 
 	// BorrowFixedRequestPacket lets an internal immutable caller retain the

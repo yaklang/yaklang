@@ -45,7 +45,7 @@ func ParseHTTPResponseLine(line string) (string, int, string, bool) {
 }
 
 func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true, false, nil, nil)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true, false, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http
 // lets the caller reserve
 // space in its already-existing wire capture before the body is drained.
 func ReadHTTPResponseMetadataFromBufioReader(reader io.Reader, req *http.Request, prepareBodyCapacity func(int)) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true, true, prepareBodyCapacity, nil)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true, true, prepareBodyCapacity, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func ReadHTTPResponseMetadataFromBufioReader(reader io.Reader, req *http.Request
 // including informational responses. Most callers should use
 // ReadHTTPResponseFromBufioReader, which skips non-terminal 1xx responses.
 func ReadSingleHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, false, false, nil, nil)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, false, false, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func OpenTempFile(s string) (*os.File, error) {
 }
 
 func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, false, nil, nil)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, false, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *h
 // ReadHTTPResponseMetadataFromBufioReaderConn is the connection-aware variant
 // of ReadHTTPResponseMetadataFromBufioReader.
 func ReadHTTPResponseMetadataFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request, prepareBodyCapacity func(int)) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, true, prepareBodyCapacity, nil)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, true, prepareBodyCapacity, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,30 @@ func ReadHTTPResponseMetadataFromBufioReaderConn(reader io.Reader, conn net.Conn
 // suffix with exactly the requested size. The view is stored in req without a
 // clone; the capture owner must keep it alive and unchanged while req is used.
 func ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacket(reader io.Reader, conn net.Conn, req *http.Request, prepareBodyCapacity func(int), borrowFinalPacket func(int) []byte) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, true, prepareBodyCapacity, borrowFinalPacket)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, true, prepareBodyCapacity, borrowFinalPacket, nil)
+	if err != nil {
+		return nil, err
+	}
+	rsp.Request = req
+	return rsp, nil
+}
+
+// ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacketFallback extends
+// the strict borrowed-packet variant for wire captures whose headers are
+// normalized while parsing, such as LF-only responses. Canonical packets still
+// borrow the transport-owned final response without a clone. If that exact view
+// is unavailable, copyFinalBody must return the captured final body suffix with
+// exactly the requested size; the parser copies it behind the normalized header
+// and stores an owned packet.
+func ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacketFallback(
+	reader io.Reader,
+	conn net.Conn,
+	req *http.Request,
+	prepareBodyCapacity func(int),
+	borrowFinalPacket func(int) []byte,
+	copyFinalBody func(int) []byte,
+) (*http.Response, error) {
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true, true, prepareBodyCapacity, borrowFinalPacket, copyFinalBody)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +169,7 @@ func ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacket(reader io.Rea
 }
 
 func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(bytes.NewReader(raw), true, req, nil, true, false, nil, nil)
+	rsp, err := readHTTPResponseFromBufioReader(bytes.NewReader(raw), true, req, nil, true, false, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +205,7 @@ func (r *httpResponseBytesBodyViewReader) takeRemainingBodyView() []byte {
 // used. ReadHTTPResponseFromBytes keeps its historical independent-Body
 // ownership and remains the default for shared or externally mutable packets.
 func ReadHTTPResponseFromBytesWithBodyView(raw []byte) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(newHTTPResponseBytesBodyViewReader(raw), true, nil, nil, true, false, nil, nil)
+	rsp, err := readHTTPResponseFromBufioReader(newHTTPResponseBytesBodyViewReader(raw), true, nil, nil, true, false, nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +333,7 @@ func HTTPResponseHasDiscardedIntermediateBody(rsp *http.Response) bool {
 	return ok
 }
 
-func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn, skipInformational bool, discardIntermediateBody bool, prepareBodyCapacity func(int), borrowFinalPacket func(int) []byte) (*http.Response, error) {
+func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn, skipInformational bool, discardIntermediateBody bool, prepareBodyCapacity func(int), borrowFinalPacket func(int) []byte, copyFinalBody func(int) []byte) (*http.Response, error) {
 	var rawPacket *bytes.Buffer
 	if req != nil {
 		rawPacket = new(bytes.Buffer)
@@ -686,10 +709,19 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			if discardBoundedBody && borrowFinalPacket != nil {
 				finalPacketSize := rawPacket.Len() + discardedBodyBytes
 				borrowedPacket := borrowFinalPacket(finalPacketSize)
-				if len(borrowedPacket) != finalPacketSize {
+				if len(borrowedPacket) == finalPacketSize {
+					httpctx.SetBareResponseBytesForceBorrowed(req, borrowedPacket)
+				} else if copyFinalBody != nil {
+					finalBody := copyFinalBody(discardedBodyBytes)
+					if len(finalBody) != discardedBodyBytes {
+						return nil, Errorf("invalid captured HTTP response body: got %d bytes, want %d", len(finalBody), discardedBodyBytes)
+					}
+					rawPacket.Grow(discardedBodyBytes)
+					_, _ = rawPacket.Write(finalBody)
+					httpctx.SetBareResponseBytesForceOwned(req, rawPacket.Bytes())
+				} else {
 					return nil, Errorf("invalid borrowed HTTP response packet: got %d bytes, want %d", len(borrowedPacket), finalPacketSize)
 				}
-				httpctx.SetBareResponseBytesForceBorrowed(req, borrowedPacket)
 			} else {
 				// rawPacket is local to this parser and is not accessed after the
 				// return. Transfer it to httpctx without cloning; rsp.Body owns a

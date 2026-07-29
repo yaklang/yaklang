@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/gorm"
@@ -18,11 +19,14 @@ import (
 )
 
 var (
-	escapeRegexp = regexp.MustCompile(`[%_\[\]^\\]`)
+	escapeRegexp            = regexp.MustCompile(`[%_\[\]^\\]`)
+	tempTestDatabaseCounter uint64
 )
 
 func createTempTestDatabase() (*gorm.DB, error) {
-	db, err := gorm.Open("sqlite3", "file::memory:?cache=shared")
+	databaseID := atomic.AddUint64(&tempTestDatabaseCounter, 1)
+	dsn := fmt.Sprintf("file:bizhelper-test-%d?mode=memory&cache=shared", databaseID)
+	db, err := gorm.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, err
 	}

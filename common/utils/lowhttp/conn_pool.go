@@ -836,17 +836,24 @@ func (pc *persistConn) readLoop() {
 				rc.option.BodyStreamReaderHandler == nil &&
 				!rc.option.AutoDetectSSE
 			if borrowCapturedPacket {
-				resp, err = utils.ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacket(
+				resp, err = utils.ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacketFallback(
 					httpResponseReader,
 					pc.conn,
 					stashRequest,
 					respBuffer.Grow,
 					func(finalPacketSize int) []byte {
 						captured := respBuffer.Bytes()
-						if finalPacketSize <= 0 || finalPacketSize > len(captured) {
+						if finalPacketSize <= 0 || finalPacketSize != len(captured) {
 							return nil
 						}
-						return captured[len(captured)-finalPacketSize:]
+						return captured
+					},
+					func(finalBodySize int) []byte {
+						captured := respBuffer.Bytes()
+						if finalBodySize < 0 || finalBodySize > len(captured) {
+							return nil
+						}
+						return captured[len(captured)-finalBodySize:]
 					},
 				)
 			} else {

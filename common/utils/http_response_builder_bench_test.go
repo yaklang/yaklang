@@ -109,6 +109,7 @@ func BenchmarkReadHTTPResponseMetadataContentLength256K(b *testing.B) {
 		name     string
 		metadata bool
 		borrowed bool
+		fallback bool
 		wantBody bool
 	}{
 		{
@@ -124,6 +125,12 @@ func BenchmarkReadHTTPResponseMetadataContentLength256K(b *testing.B) {
 			metadata: true,
 			borrowed: true,
 		},
+		{
+			name:     "borrowed-transport-packet-fallback",
+			metadata: true,
+			borrowed: true,
+			fallback: true,
+		},
 	} {
 		b.Run(benchmark.name, func(b *testing.B) {
 			b.ReportAllocs()
@@ -134,16 +141,31 @@ func BenchmarkReadHTTPResponseMetadataContentLength256K(b *testing.B) {
 				var rsp *http.Response
 				var err error
 				if benchmark.borrowed {
-					rsp, err = ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacket(
-						io.TeeReader(bytes.NewReader(packet), &wire),
-						nil,
-						req,
-						wire.Grow,
-						func(finalPacketSize int) []byte {
-							captured := wire.Bytes()
-							return captured[len(captured)-finalPacketSize:]
-						},
-					)
+					borrowFinalPacket := func(finalPacketSize int) []byte {
+						captured := wire.Bytes()
+						return captured[len(captured)-finalPacketSize:]
+					}
+					if benchmark.fallback {
+						rsp, err = ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacketFallback(
+							io.TeeReader(bytes.NewReader(packet), &wire),
+							nil,
+							req,
+							wire.Grow,
+							borrowFinalPacket,
+							func(finalBodySize int) []byte {
+								captured := wire.Bytes()
+								return captured[len(captured)-finalBodySize:]
+							},
+						)
+					} else {
+						rsp, err = ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacket(
+							io.TeeReader(bytes.NewReader(packet), &wire),
+							nil,
+							req,
+							wire.Grow,
+							borrowFinalPacket,
+						)
+					}
 				} else if benchmark.metadata {
 					rsp, err = ReadHTTPResponseMetadataFromBufioReader(io.TeeReader(bytes.NewReader(packet), &wire), req, wire.Grow)
 				} else {
@@ -221,6 +243,45 @@ func TestReadHTTPResponseMetadataBorrowsTransportPacket(t *testing.T) {
 	require.Equal(t, packet, wire.Bytes(), "transport capture must retain informational responses")
 	require.Equal(t, finalPacket, httpctx.GetBareResponseBytes(req))
 	require.Same(t, &wire.Bytes()[len(interimPacket)], &httpctx.GetBareResponseBytes(req)[0])
+}
+
+func TestReadHTTPResponseMetadataBorrowedPacketFallsBackForNormalizedHeader(t *testing.T) {
+	finalBody := []byte("yak-response")
+	finalWirePacket := []byte("HTTP/1.1 200 OK\nContent-Length: " + strconv.Itoa(len(finalBody)) + "\n\n" + string(finalBody))
+	finalNormalizedPacket := []byte("HTTP/1.1 200 OK\r\nContent-Length: " + strconv.Itoa(len(finalBody)) + "\r\n\r\n" + string(finalBody))
+	packet := bytes.Clone(finalWirePacket)
+	req := &http.Request{Method: http.MethodGet}
+	var wire bytes.Buffer
+
+	rsp, err := ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacketFallback(
+		io.TeeReader(bytes.NewReader(packet), &wire),
+		nil,
+		req,
+		wire.Grow,
+		func(finalPacketSize int) []byte {
+			captured := wire.Bytes()
+			if finalPacketSize != len(captured) {
+				return nil
+			}
+			return captured
+		},
+		func(finalBodySize int) []byte {
+			captured := wire.Bytes()
+			if finalBodySize > len(captured) {
+				return nil
+			}
+			return captured[len(captured)-finalBodySize:]
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, HTTPResponseHasDiscardedIntermediateBody(rsp))
+	require.Equal(t, packet, wire.Bytes(), "transport capture must preserve the original LF-only response")
+
+	bare := httpctx.GetBareResponseBytes(req)
+	require.Equal(t, finalNormalizedPacket, bare)
+	require.NotSame(t, &wire.Bytes()[0], &bare[0], "normalized packet must own its storage")
+	wire.Bytes()[len(packet)-1] = 'X'
+	require.Equal(t, finalBody[len(finalBody)-1], bare[len(bare)-1], "owned fallback aliases the transport capture")
 }
 
 func TestReadHTTPResponseMetadataBorrowedPacketPreservesShortBody(t *testing.T) {
