@@ -1,13 +1,19 @@
+// Package loop_intent legacy_helpers.go retains helper functions that are still
+// referenced by tests but were part of the old action-based loop.
+// These functions delegate to the shared reactloops implementations where possible.
 package loop_intent
 
 import (
 	"encoding/json"
-	"fmt"
+	"io"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 )
 
+// capabilityDetail is the local mirror of reactloops.CapabilityDetail, retained
+// for test compatibility.
 type capabilityDetail struct {
 	CapabilityName string `json:"capability_name"`
 	CapabilityType string `json:"capability_type"`
@@ -31,6 +37,14 @@ var capabilityTypeLabels = map[string]string{
 }
 
 var capabilityTypeOrder = []string{"tool", "mcp-tool", "forge", "skill", "focus_mode"}
+
+func appendCapDetail(details *[]capabilityDetail, name, capType, desc string) {
+	*details = append(*details, capabilityDetail{
+		CapabilityName: name,
+		CapabilityType: capType,
+		Description:    desc,
+	})
+}
 
 func parseCapabilityDetails(jsonStr string) []capabilityDetail {
 	if jsonStr == "" {
@@ -56,14 +70,10 @@ func marshalCapabilityDetails(details []capabilityDetail) string {
 	return string(data)
 }
 
-// buildCapabilityEnrichmentMarkdown constructs structured Markdown from capability details,
-// grouped by type with usage guidance for each type.
-// When recommendedNames is non-empty, only matching capabilities are included.
 func buildCapabilityEnrichmentMarkdown(details []capabilityDetail, recommendedNames map[string]bool) string {
 	if len(details) == 0 {
 		return ""
 	}
-
 	grouped := make(map[string][]capabilityDetail)
 	for _, d := range details {
 		if len(recommendedNames) > 0 && !recommendedNames[d.CapabilityName] {
@@ -74,7 +84,6 @@ func buildCapabilityEnrichmentMarkdown(details []capabilityDetail, recommendedNa
 
 	var md strings.Builder
 	md.WriteString("### Recommended Capabilities / 推荐能力\n\n")
-
 	hasContent := false
 	for _, capType := range capabilityTypeOrder {
 		caps, ok := grouped[capType]
@@ -82,26 +91,70 @@ func buildCapabilityEnrichmentMarkdown(details []capabilityDetail, recommendedNa
 			continue
 		}
 		hasContent = true
-
 		label := capabilityTypeLabels[capType]
 		if label == "" {
 			label = capType
 		}
-		md.WriteString(fmt.Sprintf("#### %s\n", label))
-
+		md.WriteString("#### " + label + "\n")
 		if guide, ok := capabilityTypeUsageGuides[capType]; ok {
 			md.WriteString(guide)
 			md.WriteString("\n\n")
 		}
-
 		for _, cap := range caps {
-			md.WriteString(fmt.Sprintf("- **%s**: %s\n", cap.CapabilityName, cap.Description))
+			md.WriteString("- **" + cap.CapabilityName + "**: " + cap.Description + "\n")
 		}
 		md.WriteString("\n")
 	}
-
 	if !hasContent {
 		return ""
 	}
 	return md.String()
+}
+
+func searchLoopMetadata(query string) []*reactloops.LoopMetadata {
+	allMeta := reactloops.GetAllLoopMetadata()
+	queryLower := strings.ToLower(query)
+	queryTokens := strings.Fields(queryLower)
+	var matched []*reactloops.LoopMetadata
+
+	for _, meta := range allMeta {
+		if meta.IsHidden {
+			continue
+		}
+		searchText := strings.ToLower(meta.Name + " " + meta.Description + " " + meta.UsagePrompt)
+		if strings.Contains(searchText, queryLower) {
+			matched = append(matched, meta)
+			continue
+		}
+		if len(queryTokens) > 1 {
+			meaningfulTokens := 0
+			matchCount := 0
+			for _, token := range queryTokens {
+				if len(token) < 2 {
+					continue
+				}
+				meaningfulTokens++
+				if strings.Contains(searchText, token) {
+					matchCount++
+				}
+			}
+			if meaningfulTokens > 0 && matchCount > 0 && matchCount >= (meaningfulTokens+1)/2 {
+				matched = append(matched, meta)
+			}
+		}
+	}
+	return matched
+}
+
+func intentSummaryStreamHandler(fieldReader io.Reader, emitWriter io.Writer) {
+	content, err := io.ReadAll(fieldReader)
+	if err != nil {
+		return
+	}
+	_, _ = emitWriter.Write([]byte(reactloops.CompactIntentSummary(string(content))))
+}
+
+// compactIntentSummary is retained for test compatibility.
+func compactIntentSummary(summary string) string {
+	return reactloops.CompactIntentSummary(summary)
 }
