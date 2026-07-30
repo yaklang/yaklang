@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
@@ -74,6 +75,15 @@ func main() {
 		cli.IntFlag{
 			Name: "duration-days,d",
 		},
+		cli.StringFlag{
+			Name:  "format",
+			Value: "legacy",
+			Usage: "license format: legacy or legion-v2",
+		},
+		cli.StringFlag{
+			Name:  "products",
+			Usage: "comma-separated Legion products: scan_center,ssa,hids,memfit",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
@@ -96,10 +106,28 @@ func main() {
 			return err
 		}
 
-		resp, err := m.SignLicense(
-			strings.TrimSpace(string(raw)), org,
-			time.Duration(c.Int64("duration-days"))*(time.Hour*24),
-			nil)
+		params, err := buildEntitlementParams(c.String("products"))
+		if err != nil {
+			return err
+		}
+		request := strings.TrimSpace(string(raw))
+		duration := time.Duration(c.Int64("duration-days")) * (time.Hour * 24)
+		if duration <= 0 {
+			return utils.Errorf("duration-days must be greater than zero")
+		}
+		format := strings.TrimSpace(c.String("format"))
+		if params != nil && format != "legion-v2" {
+			return utils.Errorf("--products requires --format legion-v2")
+		}
+		var resp string
+		switch format {
+		case "", "legacy":
+			resp, err = m.SignLicense(request, org, duration, params)
+		case "legion-v2":
+			resp, err = m.SignLicenseV2(request, org, duration, params)
+		default:
+			return utils.Errorf("unknown license format: %s (valid: legacy, legion-v2)", c.String("format"))
+		}
 		if err != nil {
 			return err
 		}
@@ -116,4 +144,46 @@ func main() {
 		fmt.Printf("command: [%v] failed: %v\n", strings.Join(os.Args, " "), err)
 		return
 	}
+}
+
+func buildEntitlementParams(productsFlag string) (map[string]string, error) {
+	productsFlag = strings.TrimSpace(productsFlag)
+	if productsFlag == "" {
+		return nil, nil
+	}
+	validProducts := map[string]bool{
+		"scan_center": true,
+		"ssa":         true,
+		"hids":        true,
+		"memfit":      true,
+	}
+	products := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, raw := range strings.Split(productsFlag, ",") {
+		product := strings.TrimSpace(raw)
+		if product == "" {
+			continue
+		}
+		if !validProducts[product] {
+			return nil, utils.Errorf(
+				"unknown product key: %s (valid: scan_center, ssa, hids, memfit)",
+				product,
+			)
+		}
+		if !seen[product] {
+			products = append(products, product)
+			seen[product] = true
+		}
+	}
+	if len(products) == 0 {
+		return nil, nil
+	}
+	raw, err := json.Marshal(map[string]any{
+		"products": products,
+		"version":  1,
+	})
+	if err != nil {
+		return nil, utils.Errorf("marshal entitlements failed: %s", err)
+	}
+	return map[string]string{"entitlements": string(raw)}, nil
 }
