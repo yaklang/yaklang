@@ -1,7 +1,7 @@
 package xlic
 
 import (
-	"embed"
+	_ "embed"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/license"
@@ -11,8 +11,14 @@ import (
 	"github.com/yaklang/gorm"
 )
 
-//go:embed certs
-var certs embed.FS
+// Only embed the PUBLIC key. The private key (pri.gzip) is NOT embedded — it
+// must never ship in the client binary. The signer (xlic CLI / signing server)
+// holds the private key out-of-band. If pri.gzip is absent the verifier still
+// works (it only needs the public key); if pub.gzip is absent we fall back to
+// a generated dev keypair (local dev only).
+//
+//go:embed certs/pub.gzip
+var pubGzip []byte
 
 var (
 	initOnce sync.Once
@@ -21,37 +27,22 @@ var (
 
 func initMachine() {
 	initOnce.Do(func() {
-		var (
-			encBytes, decBytes []byte
-		)
+		var encBytes []byte
 
-		raw, err := certs.ReadFile("certs/pub.gzip")
-		if err != nil {
-			log.Debugf("read enc.gzip error: %v", err)
-		}
-		if len(raw) > 0 {
-			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
+		if len(pubGzip) > 0 {
+			if raw, _ := utils.GzipDeCompress(pubGzip); len(raw) > 0 {
 				encBytes = raw
 			}
 		}
 
-		raw, err = certs.ReadFile("certs/pri.gzip")
-		if err != nil {
-			log.Debugf("read pri.gzip error: %v", err)
+		if len(encBytes) <= 0 {
+			// dev fallback: no embedded public key — generate a throwaway keypair
+			encBytes, _, _ = tlsutils.GeneratePrivateAndPublicKeyPEM()
 		}
 
-		if len(raw) > 0 {
-			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
-				decBytes = raw
-			}
-		}
-
-		if len(encBytes) <= 0 || len(decBytes) <= 0 {
-			decBytes, encBytes, _ = tlsutils.GeneratePrivateAndPublicKeyPEM()
-		}
-
-		// spew.Dump(codec.Md5(string(encBytes)), codec.Md5(string(decBytes)))
-		Machine = license.NewMachine(encBytes, decBytes)
+		// Verifier-only: the shipped binary only needs the public key to verify
+		// licenses. The private key is held by the off-box signer, never here.
+		Machine = license.NewVerifier(encBytes)
 	})
 }
 
