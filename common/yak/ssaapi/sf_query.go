@@ -58,6 +58,10 @@ type queryConfig struct {
 	// control
 	ctx context.Context
 
+	// reuseBaseProgramName: when set with an overlay query, merge risks from a
+	// prior base-program scan for files that remain base-only (unchanged).
+	reuseBaseProgramName string
+
 	*ssaconfig.Config
 }
 
@@ -183,6 +187,22 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 
 	var ret *SyntaxFlowResult
 	ret = CreateResultFromQuery(res, config.Config)
+
+	// Overlay incremental reuse: fold risks from a prior base scan for files
+	// that were not overridden by upper layers.
+	if config.reuseBaseProgramName != "" {
+		var overlay *ProgramOverLay
+		_ = value.Recursive(func(op sfvm.ValueOperator) error {
+			if o, ok := op.(*ProgramOverLay); ok {
+				overlay = o
+				return utils.Error("abort")
+			}
+			return nil
+		})
+		if overlay != nil {
+			mergeUnchangedFileRisksFromBaseCache(ret, overlay, config)
+		}
+	}
 
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
@@ -440,6 +460,84 @@ func QueryWithUseCache(b ...bool) QueryOption {
 	}
 }
 
+// QueryWithOverlayResultReuse enables merging risks from a prior base-program
+// SyntaxFlow result for files that remain base-only under the overlay.
+// Pass the base program name, or omit to use overlay.Layers[0] / GetBaseProgramName.
+func QueryWithOverlayResultReuse(baseProgramName ...string) QueryOption {
+	return func(c *queryConfig) {
+		if len(baseProgramName) > 0 && baseProgramName[0] != "" {
+			c.reuseBaseProgramName = baseProgramName[0]
+			return
+		}
+		c.reuseBaseProgramName = "__auto__"
+	}
+}
+
+// mergeUnchangedFileRisksFromBaseCache loads a cached base-program result for the
+// same rule and copies risks whose files are still base-only into the overlay result.
+func mergeUnchangedFileRisksFromBaseCache(ret *SyntaxFlowResult, overlay *ProgramOverLay, config *queryConfig) {
+	if ret == nil || overlay == nil || config == nil {
+		return
+	}
+	baseName := config.reuseBaseProgramName
+	if baseName == "" || baseName == "__auto__" {
+		baseName = overlay.GetReuseBaseProgramName()
+	}
+	if baseName == "" || baseName == "__auto__" {
+		names := overlay.GetLayerProgramNames()
+		if len(names) > 0 {
+			baseName = names[0]
+		}
+	}
+	if baseName == "" {
+		return
+	}
+
+	ruleContent := config.ruleContent
+	if ruleContent == "" && config.rule != nil {
+		ruleContent = config.rule.Content
+	}
+	if ruleContent == "" {
+		return
+	}
+	kind := config.kind
+	if kind == "" {
+		kind = schema.SFResultKindScan
+	}
+
+	baseRet, err := LoadResultByRuleContent(baseName, ruleContent, kind)
+	if err != nil || baseRet == nil {
+		return
+	}
+
+	merged := 0
+	for name, risk := range baseRet.riskMap {
+		if risk == nil {
+			continue
+		}
+		path := normalizeOverlayFilePath(risk.CodeSourceUrl, baseName)
+		if path == "" {
+			continue
+		}
+		if !overlay.IsBaseOnlyFile(path) {
+			continue
+		}
+		if _, exists := ret.riskMap[name]; exists {
+			continue
+		}
+		// Re-tag program name to the overlay (top) program for consistent reporting.
+		copied := *risk
+		if ret.program != nil {
+			copied.ProgramName = ret.program.GetProgramName()
+		}
+		ret.riskMap[name] = &copied
+		merged++
+	}
+	if merged > 0 {
+		log.Infof("overlay result reuse: merged %d base-only risks from program %s", merged, baseName)
+	}
+}
+
 // QueryWithEnableDebug 设置 SyntaxFlow 查询是否开启调试输出（导出名为 syntaxflow.withExecDebug）
 // 参数:
 //   - b: 是否开启调试，缺省为 true
@@ -565,6 +663,12 @@ func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...Que
 		if topLayer != nil && topLayer.Program != nil {
 			opts = append(opts, QueryWithProgram(topLayer.Program))
 		}
+		// Enable base result reuse when base layer name is known (no-op if no cache).
+		if p.reuseBaseProgramName != "" {
+			opts = append(opts, QueryWithOverlayResultReuse(p.reuseBaseProgramName))
+		} else if layer0 := p.Layers[0]; layer0 != nil && layer0.Program != nil {
+			opts = append(opts, QueryWithOverlayResultReuse(layer0.Program.GetProgramName()))
+		}
 	}
 	return QuerySyntaxflow(opts...)
 }
@@ -581,6 +685,11 @@ func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*Sy
 		topLayer := p.Layers[len(p.Layers)-1]
 		if topLayer != nil && topLayer.Program != nil {
 			opts = append(opts, QueryWithProgram(topLayer.Program))
+		}
+		if p.reuseBaseProgramName != "" {
+			opts = append(opts, QueryWithOverlayResultReuse(p.reuseBaseProgramName))
+		} else if layer0 := p.Layers[0]; layer0 != nil && layer0.Program != nil {
+			opts = append(opts, QueryWithOverlayResultReuse(layer0.Program.GetProgramName()))
 		}
 	}
 	return QuerySyntaxflow(opts...)

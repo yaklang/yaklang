@@ -225,6 +225,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		// next rule and don't bloat retained memory. See Program.ResetInterRuleState.
 		if prog != nil {
 			prog.ResetInterRuleState()
+			if overlay := prog.GetOverlay(); overlay != nil {
+				overlay.ResetInterRuleStateAllLayers()
+			}
 		}
 		return nil
 	}

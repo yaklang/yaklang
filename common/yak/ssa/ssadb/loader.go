@@ -143,28 +143,32 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 
 	// 2. Handle ConstType
 	if matchMod&ConstType != 0 {
-		query := db.Model(&IrCode{}).Where("opcode=5 AND const_type = 'normal'")
+		// Use GetDB() with fully-qualified program_name — GetDBInProgram's bare
+		// "program_name = ?" becomes ambiguous once IrSources is joined for exclude.
+		query := GetDB().Model(&IrCode{}).
+			Where(TableIrCodes+".program_name = ?", progName).
+			Where(TableIrCodes+".opcode = ? AND "+TableIrCodes+".const_type = ?", 5, "normal")
 		if compareMode == ExactCompare {
-			query = query.Where("string = ?", value)
+			query = query.Where(TableIrCodes+".string = ?", value)
 		} else {
 			// This regex operation on the 'string' column (TEXT) is likely a full table scan if no index exists.
 			// Keep dialect compatibility:
 			// - SQLite: "REGEXP" via the registered regexp() function in sqlite3_extended driver.
 			// - MySQL:  "REGEXP"
 			// - Postgres: "~"
-			dialect := db.Dialect().GetName()
+			dialect := GetDB().Dialect().GetName()
 			switch dialect {
 			case "postgres", "postgresql":
-				query = query.Where("string ~ ?", value)
+				query = query.Where(TableIrCodes+".string ~ ?", value)
 			default:
-				query = query.Where("string REGEXP ?", value)
+				query = query.Where(TableIrCodes+".string REGEXP ?", value)
 			}
 		}
 		// ConstType query also needs file exclusion
 		if len(excludeFiles) > 0 {
 			query = query.Joins("INNER JOIN "+TableIrSources+" ON "+TableIrCodes+".source_code_hash = "+TableIrSources+".source_code_hash").
 				Where(TableIrSources+".program_name = ?", progName)
-			concatExpr := getConcatExpression(db)
+			concatExpr := getConcatExpression(GetDB())
 			excludeConditions := make([]string, 0, len(excludeFiles))
 			excludeArgs := make([]interface{}, 0, len(excludeFiles))
 			for _, filePath := range excludeFiles {
