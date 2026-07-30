@@ -59,10 +59,6 @@ func (t *ToolResult) DumpTimelineItem(buf io.Writer, options ...ToolResultDumpOp
 	}
 	fmt.Fprintf(buf, "tool_name: %#v\n", t.Name)
 
-	if t.CallExpectations != "" {
-		fmt.Fprintf(buf, "call_expectations: %s\n", t.CallExpectations)
-	}
-
 	if opts.IncludeParams {
 		t.dumpTimelineParams(buf)
 	}
@@ -102,15 +98,28 @@ func (t *ToolResult) dumpTimelineResult(writer io.Writer) {
 	buf := bytes.NewBuffer(nil)
 
 	if t.ShrinkResult != "" { // shrink result preface
-		buf.WriteString(fmt.Sprintf("shrink_result: %#v\n", t.ShrinkResult))
+		buf.WriteString(t.ShrinkResult)
+		if !strings.HasSuffix(t.ShrinkResult, "\n") {
+			buf.WriteByte('\n')
+		}
 	} else if t.ShrinkSimilarResult != "" { //  shrink similar result second
-		buf.WriteString(fmt.Sprintf("shrink_similar_result: %#v\n", t.ShrinkSimilarResult))
+		buf.WriteString(t.ShrinkSimilarResult)
+		if !strings.HasSuffix(t.ShrinkSimilarResult, "\n") {
+			buf.WriteByte('\n')
+		}
 	} else {
 		// 处理工具执行结果
 		switch ret := t.Data.(type) {
 		case string:
 			if ret == "" {
 				buf.WriteString("no output\n")
+			} else if strings.HasPrefix(ret, "COMBINED OUTPUT:") {
+				// Data already has framework packaging (COMBINED OUTPUT / RESULT / HINT),
+				// no need for an extra "data:" prefix that just duplicates semantics.
+				buf.WriteString(ret)
+				if !strings.HasSuffix(ret, "\n") {
+					buf.WriteByte('\n')
+				}
 			} else {
 				buf.WriteString("data:\n")
 				buf.WriteString(ret)
