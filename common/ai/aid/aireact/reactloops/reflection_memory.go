@@ -78,7 +78,9 @@ func (r *ReActLoop) addReflectionToTimeline(reflection *ActionReflection) {
 		reflection.IterationNum, reflection.ExecutionTime, reflection.ReflectionLevel))
 
 	// 添加建议
-	if len(reflection.Suggestions) > 0 {
+	// SPIN 场景下 suggestions 已由 logic_spin_warning 条目承载，
+	// 此处不再重复输出，避免同一组建议在 timeline 中出现两次。
+	if len(reflection.Suggestions) > 0 && !reflection.IsSpinning {
 		timelineMsg.WriteString("MANDATORY RECOMMENDATIONS FOR FUTURE ACTIONS:\n")
 		for i, suggestion := range reflection.Suggestions {
 			timelineMsg.WriteString(fmt.Sprintf("%d. %s\n", i+1, suggestion))
