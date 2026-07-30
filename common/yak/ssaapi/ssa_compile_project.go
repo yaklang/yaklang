@@ -369,7 +369,7 @@ func (c *Config) peephole() (Programs, error) {
 
 // removeProgramNamePrefix 去掉文件路径中的 program name 前缀
 // 输入格式可能是: /mytest(2026-01-20 11:48:20)/test.go 或 /mytest(2026-01-20 11:48:20)/folder/test.go
-// 输出格式: /test.go 或 /folder/test.go
+// 输出格式: /test.go 或 /folder/test.go（前缀形态可能不一致，调用方应优先用 normalizeOverlayFilePath）
 func removeProgramNamePrefix(filePath, programName string) string {
 	if filePath == "" || programName == "" {
 		return filePath
@@ -401,6 +401,36 @@ func removeProgramNamePrefix(filePath, programName string) string {
 	}
 
 	return filePath
+}
+
+// normalizeOverlayFilePath strips optional program-name prefix and returns a
+// canonical path with a leading "/". Used for FileToLayerMap / FileSet /
+// FileHashMap keys and for excludeFiles passed into MatchInstructionsByVariable
+// so DB (CONCAT(folder_path, file_name)) and memory-mode exclusion agree.
+func normalizeOverlayFilePath(filePath, programName string) string {
+	if filePath == "" {
+		return ""
+	}
+	path := filePath
+	if programName != "" {
+		path = removeProgramNamePrefix(filePath, programName)
+	}
+	path = strings.TrimPrefix(path, "/")
+	if path == "" {
+		return "/"
+	}
+	return "/" + path
+}
+
+// ensureOverlayPathSlash ensures a leading "/" on an already program-prefix-free path.
+func ensureOverlayPathSlash(path string) string {
+	if path == "" {
+		return ""
+	}
+	if !strings.HasPrefix(path, "/") {
+		return "/" + path
+	}
+	return path
 }
 
 // removeProgramNamePrefixFromFS 从文件系统中去掉 program name 前缀

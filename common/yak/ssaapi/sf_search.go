@@ -33,34 +33,61 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		}
 	}
 
+	// Fast path: value's file is owned by the same layer as the value → no need
+	// to Ref across layers (members already come from the owning IR).
+	if len(memberMap) > 0 && value.ParentProgram != nil {
+		filePath := ""
+		if rng := value.GetRange(); rng != nil {
+			if ed := rng.GetEditor(); ed != nil {
+				filePath = ed.GetFilePath()
+				if filePath == "" {
+					filePath = ed.GetUrl()
+				}
+			}
+		}
+		if filePath != "" {
+			normalized := normalizeOverlayFilePath(filePath, value.ParentProgram.GetProgramName())
+			valueLayer := overlay.getValueLayerIndex(value)
+			if top, ok := overlay.FileToLayerMap.Get(normalized); ok && top == valueLayer {
+				return memberMap
+			}
+		}
+	}
+
 	// 如果当前 instruction 没有成员，或者需要跨 layer 查找，则通过名称查找
-	// 获取当前 value 的名称，用于在所有 layer 中查找相同类型的值
 	valueName := value.GetName()
 	if valueName == "" {
 		valueName = value.String()
 	}
 
 	// 从所有 layer 中查找成员，上层覆盖下层
-	// 从最上层开始遍历，这样上层的成员会自动覆盖下层的同名成员
 	for i := len(overlay.Layers) - 1; i >= 0; i-- {
 		layer := overlay.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
 		}
 
-		// 在当前 layer 的 Program 中查找相同名称的值
-		layerValues := layer.Program.Ref(valueName)
+		// Base layer: only search files not owned by upper layers.
+		var layerValues Values
+		if i == 0 {
+			exclude := overlay.overriddenFilesList()
+			if len(exclude) > 0 {
+				layerValues = layer.Program.refWithExcludeFiles(valueName, exclude)
+			} else {
+				layerValues = layer.Program.Ref(valueName)
+			}
+		} else {
+			layerValues = layer.Program.Ref(valueName)
+		}
 		if len(layerValues) == 0 {
 			continue
 		}
 
-		// 对同一 layer 中的多个 Ref 结果去重：只处理第一个匹配的对象值
-		// 因为同一 layer 中可能有多个同名但不同类型的值，我们只需要对象类型的值
 		var targetLayerValue *Value
 		for _, layerValue := range layerValues {
 			if layerValue.IsObject() {
 				targetLayerValue = layerValue
-				break // 只取第一个匹配的对象值
+				break
 			}
 		}
 

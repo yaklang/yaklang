@@ -109,6 +109,21 @@ func MatchInstructionsByVariableWithExcludeFiles(
 		}
 
 		filteredInsts := make([]Instruction, 0, len(insts))
+		excludeSet := make(map[string]struct{}, len(excludeFiles)*4)
+		addExcludeKey := func(path string) {
+			if path == "" {
+				return
+			}
+			n := normalizeFilePathForExclude(path)
+			excludeSet[n] = struct{}{}
+			excludeSet[strings.TrimPrefix(n, "/")] = struct{}{}
+		}
+		for _, excludePath := range excludeFiles {
+			addExcludeKey(excludePath)
+			if prog != nil && prog.Name != "" {
+				addExcludeKey(stripProgramNamePrefixForExclude(excludePath, prog.Name))
+			}
+		}
 		for _, inst := range insts {
 			filePath := getInstructionFilePath(inst)
 			if filePath == "" {
@@ -117,10 +132,16 @@ func MatchInstructionsByVariableWithExcludeFiles(
 			}
 			normalizedPath := normalizeFilePathForExclude(filePath)
 			shouldExclude := false
-			for _, excludePath := range excludeFiles {
-				if normalizeFilePathForExclude(excludePath) == normalizedPath {
+			if _, ok := excludeSet[normalizedPath]; ok {
+				shouldExclude = true
+			} else if _, ok := excludeSet[strings.TrimPrefix(normalizedPath, "/")]; ok {
+				shouldExclude = true
+			} else if prog != nil && prog.Name != "" {
+				stripped := normalizeFilePathForExclude(stripProgramNamePrefixForExclude(filePath, prog.Name))
+				if _, ok := excludeSet[stripped]; ok {
 					shouldExclude = true
-					break
+				} else if _, ok := excludeSet[strings.TrimPrefix(stripped, "/")]; ok {
+					shouldExclude = true
 				}
 			}
 			if !shouldExclude {
@@ -167,14 +188,38 @@ func normalizeFilePathForExclude(path string) string {
 	return path
 }
 
-// getInstructionFilePath 获取指令的文件路径
+// stripProgramNamePrefixForExclude mirrors ssaapi.normalizeOverlayFilePath's
+// program-prefix strip so memory-mode exclude matches overlay excludeFiles.
+func stripProgramNamePrefixForExclude(filePath, programName string) string {
+	if filePath == "" || programName == "" {
+		return filePath
+	}
+	path := strings.TrimPrefix(filePath, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return filePath
+	}
+	first := parts[0]
+	if first == programName || strings.HasPrefix(first, programName+"(") {
+		if len(parts) > 1 {
+			return "/" + strings.Join(parts[1:], "/")
+		}
+		return "/"
+	}
+	return filePath
+}
+
+// getInstructionFilePath 获取指令的文件路径（不含 program-name 前缀，便于 exclude 对齐）
 func getInstructionFilePath(inst Instruction) string {
 	if inst == nil {
 		return ""
 	}
-	// 尝试从指令的 Range 获取文件路径
 	if r := inst.GetRange(); r != nil {
 		if editor := r.GetEditor(); editor != nil {
+			// Prefer FilePath (no program name) so excludeFiles from overlay match.
+			if fp := editor.GetFilePath(); fp != "" {
+				return fp
+			}
 			return editor.GetUrl()
 		}
 	}

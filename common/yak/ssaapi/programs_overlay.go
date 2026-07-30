@@ -46,13 +46,24 @@ type ProgramOverLay struct {
 
 	// FileToLayerMap: 文件路径 -> 最上层包含该文件的 Layer 索引
 	// 用于快速判断文件在哪个 Layer 中，以及上层是否覆盖下层
+	// Keys are canonical paths from normalizeOverlayFilePath (leading "/").
 	FileToLayerMap *utils.SafeMap[int] // key: 文件路径, value: Layer 索引
+
+	// baseOnlyFiles: FileToLayerMap[path]==1 and not deleted — IR lives only in base.
+	// overriddenFiles: FileToLayerMap[path]>1 — upper layers own these files; base
+	// queries should exclude them up-front (not only when upper layer happens to match).
+	baseOnlyFiles   *utils.SafeMap[struct{}]
+	overriddenFiles *utils.SafeMap[struct{}]
 
 	// 聚合后的文件系统（所有 Layer 文件系统的 differ 聚合）
 	AggregatedFS fi.FileSystem
 
 	// signatureCache 缓存 Value 的签名，用于重定位
 	signatureCache *utils.CacheWithKey[string, *Value]
+
+	// reuseBaseProgramName: when set, overlay SyntaxFlow may merge risks from a
+	// previous base-program scan for files in baseOnlyFiles (unchanged files).
+	reuseBaseProgramName string
 
 	// overlay 的元数据（用于实现 Program interface）
 	programName string
@@ -188,13 +199,87 @@ func (p *ProgramOverLay) GetOverlay() *ProgramOverLay {
 	return p
 }
 
+// ResetInterRuleStateAllLayers clears analysis caches on every layer program.
+func (p *ProgramOverLay) ResetInterRuleStateAllLayers() {
+	if p == nil {
+		return
+	}
+	for _, layer := range p.Layers {
+		if layer != nil && layer.Program != nil {
+			layer.Program.ResetInterRuleState()
+		}
+	}
+}
+
 // newEmptyOverlay 创建一个空的 ProgramOverLay
 func newEmptyOverlay() *ProgramOverLay {
 	return &ProgramOverLay{
-		Layers:         make([]*ProgramLayer, 0),
-		FileToLayerMap: utils.NewSafeMap[int](),
-		signatureCache: utils.NewTTLCacheWithKey[string, *Value](0),
+		Layers:          make([]*ProgramLayer, 0),
+		FileToLayerMap:  utils.NewSafeMap[int](),
+		baseOnlyFiles:   utils.NewSafeMap[struct{}](),
+		overriddenFiles: utils.NewSafeMap[struct{}](),
+		signatureCache:  utils.NewTTLCacheWithKey[string, *Value](0),
 	}
+}
+
+// rebuildFilePartitions fills baseOnlyFiles / overriddenFiles from FileToLayerMap.
+func (p *ProgramOverLay) rebuildFilePartitions() {
+	if p == nil {
+		return
+	}
+	if p.baseOnlyFiles == nil {
+		p.baseOnlyFiles = utils.NewSafeMap[struct{}]()
+	} else {
+		p.baseOnlyFiles = utils.NewSafeMap[struct{}]()
+	}
+	if p.overriddenFiles == nil {
+		p.overriddenFiles = utils.NewSafeMap[struct{}]()
+	} else {
+		p.overriddenFiles = utils.NewSafeMap[struct{}]()
+	}
+	if p.FileToLayerMap == nil {
+		return
+	}
+	p.FileToLayerMap.ForEach(func(path string, layerIdx int) bool {
+		path = ensureOverlayPathSlash(path)
+		if layerIdx <= 1 {
+			p.baseOnlyFiles.Set(path, struct{}{})
+		} else {
+			p.overriddenFiles.Set(path, struct{}{})
+		}
+		return true
+	})
+}
+
+// overriddenFilesList returns canonical paths owned by upper layers (for excludeFiles).
+func (p *ProgramOverLay) overriddenFilesList() []string {
+	if p == nil || p.overriddenFiles == nil || p.overriddenFiles.Count() == 0 {
+		return nil
+	}
+	return p.overriddenFiles.Keys()
+}
+
+// SetReuseBaseProgramName enables post-query risk merge from a prior base scan.
+func (p *ProgramOverLay) SetReuseBaseProgramName(name string) {
+	if p == nil {
+		return
+	}
+	p.reuseBaseProgramName = name
+}
+
+func (p *ProgramOverLay) GetReuseBaseProgramName() string {
+	if p == nil {
+		return ""
+	}
+	return p.reuseBaseProgramName
+}
+
+// IsBaseOnlyFile reports whether path is owned solely by the base layer.
+func (p *ProgramOverLay) IsBaseOnlyFile(path string) bool {
+	if p == nil || p.baseOnlyFiles == nil {
+		return false
+	}
+	return p.baseOnlyFiles.Have(ensureOverlayPathSlash(path))
 }
 
 func createLayer1FromProgram(prog *Program, layerIndex int) *ProgramLayer {
@@ -209,7 +294,7 @@ func createLayer1FromProgram(prog *Program, layerIndex int) *ProgramLayer {
 		if filePath == "" {
 			return true
 		}
-		normalizedPath := removeProgramNamePrefix(filePath, prog.GetProgramName())
+		normalizedPath := normalizeOverlayFilePath(filePath, prog.GetProgramName())
 		layer.FileSet.Set(normalizedPath, struct{}{})
 		layer.FileHashMap.Set(normalizedPath, 1)
 		return true
@@ -291,7 +376,7 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 
 		for filePath, hash := range fileHashMap {
 			if filePath != "" {
-				layer.FileHashMap.Set(removeProgramNamePrefix(filePath, diffProgram.GetProgramName()), hash)
+				layer.FileHashMap.Set(normalizeOverlayFilePath(filePath, diffProgram.GetProgramName()), hash)
 			}
 		}
 
@@ -308,8 +393,9 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 			}
 
 			if hash != -1 {
-				layer.FileSet.Set(removeProgramNamePrefix(filePath, diffProgram.GetProgramName()), struct{}{})
-				overlay.FileToLayerMap.Set(removeProgramNamePrefix(filePath, diffProgram.GetProgramName()), layerIndex)
+				normalizedPath := normalizeOverlayFilePath(filePath, diffProgram.GetProgramName())
+				layer.FileSet.Set(normalizedPath, struct{}{})
+				overlay.FileToLayerMap.Set(normalizedPath, layerIndex)
 			}
 			return true
 		})
@@ -322,7 +408,7 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 		if filePath == "" {
 			return true
 		}
-		normalizedPath := removeProgramNamePrefix(filePath, layer1ProgramName)
+		normalizedPath := normalizeOverlayFilePath(filePath, layer1ProgramName)
 		if !overlay.FileToLayerMap.Have(normalizedPath) {
 			isDeleted := false
 			for i := 1; i < len(overlay.Layers); i++ {
@@ -339,6 +425,7 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	})
 
 	overlay.programName = layers[len(layers)-1].GetProgramName()
+	overlay.rebuildFilePartitions()
 	aggregatedFS, err := overlay.aggregateFileSystems()
 	if err != nil {
 		log.Errorf("failed to aggregate file systems: %v", err)
@@ -407,13 +494,13 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 
 	for filePath, hash := range fileHashMap {
 		if filePath != "" {
-			newLayer.FileHashMap.Set(removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName()), hash)
+			newLayer.FileHashMap.Set(normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName()), hash)
 		}
 	}
 
 	// 复用 baseOverlay 的 FileToLayerMap，然后添加新的 layer 的文件映射
 	baseOverlay.FileToLayerMap.ForEach(func(normalizedPath string, layerIdx int) bool {
-		overlay.FileToLayerMap.Set(normalizedPath, layerIdx)
+		overlay.FileToLayerMap.Set(ensureOverlayPathSlash(normalizedPath), layerIdx)
 		return true
 	})
 
@@ -430,7 +517,7 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 		}
 
 		if hash != -1 {
-			normalizedPath := removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName())
+			normalizedPath := normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName())
 			newLayer.FileSet.Set(normalizedPath, struct{}{})
 			overlay.FileToLayerMap.Set(normalizedPath, layerIndex)
 		}
@@ -466,7 +553,7 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 		// 这些文件在 baseOverlay 的 AggregatedFS 中存在，但在 layer3 中被删除了
 		for filePath, hash := range fileHashMap {
 			if hash == -1 {
-				normalizedPath := removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName())
+				normalizedPath := normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName())
 				// 删除文件（如果存在）
 				if exists, _ := newAggregatedFS.Exists(normalizedPath); exists {
 					newAggregatedFS.Delete(normalizedPath)
@@ -480,7 +567,7 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 			if filePath == "" || me == nil {
 				return true
 			}
-			normalizedPath := removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName())
+			normalizedPath := normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName())
 			// 检查这个文件是否在 layer3 中被删除
 			if hash, exists := fileHashMap[filePath]; exists && hash == -1 {
 				// 文件被删除，不需要添加到 AggregatedFS
@@ -508,6 +595,8 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 		overlay.programKind = newLayerProgram.GetProgramKind()
 		overlay.language = newLayerProgram.GetLanguage()
 	}
+
+	overlay.rebuildFilePartitions()
 
 	log.Infof("ProgramOverLay: Extended with %d layers (reused base overlay), %d unique files",
 		len(overlay.Layers), overlay.FileToLayerMap.Count())
@@ -813,6 +902,8 @@ func (p *ProgramOverLay) getValueFilePath(v *Value) string {
 		return ""
 	}
 
+	// Prefer path without program-name prefix so it matches FileToLayerMap /
+	// excludeFiles canonical form (normalizeOverlayFilePath).
 	filePath := editor.GetFilePath()
 	if filePath == "" {
 		filePath = editor.GetUrl()
@@ -826,25 +917,16 @@ func (p *ProgramOverLay) isFileDeleted(filePath string, currentLayerIndex int) b
 		return false
 	}
 
-	normalizedPath := filePath
+	normalizedPath := ensureOverlayPathSlash(filePath)
 	if currentLayerIndex >= 0 && currentLayerIndex < len(p.Layers) {
 		layer := p.Layers[currentLayerIndex]
 		if layer != nil && layer.Program != nil {
 			layerProgramName := layer.Program.GetProgramName()
-			normalizedPath = removeProgramNamePrefix(filePath, layerProgramName)
-			normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+			normalizedPath = normalizeOverlayFilePath(filePath, layerProgramName)
 		}
 	}
 
-	aggregatedFS := p.GetAggregatedFileSystem()
-	if aggregatedFS != nil {
-		exists, _ := aggregatedFS.Exists(normalizedPath)
-		if !exists {
-			return true
-		}
-		return false
-	}
-
+	// Prefer metadata (FileHashMap) over AggregatedFS — hot path during SF queries.
 	for j := currentLayerIndex + 1; j < len(p.Layers); j++ {
 		upperLayer := p.Layers[j]
 		if upperLayer != nil && upperLayer.FileHashMap != nil {
@@ -853,6 +935,19 @@ func (p *ProgramOverLay) isFileDeleted(filePath string, currentLayerIndex int) b
 				return true
 			}
 		}
+	}
+
+	if _, exists := p.FileToLayerMap.Get(normalizedPath); !exists {
+		// Not in aggregated view and marked deleted above, or never present.
+		for j := currentLayerIndex + 1; j < len(p.Layers); j++ {
+			upperLayer := p.Layers[j]
+			if upperLayer != nil && upperLayer.FileHashMap != nil {
+				if hash, ok := upperLayer.FileHashMap.Get(normalizedPath); ok && hash == -1 {
+					return true
+				}
+			}
+		}
+		return false
 	}
 
 	return false
@@ -899,9 +994,10 @@ func (p *ProgramOverLay) IsOverridden(v *Value) bool {
 		layer := p.Layers[valueLayerIndex-1]
 		if layer != nil && layer.Program != nil {
 			layerProgramName := layer.Program.GetProgramName()
-			normalizedPath = removeProgramNamePrefix(filePath, layerProgramName)
-			normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+			normalizedPath = normalizeOverlayFilePath(filePath, layerProgramName)
 		}
+	} else {
+		normalizedPath = ensureOverlayPathSlash(filePath)
 	}
 
 	topLayerIndex, exists := p.FileToLayerMap.Get(normalizedPath)
@@ -922,8 +1018,7 @@ func (p *ProgramOverLay) isVisibleValueInLayer(v *Value, layer *ProgramLayer, la
 		return true
 	}
 
-	normalizedPath := removeProgramNamePrefix(filePath, layer.Program.GetProgramName())
-	normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+	normalizedPath := normalizeOverlayFilePath(filePath, layer.Program.GetProgramName())
 	if p.isFileDeleted(normalizedPath, layerPosition) {
 		return false
 	}
@@ -945,6 +1040,7 @@ func (p *ProgramOverLay) Ref(name string) Values {
 
 	foundFiles := utils.NewSafeMap[struct{}]()
 	excludeFiles := make([]string, 0)
+	overriddenSeed := p.overriddenFilesList()
 
 	for i := len(p.Layers) - 1; i >= 0; i-- {
 		layer := p.Layers[i]
@@ -953,9 +1049,14 @@ func (p *ProgramOverLay) Ref(name string) Values {
 		}
 
 		layerProgramName := layer.Program.GetProgramName()
+		layerExclude := excludeFiles
+		if i == 0 && len(overriddenSeed) > 0 {
+			layerExclude = append(append([]string(nil), overriddenSeed...), excludeFiles...)
+		}
+
 		var layerValues Values
-		if len(excludeFiles) > 0 {
-			layerValues = layer.Program.refWithExcludeFiles(name, excludeFiles)
+		if len(layerExclude) > 0 {
+			layerValues = layer.Program.refWithExcludeFiles(name, layerExclude)
 		} else {
 			layerValues = layer.Program.Ref(name)
 		}
@@ -973,8 +1074,7 @@ func (p *ProgramOverLay) Ref(name string) Values {
 				continue
 			}
 
-			normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
-			normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+			normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
 			if foundFiles.Have(normalizedPath) {
 				continue
 			}
@@ -1022,31 +1122,69 @@ func (p *ProgramOverLay) generateRelocateRule(v *Value) string {
 	return rule
 }
 
+// relocateNameCandidates returns filtered names suitable for direct SSA lookup.
+func relocateNameCandidates(v *Value) []string {
+	if v == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var out []string
+	for _, name := range getValueNames(v) {
+		if name == "" {
+			continue
+		}
+		if match, err := regexp.Match(`.*(=|-).*`, []byte(name)); err == nil && match {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
 func (p *ProgramOverLay) findValueInLayer(layer *ProgramLayer, v *Value) *Value {
-	if layer == nil || layer.Program == nil {
+	if layer == nil || layer.Program == nil || v == nil {
 		return nil
 	}
 
-	rule := p.generateRelocateRule(v)
-	if rule == "" {
-		return nil
-	}
-
-	cacheKey := fmt.Sprintf("%s:%s", layer.Program.GetProgramName(), rule)
+	cacheKey := fmt.Sprintf("%d:%d:%s", v.GetId(), layer.LayerIndex, layer.Program.GetProgramName())
 	if cached, ok := p.signatureCache.Get(cacheKey); ok {
 		return cached
 	}
 
-	res, err := layer.Program.SyntaxFlowWithError(rule, QueryWithEnableDebug())
-	if err != nil {
-		log.Debugf("search value by Rule failed in Layer %d: %v", layer.LayerIndex, err)
-		return nil
+	wantOpcode := v.GetOpcode()
+	names := relocateNameCandidates(v)
+
+	// Fast path: direct SSA variable lookup (no nested SyntaxFlow VM).
+	for _, name := range names {
+		candidates := layer.Program.Ref(name)
+		for _, cand := range candidates {
+			if cand == nil {
+				continue
+			}
+			if wantOpcode != "" && cand.GetOpcode() != wantOpcode {
+				continue
+			}
+			p.signatureCache.Set(cacheKey, cand)
+			return cand
+		}
 	}
 
-	values := res.GetAllValuesChain()
-	if len(values) > 0 {
-		p.signatureCache.Set(cacheKey, values[0])
-		return values[0]
+	// Fallback: preserve previous correctness for consts / oddly-named values
+	// via a targeted SyntaxFlow rule (still cached; debug disabled for hot path).
+	rule := p.generateRelocateRule(v)
+	if rule != "" {
+		res, err := layer.Program.SyntaxFlowWithError(rule)
+		if err == nil {
+			values := res.GetAllValuesChain()
+			if len(values) > 0 {
+				p.signatureCache.Set(cacheKey, values[0])
+				return values[0]
+			}
+		}
 	}
 
 	return nil
@@ -1072,9 +1210,10 @@ func (p *ProgramOverLay) Relocate(v *Value) *Value {
 		layer := p.Layers[valueLayerIndex-1]
 		if layer != nil && layer.Program != nil {
 			layerProgramName := layer.Program.GetProgramName()
-			normalizedPath = removeProgramNamePrefix(filePath, layerProgramName)
-			normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+			normalizedPath = normalizeOverlayFilePath(filePath, layerProgramName)
 		}
+	} else {
+		normalizedPath = ensureOverlayPathSlash(filePath)
 	}
 
 	fileLayerIndex, exists := p.FileToLayerMap.Get(normalizedPath)
@@ -1201,6 +1340,7 @@ func (p *ProgramOverLay) queryMatch(
 	results := make([]sfvm.ValueOperator, 0)
 	foundFiles := utils.NewSafeMap[struct{}]()
 	excludeFiles := make([]string, 0)
+	overriddenSeed := p.overriddenFilesList()
 
 	for i := len(p.Layers) - 1; i >= 0; i-- {
 		layer := p.Layers[i]
@@ -1208,8 +1348,16 @@ func (p *ProgramOverLay) queryMatch(
 			continue
 		}
 
+		// Base layer: exclude all overridden files up-front (not only files that
+		// happened to match on an upper layer in this query). Upper layers must
+		// still see their own files, so do not seed exclude for them.
+		layerExclude := excludeFiles
+		if i == 0 && len(overriddenSeed) > 0 {
+			layerExclude = append(append([]string(nil), overriddenSeed...), excludeFiles...)
+		}
+
 		layerProgramName := layer.Program.GetProgramName()
-		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, excludeFiles)
+		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, layerExclude)
 		if err != nil {
 			continue
 		}
@@ -1228,8 +1376,7 @@ func (p *ProgramOverLay) queryMatch(
 						return nil
 					}
 
-					normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
-					normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+					normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
 					if foundFiles.Have(normalizedPath) {
 						return nil
 					}
@@ -1325,12 +1472,19 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 	}
 
 	results := make([]sfvm.ValueOperator, 0)
+	foundFiles := utils.NewSafeMap[struct{}]()
+	overridden := utils.NewSafeMap[struct{}]()
+	for _, path := range p.overriddenFilesList() {
+		overridden.Set(path, struct{}{})
+	}
+
 	for i := len(p.Layers) - 1; i >= 0; i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
 		}
 
+		layerProgramName := layer.Program.GetProgramName()
 		values, _ := compare(layer.Program)
 		if values.IsEmpty() {
 			continue
@@ -1344,6 +1498,20 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 			}
 			if !p.isVisibleValueInLayer(v, layer, i) {
 				return nil
+			}
+
+			filePath := p.getValueFilePath(v)
+			if filePath != "" {
+				normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
+				// Base layer: skip files owned by upper layers (even if compare
+				// still returned them — post-filter without exclude push-down).
+				if i == 0 && overridden.Have(normalizedPath) {
+					return nil
+				}
+				if foundFiles.Have(normalizedPath) {
+					return nil
+				}
+				foundFiles.Set(normalizedPath, struct{}{})
 			}
 
 			results = append(results, v)

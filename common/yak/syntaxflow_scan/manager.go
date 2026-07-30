@@ -271,6 +271,9 @@ func (m *scanManager) initByConfig() error {
 			}
 			config.Programs = append(config.Programs, prog)
 		}
+		// When both a diff (with overlay) and its base program are listed,
+		// scanning the base alone duplicates work already covered by overlay.
+		config.Programs = dedupeProgramsCoveredByOverlay(config.Programs)
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
@@ -337,6 +340,56 @@ func (m *scanManager) initByConfig() error {
 	log.Infof("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(programCount))
 	m.setTotalQuery(m.rulesCount * int64(programCount))
 	return nil
+}
+
+// dedupeProgramsCoveredByOverlay drops standalone base programs when another
+// loaded program's overlay already includes them as a lower layer. Overlay
+// SyntaxFlow already aggregates those layers; scanning base alone doubles work.
+func dedupeProgramsCoveredByOverlay(programs []*ssaapi.Program) []*ssaapi.Program {
+	if len(programs) <= 1 {
+		return programs
+	}
+	covered := make(map[string]struct{})
+	for _, prog := range programs {
+		if prog == nil {
+			continue
+		}
+		overlay := prog.GetOverlay()
+		if overlay == nil {
+			continue
+		}
+		for _, name := range overlay.GetLayerProgramNames() {
+			if name == "" || name == prog.GetProgramName() {
+				continue
+			}
+			covered[name] = struct{}{}
+		}
+		if base := prog.GetBaseProgramName(); base != "" && base != prog.GetProgramName() {
+			covered[base] = struct{}{}
+		}
+	}
+	if len(covered) == 0 {
+		// Still drop nils when nothing is covered.
+		out := make([]*ssaapi.Program, 0, len(programs))
+		for _, prog := range programs {
+			if prog != nil {
+				out = append(out, prog)
+			}
+		}
+		return out
+	}
+	out := make([]*ssaapi.Program, 0, len(programs))
+	for _, prog := range programs {
+		if prog == nil {
+			continue
+		}
+		if _, ok := covered[prog.GetProgramName()]; ok {
+			log.Infof("SyntaxFlow Scan: skip program %s (covered by overlay of another program)", prog.GetProgramName())
+			continue
+		}
+		out = append(out, prog)
+	}
+	return out
 }
 
 func (m *scanManager) TaskId() string {
