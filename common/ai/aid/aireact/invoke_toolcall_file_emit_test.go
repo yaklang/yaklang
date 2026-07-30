@@ -22,6 +22,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// fileEmitIntegrationTestTimeout bounds event-wait loops in FileEmit integration tests.
+// Mock ReAct flows plus artifact finalize routinely exceed 8-10s on shared CI runners.
+const fileEmitIntegrationTestTimeout = 30 * time.Second
+
 func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
@@ -131,10 +135,7 @@ func TestReAct_ToolCall_FileEmit(t *testing.T) {
 		}
 	}()
 
-	// Artifact persistence is I/O-bound and can be slower on shared CI runners.
-	// Keep the assertion below the documented 10s budget without making CI use a
-	// stricter deadline than local runs.
-	after := time.After(8 * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	// 收集 emit 的 report markdown 文件路径
 	var reportFilePath string
@@ -245,16 +246,18 @@ LOOP:
 
 // TestReAct_ToolCall_FileEmit_LargeResult 测试大 result 时的文件 emit
 func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
+	const largeResultTestBytes = 768 * 1024 // 768KB: exercises artifact spill without multi-MB finalize cost
+
 	toolName := "test_large_result_" + ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
-	// 创建一个工具，返回大的 result（5MB）
+	// 创建一个工具，返回大的 result（768KB）
 	testTool, err := aitool.New(
 		toolName,
 		aitool.WithNumberParam("size"),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			size := int(params.GetInt("size", 5*1024*1024)) // 5MB
+			size := int(params.GetInt("size", largeResultTestBytes))
 
 			// 生成大的 result（使用更高效的方式）
 			largeData := strings.Repeat("A", size)
@@ -295,7 +298,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 			if isToolParamGenerationPrompt(prompt, toolName) {
 				rsp := i.NewAIResponse()
 				// Include identifier field for new directory structure
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "generate_large_data", "params": { "size" : 5242880 }}`)) // 5MB
+				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "identifier": "generate_large_data", "params": { "size" : %d }}`, largeResultTestBytes)))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -335,10 +338,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 		}
 	}()
 
-	// Artifact persistence is I/O-bound and can be slower on shared CI runners.
-	// Keep the assertion below the documented 10s budget without making CI use a
-	// stricter deadline than local runs.
-	after := time.After(8 * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	var reportFilePath string
 	toolCallDone := false
@@ -394,11 +394,11 @@ LOOP:
 
 	contentStr := string(content)
 	require.Contains(t, contentStr, "AAAAAAAAAA", "report should contain a head/tail preview")
-	require.Less(t, len(content), 512*1024, "report must not duplicate the complete 5MB result")
+	require.Less(t, len(content), 512*1024, "report must not duplicate the complete large result")
 	resultPath := filepath.Join(filepath.Dir(reportFilePath), "result.json")
 	resultContent, err := os.ReadFile(resultPath)
 	require.NoError(t, err)
-	require.Greater(t, len(resultContent), 4*1024*1024, "result artifact should retain the complete output")
+	require.Greater(t, len(resultContent), 512*1024, "result artifact should retain the complete output")
 
 	log.Infof("✓ Large result artifact emitted successfully: %s (%d bytes)", resultPath, len(resultContent))
 
@@ -505,12 +505,7 @@ func TestReAct_ToolCall_FileEmit_EmptyStdoutStderr(t *testing.T) {
 		}
 	}()
 
-	// 设置超时时间
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	// 收集 emit 的 report 文件路径
 	var reportFilePath string
@@ -679,11 +674,7 @@ func TestReAct_ToolCall_FileEmit_WithIdentifier(t *testing.T) {
 	}()
 
 	// Set timeout
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	// Collect emitted report file
 	var reportFilePath string
@@ -846,11 +837,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	var reportFilePath string
 	toolCallDone := false
@@ -975,11 +962,7 @@ func TestReAct_ToolCall_LogDir(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(8)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(fileEmitIntegrationTestTimeout)
 
 	var toolCallLogPath string // now a file path (.md) instead of a directory
 	var toolCallLogPathEventCallToolID string

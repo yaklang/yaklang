@@ -27,6 +27,11 @@ const (
 	toolOutputSnapshotMaxBytes = 128 * 1024
 	toolUIStreamHeadBytes      = 12 * 1024
 	toolUIStreamTailBytes      = 4 * 1024
+	// Bodies larger than this are byte-truncated before ytoken.Encode in shrinkBodyWithStats.
+	shrinkBodyPreTruncateBytes = 512 * 1024
+	// fileStats fully tokenizes only files up to this size; larger files use head/tail sampling.
+	fileStatsFullTokenizeLimit = 256 * 1024
+	fileStatsTokenSampleBytes  = 64 * 1024
 )
 
 type boundedToolUIWriter struct {
@@ -384,7 +389,7 @@ func fileStats(path string) artifactFileStats {
 	}
 	h := sha256.Sum256(data)
 	st.Bytes = int64(len(data))
-	st.Tokens = ytoken.CalcTokenCount(string(data))
+	st.Tokens = tokenCountForArtifactStats(data)
 	st.Lines = int64(bytes.Count(data, []byte{'\n'}))
 	if len(data) > 0 && data[len(data)-1] != '\n' {
 		st.Lines++
@@ -392,6 +397,53 @@ func fileStats(path string) artifactFileStats {
 	st.SHA256 = hex.EncodeToString(h[:])
 	st.Persistent = true
 	return st
+}
+
+// tokenCountForArtifactStats returns an exact count for small files and a
+// head/tail extrapolation for large artifacts so manifest generation does not
+// tokenize multi-MB payloads synchronously.
+func tokenCountForArtifactStats(data []byte) int {
+	if len(data) == 0 {
+		return 0
+	}
+	if len(data) <= fileStatsFullTokenizeLimit {
+		return ytoken.CalcTokenCount(string(data))
+	}
+	sample := fileStatsTokenSampleBytes
+	if sample*2 > len(data) {
+		sample = len(data) / 2
+	}
+	if sample <= 0 {
+		return ytoken.CalcTokenCount(string(data))
+	}
+	headTokens := ytoken.CalcTokenCount(string(data[:sample]))
+	tailTokens := ytoken.CalcTokenCount(string(data[len(data)-sample:]))
+	avg := float64(headTokens+tailTokens) / float64(sample*2)
+	estimate := int(avg * float64(len(data)))
+	if estimate < headTokens+tailTokens {
+		return headTokens + tailTokens
+	}
+	return estimate
+}
+
+func preTruncateBodyForTokenShrink(body string, maxBytes int) string {
+	if maxBytes <= 0 || len(body) <= maxBytes {
+		return body
+	}
+	headBytes := maxBytes / 2
+	tailBytes := maxBytes - headBytes
+	if headBytes <= 0 || tailBytes <= 0 {
+		return body[:maxBytes]
+	}
+	omitted := len(body) - headBytes - tailBytes
+	marker := fmt.Sprintf("\n\n... [preview truncated %d bytes from the middle before token shrink] ...\n\n", omitted)
+	if len(marker) >= maxBytes {
+		return body[:maxBytes]
+	}
+	remaining := maxBytes - len(marker)
+	headBytes = remaining / 2
+	tailBytes = remaining - headBytes
+	return body[:headBytes] + marker + body[len(body)-tailBytes:]
 }
 
 func toolArtifactHint(b *toolCallArtifactBundle, persistErr error) string {
@@ -411,6 +463,9 @@ Do not load or cat the complete artifact unless necessary.`, b.combinedPath, b.s
 func shrinkBodyWithStats(body string, budget int) string {
 	if budget <= 0 {
 		return ""
+	}
+	if len(body) > shrinkBodyPreTruncateBytes {
+		body = preTruncateBodyForTokenShrink(body, shrinkBodyPreTruncateBytes)
 	}
 	tokens := ytoken.Encode(body)
 	if len(tokens) <= budget {

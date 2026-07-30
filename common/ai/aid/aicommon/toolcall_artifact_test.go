@@ -410,3 +410,22 @@ func BenchmarkNormalizeToolResultData200KTokens(b *testing.B) {
 		normalizeToolResultData(toolResult, combined, result, "HINT:\n/tmp/artifact")
 	}
 }
+
+func TestTokenCountForArtifactStats_LargeFileUsesEstimate(t *testing.T) {
+	small := []byte(strings.Repeat("alpha beta ", 1000))
+	large := []byte(strings.Repeat("A", 512*1024))
+
+	exact := tokenCountForArtifactStats(small)
+	require.Greater(t, exact, 0)
+	require.Equal(t, ytoken.CalcTokenCount(string(small)), exact)
+
+	estimate := tokenCountForArtifactStats(large)
+	require.Greater(t, estimate, ytoken.CalcTokenCount(string(large[:fileStatsTokenSampleBytes])))
+}
+
+func TestShrinkBodyWithStats_LargeBodyStaysWithinBudget(t *testing.T) {
+	body := "COMBINED OUTPUT:\n" + strings.Repeat("line-0123456789\n", 200000) + "\nRESULT:\n" + strings.Repeat("A", 1024*1024)
+	out := shrinkBodyWithStats(body, 4096)
+	require.LessOrEqual(t, ytoken.CalcTokenCount(out), 4096+256)
+	require.Contains(t, out, "truncated")
+}
