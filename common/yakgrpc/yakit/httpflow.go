@@ -1197,6 +1197,7 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 	if req.GetDeleteAll() {
 		if err := schema.DropRecreateTable(db, &schema.HTTPFlow{}); err != nil {
 			log.Errorf("drop recreate http_flows failed: %s", err)
+			return err
 		}
 		DeleteProjectKeyBareRequestAndResponse(db)
 		return nil

@@ -134,3 +134,34 @@ func TestProjectDatabaseBindingGenerationChangesOnRebind(t *testing.T) {
 		t.Fatalf("unexpected second binding: first=%#v second=%#v", first, second)
 	}
 }
+
+func TestAdvanceProjectDatabaseGenerationKeepsHandlesAndRejectsStaleCaller(t *testing.T) {
+	resetYakitDatabaseForBindTest(t)
+
+	projectPath := filepath.Join(t.TempDir(), "project.db")
+	projectDB, err := CreateProjectDatabase(projectPath)
+	if err != nil {
+		t.Fatalf("create project db: %v", err)
+	}
+	BindProjectDatabase(projectDB, projectPath)
+	first := CaptureProjectDatabaseBinding()
+
+	second, advanced := AdvanceProjectDatabaseGeneration(first.Generation)
+	if !advanced {
+		t.Fatal("expected current generation to advance")
+	}
+	if second.Database != first.Database || second.ReadDatabase != first.ReadDatabase || second.Path != first.Path {
+		t.Fatalf("advancing generation changed database handles: first=%#v second=%#v", first, second)
+	}
+	if second.Generation <= first.Generation {
+		t.Fatalf("generation did not advance: first=%d second=%d", first.Generation, second.Generation)
+	}
+
+	current, advanced := AdvanceProjectDatabaseGeneration(first.Generation)
+	if advanced {
+		t.Fatal("stale generation unexpectedly advanced the current project")
+	}
+	if current.Generation != second.Generation {
+		t.Fatalf("stale caller changed generation: current=%d want=%d", current.Generation, second.Generation)
+	}
+}

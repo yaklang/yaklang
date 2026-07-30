@@ -11,8 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -267,6 +267,34 @@ func CaptureProjectDatabaseBinding() ProjectDatabaseBinding {
 		return *binding
 	}
 	return publishProjectDatabaseBinding(projectDataBase, nil, currentProjectDatabasePath, false)
+}
+
+// AdvanceProjectDatabaseGeneration marks the current project database as a new
+// logical incarnation without reopening its handles. Destructive table
+// recreation uses this so cursors and process-local streams from the previous
+// incarnation cannot hide rows whose SQLite IDs started over.
+//
+// The expected generation makes the operation conditional: if a project switch
+// raced with the caller, the new project binding is left untouched.
+func AdvanceProjectDatabaseGeneration(expectedGeneration uint64) (ProjectDatabaseBinding, bool) {
+	for {
+		current := projectDatabaseBinding.Load()
+		if current == nil || current.Database == nil || current.Generation != expectedGeneration {
+			if current == nil {
+				return ProjectDatabaseBinding{}, false
+			}
+			return *current, false
+		}
+		next := &ProjectDatabaseBinding{
+			Database:     current.Database,
+			ReadDatabase: current.ReadDatabase,
+			Path:         current.Path,
+			Generation:   projectDatabaseGeneration.Add(1),
+		}
+		if projectDatabaseBinding.CompareAndSwap(current, next) {
+			return *next, true
+		}
+	}
 }
 
 // GetCurrentProfileDatabasePath 返回当前 profile SQLite 数据库文件路径；仅在慢 SQL 等使用 profile DB 的创建处调用

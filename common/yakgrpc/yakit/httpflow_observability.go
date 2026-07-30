@@ -193,6 +193,31 @@ func updateHTTPFlowHighWater(databaseIdentity string, projectGeneration uint64, 
 	update(&slot.value)
 }
 
+func resetHTTPFlowObservabilityProject(databaseIdentity string, projectGeneration uint64) {
+	if databaseIdentity == "" || projectGeneration == 0 {
+		return
+	}
+	for index := range httpFlowTimingSlots {
+		slot := &httpFlowTimingSlots[index]
+		slot.mu.Lock()
+		if slot.valid && slot.value.DatabaseIdentity == databaseIdentity &&
+			slot.value.ProjectGeneration == projectGeneration {
+			slot.value = HTTPFlowPersistTiming{}
+			slot.valid = false
+		}
+		slot.mu.Unlock()
+	}
+
+	slot := &httpFlowHighWaterSlots[httpFlowHighWaterSlot(databaseIdentity, projectGeneration)]
+	slot.mu.Lock()
+	if slot.valid && slot.value.DatabaseIdentity == databaseIdentity &&
+		slot.value.ProjectGeneration == projectGeneration {
+		slot.value = HTTPFlowPipelineHighWater{}
+		slot.valid = false
+	}
+	slot.mu.Unlock()
+}
+
 func httpFlowHighWaterSlot(databaseIdentity string, projectGeneration uint64) uint32 {
 	// FNV-1a is sufficient here: DatabaseIdentity is already a SHA-256-derived
 	// opaque value and collisions only evict diagnostics, never HTTP flow data.

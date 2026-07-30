@@ -132,6 +132,39 @@ func TestHTTPFlowLiveBrokerSignalsSlowConsumerInsteadOfDroppingSilently(t *testi
 	}
 }
 
+func TestHTTPFlowLiveBrokerResetProjectAllowsLowerIDs(t *testing.T) {
+	broker := newHTTPFlowLiveBroker(8, 8)
+	identity := "project-reset"
+	const generation = uint64(13)
+
+	_, ok := broker.publishCommitted(httpFlowLiveTestFlow(900, identity, generation))
+	require.True(t, ok)
+	subscription, replay, gap := broker.subscribe(identity, generation, 0, 900)
+	require.Nil(t, gap)
+	require.Empty(t, replay)
+	require.NotNil(t, subscription)
+	t.Cleanup(subscription.Close)
+
+	require.True(t, broker.resetProject(identity, generation))
+	select {
+	case liveGap := <-subscription.Gaps():
+		require.Equal(t, HTTPFlowLiveGapCursorAhead, liveGap.Reason)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for reset gap")
+	}
+	require.Equal(t, HTTPFlowLiveState{OldestAvailableSequence: 1}, broker.snapshot(identity, generation))
+
+	record, ok := broker.publishCommitted(httpFlowLiveTestFlow(1, identity, generation))
+	require.True(t, ok)
+	require.Equal(t, uint64(1), record.Sequence)
+	require.Equal(t, uint64(1), record.HighWaterID)
+	require.Equal(t, HTTPFlowLiveState{
+		OldestAvailableSequence: 1,
+		LatestSequence:          1,
+		HighWaterID:             1,
+	}, broker.snapshot(identity, generation))
+}
+
 func TestHTTPFlowLiveBrokerEvictsProjectsWithExplicitGap(t *testing.T) {
 	broker := newHTTPFlowLiveBroker(4, 1)
 	subscription, _, gap := broker.subscribe("old-project", 1, 0, 0)

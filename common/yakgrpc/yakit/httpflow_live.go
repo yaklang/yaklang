@@ -174,6 +174,18 @@ func SnapshotHTTPFlowLive(databaseIdentity string, projectGeneration uint64) HTT
 	return globalHTTPFlowLiveBroker.snapshot(databaseIdentity, projectGeneration)
 }
 
+// ResetHTTPFlowRuntimeState invalidates process-local cursors for one database
+// incarnation after the HTTP flow table has been destructively recreated.
+// Existing subscribers receive an explicit gap and must bootstrap from the
+// database again; lower SQLite IDs can then start a fresh live sequence.
+func ResetHTTPFlowRuntimeState(databaseIdentity string, projectGeneration uint64) {
+	if databaseIdentity == "" || projectGeneration == 0 {
+		return
+	}
+	resetHTTPFlowObservabilityProject(databaseIdentity, projectGeneration)
+	globalHTTPFlowLiveBroker.resetProject(databaseIdentity, projectGeneration)
+}
+
 func (b *httpFlowLiveBroker) publishCommitted(flow *schema.HTTPFlow) (HTTPFlowLiveRecord, bool) {
 	if flow == nil || flow.ID == 0 || flow.SourceType != schema.HTTPFlow_SourceType_MITM || flow.RuntimeTiming == nil {
 		return HTTPFlowLiveRecord{}, false
@@ -305,6 +317,39 @@ func (b *httpFlowLiveBroker) snapshot(databaseIdentity string, projectGeneration
 		}
 	}
 	return HTTPFlowLiveState{}
+}
+
+func (b *httpFlowLiveBroker) resetProject(databaseIdentity string, projectGeneration uint64) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for index, project := range b.projects {
+		if project == nil || project.databaseIdentity != databaseIdentity ||
+			project.projectGeneration != projectGeneration {
+			continue
+		}
+		for subscriber := range project.subscribers {
+			if subscriber.gapped {
+				continue
+			}
+			subscriber.gapped = true
+			b.signalGapLocked(subscriber, HTTPFlowLiveGap{
+				Reason:                  HTTPFlowLiveGapCursorAhead,
+				RequestedSequence:       project.nextSequence,
+				OldestAvailableSequence: project.oldestAvailableSequence(),
+				LatestSequence:          project.nextSequence,
+			})
+		}
+		b.clock++
+		b.projects[index] = &httpFlowLiveProject{
+			databaseIdentity:  databaseIdentity,
+			projectGeneration: projectGeneration,
+			lastUsed:          b.clock,
+			events:            make([]HTTPFlowLiveRecord, 0, b.replayCapacity),
+			subscribers:       make(map[*httpFlowLiveSubscriber]struct{}),
+		}
+		return true
+	}
+	return false
 }
 
 func (b *httpFlowLiveBroker) projectLocked(databaseIdentity string, projectGeneration uint64) *httpFlowLiveProject {

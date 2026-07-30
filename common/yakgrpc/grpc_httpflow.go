@@ -40,6 +40,17 @@ import (
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {
 	db := s.GetProjectDatabase()
+	usesGlobalProjectDatabase := s == nil || s.projectDatabase == nil
+	var projectBinding consts.ProjectDatabaseBinding
+	if usesGlobalProjectDatabase {
+		// Keep the handle and generation coherent if a project switch races
+		// with DeleteAll. Test servers with a private database must not rotate
+		// the unrelated process-global project binding.
+		projectBinding = consts.CaptureProjectDatabaseBinding()
+		if projectBinding.Database != nil {
+			db = projectBinding.Database
+		}
+	}
 	if !r.GetDeleteAll() {
 		var (
 			websocketHash []string
@@ -85,9 +96,18 @@ func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowReque
 		yakit.DropExtractedDataTable(db)
 		model.DropHTTPFlowCacheGRPCModelByFlow()
 	}
-	err := yakit.DeleteHTTPFlow(s.GetProjectDatabase(), r)
+	err := yakit.DeleteHTTPFlow(db, r)
 	if err != nil {
 		log.Error(err)
+	} else if r.GetDeleteAll() && usesGlobalProjectDatabase {
+		// DropRecreateTable resets SQLite IDs. Rotate the logical database
+		// generation before invalidating the old stream so a concurrent frontend
+		// bootstrap can never pair lower IDs with the previous generation.
+		_, _ = consts.AdvanceProjectDatabaseGeneration(projectBinding.Generation)
+		yakit.ResetHTTPFlowRuntimeState(
+			yakit.HTTPFlowDatabaseIdentity(projectBinding.Path),
+			projectBinding.Generation,
+		)
 	}
 	return &ypb.Empty{}, nil
 }

@@ -1390,3 +1390,9 @@ heap `2026-07-29T03-14-04-256Z -> 2026-07-29T03-47-31-376Z` 中旧 `quoteHTTPPac
 完整 lowhttp（`186.652 s`）、完整 yakit（`68.573 s`）、聚焦 minimartian/yakit、quote 并发 race、response borrowed race 和 yakgrpc 全包编译检查均通过。所有专用 Go cache 已清到约 12 KiB，全局 Go build cache 从本轮峰值约 3.9 GiB 主动清到约 768 KiB；E2E build/tmp 与 Electron/Yak/WDIO/chromedriver 无残留，受管 Yak 二进制缓存约 1.5 GiB，磁盘可用约 838 GiB。这些仍不能覆盖历史 290 GiB 事故。
 
 至此，当前 profile 中两个经确认可兼容处理的大头已经完成：避免的 grow copy 与 quoted TEXT 输出分配均有微基准、heap caller、race、数据库/proto 兼容和 3 次产品门禁证据。剩余 grow 主要是网络首次物化，继续删除需要改变 packet/body ownership 或协议行为，不再作为本轮低风险优化继续追逐；MITM 性能专项可在此阶段性收口。
+
+## 55. 第八十七轮：清库 generation 与实时游标一致性（2026-07-30）
+
+产品回归发现 HTTPFlow DeleteAll 通过 Drop/Recreate 复用自增 ID 后，前端旧 `AfterId` 和后端 live broker/high-water 仍属于清库前的逻辑数据集，可能永久过滤 ID 较小的新流量。修复在 DeleteAll 成功后原子推进项目数据库的逻辑 generation，并清理旧 generation 的 live broker、observability timing 与 high-water；旧订阅收到明确 GAP 后按新 generation 重建查询。Drop/Recreate 失败现在会返回到底层删除调用，gRPC 不再继续旋转运行态。
+
+该边界不修改 proto、数据库 schema、表结构、历史行格式或项目文件路径；现有 reader/writer handle 保持不变，仅更换进程内逻辑 incarnation。测试覆盖 generation CAS、句柄保持、旧调用拒绝、broker 允许较小 ID 重新开始，以及复用 ID 时 timing/high-water 不串代。`common/consts`、`common/yakgrpc/yakit` 定向测试和 `common/yakgrpc` 全包编译检查通过；所有验证使用独立限量 Go cache，结束后已清理。

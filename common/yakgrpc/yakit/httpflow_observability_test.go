@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -103,6 +103,37 @@ func TestHTTPFlowObservabilityDoesNotCountPluginFlowInMITMHighWater(t *testing.T
 	require.Equal(t, uint64(7), SnapshotHTTPFlowPipelineHighWater(databaseIdentity, projectGeneration).LatestPersistedID)
 	_, ok := GetHTTPFlowPersistTiming(databaseIdentity, projectGeneration, 99)
 	require.True(t, ok, "the bounded registry may diagnose non-table V2 flows without inflating MITM backlog")
+}
+
+func TestResetHTTPFlowRuntimeStateClearsReusedIDTimingAndHighWater(t *testing.T) {
+	resetHTTPFlowObservabilityForTest()
+	resetHTTPFlowLiveBrokerForTest()
+	t.Cleanup(resetHTTPFlowObservabilityForTest)
+	t.Cleanup(resetHTTPFlowLiveBrokerForTest)
+
+	databaseIdentity := HTTPFlowDatabaseIdentity("reset-project.db")
+	const projectGeneration = uint64(3)
+	oldFlow := httpFlowLiveTestFlow(900, databaseIdentity, projectGeneration)
+	RecordHTTPFlowPersisted(oldFlow)
+	_, ok := PublishHTTPFlowLiveCommitted(oldFlow)
+	require.True(t, ok)
+
+	ResetHTTPFlowRuntimeState(databaseIdentity, projectGeneration)
+	require.Zero(t, SnapshotHTTPFlowPipelineHighWater(databaseIdentity, projectGeneration).LatestPersistedID)
+	require.Equal(
+		t,
+		HTTPFlowLiveState{OldestAvailableSequence: 1},
+		SnapshotHTTPFlowLive(databaseIdentity, projectGeneration),
+	)
+	_, ok = GetHTTPFlowPersistTiming(databaseIdentity, projectGeneration, 900)
+	require.False(t, ok)
+
+	newFlow := httpFlowLiveTestFlow(1, databaseIdentity, projectGeneration)
+	RecordHTTPFlowPersisted(newFlow)
+	_, ok = PublishHTTPFlowLiveCommitted(newFlow)
+	require.True(t, ok)
+	require.Equal(t, uint64(1), SnapshotHTTPFlowPipelineHighWater(databaseIdentity, projectGeneration).LatestPersistedID)
+	require.Equal(t, uint64(1), SnapshotHTTPFlowLive(databaseIdentity, projectGeneration).HighWaterID)
 }
 
 func TestInsertHTTPFlowRecordsPersistStagesWithoutChangingSchema(t *testing.T) {
