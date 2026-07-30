@@ -229,12 +229,13 @@ type ToolCaller struct {
 	done            *sync.Once
 	callToolId      string
 	startTime       time.Time // Track tool call start time
-	reason          string    // human-readable reason for this tool call, emitted with the start card
-	reasonFinalized bool      // when true, the thinking stream should not overwrite the reason
+	reason          string    // human-readable reason for this tool call (preset / action / liteforge-generated)
+	reasonFinalized bool      // ONLY for the thinking stream: when true, SetOnReasonChunk should not emit (a concrete reason already exists)
+	reasonGen       bool      // liteforge reason generation has run for this tool call (at most once; reset by review)
 
 	// invokeRuntime is an optional AIInvokeRuntime used to (re)generate a
 	// human-readable reason via a lightweight (speed-priority) lite forge when
-	// no reason was preset (emitStart) or when review changed the tool/params.
+	// no reason was preset or when review changed the tool/params.
 	// nil in paths without a runtime (e.g. AiTask.callTool) → graceful no-op.
 	invokeRuntime AIInvokeRuntime
 
@@ -310,10 +311,9 @@ func WithToolCaller_OmitResultParamsInTimeline() ToolCallerOption {
 }
 
 // WithToolCaller_Reason sets the human-readable reason for this tool call. The
-// reason is emitted via EmitToolCallReason alongside the start card so the
-// frontend can show why the tool is being invoked. EmitToolCallReason may be
-// called again later (e.g. with the AI's thinking during param generation) to
-// update the reason on the card.
+// reason is emitted from the unified reason-handling point in
+// CallToolWithExistedParams. reasonFinalized is set so the param-generation
+// thinking stream won't overwrite this concrete reason.
 func WithToolCaller_Reason(reason string) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reason = reason
@@ -616,11 +616,11 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 	return t.CallToolWithExistedParams(tool, false, make(aitool.InvokeParams))
 }
 
-// emitStart records the start time, binds the emitter via onCallToolStart, and
-// emits EmitToolCallStart (the tool-call card) — and EmitToolCallReason when a
-// reason was preset via WithToolCaller_Reason. It is invoked through t.start
-// (a sync.Once) so the card is emitted exactly once even when the caller triggers
-// start early (e.g. DirectlyCallTool) and CallToolWithExistedParams runs later.
+// emitStart emits the tool-call START event (the loading card) exactly once,
+// guarded by t.start (sync.Once). It ONLY emits the start event — reason
+// emission and liteforge generation are handled in one place by
+// CallToolWithExistedParams (via emitReason / generateReasonIfNeeded), so both
+// the normal require path and the direct-call path share the same reason logic.
 func (t *ToolCaller) emitStart(tool *aitool.Tool) {
 	t.m.Lock()
 	defer t.m.Unlock()
@@ -630,21 +630,69 @@ func (t *ToolCaller) emitStart(tool *aitool.Tool) {
 	}
 	// should emit after call tool start callback, this call will bind call tool id for emitter
 	t.emitter.EmitToolCallStart(t.callToolId, tool, t.startTime)
-	if t.reason != "" {
-		t.emitter.EmitToolCallReason(t.callToolId, t.reason)
-	} else if t.invokeRuntime != nil && !utils.IsNil(t.invokeRuntime) {
-		// No preset reason: ask the lightweight model for a one-line reason so
-		// the card isn't blank. Run async so emitStart (and the require path's
-		// param generation right after) isn't blocked on the model call. The
-		// goroutine does not take t.m, so the lock held here is safe.
-		toolRef := tool
-		go func() {
-			defer func() { _ = recover() }()
-			if reason := t.generateReasonByLiteForge(t.ctx, toolRef, nil); reason != "" {
-				t.emitter.EmitToolCallReason(t.callToolId, reason)
-				t.reasonFinalized = true
-			}
-		}()
+}
+
+// emitReason emits a concrete reason string on the tool-call card and marks the
+// reason as finalized so the param-generation thinking stream won't overwrite it.
+func (t *ToolCaller) emitReason(reason string) {
+	if strings.TrimSpace(reason) == "" {
+		return
+	}
+	t.m.Lock()
+	t.reasonFinalized = true
+	t.m.Unlock()
+	if t.emitter != nil {
+		t.emitter.EmitToolCallReason(t.callToolId, reason)
+	}
+}
+
+// resetReasonForReview clears the reason state so the recursive CallTool
+// (after review changed the tool or params) may generate a fresh reason once
+// more from the unified reason-handling point. This is the only legitimate
+// case for regenerating a reason. reasonFinalized is reset only so the thinking
+// stream is allowed to emit again until a new concrete reason is set.
+func (t *ToolCaller) resetReasonForReview() {
+	t.m.Lock()
+	defer t.m.Unlock()
+	t.reason = ""
+	t.reasonFinalized = false
+	t.reasonGen = false
+}
+
+// generateReasonIfNeeded generates a reason via the speed-priority liteforge AT
+// MOST ONCE per tool call (guarded by t.reasonGen). It is a no-op when a reason
+// is already present (preset / action-stashed) or no invokeRuntime is configured.
+// reasonFinalized is NOT used as a guard here — its only job is to tell the
+// param-generation thinking stream (SetOnReasonChunk) not to overwrite an already
+// emitted concrete reason. Call this from the single reason-handling point in
+// CallToolWithExistedParams; review resets the state before recursing so it may
+// run once more.
+func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.InvokeParams) {
+	if func() bool {
+		t.m.Lock()
+		defer t.m.Unlock()
+		// already have a concrete reason, or liteforge already ran once
+		if strings.TrimSpace(t.reason) != "" || t.reasonGen {
+			return true
+		}
+		t.reasonGen = true
+		return false
+	}() {
+		return
+	}
+	if t.invokeRuntime == nil || utils.IsNil(t.invokeRuntime) || tool == nil {
+		return
+	}
+	reason := t.generateReasonByLiteForge(t.ctx, tool, params)
+	if strings.TrimSpace(reason) == "" {
+		return
+	}
+	t.m.Lock()
+	t.reason = reason
+	t.reasonFinalized = true // concrete reason now exists; thinking stream should not overwrite
+	t.m.Unlock()
+	if t.emitter != nil {
+		t.emitter.EmitToolCallReason(t.callToolId, reason)
 	}
 }
 
@@ -675,18 +723,23 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 	}
 
 	// 1. emit start card first (loading). sync.Once guards the later CallToolWithExistedParams.
+	//    Only the start event is emitted here; reason is handled in the single
+	//    reason-handling point inside CallToolWithExistedParams, shared by both
+	//    the direct-call and normal require paths.
 	t.start.Do(func() { t.emitStart(nominalTool) })
 
-	// 2. read reason from the streaming action (blocks until reason streams in),
-	//    fallback to human_readable_thought, emit as a separate event so the card
-	//    is never blocked on reason parsing.
-	if action != nil {
+	// 2. stash the action's reason (if any) into t.reason so the unified
+	//    reason handler in CallToolWithExistedParams can emit it. We do NOT emit
+	//    here — that path is the single source of truth for reason events.
+	//    reasonFinalized is set so the param-generation thinking stream won't
+	//    overwrite this concrete reason.
+	if action != nil && strings.TrimSpace(t.reason) == "" {
 		reason := action.GetString("directly_call_reason")
 		if strings.TrimSpace(reason) == "" {
 			reason = action.GetString("human_readable_thought")
 		}
 		if strings.TrimSpace(reason) != "" {
-			t.emitter.EmitToolCallReason(t.callToolId, reason)
+			t.reason = reason
 			t.reasonFinalized = true
 		}
 	}
@@ -1029,6 +1082,19 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	defer t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
 
 	t.start.Do(func() { t.emitStart(tool) })
+
+	// === unified reason handling (single source of truth) ===
+	// Both the normal require path and DirectlyCallTool converge here. Priority:
+	//   1. preset reason (WithToolCaller_Reason) or action-stashed reason
+	//   2. liteforge-generated reason (at most once per tool call)
+	// Emit the concrete reason if present, otherwise generate one. The
+	// param-generation thinking stream may still update the card afterwards, but
+	// only while reasonFinalized is false.
+	if strings.TrimSpace(t.reason) != "" {
+		t.emitReason(t.reason)
+	} else {
+		t.generateReasonIfNeeded(tool, nil)
+	}
 
 	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
 	// pluginInvokeStartTime: 纯插件执行起点（从真正进入 t.invoke 前开始计时）。
