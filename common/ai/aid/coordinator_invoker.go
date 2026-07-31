@@ -123,22 +123,6 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 								return
 							}
 						}
-
-						if isDone && !task.IsAsyncMode() {
-							searchResult, err := c.MemoryTriage.SearchMemory(task.GetUserInput(), 4096)
-							if err != nil {
-								log.Warnf("memory search for completed task failed: %v", err)
-								return
-							}
-							if len(searchResult.Memories) > 0 {
-								log.Infof("found %d relevant memories for completed task %s (total: %d tokens)", len(searchResult.Memories), task.GetId(), searchResult.ContentTokens)
-								if c.DebugEvent {
-									log.Infof("memory search summary: %s", searchResult.SearchSummary)
-								}
-							} else if c.DebugEvent {
-								log.Infof("no relevant memories found for completed task %s", task.GetId())
-							}
-						}
 					}()
 				})
 			})

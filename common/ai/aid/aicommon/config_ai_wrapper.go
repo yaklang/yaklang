@@ -83,9 +83,12 @@ func (c *Config) finalizeTierConsumption(tier consts.ModelTier, estimatedInputTo
 	if c == nil || rsp == nil {
 		return metrics
 	}
+	// InputTokens (PromptTokens) includes cached tokens; subtract them so
+	// the recorded input consumption reflects non-cached input only.
+	inputTokens := metrics.InputTokens - metrics.CacheHitTokens
 	c.AddTierConsumption(
 		tier,
-		metrics.InputTokens,
+		inputTokens,
 		metrics.OutputTokens,
 	)
 	if metrics.CacheHitTokens > 0 {

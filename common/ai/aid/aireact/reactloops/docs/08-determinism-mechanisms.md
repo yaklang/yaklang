@@ -65,7 +65,6 @@ type PerceptionState struct {
 | 常量 | 含义 | 触发时机 |
 |------|------|----------|
 | `PerceptionTriggerPostAction` | action 完成后 | 每轮主循环 |
-| `PerceptionTriggerVerification` | 验证后 | `MaybeTriggerPerceptionAfterVerification` |
 | `PerceptionTriggerForced` | 主动强制 | `ForcePerceptionUpdate` |
 | `PerceptionTriggerSpinDetected` | 检测到自旋 | spin_detection 协同 |
 | `PerceptionTriggerLoopSwitch` | 子 loop 切换 | 跨 loop 时重置 |
