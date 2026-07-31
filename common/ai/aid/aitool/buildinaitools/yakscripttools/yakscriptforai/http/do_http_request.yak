@@ -518,6 +518,87 @@ if err != nil {
 rsp = rspIns.RawPacket
 req = rspIns.RawRequest
 
+// --- form-encoded 兜底重试 ---
+// 现场问题: AI 对登录/表单类接口习惯发 application/json, 但很多服务端只收
+// application/x-www-form-urlencoded (见 redhaze login.js: URLSearchParams + form),
+// 导致明明带了字段却收到 400 "xxx and password are required" / "invalid request body",
+// AI 误以为是字段名错了而死磕 (run-2/run-3 各 9 次, 漏掉 SQLi 认证绕过).
+// 这里兜底: 当 POST + JSON body + 400 + 响应像"字段必填/invalid body" 时, 自动把 JSON
+// body 转成 form-encoded 重发一次, 并明确提示 AI "JSON 被拒, 已用 form 重试".
+// 关键词: do_http_request form 重试, content-type 不匹配, application/x-www-form-urlencoded
+tryFormRetryOnJsonRejected = func() {
+    // 只对 POST + URL 模式 + 用了 body 的情况生效.
+    if packet != "" {
+        return false
+    }
+    if str.ToUpper(method) != "POST" {
+        return false
+    }
+    if body == "" {
+        return false
+    }
+    // 原始请求必须是 JSON (AI 主动带了 application/json).
+    ct = str.ToLower(str.TrimSpace(contentType))
+    if !str.Contains(ct, "json") {
+        return false
+    }
+    // 响应必须是 400.
+    statusCode = poc.GetStatusCodeFromResponse(rsp)
+    if statusCode != 400 {
+        return false
+    }
+    // 响应体像"字段必填 / invalid body"这类典型的 content-type/编码不匹配信号.
+    bodyLower = str.ToLower(poc.GetHTTPPacketBody(rsp))
+    isRejectedSignal = str.Contains(bodyLower, "required") || str.Contains(bodyLower, "invalid") || str.Contains(bodyLower, "missing")
+    if !isRejectedSignal {
+        return false
+    }
+    // 把 JSON body 转成 form-encoded: {"a":"b","c":"d"} -> a=b&c=d
+    // 不依赖 JSON 库: AI 发的登录 body 通常是扁平对象, 用字符串切分即可.
+    // 去掉外层大括号后按逗号切分, 每段按第一个冒号切 k/v, 去掉首尾引号.
+    inner = str.Trim(str.TrimSpace(body), "{}")
+    if inner == "" {
+        return false
+    }
+    pairs = []
+    for _, seg := range str.Split(inner, ",") {
+        kv = str.SplitN(seg, ":", 2)
+        if len(kv) == 2 {
+            fk = str.Trim(str.TrimSpace(kv[0]), "\"")
+            fv = str.Trim(str.TrimSpace(kv[1]), "\"")
+            if fk != "" {
+                pairs.Push(sprintf("%v=%v", codec.EscapeQueryUrl(fk), codec.EscapeQueryUrl(fv)))
+            }
+        }
+    }
+    if len(pairs) == 0 {
+        return false
+    }
+    formBody = str.Join(pairs, "&")
+
+    // 用同一份 rawPacket, 换 Content-Type 为 form, 换 body 为 formBody, 重新发送.
+    retryPacket = rawPacket
+    retryPacket = poc.ReplaceHTTPPacketHeader(retryPacket, "Content-Type", "application/x-www-form-urlencoded")
+    retryPacket = poc.ReplaceHTTPPacketBody(retryPacket, []byte(formBody))
+    retryRspIns, _, retryErr := poc.HTTPEx(retryPacket, opts...)
+    if retryErr != nil {
+        return false
+    }
+    // 只有当 form 重试后状态码不再是 400 时, 才认为重试"奏效" (服务端接受了 form),
+    // 此时把 req/rsp 替换成重试的版本, 并提示 AI.
+    retryStatusCode = poc.GetStatusCodeFromResponse(retryRspIns.RawPacket)
+    if retryStatusCode == 400 {
+        return false
+    }
+    yakit.Info("[content-type hint] JSON body was rejected with HTTP 400 (likely '%v'). Retried the SAME request as application/x-www-form-urlencoded and the server accepted it (now HTTP %v). => This endpoint expects FORM-ENCODED bodies, NOT JSON. For login/form endpoints like this, use post-params (or content-type=application/x-www-form-urlencoded) instead of a JSON body. The response being JSON does NOT mean the request should be JSON.", str.TrimSpace(poc.GetHTTPPacketBody(rsp)), retryStatusCode)
+    rspIns = retryRspIns
+    rsp = retryRspIns.RawPacket
+    req = retryRspIns.RawRequest
+    return true
+}
+
+tryFormRetryOnJsonRejected()
+
 // --- print request packet (only in verbose mode; default already printed a one-line summary above) ---
 reqSize = len(req)
 if verbose && reqSize > 0 {
@@ -610,6 +691,59 @@ if len(rsp) > 0 {
             } else {
                 yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", len(rsp), string(rsp[:10240]))
             }
+        }
+    }
+}
+
+// --- 表单接口探测提示 (治本) ---
+// 现场问题: AI 看到 JSON 响应就以为请求也该是 JSON, 但很多登录/表单接口其实是
+// form-encoded (见 redhaze login.js: URLSearchParams + application/x-www-form-urlencoded).
+// 当响应是 HTML 含 <form>/<input name=> 或 JS 用 URLSearchParams 提交时, 主动提示 AI
+// "这是表单接口, 字段是 X/Y, 用 form-encoded 而非 JSON", 从源头避免 AI 死磕 JSON.
+// 关键词: do_http_request 表单探测, form hint, URLSearchParams, 别用 JSON
+if method == "GET" || (method == "POST" && body == "") {
+    rspText = string(rsp)
+    rspLower = str.ToLower(rspText)
+    hasFormHtml = str.Contains(rspLower, "<form") && str.Contains(rspLower, " name=")
+    hasFormJs = str.Contains(rspText, "URLSearchParams") || str.Contains(rspText, "x-www-form-urlencoded")
+    if hasFormHtml || hasFormJs {
+        // 从响应里尽量提取 input 字段名, 帮 AI 直接拼请求.
+        fieldNames = []
+        for _, line := range str.Split(rspText, "\n") {
+            lineLower = str.ToLower(line)
+            if str.Contains(lineLower, "<input") {
+                // 提取 name="xxx" 或 name='xxx'
+                idx = str.Index(str.ToLower(line), "name=")
+                if idx > 0 {
+                    rest = str.TrimSpace(line[idx+5:])
+                    // 去掉引号
+                    rest = str.Trim(rest, "\"'")
+                    // 取到下一个空白/引号前
+                    for _, ch := range [" ", "\t", ">", "/", "\"", "'"] {
+                        ci = str.Index(rest, ch)
+                        if ci > 0 {
+                            rest = rest[:ci]
+                        }
+                    }
+                    if rest != "" && rest != "submit" && rest != "button" {
+                        fieldNames.Push(rest)
+                    }
+                }
+            }
+        }
+        // 去重
+        seen = {}
+        uniqueFields = []
+        for _, f := range fieldNames {
+            if !seen[f] {
+                seen[f] = true
+                uniqueFields.Push(f)
+            }
+        }
+        if len(uniqueFields) > 0 {
+            yakit.Info("[form-endpoint hint] This response contains an HTML <form> / form-submit JS. The likely login/form fields are: [%v]. Such form endpoints usually expect application/x-www-form-urlencoded (use post-params), NOT a JSON body — even when the API response is JSON. Verify the real encoding (e.g. via the page's JS) before sending.", str.Join(uniqueFields, ", "))
+        } else {
+            yakit.Info("[form-endpoint hint] This response contains form-submit JS (URLSearchParams / x-www-form-urlencoded). The endpoint likely expects FORM-ENCODED bodies, NOT JSON. Use post-params instead of a JSON body.")
         }
     }
 }

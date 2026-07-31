@@ -485,6 +485,39 @@ func TestDoHTTPRequest_QuietMode(t *testing.T) {
 	assert.Assert(t, !strings.Contains(stdout, "dns:"), "connection trace must NOT print when verbose is off")
 }
 
+// TestDoHTTPRequest_FormRetryOnJsonRejected reproduces the highest-impact field failure:
+// the AI POSTs a JSON body to a form-only login endpoint; the server replies 400
+// "emp_no and password are required" because it only parses application/x-www-form-urlencoded.
+// The tool must auto-retry the same request as form-encoded, surface a [content-type hint],
+// and report the accepted response (200 here) instead of leaving the AI stuck on 400.
+func TestDoHTTPRequest_FormRetryOnJsonRejected(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		reqStr := string(req)
+		// form-only endpoint: JSON body -> 400 required; form-encoded body -> 200
+		if strings.Contains(reqStr, "Content-Type: application/json") {
+			return []byte("HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n{\"message\":\"emp_no and password are required\"}")
+		}
+		if strings.Contains(reqStr, "Content-Type: application/x-www-form-urlencoded") && strings.Contains(reqStr, "emp_no=") {
+			return []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"message\":\"staff credential mismatch\"}")
+		}
+		return []byte("HTTP/1.1 400 Bad Request\r\n\r\n{\"message\":\"bad\"}")
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":          "http://" + host + ":" + strconv.Itoa(port) + "/api/login",
+		"method":       "POST",
+		"content-type": "application/json",
+		"body":         `{"emp_no":"EMP00001","password":"x"}`,
+		"timeout":      10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "content-type hint"), "should emit a content-type hint when JSON is rejected with a 'required' 400")
+	assert.Assert(t, strings.Contains(stdout, "x-www-form-urlencoded"), "hint should mention form-encoded")
+	assert.Assert(t, strings.Contains(stdout, "200 OK"), "should report the accepted form-retried response (200), not stay on 400")
+	assert.Assert(t, strings.Contains(stdout, "staff credential mismatch"), "should surface the form-retried response body")
+}
+
 func TestDoHTTPRequest_Timeout(t *testing.T) {
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {}

@@ -732,3 +732,69 @@ func TestBatchDoHTTPRequest_PrefixWithSlashPaths(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "/api/v2/admin"), "prefix should handle paths without leading slash")
 	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both prefixed requests should succeed")
 }
+
+// Test 32: AI passes "paths" as a JSON ARRAY.
+// The executor stringifies it to "[/p1 /p2]"; normalizePaths must split it back
+// into two real paths instead of treating the whole blob as one broken path.
+// Reproduces the field failure: "got array, want string".
+func TestBatchDoHTTPRequest_PathsAsArray(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("arr_path:" + r.URL.Path))
+	})
+
+	tool := getBatchDoHTTPRequestTool(t)
+	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      []string{"/arr_a", "/arr_b"},
+		"concurrent": 1,
+		"timeout":    10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 2"), "array-form paths should be split into 2")
+	assert.Assert(t, strings.Contains(stdout, "arr_path:/arr_a"), "first array path should be requested")
+	assert.Assert(t, strings.Contains(stdout, "arr_path:/arr_b"), "second array path should be requested")
+	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both array-form paths should succeed")
+}
+
+// Test 33: AI passes "headers" as a JSON OBJECT (regression for schema friction).
+func TestBatchDoHTTPRequest_HeadersAsObject(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if strings.Contains(string(req), "X-Obj-Header: obj-value-123") {
+			return []byte("HTTP/1.1 200 OK\r\n\r\nobj_header_ok")
+		}
+		return []byte("HTTP/1.1 200 OK\r\n\r\nobj_header_missing")
+	})
+
+	tool := getBatchDoHTTPRequestTool(t)
+	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/test",
+		"headers":    map[string]string{"X-Obj-Header": "obj-value-123"},
+		"concurrent": 1,
+		"timeout":    10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "obj_header_ok"), "object-form header should reach the server")
+}
+
+// Test 34: AI passes "query-params" as a JSON OBJECT.
+func TestBatchDoHTTPRequest_QueryParamsAsObject(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if strings.Contains(string(req), "objid=99") {
+			return []byte("HTTP/1.1 200 OK\r\n\r\nobj_param_ok")
+		}
+		return []byte("HTTP/1.1 200 OK\r\n\r\nobj_param_missing")
+	})
+
+	tool := getBatchDoHTTPRequestTool(t)
+	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
+		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
+		"paths":        "/search",
+		"query-params": map[string]string{"objid": "99"},
+		"concurrent":   1,
+		"timeout":      10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "obj_param_ok"), "object-form query param should reach the server")
+}

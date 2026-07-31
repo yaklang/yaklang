@@ -239,12 +239,12 @@ yakit.AutoInitYakit()
 // --- parse parameters ---
 // URL mode params
 baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
-pathsStr = cli.String("paths", cli.setHelp("paths to test, one per line; in Packet mode any query string inside a path must already be encoded"), cli.setRequired(false))
+pathsStr = cli.String("paths", cli.setHelp("paths to test, one per line; ALSO accepts a JSON array [\"/a\",\"/b\"]. In Packet mode any query string inside a path must already be encoded"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
-headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
+headers = cli.String("headers", cli.setHelp("custom headers, one per line: 'Key: Value'; ALSO accepts a JSON object {key:value} (AI may pass either)"), cli.setRequired(false))
 body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
 contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
-queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2; preferred for testing GET params across many paths"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("URL query params: 'k1=v1&k2=v2' string OR JSON object {k1:v1}; preferred for testing GET params across many paths"), cli.setRequired(false))
 prefix = cli.String("prefix", cli.setHelp("path prefix to prepend to all paths, e.g. /v1/ or /api/v2/"), cli.setRequired(false))
 curlHeaders = cli.StringSlice("H", cli.setHelp("curl-style headers, can be used multiple times: -H 'Content-Type: application/json' -H 'Authorization: Bearer token'"), cli.setRequired(false))
 
@@ -266,6 +266,92 @@ includeCode = cli.String("include-code", cli.setHelp("include only these status 
 excludeSize = cli.String("exclude-size", cli.setHelp("exclude content-length ranges"), cli.setRequired(false))
 maxBodySize = cli.Int("max-body-size", cli.setHelp("max response body size to display"), cli.setDefault(4096))
 cli.check()
+
+// --- 参数归一化 ---
+// AI 有时把 headers/query-params 传成 JSON 对象, 把 paths 传成 JSON 数组. 执行器
+// (yakscript_plugin_for_ai.go) 会用 fmt.Sprint 把非 bool 值转成字符串:
+//   - 对象 -> "map[k1:v1 k2:v2]" (Go map 字面量, 字母序排序)
+//   - 数组 -> "[/a /b /c]"       (Go slice 字面量, 空格分隔)
+// 这里把它们还原成工具原本接受的字符串写法, 与既有用法兼容.
+// 关键词: batch_do_http_request 参数归一化, paths 数组, headers/query-params 对象, fmt.Sprint
+normalizeMapLike = func(raw, pairSep, kvSep) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        out = []
+        for _, kv := range str.Split(inner, " ") {
+            kv = str.TrimSpace(kv)
+            if kv == "" {
+                continue
+            }
+            colonIdx = str.Index(kv, ":")
+            if colonIdx > 0 {
+                out.Push(sprintf("%v%v%v", str.TrimSpace(kv[:colonIdx]), kvSep, str.TrimSpace(kv[colonIdx+1:])))
+            } else {
+                out.Push(sprintf("%v%v", kv, kvSep))
+            }
+        }
+        return str.Join(out, pairSep)
+    }
+    return s
+}
+
+// headers 归一化: 接受 "Key: Value\n..." 或对象; 输出 "Key: Value\n..."
+normalizeHeaders = func(raw) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        out = []
+        for _, kv := range str.Split(inner, " ") {
+            kv = str.TrimSpace(kv)
+            if kv == "" {
+                continue
+            }
+            colonIdx = str.Index(kv, ":")
+            if colonIdx > 0 {
+                out.Push(sprintf("%v: %v", str.TrimSpace(kv[:colonIdx]), str.TrimSpace(kv[colonIdx+1:])))
+            }
+        }
+        return str.Join(out, "\n")
+    }
+    return s
+}
+
+// paths 归一化: 接受多行字符串或数组; 输出多行字符串.
+// 数组字面量形如 "[/a /b /c]" -> 每个元素一行.
+// 也容忍单行 "a b c" (少见, 但 AI 偶尔会把多路径塞进一个元素), 这里不强行拆, 保持原样.
+normalizePaths = func(raw) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[1:len(trimmed)-1])
+        out = []
+        for _, p := range str.Split(inner, " ") {
+            p = str.TrimSpace(p)
+            if p == "" {
+                continue
+            }
+            out.Push(p)
+        }
+        return str.Join(out, "\n")
+    }
+    return s
+}
+
+headers = normalizeHeaders(headers)
+queryParams = normalizeMapLike(queryParams, "&", "=")
+pathsStr = normalizePaths(pathsStr)
 
 // --- validation ---
 if packet == "" && baseUrl == "" && pathsStr == "" {
