@@ -182,6 +182,7 @@ type Config struct {
 	EventHandler           func(e *schema.AiOutputEvent)
 	DisableOutputEventType []string
 	SaveEvent              bool
+	ResultSink             ResultSink
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -1463,6 +1464,21 @@ func WithEmitter(emitter *Emitter) ConfigOption {
 		}
 		return nil
 	}
+}
+
+// WithResultSink installs a run-scoped structured-result backend.
+func WithResultSink(sink ResultSink) ConfigOption {
+	return func(c *Config) error {
+		c.ResultSink = sink
+		return nil
+	}
+}
+
+func (c *Config) GetResultSink() ResultSink {
+	if c == nil {
+		return nil
+	}
+	return c.ResultSink
 }
 
 // Event / output
@@ -4082,6 +4098,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.EventHandler != nil {
 		opts = append(opts, WithEventHandler(i.EventHandler))
+	}
+	if i.ResultSink != nil {
+		opts = append(opts, WithResultSink(i.ResultSink))
 	}
 
 	if i.GetUserUsageCallback() != nil {
