@@ -80,6 +80,15 @@ type statelessAIEngineRuntimeHandle struct {
 	newEngine func(opts ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error)
 }
 
+func (h *statelessAIEngineRuntimeHandle) activeTurnID() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.activeTurn == nil {
+		return ""
+	}
+	return h.activeTurn.turnID
+}
+
 func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessionInput) error {
 	if isInteractiveAISessionInput(input.InputType) {
 		handled, err := h.sendInterventionInput(input)
