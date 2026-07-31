@@ -3,6 +3,7 @@ package loop_infosec_recon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,12 +11,20 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+)
+
+const (
+	maxInlineReconAssetPayloadBytes = 60 * 1024
+	maxInlineReconAssetURLBytes     = 16 * 1024
+	maxInlineReconAssetSourceBytes  = 4 * 1024
+	maxInlineReconAssetErrorBytes   = 4 * 1024
 )
 
 // infosecRejectUnsafeArgv blocks control characters that must never appear in tool parameters.
@@ -524,6 +533,7 @@ func submitVerifiedAPIAssets(
 	}
 
 	submitted := 0
+	var submitErr error
 	for _, entry := range pool.Entries {
 		if !entry.Verified {
 			continue
@@ -536,9 +546,13 @@ func submitVerifiedAPIAssets(
 		if target == "" {
 			continue
 		}
-		payload, err := json.Marshal(entry)
+		payload, err := marshalVerifiedAPIAssetPayload(entry)
 		if err != nil {
-			return submitted, fmt.Errorf("marshal verified API endpoint %s %s: %w", method, target, err)
+			submitErr = errors.Join(
+				submitErr,
+				fmt.Errorf("marshal verified API endpoint %s %s: %w", method, target, err),
+			)
+			continue
 		}
 		identityKey := "http_endpoint:" + method + ":" + target
 		if _, err := sink.SubmitAsset(ctx, aicommon.AssetResult{
@@ -548,11 +562,83 @@ func submitVerifiedAPIAssets(
 			IdentityKey: identityKey,
 			Payload:     payload,
 		}); err != nil {
-			return submitted, fmt.Errorf("submit verified API endpoint %s %s: %w", method, target, err)
+			submitErr = errors.Join(
+				submitErr,
+				fmt.Errorf("submit verified API endpoint %s %s: %w", method, target, err),
+			)
+			continue
 		}
 		submitted++
 	}
-	return submitted, nil
+	return submitted, submitErr
+}
+
+func marshalVerifiedAPIAssetPayload(entry APIPoolEntry) ([]byte, error) {
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) <= maxInlineReconAssetPayloadBytes {
+		return raw, nil
+	}
+
+	payload := entry
+	originalEvidence := payload.Evidence
+	payload.Evidence = ""
+	payload.NormalizedURL = truncateReconAssetText(
+		payload.NormalizedURL,
+		maxInlineReconAssetURLBytes,
+	)
+	payload.Source = truncateReconAssetText(payload.Source, maxInlineReconAssetSourceBytes)
+	payload.ProbeError = truncateReconAssetText(payload.ProbeError, maxInlineReconAssetErrorBytes)
+	base, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	if len(base) > maxInlineReconAssetPayloadBytes {
+		return nil, fmt.Errorf(
+			"verified API endpoint metadata exceeds %d bytes",
+			maxInlineReconAssetPayloadBytes,
+		)
+	}
+
+	// JSON may expand control characters to six bytes. Use that worst-case
+	// ratio so the reconstructed payload always remains below the Scan Node
+	// inline-result contract while preserving as much evidence as possible.
+	evidenceBudget := (maxInlineReconAssetPayloadBytes - len(base)) / 6
+	payload.Evidence = truncateReconAssetText(originalEvidence, evidenceBudget)
+	raw, err = json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	for len(raw) > maxInlineReconAssetPayloadBytes && payload.Evidence != "" {
+		payload.Evidence = truncateReconAssetText(payload.Evidence, len(payload.Evidence)/2)
+		raw, err = json.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(raw) > maxInlineReconAssetPayloadBytes {
+		return nil, fmt.Errorf(
+			"verified API endpoint payload exceeds %d bytes",
+			maxInlineReconAssetPayloadBytes,
+		)
+	}
+	return raw, nil
+}
+
+func truncateReconAssetText(value string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(value) <= maxBytes {
+		return value
+	}
+	truncated := value[:maxBytes]
+	for !utf8.ValidString(truncated) {
+		truncated = truncated[:len(truncated)-1]
+	}
+	return truncated
 }
 
 func reconResultContext(loop *reactloops.ReActLoop) context.Context {
