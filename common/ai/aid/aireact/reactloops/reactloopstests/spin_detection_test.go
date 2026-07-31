@@ -949,7 +949,8 @@ func TestSpinDetectionSameActionTypeDifferentTool(t *testing.T) {
 		t.Logf("  [%d] ActionType=%q ToolName=%q", idx, rec.ActionType, rec.ToolName)
 	}
 
-	// 关键断言: 同 ActionType 不同 ToolName 不应触发 SPIN.
+	// 关键断言: 同 ActionType 不同 ToolName 不应触发 SPIN，软 TODO
+	// checkpoint 产生的两个 finish 控制动作也不应被当作执行自旋.
 	if loop.IsInSameActionTypeSpin() {
 		t.Error("FAIL: IsInSameActionTypeSpin returned true for actions with different tool names")
 	} else {

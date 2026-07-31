@@ -60,6 +60,13 @@ func (r *ReActLoop) IsInSameActionTypeSpin() bool {
 
 	lastActionType := r.actionHistory[historyLen-1].ActionType
 	lastToolName := r.actionHistory[historyLen-1].ToolName
+	// A normal soft TODO checkpoint records two consecutive finish actions:
+	// the initial request and the confirmation after the checkpoint. They are
+	// termination control signals, not repeated work, so they must never be
+	// classified as an execution spin.
+	if lastActionType == loopAction_Finish.ActionType {
+		return false
+	}
 	for i := historyLen - threshold; i < historyLen; i++ {
 		if r.actionHistory[i].ActionType != lastActionType {
 			return false

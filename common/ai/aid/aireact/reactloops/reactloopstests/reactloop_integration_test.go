@@ -489,8 +489,8 @@ func TestReActLoop_DisallowLoopExit(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if callCount != 2 {
-		t.Errorf("Expected 2 calls (1 disallow + 1 finish), got %d", callCount)
+	if callCount != 3 {
+		t.Errorf("Expected 3 calls (1 disallow + finish checkpoint + finish confirmation), got %d", callCount)
 	}
 
 	t.Logf("DisallowExit test completed with %d calls", callCount)
@@ -657,7 +657,7 @@ func TestReActLoop_AsyncMode(t *testing.T) {
 }
 
 // TestReActLoop_AsyncMode_AutoClosesActiveTodos 验证主循环进入 async 时,
-// 当前任务的活跃 TODO 会自动标记为 done.
+// 当前任务的活跃 TODO 会带原因标记为 deferred.
 func TestReActLoop_AsyncMode_AutoClosesActiveTodos(t *testing.T) {
 	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
@@ -704,8 +704,14 @@ func TestReActLoop_AsyncMode_AutoClosesActiveTodos(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("expected 1 todo item, got %d", len(items))
 	}
-	if items[0].Status != aicommon.VerificationTodoStatusDone {
-		t.Fatalf("expected main_open todo to be DONE after async handoff, got %s", items[0].Status)
+	if items[0].Status != aicommon.VerificationTodoStatusSkipped {
+		t.Fatalf("expected main_open todo to be SKIPPED after async handoff, got %s", items[0].Status)
+	}
+	if items[0].Outcome != aicommon.TodoOutcomeDeferred {
+		t.Fatalf("expected main_open todo outcome to be deferred, got %s", items[0].Outcome)
+	}
+	if strings.TrimSpace(items[0].Reason) == "" {
+		t.Fatal("expected async handoff to record a non-empty deferred reason")
 	}
 }
 
@@ -885,8 +891,8 @@ func TestReActLoop_GetLastNAction_EdgeCases(t *testing.T) {
 
 	// 测试请求超过实际记录数
 	moreThanExists := loop.GetLastNAction(100)
-	if len(moreThanExists) > 1 {
-		t.Errorf("Expected at most 1 record, got %d", len(moreThanExists))
+	if len(moreThanExists) > 2 {
+		t.Errorf("Expected at most 2 records (finish checkpoint and confirmation), got %d", len(moreThanExists))
 	}
 
 	// 测试请求 0 或负数
