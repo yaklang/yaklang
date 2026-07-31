@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,7 +113,35 @@ func (p *jobEventPublisher) PublishRisk(
 	dedupeKey string,
 	riskJSON []byte,
 ) error {
-	return p.publish(ctx, legionEventRisk, ref, uuid.NewString(), &jobv1.JobRisk{
+	return p.PublishRiskWithEventID(
+		ctx,
+		ref,
+		uuid.NewString(),
+		riskKind,
+		title,
+		target,
+		severity,
+		dedupeKey,
+		riskJSON,
+	)
+}
+
+func (p *jobEventPublisher) PublishRiskWithEventID(
+	ctx context.Context,
+	ref jobExecutionRef,
+	eventID string,
+	riskKind string,
+	title string,
+	target string,
+	severity string,
+	dedupeKey string,
+	riskJSON []byte,
+) error {
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		return fmt.Errorf("job risk event_id is required")
+	}
+	return p.publish(ctx, legionEventRisk, ref, eventID, &jobv1.JobRisk{
 		Job:       p.jobRef(ref),
 		RiskKind:  riskKind,
 		Title:     title,

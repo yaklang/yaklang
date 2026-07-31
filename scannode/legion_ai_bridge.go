@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
@@ -94,6 +95,7 @@ type aiSessionBinding struct {
 	CredentialRefs             []aiSessionCredentialRef
 	PlatformBearerToken        string
 	HTTPClient                 *http.Client
+	ResultSink                 aicommon.ResultSink
 }
 
 type aiSessionAttachmentRef struct {
@@ -115,6 +117,7 @@ type aiSessionCredentialRef struct {
 type aiSessionRuntimeBindOptions struct {
 	PlatformBearerToken string
 	HTTPClient          *http.Client
+	ResultSink          aicommon.ResultSink
 }
 
 type aiSessionInput struct {
@@ -155,15 +158,17 @@ type acceptedAISessionContextUpdate struct {
 }
 
 type cancelledAISessionRuntime struct {
-	ref    aiSessionCommandRef
-	reason string
-	handle aiSessionRuntimeHandle
+	ref        aiSessionCommandRef
+	reason     string
+	handle     aiSessionRuntimeHandle
+	resultSink *aiSessionResultSinkProxy
 }
 
 type closedAISessionRuntime struct {
-	ref    aiSessionCommandRef
-	reason string
-	handle aiSessionRuntimeHandle
+	ref        aiSessionCommandRef
+	reason     string
+	handle     aiSessionRuntimeHandle
+	resultSink *aiSessionResultSinkProxy
 }
 
 type aiSessionRuntimeManager struct {
@@ -180,6 +185,7 @@ type aiSessionRuntime struct {
 	seq                    uint64
 	cancel                 context.CancelFunc
 	handle                 aiSessionRuntimeHandle
+	resultSink             *aiSessionResultSinkProxy
 	processedInputCommands map[string]struct{}
 	processedInputOrder    []string
 	inFlightInputCommands  map[string]struct{}
@@ -213,15 +219,18 @@ func (m *aiSessionRuntimeManager) Bind(
 		existing.ref = ref
 		existing.projectID = strings.TrimSpace(command.GetProjectId())
 		existing.title = strings.TrimSpace(command.GetTitle())
+		existing.resultSink.Set(options.ResultSink)
 		return ref, nil
 	}
 
 	ctx, cancel := context.WithCancel(parent)
+	resultSink := newAISessionResultSinkProxy(options.ResultSink)
 	runtime := &aiSessionRuntime{
 		ref:                    ref,
 		projectID:              strings.TrimSpace(command.GetProjectId()),
 		title:                  strings.TrimSpace(command.GetTitle()),
 		cancel:                 cancel,
+		resultSink:             resultSink,
 		processedInputCommands: make(map[string]struct{}),
 		inFlightInputCommands:  make(map[string]struct{}),
 	}
@@ -236,6 +245,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
 		HTTPClient:                 options.HTTPClient,
+		ResultSink:                 resultSink,
 	}, &managedAISessionRuntimeEmitter{
 		ctx:       parent,
 		runtime:   runtime,
@@ -413,7 +423,12 @@ func (m *aiSessionRuntimeManager) Cancel(
 	}
 	session.mu.Unlock()
 	delete(m.sessions, ref.SessionID)
-	return cancelledAISessionRuntime{ref: ref, reason: reason, handle: handle}, nil
+	return cancelledAISessionRuntime{
+		ref:        ref,
+		reason:     reason,
+		handle:     handle,
+		resultSink: session.resultSink,
+	}, nil
 }
 
 func (m *aiSessionRuntimeManager) Close(
@@ -443,7 +458,12 @@ func (m *aiSessionRuntimeManager) Close(
 	}
 	session.mu.Unlock()
 	delete(m.sessions, ref.SessionID)
-	return closedAISessionRuntime{ref: ref, reason: reason, handle: handle}, nil
+	return closedAISessionRuntime{
+		ref:        ref,
+		reason:     reason,
+		handle:     handle,
+		resultSink: session.resultSink,
+	}, nil
 }
 
 func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) error {
@@ -458,13 +478,22 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 	}
 
 	session, _ := b.agent.node.GetSessionState()
-	ref, err := b.ensureAIRuntime().Bind(
+	resultSink, err := newLegionAIFocusResultSink(
+		b.publisher,
+		command.GetMetadata().GetCommandId(),
+		command.GetResultContext(),
+	)
+	if err != nil {
+		return b.publishAISessionCommandFailure(ctx, ref, "invalid_ai_focus_result_context", err)
+	}
+	ref, err = b.ensureAIRuntime().Bind(
 		b.agent.node.GetRootContext(),
 		&command,
 		b.ensureAIPublisher(),
 		aiSessionRuntimeBindOptions{
 			PlatformBearerToken: session.SessionToken,
 			HTTPClient:          b.agent.httpClient,
+			ResultSink:          resultSink,
 		},
 	)
 	if err != nil {
@@ -590,6 +619,9 @@ func (b *legionJobBridge) handleAISessionCancel(ctx context.Context, raw []byte)
 	if cancelled.handle != nil {
 		cancelled.handle.Cancel(cancelled.reason)
 	}
+	if err := cancelled.resultSink.Cancel(ctx, cancelled.reason); err != nil {
+		logAISessionRuntimePublishError("focus-result-cancelled", cancelled.ref.SessionID, err)
+	}
 	return b.ensureAIPublisher().PublishCancelled(ctx, cancelled.ref, cancelled.reason)
 }
 
@@ -611,10 +643,14 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 	if closed.handle != nil {
 		closed.handle.Close(closed.reason)
 	}
-	return b.ensureAIPublisher().PublishDone(ctx, closed.ref, mustJSON(map[string]string{
+	resultJSON := mustJSON(map[string]string{
 		"reason":    closed.reason,
 		"closed_by": "platform",
-	}))
+	})
+	if err := closed.resultSink.Succeed(ctx, resultJSON); err != nil {
+		logAISessionRuntimePublishError("focus-result-succeeded", closed.ref.SessionID, err)
+	}
+	return b.ensureAIPublisher().PublishDone(ctx, closed.ref, resultJSON)
 }
 
 func (b *legionJobBridge) publishAISessionCommandFailure(
@@ -715,9 +751,20 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 		return fmt.Errorf("ai session bind session_id is required")
 	case strings.TrimSpace(command.GetOwnerUserId()) == "":
 		return fmt.Errorf("ai session bind owner_user_id is required")
-	default:
-		return nil
 	}
+	if resultContext := command.GetResultContext(); resultContext != nil {
+		if _, err := validateLegionAIFocusResultContext(
+			command.GetMetadata().GetCommandId(),
+			resultContext,
+		); err != nil {
+			return err
+		}
+		if strings.TrimSpace(command.GetSession().GetRunId()) !=
+			strings.TrimSpace(resultContext.GetFocusRunId()) {
+			return fmt.Errorf("ai session run_id must match focus result focus_run_id")
+		}
+	}
+	return nil
 }
 
 func validateAISessionInputCommand(command *aiv1.PushAISessionInputCommand) error {
@@ -924,6 +971,9 @@ func (e *managedAISessionRuntimeEmitter) Done(resultJSON []byte) {
 		return
 	}
 	ref := e.runtime.currentRef()
+	if err := e.runtime.resultSink.Succeed(e.ctx, resultJSON); err != nil {
+		logAISessionRuntimePublishError("focus-result-succeeded", ref.SessionID, err)
+	}
 	if err := e.publisher.PublishDone(e.ctx, ref, resultJSON); err != nil {
 		logAISessionRuntimePublishError("done", ref.SessionID, err)
 	}
@@ -934,6 +984,9 @@ func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, det
 		return
 	}
 	ref := e.runtime.currentRef()
+	if err := e.runtime.resultSink.Fail(e.ctx, code, message, detailJSON); err != nil {
+		logAISessionRuntimePublishError("focus-result-failed", ref.SessionID, err)
+	}
 	if err := e.publisher.PublishFailed(e.ctx, ref, code, message, detailJSON); err != nil {
 		logAISessionRuntimePublishError("failed", ref.SessionID, err)
 	}

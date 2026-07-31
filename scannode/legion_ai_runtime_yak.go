@@ -250,6 +250,9 @@ func buildYakAIEngineOptions(
 			emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
 		}),
 	}
+	if binding.ResultSink != nil {
+		config = append(config, aiengine.WithResultSink(binding.ResultSink))
+	}
 	if options.MaxIteration > 0 {
 		config = append(config, aiengine.WithMaxIteration(options.MaxIteration))
 	}

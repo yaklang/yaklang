@@ -3,6 +3,7 @@ syntax = "proto3";
 package legion.ai.v1;
 
 import "google/protobuf/timestamp.proto";
+import "legion/job/v1/job.proto";
 import "legion/node/v1/node.proto";
 
 option go_package = "legion/gen/proto/legion/ai/v1;aiv1";
@@ -39,6 +40,7 @@ message BindAISessionCommand {
   bytes runtime_option_snapshot_json = 8;
   repeated AISessionAttachmentRef attachments = 9;
   repeated AISessionCredentialRef credential_refs = 10;
+  AIFocusResultContext result_context = 11;
 }
 
 message PushAISessionInputCommand {
@@ -2023,4 +2025,11 @@ message AISessionCancelled {
   AISessionRef session = 2;
   google.protobuf.Timestamp finished_at = 3;
   string reason = 4;
+}
+
+message AIFocusResultContext {
+  string focus_run_id = 1;
+  string focus_mode = 2;
+  string schema_version = 3;
+  legion.job.v1.JobRef job = 4;
 }
