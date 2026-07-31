@@ -953,4 +953,10 @@ func TestPromptManager_HighStaticSection_TokenBudget(t *testing.T) {
 	require.GreaterOrEqual(t, tokenCount, 1500,
 		"high-static section must keep >= 1500 tokens to survive dashscope prefix cache window; got %d tokens (%d bytes)",
 		tokenCount, len(rendered))
+
+	require.Contains(t, rendered, "目标明确的简单任务直达目标")
+	require.Contains(t, rendered, "选择 2-4 个独立方向建 TODO")
+	require.Contains(t, rendered, "满意度校验只观察 TODO, 不写此字段")
+	require.NotContains(t, rendered, "系统自动 SKIPPED")
+	require.NotContains(t, rendered, "满意度校验阶段的 `next_movements`")
 }

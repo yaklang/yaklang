@@ -18,7 +18,7 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 		lines = append(lines, aicommon.FormatVerificationTodoLine(item))
 	}
 	return fmt.Sprintf(
-		"current task still has %d active TODO item(s); %s cannot exit until each one is explicitly closed via adjust_todolist or verification next_movements with op=done / op=delete / op=skip.\nRemaining TODOs:\n%s",
+		"current task still has %d active TODO item(s); %s cannot exit until each one is explicitly closed via next_movements with op=done / op=delete / op=skip.\nRemaining TODOs:\n%s",
 		len(items),
 		actionName,
 		strings.Join(lines, "\n"),
@@ -42,9 +42,16 @@ var loopAction_Finish = &LoopAction{
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +
 		"CRITICAL: if the current task still owns active TODO items, finish will be rejected until those TODOs are explicitly closed. " +
+		"Do NOT carry next_movements on finish; close TODOs in a prior iteration after their evidence is already observed. " +
 		"If the user needs a structured Markdown answer emitted to the chat, use 'directly_answer' first " +
 		"(it delivers the answer but does NOT end the task), then call 'finish'. " +
 		"Add 'human_readable_thought' only if a brief closing note is needed.",
+	ActionVerifier: func(loop *ReActLoop, action *aicommon.Action) error {
+		if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
+			return utils.Error("finish must not carry next_movements; close TODOs in a prior iteration, then finish")
+		}
+		return nil
+	},
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
 			msg := buildFinishBlockedByGoalModeMessage(loop.GetCurrentIterationIndex(), loop.GetGoalMinIterations())

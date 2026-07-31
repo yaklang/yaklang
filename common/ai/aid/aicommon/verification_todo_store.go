@@ -63,10 +63,10 @@ type VerificationTodoItem struct {
 	ScopeTaskIndex string `json:"scope_task_index,omitempty"`
 }
 
-// VerificationTodoStore is a session-scoped TODO store maintained incrementally
-// by applying each verification round's `next_movements` ops. It replaces the
-// previous "rebuild from history" approach so the state survives prompt builds
-// without scanning the full history every time.
+// VerificationTodoStore is a session-scoped, task-owned TODO store maintained
+// incrementally by main-loop `next_movements` ops. Verification only reads it
+// as an objective completion gate. The persistent store avoids rebuilding state
+// from full history on every prompt.
 //
 // 关键词: VerificationTodoStore, TODO 增量状态, ApplyOperations, Render,
 //
@@ -707,7 +707,7 @@ func (s *VerificationTodoStore) RenderWithCurrentScope(currentScope Verification
 	if len(currentItems) == 0 {
 		lines = append(lines, "- (no TODO items tracked for the current task yet)")
 	} else {
-		lines = append(lines, "- You MUST advance or close ONLY the TODOs in this section via adjust_todolist / verification next_movements.")
+		lines = append(lines, "- You MUST advance or close ONLY the TODOs in this section via main-loop next_movements.")
 		if len(currentActive) == 0 {
 			lines = append(lines, "- (no active TODO items for the current task)")
 		} else {

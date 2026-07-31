@@ -159,6 +159,19 @@ func TestFinish_BlockedByCurrentTaskTodos(t *testing.T) {
 	assert.Contains(t, invoker.timelineString(), "write_summary")
 }
 
+func TestFinish_RejectsNextMovements(t *testing.T) {
+	loop, _, _, _ := newTodoGateTestLoop(t, nil)
+	action, err := aicommon.ExtractAction(
+		`{"@action":"finish","next_movements":[{"op":"done","id":"deep_scan"}]}`,
+		"finish",
+	)
+	require.NoError(t, err)
+
+	err = loopAction_Finish.ActionVerifier(loop, action)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must not carry next_movements")
+}
+
 func TestFinish_BlockedByGoalMode(t *testing.T) {
 	loop, invoker, cfg, task := newTodoGateTestLoop(t, nil)
 	cfg.enableGoalMode = true
