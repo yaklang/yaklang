@@ -12,41 +12,32 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// loopAction_AdjustTodolist is the main-loop sibling of the verification path's
-// `next_movements`: it lets the AI proactively post a delta into the shared
-// global TODO store from inside a normal ReAct iteration, without having to
-// wait for a verification AI call. Operations mirror verification semantics
-// exactly (add / doing / done / delete / skip) and are applied through the
-// same SessionPromptState.VerificationTodoStore that verification writes,
-// so both channels converge on a single TODO snapshot rendered into every
-// loop prompt.
+// loopAction_AdjustTodolist lets the main-loop AI post an explicit delta into
+// the session-shared, task-scoped TODO store. Verification is read-only; this
+// action and the all-action next_movements bottom line are the write paths.
 //
 // 设计目标:
-//   - 让 AI 在主循环里就能维护 TODO, 不必凑 verification 才能纠正方向;
-//   - 与 verification.next_movements 共享同一份 store, 不再人为拆通道;
-//   - 事件流与 verification 一致 (timeline NEXT_MOVEMENTS 对偶, EVENT_TYPE_TODO_LIST_UPDATE),
-//     前端 TODO 面板无需区分来源即可消费.
+//   - 让 AI 在主循环里主动维护执行前沿;
+//   - 简单任务克制建项, 探索任务用少量高价值分支兼顾广度与深度;
+//   - 统一广播 TODO 更新, 让前端与后续 prompt 读取同一份状态.
 //
 // 关键词: adjust_todolist 主循环 TODO 通道, ApplyVerificationTodoOps 复用,
 //
 //	NEXT_MOVEMENTS timeline 对偶, EVENT_TYPE_TODO_LIST_UPDATE
 var loopAction_AdjustTodolist = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST,
-	Description: "Proactively adjust the global TODO list from the main ReAct loop using the same increment grammar as verification.next_movements " +
-		"(ops: add / doing / done / delete / skip). Use this when the current iteration produced enough new information to enqueue, mark in-progress, " +
-		"close, drop, or skip TODO items, but you don't want to wait for the next verification round. Always submit only the delta against the existing " +
-		"TODO list; never repeat unchanged items. The applied delta is written into the shared TODO store, broadcast as a structured todo_list_update " +
-		"event, and breadcrumbed into the timeline under NEXT_MOVEMENTS, exactly like verification. " +
+	Description: "Adjust the session-shared, current-task TODO frontier with add / doing / done / delete / skip. " +
+		"Submit only changed items and never mutate another task's TODOs. Keep simple tasks minimal. For exploratory work, add a small number of " +
+		"independent high-value branches, group similar variants into one probe TODO, and close a branch only after evidence meets its stop condition. " +
+		"Use done only for work already supported by observed evidence; verification reads this store but does not modify it. " +
 		"LANGUAGE: every human-readable string (especially the `content` field) MUST be written in the same natural language as the user's query " +
-		"and the surrounding session. If the user is speaking Chinese, write Chinese; if English, write English. Never auto-translate to English " +
-		"just because the action description happens to be in English. The frontend renders these strings verbatim into the shared TODO panel " +
-		"alongside verification.next_movements output, so any language drift will look jarring to the user.",
+		"and the surrounding session. Never auto-translate to English just because this description is in English.",
 	Options: []aitool.ToolOption{
 		aitool.WithStructArrayParam("next_movements",
 			[]aitool.PropertyOption{
-				aitool.WithParam_Description("TODO increment array. Each item describes one delta op against the shared global TODO list. " +
+				aitool.WithParam_Description("TODO increment array. Each item describes one delta op against the shared current-task TODO frontier. " +
 					"Submit only the items that should change this round; never repeat existing TODOs unchanged. " +
-					"Same shape as verification.next_movements: {op, id, content}. When you have nothing to change, do NOT emit this action. " +
+					"Shape: {op, id, content}. When you have nothing to change, do NOT emit this action. " +
 					"Language rule: the `content` field MUST match the language of the user query / surrounding session " +
 					"(用户用中文 → content 写中文; English user → English content). Do NOT translate to English just because this schema is English."),
 				aitool.WithParam_Required(true),
@@ -64,10 +55,9 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 			),
 			aitool.WithStringParam("content",
 				aitool.WithParam_Description("TODO content shown directly in the user-facing TODO panel. Required when op=add; optional otherwise. "+
-					"Keep it short, action-oriented, aligned with the current task goal. "+
+					"Keep it short, action-oriented, aligned with the current task goal, and include an observable stop condition when useful. "+
 					"LANGUAGE: write in the SAME natural language as the user's query (用户中文 → 用中文; English user → English). "+
-					"Do NOT translate to English. This text sits next to verification.next_movements output in the same panel; "+
-					"language drift between the two channels will look broken to the user."),
+					"Do NOT translate to English."),
 			),
 		),
 	},

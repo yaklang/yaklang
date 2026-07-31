@@ -403,15 +403,15 @@ ActionHandler: func(loop *ReActLoop, action *aicommon.Action, op *LoopActionHand
 
 ### TODO 关闭与 Satisfied 兜底机制
 
-`VerifyUserSatisfaction` 不仅产出 `Satisfied`，还驱动一个全局 TODO 闭环：
+主循环维护 TODO，`VerifyUserSatisfaction` 只读取它作为完成门禁：
 
-1. **TODO 状态**：`SessionPromptState.VerificationTodoStore` 维护 TODO 列表（PENDING / DOING / DONE / DELETED / SKIPPED），通过 `next_movements` 的增量 op 演进。
+1. **TODO 状态**：`SessionPromptState.VerificationTodoStore` 维护会话共享、任务域隔离的 TODO 列表（PENDING / DOING / DONE / DELETED / SKIPPED），通过主循环 `next_movements` 增量演进。
 2. **关闭 TODO 的三种方式**（必须 AI 主动声明，旧的"Satisfied=true 自动翻 SKIPPED"语义已废弃）：
    - `{"op": "done", "id": "..."}`：表示该项已完成
    - `{"op": "delete", "id": "..."}`：表示该项不再需要
    - `{"op": "skip", "id": "..."}`：表示该项主动跳过（与 delete 区别：skip 表"本次范围内不做"，delete 表"彻底不要"）
 3. **Satisfied 兜底**（[verification.go](../../../verification.go) `enforceTodoCompletionBeforeSatisfaction`）：
-   - 在 `AppendVerificationHistory` 写入 TODO 状态之后、`emitTodoListUpdate` 发送前端事件之前触发
+   - verification 不写 TODO；它在形成观测结果后读取当前任务的 TODO store
    - 若 AI 声明 `user_satisfied=true` 但 store 仍有 `PENDING + DOING > 0`：
      - `result.Satisfied` 被强制覆盖为 `false`
      - `result.Reasoning` 前注入 `[OVERRIDE] ...`，保留 AI 原文于 `[AI ORIGINAL] ...`
