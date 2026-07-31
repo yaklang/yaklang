@@ -93,7 +93,33 @@ func (p *jobEventPublisher) PublishAsset(
 	identityKey string,
 	assetJSON []byte,
 ) error {
-	return p.publish(ctx, legionEventAsset, ref, uuid.NewString(), &jobv1.JobAsset{
+	return p.PublishAssetWithEventID(
+		ctx,
+		ref,
+		uuid.NewString(),
+		assetKind,
+		title,
+		target,
+		identityKey,
+		assetJSON,
+	)
+}
+
+func (p *jobEventPublisher) PublishAssetWithEventID(
+	ctx context.Context,
+	ref jobExecutionRef,
+	eventID string,
+	assetKind string,
+	title string,
+	target string,
+	identityKey string,
+	assetJSON []byte,
+) error {
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		return fmt.Errorf("job asset event_id is required")
+	}
+	return p.publish(ctx, legionEventAsset, ref, eventID, &jobv1.JobAsset{
 		Job:         p.jobRef(ref),
 		AssetKind:   assetKind,
 		Title:       title,

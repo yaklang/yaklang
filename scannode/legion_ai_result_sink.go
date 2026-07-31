@@ -21,9 +21,20 @@ import (
 const (
 	legionAIFocusResultSchemaV1  = "legion.focus-result.v1"
 	maxInlineFocusRiskFieldBytes = 64 * 1024
+	maxInlineFocusAssetBytes     = 64 * 1024
 )
 
 type aiFocusResultEventPublisher interface {
+	PublishAssetWithEventID(
+		context.Context,
+		jobExecutionRef,
+		string,
+		string,
+		string,
+		string,
+		string,
+		[]byte,
+	) error
 	PublishRiskWithEventID(
 		context.Context,
 		jobExecutionRef,
@@ -108,6 +119,21 @@ func (p *aiSessionResultSinkProxy) SubmitRisk(
 		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
 	}
 	return sink.SubmitRisk(ctx, risk)
+}
+
+func (p *aiSessionResultSinkProxy) SubmitAsset(
+	ctx context.Context,
+	asset aicommon.AssetResult,
+) (aicommon.ResultReceipt, error) {
+	sink := p.current()
+	if sink == nil {
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+	}
+	assetSink, ok := sink.(aicommon.AssetResultSink)
+	if !ok {
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink does not accept assets")
+	}
+	return assetSink.SubmitAsset(ctx, asset)
 }
 
 func (p *aiSessionResultSinkProxy) Succeed(ctx context.Context, resultJSON []byte) error {
@@ -240,6 +266,54 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 	}, nil
 }
 
+func (s *legionAIFocusResultSink) SubmitAsset(
+	ctx context.Context,
+	asset aicommon.AssetResult,
+) (aicommon.ResultReceipt, error) {
+	asset.Kind = strings.TrimSpace(asset.Kind)
+	asset.Title = strings.TrimSpace(asset.Title)
+	asset.Target = strings.TrimSpace(asset.Target)
+	asset.IdentityKey = strings.TrimSpace(asset.IdentityKey)
+	switch {
+	case asset.Kind == "":
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset kind is required")
+	case asset.Title == "":
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset title is required")
+	case asset.Target == "":
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset target is required")
+	case asset.IdentityKey == "":
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset identity_key is required")
+	case len(asset.Payload) == 0:
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset payload is required")
+	case len(asset.Payload) > maxInlineFocusAssetBytes:
+		return aicommon.ResultReceipt{}, fmt.Errorf(
+			"ai focus asset payload exceeds %d bytes",
+			maxInlineFocusAssetBytes,
+		)
+	case !json.Valid(asset.Payload):
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset payload must be valid JSON")
+	}
+
+	eventID := focusAssetEventID(s.ref.JobID, asset.Kind, asset.IdentityKey)
+	if err := s.publisher.PublishAssetWithEventID(
+		ctx,
+		s.ref,
+		eventID,
+		asset.Kind,
+		asset.Title,
+		asset.Target,
+		asset.IdentityKey,
+		asset.Payload,
+	); err != nil {
+		return aicommon.ResultReceipt{}, fmt.Errorf("publish ai focus asset: %w", err)
+	}
+	return aicommon.ResultReceipt{
+		ResultID:  eventID,
+		DedupeKey: asset.IdentityKey,
+		BackendID: s.ref.JobID,
+	}, nil
+}
+
 func (s *legionAIFocusResultSink) Succeed(
 	ctx context.Context,
 	resultJSON []byte,
@@ -328,6 +402,19 @@ func focusRiskDedupeKey(risk *schema.Risk, target string) string {
 		strings.ToLower(strings.TrimSpace(risk.Parameter)),
 	}, "\x00")))
 	return hex.EncodeToString(sum[:])
+}
+
+func focusAssetEventID(
+	jobID string,
+	assetKind string,
+	identityKey string,
+) string {
+	name := strings.Join([]string{
+		strings.TrimSpace(jobID),
+		strings.ToLower(strings.TrimSpace(assetKind)),
+		strings.TrimSpace(identityKey),
+	}, "\x00")
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
 }
 
 func truncateFocusRiskField(value string) string {
