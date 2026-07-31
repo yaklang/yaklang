@@ -70,6 +70,14 @@ type aiSessionRuntimeHandle interface {
 	Close(string)
 }
 
+// aiSessionRuntimeTurnRefProvider exposes the stable command identity of the
+// live logical turn. Control commands (review decisions, free interventions,
+// sync events) have their own command IDs, but events emitted by the running
+// engine must remain causally attached to the turn that owns that engine.
+type aiSessionRuntimeTurnRefProvider interface {
+	activeTurnID() string
+}
+
 type aiSessionRuntimeEmitter interface {
 	Emit(string, []byte)
 	Done([]byte)
@@ -933,13 +941,31 @@ func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, det
 
 func (r *aiSessionRuntime) nextEventRefAndSeq() (aiSessionCommandRef, uint64) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.seq++
-	return r.ref, r.seq
+	ref := r.ref
+	seq := r.seq
+	handle := r.handle
+	r.mu.Unlock()
+
+	return stableAISessionRuntimeEventRef(ref, handle), seq
+}
+
+func stableAISessionRuntimeEventRef(
+	ref aiSessionCommandRef,
+	handle aiSessionRuntimeHandle,
+) aiSessionCommandRef {
+	if provider, ok := handle.(aiSessionRuntimeTurnRefProvider); ok {
+		if turnID := strings.TrimSpace(provider.activeTurnID()); turnID != "" {
+			ref.CommandID = turnID
+		}
+	}
+	return ref
 }
 
 func (r *aiSessionRuntime) currentRef() aiSessionCommandRef {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.ref
+	ref := r.ref
+	handle := r.handle
+	r.mu.Unlock()
+	return stableAISessionRuntimeEventRef(ref, handle)
 }
