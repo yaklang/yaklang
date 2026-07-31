@@ -632,7 +632,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 			// Init handler completed the task, exit immediately (early routing)
 			r.loadingStatus("init handler done (early exit)")
 			log.Infof("ReactLoop[%v] init handler signaled Done, exiting early", r.loopName)
-			r.GetInvoker().AddToTimeline("init_done", fmt.Sprintf("ReActLoop[%v] init handler completed task early", r.loopName))
 			return nil
 		}
 

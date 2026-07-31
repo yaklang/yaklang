@@ -249,8 +249,10 @@ func TestNormalizeToolResultDataDeduplicatesExactCombinedAndResult(t *testing.T)
 	toolResult := &aitool.ToolResult{Name: "dedupe", Success: true}
 	normalizeToolResultData(toolResult, result, result, "HINT:\n/path")
 	data := toolResult.Data.(string)
+	// When combined == result, the RESULT section is omitted entirely (no "RESULT:" tag),
+	// so the result string appears exactly once (only in COMBINED OUTPUT).
 	require.Equal(t, 1, strings.Count(data, result))
-	require.Contains(t, data, "duplicate of COMBINED OUTPUT")
+	require.NotContains(t, data, "RESULT:")
 }
 
 func TestToolArtifactFailureNeverFallsBackToOversizedInlineData(t *testing.T) {
