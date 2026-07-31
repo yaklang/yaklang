@@ -3,6 +3,7 @@ package scannode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -582,6 +583,110 @@ func TestHandleAISessionClosePublishesDone(t *testing.T) {
 	driver.assertClose(t, 0, "platform done")
 }
 
+func TestHandleAISessionCloseRetainsRuntimeUntilTerminalEventsPublish(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+	fakeJS.failNextPublishes(1)
+
+	closeRaw := mustMarshalProto(t, validAISessionCloseCommand())
+	if err := bridge.handleAISessionClose(context.Background(), closeRaw); err == nil {
+		t.Fatal("expected terminal focus-result publication failure")
+	}
+	driver.assertClose(t, 0, "platform done")
+	if !hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("runtime was removed before terminal events could be retried")
+	}
+
+	if err := bridge.handleAISessionClose(context.Background(), closeRaw); err != nil {
+		t.Fatalf("retry ai close: %v", err)
+	}
+	driver.mu.Lock()
+	closeCount := len(driver.closes)
+	driver.mu.Unlock()
+	if closeCount != 1 {
+		t.Fatalf("expected runtime close to be applied once, got %d", closeCount)
+	}
+	if hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("runtime was not removed after both terminal events published")
+	}
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.succeeded", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 1)
+}
+
+func TestHandleAISessionCancelRetainsRuntimeUntilTerminalEventsPublish(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+	fakeJS.failNextPublishes(1)
+
+	cancelRaw := mustMarshalProto(t, validAISessionCancelCommand())
+	if err := bridge.handleAISessionCancel(context.Background(), cancelRaw); err == nil {
+		t.Fatal("expected terminal focus-result publication failure")
+	}
+	driver.assertCancel(t, 0, "user requested")
+	if !hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("runtime was removed before terminal events could be retried")
+	}
+
+	if err := bridge.handleAISessionCancel(context.Background(), cancelRaw); err != nil {
+		t.Fatalf("retry ai cancel: %v", err)
+	}
+	driver.mu.Lock()
+	cancelCount := len(driver.cancels)
+	driver.mu.Unlock()
+	if cancelCount != 1 {
+		t.Fatalf("expected runtime cancel to be applied once, got %d", cancelCount)
+	}
+	if hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("runtime was not removed after both terminal events published")
+	}
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.cancelled", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.cancelled", 1)
+}
+
+func TestRuntimeEmitterRetriesTerminalPublication(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+	fakeJS.failNextPublishes(1)
+
+	driver.mu.Lock()
+	emitter := driver.emitters[0]
+	driver.mu.Unlock()
+	emitter.Done([]byte(`{"summary":"finished"}`))
+
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.succeeded", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 1)
+}
+
 func TestCommandConsumerRoutesAISessionBindCommand(t *testing.T) {
 	t.Parallel()
 
@@ -662,14 +767,19 @@ func (s *aiBootstrapSessionTransport) Shutdown(context.Context, node.SessionStat
 type aiFakeJetStreamContext struct {
 	nats.JetStreamContext
 
-	mu      sync.Mutex
-	publish []*nats.Msg
+	mu                sync.Mutex
+	publish           []*nats.Msg
+	remainingFailures int
 }
 
 func (f *aiFakeJetStreamContext) PublishMsg(msg *nats.Msg, _ ...nats.PubOpt) (*nats.PubAck, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	if f.remainingFailures > 0 {
+		f.remainingFailures--
+		return nil, errors.New("injected JetStream publish failure")
+	}
 	cloned := nats.NewMsg(msg.Subject)
 	cloned.Header = msg.Header
 	cloned.Reply = msg.Reply
@@ -680,6 +790,12 @@ func (f *aiFakeJetStreamContext) PublishMsg(msg *nats.Msg, _ ...nats.PubOpt) (*n
 		Stream:   "LEGION_EVENTS",
 		Sequence: uint64(len(f.publish)),
 	}, nil
+}
+
+func (f *aiFakeJetStreamContext) failNextPublishes(count int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.remainingFailures = count
 }
 
 func newTestAISessionBridge(
@@ -855,9 +971,37 @@ func resetPublishedMessages(fakeJS *aiFakeJetStreamContext) {
 	fakeJS.publish = nil
 }
 
+func assertPublishedSubjectCount(
+	t *testing.T,
+	fakeJS *aiFakeJetStreamContext,
+	subject string,
+	want int,
+) {
+	t.Helper()
+	fakeJS.mu.Lock()
+	defer fakeJS.mu.Unlock()
+	got := 0
+	for _, msg := range fakeJS.publish {
+		if msg.Subject == subject {
+			got++
+		}
+	}
+	if got != want {
+		t.Fatalf("expected %d %s events, got %d", want, subject, got)
+	}
+}
+
+func hasAISessionRuntime(manager *aiSessionRuntimeManager, sessionID string) bool {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	_, ok := manager.sessions[sessionID]
+	return ok
+}
+
 type recordingAISessionRuntimeDriver struct {
 	mu       sync.Mutex
 	bindings []aiSessionBinding
+	emitters []aiSessionRuntimeEmitter
 	inputs   []aiSessionInput
 	contexts []aiSessionContextUpdate
 	cancels  []string
@@ -867,11 +1011,12 @@ type recordingAISessionRuntimeDriver struct {
 func (d *recordingAISessionRuntimeDriver) Bind(
 	_ context.Context,
 	binding aiSessionBinding,
-	_ aiSessionRuntimeEmitter,
+	emitter aiSessionRuntimeEmitter,
 ) (aiSessionRuntimeHandle, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.bindings = append(d.bindings, binding)
+	d.emitters = append(d.emitters, emitter)
 	return &recordingAISessionRuntimeHandle{driver: d}, nil
 }
 

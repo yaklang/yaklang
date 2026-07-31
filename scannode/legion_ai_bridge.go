@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -158,17 +159,19 @@ type acceptedAISessionContextUpdate struct {
 }
 
 type cancelledAISessionRuntime struct {
-	ref        aiSessionCommandRef
-	reason     string
-	handle     aiSessionRuntimeHandle
-	resultSink *aiSessionResultSinkProxy
+	ref         aiSessionCommandRef
+	reason      string
+	handle      aiSessionRuntimeHandle
+	resultSink  *aiSessionResultSinkProxy
+	applyHandle bool
 }
 
 type closedAISessionRuntime struct {
-	ref        aiSessionCommandRef
-	reason     string
-	handle     aiSessionRuntimeHandle
-	resultSink *aiSessionResultSinkProxy
+	ref         aiSessionCommandRef
+	reason      string
+	handle      aiSessionRuntimeHandle
+	resultSink  *aiSessionResultSinkProxy
+	applyHandle bool
 }
 
 type aiSessionRuntimeManager struct {
@@ -189,6 +192,9 @@ type aiSessionRuntime struct {
 	processedInputCommands map[string]struct{}
 	processedInputOrder    []string
 	inFlightInputCommands  map[string]struct{}
+	terminalCommandID      string
+	terminalKind           string
+	terminalReason         string
 }
 
 func newAISessionRuntimeManager(driver aiSessionRuntimeDriver) *aiSessionRuntimeManager {
@@ -418,16 +424,33 @@ func (m *aiSessionRuntimeManager) Cancel(
 	session.mu.Lock()
 	ref.RunID = session.ref.RunID
 	handle := session.handle
-	if session.cancel != nil {
-		session.cancel()
+	applyHandle := false
+	if session.terminalCommandID == "" {
+		session.terminalCommandID = ref.CommandID
+		session.terminalKind = "cancel"
+		session.terminalReason = reason
+		applyHandle = true
+		if session.cancel != nil {
+			session.cancel()
+		}
+	} else {
+		if session.terminalCommandID != ref.CommandID || session.terminalKind != "cancel" {
+			session.mu.Unlock()
+			return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
+				"ai session terminal command conflicts with pending %s command %s",
+				session.terminalKind,
+				session.terminalCommandID,
+			)
+		}
+		reason = session.terminalReason
 	}
 	session.mu.Unlock()
-	delete(m.sessions, ref.SessionID)
 	return cancelledAISessionRuntime{
-		ref:        ref,
-		reason:     reason,
-		handle:     handle,
-		resultSink: session.resultSink,
+		ref:         ref,
+		reason:      reason,
+		handle:      handle,
+		resultSink:  session.resultSink,
+		applyHandle: applyHandle,
 	}, nil
 }
 
@@ -453,17 +476,67 @@ func (m *aiSessionRuntimeManager) Close(
 	session.mu.Lock()
 	ref.RunID = session.ref.RunID
 	handle := session.handle
-	if session.cancel != nil {
-		session.cancel()
+	applyHandle := false
+	if session.terminalCommandID == "" {
+		session.terminalCommandID = ref.CommandID
+		session.terminalKind = "close"
+		session.terminalReason = reason
+		applyHandle = true
+		if session.cancel != nil {
+			session.cancel()
+		}
+	} else {
+		if session.terminalCommandID != ref.CommandID || session.terminalKind != "close" {
+			session.mu.Unlock()
+			return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
+				"ai session terminal command conflicts with pending %s command %s",
+				session.terminalKind,
+				session.terminalCommandID,
+			)
+		}
+		reason = session.terminalReason
 	}
 	session.mu.Unlock()
-	delete(m.sessions, ref.SessionID)
 	return closedAISessionRuntime{
-		ref:        ref,
-		reason:     reason,
-		handle:     handle,
-		resultSink: session.resultSink,
+		ref:         ref,
+		reason:      reason,
+		handle:      handle,
+		resultSink:  session.resultSink,
+		applyHandle: applyHandle,
 	}, nil
+}
+
+func (m *aiSessionRuntimeManager) CompleteTerminal(
+	ref aiSessionCommandRef,
+	kind string,
+) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	session, ok := m.sessions[ref.SessionID]
+	if !ok {
+		return nil
+	}
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	switch {
+	case session.ref.OwnerUserID != ref.OwnerUserID:
+		return fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
+	case session.terminalCommandID != ref.CommandID:
+		return fmt.Errorf(
+			"ai session terminal command mismatch: got %s want %s",
+			ref.CommandID,
+			session.terminalCommandID,
+		)
+	case session.terminalKind != kind:
+		return fmt.Errorf(
+			"ai session terminal kind mismatch: got %s want %s",
+			kind,
+			session.terminalKind,
+		)
+	}
+	delete(m.sessions, ref.SessionID)
+	return nil
 }
 
 func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) error {
@@ -616,13 +689,16 @@ func (b *legionJobBridge) handleAISessionCancel(ctx context.Context, raw []byte)
 	if err != nil {
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_cancel_failed", err)
 	}
-	if cancelled.handle != nil {
+	if cancelled.applyHandle && cancelled.handle != nil {
 		cancelled.handle.Cancel(cancelled.reason)
 	}
 	if err := cancelled.resultSink.Cancel(ctx, cancelled.reason); err != nil {
-		logAISessionRuntimePublishError("focus-result-cancelled", cancelled.ref.SessionID, err)
+		return fmt.Errorf("publish focus result cancelled: %w", err)
 	}
-	return b.ensureAIPublisher().PublishCancelled(ctx, cancelled.ref, cancelled.reason)
+	if err := b.ensureAIPublisher().PublishCancelled(ctx, cancelled.ref, cancelled.reason); err != nil {
+		return err
+	}
+	return b.ensureAIRuntime().CompleteTerminal(cancelled.ref, "cancel")
 }
 
 func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) error {
@@ -640,7 +716,7 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 	if err != nil {
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_close_failed", err)
 	}
-	if closed.handle != nil {
+	if closed.applyHandle && closed.handle != nil {
 		closed.handle.Close(closed.reason)
 	}
 	resultJSON := mustJSON(map[string]string{
@@ -648,9 +724,12 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 		"closed_by": "platform",
 	})
 	if err := closed.resultSink.Succeed(ctx, resultJSON); err != nil {
-		logAISessionRuntimePublishError("focus-result-succeeded", closed.ref.SessionID, err)
+		return fmt.Errorf("publish focus result succeeded: %w", err)
 	}
-	return b.ensureAIPublisher().PublishDone(ctx, closed.ref, resultJSON)
+	if err := b.ensureAIPublisher().PublishDone(ctx, closed.ref, resultJSON); err != nil {
+		return err
+	}
+	return b.ensureAIRuntime().CompleteTerminal(closed.ref, "close")
 }
 
 func (b *legionJobBridge) publishAISessionCommandFailure(
@@ -971,10 +1050,12 @@ func (e *managedAISessionRuntimeEmitter) Done(resultJSON []byte) {
 		return
 	}
 	ref := e.runtime.currentRef()
-	if err := e.runtime.resultSink.Succeed(e.ctx, resultJSON); err != nil {
-		logAISessionRuntimePublishError("focus-result-succeeded", ref.SessionID, err)
-	}
-	if err := e.publisher.PublishDone(e.ctx, ref, resultJSON); err != nil {
+	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
+		if err := e.runtime.resultSink.Succeed(ctx, resultJSON); err != nil {
+			return err
+		}
+		return e.publisher.PublishDone(ctx, ref, resultJSON)
+	}); err != nil {
 		logAISessionRuntimePublishError("done", ref.SessionID, err)
 	}
 }
@@ -984,11 +1065,51 @@ func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, det
 		return
 	}
 	ref := e.runtime.currentRef()
-	if err := e.runtime.resultSink.Fail(e.ctx, code, message, detailJSON); err != nil {
-		logAISessionRuntimePublishError("focus-result-failed", ref.SessionID, err)
-	}
-	if err := e.publisher.PublishFailed(e.ctx, ref, code, message, detailJSON); err != nil {
+	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
+		if err := e.runtime.resultSink.Fail(ctx, code, message, detailJSON); err != nil {
+			return err
+		}
+		return e.publisher.PublishFailed(ctx, ref, code, message, detailJSON)
+	}); err != nil {
 		logAISessionRuntimePublishError("failed", ref.SessionID, err)
+	}
+}
+
+func retryAISessionTerminalPublish(
+	ctx context.Context,
+	publish func(context.Context) error,
+) error {
+	const initialDelay = 100 * time.Millisecond
+	const maxDelay = 5 * time.Second
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var err error
+	delay := initialDelay
+	for {
+		err = publish(ctx)
+		if err == nil {
+			return nil
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return errors.Join(err, ctx.Err())
+		case <-timer.C:
+		}
+		if delay < maxDelay {
+			delay *= 2
+			if delay > maxDelay {
+				delay = maxDelay
+			}
+		}
 	}
 }
 
