@@ -11,12 +11,28 @@ import (
 )
 
 func TestSSEMCPClient(t *testing.T) {
+	observedClientCh := make(chan server.NotificationContext, 1)
 	// Create MCP server with capabilities
 	mcpServer := server.NewMCPServer(
 		"test-server",
 		"1.0.0",
 		server.WithResourceCapabilities(true, true),
 		server.WithPromptCapabilities(true),
+		server.WithToolCallObserver(func(
+			ctx context.Context,
+			_ mcp.CallToolRequest,
+			_ *mcp.CallToolResult,
+			_ error,
+			_ time.Duration,
+		) {
+			scoped := server.ServerFromContext(ctx)
+			if scoped != nil {
+				select {
+				case observedClientCh <- scoped.CurrentClientContext():
+				default:
+				}
+			}
+		}),
 	)
 
 	// Add a test tool
@@ -96,6 +112,26 @@ func TestSSEMCPClient(t *testing.T) {
 		_, err = client.ListTools(ctx, toolsRequest)
 		if err != nil {
 			t.Errorf("ListTools failed: %v", err)
+		}
+
+		callRequest := mcp.CallToolRequest{}
+		callRequest.Params.Name = "test-tool"
+		callRequest.Params.Arguments = map[string]interface{}{
+			"parameter-1": "identity-check",
+		}
+		if _, err = client.CallTool(ctx, callRequest); err != nil {
+			t.Fatalf("CallTool failed: %v", err)
+		}
+		select {
+		case observedClient := <-observedClientCh:
+			if observedClient.ClientName != "test-client" || observedClient.ClientVersion != "1.0.0" {
+				t.Fatalf("unexpected client metadata: %#v", observedClient)
+			}
+			if observedClient.SessionID == "" {
+				t.Fatal("expected SSE session ID")
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("timeout waiting for SSE tool observer")
 		}
 	})
 

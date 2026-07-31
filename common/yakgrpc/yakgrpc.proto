@@ -1049,6 +1049,9 @@ service Yak {
   rpc GetMCPToolList(GetMCPToolListRequest) returns (GetMCPToolListResponse);
   rpc GetMCPToolDetail(GetMCPToolDetailRequest) returns (MCPClientToolConfig);
   rpc SetMCPToolEnabled(SetMCPToolEnabledRequest) returns (GeneralResponse);
+  rpc QueryMCPToolCallHistory(QueryMCPToolCallHistoryRequest) returns (QueryMCPToolCallHistoryResponse);
+  rpc GetMCPToolCallHistoryDetail(GetMCPToolCallHistoryDetailRequest) returns (MCPToolCallHistory);
+  rpc DeleteMCPToolCallHistory(DeleteMCPToolCallHistoryRequest) returns (Empty);
 
   // RAG Collection Search
   rpc RAGCollectionSearch(RAGCollectionSearchRequest) returns (stream RAGCollectionSearchResponse);
@@ -2380,6 +2383,9 @@ message AISessionFilter {
   string Keyword = 2;
   // 按会话来源筛选（OR，与 SessionID / Keyword 条件 AND 组合）
   repeated string Source = 3;
+  // 按 IM 平台筛选（如 feishu / dingtalk），仅当 Source 含 "im" 时有意义；
+  // 匹配 ai_sessions_v1.im_source JSON 内的 platform 字段。
+  repeated string Platform = 4;
 }
 
 message AISession {
@@ -2441,6 +2447,9 @@ message DeleteAISessionFilter {
   int64 BeforeTimestamp = 3;
   // 删除 source 匹配的会话（OR，可与 SessionID / 时间范围 AND 组合）
   repeated string Source = 4;
+  // 按 IM 平台删除（如 feishu / dingtalk），仅当 Source 含 "im" 时有意义；
+  // 匹配 ai_sessions_v1.im_source JSON 内的 platform 字段。
+  repeated string Platform = 5;
 }
 
 message DeleteAISessionRequest {
@@ -9860,4 +9869,56 @@ message HTTPFlowLiveEvent {
   int64 FlowBuiltAtUnixMs = 15;
   int64 PersistEnqueuedAtUnixMs = 16;
   int64 PersistStartedAtUnixMs = 17;
+}
+
+message QueryMCPToolCallHistoryRequest {
+  string Keyword = 1;
+  string Status = 2;
+  Paging Pagination = 3;
+}
+
+message MCPToolCallHistory {
+  int64 ID = 1;
+  string ToolName = 2;
+  string Arguments = 3;
+  string Result = 4;
+  bool Success = 5;
+  string ErrorMessage = 6;
+  int64 DurationMillis = 7;
+  string ClientID = 8;
+  string SessionID = 9;
+  int64 CreatedAt = 10;
+  string ClientName = 11;
+  string ClientVersion = 12;
+}
+
+message MCPToolCallHistorySummary {
+  int64 ID = 1;
+  string ToolName = 2;
+  bool Success = 3;
+  string ErrorMessage = 4;
+  int64 DurationMillis = 5;
+  string ClientID = 6;
+  string SessionID = 7;
+  int64 CreatedAt = 8;
+  string ClientName = 9;
+  string ClientVersion = 10;
+}
+
+message QueryMCPToolCallHistoryResponse {
+  repeated MCPToolCallHistorySummary Histories = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+message GetMCPToolCallHistoryDetailRequest {
+  int64 ID = 1;
+}
+
+message DeleteMCPToolCallHistoryRequest {
+  repeated int64 IDs = 1;
+  bool DeleteAll = 2;
+  bool DeleteFiltered = 3;
+  string Keyword = 4;
+  string Status = 5;
 }

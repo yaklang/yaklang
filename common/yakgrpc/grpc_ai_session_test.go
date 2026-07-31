@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -166,6 +167,104 @@ func TestServer_QueryAISession_FilterBySource(t *testing.T) {
 	for _, row := range resp.GetData() {
 		require.Equal(t, "alpha", row.GetSource())
 	}
+}
+
+// TestServer_QueryAISession_FilterByPlatform verifies that querying with
+// Platform filters IM sessions by the platform stored inside im_source JSON,
+// without mixing up feishu and dingtalk sessions (both have source="im").
+func TestServer_QueryAISession_FilterByPlatform(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	srv := &Server{projectDatabase: db}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	marker := "plat-filter-" + uuid.NewString()
+	feishuSession := marker + "-feishu"
+	dingtalkSession := marker + "-dingtalk"
+
+	for _, sid := range []string{feishuSession, dingtalkSession} {
+		_, err = yakit.EnsureAISessionMeta(db, sid, "im")
+		require.NoError(t, err)
+	}
+	// Write IM meta so im_source JSON carries the platform.
+	_, err = srv.UpdateAISessionIMMeta(ctx, &ypb.UpdateAISessionIMMetaRequest{
+		SessionID: feishuSession,
+		Meta:      &ypb.IMSourceMeta{Platform: "feishu", ChatType: "private"},
+	})
+	require.NoError(t, err)
+	_, err = srv.UpdateAISessionIMMeta(ctx, &ypb.UpdateAISessionIMMetaRequest{
+		SessionID: dingtalkSession,
+		Meta:      &ypb.IMSourceMeta{Platform: "dingtalk", ChatType: "group"},
+	})
+	require.NoError(t, err)
+
+	// Query feishu only.
+	resp, err := srv.QueryAISession(ctx, &ypb.QueryAISessionRequest{
+		Filter: &ypb.AISessionFilter{Keyword: marker, Source: []string{"im"}, Platform: []string{"feishu"}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), resp.GetTotal())
+	require.Equal(t, feishuSession, resp.GetData()[0].GetSessionID())
+
+	// Query dingtalk only.
+	resp, err = srv.QueryAISession(ctx, &ypb.QueryAISessionRequest{
+		Filter: &ypb.AISessionFilter{Keyword: marker, Source: []string{"im"}, Platform: []string{"dingtalk"}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), resp.GetTotal())
+	require.Equal(t, dingtalkSession, resp.GetData()[0].GetSessionID())
+}
+
+// TestServer_DeleteAISession_ByPlatform verifies that deleting by Platform
+// only removes sessions of that platform, leaving the other IM platform intact.
+// Uses the full project database (via consts) so the delete pipeline can reach
+// all related tables (ai_agent_runtimes, rag, memory, ...).
+func TestServer_DeleteAISession_ByPlatform(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	srv := &Server{}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	marker := "plat-del-" + uuid.NewString()
+	feishuSession := marker + "-feishu"
+	dingtalkSession := marker + "-dingtalk"
+
+	for _, sid := range []string{feishuSession, dingtalkSession} {
+		_, err := yakit.EnsureAISessionMeta(db, sid, "im")
+		require.NoError(t, err)
+	}
+	_, err := srv.UpdateAISessionIMMeta(ctx, &ypb.UpdateAISessionIMMetaRequest{
+		SessionID: feishuSession,
+		Meta:      &ypb.IMSourceMeta{Platform: "feishu", ChatType: "private"},
+	})
+	require.NoError(t, err)
+	_, err = srv.UpdateAISessionIMMeta(ctx, &ypb.UpdateAISessionIMMetaRequest{
+		SessionID: dingtalkSession,
+		Meta:      &ypb.IMSourceMeta{Platform: "dingtalk", ChatType: "group"},
+	})
+	require.NoError(t, err)
+
+	// Delete feishu only, scoped to the two test sessions (AND with SessionID)
+	// so we never touch unrelated real IM sessions in the project database.
+	_, err = srv.DeleteAISession(ctx, &ypb.DeleteAISessionRequest{
+		Filter: &ypb.DeleteAISessionFilter{
+			SessionID: []string{feishuSession, dingtalkSession},
+			Source:    []string{"im"},
+			Platform:  []string{"feishu"},
+		},
+	})
+	require.NoError(t, err)
+
+	// feishu gone, dingtalk remains (isolated by marker keyword).
+	resp, err := srv.QueryAISession(ctx, &ypb.QueryAISessionRequest{
+		Filter: &ypb.AISessionFilter{Keyword: marker, Source: []string{"im"}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), resp.GetTotal())
+	require.Equal(t, dingtalkSession, resp.GetData()[0].GetSessionID())
 }
 
 // UpdateAISessionIMMeta 写入后，QueryAISession 应能返回 IMSourceMeta，

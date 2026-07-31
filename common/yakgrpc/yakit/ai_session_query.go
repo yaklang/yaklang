@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -53,6 +54,39 @@ func applyAISessionSourceFilter(db *gorm.DB, sources []string) *gorm.DB {
 	}
 }
 
+// applyAISessionPlatformFilter matches IM platform values stored inside the
+// ai_sessions_v1.im_source JSON column. The JSON is written by protojson
+// (camelCase field names), so the platform is stored as `"platform":"feishu"`.
+// We use LIKE to stay compatible with both SQLite (no JSON1 guarantee) and
+// MySQL. Platform values come from notify.Platform constants (feishu /
+// dingtalk) but are normalized here to lower case to be safe.
+func applyAISessionPlatformFilter(db *gorm.DB, platforms []string) *gorm.DB {
+	platforms = normalizeAISessionFilterStrings(platforms)
+	if len(platforms) == 0 {
+		return db
+	}
+
+	seen := make(map[string]struct{}, len(platforms))
+	wheres := make([]string, 0, len(platforms))
+	args := make([]any, 0, len(platforms))
+	for _, p := range platforms {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		wheres = append(wheres, "im_source LIKE ?")
+		args = append(args, fmt.Sprintf(`%%"platform":"%s"%%`, p))
+	}
+	if len(wheres) == 0 {
+		return db
+	}
+	return db.Where(strings.Join(wheres, " OR "), args...)
+}
+
 func FilterAISessionMeta(db *gorm.DB, filter *ypb.AISessionFilter) *gorm.DB {
 	db = db.Model(&schema.AISession{})
 	if filter == nil {
@@ -65,6 +99,9 @@ func FilterAISessionMeta(db *gorm.DB, filter *ypb.AISessionFilter) *gorm.DB {
 	}
 	if len(filter.GetSource()) > 0 {
 		db = applyAISessionSourceFilter(db, filter.GetSource())
+	}
+	if len(filter.GetPlatform()) > 0 {
+		db = applyAISessionPlatformFilter(db, filter.GetPlatform())
 	}
 	return db
 }
@@ -140,7 +177,11 @@ func QueryAISessionIDsForDelete(db *gorm.DB, filter *ypb.DeleteAISessionFilter, 
 		if len(filter.GetSource()) > 0 {
 			query = applyAISessionSourceFilter(query, filter.GetSource())
 		}
-		if len(sessionIDs) == 0 && filter.GetAfterTimestamp() <= 0 && filter.GetBeforeTimestamp() <= 0 && len(sources) == 0 {
+		platforms := normalizeAISessionFilterStrings(filter.GetPlatform())
+		if len(filter.GetPlatform()) > 0 {
+			query = applyAISessionPlatformFilter(query, filter.GetPlatform())
+		}
+		if len(sessionIDs) == 0 && filter.GetAfterTimestamp() <= 0 && filter.GetBeforeTimestamp() <= 0 && len(sources) == 0 && len(platforms) == 0 {
 			return nil, utils.Errorf("at least one filter condition is required")
 		}
 	}

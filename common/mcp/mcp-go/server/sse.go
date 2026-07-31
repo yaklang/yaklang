@@ -29,11 +29,32 @@ type SSEServer struct {
 
 // sseSession represents an active SSE connection.
 type sseSession struct {
-	mu        sync.Mutex
-	writer    http.ResponseWriter
-	flusher   http.Flusher
-	closeOnce sync.Once
-	done      chan struct{}
+	mu            sync.Mutex
+	metadataMu    sync.RWMutex
+	writer        http.ResponseWriter
+	flusher       http.Flusher
+	closeOnce     sync.Once
+	done          chan struct{}
+	clientName    string
+	clientVersion string
+}
+
+func (s *sseSession) notificationContext(sessionID string) NotificationContext {
+	s.metadataMu.RLock()
+	defer s.metadataMu.RUnlock()
+	return NotificationContext{
+		ClientID:      sessionID,
+		SessionID:     sessionID,
+		ClientName:    s.clientName,
+		ClientVersion: s.clientVersion,
+	}
+}
+
+func (s *sseSession) setClientMetadata(clientContext NotificationContext) {
+	s.metadataMu.Lock()
+	defer s.metadataMu.Unlock()
+	s.clientName = clientContext.ClientName
+	s.clientVersion = clientContext.ClientVersion
 }
 
 var allowedMessageOriginExtensionSchemes = map[string]struct{}{
@@ -327,19 +348,16 @@ func (s *SSEServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set the client context in the server before handling the message
-	ctx := withTransportContext(r.Context(), legacySSETransport)
-	ctx = s.server.WithContext(ctx, NotificationContext{
-		ClientID:  sessionID,
-		SessionID: sessionID,
-	})
-
 	sessionI, ok := s.sessions.Load(sessionID)
 	if !ok {
 		s.writeJSONRPCError(w, nil, mcp.INVALID_PARAMS, "Invalid session ID")
 		return
 	}
 	session := sessionI.(*sseSession)
+
+	// Set the client context in the server before handling the message.
+	ctx := withTransportContext(r.Context(), legacySSETransport)
+	ctx = s.server.WithContext(ctx, session.notificationContext(sessionID))
 
 	// Parse message as raw JSON
 	var rawMessage json.RawMessage
@@ -350,6 +368,9 @@ func (s *SSEServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Process message through MCPServer
 	response := s.server.HandleMessage(ctx, rawMessage)
+	if scoped := ServerFromContext(ctx); scoped != nil {
+		session.setClientMetadata(scoped.CurrentClientContext())
+	}
 
 	// Only send response if there is one (not for notifications)
 	if response != nil {

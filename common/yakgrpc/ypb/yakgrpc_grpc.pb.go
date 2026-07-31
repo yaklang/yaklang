@@ -638,6 +638,9 @@ const (
 	Yak_GetMCPToolList_FullMethodName                             = "/ypb.Yak/GetMCPToolList"
 	Yak_GetMCPToolDetail_FullMethodName                           = "/ypb.Yak/GetMCPToolDetail"
 	Yak_SetMCPToolEnabled_FullMethodName                          = "/ypb.Yak/SetMCPToolEnabled"
+	Yak_QueryMCPToolCallHistory_FullMethodName                    = "/ypb.Yak/QueryMCPToolCallHistory"
+	Yak_GetMCPToolCallHistoryDetail_FullMethodName                = "/ypb.Yak/GetMCPToolCallHistoryDetail"
+	Yak_DeleteMCPToolCallHistory_FullMethodName                   = "/ypb.Yak/DeleteMCPToolCallHistory"
 	Yak_RAGCollectionSearch_FullMethodName                        = "/ypb.Yak/RAGCollectionSearch"
 	Yak_DownloadRAGs_FullMethodName                               = "/ypb.Yak/DownloadRAGs"
 	Yak_SaveIMBot_FullMethodName                                  = "/ypb.Yak/SaveIMBot"
@@ -1435,6 +1438,9 @@ type YakClient interface {
 	GetMCPToolList(ctx context.Context, in *GetMCPToolListRequest, opts ...grpc.CallOption) (*GetMCPToolListResponse, error)
 	GetMCPToolDetail(ctx context.Context, in *GetMCPToolDetailRequest, opts ...grpc.CallOption) (*MCPClientToolConfig, error)
 	SetMCPToolEnabled(ctx context.Context, in *SetMCPToolEnabledRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	QueryMCPToolCallHistory(ctx context.Context, in *QueryMCPToolCallHistoryRequest, opts ...grpc.CallOption) (*QueryMCPToolCallHistoryResponse, error)
+	GetMCPToolCallHistoryDetail(ctx context.Context, in *GetMCPToolCallHistoryDetailRequest, opts ...grpc.CallOption) (*MCPToolCallHistory, error)
+	DeleteMCPToolCallHistory(ctx context.Context, in *DeleteMCPToolCallHistoryRequest, opts ...grpc.CallOption) (*Empty, error)
 	// RAG Collection Search
 	RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error)
 	// Download rags
@@ -8564,6 +8570,36 @@ func (c *yakClient) SetMCPToolEnabled(ctx context.Context, in *SetMCPToolEnabled
 	return out, nil
 }
 
+func (c *yakClient) QueryMCPToolCallHistory(ctx context.Context, in *QueryMCPToolCallHistoryRequest, opts ...grpc.CallOption) (*QueryMCPToolCallHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryMCPToolCallHistoryResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryMCPToolCallHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetMCPToolCallHistoryDetail(ctx context.Context, in *GetMCPToolCallHistoryDetailRequest, opts ...grpc.CallOption) (*MCPToolCallHistory, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MCPToolCallHistory)
+	err := c.cc.Invoke(ctx, Yak_GetMCPToolCallHistoryDetail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteMCPToolCallHistory(ctx context.Context, in *DeleteMCPToolCallHistoryRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_DeleteMCPToolCallHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[112], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
@@ -9512,6 +9548,9 @@ type YakServer interface {
 	GetMCPToolList(context.Context, *GetMCPToolListRequest) (*GetMCPToolListResponse, error)
 	GetMCPToolDetail(context.Context, *GetMCPToolDetailRequest) (*MCPClientToolConfig, error)
 	SetMCPToolEnabled(context.Context, *SetMCPToolEnabledRequest) (*GeneralResponse, error)
+	QueryMCPToolCallHistory(context.Context, *QueryMCPToolCallHistoryRequest) (*QueryMCPToolCallHistoryResponse, error)
+	GetMCPToolCallHistoryDetail(context.Context, *GetMCPToolCallHistoryDetailRequest) (*MCPToolCallHistory, error)
+	DeleteMCPToolCallHistory(context.Context, *DeleteMCPToolCallHistoryRequest) (*Empty, error)
 	// RAG Collection Search
 	RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error
 	// Download rags
@@ -11401,6 +11440,15 @@ func (UnimplementedYakServer) GetMCPToolDetail(context.Context, *GetMCPToolDetai
 }
 func (UnimplementedYakServer) SetMCPToolEnabled(context.Context, *SetMCPToolEnabledRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetMCPToolEnabled not implemented")
+}
+func (UnimplementedYakServer) QueryMCPToolCallHistory(context.Context, *QueryMCPToolCallHistoryRequest) (*QueryMCPToolCallHistoryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryMCPToolCallHistory not implemented")
+}
+func (UnimplementedYakServer) GetMCPToolCallHistoryDetail(context.Context, *GetMCPToolCallHistoryDetailRequest) (*MCPToolCallHistory, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMCPToolCallHistoryDetail not implemented")
+}
+func (UnimplementedYakServer) DeleteMCPToolCallHistory(context.Context, *DeleteMCPToolCallHistoryRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteMCPToolCallHistory not implemented")
 }
 func (UnimplementedYakServer) RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method RAGCollectionSearch not implemented")
@@ -21749,6 +21797,60 @@ func _Yak_SetMCPToolEnabled_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QueryMCPToolCallHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryMCPToolCallHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryMCPToolCallHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryMCPToolCallHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryMCPToolCallHistory(ctx, req.(*QueryMCPToolCallHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetMCPToolCallHistoryDetail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMCPToolCallHistoryDetailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetMCPToolCallHistoryDetail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetMCPToolCallHistoryDetail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetMCPToolCallHistoryDetail(ctx, req.(*GetMCPToolCallHistoryDetailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteMCPToolCallHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMCPToolCallHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteMCPToolCallHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteMCPToolCallHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteMCPToolCallHistory(ctx, req.(*DeleteMCPToolCallHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_RAGCollectionSearch_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(RAGCollectionSearchRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -23964,6 +24066,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetMCPToolEnabled",
 			Handler:    _Yak_SetMCPToolEnabled_Handler,
+		},
+		{
+			MethodName: "QueryMCPToolCallHistory",
+			Handler:    _Yak_QueryMCPToolCallHistory_Handler,
+		},
+		{
+			MethodName: "GetMCPToolCallHistoryDetail",
+			Handler:    _Yak_GetMCPToolCallHistoryDetail_Handler,
+		},
+		{
+			MethodName: "DeleteMCPToolCallHistory",
+			Handler:    _Yak_DeleteMCPToolCallHistory_Handler,
 		},
 		{
 			MethodName: "SaveIMBot",

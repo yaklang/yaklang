@@ -158,6 +158,9 @@ func hasDeleteAISessionFilterCondition(filter *ypb.DeleteAISessionFilter) bool {
 	if len(filter.GetSource()) > 0 {
 		return true
 	}
+	if len(filter.GetPlatform()) > 0 {
+		return true
+	}
 	return false
 }
 
@@ -168,7 +171,10 @@ func needsAISessionDeleteDBLookup(filter *ypb.DeleteAISessionFilter) bool {
 	if filter.GetAfterTimestamp() > 0 || filter.GetBeforeTimestamp() > 0 {
 		return true
 	}
-	return len(filter.GetSource()) > 0
+	if len(filter.GetSource()) > 0 || len(filter.GetPlatform()) > 0 {
+		return true
+	}
+	return false
 }
 
 func (gw *AIAgentHTTPGateway) cancelAndRemoveDeletedSessions(req *ypb.DeleteAISessionRequest) {
