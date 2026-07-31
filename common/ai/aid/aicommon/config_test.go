@@ -184,6 +184,27 @@ func TestConfig_ToolManagerPropagation(t *testing.T) {
 	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
 }
 
+func TestConfigResultSinkIsRunScoped(t *testing.T) {
+	sink := ResultSinkFunc(func(
+		context.Context,
+		*schema.Risk,
+	) (ResultReceipt, error) {
+		return ResultReceipt{}, nil
+	})
+	config := NewConfig(context.Background(), WithResultSink(sink))
+
+	if ResultSinkFromConfig(config) == nil {
+		t.Fatal("expected result sink to be available from runtime config")
+	}
+	child := NewConfig(context.Background(), ConvertConfigToOptions(config)...)
+	if ResultSinkFromConfig(child) == nil {
+		t.Fatal("expected child runtime config to retain the run-scoped result sink")
+	}
+	if ResultSinkFromConfig(struct{}{}) != nil {
+		t.Fatal("expected configs without ResultSinkProvider to remain compatible")
+	}
+}
+
 func TestConfig_AiForgeManagerPropagation(t *testing.T) {
 	parent := NewConfig(context.Background())
 	require.NotNil(t, parent.GetAIForgeManager())

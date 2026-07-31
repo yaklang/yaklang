@@ -83,6 +83,7 @@ type AIEngineConfig struct {
 	OnInputRequiredRaw   func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, question string) string             // 需要用户输入回调
 	OnInputRequired      func(react aicommon.AIEngineOperator, question string) string                                          // 需要用户输入回调
 	OnSessionID          func(sessionID string)                                                                                 // 会话 ID 就绪回调
+	ResultSink           aicommon.ResultSink
 
 	// 高级配置
 	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
@@ -678,6 +679,13 @@ func WithOnData(callback func(react aicommon.AIEngineOperator, event *schema.AiO
 func WithOnFinished(callback func(react aicommon.AIEngineOperator)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnFinished = callback
+	}
+}
+
+// WithResultSink installs the structured-result backend used by Focus Modes.
+func WithResultSink(sink aicommon.ResultSink) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.ResultSink = sink
 	}
 }
 
