@@ -3,6 +3,7 @@ package loop_infosec_recon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,6 +18,16 @@ import (
 
 type recordingReconAssetSink struct {
 	assets []aicommon.AssetResult
+}
+
+type sizeLimitedReconAssetSink struct {
+	recordingReconAssetSink
+	maxPayloadBytes int
+}
+
+type selectiveFailReconAssetSink struct {
+	recordingReconAssetSink
+	rejectIdentity string
 }
 
 func (s *recordingReconAssetSink) SubmitRisk(
@@ -36,6 +47,29 @@ func (s *recordingReconAssetSink) SubmitAsset(
 		DedupeKey: asset.IdentityKey,
 		BackendID: "job-1",
 	}, nil
+}
+
+func (s *sizeLimitedReconAssetSink) SubmitAsset(
+	ctx context.Context,
+	asset aicommon.AssetResult,
+) (aicommon.ResultReceipt, error) {
+	if len(asset.Payload) > s.maxPayloadBytes {
+		return aicommon.ResultReceipt{}, fmt.Errorf(
+			"payload exceeds %d bytes",
+			s.maxPayloadBytes,
+		)
+	}
+	return s.recordingReconAssetSink.SubmitAsset(ctx, asset)
+}
+
+func (s *selectiveFailReconAssetSink) SubmitAsset(
+	ctx context.Context,
+	asset aicommon.AssetResult,
+) (aicommon.ResultReceipt, error) {
+	if asset.IdentityKey == s.rejectIdentity {
+		return aicommon.ResultReceipt{}, fmt.Errorf("injected asset failure")
+	}
+	return s.recordingReconAssetSink.SubmitAsset(ctx, asset)
 }
 
 func TestNormalizeURL(t *testing.T) {
@@ -205,4 +239,74 @@ func TestSubmitVerifiedAPIAssetsPublishesOnlyVerifiedEndpoints(t *testing.T) {
 	require.True(t, payload.Verified)
 	require.Equal(t, http.StatusOK, payload.StatusCode)
 	require.Equal(t, "js_static_extract_ai", payload.Source)
+}
+
+func TestSubmitVerifiedAPIAssetsBoundsEvidenceAndContinues(t *testing.T) {
+	t.Parallel()
+
+	const maxPayloadBytes = 64 * 1024
+	pool := &APIPool{Entries: []APIPoolEntry{
+		{
+			NormalizedURL: "https://example.com/api/large",
+			Method:        http.MethodGet,
+			Source:        "js_static_extract_ai",
+			Evidence:      strings.Repeat("\x01", maxPayloadBytes),
+			Verified:      true,
+			StatusCode:    http.StatusOK,
+		},
+		{
+			NormalizedURL: "https://example.com/api/after-large",
+			Method:        http.MethodPost,
+			Source:        "js_static_extract_ai",
+			Evidence:      "fetch('/api/after-large')",
+			Verified:      true,
+			StatusCode:    http.StatusCreated,
+		},
+	}}
+	sink := &sizeLimitedReconAssetSink{maxPayloadBytes: maxPayloadBytes}
+
+	submitted, err := submitVerifiedAPIAssets(context.Background(), sink, pool)
+	require.NoError(t, err)
+	require.Equal(t, 2, submitted)
+	require.Len(t, sink.assets, 2)
+	require.LessOrEqual(t, len(sink.assets[0].Payload), maxPayloadBytes)
+
+	var payload APIPoolEntry
+	require.NoError(t, json.Unmarshal(sink.assets[0].Payload, &payload))
+	require.Less(t, len(payload.Evidence), len(pool.Entries[0].Evidence))
+	require.Equal(t, pool.Entries[0].NormalizedURL, payload.NormalizedURL)
+}
+
+func TestSubmitVerifiedAPIAssetsContinuesAfterSingleAssetFailure(t *testing.T) {
+	t.Parallel()
+
+	pool := &APIPool{Entries: []APIPoolEntry{
+		{
+			NormalizedURL: "https://example.com/api/fails",
+			Method:        http.MethodGet,
+			Source:        "test",
+			Verified:      true,
+			StatusCode:    http.StatusOK,
+		},
+		{
+			NormalizedURL: "https://example.com/api/succeeds",
+			Method:        http.MethodPost,
+			Source:        "test",
+			Verified:      true,
+			StatusCode:    http.StatusCreated,
+		},
+	}}
+	sink := &selectiveFailReconAssetSink{
+		rejectIdentity: "http_endpoint:GET:https://example.com/api/fails",
+	}
+
+	submitted, err := submitVerifiedAPIAssets(context.Background(), sink, pool)
+	require.ErrorContains(t, err, "injected asset failure")
+	require.Equal(t, 1, submitted)
+	require.Len(t, sink.assets, 1)
+	require.Equal(
+		t,
+		"http_endpoint:POST:https://example.com/api/succeeds",
+		sink.assets[0].IdentityKey,
+	)
 }
