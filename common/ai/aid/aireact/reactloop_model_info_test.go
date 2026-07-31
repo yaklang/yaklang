@@ -37,8 +37,8 @@ func TestReActLoop_MainLoopEventsInheritAIModelInfoFromResponse(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			// 去 Exit 化后 directly_answer 只发答复并继续循环, 真正收尾交给唯一终结器 finish.
-			// 第一轮发 directly_answer (产出 thought + answer-payload 节点), 第二轮发 finish 收口.
-			// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 两轮收尾
+			// 第一轮发 directly_answer (产出 thought + answer-payload 节点), 后两轮 finish 完成软 TODO 检查和确认.
+			// 关键词: directly_answer 永不 Exit, finish 唯一终结器, 软 TODO checkpoint
 			count := aiCallCount
 			aiCallCount++
 
@@ -73,7 +73,7 @@ func TestReActLoop_MainLoopEventsInheritAIModelInfoFromResponse(t *testing.T) {
 	require.NoError(t, err)
 	loop.GetEmitter().WaitForStream()
 
-	require.Equal(t, 2, aiCallCount, "expected directly_answer then finish (two main loop AI callbacks)")
+	require.Equal(t, 3, aiCallCount, "expected directly_answer, finish checkpoint, then finish confirmation")
 
 	mu.Lock()
 	defer mu.Unlock()

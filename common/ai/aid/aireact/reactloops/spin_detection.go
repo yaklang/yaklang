@@ -53,25 +53,18 @@ func (r *ReActLoop) IsInSameActionTypeSpin() bool {
 		threshold = 8 // 默认阈值
 	}
 
-	historyLen := len(r.actionHistory)
-	if historyLen < threshold {
+	recentActions := r.recentSpinActionsLocked(threshold)
+	if len(recentActions) < threshold {
 		return false
 	}
 
-	lastActionType := r.actionHistory[historyLen-1].ActionType
-	lastToolName := r.actionHistory[historyLen-1].ToolName
-	// A normal soft TODO checkpoint records two consecutive finish actions:
-	// the initial request and the confirmation after the checkpoint. They are
-	// termination control signals, not repeated work, so they must never be
-	// classified as an execution spin.
-	if lastActionType == loopAction_Finish.ActionType {
-		return false
-	}
-	for i := historyLen - threshold; i < historyLen; i++ {
-		if r.actionHistory[i].ActionType != lastActionType {
+	lastActionType := recentActions[len(recentActions)-1].ActionType
+	lastToolName := recentActions[len(recentActions)-1].ToolName
+	for _, action := range recentActions {
+		if action.ActionType != lastActionType {
 			return false
 		}
-		if r.actionHistory[i].ToolName != lastToolName {
+		if action.ToolName != lastToolName {
 			return false
 		}
 	}
@@ -79,4 +72,25 @@ func (r *ReActLoop) IsInSameActionTypeSpin() bool {
 	log.Infof("detected same action+tool spin: %d consecutive actions of type %q tool %q",
 		threshold, lastActionType, lastToolName)
 	return true
+}
+
+// recentSpinActionsLocked returns the latest real work actions in chronological
+// order. finish records are lifecycle control signals (including the soft TODO
+// checkpoint pair), so they do not break or create an execution-spin window.
+// r.actionHistoryMutex must be held by the caller.
+func (r *ReActLoop) recentSpinActionsLocked(limit int) []*ActionRecord {
+	if limit <= 0 {
+		return nil
+	}
+	recent := make([]*ActionRecord, limit)
+	writeIndex := limit - 1
+	for index := len(r.actionHistory) - 1; index >= 0 && writeIndex >= 0; index-- {
+		action := r.actionHistory[index]
+		if action == nil || action.ActionType == loopAction_Finish.ActionType {
+			continue
+		}
+		recent[writeIndex] = action
+		writeIndex--
+	}
+	return recent[writeIndex+1:]
 }

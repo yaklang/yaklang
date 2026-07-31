@@ -85,15 +85,15 @@ func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
 	}
 
 	r.actionHistoryMutex.Lock()
-	historyLen := len(r.actionHistory)
-	if historyLen < r.sameActionTypeSpinThreshold {
+	threshold := r.sameActionTypeSpinThreshold
+	if threshold <= 0 {
+		threshold = 8
+	}
+	recentActions := r.recentSpinActionsLocked(threshold)
+	if len(recentActions) < threshold {
 		r.actionHistoryMutex.Unlock()
 		return nil
 	}
-
-	// 获取最近的 action 记录用于分析
-	recentActions := make([]*ActionRecord, r.sameActionTypeSpinThreshold)
-	copy(recentActions, r.actionHistory[historyLen-r.sameActionTypeSpinThreshold:])
 	r.actionHistoryMutex.Unlock()
 
 	// 检查是否都是相同的 ActionType + ToolName(与 IsInSameActionTypeSpin 双维度对齐)
