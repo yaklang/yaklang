@@ -631,6 +631,9 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 	if config.UserUsageCallback != nil {
 		options = append(options, aicommon.WithUserUsageCallback(config.UserUsageCallback))
 	}
+	if config.ResultSink != nil {
+		options = append(options, aicommon.WithResultSink(config.ResultSink))
+	}
 
 	// 高级配置
 

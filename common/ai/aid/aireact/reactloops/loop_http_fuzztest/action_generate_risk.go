@@ -1,6 +1,7 @@
 package loop_http_fuzztest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -66,14 +67,18 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			specs := collectGenerateRiskSpecs(action)
 			riskIDs := make([]string, 0, len(specs))
+			localRiskIDs := make([]string, 0, len(specs))
 			summaries := make([]string, 0, len(specs))
 			for idx, spec := range specs {
-				riskID, summary, err := saveGeneratedRisk(loop, spec)
+				riskID, summary, persistedLocally, err := saveGeneratedRisk(loop, spec)
 				if err != nil {
 					operator.Fail(fmt.Errorf("generate_risk: save risk #%d failed: %w", idx+1, err))
 					return
 				}
 				riskIDs = append(riskIDs, riskID)
+				if persistedLocally {
+					localRiskIDs = append(localRiskIDs, riskID)
+				}
 				summaries = append(summaries, summary)
 			}
 
@@ -96,7 +101,7 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				riskFeedbackType = strings.TrimSpace(specs[0].RiskType)
 				riskFeedbackSeverity = strings.TrimSpace(specs[0].Severity)
 			}
-			loop.SubmitRiskFeedback(riskIDs, riskFeedbackType, riskFeedbackSeverity)
+			loop.SubmitRiskFeedback(localRiskIDs, riskFeedbackType, riskFeedbackSeverity)
 
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeGenerateRisk, fmt.Sprintf("生成 %d 个 Risk / Generated %d Risks", len(riskIDs), len(riskIDs)), summary)
 			reactloops.EmitStatus(loop, "完成 / Complete")
@@ -184,7 +189,7 @@ func validateGenerateRiskSpec(loop *reactloops.ReActLoop, spec generateRiskSpec,
 	return nil
 }
 
-func saveGeneratedRisk(loop *reactloops.ReActLoop, spec generateRiskSpec) (string, string, error) {
+func saveGeneratedRisk(loop *reactloops.ReActLoop, spec generateRiskSpec) (string, string, bool, error) {
 	target := inferGenerateRiskTarget(loop, spec.Target)
 	title := strings.TrimSpace(spec.Title)
 	titleVerbose := strings.TrimSpace(spec.TitleVerbose)
@@ -225,17 +230,53 @@ func saveGeneratedRisk(loop *reactloops.ReActLoop, spec generateRiskSpec) (strin
 		opts = append(opts, yakit.WithRiskParam_Response(responseRaw))
 	}
 
-	risk, err := yakit.NewRisk(target, opts...)
-	if err != nil {
-		return "", "", err
-	}
+	risk := yakit.CreateRisk(target, opts...)
 	if risk == nil {
-		return "", "", fmt.Errorf("saved risk is nil")
+		return "", "", false, fmt.Errorf("created risk is nil")
+	}
+
+	if sink := focusResultSink(loop); sink != nil {
+		receipt, err := sink.SubmitRisk(focusResultContext(loop), risk)
+		if err != nil {
+			return "", "", false, err
+		}
+		if strings.TrimSpace(receipt.ResultID) == "" {
+			return "", "", false, fmt.Errorf("focus result sink returned an empty result id")
+		}
+		summary := fmt.Sprintf(
+			"- result_id=%s severity=%s type=%s target=%s title=%s",
+			receipt.ResultID,
+			risk.Severity,
+			risk.RiskType,
+			target,
+			title,
+		)
+		return receipt.ResultID, summary, false, nil
+	}
+
+	if err := yakit.SaveRisk(risk); err != nil {
+		return "", "", false, err
 	}
 
 	riskID := fmt.Sprintf("%d", risk.ID)
 	summary := fmt.Sprintf("- id=%d severity=%s type=%s target=%s title=%s", risk.ID, risk.Severity, risk.RiskType, target, title)
-	return riskID, summary, nil
+	return riskID, summary, true, nil
+}
+
+func focusResultSink(loop *reactloops.ReActLoop) aicommon.ResultSink {
+	if loop == nil {
+		return nil
+	}
+	return aicommon.ResultSinkFromConfig(loop.GetConfig())
+}
+
+func focusResultContext(loop *reactloops.ReActLoop) context.Context {
+	if loop != nil {
+		if config := loop.GetConfig(); config != nil && config.GetContext() != nil {
+			return config.GetContext()
+		}
+	}
+	return context.Background()
 }
 
 func isValidGenerateRiskSeverity(severity string) bool {
