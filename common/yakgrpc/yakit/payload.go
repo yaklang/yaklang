@@ -116,8 +116,25 @@ func CheckExistGroup(db *gorm.DB, group string) (*schema.Payload, error) {
 
 // save payload from file
 func SavePayloadByFilename(db *gorm.DB, group string, fileName string) error {
-	return ReadPayloadFileLineWithCallBack(context.Background(), fileName, func(s string, rawLen int64, hitCount int64) error {
-		return CreateOrUpdatePayload(db, s, group, "", hitCount, true)
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		mode, err := InspectPayloadGroupStorage(tx, group)
+		if err != nil {
+			return err
+		}
+		switch mode {
+		case PayloadGroupStorageLegacyFileFlag:
+			if _, err := repairLegacyFilePayloadGroup(tx, group); err != nil {
+				return err
+			}
+		case PayloadGroupStorageFile:
+			return utils.Errorf("payload group %q is file-backed and cannot be imported as a database group", group)
+		case PayloadGroupStorageInconsistent:
+			return utils.Errorf("payload group %q has inconsistent storage records", group)
+		}
+
+		return ReadPayloadFileLineWithCallBack(context.Background(), fileName, func(s string, rawLen int64, hitCount int64) error {
+			return CreateOrUpdatePayload(tx, s, group, "", hitCount, false)
+		})
 	})
 }
 
@@ -258,15 +275,22 @@ func GetPayloadFirst(db *gorm.DB, group string) (*schema.Payload, error) {
 }
 
 func GetPayloadGroupFileName(db *gorm.DB, group string) (string, error) {
-	if payload, err := GetPayloadFirst(db, group); err != nil {
+	mode, err := InspectPayloadGroupStorage(db, group)
+	if err != nil {
 		return "", err
-	} else {
-		if payload.IsFile != nil && *payload.IsFile {
-			return *payload.Content, nil
-		} else {
-			return "", utils.Errorf("this group %s save in database not in file", group)
-		}
 	}
+	if mode != PayloadGroupStorageFile {
+		return "", utils.Errorf("payload group %q is %s, not file-backed", group, mode)
+	}
+
+	payload, err := GetPayloadFirst(db, group)
+	if err != nil {
+		return "", err
+	}
+	if payload.Content == nil {
+		return "", utils.Errorf("payload group %q has an empty backing file path", group)
+	}
+	return *payload.Content, nil
 }
 
 func GetPayloadCountInGroup(db *gorm.DB, group string) int64 {
