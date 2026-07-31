@@ -1008,6 +1008,10 @@ LOOP:
 				operator.SetReflectionData("rejected_action", actionName)
 				operator.SetReflectionData("rejected_reason", "task_already_async")
 				operator.Continue()
+				continueIter := func() {
+					r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
+				}
+				continueIter()
 				continue
 			}
 			task.SetAsyncMode(true)
@@ -1035,6 +1039,10 @@ LOOP:
 			r.finishIterationLoopWithError(iterationCount, task, finalError)
 			needSummary.SetTo(true)
 			return finalError
+		}
+
+		continueIter := func() {
+			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
 		}
 
 		select {
@@ -1082,6 +1090,10 @@ LOOP:
 				})
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
+			}
+			if !operator.isSilence {
+				// 正常退出
+				continueIter()
 			}
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
@@ -1150,6 +1162,10 @@ LOOP:
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
 			}
+			if !operator.isSilence {
+				// 正常退出
+				continueIter()
+			}
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1203,6 +1219,7 @@ LOOP:
 
 		// 非异步模式，继续下一次循环
 		if operator.IsContinued() {
+			continueIter()
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1219,6 +1236,7 @@ LOOP:
 		}
 
 		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
+		continueIter()
 		utils.Debug(func() {
 			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			fmt.Printf("[Default Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())

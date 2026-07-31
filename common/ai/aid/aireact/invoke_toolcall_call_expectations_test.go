@@ -149,15 +149,8 @@ func TestReAct_ToolUse_CallExpectations_InTimelineVerify(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var verifyPromptContainsExpectations bool
-	ins, err := NewTestReAct(
+	_, err = NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := r.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied") {
-				if strings.Contains(prompt, testCallExpectations) {
-					verifyPromptContainsExpectations = true
-				}
-			}
 			return mockedToolCallingWithCallExpectations(i, r, "sleep_test")
 		}),
 		aicommon.WithEventInputChan(in),
@@ -206,12 +199,10 @@ LOOP:
 	require.True(t, toolCalled, "tool should be called")
 	require.True(t, reviewed, "tool use review should be triggered")
 
-	tl := ins.DumpTimeline()
-	require.Contains(t, tl, testCallExpectations,
-		"timeline dump should contain call_expectations from ToolResult")
-
-	require.True(t, verifyPromptContainsExpectations,
-		"verify-satisfaction prompt should contain call_expectations via timeline")
+	// call_expectations is no longer rendered in timeline dump, so the verify-satisfaction
+	// prompt (which includes timeline) no longer carries it. The expectations text is
+	// still preserved on ToolResult.CallExpectations for interval review and audit.
+	// This test now only verifies tool execution + review flow, not expectations in verify prompt.
 }
 
 func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
@@ -323,7 +314,9 @@ func TestNormalizeIntervalReviewFieldContent(t *testing.T) {
 	})
 }
 
-func TestToolResult_String_ContainsCallExpectations(t *testing.T) {
+func TestToolResult_String_OmitsCallExpectations(t *testing.T) {
+	// call_expectations is no longer rendered in timeline dump (ToolResult.String())
+	// to save tokens; it is still carried on the struct for interval-review / verify prompts.
 	result := &aitool.ToolResult{
 		Name:             "test_tool",
 		Param:            map[string]any{"key": "value"},
@@ -332,8 +325,8 @@ func TestToolResult_String_ContainsCallExpectations(t *testing.T) {
 	}
 
 	str := result.String()
-	require.Contains(t, str, "call_expectations:", "String() output should contain call_expectations label")
-	require.Contains(t, str, testCallExpectations, "String() output should contain the actual expectations text")
+	require.NotContains(t, str, "call_expectations:", "String() should not contain call_expectations label (removed from dump)")
+	require.NotContains(t, str, testCallExpectations, "String() should not contain the expectations text in dump")
 }
 
 func TestToolResult_String_OmitsEmptyCallExpectations(t *testing.T) {
