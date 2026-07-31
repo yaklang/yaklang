@@ -1,4 +1,4 @@
-__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection. if you want to exec batch requests, please use batch_do_http_request tool instead. 强大的HTTP请求工具，功能媲美curl。支持两种模式：URL模式（指定URL、方法、头部、请求体、参数）和报文模式（发送原始HTTP请求报文）。功能包括超时控制、重定向处理、关键字/正则匹配、代理支持和HTTPS自动检测。如果需要执行批量请求，需要遍历某个参数，同时访问多个请求，请使用batch_do_http_request工具。"
+__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection. OUTPUT IS MINIMAL BY DEFAULT: only a one-line request summary, the status line, and the response body are printed (great for quick probing and IDOR/enum). To also print the full request packet + connection trace (dns/connect/server timings), set verbose=true. The full request/response packets are NOT dumped to temp files unless you set save-packet=true. IMPORTANT: if you want to iterate over a parameter (e.g. enumerate order/user IDs 1..N against the same endpoint) or send many requests at once, use the batch_do_http_request tool instead of calling this tool repeatedly. 强大的HTTP请求工具，功能媲美curl。支持两种模式：URL模式（指定URL、方法、头部、请求体、参数）和报文模式（发送原始HTTP请求报文）。默认输出已精简：只打印一行请求摘要、状态行、响应体（适合快速探测与IDOR/枚举）。需要完整请求报文+连接耗时(dns/connect/server)，请设置 verbose=true。需要把报文保存到文件，请设置 save-packet=true。重要：若要遍历某个参数（如枚举订单/用户ID 1..N）或一次发很多请求，请改用 batch_do_http_request 工具，不要重复调用本工具。"
 __VERBOSE_NAME__ = "Powerful HTTP Request Tool (curl-like)"
 __VERBOSE_NAME_ZH__ = "强大的HTTP请求工具（类curl）"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
@@ -57,7 +57,7 @@ specific GET or POST parameter, prefer URL Mode with "query-params" or "post-par
 
 Use JSON params for single-line values:
     url, method, content-type, query-params, post-params,
-    https, timeout, redirect-times, keyword, regexp-match, show-request, proxy
+    https, timeout, redirect-times, keyword, regexp-match, verbose, save-packet, proxy
 
 Use AITAG for multi-line or structured content:
     packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
@@ -72,11 +72,18 @@ Required:
 
 Optional:
     method          (string)  HTTP method. Default: "GET".
-    headers         (string)  Custom headers. Use AITAG when providing multiple lines.
+    headers         (string or object)  Custom headers. Two accepted forms:
+                            (a) a string with one "Key: Value" per line (use AITAG for
+                                multiple lines): "X-Header: v1\nX-Other: v2";
+                            (b) a JSON object: {"X-Header": "v1", "X-Other": "v2"}.
     body            (string)  Request body content. Use AITAG.
     content-type    (string)  Content-Type header value.
-    query-params    (string)  Query parameters like "k1=v1&k2=v2". Preferred for GET param testing.
-    post-params     (string)  Form parameters like "k1=v1&k2=v2". Preferred for form POST testing.
+    query-params    (string or object)  Query parameters. Accepted forms:
+                            (a) "k1=v1&k2=v2" string; (b) {"k1":"v1","k2":"v2"} object.
+                            Preferred for GET param testing (values patched/encoded safely).
+    post-params     (string or object)  POST form parameters. Accepted forms:
+                            (a) "k1=v1&k2=v2" string; (b) {"k1":"v1","k2":"v2"} object.
+                            Preferred for form POST testing.
 
 --- Packet Mode ---
 Required when not using URL Mode:
@@ -90,8 +97,27 @@ Optional:
     redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
     keyword         (string)  Keyword to search in the response.
     regexp-match    (string)  Regular expression to search in the response.
-    show-request    (string)  Display and save the full request packet: "yes"/"no". Default: "no".
+    verbose         (bool)    Verbose output: also print the mode line, the FULL request
+                              packet, and the connection trace (dns/connect/server/total).
+                              OFF by default — output is already minimal (one-line request
+                              summary + status line + response body), which is ideal for
+                              quick probing and IDOR/enum. Turn on only when you need to
+                              inspect the exact wire-format request. Default: false.
+    save-packet     (bool)    Dump the full request AND response packets to temp files and
+                              return their paths. OFF by default to keep output small; the
+                              packets are still printed inline (truncated for very large
+                              bodies). Set to true only when you need the raw files.
+                              Accepts true/false, yes/no, 1/0. Default: false.
     proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
+
+## When to use batch_do_http_request instead
+
+This tool sends ONE request per call. If your goal is to ITERATE over a parameter
+(e.g. enumerate order/user/ticket IDs 1..N against the same endpoint, or fuzz a
+value across many requests), DO NOT call this tool in a loop — use the
+batch_do_http_request tool, which iterates a fuzztag/parameter and sends all
+requests in one call with a consolidated summary. Calling do_http_request dozens
+of times for enumeration wastes rounds and bloats context.
 
 ## Black-Box Experiment Methodology
 
@@ -122,8 +148,8 @@ Every HTTP request is an experiment against a black box. Apply this cycle:
    the black box. If two consecutive requests produce the same baseline response with
    the same reasoning, you are in a zero-information loop. Change your experimental
    design — vary a different controlled variable, or expand your observable variables
-   (e.g., use "show-request" to inspect the actual wire format, check response headers
-   you haven't looked at, use "keyword" or "regexp-match" to detect specific signals).
+   (e.g., use "save-packet" to dump the actual wire format to a file, check response
+   headers you haven't looked at, use "keyword" or "regexp-match" to detect signals).
 
 ## Few-Shot Examples
 
@@ -142,7 +168,7 @@ User intent: "Test the id parameter with a payload containing spaces"
         "url": "https://target.example.com/admin.php",
         "query-params": "id=1 or xxx",
         "timeout": 10,
-        "show-request": "yes"
+        "save-packet": true
     }
 }
 ```
@@ -211,7 +237,7 @@ User intent: "Replay this HTTP request I captured"
         "https": "auto",
         "timeout": 10,
         "redirect-times": 0,
-        "show-request": "yes"
+        "save-packet": true
     }
 }
 ```
@@ -250,11 +276,11 @@ yakit.AutoInitYakit()
 // URL mode params
 urlStr = cli.String("url", cli.setHelp("target URL for URL mode"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
-headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
+headers = cli.String("headers", cli.setHelp("custom headers; accept 'Key: Value' per line OR a JSON object {key:value} (AI may pass either)"), cli.setRequired(false))
 body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
 contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
-queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2; preferred for testing GET params because values are patched/encoded safely"), cli.setRequired(false))
-postParams = cli.String("post-params", cli.setHelp("POST form params: k1=v1&k2=v2; preferred for form parameter testing"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("URL query params: 'k1=v1&k2=v2' string OR JSON object {k1:v1}; preferred for GET param testing"), cli.setRequired(false))
+postParams = cli.String("post-params", cli.setHelp("POST form params: 'k1=v1&k2=v2' string OR JSON object {k1:v1}; preferred for form POST testing"), cli.setRequired(false))
 
 // Packet mode params
 packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode; request target/query must already be encoded"), cli.setRequired(false))
@@ -265,9 +291,78 @@ timeout = cli.Int("timeout", cli.setHelp("request timeout in seconds"), cli.setD
 redirectTimes = cli.Int("redirect-times", cli.setHelp("max redirect follows, 0 to disable"), cli.setDefault(3))
 keyword = cli.String("keyword", cli.setHelp("keyword to highlight in response"), cli.setRequired(false))
 regexpMatch = cli.String("regexp-match", cli.setHelp("regex to search in response"), cli.setRequired(false))
-showRequest = cli.String("show-request", cli.setHelp("display request packet: yes/no"), cli.setDefault("no"))
+// save-packet: dump the full request AND response packets to temp files. OFF by default
+// to keep output small; the packets are still printed inline (truncated for large bodies).
+// 用 cli.Bool: AI 传 JSON true 时, 执行器注入裸 --save-packet 标志, cli.Bool 读到 true.
+savePacket = cli.Bool("save-packet", cli.setHelp("dump full request+response packets to temp files (default off; packets are still printed inline)"))
+// verbose: 默认 false 时输出已精简到状态行 + 响应体 (适合批量枚举/快速探测);
+// true 时恢复完整输出 (模式行 + 完整请求报文 + 连接 trace). 用 cli.Bool, 同 save-packet.
+verbose = cli.Bool("verbose", cli.setHelp("verbose output: print full request packet + connection trace + mode line (default off; output is minimal: status line + response body)"))
 proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
 cli.check()
+
+// --- normalize params that AI may pass as object/map or string ---
+// AI 有时把 headers/query-params/post-params 传成 JSON 对象. 执行器 (yakscript_plugin_for_ai.go)
+// 会把非 bool 值用 fmt.Sprint 转成字符串, 对象会变成 "map[k1:v1 k2:v2]" 这种 Go map 字面量
+// (注意: 每一对是 "key:value", 对之间用空格分隔, 字母序排序).
+// 这里把它归一化成 "k1=v1&k2=v2" 或 "Key: Value\n..." 的规范字符串, 与原有字符串写法兼容.
+// 关键词: do_http_request 参数归一化, headers 对象, fmt.Sprint map
+normalizeMapLike = func(raw, pairSep, kvSep) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    // 形如 map[k1:v1 k2:v2] (Go fmt.Sprint of a map) -> 拆成 pair 列表
+    if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        out = []
+        for _, kv := range str.Split(inner, " ") {
+            kv = str.TrimSpace(kv)
+            if kv == "" {
+                continue
+            }
+            // map 字面量里 key/value 用第一个冒号 ":" 分隔
+            colonIdx = str.Index(kv, ":")
+            if colonIdx > 0 {
+                out.Push(sprintf("%v%v%v", str.TrimSpace(kv[:colonIdx]), kvSep, str.TrimSpace(kv[colonIdx+1:])))
+            } else {
+                out.Push(sprintf("%v%v", kv, kvSep))
+            }
+        }
+        return str.Join(out, pairSep)
+    }
+    return s
+}
+
+// headers 归一化: 接受 "Key: Value\n..." 或对象; 输出 "Key: Value\n..."
+normalizeHeaders = func(raw) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        out = []
+        for _, kv := range str.Split(inner, " ") {
+            kv = str.TrimSpace(kv)
+            if kv == "" {
+                continue
+            }
+            colonIdx = str.Index(kv, ":")
+            if colonIdx > 0 {
+                out.Push(sprintf("%v: %v", str.TrimSpace(kv[:colonIdx]), str.TrimSpace(kv[colonIdx+1:])))
+            }
+        }
+        return str.Join(out, "\n")
+    }
+    return s
+}
+
+headers = normalizeHeaders(headers)
+queryParams = normalizeMapLike(queryParams, "&", "=")
+postParams = normalizeMapLike(postParams, "&", "=")
 
 // --- validation ---
 if packet == "" && urlStr == "" {
@@ -327,7 +422,7 @@ isHttps = false
 
 if packet != "" {
     // === Packet Mode ===
-    yakit.Info("mode: Packet (raw HTTP request)")
+    if verbose { yakit.Info("mode: Packet (raw HTTP request)") }
     rawPacket = []byte(packet)
 
     // detect HTTPS from packet Host header
@@ -337,12 +432,16 @@ if packet != "" {
 
     url = poc.GetUrlFromHTTPRequest(isHttps ? "https" : "http", rawPacket)
     methodStr = poc.GetHTTPRequestMethod(rawPacket)
+    // 单行请求摘要: 默认就打 (一行, 高价值); 完整 target 行只在 verbose 下打.
     if url != "" {
-        yakit.Info("packet target: [%v] %v (https=%v)", methodStr, url, isHttps)
+        yakit.Info("request: %v %v", methodStr, url)
+        if verbose { yakit.Info("packet target: [%v] %v (https=%v)", methodStr, url, isHttps) }
     }
 } else {
     // === URL Mode ===
-    yakit.Info("mode: URL (%v %v)", method, urlStr)
+    if verbose { yakit.Info("mode: URL (%v %v)", method, urlStr) }
+    // 单行请求摘要: 默认就打, 让 AI 知道这次打的是哪个 URL.
+    yakit.Info("request: %v %v", method, urlStr)
 
     // parse URL to raw packet
     autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
@@ -419,28 +518,116 @@ if err != nil {
 rsp = rspIns.RawPacket
 req = rspIns.RawRequest
 
-// --- print request packet ---
+// --- form-encoded 兜底重试 ---
+// 现场问题: AI 对登录/表单类接口习惯发 application/json, 但很多服务端只收
+// application/x-www-form-urlencoded (见 redhaze login.js: URLSearchParams + form),
+// 导致明明带了字段却收到 400 "xxx and password are required" / "invalid request body",
+// AI 误以为是字段名错了而死磕 (run-2/run-3 各 9 次, 漏掉 SQLi 认证绕过).
+// 这里兜底: 当 POST + JSON body + 400 + 响应像"字段必填/invalid body" 时, 自动把 JSON
+// body 转成 form-encoded 重发一次, 并明确提示 AI "JSON 被拒, 已用 form 重试".
+// 关键词: do_http_request form 重试, content-type 不匹配, application/x-www-form-urlencoded
+tryFormRetryOnJsonRejected = func() {
+    // 只对 POST + URL 模式 + 用了 body 的情况生效.
+    if packet != "" {
+        return false
+    }
+    if str.ToUpper(method) != "POST" {
+        return false
+    }
+    if body == "" {
+        return false
+    }
+    // 原始请求必须是 JSON (AI 主动带了 application/json).
+    ct = str.ToLower(str.TrimSpace(contentType))
+    if !str.Contains(ct, "json") {
+        return false
+    }
+    // 响应必须是 400.
+    statusCode = poc.GetStatusCodeFromResponse(rsp)
+    if statusCode != 400 {
+        return false
+    }
+    // 响应体像"字段必填 / invalid body"这类典型的 content-type/编码不匹配信号.
+    bodyLower = str.ToLower(poc.GetHTTPPacketBody(rsp))
+    isRejectedSignal = str.Contains(bodyLower, "required") || str.Contains(bodyLower, "invalid") || str.Contains(bodyLower, "missing")
+    if !isRejectedSignal {
+        return false
+    }
+    // 把 JSON body 转成 form-encoded: {"a":"b","c":"d"} -> a=b&c=d
+    // 不依赖 JSON 库: AI 发的登录 body 通常是扁平对象, 用字符串切分即可.
+    // 去掉外层大括号后按逗号切分, 每段按第一个冒号切 k/v, 去掉首尾引号.
+    inner = str.Trim(str.TrimSpace(body), "{}")
+    if inner == "" {
+        return false
+    }
+    pairs = []
+    for _, seg := range str.Split(inner, ",") {
+        kv = str.SplitN(seg, ":", 2)
+        if len(kv) == 2 {
+            fk = str.Trim(str.TrimSpace(kv[0]), "\"")
+            fv = str.Trim(str.TrimSpace(kv[1]), "\"")
+            if fk != "" {
+                pairs.Push(sprintf("%v=%v", codec.EscapeQueryUrl(fk), codec.EscapeQueryUrl(fv)))
+            }
+        }
+    }
+    if len(pairs) == 0 {
+        return false
+    }
+    formBody = str.Join(pairs, "&")
+
+    // 用同一份 rawPacket, 换 Content-Type 为 form, 换 body 为 formBody, 重新发送.
+    retryPacket = rawPacket
+    retryPacket = poc.ReplaceHTTPPacketHeader(retryPacket, "Content-Type", "application/x-www-form-urlencoded")
+    retryPacket = poc.ReplaceHTTPPacketBody(retryPacket, []byte(formBody))
+    retryRspIns, _, retryErr := poc.HTTPEx(retryPacket, opts...)
+    if retryErr != nil {
+        return false
+    }
+    // 只有当 form 重试后状态码不再是 400 时, 才认为重试"奏效" (服务端接受了 form),
+    // 此时把 req/rsp 替换成重试的版本, 并提示 AI.
+    retryStatusCode = poc.GetStatusCodeFromResponse(retryRspIns.RawPacket)
+    if retryStatusCode == 400 {
+        return false
+    }
+    yakit.Info("[content-type hint] JSON body was rejected with HTTP 400 (likely '%v'). Retried the SAME request as application/x-www-form-urlencoded and the server accepted it (now HTTP %v). => This endpoint expects FORM-ENCODED bodies, NOT JSON. For login/form endpoints like this, use post-params (or content-type=application/x-www-form-urlencoded) instead of a JSON body. The response being JSON does NOT mean the request should be JSON.", str.TrimSpace(poc.GetHTTPPacketBody(rsp)), retryStatusCode)
+    rspIns = retryRspIns
+    rsp = retryRspIns.RawPacket
+    req = retryRspIns.RawRequest
+    return true
+}
+
+tryFormRetryOnJsonRejected()
+
+// --- print request packet (only in verbose mode; default already printed a one-line summary above) ---
 reqSize = len(req)
-if reqSize > 0 {
+if verbose && reqSize > 0 {
     if reqSize <= 5120 {
         yakit.Info("request packet (%v bytes):\n%v", reqSize, string(req))
     } else {
-        yakit.Info("request packet (%v bytes, truncated to 5KB):\n%v\n... (truncated, full request saved to file)", reqSize, string(req[:5120]))
+        // 大请求截断内联打印; 完整文件仅在 save-packet 打开时才落盘.
+        if savePacket {
+            yakit.Info("request packet (%v bytes, truncated to 5KB):\n%v\n... (truncated, full request saved to file)", reqSize, string(req[:5120]))
+        } else {
+            yakit.Info("request packet (%v bytes, truncated to 5KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", reqSize, string(req[:5120]))
+        }
     }
 }
 
 // --- report results ---
-// connection info
-if rspIns.PortIsOpen {
-    yakit.Info("remote %v is open", rspIns.RemoteAddr)
+// connection info (verbose only; trace is noise for batch IDOR/enum flows)
+if verbose {
+    if rspIns.PortIsOpen {
+        yakit.Info("remote %v is open", rspIns.RemoteAddr)
+    }
+    try {
+        yakit.Info("dns: %v, connect: %v, server: %v, total: %v",
+            rspIns.TraceInfo.DNSTime.String(),
+            rspIns.TraceInfo.ConnTime.String(),
+            rspIns.TraceInfo.ServerTime.String(),
+            rspIns.TraceInfo.TotalTime.String())
+    } catch e {}
 }
-try {
-    yakit.Info("dns: %v, connect: %v, server: %v, total: %v",
-        rspIns.TraceInfo.DNSTime.String(),
-        rspIns.TraceInfo.ConnTime.String(),
-        rspIns.TraceInfo.ServerTime.String(),
-        rspIns.TraceInfo.TotalTime.String())
-} catch e {}
 
 // status line
 try {
@@ -456,30 +643,29 @@ try {
     yakit.Info("response body size: %v", rspIns.ResponseBodySize)
 }
 
-// save request if requested
-if str.ToLower(showRequest) in ["yes", "y", "true"] {
+// save request/response/redirect to files only when save-packet is enabled.
+// 默认不落盘, 保持输出精简; 完整报文已在内联打印中给出 (大报文会截断).
+if savePacket {
     reqFile, err := file.TempFileName("http-request-*.txt")
     if err == nil {
         file.Save(reqFile, string(req))
         yakit.Info("request packet [size:%v] saved to %v", len(req), reqFile)
     }
-}
 
-// save response
-rspFile, err := file.TempFileName("http-response-*.txt")
-if err != nil {
-    yakit.Error("failed to create temp file for response: %v", err)
-} else {
-    file.Save(rspFile, string(rsp))
-    yakit.Info("response packet [size:%v] saved to %v", len(rsp), rspFile)
-}
+    rspFile, err := file.TempFileName("http-response-*.txt")
+    if err != nil {
+        yakit.Error("failed to create temp file for response: %v", err)
+    } else {
+        file.Save(rspFile, string(rsp))
+        yakit.Info("response packet [size:%v] saved to %v", len(rsp), rspFile)
+    }
 
-// save redirect logs
-if len(redirectLogs) > 0 {
-    redirectFile, err := file.TempFileName("http-redirect-logs-*.txt")
-    if err == nil {
-        file.Save(redirectFile, str.Join(redirectLogs, "\n"))
-        yakit.Info("%d redirects recorded, saved to %v", len(redirectLogs), redirectFile)
+    if len(redirectLogs) > 0 {
+        redirectFile, err := file.TempFileName("http-redirect-logs-*.txt")
+        if err == nil {
+            file.Save(redirectFile, str.Join(redirectLogs, "\n"))
+            yakit.Info("%d redirects recorded, saved to %v", len(redirectLogs), redirectFile)
+        }
     }
 }
 
@@ -490,13 +676,74 @@ if len(rsp) > 0 {
         if len(rsp) <= 5120 {
             yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
         } else {
-            yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below and saved file", len(rsp))
+            if savePacket {
+                yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below and saved file", len(rsp))
+            } else {
+                yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below (set save-packet=true to dump the full packet to a file)", len(rsp))
+            }
         }
     } else {
         if len(rsp) <= 10240 {
             yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
         } else {
-            yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated, full response saved to file)", len(rsp), string(rsp[:10240]))
+            if savePacket {
+                yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated, full response saved to file)", len(rsp), string(rsp[:10240]))
+            } else {
+                yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", len(rsp), string(rsp[:10240]))
+            }
+        }
+    }
+}
+
+// --- 表单接口探测提示 (治本) ---
+// 现场问题: AI 看到 JSON 响应就以为请求也该是 JSON, 但很多登录/表单接口其实是
+// form-encoded (见 redhaze login.js: URLSearchParams + application/x-www-form-urlencoded).
+// 当响应是 HTML 含 <form>/<input name=> 或 JS 用 URLSearchParams 提交时, 主动提示 AI
+// "这是表单接口, 字段是 X/Y, 用 form-encoded 而非 JSON", 从源头避免 AI 死磕 JSON.
+// 关键词: do_http_request 表单探测, form hint, URLSearchParams, 别用 JSON
+if method == "GET" || (method == "POST" && body == "") {
+    rspText = string(rsp)
+    rspLower = str.ToLower(rspText)
+    hasFormHtml = str.Contains(rspLower, "<form") && str.Contains(rspLower, " name=")
+    hasFormJs = str.Contains(rspText, "URLSearchParams") || str.Contains(rspText, "x-www-form-urlencoded")
+    if hasFormHtml || hasFormJs {
+        // 从响应里尽量提取 input 字段名, 帮 AI 直接拼请求.
+        fieldNames = []
+        for _, line := range str.Split(rspText, "\n") {
+            lineLower = str.ToLower(line)
+            if str.Contains(lineLower, "<input") {
+                // 提取 name="xxx" 或 name='xxx'
+                idx = str.Index(str.ToLower(line), "name=")
+                if idx > 0 {
+                    rest = str.TrimSpace(line[idx+5:])
+                    // 去掉引号
+                    rest = str.Trim(rest, "\"'")
+                    // 取到下一个空白/引号前
+                    for _, ch := range [" ", "\t", ">", "/", "\"", "'"] {
+                        ci = str.Index(rest, ch)
+                        if ci > 0 {
+                            rest = rest[:ci]
+                        }
+                    }
+                    if rest != "" && rest != "submit" && rest != "button" {
+                        fieldNames.Push(rest)
+                    }
+                }
+            }
+        }
+        // 去重
+        seen = {}
+        uniqueFields = []
+        for _, f := range fieldNames {
+            if !seen[f] {
+                seen[f] = true
+                uniqueFields.Push(f)
+            }
+        }
+        if len(uniqueFields) > 0 {
+            yakit.Info("[form-endpoint hint] This response contains an HTML <form> / form-submit JS. The likely login/form fields are: [%v]. Such form endpoints usually expect application/x-www-form-urlencoded (use post-params), NOT a JSON body — even when the API response is JSON. Verify the real encoding (e.g. via the page's JS) before sending.", str.Join(uniqueFields, ", "))
+        } else {
+            yakit.Info("[form-endpoint hint] This response contains form-submit JS (URLSearchParams / x-www-form-urlencoded). The endpoint likely expects FORM-ENCODED bodies, NOT JSON. Use post-params instead of a JSON body.")
         }
     }
 }
