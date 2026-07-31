@@ -142,21 +142,28 @@ func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.DeletePayloa
 	if group == "" {
 		return nil, utils.Errorf("group name is empty")
 	}
-	// if file, delete file
-	payload, err := yakit.GetPayloadFirst(s.GetProfileDatabase(), group)
+	db := s.GetProfileDatabase()
+	mode, err := yakit.InspectPayloadGroupStorage(db, group)
 	if err != nil {
-		return nil, utils.Wrap(err, "delete payload by group error")
+		return nil, utils.Wrap(err, "inspect payload group before delete")
 	}
-
-	if payload.IsFile != nil && *payload.IsFile {
-		// delete file
-		if err := os.Remove(*payload.Content); err != nil {
+	switch mode {
+	case yakit.PayloadGroupStorageEmpty:
+		return nil, utils.Errorf("payload group %q does not exist", group)
+	case yakit.PayloadGroupStorageFile:
+		filename, err := yakit.GetPayloadGroupFileName(db, group)
+		if err != nil {
+			return nil, utils.Wrap(err, "get payload backing file before delete")
+		}
+		if err := os.Remove(filename); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, utils.Wrap(err, "delete payload by group error")
 		}
+	case yakit.PayloadGroupStorageInconsistent:
+		return nil, utils.Errorf("payload group %q has inconsistent storage records", group)
 	}
 
 	// delete in database
-	if err := yakit.DeletePayloadByGroup(s.GetProfileDatabase(), group); err != nil {
+	if err := yakit.DeletePayloadByGroup(db, group); err != nil {
 		return nil, utils.Wrap(err, "delete payload by group error")
 	}
 	return &ypb.Empty{}, nil
