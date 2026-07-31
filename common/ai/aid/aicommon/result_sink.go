@@ -14,11 +14,29 @@ type ResultReceipt struct {
 	BackendID string
 }
 
+// AssetResult is a platform-neutral structured asset produced by a Focus Mode.
+// Payload is an inline JSON document whose schema is owned by Kind.
+type AssetResult struct {
+	Kind        string
+	Title       string
+	Target      string
+	IdentityKey string
+	Payload     []byte
+}
+
 // ResultSink is injected per AI runtime. Desktop runtimes leave it unset and
 // retain their existing local persistence behavior; SaaS runtimes inject a
 // sink that transfers ownership to Legion.
 type ResultSink interface {
 	SubmitRisk(context.Context, *schema.Risk) (ResultReceipt, error)
+}
+
+// AssetResultSink is an optional capability implemented by backends that can
+// take ownership of structured assets. Keeping it separate preserves
+// compatibility with ResultSink implementations that only accept risks.
+type AssetResultSink interface {
+	ResultSink
+	SubmitAsset(context.Context, AssetResult) (ResultReceipt, error)
 }
 
 // ResultSinkProvider is intentionally separate from AICallerConfigIf so
@@ -34,6 +52,14 @@ func ResultSinkFromConfig(config any) ResultSink {
 		return nil
 	}
 	return provider.GetResultSink()
+}
+
+func AssetResultSinkFromConfig(config any) AssetResultSink {
+	sink, ok := ResultSinkFromConfig(config).(AssetResultSink)
+	if !ok {
+		return nil
+	}
+	return sink
 }
 
 // ResultSinkFunc is a compact adapter for tests and lightweight runtimes.

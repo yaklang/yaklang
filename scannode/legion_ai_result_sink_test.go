@@ -7,6 +7,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
@@ -23,12 +24,45 @@ type recordedAIFocusRisk struct {
 	raw       []byte
 }
 
+type recordedAIFocusAsset struct {
+	eventID     string
+	ref         jobExecutionRef
+	assetKind   string
+	title       string
+	target      string
+	identityKey string
+	raw         []byte
+}
+
 type recordingAIFocusRiskPublisher struct {
 	risks        []recordedAIFocusRisk
+	assets       []recordedAIFocusAsset
 	succeeded    int
 	failed       int
 	cancelled    int
 	lifecycleRef jobExecutionRef
+}
+
+func (p *recordingAIFocusRiskPublisher) PublishAssetWithEventID(
+	_ context.Context,
+	ref jobExecutionRef,
+	eventID string,
+	assetKind string,
+	title string,
+	target string,
+	identityKey string,
+	raw []byte,
+) error {
+	p.assets = append(p.assets, recordedAIFocusAsset{
+		eventID:     eventID,
+		ref:         ref,
+		assetKind:   assetKind,
+		title:       title,
+		target:      target,
+		identityKey: identityKey,
+		raw:         append([]byte(nil), raw...),
+	})
+	return nil
 }
 
 func (p *recordingAIFocusRiskPublisher) PublishRiskWithEventID(
@@ -156,6 +190,81 @@ func TestLegionAIFocusResultSinkPublishesRunScopedRisk(t *testing.T) {
 	}
 	if secondReceipt.DedupeKey != receipt.DedupeKey {
 		t.Fatalf("expected stable dedupe key, got %s and %s", receipt.DedupeKey, secondReceipt.DedupeKey)
+	}
+}
+
+func TestLegionAIFocusResultSinkPublishesIdempotentAsset(t *testing.T) {
+	t.Parallel()
+
+	publisher := &recordingAIFocusRiskPublisher{}
+	sink, err := newLegionAIFocusResultSink(
+		publisher,
+		"bind-1",
+		validAIFocusResultContext(),
+	)
+	if err != nil {
+		t.Fatalf("new result sink: %v", err)
+	}
+	assetSink, ok := sink.(aicommon.AssetResultSink)
+	if !ok {
+		t.Fatalf("expected Legion result sink to support structured assets")
+	}
+	asset := aicommon.AssetResult{
+		Kind:        "http_endpoint",
+		Title:       "GET https://example.com/api/users",
+		Target:      "https://example.com/api/users",
+		IdentityKey: "http_endpoint:GET:https://example.com/api/users",
+		Payload:     []byte(`{"method":"GET","status_code":200,"verified":true}`),
+	}
+
+	first, err := assetSink.SubmitAsset(context.Background(), asset)
+	if err != nil {
+		t.Fatalf("submit asset: %v", err)
+	}
+	second, err := assetSink.SubmitAsset(context.Background(), asset)
+	if err != nil {
+		t.Fatalf("resubmit asset: %v", err)
+	}
+	if first.ResultID == "" || second.ResultID != first.ResultID {
+		t.Fatalf("expected a stable asset event id, first=%#v second=%#v", first, second)
+	}
+	if first.DedupeKey != asset.IdentityKey || first.BackendID != "job-1" {
+		t.Fatalf("unexpected asset receipt: %#v", first)
+	}
+	if len(publisher.assets) != 2 {
+		t.Fatalf("expected two idempotent publications, got %d", len(publisher.assets))
+	}
+	published := publisher.assets[0]
+	if published.eventID != first.ResultID ||
+		published.assetKind != asset.Kind ||
+		published.target != asset.Target ||
+		published.identityKey != asset.IdentityKey ||
+		string(published.raw) != string(asset.Payload) {
+		t.Fatalf("unexpected published asset: %#v", published)
+	}
+
+	reboundContext := validAIFocusResultContext()
+	reboundContext.Job.AttemptId = "attempt-2"
+	reboundPublisher := &recordingAIFocusRiskPublisher{}
+	reboundSink, err := newLegionAIFocusResultSink(
+		reboundPublisher,
+		"bind-2",
+		reboundContext,
+	)
+	if err != nil {
+		t.Fatalf("new rebound result sink: %v", err)
+	}
+	reboundReceipt, err := reboundSink.(aicommon.AssetResultSink).
+		SubmitAsset(context.Background(), asset)
+	if err != nil {
+		t.Fatalf("submit rebound asset: %v", err)
+	}
+	if reboundReceipt.ResultID != first.ResultID {
+		t.Fatalf(
+			"expected asset identity to remain stable across runtime rebinds, first=%s rebound=%s",
+			first.ResultID,
+			reboundReceipt.ResultID,
+		)
 	}
 }
 

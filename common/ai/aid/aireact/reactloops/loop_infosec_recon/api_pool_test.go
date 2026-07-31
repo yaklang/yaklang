@@ -1,6 +1,8 @@
 package loop_infosec_recon
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,7 +11,32 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 )
+
+type recordingReconAssetSink struct {
+	assets []aicommon.AssetResult
+}
+
+func (s *recordingReconAssetSink) SubmitRisk(
+	context.Context,
+	*schema.Risk,
+) (aicommon.ResultReceipt, error) {
+	return aicommon.ResultReceipt{}, nil
+}
+
+func (s *recordingReconAssetSink) SubmitAsset(
+	_ context.Context,
+	asset aicommon.AssetResult,
+) (aicommon.ResultReceipt, error) {
+	s.assets = append(s.assets, asset)
+	return aicommon.ResultReceipt{
+		ResultID:  asset.IdentityKey,
+		DedupeKey: asset.IdentityKey,
+		BackendID: "job-1",
+	}, nil
+}
 
 func TestNormalizeURL(t *testing.T) {
 	u, err := NormalizeURL("https://Example.COM/path#frag", "")
@@ -134,4 +161,48 @@ func TestProbePoolHTTP_RespectsScopeHosts(t *testing.T) {
 	require.NotNil(t, other)
 	require.False(t, other.Verified)
 	require.Zero(t, other.StatusCode)
+}
+
+func TestSubmitVerifiedAPIAssetsPublishesOnlyVerifiedEndpoints(t *testing.T) {
+	t.Parallel()
+
+	pool := &APIPool{Entries: []APIPoolEntry{
+		{
+			NormalizedURL: "https://example.com/api/users",
+			Method:        "get",
+			Source:        "js_static_extract_ai",
+			Confidence:    0.95,
+			Evidence:      "fetch('/api/users')",
+			Verified:      true,
+			StatusCode:    http.StatusOK,
+		},
+		{
+			NormalizedURL: "https://example.com/api/admin",
+			Method:        "GET",
+			Source:        "js_static_extract_ai",
+			Verified:      false,
+			StatusCode:    http.StatusForbidden,
+		},
+	}}
+	sink := &recordingReconAssetSink{}
+
+	submitted, err := submitVerifiedAPIAssets(context.Background(), sink, pool)
+	require.NoError(t, err)
+	require.Equal(t, 1, submitted)
+	require.Len(t, sink.assets, 1)
+
+	asset := sink.assets[0]
+	require.Equal(t, "http_endpoint", asset.Kind)
+	require.Equal(t, "GET https://example.com/api/users", asset.Title)
+	require.Equal(t, "https://example.com/api/users", asset.Target)
+	require.Equal(
+		t,
+		"http_endpoint:GET:https://example.com/api/users",
+		asset.IdentityKey,
+	)
+	var payload APIPoolEntry
+	require.NoError(t, json.Unmarshal(asset.Payload, &payload))
+	require.True(t, payload.Verified)
+	require.Equal(t, http.StatusOK, payload.StatusCode)
+	require.Equal(t, "js_static_extract_ai", payload.Source)
 }
