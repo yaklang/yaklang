@@ -1,4 +1,4 @@
-__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection. NOTE: to keep output small and fast, the full request/response packets are NOT dumped to temp files by default — they are only printed inline (truncated for very large bodies). If you need the raw packet saved to a file, set save-packet=true. if you want to exec batch requests, please use batch_do_http_request tool instead. 强大的HTTP请求工具，功能媲美curl。支持两种模式：URL模式（指定URL、方法、头部、请求体、参数）和报文模式（发送原始HTTP请求报文）。功能包括超时控制、重定向处理、关键字/正则匹配、代理支持和HTTPS自动检测。注意：为保持输出精简，默认不会把完整请求/响应报文 dump 到临时文件，只会在输出中内联打印（过大时截断）；如果你需要把原始报文保存到文件，请设置 save-packet=true。如果需要执行批量请求，需要遍历某个参数，同时访问多个请求，请使用batch_do_http_request工具。"
+__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection. OUTPUT IS MINIMAL BY DEFAULT: only a one-line request summary, the status line, and the response body are printed (great for quick probing and IDOR/enum). To also print the full request packet + connection trace (dns/connect/server timings), set verbose=true. The full request/response packets are NOT dumped to temp files unless you set save-packet=true. IMPORTANT: if you want to iterate over a parameter (e.g. enumerate order/user IDs 1..N against the same endpoint) or send many requests at once, use the batch_do_http_request tool instead of calling this tool repeatedly. 强大的HTTP请求工具，功能媲美curl。支持两种模式：URL模式（指定URL、方法、头部、请求体、参数）和报文模式（发送原始HTTP请求报文）。默认输出已精简：只打印一行请求摘要、状态行、响应体（适合快速探测与IDOR/枚举）。需要完整请求报文+连接耗时(dns/connect/server)，请设置 verbose=true。需要把报文保存到文件，请设置 save-packet=true。重要：若要遍历某个参数（如枚举订单/用户ID 1..N）或一次发很多请求，请改用 batch_do_http_request 工具，不要重复调用本工具。"
 __VERBOSE_NAME__ = "Powerful HTTP Request Tool (curl-like)"
 __VERBOSE_NAME_ZH__ = "强大的HTTP请求工具（类curl）"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
@@ -57,7 +57,7 @@ specific GET or POST parameter, prefer URL Mode with "query-params" or "post-par
 
 Use JSON params for single-line values:
     url, method, content-type, query-params, post-params,
-    https, timeout, redirect-times, keyword, regexp-match, save-packet, proxy
+    https, timeout, redirect-times, keyword, regexp-match, verbose, save-packet, proxy
 
 Use AITAG for multi-line or structured content:
     packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
@@ -97,12 +97,27 @@ Optional:
     redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
     keyword         (string)  Keyword to search in the response.
     regexp-match    (string)  Regular expression to search in the response.
+    verbose         (bool)    Verbose output: also print the mode line, the FULL request
+                              packet, and the connection trace (dns/connect/server/total).
+                              OFF by default — output is already minimal (one-line request
+                              summary + status line + response body), which is ideal for
+                              quick probing and IDOR/enum. Turn on only when you need to
+                              inspect the exact wire-format request. Default: false.
     save-packet     (bool)    Dump the full request AND response packets to temp files and
                               return their paths. OFF by default to keep output small; the
                               packets are still printed inline (truncated for very large
                               bodies). Set to true only when you need the raw files.
                               Accepts true/false, yes/no, 1/0. Default: false.
     proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
+
+## When to use batch_do_http_request instead
+
+This tool sends ONE request per call. If your goal is to ITERATE over a parameter
+(e.g. enumerate order/user/ticket IDs 1..N against the same endpoint, or fuzz a
+value across many requests), DO NOT call this tool in a loop — use the
+batch_do_http_request tool, which iterates a fuzztag/parameter and sends all
+requests in one call with a consolidated summary. Calling do_http_request dozens
+of times for enumeration wastes rounds and bloats context.
 
 ## Black-Box Experiment Methodology
 
@@ -280,6 +295,9 @@ regexpMatch = cli.String("regexp-match", cli.setHelp("regex to search in respons
 // to keep output small; the packets are still printed inline (truncated for large bodies).
 // 用 cli.Bool: AI 传 JSON true 时, 执行器注入裸 --save-packet 标志, cli.Bool 读到 true.
 savePacket = cli.Bool("save-packet", cli.setHelp("dump full request+response packets to temp files (default off; packets are still printed inline)"))
+// verbose: 默认 false 时输出已精简到状态行 + 响应体 (适合批量枚举/快速探测);
+// true 时恢复完整输出 (模式行 + 完整请求报文 + 连接 trace). 用 cli.Bool, 同 save-packet.
+verbose = cli.Bool("verbose", cli.setHelp("verbose output: print full request packet + connection trace + mode line (default off; output is minimal: status line + response body)"))
 proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
 cli.check()
 
@@ -404,7 +422,7 @@ isHttps = false
 
 if packet != "" {
     // === Packet Mode ===
-    yakit.Info("mode: Packet (raw HTTP request)")
+    if verbose { yakit.Info("mode: Packet (raw HTTP request)") }
     rawPacket = []byte(packet)
 
     // detect HTTPS from packet Host header
@@ -414,12 +432,16 @@ if packet != "" {
 
     url = poc.GetUrlFromHTTPRequest(isHttps ? "https" : "http", rawPacket)
     methodStr = poc.GetHTTPRequestMethod(rawPacket)
+    // 单行请求摘要: 默认就打 (一行, 高价值); 完整 target 行只在 verbose 下打.
     if url != "" {
-        yakit.Info("packet target: [%v] %v (https=%v)", methodStr, url, isHttps)
+        yakit.Info("request: %v %v", methodStr, url)
+        if verbose { yakit.Info("packet target: [%v] %v (https=%v)", methodStr, url, isHttps) }
     }
 } else {
     // === URL Mode ===
-    yakit.Info("mode: URL (%v %v)", method, urlStr)
+    if verbose { yakit.Info("mode: URL (%v %v)", method, urlStr) }
+    // 单行请求摘要: 默认就打, 让 AI 知道这次打的是哪个 URL.
+    yakit.Info("request: %v %v", method, urlStr)
 
     // parse URL to raw packet
     autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
@@ -496,9 +518,9 @@ if err != nil {
 rsp = rspIns.RawPacket
 req = rspIns.RawRequest
 
-// --- print request packet ---
+// --- print request packet (only in verbose mode; default already printed a one-line summary above) ---
 reqSize = len(req)
-if reqSize > 0 {
+if verbose && reqSize > 0 {
     if reqSize <= 5120 {
         yakit.Info("request packet (%v bytes):\n%v", reqSize, string(req))
     } else {
@@ -512,17 +534,19 @@ if reqSize > 0 {
 }
 
 // --- report results ---
-// connection info
-if rspIns.PortIsOpen {
-    yakit.Info("remote %v is open", rspIns.RemoteAddr)
+// connection info (verbose only; trace is noise for batch IDOR/enum flows)
+if verbose {
+    if rspIns.PortIsOpen {
+        yakit.Info("remote %v is open", rspIns.RemoteAddr)
+    }
+    try {
+        yakit.Info("dns: %v, connect: %v, server: %v, total: %v",
+            rspIns.TraceInfo.DNSTime.String(),
+            rspIns.TraceInfo.ConnTime.String(),
+            rspIns.TraceInfo.ServerTime.String(),
+            rspIns.TraceInfo.TotalTime.String())
+    } catch e {}
 }
-try {
-    yakit.Info("dns: %v, connect: %v, server: %v, total: %v",
-        rspIns.TraceInfo.DNSTime.String(),
-        rspIns.TraceInfo.ConnTime.String(),
-        rspIns.TraceInfo.ServerTime.String(),
-        rspIns.TraceInfo.TotalTime.String())
-} catch e {}
 
 // status line
 try {

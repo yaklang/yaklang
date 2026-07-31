@@ -55,6 +55,7 @@ func TestDoHTTPRequest_BasicURL(t *testing.T) {
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
 		"url":     "http://" + host + ":" + strconv.Itoa(port),
 		"timeout": 10,
+		"verbose": true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, flag), "response flag not found in stdout")
@@ -72,6 +73,7 @@ func TestDoHTTPRequest_RequestSmallPrint(t *testing.T) {
 		"url":     "http://" + host + ":" + strconv.Itoa(port) + "/test-path",
 		"method":  "GET",
 		"timeout": 10,
+		"verbose": true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "request packet"), "request packet header not found")
@@ -94,6 +96,7 @@ func TestDoHTTPRequest_RequestLargeTruncate(t *testing.T) {
 		"body":         largeBody,
 		"content-type": "text/plain",
 		"timeout":      10,
+		"verbose":      true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "request packet"), "request packet header not found")
@@ -109,6 +112,7 @@ func TestDoHTTPRequest_RequestLargeTruncate(t *testing.T) {
 		"body":         largeBody,
 		"content-type": "text/plain",
 		"timeout":      10,
+		"verbose":      true,
 		"save-packet":  true,
 	})
 
@@ -237,6 +241,7 @@ func TestDoHTTPRequest_PacketMode(t *testing.T) {
 		"packet":  packet,
 		"https":   "no",
 		"timeout": 10,
+		"verbose": true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, flag), "packet mode response should contain flag")
@@ -260,6 +265,7 @@ func TestDoHTTPRequest_CustomHeaders(t *testing.T) {
 		"url":     "http://" + host + ":" + strconv.Itoa(port),
 		"headers": "X-My-Header: test-value-123",
 		"timeout": 10,
+		"verbose": true,
 	})
 
 	_ = receivedHeader
@@ -285,6 +291,7 @@ func TestDoHTTPRequest_HeadersAsObject(t *testing.T) {
 		"url":     "http://" + host + ":" + strconv.Itoa(port),
 		"headers": map[string]string{"X-My-Header": "test-value-123"},
 		"timeout": 10,
+		"verbose": true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "X-My-Header"), "object-form header should appear in request packet output")
@@ -326,6 +333,7 @@ func TestDoHTTPRequest_PostBody(t *testing.T) {
 		"body":         `{"name":"test"}`,
 		"content-type": "application/json",
 		"timeout":      10,
+		"verbose":      true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "body_ok"), "server should receive the body")
@@ -346,6 +354,7 @@ func TestDoHTTPRequest_QueryParams(t *testing.T) {
 		"url":          "http://" + host + ":" + strconv.Itoa(port) + "/search",
 		"query-params": "foo=bar&baz=qux",
 		"timeout":      10,
+		"verbose":      true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "query_ok"), "server should receive query params")
@@ -367,6 +376,7 @@ func TestDoHTTPRequest_PostParams(t *testing.T) {
 		"method":      "POST",
 		"post-params": "user=admin&pass=secret",
 		"timeout":     10,
+		"verbose":     true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "post_params_ok"), "server should receive post params")
@@ -421,24 +431,58 @@ func TestDoHTTPRequest_SavePacket(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
-	// default (save-packet off): request still printed inline, but nothing saved to file
+	// default (save-packet off, verbose off): a one-line request summary is printed,
+	// but the full request packet is NOT printed and nothing is saved to file
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
 		"url":     "http://" + host + ":" + strconv.Itoa(port),
 		"timeout": 10,
 	})
-	assert.Assert(t, strings.Contains(stdout, "request packet"), "request should always be printed")
+	assert.Assert(t, strings.Contains(stdout, "request: GET"), "one-line request summary should be printed")
+	assert.Assert(t, !strings.Contains(stdout, "request packet"), "full request packet should NOT be printed when verbose is off")
 	assert.Assert(t, !strings.Contains(stdout, "saved to"), "no file should be saved when save-packet is off")
 
-	// save-packet=true: both request and response packets are saved to temp files
+	// save-packet=true (+ verbose to also see the inline packet): both request and
+	// response packets are saved to temp files
 	host2, port2 := utils.DebugMockHTTP([]byte(flag))
 	stdout, _ = execTool(t, tool, aitool.InvokeParams{
 		"url":         "http://" + host2 + ":" + strconv.Itoa(port2),
 		"timeout":     10,
+		"verbose":     true,
 		"save-packet": true,
 	})
-	assert.Assert(t, strings.Contains(stdout, "request packet"), "request should always be printed")
+	assert.Assert(t, strings.Contains(stdout, "request packet"), "request packet should be printed in verbose mode")
 	assert.Assert(t, strings.Contains(stdout, "request packet [size:"), "save-packet=true should save the request to a file")
 	assert.Assert(t, strings.Contains(stdout, "response packet [size:"), "save-packet=true should save the response to a file")
+}
+
+// TestDoHTTPRequest_QuietMode verifies the DEFAULT (verbose=false) output is minimal:
+// a one-line request summary + status line + response body are present, but the full
+// request packet, the mode line, "remote ... is open", and the connection trace are NOT.
+// This is what keeps repeated IDOR/enum calls from bloating the AI context window.
+func TestDoHTTPRequest_QuietMode(t *testing.T) {
+	bodyMarker := "QUIET_BODY_" + utils.RandStringBytes(10)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + bodyMarker)
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":     "http://" + host + ":" + strconv.Itoa(port) + "/api/items/1",
+		"timeout": 10,
+		// verbose intentionally NOT set (default off)
+	})
+
+	// what SHOULD be present (the high-value info for vulnerability judgment)
+	assert.Assert(t, strings.Contains(stdout, "request: GET"), "one-line request summary should be printed")
+	assert.Assert(t, strings.Contains(stdout, "/api/items/1"), "request URL should be in the summary")
+	assert.Assert(t, strings.Contains(stdout, "HTTP/1.1 200 OK"), "status line should be printed")
+	assert.Assert(t, strings.Contains(stdout, bodyMarker), "response body should be printed")
+
+	// what should NOT be present (verbose-only noise)
+	assert.Assert(t, !strings.Contains(stdout, "request packet"), "full request packet must NOT print when verbose is off")
+	assert.Assert(t, !strings.Contains(stdout, "mode: URL"), "mode line must NOT print when verbose is off")
+	assert.Assert(t, !strings.Contains(stdout, "is open"), "'remote ... is open' must NOT print when verbose is off")
+	assert.Assert(t, !strings.Contains(stdout, "dns:"), "connection trace must NOT print when verbose is off")
 }
 
 func TestDoHTTPRequest_Timeout(t *testing.T) {
@@ -473,6 +517,7 @@ func TestDoHTTPRequest_ContentType(t *testing.T) {
 		"body":         "<root/>",
 		"content-type": "application/xml",
 		"timeout":      10,
+		"verbose":      true,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "ctype_ok"), "server should receive correct content-type")
