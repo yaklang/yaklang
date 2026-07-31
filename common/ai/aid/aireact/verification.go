@@ -205,12 +205,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				r.AddToTimeline("evidence_ops", strings.Join(opSummary, "; "))
 			}
 
-			// verification 不再产出 next_movements: TODO 维护职责完全交给
-			// 主循环的 adjust_todolist action 和 next_movements 兜底入口.
+			// verification 不再产出 todo_delta: TODO 维护职责完全交给
+			// 主循环正常 action 的可选 todo_delta 和统一兜底入口.
 			// verification 收缩为纯观测角色, 只产出 evidence + satisfied/
 			// reasoning/completed_task_index 作为观测信号.
-			// 关键词: verification 纯观测, 不写 next_movements, 不维护 TODO,
-			// adjust_todolist 是 TODO 权威入口
+			// 关键词: verification 纯观测, 不写 todo_delta, 不维护 TODO,
+			// todo_delta 是 TODO 权威入口
 
 			emitVerificationReferenceMaterials(boundEmitter, rawResponse.String())
 			return nil
@@ -245,7 +245,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	// PushSatisfactionRecord* 完成), Evidence 由调用方 ApplySessionEvidenceOps
 	// 写入. enforceTodoCompletionBeforeSatisfaction 第二道仍保留, 用 store 残留
 	// TODO 作为客观门推翻 AI 的 satisfied=true 主观声明 (store 由
-	// adjust_todolist / 主循环兜底维护).
+	// todo_delta / 主循环兜底维护).
 	// 关键词: verification 不写 store, satisfied 客观门第二道保留
 	r.enforceTodoCompletionBeforeSatisfaction(result)
 
@@ -255,7 +255,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 // enforceTodoCompletionBeforeSatisfaction is the Satisfied bottom-line override.
 //
 // 控制论视角: AI 输出的 user_satisfied=true 是控制器的"已达稳态"信号. 但
-// 当全局 TODO store 还有 PENDING/DOING 项, 说明可能性空间内仍存在 AI 自己
+// 当当前 task scope 的 TODO store 还有开放项, 说明可能性空间内仍存在 AI 自己
 // 列出的待完成动作, 这与"已达稳态"在控制语义上互相冲突. 此时我们用
 // SessionPromptState 中可观测的 TODO 状态作为客观反馈, 推翻 AI 的主观
 // 声明 — 把 user_satisfied 强制回退为 false, 并写一条
@@ -271,9 +271,9 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 //   - result.Reasoning 前缀注入 [OVERRIDE]，保留 AI 原文于 [AI ORIGINAL]
 //   - timeline 写入 [VERIFICATION_TODO_INCOMPLETE], 列出残留 TODO 摘要
 //
-// 注: 原第一道 (检查 result.NextMovements 里有没有 add op) 已移除 ——
-// verification 不再产出 next_movements, 这道永远不触发. TODO store 的写入
-// 现在由 adjust_todolist action 和主循环 next_movements 兜底入口承担, 本
+// 注: 原第一道 (检查 result.TodoDelta 里有没有 add op) 已移除 ——
+// verification 不再产出 todo_delta, 这道永远不触发. TODO store 的写入
+// 现在由主循环正常 action 的可选 todo_delta 和统一兜底入口承担, 本
 // 函数只做第二道: 读 store 残留 TODO 作为客观门.
 //
 // 关键词: enforceTodoCompletionBeforeSatisfaction, Satisfied 兜底回退,
@@ -311,7 +311,7 @@ func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifyS
 	msg := fmt.Sprintf(
 		"AI declared user_satisfied=true but %d active TODO item(s) still remain (pending=%d, doing=%d). "+
 			"user_satisfied has been force-overridden to false. Each remaining TODO must be explicitly closed "+
-			"via next_movements with op=done / op=delete / op=skip before completion can be acknowledged. "+
+			"via todo_delta.close with outcome resolved, dismissed, or deferred and a non-empty reason before completion can be acknowledged. "+
 			"Remaining TODOs:\n%s",
 		activeTotal, stats.Pending, stats.Doing, strings.Join(activeLines, "\n"),
 	)
@@ -326,32 +326,6 @@ func (r *ReAct) enforceTodoCompletionBeforeSatisfaction(result *aicommon.VerifyS
 
 	r.AddToTimeline("[VERIFICATION_TODO_INCOMPLETE]", msg)
 	log.Warnf("verification satisfied override: %d active TODO(s) remain, forcing user_satisfied=false", activeTotal)
-}
-
-// addNextMovementsBreadcrumb / emitTodoListUpdate 已随 verification 不再产出
-// next_movements 一并移除. verification 收缩为纯观测角色后:
-//   - 不再写 NEXT_MOVEMENTS timeline breadcrumb (TODO 增量由 adjust_todolist
-//     主循环通道自行写 timeline);
-//   - 不再发 EVENT_TYPE_TODO_LIST_UPDATE (前端 TODO 面板的权威更新源改为
-//     adjust_todolist / 主循环 next_movements 兜底入口).
-//
-// 关键词: verification 不写 next_movements breadcrumb, 不发 TodoListUpdate
-
-// writeNextMovementsDisplayStream / formatNextMovementDisplayLine 都已经
-// 抽到 aicommon 包成为公开 helper, 这里保留 package-local 薄包装是为了:
-//  1. 让 verification_compat_test.go 等历史调用点继续按原符号引用, 无需大改;
-//  2. 让 adjust_todolist 主循环路径与 verification 共享同一份字节流转换,
-//     避免双通道字符级漂移.
-//
-// 关键词: writeNextMovementsDisplayStream 兼容层, formatNextMovementDisplayLine
-//
-//	薄包装, aicommon 单源, verification + adjust_todolist 双通道一致
-func writeNextMovementsDisplayStream(reader io.Reader, writer io.Writer) error {
-	return aicommon.WriteNextMovementsDisplayStream(reader, writer)
-}
-
-func formatNextMovementDisplayLine(movement aicommon.VerifyNextMovement) string {
-	return aicommon.FormatNextMovementDisplayLine(movement)
 }
 
 func writeEvidenceDisplayStream(reader io.Reader, writer io.Writer) error {
@@ -427,17 +401,4 @@ func normalizeEvidenceOperations(action *aicommon.Action) []aicommon.EvidenceOpe
 		})
 	}
 	return ops
-}
-
-// normalizeVerifyNextMovements is a thin wrapper around the public
-// aicommon.NormalizeVerifyNextMovements helper. The verification path keeps
-// its own private symbol so existing call sites and tests in this package
-// do not need to be touched, while the underlying parsing logic stays in
-// aicommon and is also reused by the main-loop adjust_todolist action.
-//
-// 关键词: normalizeVerifyNextMovements thin wrapper, aicommon 单源,
-//
-//	adjust_todolist 复用
-func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNextMovement {
-	return aicommon.NormalizeVerifyNextMovements(action)
 }

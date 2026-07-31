@@ -61,7 +61,7 @@ func init() {
 					attachedResources := loop.Get("attached_resources")
 					searchResults := loop.Get("search_results_summary")
 					searchHistory := loop.Get("search_history")
-					nextMovementsSummary := loop.Get("next_movements_summary")
+					nextSearchSummary := loop.Get("next_search_summary")
 					artifactsSummary := buildArtifactsSummary(loop)
 					// 已加载的知识库列表，用于在 prompt 中展示
 					loadedKnowledgeBases := loop.Get("knowledge_bases")
@@ -71,7 +71,7 @@ func init() {
 						"AttachedResources":    attachedResources,
 						"SearchResults":        searchResults,
 						"SearchHistory":        searchHistory,
-						"NextMovementsSummary": nextMovementsSummary,
+						"NextSearchSummary":    nextSearchSummary,
 						"ArtifactsSummary":     artifactsSummary,
 						"LoadedKnowledgeBases": loadedKnowledgeBases,
 						"Nonce":                nonce,

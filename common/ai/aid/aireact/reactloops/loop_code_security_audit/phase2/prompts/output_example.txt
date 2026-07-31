@@ -212,8 +212,8 @@
 // 错误：用 cybersecurity-risk 代替 add_finding（不会进入扫描流水线）
 {"@action":"cybersecurity-risk", ...}
 
-// 错误：用 next_movements 假装完成，却不调用 mark_file_done
-{"@action":"read_file","file":"/abs/project/foo.go","next_movements":[{"id":"audit_foo","op":"done"}]}
+// 错误：用 todo_delta 假装完成，却不调用 mark_file_done
+{"@action":"read_file","file":"/abs/project/foo.go","todo_delta":{"close":[{"id":"audit_foo","outcome":"resolved","reason":"仅阅读了文件，尚未调用 mark_file_done，不能据此宣告扫描流水线完成","refs":[]}]}}
 
 // 正确：读完后显式 mark；漏洞用 add_finding
 {"@action":"mark_file_done","file_path":"/abs/project/foo.go","audit_summary":"无本类别漏洞"}

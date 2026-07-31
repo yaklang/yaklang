@@ -787,29 +787,22 @@ func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIn
 	})
 }
 
-// EmitNextMovementsSplitStreams splits an already-parsed next_movements slice
-// by op and emits each individual movement as its own stream event under the
-// matching nodeId:
+// EmitTodoDeltaReasonStreams emits only TODO operations carrying an explicit
+// reason. Full frontend state synchronization is handled by the structured
+// todo_list_update/current_task_todo_list_update snapshots; these streams are
+// user-visible annotations and must not echo routine add/update/current noise.
 //
-//   - "added"    (add)                   -> nodeIdAdded
-//   - "doing"    (doing / 开始执行)      -> nodeIdDoing
-//   - "completed"(done / delete / skip)  -> nodeIdCompleted
+// The emitted text is the reason itself. Operations without a non-empty reason
+// produce no stream event. With the current protocol this normally means only
+// resolved/dismissed/deferred close operations reach todo_reason.
 //
-// Each movement emits one event whose text is the TODO item's content only
-// (no label, no ID). The nodeId already carries the semantic label (i18n),
-// and the content is resolved by applyStatusMutation backfilling from the
-// store when the original movement didn't carry it. Movements with empty
-// content after resolution are silently skipped.
-//
-// 关键词: EmitNextMovementsSplitStreams, next_movements 逐条 emit,
-//
-//	added / doing / completed 流, 每条直接展示 content, 无参考资料
-func (r *Emitter) EmitNextMovementsSplitStreams(
-	nodeIdAdded, nodeIdDoing, nodeIdCompleted string,
-	movements []VerifyNextMovement,
+// 关键词: EmitTodoDeltaReasonStreams, reason-only stream, 结构化事件负责状态同步
+func (r *Emitter) EmitTodoDeltaReasonStreams(
+	nodeID string,
+	operations []TodoOperation,
 	taskIndex string,
 ) ([]*schema.AiOutputEvent, error) {
-	if r == nil || len(movements) == 0 {
+	if r == nil || len(operations) == 0 {
 		return nil, nil
 	}
 
@@ -817,14 +810,10 @@ func (r *Emitter) EmitNextMovementsSplitStreams(
 		events   []*schema.AiOutputEvent
 		firstErr error
 	)
-	emitItem := func(nodeId string, m VerifyNextMovement) {
-		text := strings.TrimSpace(m.Content)
-		if text == "" {
-			return
-		}
+	emitItem := func(nodeId, reason string) {
 		event, err := r.EmitDefaultStreamEvent(
 			nodeId,
-			strings.NewReader(text),
+			strings.NewReader(reason),
 			taskIndex,
 			func() {},
 		)
@@ -839,15 +828,12 @@ func (r *Emitter) EmitNextMovementsSplitStreams(
 			events = append(events, event)
 		}
 	}
-	for _, m := range movements {
-		switch {
-		case IsNextMovementAddedOp(m.Op):
-			emitItem(nodeIdAdded, m)
-		case IsNextMovementDoingOp(m.Op):
-			emitItem(nodeIdDoing, m)
-		default:
-			emitItem(nodeIdCompleted, m)
+	for _, operation := range operations {
+		reason := strings.TrimSpace(operation.Reason)
+		if reason == "" {
+			continue
 		}
+		emitItem(nodeID, reason)
 	}
 
 	if firstErr != nil && len(events) == 0 {

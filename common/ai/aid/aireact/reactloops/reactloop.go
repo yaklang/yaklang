@@ -29,14 +29,13 @@ type ReActLoopOption func(r *ReActLoop)
 type ContextProviderFunc func(loop *ReActLoop, nonce string) (string, error)
 type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce string) (string, error)
 
-// SatisfactionRecord 记录满意度验证的结果，包含验证状态、原因、已完成任务索引和下一步行动计划
+// SatisfactionRecord records the read-only verification result.
 type SatisfactionRecord struct {
-	Satisfactory       bool                          `json:"satisfactory"`         // 是否满足用户需求
-	Reason             string                        `json:"reason"`               // 满意/不满意的原因分析
-	CompletedTaskIndex string                        `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
-	NextMovements      []aicommon.VerifyNextMovement `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
-	Evidence           string                        `json:"evidence"`             // 运行期新增的证据 Markdown (legacy)
-	EvidenceOps        []aicommon.EvidenceOperation  `json:"evidence_ops"`         // 结构化证据增量操作
+	Satisfactory       bool                         `json:"satisfactory"`
+	Reason             string                       `json:"reason"`
+	CompletedTaskIndex string                       `json:"completed_task_index"`
+	Evidence           string                       `json:"evidence"`
+	EvidenceOps        []aicommon.EvidenceOperation `json:"evidence_ops"`
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
@@ -68,6 +67,9 @@ type ReActLoop struct {
 	lastLoopSchema                  string
 	reflectionOutputExampleProvider ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
+	softTodoCheckpointMu            sync.Mutex
+	softTodoChecked                 bool
+	softTodoCheckpointPending       bool
 
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
@@ -369,13 +371,13 @@ func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
 	r.submitValueFeedbackSignal(aicommon.ValueFeedbackTriggerVerification)
 }
 
-// PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引和下一步行动计划
-func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, nextMovements []aicommon.VerifyNextMovement, evidence string, evidenceOps ...[]aicommon.EvidenceOperation) {
+// PushSatisfactionRecordWithCompletedTaskIndex records verification output;
+// TODO maintenance remains exclusively in normal ReAct action todo_delta.
+func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, evidence string, evidenceOps ...[]aicommon.EvidenceOperation) {
 	record := &SatisfactionRecord{
 		Satisfactory:       satisfactory,
 		Reason:             reason,
 		CompletedTaskIndex: completedTaskIndex,
-		NextMovements:      nextMovements,
 		Evidence:           evidence,
 	}
 	if len(evidenceOps) > 0 {
@@ -759,16 +761,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE); !ok {
 		if verifyNow, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE); ok {
 			r.actions.Set(verifyNow.ActionType, verifyNow)
-		}
-	}
-
-	// adjust_todolist 是 verification.next_movements 的主循环兄弟通道, 写入同一份
-	// 全局 TODO store, 因此默认对所有 loop 开放 (无 allowXxx gate). 子 loop 可在
-	// option 阶段提前 r.actions.Set 同名 key 覆盖, 这里只做缺省兜底 inject.
-	// 关键词: adjust_todolist 默认全 loop 接入, 与 save_evidence 同位
-	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); !ok {
-		if adjustTodolist, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); ok {
-			r.actions.Set(adjustTodolist.ActionType, adjustTodolist)
 		}
 	}
 

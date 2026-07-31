@@ -17,7 +17,7 @@
 
 {{ if .TodoSnapshot }}
 
-全局待办清单（TODO LIST）由历轮 Verify 阶段累积维护，跨整段会话保持可见，是当前最权威的"应做、正在做、已关闭"事项集合。在选择下一步动作前请先对照此清单：优先沿 [DOING] 项继续推进、不要重复创建已存在的 [ ] 项、[DELETED] / [SKIPPED] 已显式放弃不应再尝试。任何新增 / 完成 / 删除都只能通过 verify-satisfaction 的 next_movements 走，正常 loop 动作不直接写入。
+TODO LIST 是正常 ReAct 动作随手维护的短期工作集。CURRENT TASK 中最多一个 [CURRENT] 焦点；首次建立多步骤工作集时覆盖用户明确要求的独立维度，并在同轮选定一个显式 ID 为 current。其它开放项表示后续仍需处理，关闭项带 outcome、reason 和 refs 留痕。兄弟任务只读可见。任意正常动作都可携带可选 `todo_delta`，没有变化时省略；verification 不维护 TODO，也不存在独立 TODO 维护动作。close 只能依据当前动作执行前已获得的当前任务 Observation；历史记忆或其它任务结论必须重新验证后才能标记 resolved。不要重复添加现有项，不要无理由关闭，更不要为了结束任务伪造 resolved。
 
 {{ .TodoSnapshot }}
 {{ end }}

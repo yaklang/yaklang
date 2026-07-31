@@ -90,11 +90,17 @@ func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
 func (t *transactionTestConfig) GetVerificationTodoRendered(_ VerificationTodoScope) string {
 	return ""
 }
-func (t *transactionTestConfig) ApplyVerificationTodoOps(VerificationTodoScope, bool, []VerifyNextMovement) []VerificationTodoApplyResult {
+func (t *transactionTestConfig) ApplyTodoDelta(VerificationTodoScope, *TodoDelta) []VerificationTodoApplyResult {
 	return nil
 }
-func (t *transactionTestConfig) GetVerificationTodoMarkdownDelta(VerificationTodoScope, bool, []VerifyNextMovement) string {
+func (t *transactionTestConfig) ValidateTodoDelta(VerificationTodoScope, *TodoDelta) error {
+	return nil
+}
+func (t *transactionTestConfig) GetVerificationTodoMarkdownDelta(VerificationTodoScope, *TodoDelta) string {
 	return ""
+}
+func (t *transactionTestConfig) SnapshotCanonicalTodos(VerificationTodoScope) ([]TodoOpenItem, string, []TodoClosedItem) {
+	return nil, "", nil
 }
 func (t *transactionTestConfig) SnapshotVerificationTodoItems() []VerificationTodoItem {
 	return nil

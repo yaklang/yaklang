@@ -200,6 +200,7 @@ func (r *ReActLoop) generateLoopPrompt(
 			})
 		}
 	}
+	reactiveData = appendSoftTodoCheckpoint(reactiveData, r.consumeSoftTodoCheckpoint())
 
 	// Render skills context if the manager is available.
 	// 三态分离: SkillsContext (SemiDynamic 1, 含 catalog) + ForcedSkills (frozen_block
@@ -222,7 +223,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	// 全局 TODO 块: 与 SessionEvidence 同处 timeline-open 段, 物理位置紧跟
 	// SessionEvidence 之后. 任何 loop iteration 都能看到, 不再受限于 Verify
 	// 调用时机. 数据源是 SessionPromptState 的 VerificationTodoStore, 由
-	// VerifyUserSatisfaction 通过 ApplyVerificationTodoOps 增量写入.
+	// 正常 ReAct action 通过 ApplyTodoDelta 增量写入；verification 保持只读.
 	// 关键词: TodoSnapshot 渲染, timeline-open 全局可见, SessionPromptState
 	var todoSnapshot string
 	if r.shouldRenderTodoSnapshot() {

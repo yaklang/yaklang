@@ -1089,62 +1089,8 @@ func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testin
 	}
 }
 
-// 注: TestGenerateVerificationPrompt_RendersTodoSnapshot 和
-// TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied 已移除.
-// 这两个测试断言 verification prompt 包含 next_movements 操作语法指引
-// (op: doing/done/delete/skip/add 等) 和 "satisfied 时同轮关闭 TODO" 的
-// instruction 文本. verification 收缩为纯观测角色后不再产出/维护
-// next_movements (schema 已删 next_movements 字段, instruction 已删相关
-// 指引), TODO 维护职责移交 adjust_todolist, 这两个测试验证的内容已不存在.
-// TodoSnapshot 的渲染本身仍由 TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus
-// 覆盖 (store 由 adjust_todolist 维护, verification prompt 仍展示当前 TODO).
-
-func TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus(t *testing.T) {
-	react, err := NewTestReAct(
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create ReAct instance: %v", err)
-	}
-
-	for index := 0; index < 80; index++ {
-		react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-			Satisfied: false,
-			NextMovements: []aicommon.VerifyNextMovement{{
-				Op:      "add",
-				ID:      fmt.Sprintf("todo_%03d", index),
-				Content: strings.Repeat("非常长的待办描述", 30),
-			}},
-		})
-	}
-	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
-		Satisfied: false,
-		NextMovements: []aicommon.VerifyNextMovement{{
-			Op:      "add",
-			ID:      "active_focus",
-			Content: "优先保留这个焦点 TODO",
-		}},
-	})
-
-	prompt, _, err := react.promptManager.GenerateVerificationPrompt("请继续推进当前焦点任务", true, "tool executed: continue")
-	if err != nil {
-		t.Fatalf("Failed to generate verification prompt: %v", err)
-	}
-
-	if !utils.MatchAllOfSubString(
-		prompt,
-		"# TODO:",
-		"active_focus",
-		"TODO history exceeded 10K tokens",
-	) {
-		t.Fatalf("verification prompt should truncate long TODO history but keep latest focus item. Got:\n%s", prompt)
-	}
-}
+// Verification 保持纯观测，schema 不包含 todo_delta。TodoSnapshot 的只读
+// 渲染由 TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus 覆盖。
 
 func TestGenerateVerificationPrompt_IncludesEvidenceJSONArrayGuidance(t *testing.T) {
 	react, err := NewTestReAct(

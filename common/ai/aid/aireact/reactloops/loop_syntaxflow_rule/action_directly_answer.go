@@ -16,7 +16,7 @@ var loopAction_DirectlyAnswerSyntaxFlow = &reactloops.LoopAction{
 	ActionType: "directly_answer",
 	Description: "Directly answer with the 'answer_payload' field. " +
 		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. Use the 'finish' action to terminate. " +
-		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
+		"OPTIONAL: carry a non-empty 'todo_delta' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",

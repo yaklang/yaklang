@@ -1,68 +1,9 @@
 package aireact
 
-import (
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-)
+import "github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-// Type / constant aliases keep the old aireact-local symbol surface
-// intact so in-package tests can keep referencing them without churn.
-// Real logic lives in aicommon.VerificationTodoStore.
-//
-// 关键词: aireact <-> aicommon TODO 兼容层, 类型别名, 字符串别名
-type verificationTodoStatus = aicommon.VerificationTodoStatus
-
-const (
-	verificationTodoStatusPending = aicommon.VerificationTodoStatusPending
-	verificationTodoStatusDoing   = aicommon.VerificationTodoStatusDoing
-	verificationTodoStatusDone    = aicommon.VerificationTodoStatusDone
-	verificationTodoStatusDeleted = aicommon.VerificationTodoStatusDeleted
-	verificationTodoStatusSkipped = aicommon.VerificationTodoStatusSkipped
-)
-
-type verificationTodoStats = aicommon.VerificationTodoStats
-type verificationTodoItem = aicommon.VerificationTodoItem
-
-// verificationTodoSnapshotLimit is measured in tokens (not bytes). Re-exported
-// here for backward-compatible test references.
-const verificationTodoSnapshotLimit = aicommon.VerificationTodoSnapshotLimit
-
-// AppendVerificationHistory commits one verification round's
-// next_movements (and the round's satisfied flag) into the shared
-// SessionPromptState TODO store. The TODO list is then visible to the loop
-// prompt (timeline-open section) on every subsequent iteration, not only
-// inside the next Verify call.
-//
-// 注意: verification 主流程 (VerifyUserSatisfaction) 已不再调用本函数 ——
-// verification 收缩为纯观测角色后不再产出 next_movements, TODO 维护职责
-// 完全交给主循环的 adjust_todolist action 和 next_movements 兜底入口. 本
-// 函数现在仅作为测试 helper 保留, 用于在单测里构造 TODO store 状态以覆盖
-// enforceTodoCompletionBeforeSatisfaction 第二道 (store 残留 TODO 推翻
-// satisfied) 这类仍生效的逻辑. 运行时请勿再调用.
-//
-// 关键词: AppendVerificationHistory 测试 helper, verification 不再写 store,
-//
-//	adjust_todolist 是 TODO 权威入口
-func (r *ReAct) AppendVerificationHistory(result *aicommon.VerifySatisfactionResult) {
-	if r == nil || result == nil {
-		return
-	}
-	if r.config == nil {
-		return
-	}
-	applyResults := r.config.ApplyVerificationTodoOps(
-		aicommon.BuildVerificationTodoScope(r.GetCurrentTask()),
-		result.Satisfied,
-		result.NextMovements,
-	)
-	if line := aicommon.FormatVerificationTodoApplyErrors(applyResults); line != "" {
-		r.AddToTimeline("[NEXT_MOVEMENTS_ERROR]", line)
-	}
-}
-
-// RenderVerificationTodoSnapshot returns the plain-text TODO snapshot built
-// from the shared SessionPromptState store. When the store is empty the
-// caller-friendly placeholder "- no tracked TODO items" is returned (the
-// caller can choose to suppress empty blocks itself).
+// RenderVerificationTodoSnapshot exposes the session work set to verification
+// as read-only context. Verification never mutates TODO state.
 func (r *ReAct) RenderVerificationTodoSnapshot() string {
 	if r == nil || r.config == nil {
 		return "- no tracked TODO items"
@@ -74,80 +15,6 @@ func (r *ReAct) RenderVerificationTodoSnapshot() string {
 	return rendered
 }
 
-// RenderVerificationTodoMarkdownSnapshot returns the markdown snapshot used by
-// the verification markdown stream (with delta markers like (new) / (done)).
-// `current` is the not-yet-committed verification result; the function computes
-// the snapshot AS IF `current` were applied, leaving the underlying state
-// untouched.
-func (r *ReAct) RenderVerificationTodoMarkdownSnapshot(current *aicommon.VerifySatisfactionResult) string {
-	if r == nil || r.config == nil {
-		return ""
-	}
-	if current == nil {
-		// preserve old behaviour: when nothing new is supplied, still surface
-		// the current full snapshot via the markdown formatter.
-		return r.config.GetVerificationTodoMarkdownDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), false, nil)
-	}
-	return r.config.GetVerificationTodoMarkdownDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), current.Satisfied, current.NextMovements)
-}
-
-// renderVerificationTodoSnapshot is kept as a package-local shim so existing
-// aireact tests (verification_todo_test.go) can keep operating on a
-// VerifySatisfactionResult history slice. It rebuilds a fresh
-// VerificationTodoStore by applying each history entry sequentially, then
-// renders.
-//
-// 关键词: renderVerificationTodoSnapshot 兼容层, history -> store
-func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult) string {
-	store := buildVerificationTodoStoreFromHistory(history)
-	if store.IsEmpty() {
-		return "- no tracked TODO items"
-	}
-	return store.Render()
-}
-
-func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfactionResult, current *aicommon.VerifySatisfactionResult) string {
-	store := buildVerificationTodoStoreFromHistory(history)
-	if current == nil {
-		return store.RenderMarkdownDelta(aicommon.VerificationTodoScope{}, false, nil)
-	}
-	return store.RenderMarkdownDelta(aicommon.VerificationTodoScope{}, current.Satisfied, current.NextMovements)
-}
-
-func buildVerificationTodoStoreFromHistory(history []*aicommon.VerifySatisfactionResult) *aicommon.VerificationTodoStore {
-	store := aicommon.NewVerificationTodoStore()
-	for _, record := range history {
-		if record == nil {
-			continue
-		}
-		_ = store.Apply(aicommon.VerificationTodoScope{}, record.Satisfied, record.NextMovements)
-	}
-	return store
-}
-
-// buildVerificationTodoItems / buildVerificationTodoItemsAndStats remain as
-// package-local helpers for back-compat with verification_todo_test.go.
-func buildVerificationTodoItems(history []*aicommon.VerifySatisfactionResult) []aicommon.VerificationTodoItem {
-	store := buildVerificationTodoStoreFromHistory(history)
-	return store.SnapshotItems()
-}
-
-func buildVerificationTodoItemsAndStats(history []*aicommon.VerifySatisfactionResult) ([]aicommon.VerificationTodoItem, aicommon.VerificationTodoStats) {
-	store := buildVerificationTodoStoreFromHistory(history)
-	return store.SnapshotItems(), store.Stats()
-}
-
-// Package-local pass-through helpers kept for legacy tests. New code should
-// use the aicommon.Format* / aicommon.Sanitize* functions directly.
-
-func formatVerificationTodoLine(item aicommon.VerificationTodoItem) string {
-	return aicommon.FormatVerificationTodoLine(item)
-}
-
-func formatVerificationTodoMarkdownLine(item aicommon.VerificationTodoItem, marker string) string {
-	return aicommon.FormatVerificationTodoMarkdownLine(item, marker)
-}
-
-func sanitizeVerificationTodoMarkdownContent(content string) string {
-	return aicommon.SanitizeVerificationTodoMarkdownContent(content)
+func (r *ReAct) RenderVerificationTodoMarkdownSnapshot(_ *aicommon.VerifySatisfactionResult) string {
+	return r.RenderVerificationTodoSnapshot()
 }

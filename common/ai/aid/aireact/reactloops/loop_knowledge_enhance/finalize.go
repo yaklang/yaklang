@@ -114,7 +114,7 @@ func deliverRawReportFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInv
 // into a single document limited to 50KB
 func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) string {
 	userQuery := loop.Get("user_query")
-	finalSummary := loop.Get("final_summary") // 从 evaluateNextMovements 获取的总结
+	finalSummary := loop.Get("final_summary") // 从 evaluateNextSearch 获取的总结
 	searchResultsSummary := loop.Get("search_results_summary")
 	maxIterations := loop.GetCurrentIterationIndex()
 
@@ -161,8 +161,8 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 	searchHistory := loop.Get("search_history")
 	searchCountStr := loop.Get("search_count")
 
-	// Get next movements summary
-	nextMovementsSummary := loop.Get("next_movements_summary")
+	// Get next steps summary
+	nextSearchSummary := loop.Get("next_search_summary")
 
 	// Build final document
 	var finalDoc strings.Builder
@@ -173,7 +173,7 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 	finalDoc.WriteString(userQuery)
 	finalDoc.WriteString("\n\n")
 
-	// Summary section (from evaluateNextMovements)
+	// Summary section (from evaluateNextSearch)
 	if finalSummary != "" {
 		finalDoc.WriteString("## 总体回答\n\n")
 		finalDoc.WriteString(finalSummary)
@@ -212,11 +212,11 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 		finalDoc.WriteString("本次没有收集到可供聚合的知识片段。\n\n")
 	}
 
-	// Next movements summary (for reference)
-	if nextMovementsSummary != "" {
+	// Next-search summary (for reference)
+	if nextSearchSummary != "" {
 		finalDoc.WriteString("## 搜索过程中的建议记录\n\n")
 		finalDoc.WriteString("<details>\n<summary>点击展开</summary>\n\n")
-		finalDoc.WriteString(nextMovementsSummary)
+		finalDoc.WriteString(nextSearchSummary)
 		finalDoc.WriteString("\n\n</details>\n\n")
 	}
 

@@ -11,10 +11,10 @@
 ### 当前搜索结果摘要
 {{ .SearchResults }}
 
-{{ if .NextMovementsSummary }}
+{{ if .NextSearchSummary }}
 ### 下一步建议汇总
 以下是前几轮搜索中给出的改进建议：
-{{ .NextMovementsSummary }}
+{{ .NextSearchSummary }}
 {{ end }}
 
 {{ if .ArtifactsSummary }}

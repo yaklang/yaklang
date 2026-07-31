@@ -14,7 +14,7 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 	ActionType: "directly_answer",
 	Description: "用于回答 HTTP 安全测试过程中的阶段性结论或简短问题。短答案可用 answer_payload；需要 Markdown 分段、列表、表格或更复杂展示时，使用 FINAL_ANSWER AITAG。若已验证漏洞或存在应落库风险，必须先调用 generate_risk 保存 Risk；回答漏洞结论时必须包含证据链。" +
 		" 重要: directly_answer 只负责发出答复, 之后循环会继续, 它不会结束任务。要终结整个流程必须使用 finish 动作。" +
-		" 可选: 如同时携带非空的 next_movements 增量, 用于安排后续 TODO 更新。",
+		" 可选: 如同时携带非空的 todo_delta 增量, 用于安排后续 TODO 更新。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",

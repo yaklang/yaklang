@@ -679,9 +679,7 @@ func TestReActLoop_AsyncMode_AutoClosesActiveTodos(t *testing.T) {
 
 	task := aicommon.NewStatefulTaskBase("async-todo-task", "1-1", nil, nil, true)
 	cfg := reactIns.GetConfig()
-	cfg.ApplyVerificationTodoOps(aicommon.BuildVerificationTodoScope(task), false, []aicommon.VerifyNextMovement{
-		{Op: "add", ID: "main_open", Content: "主循环待办"},
-	})
+	cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), &aicommon.TodoDelta{Add: []aicommon.TodoAdd{{ID: "main_open", Text: "主循环待办"}}})
 
 	loop, err := reactloops.NewReActLoop("async-todo-loop", reactIns,
 		reactloops.WithOverrideLoopAction(&reactloops.LoopAction{

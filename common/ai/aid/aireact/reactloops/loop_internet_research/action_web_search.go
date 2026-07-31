@@ -158,7 +158,7 @@ Time: %s
 			loop.Set("search_history", searchHistory)
 
 			loop.LoadingStatus("evaluating search progress")
-			evalResult := evaluateNextMovements(ctx, invoker, loop, userQuery, searchQuery, content, searchCount)
+			evalResult := evaluateNextSearch(ctx, invoker, loop, userQuery, searchQuery, content, searchCount)
 			if evalResult.Finished {
 				log.Infof("internet research finished, summary: %s", evalResult.Summary)
 				loop.Set("final_summary", evalResult.Summary)
@@ -168,16 +168,16 @@ Time: %s
 				r.AddToTimeline("internet_research_finished", feedback)
 				op.Exit()
 			} else {
-				currentNextMovements := loop.Get("next_movements_summary")
-				if currentNextMovements != "" {
-					currentNextMovements += "\n\n"
+				currentNextSearch := loop.Get("next_search_summary")
+				if currentNextSearch != "" {
+					currentNextSearch += "\n\n"
 				}
-				currentNextMovements += fmt.Sprintf("【Search #%d: %s】\n%s", searchCount, searchQuery, evalResult.NextMovements)
-				loop.Set("next_movements_summary", currentNextMovements)
+				currentNextSearch += fmt.Sprintf("【Search #%d: %s】\n%s", searchCount, searchQuery, evalResult.NextSearch)
+				loop.Set("next_search_summary", currentNextSearch)
 
 				feedback := fmt.Sprintf("=== Search Complete ===\nQuery: %s\nContent: %d bytes\nSaved to: %s\n\n=== Next Steps ===\n%s\n\nPlease continue searching based on suggestions.",
-					searchQuery, len(content), artifactFilename, evalResult.NextMovements)
-				loop.Set("next_movements", feedback)
+					searchQuery, len(content), artifactFilename, evalResult.NextSearch)
+				loop.Set("next_search", feedback)
 				op.Continue()
 			}
 		},
@@ -185,12 +185,12 @@ Time: %s
 }
 
 type EvaluateResult struct {
-	NextMovements string
-	Finished      bool
-	Summary       string
+	NextSearch string
+	Finished   bool
+	Summary    string
 }
 
-func evaluateNextMovements(
+func evaluateNextSearch(
 	ctxAny any,
 	invoker aicommon.AIInvokeRuntime,
 	loop *reactloops.ReActLoop,
@@ -201,7 +201,7 @@ func evaluateNextMovements(
 ) EvaluateResult {
 	ctx, ok := ctxAny.(context.Context)
 	if !ok {
-		log.Warnf("evaluateNextMovements: context conversion failed")
+		log.Warnf("evaluateNextSearch: context conversion failed")
 		ctx = context.Background()
 	}
 	dNonce := utils.RandStringBytes(4)
@@ -209,7 +209,7 @@ func evaluateNextMovements(
 	searchHistory := loop.Get("search_history")
 
 	if searchCount >= maxSearchResults {
-		log.Infof("evaluateNextMovements: search count reached limit (%d), stopping", searchCount)
+		log.Infof("evaluateNextSearch: search count reached limit (%d), stopping", searchCount)
 		return EvaluateResult{
 			Finished: true,
 			Summary:  "reached maximum search count limit",
@@ -242,7 +242,7 @@ Evaluation Criteria:
 
 Output Requirements:
 - finished: boolean, true if information is sufficient, false otherwise
-- next_movements: if finished is false, provide specific search suggestions (keywords/queries); if finished is true, output empty string
+- next_search: if finished is false, provide specific search suggestions (keywords/queries); if finished is true, output empty string
 - summary: if finished is true, briefly summarize collected knowledge; if finished is false, output empty string
 
 Constraints:
@@ -267,7 +267,7 @@ Constraints:
 	})
 
 	if err != nil {
-		log.Errorf("evaluateNextMovements: template render failed: %v", err)
+		log.Errorf("evaluateNextSearch: template render failed: %v", err)
 		return EvaluateResult{Finished: true, Summary: "template render failed"}
 	}
 
@@ -279,7 +279,7 @@ Constraints:
 			aitool.WithBoolParam("finished",
 				aitool.WithParam_Description("whether information collection is complete"),
 				aitool.WithParam_Required(true)),
-			aitool.WithStringParam("next_movements",
+			aitool.WithStringParam("next_search",
 				aitool.WithParam_Description("next search suggestions if not finished")),
 			aitool.WithStringParam("summary",
 				aitool.WithParam_Description("brief summary of collected knowledge if finished")),
@@ -287,7 +287,7 @@ Constraints:
 	)
 
 	if err != nil {
-		log.Errorf("evaluateNextMovements: LiteForge failed: %v", err)
+		log.Errorf("evaluateNextSearch: LiteForge failed: %v", err)
 		return EvaluateResult{Finished: true, Summary: "LiteForge evaluation failed"}
 	}
 
@@ -296,13 +296,13 @@ Constraints:
 	}
 
 	finished := forgeResult.GetBool("finished")
-	nextMovements := strings.TrimSpace(forgeResult.GetString("next_movements"))
+	nextSearch := strings.TrimSpace(forgeResult.GetString("next_search"))
 	summary := strings.TrimSpace(forgeResult.GetString("summary"))
 
 	return EvaluateResult{
-		NextMovements: nextMovements,
-		Finished:      finished,
-		Summary:       summary,
+		NextSearch: nextSearch,
+		Finished:   finished,
+		Summary:    summary,
 	}
 }
 

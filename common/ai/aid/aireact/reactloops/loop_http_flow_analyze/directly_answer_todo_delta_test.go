@@ -15,8 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// flowAnalyzeTodoConfig 暴露可配置的 active TODO 集合, 用来模拟主循环
-// applyNextMovementsBottomLine apply 之后的 store 状态.
+// flowAnalyzeTodoConfig 暴露可配置的 active TODO 集合，用来模拟主循环
+// applyTodoDeltaBottomLine 应用增量后的 store 状态。
 type flowAnalyzeTodoConfig struct {
 	*mock.MockedAIConfig
 	mu     sync.Mutex
@@ -76,15 +76,15 @@ func newFlowAnalyzeTodoLoop(t *testing.T, active []aicommon.VerificationTodoItem
 	return loop, invoker, task
 }
 
-// TestFlowAnalyzeDirectlyAnswer_ContinuesWithNextMovements 验证 http_flow_analyze
-// 专用 directly_answer 复用了与 buildin 同一套收口决策: 携带 next_movements 且
+// TestFlowAnalyzeDirectlyAnswer_ContinuesWithTodoDelta 验证 http_flow_analyze
+// 专用 directly_answer 复用了与 buildin 同一套收口决策: 携带 todo_delta 且
 // apply 之后仍有 open TODO 时, 答复后续跑而非收口.
-func TestFlowAnalyzeDirectlyAnswer_ContinuesWithNextMovements(t *testing.T) {
+func TestFlowAnalyzeDirectlyAnswer_ContinuesWithTodoDelta(t *testing.T) {
 	loop, invoker, task := newFlowAnalyzeTodoLoop(t, []aicommon.VerificationTodoItem{
 		{ID: "trace_followups", Content: "继续追踪关联请求", Status: aicommon.VerificationTodoStatusDoing},
 	})
 	action, err := aicommon.ExtractAction(
-		`{"@action":"directly_answer","answer_payload":"阶段性结论","next_movements":[{"op":"add","id":"trace_followups","content":"继续追踪关联请求"}]}`,
+		`{"@action":"directly_answer","answer_payload":"阶段性结论","todo_delta":{"update":[{"id":"trace_followups","text":"继续追踪关联请求"}],"current":"trace_followups"}}`,
 		"directly_answer",
 	)
 	require.NoError(t, err)
@@ -101,11 +101,11 @@ func TestFlowAnalyzeDirectlyAnswer_ContinuesWithNextMovements(t *testing.T) {
 	assert.Equal(t, "阶段性结论", invoker.results[0])
 }
 
-// TestFlowAnalyzeDirectlyAnswer_ContinuesWithoutNextMovements 验证去 Exit 化:
-// 不携带 next_movements 时, http_flow_analyze 专用 directly_answer 同样只
+// TestFlowAnalyzeDirectlyAnswer_ContinuesWithoutTodoDelta 验证去 Exit 化:
+// 不携带 todo_delta 时, http_flow_analyze 专用 directly_answer 同样只
 // emit + Continue, 绝不 Exit. 终结改由显式 finish 负责.
 // 关键词: directly_answer 永不 Exit, http_flow_analyze 无增量也续跑
-func TestFlowAnalyzeDirectlyAnswer_ContinuesWithoutNextMovements(t *testing.T) {
+func TestFlowAnalyzeDirectlyAnswer_ContinuesWithoutTodoDelta(t *testing.T) {
 	loop, invoker, task := newFlowAnalyzeTodoLoop(t, nil)
 	action, err := aicommon.ExtractAction(
 		`{"@action":"directly_answer","answer_payload":"最终结论"}`,

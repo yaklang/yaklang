@@ -18,14 +18,15 @@ import (
 )
 
 // mockedMaxIterationLoopForever 让 ReAct 永远选择继续调用工具且从不满意, 从而必然
-// 撞上最大迭代上限. 在满意度校验里通过 next_movements 落一条 TODO, 用来验证软性
-// 中断会把它 SKIP 回收. directly_answer(即 loop 的 finalize 收尾总结)会正常应答.
+// 撞上最大迭代上限. 正常工具动作顺手新增 TODO，用来验证软性中断会把它以
+// deferred + reason 关闭。directly_answer(即 loop 的 finalize 收尾总结)会正常应答.
 func mockedMaxIterationLoopForever(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `",
+"todo_delta":{"add":[{"text":"继续排查剩余的可疑流量"}]}},
 "human_readable_thought": "keep probing with the tool", "cumulative_summary": "..still working.."}
 `))
 		rsp.Close()
@@ -41,15 +42,15 @@ func mockedMaxIterationLoopForever(i aicommon.AICallerConfigIf, req *aicommon.AI
 
 	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		// 永不满意, 并顺带落一条待办, 让它在撞上迭代上限时仍处于活跃状态.
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "still-not-done-mock", "next_movements":[{"op":"add","id":"pending_probe","content":"继续排查剩余的可疑流量"}]}`))
+		// verification 只报告观测，不维护 TODO。
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "still-not-done-mock"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
 	if isDirectAnswerPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "本轮到达迭代上限，这是一次自然结束（不是错误）。已把没做完的排查项标记为 SKIP，你可以回复继续，或开启新话题。"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "本轮到达迭代上限，这是一次自然结束（不是错误）。没做完的排查项已记录为 deferred 并保留原因，你可以回复继续，或开启新话题。"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -61,10 +62,10 @@ func mockedMaxIterationLoopForever(i aicommon.AICallerConfigIf, req *aicommon.AI
 // 系统框架路径的对客户端表现 (对应用户提出的响应测试要点):
 //  1. 客户端表现为"自然结束": 收到 success_react_task 终止事件, 任务状态 completed;
 //  2. 不出现错误: 全程不出现 fail_react_task 事件;
-//  3. TODO 都被清掉: 撞上限时把活跃 TODO 批量 SKIP, timeline 记录 "marked as SKIP";
+//  3. TODO 都被留痕关闭: 撞上限时把开放 TODO 批量标为 deferred 并记录 reason;
 //  4. 退出原因入 timeline: timeline 记录 iteration_limit_interrupt (退出=超出最大迭代).
 //
-// 关键词: max iteration 自然结束, 无 fail, 待办 SKIP, timeline 退出原因
+// 关键词: max iteration 自然结束, 无 fail, 待办 deferred, timeline 退出原因
 func TestReAct_MaxIteration_NaturalEnd(t *testing.T) {
 	_ = ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -184,9 +185,9 @@ LOOP:
 	if !strings.Contains(tl, "iteration_limit_interrupt") {
 		t.Fatalf("timeline must record the iteration-limit interrupt exit reason, got:\n%s", tl)
 	}
-	// 要点3: 活跃 TODO 被 SKIP 回收.
-	if !strings.Contains(tl, "marked as SKIP") {
-		t.Fatalf("timeline must record that unfinished TODOs were marked as SKIP, got:\n%s", tl)
+	// 要点3: 活跃 TODO 被 deferred 留痕关闭.
+	if !strings.Contains(tl, "deferred") {
+		t.Fatalf("timeline must record that unfinished TODOs were deferred, got:\n%s", tl)
 	}
 	fmt.Println("--- max-iteration natural-end timeline ---")
 	fmt.Println(tl)

@@ -15,7 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-		"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -397,7 +397,7 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 
 **当前迭代**: {{ .IterationCount }} | **本轮 Finding 数**: {{ .FindingsCount }}
 
-{{ if not .IsSearchPhase }}[终止规则] complete_scan 仅在**全部**目标文件均已 mark_file_done 后才会被接受。每个文件：read_file → mark_file_done；不可用 next_movements 跳过 mark。{{ end }}`
+{{ if not .IsSearchPhase }}[终止规则] complete_scan 仅在**全部**目标文件均已 mark_file_done 后才会被接受。每个文件：read_file → mark_file_done；不可用 todo_delta 跳过 mark。{{ end }}`
 
 // buildSingleCategoryScanLoop 构建针对单一漏洞类别的扫描 Loop（两阶段：discovery → 逐文件审计）。
 //
