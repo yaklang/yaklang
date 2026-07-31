@@ -172,6 +172,18 @@ func normalizeMCPArguments(arguments map[string]any) map[string]any {
 		}
 		delete(args, "request")
 	}
+	// save_yak_script / exec_yak_script alias: pluginType → type
+	if pt, ok := args["pluginType"]; ok {
+		if _, exists := args["type"]; !exists {
+			args["type"] = pt
+		}
+	}
+	// save_yak_script alias: code → content
+	if code, ok := args["code"]; ok {
+		if _, exists := args["content"]; !exists {
+			args["content"] = code
+		}
+	}
 	if group, ok := args["group"].(map[string]any); ok {
 		for k, v := range group {
 			if _, exists := args[k]; !exists {

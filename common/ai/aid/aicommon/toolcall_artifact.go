@@ -401,11 +401,9 @@ func toolArtifactHint(b *toolCallArtifactBundle, persistErr error) string {
 	return fmt.Sprintf(`HINT:
 Complete tool output is stored in artifacts:
 - combined output: %s
-- stdout: %s
-- stderr: %s
 - result: %s
 Use grep first, or read_file(file=%q, mode="lines", offset=..., lines=...).
-Do not load or cat the complete artifact unless necessary.`, b.combinedPath, b.stdoutPath, b.stderrPath, b.resultPath, b.combinedPath)
+Do not load or cat the complete artifact unless necessary.`, b.combinedPath, b.resultPath, b.combinedPath)
 }
 
 func shrinkBodyWithStats(body string, budget int) string {
@@ -442,13 +440,25 @@ func normalizeToolResultData(toolResult *aitool.ToolResult, combined, resultText
 	if combined == "" {
 		combined = "(empty)"
 	}
-	if resultText == "" {
-		resultText = "(empty)"
-	}
 	if combined == resultText {
-		resultText = "[duplicate of COMBINED OUTPUT omitted]"
+		// duplicate: skip RESULT section entirely to save tokens
+		body := "COMBINED OUTPUT:\n" + combined
+		applyNormalizedData(toolResult, body, hint)
+		return
+	}
+	if resultText == "" {
+		// empty result: skip RESULT section to avoid a two-line "(empty)" no-op
+		body := "COMBINED OUTPUT:\n" + combined
+		applyNormalizedData(toolResult, body, hint)
+		return
 	}
 	body := "COMBINED OUTPUT:\n" + combined + "\n\nRESULT:\n" + resultText
+	applyNormalizedData(toolResult, body, hint)
+}
+
+// applyNormalizedData is the shared tail of normalizeToolResultData that
+// applies shrinkBodyWithStats, token limits and enforcement to the body.
+func applyNormalizedData(toolResult *aitool.ToolResult, body, hint string) {
 	staticTokens := ytoken.CalcTokenCount("\n\n" + hint)
 	bodyBudget := ToolResultTokenLimit - toolResultHintReserve
 	if bodyBudget > ToolResultTokenLimit-staticTokens {

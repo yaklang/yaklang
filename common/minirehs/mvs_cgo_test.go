@@ -7,7 +7,9 @@ import (
 	"math/rand"
 	"regexp"
 	"regexp/syntax"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // 本文件是纯 C99 运行期内核 (native/mvscan) 的差分护栏, 仅在 `cgo && minirehs_mvs` 构建运行.
@@ -41,10 +43,303 @@ func TestMVSKernelAvailable(t *testing.T) {
 	}
 }
 
+// TestMVSKernelCombinedBoundaryFusion 验证 combined scanner 在线生成的断言边界与
+// Go 参考实现逐字节一致，覆盖 ASCII、任意字节和非法 UTF-8。边界融合让 combined
+// 从“预算边界 + NFA”两趟数据变为一趟，因此必须独立守住零宽断言语义。
+func TestMVSKernelCombinedBoundaryFusion(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `[a-z]{2,4}`},
+		{ID: 2, Expr: `\b[0-9]{2,5}\b`},
+		{ID: 3, Expr: `(?m)^[A-Z][0-9]+$`},
+	}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if mdb.kernel == nil || mdb.merged == nil || len(mdb.assertAlwaysOnCIdxs) == 0 {
+		t.Fatalf("combined prerequisites missing: kernel=%v merged=%v assert=%d",
+			mdb.kernel != nil, mdb.merged != nil, len(mdb.assertAlwaysOnCIdxs))
+	}
+
+	rng := rand.New(rand.NewSource(0x5eed))
+	sc := &scratch{}
+	for caseNo := 0; caseNo < 800; caseNo++ {
+		data := make([]byte, 1+rng.Intn(256))
+		for i := range data {
+			switch rng.Intn(3) {
+			case 0:
+				data[i] = "abcXYZ019_ \n"[rng.Intn(len("abcXYZ019_ \n"))]
+			default:
+				data[i] = byte(rng.Intn(256))
+			}
+		}
+		mdb.kernel.combinedScan(data, mdb.assertAlwaysOnCIdxs, true, sc)
+		want := computeBoundaries(data, nil)
+		for i := 0; ; {
+			if sc.assertBound[i] != want[i] {
+				t.Fatalf("case=%d offset=%d data=%q combined=%#x want=%#x",
+					caseNo, i, data, sc.assertBound[i], want[i])
+			}
+			if i == len(data) {
+				break
+			}
+			_, size := utf8.DecodeRune(data[i:])
+			i += size
+		}
+	}
+}
+
+func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `[a-z]{2,4}`}, // 确保 combined 含 merged unit
+		{ID: 2, Expr: `[^0-9]((\d{8}(0\d|10|11|12)([0-2]\d|30|31)\d{3}$)|(\d{6}(18|19|20)\d{2}(0[1-9]|10|11|12)([0-2]\d|30|31)\d{3}(\d|X|x)))[^0-9]`},
+		{ID: 3, Expr: `(^([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5})|[^a-zA-Z0-9]([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}))`},
+	}
+	mvs, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer mvs.Close()
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+	mdb := getMVSDB(t, mvs)
+	for _, data := range [][]byte{
+		[]byte(` 11:22:33:44:55:66 `),
+		[]byte(`x 11010519491231002X y`),
+		[]byte(`ordinary payload without either form`),
+	} {
+		bound := computeBoundaries(data, nil)
+		for _, idx := range mdb.assertAlwaysOn {
+			goHit := mdb.nfas[idx].existsInAssertShared1(data, bound)
+			cHit := mdb.kernel.nfaExistsAssertSelf(idx, data, nil)
+			if cHit != goHit {
+				t.Fatalf("assert self mismatch data=%q idx=%d C=%v Go=%v", data, idx, cHit, goHit)
+			}
+		}
+		got := mvsExistIDs(t, mvs, data)
+		want := mvsExistIDs(t, oracle, data)
+		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("combined-assert %q", data))
+	}
+}
+
+// TestMVSKernelAssertOnlineManyRandom 验证 always-on assert 的单趟融合扫描与
+// 单条 C 执行器逐位一致，覆盖 ASCII、Unicode 与非法 UTF-8 输入。
+func TestMVSKernelAssertOnlineManyRandom(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `\b[0-9]{2,5}\b`},
+		{ID: 2, Expr: `(?m)^[A-Z][0-9]+$`},
+		{ID: 3, Expr: `(^([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5})|[^a-zA-Z0-9]([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}))`},
+	}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if len(mdb.assertAlwaysOnCIdxs) < 2 {
+		t.Fatalf("need multiple C assert units, got %d", len(mdb.assertAlwaysOnCIdxs))
+	}
+
+	rng := rand.New(rand.NewSource(0xa55e47))
+	sc := &scratch{}
+	for caseNo := 0; caseNo < 1200; caseNo++ {
+		data := make([]byte, 1+rng.Intn(384))
+		for i := range data {
+			if rng.Intn(3) == 0 {
+				data[i] = "abcXYZ019_: \n"[rng.Intn(len("abcXYZ019_: \n"))]
+			} else {
+				data[i] = byte(rng.Intn(256))
+			}
+		}
+		got := mdb.kernel.nfaExistsAssertMany(mdb.assertAlwaysOnCIdxs, data, sc)
+		for i, idx := range mdb.assertAlwaysOnCIdxs {
+			want := mdb.kernel.nfaExistsAssertSelf(int(idx), data, nil)
+			if (got[i] != 0) != want {
+				t.Fatalf("case=%d idx=%d data=%q fused=%v single=%v",
+					caseNo, idx, data, got[i] != 0, want)
+			}
+		}
+	}
+}
+
+// TestMVSParallelAlwaysOnEarlyStop 覆盖 Scratch 常驻 worker team 在 handler 提前停止时
+// 仍会收拢本次任务，下一次复用及 Close 不会读到陈旧结果、阻塞或泄漏活跃任务。
+func TestMVSParallelAlwaysOnEarlyStop(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `[a-z]{2,4}`},
+		{ID: 2, Expr: `(^([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5})|[^a-zA-Z0-9]([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}))`},
+		{ID: 3, Expr: `needle[a-z]+`},
+	}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	scr, err := db.NewScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scr.Close()
+	data := []byte("needlepayload " + strings.Repeat("ordinary ascii traffic ", 64))
+	if err := db.Scan(data, scr, func(Match) bool { return false }); err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 20; round++ {
+		got := map[PatternID]bool{}
+		if err := db.Scan(data, scr, func(m Match) bool { got[m.ID] = true; return true }); err != nil {
+			t.Fatal(err)
+		}
+		if !got[1] || !got[3] {
+			t.Fatalf("round=%d missing expected hits: %v", round, got)
+		}
+	}
+}
+
+func TestMVSKernelAssertGuardTablesRandom(t *testing.T) {
+	exprs := []string{
+		`\b[a-z]{2,8}\b`,
+		`\B_[A-Z0-9]{1,5}\B`,
+		`(?m)^[A-Z][a-z0-9_]{0,12}$`,
+		`(?:^|[^0-9])[0-9]{3,7}(?:$|[^0-9])`,
+		`\A(?:GET|POST)[ \t]+[^\n]{1,20}\z`,
+	}
+	rng := rand.New(rand.NewSource(0x6a17d))
+	for _, expr := range exprs {
+		parsed, err := syntax.Parse(expr, syntax.Perl)
+		if err != nil {
+			t.Fatalf("parse %q: %v", expr, err)
+		}
+		nfa, ok := compileMVSNFAAssert(parsed.Simplify())
+		if !ok || nfa == nil || !nfa.hasAssert || !nfa.single {
+			t.Fatalf("expected single-word assert NFA for %q", expr)
+		}
+		k := openSingleNFAKernel(t, nfa)
+		re := regexp.MustCompile(expr)
+		for caseNo := 0; caseNo < 500; caseNo++ {
+			data := make([]byte, rng.Intn(192))
+			for i := range data {
+				switch rng.Intn(4) {
+				case 0, 1:
+					const alphabet = "abcXYZ019_ \t\n-:"
+					data[i] = alphabet[rng.Intn(len(alphabet))]
+				default:
+					data[i] = byte(rng.Intn(256))
+				}
+			}
+			bound := computeBoundaries(data, nil)
+			goHit := nfa.existsInAssertShared1(data, bound)
+			cHit := k.nfaExistsAssertSelf(0, data, nil)
+			want := re.Match(data)
+			if cHit != goHit || goHit != want {
+				t.Fatalf("expr=%q case=%d data=%q C=%v Go=%v oracle=%v",
+					expr, caseNo, data, cHit, goHit, want)
+			}
+		}
+		k.close()
+	}
+}
+
+func TestMVSKernelAssertOnlineMultiwordRandom(t *testing.T) {
+	exprs := []string{
+		`\b[a-z]{70}\b`,
+		`(?m)^[A-Z][a-z0-9_]{64,90}$`,
+		`(?:^|[^0-9])[0-9]{65,80}(?:$|[^0-9])`,
+	}
+	rng := rand.New(rand.NewSource(0x0a11ce))
+	for _, expr := range exprs {
+		parsed, err := syntax.Parse(expr, syntax.Perl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nfa, ok := compileMVSNFAAssert(parsed.Simplify())
+		if !ok || nfa == nil || !nfa.hasAssert || nfa.single {
+			t.Fatalf("expected multiword assert NFA for %q", expr)
+		}
+		k := openSingleNFAKernel(t, nfa)
+		re := regexp.MustCompile(expr)
+		for caseNo := 0; caseNo < 400; caseNo++ {
+			data := make([]byte, rng.Intn(256))
+			for i := range data {
+				const alphabet = "abcXYZ019_ \t\n-:"
+				if rng.Intn(4) == 0 {
+					data[i] = byte(rng.Intn(256))
+				} else {
+					data[i] = alphabet[rng.Intn(len(alphabet))]
+				}
+			}
+			bound := computeBoundaries(data, nil)
+			goHit := nfa.existsInAssertShared(data, bound)
+			cHit := k.nfaExistsAssertOnline(0, data)
+			want := re.Match(data)
+			if cHit != goHit || goHit != want {
+				t.Fatalf("expr=%q case=%d data=%q online=%v Go=%v oracle=%v",
+					expr, caseNo, data, cHit, goHit, want)
+			}
+		}
+		k.close()
+	}
+}
+
+// TestMVSKernelAnchoredBatchBackendOracle 接通 C anchored-many 的端到端 A/B 路径。
+// 默认生产开关保持关闭，直到 C 侧能把 literal trigger 与局部 verifier 融为一趟；此测试
+// 保证未来重新评估时，该批处理路径仍和 stdlib oracle 完全一致。
+func TestMVSKernelAnchoredBatchBackendOracle(t *testing.T) {
+	old := anchorCBatchEnabled
+	anchorCBatchEnabled = true
+	defer func() { anchorCBatchEnabled = old }()
+
+	patterns, _ := compilableMITMPatterns(t)
+	db, err := Compile(patterns, WithBackend(BackendMVS))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer db.Close()
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	for i, rec := range records {
+		got := mvsExistIDs(t, db, rec)
+		want := mvsExistIDs(t, oracle, rec)
+		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("anchored-c-batch-record#%d", i))
+	}
+}
+
+// BenchmarkMVSCAnchoredBatchAB 衡量 C anchored-many 与默认 Go 单字 gap-jump 的净差异。
+// 该 A/B 只在 cgo+mvs 构建中存在，避免将尚未验收的 C 调度混入主基准。
+func BenchmarkMVSCAnchoredBatchAB(b *testing.B) {
+	patterns := re2OnlyMITMPatterns(b)
+	records, _ := loadCorpusB(b)
+	old := anchorCBatchEnabled
+	defer func() { anchorCBatchEnabled = old }()
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+	}{
+		{"GoGapJump", false},
+		{"CBatchGapJump", true},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			anchorCBatchEnabled = tc.enabled
+			benchScanRecordsOpts(b, patterns, records, WithBackend(BackendMVS), WithReportLocation(false))
+		})
+	}
+}
+
 // openSingleNFAKernel 把一条 NFA 序列化为 blob 并打开 C 内核 (pattern 槽位仅 idx 0).
 func openSingleNFAKernel(t *testing.T, nfa *mvsNFA) *mvsKernel {
 	t.Helper()
-	blob := buildMVSBlob([]*mvsNFA{nfa}, nil)
+	blob := buildMVSBlob([]*mvsNFA{nfa}, nil, nil, nil)
 	k := openMVSKernel(blob, 1)
 	if k == nil {
 		t.Fatal("openMVSKernel returned nil for valid single-NFA blob")
@@ -59,7 +354,7 @@ func TestMVSKernelExistsDirect(t *testing.T) {
 		expr   string
 		inputs []string
 	}{
-		{`AKIA[0-9A-Z]{16}`, []string{"AKIAABCDEFGHIJKLMNOP", "xxAKIAABCDEFGHIJKLMNOPyy", "AKIAshort"}},
+		{`AKIA[0-9A-Z]{16}`, []string{"AKIA"+"ABCDEFGHIJKLMNOP", "xxAKIA"+"ABCDEFGHIJKLMNOPyy", "AKIAshort"}},
 		{`Druid`, []string{"Druid", "xDruidy", "druid", "Dru"}},
 		{`swagger-ui\.html`, []string{"/swagger-ui.html", "swagger-uiXhtml", "swagger-ui.htm"}},
 		{`[0-9]{3,}`, []string{"12", "123", "99999", "ab123cd"}},
@@ -96,6 +391,49 @@ func TestMVSKernelExistsDirect(t *testing.T) {
 			}
 			if cHit != want {
 				t.Errorf("expr=%q input=%q: C=%v oracle=%v", c.expr, in, cHit, want)
+			}
+		}
+		k.close()
+	}
+}
+
+// TestMVSKernelFindAllLoc1Direct 验证 C 单字定位器与 Go leftmost-longest 定位器逐 span
+// 一致。它覆盖重叠、量词、锚定、大小写折叠、UTF-8 与多次非重叠匹配，防止存在性内核
+// 的定位优化改变既有 Match.From/To 语义。
+func TestMVSKernelFindAllLoc1Direct(t *testing.T) {
+	cases := []struct {
+		expr   string
+		inputs []string
+	}{
+		{`Druid`, []string{"DruidDruid", "xDruidyDruidz", "none", "Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid"}},
+		{`[0-9]{3,}`, []string{"ab123cd456", "99999 12 777", "no digits"}},
+		{`ab+c`, []string{"abc abbbbc ac", "xabbcy abc"}},
+		{`a[bc]*d`, []string{"ad abcbcd abbccd", "aXd"}},
+		{`(?i)druid`, []string{"DRUID DrUiD druid", "none"}},
+		{`^GET`, []string{"GET /x", "GET GET", "xGET"}},
+		{`END$`, []string{"the END", "ENDx", "END"}},
+		{`[A-Z]+`, []string{"xABCy DEF G", "äÖX"}},
+		{`(?:ab){40}`, []string{"xxababababababababababababababababababababababababababababababababababababababababababababyy", "abababab"}},
+	}
+	for _, tc := range cases {
+		nfa := buildNFAFor(t, tc.expr)
+		if nfa == nil || nfa.hasAssert {
+			t.Fatalf("expected lean NFA for %q", tc.expr)
+		}
+		k := openSingleNFAKernel(t, nfa)
+		for _, input := range tc.inputs {
+			data := []byte(input)
+			want := nfaFindAll(nfa, data)
+			gotFlat, ok := k.findAllLoc(0, data, &scratch{})
+			if !ok {
+				t.Fatalf("C locator rejected supported expr=%q input=%q", tc.expr, input)
+			}
+			got := make([][2]int, 0, len(gotFlat)/2)
+			for i := 0; i < len(gotFlat); i += 2 {
+				got = append(got, [2]int{int(gotFlat[i]), int(gotFlat[i+1])})
+			}
+			if !sameSpans(got, want) {
+				t.Fatalf("expr=%q input=%q C=%v Go=%v", tc.expr, input, got, want)
 			}
 		}
 		k.close()
@@ -323,7 +661,7 @@ func TestMVSKernelMergedRandom(t *testing.T) {
 	for _, m := range members {
 		nfas[m.idx] = m.nfa
 	}
-	blob := buildMVSBlob(nfas, merged)
+	blob := buildMVSBlob(nfas, merged, nil, nil)
 	k := openMVSKernel(blob, npat)
 	if k == nil {
 		t.Fatal("openMVSKernel nil")
@@ -450,6 +788,39 @@ func TestMVSKernelMergedSIMDScalarTwin(t *testing.T) {
 	t.Logf("merged SIMD/scalar twin: %d inputs bit-identical", len(inputs))
 }
 
+func TestMVSKernelMergedMembersRealTraffic(t *testing.T) {
+	patterns, _ := compilableMITMPatterns(t)
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if mdb.kernel == nil || mdb.merged == nil || len(mdb.merged.memIdx) == 0 {
+		t.Fatal("expected merged C kernel members")
+	}
+	for _, idx := range mdb.merged.memIdx {
+		t.Logf("merged member idx=%d rule=%d npos=%d nword=%d", idx, mdb.all[idx].id, mdb.nfas[idx].npos, mdb.nfas[idx].nword)
+	}
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	mergedSc := &scratch{}
+	for ri, rec := range records {
+		merged := toIntSet(mdb.kernel.mergedScan(rec, mergedSc))
+		individual := map[int]struct{}{}
+		for _, idx := range mdb.merged.memIdx {
+			if mdb.kernel.nfaExists(idx, rec) {
+				individual[idx] = struct{}{}
+			}
+		}
+		if !sameIntSet(individual, merged) {
+			t.Fatalf("record#%d merged=%v individual=%v members=%v", ri, merged, individual, mdb.merged.memIdx)
+		}
+	}
+}
+
 // TestMVSKernelEndToEndOracle 端到端: minirehs_mvs 构建 (C 内核驱动存在性) 与 stdlib oracle
 // 在真实流量上命中 ID 集合逐条一致 (这是把 C 内核接进 scan 后的最终护栏).
 func TestMVSKernelEndToEndOracle(t *testing.T) {
@@ -489,4 +860,247 @@ func toIntSet(in []int) map[int]struct{} {
 		s[v] = struct{}{}
 	}
 	return s
+}
+
+// TestMVSKernelAnchoredDirect 用固定 pattern + 定向输入 + 手工 spans, 比对 C nfaExistsAnchored
+// 与 Go existsInAnchored / existsInAnchored1 及 SIMD/标量孪生四方一致. 覆盖 nword==1 与 nword>=2.
+func TestMVSKernelAnchoredDirect(t *testing.T) {
+	cases := []struct {
+		expr  string
+		input string
+		spans []anchorSpan
+	}{
+		{`token=\w+`, "xx token=abc123 yy", []anchorSpan{{4, 10}}},
+		{`token=\w+`, "token=abc zz token=def", []anchorSpan{{0, 6}, {14, 20}}},
+		{`token=\w+`, "no match here", []anchorSpan{{0, 4}}},
+		{`pass[word]?\s*[:=]`, "x password: y", []anchorSpan{{2, 8}}},
+		{`AKIA[0-9A-Z]{16}`, "xxAKIA"+"ABCDEFGHIJKLMNOPyy", []anchorSpan{{2, 7}}},
+		{`a[bc]+d`, "xabcbcdy abcd", []anchorSpan{{1, 2}, {9, 10}}},
+		{`https?://[a-z]+`, "visit http://abc or https://xyz", []anchorSpan{{6, 11}, {20, 26}}},
+		{`[0-9]{4,6}`, "code 12345 ok 99", []anchorSpan{{5, 10}}},
+		{`colou?r`, "color colour", []anchorSpan{{0, 6}, {6, 12}}},
+		{`café`, "xcaféy", []anchorSpan{{2, 6}}},
+		{`[\x{4e00}-\x{9fff}]+`, "x 中文 y", []anchorSpan{{2, 5}}},
+		// nword>=2 (位置数>64) 走 SIMD 档
+		{`[a-z]{70}`, strings.Repeat("x", 50) + strings.Repeat("a", 70) + strings.Repeat("y", 30), []anchorSpan{{50, 51}}},
+		{`[0-9a-f]{80}`, strings.Repeat("z", 40) + strings.Repeat("0123456789abcdef", 8) + strings.Repeat("z", 40), []anchorSpan{{40, 41}}},
+	}
+	checks := 0
+	for _, c := range cases {
+		nfa := buildNFAFor(t, c.expr)
+		if nfa == nil {
+			t.Logf("expr=%q fallback (skip)", c.expr)
+			continue
+		}
+		data := []byte(c.input)
+		k := openSingleNFAKernel(t, nfa)
+		var goHit bool
+		if nfa.single {
+			goHit = nfa.existsInAnchored1(data, c.spans)
+		} else if nfa.nword == 2 {
+			goHit = nfa.existsInAnchored2(data, c.spans)
+		} else {
+			prev := make([]uint64, nfa.nword)
+			cand := make([]uint64, nfa.nword)
+			active := make([]uint64, nfa.nword)
+			goHit = nfa.existsInAnchored(data, c.spans, prev, cand, active)
+		}
+		cHit := k.nfaExistsAnchored(0, data, c.spans)
+		cScalarHit := k.nfaExistsAnchoredScalar(0, data, c.spans)
+		checks++
+		if cHit != goHit {
+			t.Errorf("C!=Go expr=%q input=%q spans=%v C=%v go=%v", c.expr, c.input, c.spans, cHit, goHit)
+		}
+		if cHit != cScalarHit {
+			t.Errorf("SIMD!=scalar expr=%q input=%q spans=%v simd=%v scalar=%v", c.expr, c.input, c.spans, cHit, cScalarHit)
+		}
+		k.close()
+	}
+	t.Logf("anchored direct: checks=%d (all C==Go==scalar-twin)", checks)
+}
+
+// TestMVSKernelAnchoredRandom 随机 pattern + 随机输入 + 随机 spans, 比对 C nfaExistsAnchored
+// 与 Go existsInAnchored 逐位一致 (含 SIMD/标量孪生). 覆盖 nword==1 与 nword>=2, 含非法 UTF-8.
+func TestMVSKernelAnchoredRandom(t *testing.T) {
+	exprs := []string{
+		`ab+c`, `[0-9]{3,}`, `https?://`, `colou?r`, `a[bc]*d`, `Druid`,
+		`AKIA[0-9A-Z]{16}`, `\d{1,3}\.\d{1,3}`, `(GET|POST|PUT)`, `<[^>]+>`,
+		`café`, `[\x{4e00}-\x{9fff}]+`,
+		`[a-z]{70}`, `[0-9a-f]{80}`, `(abc|def|ghi){25}`,
+	}
+	r := rand.New(rand.NewSource(0xA7 + 0xC))
+	checks, multiWord := 0, 0
+	for _, expr := range exprs {
+		nfa := buildNFAFor(t, expr)
+		if nfa == nil {
+			t.Logf("expr=%q fallback (skip)", expr)
+			continue
+		}
+		if nfa.nword >= 2 {
+			multiWord++
+		}
+		k := openSingleNFAKernel(t, nfa)
+		for s := 0; s < 300; s++ {
+			n := r.Intn(200)
+			data := make([]byte, n)
+			for i := range data {
+				switch r.Intn(3) {
+				case 0:
+					data[i] = byte("abcdef0123.GETPOST _"[r.Intn(20)])
+				case 1:
+					data[i] = byte(r.Intn(128))
+				default:
+					data[i] = byte(r.Intn(256))
+				}
+			}
+			nspan := 1 + r.Intn(3)
+			spans := make([]anchorSpan, nspan)
+			for i := range spans {
+				lo := r.Intn(n + 1)
+				hi := lo + r.Intn(n-lo+1)
+				spans[i] = anchorSpan{int32(lo), int32(hi)}
+			}
+			spans = mergeAnchorSpans(spans)
+			var goHit bool
+			if nfa.single {
+				goHit = nfa.existsInAnchored1(data, spans)
+			} else if nfa.nword == 2 {
+				goHit = nfa.existsInAnchored2(data, spans)
+			} else {
+				prev := make([]uint64, nfa.nword)
+				cand := make([]uint64, nfa.nword)
+				active := make([]uint64, nfa.nword)
+				goHit = nfa.existsInAnchored(data, spans, prev, cand, active)
+			}
+			cHit := k.nfaExistsAnchored(0, data, spans)
+			cScalar := k.nfaExistsAnchoredScalar(0, data, spans)
+			checks++
+			if cHit != cScalar {
+				t.Fatalf("SIMD!=scalar expr=%q nword=%d data=%q spans=%v simd=%v scalar=%v", expr, nfa.nword, data, spans, cHit, cScalar)
+			}
+			if cHit != goHit {
+				t.Fatalf("C!=Go expr=%q nword=%d data=%q spans=%v C=%v go=%v", expr, nfa.nword, data, spans, cHit, goHit)
+			}
+		}
+		k.close()
+	}
+	t.Logf("anchored random diff: exprs=%d (multiWord=%d) checks=%d (all C==Go==scalar)", len(exprs), multiWord, checks)
+	if multiWord < 2 {
+		t.Fatalf("too few multi-word (nword>=2) NFAs exercised: %d", multiWord)
+	}
+}
+
+// TestMVSKernelAnchoredRealTraffic 在真实 MITM 规则集 + 真实流量上, 对每条 anchorable lean pattern
+// 比对 C nfaExistsAnchored 与生产 Go 快路径逐条一致。spans 直接由真实字面量命中按生产公式构造，
+// 覆盖全报文宽测试无法触发的稀疏 span/gap-jump 边界。
+func TestMVSKernelAnchoredRealTraffic(t *testing.T) {
+	patterns, _ := compilableMITMPatterns(t)
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if mdb.kernel == nil {
+		t.Fatal("expected C kernel active")
+	}
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	scr, err := db.NewScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc := scr.(*scratch)
+	spansByIdx := make([][]anchorSpan, mdb.n)
+	anchorCount, checks := 0, 0
+	for idx := 0; idx < mdb.n; idx++ {
+		if mdb.anchorable[idx] && mdb.nfas[idx] != nil && !mdb.nfas[idx].hasAssert {
+			anchorCount++
+		}
+	}
+	for ri, rec := range records {
+		for idx := range spansByIdx {
+			spansByIdx[idx] = spansByIdx[idx][:0]
+		}
+		for _, h := range mdb.pf.scanHits(rec, sc) {
+			if int(h.litID) >= len(mdb.litToPat) {
+				continue
+			}
+			for k, idx32 := range mdb.litToPat[h.litID] {
+				idx := int(idx32)
+				if !mdb.anchorable[idx] || mdb.nfas[idx] == nil || mdb.nfas[idx].hasAssert {
+					continue
+				}
+				head := mdb.litHead[h.litID][k]
+				lo := 0
+				if head >= 0 {
+					lo = int(h.end) - int(head)
+					if lo < 0 {
+						lo = 0
+					}
+				}
+				spansByIdx[idx] = append(spansByIdx[idx], anchorSpan{int32(lo), h.end})
+			}
+		}
+		for idx, rawSpans := range spansByIdx {
+			if len(rawSpans) == 0 {
+				continue
+			}
+			nfa := mdb.nfas[idx]
+			spans := mergeAnchorSpans(rawSpans)
+			var goHit bool
+			switch {
+			case nfa.single:
+				goHit = nfa.existsInAnchored1(rec, spans)
+			case nfa.nword == 2:
+				goHit = nfa.existsInAnchored2(rec, spans)
+			default:
+				prev := make([]uint64, nfa.nword)
+				cand := make([]uint64, nfa.nword)
+				active := make([]uint64, nfa.nword)
+				goHit = nfa.existsInAnchored(rec, spans, prev, cand, active)
+			}
+			cHit := mdb.kernel.nfaExistsAnchored(idx, rec, spans)
+			checks++
+			if cHit != goHit {
+				cScalar := mdb.kernel.nfaExistsAnchoredScalar(idx, rec, spans)
+				t.Fatalf("C!=Go anchored idx=%d rule=%d record#%d len=%d nword=%d spans=%v C=%v scalar=%v go=%v",
+					idx, mdb.all[idx].id, ri, len(rec), nfa.nword, spans, cHit, cScalar, goHit)
+			}
+		}
+	}
+	t.Logf("anchored real traffic: anchorable=%d records=%d checks=%d (all C==Go)", anchorCount, len(records), checks)
+}
+
+// TestMVSKernelAnchoredEndToEndOracle 端到端: C 内核 anchored 路径激活后, 整体命中集合与
+// stdlib oracle 一致 (含 anchorable + biAnchorable 前向走 C 的路径).
+func TestMVSKernelAnchoredEndToEndOracle(t *testing.T) {
+	patterns, _ := compilableMITMPatterns(t)
+	mvs, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer mvs.Close()
+	if getMVSDB(t, mvs).kernel == nil {
+		t.Fatal("expected C kernel active")
+	}
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	for i, rec := range records {
+		got := mvsExistIDs(t, mvs, rec)
+		ora := mvsExistIDs(t, oracle, rec)
+		mvsAssertSameIDSet(t, got, ora, fmt.Sprintf("anchored-e2e-record#%d(len=%d)", i, len(rec)))
+		if t.Failed() {
+			t.FailNow()
+		}
+	}
 }

@@ -88,30 +88,31 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 				return rsp, nil
 			}
 
-			// Capability catalog match helper used by query_capabilities.
+			// Capability catalog match helper (BM25 chunk matching LiteForge).
 			// Return the forge identifier so deep intent can continue normally.
-			if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
-				utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+			if aicommon.IsCapabilityCatalogMatchPrompt(prompt) {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "capability-catalog-match", "matched_identifiers": ["` + testForgeName + `"]}
-`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": ["` + testForgeName + `"]}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
-			// ---- Phase 1: Intent loop (single iteration with MaxIterations=1) ----
-			// Match the intent loop by its intent-specific actions instead of assuming
-			// directly_answer is absent. Prompt examples may legitimately include it.
-			// With MaxIterations(1), only 1 iteration runs. After that, the post-iteration
-			// hook auto-generates the intent summary via LiteForge.
-			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") {
+			// ---- Phase 1: Intent loop (single LiteForge call via intent_runner) ----
+			// The simplified loop_intent runs entirely in InitTask with a single
+			// LiteForge "intent-keyword-gen" call (no ReAct iterations). Track it.
+			if aicommon.IsIntentKeywordGenPrompt(prompt) {
 				atomic.AddInt32(&intentSearchCalled, 1)
-				log.Infof("intent loop: returning query_capabilities action (single iteration)")
+				log.Infof("intent loop: returning intent-keyword-gen action")
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "query_capabilities", "human_readable_thought": "searching for capabilities matching the user request", "search_query": "` + testForgeName + `"}
-`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-keyword-gen", "intent_summary": "security assessment capabilities", "search_keywords": ["` + testForgeName + ` security assessment"], "tags": ["security"], "questions": ["what scanning capabilities are available?"]}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Conditional second LiteForge call for capability recommendation.
+			if aicommon.IsIntentRecommendPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-capability-recommend", "recommended_capabilities": ["` + testForgeName + `"]}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -120,8 +121,8 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 			// The main loop prompt contains directly_answer, but should not be confused
 			// with the intent loop or the capability matcher helper.
 			if isPrimaryDecisionPrompt(prompt) &&
-				!utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
-				!utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+				!aicommon.IsIntentKeywordGenPrompt(prompt) &&
+				!aicommon.IsCapabilityCatalogMatchPrompt(prompt) {
 				n := atomic.AddInt32(&mainLoopCalled, 1)
 
 				// Check whether EXTRA_CAPABILITIES block appears in the prompt

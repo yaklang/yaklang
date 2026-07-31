@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // DeepIntentResult holds the output from a deep intent recognition sub-loop.
@@ -115,7 +116,7 @@ func ApplyDeepIntentResult(r aicommon.AIInvokeRuntime, loop *ReActLoop, result *
 	}
 	if result.ContextEnrichment != "" {
 		loop.Set("intent_context_enrichment", result.ContextEnrichment)
-		r.AddToTimeline("intent_context_enrichment", "已补充能力上下文")
+		r.AddToTimeline("intent_context_enrichment", utils.ShrinkString(result.ContextEnrichment, 200))
 	}
 
 	PopulateExtraCapabilitiesFromDeepIntent(r, loop, result)

@@ -28,7 +28,7 @@ type recoveredTask struct {
 	Subtasks           []*recoveredTask `json:"subtasks,omitempty"`
 }
 
-func (c *Coordinator) tryRecoverPlanAndExec(startTaskIndex string) (*AiTask, *PlanAndExecProgress, bool, error) {
+func (c *Coordinator) tryRecoverPlanAndExec(startTaskID string) (*AiTask, *PlanAndExecProgress, bool, error) {
 	if c == nil {
 		return nil, nil, false, nil
 	}
@@ -70,14 +70,14 @@ func (c *Coordinator) tryRecoverPlanAndExec(startTaskIndex string) (*AiTask, *Pl
 		return nil, &progress, false, nil
 	}
 	c.standardizeTaskTree(root)
-	effectiveStartTaskIndex := strings.TrimSpace(startTaskIndex)
-	if effectiveStartTaskIndex == "" {
-		effectiveStartTaskIndex = strings.TrimSpace(progress.CurrentTaskIndex)
-		if effectiveStartTaskIndex == "" && len(progress.ActiveTaskIndexes) > 0 {
-			effectiveStartTaskIndex = strings.TrimSpace(progress.ActiveTaskIndexes[0])
+	effectiveStartTaskID := strings.TrimSpace(startTaskID)
+	if effectiveStartTaskID == "" {
+		effectiveStartTaskID = strings.TrimSpace(progress.CurrentTaskID)
+		if effectiveStartTaskID == "" && len(progress.ActiveTaskIDs) > 0 {
+			effectiveStartTaskID = strings.TrimSpace(progress.ActiveTaskIDs[0])
 		}
 	}
-	if err := prepareRecoveryStartTask(root, effectiveStartTaskIndex); err != nil {
+	if err := prepareRecoveryStartTask(root, effectiveStartTaskID); err != nil {
 		return nil, &progress, true, err
 	}
 	return root, &progress, true, nil
@@ -149,8 +149,8 @@ func restoreRecoveredTaskID(task *AiTask, src *recoveredTask) {
 	}
 }
 
-func prepareRecoveryStartTask(root *AiTask, startTaskIndex string) error {
-	startTaskIndex = strings.TrimSpace(startTaskIndex)
+func prepareRecoveryStartTask(root *AiTask, startTaskID string) error {
+	startTaskID = strings.TrimSpace(startTaskID)
 	if root == nil {
 		return nil
 	}
@@ -160,23 +160,23 @@ func prepareRecoveryStartTask(root *AiTask, startTaskIndex string) error {
 		return err
 	}
 
-	if startTaskIndex == "" {
-		if autoTaskIndex, ok := locateAutoRecoveryTask(graph); ok {
-			startTaskIndex = autoTaskIndex
+	if startTaskID == "" {
+		if autoTaskID, ok := locateAutoRecoveryTask(graph); ok {
+			startTaskID = autoTaskID
 		} else {
 			return nil
 		}
 	}
-	targetOrder, err := locateRecoveryTaskOrder(root, graph, startTaskIndex)
+	targetOrder, err := locateRecoveryTaskOrder(root, graph, startTaskID)
 	if err != nil {
 		return err
 	}
 
 	for _, task := range graph.order {
-		if task == nil || task.Index == "" {
+		if task == nil || task.TaskId == "" {
 			continue
 		}
-		order, ok := graph.OrderOf(task.Index)
+		order, ok := graph.OrderOf(task.TaskId)
 		if !ok {
 			continue
 		}
@@ -203,30 +203,30 @@ func locateAutoRecoveryTask(graph *executableTaskGraph) (string, bool) {
 		if task.executed() || task.GetStatus() == aicommon.AITaskState_Skipped {
 			continue
 		}
-		return task.Index, true
+		return task.TaskId, true
 	}
 	return "", false
 }
 
-func locateRecoveryTaskOrder(root *AiTask, graph *executableTaskGraph, startTaskIndex string) (int, error) {
+func locateRecoveryTaskOrder(root *AiTask, graph *executableTaskGraph, startTaskID string) (int, error) {
 	if graph == nil {
 		return 0, workflowdag.ErrEmptyDAG
 	}
 
-	startTaskIndex = strings.TrimSpace(startTaskIndex)
-	if order, ok := graph.OrderOf(startTaskIndex); ok {
+	startTaskID = strings.TrimSpace(startTaskID)
+	if order, ok := graph.OrderOf(startTaskID); ok {
 		return order, nil
 	}
 
 	references := buildTaskReferenceMap(root)
-	targetIndex, ok := references[startTaskIndex]
+	targetID, ok := references[startTaskID]
 	if !ok {
-		return 0, utils.Errorf("recovery start task %q not found", startTaskIndex)
+		return 0, utils.Errorf("recovery start task %q not found", startTaskID)
 	}
-	if order, ok := graph.OrderOf(targetIndex); ok {
+	if order, ok := graph.OrderOf(targetID); ok {
 		return order, nil
 	}
-	return 0, utils.Errorf("recovery start task %q is not an executable task node", startTaskIndex)
+	return 0, utils.Errorf("recovery start task %q is not an executable task node", startTaskID)
 }
 
 // resetTaskForRecovery 会把任务恢复成未完成状态，让 runtime 不会因为旧状态而跳过它。

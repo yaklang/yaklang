@@ -53,7 +53,12 @@ type MemoryFlushBuffer struct {
 
 func DefaultMemoryFlushBufferConfig() MemoryFlushBufferConfig {
 	return MemoryFlushBufferConfig{
-		MaxPendingIterations: 3,
+		// P1 优化: 从 3 提高到 6，减少记忆 triage 的 LLM 调用频次。
+		// 原值 3 导致每 3 轮 iter 就 flush 一次 HandleMemory (含 G1 memory-triage
+		// LLM 调用)，10 iter task 产生 4 次 flush。改为 6 后降至 2 次 (iter6 + done)，
+		// 记忆写入仍异步不阻塞主循环，task done 时仍会 flush 不会丢失记忆。
+		// 关键词: P1 MaxPendingIterations 3→6, 记忆 flush 频次减半
+		MaxPendingIterations: 6,
 		MaxPendingBytes:      4096,
 	}
 }

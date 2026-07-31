@@ -71,11 +71,13 @@ func shouldRewriteMBA(inst llvm.Value) bool {
 // rewriteMBA applies MBA identities:
 //
 // add(x, y) => (x & y) + (x | y)
-//   because: (x & y) + (x | y) = (x & y) + (x ^ y) + (x & y) = 2*(x & y) + (x ^ y) = x + y
+//
+//	because: (x & y) + (x | y) = (x & y) + (x ^ y) + (x & y) = 2*(x & y) + (x ^ y) = x + y
 //
 // sub(x, y) => (x & ~y) - (~x & y)
-//   because: (x & ~y) is bits only in x; (~x & y) is bits only in y;
-//   difference gives x - y.
+//
+//	because: (x & ~y) is bits only in x; (~x & y) is bits only in y;
+//	difference gives x - y.
 func rewriteMBA(builder llvm.Builder, inst llvm.Value, rewriteIndex uint64) error {
 	if inst.NumOperands() < 2 {
 		return fmt.Errorf("mba obfuscator expects two operands")

@@ -506,11 +506,10 @@ func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFiel
 		tags []*yakit.TagAndStatusCode
 		err  error
 	)
-	if req.IsAll {
-		// 需要统计所有tag
+	if req.GetIsAll() {
 		tags, err = yakit.QueryHTTPFlowTagsWithDB(s.GetProjectDatabase())
 	} else {
-		tags, err = yakit.HTTPFlowTags(req.RefreshRequest)
+		tags, err = yakit.HTTPFlowTags(req.GetRefreshRequest())
 	}
 	// statusCode, err := yakit.HTTPFlowStatusCode(req.RefreshRequest)
 	var tagsCode ypb.HTTPFlowsFieldGroupResponse

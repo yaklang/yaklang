@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,11 +11,9 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/linkprep"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -563,47 +560,20 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		}
 	}
 
-	// Prepare full embedded runtime archive when linking and stdlib pruning is disabled.
-	// Pruned stdlib compilation needs SSA/lowering information, so it is done later,
-	// immediately before native linking.
 	runtimeArchive := strings.TrimSpace(cfg.RuntimeArchive)
 	extraLinkArgs := append([]string{}, cfg.ExtraLinkArgs...)
-	if linking && runtimeArchive == "" && !cfg.StdlibCompile {
-		if archivePath, extractErr := embed.ExtractLibyakToDir(cfg.WorkDir); extractErr == nil {
-			runtimeArchive = archivePath
-			cfg.RuntimeArchive = archivePath
-		} else if extractErr != embed.ErrNoEmbeddedRuntime {
-			return CompileResult{}, extractErr
-		}
-
-		if _, gcErr := embed.ExtractLibgcToDir(cfg.WorkDir); gcErr == nil {
-			// Extracted libgc.a into the work dir; clang will use -L$WORK -lgc.
-			extraLinkArgs = append(extraLinkArgs, "-L"+cfg.WorkDir)
-		} else if gcErr != embed.ErrNoEmbeddedRuntime {
-			return CompileResult{}, gcErr
-		}
-	}
 	cfg.ExtraLinkArgs = extraLinkArgs
 
-	// When embedding is disabled, ExtractLibyakToDir leaves RuntimeArchive empty and
-	// CompileLLVMToBinary falls back to findRuntimeArchive() at link time. Linkprep
-	// must see the same path up front so archives are rewritten before clang runs.
-	if linking && strings.TrimSpace(cfg.RuntimeArchive) == "" && !cfg.StdlibCompile {
-		p, err := findRuntimeArchive()
-		if err == nil {
+	// When stdlib pruning is disabled, use a prebuilt runtime archive from disk
+	// (legacy path; the self-contained build embeds the runtime and resolves to "").
+	if linking && runtimeArchive == "" && !cfg.StdlibCompile {
+		p, err := resolveDiskRuntimeArchive(cfg)
+		if err != nil {
+			return CompileResult{}, err
+		}
+		if p != "" {
 			cfg.RuntimeArchive = p
 			runtimeArchive = p
-		} else {
-			archivePath, gcLibDir, fullBuildErr := embed.BuildRuntimeArchiveFromLocalSource(cfg.WorkDir)
-			if fullBuildErr != nil {
-				return CompileResult{}, fullBuildErr
-			}
-			cfg.RuntimeArchive = archivePath
-			runtimeArchive = archivePath
-			if strings.TrimSpace(gcLibDir) != "" {
-				extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
-				cfg.ExtraLinkArgs = extraLinkArgs
-			}
 		}
 	}
 
@@ -705,7 +675,7 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		} else {
 			outputFile = replaceExt(cfg.SourceFile, ".s")
 		}
-		if err := CompileLLVMToAsm(finalLL, outputFile); err != nil {
+		if err := emitAsmModule(comp.Mod, finalLL, outputFile); err != nil {
 			return CompileResult{}, err
 		}
 		log.Infof("Assembly written to: %s", outputFile)
@@ -722,7 +692,7 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		} else {
 			outputFile = replaceExt(cfg.SourceFile, ".o")
 		}
-		if err := CompileLLVMToObject(finalLL, outputFile); err != nil {
+		if err := emitObjectModule(comp.Mod, finalLL, outputFile); err != nil {
 			return CompileResult{}, err
 		}
 		log.Infof("Object file written to: %s", outputFile)
@@ -734,84 +704,11 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
-	linkingNative := !cfg.SkipRuntimeLink
-	if linkingNative && strings.TrimSpace(cfg.RuntimeArchive) == "" && cfg.StdlibCompile {
-		deps := runtimeDepsFromCompiler(comp)
-		archivePath, gcLibDir, buildErr := embed.BuildPrunedRuntimeArchiveFromEmbeddedSourceWithDeps(cfg.WorkDir, deps)
-		if errors.Is(buildErr, embed.ErrNoEmbeddedRuntimeSource) {
-			archivePath, gcLibDir, buildErr = embed.BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(cfg.WorkDir, deps)
-		}
-		if buildErr == nil {
-			runtimeArchive = archivePath
-			cfg.RuntimeArchive = archivePath
-			if strings.TrimSpace(gcLibDir) != "" {
-				extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
-				cfg.ExtraLinkArgs = extraLinkArgs
-			}
-		} else if errors.Is(buildErr, embed.ErrUnsupportedPrunedRuntime) || errors.Is(buildErr, embed.ErrNoEmbeddedRuntimeSource) {
-			if archivePath, extractErr := embed.ExtractLibyakToDir(cfg.WorkDir); extractErr == nil {
-				runtimeArchive = archivePath
-				cfg.RuntimeArchive = archivePath
-			} else if extractErr != embed.ErrNoEmbeddedRuntime {
-				return CompileResult{}, extractErr
-			}
-			if _, gcErr := embed.ExtractLibgcToDir(cfg.WorkDir); gcErr == nil {
-				extraLinkArgs = append(extraLinkArgs, "-L"+cfg.WorkDir)
-				cfg.ExtraLinkArgs = extraLinkArgs
-			} else if gcErr != embed.ErrNoEmbeddedRuntime {
-				return CompileResult{}, gcErr
-			}
-			if strings.TrimSpace(cfg.RuntimeArchive) == "" {
-				p, err := findRuntimeArchive()
-				if err == nil {
-					cfg.RuntimeArchive = p
-					runtimeArchive = p
-				} else {
-					archivePath, gcLibDir, fullBuildErr := embed.BuildRuntimeArchiveFromLocalSource(cfg.WorkDir)
-					if fullBuildErr != nil {
-						return CompileResult{}, fullBuildErr
-					}
-					cfg.RuntimeArchive = archivePath
-					runtimeArchive = archivePath
-					if strings.TrimSpace(gcLibDir) != "" {
-						extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
-						cfg.ExtraLinkArgs = extraLinkArgs
-					}
-				}
-			}
-		} else {
-			return CompileResult{}, buildErr
-		}
-	}
-	var linkprepCleanup func()
-	if linkingNative && len(cfg.RuntimeSymManifest) > 0 && strings.TrimSpace(cfg.RuntimeArchive) != "" {
-		archives := []string{filepath.Clean(cfg.RuntimeArchive)}
-		for _, o := range cfg.ObfArchives {
-			o = strings.TrimSpace(o)
-			if o != "" {
-				archives = append(archives, filepath.Clean(o))
-			}
-		}
-		out, cleanup, lpErr := linkprep.PrepareForLink(linkprep.PrepareInput{
-			Archives: archives,
-			Manifest: cfg.RuntimeSymManifest,
-			WorkDir:  cfg.WorkDir,
-			Trace:    cfg.Trace,
-		})
-		if lpErr != nil {
-			return CompileResult{}, utils.Errorf("linkprep: %v", lpErr)
-		}
-		linkprepCleanup = cleanup
-		defer linkprepCleanup()
-		cfg.RuntimeArchive = out[0]
-		if len(out) > 1 {
-			cfg.ObfArchives = append([]string{}, out[1:]...)
-		}
-	}
-
-	if err := CompileLLVMToBinary(finalLL, outputFile, !cfg.SkipRuntimeLink, cfg.RuntimeArchive, cfg.ObfArchives, cfg.ExtraLinkArgs...); err != nil {
+	ra, el, err := prepareAndLinkBinary(comp, finalLL, outputFile, cfg)
+	if err != nil {
 		return CompileResult{}, err
 	}
+	runtimeArchive, extraLinkArgs = ra, el
 
 	log.Infof("Executable written to: %s", outputFile)
 	if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {

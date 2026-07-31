@@ -2,11 +2,10 @@ package yakit
 
 import (
 	"path/filepath"
-	"sort"
 	"testing"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -28,12 +27,21 @@ func TestHTTPFlowFieldGroupsUseProvidedDatabase(t *testing.T) {
 
 	tags, err := QueryHTTPFlowTagsWithDB(db)
 	require.NoError(t, err)
-	tagValues := make([]string, 0, len(tags))
+	tagsByValue := make(map[string]*TagAndStatusCode, len(tags))
 	for _, tag := range tags {
-		tagValues = append(tagValues, tag.Value)
+		tagsByValue[tag.Value] = tag
 	}
-	sort.Strings(tagValues)
-	require.Equal(t, []string{"alpha", "beta", "gamma"}, tagValues)
+	require.Equal(t, 2, tagsByValue["alpha"].Count)
+	require.Equal(t, 1, tagsByValue["beta"].Count)
+	require.Equal(t, 1, tagsByValue["gamma"].Count)
+	require.False(t, tagsByValue["alpha"].Builtin)
+	require.NotContains(t, tagsByValue, "YAKIT_COLOR_RED")
+	for builtin := range HTTPFlowBuiltinTags {
+		tag, ok := tagsByValue[builtin]
+		require.True(t, ok, "missing builtin tag %s", builtin)
+		require.True(t, tag.Builtin)
+		require.Zero(t, tag.Count)
+	}
 
 	suffixes, err := HTTPFlowSuffixesWithDB(db)
 	require.NoError(t, err)

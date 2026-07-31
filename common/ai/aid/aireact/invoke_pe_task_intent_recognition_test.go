@@ -84,29 +84,31 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
-			// Phase: LiteForge intent finalize (post-iteration hook)
-			if strings.Contains(prompt, "intent-finalize-summary") {
+			// Phase: Intent loop — single LiteForge "intent-keyword-gen" call
+			// (during PE task init). The simplified loop_intent runs entirely
+			// in InitTask with one LiteForge call; no ReAct iterations.
+			if aicommon.IsIntentKeywordGenPrompt(prompt) &&
+				!strings.Contains(prompt, "PROGRESS_TASK_") {
+				atomic.AddInt32(&intentLoopCalled, 1)
+				log.Infof("intent loop (intent-keyword-gen) called during PE task init")
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-finalize-summary", "intent_analysis": "test intent analysis", "context_enrichment": "test context"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-keyword-gen", "intent_summary": "test intent analysis", "search_keywords": ["test tools"], "tags": ["test"], "questions": ["what tools are available?"]}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
-			// Phase: Intent loop (during PE task init)
-			if isIntentEnrichmentPrompt(prompt) &&
-				!strings.Contains(prompt, "PROGRESS_TASK_") {
-				count := atomic.AddInt32(&intentLoopCalled, 1)
-				log.Infof("intent loop called during PE task init (count=%d)", count)
+			// Phase: Intent capability recommendation (conditional second call)
+			if aicommon.IsIntentRecommendPrompt(prompt) {
 				rsp := i.NewAIResponse()
-				if count <= 1 {
-					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "query_capabilities", "human_readable_thought": "searching capabilities", "search_query": "test tools"}
-`))
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "finalize_enrichment", "human_readable_thought": "intent recognition complete", "final_query": "test task"}
-`))
-				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-capability-recommend", "recommended_capabilities": []}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: Capability catalog match (BM25 chunk matching LiteForge)
+			if aicommon.IsCapabilityCatalogMatchPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -271,30 +273,31 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
-			// Phase: LiteForge intent finalize (post-iteration hook)
-			if strings.Contains(prompt, "intent-finalize-summary") {
+			// Phase: Intent loop — single LiteForge "intent-keyword-gen" call
+			// (during plan or PE task init).
+			if aicommon.IsIntentKeywordGenPrompt(prompt) &&
+				!strings.Contains(prompt, "PROGRESS_TASK_") &&
+				!strings.Contains(prompt, "search_knowledge") {
+				atomic.AddInt32(&intentLoopCalled, 1)
+				log.Infof("intent loop (intent-keyword-gen) called")
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-finalize-summary", "intent_analysis": "test intent analysis", "context_enrichment": "test context"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-keyword-gen", "intent_summary": "test intent analysis", "search_keywords": ["test"], "tags": ["test"], "questions": ["what capabilities are available?"]}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
-			// Phase: Intent loop (during plan or PE task init)
-			if isIntentEnrichmentPrompt(prompt) &&
-				!strings.Contains(prompt, "PROGRESS_TASK_") &&
-				!strings.Contains(prompt, "search_knowledge") {
-				count := atomic.AddInt32(&intentLoopCalled, 1)
-				log.Infof("intent loop called (count=%d)", count)
+			// Phase: Intent capability recommendation (conditional second call)
+			if aicommon.IsIntentRecommendPrompt(prompt) {
 				rsp := i.NewAIResponse()
-				if count <= 1 {
-					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "query_capabilities", "human_readable_thought": "searching capabilities", "search_query": "test"}
-`))
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "finalize_enrichment", "human_readable_thought": "intent recognition complete", "final_query": "test"}
-`))
-				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "intent-capability-recommend", "recommended_capabilities": []}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: Capability catalog match (BM25 chunk matching LiteForge)
+			if aicommon.IsCapabilityCatalogMatchPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
 				rsp.Close()
 				return rsp, nil
 			}

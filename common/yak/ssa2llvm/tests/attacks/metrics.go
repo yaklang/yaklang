@@ -90,12 +90,12 @@ func checkFunctionNameRecovery(result *AnalysisResult) float64 {
 
 	// Known internal/runtime names that don't count as "recovered".
 	skip := map[string]bool{
-		"main":                    true,
-		"yak_internal_atmain":     true,
+		"main":                   true,
+		"yak_internal_atmain":    true,
 		"yak_internal_main":      true,
-		"yak_runtime_gc":          true,
-		"yak_runtime_invoke":      true,
-		"yak_internal_print_int":  true,
+		"yak_runtime_gc":         true,
+		"yak_runtime_invoke":     true,
+		"yak_internal_print_int": true,
 	}
 
 	userFuncs := 0

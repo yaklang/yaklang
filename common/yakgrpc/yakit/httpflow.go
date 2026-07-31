@@ -1763,38 +1763,39 @@ const (
 	return statusCode, nil
 }*/
 
-func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
-	tagCounts := make(map[string]int)
-	for _, v := range model.GlobalHTTPFlowCache.GetAll() {
-		for _, tag := range strings.Split(v.Tags, "|") {
-			tag = strings.TrimSpace(tag)
-			if tag != "" {
-				tagCounts[tag]++
-			}
+func accumulateHTTPFlowTagField(rawTags string, tagCounts map[string]int) {
+	for _, tag := range strings.Split(rawTags, "|") {
+		tag = strings.TrimSpace(tag)
+		if tag != "" && !strings.HasPrefix(tag, schema.COLORPREFIX) {
+			tagCounts[tag]++
 		}
 	}
-	tags := make([]*TagAndStatusCode, 0)
-	for k, v := range tagCounts {
-		if !strings.HasPrefix(k, schema.COLORPREFIX) {
-			tags = append(tags, &TagAndStatusCode{
-				Value:   k,
-				Count:   v,
-				Builtin: IsHTTPFlowBuiltinTag(k),
-			})
-		}
-	}
-	return tags, nil
 }
 
+// HTTPFlowTags 从内存缓存统计 tag。
+// refreshRequest 为历史兼容参数，当前未使用。
+func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
+	_ = refreshRequest
+	tagCounts := make(map[string]int)
+	for _, v := range model.GlobalHTTPFlowCache.GetAll() {
+		if v == nil {
+			continue
+		}
+		accumulateHTTPFlowTagField(v.Tags, tagCounts)
+	}
+	return HTTPFlowTagsFromCounts(tagCounts), nil
+}
+
+// QueryHTTPFlowTags 从项目库全量统计 tag。
 func QueryHTTPFlowTags() ([]*TagAndStatusCode, error) {
 	return QueryHTTPFlowTagsWithDB(consts.GetGormProjectDatabase())
 }
 
 func QueryHTTPFlowTagsWithDB(db *gorm.DB) ([]*TagAndStatusCode, error) {
-	tagSet := make(map[string]struct{})
 	if db == nil {
 		return nil, utils.Error("project database is nil")
 	}
+	tagCounts := make(map[string]int)
 	rows, err := db.Model(&schema.HTTPFlow{}).
 		Select("tags").
 		Where("tags IS NOT NULL AND tags != ''").
@@ -1809,26 +1810,12 @@ func QueryHTTPFlowTagsWithDB(db *gorm.DB) ([]*TagAndStatusCode, error) {
 		if err := rows.Scan(&rawTags); err != nil {
 			return nil, utils.Errorf("scan HTTP flow tags failed: %s", err)
 		}
-		parts := strings.Split(rawTags, "|")
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part != "" && !strings.HasPrefix(part, schema.COLORPREFIX) {
-				tagSet[part] = struct{}{}
-			}
-		}
+		accumulateHTTPFlowTagField(rawTags, tagCounts)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, utils.Errorf("iterate HTTP flow tags failed: %s", err)
 	}
-
-	tags := make([]*TagAndStatusCode, 0)
-	for tag := range tagSet {
-		tags = append(tags, &TagAndStatusCode{
-			Value:   tag,
-			Builtin: IsHTTPFlowBuiltinTag(tag),
-		})
-	}
-	return tags, nil
+	return HTTPFlowTagsFromCounts(tagCounts), nil
 }
 
 func HTTPFlowSuffixes() ([]*TagAndStatusCode, error) {

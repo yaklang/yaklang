@@ -53,14 +53,14 @@ func (n *executableTaskNode) IsSkipped() bool {
 }
 
 type executableTaskGraph struct {
-	root             *AiTask
-	nodes            []*executableTaskNode
-	nodeByID         map[string]*executableTaskNode
-	dependents       map[string][]string
-	stages           [][]*executableTaskNode
-	stageByTaskIndex map[string]int
-	order            []*AiTask
-	orderIndexByTask map[string]int
+	root               *AiTask
+	nodes              []*executableTaskNode
+	nodeByID           map[string]*executableTaskNode
+	dependents         map[string][]string
+	stages             [][]*executableTaskNode
+	stageByTaskID      map[string]int
+	order              []*AiTask
+	orderIndexByTaskID map[string]int
 }
 
 func (g *executableTaskGraph) TotalTasks() int {
@@ -86,27 +86,27 @@ func (g *executableTaskGraph) OrderedTasks() []*AiTask {
 	return result
 }
 
-func (g *executableTaskGraph) StageOf(taskIndex string) (int, bool) {
+func (g *executableTaskGraph) StageOf(taskID string) (int, bool) {
 	if g == nil {
 		return 0, false
 	}
-	stage, ok := g.stageByTaskIndex[strings.TrimSpace(taskIndex)]
+	stage, ok := g.stageByTaskID[strings.TrimSpace(taskID)]
 	return stage, ok
 }
 
-func (g *executableTaskGraph) Node(taskIndex string) (*executableTaskNode, bool) {
+func (g *executableTaskGraph) Node(taskID string) (*executableTaskNode, bool) {
 	if g == nil {
 		return nil, false
 	}
-	node, ok := g.nodeByID[strings.TrimSpace(taskIndex)]
+	node, ok := g.nodeByID[strings.TrimSpace(taskID)]
 	return node, ok
 }
 
-func (g *executableTaskGraph) OrderOf(taskIndex string) (int, bool) {
+func (g *executableTaskGraph) OrderOf(taskID string) (int, bool) {
 	if g == nil {
 		return 0, false
 	}
-	idx, ok := g.orderIndexByTask[strings.TrimSpace(taskIndex)]
+	idx, ok := g.orderIndexByTaskID[strings.TrimSpace(taskID)]
 	return idx, ok
 }
 
@@ -163,18 +163,24 @@ func buildTaskReferenceMap(root *AiTask) map[string]string {
 	order := DFSOrderAiTask(root)
 	for i := 0; i < order.Len(); i++ {
 		task, ok := order.Get(i)
-		if !ok || task == nil || task.Index == "" {
+		if !ok || task == nil || task.TaskId == "" {
 			continue
 		}
-		references[task.Index] = task.Index
+		references[task.TaskId] = task.TaskId
+		// backward compat: index alias also resolves to TaskId
+		if idx := strings.TrimSpace(task.Index); idx != "" {
+			if _, exists := references[idx]; !exists {
+				references[idx] = task.TaskId
+			}
+		}
 		if name := strings.TrimSpace(task.Name); name != "" {
 			if _, exists := references[name]; !exists {
-				references[name] = task.Index
+				references[name] = task.TaskId
 			}
 		}
 		if semanticID := strings.TrimSpace(task.GetSemanticIdentifier()); semanticID != "" {
 			if _, exists := references[semanticID]; !exists {
-				references[semanticID] = task.Index
+				references[semanticID] = task.TaskId
 			}
 		}
 	}
@@ -205,14 +211,14 @@ func buildExecutableLeavesByTask(root *AiTask) map[string][]*AiTask {
 			return nil
 		}
 		if len(task.Subtasks) == 0 {
-			result[task.Index] = []*AiTask{task}
-			return result[task.Index]
+			result[task.TaskId] = []*AiTask{task}
+			return result[task.TaskId]
 		}
 		var leaves []*AiTask
 		for _, child := range task.Subtasks {
 			leaves = append(leaves, walk(child)...)
 		}
-		result[task.Index] = leaves
+		result[task.TaskId] = leaves
 		return leaves
 	}
 	walk(root)
@@ -246,18 +252,18 @@ func collectSubtreeEntryLeaves(subtreeLeaves []*AiTask, leafDeps map[string]map[
 	}
 	subtreeSet := make(map[string]struct{}, len(subtreeLeaves))
 	for _, leaf := range subtreeLeaves {
-		if leaf == nil || leaf.Index == "" {
+		if leaf == nil || leaf.TaskId == "" {
 			continue
 		}
-		subtreeSet[leaf.Index] = struct{}{}
+		subtreeSet[leaf.TaskId] = struct{}{}
 	}
 	var entries []*AiTask
 	for _, leaf := range subtreeLeaves {
-		if leaf == nil || leaf.Index == "" {
+		if leaf == nil || leaf.TaskId == "" {
 			continue
 		}
 		hasInternalDep := false
-		for depID := range leafDeps[leaf.Index] {
+		for depID := range leafDeps[leaf.TaskId] {
 			if _, ok := subtreeSet[depID]; ok {
 				hasInternalDep = true
 				break
@@ -300,13 +306,13 @@ func resolveDependencyLeafTargets(task *AiTask, refs []string, references map[st
 			continue
 		}
 		for _, target := range targetLeaves {
-			if target == nil || target.Index == "" {
+			if target == nil || target.TaskId == "" {
 				continue
 			}
-			if _, exists := seen[target.Index]; exists {
+			if _, exists := seen[target.TaskId]; exists {
 				continue
 			}
-			seen[target.Index] = struct{}{}
+			seen[target.TaskId] = struct{}{}
 			resolved = append(resolved, target)
 		}
 	}
@@ -318,15 +324,15 @@ func propagateExecutableLeafDependencies(task *AiTask, leafDeps map[string]map[s
 		return nil, nil
 	}
 	if len(task.Subtasks) == 0 {
-		if leafDeps[task.Index] == nil {
-			leafDeps[task.Index] = make(map[string]struct{})
+		if leafDeps[task.TaskId] == nil {
+			leafDeps[task.TaskId] = make(map[string]struct{})
 		}
 		resolvedDeps, err := resolveDependencyLeafTargets(task, normalizeDependencyRefs(task.DependsOn), references, leavesByTask)
 		if err != nil {
 			return nil, err
 		}
 		for _, dep := range resolvedDeps {
-			addDependency(leafDeps[task.Index], dep.Index)
+			addDependency(leafDeps[task.TaskId], dep.TaskId)
 		}
 		return []*AiTask{task}, nil
 	}
@@ -347,14 +353,14 @@ func propagateExecutableLeafDependencies(task *AiTask, leafDeps map[string]map[s
 	}
 	if len(resolvedDeps) > 0 {
 		for _, entry := range entryLeaves {
-			if entry == nil || entry.Index == "" {
+			if entry == nil || entry.TaskId == "" {
 				continue
 			}
-			if leafDeps[entry.Index] == nil {
-				leafDeps[entry.Index] = make(map[string]struct{})
+			if leafDeps[entry.TaskId] == nil {
+				leafDeps[entry.TaskId] = make(map[string]struct{})
 			}
 			for _, dep := range resolvedDeps {
-				addDependency(leafDeps[entry.Index], dep.Index)
+				addDependency(leafDeps[entry.TaskId], dep.TaskId)
 			}
 		}
 	}
@@ -375,10 +381,10 @@ func buildStrictExecutableTaskGraph(root *AiTask) (*executableTaskGraph, error) 
 	leavesByTask := buildExecutableLeavesByTask(root)
 	leafDeps := make(map[string]map[string]struct{}, len(leafOrder))
 	for _, leaf := range leafOrder {
-		if leaf == nil || leaf.Index == "" {
+		if leaf == nil || leaf.TaskId == "" {
 			continue
 		}
-		leafDeps[leaf.Index] = make(map[string]struct{})
+		leafDeps[leaf.TaskId] = make(map[string]struct{})
 	}
 	if _, err := propagateExecutableLeafDependencies(root, leafDeps, references, leavesByTask); err != nil {
 		return nil, err
@@ -386,25 +392,25 @@ func buildStrictExecutableTaskGraph(root *AiTask) (*executableTaskGraph, error) 
 
 	nodes := make([]*executableTaskNode, 0, len(leafOrder))
 	nodeByID := make(map[string]*executableTaskNode, len(leafOrder))
-	orderIndexByTask := make(map[string]int, len(leafOrder))
+	orderIndexByTaskID := make(map[string]int, len(leafOrder))
 	for idx, leaf := range leafOrder {
-		if leaf == nil || leaf.Index == "" {
+		if leaf == nil || leaf.TaskId == "" {
 			continue
 		}
-		orderIndexByTask[leaf.Index] = idx
-		deps := make([]string, 0, len(leafDeps[leaf.Index]))
-		for depID := range leafDeps[leaf.Index] {
-			if depID == leaf.Index {
-				return nil, utils.Errorf("task executable DAG contains self dependency on %q", leaf.Index)
+		orderIndexByTaskID[leaf.TaskId] = idx
+		deps := make([]string, 0, len(leafDeps[leaf.TaskId]))
+		for depID := range leafDeps[leaf.TaskId] {
+			if depID == leaf.TaskId {
+				return nil, utils.Errorf("task executable DAG contains self dependency on %q", leaf.TaskId)
 			}
 			deps = append(deps, depID)
 		}
 		sort.Slice(deps, func(i, j int) bool {
-			return orderIndexByTask[deps[i]] < orderIndexByTask[deps[j]]
+			return orderIndexByTaskID[deps[i]] < orderIndexByTaskID[deps[j]]
 		})
 		node := &executableTaskNode{
 			task:  leaf,
-			id:    leaf.Index,
+			id:    leaf.TaskId,
 			deps:  deps,
 			order: idx,
 		}
@@ -413,7 +419,7 @@ func buildStrictExecutableTaskGraph(root *AiTask) (*executableTaskGraph, error) 
 	}
 
 	dependents := make(map[string][]string, len(nodes))
-	stageByTaskIndex, stages, err := calculateStrictExecutableStages(nodes)
+	stageByTaskID, stages, err := calculateStrictExecutableStages(nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -421,20 +427,20 @@ func buildStrictExecutableTaskGraph(root *AiTask) (*executableTaskGraph, error) 
 		for _, depID := range node.deps {
 			dependents[depID] = append(dependents[depID], node.id)
 		}
-		if stage, ok := stageByTaskIndex[node.id]; ok {
+		if stage, ok := stageByTaskID[node.id]; ok {
 			node.stage = stage
 		}
 	}
 
 	return &executableTaskGraph{
-		root:             root,
-		nodes:            nodes,
-		nodeByID:         nodeByID,
-		dependents:       dependents,
-		stages:           stages,
-		stageByTaskIndex: stageByTaskIndex,
-		order:            leafOrder,
-		orderIndexByTask: orderIndexByTask,
+		root:               root,
+		nodes:              nodes,
+		nodeByID:           nodeByID,
+		dependents:         dependents,
+		stages:             stages,
+		stageByTaskID:      stageByTaskID,
+		order:              leafOrder,
+		orderIndexByTaskID: orderIndexByTaskID,
 	}, nil
 }
 
@@ -495,16 +501,16 @@ func calculateStrictExecutableStages(nodes []*executableTaskNode) (map[string]in
 		return nil, nil, utils.Errorf("task executable DAG contains cycle")
 	}
 
-	stageByTaskIndex := make(map[string]int, len(nodes))
+	stageByTaskID := make(map[string]int, len(nodes))
 	maxStage := 0
 	for _, node := range topoOrder {
 		stage := 0
 		for _, depID := range node.deps {
-			if depStage := stageByTaskIndex[depID] + 1; depStage > stage {
+			if depStage := stageByTaskID[depID] + 1; depStage > stage {
 				stage = depStage
 			}
 		}
-		stageByTaskIndex[node.id] = stage
+		stageByTaskID[node.id] = stage
 		if stage > maxStage {
 			maxStage = stage
 		}
@@ -512,7 +518,7 @@ func calculateStrictExecutableStages(nodes []*executableTaskNode) (map[string]in
 
 	stages := make([][]*executableTaskNode, maxStage+1)
 	for _, node := range nodes {
-		stage := stageByTaskIndex[node.id]
+		stage := stageByTaskID[node.id]
 		stages[stage] = append(stages[stage], node)
 	}
 	for _, stage := range stages {
@@ -520,7 +526,7 @@ func calculateStrictExecutableStages(nodes []*executableTaskNode) (map[string]in
 			return stage[i].order < stage[j].order
 		})
 	}
-	return stageByTaskIndex, stages, nil
+	return stageByTaskID, stages, nil
 }
 
 func (c *Coordinator) standardizeTaskTree(task *AiTask) *AiTask {

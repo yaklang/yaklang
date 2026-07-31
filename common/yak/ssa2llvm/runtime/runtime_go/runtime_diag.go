@@ -1,5 +1,3 @@
-//go:build ssa2llvm_runtime_debug
-
 package main
 
 import (
@@ -13,7 +11,9 @@ func runtimeGCLogEnabled() bool {
 }
 
 func runtimeDiagPrintf(format string, args ...any) {
-	fmt.Printf(format, args...)
+	if runtimeGCLogEnabled() {
+		fmt.Printf(format, args...)
+	}
 }
 
 func runtimeLogPanicRecovery(kind string, recovered any) {

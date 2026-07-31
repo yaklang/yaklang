@@ -88,7 +88,14 @@ func TestReActLoop_LoadCapability_ToolEquivalence(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if aicommon.IsToolCallReasonLiteForgePrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(aicommon.MockedToolCallReasonActionJSON))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if aicommon.IsVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "abc-mocked-reason"}`))
 				rsp.Close()
@@ -173,7 +180,14 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if aicommon.IsToolCallReasonLiteForgePrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(aicommon.MockedToolCallReasonActionJSON))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if aicommon.IsVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "abc-mocked-reason"}`))
 				rsp.Close()

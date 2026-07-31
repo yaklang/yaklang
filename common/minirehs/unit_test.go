@@ -1,6 +1,7 @@
 package minirehs
 
 import (
+	"reflect"
 	"regexp"
 	"regexp/syntax"
 	"strings"
@@ -388,6 +389,25 @@ func TestScalarPrefilterScanHits(t *testing.T) {
 	}
 }
 
+func TestACScanFoldASCIIEquivalence(t *testing.T) {
+	li := buildLiteralIndex([]*compiledPattern{
+		{id: 1, idx: 0, literals: []string{"authorization"}},
+		{id: 2, idx: 1, literals: []string{"cookie"}},
+	})
+	p := newScalarPrefilter(li)
+	data := []byte("AUTHORIZATION: x\\r\\nCoOkIe: y\\xff")
+	var want, got []litHit
+	p.ac.scan(asciiLowerInto(data, new([]byte)), func(id int32, end int) {
+		want = append(want, litHit{litID: id, end: int32(end)})
+	})
+	p.ac.scanFoldASCII(data, func(id int32, end int) {
+		got = append(got, litHit{litID: id, end: int32(end)})
+	})
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("folded scan mismatch: got=%v want=%v", got, want)
+	}
+}
+
 func TestLiteralIndexEmpty(t *testing.T) {
 	if !(&literalIndex{}).empty() {
 		t.Errorf("empty index must report empty")
@@ -649,6 +669,24 @@ func TestRegexp2VerifierNoMatch(t *testing.T) {
 	got = collectMatches(t, db, []byte("foobaz"))
 	if len(got) != 1 {
 		t.Errorf("foo(?!bar) must match 'foobaz', got %v", got)
+	}
+}
+
+func TestNonASCIILiteralPrefilterKeepsByteIdentity(t *testing.T) {
+	expr := `(?s)^[\x20-\x7e]+?.{8}\xc3\x70`
+	data := []byte("7A7中7中77AÃp")
+	for _, backend := range []BackendKind{BackendEngine, BackendMVS} {
+		t.Run(backend.String(), func(t *testing.T) {
+			db, err := Compile([]Pattern{{ID: 1, Expr: expr}},
+				WithBackend(backend), WithReportLocation(false), WithLogger(silentLogger{}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			if got := collectMatches(t, db, data); len(got) != 1 || got[0].ID != 1 {
+				t.Fatalf("non-ASCII literal was lost by prefilter: got=%v", got)
+			}
+		})
 	}
 }
 

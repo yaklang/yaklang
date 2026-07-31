@@ -98,7 +98,7 @@ func (c *Coordinator) runPlanPhaseThroughReview() error {
 	return nil
 }
 
-func (c *Coordinator) runExecuteRoot(startTaskIndex string) error {
+func (c *Coordinator) runExecuteRoot(startTaskID string) error {
 	c.planLoadingStatus("执行任务中 / Executing Tasks...")
 	c.EmitInfo("start to create runtime")
 	c.ensureSessionSnapshotEmitHandler()
@@ -116,7 +116,7 @@ func (c *Coordinator) runExecuteRoot(startTaskIndex string) error {
 	}()
 	rt := c.createRuntime()
 	c.runtime = rt
-	if err := rt.Invoke(c.rootTask, startTaskIndex); err != nil {
+	if err := rt.Invoke(c.rootTask, startTaskID); err != nil {
 		c.planLoadingStatus("任务执行失败 / Task Execution Failed")
 		return err
 	}
@@ -132,12 +132,12 @@ func (c *Coordinator) ensureSessionSnapshotEmitHandler() {
 	})
 }
 
-func (c *Coordinator) tryRecoverAndExecute(startTaskIndex string) (bool, error) {
-	recoveryStartTaskIndex := c.getRecoveryStartTaskIndex()
-	if recoveryStartTaskIndex == "" {
-		recoveryStartTaskIndex = startTaskIndex
+func (c *Coordinator) tryRecoverAndExecute(startTaskID string) (bool, error) {
+	recoveryStartTaskID := c.getRecoveryStartTaskID()
+	if recoveryStartTaskID == "" {
+		recoveryStartTaskID = startTaskID
 	}
-	recoveredRoot, _, ok, err := c.tryRecoverPlanAndExec(recoveryStartTaskIndex)
+	recoveredRoot, _, ok, err := c.tryRecoverPlanAndExec(recoveryStartTaskID)
 	if !ok {
 		return false, nil
 	}
@@ -157,7 +157,7 @@ func (c *Coordinator) tryRecoverAndExecute(startTaskIndex string) (bool, error) 
 		c.EmitError("no subtasks found in recovered task tree")
 		return false, utils.Errorf("coordinator: no subtasks found in recovered task tree")
 	}
-	if err := c.runExecuteRoot(recoveryStartTaskIndex); err != nil {
+	if err := c.runExecuteRoot(recoveryStartTaskID); err != nil {
 		return true, err
 	}
 	return true, nil

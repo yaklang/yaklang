@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -27,6 +28,7 @@ const defaultPromptSummaryBytes = 0
 
 const lastPromptObservationLoopKey = "last_ai_decision_prompt_observation"
 const lastPromptObservationStatusLoopKey = "last_ai_decision_prompt_observation_status"
+const lastPromptTokenLoopKey = "last_ai_decision_prompt_token"
 const ReActPromptObservationStatusKey = "re-act-prompt-observation-status"
 
 type PromptSectionRole string
@@ -735,7 +737,7 @@ func buildPromptSectionStatus(section *PromptSectionObservation, maxSummaryBytes
 		SummaryTruncated: truncated,
 		BytesPercent:     bytesPercentOfTotal(bytesValue, totalPromptBytes),
 		EstimatedTokens:  section.EstimatedTokens,
-		ContentHash:      contentHash8(section.Content),
+		ContentHash:      cachedContentHash8(section.Content),
 	}
 	for _, child := range section.Children {
 		if childStatus := buildPromptSectionStatus(child, maxSummaryBytes, totalPromptBytes); childStatus != nil {
@@ -802,6 +804,32 @@ func contentHash8(content string) string {
 	}
 	sum := sha1.Sum([]byte(content))
 	return hex.EncodeToString(sum[:])[:8]
+}
+
+// contentHash8Cache 缓存 sha1 结果，避免对相同 section 内容重复计算。
+var (
+	contentHash8CacheMu sync.RWMutex
+	contentHash8Cache   = map[string]string{}
+)
+
+func cachedContentHash8(content string) string {
+	if content == "" {
+		return ""
+	}
+	contentHash8CacheMu.RLock()
+	if h, ok := contentHash8Cache[content]; ok {
+		contentHash8CacheMu.RUnlock()
+		return h
+	}
+	contentHash8CacheMu.RUnlock()
+	h := contentHash8(content)
+	contentHash8CacheMu.Lock()
+	if len(contentHash8Cache) > 512 {
+		contentHash8Cache = map[string]string{}
+	}
+	contentHash8Cache[content] = h
+	contentHash8CacheMu.Unlock()
+	return h
 }
 
 func appendPromptSectionCLI(buf *strings.Builder, section *PromptSectionObservation, prefix string, isLast bool, maxPreviewBytes int) {
@@ -1001,6 +1029,23 @@ func (r *ReActLoop) SetLastPromptObservationStatus(status *PromptObservationStat
 		return
 	}
 	r.Set(lastPromptObservationStatusLoopKey, status)
+}
+
+// SetLastPromptToken 同步存储当前 prompt 的 token 估算值，供 verification
+// gate 的 token 门判断使用。这是 observation 异步化后唯一的同步副产物。
+func (r *ReActLoop) SetLastPromptToken(tokens int) {
+	if r == nil {
+		return
+	}
+	r.Set(lastPromptTokenLoopKey, tokens)
+}
+
+func (r *ReActLoop) GetLastPromptToken() int {
+	if r == nil {
+		return 0
+	}
+	tokens, _ := r.GetVariable(lastPromptTokenLoopKey).(int)
+	return tokens
 }
 
 func (r *ReActLoop) GetLastPromptObservationStatus() *PromptObservationStatus {

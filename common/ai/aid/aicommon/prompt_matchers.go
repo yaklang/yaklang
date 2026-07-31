@@ -141,9 +141,6 @@ func IsVerifySatisfactionPrompt(prompt string) bool {
 	if strings.Contains(prompt, "verify-satisfaction") && strings.Contains(prompt, "user_satisfied") {
 		return true
 	}
-	if !strings.Contains(prompt, "# Instructions") {
-		return false
-	}
 	return strings.Contains(prompt, "任务策略师") ||
 		(strings.Contains(prompt, "当前子任务") && strings.Contains(prompt, "completed_task_index"))
 }
@@ -157,3 +154,36 @@ func IsToolCallReasonLiteForgePrompt(prompt string) bool {
 // MockedToolCallReasonActionJSON is a canned valid action for the
 // tool-call-reason lite forge so the forge finishes immediately.
 const MockedToolCallReasonActionJSON = `{"@action": "tool-call-reason", "reason": "mocked tool-call reason"}`
+
+// --- intent loop LiteForge prompt matchers ---
+
+// IsIntentKeywordGenPrompt detects the LiteForge "intent-keyword-gen" prompt
+// (the single AI call that generates intent_summary + search_keywords).
+func IsIntentKeywordGenPrompt(prompt string) bool {
+	return strings.Contains(prompt, "intent-keyword-gen")
+}
+
+// IsIntentRecommendPrompt detects the LiteForge "intent-capability-recommend"
+// prompt (the conditional second call to recommend capabilities).
+func IsIntentRecommendPrompt(prompt string) bool {
+	return strings.Contains(prompt, "intent-capability-recommend")
+}
+
+// IsCapabilityCatalogMatchPrompt detects the LiteForge
+// "capability-catalog-match" prompt used by BM25 chunk matching.
+func IsCapabilityCatalogMatchPrompt(prompt string) bool {
+	return strings.Contains(prompt, "capability-catalog-match")
+}
+
+// MockedIntentKeywordGenActionJSON is a canned valid action for the
+// intent-keyword-gen lite forge.
+const MockedIntentKeywordGenActionJSON = `{"@action": "intent-keyword-gen", "intent_summary": "安全评估与能力发现", "search_keywords": ["security assessment port scan", "vulnerability analysis"], "tags": ["security","assessment"], "questions": ["what capabilities are available?"]}`
+
+// MockedIntentRecommendActionJSON is a canned valid action for the
+// intent-capability-recommend lite forge.
+const MockedIntentRecommendActionJSON = `{"@action": "intent-capability-recommend", "recommended_capabilities": []}`
+
+// MockedCapabilityCatalogMatchActionJSON is a canned valid action for the
+// capability-catalog-match lite forge. The caller should override
+// matched_identifiers with test-specific identifiers.
+const MockedCapabilityCatalogMatchActionJSON = `{"@action": "capability-catalog-match", "matched_identifiers": []}`

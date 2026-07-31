@@ -13,19 +13,37 @@ type NameCache struct {
 	idToName map[int64]string
 	program  string
 	loaded   bool
+	// useDB controls whether the cache touches the SSA database. When false
+	// (in-memory programs, e.g. ssa2llvm AOT compiles), the cache never calls
+	// GetDB and assigns ids from an in-memory counter — so building the SSA
+	// program does not open/migrate the YakIT/SSA database. When true
+	// (DB-backed programs, e.g. the interpreter's incremental compile), the
+	// cache preloads existing name<->id mappings from the DB and persists new
+	// ids via FirstOrCreate, as before.
+	useDB  bool
+	nextID int64
 }
 
-func NewNameCache(program string) *NameCache {
+// NewNameCache creates a name cache for program. useDB selects DB-backed mode;
+// pass false for in-memory programs so the cache never touches the SSA database.
+func NewNameCache(program string, useDB bool) *NameCache {
 	cache := &NameCache{
 		nameToId: make(map[string]int64),
 		idToName: make(map[int64]string),
 		program:  program,
+		useDB:    useDB,
 	}
-	cache.Preload()
+	if useDB {
+		cache.Preload()
+	}
 	return cache
 }
 
 func (c *NameCache) Preload() {
+	if !c.useDB {
+		return
+	}
+
 	c.RLock()
 	if c.loaded {
 		c.RUnlock()
@@ -82,6 +100,15 @@ func (c *NameCache) GetID(name string) int64 {
 		return id
 	}
 
+	if !c.useDB {
+		// In-memory: assign a fresh local id. 0 is reserved for "".
+		c.nextID++
+		id := c.nextID
+		c.nameToId[name] = id
+		c.idToName[id] = name
+		return id
+	}
+
 	db := GetDB()
 	if db == nil {
 		return 0
@@ -119,6 +146,11 @@ func (c *NameCache) GetName(id int64) string {
 
 	if name, ok := c.idToName[id]; ok {
 		return name
+	}
+
+	if !c.useDB {
+		// In-memory: an id not in the map was never assigned by this cache.
+		return ""
 	}
 
 	db := GetDB()

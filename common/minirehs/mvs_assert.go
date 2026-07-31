@@ -549,8 +549,13 @@ func buildCondBits(ps []posGuard, npos, nword int) (uncond []uint64, cond []guar
 
 // computeBoundaries 预计算 data 每个字节边界位置的零宽条件集 (与具体 pattern 无关, 仅取决于输入):
 // bound[j] = 第 j 字节处 (前一 rune 结尾 / 后一 rune 开头之间) 的边界条件. 仅在 rune 起始偏移与
-// 末尾 n 处写入 (existsInAssertShared 只读这些位置). 复用入参 buf 底层数组。
+// computeBoundaries 预算每个 rune 起始处的边界条件集 (bound[i]) 与文本末尾 (bound[n]),
+// 供多条断言 NFA 共享 (existsInAssertShared 只读这些位置). 复用入参 buf 底层数组。
 // 多条断言 NFA 共享同一份 bound, 省去 boundaryConds / isWordRune 的逐 pattern 重复计算。
+//
+// ASCII 快路径: 真实流量绝大多数为 ASCII, 对 c<0x80 的字节 rune==rune(c)、size==1 (与
+// utf8.DecodeRune 逐位一致), 直接用字节判定 isWordRune/\n, 跳过 DecodeRune 的分支与 rune 宽化开销。
+// 遇到非 ASCII 字节才回退到逐 rune 解码路径。
 func computeBoundaries(data []byte, buf []uint8) []uint8 {
 	n := len(data)
 	if cap(buf) < n+1 {
@@ -558,16 +563,82 @@ func computeBoundaries(data []byte, buf []uint8) []uint8 {
 	} else {
 		buf = buf[:n+1]
 	}
-	prev := rune(-1)
+	// wordPrev/prevIsNewline 追踪"前一 rune 是否单词字符 / 是否 \n", prevIsTextStart 追踪是否文本始.
+	// 用字节级状态避免 rune 比较 (ASCII 快路径内零 rune 操作).
+	prevWord := false       // isWordRune(prev); prev==-1 时 isWordRune(-1)=false
+	prevIsNewline := false  // prev == '\n'
+	prevIsStart := true     // prev < 0 (文本始)
 	i := 0
 	for i < n {
+		c := data[i]
+		var b uint8
+		// before 侧边界.
+		if prevIsStart {
+			b |= condBeginText | condBeginLine
+		} else if prevIsNewline {
+			b |= condBeginLine
+		}
+		if c < utf8.RuneSelf {
+			// ASCII 快路径: rune == rune(c), size == 1.
+			curWord := isWordByte(c)
+			curIsNewline := c == '\n'
+			// after 侧边界 (after = rune(c), 非 -1).
+			if curIsNewline {
+				b |= condEndLine
+			}
+			if prevWord != curWord {
+				b |= condWordBoundary
+			} else {
+				b |= condNoWordBoundary
+			}
+			buf[i] = b
+			prevWord = curWord
+			prevIsNewline = curIsNewline
+			prevIsStart = false
+			i++
+			continue
+		}
+		// 非 ASCII: 回退逐 rune 解码.
 		r, size := utf8.DecodeRune(data[i:])
-		buf[i] = boundaryConds(prev, r)
-		prev = r
+		curWord := isWordRune(r)
+		curIsNewline := r == '\n'
+		if curIsNewline {
+			b |= condEndLine
+		}
+		if prevWord != curWord {
+			b |= condWordBoundary
+		} else {
+			b |= condNoWordBoundary
+		}
+		buf[i] = b
+		prevWord = curWord
+		prevIsNewline = curIsNewline
+		prevIsStart = false
 		i += size
 	}
-	buf[n] = boundaryConds(prev, -1)
+	// 末尾: after = -1 (文本末).
+	var b uint8
+	if prevIsStart {
+		b |= condBeginText | condBeginLine
+	} else if prevIsNewline {
+		b |= condBeginLine
+	}
+	b |= condEndText | condEndLine
+	if prevWord { // isWordRune(prev) != isWordRune(-1)=false
+		b |= condWordBoundary
+	} else {
+		b |= condNoWordBoundary
+	}
+	buf[n] = b
 	return buf
+}
+
+// isWordByte 是 isWordRune 的 ASCII 字节版 (c < 0x80 时与 isWordRune(rune(c)) 同真伪).
+func isWordByte(c byte) bool {
+	return c == '_' ||
+		'0' <= c && c <= '9' ||
+		'a' <= c && c <= 'z' ||
+		'A' <= c && c <= 'Z'
 }
 
 // existsInAssert 是带边界条件门控的位并行存在性判定 (与 existsIn 同语义, 额外处理零宽断言).
@@ -655,12 +726,15 @@ func (nfa *mvsNFA) existsInAssertShared(data []byte, bound []uint8) bool {
 // existsInAssertShared1 是 existsInAssertShared 的 nword==1 标量快路径: 活跃集为单个 uint64,
 // 全程寄存器位运算且零分配 (多字版每调用 make 两个 []uint64; 本版用本地标量, 显著省分配 + 位运算).
 // 语义与 existsInAssertShared 完全一致, 仅用于 nfa.single 的断言 NFA. guard 位集取 gb.bits[0].
-// 含 ASCII 快路径 (省 utf8.DecodeRune + symbolOf 调用). bound 为整段共享边界 (computeBoundaries).
+// 含 ASCII 快路径 (省 utf8.DecodeRune + symbolOf 调用) + LimEx 链/异常拆分 (链边左移批量推进).
+// bound 为整段共享边界 (computeBoundaries).
 func (nfa *mvsNFA) existsInAssertShared1(data []byte, bound []uint8) bool {
 	first := nfa.first1
 	lastAny := nfa.lastAny1
-	follow := nfa.follow1
 	reach := nfa.reach1
+	chainTarget := nfa.chainTarget1
+	excMask := nfa.excMask1
+	excFollow := nfa.excFollow1
 	n := len(data)
 
 	var prev uint64
@@ -678,18 +752,31 @@ func (nfa *mvsNFA) existsInAssertShared1(data []byte, bound []uint8) bool {
 		}
 		bpre := bound[i]
 
-		cand := first
+		// LimEx: 链边用左移批量推进; 异常边逐个 OR.
+		shifted := (prev << 1) & chainTarget
+		cand := first | shifted
 		for _, gb := range nfa.condFirst {
 			if guardHolds(gb.g, bpre) {
 				cand |= gb.bits[0]
 			}
 		}
-		for pw := prev; pw != 0; pw &= pw - 1 {
-			p := bits.TrailingZeros64(pw)
-			cand |= follow[p]
-			for _, gb := range nfa.condFollow[p] {
-				if guardHolds(gb.g, bpre) {
-					cand |= gb.bits[0]
+		// 异常边: 仅对活跃的异常位置展开无条件异常后继.
+		if exc := prev & excMask; exc != 0 {
+			for exc != 0 {
+				p := bits.TrailingZeros64(exc)
+				exc &= exc - 1
+				cand |= excFollow[p]
+			}
+		}
+		// condFollow: 条件后继对所有"有 condFollow 条目的活跃位置"展开.
+		if cfm := prev & nfa.condFollowMask1; cfm != 0 {
+			for cfm != 0 {
+				p := bits.TrailingZeros64(cfm)
+				cfm &= cfm - 1
+				for _, gb := range nfa.condFollow[p] {
+					if guardHolds(gb.g, bpre) {
+						cand |= gb.bits[0]
+					}
 				}
 			}
 		}

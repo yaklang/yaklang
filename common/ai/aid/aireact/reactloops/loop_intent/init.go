@@ -1,15 +1,12 @@
 package loop_intent
 
 import (
-	"bytes"
 	_ "embed"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed prompts/persistent_instruction.txt
@@ -35,46 +32,10 @@ func init() {
 				reactloops.WithAllowUserInteract(false),
 				reactloops.WithUseSpeedPriorityAICallback(true),
 				reactloops.WithInitTask(buildInitTask(r)),
-				reactloops.WithMaxIterations(1),
+				reactloops.WithMaxIterations(0), // init-only loop: no ReAct iterations needed
 				reactloops.WithDisableIncreaseIteration(true),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
-					allowActionNames := []string{
-						"query_capabilities",
-						"finalize_enrichment",
-					}
-					for _, actionName := range allowActionNames {
-						if action.ActionType == actionName {
-							return true
-						}
-					}
-					return false
-				}),
-				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-					userQuery := loop.Get("user_query")
-					searchResults := loop.Get("search_results")
-					intentAnalysis := loop.Get("intent_analysis")
-					language := loop.Get("language")
-					if language == "" {
-						language = "zh"
-					}
-
-					renderMap := map[string]any{
-						"UserQuery":      userQuery,
-						"SearchResults":  searchResults,
-						"IntentAnalysis": intentAnalysis,
-						"Language":       language,
-						"Nonce":          nonce,
-					}
-					return utils.RenderTemplate(reactiveData, renderMap)
-				}),
-				// Register custom actions
-				searchCapabilitiesAction(r),
-				finalizeEnrichmentAction(r),
-				// Post-iteration hook: ensures finalization always runs on loop exit
-				// (mirrors loop_knowledge_enhance pattern)
-				BuildOnPostIterationHook(r),
 			}
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INTENT, r, preset...)
@@ -113,59 +74,31 @@ func getLanguageFromConfig(r aicommon.AIInvokeRuntime) string {
 }
 
 // buildInitTask creates the init handler for the intent recognition loop.
+//
+// The simplified loop_intent runs entirely in InitTask:
+//  1. Single AI call to generate intent_summary + search_keywords.
+//  2. Local BM25 capability search (tools, forges, skills, focus modes) — no AI.
+//  3. Conditional second AI call for capability recommendation (only when matched results > threshold).
+//  4. Set loop variables and exit via op.Done().
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		userQuery := task.GetUserInput()
 
-		// Read language preference: default "zh" (Chinese)
-		language := getLanguageFromConfig(r)
-
-		// Store user query and language in loop context for reactive data template
+		// Store user query and language in loop context
 		loop.Set("user_query", userQuery)
-		loop.Set("language", language)
+		loop.Set("language", getLanguageFromConfig(r))
 		loop.Set("search_results", "")
 		loop.Set("intent_analysis", "")
 		loop.Set("recommended_tools", "")
 		loop.Set("recommended_forges", "")
 		loop.Set("context_enrichment", "")
 
-		// Build the catalog locally only. Semantic matching is handled by the
-		// bounded BM25 action; here we recognize identifiers explicitly named
-		// by the user without sending the 30KB+ catalog to another model.
-		catalog := BuildCapabilityCatalog(r)
-		if catalog != "" {
-			log.Infof("intent init: built capability catalog (%d bytes)", len(catalog))
-
-			preMatched := MatchExplicitIdentifiersFromCatalog(catalog, userQuery)
-			if len(preMatched) > 0 {
-				verified := VerifyIdentifiers(loop, preMatched)
-				if len(verified) > 0 {
-					loop.Set("catalog_matched_identifiers", strings.Join(verified, ","))
-					log.Infof("intent init: catalog pre-matched %d identifiers (verified %d): %v",
-						len(preMatched), len(verified), verified)
-				}
-			}
-		}
-
-		// Build a summary of available loop metadata for the AI to reference
-		allMeta := reactloops.GetAllLoopMetadata()
-		var loopSummary strings.Builder
-		for _, meta := range allMeta {
-			if meta.IsHidden {
-				continue
-			}
-			loopSummary.WriteString("- " + meta.Name)
-			if meta.Description != "" {
-				loopSummary.WriteString(": " + meta.Description)
-			}
-			loopSummary.WriteString("\n")
-		}
-		if loopSummary.Len() > 0 {
-			loop.Set("available_focus_modes", loopSummary.String())
-		}
-
 		r.AddToTimeline("intent_init", "Intent recognition loop initialized for deep analysis")
-		log.Infof("intent recognition loop initialized for query: %s", utils.ShrinkString(userQuery, 200))
-		operator.Continue()
+		log.Infof("intent recognition loop initialized for query: %s", userQuery)
+
+		// Run the full intent recognition pipeline (1-2 AI calls max)
+		runIntentRecognition(r, loop)
+
+		operator.Done()
 	}
 }

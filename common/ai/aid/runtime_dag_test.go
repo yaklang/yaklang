@@ -15,32 +15,32 @@ import (
 func buildManualExecutableGraph(t *testing.T, nodes ...*executableTaskNode) *executableTaskGraph {
 	t.Helper()
 
-	stageByTaskIndex, stages, err := calculateStrictExecutableStages(nodes)
+	stageByTaskID, stages, err := calculateStrictExecutableStages(nodes)
 	require.NoError(t, err)
 
 	nodeByID := make(map[string]*executableTaskNode, len(nodes))
 	dependents := make(map[string][]string, len(nodes))
 	order := make([]*AiTask, 0, len(nodes))
-	orderIndexByTask := make(map[string]int, len(nodes))
+	orderIndexByTaskID := make(map[string]int, len(nodes))
 	for i, node := range nodes {
 		require.NotNil(t, node)
 		nodeByID[node.id] = node
-		node.stage = stageByTaskIndex[node.id]
+		node.stage = stageByTaskID[node.id]
 		order = append(order, node.task)
-		orderIndexByTask[node.id] = i
+		orderIndexByTaskID[node.id] = i
 		for _, depID := range node.deps {
 			dependents[depID] = append(dependents[depID], node.id)
 		}
 	}
 
 	return &executableTaskGraph{
-		nodes:            nodes,
-		nodeByID:         nodeByID,
-		dependents:       dependents,
-		stages:           stages,
-		stageByTaskIndex: stageByTaskIndex,
-		order:            order,
-		orderIndexByTask: orderIndexByTask,
+		nodes:              nodes,
+		nodeByID:           nodeByID,
+		dependents:         dependents,
+		stages:             stages,
+		stageByTaskID:      stageByTaskID,
+		order:              order,
+		orderIndexByTaskID: orderIndexByTaskID,
 	}
 }
 
@@ -322,4 +322,68 @@ func TestRuntimeStageTimelineForkMergePreservesGlobalIDOrder(t *testing.T) {
 	// IDs come from the shared SeqIdProvider; B finishes first so it gets the lower ID
 	// and appears before A in Dump, regardless of DAG order.
 	require.Less(t, strings.Index(mainDump, "task-B-order-marker"), strings.Index(mainDump, "task-A-order-marker"))
+}
+
+// TestRuntimeFinishActiveTaskClearsByTaskId verifies that after a stage
+// finishes, the activeTaskIDs set is fully cleared regardless of whether the
+// task node id is the stable TaskId (production path) and for both the
+// serial (concurrency=1) and concurrent (concurrency>1) execution branches.
+// This guards the regression where finishActiveTask was called with
+// result.task.Index while activeTaskIDs held node.id (=TaskId).
+func TestRuntimeFinishActiveTaskClearsByTaskId_Serial(t *testing.T) {
+	coordinator := newTestCoordinator(t)
+	coordinator.Config = aicommon.NewConfig(context.Background(), aicommon.WithPlanExecTaskConcurrency(1))
+
+	tasks := make([]*AiTask, 0, 3)
+	nodes := make([]*executableTaskNode, 0, 3)
+	for i := 0; i < 3; i++ {
+		task := newStateTask(coordinator, "task")
+		task.GenerateIndex()
+		tasks = append(tasks, task)
+		nodes = append(nodes, &executableTaskNode{
+			task:  task,
+			id:    task.TaskId, // production path: node.id == TaskId
+			deps:  nil,
+			order: i,
+		})
+	}
+	graph := buildManualExecutableGraph(t, nodes...)
+	r := &runtime{config: coordinator, RootTask: nodes[0].task, execGraph: graph, currentStage: -1}
+
+	_, err := r.executeStageWithHandler(0, graph.stages[0], graph.TotalTasks(), graph.TotalStages(), func(task *AiTask) error {
+		return nil
+	})
+	require.NoError(t, err)
+
+	snap := r.progressSnapshot()
+	require.Empty(t, snap.activeTaskIDs, "activeTaskIDs should be empty after serial stage finishes (TaskId match path)")
+}
+
+func TestRuntimeFinishActiveTaskClearsByTaskId_Concurrent(t *testing.T) {
+	coordinator := newTestCoordinator(t)
+	coordinator.Config = aicommon.NewConfig(context.Background(), aicommon.WithPlanExecTaskConcurrency(3))
+
+	tasks := make([]*AiTask, 0, 4)
+	nodes := make([]*executableTaskNode, 0, 4)
+	for i := 0; i < 4; i++ {
+		task := newStateTask(coordinator, "task")
+		task.GenerateIndex()
+		tasks = append(tasks, task)
+		nodes = append(nodes, &executableTaskNode{
+			task:  task,
+			id:    task.TaskId, // production path: node.id == TaskId
+			deps:  nil,
+			order: i,
+		})
+	}
+	graph := buildManualExecutableGraph(t, nodes...)
+	r := &runtime{config: coordinator, RootTask: nodes[0].task, execGraph: graph, currentStage: -1}
+
+	_, err := r.executeStageWithHandler(0, graph.stages[0], graph.TotalTasks(), graph.TotalStages(), func(task *AiTask) error {
+		return nil
+	})
+	require.NoError(t, err)
+
+	snap := r.progressSnapshot()
+	require.Empty(t, snap.activeTaskIDs, "activeTaskIDs should be empty after concurrent stage finishes (TaskId match path)")
 }

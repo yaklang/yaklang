@@ -134,6 +134,11 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int, sc *scratch) (int, i
 		// ^ 锚定: 匹配只能始于绝对偏移 0, 续扫 (searchFrom>0) 必不命中.
 		return 0, 0, false
 	}
+	// nword==1 (77% 真实 pattern) 走单字快路径: 活跃集/候选集是单个 uint64, 全程无 for-w 循环,
+	// 起点追踪用 npos<=64 的紧凑 int 数组. 与通用版逐位一致 (差分 TestMVSLocation* 覆盖).
+	if nfa.single {
+		return nfa.findLocFrom1(data, searchFrom, sc)
+	}
 	const inf = int(^uint(0) >> 1)
 	nword := nfa.nword
 	npos := nfa.npos
@@ -180,7 +185,8 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int, sc *scratch) (int, i
 			cand[w] = 0
 		}
 
-		// 后继并集: 继承前驱起点, 汇聚取最小.
+		// LimEx 后继并集: p->p+1 链边直接推进，只有异常边展开位集；
+		// 起点传播仍按目标位置取最小，故 leftmost-longest 语义不变。
 		if hasPrev {
 			for w := 0; w < nword; w++ {
 				pw := prevActive[w]
@@ -188,7 +194,18 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int, sc *scratch) (int, i
 					p := w*64 + bits.TrailingZeros64(pw)
 					pw &= pw - 1
 					sp := prevStart[p]
-					fp := nfa.follow[p]
+					if q := p + 1; q < npos && bsTest(nfa.chainTarget, q) {
+						qw := q >> 6
+						bit := uint64(1) << uint(q&63)
+						if cand[qw]&bit == 0 || sp < candStart[q] {
+							cand[qw] |= bit
+							candStart[q] = sp
+						}
+					}
+					fp := nfa.excFollow[p]
+					if fp == nil {
+						continue
+					}
 					for fw := 0; fw < nword; fw++ {
 						fb := fp[fw]
 						for fb != 0 {
@@ -289,24 +306,40 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int, sc *scratch) (int, i
 	return bestStart, bestEnd, true
 }
 
-// existsIn1 是 nword==1 (位置数 <=64) 的零分配快路径: 活跃集是单个 uint64, 全程寄存器位运算.
-// 绝大多数真实 pattern 走此路径.
-func (nfa *mvsNFA) existsIn1(data []byte) bool {
+// findLocFrom1 是 nword==1 (npos<=64) 的单字 leftmost-longest 定位快路径.
+// 与 findLocFrom 通用版逐位一致 (差分 TestMVSLocation* 覆盖), 消除所有 for-w 循环:
+// 活跃集/候选集是单个 uint64 (寄存器), 起点追踪用 npos<=64 的 int 数组.
+// 全程零分配 (有 scratch 复用 locPrev1/locCandStart1/locPrevStart1).
+func (nfa *mvsNFA) findLocFrom1(data []byte, searchFrom int, sc *scratch) (int, int, bool) {
+	const inf = int(^uint(0) >> 1)
+	npos := nfa.npos
 	first := nfa.first1
 	lastAny := nfa.lastAny1
 	lastEnd := nfa.lastEnd1
-	follow := nfa.follow1
+	chainTarget := nfa.chainTarget1
+	excFollow := nfa.excFollow1
 	reach := nfa.reach1
 	anchored := nfa.anchoredStart
 	requireEnd := nfa.requireEnd
 	n := len(data)
 
-	var prev uint64
-	i := 0
+	var candStart, prevStart []int
+	if sc != nil {
+		sc.locCandStart = ensureIntLen(sc.locCandStart, npos)
+		sc.locPrevStart = ensureIntLen(sc.locPrevStart, npos)
+		candStart, prevStart = sc.locCandStart, sc.locPrevStart
+	} else {
+		candStart = make([]int, npos)
+		prevStart = make([]int, npos)
+	}
+
+	bestStart, bestEnd := -1, -1
+	var prevActive uint64
+	hasPrev := false
+
+	i := searchFrom
 	for i < n {
-		atStart := i == 0
-		// ASCII 快路径: 单字节 rune 直接查 asciiSym, 省去 utf8.DecodeRune + symbolOf 调用开销
-		// (语料绝大多数字节为 ASCII; 非 ASCII 才回退完整解码 + 切点二分).
+		runeStart := i
 		c := data[i]
 		var sym int
 		if c < utf8.RuneSelf {
@@ -319,11 +352,157 @@ func (nfa *mvsNFA) existsIn1(data []byte) bool {
 		}
 
 		var cand uint64
-		if !anchored || atStart {
-			cand = first
+		// LimEx 后继并集: 链边直接推进，只有异常边逐目标传播起点。
+		if hasPrev {
+			for pw := prevActive; pw != 0; {
+				p := bits.TrailingZeros64(pw)
+				pw &= pw - 1
+				sp := prevStart[p]
+				if q := p + 1; q < npos && chainTarget&(uint64(1)<<uint(q)) != 0 {
+					bit := uint64(1) << uint(q)
+					if cand&bit == 0 || sp < candStart[q] {
+						cand |= bit
+						candStart[q] = sp
+					}
+				}
+				fp := excFollow[p]
+				for fb := fp; fb != 0; {
+					q := bits.TrailingZeros64(fb)
+					fb &= fb - 1
+					bit := uint64(1) << uint(q)
+					if cand&bit == 0 {
+						cand |= bit
+						candStart[q] = sp
+					} else if sp < candStart[q] {
+						candStart[q] = sp
+					}
+				}
+			}
 		}
-		for pw := prev; pw != 0; pw &= pw - 1 {
-			cand |= follow[bits.TrailingZeros64(pw)]
+		// 注入起点 (无锚每步; 有锚仅绝对偏移 0).
+		if !anchored || runeStart == 0 {
+			for fb := first; fb != 0; {
+				q := bits.TrailingZeros64(fb)
+				fb &= fb - 1
+				bit := uint64(1) << uint(q)
+				if cand&bit == 0 {
+					cand |= bit
+					candStart[q] = runeStart
+				} else if runeStart < candStart[q] {
+					candStart[q] = runeStart
+				}
+			}
+		}
+
+		rc := reach[sym]
+		active := cand & rc
+		anyActive := active != 0
+		minActiveStart := inf
+		minAcc := inf
+		if anyActive {
+			// 记录每个活跃 position 的起点 (供下步后继继承), 同时累计最小活跃起点与最小命中起点.
+			acc := active & lastAny
+			if requireEnd && i == n {
+				acc |= active & lastEnd
+			}
+			for vv := active; vv != 0; {
+				q := bits.TrailingZeros64(vv)
+				vv &= vv - 1
+				s := candStart[q]
+				prevStart[q] = s
+				if s < minActiveStart {
+					minActiveStart = s
+				}
+			}
+			for acc != 0 {
+				q := bits.TrailingZeros64(acc)
+				acc &= acc - 1
+				if candStart[q] < minAcc {
+					minAcc = candStart[q]
+				}
+			}
+		}
+		prevActive = active
+		hasPrev = anyActive
+
+		if minAcc != inf {
+			end := i
+			if bestEnd < 0 || minAcc < bestStart || (minAcc == bestStart && end > bestEnd) {
+				bestStart = minAcc
+				bestEnd = end
+			}
+		}
+
+		if !anyActive {
+			if anchored {
+				break
+			}
+			if bestEnd >= 0 {
+				break
+			}
+			continue
+		}
+		if bestEnd >= 0 && minActiveStart > bestStart {
+			break
+		}
+	}
+
+	if bestEnd < 0 {
+		return 0, 0, false
+	}
+	return bestStart, bestEnd, true
+}
+
+// existsIn1 是 nword==1 标量快路径 (绝大多数真实 pattern 走此路径).
+// 使用 LimEx 链/异常拆分 (源自 Hyperscan NSDI'19): 链边 p->p+1 用一次左移批量推进,
+// 异常边仅对活跃异常位置逐个 OR. 对 Glushkov 连接产生的边恰是 p->p+1, 大量 follow 落入
+// 链边、异常稀疏, 故每字节趋近 O(1) 位运算 (与活跃位置数无关).
+//
+// 另含两个快路径: ① ASCII 快路径 (省 utf8.DecodeRune + symbolOf); ② prev==0 时跳过异常循环
+// (NFA 休眠: 只需注入 first, 无活跃后继需展开). 对稀疏命中的真实流量 (大多字节不激活 NFA),
+// ② 是显著收益.
+func (nfa *mvsNFA) existsIn1(data []byte) bool {
+	first := nfa.first1
+	lastAny := nfa.lastAny1
+	lastEnd := nfa.lastEnd1
+	reach := nfa.reach1
+	anchored := nfa.anchoredStart
+	requireEnd := nfa.requireEnd
+	chainTarget := nfa.chainTarget1
+	excMask := nfa.excMask1
+	excFollow := nfa.excFollow1
+	n := len(data)
+
+	var prev uint64
+	i := 0
+	for i < n {
+		atStart := i == 0
+		c := data[i]
+		var sym int
+		if c < utf8.RuneSelf {
+			sym = int(nfa.asciiSym[c])
+			i++
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym = nfa.symbolOf(r)
+			i += size
+		}
+
+		// LimEx 递推: 链边用左移批量推进; 异常边逐个 OR.
+		shifted := (prev << 1) & chainTarget
+		var cand uint64
+		if !anchored || atStart {
+			cand = first | shifted
+		} else {
+			cand = shifted
+		}
+		// 异常边: 仅对活跃的异常位置展开 (excCount 越少越快).
+		if exc := prev & excMask; exc != 0 {
+			for exc != 0 {
+				p := bits.TrailingZeros64(exc)
+				exc &= exc - 1
+				cand |= excFollow[p]
+			}
 		}
 		active := cand & reach[sym]
 		if active&lastAny != 0 {

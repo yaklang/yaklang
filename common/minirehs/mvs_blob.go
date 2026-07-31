@@ -13,7 +13,7 @@ package minirehs
 // mvsBlobMagic / mvsBlobVersion 是 blob 头, C 侧校验. 契约一旦冻结不得随意改 (改则升 version).
 var mvsBlobMagic = [4]byte{'M', 'V', 'S', '1'}
 
-const mvsBlobVersion uint32 = 1
+const mvsBlobVersion uint32 = 3
 
 // mvsUnit 是 per-pattern NFA 与合并 NFA 的统一可序列化视图.
 type mvsUnit struct {
@@ -31,11 +31,45 @@ type mvsUnit struct {
 	cuts            []int32  // [nsym+1] 升序切点
 	asciiSym        []int32  // [128]
 	posPat          []int32  // [npos] 命中位置->成员 idx (-1 表示非命中位置)
+
+	// LimEx 多字扩展 (v3 blob, merged NFA): 链边由整个位集左移推进，只保留异常边行。
+	hasLimEx    bool
+	chainTarget []uint64 // [nword]
+	excMask     []uint64 // [nword]
+	excFollow   []uint64 // [npos*nword]
+
+	// 断言扩展 (v2 blob, 仅 hasAssert NFA). 对应 C mvs_nfa assert 字段.
+	hasAssert bool
+	// LimEx 单字字段
+	chainTarget1    uint64
+	excMask1        uint64
+	excFollow1Flat  []uint64 // [npos]
+	condFollowMask1 uint64
+	// condFirst (条件起点注入)
+	condFirstGuard []uint8
+	condFirstBits  []uint64
+	// condFollow (条件后继, 扁平三元组)
+	condFollowPos   []int32
+	condFollowGuard []uint8
+	condFollowBits  []uint64
+	// condAccept (条件接受)
+	condAcceptGuard []uint8
+	condAcceptBits  []uint64
+	// 必要条件预过滤 (C 内核同侧检查, 零跨界开销)
+	necMinRunLen     int32
+	necRunClass      int32 // 1=digit, 2=hex
+	necRequiredByte  int32 // -1=无, 0-255
+	necRequiredCount int32
+	// DFA 转换 (小规模 NFA 确定性化)
+	hasDFA     bool
+	dfaNstates int32
+	dfaNext    []int32 // [nstates*256]
+	dfaAccept  []byte  // [nstates]
 }
 
 // unitFromNFA 把一条 per-pattern NFA 转为 unit. reportedIdx 填入命中位置的 posPat
 // (存在性执行不使用 posPat, 仅为统一结构/可观测).
-func unitFromNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
+func unitFromNFA(nfa *mvsNFA, reportedIdx int, hasLiterals bool) mvsUnit {
 	zero := make([]uint64, nfa.nword)
 	u := mvsUnit{
 		npos:        nfa.npos,
@@ -64,11 +98,23 @@ func unitFromNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
 	}
 	setAcceptPos(u.posPat, nfa.lastAny, int32(reportedIdx))
 	setAcceptPos(u.posPat, nfa.lastEnd, int32(reportedIdx))
+	// DFA 转换: 仅对无字面量、无锚点、无断言的 always-on lean NFA 构建.
+	// anchoredStart/requireEnd NFA 的 DFA 死状态重置不正确 (锚点语义).
+	if !hasLiterals && !nfa.hasAssert && !nfa.anchoredStart && !nfa.requireEnd &&
+		nfa.npos <= DFA_MAX_NPOS && nfa.npos >= 2 {
+		if dfa := buildDFAFromNFA(nfa); dfa != nil {
+			u.hasDFA = true
+			u.dfaNstates = int32(dfa.nstates)
+			u.dfaNext = dfa.next
+			u.dfaAccept = dfa.accept
+		}
+	}
 	return u
 }
 
 // unitFromMerged 把合并 always-on NFA 转为 unit.
 func unitFromMerged(m *mvsMergedNFA) mvsUnit {
+	le := buildLimEx(m)
 	return mvsUnit{
 		npos:            m.npos,
 		nword:           m.nword,
@@ -83,23 +129,112 @@ func unitFromMerged(m *mvsMergedNFA) mvsUnit {
 		cuts:            runesToI32(m.cuts),
 		asciiSym:        m.asciiSym[:],
 		posPat:          cloneI32(m.posPat),
+		hasLimEx:        true,
+		chainTarget:     cloneU64(le.chainTarget),
+		excMask:         cloneU64(le.excMask),
+		excFollow:       flattenRows(le.excFollow, m.npos, m.nword),
 	}
 }
 
+// unitFromAssertNFA 把断言 NFA (hasAssert, nword==1) 转为 unit, 含 LimEx + guard + 必要条件字段.
+func unitFromAssertNFA(nfa *mvsNFA, reportedIdx int, nec necFactor) mvsUnit {
+	u := unitFromNFA(nfa, reportedIdx, true) // assert NFA: 不构建 DFA
+	u.hasAssert = true
+	u.chainTarget1 = nfa.chainTarget1
+	u.excMask1 = nfa.excMask1
+	u.excFollow1Flat = make([]uint64, nfa.npos)
+	copy(u.excFollow1Flat, nfa.excFollow1)
+	u.condFollowMask1 = nfa.condFollowMask1
+	nw := uint64(nfa.nword)
+	// condFirst: 每个 guard 条目的 bits 为 nword 个 uint64 (单字时 nword=1, 向后兼容).
+	for _, gb := range nfa.condFirst {
+		u.condFirstGuard = append(u.condFirstGuard, uint8(gb.g))
+		for w := 0; w < int(nw); w++ {
+			if w < len(gb.bits) {
+				u.condFirstBits = append(u.condFirstBits, gb.bits[w])
+			} else {
+				u.condFirstBits = append(u.condFirstBits, 0)
+			}
+		}
+	}
+	// condFollow (扁平三元组, 每个 bits 为 nword 个 uint64)
+	for p := 0; p < nfa.npos; p++ {
+		for _, gb := range nfa.condFollow[p] {
+			u.condFollowPos = append(u.condFollowPos, int32(p))
+			u.condFollowGuard = append(u.condFollowGuard, uint8(gb.g))
+			for w := 0; w < int(nw); w++ {
+				if w < len(gb.bits) {
+					u.condFollowBits = append(u.condFollowBits, gb.bits[w])
+				} else {
+					u.condFollowBits = append(u.condFollowBits, 0)
+				}
+			}
+		}
+	}
+	// condAccept
+	for _, gb := range nfa.condAccept {
+		u.condAcceptGuard = append(u.condAcceptGuard, uint8(gb.g))
+		for w := 0; w < int(nw); w++ {
+			if w < len(gb.bits) {
+				u.condAcceptBits = append(u.condAcceptBits, gb.bits[w])
+			} else {
+				u.condAcceptBits = append(u.condAcceptBits, 0)
+			}
+		}
+	}
+	// 必要条件预过滤 (从 necFactor 提取, C 内核同侧检查)
+	if nec.hasFactor && nec.minRunLen > 0 {
+		u.necMinRunLen = int32(nec.minRunLen)
+		switch nec.runClass {
+		case byteClassDigit:
+			u.necRunClass = 1
+		case byteClassHex:
+			u.necRunClass = 2
+		default:
+			u.necMinRunLen = 0
+		}
+	}
+	u.necRequiredByte = -1
+	for b, req := range nec.requiredBytes {
+		if req > 0 {
+			u.necRequiredByte = int32(b)
+			u.necRequiredCount = int32(req)
+			break
+		}
+	}
+	return u
+}
+
+// getNecFactor 安全获取 assertNecFactors[idx] (可能为 nil 或越界).
+func getNecFactor(factors []necFactor, idx int) necFactor {
+	if factors != nil && idx < len(factors) {
+		return factors[idx]
+	}
+	return necFactor{}
+}
+
 // buildMVSBlob 把整个 db 的 per-pattern NFA (按 idx) + 合并 NFA 序列化为单段 blob.
-// nfas[idx]==nil (走 verifier 兜底) 或 hasAssert (带零宽断言 guard, C 内核不表达, 由 Go
-// existsInAssert 执行) 的, slotUnit 记 -1, C 侧无对应 unit.
-func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA) []byte {
+// hasLiterals[idx] 标记该 idx 是否有必需字面量 (有字面量的 pattern 不构建 DFA).
+func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFactor, hasLiterals []bool) []byte {
 	npat := len(nfas)
 	slotUnit := make([]int32, npat)
 	var units []mvsUnit
 	for idx := 0; idx < npat; idx++ {
-		if nfas[idx] == nil || nfas[idx].hasAssert {
+		if nfas[idx] == nil {
 			slotUnit[idx] = -1
 			continue
 		}
+		if nfas[idx].hasAssert {
+			slotUnit[idx] = int32(len(units))
+			units = append(units, unitFromAssertNFA(nfas[idx], idx, getNecFactor(assertNecFactors, idx)))
+			continue
+		}
+		hl := true // 默认有字面量 (保守: 不构建 DFA)
+		if hasLiterals != nil && idx < len(hasLiterals) {
+			hl = hasLiterals[idx]
+		}
 		slotUnit[idx] = int32(len(units))
-		units = append(units, unitFromNFA(nfas[idx], idx))
+		units = append(units, unitFromNFA(nfas[idx], idx, hl))
 	}
 	mergedUnit := int32(-1)
 	if merged != nil {
@@ -155,6 +290,15 @@ func encodeUnit(u mvsUnit) []byte {
 	if u.hasAnchored {
 		flags |= 1
 	}
+	if u.hasAssert {
+		flags |= 2 // bit1 = hasAssert
+	}
+	if u.hasDFA {
+		flags |= 4 // bit2 = hasDFA
+	}
+	if u.hasLimEx {
+		flags |= 8 // bit3 = hasLimEx (v3)
+	}
 	b := make([]byte, 0, 16+(len(u.follow)+len(u.reach)+u.nword*4)*8+(len(u.cuts)+128+u.npos)*4)
 	b = putU32(b, uint32(u.npos))
 	b = putU32(b, uint32(u.nword))
@@ -169,6 +313,51 @@ func encodeUnit(u mvsUnit) []byte {
 	b = putI32s(b, u.cuts)
 	b = putI32s(b, u.asciiSym)
 	b = putI32s(b, u.posPat)
+	// LimEx 多字扩展 (v3, flags bit3).
+	if u.hasLimEx {
+		b = putU64s(b, u.chainTarget)
+		b = putU64s(b, u.excMask)
+		b = putU64s(b, u.excFollow)
+	}
+	// 断言扩展 (v2, 仅 hasAssert):
+	if u.hasAssert {
+		b = putU64(b, u.chainTarget1)
+		b = putU64(b, u.excMask1)
+		b = putU64s(b, u.excFollow1Flat)
+		b = putU64(b, u.condFollowMask1)
+		// condFirst
+		b = putI32(b, int32(len(u.condFirstGuard)))
+		for _, g := range u.condFirstGuard {
+			b = append(b, g)
+		}
+		b = putU64s(b, u.condFirstBits)
+		// condFollow
+		b = putI32(b, int32(len(u.condFollowPos)))
+		b = putI32s(b, u.condFollowPos)
+		for _, g := range u.condFollowGuard {
+			b = append(b, g)
+		}
+		b = putU64s(b, u.condFollowBits)
+		// condAccept
+		b = putI32(b, int32(len(u.condAcceptGuard)))
+		for _, g := range u.condAcceptGuard {
+			b = append(b, g)
+		}
+		b = putU64s(b, u.condAcceptBits)
+		// 必要条件预过滤 (4 个 i32)
+		b = putI32(b, u.necMinRunLen)
+		b = putI32(b, u.necRunClass)
+		b = putI32(b, u.necRequiredByte)
+		b = putI32(b, u.necRequiredCount)
+	}
+	// DFA 扩展 (bit2 = hasDFA, 在所有字段最后)
+	if u.hasDFA {
+		b = putI32(b, u.dfaNstates)
+		b = putI32s(b, u.dfaNext)
+		for _, a := range u.dfaAccept {
+			b = append(b, a)
+		}
+	}
 	return b
 }
 

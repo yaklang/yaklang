@@ -43,16 +43,11 @@ func TestYaklibDispatch_BuiltinsDoNotRecordRuntimeDependencies(t *testing.T) {
 	require.Empty(t, deps)
 }
 
-func TestRuntimeDispatchDependencies_RecordPocDispatcher(t *testing.T) {
-	deps := compileRuntimeDispatchDependencies(t, `check = () => { poc.timeout(2); return 0 }`)
-	require.Contains(t, deps, abi.IDPocTimeout)
-}
-
-func TestRuntimeDispatchDependencies_PrintlnDoesNotRecordPocDispatcher(t *testing.T) {
-	deps := compileRuntimeDispatchDependencies(t, `check = () => { println("yak"); return 0 }`)
-	require.NotContains(t, deps, abi.IDPocTimeout)
-	require.NotContains(t, deps, abi.IDPocGet)
-	require.NotContains(t, deps, abi.IDPocGetHTTPPacketBody)
+func TestYaklibDispatch_PocUsesGenericYaklibPath(t *testing.T) {
+	code := `check = () => { poc.Get("http://example.com", poc.timeout(2)); return 0 }`
+	deps := compileYaklibDependencies(t, code)
+	require.Contains(t, deps["poc"], "Get")
+	require.Contains(t, deps["poc"], "timeout")
 }
 
 func TestYaklibExtern_ModeAllConstantDoesNotRecordRuntimeDependency(t *testing.T) {
@@ -60,17 +55,15 @@ func TestYaklibExtern_ModeAllConstantDoesNotRecordRuntimeDependency(t *testing.T
 	require.Empty(t, deps)
 }
 
-func TestYaklibDispatch_YakitInfoUsesDedicatedFuncID(t *testing.T) {
+func TestYaklibDispatch_YakitInfoUsesGenericYaklibPath(t *testing.T) {
 	code := `check = () => { yakit.Info("ok"); return 1 }`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 
-	binding, ok := defaultExternBindings["yakit.Info"]
-	require.True(t, ok)
-	require.Equal(t, abi.IDYakitInfo, binding.DispatchID)
-
-	require.NotContains(t, ir, "yaklib_pkg_")
+	require.Contains(t, ir, "yaklib_pkg_")
+	require.Contains(t, ir, "yaklib_method_")
 	require.Contains(t, ir, "call void @"+abi.InvokeSymbol)
+	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
 func TestYaklibDispatch_NonStdlibGlobalDoesNotUseGenericYaklibPath(t *testing.T) {

@@ -269,8 +269,8 @@ func ensureLegacyTestRiskID(t *testing.T) int64 {
 		yakit.WithRiskParam_Severity("low"),
 	)
 	require.NoError(t, err)
-	require.NotZero(t, r.ID)
-	id := int64(r.ID)
+	require.NotZero(t, r.Model.ID)
+	id := int64(r.Model.ID)
 	t.Cleanup(func() {
 		_ = yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), id)
 	})
@@ -820,14 +820,47 @@ func legacyYakScriptToolCases() map[string][]legacyToolCase {
 				"pluginType": "yak",
 			},
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
+				var result map[string]any
+				decodeToolResultJSON(t, text, &result)
+				assert.Equal(t, true, result["ok"])
+				assert.Equal(t, false, result["hasBlockingErrors"])
+				assert.Equal(t, "yak", result["pluginType"])
+			},
+		},
+		{
+			name: "invalid_mitm_returns_readable_errors",
+			args: map[string]any{
+				"code":       `mirrorNewWebsitePath = func( {`,
+				"pluginType": "mitm",
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var result map[string]any
+				decodeToolResultJSON(t, text, &result)
+				assert.Equal(t, false, result["ok"])
+				assert.Equal(t, true, result["hasBlockingErrors"])
+				assert.Equal(t, "mitm", result["pluginType"])
+				formatted, _ := result["formatted"].(string)
+				require.NotEmpty(t, formatted)
+				assert.NotContains(t, formatted, "5Z+") // must not be base64-only blob
+				assert.Contains(t, strings.ToLower(formatted), "error")
+				issues, ok := result["issues"].([]any)
+				require.True(t, ok)
+				require.NotEmpty(t, issues)
+				first, ok := issues[0].(map[string]any)
+				require.True(t, ok)
+				msg, _ := first["message"].(string)
+				require.NotEmpty(t, msg)
+				assert.NotContains(t, msg, "5Z+")
 			},
 		},
 		{
 			name: "empty_code_returns_analysis_result",
 			args: map[string]any{"pluginType": "yak"},
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotNil(t, text)
+				var result map[string]any
+				decodeToolResultJSON(t, text, &result)
+				_, hasOK := result["ok"]
+				assert.True(t, hasOK)
 			},
 		},
 	},
@@ -882,6 +915,106 @@ func legacyYakScriptToolCases() map[string][]legacyToolCase {
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
 				assert.NotEmpty(t, strings.TrimSpace(text))
 			},
+		},
+	},
+	"save_yak_script": {
+		{
+			name: "create_mitm_plugin",
+			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+				return map[string]any{
+					"scriptName": uniqueName("mcp-save-mitm"),
+					"type":       "mitm",
+					"content":    `mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {}`,
+					"help":       "mcp save_yak_script integration test",
+					"tags":       "mcp,test,mitm",
+				}
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var script map[string]any
+				decodeToolResultJSON(t, text, &script)
+				name, _ := script["ScriptName"].(string)
+				require.NotEmpty(t, name)
+				t.Cleanup(func() {
+					_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+				})
+				assert.Equal(t, "mitm", script["Type"])
+				assert.Contains(t, fmt.Sprint(script["Content"]), "mirrorNewWebsitePath")
+				id, ok := script["Id"].(float64)
+				require.True(t, ok)
+				assert.Greater(t, id, float64(0))
+			},
+		},
+		{
+			name: "create_with_pluginType_and_code_alias",
+			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+				return map[string]any{
+					"scriptName": uniqueName("mcp-save-yak"),
+					"pluginType": "yak",
+					"code":       `println("mcp-save-alias")`,
+					"help":       "alias fields for save_yak_script",
+				}
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var script map[string]any
+				decodeToolResultJSON(t, text, &script)
+				name, _ := script["ScriptName"].(string)
+				require.NotEmpty(t, name)
+				t.Cleanup(func() {
+					_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+				})
+				assert.Equal(t, "yak", script["Type"])
+			},
+		},
+		{
+			name: "update_existing_plugin",
+			buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+				name := uniqueName("mcp-save-upd")
+				result, err := invokeLegacyTool(t, srv, "save_yak_script", map[string]any{
+					"scriptName": name,
+					"type":       "yak",
+					"content":    `println("v1")`,
+					"help":       "before update",
+				}, 10*time.Second)
+				require.NoError(t, err)
+				text := toolResultText(t, result)
+				var created map[string]any
+				decodeToolResultJSON(t, text, &created)
+				id, ok := created["Id"].(float64)
+				require.True(t, ok)
+				t.Cleanup(func() {
+					_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+				})
+				return map[string]any{
+					"id":         id,
+					"scriptName": name,
+					"type":       "yak",
+					"content":    `println("v2-updated")`,
+					"help":       "after update",
+				}
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var script map[string]any
+				decodeToolResultJSON(t, text, &script)
+				assert.Contains(t, fmt.Sprint(script["Content"]), "v2-updated")
+				if isUpdate, ok := script["IsUpdate"].(bool); ok {
+					assert.True(t, isUpdate)
+				}
+			},
+		},
+		{
+			name: "reject_invalid_syntax",
+			args: map[string]any{
+				"scriptName": uniqueName("mcp-save-bad"),
+				"type":       "mitm",
+				"content":    `mirrorNewWebsitePath = func( {`,
+			},
+			wantErr:     true,
+			errContains: []string{"static analyze failed", "invalid", "save plugin failed"},
+		},
+		{
+			name:    "reject_missing_script_name",
+			args:    map[string]any{"type": "yak", "content": `println(1)`},
+			wantErr: true,
 		},
 	},
 	"create_yak_script_group": {
