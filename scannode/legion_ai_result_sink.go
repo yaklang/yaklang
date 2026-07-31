@@ -114,7 +114,12 @@ func (p *aiSessionResultSinkProxy) SubmitRisk(
 	ctx context.Context,
 	risk *schema.Risk,
 ) (aicommon.ResultReceipt, error) {
-	sink := p.current()
+	if p == nil {
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	sink := p.sink
 	if sink == nil {
 		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
 	}
@@ -125,7 +130,12 @@ func (p *aiSessionResultSinkProxy) SubmitAsset(
 	ctx context.Context,
 	asset aicommon.AssetResult,
 ) (aicommon.ResultReceipt, error) {
-	sink := p.current()
+	if p == nil {
+		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	sink := p.sink
 	if sink == nil {
 		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
 	}
@@ -137,7 +147,12 @@ func (p *aiSessionResultSinkProxy) SubmitAsset(
 }
 
 func (p *aiSessionResultSinkProxy) Succeed(ctx context.Context, resultJSON []byte) error {
-	if lifecycle, ok := p.current().(aiFocusResultLifecycle); ok {
+	if p == nil {
+		return nil
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if lifecycle, ok := p.sink.(aiFocusResultLifecycle); ok {
 		return lifecycle.Succeed(ctx, resultJSON)
 	}
 	return nil
@@ -149,26 +164,27 @@ func (p *aiSessionResultSinkProxy) Fail(
 	message string,
 	detailJSON []byte,
 ) error {
-	if lifecycle, ok := p.current().(aiFocusResultLifecycle); ok {
+	if p == nil {
+		return nil
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if lifecycle, ok := p.sink.(aiFocusResultLifecycle); ok {
 		return lifecycle.Fail(ctx, code, message, detailJSON)
 	}
 	return nil
 }
 
 func (p *aiSessionResultSinkProxy) Cancel(ctx context.Context, reason string) error {
-	if lifecycle, ok := p.current().(aiFocusResultLifecycle); ok {
-		return lifecycle.Cancel(ctx, reason)
-	}
-	return nil
-}
-
-func (p *aiSessionResultSinkProxy) current() aicommon.ResultSink {
 	if p == nil {
 		return nil
 	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.sink
+	if lifecycle, ok := p.sink.(aiFocusResultLifecycle); ok {
+		return lifecycle.Cancel(ctx, reason)
+	}
+	return nil
 }
 
 func validateLegionAIFocusResultContext(
@@ -246,10 +262,11 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 		return aicommon.ResultReceipt{}, fmt.Errorf("marshal ai focus risk: %w", err)
 	}
 	dedupeKey := focusRiskDedupeKey(&normalized, target)
+	eventID := focusRiskEventID(s.ref.JobID, dedupeKey)
 	if err := s.publisher.PublishRiskWithEventID(
 		ctx,
 		s.ref,
-		normalized.Hash,
+		eventID,
 		normalized.RiskType,
 		normalized.Title,
 		target,
@@ -260,7 +277,7 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 		return aicommon.ResultReceipt{}, fmt.Errorf("publish ai focus risk: %w", err)
 	}
 	return aicommon.ResultReceipt{
-		ResultID:  normalized.Hash,
+		ResultID:  eventID,
 		DedupeKey: dedupeKey,
 		BackendID: s.ref.JobID,
 	}, nil
@@ -413,6 +430,15 @@ func focusAssetEventID(
 		strings.TrimSpace(jobID),
 		strings.ToLower(strings.TrimSpace(assetKind)),
 		strings.TrimSpace(identityKey),
+	}, "\x00")
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
+}
+
+func focusRiskEventID(jobID string, dedupeKey string) string {
+	name := strings.Join([]string{
+		strings.TrimSpace(jobID),
+		"risk",
+		strings.TrimSpace(dedupeKey),
 	}, "\x00")
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
 }
