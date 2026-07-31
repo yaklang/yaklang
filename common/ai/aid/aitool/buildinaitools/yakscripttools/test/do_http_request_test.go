@@ -87,6 +87,7 @@ func TestDoHTTPRequest_RequestLargeTruncate(t *testing.T) {
 
 	largeBody := strings.Repeat("X", 6*1024)
 
+	// without save-packet: truncated inline, hint tells AI how to get the full file
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
 		"url":          "http://" + host + ":" + strconv.Itoa(port),
 		"method":       "POST",
@@ -97,7 +98,22 @@ func TestDoHTTPRequest_RequestLargeTruncate(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, "request packet"), "request packet header not found")
 	assert.Assert(t, strings.Contains(stdout, "truncated"), "large request should contain 'truncated'")
-	assert.Assert(t, strings.Contains(stdout, "full request saved to file"), "truncation hint not found")
+	assert.Assert(t, strings.Contains(stdout, "save-packet=true"), "truncation hint should point to save-packet")
+	assert.Assert(t, !strings.Contains(stdout, "saved to"), "no file should be saved when save-packet is off")
+
+	// with save-packet=true: the full packet is dumped to a file
+	host2, port2 := utils.DebugMockHTTP([]byte(flag))
+	stdout, _ = execTool(t, tool, aitool.InvokeParams{
+		"url":          "http://" + host2 + ":" + strconv.Itoa(port2),
+		"method":       "POST",
+		"body":         largeBody,
+		"content-type": "text/plain",
+		"timeout":      10,
+		"save-packet":  true,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "truncated"), "large request should contain 'truncated'")
+	assert.Assert(t, strings.Contains(stdout, "full request saved to file"), "with save-packet the full request file hint should appear")
 }
 
 func TestDoHTTPRequest_ResponseSmallNoPattern(t *testing.T) {
@@ -125,6 +141,7 @@ func TestDoHTTPRequest_ResponseLargeNoPattern(t *testing.T) {
 	})
 	tool := getDoHTTPRequestTool(t)
 
+	// without save-packet: truncated inline, hint points to save-packet, no file saved
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
 		"url":     "http://" + host + ":" + strconv.Itoa(port),
 		"timeout": 10,
@@ -132,8 +149,19 @@ func TestDoHTTPRequest_ResponseLargeNoPattern(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, headMarker), "head of large response should be printed")
 	assert.Assert(t, strings.Contains(stdout, "truncated"), "large response without pattern should be truncated")
-	assert.Assert(t, strings.Contains(stdout, "full response saved to file"), "truncation hint not found")
+	assert.Assert(t, strings.Contains(stdout, "save-packet=true"), "truncation hint should point to save-packet")
+	assert.Assert(t, !strings.Contains(stdout, "saved to"), "no file should be saved when save-packet is off")
 	assert.Assert(t, !strings.Contains(stdout, tailMarker), "tail should not appear in truncated output")
+
+	// with save-packet=true: the full response is dumped to a file
+	stdout, _ = execTool(t, tool, aitool.InvokeParams{
+		"url":         "http://" + host + ":" + strconv.Itoa(port),
+		"timeout":     10,
+		"save-packet": true,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "truncated"), "large response should be truncated")
+	assert.Assert(t, strings.Contains(stdout, "full response saved to file"), "with save-packet the full response file hint should appear")
 }
 
 func TestDoHTTPRequest_ResponseSmallWithKeyword(t *testing.T) {
@@ -237,6 +265,49 @@ func TestDoHTTPRequest_CustomHeaders(t *testing.T) {
 	_ = receivedHeader
 	assert.Assert(t, strings.Contains(stdout, "X-My-Header"), "custom header should appear in request packet output")
 	assert.Assert(t, strings.Contains(stdout, "header_received"), "server should receive the custom header")
+}
+
+// TestDoHTTPRequest_HeadersAsObject reproduces the real failure seen in the field:
+// the AI passed "headers" as a JSON OBJECT, but the schema declared it a string, so the
+// fast-path validation rejected it ("got object, want string"). The executor stringifies
+// the map to "map[X-My-Header:test-value-123]"; the tool must normalize that back into a
+// real header instead of dropping it.
+func TestDoHTTPRequest_HeadersAsObject(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if strings.Contains(string(req), "X-My-Header: test-value-123") {
+			return []byte("HTTP/1.1 200 OK\r\n\r\nheader_received")
+		}
+		return []byte("HTTP/1.1 200 OK\r\n\r\nheader_missing")
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":     "http://" + host + ":" + strconv.Itoa(port),
+		"headers": map[string]string{"X-My-Header": "test-value-123"},
+		"timeout": 10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "X-My-Header"), "object-form header should appear in request packet output")
+	assert.Assert(t, strings.Contains(stdout, "header_received"), "server should receive the object-form header")
+}
+
+// TestDoHTTPRequest_QueryParamsAsObject verifies query-params also accept a JSON object.
+func TestDoHTTPRequest_QueryParamsAsObject(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if strings.Contains(string(req), "id=42") {
+			return []byte("HTTP/1.1 200 OK\r\n\r\nparam_received")
+		}
+		return []byte("HTTP/1.1 200 OK\r\n\r\nparam_missing")
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":          "http://" + host + ":" + strconv.Itoa(port) + "/",
+		"query-params": map[string]string{"id": "42"},
+		"timeout":      10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "param_received"), "server should receive the object-form query param")
 }
 
 func TestDoHTTPRequest_PostBody(t *testing.T) {
@@ -345,19 +416,29 @@ func TestDoHTTPRequest_NoRedirect(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "302") || strings.Contains(stdout, "Found"), "should show redirect status code")
 }
 
-func TestDoHTTPRequest_ShowRequest(t *testing.T) {
+func TestDoHTTPRequest_SavePacket(t *testing.T) {
 	flag := utils.RandStringBytes(20)
 	host, port := utils.DebugMockHTTP([]byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
+	// default (save-packet off): request still printed inline, but nothing saved to file
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
-		"url":          "http://" + host + ":" + strconv.Itoa(port),
-		"show-request": "yes",
-		"timeout":      10,
+		"url":     "http://" + host + ":" + strconv.Itoa(port),
+		"timeout": 10,
 	})
-
 	assert.Assert(t, strings.Contains(stdout, "request packet"), "request should always be printed")
-	assert.Assert(t, strings.Contains(stdout, "saved to"), "show-request=yes should save request to file")
+	assert.Assert(t, !strings.Contains(stdout, "saved to"), "no file should be saved when save-packet is off")
+
+	// save-packet=true: both request and response packets are saved to temp files
+	host2, port2 := utils.DebugMockHTTP([]byte(flag))
+	stdout, _ = execTool(t, tool, aitool.InvokeParams{
+		"url":         "http://" + host2 + ":" + strconv.Itoa(port2),
+		"timeout":     10,
+		"save-packet": true,
+	})
+	assert.Assert(t, strings.Contains(stdout, "request packet"), "request should always be printed")
+	assert.Assert(t, strings.Contains(stdout, "request packet [size:"), "save-packet=true should save the request to a file")
+	assert.Assert(t, strings.Contains(stdout, "response packet [size:"), "save-packet=true should save the response to a file")
 }
 
 func TestDoHTTPRequest_Timeout(t *testing.T) {
