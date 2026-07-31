@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -41,6 +42,32 @@ type recordingAIFocusRiskPublisher struct {
 	failed       int
 	cancelled    int
 	lifecycleRef jobExecutionRef
+}
+
+type blockingAIFocusResultSink struct {
+	started  chan struct{}
+	release  chan struct{}
+	resultID string
+}
+
+func (s *blockingAIFocusResultSink) SubmitRisk(
+	context.Context,
+	*schema.Risk,
+) (aicommon.ResultReceipt, error) {
+	close(s.started)
+	<-s.release
+	return aicommon.ResultReceipt{ResultID: s.resultID}, nil
+}
+
+type immediateAIFocusResultSink struct {
+	resultID string
+}
+
+func (s *immediateAIFocusResultSink) SubmitRisk(
+	context.Context,
+	*schema.Risk,
+) (aicommon.ResultReceipt, error) {
+	return aicommon.ResultReceipt{ResultID: s.resultID}, nil
 }
 
 func (p *recordingAIFocusRiskPublisher) PublishAssetWithEventID(
@@ -147,7 +174,7 @@ func TestLegionAIFocusResultSinkPublishesRunScopedRisk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("submit risk: %v", err)
 	}
-	if receipt.ResultID != "risk-1" || receipt.BackendID != "job-1" {
+	if receipt.ResultID == "" || receipt.BackendID != "job-1" {
 		t.Fatalf("unexpected receipt: %#v", receipt)
 	}
 	if len(publisher.risks) != 1 {
@@ -190,6 +217,69 @@ func TestLegionAIFocusResultSinkPublishesRunScopedRisk(t *testing.T) {
 	}
 	if secondReceipt.DedupeKey != receipt.DedupeKey {
 		t.Fatalf("expected stable dedupe key, got %s and %s", receipt.DedupeKey, secondReceipt.DedupeKey)
+	}
+	if secondReceipt.ResultID != receipt.ResultID {
+		t.Fatalf(
+			"expected retries to reuse one platform event id, got %s and %s",
+			receipt.ResultID,
+			secondReceipt.ResultID,
+		)
+	}
+	if publisher.risks[1].eventID != publisher.risks[0].eventID {
+		t.Fatalf(
+			"expected duplicate risks to publish one event id, got %s and %s",
+			publisher.risks[0].eventID,
+			publisher.risks[1].eventID,
+		)
+	}
+}
+
+func TestAISessionResultSinkProxyFencesRebindAgainstInFlightSubmission(t *testing.T) {
+	t.Parallel()
+
+	oldSink := &blockingAIFocusResultSink{
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+		resultID: "old-attempt",
+	}
+	newSink := &immediateAIFocusResultSink{resultID: "new-attempt"}
+	proxy := newAISessionResultSinkProxy(oldSink)
+
+	submitDone := make(chan aicommon.ResultReceipt, 1)
+	go func() {
+		receipt, _ := proxy.SubmitRisk(context.Background(), &schema.Risk{})
+		submitDone <- receipt
+	}()
+	<-oldSink.started
+
+	setDone := make(chan struct{})
+	go func() {
+		proxy.Set(newSink)
+		close(setDone)
+	}()
+
+	select {
+	case <-setDone:
+		t.Fatal("rebind completed while an old-attempt submission was still in flight")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(oldSink.release)
+	if receipt := <-submitDone; receipt.ResultID != "old-attempt" {
+		t.Fatalf("unexpected in-flight receipt: %#v", receipt)
+	}
+	select {
+	case <-setDone:
+	case <-time.After(time.Second):
+		t.Fatal("rebind did not complete after the in-flight submission finished")
+	}
+
+	receipt, err := proxy.SubmitRisk(context.Background(), &schema.Risk{})
+	if err != nil {
+		t.Fatalf("submit after rebind: %v", err)
+	}
+	if receipt.ResultID != "new-attempt" {
+		t.Fatalf("expected new sink after rebind, got %#v", receipt)
 	}
 }
 
