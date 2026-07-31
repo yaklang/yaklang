@@ -286,7 +286,9 @@ func (r *ReActLoop) generateLoopPrompt(
 	_nonce := nonce
 	_debugMode := r.isDebugModeEnabled()
 	_emitter := r.emitter
+	r.observationInflight.Add(1)
 	go func() {
+		defer r.observationInflight.Done()
 		defer func() {
 			if rec := recover(); rec != nil {
 				log.Warnf("async observation build panic recovered: %v", rec)

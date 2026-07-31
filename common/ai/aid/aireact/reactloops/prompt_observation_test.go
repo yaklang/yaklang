@@ -118,6 +118,9 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, prompt)
 
+	// observation is built async; wait for it before asserting
+	loop.WaitForInflightObservation()
+
 	observation := loop.GetLastPromptObservation()
 	require.NotNil(t, observation)
 	require.Equal(t, "prompt-observation-loop", observation.LoopName)

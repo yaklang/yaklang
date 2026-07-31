@@ -190,6 +190,12 @@ type ReActLoop struct {
 	// 关键词: 异步反思 inflight 跟踪, 测试可观测
 	reflectionInflight sync.WaitGroup
 
+	// observationInflight 跟踪异步 prompt observation 构建 goroutine 数量,
+	// 供测试 best-effort 等待 (WaitForInflightObservation). 生产路径不会主动
+	// 等待 (fire-and-forget).
+	// 关键词: 异步 observation inflight 跟踪, 测试可观测
+	observationInflight sync.WaitGroup
+
 	// Init handler action constraints
 	// These are set by the init handler and cleared after first iteration
 	initActionMustUse  []string // Actions that MUST be used (set by init)
@@ -341,6 +347,17 @@ func (r *ReActLoop) WaitForInflightReflections() {
 		return
 	}
 	r.reflectionInflight.Wait()
+}
+
+// WaitForInflightObservation 等待所有异步 prompt observation 构建 goroutine
+// 完成. 主循环不应调用 (会破坏 fire-and-forget 语义); 仅用于测试在
+// generateLoopPrompt 返回后断言 observation 字段.
+// 关键词: 异步 observation join, 测试可观测
+func (r *ReActLoop) WaitForInflightObservation() {
+	if r == nil {
+		return
+	}
+	r.observationInflight.Wait()
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
