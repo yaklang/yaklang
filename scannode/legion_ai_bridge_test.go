@@ -430,6 +430,56 @@ func TestAISessionPublisherUsesDistinctEventIDPerSequence(t *testing.T) {
 	}
 }
 
+func TestAISessionRuntimeEventsKeepStableStatelessTurnCausationAcrossControlInputs(t *testing.T) {
+	t.Parallel()
+
+	handle := &statelessAIEngineRuntimeHandle{
+		activeTurn: &statelessAITurn{turnID: "turn-root"},
+	}
+	runtime := &aiSessionRuntime{
+		ref: aiSessionCommandRef{
+			CommandID:   "review-command-1",
+			SessionID:   "ai-session-1",
+			RunID:       "run-1",
+			OwnerUserID: "user-1",
+		},
+		handle: handle,
+	}
+
+	firstRef, firstSeq := runtime.nextEventRefAndSeq()
+	if firstRef.CommandID != "turn-root" {
+		t.Fatalf("first review changed turn causation: got %q", firstRef.CommandID)
+	}
+	if terminalRef := runtime.currentRef(); terminalRef.CommandID != "turn-root" {
+		t.Fatalf("terminal event changed turn causation: got %q", terminalRef.CommandID)
+	}
+
+	runtime.mu.Lock()
+	runtime.ref.CommandID = "review-command-2"
+	runtime.mu.Unlock()
+	secondRef, secondSeq := runtime.nextEventRefAndSeq()
+	if secondRef.CommandID != "turn-root" {
+		t.Fatalf("second review changed turn causation: got %q", secondRef.CommandID)
+	}
+	if firstSeq != 1 || secondSeq != 2 {
+		t.Fatalf("unexpected event sequence: first=%d second=%d", firstSeq, secondSeq)
+	}
+
+	handle.mu.Lock()
+	handle.activeTurn = nil
+	handle.mu.Unlock()
+	runtime.mu.Lock()
+	runtime.ref.CommandID = "next-turn-command"
+	runtime.mu.Unlock()
+	nextRef, _ := runtime.nextEventRefAndSeq()
+	if nextRef.CommandID != "next-turn-command" {
+		t.Fatalf("idle runtime did not fall back to latest command: got %q", nextRef.CommandID)
+	}
+	if idleTerminalRef := runtime.currentRef(); idleTerminalRef.CommandID != "next-turn-command" {
+		t.Fatalf("idle terminal event did not fall back to latest command: got %q", idleTerminalRef.CommandID)
+	}
+}
+
 func TestHandleAISessionAppendContextPublishesRuntimeEvent(t *testing.T) {
 	t.Parallel()
 
