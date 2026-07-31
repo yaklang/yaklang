@@ -636,7 +636,7 @@ heap `2026-07-26T14-24-26-460Z` 对照第三十八轮 `2026-07-26T11-15-02-333Z`
 
 状态：协议、后端 broker/RPC、Electron bridge、Renderer shadow/canary 控制器、有界观测、body-free 直接列表消费和真实 Electron A/B 已实现；自 2026-07-26 起，兼容的 MITM 顶部视图默认使用 `canary` 直接消费，Query 仍是恢复、筛选、离顶、旧引擎和异常场景的事实来源；其他 UI 消费者尚未切换。
 
-- 新增独立 server-stream RPC，不复用 MITMV2 手动控制流；协议拆到 `httpflow_live.proto`，避免巨型 `HTTPFlow` 生成索引漂移；
+- 新增独立 server-stream RPC，不复用 MITMV2 手动控制流；实时消息保持 body-free，但定义已在第八十八轮合并回主 `yakgrpc.proto`；
 - 支持 `LastSeenSequence、LastSeenID、ProjectGeneration、DatabaseIdentity、SessionID` 和 v1 `SourceType` 筛选；
 - `HTTPFlowLiveSummary` 只含列表标量，协议层不存在 Request/Response 字段；新增的 request hijack、response mirror、flow built、persist enqueue/start 时间也只是可选 `int64` 标量，用于端到端归因，不重新引入正文；
 - 后端按项目/代次维护单调 Sequence、2048 条重放窗口、256 条订阅队列和 4 个最近项目槽；超窗、慢消费者、项目淘汰和游标异常都显式返回 `Gap`，不静默丢数据；
@@ -1396,3 +1396,7 @@ heap `2026-07-29T03-14-04-256Z -> 2026-07-29T03-47-31-376Z` 中旧 `quoteHTTPPac
 产品回归发现 HTTPFlow DeleteAll 通过 Drop/Recreate 复用自增 ID 后，前端旧 `AfterId` 和后端 live broker/high-water 仍属于清库前的逻辑数据集，可能永久过滤 ID 较小的新流量。修复在 DeleteAll 成功后原子推进项目数据库的逻辑 generation，并清理旧 generation 的 live broker、observability timing 与 high-water；旧订阅收到明确 GAP 后按新 generation 重建查询。Drop/Recreate 失败现在会返回到底层删除调用，gRPC 不再继续旋转运行态。
 
 该边界不修改 proto、数据库 schema、表结构、历史行格式或项目文件路径；现有 reader/writer handle 保持不变，仅更换进程内逻辑 incarnation。测试覆盖 generation CAS、句柄保持、旧调用拒绝、broker 允许较小 ID 重新开始，以及复用 ID 时 timing/high-water 不串代。`common/consts`、`common/yakgrpc/yakit` 定向测试和 `common/yakgrpc` 全包编译检查通过；所有验证使用独立限量 Go cache，结束后已清理。
+
+## 56. 第八十八轮：HTTPFlow 实时协议主文件单源化（2026-07-31）
+
+按协议维护要求，将 `httpflow_live.proto` 中的两个枚举和五个消息原样合并到主 `yakgrpc.proto`，删除独立源文件并重新生成 Go binding；`SubscribeHTTPFlows` RPC 名称、所有消息/字段名、字段号和枚举值均未改变，wire 协议兼容。前后端主 proto 保持逐字节一致，实时摘要仍不含 Request/Response 正文。
