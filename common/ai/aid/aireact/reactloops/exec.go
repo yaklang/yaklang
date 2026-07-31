@@ -375,9 +375,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 						// 这条 think/assistant 流来自 AI 响应中的哪个字段（如 human_readable_thought
 						// 还是 modify_code_reason）。不污染 ContentType，避免破坏前端按 MIME 主类型解析。
 						contentType := fieldIns.ContentType
-						if contentType == "" {
-							contentType = "text/plain"
-						}
 						preparedReader, readable, readableErr := waitReadableStream(pr)
 						if readableErr != nil {
 							log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
