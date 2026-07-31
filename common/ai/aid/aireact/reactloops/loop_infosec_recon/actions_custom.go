@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -480,12 +481,85 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				op.Continue()
 				return
 			}
+			submitted, err := submitVerifiedAPIAssets(
+				reconResultContext(loop),
+				aicommon.AssetResultSinkFromConfig(loop.GetConfig()),
+				pool,
+			)
+			if err != nil {
+				op.Fail(fmt.Errorf("publish verified API assets: %w", err))
+				return
+			}
 			_, verified, _, _ := PoolStats(pool)
-			r.AddToTimeline("probe_api", fmt.Sprintf("probed %d entries; verified count=%d", n, verified))
-			op.Feedback(fmt.Sprintf("Probed %d URLs this batch. Verified entries in pool: %d / %d", n, verified, len(pool.Entries)))
+			r.AddToTimeline(
+				"probe_api",
+				fmt.Sprintf(
+					"probed %d entries; verified count=%d; submitted assets=%d",
+					n,
+					verified,
+					submitted,
+				),
+			)
+			op.Feedback(fmt.Sprintf(
+				"Probed %d URLs this batch. Verified entries in pool: %d / %d. Submitted assets: %d",
+				n,
+				verified,
+				len(pool.Entries),
+				submitted,
+			))
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, fmt.Sprintf("完成: probe_api_candidates (%d probed) / Done: probe_api_candidates (%d probed)", n, n))
 			op.Continue()
 		},
 	)
+}
+
+func submitVerifiedAPIAssets(
+	ctx context.Context,
+	sink aicommon.AssetResultSink,
+	pool *APIPool,
+) (int, error) {
+	if sink == nil || pool == nil {
+		return 0, nil
+	}
+
+	submitted := 0
+	for _, entry := range pool.Entries {
+		if !entry.Verified {
+			continue
+		}
+		method := strings.ToUpper(strings.TrimSpace(entry.Method))
+		if method == "" {
+			method = http.MethodGet
+		}
+		target := strings.TrimSpace(entry.NormalizedURL)
+		if target == "" {
+			continue
+		}
+		payload, err := json.Marshal(entry)
+		if err != nil {
+			return submitted, fmt.Errorf("marshal verified API endpoint %s %s: %w", method, target, err)
+		}
+		identityKey := "http_endpoint:" + method + ":" + target
+		if _, err := sink.SubmitAsset(ctx, aicommon.AssetResult{
+			Kind:        "http_endpoint",
+			Title:       method + " " + target,
+			Target:      target,
+			IdentityKey: identityKey,
+			Payload:     payload,
+		}); err != nil {
+			return submitted, fmt.Errorf("submit verified API endpoint %s %s: %w", method, target, err)
+		}
+		submitted++
+	}
+	return submitted, nil
+}
+
+func reconResultContext(loop *reactloops.ReActLoop) context.Context {
+	if loop != nil {
+		if config := loop.GetConfig(); config != nil && config.GetContext() != nil {
+			return config.GetContext()
+		}
+	}
+	return context.Background()
 }
