@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"context"
 	"net"
 	"os"
 	"runtime"
@@ -19,6 +20,7 @@ var SystemExports = map[string]interface{}{
 	"IsUDPPortOpen":             IsUDPPortOpen,
 	"LookupHost":                lookupHost,
 	"LookupIP":                  lookupIP,
+	"LookupSystemIPWithTimeout": LookupSystemIPWithTimeout,
 	"IsTCPPortAvailable":        IsTCPPortAvailable,
 	"IsUDPPortAvailable":        IsUDPPortAvailable,
 	"GetRandomAvailableTCPPort": GetRandomAvailableTCPPort,
@@ -138,6 +140,27 @@ func lookupHost(i string) []string {
 // ```
 func lookupIP(i string) []string {
 	return netx.LookupAll(i)
+}
+
+// LookupSystemIPWithTimeout 仅使用操作系统当前配置的 DNS resolver 查询域名，
+// 并用 seconds 限制整个查询耗时。它不会在系统 DNS 返回 NXDOMAIN 后继续遍历
+// Yak 的公共 DNS fallback，因此适合探测本机 DNS/TUN 行为，且不会因外部 DNS
+// 不可达而长时间阻塞。
+func LookupSystemIPWithTimeout(host string, seconds float64) []string {
+	if seconds <= 0 {
+		seconds = 0.5
+	}
+	if seconds > 5 {
+		seconds = 5
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(seconds*float64(time.Second)))
+	defer cancel()
+
+	results, err := net.DefaultResolver.LookupHost(ctx, host)
+	if err != nil {
+		return nil
+	}
+	return results
 }
 
 // IsTCPPortOpen 检查本地TCP端口是否开放（被占用）
