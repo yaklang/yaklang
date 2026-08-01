@@ -1,15 +1,17 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils/sysproc"
 	"net"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/utils/privileged"
+	"github.com/yaklang/yaklang/common/utils/sysproc"
 )
 
 var SystemExports = map[string]interface{}{
@@ -63,9 +65,49 @@ var SystemExports = map[string]interface{}{
 	"GetLocalAddress":      GetLocalAddress,
 	"GetLocalIPv4Address":  GetLocalIPv4Address,
 	"GetLocalIPv6Address":  GetLocalIPv6Address,
+	"GetRouteInfo":         GetRouteInfo,
 
 	"NewConnectionsWatcher": sysproc.NewWatcher,
 	"NewProcessWatcher":     sysproc.NewProcessesWatcher,
+}
+
+// GetRouteInfo 返回当前系统到指定目标的实际路由信息.
+//
+// 该函数只读取内核路由表与网卡信息，不修改路由，因此不需要
+// root/Administrator 权限. 典型用途是让 Yak 脚本判断某个具体目标
+// 是否经过 utun/tun/wg 等隧道，而不是仅因为系统里存在一张隧道
+// 网卡就产生误判.
+//
+// 返回 map 固定包含 target/interface/gateway/source/error 五个键；
+// 成功时 error 为空字符串，失败时其他路由字段可能为空.
+//
+// Example:
+//
+//	os.GetRouteInfo("198.18.1.2") // {"interface":"utun4", ...}
+func GetRouteInfo(target string) map[string]string {
+	result := map[string]string{
+		"target":    target,
+		"interface": "",
+		"gateway":   "",
+		"source":    "",
+		"error":     "",
+	}
+
+	iface, gateway, source, err := netutil.Route(3*time.Second, target)
+	if err != nil {
+		result["error"] = err.Error()
+		return result
+	}
+	if iface != nil {
+		result["interface"] = iface.Name
+	}
+	if gateway != nil {
+		result["gateway"] = gateway.String()
+	}
+	if source != nil {
+		result["source"] = source.String()
+	}
+	return result
 }
 
 // LookupHost 通过DNS服务器，根据域名查找IP
