@@ -37,7 +37,7 @@ var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
 	Description: "Request completion of the current task. The first valid request starts one soft TODO checkpoint; confirm with finish again after that checkpoint to exit. " +
 		"This is the ONLY action that terminates the ReAct loop — no other action ends the task implicitly. " +
-		"PREFERRED completion action whenever evidence/results are already present in the timeline " +
+		"Use it when evidence/results are already present in the timeline and no evidence-backed, in-scope, immediately executable next action would materially improve confidence, risk coverage, or impact assessment " +
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +

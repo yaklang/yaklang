@@ -99,6 +99,11 @@ func TestFinishFirstRequestAlwaysContinuesAndQueuesCheckpoint(t *testing.T) {
 	require.Equal(t, softTodoCheckpointPrompt, checkpoint)
 	require.Contains(t, checkpoint, "单次阴性请求")
 	require.Contains(t, checkpoint, "设为 CURRENT")
+	require.Contains(t, checkpoint, "timeline 和最新 Observation")
+	require.Contains(t, checkpoint, "TODO 已清空不是任务完成的充分证据")
+	require.Contains(t, checkpoint, "仍属于当前用户目标和 CURRENT-TASK")
+	require.Contains(t, checkpoint, "预期信息增益很低")
+	require.Contains(t, checkpoint, "立即用本轮 todo_delta")
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
