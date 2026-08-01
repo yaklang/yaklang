@@ -523,6 +523,13 @@ case "bash":
 # User command starts here
 ` + command + `
 `
+
+    // Yak tool sources may be checked out with CRLF line endings. Raw string
+    // literals preserve those bytes, which makes Linux bash interpret the
+    // generated script as commands such as $'uptime\r'. Normalize both the
+    // template and user-provided command to LF before saving the script.
+    scriptContent = str.ReplaceAll(scriptContent, "\r\n", "\n")
+    scriptContent = str.ReplaceAll(scriptContent, "\r", "\n")
     
     // Create temporary script file
     scriptFile, err = file.TempFileName("ai_bash_script_*.sh")
