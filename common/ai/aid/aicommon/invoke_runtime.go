@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -9,10 +10,111 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type VerifyNextMovement struct {
-	Op      string `json:"op"`
-	Content string `json:"content,omitempty"`
-	ID      string `json:"id"`
+type TodoOutcome string
+
+const (
+	TodoOutcomeResolved  TodoOutcome = "resolved"
+	TodoOutcomeDismissed TodoOutcome = "dismissed"
+	TodoOutcomeDeferred  TodoOutcome = "deferred"
+)
+
+type TodoAdd struct {
+	ID   string `json:"id,omitempty"`
+	Text string `json:"text"`
+}
+
+type TodoUpdate struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
+type TodoClose struct {
+	ID      string      `json:"id"`
+	Outcome TodoOutcome `json:"outcome"`
+	Reason  string      `json:"reason"`
+	Refs    []string    `json:"refs,omitempty"`
+}
+
+// TodoDelta is the optional TODO increment carried by a normal ReAct action.
+// CurrentSet distinguishes an omitted current field from an explicit null or
+// empty value, which clears the current focus.
+type TodoDelta struct {
+	Current    *string      `json:"current,omitempty"`
+	CurrentSet bool         `json:"-"`
+	Add        []TodoAdd    `json:"add,omitempty"`
+	Update     []TodoUpdate `json:"update,omitempty"`
+	Close      []TodoClose  `json:"close,omitempty"`
+}
+
+// UnmarshalJSON preserves whether current was omitted, explicitly null, or a
+// string. The default decoder cannot populate CurrentSet, which would silently
+// turn an explicit focus clear into "leave focus unchanged" in stream/event
+// consumers that decode TodoDelta directly.
+func (d *TodoDelta) UnmarshalJSON(data []byte) error {
+	if d == nil {
+		return fmt.Errorf("cannot unmarshal todo_delta into nil receiver")
+	}
+	var wire struct {
+		Add    []TodoAdd    `json:"add"`
+		Update []TodoUpdate `json:"update"`
+		Close  []TodoClose  `json:"close"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*d = TodoDelta{Add: wire.Add, Update: wire.Update, Close: wire.Close}
+	currentRaw, exists := fields["current"]
+	if !exists {
+		return nil
+	}
+	d.CurrentSet = true
+	if strings.TrimSpace(string(currentRaw)) == "null" {
+		return nil
+	}
+	var current string
+	if err := json.Unmarshal(currentRaw, &current); err != nil {
+		return fmt.Errorf("todo_delta.current must be a string or null: %w", err)
+	}
+	current = strings.TrimSpace(current)
+	d.Current = &current
+	return nil
+}
+
+// MarshalJSON preserves the current field's three-state protocol in emitted
+// applied_delta payloads: omitted means unchanged, null/empty means clear.
+func (d TodoDelta) MarshalJSON() ([]byte, error) {
+	payload := make(map[string]any)
+	if d.CurrentSet {
+		if d.Current == nil {
+			payload["current"] = nil
+		} else {
+			payload["current"] = *d.Current
+		}
+	}
+	if len(d.Add) > 0 {
+		payload["add"] = d.Add
+	}
+	if len(d.Update) > 0 {
+		payload["update"] = d.Update
+	}
+	if len(d.Close) > 0 {
+		payload["close"] = d.Close
+	}
+	return json.Marshal(payload)
+}
+
+// TodoOperation is the legacy-shaped applied_ops event projection consumed by
+// existing Yakit versions. Model output never accepts this shape.
+type TodoOperation struct {
+	Op      string   `json:"op"`
+	Content string   `json:"content,omitempty"`
+	ID      string   `json:"id,omitempty"`
+	Reason  string   `json:"reason,omitempty"`
+	Refs    []string `json:"refs,omitempty"`
 }
 
 type EvidenceOperation struct {
@@ -23,12 +125,11 @@ type EvidenceOperation struct {
 
 // VerifySatisfactionResult represents the result of user satisfaction verification
 type VerifySatisfactionResult struct {
-	Satisfied          bool                 `json:"satisfied"`            // Whether the user is satisfied
-	Reasoning          string               `json:"reasoning"`            // The reasoning for the satisfaction status
-	CompletedTaskIndex string               `json:"completed_task_index"` // Index of completed task(s), e.g., "1-1" or "1-1,1-2"
-	NextMovements      []VerifyNextMovement `json:"next_movements"`       // AI's next action plan for in-progress status tracking
-	Evidence           string               `json:"evidence"`             // Legacy: markdown evidence string
-	EvidenceOps        []EvidenceOperation  `json:"evidence_ops"`         // Structured evidence incremental operations
+	Satisfied          bool                `json:"satisfied"`
+	Reasoning          string              `json:"reasoning"`
+	CompletedTaskIndex string              `json:"completed_task_index"`
+	Evidence           string              `json:"evidence"`
+	EvidenceOps        []EvidenceOperation `json:"evidence_ops"`
 }
 
 // NewVerifySatisfactionResult creates a new VerifySatisfactionResult
@@ -38,56 +139,6 @@ func NewVerifySatisfactionResult(satisfied bool, reasoning string, completedTask
 		Reasoning:          reasoning,
 		CompletedTaskIndex: completedTaskIndex,
 	}
-}
-
-// NewVerifySatisfactionResultWithNextMovements creates a new VerifySatisfactionResult with next movements
-func NewVerifySatisfactionResultWithNextMovements(satisfied bool, reasoning string, completedTaskIndex string, nextMovements []VerifyNextMovement) *VerifySatisfactionResult {
-	return &VerifySatisfactionResult{
-		Satisfied:          satisfied,
-		Reasoning:          reasoning,
-		CompletedTaskIndex: completedTaskIndex,
-		NextMovements:      nextMovements,
-	}
-}
-
-func HasNewTodoAddOps(movements []VerifyNextMovement) bool {
-	for _, m := range movements {
-		if strings.EqualFold(strings.TrimSpace(m.Op), "add") && strings.TrimSpace(m.Content) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string {
-	if len(nextMovements) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(nextMovements))
-	for _, movement := range nextMovements {
-		switch strings.ToLower(strings.TrimSpace(movement.Op)) {
-		case "add":
-			if movement.Content == "" {
-				parts = append(parts, "ADD["+movement.ID+"]")
-				continue
-			}
-			parts = append(parts, "ADD["+movement.ID+"]: "+movement.Content)
-		case "doing":
-			parts = append(parts, "DOING["+movement.ID+"]")
-		case "done":
-			parts = append(parts, "DONE["+movement.ID+"]")
-		case "delete":
-			parts = append(parts, "DELETE["+movement.ID+"]")
-		case "skip":
-			// 显式跳过 op summary, 与 done/delete 平行展示, 形成
-			// "三种主动关闭方式" (DONE/DELETE/SKIP) 的统一摘要文本.
-			// 关键词: FormatVerifyNextMovementsSummary skip 摘要
-			parts = append(parts, "SKIP["+movement.ID+"]")
-		default:
-			parts = append(parts, strings.ToUpper(movement.Op)+"["+movement.ID+"]")
-		}
-	}
-	return strings.Join(parts, "; ")
 }
 
 func FormatEvidenceOpLine(op EvidenceOperation, language string) string {

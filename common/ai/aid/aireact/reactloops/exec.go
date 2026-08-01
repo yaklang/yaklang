@@ -466,13 +466,24 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if utils.IsNil(verifier) {
 				return utils.Errorf("action[%s] verifier is nil", actionType)
 			}
-			if verifier.ActionVerifier == nil {
-				r.loadingStatus(fmt.Sprintf("动作 [%s] 验证跳过 / Action [%s] Verify Skipped", actionType, actionType))
+			if verifier.ActionVerifier != nil {
+				r.loadingStatus(fmt.Sprintf("验证动作 [%s] / Verifying Action [%s]", actionType, actionType))
+				if err := verifier.ActionVerifier(r, action); err != nil {
+					return err
+				}
+			}
+			delta, err := aicommon.NormalizeTodoDelta(action)
+			if err != nil {
+				suppressInvalidTodoDelta(r, action, err)
 				return nil
 			}
-
-			r.loadingStatus(fmt.Sprintf("验证动作 [%s] / Verifying Action [%s]", actionType, actionType))
-			return verifier.ActionVerifier(r, action)
+			if delta != nil {
+				if err := r.config.ValidateTodoDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), delta); err != nil {
+					suppressInvalidTodoDelta(r, action, err)
+					return nil
+				}
+			}
+			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
 	)
@@ -835,7 +846,7 @@ LOOP:
 			// 到达迭代上限属于"软性中断", 框架层统一按"自然结束"处理, 不再当作
 			// 硬错误 EmitReActFail. 处理步骤 (与具体 loop / 专注模式无关):
 			//  1. applyMaxIterationSoftInterrupt: 把当前任务仍活跃的 TODO 批量
-			//     标记 SKIP (待办回收) 并广播, 置位软中断标记, 记录未完成 TODO 快照,
+			//     标记 deferred (待办回收) 并广播, 置位软中断标记, 记录未完成 TODO 快照,
 			//     同时在 Timeline 落一次"退出原因=超出最大迭代 + 可回复继续"的软性说明;
 			//  2. finishIterationLoopWithError(reason=maxIterErr): 照常跑
 			//     onPostIteration hook. 各 loop 已有的 finalize 收尾总结 (loop_default
@@ -848,7 +859,7 @@ LOOP:
 			//     内部 loop 在自己的 finalize 里 IgnoreError 自管收尾时才保持静默;
 			//  3. 正常 break LOOP -> return nil -> complete(nil), 资源回收由
 			//     ExecuteWithExistedTask 的 defer r.Release() 完成.
-			// 关键词: max iteration 软性中断, 自然结束, downgrade-max-iteration-err, 待办 SKIP
+			// 关键词: max iteration 软性中断, 自然结束, downgrade-max-iteration-err, 待办 deferred
 			maxIterErr := utils.Errorf("reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
 			r.applyMaxIterationSoftInterrupt(iterationCount, task, maxIterations)
 			r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
@@ -981,12 +992,18 @@ LOOP:
 		}
 		r.GetInvoker().AddToTimeline("iteration", msg)
 
-		// 主 loop next_movements 兜底拦截: 详见 applyNextMovementsBottomLine.
+		// 主 loop todo_delta 兜底拦截: 详见 applyTodoDeltaBottomLine.
 		// 时序保证: AddToTimeline("iteration") 已完成 → 兜底 apply + emit →
 		// handler.AsyncMode check / ActionHandler 才跑. async mode reject
 		// (continue 跳出) 之前兜底也已经执行, 不会漏 apply.
-		// 关键词: 主 loop next_movements 兜底入口, 孤儿待办修复
-		applyNextMovementsBottomLine(r, task, iterationCount, actionParams)
+		// 关键词: 主 loop todo_delta 兜底入口, 孤儿待办修复
+		applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
+		// Legacy object wrappers keep ActionType()=="object" while the selected
+		// handler is finish. Reset based on the resolved handler so consecutive
+		// finish requests remain in the same soft-checkpoint flow.
+		if handler == nil || handler.ActionType != "finish" {
+			r.resetSoftTodoFinishFlow()
+		}
 
 		if handler.AsyncMode {
 			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
@@ -1174,7 +1191,7 @@ LOOP:
 
 		effectiveAsyncMode := handler.AsyncMode || operator.IsAsyncModeRequested()
 		if effectiveAsyncMode {
-			// 主循环进入 async 时, 当前任务残留的活跃 TODO 自动标记为 done,
+			// 主循环进入 async 时, 当前任务残留的活跃 TODO 自动标记为 deferred,
 			// 避免异步子任务接手后主循环 TODO 仍阻塞 finish.
 			var asyncTodoTimelineHook func(category, line string)
 			if invoker := r.GetInvoker(); invoker != nil {
@@ -1182,7 +1199,7 @@ LOOP:
 					invoker.AddToTimeline(category, line)
 				}
 			}
-			aicommon.MarkActiveTodosDoneOnAsyncHandoff(r.config, emitter, task, iterationCount, asyncTodoTimelineHook)
+			aicommon.DeferOpenTodosOnAsyncHandoff(r.config, emitter, task, iterationCount, asyncTodoTimelineHook)
 
 			if !handler.AsyncMode {
 				// dynamic async mode requested by handler at runtime
@@ -1313,15 +1330,15 @@ func (r *ReActLoop) GetMaxIterationInterruptSummary() string {
 }
 
 // applyMaxIterationSoftInterrupt 处理到达迭代上限时的"待办回收 + 软性提示":
-//  1. 读取当前任务仍处于 PENDING/DOING 的 TODO, 记录其可读快照供直接回答引用;
-//  2. 复用 ApplyVerificationNextMovementsAndEmit 单源 helper 把这些 TODO 批量
-//     标记为 SKIP (更新 store + 广播 todo_list_update + NEXT_MOVEMENTS timeline);
+//  1. 读取当前任务仍开放的 TODO, 记录其可读快照供直接回答引用;
+//  2. 复用 ApplyTodoDeltaAndEmit 把这些 TODO 批量关闭为 deferred，并记录 reason
+//     (更新 store + 广播 todo_list_update + TODO_DELTA timeline);
 //  3. 在 Timeline 追加一条软性中断说明 (非 error 类别), 只报告一次.
 //
 // 该方法只负责"回收 + 提示", 不生成直接回答 — 直接回答交给 loop 的 finalize
 // hook (见各 loop 的 WithOnPostIteraction), 以便复用每个 loop 已有的答复渲染.
 //
-// 关键词: max iteration 软性中断, 待办 SKIP 回收, 单条软提示, 复用单源 helper
+// 关键词: max iteration 软性中断, 待办 deferred 留痕, 单条软提示, 复用单源 helper
 func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aicommon.AIStatefulTask, maxIterations int) {
 	if r == nil || utils.IsNil(task) {
 		return
@@ -1351,36 +1368,26 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 		r.Set(maxIterationInterruptSummaryKey, summary)
 	}
 
-	// 把活跃 TODO 批量 SKIP: 复用与 verification / adjust_todolist / 主循环兜底
+	// 把开放 TODO 批量关闭为 deferred: 复用与 todo_delta / 主循环兜底
 	// 完全一致的单源 helper, 保证 store 更新 + todo_list_update 广播 + timeline
 	// breadcrumb 字节级对齐.
 	if cfg != nil && len(activeItems) > 0 {
-		movements := make([]aicommon.VerifyNextMovement, 0, len(activeItems))
-		for _, item := range activeItems {
-			id := strings.TrimSpace(item.ID)
-			if id == "" {
-				continue
-			}
-			movements = append(movements, aicommon.VerifyNextMovement{
-				Op: "skip",
-				ID: id,
-			})
-		}
-		if len(movements) > 0 {
+		reason := fmt.Sprintf("Reached the ReAct iteration limit (%d) after the recorded attempts; unfinished work is deferred until a later continuation.", maxIterations)
+		delta := aicommon.BuildDeferredDeltaForOpenTodos(activeItems, reason)
+		if delta != nil {
 			var timelineHook func(category, line string)
 			if invoker := r.GetInvoker(); invoker != nil {
 				timelineHook = func(category, line string) {
 					invoker.AddToTimeline(category, line)
 				}
 			}
-			aicommon.ApplyVerificationNextMovementsAndEmit(
+			aicommon.ApplyTodoDeltaAndEmit(
 				cfg,
 				r.GetEmitter(),
 				task,
 				scope,
 				iterationCount,
-				false,
-				movements,
+				delta,
 				timelineHook,
 			)
 		}
@@ -1393,7 +1400,7 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 			loopName = "general-purpose"
 		}
 		msg := fmt.Sprintf(
-			"[%v] reached iteration limit (%d); the task was softly interrupted (NOT a failure). %d unfinished TODO(s) were marked as SKIP. A direct answer will summarize what was left undone; reply \"继续\" to resume, or give a new direction.",
+			"[%v] reached iteration limit (%d); the task was softly interrupted (NOT a failure). %d unfinished TODO(s) were closed as deferred with an explicit reason. A direct answer will summarize what was left undone; reply \"继续\" to resume, or give a new direction.",
 			loopName, maxIterations, len(activeItems),
 		)
 		invoker.AddToTimeline("iteration_limit_interrupt", msg)

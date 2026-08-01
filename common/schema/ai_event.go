@@ -81,7 +81,6 @@ const (
 	AI_REACT_LOOP_ACTION_LOAD_CAPABILITY           = "load_capability"
 	AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL        = "directly_call_tool"
 	AI_REACT_LOOP_ACTION_SAVE_EVIDENCE             = "save_evidence"
-	AI_REACT_LOOP_ACTION_ADJUST_TODOLIST           = "adjust_todolist"
 	AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS         = "query_mcp_servers"
 	AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS           = "query_mcp_tools"
 	AI_REACT_LOOP_ACTION_LIST_ASYNC_TASKS          = "list_async_tasks"
@@ -255,7 +254,7 @@ const (
 	EVENT_TYPE_API_REQUEST_FAILED EventType = "api_request_failed"
 
 	// EVENT_TYPE_TODO_LIST_UPDATE emits the full structured TODO list snapshot
-	// after one verification round commits its next_movements to the shared
+	// after one normal ReAct action commits its todo_delta to the shared
 	// SessionPromptState. The frontend uses this to render a persistent TODO
 	// panel that stays visible across loop iterations (not only during Verify
 	// markdown streaming).
@@ -264,7 +263,7 @@ const (
 	//   {
 	//     "items": [
 	//       {"id":"...","content":"...","status":"PENDING|DOING|DONE|DELETED|SKIPPED",
-	//        "created_at":<int>,"updated_at":<int>}
+	//        "reason":"...","refs":["tool-call-..."],"created_at":<int>,"updated_at":<int>}
 	//     ],
 	//     "stats": {"pending":N,"doing":N,"done":N,"deleted":N,"skipped":N},
 	//     "applied_ops": [
@@ -273,7 +272,11 @@ const (
 	//     ],
 	//     "satisfied": <bool>,
 	//     "iteration_index": <int>,
-	//     "task_id": "..."
+	//     "task_id": "...",
+	//     "open_todos": [...],
+	//     "current_todo_id": "...",
+	//     "closed_todos": [...],
+	//     "applied_delta": {"add":[...],"update":[...],"close":[...],"current":"..."}
 	//   }
 	//
 	// 关键词: EVENT_TYPE_TODO_LIST_UPDATE, 全局 TODO 事件, 结构化前端通道

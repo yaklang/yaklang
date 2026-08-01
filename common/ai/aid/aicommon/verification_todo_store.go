@@ -4,15 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/ytoken"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-// VerificationTodoSnapshotLimit is the token budget for the rendered TODO snapshot.
-//
-// 关键词: VerificationTodoSnapshotLimit, TODO token 预算, 10K token
 const VerificationTodoSnapshotLimit = 10 * 1024
 
 type VerificationTodoStatus string
@@ -25,7 +22,6 @@ const (
 	VerificationTodoStatusSkipped VerificationTodoStatus = "SKIPPED"
 )
 
-// VerificationTodoStats summarizes counts of TODO items grouped by status.
 type VerificationTodoStats struct {
 	Pending int `json:"pending"`
 	Doing   int `json:"doing"`
@@ -34,8 +30,6 @@ type VerificationTodoStats struct {
 	Skipped int `json:"skipped"`
 }
 
-// VerificationTodoScope identifies which task owns a TODO item while keeping
-// the underlying store session-scoped and globally visible.
 type VerificationTodoScope struct {
 	TaskID    string `json:"task_id,omitempty"`
 	TaskIndex string `json:"task_index,omitempty"`
@@ -47,11 +41,10 @@ func (s VerificationTodoScope) normalize() VerificationTodoScope {
 	return s
 }
 
-func (s VerificationTodoScope) IsZero() bool {
-	return strings.TrimSpace(s.TaskID) == ""
-}
+func (s VerificationTodoScope) IsZero() bool { return strings.TrimSpace(s.TaskID) == "" }
 
-// VerificationTodoItem captures a single TODO entry tracked across rounds.
+// VerificationTodoItem is the compatibility projection used by existing UI
+// events. Canonical persistence uses TodoScopeState below.
 type VerificationTodoItem struct {
 	ID        string                 `json:"id"`
 	Content   string                 `json:"content"`
@@ -59,589 +52,488 @@ type VerificationTodoItem struct {
 	CreatedAt int                    `json:"created_at"`
 	UpdatedAt int                    `json:"updated_at"`
 
-	ScopeTaskID    string `json:"scope_task_id,omitempty"`
-	ScopeTaskIndex string `json:"scope_task_index,omitempty"`
+	ScopeTaskID    string      `json:"scope_task_id,omitempty"`
+	ScopeTaskIndex string      `json:"scope_task_index,omitempty"`
+	Outcome        TodoOutcome `json:"outcome,omitempty"`
+	Reason         string      `json:"reason,omitempty"`
+	Refs           []string    `json:"refs,omitempty"`
 }
 
-// VerificationTodoStore is a session-scoped TODO store maintained incrementally
-// by applying each verification round's `next_movements` ops. It replaces the
-// previous "rebuild from history" approach so the state survives prompt builds
-// without scanning the full history every time.
-//
-// 关键词: VerificationTodoStore, TODO 增量状态, ApplyOperations, Render,
-//
-//	RenderMarkdownDelta, prompt 注入, 增量持久化
+func (i VerificationTodoItem) scope() VerificationTodoScope {
+	return VerificationTodoScope{TaskID: i.ScopeTaskID, TaskIndex: i.ScopeTaskIndex}.normalize()
+}
+
+type TodoOpenItem struct {
+	ID        string `json:"id"`
+	Text      string `json:"text"`
+	CreatedAt int    `json:"created_at"`
+	UpdatedAt int    `json:"updated_at"`
+}
+
+type TodoClosedItem struct {
+	ID        string      `json:"id"`
+	Text      string      `json:"text"`
+	Outcome   TodoOutcome `json:"outcome"`
+	Reason    string      `json:"reason"`
+	Refs      []string    `json:"refs"`
+	CreatedAt int         `json:"created_at"`
+	UpdatedAt int         `json:"updated_at"`
+}
+
+type TodoScopeState struct {
+	TaskID        string            `json:"task_id,omitempty"`
+	TaskIndex     string            `json:"task_index,omitempty"`
+	OpenTodos     []*TodoOpenItem   `json:"open_todos"`
+	CurrentTodoID string            `json:"current_todo_id,omitempty"`
+	ClosedTodos   []*TodoClosedItem `json:"closed_todos"`
+	Counter       int               `json:"counter"`
+	Revision      int               `json:"revision"`
+}
+
+func (s *TodoScopeState) scope() VerificationTodoScope {
+	if s == nil {
+		return VerificationTodoScope{}
+	}
+	return VerificationTodoScope{TaskID: s.TaskID, TaskIndex: s.TaskIndex}.normalize()
+}
+
 type VerificationTodoStore struct {
-	Items   []*VerificationTodoItem `json:"items"`
-	Counter int                     `json:"counter"`
+	Scopes []*TodoScopeState `json:"scopes"`
 }
 
-// NewVerificationTodoStore returns an empty TODO store.
 func NewVerificationTodoStore() *VerificationTodoStore {
-	return &VerificationTodoStore{Items: make([]*VerificationTodoItem, 0)}
+	return &VerificationTodoStore{Scopes: make([]*TodoScopeState, 0)}
 }
 
-// IsEmpty reports whether the store has no tracked TODO items.
 func (s *VerificationTodoStore) IsEmpty() bool {
 	if s == nil {
 		return true
 	}
-	return len(s.Items) == 0
+	for _, state := range s.Scopes {
+		if state != nil && (len(state.OpenTodos) > 0 || len(state.ClosedTodos) > 0) {
+			return false
+		}
+	}
+	return true
 }
 
-// Clone returns a deep copy of the store. Useful for delta rendering without
-// mutating the live state.
 func (s *VerificationTodoStore) Clone() *VerificationTodoStore {
 	if s == nil {
 		return NewVerificationTodoStore()
 	}
-	cloned := &VerificationTodoStore{
-		Items:   make([]*VerificationTodoItem, 0, len(s.Items)),
-		Counter: s.Counter,
-	}
-	for _, item := range s.Items {
-		if item == nil {
-			continue
-		}
-		copyItem := *item
-		cloned.Items = append(cloned.Items, &copyItem)
-	}
-	return cloned
+	raw, _ := json.Marshal(s)
+	var clone VerificationTodoStore
+	_ = json.Unmarshal(raw, &clone)
+	clone.normalize()
+	return &clone
 }
 
-// VerificationTodoApplyResult reports the outcome of applying one
-// next_movements op under the supplied task scope. Applied movements and real
-// failures yield result entries so callers can render a uniform per-op summary.
-// Idempotent DOING heartbeats are intentionally omitted. When Success is false,
-// Reason carries the human-readable failure explanation.
-//
-// 关键词: VerificationTodoApplyResult, Success, per-op 结果, 方便结果输出
 type VerificationTodoApplyResult struct {
-	Movement VerifyNextMovement
-	Success  bool
-	Reason   string
+	Operation TodoOperation
+	Success   bool
+	Reason    string
+	// NoOp marks an idempotent request that was already true in the working
+	// state. A no-op does not invalidate other effective operations in the
+	// same delta. A delta made entirely of no-ops is accepted and normalized to
+	// an empty delta so callers can suppress events without retrying the model.
+	NoOp bool
+	// RolledBack distinguishes an operation that was valid on the working copy
+	// but was not committed because another operation in the same delta failed.
+	// It lets validation report the real cause instead of the rollback symptom.
+	RolledBack bool
 }
 
-// FormatVerificationTodoApplyResults renders every apply result (success and
-// failure) for timeline / feedback consumers, one line per op. Empty input
-// yields an empty string. Successful ops render as `OK <op>[<id>]`, failed
-// ops render as `FAILED <op>[<id>]: <reason>`.
 func FormatVerificationTodoApplyResults(results []VerificationTodoApplyResult) string {
-	if len(results) == 0 {
-		return ""
-	}
 	lines := make([]string, 0, len(results))
-	for _, r := range results {
-		op := strings.ToUpper(strings.TrimSpace(r.Movement.Op))
-		if op == "" {
-			op = "UNKNOWN"
-		}
-		id := strings.TrimSpace(r.Movement.ID)
-		if r.Success {
-			if id != "" {
-				lines = append(lines, fmt.Sprintf("OK %s[%s]", op, id))
-			} else {
-				lines = append(lines, fmt.Sprintf("OK %s", op))
-			}
-			continue
-		}
-		reason := strings.TrimSpace(r.Reason)
-		switch {
-		case id != "" && reason != "":
-			lines = append(lines, fmt.Sprintf("FAILED %s[%s]: %s", op, id, reason))
-		case id != "":
-			lines = append(lines, fmt.Sprintf("FAILED %s[%s]", op, id))
-		case reason != "":
-			lines = append(lines, fmt.Sprintf("FAILED %s: %s", op, reason))
-		default:
-			lines = append(lines, fmt.Sprintf("FAILED %s", op))
+	for _, result := range results {
+		label := strings.ToUpper(strings.TrimSpace(result.Operation.Op))
+		if result.Success {
+			lines = append(lines, fmt.Sprintf("OK %s[%s]", label, result.Operation.ID))
+		} else {
+			lines = append(lines, fmt.Sprintf("FAILED %s[%s]: %s", label, result.Operation.ID, result.Reason))
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
-// FormatVerificationTodoApplyErrors renders only the failed apply results for
-// the timeline [NEXT_MOVEMENTS_ERROR] category. Successful results are
-// filtered out. Empty input (or no failures) yields an empty string.
 func FormatVerificationTodoApplyErrors(results []VerificationTodoApplyResult) string {
-	if len(results) == 0 {
-		return ""
-	}
-	failed := make([]VerificationTodoApplyResult, 0, len(results))
-	for _, r := range results {
-		if !r.Success {
-			failed = append(failed, r)
+	failed := make([]VerificationTodoApplyResult, 0)
+	for _, result := range results {
+		if !result.Success {
+			failed = append(failed, result)
 		}
 	}
-	if len(failed) == 0 {
-		return ""
-	}
-	lines := make([]string, 0, len(failed))
-	for _, r := range failed {
-		op := strings.ToUpper(strings.TrimSpace(r.Movement.Op))
-		if op == "" {
-			op = "UNKNOWN"
-		}
-		id := strings.TrimSpace(r.Movement.ID)
-		reason := strings.TrimSpace(r.Reason)
-		switch {
-		case id != "" && reason != "":
-			lines = append(lines, fmt.Sprintf("FAILED %s[%s]: %s", op, id, reason))
-		case id != "":
-			lines = append(lines, fmt.Sprintf("FAILED %s[%s]", op, id))
-		case reason != "":
-			lines = append(lines, fmt.Sprintf("FAILED %s: %s", op, reason))
-		default:
-			lines = append(lines, fmt.Sprintf("FAILED %s", op))
-		}
-	}
-	return strings.Join(lines, "\n")
+	return FormatVerificationTodoApplyResults(failed)
 }
 
-// Apply incrementally updates the store with one verification round's
-// `next_movements` operations.
-//
-// 历史: 旧版本在 satisfied == true 时, 会自动把剩余 PENDING/DOING 项翻成
-// SKIPPED. 该自动翻转语义已被废弃, 原因如下:
-//  1. AI 可能在还有未关闭 TODO 的情况下错误地宣告 user_satisfied=true,
-//     自动翻转会掩盖问题, 让 verify gate 直接 Exit 主循环;
-//  2. 兜底机制 (ReAct.enforceTodoCompletionBeforeSatisfaction) 需要在
-//     Apply 之后观察"是否仍有活跃 TODO", 自动翻转会让兜底永远观察不到.
-//
-// 新语义: AI 必须通过 next_movements 显式输出 done / delete / skip 来关闭
-// 每一个 TODO. satisfied 形参保留是为了接口稳定 (DB 反序列化 + 兼容旧
-// 调用方), 但不再触发任何状态变更.
-//
-// 无法应用的 op (跨作用域修改、缺失 id/content、未知 op 等) 会以 Success=false
-// 的结果条目返回, 由上层写入 timeline 的 [NEXT_MOVEMENTS_ERROR] 类别, 不再静默
-// 吞掉. 成功应用的 op 以 Success=true 的结果条目返回, 让调用方可以做统一的
-// per-op 结果输出 (见 FormatVerificationTodoApplyResults).
-//
-// 冗余更新通常视为失败: 当一个 op 应用前后 TODO 的状态 (status / content) 完全
-// 不变时, 视为冗余更新, 返回 Success=false 并给出 "redundant <op>: ..." 的
-// Reason, 不推进 UpdatedAt. 典型场景: 重复 add 同 id 同 content 的 PENDING
-// 任务、对已经 DONE 的 TODO 再次 done、对已经 DELETED / SKIPPED 的 TODO 再次
-// delete / skip. 唯一例外是重复 doing/pending: 它只是无害的进行中状态心跳,
-// Apply 会静默丢弃, 不生成成功或失败噪声.
-//
-// 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip, per-op 结果, redundant doing 静默
-func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
-	if s == nil {
+// ApplyTodoDelta validates and atomically applies add -> update -> close ->
+// current. The input delta is updated with generated IDs for event emission.
+func (s *VerificationTodoStore) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
+	if s == nil || delta == nil {
 		return nil
 	}
-	_ = satisfied // 保留形参; 语义见上方注释, 不再触发自动翻转
-	s.Counter++
-	roundIndex := s.Counter
-	scope = scope.normalize()
+	if err := delta.ValidateShape(); err != nil {
+		return []VerificationTodoApplyResult{{Operation: TodoOperation{Op: "validate"}, Reason: err.Error()}}
+	}
+	working := s.Clone()
+	workingDelta := cloneTodoDelta(delta)
+	results := working.applyTodoDelta(scope, workingDelta)
+	causes := todoDeltaFailureCauses(results)
+	if len(causes) > 0 {
+		cause := strings.Join(causes, "; ")
+		for index := range results {
+			if results[index].Success {
+				results[index].Success = false
+				results[index].RolledBack = true
+				results[index].Reason = "valid operation was rolled back atomically because " + cause
+			}
+		}
+		return results
+	}
+	effectiveDelta := todoDeltaWithoutNoOps(workingDelta, results)
+	if effectiveDelta == nil || !effectiveDelta.HasChanges() {
+		// Idempotent model output is valid. Real models occasionally repeat the
+		// already-current focus or an unchanged TODO text even though the prompt
+		// asks them to omit no-op deltas. Treating that as a validation failure
+		// retries the entire AI transaction without improving state.
+		//
+		// Mutate the caller-visible delta to an empty normalized delta so the
+		// shared apply/emit path can silently suppress snapshots, breadcrumbs and
+		// reason streams. Invalid operations still return through the atomic
+		// failure branch above.
+		*delta = TodoDelta{}
+		return results
+	}
+	s.Scopes = working.Scopes
+	*delta = *effectiveDelta
+	return results
+}
 
-	results := make([]VerificationTodoApplyResult, 0, len(movements))
-	for _, movement := range movements {
-		id := strings.TrimSpace(movement.ID)
-		if id == "" {
-			results = append(results, todoApplyFailure(movement, "missing id"))
+// todoDeltaWithoutNoOps keeps applied_delta and the compatibility operation
+// stream truthful: idempotent fields accepted for robustness are not emitted
+// as if they changed state.
+func todoDeltaWithoutNoOps(delta *TodoDelta, results []VerificationTodoApplyResult) *TodoDelta {
+	if delta == nil {
+		return nil
+	}
+	effective := &TodoDelta{}
+	resultIndex := 0
+	for _, item := range delta.Add {
+		if resultIndex < len(results) && !results[resultIndex].NoOp {
+			effective.Add = append(effective.Add, item)
+		}
+		resultIndex++
+	}
+	for _, item := range delta.Update {
+		if resultIndex < len(results) && !results[resultIndex].NoOp {
+			effective.Update = append(effective.Update, item)
+		}
+		resultIndex++
+	}
+	for _, item := range delta.Close {
+		if resultIndex < len(results) && !results[resultIndex].NoOp {
+			effective.Close = append(effective.Close, item)
+		}
+		resultIndex++
+	}
+	if delta.CurrentSet && resultIndex < len(results) && !results[resultIndex].NoOp {
+		effective.CurrentSet = true
+		if delta.Current != nil {
+			current := *delta.Current
+			effective.Current = &current
+		}
+	}
+	return effective
+}
+
+func todoDeltaFailureCauses(results []VerificationTodoApplyResult) []string {
+	causes := make([]string, 0)
+	for _, result := range results {
+		if result.Success || result.RolledBack {
 			continue
 		}
-		op := strings.ToLower(strings.TrimSpace(movement.Op))
-		var result VerificationTodoApplyResult
-		switch op {
-		case "add":
-			result = s.applyAdd(movement, scope, id, roundIndex)
-		case "doing", "pending":
-			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDoing, true, roundIndex)
-			// Reasserting DOING without changing content is an idempotent heartbeat,
-			// not a failed movement. Drop it entirely so it produces neither
-			// `FAILED DOING[...]` nor an equally-unhelpful success line.
-			if !result.Success && result.Reason == redundantTodoMutationReason(VerificationTodoStatusDoing) {
-				continue
-			}
-		case "done":
-			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDone, false, roundIndex)
-		case "delete":
-			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDeleted, true, roundIndex)
-		case "skip":
-			// 显式跳过: AI 主动声明"这个 TODO 暂不做, 但也不算删除".
-			// 与 delete 的区别在于语义层面 — delete 表示"不再需要", skip 表
-			// 示"本次任务范围内不做". 状态上都是终态, 不再算 active TODO.
-			// 关键词: 显式 skip op, 主动跳过, 终态状态
-			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusSkipped, true, roundIndex)
-		default:
-			result = todoApplyFailure(movement, fmt.Sprintf("unsupported op %q; allowed: add, doing, pending, done, delete, skip", op))
+		operation := strings.ToUpper(strings.TrimSpace(result.Operation.Op))
+		if operation == "" {
+			operation = "OPERATION"
 		}
-		results = append(results, result)
+		id := strings.TrimSpace(result.Operation.ID)
+		if id == "" {
+			causes = append(causes, fmt.Sprintf("%s: %s", operation, result.Reason))
+		} else {
+			causes = append(causes, fmt.Sprintf("%s[%s]: %s", operation, id, result.Reason))
+		}
+	}
+	return causes
+}
+
+func FormatTodoDeltaValidationError(results []VerificationTodoApplyResult) string {
+	return strings.Join(todoDeltaFailureCauses(results), "; ")
+}
+
+func cloneTodoDelta(delta *TodoDelta) *TodoDelta {
+	if delta == nil {
+		return nil
+	}
+	copyDelta := *delta
+	copyDelta.Add = append([]TodoAdd(nil), delta.Add...)
+	copyDelta.Update = append([]TodoUpdate(nil), delta.Update...)
+	copyDelta.Close = append([]TodoClose(nil), delta.Close...)
+	for index := range copyDelta.Close {
+		copyDelta.Close[index].Refs = append([]string(nil), delta.Close[index].Refs...)
+	}
+	if delta.Current != nil {
+		value := *delta.Current
+		copyDelta.Current = &value
+	}
+	return &copyDelta
+}
+
+func (s *VerificationTodoStore) applyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
+	state := s.ensureScope(scope)
+	state.Revision++
+	revision := state.Revision
+	results := make([]VerificationTodoApplyResult, 0, len(delta.Add)+len(delta.Update)+len(delta.Close)+1)
+	generatedAddIDs := make(map[string]struct{})
+	for index := range delta.Add {
+		item := &delta.Add[index]
+		if item.ID == "" {
+			item.ID = state.nextID()
+			generatedAddIDs[item.ID] = struct{}{}
+		}
+		operation := TodoOperation{Op: "add", ID: item.ID, Content: item.Text}
+		if open := state.findOpen(item.ID); open != nil {
+			if strings.TrimSpace(open.Text) == strings.TrimSpace(item.Text) {
+				results = append(results, todoDeltaNoOp(operation, "identical open todo already exists"))
+			} else {
+				results = append(results, todoDeltaFailure(operation, "todo id already exists as an open item with different text; use todo_delta.update instead"))
+			}
+			continue
+		}
+		if state.findClosed(item.ID) != nil {
+			results = append(results, todoDeltaFailure(operation, "todo id already exists as closed history and cannot be reopened"))
+			continue
+		}
+		state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Text, CreatedAt: revision, UpdatedAt: revision})
+		results = append(results, todoDeltaSuccess(operation))
+	}
+	for _, item := range delta.Update {
+		operation := TodoOperation{Op: "update", ID: item.ID, Content: item.Text}
+		open := state.findOpen(item.ID)
+		if open == nil {
+			results = append(results, todoDeltaFailure(operation, "todo is not open in current task scope; open todo ids: "+state.openIDSummary()))
+			continue
+		}
+		if open.Text == item.Text {
+			results = append(results, todoDeltaNoOp(operation, "todo text is already unchanged"))
+			continue
+		}
+		open.Text, open.UpdatedAt = item.Text, revision
+		results = append(results, todoDeltaSuccess(operation))
+	}
+	for _, item := range delta.Close {
+		operation := TodoOperation{Op: string(item.Outcome), ID: item.ID, Reason: item.Reason, Refs: append([]string(nil), item.Refs...)}
+		openIndex, open := state.openIndex(item.ID)
+		if open == nil {
+			results = append(results, todoDeltaFailure(operation, "todo is not open in current task scope; open todo ids: "+state.openIDSummary()))
+			continue
+		}
+		state.OpenTodos = append(state.OpenTodos[:openIndex], state.OpenTodos[openIndex+1:]...)
+		state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{
+			ID: open.ID, Text: open.Text, Outcome: item.Outcome, Reason: item.Reason,
+			Refs: append([]string(nil), item.Refs...), CreatedAt: open.CreatedAt, UpdatedAt: revision,
+		})
+		if state.CurrentTodoID == item.ID {
+			state.CurrentTodoID = ""
+		}
+		results = append(results, todoDeltaSuccess(operation))
+	}
+	if delta.CurrentSet {
+		current := ""
+		if delta.Current != nil {
+			current = strings.TrimSpace(*delta.Current)
+		}
+		operation := TodoOperation{Op: "current", ID: current}
+		if _, generatedThisRound := generatedAddIDs[current]; current != "" && generatedThisRound {
+			results = append(results, todoDeltaFailure(operation, "same-round current requires an explicit todo_delta.add.id; generated IDs cannot be referenced by prediction"))
+		} else if current != "" && state.findOpen(current) == nil {
+			results = append(results, todoDeltaFailure(operation, "current must reference an open TODO in the current task scope after add/update/close are applied; open todo ids: "+state.openIDSummary()))
+		} else if state.CurrentTodoID == current {
+			results = append(results, todoDeltaNoOp(operation, "current focus already matches"))
+		} else {
+			state.CurrentTodoID = current
+			results = append(results, todoDeltaSuccess(operation))
+		}
 	}
 	return results
 }
 
-// todoApplySuccess / todoApplyFailure are the two constructors for the per-op
-// result entries recorded by Apply. Centralizing them keeps the apply branches
-// one line each.
-func todoApplySuccess(movement VerifyNextMovement) VerificationTodoApplyResult {
-	return VerificationTodoApplyResult{Movement: movement, Success: true}
+func (s *TodoScopeState) openIDSummary() string {
+	if s == nil || len(s.OpenTodos) == 0 {
+		return "[]"
+	}
+	ids := make([]string, 0, len(s.OpenTodos))
+	for _, item := range s.OpenTodos {
+		if item != nil && strings.TrimSpace(item.ID) != "" {
+			ids = append(ids, item.ID)
+		}
+	}
+	return "[" + strings.Join(ids, ", ") + "]"
 }
 
-func todoApplyFailure(movement VerifyNextMovement, reason string) VerificationTodoApplyResult {
-	return VerificationTodoApplyResult{Movement: movement, Success: false, Reason: reason}
+func todoDeltaSuccess(operation TodoOperation) VerificationTodoApplyResult {
+	return VerificationTodoApplyResult{Operation: operation, Success: true}
 }
 
-// redundantTodoMutationReason renders the "redundant <op>: todo already <state>"
-// message for a mutation that would leave status / content unchanged. The op
-// label is derived from the target status so doing/pending both report "doing".
-func redundantTodoMutationReason(target VerificationTodoStatus) string {
-	op, suffix := "doing", "doing"
-	switch target {
-	case VerificationTodoStatusDone:
-		op, suffix = "done", "done"
-	case VerificationTodoStatusDeleted:
-		op, suffix = "delete", "deleted"
-	case VerificationTodoStatusSkipped:
-		op, suffix = "skip", "skipped"
-	}
-	return fmt.Sprintf("redundant %s: todo already %s", op, suffix)
+func todoDeltaNoOp(operation TodoOperation, reason string) VerificationTodoApplyResult {
+	return VerificationTodoApplyResult{Operation: operation, Success: true, Reason: reason, NoOp: true}
 }
 
-// applyAdd handles the "add" op. A missing item creates a fresh PENDING entry;
-// an existing same-id PENDING item with unchanged content is a redundant add
-// (failure); otherwise the content is (re)set to PENDING.
-func (s *VerificationTodoStore) applyAdd(movement VerifyNextMovement, scope VerificationTodoScope, id string, roundIndex int) VerificationTodoApplyResult {
-	content := strings.TrimSpace(movement.Content)
-	if content == "" {
-		return todoApplyFailure(movement, "add requires non-empty content")
-	}
-	item := s.findExactScopedItem(scope, id)
-	if item == nil {
-		item = &VerificationTodoItem{ID: id, CreatedAt: roundIndex}
-		item.applyScope(scope)
-		item.Content = content
-		item.Status = VerificationTodoStatusPending
-		item.UpdatedAt = roundIndex
-		s.Items = append(s.Items, item)
-		return todoApplySuccess(movement)
-	}
-	// 冗余 add: 同作用域下已存在相同 id 的 PENDING TODO 且 content 不变 → 失败.
-	// 关键词: 冗余 add, 重复添加相同任务, 状态未变即失败
-	if item.Status == VerificationTodoStatusPending && item.Content == content {
-		return todoApplyFailure(movement, "redundant add: todo already pending with same content")
-	}
-	item.Content = content
-	item.Status = VerificationTodoStatusPending
-	item.UpdatedAt = roundIndex
-	return todoApplySuccess(movement)
+func todoDeltaFailure(operation TodoOperation, reason string) VerificationTodoApplyResult {
+	return VerificationTodoApplyResult{Operation: operation, Reason: reason}
 }
 
-// applyStatusMutation is the shared path for doing/pending/done/delete/skip.
-// It looks the item up under scope, rejects redundant (no-op) transitions,
-// optionally applies a content override (only when allowContent is true; done
-// never carries content), then stamps the target status + UpdatedAt.
-func (s *VerificationTodoStore) applyStatusMutation(
-	movement VerifyNextMovement,
-	scope VerificationTodoScope,
-	id string,
-	target VerificationTodoStatus,
-	allowContent bool,
-	roundIndex int,
-) VerificationTodoApplyResult {
-	item := s.findItemForMutation(scope, id)
-	if item == nil {
-		return todoApplyFailure(movement, s.mutationFailureReason(scope, id))
-	}
-	newContent := strings.TrimSpace(movement.Content)
-	contentUnchanged := !allowContent || newContent == "" || newContent == item.Content
-	// 冗余: 目标状态已是 target 且 content 未变更 → 失败, 不推进 UpdatedAt.
-	// 关键词: 冗余 doing/done/delete/skip, 空转轮次识别
-	if item.Status == target && contentUnchanged {
-		return todoApplyFailure(movement, redundantTodoMutationReason(target))
-	}
-	item.claimLegacyScope(scope)
-	if allowContent && newContent != "" {
-		item.Content = newContent
-	}
-	item.Status = target
-	item.UpdatedAt = roundIndex
-	resultMovement := movement
-	if resultMovement.Content == "" {
-		resultMovement.Content = item.Content
-	}
-	return todoApplySuccess(resultMovement)
-}
-
-func (i *VerificationTodoItem) scope() VerificationTodoScope {
-	if i == nil {
-		return VerificationTodoScope{}
-	}
-	return VerificationTodoScope{
-		TaskID:    i.ScopeTaskID,
-		TaskIndex: i.ScopeTaskIndex,
-	}.normalize()
-}
-
-func (i *VerificationTodoItem) matchesScope(scope VerificationTodoScope) bool {
-	if i == nil {
-		return false
-	}
+func (s *VerificationTodoStore) ensureScope(scope VerificationTodoScope) *TodoScopeState {
 	scope = scope.normalize()
-	if scope.IsZero() {
-		return strings.TrimSpace(i.ScopeTaskID) == ""
+	for _, state := range s.Scopes {
+		if state != nil && state.TaskID == scope.TaskID {
+			if state.TaskIndex == "" {
+				state.TaskIndex = scope.TaskIndex
+			}
+			return state
+		}
 	}
-	return strings.TrimSpace(i.ScopeTaskID) == scope.TaskID
+	state := &TodoScopeState{TaskID: scope.TaskID, TaskIndex: scope.TaskIndex, OpenTodos: make([]*TodoOpenItem, 0), ClosedTodos: make([]*TodoClosedItem, 0)}
+	s.Scopes = append(s.Scopes, state)
+	return state
 }
 
-func (i *VerificationTodoItem) isLegacyScope() bool {
-	return i != nil && strings.TrimSpace(i.ScopeTaskID) == ""
-}
-
-func (i *VerificationTodoItem) applyScope(scope VerificationTodoScope) {
-	if i == nil {
-		return
-	}
-	scope = scope.normalize()
-	if scope.IsZero() {
-		return
-	}
-	i.ScopeTaskID = scope.TaskID
-	i.ScopeTaskIndex = scope.TaskIndex
-}
-
-func (i *VerificationTodoItem) claimLegacyScope(scope VerificationTodoScope) {
-	if i == nil || !i.isLegacyScope() {
-		return
-	}
-	i.applyScope(scope)
-}
-
-func verificationTodoIdentityKey(scope VerificationTodoScope, id string) string {
-	scope = scope.normalize()
-	return scope.TaskID + "\x00" + strings.TrimSpace(id)
-}
-
-func (s *VerificationTodoStore) findExactScopedItem(scope VerificationTodoScope, id string) *VerificationTodoItem {
+func (s *VerificationTodoStore) findScope(scope VerificationTodoScope) *TodoScopeState {
 	if s == nil {
 		return nil
 	}
 	scope = scope.normalize()
-	id = strings.TrimSpace(id)
-	for _, item := range s.Items {
-		if item != nil && strings.TrimSpace(item.ID) == id && item.matchesScope(scope) {
+	for _, state := range s.Scopes {
+		if state != nil && state.TaskID == scope.TaskID {
+			return state
+		}
+	}
+	return nil
+}
+
+func (s *TodoScopeState) nextID() string {
+	for {
+		s.Counter++
+		id := "todo-" + strconv.Itoa(s.Counter)
+		if s.findOpen(id) == nil && s.findClosed(id) == nil {
+			return id
+		}
+	}
+}
+
+func (s *TodoScopeState) findOpen(id string) *TodoOpenItem {
+	_, item := s.openIndex(id)
+	return item
+}
+
+func (s *TodoScopeState) openIndex(id string) (int, *TodoOpenItem) {
+	for index, item := range s.OpenTodos {
+		if item != nil && item.ID == strings.TrimSpace(id) {
+			return index, item
+		}
+	}
+	return -1, nil
+}
+
+func (s *TodoScopeState) findClosed(id string) *TodoClosedItem {
+	for _, item := range s.ClosedTodos {
+		if item != nil && item.ID == strings.TrimSpace(id) {
 			return item
 		}
 	}
 	return nil
 }
 
-func (s *VerificationTodoStore) findLegacyItem(id string) *VerificationTodoItem {
-	if s == nil {
-		return nil
-	}
-	id = strings.TrimSpace(id)
-	for _, item := range s.Items {
-		if item != nil && item.isLegacyScope() && strings.TrimSpace(item.ID) == id {
-			return item
-		}
-	}
-	return nil
-}
-
-func (s *VerificationTodoStore) findItemForMutation(scope VerificationTodoScope, id string) *VerificationTodoItem {
-	if s == nil {
-		return nil
-	}
-	scope = scope.normalize()
-	if item := s.findExactScopedItem(scope, id); item != nil {
-		return item
-	}
-	if scope.IsZero() {
-		return nil
-	}
-	return s.findLegacyItem(id)
-}
-
-func (s *VerificationTodoStore) findItemByID(id string) *VerificationTodoItem {
-	if s == nil {
-		return nil
-	}
-	id = strings.TrimSpace(id)
-	for _, item := range s.Items {
-		if item != nil && strings.TrimSpace(item.ID) == id {
-			return item
-		}
-	}
-	return nil
-}
-
-func (s *VerificationTodoStore) mutationFailureReason(scope VerificationTodoScope, id string) string {
-	scope = scope.normalize()
-	item := s.findItemByID(id)
-	if item == nil {
-		return "todo not found"
-	}
-	if !item.matchesScope(scope) && !item.isLegacyScope() {
-		itemScope := item.scope()
-		return fmt.Sprintf(
-			"todo belongs to another task scope (task_id=%s, task_index=%s), cannot mutate from current scope (task_id=%s, task_index=%s)",
-			itemScope.TaskID, itemScope.TaskIndex, scope.TaskID, scope.TaskIndex,
-		)
-	}
-	if scope.IsZero() {
-		return "todo not found"
-	}
-	return fmt.Sprintf(
-		"todo not found in current task scope (task_id=%s, task_index=%s)",
-		scope.TaskID, scope.TaskIndex,
-	)
-}
-
-// SnapshotItems returns a deep-copied slice of the current items, safe for
-// callers to mutate or serialize.
 func (s *VerificationTodoStore) SnapshotItems() []VerificationTodoItem {
 	if s == nil {
 		return nil
 	}
-	out := make([]VerificationTodoItem, 0, len(s.Items))
-	for _, item := range s.Items {
-		if item == nil {
-			continue
-		}
-		out = append(out, *item)
+	var items []VerificationTodoItem
+	for _, state := range s.Scopes {
+		items = append(items, projectScope(state)...)
 	}
-	return out
+	return items
 }
 
-// SnapshotItemsByScope returns a deep-copied slice of items belonging to the
-// given task scope. Legacy unscoped items are only returned when scope is zero.
 func (s *VerificationTodoStore) SnapshotItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
-	if s == nil {
-		return nil
-	}
-	scope = scope.normalize()
-	out := make([]VerificationTodoItem, 0)
-	for _, item := range s.Items {
-		if item == nil || !item.matchesScope(scope) {
-			continue
-		}
-		out = append(out, *item)
-	}
-	return out
+	return projectScope(s.findScope(scope))
 }
 
-// HasActiveTodos reports whether the store still tracks any PENDING or DOING
-// item. This is the primary signal consumed by the Satisfied bottom-line
-// override: when the AI declares user_satisfied=true while
-// HasActiveTodos() == true, the verification result is rolled back to
-// user_satisfied=false so the loop keeps pushing on the unfinished TODOs.
-//
-// 关键词: HasActiveTodos, Satisfied 兜底信号, 仍有未关闭 TODO 检测
+func projectScope(state *TodoScopeState) []VerificationTodoItem {
+	if state == nil {
+		return nil
+	}
+	items := make([]VerificationTodoItem, 0, len(state.OpenTodos)+len(state.ClosedTodos))
+	for _, item := range state.OpenTodos {
+		if item == nil {
+			continue
+		}
+		status := VerificationTodoStatusPending
+		if item.ID == state.CurrentTodoID {
+			status = VerificationTodoStatusDoing
+		}
+		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex})
+	}
+	for _, item := range state.ClosedTodos {
+		if item == nil {
+			continue
+		}
+		status := map[TodoOutcome]VerificationTodoStatus{TodoOutcomeResolved: VerificationTodoStatusDone, TodoOutcomeDismissed: VerificationTodoStatusDeleted, TodoOutcomeDeferred: VerificationTodoStatusSkipped}[item.Outcome]
+		items = append(items, VerificationTodoItem{ID: item.ID, Content: item.Text, Status: status, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, ScopeTaskID: state.TaskID, ScopeTaskIndex: state.TaskIndex, Outcome: item.Outcome, Reason: item.Reason, Refs: append([]string(nil), item.Refs...)})
+	}
+	return items
+}
+
 func (s *VerificationTodoStore) HasActiveTodos() bool {
-	if s == nil {
-		return false
-	}
-	for _, item := range s.Items {
-		if item == nil {
-			continue
-		}
-		if item.Status == VerificationTodoStatusPending || item.Status == VerificationTodoStatusDoing {
+	for _, state := range s.Scopes {
+		if state != nil && len(state.OpenTodos) > 0 {
 			return true
 		}
 	}
 	return false
 }
 
-// HasActiveTodosByScope reports whether the given task scope still owns any
-// PENDING/DOING items. Legacy unscoped items do not block scoped queries.
 func (s *VerificationTodoStore) HasActiveTodosByScope(scope VerificationTodoScope) bool {
-	if s == nil {
-		return false
-	}
-	for _, item := range s.Items {
-		if item == nil || !item.matchesScope(scope) {
-			continue
-		}
-		if item.Status == VerificationTodoStatusPending || item.Status == VerificationTodoStatusDoing {
-			return true
-		}
-	}
-	return false
+	state := s.findScope(scope)
+	return state != nil && len(state.OpenTodos) > 0
 }
 
-// ActiveTodoItems returns a deep-copied snapshot containing only PENDING /
-// DOING items in their original ordering. Used by the Satisfied bottom-line
-// override to build a human-readable "remaining TODOs" report for the
-// timeline breadcrumb pushed to the AI.
-//
-// 关键词: ActiveTodoItems, 残留 TODO 快照, Satisfied 兜底 timeline 输入
 func (s *VerificationTodoStore) ActiveTodoItems() []VerificationTodoItem {
-	if s == nil {
-		return nil
-	}
-	out := make([]VerificationTodoItem, 0)
-	for _, item := range s.Items {
-		if item == nil {
-			continue
-		}
-		if item.Status != VerificationTodoStatusPending && item.Status != VerificationTodoStatusDoing {
-			continue
-		}
-		out = append(out, *item)
-	}
-	return out
+	items := s.SnapshotItems()
+	return filterOpenProjection(items)
 }
 
-// ActiveTodoItemsByScope returns only active TODOs owned by the given task
-// scope. Legacy items are intentionally excluded from scoped queries so old
-// session data does not block unrelated current tasks.
 func (s *VerificationTodoStore) ActiveTodoItemsByScope(scope VerificationTodoScope) []VerificationTodoItem {
-	if s == nil {
-		return nil
-	}
-	scope = scope.normalize()
-	out := make([]VerificationTodoItem, 0)
-	for _, item := range s.Items {
-		if item == nil || !item.matchesScope(scope) {
-			continue
+	return filterOpenProjection(s.SnapshotItemsByScope(scope))
+}
+
+func filterOpenProjection(items []VerificationTodoItem) []VerificationTodoItem {
+	out := make([]VerificationTodoItem, 0, len(items))
+	for _, item := range items {
+		if item.Status == VerificationTodoStatusPending || item.Status == VerificationTodoStatusDoing {
+			out = append(out, item)
 		}
-		if item.Status != VerificationTodoStatusPending && item.Status != VerificationTodoStatusDoing {
-			continue
-		}
-		out = append(out, *item)
 	}
 	return out
 }
 
-// Stats returns counts grouped by status.
-func (s *VerificationTodoStore) Stats() VerificationTodoStats {
-	stats := VerificationTodoStats{}
-	if s == nil {
-		return stats
-	}
-	for _, item := range s.Items {
-		if item == nil {
-			continue
-		}
-		switch item.Status {
-		case VerificationTodoStatusPending:
-			stats.Pending++
-		case VerificationTodoStatusDoing:
-			stats.Doing++
-		case VerificationTodoStatusDone:
-			stats.Done++
-		case VerificationTodoStatusDeleted:
-			stats.Deleted++
-		case VerificationTodoStatusSkipped:
-			stats.Skipped++
-		}
-	}
-	return stats
-}
-
-// StatsByScope returns counts grouped by status for a single task scope.
+func (s *VerificationTodoStore) Stats() VerificationTodoStats { return statsFor(s.SnapshotItems()) }
 func (s *VerificationTodoStore) StatsByScope(scope VerificationTodoScope) VerificationTodoStats {
-	stats := VerificationTodoStats{}
-	if s == nil {
-		return stats
-	}
-	scope = scope.normalize()
-	for _, item := range s.Items {
-		if item == nil || !item.matchesScope(scope) {
-			continue
-		}
+	return statsFor(s.SnapshotItemsByScope(scope))
+}
+
+func statsFor(items []VerificationTodoItem) VerificationTodoStats {
+	var stats VerificationTodoStats
+	for _, item := range items {
 		switch item.Status {
 		case VerificationTodoStatusPending:
 			stats.Pending++
@@ -658,491 +550,229 @@ func (s *VerificationTodoStore) StatsByScope(scope VerificationTodoScope) Verifi
 	return stats
 }
 
-// Render returns a plain-text snapshot of TODO items, suitable for the prompt
-// TODO block. Active items (doing/pending) are listed first, followed by
-// closed items (done/deleted/skipped). Output is capped at
-// VerificationTodoSnapshotLimit tokens and truncated when necessary.
-func (s *VerificationTodoStore) Render() string {
-	if s == nil || len(s.Items) == 0 {
-		return "- no tracked TODO items"
+func (s *VerificationTodoStore) CanonicalSnapshot(scope VerificationTodoScope) (open []TodoOpenItem, current string, closed []TodoClosedItem) {
+	state := s.findScope(scope)
+	if state == nil {
+		return []TodoOpenItem{}, "", []TodoClosedItem{}
 	}
-	active, closed := splitVerificationTodoPromptItems(s.SnapshotItems())
-	lines := renderVerificationTodoActiveLines(active)
-	lines = append(lines, renderVerificationTodoClosedSummaryLines(closed)...)
-	return truncateVerificationTodoLines(lines)
+	for _, item := range state.OpenTodos {
+		if item != nil {
+			open = append(open, *item)
+		}
+	}
+	for _, item := range state.ClosedTodos {
+		if item != nil {
+			copyItem := *item
+			copyItem.Refs = append([]string(nil), item.Refs...)
+			closed = append(closed, copyItem)
+		}
+	}
+	return open, state.CurrentTodoID, closed
 }
 
-// RenderWithCurrentScope renders the session TODO snapshot grouped by task
-// ownership. When currentScope is zero the output matches Render(). Otherwise
-// items are split into a CURRENT TASK section (mutable by the model) and an
-// OTHER TASKS section (read-only context from sibling or finished tasks).
-//
-// 关键词: RenderWithCurrentScope, 当前任务 vs 其它任务, prompt 分组渲染
-func (s *VerificationTodoStore) RenderWithCurrentScope(currentScope VerificationTodoScope) string {
-	if s == nil || len(s.Items) == 0 {
+func (s *VerificationTodoStore) Render() string {
+	return renderTodoItems(s.SnapshotItems(), VerificationTodoScope{})
+}
+
+func (s *VerificationTodoStore) RenderWithCurrentScope(scope VerificationTodoScope) string {
+	if s == nil || s.IsEmpty() {
 		return "- no tracked TODO items"
 	}
-	currentScope = currentScope.normalize()
-	if currentScope.IsZero() {
-		return s.Render()
-	}
-
-	currentItems := make([]VerificationTodoItem, 0)
-	otherItems := make([]VerificationTodoItem, 0)
-	for _, item := range s.Items {
-		if item == nil {
-			continue
-		}
-		copyItem := *item
-		if item.matchesScope(currentScope) {
-			currentItems = append(currentItems, copyItem)
-		} else {
-			otherItems = append(otherItems, copyItem)
-		}
-	}
-
-	currentActive, currentClosed := splitVerificationTodoPromptItems(currentItems)
-	lines := make([]string, 0, len(s.Items)+12)
-	lines = append(lines, formatVerificationTodoCurrentTaskHeader(currentScope))
-	if len(currentItems) == 0 {
+	lines := []string{formatVerificationTodoCurrentTaskHeader(scope), "- TODOs are a short-term work set. Maintain only the current task section; other scopes are read-only."}
+	current := s.SnapshotItemsByScope(scope)
+	if len(current) == 0 {
 		lines = append(lines, "- (no TODO items tracked for the current task yet)")
 	} else {
-		lines = append(lines, "- You MUST advance or close ONLY the TODOs in this section via adjust_todolist / verification next_movements.")
-		if len(currentActive) == 0 {
-			lines = append(lines, "- (no active TODO items for the current task)")
-		} else {
-			lines = append(lines, renderVerificationTodoActiveLines(currentActive)...)
+		lines = append(lines, renderTodoProjection(current)...)
+	}
+	for _, state := range s.Scopes {
+		if state == nil || state.TaskID == scope.normalize().TaskID {
+			continue
 		}
+		lines = append(lines, "", "### OTHER TASK (read-only) "+formatScope(state.scope()))
+		lines = append(lines, renderTodoProjection(projectScope(state))...)
 	}
-
-	if len(otherItems) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, "### OTHER TASKS (read-only context)")
-		lines = append(lines, "- TODOs below belong to sibling or finished tasks. Do NOT mutate them; use them only as history/context.")
-		lines = append(lines, renderVerificationTodoOtherTaskActiveSections(otherItems)...)
-	}
-
-	// Closed state is useful for avoiding repeated work, but its content is not
-	// actionable. Render it only after all active TODOs so history cannot evict
-	// current work from the fixed prompt budget.
-	if len(currentClosed) > 0 {
-		lines = append(lines, "", "### CURRENT TASK CLOSED SUMMARY")
-		lines = append(lines, renderVerificationTodoClosedSummaryLines(currentClosed)...)
-	}
-	if len(otherItems) > 0 {
-		if closedLines := renderVerificationTodoOtherTaskClosedSections(otherItems); len(closedLines) > 0 {
-			lines = append(lines, "", "### OTHER TASKS CLOSED SUMMARY (read-only)")
-			lines = append(lines, closedLines...)
-		}
-	}
-
 	return truncateVerificationTodoLines(lines)
+}
+
+func renderTodoItems(items []VerificationTodoItem, scope VerificationTodoScope) string {
+	if len(items) == 0 {
+		return "- no tracked TODO items"
+	}
+	return truncateVerificationTodoLines(renderTodoProjection(items))
+}
+
+func renderTodoProjection(items []VerificationTodoItem) []string {
+	sort.SliceStable(items, func(i, j int) bool { return items[i].UpdatedAt > items[j].UpdatedAt })
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		content := strings.Join(strings.Fields(item.Content), " ")
+		switch item.Status {
+		case VerificationTodoStatusPending:
+			lines = append(lines, fmt.Sprintf("- [ ] [id: %s]: %s", item.ID, content))
+		case VerificationTodoStatusDoing:
+			lines = append(lines, fmt.Sprintf("- [CURRENT] [id: %s]: %s", item.ID, content))
+		default:
+			lines = append(lines, fmt.Sprintf("- [%s] [id: %s]: %s; reason: %s; refs: %s", item.Outcome, item.ID, content, item.Reason, strings.Join(item.Refs, ", ")))
+		}
+	}
+	return lines
 }
 
 func formatVerificationTodoCurrentTaskHeader(scope VerificationTodoScope) string {
+	return "### CURRENT TASK " + formatScope(scope)
+}
+
+func formatScope(scope VerificationTodoScope) string {
 	scope = scope.normalize()
-	switch {
-	case scope.TaskIndex != "" && scope.TaskID != "":
-		return fmt.Sprintf("### CURRENT TASK [task_index=%s, task_id=%s]", scope.TaskIndex, scope.TaskID)
-	case scope.TaskIndex != "":
-		return fmt.Sprintf("### CURRENT TASK [task_index=%s]", scope.TaskIndex)
-	default:
-		return fmt.Sprintf("### CURRENT TASK [task_id=%s]", scope.TaskID)
-	}
-}
-
-func groupVerificationTodoItemsByTask(items []VerificationTodoItem) ([]string, map[string][]VerificationTodoItem) {
-	if len(items) == 0 {
-		return nil, nil
-	}
-	grouped := make(map[string][]VerificationTodoItem)
-	order := make([]string, 0)
-	for _, item := range items {
-		key := formatVerificationTodoOtherTaskGroupKey(item)
-		if _, exists := grouped[key]; !exists {
-			order = append(order, key)
-		}
-		grouped[key] = append(grouped[key], item)
-	}
-	return order, grouped
-}
-
-func renderVerificationTodoOtherTaskActiveSections(items []VerificationTodoItem) []string {
-	order, grouped := groupVerificationTodoItemsByTask(items)
-	lines := make([]string, 0, len(items)+len(order))
-	for _, key := range order {
-		active, _ := splitVerificationTodoPromptItems(grouped[key])
-		if len(active) == 0 {
-			continue
-		}
-		lines = append(lines, "")
-		lines = append(lines, "#### "+key)
-		lines = append(lines, renderVerificationTodoActiveLines(active)...)
-	}
-	return lines
-}
-
-func renderVerificationTodoOtherTaskClosedSections(items []VerificationTodoItem) []string {
-	order, grouped := groupVerificationTodoItemsByTask(items)
-	lines := make([]string, 0, len(items)+len(order))
-	for _, key := range order {
-		_, closed := splitVerificationTodoPromptItems(grouped[key])
-		if len(closed) == 0 {
-			continue
-		}
-		lines = append(lines, "#### "+key)
-		lines = append(lines, renderVerificationTodoClosedSummaryLines(closed)...)
-	}
-	return lines
-}
-
-func formatVerificationTodoOtherTaskGroupKey(item VerificationTodoItem) string {
-	scope := item.scope().normalize()
-	switch {
-	case scope.TaskIndex != "" && scope.TaskID != "":
-		return fmt.Sprintf("task_index=%s, task_id=%s", scope.TaskIndex, scope.TaskID)
-	case scope.TaskIndex != "":
-		return fmt.Sprintf("task_index=%s", scope.TaskIndex)
-	case scope.TaskID != "":
-		return fmt.Sprintf("task_id=%s", scope.TaskID)
-	default:
-		return "unscoped legacy task"
-	}
-}
-
-func splitVerificationTodoPromptItems(items []VerificationTodoItem) (active, closed []VerificationTodoItem) {
-	active = make([]VerificationTodoItem, 0, len(items))
-	closed = make([]VerificationTodoItem, 0, len(items))
-	for _, item := range items {
-		switch item.Status {
-		case VerificationTodoStatusPending, VerificationTodoStatusDoing:
-			active = append(active, item)
-		default:
-			closed = append(closed, item)
-		}
-	}
-	sortVerificationTodoItemsRecentFirst(active)
-	sortVerificationTodoItemsRecentFirst(closed)
-	return active, closed
-}
-
-func sortVerificationTodoItemsRecentFirst(items []VerificationTodoItem) {
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].UpdatedAt != items[j].UpdatedAt {
-			return items[i].UpdatedAt > items[j].UpdatedAt
-		}
-		if items[i].CreatedAt != items[j].CreatedAt {
-			return items[i].CreatedAt > items[j].CreatedAt
-		}
-		return items[i].ID < items[j].ID
-	})
-}
-
-func renderVerificationTodoActiveLines(items []VerificationTodoItem) []string {
-	lines := make([]string, 0, len(items))
-	for _, item := range items {
-		status := "[ ]"
-		if item.Status == VerificationTodoStatusDoing {
-			status = "[DOING]"
-		}
-		content := strings.Join(strings.Fields(item.Content), " ")
-		if content == "" {
-			content = "(no content)"
-		}
-		lines = append(lines, fmt.Sprintf("- %s: [id: %s]: %s", status, item.ID, content))
-	}
-	return lines
-}
-
-const verificationTodoClosedIDsPerStatus = 64
-
-func renderVerificationTodoClosedSummaryLines(items []VerificationTodoItem) []string {
-	byStatus := map[VerificationTodoStatus][]VerificationTodoItem{}
-	for _, item := range items {
-		byStatus[item.Status] = append(byStatus[item.Status], item)
-	}
-	statuses := []VerificationTodoStatus{
-		VerificationTodoStatusDone,
-		VerificationTodoStatusDeleted,
-		VerificationTodoStatusSkipped,
-	}
-	lines := make([]string, 0, len(statuses))
-	for _, status := range statuses {
-		statusItems := byStatus[status]
-		if len(statusItems) == 0 {
-			continue
-		}
-		sortVerificationTodoItemsRecentFirst(statusItems)
-		visible := len(statusItems)
-		if visible > verificationTodoClosedIDsPerStatus {
-			visible = verificationTodoClosedIDsPerStatus
-		}
-		ids := make([]string, 0, visible)
-		for _, item := range statusItems[:visible] {
-			ids = append(ids, item.ID)
-		}
-		line := fmt.Sprintf("- %s (%d): %s", status, len(statusItems), strings.Join(ids, ", "))
-		if omitted := len(statusItems) - visible; omitted > 0 {
-			line += fmt.Sprintf("; +%d omitted", omitted)
-		}
-		lines = append(lines, line)
-	}
-	return lines
+	return fmt.Sprintf("[task_index=%s, task_id=%s]", scope.TaskIndex, scope.TaskID)
 }
 
 func truncateVerificationTodoLines(lines []string) string {
 	if len(lines) == 0 {
 		return "- no tracked TODO items"
 	}
-
-	note := "- NOTE: TODO history exceeded 10K tokens; older closed items were truncated because this ReAct chain is too long. Prioritize finishing or dropping stale TODOs."
-	if ytoken.CalcTokenCount(strings.Join(lines, "\n")) <= VerificationTodoSnapshotLimit {
-		return strings.Join(lines, "\n")
+	for len(lines) > 1 && ytoken.CalcTokenCount(strings.Join(lines, "\n")) > VerificationTodoSnapshotLimit {
+		lines = lines[:len(lines)-1]
 	}
-
-	truncated := make([]string, 0, len(lines))
-	currentTokens := 0
-	for _, line := range lines {
-		lineTokens := ytoken.CalcTokenCount(line)
-		separatorTokens := 0
-		if len(truncated) > 0 {
-			separatorTokens = 1
-		}
-		if currentTokens+separatorTokens+lineTokens > VerificationTodoSnapshotLimit-ytoken.CalcTokenCount(note)-1 {
-			break
-		}
-		truncated = append(truncated, line)
-		currentTokens += separatorTokens + lineTokens
-	}
-	truncated = append(truncated, note)
-	return strings.Join(truncated, "\n")
+	return strings.Join(lines, "\n")
 }
 
-// RenderMarkdownDelta renders the markdown snapshot for emitting to the
-// frontend after a verification round. It applies `movements` (and
-// `satisfied`) on a clone of the current state, marking items that became new
-// / doing / done / deleted / skipped during this very round.
-//
-// 与 plain Render 不同, 该输出携带 (new)/(doing)/(done)/(deleted)/(skipped)
-// 这些 marker, 让前端 markdown 通道能高亮本轮变化.
-//
-// 关键词: RenderMarkdownDelta, markdown 增量标记, frontend stream
-func (s *VerificationTodoStore) RenderMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
-	previous := s
-	if previous == nil {
-		previous = NewVerificationTodoStore()
-	}
-	scope = scope.normalize()
-	previousIDs := make(map[string]struct{}, len(previous.Items))
-	for _, item := range previous.Items {
-		if item != nil {
-			previousIDs[verificationTodoIdentityKey(item.scope(), item.ID)] = struct{}{}
-		}
-	}
+func (s *VerificationTodoStore) RenderMarkdownDelta(scope VerificationTodoScope, delta *TodoDelta) string {
+	clone := s.Clone()
+	_ = clone.ApplyTodoDelta(scope, cloneTodoDelta(delta))
+	return clone.RenderWithCurrentScope(scope)
+}
 
-	cloned := previous.Clone()
-	_ = cloned.Apply(scope, satisfied, movements)
-	if len(cloned.Items) == 0 {
+func (s *VerificationTodoStore) Marshal() string {
+	if s == nil {
 		return ""
 	}
+	s.normalize()
+	raw, err := json.Marshal(s)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
 
-	currentNewIDs := make(map[string]struct{})
-	currentDoneIDs := make(map[string]struct{})
-	currentSkippedIDs := make(map[string]struct{})
-	for _, movement := range movements {
-		id := strings.TrimSpace(movement.ID)
-		if id == "" {
+func (s *VerificationTodoStore) normalize() {
+	if s.Scopes == nil {
+		s.Scopes = make([]*TodoScopeState, 0)
+	}
+	for _, state := range s.Scopes {
+		if state == nil {
 			continue
 		}
-		identityKey := verificationTodoIdentityKey(scope, id)
-		switch strings.ToLower(strings.TrimSpace(movement.Op)) {
-		case "add":
-			if _, exists := previousIDs[identityKey]; !exists {
-				currentNewIDs[identityKey] = struct{}{}
+		state.TaskID = strings.TrimSpace(state.TaskID)
+		state.TaskIndex = strings.TrimSpace(state.TaskIndex)
+		if state.OpenTodos == nil {
+			state.OpenTodos = make([]*TodoOpenItem, 0)
+		}
+		if state.ClosedTodos == nil {
+			state.ClosedTodos = make([]*TodoClosedItem, 0)
+		}
+		if state.CurrentTodoID != "" && state.findOpen(state.CurrentTodoID) == nil {
+			state.CurrentTodoID = ""
+		}
+		for _, item := range state.OpenTodos {
+			if item != nil {
+				if number, ok := parseTodoNumber(item.ID); ok && number > state.Counter {
+					state.Counter = number
+				}
 			}
-		case "done":
-			currentDoneIDs[identityKey] = struct{}{}
-		case "skip":
-			// 本轮显式 skip 的 TODO, 在 markdown delta 中需要打上 (skipped)
-			// marker, 与 done / deleted 形成对偶的关闭信号.
-			// 关键词: RenderMarkdownDelta skip marker, 显式跳过高亮
-			currentSkippedIDs[identityKey] = struct{}{}
+		}
+		for _, item := range state.ClosedTodos {
+			if item != nil {
+				if number, ok := parseTodoNumber(item.ID); ok && number > state.Counter {
+					state.Counter = number
+				}
+			}
 		}
 	}
+}
 
-	oldPending := make([]string, 0)
-	doingItems := make([]string, 0)
-	newPending := make([]string, 0)
-	oldDone := make([]string, 0)
-	currentDone := make([]string, 0)
-	deleted := make([]string, 0)
-	oldSkipped := make([]string, 0)
-	currentSkipped := make([]string, 0)
+func UnmarshalVerificationTodoStore(data string) *VerificationTodoStore {
+	store := NewVerificationTodoStore()
+	if strings.TrimSpace(data) == "" {
+		return store
+	}
+	var envelope struct {
+		Scopes []json.RawMessage       `json:"scopes"`
+		Items  []*VerificationTodoItem `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(data), &envelope); err != nil {
+		return store
+	}
+	if len(envelope.Scopes) > 0 {
+		if err := json.Unmarshal([]byte(data), store); err == nil {
+			store.normalize()
+			return store
+		}
+	}
+	return migrateLegacyTodoItems(envelope.Items)
+}
 
-	for _, item := range cloned.Items {
+const legacyTodoReason = "Migrated from an older Yaklang session; the previous version did not record a closure reason."
+
+func migrateLegacyTodoItems(items []*VerificationTodoItem) *VerificationTodoStore {
+	store := NewVerificationTodoStore()
+	newestDoing := make(map[string]*VerificationTodoItem)
+	for _, item := range items {
+		if item == nil || item.Status != VerificationTodoStatusDoing {
+			continue
+		}
+		key := strings.TrimSpace(item.ScopeTaskID)
+		if newestDoing[key] == nil || item.UpdatedAt > newestDoing[key].UpdatedAt {
+			newestDoing[key] = item
+		}
+	}
+	for _, item := range items {
 		if item == nil {
 			continue
 		}
-		identityKey := verificationTodoIdentityKey(item.scope(), item.ID)
+		scope := VerificationTodoScope{TaskID: item.ScopeTaskID, TaskIndex: item.ScopeTaskIndex}
+		state := store.ensureScope(scope)
+		if item.UpdatedAt > state.Revision {
+			state.Revision = item.UpdatedAt
+		}
+		if number, ok := parseTodoNumber(item.ID); ok && number > state.Counter {
+			state.Counter = number
+		}
 		switch item.Status {
-		case VerificationTodoStatusPending:
-			if _, isNew := currentNewIDs[identityKey]; isNew {
-				newPending = append(newPending, FormatVerificationTodoMarkdownLine(*item, "new"))
-			} else {
-				oldPending = append(oldPending, FormatVerificationTodoMarkdownLine(*item, ""))
+		case VerificationTodoStatusPending, VerificationTodoStatusDoing:
+			state.OpenTodos = append(state.OpenTodos, &TodoOpenItem{ID: item.ID, Text: item.Content, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
+			if item.Status == VerificationTodoStatusDoing && newestDoing[state.TaskID] == item {
+				state.CurrentTodoID = item.ID
 			}
-		case VerificationTodoStatusDoing:
-			doingItems = append(doingItems, FormatVerificationTodoMarkdownLine(*item, "doing"))
-		case VerificationTodoStatusDone:
-			if _, isDone := currentDoneIDs[identityKey]; isDone {
-				currentDone = append(currentDone, FormatVerificationTodoMarkdownLine(*item, "done"))
-			} else {
-				oldDone = append(oldDone, FormatVerificationTodoMarkdownLine(*item, ""))
-			}
-		case VerificationTodoStatusDeleted:
-			deleted = append(deleted, FormatVerificationTodoMarkdownLine(*item, "deleted"))
-		case VerificationTodoStatusSkipped:
-			if _, isSkipped := currentSkippedIDs[identityKey]; isSkipped {
-				currentSkipped = append(currentSkipped, FormatVerificationTodoMarkdownLine(*item, "skipped"))
-			} else {
-				// 历史轮次已经被 skip 的 TODO 不应该每轮都带 (skipped)
-				// marker, 否则前端会把它当成"本轮新发生的变化"反复闪一下.
-				// 关键词: 历史 SKIPPED 不再高亮, 仅本轮 skip 才带 marker
-				oldSkipped = append(oldSkipped, FormatVerificationTodoMarkdownLine(*item, ""))
-			}
+		case VerificationTodoStatusDone, VerificationTodoStatusDeleted, VerificationTodoStatusSkipped:
+			outcome := map[VerificationTodoStatus]TodoOutcome{VerificationTodoStatusDone: TodoOutcomeResolved, VerificationTodoStatusDeleted: TodoOutcomeDismissed, VerificationTodoStatusSkipped: TodoOutcomeDeferred}[item.Status]
+			state.ClosedTodos = append(state.ClosedTodos, &TodoClosedItem{ID: item.ID, Text: item.Content, Outcome: outcome, Reason: legacyTodoReason, Refs: []string{}, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt})
 		}
 	}
-
-	lines := append([]string{}, doingItems...)
-	lines = append(lines, oldPending...)
-	lines = append(lines, newPending...)
-	lines = append(lines, oldDone...)
-	lines = append(lines, currentDone...)
-	lines = append(lines, deleted...)
-	lines = append(lines, oldSkipped...)
-	lines = append(lines, currentSkipped...)
-
-	note := "- [x] (truncated) TODO snapshot exceeded 10K tokens; older items were omitted to keep the view stable."
-	if ytoken.CalcTokenCount(strings.Join(lines, "\n")) <= VerificationTodoSnapshotLimit {
-		return strings.Join(lines, "\n")
-	}
-
-	truncated := make([]string, 0, len(lines))
-	currentTokens := 0
-	for _, line := range lines {
-		lineTokens := ytoken.CalcTokenCount(line)
-		separatorTokens := 0
-		if len(truncated) > 0 {
-			separatorTokens = 1
-		}
-		if currentTokens+separatorTokens+lineTokens > VerificationTodoSnapshotLimit-ytoken.CalcTokenCount(note)-1 {
-			break
-		}
-		truncated = append(truncated, line)
-		currentTokens += separatorTokens + lineTokens
-	}
-	truncated = append(truncated, note)
-	return strings.Join(truncated, "\n")
+	return store
 }
 
-// Marshal returns a JSON-encoded representation of the store, suitable for
-// persistence in SessionPromptState.
-func (s *VerificationTodoStore) Marshal() string {
-	if s == nil {
-		return `{"items":[],"counter":0}`
+func parseTodoNumber(id string) (int, bool) {
+	if !strings.HasPrefix(id, "todo-") {
+		return 0, false
 	}
-	data, err := json.Marshal(s)
-	if err != nil {
-		return `{"items":[],"counter":0}`
-	}
-	return string(data)
+	number, err := strconv.Atoi(strings.TrimPrefix(id, "todo-"))
+	return number, err == nil
 }
 
-// UnmarshalVerificationTodoStore decodes a JSON string produced by Marshal,
-// falling back to an empty store when the payload is empty or malformed.
-func UnmarshalVerificationTodoStore(data string) *VerificationTodoStore {
-	trimmed := strings.TrimSpace(data)
-	if trimmed == "" {
-		return NewVerificationTodoStore()
-	}
-	store := &VerificationTodoStore{}
-	if err := json.Unmarshal([]byte(trimmed), store); err == nil {
-		if store.Items == nil {
-			store.Items = make([]*VerificationTodoItem, 0)
-		}
-		return store
-	}
-	return NewVerificationTodoStore()
-}
-
-// FormatVerificationTodoLine renders a single item line for the prompt TODO
-// block. The format is intentionally compatible with the previous
-// `formatVerificationTodoLine` output so existing tests / prompt examples keep
-// passing.
-//
-// 关键词: FormatVerificationTodoLine, [DOING] [DELETED] [SKIPPED] [x] [ ]
 func FormatVerificationTodoLine(item VerificationTodoItem) string {
-	statusLabel := "[ ]"
-	switch item.Status {
-	case VerificationTodoStatusDoing:
-		statusLabel = "[DOING]"
-	case VerificationTodoStatusDone:
-		statusLabel = "[x]"
-	case VerificationTodoStatusDeleted:
-		statusLabel = "[DELETED]"
-	case VerificationTodoStatusSkipped:
-		statusLabel = "[SKIPPED]"
-	}
-	content := utils.ShrinkString(strings.TrimSpace(item.Content), 400)
-	if content == "" {
-		content = "(no content)"
-	}
-	return fmt.Sprintf("- %s: [id: %s]: %s", statusLabel, item.ID, content)
+	return strings.TrimPrefix(strings.Join(renderTodoProjection([]VerificationTodoItem{item}), ""), "- ")
 }
 
-// FormatVerificationTodoMarkdownLine renders a single item line for the
-// markdown stream emitted at the end of a verification round. The output
-// format matches the previous `formatVerificationTodoMarkdownLine` (delta
-// markers like (new) / (doing) / (done) / (deleted) / (skipped)).
 func FormatVerificationTodoMarkdownLine(item VerificationTodoItem, marker string) string {
-	statusLabel := "[ ]"
-	switch item.Status {
-	case VerificationTodoStatusDone, VerificationTodoStatusDeleted, VerificationTodoStatusSkipped:
-		statusLabel = "[x]"
+	line := FormatVerificationTodoLine(item)
+	if strings.TrimSpace(marker) == "" {
+		return "- " + line
 	}
-	content := SanitizeVerificationTodoMarkdownContent(item.Content)
-	if item.Status == VerificationTodoStatusDone || item.Status == VerificationTodoStatusDeleted {
-		content = "~~" + content + "~~"
-	}
-	if marker == "" && item.Status == VerificationTodoStatusDeleted {
-		marker = "deleted"
-	}
-	if marker == "" {
-		return fmt.Sprintf("- %s %s", statusLabel, content)
-	}
-	return fmt.Sprintf("- %s (%s) %s", statusLabel, marker, content)
+	return fmt.Sprintf("- **(%s)** %s", marker, line)
 }
 
-// SanitizeVerificationTodoMarkdownContent collapses line breaks / tabs / other
-// whitespace into single spaces so a single TODO item never injects extra
-// markdown bullets into the emitted stream.
-//
-// 关键词: SanitizeVerificationTodoMarkdownContent, 防 markdown 注入,
-//
-//	UnicodeLineSep U+2028, ParagraphSep U+2029 替换
 func SanitizeVerificationTodoMarkdownContent(content string) string {
-	replacer := strings.NewReplacer(
-		"\r", " ",
-		"\n", " ",
-		"\t", " ",
-		"\u2028", " ",
-		"\u2029", " ",
-	)
-	content = replacer.Replace(content)
-	content = strings.Join(strings.Fields(content), " ")
-	content = utils.ShrinkString(strings.TrimSpace(content), 400)
-	if content == "" {
-		return "(no content)"
-	}
-	return content
+	return strings.Join(strings.Fields(content), " ")
 }

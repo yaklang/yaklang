@@ -293,7 +293,6 @@ Example - Sequential file operations(With AI-Tag tags):
 					verifyResult.Satisfied,
 					verifyResult.Reasoning,
 					verifyResult.CompletedTaskIndex,
-					verifyResult.NextMovements,
 					verifyResult.Evidence,
 					verifyResult.EvidenceOps,
 				)

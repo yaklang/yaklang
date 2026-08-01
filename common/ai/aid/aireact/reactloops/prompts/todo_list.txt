@@ -2,16 +2,21 @@
 <|TODO_LIST_{{ .Nonce }}|>
 ## 待办清单（TODO）
 
-以下 TODO 由历轮 Verify / adjust_todolist 累计维护，在每一次 loop iteration 中保持可见。列表已按任务归属分组：
+以下 TODO 由正常 ReAct 动作携带的可选 todo_delta 累计维护，在每一次 loop iteration 中保持可见。列表已按任务归属分组：
 
 - **CURRENT TASK（当前任务）**：属于你正在执行的任务。你必须只在这里推进、关闭 TODO。
 - **OTHER TASKS（其它任务）**：属于已完成或并行的兄弟任务，仅供上下文参考，**不要修改**其中的 TODO。
 
 在选择下一步动作前：
 - 只操作 CURRENT TASK 区块内的 TODO
-- 优先沿 [DOING] 项继续推进，不要平行开第二条线
-- 不要重复创建已存在的 [ ] 项；只有真正新增的子目标才用 add
-- [DELETED] / [SKIPPED] 已显式放弃，不要再尝试
+- 优先沿 [CURRENT] 项继续推进；同一 CURRENT TASK 最多一个当前焦点
+- 当前任务尚无焦点且需要新增 TODO 时，为首要项显式给出 ID，并在同一轮设为 current
+- 多步骤或多维度任务应覆盖用户明确要求且仍需推进的各个独立维度，不要被最先发现的一条线索收窄整个工作集
+- 不要重复创建已存在的开放项；只有真正新增的短期问题才用 add
+- 关闭必须选择 resolved / dismissed / deferred，并留下非空 reason；close 只能依据当前动作开始前已经获得的当前任务 Observation，不能把当前动作的预期结果提前写成成果
+- reason 与 refs 是 close 对象中的同级字段，例如 `{"id":"todo-1","outcome":"resolved","reason":"实际成果","refs":["tool-call-48"]}`，不要把 refs 拼进 reason
+- 历史记忆、其它任务结论和推测只能作为待复核线索，未经当前任务重新验证不得用于 resolved；重要成果尽量填写已有工具调用或 Observation refs
+- 不要为了清空列表伪造完成
 - 不要误改 OTHER TASKS 区块中的历史 TODO
 
 {{ .Todo }}

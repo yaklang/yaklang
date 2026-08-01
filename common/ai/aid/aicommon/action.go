@@ -162,6 +162,48 @@ func (a *Action) GetInvokeParamsArray(key string) []aitool.InvokeParams {
 	return a.params.GetObjectArray(key)
 }
 
+// LookupParam returns a raw parsed action parameter without coercion. The
+// canonical top-level object is preferred over the incremental field callback
+// cache: while an object is streaming, the latter can temporarily represent
+// an empty object as an empty slice. Protocols such as todo_delta need the
+// final shape so omitted, null, and empty values remain distinguishable.
+func (a *Action) LookupParam(key string) (any, bool) {
+	a.waitKey(key)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.generalParamKey != "" {
+		if general := a.params.GetObject(a.generalParamKey); general != nil {
+			if value, ok := general[key]; ok {
+				return value, true
+			}
+		}
+	}
+	value, ok := a.params[key]
+	return value, ok
+}
+
+// DeleteParam suppresses an optional sidecar parameter after parsing. Both the
+// flattened compatibility cache and the canonical object are updated so later
+// consumers cannot accidentally re-apply a rejected value.
+func (a *Action) DeleteParam(key string) {
+	if a == nil {
+		return
+	}
+	a.waitKey(key)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.params, key)
+	if a.generalParamKey == "" {
+		return
+	}
+	switch general := a.params[a.generalParamKey].(type) {
+	case aitool.InvokeParams:
+		delete(general, key)
+	case map[string]any:
+		delete(general, key)
+	}
+}
+
 func (a *Action) GetParams() aitool.InvokeParams {
 	return a.GetInvokeParams(a.generalParamKey)
 }

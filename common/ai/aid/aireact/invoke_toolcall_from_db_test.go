@@ -502,11 +502,8 @@ LOOP:
 	fmt.Printf("✓ Successfully called tool from database directly by name: %s\n", toolName)
 }
 
-// 注: 原 TestReAct_ToolUse_WithNextMovements 已移除. 该测试验证 verification
-// 返回的 next_movements 被流式输出到前端并写入 NEXT_MOVEMENTS timeline
-// breadcrumb. verification 收缩为纯观测角色后不再产出/处理 next_movements
-// (schema 已删字段, 不再注册 next_movements 流处理器, 不再写 breadcrumb),
-// TODO 维护职责移交 adjust_todolist, 该测试验证的功能已不存在.
+// TODO delta 的通用 action 集成由 reactloops/todo_delta_bottom_line_test.go
+// 覆盖；verification 保持纯观测，不再承担 TODO 更新职责。
 
 // setupMockYakScriptPluginInDB creates a MITM-type YakScript plugin in the database with enable_for_ai=true.
 // It registers both t.Cleanup and returns a cleanup function for extra safety.

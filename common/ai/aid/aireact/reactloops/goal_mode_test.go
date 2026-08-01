@@ -26,10 +26,10 @@ func TestGenerateSchemaString_GoalModeRemovesFinish(t *testing.T) {
 	loop, _, _, _ := newTodoGateTestLoop(t, nil)
 	registerFinishAndAnswer(loop)
 
-	// "finish: Mark the current task" is the unique description prefix of the
+	// "finish: Request completion of the current task" is the unique description prefix of the
 	// finish action entry; the word "finish" alone also appears in
 	// directly_answer's description, so assert on the entry, not the bare word.
-	const finishEntry = "finish: Mark the current task"
+	const finishEntry = "finish: Request completion of the current task"
 
 	off, err := loop.generateSchemaString(false)
 	require.NoError(t, err)

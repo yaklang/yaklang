@@ -83,7 +83,7 @@ type imSession struct {
 }
 
 // isUserVisibleStream 判断一个流事件的 NodeId 是否应该直接展示给 IM 用户。
-// 最终回复和 AI 调用错误都必须展示；其余 intent_summary / next_movements /
+// 最终回复和 AI 调用错误都必须展示；其余 intent_summary / todo_delta /
 // dispatches / plan / directly-answer 等中间过程必须过滤。
 // 注意：directly-answer NodeId 含 <|FINAL_ANSWER|> 内部标记，不是纯用户回复。
 func isUserVisibleStream(nodeID string) bool {

@@ -30,12 +30,9 @@ func mockedFreeInputOutput(config aicommon.AICallerConfigIf, flag string) (*aico
 }
 
 func addScopedVerificationTodo(config aicommon.AICallerConfigIf, task aicommon.AIStatefulTask, todoID, content string) {
-	config.ApplyVerificationTodoOps(
+	config.ApplyTodoDelta(
 		aicommon.BuildVerificationTodoScope(task),
-		false,
-		[]aicommon.VerifyNextMovement{
-			{Op: "add", ID: todoID, Content: content},
-		},
+		&aicommon.TodoDelta{Add: []aicommon.TodoAdd{{ID: todoID, Text: content}}},
 	)
 }
 
@@ -221,10 +218,11 @@ func TestReAct_DirectlyAnswer_ChecksCurrentTaskTodo(t *testing.T) {
 					// finish 是被 TODO 闸门拦截的唯一终结器: 此时仍有 open TODO
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"try finish","cumulative_summary":"summary"}`)
 				case 3:
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"adjust_todolist","next_movements":[{"op":"done","id":"current_open_todo"}]},"human_readable_thought":"close todo","cumulative_summary":"todo updated"}`)
+					// checkpoint 后仍有开放 TODO，finish 被拒绝，但不重复插入 checkpoint。
+					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm finish","cumulative_summary":"summary"}`)
 				case 4:
-					// TODO 已关闭, finish 放行收口
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"finish","cumulative_summary":"summary"}`)
+					// finish 可在同轮携带 todo_delta；先关闭 TODO，再放行收口。
+					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish","todo_delta":{"close":[{"id":"current_open_todo","outcome":"resolved","reason":"最终答复已生成并完成当前任务要求","refs":[]}]}} ,"human_readable_thought":"close todo and finish","cumulative_summary":"todo updated"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}
@@ -325,8 +323,11 @@ func TestReAct_DirectlyAnswer_IgnoresSessionTodoFromOtherTask(t *testing.T) {
 					addScopedVerificationTodo(ins.GetConfig(), siblingTask, "session_only_open_todo", "别的任务残留待办")
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"directly_answer","answer_payload":"final answer"},"human_readable_thought":"directly answer","cumulative_summary":"summary"}`)
 				case 2:
-					// 仅兄弟任务有 open TODO, 本任务的 finish 不应被拦, 直接收口
+					// 首次 finish 只触发软 TODO checkpoint；兄弟任务 TODO 不参与检查。
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"finish","cumulative_summary":"summary"}`)
+				case 3:
+					// checkpoint 后再次 finish：当前 scope 无开放 TODO，应直接放行。
+					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm finish","cumulative_summary":"summary"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}
@@ -380,8 +381,8 @@ LOOP:
 	if !taskCompleted {
 		t.Fatal("task should complete when only sibling task owns unfinished todo")
 	}
-	if got := atomic.LoadInt32(&primaryAttempts); got != 2 {
-		t.Fatalf("expected exactly 2 primary decision attempts, got %d", got)
+	if got := atomic.LoadInt32(&primaryAttempts); got != 3 {
+		t.Fatalf("expected exactly 3 primary decision attempts, got %d", got)
 	}
 	haveFinalAnswer := false
 	for _, result := range results {
@@ -430,10 +431,10 @@ func TestReAct_DirectlyAnswer_PrefersCurrentTaskTodoOverSessionTodo(t *testing.T
 					// 当前任务仍有 open TODO, finish 被拦
 					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"try finish","cumulative_summary":"summary"}`)
 				case 3:
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"adjust_todolist","next_movements":[{"op":"done","id":"current_blocking_todo"}]},"human_readable_thought":"close todo","cumulative_summary":"todo updated"}`)
+					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"confirm finish","cumulative_summary":"summary"}`)
 				case 4:
 					// 当前任务 TODO 已关闭, 兄弟任务 TODO 不拦, finish 放行
-					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"finish","cumulative_summary":"summary"}`)
+					return mockedLoopDirectlyAnswerOutput(i, `{"@action":"object","next_action":{"type":"finish","todo_delta":{"close":[{"id":"current_blocking_todo","outcome":"resolved","reason":"当前任务要求已完成并生成最终答复","refs":[]}]}} ,"human_readable_thought":"close current todo and finish","cumulative_summary":"todo updated"}`)
 				default:
 					return nil, utils.Errorf("unexpected primary prompt attempt: %d", atomic.LoadInt32(&primaryAttempts))
 				}

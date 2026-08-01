@@ -14,11 +14,15 @@ import (
 type TodoListUpdatePayload struct {
 	Items          []VerificationTodoItem `json:"items"`
 	Stats          VerificationTodoStats  `json:"stats"`
-	AppliedOps     []VerifyNextMovement   `json:"applied_ops"`
+	AppliedOps     []TodoOperation        `json:"applied_ops"`
 	Satisfied      bool                   `json:"satisfied"`
 	IterationIndex int                    `json:"iteration_index"`
 	TaskID         string                 `json:"task_id,omitempty"`
 	TaskIndex      string                 `json:"task_index,omitempty"`
+	OpenTodos      []TodoOpenItem         `json:"open_todos"`
+	CurrentTodoID  string                 `json:"current_todo_id,omitempty"`
+	ClosedTodos    []TodoClosedItem       `json:"closed_todos"`
+	AppliedDelta   *TodoDelta             `json:"applied_delta,omitempty"`
 }
 
 // BuildCurrentTaskTodoListPayload builds a TodoListUpdatePayload scoped to the
@@ -32,7 +36,7 @@ func BuildCurrentTaskTodoListPayload(
 	task AIStatefulTask,
 	iterationIndex int,
 	satisfied bool,
-	appliedOps []VerifyNextMovement,
+	appliedOps []TodoOperation,
 ) TodoListUpdatePayload {
 	scope := BuildVerificationTodoScope(task)
 	payload := TodoListUpdatePayload{
@@ -42,7 +46,7 @@ func BuildCurrentTaskTodoListPayload(
 		TaskIndex:      scope.TaskIndex,
 	}
 	if len(appliedOps) > 0 {
-		payload.AppliedOps = append([]VerifyNextMovement(nil), appliedOps...)
+		payload.AppliedOps = append([]TodoOperation(nil), appliedOps...)
 	}
 	if cfg == nil || scope.IsZero() {
 		payload.Items = []VerificationTodoItem{}
@@ -51,6 +55,7 @@ func BuildCurrentTaskTodoListPayload(
 	}
 	payload.Items = cfg.SnapshotVerificationTodoItemsByScope(scope)
 	payload.Stats = cfg.GetVerificationTodoStatsByScope(scope)
+	payload.OpenTodos, payload.CurrentTodoID, payload.ClosedTodos = cfg.SnapshotCanonicalTodos(scope)
 	return payload
 }
 
@@ -59,7 +64,13 @@ func normalizeTodoListUpdatePayload(payload TodoListUpdatePayload) TodoListUpdat
 		payload.Items = []VerificationTodoItem{}
 	}
 	if payload.AppliedOps == nil {
-		payload.AppliedOps = []VerifyNextMovement{}
+		payload.AppliedOps = []TodoOperation{}
+	}
+	if payload.OpenTodos == nil {
+		payload.OpenTodos = []TodoOpenItem{}
+	}
+	if payload.ClosedTodos == nil {
+		payload.ClosedTodos = []TodoClosedItem{}
 	}
 	return payload
 }
@@ -75,7 +86,7 @@ func (r *Emitter) EmitCurrentTaskTodoList(
 	task AIStatefulTask,
 	iterationIndex int,
 	satisfied bool,
-	appliedOps []VerifyNextMovement,
+	appliedOps []TodoOperation,
 ) (*schema.AiOutputEvent, error) {
 	if r == nil {
 		return nil, nil
@@ -110,7 +121,10 @@ func (r *Emitter) EmitTodoListUpdates(cfg AICallerConfigIf, task AIStatefulTask,
 	if _, err := r.EmitTodoListUpdate(payload); err != nil {
 		log.Warnf("emit todo_list_update event failed: %v", err)
 	}
-	if _, err := r.EmitCurrentTaskTodoList(cfg, task, payload.IterationIndex, payload.Satisfied, payload.AppliedOps); err != nil {
+	currentPayload := BuildCurrentTaskTodoListPayload(cfg, task, payload.IterationIndex, payload.Satisfied, payload.AppliedOps)
+	currentPayload.AppliedDelta = payload.AppliedDelta
+	currentPayload = normalizeTodoListUpdatePayload(currentPayload)
+	if _, err := r.EmitJSON(schema.EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE, "current_task_todo_list", currentPayload); err != nil {
 		log.Warnf("emit current_task_todo_list_update event failed: %v", err)
 	}
 }

@@ -283,7 +283,6 @@ WithUseSpeedPriorityAICallback(true)         // 用 speed 模型（默认 qualit
 | `Reasoning` | LLM 的判断理由 |
 | `OutputFiles` | 生成的关键文件路径（自动 `EmitPinFilename` + 推入 Open Timeline，仅 `[DELIVERY FILE]` + 文件名 + size/mime/mtime，**不嵌入文件正文**；老路径的 `output_file:` ContextProvider 已废弃） |
 | `Evidence` / `EvidenceOps` | 留存证据，注入到下一轮 prompt 的 `<|SESSION_EVIDENCE_<nonce>|>` 段 |
-| `NextMovements` | 若不满意，给出建议下一步 |
 | `CompletedTaskIndex` | 已完成的子任务标识 |
 
 `Satisfied=true` 时，watchdog 调用方会 `task.Finish(nil)` 退出循环。
@@ -405,7 +404,7 @@ ActionHandler: func(loop *ReActLoop, action *aicommon.Action, op *LoopActionHand
 
 `VerifyUserSatisfaction` 不仅产出 `Satisfied`，还驱动一个全局 TODO 闭环：
 
-1. **TODO 状态**：`SessionPromptState.VerificationTodoStore` 维护 TODO 列表（PENDING / DOING / DONE / DELETED / SKIPPED），通过 `next_movements` 的增量 op 演进。
+1. **TODO 状态**：`SessionPromptState.VerificationTodoStore` 按 task scope 维护 `open_todos`、唯一 `current_todo_id` 和带 outcome/reason/refs 的 `closed_todos`，通过正常 action 的可选 `todo_delta` 演进。
 2. **关闭 TODO 的三种方式**（必须 AI 主动声明，旧的"Satisfied=true 自动翻 SKIPPED"语义已废弃）：
    - `{"op": "done", "id": "..."}`：表示该项已完成
    - `{"op": "delete", "id": "..."}`：表示该项不再需要

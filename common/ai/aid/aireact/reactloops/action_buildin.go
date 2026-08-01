@@ -18,7 +18,7 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 		lines = append(lines, aicommon.FormatVerificationTodoLine(item))
 	}
 	return fmt.Sprintf(
-		"current task still has %d active TODO item(s); %s cannot exit until each one is explicitly closed via adjust_todolist or verification next_movements with op=done / op=delete / op=skip.\nRemaining TODOs:\n%s",
+		"current task still has %d open TODO item(s); %s cannot exit until each one is closed through todo_delta.close with outcome resolved, dismissed, or deferred and a non-empty reason. Do not fabricate completion.\nRemaining TODOs:\n%s",
 		len(items),
 		actionName,
 		strings.Join(lines, "\n"),
@@ -35,7 +35,7 @@ func buildFinishBlockedByGoalModeMessage(currentIteration, goalMinIterations int
 
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
-	Description: "Mark the current task as finished and exit the loop IMMEDIATELY. " +
+	Description: "Request completion of the current task. The first valid request starts one soft TODO checkpoint; confirm with finish again after that checkpoint to exit. " +
 		"This is the ONLY action that terminates the ReAct loop — no other action ends the task implicitly. " +
 		"PREFERRED completion action whenever evidence/results are already present in the timeline " +
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
@@ -53,6 +53,15 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
+		if !loop.requestSoftTodoCheckpoint() {
+			msg := "finish requested; a soft TODO checkpoint will be shown in the next context before termination can be confirmed"
+			if loop.invoker != nil {
+				loop.invoker.AddToTimeline("SOFT_TODO_CHECKPOINT_REQUESTED", msg)
+			}
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 			msg := buildExitBlockedByTodoMessage("finish", items)
 			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
@@ -60,7 +69,9 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
-		loop.invoker.AddToTimeline("finish", "AI decided mark the current Task is finished")
+		if loop.invoker != nil {
+			loop.invoker.AddToTimeline("finish", "AI confirmed finish after the soft TODO checkpoint")
+		}
 		operator.Exit()
 	},
 }
@@ -70,7 +81,7 @@ var loopAction_DirectlyAnswer = &LoopAction{
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
 		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. " +
 		"To terminate the ReAct loop you MUST use the 'finish' action (the only terminator). " +
-		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
+		"OPTIONAL: carry a non-empty 'todo_delta' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",

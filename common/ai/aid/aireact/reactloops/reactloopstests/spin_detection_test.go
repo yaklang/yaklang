@@ -18,21 +18,35 @@ import (
 // TestIsInSameActionTypeSpin 测试 IsInSameActionTypeSpin 方法
 // 构造一个自定义 action，然后反复调用，检查是否触发 SPIN 检测
 func TestIsInSameActionTypeSpin(t *testing.T) {
+	const testActionName = "test_spin_action"
+	var aiCallCount int
+	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aiCallCount++
+		rsp := i.NewAIResponse()
+		if aiCallCount <= 4 {
+			rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action":%q,"iteration":%d}`, testActionName, aiCallCount)))
+		} else {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action":"finish","answer":"done"}`))
+		}
+		rsp.Close()
+		return rsp, nil
+	}
+
 	// 创建测试框架，设置较低的阈值以便快速触发
 	framework := NewActionTestFrameworkEx(
 		t,
 		"spin-test",
 		[]reactloops.ReActLoopOption{
 			reactloops.WithSameActionTypeSpinThreshold(3), // 连续 3 次相同 Action 触发
-			reactloops.WithEnableSelfReflection(true),
 		},
-		nil,
+		[]aicommon.ConfigOption{
+			aicommon.WithAICallback(aiCallback),
+		},
 	)
 
 	loop := framework.GetLoop()
 
 	// 注册一个测试 action
-	testActionName := "test_spin_action"
 	framework.RegisterTestAction(
 		testActionName,
 		"Test action for spin detection",
@@ -43,19 +57,13 @@ func TestIsInSameActionTypeSpin(t *testing.T) {
 		},
 	)
 
-	// 执行 4 次相同的 action（超过阈值 3）
-	for i := 0; i < 4; i++ {
-		err := framework.ExecuteAction(testActionName, map[string]interface{}{
-			"iteration": i + 1,
-		})
-		if err != nil {
-			t.Fatalf("ExecuteAction failed at iteration %d: %v", i+1, err)
-		}
+	// 在同一个 ReAct 执行中连续执行 4 次相同 action，然后经过
+	// 软 TODO checkpoint 的两次 finish 收口。
+	if err := loop.Execute("spin-task", context.Background(), "Testing repeated work actions"); err != nil {
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	// 等待异步自我反思 goroutine 完成
-	loop.WaitForInflightReflections()
-
+	allActions := loop.GetAllExistedActionRecord()
 	// 检查是否检测到 SPIN
 	isSpinning := loop.IsInSameActionTypeSpin()
 	if !isSpinning {
@@ -63,16 +71,22 @@ func TestIsInSameActionTypeSpin(t *testing.T) {
 	}
 
 	// 验证 action 历史记录
-	allActions := loop.GetAllExistedActionRecord()
 	if len(allActions) < 4 {
 		t.Errorf("Expected at least 4 action records, got %d", len(allActions))
 	}
 
-	// 验证最后 3 个 action 都是相同类型
-	last3Actions := loop.GetLastNAction(3)
-	if len(last3Actions) != 3 {
-		t.Errorf("Expected 3 last actions, got %d", len(last3Actions))
+	// 软 checkpoint 的 finish 是生命周期控制记录，验证最后 3 个真实工作
+	// action 都是相同类型。
+	workActions := make([]*reactloops.ActionRecord, 0, len(allActions))
+	for _, action := range allActions {
+		if action.ActionType != "finish" {
+			workActions = append(workActions, action)
+		}
 	}
+	if len(workActions) < 3 {
+		t.Fatalf("Expected at least 3 work actions, got %d", len(workActions))
+	}
+	last3Actions := workActions[len(workActions)-3:]
 
 	firstActionType := last3Actions[0].ActionType
 	for i, action := range last3Actions {
@@ -949,7 +963,8 @@ func TestSpinDetectionSameActionTypeDifferentTool(t *testing.T) {
 		t.Logf("  [%d] ActionType=%q ToolName=%q", idx, rec.ActionType, rec.ToolName)
 	}
 
-	// 关键断言: 同 ActionType 不同 ToolName 不应触发 SPIN.
+	// 关键断言: 同 ActionType 不同 ToolName 不应触发 SPIN，软 TODO
+	// checkpoint 产生的两个 finish 控制动作也不应被当作执行自旋.
 	if loop.IsInSameActionTypeSpin() {
 		t.Error("FAIL: IsInSameActionTypeSpin returned true for actions with different tool names")
 	} else {

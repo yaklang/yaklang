@@ -31,27 +31,23 @@ ui/
 `
 )
 
-// sampleWriteFileWithNextMovementsAIResponse reproduces the problematic dir_explore
-// model output: write_file JSON carries next_movements, while the real file body
+// sampleWriteFileWithTodoDeltaAIResponse reproduces the problematic dir_explore
+// model output: write_file JSON carries todo_delta, while the real file body
 // lives in a TOOL_PARAM_content AITAG block outside JSON.
-func sampleWriteFileWithNextMovementsAIResponse(nonce string) string {
+func sampleWriteFileWithTodoDeltaAIResponse(nonce string) string {
 	return `{
   "@action": "write_file",
   "identifier": "write_dir_structure",
   "human_readable_thought": "目录树已完整获取，立即写入 dir_structure.md。",
   "file": "/Users/zwh_china/yakit-projects/aispace/122_irify_audit_scan_20260626_bab54/audit/dir_structure.md",
   "force": true,
-  "next_movements": [
-    {
-      "op": "add",
-      "id": "find_entry_points",
-      "content": "` + sampleTodoContent + `"
-    },
-    {
-      "op": "doing",
-      "id": "explore_dir_structure"
-    }
-  ]
+  "todo_delta": {
+    "add": [
+      {"id": "find_entry_points", "text": "` + sampleTodoContent + `"},
+      {"id": "explore_dir_structure", "text": "梳理项目目录结构"}
+    ],
+    "current": "explore_dir_structure"
+  }
 }
 <|TOOL_PARAM_content_` + nonce + `|>
 ` + sampleDirStructureContent + `<|TOOL_PARAM_content_END_` + nonce + `|>`
@@ -88,12 +84,12 @@ func parseSampleWriteFileAction(t *testing.T, raw string, opts ...aicommon.Actio
 	return action
 }
 
-func TestParseWriteFileWithNextMovements_withoutAITAGRegistration(t *testing.T) {
-	raw := sampleWriteFileWithNextMovementsAIResponse(sampleWriteFileNonce)
+func TestParseWriteFileWithTodoDelta_withoutAITAGRegistration(t *testing.T) {
+	raw := sampleWriteFileWithTodoDeltaAIResponse(sampleWriteFileNonce)
 	action := parseSampleWriteFileAction(t, raw)
 
-	require.Equal(t, sampleTodoContent, action.GetString("content"),
-		"flat content should be polluted by next_movements[].content")
+	require.Empty(t, action.GetString("content"),
+		"todo_delta.text must not collide with the tool content parameter")
 
 	aitagKey := aicommon.GetToolParamAITagActionKey("content")
 	require.Empty(t, action.GetString(aitagKey),
@@ -114,15 +110,15 @@ func TestParseWriteFileWithNextMovements_withoutAITAGRegistration(t *testing.T) 
 		"MergeLoopActionToolParams cannot invent content when AITAG was never parsed")
 }
 
-func TestParseWriteFileWithNextMovements_withAITAGRegistrationAndMerge(t *testing.T) {
-	raw := sampleWriteFileWithNextMovementsAIResponse(sampleWriteFileNonce)
+func TestParseWriteFileWithTodoDelta_withAITAGRegistrationAndMerge(t *testing.T) {
+	raw := sampleWriteFileWithTodoDeltaAIResponse(sampleWriteFileNonce)
 	action := parseSampleWriteFileAction(t, raw, toolParamContentAITagOptions(sampleWriteFileNonce)...)
 
 	aitagKey := aicommon.GetToolParamAITagActionKey("content")
 	require.Contains(t, action.GetString(aitagKey), "# 目录结构",
 		"AITAG block should be captured into __aitag__content")
 
-	require.Equal(t, sampleTodoContent, action.GetString("content"))
+	require.Empty(t, action.GetString("content"))
 
 	nested := action.GetParams()
 	require.Empty(t, nested.GetString("content"),
@@ -137,17 +133,17 @@ func TestParseWriteFileWithNextMovements_withAITAGRegistrationAndMerge(t *testin
 	require.True(t, merged.GetBool("force"))
 	require.Empty(t, merged.GetString("identifier"))
 	require.Empty(t, merged.GetString("human_readable_thought"))
-	require.Nil(t, merged["next_movements"])
+	require.Nil(t, merged["todo_delta"])
 }
 
 func TestMergeLoopActionToolParams_stripsLoopMetadata(t *testing.T) {
-	raw := sampleWriteFileWithNextMovementsAIResponse(sampleWriteFileNonce)
+	raw := sampleWriteFileWithTodoDeltaAIResponse(sampleWriteFileNonce)
 	action := parseSampleWriteFileAction(t, raw, toolParamContentAITagOptions(sampleWriteFileNonce)...)
 
 	merged := MergeLoopActionToolParams(action, action.GetParams(), []string{"content"})
 	require.NotContains(t, merged, "identifier")
 	require.NotContains(t, merged, "human_readable_thought")
-	require.NotContains(t, merged, "next_movements")
+	require.NotContains(t, merged, "todo_delta")
 	require.NotContains(t, merged, aicommon.GetToolParamAITagActionKey("content"))
 	require.Contains(t, merged.GetString("content"), "# 目录结构")
 }
@@ -161,7 +157,7 @@ func TestBuildLoopActionToolInvokeParams_mergesAITAGForConvertedToolAction(t *te
 		aitool.WithBoolParam("force"),
 	)
 
-	raw := sampleWriteFileWithNextMovementsAIResponse(sampleWriteFileNonce)
+	raw := sampleWriteFileWithTodoDeltaAIResponse(sampleWriteFileNonce)
 	action := parseSampleWriteFileAction(t, raw, toolParamContentAITagOptions(sampleWriteFileNonce)...)
 
 	merged := BuildLoopActionToolInvokeParams(action, writeFileTool)
@@ -170,7 +166,7 @@ func TestBuildLoopActionToolInvokeParams_mergesAITAGForConvertedToolAction(t *te
 	require.NotEmpty(t, merged.GetString("file"))
 	require.True(t, merged.GetBool("force"))
 	require.Empty(t, merged.GetString("identifier"))
-	require.Nil(t, merged["next_movements"])
+	require.Nil(t, merged["todo_delta"])
 
 	valid, errs := writeFileTool.ValidateParams(merged)
 	require.True(t, valid, "converted tool action params should pass validation: %v", errs)

@@ -3329,26 +3329,31 @@ func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope)
 	return c.GetSessionPromptState().GetVerificationTodoRendered(currentScope)
 }
 
-// ApplyVerificationTodoOps applies one verification round's next_movements to
-// the persisted TODO store. When the persistent session id is configured, the
-// resulting JSON is also flushed to DB (TODO persistence hooks may be added
-// later — for now this only updates the in-memory SessionPromptState).
+// ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
+// persisted TODO store. When the persistent session id is configured, the
+// resulting canonical JSON is retained by the shared SessionPromptState.
 //
-// 关键词: ApplyVerificationTodoOps, Verify 写入, SessionPromptState 同步
-func (c *Config) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
+// 关键词: ApplyTodoDelta, ReAct 增量写入, SessionPromptState 同步
+func (c *Config) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
 	if c == nil {
 		return nil
 	}
-	// 即便没有 movements, satisfied=true 也可能触发 SKIPPED 状态转换；故不 early-return.
-	return c.GetSessionPromptState().ApplyVerificationTodoOps(scope, satisfied, movements)
+	return c.GetSessionPromptState().ApplyTodoDelta(scope, delta)
+}
+
+func (c *Config) ValidateTodoDelta(scope VerificationTodoScope, delta *TodoDelta) error {
+	return c.GetSessionPromptState().ValidateTodoDelta(scope, delta)
 }
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
 // against the current state without mutating it. Use this when you need the
-// delta markers (new / done / deleted / skipped) for a markdown stream emitted
-// BEFORE you commit the ops via ApplyVerificationTodoOps.
-func (c *Config) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
-	return c.GetSessionPromptState().GetVerificationTodoMarkdownDelta(scope, satisfied, movements)
+// projected snapshot before committing the delta via ApplyTodoDelta.
+func (c *Config) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, delta *TodoDelta) string {
+	return c.GetSessionPromptState().GetVerificationTodoMarkdownDelta(scope, delta)
+}
+
+func (c *Config) SnapshotCanonicalTodos(scope VerificationTodoScope) ([]TodoOpenItem, string, []TodoClosedItem) {
+	return c.GetSessionPromptState().SnapshotCanonicalTodos(scope)
 }
 
 // SnapshotVerificationTodoItems returns a deep-copied slice of the current

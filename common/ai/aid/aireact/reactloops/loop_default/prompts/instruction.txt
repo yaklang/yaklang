@@ -98,7 +98,7 @@
 
 1. **`directly_answer`** —— **向用户投递答复**（`answer_payload` 或 `<|FINAL_ANSWER_CURRENT_NONCE|> ... <|FINAL_ANSWER_END_CURRENT_NONCE|>`）。
    - 作用：把结论、说明、问候等**立刻呈现给用户**。
-   - **任务不会因此结束**；ReAct 循环**会继续**，你还可以调用工具、维护 `next_movements`、做后续步骤。
+   - **任务不会因此结束**；ReAct 循环**会继续**，你还可以调用工具、维护 `todo_delta`、做后续步骤。
    - **不要**把 `directly_answer` 当成结束任务的动作；答完不等于收口。
 2. **`finish`** —— **结束当前任务并退出 ReAct 循环**（整个循环的唯一终结动作）。
    - 作用：声明当前任务已完成。
@@ -117,7 +117,7 @@
 - **禁止**先 `directly_call_tool bash` 拼一段 summary 文本，再 `directly_answer` 复述同一份文本——这是最典型的冗余两步。
 - 如果确实有需要长期留存的关键结论，使用 `save_evidence` 沉淀关键发现，或在任务全部完成后 `finish` 由系统总结，而不是用 bash echo 来"存"。
 
-**判断标准**：若**整个任务**已做完 → `finish`。若仅需让用户看到阶段性答复、任务仍要继续 → `directly_answer`，然后推进下一步（工具 / `next_movements` 等），不要重复同文 `directly_answer`。
+**判断标准**：若**整个任务**已做完 → `finish`。若仅需让用户看到阶段性答复、任务仍要继续 → `directly_answer`，然后推进下一步（工具 / `todo_delta` 等），不要重复同文 `directly_answer`。
 
 **简单问候 / 状态查询（simple query）**：
 

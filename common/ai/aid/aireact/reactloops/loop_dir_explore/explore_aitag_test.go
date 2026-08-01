@@ -40,17 +40,13 @@ func TestWriteFileAction_extractAITAGContent_endToEnd(t *testing.T) {
   "human_readable_thought": "目录树已完整获取，立即写入 dir_structure.md。",
   "file": "/Users/zwh_china/yakit-projects/aispace/122_irify_audit_scan_20260626_bab54/audit/dir_structure.md",
   "force": true,
-  "next_movements": [
-    {
-      "op": "add",
-      "id": "find_entry_points",
-      "content": "搜索项目所有入口点（main 函数）"
-    },
-    {
-      "op": "doing",
-      "id": "explore_dir_structure"
-    }
-  ]
+  "todo_delta": {
+    "add": [
+      {"id": "find_entry_points", "text": "搜索项目所有入口点（main 函数）"},
+      {"id": "explore_dir_structure", "text": "梳理项目目录结构"}
+    ],
+    "current": "explore_dir_structure"
+  }
 }
 <|TOOL_PARAM_content_` + nonce + `|>
 # Directory Structure

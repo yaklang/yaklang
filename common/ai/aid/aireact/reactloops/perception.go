@@ -334,8 +334,8 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 			reason = aicommon.ShrinkTextBlockByTokens(reason, 1000)
 		}
 		buf.WriteString(fmt.Sprintf("Last Verification: %s - %s\n", satisfied, reason))
-		// 注: verification 收缩为纯观测角色后不再产出 NextMovements, 这里不再
-		// 渲染 "Next Movements" 段 (TODO 推进交由主循环 adjust_todolist).
+		// 注: verification 收缩为纯观测角色后不再产出 TodoDelta, 这里不再
+		// 渲染 "Next Steps" 段 (TODO 推进交由主循环 todo_delta).
 		// satisfied + reasoning 仍是 perception 需要感知的观测信号.
 	}
 
@@ -1044,7 +1044,6 @@ func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
 	}
 	r.invokePerceptionTrigger(PerceptionTriggerPostAction, false)
 }
-
 
 // TriggerPerceptionOnSpin forces a perception update when SPIN is detected,
 // providing fresh context that may help the loop break out of a repeating pattern.

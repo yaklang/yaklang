@@ -27,14 +27,14 @@ func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
 	}
 	category := normalizeTimelinePromptCategory(parsed.EntryType)
 	switch category {
-	case "NEXT_MOVEMENTS", "EVIDENCE_OPS":
+	case "TODO_DELTA", "EVIDENCE_OPS":
 		return nil
 	case "ITERATION":
 		if iterationCompletionHeartbeatPattern.MatchString(strings.TrimSpace(parsed.Content)) {
 			return nil
 		}
 		return item
-	case "NEXT_MOVEMENTS_ERROR":
+	case "TODO_DELTA_ERROR":
 		filtered := filterRedundantTodoErrorLines(parsed.Content)
 		if filtered == "" {
 			return nil

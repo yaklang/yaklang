@@ -95,10 +95,6 @@ func saveNodeIdI18nToDB(nodeId string, i18n *I18n) {
 }
 
 var nodeIdMapper = map[string]*I18n{
-	"adjust_todolist": {
-		Zh: "待办事项",
-		En: "TODO List",
-	},
 	"todo_added": {
 		Zh: "待办任务",
 		En: "TODO Added",
@@ -110,6 +106,10 @@ var nodeIdMapper = map[string]*I18n{
 	"todo_completed": {
 		Zh: "待办完成",
 		En: "TODO Completed",
+	},
+	"todo_reason": {
+		Zh: "进展",
+		En: "Progress",
 	},
 	"task-dependency": {
 		Zh: "任务依赖",
@@ -322,10 +322,6 @@ var nodeIdMapper = map[string]*I18n{
 	"human_readable_result": {
 		Zh: "结果摘要",
 		En: "Human Readable Result",
-	},
-	"next_movements_snapshot": {
-		Zh: "待办",
-		En: "TODO",
 	},
 	"delivery_files_snapshot": {
 		Zh: "交付文件",
