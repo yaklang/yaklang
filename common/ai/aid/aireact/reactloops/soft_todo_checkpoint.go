@@ -17,6 +17,7 @@ const softTodoCheckpointPrompt = `[SOFT TODO CHECKPOINT]
 
 - 是否仍有不能忽略的开放事项；
 - 是否有 TODO 已解决但尚未记录结果；
+- 是否有验证型 TODO 仅凭单次阴性请求、普通扫描未命中或无明显报错就被关闭；若有，重新添加其中价值最高的一项作为有区分力的验证 TODO，并设为 CURRENT；
 - 未完成事项是否应明确标记为 deferred。
 
 不要为了清空列表而伪造完成。

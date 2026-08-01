@@ -95,7 +95,10 @@ func TestFinishFirstRequestAlwaysContinuesAndQueuesCheckpoint(t *testing.T) {
 	op := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, op)
 	require.True(t, op.IsContinued())
-	require.Equal(t, softTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+	checkpoint := loop.consumeTodoCheckpoint()
+	require.Equal(t, softTodoCheckpointPrompt, checkpoint)
+	require.Contains(t, checkpoint, "单次阴性请求")
+	require.Contains(t, checkpoint, "设为 CURRENT")
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
