@@ -179,8 +179,8 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 
 	var outputExample string
-	if r.reflectionOutputExampleProvider != nil {
-		outputExample, err = r.reflectionOutputExampleProvider(r, "") // persistent context not use nonce
+	if r.outputExampleProvider != nil {
+		outputExample, err = r.outputExampleProvider(r, "") // persistent context not use nonce
 		if err != nil {
 			return "", utils.Wrap(err, "build output example failed")
 		}
@@ -200,7 +200,7 @@ func (r *ReActLoop) generateLoopPrompt(
 			})
 		}
 	}
-	reactiveData = appendSoftTodoCheckpoint(reactiveData, r.consumeSoftTodoCheckpoint())
+	todoCheckpoint := r.consumeTodoCheckpoint()
 
 	// Render skills context if the manager is available.
 	// 三态分离: SkillsContext (SemiDynamic 1, 含 catalog) + ForcedSkills (frozen_block
@@ -266,6 +266,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		TodoSnapshot:      todoSnapshot,
 		ReactiveData:      reactiveData,
 		InjectedMemory:    memory,
+		TodoCheckpoint:    todoCheckpoint,
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")

@@ -289,8 +289,6 @@ type Config struct {
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
 	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
-	EnableSelfReflection bool
-
 	// other context
 	PersistentMemory []string
 
@@ -2197,18 +2195,6 @@ func WithMemoryPoolSize(sz int64) ConfigOption {
 	}
 }
 
-func WithEnableSelfReflection(v bool) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		c.EnableSelfReflection = v
-		c.m.Unlock()
-		return nil
-	}
-}
-
 func WithEnablePlanAndExec(enable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2465,8 +2451,7 @@ func WithDisableIntentRecognition(disable bool) ConfigOption {
 	}
 }
 
-// WithSyncPerceptionTrigger when true, MaybeTriggerPerceptionAfterAction
-// and TriggerPerceptionOnSpin invoke TriggerPerception on the caller goroutine;
+// WithSyncPerceptionTrigger makes perception triggers run on the caller goroutine;
 // when false (default), they spawn a goroutine.
 func WithSyncPerceptionTrigger(enable bool) ConfigOption {
 	return func(c *Config) error {

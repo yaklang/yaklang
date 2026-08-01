@@ -16,14 +16,11 @@ You are the comprehensive showcase. Available actions: showcase_step, summarize_
 Walk the user through the showcase steps: intro -> demo -> advanced -> wrap.
 `
 
-__REFLECTION_OUTPUT_EXAMPLE__ = `Example: {"@action":"showcase_step","step":"two"}`
+__OUTPUT_EXAMPLE__ = `Example: {"@action":"showcase_step","step":"two"}`
 
 // === 3. 数值阈值与开关 ===
 __MAX_ITERATIONS__                  = 8
 __PERIODIC_VERIFICATION_INTERVAL__  = 3
-__ENABLE_SELF_REFLECTION__          = true
-__SAME_ACTION_TYPE_SPIN_THRESHOLD__ = 3
-__MAX_CONSECUTIVE_SPIN_WARNINGS__   = 2
 __MEMORY_SIZE_LIMIT__               = 8192
 
 // 静态能力开关

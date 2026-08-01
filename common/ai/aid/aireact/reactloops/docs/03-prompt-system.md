@@ -39,7 +39,7 @@ flowchart TD
 **两层渲染**的含义：
 
 1. **第一层**：`PersistentInstruction`、`OutputExample`、`ReactiveData` 自身可以是 Go template 字符串，使用 `getRenderValues()` 提供的变量渲染。
-2. **第二层**：上一步渲染出的字符串通过 `WithPersistentInstruction` / `WithReflectionOutputExample` / `WithReactiveDataBuilder` 注入到 `PromptMaterials` 对应字段；`ExecutionPolicy` 这类稳定策略则由 `Config.GetExecutionPolicy()` 提供，再由 `aicommon.PromptPrefixBuilder` 把它们落到 semi-dynamic-2 与 dynamic 段。
+2. **第二层**：上一步渲染出的字符串通过 `WithPersistentInstruction` / `WithOutputExample` / `WithReactiveDataBuilder` 注入到 `PromptMaterials` 对应字段；`ExecutionPolicy` 这类稳定策略则由 `Config.GetExecutionPolicy()` 提供，再由 `aicommon.PromptPrefixBuilder` 把它们落到 semi-dynamic-2 与 dynamic 段。
 
 这样 loop 编写者可以在自己的 prompt 里用 `{{ .CurrentTime }}`、`{{ .OSArch }}` 这些通用变量。
 
@@ -55,7 +55,7 @@ flowchart TD
 | SemiDynamic2 | [semi_dynamic_2_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_2_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI2_*\|>` 包裹） | TaskInstruction + ExecutionPolicy + Schema + OutputExample |
 | TimelineOpen | [timeline_open_section.txt](../../../aicommon/prompts/prefix/timeline_open_section.txt) | 易变尾段，落在所有 cache 边界外 | Timeline 末桶 + SessionEvidence + Todo + Workspace + UserHistory + Current Time + PlanContext |
 
-最后由 `dynamic_section.txt`（loop 自己的 dynamic 段）渲染 UserQuery / AutoContext / ExtraCapabilities / REFLECTION / InjectedMemory，与前 5 段一起经 `buildTaggedPromptSections` 拼成完整 prompt。
+最后由 `dynamic_section.txt`（loop 自己的 dynamic 段）渲染 UserQuery / AutoContext / ExtraCapabilities / ReactiveData / InjectedMemory / TodoCheckpoint，与前 5 段一起经 `buildTaggedPromptSections` 拼成完整 prompt。
 
 **所有 `<|XXX_{{.Nonce}}|>` 标签是为了防止 prompt 注入**：用户输入永远夹在 `<|USER_QUERY_<nonce>|>` ... `<|USER_QUERY_END_<nonce>|>` 之间，nonce 是每轮随机的 4 字符串（`utils.RandStringBytes(4)`）。LLM 看到的 `<|USER_QUERY_aB3x|>` 这样的 tag 不会被用户提前伪造，也不会被 LLM 提前学到固定值。
 
@@ -123,7 +123,7 @@ reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce 
 
 **用途**：每轮变化的上下文——上一轮的反馈、loop 当前状态、最近的事件。
 
-**位置**：渲染到 `<|REFLECTION_<nonce>|>` ... `<|REFLECTION_END_<nonce>|>`（**注意是 REFLECTION 标签，不要被名字迷惑**——它和反思机制无关，只是模板段落名）。
+**位置**：渲染到 `<|REACTIVE_DATA_<nonce>|>` ... `<|REACTIVE_DATA_END_<nonce>|>`。
 
 **Provider 签名**：
 
@@ -167,9 +167,9 @@ reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *
 并以稳定顺序渲染 `<|CACHE_TOOL_CALL_[current-nonce]|>`。重复使用且 Schema 未变化时
 不会改变 Prompt。
 
-## 3.6 `OutputExample`：输出示例与反思格式
+## 3.6 `OutputExample`：输出示例
 
-**用途**：给 LLM 看几个标准输出片段，引导格式正确。**反思**机制开启后，反思的 OutputFormat 也来自这里。
+**用途**：给 LLM 看几个标准输出片段，引导格式正确。
 
 **位置**：渲染到 `<|OUTPUT_EXAMPLE_<nonce>|>` ... `<|OUTPUT_EXAMPLE_END_<nonce>|>`。
 
@@ -179,10 +179,10 @@ reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *
 //go:embed prompts/output_example.txt
 var outputExample string
 
-reactloops.WithReflectionOutputExample(outputExample)
+reactloops.WithOutputExample(outputExample)
 ```
 
-**自动叠加机制**：`WithReflectionOutputExample` 内部会**遍历 `loop.loopActions`**（即 `WithActionFactoryFromLoop` 注册的子 loop 派生 action），把它们各自的 `OutputExamples` 字段也拼到末尾。这样：
+**自动叠加机制**：`WithOutputExample` 内部会**遍历 `loop.loopActions`**（即 `WithActionFactoryFromLoop` 注册的子 loop 派生 action），把它们各自的 `OutputExamples` 字段也拼到末尾。这样：
 
 - 你只需要写本 loop 自己的示例
 - 子 loop 的示例（在它们的 `LoopMetadata.OutputExamplePrompt` 或 `LoopAction.OutputExamples` 中）会自动被合并
@@ -292,13 +292,12 @@ Schema              1240   4520
 ...
 ```
 
-### 临时跳过 perception / reflection
+### 临时跳过 perception
 
-在调试 prompt 大小时，先关掉感知/反思，缩短 prompt：
+在调试 prompt 大小时，可以先关掉感知以缩短 prompt：
 
 ```go
 WithDisableLoopPerception(true)
-WithEnableSelfReflection(false)
 ```
 
 ### 占位符调试

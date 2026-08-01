@@ -15,7 +15,7 @@ import (
 //go:embed prompts/instruction.txt
 var instruction string
 
-//go:embed prompts/reflection_output_example.txt
+//go:embed prompts/output_example.txt
 var outputExample string
 
 //go:embed prompts/reactive_data.txt
@@ -87,7 +87,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),
 				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 					if !isDone {
@@ -111,12 +111,6 @@ func init() {
 				}),
 			}
 
-			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
-			if config := r.GetConfig(); config != nil {
-				if reactConfig, ok := config.(interface{ GetEnableSelfReflection() bool }); ok {
-					preset = append(preset, reactloops.WithEnableSelfReflection(reactConfig.GetEnableSelfReflection()))
-				}
-			}
 			preset = append(preset, opts...)
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err
@@ -146,16 +140,10 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),
 			}
 
-			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
-			if config := r.GetConfig(); config != nil {
-				if reactConfig, ok := config.(interface{ GetEnableSelfReflection() bool }); ok {
-					preset = append(preset, reactloops.WithEnableSelfReflection(reactConfig.GetEnableSelfReflection()))
-				}
-			}
 			preset = append(preset, opts...)
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err

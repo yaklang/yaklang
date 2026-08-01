@@ -28,7 +28,6 @@ func BuildReportLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithEnableSelfReflection(false),
 
 		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 			stats := state.GetStats()

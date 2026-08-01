@@ -26,7 +26,7 @@ var instruction string
 //go:embed prompts/reactive_data.txt
 var reactiveData string
 
-//go:embed prompts/reflection_output_example.txt
+//go:embed prompts/output_example.txt
 var outputExample string
 
 const LoopHTTPFuzztestName = "http_fuzztest"
@@ -49,7 +49,7 @@ func init() {
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					originalRequest := getLoopOriginalRequestForPrompt(loop)
 					originalRequestSummary := loop.Get("original_request_summary")

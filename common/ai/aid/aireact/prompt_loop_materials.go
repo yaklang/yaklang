@@ -403,6 +403,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		"TodoSnapshot":       "",
 		"ReactiveData":       "",
 		"InjectedMemory":     "",
+		"TodoCheckpoint":     "",
 		"AllowPlanAndExec":   false,
 		"AllowToolCall":      false,
 		"HasLoadCapability":  false,
@@ -455,6 +456,7 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 		data["TodoSnapshot"] = input.TodoSnapshot
 		data["ReactiveData"] = input.ReactiveData
 		data["InjectedMemory"] = input.InjectedMemory
+		data["TodoCheckpoint"] = input.TodoCheckpoint
 	}
 	return data
 }
@@ -917,7 +919,7 @@ func (pm *PromptManager) buildDynamicObservation(
 			"Reactive Data",
 			reactloops.PromptSectionRoleDynamic,
 			true,
-			renderTaggedBlock("REFLECTION", input.Nonce, input.ReactiveData),
+			renderTaggedBlock("REACTIVE_DATA", input.Nonce, input.ReactiveData),
 		),
 		reactloops.NewPromptSectionObservation(
 			"section.dynamic.injected_memory",
@@ -925,6 +927,13 @@ func (pm *PromptManager) buildDynamicObservation(
 			reactloops.PromptSectionRoleDynamic,
 			true,
 			renderInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
+		),
+		reactloops.NewPromptSectionObservation(
+			"section.dynamic.todo_checkpoint",
+			"TODO Checkpoint",
+			reactloops.PromptSectionRoleDynamic,
+			false,
+			input.TodoCheckpoint,
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)

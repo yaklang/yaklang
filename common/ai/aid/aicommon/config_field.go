@@ -130,10 +130,6 @@ func (c *Config) GetMaxIterations() int64 {
 	return c.GetMaxIterationCount()
 }
 
-func (c *Config) GetEnableSelfReflection() bool {
-	return c.EnableSelfReflection
-}
-
 func (c *Config) GetToolCallIntervalReviewExtraPrompt() string {
 	return c.ToolCallIntervalReviewExtraPrompt
 }

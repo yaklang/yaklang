@@ -36,8 +36,6 @@ const (
 	ValueFeedbackTriggerIterationEnd   = "iteration_end"
 	ValueFeedbackTriggerLoopEnd        = "loop_end"
 	ValueFeedbackTriggerReviewDecision = "review_decision"
-	ValueFeedbackTriggerSpinDetected   = "spin_detected"
-	ValueFeedbackTriggerSelfReflection = "self_reflection"
 	ValueFeedbackTriggerVerification   = "verification"
 	// ValueFeedbackTriggerRiskFeedback 在 AI 报出漏洞 (risk) 之后触发, 收集
 	// "该漏洞是否为误报" 的反馈. 误报信号可来自 AI 自判 (source=model_judge) 或

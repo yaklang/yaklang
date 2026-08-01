@@ -20,7 +20,7 @@ common/ai/aid/aireact/reactloops/
 │   └── prompts/
 │       ├── persistent_instruction.txt           # 主 prompt（人格设定）
 │       ├── reactive_data.txt                    # 反应数据模板
-│       └── reflection_output_example.txt        # 输出示例
+│       └── output_example.txt        # 输出示例
 └── reactinit/
     └── init.go                                  # 加 import
 ```
@@ -55,7 +55,7 @@ common/ai/aid/aireact/reactloops/
 
 ## 步骤 3：写 prompts/reactive_data.txt
 
-每轮迭代后，根据上一轮的反馈和状态生成"反应数据"，注入下一轮 prompt 的 `<|REFLECTION_<nonce>|>` 段。
+每轮迭代后，根据上一轮的反馈和状态生成"反应数据"，注入下一轮 prompt 的 `<|REACTIVE_DATA_<nonce>|>` 段。
 
 ```text
 <|REACTIVE_DATA_{{.Nonce}}|>
@@ -72,7 +72,7 @@ common/ai/aid/aireact/reactloops/
 <|REACTIVE_DATA_END_{{.Nonce}}|>
 ```
 
-## 步骤 4：写 prompts/reflection_output_example.txt
+## 步骤 4：写 prompts/output_example.txt
 
 给 LLM 一个 JSON 输出示例，提高 schema 遵守率。
 
@@ -112,7 +112,7 @@ var instruction string
 //go:embed prompts/reactive_data.txt
 var reactiveDataTpl string
 
-//go:embed prompts/reflection_output_example.txt
+//go:embed prompts/output_example.txt
 var outputExample string
 
 const LoopLogAnalyzeName = "log_analyze"
@@ -128,7 +128,7 @@ func init() {
                 reactloops.WithAllowAIForge(false),
 
                 reactloops.WithPersistentInstruction(instruction),
-                reactloops.WithReflectionOutputExample(outputExample),
+                reactloops.WithOutputExample(outputExample),
                 reactloops.WithReactiveDataBuilder(buildReactiveData),
 
                 reactloops.WithAITagFieldWithAINodeId("FINAL_ANSWER", "tag_final_answer", "re-act-loop-answer-payload", aicommon.TypeTextMarkdown),
@@ -139,8 +139,6 @@ func init() {
                 reactloops.WithInitTask(buildInitTask(invoker)),
                 BuildOnPostIterationHook(invoker),
 
-                reactloops.WithSameActionTypeSpinThreshold(3),
-                reactloops.WithEnableSelfReflection(true),
                 reactloops.WithPeriodicVerificationInterval(3),
             }
             preset = append(preset, opts...)
@@ -589,7 +587,7 @@ yak test ./common/ai/aid/aireact/reactloops/loop_log_analyze/...
 - [ ] Handler 末尾必须调 `op.Continue()` / `op.Exit()` / `op.Fail()` 之一
 - [ ] 关键中间数据写到 `loop.Set` + timeline
 - [ ] 关键消息用 `op.Feedback` 注入下一轮 prompt
-- [ ] 错误处理：tool 失败用 `Continue + Critical reflection`，不要直接 Fail loop
+- [ ] 错误处理：可恢复的 tool 失败写入普通 feedback 后 `Continue`，不要直接 Fail loop
 
 ### Hooks
 
@@ -609,8 +607,7 @@ yak test ./common/ai/aid/aireact/reactloops/loop_log_analyze/...
 
 ### 确定性
 
-- [ ] `WithSameActionTypeSpinThreshold` 设了合理阈值（默认 3）
-- [ ] `WithEnableSelfReflection` 关键 loop 必须开（默认 true）
+- [ ] 长链路任务为 TODO 维护唯一 current，使 25 轮软检查点能够按任务焦点工作
 - [ ] `WithPeriodicVerificationInterval` 设了合理间隔
 - [ ] `WithMaxIterations` 设置上限（默认 100，可以调小）
 

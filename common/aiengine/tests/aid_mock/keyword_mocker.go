@@ -273,19 +273,7 @@ func (s *KeywordScenarios) loadBuiltInResponses() {
 		"Write Yaklang code response",
 	)
 
-	// 12. 自我反思响应
-	s.AddResponse(
-		"self_reflection",
-		[]string{"reflection", "analyze"},
-		BuildDirectlyAnswer(
-			"After reflection, I believe the approach is correct.",
-			"Performing self-reflection",
-			"Self-reflection completed",
-		),
-		"Self-reflection response",
-	)
-
-	// 13. 查询文档响应
+	// 12. 查询文档响应
 	s.AddResponse(
 		"query_document",
 		[]string{"query", "document", "knowledge"},

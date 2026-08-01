@@ -1,6 +1,6 @@
 # aireact 角色 Prompt 缓存优化方案
 
-## 1. 角色清单（R1~R10）
+## 1. 角色清单（R1~R9）
 
 | 编号 | 角色 | 生成方法 | 用途 | 走共享 prefix? |
 |------|------|---------|------|:---:|
@@ -13,7 +13,6 @@
 | R7 | 验证/满意度判定 | `GenerateVerificationPrompt` | 评估子任务是否达成，产出 user_satisfied + evidence | ✅ |
 | R8 | 直接回答 | `GenerateDirectlyAnswerPrompt` | 无需工具时直接给出最终回答 | ✅ |
 | R9 | 工具间隔审查 | `GenerateIntervalReviewPromptWithContext` | 长时间工具调用的进度审查（continue/cancel） | ❌ |
-| R10 | 自我反思 | `buildReflectionPrompt` | SPIN 死循环检测与打破建议 | ❌ |
 
 > 另有 R11 对话标题生成（`GenerateRequireConversationTitlePrompt`），频率极低，不走 prefix，不参与缓存优化。
 
@@ -33,7 +32,6 @@
 | R5 | 蓝图参数生成 | 0 | 0% | 本次运行未使用蓝图 |
 | R6 | 蓝图切换 | 0 | 0% | 同上 |
 | R9 | 工具间隔审查 | 0 | 0% | 走 lightweight 模型，不在 dump 中 |
-| R10 | 自我反思 | 0 | 0% | 走 lightweight 模型，不在 dump 中 |
 | **合计** | | **23** | 100% | |
 
 **关键观察**：
@@ -88,9 +86,9 @@ R4（工具重选择）和 R6（蓝图切换）逻辑 85% 重叠（"旧的不合
 - R4/R6 改用统一模板
 - 删除 6 个文件 + 6 个 embed 声明
 
-### 4.2 P1：R9/R10 改走共享 prefix
+### 4.2 P1：R9 改走共享 prefix
 
-R9/R10 完全脱离共享 prefix，与主循环切换时 0 命中。改走 `preparePromptPrefixMaterials` 路径后复用 high-static + frozen + semi-1，消除 0 命中和 prefix_misalign 度量干扰。
+R9 历史上脱离共享 prefix，与主循环切换时 0 命中。改走 `preparePromptPrefixMaterials` 路径后复用 high-static + frozen + semi-1，消除 0 命中和 prefix_misalign 度量干扰。
 
 ## 5. 合并后的角色全景
 

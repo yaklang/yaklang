@@ -361,7 +361,7 @@ preset := []ReActLoopOption{
     WithAllowToolCall(true),
     WithPersistentInstruction(instruction),
     WithReactiveDataBuilder(myReactiveDataBuilder),
-    WithReflectionOutputExample(outputExample),
+    WithOutputExample(outputExample),
     WithInitTask(myInitHandler),
     BuildOnPostIterationHook(invoker), // 整循环结束时 finalize
 }

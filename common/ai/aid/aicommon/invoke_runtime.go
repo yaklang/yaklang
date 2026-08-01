@@ -264,6 +264,10 @@ type LoopPromptAssemblyInput struct {
 	TodoSnapshot   string
 	ReactiveData   string
 	InjectedMemory string
+	// TodoCheckpoint is the one-shot soft-STW prompt tail. It is rendered as
+	// the final child of the pure dynamic section, immediately before the
+	// PROMPT_SECTION_dynamic_END marker, and never enters a cacheable section.
+	TodoCheckpoint string
 
 	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始
 	// 输入"两类只读上下文。注: 命名虽为 "Frozen", 但实际并不放入冻结段;

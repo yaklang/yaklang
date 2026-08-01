@@ -57,7 +57,7 @@ func ExampleKeywordScenarios_addCustomResponse() {
 	fmt.Printf("Custom response exists: %v\n", resp != nil)
 
 	// Output:
-	// Total responses: 21
+	// Total responses: 1
 	// Custom response exists: true
 }
 
@@ -139,7 +139,7 @@ func ExampleListScenarios() {
 	fmt.Printf("First scenario exists: %v\n", len(scenarios) > 0)
 
 	// Output:
-	// Total scenarios: 15
+	// Total scenarios: 14
 	// First scenario exists: true
 }
 

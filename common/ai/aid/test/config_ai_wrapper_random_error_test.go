@@ -89,7 +89,6 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 		aicommon.WithAIAutoRetry(1),
 		aicommon.WithAITransactionAutoRetry(3),
 		aicommon.WithDisableIntentRecognition(true),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithGenerateReport(false),

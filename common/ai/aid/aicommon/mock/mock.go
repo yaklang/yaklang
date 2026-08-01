@@ -275,8 +275,9 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 		renderMockUserQueryBlock(input.Nonce, input.UserQuery),
 		renderMockTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		input.SessionEvidence,
-		renderMockTaggedBlock("REFLECTION", input.Nonce, input.ReactiveData),
+		renderMockTaggedBlock("REACTIVE_DATA", input.Nonce, input.ReactiveData),
 		renderMockInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
+		input.TodoCheckpoint,
 	), input.Nonce)
 
 	return &aicommon.LoopPromptAssemblyResult{

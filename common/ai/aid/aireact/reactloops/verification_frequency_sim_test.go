@@ -665,12 +665,12 @@ func writeVerifyFrequencyExperimentReport(results []verifySimResult, baseSnapsho
 
 	buf.WriteString("## 16.4 redhaze fixture 关键结果\n\n")
 	redhazeKey := []simVerifyParams{
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 0, 0, 6},     // baseline (无 cooldown)
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},  // 新版默认
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 2, 5000, 3},  // cooldown=2 对比
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 8000, 3},  // 硬门更高
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 3000, 3},  // 硬门更低
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 5},  // firstFire 推后
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 0, 0, 6},    // baseline (无 cooldown)
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3}, // 新版默认
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 2, 5000, 3}, // cooldown=2 对比
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 8000, 3}, // 硬门更高
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 3000, 3}, // 硬门更低
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 5}, // firstFire 推后
 	}
 	writeFixtureSection(&buf, results, "redhaze", redhazeKey)
 
@@ -772,7 +772,7 @@ func writeVerifyFrequencyExperimentReport(results []verifySimResult, baseSnapsho
 	buf.WriteString("- 显式调用路径 (`VerifyUserSatisfactionNow` / `save_evidence` action) 与自动路径\n")
 	buf.WriteString("  在清零基线时刻上已对齐, 都使用 fire 结束时刻作为新基线 (见 16.8).\n")
 	buf.WriteString("- 提前完成场景 (`early_done` 画像): firstFire=3 让首次反馈最早在 iter=3 拿到, 后续靠 iter 门/硬门 兜底.\n")
-	buf.WriteString("- 副作用代价说明: lagIters>0 意味着 loop 多跑了几轮 \"无用工具调用\", 但每次工具调用本身有自己的 perception/反思节流, 不会失控.\n")
+	buf.WriteString("- 副作用代价说明: lagIters>0 意味着 loop 多跑了几轮 \"无用工具调用\", 但 perception 节流和 CURRENT TODO 软检查点仍会限制长链路漂移.\n")
 
 	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		return err

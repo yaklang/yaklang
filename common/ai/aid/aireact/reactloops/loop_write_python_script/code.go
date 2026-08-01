@@ -16,7 +16,7 @@ import (
 //go:embed prompts/persistent_instruction.txt
 var instruction string
 
-//go:embed prompts/reflection_output_example.txt
+//go:embed prompts/output_example.txt
 var outputExample string
 
 //go:embed prompts/reactive_data.txt
@@ -45,7 +45,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				modSuite.GetAITagOption(),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					pythonCode := loop.Get(modSuite.GetFullCodeVariableName())
 					codeWithLine := utils.PrefixLinesWithLineNumbers(pythonCode)

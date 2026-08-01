@@ -70,7 +70,7 @@ Boot 与 Run 双相执行：
 | Yak 常量 | Go 选项 |
 |---|---|
 | `__PERSISTENT_INSTRUCTION__` | `WithPersistentInstruction` |
-| `__REFLECTION_OUTPUT_EXAMPLE__` | `WithReflectionOutputExample` |
+| `__OUTPUT_EXAMPLE__` | `WithOutputExample` |
 | `__TOOL_CALL_INTERVAL_REVIEW_EXTRA_PROMPT__` | `WithToolCallIntervalReviewExtraPrompt` |
 
 #### 数值与开关阈值
@@ -79,14 +79,10 @@ Boot 与 Run 双相执行：
 |---|---|---|
 | `__MAX_ITERATIONS__` | `WithMaxIterations` | int |
 | `__PERIODIC_VERIFICATION_INTERVAL__` | `WithPeriodicVerificationInterval` | int |
-| `__SAME_ACTION_TYPE_SPIN_THRESHOLD__` | `WithSameActionTypeSpinThreshold` | int |
-| `__SAME_LOGIC_SPIN_THRESHOLD__` | `WithSameLogicSpinThreshold` | int |
-| `__MAX_CONSECUTIVE_SPIN_WARNINGS__` | `WithMaxConsecutiveSpinWarnings` | int |
 | `__MEMORY_SIZE_LIMIT__` | `WithMemorySizeLimit` | int |
 | `__NO_END_LOADING_STATUS__` | `WithNoEndLoadingStatus` | bool |
 | `__USE_SPEED_PRIORITY_AI__` | `WithUseSpeedPriorityAICallback` | bool |
 | `__DISABLE_LOOP_PERCEPTION__` | `WithDisableLoopPerception` | bool |
-| `__ENABLE_SELF_REFLECTION__` | `WithEnableSelfReflection` | bool |
 
 #### 能力开关（静态版）
 
@@ -118,7 +114,7 @@ Boot 与 Run 双相执行：
 | `focusOnAsyncTaskFinished` | `WithOnAsyncTaskFinished` | — |
 | `focusGeneratePrompt` | `WithLoopPromptGenerator` | — |
 | `focusPersistentContext` | `WithPersistentContextProvider` | 高于 `__PERSISTENT_INSTRUCTION__` |
-| `focusReflectionOutputExample` | `WithReflectionOutputExampleContextProvider` | 高于 `__REFLECTION_OUTPUT_EXAMPLE__` |
+| `focusOutputExample` | `WithOutputExampleContextProvider` | 高于 `__OUTPUT_EXAMPLE__` |
 | `focusReactiveData` | `WithReactiveDataBuilder` | — |
 | `focusActionFilter` | `WithActionFilter` | — |
 | `focusAllowRAG` | `WithAllowRAGGetter` | 高于 `__ALLOW_RAG__` |
@@ -327,8 +323,8 @@ sidekicks：
 | 类别 | 包含什么 |
 |---|---|
 | 元数据 dunder | `__VERBOSE_NAME__` / `__VERBOSE_NAME_ZH__` / `__DESCRIPTION__` / `__USAGE_PROMPT__` / `__OUTPUT_EXAMPLE__` |
-| Prompt 文本 | `__PERSISTENT_INSTRUCTION__` / `__REFLECTION_OUTPUT_EXAMPLE__` |
-| 阈值 | `__MAX_ITERATIONS__` / `__PERIODIC_VERIFICATION_INTERVAL__` / `__ENABLE_SELF_REFLECTION__` / `__SAME_ACTION_TYPE_SPIN_THRESHOLD__` / `__MAX_CONSECUTIVE_SPIN_WARNINGS__` / `__MEMORY_SIZE_LIMIT__` |
+| Prompt 文本 | `__PERSISTENT_INSTRUCTION__` / `__OUTPUT_EXAMPLE__` |
+| 阈值 | `__MAX_ITERATIONS__` / `__PERIODIC_VERIFICATION_INTERVAL__` / `__MEMORY_SIZE_LIMIT__` |
 | 能力开关 | `__ALLOW_RAG__` / `__ALLOW_TOOL_CALL__` / `__ALLOW_USER_INTERACT__` |
 | 初始变量 / 流字段 | `__VARS__` / `__AI_TAG_FIELDS__` |
 | 钩子 | `focusInitTask` / `focusOnLoopInstanceCreated` / `focusPostIteration` / `focusReactiveData` / `focusPersistentContext` |

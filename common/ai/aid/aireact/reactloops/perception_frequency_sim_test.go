@@ -68,7 +68,7 @@ var caseIterTimeFixtureRedhaze = []struct {
 //   - iterationTriggerInterval / minInterval / maxInterval
 //   - consecutiveUnchanged 触发 *=2 退避 (>=2 阈值)
 //   - PrevTopicsHash 比对 (hashTopics)
-//   - Forced/SpinDetected/LoopSwitch 三种 trigger 绕门更新
+//   - Forced/LoopSwitch 三种 trigger 绕门更新
 //
 // 关键词: 仿真控制器, 镜像 perceptionController 逻辑, 显式 now
 type simController struct {
@@ -134,7 +134,7 @@ func (s *simController) applyResult(now time.Time, changed bool, topics []string
 
 	shouldUpd := false
 	switch trigger {
-	case PerceptionTriggerForced, PerceptionTriggerSpinDetected, PerceptionTriggerLoopSwitch:
+	case PerceptionTriggerForced, PerceptionTriggerLoopSwitch:
 		shouldUpd = true
 	default:
 		if changed {
@@ -500,7 +500,7 @@ func writeFrequencyExperimentReport(results []simResult) error {
 	buf.WriteString("  因 capability 是累积加载, 已加载的 SKILL 仍可使用, 风险可接受.\n")
 	buf.WriteString("- minInterval=120s 在快节奏 iter (<60s/iter) 场景下会跳过多个候选,\n")
 	buf.WriteString("  但这正是设计目标 —— 同领域内的快速 drift 不需要每次重感知.\n")
-	buf.WriteString("- spin / forced / loop_switch 三种 trigger 仍然绕门即时刷新, 不受本次默认值调整影响,\n")
+	buf.WriteString("- forced / loop_switch 三种 trigger 仍然绕门即时刷新, 不受本次默认值调整影响,\n")
 	buf.WriteString("  保证了关键场景 (循环卡死/用户显式请求/子 loop 切换) 的响应性.\n")
 	buf.WriteString("- 退避算法 (`*=2 at consecutiveUnchanged>=2`) 不变, 在持续 drift 时仍可继续放大间隔到 max=5min.\n")
 

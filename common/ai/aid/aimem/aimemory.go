@@ -91,7 +91,6 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 	if requireInvoker && triage.invoker == nil && config.autoReActInvoker {
 		lightOpts := []aicommon.ConfigOption{
 			aicommon.WithMemoryTriage(triage),
-			aicommon.WithEnableSelfReflection(false),
 			aicommon.WithDisallowMCPServers(true),
 			aicommon.WithDisableSessionTitleGeneration(true),
 		}

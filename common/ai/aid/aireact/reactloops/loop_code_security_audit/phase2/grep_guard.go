@@ -19,7 +19,7 @@
 // Guard runs before mutator. Grep budget is checked in the guard using the pre-bump count;
 // the mutator bumps after the guard allows the call.
 //
-// See also: phase2_guards.go (read_file spin guards), phase2_read_file_guard.go,
+// See also: phase2_guards.go (read_file repeated-read guards), phase2_read_file_guard.go,
 // prompts/phase2_scan_instruction.txt.
 package phase2
 

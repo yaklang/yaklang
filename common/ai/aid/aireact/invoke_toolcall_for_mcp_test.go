@@ -230,7 +230,6 @@ func TestReAct_MCPToolUse(t *testing.T) {
 			out <- e.ToGRPC()
 		}),
 		aicommon.WithMemoryTriage(nil),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(false),           // Important: enable MCP servers
 		aicommon.WithDisableIntentRecognition(true),      // Prevent intent sub-loop from consuming mock responses
 		aicommon.WithDisableSessionTitleGeneration(true), // Prevent title generation from consuming mock responses

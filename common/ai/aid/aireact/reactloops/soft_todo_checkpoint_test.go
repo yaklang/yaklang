@@ -66,20 +66,44 @@ func newTodoGateTestLoop(t *testing.T, active []aicommon.VerificationTodoItem) (
 	return loop, invoker, cfg, task
 }
 
+func setCurrentTodo(t *testing.T, cfg *softCheckpointConfig, task aicommon.AIStatefulTask, id string) {
+	t.Helper()
+	current := id
+	delta := &aicommon.TodoDelta{
+		Current:    &current,
+		CurrentSet: true,
+		Add:        []aicommon.TodoAdd{{ID: id, Text: "work " + id}},
+	}
+	results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), delta)
+	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
+}
+
+func switchCurrentTodo(t *testing.T, cfg *softCheckpointConfig, task aicommon.AIStatefulTask, id string) {
+	t.Helper()
+	current := id
+	delta := &aicommon.TodoDelta{
+		Current:    &current,
+		CurrentSet: true,
+		Add:        []aicommon.TodoAdd{{ID: id, Text: "work " + id}},
+	}
+	results := cfg.ApplyTodoDelta(aicommon.BuildVerificationTodoScope(task), delta)
+	require.Empty(t, aicommon.FormatVerificationTodoApplyErrors(results))
+}
+
 func TestFinishFirstRequestAlwaysContinuesAndQueuesCheckpoint(t *testing.T) {
 	loop, _, _, task := newTodoGateTestLoop(t, nil)
 	op := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, op)
 	require.True(t, op.IsContinued())
-	require.Equal(t, softTodoCheckpointPrompt, loop.consumeSoftTodoCheckpoint())
-	require.Empty(t, loop.consumeSoftTodoCheckpoint())
+	require.Equal(t, softTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
 func TestFinishSecondRequestExitsWithoutOpenTodos(t *testing.T) {
 	loop, _, _, task := newTodoGateTestLoop(t, nil)
 	first := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, first)
-	_ = loop.consumeSoftTodoCheckpoint()
+	_ = loop.consumeTodoCheckpoint()
 	second := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, second)
 	terminated, err := second.IsTerminated()
@@ -91,24 +115,24 @@ func TestFinishSecondRequestRejectsOpenTodosWithoutRepeatingCheckpoint(t *testin
 	loop, _, _, task := newTodoGateTestLoop(t, []aicommon.VerificationTodoItem{{ID: "todo-1", Content: "work", Status: aicommon.VerificationTodoStatusDoing}})
 	first := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, first)
-	_ = loop.consumeSoftTodoCheckpoint()
+	_ = loop.consumeTodoCheckpoint()
 	second := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, second)
 	require.True(t, second.IsContinued())
 	require.Contains(t, second.GetFeedback().String(), "todo_delta.close")
-	require.Empty(t, loop.consumeSoftTodoCheckpoint())
+	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
 func TestNonFinishResetsFinishFlow(t *testing.T) {
 	loop, _, _, task := newTodoGateTestLoop(t, nil)
 	first := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, first)
-	_ = loop.consumeSoftTodoCheckpoint()
+	_ = loop.consumeTodoCheckpoint()
 	loop.resetSoftTodoFinishFlow()
 	again := NewActionHandlerOperator(task)
 	loopAction_Finish.ActionHandler(loop, nil, again)
 	require.True(t, again.IsContinued())
-	require.Equal(t, softTodoCheckpointPrompt, loop.consumeSoftTodoCheckpoint())
+	require.Equal(t, softTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
 }
 
 func TestGoalModeGatePrecedesCheckpoint(t *testing.T) {
@@ -120,7 +144,7 @@ func TestGoalModeGatePrecedesCheckpoint(t *testing.T) {
 	loopAction_Finish.ActionHandler(loop, nil, op)
 	require.True(t, op.IsContinued())
 	require.True(t, strings.Contains(op.GetFeedback().String(), "goal mode"))
-	require.Empty(t, loop.consumeSoftTodoCheckpoint())
+	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
 func TestDirectlyAnswerEmitsAndContinuesWithoutImplicitFinish(t *testing.T) {
@@ -149,4 +173,81 @@ func TestDirectlyAnswerWithOpenTodosStillEmitsAndContinues(t *testing.T) {
 	require.True(t, op.IsContinued())
 	require.Equal(t, []string{"progress"}, invoker.results)
 	require.Contains(t, op.GetFeedback().String(), "Remaining TODOs")
+}
+
+func TestCurrentTodoCheckpointQueuesAfterTwentyFifthValidIteration(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	setCurrentTodo(t, cfg, task, "todo-1")
+
+	for iteration := 0; iteration < currentTodoCheckpointThreshold-1; iteration++ {
+		loop.recordCurrentTodoIteration(task)
+	}
+	require.Empty(t, loop.consumeTodoCheckpoint(), "the 24th iteration must not queue a checkpoint")
+
+	loop.recordCurrentTodoIteration(task)
+	require.Equal(t, currentTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+	require.Empty(t, loop.consumeTodoCheckpoint())
+}
+
+func TestCurrentTodoCheckpointRestartsWindowAfterInjection(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	setCurrentTodo(t, cfg, task, "todo-1")
+
+	for iteration := 0; iteration < currentTodoCheckpointThreshold; iteration++ {
+		loop.recordCurrentTodoIteration(task)
+	}
+	require.Equal(t, currentTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+
+	for iteration := 0; iteration < currentTodoCheckpointThreshold-1; iteration++ {
+		loop.recordCurrentTodoIteration(task)
+	}
+	require.Empty(t, loop.consumeTodoCheckpoint())
+	loop.recordCurrentTodoIteration(task)
+	require.Equal(t, currentTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+}
+
+func TestCurrentTodoCheckpointDropsWhenCurrentChangesBeforeInjection(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	setCurrentTodo(t, cfg, task, "todo-1")
+	for iteration := 0; iteration < currentTodoCheckpointThreshold; iteration++ {
+		loop.recordCurrentTodoIteration(task)
+	}
+
+	switchCurrentTodo(t, cfg, task, "todo-2")
+	require.Empty(t, loop.consumeTodoCheckpoint())
+	loop.recordCurrentTodoIteration(task)
+	progress := loop.currentTodoProgress[todoCheckpointScopeKey(aicommon.BuildVerificationTodoScope(task))]
+	require.NotNil(t, progress)
+	require.Equal(t, "todo-2", progress.CurrentTodoID)
+	require.Equal(t, 1, progress.Iterations)
+}
+
+func TestCurrentTodoCheckpointIsIsolatedByTaskScope(t *testing.T) {
+	loop, invoker, cfg, firstTask := newTodoGateTestLoop(t, nil)
+	setCurrentTodo(t, cfg, firstTask, "todo-1")
+	for iteration := 0; iteration < currentTodoCheckpointThreshold; iteration++ {
+		loop.recordCurrentTodoIteration(firstTask)
+	}
+
+	secondTask := aicommon.NewStatefulTaskBase("task-2", "input", context.Background(), cfg.GetEmitter(), true)
+	setCurrentTodo(t, cfg, secondTask, "todo-2")
+	invoker.SetCurrentTask(secondTask)
+	loop.SetCurrentTask(secondTask)
+	require.Empty(t, loop.consumeTodoCheckpoint())
+
+	invoker.SetCurrentTask(firstTask)
+	loop.SetCurrentTask(firstTask)
+	require.Equal(t, currentTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+}
+
+func TestFinishCheckpointSubsumesPendingCurrentCheckpoint(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	setCurrentTodo(t, cfg, task, "todo-1")
+	for iteration := 0; iteration < currentTodoCheckpointThreshold; iteration++ {
+		loop.recordCurrentTodoIteration(task)
+	}
+
+	require.False(t, loop.requestSoftTodoCheckpoint())
+	require.Equal(t, softTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+	require.Empty(t, loop.consumeTodoCheckpoint())
 }

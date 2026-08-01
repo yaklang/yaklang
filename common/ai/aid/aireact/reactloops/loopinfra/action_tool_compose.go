@@ -170,8 +170,6 @@ Example - Sequential file operations(With AI-Tag tags):
 			loopInfraActionFinish(loop, loopInfraNodeToolCompose,
 				"工具编排解析失败 / Tool Compose Build Failed",
 				utils.ShrinkTextBlock(errMsg, 800))
-			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-			operator.SetReflectionData("dag_build_error", err.Error())
 			operator.Feedback(utils.Error(errMsg))
 			operator.Continue()
 			return
@@ -253,9 +251,6 @@ Example - Sequential file operations(With AI-Tag tags):
 			loopInfraActionFinish(loop, loopInfraNodeToolCompose,
 				"工具编排执行失败 / Tool Compose Execution Failed",
 				utils.ShrinkTextBlock(errMsg, 800))
-			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-			operator.SetReflectionData("dag_execution_error", err.Error())
-			operator.SetReflectionData("execution_errors", executionErrors)
 			operator.Feedback(utils.Error(errMsg))
 			operator.Continue()
 			return
@@ -304,8 +299,6 @@ Example - Sequential file operations(With AI-Tag tags):
 
 		// If there were any errors during execution, provide feedback
 		if len(executionErrors) > 0 {
-			operator.SetReflectionLevel(reactloops.ReflectionLevel_Standard)
-			operator.SetReflectionData("partial_errors", executionErrors)
 		}
 
 		operator.Continue()

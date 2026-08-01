@@ -27,7 +27,6 @@ func newHTTPFuzztestAICallbackInvoker(t *testing.T, cb aicommon.AICallbackType) 
 	base.SetConfig(aicommon.NewConfig(
 		ctx,
 		aicommon.WithAICallback(cb),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithDisableIntentRecognition(true),

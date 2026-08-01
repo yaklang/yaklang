@@ -2,13 +2,13 @@
 seq:    000010
 time:   2026-05-03T11:35:39+08:00
 model:  memfit-light-free
-total:  29107 bytes / 4 chunks
+total:  29113 bytes / 4 chunks
 
 ## sections
 [1] section=high-static   nonce=high-static              bytes=8822 hash=7a49ff8118696481 seen=1 first=2026-05-03T11:35:39+08:00
 [2] section=semi-dynamic  nonce=semi-dynamic             bytes=12683 hash=83c6d07057edd970 seen=1 first=2026-05-03T11:35:39+08:00
 [3] section=timeline      nonce=timeline                 bytes=2574 hash=58eb46ce794263dd seen=1 first=2026-05-03T11:35:39+08:00
-[4] section=dynamic       nonce=dynamic_OVGn             bytes=4760 hash=42bf09ce485eb7d1 seen=1 first=2026-05-03T11:35:39+08:00
+[4] section=dynamic       nonce=dynamic_OVGn             bytes=4766 hash=42bf09ce485eb7d1 seen=1 first=2026-05-03T11:35:39+08:00
 
 ## hit report
 prefix_hit_chunks: 0
@@ -29,7 +29,7 @@ section_hash_count:
 - high-static section unstable: 9 distinct hashes seen, check template variables polluting it
 - semi-dynamic section drifts more than expected: 9 distinct hashes, tool/forge/schema list may be churning
 
-## raw prompt (29107 bytes)
+## raw prompt (29113 bytes)
 <|PROMPT_SECTION_high-static|>
 <|TRAITS|>
 ## Core Traits (核心性格) - 严肃/专业/无Emoji
@@ -465,7 +465,7 @@ last-content is empty, new content added
 
 
 
-<|REFLECTION_OVGn|>
+<|REACTIVE_DATA_OVGn|>
 LANGUAGE: 请使用中文进行意图分析和输出。
 
 ## 当前意图识别状态 / Intent Recognition State
@@ -520,5 +520,5 @@ hostscan
 5. 如果用户输入直接包含了某个 identifier，优先确认并推荐该能力。
 
 
-<|REFLECTION_END_OVGn|>
+<|REACTIVE_DATA_END_OVGn|>
 <|PROMPT_SECTION_dynamic_END_OVGn|>

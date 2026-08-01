@@ -50,19 +50,11 @@ func handleToolCallResult(
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingError(err) {
 			operator.Feedback(errMsg + "\n\n[MCP] This MCP tool is still connecting to its remote server. " +
 				"Wait a few seconds and call the same tool again with require_tool; do NOT switch to an unrelated tool.")
-			operator.SetReflectionLevel(reactloops.ReflectionLevel_Standard)
 		} else if !resolved.IsUnknown() && resolved.IdentityType != aicommon.ResolvedAs_Tool {
 			invoker.AddToTimeline("identifier_resolved", resolved.Suggestion)
 			operator.Feedback(errMsg + "\n\n" + resolved.Suggestion)
-			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
 		} else {
 			operator.Feedback(errMsg + " Please try a different tool or approach.")
-			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-		}
-		operator.SetReflectionData("tool_error", err.Error())
-		operator.SetReflectionData("tool_name", toolPayload)
-		if operator.GetReflectionLevel() == reactloops.ReflectionLevel_Critical {
-			operator.SetReflectionData("resolved_type", string(resolved.IdentityType))
 		}
 		operator.Continue()
 		return

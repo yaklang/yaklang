@@ -195,7 +195,7 @@ aicommon.WithGeneralConfigStreamableFieldCallback(
 
 ### A. 感知层（perception）
 
-[perception.go](../perception.go) 每隔几轮跑一次：抽取当前任务的 topic / keywords / summary / confidence，注入下一轮 prompt 的 `<|REFLECTION_<nonce>|>` 段。
+[perception.go](../perception.go) 每隔几轮跑一次：抽取当前任务的 topic / keywords / summary / confidence，注入下一轮 prompt 的 `<|REACTIVE_DATA_<nonce>|>` 段。
 
 ```go
 action, err := r.invoker.InvokeSpeedPriorityLiteForge(ctx, "perception",
@@ -216,15 +216,11 @@ state.OneLinerSummary = action.GetString("summary")
 
 [capability_search.go](../capability_search.go) 把候选能力分块（防超长 prompt），每块用 LiteForge 让 LLM 选 top-N。
 
-### C. 自旋 AI 检测
-
-[spin_detection.go](../spin_detection.go) 第二层：当同 type action 触发 N 次后，跑 LiteForge 让 LLM 判断"是否真的是死循环"。
-
-### D. 技能加载冲突仲裁
+### C. 技能加载冲突仲裁
 
 [loopinfra/action_loading_skills.go](../loopinfra/action_loading_skills.go) 加载多个技能时，用 LiteForge 判断哪个最相关、是否冲突。
 
-### E. 计划生成
+### D. 计划生成
 
 [loop_plan/generate_document_and_plan.go](../loop_plan/generate_document_and_plan.go) / [loop_plan/facts.go](../loop_plan/facts.go) 一系列 LiteForge 步骤生成正式的多步任务计划。
 
@@ -308,7 +304,7 @@ reactloops.WithRegisterLoopAction(
         )
         if err != nil {
             invoker.AddToTimeline("extract-failed", fmt.Sprintf("liteforge failed: %v", err))
-            op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+			op.Feedback(fmt.Sprintf("liteforge failed: %v", err))
             op.Continue()
             return
         }
@@ -334,7 +330,7 @@ reactloops.WithRegisterLoopAction(
 2. **prompt 构造**：清晰、有上下文、用代码块包裹用户数据
 3. **outputs 设计**：每个字段都有 description，LLM 才知道怎么填
 4. **流式字段**：让 `message` 实时流到 UI
-5. **失败 fallback**：不直接 Fail loop，而是 `Continue` + `Critical` reflection，让主 LLM 反思下一步
+5. **失败 fallback**：不直接 Fail loop，而是写普通 feedback 后 `Continue`，让下一轮主决策选择替代路径
 6. **结果落地**：`AddToTimeline` + `loop.Set` + `op.Feedback` 三处都写
 
 ### 7.6.1 `AddToTimeline` vs `loop.Set` vs `op.Feedback`
@@ -476,7 +472,7 @@ LLM 会"省略"它觉得不重要的字段，结果 `action.GetString("xxx")` �
 ## 7.10 进一步阅读
 
 - [05-hooks-and-lifecycle.md](05-hooks-and-lifecycle.md)：在 InitTask / OnPostIteraction 用 LiteForge
-- [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：感知 / 反思 / 自旋都基于 LiteForge
+- [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：感知、验证门和 TODO 软检查点
 - [09-capabilities.md](09-capabilities.md)：capability_search 用 LiteForge 做分块匹配
 - 源码：
   - [common/aiforge/liteforge.go](../../../../aiforge/liteforge.go)

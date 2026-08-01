@@ -1736,7 +1736,7 @@ func BuildTrajectory(sessionID string, events []*schema.AiOutputEvent) *Trajecto
 			var obs promptObservation
 			if err := json.Unmarshal(e.Content, &obs); err == nil && obs.LoopName != "" {
 				// A prompt_profile carries the loop_name of the loop that produced
-				// the AI reflection, but its DB task_id column may be the session
+				// the AI loop invocation, but its DB task_id column may be the session
 				// root (sub-loops forward events through the parent emitter). Setting
 				// this on the root task's meta would let a child loop's name (e.g.
 				// dir_explore during Phase 1) pollute the session root node, so the

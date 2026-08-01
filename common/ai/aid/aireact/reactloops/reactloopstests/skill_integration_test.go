@@ -23,10 +23,9 @@ import (
 //
 // Priority order (first match wins):
 //   1. verify-satisfaction  — "verify-satisfaction" + "user_satisfied" + "reasoning"
-//   2. self-reflection      — "SELF_REFLECTION_TASK"
-//   3. call-tool params     — "# Tool Context" + "call-tool" (R2 reuses R1 instruction)
-//   4. main ReAct prompt    — "directly_answer" + "SCHEMA" + "USER_QUERY"
-//   5. unknown / fallback
+//   2. call-tool params     — "# Tool Context" + "call-tool" (R2 reuses R1 instruction)
+//   3. main ReAct prompt    — "directly_answer" + "SCHEMA" + "USER_QUERY"
+//   4. unknown / fallback
 //
 // The main ReAct prompt is the only one that contains the action schema
 // (including loading_skills when skills are configured).
@@ -73,7 +72,6 @@ const (
 	promptUnknown promptType = iota
 	promptMainReAct
 	promptVerifySatisfaction
-	promptSelfReflection
 	promptCallToolParams
 )
 
@@ -85,17 +83,12 @@ func classifyPrompt(prompt string) promptType {
 		return promptVerifySatisfaction
 	}
 
-	// 2. self-reflection: unique tag never present elsewhere
-	if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
-		return promptSelfReflection
-	}
-
-	// 3. call-tool params: two markers that uniquely identify it
+	// 2. call-tool params: two markers that uniquely identify it
 	if aicommon.IsToolParamGenPromptForTool(prompt, "") && strings.Contains(prompt, "call-tool") {
 		return promptCallToolParams
 	}
 
-	// 4. main ReAct prompt: three markers that uniquely and stably identify it
+	// 3. main ReAct prompt: three markers that uniquely and stably identify it
 	//    - "directly_answer": always present as an action type in the schema
 	//    - "SCHEMA": static schema block unique to main prompt
 	//    - "USER_QUERY": nonce-tagged user query block unique to main prompt
@@ -140,12 +133,6 @@ func handleNonMainPrompt(prompt string, i aicommon.AICallerConfigIf) (*aicommon.
 	case promptVerifySatisfaction:
 		rsp, err := makeVerifySatisfactionResponse(i)
 		return rsp, err, true
-	case promptSelfReflection:
-		// self-reflection: return a simple positive reflection
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"action_is_effective": true, "should_continue": true, "suggestion": ""}`))
-		rsp.Close()
-		return rsp, nil, true
 	case promptCallToolParams:
 		// call-tool params: should not appear in skill tests (no tools), finish gracefully
 		rsp, err := makeFinishResponse(i)

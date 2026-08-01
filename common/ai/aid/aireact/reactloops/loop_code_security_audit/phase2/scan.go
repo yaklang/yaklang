@@ -406,7 +406,7 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 //   - grep mutator: phase-B content mode + grep counters (phase2_grep_guard.go)
 //   - discovery guard: block find_file/tree in phase B
 //   - trace grep guard: scoped content grep in phase B
-//   - spot-read / read-spin guards: phase2_guards.go
+//   - spot-read / repeated-read guards: phase2_guards.go
 func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, category model.VulnCategory, categoryIndex, categoryTotal int, initialScan *ScanState, artifacts *categoryArtifactStore) (*reactloops.ReActLoop, *ScanState, error) {
 	scan := initialScan
 	if scan == nil {
@@ -423,9 +423,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithSameActionTypeSpinThreshold(len(category.SinkHints)*2 + 5),
-		reactloops.WithSameLogicSpinThreshold(3),
-		reactloops.WithMaxConsecutiveSpinWarnings(4),
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
@@ -442,7 +439,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			}
 			return utils.RenderTemplate(phase2ScanInstruction, vars)
 		}),
-		reactloops.WithReflectionOutputExample(phase2OutputExample),
+		reactloops.WithOutputExample(phase2OutputExample),
 
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 			iterCount := loop.GetCurrentIterationIndex()
@@ -574,7 +571,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 		reactloops.WithToolInvokeGuard(buildPhase2PhaseBDiscoveryToolGuard(scan)),
 		reactloops.WithToolInvokeGuard(buildPhase2PhaseBGrepGuard(scan, state.ProjectPath)),
 		reactloops.WithToolInvokeGuard(buildPhase2PhaseASpotReadGuard(scan)),
-		reactloops.WithToolInvokeGuard(buildPhase2PhaseBReadSpinGuard(scan)),
+		reactloops.WithToolInvokeGuard(buildPhase2PhaseBReadRepeatGuard(scan)),
 
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, op *reactloops.OnPostIterationOperator) {
 			if !isDone || scanCompleted {
@@ -963,7 +960,6 @@ func BuildAllCategoriesLoop(r aicommon.AIInvokeRuntime, state *model.AuditState,
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithEnableSelfReflection(false),
 
 		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 			finalCategories := overrideCategories

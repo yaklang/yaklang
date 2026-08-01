@@ -44,10 +44,6 @@ func (s *promptRenderLoopStub) GetMemoryTriage() aicommon.MemoryTriage {
 	return nil
 }
 
-func (s *promptRenderLoopStub) GetEnableSelfReflection() bool {
-	return false
-}
-
 func (s *promptRenderLoopStub) Set(key string, value any) {}
 
 func (s *promptRenderLoopStub) Get(key string) string {

@@ -35,7 +35,7 @@ func init() {
 				reactloops.WithMaxIterations(0), // init-only loop: no ReAct iterations needed
 				reactloops.WithDisableIncreaseIteration(true),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 			}
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INTENT, r, preset...)

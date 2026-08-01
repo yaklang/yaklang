@@ -145,10 +145,6 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithEnableSelfReflection(false),
-		reactloops.WithSameActionTypeSpinThreshold(3),
-		reactloops.WithSameLogicSpinThreshold(3),
-		reactloops.WithMaxConsecutiveSpinWarnings(2),
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
@@ -207,7 +203,7 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 				"ExploreWorkDir": exploreWorkDir,
 			})
 		}),
-		reactloops.WithReflectionOutputExample(exploreOutputExample),
+		reactloops.WithOutputExample(exploreOutputExample),
 
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 			iterCount := loop.GetCurrentIterationIndex()

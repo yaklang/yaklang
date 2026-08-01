@@ -18,7 +18,7 @@ var persistentInstruction string
 //go:embed prompts/reactive_data.txt
 var reactiveData string
 
-//go:embed prompts/reflection_output_example.txt
+//go:embed prompts/output_example.txt
 var outputExample string
 
 func init() {
@@ -35,7 +35,7 @@ func init() {
 				reactloops.WithMaxIterations(20),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(persistentInstruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFlowAnalyze),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					currentIter := loop.GetCurrentIterationIndex()

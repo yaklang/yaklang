@@ -32,7 +32,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithAITagFieldWithAINodeId("JAVA_CODE", "java_code", "re-act-loop-answer-payload", "code/java"),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					currentFile := loop.Get("current_file")
 					currentFileContent := loop.Get("current_file_content")

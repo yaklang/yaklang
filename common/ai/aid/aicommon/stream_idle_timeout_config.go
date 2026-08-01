@@ -8,8 +8,8 @@ import (
 
 const (
 	// ConfigKeyEnableAIStreamIdleTimeout toggles the StreamIdleTimeoutReader
-	// wrap around post-action synchronous AI calls (verification /
-	// Critical-level reflection). Default is true; the operator can flip it
+	// wrap around post-action synchronous AI calls such as verification.
+	// Default is true; the operator can flip it
 	// off via SetConfig at runtime to restore the pre-fix behavior in case a
 	// regression is suspected.
 	//
@@ -72,8 +72,8 @@ func ResolveAIStreamIdleThresholds(cfg KeyValueConfigIf) (ttfb, idle time.Durati
 }
 
 // LogStreamTimingSnapshot writes a single structured log line summarizing a
-// stream timing snapshot. tag identifies the call site (e.g. "VERIFY_AI_TIMING"
-// or "REFLECTION_AI_TIMING") so downstream log analysis can attribute timings
+// stream timing snapshot. tag identifies the call site (e.g. "VERIFY_AI_TIMING")
+// so downstream log analysis can attribute timings
 // to the correct AI call.
 //
 // 关键词: LogStreamTimingSnapshot, 结构化计时日志, P0 埋点
