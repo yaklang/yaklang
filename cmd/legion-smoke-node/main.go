@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,10 +14,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/scannode"
 )
 
@@ -110,6 +115,9 @@ func runNode(args []string) error {
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
+	if err := initializeAISessionCapabilities(*kind, syncAISessionCapabilities); err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -158,16 +166,16 @@ func runNode(args []string) error {
 	}
 
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
-		NodeType:            spec.NodeType_Scanner,
-		Kind:                strings.TrimSpace(*kind),
-		NodeID:              *nodeID,
-		DisplayName:         *displayName,
-		AgentInstallationID: *agentInstallationID,
-		BaseDir:             *baseDir,
-		EnrollmentToken:     *enrollmentToken,
-		PlatformAPIBaseURL:  *apiURL,
-		Version:             *version,
-		HeartbeatInterval:   *heartbeatInterval,
+		NodeType:             spec.NodeType_Scanner,
+		Kind:                 strings.TrimSpace(*kind),
+		NodeID:               *nodeID,
+		DisplayName:          *displayName,
+		AgentInstallationID:  *agentInstallationID,
+		BaseDir:              *baseDir,
+		EnrollmentToken:      *enrollmentToken,
+		PlatformAPIBaseURL:   *apiURL,
+		Version:              *version,
+		HeartbeatInterval:    *heartbeatInterval,
 		HostIdentityProvider: hostIdentityProvider,
 		PostBootstrapHook:    postBootstrapHook,
 	})
@@ -184,6 +192,48 @@ func runNode(args []string) error {
 	<-ctx.Done()
 	scanNode.Shutdown()
 	<-done
+	return nil
+}
+
+// initializeAISessionCapabilities keeps host Scan Nodes on their existing
+// startup path while making the ephemeral AI session runtime self-contained.
+// The full Yakit post-init pipeline also imports unrelated plugins and rules;
+// synchronizing only the capability stores keeps session startup bounded.
+func initializeAISessionCapabilities(kind string, syncFn func() error) error {
+	if strings.TrimSpace(kind) != "ai_session" {
+		return nil
+	}
+	if syncFn == nil {
+		return fmt.Errorf("initialize AI session capabilities: sync function is nil")
+	}
+	if err := syncFn(); err != nil {
+		return fmt.Errorf("initialize AI session capabilities: %w", err)
+	}
+	return nil
+}
+
+func syncAISessionCapabilities() error {
+	// Capability search reads the profile database, while the tool manager also
+	// keeps an in-memory registry. Ephemeral session containers previously only
+	// populated the latter, so query_capabilities saw zero tools and blueprints.
+	yakscripttools.OverrideYakScriptAiTools()
+	yakscripttools.UpdateAIYakToolAIOutputOption()
+
+	db := consts.GetGormProfileDatabase()
+	toolCount, err := yakit.CountAIYakTools(db, nil)
+	if err != nil {
+		return fmt.Errorf("verify built-in AI tools: %w", err)
+	}
+	if toolCount == 0 {
+		return fmt.Errorf("verify built-in AI tools: capability store is empty")
+	}
+
+	if err := aiforge.ForceSyncBuildInForge(); err != nil {
+		return fmt.Errorf("sync built-in AI blueprints: %w", err)
+	}
+	if _, err := yakit.GetAIForgeByName(db, "hostscan"); err != nil {
+		return fmt.Errorf("verify built-in AI blueprint hostscan: %w", err)
+	}
 	return nil
 }
 
