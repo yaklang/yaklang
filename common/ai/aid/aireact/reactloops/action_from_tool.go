@@ -158,9 +158,6 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				// FIX: Instead of terminating the loop, record error and allow AI to retry
 				errMsg := fmt.Sprintf("Tool '%s' execution failed: %v. Please try a different approach or tool.", tool.GetName(), err)
 				invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
-				operator.SetReflectionLevel(ReflectionLevel_Critical)
-				operator.SetReflectionData("tool_error", err.Error())
-				operator.SetReflectionData("tool_name", tool.GetName())
 				operator.Continue()
 				return
 			}
@@ -190,9 +187,6 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				// FIX: Instead of terminating the loop, record error and allow AI to retry
 				errMsg := fmt.Sprintf("Tool '%s' returned error: %s. Please try a different approach or tool.", tool.GetName(), result.Error)
 				invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
-				operator.SetReflectionLevel(ReflectionLevel_Critical)
-				operator.SetReflectionData("tool_error", result.Error)
-				operator.SetReflectionData("tool_name", tool.GetName())
 				// Continue to allow AI to try another approach
 				// Note: We still proceed to verify user satisfaction to give AI context
 			}

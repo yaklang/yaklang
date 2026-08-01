@@ -155,7 +155,7 @@ DYNAMIC    <|PROMPT_SECTION_dynamic_<turnNonce>|>
   归入 SEMI 块.
 - **Schema 在 SEMI 段**: schema 跨 react loop 切换会变化, 把它和 SkillsContext
   归为同一中等稳定段, 不污染 FROZEN 字节边界。
-- **CacheToolCall 在 SEMI 段 (P1 物理迁移)**: 历史上该块位于 dynamic/REFLECTION,
+- **CacheToolCall 在 SEMI 段 (P1 物理迁移)**: 历史上该块位于 dynamic/reactive-data,
   内含 turn nonce 导致每轮变化无法缓存. 现迁到 SEMI 段并改用稳定 nonce 渲染,
   随 SEMI 段一起进入二级 cache 命中.
 - **Timeline 末桶在 OPEN**: 最末 interval 桶仍在写入, midterm 检索结果也只在
@@ -812,4 +812,3 @@ dynamic 段尺寸并提升缓存命中:
   本次 P2.1 不动; 若 cachebench 仍发现 finish 跳变是主要 churn 源, 再考虑
   把 `finish` 也保留 + ReactiveData 段加 "[do not use finish in this turn]"
   约束转移。先观察 P2.1 单点改动收益再决定。
-

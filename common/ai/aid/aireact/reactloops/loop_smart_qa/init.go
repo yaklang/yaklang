@@ -45,7 +45,7 @@ func init() {
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithMaxIterations(5),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 					for _, name := range allowedActions {

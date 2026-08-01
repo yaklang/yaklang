@@ -90,7 +90,7 @@ func buildSchema(actions ...*LoopAction) string {
 
 func todoDeltaSchemaOption() aitool.ToolOption {
 	return aitool.WithStructParam("todo_delta", []aitool.PropertyOption{
-		aitool.WithParam_Description("Optional short-term TODO work-set delta. Omit it when nothing changes. Apply order is add, update, close, current. When initializing a multi-step work set, cover the user's explicit dimensions and set one explicit-id item current. Every close requires outcome and reason; refs is a separate sibling field. Base close data only on observations already available before the current action runs."),
+		aitool.WithParam_Description("Optional short-term TODO work-set delta. Omit it when nothing changes. Apply order is add, update, close, current. When initializing a multi-step work set, cover the user's explicit dimensions and set one explicit-id item current. Upgrade high-value signals into a concrete falsifiable current TODO and keep that focus until confirmed, discriminatively ruled out, or explicitly blocked. Every close requires outcome and reason; refs is a separate sibling field. Base close data only on observations already available before the current action runs. For verification TODOs, the reason must identify experiments and observations that distinguish the hypothesis; a single ordinary request, payload miss, scanner miss, or absence of an obvious error is insufficient to close."),
 	},
 		aitool.WithRawParam("current", map[string]any{"type": []string{"string", "null"}, "description": "Optional unique current TODO id. Omit to keep focus; null or empty clears it."}),
 		aitool.WithStructArrayParam("add", nil, nil,

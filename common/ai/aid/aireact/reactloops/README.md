@@ -22,10 +22,9 @@ flowchart TD
     CallAI --> Extract["ExtractActionFromStream<br/>(解析 @action + 字段)"]
     Extract --> Verify["ActionVerifier"]
     Verify --> Handle["ActionHandler<br/>(operator.Continue/Exit/Fail/Feedback)"]
-    Handle --> Reflect["Reflection<br/>(可选 5 级)"]
-    Reflect --> Perceive["Perception<br/>(可选触发感知)"]
-    Perceive --> Spin["SpinDetection<br/>(自旋检测)"]
-    Spin --> Verif["VerificationGate<br/>(节流/强制/Watchdog)"]
+    Handle --> Perceive["Perception<br/>(可选触发感知)"]
+    Perceive --> TodoGate["TODO Soft Checkpoint<br/>(Finish / CURRENT 25轮)"]
+    TodoGate --> Verif["VerificationGate<br/>(节流/强制/Watchdog)"]
     Verif --> Loop
     Loop -->|退出| Post["OnPostIteration Hook<br/>(可强制 finalize)"]
     Post --> End["任务结束"]
@@ -51,7 +50,7 @@ flowchart TD
 2. **Action 体系**：内置 / loopinfra 通用 / 从 Tool 派生 / 从子 Loop 派生 四种来源。
 3. **生命周期 Hook**：`InitTask` / `OnPostIteraction` / `OnLoopInstanceCreated` / 异步任务回调。
 4. **Emitter 流式输出**：把任务进度、思考、结果以事件流推给 UI。
-5. **确定性机制**：感知（Perception）+ 反思（Reflection）+ 自旋检测（SpinDetection）+ 验证门（VerificationGate）。
+5. **稳定机制**：感知（Perception）+ TODO 软检查点 + 验证门（VerificationGate）。
 
 ## 已注册的专注模式速查
 
@@ -90,7 +89,7 @@ flowchart TD
 | [docs/05-hooks-and-lifecycle.md](docs/05-hooks-and-lifecycle.md) | `InitTask` / `OnPostIteraction` / `OnLoopInstanceCreated` / 异步任务钩子 |
 | [docs/06-emitter-and-streaming.md](docs/06-emitter-and-streaming.md) | `Emitter` 结构、流式机制、事件速查表、UX 最佳实践 |
 | [docs/07-liteforge.md](docs/07-liteforge.md) | LiteForge 定位、API、三档优先级、在各 loop_xxx 的应用、实战示例 |
-| [docs/08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) | 感知 / 反思 / 自旋检测 / 验证门四件套 + 调参组合 |
+| [docs/08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) | 感知 / 验证门 / Finished 与 CURRENT TODO 软检查点 |
 | [docs/09-capabilities.md](docs/09-capabilities.md) | Capability 体系、`ExtraCapabilitiesManager`、`load_capability` 的 4 种身份、子 loop 作为能力 |
 | [docs/10-build-your-own-loop.md](docs/10-build-your-own-loop.md) | **重头戏**：12 步端到端教程 + checklist，所有样板代码 |
 | [docs/11-case-studies.md](docs/11-case-studies.md) | 17 个 loop_xxx 横向对比表 + 5 个重点细讲 |
@@ -189,8 +188,7 @@ import (
 | 想自定义 prompt | [03-prompt-system.md](docs/03-prompt-system.md) |
 | 想嵌套调用另一个专注模式 | [04-actions.md](docs/04-actions.md) 来源 4 + [09-capabilities.md](docs/09-capabilities.md) |
 | 想在循环结束时强制写一个 Markdown 报告 | [05-hooks-and-lifecycle.md](docs/05-hooks-and-lifecycle.md) `OnPostIteraction` |
-| 想让模型在执行后自检 | [08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) Reflection / Verification |
-| 想防止模型重复调用同一个 action | [08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) Spin Detection |
+| 想让长链路克制地校正当前路径 | [08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) CURRENT TODO 软检查点 |
 | 想让 UI 实时显示思考过程 | [06-emitter-and-streaming.md](docs/06-emitter-and-streaming.md) |
 | 想让用户感知到「在写、在流、马上好了」 | [14-streaming-ux.md](docs/14-streaming-ux.md) |
 | 想从零写一个新专注模式 | [10-build-your-own-loop.md](docs/10-build-your-own-loop.md) |

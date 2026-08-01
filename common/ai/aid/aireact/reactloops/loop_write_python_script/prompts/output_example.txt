@@ -1,4 +1,4 @@
-## Output Examples
+## Output Example
 
 ### Example 1: Write a new script (only when NO code exists)
 

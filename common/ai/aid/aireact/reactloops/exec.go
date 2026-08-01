@@ -955,8 +955,7 @@ LOOP:
 
 		r.loadingStatus(fmt.Sprintf("[%v]执行中 / [%v] executing action...", actionName, actionName))
 
-		// 记录当前迭代索引和 Action 信息
-		// 关键词: action history append, SPIN 检测数据源, tool_name 抽取
+		// 记录当前迭代索引和 Action 信息。
 		r.actionHistoryMutex.Lock()
 		actionRecord := &ActionRecord{
 			ActionType:     actionParams.ActionType(),
@@ -1018,9 +1017,6 @@ LOOP:
 				r.GetInvoker().AddToTimeline("[ASYNC_ACTION_REJECTED]", rejectMsg)
 				operator = newLoopActionHandlerOperator(task)
 				operator.Feedback(rejectMsg)
-				operator.SetReflectionLevel(ReflectionLevel_Critical)
-				operator.SetReflectionData("rejected_action", actionName)
-				operator.SetReflectionData("rejected_reason", "task_already_async")
 				operator.Continue()
 				continueIter := func() {
 					r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
@@ -1065,9 +1061,6 @@ LOOP:
 		default:
 		}
 
-		// 记录 action 执行开始时间
-		actionStartTime := time.Now()
-
 		// Temporarily sync the invoker's currentTask with this loop's task so that
 		// any tool call made inside the action handler (via ExecuteToolRequiredAndCallWithoutRequired)
 		// writes its tool-call Artifact bundle into the sub-task's directory instead of
@@ -1085,9 +1078,9 @@ LOOP:
 				operator,
 			)
 		}()
-
-		// 计算 action 执行时间
-		actionExecutionDuration := time.Since(actionStartTime)
+		if handler.ActionType != loopAction_Finish.ActionType {
+			r.recordCurrentTodoIteration(task)
+		}
 
 		// 先检查 operator 状态，如果 operator 已经表明要终止（无论成功或失败），
 		// 则 context canceled 不应该被视为错误
@@ -1134,34 +1127,8 @@ LOOP:
 			}
 		}
 
-		// 执行自我反思 (如果启用且策略命中).
-		// Critical(失败归因) 走同步以保证下一轮 prompt 立即含失败上下文;
-		// 其它级别(主要是 SPIN/Standard) 走异步 fire-and-forget, 主循环不阻塞.
-		// 关键词: 反思入口, 异步 fire-and-forget, SPIN 不干扰执行
-		reflectionLevel := r.shouldTriggerReflection(handler, operator, iterationCount)
-		if reflectionLevel != ReflectionLevel_None {
-			log.Infof("trigger self-reflection for action[%s] with level[%s] (async=%v)",
-				actionName, reflectionLevel.String(), reflectionLevel != ReflectionLevel_Critical)
-			r.MaybeExecuteReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
-		}
-
 		// T1: perception after action execution (async, non-blocking)
 		r.MaybeTriggerPerceptionAfterAction(iterationCount)
-
-		if r.ShouldForceExitDueToSpin() {
-			// T3: force perception update on SPIN detection
-			r.TriggerPerceptionOnSpin()
-
-			log.Warnf("ReactLoop[%v] spin threshold reached (%d consecutive warnings), adding timeline pressure instead of force-exiting",
-				r.loopName, r.consecutiveSpinWarnings)
-			r.GetInvoker().AddToTimeline("spin_pressure",
-				fmt.Sprintf("[SPIN PRESSURE] %d consecutive spin warnings detected. "+
-					"You MUST change your approach immediately. "+
-					"Use a completely different action type or strategy. "+
-					"The task remains incomplete and requires a new direction. "+
-					"Continuing with the same approach will not help.", r.consecutiveSpinWarnings))
-			r.ResetSpinWarning()
-		}
 
 		// 检查 operator 状态
 		if isTerminated, err := operator.IsTerminated(); isTerminated {
@@ -1587,17 +1554,16 @@ func (r *ReActLoop) isDebugModeEnabled() bool {
 	return false
 }
 
-// extractToolNameFromAction 按优先级从 action 参数里抽取工具名,用于 SPIN
-// 双维度判定(ActionType + ToolName). 字段优先级:
+// extractToolNameFromAction 按优先级从 action 参数里抽取工具名，供执行历史使用。
+// 字段优先级:
 //  1. directly_call_tool_name 顶层
 //  2. next_action.directly_call_tool_name (legacy 兼容)
 //  3. tool_require_payload (require_tool 路径)
 //  4. tool_name / tool 通用兜底
 //
-// 全部命中为空返回空串, 表示该 action 不是 tool 调用类, SPIN 检测会退化为
-// 只比 ActionType.
+// 全部命中为空返回空串, 表示该 action 不是 tool 调用类。
 //
-// 关键词: extractToolNameFromAction, SPIN 细粒度, tool_name 抽取优先级
+// 关键词: extractToolNameFromAction, tool_name 抽取优先级
 func extractToolNameFromAction(action *aicommon.Action) string {
 	if utils.IsNil(action) {
 		return ""

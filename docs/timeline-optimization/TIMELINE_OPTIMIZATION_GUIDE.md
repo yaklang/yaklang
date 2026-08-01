@@ -67,18 +67,6 @@ r.GetInvoker().AddToTimeline("iteration",
 - 移除 `continueIter()` 中的这条 AddToTimeline。
 - 保留开头的 `ReAct iteration N` 条目（携带 Reason/Next-Step，有信息量）。
 
-#### E. `reflection` 与 `logic_spin_warning` 的内容重叠
-
-**位置**：
-- `common/ai/aid/aireact/reactloops/reflection.go:509` → `AddToTimeline("logic_spin_warning", ...)` 含 Suggestions
-- `common/ai/aid/aireact/reactloops/reflection_memory.go:96` → `AddToTimeline("reflection", ...)` 也含 MANDATORY RECOMMENDATIONS（同样的 Suggestions）
-
-**问题**：当 SPIN 检测触发时，`logic_spin_warning` 和随后的 `reflection` 会输出几乎相同的 Suggestions 列表（从 timeline 示例可见 6 条建议重复出现两次）。
-
-**方案**：
-- SPIN 场景下，`reflection` 条目只保留执行结果摘要（action / iteration / 耗时 / level），不再重复 Suggestions（已由 `logic_spin_warning` 承载）。
-- 可在 `addReflectionToTimeline` 中判断 `reflection.IsSpinning`，若 true 则跳过 Suggestions 部分。
-
 ### 1.2 待排查项
 
 - `perception` 条目（`perception.go:938`）每次 post-action 都触发，需确认频率是否过高。
@@ -198,7 +186,6 @@ if t.CallExpectations != "" {
    - [ ] `init_done` 降级为 log
    - [ ] `intent_context_enrichment` 移除或输出实质内容
    - [ ] `continueIter()` 移除 `ReAct Iteration Done` 条目
-   - [ ] SPIN 场景 `reflection` 不重复 Suggestions
    - [ ] 复核 `OmitParamsInTimeline` 在 fallback 路径的行为
 
 3. **验证**：

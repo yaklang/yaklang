@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
-		"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -73,10 +73,6 @@ func buildSingleFindingVerifyLoop(
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(true),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithEnableSelfReflection(true),
-		reactloops.WithSameActionTypeSpinThreshold(3),
-		reactloops.WithSameLogicSpinThreshold(2),
-		reactloops.WithMaxConsecutiveSpinWarnings(2),
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
@@ -89,7 +85,7 @@ func buildSingleFindingVerifyLoop(
 				"EntryPoints": state.EntryPoints,
 			})
 		}),
-		reactloops.WithReflectionOutputExample(phase3OutputExample),
+		reactloops.WithOutputExample(phase3OutputExample),
 
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 			reconFileHint := ""
@@ -137,7 +133,6 @@ func buildSingleFindingVerifyLoop(
 		registerPhase3ConcludeFindingAction(r, state, verify, &concluded),
 		registerPhase3ReadReconNotesAction(r, state),
 	}
-
 
 	loopName := fmt.Sprintf("code_audit_verify_%s", finding.ID)
 	return reactloops.NewReActLoop(loopName, r, preset...)

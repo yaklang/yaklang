@@ -206,9 +206,9 @@ section_hash_count:
 11:35:35 [text/plan_execute]
 [plan_execute] [task:react-hostscan-3DCHrQmk]:
   plan/forge: hostscan is started
-11:35:35 [text/reflection]
-[reflection] [task:react-hostscan-3DCHrQmk]:
-  ✓ [REFLECTION] Action 'require_ai_blueprint' EXECUTED SUCCESSFULLY (iteration 1, 1.89464975s, level: minimal)
+11:35:35 [text/action-log]
+[action-log] [task:react-hostscan-3DCHrQmk]:
+  ✓ [ACTION_LOG] Action 'require_ai_blueprint' EXECUTED SUCCESSFULLY (iteration 1, 1.89464975s, level: minimal)
 <|TIMELINE_END_b3t1777779180|>
 
 

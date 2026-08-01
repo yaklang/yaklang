@@ -8,7 +8,7 @@
 //   - buildPhase2PhaseASpotReadGuard: force lock_target_files after too many spot reads
 //
 // Phase B guards
-//   - buildPhase2PhaseBReadSpinGuard: force mark_file_done after too many reads on one target
+//   - buildPhase2PhaseBReadRepeatGuard: force mark_file_done after too many reads on one target
 //   - discovery / trace grep policies live in phase2_grep_guard.go
 //
 // Feedback formatters in this file are shared with custom action handlers in phase2_scan.go.
@@ -69,9 +69,9 @@ func formatPathListForFeedback(paths []string, maxShow int) string {
 	return b.String()
 }
 
-// buildPhase2PhaseBReadSpinGuard prevents re-reading the same locked target without marking it done.
+// buildPhase2PhaseBReadRepeatGuard prevents re-reading the same locked target without marking it done.
 // Reads of non-target paths or already-marked files are not counted (see phase2_read_file_guard.go).
-func buildPhase2PhaseBReadSpinGuard(scan *ScanState) reactloops.ToolInvokeGuard {
+func buildPhase2PhaseBReadRepeatGuard(scan *ScanState) reactloops.ToolInvokeGuard {
 	return func(toolName string, params aitool.InvokeParams) (bool, string) {
 		if toolName != "read_file" || scan.CurrentPhase() != ScanPhaseAudit {
 			return true, ""
@@ -87,11 +87,11 @@ func buildPhase2PhaseBReadSpinGuard(scan *ScanState) reactloops.ToolInvokeGuard 
 		if count < phase2MaxPhaseBReadsPerFile {
 			return true, ""
 		}
-		return false, formatPhaseBReadSpinFeedback(file, count, scan)
+		return false, formatPhaseBReadRepeatFeedback(file, count, scan)
 	}
 }
 
-func formatPhaseBReadSpinFeedback(file string, readCount int, scan *ScanState) string {
+func formatPhaseBReadRepeatFeedback(file string, readCount int, scan *ScanState) string {
 	return fmt.Sprintf(
 		"[错误] 阶段B 已对 %q read_file %d 次仍未 mark_file_done（上限 %d）。\n"+
 			"下一 action **必须**是 mark_file_done(file_path=%q, audit_summary=...)。\n"+

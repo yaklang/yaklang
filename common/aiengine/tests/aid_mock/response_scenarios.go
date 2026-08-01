@@ -199,21 +199,7 @@ var TestScenarios = map[string]*TestScenarioDefinition{
 		},
 	},
 
-	// 场景14: 自我反思和优化
-	"self_reflection": &TestScenarioDefinition{
-		Name:        "self_reflection",
-		Description: "Self-reflection and optimization workflow",
-		Steps: []string{
-			// 初始响应
-			`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "Initial approach"}, "human_readable_thought": "First attempt", "cumulative_summary": "Initial response"}`,
-			// 自我反思
-			`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "After reflection, better approach"}, "human_readable_thought": "Reflecting on approach", "cumulative_summary": "Improved solution"}`,
-			// 最终优化
-			`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "Optimized final solution"}, "human_readable_thought": "Optimization complete", "cumulative_summary": "Best solution provided"}`,
-		},
-	},
-
-	// 场景15: 任务取消和清理
+	// 场景14: 任务取消和清理
 	"task_cancellation": &TestScenarioDefinition{
 		Name:        "task_cancellation",
 		Description: "Task cancellation and cleanup workflow",

@@ -116,7 +116,7 @@ func init() {
 						"PlanModeReason": loop.Get(PLAN_MODE_REASON_KEY),
 					})
 				}),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					enhance := loop.Get(PLAN_ENHANCE_KEY)
 					fileResults := loop.Get(PLAN_FILE_RESULTS_KEY)

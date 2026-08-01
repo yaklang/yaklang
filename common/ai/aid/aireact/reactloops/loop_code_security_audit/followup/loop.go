@@ -65,16 +65,13 @@ func BuildLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts ...reac
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(true),
 		reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-		reactloops.WithEnableSelfReflection(true),
-		reactloops.WithSameActionTypeSpinThreshold(5),
-		reactloops.WithSameLogicSpinThreshold(3),
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			return followupInstruction, nil
 		}),
-		reactloops.WithReflectionOutputExample(followupOutputExample),
+		reactloops.WithOutputExample(followupOutputExample),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 			task := loop.GetCurrentTask()
 			userQuery := ""

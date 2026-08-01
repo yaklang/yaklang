@@ -24,7 +24,7 @@ type LoopAction struct {
     ActionHandler     LoopActionHandlerFunc
     StreamFields      []*LoopStreamField    // JSON 字段流
     AITagStreamFields []*LoopAITagField     // XML 标签流
-    OutputExamples    string `json:"output_examples,omitempty"` // 给 reflection example 用
+    OutputExamples    string `json:"output_examples,omitempty"` // 给主循环输出示例用
 }
 ```
 
@@ -130,7 +130,7 @@ func init() {
 阅读 [loopinfra/](../loopinfra) 下的 action 时，会发现一些一致模式：
 
 1. **结尾几乎都调 `MaybeVerifyUserSatisfaction`**：通用工具 action 在执行成功后会触发节流验证，避免无意义的重复。参考 [loopinfra/tool_call_common.go](../loopinfra/tool_call_common.go) 的 `handleToolCallResult`。
-2. **失败不直接 Fail，而是设置 Reflection level=Critical**：如 [action_from_tool.go:152-161](../action_from_tool.go) 的工具失败处理，让 AI 反思后重试不同工具。
+2. **可恢复失败写普通反馈并继续**：如 [action_from_tool.go](../action_from_tool.go) 的工具失败处理，把错误交给下一轮主决策选择替代工具。
 3. **emit 文件而不仅是事件**：长输出（如知识增强答案、规划文档）通过 `EmitFileArtifactWithExt` 落盘，前端可下载。
 
 ## 4.4 来源 3：从 Tool 派生
@@ -152,7 +152,7 @@ func WithRegisterLoopActionFromTool(tool *aitool.Tool) ReActLoopOption
 **关键实现要点**：
 
 - Verifier 调 `tool.ValidateParams(params)` 做 schema 校验。校验失败会 `AddToTimeline("[PARAMETER_VALIDATION_ERROR]", ...)`，让 AI 看见错误并重试。
-- Handler 内部容错处理：工具失败**不会**调 `operator.Fail`，而是 `SetReflectionLevel(Critical)` + `Continue`，让 AI 反思后选择别的方案（[action_from_tool.go:152-161](../action_from_tool.go)）。
+- Handler 内部容错处理：工具失败**不会**调 `operator.Fail`，而是写入 `Feedback` / timeline 后 `Continue`，让下一轮选择别的方案。
 - Handler 末尾调 `MaybeVerifyUserSatisfaction`：如果验证返回 `Satisfied=true` 直接 `operator.Exit()`。
 - 多种参数提取格式兼容：handler 同时支持 `{"@action":"tool", "params":{...}}`（标准） / `{"@action":"tool", x:1, y:2}`（拍平）等多种 LLM 输出。
 
@@ -293,12 +293,11 @@ reactloops.WithAITagFieldWithAINodeId("GEN_MODIFIED_PACKET", modifiedPacketConte
 | 普通成功，继续下一轮 | `operator.Continue()` |
 | 任务完成 | `operator.Exit()` |
 | 任务失败，无救 | `operator.Fail(err)` |
-| 工具失败但还能换工具 | `operator.SetReflectionLevel(Critical)` + `Continue()` |
+| 工具失败但还能换工具 | `operator.Feedback(err)` + `Continue()` |
 | 想阻止 LLM 下一轮选 finish/exit | `operator.DisallowNextLoopExit()`（仅本次有效） |
 | 把这一轮观察到的事实告诉下一轮 | `operator.Feedback("...")` |
 | 解析参数后判定是异步任务（如 forge） | `operator.RequestAsyncMode()` |
 | 不发本次完成 loadingStatus | `operator.MarkSilence()` |
-| 自定义反思级别 | `operator.SetReflectionLevel(level)` |
 
 ### 互斥规则
 
@@ -325,7 +324,7 @@ operator.Continue()
 operator.Feedback(fmt.Sprintf("scan %s found %d issues", target, len(issues)))
 ```
 
-下一轮 prompt 的 `<|REFLECTION_<nonce>|>` 段会包含这条信息，LLM 看到后会调整下一步行动。
+下一轮 prompt 的 `<|REACTIVE_DATA_<nonce>|>` 段会包含这条信息，LLM 看到后会调整下一步行动。
 
 **坏的实践**：把整个工具输出全塞进 Feedback。这会导致 prompt 爆炸。改成：
 
@@ -377,7 +376,6 @@ reactloops.WithRegisterLoopAction(
         log.Infof("scanning %s depth=%d", target, depth)
         results, err := myScanner.Scan(target, depth)
         if err != nil {
-            op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
             op.Feedback(fmt.Sprintf("scan failed: %v, try smaller depth or different target", err))
             op.Continue()
             return

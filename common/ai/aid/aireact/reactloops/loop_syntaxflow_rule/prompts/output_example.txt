@@ -1,4 +1,4 @@
-## SyntaxFlow 规则输出格式示例
+## SyntaxFlow 规则输出示例
 
 * 使用 `write_rule` 创建新规则
 * 使用 `modify_rule` 修改已有规则（指定 modify_start_line 和 modify_end_line）

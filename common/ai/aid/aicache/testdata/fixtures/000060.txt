@@ -2,13 +2,13 @@
 seq:    000060
 time:   2026-05-03T11:37:17+08:00
 model:  memfit-glm-5-free
-total:  124039 bytes / 4 chunks
+total:  124045 bytes / 4 chunks
 
 ## sections
 [1] section=high-static   nonce=high-static              bytes=16760 hash=8b7431254da4dade seen=7 first=2026-05-03T11:35:41+08:00
 [2] section=semi-dynamic  nonce=semi-dynamic             bytes=18021 hash=52b4e57d4ccec8a5 seen=6 first=2026-05-03T11:35:46+08:00
 [3] section=timeline      nonce=timeline                 bytes=44123 hash=cbf705c376e2e762 seen=1 first=2026-05-03T11:37:17+08:00
-[4] section=dynamic       nonce=dynamic_QGiX             bytes=44867 hash=c72ca0c1a644012e seen=1 first=2026-05-03T11:37:17+08:00
+[4] section=dynamic       nonce=dynamic_QGiX             bytes=44873 hash=c72ca0c1a644012e seen=1 first=2026-05-03T11:37:17+08:00
 
 ## hit report
 prefix_hit_chunks: 2
@@ -29,7 +29,7 @@ section_hash_count:
 - semi-dynamic section drifts more than expected: 44 distinct hashes, tool/forge/schema list may be churning
 - hit ratio poor (28.1%) - prefix alignment broken early
 
-## raw prompt (124039 bytes)
+## raw prompt (124045 bytes)
 <|PROMPT_SECTION_high-static|>
 <|TRAITS|>
 ## Core Traits (核心性格) - 严肃/专业/无Emoji
@@ -940,7 +940,7 @@ This tool is protocol-specific: you MUST already know the exact ...
 
 
 
-<|REFLECTION_QGiX|>
+<|REACTIVE_DATA_QGiX|>
 
 当前 Plan-Execution 模式进度信息：
 
@@ -1516,7 +1516,7 @@ AITAG-capable params seen in cached tools:
 
 <|CACHE_TOOL_CALL_END_QGiX>
 			
-<|REFLECTION_END_QGiX|>
+<|REACTIVE_DATA_END_QGiX|>
 
 
 <|INJECTED_MEMORY_QGiX|>

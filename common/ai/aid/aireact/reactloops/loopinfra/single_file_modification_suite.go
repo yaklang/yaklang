@@ -79,8 +79,6 @@ type SingleFileModificationSuiteFactory struct {
 	fileChangedCb       FileChangedCallback
 	postSyntaxCleanHook PostSyntaxCleanHook
 	codePrettifyCb      CodePrettifyCallback
-	spinDetectionCb  func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string)
-	reflectionPrompt func(startLine, endLine int, reason string) string
 
 	// Runtime reference (set by GetActions)
 	runtime aicommon.AIInvokeRuntime
@@ -174,20 +172,6 @@ func WithPostSyntaxCleanHook(hook PostSyntaxCleanHook) SingleFileModificationOpt
 func WithCodePrettify(cb CodePrettifyCallback) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
 		f.codePrettifyCb = cb
-	}
-}
-
-// WithSpinDetection sets the callback for detecting spinning (repetitive small modifications)
-func WithSpinDetection(cb func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string)) SingleFileModificationOption {
-	return func(f *SingleFileModificationSuiteFactory) {
-		f.spinDetectionCb = cb
-	}
-}
-
-// WithReflectionPrompt sets the callback for generating reflection prompts when spinning is detected
-func WithReflectionPrompt(cb func(startLine, endLine int, reason string) string) SingleFileModificationOption {
-	return func(f *SingleFileModificationSuiteFactory) {
-		f.reflectionPrompt = cb
 	}
 }
 
@@ -670,22 +654,6 @@ func (f *SingleFileModificationSuiteFactory) PrettifyCode(code string) (int, int
 		return 0, 0, code, false
 	}
 	return f.codePrettifyCb(code)
-}
-
-// DetectSpinning checks for spinning behavior
-func (f *SingleFileModificationSuiteFactory) DetectSpinning(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string) {
-	if f.spinDetectionCb == nil {
-		return false, ""
-	}
-	return f.spinDetectionCb(loop, startLine, endLine)
-}
-
-// GetReflectionPrompt generates a reflection prompt for spinning
-func (f *SingleFileModificationSuiteFactory) GetReflectionPrompt(startLine, endLine int, reason string) string {
-	if f.reflectionPrompt == nil {
-		return ""
-	}
-	return f.reflectionPrompt(startLine, endLine, reason)
 }
 
 // defaultPrettifyAITagCode is the default implementation for prettifying AI-generated code

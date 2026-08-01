@@ -79,9 +79,9 @@ func CollectFocusModeDynamicOptions(caller *FocusModeYakHookCaller) []ReActLoopO
 		}))
 	}
 
-	if caller.HasHook(FocusHook_ReflectionOutputExample) {
-		opts = append(opts, WithReflectionOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
-			ret, err := caller.CallByName(FocusHook_ReflectionOutputExample, loop, nonce)
+	if caller.HasHook(FocusHook_OutputExample) {
+		opts = append(opts, WithOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
+			ret, err := caller.CallByName(FocusHook_OutputExample, loop, nonce)
 			if err != nil {
 				return "", err
 			}

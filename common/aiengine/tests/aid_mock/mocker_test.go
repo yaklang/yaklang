@@ -43,22 +43,23 @@ func TestKeywordScenarios_CustomResponse(t *testing.T) {
 // TestKeywordScenarios_ListResponses 测试列出所有响应
 func TestKeywordScenarios_ListResponses(t *testing.T) {
 	scenarios := NewKeywordScenarios()
+	scenarios.AddResponse("custom", []string{"custom"}, `{"@action":"finish"}`, "custom response")
 	responses := scenarios.ListResponses()
 
 	if len(responses) == 0 {
 		t.Fatal("Expected at least some built-in responses")
 	}
 
-	// 验证包含一些内置响应
+	// 验证包含刚注册的响应
 	found := false
 	for _, name := range responses {
-		if name == "directly_answer" {
+		if name == "custom" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatal("Expected to find 'directly_answer' in built-in responses")
+		t.Fatal("Expected to find the registered custom response")
 	}
 }
 

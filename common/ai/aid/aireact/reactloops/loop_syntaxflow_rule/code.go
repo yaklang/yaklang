@@ -77,7 +77,7 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 //go:embed prompts/persistent_instruction.txt
 var instruction string
 
-//go:embed prompts/reflection_output_example.txt
+//go:embed prompts/output_example.txt
 var outputExample string
 
 //go:embed prompts/reactive_data.txt
@@ -119,7 +119,6 @@ func init() {
 					return errMsg, blocking
 				}),
 				loopinfra.WithEventType("syntaxflow_rule_editor"),
-				// loopinfra.WithSkipReflectionWhenValidationPasses(true), // 验证通过后跳过反思，避免建议 tool_compose 等导致 AI 继续生成错误规则
 				loopinfra.WithExitAfterWrite(false), // 验证通过后不立即退出，保留迭代以便 AI 调用 check-syntaxflow-syntax 进行样例自检
 			)
 
@@ -132,7 +131,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				modSuite.GetAITagOption(),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					sfCode := loop.Get("full_sf_code")
 					codeWithLine := utils.PrefixLinesWithLineNumbers(sfCode)

@@ -129,27 +129,6 @@ func TestPrettifyCode_DefaultAndConfigured(t *testing.T) {
 	assert.True(t, fixed)
 }
 
-func TestDetectSpinningAndReflectionPrompt_DefaultAndConfigured(t *testing.T) {
-	f := newFactoryForSuiteTest(t)
-	spin, reason := f.DetectSpinning(nil, 1, 2)
-	assert.False(t, spin)
-	assert.Equal(t, "", reason)
-	assert.Equal(t, "", f.GetReflectionPrompt(1, 2, "r"))
-
-	f2 := newFactoryForSuiteTest(t,
-		WithSpinDetection(func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string) {
-			return true, "repeat edits"
-		}),
-		WithReflectionPrompt(func(startLine, endLine int, reason string) string {
-			return "please rethink"
-		}),
-	)
-	spin, reason = f2.DetectSpinning(nil, 1, 2)
-	assert.True(t, spin)
-	assert.Equal(t, "repeat edits", reason)
-	assert.Equal(t, "please rethink", f2.GetReflectionPrompt(1, 2, "repeat edits"))
-}
-
 func TestDefaultPrettifyAITagCode_EmptyAndInvalidInputs(t *testing.T) {
 	tests := []struct {
 		name string

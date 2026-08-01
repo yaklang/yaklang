@@ -192,16 +192,16 @@ func TestLoopAction_OutputExample(t *testing.T) {
 	}
 }
 
-// TestLoopAction_ReflectionOutputExampleProvider tests that OutputExamples from LoopAction
-// is correctly rendered in the reflectionOutputExampleProvider (options.go lines 195-229)
-func TestLoopAction_ReflectionOutputExampleProvider(t *testing.T) {
+// TestLoopAction_OutputExampleProvider tests that OutputExamples from LoopAction
+// is correctly rendered in the outputExampleProvider (options.go lines 195-229)
+func TestLoopAction_OutputExampleProvider(t *testing.T) {
 	// Create and register a LoopAction with OutputExamples
-	testActionName := "test_reflection_action"
-	testOutputExample := "This is a test output example for reflection"
+	testActionName := "test_output_example_action"
+	testOutputExample := "This is a test output example"
 
 	action := &LoopAction{
 		ActionType:     testActionName,
-		Description:    "Test action for reflection output example",
+		Description:    "Test action output example",
 		OutputExamples: testOutputExample,
 	}
 	RegisterAction(action)
@@ -231,7 +231,7 @@ func TestLoopAction_ReflectionOutputExampleProvider(t *testing.T) {
 			return nil, nil // mock factory
 		},
 		WithLoopDescription("Test loop metadata for output example fallback behavior"),
-		WithLoopUsagePrompt("Used in tests to verify reflection output falls back to LoopMetadata when action output examples are absent."),
+		WithLoopUsagePrompt("Used in tests to verify output falls back to LoopMetadata when action output examples are absent."),
 		WithLoopOutputExample(testMetadataOutputExample),
 		WithLoopIsHidden(true),
 		WithVerboseName("Metadata Fallback Test Loop"),
@@ -279,7 +279,7 @@ func TestLoopAction_OutputExamplesInLoopActions(t *testing.T) {
 	// GetLoopAction returns the action with OutputExamples
 	// This is the key logic in options.go:208-214
 	if action, ok := GetLoopAction(actionName); ok && action.OutputExamples != "" {
-		// This simulates the logic in WithReflectionOutputExample
+		// This simulates the logic in WithOutputExample
 		if action.OutputExamples != outputExample {
 			t.Errorf("GetLoopAction should return action with OutputExamples")
 		}

@@ -388,10 +388,6 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 				op.Feedback(errMsg + "\n\n" + resolved.Suggestion)
 			}
 
-			op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-			op.SetReflectionData("skill_load_error", err.Error())
-			op.SetReflectionData("skill_name", skillName)
-			op.SetReflectionData("resolved_type", string(resolved.IdentityType))
 			op.Continue()
 			return
 		}

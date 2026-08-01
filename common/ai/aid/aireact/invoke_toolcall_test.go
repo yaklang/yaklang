@@ -655,14 +655,6 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			return rsp, nil
 		}
 
-		// Handle self-reflection prompts
-		if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
-			rsp.Close()
-			return rsp, nil
-		}
-
 		if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked post-iteration summary"}`))

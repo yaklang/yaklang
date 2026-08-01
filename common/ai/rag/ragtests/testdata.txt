@@ -635,12 +635,8 @@ type ReActLoop struct {
     currentMemories *omap.OrderedMap[string, *aicommon.MemoryEntity]
     memoryTriage    aicommon.MemoryTriage
 
-    // Self-reflection support
-    enableSelfReflection bool
-
-    // Spin detection thresholds
-    sameActionTypeSpinThreshold int
-    sameLogicSpinThreshold      int
+    // Per-task CURRENT TODO progress for the 25-iteration soft checkpoint
+    currentTodoProgress map[string]*currentTodoProgress
 
     // Action history for pattern detection
     actionHistory         []*ActionRecord
@@ -651,7 +647,7 @@ type ReActLoop struct {
 
 ### 5.2 The OODA Execution Loop
 
-Each ReAct iteration follows the OODA (Observe-Orient-Decide-Act) cycle, enhanced with self-reflection:
+Each ReAct iteration follows the OODA (Observe-Orient-Decide-Act) cycle, with deterministic TODO checkpoints for long-running work:
 
 ```go
 // From reactloops/exec.go - Main execution loop
@@ -727,7 +723,7 @@ for {
     actionName := actionParams.Name()
     r.loadingStatus(fmt.Sprintf("[%v]执行中 / [%v] executing action...", actionName, actionName))
 
-    // Record action for history tracking and spin detection
+    // Record action for history tracking and diagnostics
     r.actionHistoryMutex.Lock()
     r.currentIterationIndex = iterationCount
     actionRecord := &ActionRecord{
@@ -750,18 +746,12 @@ for {
     r.GetInvoker().AddToTimeline("iteration", msg)
 
     // Execute the action handler
-    actionStartTime := time.Now()
     handler.ActionHandler(r, actionParams, operator)
-    actionExecutionDuration := time.Since(actionStartTime)
 
-    // ═══════════════════════════════════════════════════════════
-    // REFLECT Phase: Self-assessment (if enabled)
-    // ═══════════════════════════════════════════════════════════
-    reflectionLevel := r.shouldTriggerReflection(handler, operator, iterationCount)
-    if reflectionLevel != ReflectionLevel_None {
-        r.loadingStatus(fmt.Sprintf("[%v]反思中 / [%v] self-reflecting...", actionName, actionName))
-        r.executeReflection(handler, actionParams, operator, reflectionLevel,
-            iterationCount, actionExecutionDuration)
+    // Count only actions whose handlers actually ran. The same CURRENT TODO
+    // queues a soft checkpoint after 25 valid iterations.
+    if handler.ActionType != loopAction_Finish.ActionType {
+        r.recordCurrentTodoIteration(task)
     }
 
     // Check termination conditions
@@ -787,7 +777,8 @@ for {
 
 ### 5.3 Action History Tracking
 
-Every action is recorded for spin detection, debugging, and pattern analysis:
+Every action is recorded for debugging, timeline diagnostics, and local
+deterministic guards:
 
 ```go
 // From reactloops/reactloop.go - Action record structure
@@ -799,13 +790,10 @@ type ActionRecord struct {
 }
 ```
 
-The action history enables sophisticated pattern detection:
-
-| Detection Type | Implementation | Purpose |
-|---------------|----------------|---------|
-| **Same Action Type Spin** | `IsInSameActionTypeSpin()` | Detect repetitive actions |
-| **Logic Spin** | `IsInSameLogicSpinWithAI()` | AI-driven semantic analysis |
-| **Iteration Tracking** | `currentIterationIndex` | Progress monitoring |
+General action history no longer launches a separate AI analysis path. Repeated
+reads, repeated queries, and path failures are handled by the relevant action's
+deterministic guard. CURRENT TODO progress uses its own task-scoped counter and
+queues a soft checkpoint after 25 valid handler executions.
 
 ---
 
@@ -1647,7 +1635,7 @@ Main Thread                  Async Operations
 The Recursive Dual-Engine Architecture represents a principled approach to building autonomous AI agents that can handle tasks of arbitrary complexity. By combining strategic planning with tactical execution and enabling recursive invocation between the two layers, Memfit AI achieves:
 
 1. **Scalability**: Tasks of any complexity can be decomposed until manageable through fractal recursion
-2. **Robustness**: Failures at any level trigger appropriate recovery mechanisms through self-reflection
+2. **Robustness**: Failures remain visible through ordinary feedback and timeline evidence, while TODO checkpoints provide restrained path correction
 3. **Transparency**: Hierarchical progress tracking enables human oversight at every level
 4. **Flexibility**: Dynamic re-planning adapts to runtime conditions through action-as-planning
 5. **Context Preservation**: Shared Timeline ensures no information is lost across recursion levels

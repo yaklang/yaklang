@@ -247,6 +247,6 @@ iter 20  t=770   phase=4
   因 capability 是累积加载, 已加载的 SKILL 仍可使用, 风险可接受.
 - minInterval=120s 在快节奏 iter (<60s/iter) 场景下会跳过多个候选,
   但这正是设计目标 —— 同领域内的快速 drift 不需要每次重感知.
-- spin / forced / loop_switch 三种 trigger 仍然绕门即时刷新, 不受本次默认值调整影响,
+- forced / loop_switch 三种 trigger 仍然绕门即时刷新, 不受本次默认值调整影响,
   保证了关键场景 (循环卡死/用户显式请求/子 loop 切换) 的响应性.
 - 退避算法 (`*=2 at consecutiveUnchanged>=2`) 不变, 在持续 drift 时仍可继续放大间隔到 max=5min.

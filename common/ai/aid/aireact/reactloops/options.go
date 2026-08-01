@@ -264,9 +264,9 @@ func WithAITagFieldWithAINodeId(tagName, variableName, nodeId string, contentTyp
 	}
 }
 
-func WithReflectionOutputExampleContextProvider(provider ContextProviderFunc) ReActLoopOption {
+func WithOutputExampleContextProvider(provider ContextProviderFunc) ReActLoopOption {
 	return func(r *ReActLoop) {
-		r.reflectionOutputExampleProvider = provider
+		r.outputExampleProvider = provider
 	}
 }
 
@@ -276,8 +276,8 @@ func WithPersistentContextProvider(provider ContextProviderFunc) ReActLoopOption
 	}
 }
 
-func WithReflectionOutputExample(example string) ReActLoopOption {
-	return WithReflectionOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
+func WithOutputExample(example string) ReActLoopOption {
+	return WithOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
 		_, result, err := loop.getRenderValues()
 		if err != nil {
 			return "", utils.Errorf("get basic prompt info failed: %v", err)
@@ -444,50 +444,6 @@ func WithUseSpeedPriorityAICallback(b ...bool) ReActLoopOption {
 	}
 }
 
-// WithEnableSelfReflection 启用自我反思功能
-// 启用后，每次 action 执行后会根据策略进行自我反思分析
-// action 可以通过 operator.SetReflectionLevel() 自定义反思级别
-func WithEnableSelfReflection(enable ...bool) ReActLoopOption {
-	return func(r *ReActLoop) {
-		if len(enable) > 0 {
-			r.enableSelfReflection = enable[0]
-		} else {
-			r.enableSelfReflection = true
-		}
-	}
-}
-
-// WithSameActionTypeSpinThreshold 设置相同任务自旋阈值
-// 当连续执行"相同 ActionType + 相同 ToolName"的次数达到此阈值时,触发 SPIN 检测
-// 默认值为 8(从历史的 3 提到 8,降低误触发频率,只在长时间真的卡住时才介入)
-func WithSameActionTypeSpinThreshold(threshold int) ReActLoopOption {
-	return func(r *ReActLoop) {
-		if threshold > 0 {
-			r.sameActionTypeSpinThreshold = threshold
-		}
-	}
-}
-
-// WithSameLogicSpinThreshold 设置相同逻辑自旋阈值
-// 当连续执行"相同 ActionType + 相同 ToolName"次数达到此阈值时,使用 AI 进行深度 SPIN 检测
-// 默认值为 8(与简单检测阈值对齐)
-func WithSameLogicSpinThreshold(threshold int) ReActLoopOption {
-	return func(r *ReActLoop) {
-		if threshold > 0 {
-			r.sameLogicSpinThreshold = threshold
-		}
-	}
-}
-
-// WithMaxConsecutiveSpinWarnings sets the max number of consecutive spin warnings
-// before the loop is forcibly terminated. Default is 3.
-// Set to 0 to disable force-exit on spin.
-func WithMaxConsecutiveSpinWarnings(max int) ReActLoopOption {
-	return func(r *ReActLoop) {
-		r.maxConsecutiveSpinWarnings = max
-	}
-}
-
 // WithToolParamAITagFields registers TOOL_PARAM_* AITAG parsers for loop-action
 // tool parameters (e.g. write_file "content"). Required when FS tools are
 // registered as loop actions instead of require_tool / directly_call_tool.
@@ -632,7 +588,6 @@ func BasicAICommonConfigOption(c *aicommon.Config) []ReActLoopOption {
 		WithMemoryPool(c.MemoryPool),
 		WithPeriodicVerificationInterval(int(c.PeriodicVerificationInterval)),
 		WithMemorySizeLimit(int(c.MemoryPoolSize)),
-		WithEnableSelfReflection(c.EnableSelfReflection),
 	}
 	return basicOptions
 }

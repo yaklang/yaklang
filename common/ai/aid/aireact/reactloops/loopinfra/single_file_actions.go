@@ -254,10 +254,6 @@ GEN_CODE 预览：
 				return
 			}
 
-			if loop.GetInt("modify_attempts") >= 3 {
-				op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
-			}
-
 			invoker := loop.GetInvoker()
 
 			fullCode := loop.Get(fullCodeVar)
@@ -342,25 +338,10 @@ GEN_CODE 解析行号：[%d-%d]
 			// modify 操作不自动退出：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
 			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false, errMsg)
 
-			// Check for spinning behavior
-			isSpinning, spinReason := f.DetectSpinning(loop, modifyStartLine, modifyEndLine)
-			if isSpinning {
-				// Trigger anti-spinning mechanism
-				reflectionPrompt := f.GetReflectionPrompt(modifyStartLine, modifyEndLine, spinReason)
-				if reflectionPrompt != "" {
-					op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
-					op.Feedback(reflectionPrompt)
-				}
-				invoker.AddToTimeline("spinning_detected", spinReason)
-				log.Warnf("spinning detected in modify_code: %s", spinReason)
-			}
-
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("line[%v-%v]:\n", modifyStartLine, modifyEndLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
-				if hasBlockingErrors || !isSpinning {
-					op.Feedback(errMsg)
-				}
+				op.Feedback(errMsg)
 			} else {
 				msg += "\n\n--[linter]--\nNo issues found in the modified code segment."
 			}
@@ -384,7 +365,7 @@ GEN_CODE 解析行号：[%d-%d]
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
 
-			if errMsg != "" && !isSpinning {
+			if errMsg != "" {
 				invoker.AddToTimeline("advice", "use search tools to find more syntax samples or docs")
 			}
 		},

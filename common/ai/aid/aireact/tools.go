@@ -8,7 +8,6 @@ import (
 func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	basicOption := []aicommon.ConfigOption{
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithDisableIntentRecognition(true),

@@ -13,7 +13,7 @@ reactloops 目录下当前已注册 17 个专注模式。本章给出横向对�
 | [loop_smart_qa](../loop_smart_qa) | 中 | InitTask | 7（search_knowledge, web_search 等） | 否（用 final_answer） | 否 | 多 | persistent_instruction | 智能问答 |
 | [loop_knowledge_enhance](../loop_knowledge_enhance) | 中 | OnPostIteraction（finalize fallback） | 1（search） | 否 | finalize fallback | 1 | persistent_instruction | 知识库增强 |
 | [loop_plan](../loop_plan) | 高 | InitTask + OnPostIteraction | 8（output_facts, search_knowledge, scan_port 等） | 否（用 finish_exploration） | 多个 LiteForge 步骤生成文档/计划 | 多（含 AITag） | persistent + plan_from_document + guidance_document | 任务规划 |
-| [loop_http_fuzztest](../loop_http_fuzztest) | 极高 | InitTask + OnPostIteraction | 9（set_http_request, fuzz_method, fuzz_path 等） | 是 | 初始化 + finalize 多次 | 多（AITag + Stream） | persistent + reactive_data + reflection_output_example | HTTP 安全模糊测试 |
+| [loop_http_fuzztest](../loop_http_fuzztest) | 极高 | InitTask + OnPostIteraction | 9（set_http_request, fuzz_method, fuzz_path 等） | 是 | 初始化 + finalize 多次 | 多（AITag + Stream） | persistent + reactive_data + output_example | HTTP 安全模糊测试 |
 | [loop_http_flow_analyze](../loop_http_flow_analyze) | 高 | OnPostIteraction（强制 fallback） | 4（filter, match, get_detail, output_findings） | 是 | finalize fallback | 多 | persistent + reactive_data | HTTP 流量分析 |
 | [loop_code_security_audit](../loop_code_security_audit) | 极高 | InitTask + 多阶段 | 多（phase1 + phase2 扫描） | 是 | 多个 phase 内部 | 多 | persistent + 多 phase | 代码安全审计 |
 | [loop_syntaxflow_rule](../loop_syntaxflow_rule) | 高 | InitTask（LiteForge 抽参数） | 多 | 是 | 强 | 多 | persistent + reactive_data | SyntaxFlow 规则编写 |
@@ -276,7 +276,7 @@ preset := []reactloops.ReActLoopOption{
     reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
     reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
     reactloops.WithPersistentInstruction(instruction),
-    reactloops.WithReflectionOutputExample(outputExample),
+    reactloops.WithOutputExample(outputExample),
     
     // 复杂的 ReactiveData：20+ 个状态字段渲染
     reactloops.WithReactiveDataBuilder(...),

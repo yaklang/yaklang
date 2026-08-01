@@ -284,10 +284,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithEnableSelfReflection(true),
-		reactloops.WithSameActionTypeSpinThreshold(5),
-		reactloops.WithSameLogicSpinThreshold(3),
-		reactloops.WithMaxConsecutiveSpinWarnings(2),
 		reactloops.WithAITagFieldWithAINodeId("FINDINGS", "findings_summary", "skill-audit-findings", aicommon.TypeTextMarkdown),
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
@@ -307,7 +303,7 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			}
 			return utils.RenderTemplate(auditInstruction, vars)
 		}),
-		reactloops.WithReflectionOutputExample(auditOutputExample),
+		reactloops.WithOutputExample(auditOutputExample),
 
 		// Reactive data: current progress snapshot
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {

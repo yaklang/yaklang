@@ -71,14 +71,14 @@ func TestFormatCompleteScanBlockedFeedback(t *testing.T) {
 	require.Contains(t, msg, "not_vul")
 }
 
-func TestBuildPhase2PhaseBReadSpinGuard_BlocksThirdRead(t *testing.T) {
+func TestBuildPhase2PhaseBReadRepeatGuard_BlocksThirdRead(t *testing.T) {
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/tmp/a.go"})
 	scan.CommitToAudit()
 	scan.BumpPhaseBRead("/tmp/a.go")
 	scan.BumpPhaseBRead("/tmp/a.go")
 
-	guard := buildPhase2PhaseBReadSpinGuard(scan)
+	guard := buildPhase2PhaseBReadRepeatGuard(scan)
 	params := map[string]any{"file": "/tmp/a.go"}
 	allow, msg := guard("read_file", params)
 	require.False(t, allow)
@@ -86,12 +86,12 @@ func TestBuildPhase2PhaseBReadSpinGuard_BlocksThirdRead(t *testing.T) {
 	require.Contains(t, msg, "/tmp/a.go")
 }
 
-func TestBuildPhase2PhaseBReadSpinGuard_AllowsFirstRead(t *testing.T) {
+func TestBuildPhase2PhaseBReadRepeatGuard_AllowsFirstRead(t *testing.T) {
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/tmp/a.go"})
 	scan.CommitToAudit()
 
-	guard := buildPhase2PhaseBReadSpinGuard(scan)
+	guard := buildPhase2PhaseBReadRepeatGuard(scan)
 	params := map[string]any{"file": "/tmp/a.go"}
 	allow, msg := guard("read_file", params)
 	require.True(t, allow)

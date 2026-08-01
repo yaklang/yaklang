@@ -126,4 +126,4 @@ grep(pattern="exec(", path="/abs/project/src/")
 
 ## 当前任务
 
-查看 `<|REFLECTION_...|>` 区段了解：待验证的 Finding 列表、当前验证进度。
+查看 `<|REACTIVE_DATA_...|>` 区段了解：待验证的 Finding 列表、当前验证进度。

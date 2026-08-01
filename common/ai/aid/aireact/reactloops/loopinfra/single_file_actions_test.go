@@ -444,35 +444,6 @@ func TestModifyAction_PrettifyMismatch_ContinueAndTimeline(t *testing.T) {
 	assert.NotEmpty(t, op.GetFeedback().String())
 }
 
-func TestModifyAction_Spinning_ReflectionAndFeedback(t *testing.T) {
-	runtime := newTestRuntimeForSingleFile(t)
-	loop, factory, task := newLoopAndFactory(t, runtime,
-		WithActionSuffix("code"),
-		WithSpinDetection(func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string) {
-			return true, "same range repeatedly"
-		}),
-		WithReflectionPrompt(func(startLine, endLine int, reason string) string {
-			return "please reflect before retry"
-		}),
-	)
-	filename := filepath.Join(runtime.tmpDir, "spin.yak")
-	loop.Set(factory.GetFilenameVariableName(), filename)
-	loop.Set(factory.GetFullCodeVariableName(), "a\nb\nc")
-	loop.Set(factory.GetCodeVariableName(), "B")
-
-	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
-		"modify_start_line": 2,
-		"modify_end_line":   2,
-	})
-	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
-	op := reactloops.NewActionHandlerOperator(task)
-	ac.ActionHandler(loop, action, op)
-
-	assert.Equal(t, reactloops.ReflectionLevel_Deep, op.GetReflectionLevel())
-	assert.Contains(t, op.GetFeedback().String(), "please reflect before retry")
-	assert.True(t, runtime.timelineContains("spinning_detected"))
-}
-
 func TestInsertAction_VerifierAndSuccess(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"))

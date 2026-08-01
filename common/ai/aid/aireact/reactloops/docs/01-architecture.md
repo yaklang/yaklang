@@ -28,7 +28,7 @@
 | 字段 | 类型 | 作用 |
 |------|------|------|
 | `persistentInstructionProvider` | `ContextProviderFunc` | 持久指令（长期规则） |
-| `reflectionOutputExampleProvider` | `ContextProviderFunc` | 输出示例（含反思格式） |
+| `outputExampleProvider` | `ContextProviderFunc` | 输出示例 |
 | `reactiveDataBuilder` | `FeedbackProviderFunc` | 上一轮反馈 + 各 loop 自己的动态状态 |
 | `loopPromptGenerator` | `ReActLoopCoreGenerateCode` | 极少使用，覆盖整个 prompt 生成逻辑 |
 | `toolsGetter` | `func() []*aitool.Tool` | 在基础 prompt 模板里展示工具列表 |
@@ -93,11 +93,7 @@ allowSkillViewOffset func() bool
 | `verificationRuntimeSnapshot` | `*VerificationRuntimeSnapshot` | 上次验证的快照（用于节流） |
 | `verificationMutex` | `*sync.Mutex` | 保护快照 |
 | `verificationWatchdogTimer` | `*time.Timer` | 看门狗，长期无验证活动则强制触发 |
-| `sameActionTypeSpinThreshold` | `int` | 同 action type 自旋阈值，默认 3 |
-| `sameLogicSpinThreshold` | `int` | AI 深度自旋检测阈值 |
-| `consecutiveSpinWarnings` | `int` | 当前连续自旋警告数 |
-| `maxConsecutiveSpinWarnings` | `int` | 最大允许的连续警告，超过则强退 |
-| `enableSelfReflection` | `bool` | 是否开启反思 |
+| `currentTodoProgress` | `map[string]*currentTodoProgress` | 各 task scope 的 CURRENT TODO 连续有效迭代计数 |
 | `perception` | `*perceptionController` | 感知层控制器（可被 `WithDisableLoopPerception` 关闭） |
 
 详见 [08-determinism-mechanisms.md](08-determinism-mechanisms.md)。
@@ -176,8 +172,6 @@ sequenceDiagram
     participant Prompt as Prompt 生成
     participant LLM as LLM (CallAI)
     participant Action as Action 执行
-    participant Reflect as 反思
-    participant Spin as SpinDetection
     participant Hook as PostIteration
 
     Main->>Mem: 异步装载快速记忆<br/>(200ms timeout)
@@ -188,8 +182,7 @@ sequenceDiagram
     LLM-->>Main: actionParams + handler
     Main->>Action: handler.ActionVerifier 已在 transaction 内做过<br/>handler.ActionHandler(loop, action, operator)
     Action-->>Main: operator 状态<br/>(Continue/Exit/Fail/Async/Feedback)
-    Main->>Reflect: shouldTriggerReflection?<br/>executeReflection
-    Main->>Spin: IsInSpin? (累计 warning)
+    Main->>Main: 记录 CURRENT TODO 有效迭代<br/>达到 25 时排队软检查点
     alt 终止条件成立
         Main->>Hook: finishIterationLoopWithError(iter, task, reason)
         Hook-->>Main: postOp.ShouldEndIteration / IgnoreError
@@ -210,9 +203,8 @@ sequenceDiagram
 | 4. 调用 AI | [exec.go:647-651](../exec.go) `callAITransaction` |
 | 5. 校验 + 提取 Action | `callAITransaction` 内部 `ExtractActionFromStream` + `ActionVerifier` |
 | 6. 执行 Handler | [exec.go ~692-750](../exec.go) |
-| 7. 反思 | [reflection.go](../reflection.go) `executeReflection` |
-| 8. 自旋检测 | [spin_detection.go](../spin_detection.go) `IsInSpin` |
-| 9. 结束/继续判断 | 依赖 `operator.IsTerminated()`、`IsContinued()` |
+| 7. CURRENT TODO 计数 | [soft_todo_checkpoint.go](../soft_todo_checkpoint.go) `recordCurrentTodoIteration` |
+| 8. 结束/继续判断 | 依赖 `operator.IsTerminated()`、`IsContinued()` |
 
 ## 1.4 状态机
 
@@ -267,8 +259,6 @@ operator.GetFeedback() *bytes.Buffer
 operator.DisallowNextLoopExit()    // 阻止下一轮 LLM 选择 finish/exit
 operator.RequestAsyncMode()        // 动态切到异步（如 load_capability 解析为 forge）
 operator.MarkSilence(b...)         // 不发"完成"loadingStatus
-operator.SetReflectionLevel(level) // 强制本轮反思级别
-operator.SetReflectionData(k, v)   // 反思时附带数据
 operator.GetTask() AIStatefulTask
 operator.GetContext() context.Context
 ```
@@ -291,7 +281,7 @@ operator.Exit() // 这一行不会生效，因为 Continue 已经先到
 
 - `operator.Exit()`（成功退出）
 - 验证门返回 `Satisfied=true` 后某些 action 会调 `operator.Exit()`（如 `enhance_knowledge_answer`、`tool_compose`、`save_evidence`）
-- 反思建议 + 后续轮次中模型选择 `finish` / `directly_answer`
+- 普通反馈 + 后续轮次中模型选择 `finish` / `directly_answer`
 - 达到 `maxIterations`
 
 ### `Feedback` 的传递路径
@@ -301,7 +291,7 @@ flowchart LR
     A["operator.Feedback('observation')"] --> B["feedbacks bytes.Buffer"]
     B --> C["下一轮 reactiveDataBuilder(loop, feedbacks, nonce)"]
     C --> D["渲染到 ReactiveData 段"]
-    D --> E["拼进 prompt 的 REFLECTION 区块"]
+    D --> E["拼进 prompt 的 REACTIVE_DATA 区块"]
     E --> F["LLM 看到上一轮的反馈"]
 ```
 
@@ -359,4 +349,4 @@ op.DeferAfterCallbacks(fn)      // 在所有回调链跑完后再执行
 - [02-options-reference.md](02-options-reference.md)：所有 `With*` 选项的全集
 - [04-actions.md](04-actions.md)：Action 的 4 种来源与 operator 的实战使用
 - [05-hooks-and-lifecycle.md](05-hooks-and-lifecycle.md)：Hook 的具体场景
-- [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：本文未展开的反思 / 自旋 / 验证细节
+- [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：本文未展开的感知 / 验证门 / TODO 软检查点细节

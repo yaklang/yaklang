@@ -349,7 +349,7 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			if resolveErr != nil {
 				fb := resolveErr.Error()
 				infosecRecordJsStaticPathFailure(loop, fb)
-				if hint := strings.TrimSpace(loop.Get(keySpinRecoveryHint)); hint != "" {
+				if hint := strings.TrimSpace(loop.Get(keyPathFailureRecoveryHint)); hint != "" {
 					fb += "\n\n" + hint
 				}
 				op.Feedback(fb)

@@ -234,7 +234,7 @@ flowchart TD
 ```go
 mgr := loop.GetSkillsContextManager()
 err := mgr.LoadSkill(identifier)
-// 失败时 reflection critical
+// 失败时写入普通反馈
 // 成功时 emit reference material + 推荐相关能力
 ```
 
@@ -259,7 +259,7 @@ _, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
 1. **创建子 task**：和当前 task 不是同一个，避免相互污染
 2. **复用同一个 emitter / config**：UI 看到的还是同一个流
 3. **同步执行**：等子 loop 跑完才返回（`enter_focus_mode` 也是这个语义）
-4. **失败时不退出主 loop**：`Continue` + Critical reflection，让 LLM 换策略
+4. **失败时不退出主 loop**：写入普通 feedback 后 `Continue`，让下一轮主决策换策略
 
 ### 9.4.5 Unknown fallback
 

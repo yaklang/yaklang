@@ -10770,8 +10770,8 @@ type AIStartParams struct {
 	UserPresetPrompt string `protobuf:"bytes,35,opt,name=UserPresetPrompt,proto3" json:"UserPresetPrompt,omitempty"`
 	// 是否关闭工具执行期间的 interval review
 	DisableToolIntervalReview bool `protobuf:"varint,36,opt,name=DisableToolIntervalReview,proto3" json:"DisableToolIntervalReview,omitempty"`
-	// 为 true 时，MaybeTriggerPerceptionAfterAction /
-	// TriggerPerceptionOnSpin 内直接同步调用 TriggerPerception；默认 false 时为异步 goroutine 调用
+	// 为 true 时，MaybeTriggerPerceptionAfterAction 内直接同步调用 TriggerPerception；
+	// 默认 false 时为异步 goroutine 调用
 	SyncPerceptionTrigger bool `protobuf:"varint,37,opt,name=SyncPerceptionTrigger,proto3" json:"SyncPerceptionTrigger,omitempty"`
 	// 为 true 时允许 request_plan_and_execution（PE）与 require_ai_blueprint（蓝图）两类动作；
 	// 默认 false 时禁用上述能力。该开关在 StartAIReAct 参数转换中晚于 DisableAISearchForge 应用，优先级更高。

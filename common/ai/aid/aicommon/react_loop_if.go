@@ -20,7 +20,6 @@ type ReActLoopIF interface {
 	GetEmitter() *Emitter
 	GetConfig() AICallerConfigIf
 	GetMemoryTriage() MemoryTriage
-	GetEnableSelfReflection() bool
 
 	// Variable management
 	Set(key string, value any)

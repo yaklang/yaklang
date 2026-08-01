@@ -1,4 +1,4 @@
-*. 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
+* 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
     * `{"@action": "directly_answer", "answer_payload": "...[your-answer not a markdown].."}`
 
 *. 简单直接回答时，默认不要输出 `human_readable_thought`
