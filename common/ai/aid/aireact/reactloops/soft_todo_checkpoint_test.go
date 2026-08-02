@@ -107,7 +107,11 @@ func TestFinishFirstRequestAlwaysContinuesAndQueuesCheckpoint(t *testing.T) {
 	require.Contains(t, checkpoint, "立即用本轮 todo_delta")
 	require.Contains(t, checkpoint, "尚未通过 todo_delta 进入 Frontier")
 	require.Contains(t, checkpoint, "先将它们全部加入或更新到 Frontier")
-	require.Contains(t, checkpoint, "具体目标、触发证据、可证伪假设和恢复后的第一步")
+	require.Contains(t, checkpoint, "范围内具体入口")
+	require.Contains(t, checkpoint, "单次工具、参数、连接、认证、空响应或 payload 失败")
+	require.Contains(t, checkpoint, "有实质差异的修正或替代实验")
+	require.Contains(t, checkpoint, "覆盖入口写清目标、来源证据和第一步")
+	require.Contains(t, checkpoint, "验证型分支再写可证伪假设")
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 

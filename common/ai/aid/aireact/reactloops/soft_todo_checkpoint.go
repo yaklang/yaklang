@@ -18,7 +18,8 @@ const softTodoCheckpointPrompt = `[SOFT TODO CHECKPOINT]
 - 是否仍有不能忽略的开放事项；
 - 是否有 TODO 已解决但尚未记录结果；
 - 是否有验证型 TODO 仅凭单次阴性请求、普通扫描未命中或无明显报错就被关闭；若有，重新添加其中价值最高的一项作为有区分力的验证 TODO，并设为 CURRENT；
-- timeline 或最新 Observation 是否打开了一条或多条稍后需要回访的合格路径，但它们尚未通过 todo_delta 进入 Frontier；
+- timeline 或最新 Observation 是否暴露了尚未通过 todo_delta 进入 Frontier 的范围内具体入口（链接、表单 action、跳转、脚本路由、文档端点或响应字段）；
+- 是否把单次工具、参数、连接、认证、空响应或 payload 失败误当成路径结束，而没有先执行有实质差异的修正或替代实验；
 - 未完成事项是否应明确标记为 deferred。
 
 还要检查是否出现了尚未进入 TODO 的高价值后续行动。只有同时满足以下条件时，它才阻止结束：
@@ -28,7 +29,7 @@ const softTodoCheckpointPrompt = `[SOFT TODO CHECKPOINT]
 - 无需用户新增目标或授权，能够在当前主线之后或前置条件满足后执行；
 - 预计会实质提高结论可信度、风险覆盖或影响判断。
 
-若存在一个或多个合格分支，立即用本轮 todo_delta 先将它们全部加入或更新到 Frontier，写清具体目标、触发证据、可证伪假设和恢复后的第一步，再将价值最高且最接近当前证据的一项设为 CURRENT 并继续 ReAct，不要再次 finish。
+若存在一个或多个合格分支，立即用本轮 todo_delta 先将它们全部加入或更新到 Frontier。覆盖入口写清目标、来源证据和第一步；验证型分支再写可证伪假设。随后将价值最高且最接近当前证据的一项设为 CURRENT 并继续 ReAct，不要再次 finish。
 通用优化、范围外扩展、需要用户新选择、没有具体观察目标或只有空泛猜测且预期信息增益很低的想法不阻止结束，也不要为了显得主动制造 TODO。
 
 不要为了清空列表而伪造完成。
@@ -46,10 +47,11 @@ const currentTodoCheckpointPrompt = `[CURRENT TODO CHECKPOINT]
 - 当前 TODO 是否过大，需要拆分；
 - 当前 Observation 是否产生了尚未进入 Frontier 的同级有效分支；
 - 是否正在重复近似行动和近似观察；
-- 当前事项是否已确认、被有区分力地排除、明确受阻，或被新一手证据严格逆转优先级。
+- 当前事项是否已确认、被有区分力地排除、被外部前置条件阻塞，或暂时没有信息增益但 Frontier 仍有可执行项；
+- 最近的失败是否只来自一种工具调用、参数形态、连接、认证上下文、观察通道或 payload。
 
-如果当前路径仍有明确进展，沿 CURRENT 继续向深处执行；新出现的同级有效分支先用 todo_delta 保存到 Frontier，不要横向跳转。
-只有满足关闭、阻塞或严格优先级逆转条件时才切换。切换前 close 当前项，或 update 写清阶段结果、阻塞原因和恢复条件；已有关闭证据且下一项明确时，在同一 todo_delta 中 close 旧项并设置下一 CURRENT。
+如果当前路径仍有新的可控变量和明确进展，改变实验设计并沿 CURRENT 继续向深处执行；新出现的同级具体入口先用 todo_delta 保存到 Frontier，不得漏记。
+单次失败不能 close 或 deferred。先修正调用，或改变方法、编码、参数通道、请求形态、会话、基线与观察通道。CURRENT 闭环、外部阻塞或暂时零信息时，close 或 update 写清阶段结果、已尝试变化和恢复条件；交接时在同一 todo_delta 中 close 旧项并设置下一 CURRENT。
 仅在必要时调整 TODO，不要为了响应检查而制造修改。
 随后直接继续 ReAct。`
 

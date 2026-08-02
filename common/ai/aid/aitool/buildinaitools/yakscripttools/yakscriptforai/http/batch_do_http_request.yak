@@ -30,6 +30,13 @@ Use AITAG for multi-line `paths`, `packet`, `body`, and `headers`.
 - Results: `keyword`, `regexp-match`, `exclude-code`, `include-code`, `exclude-size`, `max-body-size`.
 - There is no `requests`, `concurrency`, or `include_body` parameter. Use `paths`, `concurrent`; response content is included automatically.
 
+## Interpret the batch as a survey
+
+- Preserve every concrete in-scope endpoint discovered from pages, forms, redirects, scripts, documentation, response fields, or this batch in todo_delta before choosing one current endpoint for deeper testing. A discovered entry point is a coverage branch even when it has no vulnerability signal yet.
+- Compare status, size, body semantics, headers, redirects, and timing against a baseline; filters are viewing aids, not proof that excluded paths are safe.
+- A validation error, connection failure, authentication rejection, empty response, or one uniform result does not exhaust the paths. Correct the request shape or run a materially different batch with another method, encoding, parameter channel, session context, or observable before closing them.
+- Use do_http_request for the selected current endpoint when the next experiment needs one-variable control or exact packet inspection.
+
 ## Examples
 
 Structured form (preferred):
