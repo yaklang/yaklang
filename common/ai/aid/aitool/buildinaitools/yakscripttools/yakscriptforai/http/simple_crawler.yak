@@ -60,6 +60,14 @@ discoveredUrls = sync.NewLock()
 discoveredUrlSet = {}
 requestedUrlSet = {}
 
+normalizeDisplayUrl = func(rawUrl) {
+    sharpIndex = str.Index(rawUrl, "#")
+    if sharpIndex >= 0 {
+        return rawUrl[:sharpIndex]
+    }
+    return rawUrl
+}
+
 opts = []
 if reqsLimit > 0 {
     opts.Append(crawler.maxRequest(reqsLimit))
@@ -84,6 +92,10 @@ if timeoutSecond > 0 {
 }
 
 opts.Append(crawler.onUrlFound(func(urlStr) {
+    urlStr = normalizeDisplayUrl(urlStr)
+    if urlStr == "" {
+        return
+    }
     discoveredUrls.Lock()
     defer discoveredUrls.Unlock()
     if urlStr in discoveredUrlSet {
@@ -117,7 +129,8 @@ for currentStartUrl in targetCandidates {
     for result in reqCh {
         currentResults++
         totalResults++
-        urlstr := result.Url()
+        rawUrlstr := result.Url()
+        urlstr := normalizeDisplayUrl(rawUrlstr)
 
         discoveredUrls.Lock()
         requestedUrlSet[urlstr] = true
@@ -135,6 +148,14 @@ for currentStartUrl in targetCandidates {
             rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
         } catch {}
 
+        // A URL fragment is browser-only and must never be sent to the server.
+        // Keep the output quiet if an older/lower-level request path still
+        // returns a misleading 404 for one; the crawler now strips fragments at
+        // request construction time, so this is only a defensive compatibility
+        // guard.
+        if rawUrlstr != urlstr && str.Contains(rspdesc, " 404 ") {
+            continue
+        }
         requestLines.Append(sprintf("[%v] [%v] %v", method, rspdesc, urlstr))
     }
 
