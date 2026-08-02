@@ -39,6 +39,10 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.Contains(t, highStatic, "单次普通请求、单一 payload、扫描未命中或无明显报错不得 close")
 	require.Contains(t, highStatic, "任务漂移先纠偏")
 	require.NotContains(t, highStatic, "任务漂移即完成")
+	require.Contains(t, highStatic, "不得重复或换句话再次交付同一答案")
+	require.Contains(t, highStatic, "同一 CURRENT-TASK 中，不携带有效 `todo_delta` 的 `directly_answer` 最多成功一次")
+	require.Contains(t, highStatic, "intent classifier 明确标记的 `simple_query` 例外")
+	require.Contains(t, highStatic, "无剩余工作时立即用 \"标记完成\" 收口")
 
 	require.Contains(t, verificationInstructionText, "安全测试阴性结论必须有区分力")
 	require.Contains(t, verificationInstructionText, "漂移本身不能证明当前子任务完成")

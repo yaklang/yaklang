@@ -23,8 +23,8 @@ NOTE: Even when using the external tag, a foundational Action JSON structure is 
 * They are strictly mutually exclusive, and at least one is required.
 * NEVER nest the <|FINAL_ANSWER_...|> tag inside the answer_payload field.
 [PROCESS CONTROL]
-* The directly_answer action ONLY delivers the answer; the execution loop CONTINUES afterward.
-* You MUST explicitly invoke the finish action to terminate the process.`,
+* For ordinary tasks, directly_answer delivers the answer and execution then follows Current/TODO state; use finish when no work remains.
+* Do not invoke directly_answer twice without an effective todo_delta in the same CURRENT-TASK.`,
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
@@ -65,8 +65,7 @@ NOTE: Even when using the external tag, a foundational Action JSON structure is 
 			// 关键词: directly_answer ActionVerifier AITAG hint, 5 次重试黑洞修复
 			return reactloops.WrapDirectlyAnswerError(loop, utils.Error("directly_answer requires answer_payload or FINAL_ANSWER tag, but both are empty"))
 		}
-		loop.Set("directly_answer_payload", payload)
-		return nil
+		return reactloops.FinishDirectlyAnswerVerification(loop, action, payload)
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		invoker := loop.GetInvoker()
@@ -88,9 +87,7 @@ NOTE: Even when using the external tag, a foundational Action JSON structure is 
 		invoker.AddToTimeline(reactloops.TimelineEntryAssistantOutput,
 			reactloops.TimelineAssistantOutputLabel+"\n"+utils.PrefixLines(payload, "  | "))
 
-		// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
-		// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.
-		// 关键词: directly_answer 永不 Exit, http_flow_analyze 复用单源, finish 唯一终结器
+		// 共享收口负责续跑、simple_query 自动收口和重复答复防抖。
 		reactloops.DirectlyAnswerContinue(loop, action, operator)
 	},
 }

@@ -87,3 +87,93 @@ func TestActionBuiltinDirectlyAnswerVerifier_HasPayloadPasses(t *testing.T) {
 	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
 	assert.Equal(t, "hi", strings.TrimSpace(loop.Get("directly_answer_payload")))
 }
+
+func TestShouldAutoFinishAfterSimpleQueryDirectlyAnswer(t *testing.T) {
+	loop, _, _, _ := newTodoGateTestLoop(t, nil)
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
+	require.NoError(t, err)
+	assert.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+
+	loop.Set("intent_hint", "capabilities_matched")
+	assert.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	actionWithDelta, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"hi","todo_delta":{"add":[{"id":"follow_up","text":"继续处理已发现的问题"}],"current":"follow_up"}}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	assert.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, actionWithDelta))
+
+	loopWithOpenTodo, _, _, _ := newTodoGateTestLoop(t, []aicommon.VerificationTodoItem{{ID: "still_open", Status: aicommon.VerificationTodoStatusPending}})
+	loopWithOpenTodo.Set("intent_hint", loopIntentHintSimpleQuery)
+	assert.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loopWithOpenTodo, action))
+}
+
+func TestDirectlyAnswerContinueAutoFinishesSimpleQuery(t *testing.T) {
+	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+
+	op := NewActionHandlerOperator(task)
+	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
+
+	terminated, termErr := op.IsTerminated()
+	require.True(t, terminated)
+	require.NoError(t, termErr)
+	require.False(t, op.IsContinued())
+	assert.Contains(t, strings.Join(invoker.timeline, "\n"), "simple_query")
+}
+
+func TestRejectDuplicateDirectlyAnswerWithoutTodoDelta(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	first, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report one"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, first))
+	noteDirectlyAnswerDeliveredWithoutTodoDelta(loop, first)
+
+	second, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report two"}`, "directly_answer")
+	require.NoError(t, err)
+	verifierErr := loopAction_DirectlyAnswer.ActionVerifier(loop, second)
+	require.Error(t, verifierErr)
+	assert.Contains(t, verifierErr.Error(), "already delivered")
+	assert.Contains(t, verifierErr.Error(), "finish")
+
+	emptyDelta, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report three","todo_delta":{}}`, "directly_answer")
+	require.NoError(t, err)
+	require.Error(t, loopAction_DirectlyAnswer.ActionVerifier(loop, emptyDelta), "empty todo_delta is omitted and must not bypass the duplicate guard")
+}
+
+func TestRejectDuplicateDirectlyAnswerAllowsAnswerWithTodoDelta(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	first, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report one"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, first))
+	noteDirectlyAnswerDeliveredWithoutTodoDelta(loop, first)
+
+	withDelta, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"report two","todo_delta":{"add":[{"id":"follow","text":"继续验证新线索"}],"current":"follow"}}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, withDelta))
+}
+
+func TestRejectDuplicateDirectlyAnswerAllowsLaterNoDeltaWhenFirstHadTodoDelta(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	first, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"report one","todo_delta":{"add":[{"id":"follow","text":"继续验证新线索"}],"current":"follow"}}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, first))
+	noteDirectlyAnswerDeliveredWithoutTodoDelta(loop, first)
+	assert.False(t, directlyAnswerDeliveredWithoutTodoDelta(loop))
+
+	second, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report two"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, second))
+}

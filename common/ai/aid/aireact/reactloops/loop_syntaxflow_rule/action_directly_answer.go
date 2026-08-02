@@ -15,8 +15,9 @@ import (
 var loopAction_DirectlyAnswerSyntaxFlow = &reactloops.LoopAction{
 	ActionType: "directly_answer",
 	Description: "Directly answer with the 'answer_payload' field. " +
-		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. Use the 'finish' action to terminate. " +
-		"OPTIONAL: carry a non-empty 'todo_delta' delta alongside the answer to schedule follow-up TODO updates.",
+		"For ordinary tasks, continue or finish according to Current/TODO state after delivery. " +
+		"Do not invoke directly_answer twice without an effective todo_delta in the same CURRENT-TASK. " +
+		"Carry a non-empty todo_delta whenever the answer changes or schedules follow-up TODO state.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
@@ -69,9 +70,8 @@ func directlyAnswerSyntaxFlowVerifier(loop *reactloops.ReActLoop, action *aicomm
 		}
 	}
 
-	// 2. Pass payload to handler（规则代码由 replace_payload 检测并丢弃，以文件内容为准）
-	loop.Set("directly_answer_payload", payload)
-	return nil
+	// 2. Pass payload to the shared duplicate guard and handler store.
+	return reactloops.FinishDirectlyAnswerVerification(loop, action, payload)
 }
 
 func directlyAnswerSyntaxFlowHandler(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
@@ -100,8 +100,6 @@ func directlyAnswerSyntaxFlowHandler(loop *reactloops.ReActLoop, action *aicommo
 		answerPath,
 	))
 
-	// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
-	// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.
-	// 关键词: directly_answer 永不 Exit, syntaxflow_rule 复用单源, finish 唯一终结器
+	// 共享收口负责续跑、simple_query 自动收口和重复答复防抖。
 	reactloops.DirectlyAnswerContinue(loop, action, operator)
 }

@@ -12,10 +12,10 @@ import (
 // 之后调它代替裸 operator.Exit(), 让 "改 directly_answer 很简单".
 //
 // 核心约定 (与 high_static_section.txt 的 "## 任务状态机制: todo_delta"
-// 以及 "统一入口与终结" 对齐): directly_answer 绝不 Exit. 它只负责把答复发
-// 出去, 然后追加一条 timeline 表明 "回答已交付, 循环继续", 并 Continue. 真正
-// 结束整个 ReAct 循环只能由显式的 finish action 完成 (见 loopAction_Finish),
-// 系统里不存在任何隐式 Exit.
+// 以及 "统一入口与终结" 对齐): directly_answer 只交付答复, 不应被当成
+// 通用终结器. 普通任务由 finish 收口; 但 intent classifier 已明确标记为
+// simple_query、本轮无有效 todo_delta 且无开放 TODO 时, host 在答复交付后
+// 直接 Exit, 避免为了补一个 finish 再次调模型.
 //
 // 语义分支:
 //   - 携带 todo_delta 增量: timeline 标注循环将继续推进这些 TODO 更新.
@@ -27,17 +27,78 @@ import (
 // applyTodoDeltaBottomLine) 在 ActionHandler 之前完成, 所以这里
 // GetBlockingVerificationTodoItems 读到的就是 apply 之后的状态.
 //
-// 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器,
-//
-//	directly_answer 改起来很简单
-//
 // Timeline 里记录用户可见答复时，不使用 directly_answer 等 action 名，避免 agent
 // 从 timeline 反推出「可随时调用 directly_answer」。
 const (
 	TimelineEntryAssistantOutput     = "assistant_output"
 	TimelineEntryAssistantOutputNote = "assistant_output_note"
 	TimelineAssistantOutputLabel     = "assistant output:"
+	loopIntentHintSimpleQuery        = "simple_query"
+
+	loopVarDirectlyAnswerDeliveredWithoutTodoDelta = "directly_answer_delivered_without_todo_delta"
 )
+
+const errDuplicateDirectlyAnswerWithoutTodoDelta = "assistant output was already delivered for this CURRENT-TASK without an effective todo_delta; " +
+	"do not emit another answer or rephrase the previous one. Use 'finish' if the latest user input is fully answered, " +
+	"or choose a tool action and maintain todo_delta if more work remains."
+
+func directlyAnswerHasTodoDelta(action *aicommon.Action) bool {
+	delta, err := aicommon.NormalizeTodoDelta(action)
+	return err == nil && delta != nil
+}
+
+func directlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop) bool {
+	if loop == nil {
+		return false
+	}
+	value, _ := loop.GetVariable(loopVarDirectlyAnswerDeliveredWithoutTodoDelta).(bool)
+	return value
+}
+
+// RejectDuplicateDirectlyAnswerWithoutTodoDelta blocks a second user-visible
+// answer in the same CURRENT-TASK when the first answer did not schedule any
+// state change. A directly_answer with an effective todo_delta remains valid:
+// it is a progress handoff rather than an accidental replay.
+func RejectDuplicateDirectlyAnswerWithoutTodoDelta(loop *ReActLoop, action *aicommon.Action) error {
+	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) || !directlyAnswerDeliveredWithoutTodoDelta(loop) {
+		return nil
+	}
+	return utils.Error(errDuplicateDirectlyAnswerWithoutTodoDelta)
+}
+
+// FinishDirectlyAnswerVerification applies the duplicate guard shared by the
+// built-in and specialized directly_answer actions, then stores their payload.
+func FinishDirectlyAnswerVerification(loop *ReActLoop, action *aicommon.Action, payload string) error {
+	if err := RejectDuplicateDirectlyAnswerWithoutTodoDelta(loop, action); err != nil {
+		return err
+	}
+	loop.Set("directly_answer_payload", payload)
+	return nil
+}
+
+func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicommon.Action) {
+	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) {
+		return
+	}
+	loop.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
+}
+
+// ShouldAutoFinishAfterSimpleQueryDirectlyAnswer identifies the narrow host
+// guard for greetings, status checks, and other classifier-approved trivial
+// inquiries. No extra model round is useful when the answer was delivered and
+// neither todo_delta nor the persistent TODO store contains remaining work.
+func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
+	if loop == nil || action == nil || strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
+		return false
+	}
+	if directlyAnswerHasTodoDelta(action) {
+		return false
+	}
+	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
+		return false
+	}
+	return true
+}
 
 func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 	if operator == nil {
@@ -47,9 +108,9 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		operator.Continue()
 		return
 	}
+	noteDirectlyAnswerDeliveredWithoutTodoDelta(loop, action)
 	invoker := loop.GetInvoker()
-	delta, _ := aicommon.NormalizeTodoDelta(action)
-	if delta != nil {
+	if directlyAnswerHasTodoDelta(action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
 				"assistant output delivered; the loop continues to honor the scheduled todo_delta. "+
@@ -58,14 +119,21 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		operator.Continue()
 		return
 	}
+	if ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action) {
+		if !utils.IsNil(invoker) {
+			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
+				"simple_query answer delivered; CURRENT-TASK has no effective todo_delta or open TODO. "+
+					"The host is closing this trivial exchange without another model iteration.")
+		}
+		operator.Exit()
+		return
+	}
 	if !utils.IsNil(invoker) {
 		invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
-			"assistant output delivered; the task is NOT complete yet. "+
-				"The ReAct loop CONTINUES automatically — the user does NOT need to reply '继续'/'continue' for you to proceed. "+
-				"If you already know the next step, EXECUTE it now in the next iteration via require_tool / directly_call_tool / request_plan; "+
-				"do NOT merely announce it and wait for the user's permission. "+
-				"When the entire CURRENT-TASK is complete, use the 'finish' action to terminate the ReAct loop. "+
-				"Do not repeat the same answer; continue with tools, todo_delta, or finish.")
+			"assistant output delivered. Do not repeat or rephrase the same answer. "+
+				"Re-evaluate CURRENT-TASK: if the latest user input is fully answered and no open TODO remains, use 'finish' now; "+
+				"otherwise continue the existing Current with tools and maintain todo_delta. "+
+				"The user does not need to reply 'continue'.")
 	}
 	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 		operator.Feedback(buildExitBlockedByTodoMessage("finish", items))
