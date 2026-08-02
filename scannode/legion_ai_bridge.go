@@ -101,7 +101,7 @@ type aiSessionBinding struct {
 	CredentialRefs             []aiSessionCredentialRef
 	PlatformBearerToken        string
 	HTTPClient                 *http.Client
-	ResultSink                 aicommon.ResultSink
+	FocusRuntime               aicommon.FocusRuntime
 	ExecutionMode              string
 	AuthorizedTargetURL        string
 }
@@ -125,7 +125,7 @@ type aiSessionCredentialRef struct {
 type aiSessionRuntimeBindOptions struct {
 	PlatformBearerToken string
 	HTTPClient          *http.Client
-	ResultSink          aicommon.ResultSink
+	ResultSink          aiFocusResultSink
 }
 
 type aiSessionInput struct {
@@ -241,6 +241,15 @@ func (m *aiSessionRuntimeManager) Bind(
 
 	ctx, cancel := context.WithCancel(parent)
 	resultSink := newAISessionResultSinkProxy(options.ResultSink)
+	focusRuntime, err := newLegionServerFocusRuntime(
+		ctx,
+		strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
+		resultSink,
+	)
+	if err != nil {
+		cancel()
+		return ref, err
+	}
 	runtime := &aiSessionRuntime{
 		ref:                    ref,
 		projectID:              strings.TrimSpace(command.GetProjectId()),
@@ -262,7 +271,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
 		HTTPClient:                 options.HTTPClient,
-		ResultSink:                 resultSink,
+		FocusRuntime:               focusRuntime,
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
 	}, &managedAISessionRuntimeEmitter{

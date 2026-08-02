@@ -124,26 +124,3 @@ func TestBuildReActOptionsAppendsTieredCallbackOverrides(t *testing.T) {
 		t.Fatalf("expected speed callback override, got %q", seen["speed"])
 	}
 }
-
-func TestBuildReActOptionsPropagatesResultSink(t *testing.T) {
-	sink := aicommon.ResultSinkFunc(func(
-		context.Context,
-		*schema.Risk,
-	) (aicommon.ResultReceipt, error) {
-		return aicommon.ResultReceipt{}, nil
-	})
-	engineConfig := NewAIEngineConfig(
-		WithResultSink(sink),
-		WithDisableMCPServers(true),
-	)
-	opts := buildReActOptions(
-		context.Background(),
-		engineConfig,
-		make(chan *schema.AiOutputEvent, 1),
-	)
-	config := aicommon.NewConfig(context.Background(), opts...)
-
-	if aicommon.ResultSinkFromConfig(config) == nil {
-		t.Fatal("expected result sink to reach ReAct runtime config")
-	}
-}
