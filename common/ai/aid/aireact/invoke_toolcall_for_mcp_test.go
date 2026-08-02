@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,10 +25,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, nonce string) (*aicommon.AIResponse, error) {
+func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, nonce string, primaryDecisionCount *atomic.Int32) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
+		if primaryDecisionCount.Add(1) > 1 {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: mcp tool done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
 "human_readable_thought": "mocked thought for mcp tool calling", "cumulative_summary": "..cumulative-mocked for mcp tool calling.."}
@@ -205,10 +211,11 @@ func TestReAct_MCPToolUse(t *testing.T) {
 
 	// The full MCP tool name will be: mcp_{serverName}_test_echo
 	mcpToolName := fmt.Sprintf("mcp_%s_test_echo", serverName)
+	var primaryDecisionCount atomic.Int32
 
 	ins, err := NewReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedMCPToolCalling(i, r, mcpToolName, nonce)
+			return mockedMCPToolCalling(i, r, mcpToolName, nonce, &primaryDecisionCount)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -229,7 +236,7 @@ func TestReAct_MCPToolUse(t *testing.T) {
 			}
 			out <- e.ToGRPC()
 		}),
-		aicommon.WithMemoryTriage(nil),
+		aicommon.WithNoOpMemoryTriage(),
 		aicommon.WithDisallowMCPServers(false),           // Important: enable MCP servers
 		aicommon.WithDisableIntentRecognition(true),      // Prevent intent sub-loop from consuming mock responses
 		aicommon.WithDisableSessionTitleGeneration(true), // Prevent title generation from consuming mock responses
@@ -375,6 +382,9 @@ LOOP:
 
 	if !toolCallOutputEvent {
 		t.Fatal("Expected to have at least one tool call output event, but got none")
+	}
+	if !taskCompleted {
+		t.Fatal("Expected ReAct task to complete before test cleanup")
 	}
 
 	// Verify timeline contains MCP tool call information
