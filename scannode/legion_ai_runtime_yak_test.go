@@ -34,6 +34,23 @@ func TestStatefulRuntimeRejectsSingleRunInsteadOfLeavingFocusOpen(t *testing.T) 
 	}
 }
 
+func TestBuildYakAIEngineOptionsDefersPinnedFocusToContextRelease(t *testing.T) {
+	options, err := buildYakAIEngineOptions(context.Background(), aiSessionBinding{
+		Ref: aiSessionCommandRef{SessionID: "ai-session-release"},
+		RuntimeOptionSnapshotJSON: []byte(`{
+			"focus_mode_loop":"http_fuzztest",
+			"focus_release_id":"http_fuzztest@1.0.0+abcdef123456"
+		}`),
+	}, noopAISessionRuntimeEmitter{})
+	if err != nil {
+		t.Fatalf("build options: %v", err)
+	}
+	config := aiengine.NewAIEngineConfig(options...)
+	if config.Focus != "" {
+		t.Fatalf("logical engine focus must not execute directly when a server release is pinned: %q", config.Focus)
+	}
+}
+
 func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection(t *testing.T) {
 	t.Parallel()
 

@@ -54,15 +54,16 @@ type aiFocusResultEventPublisher interface {
 }
 
 type legionAIFocusResultSink struct {
-	publisher  aiFocusResultEventPublisher
-	ref        jobExecutionRef
-	focusRunID string
-	focusMode  string
-	targetURL  string
-	mu         sync.Mutex
-	assetIDs   map[string]struct{}
-	riskIDs    map[string]struct{}
-	targets    map[string]struct{}
+	publisher      aiFocusResultEventPublisher
+	ref            jobExecutionRef
+	focusRunID     string
+	focusMode      string
+	focusReleaseID string
+	targetURL      string
+	mu             sync.Mutex
+	assetIDs       map[string]struct{}
+	riskIDs        map[string]struct{}
+	targets        map[string]struct{}
 }
 
 func newLegionAIFocusResultSink(
@@ -81,14 +82,15 @@ func newLegionAIFocusResultSink(
 		return nil, err
 	}
 	return &legionAIFocusResultSink{
-		publisher:  publisher,
-		ref:        ref,
-		focusRunID: strings.TrimSpace(resultContext.GetFocusRunId()),
-		focusMode:  strings.TrimSpace(resultContext.GetFocusMode()),
-		targetURL:  strings.TrimSpace(resultContext.GetTargetUrl()),
-		assetIDs:   make(map[string]struct{}),
-		riskIDs:    make(map[string]struct{}),
-		targets:    make(map[string]struct{}),
+		publisher:      publisher,
+		ref:            ref,
+		focusRunID:     strings.TrimSpace(resultContext.GetFocusRunId()),
+		focusMode:      strings.TrimSpace(resultContext.GetFocusMode()),
+		focusReleaseID: strings.TrimSpace(resultContext.GetFocusReleaseId()),
+		targetURL:      strings.TrimSpace(resultContext.GetTargetUrl()),
+		assetIDs:       make(map[string]struct{}),
+		riskIDs:        make(map[string]struct{}),
+		targets:        make(map[string]struct{}),
 	}, nil
 }
 
@@ -239,6 +241,8 @@ func validateLegionAIFocusResultContext(
 		return jobExecutionRef{}, fmt.Errorf("ai focus result focus_run_id is required")
 	case strings.TrimSpace(resultContext.GetFocusMode()) == "":
 		return jobExecutionRef{}, fmt.Errorf("ai focus result focus_mode is required")
+	case strings.TrimSpace(resultContext.GetFocusReleaseId()) == "":
+		return jobExecutionRef{}, fmt.Errorf("ai focus result focus_release_id is required")
 	case strings.TrimSpace(resultContext.GetSchemaVersion()) != legionAIFocusResultSchemaV1:
 		return jobExecutionRef{}, fmt.Errorf(
 			"unsupported ai focus result schema_version %q",
@@ -390,6 +394,7 @@ func (s *legionAIFocusResultSink) Succeed(
 	result["schema_version"] = "legion.focus-run-result.v1"
 	result["focus_run_id"] = s.focusRunID
 	result["focus_mode"] = s.focusMode
+	result["focus_release_id"] = s.focusReleaseID
 	result["target_url"] = s.targetURL
 	result["status"] = "succeeded"
 	result["asset_count"] = len(assetIDs)
@@ -458,8 +463,9 @@ func (s *legionAIFocusResultSink) Fail(
 	detailJSON []byte,
 ) error {
 	detail := map[string]string{
-		"focus_run_id": s.focusRunID,
-		"focus_mode":   s.focusMode,
+		"focus_run_id":     s.focusRunID,
+		"focus_mode":       s.focusMode,
+		"focus_release_id": s.focusReleaseID,
 	}
 	if len(detailJSON) > 0 {
 		detail["runtime_detail_json"] = string(detailJSON)

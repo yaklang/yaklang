@@ -73,6 +73,22 @@ __VERBOSE_NAME__ = "Explicit Name Test"
 	require.False(t, foundDefault, "default name should not be used when __NAME__ is set")
 }
 
+func TestRegisterYakFocusMode_FixedNameRejectsScriptOverride(t *testing.T) {
+	defaultName := "yakfm_fixed_" + utils.RandStringBytes(6)
+	overrideName := "yakfm_override_" + utils.RandStringBytes(6)
+	err := RegisterYakFocusModeFromBundle(&FocusModeBundle{
+		Name:      defaultName,
+		FixedName: true,
+		EntryFile: defaultName + FocusModeFileSuffix,
+		EntryCode: `__NAME__ = "` + overrideName + `"`,
+	})
+	require.Error(t, err)
+	_, found := GetLoopFactory(defaultName)
+	require.False(t, found)
+	_, found = GetLoopFactory(overrideName)
+	require.False(t, found)
+}
+
 // 验证同名重复注册失败，且失败时不会污染 yakFocusBundles。
 // 关键词: yak focus mode register test, duplicate registration rejection
 func TestRegisterYakFocusMode_DuplicateRejected(t *testing.T) {

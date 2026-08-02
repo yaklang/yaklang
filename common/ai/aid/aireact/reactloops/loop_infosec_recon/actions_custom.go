@@ -53,6 +53,47 @@ func infosecValidateHTTPURL(raw string) error {
 	return nil
 }
 
+// installBoundedSaaSReconSeed materializes the server authorization into the
+// inner engine loop before the model sees an action schema. This keeps the
+// release deterministic: the model can probe the exact target, but cannot
+// choose or widen the seed-registration step.
+func installBoundedSaaSReconSeed(
+	loop *reactloops.ReActLoop,
+	workDir string,
+	proposedTarget string,
+	requestedScope string,
+) (string, error) {
+	if loop == nil {
+		return "", utils.Error("bounded SaaS recon loop is missing")
+	}
+	seed, err := validateSaaSReconActionTarget(loop.GetConfig(), proposedTarget)
+	if err != nil {
+		return "", err
+	}
+	scopeHost, err := normalizeSaaSReconScope(seed, requestedScope)
+	if err != nil {
+		return "", err
+	}
+	pool, err := LoadAPIPool(workDir)
+	if err != nil {
+		return "", utils.Wrap(err, "load bounded SaaS recon pool")
+	}
+	pool.SeedURL = seed
+	pool.Entries = []APIPoolEntry{}
+	if _, mergeErrs := addSaaSReconSeedCandidate(pool, seed, scopeHost); len(mergeErrs) > 0 {
+		return "", utils.Errorf("register SaaS seed candidate: %s", strings.Join(mergeErrs, "; "))
+	}
+	if err := SaveAPIPool(workDir, pool); err != nil {
+		return "", utils.Wrap(err, "save bounded SaaS recon pool")
+	}
+	loop.Set(keySeedURL, seed)
+	loop.Set(keyScopeHosts, scopeHost)
+	loop.Set(keyMaxCrawlDepth, defaultCrawlDepth)
+	loop.Set(keyProbeConcurrency, defaultProbeConc)
+	loop.Set(keySaaSSeedRegistered, "true")
+	return seed, nil
+}
+
 // infosecResolveLocalPathForExec returns an absolute, existing path for use as a yak CLI argument.
 func infosecResolveLocalPathForExec(p, baseWd string) (abs string, err error) {
 	p = strings.TrimSpace(p)
@@ -120,11 +161,17 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			saasMode := isBoundedSaaSRecon(loop.GetConfig())
 			if saasMode {
 				var err error
-				seed, err = validateSaaSReconActionTarget(loop.GetConfig(), seed)
+				seed, err = installBoundedSaaSReconSeed(loop, wd, seed, action.GetString("scope_hosts"))
 				if err != nil {
 					op.Fail(err)
 					return
 				}
+				r.AddToTimeline("infosec_seed", fmt.Sprintf("seed=%s workdir=%s", seed, wd))
+				op.Feedback(fmt.Sprintf("Registered server-authorized seed URL. Pool file: %s", filepath.Join(wd, poolFileName)))
+				reactloops.EmitStatus(loop, "完成 / Complete")
+				reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, fmt.Sprintf("完成: recon_register_seed / Done: recon_register_seed (seed=%s)", seed))
+				op.Continue()
+				return
 			} else if norm, coerced, note := infosecPickFirstHTTPURL(seed); coerced {
 				seed = norm
 				r.AddToTimeline("infosec_seed_url_coerced", note)
@@ -135,18 +182,7 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				return
 			}
 			loop.Set(keySeedURL, seed)
-			if saasMode {
-				loop.Set(keySaaSSeedRegistered, "true")
-				scopeHost, err := normalizeSaaSReconScope(
-					seed,
-					action.GetString("scope_hosts"),
-				)
-				if err != nil {
-					op.Fail(err)
-					return
-				}
-				loop.Set(keyScopeHosts, scopeHost)
-			} else if sh := strings.TrimSpace(action.GetString("scope_hosts")); sh != "" {
+			if sh := strings.TrimSpace(action.GetString("scope_hosts")); sh != "" {
 				loop.Set(keyScopeHosts, sh)
 			}
 			loop.Set(keyMaxCrawlDepth, fmt.Sprintf("%d", action.GetInt("max_crawl_depth")))
@@ -159,18 +195,6 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				return
 			}
 			pool.SeedURL = seed
-			if saasMode {
-				// A retried registration replaces, rather than expands, the SaaS target.
-				pool.Entries = []APIPoolEntry{}
-				if _, mergeErrs := addSaaSReconSeedCandidate(
-					pool,
-					seed,
-					loop.Get(keyScopeHosts),
-				); len(mergeErrs) > 0 {
-					op.Fail(fmt.Errorf("register SaaS seed candidate: %s", strings.Join(mergeErrs, "; ")))
-					return
-				}
-			}
 			if err := SaveAPIPool(wd, pool); err != nil {
 				op.Feedback(fmt.Sprintf("save pool failed: %v", err))
 				op.Continue()
@@ -280,7 +304,23 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithIntegerParam("max_depth", aitool.WithParam_Default(2)),
 			aitool.WithIntegerParam("urls_max", aitool.WithParam_Default(80)),
 		},
-		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+			if !isBoundedSaaSRecon(loop.GetConfig()) {
+				return nil
+			}
+			if loop.Get(keySaaSCrawlAttempted) == "true" {
+				return utils.Error("SaaS recon crawl is already attempted")
+			}
+			if loop.Get(keySaaSSeedRegistered) != "true" {
+				return utils.Error("SaaS recon seed is not initialized")
+			}
+			startURL := strings.TrimSpace(action.GetString("start_url"))
+			if startURL == "" {
+				return nil
+			}
+			_, err := validateSaaSReconActionTarget(loop.GetConfig(), startURL)
+			return err
+		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, fmt.Sprintf("开始: %s / Start: %s", ToolCrawlJsCollector, ToolCrawlJsCollector))
 			reactloops.EmitStatus(loop, "JS 爬取分析中 / Running JS crawl analysis...")
@@ -295,6 +335,49 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			}
 			if seed == "" {
 				op.Feedback(ToolCrawlJsCollector + ": set start_url or run recon_register_seed first.")
+				op.Continue()
+				return
+			}
+			if isBoundedSaaSRecon(loop.GetConfig()) {
+				loop.Set(keySaaSCrawlAttempted, "true")
+				_, ctx := infosecInvokerContext(loop)
+				stats, findings, crawlErr := crawlBoundedSaaSRecon(ctx, nil, seed, wd)
+				if crawlErr != nil {
+					op.Fail(fmt.Errorf("SaaS recon crawl failed: %w", crawlErr))
+					return
+				}
+				pool, loadErr := LoadAPIPool(wd)
+				if loadErr != nil {
+					op.Fail(fmt.Errorf("load SaaS recon pool: %w", loadErr))
+					return
+				}
+				added, mergeErrs := mergeBoundedSaaSReconFindings(
+					pool,
+					seed,
+					loop.Get(keyScopeHosts),
+					findings,
+				)
+				filterBoundedSaaSReconPool(pool, seed)
+				if saveErr := SaveAPIPool(wd, pool); saveErr != nil {
+					op.Fail(fmt.Errorf("save SaaS recon pool: %w", saveErr))
+					return
+				}
+				loop.Set(keyVerifiedJsDir, stats.VerifiedJSDir)
+				loop.Set(keySaaSCrawlCompleted, "true")
+				summary := fmt.Sprintf(
+					"SaaS crawl completed: pages=%d scripts=%d requests=%d candidates=%d added=%d parse_errors=%d",
+					stats.Pages,
+					stats.Scripts,
+					stats.Requests,
+					stats.Candidates,
+					added,
+					len(mergeErrs),
+				)
+				r.AddToTimeline(ToolCrawlJsCollector+"_done", summary)
+				appendInfosecReconLog(loop, summary)
+				op.Feedback(summary + ". Next: call " + ToolJsStaticExtractAI + ".")
+				reactloops.EmitStatus(loop, "站点与脚本采集完成 / Site and script collection complete")
+				reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, "完成: SaaS 同源站点与脚本采集 / Done: SaaS same-origin site and script collection")
 				op.Continue()
 				return
 			}
@@ -383,6 +466,15 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			aitool.WithBoolParam("skip_phase2", aitool.WithParam_Default(true)),
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+			if isBoundedSaaSRecon(loop.GetConfig()) {
+				if loop.Get(keySaaSCrawlCompleted) != "true" {
+					return utils.Error("complete SaaS recon crawl before static endpoint extraction")
+				}
+				if loop.Get(keySaaSStaticAttempted) == "true" {
+					return utils.Error("SaaS recon static extraction is already attempted")
+				}
+				return nil
+			}
 			dir := strings.TrimSpace(action.GetString("dir"))
 			paths := strings.TrimSpace(action.GetString("paths"))
 			if dir == "" && paths == "" && strings.TrimSpace(loop.Get(keyVerifiedJsDir)) == "" {
@@ -397,6 +489,47 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			wd := loop.Get(keyWorkDir)
 			if wd == "" {
 				wd = workDirFromInvoker(r)
+			}
+			if isBoundedSaaSRecon(loop.GetConfig()) {
+				loop.Set(keySaaSStaticAttempted, "true")
+				seed := loop.Get(keySeedURL)
+				verifiedDir := loop.Get(keyVerifiedJsDir)
+				findings, filesRead, extractErr := extractBoundedSaaSReconStaticFindings(seed, verifiedDir)
+				if extractErr != nil {
+					op.Fail(fmt.Errorf("SaaS static endpoint extraction failed: %w", extractErr))
+					return
+				}
+				pool, loadErr := LoadAPIPool(wd)
+				if loadErr != nil {
+					op.Fail(fmt.Errorf("load SaaS recon pool: %w", loadErr))
+					return
+				}
+				added, mergeErrs := mergeBoundedSaaSReconFindings(
+					pool,
+					seed,
+					loop.Get(keyScopeHosts),
+					findings,
+				)
+				filterBoundedSaaSReconPool(pool, seed)
+				if saveErr := SaveAPIPool(wd, pool); saveErr != nil {
+					op.Fail(fmt.Errorf("save SaaS recon pool: %w", saveErr))
+					return
+				}
+				loop.Set(keySaaSStaticCompleted, "true")
+				summary := fmt.Sprintf(
+					"SaaS static endpoint extraction completed: files=%d candidates=%d added=%d parse_errors=%d",
+					filesRead,
+					len(findings),
+					added,
+					len(mergeErrs),
+				)
+				r.AddToTimeline(ToolJsStaticExtractAI+"_done", summary)
+				appendInfosecReconLog(loop, summary)
+				op.Feedback(summary + ". Next: call probe_api_candidates.")
+				reactloops.EmitStatus(loop, "API 候选提取完成 / API candidate extraction complete")
+				reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, "完成: SaaS JS API 候选提取 / Done: SaaS JS API candidate extraction")
+				op.Continue()
+				return
 			}
 			pathsStr := action.GetString("paths")
 			dirStr := action.GetString("dir")
@@ -506,8 +639,8 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				if loop.Get(keySaaSProbeAttempted) == "true" {
 					return utils.Error("bounded SaaS recon probe is already attempted")
 				}
-				if strings.TrimSpace(loop.Get(keyScopeHosts)) == "" {
-					return utils.Error("run recon_register_seed before probing the bounded SaaS target")
+				if loop.Get(keySaaSStaticCompleted) != "true" {
+					return utils.Error("complete SaaS crawl and static extraction before probing API candidates")
 				}
 			}
 			return nil
@@ -553,6 +686,9 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				op.Feedback(fmt.Sprintf("load pool: %v", err))
 				op.Continue()
 				return
+			}
+			if saasMode {
+				filterBoundedSaaSReconPool(pool, loop.Get(keySeedURL))
 			}
 			allowed := ParseScopeHostSet(loop.Get(keyScopeHosts))
 			if saasMode && len(allowed) == 0 {
@@ -603,8 +739,7 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, fmt.Sprintf("完成: probe_api_candidates (%d probed) / Done: probe_api_candidates (%d probed)", n, n))
 			if saasMode {
 				if submitted == 0 {
-					op.Fail("bounded SaaS recon finished without a verified asset")
-					return
+					op.Feedback("The bounded discovery pipeline completed, but no endpoint passed HEAD verification in this run.")
 				}
 				op.Exit()
 				return

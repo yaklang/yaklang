@@ -182,6 +182,55 @@ func TestStatelessDriverSendInputEmptyUserInputErrors(t *testing.T) {
 	}
 }
 
+func TestStatelessDriverRequiresPinnedFocusReleaseInContextPackage(t *testing.T) {
+	handle := &statelessAIEngineRuntimeHandle{pinnedFocusReleaseID: "http_fuzztest@1.0.0+abcdef123456"}
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		ContextPackage: &aiv1.ContextPackage{UserInput: "run"},
+	})
+	if err == nil || !contains(err.Error(), "is missing from context package") {
+		t.Fatalf("expected missing focus release error, got %v", err)
+	}
+}
+
+func TestStatelessDriverRejectsMismatchedPinnedFocusRelease(t *testing.T) {
+	handle := &statelessAIEngineRuntimeHandle{pinnedFocusReleaseID: "http_fuzztest@1.0.0+abcdef123456"}
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		ContextPackage: &aiv1.ContextPackage{
+			UserInput: "run",
+			FocusRelease: &aiv1.ContextFocusRelease{
+				ReleaseId: "infosec_recon@1.0.0+abcdef123456",
+			},
+		},
+	})
+	if err == nil || !contains(err.Error(), "focus release mismatch") {
+		t.Fatalf("expected focus release mismatch, got %v", err)
+	}
+}
+
+func TestStatelessDriverAppliesPinnedFocusReleaseToEngineConstruction(t *testing.T) {
+	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Pinned Runtime Focus"`)
+	handle := &statelessAIEngineRuntimeHandle{
+		pinnedFocusReleaseID: release.ReleaseId,
+		newEngine: func(options ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+			config := aiengine.NewAIEngineConfig(options...)
+			if config.Focus != release.RuntimeName {
+				t.Fatalf("engine focus = %q, want pinned runtime %q", config.Focus, release.RuntimeName)
+			}
+			return nil, errFakeEngineFactory
+		},
+	}
+
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		ContextPackage: &aiv1.ContextPackage{
+			UserInput:    "run the pinned focus",
+			FocusRelease: release,
+		},
+	})
+	if err == nil || !contains(err.Error(), errFakeEngineFactory.Error()) {
+		t.Fatalf("expected injected engine factory error after focus assertion, got %v", err)
+	}
+}
+
 func TestStatelessDriverInteractiveResponseRequiresActiveTurnWithoutCreatingEngine(t *testing.T) {
 	var engineCreated int32
 	driver := newStatelessAIEngineRuntimeDriver()

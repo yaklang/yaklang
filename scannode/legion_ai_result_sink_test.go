@@ -554,11 +554,12 @@ func TestLegionAIFocusResultSinkPublishesIdempotentSummaryBeforeSuccess(t *testi
 
 func validAIFocusResultContext() *aiv1.AIFocusResultContext {
 	return &aiv1.AIFocusResultContext{
-		FocusRunId:    "focus-run-1",
-		FocusMode:     "infosec_recon",
-		SchemaVersion: legionAIFocusResultSchemaV1,
-		ExecutionMode: "single_run",
-		TargetUrl:     "https://example.com/health?q=1",
+		FocusRunId:     "focus-run-1",
+		FocusMode:      "infosec_recon",
+		FocusReleaseId: "infosec_recon@1.0.0+abcdef123456",
+		SchemaVersion:  legionAIFocusResultSchemaV1,
+		ExecutionMode:  "single_run",
+		TargetUrl:      "https://example.com/health?q=1",
 		Job: &jobv1.JobRef{
 			JobId:     "job-1",
 			SubtaskId: "subtask-1",

@@ -224,6 +224,7 @@ type yakRuntimeOptions struct {
 	TimelineContentSizeLimit       int64             `json:"timeline_content_size_limit"`
 	Focus                          string            `json:"focus"`
 	FocusModeLoop                  string            `json:"focus_mode_loop"`
+	FocusReleaseID                 string            `json:"focus_release_id"`
 	Workdir                        string            `json:"workdir"`
 	Language                       string            `json:"language"`
 }
@@ -283,10 +284,11 @@ func buildYakAIEngineOptions(
 	if extOptions := buildYakAICommonExtOptions(options); len(extOptions) > 0 {
 		config = append(config, aiengine.WithExtOptions(extOptions...))
 	}
-	if strings.TrimSpace(options.Focus) != "" {
+	serverReleasedFocus := strings.TrimSpace(options.FocusReleaseID) != ""
+	if !serverReleasedFocus && strings.TrimSpace(options.Focus) != "" {
 		config = append(config, aiengine.WithFocus(strings.TrimSpace(options.Focus)))
 	}
-	if strings.TrimSpace(options.FocusModeLoop) != "" {
+	if !serverReleasedFocus && strings.TrimSpace(options.FocusModeLoop) != "" {
 		config = append(config, aiengine.WithFocus(strings.TrimSpace(options.FocusModeLoop)))
 	}
 	if strings.TrimSpace(options.Workdir) != "" {
@@ -724,6 +726,9 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	}
 	if overlay.FocusModeLoop != "" {
 		base.FocusModeLoop = overlay.FocusModeLoop
+	}
+	if overlay.FocusReleaseID != "" {
+		base.FocusReleaseID = overlay.FocusReleaseID
 	}
 	if overlay.Workdir != "" {
 		base.Workdir = overlay.Workdir
