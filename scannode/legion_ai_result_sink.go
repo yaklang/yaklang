@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -46,6 +47,7 @@ type aiFocusResultEventPublisher interface {
 		string,
 		[]byte,
 	) error
+	PublishReportWithEventID(context.Context, jobExecutionRef, string, string, []byte) error
 	PublishSucceeded(context.Context, jobExecutionRef, any) error
 	PublishFailed(context.Context, jobExecutionRef, string, string, map[string]string) error
 	PublishCancelled(context.Context, jobExecutionRef, string) error
@@ -56,6 +58,11 @@ type legionAIFocusResultSink struct {
 	ref        jobExecutionRef
 	focusRunID string
 	focusMode  string
+	targetURL  string
+	mu         sync.Mutex
+	assetIDs   map[string]struct{}
+	riskIDs    map[string]struct{}
+	targets    map[string]struct{}
 }
 
 func newLegionAIFocusResultSink(
@@ -78,7 +85,18 @@ func newLegionAIFocusResultSink(
 		ref:        ref,
 		focusRunID: strings.TrimSpace(resultContext.GetFocusRunId()),
 		focusMode:  strings.TrimSpace(resultContext.GetFocusMode()),
+		targetURL:  strings.TrimSpace(resultContext.GetTargetUrl()),
+		assetIDs:   make(map[string]struct{}),
+		riskIDs:    make(map[string]struct{}),
+		targets:    make(map[string]struct{}),
 	}, nil
+}
+
+func (s *legionAIFocusResultSink) AuthorizedTargetURL() string {
+	if s == nil {
+		return ""
+	}
+	return s.targetURL
 }
 
 type aiFocusResultLifecycle interface {
@@ -144,6 +162,19 @@ func (p *aiSessionResultSinkProxy) SubmitAsset(
 		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink does not accept assets")
 	}
 	return assetSink.SubmitAsset(ctx, asset)
+}
+
+func (p *aiSessionResultSinkProxy) AuthorizedTargetURL() string {
+	if p == nil {
+		return ""
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	provider, ok := p.sink.(aicommon.AuthorizedTargetProvider)
+	if !ok || provider == nil {
+		return ""
+	}
+	return provider.AuthorizedTargetURL()
 }
 
 func (p *aiSessionResultSinkProxy) Succeed(ctx context.Context, resultJSON []byte) error {
@@ -221,6 +252,13 @@ func validateLegionAIFocusResultContext(
 		return jobExecutionRef{}, fmt.Errorf("ai focus result subtask_id is required")
 	case ref.AttemptID == "":
 		return jobExecutionRef{}, fmt.Errorf("ai focus result attempt_id is required")
+	case strings.TrimSpace(resultContext.GetExecutionMode()) != "single_run":
+		return jobExecutionRef{}, fmt.Errorf(
+			"unsupported ai focus result execution_mode %q",
+			resultContext.GetExecutionMode(),
+		)
+	case strings.TrimSpace(resultContext.GetTargetUrl()) == "":
+		return jobExecutionRef{}, fmt.Errorf("ai focus result target_url is required")
 	default:
 		return ref, nil
 	}
@@ -276,6 +314,7 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 	); err != nil {
 		return aicommon.ResultReceipt{}, fmt.Errorf("publish ai focus risk: %w", err)
 	}
+	s.recordRisk(eventID, target)
 	return aicommon.ResultReceipt{
 		ResultID:  eventID,
 		DedupeKey: dedupeKey,
@@ -324,6 +363,7 @@ func (s *legionAIFocusResultSink) SubmitAsset(
 	); err != nil {
 		return aicommon.ResultReceipt{}, fmt.Errorf("publish ai focus asset: %w", err)
 	}
+	s.recordAsset(eventID, asset.Target)
 	return aicommon.ResultReceipt{
 		ResultID:  eventID,
 		DedupeKey: asset.IdentityKey,
@@ -335,23 +375,80 @@ func (s *legionAIFocusResultSink) Succeed(
 	ctx context.Context,
 	resultJSON []byte,
 ) error {
-	result := any(map[string]string{
-		"focus_run_id": s.focusRunID,
-		"focus_mode":   s.focusMode,
-	})
+	result := make(map[string]any)
 	if len(resultJSON) > 0 {
-		var decoded any
-		if err := json.Unmarshal(resultJSON, &decoded); err == nil {
-			result = decoded
-		} else {
-			result = map[string]string{
-				"focus_run_id":   s.focusRunID,
-				"focus_mode":     s.focusMode,
-				"result_payload": string(resultJSON),
+		var decoded map[string]any
+		if err := json.Unmarshal(resultJSON, &decoded); err == nil && decoded != nil {
+			for key, value := range decoded {
+				result[key] = value
 			}
+		} else {
+			result["result_payload"] = string(resultJSON)
 		}
 	}
+	assetIDs, riskIDs, targets := s.resultSummarySnapshot()
+	result["schema_version"] = "legion.focus-run-result.v1"
+	result["focus_run_id"] = s.focusRunID
+	result["focus_mode"] = s.focusMode
+	result["target_url"] = s.targetURL
+	result["status"] = "succeeded"
+	result["asset_count"] = len(assetIDs)
+	result["risk_count"] = len(riskIDs)
+	result["asset_result_ids"] = assetIDs
+	result["risk_result_ids"] = riskIDs
+	result["targets"] = targets
+	reportJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("marshal ai focus summary report: %w", err)
+	}
+	if err := s.publisher.PublishReportWithEventID(
+		ctx,
+		s.ref,
+		focusSummaryReportEventID(s.ref.JobID),
+		"ai_focus_summary",
+		reportJSON,
+	); err != nil {
+		return fmt.Errorf("publish ai focus summary report: %w", err)
+	}
 	return s.publisher.PublishSucceeded(ctx, s.ref, result)
+}
+
+func (s *legionAIFocusResultSink) recordAsset(eventID string, target string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.assetIDs[strings.TrimSpace(eventID)] = struct{}{}
+	if target = strings.TrimSpace(target); target != "" {
+		s.targets[target] = struct{}{}
+	}
+}
+
+func (s *legionAIFocusResultSink) recordRisk(eventID string, target string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.riskIDs[strings.TrimSpace(eventID)] = struct{}{}
+	if target = strings.TrimSpace(target); target != "" {
+		s.targets[target] = struct{}{}
+	}
+}
+
+func (s *legionAIFocusResultSink) resultSummarySnapshot() ([]string, []string, []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assets := sortedFocusResultKeys(s.assetIDs)
+	risks := sortedFocusResultKeys(s.riskIDs)
+	targets := sortedFocusResultKeys(s.targets)
+	return assets, risks, targets
+}
+
+func sortedFocusResultKeys(values map[string]struct{}) []string {
+	result := make([]string, 0, len(values))
+	for value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			result = append(result, value)
+		}
+	}
+	sort.Strings(result)
+	return result
 }
 
 func (s *legionAIFocusResultSink) Fail(
@@ -440,6 +537,11 @@ func focusRiskEventID(jobID string, dedupeKey string) string {
 		"risk",
 		strings.TrimSpace(dedupeKey),
 	}, "\x00")
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
+}
+
+func focusSummaryReportEventID(jobID string) string {
+	name := strings.Join([]string{strings.TrimSpace(jobID), "ai_focus_summary"}, "\x00")
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
 }
 

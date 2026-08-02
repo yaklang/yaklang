@@ -1,10 +1,12 @@
 package loop_infosec_recon
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
@@ -25,8 +27,73 @@ type reconProbeSettings struct {
 	followRedirects bool
 }
 
+const maxAuthorizedSaaSReconTargetBytes = 2048
+
 func isBoundedSaaSRecon(config aicommon.AICallerConfigIf) bool {
 	return config != nil && aicommon.AssetResultSinkFromConfig(config) != nil
+}
+
+func authorizedSaaSReconTarget(config aicommon.AICallerConfigIf) (string, error) {
+	targetURL := aicommon.AuthorizedTargetURLFromConfig(config)
+	if strings.TrimSpace(targetURL) == "" {
+		return "", utils.Error("bounded SaaS recon requires a server-authorized target")
+	}
+	return normalizeAuthorizedSaaSReconTarget(targetURL)
+}
+
+func normalizeAuthorizedSaaSReconTarget(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > maxAuthorizedSaaSReconTargetBytes || strings.Contains(raw, "#") {
+		return "", utils.Error("invalid server-authorized target URL")
+	}
+	for _, char := range raw {
+		if unicode.IsControl(char) {
+			return "", utils.Error("invalid server-authorized target URL")
+		}
+	}
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil || parsed == nil || parsed.Host == "" || parsed.Opaque != "" {
+		return "", utils.Error("invalid server-authorized target URL")
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", utils.Error("server-authorized target must use HTTP(S)")
+	}
+	if parsed.User != nil || parsed.Fragment != "" {
+		return "", utils.Error("server-authorized target cannot contain credentials or fragments")
+	}
+	hostname := strings.ToLower(parsed.Hostname())
+	if hostname == "" {
+		return "", utils.Error("server-authorized target URL is missing a host")
+	}
+	port := parsed.Port()
+	if (parsed.Scheme == "http" && port == "80") || (parsed.Scheme == "https" && port == "443") {
+		port = ""
+	}
+	if strings.Contains(hostname, ":") {
+		if port == "" {
+			parsed.Host = "[" + hostname + "]"
+		} else {
+			parsed.Host = net.JoinHostPort(hostname, port)
+		}
+	} else if port == "" {
+		parsed.Host = hostname
+	} else {
+		parsed.Host = net.JoinHostPort(hostname, port)
+	}
+	return parsed.String(), nil
+}
+
+func validateSaaSReconActionTarget(config aicommon.AICallerConfigIf, proposed string) (string, error) {
+	authorized, err := authorizedSaaSReconTarget(config)
+	if err != nil {
+		return "", err
+	}
+	normalized, err := normalizeAuthorizedSaaSReconTarget(proposed)
+	if err != nil || normalized != authorized {
+		return "", utils.Errorf("recon seed must exactly match the server-authorized target %q", authorized)
+	}
+	return authorized, nil
 }
 
 func infosecReconAllowedActions(saasMode, allowUserInteraction bool) []string {

@@ -23,6 +23,17 @@ func (noopAISessionRuntimeEmitter) Done([]byte) {}
 
 func (noopAISessionRuntimeEmitter) Failed(string, string, []byte) {}
 
+func TestStatefulRuntimeRejectsSingleRunInsteadOfLeavingFocusOpen(t *testing.T) {
+	_, err := (yakAIEngineRuntimeDriver{}).Bind(
+		context.Background(),
+		aiSessionBinding{ExecutionMode: "single_run"},
+		noopAISessionRuntimeEmitter{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "single_run requires the stateless runtime") {
+		t.Fatalf("expected explicit single-run rollback rejection, got %v", err)
+	}
+}
+
 func TestBuildYakAIEngineOptionsIncludesAttachmentContentAndCredentialProjection(t *testing.T) {
 	t.Parallel()
 

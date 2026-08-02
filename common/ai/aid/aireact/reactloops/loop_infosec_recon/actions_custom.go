@@ -93,14 +93,15 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				return utils.Error("recon_register_seed requires seed_url")
 			}
 			if isBoundedSaaSRecon(loop.GetConfig()) {
-				if norm, coerced, _ := infosecPickFirstHTTPURL(seed); coerced {
-					seed = norm
+				if loop.Get(keySaaSSeedRegistered) == "true" {
+					return utils.Error("bounded SaaS recon seed is already registered")
 				}
-				if err := infosecValidateHTTPURL(seed); err != nil {
+				authorized, err := validateSaaSReconActionTarget(loop.GetConfig(), seed)
+				if err != nil {
 					return err
 				}
-				_, err := normalizeSaaSReconScope(
-					seed,
+				_, err = normalizeSaaSReconScope(
+					authorized,
 					action.GetString("scope_hosts"),
 				)
 				return err
@@ -116,7 +117,15 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				wd = workDirFromInvoker(r)
 			}
 			seed := strings.TrimSpace(action.GetString("seed_url"))
-			if norm, coerced, note := infosecPickFirstHTTPURL(seed); coerced {
+			saasMode := isBoundedSaaSRecon(loop.GetConfig())
+			if saasMode {
+				var err error
+				seed, err = validateSaaSReconActionTarget(loop.GetConfig(), seed)
+				if err != nil {
+					op.Fail(err)
+					return
+				}
+			} else if norm, coerced, note := infosecPickFirstHTTPURL(seed); coerced {
 				seed = norm
 				r.AddToTimeline("infosec_seed_url_coerced", note)
 			}
@@ -125,9 +134,9 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				op.Continue()
 				return
 			}
-			saasMode := isBoundedSaaSRecon(loop.GetConfig())
 			loop.Set(keySeedURL, seed)
 			if saasMode {
+				loop.Set(keySaaSSeedRegistered, "true")
 				scopeHost, err := normalizeSaaSReconScope(
 					seed,
 					action.GetString("scope_hosts"),
@@ -493,8 +502,13 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			aitool.WithIntegerParam("timeout_seconds", aitool.WithParam_Default(12)),
 		},
 		func(loop *reactloops.ReActLoop, _ *aicommon.Action) error {
-			if isBoundedSaaSRecon(loop.GetConfig()) && strings.TrimSpace(loop.Get(keyScopeHosts)) == "" {
-				return utils.Error("run recon_register_seed before probing the bounded SaaS target")
+			if isBoundedSaaSRecon(loop.GetConfig()) {
+				if loop.Get(keySaaSProbeAttempted) == "true" {
+					return utils.Error("bounded SaaS recon probe is already attempted")
+				}
+				if strings.TrimSpace(loop.Get(keyScopeHosts)) == "" {
+					return utils.Error("run recon_register_seed before probing the bounded SaaS target")
+				}
 			}
 			return nil
 		},
@@ -507,6 +521,9 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				wd = workDirFromInvoker(r)
 			}
 			saasMode := isBoundedSaaSRecon(loop.GetConfig())
+			if saasMode {
+				loop.Set(keySaaSProbeAttempted, "true")
+			}
 			settings := reconProbeSettings{
 				limit:           action.GetInt("limit"),
 				concurrency:     action.GetInt("concurrency"),

@@ -184,7 +184,21 @@ func (p *jobEventPublisher) PublishReport(
 	reportKind string,
 	reportJSON []byte,
 ) error {
-	return p.publish(ctx, legionEventReport, ref, uuid.NewString(), &jobv1.JobReport{
+	return p.PublishReportWithEventID(ctx, ref, uuid.NewString(), reportKind, reportJSON)
+}
+
+func (p *jobEventPublisher) PublishReportWithEventID(
+	ctx context.Context,
+	ref jobExecutionRef,
+	eventID string,
+	reportKind string,
+	reportJSON []byte,
+) error {
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" {
+		return fmt.Errorf("job report event_id is required")
+	}
+	return p.publish(ctx, legionEventReport, ref, eventID, &jobv1.JobReport{
 		Job:        p.jobRef(ref),
 		ReportKind: reportKind,
 		ReportJson: cloneBytes(reportJSON),

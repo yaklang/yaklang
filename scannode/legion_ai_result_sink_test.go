@@ -42,6 +42,9 @@ type recordingAIFocusRiskPublisher struct {
 	failed       int
 	cancelled    int
 	lifecycleRef jobExecutionRef
+	reports      [][]byte
+	reportIDs    []string
+	order        []string
 }
 
 type blockingAIFocusResultSink struct {
@@ -123,6 +126,21 @@ func (p *recordingAIFocusRiskPublisher) PublishSucceeded(
 ) error {
 	p.succeeded++
 	p.lifecycleRef = ref
+	p.order = append(p.order, "succeeded")
+	return nil
+}
+
+func (p *recordingAIFocusRiskPublisher) PublishReportWithEventID(
+	_ context.Context,
+	ref jobExecutionRef,
+	eventID string,
+	_ string,
+	reportJSON []byte,
+) error {
+	p.lifecycleRef = ref
+	p.reportIDs = append(p.reportIDs, eventID)
+	p.reports = append(p.reports, append([]byte(nil), reportJSON...))
+	p.order = append(p.order, "report")
 	return nil
 }
 
@@ -374,7 +392,36 @@ func TestValidateLegionAIFocusResultContextRejectsIncompleteIdentity(t *testing.
 	if err == nil || !strings.Contains(err.Error(), "unsupported") {
 		t.Fatalf("expected schema validation error, got %v", err)
 	}
+
+	resultContext = validAIFocusResultContext()
+	resultContext.TargetUrl = ""
+	_, err = validateLegionAIFocusResultContext("bind-1", resultContext)
+	if err == nil || !strings.Contains(err.Error(), "target_url is required") {
+		t.Fatalf("expected target validation error, got %v", err)
+	}
 }
+
+func TestLegionAIFocusResultSinkProvidesServerAuthorizedTarget(t *testing.T) {
+	t.Parallel()
+
+	sink, err := newLegionAIFocusResultSink(
+		&recordingAIFocusRiskPublisher{},
+		"bind-1",
+		validAIFocusResultContext(),
+	)
+	if err != nil {
+		t.Fatalf("new result sink: %v", err)
+	}
+	if target := aicommon.AuthorizedTargetURLFromConfig(&resultSinkConfigStub{sink: sink}); target != "https://example.com/health?q=1" {
+		t.Fatalf("unexpected authorized target: %q", target)
+	}
+}
+
+type resultSinkConfigStub struct {
+	sink aicommon.ResultSink
+}
+
+func (s *resultSinkConfigStub) GetResultSink() aicommon.ResultSink { return s.sink }
 
 func TestValidateAISessionBindCommandRequiresMatchingFocusRun(t *testing.T) {
 	t.Parallel()
@@ -444,11 +491,74 @@ func TestAISessionResultSinkProxySwitchesRebindIdentityAndFinalizes(t *testing.T
 	}
 }
 
+func TestLegionAIFocusResultSinkPublishesIdempotentSummaryBeforeSuccess(t *testing.T) {
+	publisher := &recordingAIFocusRiskPublisher{}
+	rawSink, err := newLegionAIFocusResultSink(publisher, "bind-1", validAIFocusResultContext())
+	if err != nil {
+		t.Fatalf("new result sink: %v", err)
+	}
+	sink := rawSink.(*legionAIFocusResultSink)
+	asset := aicommon.AssetResult{
+		Kind:        "http_endpoint",
+		Title:       "HEAD https://example.com/health?q=1",
+		Target:      "https://example.com/health?q=1",
+		IdentityKey: "http_endpoint:HEAD:https://example.com/health?q=1",
+		Payload:     []byte(`{"status_code":204}`),
+	}
+	for range 2 {
+		if _, err := sink.SubmitAsset(context.Background(), asset); err != nil {
+			t.Fatalf("submit asset: %v", err)
+		}
+	}
+	risk := &schema.Risk{
+		Url:      asset.Target,
+		Title:    "Observed response",
+		RiskType: "observation",
+		Severity: "info",
+	}
+	for range 2 {
+		if _, err := sink.SubmitRisk(context.Background(), risk); err != nil {
+			t.Fatalf("submit risk: %v", err)
+		}
+	}
+	if err := sink.Succeed(context.Background(), []byte(`{
+		"focus_run_id":"client-spoof",
+		"focus_mode":"client-spoof",
+		"status":"done"
+	}`)); err != nil {
+		t.Fatalf("succeed: %v", err)
+	}
+	if len(publisher.reports) != 1 || len(publisher.reportIDs) != 1 {
+		t.Fatalf("expected one summary report: %#v", publisher)
+	}
+	if len(publisher.order) != 2 || publisher.order[0] != "report" || publisher.order[1] != "succeeded" {
+		t.Fatalf("unexpected publication order: %#v", publisher.order)
+	}
+	var summary map[string]any
+	if err := json.Unmarshal(publisher.reports[0], &summary); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if summary["focus_run_id"] != "focus-run-1" || summary["focus_mode"] != "infosec_recon" {
+		t.Fatalf("server identity was not preserved: %#v", summary)
+	}
+	if summary["asset_count"] != float64(1) || summary["risk_count"] != float64(1) {
+		t.Fatalf("unexpected unique result counts: %#v", summary)
+	}
+	if summary["target_url"] != "https://example.com/health?q=1" {
+		t.Fatalf("unexpected target in summary: %#v", summary)
+	}
+	if publisher.reportIDs[0] != focusSummaryReportEventID("job-1") {
+		t.Fatalf("unexpected report event id: %q", publisher.reportIDs[0])
+	}
+}
+
 func validAIFocusResultContext() *aiv1.AIFocusResultContext {
 	return &aiv1.AIFocusResultContext{
 		FocusRunId:    "focus-run-1",
-		FocusMode:     "http_fuzztest",
+		FocusMode:     "infosec_recon",
 		SchemaVersion: legionAIFocusResultSchemaV1,
+		ExecutionMode: "single_run",
+		TargetUrl:     "https://example.com/health?q=1",
 		Job: &jobv1.JobRef{
 			JobId:     "job-1",
 			SubtaskId: "subtask-1",
