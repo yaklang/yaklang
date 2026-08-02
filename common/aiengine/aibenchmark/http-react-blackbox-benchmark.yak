@@ -1,0 +1,578 @@
+// ReAct 工具黑盒诊断 runner（HTTP + 文件编辑/Python 迭代）。
+//
+// 每个 case 独立声明需要暴露的工具，记录工具参数、耗时、结果、落盘
+// artifact、工作文件检查和 ReAct action timeline。HTTP case 仅访问公开测试
+// 站点；文件编辑 case 使用独立临时目录。
+//
+// 用法（仓库根目录）：
+//   yak common/aiengine/aibenchmark/http-react-blackbox-benchmark.yak \
+//     --case single-query-escaping
+
+configFile = cli.String("config", cli.setDefault("common/aiengine/aibenchmark/http-react-blackbox-cases.json"), cli.setHelp("测试任务 JSON"))
+caseName = cli.String("case", cli.setDefault(""), cli.setHelp("只运行指定 case；留空运行全部"))
+outputDir = cli.String("output-dir", cli.setDefault("./benchmark-reports/tool-react-blackbox"), cli.setHelp("报告输出目录"))
+timeoutSec = cli.Int("timeout", cli.setDefault(120), cli.setHelp("每个 case 的硬超时秒数"))
+maxIteration = cli.Int("max-iteration", cli.setDefault(6), cli.setHelp("每个 case 的最大 ReAct 迭代数"))
+cli.check()
+
+func clean(value) {
+    if value == nil || value == undefined {
+        return ""
+    }
+    return str.TrimSpace(sprintf("%v", value))
+}
+
+func parseEventContent(content) {
+    if len(content) == 0 {
+        return {}
+    }
+    raw = str.TrimSpace(string(content))
+    // 部分事件合法地携带 JSON array/string；采集器只需要 object 字段，
+    // 先做形态判断，避免对 slice 使用 map key 导致回调 panic。
+    if !str.HasPrefix(raw, "{") {
+        return {}
+    }
+    try {
+        value = json.loads(raw)
+        if value != nil && value != undefined {
+            return value
+        }
+    } catch err {
+    }
+    return {}
+}
+
+func getOrCreateToolCall(toolCalls, callID) {
+    if clean(callID) == "" {
+        callID = "unknown"
+    }
+    if toolCalls[callID] == nil || toolCalls[callID] == undefined {
+        toolCalls[callID] = {
+            "call_tool_id": callID,
+            "tool": "",
+            "params": {},
+            "status": "started",
+            "duration_ms": 0,
+            "total_duration_ms": 0,
+            "result_bytes": 0,
+            "result_empty": false,
+            "result_preview": "",
+            "log_path": "",
+            "call_dir": "",
+            "combined_output_bytes": 0,
+            "raw_result_bytes": 0,
+        }
+    }
+    return toolCalls[callID]
+}
+
+func preview(text, limit) {
+    text = clean(text)
+    if len(text) <= limit {
+        return text
+    }
+    return text[:limit] + "..."
+}
+
+func readSize(path) {
+    if path == "" || !file.IsExisted(path) {
+        return 0
+    }
+    info, err = file.Stat(path)
+    if err != nil {
+        return 0
+    }
+    return info.Size()
+}
+
+func prepareWorkspace(caseConfig, startedAt) {
+    workspaceDir = file.Join(os.TempDir(), sprintf("yak-react-tool-benchmark-%s-%d", caseConfig["name"], startedAt.UnixNano()))
+    err = file.MkdirAll(workspaceDir)
+    if err != nil {
+        die(sprintf("create case workspace failed: %v", err))
+    }
+    setupFiles = caseConfig["setup_files"]
+    if setupFiles != nil && setupFiles != undefined {
+        for setupFile in setupFiles {
+            relativePath = clean(setupFile["path"])
+            if relativePath == "" || str.Contains(relativePath, "..") || str.HasPrefix(relativePath, "/") {
+                die("unsafe setup file path: " + relativePath)
+            }
+            targetPath = file.Join(workspaceDir, relativePath)
+            err = file.MkdirAll(file.GetDirPath(targetPath))
+            if err != nil {
+                die(sprintf("create setup file directory failed: %v", err))
+            }
+            err = file.Save(targetPath, clean(setupFile["content"]))
+            if err != nil {
+                die(sprintf("write setup file failed: %v", err))
+            }
+        }
+    }
+    return workspaceDir
+}
+
+func renderCasePrompt(caseConfig, workspaceDir) {
+    prompt = clean(caseConfig["prompt"])
+    return str.ReplaceAll(prompt, "{{WORKDIR}}", workspaceDir)
+}
+
+func inspectWorkspace(caseConfig, result) {
+    checks = []
+    expectedFiles = caseConfig["expected_files"]
+    if expectedFiles == nil || expectedFiles == undefined {
+        result["file_checks"] = checks
+        return
+    }
+    for spec in expectedFiles {
+        relativePath = clean(spec["path"])
+        targetPath = file.Join(result["workspace_dir"], relativePath)
+        exists = file.IsExisted(targetPath)
+        content = ""
+        if exists {
+            raw, err = file.ReadFile(targetPath)
+            if err == nil {
+                content = string(raw)
+            }
+        }
+        missingTokens = []
+        forbiddenTokens = []
+        for token in spec["contains"] {
+            if !str.Contains(content, clean(token)) {
+                missingTokens = append(missingTokens, clean(token))
+            }
+        }
+        if spec["not_contains"] != nil && spec["not_contains"] != undefined {
+            for token in spec["not_contains"] {
+                if str.Contains(content, clean(token)) {
+                    forbiddenTokens = append(forbiddenTokens, clean(token))
+                }
+            }
+        }
+        checks = append(checks, {
+            "path": targetPath,
+            "exists": exists,
+            "size": len(content),
+            "missing_tokens": missingTokens,
+            "forbidden_tokens_found": forbiddenTokens,
+            "content_preview": preview(content, 1600),
+            "passed": exists && len(missingTokens) == 0 && len(forbiddenTokens) == 0,
+        })
+    }
+    result["file_checks"] = checks
+}
+
+func runFileVerifications(caseConfig, result) {
+    verifications = []
+    commands = caseConfig["verification_commands"]
+    if commands == nil || commands == undefined {
+        result["verification_checks"] = verifications
+        return
+    }
+    for spec in commands {
+        command = str.ReplaceAll(clean(spec["command"]), "{{WORKDIR}}", result["workspace_dir"])
+        verifyCtx, verifyCancel = context.WithTimeout(context.Background(), time.ParseDuration("15s")~)
+        cmd, commandErr = exec.CommandContext(verifyCtx, command)
+        output = ""
+        if commandErr == nil {
+            rawOutput, runErr = cmd.Output()
+            output = string(rawOutput)
+            if runErr != nil {
+                commandErr = runErr
+            }
+        }
+        verifyCancel()
+        missingTokens = []
+        for token in spec["expected_tokens"] {
+            if !str.Contains(output, clean(token)) {
+                missingTokens = append(missingTokens, clean(token))
+            }
+        }
+        verifications = append(verifications, {
+            "command": command,
+            "output": preview(output, 2000),
+            "error": commandErr == nil ? "" : sprintf("%v", commandErr),
+            "missing_tokens": missingTokens,
+            "passed": commandErr == nil && len(missingTokens) == 0,
+        })
+    }
+    result["verification_checks"] = verifications
+}
+
+func inspectTimeline(result, pinnedActionFiles) {
+    taskDir = result["task_dir"]
+    if taskDir == "" || !file.IsDir(taskDir) {
+        return
+    }
+
+    actionCounts = {
+        "total": 0,
+        "require_tool": 0,
+        "directly_call_tool": 0,
+        "directly_answer": 0,
+        "finish": 0,
+        "other": 0,
+    }
+    actionFiles = pinnedActionFiles
+    for name in actionFiles {
+        actionCounts["total"]++
+        matched = false
+        for actionType in ["require_tool", "directly_call_tool", "directly_answer", "finish"] {
+            if str.Contains(name, "_" + actionType + ".md") {
+                actionCounts[actionType]++
+                matched = true
+            }
+        }
+        if !matched {
+            actionCounts["other"]++
+        }
+    }
+    actionDir = file.Join(taskDir, "loop_default_action_calls")
+    if len(actionFiles) == 0 && file.IsDir(actionDir) {
+        infos, err = file.ReadDirInfoInDirectory(actionDir)
+        if err == nil {
+            for info in infos {
+                name = info.Name
+                if !str.HasSuffix(name, ".md") {
+                    continue
+                }
+                actionCounts["total"]++
+                actionFiles = append(actionFiles, name)
+                matched = false
+                for actionType in ["require_tool", "directly_call_tool", "directly_answer", "finish"] {
+                    if str.Contains(name, "_" + actionType + ".md") {
+                        actionCounts[actionType]++
+                        matched = true
+                    }
+                }
+                if !matched {
+                    actionCounts["other"]++
+                }
+            }
+        }
+    }
+    result["timeline"] = {
+        "action_counts": actionCounts,
+        "action_files": actionFiles,
+        "has_finish_action": actionCounts["finish"] > 0,
+    }
+}
+
+func inspectToolArtifacts(result) {
+    combinedTotal = 0
+    rawResultTotal = 0
+    combinedEmpty = 0
+    rawResultEmpty = 0
+    for call in result["tool_calls"] {
+        callDir = call["call_dir"]
+        if callDir == "" {
+            continue
+        }
+        combinedBytes = readSize(file.Join(callDir, "combined_output.txt"))
+        rawResultBytes = readSize(file.Join(callDir, "result.txt"))
+        call["combined_output_bytes"] = combinedBytes
+        call["raw_result_bytes"] = rawResultBytes
+        combinedTotal += combinedBytes
+        rawResultTotal += rawResultBytes
+        if combinedBytes == 0 {
+            combinedEmpty++
+        }
+        if rawResultBytes == 0 {
+            rawResultEmpty++
+        }
+    }
+    result["artifact_summary"] = {
+        "combined_output_total_bytes": combinedTotal,
+        "combined_output_empty_count": combinedEmpty,
+        "raw_result_total_bytes": rawResultTotal,
+        "raw_result_empty_count": rawResultEmpty,
+    }
+}
+
+func evaluateCase(caseConfig, result, allResultText) {
+    reasons = []
+    calls = result["tool_calls"]
+    callCount = len(calls)
+    minCalls = int(caseConfig["min_tool_calls"])
+    maxCalls = int(caseConfig["max_tool_calls"])
+
+    if callCount < minCalls {
+        reasons = append(reasons, sprintf("tool calls %d < expected minimum %d", callCount, minCalls))
+    }
+    if maxCalls > 0 && callCount > maxCalls {
+        reasons = append(reasons, sprintf("tool calls %d > expected maximum %d", callCount, maxCalls))
+    }
+
+    actualTools = {}
+    toolCounts = {}
+    emptyResults = 0
+    terminalEvents = 0
+    for call in calls {
+        actualTools[call["tool"]] = true
+        toolCounts[call["tool"]] = int(toolCounts[call["tool"]]) + 1
+        if call["result_empty"] {
+            emptyResults++
+        }
+        if call["status"] == "done" || call["status"] == "error" {
+            terminalEvents++
+        }
+    }
+    for expectedTool in caseConfig["expected_tools"] {
+        if !actualTools[expectedTool] {
+            reasons = append(reasons, "missing expected tool: " + expectedTool)
+        }
+    }
+    minToolCounts = caseConfig["expected_tool_min_counts"]
+    if minToolCounts != nil && minToolCounts != undefined {
+        for toolName, expectedCount in minToolCounts {
+            actualCount = int(toolCounts[toolName])
+            if actualCount < int(expectedCount) {
+                reasons = append(reasons, sprintf("tool %s calls %d < expected minimum %d", toolName, actualCount, int(expectedCount)))
+            }
+        }
+    }
+    maxToolCounts = caseConfig["expected_tool_max_counts"]
+    if maxToolCounts != nil && maxToolCounts != undefined {
+        for toolName, expectedCount in maxToolCounts {
+            actualCount = int(toolCounts[toolName])
+            if actualCount > int(expectedCount) {
+                reasons = append(reasons, sprintf("tool %s calls %d > expected maximum %d", toolName, actualCount, int(expectedCount)))
+            }
+        }
+    }
+    forbiddenTools = caseConfig["forbidden_tools"]
+    if forbiddenTools != nil && forbiddenTools != undefined {
+        for toolName in forbiddenTools {
+            if int(toolCounts[toolName]) > 0 {
+                reasons = append(reasons, sprintf("forbidden tool used: %s (%d calls)", toolName, int(toolCounts[toolName])))
+            }
+        }
+    }
+    if emptyResults > 0 {
+        reasons = append(reasons, sprintf("empty tool_call_result: %d", emptyResults))
+    }
+    if terminalEvents < callCount {
+        reasons = append(reasons, sprintf("terminal tool events %d < starts %d", terminalEvents, callCount))
+    }
+    for token in caseConfig["expected_result_tokens"] {
+        if !str.Contains(allResultText, token) {
+            reasons = append(reasons, "missing result evidence: " + token)
+        }
+    }
+    for check in result["file_checks"] {
+        if !check["passed"] {
+            reasons = append(reasons, "file postcondition failed: " + check["path"])
+        }
+    }
+    for check in result["verification_checks"] {
+        if !check["passed"] {
+            reasons = append(reasons, "verification command failed: " + check["command"])
+        }
+    }
+    if result["hard_timeout_triggered"] {
+        reasons = append(reasons, "InvokeReAct did not return before hard timeout")
+    }
+    if !result["finished_callback"] {
+        reasons = append(reasons, "aim.onFinished was not called")
+    }
+    timeline = result["timeline"]
+    if timeline != nil && timeline != undefined && !timeline["has_finish_action"] {
+        reasons = append(reasons, "timeline has no finish action")
+    }
+
+    result["evaluation"] = {
+        "passed": len(reasons) == 0,
+        "reasons": reasons,
+        "tool_call_count": callCount,
+        "empty_result_count": emptyResults,
+        "terminal_event_count": terminalEvents,
+        "tool_counts": toolCounts,
+    }
+}
+
+func runCase(caseConfig) {
+    startedAt = time.Now()
+    sessionID = sprintf("tool-react-blackbox-%s-%d", caseConfig["name"], startedAt.Unix())
+    workspaceDir = prepareWorkspace(caseConfig, startedAt)
+    renderedPrompt = renderCasePrompt(caseConfig, workspaceDir)
+    benchCtx, benchCancel = context.WithCancel(context.Background())
+    finishedCallback = false
+    hardTimeoutTriggered = false
+    resultText = ""
+    eventCounts = {}
+    eventRecords = []
+    toolCalls = {}
+    pinnedActionFiles = []
+    taskDir = ""
+
+    includeTools = caseConfig["include_tools"]
+    if includeTools == nil || includeTools == undefined || len(includeTools) == 0 {
+        includeTools = ["do_http_request", "batch_do_http_request"]
+    }
+
+    go func {
+        time.sleep(timeoutSec)
+        hardTimeoutTriggered = true
+        benchCancel()
+    }
+
+    opts = [
+        aim.sessionID(sessionID),
+        aim.context(benchCtx),
+        aim.timeout(timeoutSec),
+        aim.maxIteration(maxIteration),
+        aim.language("zh"),
+        aim.yoloMode(),
+        aim.allowUserInteract(false),
+        aim.includeToolNames(includeTools...),
+        aim.onFinished(func(react) {
+            finishedCallback = true
+            // 给 finish/timeline 落盘留出时间；若 InvokeReAct 的后台收尾卡住，主动取消。
+            go func {
+                time.sleep(2)
+                benchCancel()
+            }
+        }),
+        aim.onEvent(func(react, event) {
+            eventType = string(event.Type)
+            eventCounts[eventType] = int(eventCounts[eventType]) + 1
+            payload = parseEventContent(event.Content)
+            callID = clean(payload["call_tool_id"])
+
+            if eventType == "filesystem_pin_filename" {
+                pinnedPath = clean(payload["path"])
+                if str.Contains(pinnedPath, "/loop_default_action_calls/") && str.HasSuffix(pinnedPath, ".md") {
+                    pinnedActionFiles = append(pinnedActionFiles, file.GetBase(pinnedPath))
+                }
+            }
+
+            if eventType == "tool_call_start" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                call["tool"] = clean(payload["tool"]["name"])
+            } else if eventType == "tool_call_param" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                call["params"] = payload["params"]
+            } else if eventType == "tool_call_done" || eventType == "tool_call_error" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                call["status"] = eventType == "tool_call_done" ? "done" : "error"
+                call["duration_ms"] = int(payload["duration_ms"])
+                call["total_duration_ms"] = int(payload["total_duration_ms"])
+                if eventType == "tool_call_error" {
+                    errorText = clean(payload["error"])
+                    call["error"] = errorText
+                    call["result_bytes"] = len(errorText)
+                    call["result_empty"] = errorText == ""
+                    call["result_preview"] = preview(errorText, 1200)
+                    resultText += "\n" + errorText
+                }
+            } else if eventType == "tool_call_result" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                text = clean(payload["result"])
+                call["result_bytes"] = len(text)
+                call["result_empty"] = text == "" || text == "(empty)" || str.Contains(text, "COMBINED OUTPUT: (empty)")
+                call["result_preview"] = preview(text, 1200)
+                resultText += "\n" + text
+            } else if eventType == "tool_call_log_dir" {
+                call = getOrCreateToolCall(toolCalls, callID)
+                logPath = clean(payload["dir_path"])
+                call["log_path"] = logPath
+                callDir = logPath
+                if !file.IsDir(callDir) {
+                    callDir = file.GetDirPath(callDir)
+                }
+                call["call_dir"] = callDir
+                if callDir != "" {
+                    // file.GetDirPath 会保留尾部斜杠；直接按稳定的 tool_calls
+                    // 目录边界截取，避免把单个 call 目录误当 task 根目录。
+                    marker = "/tool_calls/"
+                    markerIndex = str.Index(callDir, marker)
+                    if markerIndex > 0 {
+                        taskDir = callDir[:markerIndex]
+                    }
+                }
+            }
+
+            // 完整保留工具生命周期；其余事件只保留短预览，足够重建 timeline。
+            keepFull = str.HasPrefix(eventType, "tool_call_")
+            content = string(event.Content)
+            eventRecords = append(eventRecords, {
+                "index": len(eventRecords) + 1,
+                "timestamp": event.Timestamp,
+                "type": eventType,
+                "node_id": event.NodeId,
+                "content": keepFull ? content : preview(content, 500),
+            })
+        }),
+    ]
+
+    invokeErr = aim.InvokeReAct(renderedPrompt, opts...)
+    benchCancel()
+    endedAt = time.Now()
+
+    calls = []
+    for _, call in toolCalls {
+        calls = append(calls, call)
+    }
+    result = {
+        "case": caseConfig["name"],
+        "description": caseConfig["description"],
+        "prompt": renderedPrompt,
+        "included_tools": includeTools,
+        "workspace_dir": workspaceDir,
+        "session_id": sessionID,
+        "start_time": startedAt.Format("2006-01-02 15:04:05"),
+        "duration_ms": endedAt.Sub(startedAt).Milliseconds(),
+        "invoke_error": invokeErr == nil ? "" : sprintf("%v", invokeErr),
+        "finished_callback": finishedCallback,
+        "hard_timeout_triggered": hardTimeoutTriggered,
+        "event_counts": eventCounts,
+        "events": eventRecords,
+        "tool_calls": calls,
+        "task_dir": taskDir,
+    }
+    inspectTimeline(result, pinnedActionFiles)
+    inspectToolArtifacts(result)
+    inspectWorkspace(caseConfig, result)
+    runFileVerifications(caseConfig, result)
+    evaluateCase(caseConfig, result, resultText)
+    return result
+}
+
+content, err = file.ReadFile(configFile)
+if err != nil {
+    die(sprintf("read cases failed: %v", err))
+}
+cases = json.loads(content)
+selected = []
+for caseConfig in cases {
+    if caseName == "" || caseConfig["name"] == caseName {
+        selected = append(selected, caseConfig)
+    }
+}
+if len(selected) == 0 {
+    die("no matching case: " + caseName)
+}
+
+file.MkdirAll(outputDir)~
+results = []
+currentCase = 0
+for caseConfig in selected {
+    currentCase++
+    log.info("[%d/%d] running ReAct tool blackbox case: %s", currentCase, len(selected), caseConfig["name"])
+    result = runCase(caseConfig)
+    results = append(results, result)
+    log.info("case=%s passed=%v tool_calls=%d duration_ms=%d task_dir=%s",
+        result["case"], result["evaluation"]["passed"], len(result["tool_calls"]), result["duration_ms"], result["task_dir"])
+}
+
+report = {
+    "report_type": "tool-react-blackbox-benchmark",
+    "generated_at": time.Now().Format("2006-01-02 15:04:05"),
+    "config": configFile,
+    "timeout_seconds": timeoutSec,
+    "max_iteration": maxIteration,
+    "results": results,
+}
+reportPath = file.Join(outputDir, sprintf("tool-react-blackbox-%s.json", time.Now().Format("20060102-150405")))
+file.Save(reportPath, json.dumps(report, json.withIndent("  ")))~
+println("REPORT_PATH=" + reportPath)

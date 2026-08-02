@@ -25,6 +25,23 @@ type ToolInvokeParams struct {
 	Params map[string]any `json:"params,omitempty"`
 }
 
+func formatParamValidationFailure(validationErrors []string) string {
+	details := strings.Join(validationErrors, "; ")
+	guidance := "修复建议: 按错误路径修正对应参数；可选参数没有值时应省略该字段。"
+	lower := strings.ToLower(details)
+	switch {
+	case strings.Contains(lower, "got array, want object") || strings.Contains(lower, "maxitems"):
+		guidance = "修复建议: 该参数需要 JSON 对象，例如 {\"key\":\"value\"}；没有值时省略或传 {}，不要传非空数组。"
+	case strings.Contains(lower, "got object, want string"):
+		guidance = "修复建议: 该参数需要字符串；例如 headers 使用 \"Name: value\\nName2: value2\"。若工具说明允许对象，请改用其结构化对象参数。"
+	case strings.Contains(lower, "got string, want integer") || strings.Contains(lower, "got number, want integer"):
+		guidance = "修复建议: 该参数需要整数，不要加引号或小数；例如 timeout=10、redirect-times=0。"
+	case strings.Contains(lower, "missing") || strings.Contains(lower, "required"):
+		guidance = "修复建议: 补齐错误中指出的必填参数；不要用空数组或空字符串代替必填值。"
+	}
+	return fmt.Sprintf("参数验证失败: %s。%s 修正参数后可直接重试；工具回调尚未执行，若这是发包工具，请求尚未发送。", details, guidance)
+}
+
 // InvokeWithJSON 使用JSON字符串调用工具
 func (t *Tool) InvokeWithJSON(jsonStr string, opts ...ToolInvokeOptions) (*ToolResult, error) {
 	// 解析JSON
@@ -176,6 +193,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	}
 
 	if !valid {
+		validationMessage := formatParamValidationFailure(validationErrors)
 		log.Errorf("tool[%s] param validation failed: errors=%v, params_keys=%v",
 			t.Name, validationErrors, func() []string {
 				keys := make([]string, 0, len(params))
@@ -189,8 +207,8 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 			Description: t.Description,
 			Param:       params,
 			Success:     false,
-			Error:       fmt.Sprintf("参数验证失败: %v", validationErrors),
-		}, fmt.Errorf("参数验证失败: %v", validationErrors)
+			Error:       validationMessage,
+		}, fmt.Errorf("%s", validationMessage)
 	}
 	if _, ok := params["@action"]; ok {
 		delete(params, "@action")
@@ -232,6 +250,7 @@ func (t *Tool) InvokeWithOrderedParams(params *omap.OrderedMap[string, any], opt
 	// 验证参数
 	valid, validationErrors := t.ValidateOrderedParams(params)
 	if !valid {
+		validationMessage := formatParamValidationFailure(validationErrors)
 		// 转换为普通 map 用于结果显示
 		paramMap := make(map[string]any)
 		if params != nil {
@@ -245,8 +264,8 @@ func (t *Tool) InvokeWithOrderedParams(params *omap.OrderedMap[string, any], opt
 			Description: t.Description,
 			Param:       paramMap,
 			Success:     false,
-			Error:       fmt.Sprintf("参数验证失败: %v", validationErrors),
-		}, fmt.Errorf("参数验证失败: %v", validationErrors)
+			Error:       validationMessage,
+		}, fmt.Errorf("%s", validationMessage)
 	}
 
 	// 转换为普通 map 用于执行

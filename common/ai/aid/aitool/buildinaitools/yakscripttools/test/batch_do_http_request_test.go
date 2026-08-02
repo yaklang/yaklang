@@ -87,6 +87,7 @@ func TestBatchDoHTTPRequest_BasicGet(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "should show 2 successful requests")
 	assert.Assert(t, strings.Contains(stdout, "/path1"), "path1 should appear")
 	assert.Assert(t, strings.Contains(stdout, "/path2"), "path2 should appear")
+	assert.Assert(t, strings.Contains(stdout, "request #1 packet") || strings.Contains(stdout, "request #2 packet"), "each generated batch request packet should be printed")
 }
 
 // Test 2: Prefix parameter
@@ -797,4 +798,95 @@ func TestBatchDoHTTPRequest_QueryParamsAsObject(t *testing.T) {
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "obj_param_ok"), "object-form query param should reach the server")
+}
+
+func TestBatchDoHTTPRequest_FormObjectEscapesSpecialCharacters(t *testing.T) {
+	const special = `asdf' abc " #&tail`
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("parse_failed:" + err.Error()))
+			return
+		}
+		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
+			w.Write([]byte("batch_special_form_ok"))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("batch_special_form_mismatch"))
+	})
+	tool := getBatchDoHTTPRequestTool(t)
+
+	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
+		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
+		"paths":        "/submit",
+		"method":       "POST",
+		"content-type": "application/json", // `form` must still select form encoding.
+		"form": map[string]any{
+			"a": special,
+			"b": "ssxxx",
+		},
+		"concurrent": 1,
+		"timeout":    10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "batch_special_form_ok"), "batch structured form values should survive quotes, spaces, #, and an inner &")
+	assert.Assert(t, strings.Contains(stdout, "Success: 1"), "batch request should complete successfully")
+	assert.Assert(t, strings.Contains(stdout, "request #1 packet"), "batch request packet should be visible to the AI")
+	assert.Assert(t, strings.Contains(stdout, "a=asdf%27+abc+%22+%23%26tail"), "printed batch packet should show the final encoded form value")
+}
+
+// Keep the full ReAct invocation path covered: schema defaults are applied before
+// callback execution, so an omitted query object must never become string "{}".
+func TestBatchDoHTTPRequest_InvokeWithParamsDoesNotStringifyOmittedJSONObjectDefaults(t *testing.T) {
+	const special = `asdf' abc " #&tail`
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
+			w.Write([]byte("batch_react_form_result_visible"))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("batch_react_form_mismatch"))
+	})
+	tool := getBatchDoHTTPRequestTool(t)
+
+	result, err := tool.InvokeWithParams(aitool.InvokeParams{
+		"base-url": "http://" + host + ":" + strconv.Itoa(port),
+		"paths":    "/one\n/two",
+		"method":   "POST",
+		"form": map[string]any{
+			"a": special,
+			"b": "ssxxx",
+		},
+		"concurrent": 2,
+		"timeout":    10,
+	})
+	assert.NilError(t, err)
+	execution, ok := result.Data.(*aitool.ToolExecutionResult)
+	assert.Assert(t, ok, "InvokeWithParams should return a ToolExecutionResult")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "batch_react_form_result_visible"), "ReAct-visible combined output should contain batch responses")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "Success: 2"), "ReAct-visible combined output should contain the batch summary")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "request #"), "ReAct-visible combined output should contain generated request packets")
+}
+
+func TestBatchDoHTTPRequest_InvokeWithParamsAcceptsEmptyQueryAndFormArrays(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\r\n\r\nbatch_empty_collections_ok")
+	})
+	tool := getBatchDoHTTPRequestTool(t)
+
+	result, err := tool.InvokeWithParams(aitool.InvokeParams{
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/one",
+		"query":      []any{},
+		"form":       []any{},
+		"concurrent": 1,
+		"timeout":    10,
+	})
+	assert.NilError(t, err)
+	execution, ok := result.Data.(*aitool.ToolExecutionResult)
+	assert.Assert(t, ok)
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "batch_empty_collections_ok"))
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "normalized parameter \"query\""), "normalization should be visible to ReAct/timeline")
 }

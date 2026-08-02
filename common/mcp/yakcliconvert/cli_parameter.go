@@ -105,6 +105,18 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 			schema := make(map[string]any)
 			err := json.Unmarshal([]byte(arg1), &schema)
 			if err == nil {
+				// A union schema without a top-level type intentionally replaces the
+				// primitive type inferred from cli.String/cli.Int. Keeping both would
+				// turn `oneOf: [string, object]` into `type: string AND oneOf`, causing
+				// ReAct preflight validation to reject the documented object form before
+				// the Yak script can normalize it or emit actionable output.
+				_, hasExplicitType := schema["type"]
+				_, hasOneOf := schema["oneOf"]
+				_, hasAnyOf := schema["anyOf"]
+				if !hasExplicitType && (hasOneOf || hasAnyOf) {
+					delete(field, "type")
+					delete(field, "items")
+				}
 				maps.Copy(field, schema)
 			}
 		}
@@ -157,6 +169,18 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 			// handler option
 			for i := 2; i < opLen; i++ {
 				handleOption(field, v.GetOperand(i))
+			}
+
+			// cli.Json consumes a JSON string at runtime, while the generated tool
+			// schema exposes an object. Decode its default here so schema default
+			// application does not inject a string that immediately fails validation.
+			if funcName == "cli.Json" {
+				if raw, ok := field["default"].(string); ok {
+					var objectDefault map[string]any
+					if err := json.Unmarshal([]byte(raw), &objectDefault); err == nil {
+						field["default"] = objectDefault
+					}
+				}
 			}
 
 			// Remove required from property schema and add to InputSchema.required

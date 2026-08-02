@@ -102,8 +102,12 @@ func TestFinishFirstRequestAlwaysContinuesAndQueuesCheckpoint(t *testing.T) {
 	require.Contains(t, checkpoint, "timeline 和最新 Observation")
 	require.Contains(t, checkpoint, "TODO 已清空不是任务完成的充分证据")
 	require.Contains(t, checkpoint, "仍属于当前用户目标和 CURRENT-TASK")
+	require.Contains(t, checkpoint, "无需用户新增目标或授权")
 	require.Contains(t, checkpoint, "预期信息增益很低")
 	require.Contains(t, checkpoint, "立即用本轮 todo_delta")
+	require.Contains(t, checkpoint, "尚未通过 todo_delta 进入 Frontier")
+	require.Contains(t, checkpoint, "先将它们全部加入或更新到 Frontier")
+	require.Contains(t, checkpoint, "具体目标、触发证据、可证伪假设和恢复后的第一步")
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 
@@ -193,7 +197,12 @@ func TestCurrentTodoCheckpointQueuesAfterTwentyFifthValidIteration(t *testing.T)
 	require.Empty(t, loop.consumeTodoCheckpoint(), "the 24th iteration must not queue a checkpoint")
 
 	loop.recordCurrentTodoIteration(task)
-	require.Equal(t, currentTodoCheckpointPrompt, loop.consumeTodoCheckpoint())
+	checkpoint := loop.consumeTodoCheckpoint()
+	require.Equal(t, currentTodoCheckpointPrompt, checkpoint)
+	require.Contains(t, checkpoint, "主要矛盾")
+	require.Contains(t, checkpoint, "尚未进入 Frontier 的同级有效分支")
+	require.Contains(t, checkpoint, "沿 CURRENT 继续向深处执行")
+	require.Contains(t, checkpoint, "同一 todo_delta 中 close 旧项并设置下一 CURRENT")
 	require.Empty(t, loop.consumeTodoCheckpoint())
 }
 

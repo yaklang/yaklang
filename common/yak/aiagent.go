@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -32,6 +33,69 @@ func init() {
 	yakscripttools.RegisterYakScriptAiToolsCovertHandle(YakTool2AITool) // avoid cycle import
 }
 
+func schemaNodeAllowsObject(node map[string]any) bool {
+	if node == nil {
+		return false
+	}
+	if typ, _ := node["type"].(string); typ == "object" {
+		return true
+	}
+	for _, unionKey := range []string{"oneOf", "anyOf"} {
+		variants, _ := node[unionKey].([]any)
+		for _, variant := range variants {
+			variantMap, _ := variant.(map[string]any)
+			if schemaNodeAllowsObject(variantMap) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isEmptyArrayLike(value any) bool {
+	if value == nil {
+		return false
+	}
+	rv := reflect.ValueOf(value)
+	return rv.IsValid() && (rv.Kind() == reflect.Array || rv.Kind() == reflect.Slice) && rv.Len() == 0
+}
+
+// Optional object fields are sometimes emitted by form UIs as [] instead of being
+// omitted. The public schema explicitly opts compatible fields into this behavior;
+// normalize those empty arrays before cli.Json sees them, and report the correction
+// in captured output so ReAct/timeline users can understand the effective request.
+func normalizeEmptyObjectParams(tool *mcp.Tool, params aitool.InvokeParams) (aitool.InvokeParams, []string) {
+	normalized := make(aitool.InvokeParams, len(params))
+	for key, value := range params {
+		normalized[key] = value
+	}
+	if tool == nil || tool.InputSchema.Properties == nil {
+		return normalized, nil
+	}
+
+	var notes []string
+	for key, value := range normalized {
+		if !isEmptyArrayLike(value) {
+			continue
+		}
+		property, ok := tool.InputSchema.Properties.Get(key)
+		if !ok {
+			continue
+		}
+		rawSchema, err := json.Marshal(property)
+		if err != nil {
+			continue
+		}
+		var schemaNode map[string]any
+		if err := json.Unmarshal(rawSchema, &schemaNode); err != nil || !schemaNodeAllowsObject(schemaNode) {
+			continue
+		}
+		normalized[key] = map[string]any{}
+		notes = append(notes, fmt.Sprintf("normalized parameter %q from empty array [] to empty object {}; omit the field or pass {} next time", key))
+	}
+	return normalized, notes
+}
+
 func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 	tools := []*aitool.Tool{}
 	for _, aiTool := range aitools {
@@ -54,6 +118,10 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
+				params, normalizationNotes := normalizeEmptyObjectParams(tool, params)
+				for _, note := range normalizationNotes {
+					fmt.Fprintf(stdout, "[warning] input compatibility: %s. Execution will continue.\n", note)
+				}
 
 				var runtimeId string
 				var runtimeFeedBacker func(result *ypb.ExecResult) error
@@ -83,7 +151,7 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 							args = append(args, "--"+k)
 						}
 					default:
-						args = append(args, "--"+k, fmt.Sprint(ret))
+						args = append(args, "--"+k, nativeYakPluginArgString(ret))
 					}
 
 				}
