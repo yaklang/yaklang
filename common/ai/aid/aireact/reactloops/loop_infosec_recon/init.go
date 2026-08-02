@@ -27,50 +27,25 @@ func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_INFOSEC_RECON,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-			// meta/schema-level loop actions vs toolkit-style names (see names.go for embedded tools).
-			metaActions := []string{
-				schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER,
-				"finish",
-				schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE,
-				schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES,
-				schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY,
-				schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
-				schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES,
-				schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET,
-				"recon_register_seed",
-				"api_pool_merge",
-				ToolCrawlJsCollector,
-				ToolJsStaticExtractAI,
-				"probe_api_candidates",
-			}
-			toolActions := []string{
-				"web_search",
-				"scan_port",
-				"simple_crawler",
-				"banner_grab",
-				"dig",
-				"do_http_request",
-				"batch_do_http_request",
-				"read_file",
-				"find_files",
-				"grep_text",
-				"url_content_summary",
-				"subdomain_scan",
-				"network_space_search",
-				"search_knowledge",
-			}
-			allowed := append(append([]string{}, metaActions...), toolActions...)
-			if r.GetConfig().GetAllowUserInteraction() {
-				allowed = append(allowed, schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
-			}
+			saasMode := isBoundedSaaSRecon(r.GetConfig())
+			allowed := infosecReconAllowedActions(
+				saasMode,
+				r.GetConfig().GetAllowUserInteraction(),
+			)
 
 			maxIter := int(r.GetConfig().GetMaxIterationCount())
-			if maxIter < 16 {
+			if saasMode {
+				maxIter = 6
+			} else if maxIter < 16 {
 				maxIter = 16
+			}
+			instruction := persistentInstruction
+			if saasMode {
+				instruction = boundedSaaSReconInstruction
 			}
 
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(true),
+				reactloops.WithAllowRAG(!saasMode),
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
@@ -85,7 +60,7 @@ func init() {
 					}
 					return false
 				}),
-				reactloops.WithPersistentInstruction(persistentInstruction),
+				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					wd := loop.Get(keyWorkDir)

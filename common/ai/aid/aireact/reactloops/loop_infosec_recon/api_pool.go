@@ -202,10 +202,34 @@ func PoolStats(p *APIPool) (total, verified, unverified int, bySource map[string
 // ProbePoolHTTP issues HEAD or GET for unverified entries (limited).
 // If allowedHosts is non-empty, only entries whose URL host is in the set are probed.
 func ProbePoolHTTP(p *APIPool, limit, concurrency int, useHead bool, timeout time.Duration, allowedHosts map[string]bool) int {
+	return probePoolHTTP(p, limit, concurrency, useHead, timeout, allowedHosts, true)
+}
+
+func probePoolHTTP(
+	p *APIPool,
+	limit int,
+	concurrency int,
+	useHead bool,
+	timeout time.Duration,
+	allowedHosts map[string]bool,
+	followRedirects bool,
+) int {
 	if p == nil || limit <= 0 {
 		return 0
 	}
 	client := &http.Client{Timeout: timeout}
+	if !followRedirects {
+		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+	} else if len(allowedHosts) > 0 {
+		client.CheckRedirect = func(req *http.Request, _ []*http.Request) error {
+			if !entryHostInScope(req.URL.String(), allowedHosts) {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		}
+	}
 	var targets []*APIPoolEntry
 	for i := range p.Entries {
 		if p.Entries[i].Verified {
