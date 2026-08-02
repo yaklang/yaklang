@@ -13,11 +13,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-const boundedSaaSReconInstruction = `You are a bounded SaaS business-service verification assistant.
-Operate only on the single http or https URL explicitly supplied by the user.
-Call recon_register_seed exactly once with that URL. Do not invent scope_hosts or widen the target.
-Then call probe_api_candidates exactly once. The probe is restricted to one HEAD request, does not follow redirects, publishes the verified endpoint to the SaaS asset sink, and ends the run.
-No crawling, port discovery, local-file access, arbitrary HTTP requests, or target expansion is permitted.`
+const boundedSaaSReconInstruction = `You are the SaaS edition of the Infosec/API Surface Recon focus.
+The platform has already registered one server-authorized HTTP(S) seed and an exact same-origin scope.
+Complete the following pipeline in order and do not skip a stage:
+1. Call crawl_js_collector once. In SaaS this is a deterministic, request-budgeted same-origin page and JavaScript collector; model parameters cannot widen its scope.
+2. Call js_static_extract_ai once. In SaaS this reads only the collector-owned directory and extracts same-origin API candidates into the run-local API pool.
+3. Call probe_api_candidates once. It performs a bounded HEAD verification batch, publishes verified endpoints to the platform asset sink, and ends the run.
+Do not register another seed, expand hosts or ports, invoke arbitrary tools, access operator-local files, or repeat a completed stage.`
 
 type reconProbeSettings struct {
 	limit           int
@@ -99,7 +101,8 @@ func validateSaaSReconActionTarget(config aicommon.AICallerConfigIf, proposed st
 func infosecReconAllowedActions(saasMode, allowUserInteraction bool) []string {
 	if saasMode {
 		return []string{
-			"recon_register_seed",
+			ToolCrawlJsCollector,
+			ToolJsStaticExtractAI,
 			"probe_api_candidates",
 		}
 	}
@@ -172,8 +175,8 @@ func boundedSaaSReconProbeSettings(
 		requestedTimeout = 5 * time.Second
 	}
 	return reconProbeSettings{
-		limit:           1,
-		concurrency:     1,
+		limit:           24,
+		concurrency:     2,
 		useHead:         true,
 		timeout:         requestedTimeout,
 		followRedirects: false,

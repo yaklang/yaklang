@@ -12,7 +12,8 @@ func TestInfosecReconAllowedActions_BoundsSaaSMode(t *testing.T) {
 	t.Parallel()
 
 	require.ElementsMatch(t, []string{
-		"recon_register_seed",
+		ToolCrawlJsCollector,
+		ToolJsStaticExtractAI,
 		"probe_api_candidates",
 	}, infosecReconAllowedActions(true, false))
 
@@ -47,12 +48,12 @@ func TestNormalizeSaaSReconScope_RejectsWidening(t *testing.T) {
 	require.ErrorContains(t, err, "cannot widen")
 }
 
-func TestSaaSReconProbeSettings_AreLowImpact(t *testing.T) {
+func TestSaaSReconProbeSettings_AreBoundedForMultiStageDiscovery(t *testing.T) {
 	t.Parallel()
 
 	settings := boundedSaaSReconProbeSettings(99, 99, false, 99*time.Second)
-	require.Equal(t, 1, settings.limit)
-	require.Equal(t, 1, settings.concurrency)
+	require.Equal(t, 24, settings.limit)
+	require.Equal(t, 2, settings.concurrency)
 	require.True(t, settings.useHead)
 	require.Equal(t, 5*time.Second, settings.timeout)
 	require.False(t, settings.followRedirects)

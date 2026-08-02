@@ -35,7 +35,7 @@ func init() {
 
 			maxIter := int(r.GetConfig().GetMaxIterationCount())
 			if saasMode {
-				maxIter = 6
+				maxIter = 12
 			} else if maxIter < 16 {
 				maxIter = 16
 			}

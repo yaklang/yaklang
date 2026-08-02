@@ -73,6 +73,7 @@ message ContextPackage {
   string user_input = 6;                      // this turn's user input text
   bytes provider_policy_snapshot_json = 7;    // model provider config (API key, base URL, headers)
   bytes runtime_option_snapshot_json = 8;     // temperature, max_tokens, etc.
+  ContextFocusRelease focus_release = 9;      // immutable server-published Yak Focus release pinned to the session
 }
 
 // ContextMessage is one replayed conversation turn. Only user inputs and
@@ -2034,4 +2035,24 @@ message AIFocusResultContext {
   legion.job.v1.JobRef job = 4;
   string execution_mode = 5;
   string target_url = 6;
+  string focus_release_id = 7;
+}
+
+message ContextFocusSidekick {
+  string path = 1;
+  string content = 2;
+}
+
+// ContextFocusRelease carries the exact immutable Yak bundle selected by the
+// server. Scan Node verifies sha256 before registering runtime_name; it never
+// resolves the client-facing focus_name directly.
+message ContextFocusRelease {
+  string release_id = 1;
+  string focus_name = 2;
+  string runtime_name = 3;
+  string version = 4;
+  string entry_file = 5;
+  string entry_code = 6;
+  repeated ContextFocusSidekick sidekicks = 7;
+  string sha256 = 8;
 }

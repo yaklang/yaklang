@@ -38,9 +38,10 @@ func (statelessAIEngineRuntimeDriver) Bind(
 		return nil, fmt.Errorf("stateless bind: build options: %w", err)
 	}
 	return &statelessAIEngineRuntimeHandle{
-		binding:       binding,
-		emitter:       emitter,
-		cachedOptions: cachedOptions,
+		binding:              binding,
+		emitter:              emitter,
+		cachedOptions:        cachedOptions,
+		pinnedFocusReleaseID: pinnedFocusReleaseID(binding.RuntimeOptionSnapshotJSON),
 		newEngine: func(opts ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
 			return aiengine.NewAIEngine(opts...)
 		},
@@ -67,9 +68,10 @@ func (t *statelessAITurn) close() {
 }
 
 type statelessAIEngineRuntimeHandle struct {
-	binding       aiSessionBinding
-	emitter       aiSessionRuntimeEmitter
-	cachedOptions []aiengine.AIEngineConfigOption
+	binding              aiSessionBinding
+	emitter              aiSessionRuntimeEmitter
+	cachedOptions        []aiengine.AIEngineConfigOption
+	pinnedFocusReleaseID string
 
 	mu         sync.Mutex
 	activeTurn *statelessAITurn
@@ -139,6 +141,30 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 	}
 	if userInput == "" {
 		return fmt.Errorf("stateless sendinput: empty user input")
+	}
+
+	var contextFocusRelease *aiv1.ContextFocusRelease
+	if input.ContextPackage != nil {
+		contextFocusRelease = input.ContextPackage.GetFocusRelease()
+	}
+	if h.pinnedFocusReleaseID != "" {
+		if contextFocusRelease == nil {
+			return fmt.Errorf("stateless sendinput: pinned focus release %q is missing from context package", h.pinnedFocusReleaseID)
+		}
+		if strings.TrimSpace(contextFocusRelease.GetReleaseId()) != h.pinnedFocusReleaseID {
+			return fmt.Errorf("stateless sendinput: focus release mismatch: pinned %q, received %q", h.pinnedFocusReleaseID, contextFocusRelease.GetReleaseId())
+		}
+	}
+	runtimeFocusName, err := registerContextFocusRelease(contextFocusRelease)
+	if err != nil {
+		return fmt.Errorf("stateless sendinput: %w", err)
+	}
+	if runtimeFocusName != "" {
+		// Focus is consumed while NewAIEngine builds the ReAct operator. SendMsg
+		// only applies per-message attached resources, so setting it there would
+		// merely advertise the release as an available capability while the task
+		// still ran through the default loop.
+		options = append(options, aiengine.WithFocus(runtimeFocusName))
 	}
 
 	h.mu.Lock()

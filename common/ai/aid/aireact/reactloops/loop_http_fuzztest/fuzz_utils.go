@@ -972,6 +972,12 @@ func getFuzzRequest(loop *reactloops.ReActLoop) (*mutate.FuzzHTTPRequest, error)
 // 2. 结束后根据数据规模渲染 overview + analysis 文档。
 // 3. 在需要时只压缩 analysis 段，再把最终反馈送去满意度验证。
 func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string, paramSummary string, action *aicommon.Action) (string, *aicommon.VerifySatisfactionResult, error) {
+	if err := validateBoundedSaaSHTTPFuzzRequest(loop); err != nil {
+		return "", nil, err
+	}
+	if err := claimBoundedSaaSHTTPFuzzBatch(loop); err != nil {
+		return "", nil, err
+	}
 	reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeFuzz, buildLoopHTTPFuzzActionLogStartLine(actionName, paramSummary, action))
 	reactloops.EmitStatus(loop, "模糊测试中 / Fuzzing...")
 	isHttpsStr := loop.Get("is_https")
@@ -1030,6 +1036,9 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		mutate.WithPoolOpt_Source(loopHTTPFuzztestHTTPSource),
 		mutate.WithPoolOpt_SaveHTTPFlow(true),
 	}
+	if isBoundedSaaSHTTPFuzz(loop.GetConfig()) {
+		execOpts = append(execOpts, boundedSaaSHTTPFuzzExecOptions()...)
+	}
 	if taskCtx != nil {
 		execOpts = append(execOpts, mutate.WithPoolOpt_Context(taskCtx))
 	}
@@ -1086,6 +1095,13 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	overview.finalizeResponseLengthGroups()
 	progressEmitter.emitProgress(overview, representativeStatusCode, true)
 	emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, reason, paramSummary, buildLoopHTTPFuzzStatusProgress(overview, representativeStatusCode, 3))
+	if err := validateBoundedSaaSHTTPFuzzOutcome(loop, overview); err != nil {
+		return "", nil, err
+	}
+	if err := publishBoundedSaaSHTTPFuzzAsset(loop, actionName, overview, representativeStatusCode); err != nil {
+		return "", nil, utils.Wrap(err, "publish bounded SaaS HTTP fuzz asset")
+	}
+	markBoundedSaaSHTTPFuzzCompleted(loop)
 
 	if representativeRequest != "" || representativeResponse != "" {
 		loop.Set("representative_request", representativeRequest)

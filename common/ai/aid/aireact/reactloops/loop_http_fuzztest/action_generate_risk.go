@@ -53,6 +53,9 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 		},
 		[]*reactloops.LoopStreamField{},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
+			if err := validateBoundedSaaSHTTPFuzzCompleted(l); err != nil {
+				return err
+			}
 			specs := collectGenerateRiskSpecs(action)
 			if len(specs) == 0 {
 				return fmt.Errorf("generate_risk requires either risks array or single-risk fields")
@@ -61,6 +64,9 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				if err := validateGenerateRiskSpec(l, spec, idx); err != nil {
 					return err
 				}
+			}
+			if isBoundedSaaSHTTPFuzz(l.GetConfig()) && len(specs) > 3 {
+				return fmt.Errorf("bounded SaaS HTTP fuzz accepts at most 3 risks")
 			}
 			return nil
 		},
@@ -107,6 +113,10 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			r.AddToTimeline("generate_risk", summary)
 			operator.Feedback(summary)
+			if isBoundedSaaSHTTPFuzz(loop.GetConfig()) {
+				operator.Exit()
+				return
+			}
 			operator.Continue()
 		},
 	)
@@ -183,14 +193,23 @@ func validateGenerateRiskSpec(loop *reactloops.ReActLoop, spec generateRiskSpec,
 	if strings.TrimSpace(spec.Description) == "" {
 		return fmt.Errorf("%s: description is required", prefix)
 	}
-	if inferGenerateRiskTarget(loop, spec.Target) == "" {
+	if _, err := validateBoundedSaaSRiskTarget(loop, spec.Target); err != nil {
+		return fmt.Errorf("%s: %w", prefix, err)
+	}
+	if inferGenerateRiskTarget(loop, spec.Target) == "" && (loop == nil || !isBoundedSaaSHTTPFuzz(loop.GetConfig())) {
 		return fmt.Errorf("%s: target is required when no representative/current HTTP request URL can be inferred", prefix)
 	}
 	return nil
 }
 
 func saveGeneratedRisk(loop *reactloops.ReActLoop, spec generateRiskSpec) (string, string, bool, error) {
-	target := inferGenerateRiskTarget(loop, spec.Target)
+	target, err := validateBoundedSaaSRiskTarget(loop, spec.Target)
+	if err != nil {
+		return "", "", false, err
+	}
+	if target == "" {
+		target = inferGenerateRiskTarget(loop, spec.Target)
+	}
 	title := strings.TrimSpace(spec.Title)
 	titleVerbose := strings.TrimSpace(spec.TitleVerbose)
 	if titleVerbose == "" {
