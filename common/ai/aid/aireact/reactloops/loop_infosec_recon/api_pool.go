@@ -19,14 +19,15 @@ const poolFormatVersion = 1
 
 // APIPoolEntry is one deduplicated API candidate in the shared pool.
 type APIPoolEntry struct {
-	NormalizedURL string  `json:"normalized_url"`
-	Method        string  `json:"method,omitempty"`
-	Source        string  `json:"source"`
-	Confidence    float64 `json:"confidence,omitempty"`
-	Evidence      string  `json:"evidence,omitempty"`
-	Verified      bool    `json:"verified"`
-	StatusCode    int     `json:"status_code,omitempty"`
-	ProbeError    string  `json:"probe_error,omitempty"`
+	NormalizedURL      string  `json:"normalized_url"`
+	Method             string  `json:"method,omitempty"`
+	Source             string  `json:"source"`
+	Confidence         float64 `json:"confidence,omitempty"`
+	Evidence           string  `json:"evidence,omitempty"`
+	Verified           bool    `json:"verified"`
+	StatusCode         int     `json:"status_code,omitempty"`
+	VerificationMethod string  `json:"verification_method,omitempty"`
+	ProbeError         string  `json:"probe_error,omitempty"`
 }
 
 // APIPool is persisted under the task work directory.
@@ -261,10 +262,12 @@ func probePoolHTTP(
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			req, err := http.NewRequest(http.MethodGet, e.NormalizedURL, nil)
+			verificationMethod := http.MethodGet
 			if useHead {
-				req, err = http.NewRequest(http.MethodHead, e.NormalizedURL, nil)
+				verificationMethod = http.MethodHead
 			}
+			e.VerificationMethod = verificationMethod
+			req, err := http.NewRequest(verificationMethod, e.NormalizedURL, nil)
 			if err != nil {
 				e.ProbeError = err.Error()
 				return

@@ -58,6 +58,9 @@ func TestBoundedSaaSReconActions_RegisterProbePublishAndExit(t *testing.T) {
 	require.Equal(t, http.MethodHead, requestMethod.Load())
 	require.Len(t, sink.assets, 1)
 	require.Equal(t, server.URL+"/health", sink.assets[0].Target)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(sink.assets[0].Payload, &payload))
+	require.Equal(t, http.MethodHead, payload["verification_method"])
 }
 
 func TestBoundedSaaSReconRegisterVerifier_RejectsScopeWidening(t *testing.T) {
