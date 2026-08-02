@@ -73,9 +73,9 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockAfterSessionEvidence(t *testi
 
 	require.Contains(t, prompt, "- [ ]: [id: verify_target]: 复现目标错误码")
 	require.Contains(t, prompt, "- [ ]: [id: collect_signal]: 采集响应特征")
-	require.Contains(t, prompt, "开放项共同构成待返回的 Frontier")
-	require.Contains(t, prompt, "先在同一动作中 add / update 全部分支")
-	require.Contains(t, prompt, "同一 delta 中 close 旧项并设置下一 current")
+	require.Contains(t, prompt, "开放项构成待返回的 Frontier")
+	require.Contains(t, prompt, "先在下一正常动作的 `todo_delta` 中保存全部入口")
+	require.Contains(t, prompt, "同一 delta 切到下一 Frontier")
 }
 
 // TestPromptManager_AssembleLoopPrompt_TodoBlockSkippedWhenEmpty 验证当
