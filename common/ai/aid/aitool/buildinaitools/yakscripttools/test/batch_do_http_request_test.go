@@ -71,6 +71,15 @@ func TestBatchDoHTTPRequest_MetadataContainsIntentHints(t *testing.T) {
 	assert.Assert(t, strings.Contains(aiTool.Keywords, "api endpoint validation"), "keywords should include English endpoint validation")
 }
 
+func TestBatchDoHTTPRequestUsagePreservesSurveyFrontierAndRecovery(t *testing.T) {
+	usage := getBatchDoHTTPRequestTool(t).Usage
+	assert.Assert(t, strings.Contains(usage, "Preserve every concrete in-scope endpoint"))
+	assert.Assert(t, strings.Contains(usage, "coverage branch even when it has no vulnerability signal yet"))
+	assert.Assert(t, strings.Contains(usage, "does not exhaust the paths"))
+	assert.Assert(t, strings.Contains(usage, "materially different batch"))
+	assert.Assert(t, strings.Contains(usage, "selected current endpoint"))
+}
+
 // Test 1: Basic batch GET requests - verify summary output
 func TestBatchDoHTTPRequest_BasicGet(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte("response_body"))

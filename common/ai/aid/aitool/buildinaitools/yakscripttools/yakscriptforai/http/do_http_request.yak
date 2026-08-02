@@ -29,6 +29,18 @@ The legacy string fields `query-params` and `post-params` remain for compatibili
 - `body` overrides `form` when both are present.
 - Use AITAG for `packet`, multi-line `body`, and multi-line `headers`.
 
+## Black-box experiment loop
+
+Treat each request as one experiment, not as a one-shot verdict.
+
+1. Establish a normal baseline and note the status, body/length, headers, redirect, and timing signals relevant to the target.
+2. Change one controllable variable at a time: method, parameter value, input channel, encoding, request shape, authentication/session context, or observable.
+3. Compare against the baseline. A request error, parameter validation failure, timeout, connection/TLS/proxy failure, authentication rejection, empty response, or one payload miss does not prove the endpoint or hypothesis is exhausted.
+4. Read the tool feedback and perform a materially different recovery experiment: correct invalid parameters, inspect the generated packet, switch structured/packet mode, adjust method or encoding, restore required headers/cookies, or expand the observable with verbose/save-packet/keyword/regexp.
+5. Continue while a new controllable variable can produce information. When this endpoint is confirmed, discriminatively ruled out, externally blocked, or temporarily has zero information gain, preserve the result and resume condition in todo_delta and move to the next recorded Frontier entry.
+
+If the response exposes another in-scope link, form action, redirect target, script route, documented endpoint, or API field, record that concrete entry point in todo_delta before continuing the current experiment. It is a coverage branch even before a vulnerability signal exists.
+
 ## Examples
 
 Structured form (preferred):
