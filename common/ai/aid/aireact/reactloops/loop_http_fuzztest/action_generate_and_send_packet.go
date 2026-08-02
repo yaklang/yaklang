@@ -19,6 +19,7 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 		"生成完整原始 HTTP 数据包并直接发送测试。适用于需要 AI 基于漏洞目标构造整包请求的场景。",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("packet_type", aitool.WithParam_Description("数据包类型：mutation 表示基于当前请求变异，synthetic 表示重新生成完整原始包。"), aitool.WithParam_Required(true)),
+			aitool.WithStringParam("target_purpose", aitool.WithParam_Description("本次请求要验证的具体目标、预期信号与安全边界。"), aitool.WithParam_Required(true)),
 		},
 		[]*reactloops.LoopStreamField{
 			{FieldName: "reason", AINodeId: "thought"},
