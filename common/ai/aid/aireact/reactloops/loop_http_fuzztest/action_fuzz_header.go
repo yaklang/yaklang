@@ -9,14 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func pinBoundedSaaSHeaderAction(action *aicommon.Action) {
-	if action == nil {
-		return
-	}
-	action.ForceSet("header_name", boundedSaaSHeaderName)
-	action.ForceSet("header_values", append([]string(nil), boundedSaaSHeaderValues...))
-}
-
 var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"fuzz_header",
@@ -29,9 +21,6 @@ var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			{FieldName: "reason", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
-			if isBoundedSaaSHTTPFuzz(l.GetConfig()) {
-				pinBoundedSaaSHeaderAction(action)
-			}
 			headerName := action.GetString("header_name")
 			if headerName == "" {
 				return fmt.Errorf("header_name parameter is required")
@@ -40,7 +29,7 @@ var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			if len(headerValues) == 0 {
 				return fmt.Errorf("header_values parameter is required and cannot be empty")
 			}
-			return validateBoundedSaaSHeaderAction(l, headerName, headerValues)
+			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			headerName := action.GetString("header_name")
@@ -67,11 +56,6 @@ var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			}
 
 			r.AddToTimeline("fuzz_header", fmt.Sprintf("Tested header %s with values: %v\n%s", headerName, headerValues, buildFuzzTimelineSummary(diffResult)))
-			if isBoundedSaaSHTTPFuzz(loop.GetConfig()) {
-				operator.Feedback(diffResult)
-				operator.Exit()
-				return
-			}
 			applyFuzzVerificationOutcome(loop, operator, diffResult, verifyResult)
 		},
 	)

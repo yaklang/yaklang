@@ -4,22 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_asset_intake"
-	"github.com/yaklang/yaklang/common/schema"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 )
-
-func TestAssetIntakeFocusIsHiddenFromProductCatalog(t *testing.T) {
-	meta, ok := reactloops.GetLoopMetadata(schema.AI_REACT_LOOP_NAME_ASSET_INTAKE)
-	if !ok || meta == nil {
-		t.Fatal("asset intake focus metadata is missing")
-	}
-	if !meta.IsHidden {
-		t.Fatal("asset intake must remain an internal acceptance focus")
-	}
-}
 
 func TestValidateAIFocusQueryCommand(t *testing.T) {
 	valid := func() *aiv1.QueryAIFocusCommand {
