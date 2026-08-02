@@ -16,13 +16,27 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-func TestBoundedSaaSReconActions_RegisterProbePublishAndExit(t *testing.T) {
-	var requestCount atomic.Int32
-	var requestMethod atomic.Value
+func TestBoundedSaaSReconActions_CrawlExtractProbePublishAndExit(t *testing.T) {
+	var getCount atomic.Int32
+	var headCount atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount.Add(1)
-		requestMethod.Store(r.Method)
-		w.WriteHeader(http.StatusNoContent)
+		if r.Method == http.MethodHead {
+			headCount.Add(1)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		getCount.Add(1)
+		switch r.URL.Path {
+		case "/health":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write([]byte(`<html><body><a href="/api/ping">API</a><script src="/app.js"></script></body></html>`))
+		case "/app.js":
+			w.Header().Set("Content-Type", "application/javascript")
+			_, _ = w.Write([]byte(`fetch("/api/users"); const outside = "https://outside.invalid/api/ignored";`))
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}
 	}))
 	defer server.Close()
 
@@ -45,6 +59,27 @@ func TestBoundedSaaSReconActions_RegisterProbePublishAndExit(t *testing.T) {
 	require.Len(t, pool.Entries, 1)
 	require.Equal(t, server.URL+"/health", pool.Entries[0].NormalizedURL)
 
+	crawlOperator := executeReconAction(t, loop, ToolCrawlJsCollector, map[string]any{
+		"start_url": server.URL + "/health",
+		"max_depth": 99,
+		"urls_max":  999,
+	})
+	require.True(t, crawlOperator.IsContinued())
+	require.Equal(t, "true", loop.Get(keySaaSCrawlCompleted))
+
+	staticOperator := executeReconAction(t, loop, ToolJsStaticExtractAI, map[string]any{
+		"paths": "/operator/local/path/must/be/ignored",
+	})
+	require.True(t, staticOperator.IsContinued())
+	require.Equal(t, "true", loop.Get(keySaaSStaticCompleted))
+
+	pool, err = LoadAPIPool(loop.Get(keyWorkDir))
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(pool.Entries), 3)
+	require.True(t, containsReconPoolURL(pool, server.URL+"/api/ping"))
+	require.True(t, containsReconPoolURL(pool, server.URL+"/api/users"))
+	require.False(t, containsReconPoolURL(pool, "https://outside.invalid/api/ignored"))
+
 	probeOperator := executeReconAction(t, loop, "probe_api_candidates", map[string]any{
 		"limit":           99,
 		"concurrency":     99,
@@ -54,13 +89,35 @@ func TestBoundedSaaSReconActions_RegisterProbePublishAndExit(t *testing.T) {
 	terminated, err = probeOperator.IsTerminated()
 	require.NoError(t, err)
 	require.True(t, terminated)
-	require.Equal(t, int32(1), requestCount.Load())
-	require.Equal(t, http.MethodHead, requestMethod.Load())
-	require.Len(t, sink.assets, 1)
-	require.Equal(t, server.URL+"/health", sink.assets[0].Target)
+	require.GreaterOrEqual(t, getCount.Load(), int32(3))
+	require.GreaterOrEqual(t, headCount.Load(), int32(3))
+	require.GreaterOrEqual(t, len(sink.assets), 3)
+	asset := findReconAssetByTarget(t, sink.assets, server.URL+"/api/users")
 	var payload map[string]any
-	require.NoError(t, json.Unmarshal(sink.assets[0].Payload, &payload))
+	require.NoError(t, json.Unmarshal(asset.Payload, &payload))
 	require.Equal(t, http.MethodHead, payload["verification_method"])
+}
+
+func TestInstallBoundedSaaSReconSeedUsesOnlyServerAuthorization(t *testing.T) {
+	target := "https://business.example:8443/health?q=1"
+	loop := newBoundedSaaSReconActionTestLoop(t, &recordingReconAssetSink{targetURL: target})
+	workDir := loop.Get(keyWorkDir)
+	require.NoError(t, ensurePoolFile(workDir))
+
+	seed, err := installBoundedSaaSReconSeed(loop, workDir, target, "")
+	require.NoError(t, err)
+	require.Equal(t, target, seed)
+	require.Equal(t, "business.example", loop.Get(keyScopeHosts))
+	require.Equal(t, "true", loop.Get(keySaaSSeedRegistered))
+
+	pool, err := LoadAPIPool(workDir)
+	require.NoError(t, err)
+	require.Equal(t, target, pool.SeedURL)
+	require.Len(t, pool.Entries, 1)
+	require.Equal(t, target, pool.Entries[0].NormalizedURL)
+
+	_, err = installBoundedSaaSReconSeed(loop, workDir, "https://other.example/health", "")
+	require.ErrorContains(t, err, "server-authorized target")
 }
 
 func TestBoundedSaaSReconRegisterVerifier_RejectsScopeWidening(t *testing.T) {
@@ -100,11 +157,16 @@ func TestBoundedSaaSReconRegisterVerifier_LocksExactServerTarget(t *testing.T) {
 	}
 }
 
-func TestBoundedSaaSReconRejectsRepeatedRegisterAndProbe(t *testing.T) {
+func TestBoundedSaaSReconRejectsRepeatedPipelineStages(t *testing.T) {
 	var requestCount atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount.Add(1)
-		w.WriteHeader(http.StatusNoContent)
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body>ok</body></html>`))
 	}))
 	defer server.Close()
 
@@ -118,6 +180,20 @@ func TestBoundedSaaSReconRejectsRepeatedRegisterAndProbe(t *testing.T) {
 	err = registerHandler.ActionVerifier(loop, buildReconAction(t, "recon_register_seed", map[string]any{"seed_url": target}))
 	require.ErrorContains(t, err, "already registered")
 
+	firstCrawl := executeReconAction(t, loop, ToolCrawlJsCollector, map[string]any{})
+	require.True(t, firstCrawl.IsContinued())
+	crawlHandler, err := loop.GetActionHandler(ToolCrawlJsCollector)
+	require.NoError(t, err)
+	err = crawlHandler.ActionVerifier(loop, buildReconAction(t, ToolCrawlJsCollector, map[string]any{}))
+	require.ErrorContains(t, err, "already attempted")
+
+	firstStatic := executeReconAction(t, loop, ToolJsStaticExtractAI, map[string]any{})
+	require.True(t, firstStatic.IsContinued())
+	staticHandler, err := loop.GetActionHandler(ToolJsStaticExtractAI)
+	require.NoError(t, err)
+	err = staticHandler.ActionVerifier(loop, buildReconAction(t, ToolJsStaticExtractAI, map[string]any{}))
+	require.ErrorContains(t, err, "already attempted")
+
 	firstProbe := executeReconAction(t, loop, "probe_api_candidates", map[string]any{})
 	terminated, err := firstProbe.IsTerminated()
 	require.NoError(t, err)
@@ -127,7 +203,27 @@ func TestBoundedSaaSReconRejectsRepeatedRegisterAndProbe(t *testing.T) {
 	require.NoError(t, err)
 	err = probeHandler.ActionVerifier(loop, buildReconAction(t, "probe_api_candidates", map[string]any{}))
 	require.ErrorContains(t, err, "already attempted")
-	require.Equal(t, int32(1), requestCount.Load())
+	require.Greater(t, requestCount.Load(), int32(1))
+}
+
+func containsReconPoolURL(pool *APIPool, target string) bool {
+	for _, entry := range pool.Entries {
+		if entry.NormalizedURL == target {
+			return true
+		}
+	}
+	return false
+}
+
+func findReconAssetByTarget(t *testing.T, assets []aicommon.AssetResult, target string) aicommon.AssetResult {
+	t.Helper()
+	for _, asset := range assets {
+		if asset.Target == target {
+			return asset
+		}
+	}
+	t.Fatalf("asset %s not found", target)
+	return aicommon.AssetResult{}
 }
 
 func newBoundedSaaSReconActionTestLoop(

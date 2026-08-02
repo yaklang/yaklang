@@ -32,7 +32,7 @@ var fuzzGetParamsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			if len(paramValues) == 0 {
 				return fmt.Errorf("param_values parameter is required and cannot be empty")
 			}
-			return nil
+			return validateBoundedSaaSGetParamsAction(l, paramName, paramValues, rawMode)
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			paramName := action.GetString("param_name")
