@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -197,6 +198,43 @@ func TestProbePoolHTTP_RespectsScopeHosts(t *testing.T) {
 	require.Zero(t, other.StatusCode)
 }
 
+func TestProbePoolHTTP_DoesNotFollowRedirectsWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	var redirectedRequests atomic.Int32
+	redirectTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		redirectedRequests.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer redirectTarget.Close()
+
+	redirectSource := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, redirectTarget.URL+"/outside", http.StatusFound)
+	}))
+	defer redirectSource.Close()
+
+	parsed, err := url.Parse(redirectSource.URL)
+	require.NoError(t, err)
+	pool := &APIPool{Entries: []APIPoolEntry{{
+		NormalizedURL: redirectSource.URL + "/start",
+		Method:        http.MethodGet,
+	}}}
+
+	n := probePoolHTTP(
+		pool,
+		1,
+		1,
+		true,
+		5*time.Second,
+		ParseScopeHostSet(parsed.Hostname()),
+		false,
+	)
+	require.Equal(t, 1, n)
+	require.Zero(t, redirectedRequests.Load())
+	require.True(t, pool.Entries[0].Verified)
+	require.Equal(t, http.StatusFound, pool.Entries[0].StatusCode)
+}
+
 func TestSubmitVerifiedAPIAssetsPublishesOnlyVerifiedEndpoints(t *testing.T) {
 	t.Parallel()
 
@@ -239,6 +277,18 @@ func TestSubmitVerifiedAPIAssetsPublishesOnlyVerifiedEndpoints(t *testing.T) {
 	require.True(t, payload.Verified)
 	require.Equal(t, http.StatusOK, payload.StatusCode)
 	require.Equal(t, "js_static_extract_ai", payload.Source)
+
+	var businessPayload map[string]any
+	require.NoError(t, json.Unmarshal(asset.Payload, &businessPayload))
+	require.Equal(t, "1", businessPayload["schema_version"])
+	require.Equal(t, "verified", businessPayload["verification_state"])
+	require.Equal(t, true, businessPayload["network_access_performed"])
+	require.Equal(t, "https://example.com/api/users", businessPayload["url"])
+	require.Equal(t, "https", businessPayload["scheme"])
+	require.Equal(t, "example.com", businessPayload["host"])
+	require.Equal(t, "443", businessPayload["port"])
+	require.Equal(t, "https://example.com/api/users", businessPayload["http_url"])
+	require.Equal(t, float64(http.StatusOK), businessPayload["http_status_code"])
 }
 
 func TestSubmitVerifiedAPIAssetsBoundsEvidenceAndContinues(t *testing.T) {
