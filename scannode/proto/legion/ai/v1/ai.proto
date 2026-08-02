@@ -2032,4 +2032,6 @@ message AIFocusResultContext {
   string focus_mode = 2;
   string schema_version = 3;
   legion.job.v1.JobRef job = 4;
+  string execution_mode = 5;
+  string target_url = 6;
 }

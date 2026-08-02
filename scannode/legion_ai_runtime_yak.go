@@ -46,6 +46,9 @@ func (yakAIEngineRuntimeDriver) Bind(
 	binding aiSessionBinding,
 	emitter aiSessionRuntimeEmitter,
 ) (aiSessionRuntimeHandle, error) {
+	if strings.EqualFold(strings.TrimSpace(binding.ExecutionMode), "single_run") {
+		return nil, fmt.Errorf("single_run requires the stateless runtime; LEGION_AI_RUNTIME=stateful is rollback-only")
+	}
 	options, err := buildYakAIEngineOptions(ctx, binding, emitter)
 	if err != nil {
 		return nil, err

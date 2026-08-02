@@ -22,15 +22,18 @@ var embeddedJsStaticExtractAiScript string
 var embeddedCrawlJsCollectorScript string
 
 const (
-	keyWorkDir          = "infosec_workdir"
-	keyPoolPath         = "infosec_pool_path"
-	keySeedURL          = "infosec_seed_url"
-	keyScopeHosts       = "infosec_scope_hosts"
-	keyMaxCrawlDepth    = "infosec_max_crawl_depth"
-	keyProbeConcurrency = "infosec_probe_concurrency"
-	keyLastReconSnippet = "infosec_recon_log_tail"
-	defaultCrawlDepth   = "2"
-	defaultProbeConc    = "6"
+	keyWorkDir              = "infosec_workdir"
+	keyPoolPath             = "infosec_pool_path"
+	keySeedURL              = "infosec_seed_url"
+	keyScopeHosts           = "infosec_scope_hosts"
+	keyMaxCrawlDepth        = "infosec_max_crawl_depth"
+	keyProbeConcurrency     = "infosec_probe_concurrency"
+	keyLastReconSnippet     = "infosec_recon_log_tail"
+	keySaaSAuthorizedTarget = "infosec_saas_authorized_target"
+	keySaaSSeedRegistered   = "infosec_saas_seed_registered"
+	keySaaSProbeAttempted   = "infosec_saas_probe_attempted"
+	defaultCrawlDepth       = "2"
+	defaultProbeConc        = "6"
 )
 
 // Markers for idempotent merge of infosec_recon-specific interval-review (progress audit) extra prompts.
@@ -104,6 +107,14 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set(keyPoolPath, poolPath)
 		loop.Set(keyMaxCrawlDepth, defaultCrawlDepth)
 		loop.Set(keyProbeConcurrency, defaultProbeConc)
+		if isBoundedSaaSRecon(r.GetConfig()) {
+			targetURL, err := authorizedSaaSReconTarget(r.GetConfig())
+			if err != nil {
+				operator.Failed(err)
+				return
+			}
+			loop.Set(keySaaSAuthorizedTarget, targetURL)
+		}
 
 		if _, err := LoadAPIPool(wd); err != nil {
 			log.Warnf("infosec_recon: load pool: %v", err)
