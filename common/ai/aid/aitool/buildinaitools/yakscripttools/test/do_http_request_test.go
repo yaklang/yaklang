@@ -186,6 +186,36 @@ func TestDoHTTPRequest_ResponseSmallWithKeyword(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "keyword match"), "keyword match result should be shown")
 }
 
+func TestDoHTTPRequest_KeywordNotFoundIsExplicit(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte("ordinary response without the marker"))
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":     "http://" + host + ":" + strconv.Itoa(port),
+		"keyword": "InternalNote",
+		"timeout": 10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "keyword match: not found"), "a missing keyword must be explicit")
+	assert.Assert(t, strings.Contains(stdout, "retry without keyword"), "output must provide a direct recovery action")
+	assert.Assert(t, strings.Contains(stdout, "response packet"), "normal response evidence must remain visible")
+}
+
+func TestDoHTTPRequest_MalformedHeaderIsVisibleButRequestContinues(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte("malformed_header_recovered"))
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":     "http://" + host + ":" + strconv.Itoa(port),
+		"headers": "this-is-not-a-header\nX-Good: yes",
+		"timeout": 10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "ignored malformed header line"), "ignored input must be visible")
+	assert.Assert(t, strings.Contains(stdout, "expected 'Name: value'"), "warning must show the corrected shape")
+	assert.Assert(t, strings.Contains(stdout, "malformed_header_recovered"), "safe malformed input should not abort the request")
+}
+
 func TestDoHTTPRequest_ResponseLargeWithKeyword(t *testing.T) {
 	keyword := "NEEDLE_" + utils.RandStringBytes(10)
 	largeBody := strings.Repeat("B", 6*1024) + keyword + strings.Repeat("C", 6*1024)
@@ -361,6 +391,32 @@ func TestDoHTTPRequest_QueryParams(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "foo=bar"), "query param should appear in request output")
 }
 
+func TestDoHTTPRequest_QueryObjectEscapesSpecialCharacters(t *testing.T) {
+	const special = `asdf' abc " #&tail`
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("a") == special && r.URL.Query().Get("b") == "ssxxx" {
+			w.Write([]byte("special_query_ok"))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("special_query_mismatch"))
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url": "http://" + host + ":" + strconv.Itoa(port) + "/search",
+		"query": map[string]any{
+			"a": special,
+			"b": "ssxxx",
+		},
+		"timeout": 10,
+		"verbose": true,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "special_query_ok"), "structured query values should survive quotes, spaces, #, and an inner &")
+	assert.Assert(t, strings.Contains(stdout, "a=asdf%27+abc+%22+%23%26tail"), "request target should contain the URL-encoded special value")
+}
+
 func TestDoHTTPRequest_PostParams(t *testing.T) {
 	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		reqStr := string(req)
@@ -381,6 +437,163 @@ func TestDoHTTPRequest_PostParams(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, "post_params_ok"), "server should receive post params")
 	assert.Assert(t, strings.Contains(stdout, "user=admin"), "post param should appear in request output")
+}
+
+func TestDoHTTPRequest_FormObjectEscapesSpecialCharacters(t *testing.T) {
+	const special = `asdf' abc " #&tail`
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("parse_failed:" + err.Error()))
+			return
+		}
+		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("special_form_ok"))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("special_form_mismatch"))
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":          "http://" + host + ":" + strconv.Itoa(port),
+		"method":       "POST",
+		"content-type": "application/json", // `form` must still select form encoding.
+		"form": map[string]any{
+			"a": special,
+			"b": "ssxxx",
+		},
+		"timeout": 10,
+		"verbose": true,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "special_form_ok"), "structured form values should survive quotes, spaces, #, and an inner &")
+	assert.Assert(t, strings.Contains(stdout, "a=asdf%27+abc+%22+%23%26tail"), "request body should contain the URL-encoded special value")
+	assert.Assert(t, strings.Contains(stdout, "b=ssxxx"), "second form field should remain separate")
+}
+
+// InvokeWithParams exercises the same schema-default and output-capture path used by
+// ReAct. An omitted JSON object must stay omitted instead of becoming string "{}".
+func TestDoHTTPRequest_InvokeWithParamsDoesNotStringifyOmittedJSONObjectDefaults(t *testing.T) {
+	const special = `asdf' abc " #&tail`
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
+			w.Write([]byte("react_form_result_visible"))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("react_form_mismatch"))
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	result, err := tool.InvokeWithParams(aitool.InvokeParams{
+		"url":    "http://" + host + ":" + strconv.Itoa(port),
+		"method": "POST",
+		"form": map[string]any{
+			"a": special,
+			"b": "ssxxx",
+		},
+		"timeout": 10,
+		"verbose": true,
+	})
+	assert.NilError(t, err)
+	execution, ok := result.Data.(*aitool.ToolExecutionResult)
+	assert.Assert(t, ok, "InvokeWithParams should return a ToolExecutionResult")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "react_form_result_visible"), "ReAct-visible combined output should contain the response")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "request packet"), "ReAct-visible combined output should show what was sent")
+}
+
+// Empty arrays are commonly emitted by form-based tool UIs for optional collection
+// fields. They mean "no query/form values" and must not prevent the request from
+// reaching the Yak script before it can print request/response evidence.
+func TestDoHTTPRequest_InvokeWithParamsAcceptsEmptyQueryAndFormArrays(t *testing.T) {
+	bodyMarker := "EMPTY_COLLECTIONS_" + utils.RandStringBytes(10)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if strings.Contains(string(req), "Cookie: sess_guest=test-session") {
+			return []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"InternalNote\":\"" + bodyMarker + "\"}")
+		}
+		return []byte("HTTP/1.1 401 Unauthorized\r\n\r\nmissing cookie")
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	result, err := tool.InvokeWithParams(aitool.InvokeParams{
+		"url":            "http://" + host + ":" + strconv.Itoa(port) + "/api/desk/tickets/14",
+		"method":         "GET",
+		"headers":        "Cookie: sess_guest=test-session",
+		"query":          []any{},
+		"form":           []any{},
+		"keyword":        "InternalNote",
+		"redirect-times": 0,
+		"timeout":        10,
+	})
+	assert.NilError(t, err)
+	execution, ok := result.Data.(*aitool.ToolExecutionResult)
+	assert.Assert(t, ok, "InvokeWithParams should return a ToolExecutionResult")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "request packet"), "request packet should be visible")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "InternalNote"), "keyword and response content should be visible")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, bodyMarker), "response body should be visible")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "normalized parameter \"query\""), "normalization should be visible to ReAct/timeline")
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "Execution will continue"), "normalization message should say the request continued")
+}
+
+func TestDoHTTPRequest_InvokeWithParamsAcceptsHeaderObject(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if strings.Contains(string(req), "Cookie: sess_guest=test-session") {
+			return []byte("HTTP/1.1 200 OK\r\n\r\nheader_object_ok")
+		}
+		return []byte("HTTP/1.1 401 Unauthorized\r\n\r\nmissing cookie")
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	result, err := tool.InvokeWithParams(aitool.InvokeParams{
+		"url":     "http://" + host + ":" + strconv.Itoa(port),
+		"headers": map[string]any{"Cookie": "sess_guest=test-session"},
+		"timeout": 10,
+	})
+	assert.NilError(t, err)
+	execution, ok := result.Data.(*aitool.ToolExecutionResult)
+	assert.Assert(t, ok)
+	assert.Assert(t, strings.Contains(execution.CombinedOutput, "header_object_ok"), "object header should survive validation and CLI conversion")
+}
+
+func TestDoHTTPRequest_InvalidNonEmptyFormArrayReturnsActionableError(t *testing.T) {
+	tool := getDoHTTPRequestTool(t)
+	result, err := tool.InvokeWithParams(aitool.InvokeParams{
+		"url":  "http://127.0.0.1/",
+		"form": []any{"a=1"},
+	})
+	assert.Assert(t, err != nil)
+	assert.Assert(t, result != nil)
+	assert.Assert(t, strings.Contains(result.Error, "请求尚未发送"), "error must make preflight failure explicit")
+	assert.Assert(t, strings.Contains(result.Error, "JSON 对象"), "error must explain the required shape")
+	assert.Assert(t, strings.Contains(result.Error, "不要传非空数组"), "error must give a direct correction")
+}
+
+func TestDoHTTPRequest_LegacyPostParamsObjectEscapesSpecialCharacters(t *testing.T) {
+	const special = `asdf' abc " #&tail`
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.Form.Get("a") == special && r.Form.Get("b") == "ssxxx" {
+			w.Write([]byte("legacy_object_form_ok"))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("legacy_object_form_mismatch"))
+	})
+	tool := getDoHTTPRequestTool(t)
+
+	stdout, _ := execTool(t, tool, aitool.InvokeParams{
+		"url":          "http://" + host + ":" + strconv.Itoa(port),
+		"method":       "POST",
+		"content-type": "application/json",
+		"post-params":  map[string]string{"a": special, "b": "ssxxx"},
+		"timeout":      10,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "legacy_object_form_ok"), "legacy object input should remain lossless across the CLI boundary")
 }
 
 func TestDoHTTPRequest_Redirect(t *testing.T) {
@@ -431,14 +644,14 @@ func TestDoHTTPRequest_SavePacket(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(flag))
 	tool := getDoHTTPRequestTool(t)
 
-	// default (save-packet off, verbose off): a one-line request summary is printed,
-	// but the full request packet is NOT printed and nothing is saved to file
+	// default (save-packet off, verbose off): the generated request packet is printed
+	// for AI inspection, but nothing is saved to file.
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
 		"url":     "http://" + host + ":" + strconv.Itoa(port),
 		"timeout": 10,
 	})
 	assert.Assert(t, strings.Contains(stdout, "request: GET"), "one-line request summary should be printed")
-	assert.Assert(t, !strings.Contains(stdout, "request packet"), "full request packet should NOT be printed when verbose is off")
+	assert.Assert(t, strings.Contains(stdout, "request packet"), "generated request packet should always be printed")
 	assert.Assert(t, !strings.Contains(stdout, "saved to"), "no file should be saved when save-packet is off")
 
 	// save-packet=true (+ verbose to also see the inline packet): both request and
@@ -455,10 +668,9 @@ func TestDoHTTPRequest_SavePacket(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "response packet [size:"), "save-packet=true should save the response to a file")
 }
 
-// TestDoHTTPRequest_QuietMode verifies the DEFAULT (verbose=false) output is minimal:
-// a one-line request summary + status line + response body are present, but the full
-// request packet, the mode line, "remote ... is open", and the connection trace are NOT.
-// This is what keeps repeated IDOR/enum calls from bloating the AI context window.
+// TestDoHTTPRequest_QuietMode verifies the DEFAULT (verbose=false) output keeps the
+// generated request packet and response evidence, while hiding the mode line and
+// connection trace.
 func TestDoHTTPRequest_QuietMode(t *testing.T) {
 	bodyMarker := "QUIET_BODY_" + utils.RandStringBytes(10)
 	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
@@ -475,11 +687,11 @@ func TestDoHTTPRequest_QuietMode(t *testing.T) {
 	// what SHOULD be present (the high-value info for vulnerability judgment)
 	assert.Assert(t, strings.Contains(stdout, "request: GET"), "one-line request summary should be printed")
 	assert.Assert(t, strings.Contains(stdout, "/api/items/1"), "request URL should be in the summary")
+	assert.Assert(t, strings.Contains(stdout, "request packet"), "generated request packet must be visible when verbose is off")
 	assert.Assert(t, strings.Contains(stdout, "HTTP/1.1 200 OK"), "status line should be printed")
 	assert.Assert(t, strings.Contains(stdout, bodyMarker), "response body should be printed")
 
 	// what should NOT be present (verbose-only noise)
-	assert.Assert(t, !strings.Contains(stdout, "request packet"), "full request packet must NOT print when verbose is off")
 	assert.Assert(t, !strings.Contains(stdout, "mode: URL"), "mode line must NOT print when verbose is off")
 	assert.Assert(t, !strings.Contains(stdout, "is open"), "'remote ... is open' must NOT print when verbose is off")
 	assert.Assert(t, !strings.Contains(stdout, "dns:"), "connection trace must NOT print when verbose is off")

@@ -1,273 +1,57 @@
-__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection. OUTPUT IS MINIMAL BY DEFAULT: only a one-line request summary, the status line, and the response body are printed (great for quick probing and IDOR/enum). To also print the full request packet + connection trace (dns/connect/server timings), set verbose=true. The full request/response packets are NOT dumped to temp files unless you set save-packet=true. IMPORTANT: if you want to iterate over a parameter (e.g. enumerate order/user IDs 1..N against the same endpoint) or send many requests at once, use the batch_do_http_request tool instead of calling this tool repeatedly. 强大的HTTP请求工具，功能媲美curl。支持两种模式：URL模式（指定URL、方法、头部、请求体、参数）和报文模式（发送原始HTTP请求报文）。默认输出已精简：只打印一行请求摘要、状态行、响应体（适合快速探测与IDOR/枚举）。需要完整请求报文+连接耗时(dns/connect/server)，请设置 verbose=true。需要把报文保存到文件，请设置 save-packet=true。重要：若要遍历某个参数（如枚举订单/用户ID 1..N）或一次发很多请求，请改用 batch_do_http_request 工具，不要重复调用本工具。"
+__DESC__ = "Send one HTTP request. Prefer URL mode with structured query/form objects: pass original unescaped values and the tool URL-encodes them safely. Use body for a raw JSON/XML/text body. Use packet when exact bytes, duplicate parameters, ordering, or custom encoding matter. Use batch_do_http_request for multiple requests. 发送单个 HTTP 请求。优先使用 URL 模式的 query/form 对象，传原始未转义值，由工具安全编码；JSON/XML/文本使用 body；需要精确数据包、重复参数、顺序或自定义编码时使用 packet；多请求使用 batch_do_http_request。"
 __VERBOSE_NAME__ = "Powerful HTTP Request Tool (curl-like)"
 __VERBOSE_NAME_ZH__ = "强大的HTTP请求工具（类curl）"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 
 __USAGE__ = <<<USAGE_BLOCK
-Powerful HTTP Request Tool - AI Usage Guide
+Send one HTTP request in either URL mode or Packet mode.
 
-Modes:
-    1. URL Mode: use "url" plus optional method, headers, body, query-params, and post-params.
-    2. Packet Mode: use "packet" to send an exact raw HTTP request.
+## Choose the mode
 
-If "packet" is present, Packet Mode is used. Otherwise "url" is required.
-Use Packet Mode only when you need full wire-level control. If you are testing a
-specific GET or POST parameter, prefer URL Mode with "query-params" or "post-params".
+- Normal query/form request: use `url` plus `query` or `form`.
+- Raw JSON/XML/text body: use `body` and `content-type`; use AITAG for multi-line content.
+- Exact request bytes, duplicate keys, parameter ordering, unusual separators, or custom/double encoding: use `packet` with AITAG. Packet content is sent as written.
+- Multiple requests or value iteration: use `batch_do_http_request`.
 
-##############################################################################
-# HARD RULES FOR AI PARAMETER GENERATION                                     #
-##############################################################################
+## Encoding rule (important)
 
-1. AITAG is mandatory for multi-line or structured content.
-     Use AITAG for:
-         - packet
-         - body
-         - headers when multiple header lines are provided
+`query` and `form` are JSON objects. Put ORIGINAL, UNESCAPED values in them. The tool URL-encodes every key and value exactly once. Do not pre-encode `%`, spaces, quotes, `#`, or `&`.
 
-     Never put a raw HTTP packet or multi-line body directly into JSON params.
-     Keep them outside JSON using AITAG blocks so line breaks and raw HTTP format stay intact.
+Example: `{"form":{"a":"asdf' abc \" #&tail","b":"ssxxx"}}` is sent as an `application/x-www-form-urlencoded` body with the special characters encoded and the inner `&` kept inside `a`.
 
-2. Prefer structured params when testing specific parameters.
-     Safer choices:
-         - "query-params" for GET query values
-         - "post-params" for application/x-www-form-urlencoded POST values
+The legacy string fields `query-params` and `post-params` remain for compatibility, but their `k=v&k2=v2` syntax cannot distinguish a delimiter from a literal unescaped `&`. Do not generate them for new calls.
 
-     These are safer than hand-writing the request line because the tool patches the
-     request and applies normal parameter encoding for query/form values.
+## Main parameters
 
-3. Packet Mode requires already-encoded request targets.
-     In Packet Mode, the request line is treated as raw HTTP text. If the path or
-     query contains spaces or special characters, you must encode them yourself.
+- URL mode: `url`, optional `method`, `query` object, `form` object, `headers`, `body`, `content-type`.
+- Packet mode: `packet`; optional `https` (`yes`/`no`/`auto`).
+- Common: `timeout`, `redirect-times`, `keyword`, `regexp-match`, `proxy`, `verbose`, `save-packet`.
+- `body` overrides `form` when both are present.
+- Use AITAG for `packet`, multi-line `body`, and multi-line `headers`.
 
-     WRONG:
-         GET /admin.php?id=1 or xxx HTTP/1.1
+## Examples
 
-     CORRECT:
-         GET /admin.php?id=1%20or%20xxx HTTP/1.1
-
-     ALSO OK in many form-style cases:
-         GET /admin.php?id=1+or+xxx HTTP/1.1
-
-     Unencoded spaces in packet mode often trigger 400 responses from servers or proxies.
-
-4. If you replay a captured packet, preserve the exact bytes unless you intentionally edit it.
-     If you edit GET parameters inside the packet, keep the request target URI-encoded.
-
-## Quick placement rules
-
-Use JSON params for single-line values:
-    url, method, content-type, query-params, post-params,
-    https, timeout, redirect-times, keyword, regexp-match, verbose, save-packet, proxy
-
-Use AITAG for multi-line or structured content:
-    packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
-    body    -> <|TOOL_PARAM_body_{NONCE}|> ... <|TOOL_PARAM_body_END_{NONCE}|>
-    headers -> <|TOOL_PARAM_headers_{NONCE}|> ... <|TOOL_PARAM_headers_END_{NONCE}|>
-
-## Parameters
-
---- URL Mode ---
-Required:
-    url             (string)  Full target URL. Example: "https://example.com/api/v1/users".
-
-Optional:
-    method          (string)  HTTP method. Default: "GET".
-    headers         (string or object)  Custom headers. Two accepted forms:
-                            (a) a string with one "Key: Value" per line (use AITAG for
-                                multiple lines): "X-Header: v1\nX-Other: v2";
-                            (b) a JSON object: {"X-Header": "v1", "X-Other": "v2"}.
-    body            (string)  Request body content. Use AITAG.
-    content-type    (string)  Content-Type header value.
-    query-params    (string or object)  Query parameters. Accepted forms:
-                            (a) "k1=v1&k2=v2" string; (b) {"k1":"v1","k2":"v2"} object.
-                            Preferred for GET param testing (values patched/encoded safely).
-    post-params     (string or object)  POST form parameters. Accepted forms:
-                            (a) "k1=v1&k2=v2" string; (b) {"k1":"v1","k2":"v2"} object.
-                            Preferred for form POST testing.
-
---- Packet Mode ---
-Required when not using URL Mode:
-    packet          (string)  Complete raw HTTP request packet. Use AITAG.
-                                                        The request line, query string, and body must already be valid raw HTTP content.
-
---- Common ---
-Optional:
-    https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto".
-    timeout         (int)     Request timeout in seconds. Default: 10.
-    redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
-    keyword         (string)  Keyword to search in the response.
-    regexp-match    (string)  Regular expression to search in the response.
-    verbose         (bool)    Verbose output: also print the mode line, the FULL request
-                              packet, and the connection trace (dns/connect/server/total).
-                              OFF by default — output is already minimal (one-line request
-                              summary + status line + response body), which is ideal for
-                              quick probing and IDOR/enum. Turn on only when you need to
-                              inspect the exact wire-format request. Default: false.
-    save-packet     (bool)    Dump the full request AND response packets to temp files and
-                              return their paths. OFF by default to keep output small; the
-                              packets are still printed inline (truncated for very large
-                              bodies). Set to true only when you need the raw files.
-                              Accepts true/false, yes/no, 1/0. Default: false.
-    proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
-
-## When to use batch_do_http_request instead
-
-This tool sends ONE request per call. If your goal is to ITERATE over a parameter
-(e.g. enumerate order/user/ticket IDs 1..N against the same endpoint, or fuzz a
-value across many requests), DO NOT call this tool in a loop — use the
-batch_do_http_request tool, which iterates a fuzztag/parameter and sends all
-requests in one call with a consolidated summary. Calling do_http_request dozens
-of times for enumeration wastes rounds and bloats context.
-
-## Black-Box Experiment Methodology
-
-Every HTTP request is an experiment against a black box. Apply this cycle:
-
-1. **Define your variables**: Before sending, be explicit about what you are controlling
-   (which parameter, which channel, what value) and what you will observe (status code,
-   body content, body size, headers). If you change multiple variables at once, you
-   cannot attribute the outcome to any single change.
-
-2. **Establish a stable baseline**: Send a normal/empty request first. The response is
-   your "stable state." All subsequent experiments are perturbations from this baseline.
-   A response identical to baseline means your input had no observable effect on the
-   black box. A response that differs from baseline carries information.
-
-3. **Match your input channel to the black box's intake**: The black box reads from a
-   specific input channel (query string, POST body, headers, etc.). Your controlled
-   variable must enter through the same channel the black box reads. Otherwise your
-   perturbation never reaches the system under test — you are experimenting on a
-   different black box.
-
-4. **One experiment, one hypothesis**: Before each request, state what you expect to
-   observe and what it would mean. "If the response differs from baseline, it means
-   my input was processed by the downstream component." Without a hypothesis, you
-   cannot interpret the result and the experiment produces zero information.
-
-5. **Information gain per iteration**: Each request should shrink your uncertainty about
-   the black box. If two consecutive requests produce the same baseline response with
-   the same reasoning, you are in a zero-information loop. Change your experimental
-   design — vary a different controlled variable, or expand your observable variables
-   (e.g., use "save-packet" to dump the actual wire format to a file, check response
-   headers you haven't looked at, use "keyword" or "regexp-match" to detect signals).
-
-## Few-Shot Examples
-
-Replace {NONCE} with the actual nonce from the response format section.
-
-### Example 1: Test a GET parameter safely (URL mode, preferred)
-
-User intent: "Test the id parameter with a payload containing spaces"
-
+Structured form (preferred):
 ```json
-{
-    "@action": "call-tool",
-    "tool": "do_http_request",
-    "identifier": "test_get_param_safely",
-    "params": {
-        "url": "https://target.example.com/admin.php",
-        "query-params": "id=1 or xxx",
-        "timeout": 10,
-        "save-packet": true
-    }
-}
+{"@action":"call-tool","tool":"do_http_request","identifier":"submit_form","params":{"url":"https://target.example/submit","method":"POST","form":{"a":"asdf' abc \" #&tail","b":"ssxxx"},"timeout":10}}
 ```
 
-### Example 2: POST JSON data (URL mode, body via AITAG)
-
-User intent: "Send a JSON POST to an API endpoint"
-
+Structured query (preferred):
 ```json
-{
-    "@action": "call-tool",
-    "tool": "do_http_request",
-    "identifier": "post_json_api",
-    "params": {
-        "url": "https://api.example.com/v1/users",
-        "method": "POST",
-        "content-type": "application/json",
-        "timeout": 15
-    }
-}
+{"@action":"call-tool","tool":"do_http_request","identifier":"search","params":{"url":"https://target.example/search","query":{"q":"a & b #1","page":1}}}
 ```
 
-<|TOOL_PARAM_body_{NONCE}|>
-{
-    "username": "admin",
-    "email": "admin@example.com",
-    "role": "administrator"
-}
-<|TOOL_PARAM_body_END_{NONCE}|>
-
-### Example 3: Raw packet with an already-encoded query (Packet mode)
-
-User intent: "Send a crafted HTTP request and control the exact raw packet"
-
+Exact raw request:
 ```json
-{
-    "@action": "call-tool",
-    "tool": "do_http_request",
-    "identifier": "raw_packet_request",
-    "params": {
-        "https": "yes",
-        "timeout": 15,
-        "keyword": "success"
-    }
-}
+{"@action":"call-tool","tool":"do_http_request","identifier":"raw_request","params":{"https":"yes","timeout":10}}
 ```
-
 <|TOOL_PARAM_packet_{NONCE}|>
-GET /admin.php?id=1%20or%20xxx HTTP/1.1
-Host: target.example.com
-User-Agent: Mozilla/5.0
-Accept: text/html,application/xhtml+xml
+POST /submit HTTP/1.1
+Host: target.example
+Content-Type: application/x-www-form-urlencoded
 
+a=already%20encoded&b=exact
 <|TOOL_PARAM_packet_END_{NONCE}|>
-
-### Example 4: Replay a captured proxy request and keep query encoding valid
-
-User intent: "Replay this HTTP request I captured"
-
-```json
-{
-    "@action": "call-tool",
-    "tool": "do_http_request",
-    "identifier": "replay_captured_request",
-    "params": {
-        "https": "auto",
-        "timeout": 10,
-        "redirect-times": 0,
-        "save-packet": true
-    }
-}
-```
-
-<|TOOL_PARAM_packet_{NONCE}|>
-GET /admin.php?id=1%20or%20xxx HTTP/1.1
-Host: target.example.com
-Cookie: session=abc123; token=xyz789
-Referer: https://target.example.com/login
-Accept: text/html,application/xhtml+xml
-
-<|TOOL_PARAM_packet_END_{NONCE}|>
-
-### Example 5: URL mode with query params and keyword search
-
-User intent: "Search the API and look for 'error' in response"
-
-```json
-{
-    "@action": "call-tool",
-    "tool": "do_http_request",
-    "identifier": "api_search_check",
-    "params": {
-        "url": "https://api.example.com/search",
-        "query-params": "q=test&page=1&limit=10",
-        "keyword": "error",
-        "timeout": 10
-    }
-}
-```
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -276,11 +60,43 @@ yakit.AutoInitYakit()
 // URL mode params
 urlStr = cli.String("url", cli.setHelp("target URL for URL mode"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
-headers = cli.String("headers", cli.setHelp("custom headers; accept 'Key: Value' per line OR a JSON object {key:value} (AI may pass either)"), cli.setRequired(false))
+headers = cli.String("headers", cli.setHelp("custom headers; accept 'Key: Value' per line OR a JSON object {key:value} (AI may pass either); omit when empty"), cli.setJsonSchema(`{
+    "oneOf": [
+        {"type":"string"},
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setRequired(false))
 body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
 contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
-queryParams = cli.String("query-params", cli.setHelp("URL query params: 'k1=v1&k2=v2' string OR JSON object {k1:v1}; preferred for GET param testing"), cli.setRequired(false))
-postParams = cli.String("post-params", cli.setHelp("POST form params: 'k1=v1&k2=v2' string OR JSON object {k1:v1}; preferred for form POST testing"), cli.setRequired(false))
+queryValues = cli.Json("query", cli.setHelp("structured URL query values; pass original unescaped values and the tool URL-encodes them once; omit when empty (an empty [] is accepted for UI compatibility)"), cli.setJsonSchema(`{
+    "description": "Query key/value pairs. Values must be original and unescaped. Empty arrays are accepted only as an empty-value compatibility form.",
+    "oneOf": [
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setDefault("{}"), cli.setRequired(false))
+formValues = cli.Json("form", cli.setHelp("structured form values; pass original unescaped values and the tool emits application/x-www-form-urlencoded; omit when empty (an empty [] is accepted for UI compatibility)"), cli.setJsonSchema(`{
+    "description": "Form key/value pairs. Values must be original and unescaped. Empty arrays are accepted only as an empty-value compatibility form.",
+    "oneOf": [
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setDefault("{}"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("legacy k=v&k2=v2 query string or compatibility object; ambiguous for literal '&', prefer query object"), cli.setJsonSchema(`{
+    "oneOf": [
+        {"type":"string"},
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setRequired(false))
+postParams = cli.String("post-params", cli.setHelp("legacy k=v&k2=v2 form string or compatibility object; ambiguous for literal '&', prefer form object"), cli.setJsonSchema(`{
+    "oneOf": [
+        {"type":"string"},
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setRequired(false))
 
 // Packet mode params
 packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode; request target/query must already be encoded"), cli.setRequired(false))
@@ -295,18 +111,32 @@ regexpMatch = cli.String("regexp-match", cli.setHelp("regex to search in respons
 // to keep output small; the packets are still printed inline (truncated for large bodies).
 // 用 cli.Bool: AI 传 JSON true 时, 执行器注入裸 --save-packet 标志, cli.Bool 读到 true.
 savePacket = cli.Bool("save-packet", cli.setHelp("dump full request+response packets to temp files (default off; packets are still printed inline)"))
-// verbose: 默认 false 时输出已精简到状态行 + 响应体 (适合批量枚举/快速探测);
-// true 时恢复完整输出 (模式行 + 完整请求报文 + 连接 trace). 用 cli.Bool, 同 save-packet.
-verbose = cli.Bool("verbose", cli.setHelp("verbose output: print full request packet + connection trace + mode line (default off; output is minimal: status line + response body)"))
+// 最终请求报文始终输出，确保 AI 能核对参数实际生成的 packet；verbose 只控制模式行和连接 trace。
+verbose = cli.Bool("verbose", cli.setHelp("verbose output: print connection trace + mode line; the generated request packet is always printed"))
 proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
 cli.check()
 
-// --- normalize params that AI may pass as object/map or string ---
-// AI 有时把 headers/query-params/post-params 传成 JSON 对象. 执行器 (yakscript_plugin_for_ai.go)
-// 会把非 bool 值用 fmt.Sprint 转成字符串, 对象会变成 "map[k1:v1 k2:v2]" 这种 Go map 字面量
-// (注意: 每一对是 "key:value", 对之间用空格分隔, 字母序排序).
-// 这里把它归一化成 "k1=v1&k2=v2" 或 "Key: Value\n..." 的规范字符串, 与原有字符串写法兼容.
-// 关键词: do_http_request 参数归一化, headers 对象, fmt.Sprint map
+// Safe scalar recovery. Keep the correction visible so the AI knows which
+// effective values were used instead of silently changing request behavior.
+if str.TrimSpace(method) == "" {
+    yakit.Warn("empty method normalized to GET; pass method=GET explicitly next time")
+    method = "GET"
+}
+method = str.ToUpper(str.TrimSpace(method))
+if timeout <= 0 {
+    yakit.Warn("timeout=%v is not a safe bounded timeout; normalized to 10 seconds", timeout)
+    timeout = 10
+}
+if redirectTimes < 0 {
+    yakit.Warn("redirect-times=%v is invalid; normalized to 0 (redirects disabled)", redirectTimes)
+    redirectTimes = 0
+}
+
+// --- normalize legacy params ---
+// Object arguments now cross the AI-tool -> CLI boundary as JSON. Keep support for
+// old direct callers that put an object into the legacy string fields, but retain the
+// object until request construction so special characters never pass through k=v&...
+// splitting. The map[...] branch only preserves compatibility with older executors.
 normalizeMapLike = func(raw, pairSep, kvSep) {
     if raw == "" || raw == nil {
         return ""
@@ -342,6 +172,16 @@ normalizeHeaders = func(raw) {
     }
     s = sprint(raw)
     trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "{") && str.HasSuffix(trimmed, "}") {
+        try {
+            values = json.loads(trimmed)
+            out = []
+            for key, value := range values {
+                out.Push(sprintf("%v: %v", key, value))
+            }
+            return str.Join(out, "\n")
+        } catch e {}
+    }
     if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
         inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
         out = []
@@ -360,9 +200,27 @@ normalizeHeaders = func(raw) {
     return s
 }
 
+normalizeLegacyParams = func(raw) {
+    if raw == "" || raw == nil {
+        return {"raw": "", "values": {}}
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "{") && str.HasSuffix(trimmed, "}") {
+        try {
+            return {"raw": "", "values": json.loads(trimmed)}
+        } catch e {}
+    }
+    return {"raw": normalizeMapLike(s, "&", "="), "values": {}}
+}
+
 headers = normalizeHeaders(headers)
-queryParams = normalizeMapLike(queryParams, "&", "=")
-postParams = normalizeMapLike(postParams, "&", "=")
+normalizedQueryParams = normalizeLegacyParams(queryParams)
+queryParams = normalizedQueryParams["raw"]
+legacyQueryValues = normalizedQueryParams["values"]
+normalizedPostParams = normalizeLegacyParams(postParams)
+postParams = normalizedPostParams["raw"]
+legacyFormValues = normalizedPostParams["values"]
 
 // --- validation ---
 if packet == "" && urlStr == "" {
@@ -446,7 +304,7 @@ if packet != "" {
     // parse URL to raw packet
     autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
     if err != nil {
-        yakit.Error("failed to parse URL to HTTP request: %v", err)
+        yakit.Error("failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL such as https://host/path, or use packet mode when exact request bytes are required. Request was not sent.", err)
         return
     }
     rawPacket = parsedPacket
@@ -459,13 +317,16 @@ if packet != "" {
 
     // apply custom headers
     if headers != "" {
+        headerLineIndex = 0
         for _, line := range str.SplitAndTrim(headers, "\n") {
+            headerLineIndex++
             line = str.TrimSpace(line)
             if line == "" {
                 continue
             }
             idx = str.Index(line, ":")
             if idx <= 0 {
+                yakit.Warn("ignored malformed header line #%v: expected 'Name: value'. Fix the headers parameter and retry if this header is required.", headerLineIndex)
                 continue
             }
             hKey = str.TrimSpace(line[:idx])
@@ -488,19 +349,41 @@ if packet != "" {
         }
     }
 
-    // apply post params
-    if postParams != "" {
-        for _, pair := range str.SplitAndTrim(postParams, "&") {
-            parts = str.SplitN(pair, "=", 2)
-            if len(parts) == 2 {
-                rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], parts[1])
-            } elif len(parts) == 1 && parts[0] != "" {
-                rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], "")
+    // Object values stay structurally separate until this point. The lowhttp patcher
+    // performs the one and only URL-encoding pass.
+    for key, value := range legacyQueryValues {
+        rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
+    }
+    for key, value := range queryValues {
+        rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
+    }
+
+    // Apply form params only when there is no raw body. `body` is the explicit raw
+    // representation and therefore wins without inheriting a form Content-Type.
+    if body == "" {
+        hasFormValues = postParams != "" || len(legacyFormValues) > 0 || len(formValues) > 0
+        if hasFormValues {
+            rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", "application/x-www-form-urlencoded")
+        }
+        if postParams != "" {
+            for _, pair := range str.SplitAndTrim(postParams, "&") {
+                parts = str.SplitN(pair, "=", 2)
+                if len(parts) == 2 {
+                    rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], parts[1])
+                } elif len(parts) == 1 && parts[0] != "" {
+                    rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], "")
+                }
             }
+        }
+        for key, value := range legacyFormValues {
+            rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
+        }
+        for key, value := range formValues {
+            rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
         }
     }
 
-    // apply body (overrides post-params if both provided)
+    // Apply the raw body last.
     if body != "" {
         rawPacket = poc.ReplaceHTTPPacketBody(rawPacket, []byte(body))
     }
@@ -508,10 +391,30 @@ if packet != "" {
 
 opts.Push(poc.https(isHttps))
 
+// AI 必须在请求成功或失败前都能看到参数实际生成的 packet，才能快速修订编码、
+// header 和 body。大报文仅截断展示；save-packet 仍负责把完整报文落盘。
+printRequestPacket = func(label, requestPacket) {
+    packetSize = len(requestPacket)
+    if packetSize <= 0 {
+        yakit.Info("%v: (empty)", label)
+        return
+    }
+    if packetSize <= 5120 {
+        yakit.Info("%v (%v bytes):\n%v", label, packetSize, string(requestPacket))
+        return
+    }
+    if savePacket {
+        yakit.Info("%v (%v bytes, truncated to 5KB):\n%v\n... (truncated, full request will be saved to file)", label, packetSize, string(requestPacket[:5120]))
+    } else {
+        yakit.Info("%v (%v bytes, truncated to 5KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", label, packetSize, string(requestPacket[:5120]))
+    }
+}
+
 // --- execute request ---
+printRequestPacket("request packet", rawPacket)
 rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
 if err != nil {
-    yakit.Error("HTTP request failed: %v", err)
+    yakit.Error("HTTP request failed: %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err)
     return
 }
 
@@ -580,6 +483,7 @@ tryFormRetryOnJsonRejected = func() {
     retryPacket = rawPacket
     retryPacket = poc.ReplaceHTTPPacketHeader(retryPacket, "Content-Type", "application/x-www-form-urlencoded")
     retryPacket = poc.ReplaceHTTPPacketBody(retryPacket, []byte(formBody))
+    printRequestPacket("retry request packet", retryPacket)
     retryRspIns, _, retryErr := poc.HTTPEx(retryPacket, opts...)
     if retryErr != nil {
         return false
@@ -598,21 +502,6 @@ tryFormRetryOnJsonRejected = func() {
 }
 
 tryFormRetryOnJsonRejected()
-
-// --- print request packet (only in verbose mode; default already printed a one-line summary above) ---
-reqSize = len(req)
-if verbose && reqSize > 0 {
-    if reqSize <= 5120 {
-        yakit.Info("request packet (%v bytes):\n%v", reqSize, string(req))
-    } else {
-        // 大请求截断内联打印; 完整文件仅在 save-packet 打开时才落盘.
-        if savePacket {
-            yakit.Info("request packet (%v bytes, truncated to 5KB):\n%v\n... (truncated, full request saved to file)", reqSize, string(req[:5120]))
-        } else {
-            yakit.Info("request packet (%v bytes, truncated to 5KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", reqSize, string(req[:5120]))
-        }
-    }
-}
 
 // --- report results ---
 // connection info (verbose only; trace is noise for batch IDOR/enum flows)
@@ -649,7 +538,7 @@ if savePacket {
     reqFile, err := file.TempFileName("http-request-*.txt")
     if err == nil {
         file.Save(reqFile, string(req))
-        yakit.Info("request packet [size:%v] saved to %v", len(req), reqFile)
+        yakit.Info("request packet [size:%v], full request saved to file: %v", len(req), reqFile)
     }
 
     rspFile, err := file.TempFileName("http-response-*.txt")
@@ -693,6 +582,8 @@ if len(rsp) > 0 {
             }
         }
     }
+} else {
+    yakit.Error("response packet is empty after HTTP execution. Recovery: inspect the request packet and connection trace (verbose=true), verify the server did not close the connection, and retry with save-packet=true if the problem persists.")
 }
 
 // --- 表单接口探测提示 (治本) ---
@@ -753,7 +644,9 @@ if hasPattern {
     edt := memeditor.New(string(rsp))
     if keyword != "" {
         yakit.Info("searching keyword pattern: %v", keyword)
+        keywordMatchCount = 0
         edt.FindStringRange(keyword, rg => {
+            keywordMatchCount++
             matchContent := rg.GetTextContextWithPrompt(3)
             if len(matchContent) > 30000 {
                 yakit.Info("keyword match [size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
@@ -761,16 +654,28 @@ if hasPattern {
                 yakit.Info("keyword match:\n%v", matchContent)
             }
         })
+        if keywordMatchCount == 0 {
+            yakit.Info("keyword match: not found in response (%v bytes). The HTTP response is still shown above; verify keyword spelling/case or retry without keyword to inspect the normal response preview.", len(rsp))
+        }
     }
     if regexpMatch != "" {
         yakit.Info("searching regexp pattern: %v", regexpMatch)
-        edt.FindRegexpRange(regexpMatch, rg => {
-            matchContent := rg.GetTextContextWithPrompt(3)
-            if len(matchContent) > 30000 {
-                yakit.Info("regexp match [size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
-            } else {
-                yakit.Info("regexp match:\n%v", matchContent)
+        regexpMatchCount = 0
+        try {
+            edt.FindRegexpRange(regexpMatch, rg => {
+                regexpMatchCount++
+                matchContent := rg.GetTextContextWithPrompt(3)
+                if len(matchContent) > 30000 {
+                    yakit.Info("regexp match [size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+                } else {
+                    yakit.Info("regexp match:\n%v", matchContent)
+                }
+            })
+            if regexpMatchCount == 0 {
+                yakit.Info("regexp match: not found in response (%v bytes). Verify the expression or retry without regexp-match to inspect the normal response preview.", len(rsp))
             }
-        })
+        } catch e {
+            yakit.Error("invalid regexp-match %q: %v. Recovery: correct or remove regexp-match and retry; the HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
+        }
     }
 }

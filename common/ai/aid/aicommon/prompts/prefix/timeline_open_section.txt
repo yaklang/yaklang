@@ -17,7 +17,7 @@
 
 {{ if .TodoSnapshot }}
 
-TODO LIST 是正常 ReAct 动作随手维护的短期工作集。CURRENT TASK 中最多一个 [CURRENT] 焦点；首次建立多步骤工作集时覆盖用户明确要求的独立维度，并在同轮选定一个显式 ID 为 current。其它开放项表示后续仍需处理，关闭项带 outcome、reason 和 refs 留痕。兄弟任务只读可见。任意正常动作都可携带可选 `todo_delta`，没有变化时省略；verification 不维护 TODO，也不存在独立 TODO 维护动作。广度筛查发现高风险语义、稳定差异、错误信息或可继续验证的弱信号时，把具体可证伪假设升级为 current 并保持焦点，直到确认、被有区分力的实验排除或明确受阻。close 只能依据当前动作执行前已获得的当前任务 Observation；验证型 close 的 reason 必须说明足以区分假设真假的实验与观察，单次普通请求、单一 payload、扫描未命中或无明显报错不足以关闭。历史记忆或其它任务结论必须重新验证后才能标记 resolved。不要重复添加现有项，不要无理由关闭，更不要为了结束任务伪造 resolved。
+TODO LIST 是正常 ReAct 的短期工作集只读投影，只有正常动作中的 `todo_delta` 能改变它；thought、reasoning、timeline 和普通文本都不会自动维护 TODO。`todo_delta` 只在状态确实不变时省略，新增、细化、关闭、延期、恢复或切换必须与产生变化的动作同轮提交。CURRENT TASK 的开放项共同构成待返回的 Frontier，最多一个 [CURRENT] 作为当前主要矛盾，其余开放项是已保留的次要矛盾；多步骤、多入口或探索后验证任务在第一条可执行动作中初始化全部已知工作、设置显式 current 并立即推进。兄弟任务只读可见，verification 只观察。Observation 打开一条或多条稍后需要回访的合格路径时，先在同一动作中 add / update 全部分支，再按验收阻塞、证据关联、信息增益与影响、执行和返回成本选择一项 current，并让本轮动作直接沿它向深处推进；后续才可执行或工具本轮未暴露不是拒绝入队的理由，分支描述保留具体目标、触发证据、可证伪假设和恢复后的第一步。current 在确认、被有区分力地排除、明确受阻或发生严格优先级逆转前不得横向切换；切换前 close 或 update 留下结果与恢复条件，能够闭环时在同一 delta 中 close 旧项并设置下一 current。close 只能依据当前动作执行前已获得的当前任务 Observation；验证型 close 的 reason 必须说明足以区分假设真假的实验与观察，单次普通请求、单一 payload、扫描未命中或无明显报错不足以关闭。不要为了结束任务伪造 resolved。
 
 {{ .TodoSnapshot }}
 {{ end }}

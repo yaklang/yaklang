@@ -2,14 +2,15 @@ package aicommon
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -59,6 +60,44 @@ func TestShouldIgnoreExecResultForEmit_FileStatusOnly(t *testing.T) {
 
 	writeExec := yaklib.NewYakitLogExecResult("file", `{"action":"WRITE","path":"/tmp/demo.txt"}`)
 	require.False(t, shouldIgnoreExecResultForEmit(writeExec))
+}
+
+func TestToolCallerInvoke_PreflightValidationErrorIsReported(t *testing.T) {
+	setupToolCallInvokeTestProjectDB(t)
+	callToolID := "toolcall-validation-" + ksuid.New().String()
+	tc, _ := newToolCallerForCountTest(t, callToolID)
+
+	callbackCalled := false
+	tool, err := aitool.New(
+		"mock-validation-error",
+		aitool.WithStringParam("value", aitool.WithParam_Required(true)),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			callbackCalled = true
+			return "unexpected", nil
+		}),
+	)
+	require.NoError(t, err)
+
+	var reportedError string
+	stderrOutput := &toolOutputBuffer{}
+	result, err := tc.invoke(
+		tool,
+		aitool.InvokeParams{"value": []any{"invalid"}},
+		func(reason any) {},
+		func(invokeErr any) { reportedError = fmt.Sprint(invokeErr) },
+		&toolOutputBuffer{}, stderrOutput, &toolOutputBuffer{}, &toolOutputBuffer{},
+	)
+
+	require.Error(t, err)
+	require.NotNil(t, result)
+	require.False(t, callbackCalled, "schema validation must stop the callback")
+	require.Contains(t, result.Error, "参数验证失败")
+	require.Contains(t, result.Error, "修复建议")
+	require.Contains(t, result.Error, "请求尚未发送")
+	require.Contains(t, reportedError, "参数验证失败")
+	require.Contains(t, reportedError, "修复建议")
+	require.Contains(t, string(stderrOutput.Snapshot()), "参数验证失败")
+	require.Contains(t, string(stderrOutput.Snapshot()), "请求尚未发送")
 }
 
 func TestToolCallerInvoke_HTTPFlowCountRefresh(t *testing.T) {

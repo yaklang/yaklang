@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -194,8 +195,8 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 				paramDesc = append(paramDesc, fmt.Sprintf("%s=true", k))
 			}
 		default:
-			args = append(args, "--"+k, fmt.Sprint(ret))
-			valStr := fmt.Sprint(ret)
+			valStr := nativeYakPluginArgString(ret)
+			args = append(args, "--"+k, valStr)
 			if len(valStr) > 80 {
 				valStr = valStr[:80] + "..."
 			}
@@ -232,6 +233,22 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 	}
 
 	return collectNativePluginResult(runtimeId, script.ScriptName, stdout), nil
+}
+
+// nativeYakPluginArgString preserves structured object parameters when they cross
+// the AI-tool -> CLI boundary. fmt.Sprint turns a map into "map[k:v ...]", which is
+// ambiguous as soon as a value contains spaces, quotes, '&', or '#'. JSON is the
+// CLI's lossless representation for object parameters and is what cli.Json expects.
+func nativeYakPluginArgString(v any) string {
+	if v != nil {
+		rv := reflect.ValueOf(v)
+		if rv.IsValid() && rv.Kind() == reflect.Map {
+			if raw, err := json.Marshal(v); err == nil {
+				return string(raw)
+			}
+		}
+	}
+	return fmt.Sprint(v)
 }
 
 func collectNativePluginResult(runtimeId string, pluginName string, stdout io.Writer) string {
