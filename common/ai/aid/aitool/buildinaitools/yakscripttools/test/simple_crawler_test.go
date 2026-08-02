@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -99,4 +100,43 @@ func TestSimpleCrawler_CoverageHint(t *testing.T) {
 		"standard crawl summary should still be present")
 	assert.Assert(t, strings.Contains(stdout, "=== Requested URLs ==="),
 		"requested URLs section should still be present")
+}
+
+func TestSimpleCrawler_HidesAndDoesNotRequestURLFragments(t *testing.T) {
+	var port int
+	var fragmentRequestCount atomic.Int64
+	host, p := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.RequestURI, "#") {
+			fragmentRequestCount.Add(1)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if r.URL.Path == "/" {
+			w.Write([]byte(`<a href="#overview">overview</a>
+<a href="/home#section-systems">systems</a>
+<a href="/home#section-energy">energy</a>`))
+			return
+		}
+		w.Write([]byte("ok"))
+	})
+	port = p
+	baseURL := "http://" + host + ":" + strconv.Itoa(port)
+
+	tool := getSimpleCrawlerTool(t)
+	stdout, _ := execCrawlerTool(t, tool, aitool.InvokeParams{
+		"urls":                   baseURL,
+		"reqs-max":               20,
+		"max-depth":              3,
+		"timeout":                5,
+		"forbid-for-parent-path": "yes",
+	})
+
+	assert.Equal(t, fragmentRequestCount.Load(), int64(0), "crawler must not send URL fragments to the server")
+	assert.Assert(t, strings.Contains(stdout, "Requests sent:   2"),
+		"fragment variants should not consume the request budget; got:\n%s", stdout)
+	assert.Assert(t, !strings.Contains(stdout, "#section-"),
+		"fragment URL should not be shown in crawler output; got:\n%s", stdout)
+	assert.Assert(t, !strings.Contains(stdout, "404 Not Found"),
+		"fragment-only 404 should not be shown in crawler output; got:\n%s", stdout)
 }

@@ -383,6 +383,9 @@ func StartCrawler(url string, opt ...ConfigOpt) (chan *Req, error) {
 func NewCrawler(urls string, opts ...ConfigOpt) (*Crawler, error) {
 	urlsRaw := utils.PrettifyListFromStringSplited(urls, ",")
 	urlList := utils.ParseStringToUrlsWith3W(urlsRaw...)
+	for i, rawURL := range urlList {
+		urlList[i] = stripURLFragment(rawURL)
+	}
 	log.Debugf("actual url list: %v", urlList)
 
 	config := &Config{}
@@ -705,15 +708,14 @@ func (c *Crawler) handleReqResult(r *Req) {
 			log.Errorf("create request from bytes error: %s", err.Error())
 			return
 		}
-		if config.onUrlFound != nil {
-			config.onUrlFound(req.Url())
-		}
 		if ret, err := url.Parse(req.Url()); err != nil {
 			if !config.CheckShouldBeHandledURL(ret) {
 				return
 			}
 		}
-		c.submit(req)
+		if c.submit(req) && config.onUrlFound != nil {
+			config.onUrlFound(req.Url())
+		}
 	}
 
 	var jsContents []*JavaScriptContent
@@ -1098,7 +1100,14 @@ func (c *Crawler) submit(r *Req) bool {
 	if c == nil || c.scheduler == nil {
 		return false
 	}
-	return c.scheduler.Submit(r)
+	if _, loaded := c.foundUrls.LoadOrStore(r.Hash(), nil); loaded {
+		return false
+	}
+	if !c.scheduler.Submit(r) {
+		c.foundUrls.Delete(r.Hash())
+		return false
+	}
+	return true
 }
 
 func (c *Crawler) createReqFromUrl(preRequest *Req, u string) (*Req, error) {
@@ -1114,7 +1123,14 @@ func (c *Crawler) createReqFromBytes(preRequest *Req, https bool, req []byte) (*
 	if err != nil {
 		return nil, err
 	}
+	urlIns.Fragment = ""
+	urlIns.RawFragment = ""
 	reqIns.URL = urlIns
+	reqIns.RequestURI = ""
+	req, err = utils.HttpDumpWithBody(reqIns, true)
+	if err != nil {
+		return nil, err
+	}
 	return &Req{
 		depth:      preRequest.depth + 1,
 		https:      https,
@@ -1125,6 +1141,7 @@ func (c *Crawler) createReqFromBytes(preRequest *Req, https bool, req []byte) (*
 }
 
 func createReqFromUrlEx(preqRequest *Req, method, u string, body io.Reader, c *Crawler) (*Req, error) {
+	u = stripURLFragment(u)
 	r, err := http.NewRequest(method, u, body)
 	if err != nil {
 		return nil, utils.Errorf("create request from url[%v] failed: %s", u, err)

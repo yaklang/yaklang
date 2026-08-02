@@ -1,11 +1,13 @@
 package crawler
 
 import (
+	"net/url"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"golang.org/x/net/html"
-	"strings"
 )
 
 func NewHTTPRequest(https bool, req []byte, rsp []byte, urlString string) (bool, []byte, error) {
@@ -17,6 +19,16 @@ func NewHTTPRequest(https bool, req []byte, rsp []byte, urlString string) (bool,
 		}
 	} else if strings.HasPrefix(urlString, "javascript:") {
 		return https, nil, utils.Errorf("javascript schema url cannot build http request: %s", urlString)
+	}
+	if ref, err := url.Parse(urlString); err == nil && (ref.Fragment != "" || strings.HasSuffix(urlString, "#")) {
+		if !ref.IsAbs() {
+			if base, baseErr := lowhttp.ExtractURLFromHTTPRequestRaw(req, https); baseErr == nil {
+				ref = base.ResolveReference(ref)
+			}
+		}
+		urlString = stripURLFragment(ref.String())
+	} else {
+		urlString = stripURLFragment(urlString)
 	}
 	reqBytes := lowhttp.UrlToRequestPacket(
 		"GET", urlString, req, https,
