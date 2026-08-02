@@ -24,6 +24,15 @@ func askForClarificationInSchema(prompt string) bool {
 func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	fmt.Println(prompt)
+	if isPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "assistant output delivered. Do not repeat or rephrase the same answer") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": {"type": "finish"},
+"human_readable_thought": "finish after the answer was delivered", "cumulative_summary": "clarification flow completed"}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
 	if isPrimaryDecisionPrompt(prompt) && !askForClarificationInSchema(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
