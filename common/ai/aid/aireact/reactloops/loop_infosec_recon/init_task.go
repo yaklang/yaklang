@@ -112,10 +112,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			log.Warnf("infosec_recon: init pool file: %v", err)
 		}
 
-		embeddedInfosecYakTools()
+		if !isBoundedSaaSRecon(r.GetConfig()) {
+			embeddedInfosecYakTools()
 
-		if c, ok := r.GetConfig().(*aicommon.Config); ok {
-			mergeInfosecLongRunningToolIntervalReviewExtraPrompt(c)
+			if c, ok := r.GetConfig().(*aicommon.Config); ok {
+				mergeInfosecLongRunningToolIntervalReviewExtraPrompt(c)
+			}
 		}
 
 		r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → "+ToolCrawlJsCollector+" (optional deep_js) → "+ToolJsStaticExtractAI+"(paths / verified JS dir) → api_pool_merge / probe_api_candidates as needed.")

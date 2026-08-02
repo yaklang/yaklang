@@ -88,8 +88,22 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			aitool.WithIntegerParam("probe_concurrency", aitool.WithParam_Default(6), aitool.WithParam_Description("Default max parallelism for probe_api_candidates.")),
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-			if strings.TrimSpace(action.GetString("seed_url")) == "" {
+			seed := strings.TrimSpace(action.GetString("seed_url"))
+			if seed == "" {
 				return utils.Error("recon_register_seed requires seed_url")
+			}
+			if isBoundedSaaSRecon(loop.GetConfig()) {
+				if norm, coerced, _ := infosecPickFirstHTTPURL(seed); coerced {
+					seed = norm
+				}
+				if err := infosecValidateHTTPURL(seed); err != nil {
+					return err
+				}
+				_, err := normalizeSaaSReconScope(
+					seed,
+					action.GetString("scope_hosts"),
+				)
+				return err
 			}
 			return nil
 		},
@@ -111,8 +125,19 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				op.Continue()
 				return
 			}
+			saasMode := isBoundedSaaSRecon(loop.GetConfig())
 			loop.Set(keySeedURL, seed)
-			if sh := strings.TrimSpace(action.GetString("scope_hosts")); sh != "" {
+			if saasMode {
+				scopeHost, err := normalizeSaaSReconScope(
+					seed,
+					action.GetString("scope_hosts"),
+				)
+				if err != nil {
+					op.Fail(err)
+					return
+				}
+				loop.Set(keyScopeHosts, scopeHost)
+			} else if sh := strings.TrimSpace(action.GetString("scope_hosts")); sh != "" {
 				loop.Set(keyScopeHosts, sh)
 			}
 			loop.Set(keyMaxCrawlDepth, fmt.Sprintf("%d", action.GetInt("max_crawl_depth")))
@@ -125,6 +150,18 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				return
 			}
 			pool.SeedURL = seed
+			if saasMode {
+				// A retried registration replaces, rather than expands, the SaaS target.
+				pool.Entries = []APIPoolEntry{}
+				if _, mergeErrs := addSaaSReconSeedCandidate(
+					pool,
+					seed,
+					loop.Get(keyScopeHosts),
+				); len(mergeErrs) > 0 {
+					op.Fail(fmt.Errorf("register SaaS seed candidate: %s", strings.Join(mergeErrs, "; ")))
+					return
+				}
+			}
 			if err := SaveAPIPool(wd, pool); err != nil {
 				op.Feedback(fmt.Sprintf("save pool failed: %v", err))
 				op.Continue()
@@ -455,7 +492,12 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			aitool.WithBoolParam("use_head", aitool.WithParam_Default(true)),
 			aitool.WithIntegerParam("timeout_seconds", aitool.WithParam_Default(12)),
 		},
-		nil,
+		func(loop *reactloops.ReActLoop, _ *aicommon.Action) error {
+			if isBoundedSaaSRecon(loop.GetConfig()) && strings.TrimSpace(loop.Get(keyScopeHosts)) == "" {
+				return utils.Error("run recon_register_seed before probing the bounded SaaS target")
+			}
+			return nil
+		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, "开始: probe_api_candidates / Start: probe_api_candidates")
 			reactloops.EmitStatus(loop, "探测 API 候选中 / Probing API candidates...")
@@ -464,18 +506,30 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			if wd == "" {
 				wd = workDirFromInvoker(r)
 			}
-			limit := action.GetInt("limit")
-			if limit < 1 {
-				limit = 40
+			saasMode := isBoundedSaaSRecon(loop.GetConfig())
+			settings := reconProbeSettings{
+				limit:           action.GetInt("limit"),
+				concurrency:     action.GetInt("concurrency"),
+				useHead:         action.GetBool("use_head"),
+				timeout:         time.Duration(action.GetInt("timeout_seconds")) * time.Second,
+				followRedirects: true,
 			}
-			conc := action.GetInt("concurrency")
-			if conc < 1 {
-				conc = 6
+			if settings.limit < 1 {
+				settings.limit = 40
 			}
-			useHead := action.GetBool("use_head")
-			to := time.Duration(action.GetInt("timeout_seconds")) * time.Second
-			if to <= 0 {
-				to = 12 * time.Second
+			if settings.concurrency < 1 {
+				settings.concurrency = 6
+			}
+			if settings.timeout <= 0 {
+				settings.timeout = 12 * time.Second
+			}
+			if saasMode {
+				settings = boundedSaaSReconProbeSettings(
+					settings.limit,
+					settings.concurrency,
+					settings.useHead,
+					settings.timeout,
+				)
 			}
 			pool, err := LoadAPIPool(wd)
 			if err != nil {
@@ -484,7 +538,19 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				return
 			}
 			allowed := ParseScopeHostSet(loop.Get(keyScopeHosts))
-			n := ProbePoolHTTP(pool, limit, conc, useHead, to, allowed)
+			if saasMode && len(allowed) == 0 {
+				op.Fail("bounded SaaS recon requires the exact seed host scope")
+				return
+			}
+			n := probePoolHTTP(
+				pool,
+				settings.limit,
+				settings.concurrency,
+				settings.useHead,
+				settings.timeout,
+				allowed,
+				settings.followRedirects,
+			)
 			if err := SaveAPIPool(wd, pool); err != nil {
 				op.Feedback(fmt.Sprintf("save pool: %v", err))
 				op.Continue()
@@ -518,6 +584,14 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			))
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			reactloops.EmitActionLog(loop, infosecAPIPoolNodeID, fmt.Sprintf("完成: probe_api_candidates (%d probed) / Done: probe_api_candidates (%d probed)", n, n))
+			if saasMode {
+				if submitted == 0 {
+					op.Fail("bounded SaaS recon finished without a verified asset")
+					return
+				}
+				op.Exit()
+				return
+			}
 			op.Continue()
 		},
 	)
@@ -573,8 +647,25 @@ func submitVerifiedAPIAssets(
 	return submitted, submitErr
 }
 
+type verifiedAPIAssetPayload struct {
+	APIPoolEntry
+	SchemaVersion          string `json:"schema_version"`
+	VerificationState      string `json:"verification_state"`
+	NetworkAccessPerformed bool   `json:"network_access_performed"`
+	URL                    string `json:"url"`
+	Scheme                 string `json:"scheme"`
+	Host                   string `json:"host"`
+	Port                   string `json:"port"`
+	HTTPURL                string `json:"http_url"`
+	HTTPStatusCode         int    `json:"http_status_code,omitempty"`
+}
+
 func marshalVerifiedAPIAssetPayload(entry APIPoolEntry) ([]byte, error) {
-	raw, err := json.Marshal(entry)
+	payload, err := newVerifiedAPIAssetPayload(entry)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -582,13 +673,14 @@ func marshalVerifiedAPIAssetPayload(entry APIPoolEntry) ([]byte, error) {
 		return raw, nil
 	}
 
-	payload := entry
 	originalEvidence := payload.Evidence
 	payload.Evidence = ""
 	payload.NormalizedURL = truncateReconAssetText(
 		payload.NormalizedURL,
 		maxInlineReconAssetURLBytes,
 	)
+	payload.URL = truncateReconAssetText(payload.URL, maxInlineReconAssetURLBytes)
+	payload.HTTPURL = payload.URL
 	payload.Source = truncateReconAssetText(payload.Source, maxInlineReconAssetSourceBytes)
 	payload.ProbeError = truncateReconAssetText(payload.ProbeError, maxInlineReconAssetErrorBytes)
 	base, err := json.Marshal(payload)
@@ -625,6 +717,42 @@ func marshalVerifiedAPIAssetPayload(entry APIPoolEntry) ([]byte, error) {
 		)
 	}
 	return raw, nil
+}
+
+func newVerifiedAPIAssetPayload(entry APIPoolEntry) (verifiedAPIAssetPayload, error) {
+	target := strings.TrimSpace(entry.NormalizedURL)
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return verifiedAPIAssetPayload{}, err
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if (scheme != "http" && scheme != "https") || host == "" {
+		return verifiedAPIAssetPayload{}, fmt.Errorf(
+			"verified API endpoint must be an absolute HTTP(S) URL: %q",
+			target,
+		)
+	}
+	port := parsed.Port()
+	if port == "" {
+		if scheme == "https" {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+	return verifiedAPIAssetPayload{
+		APIPoolEntry:           entry,
+		SchemaVersion:          "1",
+		VerificationState:      "verified",
+		NetworkAccessPerformed: true,
+		URL:                    target,
+		Scheme:                 scheme,
+		Host:                   host,
+		Port:                   port,
+		HTTPURL:                target,
+		HTTPStatusCode:         entry.StatusCode,
+	}, nil
 }
 
 func truncateReconAssetText(value string, maxBytes int) string {
