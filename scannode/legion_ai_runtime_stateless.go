@@ -262,6 +262,12 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 
 	h.mu.Lock()
 	closed := h.closed
+	singleRunTerminal := ctx.Err() == nil && !closed &&
+		strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run")
+	autoComplete := err == nil && singleRunTerminal
+	if singleRunTerminal {
+		h.closed = true
+	}
 	if h.activeTurn == turn {
 		h.activeTurn = nil
 	}
@@ -269,9 +275,29 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 	turn.close()
 
 	if err != nil && ctx.Err() == nil && !closed {
-		h.emitter.Failed(yakAISendFailureCode(err), err.Error(), mustJSON(map[string]string{
+		code := yakAISendFailureCode(err)
+		detailJSON := mustJSON(map[string]string{
 			"runtime": "stateless_yak_ai_engine",
-		}))
+		})
+		if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok &&
+			strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run") {
+			completer.FailTurn(turn.turnID, code, err.Error(), detailJSON)
+			return
+		}
+		h.emitter.Failed(code, err.Error(), detailJSON)
+		return
+	}
+	if autoComplete {
+		resultJSON := mustJSON(map[string]string{
+			"execution_mode": "single_run",
+			"target_url":     strings.TrimSpace(h.binding.AuthorizedTargetURL),
+			"turn_id":        turn.turnID,
+		})
+		if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok {
+			completer.DoneTurn(turn.turnID, resultJSON)
+			return
+		}
+		h.emitter.Done(resultJSON)
 	}
 }
 

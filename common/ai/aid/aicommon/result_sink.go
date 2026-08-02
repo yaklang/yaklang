@@ -39,6 +39,12 @@ type AssetResultSink interface {
 	SubmitAsset(context.Context, AssetResult) (ResultReceipt, error)
 }
 
+// AuthorizedTargetProvider exposes the server-derived target of a bounded
+// Focus run. Focus code may read it, but cannot replace it.
+type AuthorizedTargetProvider interface {
+	AuthorizedTargetURL() string
+}
+
 // ResultSinkProvider is intentionally separate from AICallerConfigIf so
 // existing third-party and test implementations of that broad interface do
 // not need to change.
@@ -60,6 +66,15 @@ func AssetResultSinkFromConfig(config any) AssetResultSink {
 		return nil
 	}
 	return sink
+}
+
+func AuthorizedTargetURLFromConfig(config any) string {
+	sink := ResultSinkFromConfig(config)
+	provider, ok := sink.(AuthorizedTargetProvider)
+	if !ok || provider == nil {
+		return ""
+	}
+	return provider.AuthorizedTargetURL()
 }
 
 // ResultSinkFunc is a compact adapter for tests and lightweight runtimes.

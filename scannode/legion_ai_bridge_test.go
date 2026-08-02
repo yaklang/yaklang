@@ -687,6 +687,96 @@ func TestRuntimeEmitterRetriesTerminalPublication(t *testing.T) {
 	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 1)
 }
 
+func TestRuntimeEmitterSingleRunCompletesWithTurnCausationAndRemovesRuntime(t *testing.T) {
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, validAISessionInputCommand())); err != nil {
+		t.Fatalf("handle ai input: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+
+	driver.mu.Lock()
+	emitter := driver.emitters[0]
+	driver.mu.Unlock()
+	completer, ok := emitter.(aiSessionRuntimeTurnCompleter)
+	if !ok {
+		t.Fatal("managed runtime emitter does not support turn completion")
+	}
+	completer.DoneTurn("cmd-input-1", []byte(`{"status":"done"}`))
+
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.report", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.succeeded", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 1)
+	if hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("single-run runtime was not removed after terminal publication")
+	}
+
+	before := publishedMessageCount(fakeJS)
+	if err := bridge.handleAISessionClose(context.Background(), mustMarshalProto(t, validAISessionCloseCommand())); err != nil {
+		t.Fatalf("late close after automatic completion: %v", err)
+	}
+	if after := publishedMessageCount(fakeJS); after != before {
+		t.Fatalf("late close duplicated terminal events: before=%d after=%d", before, after)
+	}
+}
+
+func TestRuntimeEmitterSingleRunFailureRemovesRuntimeWithoutLateSuccess(t *testing.T) {
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, validAISessionInputCommand())); err != nil {
+		t.Fatalf("handle ai input: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+
+	driver.mu.Lock()
+	emitter := driver.emitters[0]
+	driver.mu.Unlock()
+	completer, ok := emitter.(aiSessionRuntimeTurnCompleter)
+	if !ok {
+		t.Fatal("managed runtime emitter does not support turn completion")
+	}
+	completer.FailTurn(
+		"cmd-input-1",
+		"bounded_probe_failed",
+		"target did not return a verified response",
+		[]byte(`{"runtime":"stateless_yak_ai_engine"}`),
+	)
+
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.failed", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.failed", 1)
+	if hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("failed single-run runtime was not removed after terminal publication")
+	}
+
+	before := publishedMessageCount(fakeJS)
+	if err := bridge.handleAISessionClose(context.Background(), mustMarshalProto(t, validAISessionCloseCommand())); err != nil {
+		t.Fatalf("late close after automatic failure: %v", err)
+	}
+	if after := publishedMessageCount(fakeJS); after != before {
+		t.Fatalf("late close converted failure into success: before=%d after=%d", before, after)
+	}
+}
+
+func publishedMessageCount(fakeJS *aiFakeJetStreamContext) int {
+	fakeJS.mu.Lock()
+	defer fakeJS.mu.Unlock()
+	return len(fakeJS.publish)
+}
+
 func TestCommandConsumerRoutesAISessionBindCommand(t *testing.T) {
 	t.Parallel()
 

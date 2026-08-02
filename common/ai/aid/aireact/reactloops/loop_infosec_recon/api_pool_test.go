@@ -18,7 +18,8 @@ import (
 )
 
 type recordingReconAssetSink struct {
-	assets []aicommon.AssetResult
+	assets    []aicommon.AssetResult
+	targetURL string
 }
 
 type sizeLimitedReconAssetSink struct {
@@ -48,6 +49,10 @@ func (s *recordingReconAssetSink) SubmitAsset(
 		DedupeKey: asset.IdentityKey,
 		BackendID: "job-1",
 	}, nil
+}
+
+func (s *recordingReconAssetSink) AuthorizedTargetURL() string {
+	return s.targetURL
 }
 
 func (s *sizeLimitedReconAssetSink) SubmitAsset(

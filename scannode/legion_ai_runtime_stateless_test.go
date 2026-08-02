@@ -31,6 +31,33 @@ func (e recordingStatelessEmitter) Failed(code string, _ string, _ []byte) {
 	e.failed <- code
 }
 
+type singleRunCompletion struct {
+	turnID string
+	result []byte
+}
+
+type recordingSingleRunEmitter struct {
+	done   chan singleRunCompletion
+	failed chan singleRunCompletion
+}
+
+func (recordingSingleRunEmitter) Emit(string, []byte) {}
+func (recordingSingleRunEmitter) Done([]byte)         {}
+func (recordingSingleRunEmitter) Failed(string, string, []byte) {
+}
+func (e recordingSingleRunEmitter) DoneTurn(turnID string, result []byte) {
+	e.done <- singleRunCompletion{turnID: turnID, result: append([]byte(nil), result...)}
+}
+func (e recordingSingleRunEmitter) FailTurn(turnID, code, message string, detail []byte) {
+	if e.failed == nil {
+		return
+	}
+	e.failed <- singleRunCompletion{
+		turnID: turnID,
+		result: append([]byte(code+":"+message+":"), detail...),
+	}
+}
+
 type fakeStatelessTurnEngine struct {
 	started   chan struct{}
 	release   chan struct{}
@@ -451,6 +478,132 @@ func TestStatelessDriverStartsFreshEngineAfterTurnCompletes(t *testing.T) {
 		t.Fatal("second turn did not start with a fresh engine")
 	}
 	close(engines[1].release)
+}
+
+func TestStatelessDriverSingleRunCompletesAndRejectsSecondTurn(t *testing.T) {
+	emitter := recordingSingleRunEmitter{done: make(chan singleRunCompletion, 1)}
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:           aiSessionCommandRef{SessionID: "s-stateless-single-run", OwnerUserID: "u1"},
+		ExecutionMode: "single_run",
+	}, emitter)
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-single-1"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"start"}`),
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	<-engine.started
+	close(engine.release)
+
+	select {
+	case done := <-emitter.done:
+		if done.turnID != "turn-single-1" {
+			t.Fatalf("unexpected terminal turn id: %q", done.turnID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("single run did not complete automatically")
+	}
+
+	err = sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-single-2"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"again"}`),
+	})
+	if err == nil || !contains(err.Error(), "runtime is closed") {
+		t.Fatalf("expected closed runtime after single run, got %v", err)
+	}
+}
+
+func TestStatelessDriverSingleRunFailureTerminatesTheOwningTurn(t *testing.T) {
+	emitter := recordingSingleRunEmitter{
+		done:   make(chan singleRunCompletion, 1),
+		failed: make(chan singleRunCompletion, 1),
+	}
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:           aiSessionCommandRef{SessionID: "s-stateless-single-fail", OwnerUserID: "u1"},
+		ExecutionMode: "single_run",
+	}, emitter)
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	engine.sendErr = fmt.Errorf("bounded probe failed")
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-fail-1"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"start"}`),
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	<-engine.started
+	close(engine.release)
+
+	select {
+	case failed := <-emitter.failed:
+		if failed.turnID != "turn-fail-1" || !contains(string(failed.result), "bounded probe failed") {
+			t.Fatalf("unexpected terminal failure: %#v", failed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("single-run failure did not terminate automatically")
+	}
+
+	err = sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-fail-2"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"again"}`),
+	})
+	if err == nil || !contains(err.Error(), "runtime is closed") {
+		t.Fatalf("expected closed runtime after single-run failure, got %v", err)
+	}
+}
+
+func TestStatelessDriverCloseWinsAgainstSingleRunCompletion(t *testing.T) {
+	emitter := recordingSingleRunEmitter{done: make(chan singleRunCompletion, 1)}
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:           aiSessionCommandRef{SessionID: "s-stateless-single-close", OwnerUserID: "u1"},
+		ExecutionMode: "single_run",
+	}, emitter)
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-close-1"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"start"}`),
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	<-engine.started
+	sh.Close("platform close")
+
+	select {
+	case done := <-emitter.done:
+		t.Fatalf("close must suppress automatic success: %#v", done)
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestStatelessDriverRejectsSecondMessageWhileTurnIsActive(t *testing.T) {

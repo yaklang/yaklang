@@ -18864,6 +18864,8 @@ type AIFocusResultContext struct {
 	FocusMode     string                 `protobuf:"bytes,2,opt,name=focus_mode,json=focusMode,proto3" json:"focus_mode,omitempty"`
 	SchemaVersion string                 `protobuf:"bytes,3,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
 	Job           *v11.JobRef            `protobuf:"bytes,4,opt,name=job,proto3" json:"job,omitempty"`
+	ExecutionMode string                 `protobuf:"bytes,5,opt,name=execution_mode,json=executionMode,proto3" json:"execution_mode,omitempty"`
+	TargetUrl     string                 `protobuf:"bytes,6,opt,name=target_url,json=targetUrl,proto3" json:"target_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -18924,6 +18926,20 @@ func (x *AIFocusResultContext) GetJob() *v11.JobRef {
 		return x.Job
 	}
 	return nil
+}
+
+func (x *AIFocusResultContext) GetExecutionMode() string {
+	if x != nil {
+		return x.ExecutionMode
+	}
+	return ""
+}
+
+func (x *AIFocusResultContext) GetTargetUrl() string {
+	if x != nil {
+		return x.TargetUrl
+	}
+	return ""
 }
 
 var File_legion_ai_v1_ai_proto protoreflect.FileDescriptor
@@ -20698,14 +20714,17 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\asession\x18\x02 \x01(\v2\x1a.legion.ai.v1.AISessionRefR\asession\x12;\n" +
 	"\vfinished_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"finishedAt\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xa7\x01\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"\xed\x01\n" +
 	"\x14AIFocusResultContext\x12 \n" +
 	"\ffocus_run_id\x18\x01 \x01(\tR\n" +
 	"focusRunId\x12\x1d\n" +
 	"\n" +
 	"focus_mode\x18\x02 \x01(\tR\tfocusMode\x12%\n" +
 	"\x0eschema_version\x18\x03 \x01(\tR\rschemaVersion\x12'\n" +
-	"\x03job\x18\x04 \x01(\v2\x15.legion.job.v1.JobRefR\x03jobB$Z\"legion/gen/proto/legion/ai/v1;aiv1b\x06proto3"
+	"\x03job\x18\x04 \x01(\v2\x15.legion.job.v1.JobRefR\x03job\x12%\n" +
+	"\x0eexecution_mode\x18\x05 \x01(\tR\rexecutionMode\x12\x1d\n" +
+	"\n" +
+	"target_url\x18\x06 \x01(\tR\ttargetUrlB$Z\"legion/gen/proto/legion/ai/v1;aiv1b\x06proto3"
 
 var (
 	file_legion_ai_v1_ai_proto_rawDescOnce sync.Once

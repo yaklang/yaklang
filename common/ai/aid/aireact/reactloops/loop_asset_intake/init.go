@@ -77,6 +77,7 @@ func init() {
 		reactloops.WithLoopOutputExample(assetIntakeOutputExample),
 		reactloops.WithVerboseName("SaaS Asset Intake"),
 		reactloops.WithVerboseNameZh("SaaS 资产接入"),
+		reactloops.WithLoopIsHidden(true),
 	)
 	if err != nil {
 		log.Errorf("register reactloop %s failed: %v", schema.AI_REACT_LOOP_NAME_ASSET_INTAKE, err)
