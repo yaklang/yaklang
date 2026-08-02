@@ -184,24 +184,26 @@ func TestConfig_ToolManagerPropagation(t *testing.T) {
 	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
 }
 
-func TestConfigResultSinkIsRunScoped(t *testing.T) {
-	sink := ResultSinkFunc(func(
-		context.Context,
-		*schema.Risk,
-	) (ResultReceipt, error) {
-		return ResultReceipt{}, nil
-	})
-	config := NewConfig(context.Background(), WithResultSink(sink))
+type testFocusRuntime struct{}
 
-	if ResultSinkFromConfig(config) == nil {
-		t.Fatal("expected result sink to be available from runtime config")
+func (testFocusRuntime) AuthorizedTarget() string { return "https://example.test/" }
+
+func (testFocusRuntime) Execute(string, map[string]any) (map[string]any, error) {
+	return map[string]any{"ok": true}, nil
+}
+
+func TestConfigFocusRuntimeIsRunScoped(t *testing.T) {
+	runtime := testFocusRuntime{}
+	config := NewConfig(context.Background(), WithFocusRuntime(runtime))
+	if FocusRuntimeFromConfig(config) == nil {
+		t.Fatal("expected focus runtime on parent config")
 	}
-	child := NewConfig(context.Background(), ConvertConfigToOptions(config)...)
-	if ResultSinkFromConfig(child) == nil {
-		t.Fatal("expected child runtime config to retain the run-scoped result sink")
+	child := NewConfig(context.Background(), config.OriginOptions()...)
+	if FocusRuntimeFromConfig(child) == nil {
+		t.Fatal("expected focus runtime to propagate to child config")
 	}
-	if ResultSinkFromConfig(struct{}{}) != nil {
-		t.Fatal("expected configs without ResultSinkProvider to remain compatible")
+	if FocusRuntimeFromConfig(struct{}{}) != nil {
+		t.Fatal("expected configs without FocusRuntimeProvider to remain compatible")
 	}
 }
 

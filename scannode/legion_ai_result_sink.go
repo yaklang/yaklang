@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
@@ -24,6 +23,29 @@ const (
 	maxInlineFocusRiskFieldBytes = 64 * 1024
 	maxInlineFocusAssetBytes     = 64 * 1024
 )
+
+type aiFocusResultReceipt struct {
+	ResultID  string
+	DedupeKey string
+	BackendID string
+}
+
+type aiFocusAssetResult struct {
+	Kind        string
+	Title       string
+	Target      string
+	IdentityKey string
+	Payload     []byte
+}
+
+type aiFocusResultSink interface {
+	SubmitRisk(context.Context, *schema.Risk) (aiFocusResultReceipt, error)
+}
+
+type aiFocusAssetResultSink interface {
+	aiFocusResultSink
+	SubmitAsset(context.Context, aiFocusAssetResult) (aiFocusResultReceipt, error)
+}
 
 type aiFocusResultEventPublisher interface {
 	PublishAssetWithEventID(
@@ -70,7 +92,7 @@ func newLegionAIFocusResultSink(
 	publisher aiFocusResultEventPublisher,
 	bindCommandID string,
 	resultContext *aiv1.AIFocusResultContext,
-) (aicommon.ResultSink, error) {
+) (aiFocusResultSink, error) {
 	if resultContext == nil {
 		return nil, nil
 	}
@@ -94,13 +116,6 @@ func newLegionAIFocusResultSink(
 	}, nil
 }
 
-func (s *legionAIFocusResultSink) AuthorizedTargetURL() string {
-	if s == nil {
-		return ""
-	}
-	return s.targetURL
-}
-
 type aiFocusResultLifecycle interface {
 	Succeed(context.Context, []byte) error
 	Fail(context.Context, string, string, []byte) error
@@ -111,17 +126,17 @@ type aiFocusResultLifecycle interface {
 // current server-issued result identity when Legion rebinds the same session.
 type aiSessionResultSinkProxy struct {
 	mu   sync.RWMutex
-	sink aicommon.ResultSink
+	sink aiFocusResultSink
 }
 
-func newAISessionResultSinkProxy(sink aicommon.ResultSink) *aiSessionResultSinkProxy {
+func newAISessionResultSinkProxy(sink aiFocusResultSink) *aiSessionResultSinkProxy {
 	if sink == nil {
 		return nil
 	}
 	return &aiSessionResultSinkProxy{sink: sink}
 }
 
-func (p *aiSessionResultSinkProxy) Set(sink aicommon.ResultSink) {
+func (p *aiSessionResultSinkProxy) Set(sink aiFocusResultSink) {
 	if p == nil || sink == nil {
 		return
 	}
@@ -133,50 +148,37 @@ func (p *aiSessionResultSinkProxy) Set(sink aicommon.ResultSink) {
 func (p *aiSessionResultSinkProxy) SubmitRisk(
 	ctx context.Context,
 	risk *schema.Risk,
-) (aicommon.ResultReceipt, error) {
+) (aiFocusResultReceipt, error) {
 	if p == nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
 	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	sink := p.sink
 	if sink == nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
 	}
 	return sink.SubmitRisk(ctx, risk)
 }
 
 func (p *aiSessionResultSinkProxy) SubmitAsset(
 	ctx context.Context,
-	asset aicommon.AssetResult,
-) (aicommon.ResultReceipt, error) {
+	asset aiFocusAssetResult,
+) (aiFocusResultReceipt, error) {
 	if p == nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
 	}
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	sink := p.sink
 	if sink == nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
 	}
-	assetSink, ok := sink.(aicommon.AssetResultSink)
+	assetSink, ok := sink.(aiFocusAssetResultSink)
 	if !ok {
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai session result sink does not accept assets")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink does not accept assets")
 	}
 	return assetSink.SubmitAsset(ctx, asset)
-}
-
-func (p *aiSessionResultSinkProxy) AuthorizedTargetURL() string {
-	if p == nil {
-		return ""
-	}
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	provider, ok := p.sink.(aicommon.AuthorizedTargetProvider)
-	if !ok || provider == nil {
-		return ""
-	}
-	return provider.AuthorizedTargetURL()
 }
 
 func (p *aiSessionResultSinkProxy) Succeed(ctx context.Context, resultJSON []byte) error {
@@ -271,9 +273,9 @@ func validateLegionAIFocusResultContext(
 func (s *legionAIFocusResultSink) SubmitRisk(
 	ctx context.Context,
 	risk *schema.Risk,
-) (aicommon.ResultReceipt, error) {
+) (aiFocusResultReceipt, error) {
 	if risk == nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus risk is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus risk is required")
 	}
 
 	normalized := *risk
@@ -287,12 +289,17 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 	target := focusRiskTarget(&normalized)
 	switch {
 	case normalized.Title == "":
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus risk title is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus risk title is required")
 	case normalized.RiskType == "":
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus risk type is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus risk type is required")
 	case target == "":
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus risk target is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus risk target is required")
 	}
+	target, err := normalizeServerFocusResultTarget(s.targetURL, target)
+	if err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus risk target: %w", err)
+	}
+	normalized.Url = target
 
 	normalized.QuotedRequest = truncateFocusRiskField(normalized.QuotedRequest)
 	normalized.QuotedResponse = truncateFocusRiskField(normalized.QuotedResponse)
@@ -301,7 +308,7 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 
 	raw, err := json.Marshal(&normalized)
 	if err != nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("marshal ai focus risk: %w", err)
+		return aiFocusResultReceipt{}, fmt.Errorf("marshal ai focus risk: %w", err)
 	}
 	dedupeKey := focusRiskDedupeKey(&normalized, target)
 	eventID := focusRiskEventID(s.ref.JobID, dedupeKey)
@@ -316,10 +323,10 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 		dedupeKey,
 		raw,
 	); err != nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("publish ai focus risk: %w", err)
+		return aiFocusResultReceipt{}, fmt.Errorf("publish ai focus risk: %w", err)
 	}
 	s.recordRisk(eventID, target)
-	return aicommon.ResultReceipt{
+	return aiFocusResultReceipt{
 		ResultID:  eventID,
 		DedupeKey: dedupeKey,
 		BackendID: s.ref.JobID,
@@ -328,31 +335,36 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 
 func (s *legionAIFocusResultSink) SubmitAsset(
 	ctx context.Context,
-	asset aicommon.AssetResult,
-) (aicommon.ResultReceipt, error) {
+	asset aiFocusAssetResult,
+) (aiFocusResultReceipt, error) {
 	asset.Kind = strings.TrimSpace(asset.Kind)
 	asset.Title = strings.TrimSpace(asset.Title)
 	asset.Target = strings.TrimSpace(asset.Target)
 	asset.IdentityKey = strings.TrimSpace(asset.IdentityKey)
 	switch {
 	case asset.Kind == "":
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset kind is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus asset kind is required")
 	case asset.Title == "":
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset title is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus asset title is required")
 	case asset.Target == "":
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset target is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus asset target is required")
 	case asset.IdentityKey == "":
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset identity_key is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus asset identity_key is required")
 	case len(asset.Payload) == 0:
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset payload is required")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus asset payload is required")
 	case len(asset.Payload) > maxInlineFocusAssetBytes:
-		return aicommon.ResultReceipt{}, fmt.Errorf(
+		return aiFocusResultReceipt{}, fmt.Errorf(
 			"ai focus asset payload exceeds %d bytes",
 			maxInlineFocusAssetBytes,
 		)
 	case !json.Valid(asset.Payload):
-		return aicommon.ResultReceipt{}, fmt.Errorf("ai focus asset payload must be valid JSON")
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus asset payload must be valid JSON")
 	}
+	normalizedTarget, err := normalizeServerFocusResultTarget(s.targetURL, asset.Target)
+	if err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai focus asset target: %w", err)
+	}
+	asset.Target = normalizedTarget
 
 	eventID := focusAssetEventID(s.ref.JobID, asset.Kind, asset.IdentityKey)
 	if err := s.publisher.PublishAssetWithEventID(
@@ -365,10 +377,10 @@ func (s *legionAIFocusResultSink) SubmitAsset(
 		asset.IdentityKey,
 		asset.Payload,
 	); err != nil {
-		return aicommon.ResultReceipt{}, fmt.Errorf("publish ai focus asset: %w", err)
+		return aiFocusResultReceipt{}, fmt.Errorf("publish ai focus asset: %w", err)
 	}
 	s.recordAsset(eventID, asset.Target)
-	return aicommon.ResultReceipt{
+	return aiFocusResultReceipt{
 		ResultID:  eventID,
 		DedupeKey: asset.IdentityKey,
 		BackendID: s.ref.JobID,

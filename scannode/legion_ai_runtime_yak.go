@@ -254,9 +254,6 @@ func buildYakAIEngineOptions(
 			emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
 		}),
 	}
-	if binding.ResultSink != nil {
-		config = append(config, aiengine.WithResultSink(binding.ResultSink))
-	}
 	if options.MaxIteration > 0 {
 		config = append(config, aiengine.WithMaxIteration(options.MaxIteration))
 	}
@@ -281,7 +278,11 @@ func buildYakAIEngineOptions(
 	if options.TimelineContentSizeLimit > 0 {
 		config = append(config, aiengine.WithTimelineContentLimit(int(options.TimelineContentSizeLimit)))
 	}
-	if extOptions := buildYakAICommonExtOptions(options); len(extOptions) > 0 {
+	extOptions := buildYakAICommonExtOptions(options)
+	if binding.FocusRuntime != nil {
+		extOptions = append(extOptions, aicommon.WithFocusRuntime(binding.FocusRuntime))
+	}
+	if len(extOptions) > 0 {
 		config = append(config, aiengine.WithExtOptions(extOptions...))
 	}
 	serverReleasedFocus := strings.TrimSpace(options.FocusReleaseID) != ""

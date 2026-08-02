@@ -1,7 +1,6 @@
 package loop_http_fuzztest
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -53,9 +52,6 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 		},
 		[]*reactloops.LoopStreamField{},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
-			if err := validateBoundedSaaSHTTPFuzzCompleted(l); err != nil {
-				return err
-			}
 			specs := collectGenerateRiskSpecs(action)
 			if len(specs) == 0 {
 				return fmt.Errorf("generate_risk requires either risks array or single-risk fields")
@@ -65,26 +61,19 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 					return err
 				}
 			}
-			if isBoundedSaaSHTTPFuzz(l.GetConfig()) && len(specs) > 3 {
-				return fmt.Errorf("bounded SaaS HTTP fuzz accepts at most 3 risks")
-			}
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			specs := collectGenerateRiskSpecs(action)
 			riskIDs := make([]string, 0, len(specs))
-			localRiskIDs := make([]string, 0, len(specs))
 			summaries := make([]string, 0, len(specs))
 			for idx, spec := range specs {
-				riskID, summary, persistedLocally, err := saveGeneratedRisk(loop, spec)
+				riskID, summary, err := saveGeneratedRisk(loop, spec)
 				if err != nil {
 					operator.Fail(fmt.Errorf("generate_risk: save risk #%d failed: %w", idx+1, err))
 					return
 				}
 				riskIDs = append(riskIDs, riskID)
-				if persistedLocally {
-					localRiskIDs = append(localRiskIDs, riskID)
-				}
 				summaries = append(summaries, summary)
 			}
 
@@ -107,16 +96,12 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				riskFeedbackType = strings.TrimSpace(specs[0].RiskType)
 				riskFeedbackSeverity = strings.TrimSpace(specs[0].Severity)
 			}
-			loop.SubmitRiskFeedback(localRiskIDs, riskFeedbackType, riskFeedbackSeverity)
+			loop.SubmitRiskFeedback(riskIDs, riskFeedbackType, riskFeedbackSeverity)
 
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeGenerateRisk, fmt.Sprintf("生成 %d 个 Risk / Generated %d Risks", len(riskIDs), len(riskIDs)), summary)
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			r.AddToTimeline("generate_risk", summary)
 			operator.Feedback(summary)
-			if isBoundedSaaSHTTPFuzz(loop.GetConfig()) {
-				operator.Exit()
-				return
-			}
 			operator.Continue()
 		},
 	)
@@ -193,23 +178,14 @@ func validateGenerateRiskSpec(loop *reactloops.ReActLoop, spec generateRiskSpec,
 	if strings.TrimSpace(spec.Description) == "" {
 		return fmt.Errorf("%s: description is required", prefix)
 	}
-	if _, err := validateBoundedSaaSRiskTarget(loop, spec.Target); err != nil {
-		return fmt.Errorf("%s: %w", prefix, err)
-	}
-	if inferGenerateRiskTarget(loop, spec.Target) == "" && (loop == nil || !isBoundedSaaSHTTPFuzz(loop.GetConfig())) {
+	if inferGenerateRiskTarget(loop, spec.Target) == "" {
 		return fmt.Errorf("%s: target is required when no representative/current HTTP request URL can be inferred", prefix)
 	}
 	return nil
 }
 
-func saveGeneratedRisk(loop *reactloops.ReActLoop, spec generateRiskSpec) (string, string, bool, error) {
-	target, err := validateBoundedSaaSRiskTarget(loop, spec.Target)
-	if err != nil {
-		return "", "", false, err
-	}
-	if target == "" {
-		target = inferGenerateRiskTarget(loop, spec.Target)
-	}
+func saveGeneratedRisk(loop *reactloops.ReActLoop, spec generateRiskSpec) (string, string, error) {
+	target := inferGenerateRiskTarget(loop, spec.Target)
 	title := strings.TrimSpace(spec.Title)
 	titleVerbose := strings.TrimSpace(spec.TitleVerbose)
 	if titleVerbose == "" {
@@ -249,53 +225,17 @@ func saveGeneratedRisk(loop *reactloops.ReActLoop, spec generateRiskSpec) (strin
 		opts = append(opts, yakit.WithRiskParam_Response(responseRaw))
 	}
 
-	risk := yakit.CreateRisk(target, opts...)
+	risk, err := yakit.NewRisk(target, opts...)
+	if err != nil {
+		return "", "", err
+	}
 	if risk == nil {
-		return "", "", false, fmt.Errorf("created risk is nil")
-	}
-
-	if sink := focusResultSink(loop); sink != nil {
-		receipt, err := sink.SubmitRisk(focusResultContext(loop), risk)
-		if err != nil {
-			return "", "", false, err
-		}
-		if strings.TrimSpace(receipt.ResultID) == "" {
-			return "", "", false, fmt.Errorf("focus result sink returned an empty result id")
-		}
-		summary := fmt.Sprintf(
-			"- result_id=%s severity=%s type=%s target=%s title=%s",
-			receipt.ResultID,
-			risk.Severity,
-			risk.RiskType,
-			target,
-			title,
-		)
-		return receipt.ResultID, summary, false, nil
-	}
-
-	if err := yakit.SaveRisk(risk); err != nil {
-		return "", "", false, err
+		return "", "", fmt.Errorf("saved risk is nil")
 	}
 
 	riskID := fmt.Sprintf("%d", risk.ID)
 	summary := fmt.Sprintf("- id=%d severity=%s type=%s target=%s title=%s", risk.ID, risk.Severity, risk.RiskType, target, title)
-	return riskID, summary, true, nil
-}
-
-func focusResultSink(loop *reactloops.ReActLoop) aicommon.ResultSink {
-	if loop == nil {
-		return nil
-	}
-	return aicommon.ResultSinkFromConfig(loop.GetConfig())
-}
-
-func focusResultContext(loop *reactloops.ReActLoop) context.Context {
-	if loop != nil {
-		if config := loop.GetConfig(); config != nil && config.GetContext() != nil {
-			return config.GetContext()
-		}
-	}
-	return context.Background()
+	return riskID, summary, nil
 }
 
 func isValidGenerateRiskSeverity(severity string) bool {

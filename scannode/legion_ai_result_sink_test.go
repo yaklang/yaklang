@@ -8,7 +8,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
@@ -56,10 +55,10 @@ type blockingAIFocusResultSink struct {
 func (s *blockingAIFocusResultSink) SubmitRisk(
 	context.Context,
 	*schema.Risk,
-) (aicommon.ResultReceipt, error) {
+) (aiFocusResultReceipt, error) {
 	close(s.started)
 	<-s.release
-	return aicommon.ResultReceipt{ResultID: s.resultID}, nil
+	return aiFocusResultReceipt{ResultID: s.resultID}, nil
 }
 
 type immediateAIFocusResultSink struct {
@@ -69,8 +68,8 @@ type immediateAIFocusResultSink struct {
 func (s *immediateAIFocusResultSink) SubmitRisk(
 	context.Context,
 	*schema.Risk,
-) (aicommon.ResultReceipt, error) {
-	return aicommon.ResultReceipt{ResultID: s.resultID}, nil
+) (aiFocusResultReceipt, error) {
+	return aiFocusResultReceipt{ResultID: s.resultID}, nil
 }
 
 func (p *recordingAIFocusRiskPublisher) PublishAssetWithEventID(
@@ -263,7 +262,7 @@ func TestAISessionResultSinkProxyFencesRebindAgainstInFlightSubmission(t *testin
 	newSink := &immediateAIFocusResultSink{resultID: "new-attempt"}
 	proxy := newAISessionResultSinkProxy(oldSink)
 
-	submitDone := make(chan aicommon.ResultReceipt, 1)
+	submitDone := make(chan aiFocusResultReceipt, 1)
 	go func() {
 		receipt, _ := proxy.SubmitRisk(context.Background(), &schema.Risk{})
 		submitDone <- receipt
@@ -313,11 +312,11 @@ func TestLegionAIFocusResultSinkPublishesIdempotentAsset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new result sink: %v", err)
 	}
-	assetSink, ok := sink.(aicommon.AssetResultSink)
+	assetSink, ok := sink.(aiFocusAssetResultSink)
 	if !ok {
 		t.Fatalf("expected Legion result sink to support structured assets")
 	}
-	asset := aicommon.AssetResult{
+	asset := aiFocusAssetResult{
 		Kind:        "http_endpoint",
 		Title:       "GET https://example.com/api/users",
 		Target:      "https://example.com/api/users",
@@ -362,7 +361,7 @@ func TestLegionAIFocusResultSinkPublishesIdempotentAsset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new rebound result sink: %v", err)
 	}
-	reboundReceipt, err := reboundSink.(aicommon.AssetResultSink).
+	reboundReceipt, err := reboundSink.(aiFocusAssetResultSink).
 		SubmitAsset(context.Background(), asset)
 	if err != nil {
 		t.Fatalf("submit rebound asset: %v", err)
@@ -373,6 +372,36 @@ func TestLegionAIFocusResultSinkPublishesIdempotentAsset(t *testing.T) {
 			first.ResultID,
 			reboundReceipt.ResultID,
 		)
+	}
+}
+
+func TestLegionAIFocusResultSinkRejectsOffOriginTargets(t *testing.T) {
+	t.Parallel()
+
+	rawSink, err := newLegionAIFocusResultSink(
+		&recordingAIFocusRiskPublisher{},
+		"bind-1",
+		validAIFocusResultContext(),
+	)
+	if err != nil {
+		t.Fatalf("new result sink: %v", err)
+	}
+	assetSink := rawSink.(aiFocusAssetResultSink)
+	if _, err := assetSink.SubmitAsset(context.Background(), aiFocusAssetResult{
+		Kind:        "http_endpoint",
+		Title:       "Outside endpoint",
+		Target:      "https://outside.test/api",
+		IdentityKey: "outside",
+		Payload:     []byte(`{"status":"responded"}`),
+	}); err == nil || !strings.Contains(err.Error(), "outside the authorized origin") {
+		t.Fatalf("expected off-origin asset rejection, got %v", err)
+	}
+	if _, err := rawSink.SubmitRisk(context.Background(), &schema.Risk{
+		Title:    "Outside risk",
+		RiskType: "test",
+		Url:      "https://outside.test/api",
+	}); err == nil || !strings.Contains(err.Error(), "outside the authorized origin") {
+		t.Fatalf("expected off-origin risk rejection, got %v", err)
 	}
 }
 
@@ -400,28 +429,6 @@ func TestValidateLegionAIFocusResultContextRejectsIncompleteIdentity(t *testing.
 		t.Fatalf("expected target validation error, got %v", err)
 	}
 }
-
-func TestLegionAIFocusResultSinkProvidesServerAuthorizedTarget(t *testing.T) {
-	t.Parallel()
-
-	sink, err := newLegionAIFocusResultSink(
-		&recordingAIFocusRiskPublisher{},
-		"bind-1",
-		validAIFocusResultContext(),
-	)
-	if err != nil {
-		t.Fatalf("new result sink: %v", err)
-	}
-	if target := aicommon.AuthorizedTargetURLFromConfig(&resultSinkConfigStub{sink: sink}); target != "https://example.com/health?q=1" {
-		t.Fatalf("unexpected authorized target: %q", target)
-	}
-}
-
-type resultSinkConfigStub struct {
-	sink aicommon.ResultSink
-}
-
-func (s *resultSinkConfigStub) GetResultSink() aicommon.ResultSink { return s.sink }
 
 func TestValidateAISessionBindCommandRequiresMatchingFocusRun(t *testing.T) {
 	t.Parallel()
@@ -498,7 +505,7 @@ func TestLegionAIFocusResultSinkPublishesIdempotentSummaryBeforeSuccess(t *testi
 		t.Fatalf("new result sink: %v", err)
 	}
 	sink := rawSink.(*legionAIFocusResultSink)
-	asset := aicommon.AssetResult{
+	asset := aiFocusAssetResult{
 		Kind:        "http_endpoint",
 		Title:       "HEAD https://example.com/health?q=1",
 		Target:      "https://example.com/health?q=1",

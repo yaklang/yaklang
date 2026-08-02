@@ -67,6 +67,8 @@ var (
 	yakFocusBundles   = map[string]*FocusModeBundle{}
 )
 
+const serverFocusRuntimeGlobal = "focusRuntime"
+
 // GetYakFocusModeBundle 通过名字查询已注册的 bundle，主要供测试使用。
 func GetYakFocusModeBundle(name string) (*FocusModeBundle, bool) {
 	yakFocusBundlesMu.RLock()
@@ -110,6 +112,7 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 		bundle.EntryFile,
 		bundleCode,
 		WithFocusModeCallerCallTimeout(bootCallTimeout),
+		WithFocusModeCallerVars(map[string]any{serverFocusRuntimeGlobal: nil}),
 	)
 	if err != nil {
 		return utils.Wrapf(err, "yak focus mode: boot eval failed for %s", defaultName)
@@ -137,17 +140,7 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 			runCallTimeout = 30 * time.Second
 		}
 
-		callerOpts := []FocusModeCallerOption{
-			WithFocusModeCallerCallTimeout(runCallTimeout),
-		}
-		if invoker != nil {
-			if cfg := invoker.GetConfig(); cfg != nil {
-				if ctx := cfg.GetContext(); ctx != nil {
-					callerOpts = append(callerOpts, WithFocusModeCallerParentContext(ctx))
-				}
-			}
-		}
-
+		callerOpts := focusModeRunCallerOptions(invoker, runCallTimeout)
 		caller, err := NewFocusModeYakHookCaller(bundle.EntryFile, bundleCode, callerOpts...)
 		if err != nil {
 			return nil, utils.Wrapf(err, "yak focus mode[%v]: create run-phase caller failed", resolvedName)
@@ -179,6 +172,28 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 
 	log.Infof("yak focus mode[%v] registered (entry=%v, sidekicks=%d)", resolvedName, bundle.EntryFile, len(bundle.Sidekicks))
 	return nil
+}
+
+func focusModeRunCallerOptions(
+	invoker aicommon.AIInvokeRuntime,
+	callTimeout time.Duration,
+) []FocusModeCallerOption {
+	callerOpts := []FocusModeCallerOption{
+		WithFocusModeCallerCallTimeout(callTimeout),
+	}
+	if invoker == nil || invoker.GetConfig() == nil {
+		return callerOpts
+	}
+	config := invoker.GetConfig()
+	if ctx := config.GetContext(); ctx != nil {
+		callerOpts = append(callerOpts, WithFocusModeCallerParentContext(ctx))
+	}
+	if runtime := aicommon.FocusRuntimeFromConfig(config); runtime != nil {
+		callerOpts = append(callerOpts, WithFocusModeCallerVars(map[string]any{
+			serverFocusRuntimeGlobal: runtime,
+		}))
+	}
+	return callerOpts
 }
 
 // RegisterYakFocusMode 是 RegisterYakFocusModeFromBundle 的便捷封装，

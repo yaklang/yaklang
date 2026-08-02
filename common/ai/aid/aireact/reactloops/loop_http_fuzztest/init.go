@@ -36,34 +36,19 @@ func init() {
 	err := reactloops.RegisterLoopFactory(
 		LoopHTTPFuzztestName,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-			saasMode := isBoundedSaaSHTTPFuzz(r.GetConfig())
-			maxIterations := int(r.GetConfig().GetMaxIterationCount())
-			persistentInstruction := instruction
-			if saasMode {
-				maxIterations = 5
-				persistentInstruction = boundedSaaSHTTPFuzzInstruction
-			}
 			// 创建预设选项
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(false),
-				reactloops.WithAllowToolCall(!saasMode),
-				reactloops.WithAllowAIForge(!saasMode),
-				reactloops.WithAllowPlanAndExec(!saasMode),
+				reactloops.WithAllowToolCall(true),
 				reactloops.WithAITagFieldWithAINodeId("GEN_PACKET", generatedPacketContentField, "http_flow", aicommon.TypeCodeHTTPRequest),
 				reactloops.WithAITagFieldWithAINodeId("GEN_MODIFIED_PACKET", modifiedPacketContentField, "http_flow", aicommon.TypeCodeHTTPRequest),
 				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFuzztest),
 				reactloops.WithInitTask(buildInitTask(r)),
 				BuildOnPostIterationHook(r),
 				reactloops.WithDisablePeriodicVerification(true),
-				reactloops.WithMaxIterations(maxIterations),
-				reactloops.WithAllowUserInteract(!saasMode && r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
-					if !saasMode {
-						return true
-					}
-					return boundedSaaSHTTPFuzzActionAllowed(action.ActionType)
-				}),
-				reactloops.WithPersistentInstruction(persistentInstruction),
+				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
+				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
+				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					originalRequest := getLoopOriginalRequestForPrompt(loop)
@@ -124,9 +109,6 @@ func init() {
 				generateAndSendPacketAction(r),
 				generateRiskAction(r),
 			}
-			if saasMode {
-				preset = append(preset, reactloops.WithOverrideLoopAction(boundedSaaSHTTPFuzzFinishAction))
-			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(LoopHTTPFuzztestName, r, preset...)
 		},
@@ -150,24 +132,6 @@ var urlPattern = regexp.MustCompile(`https?://[^\s"'<>]+`)
 // buildInitTask creates the initialization task handler
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-		if isBoundedSaaSHTTPFuzz(r.GetConfig()) {
-			targetURL, err := authorizedSaaSHTTPFuzzTarget(r.GetConfig())
-			if err != nil {
-				operator.Failed(err)
-				return
-			}
-			if !initBoundedSaaSHTTPFuzzRequest(loop, r, targetURL) {
-				operator.Failed("failed to initialize the server-authorized HTTP target")
-				return
-			}
-			loop.Set(boundedSaaSHTTPFuzzTargetKey, targetURL)
-			r.AddToTimeline("http_fuzztest_saas_init", "Initialized one bounded request from the server-authorized target")
-			reactloops.EmitStatus(loop, "受控 HTTP 测试已就绪 / Bounded HTTP Test Ready")
-			operator.NextAction("fuzz_header")
-			operator.Continue()
-			return
-		}
-
 		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, task.GetAttachedDatas())
 
 		config := r.GetConfig()
@@ -354,31 +318,6 @@ func initFuzzRequestFromURL(loop *reactloops.ReActLoop, runtime aicommon.AIInvok
 	})
 	if err != nil {
 		log.Warnf("failed to build fuzz request from URL packet: %v", err)
-		return false
-	}
-	return true
-}
-
-func initBoundedSaaSHTTPFuzzRequest(loop *reactloops.ReActLoop, runtime aicommon.AIInvokeRuntime, targetURL string) bool {
-	isHTTPS, packet, err := lowhttp.ParseUrlToHttpRequestRaw("GET", targetURL)
-	if err != nil {
-		log.Warnf("failed to build bounded SaaS request from authorized URL: %v", err)
-		return false
-	}
-	_, err = applyLoopHTTPFuzzRequestChange(loop, runtime, &loopHTTPFuzzRequestChange{
-		RawRequest:          string(packet),
-		IsHTTPS:             isHTTPS,
-		SourceAction:        "server_authorized_url",
-		EventOp:             loopHTTPFuzzRequestEventOpReplace,
-		ResetBaseline:       true,
-		ClearActionTracking: true,
-		EmitEvent:           true,
-		EmitEditablePacket:  false,
-		PersistSession:      false,
-		Task:                loop.GetCurrentTask(),
-	})
-	if err != nil {
-		log.Warnf("failed to install bounded SaaS request: %v", err)
 		return false
 	}
 	return true

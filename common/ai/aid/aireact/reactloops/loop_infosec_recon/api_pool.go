@@ -19,15 +19,14 @@ const poolFormatVersion = 1
 
 // APIPoolEntry is one deduplicated API candidate in the shared pool.
 type APIPoolEntry struct {
-	NormalizedURL      string  `json:"normalized_url"`
-	Method             string  `json:"method,omitempty"`
-	Source             string  `json:"source"`
-	Confidence         float64 `json:"confidence,omitempty"`
-	Evidence           string  `json:"evidence,omitempty"`
-	Verified           bool    `json:"verified"`
-	StatusCode         int     `json:"status_code,omitempty"`
-	VerificationMethod string  `json:"verification_method,omitempty"`
-	ProbeError         string  `json:"probe_error,omitempty"`
+	NormalizedURL string  `json:"normalized_url"`
+	Method        string  `json:"method,omitempty"`
+	Source        string  `json:"source"`
+	Confidence    float64 `json:"confidence,omitempty"`
+	Evidence      string  `json:"evidence,omitempty"`
+	Verified      bool    `json:"verified"`
+	StatusCode    int     `json:"status_code,omitempty"`
+	ProbeError    string  `json:"probe_error,omitempty"`
 }
 
 // APIPool is persisted under the task work directory.
@@ -203,34 +202,10 @@ func PoolStats(p *APIPool) (total, verified, unverified int, bySource map[string
 // ProbePoolHTTP issues HEAD or GET for unverified entries (limited).
 // If allowedHosts is non-empty, only entries whose URL host is in the set are probed.
 func ProbePoolHTTP(p *APIPool, limit, concurrency int, useHead bool, timeout time.Duration, allowedHosts map[string]bool) int {
-	return probePoolHTTP(p, limit, concurrency, useHead, timeout, allowedHosts, true)
-}
-
-func probePoolHTTP(
-	p *APIPool,
-	limit int,
-	concurrency int,
-	useHead bool,
-	timeout time.Duration,
-	allowedHosts map[string]bool,
-	followRedirects bool,
-) int {
 	if p == nil || limit <= 0 {
 		return 0
 	}
 	client := &http.Client{Timeout: timeout}
-	if !followRedirects {
-		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
-	} else if len(allowedHosts) > 0 {
-		client.CheckRedirect = func(req *http.Request, _ []*http.Request) error {
-			if !entryHostInScope(req.URL.String(), allowedHosts) {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		}
-	}
 	var targets []*APIPoolEntry
 	for i := range p.Entries {
 		if p.Entries[i].Verified {
@@ -262,12 +237,10 @@ func probePoolHTTP(
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			verificationMethod := http.MethodGet
+			req, err := http.NewRequest(http.MethodGet, e.NormalizedURL, nil)
 			if useHead {
-				verificationMethod = http.MethodHead
+				req, err = http.NewRequest(http.MethodHead, e.NormalizedURL, nil)
 			}
-			e.VerificationMethod = verificationMethod
-			req, err := http.NewRequest(verificationMethod, e.NormalizedURL, nil)
 			if err != nil {
 				e.ProbeError = err.Error()
 				return

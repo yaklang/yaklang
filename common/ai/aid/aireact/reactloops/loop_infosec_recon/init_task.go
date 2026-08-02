@@ -2,7 +2,6 @@ package loop_infosec_recon
 
 import (
 	_ "embed"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,22 +22,15 @@ var embeddedJsStaticExtractAiScript string
 var embeddedCrawlJsCollectorScript string
 
 const (
-	keyWorkDir              = "infosec_workdir"
-	keyPoolPath             = "infosec_pool_path"
-	keySeedURL              = "infosec_seed_url"
-	keyScopeHosts           = "infosec_scope_hosts"
-	keyMaxCrawlDepth        = "infosec_max_crawl_depth"
-	keyProbeConcurrency     = "infosec_probe_concurrency"
-	keyLastReconSnippet     = "infosec_recon_log_tail"
-	keySaaSAuthorizedTarget = "infosec_saas_authorized_target"
-	keySaaSSeedRegistered   = "infosec_saas_seed_registered"
-	keySaaSCrawlAttempted   = "infosec_saas_crawl_attempted"
-	keySaaSCrawlCompleted   = "infosec_saas_crawl_completed"
-	keySaaSStaticAttempted  = "infosec_saas_static_attempted"
-	keySaaSStaticCompleted  = "infosec_saas_static_completed"
-	keySaaSProbeAttempted   = "infosec_saas_probe_attempted"
-	defaultCrawlDepth       = "2"
-	defaultProbeConc        = "6"
+	keyWorkDir          = "infosec_workdir"
+	keyPoolPath         = "infosec_pool_path"
+	keySeedURL          = "infosec_seed_url"
+	keyScopeHosts       = "infosec_scope_hosts"
+	keyMaxCrawlDepth    = "infosec_max_crawl_depth"
+	keyProbeConcurrency = "infosec_probe_concurrency"
+	keyLastReconSnippet = "infosec_recon_log_tail"
+	defaultCrawlDepth   = "2"
+	defaultProbeConc    = "6"
 )
 
 // Markers for idempotent merge of infosec_recon-specific interval-review (progress audit) extra prompts.
@@ -112,14 +104,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set(keyPoolPath, poolPath)
 		loop.Set(keyMaxCrawlDepth, defaultCrawlDepth)
 		loop.Set(keyProbeConcurrency, defaultProbeConc)
-		if isBoundedSaaSRecon(r.GetConfig()) {
-			targetURL, err := authorizedSaaSReconTarget(r.GetConfig())
-			if err != nil {
-				operator.Failed(err)
-				return
-			}
-			loop.Set(keySaaSAuthorizedTarget, targetURL)
-		}
 
 		if _, err := LoadAPIPool(wd); err != nil {
 			log.Warnf("infosec_recon: load pool: %v", err)
@@ -127,29 +111,14 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		if err := ensurePoolFile(wd); err != nil {
 			log.Warnf("infosec_recon: init pool file: %v", err)
 		}
-		if isBoundedSaaSRecon(r.GetConfig()) {
-			targetURL := loop.Get(keySaaSAuthorizedTarget)
-			if _, err := installBoundedSaaSReconSeed(loop, wd, targetURL, ""); err != nil {
-				operator.Failed(err)
-				return
-			}
-			r.AddToTimeline("infosec_seed", fmt.Sprintf("server-authorized seed=%s workdir=%s", targetURL, wd))
-			operator.NextAction(ToolCrawlJsCollector)
+
+		embeddedInfosecYakTools()
+
+		if c, ok := r.GetConfig().(*aicommon.Config); ok {
+			mergeInfosecLongRunningToolIntervalReviewExtraPrompt(c)
 		}
 
-		if !isBoundedSaaSRecon(r.GetConfig()) {
-			embeddedInfosecYakTools()
-
-			if c, ok := r.GetConfig().(*aicommon.Config); ok {
-				mergeInfosecLongRunningToolIntervalReviewExtraPrompt(c)
-			}
-		}
-
-		if isBoundedSaaSRecon(r.GetConfig()) {
-			r.AddToTimeline("infosec_recon_init", "Server-authorized target registered; starting the bounded crawl, static endpoint extraction, and verification pipeline.")
-		} else {
-			r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → "+ToolCrawlJsCollector+" (optional deep_js) → "+ToolJsStaticExtractAI+"(paths / verified JS dir) → api_pool_merge / probe_api_candidates as needed.")
-		}
+		r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → "+ToolCrawlJsCollector+" (optional deep_js) → "+ToolJsStaticExtractAI+"(paths / verified JS dir) → api_pool_merge / probe_api_candidates as needed.")
 		reactloops.EmitStatus(loop, "信息搜集任务就绪 / Infosec recon task ready")
 		operator.Continue()
 	}

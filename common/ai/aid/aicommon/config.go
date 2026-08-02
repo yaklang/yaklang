@@ -182,7 +182,7 @@ type Config struct {
 	EventHandler           func(e *schema.AiOutputEvent)
 	DisableOutputEventType []string
 	SaveEvent              bool
-	ResultSink             ResultSink
+	FocusRuntime           FocusRuntime
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -1468,19 +1468,20 @@ func WithEmitter(emitter *Emitter) ConfigOption {
 	}
 }
 
-// WithResultSink installs a run-scoped structured-result backend.
-func WithResultSink(sink ResultSink) ConfigOption {
+// WithFocusRuntime installs the capability boundary used by server-released
+// Yak Focus code. Desktop and client runtimes leave it unset.
+func WithFocusRuntime(runtime FocusRuntime) ConfigOption {
 	return func(c *Config) error {
-		c.ResultSink = sink
+		c.FocusRuntime = runtime
 		return nil
 	}
 }
 
-func (c *Config) GetResultSink() ResultSink {
+func (c *Config) GetFocusRuntime() FocusRuntime {
 	if c == nil {
 		return nil
 	}
-	return c.ResultSink
+	return c.FocusRuntime
 }
 
 // Event / output
@@ -4109,8 +4110,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.EventHandler != nil {
 		opts = append(opts, WithEventHandler(i.EventHandler))
 	}
-	if i.ResultSink != nil {
-		opts = append(opts, WithResultSink(i.ResultSink))
+	if i.FocusRuntime != nil {
+		opts = append(opts, WithFocusRuntime(i.FocusRuntime))
 	}
 
 	if i.GetUserUsageCallback() != nil {
