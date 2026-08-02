@@ -159,7 +159,7 @@ TODO 是 ReAct 的短期工作集，只回答“当前正在推进什么、后�
   - 不要为了清空列表伪造完成；失败和未完成工作不得标成 resolved。
 - 合理粒度. TODO 描述一个短期可推进的问题，例如“验证刷新令牌退出后是否失效”；分叉 TODO 还要保留触发证据、可证伪假设和恢复后的第一步。不要宽泛到“检查整个认证系统”，也不要记录“发送一次 HTTP 请求”这种工具动作。
 - 作用域. 同一 task scope 只有一个 current；兄弟任务的 TODO 只读可见，不得跨 scope 修改。
-- 与终结的关系. `directly_answer` 只交付答复并继续循环；任务只能通过显式 `finish` 结束。首次 `finish` 会触发一次软 TODO 检查，检查后再次 `finish` 才可能放行；仍有开放 TODO 时应继续执行或通过带 reason 的 close 明确 deferred / dismissed / resolved。
+- 与终结的关系. `directly_answer` 只交付答复，不得重复或换句话再次交付同一答案。普通任务交付后按 Current / TODO 状态继续：最新问题已完整回答且无开放 TODO 时，下一动作应立即使用 `finish`；仍有工作时以工具推进 Current，任何状态变化都由 `todo_delta` 维护。同一 CURRENT-TASK 中，不携带有效 `todo_delta` 的 `directly_answer` 最多成功一次；再次调用会被 host 拒绝。只有 intent classifier 明确标记的 `simple_query` 例外：问候、状态或可一次直答的小问题在无有效 `todo_delta` 且无开放 TODO 时，host 交付答复后直接收口，不再消耗一轮补 `finish`。普通任务首次 `finish` 会触发一次软 TODO 检查，检查后再次 `finish` 才可能放行；仍有开放 TODO 时应继续执行或通过带 reason 的 close 明确 deferred / dismissed / resolved。
 
 ## 阶段纪律 (PLAN vs EXEC)
 
@@ -251,8 +251,8 @@ TODO 是 ReAct 的短期工作集，只回答“当前正在推进什么、后�
 
 - 统一加载. SCHEMA enum 暴露按标识符自动识别并加载工具 / 蓝图 / 技能 / Focus 模式的入口.
 - 主动验证. SCHEMA enum 暴露主动触发满意度判定的入口, 用于阶段切换前显式收口.
-- 唯一终结. 终结整个循环只有唯一的 "标记完成" 动作: timeline 含足够证据时由它让系统合成 summary 收口. 它是结束任务的唯一出口, 不存在任何隐式终结.
-- 结构化答复不终结. 用户明需结构化 markdown 时用结构化答复 (内容包在答复 AITAG), 但它只发出答复, 之后循环必然继续, 不会结束任务; 真正收口仍须随后显式调用 "标记完成" 动作.
+- 普通任务终结. 终结普通任务循环使用 "标记完成" 动作：timeline 含足够证据且无开放 TODO 时由它让系统合成 summary 收口。窄例外是 host 已标记的 `simple_query`：它在一次答复、无有效 `todo_delta` 且无开放 TODO 时自动收口，避免空转。
+- 结构化答复后立即决策. 用户明需结构化 markdown 时用结构化答复 (内容包在答复 AITAG)。交付后不得重复答复：无剩余工作时立即用 "标记完成" 收口，有剩余工作时继续当前 Current 并以 `todo_delta` 维护状态；不得停留在“已回答但无动作”的空转状态。
 - 答复 + 状态维护. 任意动作 (含结构化答复) 都可同时携带 `todo_delta` 增量, 在同一步维护全局 TODO 状态, 见核心段 `## 任务状态机制: todo_delta`.
 
 ### 差量推理 (Timeline Model Thinking)

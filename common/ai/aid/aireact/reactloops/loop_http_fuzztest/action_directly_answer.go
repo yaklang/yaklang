@@ -13,8 +13,8 @@ import (
 var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 	ActionType: "directly_answer",
 	Description: "用于回答 HTTP 安全测试过程中的阶段性结论或简短问题。短答案可用 answer_payload；需要 Markdown 分段、列表、表格或更复杂展示时，使用 FINAL_ANSWER AITAG。若已验证漏洞或存在应落库风险，必须先调用 generate_risk 保存 Risk；回答漏洞结论时必须包含证据链。" +
-		" 重要: directly_answer 只负责发出答复, 之后循环会继续, 它不会结束任务。要终结整个流程必须使用 finish 动作。" +
-		" 可选: 如同时携带非空的 todo_delta 增量, 用于安排后续 TODO 更新。",
+		" 普通任务答复后根据 Current/TODO 状态续跑或 finish；同一 CURRENT-TASK 不得在无有效 todo_delta 时重复 directly_answer。" +
+		" 如答复同时改变或安排后续 TODO，必须携带非空 todo_delta。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
@@ -63,8 +63,7 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 		if loopHTTPFuzzHasRiskWorthyEvidence(loop, payload) && !loopHTTPFuzzAnswerHasEvidenceChain(payload) {
 			return utils.Error("directly_answer blocked: verified vulnerability conclusions must include an evidence chain, such as tested payloads/parameters, representative request or HTTPFlow, response differences, and reproduction steps.")
 		}
-		loop.Set("directly_answer_payload", payload)
-		return nil
+		return reactloops.FinishDirectlyAnswerVerification(loop, action, payload)
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		invoker := loop.GetInvoker()
@@ -106,9 +105,7 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 		}
 		invoker.AddToTimeline(reactloops.TimelineEntryAssistantOutput, timeline.String())
 
-		// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
-		// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.
-		// 关键词: directly_answer 永不 Exit, http_fuzztest 复用单源, finish 唯一终结器
+		// 共享收口负责续跑、simple_query 自动收口和重复答复防抖。
 		reactloops.DirectlyAnswerContinue(loop, action, operator)
 	},
 }
