@@ -245,13 +245,14 @@ func TestSubmitVerifiedAPIAssetsPublishesOnlyVerifiedEndpoints(t *testing.T) {
 
 	pool := &APIPool{Entries: []APIPoolEntry{
 		{
-			NormalizedURL: "https://example.com/api/users",
-			Method:        "get",
-			Source:        "js_static_extract_ai",
-			Confidence:    0.95,
-			Evidence:      "fetch('/api/users')",
-			Verified:      true,
-			StatusCode:    http.StatusOK,
+			NormalizedURL:      "https://example.com/api/users",
+			Method:             "get",
+			Source:             "js_static_extract_ai",
+			Confidence:         0.95,
+			Evidence:           "fetch('/api/users')",
+			Verified:           true,
+			StatusCode:         http.StatusOK,
+			VerificationMethod: http.MethodHead,
 		},
 		{
 			NormalizedURL: "https://example.com/api/admin",
@@ -294,6 +295,7 @@ func TestSubmitVerifiedAPIAssetsPublishesOnlyVerifiedEndpoints(t *testing.T) {
 	require.Equal(t, "443", businessPayload["port"])
 	require.Equal(t, "https://example.com/api/users", businessPayload["http_url"])
 	require.Equal(t, float64(http.StatusOK), businessPayload["http_status_code"])
+	require.Equal(t, http.MethodHead, businessPayload["verification_method"])
 }
 
 func TestSubmitVerifiedAPIAssetsBoundsEvidenceAndContinues(t *testing.T) {
