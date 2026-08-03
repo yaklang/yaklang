@@ -15,7 +15,7 @@
 
 *. `todo_delta` 使用案例（维护 TODO 工作集，与正常动作同轮携带）：
     * 任务一开始就需要拆成多个入口时，第一条动作同时建立初始 TODO 并指定 current：
-      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "先探测登录接口的认证方式", "todo_delta": {"add": [{"id": "login_auth", "text": "验证 /api/login 的认证方式：来源为 crawler 发现的表单 action；下一步发一次空凭据请求看返回码"}, {"id": "explore_admin", "text": "待探索：/admin/ 路径下的后台入口，来源为 sitemap.xml；尚未访问"}], "current": "login_auth"}}`
+      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "先探测登录接口的认证方式", "todo_delta": {"add": [{"id": "login_auth", "text": "验证 /api/login 的认证方式：来源为 crawler 发现的表单 action；空凭据请求返回 401 即无认证绕过"}, {"id": "explore_admin", "text": "待探索：/admin/ 路径下的后台入口，来源为 sitemap.xml；尚未访问"}], "current": "login_auth"}}`
     * 工具 Observation 暴露了新的范围内入口（例如响应里出现了新的跳转链接）：先把新线索记为"待探索"再继续推进 current：
       `{"@action": "directly_call_tool", "identifier": "http_request", "human_readable_thought": "对比携带旧token和新token的响应差异", "todo_delta": {"add": [{"id": "explore_refresh_token", "text": "待探索：/api/v2/token/refresh 接口，来源为上一次响应头 Set-Cookie 差异；尚未验证是否可重放"}]}}`
     * 当前 current 已有结论，关闭并切换到下一条待探索项：
