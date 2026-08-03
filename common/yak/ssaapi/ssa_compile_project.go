@@ -403,6 +403,16 @@ func removeProgramNamePrefix(filePath, programName string) string {
 	return filePath
 }
 
+// cleanOverlayLogicalPath normalizes overlay logical paths: filepath.Clean for
+// ".." / "." semantics, then filepath.ToSlash so VirtualFS always uses "/".
+func cleanOverlayLogicalPath(p string) string {
+	p = filepath.ToSlash(strings.TrimSpace(p))
+	for strings.HasPrefix(p, "./") {
+		p = p[2:]
+	}
+	return filepath.ToSlash(filepath.Clean(p))
+}
+
 // normalizeOverlayFilePath strips optional program-name prefix and returns a
 // canonical path with a leading "/". Used for FileToLayerMap / FileSet /
 // FileHashMap keys and for excludeFiles passed into MatchInstructionsByVariable
@@ -415,8 +425,8 @@ func normalizeOverlayFilePath(filePath, programName string) string {
 	if programName != "" {
 		path = removeProgramNamePrefix(filePath, programName)
 	}
-	path = strings.TrimPrefix(path, "/")
-	if path == "" {
+	path = cleanOverlayLogicalPath(strings.TrimPrefix(filepath.ToSlash(path), "/"))
+	if path == "" || path == "." {
 		return "/"
 	}
 	return "/" + path
@@ -427,10 +437,32 @@ func ensureOverlayPathSlash(path string) string {
 	if path == "" {
 		return ""
 	}
-	if !strings.HasPrefix(path, "/") {
-		return "/" + path
+	path = cleanOverlayLogicalPath(strings.TrimPrefix(filepath.ToSlash(path), "/"))
+	if path == "" || path == "." {
+		return "/"
 	}
-	return path
+	return "/" + path
+}
+
+// overlayAggregatedFSPath maps canonical overlay key ("/a/b.java") to VirtualFS
+// storage path ("a/b.java") used by Recursive / AddFile / Delete.
+func overlayAggregatedFSPath(canonical string) string {
+	if canonical == "" || canonical == "/" {
+		return ""
+	}
+	p := cleanOverlayLogicalPath(strings.TrimPrefix(filepath.ToSlash(canonical), "/"))
+	if p == "" || p == "." {
+		return ""
+	}
+	return p
+}
+
+// overlayPathFromAggregatedFS maps a VirtualFS walk path back to canonical overlay key.
+func overlayPathFromAggregatedFS(vfsPath string) string {
+	if vfsPath == "" || vfsPath == "." {
+		return "/"
+	}
+	return ensureOverlayPathSlash(vfsPath)
 }
 
 // removeProgramNamePrefixFromFS 从文件系统中去掉 program name 前缀
@@ -459,13 +491,17 @@ func removeProgramNamePrefixFromFS(fs fi.FileSystem, programName string) (fi.Fil
 			return nil
 		}
 
-		// 去掉 program name 前缀
+		// 去掉 program name 前缀，写入 AggregatedFS 时使用统一 VFS 路径
 		cleanPath := removeProgramNamePrefix(pathname, programName)
 		if cleanPath == "" || cleanPath == "/" {
 			return nil
 		}
+		vfsPath := overlayAggregatedFSPath(ensureOverlayPathSlash(cleanPath))
+		if vfsPath == "" {
+			return nil
+		}
 
-		vfs.AddFile(cleanPath, string(content))
+		vfs.AddFile(vfsPath, string(content))
 		return nil
 	}))
 
@@ -497,7 +533,7 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 				log.Warnf("failed to get editor for file %s (hash: %s): %v", filePath, hash, err)
 				continue
 			}
-			vfs.AddFile(cleanPath, editor.GetSourceCode())
+			addFileToAggregatedFS(vfs, ensureOverlayPathSlash(cleanPath), editor.GetSourceCode())
 			fileCount++
 		}
 		if fileCount > 0 {
@@ -531,7 +567,7 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 		// 确保去掉 program name 前缀（如果存在）
 		cleanPath := removeProgramNamePrefix(filePath, programName)
 		content := editor.GetSourceCode()
-		vfs.AddFile(cleanPath, content)
+		addFileToAggregatedFS(vfs, ensureOverlayPathSlash(cleanPath), content)
 	}
 
 	return vfs, nil
