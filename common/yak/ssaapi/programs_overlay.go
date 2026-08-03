@@ -392,6 +392,30 @@ func findFileInProgramWithPrefix(prog *Program, filePath string, programName str
 	return findFileInProgram(prog, filePath)
 }
 
+func addFileToAggregatedFS(vfs *filesys.VirtualFS, canonicalPath, content string) {
+	if vfs == nil || canonicalPath == "" {
+		return
+	}
+	vfsPath := overlayAggregatedFSPath(canonicalPath)
+	if vfsPath == "" {
+		return
+	}
+	vfs.AddFile(vfsPath, content)
+}
+
+func deleteFileFromAggregatedFS(vfs *filesys.VirtualFS, canonicalPath string) {
+	if vfs == nil || canonicalPath == "" {
+		return
+	}
+	vfsPath := overlayAggregatedFSPath(canonicalPath)
+	if vfsPath == "" {
+		return
+	}
+	if exists, _ := vfs.Exists(vfsPath); exists {
+		_ = vfs.Delete(vfsPath)
+	}
+}
+
 func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	if len(layers) < 2 {
 		log.Errorf("createOverlayFromLayers requires at least 2 layers, got %d", len(layers))
@@ -593,13 +617,13 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 			if info.IsDir() {
 				return nil
 			}
-			// 复制文件内容
+			// 复制文件内容，统一 canonical / VFS 路径
 			content, err := baseOverlay.AggregatedFS.ReadFile(path)
 			if err != nil {
 				log.Warnf("failed to read file %s from baseOverlay AggregatedFS: %v", path, err)
 				return nil
 			}
-			newAggregatedFS.AddFile(path, string(content))
+			addFileToAggregatedFS(newAggregatedFS, overlayPathFromAggregatedFS(path), string(content))
 			return nil
 		}))
 		if err != nil {
@@ -611,10 +635,8 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 		for filePath, hash := range fileHashMap {
 			if hash == -1 {
 				normalizedPath := normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName())
-				// 删除文件（如果存在）
-				if exists, _ := newAggregatedFS.Exists(normalizedPath); exists {
-					newAggregatedFS.Delete(normalizedPath)
-				}
+				deleteFileFromAggregatedFS(newAggregatedFS, normalizedPath)
+				overlay.FileToLayerMap.Delete(normalizedPath)
 			}
 		}
 
@@ -631,7 +653,7 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 				return true
 			}
 			// 添加或更新文件（layer3 的文件会覆盖 baseOverlay 的文件）
-			newAggregatedFS.AddFile(normalizedPath, me.GetSourceCode())
+			addFileToAggregatedFS(newAggregatedFS, normalizedPath, me.GetSourceCode())
 			return true
 		})
 
@@ -748,7 +770,7 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 			foundInLayer, content := findFileInProgramWithPrefix(layer.Program, filePath, layerProgramName)
 
 			if foundInLayer {
-				aggregated.AddFile(filePath, content)
+				addFileToAggregatedFS(aggregated, filePath, content)
 				break
 			}
 		}
