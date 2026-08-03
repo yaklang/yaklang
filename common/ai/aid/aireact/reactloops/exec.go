@@ -20,22 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// timelineAITagModelThinking 与 prompts/loop/high_static_section.txt 中
-// 「Timeline 每轮记录」约定一致: 仅模型思考流用 AITAG; 其下决策摘要为明文.
-const timelineAITagModelThinking = "TIMELINE_MODEL_THINKING"
-
-// wrapTimelineAITagBlock 将一段正文包成 `<|TAG_nonce|>...<|TAG_END_nonce|>`。
-// body 或 nonce 为空时返回空串 (调用方跳过拼接).
-func wrapTimelineAITagBlock(tagName, nonce, body string) string {
-	body = strings.TrimSpace(body)
-	nonce = strings.TrimSpace(nonce)
-	tagName = strings.TrimSpace(tagName)
-	if body == "" || nonce == "" || tagName == "" {
-		return ""
-	}
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, body, tagName, nonce)
-}
-
 // isJSONEmbeddedAITagPrefix 判断字段流的首批 peek 字节是否以 `<|TagName_` 开头,
 // 兼容 JSON 字段流推过来的 raw bytes 通常带外层 `"` 与零宽空白. 命中即视为 AI 把
 // AITag 块塞进了 JSON 字符串值, 触发 JSON / AITag 双 emit 重复, 让调用方静默
@@ -930,7 +914,6 @@ LOOP:
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
 
 		streamWg.Wait()
-		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
 
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
@@ -974,27 +957,7 @@ LOOP:
 
 		r.emitActionExecutionRecord(task, actionParams, iterationCount, prompt)
 
-		// allow iteration info to be added to timeline
-		loopName := r.loopName
-		if loopName == "" {
-			loopName = "general-purpose"
-		}
-		reason := actionParams.GetString("human_readable_thought")
-		turnNonce := strings.ToLower(utils.RandStringBytes(6))
-		decisionBody := fmt.Sprintf("[%v]======== ReAct iteration %d ========", loopName, iterationCount)
-		if reason != "" {
-			decisionBody += "\nReason/Next-Step: " + reason
-		}
-		msg := decisionBody
-		if b := wrapTimelineAITagBlock(timelineAITagModelThinking, turnNonce, iterationModelThinking); b != "" {
-			msg = b + "\n\n" + decisionBody
-		}
-		r.GetInvoker().AddToTimeline("iteration", msg)
-
 		// 主 loop todo_delta 兜底拦截: 详见 applyTodoDeltaBottomLine.
-		// 时序保证: AddToTimeline("iteration") 已完成 → 兜底 apply + emit →
-		// handler.AsyncMode check / ActionHandler 才跑. async mode reject
-		// (continue 跳出) 之前兜底也已经执行, 不会漏 apply.
 		// 关键词: 主 loop todo_delta 兜底入口, 孤儿待办修复
 		applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
 		// Legacy object wrappers keep ActionType()=="object" while the selected
@@ -1018,10 +981,6 @@ LOOP:
 				operator = newLoopActionHandlerOperator(task)
 				operator.Feedback(rejectMsg)
 				operator.Continue()
-				continueIter := func() {
-					r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
-				}
-				continueIter()
 				continue
 			}
 			task.SetAsyncMode(true)
@@ -1049,10 +1008,6 @@ LOOP:
 			r.finishIterationLoopWithError(iterationCount, task, finalError)
 			needSummary.SetTo(true)
 			return finalError
-		}
-
-		continueIter := func() {
-			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
 		}
 
 		select {
@@ -1098,10 +1053,7 @@ LOOP:
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
 			}
-			if !operator.isSilence {
-				// 正常退出
-				continueIter()
-			}
+
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1143,10 +1095,7 @@ LOOP:
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
 			}
-			if !operator.isSilence {
-				// 正常退出
-				continueIter()
-			}
+
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1200,7 +1149,6 @@ LOOP:
 
 		// 非异步模式，继续下一次循环
 		if operator.IsContinued() {
-			continueIter()
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1217,7 +1165,6 @@ LOOP:
 		}
 
 		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
-		continueIter()
 		utils.Debug(func() {
 			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			fmt.Printf("[Default Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
