@@ -66,18 +66,10 @@ func lazyBuildLab(lb *LazyBuilder, prog *Program, rng *memedit.Range) diagnostic
 	return diagnostics.NewLab(opts...)
 }
 
-// runLazyBuilder executes lb.Build(), wrapping with TRACE only when diagnostics is active.
+// runLazyBuilder executes lb.Build() directly without diagnostics TRACE wrapping.
 func (p *Program) runLazyBuilder(lb *LazyBuilder, rng *memedit.Range) {
 	if lb == nil {
 		return
 	}
-	rec := p.diagnosticsRecorderForChild()
-	if rec == nil {
-		lb.Build()
-		return
-	}
-	_ = rec.TraceLab(lazyBuildLab(lb, p, rng), func() error {
-		lb.Build()
-		return nil
-	})
+	lb.Build()
 }

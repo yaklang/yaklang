@@ -219,15 +219,7 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if config.DiagnosticsEnabled() {
-		defer config.LogDiagnostics("ssa.compile")
-	}
-	f1 := func() error {
-		prog, err = config.parseProject()
-		return nil
-	}
-	config.DiagnosticsTrack("ssaapi.ParseProject", f1)
-	return
+	return config.parseProject()
 }
 
 func (c *Config) parseProject() (progs Programs, err error) {
