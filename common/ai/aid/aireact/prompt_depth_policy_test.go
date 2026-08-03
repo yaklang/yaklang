@@ -19,18 +19,18 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.Contains(t, highStatic, "区分性优先")
 	require.Contains(t, highStatic, "性价比优先")
 	require.Contains(t, highStatic, "阴性结论 / 歧义场景专用")
-	require.Contains(t, highStatic, "`todo_delta` 是唯一写入通道")
-	require.Contains(t, highStatic, "此处只定形态")
+	require.Contains(t, defaultLoopInstruction, "`todo_delta` 是唯一写入通道")
+	require.Contains(t, highStatic, "集中在任务指令段")
 	require.Contains(t, highStatic, "`todo_delta` 与 Plan 子任务树服务不同尺度")
-	require.Contains(t, highStatic, "兄弟任务的 TODO 只读可见")
+	require.Contains(t, defaultLoopInstruction, "兄弟任务的 TODO 只读可见")
 	require.NotContains(t, highStatic, "严格优先级逆转")
 	require.NotContains(t, highStatic, "当前工具与权限可以立即执行")
 	require.Contains(t, highStatic, "后续行动不越界")
-	require.Contains(t, highStatic, "单次普通请求、单一 payload、扫描未命中或无明显报错只说明本次未命中")
+	require.Contains(t, highStatic, "单次未命中不等于不存在")
 	require.Contains(t, highStatic, "任务漂移先纠偏")
 	require.NotContains(t, highStatic, "任务漂移即完成")
-	require.Contains(t, highStatic, "同一 CURRENT-TASK 中不携带有效 `todo_delta` 的 `directly_answer` 最多成功一次")
-	require.Contains(t, highStatic, "`simple_query` 例外")
+	require.Contains(t, defaultLoopInstruction, "同一 CURRENT-TASK 中不携带有效 `todo_delta` 的 `directly_answer` 最多成功一次")
+	require.Contains(t, defaultLoopInstruction, "`simple_query` 例外")
 	require.Contains(t, highStatic, "无剩余工作时立即用 \"标记完成\" 收口")
 
 	require.Contains(t, defaultLoopInstruction, "## TODO 状态维护（todo_delta）")
@@ -41,8 +41,9 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.Contains(t, defaultLoopInstruction, "来源证据")
 	require.Contains(t, defaultLoopInstruction, "下一步动作")
 	require.Contains(t, defaultLoopInstruction, "文本以\"待探索：\"开头")
-	require.Contains(t, defaultLoopInstruction, "存在开放 TODO 时不能 `finish`")
-	require.Contains(t, defaultLoopInstruction, "不允许为了清空列表伪造 `resolved`")
+	require.Contains(t, defaultLoopInstruction, "存在开放 TODO 时不得 `finish`")
+	require.Contains(t, defaultLoopInstruction, "不得为清空列表伪造 `resolved`")
+	require.Contains(t, defaultLoopInstruction, "一条一任务")
 	require.Contains(t, defaultLoopOutputExample, "`todo_delta` 使用案例")
 	require.Contains(t, defaultLoopOutputExample, "`save_evidence` 使用案例")
 
@@ -70,7 +71,7 @@ func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
 		{
 			name: "multi-step work bootstraps todo delta before execution",
 			required: []string{
-				"`todo_delta` 是唯一的写入通道",
+				"`todo_delta` 是唯一写入通道",
 				"第一条可执行动作就要建立初始 TODO 集合并显式指定 `current`",
 				"第一条动作同时建立初始 TODO 并指定 current",
 			},
@@ -78,16 +79,16 @@ func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
 		{
 			name: "multiple website entry points are recorded before one is tested",
 			required: []string{
-				"工具 Observation 打开了新的分支",
+				"Observation 打开了新的分支",
 				"先用 `add` / `update` 把这些分支记为\"待探索\"",
-				"Observation 每暴露一个新的范围内具体入口，就当场 `add`",
-				"先把新线索记为\"待探索\"再继续推进 current",
+				"不写就等于遗忘",
+				"先用 `add` / `update` 把这些分支记为\"待探索\"再继续推进 `current`",
 			},
 		},
 		{
 			name: "current branch keeps depth while sibling branches remain resumable",
 			required: []string{
-				"Frontier 中唯一被标记为\"当前主要矛盾\"的一项",
+				"`current` 是其中唯一被标记为\"当前主要矛盾\"的一项",
 				"哪怕它暂时不是 `current`，也必须先用 `add` 落成一条 TODO",
 				"收集齐\"待探索\"线索比机械地把单一路径走到底更重要",
 			},
@@ -113,8 +114,8 @@ func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
 			name: "low value ideas do not inflate the frontier or justify finish",
 			required: []string{
 				"只要求范围内、具体、可追溯出处",
-				"无目标、无来源、无下一步，写完等于没写",
-				"存在开放关键项时不收口",
+				"无目标、无来源、无下一步",
+				"存在开放 TODO 时不得 `finish`",
 			},
 		},
 	}
