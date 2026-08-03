@@ -58,8 +58,7 @@ type queryConfig struct {
 	// control
 	ctx context.Context
 
-	// reuseBaseProgramName: when set with an overlay query, merge risks from a
-	// prior base-program scan for files that remain base-only (unchanged).
+	// reuseBaseProgramName retained for API compat; overlay scan no longer merges cache.
 	reuseBaseProgramName string
 
 	*ssaconfig.Config
@@ -169,31 +168,9 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		return nil, err
 	}
 
-	// When a prior base scan exists, skip querying layer-0 IR during overlay SF.
-	// Base-only risks are merged after the query via mergeUnchangedFileRisksFromBaseCache.
-	if config.reuseBaseProgramName != "" {
-		if overlay := findProgramOverlay(value); overlay != nil {
-			ruleContent := config.ruleContent
-			if ruleContent == "" && config.rule != nil {
-				ruleContent = config.rule.Content
-			}
-			kind := config.kind
-			if kind == "" {
-				kind = schema.SFResultKindScan
-			}
-			baseName := config.reuseBaseProgramName
-			if baseName == "" || baseName == "__auto__" {
-				baseName = overlay.ResolveReuseBaseProgramName()
-			}
-			if baseName != "" && ruleContent != "" {
-				if cached, loadErr := LoadResultByRuleContent(baseName, ruleContent, kind); loadErr == nil && cached != nil {
-					overlay.SetSkipBaseLayerQuery(true)
-					defer overlay.SetSkipBaseLayerQuery(false)
-					log.Infof("overlay scan skip base layer: reusing cached base result from %s", baseName)
-				}
-			}
-		}
-	}
+	// Overlay incremental scan uses dual-source IR routing (base exclude + owner
+	// include). Do NOT skip base IR or merge audit_results cache — effective
+	// scan scope remains the full aggregated file view (~4000 files).
 
 	total := len(frame.Codes) + 1
 	handler := 0
@@ -213,22 +190,6 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 
 	var ret *SyntaxFlowResult
 	ret = CreateResultFromQuery(res, config.Config)
-
-	// Overlay incremental reuse: fold risks from a prior base scan for files
-	// that were not overridden by upper layers.
-	if config.reuseBaseProgramName != "" {
-		var overlay *ProgramOverLay
-		_ = value.Recursive(func(op sfvm.ValueOperator) error {
-			if o, ok := op.(*ProgramOverLay); ok {
-				overlay = o
-				return utils.Error("abort")
-			}
-			return nil
-		})
-		if overlay != nil {
-			mergeUnchangedFileRisksFromBaseCache(ret, overlay, config)
-		}
-	}
 
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
@@ -486,105 +447,13 @@ func QueryWithUseCache(b ...bool) QueryOption {
 	}
 }
 
-// QueryWithOverlayResultReuse enables merging risks from a prior base-program
-// SyntaxFlow result for files that remain base-only under the overlay.
-// Pass the base program name, or omit to use overlay.Layers[0] / GetBaseProgramName.
+// QueryWithOverlayResultReuse is retained for API compatibility but is a no-op.
+// Overlay incremental scan uses dual-source live IR (base exclude + owner include)
+// and must not depend on base audit_results cache.
 func QueryWithOverlayResultReuse(baseProgramName ...string) QueryOption {
 	return func(c *queryConfig) {
-		if len(baseProgramName) > 0 && baseProgramName[0] != "" {
-			c.reuseBaseProgramName = baseProgramName[0]
-			return
-		}
-		c.reuseBaseProgramName = "__auto__"
-	}
-}
-
-func findProgramOverlay(values sfvm.Values) *ProgramOverLay {
-	if len(values) == 0 {
-		return nil
-	}
-	var overlay *ProgramOverLay
-	_ = values.Recursive(func(op sfvm.ValueOperator) error {
-		if o, ok := op.(*ProgramOverLay); ok {
-			overlay = o
-			return utils.Error("abort")
-		}
-		return nil
-	})
-	return overlay
-}
-
-// mergeUnchangedFileRisksFromBaseCache loads a cached base-program result for the
-// same rule and copies risks whose files are still base-only into the overlay result.
-func mergeUnchangedFileRisksFromBaseCache(ret *SyntaxFlowResult, overlay *ProgramOverLay, config *queryConfig) {
-	if ret == nil || overlay == nil || config == nil {
-		return
-	}
-	baseName := config.reuseBaseProgramName
-	if baseName == "" || baseName == "__auto__" {
-		baseName = overlay.ResolveReuseBaseProgramName()
-	}
-	if baseName == "" || baseName == "__auto__" {
-		names := overlay.GetLayerProgramNames()
-		if len(names) > 0 {
-			baseName = names[0]
-		}
-	}
-	if baseName == "" {
-		return
-	}
-
-	ruleContent := config.ruleContent
-	if ruleContent == "" && config.rule != nil {
-		ruleContent = config.rule.Content
-	}
-	if ruleContent == "" {
-		return
-	}
-	kind := config.kind
-	if kind == "" {
-		kind = schema.SFResultKindScan
-	}
-
-	baseRet, err := LoadResultByRuleContent(baseName, ruleContent, kind)
-	if err != nil || baseRet == nil {
-		return
-	}
-	// Hydrate risks from cached audit metadata (loadResult only fills dbResult).
-	if baseRet.dbResult != nil && len(baseRet.riskMap) < len(baseRet.dbResult.RiskHashs) {
-		for name := range baseRet.dbResult.RiskHashs {
-			baseRet.getRisk(name)
-		}
-	}
-
-	merged := 0
-	for name, risk := range baseRet.riskMap {
-		if risk == nil {
-			continue
-		}
-		path := normalizeOverlayFilePath(risk.CodeSourceUrl, baseName)
-		if path == "" {
-			continue
-		}
-		// Merge risks on unchanged base files. FileToLayerMap only lists overlay-
-		// touched paths (~36); the vast majority of base files are absent from the
-		// map and must still reuse base scan results. Skip only upper-layer overrides.
-		if overlay.IsOverriddenFile(path) {
-			continue
-		}
-		if _, exists := ret.riskMap[name]; exists {
-			continue
-		}
-		// Re-tag program name to the overlay (top) program for consistent reporting.
-		copied := *risk
-		if ret.program != nil {
-			copied.ProgramName = ret.program.GetProgramName()
-		}
-		ret.riskMap[name] = &copied
-		merged++
-	}
-	if merged > 0 {
-		log.Infof("overlay result reuse: merged %d base-only risks from program %s", merged, baseName)
+		_ = baseProgramName
+		// no-op: dual-source IR routing replaced cache merge / skip-base
 	}
 }
 
@@ -707,18 +576,16 @@ func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...Que
 			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
 		),
 	)
-	// Explicitly set config.program to top layer's program for saving risks
+	// Explicitly set config.program to top layer's program for saving risks.
+	// Dual-source IR routing handles base+diff without audit cache reuse.
 	if len(p.Layers) > 0 {
 		topLayer := p.Layers[len(p.Layers)-1]
 		if topLayer != nil && topLayer.Program != nil {
 			opts = append(opts, QueryWithProgram(topLayer.Program))
 		}
-		// Enable base result reuse when base layer name is known (no-op if no cache).
-		if p.reuseBaseProgramName != "" {
-			opts = append(opts, QueryWithOverlayResultReuse(p.reuseBaseProgramName))
-		} else if layer0 := p.Layers[0]; layer0 != nil && layer0.Program != nil {
-			opts = append(opts, QueryWithOverlayResultReuse(layer0.Program.GetProgramName()))
-		}
+		part := p.GetScanFilePartition()
+		log.Infof("overlay SF dual-source scan: layers=%d aggregated=%d overridden=%d unchanged=%d deleted=%d",
+			len(p.Layers), part.AggregatedCount, len(part.Overridden), len(part.Unchanged), len(part.Deleted))
 	}
 	return QuerySyntaxflow(opts...)
 }
@@ -730,16 +597,12 @@ func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*Sy
 			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
 		),
 	)
-	// Explicitly set config.program to top layer's program for saving risks
+	// Explicitly set config.program to top layer's program for saving risks.
+	// Dual-source IR routing handles base+diff without audit cache reuse.
 	if len(p.Layers) > 0 {
 		topLayer := p.Layers[len(p.Layers)-1]
 		if topLayer != nil && topLayer.Program != nil {
 			opts = append(opts, QueryWithProgram(topLayer.Program))
-		}
-		if p.reuseBaseProgramName != "" {
-			opts = append(opts, QueryWithOverlayResultReuse(p.reuseBaseProgramName))
-		} else if layer0 := p.Layers[0]; layer0 != nil && layer0.Program != nil {
-			opts = append(opts, QueryWithOverlayResultReuse(layer0.Program.GetProgramName()))
 		}
 	}
 	return QuerySyntaxflow(opts...)

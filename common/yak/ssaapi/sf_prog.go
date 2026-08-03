@@ -310,6 +310,25 @@ func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode
 	return len(values) > 0, ToSFVMValues(values), nil
 }
 
+// matchVariableWithIncludeFiles 搜索变量，仅保留 includeFiles 中的结果
+func (p *Program) matchVariableWithIncludeFiles(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string, includeFiles []string) (bool, sfvm.Values, error) {
+	if len(includeFiles) == 0 {
+		return false, nil, nil
+	}
+	var values Values = lo.FilterMap(
+		ssa.MatchInstructionsByVariableWithIncludeFiles(ctx, p.Program, compareMode, mod, pattern, includeFiles),
+		func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, err := p.NewValue(i); err != nil {
+				log.Errorf("matchVariable include: new value failed: %v", err)
+				return nil, false
+			} else {
+				return v, true
+			}
+		},
+	)
+	return len(values) > 0, ToSFVMValues(values), nil
+}
+
 func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported list index")
 }

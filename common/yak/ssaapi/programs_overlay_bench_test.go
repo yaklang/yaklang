@@ -42,6 +42,12 @@ public class A {
 				require.True(t, overlay.IsBaseOnlyFile("/Keep.java") || overlay.IsBaseOnlyFile("Keep.java"),
 					"Keep.java should remain base-only")
 
+				part := overlay.GetScanFilePartition()
+				require.Contains(t, part.Overridden, "/A.java")
+				require.NotContains(t, part.Overridden, "/Keep.java")
+				ownedDiff := overlay.PathsOwnedByLayer(2)
+				require.Contains(t, ownedDiff, "/A.java")
+
 				res, err := overlay.SyntaxFlowWithError(`valueStr as $res`)
 				require.NoError(t, err)
 				ssatest.CompareResult(t, true, res, map[string][]string{
@@ -53,6 +59,12 @@ public class A {
 				ssatest.CompareResult(t, true, keep, map[string][]string{
 					"res": {"Keep from Base"},
 				})
+
+				// Dual-source Ref: overridden from owner layer, unchanged from base.
+				vals := overlay.Ref("valueStr")
+				require.NotEmpty(t, vals)
+				keepVals := overlay.Ref("keepStr")
+				require.NotEmpty(t, keepVals)
 			},
 		},
 	)

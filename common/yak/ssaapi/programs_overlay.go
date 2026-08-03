@@ -61,13 +61,8 @@ type ProgramOverLay struct {
 	// signatureCache 缓存 Value 的签名，用于重定位
 	signatureCache *utils.CacheWithKey[string, *Value]
 
-	// reuseBaseProgramName: when set, overlay SyntaxFlow may merge risks from a
-	// previous base-program scan for files in baseOnlyFiles (unchanged files).
+	// reuseBaseProgramName: optional hint for ResolveReuseBaseProgramName (compat).
 	reuseBaseProgramName string
-
-	// skipBaseLayerQuery: when true, queryMatch/Ref skip layer 0 and rely on
-	// mergeUnchangedFileRisksFromBaseCache for base-only file results.
-	skipBaseLayerQuery bool
 
 	// overlay 的元数据（用于实现 Program interface）
 	programName string
@@ -278,26 +273,7 @@ func (p *ProgramOverLay) GetReuseBaseProgramName() string {
 	return p.reuseBaseProgramName
 }
 
-// SetSkipBaseLayerQuery skips IR queries against layer 0 during SyntaxFlow.
-func (p *ProgramOverLay) SetSkipBaseLayerQuery(skip bool) {
-	if p == nil {
-		return
-	}
-	p.skipBaseLayerQuery = skip
-}
-
-func (p *ProgramOverLay) ShouldSkipBaseLayerQuery() bool {
-	return p != nil && p.skipBaseLayerQuery
-}
-
-func (p *ProgramOverLay) queryLayerLoopStartIndex() int {
-	if p != nil && p.skipBaseLayerQuery && len(p.Layers) > 1 {
-		return 1
-	}
-	return 0
-}
-
-// ResolveReuseBaseProgramName returns the flat bottom program used for base scan cache lookup.
+// ResolveReuseBaseProgramName returns the flat bottom program name for this overlay.
 func (p *ProgramOverLay) ResolveReuseBaseProgramName() string {
 	if p == nil {
 		return ""
@@ -337,6 +313,93 @@ func (p *ProgramOverLay) IsOverriddenFile(path string) bool {
 		return false
 	}
 	return p.overriddenFiles.Have(ensureOverlayPathSlash(path))
+}
+
+// ScanFilePartition describes the effective overlay file view for incremental scan.
+// Aggregated ≈ base ∪ overridden − deleted (typically ~4000 files).
+type ScanFilePartition struct {
+	AggregatedCount int
+	Overridden      []string
+	Unchanged       []string
+	Deleted         []string
+}
+
+// GetScanFilePartition returns the dual-source scan partition for this overlay.
+func (p *ProgramOverLay) GetScanFilePartition() ScanFilePartition {
+	out := ScanFilePartition{}
+	if p == nil {
+		return out
+	}
+	aggregated := p.getAggregatedFilesSet()
+	out.AggregatedCount = aggregated.Count()
+
+	overriddenSet := utils.NewSafeMap[struct{}]()
+	for _, path := range p.overriddenFilesList() {
+		path = ensureOverlayPathSlash(path)
+		overriddenSet.Set(path, struct{}{})
+		out.Overridden = append(out.Overridden, path)
+	}
+
+	aggregated.ForEach(func(path string, _ struct{}) bool {
+		path = ensureOverlayPathSlash(path)
+		if overriddenSet.Have(path) {
+			return true
+		}
+		out.Unchanged = append(out.Unchanged, path)
+		return true
+	})
+
+	seenDeleted := utils.NewSafeMap[struct{}]()
+	for i := 1; i < len(p.Layers); i++ {
+		layer := p.Layers[i]
+		if layer == nil || layer.FileHashMap == nil {
+			continue
+		}
+		layer.FileHashMap.ForEach(func(path string, hash int) bool {
+			if hash != -1 {
+				return true
+			}
+			path = ensureOverlayPathSlash(path)
+			if aggregated.Have(path) || seenDeleted.Have(path) {
+				return true
+			}
+			seenDeleted.Set(path, struct{}{})
+			out.Deleted = append(out.Deleted, path)
+			return true
+		})
+	}
+	return out
+}
+
+// GetFileOwnerLayer returns the 1-based owning layer index for a canonical path.
+func (p *ProgramOverLay) GetFileOwnerLayer(path string) (int, bool) {
+	if p == nil || p.FileToLayerMap == nil || path == "" {
+		return 0, false
+	}
+	return p.FileToLayerMap.Get(ensureOverlayPathSlash(path))
+}
+
+// IsPresentInAggregatedView reports whether path is in the final aggregated file set.
+func (p *ProgramOverLay) IsPresentInAggregatedView(path string) bool {
+	if p == nil || path == "" {
+		return false
+	}
+	return p.getAggregatedFilesSet().Have(ensureOverlayPathSlash(path))
+}
+
+// PathsOwnedByLayer returns canonical paths whose FileToLayerMap owner is layerIndex (1-based).
+func (p *ProgramOverLay) PathsOwnedByLayer(layerIndex int) []string {
+	if p == nil || p.FileToLayerMap == nil || layerIndex < 1 {
+		return nil
+	}
+	var out []string
+	p.FileToLayerMap.ForEach(func(path string, idx int) bool {
+		if idx == layerIndex {
+			out = append(out, ensureOverlayPathSlash(path))
+		}
+		return true
+	})
+	return out
 }
 
 func createLayer1FromProgram(prog *Program, layerIndex int) *ProgramLayer {
@@ -1110,63 +1173,72 @@ func (p *ProgramOverLay) isVisibleValueInLayer(v *Value, layer *ProgramLayer, la
 	return true
 }
 
-// Ref 实现基于层的查找策略：从上层到下层，上层覆盖下层
+// appendVisibleLayerValues merges layerValues into result with file-path dedupe.
+func (p *ProgramOverLay) appendVisibleLayerValues(
+	result Values,
+	foundFiles *utils.SafeMap[struct{}],
+	layer *ProgramLayer,
+	layerPos int,
+	layerValues Values,
+) Values {
+	if layer == nil || layer.Program == nil || len(layerValues) == 0 {
+		return result
+	}
+	layerProgramName := layer.Program.GetProgramName()
+	for _, v := range layerValues {
+		if !p.isVisibleValueInLayer(v, layer, layerPos) {
+			continue
+		}
+		filePath := p.getValueFilePath(v)
+		if filePath == "" {
+			result = append(result, v)
+			continue
+		}
+		normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
+		if foundFiles.Have(normalizedPath) {
+			continue
+		}
+		foundFiles.Set(normalizedPath, struct{}{})
+		result = append(result, v)
+	}
+	return result
+}
+
+// Ref dual-source routing: base layer (exclude overridden) + each owner layer (include owned paths).
+// Avoids N-layer full IR scans that explode cost on large base programs.
 func (p *ProgramOverLay) Ref(name string) Values {
 	var result Values
-	if p == nil {
+	if p == nil || len(p.Layers) == 0 {
 		return result
 	}
 
 	foundFiles := utils.NewSafeMap[struct{}]()
-	excludeFiles := make([]string, 0)
-	overriddenSeed := p.overriddenFilesList()
 
-	for i := len(p.Layers) - 1; i >= p.queryLayerLoopStartIndex(); i-- {
+	// Diff sources first (upper layers own overridden files).
+	for i := len(p.Layers) - 1; i >= 1; i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
 		}
-
-		layerProgramName := layer.Program.GetProgramName()
-		layerExclude := excludeFiles
-		if i == 0 && len(overriddenSeed) > 0 {
-			layerExclude = append(append([]string(nil), overriddenSeed...), excludeFiles...)
+		owned := p.PathsOwnedByLayer(layer.LayerIndex)
+		if len(owned) == 0 {
+			continue
 		}
+		layerValues := layer.Program.refWithIncludeFiles(name, owned)
+		result = p.appendVisibleLayerValues(result, foundFiles, layer, i, layerValues)
+	}
 
+	// Base source: unchanged files (~3960) via exclude of overridden paths.
+	base := p.Layers[0]
+	if base != nil && base.Program != nil {
+		overridden := p.overriddenFilesList()
 		var layerValues Values
-		if len(layerExclude) > 0 {
-			layerValues = layer.Program.refWithExcludeFiles(name, layerExclude)
+		if len(overridden) > 0 {
+			layerValues = base.Program.refWithExcludeFiles(name, overridden)
 		} else {
-			layerValues = layer.Program.Ref(name)
+			layerValues = base.Program.Ref(name)
 		}
-
-		currentLayerFoundFiles := utils.NewSafeMap[struct{}]()
-
-		for _, v := range layerValues {
-			if !p.isVisibleValueInLayer(v, layer, i) {
-				continue
-			}
-
-			filePath := p.getValueFilePath(v)
-			if filePath == "" {
-				result = append(result, v)
-				continue
-			}
-
-			normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
-			if foundFiles.Have(normalizedPath) {
-				continue
-			}
-
-			currentLayerFoundFiles.Set(normalizedPath, struct{}{})
-			result = append(result, v)
-		}
-
-		currentLayerFoundFiles.ForEach(func(file string, _ struct{}) bool {
-			foundFiles.Set(file, struct{}{})
-			excludeFiles = append(excludeFiles, file)
-			return true
-		})
+		result = p.appendVisibleLayerValues(result, foundFiles, base, 0, layerValues)
 	}
 
 	return result
@@ -1405,96 +1477,89 @@ func (p *ProgramOverLay) Recursive(f func(sfvm.ValueOperator) error) error {
 	return nil
 }
 
-// queryMatch 通用的查询匹配方法，应用上层优先策略
+// queryMatch uses dual-source routing: owner layers with include, base with exclude.
 func (p *ProgramOverLay) queryMatch(
 	ctx context.Context,
 	mod ssadb.MatchMode,
-	queryFunc func(*Program, context.Context, ssadb.MatchMode, string, []string) (bool, sfvm.Values, error),
+	compareMode ssadb.CompareMode,
 	query string,
 ) (bool, sfvm.Values, error) {
-	if p == nil {
+	if p == nil || len(p.Layers) == 0 {
 		return false, nil, nil
 	}
 
 	results := make([]sfvm.ValueOperator, 0)
 	foundFiles := utils.NewSafeMap[struct{}]()
-	excludeFiles := make([]string, 0)
-	overriddenSeed := p.overriddenFilesList()
 
-	for i := len(p.Layers) - 1; i >= p.queryLayerLoopStartIndex(); i-- {
+	collect := func(layer *ProgramLayer, layerPos int, vals sfvm.Values) {
+		if layer == nil || layer.Program == nil || vals == nil {
+			return
+		}
+		layerProgramName := layer.Program.GetProgramName()
+		_ = vals.Recursive(func(op sfvm.ValueOperator) error {
+			v, ok := op.(*Value)
+			if !ok {
+				results = append(results, op)
+				return nil
+			}
+			if !p.isVisibleValueInLayer(v, layer, layerPos) {
+				return nil
+			}
+			filePath := p.getValueFilePath(v)
+			if filePath == "" {
+				results = append(results, v)
+				return nil
+			}
+			normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
+			if foundFiles.Have(normalizedPath) {
+				return nil
+			}
+			foundFiles.Set(normalizedPath, struct{}{})
+			results = append(results, v)
+			return nil
+		})
+	}
+
+	// Diff sources: each owner layer with include of owned paths.
+	for i := len(p.Layers) - 1; i >= 1; i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
 		}
-
-		// Base layer: exclude all overridden files up-front (not only files that
-		// happened to match on an upper layer in this query). Upper layers must
-		// still see their own files, so do not seed exclude for them.
-		layerExclude := excludeFiles
-		if i == 0 && len(overriddenSeed) > 0 {
-			layerExclude = append(append([]string(nil), overriddenSeed...), excludeFiles...)
-		}
-
-		layerProgramName := layer.Program.GetProgramName()
-		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, layerExclude)
-		if err != nil {
+		owned := p.PathsOwnedByLayer(layer.LayerIndex)
+		if len(owned) == 0 {
 			continue
 		}
-
-		currentLayerFoundFiles := utils.NewSafeMap[struct{}]()
-		if matched {
-			vals.Recursive(func(op sfvm.ValueOperator) error {
-				if v, ok := op.(*Value); ok {
-					if !p.isVisibleValueInLayer(v, layer, i) {
-						return nil
-					}
-
-					filePath := p.getValueFilePath(v)
-					if filePath == "" {
-						results = append(results, v)
-						return nil
-					}
-
-					normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
-					if foundFiles.Have(normalizedPath) {
-						return nil
-					}
-
-					currentLayerFoundFiles.Set(normalizedPath, struct{}{})
-					results = append(results, v)
-					return nil
-				}
-				results = append(results, op)
-				return nil
-			})
+		matched, vals, err := layer.Program.matchVariableWithIncludeFiles(ctx, compareMode, mod, query, owned)
+		if err != nil || !matched {
+			continue
 		}
+		collect(layer, i, vals)
+	}
 
-		currentLayerFoundFiles.ForEach(func(file string, _ struct{}) bool {
-			foundFiles.Set(file, struct{}{})
-			excludeFiles = append(excludeFiles, file)
-			return true
-		})
+	// Base source: exclude overridden files.
+	base := p.Layers[0]
+	if base != nil && base.Program != nil {
+		overridden := p.overriddenFilesList()
+		matched, vals, err := base.Program.matchVariableWithExcludeFiles(ctx, compareMode, mod, query, overridden)
+		if err == nil && matched {
+			collect(base, 0, vals)
+		}
 	}
 
 	return len(results) > 0, sfvm.NewValues(results), nil
 }
 
 func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.Values, error) {
-		return prog.matchVariableWithExcludeFiles(ctx, ssadb.ExactCompare, mod, query, excludeFiles)
-	}, want)
+	return p.queryMatch(ctx, mod, ssadb.ExactCompare, want)
 }
 
 func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.Values, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.Values, error) {
-		return prog.matchVariableWithExcludeFiles(ctx, ssadb.GlobCompare, mod, query, excludeFiles)
-	}, g)
+	return p.queryMatch(ctx, mod, ssadb.GlobCompare, g)
 }
 
 func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.Values, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.Values, error) {
-		return prog.matchVariableWithExcludeFiles(ctx, ssadb.RegexpCompare, mod, query, excludeFiles)
-	}, re)
+	return p.queryMatch(ctx, mod, ssadb.RegexpCompare, re)
 }
 
 func (p *ProgramOverLay) GetCalled() (sfvm.Values, error) {
@@ -1552,23 +1617,29 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 
 	results := make([]sfvm.ValueOperator, 0)
 	foundFiles := utils.NewSafeMap[struct{}]()
+	ownedByLayer := make(map[int]*utils.SafeMap[struct{}])
+	for layerIdx := 1; layerIdx <= len(p.Layers); layerIdx++ {
+		set := utils.NewSafeMap[struct{}]()
+		for _, path := range p.PathsOwnedByLayer(layerIdx) {
+			set.Set(path, struct{}{})
+		}
+		ownedByLayer[layerIdx] = set
+	}
 	overridden := utils.NewSafeMap[struct{}]()
 	for _, path := range p.overriddenFilesList() {
 		overridden.Set(path, struct{}{})
 	}
 
-	for i := len(p.Layers) - 1; i >= p.queryLayerLoopStartIndex(); i-- {
-		layer := p.Layers[i]
+	collectLayer := func(i int, layer *ProgramLayer) {
 		if layer == nil || layer.Program == nil {
-			continue
+			return
 		}
-
 		layerProgramName := layer.Program.GetProgramName()
 		values, _ := compare(layer.Program)
 		if values.IsEmpty() {
-			continue
+			return
 		}
-
+		owned := ownedByLayer[layer.LayerIndex]
 		_ = values.Recursive(func(operator sfvm.ValueOperator) error {
 			v, ok := operator.(*Value)
 			if !ok {
@@ -1578,13 +1649,15 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 			if !p.isVisibleValueInLayer(v, layer, i) {
 				return nil
 			}
-
 			filePath := p.getValueFilePath(v)
 			if filePath != "" {
 				normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
-				// Base layer: skip files owned by upper layers (even if compare
-				// still returned them — post-filter without exclude push-down).
-				if i == 0 && overridden.Have(normalizedPath) {
+				if i == 0 {
+					if overridden.Have(normalizedPath) {
+						return nil
+					}
+				} else if owned != nil && !owned.Have(normalizedPath) {
+					// Upper layer IR may still contain files later overridden by a higher layer.
 					return nil
 				}
 				if foundFiles.Have(normalizedPath) {
@@ -1592,10 +1665,17 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 				}
 				foundFiles.Set(normalizedPath, struct{}{})
 			}
-
 			results = append(results, v)
 			return nil
 		})
+	}
+
+	// Diff owner layers first, then base (dual-source order).
+	for i := len(p.Layers) - 1; i >= 1; i-- {
+		collectLayer(i, p.Layers[i])
+	}
+	if len(p.Layers) > 0 {
+		collectLayer(0, p.Layers[0])
 	}
 
 	return sfvm.NewValues(results)
