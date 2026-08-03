@@ -281,10 +281,23 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
+
+		cli.StringFlag{
+			Name:  "debug",
+			Usage: "enable pprof/debug output: specify a directory path; creates structured output with ssadb.db, log, report, cmd.txt, and pprof subdirectories",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if ret, err := log.ParseLevel(c.String("log")); err == nil {
 			log.SetLevel(ret)
+		}
+
+		if debugDir := c.String("debug"); debugDir != "" {
+			cleanup, err := setupDebugDir(c, debugDir)
+			if err != nil {
+				return utils.Errorf("setup debug dir failed: %v", err)
+			}
+			defer cleanup()
 		}
 
 		configFilePath := c.String("config")
@@ -1388,6 +1401,11 @@ and exports structured report (sarif/irify).`,
 			Name:  "syntaxflow,sf",
 			Usage: "custom rules: inline syntaxflow, .sf/.syntaxflow file, or directory",
 		},
+
+		cli.StringFlag{
+			Name:  "debug",
+			Usage: "enable pprof/debug output: specify a directory path; creates structured output with ssadb.db, log, report, cmd.txt, and pprof subdirectories",
+		},
 	},
 	Action: func(c *cli.Context) (e error) {
 		defer func() {
@@ -1400,6 +1418,20 @@ and exports structured report (sarif/irify).`,
 			}
 		}()
 		ctx := context.Background()
+
+		var pprofCleanup func()
+		if debugDir := c.String("debug"); debugDir != "" {
+			cleanup, err := setupDebugDir(c, debugDir)
+			if err != nil {
+				return utils.Errorf("setup debug dir failed: %v", err)
+			}
+			pprofCleanup = cleanup
+			defer func() {
+				if pprofCleanup != nil {
+					pprofCleanup()
+				}
+			}()
+		}
 
 		if logLevel := c.String("log-level"); logLevel != "" {
 			level, err := log.ParseLevel(logLevel)

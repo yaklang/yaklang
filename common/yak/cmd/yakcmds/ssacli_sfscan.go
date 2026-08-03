@@ -2,11 +2,14 @@ package yakcmds
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/urfavecli"
@@ -102,8 +105,13 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 		opts = append(opts, ssaconfig.WithSyntaxFlowMemory(true))
 	}
 
-	// Output file
-	if outputFile := c.String("output"); outputFile != "" {
+	// Output file (auto-redirect to <debugDir>/report when --debug is set and --output is not)
+	outputFile := c.String("output")
+	if outputFile == "" && c.String("debug") != "" {
+		outputFile = filepath.Join(c.String("debug"), "report")
+		log.Infof("[debug] report output redirected to: %s", outputFile)
+	}
+	if outputFile != "" {
 		opts = append(opts, ssaconfig.WithOutputFile(outputFile))
 	}
 
@@ -155,7 +163,7 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	config.Format = sfreport.ReportTypeFromString(outputFormat)
 
 	// 处理输出文件
-	outputFile := cfg.GetOutputFile()
+	outputFile = cfg.GetOutputFile()
 	if outputFile == "" {
 		log.Infof("output file is not specified, use stdout")
 		config.OutputWriter = os.Stdout
@@ -492,6 +500,10 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 	}
 	if cliCtx.IsSet("output") {
 		opts = append(opts, ssaconfig.WithOutputFile(cliCtx.String("output")))
+	} else if debugDir := cliCtx.String("debug"); debugDir != "" {
+		reportPath := filepath.Join(debugDir, "report")
+		opts = append(opts, ssaconfig.WithOutputFile(reportPath))
+		log.Infof("[debug] report output redirected to: %s", reportPath)
 	}
 	if cliCtx.IsSet("with-file-content") {
 		opts = append(opts, ssaconfig.WithOutputFileContent(cliCtx.Bool("with-file-content")))
@@ -520,4 +532,60 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 		}
 	}
 	return nil
+}
+
+// setupDebugDir creates a structured debug output directory and wires up all
+// the output paths. It:
+//  1. Creates the directory structure: <dir>/{cpu-pprof,memory-pprof,goroutine-pprof}
+//  2. Redirects --database to <dir>/ssadb.db
+//  3. Redirects --output to <dir>/report
+//  4. Saves the launch command to <dir>/cmd.txt
+//  5. Starts a pprof HTTP server and periodic pprof collector
+//
+// The returned cleanup function stops the pprof collector and should be deferred.
+func setupDebugDir(c *cli.Context, dir string) (func(), error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, utils.Errorf("create debug dir %s: %v", dir, err)
+	}
+
+	// Save the launch command
+	cmdPath := filepath.Join(dir, "cmd.txt")
+	cmdContent := fmt.Sprintf("yak %s\n\nFull command:\n%s\n\nTimestamp: %s\n",
+		c.Command.Name,
+		strings.Join(os.Args, " "),
+		time.Now().Format("2006-01-02 15:04:05 -07:00"),
+	)
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0o644); err != nil {
+		return nil, utils.Errorf("write cmd.txt: %v", err)
+	}
+
+	// Redirect SSA database to <dir>/ssadb.db
+	ssadbPath := filepath.Join(dir, "ssadb.db")
+	if err := consts.SetGormSSAProjectDatabaseByInfo(ssadbPath); err != nil {
+		return nil, utils.Errorf("set SSA database to %s: %v", ssadbPath, err)
+	}
+	log.Infof("[debug] SSA database: %s", ssadbPath)
+
+	// Redirect log output to <dir>/log (in addition to stdout)
+	logPath := filepath.Join(dir, "log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, utils.Errorf("create log file %s: %v", logPath, err)
+	}
+	log.Infof("[debug] log output: %s", logPath)
+	log.SetOutput(io.MultiWriter(logFile, os.Stdout))
+
+	// Start pprof collector
+	cleanup, err := ssaapi.StartPprofCollector(dir)
+	if err != nil {
+		logFile.Close()
+		return nil, utils.Errorf("start pprof collector: %v", err)
+	}
+
+	originalCleanup := cleanup
+	combinedCleanup := func() {
+		originalCleanup()
+		logFile.Close()
+	}
+	return combinedCleanup, nil
 }
