@@ -39,7 +39,7 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.Contains(t, defaultLoopInstruction, "Observation 打开了新的分支")
 	require.Contains(t, defaultLoopInstruction, "具体目标")
 	require.Contains(t, defaultLoopInstruction, "来源证据")
-	require.Contains(t, defaultLoopInstruction, "下一步动作")
+	require.Contains(t, defaultLoopInstruction, "可验证假设")
 	require.Contains(t, defaultLoopInstruction, "文本以\"待探索：\"开头")
 	require.Contains(t, defaultLoopInstruction, "存在开放 TODO 时不得 `finish`")
 	require.Contains(t, defaultLoopInstruction, "不得为清空列表伪造 `resolved`")
@@ -114,7 +114,7 @@ func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
 			name: "low value ideas do not inflate the frontier or justify finish",
 			required: []string{
 				"只要求范围内、具体、可追溯出处",
-				"无目标、无来源、无下一步",
+				"无目标、无来源、无可验证假设",
 				"存在开放 TODO 时不得 `finish`",
 			},
 		},
