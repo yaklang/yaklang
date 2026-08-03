@@ -12,6 +12,21 @@
 
 *. 如果你想要使用工具：
     * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "先读取配置"}`
+
+*. `todo_delta` 使用案例（维护 TODO 工作集，与正常动作同轮携带）：
+    * 任务一开始就需要拆成多个入口时，第一条动作同时建立初始 TODO 并指定 current：
+      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "先探测登录接口的认证方式", "todo_delta": {"add": [{"id": "login_auth", "text": "验证 /api/login 的认证方式：来源为 crawler 发现的表单 action；下一步发一次空凭据请求看返回码"}, {"id": "explore_admin", "text": "待探索：/admin/ 路径下的后台入口，来源为 sitemap.xml；尚未访问"}], "current": "login_auth"}}`
+    * 工具 Observation 暴露了新的范围内入口（例如响应里出现了新的跳转链接）：先把新线索记为"待探索"再继续推进 current：
+      `{"@action": "directly_call_tool", "identifier": "http_request", "human_readable_thought": "对比携带旧token和新token的响应差异", "todo_delta": {"add": [{"id": "explore_refresh_token", "text": "待探索：/api/v2/token/refresh 接口，来源为上一次响应头 Set-Cookie 差异；尚未验证是否可重放"}]}}`
+    * 当前 current 已有结论，关闭并切换到下一条待探索项：
+      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "切换到验证token刷新重放", "todo_delta": {"close": [{"id": "login_auth", "outcome": "resolved", "reason": "空凭据请求返回401且响应体无敏感信息泄露，未发现认证绕过", "refs": ["tool-call-3"]}], "current": "explore_refresh_token"}}`
+
+*. `save_evidence` 使用案例（确认关键事实后主动沉淀，不等任务结束）：
+    * 确认一个安全风险后，先落证据再继续，同时把新发现的关联入口记为待探索：
+      `{"@action": "save_evidence", "verification_payload": "确认 /api/v2/token/refresh 存在重放漏洞：同一 refresh_token 重放两次均返回 200 且下发新的有效 access_token，未做一次性校验，响应字段 access_token 每次不同但均可正常鉴权", "todo_delta": {"add": [{"id": "check_logout_invalidate", "text": "待探索：验证退出登录后 refresh_token 是否失效，来源为本次重放漏洞的关联假设"}]}}`
+    * 排除一条路径时，写明实验条件和对照，而不是单次未命中就下结论：
+      `{"@action": "save_evidence", "verification_payload": "排除 /admin/ 路径存在未授权访问：对比携带有效 session 与清空 Cookie 两种请求，未登录时返回 302 跳转至登录页，与预期基线一致，字段和状态码均无差异"}`
+
 {{ if .AllowKnowledgeEnhanceAnswer }}*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:
     * `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "..[rewrite-user-query]..", "human_readable_thought": "先补充资料"}
 {{end}}
