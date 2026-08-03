@@ -268,6 +268,9 @@ func (r *SyntaxFlowResult) GetFileCount() int {
 		return 0
 	}
 	if r.program != nil {
+		if overlay := r.program.GetOverlay(); overlay != nil {
+			return overlay.GetFileCount()
+		}
 		return len(r.program.Program.FileList)
 	}
 	return 0

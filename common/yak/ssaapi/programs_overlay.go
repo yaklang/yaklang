@@ -65,6 +65,10 @@ type ProgramOverLay struct {
 	// previous base-program scan for files in baseOnlyFiles (unchanged files).
 	reuseBaseProgramName string
 
+	// skipBaseLayerQuery: when true, queryMatch/Ref skip layer 0 and rely on
+	// mergeUnchangedFileRisksFromBaseCache for base-only file results.
+	skipBaseLayerQuery bool
+
 	// overlay 的元数据（用于实现 Program interface）
 	programName string
 	programKind ssadb.ProgramKind
@@ -274,12 +278,65 @@ func (p *ProgramOverLay) GetReuseBaseProgramName() string {
 	return p.reuseBaseProgramName
 }
 
+// SetSkipBaseLayerQuery skips IR queries against layer 0 during SyntaxFlow.
+func (p *ProgramOverLay) SetSkipBaseLayerQuery(skip bool) {
+	if p == nil {
+		return
+	}
+	p.skipBaseLayerQuery = skip
+}
+
+func (p *ProgramOverLay) ShouldSkipBaseLayerQuery() bool {
+	return p != nil && p.skipBaseLayerQuery
+}
+
+func (p *ProgramOverLay) queryLayerLoopStartIndex() int {
+	if p != nil && p.skipBaseLayerQuery && len(p.Layers) > 1 {
+		return 1
+	}
+	return 0
+}
+
+// ResolveReuseBaseProgramName returns the flat bottom program used for base scan cache lookup.
+func (p *ProgramOverLay) ResolveReuseBaseProgramName() string {
+	if p == nil {
+		return ""
+	}
+	if name := p.reuseBaseProgramName; name != "" && name != "__auto__" {
+		return name
+	}
+	return p.flatBottomProgramName()
+}
+
+func (p *ProgramOverLay) flatBottomProgramName() string {
+	if p == nil || len(p.Layers) == 0 || p.Layers[0] == nil || p.Layers[0].Program == nil {
+		return ""
+	}
+	prog := p.Layers[0].Program
+	for i := 0; i < 16; i++ {
+		if ov := prog.GetOverlay(); ov != nil && len(ov.Layers) > 0 && ov.Layers[0] != nil && ov.Layers[0].Program != nil {
+			prog = ov.Layers[0].Program
+			continue
+		}
+		return prog.GetProgramName()
+	}
+	return prog.GetProgramName()
+}
+
 // IsBaseOnlyFile reports whether path is owned solely by the base layer.
 func (p *ProgramOverLay) IsBaseOnlyFile(path string) bool {
 	if p == nil || p.baseOnlyFiles == nil {
 		return false
 	}
 	return p.baseOnlyFiles.Have(ensureOverlayPathSlash(path))
+}
+
+// IsOverriddenFile reports whether an upper overlay layer owns the file.
+func (p *ProgramOverLay) IsOverriddenFile(path string) bool {
+	if p == nil || p.overriddenFiles == nil {
+		return false
+	}
+	return p.overriddenFiles.Have(ensureOverlayPathSlash(path))
 }
 
 func createLayer1FromProgram(prog *Program, layerIndex int) *ProgramLayer {
@@ -1042,7 +1099,7 @@ func (p *ProgramOverLay) Ref(name string) Values {
 	excludeFiles := make([]string, 0)
 	overriddenSeed := p.overriddenFilesList()
 
-	for i := len(p.Layers) - 1; i >= 0; i-- {
+	for i := len(p.Layers) - 1; i >= p.queryLayerLoopStartIndex(); i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
@@ -1342,7 +1399,7 @@ func (p *ProgramOverLay) queryMatch(
 	excludeFiles := make([]string, 0)
 	overriddenSeed := p.overriddenFilesList()
 
-	for i := len(p.Layers) - 1; i >= 0; i-- {
+	for i := len(p.Layers) - 1; i >= p.queryLayerLoopStartIndex(); i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
@@ -1478,7 +1535,7 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 		overridden.Set(path, struct{}{})
 	}
 
-	for i := len(p.Layers) - 1; i >= 0; i-- {
+	for i := len(p.Layers) - 1; i >= p.queryLayerLoopStartIndex(); i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
