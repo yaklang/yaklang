@@ -75,7 +75,7 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockAfterSessionEvidence(t *testi
 	require.Contains(t, prompt, "- [ ]: [id: collect_signal]: 采集响应特征")
 	require.Contains(t, prompt, "TODO LIST 是 `todo_delta` 累计维护后的只读快照")
 	require.Contains(t, prompt, "见任务指令段 `## TODO 状态维护（todo_delta）` 末尾的")
-	require.Contains(t, prompt, "CURRENT TASK")
+	require.Contains(t, prompt, "只读快照")
 }
 
 // TestPromptManager_AssembleLoopPrompt_TodoBlockSkippedWhenEmpty 验证当
