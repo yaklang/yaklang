@@ -11,7 +11,7 @@ import (
 // directly_answer 与各 loop 专用 directly_answer 复用, 调用方把答复 emit 完
 // 之后调它代替裸 operator.Exit(), 让 "改 directly_answer 很简单".
 //
-// 核心约定 (与 high_static_section.txt 的 "## 任务状态机制: todo_delta"
+// 核心约定 (与 instruction.txt 的 "## TODO 状态维护（todo_delta）"
 // 以及 "统一入口与终结" 对齐): directly_answer 只交付答复, 不应被当成
 // 通用终结器. 普通任务由 finish 收口; 但 intent classifier 已明确标记为
 // simple_query、本轮无有效 todo_delta 且无开放 TODO 时, host 在答复交付后
