@@ -39,7 +39,6 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -282,25 +281,10 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
-		cli.BoolFlag{
-			Name:  "file-perf-log",
-			Usage: "enable file-level compile performance log output",
-		},
-		cli.BoolFlag{
-			Name:  "diagnostics",
-			Usage: "enable SSA compile diagnostics and nested TRACE output",
-		},
-		cli.StringFlag{
-			Name:  "pprof",
-			Usage: `enable pprof and save pprof file to the given path`,
-		},
 	},
 	Action: func(c *cli.Context) error {
 		if ret, err := log.ParseLevel(c.String("log")); err == nil {
 			log.SetLevel(ret)
-		}
-		if pprofFile := c.String("pprof"); pprofFile != "" {
-			diagnostics.StartHeapMonitor(30*time.Second, diagnostics.WithFileName(pprofFile))
 		}
 
 		configFilePath := c.String("config")
@@ -361,12 +345,6 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		programName := compileConfig.GetProgramName()
 		reCompile := compileConfig.GetCompileReCompile()
 		targetPath := compileConfig.GetCodeSourceLocalFileOrURL()
-
-		if programName != "" && compileConfig.diagnosticsEnabled {
-			defer func() {
-				diagnostics.LogRecorder("compile")
-			}()
-		}
 
 		// check program name duplicate
 		if programName != "" {
@@ -1385,23 +1363,8 @@ and exports structured report (sarif/irify).`,
 		// }}}
 
 		cli.StringFlag{
-			Name:  "pprof",
-			Usage: `enable pprof and save pprof file to the given path`,
-		},
-
-		cli.StringFlag{
 			Name:  "log-level,loglevel",
 			Usage: `set log level, default is info, optional value: debug, info, warn, error`,
-		},
-
-		cli.BoolFlag{
-			Name:  "rule-perf-log",
-			Usage: "enable per-rule performance profiling log",
-		},
-
-		cli.BoolFlag{
-			Name:  "file-perf-log",
-			Usage: "enable file-level compile performance profiling log",
 		},
 
 		cli.DurationFlag{
@@ -1438,10 +1401,6 @@ and exports structured report (sarif/irify).`,
 		}()
 		ctx := context.Background()
 
-		if pprofFile := c.String("pprof"); pprofFile != "" {
-			diagnostics.StartHeapMonitor(30*time.Second, diagnostics.WithFileName(pprofFile))
-		}
-
 		if logLevel := c.String("log-level"); logLevel != "" {
 			level, err := log.ParseLevel(logLevel)
 			if err != nil {
@@ -1449,10 +1408,6 @@ and exports structured report (sarif/irify).`,
 				level = log.InfoLevel
 			}
 			log.SetLevel(level)
-		}
-		if diagnostics.Enabled(diagnostics.LevelLow) {
-			defer diagnostics.DefaultRecorder().Log("code-scan")
-			defer diagnostics.LogHeapSnapshot("code_scan_end", true)
 		}
 
 		// 检查是否指定了 config 文件，如果是则走 config-scan 模式
@@ -1575,12 +1530,7 @@ and exports structured report (sarif/irify).`,
 			scanOpt = append(scanOpt,
 				ssaconfig.WithRuleFilter(ruleFilter),
 				ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
-				syntaxflow_scan.WithRulePerformanceLog(c.Bool("rule-perf-log")),
 			)
-		}
-
-		if c.Bool("rule-perf-log") {
-			scanOpt = append(scanOpt, syntaxflow_scan.WithRulePerformanceLog(true))
 		}
 
 		// Per-rule wall-clock budget (default 4h via the flag Value). Bounds
@@ -1665,28 +1615,6 @@ and exports structured report (sarif/irify).`,
 		if err != nil {
 			log.Errorf("scan failed: %s", err)
 			return err
-		}
-		// 输出编译性能汇总表格
-		compileRecorder := diagnostics.DefaultRecorder()
-		if compileRecorder != nil {
-			snapshots := compileRecorder.Snapshot()
-			if len(snapshots) > 0 {
-				table := diagnostics.FormatPerformanceTable("Compilation Performance Summary", snapshots)
-				log.Info("\n" + table)
-			}
-		}
-		// 输出文件性能汇总表格
-		if len(progs) > 0 && progs[0] != nil {
-			if progConfig := progs[0].GetConfig(); progConfig != nil {
-				filePerfRecorder := progConfig.GetFilePerformanceRecorder()
-				if filePerfRecorder != nil {
-					snapshots := filePerfRecorder.Snapshot()
-					if len(snapshots) > 0 {
-						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
-						log.Info("\n" + table)
-					}
-				}
-			}
 		}
 		return nil
 	},

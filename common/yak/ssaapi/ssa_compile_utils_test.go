@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/yaklang/antlr/v4"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/antlr/v4"
 
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -163,7 +163,7 @@ func TestResolveASTBuildWindow_PHPTraceKeepsBalancedWindow(t *testing.T) {
 	decision := cfg.resolveASTBuildWindow(cfg.GetCompileConcurrency())
 
 	require.True(t, decision.largeProject)
-	require.True(t, decision.diagnosticsHeavy)
+	require.False(t, decision.diagnosticsHeavy) // diagnostics monitoring removed
 	require.Equal(t, 2, decision.window)
 	require.Equal(t, int64(10*1024*1024*1024), decision.budgetBytes)
 	require.Equal(t, int64(4*1024*1024*1024), decision.slotCostBytes)

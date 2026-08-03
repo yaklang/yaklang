@@ -5,8 +5,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
@@ -212,9 +212,6 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		// database
 		OptionSaveValue_Database(database),
 		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
-	}
-	if r.program != nil && r.program.config != nil && r.program.config.DiagnosticsEnabled() {
-		opts = append(opts, OptionSaveValue_Diagnostics(r.program.config.DiagnosticsRecorder()))
 	}
 	saveVariable := func(name string, values Values) {
 		// Build a FRESH opts slice per variable. The outer `opts` is shared by

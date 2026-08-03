@@ -24,8 +24,8 @@ func buildFileContent(
 	builder *ssa.FunctionBuilder,
 	fileContent *ssareducer.FileContent,
 	ast ssa.FrontAST,
-	enableFilePerfLog bool,
-	filePerfRecorder *diagnostics.Recorder,
+	_ bool,
+	_ *diagnostics.Recorder,
 ) {
 	path := fileContent.Path
 	fileBuildStart := time.Now()
@@ -34,8 +34,8 @@ func buildFileContent(
 			log.Errorf("parse [%s] error %v  ", path, r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
-		if enableFilePerfLog {
-			recordFilePerformance(filePerfRecorder, "Build", "Build", path, time.Since(fileBuildStart))
+		if d := time.Since(fileBuildStart); d > 100*time.Millisecond {
+			log.Debugf("[file build] %s cost %v", path, d)
 		}
 	}()
 
@@ -207,9 +207,6 @@ func (c *Config) parseProjectWithFSUnits(
 	if err != nil {
 		return nil, err
 	}
-	if rec := c.DiagnosticsRecorder(); rec != nil {
-		prog.SetDiagnosticsRecorder(rec)
-	}
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := s
 		if len(v) > 0 {
@@ -258,11 +255,6 @@ func (c *Config) parseProjectWithFSUnits(
 	astParseErrLogged := 0
 	astParseErrSuppressed := false
 	const maxAstParseErrLogs = 20
-	enableFilePerfLog := c.Config != nil && c.Config.GetCompileFilePerformanceLog()
-	if enableFilePerfLog && c.filePerformanceRecorder == nil {
-		c.filePerformanceRecorder = diagnostics.NewRecorder()
-	}
-	filePerfRecorder := c.filePerformanceRecorder
 	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
 	preHandlerNum := 0
 	preHandlerProcess := func() {
@@ -306,7 +298,6 @@ func (c *Config) parseProjectWithFSUnits(
 				}
 				func(fileContent *ssareducer.FileContent) {
 					defer fileContent.Release()
-					fileASTStart := time.Now()
 					if fileContent.Status == ssareducer.FileStatusFsError {
 						log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 						prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
@@ -359,12 +350,8 @@ func (c *Config) parseProjectWithFSUnits(
 							prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
 								fileBuildStart := time.Now()
 								defer func() {
-									if enableFilePerfLog && filePerfRecorder != nil {
-										fileBuildTime := time.Since(fileBuildStart)
-										filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
-										if fileBuildTime > 100*time.Millisecond {
-											log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
-										}
+									if d := time.Since(fileBuildStart); d > 100*time.Millisecond {
+										log.Debugf("[file build] %s cost %v", path, d)
 									}
 								}()
 								if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
@@ -380,9 +367,6 @@ func (c *Config) parseProjectWithFSUnits(
 						}
 					}
 					fileContent.AST = nil
-					if enableFilePerfLog {
-						recordFilePerformance(filePerfRecorder, "AST", "AST parse", fileContent.Path, time.Since(fileASTStart))
-					}
 				}(fileContent)
 				if c.isStop() {
 					unitCanceled = true
@@ -482,7 +466,6 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, since)
 	}
 	finishTime = time.Since(finishStart)
-	logPhaseHeap("f4_finish")
 
 	compilePhase = "f5_save_db"
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
@@ -506,21 +489,10 @@ func (c *Config) parseProjectWithFSUnits(
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
 		prog.ProcessInfof("[SSA/persist] program %s IR cache flush finished, cost %v", prog.Name, saveTime)
 	}
-	logPhaseHeap("f5_save_db")
 
 	compilePhase = "f6_wait"
 	wg.Wait()
-	logPhaseHeap("f6_wait")
 
-	if enableFilePerfLog && filePerfRecorder != nil {
-		snapshots := filePerfRecorder.Snapshot()
-		if len(snapshots) > 0 {
-			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
-			fmt.Println(table)
-		} else {
-			fmt.Println("File Performance: no data recorded")
-		}
-	}
 	p := NewProgram(prog, c)
 	SaveConfig(c, p)
 	SetProgramCache(p)
@@ -631,9 +603,6 @@ func (c *Config) parseProjectWithFSLegacy(
 	if err != nil {
 		return nil, err
 	}
-	if rec := c.DiagnosticsRecorder(); rec != nil {
-		prog.SetDiagnosticsRecorder(rec)
-	}
 
 	wg.Add(1)
 	go func() {
@@ -676,12 +645,6 @@ func (c *Config) parseProjectWithFSLegacy(
 	astParseErrLogged := 0
 	astParseErrSuppressed := false
 	const maxAstParseErrLogs = 20
-	enableFilePerfLog := c.Config != nil && c.Config.GetCompileFilePerformanceLog()
-	// 创建文件性能 recorder
-	if enableFilePerfLog && c.filePerformanceRecorder == nil {
-		c.filePerformanceRecorder = diagnostics.NewRecorder()
-	}
-	filePerfRecorder := c.filePerformanceRecorder
 	// When pre-handler already emits file skeletons and schedules remaining file
 	// work, the shared pipeline must not capture the whole file AST in another
 	// closure.
@@ -712,7 +675,6 @@ func (c *Config) parseProjectWithFSLegacy(
 			}
 			func(fileContent *ssareducer.FileContent) {
 				defer fileContent.Release()
-				fileASTStart := time.Now()
 				if fileContent.Status == ssareducer.FileStatusFsError {
 					log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 					prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
@@ -773,12 +735,8 @@ func (c *Config) parseProjectWithFSLegacy(
 						prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
 							fileBuildStart := time.Now()
 							defer func() {
-								if enableFilePerfLog && filePerfRecorder != nil {
-									fileBuildTime := time.Since(fileBuildStart)
-									filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
-									if fileBuildTime > 100*time.Millisecond {
-										log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
-									}
+								if d := time.Since(fileBuildStart); d > 100*time.Millisecond {
+									log.Debugf("[file build] %s cost %v", path, d)
 								}
 							}()
 							if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
@@ -797,9 +755,6 @@ func (c *Config) parseProjectWithFSLegacy(
 				// AST root reference. For self-registering languages the body subtrees
 				// are detached, so the rest of the parse tree becomes collectable here.
 				fileContent.AST = nil
-				if enableFilePerfLog {
-					recordFilePerformance(filePerfRecorder, "AST", "AST parse", fileContent.Path, time.Since(fileASTStart))
-				}
 			}(fileContent)
 		}
 		preHandlerTime = time.Since(start)
@@ -921,7 +876,6 @@ func (c *Config) parseProjectWithFSLegacy(
 			compilePhase = phase
 			log.Debugf("ssa.compile.phase enter %s", compilePhase)
 			stepErr := fn()
-			logPhaseHeap(phase)
 			return stepErr
 		}
 	}
@@ -933,43 +887,15 @@ func (c *Config) parseProjectWithFSLegacy(
 		wrapPhase("f5_save_db", f5),
 		wrapPhase("f6_wait", f6),
 	}
-	if rec := c.DiagnosticsRecorder(); rec != nil {
-		err = rec.Track("ParseProjectWithFS", phaseSteps...)
-	} else {
-		for _, step := range phaseSteps {
-			if err = step(); err != nil {
-				break
-			}
+	for _, step := range phaseSteps {
+		if err = step(); err != nil {
+			break
 		}
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	// wall := time.Since(overallStart)
-	// totalCompile := calculateTime + preHandlerTime + parseTime + finishTime + saveTime
-	// log.Infof(
-	// 	"[ssa.compile.summary] program=%s handler_files=%d wall=%s scan=%s pre_handler=%s main_build=%s finish=%s save_instructions=%s phase_sum=%s",
-	// 	prog.Name,
-	// 	len(handlerFilesMap),
-	// 	wall,
-	// 	calculateTime,
-	// 	preHandlerTime,
-	// 	parseTime,
-	// 	finishTime,
-	// 	saveTime,
-	// 	totalCompile,
-	// )
-
 	// 输出文件性能汇总表格
-	if enableFilePerfLog && filePerfRecorder != nil {
-		snapshots := filePerfRecorder.Snapshot()
-		if len(snapshots) > 0 {
-			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
-			fmt.Println(table)
-		} else {
-			fmt.Println("File Performance: no data recorded")
-		}
-	}
 	return NewProgram(prog, c), nil
 }
