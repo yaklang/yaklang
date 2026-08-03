@@ -61,7 +61,11 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 	}
 
 	// 从所有 layer 中查找成员，上层覆盖下层
-	for i := len(overlay.Layers) - 1; i >= 0; i-- {
+	startIdx := 0
+	if overlay.ShouldSkipBaseLayerQuery() && len(overlay.Layers) > 1 {
+		startIdx = 1
+	}
+	for i := len(overlay.Layers) - 1; i >= startIdx; i-- {
 		layer := overlay.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue

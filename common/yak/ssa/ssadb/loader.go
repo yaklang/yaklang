@@ -34,55 +34,80 @@ func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) <-chan 
 	return yieldIrCodes(ctx, progName, ids)
 }
 
-// yieldFromIrIndexWithExcludeFiles queries from IrIndex, excluding specified files
-// DB: query with applied matching conditions (e.g. variable_id = ?)
-// excludeFiles: list of file paths to exclude (normalized paths, e.g. "/test.go")
+// yieldFromIrIndexWithExcludeFiles queries from IrIndex, excluding specified files.
+// Uses fast index pluck + in-memory file filtering instead of a multi-table JOIN.
 func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName string, excludeFiles []string) <-chan *IrCode {
-	var ids []int64
-
-	// Step 1: Get matched value_ids from DB (DB already contains match conditions and program_name)
 	var matchedIds []int64
 	distinctIrIndicesValueID := "DISTINCT " + TableIrIndices + ".value_id"
 	if err := DB.Pluck(distinctIrIndicesValueID, &matchedIds).Error; err != nil {
 		log.Errorf("failed to get matched ids: %v", err)
 		return emptyIrCodeChan()
 	}
-
 	if len(matchedIds) == 0 {
 		return emptyIrCodeChan()
 	}
+	return yieldIrCodesWithExclude(ctx, progName, matchedIds, excludeFiles)
+}
 
-	// Step 2: Join to exclude files based on matched value_ids
-	baseDB := GetDB()
-	query := baseDB.Model(&IrIndex{}).
-		Select(distinctIrIndicesValueID).
-		Joins("INNER JOIN "+TableIrCodes+" ON "+TableIrIndices+".value_id = "+TableIrCodes+".code_id").
-		Joins("INNER JOIN "+TableIrSources+" ON "+TableIrCodes+".source_code_hash = "+TableIrSources+".source_code_hash").
-		Where(TableIrIndices+".program_name = ?", progName).
-		Where(TableIrCodes+".program_name = ?", progName).
-		Where(TableIrSources+".program_name = ?", progName).
-		Where(TableIrIndices+".value_id IN (?)", matchedIds)
-
-	// Add exclusion conditions if needed
-	if len(excludeFiles) > 0 {
-		concatExpr := getConcatExpression(baseDB)
-		excludeConditions := make([]string, 0, len(excludeFiles))
-		excludeArgs := make([]interface{}, 0, len(excludeFiles))
-		for _, filePath := range excludeFiles {
-			normalizedPath := normalizeFilePathForExclusion(filePath)
-			excludeConditions = append(excludeConditions, concatExpr+" != ?")
-			excludeArgs = append(excludeArgs, normalizedPath)
-		}
-		if len(excludeConditions) > 0 {
-			query = query.Where(strings.Join(excludeConditions, " AND "), excludeArgs...)
-		}
+func buildExcludeFileSet(excludeFiles []string) map[string]struct{} {
+	if len(excludeFiles) == 0 {
+		return nil
 	}
-
-	if err := query.Pluck(distinctIrIndicesValueID, &ids).Error; err != nil {
-		log.Errorf("failed to get ids from index with exclude files: %v", err)
-		return emptyIrCodeChan()
+	set := make(map[string]struct{}, len(excludeFiles)*2)
+	for _, filePath := range excludeFiles {
+		n := normalizeFilePathForExclusion(filePath)
+		set[n] = struct{}{}
+		set[strings.TrimPrefix(n, "/")] = struct{}{}
 	}
-	return yieldIrCodes(ctx, progName, ids)
+	return set
+}
+
+func irCodeFilePath(ir *IrCode) string {
+	if ir == nil || ir.IsEmptySourceCodeHash() {
+		return ""
+	}
+	editor, err := GetEditorByHash(ir.SourceCodeHash)
+	if err != nil || editor == nil {
+		return ""
+	}
+	path := editor.GetFilePath()
+	if path == "" {
+		path = editor.GetUrl()
+	}
+	return normalizeFilePathForExclusion(path)
+}
+
+func irCodeExcludedBySet(ir *IrCode, excludeSet map[string]struct{}) bool {
+	if len(excludeSet) == 0 {
+		return false
+	}
+	path := irCodeFilePath(ir)
+	if path == "" {
+		return false
+	}
+	if _, ok := excludeSet[path]; ok {
+		return true
+	}
+	return false
+}
+
+func yieldIrCodesWithExclude(ctx context.Context, progName string, ids []int64, excludeFiles []string) <-chan *IrCode {
+	excludeSet := buildExcludeFileSet(excludeFiles)
+	in := yieldIrCodes(ctx, progName, ids)
+	if len(excludeSet) == 0 {
+		return in
+	}
+	outC := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+	go func() {
+		defer outC.Close()
+		for ir := range in {
+			if irCodeExcludedBySet(ir, excludeSet) {
+				continue
+			}
+			outC.SafeFeed(ir)
+		}
+	}()
+	return outC.OutputChannel()
 }
 
 func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrCode {
@@ -164,27 +189,26 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 				query = query.Where(TableIrCodes+".string REGEXP ?", value)
 			}
 		}
-		// ConstType query also needs file exclusion
-		if len(excludeFiles) > 0 {
-			query = query.Joins("INNER JOIN "+TableIrSources+" ON "+TableIrCodes+".source_code_hash = "+TableIrSources+".source_code_hash").
-				Where(TableIrSources+".program_name = ?", progName)
-			concatExpr := getConcatExpression(GetDB())
-			excludeConditions := make([]string, 0, len(excludeFiles))
-			excludeArgs := make([]interface{}, 0, len(excludeFiles))
-			for _, filePath := range excludeFiles {
-				normalizedPath := normalizeFilePathForExclusion(filePath)
-				excludeConditions = append(excludeConditions, concatExpr+" != ?")
-				excludeArgs = append(excludeArgs, normalizedPath)
-			}
-			if len(excludeConditions) > 0 {
-				query = query.Where(strings.Join(excludeConditions, " AND "), excludeArgs...)
-			}
-		}
+		// ConstType query also needs file exclusion — filter in memory after load.
 		ch := YieldIrCode(query, ctx, progName)
+		if len(excludeFiles) == 0 {
+			resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+			go func() {
+				defer resultCh.Close()
+				for ir := range ch {
+					resultCh.SafeFeed(ir)
+				}
+			}()
+			return resultCh.OutputChannel()
+		}
+		excludeSet := buildExcludeFileSet(excludeFiles)
 		resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
 		go func() {
 			defer resultCh.Close()
 			for ir := range ch {
+				if irCodeExcludedBySet(ir, excludeSet) {
+					continue
+				}
 				resultCh.SafeFeed(ir)
 			}
 		}()
@@ -199,13 +223,7 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 	var resultCh *chanx.UnlimitedChan[*IrCode]
 	if len(excludeFiles) > 0 {
 		ch := yieldFromIrIndexWithExcludeFiles(query, ctx, progName, excludeFiles)
-		resultCh = chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-		go func() {
-			defer resultCh.Close()
-			for ir := range ch {
-				resultCh.SafeFeed(ir)
-			}
-		}()
+		return ch
 	} else {
 		ch := yieldFromIrIndex(query, ctx, progName)
 		resultCh = chanx.NewUnlimitedChan[*IrCode](ctx, 100)

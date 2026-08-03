@@ -300,16 +300,29 @@ func (r *SyntaxFlowResult) YieldRisk() chan *schema.SSARisk {
 	ch := make(chan *schema.SSARisk)
 	go func() {
 		defer close(ch)
+		yielded := make(map[string]struct{})
+		emit := func(risk *schema.SSARisk) {
+			if risk == nil || risk.Hash == "" {
+				return
+			}
+			if _, ok := yielded[risk.Hash]; ok {
+				return
+			}
+			yielded[risk.Hash] = struct{}{}
+			ch <- risk
+		}
+
 		r.GetAlertVariables()
 		r.GetAlertValues().ForEach(func(variable string, v Values) bool {
 			for index := range v {
-				risk := r.GetRiskByValue(variable, index)
-				if risk != nil {
-					ch <- risk
-				}
+				emit(r.GetRiskByValue(variable, index))
 			}
 			return true
 		})
+		// Include merged base-only risks (not present in current rule alert values).
+		for _, risk := range r.riskMap {
+			emit(risk)
+		}
 	}()
 	return ch
 }
