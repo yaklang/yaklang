@@ -1,51 +1,50 @@
 package aireact
 
 import (
+	_ "embed"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
+//go:embed reactloops/loop_default/prompts/instruction.txt
+var defaultLoopInstruction string
+
+//go:embed reactloops/loop_default/prompts/output_example.txt
+var defaultLoopOutputExample string
+
 func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *testing.T) {
 	highStatic := aicommon.SharedPlanAndExecHighStaticTemplate
 	require.Contains(t, highStatic, "区分性优先")
-	require.Contains(t, highStatic, "候选升级")
-	require.Contains(t, highStatic, "行动一致性")
-	require.Contains(t, highStatic, "TODO LIST 只是持久状态的只读投影")
+	require.Contains(t, highStatic, "性价比优先")
+	require.Contains(t, highStatic, "阴性结论 / 歧义场景专用")
 	require.Contains(t, highStatic, "`todo_delta` 是唯一写入通道")
-	require.Contains(t, highStatic, "状态变化必写")
-	require.Contains(t, highStatic, "强制初始化")
-	require.Contains(t, highStatic, "第一条可执行的正常动作必须同时携带 `todo_delta`")
-	require.Contains(t, highStatic, "主次矛盾")
-	require.Contains(t, highStatic, "不改写 Plan 子任务树和 coordinator 调度")
-	require.Contains(t, highStatic, "显式 Survey 阶段可按专用提示完成广度建索引")
-	require.Contains(t, highStatic, "分叉原子落档")
-	require.Contains(t, highStatic, "深度优先")
-	require.Contains(t, highStatic, "故障恢复")
-	require.Contains(t, highStatic, "焦点流动")
-	require.Contains(t, highStatic, "先用 todo_delta 记录分叉，再执行 Current")
-	require.Contains(t, highStatic, "全部合格分支")
-	require.Contains(t, highStatic, "再在同一 `todo_delta` 中设置下一 current")
-	require.Contains(t, highStatic, "具体入口本身就是合格的覆盖分支")
-	require.Contains(t, highStatic, "不要求先出现漏洞信号")
-	require.Contains(t, highStatic, "验证型分支再补可证伪假设")
-	require.Contains(t, highStatic, "单次工具失败、参数校验失败、超时、连接失败、认证拒绝")
-	require.Contains(t, highStatic, "不能据此 close、deferred 或 finish")
-	require.Contains(t, highStatic, "执行有区分力的替代实验")
+	require.Contains(t, highStatic, "此处只定形态")
+	require.Contains(t, highStatic, "`todo_delta` 与 Plan 子任务树服务不同尺度")
+	require.Contains(t, highStatic, "兄弟任务的 TODO 只读可见")
 	require.NotContains(t, highStatic, "严格优先级逆转")
-	require.Contains(t, highStatic, "TODO 清空不是任务完成的充分证据")
-	require.Contains(t, highStatic, "发现一个或多个满足四项的行动时不得 `finish`")
-	require.Contains(t, highStatic, "只有空泛猜测且预期信息增益很低的建议属于非阻塞可选后续")
 	require.NotContains(t, highStatic, "当前工具与权限可以立即执行")
 	require.Contains(t, highStatic, "后续行动不越界")
-	require.Contains(t, highStatic, "单次普通请求、单一 payload、扫描未命中或无明显报错不得 close")
+	require.Contains(t, highStatic, "单次普通请求、单一 payload、扫描未命中或无明显报错只说明本次未命中")
 	require.Contains(t, highStatic, "任务漂移先纠偏")
 	require.NotContains(t, highStatic, "任务漂移即完成")
-	require.Contains(t, highStatic, "不得重复或换句话再次交付同一答案")
-	require.Contains(t, highStatic, "同一 CURRENT-TASK 中，不携带有效 `todo_delta` 的 `directly_answer` 最多成功一次")
-	require.Contains(t, highStatic, "intent classifier 明确标记的 `simple_query` 例外")
+	require.Contains(t, highStatic, "同一 CURRENT-TASK 中不携带有效 `todo_delta` 的 `directly_answer` 最多成功一次")
+	require.Contains(t, highStatic, "`simple_query` 例外")
 	require.Contains(t, highStatic, "无剩余工作时立即用 \"标记完成\" 收口")
+
+	require.Contains(t, defaultLoopInstruction, "## TODO 状态维护（todo_delta）")
+	require.Contains(t, defaultLoopInstruction, "Frontier（前沿）")
+	require.Contains(t, defaultLoopInstruction, "第一条可执行动作就要建立初始 TODO 集合并显式指定 `current`")
+	require.Contains(t, defaultLoopInstruction, "Observation 打开了新的分支")
+	require.Contains(t, defaultLoopInstruction, "具体目标")
+	require.Contains(t, defaultLoopInstruction, "来源证据")
+	require.Contains(t, defaultLoopInstruction, "下一步动作")
+	require.Contains(t, defaultLoopInstruction, "文本以\"待探索：\"开头")
+	require.Contains(t, defaultLoopInstruction, "存在开放 TODO 时不能 `finish`")
+	require.Contains(t, defaultLoopInstruction, "不允许为了清空列表伪造 `resolved`")
+	require.Contains(t, defaultLoopOutputExample, "`todo_delta` 使用案例")
+	require.Contains(t, defaultLoopOutputExample, "`save_evidence` 使用案例")
 
 	require.Contains(t, verificationInstructionText, "安全测试阴性结论必须有区分力")
 	require.Contains(t, verificationInstructionText, "漂移本身不能证明当前子任务完成")
@@ -63,7 +62,7 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 }
 
 func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
-	policy := aicommon.SharedPlanAndExecHighStaticTemplate
+	policy := aicommon.SharedPlanAndExecHighStaticTemplate + "\n" + defaultLoopInstruction + "\n" + defaultLoopOutputExample
 	tests := []struct {
 		name     string
 		required []string
@@ -71,52 +70,50 @@ func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
 		{
 			name: "multi-step work bootstraps todo delta before execution",
 			required: []string{
-				"TODO LIST 只是持久状态的只读投影",
-				"`todo_delta` 是唯一写入通道",
-				"第一条可执行的正常动作必须同时携带 `todo_delta`",
-				"同一动作中执行它",
+				"`todo_delta` 是唯一的写入通道",
+				"第一条可执行动作就要建立初始 TODO 集合并显式指定 `current`",
+				"第一条动作同时建立初始 TODO 并指定 current",
 			},
 		},
 		{
 			name: "multiple website entry points are recorded before one is tested",
 			required: []string{
-				"页面链接、表单 action、跳转、脚本路由、接口文档或响应字段",
-				"具体入口本身就是合格的覆盖分支",
-				"不要求先出现漏洞信号",
-				"`add` / `update` 全部合格分支",
-				"先用 todo_delta 记录分叉，再执行 Current",
+				"工具 Observation 打开了新的分支",
+				"先用 `add` / `update` 把这些分支记为\"待探索\"",
+				"Observation 每暴露一个新的范围内具体入口，就当场 `add`",
+				"先把新线索记为\"待探索\"再继续推进 current",
 			},
 		},
 		{
 			name: "current branch keeps depth while sibling branches remain resumable",
 			required: []string{
-				"执行沿唯一 `current` 做连续实验闭环",
-				"可独立测试的同级入口先入 Frontier",
-				"当前项闭环或暂时不再产出信息后必须返回它们",
+				"Frontier 中唯一被标记为\"当前主要矛盾\"的一项",
+				"哪怕它暂时不是 `current`，也必须先用 `add` 落成一条 TODO",
+				"收集齐\"待探索\"线索比机械地把单一路径走到底更重要",
 			},
 		},
 		{
 			name: "completed or blocked current hands off without an empty focus window",
 			required: []string{
-				"`current` 仍有不同且有信息增益的下一步时继续向深处",
-				"update 阶段结果、已尝试变化和恢复条件",
-				"再在同一 `todo_delta` 中设置下一 current",
+				"`current` 已经有结论、被证据排除、或被外部条件阻塞时",
+				"先 `close`（写清 `outcome` + 非空 `reason`）",
+				"再把 `current` 切换到下一条最有价值的开放项",
 			},
 		},
 		{
 			name: "one failure triggers recovery instead of abandonment",
 			required: []string{
-				"单次工具失败、参数校验失败、超时、连接失败、认证拒绝",
-				"不能据此 close、deferred 或 finish",
-				"改变方法、编码、参数通道、请求形态、身份/会话、基线与观察通道",
-				"执行有区分力的替代实验",
+				"工具报错或协议异常不是停止条件",
+				"改变请求方法、参数形态、输入通道、会话上下文或观察方式",
+				"执行至少一条有实质差异的合理替代路径",
+				"所有合理路径穷尽后才报告不可行",
 			},
 		},
 		{
 			name: "low value ideas do not inflate the frontier or justify finish",
 			required: []string{
-				"明确范围外、重复、没有观察依据或无法形成动作的空泛想法",
-				"只有空泛猜测且预期信息增益很低的建议属于非阻塞可选后续",
+				"只要求范围内、具体、可追溯出处",
+				"无目标、无来源、无下一步，写完等于没写",
 				"存在开放关键项时不收口",
 			},
 		},
