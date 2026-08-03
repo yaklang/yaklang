@@ -4,18 +4,23 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func TestOverlaySkipBaseLayerWhenBaseCacheExists(t *testing.T) {
+// TestOverlayDualSourceRefLiveIR verifies unchanged base files resolve from base
+// IR and overridden files from the owner diff layer — without audit cache merge.
+func TestOverlayDualSourceRefLiveIR(t *testing.T) {
 	ssatest.CheckIncrementalProgram(t,
 		ssatest.IncrementalStep{
 			Files: map[string]string{
 				"Keep.java": `
 public class Keep {
   static string keepStr = "Keep from Base";
+}`,
+				"A.java": `
+public class A {
+  static string valueStr = "Value from Base";
 }`,
 			},
 		},
@@ -27,29 +32,31 @@ public class A {
 }`,
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
-				if stage != ssatest.IncrementalCheckStageDB {
+				if stage != ssatest.IncrementalCheckStageCompile {
 					return
 				}
 				require.NotNil(t, overlay)
 
-				baseProg := overlay.Layers[0].Program
-				require.NotNil(t, baseProg)
+				part := overlay.GetScanFilePartition()
+				require.GreaterOrEqual(t, part.AggregatedCount, 2)
+				require.Contains(t, part.Overridden, "/A.java")
+				require.NotContains(t, part.Overridden, "/Keep.java")
+				require.True(t, overlay.IsPresentInAggregatedView("/Keep.java") || overlay.IsPresentInAggregatedView("Keep.java"))
+				ownerA, ok := overlay.GetFileOwnerLayer("/A.java")
+				require.True(t, ok)
+				require.Greater(t, ownerA, 1)
 
-				rule := `keepStr as $res
-alert $res for {
-	name: "keep_alert"
-}`
-				_, err := baseProg.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindScan))
+				keep, err := overlay.SyntaxFlowWithError(`keepStr as $res`)
 				require.NoError(t, err)
+				ssatest.CompareResult(t, true, keep, map[string][]string{
+					"res": {"Keep from Base"},
+				})
 
-				baseName := overlay.ResolveReuseBaseProgramName()
-				require.NotEmpty(t, baseName)
-				_, err = ssaapi.LoadResultByRuleContent(baseName, rule, schema.SFResultKindScan)
+				diff, err := overlay.SyntaxFlowWithError(`valueStr as $res`)
 				require.NoError(t, err)
-
-				res, err := overlay.SyntaxFlowWithError(rule, ssaapi.QueryWithSave(schema.SFResultKindScan))
-				require.NoError(t, err)
-				require.NotEmpty(t, res.GetGRPCModelRisk(), "base-only risks should merge from cached base scan")
+				ssatest.CompareResult(t, true, diff, map[string][]string{
+					"res": {"Value from Diff"},
+				})
 			},
 		},
 	)

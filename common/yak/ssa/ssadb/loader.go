@@ -110,6 +110,59 @@ func yieldIrCodesWithExclude(ctx context.Context, progName string, ids []int64, 
 	return outC.OutputChannel()
 }
 
+// yieldFromIrIndexWithIncludeFiles queries from IrIndex, keeping only specified files.
+func yieldFromIrIndexWithIncludeFiles(DB *gorm.DB, ctx context.Context, progName string, includeFiles []string) <-chan *IrCode {
+	var matchedIds []int64
+	distinctIrIndicesValueID := "DISTINCT " + TableIrIndices + ".value_id"
+	if err := DB.Pluck(distinctIrIndicesValueID, &matchedIds).Error; err != nil {
+		log.Errorf("failed to get matched ids: %v", err)
+		return emptyIrCodeChan()
+	}
+	if len(matchedIds) == 0 {
+		return emptyIrCodeChan()
+	}
+	return yieldIrCodesWithInclude(ctx, progName, matchedIds, includeFiles)
+}
+
+func irCodeIncludedBySet(ir *IrCode, includeSet map[string]struct{}) bool {
+	if len(includeSet) == 0 {
+		return false
+	}
+	path := irCodeFilePath(ir)
+	if path == "" {
+		return false
+	}
+	if _, ok := includeSet[path]; ok {
+		return true
+	}
+	if _, ok := includeSet[strings.TrimPrefix(path, "/")]; ok {
+		return true
+	}
+	return false
+}
+
+func yieldIrCodesWithInclude(ctx context.Context, progName string, ids []int64, includeFiles []string) <-chan *IrCode {
+	includeSet := buildExcludeFileSet(includeFiles) // same path normalization
+	in := yieldIrCodes(ctx, progName, ids)
+	if len(includeSet) == 0 {
+		// Empty include set means no files match — return empty channel.
+		outC := chanx.NewUnlimitedChan[*IrCode](ctx, 1)
+		outC.Close()
+		return outC.OutputChannel()
+	}
+	outC := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+	go func() {
+		defer outC.Close()
+		for ir := range in {
+			if !irCodeIncludedBySet(ir, includeSet) {
+				continue
+			}
+			outC.SafeFeed(ir)
+		}
+	}()
+	return outC.OutputChannel()
+}
+
 func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrCode {
 	outC := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
 	go func() {
@@ -160,10 +213,53 @@ func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 }
 
 func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles []string) <-chan *IrCode {
+	return searchVariableWithFileFilter(db, ctx, progName, cache, compareMode, matchMod, value, excludeFiles, nil)
+}
+
+// SearchVariableWithIncludeFiles searches variables, keeping only results from includeFiles.
+func SearchVariableWithIncludeFiles(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, includeFiles []string) <-chan *IrCode {
+	var result <-chan *IrCode
+	_ = diagnostics.TrackLow("ssadb.SearchVariableWithIncludeFiles", func() error {
+		result = searchVariableWithFileFilter(db, ctx, progName, cache, compareMode, matchMod, value, nil, includeFiles)
+		return nil
+	})
+	return result
+}
+
+func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles, includeFiles []string) <-chan *IrCode {
 	// 1. Handle Glob -> Regexp
 	if compareMode == GlobCompare {
 		value = glob.Glob2Regex(value)
 		compareMode = RegexpCompare
+	}
+
+	filterConst := func(ch <-chan *IrCode) <-chan *IrCode {
+		excludeSet := buildExcludeFileSet(excludeFiles)
+		includeSet := buildExcludeFileSet(includeFiles)
+		if len(excludeSet) == 0 && len(includeSet) == 0 {
+			resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+			go func() {
+				defer resultCh.Close()
+				for ir := range ch {
+					resultCh.SafeFeed(ir)
+				}
+			}()
+			return resultCh.OutputChannel()
+		}
+		resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+		go func() {
+			defer resultCh.Close()
+			for ir := range ch {
+				if len(includeSet) > 0 && !irCodeIncludedBySet(ir, includeSet) {
+					continue
+				}
+				if irCodeExcludedBySet(ir, excludeSet) {
+					continue
+				}
+				resultCh.SafeFeed(ir)
+			}
+		}()
+		return resultCh.OutputChannel()
 	}
 
 	// 2. Handle ConstType
@@ -191,28 +287,7 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 		}
 		// ConstType query also needs file exclusion — filter in memory after load.
 		ch := YieldIrCode(query, ctx, progName)
-		if len(excludeFiles) == 0 {
-			resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-			go func() {
-				defer resultCh.Close()
-				for ir := range ch {
-					resultCh.SafeFeed(ir)
-				}
-			}()
-			return resultCh.OutputChannel()
-		}
-		excludeSet := buildExcludeFileSet(excludeFiles)
-		resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-		go func() {
-			defer resultCh.Close()
-			for ir := range ch {
-				if irCodeExcludedBySet(ir, excludeSet) {
-					continue
-				}
-				resultCh.SafeFeed(ir)
-			}
-		}()
-		return resultCh.OutputChannel()
+		return filterConst(ch)
 	}
 
 	// 3. Handle Variable/Field (Search in IrIndex)
@@ -220,20 +295,20 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 	// PASS progName to applyMatchCondition
 	query = applyMatchCondition(query, progName, cache, matchMod, compareMode, value)
 
-	var resultCh *chanx.UnlimitedChan[*IrCode]
-	if len(excludeFiles) > 0 {
-		ch := yieldFromIrIndexWithExcludeFiles(query, ctx, progName, excludeFiles)
-		return ch
-	} else {
-		ch := yieldFromIrIndex(query, ctx, progName)
-		resultCh = chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-		go func() {
-			defer resultCh.Close()
-			for ir := range ch {
-				resultCh.SafeFeed(ir)
-			}
-		}()
+	if len(includeFiles) > 0 {
+		return yieldFromIrIndexWithIncludeFiles(query, ctx, progName, includeFiles)
 	}
+	if len(excludeFiles) > 0 {
+		return yieldFromIrIndexWithExcludeFiles(query, ctx, progName, excludeFiles)
+	}
+	ch := yieldFromIrIndex(query, ctx, progName)
+	resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+	go func() {
+		defer resultCh.Close()
+		for ir := range ch {
+			resultCh.SafeFeed(ir)
+		}
+	}()
 	return resultCh.OutputChannel()
 }
 

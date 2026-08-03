@@ -33,77 +33,125 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		}
 	}
 
-	// Fast path: value's file is owned by the same layer as the value → no need
-	// to Ref across layers (members already come from the owning IR).
-	if len(memberMap) > 0 && value.ParentProgram != nil {
-		filePath := ""
-		if rng := value.GetRange(); rng != nil {
-			if ed := rng.GetEditor(); ed != nil {
-				filePath = ed.GetFilePath()
-				if filePath == "" {
-					filePath = ed.GetUrl()
-				}
-			}
-		}
-		if filePath != "" {
-			normalized := normalizeOverlayFilePath(filePath, value.ParentProgram.GetProgramName())
-			valueLayer := overlay.getValueLayerIndex(value)
-			if top, ok := overlay.FileToLayerMap.Get(normalized); ok && top == valueLayer {
-				return memberMap
+	filePath := ""
+	if rng := value.GetRange(); rng != nil {
+		if ed := rng.GetEditor(); ed != nil {
+			filePath = ed.GetFilePath()
+			if filePath == "" {
+				filePath = ed.GetUrl()
 			}
 		}
 	}
 
-	// 如果当前 instruction 没有成员，或者需要跨 layer 查找，则通过名称查找
+	// Owner-layer fast path: value's file is owned by a known layer → only search that layer.
+	if filePath != "" && value.ParentProgram != nil {
+		normalized := normalizeOverlayFilePath(filePath, value.ParentProgram.GetProgramName())
+		ownerLayer, ok := overlay.GetFileOwnerLayer(normalized)
+		if ok && ownerLayer >= 1 && ownerLayer <= len(overlay.Layers) {
+			valueLayer := overlay.getValueLayerIndex(value)
+			// Members already from owning IR when value lives in the owner layer.
+			if len(memberMap) > 0 && valueLayer == ownerLayer {
+				return memberMap
+			}
+			layer := overlay.Layers[ownerLayer-1]
+			if layer != nil && layer.Program != nil {
+				collectMembersFromLayerRef(memberMap, value, overlay, layer, ownerLayer-1, value.GetName(), value.String())
+			}
+			return memberMap
+		}
+	}
+
+	// No file context: dual-source Ref for the object name, then collect members from owner layers only.
 	valueName := value.GetName()
 	if valueName == "" {
 		valueName = value.String()
 	}
-
-	// 从所有 layer 中查找成员，上层覆盖下层
-	startIdx := 0
-	if overlay.ShouldSkipBaseLayerQuery() && len(overlay.Layers) > 1 {
-		startIdx = 1
+	if valueName == "" {
+		return memberMap
 	}
-	for i := len(overlay.Layers) - 1; i >= startIdx; i-- {
-		layer := overlay.Layers[i]
-		if layer == nil || layer.Program == nil {
+
+	// Prefer members already on the current instruction; otherwise resolve via dual-source Ref.
+	if len(memberMap) > 0 {
+		return memberMap
+	}
+
+	layerValues := overlay.Ref(valueName)
+	for _, layerValue := range layerValues {
+		if layerValue == nil || !layerValue.IsObject() {
 			continue
 		}
-
-		// Base layer: only search files not owned by upper layers.
-		var layerValues Values
-		if i == 0 {
-			exclude := overlay.overriddenFilesList()
-			if len(exclude) > 0 {
-				layerValues = layer.Program.refWithExcludeFiles(valueName, exclude)
-			} else {
-				layerValues = layer.Program.Ref(valueName)
-			}
-		} else {
-			layerValues = layer.Program.Ref(valueName)
-		}
-		if len(layerValues) == 0 {
-			continue
-		}
-
-		var targetLayerValue *Value
-		for _, layerValue := range layerValues {
-			if layerValue.IsObject() {
-				targetLayerValue = layerValue
-				break
-			}
-		}
-
-		if targetLayerValue == nil {
-			continue
-		}
-
-		layerInst := targetLayerValue.getValue()
+		layerInst := layerValue.getValue()
 		if layerInst == nil {
 			continue
 		}
+		for _, pair := range ssa.GetLastWinsMemberPairs(layerInst) {
+			keyName := pair.KeyString()
+			if keyName == "" {
+				continue
+			}
+			if _, exists := memberMap[keyName]; exists {
+				continue
+			}
+			newValVal, err := layerValue.ParentProgram.NewValue(pair.Member)
+			if err == nil && newValVal != nil {
+				memberMap[keyName] = newValVal
+			}
+		}
+	}
 
+	return memberMap
+}
+
+func collectMembersFromLayerRef(
+	memberMap map[string]*Value,
+	value *Value,
+	overlay *ProgramOverLay,
+	layer *ProgramLayer,
+	layerPos int,
+	names ...string,
+) {
+	if layer == nil || layer.Program == nil {
+		return
+	}
+	owned := overlay.PathsOwnedByLayer(layer.LayerIndex)
+	var layerValues Values
+	if layerPos == 0 {
+		overridden := overlay.overriddenFilesList()
+		for _, name := range names {
+			if name == "" {
+				continue
+			}
+			var vals Values
+			if len(overridden) > 0 {
+				vals = layer.Program.refWithExcludeFiles(name, overridden)
+			} else {
+				vals = layer.Program.Ref(name)
+			}
+			layerValues = append(layerValues, vals...)
+		}
+	} else {
+		if len(owned) == 0 {
+			return
+		}
+		for _, name := range names {
+			if name == "" {
+				continue
+			}
+			layerValues = append(layerValues, layer.Program.refWithIncludeFiles(name, owned)...)
+		}
+	}
+
+	for _, layerValue := range layerValues {
+		if layerValue == nil || !layerValue.IsObject() {
+			continue
+		}
+		if !overlay.isVisibleValueInLayer(layerValue, layer, layerPos) {
+			continue
+		}
+		layerInst := layerValue.getValue()
+		if layerInst == nil {
+			continue
+		}
 		for _, pair := range ssa.GetLastWinsMemberPairs(layerInst) {
 			keyName := pair.KeyString()
 			if keyName == "" {
@@ -118,8 +166,6 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 			}
 		}
 	}
-
-	return memberMap
 }
 
 type userNodeItems struct {

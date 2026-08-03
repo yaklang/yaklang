@@ -70,6 +70,30 @@ func MatchInstructionsByVariableWithExcludeFiles(
 	name string,
 	excludeFiles []string,
 ) (res []Instruction) {
+	return matchInstructionsByVariableWithFileFilter(ctx, prog, compareMode, matchMode, name, excludeFiles, nil)
+}
+
+// MatchInstructionsByVariableWithIncludeFiles 搜索变量，仅保留 includeFiles 中的结果
+func MatchInstructionsByVariableWithIncludeFiles(
+	ctx context.Context,
+	prog *Program,
+	compareMode ssadb.CompareMode,
+	matchMode ssadb.MatchMode,
+	name string,
+	includeFiles []string,
+) (res []Instruction) {
+	return matchInstructionsByVariableWithFileFilter(ctx, prog, compareMode, matchMode, name, nil, includeFiles)
+}
+
+func matchInstructionsByVariableWithFileFilter(
+	ctx context.Context,
+	prog *Program,
+	compareMode ssadb.CompareMode,
+	matchMode ssadb.MatchMode,
+	name string,
+	excludeFiles []string,
+	includeFiles []string,
+) (res []Instruction) {
 	var ret []Instruction
 	tmp := make(map[int64]struct{})
 	addRes := func(insts ...Instruction) {
@@ -79,6 +103,51 @@ func MatchInstructionsByVariableWithExcludeFiles(
 				tmp[inst.GetId()] = struct{}{}
 			}
 		}
+	}
+
+	buildPathSet := func(files []string) map[string]struct{} {
+		if len(files) == 0 {
+			return nil
+		}
+		set := make(map[string]struct{}, len(files)*4)
+		addKey := func(path string) {
+			if path == "" {
+				return
+			}
+			n := normalizeFilePathForExclude(path)
+			set[n] = struct{}{}
+			set[strings.TrimPrefix(n, "/")] = struct{}{}
+		}
+		for _, filePath := range files {
+			addKey(filePath)
+			if prog != nil && prog.Name != "" {
+				addKey(stripProgramNamePrefixForExclude(filePath, prog.Name))
+			}
+		}
+		return set
+	}
+
+	pathInSet := func(filePath string, set map[string]struct{}) bool {
+		if len(set) == 0 || filePath == "" {
+			return false
+		}
+		normalizedPath := normalizeFilePathForExclude(filePath)
+		if _, ok := set[normalizedPath]; ok {
+			return true
+		}
+		if _, ok := set[strings.TrimPrefix(normalizedPath, "/")]; ok {
+			return true
+		}
+		if prog != nil && prog.Name != "" {
+			stripped := normalizeFilePathForExclude(stripProgramNamePrefixForExclude(filePath, prog.Name))
+			if _, ok := set[stripped]; ok {
+				return true
+			}
+			if _, ok := set[strings.TrimPrefix(stripped, "/")]; ok {
+				return true
+			}
+		}
+		return false
 	}
 
 	loadFromMemory := func() {
@@ -103,50 +172,30 @@ func MatchInstructionsByVariableWithExcludeFiles(
 		}
 
 		insts := prog.Cache.findByVariableEx(matchMode, check)
-		if len(excludeFiles) == 0 {
+		if len(excludeFiles) == 0 && len(includeFiles) == 0 {
 			addRes(insts...)
 			return
 		}
 
 		filteredInsts := make([]Instruction, 0, len(insts))
-		excludeSet := make(map[string]struct{}, len(excludeFiles)*4)
-		addExcludeKey := func(path string) {
-			if path == "" {
-				return
-			}
-			n := normalizeFilePathForExclude(path)
-			excludeSet[n] = struct{}{}
-			excludeSet[strings.TrimPrefix(n, "/")] = struct{}{}
-		}
-		for _, excludePath := range excludeFiles {
-			addExcludeKey(excludePath)
-			if prog != nil && prog.Name != "" {
-				addExcludeKey(stripProgramNamePrefixForExclude(excludePath, prog.Name))
-			}
-		}
+		excludeSet := buildPathSet(excludeFiles)
+		includeSet := buildPathSet(includeFiles)
 		for _, inst := range insts {
 			filePath := getInstructionFilePath(inst)
 			if filePath == "" {
-				filteredInsts = append(filteredInsts, inst)
+				// No file path: keep for exclude-only; drop for include-only.
+				if len(includeSet) == 0 {
+					filteredInsts = append(filteredInsts, inst)
+				}
 				continue
 			}
-			normalizedPath := normalizeFilePathForExclude(filePath)
-			shouldExclude := false
-			if _, ok := excludeSet[normalizedPath]; ok {
-				shouldExclude = true
-			} else if _, ok := excludeSet[strings.TrimPrefix(normalizedPath, "/")]; ok {
-				shouldExclude = true
-			} else if prog != nil && prog.Name != "" {
-				stripped := normalizeFilePathForExclude(stripProgramNamePrefixForExclude(filePath, prog.Name))
-				if _, ok := excludeSet[stripped]; ok {
-					shouldExclude = true
-				} else if _, ok := excludeSet[strings.TrimPrefix(stripped, "/")]; ok {
-					shouldExclude = true
-				}
+			if len(includeSet) > 0 && !pathInSet(filePath, includeSet) {
+				continue
 			}
-			if !shouldExclude {
-				filteredInsts = append(filteredInsts, inst)
+			if pathInSet(filePath, excludeSet) {
+				continue
 			}
+			filteredInsts = append(filteredInsts, inst)
 		}
 		addRes(filteredInsts...)
 	}
@@ -161,7 +210,12 @@ func MatchInstructionsByVariableWithExcludeFiles(
 		// amplify save -> reload -> rewrite cost. Prefer the live in-memory indexes.
 		loadFromMemory()
 	case ProgramCacheDBRead:
-		ch := ssadb.SearchVariableWithExcludeFiles(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, prog.NameCache, compareMode, matchMode, name, excludeFiles)
+		var ch <-chan *ssadb.IrCode
+		if len(includeFiles) > 0 {
+			ch = ssadb.SearchVariableWithIncludeFiles(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, prog.NameCache, compareMode, matchMode, name, includeFiles)
+		} else {
+			ch = ssadb.SearchVariableWithExcludeFiles(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, prog.NameCache, compareMode, matchMode, name, excludeFiles)
+		}
 		for ir := range ch {
 			var inst Instruction
 			var err error
