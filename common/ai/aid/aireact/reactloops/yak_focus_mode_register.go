@@ -3,6 +3,7 @@ package reactloops
 import (
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -31,6 +32,10 @@ type FocusModeBundle struct {
 	// Name 显式指定专注模式名（不填则取 EntryFile 的 basename 作 fallback）
 	Name string
 
+	// FixedName rejects a script-level __NAME__ override. Server-delivered
+	// releases use this to keep the integrity-bound runtime name authoritative.
+	FixedName bool
+
 	// EntryFile 主入口文件相对路径（仅做调试 / log 使用）
 	EntryFile string
 
@@ -57,10 +62,17 @@ type FocusModeSidekick struct {
 
 // yakFocusBundles 保存所有已通过 RegisterYakFocusModeFromBundle 注册的 bundle，
 // run 期 CreateLoopByName 时会回查它生成新引擎。
-var yakFocusBundles = map[string]*FocusModeBundle{}
+var (
+	yakFocusBundlesMu sync.RWMutex
+	yakFocusBundles   = map[string]*FocusModeBundle{}
+)
+
+const serverFocusRuntimeGlobal = "focusRuntime"
 
 // GetYakFocusModeBundle 通过名字查询已注册的 bundle，主要供测试使用。
 func GetYakFocusModeBundle(name string) (*FocusModeBundle, bool) {
+	yakFocusBundlesMu.RLock()
+	defer yakFocusBundlesMu.RUnlock()
 	b, ok := yakFocusBundles[name]
 	return b, ok
 }
@@ -100,6 +112,7 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 		bundle.EntryFile,
 		bundleCode,
 		WithFocusModeCallerCallTimeout(bootCallTimeout),
+		WithFocusModeCallerVars(map[string]any{serverFocusRuntimeGlobal: nil}),
 	)
 	if err != nil {
 		return utils.Wrapf(err, "yak focus mode: boot eval failed for %s", defaultName)
@@ -110,10 +123,15 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 	if resolvedName == "" {
 		resolvedName = defaultName
 	}
+	if bundle.FixedName && resolvedName != defaultName {
+		return utils.Errorf("yak focus mode: fixed name %q cannot be overridden by %q", defaultName, resolvedName)
+	}
 	bundle.Name = resolvedName
 
 	// 缓存 bundle 给 run 期使用（在尝试注册 LoopFactory 之前），方便测试通过名称回查
+	yakFocusBundlesMu.Lock()
 	yakFocusBundles[resolvedName] = bundle
+	yakFocusBundlesMu.Unlock()
 
 	// ---- run 期 LoopFactory ----
 	factory := func(invoker aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error) {
@@ -122,17 +140,7 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 			runCallTimeout = 30 * time.Second
 		}
 
-		callerOpts := []FocusModeCallerOption{
-			WithFocusModeCallerCallTimeout(runCallTimeout),
-		}
-		if invoker != nil {
-			if cfg := invoker.GetConfig(); cfg != nil {
-				if ctx := cfg.GetContext(); ctx != nil {
-					callerOpts = append(callerOpts, WithFocusModeCallerParentContext(ctx))
-				}
-			}
-		}
-
+		callerOpts := focusModeRunCallerOptions(invoker, runCallTimeout)
 		caller, err := NewFocusModeYakHookCaller(bundle.EntryFile, bundleCode, callerOpts...)
 		if err != nil {
 			return nil, utils.Wrapf(err, "yak focus mode[%v]: create run-phase caller failed", resolvedName)
@@ -156,12 +164,36 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 
 	if err := RegisterLoopFactory(resolvedName, factory, metadataOpts...); err != nil {
 		// 注册失败时回滚 bundle 缓存，避免 GetYakFocusModeBundle 给出脏数据
+		yakFocusBundlesMu.Lock()
 		delete(yakFocusBundles, resolvedName)
+		yakFocusBundlesMu.Unlock()
 		return utils.Wrapf(err, "yak focus mode[%v]: register loop factory failed", resolvedName)
 	}
 
 	log.Infof("yak focus mode[%v] registered (entry=%v, sidekicks=%d)", resolvedName, bundle.EntryFile, len(bundle.Sidekicks))
 	return nil
+}
+
+func focusModeRunCallerOptions(
+	invoker aicommon.AIInvokeRuntime,
+	callTimeout time.Duration,
+) []FocusModeCallerOption {
+	callerOpts := []FocusModeCallerOption{
+		WithFocusModeCallerCallTimeout(callTimeout),
+	}
+	if invoker == nil || invoker.GetConfig() == nil {
+		return callerOpts
+	}
+	config := invoker.GetConfig()
+	if ctx := config.GetContext(); ctx != nil {
+		callerOpts = append(callerOpts, WithFocusModeCallerParentContext(ctx))
+	}
+	if runtime := aicommon.FocusRuntimeFromConfig(config); runtime != nil {
+		callerOpts = append(callerOpts, WithFocusModeCallerVars(map[string]any{
+			serverFocusRuntimeGlobal: runtime,
+		}))
+	}
+	return callerOpts
 }
 
 // RegisterYakFocusMode 是 RegisterYakFocusModeFromBundle 的便捷封装，

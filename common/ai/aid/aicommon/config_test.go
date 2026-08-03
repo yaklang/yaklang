@@ -184,6 +184,29 @@ func TestConfig_ToolManagerPropagation(t *testing.T) {
 	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
 }
 
+type testFocusRuntime struct{}
+
+func (testFocusRuntime) AuthorizedTarget() string { return "https://example.test/" }
+
+func (testFocusRuntime) Execute(string, map[string]any) (map[string]any, error) {
+	return map[string]any{"ok": true}, nil
+}
+
+func TestConfigFocusRuntimeIsRunScoped(t *testing.T) {
+	runtime := testFocusRuntime{}
+	config := NewConfig(context.Background(), WithFocusRuntime(runtime))
+	if FocusRuntimeFromConfig(config) == nil {
+		t.Fatal("expected focus runtime on parent config")
+	}
+	child := NewConfig(context.Background(), config.OriginOptions()...)
+	if FocusRuntimeFromConfig(child) == nil {
+		t.Fatal("expected focus runtime to propagate to child config")
+	}
+	if FocusRuntimeFromConfig(struct{}{}) != nil {
+		t.Fatal("expected configs without FocusRuntimeProvider to remain compatible")
+	}
+}
+
 func TestConfig_AiForgeManagerPropagation(t *testing.T) {
 	parent := NewConfig(context.Background())
 	require.NotNil(t, parent.GetAIForgeManager())

@@ -182,6 +182,7 @@ type Config struct {
 	EventHandler           func(e *schema.AiOutputEvent)
 	DisableOutputEventType []string
 	SaveEvent              bool
+	FocusRuntime           FocusRuntime
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -1463,6 +1464,22 @@ func WithEmitter(emitter *Emitter) ConfigOption {
 		}
 		return nil
 	}
+}
+
+// WithFocusRuntime installs the capability boundary used by server-released
+// Yak Focus code. Desktop and client runtimes leave it unset.
+func WithFocusRuntime(runtime FocusRuntime) ConfigOption {
+	return func(c *Config) error {
+		c.FocusRuntime = runtime
+		return nil
+	}
+}
+
+func (c *Config) GetFocusRuntime() FocusRuntime {
+	if c == nil {
+		return nil
+	}
+	return c.FocusRuntime
 }
 
 // Event / output
@@ -4082,6 +4099,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.EventHandler != nil {
 		opts = append(opts, WithEventHandler(i.EventHandler))
+	}
+	if i.FocusRuntime != nil {
+		opts = append(opts, WithFocusRuntime(i.FocusRuntime))
 	}
 
 	if i.GetUserUsageCallback() != nil {
