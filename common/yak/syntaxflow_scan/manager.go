@@ -360,17 +360,10 @@ func dedupeProgramsCoveredByOverlay(programs []*ssaapi.Program) []*ssaapi.Progra
 			continue
 		}
 		overlay := prog.GetOverlay()
-		if overlay == nil {
+		if overlay == nil || !overlay.IsTopLayerProgram(prog) {
 			continue
 		}
 		layerNames := overlay.GetLayerProgramNames()
-		if len(layerNames) == 0 {
-			continue
-		}
-		topName := layerNames[len(layerNames)-1]
-		if prog.GetProgramName() != topName {
-			continue
-		}
 		for _, name := range layerNames {
 			if name == "" || name == prog.GetProgramName() {
 				continue

@@ -166,8 +166,8 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 	// }}
 }
 
-// convertSSARiskFromMetadata adds a reused/merged SSARisk when the overlay result
-// has no matching alert value (typical for base-only file reuse).
+// convertSSARiskFromMetadata adds an SSARisk when the result has risk metadata
+// but no matching alert value (e.g. index/variable drift).
 func (r *Report) convertSSARiskFromMetadata(ssarisk *schema.SSARisk, result *ssaapi.SyntaxFlowResult) {
 	if r == nil || ssarisk == nil || result == nil {
 		return

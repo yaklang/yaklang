@@ -37,15 +37,10 @@ public class A {
 				}
 				require.NotNil(t, overlay)
 
-				part := overlay.GetScanFilePartition()
-				require.GreaterOrEqual(t, part.AggregatedCount, 2)
-				require.Contains(t, part.Overridden, "/A.java")
-				require.NotContains(t, part.Overridden, "/Keep.java")
-				require.True(t, overlay.IsPresentInAggregatedView("/Keep.java") || overlay.IsPresentInAggregatedView("Keep.java"))
-				ownerA, ok := overlay.GetFileOwnerLayer("/A.java")
-				require.True(t, ok)
-				require.Greater(t, ownerA, 1)
-				require.NotEmpty(t, overlay.PathsOwnedByLayer(2), "diff ownership must work after DB reload")
+				ownedDiff := overlay.PathsOwnedByLayer(2)
+				require.Contains(t, ownedDiff, "/A.java")
+				require.NotContains(t, ownedDiff, "/Keep.java")
+				require.Contains(t, overlay.PathsOwnedByLayer(1), "/Keep.java")
 
 				keep, err := overlay.SyntaxFlowWithError(`keepStr as $res`)
 				require.NoError(t, err)

@@ -58,9 +58,6 @@ type queryConfig struct {
 	// control
 	ctx context.Context
 
-	// reuseBaseProgramName retained for API compat; overlay scan no longer merges cache.
-	reuseBaseProgramName string
-
 	*ssaconfig.Config
 }
 
@@ -447,16 +444,6 @@ func QueryWithUseCache(b ...bool) QueryOption {
 	}
 }
 
-// QueryWithOverlayResultReuse is retained for API compatibility but is a no-op.
-// Overlay incremental scan uses dual-source live IR (base exclude + owner include)
-// and must not depend on base audit_results cache.
-func QueryWithOverlayResultReuse(baseProgramName ...string) QueryOption {
-	return func(c *queryConfig) {
-		_ = baseProgramName
-		// no-op: dual-source IR routing replaced cache merge / skip-base
-	}
-}
-
 // QueryWithEnableDebug 设置 SyntaxFlow 查询是否开启调试输出（导出名为 syntaxflow.withExecDebug）
 // 参数:
 //   - b: 是否开启调试，缺省为 true
@@ -583,9 +570,16 @@ func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...Que
 		if topLayer != nil && topLayer.Program != nil {
 			opts = append(opts, QueryWithProgram(topLayer.Program))
 		}
-		part := p.GetScanFilePartition()
-		log.Infof("overlay SF dual-source scan: layers=%d aggregated=%d overridden=%d unchanged=%d deleted=%d",
-			len(p.Layers), part.AggregatedCount, len(part.Overridden), len(part.Unchanged), len(part.Deleted))
+		fileCount := 0
+		if p.FileToLayerMap != nil {
+			fileCount = p.FileToLayerMap.Count()
+		}
+		overriddenCount := 0
+		if p.overriddenFiles != nil {
+			overriddenCount = p.overriddenFiles.Count()
+		}
+		log.Infof("overlay SF dual-source scan: layers=%d files=%d overridden=%d",
+			len(p.Layers), fileCount, overriddenCount)
 	}
 	return QuerySyntaxflow(opts...)
 }
