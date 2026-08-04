@@ -41,7 +41,15 @@
 <|GEN_CODE_END_{{ .Nonce }}|>
 ```
 禁止只发 JSON 不发代码块；禁止用 markdown ```yak 代码块（系统无法解析）。若只想先查文档/样例就别选 write_code，改用查询动作。{{ end }}
-{{ if .FeedbackMessages }}
+{{ if .NeedsLintResearch }}
+## 【强制】lint 修复门禁（modify_code 已从可用动作中移除）
+当前 `yak_lint_ok=false` 且尚未完成检索。**本轮只能**调用：
+- `grep_yaklang_samples` / `semantic_search_yaklang_samples`
+- `yakdoc_search` / `yakdoc_function_details` / `yakdoc_library_details` 等
+
+完成一次成功检索后，系统才会重新开放 `modify_code`。禁止猜测式连续 patch。
+
+{{ end }}{{ if .FeedbackMessages }}
 ## 本轮编译反馈（Yaklang 编译器静态分析，必须优先处理）
 <|ERR/LINT_WARNING_{{ .Nonce }}|>
 {{ .FeedbackMessages }}

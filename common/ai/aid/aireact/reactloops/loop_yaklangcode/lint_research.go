@@ -1,0 +1,97 @@
+package loop_yaklangcode
+
+import (
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+)
+
+const (
+	loopVarLintResearchDone = "lint_research_done"
+)
+
+// yaklangCodeMutatingActions must not run while lint is failing until a research action succeeds.
+var yaklangCodeMutatingActions = map[string]struct{}{
+	"write_code":  {},
+	"modify_code": {},
+	"insert_code": {},
+	"delete_code": {},
+}
+
+func markYaklangLintResearchDone(loop *reactloops.ReActLoop) {
+	if loop == nil {
+		return
+	}
+	loop.Set(loopVarLintResearchDone, "true")
+}
+
+func markYaklangLintResearchNeeded(loop *reactloops.ReActLoop) {
+	if loop == nil {
+		return
+	}
+	loop.Set(loopVarLintResearchDone, "false")
+}
+
+func hasYaklangLintResearchDone(loop interface{ Get(string) string }) bool {
+	if loop == nil {
+		return false
+	}
+	return loop.Get(loopVarLintResearchDone) == "true"
+}
+
+// needsYaklangLintResearchGate is true when static analysis failed and the model
+// has not yet completed a grep/yakdoc research step in this lint-failure cycle.
+func needsYaklangLintResearchGate(loop interface{ Get(string) string }) bool {
+	if loop == nil {
+		return false
+	}
+	return hasBlockingLintErrors(loop) && !hasYaklangLintResearchDone(loop)
+}
+
+const yaklangLintResearchGateFeedback = `【lint 修复门禁】当前代码存在阻塞性语法/静态分析错误，且尚未完成检索。
+
+下一步必须先调用其一：
+- grep_yaklang_samples（按报错标识符 pattern 检索样例）
+- semantic_search_yaklang_samples
+- yakdoc_*（查 API 签名，如 poc.Post / json.loads）
+
+检索完成后再 modify_code。禁止在未检索时连续猜测式 patch。`
+
+type yaklangLoopBox struct {
+	loop *reactloops.ReActLoop
+}
+
+// newYaklangLintResearchActionFilter hides code-mutating actions from the schema
+// until the model runs grep/yakdoc after a lint failure. box.loop is set in InitTask.
+func newYaklangLintResearchActionFilter(box *yaklangLoopBox) func(action *reactloops.LoopAction) bool {
+	return func(action *reactloops.LoopAction) bool {
+		if action == nil || box == nil || box.loop == nil {
+			return true
+		}
+		if !needsYaklangLintResearchGate(box.loop) {
+			return true
+		}
+		if _, mutating := yaklangCodeMutatingActions[action.ActionType]; mutating {
+			return false
+		}
+		return true
+	}
+}
+
+func wrapInitTaskBindLoopBox(
+	box *yaklangLoopBox,
+	inner func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator),
+) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+		if box != nil {
+			box.loop = loop
+		}
+		inner(loop, task, operator)
+	}
+}
+
+func isYaklangCodeMutatingAction(actionType string) bool {
+	_, ok := yaklangCodeMutatingActions[strings.TrimSpace(actionType)]
+	return ok
+}

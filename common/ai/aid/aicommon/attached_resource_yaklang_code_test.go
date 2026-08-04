@@ -257,12 +257,14 @@ func TestParseYaklangEditorContext_MentionOnlyIsCreateMode(t *testing.T) {
 }
 
 func TestResolveYaklangInitTargetPath_RejectsNonYak(t *testing.T) {
-	ctx := &YaklangEditorContext{EditorFile: `/tmp/report.md`}
-	path, fromAttached := ResolveYaklangInitTargetPath(ctx, `/tmp/liteforge.yak`)
+	report := filepath.FromSlash("/tmp/report.md")
+	liteforge := filepath.FromSlash("/tmp/liteforge.yak")
+	ctx := &YaklangEditorContext{EditorFile: report}
+	path, fromAttached := ResolveYaklangInitTargetPath(ctx, liteforge)
 	require.False(t, fromAttached)
-	require.Equal(t, filepath.Clean(`/tmp/liteforge.yak`), path)
+	require.Equal(t, filepath.Clean(liteforge), path)
 
-	path, fromAttached = ResolveYaklangInitTargetPath(ctx, `/tmp/report.md`)
+	path, fromAttached = ResolveYaklangInitTargetPath(ctx, report)
 	require.False(t, fromAttached)
 	require.Empty(t, path)
 }

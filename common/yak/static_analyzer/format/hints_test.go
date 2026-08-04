@@ -36,6 +36,13 @@ func TestLookupCompilerErrorHint_Fallback(t *testing.T) {
 	require.Contains(t, hint, "编译器/静态分析报错")
 }
 
+func TestLookupCompilerErrorHint_PocPostArity(t *testing.T) {
+	msg := `The function call returns (lowhttp.LowhttpResponse, http.Request, error) type, but 2 variables on the left side.`
+	hint := lookupCompilerErrorHint(msg, `rsp, err := poc.Post(url)`)
+	require.Contains(t, hint, "rsp, req, err")
+	require.Contains(t, hint, "poc.Post")
+}
+
 func TestExtractCoreCompilerMessage(t *testing.T) {
 	raw := `[Error]: Value undefined:foo in [1:1 -- 1:4] from SSA:TypeCheck`
 	assert.Equal(t, "Value undefined:foo", ExtractCoreCompilerMessage(raw))
