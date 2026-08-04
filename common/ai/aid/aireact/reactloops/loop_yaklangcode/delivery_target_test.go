@@ -3,6 +3,7 @@ package loop_yaklangcode
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -78,6 +79,7 @@ func TestResolveYaklangDeliveryTarget_NonYakFallsBackToCreate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
 	assert.True(t, isYaklangGenCodePath(path))
+	assert.NotContains(t, strings.ToLower(path), ".md")
 
 	loop.Set("editor_file_path", "")
 	loop.Set("filename", refMD)
@@ -85,6 +87,7 @@ func TestResolveYaklangDeliveryTarget_NonYakFallsBackToCreate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
 	assert.True(t, isYaklangGenCodePath(path))
+	assert.NotContains(t, strings.ToLower(path), ".md")
 }
 
 func TestNewYaklangGenCodePath(t *testing.T) {
