@@ -130,7 +130,9 @@ func irCodeIncludedBySet(ir *IrCode, includeSet map[string]struct{}) bool {
 	}
 	path := irCodeFilePath(ir)
 	if path == "" {
-		return false
+		// Extern/lib IR has no source file — keep so overlay include queries
+		// still resolve entry symbols like Runtime.
+		return true
 	}
 	if _, ok := includeSet[path]; ok {
 		return true

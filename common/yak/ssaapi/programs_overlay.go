@@ -518,9 +518,17 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 
 		fileHashMap = diffProgram.Program.FileHashMap
 
+		// Ownership must come from FileHashMap metadata — ForEachAllFile needs
+		// editors and can miss paths when programs are loaded from DB (lazy).
 		for filePath, hash := range fileHashMap {
-			if filePath != "" {
-				layer.FileHashMap.Set(normalizeOverlayFilePath(filePath, diffProgram.GetProgramName()), hash)
+			if filePath == "" {
+				continue
+			}
+			normalizedPath := normalizeOverlayFilePath(filePath, diffProgram.GetProgramName())
+			layer.FileHashMap.Set(normalizedPath, hash)
+			if hash != -1 {
+				layer.FileSet.Set(normalizedPath, struct{}{})
+				overlay.FileToLayerMap.Set(normalizedPath, layerIndex)
 			}
 		}
 
@@ -548,6 +556,28 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	}
 
 	layer1ProgramName := layers[0].GetProgramName()
+	// Prefer FileList keys so base ownership works without loading every editor.
+	if layers[0] != nil && layers[0].Program != nil {
+		for filePath := range layers[0].Program.FileList {
+			if filePath == "" {
+				continue
+			}
+			normalizedPath := normalizeOverlayFilePath(filePath, layer1ProgramName)
+			if overlay.FileToLayerMap.Have(normalizedPath) {
+				continue
+			}
+			isDeleted := false
+			for i := 1; i < len(overlay.Layers); i++ {
+				if hash, exists := overlay.Layers[i].FileHashMap.Get(normalizedPath); exists && hash == -1 {
+					isDeleted = true
+					break
+				}
+			}
+			if !isDeleted {
+				overlay.FileToLayerMap.Set(normalizedPath, 1)
+			}
+		}
+	}
 	layers[0].ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
 		if filePath == "" {
 			return true
@@ -636,17 +666,26 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 
 	fileHashMap = newLayerProgram.Program.FileHashMap
 
-	for filePath, hash := range fileHashMap {
-		if filePath != "" {
-			newLayer.FileHashMap.Set(normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName()), hash)
-		}
-	}
-
-	// 复用 baseOverlay 的 FileToLayerMap，然后添加新的 layer 的文件映射
+	// 复用 baseOverlay 的 FileToLayerMap，然后用 FileHashMap 写入新层 ownership
+	// （不依赖 ForEachAllFile/editor，DB 懒加载也能正确分区）
 	baseOverlay.FileToLayerMap.ForEach(func(normalizedPath string, layerIdx int) bool {
 		overlay.FileToLayerMap.Set(ensureOverlayPathSlash(normalizedPath), layerIdx)
 		return true
 	})
+
+	for filePath, hash := range fileHashMap {
+		if filePath == "" {
+			continue
+		}
+		normalizedPath := normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName())
+		newLayer.FileHashMap.Set(normalizedPath, hash)
+		if hash == -1 {
+			overlay.FileToLayerMap.Delete(normalizedPath)
+			continue
+		}
+		newLayer.FileSet.Set(normalizedPath, struct{}{})
+		overlay.FileToLayerMap.Set(normalizedPath, layerIndex)
+	}
 
 	newLayerProgram.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
 		if filePath == "" {
@@ -1173,7 +1212,9 @@ func (p *ProgramOverLay) isVisibleValueInLayer(v *Value, layer *ProgramLayer, la
 	return true
 }
 
-// appendVisibleLayerValues merges layerValues into result with file-path dedupe.
+// appendVisibleLayerValues merges layerValues into result.
+// foundFiles tracks paths already claimed by an upper layer so lower layers
+// skip them. Multiple matches from the same file within this layer are kept.
 func (p *ProgramOverLay) appendVisibleLayerValues(
 	result Values,
 	foundFiles *utils.SafeMap[struct{}],
@@ -1185,6 +1226,7 @@ func (p *ProgramOverLay) appendVisibleLayerValues(
 		return result
 	}
 	layerProgramName := layer.Program.GetProgramName()
+	claimed := make([]string, 0)
 	for _, v := range layerValues {
 		if !p.isVisibleValueInLayer(v, layer, layerPos) {
 			continue
@@ -1198,8 +1240,11 @@ func (p *ProgramOverLay) appendVisibleLayerValues(
 		if foundFiles.Have(normalizedPath) {
 			continue
 		}
-		foundFiles.Set(normalizedPath, struct{}{})
 		result = append(result, v)
+		claimed = append(claimed, normalizedPath)
+	}
+	for _, path := range claimed {
+		foundFiles.Set(path, struct{}{})
 	}
 	return result
 }
@@ -1496,6 +1541,7 @@ func (p *ProgramOverLay) queryMatch(
 			return
 		}
 		layerProgramName := layer.Program.GetProgramName()
+		claimed := make([]string, 0)
 		_ = vals.Recursive(func(op sfvm.ValueOperator) error {
 			v, ok := op.(*Value)
 			if !ok {
@@ -1514,10 +1560,13 @@ func (p *ProgramOverLay) queryMatch(
 			if foundFiles.Have(normalizedPath) {
 				return nil
 			}
-			foundFiles.Set(normalizedPath, struct{}{})
 			results = append(results, v)
+			claimed = append(claimed, normalizedPath)
 			return nil
 		})
+		for _, path := range claimed {
+			foundFiles.Set(path, struct{}{})
+		}
 	}
 
 	// Diff sources: each owner layer with include of owned paths.
@@ -1640,6 +1689,7 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 			return
 		}
 		owned := ownedByLayer[layer.LayerIndex]
+		claimed := make([]string, 0)
 		_ = values.Recursive(func(operator sfvm.ValueOperator) error {
 			v, ok := operator.(*Value)
 			if !ok {
@@ -1663,11 +1713,14 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 				if foundFiles.Have(normalizedPath) {
 					return nil
 				}
-				foundFiles.Set(normalizedPath, struct{}{})
+				claimed = append(claimed, normalizedPath)
 			}
 			results = append(results, v)
 			return nil
 		})
+		for _, path := range claimed {
+			foundFiles.Set(path, struct{}{})
+		}
 	}
 
 	// Diff owner layers first, then base (dual-source order).

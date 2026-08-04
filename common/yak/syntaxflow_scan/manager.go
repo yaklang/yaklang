@@ -345,6 +345,11 @@ func (m *scanManager) initByConfig() error {
 // dedupeProgramsCoveredByOverlay drops standalone base programs when another
 // loaded program's overlay already includes them as a lower layer. Overlay
 // SyntaxFlow already aggregates those layers; scanning base alone doubles work.
+//
+// Only the top-layer program may mark others as covered. Lower layers also
+// carry GetOverlay() for SF routing (Value.ParentProgram.GetOverlay), so using
+// their overlay would incorrectly mark the top program as covered and empty
+// the scan program list.
 func dedupeProgramsCoveredByOverlay(programs []*ssaapi.Program) []*ssaapi.Program {
 	if len(programs) <= 1 {
 		return programs
@@ -358,7 +363,15 @@ func dedupeProgramsCoveredByOverlay(programs []*ssaapi.Program) []*ssaapi.Progra
 		if overlay == nil {
 			continue
 		}
-		for _, name := range overlay.GetLayerProgramNames() {
+		layerNames := overlay.GetLayerProgramNames()
+		if len(layerNames) == 0 {
+			continue
+		}
+		topName := layerNames[len(layerNames)-1]
+		if prog.GetProgramName() != topName {
+			continue
+		}
+		for _, name := range layerNames {
 			if name == "" || name == prog.GetProgramName() {
 				continue
 			}
