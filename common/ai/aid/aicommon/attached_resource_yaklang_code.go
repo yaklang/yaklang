@@ -25,6 +25,9 @@ import (
 // Legacy: some clients still send the open .yak as Type=file Key=file_path.
 // Backend accepts that only when no Type=code is present and the path ends with .yak.
 //
+// @mention reference files (e.g. .md reports) must NOT become editor_file_path /
+// yaklang_code_change delivery targets — they are context-only via ContextProvider.
+//
 // yaklang_code_change delivery (backend → frontend):
 //   - op=patch: code.content is the changed fragment; code.patch describes how to apply it
 //     (kind: line_range | snippet | insert | delete | full; optional old_snippet; 1-based absolute file lines).
@@ -82,11 +85,123 @@ func IsYaklangScriptDeliveryPath(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".yak")
 }
 
+// :mention[path]{mentionId="path"} or :mention[path]
+var yaklangMentionPathPattern = regexp.MustCompile(`(?i):mention\[([^\]]+)\](?:\{[^}]*mentionId="([^"]*)"[^}]*\})?`)
+
+// ExtractMentionPathsFromUserInput collects absolute/relative paths from :mention[...] chips.
+func ExtractMentionPathsFromUserInput(userInput string) []string {
+	userInput = strings.TrimSpace(userInput)
+	if userInput == "" {
+		return nil
+	}
+	matches := yaklangMentionPathPattern.FindAllStringSubmatch(userInput, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(matches))
+	var out []string
+	add := func(raw string) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		// Mention display may escape underscores as \_
+		raw = strings.ReplaceAll(raw, `\_`, "_")
+		cleaned := filepath.Clean(raw)
+		key := strings.ToLower(cleaned)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, cleaned)
+	}
+	for _, m := range matches {
+		if len(m) > 1 {
+			add(m[1])
+		}
+		if len(m) > 2 && strings.TrimSpace(m[2]) != "" {
+			add(m[2])
+		}
+	}
+	return out
+}
+
+func pathInMentionSet(path string, mentionPaths []string) bool {
+	path = filepath.Clean(strings.TrimSpace(path))
+	if path == "" || len(mentionPaths) == 0 {
+		return false
+	}
+	pathLower := strings.ToLower(path)
+	base := strings.ToLower(filepath.Base(path))
+	for _, m := range mentionPaths {
+		m = filepath.Clean(strings.TrimSpace(m))
+		if m == "" {
+			continue
+		}
+		if strings.EqualFold(path, m) || pathLower == strings.ToLower(m) {
+			return true
+		}
+		// mention path may use escaped underscores or partial display forms
+		if base != "" && strings.EqualFold(base, filepath.Base(m)) {
+			return true
+		}
+	}
+	return false
+}
+
+func isPathUnderWorkspace(path, workspace string) bool {
+	path = filepath.Clean(strings.TrimSpace(path))
+	workspace = filepath.Clean(strings.TrimSpace(workspace))
+	if path == "" || workspace == "" {
+		return false
+	}
+	rel, err := filepath.Rel(workspace, path)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// pickYaklangEditorFile chooses the best .yak delivery path from candidates.
+// Prefer workspace-scoped .yak files; never pick mention-only reference paths.
+func pickYaklangEditorFile(candidates []string, workspace string, mentionPaths []string) string {
+	var yakCandidates []string
+	for _, c := range candidates {
+		c = filepath.Clean(strings.TrimSpace(c))
+		if !IsYaklangScriptDeliveryPath(c) {
+			continue
+		}
+		if pathInMentionSet(c, mentionPaths) {
+			continue
+		}
+		yakCandidates = append(yakCandidates, c)
+	}
+	if len(yakCandidates) == 0 {
+		return ""
+	}
+	if workspace != "" {
+		workspace = filepath.Clean(workspace)
+		for _, c := range yakCandidates {
+			if isPathUnderWorkspace(c, workspace) {
+				return c
+			}
+		}
+	}
+	return yakCandidates[0]
+}
+
 // ParseYaklangEditorContextFromAttached builds editor context from AttachedResourceInfo payloads.
 // Type=code Key=file_path is the canonical writable delivery slot.
 // Type=file Key=file_path is reference/@ context and must not become EditorFile unless legacy fallback.
 func ParseYaklangEditorContextFromAttached(attachedDatas []*AttachedResource) *YaklangEditorContext {
+	return ParseYaklangEditorContextFromAttachedWithUserInput(attachedDatas, "")
+}
+
+// ParseYaklangEditorContextFromAttachedWithUserInput is like ParseYaklangEditorContextFromAttached
+// but also excludes paths appearing in FreeInput :mention[...] chips.
+func ParseYaklangEditorContextFromAttachedWithUserInput(attachedDatas []*AttachedResource, userInput string) *YaklangEditorContext {
 	ctx := &YaklangEditorContext{}
+	mentionPaths := ExtractMentionPathsFromUserInput(userInput)
 	var codeDeliveryCandidates []string
 	var legacyFileYakCandidates []string
 	var selectionPath string
@@ -119,9 +234,17 @@ func ParseYaklangEditorContextFromAttached(attachedDatas []*AttachedResource) *Y
 					ctx.WorkspacePath = filepath.Clean(path)
 				}
 			case data.HasKey(CONTEXT_PROVIDER_KEY_FILE_PATH):
+				path := strings.TrimSpace(data.Value)
+				if path == "" {
+					continue
+				}
+				cleaned := filepath.Clean(path)
 				// Type=file is read-only reference context. Keep .yak only as legacy delivery fallback.
-				if path := strings.TrimSpace(data.Value); IsYaklangScriptDeliveryPath(path) {
-					legacyFileYakCandidates = append(legacyFileYakCandidates, filepath.Clean(path))
+				if IsYaklangScriptDeliveryPath(path) {
+					legacyFileYakCandidates = append(legacyFileYakCandidates, cleaned)
+				} else {
+					// Mention-only attachments often reuse file_path; track for exclusion even without FreeInput parse.
+					mentionPaths = append(mentionPaths, cleaned)
 				}
 			}
 		}
@@ -129,11 +252,12 @@ func ParseYaklangEditorContextFromAttached(attachedDatas []*AttachedResource) *Y
 
 	switch {
 	case len(codeDeliveryCandidates) > 0:
-		ctx.EditorFile = pickYaklangEditorFile(codeDeliveryCandidates, ctx.WorkspacePath)
-	case IsYaklangScriptDeliveryPath(selectionPath):
+		// Type=code is the authoritative writable slot; do not exclude via mention chips.
+		ctx.EditorFile = pickYaklangEditorFile(codeDeliveryCandidates, ctx.WorkspacePath, nil)
+	case IsYaklangScriptDeliveryPath(selectionPath) && !pathInMentionSet(selectionPath, mentionPaths):
 		ctx.EditorFile = filepath.Clean(selectionPath)
 	case len(legacyFileYakCandidates) > 0:
-		ctx.EditorFile = pickYaklangEditorFile(legacyFileYakCandidates, ctx.WorkspacePath)
+		ctx.EditorFile = pickYaklangEditorFile(legacyFileYakCandidates, ctx.WorkspacePath, mentionPaths)
 		if ctx.EditorFile != "" {
 			log.Infof("legacy Type=file file_path used as yak delivery target; prefer Type=code: %s", ctx.EditorFile)
 		}
@@ -143,42 +267,6 @@ func ParseYaklangEditorContextFromAttached(attachedDatas []*AttachedResource) *Y
 		return nil
 	}
 	return ctx
-}
-
-func pickYaklangEditorFile(candidates []string, workspace string) string {
-	var yakCandidates []string
-	for _, c := range candidates {
-		c = filepath.Clean(strings.TrimSpace(c))
-		if !IsYaklangScriptDeliveryPath(c) {
-			continue
-		}
-		yakCandidates = append(yakCandidates, c)
-	}
-	if len(yakCandidates) == 0 {
-		return ""
-	}
-	if workspace != "" {
-		workspace = filepath.Clean(workspace)
-		for _, c := range yakCandidates {
-			if isPathUnderWorkspace(c, workspace) {
-				return c
-			}
-		}
-	}
-	return yakCandidates[0]
-}
-
-func isPathUnderWorkspace(path, workspace string) bool {
-	path = filepath.Clean(strings.TrimSpace(path))
-	workspace = filepath.Clean(strings.TrimSpace(workspace))
-	if path == "" || workspace == "" {
-		return false
-	}
-	rel, err := filepath.Rel(workspace, path)
-	if err != nil {
-		return false
-	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // CollectYaklangDeliveryPathsFromAttached returns writable delivery paths (Type=code / resolved EditorFile).
@@ -238,6 +326,7 @@ func FormatYaklangEditorContextMarkdown(ctx *YaklangEditorContext) string {
 
 // EnrichYaklangEditorContextFromUserInput fills EditorFile when the frontend only sent
 // workspace/directory_path but the user explicitly named a .yak file in FreeInput.
+// Non-.yak EditorFile values (e.g. @mention .md mis-bound as file_path) are cleared first.
 func EnrichYaklangEditorContextFromUserInput(ctx *YaklangEditorContext, userInput string) {
 	if ctx == nil {
 		return
@@ -251,6 +340,10 @@ func EnrichYaklangEditorContextFromUserInput(ctx *YaklangEditorContext, userInpu
 	}
 	inferred := InferYaklangEditorFileFromUserInput(userInput, ctx.WorkspacePath)
 	if inferred == "" || !IsYaklangScriptDeliveryPath(inferred) {
+		return
+	}
+	// Do not treat mention-chip paths as delivery targets.
+	if pathInMentionSet(inferred, ExtractMentionPathsFromUserInput(userInput)) {
 		return
 	}
 	ctx.EditorFile = inferred
@@ -324,6 +417,7 @@ func YaklangAttachedInitialCode(ctx *YaklangEditorContext) (code string, ok bool
 // ResolveYaklangInitFullCode picks the in-memory buffer for modify_code / delete_code / insert_code.
 // When an editor file is attached and diskContent is non-empty, disk wins so line numbers match the
 // on-disk file. Otherwise attached selection content is used when present (e.g. unsaved buffer).
+// Non-.yak targets never seed from disk (avoids loading markdown reports into full_code).
 func ResolveYaklangInitFullCode(editorCtx *YaklangEditorContext, diskContent string) (code string, fromAttachedSelection bool) {
 	if editorCtx != nil && editorCtx.HasEditorFile() {
 		if trimmed := strings.TrimSpace(diskContent); trimmed != "" {
@@ -349,6 +443,7 @@ func YaklangCodeLineBase(editorCtx *YaklangEditorContext, fullCodeFromSelection 
 }
 
 // ResolveYaklangInitTargetPath picks the init target file path (attachment beats liteforge).
+// Non-.yak attached paths are ignored so markdown @mention files never become seed targets.
 func ResolveYaklangInitTargetPath(editorCtx *YaklangEditorContext, liteforgePath string) (targetPath string, fromAttached bool) {
 	if editorCtx != nil && editorCtx.HasEditorFile() {
 		return filepath.Clean(editorCtx.EditorFile), true
