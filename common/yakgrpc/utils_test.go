@@ -74,7 +74,7 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 	})
 
 	// OnServerStarted must not run inline in the Recv loop: MITM may stream.Send
-	// (e.g. large-request notification) while the callback waits on poc/HTTP.
+	// while the callback waits on poc/HTTP.
 	var startedWg sync.WaitGroup
 	for {
 		rsp, err := stream.Recv()

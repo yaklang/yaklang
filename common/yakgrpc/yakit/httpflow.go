@@ -1208,8 +1208,9 @@ func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB 
 			extraSelectField = "payload,"
 		}
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
-		// max request size is 200K -> 200 * 1024 -> 204800
+		// max request size follows GlobalMaxContentLength (「转储数据包大小」)
 		// max response size is 500K -> 500 * 1024 -> 512000
+		maxReqPreview := GetMaxHTTPFlowRequestBodyInDBBytes()
 		db = db.Select(fmt.Sprintf(`id,created_at,updated_at,hidden_index,%s -- basic gorm fields
 body_length, -- handle body length should be careful, if it's big, no return response
 request_length, -- request body length
@@ -1224,9 +1225,9 @@ tags, is_websocket, websocket_hash, runtime_id, from_plugin,
 process_name,
 is_read_too_slow_response,
 
--- request is larger than 200K or marked too-large, return empty string
-(is_too_large_request OR LENGTH(request) > 204800) as is_request_oversize,
-CASE WHEN (is_too_large_request OR LENGTH(request) > 204800) THEN '' ELSE request END as request,
+-- request oversize (spill threshold / GlobalMaxContentLength) or marked too-large
+(is_too_large_request OR LENGTH(request) > %d) as is_request_oversize,
+CASE WHEN (is_too_large_request OR LENGTH(request) > %d) THEN '' ELSE request END as request,
 
 -- is request too large (body spilled to file)
 is_too_large_request,
@@ -1239,7 +1240,7 @@ CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,
 -- is response too large
 is_too_large_response, 
 too_large_response_header_file, too_large_response_body_file, duration
-`, extraSelectField))
+`, extraSelectField, maxReqPreview, maxReqPreview))
 	}
 
 	if params.Pagination == nil {

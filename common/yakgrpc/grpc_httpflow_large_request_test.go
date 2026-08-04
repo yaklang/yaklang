@@ -22,6 +22,10 @@ func TestGRPCMUSTPASS_HTTP_QueryHTTPFlow_Oversize_Request(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	prev := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(1024 * 1024) // 1MB so 3MB request spills
+	t.Cleanup(func() { consts.SetGlobalMaxContentLength(prev) })
+
 	yakit.DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
 		DeleteAll: false,
 		Id:        nil,
@@ -107,7 +111,7 @@ Host: www.example.com
 	}
 
 	if !response.GetIsTooLargeRequest() {
-		t.Fatal("3MB request should be marked as too large")
+		t.Fatal("3MB request should be marked as too large when GlobalMaxContentLength is 1MB")
 	}
 	if !strings.Contains(string(response.GetRequest()), "request too large") {
 		t.Fatal("GetHTTPFlowById should return truncate notice for oversized request")

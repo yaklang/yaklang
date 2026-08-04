@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -95,8 +96,14 @@ func TestMITM_UploadFile(t *testing.T) {
 }
 
 func TestMITM_LargeRequestWireForward(t *testing.T) {
-	// Default spill cap is 200KB (History preview); GlobalMaxContentLength stays at ~10MB for MITM I/O.
+	// Wire forwarding must keep the full body even when History spill kicks in.
+	// Lower 「转储数据包大小」 below body size so spill is exercised without
+	// relying on the old hardcoded 200KB History cap.
 	const bodySize = 300 * 1024
+	prev := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(200 * 1024)
+	t.Cleanup(func() { consts.SetGlobalMaxContentLength(prev) })
+
 	token := uuid.New().String()
 	var receivedBodyLen atomic.Int64
 
@@ -133,7 +140,7 @@ func TestMITM_LargeRequestWireForward(t *testing.T) {
 			}, 1)
 			require.NoError(t, err)
 			require.Len(t, flowMsg.Data, 1)
-			require.True(t, flowMsg.Data[0].IsTooLargeRequest, "300KB body should spill at 200KB History threshold without lowering GlobalMaxContentLength")
+			require.True(t, flowMsg.Data[0].IsTooLargeRequest, "300KB body should spill when GlobalMaxContentLength is 200KB")
 		}),
 	)
 }
