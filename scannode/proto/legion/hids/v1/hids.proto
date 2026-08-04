@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package legion.hids.v1;
+
+import "google/protobuf/timestamp.proto";
+import "legion/capability/v1/capability.proto";
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/hids/v1;hidsv1";
+
+message HIDSObservation {
+  legion.node.v1.EventMetadata metadata = 1;
+  legion.capability.v1.CapabilityRef capability = 2;
+  string hids_event_type = 3;
+  google.protobuf.Timestamp observed_at = 4;
+  bytes event_json = 5;
+}
+
+message HIDSProcessRef {
+  int32 pid = 1;
+  string boot_id = 2;
+  int64 start_time_unix_ms = 3;
+  string process_name = 4;
+  string process_image = 5;
+  string process_command = 6;
+  string username = 7;
+}
+
+message ExecuteHIDSResponseActionCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  string action = 4;
+  HIDSProcessRef process = 5;
+}
+
+message HIDSDesiredSpecDryRunCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  bytes desired_spec_json = 4;
+}
+
+message CollectHIDSCurrentStateCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  string collect_type = 4;
+}
+
+message CollectHIDSFileEvidenceCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  legion.capability.v1.CapabilityRef capability = 3;
+  string kind = 4;
+  string path = 5;
+  bool recursive = 6;
+  int32 max_depth = 7;
+  int32 max_entries = 8;
+}
+
+message HIDSDesiredSpecDryRunResult {
+  legion.node.v1.EventMetadata metadata = 1;
+  legion.capability.v1.CapabilityRef capability = 2;
+  string status = 3;
+  string message = 4;
+  string error_code = 5;
+  string error_message = 6;
+  google.protobuf.Timestamp observed_at = 7;
+  bytes detail_json = 8;
+}
+
+message HIDSResponseActionResult {
+  legion.node.v1.EventMetadata metadata = 1;
+  legion.capability.v1.CapabilityRef capability = 2;
+  string action = 3;
+  string status = 4;
+  string error_code = 5;
+  string error_message = 6;
+  google.protobuf.Timestamp observed_at = 7;
+  bytes detail_json = 8;
+  HIDSProcessRef process = 9;
+}

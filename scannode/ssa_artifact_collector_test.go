@@ -145,7 +145,7 @@ func TestAppendKeyValueParams_SkipScannodeInternalKeys(t *testing.T) {
 		"_scannode_ssa_upload_url":  "http://localhost/upload",
 		"_scannode_ssa_object_key":  "ssa/tasks/t1/report.json.gz",
 		"_scannode_ssa_codec":       "gzip",
-		"ruleset-hash":              "abc",
+		"rule_snapshot_id":          "rulesnapshot-a",
 		"_scannode_unknown_setting": "x",
 	})
 
@@ -154,12 +154,161 @@ func TestAppendKeyValueParams_SkipScannodeInternalKeys(t *testing.T) {
 		joined[a] = struct{}{}
 	}
 	_, hasTask := joined["--task-id"]
-	_, hasRuleset := joined["--ruleset-hash"]
-	_, hasInternalUpload := joined["--_scannode_ssa_upload_url"]
+	_, hasRuleSnapshot := joined["--rule_snapshot_id"]
+	_, hasInternalObjectKey := joined["--_scannode_ssa_object_key"]
 	_, hasInternalCodec := joined["--_scannode_ssa_codec"]
 
 	require.True(t, hasTask)
-	require.True(t, hasRuleset)
-	require.False(t, hasInternalUpload)
+	require.True(t, hasRuleSnapshot)
+	require.False(t, hasInternalObjectKey)
 	require.False(t, hasInternalCodec)
+}
+
+func TestAppendKeyValueParams_ExpandsStringSliceValues(t *testing.T) {
+	node := &ScanNode{}
+	args := node.appendKeyValueParams(nil, map[string]interface{}{
+		"port-preset": []string{"top100"},
+		"ports":       "2080",
+	})
+
+	require.Equal(t, []string{"top100"}, valuesAfterFlag(args, "--port-preset"))
+	require.NotContains(t, args, `["top100"]`)
+	require.Equal(t, []string{"2080"}, valuesAfterFlag(args, "--ports"))
+}
+
+func valuesAfterFlag(args []string, flag string) []string {
+	values := make([]string, 0)
+	for index := 0; index < len(args)-1; index++ {
+		if args[index] == flag {
+			values = append(values, args[index+1])
+		}
+	}
+	return values
+}
+
+func TestUploadMetricsAccumulation(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+
+	c.recordUploadMs(500)
+	c.recordUploadMs(300)
+	c.recordTicketFetchMs(120)
+	c.recordTicketFetchMs(80)
+	c.recordRetry()
+	c.recordRetry()
+	c.recordRetry()
+	c.recordSegment()
+	c.recordSegment()
+
+	m := c.snapshotUploadMetrics()
+	if m.TotalUploadMs != 800 {
+		t.Errorf("totalUploadMs = %d, want 800", m.TotalUploadMs)
+	}
+	if m.TicketFetchMs != 200 {
+		t.Errorf("ticketFetchMs = %d, want 200", m.TicketFetchMs)
+	}
+	if m.Retries != 3 {
+		t.Errorf("retries = %d, want 3", m.Retries)
+	}
+	if m.Segments != 2 {
+		t.Errorf("segments = %d, want 2", m.Segments)
+	}
+}
+
+func TestUploadMetricsConcurrency(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+
+	done := make(chan struct{})
+	for i := 0; i < 100; i++ {
+		go func() {
+			c.recordUploadMs(1)
+			c.recordRetry()
+			done <- struct{}{}
+		}()
+	}
+	for i := 0; i < 100; i++ {
+		<-done
+	}
+
+	m := c.snapshotUploadMetrics()
+	if m.TotalUploadMs != 100 {
+		t.Errorf("totalUploadMs = %d, want 100", m.TotalUploadMs)
+	}
+	if m.Retries != 100 {
+		t.Errorf("retries = %d, want 100", m.Retries)
+	}
+}
+
+func TestBuildReadyEventPopulatesMetrics(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+	c.recordUploadMs(1500)
+	c.recordTicketFetchMs(200)
+	c.recordSegment()
+	c.recordRetry()
+	c.setUploadBytes(102400, 32000)
+
+	build := &SSAArtifactBuildResult{
+		ObjectKey:        "ssa/task-1/artifact",
+		Codec:            "zstd",
+		ArtifactFormat:   "ssa-result-segments-manifest-v1",
+		CompressedSize:   32000,
+		UncompressedSize: 102400,
+		SHA256:           "abc123",
+	}
+	event := c.BuildReadyEvent(build, 5000, 42)
+	if event == nil {
+		t.Fatal("BuildReadyEvent returned nil")
+	}
+	if len(event.Metrics) == 0 {
+		t.Fatal("event.Metrics is empty, expected upload metrics JSON")
+	}
+
+	var metrics map[string]any
+	if err := json.Unmarshal(event.Metrics, &metrics); err != nil {
+		t.Fatalf("failed to parse metrics JSON: %v", err)
+	}
+	if metrics["total_upload_ms"] != float64(1500) {
+		t.Errorf("metrics.total_upload_ms = %v, want 1500", metrics["total_upload_ms"])
+	}
+	if metrics["ticket_fetch_ms"] != float64(200) {
+		t.Errorf("metrics.ticket_fetch_ms = %v, want 200", metrics["ticket_fetch_ms"])
+	}
+	if metrics["segments"] != float64(1) {
+		t.Errorf("metrics.segments = %v, want 1", metrics["segments"])
+	}
+	if metrics["retries"] != float64(1) {
+		t.Errorf("metrics.retries = %v, want 1", metrics["retries"])
+	}
+}
+
+func TestBuildUploadFailedEvent(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+	c.recordUploadMs(500)
+	c.recordRetry()
+	c.setUploadBytes(12000, 4000)
+
+	event := c.BuildUploadFailedEvent("sts_expired", "sts token expired at 2026-07-22T10:00:00Z", 12000)
+	if event == nil {
+		t.Fatal("BuildUploadFailedEvent returned nil")
+	}
+	if event.ErrorCode != "sts_expired" {
+		t.Errorf("ErrorCode = %q, want sts_expired", event.ErrorCode)
+	}
+	if event.ErrorMessage == "" {
+		t.Error("ErrorMessage is empty")
+	}
+	if event.UploadedBytes != 12000 {
+		t.Errorf("UploadedBytes = %d, want 12000", event.UploadedBytes)
+	}
+	if len(event.Metrics) == 0 {
+		t.Error("Metrics is empty, expected partial upload metrics")
+	}
+
+	// Verify the metrics JSON contains the accumulated values
+	var metrics map[string]any
+	if err := json.Unmarshal(event.Metrics, &metrics); err != nil {
+		t.Fatalf("failed to parse metrics JSON: %v", err)
+	}
+	if metrics["total_upload_ms"] != float64(500) {
+		t.Errorf("metrics.total_upload_ms = %v, want 500", metrics["total_upload_ms"])
+	}
 }

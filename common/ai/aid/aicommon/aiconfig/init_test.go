@@ -394,6 +394,45 @@ func TestEnsureConfigLoaded_NetworkConfigPersistsToDB(t *testing.T) {
 	assert.Len(t, dbCfg.IntelligentModels, 1)
 	assert.Len(t, dbCfg.LightweightModels, 1)
 	assert.Len(t, dbCfg.VisionModels, 1)
+	assert.Equal(t, "memfit-standard-free", dbCfg.IntelligentModels[0].GetModelName())
+	assert.Equal(t, "memfit-light-free", dbCfg.LightweightModels[0].GetModelName())
+	assert.Equal(t, "memfit-vision-free", dbCfg.VisionModels[0].GetModelName())
+}
+
+func TestEnsureConfigLoaded_BackfillsModelNameFromExtraParams(t *testing.T) {
+	saveAndRestore(t)
+	setupTempYakitHome(t)
+
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) {
+		return &ypb.AIGlobalConfig{
+			Enabled:       true,
+			RoutingPolicy: "balance",
+			IntelligentModels: []*ypb.AIModelConfig{
+				{
+					Provider: &ypb.ThirdPartyApplicationConfig{
+						Type:   "aibalance",
+						APIKey: "test",
+					},
+					ExtraParams: []*ypb.KVPair{
+						{Key: consts.ModelExtraParamKey, Value: "legacy-intelligent"},
+					},
+				},
+			},
+		}, nil
+	})
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig { return nil })
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	dbCfg, err := yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
+	require.NoError(t, err)
+	require.NotNil(t, dbCfg)
+	require.Len(t, dbCfg.IntelligentModels, 1)
+	assert.Equal(t, "legacy-intelligent", dbCfg.IntelligentModels[0].GetModelName())
+	assert.Len(t, dbCfg.LightweightModels, 1)
+	assert.Len(t, dbCfg.VisionModels, 1)
 	assert.Equal(t, "memfit-light-free", dbCfg.LightweightModels[0].GetModelName())
 	assert.Equal(t, "memfit-vision-free", dbCfg.VisionModels[0].GetModelName())
 }

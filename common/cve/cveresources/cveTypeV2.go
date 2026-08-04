@@ -196,6 +196,7 @@ type CVE2Node struct {
 	Operator string         `json:"operator"`
 	Negate   bool           `json:"negate"`
 	CpeMatch []CVE2CpeMatch `json:"cpeMatch"`
+	Children []CVE2Node     `json:"children"`
 }
 
 // CVE 2.0 CPE匹配信息
@@ -297,7 +298,7 @@ func (v *CVEVulnerability) ToCVE(db *gorm.DB) (*CVE, error) {
 	// 处理配置信息获取厂商和产品
 	for _, config := range v.Cve.Configurations {
 		for _, node := range config.Nodes {
-			vendors, products := v.extractVendorProduct(&node)
+			vendors, products := v.extractVendorProduct(db, node)
 			Vendors = append(Vendors, vendors...)
 			Products = append(Products, products...)
 		}
@@ -507,28 +508,38 @@ func (v *CVEVulnerability) ToCVE(db *gorm.DB) (*CVE, error) {
 }
 
 // 从CPE匹配信息中提取厂商和产品信息
-func (v *CVEVulnerability) extractVendorProduct(node *CVE2Node) ([]string, []string) {
+func (v *CVEVulnerability) extractVendorProduct(db *gorm.DB, node CVE2Node) ([]string, []string) {
 	var vendors []string
 	var products []string
+
+	for _, child := range node.Children {
+		childVendors, childProducts := v.extractVendorProduct(db, child)
+		vendors = append(vendors, childVendors...)
+		products = append(products, childProducts...)
+	}
 
 	for _, cpe := range node.CpeMatch {
 		if cpe.Vulnerable {
 			// 解析CPE格式：cpe:2.3:a:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
-			parts := strings.Split(cpe.Criteria, ":")
-			if len(parts) >= 4 {
-				vendor := parts[3]
-				if len(parts) >= 5 {
-					product := parts[4]
-					if vendor != "*" && vendor != "" {
-						vendors = append(vendors, vendor)
-					}
-					if product != "*" && product != "" {
-						products = append(products, product)
-					}
-				}
+			cpeInfo, err := ParseToCPE(cpe.Criteria)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			vendor := cpeInfo.Vendor
+			product := cpeInfo.Product
+			if vendor != "*" && vendor != "" {
+				vendors = append(vendors, vendor)
+			}
+			if product != "*" && product != "" {
+				products = append(products, product)
+				db.Save(ProductsTable{
+					Product: product,
+					Vendor:  vendor,
+				})
 			}
 		}
 	}
 
-	return vendors, products
+	return Set(vendors), Set(products)
 }
