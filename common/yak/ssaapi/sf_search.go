@@ -11,6 +11,10 @@ import (
 // searchMembersWithOverlay 通过 overlay 跨 layer 查找对象的成员
 // 返回一个 map，key 是成员名称，value 是成员值
 // 上层 layer 的成员会覆盖下层 layer 的同名成员
+//
+// Member lookup uses per-layer symbol Ref (cheap). Upper layers use full Ref so
+// extern/lib symbols (e.g. Runtime bound to an import file) are not dropped by
+// include filters; base uses exclude of overridden files.
 func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]*Value {
 	memberMap := make(map[string]*Value)
 	if overlay == nil || len(overlay.Layers) == 0 {
@@ -18,7 +22,6 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 	}
 
 	// 首先尝试直接使用当前 value 的 instruction 来获取成员
-	// 如果当前 value 的 instruction 有成员，直接使用（这是最快的路径）
 	currentInst := value.getValue()
 	if currentInst != nil {
 		for _, pair := range ssa.GetLastWinsMemberPairs(currentInst) {
@@ -33,35 +36,30 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		}
 	}
 
-	filePath := ""
-	if rng := value.GetRange(); rng != nil {
-		if ed := rng.GetEditor(); ed != nil {
-			filePath = ed.GetFilePath()
-			if filePath == "" {
-				filePath = ed.GetUrl()
+	// Fast path: value's file is owned by the same layer as the value — members
+	// already come from the owning IR. Skip when program name is a lib/pkg
+	// (valueLayer==0), which still needs cross-layer merge.
+	if len(memberMap) > 0 && value.ParentProgram != nil {
+		filePath := ""
+		if rng := value.GetRange(); rng != nil {
+			if ed := rng.GetEditor(); ed != nil {
+				filePath = ed.GetFilePath()
+				if filePath == "" {
+					filePath = ed.GetUrl()
+				}
 			}
 		}
-	}
-
-	// Owner-layer fast path: value's file is owned by a known layer → only search that layer.
-	if filePath != "" && value.ParentProgram != nil {
-		normalized := normalizeOverlayFilePath(filePath, value.ParentProgram.GetProgramName())
-		ownerLayer, ok := overlay.GetFileOwnerLayer(normalized)
-		if ok && ownerLayer >= 1 && ownerLayer <= len(overlay.Layers) {
+		if filePath != "" {
+			normalized := normalizeOverlayFilePath(filePath, value.ParentProgram.GetProgramName())
 			valueLayer := overlay.getValueLayerIndex(value)
-			// Members already from owning IR when value lives in the owner layer.
-			if len(memberMap) > 0 && valueLayer == ownerLayer {
-				return memberMap
+			if valueLayer > 0 {
+				if top, ok := overlay.FileToLayerMap.Get(normalized); ok && top == valueLayer {
+					return memberMap
+				}
 			}
-			layer := overlay.Layers[ownerLayer-1]
-			if layer != nil && layer.Program != nil {
-				collectMembersFromLayerRef(memberMap, value, overlay, layer, ownerLayer-1, value.GetName(), value.String())
-			}
-			return memberMap
 		}
 	}
 
-	// No file context: dual-source Ref for the object name, then collect members from owner layers only.
 	valueName := value.GetName()
 	if valueName == "" {
 		valueName = value.String()
@@ -70,88 +68,46 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		return memberMap
 	}
 
-	// Prefer members already on the current instruction; otherwise resolve via dual-source Ref.
-	if len(memberMap) > 0 {
-		return memberMap
-	}
-
-	layerValues := overlay.Ref(valueName)
-	for _, layerValue := range layerValues {
-		if layerValue == nil || !layerValue.IsObject() {
+	// 从所有 layer 中查找成员，上层覆盖下层
+	for i := len(overlay.Layers) - 1; i >= 0; i-- {
+		layer := overlay.Layers[i]
+		if layer == nil || layer.Program == nil {
 			continue
 		}
-		layerInst := layerValue.getValue()
-		if layerInst == nil {
-			continue
-		}
-		for _, pair := range ssa.GetLastWinsMemberPairs(layerInst) {
-			keyName := pair.KeyString()
-			if keyName == "" {
-				continue
-			}
-			if _, exists := memberMap[keyName]; exists {
-				continue
-			}
-			newValVal, err := layerValue.ParentProgram.NewValue(pair.Member)
-			if err == nil && newValVal != nil {
-				memberMap[keyName] = newValVal
-			}
-		}
-	}
 
-	return memberMap
-}
-
-func collectMembersFromLayerRef(
-	memberMap map[string]*Value,
-	value *Value,
-	overlay *ProgramOverLay,
-	layer *ProgramLayer,
-	layerPos int,
-	names ...string,
-) {
-	if layer == nil || layer.Program == nil {
-		return
-	}
-	owned := overlay.PathsOwnedByLayer(layer.LayerIndex)
-	var layerValues Values
-	if layerPos == 0 {
-		overridden := overlay.overriddenFilesList()
-		for _, name := range names {
-			if name == "" {
-				continue
-			}
-			var vals Values
-			if len(overridden) > 0 {
-				vals = layer.Program.refWithExcludeFiles(name, overridden)
+		var layerValues Values
+		if i == 0 {
+			exclude := overlay.overriddenFilesList()
+			if len(exclude) > 0 {
+				layerValues = layer.Program.refWithExcludeFiles(valueName, exclude)
 			} else {
-				vals = layer.Program.Ref(name)
+				layerValues = layer.Program.Ref(valueName)
 			}
-			layerValues = append(layerValues, vals...)
+		} else {
+			// Full Ref on diff layers: include-filter can drop lib symbols whose
+			// editor path is an import file while still needing their members.
+			layerValues = layer.Program.Ref(valueName)
 		}
-	} else {
-		if len(owned) == 0 {
-			return
+		if len(layerValues) == 0 {
+			continue
 		}
-		for _, name := range names {
-			if name == "" {
-				continue
-			}
-			layerValues = append(layerValues, layer.Program.refWithIncludeFiles(name, owned)...)
-		}
-	}
 
-	for _, layerValue := range layerValues {
-		if layerValue == nil || !layerValue.IsObject() {
+		var targetLayerValue *Value
+		for _, layerValue := range layerValues {
+			if layerValue != nil && layerValue.IsObject() {
+				targetLayerValue = layerValue
+				break
+			}
+		}
+		if targetLayerValue == nil {
 			continue
 		}
-		if !overlay.isVisibleValueInLayer(layerValue, layer, layerPos) {
-			continue
-		}
-		layerInst := layerValue.getValue()
+
+		layerInst := targetLayerValue.getValue()
 		if layerInst == nil {
 			continue
 		}
+
 		for _, pair := range ssa.GetLastWinsMemberPairs(layerInst) {
 			keyName := pair.KeyString()
 			if keyName == "" {
@@ -166,6 +122,8 @@ func collectMembersFromLayerRef(
 			}
 		}
 	}
+
+	return memberMap
 }
 
 type userNodeItems struct {
@@ -204,8 +162,6 @@ func SearchWithCFG(value *Value, mod ssadb.MatchMode, compare func(string) bool,
 		case *ssa.LazyInstruction:
 			searchInstructionCFG(inst.Self())
 		default:
-			// log.Errorf("instruction type: %T", inst)
-
 		}
 	}
 	searchInstructionCFG(inst)

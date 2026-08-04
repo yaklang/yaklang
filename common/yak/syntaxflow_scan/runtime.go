@@ -16,6 +16,18 @@ import (
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
+// isOverlayTopLayerProgram reports whether prog is the top (newest) layer of overlay.
+func isOverlayTopLayerProgram(prog *ssaapi.Program, overlay *ssaapi.ProgramOverLay) bool {
+	if prog == nil || overlay == nil {
+		return false
+	}
+	names := overlay.GetLayerProgramNames()
+	if len(names) == 0 {
+		return false
+	}
+	return names[len(names)-1] == prog.GetProgramName()
+}
+
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	scanStart := time.Now()
 	defer func() {
@@ -152,7 +164,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		// 执行规则查询
 		var err error
 		var res *ssaapi.SyntaxFlowResult
-		if overlay := prog.GetOverlay(); overlay != nil {
+		// Lower layers also carry GetOverlay() for SF routing; only the top
+		// layer program should run the aggregated overlay scan.
+		if overlay := prog.GetOverlay(); overlay != nil && isOverlayTopLayerProgram(prog, overlay) {
 			res, err = overlay.SyntaxFlowRule(rule, option...)
 		} else {
 			res, err = prog.SyntaxFlowRule(rule, option...)

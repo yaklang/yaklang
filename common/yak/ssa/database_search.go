@@ -183,10 +183,9 @@ func matchInstructionsByVariableWithFileFilter(
 		for _, inst := range insts {
 			filePath := getInstructionFilePath(inst)
 			if filePath == "" {
-				// No file path: keep for exclude-only; drop for include-only.
-				if len(includeSet) == 0 {
-					filteredInsts = append(filteredInsts, inst)
-				}
+				// No file path (e.g. extern/lib Runtime): keep under both exclude
+				// and include filters so overlay dual-source Ref can still bind entry symbols.
+				filteredInsts = append(filteredInsts, inst)
 				continue
 			}
 			if len(includeSet) > 0 && !pathInSet(filePath, includeSet) {

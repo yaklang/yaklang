@@ -32,7 +32,7 @@ public class A {
 }`,
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
-				if stage != ssatest.IncrementalCheckStageCompile {
+				if stage != ssatest.IncrementalCheckStageCompile && stage != ssatest.IncrementalCheckStageDB {
 					return
 				}
 				require.NotNil(t, overlay)
@@ -45,6 +45,7 @@ public class A {
 				ownerA, ok := overlay.GetFileOwnerLayer("/A.java")
 				require.True(t, ok)
 				require.Greater(t, ownerA, 1)
+				require.NotEmpty(t, overlay.PathsOwnedByLayer(2), "diff ownership must work after DB reload")
 
 				keep, err := overlay.SyntaxFlowWithError(`keepStr as $res`)
 				require.NoError(t, err)
