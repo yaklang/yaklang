@@ -156,6 +156,10 @@ func TestMustPass(t *testing.T) {
 
 // TestMustPassHIDS 运行 HIDS 特定测试用例
 func TestMustPassHIDS(t *testing.T) {
+	if !hidsBuildEnabled {
+		t.Skip("HIDS mustpass tests require the hids build tag")
+	}
+
 	yakit.RegisterLowHTTPSaveCallback()
 
 	var cases [][]string

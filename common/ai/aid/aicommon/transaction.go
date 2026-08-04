@@ -30,9 +30,9 @@ func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
 		provider := strings.TrimSpace(rsp.GetProviderName())
 		model := strings.TrimSpace(rsp.GetModelName())
 		if provider != "" || model != "" {
-			return utils.Errorf("ai model returned empty response (provider=%s model=%s)", provider, model)
+			return utils.Wrapf(err, "ai model returned empty response (provider=%s model=%s)", provider, model)
 		}
-		return utils.Error("ai model returned empty response")
+		return utils.Wrapf(err, "ai model returned empty response")
 	}
 	return err
 }
