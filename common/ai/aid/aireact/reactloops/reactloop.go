@@ -151,6 +151,15 @@ type ReActLoop struct {
 	timelineDiffer        *aicommon.TimelineDiffer
 	currentIterationIndex int
 
+	// effectiveIterationCount 记录"有效推进轮数"。与 currentIterationIndex
+	// (原始循环圈数) 不同, 它仅在以下情况 +1:
+	//   1. 本轮的 todo_delta 有实际变更 (add/update/close/current), 或
+	//   2. 当前 scope 没有活跃 TODO (尚处于规划/侦察阶段, 无 TODO 可推).
+	// 当 scope 有活跃 TODO 但本轮 todo_delta 为空/无变化 (空转轮) 时不计入.
+	// 迭代上限判断基于此值, 避免空转轮耗光预算.
+	// 关键词: 有效迭代, todo 推进, 迭代上限重定义
+	effectiveIterationCount int
+
 	// lastIterationTickAt 记录主循环最近一次推进 (iterationCount++) 的
 	// 单调时间戳, 单位 unix nanoseconds. 仅由主循环线程写, stall heartbeat
 	// goroutine 与外部观察方原子读, 故用 atomic.Int64 即可. 心跳协程依此
@@ -572,6 +581,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		actionHistory:                make([]*ActionRecord, 0),
 		actionHistoryMutex:           new(sync.Mutex),
 		currentIterationIndex:        0,
+		effectiveIterationCount:      0,
 		currentTodoProgress:          make(map[string]*currentTodoProgress),
 		extraCapabilities:            NewExtraCapabilitiesManager(),
 		perception:                   newPerceptionController(perceptionDefaultIterationInterval),

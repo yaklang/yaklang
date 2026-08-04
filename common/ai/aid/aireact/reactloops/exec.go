@@ -806,7 +806,12 @@ LOOP:
 		// 知道 "我还在动"; 心跳逻辑见 startStallHeartbeat / recordIterationTick.
 		// 关键词: 主循环 tick, lastIterationTickAt
 		r.recordIterationTick()
-		if iterationCount > maxIterations {
+		// 迭代上限判断基于 effectiveIterationCount (有效推进轮数) 而非原始
+		// 循环圈数 iterationCount. effectiveIterationCount 在每轮 action 执行
+		// 后由 advanceEffectiveIteration 更新, 此处反映的是之前已完成的有效
+		// 迭代数. 空转轮 (有活跃 TODO 但无 todo_delta) 不计入, 不消耗预算.
+		// 关键词: 有效迭代上限, 迭代限制重定义
+		if r.effectiveIterationCount > maxIterations {
 			// 到达迭代上限: 优先尝试向用户申请临时扩充迭代次数 (仅在允许用户交互时).
 			// 用户同意 -> 提升 maxIterations 并 continue 主循环 (有扩充次数护栏防自旋);
 			// 用户拒绝 / 未启用交互 / 已达扩充上限 -> 回退到原"软性中断"退出.
@@ -969,7 +974,11 @@ LOOP:
 
 		// 主 loop todo_delta 兜底拦截: 详见 applyTodoDeltaBottomLine.
 		// 关键词: 主 loop todo_delta 兜底入口, 孤儿待办修复
-		applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
+		appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
+		// 判定本轮是否为"有效推进轮": 有活跃 TODO 但无 todo_delta 变更时
+		// 不计入 effectiveIterationCount, 从而不消耗迭代预算。
+		// 关键词: 有效迭代推进, 空转轮不计入
+		r.advanceEffectiveIteration(task, appliedTodoDelta)
 		// Legacy object wrappers keep ActionType()=="object" while the selected
 		// handler is finish. Reset based on the resolved handler so consecutive
 		// finish requests remain in the same soft-checkpoint flow.
