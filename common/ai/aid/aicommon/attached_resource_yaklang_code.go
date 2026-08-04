@@ -393,11 +393,11 @@ func YaklangCodeLineBase(editorCtx *YaklangEditorContext, fullCodeFromSelection 
 // Non-.yak attached paths are ignored so markdown @mention files never become seed targets.
 func ResolveYaklangInitTargetPath(editorCtx *YaklangEditorContext, liteforgePath string) (targetPath string, fromAttached bool) {
 	if editorCtx != nil && editorCtx.HasEditorFile() {
-		return editorCtx.EditorFile, true
+		return filepath.Clean(editorCtx.EditorFile), true
 	}
 	liteforgePath = strings.TrimSpace(liteforgePath)
 	if IsYaklangScriptDeliveryPath(liteforgePath) {
-		return liteforgePath, false
+		return filepath.Clean(liteforgePath), false
 	}
 	return "", false
 }

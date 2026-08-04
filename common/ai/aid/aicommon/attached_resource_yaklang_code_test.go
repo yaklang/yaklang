@@ -80,14 +80,16 @@ func TestYaklangAttachedInitialCode(t *testing.T) {
 }
 
 func TestResolveYaklangInitTargetPath(t *testing.T) {
-	ctx := &YaklangEditorContext{EditorFile: "/tmp/attached.yak"}
-	path, fromAttached := ResolveYaklangInitTargetPath(ctx, "/tmp/liteforge.yak")
+	attached := filepath.FromSlash("/tmp/attached.yak")
+	liteforge := filepath.FromSlash("/tmp/liteforge.yak")
+	ctx := &YaklangEditorContext{EditorFile: attached}
+	path, fromAttached := ResolveYaklangInitTargetPath(ctx, liteforge)
 	require.True(t, fromAttached)
-	require.Equal(t, "/tmp/attached.yak", path)
+	require.Equal(t, filepath.Clean(attached), path)
 
-	path, fromAttached = ResolveYaklangInitTargetPath(nil, "/tmp/liteforge.yak")
+	path, fromAttached = ResolveYaklangInitTargetPath(nil, liteforge)
 	require.False(t, fromAttached)
-	require.Equal(t, "/tmp/liteforge.yak", path)
+	require.Equal(t, filepath.Clean(liteforge), path)
 }
 
 func TestResolveYaklangInitFullCodePrefersDiskWhenEditorFile(t *testing.T) {
@@ -191,12 +193,14 @@ func TestParseYaklangEditorContext_MentionOnlyIsCreateMode(t *testing.T) {
 }
 
 func TestResolveYaklangInitTargetPath_RejectsNonYak(t *testing.T) {
-	ctx := &YaklangEditorContext{EditorFile: `/tmp/report.md`}
-	path, fromAttached := ResolveYaklangInitTargetPath(ctx, `/tmp/liteforge.yak`)
+	report := filepath.FromSlash("/tmp/report.md")
+	liteforge := filepath.FromSlash("/tmp/liteforge.yak")
+	ctx := &YaklangEditorContext{EditorFile: report}
+	path, fromAttached := ResolveYaklangInitTargetPath(ctx, liteforge)
 	require.False(t, fromAttached)
-	require.Equal(t, `/tmp/liteforge.yak`, path)
+	require.Equal(t, filepath.Clean(liteforge), path)
 
-	path, fromAttached = ResolveYaklangInitTargetPath(ctx, `/tmp/report.md`)
+	path, fromAttached = ResolveYaklangInitTargetPath(ctx, report)
 	require.False(t, fromAttached)
 	require.Empty(t, path)
 }
