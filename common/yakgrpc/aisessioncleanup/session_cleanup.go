@@ -161,6 +161,17 @@ func DeleteAllSessionArtifacts(db *gorm.DB) (*SessionCleanupResult, error) {
 	} else {
 		result.DeletedMemoryCollections = n
 	}
+	// Also clean up the independent midterm archive tables
+	if n, err := hardDeleteAll(db, &schema.AIMidtermArchiveEntity{}); err != nil {
+		return result, err
+	} else {
+		result.DeletedMemoryEntities += n
+	}
+	if n, err := hardDeleteAll(db, &schema.AIMidtermArchiveCollection{}); err != nil {
+		return result, err
+	} else {
+		result.DeletedMemoryCollections += n
+	}
 
 	log.Infof(
 		"deleted all session artifacts: memory_entities=%d memory_collections=%d rag_collections=%d rag_documents=%d entity_repositories=%d entity_relationships=%d er_model_entities=%d knowledge_bases=%d knowledge_entries=%d",
@@ -214,17 +225,41 @@ func pluckRAGArtifactNames(db *gorm.DB, model interface{}, column, likePattern s
 }
 
 func deleteMemoryEntitiesForSession(db *gorm.DB, persistentSessionID string) (int64, error) {
-	return hardDeleteWhere(db, &schema.AIMemoryEntity{},
+	n1, err := hardDeleteWhere(db, &schema.AIMemoryEntity{},
 		"session_id = ? OR session_id LIKE ?",
 		persistentSessionID, memoryMidtermSessionIDLike(persistentSessionID),
 	)
+	if err != nil {
+		return 0, err
+	}
+	// Also delete from the independent midterm archive table
+	n2, err := hardDeleteWhere(db, &schema.AIMidtermArchiveEntity{},
+		"session_id = ? OR session_id LIKE ?",
+		persistentSessionID, memoryMidtermSessionIDLike(persistentSessionID),
+	)
+	if err != nil {
+		return n1, err
+	}
+	return n1 + n2, nil
 }
 
 func deleteMemoryCollectionsForSession(db *gorm.DB, persistentSessionID string) (int64, error) {
-	return hardDeleteWhere(db, &schema.AIMemoryCollection{},
+	n1, err := hardDeleteWhere(db, &schema.AIMemoryCollection{},
 		"session_id = ? OR session_id LIKE ?",
 		persistentSessionID, memoryMidtermSessionIDLike(persistentSessionID),
 	)
+	if err != nil {
+		return 0, err
+	}
+	// Also delete from the independent midterm archive table
+	n2, err := hardDeleteWhere(db, &schema.AIMidtermArchiveCollection{},
+		"session_id = ? OR session_id LIKE ?",
+		persistentSessionID, memoryMidtermSessionIDLike(persistentSessionID),
+	)
+	if err != nil {
+		return n1, err
+	}
+	return n1 + n2, nil
 }
 
 // deleteRAGCollectionsByName 按 collection 名删除向量文档与 collection 行。
