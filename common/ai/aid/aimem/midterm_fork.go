@@ -77,7 +77,7 @@ func ForkMidtermArchiveStore(parent *AIMemoryTriage, taskIndex, taskName, persis
 		return nil, err
 	}
 
-	branchStore, err := NewAIMemoryForQuery(branchSessionID, WithDatabase(db))
+	branchStore, err := NewAIMemoryForQuery(branchSessionID, WithDatabase(db), WithMidtermArchiveMode())
 	if err != nil {
 		return nil, utils.Errorf("create branch midterm store failed: %v", err)
 	}
