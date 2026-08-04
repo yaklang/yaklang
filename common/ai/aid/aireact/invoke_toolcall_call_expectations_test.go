@@ -117,9 +117,9 @@ LOOP:
 					InteractiveJSONInput: `{"suggestion": "continue"}`,
 				}
 			}
-			if e.NodeId == "timeline_item" {
-				content := string(e.Content)
-				if strings.Contains(content, "ReAct Iteration Done") {
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
 					break LOOP
 				}
 			}
@@ -185,9 +185,9 @@ LOOP:
 					InteractiveJSONInput: `{"suggestion": "continue"}`,
 				}
 			}
-			if e.NodeId == "timeline_item" {
-				content := string(e.Content)
-				if strings.Contains(content, "ReAct Iteration Done") {
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
 					break LOOP
 				}
 			}
@@ -277,9 +277,9 @@ LOOP_EXTRA_PROMPT:
 					InteractiveJSONInput: `{"suggestion": "continue"}`,
 				}
 			}
-			if e.NodeId == "timeline_item" {
-				content := string(e.Content)
-				if strings.Contains(content, "ReAct Iteration Done") {
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
 					break LOOP_EXTRA_PROMPT
 				}
 			}

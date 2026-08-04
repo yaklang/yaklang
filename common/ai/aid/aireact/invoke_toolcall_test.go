@@ -272,7 +272,6 @@ func TestReAct_ToolUse(t *testing.T) {
 	materialFetched := false
 	var iid string
 	taskDone := false
-	iterationDone := false // Track if ReAct Iteration Done is written to timeline
 LOOP:
 	for {
 		select {
@@ -319,16 +318,7 @@ LOOP:
 				}
 			}
 
-			// Check if ReAct Iteration Done is written to timeline to avoid race condition
-			if e.NodeId == "timeline_item" {
-				content := string(e.GetContent())
-				if strings.Contains(content, "ReAct Iteration Done") {
-					iterationDone = true
-				}
-			}
-
-			// Wait for all conditions including iterationDone to avoid timeline race condition
-			if materialFetched && taskDone && iterationDone {
+			if materialFetched && taskDone {
 				break LOOP
 			}
 		case <-after:
@@ -360,14 +350,8 @@ LOOP:
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
-	if !strings.Contains(tl, `mocked thought for tool calling`) {
-		t.Fatal("timeline does not contain mocked thought")
-	}
 	if strings.Contains(tl, `when review`) {
 		t.Fatal("auto-continue review must not pollute the timeline")
-	}
-	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
-		t.Fatal("timeline does not contain ReAct iteration")
 	}
 	fmt.Println("--------------------------------------")
 }

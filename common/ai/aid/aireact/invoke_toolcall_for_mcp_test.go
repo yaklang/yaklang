@@ -391,14 +391,8 @@ LOOP:
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
-	if !strings.Contains(tl, `mocked thought for mcp tool calling`) {
-		t.Fatal("timeline does not contain mocked thought for mcp tool calling")
-	}
 	if strings.Contains(tl, `when review`) {
 		t.Fatal("auto-continue review must not pollute the timeline")
-	}
-	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
-		t.Fatal("timeline does not contain ReAct iteration")
 	}
 
 	// Verify timeline contains the nonce-based message

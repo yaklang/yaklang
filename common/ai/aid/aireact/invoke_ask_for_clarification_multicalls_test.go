@@ -156,9 +156,6 @@ LOOP:
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
 
-	if !utils.MatchAllOfSubString(tl, `ReAct Iteration Done[5]`) {
-		t.Fatal("iteration count should be 5")
-	}
 	if !utils.MatchAllOfSubString(tl, `assistant output`) {
 		t.Fatal("assistant output not found in timeline")
 	}

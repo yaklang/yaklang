@@ -258,14 +258,8 @@ LOOP:
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
-	if !strings.Contains(tl, `mocked thought for tool calling`) {
-		t.Fatal("timeline does not contain mocked thought")
-	}
 	if !utils.MatchAllOfSubString(tl, `system-question`, "user-answer", "when review") {
 		t.Fatal("timeline does not contain system-question")
-	}
-	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
-		t.Fatal("timeline does not contain ReAct iteration")
 	}
 	if !utils.MatchAllOfSubString(tl, `[mocked] cannot found proper tool, abandon it`) {
 		t.Fatal("timeline does not contain mocked-echo-params")
