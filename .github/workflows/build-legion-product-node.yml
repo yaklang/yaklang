@@ -1,0 +1,102 @@
+name: Build Legion Product Node
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/scripts/build-legion-product-node.sh"
+      - ".github/workflows/build-legion-product-node.yml"
+      - "cmd/legion-smoke-node/**"
+      - "common/hids/**"
+      - "common/node/**"
+      - "common/spec/**"
+      - "scannode/**"
+      - "go.mod"
+      - "go.sum"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legion-product-node-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-linux-amd64:
+    name: Build Linux amd64 HIDS node
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      NODE_PACKAGE_NAME: legion-product-node_linux_amd64
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      NODE_PACKAGE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build product node package
+        run: ./.github/scripts/build-legion-product-node.sh
+
+      - name: Verify package archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c "${NODE_PACKAGE_NAME}.tar.gz.sha256"
+          mkdir verify
+          tar -xzf "${NODE_PACKAGE_NAME}.tar.gz" -C verify
+          cd verify
+          sha256sum -c SHA256SUMS
+          file legion-smoke-node | grep -q 'statically linked'
+          if readelf -d legion-smoke-node 2>/dev/null | grep -q '(NEEDED)'; then
+            echo "node binary declares dynamic library dependencies" >&2
+            exit 1
+          fi
+          jq -e \
+            --arg source_sha "$SOURCE_SHA" \
+            '.artifact_type == "legion-product-node"
+             and .source.commit == $source_sha
+             and .source.dirty == false
+             and .recipe.goos == "linux"
+             and .recipe.goarch == "amd64"
+             and .recipe.build_tags == "hids"
+             and (.capabilities | index("hids") != null)' \
+            PRODUCT_NODE_MANIFEST.json >/dev/null
+
+      - name: Publish build summary
+        shell: bash
+        run: |
+          {
+            echo "## Legion product node"
+            echo
+            echo "- Source: \`${SOURCE_SHA}\`"
+            echo "- Package: \`${NODE_PACKAGE_NAME}.tar.gz\`"
+            echo "- Target: \`linux/amd64\`"
+            echo "- Build tags: \`hids\`"
+            echo "- Go: \`$(go version)\`"
+            echo
+            echo '```json'
+            jq . "dist/${NODE_PACKAGE_NAME}/PRODUCT_NODE_MANIFEST.json"
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload node package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NODE_PACKAGE_NAME }}
+          path: |
+            dist/${{ env.NODE_PACKAGE_NAME }}.tar.gz
+            dist/${{ env.NODE_PACKAGE_NAME }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14

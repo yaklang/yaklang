@@ -37,6 +37,24 @@ go build -tags hids -o ./legion-smoke-node-hids ./cmd/legion-smoke-node
 GOOS=linux GOARCH=amd64 go build -tags hids -o ./legion-smoke-node-hids-linux-amd64 ./cmd/legion-smoke-node
 ```
 
+## CI Product Node Package
+
+`.github/workflows/build-legion-product-node.yml` produces the deployable
+Linux amd64 product node from the repository's declared Go version. The
+workflow runs for relevant pull requests, manual dispatches, and every `v*`
+tag, including alpha tags.
+
+The `legion-product-node_linux_amd64` artifact contains:
+
+- `legion-product-node_linux_amd64.tar.gz`
+- `legion-product-node_linux_amd64.tar.gz.sha256`
+
+The archive contains the statically linked `legion-smoke-node`,
+`PRODUCT_NODE_MANIFEST.json`, and `SHA256SUMS`. The manifest binds the binary
+to the exact Yaklang source commit, Go toolchain, Linux amd64 target, `hids`
+build tag, and advertised capability set. This artifact is an input to the
+Legion deployment packaging pipeline; it is not a complete deployment bundle.
+
 Use `task legion_smoke_node_build_hids` for native debugging when your current host is already Linux. Use `task legion_smoke_node_build_hids_linux_amd64` when you need a deployable Linux artifact from any development host.
 
 If a future production Legion node entrypoint is added, it must also be built with `-tags hids` before the binary is expected to advertise or run the HIDS capability.
