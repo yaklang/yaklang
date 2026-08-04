@@ -13,7 +13,6 @@ func TestTimelinePromptProjectionFiltersOnlySystemBookkeeping(t *testing.T) {
 	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)
 	injectTimelineItem(tl, 1, base, &TextTimelineItem{ID: 1, Text: "[iteration]:\n[default]======== ReAct iteration 1 ========\nReason/Next-Step: keep-decision"})
-	injectTimelineItem(tl, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[iteration]:\n[default]ReAct Iteration Done[1] max:100 continue to next iteration"})
 	injectTimelineItem(tl, 3, base.Add(2*time.Second), &TextTimelineItem{ID: 3, Text: "[TODO_DELTA]:\nDONE[finished]: applied"})
 	injectTimelineItem(tl, 4, base.Add(3*time.Second), &TextTimelineItem{ID: 4, Text: "[evidence_ops]:\nUPSERT[evidence-1]: applied"})
 	injectTimelineItem(tl, 5, base.Add(4*time.Second), &TextTimelineItem{ID: 5, Text: "[[TODO_DELTA_ERROR]]:\nFAILED DOING[done]: redundant doing: todo already doing\nFAILED DONE[foreign]: todo belongs to another task scope"})
@@ -24,7 +23,6 @@ func TestTimelinePromptProjectionFiltersOnlySystemBookkeeping(t *testing.T) {
 
 	raw := tl.Dump()
 	prompt := tl.DumpForPrompt()
-	require.Contains(t, raw, "ReAct Iteration Done")
 	require.Contains(t, raw, "DONE[finished]")
 	require.Contains(t, raw, "UPSERT[evidence-1]")
 	require.Contains(t, raw, "redundant doing")
@@ -33,7 +31,6 @@ func TestTimelinePromptProjectionFiltersOnlySystemBookkeeping(t *testing.T) {
 	require.Contains(t, prompt, "todo belongs to another task scope")
 	require.Contains(t, prompt, "KEEP_PARAMS")
 	require.Contains(t, prompt, "KEEP_TOOL_RESULT")
-	require.NotContains(t, prompt, "ReAct Iteration Done")
 	require.NotContains(t, prompt, "DONE[finished]")
 	require.NotContains(t, prompt, "UPSERT[evidence-1]")
 	require.NotContains(t, prompt, "redundant doing")
