@@ -405,6 +405,11 @@ func newLocalClientEx(local bool) (ypb.YakClient, error) {
 		var finalErr error
 		ciClientOnce.Do(func() {
 			ciClient, finalErr = dialServer(addr, nil)
+			// Keep package-level localClient in sync so legacy tests that still
+			// reference localClient work under GITHUB_ACTIONS (external yak grpc).
+			if finalErr == nil {
+				localClient = ciClient
+			}
 		})
 		return ciClient, finalErr
 	}
