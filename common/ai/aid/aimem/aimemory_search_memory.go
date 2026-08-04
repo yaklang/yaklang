@@ -215,7 +215,7 @@ func (t *AIMemoryTriage) searchMemoryKeywordOnly(queryText string, tokenLimit in
 		return nil, utils.Errorf("database connection is nil")
 	}
 
-	query := db.Model(&schema.AIMemoryEntity{}).Where("session_id = ?", t.sessionID)
+	query := db.Table(t.entityTableName()).Where("session_id = ?", t.sessionID)
 	query = bizhelper.FuzzSearchEx(query, []string{"content", "tags", "potential_questions"}, queryText, false)
 
 	var dbEntities []schema.AIMemoryEntity

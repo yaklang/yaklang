@@ -20,7 +20,7 @@ func EnsureTimelineMidtermArchiveStore(cfg *aicommon.Config) *AIMemoryTriage {
 		return nil
 	}
 	midtermSessionID := PersistentSessionToMidtermMemorySessionID(persistentSessionID)
-	store, err := NewAIMemoryForQuery(midtermSessionID, WithDatabase(cfg.GetDB()))
+	store, err := NewAIMemoryForQuery(midtermSessionID, WithDatabase(cfg.GetDB()), WithMidtermArchiveMode())
 	if err != nil {
 		log.Warnf("create midterm archive store failed for session %s: %v", persistentSessionID, err)
 		return nil

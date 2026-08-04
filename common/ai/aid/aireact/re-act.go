@@ -264,7 +264,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 
 	if cfg.TimelineArchiveStore == nil && strings.TrimSpace(cfg.PersistentSessionId) != "" {
 		midtermSessionID := aimem.PersistentSessionToMidtermMemorySessionID(cfg.PersistentSessionId)
-		midtermStore, err := aimem.NewAIMemoryForQuery(midtermSessionID, aimem.WithDatabase(cfg.GetDB()))
+		midtermStore, err := aimem.NewAIMemoryForQuery(midtermSessionID, aimem.WithDatabase(cfg.GetDB()), aimem.WithMidtermArchiveMode())
 		if err != nil {
 			log.Warnf("create timeline archive store failed for session %s: %v", cfg.PersistentSessionId, err)
 		} else {
