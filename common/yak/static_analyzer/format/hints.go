@@ -195,6 +195,19 @@ var compilerErrorHints = []compilerErrorHint{
 		Hint:     "泛型/类型参数约束不满足。检查传入类型是否与函数/generic 声明一致。",
 	},
 	{
+		Name: "CallAssignmentMismatchPocHTTP",
+		AnyOf: []string{
+			"The function call returns (",
+			"The function call with ~ returns (",
+		},
+		Contains: []string{"LowhttpResponse", "variables on the left side"},
+		Hint: "poc.Get / poc.Post 返回三个值：`(lowhttp.LowhttpResponse, *http.Request, error)`。正确写法：`rsp, req, err := poc.Post(...)` 或 `rsp, req, err := poc.Get(...)`。禁止 `rsp, err := poc.Post(...)`（只接两个变量会触发本错误）。",
+		Examples: []string{
+			`rsp, err := poc.Post(url, poc.timeout(30))`,
+			`rsp, req, err := poc.Post(url, poc.timeout(30))`,
+		},
+	},
+	{
 		Name: "CallAssignmentMismatch",
 		AnyOf: []string{
 			"The function call returns (",
