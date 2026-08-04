@@ -24,7 +24,7 @@ func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
 	}
 	category := normalizeTimelinePromptCategory(parsed.EntryType)
 	switch category {
-	case "TODO_DELTA", "EVIDENCE_OPS":
+	case "TODO_DELTA", "EVIDENCE_OPS", "MODEL_THINKING":
 		return nil
 	case "ITERATION":
 		return item

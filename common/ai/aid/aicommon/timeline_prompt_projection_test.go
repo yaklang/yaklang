@@ -13,6 +13,7 @@ func TestTimelinePromptProjectionFiltersOnlySystemBookkeeping(t *testing.T) {
 	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)
 	injectTimelineItem(tl, 1, base, &TextTimelineItem{ID: 1, Text: "[iteration]:\n[default]======== ReAct iteration 1 ========\nReason/Next-Step: keep-decision"})
+	injectTimelineItem(tl, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[model_thinking]:\nlet me analyze the task and decide which tool to call"})
 	injectTimelineItem(tl, 3, base.Add(2*time.Second), &TextTimelineItem{ID: 3, Text: "[TODO_DELTA]:\nDONE[finished]: applied"})
 	injectTimelineItem(tl, 4, base.Add(3*time.Second), &TextTimelineItem{ID: 4, Text: "[evidence_ops]:\nUPSERT[evidence-1]: applied"})
 	injectTimelineItem(tl, 5, base.Add(4*time.Second), &TextTimelineItem{ID: 5, Text: "[[TODO_DELTA_ERROR]]:\nFAILED DOING[done]: redundant doing: todo already doing\nFAILED DONE[foreign]: todo belongs to another task scope"})
@@ -27,7 +28,9 @@ func TestTimelinePromptProjectionFiltersOnlySystemBookkeeping(t *testing.T) {
 	require.Contains(t, raw, "UPSERT[evidence-1]")
 	require.Contains(t, raw, "redundant doing")
 
+	require.Contains(t, raw, "let me analyze the task and decide which tool to call")
 	require.Contains(t, prompt, "Reason/Next-Step: keep-decision")
+	require.NotContains(t, prompt, "let me analyze the task and decide which tool to call")
 	require.Contains(t, prompt, "todo belongs to another task scope")
 	require.Contains(t, prompt, "KEEP_PARAMS")
 	require.Contains(t, prompt, "KEEP_TOOL_RESULT")

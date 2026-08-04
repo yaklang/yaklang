@@ -36,6 +36,11 @@ const (
 	loopIntentHintSimpleQuery        = "simple_query"
 
 	loopVarDirectlyAnswerDeliveredWithoutTodoDelta = "directly_answer_delivered_without_todo_delta"
+
+	// TimelineEntryModelThinking is the timeline entry type for the pure AI
+	// reasoning/thinking stream captured during an iteration. It is display-only
+	// and excluded from prompt projection (see timeline_prompt_projection.go).
+	TimelineEntryModelThinking = "model_thinking"
 )
 
 const errDuplicateDirectlyAnswerWithoutTodoDelta = "assistant output was already delivered for this CURRENT-TASK without an effective todo_delta; " +

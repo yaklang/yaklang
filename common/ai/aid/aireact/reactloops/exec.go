@@ -915,6 +915,16 @@ LOOP:
 
 		streamWg.Wait()
 
+		// Capture the pure model reasoning/thinking stream accumulated during
+		// this AI transaction and emit it as a standalone timeline entry. Unlike
+		// the legacy code which concatenated it with the iteration decision body,
+		// we keep it as a separate entry so the thinking is cleanly isolated for
+		// UI display. It is excluded from prompt projection (display-only).
+		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
+		if iterationModelThinking != "" {
+			r.GetInvoker().AddToTimeline(TimelineEntryModelThinking, iterationModelThinking)
+		}
+
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
 			log.Errorf("Failed to execute loop: %v", transactionErr)
