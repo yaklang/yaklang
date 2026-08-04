@@ -21,6 +21,15 @@ const testCallExpectations = "estimated ~2s execution, if timeout force stop and
 func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
+		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮工具结果
+		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
+		if strings.Contains(prompt, "COMBINED OUTPUT:") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },

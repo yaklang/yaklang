@@ -37,6 +37,16 @@ func mockPostIterationDirectAnswer(i aicommon.AICallerConfigIf, prompt string) (
 	return rsp, true
 }
 
+
+// toolResultAppearedInPrompt checks whether a tool result (identified by its
+// "COMBINED OUTPUT:" header) is already present in the prompt timeline. After
+// the iteration timeline entries were removed, the human_readable_thought text
+// no longer appears in the next iteration's prompt; the tool result is the
+// reliable signal that a tool has already been executed.
+func toolResultAppearedInPrompt(prompt string) bool {
+	return strings.Contains(prompt, "COMBINED OUTPUT:")
+}
+
 func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if rsp, ok := mockPostIterationDirectAnswer(i, prompt); ok {
@@ -44,9 +54,9 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 	}
 	if isPrimaryDecisionPrompt(prompt) {
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
-		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮工具结果
 		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
-		if strings.Contains(prompt, "mocked thought for tool calling file emit test") {
+		if toolResultAppearedInPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
@@ -291,7 +301,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 				// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
 				// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
 				// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
-				if strings.Contains(prompt, "mocked thought for large result test") {
+				if toolResultAppearedInPrompt(prompt) {
 					rsp := i.NewAIResponse()
 					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 					rsp.Close()
@@ -427,9 +437,9 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 	}
 	if isPrimaryDecisionPrompt(prompt) {
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
-		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮工具结果
 		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
-		if strings.Contains(prompt, "mocked thought for empty output test") {
+		if toolResultAppearedInPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
@@ -600,9 +610,9 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 	}
 	if isPrimaryDecisionPrompt(prompt) {
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
-		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
+		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮工具结果
 		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
-		if strings.Contains(prompt, "mocked thought for identifier test") {
+		if toolResultAppearedInPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
@@ -789,7 +799,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
 			// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮 human_readable_thought
 			// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
-			if strings.Contains(prompt, "mocked-no-id-thought") {
+			if toolResultAppearedInPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 				rsp.Close()
