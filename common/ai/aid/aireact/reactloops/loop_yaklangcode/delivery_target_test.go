@@ -3,6 +3,7 @@ package loop_yaklangcode
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,6 +61,24 @@ func TestHasYaklangEditorDeliveryTarget(t *testing.T) {
 
 	loop.Set("editor_file_path", "/tmp/foo.yak")
 	require.True(t, hasYaklangEditorDeliveryTarget(loop))
+
+	loop.Set("editor_file_path", `C:\Users\13766\Downloads\02_security_report.md`)
+	require.False(t, hasYaklangEditorDeliveryTarget(loop))
+}
+
+func TestResolveYaklangDeliveryTarget_NonYakEditorFallsBackToCreate(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("YAKIT_HOME", base)
+
+	loop, err := reactloops.NewReActLoop("resolve-md-editor", mock.NewMockInvoker(context.Background()))
+	require.NoError(t, err)
+
+	loop.Set("editor_file_path", filepath.Join(base, "02_security_report.md"))
+	path, op, err := resolveYaklangDeliveryTarget(loop)
+	require.NoError(t, err)
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.True(t, isYaklangGenCodePath(path))
+	assert.NotContains(t, strings.ToLower(path), ".md")
 }
 
 func TestNewYaklangGenCodePath(t *testing.T) {

@@ -3,6 +3,7 @@ package aicommon
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -128,4 +129,87 @@ func TestResolveYaklangInitFullCodeSelectionOnlyCreateMode(t *testing.T) {
 	code, fromSelection := ResolveYaklangInitFullCode(ctx, "disk content")
 	require.True(t, fromSelection)
 	require.Equal(t, "attached content", code)
+}
+
+func TestIsYaklangScriptDeliveryPath(t *testing.T) {
+	require.True(t, IsYaklangScriptDeliveryPath(`/tmp/demo.yak`))
+	require.True(t, IsYaklangScriptDeliveryPath(`C:\Users\me\a.YAK`))
+	require.False(t, IsYaklangScriptDeliveryPath(`C:\Users\me\02_security_report.md`))
+	require.False(t, IsYaklangScriptDeliveryPath(``))
+}
+
+func TestExtractMentionPathsFromUserInput(t *testing.T) {
+	input := `:mention[C:\Users\13766\Downloads\02\_security\_report.md]{mentionId="C:\Users\13766\Downloads\02_security_report.md"} 根据这个报告编写yak脚本`
+	paths := ExtractMentionPathsFromUserInput(input)
+	require.NotEmpty(t, paths)
+	found := false
+	for _, p := range paths {
+		if strings.Contains(strings.ToLower(filepath.Base(p)), "security") {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "expected mention path, got %#v", paths)
+}
+
+func TestParseYaklangEditorContext_IgnoresMentionMarkdownPrefersYak(t *testing.T) {
+	workspace := filepath.FromSlash("/tmp/project")
+	yakPath := filepath.Join(workspace, "iotdb_poc.yak")
+	mdPath := filepath.FromSlash(`/Users/me/Downloads/02_security_report.md`)
+	userInput := `:mention[` + mdPath + `]{mentionId="` + mdPath + `"} 根据这个报告编写yak脚本`
+
+	ctx := ParseYaklangEditorContextFromAttachedWithUserInput([]*AttachedResource{
+		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
+		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyEditorFile, mdPath),
+		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyEditorFile, yakPath),
+	}, userInput)
+	require.NotNil(t, ctx)
+	require.Equal(t, filepath.Clean(yakPath), ctx.EditorFile)
+	require.False(t, ctx.IsCreateMode())
+}
+
+func TestParseYaklangEditorContext_MentionOnlyIsCreateMode(t *testing.T) {
+	mdPath := filepath.FromSlash(`C:\Users\13766\Downloads\02_security_report.md`)
+	userInput := `:mention[` + mdPath + `]{mentionId="` + mdPath + `"} 根据这个报告编写yak脚本`
+	ctx := ParseYaklangEditorContextFromAttachedWithUserInput([]*AttachedResource{
+		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyEditorFile, mdPath),
+	}, userInput)
+	// Workspace-less mention-only: may be nil or create-mode without EditorFile
+	if ctx != nil {
+		require.True(t, ctx.IsCreateMode())
+		require.False(t, ctx.HasEditorFile())
+	}
+
+	// Non-.yak file_path alone (no FreeInput) still must not become EditorFile.
+	ctx = ParseYaklangEditorContextFromAttached([]*AttachedResource{
+		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyEditorFile, mdPath),
+	})
+	if ctx != nil {
+		require.False(t, ctx.HasEditorFile())
+		require.True(t, ctx.IsCreateMode())
+	}
+}
+
+func TestResolveYaklangInitTargetPath_RejectsNonYak(t *testing.T) {
+	ctx := &YaklangEditorContext{EditorFile: `/tmp/report.md`}
+	path, fromAttached := ResolveYaklangInitTargetPath(ctx, `/tmp/liteforge.yak`)
+	require.False(t, fromAttached)
+	require.Equal(t, `/tmp/liteforge.yak`, path)
+
+	path, fromAttached = ResolveYaklangInitTargetPath(ctx, `/tmp/report.md`)
+	require.False(t, fromAttached)
+	require.Empty(t, path)
+}
+
+func TestEnrichYaklangEditorContextFromUserInput_ClearsNonYak(t *testing.T) {
+	root := t.TempDir()
+	yakPath := filepath.Join(root, "demo.yak")
+	require.NoError(t, os.WriteFile(yakPath, nil, 0o644))
+
+	ctx := &YaklangEditorContext{
+		WorkspacePath: root,
+		EditorFile:    filepath.Join(root, "report.md"),
+	}
+	EnrichYaklangEditorContextFromUserInput(ctx, "请在demo.yak里生成代码")
+	require.Equal(t, filepath.Clean(yakPath), filepath.Clean(ctx.EditorFile))
 }

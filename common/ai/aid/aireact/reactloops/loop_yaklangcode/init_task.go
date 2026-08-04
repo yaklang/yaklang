@@ -27,11 +27,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 		docSearcher := holder.getGrep()
 		ragSearcher := holder.getRAG()
 		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
-		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
+		userInput := task.GetUserInput()
+		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas, userInput)
 		if editorCtx == nil {
 			editorCtx = &aicommon.YaklangEditorContext{}
 		}
-		aicommon.EnrichYaklangEditorContextFromUserInput(editorCtx, task.GetUserInput())
+		aicommon.EnrichYaklangEditorContextFromUserInput(editorCtx, userInput)
 		if editorCtx.HasEditorFile() {
 			loop.Set("editor_file_path", editorCtx.EditorFile)
 		} else {
