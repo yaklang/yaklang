@@ -41,8 +41,10 @@ GOOS=linux GOARCH=amd64 go build -tags hids -o ./legion-smoke-node-hids-linux-am
 
 `.github/workflows/build-legion-product-node.yml` produces the deployable
 Linux amd64 product node from the repository's declared Go version. The
-workflow runs for relevant pull requests, manual dispatches, and every `v*`
-tag, including alpha tags.
+workflow runs for relevant pull requests, manual dispatches, and tags in the
+isolated `legion-node-v*` namespace, including alpha tags. This
+namespace does not trigger the repository's existing general `v*` release
+workflows.
 
 The `legion-product-node_linux_amd64` artifact contains:
 
