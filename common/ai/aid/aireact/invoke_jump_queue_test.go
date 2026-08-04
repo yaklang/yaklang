@@ -50,7 +50,7 @@ func mockedToolCallingForJumpWithCounter(i aicommon.AICallerConfigIf, req *aicom
 		if toolCalled != nil {
 			alreadyCalled = atomic.LoadInt32(toolCalled) >= 1
 		} else {
-			alreadyCalled = strings.Count(prompt, "mocked thought for tool calling") >= 1
+			alreadyCalled = strings.Contains(prompt, "COMBINED OUTPUT:")
 		}
 		if alreadyCalled {
 			rsp := i.NewAIResponse()
