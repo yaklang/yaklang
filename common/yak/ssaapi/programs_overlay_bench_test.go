@@ -37,16 +37,10 @@ public class A {
 				require.NotNil(t, overlay)
 				require.GreaterOrEqual(t, overlay.GetLayerCount(), 2)
 
-				// A.java is overridden → not base-only; Keep.java remains base-only.
-				require.False(t, overlay.IsBaseOnlyFile("/A.java"), "A.java should be overridden")
-				require.True(t, overlay.IsBaseOnlyFile("/Keep.java") || overlay.IsBaseOnlyFile("Keep.java"),
-					"Keep.java should remain base-only")
-
-				part := overlay.GetScanFilePartition()
-				require.Contains(t, part.Overridden, "/A.java")
-				require.NotContains(t, part.Overridden, "/Keep.java")
 				ownedDiff := overlay.PathsOwnedByLayer(2)
 				require.Contains(t, ownedDiff, "/A.java")
+				require.NotContains(t, ownedDiff, "/Keep.java")
+				require.Contains(t, overlay.PathsOwnedByLayer(1), "/Keep.java")
 
 				res, err := overlay.SyntaxFlowWithError(`valueStr as $res`)
 				require.NoError(t, err)

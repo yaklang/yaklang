@@ -49,20 +49,17 @@ type ProgramOverLay struct {
 	// Keys are canonical paths from normalizeOverlayFilePath (leading "/").
 	FileToLayerMap *utils.SafeMap[int] // key: 文件路径, value: Layer 索引
 
-	// baseOnlyFiles: FileToLayerMap[path]==1 and not deleted — IR lives only in base.
 	// overriddenFiles: FileToLayerMap[path]>1 — upper layers own these files; base
 	// queries should exclude them up-front (not only when upper layer happens to match).
-	baseOnlyFiles   *utils.SafeMap[struct{}]
 	overriddenFiles *utils.SafeMap[struct{}]
+	// ownedByLayer: 1-based layer index -> paths owned by that layer (cached from FileToLayerMap).
+	ownedByLayer map[int][]string
 
 	// 聚合后的文件系统（所有 Layer 文件系统的 differ 聚合）
 	AggregatedFS fi.FileSystem
 
 	// signatureCache 缓存 Value 的签名，用于重定位
 	signatureCache *utils.CacheWithKey[string, *Value]
-
-	// reuseBaseProgramName: optional hint for ResolveReuseBaseProgramName (compat).
-	reuseBaseProgramName string
 
 	// overlay 的元数据（用于实现 Program interface）
 	programName string
@@ -215,35 +212,29 @@ func newEmptyOverlay() *ProgramOverLay {
 	return &ProgramOverLay{
 		Layers:          make([]*ProgramLayer, 0),
 		FileToLayerMap:  utils.NewSafeMap[int](),
-		baseOnlyFiles:   utils.NewSafeMap[struct{}](),
 		overriddenFiles: utils.NewSafeMap[struct{}](),
+		ownedByLayer:    make(map[int][]string),
 		signatureCache:  utils.NewTTLCacheWithKey[string, *Value](0),
 	}
 }
 
-// rebuildFilePartitions fills baseOnlyFiles / overriddenFiles from FileToLayerMap.
+// rebuildFilePartitions fills overriddenFiles / ownedByLayer from FileToLayerMap.
 func (p *ProgramOverLay) rebuildFilePartitions() {
 	if p == nil {
 		return
 	}
-	if p.baseOnlyFiles == nil {
-		p.baseOnlyFiles = utils.NewSafeMap[struct{}]()
-	} else {
-		p.baseOnlyFiles = utils.NewSafeMap[struct{}]()
-	}
-	if p.overriddenFiles == nil {
-		p.overriddenFiles = utils.NewSafeMap[struct{}]()
-	} else {
-		p.overriddenFiles = utils.NewSafeMap[struct{}]()
-	}
+	p.overriddenFiles = utils.NewSafeMap[struct{}]()
+	p.ownedByLayer = make(map[int][]string)
 	if p.FileToLayerMap == nil {
 		return
 	}
 	p.FileToLayerMap.ForEach(func(path string, layerIdx int) bool {
 		path = ensureOverlayPathSlash(path)
-		if layerIdx <= 1 {
-			p.baseOnlyFiles.Set(path, struct{}{})
-		} else {
+		if layerIdx < 1 {
+			return true
+		}
+		p.ownedByLayer[layerIdx] = append(p.ownedByLayer[layerIdx], path)
+		if layerIdx > 1 {
 			p.overriddenFiles.Set(path, struct{}{})
 		}
 		return true
@@ -258,148 +249,28 @@ func (p *ProgramOverLay) overriddenFilesList() []string {
 	return p.overriddenFiles.Keys()
 }
 
-// SetReuseBaseProgramName enables post-query risk merge from a prior base scan.
-func (p *ProgramOverLay) SetReuseBaseProgramName(name string) {
-	if p == nil {
-		return
-	}
-	p.reuseBaseProgramName = name
-}
-
-func (p *ProgramOverLay) GetReuseBaseProgramName() string {
-	if p == nil {
-		return ""
-	}
-	return p.reuseBaseProgramName
-}
-
-// ResolveReuseBaseProgramName returns the flat bottom program name for this overlay.
-func (p *ProgramOverLay) ResolveReuseBaseProgramName() string {
-	if p == nil {
-		return ""
-	}
-	if name := p.reuseBaseProgramName; name != "" && name != "__auto__" {
-		return name
-	}
-	return p.flatBottomProgramName()
-}
-
-func (p *ProgramOverLay) flatBottomProgramName() string {
-	if p == nil || len(p.Layers) == 0 || p.Layers[0] == nil || p.Layers[0].Program == nil {
-		return ""
-	}
-	prog := p.Layers[0].Program
-	for i := 0; i < 16; i++ {
-		if ov := prog.GetOverlay(); ov != nil && len(ov.Layers) > 0 && ov.Layers[0] != nil && ov.Layers[0].Program != nil {
-			prog = ov.Layers[0].Program
-			continue
-		}
-		return prog.GetProgramName()
-	}
-	return prog.GetProgramName()
-}
-
-// IsBaseOnlyFile reports whether path is owned solely by the base layer.
-func (p *ProgramOverLay) IsBaseOnlyFile(path string) bool {
-	if p == nil || p.baseOnlyFiles == nil {
-		return false
-	}
-	return p.baseOnlyFiles.Have(ensureOverlayPathSlash(path))
-}
-
-// IsOverriddenFile reports whether an upper overlay layer owns the file.
-func (p *ProgramOverLay) IsOverriddenFile(path string) bool {
-	if p == nil || p.overriddenFiles == nil {
-		return false
-	}
-	return p.overriddenFiles.Have(ensureOverlayPathSlash(path))
-}
-
-// ScanFilePartition describes the effective overlay file view for incremental scan.
-// Aggregated ≈ base ∪ overridden − deleted (typically ~4000 files).
-type ScanFilePartition struct {
-	AggregatedCount int
-	Overridden      []string
-	Unchanged       []string
-	Deleted         []string
-}
-
-// GetScanFilePartition returns the dual-source scan partition for this overlay.
-func (p *ProgramOverLay) GetScanFilePartition() ScanFilePartition {
-	out := ScanFilePartition{}
-	if p == nil {
-		return out
-	}
-	aggregated := p.getAggregatedFilesSet()
-	out.AggregatedCount = aggregated.Count()
-
-	overriddenSet := utils.NewSafeMap[struct{}]()
-	for _, path := range p.overriddenFilesList() {
-		path = ensureOverlayPathSlash(path)
-		overriddenSet.Set(path, struct{}{})
-		out.Overridden = append(out.Overridden, path)
-	}
-
-	aggregated.ForEach(func(path string, _ struct{}) bool {
-		path = ensureOverlayPathSlash(path)
-		if overriddenSet.Have(path) {
-			return true
-		}
-		out.Unchanged = append(out.Unchanged, path)
-		return true
-	})
-
-	seenDeleted := utils.NewSafeMap[struct{}]()
-	for i := 1; i < len(p.Layers); i++ {
-		layer := p.Layers[i]
-		if layer == nil || layer.FileHashMap == nil {
-			continue
-		}
-		layer.FileHashMap.ForEach(func(path string, hash int) bool {
-			if hash != -1 {
-				return true
-			}
-			path = ensureOverlayPathSlash(path)
-			if aggregated.Have(path) || seenDeleted.Have(path) {
-				return true
-			}
-			seenDeleted.Set(path, struct{}{})
-			out.Deleted = append(out.Deleted, path)
-			return true
-		})
-	}
-	return out
-}
-
-// GetFileOwnerLayer returns the 1-based owning layer index for a canonical path.
-func (p *ProgramOverLay) GetFileOwnerLayer(path string) (int, bool) {
-	if p == nil || p.FileToLayerMap == nil || path == "" {
-		return 0, false
-	}
-	return p.FileToLayerMap.Get(ensureOverlayPathSlash(path))
-}
-
-// IsPresentInAggregatedView reports whether path is in the final aggregated file set.
-func (p *ProgramOverLay) IsPresentInAggregatedView(path string) bool {
-	if p == nil || path == "" {
-		return false
-	}
-	return p.getAggregatedFilesSet().Have(ensureOverlayPathSlash(path))
-}
-
 // PathsOwnedByLayer returns canonical paths whose FileToLayerMap owner is layerIndex (1-based).
+// Results are cached by rebuildFilePartitions.
 func (p *ProgramOverLay) PathsOwnedByLayer(layerIndex int) []string {
-	if p == nil || p.FileToLayerMap == nil || layerIndex < 1 {
+	if p == nil || layerIndex < 1 {
 		return nil
 	}
-	var out []string
-	p.FileToLayerMap.ForEach(func(path string, idx int) bool {
-		if idx == layerIndex {
-			out = append(out, ensureOverlayPathSlash(path))
-		}
-		return true
-	})
-	return out
+	if p.ownedByLayer != nil {
+		return p.ownedByLayer[layerIndex]
+	}
+	return nil
+}
+
+// IsTopLayerProgram reports whether prog is the newest (top) layer of this overlay.
+func (p *ProgramOverLay) IsTopLayerProgram(prog *Program) bool {
+	if p == nil || prog == nil || len(p.Layers) == 0 {
+		return false
+	}
+	top := p.Layers[len(p.Layers)-1]
+	if top == nil || top.Program == nil {
+		return false
+	}
+	return top.Program.GetProgramName() == prog.GetProgramName()
 }
 
 func createLayer1FromProgram(prog *Program, layerIndex int) *ProgramLayer {
@@ -1666,17 +1537,13 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 
 	results := make([]sfvm.ValueOperator, 0)
 	foundFiles := utils.NewSafeMap[struct{}]()
-	ownedByLayer := make(map[int]*utils.SafeMap[struct{}])
-	for layerIdx := 1; layerIdx <= len(p.Layers); layerIdx++ {
+	ownedSets := make(map[int]*utils.SafeMap[struct{}], len(p.Layers))
+	for layerIdx, paths := range p.ownedByLayer {
 		set := utils.NewSafeMap[struct{}]()
-		for _, path := range p.PathsOwnedByLayer(layerIdx) {
+		for _, path := range paths {
 			set.Set(path, struct{}{})
 		}
-		ownedByLayer[layerIdx] = set
-	}
-	overridden := utils.NewSafeMap[struct{}]()
-	for _, path := range p.overriddenFilesList() {
-		overridden.Set(path, struct{}{})
+		ownedSets[layerIdx] = set
 	}
 
 	collectLayer := func(i int, layer *ProgramLayer) {
@@ -1688,7 +1555,7 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 		if values.IsEmpty() {
 			return
 		}
-		owned := ownedByLayer[layer.LayerIndex]
+		owned := ownedSets[layer.LayerIndex]
 		claimed := make([]string, 0)
 		_ = values.Recursive(func(operator sfvm.ValueOperator) error {
 			v, ok := operator.(*Value)
@@ -1703,7 +1570,7 @@ func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values
 			if filePath != "" {
 				normalizedPath := normalizeOverlayFilePath(filePath, layerProgramName)
 				if i == 0 {
-					if overridden.Have(normalizedPath) {
+					if p.overriddenFiles != nil && p.overriddenFiles.Have(normalizedPath) {
 						return nil
 					}
 				} else if owned != nil && !owned.Have(normalizedPath) {
