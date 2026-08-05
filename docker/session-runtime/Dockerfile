@@ -13,20 +13,43 @@
 #   LEGION_SESSIONMGR_URL, LEGION_AI_SESSION_ID, LEGION_AI_RUNTIME
 # 并通过 -agent-installation-id ai-session-<sessionID> 传 ephemeral identity。
 
+# Trusted CI resolves both image arguments to immutable sha256 references before
+# building. The tag defaults keep local development convenient without weakening
+# the published provenance contract.
+ARG GO_BUILDER_IMAGE=golang:1.22.12-bookworm
+ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
+
 # ---------- 构建阶段 ----------
-FROM golang:1.24-bookworm AS builder
+FROM ${GO_BUILDER_IMAGE} AS builder
 
 WORKDIR /src
 COPY . .
 
 # 编译 legion-smoke-node（ai_session 容器不需要 HIDS tag，精简依赖）。
 # Yaklang's embedded pcre2 and pcap dependencies require CGO.
-RUN CGO_ENABLED=1 go build -ldflags "-s -w" -o /out/legion-session-runtime ./cmd/legion-smoke-node
+ENV GOTOOLCHAIN=local
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    module_go_version="$(awk '$1 == "go" { gsub(/\r/, "", $2); print $2; exit }' go.mod)" \
+    && test "$(go env GOVERSION)" = "go${module_go_version}" \
+    && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+      -trimpath \
+      -buildvcs=false \
+      -ldflags "-s -w -buildid=" \
+      -o /out/legion-session-runtime \
+      ./cmd/legion-smoke-node
 
 # ---------- 运行阶段 ----------
-FROM debian:bookworm-slim
+FROM ${RUNTIME_BASE_IMAGE}
 
-# ai_session 容器需要 ca-certificates（调平台 HTTPS bootstrap）+ curl（调试）。
+ARG SOURCE_SHA=unknown
+ARG RUNTIME_VERSION=dev
+LABEL org.opencontainers.image.title="Legion AI Session Runtime" \
+      org.opencontainers.image.source="https://github.com/yaklang/yaklang" \
+      org.opencontainers.image.revision="${SOURCE_SHA}" \
+      org.opencontainers.image.version="${RUNTIME_VERSION}"
+
+# ai_session 容器需要 ca-certificates 调平台 HTTPS bootstrap。
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
