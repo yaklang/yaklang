@@ -39,7 +39,7 @@ func ApplyMatchedSkillsToCatalog(loop *ReActLoop, cfgFromRuntime aicommon.AICall
 	seen := make(map[string]bool, len(matchedMetas))
 	deduped := make([]*aiskillloader.SkillMeta, 0, len(matchedMetas))
 	for _, meta := range matchedMetas {
-		if meta == nil || meta.Name == "" || seen[meta.Name] {
+		if meta == nil || meta.Name == "" || seen[meta.Name] || mgr.IsSkillLoaded(meta.Name) {
 			continue
 		}
 		seen[meta.Name] = true

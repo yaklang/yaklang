@@ -1,5 +1,7 @@
 ---
 name: xss-testing
+metadata:
+  display_name_zh-CN: XSS 漏洞测试
 description: >
   跨站脚本(XSS)漏洞测试技能。覆盖反射型、存储型、DOM型 XSS 的识别与验证方法，
   提供分层 Payload 集合、WAF 绕过策略、编码变换技巧和系统化测试流程，

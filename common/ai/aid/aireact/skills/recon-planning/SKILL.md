@@ -1,5 +1,7 @@
 ---
 name: recon-planning
+metadata:
+  display_name_zh-CN: 渗透测试侦查与规划
 description: >
   渗透测试侦查与任务规划技能。定义渗透测试的完整工作流程：从信息收集(Recon)到
   范围确定、任务规划和漏洞测试执行。覆盖端口扫描、子域名枚举、Web 搜索、

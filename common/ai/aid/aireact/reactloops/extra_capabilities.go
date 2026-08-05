@@ -258,6 +258,30 @@ func (ecm *ExtraCapabilitiesManager) AddSkills(skills ...ExtraSkillInfo) {
 	}
 }
 
+// AddUnloadedSkillsToExtraCapabilities adds recommendation-only skills while
+// excluding skills whose content is already active in the current loop.
+func AddUnloadedSkillsToExtraCapabilities(loop *ReActLoop, skills ...ExtraSkillInfo) {
+	if loop == nil || len(skills) == 0 {
+		return
+	}
+	ecm := loop.GetExtraCapabilities()
+	if ecm == nil {
+		return
+	}
+	mgr := loop.GetSkillsContextManager()
+	filtered := make([]ExtraSkillInfo, 0, len(skills))
+	for _, skill := range skills {
+		if skill.Name == "" {
+			continue
+		}
+		if mgr != nil && mgr.IsSkillLoaded(skill.Name) {
+			continue
+		}
+		filtered = append(filtered, skill)
+	}
+	ecm.AddSkills(filtered...)
+}
+
 // AddFocusModes adds focus modes to the extra capabilities, keeping the newest
 // items and moving duplicate names to the newest position.
 func (ecm *ExtraCapabilitiesManager) AddFocusModes(modes ...ExtraFocusModeInfo) {

@@ -38,7 +38,7 @@ func buildTestVFS() *filesys.VirtualFS {
 // --- ParseSkillMeta tests ---
 
 func TestParseSkillMeta_ValidFull(t *testing.T) {
-	content := "---\nname: my-skill\ndescription: A useful skill.\nlicense: MIT\ncompatibility: linux\nmetadata:\n  author: test\ndisable-model-invocation: true\n---\n# My Skill\n\nDetailed instructions."
+	content := "---\nname: my-skill\ndescription: A useful skill.\nlicense: MIT\ncompatibility: linux\nmetadata:\n  author: test\n  display_name_zh-CN: 我的技能\ndisable-model-invocation: true\n---\n# My Skill\n\nDetailed instructions."
 	meta, err := ParseSkillMeta(content)
 	if err != nil {
 		t.Fatalf("ParseSkillMeta failed: %v", err)
@@ -57,6 +57,9 @@ func TestParseSkillMeta_ValidFull(t *testing.T) {
 	}
 	if meta.Metadata["author"] != "test" {
 		t.Fatalf("expected metadata.author 'test', got %q", meta.Metadata["author"])
+	}
+	if meta.GetDisplayName(SkillLocaleZhCN) != "我的技能" {
+		t.Fatalf("expected metadata.%s '我的技能', got %q", SkillMetadataDisplayNameZhCN, meta.GetDisplayName(SkillLocaleZhCN))
 	}
 	if !meta.DisableModelInvocation {
 		t.Fatal("expected disable-model-invocation to be true")

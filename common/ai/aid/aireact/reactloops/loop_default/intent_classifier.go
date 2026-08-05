@@ -630,7 +630,7 @@ func populateExtraCapabilitiesFromFastMatch(r aicommon.AIInvokeRuntime, loop *re
 			if skill == nil {
 				continue
 			}
-			ecm.AddSkills(reactloops.ExtraSkillInfo{
+			reactloops.AddUnloadedSkillsToExtraCapabilities(loop, reactloops.ExtraSkillInfo{
 				Name:        skill.Name,
 				Description: skill.Description,
 			})

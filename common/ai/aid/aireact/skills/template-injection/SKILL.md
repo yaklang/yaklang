@@ -1,5 +1,7 @@
 ---
 name: template-injection
+metadata:
+  display_name_zh-CN: 服务端模板注入测试
 description: >
   服务端模版注入(SSTI)漏洞测试技能。提供模版引擎指纹识别决策树，覆盖
   Jinja2/Twig/Freemarker/Velocity/Thymeleaf/Smarty/Pebble/Mako 等主流引擎的
