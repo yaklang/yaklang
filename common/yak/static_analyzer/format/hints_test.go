@@ -75,3 +75,24 @@ func TestFormatSingleForCopy_IncludesLocation(t *testing.T) {
 	require.Contains(t, single, "修改建议:")
 	require.Contains(t, single, "in [")
 }
+
+func TestLookupCompilerErrorHint_ByteLiteral(t *testing.T) {
+	hint := lookupCompilerErrorHint("T should be byte, but got number", `body := []byte{172, 237}`)
+	require.Contains(t, hint, "0x")
+	require.Contains(t, hint, "byte")
+	require.NotContains(t, hint, "append(a, b...)")
+}
+
+func TestLookupCompilerErrorHint_AppendBytes(t *testing.T) {
+	hint := lookupCompilerErrorHint("T should be byte, but got bytes|[]any", `frame = append(lengthPrefix, rawPayload...)`)
+	require.Contains(t, hint, "append(a, b...)")
+	require.NotContains(t, hint, "[]byte{172")
+
+	hint2 := lookupCompilerErrorHint("T should be byte, but got number", `defaultPayload = append(defaultPayload, tcNull...)`)
+	require.Contains(t, hint2, "append")
+}
+
+func TestLookupCompilerErrorHint_FuncReturnType(t *testing.T) {
+	hint := lookupCompilerErrorHint("mismatched input '[' expecting ')'", `build = func(frame) []byte {`)
+	require.Contains(t, hint, "返回类型")
+}
