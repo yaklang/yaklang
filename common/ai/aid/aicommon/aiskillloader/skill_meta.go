@@ -39,6 +39,26 @@ type SkillMeta struct {
 	Body string `yaml:"-" json:"body,omitempty"`
 }
 
+const (
+	SkillMetadataDisplayNamePrefix = "display_name_"
+	SkillLocaleZhCN                = "zh-CN"
+	SkillMetadataDisplayNameZhCN   = SkillMetadataDisplayNamePrefix + SkillLocaleZhCN
+)
+
+// GetDisplayName returns a localized display name from the SKILL spec metadata
+// map. Locale should be a BCP 47 language tag such as "zh-CN". The canonical
+// Name remains the stable, language-neutral skill identifier.
+func (m *SkillMeta) GetDisplayName(locale string) string {
+	if m == nil || m.Metadata == nil {
+		return ""
+	}
+	locale = strings.TrimSpace(locale)
+	if locale == "" {
+		return ""
+	}
+	return strings.TrimSpace(m.Metadata[SkillMetadataDisplayNamePrefix+locale])
+}
+
 // Validate checks that the required fields are set.
 func (m *SkillMeta) Validate() error {
 	if m.Name == "" {

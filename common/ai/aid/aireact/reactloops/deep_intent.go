@@ -206,7 +206,7 @@ func PopulateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *R
 						log.Debugf("deep_intent: skip skill %q: %v", name, err)
 						continue
 					}
-					ecm.AddSkills(ExtraSkillInfo{
+					AddUnloadedSkillsToExtraCapabilities(loop, ExtraSkillInfo{
 						Name:        meta.Name,
 						Description: meta.Description,
 					})

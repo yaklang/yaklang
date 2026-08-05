@@ -534,7 +534,7 @@ func PopulateExtraCapabilitiesFromCapabilityMatches(r aicommon.AIInvokeRuntime, 
 			if skill == nil {
 				continue
 			}
-			ecm.AddSkills(ExtraSkillInfo{
+			AddUnloadedSkillsToExtraCapabilities(loop, ExtraSkillInfo{
 				Name:        skill.Name,
 				Description: skill.Description,
 			})

@@ -1,5 +1,7 @@
 ---
 name: command-injection
+metadata:
+  display_name_zh-CN: 命令注入测试
 description: >
   操作系统命令注入漏洞测试技能。覆盖 Linux 和 Windows 环境下的命令注入检测与验证，
   提供多种注入操作符、盲注检测方法、编码绕过策略和分步测试流程，

@@ -118,6 +118,9 @@ func TestBuiltinSkillsFS_AllMetaValid(t *testing.T) {
 			if meta.Description == "" {
 				t.Error("description must not be empty")
 			}
+			if meta.GetDisplayName(aiskillloader.SkillLocaleZhCN) == "" {
+				t.Errorf("metadata.%s must not be empty", aiskillloader.SkillMetadataDisplayNameZhCN)
+			}
 			if meta.Body == "" {
 				t.Error("body must not be empty")
 			}

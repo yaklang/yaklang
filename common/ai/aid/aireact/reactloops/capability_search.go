@@ -217,7 +217,7 @@ func PopulateExtraCapabilitiesFromCapabilitySearchResult(r aicommon.AIInvokeRunt
 						log.Debugf("capability search: skip skill %q: %v", name, err)
 						continue
 					}
-					ecm.AddSkills(ExtraSkillInfo{Name: meta.Name, Description: meta.Description})
+					AddUnloadedSkillsToExtraCapabilities(loop, ExtraSkillInfo{Name: meta.Name, Description: meta.Description})
 				}
 			}
 		}

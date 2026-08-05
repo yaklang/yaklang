@@ -1,5 +1,7 @@
 ---
 name: how-to-use-browser
+metadata:
+  display_name_zh-CN: 浏览器自动化
 description: >
   Browser automation skill for web page interaction. Two strategies:
   (1) Snapshot + refs for simple static pages;
