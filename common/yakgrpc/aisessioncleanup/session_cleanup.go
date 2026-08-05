@@ -151,26 +151,19 @@ func DeleteAllSessionArtifacts(db *gorm.DB) (*SessionCleanupResult, error) {
 		return result, err
 	}
 
-	if n, err := hardDeleteAll(db, &schema.AIMemoryEntity{}); err != nil {
-		return result, err
-	} else {
-		result.DeletedMemoryEntities = n
+	// Drop and recreate all memory tables — much faster than DELETE FROM on large tables.
+	// This is safe because DeleteAllSessionArtifacts is only called in the deleteAll=true path,
+	// where every AI session artifact is meant to be wiped.
+	memoryTables := []interface{}{
+		&schema.AIMemoryEntity{},
+		&schema.AIMemoryCollection{},
+		&schema.AIMidtermArchiveEntity{},
+		&schema.AIMidtermArchiveCollection{},
 	}
-	if n, err := hardDeleteAll(db, &schema.AIMemoryCollection{}); err != nil {
-		return result, err
-	} else {
-		result.DeletedMemoryCollections = n
-	}
-	// Also clean up the independent midterm archive tables
-	if n, err := hardDeleteAll(db, &schema.AIMidtermArchiveEntity{}); err != nil {
-		return result, err
-	} else {
-		result.DeletedMemoryEntities += n
-	}
-	if n, err := hardDeleteAll(db, &schema.AIMidtermArchiveCollection{}); err != nil {
-		return result, err
-	} else {
-		result.DeletedMemoryCollections += n
+	for _, model := range memoryTables {
+		if err := schema.DropRecreateTable(db, model); err != nil {
+			return result, err
+		}
 	}
 
 	log.Infof(
