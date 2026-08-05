@@ -8,6 +8,8 @@ on:
   pull_request:
     paths:
       - ".github/scripts/build-legion-product-node.sh"
+      - ".github/scripts/build-legion-component-oss-index.sh"
+      - ".github/scripts/test-build-legion-component-oss-index.sh"
       - ".github/workflows/build-legion-product-node.yml"
       - "cmd/legion-smoke-node/**"
       - "common/hids/**"
@@ -36,17 +38,67 @@ jobs:
       NODE_PACKAGE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
     steps:
       - name: Check out source commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+
+      - name: Validate event and release source
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          publish_oss=false
+          case "$GITHUB_EVENT_NAME" in
+            pull_request)
+              ;;
+            workflow_dispatch)
+              [[ "$GITHUB_REF" == "refs/heads/main" ]] || {
+                echo "workflow_dispatch is restricted to main" >&2
+                exit 1
+              }
+              ;;
+            push)
+              [[ "$GITHUB_REF" =~ ^refs/tags/legion-node-v[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?$ ]] || {
+                echo "unexpected Product Node release tag: $GITHUB_REF" >&2
+                exit 1
+              }
+              publish_oss=true
+              ;;
+            *)
+              echo "unsupported event: $GITHUB_EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]]
+          if [[ "$publish_oss" == true ]]; then
+            git fetch --no-tags origin main:refs/remotes/origin/main
+            git merge-base --is-ancestor "$SOURCE_SHA" refs/remotes/origin/main || {
+              echo "published Product Node source must already be reachable from origin/main" >&2
+              exit 1
+            }
+          fi
+          version="sha-${SOURCE_SHA:0:12}"
+          [[ "$GITHUB_REF" != refs/tags/* ]] || version="$GITHUB_REF_NAME"
+          {
+            echo "publish_oss=$publish_oss"
+            echo "version=$version"
+          } >>"$GITHUB_OUTPUT"
 
       - name: Set up Go from go.mod
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
 
+      - name: Test OSS release index contract
+        run: ./.github/scripts/test-build-legion-component-oss-index.sh
+
       - name: Build product node package
+        env:
+          NODE_PACKAGE_VERSION: ${{ steps.contract.outputs.version }}
         run: ./.github/scripts/build-legion-product-node.sh
 
       - name: Verify package archive
@@ -87,6 +139,94 @@ jobs:
           cp "dist/${NODE_PACKAGE_NAME}.tar.gz" dist/artifact/
           cp "dist/${NODE_PACKAGE_NAME}.tar.gz.sha256" dist/artifact/
 
+      - name: Build immutable OSS release index
+        if: steps.contract.outputs.publish_oss == 'true'
+        id: oss-release
+        shell: bash
+        env:
+          VERSION: ${{ steps.contract.outputs.version }}
+        run: |
+          set -euo pipefail
+          public_base_url="https://yaklang.oss-accelerate.aliyuncs.com/legion/components/product-node/${VERSION}/${SOURCE_SHA}"
+          ./.github/scripts/build-legion-component-oss-index.sh \
+            --component product-node \
+            --version "$VERSION" \
+            --source-sha "$SOURCE_SHA" \
+            --artifact-dir dist/artifact \
+            --public-base-url "$public_base_url" \
+            --output dist/artifact/release-index.json
+          {
+            echo "public_base_url=$public_base_url"
+            echo "index_url=$public_base_url/release-index.json"
+            echo "index_sha256=$(sha256sum dist/artifact/release-index.json | awk '{print $1}')"
+            echo "remote_prefix=legion/components/product-node/${VERSION}/${SOURCE_SHA}"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Build repository-owned OSS uploader
+        if: steps.contract.outputs.publish_oss == 'true'
+        shell: bash
+        run: go build -trimpath -o "${RUNNER_TEMP}/yak-oss-upload" ./common/yak/cmd/yak.go
+
+      - name: Publish immutable Product Node release to OSS
+        if: steps.contract.outputs.publish_oss == 'true'
+        shell: bash
+        env:
+          OSS_KEY_ID: ${{ secrets.OSS_KEY_ID }}
+          OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}
+          REMOTE_PREFIX: ${{ steps.oss-release.outputs.remote_prefix }}
+          INDEX_URL: ${{ steps.oss-release.outputs.index_url }}
+          INDEX_SHA256: ${{ steps.oss-release.outputs.index_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ -n "$OSS_KEY_ID" && -n "$OSS_KEY_SECRET" ]]
+          existing_index="${RUNNER_TEMP}/existing-product-node-index.json"
+          http_status="$(curl --silent --show-error --location --retry 4 --retry-all-errors \
+            --output "$existing_index" --write-out '%{http_code}' "$INDEX_URL")"
+          case "$http_status" in
+            200)
+              [[ "$(sha256sum "$existing_index" | awk '{print $1}')" == "$INDEX_SHA256" ]] || {
+                echo "refusing to replace an existing OSS Product Node release index" >&2
+                exit 1
+              }
+              echo "identical OSS Product Node release already exists; upload is idempotent"
+              exit 0
+              ;;
+            404) ;;
+            *) echo "cannot determine whether OSS Product Node release already exists: HTTP $http_status" >&2; exit 1 ;;
+          esac
+          upload_specs=()
+          for file in dist/artifact/*; do
+            case "$(basename "$file")" in release-index.json|release-index.json.sha256) continue ;; esac
+            upload_specs+=("$file:/$REMOTE_PREFIX/$(basename "$file")")
+          done
+          payloads="$(IFS=';'; echo "${upload_specs[*]}")"
+          "${RUNNER_TEMP}/yak-oss-upload" upload-oss \
+            --endpoint oss-accelerate.aliyuncs.com \
+            --bucket yaklang \
+            --ak "$OSS_KEY_ID" \
+            --sk "$OSS_KEY_SECRET" \
+            --times 5 \
+            --file "$payloads"
+          "${RUNNER_TEMP}/yak-oss-upload" upload-oss \
+            --endpoint oss-accelerate.aliyuncs.com \
+            --bucket yaklang \
+            --ak "$OSS_KEY_ID" \
+            --sk "$OSS_KEY_SECRET" \
+            --times 5 \
+            --file "dist/artifact/release-index.json.sha256:/$REMOTE_PREFIX/release-index.json.sha256;dist/artifact/release-index.json:/$REMOTE_PREFIX/release-index.json"
+
+      - name: Verify public Product Node release index
+        if: steps.contract.outputs.publish_oss == 'true'
+        shell: bash
+        env:
+          INDEX_URL: ${{ steps.oss-release.outputs.index_url }}
+          INDEX_SHA256: ${{ steps.oss-release.outputs.index_sha256 }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+            "$INDEX_URL" --output "${RUNNER_TEMP}/published-product-node-index.json"
+          [[ "$(sha256sum "${RUNNER_TEMP}/published-product-node-index.json" | awk '{print $1}')" == "$INDEX_SHA256" ]]
+
       - name: Publish build summary
         shell: bash
         run: |
@@ -98,6 +238,10 @@ jobs:
             echo "- Target: \`linux/amd64\`"
             echo "- Build tags: \`hids\`"
             echo "- Go: \`$(go version)\`"
+            if [[ "${{ steps.contract.outputs.publish_oss }}" == true ]]; then
+              echo "- OSS index: \`${{ steps.oss-release.outputs.index_url }}\`"
+              echo "- OSS index SHA256: \`${{ steps.oss-release.outputs.index_sha256 }}\`"
+            fi
             echo
             echo '```json'
             jq . "dist/${NODE_PACKAGE_NAME}/PRODUCT_NODE_MANIFEST.json"
@@ -105,7 +249,7 @@ jobs:
           } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Upload node package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ env.NODE_PACKAGE_NAME }}
           path: dist/artifact/*
