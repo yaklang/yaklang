@@ -84,7 +84,54 @@ func IsYaklangScriptDeliveryPath(path string) bool {
 // :mention[path]{mentionId="path"} or :mention[path]
 var yaklangMentionPathPattern = regexp.MustCompile(`(?i):mention\[([^\]]+)\](?:\{[^}]*mentionId="([^"]*)"[^}]*\})?`)
 
-// ExtractMentionPathsFromUserInput collects absolute/relative paths from :mention[...] chips.
+// cleanMentionPath trims and normalizes a mention path without interpreting Markdown escapes.
+func cleanMentionPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	return filepath.Clean(path)
+}
+
+// NormalizeUserInputMentionPaths rewrites :mention[display]{mentionId="..."} bracket labels to mentionId.
+// Milkdown may escape underscores in display text (02\_security\_report.md); mentionId is authoritative.
+func NormalizeUserInputMentionPaths(userInput string) string {
+	userInput = strings.TrimSpace(userInput)
+	if userInput == "" {
+		return userInput
+	}
+	locs := yaklangMentionPathPattern.FindAllStringSubmatchIndex(userInput, -1)
+	if len(locs) == 0 {
+		return userInput
+	}
+	var b strings.Builder
+	last := 0
+	for _, loc := range locs {
+		if len(loc) < 4 {
+			continue
+		}
+		fullEnd := loc[1]
+		bracketStart, bracketEnd := loc[2], loc[3]
+		b.WriteString(userInput[last:bracketStart])
+
+		if len(loc) >= 6 && loc[4] >= 0 && loc[5] > loc[4] {
+			if canonical := cleanMentionPath(userInput[loc[4]:loc[5]]); canonical != "" {
+				b.WriteString(canonical)
+			} else {
+				b.WriteString(userInput[bracketStart:bracketEnd])
+			}
+		} else {
+			b.WriteString(userInput[bracketStart:bracketEnd])
+		}
+		b.WriteString(userInput[bracketEnd:fullEnd])
+		last = fullEnd
+	}
+	b.WriteString(userInput[last:])
+	return b.String()
+}
+
+// ExtractMentionPathsFromUserInput collects paths from :mention[...] chips.
+// When mentionId is present it is the only authoritative path; bracket display text is ignored.
 func ExtractMentionPathsFromUserInput(userInput string) []string {
 	userInput = strings.TrimSpace(userInput)
 	if userInput == "" {
@@ -97,13 +144,10 @@ func ExtractMentionPathsFromUserInput(userInput string) []string {
 	seen := make(map[string]struct{}, len(matches))
 	var out []string
 	add := func(raw string) {
-		raw = strings.TrimSpace(raw)
-		if raw == "" {
+		cleaned := cleanMentionPath(raw)
+		if cleaned == "" {
 			return
 		}
-		// Mention display may escape underscores as \_
-		raw = strings.ReplaceAll(raw, `\_`, "_")
-		cleaned := filepath.Clean(raw)
 		key := strings.ToLower(cleaned)
 		if _, ok := seen[key]; ok {
 			return
@@ -112,11 +156,12 @@ func ExtractMentionPathsFromUserInput(userInput string) []string {
 		out = append(out, cleaned)
 	}
 	for _, m := range matches {
-		if len(m) > 1 {
-			add(m[1])
-		}
 		if len(m) > 2 && strings.TrimSpace(m[2]) != "" {
 			add(m[2])
+			continue
+		}
+		if len(m) > 1 {
+			add(m[1])
 		}
 	}
 	return out
@@ -137,7 +182,6 @@ func pathInMentionSet(path string, mentionPaths []string) bool {
 		if strings.EqualFold(path, m) || pathLower == strings.ToLower(m) {
 			return true
 		}
-		// mention path may use escaped underscores or partial display forms
 		if base != "" && strings.EqualFold(base, filepath.Base(m)) {
 			return true
 		}

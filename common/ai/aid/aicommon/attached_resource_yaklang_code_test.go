@@ -3,7 +3,6 @@ package aicommon
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -141,17 +140,20 @@ func TestIsYaklangScriptDeliveryPath(t *testing.T) {
 }
 
 func TestExtractMentionPathsFromUserInput(t *testing.T) {
-	input := `:mention[C:\Users\13766\Downloads\02\_security\_report.md]{mentionId="C:\Users\13766\Downloads\02_security_report.md"} 根据这个报告编写yak脚本`
+	want := filepath.FromSlash(`C:/Users/13766/Downloads/02_security_report.md`)
+	input := `:mention[C:\Users\13766\Downloads\02\_security\_report.md]{mentionId="` + want + `"} 根据这个报告编写yak脚本`
 	paths := ExtractMentionPathsFromUserInput(input)
-	require.NotEmpty(t, paths)
-	found := false
-	for _, p := range paths {
-		if strings.Contains(strings.ToLower(filepath.Base(p)), "security") {
-			found = true
-			break
-		}
-	}
-	require.True(t, found, "expected mention path, got %#v", paths)
+	require.Len(t, paths, 1)
+	require.Equal(t, filepath.Clean(want), paths[0])
+	require.NotContains(t, paths[0], `\_`)
+}
+
+func TestNormalizeUserInputMentionPaths(t *testing.T) {
+	raw := `:mention[C:\Users\13766\work\测试\CVE\camel\disclosure\02\_security\_report.md]{mentionId="C:\Users\13766\work\测试\CVE\camel\disclosure\02_security_report.md"} 参考漏洞报告`
+	want := `C:\Users\13766\work\测试\CVE\camel\disclosure\02_security_report.md`
+	got := NormalizeUserInputMentionPaths(raw)
+	require.Contains(t, got, want)
+	require.NotContains(t, got, `\_`)
 }
 
 func TestParseYaklangEditorContext_IgnoresMentionMarkdownPrefersYak(t *testing.T) {
