@@ -9,6 +9,8 @@ on:
     paths:
       - ".github/scripts/package-legion-ai-session-runtime.sh"
       - ".github/scripts/test-package-legion-ai-session-runtime.sh"
+      - ".github/scripts/build-legion-component-oss-index.sh"
+      - ".github/scripts/test-build-legion-component-oss-index.sh"
       - ".github/workflows/build-legion-ai-session-runtime.yml"
       - "docker/session-runtime/**"
       - "cmd/legion-smoke-node/**"
@@ -28,7 +30,7 @@ concurrency:
 
 env:
   RUNTIME_PACKAGE_NAME: legion-ai-session-runtime_linux_amd64
-  RUNTIME_IMAGE_REPOSITORY: ghcr.io/${{ github.repository_owner }}/legion-ai-session-runtime
+  RUNTIME_IMAGE_REPOSITORY: local.invalid/yaklang/legion-ai-session-runtime
   SESSION_RUNTIME_WORKFLOW_NAME: Build Trusted Legion AI Session Runtime
   SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -36,10 +38,9 @@ jobs:
   build-linux-amd64:
     name: Build Linux amd64 AI Session Runtime
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
-      packages: write
       id-token: write
       attestations: write
     steps:
@@ -55,6 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           publish=false
+          publish_oss=false
           case "$GITHUB_EVENT_NAME" in
             pull_request)
               ;;
@@ -71,6 +73,7 @@ jobs:
                 exit 1
               }
               publish=true
+              publish_oss=true
               ;;
             *)
               echo "unsupported event: $GITHUB_EVENT_NAME" >&2
@@ -101,6 +104,7 @@ jobs:
           fi
           {
             echo "publish=$publish"
+            echo "publish_oss=$publish_oss"
             echo "version=$version"
             echo "artifact_name=$artifact_name"
             echo "ci_provider=$ci_provider"
@@ -129,6 +133,7 @@ jobs:
           export GOTOOLCHAIN=local
           go test ./cmd/legion-smoke-node ./common/node ./scannode
           ./.github/scripts/test-package-legion-ai-session-runtime.sh
+          ./.github/scripts/test-build-legion-component-oss-index.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -154,14 +159,6 @@ jobs:
             echo "go_version=$go_version"
           } >>"$GITHUB_OUTPUT"
 
-      - name: Authenticate to GitHub Container Registry
-        if: steps.contract.outputs.publish == 'true'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build AI Session Runtime image
         id: image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -169,8 +166,8 @@ jobs:
           context: .
           file: docker/session-runtime/Dockerfile
           platforms: linux/amd64
-          push: ${{ steps.contract.outputs.publish == 'true' }}
-          load: ${{ steps.contract.outputs.publish != 'true' }}
+          push: false
+          load: true
           tags: ${{ env.RUNTIME_IMAGE_REPOSITORY }}:${{ steps.contract.outputs.version }}
           build-args: |
             GO_BUILDER_IMAGE=${{ steps.bases.outputs.builder_ref }}
@@ -181,30 +178,21 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
             org.opencontainers.image.version=${{ steps.contract.outputs.version }}
-          provenance: ${{ steps.contract.outputs.publish == 'true' && 'mode=max' || 'false' }}
-          sbom: ${{ steps.contract.outputs.publish == 'true' }}
+          provenance: false
+          sbom: false
 
       - name: Inspect built image and extract Runtime binary
         id: inspect
         shell: bash
         env:
-          PUBLISH: ${{ steps.contract.outputs.publish }}
-          PUBLISHED_DIGEST: ${{ steps.image.outputs.digest }}
           VERSION: ${{ steps.contract.outputs.version }}
         run: |
           set -euo pipefail
           image_tag="${RUNTIME_IMAGE_REPOSITORY}:${VERSION}"
           image_for_inspection="$image_tag"
-          if [[ "$PUBLISH" == true ]]; then
-            [[ "$PUBLISHED_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-            image_ref="${RUNTIME_IMAGE_REPOSITORY}@${PUBLISHED_DIGEST}"
-            docker pull "$image_ref"
-            image_for_inspection="$image_ref"
-          else
-            local_image_id="$(docker image inspect --format '{{.Id}}' "$image_tag")"
-            [[ "$local_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
-            image_ref="local.invalid/yaklang/legion-ai-session-runtime@${local_image_id}"
-          fi
+          local_image_id="$(docker image inspect --format '{{.Id}}' "$image_tag")"
+          [[ "$local_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image_ref="yaklang-oss.invalid/legion-ai-session-runtime@${local_image_id}"
 
           revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image_for_inspection")"
           [[ "$revision" == "$SOURCE_SHA" ]]
@@ -223,6 +211,7 @@ jobs:
           {
             echo "image_ref=$image_ref"
             echo "image_tag=$image_tag"
+            echo "image_id=$local_image_id"
           } >>"$GITHUB_OUTPUT"
 
       - name: Generate Runtime provenance artifact
@@ -282,6 +271,105 @@ jobs:
           cp "dist/${RUNTIME_PACKAGE_NAME}.tar.gz" dist/artifact/
           cp "dist/${RUNTIME_PACKAGE_NAME}.tar.gz.sha256" dist/artifact/
 
+      - name: Build immutable OSS Runtime release
+        if: steps.contract.outputs.publish_oss == 'true'
+        id: oss-release
+        shell: bash
+        env:
+          VERSION: ${{ steps.contract.outputs.version }}
+          RUNTIME_IMAGE_REF: ${{ steps.inspect.outputs.image_ref }}
+          RUNTIME_IMAGE_ID: ${{ steps.inspect.outputs.image_id }}
+        run: |
+          set -euo pipefail
+          oss_release="dist/oss-release"
+          mkdir -p "$oss_release"
+          cp dist/artifact/* "$oss_release/"
+          docker save "$RUNTIME_IMAGE_ID" | gzip -n -1 >"$oss_release/${RUNTIME_PACKAGE_NAME}.docker.tar.gz"
+          public_base_url="https://yaklang.oss-accelerate.aliyuncs.com/legion/components/session-runtime/${VERSION}/${SOURCE_SHA}"
+          ./.github/scripts/build-legion-component-oss-index.sh \
+            --component session-runtime \
+            --version "$VERSION" \
+            --source-sha "$SOURCE_SHA" \
+            --artifact-dir "$oss_release" \
+            --public-base-url "$public_base_url" \
+            --runtime-image-ref "$RUNTIME_IMAGE_REF" \
+            --runtime-image-id "$RUNTIME_IMAGE_ID" \
+            --output "$oss_release/release-index.json"
+          cp "$oss_release/release-index.json" "$oss_release/release-index.json.sha256" dist/artifact/
+          {
+            echo "public_base_url=$public_base_url"
+            echo "index_url=$public_base_url/release-index.json"
+            echo "index_sha256=$(sha256sum "$oss_release/release-index.json" | awk '{print $1}')"
+            echo "remote_prefix=legion/components/session-runtime/${VERSION}/${SOURCE_SHA}"
+            echo "release_dir=$oss_release"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Build repository-owned OSS uploader
+        if: steps.contract.outputs.publish_oss == 'true'
+        shell: bash
+        run: go build -trimpath -o "${RUNNER_TEMP}/yak-oss-upload" ./common/yak/cmd/yak.go
+
+      - name: Publish immutable Runtime release to OSS
+        if: steps.contract.outputs.publish_oss == 'true'
+        shell: bash
+        env:
+          OSS_KEY_ID: ${{ secrets.OSS_KEY_ID }}
+          OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}
+          REMOTE_PREFIX: ${{ steps.oss-release.outputs.remote_prefix }}
+          RELEASE_DIR: ${{ steps.oss-release.outputs.release_dir }}
+          INDEX_URL: ${{ steps.oss-release.outputs.index_url }}
+          INDEX_SHA256: ${{ steps.oss-release.outputs.index_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ -n "$OSS_KEY_ID" && -n "$OSS_KEY_SECRET" ]]
+          existing_index="${RUNNER_TEMP}/existing-runtime-index.json"
+          http_status="$(curl --silent --show-error --location --retry 4 --retry-all-errors \
+            --output "$existing_index" --write-out '%{http_code}' "$INDEX_URL")"
+          case "$http_status" in
+            200)
+              [[ "$(sha256sum "$existing_index" | awk '{print $1}')" == "$INDEX_SHA256" ]] || {
+                echo "refusing to replace an existing OSS Runtime release index" >&2
+                exit 1
+              }
+              echo "identical OSS Runtime release already exists; upload is idempotent"
+              exit 0
+              ;;
+            404) ;;
+            *) echo "cannot determine whether OSS Runtime release already exists: HTTP $http_status" >&2; exit 1 ;;
+          esac
+          upload_specs=()
+          for file in "$RELEASE_DIR"/*; do
+            case "$(basename "$file")" in release-index.json|release-index.json.sha256) continue ;; esac
+            upload_specs+=("$file:/$REMOTE_PREFIX/$(basename "$file")")
+          done
+          payloads="$(IFS=';'; echo "${upload_specs[*]}")"
+          "${RUNNER_TEMP}/yak-oss-upload" upload-oss \
+            --endpoint oss-accelerate.aliyuncs.com \
+            --bucket yaklang \
+            --ak "$OSS_KEY_ID" \
+            --sk "$OSS_KEY_SECRET" \
+            --times 5 \
+            --file "$payloads"
+          "${RUNNER_TEMP}/yak-oss-upload" upload-oss \
+            --endpoint oss-accelerate.aliyuncs.com \
+            --bucket yaklang \
+            --ak "$OSS_KEY_ID" \
+            --sk "$OSS_KEY_SECRET" \
+            --times 5 \
+            --file "$RELEASE_DIR/release-index.json.sha256:/$REMOTE_PREFIX/release-index.json.sha256;$RELEASE_DIR/release-index.json:/$REMOTE_PREFIX/release-index.json"
+
+      - name: Verify public Runtime release index
+        if: steps.contract.outputs.publish_oss == 'true'
+        shell: bash
+        env:
+          INDEX_URL: ${{ steps.oss-release.outputs.index_url }}
+          INDEX_SHA256: ${{ steps.oss-release.outputs.index_sha256 }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+            "$INDEX_URL" --output "${RUNNER_TEMP}/published-runtime-index.json"
+          [[ "$(sha256sum "${RUNNER_TEMP}/published-runtime-index.json" | awk '{print $1}')" == "$INDEX_SHA256" ]]
+
       - name: Publish build summary
         shell: bash
         run: |
@@ -293,6 +381,10 @@ jobs:
             echo "- Image: \`${{ steps.inspect.outputs.image_ref }}\`"
             echo "- Artifact: \`${{ steps.contract.outputs.artifact_name }}\`"
             echo "- Go: \`${{ steps.bases.outputs.go_version }}\`"
+            if [[ "${{ steps.contract.outputs.publish_oss }}" == true ]]; then
+              echo "- OSS index: \`${{ steps.oss-release.outputs.index_url }}\`"
+              echo "- OSS index SHA256: \`${{ steps.oss-release.outputs.index_sha256 }}\`"
+            fi
             echo
             echo '```json'
             jq . "dist/${RUNTIME_PACKAGE_NAME}/SESSION_RUNTIME_MANIFEST.json"

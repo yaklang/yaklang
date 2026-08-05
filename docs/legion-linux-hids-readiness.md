@@ -61,6 +61,15 @@ Yaklang source commit, Go toolchain, Linux amd64 target, `hids` build tag, and
 advertised capability set. This artifact is an input to the Legion deployment
 packaging pipeline; it is not a complete deployment bundle.
 
+A SemVer `legion-node-v*` tag reachable from `main` also publishes these files
+under the versioned public OSS path
+`/legion/components/product-node/<tag>/<source-sha>/`. The accompanying
+`release-index.json` binds the source commit, producer manifest, archive, raw
+binary, and checksums. Cross-repository assembly consumes the OSS index URL and
+an independently approved index SHA-256 instead of a GitHub Actions run ID or
+repository token. Manual dispatch remains a build verification entry and does
+not publish a formal OSS release.
+
 Use `task legion_smoke_node_build_hids` for native debugging when your current host is already Linux. Use `task legion_smoke_node_build_hids_linux_amd64` when you need a deployable Linux artifact from any development host.
 
 If a future production Legion node entrypoint is added, it must also be built with `-tags hids` before the binary is expected to advertise or run the HIDS capability.
