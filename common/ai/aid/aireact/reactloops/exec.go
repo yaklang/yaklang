@@ -861,52 +861,28 @@ LOOP:
 		// 知道 "我还在动"; 心跳逻辑见 startStallHeartbeat / recordIterationTick.
 		// 关键词: 主循环 tick, lastIterationTickAt
 		r.recordIterationTick()
-		// 迭代上限判断基于 effectiveIterationCount (有效推进轮数) 而非原始
-		// 循环圈数 iterationCount. effectiveIterationCount 在每轮 action 执行
-		// 后由 advanceEffectiveIteration 更新, 此处反映的是之前已完成的有效
-		// 迭代数. 空转轮 (有活跃 TODO 但无 todo_delta) 不计入, 不消耗预算.
-		// 使用 >= (而非 >) 是因为 effectiveIterationCount 在本轮 action 之后才 +1,
-		// 循环顶部检查时它反映的是之前已完成的有效迭代数; 旧逻辑用 iterationCount++
-		// 后 > 比较 (pre-increment + >), 这里用 post-increment + >= 保持等价语义.
-		// 关键词: 有效迭代上限, 迭代限制重定义, post-increment >= 语义等价
+		// 迭代上限基于 effectiveIterationCount (有效推进轮数): 有活跃 TODO 但
+		// 无 todo_delta 变更的空转轮不计入, 不消耗预算. effectiveIterationCount
+		// 在每轮 action 执行后递增, 此处检查时反映的是之前已完成的有效迭代数.
 		if r.effectiveIterationCount >= maxIterations {
-			// 到达迭代上限: 优先尝试向用户申请临时扩充迭代次数 (仅在允许用户交互时).
-			// 用户同意 -> 提升 maxIterations 并 continue 主循环 (有扩充次数护栏防自旋);
-			// 用户拒绝 / 未启用交互 / 已达扩充上限 -> 回退到原"软性中断"退出.
-			// 关键词: iteration extend, 临时扩充迭代上限, 软性中断回退
+			// 到达迭代上限: 优先尝试向用户申请临时扩充 (仅在允许交互时).
+			// 用户同意 -> 提升 maxIterations 并 continue; 拒绝/不可扩充 -> 软性中断.
 			if !r.disableIncreaseIterationCount {
 				agreed, extDelta, extErr := r.requestIterationExtension(task, iterationCount, maxIterations)
 				if extErr != nil {
 					log.Warnf("ReactLoop[%v] request iteration extension error (fallback to soft interrupt): %v", r.loopName, extErr)
 				}
 				if agreed && extDelta > 0 {
-					// 用户同意扩充: 提升上限, 不推进 iterationCount (本轮仍属于"超限"那一轮,
-					// 但 maxIterations 已提高, 下一次 iterationCount > maxIterations 判断自然通过).
+					// 用户同意扩充: 提升上限, 不推进计数, 直接 continue.
 					maxIterations += extDelta
 					r.loadingStatus(fmt.Sprintf("迭代上限已临时扩充至 %d / iteration limit extended to %d", maxIterations, maxIterations))
-					// 注意: 这里不 break, 也不推进 iterationCount, 直接 continue 让下一轮
-					// 重新走主循环逻辑 (生成 prompt / 调 AI / 执行 action).
 					continue
 				}
 			}
-			// 未扩充: 走原"软性中断"处理 (保持既有语义不变).
-			// 到达迭代上限属于"软性中断", 框架层统一按"自然结束"处理, 不再当作
-			// 硬错误 EmitReActFail. 处理步骤 (与具体 loop / 专注模式无关):
-			//  1. applyMaxIterationSoftInterrupt: 把当前任务仍活跃的 TODO 批量
-			//     标记 deferred (待办回收) 并广播, 置位软中断标记, 记录未完成 TODO 快照,
-			//     同时在 Timeline 落一次"退出原因=超出最大迭代 + 可回复继续"的软性说明;
-			//  2. finishIterationLoopWithError(reason=maxIterErr): 照常跑
-			//     onPostIteration hook. 各 loop 已有的 finalize 收尾总结 (loop_default
-			//     的 DirectlyAnswer 总结 / http_flow_analyze 的分析报告等) 会读取上面
-			//     落在 timeline / interrupt store 里的上下文, 因地制宜地 AI 生成一段
-			//     "退出原因 + 未完成 TODO + 下一步(回复 '继续' 续跑或换话题)"的说明,
-			//     框架层不额外再发一次 AI 请求. 全局收尾兜底 (re-act_mainloop) 识别
-			//     IsMaxIterationInterrupted() 后, 即便 reason 带着 maxIterErr 也按
-			//     EmitReActSuccess (自然结束) 上报, 与硬中断报错形成对比; 只有隐藏 /
-			//     内部 loop 在自己的 finalize 里 IgnoreError 自管收尾时才保持静默;
-			//  3. 正常 break LOOP -> return nil -> complete(nil), 资源回收由
-			//     ExecuteWithExistedTask 的 defer r.Release() 完成.
-			// 关键词: max iteration 软性中断, 自然结束, downgrade-max-iteration-err, 待办 deferred
+			// 未扩充: 软性中断 (按"自然结束"处理, 非硬错误).
+			// applyMaxIterationSoftInterrupt 将活跃 TODO 标记 deferred 并记录快照,
+			// finishIterationLoopWithError 跑 onPostIteration hook, 各 loop 的
+			// finalize 据此生成总结说明, 框架层按 EmitReActSuccess 上报.
 			maxIterErr := utils.Errorf("reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
 			r.applyMaxIterationSoftInterrupt(iterationCount, task, maxIterations)
 			r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
@@ -1030,12 +1006,8 @@ LOOP:
 
 		r.emitActionExecutionRecord(task, actionParams, iterationCount, prompt)
 
-		// 主 loop todo_delta 兜底拦截: 详见 applyTodoDeltaBottomLine.
-		// 关键词: 主 loop todo_delta 兜底入口, 孤儿待办修复
+		// 落地 todo_delta 并判定本轮是否为有效推进 (空转轮不计入迭代预算).
 		appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
-		// 判定本轮是否为"有效推进轮": 有活跃 TODO 但无 todo_delta 变更时
-		// 不计入 effectiveIterationCount, 从而不消耗迭代预算。
-		// 关键词: 有效迭代推进, 空转轮不计入
 		r.advanceEffectiveIteration(task, appliedTodoDelta)
 		// Legacy object wrappers keep ActionType()=="object" while the selected
 		// handler is finish. Reset based on the resolved handler so consecutive
