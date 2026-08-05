@@ -134,6 +134,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 				strings.Join(pinnedLibs, ", "), strings.Join(pinnedLibs, ", ")))
 			log.Infof("pinned core library APIs for libs: %v (%d bytes)", pinnedLibs, len(pinned))
 		}
+		if dsl := BuildPinnedDSLSection(); dsl != "" {
+			loop.Set("pinned_dsl", dsl)
+			log.Infof("pinned yaklang DSL rules (%d bytes)", len(dsl))
+		}
 
 		userRequirements := utils.MustRenderTemplate(`<|USER_REQUIREMENTS_{{.nonce}}|>
 {{.data}}

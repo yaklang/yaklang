@@ -11,6 +11,9 @@
 {{ end }}{{ if not .AIKBAvailable }}## AIKB 不可用
 代码样例库未安装。仅用 `yakdoc_*` 查 API 签名；禁止臆造样例或 API。
 
+{{ end }}{{ if .PinnedDSL }}## Yaklang DSL 硬规则（Init 锁定，写码前必读）
+{{ .PinnedDSL }}
+
 {{ end }}{{ if .PinnedAPIs }}## 已锁定接口签名（本任务核心库 {{ .PinnedLibraries }} 的权威签名，优先采信）
 下面是 init 阶段据你选定的核心库从 YakDocument 抽取的**权威函数签名**。写码/修错时**优先以此为准**：参数类型、参数个数、函数名都照这里来，能直接避免"参数类型错误/猜错函数名"。这里没列全的成员用 `yakdoc_function_details` 查。
 

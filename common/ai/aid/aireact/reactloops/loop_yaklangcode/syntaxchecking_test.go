@@ -27,9 +27,9 @@ bruteTask.SetResultHandler(func(result map[string]interface{}) {
 
 	// Should contain intelligent hint about function parameter types
 	assert.Contains(t, errorMsg, "AI助手提示:", "Should contain AI assistant hint")
-	assert.Contains(t, errorMsg, "Yaklang DSL 中函数参数不允许有类型声明", "Should contain specific hint about parameter types")
-	assert.Contains(t, errorMsg, "错误: func(result map[string]interface{})", "Should show incorrect syntax")
-	assert.Contains(t, errorMsg, "正确: func(result)", "Should show correct syntax")
+	assert.Contains(t, errorMsg, "函数参数/返回类型不允许 Go 风格声明", "Should contain specific hint about parameter types")
+	assert.Contains(t, errorMsg, "func(gadgetB64 string) []byte", "Should show incorrect syntax example")
+	assert.Contains(t, errorMsg, "build = func(gadgetB64)", "Should show correct syntax example")
 }
 
 func TestCheckCodeAndFormatErrors_VariableTypeDeclarations(t *testing.T) {
@@ -154,7 +154,7 @@ func TestGetIntelligentErrorHint_FunctionParameterTypes(t *testing.T) {
 		// Should contain the specific hint we're looking for
 		expectedHints := []string{
 			"AI助手提示:",
-			"函数参数不允许有类型声明",
+			"函数参数/返回类型不允许 Go 风格声明",
 			"func(result map[string]interface{})",
 			"func(result)",
 		}
