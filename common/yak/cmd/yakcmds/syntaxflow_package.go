@@ -27,9 +27,9 @@ var syntaxFlowPackageCommand = &cli.Command{
 			Usage: "list installed rule packages",
 			Action: func(c *cli.Context) error {
 				db := consts.GetGormProfileDatabase()
-				_ = db.AutoMigrate(&schema.SyntaxFlowPackage{}).Error
-				var pkgs []*schema.SyntaxFlowPackage
-				if err := db.Order("name asc").Find(&pkgs).Error; err != nil {
+				_ = db.AutoMigrate(&schema.SyntaxFlowGroup{}, &schema.SyntaxFlowRule{}).Error
+				var pkgs []*schema.SyntaxFlowGroup
+				if err := db.Order("group_name asc").Find(&pkgs).Error; err != nil {
 					return err
 				}
 				if len(pkgs) == 0 {
@@ -37,9 +37,9 @@ var syntaxFlowPackageCommand = &cli.Command{
 					return nil
 				}
 				for _, p := range pkgs {
-					count := sfdb.CountRulesInPackage(db, p.Name)
+					count := sfdb.CountRulesInPackage(db, p.GroupName)
 					fmt.Printf("%-24s v%-10s source=%-8s builtin=%v rules=%d\n",
-						p.Name, p.Version, p.Source, p.IsBuiltin, count)
+						p.GroupName, p.Version, p.Source, p.IsBuildIn, count)
 				}
 				return nil
 			},
@@ -83,7 +83,7 @@ var syntaxFlowPackageCommand = &cli.Command{
 				if pw := c.String("password"); pw != "" {
 					opts = append(opts, sfdb.WithExportPassword(pw))
 				}
-				ruleDB := db.Model(&schema.SyntaxFlowRule{}).Where("package_name = ?", name)
+				ruleDB := db.Model(&schema.SyntaxFlowRule{}).Where("rule_group = ?", name)
 				result, err := sfdb.ExportRulesToZip(utils.TimeoutContextSeconds(600), ruleDB, out, opts...)
 				if err != nil {
 					return err
@@ -115,7 +115,7 @@ var syntaxFlowPackageCommand = &cli.Command{
 
 func importSyntaxFlowPackageCLI(input, name, password string, force bool) error {
 	db := consts.GetGormProfileDatabase()
-	_ = db.AutoMigrate(&schema.SyntaxFlowPackage{}).Error
+	_ = db.AutoMigrate(&schema.SyntaxFlowGroup{}, &schema.SyntaxFlowRule{}).Error
 	pkgName := strings.TrimSpace(name)
 
 	meta, err := sfdb.LoadPackageYAML(input)
@@ -174,7 +174,7 @@ func importSyntaxFlowPackageCLI(input, name, password string, force bool) error 
 			}
 		}
 		_ = db.Model(&schema.SyntaxFlowRule{}).Where("rule_id = ?", r.RuleID).
-			Updates(map[string]any{"package_name": meta.Name, "version": r.Version}).Error
+			Updates(map[string]any{"rule_group": meta.Name, "version": r.Version}).Error
 	}
 	if conflicts > 0 && !force {
 		return utils.Errorf("%d conflict(s); re-run with --force-overwrite-conflicts to overwrite", conflicts)

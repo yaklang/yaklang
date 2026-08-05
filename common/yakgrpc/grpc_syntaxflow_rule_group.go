@@ -16,13 +16,9 @@ func (s *Server) QuerySyntaxFlowRuleGroup(ctx context.Context, req *ypb.QuerySyn
 	if err != nil {
 		return nil, err
 	}
-	var groups []*ypb.SyntaxFlowGroup
-	for _, group := range result {
-		groups = append(groups, group.ToGRPCModel())
-	}
 	return &ypb.QuerySyntaxFlowRuleGroupResponse{
 		Pagination: req.Pagination,
-		Group:      groups,
+		Group:      yakit.AttachGroupRuleCounts(s.GetProfileDatabase(), result),
 	}, nil
 }
 
@@ -123,9 +119,5 @@ func (s *Server) QuerySyntaxFlowSameGroup(ctx context.Context, req *ypb.QuerySyn
 	if err != nil {
 		return nil, utils.Errorf("query syntax flow same group failed:%s", err)
 	}
-	var result []*ypb.SyntaxFlowGroup
-	for _, group := range groups {
-		result = append(result, group.ToGRPCModel())
-	}
-	return &ypb.QuerySyntaxFlowSameGroupResponse{Group: result}, nil
+	return &ypb.QuerySyntaxFlowSameGroupResponse{Group: yakit.AttachGroupRuleCounts(s.GetProfileDatabase(), groups)}, nil
 }

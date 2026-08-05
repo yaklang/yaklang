@@ -17,8 +17,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// Soft-compat Package RPCs: backed by SyntaxFlowGroup catalog + Rule.RuleGroup.
+
 func (s *Server) QuerySyntaxFlowPackages(ctx context.Context, req *ypb.QuerySyntaxFlowPackagesRequest) (*ypb.QuerySyntaxFlowPackagesResponse, error) {
-	db := s.GetProfileDatabase().Model(&schema.SyntaxFlowPackage{})
+	db := s.GetProfileDatabase().Model(&schema.SyntaxFlowGroup{})
 	filter := req.GetFilter()
 	if filter == nil {
 		filter = &ypb.SyntaxFlowPackageFilter{}
@@ -29,7 +31,7 @@ func (s *Server) QuerySyntaxFlowPackages(ctx context.Context, req *ypb.QuerySynt
 	if paging == nil {
 		paging = &ypb.Paging{Page: 1, Limit: 100}
 	}
-	var data []*schema.SyntaxFlowPackage
+	var data []*schema.SyntaxFlowGroup
 	p, db := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &data)
 	if db.Error != nil {
 		return nil, db.Error
@@ -39,8 +41,8 @@ func (s *Server) QuerySyntaxFlowPackages(ctx context.Context, req *ypb.QuerySynt
 		Total:      int64(p.TotalRecord),
 	}
 	for _, pkg := range data {
-		count := int32(sfdb.CountRulesInPackage(s.GetProfileDatabase(), pkg.Name))
-		resp.Packages = append(resp.Packages, pkg.ToGRPCModel(count))
+		count := int32(sfdb.CountRulesInPackage(s.GetProfileDatabase(), pkg.GroupName))
+		resp.Packages = append(resp.Packages, pkg.ToPackageGRPCModel(count))
 	}
 	return resp, nil
 }
@@ -67,16 +69,18 @@ func (s *Server) UpdateSyntaxFlowPackage(ctx context.Context, req *ypb.UpdateSyn
 	if err != nil {
 		return nil, err
 	}
-	if pkg.IsBuiltin {
-		return nil, utils.Errorf("cannot rename/update builtin package: %s", pkg.Name)
+	if pkg.IsBuildIn {
+		return nil, utils.Errorf("cannot rename/update builtin package: %s", pkg.GroupName)
 	}
 	newName := strings.TrimSpace(req.GetNewName())
-	if newName != "" && newName != pkg.Name {
-		if err := db.Model(&schema.SyntaxFlowRule{}).Where("package_name = ?", pkg.Name).
-			Update("package_name", newName).Error; err != nil {
+	if newName != "" && newName != pkg.GroupName {
+		if err := sfdb.RenameGroup(db, pkg.GroupName, newName); err != nil {
 			return nil, err
 		}
-		pkg.Name = newName
+		pkg, err = sfdb.QueryPackageByName(db, newName)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if req.GetDescription() != "" {
 		pkg.Description = req.GetDescription()
@@ -118,7 +122,7 @@ func (s *Server) ExportSyntaxFlowPackage(req *ypb.ExportSyntaxFlowPackageRequest
 	}
 	_ = stream.Send(&ypb.SyntaxFlowPackageProgress{Progress: 0.4, Message: "exporting rules", MessageType: "info", PackageName: name, PackageVersion: meta.Version})
 
-	ruleDB := db.Model(&schema.SyntaxFlowRule{}).Where("package_name = ?", name)
+	ruleDB := db.Model(&schema.SyntaxFlowRule{}).Where("rule_group = ?", name)
 	opts := []sfdb.RuleExportOption{}
 	if req.GetPassword() != "" {
 		opts = append(opts, sfdb.WithExportPassword(req.GetPassword()))
@@ -127,7 +131,6 @@ func (s *Server) ExportSyntaxFlowPackage(req *ypb.ExportSyntaxFlowPackageRequest
 	if err != nil {
 		return err
 	}
-	// sidecar package.yaml next to zip
 	_ = sfdb.WritePackageYAML(filepath.Dir(target), meta)
 	_ = stream.Send(&ypb.SyntaxFlowPackageProgress{
 		Progress: 1, Message: fmt.Sprintf("exported %d rules", result.Count),
@@ -209,7 +212,7 @@ func (s *Server) ImportSyntaxFlowPackage(req *ypb.ImportSyntaxFlowPackageRequest
 			}
 		}
 		_ = db.Model(&schema.SyntaxFlowRule{}).Where("rule_id = ?", r.RuleID).
-			Updates(map[string]any{"package_name": meta.Name, "version": r.Version}).Error
+			Updates(map[string]any{"rule_group": meta.Name, "version": r.Version}).Error
 	}
 	_ = stream.Send(&ypb.SyntaxFlowPackageProgress{Progress: 1, Message: "import finished", MessageType: "success", PackageName: meta.Name, PackageVersion: meta.Version})
 	return nil

@@ -59,8 +59,7 @@ var ProfileTables = []interface{}{
 	&GeneralRuleGroup{},
 	//syntaxFlow rule
 	&SyntaxFlowRule{},
-	&SyntaxFlowGroup{}, // deprecated: kept for DB migrate; sync no longer writes groups
-	&SyntaxFlowPackage{},
+	&SyntaxFlowGroup{}, // catalog of rule-group / package buckets; Rule.RuleGroup is the scalar bind
 	&PluginEnv{},
 	&HotPatchTemplate{},
 	&AIForge{},

@@ -129,49 +129,28 @@ func DeleteRuleByRuleName(name string) error {
 func DeleteBuildInRule() error {
 	db := consts.GetGormProfileDatabase()
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		// 1. 查询所有内置规则
-		var rules []*schema.SyntaxFlowRule
-		if err := tx.Preload("Groups").Where("is_build_in_rule = ?", true).Find(&rules).Error; err != nil {
-			return err
-		}
-
-		// 2. 清除规则与分组的关联
-		for _, r := range rules {
-			if err := tx.Model(r).Association("Groups").Clear().Error; err != nil {
-				return err
-			}
-		}
-
-		// 3. 删除所有内置规则
+		// delete builtin rules (RuleGroup scalar; no many2many clear needed)
 		if err := tx.Where("is_build_in_rule = ?", true).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
 			return err
 		}
-
-		// 4. 清理空的内置分组
-		// 查找所有内置分组中没有关联任何规则的分组
-		var emptyBuiltInGroups []schema.SyntaxFlowGroup
-		if err := tx.Table("syntax_flow_groups").
-			Joins("LEFT JOIN syntax_flow_rule_and_group ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
-			Where("syntax_flow_groups.is_build_in = ? AND syntax_flow_rule_and_group.syntax_flow_group_id IS NULL", true).
-			Find(&emptyBuiltInGroups).Error; err != nil {
-			log.Errorf("查询空内置分组失败: %v", err)
-			// 不中断事务，继续执行
-		} else if len(emptyBuiltInGroups) > 0 {
-			// 删除空的内置分组
-			emptyGroupIDs := make([]uint, len(emptyBuiltInGroups))
-			groupNames := make([]string, len(emptyBuiltInGroups))
-			for i, g := range emptyBuiltInGroups {
-				emptyGroupIDs[i] = g.ID
-				groupNames[i] = g.GroupName
+		// drop empty builtin catalog groups that no longer have rules
+		var builtinGroups []schema.SyntaxFlowGroup
+		if err := tx.Where("is_build_in = ?", true).Find(&builtinGroups).Error; err != nil {
+			log.Errorf("query builtin groups failed: %v", err)
+			return nil
+		}
+		for _, g := range builtinGroups {
+			if CountRulesInGroup(tx, g.GroupName) > 0 {
+				continue
 			}
-			if err := tx.Where("id IN (?)", emptyGroupIDs).Unscoped().Delete(&schema.SyntaxFlowGroup{}).Error; err != nil {
-				log.Errorf("删除空内置分组失败: %v", err)
-				// 不中断事务，继续执行
-			} else {
-				log.Infof("清理了 %d 个空内置分组: %v", len(emptyBuiltInGroups), groupNames)
+			// keep reserved package buckets even if empty after delete (sync will refill)
+			if g.GroupName == schema.SyntaxFlowPackageBuiltin || g.GroupName == schema.SyntaxFlowPackageAgent {
+				continue
+			}
+			if err := tx.Where("id = ?", g.ID).Unscoped().Delete(&schema.SyntaxFlowGroup{}).Error; err != nil {
+				log.Errorf("delete empty builtin group %s failed: %v", g.GroupName, err)
 			}
 		}
-
 		return nil
 	})
 }
@@ -252,7 +231,8 @@ func CreateRuleByContentExWithDBAndPackage(db *gorm.DB, ruleFileName string, con
 			packageName = schema.SyntaxFlowPackageCustom
 		}
 	}
-	rule.PackageName = packageName
+	rule.RuleGroup = packageName
+	_ = GetOrCreateGroups(db, []string{packageName})
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersionFromEmbed(rule.RuleId)
 	if err == nil {
@@ -300,8 +280,7 @@ func CreateRuleByContentExWithDBAndPackage(db *gorm.DB, ruleFileName string, con
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")
 	}
-	// Groups are deprecated: do not auto-attach language/severity/purpose/OWASP groups.
-	db.Where("rule_name = ?", rule.RuleName).Preload("Groups").First(&rule)
+	db.Where("rule_name = ?", rule.RuleName).First(&rule)
 	return rule, nil
 }
 
@@ -463,7 +442,7 @@ func YieldSyntaxFlowRulesWithoutLib(db *gorm.DB, ctx context.Context) chan *sche
 
 func QueryRuleByRuleId(db *gorm.DB, ruleId string) (*schema.SyntaxFlowRule, error) {
 	var rule schema.SyntaxFlowRule
-	if err := db.Preload("Groups").Where("rule_id = ?", ruleId).First(&rule).Error; err != nil {
+	if err := db.Where("rule_id = ?", ruleId).First(&rule).Error; err != nil {
 		return nil, err
 	}
 	return &rule, nil
@@ -471,7 +450,7 @@ func QueryRuleByRuleId(db *gorm.DB, ruleId string) (*schema.SyntaxFlowRule, erro
 
 func QueryRuleByName(db *gorm.DB, ruleName string) (*schema.SyntaxFlowRule, error) {
 	var rule schema.SyntaxFlowRule
-	if err := db.Preload("Groups").Where("rule_name = ?", ruleName).First(&rule).Error; err != nil {
+	if err := db.Where("rule_name = ?", ruleName).First(&rule).Error; err != nil {
 		return nil, err
 	}
 	return &rule, nil
@@ -479,7 +458,7 @@ func QueryRuleByName(db *gorm.DB, ruleName string) (*schema.SyntaxFlowRule, erro
 
 func QueryRulesByName(db *gorm.DB, ruleNames []string) ([]*schema.SyntaxFlowRule, error) {
 	var rules []*schema.SyntaxFlowRule
-	if err := db.Preload("Groups").Where("rule_name IN (?)", ruleNames).Find(&rules).Error; err != nil {
+	if err := db.Where("rule_name IN (?)", ruleNames).Find(&rules).Error; err != nil {
 		return nil, err
 	}
 	return rules, nil
@@ -487,7 +466,7 @@ func QueryRulesByName(db *gorm.DB, ruleNames []string) ([]*schema.SyntaxFlowRule
 
 func QueryRulesById(db *gorm.DB, ruleIds []string) ([]*schema.SyntaxFlowRule, error) {
 	var rules []*schema.SyntaxFlowRule
-	if err := db.Preload("Groups").Where("rule_id IN (?)", ruleIds).Find(&rules).Error; err != nil {
+	if err := db.Where("rule_id IN (?)", ruleIds).Find(&rules).Error; err != nil {
 		return nil, err
 	}
 	return rules, nil
@@ -522,7 +501,7 @@ func QueryGroupByRuleIds(db *gorm.DB, RuleIds []string) ([]*schema.SyntaxFlowGro
 	}
 	var groups []*schema.SyntaxFlowGroup
 	for _, rule := range rules {
-		groups = append(groups, rule.Groups...)
+		groups = append(groups, groupFromRule(db, rule)...)
 	}
 	return groups, nil
 }
@@ -536,17 +515,19 @@ func createRuleEx(rule *schema.SyntaxFlowRule, needDefaultGroup bool, groups ...
 	}
 	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowRule{})
-	// 只是创建规则而不带着组去创建，后续再添加组。
-	// 因为多对多的表直接创建会导致和该组相关的规则都被更新。
-	backUp := lo.Map(rule.Groups, func(group *schema.SyntaxFlowGroup, _ int) string {
-		return group.GroupName
-	})
-	groups = append(groups, backUp...)
-	rule.Groups = nil
+	if rule.RuleGroup != "" {
+		groups = append(groups, rule.RuleGroup)
+	}
+	if exclusive := pickExclusiveGroup(groups); exclusive != "" {
+		rule.RuleGroup = exclusive
+	} else if rule.RuleGroup == "" {
+		rule.RuleGroup = schema.SyntaxFlowPackageCustom
+	}
 	if err := db.Create(&rule).Error; err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
-	addGroupsForRule(db, rule, needDefaultGroup, groups...)
+	_ = GetOrCreateGroups(db, []string{rule.RuleGroup})
+	_ = needDefaultGroup // abandoned language/severity/purpose auto-groups
 	return rule, nil
 }
 
@@ -567,17 +548,19 @@ func CreateOrUpdateRuleWithGroup(rule *schema.SyntaxFlowRule, groups ...string) 
 	}
 	db := consts.GetGormProfileDatabase()
 	db = db.Model(&schema.SyntaxFlowRule{})
-	// 只是创建规则而不带着组去创建，后续再添加组。
-	// 因为多对多的表直接创建会导致和该组相关的规则都被更新。
-	backUp := lo.Map(rule.Groups, func(group *schema.SyntaxFlowGroup, _ int) string {
-		return group.GroupName
-	})
-	groups = append(groups, backUp...)
-	rule.Groups = nil
+	if rule.RuleGroup != "" {
+		groups = append(groups, rule.RuleGroup)
+	}
+	if exclusive := pickExclusiveGroup(groups); exclusive != "" {
+		rule.RuleGroup = exclusive
+	} else if rule.RuleGroup == "" {
+		rule.RuleGroup = schema.SyntaxFlowPackageCustom
+	}
 	if err := CreateOrUpdateSyntaxFlowRule(db, rule.RuleName, &rule); err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
-	CreateOrUpdateGroupsForRule(db, rule, groups...)
+	_ = GetOrCreateGroups(db, []string{rule.RuleGroup})
+	db.Where("rule_name = ?", rule.RuleName).First(&rule)
 	return rule, nil
 }
 

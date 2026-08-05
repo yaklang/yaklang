@@ -1,9 +1,27 @@
 # SyntaxFlow 规则包（Rule Package）设计
 
-状态：Accepted（grilling 2026-07-24）  
+状态：Accepted（grilling 2026-07-24）→ **实现枢轴 2026-08-03**  
 范围：后端一个大 PR（yaklang schema / sfdb / sync / policy / grpc / cli）；前端另开 PR，本文给出详细前端计划，**不写前端代码**。
 
-验证时间：2026-07-24T22:57:31+08:00
+验证时间：2026-08-03T16:35:22+08:00
+
+---
+
+## 0. 实现枢轴（相对原稿）
+
+原稿引入独立 `SyntaxFlowPackage` 表。落地时改为：
+
+| 能力 | 实现 |
+|------|------|
+| **包桶（互斥归属）** | `SyntaxFlowRule.RuleGroup`（列 `rule_group`）：`builtin` / `agent` / `custom` / `imported-*` |
+| **组目录** | `SyntaxFlowGroup` 保留为 catalog（可带 Version/Description/Source）；**去掉** many2many |
+| **旧中间表** | `syntax_flow_rule_and_group` **闲置不删**（旧库软兼容；新库不再写入） |
+| **旧 `package_name` 列** | 闲置不迁数据；新字段 `rule_group` 由 AutoMigrate 添加 |
+| **Package gRPC/CLI** | **软兼容保留**：底层落到 Group catalog + `RuleGroup` |
+| **分类** | 原子 `Tags` + 列字段；不再自动挂语言/等级/用途组 |
+| **Policy** | 仍为预设 Filter（Tag/列）；可跨包桶 |
+
+Wire 兼容：`SyntaxFlowRule.GroupName` 仍为 `repeated`，实际长度 ≤ 1；`PackageName` 镜像 `RuleGroup`。
 
 ---
 
@@ -37,12 +55,13 @@ Package ──1:N──► Rule ──N:M──► Tag（原子短标）
                    Policy（预设 Filter；可跨 Package）
 ```
 
-### 2.1 Package（分发单元）
+### 2.1 Package（分发单元）→ 落地为 RuleGroup
 
-- **互斥归属**：一条规则只属于一个 Package；跨包 `RuleId` 与 `RuleName` 均全局唯一。
-- **职责**：导入、导出、online 下载/上传、内置 sync 的单位。
-- **不负责**：扫描隔离。多包可同时被同一 Policy 命中（互补规则一起工作）。
-- **版本**：包级 **semver** 作为「是否进入更新」的闸门；细则用规则自身 `Version`。
+- **存储**：`Rule.RuleGroup` 标量字段（互斥）；不再使用独立 Package 表。
+- **目录**：`SyntaxFlowGroup` 记录已知桶名及元数据（version/description/source）。
+- **职责**：导入、导出、online 下载/上传、内置 sync 的单位（RPC 名仍叫 Package）。
+- **不负责**：扫描隔离。多桶可同时被同一 Policy 命中。
+- **版本**：包级 **semver** 存在 Group catalog；细则用规则自身 `Version`。
 - **升级语义**：
   - 包 semver 更新 → 进入同步；
   - 同 `RuleId` + 同 `RuleName` 且规则 Version 更高 → 更新；
@@ -51,20 +70,20 @@ Package ──1:N──► Rule ──N:M──► Tag（原子短标）
 - **来源**：
   - 内置：`builtin`、`agent`（embed 同级目录）；
   - 外部：online / 本地 zip（同格式）；
-  - 用户：默认 `custom`（可改名；可再建用户包）；
-  - 无 `package.yaml` 的旧 ZIP：每次导入一个独立包（用户命名或 `imported-<timestamp>`）。
+  - 用户：默认 `custom`（可改名；可再建用户桶）；
+  - 无 `package.yaml` 的旧 ZIP：每次导入一个独立桶（用户命名或 `imported-<timestamp>`）。
 
 ### 2.2 Rule
 
-保持现有核心字段，新增：
+保持现有核心字段，关键：
 
 | 字段 | 说明 |
 |------|------|
-| `PackageName` | 所属包名（索引） |
+| `RuleGroup` | 所属包桶（索引列 `rule_group`）；替代 many2many Groups |
 | `Tags` | 原子 Tag 列表（结构化；替代路径 `|` 串的主用途） |
 | `Language` / `Severity` / `Purpose` / `CWE` | **继续用列字段**；不再镜像进 Tag |
 
-兼容：短期内可保留旧列 `Tag string`（路径遗留），读写以 `Tags` 为准；迁移完成后可弃用。
+兼容：短期内可保留旧列 `Tag string`（路径遗留），读写以 `Tags` 为准；旧 `package_name` 列与 join 表闲置。
 
 ### 2.3 Tag（原子短标）
 

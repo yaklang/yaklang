@@ -37,12 +37,12 @@ func TestPackageNeedsUpdate(t *testing.T) {
 
 func TestGetOrCreatePackageAndConflict(t *testing.T) {
 	db := consts.GetGormProfileDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.SyntaxFlowPackage{}, &schema.SyntaxFlowRule{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.SyntaxFlowGroup{}, &schema.SyntaxFlowRule{}).Error)
 
 	pkgName := "pkg-" + uuid.NewString()
 	pkg, err := GetOrCreatePackage(db, pkgName, "0.1.0", "test", schema.SyntaxFlowPackageSourceUser, false)
 	require.NoError(t, err)
-	require.Equal(t, pkgName, pkg.Name)
+	require.Equal(t, pkgName, pkg.GroupName)
 	t.Cleanup(func() {
 		_ = DeletePackage(db, pkgName, true)
 	})
@@ -50,11 +50,11 @@ func TestGetOrCreatePackageAndConflict(t *testing.T) {
 	ruleID := uuid.NewString()
 	ruleName := "rule-" + uuid.NewString()
 	rule := &schema.SyntaxFlowRule{
-		RuleId:      ruleID,
-		RuleName:    ruleName,
-		Content:     "desc(title: x)\na",
-		PackageName: pkgName,
-		Version:     "1",
+		RuleId:    ruleID,
+		RuleName:  ruleName,
+		Content:   "desc(title: x)\na",
+		RuleGroup: pkgName,
+		Version:   "1",
 	}
 	require.NoError(t, db.Create(rule).Error)
 

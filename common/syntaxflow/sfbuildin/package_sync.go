@@ -83,7 +83,7 @@ func prunePackageRulesNotInManifest(db *gorm.DB, meta *sfdb.PackageYAML) error {
 		return nil
 	}
 	var existing []*schema.SyntaxFlowRule
-	if err := db.Where("package_name = ?", meta.Name).Find(&existing).Error; err != nil {
+	if err := db.Where("rule_group = ?", meta.Name).Find(&existing).Error; err != nil {
 		return err
 	}
 	for _, r := range existing {

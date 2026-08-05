@@ -3,6 +3,7 @@ package yakit
 import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -13,12 +14,12 @@ type GroupAndRuleCount struct {
 	Count     int64
 }
 
-// QuerySyntaxFlowRuleGroup 查询规则组中相关规则的个数
+// QuerySyntaxFlowRuleGroup 查询规则组目录；Count 来自 Rule.RuleGroup。
 func QuerySyntaxFlowRuleGroup(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleGroupRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowGroup, error) {
 	if params == nil {
 		return nil, nil, utils.Error("query syntax flow rule group failed: request is nil")
 	}
-	db = db.Model(&schema.SyntaxFlowGroup{}).Preload("Rules")
+	db = db.Model(&schema.SyntaxFlowGroup{})
 	p := params.Pagination
 	if p == nil {
 		p = &ypb.Paging{
@@ -72,4 +73,13 @@ func QuerySyntaxFlowGroupCount(db *gorm.DB, groupNames []string) int64 {
 	var count int64
 	db.Where("group_name IN (?)", groupNames).Count(&count)
 	return count
+}
+
+// AttachGroupRuleCounts fills ToGRPC Count from Rule.RuleGroup.
+func AttachGroupRuleCounts(db *gorm.DB, groups []*schema.SyntaxFlowGroup) []*ypb.SyntaxFlowGroup {
+	out := make([]*ypb.SyntaxFlowGroup, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, g.ToGRPCModelWithCount(int32(sfdb.CountRulesInGroup(db, g.GroupName))))
+	}
+	return out
 }

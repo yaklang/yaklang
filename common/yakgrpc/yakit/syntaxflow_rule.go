@@ -110,11 +110,11 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 		return db
 	}
 
-	if len(filter.GetGroupNames()) > 0 {
-		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
-			Joins("JOIN syntax_flow_groups ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
-			Where("syntax_flow_groups.group_name IN (?)", filter.GetGroupNames()).
-			Group("syntax_flow_rules.id")
+	if len(filter.GetGroupNames()) > 0 || len(filter.GetPackageNames()) > 0 {
+		names := append([]string{}, filter.GetGroupNames()...)
+		names = append(names, filter.GetPackageNames()...)
+		names = utils.RemoveRepeatedWithStringSlice(names)
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_group", names)
 	}
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", filter.GetIds())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_id", filter.GetRuleIds())
@@ -144,7 +144,8 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 		// Tags are stored in tags (comma) and mirrored to tag (pipe); match substring.
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"syntax_flow_rules.tags", "syntax_flow_rules.tag"}, filter.GetTag(), false)
 	}
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "package_name", filter.GetPackageNames())
+	// PackageNames already merged into rule_group filter above when present alone;
+	// keep no-op here for callers that only set PackageNames (handled in GroupNames block).
 	//if !params.GetIncludeLibraryRule() {
 	//	db = db.Where("allow_included = ?", false)
 	//}
@@ -191,7 +192,6 @@ func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*
 	db = bizhelper.OrderByPaging(db, p)
 	db = FilterSyntaxFlowRule(db, params.GetFilter())
 	var ret []*schema.SyntaxFlowRule
-	db = db.Preload("Groups")
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -285,11 +285,23 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
 	updateRule.NeedUpdate = true
 
-	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
-	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
-		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	if pkg := strings.TrimSpace(rule.GetPackageName()); pkg != "" {
+		updateRule.RuleGroup = pkg
+	} else if len(rule.GetGroupNames()) > 0 {
+		var exclusive string
+		for _, g := range rule.GetGroupNames() {
+			if g != "" {
+				exclusive = g
+			}
+		}
+		if exclusive != "" {
+			updateRule.RuleGroup = exclusive
+		}
 	}
-	if err := db.Model(&updateRule).Association("Groups").Replace(groups).Error; err != nil {
+	if updateRule.RuleGroup != "" {
+		_ = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), []string{updateRule.RuleGroup})
+	}
+	if err := db.Model(&schema.SyntaxFlowRule{}).Where("id = ?", updateRule.ID).Updates(updateRule).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	return updateRule, nil
@@ -298,16 +310,19 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowGroup, error) {
 	db = FilterSyntaxFlowRule(db, req)
 	var rules []*schema.SyntaxFlowRule
-	err := db.Model(&schema.SyntaxFlowRule{}).Preload("Groups").Find(&rules).Error
+	err := db.Model(&schema.SyntaxFlowRule{}).Find(&rules).Error
 	if err != nil {
 		return nil, err
 	}
-	var groups [][]*schema.SyntaxFlowGroup
-	for _, rule := range rules {
-		groups = append(groups, rule.Groups)
+	if len(rules) == 0 {
+		return nil, nil
 	}
 	if len(rules) == 1 {
-		return rules[0].Groups, nil
+		return sfdb.GroupsForRule(consts.GetGormProfileDatabase(), rules[0]), nil
+	}
+	var groups [][]*schema.SyntaxFlowGroup
+	for _, rule := range rules {
+		groups = append(groups, sfdb.GroupsForRule(consts.GetGormProfileDatabase(), rule))
 	}
 	return sfdb.GetIntersectionGroup(consts.GetGormProfileDatabase(), groups), nil
 }
@@ -389,7 +404,6 @@ func AllSyntaxFlowRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.Sy
 	db = db.Model(&schema.SyntaxFlowRule{})
 	db = FilterSyntaxFlowRule(db, req)
 	var ret []*schema.SyntaxFlowRule
-	db = db.Preload("Groups")
 	if err := db.Find(&ret).Error; err != nil {
 		return nil, utils.Errorf("query failed: %s", err)
 	}

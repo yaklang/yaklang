@@ -167,13 +167,13 @@ func TestQuerySyntaxFlowRule_WithGroupAndRuleNames(t *testing.T) {
 		Content:  "println as $output",
 	})
 	rule := &schema.SyntaxFlowRule{
-		RuleName: ruleName,
-		TitleZh:  "审计Golang HTTP输入点",
-		Language: ssaconfig.GO,
-		Content:  "println as $output",
+		RuleName:  ruleName,
+		TitleZh:   "审计Golang HTTP输入点",
+		Language:  ssaconfig.GO,
+		Content:   "println as $output",
+		RuleGroup: groupName,
 	}
 	require.NoError(t, db.Create(rule).Error)
-	require.NoError(t, db.Model(rule).Association("Groups").Append(group).Error)
 
 	requireSingleRuleNamed(t, querySyntaxFlowRules(t, db, &ypb.SyntaxFlowRuleFilter{
 		GroupNames: []string{groupName},

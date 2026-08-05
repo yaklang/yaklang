@@ -85,9 +85,9 @@ func ExportRulesToZip(ctx context.Context, db *gorm.DB, targetPath string, opts 
 		opt(config)
 	}
 
-	// 获取规则-组关系（独立查询）
+	// 获取规则-组关系（独立查询；单组字段 RuleGroup）
 	var rules []*schema.SyntaxFlowRule
-	ruleGroupDB := db.Select(`"syntax_flow_rules".id, "syntax_flow_rules".rule_id`).Preload("Groups")
+	ruleGroupDB := db.Select(`"syntax_flow_rules".id, "syntax_flow_rules".rule_id, "syntax_flow_rules".rule_group`)
 	if err := ruleGroupDB.Find(&rules).Error; err != nil {
 		return nil, utils.Wrap(err, "get syntax flow groups failed")
 	}
@@ -95,9 +95,10 @@ func ExportRulesToZip(ctx context.Context, db *gorm.DB, targetPath string, opts 
 	// 构建元数据
 	metadata := make(bizhelper.MetaData)
 	metadata["relationship"] = lo.Map(rules, func(item *schema.SyntaxFlowRule, index int) map[string]any {
-		groupNames := lo.Map(item.Groups, func(g *schema.SyntaxFlowGroup, _ int) string {
-			return g.GroupName
-		})
+		groupNames := []string{}
+		if item.RuleGroup != "" {
+			groupNames = []string{item.RuleGroup}
+		}
 		return map[string]any{
 			"rule_id":     item.RuleId,
 			"group_names": groupNames,
@@ -297,22 +298,18 @@ func restoreRuleGroups(db *gorm.DB, metadata bizhelper.MetaData) error {
 		groupNames := lo.Map(iGroupNames, func(item any, _ int) string {
 			return utils.InterfaceToString(item)
 		})
-
-		groups := GetOrCreateGroups(db, groupNames)
+		exclusive := pickExclusiveGroup(groupNames)
+		if exclusive == "" {
+			continue
+		}
+		_ = GetOrCreateGroups(db, []string{exclusive})
 		rules, err := QueryRulesById(db, []string{ruleId})
 		if err != nil {
 			return utils.Wrap(err, "query rules by id failed")
 		}
-
-		if len(rules) == 0 {
-			continue
-		}
-
-		if len(groups) > 0 && len(rules) > 0 {
-			for _, rule := range rules {
-				if err := db.Model(rule).Association("Groups").Append(groups).Error; err != nil {
-					return utils.Wrapf(err, "append groups to rule %s failed", ruleId)
-				}
+		for _, rule := range rules {
+			if err := db.Model(rule).Update("rule_group", exclusive).Error; err != nil {
+				return utils.Wrapf(err, "set rule_group on rule %s failed", ruleId)
 			}
 		}
 	}

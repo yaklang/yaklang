@@ -323,8 +323,10 @@ type SyntaxFlowRule struct {
 	// 不含 language / severity / purpose（这些用列字段）。
 	Tags StringArray `gorm:"type:text" json:"tags"`
 
-	// PackageName 所属规则包（互斥归属）
-	PackageName string `gorm:"index" json:"package_name"`
+	// RuleGroup 规则所属的唯一分组（规则包桶）：builtin / agent / custom / imported-*
+	// 替代原 many2many Groups；旧中间表 syntax_flow_rule_and_group 保留但不再写入。
+	// 列名 rule_group 为新列，AutoMigrate 自动添加；旧 package_name 列闲置不迁数据。
+	RuleGroup string `gorm:"index;column:rule_group" json:"rule_group"`
 
 	// CWE 通用弱点枚举列表
 	// Common Weakness Enumeration，如 ["CWE-89", "CWE-564"]
@@ -405,20 +407,13 @@ type SyntaxFlowRule struct {
 	// OpCodes 操作码（本地使用）
 	// 编译后的字节码或中间表示，用于优化执行性能
 	OpCodes string
-
-	// ============ 关联关系 ============
-
-	// Groups 规则所属的分组列表
-	// 多对多关系，一个规则可以属于多个分组
-	// 通过中间表 syntax_flow_rule_and_group 关联
-	Groups []*SyntaxFlowGroup `gorm:"many2many:syntax_flow_rule_and_group;"`
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {
 	// 注意：不包含 OpCodes，因为 OpCodes 是编译后的派生数据，不应该影响规则的 hash
 	// 如果包含 OpCodes，即使规则内容没有改变，hash 也会因为编译器版本、编译时间等因素而改变
 	s.SyncLegacyTagField()
-	s.Hash = utils.CalcSha256(s.RuleId, s.RuleName, s.Content, s.Tag, s.PackageName)
+	s.Hash = utils.CalcSha256(s.RuleId, s.RuleName, s.Content, s.Tag, s.RuleGroup)
 	return s.Hash
 }
 
@@ -459,8 +454,8 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
 	}
-	if s.PackageName == "" {
-		s.PackageName = SyntaxFlowPackageCustom
+	if s.RuleGroup == "" {
+		s.RuleGroup = SyntaxFlowPackageCustom
 	}
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
@@ -473,8 +468,8 @@ func (s *SyntaxFlowRule) BeforeCreate() error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
 	}
-	if s.PackageName == "" {
-		s.PackageName = SyntaxFlowPackageCustom
+	if s.RuleGroup == "" {
+		s.RuleGroup = SyntaxFlowPackageCustom
 	}
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
@@ -510,9 +505,10 @@ func (s *SyntaxFlowRule) GetInfo() *SyntaxFlowDescInfo {
 }
 
 func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
-	groupNames := make([]string, 0, len(s.Groups))
-	for _, group := range s.Groups {
-		groupNames = append(groupNames, group.GroupName)
+	// Soft wire: GroupName stays repeated (len<=1); PackageName mirrors RuleGroup.
+	groupNames := []string{}
+	if s.RuleGroup != "" {
+		groupNames = []string{s.RuleGroup}
 	}
 	alertmsg := make(map[string]*ypb.AlertMessage)
 	for name, info := range s.AlertDesc {
@@ -551,7 +547,7 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 		Hash:          s.Hash,
 		Tag:           s.Tag,
 		Tags:          s.GetAtomicTags(),
-		PackageName:   s.PackageName,
+		PackageName:   s.RuleGroup,
 		RuleId:        s.RuleId,
 		Version:       s.Version,
 		GroupName:     groupNames,

@@ -15,11 +15,11 @@ import (
 
 // PackageYAML is the on-disk / zip manifest (docs/design/rule-package.md).
 type PackageYAML struct {
-	Name        string              `yaml:"name" json:"name"`
-	Version     string              `yaml:"version" json:"version"`
-	Description string              `yaml:"description" json:"description"`
-	Source      string              `yaml:"source" json:"source"`
-	Rules       []PackageYAMLRule   `yaml:"rules" json:"rules"`
+	Name        string            `yaml:"name" json:"name"`
+	Version     string            `yaml:"version" json:"version"`
+	Description string            `yaml:"description" json:"description"`
+	Source      string            `yaml:"source" json:"source"`
+	Rules       []PackageYAMLRule `yaml:"rules" json:"rules"`
 }
 
 // PackageYAMLRule is one rule entry in package.yaml.
@@ -32,12 +32,12 @@ type PackageYAMLRule struct {
 
 // PackageConflict describes a dual-key mismatch during import/sync.
 type PackageConflict struct {
-	RuleID         string
-	RuleName       string
-	LocalVersion   string
-	RemoteVersion  string
-	Reason         string
-	PackageName    string
+	RuleID        string
+	RuleName      string
+	LocalVersion  string
+	RemoteVersion string
+	Reason        string
+	PackageName   string
 }
 
 const (
@@ -98,8 +98,9 @@ func WritePackageYAML(dir string, meta *PackageYAML) error {
 	return os.WriteFile(filepath.Join(dir, "package.yaml"), raw, 0o644)
 }
 
-// GetOrCreatePackage ensures a package row exists.
-func GetOrCreatePackage(db *gorm.DB, name, version, description, source string, builtin bool) (*schema.SyntaxFlowPackage, error) {
+// GetOrCreatePackage ensures a SyntaxFlowGroup catalog entry for the package bucket.
+// Soft-compat: Package RPCs are backed by groups + Rule.RuleGroup (no SyntaxFlowPackage table).
+func GetOrCreatePackage(db *gorm.DB, name, version, description, source string, builtin bool) (*schema.SyntaxFlowGroup, error) {
 	if db == nil {
 		return nil, utils.Error("db is nil")
 	}
@@ -107,34 +108,36 @@ func GetOrCreatePackage(db *gorm.DB, name, version, description, source string, 
 	if name == "" {
 		return nil, utils.Error("package name is empty")
 	}
-	var pkg schema.SyntaxFlowPackage
-	err := db.Where("name = ?", name).First(&pkg).Error
-	if err == nil {
+	if !builtin {
+		builtin = isBuildInGroup(name)
+	}
+	group, err := QueryGroupByName(db, name)
+	if err == nil && group != nil {
 		changed := false
-		if version != "" && pkg.Version != version {
-			pkg.Version = version
+		if version != "" && group.Version != version {
+			group.Version = version
 			changed = true
 		}
-		if description != "" && pkg.Description != description {
-			pkg.Description = description
+		if description != "" && group.Description != description {
+			group.Description = description
 			changed = true
 		}
-		if source != "" && pkg.Source != source {
-			pkg.Source = source
+		if source != "" && group.Source != source {
+			group.Source = source
 			changed = true
 		}
-		if pkg.IsBuiltin != builtin {
-			pkg.IsBuiltin = builtin
+		if group.IsBuildIn != builtin {
+			group.IsBuildIn = builtin
 			changed = true
 		}
 		if changed {
-			if err := db.Save(&pkg).Error; err != nil {
+			if err := db.Save(group).Error; err != nil {
 				return nil, err
 			}
 		}
-		return &pkg, nil
+		return group, nil
 	}
-	if !gorm.IsRecordNotFoundError(err) {
+	if !errorsIsRecordNotFound(err) {
 		return nil, err
 	}
 	if version == "" {
@@ -147,79 +150,76 @@ func GetOrCreatePackage(db *gorm.DB, name, version, description, source string, 
 			source = schema.SyntaxFlowPackageSourceUser
 		}
 	}
-	pkg = schema.SyntaxFlowPackage{
-		Name:        name,
+	group = &schema.SyntaxFlowGroup{
+		GroupName:   name,
 		Version:     version,
 		Description: description,
 		Source:      source,
-		IsBuiltin:   builtin,
+		IsBuildIn:   builtin,
 	}
-	if err := db.Create(&pkg).Error; err != nil {
+	if err := db.Create(group).Error; err != nil {
 		return nil, err
 	}
-	return &pkg, nil
+	return group, nil
 }
 
-// QueryPackageByName returns a package by name.
-func QueryPackageByName(db *gorm.DB, name string) (*schema.SyntaxFlowPackage, error) {
-	var pkg schema.SyntaxFlowPackage
-	if err := db.Where("name = ?", name).First(&pkg).Error; err != nil {
-		return nil, err
-	}
-	return &pkg, nil
+func errorsIsRecordNotFound(err error) bool {
+	return err != nil && gorm.IsRecordNotFoundError(err)
 }
 
-// CountRulesInPackage counts rules belonging to a package.
+// QueryPackageByName returns the catalog group used as a package bucket.
+func QueryPackageByName(db *gorm.DB, name string) (*schema.SyntaxFlowGroup, error) {
+	return QueryGroupByName(db, name)
+}
+
+// CountRulesInPackage counts rules whose RuleGroup equals packageName.
 func CountRulesInPackage(db *gorm.DB, packageName string) int64 {
-	var count int64
-	db.Model(&schema.SyntaxFlowRule{}).Where("package_name = ?", packageName).Count(&count)
-	return count
+	return CountRulesInGroup(db, packageName)
 }
 
-// FilterSyntaxFlowPackages applies package filter.
+// FilterSyntaxFlowPackages filters the group catalog (package buckets).
 func FilterSyntaxFlowPackages(db *gorm.DB, names, sources []string, keyword, builtinKind string) *gorm.DB {
-	db = db.Model(&schema.SyntaxFlowPackage{})
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "name", names)
+	db = db.Model(&schema.SyntaxFlowGroup{})
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "group_name", names)
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "source", sources)
 	if keyword != "" {
-		db = bizhelper.FuzzSearch(db, []string{"name", "description"}, keyword)
+		db = bizhelper.FuzzSearch(db, []string{"group_name", "description"}, keyword)
 	}
 	switch strings.ToLower(builtinKind) {
 	case "builtin", "buildin", "true":
-		db = db.Where("is_builtin = ?", true)
+		db = db.Where("is_build_in = ?", true)
 	case "unbuiltin", "unbuildin", "false":
-		db = db.Where("is_builtin = ?", false)
+		db = db.Where("is_build_in = ?", false)
 	}
 	return db
 }
 
-// DeletePackage deletes a package row; optionally deletes its rules.
+// DeletePackage deletes a non-builtin package bucket; optionally deletes its rules.
 func DeletePackage(db *gorm.DB, name string, deleteRules bool) error {
 	pkg, err := QueryPackageByName(db, name)
 	if err != nil {
 		return err
 	}
-	if pkg.IsBuiltin {
+	if pkg.IsBuildIn || name == schema.SyntaxFlowPackageBuiltin || name == schema.SyntaxFlowPackageAgent {
 		return utils.Errorf("cannot delete builtin package: %s", name)
 	}
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
 		if deleteRules {
-			if err := tx.Where("package_name = ?", name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
+			if err := tx.Where("rule_group = ?", name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
 				return err
 			}
 		} else {
-			// orphan rules → custom
-			if err := tx.Model(&schema.SyntaxFlowRule{}).Where("package_name = ?", name).
-				Update("package_name", schema.SyntaxFlowPackageCustom).Error; err != nil {
+			if err := tx.Model(&schema.SyntaxFlowRule{}).Where("rule_group = ?", name).
+				Update("rule_group", schema.SyntaxFlowPackageCustom).Error; err != nil {
 				return err
 			}
+			_ = GetOrCreateGroups(tx, []string{schema.SyntaxFlowPackageCustom})
 		}
-		return tx.Unscoped().Where("name = ?", name).Delete(&schema.SyntaxFlowPackage{}).Error
+		return tx.Unscoped().Where("group_name = ?", name).Delete(&schema.SyntaxFlowGroup{}).Error
 	})
 }
 
 // CheckRulePackageIdentityConflict checks dual-key uniqueness against DB for an incoming rule.
-// Returns nil if safe to insert/update by matching both keys; otherwise a conflict.
 func CheckRulePackageIdentityConflict(db *gorm.DB, packageName, ruleID, ruleName, remoteVersion string) *PackageConflict {
 	if ruleID == "" && ruleName == "" {
 		return nil
@@ -237,10 +237,8 @@ func CheckRulePackageIdentityConflict(db *gorm.DB, packageName, ruleID, ruleName
 	}
 	if idFound && nameFound {
 		if byID.ID == byName.ID {
-			// same row: ok to version-update
 			return nil
 		}
-		// two different rows — severe inconsistency
 		return &PackageConflict{
 			RuleID:        ruleID,
 			RuleName:      ruleName,
@@ -284,7 +282,6 @@ func PackageNeedsUpdate(localVersion, remoteVersion string) bool {
 	if localVersion == remoteVersion {
 		return false
 	}
-	// CheckNewerVersion(base, check) == true means base > check (local newer).
 	return !CheckNewerVersion(localVersion, remoteVersion)
 }
 
@@ -295,11 +292,11 @@ func BuildPackageYAMLFromDB(db *gorm.DB, packageName string) (*PackageYAML, erro
 		return nil, err
 	}
 	var rules []*schema.SyntaxFlowRule
-	if err := db.Where("package_name = ?", packageName).Find(&rules).Error; err != nil {
+	if err := db.Where("rule_group = ?", packageName).Find(&rules).Error; err != nil {
 		return nil, err
 	}
 	meta := &PackageYAML{
-		Name:        pkg.Name,
+		Name:        pkg.GroupName,
 		Version:     pkg.Version,
 		Description: pkg.Description,
 		Source:      pkg.Source,
@@ -315,8 +312,8 @@ func BuildPackageYAMLFromDB(db *gorm.DB, packageName string) (*PackageYAML, erro
 	return meta, nil
 }
 
-// EnsureCustomPackage creates the default user package if missing.
-func EnsureCustomPackage(db *gorm.DB) (*schema.SyntaxFlowPackage, error) {
+// EnsureCustomPackage creates the default user package bucket if missing.
+func EnsureCustomPackage(db *gorm.DB) (*schema.SyntaxFlowGroup, error) {
 	return GetOrCreatePackage(db, schema.SyntaxFlowPackageCustom, "0.1.0", "User local rules", schema.SyntaxFlowPackageSourceUser, false)
 }
 

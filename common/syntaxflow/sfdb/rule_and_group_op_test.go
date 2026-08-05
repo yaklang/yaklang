@@ -1,14 +1,12 @@
 package sfdb
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -23,27 +21,22 @@ func RemoveGroupForRule(db *gorm.DB, ruleName, groupName string) error {
 }
 
 func GetRuleCountByGroupName(db *gorm.DB, groupName ...string) int32 {
-	db = db.Model(&schema.SyntaxFlowGroup{})
+	var count int64
 	if len(groupName) == 1 {
-		var group schema.SyntaxFlowGroup
-		db.Preload("Rules").Where("group_name = ?", groupName).First(&group)
-		return int32(len(group.Rules))
-	} else {
-		var groups []schema.SyntaxFlowGroup
-		db.Preload("Rules").Where("group_name IN (?)", groupName).Find(&groups)
-		var count int32
-		for _, group := range groups {
-			count += int32(len(group.Rules))
-		}
-		return count
+		db.Model(&schema.SyntaxFlowRule{}).Where("rule_group = ?", groupName[0]).Count(&count)
+		return int32(count)
 	}
+	db.Model(&schema.SyntaxFlowRule{}).Where("rule_group IN (?)", groupName).Count(&count)
+	return int32(count)
 }
 
 func GetGroupCountByRuleName(db *gorm.DB, ruleName string) int32 {
-	db = db.Model(&schema.SyntaxFlowRule{})
 	var rule schema.SyntaxFlowRule
-	db.Preload("Groups").Where("rule_name = ?", ruleName).First(&rule)
-	return int32(len(rule.Groups))
+	db.Model(&schema.SyntaxFlowRule{}).Where("rule_name = ?", ruleName).First(&rule)
+	if rule.RuleGroup == "" {
+		return 0
+	}
+	return 1
 }
 
 func TestRule_OP(t *testing.T) {
@@ -134,12 +127,14 @@ func TestRule_Group_OP(t *testing.T) {
 
 		gotRule, err := QueryRuleByName(db, ruleName)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(gotRule.Groups))
+		// one-group model: second add replaces the first
+		require.Equal(t, newGroupName, gotRule.RuleGroup)
+		require.Equal(t, int32(0), GetRuleCountByGroupName(db, groupName))
 
-		// remove rule from group
-		err = RemoveGroupForRule(db, ruleName, groupName)
+		// remove current group → custom
+		err = RemoveGroupForRule(db, ruleName, newGroupName)
 		require.NoError(t, err)
-		require.Equal(t, int32(1), GetGroupCountByRuleName(db, ruleName))
+		require.Equal(t, schema.SyntaxFlowPackageCustom, mustRuleGroup(t, db, ruleName))
 	})
 
 	t.Run("test create and delete group for rule", func(t *testing.T) {
@@ -162,13 +157,13 @@ func TestRule_Group_OP(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, int32(1), GetRuleCountByGroupName(db, groupName))
 
-		// delete group
+		// delete catalog group only; rule_group scalar remains until cleared
 		err = DeleteGroup(db, groupName)
 		require.NoError(t, err)
 
 		queryRule, err := QueryRuleByName(db, ruleName)
 		require.NoError(t, err)
-		require.Equal(t, 0, len(queryRule.Groups))
+		require.Equal(t, groupName, queryRule.RuleGroup)
 	})
 	t.Run("test GetIntersectionGroup", func(t *testing.T) {
 		groupA, err := CreateGroup(db, uuid.NewString())
@@ -255,11 +250,16 @@ func TestRule_Group_OP(t *testing.T) {
 		}()
 		newRule, err := CreateRuleWithDefaultGroup(rule)
 		require.NoError(t, err)
-		marshal, err := json.Marshal(newRule.Groups)
-		require.NoError(t, err)
-		log.Infof("new group: %v", string(marshal))
-		require.Equal(t, 3, len(newRule.Groups))
+		// auto language/severity/purpose groups abandoned → default custom bucket
+		require.Equal(t, schema.SyntaxFlowPackageCustom, newRule.RuleGroup)
 	})
+}
+
+func mustRuleGroup(t *testing.T, db *gorm.DB, ruleName string) string {
+	t.Helper()
+	got, err := QueryRuleByName(db, ruleName)
+	require.NoError(t, err)
+	return got.RuleGroup
 }
 
 func TestRule_Group_CreateOrUpdate(t *testing.T) {
@@ -278,10 +278,7 @@ func TestRule_Group_CreateOrUpdate(t *testing.T) {
 		}()
 		newRule, err := CreateOrUpdateRuleWithGroup(rule, groupName1, groupName1)
 		require.NoError(t, err)
-		marshal, err := json.Marshal(newRule.Groups)
-		require.NoError(t, err)
-		log.Infof("new group: %v", string(marshal))
-		require.Equal(t, 1, len(newRule.Groups))
+		require.Equal(t, groupName1, newRule.RuleGroup)
 	})
 
 }
