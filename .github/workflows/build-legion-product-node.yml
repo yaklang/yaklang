@@ -31,6 +31,7 @@ jobs:
     timeout-minutes: 45
     env:
       NODE_PACKAGE_NAME: legion-product-node_linux_amd64
+      PRODUCT_NODE_WORKFLOW_NAME: Build Trusted Legion Product Node
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       NODE_PACKAGE_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
     steps:

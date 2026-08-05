@@ -84,7 +84,7 @@ jq -n \
   --arg ci_provider "${GITHUB_ACTIONS:+github-actions}" \
   --arg ci_run_id "${GITHUB_RUN_ID:-local}" \
   --arg ci_run_attempt "${GITHUB_RUN_ATTEMPT:-1}" \
-  --arg ci_workflow "${GITHUB_WORKFLOW:-local}" \
+  --arg ci_workflow "${PRODUCT_NODE_WORKFLOW_NAME:-${GITHUB_WORKFLOW:-local}}" \
   --arg ci_actor "${GITHUB_ACTOR:-local}" \
   '{
     schema_version: "1",
