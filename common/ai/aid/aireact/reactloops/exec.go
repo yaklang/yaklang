@@ -810,8 +810,11 @@ LOOP:
 		// 循环圈数 iterationCount. effectiveIterationCount 在每轮 action 执行
 		// 后由 advanceEffectiveIteration 更新, 此处反映的是之前已完成的有效
 		// 迭代数. 空转轮 (有活跃 TODO 但无 todo_delta) 不计入, 不消耗预算.
-		// 关键词: 有效迭代上限, 迭代限制重定义
-		if r.effectiveIterationCount > maxIterations {
+		// 使用 >= (而非 >) 是因为 effectiveIterationCount 在本轮 action 之后才 +1,
+		// 循环顶部检查时它反映的是之前已完成的有效迭代数; 旧逻辑用 iterationCount++
+		// 后 > 比较 (pre-increment + >), 这里用 post-increment + >= 保持等价语义.
+		// 关键词: 有效迭代上限, 迭代限制重定义, post-increment >= 语义等价
+		if r.effectiveIterationCount >= maxIterations {
 			// 到达迭代上限: 优先尝试向用户申请临时扩充迭代次数 (仅在允许用户交互时).
 			// 用户同意 -> 提升 maxIterations 并 continue 主循环 (有扩充次数护栏防自旋);
 			// 用户拒绝 / 未启用交互 / 已达扩充上限 -> 回退到原"软性中断"退出.
