@@ -76,8 +76,6 @@ def classify_program(name: str, manifest_base: str, pointer_base: str) -> str:
         if name == pointer_base:
             return "current-base (pointer)"
         return "promote-overlay"
-    if name.startswith("ci-yaklang-flat-"):
-        return "flattened"
     if name.startswith("ci-yaklang-diff-pr-"):
         return "pr-diff (temporary)"
     return "unknown"
@@ -130,7 +128,7 @@ def print_tree(
         return
 
     # Build the tree
-    base_progs = [p for p in programs if p == "ci-yaklang-base" or p.startswith("ci-yaklang-flat-")]
+    base_progs = [p for p in programs if p == "ci-yaklang-base"]
     promote_chain = build_promote_chain(programs)
     diff_progs = sorted([p for p in programs if p.startswith("ci-yaklang-diff-pr-")])
     unknown_progs = [p for p in programs if p not in base_progs and p not in promote_chain and p not in diff_progs]

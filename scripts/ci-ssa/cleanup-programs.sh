@@ -29,9 +29,8 @@ export CI_SSA_BASE_PROGRAM
 
 remove_one() {
   local name="$1"
-  ./yak "$SCRIPT_DIR/remove-program.yak" \
-    --database "sqlite://$SSA_DATABASE_RAW" \
-    --program "$name" || echo "::warning::Failed to remove $name"
+  ./yak ssa-remove "$name" --database "sqlite://$SSA_DATABASE_RAW" \
+    || echo "::warning::Failed to remove $name"
 }
 
 list_programs() {

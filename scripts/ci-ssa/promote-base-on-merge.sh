@@ -2,8 +2,7 @@
 # Promote CI SSA base after a PR merges into main.
 #
 # Relative to the last manifest main_sha, incremental-compile tip into a new
-# overlay program and switch the base pointer. When overlay depth exceeds the
-# limit, flatten the chain into a single program.
+# overlay program and switch the base pointer.
 #
 # Catch-up mode: if multiple PRs merged between runs, this loop advances
 # manifest.main_sha one commit at a time until it reaches NEW_SHA. Each
@@ -98,7 +97,7 @@ if [ -n "$MANIFEST_BASE" ] && [ "$MANIFEST_BASE" != "null" ] && [ -n "$POINTER_B
   DRIFT=1
 fi
 if [ "$DRIFT" -ne 0 ]; then
-  echo "::error::Base pointer drift. Run weekly full compile to re-flatten."
+  echo "::error::Base pointer drift. Run weekly full compile to re-compile."
   exit 1
 fi
 echo "Base program OK: $BASE_PROGRAM"
@@ -163,7 +162,6 @@ promote_once() {
     OLD_BASE="${CI_SSA_BASE_PROGRAM:-ci-yaklang-base}"
   fi
 
-  local OVERLAY_DEPTH_LIMIT="${CI_SSA_OVERLAY_DEPTH_LIMIT:-20}"
   local NEW_DEPTH=$((OLD_DEPTH + 1))
 
   echo "Promote: $OLD_SHA ($OLD_BASE) -> $NEW_SHA"
@@ -276,34 +274,6 @@ promote_once() {
   fi
 
   echo "Promote complete: effective base is now $NEW_PROG @ $NEW_SHA"
-
-  # Flatten disabled — flatten-overlay.yak recompiles from source files,
-  # which loses cross-file dataflow edges and produces 0-risk results.
-  # The script is kept for manual use but no longer triggered automatically.
-  # To re-enable: set CI_SSA_ENABLE_FLATTEN=1
-  if [ "${CI_SSA_ENABLE_FLATTEN:-0}" = "1" ] && [ "$NEW_DEPTH" -gt "$OVERLAY_DEPTH_LIMIT" ]; then
-    echo "::group::Flattening overlay chain (depth=$NEW_DEPTH > limit=$OVERLAY_DEPTH_LIMIT)"
-    local FLAT_NAME="ci-yaklang-flat-${SHORT_SHA}"
-    local FLATTEN_SCRIPT="$SCRIPT_DIR/flatten-overlay.yak"
-    if [ -f "$FLATTEN_SCRIPT" ]; then
-      if ./yak "$FLATTEN_SCRIPT" \
-        --program "$NEW_PROG" \
-        --output "$FLAT_NAME" \
-        --database "$SSA_DATABASE_RAW" \
-        --config "$SCRIPT_DIR/ci-yaklang-base-compile.json"; then
-        export CI_SSA_BASE_PROGRAM="$FLAT_NAME"
-        write_manifest "$NEW_SHA" "$FLAT_NAME" "0"
-        echo "::endgroup::"
-        echo "Flatten complete: base is now $FLAT_NAME (single-layer, depth=0)"
-      else
-        echo "::endgroup::"
-        echo "::warning::Flatten failed; keeping overlay chain at depth $NEW_DEPTH."
-      fi
-    else
-      echo "::endgroup::"
-      echo "::warning::flatten-overlay.yak not found; skipping flatten."
-    fi
-  fi
 }
 
 # ---------------------------------------------------------------------------

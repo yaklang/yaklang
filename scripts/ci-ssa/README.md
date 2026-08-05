@@ -12,7 +12,7 @@ Monitor 只处理**运行期间有变化**的 PR。启动时记录所有 open PR
 | **push** — open PR 的 head SHA 变化（push commit） | 清理旧 diff program → 构建 fs.zip → 增量扫描（CI） | `diff-code-scan.json`（监控器内联填充模板） |
 | **merge** — PR 合并到 main | 增量编译 overlay → 合并到基线 → 更新 pointer | `promote-base-on-merge.sh` |
 | **close** — PR 关闭（非合并） | 仅记录事件，从 hash 追踪中移除 | — |
-| 日常维护 | overlay 链过深时压平；清理残留 program | `flatten-overlay.yak` / `cleanup-programs.sh` |
+| 日常维护 | 清理残留 program | `cleanup-programs.sh` |
 
 > **push 触发逻辑**：每个 open PR 都记录其 head SHA。当 SHA 发生变化（模拟 PR 提交新 commit 运行 CI）时，触发增量扫描。旧 diff program 在新扫描的 Stage 0 中清理（`cleanup-programs.sh pr {N}` 删除该 PR 的所有旧 diff programs）。
 > **merge 跳过逻辑**：如果 merged PR 没有对应的 diff program（即没跑过 CI scan），跳过 promote。
@@ -121,27 +121,10 @@ python3 -u scripts/ci-ssa/ci-promote-monitor.py --interval 300
 5. 增量编译 `ci-yaklang-pr-{N}`（base = 当前 pointer；N=PR 编号，无 PR 编号时回退 `ci-yaklang-promote-{sha8}`）
 6. 更新 pointer + manifest（`overlay_depth + 1`）
 7. 清理该 PR 的 diff program
-8. 如果 `overlay_depth` 超过阈值，触发 `flatten-overlay.yak` 压平
 
 ### Catch-up 模式
 
 多个 PR 短时间内合并时，monitor 逐个 commit 走 promote，每个 PR 的 diff 独立成一层 overlay。promote 脚本也内置 catch-up 循环（`CI_SSA_PROMOTE_CATCH_UP=1`）。
-
-### Overlay Flatten
-
-`overlay_depth` 超过阈值（默认 20）时，promote 自动触发 [flatten-overlay.yak](./flatten-overlay.yak)：
-- 提取 overlay 聚合文件系统
-- 全量重编译为单层 program
-- 重置 `overlay_depth=0`
-
-手动运行：
-```bash
-yak scripts/ci-ssa/flatten-overlay.yak \
-  --program ci-yaklang-pr-1234 \
-  --output ci-yaklang-base \
-  --database sqlite://$SSA_DATABASE_RAW \
-  --config scripts/ci-ssa/ci-yaklang-base-compile.json
-```
 
 ---
 
@@ -152,10 +135,8 @@ yak scripts/ci-ssa/flatten-overlay.yak \
 | [ci-promote-monitor.py](./ci-promote-monitor.py) | Python | 主监控脚本：轮询 PR 事件（open/push/merge/close），触发 scan 或 promote |
 | [promote-base-on-merge.sh](./promote-base-on-merge.sh) | Shell | 核心：PR 合并 → 增量编译 → 更新基线（自包含 env/lock/check/manifest） |
 | [cleanup-programs.sh](./cleanup-programs.sh) | Shell | 清理 program：`pr <N>` / `stale` / `name <prog>` |
-| [flatten-overlay.yak](./flatten-overlay.yak) | Yak | overlay 链压平为单层 program |
-| [remove-program.yak](./remove-program.yak) | Yak | 删除指定 program（支持 `--database`） |
 | [ssa-tree.py](./ssa-tree.py) | Python | 诊断工具：打印 DB 中 program 树形结构（手动运行） |
-| [ci-yaklang-base-compile.json](./ci-yaklang-base-compile.json) | 配置 | 全量编译模板（flatten 用） |
+| [ci-yaklang-base-compile.json](./ci-yaklang-base-compile.json) | 配置 | 全量编译模板 |
 | [ci-yaklang-promote-compile.json](./ci-yaklang-promote-compile.json) | 配置 | promote 增量编译模板 |
 | [diff-code-scan.json](./diff-code-scan.json) | 配置 | PR 增量扫描模板 |
 
@@ -181,19 +162,6 @@ yak scripts/ci-ssa/flatten-overlay.yak \
 | `push` | pr_number, title, old_sha, new_sha, html_url | open PR 的 head SHA 变化 → 运行 CI 扫描 |
 | `merge` | pr_number, title, sha, html_url, has_ci | PR 合并到 main → 运行 promote（has_ci=false 时跳过） |
 | `close` | pr_number, title, html_url | PR 关闭（非合并）→ 仅记录 |
-
----
-
-## Go 桥接函数
-
-`ssaapi.Exports` 中注册的脚本可用函数（`common/yak/ssaapi/ssa_flatten.go`）：
-
-| 导出名 | 说明 |
-|--------|------|
-| `ssa.SetDatabase` | 设置活跃 SSA 库 |
-| `ssa.GetOverlayFiles` | 提取 overlay 聚合 FS |
-| `ssa.DeleteProgram` | 删除 program |
-| `ssa.ListPrograms` | 列出所有 program |
 
 ---
 

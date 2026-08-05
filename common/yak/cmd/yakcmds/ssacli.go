@@ -49,7 +49,23 @@ var ssaRemove = &cli.Command{
 	Name:    "ssa-remove",
 	Aliases: []string{"ssa-rm"},
 	Usage:   "Remove SSA OpCodes from database",
-	Action: func(c *cli.Context) {
+	UsageText: `yak ssa-remove <program-name...> [--database <db>]
+yak ssa-remove "*" [--database <db>]    # remove all programs`,
+	Description: `Remove one or more SSA programs from the database.
+Without --database, operates on the default YAKIT_HOME database.
+Use "*" to remove all programs.`,
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "database",
+			Usage: "SSA database path (e.g. sqlite:///path/to/default-yakssa.db)",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		if databaseRaw := c.String("database"); databaseRaw != "" {
+			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseRaw); err != nil {
+				return utils.Errorf("set database by info %s failed: %v", databaseRaw, err)
+			}
+		}
 		for _, name := range c.Args() {
 			if name == "*" {
 				for _, name := range ssadb.AllProgramNames(ssadb.GetDB()) {
@@ -61,6 +77,7 @@ var ssaRemove = &cli.Command{
 			log.Infof("Start to delete program: %v", name)
 			ssadb.DeleteProgram(ssadb.GetDB(), name)
 		}
+		return nil
 	},
 }
 
