@@ -1,4 +1,4 @@
-name: Build Legion Product Node
+name: Build Trusted Legion Product Node
 
 on:
   workflow_dispatch:
@@ -71,8 +71,20 @@ jobs:
              and .recipe.goos == "linux"
              and .recipe.goarch == "amd64"
              and .recipe.build_tags == "hids"
+             and .ci.workflow == "Build Trusted Legion Product Node"
              and (.capabilities | index("hids") != null)' \
             PRODUCT_NODE_MANIFEST.json >/dev/null
+
+      - name: Stage cross-repository artifact contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/artifact
+          cp "dist/${NODE_PACKAGE_NAME}/legion-smoke-node" dist/artifact/
+          cp "dist/${NODE_PACKAGE_NAME}/PRODUCT_NODE_MANIFEST.json" dist/artifact/
+          cp "dist/${NODE_PACKAGE_NAME}/SHA256SUMS" dist/artifact/
+          cp "dist/${NODE_PACKAGE_NAME}.tar.gz" dist/artifact/
+          cp "dist/${NODE_PACKAGE_NAME}.tar.gz.sha256" dist/artifact/
 
       - name: Publish build summary
         shell: bash
@@ -95,8 +107,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.NODE_PACKAGE_NAME }}
-          path: |
-            dist/${{ env.NODE_PACKAGE_NAME }}.tar.gz
-            dist/${{ env.NODE_PACKAGE_NAME }}.tar.gz.sha256
+          path: dist/artifact/*
           if-no-files-found: error
           retention-days: 14
