@@ -204,6 +204,12 @@ var Exports = map[string]any{
 
 	// Query latest program name by project name
 	"GetLatestProgramNameByProjectName": getLatestProgramNameByProjectName,
+
+	// Database / overlay flatten helpers (CI SSA infra)
+	"SetDatabase":      SetDatabase,
+	"DeleteProgram":    DeleteProgram,
+	"ListPrograms":     ListPrograms,
+	"GetOverlayFiles":  GetOverlayFiles,
 }
 
 // getLatestProgramNameByProjectName 根据 SSA 项目名查询其最新编译产物（program）的名称（导出名为 ssa.GetLatestProgramNameByProjectName）
