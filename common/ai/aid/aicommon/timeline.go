@@ -627,7 +627,7 @@ func (m *Timeline) calculateActualContentSizeLocked() int64 {
 		}
 
 		buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
-		raw := item.String()
+		raw := selectShrunkContent(item)
 		for _, line := range utils.ParseStringToRawLines(raw) {
 			buf.WriteString(fmt.Sprintf("     %s\n", line))
 		}
