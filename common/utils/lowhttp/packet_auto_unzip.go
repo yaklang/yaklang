@@ -140,6 +140,26 @@ func AutoUnzipPacketEncoding(raw []byte) (plain []byte, state *PacketEncodingSta
 	return _unzipPacketEncodingInternal(raw, _defaultUnzipPacketEncodingConfig())
 }
 
+// AutoUnzipPacketEncodingWithLimit is the bounded variant of
+// AutoUnzipPacketEncoding. maxDecodedBodyBytes applies to the decoded body, not
+// to the complete HTTP packet. If decoding would exceed the limit, the
+// function preserves raw and reports ok=false.
+//
+// Callers that process untrusted traffic for analysis should prefer this
+// helper so a small compressed response cannot expand into an unbounded
+// allocation.
+func AutoUnzipPacketEncodingWithLimit(
+	raw []byte,
+	maxDecodedBodyBytes int,
+) (plain []byte, state *PacketEncodingState, ok bool) {
+	if maxDecodedBodyBytes <= 0 {
+		return raw, nil, false
+	}
+	config := _defaultUnzipPacketEncodingConfig()
+	config.maxDecodedBytes = maxDecodedBodyBytes
+	return _unzipPacketEncodingInternal(raw, config)
+}
+
 func FastAutoUnzipPacketEncoding(raw []byte) (plain []byte) {
 	result, _, ok := _unzipPacketEncodingInternal(raw, _defaultUnzipPacketEncodingConfig())
 	if ok {
