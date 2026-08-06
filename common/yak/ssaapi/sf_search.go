@@ -36,16 +36,7 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 	}
 
 	if len(memberMap) > 0 && value.ParentProgram != nil {
-		filePath := ""
-		if rng := value.GetRange(); rng != nil {
-			if ed := rng.GetEditor(); ed != nil {
-				filePath = ed.GetFilePath()
-				if filePath == "" {
-					filePath = ed.GetUrl()
-				}
-			}
-		}
-		if filePath != "" {
+		if filePath := getValueFilePath(value); filePath != "" {
 			normalized := normalizeOverlayFilePath(filePath, value.ParentProgram.GetProgramName())
 			fromBase, di, ok := overlay.valueSource(value)
 			if ok {
@@ -109,10 +100,9 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		collectMembers(layer.Program, layer.Program.Ref(valueName))
 	}
 	if overlay.Base != nil {
-		exclude := overlay.excludeFiles()
 		var layerValues Values
-		if len(exclude) > 0 {
-			layerValues = overlay.Base.refWithExcludeFiles(valueName, exclude)
+		if len(overlay.ExcludeFile) > 0 {
+			layerValues = overlay.Base.refWithExcludeFiles(valueName, overlay.ExcludeFile)
 		} else {
 			layerValues = overlay.Base.Ref(valueName)
 		}
