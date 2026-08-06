@@ -175,7 +175,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 
 					grepOpts := []ziputil.GrepOption{
 						ziputil.WithGrepCaseSensitive(false),
-						ziputil.WithContext(15),
+						ziputil.WithContext(8),
 					}
 
 					results, err := docSearcher.GrepRegexp(pattern, grepOpts...)
@@ -198,69 +198,75 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 				}
 			}
 
-			// Step 2.2: RAG semantic search
+			// Step 2.2: RAG semantic search（Grep 已够用时跳过，减少双通道重复）
+			ranSemanticSearch := false
 			if ragSearcher != nil && len(semanticQuestions) > 0 {
-				log.Infof("init task step 2.2: semantic searching code samples with %d questions", len(semanticQuestions))
-				topN := 20
-				scoreThreshold := 0.4
-				type ResultKey struct {
-					DocID string
-				}
-				allResultsMap := make(map[ResultKey]rag.SearchResult)
-
-				questionTotal := 0
-				for _, question := range semanticQuestions {
-					if question != "" {
-						questionTotal++
+				if len(allHits) >= initGrepEnoughHits {
+					log.Infof("init task step 2.2: skip RAG, grep hits=%d >= %d", len(allHits), initGrepEnoughHits)
+				} else {
+					ranSemanticSearch = true
+					log.Infof("init task step 2.2: semantic searching code samples with %d questions (grep hits=%d)", len(semanticQuestions), len(allHits))
+					topN := 10
+					scoreThreshold := 0.4
+					type ResultKey struct {
+						DocID string
 					}
-				}
-				searchedQuestions := 0
+					allResultsMap := make(map[ResultKey]rag.SearchResult)
 
-				for idx, question := range semanticQuestions {
-					if question == "" {
-						continue
+					questionTotal := 0
+					for _, question := range semanticQuestions {
+						if question != "" {
+							questionTotal++
+						}
 					}
+					searchedQuestions := 0
 
-					log.Infof("semantic searching question %d/%d: %s", idx+1, len(semanticQuestions), question)
-					searchedQuestions++
-					reactloops.EmitStatus(loop, fmt.Sprintf(
-						"语义搜索 %d/%d / Semantic search %d/%d",
-						searchedQuestions, questionTotal, searchedQuestions, questionTotal,
-					))
-
-					results, err := ragSearcher.QueryTopN(question, topN, scoreThreshold)
-					if err != nil {
-						log.Errorf("semantic search failed for question '%s': %v", question, err)
-						continue
-					}
-
-					log.Infof("semantic search found %d results for question: %s", len(results), question)
-
-					for _, result := range results {
-						var docID string
-						if result.KnowledgeBaseEntry != nil {
-							docID = fmt.Sprintf("kb_%d_%s", result.KnowledgeBaseEntry.ID, result.KnowledgeBaseEntry.KnowledgeTitle)
-						} else if result.Document != nil {
-							docID = result.Document.ID
-						} else {
+					for idx, question := range semanticQuestions {
+						if question == "" {
 							continue
 						}
 
-						key := ResultKey{DocID: docID}
-						existing, exists := allResultsMap[key]
-						if !exists || result.Score > existing.Score {
-							allResultsMap[key] = *result
-						}
-					}
+						log.Infof("semantic searching question %d/%d: %s", idx+1, len(semanticQuestions), question)
+						searchedQuestions++
+						reactloops.EmitStatus(loop, fmt.Sprintf(
+							"语义搜索 %d/%d / Semantic search %d/%d",
+							searchedQuestions, questionTotal, searchedQuestions, questionTotal,
+						))
 
-					questionHits := make([]rag.SearchResult, 0, len(results))
-					for _, result := range results {
-						questionHits = append(questionHits, *result)
+						results, err := ragSearcher.QueryTopN(question, topN, scoreThreshold)
+						if err != nil {
+							log.Errorf("semantic search failed for question '%s': %v", question, err)
+							continue
+						}
+
+						log.Infof("semantic search found %d results for question: %s", len(results), question)
+
+						for _, result := range results {
+							var docID string
+							if result.KnowledgeBaseEntry != nil {
+								docID = fmt.Sprintf("kb_%d_%s", result.KnowledgeBaseEntry.ID, result.KnowledgeBaseEntry.KnowledgeTitle)
+							} else if result.Document != nil {
+								docID = result.Document.ID
+							} else {
+								continue
+							}
+
+							key := ResultKey{DocID: docID}
+							existing, exists := allResultsMap[key]
+							if !exists || result.Score > existing.Score {
+								allResultsMap[key] = *result
+							}
+						}
+
+						questionHits := make([]rag.SearchResult, 0, len(results))
+						for _, result := range results {
+							questionHits = append(questionHits, *result)
+						}
+						sort.Slice(questionHits, func(i, j int) bool {
+							return questionHits[i].Score > questionHits[j].Score
+						})
+						allHits = append(allHits, RAGResultsToSampleHits(question, questionHits, ragMaxHits)...)
 					}
-					sort.Slice(questionHits, func(i, j int) bool {
-						return questionHits[i].Score > questionHits[j].Score
-					})
-					allHits = append(allHits, RAGResultsToSampleHits(question, questionHits, ragMaxHits)...)
 				}
 			}
 
@@ -274,7 +280,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 					searchQueryBuilder.WriteString(strings.Join(searchPatterns, ", "))
 					searchQueryBuilder.WriteString("\n")
 				}
-				if len(semanticQuestions) > 0 {
+				if ranSemanticSearch && len(semanticQuestions) > 0 {
 					searchQueryBuilder.WriteString("Semantic Questions: ")
 					searchQueryBuilder.WriteString(strings.Join(semanticQuestions, ", "))
 				}
@@ -286,7 +292,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 				log.Infof("initial samples finalized, hit count: %d, final size: %d bytes", len(allHits), len(initialSamples))
 
 				if initialSamples != "" {
-					manifest := NewSearchManifest(searchPatterns, semanticQuestions)
+					manifestQuestions := semanticQuestions
+					if !ranSemanticSearch {
+						manifestQuestions = nil
+					}
+					manifest := NewSearchManifest(searchPatterns, manifestQuestions)
 					loop.Set("initial_code_samples", initialSamples)
 					loop.Set("init_search_manifest", manifest.JSON())
 					loop.Set("init_samples_ready", "true")

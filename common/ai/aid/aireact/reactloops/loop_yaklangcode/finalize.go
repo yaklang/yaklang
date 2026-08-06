@@ -38,17 +38,31 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 			return
 		}
 
-		if tryDeliverYaklangFinalizeViaAI(loop, invoker, task, reason) {
-			loop.Set(yaklangFinalizedFlagKey, "true")
-			ignoreYaklangMaxIterationError(operator, reason)
-			return
+		// 成功路径走 lite，避免多余一次 AI 调用；失败/不完整才用 AI 总结。
+		if shouldPreferLiteYaklangFinalize(loop) || !tryDeliverYaklangFinalizeViaAI(loop, invoker, task, reason) {
+			lite := generateYaklangFinalizeLiteSummary(loop, reason)
+			deliverYaklangFinalizeLiteSummary(loop, invoker, lite)
 		}
-
-		lite := generateYaklangFinalizeLiteSummary(loop, reason)
-		deliverYaklangFinalizeLiteSummary(loop, invoker, lite)
 		loop.Set(yaklangFinalizedFlagKey, "true")
 		ignoreYaklangMaxIterationError(operator, reason)
 	})
+}
+
+// shouldPreferLiteYaklangFinalize 为 true 时跳过 AI finalize：已有代码、无阻塞 lint、自测未失败。
+func shouldPreferLiteYaklangFinalize(loop *reactloops.ReActLoop) bool {
+	if loop == nil {
+		return true
+	}
+	if strings.TrimSpace(loop.Get("full_code")) == "" {
+		return false
+	}
+	if hasBlockingLintErrors(loop) {
+		return false
+	}
+	if hasFailedSelfTest(loop) {
+		return false
+	}
+	return true
 }
 
 func ignoreYaklangMaxIterationError(operator *reactloops.OnPostIterationOperator, reason any) {
