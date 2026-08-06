@@ -9,8 +9,8 @@ import (
 
 func TestDedupeProgramsCoveredByOverlay_Empty(t *testing.T) {
 	t.Parallel()
-	require.Nil(t, dedupeProgramsCoveredByOverlay(nil))
-	require.Empty(t, dedupeProgramsCoveredByOverlay([]*ssaapi.Program{}))
+	require.Nil(t, ssaapi.DedupeProgramsCoveredByOverlay(nil))
+	require.Empty(t, ssaapi.DedupeProgramsCoveredByOverlay([]*ssaapi.Program{}))
 }
 
 func TestDedupeProgramsCoveredByOverlay_NoOverlayUnchanged(t *testing.T) {
@@ -18,6 +18,6 @@ func TestDedupeProgramsCoveredByOverlay_NoOverlayUnchanged(t *testing.T) {
 	// Programs without overlay must all be kept (filter is a no-op).
 	// We cannot construct a full Program without compile; nil entries are dropped.
 	in := []*ssaapi.Program{nil, nil}
-	out := dedupeProgramsCoveredByOverlay(in)
+	out := ssaapi.DedupeProgramsCoveredByOverlay(in)
 	require.Empty(t, out)
 }

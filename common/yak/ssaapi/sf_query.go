@@ -19,6 +19,7 @@ import (
 type SyntaxFlowQueryInstance interface {
 	SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error)
 	SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error)
+	GetProgramName() string
 	GetLanguage() ssaconfig.Language
 	IsIncrementalCompile() bool
 	IsBaseProgram() bool

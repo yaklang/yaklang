@@ -151,6 +151,19 @@ func (p *Program) GetOverlay() *ProgramOverLay {
 	return p.overlay
 }
 
+// AsSyntaxFlowQueryInstance returns the SF entrypoint for this program:
+// the ProgramOverLay when this program is the overlay top layer, otherwise the Program itself.
+// Callers that only need SyntaxFlow should prefer this (or NewProgramFromDB) over GetOverlay().
+func (p *Program) AsSyntaxFlowQueryInstance() SyntaxFlowQueryInstance {
+	if p == nil {
+		return nil
+	}
+	if overlay := p.GetOverlay(); overlay != nil && overlay.IsTopLayerProgram(p) {
+		return overlay
+	}
+	return p
+}
+
 // IsIncrementalCompile 判断这个 program 是否是增量编译的
 // 如果 IsOverlay 为 true，或者有 BaseProgramName/FileHashMap，说明这个 program 属于增量编译流程的一部分
 func (p *Program) IsIncrementalCompile() bool {

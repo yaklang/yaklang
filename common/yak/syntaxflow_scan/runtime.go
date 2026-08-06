@@ -92,14 +92,7 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 	if target == nil {
 		return ""
 	}
-	switch t := target.(type) {
-	case *ssaapi.Program:
-		return t.GetProgramName()
-	case *ssaapi.ProgramOverLay:
-		return t.GetProgramName()
-	default:
-		return fmt.Sprintf("%T", target)
-	}
+	return target.GetProgramName()
 }
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {

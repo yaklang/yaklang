@@ -252,17 +252,12 @@ func handleSSAQuery(_ *MCPServer) server.ToolHandlerFunc {
 			return nil, utils.Error("missing required argument: rule")
 		}
 
-		prog, err := ssaapi.FromDatabase(programName)
+		prog, err := ssaapi.NewProgramFromDB(programName)
 		if err != nil {
 			return nil, utils.Wrapf(err, "failed to load program %q from database, please run ssa_compile first", programName)
 		}
 
-		var queryTarget ssaapi.SyntaxFlowQueryInstance = prog
-		if overlay := prog.GetOverlay(); overlay != nil && overlay.IsTopLayerProgram(prog) {
-			queryTarget = overlay
-		}
-
-		result, err := queryTarget.SyntaxFlowWithError(rule, ssaapi.QueryWithContext(ctx))
+		result, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithContext(ctx))
 		if err != nil {
 			return nil, utils.Wrapf(err, "SyntaxFlow query failed")
 		}

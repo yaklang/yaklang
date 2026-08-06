@@ -254,15 +254,7 @@ func NewProgramFromDB(programName string) (SyntaxFlowQueryInstance, error) {
 	if program == nil {
 		return nil, utils.Errorf("program %s is nil", programName)
 	}
-
-	// 如果程序有 overlay，返回 overlay
-	overlay := program.GetOverlay()
-	if overlay != nil {
-		return overlay, nil
-	}
-
-	// 否则返回 program
-	return program, nil
+	return program.AsSyntaxFlowQueryInstance(), nil
 }
 
 func init() {

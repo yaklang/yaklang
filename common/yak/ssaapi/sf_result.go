@@ -264,13 +264,13 @@ func (r *SyntaxFlowResult) GetProgramLang() ssaconfig.Language {
 }
 
 func (r *SyntaxFlowResult) GetFileCount() int {
-	if r == nil {
+	if r == nil || r.program == nil {
 		return 0
 	}
-	if r.program != nil {
-		if overlay := r.program.GetOverlay(); overlay != nil {
-			return overlay.GetFileCount()
-		}
+	if overlay := r.program.GetOverlay(); overlay != nil {
+		return overlay.GetFileCount()
+	}
+	if r.program.Program != nil {
 		return len(r.program.Program.FileList)
 	}
 	return 0
