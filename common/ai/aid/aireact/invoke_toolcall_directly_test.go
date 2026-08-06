@@ -209,7 +209,7 @@ LOOP:
 	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
 	timeline := react.config.Timeline.String()
 	require.Contains(t, timeline, "[DIRECT_CALL_PARAMS]")
-	require.Contains(t, timeline, "[seconds]: 0.1")
+	require.Contains(t, timeline, "seconds: 0.1")
 	require.NotContains(t, timeline, "param:", "direct-call result must not duplicate the params")
 	require.NotContains(t, timeline, "[user/review]", "fast no-op continue must not enter the timeline")
 }
