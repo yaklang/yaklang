@@ -279,3 +279,23 @@ func TestAutoUnzipAndZipPacketEncoding_ChunkedRaw(t *testing.T) {
 	require.True(t, ok)
 	require.Contains(t, string(rezip), "Transfer-Encoding:")
 }
+
+func TestAutoUnzipPacketEncodingWithLimit(t *testing.T) {
+	plainBody := bytes.Repeat([]byte("yak"), 1024)
+	gz := gzipBytes(t, plainBody)
+	orig := []byte(fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s",
+		len(gz), string(gz),
+	))
+
+	limited, state, ok := AutoUnzipPacketEncodingWithLimit(orig, 128)
+	require.False(t, ok)
+	require.Nil(t, state)
+	require.Equal(t, orig, limited)
+
+	decoded, state, ok := AutoUnzipPacketEncodingWithLimit(orig, len(plainBody))
+	require.True(t, ok)
+	require.NotNil(t, state)
+	_, decodedBody := SplitHTTPHeadersAndBodyFromPacket(decoded)
+	require.Equal(t, plainBody, decodedBody)
+}
