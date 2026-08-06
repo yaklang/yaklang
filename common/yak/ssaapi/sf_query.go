@@ -563,24 +563,12 @@ func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...Que
 			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
 		),
 	)
-	// Explicitly set config.program to top layer's program for saving risks.
-	// Dual-source IR routing handles base+diff without audit cache reuse.
-	if len(p.Layers) > 0 {
-		topLayer := p.Layers[len(p.Layers)-1]
-		if topLayer != nil && topLayer.Program != nil {
-			opts = append(opts, QueryWithProgram(topLayer.Program))
-		}
-		fileCount := 0
-		if p.FileToLayerMap != nil {
-			fileCount = p.FileToLayerMap.Count()
-		}
-		overriddenCount := 0
-		if p.overriddenFiles != nil {
-			overriddenCount = p.overriddenFiles.Count()
-		}
-		log.Infof("overlay SF dual-source scan: layers=%d files=%d overridden=%d",
-			len(p.Layers), fileCount, overriddenCount)
+	// Explicitly set config.program to top program for saving risks.
+	if top := p.topProgram(); top != nil {
+		opts = append(opts, QueryWithProgram(top))
 	}
+	log.Infof("overlay SF dual-source scan: programs=%d exclude=%d diffs=%d",
+		p.ProgramCount(), p.excludeCount(), len(p.Diff))
 	return QuerySyntaxflow(opts...)
 }
 
@@ -591,13 +579,8 @@ func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*Sy
 			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
 		),
 	)
-	// Explicitly set config.program to top layer's program for saving risks.
-	// Dual-source IR routing handles base+diff without audit cache reuse.
-	if len(p.Layers) > 0 {
-		topLayer := p.Layers[len(p.Layers)-1]
-		if topLayer != nil && topLayer.Program != nil {
-			opts = append(opts, QueryWithProgram(topLayer.Program))
-		}
+	if top := p.topProgram(); top != nil {
+		opts = append(opts, QueryWithProgram(top))
 	}
 	return QuerySyntaxflow(opts...)
 }

@@ -74,9 +74,9 @@ public class C {
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, _ ssatest.IncrementalCheckStage) {
 				require.NotNil(t, overlay)
-				require.GreaterOrEqual(t, overlay.GetLayerCount(), 2)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 2)
 
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(layerNames), 2)
 				require.NotEmpty(t, layerNames[len(layerNames)-1])
 
@@ -145,7 +145,7 @@ public class Main {
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, _ ssatest.IncrementalCheckStage) {
 				require.NotNil(t, overlay)
-				require.GreaterOrEqual(t, len(overlay.Layers), 2)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 2)
 				overlayRes, err := overlay.SyntaxFlowWithError(rule)
 				require.NoError(t, err)
 				ssatest.CompareResult(t, true, overlayRes, map[string][]string{
@@ -224,7 +224,7 @@ public class Main {
 				relocated := overlay.Relocate(baseValue)
 				require.NotNil(t, relocated)
 
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(layerNames), 2)
 				require.Equal(t, layerNames[len(layerNames)-1], relocated.GetProgramName())
 			},

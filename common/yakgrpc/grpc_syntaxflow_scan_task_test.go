@@ -113,7 +113,7 @@ func checkQuerySyntaxFlowScanTask(t *testing.T, client ypb.YakClient, testCase T
 					if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 						return
 					}
-					layerNames := overlay.GetLayerProgramNames()
+					layerNames := overlay.ProgramNames()
 					require.NotEmpty(t, layerNames)
 					compiledProgramName = layerNames[len(layerNames)-1]
 				},
@@ -523,7 +523,7 @@ public class NewClass {
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				names := overlay.GetLayerProgramNames()
+				names := overlay.ProgramNames()
 				require.NotEmpty(t, names)
 				baseProgID = names[0]
 			},
@@ -534,7 +534,7 @@ public class NewClass {
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				names := overlay.GetLayerProgramNames()
+				names := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(names), 2)
 				diffProgID = names[len(names)-1]
 			},

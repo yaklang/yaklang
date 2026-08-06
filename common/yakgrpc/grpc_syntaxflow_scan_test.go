@@ -1356,7 +1356,7 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.NotEmpty(t, layerNames)
 				baseProgID = layerNames[0]
 				baseProgramFromDB, err := ssaapi.FromDatabase(baseProgID)
@@ -1371,7 +1371,7 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(layerNames), 2)
 				diffProgID = layerNames[len(layerNames)-1]
 				diffProgramFromDB, err := ssaapi.FromDatabase(diffProgID)

@@ -17,11 +17,10 @@ import (
 // include filters; base uses exclude of overridden files.
 func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]*Value {
 	memberMap := make(map[string]*Value)
-	if overlay == nil || len(overlay.Layers) == 0 {
+	if overlay == nil || overlay.Base == nil {
 		return memberMap
 	}
 
-	// 首先尝试直接使用当前 value 的 instruction 来获取成员
 	currentInst := value.getValue()
 	if currentInst != nil {
 		for _, pair := range ssa.GetLastWinsMemberPairs(currentInst) {
@@ -36,9 +35,6 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		}
 	}
 
-	// Fast path: value's file is owned by the same layer as the value — members
-	// already come from the owning IR. Skip when program name is a lib/pkg
-	// (valueLayer==0), which still needs cross-layer merge.
 	if len(memberMap) > 0 && value.ParentProgram != nil {
 		filePath := ""
 		if rng := value.GetRange(); rng != nil {
@@ -51,9 +47,13 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		}
 		if filePath != "" {
 			normalized := normalizeOverlayFilePath(filePath, value.ParentProgram.GetProgramName())
-			valueLayer := overlay.getValueLayerIndex(value)
-			if valueLayer > 0 {
-				if top, ok := overlay.FileToLayerMap.Get(normalized); ok && top == valueLayer {
+			fromBase, di, ok := overlay.valueSource(value)
+			if ok {
+				if fromBase {
+					if !overlay.IsExcludedPath(normalized) {
+						return memberMap
+					}
+				} else if ownerDi, owned := overlay.ownerDiffIndex(normalized); owned && ownerDi == di {
 					return memberMap
 				}
 			}
@@ -68,30 +68,10 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		return memberMap
 	}
 
-	// 从所有 layer 中查找成员，上层覆盖下层
-	for i := len(overlay.Layers) - 1; i >= 0; i-- {
-		layer := overlay.Layers[i]
-		if layer == nil || layer.Program == nil {
-			continue
+	collectMembers := func(prog *Program, layerValues Values) {
+		if prog == nil || len(layerValues) == 0 {
+			return
 		}
-
-		var layerValues Values
-		if i == 0 {
-			exclude := overlay.overriddenFilesList()
-			if len(exclude) > 0 {
-				layerValues = layer.Program.refWithExcludeFiles(valueName, exclude)
-			} else {
-				layerValues = layer.Program.Ref(valueName)
-			}
-		} else {
-			// Full Ref on diff layers: include-filter can drop lib symbols whose
-			// editor path is an import file while still needing their members.
-			layerValues = layer.Program.Ref(valueName)
-		}
-		if len(layerValues) == 0 {
-			continue
-		}
-
 		var targetLayerValue *Value
 		for _, layerValue := range layerValues {
 			if layerValue != nil && layerValue.IsObject() {
@@ -100,14 +80,12 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 			}
 		}
 		if targetLayerValue == nil {
-			continue
+			return
 		}
-
 		layerInst := targetLayerValue.getValue()
 		if layerInst == nil {
-			continue
+			return
 		}
-
 		for _, pair := range ssa.GetLastWinsMemberPairs(layerInst) {
 			keyName := pair.KeyString()
 			if keyName == "" {
@@ -116,11 +94,29 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 			if _, exists := memberMap[keyName]; exists {
 				continue
 			}
-			newValVal, err := layer.Program.NewValue(pair.Member)
+			newValVal, err := prog.NewValue(pair.Member)
 			if err == nil && newValVal != nil {
 				memberMap[keyName] = newValVal
 			}
 		}
+	}
+
+	for i := len(overlay.Diff) - 1; i >= 0; i-- {
+		layer := overlay.Diff[i]
+		if layer == nil || layer.Program == nil {
+			continue
+		}
+		collectMembers(layer.Program, layer.Program.Ref(valueName))
+	}
+	if overlay.Base != nil {
+		exclude := overlay.excludeFiles()
+		var layerValues Values
+		if len(exclude) > 0 {
+			layerValues = overlay.Base.refWithExcludeFiles(valueName, exclude)
+		} else {
+			layerValues = overlay.Base.Ref(valueName)
+		}
+		collectMembers(overlay.Base, layerValues)
 	}
 
 	return memberMap
@@ -206,21 +202,18 @@ func searchMembersInKeyMatchMode(value *Value, inst ssa.Value, check func(*Value
 
 	if value.ParentProgram != nil && value.ParentProgram.overlay != nil {
 		overlay := value.ParentProgram.GetOverlay()
-		// 只有当 overlay 存在且至少有 2 个 layer 时，才考虑使用 overlay 逻辑
-		if overlay != nil && len(overlay.Layers) >= 2 {
-			isFromOverlay := false
-			for _, layer := range overlay.Layers {
-				if layer != nil && layer.Program != nil && layer.Program == value.ParentProgram {
-					isFromOverlay = true
-					break
+		if overlay != nil && overlay.Base != nil && len(overlay.Diff) > 0 {
+			isFromOverlay := overlay.Base == value.ParentProgram
+			if !isFromOverlay {
+				for _, layer := range overlay.Diff {
+					if layer != nil && layer.Program == value.ParentProgram {
+						isFromOverlay = true
+						break
+					}
 				}
 			}
-
-			// 只有当 value 来自 overlay 的查询时，才使用 overlay 逻辑
 			if isFromOverlay {
-				// 通过 overlay 跨 layer 查找成员
 				memberMap := searchMembersWithOverlay(value, overlay)
-				// 检查所有聚合的成员
 				for keyName, memberVal := range memberMap {
 					keyVal := value.NewValue(ssa.NewConst(keyName))
 					if check(keyVal) {

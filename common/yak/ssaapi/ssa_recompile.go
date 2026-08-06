@@ -98,7 +98,7 @@ func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
 
 // Recompile 仅重编译 overlay 的当前层（最上层），不会重编译底层/父层 program。
 func (o *ProgramOverLay) Recompile(inputOpt ...ssaconfig.Option) error {
-	layerProg := o.getCurrentLayerProgram()
+	layerProg := o.topProgram()
 	if layerProg == nil {
 		return utils.Error("overlay program has no current layer")
 	}

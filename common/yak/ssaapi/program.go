@@ -443,12 +443,19 @@ func (p *Program) getValueByIdFromOverlay(id int64) (*Value, error) {
 	if p == nil || p.overlay == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
 	}
-	for i := len(p.overlay.Layers) - 1; i >= 0; i-- {
-		layer := p.overlay.Layers[i]
+	ov := p.overlay
+	for i := len(ov.Diff) - 1; i >= 0; i-- {
+		layer := ov.Diff[i]
 		if layer == nil || layer.Program == nil || layer.Program == p {
 			continue
 		}
 		v, err := layer.Program.GetValueById(id)
+		if err == nil && v != nil {
+			return v, nil
+		}
+	}
+	if ov.Base != nil && ov.Base != p {
+		v, err := ov.Base.GetValueById(id)
 		if err == nil && v != nil {
 			return v, nil
 		}

@@ -1551,10 +1551,9 @@ func fetchProgram(v any) (*Program, error) {
 			parent = ret
 			return utils.Error("normal abort")
 		case *ProgramOverLay:
-			if ret != nil && len(ret.Layers) > 0 {
-				topLayer := ret.Layers[len(ret.Layers)-1]
-				if topLayer != nil && topLayer.Program != nil {
-					parent = topLayer.Program
+			if ret != nil {
+				if top := ret.topProgram(); top != nil {
+					parent = top
 					return utils.Error("normal abort")
 				}
 			}
