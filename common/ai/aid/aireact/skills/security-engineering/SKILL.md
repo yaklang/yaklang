@@ -1,7 +1,7 @@
 ---
-name: general-security-engineering
+name: security-engineering
 metadata:
-  display_name_zh-CN: 通用安全领域工程师
+  display_name_zh-CN: 安全领域
 description: >
   面向通用安全工程任务的工作框架。用于安全知识问答、风险分析、安全方案设计、
   配置检查、事件研判和跨领域安全任务，强调授权边界、证据质量、风险优先级与可执行结论；
