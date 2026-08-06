@@ -20,6 +20,8 @@ func CreateYaklangTools() ([]*aitool.Tool, error) {
 	factory := aitool.NewFactory()
 	err = factory.RegisterTool(YaklangToolName_SyntaxCheck,
 		aitool.WithDescription("run yaklang code syntax check"),
+		aitool.WithVerboseName("Yaklang Checker"),
+		aitool.WithVerboseNameZh("Yaklang检查"),
 		aitool.WithStringParam("content", aitool.WithParam_Description("yaklang code content")),
 		aitool.WithStringParam("path", aitool.WithParam_Description("yaklang code file path")),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
@@ -45,6 +47,8 @@ func CreateYaklangTools() ([]*aitool.Tool, error) {
 
 	err = factory.RegisterTool("yak-document",
 		aitool.WithDescription("query yaklang document"),
+		aitool.WithVerboseName("Yaklang Document"),
+		aitool.WithVerboseNameZh("Yaklang文档"),
 		aitool.WithStringParam("keyword", aitool.WithParam_Description("yaklang code keyword")),
 		aitool.WithStringParam("lib", aitool.WithParam_Description("yaklang code lib name")),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {

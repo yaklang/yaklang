@@ -19,6 +19,8 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 	// List JAR directory contents
 	err = factory.RegisterTool("jar_list_directory",
 		aitool.WithDescription("list files and directories in a JAR file"),
+		aitool.WithVerboseName("JAR List Dir"),
+		aitool.WithVerboseNameZh("JAR列目录"),
 		aitool.WithStringParam("jar_path",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to JAR file"),
@@ -61,6 +63,8 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 	// Read a class file from JAR
 	err = factory.RegisterTool("jar_read_class",
 		aitool.WithDescription("read and decompile a class file from a JAR"),
+		aitool.WithVerboseName("JAR Read Class"),
+		aitool.WithVerboseNameZh("JAR读取类"),
 		aitool.WithStringParam("jar_path",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to JAR file"),
@@ -107,6 +111,8 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 	// Read a file from JAR (non-class files)
 	err = factory.RegisterTool("jar_read_file",
 		aitool.WithDescription("read a file (non-class) from a JAR"),
+		aitool.WithVerboseName("JAR Read File"),
+		aitool.WithVerboseNameZh("JAR读取文件"),
 		aitool.WithStringParam("jar_path",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to JAR file"),
@@ -139,6 +145,8 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 	// Get JAR manifest
 	err = factory.RegisterTool("jar_get_manifest",
 		aitool.WithDescription("read the manifest file from a JAR"),
+		aitool.WithVerboseName("JAR Manifest"),
+		aitool.WithVerboseNameZh("JAR清单"),
 		aitool.WithStringParam("jar_path",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to JAR file"),
@@ -172,6 +180,8 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 	// Find classes in JAR
 	err = factory.RegisterTool("jar_find_classes",
 		aitool.WithDescription("find all Java classes in a JAR, including nested JARs"),
+		aitool.WithVerboseName("JAR Find Classes"),
+		aitool.WithVerboseNameZh("JAR查找类"),
 		aitool.WithStringParam("jar_path",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to JAR file"),
@@ -211,6 +221,8 @@ func CreateJarOperator() ([]*aitool.Tool, error) {
 	// Find a class by name
 	err = factory.RegisterTool("jar_find_class_by_name",
 		aitool.WithDescription("find a class by its name within a JAR file"),
+		aitool.WithVerboseName("JAR Find Class"),
+		aitool.WithVerboseNameZh("JAR查找类名"),
 		aitool.WithStringParam("jar_path",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("path to JAR file"),

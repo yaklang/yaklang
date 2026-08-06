@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 )
 
 func (r *ReAct) withTaskEmitterScope(fn func(currentTask aicommon.AIStatefulTask) (*aitool.ToolResult, bool, error)) (*aitool.ToolResult, bool, error) {
@@ -133,6 +134,41 @@ func (r *ReAct) resolveToolForCall(ctx context.Context, toolName string) (*aitoo
 		}
 	}
 	return tool, nil
+}
+
+// tryFillVerboseNameForPlaceholder fills the VerboseName / VerboseNameZh /
+// Description of a placeholder tool (used by DirectlyCallTool before the real
+// tool is resolved by the loop-layer prepare callback) so the tool-call card
+// emitted via emitStart carries a readable title.
+//
+// It only inspects the in-memory enabled tool list (which already contains MCP
+// pending stubs loaded from DB cache, since AppendTools/EnableTool register
+// them into toolsGetter). It never reads the database, never waits for a live
+// MCP connection, and silently no-ops on any error — the real tool is still
+// resolved later inside the prepare callback for the actual invocation.
+func (r *ReAct) tryFillVerboseNameForPlaceholder(tool *aitool.Tool) {
+	if tool == nil || r == nil || r.config == nil {
+		return
+	}
+	mgr := r.config.GetAiToolManager()
+	if mgr == nil {
+		return
+	}
+	tools, err := mgr.GetEnableTools()
+	if err != nil {
+		return
+	}
+	for _, real := range tools {
+		if real == nil || real.Name != tool.Name {
+			continue
+		}
+		tool.VerboseName = real.VerboseName
+		tool.VerboseNameZh = real.VerboseNameZh
+		if strings.TrimSpace(tool.Description) == "" && strings.TrimSpace(real.Description) != "" {
+			tool.Description = real.Description
+		}
+		return
+	}
 }
 
 // newToolCallerForCall builds a ToolCaller with the shared options (emitter
@@ -312,6 +348,12 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 	}
 
 	directlyCallTool := &aitool.Tool{Tool: &mcp.Tool{Name: toolName}}
+	// The placeholder only carries the tool name. Try to fill its verbose
+	// name / description from the in-memory enabled tool list so the
+	// tool-call card (emitStart) shows a readable title immediately. The
+	// real tool used for the actual invocation is still resolved later
+	// inside the prepare callback (loop-layer resolveTool).
+	r.tryFillVerboseNameForPlaceholder(directlyCallTool)
 	result, directlyAnswer, err := toolCaller.DirectlyCallTool(directlyCallTool, action, prepare)
 	if err != nil {
 		return nil, false, utils.Errorf("tool call failed: %v", err)

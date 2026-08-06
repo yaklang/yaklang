@@ -41,6 +41,8 @@ func CreateNotifySendTools() []*aitool.Tool {
 		"send_im_message",
 		aitool.WithDescription(`Send a message to an IM platform (Feishu/Lark or DingTalk). Use this to proactively push results, alerts, or reports to a user or group chat.
 Credentials (app_id/app_secret) must be configured first via the 'configure_im_credentials' tool.`),
+		aitool.WithVerboseName("Send IM Message"),
+		aitool.WithVerboseNameZh("发送IM消息"),
 		aitool.WithStringParam("platform",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("Target IM platform. Currently supported: 'feishu' (Feishu/Lark), 'dingtalk' (DingTalk)."),
@@ -121,6 +123,8 @@ Credentials (app_id/app_secret) must be configured first via the 'configure_im_c
 	credTool, err := aitool.New(
 		"configure_im_credentials",
 		aitool.WithDescription(`Configure the credentials (app_id/app_secret) for an IM platform so that 'send_im_message' can use them. Credentials are kept in memory for the lifetime of this process.`),
+		aitool.WithVerboseName("Configure IM Credentials"),
+		aitool.WithVerboseNameZh("配置IM凭证"),
 		aitool.WithStringParam("platform",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("Platform to configure: 'feishu' or 'dingtalk'."),

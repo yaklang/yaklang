@@ -31,6 +31,8 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 	factory := aitool.NewFactory()
 	err = factory.RegisterTool("ls",
 		aitool.WithDescription("list files in directory or get file info"),
+		aitool.WithVerboseName("List Files"),
+		aitool.WithVerboseNameZh("列目录"),
 		aitool.WithStringParam("path", aitool.WithParam_Required(true)),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			pathName := params.GetString("path")
@@ -238,6 +240,8 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 	err = factory.RegisterTool(
 		"copy_file",
 		aitool.WithDescription("copy file"),
+		aitool.WithVerboseName("Copy File"),
+		aitool.WithVerboseNameZh("复制文件"),
 		aitool.WithStringParam("src",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("source file path"),

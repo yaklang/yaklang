@@ -1,6 +1,6 @@
 __DESC__ = "Send one HTTP request. Prefer URL mode with structured query/form objects: pass original unescaped values and the tool URL-encodes them safely. Use body for a raw JSON/XML/text body. Use packet when exact bytes, duplicate parameters, ordering, or custom encoding matter. Use batch_do_http_request for multiple requests. 发送单个 HTTP 请求。优先使用 URL 模式的 query/form 对象，传原始未转义值，由工具安全编码；JSON/XML/文本使用 body；需要精确数据包、重复参数、顺序或自定义编码时使用 packet；多请求使用 batch_do_http_request。"
-__VERBOSE_NAME__ = "Powerful HTTP Request Tool (curl-like)"
-__VERBOSE_NAME_ZH__ = "强大的HTTP请求工具（类curl）"
+__VERBOSE_NAME__ = "HTTP Request"
+__VERBOSE_NAME_ZH__ = "HTTP请求"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 
 __USAGE__ = <<<USAGE_BLOCK

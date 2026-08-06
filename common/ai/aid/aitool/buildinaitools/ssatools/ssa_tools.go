@@ -53,6 +53,8 @@ func CreateSSATools() ([]*aitool.Tool, error) {
 func registerProjectInfoTool(factory *aitool.ToolFactory) error {
 	return factory.RegisterTool(
 		"ssa-project-info",
+		aitool.WithVerboseName("SSA Project Info"),
+		aitool.WithVerboseNameZh("SSA项目信息"),
 		aitool.WithDescription("获取SSA项目的详细信息，包括项目元数据、文件列表、编译配置等。优先从数据库读取源码，如果不可用则尝试从原始编译路径读取"),
 		aitool.WithKeywords([]string{"SSA", "项目信息", "Program", "内存模式", "源码", "project info", "metadata"}),
 		aitool.WithStringParam("program_name",
@@ -227,6 +229,8 @@ func projectInfoCallback(params aitool.InvokeParams, stdout io.Writer, stderr io
 func registerListFilesTool(factory *aitool.ToolFactory) error {
 	return factory.RegisterTool(
 		"ssa-list-files",
+		aitool.WithVerboseName("SSA List Files"),
+		aitool.WithVerboseNameZh("SSA列文件"),
 		aitool.WithDescription("列出SSA项目中的所有源代码文件，优先从数据库读取，fallback到本地文件系统"),
 		aitool.WithKeywords([]string{"SSA", "文件列表", "项目文件", "list files", "source code", "源码文件"}),
 		aitool.WithStringParam("program_name",
@@ -388,6 +392,8 @@ func listFilesCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.W
 func registerReadFileTool(factory *aitool.ToolFactory) error {
 	return factory.RegisterTool(
 		"ssa-read-file",
+		aitool.WithVerboseName("SSA Read File"),
+		aitool.WithVerboseNameZh("SSA读文件"),
 		aitool.WithDescription("读取SSA项目中的指定源代码文件，优先从数据库读取，fallback到本地文件系统，支持按行分页"),
 		aitool.WithKeywords([]string{"SSA", "读取文件", "源代码", "read file", "source code", "按行读取", "分页"}),
 		aitool.WithStringParam("program_name",
@@ -544,6 +550,8 @@ func readFileCallback(params aitool.InvokeParams, stdout io.Writer, stderr io.Wr
 func registerGrepTool(factory *aitool.ToolFactory) error {
 	return factory.RegisterTool(
 		"ssa-grep",
+		aitool.WithVerboseName("SSA Grep"),
+		aitool.WithVerboseNameZh("SSA搜索"),
 		aitool.WithDescription("在SSA项目的源代码中搜索匹配的文本或正则表达式，优先从数据库读取，fallback到本地文件系统"),
 		aitool.WithKeywords([]string{"SSA", "grep", "搜索", "代码搜索", "search", "pattern", "正则表达式", "文本查找"}),
 		aitool.WithStringParam("program_name",

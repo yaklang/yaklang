@@ -763,7 +763,8 @@ func buildStubToolFromMCPCache(fullName string, cfg *schema.MCPServerToolConfig)
 		aitool.WithMCPPendingStub(true),
 		aitool.WithDescription(desc),
 		aitool.WithKeywords([]string{"mcp", serverName, toolName, "external", "remote"}),
-		aitool.WithVerboseName(fmt.Sprintf("%s (MCP:%s)", toolName, serverName)),
+		aitool.WithVerboseName(fmt.Sprintf("%s", toolName)),
+		aitool.WithVerboseNameZh(fmt.Sprintf("%s", toolName)),
 		// Callback returns a retryable error so AI can degrade gracefully
 		// instead of crashing when the MCP server is still initializing.
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
