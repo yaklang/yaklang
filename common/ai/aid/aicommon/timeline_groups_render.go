@@ -809,6 +809,25 @@ func extractTextEntryType(text string) string {
 	return ""
 }
 
+// extractTextTimelineContent 从 TextTimelineItem.Text 提取 body 内容,
+// 与 parseTextTimelineItem 的内容解析逻辑一致 (含历史格式 removeIndent 兼容).
+// 关键词: TextTimelineItem content 提取, timeline prompt projection
+func extractTextTimelineContent(text string) string {
+	if text == "" {
+		return ""
+	}
+	colonIndex := strings.Index(text, ":\n")
+	if colonIndex != -1 {
+		content := text[colonIndex+2:]
+		return removeIndent(content, "  ")
+	}
+	colonIndex = strings.Index(text, ":")
+	if colonIndex != -1 {
+		return strings.TrimSpace(text[colonIndex+1:])
+	}
+	return text
+}
+
 // selectShrunkContent 优先返回 GetShrinkResult，回退到 GetShrinkSimilarResult，最后回退到 String
 // 用于 token 节省：尽量使用已存在的精简表示
 // 关键词: 优先 ShrinkResult, token 优化

@@ -261,7 +261,7 @@ func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, id
 // reserveToolArtifactDir never reuses an existing bundle. This matters during
 // checkpoint replay: the caller prepares a bundle before it discovers the
 // stored result, and truncating the original artifact here would make the HINT
-// in the replayed Data point at destroyed files.
+// in the replayed Data point at destroyed files. (ARTIFACT: paths)
 func reserveToolArtifactDir(base string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(base), 0o755); err != nil {
 		return base, err
@@ -396,14 +396,11 @@ func fileStats(path string) artifactFileStats {
 
 func toolArtifactHint(b *toolCallArtifactBundle, persistErr error) string {
 	if persistErr != nil || b == nil {
-		return fmt.Sprintf("HINT:\nComplete output could not be persisted (artifact_persist_failed: %v). This is a bounded preview; omitted content is unrecoverable.", persistErr)
+		return fmt.Sprintf("HINT:\nartifact_persist_failed: %v. This is a bounded preview; omitted content is unrecoverable.", persistErr)
 	}
-	return fmt.Sprintf(`HINT:
-Complete tool output is stored in artifacts:
-- combined output: %s
-- result: %s
-Use grep first, or read_file(file=%q, mode="lines", offset=..., lines=...).
-Do not load or cat the complete artifact unless necessary.`, b.combinedPath, b.resultPath, b.combinedPath)
+	// 仅保留 artifact 路径; grep / read_file 等使用纪律由 high_static_section.txt
+	// 的 "Timeline 工具产物 (Artifact)" 段集中说明, 不在每条 toolcall 重复.
+	return fmt.Sprintf("ARTIFACT:\n- combined: %s\n- result: %s", b.combinedPath, b.resultPath)
 }
 
 func shrinkBodyWithStats(body string, budget int) string {
@@ -414,7 +411,7 @@ func shrinkBodyWithStats(body string, budget int) string {
 	if len(tokens) <= budget {
 		return body
 	}
-	marker := fmt.Sprintf("\n\n... [truncated %d tokens, %d bytes and %d lines from the middle; inspect artifacts from HINT] ...\n\n",
+	marker := fmt.Sprintf("\n\n... [truncated %d tokens, %d bytes and %d lines from the middle; inspect artifacts (see ARTIFACT: paths)] ...\n\n",
 		len(tokens)-budget, len(body), strings.Count(body, "\n"))
 	markerTokens := ytoken.CalcTokenCount(marker)
 	available := budget - markerTokens
@@ -503,7 +500,10 @@ func enforceCanonicalToolResultLimit(toolResult *aitool.ToolResult) {
 		if !ok || data == "" {
 			break
 		}
-		hintIndex := strings.LastIndex(data, "\n\nHINT:\n")
+		hintIndex := strings.LastIndex(data, "\n\nARTIFACT:\n")
+		if hintIndex < 0 {
+			hintIndex = strings.LastIndex(data, "\n\nHINT:\n")
+		}
 		if hintIndex < 0 {
 			break
 		}
@@ -528,7 +528,7 @@ func (b *toolCallArtifactBundle) finalize(
 	if toolResult == nil {
 		return nil
 	}
-	if data, ok := toolResult.Data.(string); ok && strings.Contains(data, "COMBINED OUTPUT:\n") && strings.Contains(data, "\n\nRESULT:\n") && strings.Contains(data, "\n\nHINT:\n") {
+	if data, ok := toolResult.Data.(string); ok && strings.Contains(data, "COMBINED OUTPUT:\n") && strings.Contains(data, "\n\nRESULT:\n") && (strings.Contains(data, "\n\nARTIFACT:\n") || strings.Contains(data, "\n\nHINT:\n")) {
 		// A current-format checkpoint already owns stable artifact paths. Do not
 		// wrap the preview again or rewrite its bytes during replay.
 		b.closeStreams()

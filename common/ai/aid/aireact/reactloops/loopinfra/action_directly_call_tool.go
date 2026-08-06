@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"io"
 	"sort"
 	"strings"
@@ -60,9 +61,9 @@ func formatDirectlyCallToolParamsTimeline(toolName string, params aitool.InvokeP
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("直接调用工具%s生成的参数为：", toolName))
+	sb.WriteString(fmt.Sprintf("ToolName %s Parameter:", toolName))
 	for _, key := range directlyCallParamKeys(params) {
-		if key == aicommon.ReservedKeyIdentifier || key == aicommon.ReservedKeyCallExpectations {
+		if key == aicommon.ReservedKeyIdentifier || key == aicommon.ReservedKeyCallExpectations || funk.IsEmpty(params[key]) {
 			continue
 		}
 		displayKey := key
@@ -76,7 +77,7 @@ func formatDirectlyCallToolParamsTimeline(toolName string, params aitool.InvokeP
 			sb.WriteString("\n")
 			sb.WriteString(value)
 		} else {
-			sb.WriteString(fmt.Sprintf("[%s]: %s", displayKey, value))
+			sb.WriteString(fmt.Sprintf("%s: %s", displayKey, value))
 		}
 	}
 	return sb.String()
@@ -381,7 +382,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			}
 		}
 		reportStatus := func(msg string) {
-			invoker.AddToTimeline("[DIRECT_CALL_PARAMS]", msg)
+			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
 		}
 
 		toolName := loop.Get("directly_call_tool_name")
@@ -411,7 +412,7 @@ Few-shot example 2 (valid directly_call_tool):
 			loopInfraStatus(loop, "缓存工具不可用 / Cached Tool Unavailable")
 			msg := fmt.Sprintf("directly_call_tool cached tool lookup failed for '%s'; switch to @action=require_tool", toolName)
 			operator.Feedback(utils.Error(msg))
-			invoker.AddToTimeline("[DIRECT_CALL_PARAMS]", msg)
+			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
 			operator.Continue()
 			return
 		}
