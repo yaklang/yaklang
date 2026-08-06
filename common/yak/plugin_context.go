@@ -18,6 +18,7 @@ type YakitPluginContext struct {
 	vulFilter                 filter.Filterable
 	YakitClient               *yaklib.YakitClient
 	AfterSaveHTTPFlowHandlers []func(*schema.HTTPFlow)
+	RiskSaveHandler           func(context.Context, *schema.Risk) error
 }
 
 func (y *YakitPluginContext) WithContextCancel(cancel context.CancelFunc) *YakitPluginContext {
@@ -68,6 +69,11 @@ func (y *YakitPluginContext) WithAfterSaveHTTPFlowHandler(handlers ...func(*sche
 		return y
 	}
 	y.AfterSaveHTTPFlowHandlers = append(y.AfterSaveHTTPFlowHandlers, handlers...)
+	return y
+}
+
+func (y *YakitPluginContext) WithRiskSaveHandler(handler func(context.Context, *schema.Risk) error) *YakitPluginContext {
+	y.RiskSaveHandler = handler
 	return y
 }
 

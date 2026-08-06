@@ -1373,6 +1373,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	pluginUUID = pluginContext.PluginUUID
 	proxy = pluginContext.Proxy
 	afterSaveHTTPFlowHandlers := append([]func(*schema.HTTPFlow){}, pluginContext.AfterSaveHTTPFlowHandlers...)
+	riskSaveHandler := pluginContext.RiskSaveHandler
 
 	streamContext := context.Background()
 	if pluginContext.Ctx != nil {
@@ -1576,6 +1577,16 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if runtimeId != "" {
 					opts = append(opts, yakit.WithRiskParam_RuntimeId(runtimeId))
 				}
+				if riskSaveHandler != nil {
+					riskRecord := yakit.CreateRisk(target, opts...)
+					if err := riskSaveHandler(streamContext, riskRecord); err != nil {
+						panic(err)
+					}
+					if pluginContext.YakitClient != nil {
+						_ = pluginContext.YakitClient.Output(riskRecord)
+					}
+					return
+				}
 				originFunc(target, opts...)
 			}
 		}
@@ -1586,8 +1597,26 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(r *schema.Risk) error)
 		if ok {
 			return func(r *schema.Risk) error {
+				if r == nil {
+					return utils.Error("risk is required")
+				}
 				if runtimeId != "" {
 					r.RuntimeId = runtimeId
+				}
+				if r.FromYakScript == "" {
+					r.FromYakScript = pluginName
+				}
+				if r.YakScriptUUID == "" {
+					r.YakScriptUUID = pluginUUID
+				}
+				if riskSaveHandler != nil {
+					if err := riskSaveHandler(streamContext, r); err != nil {
+						return err
+					}
+					if pluginContext.YakitClient != nil {
+						_ = pluginContext.YakitClient.Output(r)
+					}
+					return nil
 				}
 				return originFunc(r)
 			}

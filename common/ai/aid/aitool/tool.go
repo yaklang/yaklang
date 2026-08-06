@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/yaklang/yaklang/common/schema"
+
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -20,6 +22,9 @@ import (
 type ToolRuntimeConfig struct {
 	FeedBacker func(result *ypb.ExecResult) error
 	RuntimeID  string
+	// RiskSaveHandler replaces the process-local SQLite write for a risk when
+	// the current AI runtime is bound to a platform-owned result sink.
+	RiskSaveHandler func(context.Context, *schema.Risk) error
 	// BrowserSessionTracker is set for AI ReAct tool runs to hook browser.Open/Close ids.
 	BrowserSessionTracker interface {
 		TrackBrowserSession(id string)

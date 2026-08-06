@@ -188,7 +188,7 @@ func focusModeRunCallerOptions(
 	if ctx := config.GetContext(); ctx != nil {
 		callerOpts = append(callerOpts, WithFocusModeCallerParentContext(ctx))
 	}
-	if runtime := aicommon.FocusRuntimeFromConfig(config); runtime != nil {
+	if runtime := aicommon.LegionResultRuntimeFromConfig(config); runtime != nil {
 		callerOpts = append(callerOpts, WithFocusModeCallerVars(map[string]any{
 			serverFocusRuntimeGlobal: runtime,
 		}))

@@ -184,26 +184,26 @@ func TestConfig_ToolManagerPropagation(t *testing.T) {
 	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
 }
 
-type testFocusRuntime struct{}
+type testLegionResultRuntime struct{}
 
-func (testFocusRuntime) AuthorizedTarget() string { return "https://example.test/" }
+func (testLegionResultRuntime) AuthorizedTarget() string { return "https://example.test/" }
 
-func (testFocusRuntime) Execute(string, map[string]any) (map[string]any, error) {
+func (testLegionResultRuntime) Execute(string, map[string]any) (map[string]any, error) {
 	return map[string]any{"ok": true}, nil
 }
 
-func TestConfigFocusRuntimeIsRunScoped(t *testing.T) {
-	runtime := testFocusRuntime{}
-	config := NewConfig(context.Background(), WithFocusRuntime(runtime))
-	if FocusRuntimeFromConfig(config) == nil {
-		t.Fatal("expected focus runtime on parent config")
+func TestConfigLegionResultRuntimeIsRunScoped(t *testing.T) {
+	runtime := testLegionResultRuntime{}
+	config := NewConfig(context.Background(), WithLegionResultRuntime(runtime))
+	if LegionResultRuntimeFromConfig(config) == nil {
+		t.Fatal("expected legion result runtime on parent config")
 	}
 	child := NewConfig(context.Background(), config.OriginOptions()...)
-	if FocusRuntimeFromConfig(child) == nil {
-		t.Fatal("expected focus runtime to propagate to child config")
+	if LegionResultRuntimeFromConfig(child) == nil {
+		t.Fatal("expected legion result runtime to propagate to child config")
 	}
-	if FocusRuntimeFromConfig(struct{}{}) != nil {
-		t.Fatal("expected configs without FocusRuntimeProvider to remain compatible")
+	if LegionResultRuntimeFromConfig(struct{}{}) != nil {
+		t.Fatal("expected configs without LegionResultRuntimeProvider to remain compatible")
 	}
 }
 

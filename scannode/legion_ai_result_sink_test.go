@@ -430,6 +430,29 @@ func TestValidateLegionAIFocusResultContextRejectsIncompleteIdentity(t *testing.
 	}
 }
 
+func TestValidateLegionAIConversationResultContextAllowsNoFocusRelease(t *testing.T) {
+	t.Parallel()
+
+	resultContext := validAIFocusResultContext()
+	resultContext.FocusMode = legionAIConversationAuditResultMode
+	resultContext.FocusReleaseId = ""
+	resultContext.ExecutionMode = legionAIConversationExecutionMode
+
+	ref, err := validateLegionAIFocusResultContext("bind-1", resultContext)
+	if err != nil {
+		t.Fatalf("validate conversation result context: %v", err)
+	}
+	if ref.JobID != resultContext.GetJob().GetJobId() || ref.AttemptID != resultContext.GetJob().GetAttemptId() {
+		t.Fatalf("unexpected conversation result ref: %#v", ref)
+	}
+
+	resultContext.ExecutionMode = "single_run"
+	if _, err := validateLegionAIFocusResultContext("bind-1", resultContext); err == nil ||
+		!strings.Contains(err.Error(), "conversation result execution_mode") {
+		t.Fatalf("expected conversation lifecycle validation, got %v", err)
+	}
+}
+
 func TestValidateAISessionBindCommandRequiresMatchingFocusRun(t *testing.T) {
 	t.Parallel()
 

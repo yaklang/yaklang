@@ -11,20 +11,20 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type registerTestFocusRuntime struct{ target string }
+type registerTestLegionResultRuntime struct{ target string }
 
-func (r registerTestFocusRuntime) AuthorizedTarget() string { return r.target }
+func (r registerTestLegionResultRuntime) AuthorizedTarget() string { return r.target }
 
-func (registerTestFocusRuntime) Execute(string, map[string]any) (map[string]any, error) {
+func (registerTestLegionResultRuntime) Execute(string, map[string]any) (map[string]any, error) {
 	return map[string]any{"ok": true}, nil
 }
 
 type registerTestFocusConfig struct {
 	aicommon.AICallerConfigIf
-	runtime aicommon.FocusRuntime
+	runtime aicommon.LegionResultRuntime
 }
 
-func (c *registerTestFocusConfig) GetFocusRuntime() aicommon.FocusRuntime { return c.runtime }
+func (c *registerTestFocusConfig) GetLegionResultRuntime() aicommon.LegionResultRuntime { return c.runtime }
 
 // 验证 RegisterYakFocusModeFromBundle 的 boot/run 双相行为：
 //   - boot 期：从 yak 脚本中提取 metadata，注册到全局表
@@ -188,7 +188,7 @@ computeName = func() {
 	require.Equal(t, "computed via sidekick", meta.VerboseName)
 }
 
-func TestRegisterYakFocusMode_InjectsRunScopedFocusRuntime(t *testing.T) {
+func TestRegisterYakFocusMode_InjectsRunScopedLegionResultRuntime(t *testing.T) {
 	code := `
 readAuthorizedTarget = func() {
     return focusRuntime.AuthorizedTarget()
@@ -198,7 +198,7 @@ readAuthorizedTarget = func() {
 	invoker := aicommonmock.NewMockInvoker(context.Background())
 	invoker.SetConfig(&registerTestFocusConfig{
 		AICallerConfigIf: baseConfig,
-		runtime:          registerTestFocusRuntime{target: "https://example.test/authorized"},
+		runtime:          registerTestLegionResultRuntime{target: "https://example.test/authorized"},
 	})
 	caller, err := NewFocusModeYakHookCaller(
 		"runtime.ai-focus.yak",

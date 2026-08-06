@@ -279,8 +279,8 @@ func buildYakAIEngineOptions(
 		config = append(config, aiengine.WithTimelineContentLimit(int(options.TimelineContentSizeLimit)))
 	}
 	extOptions := buildYakAICommonExtOptions(options)
-	if binding.FocusRuntime != nil {
-		extOptions = append(extOptions, aicommon.WithFocusRuntime(binding.FocusRuntime))
+	if binding.LegionResultRuntime != nil {
+		extOptions = append(extOptions, aicommon.WithLegionResultRuntime(binding.LegionResultRuntime))
 	}
 	if len(extOptions) > 0 {
 		config = append(config, aiengine.WithExtOptions(extOptions...))

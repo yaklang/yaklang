@@ -408,6 +408,14 @@ func (a *ToolCaller) invoke(
 			return nil
 		},
 	}
+	// When the runtime is bound to a server-authorized target (Focus release or
+	// conversation-audit session), route tool-emitted risks to the platform
+	// result sink instead of process-local SQLite.
+	if resultRuntime := LegionResultRuntimeFromConfig(a.config); resultRuntime != nil {
+		runtimeCfg.RiskSaveHandler = func(_ context.Context, risk *schema.Risk) error {
+			return submitToolRiskToPlatformSink(resultRuntime, risk)
+		}
+	}
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),
@@ -481,6 +489,41 @@ func (a *ToolCaller) invoke(
 	}
 
 	return execResult, execErr
+}
+
+// submitToolRiskToPlatformSink routes a tool-emitted risk into the
+// server-authorized result sink (Legion JobRisk) via the bound LegionResultRuntime.
+// When no runtime is bound (e.g. desktop client without a server context),
+// RiskSaveHandler stays nil and the caller falls back to local SQLite.
+func submitToolRiskToPlatformSink(runtime LegionResultRuntime, risk *schema.Risk) error {
+	if runtime == nil {
+		return errors.New("AI result runtime is unavailable")
+	}
+	if risk == nil {
+		return errors.New("risk is required")
+	}
+	target := strings.TrimSpace(risk.Url)
+	if target == "" {
+		target = strings.TrimSpace(runtime.AuthorizedTarget())
+	}
+	_, err := runtime.Execute("result.risk", map[string]any{
+		"verified":          true,
+		"target":            target,
+		"title":             risk.Title,
+		"risk_type":         risk.RiskType,
+		"severity":          risk.Severity,
+		"parameter":         risk.Parameter,
+		"payload":           risk.Payload,
+		"description":       risk.Description,
+		"solution":          risk.Solution,
+		"details":           risk.Details,
+		"request_evidence":  risk.QuotedRequest,
+		"response_evidence": risk.QuotedResponse,
+	})
+	if err != nil {
+		return fmt.Errorf("submit risk to platform result sink: %w", err)
+	}
+	return nil
 }
 
 // shouldIgnoreExecResultForEmit checks if the ExecResult should be ignored
