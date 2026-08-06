@@ -72,9 +72,9 @@ func TestFormatDirectlyCallToolParamsTimeline(t *testing.T) {
 		"target":  "https://example.com",
 	}
 	got := formatDirectlyCallToolParamsTimeline("cybersecurity-risk", params, nil)
-	assert.Contains(t, got, "直接调用工具cybersecurity-risk生成的参数为：")
-	assert.Contains(t, got, "[title]: test title")
-	assert.Contains(t, got, "[target]: https://example.com")
+	assert.Contains(t, got, "ToolName cybersecurity-risk Parameter:")
+	assert.Contains(t, got, "title: test title")
+	assert.Contains(t, got, "target: https://example.com")
 	assert.Contains(t, got, "[payload]:\nline1\nline2\nline3")
 
 	blockGot := formatDirectlyCallToolParamsTimeline("bash", aitool.InvokeParams{
@@ -82,7 +82,7 @@ func TestFormatDirectlyCallToolParamsTimeline(t *testing.T) {
 		"timeout": 20,
 	}, []string{"command"})
 	assert.Contains(t, blockGot, "[command(BLOCK)]:\n#!/bin/bash\necho hello")
-	assert.Contains(t, blockGot, "[timeout]: 20")
+	assert.Contains(t, blockGot, "timeout: 20")
 }
 
 func TestNormalizeDirectlyCallToolParams_LegacyWrappedString(t *testing.T) {
@@ -158,8 +158,8 @@ func TestDirectlyCallTool_Handler_NormalizesWrappedParamsAndStreamsProgress(t *t
 	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'sleep_test': 1 fields [seconds]")
 
 	timeline := invoker.getTimelineString()
-	assert.Contains(t, timeline, "直接调用工具sleep_test生成的参数为：")
-	assert.Contains(t, timeline, "[seconds]: 0.1")
+	assert.Contains(t, timeline, "ToolName sleep_test Parameter:")
+	assert.Contains(t, timeline, "seconds: 0.1")
 	assert.NotContains(t, timeline, "preparing directly_call_tool params")
 	assert.NotContains(t, timeline, "normalized 1 param fields")
 	assert.NotContains(t, timeline, "calling cached tool")
@@ -206,9 +206,9 @@ func TestDirectlyCallTool_Handler_MergesAITagParams(t *testing.T) {
 	assert.Equal(t, "#!/bin/bash\necho hello", invoker.withoutRequiredParams.GetString("command"))
 	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'bash_test': 2 fields [command(BLOCK), timeout]")
 	timeline := invoker.getTimelineString()
-	assert.Contains(t, timeline, "直接调用工具bash_test生成的参数为：")
+	assert.Contains(t, timeline, "ToolName bash_test Parameter:")
 	assert.Contains(t, timeline, "[command(BLOCK)]:\n#!/bin/bash\necho hello")
-	assert.Contains(t, timeline, "[timeout]: 20")
+	assert.Contains(t, timeline, "timeout: 20")
 	assert.NotContains(t, timeline, "merged 1 AITAG block params")
 }
 
