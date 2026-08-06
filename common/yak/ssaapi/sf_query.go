@@ -569,7 +569,7 @@ func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...Que
 		opts = append(opts, QueryWithProgram(top))
 	}
 	log.Infof("overlay SF dual-source scan: programs=%d exclude=%d diffs=%d",
-		p.ProgramCount(), p.excludeCount(), len(p.Diff))
+		p.ProgramCount(), len(p.ExcludeFile), len(p.Diff))
 	return QuerySyntaxflow(opts...)
 }
 

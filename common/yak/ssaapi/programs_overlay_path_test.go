@@ -34,14 +34,17 @@ func TestOverlayExcludeAndDiffOwnership(t *testing.T) {
 	overlay.Diff = []*ProgramLayer{
 		{File: []string{"/changed.java"}},
 	}
-	overlay.setOwnerByPath(map[string]int{"/changed.java": 0})
-	overlay.setDeletedFiles(nil)
+	overlay.setExcludeFile(map[string]struct{}{"/gone.java": {}})
 
 	require.Contains(t, overlay.Diff[0].File, "/changed.java")
 	require.True(t, overlay.IsExcludedPath("/changed.java"))
+	require.True(t, overlay.IsExcludedPath("/gone.java"))
 	require.False(t, overlay.IsExcludedPath("/unchanged.java"))
-	require.Contains(t, overlay.excludeFiles(), "/changed.java")
+	require.Contains(t, overlay.ExcludeFile, "/changed.java")
+	require.Contains(t, overlay.ExcludeFile, "/gone.java")
 	owner, ok := overlay.ownerDiffIndex("/changed.java")
 	require.True(t, ok)
 	require.Equal(t, 0, owner)
+	_, ownedGone := overlay.ownerDiffIndex("/gone.java")
+	require.False(t, ownedGone)
 }
