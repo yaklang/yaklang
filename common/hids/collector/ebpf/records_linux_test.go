@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	gopsnet "github.com/shirou/gopsutil/v4/net"
+	gopsnet "github.com/shirou/gopsutil/v3/net"
 )
 
 func TestParseProcessRecord(t *testing.T) {

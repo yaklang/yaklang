@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	gopsnet "github.com/shirou/gopsutil/v4/net"
+	gopsnet "github.com/shirou/gopsutil/v3/net"
 )
 
 func TestEnrichProcessInventoryTreeLinksParentsAndChildren(t *testing.T) {

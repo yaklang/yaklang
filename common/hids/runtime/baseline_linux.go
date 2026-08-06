@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	gopsnet "github.com/shirou/gopsutil/v4/net"
-	gopsprocess "github.com/shirou/gopsutil/v4/process"
+	gopsnet "github.com/shirou/gopsutil/v3/net"
+	gopsprocess "github.com/shirou/gopsutil/v3/process"
 
 	"github.com/yaklang/yaklang/common/hids/model"
 	"github.com/yaklang/yaklang/common/log"

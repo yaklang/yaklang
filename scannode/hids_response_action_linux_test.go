@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	gopsprocess "github.com/shirou/gopsutil/v4/process"
+	gopsprocess "github.com/shirou/gopsutil/v3/process"
 )
 
 func TestExecuteProcessTerminate(t *testing.T) {
