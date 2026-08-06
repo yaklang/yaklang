@@ -12,19 +12,22 @@ import (
 func TestGetAIReActRecommendedSkills(t *testing.T) {
 	response, err := (&Server{}).GetAIReActRecommendedSkills(context.Background(), &ypb.Empty{})
 	require.NoError(t, err)
-	require.Len(t, response.GetData(), 2)
+	require.Len(t, response.GetData(), 3)
 
 	require.Equal(t, []string{
-		"pentest-task-design",
+		"security-engineering",
 		"code-review",
+		"pentest-task-design",
 	}, []string{
 		response.GetData()[0].GetName(),
 		response.GetData()[1].GetName(),
+		response.GetData()[2].GetName(),
 	})
 	for _, skill := range response.GetData() {
 		require.Equal(t, aicommon.EnabledCapabilityTypeSkill, skill.GetType())
 		require.NotEmpty(t, skill.GetDisplayNameZhCN())
 		require.NotEmpty(t, skill.GetDescription())
+		require.NotEmpty(t, skill.GetContent())
 	}
 
 	// The response fields are deliberately shaped so the frontend can pass
@@ -37,7 +40,8 @@ func TestGetAIReActRecommendedSkills(t *testing.T) {
 	}
 	config := aicommon.NewConfig(context.Background(), ConvertYPBAIStartParamsToReActConfig(params)...)
 	require.Equal(t, []string{
-		"pentest-task-design",
+		"security-engineering",
 		"code-review",
+		"pentest-task-design",
 	}, config.GetEnabledSkillNames())
 }

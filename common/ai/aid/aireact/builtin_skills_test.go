@@ -22,6 +22,7 @@ var allBuiltinSkills = []struct {
 	fsPath   string // path inside the embedded FS
 	keywords []string
 }{
+	{"security-engineering", "skills/security-engineering/SKILL.md", []string{"授权边界", "证据优先", "code-review", "pentest-task-design"}},
 	{"code-review", "skills/code-review/SKILL.md", []string{"grep", "CWE-89", "CWE-77", "CWE-79"}},
 	{"xss-testing", "skills/xss-testing/SKILL.md", []string{"XSS", "Payload", "CSP"}},
 	{"sql-injection", "skills/sql-injection/SKILL.md", []string{"UNION", "SQL", "Payload"}},

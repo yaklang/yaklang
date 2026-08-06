@@ -207,6 +207,15 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		if err := cfg.LoadBuiltinSkillsFromDir(aiSkillsDir); err != nil {
 			log.Warnf("failed to load skills from %s: %v", aiSkillsDir, err)
 		}
+		// Re-scan the canonical built-in directory last. Legacy top-level copies
+		// may share a name, but edits made through the recommended-skill API must
+		// be the version that a newly-created ReAct session loads.
+		builtinSkillsDir := filepath.Join(aiSkillsDir, "builtin")
+		if utils.IsDir(builtinSkillsDir) {
+			if err := cfg.LoadBuiltinSkillsFromDir(builtinSkillsDir); err != nil {
+				log.Warnf("failed to prioritize built-in skills from %s: %v", builtinSkillsDir, err)
+			}
+		}
 	}
 
 	if du := time.Since(configLoadingStart); du > 500*time.Millisecond {

@@ -1084,6 +1084,10 @@ service Yak {
   // 返回产品推荐的内置 ReAct 技能。前端选择后，将 Name/Type 原样写入
   // StartAIReAct 首条消息的 AIStartParams.EnabledCapabilities 即可预加载技能。
   rpc GetAIReActRecommendedSkills(Empty) returns (GetAIReActRecommendedSkillsResponse);
+  // 仅更新推荐技能的 Markdown 正文；技能标识与展示元数据仍使用内置默认值。
+  rpc UpdateAIReActRecommendedSkill(UpdateAIReActRecommendedSkillRequest) returns (AIReActRecommendedSkill);
+  // 将推荐技能完整恢复为随当前版本发布的内置默认内容。
+  rpc ResetAIReActRecommendedSkill(ResetAIReActRecommendedSkillRequest) returns (AIReActRecommendedSkill);
 }
 
 // IMBotConfig 描述一个 IM 平台 bot 的配置凭证。
@@ -9937,8 +9941,21 @@ message AIReActRecommendedSkill {
   string DisplayNameZhCN = 3;
   // 来自内置 SKILL.md frontmatter 的技能说明。
   string Description = 4;
+  // 当前生效的 Markdown 正文，不包含 YAML frontmatter，可由用户编辑。
+  string Content = 5;
+  // 当前正文是否与随当前版本发布的内置默认正文不同。
+  bool IsModified = 6;
 }
 
 message GetAIReActRecommendedSkillsResponse {
   repeated AIReActRecommendedSkill Data = 1;
+}
+
+message UpdateAIReActRecommendedSkillRequest {
+  string Name = 1;
+  string Content = 2;
+}
+
+message ResetAIReActRecommendedSkillRequest {
+  string Name = 1;
 }

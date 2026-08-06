@@ -86,15 +86,36 @@ func (m *SkillMeta) BriefString() string {
 
 const frontmatterDelimiter = "---"
 
-// ParseSkillMeta parses a SKILL.md content into SkillMeta.
-// The content must start with YAML frontmatter delimited by "---".
-func ParseSkillMeta(content string) (*SkillMeta, error) {
+// SkillDocument is a parsed SKILL.md document. It keeps the original
+// frontmatter text so callers can replace the Markdown body without
+// re-serializing YAML or implementing delimiter parsing themselves.
+type SkillDocument struct {
+	Meta           *SkillMeta
+	frontmatterDoc string
+}
+
+// ReplaceBody renders the document with a new Markdown body while preserving
+// the original, already-validated frontmatter.
+func (d *SkillDocument) ReplaceBody(body string) (string, error) {
+	if d == nil || d.Meta == nil || strings.TrimSpace(d.frontmatterDoc) == "" {
+		return "", utils.Error("skill document: parsed frontmatter is required")
+	}
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return d.frontmatterDoc + "\n", nil
+	}
+	return d.frontmatterDoc + "\n\n" + body + "\n", nil
+}
+
+// ParseSkillDocument parses both metadata and document boundaries. Callers
+// that need to update a SKILL.md should use this instead of splitting the YAML
+// frontmatter independently.
+func ParseSkillDocument(content string) (*SkillDocument, error) {
 	content = strings.TrimSpace(content)
 	if !strings.HasPrefix(content, frontmatterDelimiter) {
 		return nil, utils.Error("skill meta: content must start with YAML frontmatter (---)")
 	}
 
-	// Find the closing delimiter
 	rest := content[len(frontmatterDelimiter):]
 	idx := strings.Index(rest, "\n"+frontmatterDelimiter)
 	if idx < 0 {
@@ -102,20 +123,33 @@ func ParseSkillMeta(content string) (*SkillMeta, error) {
 	}
 
 	frontmatter := strings.TrimSpace(rest[:idx])
-	body := strings.TrimSpace(rest[idx+len("\n"+frontmatterDelimiter):])
+	closingEnd := len(frontmatterDelimiter) + idx + len("\n"+frontmatterDelimiter)
+	body := strings.TrimSpace(content[closingEnd:])
 
 	meta := &SkillMeta{}
 	if err := yaml.Unmarshal([]byte(frontmatter), meta); err != nil {
 		return nil, utils.Wrapf(err, "skill meta: failed to parse YAML frontmatter")
 	}
-
 	meta.Body = body
 
 	if err := meta.Validate(); err != nil {
 		log.Warnf("skill meta validation warning: %v", err)
 	}
 
-	return meta, nil
+	return &SkillDocument{
+		Meta:           meta,
+		frontmatterDoc: strings.TrimSpace(content[:closingEnd]),
+	}, nil
+}
+
+// ParseSkillMeta parses a SKILL.md content into SkillMeta.
+// The content must start with YAML frontmatter delimited by "---".
+func ParseSkillMeta(content string) (*SkillMeta, error) {
+	document, err := ParseSkillDocument(content)
+	if err != nil {
+		return nil, err
+	}
+	return document.Meta, nil
 }
 
 var includeDirectiveRegexp = regexp.MustCompile(`<!--\s*include:\s*(.+?)\s*-->`)
