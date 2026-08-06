@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/aisessioncleanup"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -88,6 +89,23 @@ func (s *Server) DeleteAIMemoryEntity(ctx context.Context, req *ypb.DeleteAIMemo
 		return nil, utils.Errorf("request is nil")
 	}
 
+	// Fast path: when the filter is completely empty, the caller wants to wipe ALL
+	// AI memory data. Use DropRecreateTable to instantly clear the memory tables
+	// and batch-delete all ai-memory-* RAG collections via SQL, instead of loading
+	// HNSW graphs and deleting row-by-row.
+	if isAIMemoryEntityFilterEmpty(req.GetFilter()) {
+		_, err := aisessioncleanup.DeleteAllAIMemoryArtifacts(db)
+		if err != nil {
+			return nil, err
+		}
+		return &ypb.DbOperateMessage{
+			TableName:  (&schema.AIMemoryEntity{}).TableName(),
+			Operation:  "delete",
+			EffectRows: 0, // rows not counted for DropRecreateTable fast path
+			ExtraMessage: "fast_path=drop_recreate_table",
+		}, nil
+	}
+
 	vecSingleton := s.getAIMemoryVectorSingleton()
 	hook := func(ctx context.Context, _ *gorm.DB, entities []schema.AIMemoryEntity) error {
 		return deleteAIMemoryVectorsBatch(ctx, vecSingleton, entities)
@@ -116,6 +134,45 @@ func (s *Server) DeleteAIMemoryEntity(ctx context.Context, req *ypb.DeleteAIMemo
 		Operation:  "delete",
 		EffectRows: count,
 	}, nil
+}
+
+// isAIMemoryEntityFilterEmpty returns true when the filter carries no meaningful
+// constraint, meaning the caller wants to delete ALL memory entities.
+func isAIMemoryEntityFilterEmpty(filter *ypb.AIMemoryEntityFilter) bool {
+	if filter == nil {
+		return true
+	}
+	if strings.TrimSpace(filter.GetSessionID()) != "" {
+		return false
+	}
+	if len(filter.GetMemoryID()) > 0 {
+		return false
+	}
+	if strings.TrimSpace(filter.GetContentKeyword()) != "" {
+		return false
+	}
+	if len(filter.GetTags()) > 0 {
+		return false
+	}
+	if strings.TrimSpace(filter.GetPotentialQuestionKeyword()) != "" {
+		return false
+	}
+	if filter.GetCScore() != nil || filter.GetOScore() != nil || filter.GetRScore() != nil {
+		return false
+	}
+	if filter.GetEScore() != nil || filter.GetPScore() != nil || filter.GetAScore() != nil || filter.GetTScore() != nil {
+		return false
+	}
+	if filter.GetCreatedAt() != nil || filter.GetUpdatedAt() != nil {
+		return false
+	}
+	if strings.TrimSpace(filter.GetSemanticQuery()) != "" {
+		return false
+	}
+	if len(filter.GetCorePactQueryVector()) > 0 {
+		return false
+	}
+	return true
 }
 
 // aiMemoryVectorSessionSingleton 保证再批量删除的时候同一会话ID的HNSW和RAG实例不会重复创建，减少性能消耗

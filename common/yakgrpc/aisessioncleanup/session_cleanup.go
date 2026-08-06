@@ -408,3 +408,44 @@ func isMissingTableErr(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist")
 }
+
+// DeleteAllAIMemoryArtifacts 清空全部 AI 记忆数据（不含会话/runtime/event 等会话元数据）。
+// 供 DeleteAIMemoryEntity 在 filter 全空时调用，快速清空所有记忆相关表。
+//
+// 与 DeleteAllSessionArtifacts 不同，本函数只处理 AI Memory 侧的表和 RAG 集合：
+//   - 用 schema.DropRecreateTable 快速清空 4 张记忆表（entity + collection × 普通/中期归档）
+//   - 用 SQL 批量删除所有 ai-memory-% RAG 集合（向量文档 + collection 行）
+//
+// 不加载 HNSW 图、不走 RAG vectorstore 运行时，性能远优于逐条删除。
+func DeleteAllAIMemoryArtifacts(db *gorm.DB) (*SessionCleanupResult, error) {
+	result := &SessionCleanupResult{}
+	if db == nil {
+		return result, utils.Errorf("database is nil")
+	}
+
+	// 1. 删除所有 ai-memory-% RAG 集合（向量文档 + collection 行）
+	ragLike := "ai-memory-%"
+	if err := deleteRAGCollectionsForSession(db, ragLike, result); err != nil {
+		return result, err
+	}
+
+	// 2. Drop + Recreate 所有记忆表，比 DELETE FROM 快得多
+	memoryTables := []interface{}{
+		&schema.AIMemoryEntity{},
+		&schema.AIMemoryCollection{},
+		&schema.AIMidtermArchiveEntity{},
+		&schema.AIMidtermArchiveCollection{},
+	}
+	for _, model := range memoryTables {
+		if err := schema.DropRecreateTable(db, model); err != nil {
+			return result, err
+		}
+	}
+
+	log.Infof(
+		"deleted all AI memory artifacts: rag_collections=%d rag_documents=%d (memory tables dropped & recreated)",
+		result.DeletedRAGCollections,
+		result.DeletedRAGDocuments,
+	)
+	return result, nil
+}
