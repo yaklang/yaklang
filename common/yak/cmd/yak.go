@@ -547,6 +547,15 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "socket-path",
 			Usage: "IPC socket 路径或管道名（仅 unix/npipe）；Unix 新建父目录默认 0700，保留已有目录权限，socket 为 0600",
 		},
+		cli.IntFlag{
+			Name:  "browser-extension-bridge-port",
+			Value: 64333,
+			Usage: "浏览器插件本机 Bridge 端口",
+		},
+		cli.BoolFlag{
+			Name:  "disable-browser-extension-bridge",
+			Usage: "关闭浏览器插件本机 Bridge",
+		},
 	},
 	Action: func(c *cli.Context) (finalError error) {
 		grpcStartTime := time.Now()
@@ -803,10 +812,20 @@ var startGRPCServerCommand = cli.Command{
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
 		reverse_port := c.Int("reverse-port")
-		s, err := yakgrpc.NewServer(
+		init_reverse := c.Bool("disable-reverse-server")
+		serverOptions := []yakgrpc.ServerOpts{
 			yakgrpc.WithReverseServerPort(reverse_port),
+			yakgrpc.WithInitFacadeServer(!init_reverse),
 			yakgrpc.WithStartCacheLog(),
-		)
+		}
+		if !c.Bool("disable-browser-extension-bridge") {
+			bridgePort := c.Int("browser-extension-bridge-port")
+			if bridgePort <= 0 || bridgePort > 65535 {
+				return utils.Errorf("browser extension bridge port out of range: %d", bridgePort)
+			}
+			serverOptions = append(serverOptions, yakgrpc.WithBrowserExtensionBridge(bridgePort))
+		}
+		s, err := yakgrpc.NewServer(serverOptions...)
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
 			grpcPhase = "build_server"
@@ -815,6 +834,11 @@ var startGRPCServerCommand = cli.Command{
 			finalError = err
 			return
 		}
+		defer func() {
+			if closeErr := s.CloseBrowserExtensionBridge(); closeErr != nil {
+				log.Warnf("close browser extension bridge failed: %v", closeErr)
+			}
+		}()
 		ypb.RegisterYakServer(grpcTrans, s)
 
 		// TCP 监听地址和端口；IPC 分支不使用这些值。

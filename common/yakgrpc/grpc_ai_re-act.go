@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/samber/lo"
@@ -65,11 +66,27 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 	if runtime == nil {
 		return utils.Error("AI ReAct session runtime is not configured")
 	}
+	extraOptions := append([]aicommon.ConfigOption{}, additionalOptions...)
+	if forgeName := strings.TrimSpace(startParams.GetForgeName()); forgeName != "" {
+		preparation, handled, prepareErr := s.prepareRuntimeForgeReAct(
+			forgeName,
+			stream.Context(),
+			startParams.GetForgeParams(),
+			startParams.GetUserQuery(),
+		)
+		if prepareErr != nil {
+			return utils.Errorf("prepare runtime AI forge[%s] for ReAct: %v", forgeName, prepareErr)
+		}
+		if handled {
+			extraOptions = append(extraOptions, preparation.Options...)
+			log.Infof("forgeName is %v, configured by server runtime ReAct provider", forgeName)
+		}
+	}
 	request := sessionruntime.ConnectRequest{
 		StartParams: startParams,
 		Options: &sessionruntime.ConnectOptions{
 			LoadBuiltinTools: loadBuiltinTools,
-			ConfigOptions:    additionalOptions,
+			ConfigOptions:    extraOptions,
 			OnEventError: func(err error) {
 				// Keep the original streaming behavior: a failed subscriber
 				// delivery is observable, but it does not fail the shared ReAct.
