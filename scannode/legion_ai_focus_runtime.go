@@ -66,7 +66,7 @@ func newLegionServerFocusRuntime(
 	ctx context.Context,
 	authorizedTarget string,
 	sink aiFocusResultSink,
-) (aicommon.FocusRuntime, error) {
+) (aicommon.LegionResultRuntime, error) {
 	if sink == nil || strings.TrimSpace(authorizedTarget) == "" {
 		return nil, nil
 	}
@@ -288,8 +288,13 @@ func (r *legionServerFocusRuntime) submitRisk(params map[string]any) (map[string
 	}
 	requestEvidence := focusRuntimeRawString(params, "request_evidence")
 	responseEvidence := focusRuntimeRawString(params, "response_evidence")
-	if strings.TrimSpace(requestEvidence) == "" || strings.TrimSpace(responseEvidence) == "" {
-		return nil, fmt.Errorf("server focus risk requires request and response evidence")
+	description := focusRuntimeRawString(params, "description")
+	details := focusRuntimeRawString(params, "details")
+	if strings.TrimSpace(requestEvidence) == "" &&
+		strings.TrimSpace(responseEvidence) == "" &&
+		strings.TrimSpace(details) == "" &&
+		strings.TrimSpace(description) == "" {
+		return nil, fmt.Errorf("server focus risk requires structured evidence")
 	}
 	risk := &schema.Risk{
 		Title:          focusRuntimeString(params, "title"),
@@ -298,7 +303,9 @@ func (r *legionServerFocusRuntime) submitRisk(params map[string]any) (map[string
 		Url:            target.String(),
 		Parameter:      focusRuntimeString(params, "parameter"),
 		Payload:        focusRuntimeRawString(params, "payload"),
-		Details:        focusRuntimeRawString(params, "details"),
+		Description:    description,
+		Solution:       focusRuntimeRawString(params, "solution"),
+		Details:        details,
 		QuotedRequest:  requestEvidence,
 		QuotedResponse: responseEvidence,
 	}

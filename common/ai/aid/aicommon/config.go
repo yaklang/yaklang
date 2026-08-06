@@ -182,7 +182,7 @@ type Config struct {
 	EventHandler           func(e *schema.AiOutputEvent)
 	DisableOutputEventType []string
 	SaveEvent              bool
-	FocusRuntime           FocusRuntime
+	LegionResultRuntime   LegionResultRuntime
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -1466,20 +1466,21 @@ func WithEmitter(emitter *Emitter) ConfigOption {
 	}
 }
 
-// WithFocusRuntime installs the capability boundary used by server-released
-// Yak Focus code. Desktop and client runtimes leave it unset.
-func WithFocusRuntime(runtime FocusRuntime) ConfigOption {
+// WithLegionResultRuntime installs the server-side result runtime that routes
+// AI tool and focus-script risks/assets back to Legion. Desktop and client-only
+// runtimes leave it unset; their risks stay in process-local SQLite.
+func WithLegionResultRuntime(runtime LegionResultRuntime) ConfigOption {
 	return func(c *Config) error {
-		c.FocusRuntime = runtime
+		c.LegionResultRuntime = runtime
 		return nil
 	}
 }
 
-func (c *Config) GetFocusRuntime() FocusRuntime {
+func (c *Config) GetLegionResultRuntime() LegionResultRuntime {
 	if c == nil {
 		return nil
 	}
-	return c.FocusRuntime
+	return c.LegionResultRuntime
 }
 
 // Event / output
@@ -4100,8 +4101,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.EventHandler != nil {
 		opts = append(opts, WithEventHandler(i.EventHandler))
 	}
-	if i.FocusRuntime != nil {
-		opts = append(opts, WithFocusRuntime(i.FocusRuntime))
+	if i.LegionResultRuntime != nil {
+		opts = append(opts, WithLegionResultRuntime(i.LegionResultRuntime))
 	}
 
 	if i.GetUserUsageCallback() != nil {

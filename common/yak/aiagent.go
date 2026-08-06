@@ -125,9 +125,11 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 
 				var runtimeId string
 				var runtimeFeedBacker func(result *ypb.ExecResult) error
+				var riskSaveHandler func(context.Context, *schema.Risk) error
 				if runtimeConfig != nil {
 					runtimeId = runtimeConfig.RuntimeID
 					runtimeFeedBacker = runtimeConfig.FeedBacker
+					riskSaveHandler = runtimeConfig.RiskSaveHandler
 				}
 
 				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
@@ -173,6 +175,9 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 					).WithYakitClient(
 						yakitClient,
 					)
+					if riskSaveHandler != nil {
+						pluginContext.WithRiskSaveHandler(riskSaveHandler)
+					}
 					if runtimeFeedBacker != nil {
 						pluginContext.WithAfterSaveHTTPFlowHandler(func(flow *schema.HTTPFlow) {
 							if flow == nil {

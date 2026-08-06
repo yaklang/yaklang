@@ -94,6 +94,26 @@ func TestLegionServerFocusRuntimeExecutesBoundedCapabilities(t *testing.T) {
 	if receipt["result_id"] != "asset-1" || len(sink.assets) != 1 {
 		t.Fatalf("unexpected asset receipt: %#v", receipt)
 	}
+
+	riskReceipt, err := runtime.Execute(serverFocusCapabilitySubmitRisk, map[string]any{
+		"verified":    true,
+		"target":      server.URL + "/start?q=payload",
+		"title":       "Reflected XSS",
+		"risk_type":   "xss",
+		"severity":    "high",
+		"description": "q is reflected into HTML without encoding",
+		"solution":    "apply contextual output encoding",
+		"details":     `{"summary":"confirmed reflection"}`,
+	})
+	if err != nil {
+		t.Fatalf("submit structured risk: %v", err)
+	}
+	if riskReceipt["result_id"] != "risk-1" || len(sink.risks) != 1 {
+		t.Fatalf("unexpected risk receipt: %#v", riskReceipt)
+	}
+	if sink.risks[0].Description == "" || sink.risks[0].Solution == "" {
+		t.Fatalf("structured risk fields were dropped: %#v", sink.risks[0])
+	}
 }
 
 func TestLegionServerFocusRuntimeRejectsBoundaryViolations(t *testing.T) {
@@ -124,6 +144,14 @@ func TestLegionServerFocusRuntimeRejectsBoundaryViolations(t *testing.T) {
 		"response_evidence": "HTTP/1.1 200 OK",
 	}); err == nil || !strings.Contains(err.Error(), "verified evidence") {
 		t.Fatalf("expected evidence gate, got %v", err)
+	}
+	if _, err := runtime.Execute(serverFocusCapabilitySubmitRisk, map[string]any{
+		"verified":  true,
+		"target":    server.URL,
+		"title":     "missing evidence",
+		"risk_type": "test",
+	}); err == nil || !strings.Contains(err.Error(), "structured evidence") {
+		t.Fatalf("expected structured evidence rejection, got %v", err)
 	}
 
 	runtime.mu.Lock()

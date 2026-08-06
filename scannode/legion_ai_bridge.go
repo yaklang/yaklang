@@ -101,7 +101,7 @@ type aiSessionBinding struct {
 	CredentialRefs             []aiSessionCredentialRef
 	PlatformBearerToken        string
 	HTTPClient                 *http.Client
-	FocusRuntime               aicommon.FocusRuntime
+	LegionResultRuntime       aicommon.LegionResultRuntime
 	ExecutionMode              string
 	AuthorizedTargetURL        string
 }
@@ -271,7 +271,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
 		HTTPClient:                 options.HTTPClient,
-		FocusRuntime:               focusRuntime,
+		LegionResultRuntime:       focusRuntime,
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
 	}, &managedAISessionRuntimeEmitter{

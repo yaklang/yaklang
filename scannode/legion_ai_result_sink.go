@@ -19,9 +19,11 @@ import (
 )
 
 const (
-	legionAIFocusResultSchemaV1  = "legion.focus-result.v1"
-	maxInlineFocusRiskFieldBytes = 64 * 1024
-	maxInlineFocusAssetBytes     = 64 * 1024
+	legionAIFocusResultSchemaV1         = "legion.focus-result.v1"
+	legionAIConversationAuditResultMode = "conversation_audit"
+	legionAIConversationExecutionMode   = "multi_turn"
+	maxInlineFocusRiskFieldBytes        = 64 * 1024
+	maxInlineFocusAssetBytes            = 64 * 1024
 )
 
 type aiFocusResultReceipt struct {
@@ -243,7 +245,8 @@ func validateLegionAIFocusResultContext(
 		return jobExecutionRef{}, fmt.Errorf("ai focus result focus_run_id is required")
 	case strings.TrimSpace(resultContext.GetFocusMode()) == "":
 		return jobExecutionRef{}, fmt.Errorf("ai focus result focus_mode is required")
-	case strings.TrimSpace(resultContext.GetFocusReleaseId()) == "":
+	case strings.TrimSpace(resultContext.GetFocusMode()) != legionAIConversationAuditResultMode &&
+		strings.TrimSpace(resultContext.GetFocusReleaseId()) == "":
 		return jobExecutionRef{}, fmt.Errorf("ai focus result focus_release_id is required")
 	case strings.TrimSpace(resultContext.GetSchemaVersion()) != legionAIFocusResultSchemaV1:
 		return jobExecutionRef{}, fmt.Errorf(
@@ -258,7 +261,14 @@ func validateLegionAIFocusResultContext(
 		return jobExecutionRef{}, fmt.Errorf("ai focus result subtask_id is required")
 	case ref.AttemptID == "":
 		return jobExecutionRef{}, fmt.Errorf("ai focus result attempt_id is required")
-	case strings.TrimSpace(resultContext.GetExecutionMode()) != "single_run":
+	case strings.TrimSpace(resultContext.GetFocusMode()) == legionAIConversationAuditResultMode &&
+		strings.TrimSpace(resultContext.GetExecutionMode()) != legionAIConversationExecutionMode:
+		return jobExecutionRef{}, fmt.Errorf(
+			"unsupported ai conversation result execution_mode %q",
+			resultContext.GetExecutionMode(),
+		)
+	case strings.TrimSpace(resultContext.GetFocusMode()) != legionAIConversationAuditResultMode &&
+		strings.TrimSpace(resultContext.GetExecutionMode()) != "single_run":
 		return jobExecutionRef{}, fmt.Errorf(
 			"unsupported ai focus result execution_mode %q",
 			resultContext.GetExecutionMode(),
