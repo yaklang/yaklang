@@ -95,10 +95,10 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	materials.UserHistory = pm.UserHistoryContextWithNonce(nonce)
 
 	// Timeline frozen/open 与 Session Artifacts frozen/open 必须共享同一轮
-	// FrozenTimeUnix；midterm recall 是 turn 级 open prefix，在统一切分之后追加。
-	// 关键词: BuildPromptFrozenOpenMaterials, artifacts frozen time, midterm open
+	// FrozenTimeUnix；midterm memory 现在随 InjectedMemory 在 dynamic 段底部
+	// 拼接，不再注入 timeline-open 段。
+	// 关键词: BuildPromptFrozenOpenMaterials, artifacts frozen time
 	frozenOpen := aicommon.BuildPromptFrozenOpenMaterials(pm.react.config, nonce)
-	frozenOpen.TimelineOpen = prependMidtermTimelinePrefixForPrompt(pm.react, frozenOpen.TimelineOpen)
 	materials.PromptFrozenOpenMaterials = frozenOpen
 
 	allowPlanAndExec := pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil

@@ -857,6 +857,12 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
 	}
 
+	// When regular memory is updated, also refresh midterm archive memory in
+	// parallel. Both fire at the same trigger point; midterm queries are based
+	// on the perception snapshot, consumed from the invoker.
+	r.refreshMidtermMemoryAsync()
+
+
 	go func() {
 		if !utils.IsNil(r.memoryTriage) {
 			log.Info("start to handle searching memory for ReActLoop with AI")
