@@ -187,7 +187,7 @@ public class B {
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				names := overlay.GetLayerProgramNames()
+				names := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(names), 2)
 				baseProgramName = names[0]
 				diff1Program = names[len(names)-1]
@@ -214,7 +214,7 @@ public class C {
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				names := overlay.GetLayerProgramNames()
+				names := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(names), 2)
 				diff2Program = names[len(names)-1]
 			},
@@ -243,7 +243,7 @@ public class Normal {
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				names := overlay.GetLayerProgramNames()
+				names := overlay.ProgramNames()
 				require.NotEmpty(t, names)
 				normalProgram = names[0]
 			},

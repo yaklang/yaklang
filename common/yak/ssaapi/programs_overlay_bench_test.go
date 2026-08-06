@@ -35,12 +35,14 @@ public class A {
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
 				require.NotNil(t, overlay)
-				require.GreaterOrEqual(t, overlay.GetLayerCount(), 2)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 2)
 
-				ownedDiff := overlay.PathsOwnedByLayer(2)
+				require.NotEmpty(t, overlay.Diff)
+				ownedDiff := overlay.Diff[0].File
 				require.Contains(t, ownedDiff, "/A.java")
 				require.NotContains(t, ownedDiff, "/Keep.java")
-				require.Contains(t, overlay.PathsOwnedByLayer(1), "/Keep.java")
+				require.False(t, overlay.IsExcludedPath("/Keep.java"))
+				require.True(t, overlay.IsExcludedPath("/A.java"))
 
 				res, err := overlay.SyntaxFlowWithError(`valueStr as $res`)
 				require.NoError(t, err)

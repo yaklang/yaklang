@@ -37,10 +37,12 @@ public class A {
 				}
 				require.NotNil(t, overlay)
 
-				ownedDiff := overlay.PathsOwnedByLayer(2)
+				require.NotEmpty(t, overlay.Diff)
+				ownedDiff := overlay.Diff[0].File
 				require.Contains(t, ownedDiff, "/A.java")
 				require.NotContains(t, ownedDiff, "/Keep.java")
-				require.Contains(t, overlay.PathsOwnedByLayer(1), "/Keep.java")
+				require.False(t, overlay.IsExcludedPath("/Keep.java"))
+				require.True(t, overlay.IsExcludedPath("/A.java"))
 
 				keep, err := overlay.SyntaxFlowWithError(`keepStr as $res`)
 				require.NoError(t, err)

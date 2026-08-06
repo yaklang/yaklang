@@ -26,25 +26,22 @@ func TestOverlayAggregatedFSPathRoundTrip(t *testing.T) {
 	require.Equal(t, "/src/Main.java", overlayPathFromAggregatedFS("src/Main.java"))
 }
 
-func TestOverlayRebuildFilePartitions(t *testing.T) {
+func TestOverlayExcludeAndDiffOwnership(t *testing.T) {
 	t.Parallel()
 
 	overlay := newEmptyOverlay()
-	overlay.FileToLayerMap.Set("/unchanged.java", 1)
-	overlay.FileToLayerMap.Set("/changed.java", 2)
-	overlay.rebuildFilePartitions()
+	overlay.Base = &Program{}
+	overlay.Diff = []*ProgramLayer{
+		{File: []string{"/changed.java"}},
+	}
+	overlay.setOwnerByPath(map[string]int{"/changed.java": 0})
+	overlay.setDeletedFiles(nil)
 
-	require.Contains(t, overlay.PathsOwnedByLayer(1), "/unchanged.java")
-	require.NotContains(t, overlay.PathsOwnedByLayer(1), "/changed.java")
-	require.Contains(t, overlay.PathsOwnedByLayer(2), "/changed.java")
-
-	overridden := overlay.overriddenFilesList()
-	require.Contains(t, overridden, "/changed.java")
-	require.NotContains(t, overridden, "/unchanged.java")
-	require.True(t, overlay.overriddenFiles.Have("/changed.java"))
-	require.False(t, overlay.overriddenFiles.Have("/unchanged.java"))
-
-	owner, ok := overlay.FileToLayerMap.Get(ensureOverlayPathSlash("unchanged.java"))
+	require.Contains(t, overlay.Diff[0].File, "/changed.java")
+	require.True(t, overlay.IsExcludedPath("/changed.java"))
+	require.False(t, overlay.IsExcludedPath("/unchanged.java"))
+	require.Contains(t, overlay.excludeFiles(), "/changed.java")
+	owner, ok := overlay.ownerDiffIndex("/changed.java")
 	require.True(t, ok)
-	require.Equal(t, 1, owner)
+	require.Equal(t, 0, owner)
 }

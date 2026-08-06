@@ -67,7 +67,7 @@ public class B {
 				}
 				require.NotNil(t, overlay)
 
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(layerNames), 2)
 				baseName := layerNames[0]
 				diffName := layerNames[len(layerNames)-1]
@@ -148,7 +148,7 @@ public class B {
 						return
 					}
 					require.NotNil(t, overlay)
-					layerNames := overlay.GetLayerProgramNames()
+					layerNames := overlay.ProgramNames()
 					require.GreaterOrEqual(t, len(layerNames), 2)
 					diffName := layerNames[len(layerNames)-1]
 					irProg, err := ssadb.GetProgram(diffName, ssadb.Application)
@@ -182,8 +182,8 @@ public class C {
 						return
 					}
 					require.NotNil(t, overlay)
-					require.GreaterOrEqual(t, overlay.GetLayerCount(), 3)
-					layerNames := overlay.GetLayerProgramNames()
+					require.GreaterOrEqual(t, overlay.ProgramCount(), 3)
+					layerNames := overlay.ProgramNames()
 					require.GreaterOrEqual(t, len(layerNames), 3)
 					diffName := layerNames[len(layerNames)-1]
 					irProg, err := ssadb.GetProgram(diffName, ssadb.Application)
@@ -252,7 +252,7 @@ public class A {
 						return
 					}
 					require.NotNil(t, overlay)
-					layerNames := overlay.GetLayerProgramNames()
+					layerNames := overlay.ProgramNames()
 					require.GreaterOrEqual(t, len(layerNames), 3)
 					diffName := layerNames[len(layerNames)-1]
 					irProg, err := ssadb.GetProgram(diffName, ssadb.Application)
@@ -299,7 +299,7 @@ public class A {
 						return
 					}
 					require.NotNil(t, overlay)
-					layerNames := overlay.GetLayerProgramNames()
+					layerNames := overlay.ProgramNames()
 					require.NotEmpty(t, layerNames)
 					baseProgramName = layerNames[0]
 
@@ -324,7 +324,7 @@ public class A {
 						return
 					}
 					require.NotNil(t, overlay)
-					layerNames := overlay.GetLayerProgramNames()
+					layerNames := overlay.ProgramNames()
 					require.GreaterOrEqual(t, len(layerNames), 2)
 					diffProgramName = layerNames[len(layerNames)-1]
 
@@ -363,7 +363,7 @@ public class A {
 						return
 					}
 					require.NotNil(t, overlay)
-					layerNames := overlay.GetLayerProgramNames()
+					layerNames := overlay.ProgramNames()
 					require.NotEmpty(t, layerNames)
 					baseIrProg, err := ssadb.GetProgram(layerNames[0], ssadb.Application)
 					require.NoError(t, err)
