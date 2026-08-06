@@ -63,8 +63,8 @@ func execBatchTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) 
 func TestBatchDoHTTPRequest_MetadataContainsIntentHints(t *testing.T) {
 	aiTool := loadBatchDoHTTPRequestAITool(t)
 
-	assert.Equal(t, aiTool.VerboseName, "Batch HTTP Request Tool")
-	assert.Equal(t, aiTool.VerboseNameZh, "批量HTTP请求工具")
+	assert.Equal(t, aiTool.VerboseName, "Batch HTTP Request")
+	assert.Equal(t, aiTool.VerboseNameZh, "批量HTTP请求")
 	assert.Assert(t, strings.Contains(aiTool.Description, "接口批量验证"), "description should mention API batch validation")
 	assert.Assert(t, strings.Contains(aiTool.Description, "IDOR"), "description should mention IDOR use case")
 	assert.Assert(t, strings.Contains(aiTool.Keywords, "未授权访问验证"), "keywords should include unauthorized access validation")
