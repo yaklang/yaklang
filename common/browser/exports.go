@@ -8,6 +8,9 @@ var Exports = map[string]interface{}{
 	"CloseAll": CloseAll,
 
 	"HaveBrowserInstalled": HaveBrowserInstalled,
+	"ExtensionStatus":      ExtensionBridgeStatus,
+	"ExtensionCall":        CallExtensionBridge,
+	"ExtensionWaitEvent":   WaitExtensionBridgeEvent,
 
 	"id":         WithID,
 	"headless":   WithHeadless,

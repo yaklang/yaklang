@@ -325,6 +325,21 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	if aiconfig.IsTieredAIConfig() {
 		configOptions = append(configOptions, aicommon.WithAutoTieredAICallback(defaultAI))
 	}
+	if forgeName := strings.TrimSpace(startParams.GetForgeName()); forgeName != "" {
+		preparation, handled, prepareErr := s.prepareRuntimeForgeReAct(
+			forgeName,
+			baseCtx,
+			startParams.GetForgeParams(),
+			startParams.GetUserQuery(),
+		)
+		if prepareErr != nil {
+			return utils.Errorf("prepare runtime AI forge[%s] for ReAct: %v", forgeName, prepareErr)
+		}
+		if handled {
+			configOptions = append(configOptions, preparation.Options...)
+			log.Infof("forgeName is %v, configured by server runtime ReAct provider", forgeName)
+		}
+	}
 
 	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {

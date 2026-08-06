@@ -497,6 +497,15 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "local-password",
 			Usage: "本地密码模式，使用固定端口 9011，不使用 TLS，与 host/port/secret/tls/gen-tls-crt 互斥",
 		},
+		cli.IntFlag{
+			Name:  "browser-extension-bridge-port",
+			Value: 64333,
+			Usage: "浏览器插件本机 Bridge 端口",
+		},
+		cli.BoolFlag{
+			Name:  "disable-browser-extension-bridge",
+			Usage: "关闭浏览器插件本机 Bridge",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		// 检查 local-password 模式
@@ -643,15 +652,28 @@ var startGRPCServerCommand = cli.Command{
 		)
 		reverse_port := c.Int("reverse-port")
 		init_reverse := c.Bool("disable-reverse-server")
-		s, err := yakgrpc.NewServer(
+		serverOptions := []yakgrpc.ServerOpts{
 			yakgrpc.WithReverseServerPort(reverse_port),
 			yakgrpc.WithInitFacadeServer(!init_reverse),
 			yakgrpc.WithStartCacheLog(),
-		)
+		}
+		if !c.Bool("disable-browser-extension-bridge") {
+			bridgePort := c.Int("browser-extension-bridge-port")
+			if bridgePort <= 0 || bridgePort > 65535 {
+				return utils.Errorf("browser extension bridge port out of range: %d", bridgePort)
+			}
+			serverOptions = append(serverOptions, yakgrpc.WithBrowserExtensionBridge(bridgePort))
+		}
+		s, err := yakgrpc.NewServer(serverOptions...)
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
 			return err
 		}
+		defer func() {
+			if closeErr := s.CloseBrowserExtensionBridge(); closeErr != nil {
+				log.Warnf("close browser extension bridge failed: %v", closeErr)
+			}
+		}()
 		ypb.RegisterYakServer(grpcTrans, s)
 
 		// 确定监听地址和端口
