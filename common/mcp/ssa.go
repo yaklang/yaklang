@@ -23,12 +23,12 @@ The compiled program is persisted to database and can be reused for multiple Syn
 Returns a program_name that should be used in subsequent ssa_query calls.
 
 Workflow:
-1. First compile: provide target + language + program_name ? full compilation, returns program_name
+1. First compile: provide target + language + program_name - full compilation, returns program_name
 2. Query: use program_name with ssa_query (can query unlimited times without recompiling)
 3. Code changed (INCREMENTAL): provide target + language + base_program_name=<previous program_name>
-   ? only changed files are recompiled, creates a ProgramOverLay (base layer + diff layer)
-   ? returns a NEW program_name (diff program), use this for subsequent queries
-   ? the overlay automatically merges base + diff results during query
+   - only changed files are recompiled, creates a ProgramOverLay (base layer + diff layer)
+   - returns a NEW program_name (diff program), use this for subsequent queries
+   - the overlay automatically merges base + diff results during query
 4. Full recompile (RARE): set re_compile=true to delete old data and recompile everything from scratch
 
 IMPORTANT: For incremental compilation, use base_program_name (NOT re_compile).
@@ -49,7 +49,7 @@ re_compile=true is a FULL recompile that discards all previous data.`),
 		mcp.Description("INCREMENTAL compilation: name of a previously compiled program to diff against. Only changed files will be recompiled. The system creates a ProgramOverLay that merges base + diff layers. Returns a NEW diff program_name"),
 	),
 	mcp.WithBool("re_compile",
-		mcp.Description("FULL recompile: delete ALL old data and recompile from scratch. WARNING: this is NOT incremental ? use base_program_name for incremental compilation"),
+		mcp.Description("FULL recompile: delete ALL old data and recompile from scratch. WARNING: this is NOT incremental - use base_program_name for incremental compilation"),
 		mcp.Default(false),
 	),
 )
@@ -62,7 +62,7 @@ SyntaxFlow is a DSL for querying data flow paths in code. It can answer question
 - "Trace the data flow from source to sink"
 
 Key operators:
-- Dot chain: Runtime.getRuntime().exec() ? matches call chains
+- Dot chain: Runtime.getRuntime().exec() - matches call chains
 - #-> (TopDef): traces where a value comes from (Use-Def chain)
 - --> (BottomUse): traces where a value flows to (Def-Use chain)
 - ?{} : conditional filter, e.g. ?{opcode: call}
@@ -196,7 +196,7 @@ func tryCompileCache(target, programName string, lang ssaconfig.Language) (*mcp.
 	log.Infof("[Cache Hit] Program %q already compiled, no source changes detected", programName)
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("[Cache Hit] Program already compiled ? no source files changed since last compilation.\n"))
+	sb.WriteString(fmt.Sprintf("[Cache Hit] Program already compiled - no source files changed since last compilation.\n"))
 	sb.WriteString(fmt.Sprintf("Program Name: %s\nLanguage: %s\nCompiled Files: %d\nLast Compiled: %s\n",
 		irProg.ProgramName, irProg.Language, len(irProg.FileList), compiledAt.Format(time.RFC3339)))
 	sb.WriteString("\nUse this program_name in ssa_query to perform data flow analysis.")
@@ -357,4 +357,3 @@ func writeSSAValues(sb *strings.Builder, values ssaapi.Values) {
 		}
 	}
 }
-
