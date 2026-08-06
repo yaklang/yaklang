@@ -33,7 +33,7 @@ func TestNormalizeToolResultDataHardTokenLimit(t *testing.T) {
 		Param:   map[string]any{"query": "example"},
 		Success: true,
 	}
-	hint := "HINT:\nComplete tool output is stored in artifacts:\n- combined output: /tmp/artifacts/combined_output.txt\n- result: /tmp/artifacts/result.txt"
+	hint := "ARTIFACT:\n- combined: /tmp/artifacts/combined_output.txt\n- result: /tmp/artifacts/result.txt"
 	normalizeToolResultData(toolResult, combined, result, hint)
 
 	data, ok := toolResult.Data.(string)
@@ -51,7 +51,7 @@ func TestNormalizeToolResultDataHardTokenLimit(t *testing.T) {
 func TestToolResultOutputKindsOver200KTokens(t *testing.T) {
 	huge := "KIND-HEAD\n" + strings.Repeat("record-0123456789 alpha beta gamma delta\n", 25000) + "KIND-MIDDLE-SENTINEL\n" + strings.Repeat("record-9876543210 epsilon zeta eta theta\n", 25000) + "KIND-TAIL\n"
 	require.Greater(t, ytoken.CalcTokenCount(huge), 200000)
-	hint := "HINT:\nComplete tool output is stored in artifacts:\n- combined output: /tmp/tool/combined_output.txt\n- stdout: /tmp/tool/stdout.txt\n- stderr: /tmp/tool/stderr.txt\n- result: /tmp/tool/result.txt"
+	hint := "ARTIFACT:\n- combined: /tmp/tool/combined_output.txt\n- result: /tmp/tool/result.txt"
 
 	resultJSON, ext := stableResultText(map[string]any{"records": huge, "count": 50000})
 	require.Equal(t, ".json", ext)
@@ -74,7 +74,7 @@ func TestToolResultOutputKindsOver200KTokens(t *testing.T) {
 			data := toolResult.Data.(string)
 			require.LessOrEqual(t, ytoken.CalcTokenCount(data), ToolResultTokenLimit)
 			require.LessOrEqual(t, ytoken.CalcTokenCount(toolResult.String()), ToolResultTokenLimit)
-			require.Contains(t, data, "HINT:")
+			require.Contains(t, data, "ARTIFACT:")
 			require.NotContains(t, data, "KIND-MIDDLE-SENTINEL")
 		})
 	}
@@ -96,14 +96,14 @@ func TestNormalizeToolResultDataOmitsHugeTimelineParams(t *testing.T) {
 func TestLateInvocationErrorCannotPushTimelineItemOverLimit(t *testing.T) {
 	combined, result := oversizedToolFixture()
 	toolResult := &aitool.ToolResult{Name: "late-error", Success: true}
-	normalizeToolResultData(toolResult, combined, result, "HINT:\n- combined output: /tmp/late/combined_output.txt")
+	normalizeToolResultData(toolResult, combined, result, "ARTIFACT:\n- combined: /tmp/late/combined_output.txt")
 	toolResult.Success = false
 	toolResult.Error = strings.Repeat("late-checkpoint-error-0123456789 ", 30000)
 
 	enforceCanonicalToolResultLimit(toolResult)
 	require.LessOrEqual(t, ytoken.CalcTokenCount(toolResult.Data.(string)), ToolResultTokenLimit)
 	require.LessOrEqual(t, ytoken.CalcTokenCount(toolResult.String()), ToolResultTokenLimit)
-	require.Contains(t, toolResult.Data.(string), "HINT:")
+	require.Contains(t, toolResult.Data.(string), "ARTIFACT:")
 }
 
 func TestToolArtifactCombinedOutputPreservesInterleaving(t *testing.T) {
@@ -232,7 +232,7 @@ func TestToolArtifactFinalizeReplacesDataAndPersistsRawFiles(t *testing.T) {
 	require.NoError(t, b.finalize(caller, tool, "call-1", "fixture", toolResult.Param.(aitool.InvokeParams), toolResult, 0, ""))
 
 	require.IsType(t, "", toolResult.Data)
-	require.Contains(t, toolResult.Data.(string), "HINT:")
+	require.Contains(t, toolResult.Data.(string), "ARTIFACT:")
 	require.Contains(t, toolResult.Data.(string), b.combinedPath)
 	raw, err := os.ReadFile(b.combinedPath)
 	require.NoError(t, err)
@@ -247,7 +247,7 @@ func TestToolArtifactFinalizeReplacesDataAndPersistsRawFiles(t *testing.T) {
 func TestNormalizeToolResultDataDeduplicatesExactCombinedAndResult(t *testing.T) {
 	result := strings.Repeat("same-result-line\n", 100)
 	toolResult := &aitool.ToolResult{Name: "dedupe", Success: true}
-	normalizeToolResultData(toolResult, result, result, "HINT:\n/path")
+	normalizeToolResultData(toolResult, result, result, "ARTIFACT:\n/path")
 	data := toolResult.Data.(string)
 	// When combined == result, the RESULT section is omitted entirely (no "RESULT:" tag),
 	// so the result string appears exactly once (only in COMBINED OUTPUT).
@@ -316,7 +316,7 @@ func TestCurrentCheckpointReplayKeepsCompactedDataByteStable(t *testing.T) {
 	require.NoError(t, err)
 	b.stderr, err = os.Create(b.stderrPath)
 	require.NoError(t, err)
-	original := "COMBINED OUTPUT:\npreview\n\nRESULT:\nresult\n\nHINT:\n- combined output: /stable/original/path"
+	original := "COMBINED OUTPUT:\npreview\n\nRESULT:\nresult\n\nARTIFACT:\n- combined: /stable/original/path"
 	toolResult := &aitool.ToolResult{Name: "replay", Success: true, Data: original}
 	tool, err := aitool.New("replay", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
 	require.NoError(t, err)
@@ -375,7 +375,7 @@ func TestLegacyTimelineToolResultMigratesToArtifactAndCanonicalData(t *testing.T
 	require.True(t, ok)
 	require.Contains(t, data, "COMBINED OUTPUT:\nLEGACY-HEAD")
 	require.Contains(t, data, "result-tail")
-	require.Contains(t, data, "HINT:\nComplete tool output is stored in artifacts:")
+	require.Contains(t, data, "ARTIFACT:\n- combined:")
 	require.NotContains(t, data, "LEGACY-MIDDLE-SENTINEL")
 	require.LessOrEqual(t, ytoken.CalcTokenCount(data), ToolResultTokenLimit)
 	require.LessOrEqual(t, ytoken.CalcTokenCount(result.String()), ToolResultTokenLimit)
@@ -409,6 +409,6 @@ func BenchmarkNormalizeToolResultData200KTokens(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		toolResult := &aitool.ToolResult{Name: fmt.Sprintf("bench-%d", i), Success: true}
-		normalizeToolResultData(toolResult, combined, result, "HINT:\n/tmp/artifact")
+		normalizeToolResultData(toolResult, combined, result, "ARTIFACT:\n/tmp/artifact")
 	}
 }

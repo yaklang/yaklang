@@ -43,7 +43,7 @@ func TestParseTimelineItemHumanReadable_TextTimelineItem_WithTaskID(t *testing.T
 	require.NotNil(t, result)
 	require.Equal(t, "text", result.Type)
 	require.Equal(t, int64(123), result.ID)
-	require.Equal(t, "action", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "task-001", result.TaskID)
 	require.Equal(t, "This is the action content\nwith multiple lines", result.Content)
 	require.Equal(t, text, result.RawText)
@@ -65,7 +65,7 @@ func TestParseTimelineItemHumanReadable_TextTimelineItem_WithoutTaskID(t *testin
 	result := ParseTimelineItemHumanReadable(item)
 	require.NotNil(t, result)
 	require.Equal(t, "text", result.Type)
-	require.Equal(t, "[BLUEPRINT_PROMPT_ERROR]", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Empty(t, result.TaskID)
 	require.Equal(t, "Simple note content", result.Content)
 }
@@ -84,7 +84,7 @@ func TestParseTimelineItemHumanReadable_TextTimelineItem_WithBuildinEntryType(t 
 	result := ParseTimelineItemHumanReadable(item)
 	require.NotNil(t, result)
 	require.Equal(t, "text", result.Type)
-	require.Equal(t, "note", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Empty(t, result.TaskID)
 	require.Equal(t, "Simple note content", result.Content)
 }
@@ -102,7 +102,7 @@ func TestParseTimelineItemHumanReadable_TextTimelineItem_DefaultNote(t *testing.
 
 	result := ParseTimelineItemHumanReadable(item)
 	require.NotNil(t, result)
-	require.Equal(t, "note", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "task-002", result.TaskID)
 	require.Equal(t, "Default note", result.Content)
 }
@@ -139,7 +139,7 @@ func TestParseTimelineItemHumanReadable_TextTimelineItem_WithColonNoNewline(t *t
 
 	result := ParseTimelineItemHumanReadable(item)
 	require.NotNil(t, result)
-	require.Equal(t, "info", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "Some inline content", result.Content)
 }
 
@@ -259,10 +259,10 @@ func TestParseTimelineItemsHumanReadable_Multiple(t *testing.T) {
 	require.Len(t, results, 3)
 
 	require.Equal(t, "text", results[0].Type)
-	require.Equal(t, "note", results[0].EntryType)
+	require.Empty(t, results[0].EntryType)
 
 	require.Equal(t, "text", results[1].Type)
-	require.Equal(t, "action", results[1].EntryType)
+	require.Empty(t, results[1].EntryType)
 	require.Equal(t, "t1", results[1].TaskID)
 
 	require.Equal(t, "user_interaction", results[2].Type)
@@ -324,7 +324,7 @@ func TestParseTextTimelineItem_ComplexTaskID(t *testing.T) {
 	result := &TimelineItemHumanReadable{}
 	parseTextTimelineItem(result, text)
 
-	require.Equal(t, "action", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "plan-1-subtask-2-step-3", result.TaskID)
 	require.Equal(t, "Complex task", result.Content)
 }
@@ -334,7 +334,7 @@ func TestParseTextTimelineItem_MultilineContent(t *testing.T) {
 	result := &TimelineItemHumanReadable{}
 	parseTextTimelineItem(result, text)
 
-	require.Equal(t, "result", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "t1", result.TaskID)
 	require.Equal(t, "Line 1\nLine 2\nLine 3", result.Content)
 }
@@ -344,9 +344,10 @@ func TestParseTextTimelineItem_WithSpecialEntryType(t *testing.T) {
 	result := &TimelineItemHumanReadable{}
 	parseTextTimelineItem(result, text)
 
-	require.Equal(t, "current task user input", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "Special entry type", result.Content)
-	require.Equal(t, "user_input", result.Type)
+	// parseTextTimelineItem 不再设置 Type; Type 由调用方 (ParseTimelineItemHumanReadable) 按 value 类型决定
+	require.Empty(t, result.Type)
 }
 
 // TestParseTimelineItemHumanReadable_TextTimelineItem_NewFormatNoIndent 验证修复
@@ -369,7 +370,7 @@ func TestParseTimelineItemHumanReadable_TextTimelineItem_NewFormatNoIndent(t *te
 	require.NotNil(t, result)
 	require.Equal(t, "text", result.Type)
 	require.Equal(t, int64(600), result.ID)
-	require.Equal(t, "action", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "task-007", result.TaskID)
 	// removeIndent 在 body 没有 "  " 前缀时退化成 no-op, Content 维持原样
 	require.Equal(t, "Line 1\nLine 2\nLine 3", result.Content)
@@ -384,7 +385,7 @@ func TestParseTextTimelineItem_NewFormatNoIndent_NoTask(t *testing.T) {
 	result := &TimelineItemHumanReadable{}
 	parseTextTimelineItem(result, text)
 
-	require.Equal(t, "note", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Empty(t, result.TaskID)
 	require.Equal(t, "flush left line 1\nflush left line 2", result.Content)
 }
@@ -399,7 +400,7 @@ func TestParseTextTimelineItem_HistoricalFormatStillWorks(t *testing.T) {
 	result := &TimelineItemHumanReadable{}
 	parseTextTimelineItem(result, text)
 
-	require.Equal(t, "action", result.EntryType)
+	require.Empty(t, result.EntryType)
 	require.Equal(t, "task-008", result.TaskID)
 	// removeIndent 把每行 "  " 前缀消掉, 让历史数据与新数据产出一致 Content
 	require.Equal(t, "legacy line 1\nlegacy line 2", result.Content)
