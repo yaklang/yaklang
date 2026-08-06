@@ -306,11 +306,6 @@ func normalizeFilePath(filePath string) string {
 	return filePath
 }
 
-// normalizeFilePathForExclusion is kept for callers; delegates to normalizeFilePath.
-func normalizeFilePathForExclusion(filePath string) string {
-	return normalizeFilePath(filePath)
-}
-
 func emptyIrCodeChan() <-chan *IrCode {
 	ch := make(chan *IrCode)
 	close(ch)

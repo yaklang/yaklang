@@ -37,10 +37,12 @@ func (l *ProgramLayer) Ref(name string) Values {
 
 // ProgramOverLay is the dual-source incremental view: base Program + ordered diffs.
 // Base is NOT a ProgramLayer. Ownership is ownerByPath; deleted-only paths live in
-// deletedFiles. Base queries exclude ownerByPath ∪ deletedFiles (see excludeFiles).
+// deletedFiles. Base queries exclude ExcludeFile (ownerByPath ∪ deletedFiles).
 type ProgramOverLay struct {
 	Base *Program
 	Diff []*ProgramLayer
+	// ExcludeFile: paths base Ref/Match must skip (owned ∪ deleted), rebuilt with ownership maps.
+	ExcludeFile []string
 
 	// ownerByPath: canonical path -> Diff index that finally owns it.
 	ownerByPath map[string]int
@@ -183,6 +185,7 @@ func (p *ProgramOverLay) setOwnerByPath(owner map[string]int) {
 	for path, di := range owner {
 		p.ownerByPath[ensureOverlayPathSlash(path)] = di
 	}
+	p.rebuildExcludeFile()
 }
 
 func (p *ProgramOverLay) setDeletedFiles(deleted map[string]struct{}) {
@@ -193,12 +196,13 @@ func (p *ProgramOverLay) setDeletedFiles(deleted map[string]struct{}) {
 	for path := range deleted {
 		p.deletedFiles.Set(ensureOverlayPathSlash(path), struct{}{})
 	}
+	p.rebuildExcludeFile()
 }
 
-// excludeFiles returns paths base queries must skip: owned ∪ deleted.
-func (p *ProgramOverLay) excludeFiles() []string {
+// rebuildExcludeFile refreshes ExcludeFile from ownerByPath ∪ deletedFiles.
+func (p *ProgramOverLay) rebuildExcludeFile() {
 	if p == nil {
-		return nil
+		return
 	}
 	n := len(p.ownerByPath)
 	if p.deletedFiles != nil {
@@ -226,18 +230,22 @@ func (p *ProgramOverLay) excludeFiles() []string {
 			return true
 		})
 	}
-	return out
+	p.ExcludeFile = out
+}
+
+// excludeFiles returns paths base queries must skip: owned ∪ deleted.
+func (p *ProgramOverLay) excludeFiles() []string {
+	if p == nil {
+		return nil
+	}
+	return p.ExcludeFile
 }
 
 func (p *ProgramOverLay) excludeCount() int {
 	if p == nil {
 		return 0
 	}
-	n := len(p.ownerByPath)
-	if p.deletedFiles != nil {
-		n += p.deletedFiles.Count()
-	}
-	return n
+	return len(p.ExcludeFile)
 }
 
 // IsTopLayerProgram reports whether prog is the newest diff (or Base if no diffs).

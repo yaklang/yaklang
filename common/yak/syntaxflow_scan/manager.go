@@ -271,8 +271,7 @@ func (m *scanManager) initByConfig() error {
 			}
 			config.Programs = append(config.Programs, prog)
 		}
-		config.Programs = dedupeProgramsCoveredByOverlay(config.Programs)
-		config.QueryTargets = assembleQueryTargets(config.Programs)
+		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
@@ -284,7 +283,7 @@ func (m *scanManager) initByConfig() error {
 			log.Errorf("SyntaxFlow Scan Init Program By ProjectId By %d Failed", config.GetProjectID())
 		}
 		config.Programs = append(config.Programs, prog)
-		config.QueryTargets = assembleQueryTargets(config.Programs)
+		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 		// 同步更新 BaseInfo.ProgramNames，确保保存时 programs 字段不为空
 		if config.Config != nil {
 			config.Config.SetProgramName(name)
@@ -343,62 +342,6 @@ func (m *scanManager) initByConfig() error {
 	log.Infof("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(programCount))
 	m.setTotalQuery(m.rulesCount * int64(programCount))
 	return nil
-}
-
-// dedupeProgramsCoveredByOverlay drops standalone base programs when another
-// loaded program's overlay already includes them as a lower layer.
-func dedupeProgramsCoveredByOverlay(programs []*ssaapi.Program) []*ssaapi.Program {
-	if len(programs) <= 1 {
-		return programs
-	}
-	covered := make(map[string]struct{})
-	for _, prog := range programs {
-		if prog == nil {
-			continue
-		}
-		overlay := prog.GetOverlay()
-		if overlay == nil || !overlay.IsTopLayerProgram(prog) {
-			continue
-		}
-		for _, name := range overlay.ProgramNames() {
-			if name == "" || name == prog.GetProgramName() {
-				continue
-			}
-			covered[name] = struct{}{}
-		}
-		if base := prog.GetBaseProgramName(); base != "" && base != prog.GetProgramName() {
-			covered[base] = struct{}{}
-		}
-	}
-	out := make([]*ssaapi.Program, 0, len(programs))
-	for _, prog := range programs {
-		if prog == nil {
-			continue
-		}
-		if _, ok := covered[prog.GetProgramName()]; ok {
-			log.Infof("SyntaxFlow Scan: skip program %s (covered by overlay of another program)", prog.GetProgramName())
-			continue
-		}
-		out = append(out, prog)
-	}
-	return out
-}
-
-// assembleQueryTargets picks SyntaxFlowQueryInstance per program: top overlay
-// when present, otherwise the program itself. Scan runtime uses only this list.
-func assembleQueryTargets(programs []*ssaapi.Program) []ssaapi.SyntaxFlowQueryInstance {
-	out := make([]ssaapi.SyntaxFlowQueryInstance, 0, len(programs))
-	for _, prog := range programs {
-		if prog == nil {
-			continue
-		}
-		if overlay := prog.GetOverlay(); overlay != nil && overlay.IsTopLayerProgram(prog) {
-			out = append(out, overlay)
-			continue
-		}
-		out = append(out, prog)
-	}
-	return out
 }
 
 func (m *scanManager) TaskId() string {
