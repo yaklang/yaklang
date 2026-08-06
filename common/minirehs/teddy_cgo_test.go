@@ -5,6 +5,7 @@ package minirehs
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 )
 
@@ -89,11 +90,18 @@ func randLowerLiteral(r *rand.Rand) string {
 }
 
 func randCorpusWith(r *rand.Rand, lits []string, n int) []byte {
-	const alpha = "abcdefghijklmnopqrstuvwxyz0123456789 _.-=:/@\n\t"
+	const alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _.-=:/@[]\\^`\n\t"
 	buf := make([]byte, 0, n)
 	for len(buf) < n {
 		if len(lits) > 0 && r.Intn(6) == 0 {
-			buf = append(buf, lits[r.Intn(len(lits))]...)
+			lit := lits[r.Intn(len(lits))]
+			for i := 0; i < len(lit); i++ {
+				c := lit[i]
+				if c >= 'a' && c <= 'z' && r.Intn(2) == 0 {
+					c -= 'a' - 'A'
+				}
+				buf = append(buf, c)
+			}
 			continue
 		}
 		if r.Intn(30) == 0 {
@@ -103,6 +111,42 @@ func randCorpusWith(r *rand.Rand, lits []string, n int) []byte {
 		buf = append(buf, alpha[r.Intn(len(alpha))])
 	}
 	return buf[:n]
+}
+
+func TestCGOPrefilterASCIIFoldDifferential(t *testing.T) {
+	cases := []struct {
+		name string
+		lits []string
+		data []byte
+	}{
+		{
+			name: "teddy",
+			lits: []string{"api-key", "authorization", "[token]", "zebra"},
+			data: []byte("API-KEY Authorization [TOKEN] ZEBRA [ToKeN] @\\^` { | } ~ \x80\xff"),
+		},
+		{
+			name: "ac-fallback",
+			lits: []string{"a", "z", "[", "_", "`"},
+			data: []byte("AZaz[]_`@\\^ { | } ~ \x80\xff"),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			li := liFromLiterals(tc.lits)
+			cpf := newCGOPrefilter(li)
+			if cpf == nil {
+				t.Fatal("nil cgo prefilter")
+			}
+			defer cpf.release()
+			gopf := newScalarPrefilter(li)
+
+			simd := hitSet(cpf.scanHits(tc.data, &scratch{}))
+			scalar := hitSet(cpf.scanHitsScalar(tc.data, &scratch{}))
+			goac := hitSet(gopf.scanHits(tc.data, &scratch{}))
+			assertSameHits(t, simd, scalar, tc.name+" SIMD vs scalar")
+			assertSameHits(t, simd, goac, tc.name+" SIMD vs Go AC")
+		})
+	}
 }
 
 // TestTeddyDifferentialRandom 随机字面量集 + 随机数据: Teddy SIMD == Teddy 标量孪生 == 纯 Go AC.
@@ -178,5 +222,28 @@ func TestTeddyRealTrafficVsGoAC(t *testing.T) {
 		if t.Failed() {
 			t.FailNow()
 		}
+	}
+}
+
+// TestTeddyLowEntropyPrefixGate guards the exact two-byte prefix check used
+// before confirm. A long repeated byte sequence must not hide a real match at
+// its tail, and SIMD/scalar/Go AC must continue to report the same hit set.
+func TestTeddyLowEntropyPrefixGate(t *testing.T) {
+	li := liFromLiterals([]string{"akia", "api-key", "secret_access_key", "sk-"})
+	cpf := newCGOPrefilter(li)
+	if cpf == nil || !cpf.useTeddy() {
+		t.Fatal("expected Teddy-enabled prefilter")
+	}
+	defer cpf.release()
+	gopf := newScalarPrefilter(li)
+	data := append([]byte(strings.Repeat("a", 256*1024)), []byte("__API-KEY__")...)
+
+	simd := hitSet(cpf.scanHits(data, &scratch{}))
+	scalar := hitSet(cpf.scanHitsScalar(data, &scratch{}))
+	goac := hitSet(gopf.scanHits(data, &scratch{}))
+	assertSameHits(t, simd, scalar, "low-entropy SIMD vs scalar")
+	assertSameHits(t, simd, goac, "low-entropy SIMD vs Go AC")
+	if len(simd) != 1 {
+		t.Fatalf("expected exactly one api-key hit, got %v", simd)
 	}
 }

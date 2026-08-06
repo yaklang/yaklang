@@ -77,6 +77,59 @@ var _contentTypeHeaderRegexp = regexp.MustCompile(`(?i)content-type: ?`)
 // hello world`, false)
 // ```
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
+	return fixHTTPPacketCRLF(raw, noFixLength, false)
+}
+
+// FixHTTPPacketCRLFBorrowed preserves FixHTTPPacketCRLF's byte-for-byte result,
+// but may return an immutable view of raw when normalization is an exact no-op.
+// Callers must keep raw alive and must not mutate the returned packet.
+func FixHTTPPacketCRLFBorrowed(raw []byte, noFixLength bool) []byte {
+	return fixHTTPPacketCRLFWithBorrow(raw, noFixLength, false, true)
+}
+
+// HTTP header names and the tokens inspected below are ASCII. Preserve the
+// legacy Unicode/invalid-UTF-8 behavior by falling back to strings.ToLower for
+// non-ASCII input while keeping the normal path allocation-free.
+func equalASCIIFoldOrLower(value, lowerTarget string) bool {
+	if !isASCIIBytes(value) {
+		return strings.ToLower(value) == lowerTarget
+	}
+	return utils.AsciiEqualFold(value, lowerTarget)
+}
+
+func hasPrefixASCIIFoldOrLower(value, lowerPrefix string) bool {
+	if !isASCIIBytes(value) {
+		return strings.HasPrefix(strings.ToLower(value), lowerPrefix)
+	}
+	return len(value) >= len(lowerPrefix) && utils.AsciiEqualFold(value[:len(lowerPrefix)], lowerPrefix)
+}
+
+func containsASCIIFoldOrLower(value, lowerNeedle string) bool {
+	if !isASCIIBytes(value) {
+		return strings.Contains(strings.ToLower(value), lowerNeedle)
+	}
+	for index := 0; index+len(lowerNeedle) <= len(value); index++ {
+		if utils.AsciiEqualFold(value[index:index+len(lowerNeedle)], lowerNeedle) {
+			return true
+		}
+	}
+	return false
+}
+
+func isASCIIBytes(value string) bool {
+	for index := 0; index < len(value); index++ {
+		if value[index] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
+}
+
+func fixHTTPPacketCRLF(raw []byte, noFixLength bool, cloneBody bool) []byte {
+	return fixHTTPPacketCRLFWithBorrow(raw, noFixLength, cloneBody, false)
+}
+
+func fixHTTPPacketCRLFWithBorrow(raw []byte, noFixLength bool, cloneBody bool, allowBorrow bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftCRLF(raw)
 	if raw == nil || len(raw) == 0 {
@@ -92,7 +145,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	plrand := fmt.Sprintf("[[REPLACE_CONTENT_LENGTH:%v]]", utils.RandStringBytes(20))
 	plrandHandled := false
 	contentTypeRawValue := ""
-	header, body := SplitHTTPPacket(
+	header, body := splitHTTPPacketEx(
 		raw,
 		func(m, u, proto string) error {
 			isRequest = true
@@ -103,11 +156,13 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 			isResponse = true
 			return nil
 		},
+		nil,
+		cloneBody,
 		func(line string) string {
 			key, value := SplitHTTPHeader(line)
-			keyLower := strings.ToLower(key)
-			valLower := strings.ToLower(value)
-			if !isMultipart && keyLower == "content-type" && strings.HasPrefix(valLower, "multipart/form-data") {
+			if !isMultipart &&
+				equalASCIIFoldOrLower(key, "content-type") &&
+				hasPrefixASCIIFoldOrLower(value, "multipart/form-data") {
 				if matchResult := _contentTypeHeaderRegexp.FindIndex([]byte(line)); len(matchResult) > 1 {
 					end := matchResult[1]
 					contentTypeRawValue = line[end:]
@@ -116,14 +171,16 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 				}
 				isMultipart = true
 			}
-			if !haveContentLength && strings.ToLower(key) == "content-length" {
+			if !haveContentLength && equalASCIIFoldOrLower(key, "content-length") {
 				haveContentLength = true
 				if noFixLength {
 					return line
 				}
 				return fmt.Sprintf(`%v: %v`, key, plrand)
 			}
-			if !haveChunkedHeader && keyLower == "transfer-encoding" && strings.Contains(valLower, "chunked") {
+			if !haveChunkedHeader &&
+				equalASCIIFoldOrLower(key, "transfer-encoding") &&
+				containsASCIIFoldOrLower(value, "chunked") {
 				haveChunkedHeader = true
 			}
 			return line
@@ -209,6 +266,15 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		header = strings.Replace(header, plrand, strconv.Itoa(len(body)), 1)
 	}
 
+	if allowBorrow &&
+		len(restBody) == 0 &&
+		len(header) <= len(raw) &&
+		len(header)+len(body) == len(raw) &&
+		header == utils.UnsafeBytesToString(raw[:len(header)]) &&
+		(len(body) == 0 || &body[0] == &raw[len(header)]) {
+		return raw
+	}
+
 	var buf bytes.Buffer
 	buf.Write([]byte(header))
 	if len(body) > 0 {
@@ -282,13 +348,28 @@ func FixHTTPRequest(raw []byte) []byte {
 	return FixHTTPPacketCRLF(raw, false)
 }
 
+// FixHTTPRequestBorrowed is the immutable-input variant used by forwarding
+// paths that only need a normalized packet for the duration of the call.
+func FixHTTPRequestBorrowed(raw []byte) []byte {
+	return FixHTTPPacketCRLFBorrowed(raw, false)
+}
+
 func DeletePacketEncoding(raw []byte) []byte {
-	plain, _, _ := _unzipPacketEncodingInternal(
+	plain, _ := DeletePacketEncodingWithOwnership(raw)
+	return plain
+}
+
+// DeletePacketEncodingWithOwnership removes transfer/content encoding and
+// reports whether the returned packet is independently owned. A false result
+// means the conservative/no-op path returned a view of raw; callers that retain
+// it beyond raw's lifetime must still clone it.
+func DeletePacketEncodingWithOwnership(raw []byte) (plain []byte, independentlyOwned bool) {
+	plain, _, independentlyOwned = _unzipPacketEncodingInternal(
 		raw,
 		_defaultUnzipPacketEncodingConfig(),
 		_withUnzipPacketEncodingMaxDecodedBytes(0),
 	)
-	return plain
+	return plain, independentlyOwned
 }
 
 func ConvertHTTPRequestToFuzzTag(i []byte) []byte {

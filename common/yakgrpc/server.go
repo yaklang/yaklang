@@ -24,12 +24,13 @@ import (
 
 type Server struct {
 	ypb.UnimplementedYakServer
-	homeDir            string
-	cacheDir           string
-	_abandonedDatabase *gorm.DB
-	reverseServer      *facades.FacadeServer
-	profileDatabase    *gorm.DB
-	projectDatabase    *gorm.DB
+	homeDir             string
+	cacheDir            string
+	_abandonedDatabase  *gorm.DB
+	reverseServer       *facades.FacadeServer
+	profileDatabase     *gorm.DB
+	projectDatabase     *gorm.DB
+	projectReadDatabase *gorm.DB
 	// imEngine 是 IM 远程控制引擎（可选，StartIMControl 启动后非 nil）。
 	imEngine *imcontrol.Engine
 }
@@ -86,6 +87,28 @@ func (s *Server) GetProjectDatabase() *gorm.DB {
 		return s.projectDatabase
 	}
 	return consts.GetGormProjectDatabase()
+}
+
+// GetProjectReadDatabase returns only the optional dedicated read handle. A
+// nil value means callers must use the normal project database.
+func (s *Server) GetProjectReadDatabase() *gorm.DB {
+	if s != nil && s.projectDatabase != nil {
+		return s.projectReadDatabase
+	}
+	return consts.CaptureProjectDatabaseBinding().ReadDatabase
+}
+
+func (s *Server) getProjectDatabaseForHTTPFlowQuery(binding consts.ProjectDatabaseBinding) *gorm.DB {
+	if s != nil && s.projectDatabase != nil {
+		if s.projectReadDatabase != nil {
+			return s.projectReadDatabase
+		}
+		return s.projectDatabase
+	}
+	if binding.ReadDatabase != nil {
+		return binding.ReadDatabase
+	}
+	return binding.Database
 }
 
 func (s *Server) getAIMemoryVectorSingleton() *aiMemoryVectorSessionSingleton {
@@ -149,6 +172,12 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 			return nil, err
 		}
 		s.projectDatabase = db
+		readDB, err := consts.CreateProjectDatabaseReadOnly(serverConfig.projectDatabasePath)
+		if err != nil {
+			_ = db.Close()
+			return nil, err
+		}
+		s.projectReadDatabase = readDB
 	}
 
 	if serverConfig.initFacadeServer {

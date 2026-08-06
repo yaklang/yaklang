@@ -3,6 +3,7 @@ package bizhelper
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,6 +17,7 @@ type Param struct {
 	ShowSQL bool
 
 	QueryCountOnce     bool `json:"query_count_once"`    // 如果开启了，那么只有在NewPagination的时候才会查询Count，Next方法调用的时候就不查询Count
+	SkipCount          bool `json:"skip_count"`          // 显式跳过精确总数；调用方不得依赖 TotalPage/Next
 	DisableTransaction bool `json:"disable_transaction"` // 如果开启了，那么不使用Transaction
 	totalRecord        *int `json:"-"`                   // cache
 }
@@ -30,7 +32,12 @@ type Paginator struct {
 	Page        int         `json:"page"`
 	PrevPage    int         `json:"prev_page"`
 	NextPage    int         `json:"next_page"`
-	param       *Param      `json:"-"`
+	// Query phase timings are diagnostic-only and are never serialized. They
+	// let callers attribute COUNT and row loading without changing pagination.
+	CountQueryDuration time.Duration `json:"-"`
+	DataQueryDuration  time.Duration `json:"-"`
+	CountExecuted      bool          `json:"-"`
+	param              *Param        `json:"-"`
 }
 
 // Paging 分页
@@ -60,7 +67,7 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	var paginator Paginator
 	var count int
 	var offset int
-	shouldQueryCount := true
+	shouldQueryCount := !p.SkipCount
 
 	if p.QueryCountOnce && p.totalRecord != nil {
 		count = *p.totalRecord
@@ -77,7 +84,10 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 			}
 		}()
 		if shouldQueryCount {
+			countStartedAt := time.Now()
 			countDB := tx.Count(&count)
+			paginator.CountQueryDuration += time.Since(countStartedAt)
+			paginator.CountExecuted = true
 			if countDB.Error != nil {
 				tx.Error = countDB.Error
 				return
@@ -89,7 +99,9 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 		}
 
 		if p.Limit == -1 {
+			queryStartedAt := time.Now()
 			queryDB := tx.Find(result)
+			paginator.DataQueryDuration += time.Since(queryStartedAt)
 			if queryDB.Error != nil {
 				tx.Error = queryDB.Error
 			}
@@ -99,7 +111,9 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 			} else {
 				offset = (p.Page - 1) * p.Limit
 			}
+			queryStartedAt := time.Now()
 			queryDB := tx.Limit(p.Limit).Offset(offset).Find(result)
+			paginator.DataQueryDuration += time.Since(queryStartedAt)
 			if queryDB.Error != nil {
 				tx.Error = queryDB.Error
 			}

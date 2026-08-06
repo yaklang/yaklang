@@ -94,7 +94,7 @@ func spillLargeHTTPFlowRequestIfNeeded(packet []byte) (largeRequestSpillResult, 
 		return res, nil
 	}
 
-	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
 	res.OriginalBodyLen = len(body)
 	if len(body) <= GetMaxHTTPFlowRequestBodyInDBBytes() {
 		return res, nil
@@ -214,6 +214,6 @@ func requestBodyLengthFromPacket(packet []byte) int {
 	if len(packet) == 0 {
 		return 0
 	}
-	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
 	return len(body)
 }

@@ -122,11 +122,11 @@ var DBSaveAsyncChannel = make(chan DbExecFunc, 40960)
 
 func init() {
 	throttle := utils.NewThrottle(2)
-	go func() {
+	go func(queue <-chan DbExecFunc) {
 		var count uint64 = 0
-		for f := range DBSaveAsyncChannel {
+		for f := range queue {
 			db := consts.GetGormProjectDatabase()
-			batch := drainDBSaveBatch(f)
+			batch := drainDBSaveBatch(queue, f)
 			if db != nil {
 				execDBSaveBatch(db, batch)
 			} else {
@@ -144,7 +144,35 @@ func init() {
 				})
 			}
 		}
-	}()
+	}(DBSaveAsyncChannel)
+}
+
+// EnqueueDBSave binds a write to the project database that was active when the
+// producer created it. Resolving the global database later in the worker can
+// otherwise move queued traffic across projects during a project switch.
+func EnqueueDBSave(f DbExecFunc) error {
+	if f == nil {
+		return utils.Error("cannot enqueue a nil database save function")
+	}
+	binding := consts.CaptureProjectDatabaseBinding()
+	return enqueueDBSaveTo(binding.Database, f)
+}
+
+func enqueueDBSaveTo(db *gorm.DB, f DbExecFunc) error {
+	if f == nil {
+		return utils.Error("cannot enqueue a nil database save function")
+	}
+	DBSaveAsyncChannel <- bindDBSaveFunc(db, f)
+	return nil
+}
+
+func bindDBSaveFunc(db *gorm.DB, f DbExecFunc) DbExecFunc {
+	return func(_ *gorm.DB) error {
+		if db == nil {
+			return utils.Error("cannot execute async database save without a project database")
+		}
+		return f(db)
+	}
 }
 
 // triggerSlowInsertSQLCallback 触发慢插入 SQL 回调

@@ -85,6 +85,31 @@ type LowhttpExecConfig struct {
 	Password                         string
 	FixQueryEscape                   bool
 
+	// DiscardIntermediateResponseBody lets an internal transport consumer avoid
+	// retaining a bounded Content-Length body in its temporary http.Response when
+	// it separately captures and reparses the complete response packet.
+	DiscardIntermediateResponseBody bool
+
+	// BorrowConnPoolResponsePacket lets an internal immutable consumer reuse the
+	// connection pool's wire capture as the request context's bare response. It is
+	// only effective with DiscardIntermediateResponseBody on the bounded
+	// Content-Length fast path. Exact single-response wire packets then alias
+	// LowhttpResponse.BareResponse and both views must remain immutable. Responses
+	// with informational prefixes or headers requiring normalization fall back to
+	// an owned context packet.
+	BorrowConnPoolResponsePacket bool
+
+	// BorrowFixedRequestPacket lets an internal immutable caller retain the
+	// input packet and reuse it when CRLF/content-length normalization is an
+	// exact no-op. The default keeps LowhttpResponse.RawRequest independently
+	// owned for backward compatibility.
+	BorrowFixedRequestPacket bool
+
+	// BorrowFixedResponsePacket lets an internal immutable caller reuse the wire
+	// packet when response fixing is a byte-for-byte no-op. The default keeps
+	// LowhttpResponse.RawPacket independently owned for backward compatibility.
+	BorrowFixedResponsePacket bool
+
 	// DefaultBufferSize means unexpected situation's buffer size
 	DefaultBufferSize int
 
@@ -135,7 +160,9 @@ type LowhttpExecConfig struct {
 }
 
 type LowhttpResponse struct {
-	RawPacket              []byte
+	RawPacket []byte
+	// ResponsePacketFixed means RawPacket was produced successfully by FixHTTPResponsePacket.
+	ResponsePacketFixed    bool
 	BareResponse           []byte
 	RedirectRawPackets     []*RedirectFlow
 	PortIsOpen             bool
@@ -404,6 +431,30 @@ type LowhttpOpt func(o *LowhttpExecConfig)
 func WithNoBodyBuffer(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.NoBodyBuffer = b
+	}
+}
+
+func WithDiscardIntermediateResponseBody(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.DiscardIntermediateResponseBody = b
+	}
+}
+
+func WithBorrowConnPoolResponsePacket(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.BorrowConnPoolResponsePacket = b
+	}
+}
+
+func WithBorrowFixedRequestPacket(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.BorrowFixedRequestPacket = b
+	}
+}
+
+func WithBorrowFixedResponsePacket(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.BorrowFixedResponsePacket = b
 	}
 }
 

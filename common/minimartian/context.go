@@ -86,13 +86,14 @@ func (c *Context) GetSessionIntValue(i string) int {
 
 // Session provides information and storage about a connection.
 type Session struct {
-	mu       sync.RWMutex
-	id       string
-	secure   bool
-	hijacked bool
-	conn     net.Conn
-	brw      *bufio.ReadWriter
-	vals     map[string]interface{}
+	mu                 sync.RWMutex
+	id                 string
+	secure             bool
+	hijacked           bool
+	conn               net.Conn
+	brw                *bufio.ReadWriter
+	proxyHandleBuffers *proxyHandleBuffers
+	vals               map[string]interface{}
 }
 
 var (
@@ -201,6 +202,17 @@ func (s *Session) setConn(conn net.Conn, brw *bufio.ReadWriter) {
 
 	s.conn = conn
 	s.brw = brw
+}
+
+func (s *Session) releaseProxyHandleBuffers() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	buffers := s.proxyHandleBuffers
+	s.proxyHandleBuffers = nil
+	s.mu.Unlock()
+	releaseProxyHandleBuffers(buffers)
 }
 
 // Get takes key and returns the associated value from the session.

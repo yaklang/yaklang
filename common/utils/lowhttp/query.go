@@ -1,7 +1,6 @@
 package lowhttp
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"net/url"
@@ -166,7 +165,6 @@ func ParseQueryParams(s string, options ...QueryOption) *QueryParams {
 		option(query)
 	}
 
-	scanner := bufio.NewReaderSize(bytes.NewBufferString(s), len(s))
 	var items []*QueryParamItem
 
 	// 获取 position，如果有的话
@@ -205,13 +203,19 @@ func ParseQueryParams(s string, options ...QueryOption) *QueryParams {
 		}
 	}
 
-	for {
-		pair, err := scanner.ReadString('&')
-		if err != nil {
-			handle(pair)
+	// Work directly on immutable string slices. The previous bufio reader first
+	// copied the complete query into a bytes.Buffer, allocated another query-sized
+	// read buffer, then allocated every ReadString result. Indexing at '&' keeps
+	// the exact pair boundaries without any of those transient copies.
+	for offset := 0; offset <= len(s); {
+		relative := strings.IndexByte(s[offset:], '&')
+		if relative < 0 {
+			handle(s[offset:])
 			break
 		}
-		handle(pair)
+		end := offset + relative + 1
+		handle(s[offset:end])
+		offset = end
 	}
 	query.Items = items
 	return query

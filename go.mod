@@ -128,7 +128,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33
-	github.com/yaklang/gorm v0.0.0-20260723082407-eba53e567325
+	github.com/yaklang/gorm v1.9.2-yaklang.7
 	github.com/yaklang/javajive v0.1.2
 	github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80
 	github.com/ysmood/gson v0.7.3

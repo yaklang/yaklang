@@ -74,14 +74,13 @@ func CreateOrUpdateWebsocketFlowEx(db *gorm.DB, hash string, i interface{}, fini
 	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
 		return CreateOrUpdateWebsocketFlow(consts.GetGormProjectDatabase(), hash, i)
 	} else {
-		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+		return EnqueueDBSave(func(db *gorm.DB) error {
 			err := CreateOrUpdateWebsocketFlow(db, hash, i)
 			for _, h := range finishHandler {
 				h(err)
 			}
 			return err
-		}
-		return nil
+		})
 	}
 }
 

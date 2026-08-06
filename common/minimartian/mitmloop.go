@@ -266,6 +266,9 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				log.Error(err)
 				return
 			}
+			defer func() {
+				releaseProxyHandleContext(proxyContext)
+			}()
 
 			// Apply metaInfo and strongHostMode from wrapperedConn to session
 			if wrapped != nil {
@@ -299,6 +302,8 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 					log.Errorf("server s5 connect failed: %s", err)
 					return
 				}
+				releaseProxyHandleContext(proxyContext)
+				proxyContext = nil
 				handledConnection, isTls, err = IsTlsHandleShake(handledConnection)
 				if err != nil {
 					log.Errorf("check tls handle shake failed: %s", err)
@@ -549,9 +554,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		log.Debugf("mitm: connection hijacked by response modifier")
 		return nil
 	}
-	var responseBytes []byte
-	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
-	_ = responseBytes
+	err = utils.WriteHTTPResponse(res, true, brw)
 	if err != nil {
 		log.Errorf("CONNECT Request: got error while writing response back to client: %v", err)
 	}
@@ -860,7 +863,7 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 			res.Header.Set("Proxy-Authenticate", "Basic realm=\"yakit proxy\", charset=\"UTF-8\"")
 			e := fmt.Errorf("reason: %v", reason)
 			proxyutil.Warning(res.Header, e)
-			_, err := utils.DumpHTTPResponse(res, true, brw)
+			err := utils.WriteHTTPResponse(res, true, brw)
 			if err != nil {
 				// never happen
 				err = errors.Join(err, e)
@@ -1006,9 +1009,7 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 		return nil
 	}
 
-	var responseBytes []byte
-	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
-	_ = responseBytes
+	err = utils.WriteHTTPResponse(res, true, brw)
 	if err != nil {
 		if isExpectedDownstreamWriteError(err) {
 			closing = errClose

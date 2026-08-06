@@ -56,6 +56,40 @@ var commonHeader = map[string]string{
 	"X-Powered-By":              "X-Powered-By",
 }
 
+var commonHeaderLower = func() map[string]string {
+	result := make(map[string]string, len(commonHeader))
+	for canonical := range commonHeader {
+		result[canonical] = strings.ToLower(canonical)
+	}
+	return result
+}()
+
+var commonHeaderCanonicalByLower = func() map[string]string {
+	result := make(map[string]string, len(commonHeader))
+	for canonical, lower := range commonHeaderLower {
+		result[lower] = canonical
+	}
+	return result
+}()
+
+// parseOwnedHTTPHeaderLine borrows key and value strings from a header line
+// owned by the parser. ScanHTTPHeader gives each callback an independent line
+// allocation and never mutates it afterwards, so the strings remain valid for
+// the lifetime of the resulting http.Request or http.Response. Common
+// canonical names are replaced with process-lifetime interned strings.
+func parseOwnedHTTPHeaderLine(line []byte) (key, lowerKey, value string) {
+	before, after, _ := bytes.Cut(line, []byte{':'})
+	key = UnsafeBytesToString(before)
+	value = strings.TrimLeftFunc(UnsafeBytesToString(after), unicode.IsSpace)
+	if canonical, ok := commonHeader[key]; ok {
+		key = canonical
+		lowerKey = commonHeaderLower[canonical]
+		return
+	}
+	lowerKey = strings.ToLower(key)
+	return
+}
+
 // ParseHTTPRequestLine parses "GET /foo HTTP/1.1" into its three parts.
 func ParseHTTPRequestLine(line string) (method, requestURI, proto string, ok bool) {
 	s1 := strings.Index(line, " ")
@@ -73,15 +107,144 @@ func ParseHTTPRequestLine(line string) (method, requestURI, proto string, ok boo
 }
 
 func ReadHTTPRequestFromBufioReader(reader *bufio.Reader) (*http.Request, error) {
-	return readHTTPRequestFromBufioReader(reader, false, nil)
+	return readHTTPRequestFromBufioReader(reader, false, nil, nil)
 }
 
 func ReadHTTPRequestFromBufioReaderOnFirstLine(reader *bufio.Reader, h func(string)) (*http.Request, error) {
-	return readHTTPRequestFromBufioReader(reader, false, h)
+	return readHTTPRequestFromBufioReader(reader, false, h, nil)
+}
+
+const httpRequestBytesReaderPoolCapacity = 64
+const httpRequestBodyPreallocateLimit = 1 << 20
+
+type httpRequestBytesReaderState struct {
+	packet bytes.Reader
+	reader *bufio.Reader
+}
+
+var httpRequestBytesReaderPool = make(chan *httpRequestBytesReaderState, httpRequestBytesReaderPoolCapacity)
+
+// ownedHTTPRequestBody lets package-internal dumpers consume the unread body
+// without first copying it through io.ReadAll. The parser gives this type sole
+// ownership of body; callers still see only the standard io.ReadCloser and
+// io.WriterTo behavior.
+type ownedHTTPRequestBody struct {
+	data   []byte
+	reader *bytes.Reader
+}
+
+func newOwnedHTTPRequestBody(body []byte) *ownedHTTPRequestBody {
+	return &ownedHTTPRequestBody{data: body, reader: bytes.NewReader(body)}
+}
+
+func reserveHTTPRequestPacketBody(buffer *bytes.Buffer, size int) {
+	if size > 0 && size <= httpRequestBodyPreallocateLimit {
+		buffer.Grow(size)
+	}
+}
+
+func readHTTPRequestBodyWithLimit(reader io.Reader, limit int) ([]byte, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	if limit > httpRequestBodyPreallocateLimit {
+		return io.ReadAll(io.LimitReader(reader, int64(limit)))
+	}
+	body := make([]byte, limit)
+	n, err := io.ReadFull(reader, body)
+	return body[:n], err
+}
+
+func padHTTPRequestBody(body []byte, length int) []byte {
+	if len(body) >= length {
+		return body
+	}
+	originalLength := len(body)
+	if cap(body) < length {
+		padded := make([]byte, length)
+		copy(padded, body)
+		body = padded
+	} else {
+		body = body[:length]
+	}
+	for i := originalLength; i < length; i++ {
+		body[i] = '\n'
+	}
+	return body
+}
+
+func (b *ownedHTTPRequestBody) Read(p []byte) (int, error) {
+	return b.reader.Read(p)
+}
+
+func (b *ownedHTTPRequestBody) WriteTo(w io.Writer) (int64, error) {
+	return b.reader.WriteTo(w)
+}
+
+func (b *ownedHTTPRequestBody) Close() error {
+	return nil
+}
+
+func (b *ownedHTTPRequestBody) takeRemainingView() []byte {
+	offset, _ := b.reader.Seek(0, io.SeekCurrent)
+	_, _ = b.reader.Seek(0, io.SeekEnd)
+	return b.data[offset:]
+}
+
+func (b *ownedHTTPRequestBody) resetToRemainingView() []byte {
+	body := b.takeRemainingView()
+	b.data = body
+	b.reader.Reset(body)
+	return body
+}
+
+// ReadOwnedHTTPRequestBodyView returns the unread body without copying when
+// req was created by this package's HTTP request parser. It resets req.Body to
+// the beginning of the returned view, matching consume-and-restore readers.
+// The view remains owned by req and must only be used synchronously/read-only.
+// A false result leaves non-parser body implementations untouched.
+func ReadOwnedHTTPRequestBodyView(req *http.Request) ([]byte, bool) {
+	if req == nil || req.Body == nil {
+		return nil, false
+	}
+	body, ok := req.Body.(*ownedHTTPRequestBody)
+	if !ok {
+		return nil, false
+	}
+	return body.resetToRemainingView(), true
+}
+
+func acquireHTTPRequestBytesReader(raw []byte) *httpRequestBytesReaderState {
+	var state *httpRequestBytesReaderState
+	select {
+	case state = <-httpRequestBytesReaderPool:
+	default:
+		state = &httpRequestBytesReaderState{}
+		state.reader = bufio.NewReader(&state.packet)
+	}
+	state.packet.Reset(raw)
+	state.reader.Reset(&state.packet)
+	return state
+}
+
+func releaseHTTPRequestBytesReader(state *httpRequestBytesReaderState) {
+	// Drop the caller packet before retaining the bounded reader state. The
+	// channel deliberately survives GC unlike sync.Pool; at the fixed capacity
+	// it retains at most 256 KiB of bufio storage.
+	state.packet.Reset(nil)
+	state.reader.Reset(&state.packet)
+	select {
+	case httpRequestBytesReaderPool <- state:
+	default:
+	}
 }
 
 func ReadHTTPRequestFromBytes(raw []byte) (*http.Request, error) {
-	return readHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true, nil)
+	state := acquireHTTPRequestBytesReader(raw)
+	defer releaseHTTPRequestBytesReader(state)
+	return readHTTPRequestFromBufioReader(state.reader, true, nil, func() int {
+		return state.reader.Buffered() + state.packet.Len()
+	})
 }
 
 const minIPInteger uint32 = 1 << 24
@@ -264,7 +427,12 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 	}
 }
 
-func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool, onFirstLine func(string)) (*http.Request, error) {
+func readHTTPRequestFromBufioReader(
+	reader *bufio.Reader,
+	fixContentLength bool,
+	onFirstLine func(string),
+	remainingBodyBytes func() int,
+) (*http.Request, error) {
 	rawPacket := new(bytes.Buffer)
 
 	req := &http.Request{
@@ -349,16 +517,10 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 		rawPacket.Write(lineBytes)
 		rawPacket.WriteString(CRLF)
 
-		before, after, _ := bytes.Cut(lineBytes, []byte{':'})
-		keyStr := string(before)
-		valStr := strings.TrimLeftFunc(string(after), unicode.IsSpace)
-
-		if _, isCommonHeader := commonHeader[keyStr]; isCommonHeader {
-			keyStr = http.CanonicalHeaderKey(keyStr)
-		}
+		keyStr, lowerKey, valStr := parseOwnedHTTPHeaderLine(lineBytes)
 
 		isSingletonHeader := false
-		switch strings.ToLower(keyStr) {
+		switch lowerKey {
 		case "content-length":
 			useContentLength = true
 			contentLengthInt = codec.Atoi(valStr)
@@ -466,26 +628,38 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	bodyRawBuf := new(bytes.Buffer)
 	if fixContentLength {
 		// by reader
-		raw, _ := io.ReadAll(reader)
+		var raw []byte
+		if remainingBodyBytes != nil {
+			remaining := remainingBodyBytes()
+			if remaining > 0 {
+				reserveHTTPRequestPacketBody(rawPacket, remaining)
+				raw = make([]byte, remaining)
+				n, _ := io.ReadFull(reader, raw)
+				raw = raw[:n]
+			}
+		} else {
+			raw, _ = io.ReadAll(reader)
+		}
 		rawPacket.Write(raw)
 		if useContentLength && !useTransferEncodingChunked {
 			req.ContentLength = int64(len(raw))
 			shrinkHeader(req.Header, "content-length")
 			req.Header.Set("Content-Length", strconv.Itoa(len(raw)))
 		}
-		bodyRawBuf.Write(raw)
+		// raw is a fresh, parser-owned allocation. Transfer it directly to the
+		// request body instead of copying it into a second bytes.Buffer; the raw
+		// packet and httpctx bare packet still receive independent copies below.
+		bodyRawBuf = bytes.NewBuffer(raw)
 	} else {
 		// by header
 		if useContentLength && useTransferEncodingChunked {
 			log.Warn("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
 				// smuggle
-				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+				reserveHTTPRequestPacketBody(rawPacket, contentLengthInt)
+				bodyRaw, _ := readHTTPRequestBodyWithLimit(reader, contentLengthInt)
 				rawPacket.Write(bodyRaw)
-				bodyRawBuf.Write(bodyRaw)
-				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
-					bodyRawBuf.WriteString(strings.Repeat("\n", ret))
-				}
+				bodyRawBuf = bytes.NewBuffer(padHTTPRequestBody(bodyRaw, contentLengthInt))
 			} else {
 				// chunked
 				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
@@ -507,7 +681,8 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 			}
 		} else {
 			// handle content-length as default
-			bodyRaw, err := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+			reserveHTTPRequestPacketBody(rawPacket, contentLengthInt)
+			bodyRaw, err := readHTTPRequestBodyWithLimit(reader, contentLengthInt)
 			rawPacket.Write(bodyRaw)
 			if err != nil && err != io.EOF {
 				if !errors.Is(err, io.ErrUnexpectedEOF) {
@@ -515,20 +690,20 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 				}
 				log.Warnf("read body error: %v", err)
 			}
-			bodyLen := len(bodyRaw)
-			bodyRawBuf.Write(bodyRaw)
-			bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
+			bodyRawBuf = bytes.NewBuffer(padHTTPRequestBody(bodyRaw, contentLengthInt))
 		}
 	}
 	if bodyRawBuf.Len() == 0 {
 		req.Body = http.NoBody
 	} else {
-		req.Body = io.NopCloser(bodyRawBuf)
+		req.Body = newOwnedHTTPRequestBody(bodyRawBuf.Bytes())
 	}
 	if req.URL != nil && req.URL.Host != "" {
 		req.Host = req.URL.Host
 	}
-	httpctx.SetBareRequestBytes(req, rawPacket.Bytes())
+	// rawPacket is parser-owned and is not used after this point. Transfer it to
+	// httpctx instead of cloning the complete request a second time.
+	httpctx.SetBareRequestBytesOwned(req, rawPacket.Bytes())
 	return req, nil
 }
 

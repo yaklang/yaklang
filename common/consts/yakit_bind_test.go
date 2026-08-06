@@ -88,12 +88,14 @@ func resetYakitDatabaseForBindTest(t *testing.T) {
 	oldProjectDB := projectDataBase
 	oldProfilePath := currentProfileDatabasePath
 	oldProjectPath := currentProjectDatabasePath
+	oldProjectBinding := projectDatabaseBinding.Load()
 	t.Cleanup(func() {
 		initYakitDatabaseOnce = oldOnce
 		profileDatabase = oldProfileDB
 		projectDataBase = oldProjectDB
 		currentProfileDatabasePath = oldProfilePath
 		currentProjectDatabasePath = oldProjectPath
+		projectDatabaseBinding.Store(oldProjectBinding)
 		schema.SetGormProfileDatabase(oldProfileDB)
 		schema.SetGormProjectDatabase(oldProjectDB)
 	})
@@ -103,4 +105,63 @@ func resetYakitDatabaseForBindTest(t *testing.T) {
 	projectDataBase = nil
 	currentProfileDatabasePath = ""
 	currentProjectDatabasePath = ""
+	projectDatabaseBinding.Store(nil)
+}
+
+func TestProjectDatabaseBindingGenerationChangesOnRebind(t *testing.T) {
+	resetYakitDatabaseForBindTest(t)
+
+	dir := t.TempDir()
+	firstPath := filepath.Join(dir, "first.db")
+	firstDB, err := CreateProjectDatabase(firstPath)
+	if err != nil {
+		t.Fatalf("create first project db: %v", err)
+	}
+	BindProjectDatabase(firstDB, firstPath)
+	first := CaptureProjectDatabaseBinding()
+	if first.Database != firstDB || first.Path != firstPath || first.Generation == 0 {
+		t.Fatalf("unexpected first binding: %#v", first)
+	}
+
+	secondPath := filepath.Join(dir, "second.db")
+	secondDB, err := CreateProjectDatabase(secondPath)
+	if err != nil {
+		t.Fatalf("create second project db: %v", err)
+	}
+	BindProjectDatabase(secondDB, secondPath)
+	second := CaptureProjectDatabaseBinding()
+	if second.Database != secondDB || second.Path != secondPath || second.Generation <= first.Generation {
+		t.Fatalf("unexpected second binding: first=%#v second=%#v", first, second)
+	}
+}
+
+func TestAdvanceProjectDatabaseGenerationKeepsHandlesAndRejectsStaleCaller(t *testing.T) {
+	resetYakitDatabaseForBindTest(t)
+
+	projectPath := filepath.Join(t.TempDir(), "project.db")
+	projectDB, err := CreateProjectDatabase(projectPath)
+	if err != nil {
+		t.Fatalf("create project db: %v", err)
+	}
+	BindProjectDatabase(projectDB, projectPath)
+	first := CaptureProjectDatabaseBinding()
+
+	second, advanced := AdvanceProjectDatabaseGeneration(first.Generation)
+	if !advanced {
+		t.Fatal("expected current generation to advance")
+	}
+	if second.Database != first.Database || second.ReadDatabase != first.ReadDatabase || second.Path != first.Path {
+		t.Fatalf("advancing generation changed database handles: first=%#v second=%#v", first, second)
+	}
+	if second.Generation <= first.Generation {
+		t.Fatalf("generation did not advance: first=%d second=%d", first.Generation, second.Generation)
+	}
+
+	current, advanced := AdvanceProjectDatabaseGeneration(first.Generation)
+	if advanced {
+		t.Fatal("stale generation unexpectedly advanced the current project")
+	}
+	if current.Generation != second.Generation {
+		t.Fatalf("stale caller changed generation: current=%d want=%d", current.Generation, second.Generation)
+	}
 }

@@ -68,6 +68,68 @@ var (
 	goVersion  string
 )
 
+const grpcReadyMarkerPrefix = "yak grpc ready "
+const grpcPProfReadyMarkerPrefix = "yak grpc pprof ready "
+
+type grpcReadyEvent struct {
+	SchemaVersion int    `json:"schemaVersion"`
+	Address       string `json:"address"`
+}
+
+type grpcPProfReadyEvent struct {
+	SchemaVersion int    `json:"schemaVersion"`
+	Address       string `json:"address"`
+}
+
+func writeGRPCReadyEvent(writer io.Writer, address string) error {
+	payload, err := json.Marshal(grpcReadyEvent{
+		SchemaVersion: 1,
+		Address:       address,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(writer, "%s%s\n", grpcReadyMarkerPrefix, payload)
+	return err
+}
+
+func writeGRPCPProfReadyEvent(writer io.Writer, address string) error {
+	payload, err := json.Marshal(grpcPProfReadyEvent{
+		SchemaVersion: 1,
+		Address:       address,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(writer, "%s%s\n", grpcPProfReadyMarkerPrefix, payload)
+	return err
+}
+
+func startGRPCPProfServer(writer io.Writer, listenAddress string) (*http.Server, string, error) {
+	listener, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		return nil, "", fmt.Errorf("listen for grpc pprof on %q: %w", listenAddress, err)
+	}
+
+	actualAddress := listener.Addr().String()
+	if err := writeGRPCPProfReadyEvent(writer, actualAddress); err != nil {
+		_ = listener.Close()
+		return nil, "", fmt.Errorf("write grpc pprof ready event: %w", err)
+	}
+
+	server := &http.Server{
+		Handler:           http.DefaultServeMux,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       30 * time.Second,
+	}
+	go func() {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Errorf("grpc pprof server failed: %v", err)
+		}
+	}()
+	return server, actualAddress, nil
+}
+
 func initializeDatabase(projectDatabase string, profileDBName string, ssadb string) error {
 	defer func() {
 		if r := recover(); r != nil {
@@ -380,6 +442,16 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "pprof",
 			Usage: "手动 pprof 采集",
 		},
+		cli.StringFlag{
+			Name:  "pprof-listen",
+			Value: ":18080",
+			Usage: "pprof HTTP 监听地址；性能自动化应使用 127.0.0.1:0",
+		},
+		cli.IntFlag{
+			Name:  "pprof-block-rate",
+			Value: 1,
+			Usage: "runtime block profile 采样率；CPU-only 诊断可设为 0",
+		},
 		cli.Float64Flag{
 			Name:  "auto-pprof",
 			Usage: "指定 pprof 采集秒数间隔,eg. 10",
@@ -465,6 +537,12 @@ var startGRPCServerCommand = cli.Command{
 		if c.Bool("pprof") && c.IsSet("auto-pprof") {
 			return utils.Error("Parameters 'pprof' and 'auto-pprof' cannot be set at the same time")
 		}
+		if !c.Bool("pprof") && (c.IsSet("pprof-listen") || c.IsSet("pprof-block-rate")) {
+			return utils.Error("Parameters 'pprof-listen' and 'pprof-block-rate' require 'pprof'")
+		}
+		if c.Int("pprof-block-rate") < 0 {
+			return utils.Error("Parameter 'pprof-block-rate' cannot be negative")
+		}
 		if c.Bool("disable-output") {
 			os.Setenv("YAK_DISABLE", "output")
 		}
@@ -477,19 +555,17 @@ var startGRPCServerCommand = cli.Command{
 
 		enableProfile := c.Bool("pprof")
 		if enableProfile {
-			runtime.SetBlockProfileRate(1)
+			runtime.SetBlockProfileRate(c.Int("pprof-block-rate"))
+			_, pprofAddress, err := startGRPCPProfServer(os.Stdout, c.String("pprof-listen"))
+			if err != nil {
+				return err
+			}
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
 			println("---------------------------YAK GRPC PPROF-----------------------------")
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
-			println("USE: go tool pprof --seconds 30 http://127.0.0.1:18080/debug/pprof/profile")
-			go func() {
-				err := http.ListenAndServe(":18080", nil)
-				if err != nil {
-					return
-				}
-			}()
+			println("USE: go tool pprof --seconds 30 http://" + pprofAddress + "/debug/pprof/profile")
 		}
 		pprofSec := c.Float64("auto-pprof")
 		if pprofSec > 0 && c.IsSet("auto-pprof") {
@@ -654,6 +730,12 @@ var startGRPCServerCommand = cli.Command{
 				log.Error(err)
 				return err
 			}
+		}
+
+		actualAddress := lis.Addr().String()
+		log.Infof("yak grpc listener ready on: %s", actualAddress)
+		if err := writeGRPCReadyEvent(os.Stdout, actualAddress); err != nil {
+			log.Warnf("write yak grpc ready event failed: %v", err)
 		}
 
 		log.Infof("start to startup grpc server(yak grpc ok)...")

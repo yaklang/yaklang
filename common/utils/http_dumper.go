@@ -77,7 +77,14 @@ func getHeaderValueList(header http.Header, key string) []string {
 	if header == nil {
 		return nil
 	}
-	cKey := http.CanonicalHeaderKey(key)
+	cKey, isCommonLower := commonHeaderCanonicalByLower[key]
+	if !isCommonLower {
+		if canonical, isCommonCanonical := commonHeader[key]; isCommonCanonical {
+			cKey = canonical
+		} else {
+			cKey = http.CanonicalHeaderKey(key)
+		}
+	}
 	if key == cKey {
 		if raw, ok := header[key]; ok {
 			return raw
@@ -87,6 +94,12 @@ func getHeaderValueList(header http.Header, key string) []string {
 
 	v1, _ := header[key]
 	v2, _ := header[cKey]
+	if len(v1) > 0 && len(v2) == 0 && headerValuesCanUseFastPath(v1) {
+		return v1
+	}
+	if len(v2) > 0 && len(v1) == 0 && headerValuesCanUseFastPath(v2) {
+		return v2
+	}
 	vals := make([]string, 0, len(v1)+len(v2))
 	var m = map[string]any{}
 	for _, v := range [][]string{v1, v2} {
@@ -104,6 +117,25 @@ func getHeaderValueList(header http.Header, key string) []string {
 	return vals
 }
 
+const headerValueFastPathMax = 8
+
+func headerValuesCanUseFastPath(values []string) bool {
+	if len(values) > headerValueFastPathMax {
+		return false
+	}
+	for index, value := range values {
+		if value == "" {
+			return false
+		}
+		for previous := range index {
+			if values[previous] == value {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func shrinkHeader(header http.Header, key string) {
 	values := getHeaderValueList(header, key)
 	delete(header, key)
@@ -118,6 +150,45 @@ func shrinkHeader(header http.Header, key string) {
 //
 // transfer-encoding is a special header
 func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byte, error) {
+	return dumpHTTPResponse(rsp, loadBody, true, wr...)
+}
+
+// WriteHTTPResponse writes an HTTP response without retaining a second copy of
+// the serialized packet. Callers that need the packet must use DumpHTTPResponse.
+func WriteHTTPResponse(rsp *http.Response, loadBody bool, wr io.Writer) error {
+	if wr == nil {
+		return Error("nil response writer")
+	}
+	_, err := dumpHTTPResponse(rsp, loadBody, false, wr)
+	return err
+}
+
+type httpResponseDumpWriter struct {
+	io.Writer
+	stringWriter io.StringWriter
+	buffered     *bufio.Writer
+}
+
+func newHTTPResponseDumpWriter(w io.Writer) httpResponseDumpWriter {
+	if stringWriter, ok := w.(io.StringWriter); ok {
+		return httpResponseDumpWriter{Writer: w, stringWriter: stringWriter}
+	}
+	buffered := bufio.NewWriter(w)
+	return httpResponseDumpWriter{Writer: buffered, stringWriter: buffered, buffered: buffered}
+}
+
+func (w *httpResponseDumpWriter) WriteString(s string) (int, error) {
+	return w.stringWriter.WriteString(s)
+}
+
+func (w *httpResponseDumpWriter) Flush() error {
+	if w.buffered == nil {
+		return nil
+	}
+	return w.buffered.Flush()
+}
+
+func dumpHTTPResponse(rsp *http.Response, loadBody, capturePacket bool, wr ...io.Writer) ([]byte, error) {
 	if rsp == nil {
 		return nil, Error("nil response")
 	}
@@ -162,12 +233,25 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		}
 	}
 
-	var cacheBuf = new(bytes.Buffer)
-	var wrs = make([]io.Writer, 0, len(wr)+1)
-	wrs = append(wrs, cacheBuf)
-	wrs = append(wrs, wr...)
+	var cacheBuf *bytes.Buffer
+	var output io.Writer
+	if capturePacket {
+		cacheBuf = new(bytes.Buffer)
+		if len(wr) == 0 {
+			output = cacheBuf
+		} else {
+			wrs := make([]io.Writer, 0, len(wr)+1)
+			wrs = append(wrs, cacheBuf)
+			wrs = append(wrs, wr...)
+			output = io.MultiWriter(wrs...)
+		}
+	} else if len(wr) == 1 {
+		output = wr[0]
+	} else {
+		output = io.MultiWriter(wr...)
+	}
 
-	var buf = bufio.NewWriter(io.MultiWriter(wrs...))
+	buf := newHTTPResponseDumpWriter(output)
 
 	// handle proto
 	protoRaw := rsp.Proto
@@ -252,8 +336,13 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 		rsp.Body = http.NoBody
 	}
 
-	rawBody, _ := io.ReadAll(rsp.Body)
-	var backupBody = io.NopCloser(bytes.NewReader(rawBody))
+	var rawBody []byte
+	if ownedBody, ok := rsp.Body.(*ownedHTTPResponseBody); ok {
+		rawBody = ownedBody.takeRemainingView()
+	} else {
+		rawBody, _ = io.ReadAll(rsp.Body)
+	}
+	var backupBody = newOwnedHTTPResponseBody(rawBody)
 	defer func() {
 		rsp.Body = backupBody
 	}()
@@ -293,10 +382,17 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 	}
 
 	buf.WriteString(CRLF)
-	if loadBody {
-		buf.Write(rawBody)
-	}
 	buf.Flush()
+	if loadBody {
+		if capturePacket {
+			cacheBuf.Grow(len(rawBody))
+		}
+		buf.Write(rawBody)
+		buf.Flush()
+	}
+	if !capturePacket {
+		return nil, nil
+	}
 	return cacheBuf.Bytes(), nil
 }
 
@@ -419,8 +515,13 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 	if req.Body == nil {
 		req.Body = http.NoBody
 	}
-	rawBody, _ := io.ReadAll(req.Body)
-	var backupBody = io.NopCloser(bytes.NewReader(rawBody))
+	var rawBody []byte
+	if ownedBody, ok := req.Body.(*ownedHTTPRequestBody); ok {
+		rawBody = ownedBody.takeRemainingView()
+	} else {
+		rawBody, _ = io.ReadAll(req.Body)
+	}
+	var backupBody = newOwnedHTTPRequestBody(rawBody)
 	defer func() {
 		req.Body = backupBody
 	}()

@@ -1,6 +1,7 @@
 package trafficguard
 
 import (
+	"math/rand"
 	"strings"
 	"testing"
 )
@@ -17,9 +18,100 @@ func TestNewScannerCompilesAllRules(t *testing.T) {
 		t.Fatal("scanner not ready")
 	}
 	t.Logf("rules=%d alwaysOn=%d (existence phase), extract phase=pcre2", s.Len(), s.NumAlwaysOn())
-	// 质量门禁: always-on 数应远小于规则数(本组每条都有稳定字面量前缀)。
-	if s.NumAlwaysOn() > s.Len() {
-		t.Fatalf("alwaysOn=%d should be <= rules=%d", s.NumAlwaysOn(), s.Len())
+	// All MVS candidates are mandatory literals. Rule 18 has a dedicated fixed
+	// shape gate, so no full-record always-on NFA should remain.
+	if s.NumAlwaysOn() != 0 {
+		t.Fatalf("alwaysOn=%d should be zero", s.NumAlwaysOn())
+	}
+}
+
+func TestDiscordCandidateGate(t *testing.T) {
+	valid := []byte("M" + strings.Repeat("a", 23) + "." + strings.Repeat("b", 6) + "." + strings.Repeat("c", 27))
+	if !hasDiscordTokenCandidate(valid) {
+		t.Fatal("valid Discord token shape was rejected by candidate gate")
+	}
+	invalid := append([]byte(nil), valid...)
+	invalid[24] = '-'
+	if hasDiscordTokenCandidate(invalid) {
+		t.Fatal("invalid Discord token shape passed candidate gate")
+	}
+}
+
+func TestDiscordCandidateGateMatchesLegacyOracle(t *testing.T) {
+	random := rand.New(rand.NewSource(0x59414b))
+	alphabet := []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.!@#$%^&*()[]{}\x00\xff")
+	valid := []byte("M" + strings.Repeat("a", 23) + "." + strings.Repeat("b", 6) + "." + strings.Repeat("c", 27))
+	for iteration := 0; iteration < 10000; iteration++ {
+		data := make([]byte, random.Intn(1024))
+		for index := range data {
+			data[index] = alphabet[random.Intn(len(alphabet))]
+		}
+		if len(data) >= len(valid) && iteration%4 == 0 {
+			start := random.Intn(len(data) - len(valid) + 1)
+			copy(data[start:], valid)
+			if iteration%8 == 0 {
+				data[start] = 'N'
+			}
+		}
+		want := legacyDiscordTokenCandidateForBenchmark(data)
+		if got := hasDiscordTokenCandidate(data); got != want {
+			t.Fatalf("candidate mismatch at iteration %d: got %v want %v data=%q", iteration, got, want, data)
+		}
+	}
+}
+
+func TestCandidateGateCoversEveryExactRule(t *testing.T) {
+	discord := "M" + strings.Repeat("a", 23) + "." + strings.Repeat("b", 6) + "." + strings.Repeat("c", 27)
+	fixtures := map[int]string{
+		1:  "-----BEGIN RSA PRIVATE KEY-----",
+		2:  "AKIAIOSFODNN7EXAMPLE",
+		3:  "aws_secret_access_key=" + strings.Repeat("a", 40),
+		4:  "AIza" + strings.Repeat("a", 35),
+		5:  "ya29." + strings.Repeat("a", 20),
+		6:  "AccountKey=" + strings.Repeat("a", 50),
+		7:  "ghp_" + strings.Repeat("a", 36),
+		8:  "glpat-" + strings.Repeat("a", 20),
+		9:  "xoxb-" + strings.Repeat("a", 20),
+		10: "https://hooks.slack.com/services/TAAAAAA/BBBBBBB/" + strings.Repeat("a", 16),
+		11: "sk_live_" + strings.Repeat("a", 24),
+		12: "sk-proj-" + strings.Repeat("a", 40),
+		13: "SG." + strings.Repeat("a", 22) + "." + strings.Repeat("b", 43),
+		14: "SK" + strings.Repeat("a", 32),
+		15: "key-" + strings.Repeat("a", 32),
+		16: "sq0atp-" + strings.Repeat("a", 22),
+		17: "amzn.mws.12345678-1234-1234-1234-123456789abc",
+		18: discord,
+		19: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0." + strings.Repeat("a", 16),
+		22: "mysql://root:password@127.0.0.1/database",
+		23: `"password":"example-secret"`,
+		24: "api_key=" + strings.Repeat("a", 20),
+		25: "X-API-Key: " + strings.Repeat("a", 20),
+	}
+
+	scanner, err := NewScanner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, rule := range scanner.rules {
+		fixture, ok := fixtures[rule.ID]
+		if !ok {
+			t.Fatalf("missing candidate fixture for rule %d", rule.ID)
+		}
+		matches, matchErr := scanner.extractors[index].FindAll([]byte(fixture), -1)
+		if matchErr != nil || len(matches) == 0 {
+			t.Fatalf("fixture does not satisfy exact rule %d: matches=%d err=%v", rule.ID, len(matches), matchErr)
+		}
+		candidateIndexes := scanner.candidateRules([]byte(fixture))
+		found := false
+		for _, candidateIndex := range candidateIndexes {
+			if candidateIndex == index {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("candidate gate missed exact rule %d", rule.ID)
+		}
 	}
 }
 

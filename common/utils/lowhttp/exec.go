@@ -206,7 +206,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	retryHandler := option.RetryHandler
 	retry := func(rsp *LowhttpResponse, rawBytes []byte, retryTimes int) bool {
 		if retryHandler != nil {
-			rspRaw, _, err := FixHTTPResponse(rawBytes)
+			rspRaw, err := FixHTTPResponsePacket(rawBytes)
 			if err != nil {
 				rspRaw = rawBytes
 			}
@@ -267,8 +267,8 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		gmTLS                   = option.GmTLS
 		onlyGMTLS               = option.GmTLSOnly
 		preferGMTLS             = option.GmTLSPrefer
-		gmTLSCipherSuites           = option.GmTLSCipherSuites
-		gmTLSDisableCompatMode      = option.GmTLSDisableCompatMode
+		gmTLSCipherSuites       = option.GmTLSCipherSuites
+		gmTLSDisableCompatMode  = option.GmTLSDisableCompatMode
 		host                    = option.Host
 		port                    = option.Port
 		requestPacket           = option.Packet
@@ -624,7 +624,11 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	response.FromPlugin = option.FromPlugin
 
 	// fix CRLF
-	requestPacket = FixHTTPPacketCRLF(requestPacket, noFixContentLength)
+	if option.BorrowFixedRequestPacket {
+		requestPacket = FixHTTPPacketCRLFBorrowed(requestPacket, noFixContentLength)
+	} else {
+		requestPacket = FixHTTPPacketCRLF(requestPacket, noFixContentLength)
+	}
 
 	if fixQueryEscape {
 		requestPacket = FixHTTPPacketQueryEscape(requestPacket)
@@ -1129,9 +1133,16 @@ RECONNECT:
 
 		traceInfo.ServerTime = time.Since(serverTimeStart)
 
-		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
+		if option.DiscardIntermediateResponseBody {
+			firstResponse, err = utils.ReadHTTPResponseMetadataFromBufioReader(httpResponseReader, reqIns, responseRaw.Grow)
+		} else {
+			firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, reqIns)
+		}
 		if err != nil {
 			log.Warnf("[lowhttp] read response failed: %s", err)
+		}
+		if utils.HTTPResponseHasDiscardedIntermediateBody(firstResponse) {
+			firstResponse.Body = http.NoBody
 		}
 
 		if firstAuth && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {
@@ -1218,7 +1229,7 @@ RECONNECT:
 	}
 
 	if option.EnableMaxContentLength && maxContentLength > 0 {
-		if body := GetHTTPPacketBody(rawBytes); len(body) > maxContentLength {
+		if _, body := SplitHTTPHeadersAndBodyFromPacketView(rawBytes); len(body) > maxContentLength {
 			rawBytes = ReplaceHTTPPacketBodyRaw(rawBytes, body[:maxContentLength], true)
 		}
 	}
@@ -1259,7 +1270,13 @@ RECONNECT:
 		/*
 			todo: need split fix http response, fix content-type need as option
 		*/
-		rspRaw, _, err := FixHTTPResponse(rawBytes)
+		var rspRaw []byte
+		var err error
+		if option.BorrowFixedResponsePacket {
+			rspRaw, err = FixHTTPResponsePacketBorrowed(rawBytes)
+		} else {
+			rspRaw, err = FixHTTPResponsePacket(rawBytes)
+		}
 		if err != nil {
 			log.Errorf("fix http response failed: %s", err)
 			response.RawPacket = rawBytes
@@ -1273,6 +1290,7 @@ RECONNECT:
 			response.FixContentType = fixHeader
 		}
 		response.RawPacket = rspRaw
+		response.ResponsePacketFixed = true
 
 		err = failureChecker(response)
 		return response, err

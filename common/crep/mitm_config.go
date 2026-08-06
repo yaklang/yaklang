@@ -457,6 +457,21 @@ func MITM_SetDownstreamProxyRoutes(routes map[string][]string) MITMConfig {
 func MITM_SetHTTPRequestHijackRaw(c func(isHttps bool, reqIns *http.Request, req []byte) []byte) MITMConfig {
 	return func(server *MITMServer) error {
 		server.requestHijackHandler = c
+		server.requestHijackHandlerWithModification = nil
+		return nil
+	}
+}
+
+// MITM_SetHTTPRequestHijackRawWithModification lets a hijacker explicitly
+// report whether the returned packet differs from req. A false result permits
+// the proxy to keep the already parsed request instead of parsing the same
+// packet again. Callers must report true for in-place edits.
+func MITM_SetHTTPRequestHijackRawWithModification(
+	c func(isHttps bool, reqIns *http.Request, req []byte) ([]byte, bool),
+) MITMConfig {
+	return func(server *MITMServer) error {
+		server.requestHijackHandlerWithModification = c
+		server.requestHijackHandler = nil
 		return nil
 	}
 }
@@ -464,6 +479,21 @@ func MITM_SetHTTPRequestHijackRaw(c func(isHttps bool, reqIns *http.Request, req
 func MITM_SetHTTPResponseHijackRaw(c func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) []byte) MITMConfig {
 	return func(server *MITMServer) error {
 		server.responseHijackHandler = c
+		server.responseHijackHandlerWithModification = nil
+		return nil
+	}
+}
+
+// MITM_SetHTTPResponseHijackRawWithModification lets a hijacker explicitly
+// report whether the returned packet differs from rsp. A false result permits
+// the proxy to keep the already parsed response instead of snapshotting and
+// parsing the same packet again. Callers must report true for in-place edits.
+func MITM_SetHTTPResponseHijackRawWithModification(
+	c func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) ([]byte, bool),
+) MITMConfig {
+	return func(server *MITMServer) error {
+		server.responseHijackHandlerWithModification = c
+		server.responseHijackHandler = nil
 		return nil
 	}
 }
@@ -503,6 +533,7 @@ func MITM_SetHTTPRequestHijack(c func(isHttps bool, req *http.Request) *http.Req
 			}
 			return raw
 		}
+		server.requestHijackHandlerWithModification = nil
 		return nil
 	}
 }

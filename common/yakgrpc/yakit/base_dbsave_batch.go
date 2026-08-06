@@ -12,25 +12,26 @@ import (
 )
 
 const (
-	dbSaveBatchMaxSize      = 48
-	dbSaveBatchCoalesceWait = 10 * time.Millisecond
+	dbSaveBatchMaxSize = 48
 	// 慢插入判定阈值统一取自 SlowInsertSQLThreshold，避免与广播逻辑割裂
 	dbSaveSlowInsertThreshold = SlowInsertSQLThreshold
 )
 
-// drainDBSaveBatch pulls more queued writers when the channel is busy.
-func drainDBSaveBatch(first DbExecFunc) []DbExecFunc {
+// drainDBSaveBatch greedily pulls writers that are already queued. The batch is
+// still executed as sequential autocommit statements, so waiting for future
+// items only adds latency and provides no transaction or fsync coalescing.
+func drainDBSaveBatch(queue <-chan DbExecFunc, first DbExecFunc) []DbExecFunc {
 	batch := make([]DbExecFunc, 0, dbSaveBatchMaxSize)
 	batch = append(batch, first)
 
-	timer := time.NewTimer(dbSaveBatchCoalesceWait)
-	defer timer.Stop()
-
 	for len(batch) < dbSaveBatchMaxSize {
 		select {
-		case f := <-DBSaveAsyncChannel:
+		case f, ok := <-queue:
+			if !ok {
+				return batch
+			}
 			batch = append(batch, f)
-		case <-timer.C:
+		default:
 			return batch
 		}
 	}

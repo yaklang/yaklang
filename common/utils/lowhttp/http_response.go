@@ -3,14 +3,16 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
+	"mime"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	utils "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"mime"
-	"net/http"
-	"regexp"
-	"strings"
 )
 
 var (
@@ -132,41 +134,113 @@ func IsHtmlOrXmlMIMEType(s string) bool {
 // fixedResponse, body, err = str.FixHTTPResponse(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=gbk\r\n\r\n<html>你好</html>")
 // ```
 func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
+	return fixHTTPResponse(raw, true)
+}
+
+// FixHTTPResponsePacket fixes an HTTP response for callers that only need the
+// rebuilt packet. The returned packet owns its storage and raw is not modified.
+func FixHTTPResponsePacket(raw []byte) (rsp []byte, _ error) {
+	rsp, _, err := fixHTTPResponse(raw, false)
+	return rsp, err
+}
+
+// FixHTTPResponsePacketBorrowed preserves FixHTTPResponsePacket's byte-for-byte
+// result, but may return an immutable view of raw when fixing is an exact no-op.
+// FixHTTPResponsePacketBorrowed may retain an already-valid response packet,
+// including its original Content-Length header position. The generic
+// FixHTTPResponsePacket API continues to return an independently owned,
+// canonically rebuilt packet.
+func FixHTTPResponsePacketBorrowed(raw []byte) (rsp []byte, _ error) {
+	rsp, _, err := fixHTTPResponseWithBorrow(raw, false, true)
+	return rsp, err
+}
+
+func rebuildFixedHTTPResponse(
+	headerBytes, body []byte,
+	cloneBody, bodyIndependentlyOwned bool,
+	borrowPacket []byte,
+) ([]byte, []byte, error) {
+	if !cloneBody && bodyIndependentlyOwned {
+		packet := replaceHTTPPacketBodyExOwned(headerBytes, body, false, true)
+		_, packetBody := SplitHTTPHeadersAndBodyFromPacketView(packet)
+		return packet, packetBody, nil
+	}
+	return replaceHTTPPacketBodyExWithBorrow(headerBytes, body, false, true, false, borrowPacket), body, nil
+}
+
+type fixedHTTPResponseHeaderState struct {
+	isChunked       bool
+	contentEncoding string
+	contentType     string
+	noContentType   bool
+}
+
+func (state *fixedHTTPResponseHeaderState) parse(line string) {
+	const (
+		contentTypePrefix      = "content-type:"
+		transferEncodingPrefix = "transfer-encoding:"
+		contentEncodingPrefix  = "content-encoding:"
+	)
+
+	switch {
+	case len(line) >= len(contentTypePrefix) && utils.AsciiEqualFold(line[:len(contentTypePrefix)], contentTypePrefix):
+		_, state.contentType = SplitHTTPHeader(line)
+		state.noContentType = false
+	case len(line) >= len(transferEncodingPrefix) && utils.AsciiEqualFold(line[:len(transferEncodingPrefix)], transferEncodingPrefix):
+		lowerLine := strings.ToLower(line)
+		if strings.Contains(lowerLine, "chunked") {
+			state.isChunked = true
+		}
+	case len(line) >= len(contentEncodingPrefix) && utils.AsciiEqualFold(line[:len(contentEncodingPrefix)], contentEncodingPrefix):
+		// ContentEncodingDecode historically receives the complete lowercase line.
+		state.contentEncoding = strings.ToLower(line)
+	}
+}
+
+func fixHTTPResponse(raw []byte, cloneBody bool) (rsp []byte, body []byte, _ error) {
+	return fixHTTPResponseWithBorrow(raw, cloneBody, false)
+}
+
+func fixHTTPResponseWithBorrow(raw []byte, cloneBody, allowBorrow bool) (rsp []byte, body []byte, _ error) {
 	// log.Infof("response raw: \n%v", codec.EncodeBase64(raw))
 	raw, _ = bytes.CutPrefix(raw, expect100continue)
+	var borrowPacket []byte
+	if allowBorrow {
+		borrowPacket = raw
+	}
 
-	isChunked := false
-	// 这两个用来处理编码特殊情况
-	var contentEncoding string
-	var contentType string
-	noContentTypeSet := true
-	headers, body := SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
-		if strings.HasPrefix(strings.ToLower(line), "content-type:") {
-			_, contentType = SplitHTTPHeader(line)
-			noContentTypeSet = false
-		}
-		// 判断内容
-		line = strings.ToLower(line)
-		if strings.HasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
-			isChunked = true
-		}
-		if strings.HasPrefix(line, "content-encoding:") {
-			contentEncoding = line
-		}
-	})
+	headerState := fixedHTTPResponseHeaderState{noContentType: true}
+	var headers string
+	if cloneBody {
+		headers, body = SplitHTTPHeadersAndBodyFromPacket(raw, headerState.parse)
+	} else {
+		headers, body = SplitHTTPHeadersAndBodyFromPacketView(raw, headerState.parse)
+	}
 	if headers == "" {
 		return nil, nil, utils.Errorf("error for parsing http response")
 	}
 	headerBytes := []byte(headers)
+	isChunked := headerState.isChunked
+	contentEncoding := headerState.contentEncoding
+	contentType := headerState.contentType
+	noContentTypeSet := headerState.noContentType
 
 	bodyRaw := body
+	bodyIndependentlyOwned := false
 	if bodyRaw != nil && isChunked {
+		// HTTPChunkedDecode may shorten its error preview in-place. Keep the
+		// packet-only API's input immutable even for malformed chunked bodies.
+		if !cloneBody {
+			bodyRaw = bytes.Clone(bodyRaw)
+		}
 		unchunked, chunkErr := codec.HTTPChunkedDecode(bodyRaw)
 		if unchunked != nil {
 			bodyRaw = unchunked
+			bodyIndependentlyOwned = true
 		} else {
 			if chunkErr == nil {
 				bodyRaw = []byte{}
+				bodyIndependentlyOwned = true
 			}
 		}
 	}
@@ -176,16 +250,17 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 			// contents get decoded
 			headerBytes = RemoveCEHeaders(headerBytes)
 			bodyRaw = decodedBodyRaw
+			bodyIndependentlyOwned = true
 		}
 	}
 
 	if len(bodyRaw) == 0 {
-		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 	}
 	mimeResult, err := codec.MatchMIMEType(bodyRaw)
 	if err != nil {
 		log.Warnf("match mime type failed: %v", err)
-		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 	}
 
 	// 记录原始 contentType
@@ -209,7 +284,7 @@ RetryContentType:
 				}
 			}
 		}
-		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 	case IsHtmlOrXmlMIMEType(contentType):
 		// body is not text, but content-type is ...
 		// fix content-type header
@@ -240,10 +315,10 @@ RetryContentType:
 			newContentType = mime.FormatMediaType(origin, params)
 		}
 		headerBytes = ReplaceMIMEType(headerBytes, newContentType)
-		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+		return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 	default:
 		if mimeResult == nil || mimeResult.MIMEType == "" {
-			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+			return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 		}
 
 		if contentType == "" && noContentTypeSet {
@@ -262,13 +337,13 @@ RetryContentType:
 				}
 				headerBytes = ReplaceMIMEType(headerBytes, mime.FormatMediaType(contentType, map[string]string{"charset": "utf-8"}))
 			}
-			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+			return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 		} else {
 			if !mimeResult.IsText {
 				headerBytes = ReplaceMIMEType(headerBytes, mimeResult.MIMEType)
-				return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+				return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 			}
-			return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+			return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 		}
 	}
 	//
@@ -387,7 +462,28 @@ func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) (newHTTPRequest 
 }
 
 func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) []byte {
+	return replaceHTTPPacketBodyEx(raw, body, chunk, forceCL, false)
+}
+
+func replaceHTTPPacketBodyExOwned(raw []byte, body []byte, chunk bool, forceCL bool) []byte {
+	return replaceHTTPPacketBodyEx(raw, body, chunk, forceCL, true)
+}
+
+func replaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool, bodyIndependentlyOwned bool) []byte {
+	return replaceHTTPPacketBodyExWithBorrow(raw, body, chunk, forceCL, bodyIndependentlyOwned, nil)
+}
+
+func replaceHTTPPacketBodyExWithBorrow(
+	raw []byte,
+	body []byte,
+	chunk bool,
+	forceCL bool,
+	bodyIndependentlyOwned bool,
+	borrowPacket []byte,
+) []byte {
 	isChunked := false
+	contentLengthCount := 0
+	contentLength := -1
 	var firstLine string
 	var headers []string
 	_, _ = SplitHTTPPacketEx(raw, nil, nil, func(rawLine string) error {
@@ -400,16 +496,44 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 		}
 
 		if utils.IHasPrefix(line, "content-length") {
+			key, value := SplitHTTPHeader(line)
+			if !strings.EqualFold(strings.TrimSpace(key), "content-length") {
+				contentLengthCount = 2
+				return line
+			}
+			contentLengthCount++
+			parsed, err := strconv.Atoi(strings.TrimSpace(value))
+			if err != nil || parsed < 0 {
+				contentLengthCount = 2
+				return line
+			}
+			contentLength = parsed
 			return line
 		}
 		headers = append(headers, line)
 		return line
 	})
+	if packetCanBorrowValidResponse(
+		borrowPacket,
+		raw,
+		body,
+		bodyIndependentlyOwned,
+		forceCL,
+		isChunked,
+		contentLengthCount,
+		contentLength,
+	) {
+		return borrowPacket
+	}
 	headers = append([]string{firstLine}, headers...)
 	var buf bytes.Buffer
 	// 空 body
 	if body == nil {
-		buf.WriteString(strings.Join(headers, CRLF) + CRLF + CRLF)
+		header := strings.Join(headers, CRLF) + CRLF + CRLF
+		if packetMatchesBorrowedParts(borrowPacket, header, nil, bodyIndependentlyOwned) {
+			return borrowPacket
+		}
+		buf.WriteString(header)
 		return buf.Bytes()
 	}
 
@@ -423,20 +547,68 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 		headers = append(headers, "Transfer-Encoding: chunked")
 		if !isChunked {
 			body = codec.HTTPChunkedEncode(body)
+			bodyIndependentlyOwned = true
 		}
 	} else if isChunked {
 		newBody, err := codec.HTTPChunkedDecode(body)
 		if err == nil {
 			body = newBody
+			bodyIndependentlyOwned = true
 		}
 	}
 	if !chunk && (len(body) > 0 || forceCL) {
 		headers = append(headers, fmt.Sprintf("Content-Length: %d", len(body)))
 	}
-	buf.WriteString(strings.Join(headers, CRLF))
-	buf.WriteString(CRLF + CRLF)
+	header := strings.Join(headers, CRLF) + CRLF + CRLF
+	if bodyIndependentlyOwned && len(body) > 0 && len(header) <= cap(body)-len(body) {
+		bodyLength := len(body)
+		packet := body[:bodyLength+len(header)]
+		copy(packet[len(header):], packet[:bodyLength])
+		copy(packet, header)
+		return packet
+	}
+	if packetMatchesBorrowedParts(borrowPacket, header, body, bodyIndependentlyOwned) {
+		return borrowPacket
+	}
+	buf.WriteString(header)
 	buf.Write(body)
 	return buf.Bytes()
+}
+
+func packetCanBorrowValidResponse(
+	packet []byte,
+	header []byte,
+	body []byte,
+	bodyIndependentlyOwned bool,
+	forceCL bool,
+	isChunked bool,
+	contentLengthCount int,
+	contentLength int,
+) bool {
+	if bodyIndependentlyOwned || len(packet) == 0 || isChunked {
+		return false
+	}
+	packetHeader, packetBody := SplitHTTPHeadersAndBodyFromPacketView(packet)
+	if packetHeader != utils.UnsafeBytesToString(header) ||
+		len(packetBody) != len(body) ||
+		(len(body) > 0 && &packetBody[0] != &body[0]) {
+		return false
+	}
+	if len(body) > 0 || forceCL {
+		return contentLengthCount == 1 && contentLength == len(body)
+	}
+	return contentLengthCount == 0
+}
+
+func packetMatchesBorrowedParts(packet []byte, header string, body []byte, bodyIndependentlyOwned bool) bool {
+	if bodyIndependentlyOwned ||
+		len(packet) == 0 ||
+		len(header) > len(packet) ||
+		len(header)+len(body) != len(packet) ||
+		header != utils.UnsafeBytesToString(packet[:len(header)]) {
+		return false
+	}
+	return len(body) == 0 || &body[0] == &packet[len(header)]
 }
 
 func ReplaceHTTPPacketBodyRaw(raw []byte, body []byte, fixCL bool) []byte {

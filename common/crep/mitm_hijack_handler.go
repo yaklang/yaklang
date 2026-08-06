@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
 	martian "github.com/yaklang/yaklang/common/minimartian"
@@ -38,6 +37,141 @@ func getRequestUpstreamPort(req *http.Request, isHTTPS bool) (int, bool, bool) {
 		return 0, false, false
 	}
 	return port, targetURL.Port() != "", true
+}
+
+func cloneAndParseHijackedResponse(packet []byte) ([]byte, *http.Response, error) {
+	ownedPacket := bytes.Clone(packet)
+	rsp, err := utils.ReadHTTPResponseFromBytesWithBodyView(ownedPacket)
+	return ownedPacket, rsp, err
+}
+
+func samePacketView(left, right []byte) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	return len(left) == 0 || &left[0] == &right[0]
+}
+
+func (m *MITMServer) hasHTTPRequestHijackHandler() bool {
+	return m.requestHijackHandlerWithModification != nil || m.requestHijackHandler != nil
+}
+
+func (m *MITMServer) callHTTPRequestHijackHandler(
+	isHTTPS bool,
+	req *http.Request,
+	packet []byte,
+) ([]byte, bool) {
+	if m.requestHijackHandlerWithModification != nil {
+		return m.requestHijackHandlerWithModification(isHTTPS, req, packet)
+	}
+	return m.requestHijackHandler(isHTTPS, req, packet), true
+}
+
+func applyHijackedRequestResult(
+	req *http.Request,
+	isHTTPS bool,
+	originalPort int,
+	originalPortOK bool,
+	originalPacket, result []byte,
+	modified bool,
+) error {
+	// Only the modification-aware callback may retain the already parsed
+	// request. Pointer identity makes an accidentally mislabelled independent
+	// packet fall back to the conservative legacy parse path.
+	if !modified && samePacketView(originalPacket, result) {
+		return nil
+	}
+
+	hijackedReq, err := lowhttp.ParseBytesToHttpRequest(result)
+	if err != nil {
+		return err
+	}
+	if isHTTPS {
+		hijackedReq.TLS = req.TLS
+	}
+	hijackedPort, hijackedPortExplicit, hijackedPortOK := getRequestUpstreamPort(hijackedReq, isHTTPS)
+	httpctx.SetUpstreamPortModified(req, originalPortOK && hijackedPortOK && hijackedPortExplicit && originalPort != hijackedPort)
+	hijackedReq.RemoteAddr = req.RemoteAddr
+	if req.ProtoMajor != 2 {
+		hijackedReq.Proto = "HTTP/1.1"
+		hijackedReq.ProtoMajor = 1
+		hijackedReq.ProtoMinor = 1
+	}
+
+	*req = *hijackedReq.WithContext(req.Context())
+
+	// fix new request: Host n Schema
+	if req.URL.Host == "" {
+		req.URL.Host = req.Host
+	}
+
+	if req.URL.Host == "" && req.Host == "" {
+		req.URL.Host = httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
+		req.Host = req.URL.Host
+	}
+
+	if req.URL.Scheme == "" && (req.TLS != nil || isHTTPS) {
+		req.URL.Scheme = "https"
+	} else {
+		req.URL.Scheme = "http"
+	}
+	return nil
+}
+
+func (m *MITMServer) hasHTTPResponseHijackHandler() bool {
+	return m.responseHijackHandlerWithModification != nil || m.responseHijackHandler != nil
+}
+
+func (m *MITMServer) callHTTPResponseHijackHandler(
+	isHTTPS bool,
+	req *http.Request,
+	rsp *http.Response,
+	packet []byte,
+	remoteAddr string,
+) ([]byte, bool) {
+	if m.responseHijackHandlerWithModification != nil {
+		return m.responseHijackHandlerWithModification(isHTTPS, req, rsp, packet, remoteAddr)
+	}
+	return m.responseHijackHandler(isHTTPS, req, rsp, packet, remoteAddr), true
+}
+
+func applyHijackedResponseResult(
+	req *http.Request,
+	rsp *http.Response,
+	originalPacket, result []byte,
+	modified bool,
+) ([]byte, error) {
+	// The modification-aware callback is the only path allowed to transfer the
+	// original packet back without reparsing. Pointer identity also makes an
+	// accidentally mislabelled independent result fall back to legacy behavior.
+	if !modified && samePacketView(originalPacket, result) {
+		return originalPacket, nil
+	}
+
+	ownedPacket, resultRsp, err := cloneAndParseHijackedResponse(result)
+	if err != nil {
+		return nil, err
+	}
+	*rsp = *resultRsp
+	rsp.Request = req
+	rsp.TLS = req.TLS
+	return ownedPacket, nil
+}
+
+func dumpRequestToBareContext(req *http.Request) ([]byte, error) {
+	raw, err := utils.DumpHTTPRequest(req, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return raw, nil
+	}
+	// DumpHTTPRequest created this packet for the current request and no other
+	// owner needs to retain it. Hand it directly to the request context; the
+	// later hijack callback already consumes the context packet as a read-only
+	// view, so cloning it here only creates a second full request snapshot.
+	httpctx.SetBareRequestBytesOwned(req, raw)
+	return httpctx.GetBareRequestBytes(req), nil
 }
 
 func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
@@ -74,11 +208,18 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
 				return nil
 			}
-			m.requestHijackHandler(isHttps, req, hijackedRaw)
+			m.callHTTPRequestHijackHandler(isHttps, req, hijackedRaw)
 			return nil
 		},
 		ResponseHijackCallback: func(req *http.Request, rsp *http.Response, rspRaw []byte) []byte {
-			return m.responseHijackHandler(httpctx.GetRequestHTTPS(req), req, rsp, rspRaw, httpctx.GetRemoteAddr(req))
+			result, _ := m.callHTTPResponseHijackHandler(
+				httpctx.GetRequestHTTPS(req),
+				req,
+				rsp,
+				rspRaw,
+				httpctx.GetRemoteAddr(req),
+			)
+			return result
 		},
 	}
 	if m.proxyUrls != nil {
@@ -133,12 +274,9 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	if !httpctx.GetRequestViaCONNECT(req) {
 		// 不是通过 CONNECT 方法的代理，一般常见非 HTTPS 代理，这种情况下
 		// Dump 出来的数据包 URI 不包含 http://
-		raw, err := utils.DumpHTTPRequest(req, true)
+		_, err := dumpRequestToBareContext(req)
 		if err != nil {
 			log.Errorf("dump request failed: %s", err)
-		}
-		if funk.NotEmpty(raw) {
-			httpctx.SetBareRequestBytes(req, raw)
 		}
 	}
 
@@ -152,16 +290,15 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	var isHttps = req.TLS != nil || httpctx.GetRequestHTTPS(req)
 	httpctx.SetRequestHTTPS(req, isHttps)
 
-	if m.requestHijackHandler != nil {
+	if m.hasHTTPRequestHijackHandler() {
 		originalPort, _, originalPortOK := getRequestUpstreamPort(req, isHttps)
 		hijackedRaw := httpctx.GetBareRequestBytes(req)
 		if hijackedRaw == nil || len(hijackedRaw) == 0 {
-			hijackedRaw, err := utils.DumpHTTPRequest(req, true)
+			hijackedRaw, err = dumpRequestToBareContext(req)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
 				return nil
 			}
-			httpctx.SetBareRequestBytes(req, hijackedRaw)
 		}
 
 		/*
@@ -178,7 +315,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		//if urlInstance != nil {
 		//	log.Infof("hijack url [%v]: %v", req.Method, urlInstance.String())
 		//}
-		hijackedRequestRaw := m.requestHijackHandler(isHttps, req, hijackedRaw)
+		hijackedRequestRaw, modified := m.callHTTPRequestHijackHandler(isHttps, req, hijackedRaw)
 		select {
 		case <-rootCtx.Done():
 			reqContext := martian.NewContext(req, m.proxy)
@@ -189,40 +326,17 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		if hijackedRequestRaw == nil {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 		} else {
-			hijackedRaw = hijackedRequestRaw
-			hijackedReq, err := lowhttp.ParseBytesToHttpRequest(hijackedRequestRaw)
-			if err != nil {
+			if err := applyHijackedRequestResult(
+				req,
+				isHttps,
+				originalPort,
+				originalPortOK,
+				hijackedRaw,
+				hijackedRequestRaw,
+				modified,
+			); err != nil {
 				log.Errorf("mitm-hijacked request to http.Request failed: %s", err)
 				return nil
-			}
-			if isHttps {
-				hijackedReq.TLS = req.TLS
-			}
-			hijackedPort, hijackedPortExplicit, hijackedPortOK := getRequestUpstreamPort(hijackedReq, isHttps)
-			httpctx.SetUpstreamPortModified(req, originalPortOK && hijackedPortOK && hijackedPortExplicit && originalPort != hijackedPort)
-			hijackedReq.RemoteAddr = req.RemoteAddr
-			if req.ProtoMajor != 2 {
-				hijackedReq.Proto = "HTTP/1.1"
-				hijackedReq.ProtoMajor = 1
-				hijackedReq.ProtoMinor = 1
-			}
-
-			*req = *hijackedReq.WithContext(req.Context())
-
-			// fix new request: Host n Schema
-			if req.URL.Host == "" {
-				req.URL.Host = req.Host
-			}
-
-			if req.URL.Host == "" && req.Host == "" {
-				req.URL.Host = httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
-				req.Host = req.URL.Host
-			}
-
-			if req.URL.Scheme == "" && (req.TLS != nil || isHttps) {
-				req.URL.Scheme = "https"
-			} else {
-				req.URL.Scheme = "http"
 			}
 		}
 	}
@@ -276,24 +390,25 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 	}
 
 	// response hijacker
-	if m.responseHijackHandler != nil && !httpctx.IsFiltered(req) { // if flow is filtered, do not hijack response
+	if m.hasHTTPResponseHijackHandler() && !httpctx.IsFiltered(req) { // if flow is filtered, do not hijack response
 		isHttps := httpctx.GetRequestHTTPS(rsp.Request)
-		result := m.responseHijackHandler(isHttps, req, rsp, responseBytes, httpctx.GetRemoteAddr(req))
+		result, modified := m.callHTTPResponseHijackHandler(
+			isHttps,
+			req,
+			rsp,
+			responseBytes,
+			httpctx.GetRemoteAddr(req),
+		)
 		if result == nil {
 			dropped.Set()
 			rsp = proxyutil.NewResponseFromOldResponse(200, strings.NewReader("响应被用户丢弃"), req, rsp)
 		} else {
-			responseBytes = make([]byte, len(result))
-			copy(responseBytes, result)
-
-			resultRsp, err := utils.ReadHTTPResponseFromBytes(responseBytes, nil)
+			var err error
+			responseBytes, err = applyHijackedResponseResult(req, rsp, responseBytes, result, modified)
 			if err != nil {
 				log.Errorf("parse fixed response to body failed: %s", err)
 				return utils.Errorf("hijacking modified response parsing failed: %s", err)
 			}
-			*rsp = *resultRsp
-			rsp.Request = req
-			rsp.TLS = req.TLS
 		}
 	}
 

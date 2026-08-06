@@ -60,10 +60,9 @@ func CreateOrUpdateExtractedDataEx(mainId int64, i interface{}) error {
 	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() {
 		return CreateOrUpdateExtractedData(consts.GetGormProjectDatabase(), mainId, i)
 	} else {
-		DBSaveAsyncChannel <- func(db *gorm.DB) error {
+		return EnqueueDBSave(func(db *gorm.DB) error {
 			return CreateOrUpdateExtractedData(db, mainId, i)
-		}
-		return nil
+		})
 	}
 }
 

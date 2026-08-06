@@ -3,6 +3,7 @@
 package minirehs
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -46,12 +47,37 @@ func TestCGOPrefilterRealloc(t *testing.T) {
 	}
 	defer pf.release()
 
-	reps := 1000
-	data := []byte(strings.Repeat("ab", reps)) // 每个 "ab" 命中一次, 共 1000 次
+	reps := 3000
+	data := []byte(strings.Repeat("ab", reps)) // 每个 "ab" 命中一次.
 	sc := &scratch{}
 	hits := pf.scanHits(data, sc)
 	if len(hits) != reps {
 		t.Fatalf("dense scan expected %d hits, got %d", reps, len(hits))
+	}
+	pairs := &sc.cpairs[0]
+	hits = pf.scanHits(data, sc)
+	if len(hits) != reps {
+		t.Fatalf("reused dense scan expected %d hits, got %d", reps, len(hits))
+	}
+	if pairs != &sc.cpairs[0] {
+		t.Fatal("dense scan did not reuse the exact-size pair buffer")
+	}
+}
+
+func TestCGOPrefilterCleanLargeInputUsesBoundedInitialPairs(t *testing.T) {
+	li := buildLiteralIndex([]*compiledPattern{{id: 1, idx: 0, literals: []string{"authorization"}}})
+	pf := newCGOPrefilter(li)
+	if pf == nil {
+		t.Fatal("nil prefilter")
+	}
+	defer pf.release()
+
+	sc := &scratch{}
+	if hits := pf.scanHits(bytes.Repeat([]byte("z"), 256<<10), sc); len(hits) != 0 {
+		t.Fatalf("clean scan unexpectedly matched: %v", hits)
+	}
+	if got, max := cap(sc.cpairs), cgoPrefilterInitialPairCapacity*2; got > max {
+		t.Fatalf("clean scan pair buffer is not bounded: cap=%d max=%d", got, max)
 	}
 }
 
@@ -76,5 +102,106 @@ func TestCGOSimdReported(t *testing.T) {
 	info := db.Info()
 	if !info.SIMD || info.Tier != 2 {
 		t.Errorf("cgo build expected simd=true tier=2, got simd=%v tier=%d", info.SIMD, info.Tier)
+	}
+}
+
+func benchmarkCGOPrefilter256K(b *testing.B, coldScratch bool) {
+	li := liFromLiterals([]string{
+		"authorization", "api-key", "secret_access_key", "private-key",
+		"access-token", "rememberme=", "swagger-ui.html", "x-auth-token",
+	})
+	pf := newCGOPrefilter(li)
+	if pf == nil || !pf.useTeddy() {
+		b.Fatal("expected Teddy-enabled cgo prefilter")
+	}
+	defer pf.release()
+
+	chunk := []byte("GET /items?page=1 HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\n\r\n{\"status\":\"ok\",\"items\":[]}")
+	data := bytes.Repeat(chunk, 256*1024/len(chunk)+1)[:256*1024]
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	if coldScratch {
+		for i := 0; i < b.N; i++ {
+			_ = pf.scanHits(data, &scratch{})
+		}
+		return
+	}
+	sc := &scratch{}
+	for i := 0; i < b.N; i++ {
+		_ = pf.scanHits(data, sc)
+	}
+}
+
+func BenchmarkCGOPrefilterWarmScratch256K(b *testing.B) {
+	benchmarkCGOPrefilter256K(b, false)
+}
+
+func BenchmarkCGOPrefilterColdScratch256K(b *testing.B) {
+	benchmarkCGOPrefilter256K(b, true)
+}
+
+func BenchmarkCGOPrefilterColdScratchCapacity256K(b *testing.B) {
+	li := liFromLiterals([]string{
+		"authorization", "api-key", "secret_access_key", "private-key",
+		"access-token", "rememberme=", "swagger-ui.html", "x-auth-token",
+	})
+	pf := newCGOPrefilter(li)
+	if pf == nil || !pf.useTeddy() {
+		b.Fatal("expected Teddy-enabled cgo prefilter")
+	}
+	defer pf.release()
+
+	chunk := []byte("GET /items?page=1 HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/json\r\n\r\n{\"status\":\"ok\",\"items\":[]}")
+	data := bytes.Repeat(chunk, 256*1024/len(chunk)+1)[:256*1024]
+	for _, tc := range []struct {
+		name            string
+		maxInitialPairs int
+	}{
+		{name: "proportional", maxInitialPairs: 0},
+		{name: "bounded", maxInitialPairs: cgoPrefilterInitialPairCapacity},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = pf.scanHitsImplWithInitialPairCapacity(data, &scratch{}, false, tc.maxInitialPairs)
+			}
+		})
+	}
+}
+
+func BenchmarkCGOPrefilterModerateHitsCapacity256K(b *testing.B) {
+	li := liFromLiterals([]string{"api-key", "authorization", "secret_access_key"})
+	pf := newCGOPrefilter(li)
+	if pf == nil || !pf.useTeddy() {
+		b.Fatal("expected Teddy-enabled cgo prefilter")
+	}
+	defer pf.release()
+
+	const expectedHits = 4000
+	data := bytes.Repeat([]byte("z"), 256<<10)
+	for index := 0; index < expectedHits; index++ {
+		copy(data[index*64:], "api-key")
+	}
+	for _, tc := range []struct {
+		name            string
+		maxInitialPairs int
+	}{
+		{name: "proportional", maxInitialPairs: 0},
+		{name: "bounded", maxInitialPairs: cgoPrefilterInitialPairCapacity},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				hits := pf.scanHitsImplWithInitialPairCapacity(data, &scratch{}, false, tc.maxInitialPairs)
+				if len(hits) != expectedHits {
+					b.Fatalf("expected %d hits, got %d", expectedHits, len(hits))
+				}
+			}
+		})
 	}
 }

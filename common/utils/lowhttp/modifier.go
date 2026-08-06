@@ -1959,7 +1959,7 @@ func appendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerVal
 // ```
 func GetHTTPPacketCookieValues(packet []byte, key string) (cookieValues []string) {
 	var val []string
-	SplitHTTPPacket(packet, nil, nil, func(line string) string {
+	SplitHTTPHeadersAndBodyFromPacketView(packet, func(line string) {
 		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "cookie" {
 			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
@@ -1977,8 +1977,6 @@ func GetHTTPPacketCookieValues(packet []byte, key string) (cookieValues []string
 				}
 			}
 		}
-
-		return line
 	})
 	return val
 }
@@ -2076,15 +2074,14 @@ func GetHTTPPacketCookie(packet []byte, key string) (cookieValue string) {
 func GetHTTPPacketContentType(packet []byte) (contentType string) {
 	var val string
 	fetched := false
-	SplitHTTPPacket(packet, nil, nil, func(line string) string {
+	SplitHTTPHeadersAndBodyFromPacketView(packet, func(line string) {
 		if fetched {
-			return line
+			return
 		}
 		if k, v := SplitHTTPHeader(line); strings.ToLower(k) == "content-type" {
 			fetched = true
 			val = v
 		}
-		return line
 	})
 	return val
 }
@@ -2107,7 +2104,7 @@ func GetHTTPPacketContentType(packet []byte) (contentType string) {
 // ```
 func GetHTTPPacketCookies(packet []byte) (cookies map[string]string) {
 	val := make(map[string]string)
-	SplitHTTPPacket(packet, nil, nil, func(line string) string {
+	SplitHTTPHeadersAndBodyFromPacketView(packet, func(line string) {
 		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "cookie" {
 			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
@@ -2121,8 +2118,6 @@ func GetHTTPPacketCookies(packet []byte) (cookies map[string]string) {
 				val[e.Name] = e.Value
 			}
 		}
-
-		return line
 	})
 	return val
 }
@@ -2145,7 +2140,7 @@ func GetHTTPPacketCookies(packet []byte) (cookies map[string]string) {
 // ```
 func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
 	val := make(map[string][]string)
-	SplitHTTPPacket(packet, nil, nil, func(line string) string {
+	SplitHTTPHeadersAndBodyFromPacketView(packet, func(line string) {
 		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "cookie" {
 			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
@@ -2165,7 +2160,6 @@ func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
 				val[e.Name] = append(val[e.Name], e.Value)
 			}
 		}
-		return line
 	})
 	return val
 }
@@ -2188,11 +2182,10 @@ func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
 // ```
 func GetHTTPPacketHeaders(packet []byte) (headers map[string]string) {
 	val := make(map[string]string)
-	SplitHTTPPacket(packet, nil, nil, func(line string) string {
+	SplitHTTPHeadersAndBodyFromPacketView(packet, func(line string) {
 		if k, v := SplitHTTPHeader(line); k != "" {
 			val[k] = v
 		}
-		return line
 	})
 	return val
 }
@@ -2216,14 +2209,13 @@ func GetHTTPPacketHeaders(packet []byte) (headers map[string]string) {
 // ```
 func GetHTTPPacketHeadersFull(packet []byte) (headers map[string][]string) {
 	val := make(map[string][]string)
-	SplitHTTPPacket(packet, nil, nil, func(line string) string {
+	SplitHTTPHeadersAndBodyFromPacketView(packet, func(line string) {
 		if k, v := SplitHTTPHeader(line); k != "" {
 			if _, ok := val[k]; !ok {
 				val[k] = make([]string, 0)
 			}
 			val[k] = append(val[k], v)
 		}
-		return line
 	})
 	return val
 }
@@ -2511,10 +2503,10 @@ func GetFullHTTPRequestQueryParams(packet []byte) (params map[string][]string) {
 // ```
 // <|EXAMPLE_END|>
 func GetStatusCodeFromResponse(packet []byte) (statusCode int) {
-	SplitHTTPPacket(packet, nil, func(proto string, code int, codeMsg string) error {
+	splitHTTPPacketEx(packet, nil, func(proto string, code int, codeMsg string) error {
 		statusCode = code
 		return nil
-	})
+	}, nil, false)
 	return statusCode
 }
 

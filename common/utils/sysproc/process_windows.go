@@ -93,6 +93,16 @@ func findProcessName(network string, ip netip.Addr, srcPort int) (uint32, string
 	return info.pid, info.name, nil
 }
 
+func findProcessNameByEndpoints(
+	network string,
+	srcIP netip.Addr,
+	srcPort int,
+	dstIP netip.Addr,
+	dstPort int,
+) (uint32, string, error) {
+	return findProcessName(network, srcIP, srcPort)
+}
+
 func doFindProcessName(network string, ip netip.Addr, srcPort int) (*processInfo, error) {
 	family := windows.AF_INET
 	if ip.Is6() {

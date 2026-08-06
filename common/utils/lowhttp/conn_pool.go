@@ -665,6 +665,16 @@ func (d *deadlineExtendingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+func appendHTTPResponseRest(packet, rest []byte) []byte {
+	if len(rest) == 0 {
+		return packet
+	}
+	combined := make([]byte, len(packet)+len(rest))
+	copy(combined, packet)
+	copy(combined[len(packet):], rest)
+	return combined
+}
+
 func (pc *persistConn) readLoop() {
 	var closeErr error
 	defer func() {
@@ -821,11 +831,44 @@ func (pc *persistConn) readLoop() {
 				timeout: timeout,
 			}
 		}
-		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
+		if rc.option != nil && rc.option.DiscardIntermediateResponseBody {
+			borrowCapturedPacket := rc.option.BorrowConnPoolResponsePacket &&
+				rc.option.BodyStreamReaderHandler == nil &&
+				!rc.option.AutoDetectSSE
+			if borrowCapturedPacket {
+				resp, err = utils.ReadHTTPResponseMetadataFromBufioReaderConnWithBorrowedPacketFallback(
+					httpResponseReader,
+					pc.conn,
+					stashRequest,
+					respBuffer.Grow,
+					func(finalPacketSize int) []byte {
+						captured := respBuffer.Bytes()
+						if finalPacketSize <= 0 || finalPacketSize != len(captured) {
+							return nil
+						}
+						return captured
+					},
+					func(finalBodySize int) []byte {
+						captured := respBuffer.Bytes()
+						if finalBodySize < 0 || finalBodySize > len(captured) {
+							return nil
+						}
+						return captured[len(captured)-finalBodySize:]
+					},
+				)
+			} else {
+				resp, err = utils.ReadHTTPResponseMetadataFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest, respBuffer.Grow)
+			}
+		} else {
+			resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
+		}
 		if hardTimeoutTimer != nil {
 			hardTimeoutTimer.Stop()
 		}
 		if resp != nil {
+			if utils.HTTPResponseHasDiscardedIntermediateBody(resp) {
+				resp.Body = http.NoBody
+			}
 			resp.Request = nil
 		}
 
@@ -855,33 +898,26 @@ func (pc *persistConn) readLoop() {
 		}
 
 		count++
-		var responseRaw bytes.Buffer
 		var respClose bool
 		var respPacket = respBuffer.Bytes()
 		if resp != nil {
 			respClose = resp.Close
 		}
-		if len(respPacket) > 0 {
-			responseRaw.Write(respPacket)
-		}
 
 		if err != nil || respClose {
-			if responseRaw.Len() >= len(respPacket) { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
-				// continue read 5 seconds, to receive rest data
-				// ignore error, treat as bad conn
-				timeout := 5 * time.Second
-				if respClose {
-					timeout = 1 * time.Second // 如果 http close 了 则只等待1秒
-				}
-				restBytes, _ := utils.ReadUntilStable(pc.br, pc.conn, timeout, 300*time.Millisecond)
-				pc.sawEOF = true // 废弃连接
-				if len(restBytes) > 0 {
-					responseRaw.Write(restBytes)
-					respPacket = responseRaw.Bytes()
-					if len(respPacket) > 0 {
-						httpctx.SetBareResponseBytesForce(stashRequest, respPacket) // 强制修改原始响应包
-						err = nil
-					}
+			// Continue reading malformed/connection-close responses, but only
+			// allocate a recovery packet when there are bytes to append.
+			timeout := 5 * time.Second
+			if respClose {
+				timeout = 1 * time.Second
+			}
+			restBytes, _ := utils.ReadUntilStable(pc.br, pc.conn, timeout, 300*time.Millisecond)
+			pc.sawEOF = true
+			if len(restBytes) > 0 {
+				respPacket = appendHTTPResponseRest(respPacket, restBytes)
+				if len(respPacket) > 0 {
+					httpctx.SetBareResponseBytesForce(stashRequest, respPacket)
+					err = nil
 				}
 			}
 		}

@@ -20,12 +20,28 @@ const (
 )
 
 func FindProcessNameByConn(conn net.Conn) (uint32, string, error) {
-	network := conn.RemoteAddr().Network()
-	srcIP, srcPort, err := utils.ParseStringToHostPort(conn.RemoteAddr().String())
+	remoteAddr := conn.RemoteAddr()
+	network := remoteAddr.Network()
+	srcIP, srcPort, err := utils.ParseStringToHostPort(remoteAddr.String())
 	if err != nil {
 		return 0, "", err
 	}
-	return FindProcessName(network, IpToAddr(net.ParseIP(srcIP)), int(srcPort))
+	srcAddr := IpToAddr(net.ParseIP(srcIP))
+	localAddr := conn.LocalAddr()
+	if localAddr == nil {
+		return FindProcessName(network, srcAddr, int(srcPort))
+	}
+	dstIP, dstPort, err := utils.ParseStringToHostPort(localAddr.String())
+	if err != nil {
+		return FindProcessName(network, srcAddr, int(srcPort))
+	}
+	return findProcessNameByEndpoints(
+		network,
+		srcAddr,
+		int(srcPort),
+		IpToAddr(net.ParseIP(dstIP)),
+		int(dstPort),
+	)
 }
 
 func FindProcessName(network string, srcIP netip.Addr, srcPort int) (uint32, string, error) {

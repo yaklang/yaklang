@@ -40,6 +40,13 @@ import (
 )
 
 func ForceQueryUnescape(s string) string {
+	// QueryUnescape is an identity operation unless '%' or '+' occurs. Avoid
+	// running the %u regular expression and net/url scanner for the overwhelmingly
+	// common already-decoded key/value while returning the original immutable
+	// string without allocation.
+	if !strings.ContainsAny(s, "%+") {
+		return s
+	}
 	val, err := url.QueryUnescape(UrlUnicodeDecode(s))
 	if err != nil {
 		return s

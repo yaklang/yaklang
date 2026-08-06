@@ -40,6 +40,17 @@ import (
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {
 	db := s.GetProjectDatabase()
+	usesGlobalProjectDatabase := s == nil || s.projectDatabase == nil
+	var projectBinding consts.ProjectDatabaseBinding
+	if usesGlobalProjectDatabase {
+		// Keep the handle and generation coherent if a project switch races
+		// with DeleteAll. Test servers with a private database must not rotate
+		// the unrelated process-global project binding.
+		projectBinding = consts.CaptureProjectDatabaseBinding()
+		if projectBinding.Database != nil {
+			db = projectBinding.Database
+		}
+	}
 	if !r.GetDeleteAll() {
 		var (
 			websocketHash []string
@@ -85,9 +96,18 @@ func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowReque
 		yakit.DropExtractedDataTable(db)
 		model.DropHTTPFlowCacheGRPCModelByFlow()
 	}
-	err := yakit.DeleteHTTPFlow(s.GetProjectDatabase(), r)
+	err := yakit.DeleteHTTPFlow(db, r)
 	if err != nil {
 		log.Error(err)
+	} else if r.GetDeleteAll() && usesGlobalProjectDatabase {
+		// DropRecreateTable resets SQLite IDs. Rotate the logical database
+		// generation before invalidating the old stream so a concurrent frontend
+		// bootstrap can never pair lower IDs with the previous generation.
+		_, _ = consts.AdvanceProjectDatabaseGeneration(projectBinding.Generation)
+		yakit.ResetHTTPFlowRuntimeState(
+			yakit.HTTPFlowDatabaseIdentity(projectBinding.Path),
+			projectBinding.Generation,
+		)
 	}
 	return &ypb.Empty{}, nil
 }
@@ -283,6 +303,7 @@ func (s *Server) GetHTTPFlowByIds(_ context.Context, r *ypb.GetHTTPFlowByIdsRequ
 }
 
 func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowResponse, error) {
+	serverReceivedAt := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
@@ -291,16 +312,21 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	}()
 
 	// 监控慢查询
-	queryStart := time.Now()
+	queryStart := serverReceivedAt
 	tracer := &yakit.SQLTraceLogger{}
-	db := s.GetProjectDatabase()
+	projectBinding := consts.CaptureProjectDatabaseBinding()
+	db := s.getProjectDatabaseForHTTPFlowQuery(projectBinding)
 	if db != nil {
+		// Logger and logMode are mutable fields on gorm.DB. Keep them local to
+		// this query while sharing only the concurrency-safe underlying sql.DB.
+		db = db.New()
 		db.SetLogger(tracer)
 		db = db.LogMode(true)
 	}
 
 	paging, data, err := yakit.QueryHTTPFlow(db, req)
 	queryElapsed := time.Since(queryStart)
+	queryFinishedAt := time.Now()
 
 	// 查询耗时超过阈值才记录为慢查询（阈值集中定义于 yakit.SlowQuerySQLThreshold）
 	if queryElapsed > yakit.SlowQuerySQLThreshold {
@@ -316,7 +342,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 			LastSQL:       tracer.Last(),
 			Timestamp:     now,
 			TimestampUnix: now.Unix(),
-			DatabasePath:  consts.GetCurrentProjectDatabasePath(),
+			DatabasePath:  projectBinding.Path,
 		}
 
 		// 添加到收集列表（慢查询）
@@ -333,18 +359,29 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := model.ToHTTPFlowGRPCModel(r, req.Full)
+		var m *ypb.HTTPFlow
+		if req.GetExcludeRequestRaw() || req.GetExcludeResponseRaw() {
+			m, err = model.ToHTTPFlowGRPCModelWithListProjection(
+				r,
+				req.Full,
+				req.GetExcludeRequestRaw(),
+				req.GetExcludeResponseRaw(),
+			)
+		} else {
+			m, err = model.ToHTTPFlowGRPCModel(r, req.Full)
+		}
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
 		res = append(res, m)
 	}
 	cost := time.Now().Sub(start)
+	conversionFinishedAt := time.Now()
 	if cost.Milliseconds() > 200 {
 		log.Infof("finished converting httpflow(%v) cost: %s", len(res), cost)
 	}
 
-	return &ypb.QueryHTTPFlowResponse{
+	response := &ypb.QueryHTTPFlowResponse{
 		Pagination: &ypb.Paging{
 			Page:    int64(paging.Page),
 			Limit:   int64(paging.Limit),
@@ -353,7 +390,56 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 		},
 		Total: int64(paging.TotalRecord),
 		Data:  res,
-	}, nil
+	}
+	if req.GetIncludeSystemTiming() {
+		databaseIdentity := yakit.HTTPFlowDatabaseIdentity(projectBinding.Path)
+		highWater := yakit.SnapshotHTTPFlowPipelineHighWater(databaseIdentity, projectBinding.Generation)
+		flowTimings := make([]*ypb.HTTPFlowSystemTiming, 0, min(len(data), yakit.HTTPFlowTimingQuerySampleLimit))
+		for _, flow := range data {
+			if len(flowTimings) >= yakit.HTTPFlowTimingQuerySampleLimit {
+				break
+			}
+			timing, ok := yakit.GetHTTPFlowPersistTiming(databaseIdentity, projectBinding.Generation, uint64(flow.ID))
+			if !ok {
+				continue
+			}
+			flowTimings = append(flowTimings, &ypb.HTTPFlowSystemTiming{
+				Id:                             timing.ID,
+				RequestHijackAtUnixMs:          timing.RequestHijackAtUnixMs,
+				ResponseMirrorAtUnixMs:         timing.ResponseMirrorAtUnixMs,
+				FlowBuiltAtUnixMs:              timing.FlowBuiltAtUnixMs,
+				PersistEnqueuedAtUnixMs:        timing.PersistEnqueuedAtUnixMs,
+				PersistStartedAtUnixMs:         timing.PersistStartedAtUnixMs,
+				PersistedAtUnixMs:              timing.PersistedAtUnixMs,
+				DatabaseChangeDetectedAtUnixMs: timing.DatabaseChangeDetectedAtUnixMs,
+				ProjectGeneration:              timing.ProjectGeneration,
+			})
+		}
+		response.SystemTiming = &ypb.QueryHTTPFlowSystemTiming{
+			ServerReceivedAtUnixMs:     serverReceivedAt.UnixMilli(),
+			SQLFinishedAtUnixMs:        queryFinishedAt.UnixMilli(),
+			ConversionFinishedAtUnixMs: conversionFinishedAt.UnixMilli(),
+			ResponseReadyAtUnixMs:      time.Now().UnixMilli(),
+			QueryDurationUs:            queryElapsed.Microseconds(),
+			ConversionDurationUs:       cost.Microseconds(),
+			AsyncWriteQueueDepth:       int64(len(yakit.DBSaveAsyncChannel)),
+			AsyncWriteQueueCapacity:    int64(cap(yakit.DBSaveAsyncChannel)),
+			DatabaseIdentity:           databaseIdentity,
+			LatestPersistedId:          highWater.LatestPersistedID,
+			LatestPersistedAtUnixMs:    highWater.LatestPersistedAtUnixMs,
+			LatestDetectedId:           highWater.LatestDetectedID,
+			LatestDetectedAtUnixMs:     highWater.LatestDetectedAtUnixMs,
+			ReturnedFlowCount:          int64(len(data)),
+			SampledFlowCount:           int64(len(flowTimings)),
+			FlowTimings:                flowTimings,
+			CountDurationUs:            paging.CountQueryDuration.Microseconds(),
+			DataQueryDurationUs:        paging.DataQueryDuration.Microseconds(),
+			CountExecuted:              paging.CountExecuted,
+			ProjectGeneration:          projectBinding.Generation,
+		}
+	}
+
+	return response, nil
 }
 
 func (s *Server) ConvertFuzzerResponseToHTTPFlow(ctx context.Context, in *ypb.FuzzerResponse) (*ypb.HTTPFlow, error) {
@@ -421,7 +507,7 @@ func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFiel
 		err  error
 	)
 	if req.GetIsAll() {
-		tags, err = yakit.QueryHTTPFlowTags()
+		tags, err = yakit.QueryHTTPFlowTagsWithDB(s.GetProjectDatabase())
 	} else {
 		tags, err = yakit.HTTPFlowTags(req.GetRefreshRequest())
 	}
@@ -440,7 +526,7 @@ func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFiel
 	}
 
 	// 查询唯一 PathSuffix 列表
-	suffixes, err := yakit.HTTPFlowSuffixes()
+	suffixes, err := yakit.HTTPFlowSuffixesWithDB(s.GetProjectDatabase())
 	if err == nil {
 		for _, v := range suffixes {
 			tagsCode.Suffixes = append(tagsCode.Suffixes, &ypb.TagsCode{

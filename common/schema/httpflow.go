@@ -1,7 +1,9 @@
 package schema
 
 import (
+	"crypto/sha1"
 	"database/sql"
+	"encoding/hex"
 	"strconv"
 	"strings"
 
@@ -22,6 +24,21 @@ var (
 	HTTPFlow_SourceType_HAR     = "har"
 )
 
+// HTTPFlowRuntimeTiming contains process-local timestamps used to diagnose the
+// MITM live-table pipeline. It is deliberately excluded from GORM and JSON:
+// the durable HTTPFlow schema remains unchanged and recent samples are copied
+// into a bounded in-memory registry after a successful insert.
+type HTTPFlowRuntimeTiming struct {
+	RequestHijackAtUnixMs   int64
+	ResponseMirrorAtUnixMs  int64
+	FlowBuiltAtUnixMs       int64
+	PersistEnqueuedAtUnixMs int64
+	PersistStartedAtUnixMs  int64
+	PersistedAtUnixMs       int64
+	DatabaseIdentity        string
+	ProjectGeneration       uint64
+}
+
 type HTTPFlow struct {
 	gorm.Model
 
@@ -40,15 +57,19 @@ type HTTPFlow struct {
 	SourceType         string `json:"source_type,omitempty" gorm:"index"`
 	Request            string `json:"request,omitempty"`
 	Response           string `json:"response,omitempty"`
-	Duration           int64  `json:"duration,omitempty"`
-	GetParamsTotal     int    `json:"get_params_total,omitempty"`
-	PostParamsTotal    int    `json:"post_params_total,omitempty"`
-	CookieParamsTotal  int    `json:"cookie_params_total,omitempty"`
-	IPAddress          string `json:"ip_address,omitempty"`
-	RemoteAddr         string `json:"remote_addr,omitempty"`
-	IPInteger          int    `json:"ip_integer,omitempty"`
-	Tags               string `json:"tags,omitempty"` // 用来打标！
-	Payload            string `json:"payload,omitempty"`
+	// HtmlTitle is nullable so rows created before this column was introduced can
+	// fall back to response parsing. Valid with an empty String means the response
+	// was inspected and has no title.
+	HtmlTitle         sql.NullString `json:"-"`
+	Duration          int64          `json:"duration,omitempty"`
+	GetParamsTotal    int            `json:"get_params_total,omitempty"`
+	PostParamsTotal   int            `json:"post_params_total,omitempty"`
+	CookieParamsTotal int            `json:"cookie_params_total,omitempty"`
+	IPAddress         string         `json:"ip_address,omitempty"`
+	RemoteAddr        string         `json:"remote_addr,omitempty"`
+	IPInteger         int            `json:"ip_integer,omitempty"`
+	Tags              string         `json:"tags,omitempty"` // 用来打标！
+	Payload           string         `json:"payload,omitempty"`
 
 	// Websocket 相关字段
 	IsWebsocket bool `json:"is_websocket,omitempty"`
@@ -62,6 +83,12 @@ type HTTPFlow struct {
 	// AfterSaveHandlers are runtime-only callbacks triggered after the flow is
 	// successfully persisted. They are not stored in the database.
 	AfterSaveHandlers []func(*HTTPFlow) `json:"-" gorm:"-"`
+	// AfterPersistCleanups release runtime-only resources after persistence and
+	// all AfterSaveHandlers finish. They also run when persistence fails.
+	AfterPersistCleanups []func(*HTTPFlow) `json:"-" gorm:"-"`
+	// RuntimeTiming is populated only for bounded performance diagnostics. It
+	// never changes the database schema or the serialized HTTPFlow model.
+	RuntimeTiming *HTTPFlowRuntimeTiming `json:"-" gorm:"-"`
 
 	// friendly for gorm build instance, not for store
 	// 这两个字段不参与数据库存储，但是在序列化的时候，会被覆盖
@@ -104,6 +131,27 @@ func (f *HTTPFlow) SetRequest(req string) {
 
 func (f *HTTPFlow) SetResponse(rsp string) {
 	f.Response = strconv.Quote(rsp)
+	f.HtmlTitle = sql.NullString{String: ExtractHTTPFlowHTMLTitle(rsp), Valid: true}
+}
+
+const maxHTTPFlowHTMLTitleScanBytes = 512 * 1024
+
+// ExtractHTTPFlowHTMLTitle matches the historical list-query title behavior,
+// while bounding work for multi-megabyte response bodies.
+func ExtractHTTPFlowHTMLTitle(response string) string {
+	if len(response) > maxHTTPFlowHTMLTitleScanBytes {
+		response = response[:maxHTTPFlowHTMLTitleScanBytes]
+	}
+	return strings.TrimSpace(utils.ExtractTitleFromHTMLTitle(response, ""))
+}
+
+// ExtractHTTPFlowHTMLTitleBytes preserves ExtractHTTPFlowHTMLTitle semantics
+// without converting the whole response packet to a string.
+func ExtractHTTPFlowHTMLTitleBytes(response []byte) string {
+	if len(response) > maxHTTPFlowHTMLTitleScanBytes {
+		response = response[:maxHTTPFlowHTMLTitleScanBytes]
+	}
+	return strings.TrimSpace(utils.ExtractTitleFromHTMLTitleBytes(response, ""))
 }
 
 // 颜色与 Tag API
@@ -203,7 +251,46 @@ func (f *HTTPFlow) ColorSharp(rgbHex string) {
 }
 
 func (f *HTTPFlow) CalcHash() string {
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Path, f.Method, f.BodyLength, f.ContentType, f.StatusCode, f.SourceType, f.Tags, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin)
+	hasher := sha1.New()
+	writeString := func(value string) {
+		_, _ = hasher.Write(utils.UnsafeStringToBytes(value))
+	}
+	writeInt64 := func(value int64) {
+		var buffer [20]byte
+		_, _ = hasher.Write(strconv.AppendInt(buffer[:0], value, 10))
+	}
+	writeField := func(value string) {
+		writeString(" ")
+		writeString(value)
+	}
+
+	// Preserve byte-for-byte compatibility with the historical
+	// fmt.Sprintf("%v", []interface{}{...}) representation, but stream the
+	// fields into SHA-1 instead of materializing another request-sized string.
+	writeString("[")
+	if f.IsHTTPS {
+		writeString("true")
+	} else {
+		writeString("false")
+	}
+	writeField(f.Url)
+	writeField(f.Path)
+	writeField(f.Method)
+	writeString(" ")
+	writeInt64(f.BodyLength)
+	writeField(f.ContentType)
+	writeString(" ")
+	writeInt64(f.StatusCode)
+	writeField(f.SourceType)
+	writeField(f.Tags)
+	writeField(f.Request)
+	writeField(f.HiddenIndex)
+	writeField(f.RuntimeId)
+	writeField(f.FromPlugin)
+	writeString("]")
+
+	var digest [sha1.Size]byte
+	return hex.EncodeToString(hasher.Sum(digest[:0]))
 }
 
 func (f *HTTPFlow) CalcCacheHash(full bool) string {
@@ -212,6 +299,9 @@ func (f *HTTPFlow) CalcCacheHash(full bool) string {
 
 func (f *HTTPFlow) BeforeSave() error {
 	f.fixURL()
+	if !f.HtmlTitle.Valid {
+		f.HtmlTitle = sql.NullString{String: ExtractHTTPFlowHTMLTitle(f.GetResponse()), Valid: true}
+	}
 	f.Hash = f.CalcHash()
 	return nil
 }

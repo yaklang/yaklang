@@ -59,6 +59,16 @@ func findProcessName(network string, ip netip.Addr, srcPort int) (uint32, string
 	return 0, pp, err
 }
 
+func findProcessNameByEndpoints(
+	network string,
+	srcIP netip.Addr,
+	srcPort int,
+	dstIP netip.Addr,
+	dstPort int,
+) (uint32, string, error) {
+	return findProcessName(network, srcIP, srcPort)
+}
+
 func getExecPathFromPID(pid uint32) (string, error) {
 	buf := make([]byte, 2048)
 	size := uint64(len(buf))

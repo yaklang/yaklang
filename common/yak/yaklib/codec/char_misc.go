@@ -138,6 +138,13 @@ func (t *MIMEResult) _tryUTF8Convertor(raw []byte) ([]byte, bool) {
 
 		if charsetLower == "" && t.IsText {
 			charsetLower = mimecharset.FromPlain(raw)
+			// FromPlain only reports UTF-8 after validating the input (ASCII is
+			// UTF-8 as well). Running the no-op UTF-8 decoder would allocate a
+			// body-sized copy while preserving every byte, so retain the existing
+			// successful-conversion signal without materializing that copy.
+			if charsetLower == "utf-8" || charsetLower == "utf8" {
+				return raw, true
+			}
 			enc, _ := charset.Lookup(charsetLower)
 			if enc != nil {
 				fixed, err := enc.NewDecoder().Bytes(raw)

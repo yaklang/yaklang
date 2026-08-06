@@ -195,6 +195,14 @@ func (p *mitmGlobalHotPatchPipeline) MirrorHTTPFlowWithCtx(
 	}
 }
 
+func (p *mitmGlobalHotPatchPipeline) HasMirrorHTTPFlowHooks() bool {
+	p.ensureGlobalHotPatchLoaded()
+	if global := p.getGlobalCaller(); global != nil && global.HasMirrorHTTPFlowHooks() {
+		return true
+	}
+	return p.module != nil && p.module.HasMirrorHTTPFlowHooks()
+}
+
 func (p *mitmGlobalHotPatchPipeline) HijackSaveHTTPFlowEx(
 	runtimeCtx context.Context,
 	flow *schema.HTTPFlow,
