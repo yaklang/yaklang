@@ -40,13 +40,17 @@ GOOS=linux GOARCH=amd64 go build -tags hids -o ./legion-smoke-node-hids-linux-am
 ## CI Product Node Package
 
 `.github/workflows/build-legion-product-node.yml` produces the deployable
-Linux amd64 product node from the repository's declared Go version. The
-workflow runs for relevant pull requests, manual dispatches, and tags in the
-isolated `legion-node-v*` namespace, including alpha tags. This
-namespace does not trigger the repository's existing general `v*` release
-workflows.
+Linux amd64 and arm64 product nodes from the repository's declared Go version.
+The trusted packaging workflow runs only for tags in the isolated
+`legion-node-v*` namespace, including alpha tags. Pull requests and ordinary
+branch pushes do not produce Product Node packages. This namespace does not
+trigger the repository's existing general `v*` release workflows.
 
-The `legion-product-node_linux_amd64` artifact contains:
+The workflow emits separate `legion-product-node_linux_amd64` and
+`legion-product-node_linux_arm64` Actions artifacts. Each architecture package
+contains its executable, `PRODUCT_NODE_MANIFEST.json`, and `SHA256SUMS`. The
+outer release artifact also contains the package archive and its checksum.
+The amd64 artifact retains the legacy direct object names:
 
 - `legion-smoke-node`
 - `PRODUCT_NODE_MANIFEST.json`
@@ -54,21 +58,31 @@ The `legion-product-node_linux_amd64` artifact contains:
 - `legion-product-node_linux_amd64.tar.gz`
 - `legion-product-node_linux_amd64.tar.gz.sha256`
 
+The arm64 direct objects are architecture-qualified so that both variants can
+share one immutable OSS release directory:
+
+- `legion-smoke-node_linux_arm64`
+- `PRODUCT_NODE_MANIFEST_linux_arm64.json`
+- `SHA256SUMS_linux_arm64`
+- `legion-product-node_linux_arm64.tar.gz`
+- `legion-product-node_linux_arm64.tar.gz.sha256`
+
 The direct files are the cross-repository assembly contract. The archive
-contains the same statically linked `legion-smoke-node`, manifest, and inner
-checksums for standalone downloads. The manifest binds the binary to the exact
-Yaklang source commit, Go toolchain, Linux amd64 target, `hids` build tag, and
+contains the same statically linked executable, manifest, and inner checksums
+for standalone downloads. The manifest binds the binary to the exact Yaklang
+source commit, Go toolchain, Linux target architecture, `hids` build tag, and
 advertised capability set. This artifact is an input to the Legion deployment
 packaging pipeline; it is not a complete deployment bundle.
 
 A SemVer `legion-node-v*` tag reachable from `main` also publishes these files
 under the versioned public OSS path
 `/legion/components/product-node/<tag>/<source-sha>/`. The accompanying
-`release-index.json` binds the source commit, producer manifest, archive, raw
-binary, and checksums. Cross-repository assembly consumes the OSS index URL and
-an independently approved index SHA-256 instead of a GitHub Actions run ID or
-repository token. Manual dispatch remains a build verification entry and does
-not publish a formal OSS release.
+`release-index.json` retains the amd64 contract for existing consumers, while
+`release-index-linux-arm64.json` selects the arm64 objects. Each index binds the
+source commit, target platform, producer manifest, archive, raw binary, and
+checksums. Cross-repository assembly consumes the architecture-appropriate OSS
+index URL and an independently approved index SHA-256 instead of a GitHub
+Actions run ID or repository token.
 
 Use `task legion_smoke_node_build_hids` for native debugging when your current host is already Linux. Use `task legion_smoke_node_build_hids_linux_amd64` when you need a deployable Linux artifact from any development host.
 

@@ -2,7 +2,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-package_name="${NODE_PACKAGE_NAME:-legion-product-node_linux_amd64}"
+target_os="${NODE_GOOS:-linux}"
+target_arch="${NODE_GOARCH:-amd64}"
+package_name="${NODE_PACKAGE_NAME:-legion-product-node_${target_os}_${target_arch}}"
 dist_dir="${NODE_DIST_DIR:-$repo_root/dist}"
 package_dir="$dist_dir/$package_name"
 package_path="$dist_dir/$package_name.tar.gz"
@@ -19,6 +21,20 @@ log() {
 for command in file git go gzip jq readelf sha256sum stat tar; do
   command -v "$command" >/dev/null 2>&1 || die "missing required command: $command"
 done
+
+[[ "$target_os" == "linux" ]] || die "unsupported Product Node target OS: $target_os"
+case "$target_arch" in
+  amd64) expected_machine="x86-64" ;;
+  arm64) expected_machine="ARM aarch64" ;;
+  *) die "unsupported Product Node target architecture: $target_arch" ;;
+esac
+[[ "$package_name" == "legion-product-node_${target_os}_${target_arch}" ]] || \
+  die "NODE_PACKAGE_NAME does not match target platform: $package_name"
+platform_suffix=""
+if [[ "$target_arch" != "amd64" ]]; then
+  platform_suffix="_${target_os}_${target_arch}"
+fi
+binary_name="legion-smoke-node${platform_suffix}"
 
 source_sha="${SOURCE_SHA:-$(git -C "$repo_root" rev-parse HEAD)}"
 [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || die "invalid SOURCE_SHA: $source_sha"
@@ -38,7 +54,7 @@ version="${NODE_PACKAGE_VERSION:-sha-${source_sha:0:12}}"
 [[ ! -e "$package_dir" ]] || die "package directory already exists: $package_dir"
 [[ ! -e "$package_path" ]] || die "package archive already exists: $package_path"
 
-binary="$package_dir/legion-smoke-node"
+binary="$package_dir/$binary_name"
 build_tags="hids"
 module_go_version="$(awk '$1 == "go" { gsub(/\r/, "", $2); print $2; exit }' "$repo_root/go.mod")"
 [[ -n "$module_go_version" ]] || die "go.mod does not declare a Go version"
@@ -47,10 +63,10 @@ toolchain_version="$(go env GOVERSION)"
   die "Go toolchain $toolchain_version does not match go.mod version go$module_go_version"
 mkdir -p "$package_dir"
 
-log "building Linux amd64 HIDS node from $source_sha with $(go version)"
+log "building ${target_os}/${target_arch} HIDS node from $source_sha with $(go version)"
 (
   cd "$repo_root"
-  CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+  CGO_ENABLED=1 GOOS="$target_os" GOARCH="$target_arch" go build \
     -trimpath \
     -buildvcs=true \
     -tags "$build_tags" \
@@ -61,6 +77,9 @@ log "building Linux amd64 HIDS node from $source_sha with $(go version)"
 
 file_description="$(file "$binary")"
 printf '%s\n' "$file_description"
+grep -q 'ELF 64-bit' <<<"$file_description" || die "node binary is not a 64-bit ELF file"
+grep -q "$expected_machine" <<<"$file_description" || \
+  die "node binary does not match ${target_os}/${target_arch}"
 grep -q 'statically linked' <<<"$file_description" || die "node binary is not statically linked"
 if readelf -d "$binary" 2>/dev/null | grep -q '(NEEDED)'; then
   die "node binary declares dynamic library dependencies"
@@ -77,7 +96,10 @@ jq -n \
   --argjson source_dirty "$source_dirty" \
   --arg module_go_version "$module_go_version" \
   --arg go_version "$(go version)" \
+  --arg target_os "$target_os" \
+  --arg target_arch "$target_arch" \
   --arg build_tags "$build_tags" \
+  --arg binary_name "$binary_name" \
   --arg binary_sha "$binary_sha" \
   --argjson binary_size "$binary_size" \
   --arg built_at "$built_at" \
@@ -103,8 +125,8 @@ jq -n \
       actor: $ci_actor
     },
     recipe: {
-      goos: "linux",
-      goarch: "amd64",
+      goos: $target_os,
+      goarch: $target_arch,
       cgo_enabled: true,
       link_mode: "external-static",
       build_tags: $build_tags,
@@ -113,7 +135,7 @@ jq -n \
     },
     capabilities: ["hids", "ssa.rule_sync.export", "yak.execute"],
     binary: {
-      path: "legion-smoke-node",
+      path: $binary_name,
       sha256: $binary_sha,
       size: $binary_size
     },
@@ -122,7 +144,7 @@ jq -n \
 
 (
   cd "$package_dir"
-  sha256sum legion-smoke-node PRODUCT_NODE_MANIFEST.json >SHA256SUMS
+  sha256sum "$binary_name" PRODUCT_NODE_MANIFEST.json >SHA256SUMS
   sha256sum -c SHA256SUMS
 )
 

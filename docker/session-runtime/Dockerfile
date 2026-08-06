@@ -22,6 +22,9 @@ ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
 # ---------- 构建阶段 ----------
 FROM ${GO_BUILDER_IMAGE} AS builder
 
+ARG TARGETOS
+ARG TARGETARCH
+
 WORKDIR /src
 COPY . .
 
@@ -32,7 +35,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     module_go_version="$(awk '$1 == "go" { gsub(/\r/, "", $2); print $2; exit }' go.mod)" \
     && test "$(go env GOVERSION)" = "go${module_go_version}" \
-    && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
+    && test "$TARGETOS" = "linux" \
+    && case "$TARGETARCH" in amd64|arm64) ;; *) exit 1 ;; esac \
+    && CGO_ENABLED=1 GOOS="$TARGETOS" GOARCH="$TARGETARCH" go build \
       -trimpath \
       -buildvcs=false \
       -ldflags "-s -w -buildid=" \

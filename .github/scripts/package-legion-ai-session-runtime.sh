@@ -2,7 +2,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-package_name="${RUNTIME_PACKAGE_NAME:-legion-ai-session-runtime_linux_amd64}"
+target_os="${RUNTIME_GOOS:-linux}"
+target_arch="${RUNTIME_GOARCH:-amd64}"
+package_name="${RUNTIME_PACKAGE_NAME:-legion-ai-session-runtime_${target_os}_${target_arch}}"
 dist_dir="${RUNTIME_DIST_DIR:-$repo_root/dist}"
 package_dir="$dist_dir/$package_name"
 package_path="$dist_dir/$package_name.tar.gz"
@@ -21,6 +23,15 @@ log() {
 for command in file git gzip jq sha256sum stat tar; do
   command -v "$command" >/dev/null 2>&1 || die "missing required command: $command"
 done
+
+[[ "$target_os" == "linux" ]] || die "unsupported Runtime target OS: $target_os"
+case "$target_arch" in
+  amd64) expected_machine="x86-64" ;;
+  arm64) expected_machine="ARM aarch64" ;;
+  *) die "unsupported Runtime target architecture: $target_arch" ;;
+esac
+[[ "$package_name" == "legion-ai-session-runtime_${target_os}_${target_arch}" ]] || \
+  die "RUNTIME_PACKAGE_NAME does not match target platform: $package_name"
 
 source_sha="${SOURCE_SHA:-$(git -C "$repo_root" rev-parse HEAD)}"
 [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || die "invalid SOURCE_SHA: $source_sha"
@@ -63,7 +74,8 @@ fi
 
 file_description="$(file "$runtime_binary")"
 grep -q 'ELF 64-bit' <<<"$file_description" || die "runtime binary is not a 64-bit ELF file"
-grep -q 'x86-64' <<<"$file_description" || die "runtime binary is not built for linux/amd64"
+grep -q "$expected_machine" <<<"$file_description" || \
+  die "runtime binary does not match ${target_os}/${target_arch}"
 
 module_go_version="$(awk '$1 == "go" { gsub(/\r/, "", $2); print $2; exit }' "$repo_root/go.mod")"
 [[ -n "$module_go_version" ]] || die "go.mod does not declare a Go version"
@@ -98,6 +110,8 @@ jq -n \
   --arg dockerignore_sha "$dockerignore_sha" \
   --arg module_go_version "$module_go_version" \
   --arg runtime_go_version "$runtime_go_version" \
+  --arg target_os "$target_os" \
+  --arg target_arch "$target_arch" \
   --arg binary_sha "$binary_sha" \
   --argjson binary_size "$binary_size" \
   --rawfile binary_ldd "$runtime_ldd_file" \
@@ -129,8 +143,8 @@ jq -n \
       packaging_dirty: $source_dirty,
       dockerfile_sha256: $dockerfile_sha,
       dockerignore_sha256: $dockerignore_sha,
-      goos: "linux",
-      goarch: "amd64",
+      goos: $target_os,
+      goarch: $target_arch,
       cgo_enabled: true,
       link_mode: "dynamic-container",
       build_tags: "",
