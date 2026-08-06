@@ -1,0 +1,130 @@
+name: Verify Legion Component Release Contracts
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/build-legion-component-oss-index.sh"
+      - ".github/scripts/build-legion-product-node.sh"
+      - ".github/scripts/package-legion-ai-session-runtime.sh"
+      - ".github/scripts/test-build-legion-component-oss-index.sh"
+      - ".github/scripts/test-legion-component-workflow-contract.sh"
+      - ".github/scripts/test-package-legion-ai-session-runtime.sh"
+      - ".github/workflows/build-legion-ai-session-runtime.yml"
+      - ".github/workflows/build-legion-product-node.yml"
+      - ".github/workflows/verify-legion-component-release-contracts.yml"
+      - "docker/session-runtime/**"
+      - "docs/legion-ai-session-runtime-release.md"
+      - "docs/legion-linux-hids-readiness.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-legion-component-release-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Verify release-only multi-architecture contracts
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check shell syntax and lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts=(
+            .github/scripts/build-legion-component-oss-index.sh
+            .github/scripts/build-legion-product-node.sh
+            .github/scripts/package-legion-ai-session-runtime.sh
+            .github/scripts/test-build-legion-component-oss-index.sh
+            .github/scripts/test-legion-component-workflow-contract.sh
+            .github/scripts/test-package-legion-ai-session-runtime.sh
+          )
+          bash -n "${scripts[@]}"
+          shellcheck "${scripts[@]}"
+
+      - name: Test tag, architecture, and package metadata contracts
+        run: |
+          set -euo pipefail
+          ./.github/scripts/test-legion-component-workflow-contract.sh
+          ./.github/scripts/test-build-legion-component-oss-index.sh
+          ./.github/scripts/test-package-legion-ai-session-runtime.sh
+
+  build-targets:
+    name: Compile Linux ${{ matrix.goarch }} release targets
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            runner: ubuntu-22.04
+            file_machine: x86-64
+          - goarch: arm64
+            runner: ubuntu-24.04-arm
+            file_machine: ARM aarch64
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Compile Product Node without packaging
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.goarch }}
+          FILE_MACHINE: ${{ matrix.file_machine }}
+        run: |
+          set -euo pipefail
+          export GOTOOLCHAIN=local
+          binary="${RUNNER_TEMP}/legion-smoke-node-${TARGET_ARCH}"
+          CGO_ENABLED=1 GOOS=linux GOARCH="$TARGET_ARCH" go build \
+            -trimpath \
+            -buildvcs=true \
+            -tags hids \
+            -ldflags '-s -w -buildid= -linkmode external -extldflags "-static"' \
+            -o "$binary" \
+            ./cmd/legion-smoke-node
+          file "$binary" | grep -q "$FILE_MACHINE"
+          file "$binary" | grep -q 'statically linked'
+          if readelf -d "$binary" 2>/dev/null | grep -q '(NEEDED)'; then
+            echo "node binary declares dynamic library dependencies" >&2
+            exit 1
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build Runtime image without packaging
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: docker/session-runtime/Dockerfile
+          platforms: linux/${{ matrix.goarch }}
+          push: false
+          load: true
+          tags: local.invalid/yaklang/legion-ai-session-runtime:verify-${{ matrix.goarch }}
+          provenance: false
+          sbom: false
+
+      - name: Inspect Runtime image
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          image="local.invalid/yaklang/legion-ai-session-runtime:verify-${TARGET_ARCH}"
+          [[ "$(docker image inspect --format '{{.Architecture}}' "$image")" == "$TARGET_ARCH" ]]
+          docker run --rm --entrypoint /bin/sh "$image" -ec \
+            'test -x /usr/local/bin/legion-session-runtime; ldd /usr/local/bin/legion-session-runtime' \
+            >"${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"
+          ! grep -q 'not found' "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"

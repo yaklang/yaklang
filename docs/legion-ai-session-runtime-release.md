@@ -7,13 +7,12 @@ provenance.
 
 ## Workflow
 
-`Build Trusted Legion AI Session Runtime` has three entry modes:
+`Build Trusted Legion AI Session Runtime` is a release-only workflow:
 
 | Event | Behavior | Output trust level |
 |---|---|---|
-| Pull request | Build, test, inspect, and upload preview provenance | Preview; rejected by customer packaging |
-| `workflow_dispatch` on `main` | Build and attest trusted provenance without publishing a distribution object | Trusted producer verification |
-| SemVer `legion-runtime-v*` tag reachable from `main` | Publish the immutable image archive, provenance, and release index to OSS | Trusted producer release |
+| Pull request or ordinary branch push | Does not run or produce a Runtime package | No release artifact |
+| SemVer `legion-runtime-v*` tag reachable from `main` | Build amd64 and arm64 variants, then publish immutable image archives, provenance, and release indexes to OSS | Trusted producer release |
 
 The isolated tag prefix intentionally does not match the repository's generic
 `v*` release workflows. For example, an alpha producer release can use
@@ -31,12 +30,21 @@ https://yaklang.oss-accelerate.aliyuncs.com/legion/components/session-runtime/<t
 ├── SESSION_RUNTIME_MANIFEST.json
 ├── SHA256SUMS
 ├── release-index.json
-└── release-index.json.sha256
+├── release-index.json.sha256
+├── legion-ai-session-runtime_linux_arm64.docker.tar.gz
+├── legion-ai-session-runtime_linux_arm64.tar.gz
+├── legion-ai-session-runtime_linux_arm64.tar.gz.sha256
+├── SESSION_RUNTIME_MANIFEST_linux_arm64.json
+├── SHA256SUMS_linux_arm64
+├── release-index-linux-arm64.json
+└── release-index-linux-arm64.json.sha256
 ```
 
-The `legion-ai-session-runtime_linux_amd64` Actions artifact retains the
-provenance files and release index for short-term workflow inspection. It is
-not the cross-repository distribution channel.
+The separate `legion-ai-session-runtime_linux_amd64` and
+`legion-ai-session-runtime_linux_arm64` Actions artifacts retain provenance
+files and release indexes for short-term workflow inspection. They are not the
+cross-repository distribution channel. The legacy `release-index.json` selects
+amd64; `release-index-linux-arm64.json` selects arm64.
 
 The deployable Runtime binary stays inside the Docker image archive. The
 release index binds every OSS object to its SHA-256 digest and records the

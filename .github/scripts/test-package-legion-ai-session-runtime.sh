@@ -7,6 +7,11 @@ test_root="$(mktemp -d)"
 trap 'rm -rf -- "$test_root"' EXIT
 
 source_sha="$(git -C "$repo_root" rev-parse HEAD)"
+case "$(uname -m)" in
+  x86_64) target_arch="amd64" ;;
+  aarch64|arm64) target_arch="arm64" ;;
+  *) echo "unsupported test host architecture: $(uname -m)" >&2; exit 1 ;;
+esac
 fake_digest="$(printf 'a%.0s' {1..64})"
 base_digest="$(printf 'b%.0s' {1..64})"
 builder_digest="$(printf 'c%.0s' {1..64})"
@@ -24,12 +29,13 @@ RUNTIME_IMAGE_REF="registry.example/legion-ai-session-runtime@sha256:$fake_diges
 RUNTIME_IMAGE_TAG="registry.example/legion-ai-session-runtime:fixture" \
 RUNTIME_BASE_IMAGE="debian:bookworm-slim@sha256:$base_digest" \
 RUNTIME_BUILDER_IMAGE="golang:1.22.12-bookworm@sha256:$builder_digest" \
-RUNTIME_GO_VERSION="go version go1.22.12 linux/amd64" \
+RUNTIME_GOARCH="$target_arch" \
+RUNTIME_GO_VERSION="go version go1.22.12 linux/$target_arch" \
 RUNTIME_CI_PROVIDER="fixture" \
 SESSION_RUNTIME_WORKFLOW_NAME="fixture" \
 "$packager"
 
-package_name="legion-ai-session-runtime_linux_amd64"
+package_name="legion-ai-session-runtime_linux_${target_arch}"
 package_dir="$test_root/dist/$package_name"
 manifest="$package_dir/SESSION_RUNTIME_MANIFEST.json"
 
@@ -44,13 +50,14 @@ manifest="$package_dir/SESSION_RUNTIME_MANIFEST.json"
 
 jq -e \
   --arg source_sha "$source_sha" \
-  --arg image_ref "registry.example/legion-ai-session-runtime@sha256:$fake_digest" '
+  --arg image_ref "registry.example/legion-ai-session-runtime@sha256:$fake_digest" \
+  --arg target_arch "$target_arch" '
     .schema_version == "1" and
     .artifact_type == "legion-ai-session-runtime" and
     .source.commit == $source_sha and
     .recipe.packaging_source_sha == $source_sha and
     .recipe.goos == "linux" and
-    .recipe.goarch == "amd64" and
+    .recipe.goarch == $target_arch and
     .recipe.cgo_enabled == true and
     .recipe.link_mode == "dynamic-container" and
     .recipe.module_go_version == "1.22.12" and

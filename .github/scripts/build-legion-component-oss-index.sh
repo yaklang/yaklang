@@ -9,6 +9,8 @@ public_base_url=""
 output=""
 runtime_image_ref=""
 runtime_image_id=""
+target_os="linux"
+target_arch="amd64"
 
 usage() {
   cat <<'EOF'
@@ -21,6 +23,10 @@ Required:
   --artifact-dir DIR
   --public-base-url URL
   --output FILE
+
+Optional:
+  --goos linux                    Default: linux
+  --goarch amd64|arm64            Default: amd64
 
 Required for session-runtime:
   --runtime-image-ref IMAGE@sha256:...
@@ -40,10 +46,19 @@ while (($#)); do
     --output) output="$2"; shift 2 ;;
     --runtime-image-ref) runtime_image_ref="$2"; shift 2 ;;
     --runtime-image-id) runtime_image_id="$2"; shift 2 ;;
+    --goos) target_os="$2"; shift 2 ;;
+    --goarch) target_arch="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
+
+[[ "$target_os" == "linux" ]] || die "unsupported component target OS: $target_os"
+case "$target_arch" in amd64|arm64) ;; *) die "unsupported component target architecture: $target_arch" ;; esac
+platform_suffix=""
+if [[ "$target_arch" != "amd64" ]]; then
+  platform_suffix="_${target_os}_${target_arch}"
+fi
 
 for command in jq sha256sum stat; do
   command -v "$command" >/dev/null 2>&1 || die "missing required command: $command"
@@ -52,18 +67,18 @@ done
 case "$component" in
   product-node)
     [[ "$version" =~ ^legion-node-v[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?$ ]] || die "invalid Product Node release version"
-    package_name="legion-product-node_linux_amd64.tar.gz"
-    manifest_name="PRODUCT_NODE_MANIFEST.json"
-    checksums_name="SHA256SUMS"
-    binary_name="legion-smoke-node"
+    package_name="legion-product-node_${target_os}_${target_arch}.tar.gz"
+    manifest_name="PRODUCT_NODE_MANIFEST${platform_suffix}.json"
+    checksums_name="SHA256SUMS${platform_suffix}"
+    binary_name="legion-smoke-node${platform_suffix}"
     manifest_type="legion-product-node"
     ;;
   session-runtime)
     [[ "$version" =~ ^legion-runtime-v[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?$ ]] || die "invalid Session Runtime release version"
-    package_name="legion-ai-session-runtime_linux_amd64.tar.gz"
-    manifest_name="SESSION_RUNTIME_MANIFEST.json"
-    checksums_name="SHA256SUMS"
-    image_archive_name="legion-ai-session-runtime_linux_amd64.docker.tar.gz"
+    package_name="legion-ai-session-runtime_${target_os}_${target_arch}.tar.gz"
+    manifest_name="SESSION_RUNTIME_MANIFEST${platform_suffix}.json"
+    checksums_name="SHA256SUMS${platform_suffix}"
+    image_archive_name="legion-ai-session-runtime_${target_os}_${target_arch}.docker.tar.gz"
     manifest_type="legion-ai-session-runtime"
     [[ "$runtime_image_ref" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || die "invalid Runtime image ref"
     [[ "$runtime_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || die "invalid Runtime image ID"
@@ -95,13 +110,17 @@ done
 jq -e \
   --arg type "$manifest_type" \
   --arg version "$version" \
-  --arg source_sha "$source_sha" '
+  --arg source_sha "$source_sha" \
+  --arg target_os "$target_os" \
+  --arg target_arch "$target_arch" '
     .schema_version == "1" and
     .artifact_type == $type and
     .version == $version and
     .source.repository == "yaklang/yaklang" and
     .source.commit == $source_sha and
     .source.dirty == false and
+    .recipe.goos == $target_os and
+    .recipe.goarch == $target_arch and
     .ci.provider == "github-actions" and
     (.ci.run_id | test("^[0-9]+$"))
   ' "$manifest" >/dev/null || die "producer manifest does not match the requested release"
@@ -131,6 +150,8 @@ if [[ "$component" == product-node ]]; then
     --arg version "$version" \
     --arg source_sha "$source_sha" \
     --arg base_url "$public_base_url" \
+    --arg target_os "$target_os" \
+    --arg target_arch "$target_arch" \
     --argjson package "$package_record" \
     --argjson package_checksum "$package_checksum_record" \
     --argjson manifest "$manifest_record" \
@@ -142,6 +163,7 @@ if [[ "$component" == product-node ]]; then
       component:"product-node",
       version:$version,
       source:{repository:"yaklang/yaklang",commit:$source_sha},
+      platform:{goos:$target_os,goarch:$target_arch},
       distribution:{provider:"aliyun-oss",base_url:$base_url},
       artifacts:{package:$package,package_checksum:$package_checksum,manifest:$manifest,checksums:$checksums,binary:$binary}
     }' >"$output"
@@ -154,6 +176,8 @@ else
     --arg version "$version" \
     --arg source_sha "$source_sha" \
     --arg base_url "$public_base_url" \
+    --arg target_os "$target_os" \
+    --arg target_arch "$target_arch" \
     --arg runtime_image_ref "$runtime_image_ref" \
     --arg runtime_image_id "$runtime_image_id" \
     --argjson package "$package_record" \
@@ -167,6 +191,7 @@ else
       component:"session-runtime",
       version:$version,
       source:{repository:"yaklang/yaklang",commit:$source_sha},
+      platform:{goos:$target_os,goarch:$target_arch},
       distribution:{provider:"aliyun-oss",base_url:$base_url},
       runtime:{image_ref:$runtime_image_ref,image_id:$runtime_image_id},
       artifacts:{package:$package,package_checksum:$package_checksum,manifest:$manifest,checksums:$checksums,image_archive:$image_archive}
