@@ -1,6 +1,6 @@
 __DESC__ = "Send multiple HTTP requests for endpoint probing and API batch validation (IDOR included). URL mode requires `base-url` plus newline-separated `paths`; concurrency is `concurrent`. Responses are included automatically. Prefer structured query/form objects with original unescaped values. Use a packet template only for exact bytes or custom encoding. 用于端点探测、接口批量验证（含 IDOR）的批量 HTTP 请求。URL 模式必须传 `base-url` 和换行分隔的 `paths`，并发参数名是 `concurrent`，响应会自动输出；query/form 传原始未转义值。仅在需要精确报文或自定义编码时使用 packet 模板。"
-__VERBOSE_NAME__ = "Batch HTTP Request Tool"
-__VERBOSE_NAME_ZH__ = "批量HTTP请求工具"
+__VERBOSE_NAME__ = "Batch HTTP Request"
+__VERBOSE_NAME_ZH__ = "批量HTTP请求"
 __KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post,api endpoint validation,endpoint probing,api batch testing,request replay,template replay,unauthorized access check,authorization bypass verification,idor validation,horizontal privilege check,batch interface check,批量请求,并发请求,批量HTTP,多路径探测,路径枚举,目录扫描,接口批量验证,API批量测试,接口探测,端点探测,未授权访问验证,越权验证,水平越权验证,IDOR验证,批量验证接口,请求重放,模板请求,多接口测试"
 
 __USAGE__ = <<<USAGE_BLOCK

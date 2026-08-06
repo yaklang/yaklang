@@ -27,6 +27,8 @@ func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGette
 	err := factory.RegisterTool(
 		toolName,
 		aitool.WithDescription("Search resources or tools that can search the names of all currently supported things"),
+		aitool.WithVerboseName("Tools Search"),
+		aitool.WithVerboseNameZh("工具搜索"),
 		aitool.WithStringParam("query",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("The name of the tool to query, can describe requirements using natural language."),
@@ -127,6 +129,8 @@ func CreateSearchCapabilitiesTool(cfg *SearchCapabilitiesConfig) ([]*aitool.Tool
 				"or locate skills for specialized knowledge. Returns categorized results. "+
 				"IMPORTANT: Each query should only be searched ONCE. Do NOT call this tool repeatedly with the same or similar query.",
 		),
+		aitool.WithVerboseName("Search Capabilities"),
+		aitool.WithVerboseNameZh("能力搜索"),
 		aitool.WithStringParam("query",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description("Search keywords. Describe what you need using natural language, e.g. 'port scanning', 'vulnerability detection', 'encode base64'."),

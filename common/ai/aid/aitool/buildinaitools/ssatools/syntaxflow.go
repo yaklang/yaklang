@@ -15,6 +15,8 @@ const SyntaxFlowToolName_SyntaxCheck = "check-syntaxflow-syntax"
 
 func registerSyntaxFlowTool(factory *aitool.ToolFactory) error {
 	return factory.RegisterTool(SyntaxFlowToolName_SyntaxCheck,
+		aitool.WithVerboseName("SyntaxFlow Checker"),
+		aitool.WithVerboseNameZh("SyntaxFlow检查"),
 		aitool.WithDescription("SyntaxFlow 规则语法检查与正例自检（合并）。1) 语法检查：验证 .sf 规则是否符合 SyntaxFlow 语法。2) 正例自检（可选）：当提供 sample_code+language 时，将用户提供的漏洞样例作为正例（file://、UNSAFE）执行规则，若产生告警则 matched=true。有漏洞样例时必须传入 path、sample_code、filename、language 完成正例自检；无样例时仅传 path 或 syntaxflow-code 做语法检查。"),
 		aitool.WithKeywords([]string{
 			"include 必须 as $gin", "正确 include as $gin",
