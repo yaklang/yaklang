@@ -55,14 +55,7 @@ func needsYaklangLintResearchGate(loop interface{ Get(string) string }) bool {
 	return hasBlockingLintErrors(loop) && !hasYaklangLintResearchDone(loop)
 }
 
-const yaklangLintResearchGateFeedback = `【lint 修复门禁】当前代码存在阻塞性语法/静态分析错误，且尚未完成检索。
-
-下一步必须先调用其一：
-- grep_yaklang_samples（按报错标识符 pattern 检索样例）
-- semantic_search_yaklang_samples
-- yakdoc_*（查 API 签名，如 poc.Post / json.loads）
-
-检索完成后再 modify_code。禁止在未检索时连续猜测式 patch。`
+const yaklangLintResearchGateFeedback = `【lint 修复门禁】存在阻塞性错误且尚未检索。先 grep_yaklang_samples / semantic_search_* / yakdoc_*，再 modify_code。`
 
 type yaklangLoopBox struct {
 	loop *reactloops.ReActLoop

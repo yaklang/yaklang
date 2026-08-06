@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCheckCodeAndFormatErrors_FunctionParameterTypes(t *testing.T) {
@@ -141,27 +142,20 @@ _ = count
 }
 
 func TestGetIntelligentErrorHint_FunctionParameterTypes(t *testing.T) {
-	// This is a unit test for the helper function
-	// We can't easily test it directly since it's not exported,
-	// but the integration tests above cover the functionality
-
-	// Test that the main function works correctly
 	code := `bruteTask.SetResultHandler(func(result map[string]interface{}) {`
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
+	require.True(t, hasBlockingErrors, "Go-style typed func param should be a blocking syntax error")
 
-	if hasBlockingErrors {
-		// Should contain the specific hint we're looking for
-		expectedHints := []string{
-			"AI助手提示:",
-			"函数参数/返回类型不允许 Go 风格声明",
-			"func(result map[string]interface{})",
-			"func(result)",
-		}
-
-		for _, hint := range expectedHints {
-			assert.Contains(t, errorMsg, hint, "Should contain hint: %s", hint)
-		}
+	// Align with FunctionParameterTypes in compiler_error_hints.go
+	for _, hint := range []string{
+		"AI助手提示:",
+		"函数参数/返回类型不允许 Go 风格声明",
+		"func(arg) { ... }",
+		"func(gadgetB64 string) []byte {",
+		"build = func(gadgetB64) {",
+	} {
+		assert.Contains(t, errorMsg, hint, "Should contain hint: %s", hint)
 	}
 }
 
