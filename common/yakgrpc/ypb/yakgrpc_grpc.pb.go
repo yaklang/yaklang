@@ -654,6 +654,8 @@ const (
 	Yak_UpdateIMControlConfig_FullMethodName                      = "/ypb.Yak/UpdateIMControlConfig"
 	Yak_SubscribeHTTPFlows_FullMethodName                         = "/ypb.Yak/SubscribeHTTPFlows"
 	Yak_GetAIReActRecommendedSkills_FullMethodName                = "/ypb.Yak/GetAIReActRecommendedSkills"
+	Yak_UpdateAIReActRecommendedSkill_FullMethodName              = "/ypb.Yak/UpdateAIReActRecommendedSkill"
+	Yak_ResetAIReActRecommendedSkill_FullMethodName               = "/ypb.Yak/ResetAIReActRecommendedSkill"
 )
 
 // YakClient is the client API for Yak service.
@@ -1468,6 +1470,10 @@ type YakClient interface {
 	// 返回产品推荐的内置 ReAct 技能。前端选择后，将 Name/Type 原样写入
 	// StartAIReAct 首条消息的 AIStartParams.EnabledCapabilities 即可预加载技能。
 	GetAIReActRecommendedSkills(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAIReActRecommendedSkillsResponse, error)
+	// 仅更新推荐技能的 Markdown 正文；技能标识与展示元数据仍使用内置默认值。
+	UpdateAIReActRecommendedSkill(ctx context.Context, in *UpdateAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error)
+	// 将推荐技能完整恢复为随当前版本发布的内置默认内容。
+	ResetAIReActRecommendedSkill(ctx context.Context, in *ResetAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error)
 }
 
 type yakClient struct {
@@ -8779,6 +8785,26 @@ func (c *yakClient) GetAIReActRecommendedSkills(ctx context.Context, in *Empty, 
 	return out, nil
 }
 
+func (c *yakClient) UpdateAIReActRecommendedSkill(ctx context.Context, in *UpdateAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIReActRecommendedSkill)
+	err := c.cc.Invoke(ctx, Yak_UpdateAIReActRecommendedSkill_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ResetAIReActRecommendedSkill(ctx context.Context, in *ResetAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIReActRecommendedSkill)
+	err := c.cc.Invoke(ctx, Yak_ResetAIReActRecommendedSkill_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -9591,6 +9617,10 @@ type YakServer interface {
 	// 返回产品推荐的内置 ReAct 技能。前端选择后，将 Name/Type 原样写入
 	// StartAIReAct 首条消息的 AIStartParams.EnabledCapabilities 即可预加载技能。
 	GetAIReActRecommendedSkills(context.Context, *Empty) (*GetAIReActRecommendedSkillsResponse, error)
+	// 仅更新推荐技能的 Markdown 正文；技能标识与展示元数据仍使用内置默认值。
+	UpdateAIReActRecommendedSkill(context.Context, *UpdateAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error)
+	// 将推荐技能完整恢复为随当前版本发布的内置默认内容。
+	ResetAIReActRecommendedSkill(context.Context, *ResetAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -11505,6 +11535,12 @@ func (UnimplementedYakServer) SubscribeHTTPFlows(*SubscribeHTTPFlowsRequest, grp
 }
 func (UnimplementedYakServer) GetAIReActRecommendedSkills(context.Context, *Empty) (*GetAIReActRecommendedSkillsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAIReActRecommendedSkills not implemented")
+}
+func (UnimplementedYakServer) UpdateAIReActRecommendedSkill(context.Context, *UpdateAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAIReActRecommendedSkill not implemented")
+}
+func (UnimplementedYakServer) ResetAIReActRecommendedSkill(context.Context, *ResetAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResetAIReActRecommendedSkill not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -22070,6 +22106,42 @@ func _Yak_GetAIReActRecommendedSkills_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_UpdateAIReActRecommendedSkill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAIReActRecommendedSkillRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAIReActRecommendedSkill(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAIReActRecommendedSkill_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAIReActRecommendedSkill(ctx, req.(*UpdateAIReActRecommendedSkillRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ResetAIReActRecommendedSkill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetAIReActRecommendedSkillRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ResetAIReActRecommendedSkill(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ResetAIReActRecommendedSkill_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ResetAIReActRecommendedSkill(ctx, req.(*ResetAIReActRecommendedSkillRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -24148,6 +24220,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAIReActRecommendedSkills",
 			Handler:    _Yak_GetAIReActRecommendedSkills_Handler,
+		},
+		{
+			MethodName: "UpdateAIReActRecommendedSkill",
+			Handler:    _Yak_UpdateAIReActRecommendedSkill_Handler,
+		},
+		{
+			MethodName: "ResetAIReActRecommendedSkill",
+			Handler:    _Yak_ResetAIReActRecommendedSkill_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
