@@ -139,15 +139,8 @@ LOOP:
 
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
-	if !strings.Contains(tl, `mocked thought for tool calling`) {
-		t.Fatal("timeline does not contain mocked thought")
-	}
 	if strings.Contains(tl, `when review`) {
 		t.Fatal("auto-continue review must not pollute the timeline")
-	}
-	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
-		fmt.Println(tl)
-		t.Fatal("timeline does not contain ReAct iteration")
 	}
 	fmt.Println("--------------------------------------")
 

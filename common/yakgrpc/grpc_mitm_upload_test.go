@@ -69,7 +69,9 @@ func TestMITM_UploadFile(t *testing.T) {
 				}
 			}
 			log.Info("Start to check request in table")
-			flowMsg, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), localClient, &ypb.QueryHTTPFlowRequest{Keyword: uid, SourceType: "mitm"}, 1)
+			cli, err := NewLocalClient()
+			require.NoError(t, err)
+			flowMsg, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), cli, &ypb.QueryHTTPFlowRequest{Keyword: uid, SourceType: "mitm"}, 1)
 			require.NoError(t, err)
 			flow := flowMsg.Data[0]
 			log.Info("check flow in mitm")
@@ -95,8 +97,30 @@ func TestMITM_UploadFile(t *testing.T) {
 }
 
 func TestMITM_LargeRequestWireForward(t *testing.T) {
-	// Default spill cap is 200KB (History preview); GlobalMaxContentLength stays at ~10MB for MITM I/O.
+	// Wire forwarding must keep the full body even when History spill kicks in.
+	// Lower 「转储数据包大小」 below body size so spill is exercised.
+	// In CI, NewLocalClient dials the external yak grpc process: consts.Set*
+	// in this test process does NOT affect MITM spill — use SetGlobalNetworkConfig.
 	const bodySize = 300 * 1024
+	const spillLimit = uint64(200 * 1024)
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	cfg, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	require.NoError(t, err)
+	prevMax := cfg.GetMaxContentLength()
+	cfg.MaxContentLength = spillLimit
+	_, err = client.SetGlobalNetworkConfig(context.Background(), cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		cfg.MaxContentLength = prevMax
+		if prevMax == 0 {
+			_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+			return
+		}
+		_, _ = client.SetGlobalNetworkConfig(context.Background(), cfg)
+	})
+
 	token := uuid.New().String()
 	var receivedBodyLen atomic.Int64
 
@@ -127,13 +151,13 @@ func TestMITM_LargeRequestWireForward(t *testing.T) {
 			require.NoError(t, err)
 			require.GreaterOrEqual(t, receivedBodyLen.Load(), int64(bodySize))
 
-			flowMsg, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), localClient, &ypb.QueryHTTPFlowRequest{
+			flowMsg, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
 				Keyword:    token,
 				SourceType: "mitm",
 			}, 1)
 			require.NoError(t, err)
 			require.Len(t, flowMsg.Data, 1)
-			require.True(t, flowMsg.Data[0].IsTooLargeRequest, "300KB body should spill at 200KB History threshold without lowering GlobalMaxContentLength")
+			require.True(t, flowMsg.Data[0].IsTooLargeRequest, "300KB body should spill when GlobalMaxContentLength is 200KB")
 		}),
 	)
 }

@@ -35,7 +35,7 @@ func init() {
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithMaxIterations(5),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 					allowActionNames := []string{
@@ -54,16 +54,16 @@ func init() {
 					userQuery := loop.Get("user_query")
 					searchResults := loop.Get("search_results_summary")
 					searchHistory := loop.Get("search_history")
-					nextMovementsSummary := loop.Get("next_movements_summary")
+					nextSearchSummary := loop.Get("next_search_summary")
 					artifactsSummary := buildArtifactsSummary(loop)
 
 					renderMap := map[string]any{
-						"UserQuery":            userQuery,
-						"SearchResults":        searchResults,
-						"SearchHistory":        searchHistory,
-						"NextMovementsSummary": nextMovementsSummary,
-						"ArtifactsSummary":     artifactsSummary,
-						"Nonce":                nonce,
+						"UserQuery":         userQuery,
+						"SearchResults":     searchResults,
+						"SearchHistory":     searchHistory,
+						"NextSearchSummary": nextSearchSummary,
+						"ArtifactsSummary":  artifactsSummary,
+						"Nonce":             nonce,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),

@@ -11,13 +11,15 @@
 <|EXTRA_CAPABILITIES_END_{{ .Nonce }}|>{{ end }}
 {{ if .ReactiveData }}{{ if or .UserQuery .AutoContext .ExtraCapabilities }}
 
-{{ end }}<|REFLECTION_{{ .Nonce }}|>
+{{ end }}<|REACTIVE_DATA_{{ .Nonce }}|>
 {{ .ReactiveData }}
-<|REFLECTION_END_{{ .Nonce }}|>{{ end }}
+<|REACTIVE_DATA_END_{{ .Nonce }}|>{{ end }}
 {{ if .InjectedMemory }}{{ if or .UserQuery .AutoContext .ExtraCapabilities .ReactiveData }}
 
 {{ end }}<|INJECTED_MEMORY_{{ .Nonce }}|>
 # Memory Context
 These are the memories automatically retrieved by the system that are most relevant to the current input.
 {{ .InjectedMemory }}
-<|INJECTED_MEMORY_END_{{ .Nonce }}|>{{ end }}
+<|INJECTED_MEMORY_END_{{ .Nonce }}|>{{ end }}{{ if .TodoCheckpoint }}{{ if or .UserQuery .AutoContext .ExtraCapabilities .ReactiveData .InjectedMemory }}
+
+{{ end }}{{ .TodoCheckpoint }}{{ end }}

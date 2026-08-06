@@ -48,6 +48,7 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 		TodoSnapshot:      strings.Repeat("todo ", 5000),
 		ReactiveData:      strings.Repeat("reactive ", 5000),
 		InjectedMemory:    strings.Repeat("memory ", 5000),
+		TodoCheckpoint:    "[CURRENT TODO CHECKPOINT]\nkeep this dynamic tail",
 		SessionEvidence:   strings.Repeat("evidence ", 5000),
 		FrozenUserContext: strings.Repeat("plan ", 5000),
 	})
@@ -56,6 +57,8 @@ func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t
 	require.NotContains(t, result.Prompt, "ANCIENT_LIGHTWEIGHT_CONTEXT")
 	require.NotContains(t, result.Prompt, "evidence evidence evidence")
 	require.NotContains(t, result.Prompt, "Timeline Memory (Frozen)")
+	require.Contains(t, result.Prompt, "[CURRENT TODO CHECKPOINT]\nkeep this dynamic tail")
+	require.Less(t, strings.Index(result.Prompt, "[CURRENT TODO CHECKPOINT]"), strings.Index(result.Prompt, "<|PROMPT_SECTION_dynamic_END_light-1|>"))
 	promptTokens := ytoken.CalcTokenCount(result.Prompt)
 	t.Logf("bounded lightweight loop prompt tokens: %d", promptTokens)
 	require.LessOrEqual(t, promptTokens, 30000)
@@ -100,6 +103,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 		SkillsContext:   "<|SKILLS_CONTEXT_skills_context|>\nloaded skill\n<|SKILLS_CONTEXT_END_skills_context|>",
 		ReactiveData:    "reactive state",
 		InjectedMemory:  "memory content",
+		TodoCheckpoint:  "[CURRENT TODO CHECKPOINT]\ncheckpoint tail",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -140,6 +144,10 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	userQueryIdx := strings.Index(prompt, "<|USER_QUERY_n123|>")
 	autoCtxIdx := strings.Index(prompt, "<|AUTO_PROVIDE_CTX_[n123_provider_one]_START key=provider-one|>")
 	prevUserInputIdx := strings.Index(prompt, "<|PREV_USER_INPUT_n123|>")
+	reactiveDataIdx := strings.Index(prompt, "<|REACTIVE_DATA_n123|>")
+	injectedMemoryIdx := strings.Index(prompt, "<|INJECTED_MEMORY_n123|>")
+	checkpointIdx := strings.Index(prompt, "[CURRENT TODO CHECKPOINT]")
+	dynamicEndIdx := strings.Index(prompt, "<|PROMPT_SECTION_dynamic_END_n123|>")
 
 	require.NotEqual(t, -1, traitsIdx)
 	require.NotEqual(t, -1, workspaceIdx)
@@ -158,6 +166,10 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.NotEqual(t, -1, userQueryIdx)
 	require.NotEqual(t, -1, autoCtxIdx)
 	require.NotEqual(t, -1, prevUserInputIdx)
+	require.NotEqual(t, -1, reactiveDataIdx)
+	require.NotEqual(t, -1, injectedMemoryIdx)
+	require.NotEqual(t, -1, checkpointIdx)
+	require.NotEqual(t, -1, dynamicEndIdx)
 
 	// 段顺序 (P1-C3 timeline-open 段内子项重排后): TRAITS -> AI_CACHE_FROZEN(START) ->
 	// Tool/Forge/Timeline-frozen -> AI_CACHE_FROZEN(END) ->
@@ -196,10 +208,17 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Less(t, prevUserInputIdx, currentTimeIdx)
 	require.Less(t, currentTimeIdx, userQueryIdx)
 	require.Less(t, userQueryIdx, autoCtxIdx)
+	require.Less(t, autoCtxIdx, reactiveDataIdx)
+	require.Less(t, reactiveDataIdx, injectedMemoryIdx)
+	require.Less(t, injectedMemoryIdx, checkpointIdx)
+	require.Less(t, checkpointIdx, dynamicEndIdx)
+	require.NotContains(t, prompt[:timelineOpenSectionIdx], "[CURRENT TODO CHECKPOINT]")
 	require.Contains(t, prompt, "<|PERSISTENT|>")
 	require.Contains(t, prompt, "<|OUTPUT_EXAMPLE|>")
 	require.Contains(t, prompt, "<|SCHEMA|>")
 	require.NotContains(t, prompt, "<|SCHEMA_n123|>")
+	require.Equal(t, "section.dynamic.todo_checkpoint", sections[5].Children[len(sections[5].Children)-1].Key)
+	require.False(t, sections[5].Children[len(sections[5].Children)-1].Compressible)
 
 	// OUTPUT_EXAMPLE 必须出现在 semi-dynamic 段 (schema 之前, timeline-open 之前),
 	// schema 移到 semi-2 末尾后, example 在 schema 之前. 不允许回到 high-static 段.

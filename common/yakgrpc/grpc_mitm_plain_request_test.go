@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -26,7 +27,7 @@ func makePlainRequestPacket(bodySize int) []byte {
 
 func legacyCachePlainRequestBytesIfStorable(req *http.Request, decoded []byte) {
 	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded)
-	if len(body) <= yakit.MaxHTTPFlowRequestBodyInDBBytes {
+	if len(body) <= yakit.GetMaxHTTPFlowRequestBodyInDBBytes() {
 		httpctx.SetPlainRequestBytes(req, decoded)
 	}
 }
@@ -34,7 +35,7 @@ func legacyCachePlainRequestBytesIfStorable(req *http.Request, decoded []byte) {
 func cloneDecodedPlainRequestBytesIfStorable(req *http.Request, wire []byte) []byte {
 	decoded, independentlyOwned := lowhttp.DeletePacketEncodingWithOwnership(wire)
 	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(decoded)
-	if len(body) <= yakit.MaxHTTPFlowRequestBodyInDBBytes {
+	if len(body) <= yakit.GetMaxHTTPFlowRequestBodyInDBBytes() {
 		if independentlyOwned {
 			httpctx.SetPlainRequestBytesOwned(req, decoded)
 		} else {
@@ -45,9 +46,14 @@ func cloneDecodedPlainRequestBytesIfStorable(req *http.Request, wire []byte) []b
 }
 
 func TestCachePlainRequestBytesIfStorable(t *testing.T) {
+	previousLimit := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(256 * 1024)
+	t.Cleanup(func() { consts.SetGlobalMaxContentLength(previousLimit) })
+	maxBodySize := yakit.GetMaxHTTPFlowRequestBodyInDBBytes()
+
 	t.Run("exact limit is cached with independent ownership", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", nil)
-		packet := makePlainRequestPacket(yakit.MaxHTTPFlowRequestBodyInDBBytes)
+		packet := makePlainRequestPacket(maxBodySize)
 		expected := bytes.Clone(packet)
 
 		cachePlainRequestBytesIfStorable(req, packet)
@@ -61,7 +67,7 @@ func TestCachePlainRequestBytesIfStorable(t *testing.T) {
 
 	t.Run("body over limit is not cached", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", nil)
-		packet := makePlainRequestPacket(yakit.MaxHTTPFlowRequestBodyInDBBytes + 1)
+		packet := makePlainRequestPacket(maxBodySize + 1)
 
 		cachePlainRequestBytesIfStorable(req, packet)
 

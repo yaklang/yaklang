@@ -20,22 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// timelineAITagModelThinking 与 prompts/loop/high_static_section.txt 中
-// 「Timeline 每轮记录」约定一致: 仅模型思考流用 AITAG; 其下决策摘要为明文.
-const timelineAITagModelThinking = "TIMELINE_MODEL_THINKING"
-
-// wrapTimelineAITagBlock 将一段正文包成 `<|TAG_nonce|>...<|TAG_END_nonce|>`。
-// body 或 nonce 为空时返回空串 (调用方跳过拼接).
-func wrapTimelineAITagBlock(tagName, nonce, body string) string {
-	body = strings.TrimSpace(body)
-	nonce = strings.TrimSpace(nonce)
-	tagName = strings.TrimSpace(tagName)
-	if body == "" || nonce == "" || tagName == "" {
-		return ""
-	}
-	return fmt.Sprintf("<|%s_%s|>\n%s\n<|%s_END_%s|>", tagName, nonce, body, tagName, nonce)
-}
-
 // isJSONEmbeddedAITagPrefix 判断字段流的首批 peek 字节是否以 `<|TagName_` 开头,
 // 兼容 JSON 字段流推过来的 raw bytes 通常带外层 `"` 与零宽空白. 命中即视为 AI 把
 // AITag 块塞进了 JSON 字符串值, 触发 JSON / AITag 双 emit 重复, 让调用方静默
@@ -216,6 +200,65 @@ func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sy
 	return actionOptions
 }
 
+func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) string {
+	if action == nil {
+		return ""
+	}
+
+	candidates := []string{
+		strings.TrimSpace(action.ActionType()),
+		strings.TrimSpace(action.GetString("next_action.type")),
+		strings.TrimSpace(action.GetString("type")),
+	}
+	for _, candidate := range candidates {
+		if candidate != "" && candidate != "object" {
+			return candidate
+		}
+	}
+
+	hasField := func(key string) bool {
+		if strings.TrimSpace(action.GetString(key)) != "" {
+			return true
+		}
+		if strings.TrimSpace(action.GetInvokeParams("next_action").GetString(key)) != "" {
+			return true
+		}
+		return false
+	}
+
+	if strings.TrimSpace(finalAnswer) != "" || hasField("answer_payload") {
+		return "directly_answer"
+	}
+	if hasField("tool_require_payload") {
+		return "require_tool"
+	}
+	if hasField("directly_call_tool_name") || hasField("directly_call_identifier") {
+		return "directly_call_tool"
+	}
+	if hasField("tool_compose_payload") {
+		return "tool_compose"
+	}
+	if hasField("capability_identifier") {
+		return "load_capability"
+	}
+	if hasField("rewrite_user_query_for_knowledge_enhance") {
+		return "knowledge_enhance_answer"
+	}
+	if hasField("blueprint_payload") {
+		return "require_ai_blueprint"
+	}
+	if hasField("plan_request_payload") {
+		return "request_plan_and_execution"
+	}
+	if hasField("skill_name") || hasField("skill_names") {
+		return "loading_skills"
+	}
+	if hasField("resource_path") || hasField("pattern") {
+		return "load_skill_resources"
+	}
+	return ""
+}
+
 func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string) error {
 	task := aicommon.NewStatefulTaskBase(
 		taskId,
@@ -253,11 +296,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	var actionNames = r.GetAllActionNames()
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
-		actionType := action.ActionType()
-		if actionType == "object" || actionType == "" {
-			actionType = action.GetString("next_action.type")
-		}
-		return actionType
+		return inferActionTypeFromPayload(a, r.Get("tag_final_answer"))
 	}
 
 	ctxCanceled := utils.NewBool(false)
@@ -466,13 +505,24 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if utils.IsNil(verifier) {
 				return utils.Errorf("action[%s] verifier is nil", actionType)
 			}
-			if verifier.ActionVerifier == nil {
-				r.loadingStatus(fmt.Sprintf("动作 [%s] 验证跳过 / Action [%s] Verify Skipped", actionType, actionType))
+			if verifier.ActionVerifier != nil {
+				r.loadingStatus(fmt.Sprintf("验证动作 [%s] / Verifying Action [%s]", actionType, actionType))
+				if err := verifier.ActionVerifier(r, action); err != nil {
+					return err
+				}
+			}
+			delta, err := aicommon.NormalizeTodoDelta(action)
+			if err != nil {
+				suppressInvalidTodoDelta(r, action, err)
 				return nil
 			}
-
-			r.loadingStatus(fmt.Sprintf("验证动作 [%s] / Verifying Action [%s]", actionType, actionType))
-			return verifier.ActionVerifier(r, action)
+			if delta != nil {
+				if err := r.config.ValidateTodoDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), delta); err != nil {
+					suppressInvalidTodoDelta(r, action, err)
+					return nil
+				}
+			}
+			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
 	)
@@ -811,44 +861,28 @@ LOOP:
 		// 知道 "我还在动"; 心跳逻辑见 startStallHeartbeat / recordIterationTick.
 		// 关键词: 主循环 tick, lastIterationTickAt
 		r.recordIterationTick()
-		if iterationCount > maxIterations {
-			// 到达迭代上限: 优先尝试向用户申请临时扩充迭代次数 (仅在允许用户交互时).
-			// 用户同意 -> 提升 maxIterations 并 continue 主循环 (有扩充次数护栏防自旋);
-			// 用户拒绝 / 未启用交互 / 已达扩充上限 -> 回退到原"软性中断"退出.
-			// 关键词: iteration extend, 临时扩充迭代上限, 软性中断回退
+		// 迭代上限基于 effectiveIterationCount (有效推进轮数): 有活跃 TODO 但
+		// 无 todo_delta 变更的空转轮不计入, 不消耗预算. effectiveIterationCount
+		// 在每轮 action 执行后递增, 此处检查时反映的是之前已完成的有效迭代数.
+		if r.effectiveIterationCount >= maxIterations {
+			// 到达迭代上限: 优先尝试向用户申请临时扩充 (仅在允许交互时).
+			// 用户同意 -> 提升 maxIterations 并 continue; 拒绝/不可扩充 -> 软性中断.
 			if !r.disableIncreaseIterationCount {
 				agreed, extDelta, extErr := r.requestIterationExtension(task, iterationCount, maxIterations)
 				if extErr != nil {
 					log.Warnf("ReactLoop[%v] request iteration extension error (fallback to soft interrupt): %v", r.loopName, extErr)
 				}
 				if agreed && extDelta > 0 {
-					// 用户同意扩充: 提升上限, 不推进 iterationCount (本轮仍属于"超限"那一轮,
-					// 但 maxIterations 已提高, 下一次 iterationCount > maxIterations 判断自然通过).
+					// 用户同意扩充: 提升上限, 不推进计数, 直接 continue.
 					maxIterations += extDelta
 					r.loadingStatus(fmt.Sprintf("迭代上限已临时扩充至 %d / iteration limit extended to %d", maxIterations, maxIterations))
-					// 注意: 这里不 break, 也不推进 iterationCount, 直接 continue 让下一轮
-					// 重新走主循环逻辑 (生成 prompt / 调 AI / 执行 action).
 					continue
 				}
 			}
-			// 未扩充: 走原"软性中断"处理 (保持既有语义不变).
-			// 到达迭代上限属于"软性中断", 框架层统一按"自然结束"处理, 不再当作
-			// 硬错误 EmitReActFail. 处理步骤 (与具体 loop / 专注模式无关):
-			//  1. applyMaxIterationSoftInterrupt: 把当前任务仍活跃的 TODO 批量
-			//     标记 SKIP (待办回收) 并广播, 置位软中断标记, 记录未完成 TODO 快照,
-			//     同时在 Timeline 落一次"退出原因=超出最大迭代 + 可回复继续"的软性说明;
-			//  2. finishIterationLoopWithError(reason=maxIterErr): 照常跑
-			//     onPostIteration hook. 各 loop 已有的 finalize 收尾总结 (loop_default
-			//     的 DirectlyAnswer 总结 / http_flow_analyze 的分析报告等) 会读取上面
-			//     落在 timeline / interrupt store 里的上下文, 因地制宜地 AI 生成一段
-			//     "退出原因 + 未完成 TODO + 下一步(回复 '继续' 续跑或换话题)"的说明,
-			//     框架层不额外再发一次 AI 请求. 全局收尾兜底 (re-act_mainloop) 识别
-			//     IsMaxIterationInterrupted() 后, 即便 reason 带着 maxIterErr 也按
-			//     EmitReActSuccess (自然结束) 上报, 与硬中断报错形成对比; 只有隐藏 /
-			//     内部 loop 在自己的 finalize 里 IgnoreError 自管收尾时才保持静默;
-			//  3. 正常 break LOOP -> return nil -> complete(nil), 资源回收由
-			//     ExecuteWithExistedTask 的 defer r.Release() 完成.
-			// 关键词: max iteration 软性中断, 自然结束, downgrade-max-iteration-err, 待办 SKIP
+			// 未扩充: 软性中断 (按"自然结束"处理, 非硬错误).
+			// applyMaxIterationSoftInterrupt 将活跃 TODO 标记 deferred 并记录快照,
+			// finishIterationLoopWithError 跑 onPostIteration hook, 各 loop 的
+			// finalize 据此生成总结说明, 框架层按 EmitReActSuccess 上报.
 			maxIterErr := utils.Errorf("reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
 			r.applyMaxIterationSoftInterrupt(iterationCount, task, maxIterations)
 			r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
@@ -919,7 +953,16 @@ LOOP:
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
 
 		streamWg.Wait()
+
+		// Capture the pure model reasoning/thinking stream accumulated during
+		// this AI transaction and emit it as a standalone timeline entry. Unlike
+		// the legacy code which concatenated it with the iteration decision body,
+		// we keep it as a separate entry so the thinking is cleanly isolated for
+		// UI display. It is excluded from prompt projection (display-only).
 		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
+		if iterationModelThinking != "" {
+			r.GetInvoker().AddToTimeline(TimelineEntryModelThinking, iterationModelThinking)
+		}
 
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
@@ -944,8 +987,7 @@ LOOP:
 
 		r.loadingStatus(fmt.Sprintf("[%v]执行中 / [%v] executing action...", actionName, actionName))
 
-		// 记录当前迭代索引和 Action 信息
-		// 关键词: action history append, SPIN 检测数据源, tool_name 抽取
+		// 记录当前迭代索引和 Action 信息。
 		r.actionHistoryMutex.Lock()
 		actionRecord := &ActionRecord{
 			ActionType:     actionParams.ActionType(),
@@ -964,29 +1006,15 @@ LOOP:
 
 		r.emitActionExecutionRecord(task, actionParams, iterationCount, prompt)
 
-		// allow iteration info to be added to timeline
-		loopName := r.loopName
-		if loopName == "" {
-			loopName = "general-purpose"
+		// 落地 todo_delta 并判定本轮是否为有效推进 (空转轮不计入迭代预算).
+		appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
+		r.advanceEffectiveIteration(task, appliedTodoDelta)
+		// Legacy object wrappers keep ActionType()=="object" while the selected
+		// handler is finish. Reset based on the resolved handler so consecutive
+		// finish requests remain in the same soft-checkpoint flow.
+		if handler == nil || handler.ActionType != "finish" {
+			r.resetSoftTodoFinishFlow()
 		}
-		reason := actionParams.GetString("human_readable_thought")
-		turnNonce := strings.ToLower(utils.RandStringBytes(6))
-		decisionBody := fmt.Sprintf("[%v]======== ReAct iteration %d ========", loopName, iterationCount)
-		if reason != "" {
-			decisionBody += "\nReason/Next-Step: " + reason
-		}
-		msg := decisionBody
-		if b := wrapTimelineAITagBlock(timelineAITagModelThinking, turnNonce, iterationModelThinking); b != "" {
-			msg = b + "\n\n" + decisionBody
-		}
-		r.GetInvoker().AddToTimeline("iteration", msg)
-
-		// 主 loop next_movements 兜底拦截: 详见 applyNextMovementsBottomLine.
-		// 时序保证: AddToTimeline("iteration") 已完成 → 兜底 apply + emit →
-		// handler.AsyncMode check / ActionHandler 才跑. async mode reject
-		// (continue 跳出) 之前兜底也已经执行, 不会漏 apply.
-		// 关键词: 主 loop next_movements 兜底入口, 孤儿待办修复
-		applyNextMovementsBottomLine(r, task, iterationCount, actionParams)
 
 		if handler.AsyncMode {
 			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
@@ -1001,14 +1029,7 @@ LOOP:
 				r.GetInvoker().AddToTimeline("[ASYNC_ACTION_REJECTED]", rejectMsg)
 				operator = newLoopActionHandlerOperator(task)
 				operator.Feedback(rejectMsg)
-				operator.SetReflectionLevel(ReflectionLevel_Critical)
-				operator.SetReflectionData("rejected_action", actionName)
-				operator.SetReflectionData("rejected_reason", "task_already_async")
 				operator.Continue()
-				continueIter := func() {
-					r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
-				}
-				continueIter()
 				continue
 			}
 			task.SetAsyncMode(true)
@@ -1038,18 +1059,11 @@ LOOP:
 			return finalError
 		}
 
-		continueIter := func() {
-			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
-		}
-
 		select {
 		case <-task.GetContext().Done():
 			return utils.Errorf("task context done in executing ReActLoop(before ActionHandler): %v", task.GetContext().Err())
 		default:
 		}
-
-		// 记录 action 执行开始时间
-		actionStartTime := time.Now()
 
 		// Temporarily sync the invoker's currentTask with this loop's task so that
 		// any tool call made inside the action handler (via ExecuteToolRequiredAndCallWithoutRequired)
@@ -1068,9 +1082,9 @@ LOOP:
 				operator,
 			)
 		}()
-
-		// 计算 action 执行时间
-		actionExecutionDuration := time.Since(actionStartTime)
+		if handler.ActionType != loopAction_Finish.ActionType {
+			r.recordCurrentTodoIteration(task)
+		}
 
 		// 先检查 operator 状态，如果 operator 已经表明要终止（无论成功或失败），
 		// 则 context canceled 不应该被视为错误
@@ -1088,10 +1102,7 @@ LOOP:
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
 			}
-			if !operator.isSilence {
-				// 正常退出
-				continueIter()
-			}
+
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1117,34 +1128,8 @@ LOOP:
 			}
 		}
 
-		// 执行自我反思 (如果启用且策略命中).
-		// Critical(失败归因) 走同步以保证下一轮 prompt 立即含失败上下文;
-		// 其它级别(主要是 SPIN/Standard) 走异步 fire-and-forget, 主循环不阻塞.
-		// 关键词: 反思入口, 异步 fire-and-forget, SPIN 不干扰执行
-		reflectionLevel := r.shouldTriggerReflection(handler, operator, iterationCount)
-		if reflectionLevel != ReflectionLevel_None {
-			log.Infof("trigger self-reflection for action[%s] with level[%s] (async=%v)",
-				actionName, reflectionLevel.String(), reflectionLevel != ReflectionLevel_Critical)
-			r.MaybeExecuteReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
-		}
-
 		// T1: perception after action execution (async, non-blocking)
 		r.MaybeTriggerPerceptionAfterAction(iterationCount)
-
-		if r.ShouldForceExitDueToSpin() {
-			// T3: force perception update on SPIN detection
-			r.TriggerPerceptionOnSpin()
-
-			log.Warnf("ReactLoop[%v] spin threshold reached (%d consecutive warnings), adding timeline pressure instead of force-exiting",
-				r.loopName, r.consecutiveSpinWarnings)
-			r.GetInvoker().AddToTimeline("spin_pressure",
-				fmt.Sprintf("[SPIN PRESSURE] %d consecutive spin warnings detected. "+
-					"You MUST change your approach immediately. "+
-					"Use a completely different action type or strategy. "+
-					"The task remains incomplete and requires a new direction. "+
-					"Continuing with the same approach will not help.", r.consecutiveSpinWarnings))
-			r.ResetSpinWarning()
-		}
 
 		// 检查 operator 状态
 		if isTerminated, err := operator.IsTerminated(); isTerminated {
@@ -1159,10 +1144,7 @@ LOOP:
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
 			}
-			if !operator.isSilence {
-				// 正常退出
-				continueIter()
-			}
+
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1174,7 +1156,7 @@ LOOP:
 
 		effectiveAsyncMode := handler.AsyncMode || operator.IsAsyncModeRequested()
 		if effectiveAsyncMode {
-			// 主循环进入 async 时, 当前任务残留的活跃 TODO 自动标记为 done,
+			// 主循环进入 async 时, 当前任务残留的活跃 TODO 自动标记为 deferred,
 			// 避免异步子任务接手后主循环 TODO 仍阻塞 finish.
 			var asyncTodoTimelineHook func(category, line string)
 			if invoker := r.GetInvoker(); invoker != nil {
@@ -1182,7 +1164,7 @@ LOOP:
 					invoker.AddToTimeline(category, line)
 				}
 			}
-			aicommon.MarkActiveTodosDoneOnAsyncHandoff(r.config, emitter, task, iterationCount, asyncTodoTimelineHook)
+			aicommon.DeferOpenTodosOnAsyncHandoff(r.config, emitter, task, iterationCount, asyncTodoTimelineHook)
 
 			if !handler.AsyncMode {
 				// dynamic async mode requested by handler at runtime
@@ -1216,7 +1198,6 @@ LOOP:
 
 		// 非异步模式，继续下一次循环
 		if operator.IsContinued() {
-			continueIter()
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				fmt.Printf("[Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1233,7 +1214,6 @@ LOOP:
 		}
 
 		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
-		continueIter()
 		utils.Debug(func() {
 			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			fmt.Printf("[Default Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
@@ -1313,15 +1293,15 @@ func (r *ReActLoop) GetMaxIterationInterruptSummary() string {
 }
 
 // applyMaxIterationSoftInterrupt 处理到达迭代上限时的"待办回收 + 软性提示":
-//  1. 读取当前任务仍处于 PENDING/DOING 的 TODO, 记录其可读快照供直接回答引用;
-//  2. 复用 ApplyVerificationNextMovementsAndEmit 单源 helper 把这些 TODO 批量
-//     标记为 SKIP (更新 store + 广播 todo_list_update + NEXT_MOVEMENTS timeline);
+//  1. 读取当前任务仍开放的 TODO, 记录其可读快照供直接回答引用;
+//  2. 复用 ApplyTodoDeltaAndEmit 把这些 TODO 批量关闭为 deferred，并记录 reason
+//     (更新 store + 广播 todo_list_update + TODO_DELTA timeline);
 //  3. 在 Timeline 追加一条软性中断说明 (非 error 类别), 只报告一次.
 //
 // 该方法只负责"回收 + 提示", 不生成直接回答 — 直接回答交给 loop 的 finalize
 // hook (见各 loop 的 WithOnPostIteraction), 以便复用每个 loop 已有的答复渲染.
 //
-// 关键词: max iteration 软性中断, 待办 SKIP 回收, 单条软提示, 复用单源 helper
+// 关键词: max iteration 软性中断, 待办 deferred 留痕, 单条软提示, 复用单源 helper
 func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aicommon.AIStatefulTask, maxIterations int) {
 	if r == nil || utils.IsNil(task) {
 		return
@@ -1351,36 +1331,26 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 		r.Set(maxIterationInterruptSummaryKey, summary)
 	}
 
-	// 把活跃 TODO 批量 SKIP: 复用与 verification / adjust_todolist / 主循环兜底
+	// 把开放 TODO 批量关闭为 deferred: 复用与 todo_delta / 主循环兜底
 	// 完全一致的单源 helper, 保证 store 更新 + todo_list_update 广播 + timeline
 	// breadcrumb 字节级对齐.
 	if cfg != nil && len(activeItems) > 0 {
-		movements := make([]aicommon.VerifyNextMovement, 0, len(activeItems))
-		for _, item := range activeItems {
-			id := strings.TrimSpace(item.ID)
-			if id == "" {
-				continue
-			}
-			movements = append(movements, aicommon.VerifyNextMovement{
-				Op: "skip",
-				ID: id,
-			})
-		}
-		if len(movements) > 0 {
+		reason := fmt.Sprintf("Reached the ReAct iteration limit (%d) after the recorded attempts; unfinished work is deferred until a later continuation.", maxIterations)
+		delta := aicommon.BuildDeferredDeltaForOpenTodos(activeItems, reason)
+		if delta != nil {
 			var timelineHook func(category, line string)
 			if invoker := r.GetInvoker(); invoker != nil {
 				timelineHook = func(category, line string) {
 					invoker.AddToTimeline(category, line)
 				}
 			}
-			aicommon.ApplyVerificationNextMovementsAndEmit(
+			aicommon.ApplyTodoDeltaAndEmit(
 				cfg,
 				r.GetEmitter(),
 				task,
 				scope,
 				iterationCount,
-				false,
-				movements,
+				delta,
 				timelineHook,
 			)
 		}
@@ -1393,7 +1363,7 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 			loopName = "general-purpose"
 		}
 		msg := fmt.Sprintf(
-			"[%v] reached iteration limit (%d); the task was softly interrupted (NOT a failure). %d unfinished TODO(s) were marked as SKIP. A direct answer will summarize what was left undone; reply \"继续\" to resume, or give a new direction.",
+			"[%v] reached iteration limit (%d); the task was softly interrupted (NOT a failure). %d unfinished TODO(s) were closed as deferred with an explicit reason. A direct answer will summarize what was left undone; reply \"继续\" to resume, or give a new direction.",
 			loopName, maxIterations, len(activeItems),
 		)
 		invoker.AddToTimeline("iteration_limit_interrupt", msg)
@@ -1580,17 +1550,16 @@ func (r *ReActLoop) isDebugModeEnabled() bool {
 	return false
 }
 
-// extractToolNameFromAction 按优先级从 action 参数里抽取工具名,用于 SPIN
-// 双维度判定(ActionType + ToolName). 字段优先级:
+// extractToolNameFromAction 按优先级从 action 参数里抽取工具名，供执行历史使用。
+// 字段优先级:
 //  1. directly_call_tool_name 顶层
 //  2. next_action.directly_call_tool_name (legacy 兼容)
 //  3. tool_require_payload (require_tool 路径)
 //  4. tool_name / tool 通用兜底
 //
-// 全部命中为空返回空串, 表示该 action 不是 tool 调用类, SPIN 检测会退化为
-// 只比 ActionType.
+// 全部命中为空返回空串, 表示该 action 不是 tool 调用类。
 //
-// 关键词: extractToolNameFromAction, SPIN 细粒度, tool_name 抽取优先级
+// 关键词: extractToolNameFromAction, tool_name 抽取优先级
 func extractToolNameFromAction(action *aicommon.Action) string {
 	if utils.IsNil(action) {
 		return ""

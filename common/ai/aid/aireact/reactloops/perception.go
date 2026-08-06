@@ -20,16 +20,15 @@ import (
 )
 
 const (
-	PerceptionTriggerPostAction   = "post_action"
-	PerceptionTriggerForced       = "forced"
-	PerceptionTriggerSpinDetected = "spin_detected"
-	PerceptionTriggerLoopSwitch   = "loop_switch"
+	PerceptionTriggerPostAction = "post_action"
+	PerceptionTriggerForced     = "forced"
+	PerceptionTriggerLoopSwitch = "loop_switch"
 
 	// perceptionDefaultMinInterval 是两次 perception AI 调用之间的最小时间间隔.
 	// v4: 调整自 180s -> 5min, 配合 iter=8 进一步压低调用频率.
 	// 意图感知主要服务于 capability/SKILL/knowledge 补充, 大方向不变时
 	// 频繁感知反而是负担. 删除 afterVerification 入口后, perception 只由
-	// post_action (iter 门) + SPIN forced 触发, 再叠加更长的 minInterval,
+	// post_action (iter 门) + 显式 forced 触发, 再叠加更长的 minInterval,
 	// 让同阶段内紧邻的 drift 候选 (iter 间隔 <150s) 被跳过, 仅阶段切换
 	// (iter 间隔 >5min) 触发.
 	// 关键词: perceptionDefaultMinInterval v4 默认值, 5min 节流,
@@ -39,11 +38,11 @@ const (
 	// perceptionDefaultIterationInterval 控制每隔几个 iter 触发一次 post_action 感知.
 	// v4: 调整自 6 -> 8, 配合 minInterval=5min 压低频率:
 	//   iter=4 min=120s: 仍偏密, 删除 verification 入口后实测仍有冗余
-	//   iter=6 min=180s: 首次感知推迟到 iter 6, 但 SPIN forced 仍可兜底,
+	//   iter=6 min=180s: 首次感知推迟到 iter 6,
 	//                    同阶段 drift 被 iter 门 + 时间门双跳过, 仅 pivot 放行
-	// 注意: SPIN forced 路径绕过 interval 门, 不会因 iter=8 而漏掉紧急刷新.
+	// 显式 forced 路径绕过 interval 门, 不会因 iter=8 而漏掉紧急刷新.
 	// 关键词: perceptionDefaultIterationInterval v4 默认值, iter=8 节流,
-	//        SPIN forced 兜底, 双门控
+	//        forced 兜底, 双门控
 	perceptionDefaultIterationInterval  = 8
 	perceptionMaxContextTokens          = 500
 	perceptionKnowledgeMaxContextTokens = 15 * 1024
@@ -129,12 +128,9 @@ func (p *PerceptionState) IsIntentPivot() bool {
 //   - LastTrigger == PerceptionTriggerForced 时绕门 (用户/系统显式请求, 视作必须刷新)
 //   - 其他场景: 必须 IsIntentPivot() == true 才触发
 //
-// spin_detected / loop_switch 等"半紧急"trigger 仍然遵从 IntentShift, 在意图没真
-// pivot 时不重复加载, 把节流优先级放在紧急性之前 (用户选择).
-//
 // 关键词: shouldRefreshDownstreamForState, perception 下游门控,
 //
-//	forced 绕门, spin_detected loop_switch 受门控
+//	forced 绕门, loop_switch 受门控
 func (p *PerceptionState) shouldRefreshDownstreamForState(updated bool) bool {
 	if !updated || p == nil {
 		return false
@@ -159,7 +155,6 @@ func (p *PerceptionState) ShouldUpdate(newState *PerceptionState) bool {
 		return false
 	}
 	if newState.LastTrigger == PerceptionTriggerForced ||
-		newState.LastTrigger == PerceptionTriggerSpinDetected ||
 		newState.LastTrigger == PerceptionTriggerLoopSwitch {
 		return true
 	}
@@ -334,8 +329,8 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 			reason = aicommon.ShrinkTextBlockByTokens(reason, 1000)
 		}
 		buf.WriteString(fmt.Sprintf("Last Verification: %s - %s\n", satisfied, reason))
-		// 注: verification 收缩为纯观测角色后不再产出 NextMovements, 这里不再
-		// 渲染 "Next Movements" 段 (TODO 推进交由主循环 adjust_todolist).
+		// 注: verification 收缩为纯观测角色后不再产出 TodoDelta, 这里不再
+		// 渲染 "Next Steps" 段 (TODO 推进交由主循环 todo_delta).
 		// satisfied + reasoning 仍是 perception 需要感知的观测信号.
 	}
 
@@ -1043,14 +1038,4 @@ func (r *ReActLoop) MaybeTriggerPerceptionAfterAction(iterationIndex int) {
 		return
 	}
 	r.invokePerceptionTrigger(PerceptionTriggerPostAction, false)
-}
-
-
-// TriggerPerceptionOnSpin forces a perception update when SPIN is detected,
-// providing fresh context that may help the loop break out of a repeating pattern.
-func (r *ReActLoop) TriggerPerceptionOnSpin() {
-	if r.perception == nil {
-		return
-	}
-	r.invokePerceptionTrigger(PerceptionTriggerSpinDetected, true)
 }

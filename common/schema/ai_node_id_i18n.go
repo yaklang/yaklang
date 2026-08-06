@@ -95,10 +95,6 @@ func saveNodeIdI18nToDB(nodeId string, i18n *I18n) {
 }
 
 var nodeIdMapper = map[string]*I18n{
-	"adjust_todolist": {
-		Zh: "待办事项",
-		En: "TODO List",
-	},
 	"todo_added": {
 		Zh: "待办任务",
 		En: "TODO Added",
@@ -110,6 +106,10 @@ var nodeIdMapper = map[string]*I18n{
 	"todo_completed": {
 		Zh: "待办完成",
 		En: "TODO Completed",
+	},
+	"todo_reason": {
+		Zh: "进展",
+		En: "Progress",
 	},
 	"task-dependency": {
 		Zh: "任务依赖",
@@ -323,10 +323,6 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "结果摘要",
 		En: "Human Readable Result",
 	},
-	"next_movements_snapshot": {
-		Zh: "待办",
-		En: "TODO",
-	},
 	"delivery_files_snapshot": {
 		Zh: "交付文件",
 		En: "Delivery Files",
@@ -374,10 +370,6 @@ var nodeIdMapper = map[string]*I18n{
 	"infosec-js-crawl": {
 		Zh: "JS 爬取分析",
 		En: "JS Crawl Analysis",
-	},
-	"self-reflection-suggestions": {
-		Zh: "自我反思",
-		En: "Self-Reflection",
 	},
 	"semantic_questions": {
 		Zh: "语义搜索条件",
@@ -972,27 +964,6 @@ var nodeIdMapper = map[string]*I18n{
 		En: "ReAct Task",
 	},
 
-	// 自省相关的 nodeId
-	"self-reflection": {
-		Zh: "自我反思",
-		En: "Self Reflection",
-	},
-	"self-reflection-learning_insights": {
-		Zh: "学习洞察",
-		En: "Learning Insights",
-	},
-	"self-reflection-future_suggestions": {
-		Zh: "未来建议",
-		En: "Future Suggestions",
-	},
-	"self-reflection-impact_assessment": {
-		Zh: "影响评估",
-		En: "Impact Assessment",
-	},
-	"self-reflection-effectiveness_rating": {
-		Zh: "效果评级",
-		En: "Effectiveness Rating",
-	},
 	"yaklang-code": {
 		Zh: "Yaklang 代码",
 		En: "Yaklang Code",

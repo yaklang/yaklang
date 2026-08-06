@@ -47,7 +47,6 @@ func init() {
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowUserInteract(false),
-				reactloops.WithEnableSelfReflection(false),
 				reactloops.WithDisableLoopPerception(true),
 				reactloops.WithDisableTodoSnapshot(true),
 				reactloops.WithMaxIterations(maxIter),
@@ -75,7 +74,7 @@ func init() {
 						"ReferenceMaterial": loop.Get(loopVarReferenceMaterial),
 					})
 				}),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					return utils.RenderTemplate(reactiveDataTpl, map[string]any{
 						"Nonce":            nonce,

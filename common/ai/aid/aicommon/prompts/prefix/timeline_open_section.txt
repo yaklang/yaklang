@@ -17,7 +17,7 @@
 
 {{ if .TodoSnapshot }}
 
-全局待办清单（TODO LIST）由历轮 Verify 阶段累积维护，跨整段会话保持可见，是当前最权威的"应做、正在做、已关闭"事项集合。在选择下一步动作前请先对照此清单：优先沿 [DOING] 项继续推进、不要重复创建已存在的 [ ] 项、[DELETED] / [SKIPPED] 已显式放弃不应再尝试。任何新增 / 完成 / 删除都只能通过 verify-satisfaction 的 next_movements 走，正常 loop 动作不直接写入。
+TODO LIST 是 `todo_delta` 累计维护后的只读快照。分组规则、投影属性和使用方法见任务指令段 `## TODO 状态维护（todo_delta）` 末尾的"TODO LIST 只读投影"。
 
 {{ .TodoSnapshot }}
 {{ end }}

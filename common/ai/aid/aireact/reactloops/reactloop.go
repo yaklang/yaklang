@@ -29,28 +29,23 @@ type ReActLoopOption func(r *ReActLoop)
 type ContextProviderFunc func(loop *ReActLoop, nonce string) (string, error)
 type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce string) (string, error)
 
-// SatisfactionRecord 记录满意度验证的结果，包含验证状态、原因、已完成任务索引和下一步行动计划
+// SatisfactionRecord records the read-only verification result.
 type SatisfactionRecord struct {
-	Satisfactory       bool                          `json:"satisfactory"`         // 是否满足用户需求
-	Reason             string                        `json:"reason"`               // 满意/不满意的原因分析
-	CompletedTaskIndex string                        `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
-	NextMovements      []aicommon.VerifyNextMovement `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
-	Evidence           string                        `json:"evidence"`             // 运行期新增的证据 Markdown (legacy)
-	EvidenceOps        []aicommon.EvidenceOperation  `json:"evidence_ops"`         // 结构化证据增量操作
+	Satisfactory       bool                         `json:"satisfactory"`
+	Reason             string                       `json:"reason"`
+	CompletedTaskIndex string                       `json:"completed_task_index"`
+	Evidence           string                       `json:"evidence"`
+	EvidenceOps        []aicommon.EvidenceOperation `json:"evidence_ops"`
 }
 
-// ActionRecord 记录每次迭代执行的 Action 信息
-// 关键词: ActionRecord, SPIN 检测, ActionType+ToolName 双维度判定
+// ActionRecord 记录每次迭代执行的 Action 信息。
 type ActionRecord struct {
 	ActionType     string                 `json:"action_type"`
 	ActionName     string                 `json:"action_name"`
 	ActionParams   map[string]interface{} `json:"action_params"`
 	IterationIndex int                    `json:"iteration_index"`
 
-	// ToolName 是该 action 实际调用的工具名(如 require_tool/directly_call_tool 类动作),
-	// 用于 SPIN 检测的细粒度判定 — 仅当 ActionType 与 ToolName 同时连续匹配时才计为
-	// 一次同质执行, 避免"同 ActionType 不同 tool"被误判为 SPIN.
-	// 关键词: ActionRecord.ToolName, SPIN 细粒度, tool_name 抽取
+	// ToolName 是该 action 实际调用的工具名，供价值反馈和执行历史使用。
 	ToolName string `json:"tool_name,omitempty"`
 }
 
@@ -64,10 +59,14 @@ type ReActLoop struct {
 
 	loopName string
 
-	persistentInstructionProvider   ContextProviderFunc
-	lastLoopSchema                  string
-	reflectionOutputExampleProvider ContextProviderFunc
-	reactiveDataBuilder             FeedbackProviderFunc
+	persistentInstructionProvider ContextProviderFunc
+	lastLoopSchema                string
+	outputExampleProvider         ContextProviderFunc
+	reactiveDataBuilder           FeedbackProviderFunc
+	todoCheckpointMu              sync.Mutex
+	softTodoChecked               bool
+	softTodoCheckpointPending     bool
+	currentTodoProgress           map[string]*currentTodoProgress
 
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
@@ -123,9 +122,6 @@ type ReActLoop struct {
 	// use speed priority AI callback for main AI calls in the loop
 	useSpeedPriorityAI bool
 
-	// 自我反思功能开关
-	enableSelfReflection bool
-
 	// 记录历史 satisfaction 状态
 	historySatisfactionReasons []*SatisfactionRecord
 
@@ -155,6 +151,15 @@ type ReActLoop struct {
 	timelineDiffer        *aicommon.TimelineDiffer
 	currentIterationIndex int
 
+	// effectiveIterationCount 记录"有效推进轮数"。与 currentIterationIndex
+	// (原始循环圈数) 不同, 它仅在以下情况 +1:
+	//   1. 本轮的 todo_delta 有实际变更 (add/update/close/current), 或
+	//   2. 当前 scope 没有活跃 TODO (尚处于规划/侦察阶段, 无 TODO 可推).
+	// 当 scope 有活跃 TODO 但本轮 todo_delta 为空/无变化 (空转轮) 时不计入.
+	// 迭代上限判断基于此值, 避免空转轮耗光预算.
+	// 关键词: 有效迭代, todo 推进, 迭代上限重定义
+	effectiveIterationCount int
+
 	// lastIterationTickAt 记录主循环最近一次推进 (iterationCount++) 的
 	// 单调时间戳, 单位 unix nanoseconds. 仅由主循环线程写, stall heartbeat
 	// goroutine 与外部观察方原子读, 故用 atomic.Int64 即可. 心跳协程依此
@@ -171,24 +176,6 @@ type ReActLoop struct {
 	// 跟着一起阻塞.
 	// 关键词: verificationInFlight, watchdog 解锁, atomic.Bool
 	verificationInFlight atomic.Bool
-
-	// SPIN detection thresholds
-	sameActionTypeSpinThreshold int // 相同任务自旋阈值
-	sameLogicSpinThreshold      int // 相同逻辑自旋阈值
-
-	// SPIN force-exit: consecutive spin warnings counter and threshold
-	// 注: counter 由异步反思 goroutine (IncrementSpinWarning/ResetSpinWarning) 写入,
-	// 主循环线程 (ShouldForceExitDueToSpin) 读取, 必须通过 spinCounterMu 保护以避免
-	// 数据竞争. 关键词: SPIN counter 并发保护
-	consecutiveSpinWarnings    int
-	maxConsecutiveSpinWarnings int
-	spinCounterMu              sync.Mutex
-
-	// reflectionInflight 跟踪异步自我反思 goroutine 数量, 供测试 best-effort
-	// 等待 (WaitForInflightReflections) 与 Release 阶段 join 使用. 生产路径
-	// 不会主动等待 (fire-and-forget).
-	// 关键词: 异步反思 inflight 跟踪, 测试可观测
-	reflectionInflight sync.WaitGroup
 
 	// observationInflight 跟踪异步 prompt observation 构建 goroutine 数量,
 	// 供测试 best-effort 等待 (WaitForInflightObservation). 生产路径不会主动
@@ -305,50 +292,6 @@ func (r *ReActLoop) Release() {
 	}
 }
 
-// IncrementSpinWarning 累加 SPIN 警告计数. 异步反思 goroutine 调用.
-// 关键词: SPIN counter mu protected
-func (r *ReActLoop) IncrementSpinWarning() {
-	r.spinCounterMu.Lock()
-	r.consecutiveSpinWarnings++
-	cur := r.consecutiveSpinWarnings
-	max := r.maxConsecutiveSpinWarnings
-	r.spinCounterMu.Unlock()
-	log.Infof("consecutive spin warnings incremented to %d (max: %d)", cur, max)
-}
-
-// ResetSpinWarning 清零 SPIN 警告计数(任务正常推进时调用).
-// 关键词: SPIN counter mu protected
-func (r *ReActLoop) ResetSpinWarning() {
-	r.spinCounterMu.Lock()
-	prev := r.consecutiveSpinWarnings
-	r.consecutiveSpinWarnings = 0
-	r.spinCounterMu.Unlock()
-	if prev > 0 {
-		log.Infof("consecutive spin warnings reset from %d to 0", prev)
-	}
-}
-
-// ShouldForceExitDueToSpin 主循环线程读取 SPIN 计数器, 决定是否强制退出.
-// 关键词: SPIN counter mu protected
-func (r *ReActLoop) ShouldForceExitDueToSpin() bool {
-	r.spinCounterMu.Lock()
-	cur := r.consecutiveSpinWarnings
-	max := r.maxConsecutiveSpinWarnings
-	r.spinCounterMu.Unlock()
-	return max > 0 && cur >= max
-}
-
-// WaitForInflightReflections 等待所有异步自我反思 goroutine 完成. 主循环
-// 不应调用 (会破坏 fire-and-forget 语义); 仅用于测试在 Execute 返回后
-// 断言反思历史, 以及 Release/abort 阶段做 best-effort 清理.
-// 关键词: 异步反思 join, 测试可观测
-func (r *ReActLoop) WaitForInflightReflections() {
-	if r == nil {
-		return
-	}
-	r.reflectionInflight.Wait()
-}
-
 // WaitForInflightObservation 等待所有异步 prompt observation 构建 goroutine
 // 完成. 主循环不应调用 (会破坏 fire-and-forget 语义); 仅用于测试在
 // generateLoopPrompt 返回后断言 observation 字段.
@@ -369,13 +312,13 @@ func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
 	r.submitValueFeedbackSignal(aicommon.ValueFeedbackTriggerVerification)
 }
 
-// PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引和下一步行动计划
-func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, nextMovements []aicommon.VerifyNextMovement, evidence string, evidenceOps ...[]aicommon.EvidenceOperation) {
+// PushSatisfactionRecordWithCompletedTaskIndex records verification output;
+// TODO maintenance remains exclusively in normal ReAct action todo_delta.
+func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, evidence string, evidenceOps ...[]aicommon.EvidenceOperation) {
 	record := &SatisfactionRecord{
 		Satisfactory:       satisfactory,
 		Reason:             reason,
 		CompletedTaskIndex: completedTaskIndex,
-		NextMovements:      nextMovements,
 		Evidence:           evidence,
 	}
 	if len(evidenceOps) > 0 {
@@ -562,10 +505,6 @@ func (r *ReActLoop) GetMemoryTriage() aicommon.MemoryTriage {
 	return r.memoryTriage
 }
 
-func (r *ReActLoop) GetEnableSelfReflection() bool {
-	return r.enableSelfReflection
-}
-
 // GetSkillsContextManager returns the skills context manager, or nil if not configured.
 func (r *ReActLoop) GetSkillsContextManager() *aiskillloader.SkillsContextManager {
 	return r.skillsContextManager
@@ -638,14 +577,12 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		taskMutex:                    new(sync.Mutex),
 		currentMemories:              omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit:              10 * 1024,
-		enableSelfReflection:         true,
 		historySatisfactionReasons:   make([]*SatisfactionRecord, 0),
 		actionHistory:                make([]*ActionRecord, 0),
 		actionHistoryMutex:           new(sync.Mutex),
 		currentIterationIndex:        0,
-		sameActionTypeSpinThreshold:  8, // 默认连续 8 次同 ActionType+ToolName 才触发 SPIN 检测,降低误触发
-		sameLogicSpinThreshold:       8, // 默认连续 8 次同质 action 触发 AI 检测(与简单阈值对齐)
-		maxConsecutiveSpinWarnings:   3, // 默认连续 3 次 SPIN 警告后强制退出
+		effectiveIterationCount:      0,
+		currentTodoProgress:          make(map[string]*currentTodoProgress),
 		extraCapabilities:            NewExtraCapabilitiesManager(),
 		perception:                   newPerceptionController(perceptionDefaultIterationInterval),
 	}
@@ -759,16 +696,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE); !ok {
 		if verifyNow, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE); ok {
 			r.actions.Set(verifyNow.ActionType, verifyNow)
-		}
-	}
-
-	// adjust_todolist 是 verification.next_movements 的主循环兄弟通道, 写入同一份
-	// 全局 TODO store, 因此默认对所有 loop 开放 (无 allowXxx gate). 子 loop 可在
-	// option 阶段提前 r.actions.Set 同名 key 覆盖, 这里只做缺省兜底 inject.
-	// 关键词: adjust_todolist 默认全 loop 接入, 与 save_evidence 同位
-	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); !ok {
-		if adjustTodolist, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); ok {
-			r.actions.Set(adjustTodolist.ActionType, adjustTodolist)
 		}
 	}
 
@@ -1186,12 +1113,12 @@ func (r *ReActLoop) GetPersistentInstruction() string {
 }
 
 // GetOutputExample returns the output example content from the loop's
-// reflectionOutputExampleProvider. Same purpose as GetPersistentInstruction.
+// outputExampleProvider. Same purpose as GetPersistentInstruction.
 func (r *ReActLoop) GetOutputExample() string {
-	if r == nil || r.reflectionOutputExampleProvider == nil {
+	if r == nil || r.outputExampleProvider == nil {
 		return ""
 	}
-	s, err := r.reflectionOutputExampleProvider(r, "")
+	s, err := r.outputExampleProvider(r, "")
 	if err != nil {
 		return ""
 	}

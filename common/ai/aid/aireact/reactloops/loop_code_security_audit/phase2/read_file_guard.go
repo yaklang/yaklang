@@ -1,7 +1,7 @@
 // Package loop_code_security_audit — phase2_read_file_guard.go
 //
 // ToolInvokeParamsMutator for read_file: phase-A spot-check clamping and per-file read counters
-// that feed buildPhase2PhaseASpotReadGuard / buildPhase2PhaseBReadSpinGuard.
+// that feed buildPhase2PhaseASpotReadGuard / buildPhase2PhaseBReadRepeatGuard.
 //
 // Phase B does not clamp read_file lines (deep audit). Reads of caller files discovered via
 // trace grep are allowed; only reads on locked, not-yet-marked targets increment PhaseBReadCounts.
@@ -60,7 +60,7 @@ func clampPhase2ReadFileParams(phase ScanPhase, params aitool.InvokeParams) (ait
 		out["offset"], phase2SearchReadFileMaxLines)
 }
 
-// buildPhase2ReadFileParamsMutator registers read_file counters used by spin guards.
+// buildPhase2ReadFileParamsMutator registers read_file counters used by repeated-read guards.
 func buildPhase2ReadFileParamsMutator(
 	r aicommon.AIInvokeRuntime,
 	scan *ScanState,

@@ -1,11 +1,8 @@
 package aicommon
 
 import (
-	"regexp"
 	"strings"
 )
-
-var iterationCompletionHeartbeatPattern = regexp.MustCompile(`(?i)^\[[^\]]+\]\s*ReAct Iteration Done\[[^\]]+\]\s+max:\S+\s+continue to next iteration\s*$`)
 
 // projectTimelineItemForPrompt removes control-plane bookkeeping that is
 // already represented by materialized prompt state. It never mutates the raw
@@ -27,14 +24,11 @@ func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
 	}
 	category := normalizeTimelinePromptCategory(parsed.EntryType)
 	switch category {
-	case "NEXT_MOVEMENTS", "EVIDENCE_OPS":
+	case "TODO_DELTA", "EVIDENCE_OPS", "MODEL_THINKING":
 		return nil
 	case "ITERATION":
-		if iterationCompletionHeartbeatPattern.MatchString(strings.TrimSpace(parsed.Content)) {
-			return nil
-		}
 		return item
-	case "NEXT_MOVEMENTS_ERROR":
+	case "TODO_DELTA_ERROR":
 		filtered := filterRedundantTodoErrorLines(parsed.Content)
 		if filtered == "" {
 			return nil

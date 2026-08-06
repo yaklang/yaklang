@@ -153,7 +153,7 @@ Query: sql injection login
 | ReactiveData | `WithReactiveDataBuilder` 渲染结果 |
 | InjectedMemory | memory pool 拉取 |
 | Schema | actions 自动生成 |
-| OutputExample | `WithReflectionOutputExample` |
+| OutputExample | `WithOutputExample` |
 | ExtraCapabilities | `ExtraCapabilitiesManager.Render` |
 | SessionEvidence | verification 留存的 evidence |
 | SkillsContext | skills loader 注入 |
@@ -214,7 +214,7 @@ prompt section build report:
 ### 何时用 Timeline
 
 - LLM 需要"记住自己做过什么"：`AddToTimeline("anomaly_found", data)`
-- action 失败要让 LLM 反思：`AddToTimeline("error", reason)`
+- action 失败要让下一轮主决策看到：`AddToTimeline("error", reason)`
 - 关键状态变化：`AddToTimeline("phase_switched_to_2", "from_phase_1")`
 
 ### 何时用 Emitter Event
@@ -360,14 +360,9 @@ ls ~/yakit/aiworkspace/*/task_*/loop_xxx_action_calls/
 cat ~/yakit/aiworkspace/*/task_*/loop_xxx_action_calls/1_*.md
 ```
 
-### 技巧 4：临时强制反思看 LLM 自评
+### 技巧 4：把诊断事实送入下一轮
 
-```go
-op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-op.Continue()
-```
-
-下一轮 prompt 会包含 LLM 自己写的反思 → 复盘哪里出错。
+通过 `op.Feedback(...)` 或 timeline 写入错误、已尝试路径和可替代目标，再 `op.Continue()`。下一轮主决策会直接看到这些事实，不产生额外 AI 调用。
 
 ### 技巧 5：用 timeline 替代 print
 
@@ -393,17 +388,9 @@ invoker.AddToTimeline("[DEBUG]", map[string]any{
 - skill loader 加载了太多 SKILL.md
 - ExtraCapabilities 没限制 50 个工具
 
-### 技巧 7：spin 触发了但应用层不清楚？
+### 技巧 7：需要主动刷新态势？
 
-```go
-// 在 ActionHandler 之外的地方
-isSpin, result := loop.IsInSpin()
-if isSpin {
-    log.Warnf("spin detected: %+v", result)
-}
-```
-
-或者主动触发 perception 强制更新：
+可以触发 perception 强制更新：
 
 ```go
 loop.ForcePerceptionUpdate("manual_check")
@@ -448,7 +435,7 @@ desc(loop.GetInvoker())  // 看 invoker
 
 - 看 `iter_<N>.md` 里的 prompt，确认 schema 段确实存在
 - 看 LLM 原始输出（debug 模式 emitter 会打印）
-- 检查 `WithReflectionOutputExample` 的示例是否清楚
+- 检查 `WithOutputExample` 的示例是否清楚
 - 试试更换 model（speed → quality）
 
 ### Q2：流式输出卡住
@@ -463,25 +450,20 @@ desc(loop.GetInvoker())  // 看 invoker
 - 确认 `isDone == true` 才执行
 - 确认 deliver 状态守门变量名拼写正确（`loop.Get("xxx_delivered")`）
 
-### Q4：spin 检测过于敏感
-
-- 调高 `WithSameActionTypeSpinThreshold`
-- 关注 `MaxConsecutiveSpinWarnings` 阈值
-
-### Q5：感知（perception）总是不更新
+### Q4：感知（perception）总是不更新
 
 - `WithDisableLoopPerception(false)` 确认开启
 - 看 `state.LastTrigger` 是否触发
 - `state.Changed` 为 false 时不会更新（topics 哈希一样）
 - 主动 `ForcePerceptionUpdate` 跳过节流
 
-### Q6：测试用 mock callback 报"insufficient mock responses"
+### Q5：测试用 mock callback 报"insufficient mock responses"
 
 - 数 mock 响应数量是否覆盖所有 LLM 调用
 - 加 `WithDisableIntentRecognition(true)` 减少子 loop 调用
-- 加 `WithEnableSelfReflection(false)` 减少反思调用
+- 核对 perception、verification 和专用 loop 的实际调用数量
 
-### Q7：debug 文件没生成
+### Q6：debug 文件没生成
 
 - 确认环境变量正确：`echo $YAKIT_AI_WORKSPACE_DEBUG`
 - 确认 `cfg.GetOrCreateWorkDir()` 返回非空
@@ -492,7 +474,7 @@ desc(loop.GetInvoker())  // 看 invoker
 - [01-architecture.md](01-architecture.md)：主循环 → 知道每个调试点对应哪个执行阶段
 - [03-prompt-system.md](03-prompt-system.md)：prompt observation 详解
 - [05-hooks-and-lifecycle.md](05-hooks-and-lifecycle.md)：怎么在 hook 里加调试
-- [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：感知 / 反思 / 自旋的产物在 debug 目录哪里
+- [08-determinism-mechanisms.md](08-determinism-mechanisms.md)：感知、验证门和 TODO 软检查点
 - [13-yak-focus-mode.md](13-yak-focus-mode.md) §13.10 / §13.11：yak 专注模式专属的三种调试模式（CLI / Memfit UI / 单元测试）+ `~/yakit-projects/ai-focus/` 用户扩展目录
 - 源码：
   - [workspace_debug.go](../workspace_debug.go)

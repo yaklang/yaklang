@@ -2,13 +2,13 @@
 seq:    000073
 time:   2026-05-03T11:38:09+08:00
 model:  memfit-light-free
-total:  133167 bytes / 4 chunks
+total:  133173 bytes / 4 chunks
 
 ## sections
 [1] section=high-static   nonce=high-static              bytes=8822 hash=7a49ff8118696481 seen=5 first=2026-05-03T11:35:39+08:00
 [2] section=semi-dynamic  nonce=semi-dynamic             bytes=12683 hash=83c6d07057edd970 seen=5 first=2026-05-03T11:35:39+08:00
 [3] section=timeline      nonce=timeline                 bytes=75484 hash=52383595d3e2587d seen=1 first=2026-05-03T11:38:09+08:00
-[4] section=dynamic       nonce=dynamic_hUeX             bytes=35910 hash=6568d89ddbb5ee4f seen=1 first=2026-05-03T11:38:09+08:00
+[4] section=dynamic       nonce=dynamic_hUeX             bytes=35916 hash=6568d89ddbb5ee4f seen=1 first=2026-05-03T11:38:09+08:00
 
 ## hit report
 prefix_hit_chunks: 2
@@ -29,7 +29,7 @@ section_hash_count:
 - semi-dynamic section drifts more than expected: 52 distinct hashes, tool/forge/schema list may be churning
 - hit ratio poor (16.2%) - prefix alignment broken early
 
-## raw prompt (133167 bytes)
+## raw prompt (133173 bytes)
 <|PROMPT_SECTION_high-static|>
 <|TRAITS|>
 ## Core Traits (核心性格) - 严肃/专业/无Emoji
@@ -1262,7 +1262,7 @@ last-content is empty, new content added
 
 
 
-<|REFLECTION_hUeX|>
+<|REACTIVE_DATA_hUeX|>
 LANGUAGE: 请使用中文进行意图分析和输出。
 
 ## 当前意图识别状态 / Intent Recognition State
@@ -1775,5 +1775,5 @@ AITAG-capable params seen in cached tools:
 
 <|CACHE_TOOL_CALL_END_hUeX>
 			
-<|REFLECTION_END_hUeX|>
+<|REACTIVE_DATA_END_hUeX|>
 <|PROMPT_SECTION_dynamic_END_hUeX|>

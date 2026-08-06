@@ -9,7 +9,7 @@
     },
     "status_summary": {
       "type": "string",
-      "description": "【兼容字段，可选】仅当确实需要保留执行中间态时再填写。不要重复最终总结，不要和 next movements 重复。优先省略。",
+      "description": "【兼容字段，可选】仅当确实需要保留执行中间态时再填写。不要重复最终总结，不要和 next steps 重复。优先省略。",
       "examples": [
         "已完成基础枚举，待核实异常连接是否真实可疑。"
       ]

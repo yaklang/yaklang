@@ -13,10 +13,10 @@ func TestTimelinePromptProjectionFiltersOnlySystemBookkeeping(t *testing.T) {
 	base := time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)
 	injectTimelineItem(tl, 1, base, &TextTimelineItem{ID: 1, Text: "[iteration]:\n[default]======== ReAct iteration 1 ========\nReason/Next-Step: keep-decision"})
-	injectTimelineItem(tl, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[iteration]:\n[default]ReAct Iteration Done[1] max:100 continue to next iteration"})
-	injectTimelineItem(tl, 3, base.Add(2*time.Second), &TextTimelineItem{ID: 3, Text: "[NEXT_MOVEMENTS]:\nDONE[finished]: applied"})
+	injectTimelineItem(tl, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[model_thinking]:\nlet me analyze the task and decide which tool to call"})
+	injectTimelineItem(tl, 3, base.Add(2*time.Second), &TextTimelineItem{ID: 3, Text: "[TODO_DELTA]:\nDONE[finished]: applied"})
 	injectTimelineItem(tl, 4, base.Add(3*time.Second), &TextTimelineItem{ID: 4, Text: "[evidence_ops]:\nUPSERT[evidence-1]: applied"})
-	injectTimelineItem(tl, 5, base.Add(4*time.Second), &TextTimelineItem{ID: 5, Text: "[[NEXT_MOVEMENTS_ERROR]]:\nFAILED DOING[done]: redundant doing: todo already doing\nFAILED DONE[foreign]: todo belongs to another task scope"})
+	injectTimelineItem(tl, 5, base.Add(4*time.Second), &TextTimelineItem{ID: 5, Text: "[[TODO_DELTA_ERROR]]:\nFAILED DOING[done]: redundant doing: todo already doing\nFAILED DONE[foreign]: todo belongs to another task scope"})
 	directParams := &TextTimelineItem{ID: 6, Text: "[DIRECT_CALL_PARAMS]:\n{\"path\":\"KEEP_PARAMS\"}"}
 	injectTimelineItem(tl, 6, base.Add(5*time.Second), directParams)
 	toolResult := &aitool.ToolResult{ID: 7, Name: "opaque_tool", Success: true, Data: "KEEP_TOOL_RESULT"}
@@ -24,16 +24,16 @@ func TestTimelinePromptProjectionFiltersOnlySystemBookkeeping(t *testing.T) {
 
 	raw := tl.Dump()
 	prompt := tl.DumpForPrompt()
-	require.Contains(t, raw, "ReAct Iteration Done")
 	require.Contains(t, raw, "DONE[finished]")
 	require.Contains(t, raw, "UPSERT[evidence-1]")
 	require.Contains(t, raw, "redundant doing")
 
+	require.Contains(t, raw, "let me analyze the task and decide which tool to call")
 	require.Contains(t, prompt, "Reason/Next-Step: keep-decision")
+	require.NotContains(t, prompt, "let me analyze the task and decide which tool to call")
 	require.Contains(t, prompt, "todo belongs to another task scope")
 	require.Contains(t, prompt, "KEEP_PARAMS")
 	require.Contains(t, prompt, "KEEP_TOOL_RESULT")
-	require.NotContains(t, prompt, "ReAct Iteration Done")
 	require.NotContains(t, prompt, "DONE[finished]")
 	require.NotContains(t, prompt, "UPSERT[evidence-1]")
 	require.NotContains(t, prompt, "redundant doing")
@@ -55,7 +55,7 @@ func TestTimelinePromptProjectionPreservesRawBucketTopology(t *testing.T) {
 		category := "note"
 		body := strings.Repeat("payload ", i*20)
 		if i%2 == 0 {
-			category = "NEXT_MOVEMENTS"
+			category = "TODO_DELTA"
 		}
 		injectTimelineItem(tl, int64(i), base.Add(time.Duration(i)*time.Minute), &TextTimelineItem{
 			ID: int64(i), Text: "[" + category + "]:\n" + body,
@@ -84,7 +84,7 @@ func TestTimelinePromptProjectionPreservesRawBucketTopology(t *testing.T) {
 func TestTimelinePromptProjectionKeepsRealAndDropsOnlyRedundantErrorLines(t *testing.T) {
 	item := &TimelineItem{createdAt: time.Now(), value: &TextTimelineItem{
 		ID:   9,
-		Text: "[[NEXT_MOVEMENTS_ERROR]]:\nredundant done: todo already done\nmissing required field: id\nillegal op: explode",
+		Text: "[[TODO_DELTA_ERROR]]:\nredundant done: todo already done\nmissing required field: id\nillegal op: explode",
 	}}
 	projected := projectTimelineItemForPrompt(item)
 	require.NotNil(t, projected)
@@ -94,7 +94,7 @@ func TestTimelinePromptProjectionKeepsRealAndDropsOnlyRedundantErrorLines(t *tes
 	require.Contains(t, projected.String(), "illegal op: explode")
 
 	onlyRedundant := &TimelineItem{createdAt: time.Now(), value: &TextTimelineItem{
-		ID: 10, Text: "[NEXT_MOVEMENTS_ERROR]:\nFAILED DONE[x]: redundant done: todo already done",
+		ID: 10, Text: "[TODO_DELTA_ERROR]:\nFAILED DONE[x]: redundant done: todo already done",
 	}}
 	require.Nil(t, projectTimelineItemForPrompt(onlyRedundant))
 }
@@ -103,7 +103,7 @@ func TestTimelineDumpRecentForPromptKeepsNewestCompleteItemsWithinBudget(t *test
 	base := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)
 	injectTimelineItem(tl, 1, base, &TextTimelineItem{ID: 1, Text: "[note]:\nANCIENT " + strings.Repeat("old ", 3000)})
-	injectTimelineItem(tl, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[NEXT_MOVEMENTS]:\nDROP_BOOKKEEPING"})
+	injectTimelineItem(tl, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[TODO_DELTA]:\nDROP_BOOKKEEPING"})
 	injectTimelineItem(tl, 3, base.Add(2*time.Second), &TextTimelineItem{ID: 3, Text: "[note]:\nRECENT_FACT_ONE"})
 	injectTimelineItem(tl, 4, base.Add(3*time.Second), &TextTimelineItem{ID: 4, Text: "[note]:\nRECENT_FACT_TWO"})
 
@@ -138,13 +138,13 @@ func TestTimelineDumpRecentForPromptBoundsOversizedNewestItem(t *testing.T) {
 func TestTimelineBatchReducerPromptUsesProjectionWithoutRewritingToolData(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	toCompress := []*TimelineItem{
-		{createdAt: time.Now(), value: &TextTimelineItem{ID: 1, Text: "[NEXT_MOVEMENTS]:\nDROP_REDUCER_BREADCRUMB"}},
+		{createdAt: time.Now(), value: &TextTimelineItem{ID: 1, Text: "[TODO_DELTA]:\nDROP_REDUCER_BREADCRUMB"}},
 		{createdAt: time.Now(), value: &aitool.ToolResult{ID: 2, Name: "opaque", Success: true, Data: "KEEP_REDUCER_TOOL_DATA"}},
 		{createdAt: time.Now(), value: &TextTimelineItem{ID: 3, Text: "[DIRECT_CALL_PARAMS]:\nKEEP_REDUCER_DIRECT_PARAMS"}},
 	}
 	recentKeep := []*TimelineItem{
 		{createdAt: time.Now(), value: &TextTimelineItem{ID: 4, Text: "[evidence_ops]:\nDROP_RECENT_EVIDENCE_BREADCRUMB"}},
-		{createdAt: time.Now(), value: &TextTimelineItem{ID: 5, Text: "[reflection]:\nKEEP_RECENT_REFLECTION"}},
+		{createdAt: time.Now(), value: &TextTimelineItem{ID: 5, Text: "[review]:\nKEEP_RECENT_REVIEW"}},
 	}
 
 	prompt := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "PROJECTION")
@@ -152,5 +152,5 @@ func TestTimelineBatchReducerPromptUsesProjectionWithoutRewritingToolData(t *tes
 	require.NotContains(t, prompt, "DROP_RECENT_EVIDENCE_BREADCRUMB")
 	require.Contains(t, prompt, "KEEP_REDUCER_TOOL_DATA")
 	require.Contains(t, prompt, "KEEP_REDUCER_DIRECT_PARAMS")
-	require.Contains(t, prompt, "KEEP_RECENT_REFLECTION")
+	require.Contains(t, prompt, "KEEP_RECENT_REVIEW")
 }

@@ -17,8 +17,8 @@ import (
 //go:embed prompts/persistent_instruction.txt
 var persistentInstruction string
 
-//go:embed prompts/reflection_output_example.txt
-var reflectionOutputExample string
+//go:embed prompts/output_example.txt
+var outputExample string
 
 //go:embed prompts/reactive_data.txt
 var reactiveDataTemplate string
@@ -86,7 +86,7 @@ func init() {
 					return false
 				}),
 				reactloops.WithPersistentInstruction(persistentInstruction),
-				reactloops.WithReflectionOutputExample(reflectionOutputExample),
+				reactloops.WithOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					wd := loop.Get(keyWorkDir)
 					if wd == "" {
@@ -104,24 +104,24 @@ func init() {
 						srcParts = append(srcParts, k+":"+utils.InterfaceToString(bySrc[k]))
 					}
 					reconLog := loop.Get(keyReconLog)
-				if ytoken.CalcTokenCount(reconLog) > 3500 {
-					reconLog = reconLog[len(reconLog)-3500:]
-				}
-					spinHint := strings.TrimSpace(loop.Get(keySpinRecoveryHint))
+					if ytoken.CalcTokenCount(reconLog) > 3500 {
+						reconLog = reconLog[len(reconLog)-3500:]
+					}
+					pathFailureHint := strings.TrimSpace(loop.Get(keyPathFailureRecoveryHint))
 					renderMap := map[string]any{
-						"Nonce":            nonce,
-						"SeedURL":          loop.Get(keySeedURL),
-						"ScopeHosts":       loop.Get(keyScopeHosts),
-						"WorkDir":          wd,
-						"VerifiedJsDir":    loop.Get(keyVerifiedJsDir),
-						"SpinRecoveryHint": spinHint,
-						"PoolTotal":        tot,
-						"PoolVerified":     ver,
-						"PoolUnverified":   unver,
-						"PoolBySource":     strings.Join(srcParts, ", "),
-						"EnhanceData":      utils.ShrinkString(loop.Get(keyInfosecEnhanceData), 4000),
-						"ReconLogTail":     reconLog,
-						"FeedbackMessages": strings.TrimSpace(feedbacker.String()),
+						"Nonce":                   nonce,
+						"SeedURL":                 loop.Get(keySeedURL),
+						"ScopeHosts":              loop.Get(keyScopeHosts),
+						"WorkDir":                 wd,
+						"VerifiedJsDir":           loop.Get(keyVerifiedJsDir),
+						"PathFailureRecoveryHint": pathFailureHint,
+						"PoolTotal":               tot,
+						"PoolVerified":            ver,
+						"PoolUnverified":          unver,
+						"PoolBySource":            strings.Join(srcParts, ", "),
+						"EnhanceData":             utils.ShrinkString(loop.Get(keyInfosecEnhanceData), 4000),
+						"ReconLogTail":            reconLog,
+						"FeedbackMessages":        strings.TrimSpace(feedbacker.String()),
 					}
 					return utils.RenderTemplate(reactiveDataTemplate, renderMap)
 				}),
@@ -131,7 +131,6 @@ func init() {
 				runJsStaticAnalysisAction(r),
 				probeAPICandidatesAction(r),
 				searchKnowledgeInfosec(r),
-				buildInfosecPostIterationHook(r),
 				webSearchAction(r),
 				scanPortAction(r),
 				simpleCrawlerAction(r),
@@ -153,7 +152,7 @@ func init() {
 			"Merges candidates into a shared on-disk pool; JS pipeline uses registered tools "+ToolCrawlJsCollector+" and "+ToolJsStaticExtractAI+"; optional HTTP probing."),
 		reactloops.WithLoopUsagePrompt("Use when the user needs structured web/API recon on an authorized target: "+ToolCrawlJsCollector+" (save verified JS), "+
 			ToolJsStaticExtractAI+" with the downloaded JS directory or URLs, api_pool_merge, probe_api_candidates, plus DNS/ports/crawl as needed."),
-		reactloops.WithLoopOutputExample(reflectionOutputExample),
+		reactloops.WithLoopOutputExample(outputExample),
 		reactloops.WithVerboseName("Infosec/API Surface Recon"),
 		reactloops.WithVerboseNameZh("信息搜集与 API 发现"),
 	)

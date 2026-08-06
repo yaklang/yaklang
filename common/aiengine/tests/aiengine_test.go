@@ -229,22 +229,18 @@ func TestAIEngineWithCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // 立即取消
 
-	engine := newTestAIEngine(t,
-		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedDirectAnswer(i, "cancelled")
-		},
+	engine, err := aiengine.NewAIEngine(
+		aiengine.WithAICallback(mockedAnswerThenFinish("cancelled")),
+		aiengine.WithDisableMCPServers(true),
 		aiengine.WithContext(ctx),
 		aiengine.WithMaxIteration(1),
 		aiengine.WithYOLOMode(),
 	)
-	defer engine.Close()
-
-	// 验证上下文已被取消
-	select {
-	case <-engine.Context().Done():
-		// 预期行为：上下文已取消
-	default:
-		t.Error("expected context to be cancelled")
+	if engine != nil {
+		defer engine.Close()
+	}
+	if err == nil {
+		t.Fatal("expected engine creation with an already-cancelled context to fail")
 	}
 }
 
@@ -408,9 +404,7 @@ func TestAIEngine_MockDirectAnswer(t *testing.T) {
 	answerReceived := false
 
 	engine := newTestAIEngine(t,
-		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedDirectAnswer(i, "test1234")
-		},
+		mockedAnswerThenFinish("mocked_answer_test1234"),
 		aiengine.WithMaxIteration(5),
 		aiengine.WithYOLOMode(),
 		aiengine.WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
@@ -459,12 +453,7 @@ func TestAIEngine_MockMultipleTasks(t *testing.T) {
 	var taskMutex sync.Mutex
 
 	engine := newTestAIEngine(t,
-		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			taskMutex.Lock()
-			currentTask := taskCount
-			taskMutex.Unlock()
-			return mockedDirectAnswer(i, fmt.Sprintf("task%d", currentTask))
-		},
+		mockedAnswerThenFinish("mocked_answer_task0"),
 		aiengine.WithMaxIteration(5),
 		aiengine.WithYOLOMode(),
 		aiengine.WithOnFinished(func(react aicommon.AIEngineOperator) {
@@ -502,11 +491,13 @@ func TestAIEngine_MockWithTimeout(t *testing.T) {
 	finishReceived := false
 
 	engine := newTestAIEngine(t,
-		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			// 模拟快速响应
-			time.Sleep(50 * time.Millisecond)
-			return mockedDirectAnswer(i, "timeout_test")
-		},
+		func() aicommon.AICallbackType {
+			callback := mockedAnswerThenFinish("mocked_answer_timeout_test")
+			return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				time.Sleep(50 * time.Millisecond)
+				return callback(i, req)
+			}
+		}(),
 		aiengine.WithContext(ctx),
 		aiengine.WithMaxIteration(5),
 		aiengine.WithYOLOMode(),
@@ -534,6 +525,7 @@ func TestAIEngine_MockWithTimeout(t *testing.T) {
 // TestAIEngine_MockErrorHandling 测试 mock AI 返回错误的情况
 func TestAIEngine_MockErrorHandling(t *testing.T) {
 	callCount := 0
+	callback := mockedAnswerThenFinish("mocked_answer_recovered")
 
 	engine := newTestAIEngine(t,
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -543,7 +535,7 @@ func TestAIEngine_MockErrorHandling(t *testing.T) {
 				return nil, fmt.Errorf("mocked AI error")
 			}
 			// 后续调用返回正常响应
-			return mockedDirectAnswer(i, "recovered")
+			return callback(i, req)
 		},
 		aiengine.WithMaxIteration(5),
 		aiengine.WithYOLOMode(),
@@ -572,9 +564,21 @@ func TestAIEngine_MockErrorHandling(t *testing.T) {
 func TestAIEngine_MockStreamData(t *testing.T) {
 	streamChunks := []string{}
 	var streamMutex sync.Mutex
+	var callbackMutex sync.Mutex
+	firstCall := true
 
 	engine := newTestAIEngine(t,
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if !aicommon.IsPrimaryDecisionPrompt(req.GetPrompt()) && aicommon.IsDirectAnswerPrompt(req.GetPrompt()) {
+				return mockedDirectPayload(i, "streaming_test")
+			}
+			callbackMutex.Lock()
+			streamAnswer := firstCall
+			firstCall = false
+			callbackMutex.Unlock()
+			if !streamAnswer {
+				return mockedFinish(i)
+			}
 			rsp := i.NewAIResponse()
 			// 模拟流式输出
 			chunks := []string{
@@ -621,4 +625,11 @@ func TestAIEngine_MockStreamData(t *testing.T) {
 		t.Error("expected to receive stream chunks")
 	}
 	t.Logf("Received %d stream chunks", chunkCount)
+}
+
+func mockedFinish(i aicommon.AICallerConfigIf) (*aicommon.AIResponse, error) {
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"finish after the answer was delivered"}`))
+	rsp.Close()
+	return rsp, nil
 }

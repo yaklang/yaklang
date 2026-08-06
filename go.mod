@@ -25,7 +25,9 @@ require (
 	github.com/beevik/etree v1.5.0
 	github.com/bytedance/mockey v1.4.6
 	github.com/chzyer/readline v1.5.1
+	github.com/cilium/ebpf v0.17.3
 	github.com/cloudflare/circl v1.3.7
+	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/corpix/uarand v0.2.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.4
 	github.com/dave/jennifer v1.4.1
@@ -40,6 +42,7 @@ require (
 	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
 	github.com/dop251/goja_nodejs v0.0.0-20240221231712-27eeffc9c235
 	github.com/elastic/go-libaudit v0.4.0
+	github.com/elastic/go-libaudit/v2 v2.6.2
 	github.com/emersion/go-message v0.18.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
@@ -86,12 +89,13 @@ require (
 	github.com/mailru/easyjson v0.9.0
 	github.com/mattn/go-sqlite3 v1.14.48
 	github.com/mdlayher/arp v0.0.0-20191213142603-f72070a231fc
-	github.com/mdlayher/netlink v1.1.1
+	github.com/mdlayher/netlink v1.7.2
 	github.com/mfonda/simhash v0.0.0-20151007195837-79f94a1100d6
 	github.com/miekg/dns v1.1.50
 	github.com/minio/minio-go/v7 v7.0.76
 	github.com/mitchellh/go-vnc v0.0.0-20150629162542-723ed9867aed
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
+	github.com/nats-io/nats.go v1.39.1
 	github.com/oklog/ulid v1.3.1
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/oschwald/maxminddb-golang v1.7.0
@@ -153,13 +157,19 @@ require (
 	rsc.io/qr v0.2.0
 )
 
-require github.com/dlclark/regexp2 v1.11.0 // indirect
+require (
+	github.com/dlclark/regexp2 v1.11.0 // indirect
+	github.com/elastic/go-licenser v0.4.1 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
+	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/VillanCh/go-pcre2-lite v0.1.2
 	github.com/andybalholm/cascadia v1.1.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/creack/pty v1.1.21 // indirect
@@ -194,6 +204,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/josharian/native v1.1.0 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/kr/fs v0.1.0 // indirect
@@ -204,9 +215,12 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7 // indirect
 	github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065 // indirect
+	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
+	github.com/nats-io/nkeys v0.4.9 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -250,9 +264,11 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
 	go.opentelemetry.io/otel v1.34.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.32.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.22.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect

@@ -121,16 +121,16 @@ func WithPersistentContextProvider(provider ContextProviderFunc) ReActLoopOption
 
 更底层的版本。如果你需要根据 loop 的运行时状态生成不同的指令（不只是模板渲染），用这个。
 
-### `WithReflectionOutputExample(example string)` / `WithReflectionOutputExampleContextProvider(provider)`
+### `WithOutputExample(example string)` / `WithOutputExampleContextProvider(provider)`
 
 ```go
-func WithReflectionOutputExample(example string) ReActLoopOption
-func WithReflectionOutputExampleContextProvider(provider ContextProviderFunc) ReActLoopOption
+func WithOutputExample(example string) ReActLoopOption
+func WithOutputExampleContextProvider(provider ContextProviderFunc) ReActLoopOption
 ```
 
 注入"输出示例"段。被渲染到 `<|OUTPUT_EXAMPLE_...|>` 区块。
 
-**特别**：`WithReflectionOutputExample` 内部还会自动遍历 `loop.loopActions` 的所有名字，从 `GetLoopAction(actionName).OutputExamples` 或 `GetLoopMetadata(actionName).OutputExamplePrompt` 中收集每个 action 的示例并拼接：
+**特别**：`WithOutputExample` 内部还会自动遍历 `loop.loopActions` 的所有名字，从 `GetLoopAction(actionName).OutputExamples` 或 `GetLoopMetadata(actionName).OutputExamplePrompt` 中收集每个 action 的示例并拼接：
 
 ```go
 // options.go:222-256
@@ -153,7 +153,7 @@ func WithReactiveDataBuilder(provider FeedbackProviderFunc) ReActLoopOption
 
 每轮的"动态反应数据"。`feedbacker` 是上一轮 `operator.Feedback(...)` 的累积。
 
-返回值会被填到 prompt 模板的 `<|REFLECTION_...|>` 区块。
+返回值会被填到 prompt 模板的 `<|REACTIVE_DATA_...|>` 区块。
 
 [loop_http_fuzztest/init.go:52-92](../loop_http_fuzztest/init.go) 是个完整示例：把 `feedbacker.String()` + `loop.Get(originalRequest)` + `loop.Get(diff_result)` + 最近 action 摘要等所有上下文拼成 Markdown。
 
@@ -356,33 +356,11 @@ func WithToolsGetter(getter func() []*aitool.Tool) ReActLoopOption
 
 记忆池字节上限。**默认 10 KB**（`if sizeLimit <= 0`）。
 
-## 2.8 反思与自旋
-
-### `WithEnableSelfReflection(enable ...bool)`
-
-```go
-func WithEnableSelfReflection(enable ...bool) ReActLoopOption
-```
-
-启用自我反思。默认不启用。开启后每次 action 执行后按策略触发 0~5 级反思。详见 [08-determinism-mechanisms.md](08-determinism-mechanisms.md)。
-
-### `WithSameActionTypeSpinThreshold(n int)`
-
-设置同 action type 自旋阈值。**默认 3**：连续 3 次相同 type 触发简单自旋检测。
-
-### `WithSameLogicSpinThreshold(n int)`
-
-设置 AI 深度自旋检测阈值。**默认 3**：达到此阈值后用 LiteForge 调 AI 判断是否真的是逻辑层面自旋（同 type 不同参数可能不算）。
-
-### `WithMaxConsecutiveSpinWarnings(n int)`
-
-最大允许的连续自旋警告数，超过则强退。**默认 3**。设为 0 禁用强退。
-
 ### `WithUseSpeedPriorityAICallback(b ...bool)`
 
 让主循环用 `config.CallSpeedPriorityAI` 而不是 `config.CallAI`。子 loop 通常用这个降低延迟。
 
-## 2.9 技能（Skills）
+## 2.8 技能（Skills）
 
 ### `WithSkillLoader(loader, managerOpts...)`
 
@@ -442,12 +420,11 @@ func BasicAICommonConfigOption(c *aicommon.Config) []ReActLoopOption {
         WithMemoryPool(c.MemoryPool),
         WithPeriodicVerificationInterval(int(c.PeriodicVerificationInterval)),
         WithMemorySizeLimit(int(c.MemoryPoolSize)),
-        WithEnableSelfReflection(c.EnableSelfReflection),
     }
 }
 ```
 
-便捷函数：从一个 `*aicommon.Config` 一次性导出 5 个常用选项。在 loop 工厂里：
+便捷函数：从一个 `*aicommon.Config` 一次性导出常用选项。在 loop 工厂里：
 
 ```go
 preset := append(reactloops.BasicAICommonConfigOption(cfg), preset...)

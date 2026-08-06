@@ -9,7 +9,7 @@ import (
 //
 // 背景: reactloops.buildSchema 会把 action.Options ([]ToolOption) 缓存下来, 每次生成
 // prompt 都重新应用一遍 (NewObjectSchema -> newTool -> option(tool)). 当 agent 存在
-// 并发 loop (主循环 + reflection/verification) 时, 同一批 ToolOption 闭包会被多个
+// 并发 loop (主循环 + verification/子循环) 时, 同一批 ToolOption 闭包会被多个
 // goroutine 并发应用. 历史实现里 WithRawParam / WithStructParam 直接修改闭包在构造期
 // 捕获的同一个 schema map, 于是并发应用就会触发 fatal error: concurrent map writes
 // (见 tool.go schema["description"]=desc 这类写入).

@@ -80,7 +80,7 @@ find_file(dir="/abs/project", pattern="*.php")
 - fast_context 候选未全部 read+lock 就 lock_target_files(done=true) → **禁止**，会列出未纳入候选
 - lock 未 read 的 fast_context 候选 → **禁止**
 - 阶段B 连续 read 多个文件却不 mark_file_done → 必须「一个文件一组：read + mark」
-- 用 next_movements 标记「done」代替 mark_file_done → **无效**，进度只认 mark_file_done
+- 用 todo_delta 标记「done」代替 mark_file_done → **无效**，进度只认 mark_file_done
 - 阶段B 使用 `files_with_matches` / find_file / tree / fast_context → **禁止**（discovery 扩库）
 - 阶段B trace grep 超过每文件 8 次仍未 mark → **禁止**继续 grep
 - 未全部 mark_file_done 就 complete_scan → **禁止**，会列出待审文件
@@ -158,7 +158,7 @@ mark_file_done(file_path=<同一目标文件绝对路径>, audit_summary="...")
 - audit_summary 写「发现漏洞/注入/绕过」但未 add_finding → mark_file_done **会被拒绝**
 - 无漏洞时 audit_summary 须明确写「无漏洞/已防护」，再 mark_file_done
 
-# 错误：连读多个目标文件却不 mark、discovery 模式 grep、只靠 next_movements 标 done
+# 错误：连读多个目标文件却不 mark、discovery 模式 grep、只靠 todo_delta 标 done
 ```
 
 **阶段B trace grep 规则（代码强制）**：
@@ -221,4 +221,4 @@ mark_file_done(file_path=<同一目标文件绝对路径>, audit_summary="...")
 
 **confidence 指引**：8–10 清晰拼接无防护；6–7 有过滤但明显可绕过；4–5 可疑链路/需 Phase3 深读。
 
-查看 `<|REFLECTION_...|>` 区段了解：当前工作阶段、目标文件列表、审计进度。
+查看 `<|REACTIVE_DATA_...|>` 区段了解：当前工作阶段、目标文件列表、审计进度。

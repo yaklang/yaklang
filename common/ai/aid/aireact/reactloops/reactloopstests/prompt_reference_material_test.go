@@ -111,6 +111,7 @@ func TestReActLoop_PromptReferenceMaterial(t *testing.T) {
 func TestReActLoop_PromptReferenceMaterial_OnlyOnce(t *testing.T) {
 	var events []*schema.AiOutputEvent
 	var eventsMu sync.Mutex
+	var transactionCount int
 
 	// Create ReAct instance as invoker
 	reactIns, err := aireact.NewTestReAct(
@@ -120,6 +121,7 @@ func TestReActLoop_PromptReferenceMaterial_OnlyOnce(t *testing.T) {
 			events = append(events, e)
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			transactionCount++
 			rsp := i.NewAIResponse()
 
 			// Return finish action with multiple thought fields
@@ -161,15 +163,18 @@ func TestReActLoop_PromptReferenceMaterial_OnlyOnce(t *testing.T) {
 		}
 	}
 
-	require.Len(t, referenceMaterialEvents, 1, "Expected exactly one reference material event per transaction")
+	require.Len(t, referenceMaterialEvents, transactionCount, "Expected exactly one reference material event per transaction")
 
-	// Verify the single event has valid content
-	event := referenceMaterialEvents[0]
-	require.NotEmpty(t, event.Content, "Reference material content should not be empty")
+	// Verify every transaction's event has valid content. A normal finish now
+	// has two transactions because the soft TODO checkpoint requires an
+	// explicit confirmation.
+	for _, event := range referenceMaterialEvents {
+		require.NotEmpty(t, event.Content, "Reference material content should not be empty")
 
-	payload := jsonpath.FindFirst(event.Content, "$.payload")
-	require.NotNil(t, payload, "Payload should exist")
-	require.NotEmpty(t, utils.InterfaceToString(payload), "Payload should not be empty")
+		payload := jsonpath.FindFirst(event.Content, "$.payload")
+		require.NotNil(t, payload, "Payload should exist")
+		require.NotEmpty(t, utils.InterfaceToString(payload), "Payload should not be empty")
+	}
 
 	t.Logf("Successfully verified reference material was emitted exactly once")
 }

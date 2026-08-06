@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -22,7 +23,7 @@ type SessionPromptState struct {
 	evidenceJSON string
 
 	// todoJSON stores the serialized VerificationTodoStore JSON for the global
-	// TODO list maintained by VerifyUserSatisfaction. The list is rendered
+	// task-scoped TODO work set maintained by normal ReAct actions. The list is rendered
 	// into every loop prompt (timeline-open section, right after
 	// SessionEvidence) so the model can see its own pending TODOs on every
 	// iteration, not only at Verify checkpoints.
@@ -50,7 +51,7 @@ func NewSessionPromptState() *SessionPromptState {
 // independent state that cannot race with (or mutate) the parent's, EXCEPT
 // the global verification TODO store (todoJSON): that list is the parent
 // agent's verification bookkeeping and must neither leak into a sub agent's
-// prompt nor be polluted by a sub agent's next_movements. The sub agent
+// prompt nor be polluted by a sub agent's todo_delta. The sub agent
 // therefore starts with an empty TODO list.
 //
 // 关键词: ForkForSubAgent, 子 agent 隔离, 复制非 todo 状态, todoJSON 丢弃
@@ -265,14 +266,13 @@ func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 	s.todoJSON = todoJSON
 }
 
-// ApplyVerificationTodoOps applies one verification round's next_movements
-// operations (and the round's satisfied flag) to the persisted TODO store,
-// then re-serializes back to todoJSON. Returns one per-op result entry for
-// every movement (successful or not), so callers can render a uniform result
-// summary; failures carry a non-empty Reason.
+// ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
+// persisted TODO store, then re-serializes back to todoJSON. It returns one
+// result entry per delta operation so callers can render a uniform summary;
+// failures carry a non-empty Reason.
 //
-// 关键词: ApplyVerificationTodoOps, 增量更新, satisfied -> SKIPPED, DB 持久化, per-op 结果
-func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
+// 关键词: ApplyTodoDelta, 增量更新, DB 持久化, per-op 结果
+func (s *SessionPromptState) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
 	if s == nil {
 		return nil
 	}
@@ -280,9 +280,22 @@ func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScop
 	defer s.m.Unlock()
 
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	results := store.Apply(scope, satisfied, movements)
+	results := store.ApplyTodoDelta(scope, delta)
 	s.todoJSON = store.Marshal()
 	return results
+}
+
+func (s *SessionPromptState) ValidateTodoDelta(scope VerificationTodoScope, delta *TodoDelta) error {
+	if s == nil || delta == nil {
+		return nil
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	results := UnmarshalVerificationTodoStore(s.todoJSON).ApplyTodoDelta(scope, cloneTodoDelta(delta))
+	if detail := FormatTodoDeltaValidationError(results); detail != "" {
+		return fmt.Errorf("invalid todo_delta: %s", detail)
+	}
+	return nil
 }
 
 // GetVerificationTodoRendered returns the plain-text TODO snapshot ready for
@@ -304,18 +317,26 @@ func (s *SessionPromptState) GetVerificationTodoRendered(currentScope Verificati
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
 // against the current persisted state without mutating it. Callers should
-// invoke this BEFORE ApplyVerificationTodoOps so the (new) / (done) markers
-// are derived from the pre-apply state.
+// invoke this BEFORE ApplyTodoDelta when a caller needs a non-mutating preview.
 //
 // 关键词: GetVerificationTodoMarkdownDelta, 预览模式, 不变更状态
-func (s *SessionPromptState) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
+func (s *SessionPromptState) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, delta *TodoDelta) string {
 	if s == nil {
 		return ""
 	}
 	s.m.RLock()
 	defer s.m.RUnlock()
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	return store.RenderMarkdownDelta(scope, satisfied, movements)
+	return store.RenderMarkdownDelta(scope, delta)
+}
+
+func (s *SessionPromptState) SnapshotCanonicalTodos(scope VerificationTodoScope) ([]TodoOpenItem, string, []TodoClosedItem) {
+	if s == nil {
+		return []TodoOpenItem{}, "", []TodoClosedItem{}
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return UnmarshalVerificationTodoStore(s.todoJSON).CanonicalSnapshot(scope)
 }
 
 // SnapshotVerificationTodoItems returns a copy of the current TODO items for

@@ -419,6 +419,13 @@ func (a *ToolCaller) invoke(
 		aitool.WithRuntimeConfig(runtimeCfg),
 		aitool.WithOutputCapture(false),
 	)
+	if execErr != nil {
+		// Preflight failures have no script callback, so without this line their
+		// artifact would misleadingly say COMBINED OUTPUT: (empty). Mirror the final
+		// error into the regular stderr stream; this keeps live logs and saved
+		// artifacts useful even when the structured error event is unavailable.
+		_, _ = fmt.Fprintf(stderrWriter, "[error] %v\n", execErr)
+	}
 	if execResult != nil && finalizeResult != nil {
 		if finalizeErr := finalizeResult(execResult); finalizeErr != nil {
 			if execErr == nil {
@@ -436,6 +443,16 @@ func (a *ToolCaller) invoke(
 				execErr = errors.Join(execErr, checkpointErr)
 			}
 		}
+	}
+
+	// Some failures happen outside the tool callback (for example JSON Schema
+	// validation, artifact finalization, or checkpoint persistence). Those paths can
+	// return a ToolResult and an error without passing through WithErrorCallback.
+	// Always report the final aggregated error here so the UI receives tool_call_error
+	// instead of a silent done card. The caller's handler is guarded by sync.Once, so
+	// callback-time errors remain single events even when they are reported here too.
+	if execErr != nil {
+		reportError(execErr)
 	}
 
 	// 工具调用结束、runtime 已绑定漏洞之后, 异步提交 risk_feedback 价值反馈 (AI 自判).

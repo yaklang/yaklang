@@ -2,11 +2,14 @@ package yakcmds
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/urfavecli"
@@ -42,8 +45,6 @@ type ssaCliConfig struct {
 	// preferConfigCompile 为 true 时，编译阶段直接使用 Config 走 script 编译链路。
 	// 为 false 时，优先走 target + detect + script 链路。
 	preferConfigCompile bool
-	// diagnosticsEnabled enables SSA compile diagnostics and nested TRACE output.
-	diagnosticsEnabled bool
 	// forceProgramName 为 true 时，编译阶段显式固定 program_name（例如 CLI 指定 --program）。
 	forceProgramName bool
 
@@ -104,8 +105,13 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 		opts = append(opts, ssaconfig.WithSyntaxFlowMemory(true))
 	}
 
-	// Output file
-	if outputFile := c.String("output"); outputFile != "" {
+	// Output file (auto-redirect to <debugDir>/report when --debug is set and --output is not)
+	outputFile := c.String("output")
+	if outputFile == "" && c.String("debug") != "" {
+		outputFile = filepath.Join(c.String("debug"), "report")
+		log.Infof("[debug] report output redirected to: %s", outputFile)
+	}
+	if outputFile != "" {
 		opts = append(opts, ssaconfig.WithOutputFile(outputFile))
 	}
 
@@ -122,11 +128,6 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	// with-dataflow-path
 	if c.Bool("with-dataflow-path") {
 		opts = append(opts, ssaconfig.WithOutputDataflowPath(true))
-	}
-
-	// file-perf-log: 启用文件级别性能日志
-	if c.Bool("file-perf-log") {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
 	}
 
 	// 创建统一配置
@@ -162,7 +163,7 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	config.Format = sfreport.ReportTypeFromString(outputFormat)
 
 	// 处理输出文件
-	outputFile := cfg.GetOutputFile()
+	outputFile = cfg.GetOutputFile()
 	if outputFile == "" {
 		log.Infof("output file is not specified, use stdout")
 		config.OutputWriter = os.Stdout
@@ -218,13 +219,11 @@ func logCompileStageMessage(command string, config *ssaCliConfig) {
 	}
 
 	log.Infof(
-		"[%s] compile options: re-compile=%v entry-files=%d exclude-files=%d file-perf-log=%v diagnostics=%v compile-memory=%v scan-memory=%v",
+		"[%s] compile options: re-compile=%v entry-files=%d exclude-files=%d compile-memory=%v scan-memory=%v",
 		command,
 		config.GetCompileReCompile(),
 		len(config.GetCompileEntryFiles()),
 		len(config.GetCompileExcludeFiles()),
-		config.GetCompileFilePerformanceLog(),
-		config.diagnosticsEnabled,
 		config.GetCompileMemory(),
 		config.GetSyntaxFlowMemory(),
 	)
@@ -260,9 +259,6 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 			req.Target = targetPath
 			req.Language = string(config.GetLanguage())
 			req.Options = buildCompileOptionsForDetect(config.Config)
-			if config.diagnosticsEnabled {
-				req.Options = append(req.Options, ssaapi.WithDiagnostics(true))
-			}
 		}
 
 		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, req)
@@ -320,13 +316,6 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	if err := applyCompileCliOverrides(cfg, cliCtx); err != nil {
 		return nil, err
 	}
-	diagnosticsEnabled := cfg.GetCompileDiagnostics()
-	if cliCtx.Bool("diagnostics") {
-		if err := cfg.Update(ssaapi.WithDiagnostics(true)); err != nil {
-			return nil, utils.Errorf("enable diagnostics failed: %v", err)
-		}
-		diagnosticsEnabled = true
-	}
 
 	// 调试日志
 	log.Infof("Config loaded: programName=%s, language=%s, targetPath=%s, outputFile=%s, outputFormat=%s",
@@ -344,7 +333,6 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	config := &ssaCliConfig{
 		Config:              cfg,
 		preferConfigCompile: true,
-		diagnosticsEnabled:  diagnosticsEnabled,
 		forceProgramName:    strings.TrimSpace(cfg.GetProgramName()) != "",
 	}
 
@@ -425,13 +413,6 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	if entry := c.String("entry"); entry != "" {
 		opts = append(opts, ssaconfig.WithCompileEntryFiles(entry))
 	}
-	if c.Bool("file-perf-log") {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
-	}
-	diagnosticsEnabled := c.Bool("diagnostics")
-	if diagnosticsEnabled {
-		opts = append(opts, ssaapi.WithDiagnostics(true))
-	}
 
 	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
 	if err != nil {
@@ -444,7 +425,6 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	return &ssaCliConfig{
 		Config:              cfg,
 		preferConfigCompile: false,
-		diagnosticsEnabled:  diagnosticsEnabled,
 		forceProgramName:    c.IsSet("program") && strings.TrimSpace(c.String("program")) != "",
 	}, nil
 }
@@ -469,12 +449,6 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	}
 	if cfg.GetCompileReCompile() {
 		opts = append(opts, ssaconfig.WithCompileReCompile(true))
-	}
-	if cfg.GetCompileFilePerformanceLog() {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
-	}
-	if cfg.GetCompileDiagnostics() {
-		opts = append(opts, ssaconfig.WithCompileDiagnostics(true))
 	}
 	if cfg.GetCompileStrictMode() {
 		opts = append(opts, ssaconfig.WithCompileStrictMode(true))
@@ -518,9 +492,6 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 			ssaconfig.WithSyntaxFlowMemory(enable),
 		)
 	}
-	if cliCtx.IsSet("file-perf-log") {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(cliCtx.Bool("file-perf-log")))
-	}
 	if cliCtx.IsSet("re-compile") {
 		opts = append(opts, ssaconfig.WithCompileReCompile(cliCtx.Bool("re-compile")))
 	}
@@ -529,6 +500,10 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 	}
 	if cliCtx.IsSet("output") {
 		opts = append(opts, ssaconfig.WithOutputFile(cliCtx.String("output")))
+	} else if debugDir := cliCtx.String("debug"); debugDir != "" {
+		reportPath := filepath.Join(debugDir, "report")
+		opts = append(opts, ssaconfig.WithOutputFile(reportPath))
+		log.Infof("[debug] report output redirected to: %s", reportPath)
 	}
 	if cliCtx.IsSet("with-file-content") {
 		opts = append(opts, ssaconfig.WithOutputFileContent(cliCtx.Bool("with-file-content")))
@@ -557,4 +532,60 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 		}
 	}
 	return nil
+}
+
+// setupDebugDir creates a structured debug output directory and wires up all
+// the output paths. It:
+//  1. Creates the directory structure: <dir>/{cpu-pprof,memory-pprof,goroutine-pprof}
+//  2. Redirects --database to <dir>/ssadb.db
+//  3. Redirects --output to <dir>/report
+//  4. Saves the launch command to <dir>/cmd.txt
+//  5. Starts a pprof HTTP server and periodic pprof collector
+//
+// The returned cleanup function stops the pprof collector and should be deferred.
+func setupDebugDir(c *cli.Context, dir string) (func(), error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, utils.Errorf("create debug dir %s: %v", dir, err)
+	}
+
+	// Save the launch command
+	cmdPath := filepath.Join(dir, "cmd.txt")
+	cmdContent := fmt.Sprintf("yak %s\n\nFull command:\n%s\n\nTimestamp: %s\n",
+		c.Command.Name,
+		strings.Join(os.Args, " "),
+		time.Now().Format("2006-01-02 15:04:05 -07:00"),
+	)
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0o644); err != nil {
+		return nil, utils.Errorf("write cmd.txt: %v", err)
+	}
+
+	// Redirect SSA database to <dir>/ssadb.db
+	ssadbPath := filepath.Join(dir, "ssadb.db")
+	if err := consts.SetGormSSAProjectDatabaseByInfo(ssadbPath); err != nil {
+		return nil, utils.Errorf("set SSA database to %s: %v", ssadbPath, err)
+	}
+	log.Infof("[debug] SSA database: %s", ssadbPath)
+
+	// Redirect log output to <dir>/log (in addition to stdout)
+	logPath := filepath.Join(dir, "log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, utils.Errorf("create log file %s: %v", logPath, err)
+	}
+	log.Infof("[debug] log output: %s", logPath)
+	log.SetOutput(io.MultiWriter(logFile, os.Stdout))
+
+	// Start pprof collector
+	cleanup, err := ssaapi.StartPprofCollector(dir)
+	if err != nil {
+		logFile.Close()
+		return nil, utils.Errorf("start pprof collector: %v", err)
+	}
+
+	originalCleanup := cleanup
+	combinedCleanup := func() {
+		originalCleanup()
+		logFile.Close()
+	}
+	return combinedCleanup, nil
 }

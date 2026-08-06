@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/segmentio/ksuid"
@@ -17,30 +16,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
-// MaxHTTPFlowRequestBodyInDBBytes is the DB spill / History-preview threshold (200KB).
-// Request bodies larger than this are spilled to disk instead of stored in SQLite.
-const MaxHTTPFlowRequestBodyInDBBytes = 200 * 1024
+// defaultHTTPFlowRequestBodyInDBBytes matches consts default GlobalMaxContentLength (10MB).
+const defaultHTTPFlowRequestBodyInDBBytes = 10 * 1024 * 1024
 
 // GetMaxHTTPFlowRequestBodyInDBBytes returns the request-body spill threshold for HTTPFlow DB.
-//
-// Spill is capped at MaxHTTPFlowRequestBodyInDBBytes (History list preview size).
-// GlobalMaxContentLength (「转储数据包大小」) may only LOWER the threshold when set below
-// 200KB; it must NOT raise spill into the multi-MB range, because that value also drives
-// MITM/lowhttp MaxContentLength and would couple DB policy to wire I/O limits.
+// Controlled solely by GlobalMaxContentLength (「转储数据包大小」); when unset, defaults to 10MB.
 func GetMaxHTTPFlowRequestBodyInDBBytes() int {
 	n := consts.GetGlobalMaxContentLength()
-	if n == 0 || int(n) >= MaxHTTPFlowRequestBodyInDBBytes {
-		return MaxHTTPFlowRequestBodyInDBBytes
+	if n == 0 {
+		return defaultHTTPFlowRequestBodyInDBBytes
 	}
 	return int(n)
 }
-
-var (
-	largeRequestNotifyMu       sync.Mutex
-	lastLargeRequestNotifyTime time.Time
-)
-
-const largeRequestNotifyMinInterval = 3 * time.Second
 
 const storedHTTPFlowLargeRequestTruncateNotice = "[[request too large(%s), truncated]] use GetHTTPFlowBodyById(IsRequest=true) for full body"
 
@@ -229,40 +216,4 @@ func requestBodyLengthFromPacket(packet []byte) int {
 	}
 	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
 	return len(body)
-}
-
-// LargeHTTPFlowRequestUserNotice returns a user-facing message when request body is spilled to disk.
-func LargeHTTPFlowRequestUserNotice(flow *schema.HTTPFlow) string {
-	if flow == nil {
-		return ""
-	}
-	size := utils.ByteSize(uint64(flow.RequestLength))
-	if flow.RequestLength <= 0 {
-		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket([]byte(flow.GetRequest()))
-		size = utils.ByteSize(uint64(len(body)))
-	}
-	msg := fmt.Sprintf("检测到超大请求包（%s）\n\n", size)
-	msg += "请求 body 未完整写入数据库（防止卡顿/崩溃），已落盘保存。\n"
-	msg += "History 列表中不会展示完整请求体，请在详情中查看完整请求，或通过「下载 Body」流式读取。\n"
-	if flow.TooLargeRequestBodyFile != "" {
-		msg += fmt.Sprintf("\nBody 文件：\n%s", flow.TooLargeRequestBodyFile)
-	}
-	if flow.TooLargeRequestHeaderFile != "" {
-		msg += fmt.Sprintf("\nHeader 文件：\n%s", flow.TooLargeRequestHeaderFile)
-	}
-	if flow.Url != "" {
-		msg += fmt.Sprintf("\n\nURL: %s", flow.Url)
-	}
-	return msg
-}
-
-// ShouldNotifyLargeHTTPFlowRequest throttles repeated MITM notifications for bulk uploads.
-func ShouldNotifyLargeHTTPFlowRequest() bool {
-	largeRequestNotifyMu.Lock()
-	defer largeRequestNotifyMu.Unlock()
-	if time.Since(lastLargeRequestNotifyTime) < largeRequestNotifyMinInterval {
-		return false
-	}
-	lastLargeRequestNotifyTime = time.Now()
-	return true
 }

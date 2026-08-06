@@ -60,6 +60,14 @@ discoveredUrls = sync.NewLock()
 discoveredUrlSet = {}
 requestedUrlSet = {}
 
+normalizeDisplayUrl = func(rawUrl) {
+    sharpIndex = str.Index(rawUrl, "#")
+    if sharpIndex >= 0 {
+        return rawUrl[:sharpIndex]
+    }
+    return rawUrl
+}
+
 opts = []
 if reqsLimit > 0 {
     opts.Append(crawler.maxRequest(reqsLimit))
@@ -84,6 +92,10 @@ if timeoutSecond > 0 {
 }
 
 opts.Append(crawler.onUrlFound(func(urlStr) {
+    urlStr = normalizeDisplayUrl(urlStr)
+    if urlStr == "" {
+        return
+    }
     discoveredUrls.Lock()
     defer discoveredUrls.Unlock()
     if urlStr in discoveredUrlSet {
@@ -117,7 +129,8 @@ for currentStartUrl in targetCandidates {
     for result in reqCh {
         currentResults++
         totalResults++
-        urlstr := result.Url()
+        rawUrlstr := result.Url()
+        urlstr := normalizeDisplayUrl(rawUrlstr)
 
         discoveredUrls.Lock()
         requestedUrlSet[urlstr] = true
@@ -135,6 +148,14 @@ for currentStartUrl in targetCandidates {
             rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
         } catch {}
 
+        // A URL fragment is browser-only and must never be sent to the server.
+        // Keep the output quiet if an older/lower-level request path still
+        // returns a misleading 404 for one; the crawler now strips fragments at
+        // request construction time, so this is only a defensive compatibility
+        // guard.
+        if rawUrlstr != urlstr && str.Contains(rspdesc, " 404 ") {
+            continue
+        }
         requestLines.Append(sprintf("[%v] [%v] %v", method, rspdesc, urlstr))
     }
 
@@ -182,6 +203,31 @@ if len(result) <= 30000 {
 } else {
     yakit.Info(result[:30000] + "... (truncated)")
 }
+
+// 覆盖度提示: 爬虫发现的往往是多个子站 / 大量路径, 实战里 AI 经常只盯住一个深挖而漏掉其余.
+// 这里不钉死具体清单(避免过拟合到某个形态), 只用"子站数 + pending 数"作为广度信号, 引导 AI
+// 在下一步用 adjust_todo 把待测面拆成多个 todo —— 多 todo 是保证执行深度和覆盖完整度的关键.
+// 关键词: simple_crawler 覆盖度提示, adjust_todo, 多 todo, 执行深度
+distinctSubdomains = {}
+for u, _ in discoveredUrlSet {
+    lower = str.ToLower(u)
+    if str.HasPrefix(lower, "https://") || str.HasPrefix(lower, "http://") {
+        schemeEnd = str.Index(lower, "://")
+        rest = lower[schemeEnd+3:]
+        pathSlash = str.Index(rest, "/")
+        authority = rest
+        if pathSlash > 0 {
+            authority = rest[:pathSlash]
+        }
+        distinctSubdomains[authority] = true
+    }
+}
+subdomainCount = len(distinctSubdomains)
+pendingCount = discoveredCount - requestedCount
+if subdomainCount > 1 || pendingCount > 0 {
+    yakit.Info("[coverage hint] Crawler discovered %v distinct subdomain(s) and %v unrequested URL(s) (see the website forest + pending count above). A common failure mode is to fixate on ONE subdomain or ONE thread and skip the rest. In your NEXT iteration, use `adjust_todo` to break the remaining surface into MULTIPLE concrete todos (e.g. one per subdomain / per untested endpoint group, plus auth, IDOR, and parameter testing for each) before diving into any single one. More (and finer-grained) todos => better depth and coverage, and they prevent the loop from finishing before the surface is covered.", subdomainCount, pendingCount)
+}
+
 try {
     name := file.TempFileName(`crawler-result-*.txt`)~
     file.Save(name, result)~

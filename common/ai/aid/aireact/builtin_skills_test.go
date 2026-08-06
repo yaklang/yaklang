@@ -385,7 +385,6 @@ func TestExtractBuiltinSkills_ReleaseRecordMatchesWrittenFileTime(t *testing.T) 
 func TestBuiltinSkills_LoadedByReAct(t *testing.T) {
 	react, err := NewReAct(
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithDisableIntentRecognition(true),
@@ -450,7 +449,6 @@ func TestBuiltinSkills_DisabledDoesNotExtractBuiltinFiles(t *testing.T) {
 
 	_, err := NewReAct(
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithDisableIntentRecognition(true),

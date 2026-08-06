@@ -180,9 +180,6 @@ func handleLoadForgeDisabled(
 		fmt.Sprintf("蓝图加载被禁用: %s / Blueprint Disabled: %s", identifier, identifier),
 		utils.ShrinkTextBlock(rejectMsg, 800))
 	op.Feedback(rejectMsg)
-	op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-	op.SetReflectionData("forge_rejected_reason", "forge_disabled")
-	op.SetReflectionData("forge_name", identifier)
 	op.Continue()
 }
 
@@ -210,9 +207,6 @@ func handleLoadForge(
 			fmt.Sprintf("蓝图加载被拒绝: %s / Blueprint Rejected: %s", identifier, identifier),
 			utils.ShrinkTextBlock(rejectMsg, 800))
 		op.Feedback(rejectMsg)
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-		op.SetReflectionData("forge_rejected_reason", "task_already_async")
-		op.SetReflectionData("forge_name", identifier)
 		op.Continue()
 		return
 	}
@@ -290,9 +284,6 @@ func handleLoadSkill(
 		} else {
 			op.Feedback(errMsg + " Please verify the skill name is correct.")
 		}
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-		op.SetReflectionData("skill_load_error", err.Error())
-		op.SetReflectionData("skill_name", identifier)
 		op.Continue()
 		return
 	}
@@ -378,9 +369,6 @@ func handleLoadFocusMode(
 			fmt.Sprintf("专注模式执行失败: %s / Focus Mode Failed: %s", identifier, identifier),
 			utils.ShrinkTextBlock(failMsg, 800))
 		op.Feedback(failMsg)
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-		op.SetReflectionData("focus_mode_error", err.Error())
-		op.SetReflectionData("focus_mode_name", identifier)
 		op.Continue()
 		return
 	}
@@ -425,9 +413,6 @@ func handleLoadUnknown(
 			fmt.Sprintf("能力加载被阻止: %s / Capability Load Blocked: %s", identifier, identifier),
 			utils.ShrinkTextBlock(blockMsg, 800))
 		op.Feedback(blockMsg)
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-		op.SetReflectionData("blocked_identifier", identifier)
-		op.SetReflectionData("blocked_reason", "repeated_unknown_identifier")
 		op.Continue()
 		return
 	}
@@ -456,9 +441,6 @@ func handleLoadUnknown(
 			fmt.Sprintf("能力搜索失败: %s / Capability Search Failed: %s", identifier, identifier),
 			utils.ShrinkTextBlock(failMsg, 800))
 		op.Feedback(failMsg)
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
-		op.SetReflectionData("capability_search_error", err.Error())
-		op.SetReflectionData("failed_identifier", identifier)
 		op.Continue()
 		return
 	}

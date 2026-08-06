@@ -1,12 +1,30 @@
 package reactloops
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommonmock "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+type registerTestFocusRuntime struct{ target string }
+
+func (r registerTestFocusRuntime) AuthorizedTarget() string { return r.target }
+
+func (registerTestFocusRuntime) Execute(string, map[string]any) (map[string]any, error) {
+	return map[string]any{"ok": true}, nil
+}
+
+type registerTestFocusConfig struct {
+	aicommon.AICallerConfigIf
+	runtime aicommon.FocusRuntime
+}
+
+func (c *registerTestFocusConfig) GetFocusRuntime() aicommon.FocusRuntime { return c.runtime }
 
 // 验证 RegisterYakFocusModeFromBundle 的 boot/run 双相行为：
 //   - boot 期：从 yak 脚本中提取 metadata，注册到全局表
@@ -71,6 +89,22 @@ __VERBOSE_NAME__ = "Explicit Name Test"
 
 	_, foundDefault := GetLoopFactory(defaultName)
 	require.False(t, foundDefault, "default name should not be used when __NAME__ is set")
+}
+
+func TestRegisterYakFocusMode_FixedNameRejectsScriptOverride(t *testing.T) {
+	defaultName := "yakfm_fixed_" + utils.RandStringBytes(6)
+	overrideName := "yakfm_override_" + utils.RandStringBytes(6)
+	err := RegisterYakFocusModeFromBundle(&FocusModeBundle{
+		Name:      defaultName,
+		FixedName: true,
+		EntryFile: defaultName + FocusModeFileSuffix,
+		EntryCode: `__NAME__ = "` + overrideName + `"`,
+	})
+	require.Error(t, err)
+	_, found := GetLoopFactory(defaultName)
+	require.False(t, found)
+	_, found = GetLoopFactory(overrideName)
+	require.False(t, found)
 }
 
 // 验证同名重复注册失败，且失败时不会污染 yakFocusBundles。
@@ -152,4 +186,28 @@ computeName = func() {
 	meta, ok := GetLoopMetadata(name)
 	require.True(t, ok)
 	require.Equal(t, "computed via sidekick", meta.VerboseName)
+}
+
+func TestRegisterYakFocusMode_InjectsRunScopedFocusRuntime(t *testing.T) {
+	code := `
+readAuthorizedTarget = func() {
+    return focusRuntime.AuthorizedTarget()
+}
+`
+	baseConfig := aicommonmock.NewMockedAIConfig(context.Background())
+	invoker := aicommonmock.NewMockInvoker(context.Background())
+	invoker.SetConfig(&registerTestFocusConfig{
+		AICallerConfigIf: baseConfig,
+		runtime:          registerTestFocusRuntime{target: "https://example.test/authorized"},
+	})
+	caller, err := NewFocusModeYakHookCaller(
+		"runtime.ai-focus.yak",
+		code,
+		focusModeRunCallerOptions(invoker, time.Second)...,
+	)
+	require.NoError(t, err)
+	defer caller.Close()
+	target, err := caller.CallByName("readAuthorizedTarget")
+	require.NoError(t, err)
+	require.Equal(t, "https://example.test/authorized", target)
 }

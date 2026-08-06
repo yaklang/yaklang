@@ -15,7 +15,7 @@ type LoopMetadata struct {
 	Name                string // loop name
 	Description         string // describes what this loop does
 	DescriptionZh       string // describes what this loop does in Chinese
-	OutputExamplePrompt string // example output for reflection_output_example.txt
+	OutputExamplePrompt string // example output for output_example.txt
 	UsagePrompt         string // usage description for x-@action-rules in schema
 	IsHidden            bool   // whether to hide this loop from the user
 	VerboseName         string // display name in English for the frontend
@@ -46,7 +46,7 @@ func WithLoopDescriptionZh(desc string) LoopMetadataOption {
 	}
 }
 
-// WithLoopOutputExample sets the example output prompt for reflection
+// WithLoopOutputExample sets the example output prompt for the main loop.
 func WithLoopOutputExample(example string) LoopMetadataOption {
 	return func(m *LoopMetadata) {
 		m.OutputExamplePrompt = example

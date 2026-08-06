@@ -15,7 +15,7 @@ import (
 //go:embed prompts/instruction.txt
 var instruction string
 
-//go:embed prompts/reflection_output_example.txt
+//go:embed prompts/output_example.txt
 var outputExample string
 
 //go:embed prompts/reactive_data.txt
@@ -32,11 +32,13 @@ const reActPostSummary = `
 
 ---
 
-## 下一步建议
+## 可选后续（不属于本次完成条件）
 
-[友善地引导用户进行下一步行动，根据用户的意图]。提供建议的下一步行动，从可观测性，回归，调试，优化等角度出发。
+仅列出本次目标之外、不会阻塞本次完成的可选扩展，例如需要用户新选择、超出本次范围的长期可观测性、回归、调试或优化。
 
-【注意：下一步建议并不一定需要出现，以引导用户交互为核心目标】
+不要把仍属于本次目标、已有证据支持、当前可以执行且会实质提高结果质量的行动放在这里；这类行动应在 finish 前升级为 TODO 并执行。
+
+没有合适的非阻塞可选项时，省略整个章节。
 
 `
 
@@ -87,13 +89,18 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),
 				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 					if !isDone {
 						return
 					}
-					if loop.GetLastValidAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+					lastAction := loop.GetLastAction()
+					if lastAction == nil {
+						log.Warnf("iteration %d: skip final summary because last action is empty", iteration)
+						return
+					}
+					if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
 						return
 					}
@@ -111,12 +118,6 @@ func init() {
 				}),
 			}
 
-			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
-			if config := r.GetConfig(); config != nil {
-				if reactConfig, ok := config.(interface{ GetEnableSelfReflection() bool }); ok {
-					preset = append(preset, reactloops.WithEnableSelfReflection(reactConfig.GetEnableSelfReflection()))
-				}
-			}
 			preset = append(preset, opts...)
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err
@@ -146,16 +147,10 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),
 			}
 
-			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
-			if config := r.GetConfig(); config != nil {
-				if reactConfig, ok := config.(interface{ GetEnableSelfReflection() bool }); ok {
-					preset = append(preset, reactloops.WithEnableSelfReflection(reactConfig.GetEnableSelfReflection()))
-				}
-			}
 			preset = append(preset, opts...)
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err

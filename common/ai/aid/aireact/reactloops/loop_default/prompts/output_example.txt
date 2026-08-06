@@ -1,0 +1,61 @@
+* 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
+    * `{"@action": "directly_answer", "answer_payload": "...[your-answer not a markdown].."}`
+
+*. 简单直接回答时，默认不要输出 `human_readable_thought`
+
+* 在 directly_answer 的 Action 中，如果 answer_payload 的内容较大，设计到代码等多样化内容，请使用 AI Tag 回答
+
+{"@action": "directly_answer"}
+<|FINAL_ANSWER_CURRENT_NONCE|>
+# markdown in mass
+<|FINAL_ANSWER_END_CURRENT_NONCE|>
+
+*. 如果你想要使用工具：
+    * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "先读取配置"}`
+
+*. `todo_delta` 使用案例（维护 TODO 工作集，与正常动作同轮携带）：
+    * 任务一开始就需要拆成多个入口时，第一条动作同时建立初始 TODO 并指定 current：
+      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "先探测登录接口的认证方式", "todo_delta": {"add": [{"id": "login_auth", "text": "验证 /api/login 的认证方式：来源为 crawler 发现的表单 action；空凭据请求返回 401 即无认证绕过"}, {"id": "explore_admin", "text": "待探索：/admin/ 路径下的后台入口，来源为 sitemap.xml；尚未访问"}], "current": "login_auth"}}`
+    * 工具 Observation 暴露了新的范围内入口（例如响应里出现了新的跳转链接）：先把新线索记为"待探索"再继续推进 current：
+      `{"@action": "directly_call_tool", "identifier": "http_request", "human_readable_thought": "对比携带旧token和新token的响应差异", "todo_delta": {"add": [{"id": "explore_refresh_token", "text": "待探索：/api/v2/token/refresh 接口，来源为上一次响应头 Set-Cookie 差异；尚未验证是否可重放"}]}}`
+    * 当前 current 已有结论，关闭并切换到下一条待探索项：
+      `{"@action": "require_tool", "tool_require_payload": "http_request", "human_readable_thought": "切换到验证token刷新重放", "todo_delta": {"close": [{"id": "login_auth", "outcome": "resolved", "reason": "空凭据请求返回401且响应体无敏感信息泄露，未发现认证绕过", "refs": ["tool-call-3"]}], "current": "explore_refresh_token"}}`
+
+*. `save_evidence` 使用案例（确认关键事实后主动沉淀，不等任务结束）：
+    * 确认一个安全风险后，先落证据再继续，同时把新发现的关联入口记为待探索：
+      `{"@action": "save_evidence", "verification_payload": "确认 /api/v2/token/refresh 存在重放漏洞：同一 refresh_token 重放两次均返回 200 且下发新的有效 access_token，未做一次性校验，响应字段 access_token 每次不同但均可正常鉴权", "todo_delta": {"add": [{"id": "check_logout_invalidate", "text": "待探索：验证退出登录后 refresh_token 是否失效，来源为本次重放漏洞的关联假设"}]}}`
+    * 排除一条路径时，写明实验条件和对照，而不是单次未命中就下结论：
+      `{"@action": "save_evidence", "verification_payload": "排除 /admin/ 路径存在未授权访问：对比携带有效 session 与清空 Cookie 两种请求，未登录时返回 302 跳转至登录页，与预期基线一致，字段和状态码均无差异"}`
+
+{{ if .AllowKnowledgeEnhanceAnswer }}*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:
+    * `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "..[rewrite-user-query]..", "human_readable_thought": "先补充资料"}
+{{end}}
+{{ if .AllowPlan }}如果这个任务本身比较复杂：
+    * 如果你发现有对应的 AI Blueprint(Forge) 可以使用，请你输出: `{"@action": "require_ai_blueprint", "blueprint_payload": "[your-blueprint-name]", ...}` 可以启动一个已经存在 AI 预设应用执行这个任务。
+    * 如果你觉得任务复杂，且没有现有任务模版（Blueprint）需要使用任务规划能力，可使用 `request_plan`（规划+审查后再执行），需提供 `plan_request_payload`
+    * 若用户要**修改已有 plan**（含已生成但用户尚未批准执行的 plan），同样再次调用 `request_plan`；`plan_request_payload` **直接写新的 plan 需求**，不要说明这是修改，不要用 `directly_answer` 只做确认。你只负责生成 plan，执行由用户审查后决定
+
+同时你必须遵循动作选择优先级：
+1. 复杂/不确定任务，或需要新建/修订 Plan：优先 `request_plan`
+2. 需要领域指导：优先加载技能（`loading_skills` / `load_skill_resources`）
+3. 仅在“已知多工具且存在明确依赖图”时使用 `tool_compose`
+4. AI Blueprint 必须使用 `require_ai_blueprint`，禁止通过 `tool_compose` 代替
+
+反例（禁止）：
+* 任务还没拆清楚就直接 `tool_compose`
+* 只有一个工具调用却使用 `tool_compose`
+* 把 Blueprint 当普通工具节点塞进 `tool_compose`
+{{end}}
+
+*. 当你在下方动态段看到 `# Tool Context` 或 `<|TOOL_SCHEMA_...|>` 时，说明系统要求你为指定工具生成参数：
+    * 简单参数直接写入 `params`：
+      `{"@action": "call-tool", "identifier": "scan_target", "params": {"target": "example.com"}, "call_expectations": "~5s, success when results are returned"}`
+    * 多行/复杂参数使用 AITAG 承载：
+      `{"@action": "call-tool", "identifier": "run_script", "params": {"timeout": 30}}`
+      然后在 JSON 之后附加 AITAG 块（nonce 见动态段）：
+      `<|TOOL_PARAM_script_CURRENT_NONCE|>`
+      ...raw content...
+      `<|TOOL_PARAM_script_END_CURRENT_NONCE|>`
+    * 为 AI Blueprint 生成参数：
+      `{"@action": "call-ai-blueprint", "blueprint": "blueprint_name", "params": {"key": "value"}}`
+    * 如果动态段提供了旧参数（`<|OLD_PARAMS_...|>`），请基于失败原因重新生成，不要原样复制

@@ -60,15 +60,13 @@ func TestReActLoop_ToolNotFound_ShouldContinue(t *testing.T) {
 				return rsp, nil
 			}
 
-			// Self-reflection - skip quickly
-			if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
 			// Main loop - select tool
 			if aicommon.IsPrimaryDecisionPrompt(prompt) {
+				if successToolCalled {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"successful retry completed"}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				if firstToolCall {
 					firstToolCall = false
 					// First: try nonexistent tool
@@ -166,15 +164,13 @@ func TestReActLoop_ToolExecutionError_ShouldContinue(t *testing.T) {
 				return rsp, nil
 			}
 
-			// Self-reflection - skip
-			if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
 			// Main loop - select tool
 			if aicommon.IsPrimaryDecisionPrompt(prompt) {
+				if successToolCalled {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object","next_action":{"type":"finish"},"human_readable_thought":"successful retry completed"}`))
+					rsp.Close()
+					return rsp, nil
+				}
 				if firstToolCall {
 					firstToolCall = false
 					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "failing_tool"}, "human_readable_thought": "trying failing", "cumulative_summary": "test"}`))

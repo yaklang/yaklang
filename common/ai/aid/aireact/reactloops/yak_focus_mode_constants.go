@@ -66,18 +66,6 @@ const (
 	// 对应 WithPeriodicVerificationInterval。
 	FocusDunder_PeriodicVerificationInterval = "__PERIODIC_VERIFICATION_INTERVAL__"
 
-	// FocusDunder_SameActionTypeSpinThreshold 相同 Action 类型自旋阈值，
-	// 对应 WithSameActionTypeSpinThreshold。
-	FocusDunder_SameActionTypeSpinThreshold = "__SAME_ACTION_TYPE_SPIN_THRESHOLD__"
-
-	// FocusDunder_SameLogicSpinThreshold 相同逻辑自旋阈值，
-	// 对应 WithSameLogicSpinThreshold。
-	FocusDunder_SameLogicSpinThreshold = "__SAME_LOGIC_SPIN_THRESHOLD__"
-
-	// FocusDunder_MaxConsecutiveSpinWarnings 连续 spin 警告上限，
-	// 对应 WithMaxConsecutiveSpinWarnings。
-	FocusDunder_MaxConsecutiveSpinWarnings = "__MAX_CONSECUTIVE_SPIN_WARNINGS__"
-
 	// FocusDunder_AllowRAG / AIForge / PlanAndExec / ToolCall / UserInteract 静态开关。
 	// 对应 WithAllowRAG / WithAllowAIForge / WithAllowPlanAndExec /
 	// WithAllowToolCall / WithAllowUserInteract。
@@ -91,10 +79,6 @@ const (
 	// 对应 WithUseSpeedPriorityAICallback。
 	FocusDunder_UseSpeedPriorityAI = "__USE_SPEED_PRIORITY_AI__"
 
-	// FocusDunder_EnableSelfReflection 是否开启自我反思，
-	// 对应 WithEnableSelfReflection。
-	FocusDunder_EnableSelfReflection = "__ENABLE_SELF_REFLECTION__"
-
 	// FocusDunder_DisableLoopPerception 是否禁用 perception 层，
 	// 对应 WithDisableLoopPerception。
 	FocusDunder_DisableLoopPerception = "__DISABLE_LOOP_PERCEPTION__"
@@ -105,10 +89,6 @@ const (
 	// FocusDunder_PersistentInstruction 持久指令模板字符串，对应
 	// WithPersistentInstruction（自动按 RenderTemplate 渲染）。
 	FocusDunder_PersistentInstruction = "__PERSISTENT_INSTRUCTION__"
-
-	// FocusDunder_ReflectionOutputExample 反思输出示例（与 OutputExamplePrompt
-	// 不同，这里是 ReActLoop 实例级的渲染模板），对应 WithReflectionOutputExample。
-	FocusDunder_ReflectionOutputExample = "__REFLECTION_OUTPUT_EXAMPLE__"
 
 	// FocusDunder_ToolCallIntervalReviewExtraPrompt 对应
 	// WithToolCallIntervalReviewExtraPrompt。
@@ -206,11 +186,10 @@ const (
 	// 优先级高于 __PERSISTENT_INSTRUCTION__ 静态字符串。
 	FocusHook_PersistentContext = "focusPersistentContext"
 
-	// FocusHook_ReflectionOutputExample 对应
-	// WithReflectionOutputExampleContextProvider；签名：
-	//   func focusReflectionOutputExample(loop, nonce) -> string
-	// 优先级高于 __REFLECTION_OUTPUT_EXAMPLE__ 静态字符串。
-	FocusHook_ReflectionOutputExample = "focusReflectionOutputExample"
+	// FocusHook_OutputExample 对应 WithOutputExampleContextProvider；签名：
+	//   func focusOutputExample(loop, nonce) -> string
+	// 优先级高于 __OUTPUT_EXAMPLE__ 静态字符串。
+	FocusHook_OutputExample = "focusOutputExample"
 
 	// FocusHook_ReactiveData 对应 WithReactiveDataBuilder；签名：
 	//   func focusReactiveData(loop, feedback, nonce) -> string

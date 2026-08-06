@@ -5,7 +5,7 @@
  * 验证点：
  * 1. 搜索成功执行
  * 2. 结果被压缩并保存到 artifact
- * 3. 系统根据 evaluateNextMovements 的 finished 字段决定是否继续
+ * 3. 系统根据 evaluateNextSearch 的 finished 字段决定是否继续
  * 4. 系统自动判断完成后生成最终报告
  */
 

@@ -44,8 +44,8 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 		loop, err := reactloops.NewReActLoop("test-loop", invoker)
 		assert.NoError(t, err)
 
-		// Push a satisfaction record with completed task index and next movements
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "task completed", "1-1", nil, "")
+		// Push a satisfaction record with completed task index and next steps
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "task completed", "1-1", "")
 
 		// Get the last satisfaction record using the new struct-based API
 		record := loop.GetLastSatisfactionRecordFull()
@@ -53,20 +53,15 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 		assert.True(t, record.Satisfactory)
 		assert.Equal(t, "task completed", record.Reason)
 		assert.Equal(t, "1-1", record.CompletedTaskIndex)
-		assert.Empty(t, record.NextMovements)
 	})
 
 	t.Run("MultipleSatisfactionRecords", func(t *testing.T) {
 		loop, err := reactloops.NewReActLoop("test-loop", invoker)
 		assert.NoError(t, err)
 
-		// Push multiple records with next movements
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(false, "in progress", "", []aicommon.VerifyNextMovement{{
-			Op:      "add",
-			ID:      "check_file_permissions",
-			Content: "next step: check file permissions",
-		}}, "")
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "done", "1-2", nil, "")
+		// Push multiple records with next steps
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(false, "in progress", "", "")
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "done", "1-2", "")
 
 		// Should get the last one
 		record := loop.GetLastSatisfactionRecordFull()
@@ -74,7 +69,6 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 		assert.True(t, record.Satisfactory)
 		assert.Equal(t, "done", record.Reason)
 		assert.Equal(t, "1-2", record.CompletedTaskIndex)
-		assert.Empty(t, record.NextMovements)
 	})
 
 	t.Run("EmptySatisfactionRecords", func(t *testing.T) {
@@ -98,35 +92,10 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 		assert.True(t, satisfied)
 		assert.Equal(t, "old style", reason)
 
-		// New method should return struct with empty completed task index and next movements
+		// New method should return struct with empty completed task index and next steps
 		record := loop.GetLastSatisfactionRecordFull()
 		assert.NotNil(t, record)
 		assert.Empty(t, record.CompletedTaskIndex)
-		assert.Empty(t, record.NextMovements)
-	})
-
-	t.Run("NextMovementsTracking", func(t *testing.T) {
-		loop, err := reactloops.NewReActLoop("test-loop", invoker)
-		assert.NoError(t, err)
-
-		// Push a record with next movements
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(false, "in progress", "", []aicommon.VerifyNextMovement{{
-			Op:      "add",
-			ID:      "fix_file_permission",
-			Content: "use chmod 600 to fix file permissions",
-		}}, "")
-
-		// Get the last satisfaction record
-		record := loop.GetLastSatisfactionRecordFull()
-		assert.NotNil(t, record)
-		assert.False(t, record.Satisfactory)
-		assert.Equal(t, "in progress", record.Reason)
-		assert.Empty(t, record.CompletedTaskIndex)
-		assert.Equal(t, []aicommon.VerifyNextMovement{{
-			Op:      "add",
-			ID:      "fix_file_permission",
-			Content: "use chmod 600 to fix file permissions",
-		}}, record.NextMovements)
 	})
 }
 

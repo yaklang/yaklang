@@ -1,15 +1,18 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils/sysproc"
+	"context"
 	"net"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/utils/privileged"
+	"github.com/yaklang/yaklang/common/utils/sysproc"
 )
 
 var SystemExports = map[string]interface{}{
@@ -17,6 +20,7 @@ var SystemExports = map[string]interface{}{
 	"IsUDPPortOpen":             IsUDPPortOpen,
 	"LookupHost":                lookupHost,
 	"LookupIP":                  lookupIP,
+	"LookupSystemIPWithTimeout": LookupSystemIPWithTimeout,
 	"IsTCPPortAvailable":        IsTCPPortAvailable,
 	"IsUDPPortAvailable":        IsUDPPortAvailable,
 	"GetRandomAvailableTCPPort": GetRandomAvailableTCPPort,
@@ -63,9 +67,49 @@ var SystemExports = map[string]interface{}{
 	"GetLocalAddress":      GetLocalAddress,
 	"GetLocalIPv4Address":  GetLocalIPv4Address,
 	"GetLocalIPv6Address":  GetLocalIPv6Address,
+	"GetRouteInfo":         GetRouteInfo,
 
 	"NewConnectionsWatcher": sysproc.NewWatcher,
 	"NewProcessWatcher":     sysproc.NewProcessesWatcher,
+}
+
+// GetRouteInfo 返回当前系统到指定目标的实际路由信息.
+//
+// 该函数只读取内核路由表与网卡信息，不修改路由，因此不需要
+// root/Administrator 权限. 典型用途是让 Yak 脚本判断某个具体目标
+// 是否经过 utun/tun/wg 等隧道，而不是仅因为系统里存在一张隧道
+// 网卡就产生误判.
+//
+// 返回 map 固定包含 target/interface/gateway/source/error 五个键；
+// 成功时 error 为空字符串，失败时其他路由字段可能为空.
+//
+// Example:
+//
+//	os.GetRouteInfo("198.18.1.2") // {"interface":"utun4", ...}
+func GetRouteInfo(target string) map[string]string {
+	result := map[string]string{
+		"target":    target,
+		"interface": "",
+		"gateway":   "",
+		"source":    "",
+		"error":     "",
+	}
+
+	iface, gateway, source, err := netutil.Route(3*time.Second, target)
+	if err != nil {
+		result["error"] = err.Error()
+		return result
+	}
+	if iface != nil {
+		result["interface"] = iface.Name
+	}
+	if gateway != nil {
+		result["gateway"] = gateway.String()
+	}
+	if source != nil {
+		result["source"] = source.String()
+	}
+	return result
 }
 
 // LookupHost 通过DNS服务器，根据域名查找IP
@@ -96,6 +140,27 @@ func lookupHost(i string) []string {
 // ```
 func lookupIP(i string) []string {
 	return netx.LookupAll(i)
+}
+
+// LookupSystemIPWithTimeout 仅使用操作系统当前配置的 DNS resolver 查询域名，
+// 并用 seconds 限制整个查询耗时。它不会在系统 DNS 返回 NXDOMAIN 后继续遍历
+// Yak 的公共 DNS fallback，因此适合探测本机 DNS/TUN 行为，且不会因外部 DNS
+// 不可达而长时间阻塞。
+func LookupSystemIPWithTimeout(host string, seconds float64) []string {
+	if seconds <= 0 {
+		seconds = 0.5
+	}
+	if seconds > 5 {
+		seconds = 5
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(seconds*float64(time.Second)))
+	defer cancel()
+
+	results, err := net.DefaultResolver.LookupHost(ctx, host)
+	if err != nil {
+		return nil
+	}
+	return results
 }
 
 // IsTCPPortOpen 检查本地TCP端口是否开放（被占用）

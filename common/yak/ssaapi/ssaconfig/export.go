@@ -23,4 +23,6 @@ var Exports = map[string]interface{}{
 	"withCodeSourceAuthKeyContent": WithCodeSourceAuthKeyContent,
 	// Jar 递归解析配置选项
 	"withCodeSourceJarRecursiveParse": WithCodeSourceJarRecursiveParse,
+	// Debug/pprof 配置选项
+	"withDebugDir": WithDebugDir,
 }

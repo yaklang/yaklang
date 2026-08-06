@@ -71,6 +71,42 @@ func TestMUSTPASS_ScanPortTool_RuntimeCTXUsable(t *testing.T) {
 	// 端到端的"取消即快速返回"行为来保证.
 }
 
+// TestMUSTPASS_ScanPortTool_ActivatesTunSafeMode 验证 TUN/Fake-IP 的
+// 198.18.0.0/15 目标不会被整体拒绝，而是把大范围 SYN 计划收缩为
+// 少量 TCP connect 候选验证，并输出 AI TODO 与后续应用层处置指引.
+//
+// 关键词: scan_port TUN safe mode 回归, SCAN_TUN_SAFE_MODE,
+// 198.18.0.0/15 大规模端口误报, AI_TODO_REQUIRED
+func TestMUSTPASS_ScanPortTool_ActivatesTunSafeMode(t *testing.T) {
+	tool := getScanPortTool(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+
+	w1, w2 := &strings.Builder{}, &strings.Builder{}
+	// 短 context 只让脚本完成计划收缩并进入 TCP 路径，避免测试
+	// 对保留网段真正进行外部网络扫描. context canceled 是预期退出.
+	_, _ = tool.Callback(ctx, aitool.InvokeParams{
+		"hosts": "198.18.215.229",
+		"ports": "1-65535",
+		"mode":  "auto",
+	}, nil, w1, w2)
+
+	combined := w1.String() + "\n" + w2.String()
+	assert.Assert(t, strings.Contains(combined, "[SCAN_TUN_SAFE_MODE]"),
+		"expected machine-readable TUN-safe-mode marker:\n%s", combined)
+	assert.Assert(t, strings.Contains(combined, "effective-mode=tcp"),
+		"expected automatic TCP-connect fallback:\n%s", combined)
+	assert.Assert(t, strings.Contains(combined, "effective-ports=22,80,443,445,3306,3389,5432,6379,8000,8080,8443,9000"),
+		"expected broad request to be reduced to compact operational ports:\n%s", combined)
+	assert.Assert(t, strings.Contains(combined, "[AI_TODO_REQUIRED]"),
+		"expected explicit AI TODO instruction:\n%s", combined)
+	assert.Assert(t, !strings.Contains(combined, "starting SYN scan"),
+		"SYN scan must not start for a TUN/Fake-IP target:\n%s", combined)
+	assert.Assert(t, strings.Contains(combined, "starting TCP connect scan"),
+		"compact TCP scan should replace the broad SYN plan:\n%s", combined)
+}
+
 // TestMUSTPASS_ScanPortTool_CancelStopsTcpScanFast 端到端验证: 当 AI 插件 context
 // 被取消时, scan_port 的 TCP 扫描能借助注入的 CTX 迅速停止, 而不是把对一个 tarpit
 // 主机的全部端口扫完.

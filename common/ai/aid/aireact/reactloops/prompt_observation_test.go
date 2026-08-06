@@ -66,10 +66,19 @@ func (i *promptObservationTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, 
 	dynamic := NewPromptContainerSection("section.dynamic", "Pure Dynamic", PromptSectionRoleDynamic)
 	dynamic.Children = []*PromptSectionObservation{
 		NewPromptSectionObservation("section.dynamic.user_query", "User Query", PromptSectionRoleDynamic, false, "<|USER_QUERY_"+input.Nonce+"|>\nraw user input\n<|USER_QUERY_END_"+input.Nonce+"|>"),
-		NewPromptSectionObservation("section.dynamic.reactive_data", "Reactive Data", PromptSectionRoleDynamic, true, "<|REFLECTION_"+input.Nonce+"|>\nreactive context\n<|REFLECTION_END_"+input.Nonce+"|>"),
+		NewPromptSectionObservation("section.dynamic.reactive_data", "Reactive Data", PromptSectionRoleDynamic, true, "<|REACTIVE_DATA_"+input.Nonce+"|>\nreactive context\n<|REACTIVE_DATA_END_"+input.Nonce+"|>"),
 		NewPromptSectionObservation("section.dynamic.injected_memory", "Injected Memory", PromptSectionRoleDynamic, true, "<|INJECTED_MEMORY_"+input.Nonce+"|>\nmemory content\n<|INJECTED_MEMORY_END_"+input.Nonce+"|>"),
 	}
+	if strings.TrimSpace(input.TodoCheckpoint) != "" {
+		dynamic.Children = append(dynamic.Children,
+			NewPromptSectionObservation("section.dynamic.todo_checkpoint", "TODO Checkpoint", PromptSectionRoleDynamic, false, input.TodoCheckpoint),
+		)
+	}
 	dynamic = FinalizePromptContainerSection(dynamic)
+	dynamicContent := make([]string, 0, len(dynamic.Children))
+	for _, child := range dynamic.Children {
+		dynamicContent = append(dynamicContent, child.Content)
+	}
 
 	sections := []*PromptSectionObservation{highStatic, frozenBlock, semiDynamic1, semiDynamic2, timelineOpen, dynamic}
 	prompt := strings.Join([]string{
@@ -78,7 +87,7 @@ func (i *promptObservationTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, 
 		"<|PROMPT_SECTION_semi-dynamic-1|>\n" + strings.TrimSpace(semiDynamic1.Children[0].Content) + "\n<|PROMPT_SECTION_END_semi-dynamic-1|>",
 		"<|PROMPT_SECTION_semi-dynamic-2|>\n" + strings.TrimSpace(semiDynamic2.Children[0].Content) + "\n<|PROMPT_SECTION_END_semi-dynamic-2|>",
 		"<|PROMPT_SECTION_timeline-open|>\n" + strings.TrimSpace(timelineOpen.Children[0].Content+"\n\n"+timelineOpen.Children[1].Content) + "\n<|PROMPT_SECTION_END_timeline-open|>",
-		"<|PROMPT_SECTION_dynamic_" + input.Nonce + "|>\n" + strings.TrimSpace(dynamic.Children[0].Content+"\n\n"+dynamic.Children[1].Content+"\n\n"+dynamic.Children[2].Content) + "\n<|PROMPT_SECTION_dynamic_END_" + input.Nonce + "|>",
+		"<|PROMPT_SECTION_dynamic_" + input.Nonce + "|>\n" + strings.TrimSpace(strings.Join(dynamicContent, "\n\n")) + "\n<|PROMPT_SECTION_dynamic_END_" + input.Nonce + "|>",
 	}, "\n\n")
 	return &aicommon.LoopPromptAssemblyResult{
 		Prompt:   prompt,
@@ -105,13 +114,15 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	loop.actions.Set(loopAction_DirectlyAnswer.ActionType, loopAction_DirectlyAnswer)
 	loop.actions.Set(loopAction_Finish.ActionType, loopAction_Finish)
 	WithPersistentInstruction("persistent instruction")(loop)
-	WithReflectionOutputExample("example output")(loop)
+	WithOutputExample("example output")(loop)
 	WithReactiveDataBuilder(func(loop *ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 		return "reactive context", nil
 	})(loop)
 
 	task := newMockSimpleTask("test-task", "test-index")
 	loop.SetCurrentTask(task)
+	loop.softTodoChecked = true
+	loop.softTodoCheckpointPending = true
 	operator := NewActionHandlerOperator(task)
 
 	prompt, err := loop.generateLoopPrompt("nonce1", "raw user input", "", nil, "memory content", operator)
@@ -148,6 +159,12 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, "section.dynamic.user_query", observation.Sections[5].Children[0].Key)
 	require.True(t, observation.Sections[5].Children[1].Compressible)
 	require.True(t, observation.Sections[5].Children[2].Compressible)
+	require.Len(t, observation.Sections[5].Children, 4)
+	require.Equal(t, "section.dynamic.todo_checkpoint", observation.Sections[5].Children[3].Key)
+	require.False(t, observation.Sections[5].Children[3].Compressible)
+	require.Contains(t, observation.Sections[5].Children[3].Content, "[SOFT TODO CHECKPOINT]")
+	require.Less(t, strings.Index(prompt, "<|INJECTED_MEMORY_END_nonce1|>"), strings.Index(prompt, "[SOFT TODO CHECKPOINT]"))
+	require.Less(t, strings.Index(prompt, "[SOFT TODO CHECKPOINT]"), strings.Index(prompt, "<|PROMPT_SECTION_dynamic_END_nonce1|>"))
 	require.Len(t, observation.Stats.RoleStats, 6)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleHighStatic).RoleBytes)
 	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleHighStatic).RoleTokens)

@@ -76,14 +76,14 @@ func (t *AiTask) execute() error {
 			// Check if completed_task_index indicates this task should be marked as done
 			// This provides an additional mechanism to end tasks beyond just isDone
 			lastRecord := loop.GetLastSatisfactionRecordFull()
-			var summary, completedTaskIndex, nextMovements string
+			var summary, completedTaskIndex, nextSteps string
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
-				// 注: verification 收缩为纯观测角色后不再产出 NextMovements,
-				// nextMovements 保持空串 (TODO 推进交由主循环 adjust_todolist).
+				// 注: verification 收缩为纯观测角色后不再产出 TodoDelta,
+				// nextSteps 保持空串 (TODO 推进交由主循环 todo_delta).
 				// 下游 generateTaskSummary / updateProcessingStatus / saveTaskArtifacts
-				// 都有 `if nextMovements != ""` 守卫, 空串会被优雅跳过.
+				// 都有 `if nextSteps != ""` 守卫, 空串会被优雅跳过.
 				// Evidence 仍是 verification 的核心产出, 保留.
 
 				var allOps []aicommon.EvidenceOperation
@@ -131,7 +131,7 @@ func (t *AiTask) execute() error {
 				// Emit task completing status
 				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 正在总结 / Task [%s] Generating Summary...", t.Index, t.Index))
 
-				err := t.generateTaskSummary(summary, nextMovements)
+				err := t.generateTaskSummary(summary, nextSteps)
 				if err != nil {
 					log.Errorf("iteration task summary failed: %v", err)
 					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结失败 / Task [%s] Summary Failed", t.Index, t.Index))
@@ -145,17 +145,17 @@ func (t *AiTask) execute() error {
 				// Emit continuing status
 				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
 
-				// Combine summary (reasoning) and next_movements as Processing status
+				// Combine summary (reasoning) and todo_delta as Processing status
 				// This ensures both are captured in StatusSummary to avoid context loss
-				t.updateProcessingStatus(summary, nextMovements)
+				t.updateProcessingStatus(summary, nextSteps)
 
 				if t.Coordinator != nil && summary != "" {
 					timelineMsg := fmt.Sprintf(
 						"[task-verification] Task %s iteration %d verification: not yet complete. Reason: %s",
 						t.Index, iteration, summary,
 					)
-					if nextMovements != "" {
-						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextMovements)
+					if nextSteps != "" {
+						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextSteps)
 					}
 					if timeline := t.CurrentTimeline(); timeline != nil {
 						timeline.PushText(t.Coordinator.AcquireId(), timelineMsg)
@@ -168,7 +168,7 @@ func (t *AiTask) execute() error {
 
 			var lastVerificationInfo string
 			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
-				// 注: verification 收缩为纯观测角色后不再产出 NextMovements,
+				// 注: verification 收缩为纯观测角色后不再产出 TodoDelta,
 				// 这里只沉淀 satisfied + reasoning 作为观测信号.
 				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
 			}
@@ -329,7 +329,7 @@ func (t *AiTask) executeTask() error {
 	return nil
 }
 
-func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
+func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 生成总结提示 / Task [%s] Generating Summary Prompt...", t.Index, t.Index))
 
 	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
@@ -475,7 +475,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))
 
 	// Save timeline diff and result summary artifacts
-	if err := t.saveTaskArtifacts(summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+	if err := t.saveTaskArtifacts(summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
 		log.Warnf("failed to save task artifacts for task %s: %v", t.Index, err)
 		// Don't return error, as summary generation is already successful
 	}
@@ -504,7 +504,7 @@ func selectTaskSummaries(statusSummary, shortSummary, longSummary string) (conci
 }
 
 // saveTaskArtifacts saves timeline diff and result summary to files in the task directory
-func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
+func (t *AiTask) saveTaskArtifacts(summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary string) error {
 	// Get workdir
 	workdir := ""
 	if t.Coordinator != nil && t.Coordinator.Workdir != "" {
@@ -535,7 +535,7 @@ func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSu
 	}
 
 	// Save result summary
-	if err := t.saveResultSummary(taskDir, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+	if err := t.saveResultSummary(taskDir, summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
 		log.Warnf("failed to save result summary for task %s: %v", t.Index, err)
 	}
 
@@ -615,7 +615,7 @@ func (t *AiTask) saveTimelineDiff(taskDir string) error {
 }
 
 // saveResultSummary saves the result summary to task_{{index}}_{{semantic_identifier}}_result_summary.txt
-func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
+func (t *AiTask) saveResultSummary(taskDir string, summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary string) error {
 	// Get task index for filename
 	taskIndex := t.Index
 	if taskIndex == "" {
@@ -702,9 +702,9 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statu
 		contentBuilder.WriteString("\n\n")
 		hasContent = true
 	}
-	if nextMovements != "" {
-		contentBuilder.WriteString("### Next Movements\n")
-		contentBuilder.WriteString(nextMovements)
+	if nextSteps != "" {
+		contentBuilder.WriteString("### Next Steps\n")
+		contentBuilder.WriteString(nextSteps)
 		contentBuilder.WriteString("\n\n")
 		hasContent = true
 	}
@@ -826,11 +826,11 @@ func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {
 	return string(utils.Jsonify(callResult.Data))
 }
 
-// updateProcessingStatus combines summary (reasoning) and next_movements into StatusSummary
+// updateProcessingStatus combines summary (reasoning) and todo_delta into StatusSummary
 // This ensures both the current status analysis and next action plan are preserved
 // to avoid context loss when timeline becomes too long
-func (t *AiTask) updateProcessingStatus(summary string, nextMovements string) {
-	if summary == "" && nextMovements == "" {
+func (t *AiTask) updateProcessingStatus(summary string, nextSteps string) {
+	if summary == "" && nextSteps == "" {
 		return
 	}
 
@@ -841,13 +841,13 @@ func (t *AiTask) updateProcessingStatus(summary string, nextMovements string) {
 		statusParts = append(statusParts, fmt.Sprintf("【当前状态】%s", summary))
 	}
 
-	// Add next_movements as action plan
-	if nextMovements != "" {
-		statusParts = append(statusParts, fmt.Sprintf("【下一步计划】%s", nextMovements))
+	// Add todo_delta as action plan
+	if nextSteps != "" {
+		statusParts = append(statusParts, fmt.Sprintf("【下一步计划】%s", nextSteps))
 	}
 
 	// Combine both parts into StatusSummary
 	t.StatusSummary = strings.Join(statusParts, "\n")
 
-	log.Infof("task %s processing status updated: summary=%q, nextMovements=%q", t.Index, summary, nextMovements)
+	log.Infof("task %s processing status updated: summary=%q, nextSteps=%q", t.Index, summary, nextSteps)
 }

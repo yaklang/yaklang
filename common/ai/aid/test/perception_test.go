@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // TestPerception_DefaultLoop_PerceptionTriggered verifies that when perception is
@@ -36,13 +35,6 @@ func TestPerception_DefaultLoop_PerceptionTriggered(t *testing.T) {
 			if isVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
 				rsp.Close()
 				return rsp, nil
 			}

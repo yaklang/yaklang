@@ -179,8 +179,8 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 
 	var outputExample string
-	if r.reflectionOutputExampleProvider != nil {
-		outputExample, err = r.reflectionOutputExampleProvider(r, "") // persistent context not use nonce
+	if r.outputExampleProvider != nil {
+		outputExample, err = r.outputExampleProvider(r, "") // persistent context not use nonce
 		if err != nil {
 			return "", utils.Wrap(err, "build output example failed")
 		}
@@ -200,6 +200,7 @@ func (r *ReActLoop) generateLoopPrompt(
 			})
 		}
 	}
+	todoCheckpoint := r.consumeTodoCheckpoint()
 
 	// Render skills context if the manager is available.
 	// 三态分离: SkillsContext (SemiDynamic 1, 含 catalog) + ForcedSkills (frozen_block
@@ -222,7 +223,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	// 全局 TODO 块: 与 SessionEvidence 同处 timeline-open 段, 物理位置紧跟
 	// SessionEvidence 之后. 任何 loop iteration 都能看到, 不再受限于 Verify
 	// 调用时机. 数据源是 SessionPromptState 的 VerificationTodoStore, 由
-	// VerifyUserSatisfaction 通过 ApplyVerificationTodoOps 增量写入.
+	// 正常 ReAct action 通过 ApplyTodoDelta 增量写入；verification 保持只读.
 	// 关键词: TodoSnapshot 渲染, timeline-open 全局可见, SessionPromptState
 	var todoSnapshot string
 	if r.shouldRenderTodoSnapshot() {
@@ -265,6 +266,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		TodoSnapshot:      todoSnapshot,
 		ReactiveData:      reactiveData,
 		InjectedMemory:    memory,
+		TodoCheckpoint:    todoCheckpoint,
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")

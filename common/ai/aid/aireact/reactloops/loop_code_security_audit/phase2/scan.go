@@ -15,7 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-		"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -397,7 +397,7 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 
 **当前迭代**: {{ .IterationCount }} | **本轮 Finding 数**: {{ .FindingsCount }}
 
-{{ if not .IsSearchPhase }}[终止规则] complete_scan 仅在**全部**目标文件均已 mark_file_done 后才会被接受。每个文件：read_file → mark_file_done；不可用 next_movements 跳过 mark。{{ end }}`
+{{ if not .IsSearchPhase }}[终止规则] complete_scan 仅在**全部**目标文件均已 mark_file_done 后才会被接受。每个文件：read_file → mark_file_done；不可用 todo_delta 跳过 mark。{{ end }}`
 
 // buildSingleCategoryScanLoop 构建针对单一漏洞类别的扫描 Loop（两阶段：discovery → 逐文件审计）。
 //
@@ -406,7 +406,7 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 //   - grep mutator: phase-B content mode + grep counters (phase2_grep_guard.go)
 //   - discovery guard: block find_file/tree in phase B
 //   - trace grep guard: scoped content grep in phase B
-//   - spot-read / read-spin guards: phase2_guards.go
+//   - spot-read / repeated-read guards: phase2_guards.go
 func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, category model.VulnCategory, categoryIndex, categoryTotal int, initialScan *ScanState, artifacts *categoryArtifactStore) (*reactloops.ReActLoop, *ScanState, error) {
 	scan := initialScan
 	if scan == nil {
@@ -423,9 +423,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithSameActionTypeSpinThreshold(len(category.SinkHints)*2 + 5),
-		reactloops.WithSameLogicSpinThreshold(3),
-		reactloops.WithMaxConsecutiveSpinWarnings(4),
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
@@ -442,7 +439,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			}
 			return utils.RenderTemplate(phase2ScanInstruction, vars)
 		}),
-		reactloops.WithReflectionOutputExample(phase2OutputExample),
+		reactloops.WithOutputExample(phase2OutputExample),
 
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 			iterCount := loop.GetCurrentIterationIndex()
@@ -574,7 +571,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 		reactloops.WithToolInvokeGuard(buildPhase2PhaseBDiscoveryToolGuard(scan)),
 		reactloops.WithToolInvokeGuard(buildPhase2PhaseBGrepGuard(scan, state.ProjectPath)),
 		reactloops.WithToolInvokeGuard(buildPhase2PhaseASpotReadGuard(scan)),
-		reactloops.WithToolInvokeGuard(buildPhase2PhaseBReadSpinGuard(scan)),
+		reactloops.WithToolInvokeGuard(buildPhase2PhaseBReadRepeatGuard(scan)),
 
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, op *reactloops.OnPostIterationOperator) {
 			if !isDone || scanCompleted {
@@ -963,7 +960,6 @@ func BuildAllCategoriesLoop(r aicommon.AIInvokeRuntime, state *model.AuditState,
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithEnableSelfReflection(false),
 
 		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 			finalCategories := overrideCategories

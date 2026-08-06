@@ -8,10 +8,10 @@
 {{- if .VerifiedJsDir }}
 - **Verified JS dir** (use `js_static_extract_ai` **dir=**, not paths=): {{ .VerifiedJsDir }}
 {{- end }}
-{{- if .SpinRecoveryHint }}
+{{- if .PathFailureRecoveryHint }}
 
-### SPIN recovery (mandatory)
-{{ .SpinRecoveryHint }}
+### Path failure recovery (mandatory)
+{{ .PathFailureRecoveryHint }}
 {{- end }}
 
 ### API pool summary

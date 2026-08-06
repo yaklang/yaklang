@@ -41,7 +41,8 @@ func ensureDiagnosticsLevelEnabled() {
 }
 
 func (c *Config) DiagnosticsEnabled() bool {
-	return c != nil && (c.diagnosticsEnabled || (c.Config != nil && c.Config.GetCompileDiagnostics()))
+	// Diagnostics monitoring removed; always returns false so all diagnostic code paths are no-ops.
+	return false
 }
 
 func (c *Config) applyNestedSettings(rec *diagnostics.Recorder) {
@@ -57,15 +58,8 @@ func (c *Config) applyNestedSettings(rec *diagnostics.Recorder) {
 }
 
 func (c *Config) DiagnosticsRecorder() *diagnostics.Recorder {
-	if !c.DiagnosticsEnabled() {
-		return nil
-	}
-	if c.diagnosticsRecorder == nil {
-		rec := diagnostics.NewRecorder()
-		c.applyNestedSettings(rec)
-		c.diagnosticsRecorder = rec
-	}
-	return c.diagnosticsRecorder
+	// Diagnostics monitoring removed; always returns nil.
+	return nil
 }
 
 func (c *Config) SetDiagnosticsRecorder(rec *diagnostics.Recorder) {

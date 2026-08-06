@@ -20,10 +20,10 @@
 ### 当前搜索结果
 {{ .SearchResults }}
 
-{{ if .NextMovementsSummary }}
+{{ if .NextSearchSummary }}
 ### 下一步建议汇总
 以下是前几轮搜索中 AI 给出的改进建议：
-{{ .NextMovementsSummary }}
+{{ .NextSearchSummary }}
 {{ end }}
 
 {{ if .ArtifactsSummary }}

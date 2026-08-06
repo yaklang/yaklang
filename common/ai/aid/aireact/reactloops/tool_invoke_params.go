@@ -22,11 +22,11 @@ func ToolParamAITagNames(tool *aitool.Tool) []string {
 
 func isLoopActionToolInvokeMetaKey(key string) bool {
 	switch key {
-	case "@action", "identifier", "human_readable_thought", "next_movements",
+	case "@action", "identifier", "human_readable_thought", "todo_delta",
 		aicommon.ReservedKeyCallExpectations, aicommon.ReservedKeyIdentifier:
 		return true
 	}
-	if strings.HasPrefix(key, "next_movements.") {
+	if strings.HasPrefix(key, "todo_delta.") {
 		return true
 	}
 	if strings.HasPrefix(key, aicommon.GetToolParamAITagActionKey("")) {

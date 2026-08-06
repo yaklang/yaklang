@@ -18,7 +18,7 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 		lines = append(lines, aicommon.FormatVerificationTodoLine(item))
 	}
 	return fmt.Sprintf(
-		"current task still has %d active TODO item(s); %s cannot exit until each one is explicitly closed via adjust_todolist or verification next_movements with op=done / op=delete / op=skip.\nRemaining TODOs:\n%s",
+		"current task still has %d open TODO item(s); %s cannot exit until each one is closed through todo_delta.close with outcome resolved, dismissed, or deferred and a non-empty reason. Do not fabricate completion.\nRemaining TODOs:\n%s",
 		len(items),
 		actionName,
 		strings.Join(lines, "\n"),
@@ -35,9 +35,9 @@ func buildFinishBlockedByGoalModeMessage(currentIteration, goalMinIterations int
 
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
-	Description: "Mark the current task as finished and exit the loop IMMEDIATELY. " +
-		"This is the ONLY action that terminates the ReAct loop — no other action ends the task implicitly. " +
-		"PREFERRED completion action whenever evidence/results are already present in the timeline " +
+	Description: "Request completion of the current task. The first valid request starts one soft TODO checkpoint; confirm with finish again after that checkpoint to exit. " +
+		"This is the normal terminator for non-trivial ReAct tasks; the only narrow host exception is a classifier-approved simple_query with no effective todo_delta or open TODO. " +
+		"Use it when evidence/results are already present in the timeline and no evidence-backed, in-scope, immediately executable next action would materially improve confidence, risk coverage, or impact assessment " +
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +
@@ -53,6 +53,15 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
+		if !loop.requestSoftTodoCheckpoint() {
+			msg := "finish requested; a soft TODO checkpoint will be shown in the next context before termination can be confirmed"
+			if loop.invoker != nil {
+				loop.invoker.AddToTimeline("SOFT_TODO_CHECKPOINT_REQUESTED", msg)
+			}
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 			msg := buildExitBlockedByTodoMessage("finish", items)
 			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
@@ -60,7 +69,9 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
-		loop.invoker.AddToTimeline("finish", "AI decided mark the current Task is finished")
+		if loop.invoker != nil {
+			loop.invoker.AddToTimeline("finish", "AI confirmed finish after the soft TODO checkpoint")
+		}
 		operator.Exit()
 	},
 }
@@ -68,9 +79,10 @@ var loopAction_Finish = &LoopAction{
 var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType: "directly_answer",
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
-		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. " +
-		"To terminate the ReAct loop you MUST use the 'finish' action (the only terminator). " +
-		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
+		"For ordinary tasks directly_answer ONLY delivers the answer; use 'finish' when the latest user input is fully answered and no open TODO remains. " +
+		"A classifier-approved simple_query with no effective todo_delta and no open TODO is closed by the host immediately after delivery. " +
+		"Do not call directly_answer twice without an effective todo_delta in the same CURRENT-TASK; repeated or rephrased answers are rejected. " +
+		"Carry a non-empty 'todo_delta' alongside a progress answer whenever it changes or schedules follow-up TODO state.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
@@ -111,8 +123,7 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			// 关键词: directly_answer ActionVerifier AITAG hint, 5 次重试黑洞修复
 			return WrapDirectlyAnswerError(loop, utils.Error("answer_payload is required for ActionDirectlyAnswer but empty"))
 		}
-		loop.Set("directly_answer_payload", payload)
-		return nil
+		return FinishDirectlyAnswerVerification(loop, action, payload)
 	},
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		invoker := loop.GetInvoker()
@@ -126,10 +137,8 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			return
 		}
 
-		// directly_answer 绝不 Exit: 无论是否有未关闭 TODO, 都先把答复 emit
-		// 出去, 再交给 DirectlyAnswerContinue 追加 timeline + 续跑. 真正终结
-		// 整个 ReAct 只能由显式 finish action 完成, 不存在任何隐式 Exit.
-		// 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器
+		// 答复交付后由共享收口决定续跑、simple_query 自动结束，
+		// 或提醒下一轮通过 todo_delta / finish 收敛，避免重复回答。
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
 		invoker.AddToTimeline(TimelineEntryAssistantOutput, fmt.Sprintf("user input: \n"+

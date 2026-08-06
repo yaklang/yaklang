@@ -1459,7 +1459,6 @@ func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloo
 		verifyResult.Satisfied,
 		verifyResult.Reasoning,
 		verifyResult.CompletedTaskIndex,
-		verifyResult.NextMovements,
 		verifyResult.Evidence,
 		verifyResult.EvidenceOps,
 	)

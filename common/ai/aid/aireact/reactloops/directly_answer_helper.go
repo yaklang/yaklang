@@ -11,54 +11,96 @@ import (
 // directly_answer 与各 loop 专用 directly_answer 复用, 调用方把答复 emit 完
 // 之后调它代替裸 operator.Exit(), 让 "改 directly_answer 很简单".
 //
-// 核心约定 (与 high_static_section.txt 的 "## 任务状态机制: next_movements"
-// 以及 "统一入口与终结" 对齐): directly_answer 绝不 Exit. 它只负责把答复发
-// 出去, 然后追加一条 timeline 表明 "回答已交付, 循环继续", 并 Continue. 真正
-// 结束整个 ReAct 循环只能由显式的 finish action 完成 (见 loopAction_Finish),
-// 系统里不存在任何隐式 Exit.
+// 核心约定 (与 instruction.txt 的 "## TODO 状态维护（todo_delta）"
+// 以及 "统一入口与终结" 对齐): directly_answer 只交付答复, 不应被当成
+// 通用终结器. 普通任务由 finish 收口; 但 intent classifier 已明确标记为
+// simple_query、本轮无有效 todo_delta 且无开放 TODO 时, host 在答复交付后
+// 直接 Exit, 避免为了补一个 finish 再次调模型.
 //
 // 语义分支:
-//   - 携带 next_movements 增量: timeline 标注循环将继续推进这些 TODO 更新.
+//   - 携带 todo_delta 增量: timeline 标注循环将继续推进这些 TODO 更新.
 //   - 未携带增量: timeline 标注答复已交付, 需要时用 finish 收尾. 若当前任务
 //     仍有未关闭 (pending/doing) TODO, 额外 Feedback 提醒 AI 先把 TODO 关掉
 //     再 finish (finish 会被 blocked-by-todo 闸门拦住, 提前告知更顺滑).
 //
-// 注意: next_movements 增量的 store apply 由主循环 (exec.go 的
-// applyNextMovementsBottomLine) 在 ActionHandler 之前完成, 所以这里
+// 注意: todo_delta 增量的 store apply 由主循环 (exec.go 的
+// applyTodoDeltaBottomLine) 在 ActionHandler 之前完成, 所以这里
 // GetBlockingVerificationTodoItems 读到的就是 apply 之后的状态.
 //
-// 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器,
-//
-//	directly_answer 改起来很简单
-const loopIntentHintSimpleQuery = "simple_query"
-
 // Timeline 里记录用户可见答复时，不使用 directly_answer 等 action 名，避免 agent
 // 从 timeline 反推出「可随时调用 directly_answer」。
 const (
 	TimelineEntryAssistantOutput     = "assistant_output"
 	TimelineEntryAssistantOutputNote = "assistant_output_note"
 	TimelineAssistantOutputLabel     = "assistant output:"
+	loopIntentHintSimpleQuery        = "simple_query"
+
+	loopVarDirectlyAnswerDeliveredWithoutTodoDelta = "directly_answer_delivered_without_todo_delta"
+
+	// TimelineEntryModelThinking is the timeline entry type for the pure AI
+	// reasoning/thinking stream captured during an iteration. It is display-only
+	// and excluded from prompt projection (see timeline_prompt_projection.go).
+	TimelineEntryModelThinking = "model_thinking"
 )
 
-// ShouldAutoFinishAfterSimpleQueryDirectlyAnswer reports whether a directly_answer
-// on a greeting/status (simple_query) task should terminate the loop immediately
-// after emitting the user-visible answer. No extra LLM round for finish/post-summary.
+const errDuplicateDirectlyAnswerWithoutTodoDelta = "assistant output was already delivered for this CURRENT-TASK without an effective todo_delta; " +
+	"do not emit another answer or rephrase the previous one. Use 'finish' if the latest user input is fully answered, " +
+	"or choose a tool action and maintain todo_delta if more work remains."
+
+func directlyAnswerHasTodoDelta(action *aicommon.Action) bool {
+	delta, err := aicommon.NormalizeTodoDelta(action)
+	return err == nil && delta != nil
+}
+
+func directlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop) bool {
+	if loop == nil {
+		return false
+	}
+	value, _ := loop.GetVariable(loopVarDirectlyAnswerDeliveredWithoutTodoDelta).(bool)
+	return value
+}
+
+// RejectDuplicateDirectlyAnswerWithoutTodoDelta blocks a second user-visible
+// answer in the same CURRENT-TASK when the first answer did not schedule any
+// state change. A directly_answer with an effective todo_delta remains valid:
+// it is a progress handoff rather than an accidental replay.
+func RejectDuplicateDirectlyAnswerWithoutTodoDelta(loop *ReActLoop, action *aicommon.Action) error {
+	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) || !directlyAnswerDeliveredWithoutTodoDelta(loop) {
+		return nil
+	}
+	return utils.Error(errDuplicateDirectlyAnswerWithoutTodoDelta)
+}
+
+// FinishDirectlyAnswerVerification applies the duplicate guard shared by the
+// built-in and specialized directly_answer actions, then stores their payload.
+func FinishDirectlyAnswerVerification(loop *ReActLoop, action *aicommon.Action, payload string) error {
+	if err := RejectDuplicateDirectlyAnswerWithoutTodoDelta(loop, action); err != nil {
+		return err
+	}
+	loop.Set("directly_answer_payload", payload)
+	return nil
+}
+
+func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicommon.Action) {
+	if loop == nil || action == nil || directlyAnswerHasTodoDelta(action) {
+		return
+	}
+	loop.Set(loopVarDirectlyAnswerDeliveredWithoutTodoDelta, true)
+}
+
+// ShouldAutoFinishAfterSimpleQueryDirectlyAnswer identifies the narrow host
+// guard for greetings, status checks, and other classifier-approved trivial
+// inquiries. No extra model round is useful when the answer was delivered and
+// neither todo_delta nor the persistent TODO store contains remaining work.
 func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
-	if loop == nil || action == nil {
+	if loop == nil || action == nil || strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
 		return false
 	}
-	if strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
+	if directlyAnswerHasTodoDelta(action) {
 		return false
 	}
-	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
+	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 		return false
-	}
-	cfg := loop.GetConfig()
-	task := loop.GetCurrentTask()
-	if cfg != nil && task != nil {
-		if len(aicommon.GetBlockingVerificationTodoItems(cfg, task)) > 0 {
-			return false
-		}
 	}
 	return true
 }
@@ -71,11 +113,12 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		operator.Continue()
 		return
 	}
+	noteDirectlyAnswerDeliveredWithoutTodoDelta(loop, action)
 	invoker := loop.GetInvoker()
-	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
+	if directlyAnswerHasTodoDelta(action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
-				"assistant output delivered; the loop continues to honor the scheduled next_movements. "+
+				"assistant output delivered; the loop continues to honor the scheduled todo_delta. "+
 					"Use the 'finish' action to end the task once all work is done.")
 		}
 		operator.Continue()
@@ -83,23 +126,19 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	}
 	if ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action) {
 		if !utils.IsNil(invoker) {
-			invoker.AddToTimeline(
-				TimelineEntryAssistantOutputNote,
-				"simple query: greeting reply delivered to the user; CURRENT-TASK has no further work. "+
-					"Terminating the ReAct loop (do not repeat the same greeting reply).",
-			)
+			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
+				"simple_query answer delivered; CURRENT-TASK has no effective todo_delta or open TODO. "+
+					"The host is closing this trivial exchange without another model iteration.")
 		}
 		operator.Exit()
 		return
 	}
 	if !utils.IsNil(invoker) {
 		invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
-			"assistant output delivered; the task is NOT complete yet. "+
-				"The ReAct loop CONTINUES automatically — the user does NOT need to reply '继续'/'continue' for you to proceed. "+
-				"If you already know the next step, EXECUTE it now in the next iteration via require_tool / directly_call_tool / request_plan; "+
-				"do NOT merely announce it and wait for the user's permission. "+
-				"When the entire CURRENT-TASK is complete, use the 'finish' action to terminate the ReAct loop. "+
-				"Do not repeat the same answer; continue with tools, next_movements, or finish.")
+			"assistant output delivered. Do not repeat or rephrase the same answer. "+
+				"Re-evaluate CURRENT-TASK: if the latest user input is fully answered and no open TODO remains, use 'finish' now; "+
+				"otherwise continue the existing Current with tools and maintain todo_delta. "+
+				"The user does not need to reply 'continue'.")
 	}
 	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 		operator.Feedback(buildExitBlockedByTodoMessage("finish", items))

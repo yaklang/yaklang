@@ -182,6 +182,7 @@ type Config struct {
 	EventHandler           func(e *schema.AiOutputEvent)
 	DisableOutputEventType []string
 	SaveEvent              bool
+	FocusRuntime           FocusRuntime
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -289,8 +290,6 @@ type Config struct {
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
 	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
-	EnableSelfReflection bool
-
 	// other context
 	PersistentMemory []string
 
@@ -1467,6 +1466,22 @@ func WithEmitter(emitter *Emitter) ConfigOption {
 	}
 }
 
+// WithFocusRuntime installs the capability boundary used by server-released
+// Yak Focus code. Desktop and client runtimes leave it unset.
+func WithFocusRuntime(runtime FocusRuntime) ConfigOption {
+	return func(c *Config) error {
+		c.FocusRuntime = runtime
+		return nil
+	}
+}
+
+func (c *Config) GetFocusRuntime() FocusRuntime {
+	if c == nil {
+		return nil
+	}
+	return c.FocusRuntime
+}
+
 // Event / output
 func WithEventHandler(handler func(e *schema.AiOutputEvent)) ConfigOption {
 	return func(c *Config) error {
@@ -2197,18 +2212,6 @@ func WithMemoryPoolSize(sz int64) ConfigOption {
 	}
 }
 
-func WithEnableSelfReflection(v bool) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		c.EnableSelfReflection = v
-		c.m.Unlock()
-		return nil
-	}
-}
-
 func WithEnablePlanAndExec(enable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2465,8 +2468,7 @@ func WithDisableIntentRecognition(disable bool) ConfigOption {
 	}
 }
 
-// WithSyncPerceptionTrigger when true, MaybeTriggerPerceptionAfterAction
-// and TriggerPerceptionOnSpin invoke TriggerPerception on the caller goroutine;
+// WithSyncPerceptionTrigger makes perception triggers run on the caller goroutine;
 // when false (default), they spawn a goroutine.
 func WithSyncPerceptionTrigger(enable bool) ConfigOption {
 	return func(c *Config) error {
@@ -3329,26 +3331,31 @@ func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope)
 	return c.GetSessionPromptState().GetVerificationTodoRendered(currentScope)
 }
 
-// ApplyVerificationTodoOps applies one verification round's next_movements to
-// the persisted TODO store. When the persistent session id is configured, the
-// resulting JSON is also flushed to DB (TODO persistence hooks may be added
-// later — for now this only updates the in-memory SessionPromptState).
+// ApplyTodoDelta applies one normal ReAct action's optional todo_delta to the
+// persisted TODO store. When the persistent session id is configured, the
+// resulting canonical JSON is retained by the shared SessionPromptState.
 //
-// 关键词: ApplyVerificationTodoOps, Verify 写入, SessionPromptState 同步
-func (c *Config) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
+// 关键词: ApplyTodoDelta, ReAct 增量写入, SessionPromptState 同步
+func (c *Config) ApplyTodoDelta(scope VerificationTodoScope, delta *TodoDelta) []VerificationTodoApplyResult {
 	if c == nil {
 		return nil
 	}
-	// 即便没有 movements, satisfied=true 也可能触发 SKIPPED 状态转换；故不 early-return.
-	return c.GetSessionPromptState().ApplyVerificationTodoOps(scope, satisfied, movements)
+	return c.GetSessionPromptState().ApplyTodoDelta(scope, delta)
+}
+
+func (c *Config) ValidateTodoDelta(scope VerificationTodoScope, delta *TodoDelta) error {
+	return c.GetSessionPromptState().ValidateTodoDelta(scope, delta)
 }
 
 // GetVerificationTodoMarkdownDelta returns the markdown snapshot computed
 // against the current state without mutating it. Use this when you need the
-// delta markers (new / done / deleted / skipped) for a markdown stream emitted
-// BEFORE you commit the ops via ApplyVerificationTodoOps.
-func (c *Config) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) string {
-	return c.GetSessionPromptState().GetVerificationTodoMarkdownDelta(scope, satisfied, movements)
+// projected snapshot before committing the delta via ApplyTodoDelta.
+func (c *Config) GetVerificationTodoMarkdownDelta(scope VerificationTodoScope, delta *TodoDelta) string {
+	return c.GetSessionPromptState().GetVerificationTodoMarkdownDelta(scope, delta)
+}
+
+func (c *Config) SnapshotCanonicalTodos(scope VerificationTodoScope) ([]TodoOpenItem, string, []TodoClosedItem) {
+	return c.GetSessionPromptState().SnapshotCanonicalTodos(scope)
 }
 
 // SnapshotVerificationTodoItems returns a deep-copied slice of the current
@@ -4092,6 +4099,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.EventHandler != nil {
 		opts = append(opts, WithEventHandler(i.EventHandler))
+	}
+	if i.FocusRuntime != nil {
+		opts = append(opts, WithFocusRuntime(i.FocusRuntime))
 	}
 
 	if i.GetUserUsageCallback() != nil {

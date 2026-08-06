@@ -322,11 +322,6 @@ func TestPerceptionState_ShouldUpdate_ForcedAlwaysTrue(t *testing.T) {
 		t.Fatal("forced trigger should always update")
 	}
 
-	newState.LastTrigger = PerceptionTriggerSpinDetected
-	if !prev.ShouldUpdate(newState) {
-		t.Fatal("spin_detected trigger should always update")
-	}
-
 	newState.LastTrigger = PerceptionTriggerLoopSwitch
 	if !prev.ShouldUpdate(newState) {
 		t.Fatal("loop_switch trigger should always update")
@@ -663,12 +658,10 @@ func TestShouldRefreshDownstream_ForcedBypassesGate(t *testing.T) {
 		"forced + 空 IntentShift 必须绕门触发下游")
 }
 
-// TestShouldRefreshDownstream_SpinAndLoopSwitchObeyGate 验证用户的明确选择:
-// spin_detected / loop_switch 不再无条件触发下游, 仍受 IntentShift 门控约束.
-//
-// 关键词: TestShouldRefreshDownstream spin_detected loop_switch 受门控
-func TestShouldRefreshDownstream_SpinAndLoopSwitchObeyGate(t *testing.T) {
-	for _, trigger := range []string{PerceptionTriggerSpinDetected, PerceptionTriggerLoopSwitch} {
+// TestShouldRefreshDownstream_LoopSwitchObeysGate verifies loop switches still
+// obey the intent-shift gate.
+func TestShouldRefreshDownstream_LoopSwitchObeysGate(t *testing.T) {
+	for _, trigger := range []string{PerceptionTriggerLoopSwitch} {
 		t.Run(trigger+"/drift skipped", func(t *testing.T) {
 			s := &PerceptionState{
 				IntentShift: IntentShiftDrift,

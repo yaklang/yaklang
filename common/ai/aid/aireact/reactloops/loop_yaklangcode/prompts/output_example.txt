@@ -1,0 +1,98 @@
+## 输出示例（只示范"动作 JSON + 代码块"的格式，规则细节见 persistent 指令）
+
+> 一体化提醒：下面示例为方便阅读用了 ```json 围栏，**真实输出时没有围栏**——JSON 那一行后**直接紧跟** `<|GEN_CODE_CURRENT_NONCE|>` 代码块，两者是同一次输出、不可分割。输出完 JSON **不要停**，必须当场把代码块写完整(含 END 标记)。
+
+### 诊断优先（Diagnose-Before-Treat）
+1. 每次 `modify_code` 后先读返回的 lint，判断错误类型（API 不存在 / SyntaxError / undefined / 参数类型）。
+2. 据类型对症处理：API 不存在→读已附加文档或 `yakdoc_function_details`；SyntaxError/undefined→`grep_yaklang_samples`；参数类型/个数→改实参不换函数名。
+3. 拿到新信息后再 `modify_code` 一次改对。禁止在不懂错因时连续试探。
+
+---
+
+### 1. write_code（创建新代码）—— 必须带 GEN_CODE 代码块
+```json
+{"@action": "write_code", "human_readable_thought": "创建一个端口扫描脚本"}
+```
+<|GEN_CODE_CURRENT_NONCE|>
+yakit.AutoInitYakit()
+
+target := cli.String("target", cli.setRequired(true))
+ports := cli.String("ports", cli.setDefault("80,443"))
+cli.check()
+
+results, err := servicescan.Scan(target, ports)
+die(err)
+for result in results {
+    yakit.Info("Found: %v", result.String())
+}
+<|GEN_CODE_END_CURRENT_NONCE|>
+
+### 1b. write_code 写热加载脚本 —— 末尾必须带 if YAK_MAIN 自测块
+热加载脚本(定义 mirror*/hijack*/beforeRequest 等 hook)直接运行不触发 hook，必须追加自测块让用户能 `yak x.yak` 测试：
+```json
+{"@action": "write_code", "human_readable_thought": "MITM 新路径探测热加载，附 YAK_MAIN 自测"}
+```
+<|GEN_CODE_CURRENT_NONCE|>
+DISCOVERED = make(map[string]bool)
+mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {
+    DISCOVERED[url] = true
+    log.info("new path: %s", url)
+}
+
+func runSelfTest() {
+    req := []byte("GET / HTTP/1.1\r\nHost: target.local\r\n\r\n")
+    rsp := []byte("HTTP/1.1 200 OK\r\n\r\nok")
+    mirrorNewWebsitePath(false, "http://target.local/a", req, rsp, []byte("ok"))
+    mirrorNewWebsitePath(false, "http://target.local/b", req, rsp, []byte("ok"))
+    assert len(DISCOVERED) == 2, "should discover 2 paths"
+    log.info("self test passed")
+}
+
+if YAK_MAIN {
+    runSelfTest()
+}
+<|GEN_CODE_END_CURRENT_NONCE|>
+
+### 2. modify_code（精确替换现有代码）—— GEN_CODE 必须是 Patch
+GEN_CODE 内必须写 `*** Begin Patch` … `*** End Patch`（系统应用到 full_code 后再投递完整源码给前端）。禁止直接输出完整脚本或完整函数；context 与 `-` 行必须从本轮 CURRENT_CODE **逐字符**复制（字符串里的 `\n`/`\r\n` 禁止展开、禁止写成 `\\n`）。
+```json
+{"@action": "modify_code", "modify_code_reason": "类型不匹配：poc.Split 收 []byte，把 rsp 改为 rsp.RawPacket"}
+```
+<|GEN_CODE_CURRENT_NONCE|>
+*** Begin Patch
+*** Update File: current
+@@ poc.Split
+-header, body := poc.Split(rsp)
++header, body := poc.Split(rsp.RawPacket)
+ yakit.Info("body len: %d", len(body))
+*** End Patch
+<|GEN_CODE_END_CURRENT_NONCE|>
+
+扩充 `runSelfTest` 等已有函数时，同样使用 Patch，在 hunk 中保留函数声明和目标 case 附近的唯一上下文；不要把整个 `func runSelfTest(){...}` 重新输出。
+
+### 3. grep_yaklang_samples（查样例）—— 不需要代码块
+```json
+{"@action": "grep_yaklang_samples", "pattern": "synscan\\.", "context_lines": 20, "human_readable_thought": "synscan 没有 timeout，grep 查它的真实可用函数"}
+```
+
+### 4. yakdoc_function_details（查权威签名）—— 不需要代码块
+```json
+{"@action": "yakdoc_function_details", "library": "poc", "function": ["Split", "GetHTTPPacketBody"], "human_readable_thought": "确认这两个函数的参数类型再改"}
+```
+
+### 5. semantic_search_yaklang_samples（语义检索）—— 不需要代码块
+```json
+{"@action": "semantic_search_yaklang_samples", "questions": [{"question": "Yaklang中如何获取一个URL网页的标题？"}], "top_n": 30, "human_readable_thought": "不确定用哪些库组合，语义检索相关样例"}
+```
+
+---
+
+## Action 与代码块对应关系
+- 需要 `<|GEN_CODE...|>` 代码块：`write_code`、`modify_code`、`insert_code`。
+- 不需要代码块（查询/删除类）：`delete_code`、`grep_yaklang_samples`、`semantic_search_yaklang_samples`、`yakdoc_search`、`yakdoc_function_details`、`yakdoc_library_details`、`yakdoc_module_overview`、`yakdoc_variable_details`。
+
+## 绝对禁止：代码块里带行号前缀
+```
+18 | reader, err := zip.OpenReader(zipFilePath)   // 错误！行号会导致语法解析失败
+```
+生成时只要纯净代码，不带 `行号 |` 前缀。

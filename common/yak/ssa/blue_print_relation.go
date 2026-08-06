@@ -26,20 +26,31 @@ func (b BlueprintRelationKind) getRelativeRelation() BlueprintRelationKind {
 	return ""
 }
 
-func (c *Blueprint) setBlueprintRelation(parent *Blueprint, relation BlueprintRelationKind) {
+func (c *Blueprint) setBlueprintRelation(parent *Blueprint, relation BlueprintRelationKind) bool {
 	if parent == nil || c == nil {
-		return
+		return false
 	}
 	switch relation {
 	case BlueprintRelationParents:
+		for _, existed := range c.ParentBlueprints {
+			if existed == parent {
+				return false
+			}
+		}
 		c.ParentBlueprints = append(c.ParentBlueprints, parent)
 	case BlueprintRelationInterface:
+		for _, existed := range c.InterfaceBlueprints {
+			if existed == parent {
+				return false
+			}
+		}
 		c.InterfaceBlueprints = append(c.InterfaceBlueprints, parent)
 	default:
 		log.Errorf("BUG!: add parent blueprint error: unknown relation %v", relation)
-		return
+		return false
 	}
 	c.storeBlueprintRelation(parent, relation)
+	return true
 }
 
 func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintRelationKind) {

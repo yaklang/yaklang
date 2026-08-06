@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -192,7 +191,7 @@ func (c *Config) resolveASTBuildWindow(concurrency int) astBuildWindowDecision {
 		return decision
 	}
 
-	decision.diagnosticsHeavy = c != nil && c.DiagnosticsEnabled() && diagnostics.GetLevel() == diagnostics.LevelLow
+	decision.diagnosticsHeavy = false // diagnostics monitoring removed
 	decision.budgetBytes, decision.budgetSource = autoASTMemoryBudgetBytes()
 	if decision.budgetBytes <= 0 {
 		return decision

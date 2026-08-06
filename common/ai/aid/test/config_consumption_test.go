@@ -72,7 +72,6 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 		aicommon.WithAIAutoRetry(1),
 		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithDisableIntentRecognition(true),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithGenerateReport(false),

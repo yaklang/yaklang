@@ -16,7 +16,7 @@ import (
 )
 
 // makeSearchAction builds a search action for the given mode ("semantic" or "keyword")
-// 每次只搜索一个条件，搜索后评估 next_movements 决定是否继续
+// 每次只搜索一个条件，搜索后评估 next_search 决定是否继续
 func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActLoopOption {
 	desc := "根据用户问题推测相关关键词并搜索指定的知识库，返回相关的知识条目"
 	if mode == "keyword" {
@@ -130,31 +130,31 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				// 关键字模式：关键字已在 action 中提供，跳过关键字生成，仅使用精准关键词搜索
 				enhancePlans = []string{"exact_keyword_search"}
 			} else {
-			// 语义模式：HyDE 语义召回 + 精准关键词结构化召回，砍掉 ROI 低的泛化/拆分
-			enhancePlans = []string{"hypothetical_answer", "exact_keyword_search"}
+				// 语义模式：HyDE 语义召回 + 精准关键词结构化召回，砍掉 ROI 低的泛化/拆分
+				enhancePlans = []string{"hypothetical_answer", "exact_keyword_search"}
 			}
 
 			log.Infof("prepared for queryToUse: %s", queryToUse)
 			log.Infof("start to call invoker.EnhanceKnowledgeGetterEx with enhancePlans: %v, knowledgeBases: %v", enhancePlans, knowledgeBases)
 			// 执行搜索，使用 EnhanceKnowledgeGetterEx 支持指定 EnhancePlan
-		enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, queryToUse, enhancePlans, knowledgeBases...)
-		if err != nil {
-			log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
-			failMsg := fmt.Sprintf("Knowledge search FAILED for '%s': %v. "+
-				"The knowledge base could not return results for this query.", queryToUse, err)
-			r.AddToTimeline("knowledge_search_error", failMsg)
-			op.Feedback(fmt.Sprintf("搜索失败：%v\n请尝试其他查询条件。", err))
-			op.Continue()
-			return
-		}
-		if enhanceData == "" {
-			emptyMsg := fmt.Sprintf("Knowledge search for '%s' returned NO results. "+
-				"The knowledge base does not contain information matching this query.", queryToUse)
-			r.AddToTimeline("knowledge_search_empty", emptyMsg)
-			op.Feedback(fmt.Sprintf("搜索 '%s' 未找到相关结果。请尝试其他查询条件。", queryToUse))
-			op.Continue()
-			return
-		}
+			enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, queryToUse, enhancePlans, knowledgeBases...)
+			if err != nil {
+				log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
+				failMsg := fmt.Sprintf("Knowledge search FAILED for '%s': %v. "+
+					"The knowledge base could not return results for this query.", queryToUse, err)
+				r.AddToTimeline("knowledge_search_error", failMsg)
+				op.Feedback(fmt.Sprintf("搜索失败：%v\n请尝试其他查询条件。", err))
+				op.Continue()
+				return
+			}
+			if enhanceData == "" {
+				emptyMsg := fmt.Sprintf("Knowledge search for '%s' returned NO results. "+
+					"The knowledge base does not contain information matching this query.", queryToUse)
+				r.AddToTimeline("knowledge_search_empty", emptyMsg)
+				op.Feedback(fmt.Sprintf("搜索 '%s' 未找到相关结果。请尝试其他查询条件。", queryToUse))
+				op.Continue()
+				return
+			}
 
 			loop.LoadingStatus("已获取结果，准备压缩 - result fetched, preparing to compress")
 
@@ -253,8 +253,8 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			// loop.Set("all_compressed_results", allResults)
 
 			// 使用 LiteForge 评估下一步行动
-			loop.LoadingStatus("评估搜索结果与下一步计划 - evaluating next movements")
-			evalResult := evaluateNextMovements(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
+			loop.LoadingStatus("评估搜索结果与下一步计划 - evaluating next steps")
+			evalResult := evaluateNextSearch(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
 			if evalResult.Finished {
 				// 知识收集已完成，保存总结并退出循环
 				log.Infof("knowledge collection finished, summary: %s", evalResult.Summary)
@@ -277,15 +277,15 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				r.AddToTimeline("knowledge_collection_finished", feedback)
 				op.Exit() // 主动结束循环，触发 OnFinished 回调生成报告
 			} else {
-				// 记录 next_movements
-				currentNextMovements := loop.Get("next_movements_summary")
-				if currentNextMovements != "" {
-					currentNextMovements += "\n\n"
+				// 记录 next_search
+				currentNextSearch := loop.Get("next_search_summary")
+				if currentNextSearch != "" {
+					currentNextSearch += "\n\n"
 				}
-				currentNextMovements += fmt.Sprintf("【搜索 #%d: %s】\n%s", searchCount, queryToUse, evalResult.NextMovements)
-				loop.Set("next_movements_summary", currentNextMovements)
+				currentNextSearch += fmt.Sprintf("【搜索 #%d: %s】\n%s", searchCount, queryToUse, evalResult.NextSearch)
+				loop.Set("next_search_summary", currentNextSearch)
 
-				next_movements := fmt.Sprintf("Search #%d: %s\nNext: %s", searchCount, queryToUse, evalResult.NextMovements)
+				nextSearch := fmt.Sprintf("Search #%d: %s\nNext: %s", searchCount, queryToUse, evalResult.NextSearch)
 				feedback := fmt.Sprintf(`=== 搜索完成 ===
 查询: %s
 模式: %s
@@ -296,9 +296,9 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 %s
 
 请根据建议继续搜索。
-`, queryToUse, mode, len(compressedResult), artifactFilename, evalResult.NextMovements)
+`, queryToUse, mode, len(compressedResult), artifactFilename, evalResult.NextSearch)
 
-				loop.Set("next_movements", next_movements+"\n\n"+feedback)
+				loop.Set("next_search", nextSearch+"\n\n"+feedback)
 				op.Continue() // 继续循环，让 AI 执行下一步搜索
 			}
 		},
@@ -307,13 +307,13 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 
 // EvaluateResult 评估结果结构体
 type EvaluateResult struct {
-	NextMovements string // 下一步搜索建议
-	Finished      bool   // 是否已完成知识收集
-	Summary       string // 当 finished 时的总结
+	NextSearch string // 下一步搜索建议
+	Finished   bool   // 是否已完成知识收集
+	Summary    string // 当 finished 时的总结
 }
 
-// evaluateNextMovements 使用 LiteForge 评估下一步搜索需要补充什么内容
-func evaluateNextMovements(
+// evaluateNextSearch 使用 LiteForge 评估下一步搜索需要补充什么内容
+func evaluateNextSearch(
 	ctxAny any,
 	invoker aicommon.AIInvokeRuntime,
 	loop *reactloops.ReActLoop,
@@ -325,7 +325,7 @@ func evaluateNextMovements(
 	// 转换 context
 	ctx, ok := ctxAny.(context.Context)
 	if !ok {
-		log.Warnf("evaluateNextMovements: context conversion failed")
+		log.Warnf("evaluateNextSearch: context conversion failed")
 		ctx = context.Background()
 	}
 	dNonce := utils.RandStringBytes(4)
@@ -335,11 +335,11 @@ func evaluateNextMovements(
 
 	// 如果搜索次数已达上限，直接返回 finished
 	if searchCount >= 5 {
-		log.Infof("evaluateNextMovements: search count reached limit (%d), stopping", searchCount)
+		log.Infof("evaluateNextSearch: search count reached limit (%d), stopping", searchCount)
 		return EvaluateResult{
-			NextMovements: "",
-			Finished:      true,
-			Summary:       "已达到最大搜索次数限制",
+			NextSearch: "",
+			Finished:   true,
+			Summary:    "已达到最大搜索次数限制",
 		}
 	}
 
@@ -371,7 +371,7 @@ func evaluateNextMovements(
 
 【输出要求】
 - finished: 布尔值，如果信息已足够则为 true，否则为 false
-- next_movements: 如果 finished 为 false，输出具体的搜索建议（用什么关键词/查询语句）；如果 finished 为 true，输出空字符串
+- next_search: 如果 finished 为 false，输出具体的搜索建议（用什么关键词/查询语句）；如果 finished 为 true，输出空字符串
 - summary: 如果 finished 为 true，简要总结已收集的知识；如果 finished 为 false，输出空字符串
 
 【限制】
@@ -379,7 +379,7 @@ func evaluateNextMovements(
 - 避免重复相同或相似的搜索
 - 优先考虑用户问题中未被覆盖的方面
 
-请输出 finished、next_movements 和 summary。
+请输出 finished、next_search 和 summary。
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
@@ -399,23 +399,23 @@ func evaluateNextMovements(
 	})
 
 	if err != nil {
-		log.Errorf("evaluateNextMovements: template render failed: %v", err)
+		log.Errorf("evaluateNextSearch: template render failed: %v", err)
 		return EvaluateResult{Finished: true, Summary: "template render failed"}
 	}
 
 	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
-		"evaluate-next-movements",
+		"evaluate-next-search",
 		materials,
 		[]aitool.ToolOption{
 			aitool.WithBoolParam("finished", aitool.WithParam_Description("是否已完成知识收集，true 表示信息已足够，false 表示需要继续搜索"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("next_movements", aitool.WithParam_Description("下一步搜索建议，如果 finished 为 true 则为空字符串")),
+			aitool.WithStringParam("next_search", aitool.WithParam_Description("下一步搜索建议，如果 finished 为 true 则为空字符串")),
 			aitool.WithStringParam("summary", aitool.WithParam_Description("当 finished 为 true 时，简要总结已收集的知识")),
 		},
 	)
 
 	if err != nil {
-		log.Errorf("evaluateNextMovements: LiteForge failed: %v", err)
+		log.Errorf("evaluateNextSearch: LiteForge failed: %v", err)
 		return EvaluateResult{Finished: true, Summary: "LiteForge evaluation failed"}
 	}
 
@@ -424,13 +424,13 @@ func evaluateNextMovements(
 	}
 
 	finished := forgeResult.GetBool("finished")
-	nextMovements := strings.TrimSpace(forgeResult.GetString("next_movements"))
+	nextSearch := strings.TrimSpace(forgeResult.GetString("next_search"))
 	summary := strings.TrimSpace(forgeResult.GetString("summary"))
 
 	return EvaluateResult{
-		NextMovements: nextMovements,
-		Finished:      finished,
-		Summary:       summary,
+		NextSearch: nextSearch,
+		Finished:   finished,
+		Summary:    summary,
 	}
 }
 

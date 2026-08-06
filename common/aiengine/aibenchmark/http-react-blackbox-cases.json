@@ -1,0 +1,111 @@
+[
+  {
+    "name": "single-query-escaping",
+    "description": "验证 AI 能否使用结构化 query、安全转义特殊字符，并从请求包和回显中形成证据闭环。",
+    "expected_tools": ["do_http_request"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["request packet", "%26b%3Dssxxx", "response"],
+    "prompt": "这是受控的 HTTP 工具功能测试。只能访问 https://postman-echo.com/get，必须且只调用一次 do_http_request。使用 GET、timeout=12、verbose=true；query 必须传对象，其中 a 的原始值是 `asdf' abc \" #&b=ssxxx`，normal 的原始值是 `hello world`。不要把查询参数拼进 URL，不要使用 body/postparams。根据工具输出中的实际请求包确认特殊字符已编码，并根据响应确认服务端收到原始值；然后用三句话内报告请求行、状态码和结论。"
+  },
+  {
+    "name": "single-empty-array-compatibility",
+    "description": "复现 UI 将空 query/form 序列化为 [] 的调用，验证兼容归一化、实际请求包和无匹配提示都对 AI 可见。",
+    "expected_tools": ["do_http_request"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["input compatibility", "request packet", "keyword match: not found", "response"],
+    "prompt": "这是受控的 HTTP 参数容错测试。只能访问 https://postman-echo.com/get，必须且只调用一次 do_http_request，并原样使用这些参数：method=GET、url=https://postman-echo.com/get、headers 字符串为 `Cookie: sess_guest=benchmark-placeholder`、query=[]、form=[]、keyword=InternalNote、redirect-times=0、timeout=10、verbose=true。不要自行省略或改写空数组。根据工具输出说明空数组是否被安全归一化、实际生成的 request packet 是什么、keyword 未命中是否有明确提示；然后立即结束。"
+  },
+  {
+    "name": "single-invalid-json-shape-visible-error",
+    "description": "验证无法安全归一化的非空数组会被阻止发包，并在错误事件和 timeline 中给出参数路径与修复方案。",
+    "expected_tools": ["do_http_request"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["参数验证失败", "/form", "修复建议", "请求尚未发送"],
+    "prompt": "这是受控的 HTTP 参数失败可见性测试。必须且只调用一次 do_http_request，不允许重试，并原样使用：method=POST、url=https://postman-echo.com/post、form=[{\"a\":\"invalid-array-item\"}]、timeout=10。这个非空数组是刻意构造的错误输入，不要替我改成对象。调用后只能依据工具返回的错误说明：是否真正发出网络请求、出错的参数路径、期望的 JSON 形态和可直接重试的正确示例，然后立即结束。"
+  },
+  {
+    "name": "batch-website-baseline",
+    "description": "对公开示例网站做最小只读黑盒基线，验证批量工具的并发、汇总和错误可见性。",
+    "expected_tools": ["batch_do_http_request"],
+    "min_tool_calls": 1,
+    "max_tool_calls": 1,
+    "expected_result_tokens": ["Batch Request Summary", "/robots.txt", "Total:"],
+    "prompt": "这是受控的公开网站只读黑盒测试。把 https://example.com 当作未知网站；必须且只调用一次 batch_do_http_request。参数使用 base-url=https://example.com，paths 传换行字符串 `/\\n/robots.txt\\n/yak-react-definitely-not-found-20260802`，concurrent=2、timeout=10；响应会自动输出，不要传 requests、concurrency 或 include_body。不得访问其他主机、登录、爆破或追加路径。比较三条结果的状态码、大小和内容特征，并说明批量汇总是否足以支持结论。"
+  },
+  {
+    "name": "mixed-baseline-and-diff",
+    "description": "验证单发与批量工具协作时的调用效率、证据复用和 ReAct 收口质量。",
+    "expected_tools": ["do_http_request", "batch_do_http_request"],
+    "min_tool_calls": 2,
+    "max_tool_calls": 2,
+    "expected_result_tokens": ["request packet", "Batch Request Summary", "example.com"],
+    "prompt": "这是受控的公开网站只读黑盒效率测试，只能访问 https://example.com。第一步调用一次 do_http_request，url=https://example.com/、method=GET、timeout=10、verbose=true，取得完整基线。第二步调用一次 batch_do_http_request，base-url=https://example.com、paths 传换行字符串 `/robots.txt\\n/yak-react-diff-20260802`、method=GET、concurrent=2、timeout=10；不要传 requests、concurrency 或 include_body。总共只能调用两次工具，不得重复请求。复用已有证据，对比状态、大小和正文特征，评价两种工具的适用场景后立即结束。"
+  },
+  {
+    "name": "python-iterative-script-refinement",
+    "description": "从零创建 Python CLI，并经过两轮真实增量需求变化和执行验证，观察 write_file、modify_file、read_file、bash 的选择与稳定性。",
+    "include_tools": ["write_file", "modify_file", "read_file", "bash"],
+    "expected_tools": ["write_file", "modify_file", "bash"],
+    "min_tool_calls": 6,
+    "max_tool_calls": 14,
+    "expected_tool_min_counts": {"write_file": 1, "modify_file": 2, "bash": 3},
+    "expected_tool_max_counts": {"write_file": 1},
+    "expected_result_tokens": ["chars", "unique_words", "top_words"],
+    "expected_files": [
+      {
+        "path": "iterative_text_stats.py",
+        "contains": ["--ignore-case", "--top", "unique_words", "top_words"],
+        "not_contains": []
+      }
+    ],
+    "verification_commands": [
+      {
+        "command": "python3 {{WORKDIR}}/iterative_text_stats.py --text 'Red blue red GREEN' --ignore-case --top 2",
+        "expected_tokens": ["\"chars\": 18", "\"words\": 4", "\"unique_words\": 3", "\"top_words\": [[\"red\", 2], [\"blue\", 1]]"]
+      },
+      {
+        "command": "python3 -m py_compile {{WORKDIR}}/iterative_text_stats.py",
+        "expected_tokens": []
+      }
+    ],
+    "prompt": "这是一个严格分阶段的 Python 文件工具黑盒测试，所有文件只能放在 {{WORKDIR}}。不要提前实现后续阶段，也不要使用 bash heredoc、cat、echo、sed 或 python -c 修改文件。阶段一：只用 write_file 创建 {{WORKDIR}}/iterative_text_stats.py，使用标准库 argparse/json，实现 --text，按空白分词，并用 sort_keys=True 输出只含 chars 和 words 的 JSON；随后用 bash 执行 `python3 {{WORKDIR}}/iterative_text_stats.py --text 'Red blue red GREEN'`，确认 chars=18、words=4。阶段二：把它视为新的需求，只用 modify_file 增量增加 --ignore-case，并增加 unique_words；必要时先用 read_file 重新取得准确行号，然后 bash 执行并确认 unique_words=3。阶段三：再次只用 modify_file 增量增加 --top N 和 top_words，统计按次数降序、单词升序排列；执行 `python3 {{WORKDIR}}/iterative_text_stats.py --text 'Red blue red GREEN' --ignore-case --top 2`，必须得到 top_words=[[\"red\",2],[\"blue\",1]]，最后执行 py_compile。write_file 必须只调用一次，至少调用两次 modify_file、三次 bash；失败时读取当前文件后继续增量修订，全部验证通过后立即结束。"
+  },
+  {
+    "name": "python-existing-file-multihunk-repair",
+    "description": "修改已有 Python 文件的多个非连续位置，刻意制造行号漂移，评估 line-number 型 modify_file 是否需要 context-aware apply_diff 替代。",
+    "include_tools": ["read_file", "modify_file", "write_file", "bash"],
+    "expected_tools": ["read_file", "modify_file", "bash"],
+    "forbidden_tools": ["write_file"],
+    "min_tool_calls": 6,
+    "max_tool_calls": 16,
+    "expected_tool_min_counts": {"read_file": 1, "modify_file": 3, "bash": 2},
+    "expected_result_tokens": ["pen", "book", "total"],
+    "setup_files": [
+      {
+        "path": "inventory_report.py",
+        "content": "#!/usr/bin/env python3\nimport argparse\nimport json\n\nDEFAULT_SEPARATOR = \",\"\n\ndef parse_items(raw):\n    return [part for part in raw.split(DEFAULT_SEPARATOR) if part]\n\ndef summarize(items):\n    return {\"items\": items, \"total\": len(items)}\n\ndef build_parser():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--items\", required=True)\n    return parser\n\ndef main():\n    args = build_parser().parse_args()\n    items = parse_items(args.items)\n    print(json.dumps(summarize(items), ensure_ascii=False, sort_keys=True))\n\nif __name__ == \"__main__\":\n    main()\n"
+      }
+    ],
+    "expected_files": [
+      {
+        "path": "inventory_report.py",
+        "contains": ["--limit", "casefold", "json.dumps"],
+        "not_contains": ["DEFAULT_SEPARATOR"]
+      }
+    ],
+    "verification_commands": [
+      {
+        "command": "python3 {{WORKDIR}}/inventory_report.py --items ' Pen :2,book:3,PEN:4,bad,eraser:-1' --limit 2",
+        "expected_tokens": ["\"items\": [[\"pen\", 6], [\"book\", 3]]", "\"total\": 9"]
+      },
+      {
+        "command": "python3 -m py_compile {{WORKDIR}}/inventory_report.py",
+        "expected_tokens": []
+      }
+    ],
+    "prompt": "这是已有 Python 文件的多位置增量编辑测试，目标文件是 {{WORKDIR}}/inventory_report.py。禁止使用 write_file 覆盖、禁止 bash heredoc/cat/echo/sed 修改文件。先用 read_file 查看带行号的现状，再用 bash 运行一次基线。然后只用 modify_file 完成多个非连续修改：删除 DEFAULT_SEPARATOR；parse_items 要解析逗号分隔的 name:qty，名称 strip 后 casefold，忽略格式错误、非整数和 qty<=0，并合并重复名称数量；build_parser 增加整数 --limit，默认 10；summarize 接收 limit，按数量降序、名称升序输出前 N 个 [name, qty]，total 是全部有效条目的数量总和；main 传递 limit。至少调用三次 modify_file，不要用一次整文件覆盖伪装增量修改。每次多行插入导致行号变化后，应重新 read_file 获取当前行号。最终用 bash 执行 `python3 {{WORKDIR}}/inventory_report.py --items ' Pen :2,book:3,PEN:4,bad,eraser:-1' --limit 2`，必须得到 items=[[\"pen\",6],[\"book\",3]] 和 total=9，并执行 py_compile；若失败，只能继续用 read_file+modify_file 修复，验证通过后立即结束。"
+  }
+]

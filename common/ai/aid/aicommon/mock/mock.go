@@ -27,7 +27,8 @@ type MockedAIConfig struct {
 	IdSequence int64
 	RuntimeId  string
 
-	Emitter *aicommon.Emitter
+	Emitter   *aicommon.Emitter
+	TodoState *aicommon.SessionPromptState
 
 	TimelineContentSizeLimit int64
 }
@@ -59,6 +60,7 @@ func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {
 		Ctx:                       ctx,
 		RuntimeId:                 "mock-runtime-id",
 		Emitter:                   emitter,
+		TodoState:                 aicommon.NewSessionPromptState(),
 		TimelineContentSizeLimit:  1000,
 	}
 
@@ -101,40 +103,48 @@ func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
 }
 
-func (m *MockedAIConfig) GetVerificationTodoRendered(_ aicommon.VerificationTodoScope) string {
-	return ""
+func (m *MockedAIConfig) GetVerificationTodoRendered(scope aicommon.VerificationTodoScope) string {
+	return m.TodoState.GetVerificationTodoRendered(scope)
 }
 
-func (m *MockedAIConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyResult {
-	return nil
+func (m *MockedAIConfig) ApplyTodoDelta(scope aicommon.VerificationTodoScope, delta *aicommon.TodoDelta) []aicommon.VerificationTodoApplyResult {
+	return m.TodoState.ApplyTodoDelta(scope, delta)
 }
 
-func (m *MockedAIConfig) GetVerificationTodoMarkdownDelta(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) string {
-	return ""
+func (m *MockedAIConfig) ValidateTodoDelta(scope aicommon.VerificationTodoScope, delta *aicommon.TodoDelta) error {
+	return m.TodoState.ValidateTodoDelta(scope, delta)
+}
+
+func (m *MockedAIConfig) GetVerificationTodoMarkdownDelta(scope aicommon.VerificationTodoScope, delta *aicommon.TodoDelta) string {
+	return m.TodoState.GetVerificationTodoMarkdownDelta(scope, delta)
+}
+
+func (m *MockedAIConfig) SnapshotCanonicalTodos(scope aicommon.VerificationTodoScope) ([]aicommon.TodoOpenItem, string, []aicommon.TodoClosedItem) {
+	return m.TodoState.SnapshotCanonicalTodos(scope)
 }
 
 func (m *MockedAIConfig) SnapshotVerificationTodoItems() []aicommon.VerificationTodoItem {
-	return nil
+	return m.TodoState.SnapshotVerificationTodoItems()
 }
 
 func (m *MockedAIConfig) SnapshotVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
-	return nil
+	return m.TodoState.SnapshotVerificationTodoItemsByScope(scope)
 }
 
 func (m *MockedAIConfig) GetVerificationTodoStats() aicommon.VerificationTodoStats {
-	return aicommon.VerificationTodoStats{}
+	return m.TodoState.GetVerificationTodoStats()
 }
 
 func (m *MockedAIConfig) GetVerificationTodoStatsByScope(scope aicommon.VerificationTodoScope) aicommon.VerificationTodoStats {
-	return aicommon.VerificationTodoStats{}
+	return m.TodoState.GetVerificationTodoStatsByScope(scope)
 }
 
 func (m *MockedAIConfig) HasActiveVerificationTodosByScope(scope aicommon.VerificationTodoScope) bool {
-	return false
+	return m.TodoState.HasActiveVerificationTodosByScope(scope)
 }
 
 func (m *MockedAIConfig) ActiveVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
-	return nil
+	return m.TodoState.ActiveVerificationTodoItemsByScope(scope)
 }
 
 func (m *MockedAIConfig) IsCtxDone() bool {
@@ -265,8 +275,9 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 		renderMockUserQueryBlock(input.Nonce, input.UserQuery),
 		renderMockTaggedBlock("EXTRA_CAPABILITIES", input.Nonce, input.ExtraCapabilities),
 		input.SessionEvidence,
-		renderMockTaggedBlock("REFLECTION", input.Nonce, input.ReactiveData),
+		renderMockTaggedBlock("REACTIVE_DATA", input.Nonce, input.ReactiveData),
 		renderMockInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
+		input.TodoCheckpoint,
 	), input.Nonce)
 
 	return &aicommon.LoopPromptAssemblyResult{

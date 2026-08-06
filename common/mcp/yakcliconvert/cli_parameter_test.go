@@ -32,7 +32,7 @@ b = cli.Bool("b", cli.setHelp("b"), cli.setDefault(true))
 c = cli.String("c", cli.setRequired(true))
 f = cli.File("f", cli.setHelp("file"))
 s = cli.StringSlice("s", cli.setMultipleSelect(true), cli.setSelectOption("name1", "value1"),cli.setSelectOption("name2", "value2"))
-j = cli.Json("j",cli.setJsonSchema(%s))
+j = cli.Json("j",cli.setJsonSchema(%s), cli.setDefault("{\"lat\":1}"))
 cli.check()
 `, "`"+testJsonSchema+"`")
 
@@ -79,7 +79,33 @@ cli.check()
 	require.True(t, ok)
 	checkEx(jProps, "lat", "number")
 	checkEx(jProps, "lon", "number")
+	require.Equal(t, map[string]any{"lat": float64(1)}, j["default"])
 
 	require.ElementsMatch(t, tool.InputSchema.Required, []string{"a", "c"})
 
+}
+
+func TestConvertCliParameterUnionSchemaReplacesInferredPrimitiveType(t *testing.T) {
+	content := `
+headers = cli.String("headers", cli.setJsonSchema(` + "`" + `{
+  "oneOf": [
+    {"type":"string"},
+    {"type":"object","additionalProperties":{"type":"string"}},
+    {"type":"array","maxItems":0}
+  ]
+}` + "`" + `))
+cli.check()
+`
+
+	prog, err := static_analyzer.SSAParse(content, "yak")
+	require.NoError(t, err)
+	tool := yakcliconvert.ConvertCliParameterToTool("test-union", prog)
+	propertyRaw, ok := tool.InputSchema.Properties.Get("headers")
+	require.True(t, ok)
+	property, ok := propertyRaw.(map[string]any)
+	require.True(t, ok)
+	require.NotContains(t, property, "type", "an inferred primitive type must not narrow an explicit union")
+	oneOf, ok := property["oneOf"].([]any)
+	require.True(t, ok)
+	require.Len(t, oneOf, 3)
 }

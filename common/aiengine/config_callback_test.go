@@ -91,7 +91,6 @@ func TestBuildReActOptionsAppendsTieredCallbackOverrides(t *testing.T) {
 	opts := buildReActOptions(context.Background(), engineConfig, make(chan *schema.AiOutputEvent, 1))
 	opts = append(opts,
 		aicommon.WithDisableAutoSkills(true),
-		aicommon.WithEnableSelfReflection(false),
 	)
 	config := aicommon.NewConfig(context.Background(), opts...)
 

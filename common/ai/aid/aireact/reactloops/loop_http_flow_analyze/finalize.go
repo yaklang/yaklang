@@ -101,7 +101,7 @@ func collectFinalizeContextMaterials(loop *reactloops.ReActLoop, reason any) str
 	}
 
 	if unfinished := strings.TrimSpace(loop.GetMaxIterationInterruptSummary()); unfinished != "" {
-		ctx.WriteString("## Unfinished TODOs (interrupted, marked as SKIP)\n\n")
+		ctx.WriteString("## Unfinished TODOs (interrupted, closed as deferred with reasons)\n\n")
 		ctx.WriteString(unfinished)
 		ctx.WriteString("\n\n")
 	}

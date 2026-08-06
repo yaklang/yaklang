@@ -67,7 +67,7 @@ func (r *ReActLoop) iterationExecutedTool(iteration int) bool {
 	return false
 }
 
-// submitValueFeedbackSignal 在过程信号节点 (SPIN / 反思 / verification) 作为额外
+// submitValueFeedbackSignal 在 verification 等过程信号节点作为额外
 // 触发提交一条价值评估记录. 全程 recover + 非阻塞, 绝不影响主循环.
 func (r *ReActLoop) submitValueFeedbackSignal(trigger string) {
 	defer func() {

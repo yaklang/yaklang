@@ -128,15 +128,6 @@ func TestEnvFlagEnabledFalseSpellings(t *testing.T) {
 	require.True(t, envFlagEnabled("YAK_TEST_FLAG"))
 }
 
-func TestHeapProfileDirDisabledSpellings(t *testing.T) {
-	t.Setenv("YAK_SSA_HEAP_PROFILE_DIR", "off")
-	require.Empty(t, heapProfileDir())
-	t.Setenv("YAK_SSA_HEAP_PROFILE_DIR", "none")
-	require.Empty(t, heapProfileDir())
-	t.Setenv("YAK_SSA_HEAP_PROFILE_DIR", "build/heap")
-	require.Equal(t, "build/heap", heapProfileDir())
-}
-
 func TestCompileUnitPlanJavaTemplateResourceMergesWithServletUnit(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/java/com/example/DemoServlet.java", `package com.example;

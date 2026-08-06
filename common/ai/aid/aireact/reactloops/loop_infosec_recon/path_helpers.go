@@ -10,11 +10,10 @@ import (
 )
 
 const (
-	keyVerifiedJsDir         = "infosec_verified_js_dir"
-	keyJsStaticPathFailCount = "infosec_js_static_path_fail_count"
-	keySpinRecoveryHint      = "infosec_spin_recovery_hint"
+	keyVerifiedJsDir           = "infosec_verified_js_dir"
+	keyJsStaticPathFailCount   = "infosec_js_static_path_fail_count"
+	keyPathFailureRecoveryHint = "infosec_path_failure_recovery_hint"
 )
-
 
 func infosecTryStatLocalPath(p, wd string) (abs string, ok bool) {
 	p = strings.TrimSpace(p)

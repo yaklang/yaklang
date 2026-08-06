@@ -113,7 +113,6 @@ func (r *ReActLoop) ApplyVerificationResult(result *aicommon.VerifySatisfactionR
 		result.Satisfied,
 		result.Reasoning,
 		result.CompletedTaskIndex,
-		result.NextMovements,
 		result.Evidence,
 		result.EvidenceOps,
 	)

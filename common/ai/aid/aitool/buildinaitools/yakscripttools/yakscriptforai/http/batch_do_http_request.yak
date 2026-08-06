@@ -1,236 +1,65 @@
-__DESC__ = "批量HTTP请求工具，可并发测试一个或多个目标上的多个URL、路径或API接口。支持 URL 模式（基础地址加路径）和原始报文模板模式（变量替换）。适用于接口批量验证、请求重放、路径枚举、目录探测、未授权访问排查，以及 IDOR 或水平越权验证等场景。支持并发、延迟、超时、重定向、响应过滤、关键字或正则匹配和结果汇总。Batch HTTP request tool for concurrently testing multiple URLs, paths, or API endpoints on one or more targets. Supports URL mode (base URL + paths) and Packet mode (raw HTTP request templates with variable substitution). Suitable for batch endpoint validation, request replay, path enumeration, directory probing, unauthorized access checks, and IDOR or horizontal authorization verification workflows. Features include concurrent execution, delay control, timeout, redirect handling, response filtering, keyword or regex matching, and result aggregation. "
+__DESC__ = "Send multiple HTTP requests for endpoint probing and API batch validation (IDOR included). URL mode requires `base-url` plus newline-separated `paths`; concurrency is `concurrent`. Responses are included automatically. Prefer structured query/form objects with original unescaped values. Use a packet template only for exact bytes or custom encoding. 用于端点探测、接口批量验证（含 IDOR）的批量 HTTP 请求。URL 模式必须传 `base-url` 和换行分隔的 `paths`，并发参数名是 `concurrent`，响应会自动输出；query/form 传原始未转义值。仅在需要精确报文或自定义编码时使用 packet 模板。"
 __VERBOSE_NAME__ = "Batch HTTP Request Tool"
 __VERBOSE_NAME_ZH__ = "批量HTTP请求工具"
 __KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post,api endpoint validation,endpoint probing,api batch testing,request replay,template replay,unauthorized access check,authorization bypass verification,idor validation,horizontal privilege check,batch interface check,批量请求,并发请求,批量HTTP,多路径探测,路径枚举,目录扫描,接口批量验证,API批量测试,接口探测,端点探测,未授权访问验证,越权验证,水平越权验证,IDOR验证,批量验证接口,请求重放,模板请求,多接口测试"
 
 __USAGE__ = <<<USAGE_BLOCK
-Batch HTTP Request Tool - AI Usage Guide
+Send the same request shape to multiple paths or URLs.
 
-Modes:
-    1. URL Mode: use "base-url" plus multiple "paths".
-    2. Packet Mode: use a raw "packet" template with {{PATH}} placeholder.
+## Choose the mode
 
-Prefer URL Mode when you are testing the same parameter across many endpoints.
-Use Packet Mode only when you need raw headers, a custom wire format, or an exact replay template.
+- Normal requests: use `base-url`, newline-separated `paths`, and optional `query`/`form` objects.
+- Raw JSON/XML/text: use `body` plus `content-type`.
+- Exact bytes, duplicate keys, parameter ordering, unusual separators, or custom/double encoding: use a `packet` template containing `{{PATH}}`.
 
-##############################################################################
-# HARD RULES FOR AI PARAMETER GENERATION                                     #
-##############################################################################
+## Encoding rule (important)
 
-1. AITAG is mandatory for multi-line or structured content.
-     Use AITAG for:
-         - packet
-         - body
-         - headers when multiple lines are provided
-         - paths when you provide multiple lines
+`query` and `form` are JSON objects. Put ORIGINAL, UNESCAPED values in them. The tool URL-encodes each key and value exactly once. Do not pre-encode `%`, spaces, quotes, `#`, or `&`.
 
-2. Prefer structured params for parameter testing.
-     If you want to test a GET parameter across many requests, prefer:
-         - "base-url"
-         - "paths"
-         - "query-params"
+The legacy `query-params` string remains for compatibility, but `k=v&k2=v2` cannot distinguish a delimiter from a literal unescaped `&`. Do not generate it for new calls.
 
-     This is safer than manually embedding query strings into raw packets because the
-     tool patches query/form parameters using structured parameter handling.
+`body` is raw and overrides `form`. In Packet mode, the template and substituted paths are sent as written; provide valid encoded HTTP request targets yourself.
 
-3. Packet Mode requires pre-encoded paths and queries.
-     In Packet Mode, both the raw "packet" and each substituted "{{PATH}}" entry are
-     treated as already-formed HTTP request text. If a path contains spaces or special
-     characters in the query string, encode them yourself before placing them into {{PATH}}.
+Use AITAG for multi-line `paths`, `packet`, `body`, and `headers`.
 
-     WRONG path:
-         /admin.php?id=1 or xxx
+## Main parameters
 
-     CORRECT path:
-         /admin.php?id=1%20or%20xxx
+- URL mode: `base-url`, `paths`, optional `method`, `query`, `form`, `headers`, `body`, `content-type`, `prefix`.
+- Packet mode: `packet`, `paths`, optional `base-host`, `https`.
+- Control: `timeout`, `concurrent`, `delay-seconds`, `redirect-times`, `proxy`.
+- Results: `keyword`, `regexp-match`, `exclude-code`, `include-code`, `exclude-size`, `max-body-size`.
+- There is no `requests`, `concurrency`, or `include_body` parameter. Use `paths`, `concurrent`; response content is included automatically.
 
-     ALSO OK in many form-style cases:
-         /admin.php?id=1+or+xxx
+## Interpret the batch as a survey
 
-     Unencoded spaces in packet mode often cause 400 responses.
+- Preserve every concrete in-scope endpoint discovered from pages, forms, redirects, scripts, documentation, response fields, or this batch in todo_delta before choosing one current endpoint for deeper testing. A discovered entry point is a coverage branch even when it has no vulnerability signal yet.
+- Compare status, size, body semantics, headers, redirects, and timing against a baseline; filters are viewing aids, not proof that excluded paths are safe.
+- A validation error, connection failure, authentication rejection, empty response, or one uniform result does not exhaust the paths. Correct the request shape or run a materially different batch with another method, encoding, parameter channel, session context, or observable before closing them.
+- Use do_http_request for the selected current endpoint when the next experiment needs one-variable control or exact packet inspection.
 
-## Quick placement rules
+## Examples
 
-Use JSON params for single-line values:
-    base-url, method, content-type, query-params, prefix, base-host,
-    https, timeout, concurrent, delay-seconds, redirect-times,
-    keyword, regexp-match, proxy, exclude-code, include-code, exclude-size, max-body-size
-
-Use AITAG for multi-line or structured content:
-    packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
-    body    -> <|TOOL_PARAM_body_{NONCE}|> ... <|TOOL_PARAM_body_END_{NONCE}|>
-    headers -> <|TOOL_PARAM_headers_{NONCE}|> ... <|TOOL_PARAM_headers_END_{NONCE}|>
-    paths   -> <|TOOL_PARAM_paths_{NONCE}|> ... <|TOOL_PARAM_paths_END_{NONCE}|>
-
-## Parameters
-
---- URL Mode ---
-Required when not using packet mode:
-    base-url        (string)  Base URL or domain. Example: "https://example.com" or "example.com".
-    paths           (string)  Paths to test. Use AITAG when providing multiple lines.
-
-Optional:
-    method          (string)  HTTP method for all requests. Default: "GET".
-    headers         (string)  Custom headers applied to all requests. Use AITAG for multiple lines.
-    body            (string)  Request body content applied to all requests. Use AITAG.
-    content-type    (string)  Content-Type header value.
-    query-params    (string)  Query parameters appended to all requests. Preferred for GET parameter testing.
-    prefix          (string)  Path prefix to prepend to all paths.
-
---- Packet Mode ---
-Required:
-    packet          (string)  Raw HTTP request template with {{PATH}} placeholder. Use AITAG.
-                                                        Both the request template and the substituted path must already be valid raw HTTP text.
-
-Optional:
-    base-host       (string)  Override Host header value.
-
---- Common ---
-Optional:
-    https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto".
-    timeout         (int)     Request timeout in seconds. Default: 10.
-    concurrent      (int)     Number of concurrent requests. Default: 5.
-    delay-seconds   (float)   Delay between requests in seconds. If > 0, requests are sent sequentially.
-    redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
-    keyword         (string)  Keyword to search in responses.
-    regexp-match    (string)  Regular expression to search in responses.
-    proxy           (string)  Proxy URL.
-    exclude-code    (string)  Exclude responses with these status codes.
-    include-code    (string)  Only include responses with these status codes.
-    exclude-size    (string)  Exclude responses with these body-size ranges.
-    max-body-size   (int)     Maximum response size to display per request. Default: 4096.
-
-## Few-Shot Examples
-
-Replace {NONCE} with the actual nonce from the response format section.
-
-### Example 1: Test one GET parameter across multiple paths (preferred)
-
-User intent: "Probe several endpoints with the same id payload"
-
+Structured form (preferred):
 ```json
-{
-    "@action": "call-tool",
-    "tool": "batch_do_http_request",
-    "identifier": "batch_query_param_test",
-    "params": {
-        "base-url": "https://target.example.com",
-        "query-params": "id=1 or xxx",
-        "concurrent": 3,
-        "timeout": 10
-    }
-}
+{"@action":"call-tool","tool":"batch_do_http_request","identifier":"batch_form","params":{"base-url":"https://target.example","method":"POST","form":{"a":"asdf' abc \" #&tail","b":"ssxxx"},"concurrent":3}}
 ```
 <|TOOL_PARAM_paths_{NONCE}|>
-/admin.php
-/report.php
-/api/user.php
+/submit-a
+/submit-b
 <|TOOL_PARAM_paths_END_{NONCE}|>
 
-### Example 2: Batch POST requests with JSON body
-
-User intent: "Test multiple API endpoints with the same POST body"
-
+Exact packet template:
 ```json
-{
-    "@action": "call-tool",
-    "tool": "batch_do_http_request",
-    "identifier": "batch_api_test",
-    "params": {
-        "base-url": "https://api.example.com",
-        "method": "POST",
-        "content-type": "application/json",
-        "concurrent": 2,
-        "timeout": 15
-    }
-}
-```
-<|TOOL_PARAM_paths_{NONCE}|>
-/v1/users
-/v1/admin
-/v1/settings
-<|TOOL_PARAM_paths_END_{NONCE}|>
-<|TOOL_PARAM_body_{NONCE}|>
-{"action": "test", "source": "batch_tool"}
-<|TOOL_PARAM_body_END_{NONCE}|>
-
-### Example 3: Batch raw packet requests with encoded paths (Packet mode)
-
-User intent: "Send crafted HTTP requests to multiple paths using a raw template"
-
-```json
-{
-    "@action": "call-tool",
-    "tool": "batch_do_http_request",
-    "identifier": "batch_packet_test",
-    "params": {
-        "concurrent": 3,
-        "timeout": 10,
-        "keyword": "success"
-    }
-}
+{"@action":"call-tool","tool":"batch_do_http_request","identifier":"batch_raw","params":{"https":"yes","concurrent":3}}
 ```
 <|TOOL_PARAM_packet_{NONCE}|>
 GET {{PATH}} HTTP/1.1
-Host: target.example.com
-User-Agent: Mozilla/5.0
-Cookie: session=abc123
-Accept: */*
+Host: target.example
 
 <|TOOL_PARAM_packet_END_{NONCE}|>
 <|TOOL_PARAM_paths_{NONCE}|>
-/admin.php?id=1%20or%20xxx
-/dashboard
-/settings
-<|TOOL_PARAM_paths_END_{NONCE}|>
-
-### Example 4: Batch request with custom headers
-
-User intent: "Batch request with custom headers"
-
-```json
-{
-    "@action": "call-tool",
-    "tool": "batch_do_http_request",
-    "identifier": "batch_with_headers",
-    "params": {
-        "base-url": "https://api.example.com",
-        "concurrent": 3,
-        "timeout": 10
-    }
-}
-```
-<|TOOL_PARAM_paths_{NONCE}|>
-/user/1
-/user/2
-/user/3
-<|TOOL_PARAM_paths_END_{NONCE}|>
-<|TOOL_PARAM_headers_{NONCE}|>
-Authorization: Bearer token123
-X-Custom-Header: value
-<|TOOL_PARAM_headers_END_{NONCE}|>
-
-### Example 5: Sequential requests with delay
-
-User intent: "Slowly enumerate paths to avoid rate limiting"
-
-```json
-{
-    "@action": "call-tool",
-    "tool": "batch_do_http_request",
-    "identifier": "slow_path_enum",
-    "params": {
-        "base-url": "https://api.example.com",
-        "delay-seconds": 0.5,
-        "timeout": 10
-    }
-}
-```
-<|TOOL_PARAM_paths_{NONCE}|>
-/v1/a
-/v1/b
-/v1/c
-/v1/d
+/a?id=already%20encoded
+/b?id=exact
 <|TOOL_PARAM_paths_END_{NONCE}|>
 USAGE_BLOCK
 
@@ -239,12 +68,38 @@ yakit.AutoInitYakit()
 // --- parse parameters ---
 // URL mode params
 baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
-pathsStr = cli.String("paths", cli.setHelp("paths to test, one per line; in Packet mode any query string inside a path must already be encoded"), cli.setRequired(false))
+pathsStr = cli.String("paths", cli.setHelp("paths to test, REQUIRED with base-url, as one newline-separated string (use AITAG for multiple paths; do not pass a JSON array or a requests field). In Packet mode query strings must already be encoded"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
-headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
+headers = cli.String("headers", cli.setHelp("custom headers, one per line: 'Key: Value'; ALSO accepts a JSON object {key:value} (AI may pass either); omit when empty"), cli.setJsonSchema(`{
+    "oneOf": [
+        {"type":"string"},
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setRequired(false))
 body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
 contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
-queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2; preferred for testing GET params across many paths"), cli.setRequired(false))
+queryValues = cli.Json("query", cli.setHelp("structured URL query values; pass original unescaped values and the tool URL-encodes them once; omit when empty (an empty [] is accepted for UI compatibility)"), cli.setJsonSchema(`{
+    "description": "Query key/value pairs. Values must be original and unescaped. Empty arrays are accepted only as an empty-value compatibility form.",
+    "oneOf": [
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setDefault("{}"), cli.setRequired(false))
+formValues = cli.Json("form", cli.setHelp("structured form values; pass original unescaped values and the tool emits application/x-www-form-urlencoded; omit when empty (an empty [] is accepted for UI compatibility)"), cli.setJsonSchema(`{
+    "description": "Form key/value pairs. Values must be original and unescaped. Empty arrays are accepted only as an empty-value compatibility form.",
+    "oneOf": [
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setDefault("{}"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("legacy k=v&k2=v2 query string or compatibility object; ambiguous for literal '&', prefer query object"), cli.setJsonSchema(`{
+    "oneOf": [
+        {"type":"string"},
+        {"type":"object","additionalProperties":{"oneOf":[{"type":"string"},{"type":"number"},{"type":"boolean"}]}},
+        {"type":"array","maxItems":0}
+    ]
+}`), cli.setRequired(false))
 prefix = cli.String("prefix", cli.setHelp("path prefix to prepend to all paths, e.g. /v1/ or /api/v2/"), cli.setRequired(false))
 curlHeaders = cli.StringSlice("H", cli.setHelp("curl-style headers, can be used multiple times: -H 'Content-Type: application/json' -H 'Authorization: Bearer token'"), cli.setRequired(false))
 
@@ -255,7 +110,7 @@ baseHost = cli.String("base-host", cli.setHelp("host header value for packet mod
 // Common params
 httpsMode = cli.String("https", cli.setHelp("force HTTPS: yes/no/auto"), cli.setDefault("auto"))
 timeout = cli.Int("timeout", cli.setHelp("request timeout in seconds"), cli.setDefault(10))
-concurrent = cli.Int("concurrent", cli.setHelp("number of concurrent requests"), cli.setDefault(5))
+concurrent = cli.Int("concurrent", cli.setHelp("number of concurrent requests; parameter name is concurrent, not concurrency"), cli.setDefault(5))
 delaySeconds = cli.Float("delay-seconds", cli.setHelp("delay between requests in seconds"), cli.setDefault(0.0))
 redirectTimes = cli.Int("redirect-times", cli.setHelp("max redirect follows, 0 to disable"), cli.setDefault(3))
 keyword = cli.String("keyword", cli.setHelp("keyword to highlight in response"), cli.setRequired(false))
@@ -266,6 +121,115 @@ includeCode = cli.String("include-code", cli.setHelp("include only these status 
 excludeSize = cli.String("exclude-size", cli.setHelp("exclude content-length ranges"), cli.setRequired(false))
 maxBodySize = cli.Int("max-body-size", cli.setHelp("max response body size to display"), cli.setDefault(4096))
 cli.check()
+
+// --- 参数归一化 ---
+// Object arguments cross the AI-tool -> CLI boundary as JSON so values keep spaces,
+// quotes and delimiters. Keep map[...] and slice normalization only for compatibility
+// with older executors/direct callers.
+normalizeMapLike = func(raw, pairSep, kvSep) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        out = []
+        for _, kv := range str.Split(inner, " ") {
+            kv = str.TrimSpace(kv)
+            if kv == "" {
+                continue
+            }
+            colonIdx = str.Index(kv, ":")
+            if colonIdx > 0 {
+                out.Push(sprintf("%v%v%v", str.TrimSpace(kv[:colonIdx]), kvSep, str.TrimSpace(kv[colonIdx+1:])))
+            } else {
+                out.Push(sprintf("%v%v", kv, kvSep))
+            }
+        }
+        return str.Join(out, pairSep)
+    }
+    return s
+}
+
+// headers 归一化: 接受 "Key: Value\n..." 或对象; 输出 "Key: Value\n..."
+normalizeHeaders = func(raw) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "{") && str.HasSuffix(trimmed, "}") {
+        try {
+            values = json.loads(trimmed)
+            out = []
+            for key, value := range values {
+                out.Push(sprintf("%v: %v", key, value))
+            }
+            return str.Join(out, "\n")
+        } catch e {}
+    }
+    if str.HasPrefix(trimmed, "map[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[4:len(trimmed)-1])
+        out = []
+        for _, kv := range str.Split(inner, " ") {
+            kv = str.TrimSpace(kv)
+            if kv == "" {
+                continue
+            }
+            colonIdx = str.Index(kv, ":")
+            if colonIdx > 0 {
+                out.Push(sprintf("%v: %v", str.TrimSpace(kv[:colonIdx]), str.TrimSpace(kv[colonIdx+1:])))
+            }
+        }
+        return str.Join(out, "\n")
+    }
+    return s
+}
+
+normalizeLegacyParams = func(raw) {
+    if raw == "" || raw == nil {
+        return {"raw": "", "values": {}}
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "{") && str.HasSuffix(trimmed, "}") {
+        try {
+            return {"raw": "", "values": json.loads(trimmed)}
+        } catch e {}
+    }
+    return {"raw": normalizeMapLike(s, "&", "="), "values": {}}
+}
+
+// paths 归一化: 接受多行字符串或数组; 输出多行字符串.
+// 数组字面量形如 "[/a /b /c]" -> 每个元素一行.
+// 也容忍单行 "a b c" (少见, 但 AI 偶尔会把多路径塞进一个元素), 这里不强行拆, 保持原样.
+normalizePaths = func(raw) {
+    if raw == "" || raw == nil {
+        return ""
+    }
+    s = sprint(raw)
+    trimmed = str.TrimSpace(s)
+    if str.HasPrefix(trimmed, "[") && str.HasSuffix(trimmed, "]") {
+        inner = str.TrimSpace(trimmed[1:len(trimmed)-1])
+        out = []
+        for _, p := range str.Split(inner, " ") {
+            p = str.TrimSpace(p)
+            if p == "" {
+                continue
+            }
+            out.Push(p)
+        }
+        return str.Join(out, "\n")
+    }
+    return s
+}
+
+headers = normalizeHeaders(headers)
+normalizedQueryParams = normalizeLegacyParams(queryParams)
+queryParams = normalizedQueryParams["raw"]
+legacyQueryValues = normalizedQueryParams["values"]
+pathsStr = normalizePaths(pathsStr)
 
 // --- validation ---
 if packet == "" && baseUrl == "" && pathsStr == "" {
@@ -530,6 +494,21 @@ buildRequestFromUrlMode = fn(path, base) {
             }
         }
     }
+    for key, value := range legacyQueryValues {
+        rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
+    }
+    for key, value := range queryValues {
+        rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, sprint(key), sprint(value))
+    }
+
+    // Structured form values stay separated until the lowhttp patcher URL-encodes
+    // each key/value exactly once. A raw body wins when both were supplied.
+    if body == "" && len(formValues) > 0 {
+        rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", "application/x-www-form-urlencoded")
+        for key, value := range formValues {
+            rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, sprint(key), sprint(value))
+        }
+    }
 
     // Apply body
     if body != "" {
@@ -555,6 +534,23 @@ buildRequestFromPacketMode = fn(path) {
     return isHttps, rawPacket, nil
 }
 
+// 每条请求在真正发送前输出最终 packet。这样即使网络超时或连接失败，AI 仍能
+// 核对 path/query/form/header/body 的实际编码结果。单条最多内联 5KB，避免批量
+// 请求把上下文完全淹没。
+printRequestPacket = fn(idx, path, requestPacket) {
+    packetSize = len(requestPacket)
+    label = sprintf("request #%d packet [%s]", idx, path)
+    if packetSize <= 0 {
+        yakit.Info("%s: (empty)", label)
+        return
+    }
+    if packetSize <= 5120 {
+        yakit.Info("%s (%d bytes):\n%s", label, packetSize, string(requestPacket))
+    } else {
+        yakit.Info("%s (%d bytes, truncated to 5KB):\n%s\n... (truncated)", label, packetSize, string(requestPacket[:5120]))
+    }
+}
+
 // --- execute single request ---
 executeRequest = fn(idx, path, base) {
     opts = buildOpts()
@@ -576,10 +572,11 @@ executeRequest = fn(idx, path, base) {
 
     opts.Push(poc.https(isHttps))
 
+    printRequestPacket(idx, path, rawPacket)
     rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
     if err != nil {
         yakit.Error("Request #%d failed for '%s': %v", idx, path, err)
-        return {"idx": idx, "path": path, "success": false, "error": sprint(err)}
+        return {"idx": idx, "path": path, "success": false, "error": sprint(err), "request": rawPacket}
     }
 
     rsp = rspIns.RawPacket

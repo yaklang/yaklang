@@ -24,3 +24,10 @@ func TestWithDisableTodoSnapshot(t *testing.T) {
 		require.True(t, loop.shouldRenderTodoSnapshot())
 	})
 }
+
+func TestTodoListTemplateEnforcesFrontierCurrentDepthFirstPolicy(t *testing.T) {
+	require.Contains(t, todoListTemplate, "<|TODO_LIST_")
+	require.Contains(t, todoListTemplate, "{{ .Todo }}")
+	require.Contains(t, todoListTemplate, "待办清单")
+	require.NotContains(t, todoListTemplate, "严格优先级逆转")
+}

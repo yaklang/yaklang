@@ -33,16 +33,6 @@ func CollectFocusModeStaticOptions(caller *FocusModeYakHookCaller) []ReActLoopOp
 	if v, ok := caller.GetInt(FocusDunder_PeriodicVerificationInterval); ok && v >= 0 {
 		opts = append(opts, WithPeriodicVerificationInterval(v))
 	}
-	if v, ok := caller.GetInt(FocusDunder_SameActionTypeSpinThreshold); ok && v > 0 {
-		opts = append(opts, WithSameActionTypeSpinThreshold(v))
-	}
-	if v, ok := caller.GetInt(FocusDunder_SameLogicSpinThreshold); ok && v > 0 {
-		opts = append(opts, WithSameLogicSpinThreshold(v))
-	}
-	if v, ok := caller.GetInt(FocusDunder_MaxConsecutiveSpinWarnings); ok && v >= 0 {
-		opts = append(opts, WithMaxConsecutiveSpinWarnings(v))
-	}
-
 	// ---- 静态布尔开关，仅当 dunder 显式声明时才覆盖默认值 ----
 	if b, ok := caller.GetBool(FocusDunder_AllowRAG); ok {
 		opts = append(opts, WithAllowRAG(b))
@@ -62,9 +52,6 @@ func CollectFocusModeStaticOptions(caller *FocusModeYakHookCaller) []ReActLoopOp
 	if b, ok := caller.GetBool(FocusDunder_UseSpeedPriorityAI); ok && b {
 		opts = append(opts, WithUseSpeedPriorityAICallback(true))
 	}
-	if b, ok := caller.GetBool(FocusDunder_EnableSelfReflection); ok {
-		opts = append(opts, WithEnableSelfReflection(b))
-	}
 	if b, ok := caller.GetBool(FocusDunder_DisableLoopPerception); ok && b {
 		opts = append(opts, WithDisableLoopPerception(true))
 	}
@@ -76,8 +63,8 @@ func CollectFocusModeStaticOptions(caller *FocusModeYakHookCaller) []ReActLoopOp
 	if s := caller.GetString(FocusDunder_PersistentInstruction); s != "" {
 		opts = append(opts, WithPersistentInstruction(s))
 	}
-	if s := caller.GetString(FocusDunder_ReflectionOutputExample); s != "" {
-		opts = append(opts, WithReflectionOutputExample(s))
+	if s := caller.GetString(FocusDunder_OutputExample); s != "" {
+		opts = append(opts, WithOutputExample(s))
 	}
 	if s := caller.GetString(FocusDunder_ToolCallIntervalReviewExtraPrompt); s != "" {
 		opts = append(opts, WithToolCallIntervalReviewExtraPrompt(s))

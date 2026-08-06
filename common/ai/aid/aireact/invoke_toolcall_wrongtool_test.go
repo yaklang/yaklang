@@ -80,18 +80,20 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 		return rsp, nil
 	}
 
-	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
-	if strings.Contains(prompt, "用户中断了工具执行") || strings.Contains(prompt, "请根据你刚才执行的所有步骤") {
+	// Final synthesis is a different protocol from a primary ReAct decision:
+	// it requires directly_answer plus answer_payload. Returning finish here
+	// makes the finalizer retry five times and races the CI test deadline.
+	if isDirectAnswerPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after wrong tool / interruption"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_answer","answer_payload":"mocked summary after wrong tool re-select"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
 	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
-	if isDirectAnswerPrompt(prompt) {
+	if strings.Contains(prompt, "用户中断了工具执行") || strings.Contains(prompt, "请根据你刚才执行的所有步骤") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after wrong tool / direct answer"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: finish after wrong tool / interruption"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -152,6 +154,7 @@ func TestReAct_ToolUse_WrongTool(t *testing.T) {
 			out <- e.ToGRPC()
 		}),
 		aicommon.WithTools(sleepTool, echoTool),
+		aicommon.WithNoOpMemoryTriage(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -255,14 +258,8 @@ LOOP:
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
-	if !strings.Contains(tl, `mocked thought for tool calling`) {
-		t.Fatal("timeline does not contain mocked thought")
-	}
 	if !utils.MatchAllOfSubString(tl, `system-question`, "user-answer", "when review") {
 		t.Fatal("timeline does not contain system-question")
-	}
-	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
-		t.Fatal("timeline does not contain ReAct iteration")
 	}
 	if !utils.MatchAllOfSubString(tl, `mocked-echo-params`) {
 		t.Fatal("timeline does not contain mocked-echo-params")

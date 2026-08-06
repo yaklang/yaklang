@@ -26,7 +26,7 @@ func buildBigMultipartRequest(t *testing.T) ([]byte, []byte, []byte) {
 	body.WriteString(`Content-Disposition: form-data; name="desc"` + "\r\n\r\n")
 	body.WriteString("hello-field" + "\r\n")
 
-	// file part 0 (oversized, > 200KB threshold to trigger spill)
+	// file part 0 (oversized vs GlobalMaxContentLength to trigger spill)
 	f0 := []byte(strings.Repeat("F", 250 * 1024))
 	body.WriteString("--" + boundary + "\r\n")
 	body.WriteString(`Content-Disposition: form-data; name="file0"; filename="big0.bin"` + "\r\n")
@@ -54,6 +54,10 @@ func buildBigMultipartRequest(t *testing.T) ([]byte, []byte, []byte) {
 func TestGRPCMUSTPASS_GetHTTPFlowBodyById_MultipartPartIndex(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
+
+	prev := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(200 * 1024)
+	t.Cleanup(func() { consts.SetGlobalMaxContentLength(prev) })
 
 	// Clean up any prior flows of this source type.
 	yakit.DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{

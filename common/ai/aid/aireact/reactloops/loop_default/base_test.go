@@ -61,3 +61,10 @@ func TestConfigExecutionPolicy_CombinedModes(t *testing.T) {
 	require.Contains(t, text, "Both modes are active")
 	require.Contains(t, text, "reach iteration 6 before finishing")
 }
+
+func TestPostSummaryOnlyOffersNonBlockingFollowUps(t *testing.T) {
+	require.Contains(t, reActPostSummary, "## 可选后续（不属于本次完成条件）")
+	require.Contains(t, reActPostSummary, "finish 前升级为 TODO 并执行")
+	require.Contains(t, reActPostSummary, "没有合适的非阻塞可选项时，省略整个章节")
+	require.NotContains(t, reActPostSummary, "## 下一步建议")
+}

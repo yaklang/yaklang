@@ -193,7 +193,6 @@ func TestReAct_ContextDoneDieLock(t *testing.T) {
 
 	basicOption := []aicommon.ConfigOption{
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return &aicommon.AIResponse{}, nil
@@ -219,7 +218,6 @@ func TestReAct_Invoker_FreeInputShouldNotSet(t *testing.T) {
 	defer cancel()
 	basicOption := []aicommon.ConfigOption{
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return &aicommon.AIResponse{}, nil
@@ -239,7 +237,6 @@ func TestReAct_LoopCoverPeriodicVerificationIntervalOption(t *testing.T) {
 	defer cancel()
 	basicOption := []aicommon.ConfigOption{
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithContext(ctx),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {

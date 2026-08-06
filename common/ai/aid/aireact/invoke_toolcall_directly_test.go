@@ -537,10 +537,10 @@ func TestReAct_DirectlyCallTool_PersistentSession(t *testing.T) {
 			prompt := r.GetPrompt()
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. mockedToolCalling
 			// 在 isPrimaryDecisionPrompt 总是返回 require_tool, 工具执行一轮后会无限循环.
-			// 这里在 isPrimaryDecisionPrompt 分支检测到 "mocked thought for tool calling" 已
+			// 这里在 isPrimaryDecisionPrompt 分支检测到工具结果 (COMBINED OUTPUT) 已
 			// 存在于 prompt (作为 timeline-open 段内容), 说明工具已执行过, 主动 finish 收口
 			// (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
-			if isPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "mocked thought for tool calling") {
+			if isPrimaryDecisionPrompt(prompt) && strings.Contains(prompt, "COMBINED OUTPUT:") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 				rsp.Close()

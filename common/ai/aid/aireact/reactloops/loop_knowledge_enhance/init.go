@@ -38,7 +38,7 @@ func init() {
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOutputExample(outputExample),
 				// 默认 3 轮(支持多轮单条搜索); 当调用方显式配置了较小的迭代数(1-10)时遵循该配置.
 				// 全局默认 MaxIterationCount=100, 此时 clamp 不命中, 仍保持原有 3 轮行为.
 				// 关键词: knowledge_enhance max iterations, honor config, clamp 1-10
@@ -61,7 +61,7 @@ func init() {
 					attachedResources := loop.Get("attached_resources")
 					searchResults := loop.Get("search_results_summary")
 					searchHistory := loop.Get("search_history")
-					nextMovementsSummary := loop.Get("next_movements_summary")
+					nextSearchSummary := loop.Get("next_search_summary")
 					artifactsSummary := buildArtifactsSummary(loop)
 					// 已加载的知识库列表，用于在 prompt 中展示
 					loadedKnowledgeBases := loop.Get("knowledge_bases")
@@ -71,7 +71,7 @@ func init() {
 						"AttachedResources":    attachedResources,
 						"SearchResults":        searchResults,
 						"SearchHistory":        searchHistory,
-						"NextMovementsSummary": nextMovementsSummary,
+						"NextSearchSummary":    nextSearchSummary,
 						"ArtifactsSummary":     artifactsSummary,
 						"LoadedKnowledgeBases": loadedKnowledgeBases,
 						"Nonce":                nonce,

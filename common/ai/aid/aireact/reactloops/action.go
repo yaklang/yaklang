@@ -65,6 +65,7 @@ func buildSchema(actions ...*LoopAction) string {
 				"Optional. Omit this field when @action is 'directly_answer' or when the next step is already obvious. If you do provide it, keep it to one short, action-oriented sentence only (prefer <=12 Chinese characters or <=8 English words).",
 			),
 		),
+		todoDeltaSchemaOption(),
 	}
 
 	existed := make(map[string]struct{})
@@ -85,4 +86,26 @@ func buildSchema(actions ...*LoopAction) string {
 	}
 
 	return aitool.NewObjectSchema(opts...)
+}
+
+func todoDeltaSchemaOption() aitool.ToolOption {
+	return aitool.WithStructParam("todo_delta", []aitool.PropertyOption{
+		aitool.WithParam_Description("The only write channel for the short-term TODO work set; TODO LIST and prose are read-only. This field is optional only when state truly does not change. Add, refine, close, defer, resume, or switch TODOs in the same normal action that advances the work. Apply order: add, update, close, current. Open items form the Frontier and one item is current. Before following one branch, record every concrete in-scope branch exposed by an Observation. A discovered link, form action, redirect, script route, documented endpoint, or response field is sufficient source evidence for a coverage TODO; require a falsifiable hypothesis only for a verification claim. Keep current while materially different experiments can gain information. A tool/parameter/transport/auth failure or one payload miss is not closure: correct it or vary the controllable channel first. When current completes, is discriminatively ruled out, is externally blocked, or temporarily has zero information gain, save its result or resume condition and set the next Frontier item in the same delta. Every close requires outcome and reason; refs is a sibling field and closure may use only observations already available before this action."),
+	},
+		aitool.WithRawParam("current", map[string]any{"type": []string{"string", "null"}, "description": "Optional unique current TODO id. Omit to keep focus; null or empty clears it."}),
+		aitool.WithStructArrayParam("add", nil, nil,
+			aitool.WithStringParam("id", aitool.WithParam_Description("Optional stable id; the engine generates todo-N when omitted. Do not add an existing id again; use update when its text changes.")),
+			aitool.WithStringParam("text", aitool.WithParam_Required(true), aitool.WithParam_Description("A short, actionable TODO. Preserve the concrete target, source evidence, and first resume action; add a falsifiable hypothesis when the item verifies a claim.")),
+		),
+		aitool.WithStructArrayParam("update", nil, nil,
+			aitool.WithStringParam("id", aitool.WithParam_Required(true)),
+			aitool.WithStringParam("text", aitool.WithParam_Required(true)),
+		),
+		aitool.WithStructArrayParam("close", nil, nil,
+			aitool.WithStringParam("id", aitool.WithParam_Required(true)),
+			aitool.WithStringParam("outcome", aitool.WithParam_Required(true), aitool.WithParam_EnumString("resolved", "dismissed", "deferred")),
+			aitool.WithStringParam("reason", aitool.WithParam_Required(true), aitool.WithParam_Description("Required audit trail string based on observations already available in the current task before this action runs: verified result for resolved; attempts and stop reason for dismissed; attempts, unfinished work, and continuation condition for deferred. Keep refs outside this string as a sibling JSON field. Historical memory or another task's conclusion must be revalidated before resolved.")),
+			aitool.WithSimpleArrayParam("refs", "string", aitool.WithParam_Description("Optional array of tool-call or observation references. This is a sibling of reason, not part of the reason key or string.")),
+		),
+	)
 }
