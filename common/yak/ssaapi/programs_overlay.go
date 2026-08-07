@@ -1,12 +1,9 @@
 package ssaapi
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -169,36 +166,37 @@ func newEmptyOverlay() *ProgramOverLay {
 	return &ProgramOverLay{Diff: make([]*ProgramLayer, 0)}
 }
 
-// setExcludeFile installs ExcludeFile from Diff[i].File ∪ deleted.
-// Call after materializeDiffFiles so owned paths are already on layers.
-func (p *ProgramOverLay) setExcludeFile(deleted map[string]struct{}) {
+func (p *ProgramOverLay) ensureExcludePath(path string) {
 	if p == nil {
 		return
 	}
-	seen := make(map[string]struct{})
-	p.ExcludeFile = p.ExcludeFile[:0]
-	add := func(path string) {
-		path = ensureOverlayPathSlash(path)
-		if path == "" {
+	path = ensureOverlayPathSlash(path)
+	if path == "" {
+		return
+	}
+	for _, f := range p.ExcludeFile {
+		if f == path {
 			return
 		}
-		if _, ok := seen[path]; ok {
-			return
-		}
-		seen[path] = struct{}{}
-		p.ExcludeFile = append(p.ExcludeFile, path)
 	}
-	for _, layer := range p.Diff {
-		if layer == nil {
-			continue
-		}
-		for _, path := range layer.File {
-			add(path)
+	p.ExcludeFile = append(p.ExcludeFile, path)
+}
+
+// stripOwnedPath removes path from the Diff layer that currently owns it (if any).
+func (p *ProgramOverLay) stripOwnedPath(path string) {
+	di, ok := p.ownerDiffIndex(path)
+	if !ok || di < 0 || di >= len(p.Diff) || p.Diff[di] == nil {
+		return
+	}
+	layer := p.Diff[di]
+	path = ensureOverlayPathSlash(path)
+	dst := layer.File[:0]
+	for _, f := range layer.File {
+		if f != path {
+			dst = append(dst, f)
 		}
 	}
-	for path := range deleted {
-		add(path)
-	}
+	layer.File = dst
 }
 
 // IsTopLayerProgram reports whether prog is the newest diff (or Base if no diffs).
@@ -264,30 +262,37 @@ func (p *ProgramOverLay) valueSource(v *Value) (fromBase bool, di int, ok bool) 
 	return false, -1, false
 }
 
-// findFileInProgram looks up filePath, trying program-name-prefixed form first.
-func findFileInProgram(prog *Program, filePath, programName string) (found bool, content string) {
-	if prog == nil || filePath == "" {
-		return false, ""
+// readProgramFileContent looks up source by FileList/GetEditor (O(1) candidates, no full scan).
+func readProgramFileContent(prog *Program, filePath string) (string, bool) {
+	if prog == nil || prog.Program == nil || filePath == "" {
+		return "", false
 	}
-	candidates := []string{filePath}
-	if programName != "" {
-		prefixed := "/" + programName + "/" + strings.TrimPrefix(filePath, "/")
-		candidates = []string{prefixed, filePath}
+	progName := prog.GetProgramName()
+	rel := strings.TrimPrefix(ensureOverlayPathSlash(filePath), "/")
+	candidates := []string{ensureOverlayPathSlash(filePath), rel}
+	if progName != "" {
+		candidates = append([]string{"/" + progName + "/" + rel, progName + "/" + rel}, candidates...)
 	}
 	for _, candidate := range candidates {
-		prog.ForEachAllFile(func(path string, editor *memedit.MemEditor) bool {
-			if path == candidate {
-				content = editor.GetSourceCode()
-				found = true
-				return false
+		if hash, ok := prog.Program.FileList[candidate]; ok {
+			if ed, err := prog.getEditor(candidate, hash); err == nil && ed != nil {
+				return ed.GetSourceCode(), true
 			}
-			return true
-		})
-		if found {
-			return found, content
+		}
+		if ed, ok := prog.Program.GetEditor(candidate); ok && ed != nil {
+			return ed.GetSourceCode(), true
 		}
 	}
-	return false, ""
+	want := ensureOverlayPathSlash(filePath)
+	for path, hash := range prog.Program.FileList {
+		if normalizeOverlayFilePath(path, progName) != want {
+			continue
+		}
+		if ed, err := prog.getEditor(path, hash); err == nil && ed != nil {
+			return ed.GetSourceCode(), true
+		}
+	}
+	return "", false
 }
 
 func addFileToAggregatedFS(vfs *filesys.VirtualFS, canonicalPath, content string) {
@@ -314,9 +319,47 @@ func deleteFileFromAggregatedFS(vfs *filesys.VirtualFS, canonicalPath string) {
 	}
 }
 
-// applyDiffFileHashMap updates owner/deleted maps from a program's FileHashMap.
-// owner maps path -> diff index (last write wins). hash==-1 marks deleted.
-func applyDiffFileHashMap(diffProg *Program, di int, owner map[string]int, deleted map[string]struct{}) error {
+// cloneAndPatchAggregatedFS copies prev FS then applies newLayer FileHashMap (-1 delete, else upsert).
+func cloneAndPatchAggregatedFS(prev fi.FileSystem, newLayer *Program) (*filesys.VirtualFS, error) {
+	out := filesys.NewVirtualFs()
+	if prev != nil {
+		err := filesys.Recursive(".", filesys.WithFileSystem(prev), filesys.WithFileStat(func(path string, info os.FileInfo) error {
+			content, err := prev.ReadFile(path)
+			if err != nil {
+				return nil
+			}
+			addFileToAggregatedFS(out, overlayPathFromAggregatedFS(path), string(content))
+			return nil
+		}))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if newLayer == nil || newLayer.Program == nil {
+		return out, nil
+	}
+	fileHashMap := newLayer.Program.FileHashMap
+	progName := newLayer.GetProgramName()
+	for filePath, hash := range fileHashMap {
+		path := normalizeOverlayFilePath(filePath, progName)
+		if hash == -1 {
+			deleteFileFromAggregatedFS(out, path)
+			continue
+		}
+		if content, ok := readProgramFileContent(newLayer, path); ok {
+			addFileToAggregatedFS(out, path, content)
+		}
+	}
+	return out, nil
+}
+
+// applyLayerFileHashMap appends a Diff layer and applies its FileHashMap directly:
+//   - add/mod  → strip from older Diff.File, own on new layer.File, add to ExcludeFile
+//   - delete   → strip from older Diff.File, add to ExcludeFile (not owned)
+func applyLayerFileHashMap(overlay *ProgramOverLay, diffProg *Program) error {
+	if overlay == nil {
+		return utils.Errorf("overlay is nil")
+	}
 	if diffProg == nil || diffProg.Program == nil {
 		return utils.Errorf("diff program is nil")
 	}
@@ -324,34 +367,21 @@ func applyDiffFileHashMap(diffProg *Program, di int, owner map[string]int, delet
 	if len(fileHashMap) == 0 {
 		return utils.Errorf("FileHashMap is required for diff program %s, but it is empty", diffProg.GetProgramName())
 	}
+
+	layer := &ProgramLayer{Program: diffProg}
 	for filePath, hash := range fileHashMap {
 		if filePath == "" {
 			continue
 		}
-		normalizedPath := normalizeOverlayFilePath(filePath, diffProg.GetProgramName())
-		if hash == -1 {
-			delete(owner, normalizedPath)
-			deleted[normalizedPath] = struct{}{}
-			continue
+		path := normalizeOverlayFilePath(filePath, diffProg.GetProgramName())
+		overlay.stripOwnedPath(path)
+		overlay.ensureExcludePath(path)
+		if hash != -1 {
+			layer.File = append(layer.File, path)
 		}
-		owner[normalizedPath] = di
-		delete(deleted, normalizedPath)
 	}
+	overlay.Diff = append(overlay.Diff, layer)
 	return nil
-}
-
-func materializeDiffFiles(diff []*ProgramLayer, owner map[string]int) {
-	for _, layer := range diff {
-		if layer != nil {
-			layer.File = nil
-		}
-	}
-	for path, di := range owner {
-		if di < 0 || di >= len(diff) || diff[di] == nil {
-			continue
-		}
-		diff[di].File = append(diff[di].File, path)
-	}
 }
 
 func createOverlayFromLayers(programs ...*Program) *ProgramOverLay {
@@ -364,37 +394,19 @@ func createOverlayFromLayers(programs ...*Program) *ProgramOverLay {
 	overlay.Base = programs[0]
 	overlay.Diff = make([]*ProgramLayer, 0, len(programs)-1)
 
-	owner := make(map[string]int)
-	deleted := make(map[string]struct{})
-
 	for i := 1; i < len(programs); i++ {
-		diffProgram := programs[i]
-		if diffProgram == nil {
+		if programs[i] == nil {
 			continue
 		}
-		di := len(overlay.Diff)
-		if err := applyDiffFileHashMap(diffProgram, di, owner, deleted); err != nil {
+		if err := applyLayerFileHashMap(overlay, programs[i]); err != nil {
 			log.Errorf("createOverlayFromLayers: %v", err)
 			return nil
 		}
-		overlay.Diff = append(overlay.Diff, &ProgramLayer{Program: diffProgram})
 	}
 
-	materializeDiffFiles(overlay.Diff, owner)
-	overlay.setExcludeFile(deleted)
-
-	aggregatedFS, err := overlay.aggregateFileSystems()
-	if err != nil {
-		log.Errorf("failed to aggregate file systems: %v", err)
-	} else {
-		overlay.AggregatedFS = aggregatedFS
-	}
-
-	wireOverlayPrograms(overlay)
-
+	overlay.finishBuild()
 	log.Infof("ProgramOverLay: Built base+%d diffs, exclude=%d files",
 		len(overlay.Diff), len(overlay.ExcludeFile))
-
 	return overlay
 }
 
@@ -425,17 +437,10 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 	if baseOverlay == nil || baseOverlay.Base == nil {
 		return nil
 	}
-	if newLayerProgram == nil || newLayerProgram.Program == nil {
-		return nil
-	}
-	fileHashMap := newLayerProgram.Program.FileHashMap
-	if len(fileHashMap) == 0 {
-		log.Errorf("FileHashMap is required for diff program %s, but it is empty", newLayerProgram.GetProgramName())
-		return nil
-	}
 
 	overlay := newEmptyOverlay()
 	overlay.Base = baseOverlay.Base
+	overlay.ExcludeFile = append([]string(nil), baseOverlay.ExcludeFile...)
 	overlay.Diff = make([]*ProgramLayer, 0, len(baseOverlay.Diff)+1)
 	for _, layer := range baseOverlay.Diff {
 		if layer == nil {
@@ -446,73 +451,48 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 		overlay.Diff = append(overlay.Diff, &ProgramLayer{Program: layer.Program, File: copied})
 	}
 
-	owner := make(map[string]int)
-	deleted := make(map[string]struct{})
-	for di, layer := range overlay.Diff {
-		for _, path := range layer.File {
-			owner[ensureOverlayPathSlash(path)] = di
-		}
-	}
-	// Seed deleted-only paths from prior ExcludeFile (owned paths are already in owner).
-	for _, path := range baseOverlay.ExcludeFile {
-		normalized := ensureOverlayPathSlash(path)
-		if _, owned := owner[normalized]; !owned {
-			deleted[normalized] = struct{}{}
-		}
-	}
-
-	di := len(overlay.Diff)
-	if err := applyDiffFileHashMap(newLayerProgram, di, owner, deleted); err != nil {
+	if err := applyLayerFileHashMap(overlay, newLayerProgram); err != nil {
 		log.Errorf("extendOverlayWithNewLayer: %v", err)
 		return nil
 	}
-	overlay.Diff = append(overlay.Diff, &ProgramLayer{Program: newLayerProgram})
-	materializeDiffFiles(overlay.Diff, owner)
-	overlay.setExcludeFile(deleted)
-
-	if baseOverlay.AggregatedFS != nil {
-		newAggregatedFS := filesys.NewVirtualFs()
-		err := filesys.Recursive(".", filesys.WithFileSystem(baseOverlay.AggregatedFS), filesys.WithFileStat(func(path string, info os.FileInfo) error {
-			if info.IsDir() {
-				return nil
-			}
-			content, err := baseOverlay.AggregatedFS.ReadFile(path)
-			if err != nil {
-				log.Warnf("failed to read file %s from baseOverlay AggregatedFS: %v", path, err)
-				return nil
-			}
-			addFileToAggregatedFS(newAggregatedFS, overlayPathFromAggregatedFS(path), string(content))
-			return nil
-		}))
-		if err != nil {
-			log.Warnf("failed to copy files from baseOverlay AggregatedFS: %v", err)
-		}
-		for filePath, hash := range fileHashMap {
-			normalizedPath := normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName())
-			if hash == -1 {
-				deleteFileFromAggregatedFS(newAggregatedFS, normalizedPath)
-			}
-		}
-		newLayerProgram.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
-			if filePath == "" || me == nil {
-				return true
-			}
-			if hash, exists := fileHashMap[filePath]; exists && hash == -1 {
-				return true
-			}
-			normalizedPath := normalizeOverlayFilePath(filePath, newLayerProgram.GetProgramName())
-			addFileToAggregatedFS(newAggregatedFS, normalizedPath, me.GetSourceCode())
-			return true
-		})
-		overlay.AggregatedFS = newAggregatedFS
-	}
 
 	wireOverlayPrograms(overlay)
+	if baseOverlay.AggregatedFS != nil {
+		patched, err := cloneAndPatchAggregatedFS(baseOverlay.AggregatedFS, newLayerProgram)
+		if err != nil {
+			log.Warnf("patch AggregatedFS failed, falling back to full rebuild: %v", err)
+			overlay.rebuildAggregatedFS()
+		} else {
+			overlay.AggregatedFS = patched
+		}
+	} else {
+		overlay.rebuildAggregatedFS()
+	}
 
 	log.Infof("ProgramOverLay: Extended base+%d diffs, exclude=%d files",
 		len(overlay.Diff), len(overlay.ExcludeFile))
-
 	return overlay
+}
+
+// finishBuild wires programs and builds AggregatedFS from Diff.File + Base − ExcludeFile.
+func (p *ProgramOverLay) finishBuild() {
+	if p == nil {
+		return
+	}
+	wireOverlayPrograms(p)
+	p.rebuildAggregatedFS()
+}
+
+func (p *ProgramOverLay) rebuildAggregatedFS() {
+	if p == nil {
+		return
+	}
+	aggregatedFS, err := p.aggregateFileSystems()
+	if err != nil {
+		log.Errorf("failed to aggregate file systems: %v", err)
+		return
+	}
+	p.AggregatedFS = aggregatedFS
 }
 
 func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
@@ -532,8 +512,8 @@ func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
 	return createOverlayFromLayers(valid...)
 }
 
-// aggregateFileSystems builds the effective FS from Diff (top-down) then Base,
-// skipping deleted paths.
+// aggregateFileSystems builds the effective FS from ownership:
+// Diff[i].File → that layer; base FileList − ExcludeFile → Base.
 func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 	if p == nil || p.Base == nil {
 		return nil, utils.Errorf("aggregateFileSystems requires Base program")
@@ -543,26 +523,38 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 	}
 
 	aggregated := filesys.NewVirtualFs()
-	for _, filePath := range p.visibleFilePaths() {
-		added := false
-		for i := len(p.Diff) - 1; i >= 0; i-- {
-			layer := p.Diff[i]
-			if layer == nil || layer.Program == nil {
+	for _, layer := range p.Diff {
+		if layer == nil || layer.Program == nil {
+			continue
+		}
+		for _, filePath := range layer.File {
+			path := ensureOverlayPathSlash(filePath)
+			if path == "" {
 				continue
 			}
-			if found, content := findFileInProgram(layer.Program, filePath, layer.Program.GetProgramName()); found {
-				addFileToAggregatedFS(aggregated, filePath, content)
-				added = true
-				break
-			}
-		}
-		if !added && p.Base != nil {
-			if found, content := findFileInProgram(p.Base, filePath, p.Base.GetProgramName()); found {
-				addFileToAggregatedFS(aggregated, filePath, content)
+			if content, ok := readProgramFileContent(layer.Program, path); ok {
+				addFileToAggregatedFS(aggregated, path, content)
 			}
 		}
 	}
-
+	if p.Base.Program != nil {
+		progName := p.Base.GetProgramName()
+		exclude := overlayPathSet(p.ExcludeFile)
+		for filePath, hash := range p.Base.Program.FileList {
+			normalized := normalizeOverlayFilePath(filePath, progName)
+			if normalized == "" {
+				continue
+			}
+			if _, skip := exclude[normalized]; skip {
+				continue
+			}
+			ed, err := p.Base.getEditor(filePath, hash)
+			if err != nil || ed == nil {
+				continue
+			}
+			addFileToAggregatedFS(aggregated, normalized, ed.GetSourceCode())
+		}
+	}
 	return aggregated, nil
 }
 
@@ -578,47 +570,40 @@ func (p *ProgramOverLay) ProgramCount() int {
 	return n
 }
 
-// visibleFilePaths returns ∪Diff.File ∪ (base files − ExcludeFile).
-func (p *ProgramOverLay) visibleFilePaths() []string {
+func (p *ProgramOverLay) GetFileCount() int {
 	if p == nil {
-		return nil
+		return 0
 	}
-	exclude := overlayPathSet(p.ExcludeFile)
-	seen := make(map[string]struct{})
-	var out []string
-	add := func(path string) {
-		path = ensureOverlayPathSlash(path)
-		if path == "" {
-			return
-		}
-		if _, ok := seen[path]; ok {
-			return
-		}
-		seen[path] = struct{}{}
-		out = append(out, path)
+	// Prefer already-built AggregatedFS (exact visible set).
+	if p.AggregatedFS != nil {
+		n := 0
+		_ = filesys.Recursive(".", filesys.WithFileSystem(p.AggregatedFS), filesys.WithFileStat(func(_ string, _ os.FileInfo) error {
+			n++
+			return nil
+		}))
+		return n
 	}
+	// Diff[i].File paths are exclusive after applyLayerFileHashMap; ExcludeFile ⊇ owned.
+	n := 0
 	for _, layer := range p.Diff {
-		if layer == nil {
-			continue
-		}
-		for _, path := range layer.File {
-			add(path)
+		if layer != nil {
+			n += len(layer.File)
 		}
 	}
 	if p.Base != nil && p.Base.Program != nil {
+		exclude := overlayPathSet(p.ExcludeFile)
 		for filePath := range p.Base.Program.FileList {
 			normalized := normalizeOverlayFilePath(filePath, p.Base.GetProgramName())
+			if normalized == "" {
+				continue
+			}
 			if _, skip := exclude[normalized]; skip {
 				continue
 			}
-			add(normalized)
+			n++
 		}
 	}
-	return out
-}
-
-func (p *ProgramOverLay) GetFileCount() int {
-	return len(p.visibleFilePaths())
+	return n
 }
 
 // GetAggregatedFileSystem 获取聚合后的文件系统
@@ -635,80 +620,6 @@ func (p *ProgramOverLay) GetAggregatedFileSystem() fi.FileSystem {
 		p.AggregatedFS = aggregatedFS
 	}
 	return p.AggregatedFS
-}
-
-// calculateFileSystemDiff 计算两个文件系统的差异，返回差量文件系统和 hash 映射
-// hash状态: -1=删除, 0=修改, 1=新增
-func calculateFileSystemDiff(baseFS, newFS fi.FileSystem) (diffFS *filesys.VirtualFS, fileHashMap map[string]int, err error) {
-	diffFS = filesys.NewVirtualFs()
-	fileHashMap = make(map[string]int)
-
-	baseFiles := make(map[string][]byte)
-	err = filesys.Recursive(".", filesys.WithFileSystem(baseFS), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-		if isDir {
-			return nil
-		}
-		if pathname == "" {
-			return nil
-		}
-		file, err := baseFS.Open(pathname)
-		if err != nil {
-			return nil
-		}
-		defer file.Close()
-		content, err := io.ReadAll(file)
-		if err != nil {
-			return nil
-		}
-		baseFiles[pathname] = content
-		return nil
-	}))
-	if err != nil {
-		return nil, nil, utils.Wrap(err, "failed to collect baseFS files")
-	}
-
-	newFiles := make(map[string][]byte)
-	err = filesys.Recursive(".", filesys.WithFileSystem(newFS), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-		if isDir {
-			return nil
-		}
-		if pathname == "" {
-			return nil
-		}
-		file, err := newFS.Open(pathname)
-		if err != nil {
-			return nil
-		}
-		defer file.Close()
-		content, err := io.ReadAll(file)
-		if err != nil {
-			return nil
-		}
-		newFiles[pathname] = content
-		return nil
-	}))
-	if err != nil {
-		return nil, nil, utils.Wrap(err, "failed to collect newFS files")
-	}
-
-	for filePath, baseContent := range baseFiles {
-		newContent, existsInNew := newFiles[filePath]
-		if !existsInNew {
-			fileHashMap[filePath] = -1
-		} else if !bytes.Equal(baseContent, newContent) {
-			fileHashMap[filePath] = 0
-			diffFS.AddFile(filePath, string(newContent))
-		}
-	}
-
-	for filePath, newContent := range newFiles {
-		if _, existsInBase := baseFiles[filePath]; !existsInBase {
-			fileHashMap[filePath] = 1
-			diffFS.AddFile(filePath, string(newContent))
-		}
-	}
-
-	return diffFS, fileHashMap, nil
 }
 
 func getValueFilePath(v *Value) string {
@@ -741,38 +652,6 @@ func overlayPathSet(paths []string) map[string]struct{} {
 	return m
 }
 
-// appendValuesByFileFilter keeps values whose file is in allow (include=true)
-// or not in allow (include=false). Empty file path is always kept.
-func appendValuesByFileFilter(
-	vals sfvm.Values,
-	programName string,
-	allow map[string]struct{},
-	include bool,
-	results *[]sfvm.ValueOperator,
-) {
-	if vals == nil || results == nil {
-		return
-	}
-	_ = vals.Recursive(func(op sfvm.ValueOperator) error {
-		v, ok := op.(*Value)
-		if !ok {
-			*results = append(*results, op)
-			return nil
-		}
-		filePath := getValueFilePath(v)
-		if filePath == "" {
-			*results = append(*results, v)
-			return nil
-		}
-		normalized := normalizeOverlayFilePath(filePath, programName)
-		_, inSet := allow[normalized]
-		if include == inSet {
-			*results = append(*results, v)
-		}
-		return nil
-	})
-}
-
 // Ref dual-source: Diff include(owned File) then Base exclude(ExcludeFile).
 func (p *ProgramOverLay) Ref(name string) Values {
 	var result Values
@@ -796,6 +675,8 @@ func (p *ProgramOverLay) Ref(name string) Values {
 	return result
 }
 
+// Relocate maps a value from Base/older Diff onto the Diff layer that owns its file.
+// Lookup is layer.Ref only (include File); no SyntaxFlow.
 func (p *ProgramOverLay) Relocate(v *Value) *Value {
 	if v == nil || p == nil {
 		return v
@@ -809,17 +690,13 @@ func (p *ProgramOverLay) Relocate(v *Value) *Value {
 		return v
 	}
 	progName := ""
-	if fromBase && p.Base != nil {
-		progName = p.Base.GetProgramName()
-	} else if di >= 0 && di < len(p.Diff) && p.Diff[di] != nil && p.Diff[di].Program != nil {
-		progName = p.Diff[di].Program.GetProgramName()
+	if v.ParentProgram != nil {
+		progName = v.ParentProgram.GetProgramName()
 	}
-	normalizedPath := normalizeOverlayFilePath(filePath, progName)
-	ownerDi, owned := p.ownerDiffIndex(normalizedPath)
+	ownerDi, owned := p.ownerDiffIndex(normalizeOverlayFilePath(filePath, progName))
 	if !owned || ownerDi < 0 || ownerDi >= len(p.Diff) {
 		return v
 	}
-	// Only relocate when value comes from Base or an older Diff than the owner.
 	if !fromBase && di >= ownerDi {
 		return v
 	}
@@ -830,23 +707,14 @@ func (p *ProgramOverLay) Relocate(v *Value) *Value {
 
 	wantOpcode := v.GetOpcode()
 	seen := make(map[string]struct{})
-	var names []string
 	for _, name := range getValueNames(v) {
-		if name == "" {
-			continue
-		}
-		if match, err := regexp.Match(`.*(=|-).*`, []byte(name)); err == nil && match {
+		if name == "" || strings.ContainsAny(name, "=-") {
 			continue
 		}
 		if _, ok := seen[name]; ok {
 			continue
 		}
 		seen[name] = struct{}{}
-		names = append(names, name)
-	}
-
-	// Prefer layer include Ref (owned files only).
-	for _, name := range names {
 		for _, cand := range layer.Ref(name) {
 			if cand == nil {
 				continue
@@ -855,18 +723,6 @@ func (p *ProgramOverLay) Relocate(v *Value) *Value {
 				continue
 			}
 			return cand
-		}
-	}
-	// Fallback for consts / oddly-named values.
-	var rule strings.Builder
-	for _, name := range names {
-		rule.WriteString(fmt.Sprintf("%s?{opcode: %s} as $res_op\n", name, wantOpcode))
-	}
-	if rule.Len() > 0 && layer.Program != nil {
-		if res, err := layer.Program.SyntaxFlowWithError(rule.String()); err == nil {
-			if values := res.GetAllValuesChain(); len(values) > 0 {
-				return values[0]
-			}
 		}
 	}
 	return v
@@ -1080,42 +936,60 @@ func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]s
 	return nil, utils.Error("ProgramOverLay does not support FileFilter")
 }
 
-// compareAcrossLayers: Diff include(File), Base exclude(ExcludeFile).
-func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values, []bool)) sfvm.Values {
+// compareAcrossLayers: Diff include(File), Base exclude(ExcludeFile) — same dual-source as Ref/Match.
+func (p *ProgramOverLay) compareAcrossLayers(
+	compareInclude func(*Program, []string) (sfvm.Values, []bool),
+	compareExclude func(*Program, []string) (sfvm.Values, []bool),
+) sfvm.Values {
 	if p == nil || p.Base == nil {
 		return sfvm.NewEmptyValues()
 	}
 
 	results := make([]sfvm.ValueOperator, 0)
+	appendVals := func(vals sfvm.Values) {
+		if vals == nil || vals.IsEmpty() {
+			return
+		}
+		_ = vals.Recursive(func(op sfvm.ValueOperator) error {
+			results = append(results, op)
+			return nil
+		})
+	}
+
 	for i := len(p.Diff) - 1; i >= 0; i-- {
 		layer := p.Diff[i]
 		if layer == nil || layer.Program == nil || len(layer.File) == 0 {
 			continue
 		}
-		values, _ := compare(layer.Program)
-		if values.IsEmpty() {
-			continue
-		}
-		appendValuesByFileFilter(values, layer.Program.GetProgramName(), overlayPathSet(layer.File), true, &results)
+		values, _ := compareInclude(layer.Program, layer.File)
+		appendVals(values)
 	}
 
-	values, _ := compare(p.Base)
-	if !values.IsEmpty() {
-		appendValuesByFileFilter(values, p.Base.GetProgramName(), overlayPathSet(p.ExcludeFile), false, &results)
-	}
+	values, _ := compareExclude(p.Base, p.ExcludeFile)
+	appendVals(values)
 	return sfvm.NewValues(results)
 }
 
 func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
-	return p.compareAcrossLayers(func(prog *Program) (sfvm.Values, []bool) {
-		return prog.CompareString(comparator)
-	}), nil
+	return p.compareAcrossLayers(
+		func(prog *Program, include []string) (sfvm.Values, []bool) {
+			return prog.compareStringWithFileFilter(comparator, include, nil)
+		},
+		func(prog *Program, exclude []string) (sfvm.Values, []bool) {
+			return prog.compareStringWithFileFilter(comparator, nil, exclude)
+		},
+	), nil
 }
 
 func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
-	return p.compareAcrossLayers(func(prog *Program) (sfvm.Values, []bool) {
-		return prog.CompareOpcode(comparator)
-	}), nil
+	return p.compareAcrossLayers(
+		func(prog *Program, include []string) (sfvm.Values, []bool) {
+			return prog.compareOpcodeWithFileFilter(comparator, include, nil)
+		},
+		func(prog *Program, exclude []string) (sfvm.Values, []bool) {
+			return prog.compareOpcodeWithFileFilter(comparator, nil, exclude)
+		},
+	), nil
 }
 
 func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) bool {

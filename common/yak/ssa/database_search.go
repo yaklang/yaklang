@@ -13,9 +13,23 @@ import (
 )
 
 func MatchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
+	return MatchInstructionByOpcodesWithFileFilter(ctx, prog, nil, nil, opcodes...)
+}
+
+// MatchInstructionByOpcodesWithFileFilter matches opcodes then applies include/exclude file filters.
+// Empty file path is kept (extern/lib). includeFiles takes precedence when non-empty.
+func MatchInstructionByOpcodesWithFileFilter(
+	ctx context.Context,
+	prog *Program,
+	includeFiles, excludeFiles []string,
+	opcodes ...Opcode,
+) []Instruction {
 	var insts []Instruction
 	_ = diagnostics.TrackLow("ssa.MatchInstructionByOpcodes", func() error {
 		insts = matchInstructionByOpcodes(ctx, prog, opcodes...)
+		if len(includeFiles) > 0 || len(excludeFiles) > 0 {
+			insts = filterInstructionsByFiles(prog, insts, includeFiles, excludeFiles)
+		}
 		return nil
 	})
 	return insts
@@ -47,7 +61,79 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 		}
 	}
 	return insts
+}
 
+func filterInstructionsByFiles(prog *Program, insts []Instruction, includeFiles, excludeFiles []string) []Instruction {
+	if len(insts) == 0 || (len(includeFiles) == 0 && len(excludeFiles) == 0) {
+		return insts
+	}
+	includeSet := buildFilePathSet(prog, includeFiles)
+	excludeSet := buildFilePathSet(prog, excludeFiles)
+	out := make([]Instruction, 0, len(insts))
+	for _, inst := range insts {
+		filePath := getInstructionFilePath(inst)
+		if filePath == "" {
+			out = append(out, inst)
+			continue
+		}
+		if len(includeSet) > 0 && !pathInFileSet(prog, filePath, includeSet) {
+			continue
+		}
+		if pathInFileSet(prog, filePath, excludeSet) {
+			continue
+		}
+		out = append(out, inst)
+	}
+	return out
+}
+
+func buildFilePathSet(prog *Program, files []string) map[string]struct{} {
+	if len(files) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(files)*4)
+	addKey := func(path string) {
+		if path == "" {
+			return
+		}
+		n := normalizeFilePathForExclude(path)
+		set[n] = struct{}{}
+		set[strings.TrimPrefix(n, "/")] = struct{}{}
+	}
+	progName := ""
+	if prog != nil {
+		progName = prog.Name
+	}
+	for _, filePath := range files {
+		addKey(filePath)
+		if progName != "" {
+			addKey(stripProgramNamePrefixForExclude(filePath, progName))
+		}
+	}
+	return set
+}
+
+func pathInFileSet(prog *Program, filePath string, set map[string]struct{}) bool {
+	if len(set) == 0 || filePath == "" {
+		return false
+	}
+	normalizedPath := normalizeFilePathForExclude(filePath)
+	if _, ok := set[normalizedPath]; ok {
+		return true
+	}
+	if _, ok := set[strings.TrimPrefix(normalizedPath, "/")]; ok {
+		return true
+	}
+	if prog != nil && prog.Name != "" {
+		stripped := normalizeFilePathForExclude(stripProgramNamePrefixForExclude(filePath, prog.Name))
+		if _, ok := set[stripped]; ok {
+			return true
+		}
+		if _, ok := set[strings.TrimPrefix(stripped, "/")]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func MatchInstructionsByVariable(
@@ -105,51 +191,6 @@ func matchInstructionsByVariableWithFileFilter(
 		}
 	}
 
-	buildPathSet := func(files []string) map[string]struct{} {
-		if len(files) == 0 {
-			return nil
-		}
-		set := make(map[string]struct{}, len(files)*4)
-		addKey := func(path string) {
-			if path == "" {
-				return
-			}
-			n := normalizeFilePathForExclude(path)
-			set[n] = struct{}{}
-			set[strings.TrimPrefix(n, "/")] = struct{}{}
-		}
-		for _, filePath := range files {
-			addKey(filePath)
-			if prog != nil && prog.Name != "" {
-				addKey(stripProgramNamePrefixForExclude(filePath, prog.Name))
-			}
-		}
-		return set
-	}
-
-	pathInSet := func(filePath string, set map[string]struct{}) bool {
-		if len(set) == 0 || filePath == "" {
-			return false
-		}
-		normalizedPath := normalizeFilePathForExclude(filePath)
-		if _, ok := set[normalizedPath]; ok {
-			return true
-		}
-		if _, ok := set[strings.TrimPrefix(normalizedPath, "/")]; ok {
-			return true
-		}
-		if prog != nil && prog.Name != "" {
-			stripped := normalizeFilePathForExclude(stripProgramNamePrefixForExclude(filePath, prog.Name))
-			if _, ok := set[stripped]; ok {
-				return true
-			}
-			if _, ok := set[strings.TrimPrefix(stripped, "/")]; ok {
-				return true
-			}
-		}
-		return false
-	}
-
 	loadFromMemory := func() {
 		var check func(string) bool
 		switch compareMode {
@@ -172,31 +213,7 @@ func matchInstructionsByVariableWithFileFilter(
 		}
 
 		insts := prog.Cache.findByVariableEx(matchMode, check)
-		if len(excludeFiles) == 0 && len(includeFiles) == 0 {
-			addRes(insts...)
-			return
-		}
-
-		filteredInsts := make([]Instruction, 0, len(insts))
-		excludeSet := buildPathSet(excludeFiles)
-		includeSet := buildPathSet(includeFiles)
-		for _, inst := range insts {
-			filePath := getInstructionFilePath(inst)
-			if filePath == "" {
-				// No file path (e.g. extern/lib Runtime): keep under both exclude
-				// and include filters so overlay dual-source Ref can still bind entry symbols.
-				filteredInsts = append(filteredInsts, inst)
-				continue
-			}
-			if len(includeSet) > 0 && !pathInSet(filePath, includeSet) {
-				continue
-			}
-			if pathInSet(filePath, excludeSet) {
-				continue
-			}
-			filteredInsts = append(filteredInsts, inst)
-		}
-		addRes(filteredInsts...)
+		addRes(filterInstructionsByFiles(prog, insts, includeFiles, excludeFiles)...)
 	}
 
 	// all application in database, just use sql
