@@ -369,7 +369,7 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	return nil
 }
 
-// handleModifyByPatch applies a Cursor-style Apply Patch from GEN_CODE onto full_code.
+// handleModifyByPatch applies an Apply Patch block from GEN_CODE onto full_code.
 // Frontend / yaklang_code_change always receive the merged full file — never raw patch text.
 func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	loop *reactloops.ReActLoop,
@@ -397,8 +397,12 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 
 	hunks, err := ParseCodePatch(patchBody)
 	if err != nil {
-		msg := fmt.Sprintf("【modify_code 失败】Patch 解析失败: %v", err)
+		failCount, fallback := bumpPatchApplyFail(loop, actionName)
+		msg := buildPatchParseFailFeedback(err, failCount, fallback)
 		invoker.AddToTimeline("modify_patch_parse_failed", msg)
+		if fallback {
+			invoker.AddToTimeline("modify_patch_fallback_mode", fmt.Sprintf("enabled after %d consecutive patch failures", failCount))
+		}
 		op.Feedback(msg)
 		op.Continue()
 		return
@@ -407,12 +411,16 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	fullCode := loop.Get(fullCodeVar)
 	newFull, warnings, err := ApplyCodePatchWithWarnings(fullCode, hunks)
 	if err != nil {
-		msg := fmt.Sprintf(`【modify_code 失败】Patch 应用失败（文件未改动）: %v
-
-请基于本轮 CURRENT_CODE 重新生成 Patch：context 与 '-' 行必须从最新代码【逐字符】复制，不要复用 rebase/上一轮修改前的旧片段。
-字符串里的 \n/\r\n 禁止展开成真实换行，也禁止再加一层反斜杠写成 \\n。
-系统已尝试兼容 CRLF/LF、行尾空格，以及一次 \\n→\n 过转义纠正；若仍失败，请加长 @@ 上下文确保唯一匹配。`, err)
+		failCount, fallback := bumpPatchApplyFail(loop, actionName)
+		oldPreview := ""
+		if len(hunks) > 0 {
+			oldPreview = hunks[0].OldText
+		}
+		msg := buildPatchApplyFailFeedback(err, failCount, fallback, fullCode, oldPreview)
 		invoker.AddToTimeline("modify_patch_apply_failed", msg)
+		if fallback {
+			invoker.AddToTimeline("modify_patch_fallback_mode", fmt.Sprintf("enabled after %d consecutive patch failures", failCount))
+		}
 		op.Feedback(msg)
 		op.Continue()
 		return
@@ -422,6 +430,7 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 		op.Feedback("[patch warning] " + w)
 	}
 
+	resetPatchApplyFail(loop, actionName)
 	invoker.AddToTimeline("modify_code", fmt.Sprintf("applied patch (%d hunk(s))", len(hunks)))
 	if reason != "" {
 		runtime.AddToTimeline("modify_reason", reason)
@@ -512,13 +521,23 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
 	matches := findCodeMatchRanges(fullCode, oldSnippet)
 
 	if len(matches) == 0 {
-		msg := fmt.Sprintf(`【modify_code 失败】未找到 old_snippet。
+		var msg string
+		if IsPatchFallbackMode(loop, actionName) {
+			msg = fmt.Sprintf(`【modify_code 失败】未找到 old_snippet（Patch 降级模式）。
 
-请基于本轮 CURRENT_CODE 重新生成 Cursor Patch；不要复用修改前或 rebase 前的旧片段。
+请改用 modify_start_line/modify_end_line，对照 CURRENT_CODE 行号直接替换；不要再回退到 *** Begin Patch。
+
+old_snippet 预览：
+%s`, utils.ShrinkTextBlock(oldSnippet, 300))
+		} else {
+			msg = fmt.Sprintf(`【modify_code 失败】未找到 old_snippet。
+
+请基于本轮 CURRENT_CODE 重新生成 Apply Patch；不要复用修改前或 rebase 前的旧片段。
 系统已尝试兼容 CRLF/LF 与行尾空格差异，但仍未找到唯一对应内容。
 
 old_snippet 预览：
 %s`, utils.ShrinkTextBlock(oldSnippet, 300))
+		}
 		invoker.AddToTimeline("modify_snippet_not_found", msg)
 		op.Feedback(msg)
 		op.Continue()
@@ -551,9 +570,10 @@ old_snippet 预览：
 		fullCode = fullCode[:r.start] + newCode + fullCode[r.end:]
 	}
 
-	// 成功修改后重置空代码计数器
+	// 成功修改后重置空代码计数器与 patch 空转计数
 	emptyCountVar := actionName + "_empty_modify_snippet_count"
 	loop.Set(emptyCountVar, "0")
+	resetPatchApplyFail(loop, actionName)
 
 	invoker.AddToTimeline("modify_code", fmt.Sprintf("replaced snippet (%d match(es), replace_all=%v)", len(matches), replaceAll))
 	if reason != "" {

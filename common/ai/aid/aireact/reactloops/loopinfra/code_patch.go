@@ -18,19 +18,19 @@ const (
 	codePatchEscapeHint = "HINT: preview 含 \\n/\\r\\n 字面量。请从 CURRENT_CODE 逐字符复制 context/- 行；禁止把 \\n 展开成真实换行，也禁止写成 \\\\n（多一层反斜杠）。"
 )
 
-// CodePatchHunk is one @@-delimited change block inside a Cursor-style Apply Patch.
+// CodePatchHunk is one @@-delimited change block inside an Apply Patch body.
 type CodePatchHunk struct {
 	Header  string // @@ line without leading @@ (may be empty)
 	OldText string // context + deleted lines (exact match haystack)
 	NewText string // context + added lines (replacement)
 }
 
-// LooksLikeCodePatch reports whether s contains a Cursor-style Begin Patch marker.
+// LooksLikeCodePatch reports whether s contains an Apply Patch Begin Patch marker.
 func LooksLikeCodePatch(s string) bool {
 	return strings.Contains(s, codePatchBeginMarker)
 }
 
-// ParseCodePatch parses a Cursor-style Apply Patch body into hunks.
+// ParseCodePatch parses an Apply Patch body into hunks.
 // "*** Update File:" paths are ignored; callers always apply against the loop's full_code.
 func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 	s = strings.TrimSpace(s)
@@ -55,27 +55,58 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 	var hunks []CodePatchHunk
 	var cur *CodePatchHunk
 	var oldLines, newLines []string
+	var hasChange bool // true if hunk saw at least one '-' or '+' line
 
-	flush := func() {
+	flush := func() error {
 		if cur == nil {
-			return
+			return nil
 		}
 		cur.OldText = joinPatchLines(oldLines)
 		cur.NewText = joinPatchLines(newLines)
 		if cur.OldText == "" && cur.NewText == "" {
 			cur = nil
 			oldLines, newLines = nil, nil
-			return
+			hasChange = false
+			return nil
+		}
+		// Reject context-only dumps: model wrapped code in Begin Patch but omitted +/-.
+		// Leading spaces on indented Yak lines are parsed as context markers, producing
+		// OldText==NewText no-ops that look like "patches" without any real edit.
+		if !hasChange || cur.OldText == cur.NewText {
+			header := cur.Header
+			if header == "" {
+				header = "(no @@ header)"
+			}
+			err := utils.Errorf(
+				"hunk @@ %s: missing '+' / '-' change lines (context-only / no-op). "+
+					"Each hunk MUST use '-' for deleted lines and '+' for added lines; "+
+					"space-prefixed lines are context only. Example:\n"+
+					"@@ fix\n"+
+					" context\n"+
+					"-old\n"+
+					"+new",
+				header,
+			)
+			cur = nil
+			oldLines, newLines = nil, nil
+			hasChange = false
+			return err
 		}
 		hunks = append(hunks, *cur)
 		cur = nil
 		oldLines, newLines = nil, nil
+		hasChange = false
+		return nil
 	}
 
-	startHunk := func(header string) {
-		flush()
+	startHunk := func(header string) error {
+		if err := flush(); err != nil {
+			return err
+		}
 		cur = &CodePatchHunk{Header: strings.TrimSpace(header)}
 		oldLines, newLines = nil, nil
+		hasChange = false
+		return nil
 	}
 
 	for _, raw := range lines {
@@ -92,13 +123,19 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 		case strings.HasPrefix(trimmed, codePatchUpdateFile) ||
 			strings.HasPrefix(trimmed, codePatchAddFile) ||
 			strings.HasPrefix(trimmed, codePatchDeleteFile):
-			flush()
+			if err := flush(); err != nil {
+				return nil, err
+			}
 		case strings.HasPrefix(trimmed, "@@"):
 			header := strings.TrimSpace(strings.TrimPrefix(trimmed, "@@"))
-			startHunk(header)
+			if err := startHunk(header); err != nil {
+				return nil, err
+			}
 		case cur == nil && (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "-") || strings.HasPrefix(line, "+")):
 			// Hunk without @@ header — start an anonymous hunk.
-			startHunk("")
+			if err := startHunk(""); err != nil {
+				return nil, err
+			}
 			fallthrough
 		case cur != nil:
 			if len(line) == 0 {
@@ -108,7 +145,7 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 			content := ""
 			if len(line) > 1 {
 				content = line[1:]
-				// Cursor patch lines are " "+content / "-"+content / "+"+content.
+				// Apply Patch lines are " "+content / "-"+content / "+"+content.
 				// If the model omitted the leading space after the marker, keep content as-is.
 			} else {
 				content = ""
@@ -119,8 +156,10 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 				newLines = append(newLines, content)
 			case '-':
 				oldLines = append(oldLines, content)
+				hasChange = true
 			case '+':
 				newLines = append(newLines, content)
+				hasChange = true
 			default:
 				// Treat unmarked lines inside a hunk as context (tolerant of model drift).
 				oldLines = append(oldLines, line)
@@ -130,7 +169,9 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 			// Ignore stray text before first hunk / file header.
 		}
 	}
-	flush()
+	if err := flush(); err != nil {
+		return nil, err
+	}
 
 	if len(hunks) == 0 {
 		return nil, utils.Error("patch contains no hunks")
