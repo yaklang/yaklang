@@ -597,6 +597,14 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	}
 
 	// Step 3: diff 阶段 (0.1-0.3) + 编译阶段 (0.3-0.8)
+	// Pass the original config's exclude_files so that diff compilation
+	// respects the same file exclusions (e.g. *_test.go, *.pb.go) as the
+	// base compile. Without this, CompileDiffProgramAndSaveToDB creates a
+	// fresh config that only has built-in defaults, missing user patterns.
+	var diffOpts []ssaconfig.Option
+	if excludeFiles := c.GetCompileExcludeFiles(); len(excludeFiles) > 0 {
+		diffOpts = append(diffOpts, WithExcludeFile(excludeFiles...))
+	}
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
 		baseFSForDiff, c.fs, // 新文件系统
@@ -604,6 +612,7 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		c.GetLatestProgramName(), // 差量程序名称
 		c.GetLanguage(),          // 语言
 		func(p float64, msg string) { c.Processf(p, "%s", msg) },
+		diffOpts...,
 	)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to compile diff program")
