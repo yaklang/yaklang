@@ -77,7 +77,7 @@ func ForkMidtermArchiveStore(parent *AIMemoryTriage, taskIndex, taskName, persis
 		return nil, err
 	}
 
-	branchStore, err := NewAIMemoryForQuery(branchSessionID, WithDatabase(db))
+	branchStore, err := NewAIMemoryForQuery(branchSessionID, WithDatabase(db), WithMidtermArchiveMode())
 	if err != nil {
 		return nil, utils.Errorf("create branch midterm store failed: %v", err)
 	}
@@ -173,7 +173,7 @@ func (f *MidtermMemoryFork) MergeBack() (*MidtermMemoryMergeResult, error) {
 	}
 
 	var branchEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", f.BranchSessionID).Find(&branchEntities).Error; err != nil {
+	if err := db.Table(f.ParentStore.entityTableName()).Where("session_id = ?", f.BranchSessionID).Find(&branchEntities).Error; err != nil {
 		return nil, utils.Errorf("query branch midterm entities failed: %v", err)
 	}
 
@@ -257,8 +257,10 @@ func cloneAIMemoryCollectionGraph(db *gorm.DB, parentSessionID, branchSessionID 
 	if db == nil {
 		return utils.Error("database connection is nil")
 	}
+	// midterm fork always uses the midterm archive collection table
+	collectionTable := "ai_midterm_archive_collections_v1"
 	var parentCol schema.AIMemoryCollection
-	err := db.Where("session_id = ?", parentSessionID).First(&parentCol).Error
+	err := db.Table(collectionTable).Where("session_id = ?", parentSessionID).First(&parentCol).Error
 	if err == gorm.ErrRecordNotFound {
 		parentCol = schema.AIMemoryCollection{
 			SessionID:   parentSessionID,
@@ -268,7 +270,7 @@ func cloneAIMemoryCollectionGraph(db *gorm.DB, parentSessionID, branchSessionID 
 			EfConstruct: 200,
 			Dimension:   7,
 		}
-		if err := db.Create(&parentCol).Error; err != nil {
+		if err := db.Table(collectionTable).Create(&parentCol).Error; err != nil {
 			return utils.Errorf("create parent midterm collection failed: %v", err)
 		}
 	} else if err != nil {
@@ -289,14 +291,14 @@ func cloneAIMemoryCollectionGraph(db *gorm.DB, parentSessionID, branchSessionID 
 	}
 
 	var existing schema.AIMemoryCollection
-	err = db.Where("session_id = ?", branchSessionID).First(&existing).Error
+	err = db.Table(collectionTable).Where("session_id = ?", branchSessionID).First(&existing).Error
 	switch {
 	case err == gorm.ErrRecordNotFound:
-		return db.Create(&branchCol).Error
+		return db.Table(collectionTable).Create(&branchCol).Error
 	case err != nil:
 		return utils.Errorf("load branch midterm collection failed: %v", err)
 	default:
-		return db.Model(&existing).Updates(map[string]interface{}{
+		return db.Table(collectionTable).Model(&existing).Updates(map[string]interface{}{
 			"graph_binary":  branchCol.GraphBinary,
 			"m":             branchCol.M,
 			"ml":            branchCol.Ml,
@@ -325,7 +327,7 @@ func (r *AIMemoryTriage) adoptForkedMemoryEntity(entity *aicommon.MemoryEntity) 
 	}
 
 	var existing schema.AIMemoryEntity
-	err := db.Where("memory_id = ?", entity.Id).First(&existing).Error
+	err := db.Table(r.entityTableName()).Where("memory_id = ?", entity.Id).First(&existing).Error
 	if err != nil {
 		return utils.Errorf("load fork memory entity failed: %v", err)
 	}
@@ -343,7 +345,7 @@ func (r *AIMemoryTriage) adoptForkedMemoryEntity(entity *aicommon.MemoryEntity) 
 	existing.T_Score = entity.T_Score
 	existing.CorePactVector = schema.FloatArray(entity.CorePactVector)
 
-	if err := db.Save(&existing).Error; err != nil {
+	if err := db.Table(r.entityTableName()).Save(&existing).Error; err != nil {
 		return utils.Errorf("adopt fork memory entity failed: %v", err)
 	}
 

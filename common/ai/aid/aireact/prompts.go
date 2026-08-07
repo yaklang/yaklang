@@ -654,7 +654,9 @@ func (pm *PromptManager) timelineDumpForPrompt() string {
 	if timeline == nil {
 		return ""
 	}
-	return buildTimelineDumpWithMidtermMemory(pm.react, timeline)
+	// Midterm archive memory is now appended to InjectedMemory in the dynamic
+	// section, no longer prepended to the timeline dump.
+	return timeline.DumpForPrompt()
 }
 
 // DynamicContext returns the concatenation of auto (provider) context and user

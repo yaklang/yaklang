@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	midtermSessionPrefix      = "timeline-midterm:"
+	MidtermSessionPrefix     = "timeline-midterm:"
 	midtermMemoryKindTag      = "timeline_midterm"
 	midtermTagArchiveIDPrefix = "archive_id:"
 	midtermTagReasonPrefix    = "reason:"
@@ -56,7 +56,7 @@ func PersistentSessionToMidtermMemorySessionID(sessionID string) string {
 	if sessionID == "" {
 		return ""
 	}
-	return midtermSessionPrefix + sessionID
+	return MidtermSessionPrefix + sessionID
 }
 
 func (r *AIMemoryTriage) ArchiveCompressedBatch(ctx context.Context, batch *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {

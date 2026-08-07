@@ -95,7 +95,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon
 
 		// 从数据库获取完整记忆条目
 		var dbEntity schema.AIMemoryEntity
-		if err := db.Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).First(&dbEntity).Error; err != nil {
+		if err := db.Table(r.entityTableName()).Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).First(&dbEntity).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				log.Warnf("memory entity not found in database: %s", memoryID)
 				continue
@@ -136,7 +136,7 @@ func (r *AIMemoryTriage) SearchByScores(filter *aicommon.ScoreFilter, limit int)
 		return nil, utils.Errorf("database connection is nil")
 	}
 
-	query := db.Where("session_id = ?", r.sessionID)
+	query := db.Table(r.entityTableName()).Where("session_id = ?", r.sessionID)
 
 	if filter != nil {
 		if filter.C_Min > 0 || filter.C_Max > 0 {
@@ -289,7 +289,7 @@ func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) (
 	}
 
 	var dbEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
+	if err := db.Table(r.entityTableName()).Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 

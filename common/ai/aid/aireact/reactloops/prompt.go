@@ -265,7 +265,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		ExtraCapabilities: extraCapabilities,
 		TodoSnapshot:      todoSnapshot,
 		ReactiveData:      reactiveData,
-		InjectedMemory:    memory,
+		InjectedMemory:    appendMidtermToMemory(memory, r.GetCurrentMidtermMemory()),
 		TodoCheckpoint:    todoCheckpoint,
 	})
 	if err != nil {

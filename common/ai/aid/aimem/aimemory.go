@@ -66,7 +66,7 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 
 	// 创建HNSW后端
 	hnswBackendStart := time.Now()
-	hnswBackend, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionId), WithHNSWDatabase(db))
+	hnswBackend, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionId), WithHNSWDatabase(db), WithHNSWMidtermMode(config.midtermArchiveMode))
 	if du := time.Since(hnswBackendStart); du > 500*time.Millisecond {
 		log.Warnf("[AI-Memory(%v)] creating HNSW backend took %v, it's abnormal case.", name, du)
 	}
@@ -86,6 +86,7 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 		db:                 db,
 		keywordMatcher:     NewKeywordMatcher(), // 初始化关键词匹配器
 		embeddingAvailable: embeddingAvailable,
+		midtermArchiveMode: config.midtermArchiveMode,
 	}
 
 	if requireInvoker && triage.invoker == nil && config.autoReActInvoker {
