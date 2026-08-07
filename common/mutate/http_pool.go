@@ -1029,11 +1029,22 @@ type RandomChunkedInfo struct {
 	CurrentDelayTime time.Duration
 	TotalDelayTime   time.Duration
 	IsFinal          bool
+	// Direction 标识 Data 的语义方向，避免请求分块与响应增量（如 SSE）混淆：
+	//   REQUEST  = 请求分块（随机分块传输发送的请求 body 分块）
+	//   RESPONSE = 响应增量（如 SSE 流式响应的 body delta）
+	// 缺省（UNSPECIFIED）按响应增量处理，兼容旧逻辑。
+	Direction ypb.ChunkedDataDirection
 }
 
 func (r *RandomChunkedInfo) ToGRPCModel() *ypb.RandomChunkedResponse {
 	if r == nil {
 		return nil
+	}
+	direction := r.Direction
+	if direction == 0 {
+		// 兼容旧调用方：未显式设置方向时，默认按响应增量处理，
+		// 保持与历史 SSE 逻辑一致。
+		direction = ypb.ChunkedDataDirection_CHUNKED_DATA_DIRECTION_RESPONSE
 	}
 	return &ypb.RandomChunkedResponse{
 		Index:                   int64(r.Index),
@@ -1042,6 +1053,7 @@ func (r *RandomChunkedInfo) ToGRPCModel() *ypb.RandomChunkedResponse {
 		CurrentChunkedDelayTime: r.CurrentDelayTime.Milliseconds(),
 		TotalDelayTime:          r.TotalDelayTime.Milliseconds(),
 		IsFinal:                 r.IsFinal,
+		Direction:               direction,
 	}
 }
 
@@ -1532,6 +1544,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 												CurrentDelayTime: curDelay,
 												TotalDelayTime:   totalDelay,
 												IsFinal:          false,
+												Direction:        ypb.ChunkedDataDirection_CHUNKED_DATA_DIRECTION_RESPONSE,
 											},
 										},
 									})
@@ -1582,6 +1595,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 													CurrentDelayTime: curDelay,
 													TotalDelayTime:   totalDelay,
 													IsFinal:          true,
+													Direction:        ypb.ChunkedDataDirection_CHUNKED_DATA_DIRECTION_RESPONSE,
 												},
 											},
 										})
@@ -1666,6 +1680,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									ChunkedLength:    len(chunkRaw),
 									CurrentDelayTime: chunkSendTime,
 									TotalDelayTime:   totalTime,
+									// 这是请求分块（随机分块传输发送的请求 body 分块），
+									// 与响应增量（SSE）区分开，避免前端把请求 body 当响应内容回显。
+									Direction: ypb.ChunkedDataDirection_CHUNKED_DATA_DIRECTION_REQUEST,
 								}
 								copy(chunkedInfo.Data, chunkRaw)
 
@@ -1822,6 +1839,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 											CurrentDelayTime: curDelay,
 											TotalDelayTime:   totalDelay,
 											IsFinal:          true,
+											Direction:        ypb.ChunkedDataDirection_CHUNKED_DATA_DIRECTION_RESPONSE,
 										},
 									},
 								})

@@ -307,6 +307,50 @@ func TestRandomChunkedSender_hanlder(t *testing.T) {
 	})
 }
 
+// TestRandomChunkedSender_refreshCallbacks 验证缓存的 sender 在复用时
+// 会同步最新的 ctx / handler，避免重试场景下分块回调被路由到旧闭包。
+func TestRandomChunkedSender_refreshCallbacks(t *testing.T) {
+	t.Run("handler and ctx are updated", func(t *testing.T) {
+		sender, err := NewRandomChunkedSender(
+			_withRandomChunkCtx(context.Background()),
+			_withRandomChunkChunkLength(5, 10),
+			_withRandomChunkDelay(0, 0),
+			_withRandomChunkResultHandler(func(id int, raw []byte, total, chunk time.Duration) {
+				t.Errorf("old handler should not be called")
+			}),
+		)
+		require.NoError(t, err)
+
+		// 切换到一个会取消的 ctx 和新的 handler
+		ctx, cancel := context.WithCancel(context.Background())
+		called := false
+		sender.refreshCallbacks(ctx, func(id int, raw []byte, total, chunk time.Duration) {
+			called = true
+		})
+
+		// 直接调用 refreshCallbacks 设置的 handler，验证已被替换
+		if sender.handler != nil {
+			sender.handler(1, []byte("x"), 0, 0)
+		}
+		assert.True(t, called, "new handler should be invoked")
+		assert.Equal(t, ctx, sender.ctx, "ctx should be updated to the new one")
+		cancel()
+	})
+
+	t.Run("nil ctx keeps previous ctx", func(t *testing.T) {
+		base := context.Background()
+		sender, err := NewRandomChunkedSender(
+			_withRandomChunkCtx(base),
+			_withRandomChunkChunkLength(5, 10),
+			_withRandomChunkDelay(0, 0),
+		)
+		require.NoError(t, err)
+
+		sender.refreshCallbacks(nil, nil)
+		assert.Equal(t, base, sender.ctx, "nil ctx should not overwrite existing ctx")
+	})
+}
+
 // validateChunkSizes 验证分块大小是否在指定范围内
 func validateChunkSizes(t *testing.T, chunkedBody []byte, minChunk, maxChunk int) {
 	// 解析分块数据，验证每个分块的大小

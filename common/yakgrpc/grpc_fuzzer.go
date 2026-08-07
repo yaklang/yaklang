@@ -1301,6 +1301,12 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 						if chunkInfo == nil {
 							continue
 						}
+						// 仅统计响应方向的增量（SSE body delta）。请求分块
+						// （Direction=REQUEST）是请求 body 的发送记录，不应计入响应长度，
+						// 否则开启分块传输时会把请求 body 当作响应内容回显。
+						if chunkInfo.Direction == ypb.ChunkedDataDirection_CHUNKED_DATA_DIRECTION_REQUEST {
+							continue
+						}
 						deltaLen += int64(len(chunkInfo.Data))
 						if chunkInfo.IsFinal {
 							isFinal = true
