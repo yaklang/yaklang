@@ -200,7 +200,7 @@ func QueryAIForge(db *gorm.DB, filter *ypb.AIForgeFilter, paging *ypb.Paging) (*
 	db = FilterAIForge(db, filter)
 	db = bizhelper.OrderByPaging(db, paging)
 	var forges []*schema.AIForge
-	pag, db := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &forges)
+	pag, db := bizhelper.PagingByPagination(db, paging, &forges)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}

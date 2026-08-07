@@ -447,1531 +447,1548 @@ func runLegacyToolSetIntegration(t *testing.T, toolSet string) {
 	}
 }
 
-
 // --- ToolSet: codec ---
 
 func legacyCodecToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"codec_method_details": {
-		{
-			name: "returns_base64_encode_doc",
-			args: map[string]any{"method": []any{"Base64Encode"}},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "Base64Encode")
-			},
-		},
-		{
-			name:    "missing_method",
-			args:    map[string]any{},
-			wantErr: true, errContains: []string{"missing argument: method"},
-		},
-	},
-	"exec_codec": {
-		{
-			name: "base64_encode_roundtrip",
-			args: map[string]any{
-				"text": "hello",
-				"workFlow": []any{
-					map[string]any{"codecType": "Base64Encode"},
+		"codec_method_details": {
+			{
+				name: "returns_base64_encode_doc",
+				args: map[string]any{"method": []any{"Base64Encode"}},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "Base64Encode")
 				},
 			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				assert.Equal(t, "aGVsbG8=", result["text"])
+			{
+				name:    "missing_method",
+				args:    map[string]any{},
+				wantErr: true, errContains: []string{"missing argument: method"},
 			},
 		},
-		{
-			name: "base64_decode_roundtrip",
-			args: map[string]any{
-				"text": "aGVsbG8=",
-				"workFlow": []any{
-					map[string]any{"codecType": "Base64Decode"},
+		"exec_codec": {
+			{
+				name: "base64_encode_roundtrip",
+				args: map[string]any{
+					"text": "hello",
+					"workFlow": []any{
+						map[string]any{"codecType": "Base64Encode"},
+					},
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					assert.Equal(t, "aGVsbG8=", result["text"])
 				},
 			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				assert.Equal(t, "hello", result["text"])
+			{
+				name: "base64_decode_roundtrip",
+				args: map[string]any{
+					"text": "aGVsbG8=",
+					"workFlow": []any{
+						map[string]any{"codecType": "Base64Decode"},
+					},
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					assert.Equal(t, "hello", result["text"])
+				},
 			},
 		},
-	},
-	"render_fuzztag": {
-		{
-			name: "expand_int_range_without_optional_limits",
-			args: map[string]any{"template": "{{int(1-3)}}"},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "1")
-				assert.Contains(t, text, "3")
+		"render_fuzztag": {
+			{
+				name: "expand_int_range_without_optional_limits",
+				args: map[string]any{"template": "{{int(1-3)}}"},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "1")
+					assert.Contains(t, text, "3")
+				},
+			},
+			{
+				name: "empty_template_returns_decodable_result",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var results []string
+					decodeToolResultJSON(t, text, &results)
+					// empty template currently yields a single empty rendered entry
+					assert.LessOrEqual(t, len(results), 1)
+				},
 			},
 		},
-		{
-			name: "empty_template_returns_decodable_result",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var results []string
-				decodeToolResultJSON(t, text, &results)
-				// empty template currently yields a single empty rendered entry
-				assert.LessOrEqual(t, len(results), 1)
-			},
-		},
-	},
 	}
 }
-
 
 // --- ToolSet: cve ---
 
 func legacyCVEToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"query_cve": {
-		{
-			name: "keywords_without_pagination",
-			args: map[string]any{"keywords": "apache"},
-			allowErrContains: []string{
-				"CVE database is not initialized",
+		"query_cve": {
+			{
+				name: "keywords_without_pagination",
+				args: map[string]any{"keywords": "apache"},
+				allowErrContains: []string{
+					"CVE database is not initialized",
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					trimmed := strings.TrimSpace(text)
+					require.True(t, trimmed == "null" || strings.HasPrefix(trimmed, "["),
+						"expected JSON array or null, got: %s", text)
+				},
 			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				trimmed := strings.TrimSpace(text)
-				require.True(t, trimmed == "null" || strings.HasPrefix(trimmed, "["),
-					"expected JSON array or null, got: %s", text)
+			{
+				name: "lookup_by_cve_id_or_missing_database",
+				args: map[string]any{"cve": "CVE-2021-44228"},
+				allowErrContains: []string{
+					"CVE database is not initialized",
+					"empty cve database",
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, strings.ToUpper(text), "CVE-2021-44228")
+				},
 			},
 		},
-		{
-			name: "lookup_by_cve_id_or_missing_database",
-			args: map[string]any{"cve": "CVE-2021-44228"},
-			allowErrContains: []string{
-				"CVE database is not initialized",
-				"empty cve database",
-			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, strings.ToUpper(text), "CVE-2021-44228")
-			},
-		},
-	},
 	}
 }
-
 
 // --- ToolSet: httpflow ---
 
 func legacyHTTPFlowToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"query_http_flow": {
-		{
-			name: "query_without_pagination",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				assert.Contains(t, result, "flows")
-				assert.Contains(t, result, "returned_count")
-				assert.Contains(t, result, "total_matched_count")
-				assert.NotContains(t, result, "total")
-				assert.Contains(t, result, "current_database")
-				assert.Contains(t, result, "effective_filter")
+		"query_http_flow": {
+			{
+				name: "query_without_pagination",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					assert.Contains(t, result, "flows")
+					assert.Contains(t, result, "returned_count")
+					assert.Contains(t, result, "total_matched_count")
+					assert.NotContains(t, result, "total")
+					assert.Contains(t, result, "current_database")
+					assert.Contains(t, result, "effective_filter")
+				},
+			},
+			{
+				name: "keyword_filter",
+				args: map[string]any{"keywords": "example.com"},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					assert.Contains(t, result, "flows")
+				},
 			},
 		},
-		{
-			name: "keyword_filter",
-			args: map[string]any{"keywords": "example.com"},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				assert.Contains(t, result, "flows")
+		"set_tag_for_http_flow": {
+			{
+				name:        "reject_missing_id_and_hash",
+				args:        map[string]any{"tags": []any{"mcp-test"}},
+				wantErr:     true,
+				errContains: []string{"failed to set tag"},
 			},
 		},
-	},
-	"set_tag_for_http_flow": {
-		{
-			name:        "reject_missing_id_and_hash",
-			args:        map[string]any{"tags": []any{"mcp-test"}},
-			wantErr:     true,
-			errContains: []string{"failed to set tag"},
-		},
-	},
-	"delete_http_flow": {
-		{
-			name: "delete_by_impossible_url_prefix",
-			args: map[string]any{"urlPrefix": "http://mcp-integration-nonexistent.invalid/"},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "success")
+		"delete_http_flow": {
+			{
+				name: "delete_by_impossible_url_prefix",
+				args: map[string]any{"urlPrefix": "http://mcp-integration-nonexistent.invalid/"},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "success")
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: hybrid_scan ---
 
 func legacyHybridScanToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"hybrid_scan": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		"hybrid_scan": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: payload ---
 
 func legacyPayloadToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"list_all_payload_dictionary_details": {
-		{
-			name: "returns_group_tree",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				assert.True(t, result["Nodes"] != nil || result["Groups"] != nil)
+		"list_all_payload_dictionary_details": {
+			{
+				name: "returns_group_tree",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					assert.True(t, result["Nodes"] != nil || result["Groups"] != nil)
+				},
 			},
 		},
-	},
-	"query_payload": {
-		{
-			name: "query_existing_group_without_pagination",
-			buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-				return map[string]any{"group": firstPayloadGroupName(t, srv)}
+		"query_payload": {
+			{
+				name: "query_existing_group_without_pagination",
+				buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+					return map[string]any{"group": firstPayloadGroupName(t, srv)}
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					// file-backed groups return string payloads, database groups return objects
+					assert.NotNil(t, text)
+				},
 			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				// file-backed groups return string payloads, database groups return objects
-				assert.NotNil(t, text)
+			{
+				name:        "reject_missing_group",
+				args:        map[string]any{},
+				wantErr:     true,
+				errContains: []string{"group"},
 			},
 		},
-		{
-			name:        "reject_missing_group",
-			args:        map[string]any{},
-			wantErr:     true,
-			errContains: []string{"group"},
+		"create_payload_folder": {
+			{
+				name:    "reject_missing_name",
+				args:    map[string]any{},
+				wantErr: true,
+			},
 		},
-	},
-	"create_payload_folder": {
-		{
-			name:    "reject_missing_name",
-			args:    map[string]any{},
-			wantErr: true,
+		"delete_payload": {
+			{
+				name:    "reject_missing_group_and_folder",
+				args:    map[string]any{},
+				wantErr: true,
+			},
 		},
-	},
-	"delete_payload": {
-		{
-			name:    "reject_missing_group_and_folder",
-			args:    map[string]any{},
-			wantErr: true,
+		"save_payload": {
+			{
+				name:        "reject_missing_source",
+				args:        map[string]any{"group": "mcp-test-group"},
+				wantErr:     true,
+				errContains: []string{"invalid argument: source"},
+			},
 		},
-	},
-	"save_payload": {
-		{
-			name:        "reject_missing_source",
-			args:        map[string]any{"group": "mcp-test-group"},
-			wantErr:     true,
-			errContains: []string{"invalid argument: source"},
+		"rename_payload_group": {
+			{
+				name:    "reject_missing_names",
+				args:    map[string]any{},
+				wantErr: true,
+			},
 		},
-	},
-	"rename_payload_group": {
-		{
-			name:    "reject_missing_names",
-			args:    map[string]any{},
-			wantErr: true,
+		"rename_payload_folder": {
+			{
+				name:    "reject_missing_names",
+				args:    map[string]any{},
+				wantErr: true,
+			},
 		},
-	},
-	"rename_payload_folder": {
-		{
-			name:    "reject_missing_names",
-			args:    map[string]any{},
-			wantErr: true,
+		"update_one_payload": {
+			{
+				name:    "reject_missing_group",
+				args:    map[string]any{},
+				wantErr: true,
+			},
 		},
-	},
-	"update_one_payload": {
-		{
-			name:    "reject_missing_group",
-			args:    map[string]any{},
-			wantErr: true,
+		"update_payload_file_content": {
+			{
+				name:    "reject_missing_group",
+				args:    map[string]any{},
+				wantErr: true,
+			},
 		},
-	},
-	"update_payload_file_content": {
-		{
-			name:    "reject_missing_group",
-			args:    map[string]any{},
-			wantErr: true,
-		},
-	},
 	}
 }
-
 
 // --- ToolSet: port_scan ---
 
 func legacyPortScanToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"port_scan": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			validate: func(t *testing.T, text string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-				assert.NotEmpty(t, result.Content)
+		"port_scan": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				validate: func(t *testing.T, text string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+					assert.NotEmpty(t, result.Content)
+				},
 			},
 		},
-	},
-	"query_ports": {
-		{
-			name: "query_tcp_ports_without_nested_pagination",
-			args: map[string]any{"proto": "tcp"},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var ports []map[string]any
-				decodeToolResultJSON(t, text, &ports)
-				_ = ports
+		"query_ports": {
+			{
+				name: "query_tcp_ports_without_nested_pagination",
+				args: map[string]any{"proto": "tcp"},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var ports []map[string]any
+					decodeToolResultJSON(t, text, &ports)
+					_ = ports
+				},
 			},
 		},
-	},
-	"delete_ports": {
-		{
-			name: "delete_by_impossible_id",
-			args: map[string]any{"id": []any{float64(999999999)}},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "success")
+		"delete_ports": {
+			{
+				name: "delete_by_impossible_id",
+				args: map[string]any{"id": []any{float64(999999999)}},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "success")
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: yak_document ---
 
 func legacyYakDocumentToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"yakdoc_get_all_library_names": {
-		{
-			name: "lists_standard_libraries",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var libs []string
-				decodeToolResultJSON(t, text, &libs)
-				assert.Contains(t, libs, "codec")
+		"yakdoc_get_all_library_names": {
+			{
+				name: "lists_standard_libraries",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var libs []string
+					decodeToolResultJSON(t, text, &libs)
+					assert.Contains(t, libs, "codec")
+				},
 			},
 		},
-	},
-	"yakdoc_library_details": {
-		{
-			name: "returns_codec_symbols",
-			args: map[string]any{"library": []any{"codec"}},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]map[string]any
-				decodeToolResultJSON(t, text, &result)
-				codecLib, ok := result["codec"]
-				require.True(t, ok)
-				functions, _ := codecLib["functions"].([]any)
-				assert.NotEmpty(t, functions)
+		"yakdoc_library_details": {
+			{
+				name: "returns_codec_symbols",
+				args: map[string]any{"library": []any{"codec"}},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]map[string]any
+					decodeToolResultJSON(t, text, &result)
+					codecLib, ok := result["codec"]
+					require.True(t, ok)
+					functions, _ := codecLib["functions"].([]any)
+					assert.NotEmpty(t, functions)
+				},
 			},
 		},
-	},
-	"yakdoc_function_details": {
-		{
-			name: "returns_println_signature",
-			args: map[string]any{"function": []any{"println"}},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "println")
+		"yakdoc_function_details": {
+			{
+				name: "returns_println_signature",
+				args: map[string]any{"function": []any{"println"}},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "println")
+				},
+			},
+			{
+				name:    "missing_function",
+				args:    map[string]any{},
+				wantErr: true, errContains: []string{"missing argument: function"},
 			},
 		},
-		{
-			name:    "missing_function",
-			args:    map[string]any{},
-			wantErr: true, errContains: []string{"missing argument: function"},
-		},
-	},
-	"yakdoc_variable_details": {
-		{
-			name: "returns_codec_variable",
-			args: map[string]any{"library": "codec", "variable": []any{"ECB"}},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "ECB")
+		"yakdoc_variable_details": {
+			{
+				name: "returns_codec_variable",
+				args: map[string]any{"library": "codec", "variable": []any{"ECB"}},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "ECB")
+				},
+			},
+			{
+				name:    "missing_variable",
+				args:    map[string]any{},
+				wantErr: true, errContains: []string{"missing argument: variable"},
 			},
 		},
-		{
-			name:    "missing_variable",
-			args:    map[string]any{},
-			wantErr: true, errContains: []string{"missing argument: variable"},
-		},
-	},
 	}
 }
-
 
 // --- ToolSet: yak_script ---
 
 func legacyYakScriptToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"static_analyze_yak_script": {
-		{
-			name: "valid_yak_script",
-			args: map[string]any{
-				"code":       `println("mcp-static-ok")`,
-				"pluginType": "yak",
-			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				assert.Equal(t, true, result["ok"])
-				assert.Equal(t, false, result["hasBlockingErrors"])
-				assert.Equal(t, "yak", result["pluginType"])
-			},
-		},
-		{
-			name: "invalid_mitm_returns_readable_errors",
-			args: map[string]any{
-				"code":       `mirrorNewWebsitePath = func( {`,
-				"pluginType": "mitm",
-			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				assert.Equal(t, false, result["ok"])
-				assert.Equal(t, true, result["hasBlockingErrors"])
-				assert.Equal(t, "mitm", result["pluginType"])
-				formatted, _ := result["formatted"].(string)
-				require.NotEmpty(t, formatted)
-				assert.NotContains(t, formatted, "5Z+") // must not be base64-only blob
-				assert.Contains(t, strings.ToLower(formatted), "error")
-				issues, ok := result["issues"].([]any)
-				require.True(t, ok)
-				require.NotEmpty(t, issues)
-				first, ok := issues[0].(map[string]any)
-				require.True(t, ok)
-				msg, _ := first["message"].(string)
-				require.NotEmpty(t, msg)
-				assert.NotContains(t, msg, "5Z+")
-			},
-		},
-		{
-			name: "empty_code_returns_analysis_result",
-			args: map[string]any{"pluginType": "yak"},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var result map[string]any
-				decodeToolResultJSON(t, text, &result)
-				_, hasOK := result["ok"]
-				assert.True(t, hasOK)
-			},
-		},
-	},
-	"query_yak_script": {
-		{
-			name: "list_scripts_without_pagination",
-			args: map[string]any{"pagination": map[string]any{"limit": float64(3)}},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var scripts []map[string]any
-				decodeToolResultJSON(t, text, &scripts)
-				// built-in scripts should exist
-				assert.NotNil(t, scripts)
-			},
-		},
-	},
-	"list_yak_script_group": {
-		{
-			name: "list_groups",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
-			},
-		},
-	},
-	"query_yak_script_group": {
-		{
-			name: "query_groups_without_pagination",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
-			},
-		},
-	},
-	"exec_yak_script": {
-		{
-			name: "execute_inline_code",
-			args: map[string]any{
-				"code":       `yakit.Info("mcp-exec-ok")`,
-				"pluginType": "yak",
-			},
-			timeout: 20 * time.Second,
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.True(t,
-					strings.Contains(text, "mcp-exec-ok") || strings.Contains(text, "completed"),
-					"unexpected exec output: %s", text)
-			},
-		},
-		{
-			name:    "missing_plugin_type_still_runs",
-			args:    map[string]any{"code": `yakit.Info("mcp-exec-no-type")`},
-			timeout: 20 * time.Second,
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
-			},
-		},
-	},
-	"save_yak_script": {
-		{
-			name: "create_mitm_plugin",
-			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-				return map[string]any{
-					"scriptName": uniqueName("mcp-save-mitm"),
-					"type":       "mitm",
-					"content":    `mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {}`,
-					"help":       "mcp save_yak_script integration test",
-					"tags":       "mcp,test,mitm",
-				}
-			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var script map[string]any
-				decodeToolResultJSON(t, text, &script)
-				name, _ := script["ScriptName"].(string)
-				require.NotEmpty(t, name)
-				t.Cleanup(func() {
-					_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
-				})
-				assert.Equal(t, "mitm", script["Type"])
-				assert.Contains(t, fmt.Sprint(script["Content"]), "mirrorNewWebsitePath")
-				id, ok := script["Id"].(float64)
-				require.True(t, ok)
-				assert.Greater(t, id, float64(0))
-			},
-		},
-		{
-			name: "create_with_pluginType_and_code_alias",
-			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-				return map[string]any{
-					"scriptName": uniqueName("mcp-save-yak"),
+		"static_analyze_yak_script": {
+			{
+				name: "valid_yak_script",
+				args: map[string]any{
+					"code":       `println("mcp-static-ok")`,
 					"pluginType": "yak",
-					"code":       `println("mcp-save-alias")`,
-					"help":       "alias fields for save_yak_script",
-				}
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					assert.Equal(t, true, result["ok"])
+					assert.Equal(t, false, result["hasBlockingErrors"])
+					assert.Equal(t, "yak", result["pluginType"])
+				},
 			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var script map[string]any
-				decodeToolResultJSON(t, text, &script)
-				name, _ := script["ScriptName"].(string)
-				require.NotEmpty(t, name)
-				t.Cleanup(func() {
-					_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
-				})
-				assert.Equal(t, "yak", script["Type"])
+			{
+				name: "invalid_mitm_returns_readable_errors",
+				args: map[string]any{
+					"code":       `mirrorNewWebsitePath = func( {`,
+					"pluginType": "mitm",
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					assert.Equal(t, false, result["ok"])
+					assert.Equal(t, true, result["hasBlockingErrors"])
+					assert.Equal(t, "mitm", result["pluginType"])
+					formatted, _ := result["formatted"].(string)
+					require.NotEmpty(t, formatted)
+					assert.NotContains(t, formatted, "5Z+") // must not be base64-only blob
+					assert.Contains(t, strings.ToLower(formatted), "error")
+					issues, ok := result["issues"].([]any)
+					require.True(t, ok)
+					require.NotEmpty(t, issues)
+					first, ok := issues[0].(map[string]any)
+					require.True(t, ok)
+					msg, _ := first["message"].(string)
+					require.NotEmpty(t, msg)
+					assert.NotContains(t, msg, "5Z+")
+				},
 			},
-		},
-		{
-			name: "update_existing_plugin",
-			buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-				name := uniqueName("mcp-save-upd")
-				result, err := invokeLegacyTool(t, srv, "save_yak_script", map[string]any{
-					"scriptName": name,
-					"type":       "yak",
-					"content":    `println("v1")`,
-					"help":       "before update",
-				}, 10*time.Second)
-				require.NoError(t, err)
-				text := toolResultText(t, result)
-				var created map[string]any
-				decodeToolResultJSON(t, text, &created)
-				id, ok := created["Id"].(float64)
-				require.True(t, ok)
-				t.Cleanup(func() {
-					_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
-				})
-				return map[string]any{
-					"id":         id,
-					"scriptName": name,
-					"type":       "yak",
-					"content":    `println("v2-updated")`,
-					"help":       "after update",
-				}
-			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var script map[string]any
-				decodeToolResultJSON(t, text, &script)
-				assert.Contains(t, fmt.Sprint(script["Content"]), "v2-updated")
-				if isUpdate, ok := script["IsUpdate"].(bool); ok {
-					assert.True(t, isUpdate)
-				}
+			{
+				name: "empty_code_returns_analysis_result",
+				args: map[string]any{"pluginType": "yak"},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var result map[string]any
+					decodeToolResultJSON(t, text, &result)
+					_, hasOK := result["ok"]
+					assert.True(t, hasOK)
+				},
 			},
 		},
-		{
-			name: "reject_invalid_syntax",
-			args: map[string]any{
-				"scriptName": uniqueName("mcp-save-bad"),
-				"type":       "mitm",
-				"content":    `mirrorNewWebsitePath = func( {`,
-			},
-			wantErr:     true,
-			errContains: []string{"static analyze failed", "invalid", "save plugin failed"},
-		},
-		{
-			name:    "reject_missing_script_name",
-			args:    map[string]any{"type": "yak", "content": `println(1)`},
-			wantErr: true,
-		},
-	},
-	"create_yak_script_group": {
-		{
-			name: "create_named_group",
-			args: map[string]any{"GroupName": uniqueName("mcp-group")},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "success")
+		"query_yak_script": {
+			{
+				name: "list_scripts_without_pagination",
+				args: map[string]any{"pagination": map[string]any{"limit": float64(3)}},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var scripts []map[string]any
+					decodeToolResultJSON(t, text, &scripts)
+					// built-in scripts should exist
+					assert.NotNil(t, scripts)
+				},
 			},
 		},
-	},
-	"rename_yak_script_group": {
-		{
-			name:    "reject_missing_group",
-			args:    map[string]any{},
-			wantErr: true,
-		},
-	},
-	"delete_yak_script_group": {
-		{
-			name:    "reject_missing_group",
-			args:    map[string]any{},
-			wantErr: true,
-		},
-	},
-	"set_group_for_yak_script": {
-		{
-			name:    "reject_missing_save_group",
-			args:    map[string]any{},
-			wantErr: true,
-		},
-	},
-	"query_online_yak_script": {
-		{
-			name:    "missing_data_filter_still_queries",
-			args:    map[string]any{},
-			timeout: 15 * time.Second,
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var rows []map[string]any
-				decodeToolResultJSON(t, text, &rows)
-				assert.NotNil(t, rows)
+		"list_yak_script_group": {
+			{
+				name: "list_groups",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.NotEmpty(t, strings.TrimSpace(text))
+				},
 			},
 		},
-	},
-	"download_online_yak_script": {
-		{
-			name:    "missing_filter_starts_stream",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline exceeded",
-				"context canceled",
-			},
-			validate: func(t *testing.T, text string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		"query_yak_script_group": {
+			{
+				name: "query_groups_without_pagination",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.NotEmpty(t, strings.TrimSpace(text))
+				},
 			},
 		},
-	},
+		"exec_yak_script": {
+			{
+				name: "execute_inline_code",
+				args: map[string]any{
+					"code":       `yakit.Info("mcp-exec-ok")`,
+					"pluginType": "yak",
+				},
+				timeout: 20 * time.Second,
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.True(t,
+						strings.Contains(text, "mcp-exec-ok") || strings.Contains(text, "completed"),
+						"unexpected exec output: %s", text)
+				},
+			},
+			{
+				name:    "missing_plugin_type_still_runs",
+				args:    map[string]any{"code": `yakit.Info("mcp-exec-no-type")`},
+				timeout: 20 * time.Second,
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.NotEmpty(t, strings.TrimSpace(text))
+				},
+			},
+		},
+		"save_yak_script": {
+			{
+				name: "create_mitm_plugin",
+				buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+					return map[string]any{
+						"scriptName": uniqueName("mcp-save-mitm"),
+						"type":       "mitm",
+						"content":    `mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {}`,
+						"help":       "mcp save_yak_script integration test",
+						"tags":       "mcp,test,mitm",
+					}
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var script map[string]any
+					decodeToolResultJSON(t, text, &script)
+					name, _ := script["ScriptName"].(string)
+					require.NotEmpty(t, name)
+					t.Cleanup(func() {
+						_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+					})
+					assert.Equal(t, "mitm", script["Type"])
+					assert.Contains(t, fmt.Sprint(script["Content"]), "mirrorNewWebsitePath")
+					id, ok := script["Id"].(float64)
+					require.True(t, ok)
+					assert.Greater(t, id, float64(0))
+				},
+			},
+			{
+				name: "create_with_pluginType_and_code_alias",
+				buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+					return map[string]any{
+						"scriptName": uniqueName("mcp-save-yak"),
+						"pluginType": "yak",
+						"code":       `println("mcp-save-alias")`,
+						"help":       "alias fields for save_yak_script",
+					}
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var script map[string]any
+					decodeToolResultJSON(t, text, &script)
+					name, _ := script["ScriptName"].(string)
+					require.NotEmpty(t, name)
+					t.Cleanup(func() {
+						_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+					})
+					assert.Equal(t, "yak", script["Type"])
+				},
+			},
+			{
+				name: "update_existing_plugin",
+				buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+					name := uniqueName("mcp-save-upd")
+					result, err := invokeLegacyTool(t, srv, "save_yak_script", map[string]any{
+						"scriptName": name,
+						"type":       "yak",
+						"content":    `println("v1")`,
+						"help":       "before update",
+					}, 10*time.Second)
+					require.NoError(t, err)
+					text := toolResultText(t, result)
+					var created map[string]any
+					decodeToolResultJSON(t, text, &created)
+					id, ok := created["Id"].(float64)
+					require.True(t, ok)
+					t.Cleanup(func() {
+						_ = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
+					})
+					return map[string]any{
+						"id":         id,
+						"scriptName": name,
+						"type":       "yak",
+						"content":    `println("v2-updated")`,
+						"help":       "after update",
+					}
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var script map[string]any
+					decodeToolResultJSON(t, text, &script)
+					assert.Contains(t, fmt.Sprint(script["Content"]), "v2-updated")
+					if isUpdate, ok := script["IsUpdate"].(bool); ok {
+						assert.True(t, isUpdate)
+					}
+				},
+			},
+			{
+				name: "reject_invalid_syntax",
+				args: map[string]any{
+					"scriptName": uniqueName("mcp-save-bad"),
+					"type":       "mitm",
+					"content":    `mirrorNewWebsitePath = func( {`,
+				},
+				wantErr:     true,
+				errContains: []string{"static analyze failed", "invalid", "save plugin failed"},
+			},
+			{
+				name:    "reject_missing_script_name",
+				args:    map[string]any{"type": "yak", "content": `println(1)`},
+				wantErr: true,
+			},
+		},
+		"create_yak_script_group": {
+			{
+				name: "create_named_group",
+				args: map[string]any{"GroupName": uniqueName("mcp-group")},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "success")
+				},
+			},
+		},
+		"rename_yak_script_group": {
+			{
+				name:    "reject_missing_group",
+				args:    map[string]any{},
+				wantErr: true,
+			},
+		},
+		"delete_yak_script_group": {
+			{
+				name:    "reject_missing_group",
+				args:    map[string]any{},
+				wantErr: true,
+			},
+		},
+		"set_group_for_yak_script": {
+			{
+				name:    "reject_missing_save_group",
+				args:    map[string]any{},
+				wantErr: true,
+			},
+		},
+		"query_online_yak_script": {
+			{
+				name:    "missing_data_filter_still_queries",
+				args:    map[string]any{},
+				timeout: 15 * time.Second,
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var rows []map[string]any
+					decodeToolResultJSON(t, text, &rows)
+					assert.NotNil(t, rows)
+				},
+			},
+		},
+		"download_online_yak_script": {
+			{
+				name:    "missing_filter_starts_stream",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline exceeded",
+					"context canceled",
+				},
+				validate: func(t *testing.T, text string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
 	}
 }
-
 
 // --- ToolSet: reverse_shell ---
 
 func legacyReverseShellToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"generate_reverse_shell_command": {
-		{
-			name: "bash_reverse_shell",
-			args: map[string]any{
-				"program": "Bash -i", "shellType": "bash", "ip": "127.0.0.1", "port": float64(4444),
-			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "127.0.0.1")
-				assert.Contains(t, text, "4444")
+		"generate_reverse_shell_command": {
+			{
+				name: "bash_reverse_shell",
+				args: map[string]any{
+					"program": "Bash -i", "shellType": "bash", "ip": "127.0.0.1", "port": float64(4444),
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "127.0.0.1")
+					assert.Contains(t, text, "4444")
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: reverse_platform ---
 
 func legacyReversePlatformToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"get_global_reverse_server": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
+		"get_global_reverse_server": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
+		"require_dnslog_domain": {{
+			name:    "fallback_remote_bridge",
+			args:    map[string]any{"useLocal": true},
+			timeout: 10 * time.Second,
 			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
+				"dnsbroker", "bridge", "connect", "failed",
 			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
-		},
-	},
-	"require_dnslog_domain": {{
-		name:    "fallback_remote_bridge",
-		args:    map[string]any{"useLocal": true},
-		timeout: 10 * time.Second,
-		skipIfErrContains: []string{
-			"dnsbroker", "bridge", "connect", "failed",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"query_dnslog_by_token": {{
-		name:    "query_with_test_token",
-		args:    map[string]any{"token": "mcp-test-token", "useLocal": true},
-		timeout: 5 * time.Second,
-		allowErrContains: []string{
-			"dnsbroker", "retry", "failed", "no existed", "path mismatch",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"require_random_port_token": {{
-		name:    "request_token",
-		args:    map[string]any{},
-		timeout: 15 * time.Second,
-		allowErrContains: []string{
-			"DeadlineExceeded", "failed", "connect", "timeout",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"query_random_port_trigger": {{
-		name:    "auto_token",
-		args:    map[string]any{},
-		timeout: 15 * time.Second,
-		allowErrContains: []string{
-			"empty token", "empty local-port", "failed", "connect", "DeadlineExceeded",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"get_bridge_log_server": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
+		}},
+		"query_dnslog_by_token": {{
+			name:    "query_with_test_token",
+			args:    map[string]any{"token": "mcp-test-token", "useLocal": true},
+			timeout: 5 * time.Second,
+			allowErrContains: []string{
+				"dnsbroker", "retry", "failed", "no existed", "path mismatch",
 			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
-		},
-	},
-	"set_bridge_log_server": {
-		{
-			name:    "empty_args_should_not_panic",
+		}},
+		"require_random_port_token": {{
+			name:    "request_token",
 			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
+			timeout: 15 * time.Second,
+			allowErrContains: []string{
+				"DeadlineExceeded", "failed", "connect", "timeout",
 			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
-		},
-	},
-	"start_facades": {
-		{
-			name:    "empty_args_should_not_panic",
+		}},
+		"query_random_port_trigger": {{
+			name:    "auto_token",
 			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
+			timeout: 15 * time.Second,
+			allowErrContains: []string{
+				"empty token", "empty local-port", "failed", "connect", "DeadlineExceeded",
 			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
+		}},
+		"get_bridge_log_server": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
 		},
-	},
+		"set_bridge_log_server": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
+		"start_facades": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
 	}
 }
-
 
 // --- ToolSet: http_fuzzer ---
 
 func legacyHTTPFuzzerToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"http_fuzzer": {
-		{
-			name:    "missing_request_does_not_panic",
-			args:    map[string]any{"concurrent": float64(1), "isHttps": false, "fuzzTagMode": "close"},
-			timeout: 5 * time.Second,
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		"http_fuzzer": {
+			{
+				name:    "missing_request_does_not_panic",
+				args:    map[string]any{"concurrent": float64(1), "isHttps": false, "fuzzTagMode": "close"},
+				timeout: 5 * time.Second,
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
-	"create_web_fuzzer_tab": {
-		{
-			name: "reject_missing_request",
-			args: map[string]any{
-				"isHttps": false,
+		"create_web_fuzzer_tab": {
+			{
+				name: "reject_missing_request",
+				args: map[string]any{
+					"isHttps": false,
+				},
+				wantErr:     true,
+				errContains: []string{"request is required"},
 			},
-			wantErr:     true,
-			errContains: []string{"request is required"},
 		},
-	},
+		"create_web_fuzzer_tabs": {
+			{
+				name:        "reject_empty_tabs",
+				args:        map[string]any{"tabs": []any{}},
+				wantErr:     true,
+				errContains: []string{"tabs", "must not be empty"},
+			},
+		},
+		"query_web_fuzzer_tabs": {
+			{
+				name: "query_compact_inventory",
+				args: map[string]any{"kind": "all", "includeRequest": false},
+				validate: func(t *testing.T, text string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+					require.Contains(t, text, "totalTabs")
+				},
+			},
+		},
+		"update_web_fuzzer_tab": {
+			{
+				name:        "reject_missing_page_id",
+				args:        map[string]any{},
+				wantErr:     true,
+				errContains: []string{"pageId"},
+			},
+		},
+		"delete_web_fuzzer_tabs": {
+			{
+				name:        "reject_empty_page_ids",
+				args:        map[string]any{"pageIds": []string{}},
+				wantErr:     true,
+				errContains: []string{"pageIds", "must not be empty"},
+			},
+		},
+		"manage_web_fuzzer_tab_group": {
+			{
+				name:        "reject_unknown_action",
+				args:        map[string]any{"action": "invalid"},
+				wantErr:     true,
+				errContains: []string{"action"},
+			},
+		},
 	}
 }
-
 
 // --- ToolSet: brute ---
 
 func legacyBruteToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"brute": {
-		{
-			name:        "reject_missing_target",
-			args:        map[string]any{},
-			wantErr:     true,
-			errContains: []string{"invalid argument", "target"},
+		"brute": {
+			{
+				name:        "reject_missing_target",
+				args:        map[string]any{},
+				wantErr:     true,
+				errContains: []string{"invalid argument", "target"},
+			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: subdomain ---
 
 func legacySubdomainToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"subdomain_collection": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		"subdomain_collection": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: crawler ---
 
 func legacyCrawlerToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"web_crawler": {{
-		name: "minimal_unreachable_target",
-		args: map[string]any{
-			"target":            "http://127.0.0.1:1",
-			"maxDepth":          0,
-			"maxRequests":       1,
-			"maxLinks":          1,
-			"concurrent":        1,
-			"timeoutPerRequest": 1,
-		},
-		timeout:          20 * time.Second,
-		allowEmptyResult: true,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
+		"web_crawler": {{
+			name: "minimal_unreachable_target",
+			args: map[string]any{
+				"target":            "http://127.0.0.1:1",
+				"maxDepth":          0,
+				"maxRequests":       1,
+				"maxLinks":          1,
+				"concurrent":        1,
+				"timeoutPerRequest": 1,
+			},
+			timeout:          20 * time.Second,
+			allowEmptyResult: true,
+			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+				require.NotNil(t, result)
+			},
+		}},
 	}
 }
-
 
 // --- ToolSet: dynamic ---
 
 func legacyDynamicToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"dynamic_add_tool": {
-		{
-			name: "register_inline_yak_tool",
-			args: map[string]any{
-				"name":        uniqueName("mcp-dynamic"),
-				"description": "integration test dynamic tool",
-				"code":        `println("dynamic-tool-ok")`,
+		"dynamic_add_tool": {
+			{
+				name: "register_inline_yak_tool",
+				args: map[string]any{
+					"name":        uniqueName("mcp-dynamic"),
+					"description": "integration test dynamic tool",
+					"code":        `println("dynamic-tool-ok")`,
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "add tool")
+					assert.Contains(t, text, "success")
+				},
 			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "add tool")
-				assert.Contains(t, text, "success")
+			{
+				name:        "reject_invalid_yak_code",
+				args:        map[string]any{"name": "x", "description": "y", "code": "{{{invalid yak"},
+				wantErr:     true,
+				errContains: []string{"parse", "syntax", "invalid", "error"},
 			},
 		},
-		{
-			name:        "reject_invalid_yak_code",
-			args:        map[string]any{"name": "x", "description": "y", "code": "{{{invalid yak"},
-			wantErr:     true,
-			errContains: []string{"parse", "syntax", "invalid", "error"},
-		},
-	},
 	}
 }
-
 
 // --- ToolSet: ssa ---
 
 func legacySSAToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"ssa_compile": {
-		{
-			name: "compile_temp_yak_project",
-			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-				dir := t.TempDir()
-				require.NoError(t, os.WriteFile(filepath.Join(dir, "main.yak"), []byte(`println("ssa-ok")`), 0o644))
-				return map[string]any{
-					"target":       dir,
-					"language":     "yak",
-					"program_name": uniqueName("mcp-ssa"),
-				}
+		"ssa_compile": {
+			{
+				name: "compile_temp_yak_project",
+				buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+					dir := t.TempDir()
+					require.NoError(t, os.WriteFile(filepath.Join(dir, "main.yak"), []byte(`println("ssa-ok")`), 0o644))
+					return map[string]any{
+						"target":       dir,
+						"language":     "yak",
+						"program_name": uniqueName("mcp-ssa"),
+					}
+				},
+				timeout: 30 * time.Second,
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "Compilation successful")
+				},
 			},
-			timeout: 30 * time.Second,
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "Compilation successful")
+			{
+				name:        "reject_missing_target",
+				args:        map[string]any{"language": "yak"},
+				wantErr:     true,
+				errContains: []string{"missing required argument: target"},
 			},
 		},
-		{
-			name:        "reject_missing_target",
-			args:        map[string]any{"language": "yak"},
-			wantErr:     true,
-			errContains: []string{"missing required argument: target"},
+		"ssa_query": {
+			{
+				name:    "reject_missing_program",
+				args:    map[string]any{"rule": `println(* as $sink)`},
+				wantErr: true, errContains: []string{"missing required argument: program_name"},
+			},
+			{
+				name:        "reject_unknown_program",
+				args:        map[string]any{"program_name": "mcp-missing-program", "rule": `println(* as $sink)`},
+				wantErr:     true,
+				errContains: []string{"failed", "program"},
+			},
 		},
-	},
-	"ssa_query": {
-		{
-			name:    "reject_missing_program",
-			args:    map[string]any{"rule": `println(* as $sink)`},
-			wantErr: true, errContains: []string{"missing required argument: program_name"},
-		},
-		{
-			name:        "reject_unknown_program",
-			args:        map[string]any{"program_name": "mcp-missing-program", "rule": `println(* as $sink)`},
-			wantErr:     true,
-			errContains: []string{"failed", "program"},
-		},
-	},
 	}
 }
-
 
 // --- ToolSet: syntaxflow ---
 
 func legacySyntaxFlowToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"query_syntaxflow_rule": {
-		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
-			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"create_syntaxflow_rule": {{
-		name: "create_minimal_rule",
-		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-			name := uniqueName("mcp-sf")
-			t.Setenv("MCP_SF_RULE_NAME", name)
-			return map[string]any{
-				"syntaxFlowInput": map[string]any{
-					"ruleName": name,
-					"language": "java",
-					"content":  `println as $output`,
+		"query_syntaxflow_rule": {
+			{
+				name:    "minimal_pagination_should_not_panic",
+				args:    pagingArgs(),
+				timeout: 5 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline", "failed", "invalid",
 				},
-			}
-		},
-		timeout: 8 * time.Second,
-		validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-			assert.Contains(t, text, os.Getenv("MCP_SF_RULE_NAME"))
-		},
-	}},
-	"update_syntaxflow_rule": {{
-		name: "update_existing_rule",
-		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-			name := uniqueName("mcp-sf-upd")
-			_, err := invokeLegacyTool(t, srv, "create_syntaxflow_rule", map[string]any{
-				"syntaxFlowInput": map[string]any{
-					"ruleName": name,
-					"language": "java",
-					"content":  `println as $output`,
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
 				},
-			}, 8*time.Second)
-			require.NoError(t, err)
-			return map[string]any{
-				"syntaxFlowInput": map[string]any{
-					"ruleName":    name,
-					"language":    "java",
-					"content":     `println as $output`,
-					"description": "mcp-updated",
+			},
+		},
+		"create_syntaxflow_rule": {{
+			name: "create_minimal_rule",
+			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+				name := uniqueName("mcp-sf")
+				t.Setenv("MCP_SF_RULE_NAME", name)
+				return map[string]any{
+					"syntaxFlowInput": map[string]any{
+						"ruleName": name,
+						"language": "java",
+						"content":  `println as $output`,
+					},
+				}
+			},
+			timeout: 8 * time.Second,
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				assert.Contains(t, text, os.Getenv("MCP_SF_RULE_NAME"))
+			},
+		}},
+		"update_syntaxflow_rule": {{
+			name: "update_existing_rule",
+			buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+				name := uniqueName("mcp-sf-upd")
+				_, err := invokeLegacyTool(t, srv, "create_syntaxflow_rule", map[string]any{
+					"syntaxFlowInput": map[string]any{
+						"ruleName": name,
+						"language": "java",
+						"content":  `println as $output`,
+					},
+				}, 8*time.Second)
+				require.NoError(t, err)
+				return map[string]any{
+					"syntaxFlowInput": map[string]any{
+						"ruleName":    name,
+						"language":    "java",
+						"content":     `println as $output`,
+						"description": "mcp-updated",
+					},
+				}
+			},
+			timeout: 8 * time.Second,
+			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+				require.NotNil(t, result)
+			},
+		}},
+		"query_syntaxflow_result": {
+			{
+				name:    "minimal_pagination_should_not_panic",
+				args:    pagingArgs(),
+				timeout: 5 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline", "failed", "invalid",
 				},
-			}
-		},
-		timeout: 8 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"query_syntaxflow_result": {
-		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
-			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
-	"query_syntaxflow_scan_task": {
-		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
-			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"syntaxflow_scan": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		"query_syntaxflow_scan_task": {
+			{
+				name:    "minimal_pagination_should_not_panic",
+				args:    pagingArgs(),
+				timeout: 5 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline", "failed", "invalid",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
+		"syntaxflow_scan": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
 	}
 }
-
 
 // --- ToolSet: risk ---
 
 func legacyRiskToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"query_risks": {
-		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
+		"query_risks": {
+			{
+				name:    "minimal_pagination_should_not_panic",
+				args:    pagingArgs(),
+				timeout: 5 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline", "failed", "invalid",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
+		"query_risk": {{
+			name: "query_seeded_risk",
+			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+				return map[string]any{"id": ensureLegacyTestRiskID(t)}
+			},
 			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
-		},
-	},
-	"query_risk": {{
-		name: "query_seeded_risk",
-		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-			return map[string]any{"id": ensureLegacyTestRiskID(t)}
-		},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"delete_risk": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
+		}},
+		"delete_risk": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
+		},
+		"query_new_risks": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
+		"set_tag_for_risk": {{
+			name: "tag_seeded_risk",
+			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+				return map[string]any{
+					"id":   ensureLegacyTestRiskID(t),
+					"tags": []any{"mcp-test"},
+				}
+			},
+			timeout: 5 * time.Second,
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
-		},
-	},
-	"query_new_risks": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"set_tag_for_risk": {{
-		name: "tag_seeded_risk",
-		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-			return map[string]any{
-				"id":   ensureLegacyTestRiskID(t),
-				"tags": []any{"mcp-test"},
-			}
-		},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
+		}},
 	}
 }
-
 
 // --- ToolSet: yso ---
 
 func legacyYSOToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"get_all_yso_gadget_options": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
+		"get_all_yso_gadget_options": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
+		},
+		"get_all_yso_class_options": {{
+			name:    "url_dns_gadget",
+			args:    map[string]any{"gadget": "URLDNS"},
+			timeout: 5 * time.Second,
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				assert.Contains(t, text, "Options")
+			},
+		}},
+		"get_all_yso_class_generater_options": {{
+			name:    "url_dns_gadget",
+			args:    map[string]any{"gadget": "URLDNS"},
+			timeout: 5 * time.Second,
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
-		},
-	},
-	"get_all_yso_class_options": {{
-		name:    "url_dns_gadget",
-		args:    map[string]any{"gadget": "URLDNS"},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-			assert.Contains(t, text, "Options")
-		},
-	}},
-	"get_all_yso_class_generater_options": {{
-		name:    "url_dns_gadget",
-		args:    map[string]any{"gadget": "URLDNS"},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"generate_yso_bytes": {{
-		name: "url_dns_with_domain",
-		args: map[string]any{
-			"gadget": "URLDNS",
-			"class":  "URLDNS",
-			"options": []any{
-				map[string]any{"key": "domain", "value": "example.com"},
+		}},
+		"generate_yso_bytes": {{
+			name: "url_dns_with_domain",
+			args: map[string]any{
+				"gadget": "URLDNS",
+				"class":  "URLDNS",
+				"options": []any{
+					map[string]any{"key": "domain", "value": "example.com"},
+				},
 			},
-		},
-		timeout: 10 * time.Second,
-		skipIfErrContains: []string{
-			"not support", "not set", "failed",
-		},
-		validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-			assert.NotEmpty(t, text)
-		},
-	}},
-	"yso_dump": {{
-		name: "dump_generated_bytes",
-		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-			return legacyGeneratedYSOBytesArgs(t, srv)
-		},
-		timeout: 10 * time.Second,
-		allowErrContains: []string{
-			"Magic error", "dump error", "ClassFormatError",
-		},
-		validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-			assert.NotEmpty(t, strings.TrimSpace(text))
-		},
-	}},
+			timeout: 10 * time.Second,
+			skipIfErrContains: []string{
+				"not support", "not set", "failed",
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				assert.NotEmpty(t, text)
+			},
+		}},
+		"yso_dump": {{
+			name: "dump_generated_bytes",
+			buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+				return legacyGeneratedYSOBytesArgs(t, srv)
+			},
+			timeout: 10 * time.Second,
+			allowErrContains: []string{
+				"Magic error", "dump error", "ClassFormatError",
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				assert.NotEmpty(t, strings.TrimSpace(text))
+			},
+		}},
 	}
 }
-
 
 // --- ToolSet: mitm ---
 
 func legacyMITMToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"get_mitm_filter": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"set_mitm_filter": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		"get_mitm_filter": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
-	"query_mitm_replacer_rules": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
+		"set_mitm_filter": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
+		"query_mitm_replacer_rules": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 5 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline", "failed", "invalid",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
+		"get_current_rules": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
+		},
+		"set_current_rules": {{
+			name:    "empty_rules_array",
+			args:    map[string]any{"rules": []any{}},
 			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
-		},
-	},
-	"get_current_rules": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"set_current_rules": {{
-		name:    "empty_rules_array",
-		args:    map[string]any{"rules": []any{}},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"download_mitm_cert": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		}},
+		"download_mitm_cert": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
-	"start_mitm_v2": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
+		"start_mitm_v2": {
+			{
+				name:    "empty_args_should_not_panic",
+				args:    map[string]any{},
+				timeout: 3 * time.Second,
+				skipIfErrContains: []string{
+					"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+					"dnslog", "reverse", "panic",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: fingerprint ---
 
 func legacyFingerprintToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"query_fingerprint": {
-		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
-			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"create_fingerprint": {{
-		name: "create_minimal_fingerprint",
-		args: map[string]any{
-			"rule": map[string]any{
-				"ruleName":        uniqueName("mcp-fp"),
-				"matchExpression": `body="mcp-test"`,
+		"query_fingerprint": {
+			{
+				name:    "minimal_pagination_should_not_panic",
+				args:    pagingArgs(),
+				timeout: 5 * time.Second,
+				skipIfErrContains: []string{
+					"context deadline", "failed", "invalid",
+				},
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
 			},
 		},
-		timeout: 8 * time.Second,
-		validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-			assert.Contains(t, text, "create")
-		},
-	}},
-	"update_fingerprint": {{
-		name: "update_by_rule_name",
-		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-			name := uniqueName("mcp-fp-upd")
-			_, err := invokeLegacyTool(t, srv, "create_fingerprint", map[string]any{
+		"create_fingerprint": {{
+			name: "create_minimal_fingerprint",
+			args: map[string]any{
 				"rule": map[string]any{
-					"ruleName":        name,
+					"ruleName":        uniqueName("mcp-fp"),
 					"matchExpression": `body="mcp-test"`,
 				},
-			}, 8*time.Second)
-			require.NoError(t, err)
-			return map[string]any{
-				"ruleName": name,
-				"rule": map[string]any{
-					"matchExpression": `body="mcp-test-updated"`,
-				},
-			}
-		},
-		timeout: 8 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"delete_fingerprint": {
-		{
-			name:    "empty_filter_should_not_panic",
-			args:    map[string]any{"filter": map[string]any{}},
-			timeout: 3 * time.Second,
+			},
+			timeout: 8 * time.Second,
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				assert.Contains(t, text, "create")
+			},
+		}},
+		"update_fingerprint": {{
+			name: "update_by_rule_name",
+			buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+				name := uniqueName("mcp-fp-upd")
+				_, err := invokeLegacyTool(t, srv, "create_fingerprint", map[string]any{
+					"rule": map[string]any{
+						"ruleName":        name,
+						"matchExpression": `body="mcp-test"`,
+					},
+				}, 8*time.Second)
+				require.NoError(t, err)
+				return map[string]any{
+					"ruleName": name,
+					"rule": map[string]any{
+						"matchExpression": `body="mcp-test-updated"`,
+					},
+				}
+			},
+			timeout: 8 * time.Second,
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
+		}},
+		"delete_fingerprint": {
+			{
+				name:    "empty_filter_should_not_panic",
+				args:    map[string]any{"filter": map[string]any{}},
+				timeout: 3 * time.Second,
+				validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+				},
+			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: project_database ---
 
 func legacyProjectDatabaseToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"get_current_database_context": {
-		{
-			name: "returns_database_paths",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.Contains(t, text, "yakit_home")
-				assert.Contains(t, text, "current_project_db_path")
-				assert.Contains(t, text, "current_profile_db_path")
+		"get_current_database_context": {
+			{
+				name: "returns_database_paths",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.Contains(t, text, "yakit_home")
+					assert.Contains(t, text, "current_project_db_path")
+					assert.Contains(t, text, "current_profile_db_path")
+				},
 			},
 		},
-	},
-	"list_project_databases": {
-		{
-			name: "returns_project_items",
-			args: map[string]any{"limit": float64(5)},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var items []map[string]any
-				decodeToolResultJSON(t, text, &items)
-				// empty list is valid for fresh profile DB
-				_ = items
+		"list_project_databases": {
+			{
+				name: "returns_project_items",
+				args: map[string]any{"limit": float64(5)},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var items []map[string]any
+					decodeToolResultJSON(t, text, &items)
+					// empty list is valid for fresh profile DB
+					_ = items
+				},
 			},
 		},
-	},
-	"switch_current_project_database": {
-		{
-			name:        "reject_invalid_id",
-			args:        map[string]any{"id": float64(0)},
-			wantErr:     true,
-			errContains: []string{"id must be greater than 0"},
+		"switch_current_project_database": {
+			{
+				name:        "reject_invalid_id",
+				args:        map[string]any{"id": float64(0)},
+				wantErr:     true,
+				errContains: []string{"id must be greater than 0"},
+			},
 		},
-	},
-	"create_project_database": {
-		{
-			name:        "reject_missing_project_name",
-			args:        map[string]any{},
-			wantErr:     true,
-			errContains: []string{"projectName is required"},
+		"create_project_database": {
+			{
+				name:        "reject_missing_project_name",
+				args:        map[string]any{},
+				wantErr:     true,
+				errContains: []string{"projectName is required"},
+			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: global_hotpatch ---
 
 func legacyGlobalHotpatchToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"get_global_hotpatch_config": {
-		{
-			name: "returns_config_json",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var cfg map[string]any
-				decodeToolResultJSON(t, text, &cfg)
-				assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+		"get_global_hotpatch_config": {
+			{
+				name: "returns_config_json",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var cfg map[string]any
+					decodeToolResultJSON(t, text, &cfg)
+					assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+				},
 			},
 		},
-	},
-	"enable_global_hotpatch": {
-		{
-			name:        "missing_template_name",
-			args:        map[string]any{},
-			wantErr:     true,
-			errContains: []string{"templateName is required"},
-		},
-		{
-			name:        "unknown_template",
-			args:        map[string]any{"templateName": "legacy-mcp-missing-global-template"},
-			wantErr:     true,
-			errContains: []string{"failed", "template"},
-		},
-		{
-			name: "enable_existing_template",
-			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-				return map[string]any{"templateName": createLegacyGlobalHotPatchTemplate(t)}
+		"enable_global_hotpatch": {
+			{
+				name:        "missing_template_name",
+				args:        map[string]any{},
+				wantErr:     true,
+				errContains: []string{"templateName is required"},
 			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var cfg map[string]any
-				decodeToolResultJSON(t, text, &cfg)
-				assert.True(t, legacyGlobalHotPatchEnabled(cfg))
+			{
+				name:        "unknown_template",
+				args:        map[string]any{"templateName": "legacy-mcp-missing-global-template"},
+				wantErr:     true,
+				errContains: []string{"failed", "template"},
 			},
-		},
-	},
-	"disable_global_hotpatch": {
-		{
-			name: "disable_when_already_off",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var cfg map[string]any
-				decodeToolResultJSON(t, text, &cfg)
-				assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+			{
+				name: "enable_existing_template",
+				buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+					return map[string]any{"templateName": createLegacyGlobalHotPatchTemplate(t)}
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var cfg map[string]any
+					decodeToolResultJSON(t, text, &cfg)
+					assert.True(t, legacyGlobalHotPatchEnabled(cfg))
+				},
 			},
 		},
-	},
-	"reset_global_hotpatch_config": {
-		{
-			name: "reset_to_default",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var cfg map[string]any
-				decodeToolResultJSON(t, text, &cfg)
-				assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+		"disable_global_hotpatch": {
+			{
+				name: "disable_when_already_off",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var cfg map[string]any
+					decodeToolResultJSON(t, text, &cfg)
+					assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+				},
 			},
 		},
-	},
-	"query_hotpatch_template_list": {
-		{
-			name: "list_without_filter",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var payload map[string]any
-				decodeToolResultJSON(t, text, &payload)
-				_, ok := payload["Name"]
-				require.True(t, ok, "expected Name field in response")
+		"reset_global_hotpatch_config": {
+			{
+				name: "reset_to_default",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var cfg map[string]any
+					decodeToolResultJSON(t, text, &cfg)
+					assert.False(t, legacyGlobalHotPatchEnabled(cfg))
+				},
 			},
 		},
-		{
-			name: "list_global_templates",
-			args: map[string]any{"type": "global"},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
+		"query_hotpatch_template_list": {
+			{
+				name: "list_without_filter",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var payload map[string]any
+					decodeToolResultJSON(t, text, &payload)
+					_, ok := payload["Name"]
+					require.True(t, ok, "expected Name field in response")
+				},
+			},
+			{
+				name: "list_global_templates",
+				args: map[string]any{"type": "global"},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.NotEmpty(t, strings.TrimSpace(text))
+				},
 			},
 		},
-	},
-	"create_global_hotpatch_template": {
-		{
-			name:        "reject_missing_name",
-			args:        map[string]any{"content": "beforeRequest = func(isHttps, originReq, req) { return req }"},
-			wantErr:     true,
-			errContains: []string{"name is required"},
-		},
-		{
-			name:        "reject_missing_content",
-			args:        map[string]any{"name": "legacy-mcp-empty-content"},
-			wantErr:     true,
-			errContains: []string{"content is required"},
-		},
-		{
-			name:        "reject_invalid_content",
-			args:        map[string]any{"name": "legacy-mcp-bad-yak", "content": "this is not valid yak hotpatch"},
-			wantErr:     true,
-			errContains: []string{"validation failed"},
-		},
-		{
-			name: "create_valid_template",
-			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-				return map[string]any{
-					"name": uniqueName("legacy-mcp-create-global"),
-					"content": `
+		"create_global_hotpatch_template": {
+			{
+				name:        "reject_missing_name",
+				args:        map[string]any{"content": "beforeRequest = func(isHttps, originReq, req) { return req }"},
+				wantErr:     true,
+				errContains: []string{"name is required"},
+			},
+			{
+				name:        "reject_missing_content",
+				args:        map[string]any{"name": "legacy-mcp-empty-content"},
+				wantErr:     true,
+				errContains: []string{"content is required"},
+			},
+			{
+				name:        "reject_invalid_content",
+				args:        map[string]any{"name": "legacy-mcp-bad-yak", "content": "this is not valid yak hotpatch"},
+				wantErr:     true,
+				errContains: []string{"validation failed"},
+			},
+			{
+				name: "create_valid_template",
+				buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+					return map[string]any{
+						"name": uniqueName("legacy-mcp-create-global"),
+						"content": `
 beforeRequest = func(isHttps, originReq, req) { return req }
 afterRequest = func(isHttps, originReq, req, originRsp, rsp) { return rsp }
 `,
-					"tags": []any{"mcp", "global"},
-				}
-			},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				var payload map[string]any
-				decodeToolResultJSON(t, text, &payload)
-				msg, ok := payload["Message"].(map[string]any)
-				require.True(t, ok, "expected Message in response: %s", text)
-				assert.Equal(t, "create", msg["Operation"])
+						"tags": []any{"mcp", "global"},
+					}
+				},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					var payload map[string]any
+					decodeToolResultJSON(t, text, &payload)
+					msg, ok := payload["Message"].(map[string]any)
+					require.True(t, ok, "expected Message in response: %s", text)
+					assert.Equal(t, "create", msg["Operation"])
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- ToolSet: system_proxy ---
 
 func legacySystemProxyToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"get_system_proxy": {
-		{
-			name: "returns_proxy_config",
-			args: map[string]any{},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
+		"get_system_proxy": {
+			{
+				name: "returns_proxy_config",
+				args: map[string]any{},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.NotEmpty(t, strings.TrimSpace(text))
+				},
 			},
 		},
-	},
-	"set_system_proxy": {
-		{
-			name: "toggle_disable_without_proxy_value",
-			args: map[string]any{"httpProxy": "", "enable": false},
-			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-				assert.NotEmpty(t, strings.TrimSpace(text))
+		"set_system_proxy": {
+			{
+				name: "toggle_disable_without_proxy_value",
+				args: map[string]any{"httpProxy": "", "enable": false},
+				validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+					assert.NotEmpty(t, strings.TrimSpace(text))
+				},
 			},
 		},
-	},
 	}
 }
-
 
 // --- integration tests ---
 

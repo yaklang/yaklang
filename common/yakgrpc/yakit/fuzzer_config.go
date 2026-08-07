@@ -2,7 +2,9 @@ package yakit
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
@@ -15,7 +17,13 @@ import (
 const (
 	WebFuzzerConfigTypePage      = "page"
 	WebFuzzerConfigTypePageGroup = "pageGroup"
+	WebFuzzerCacheProjectKey     = "fuzzer-list-cache"
+	WebFuzzerGroupNameMaxLength  = 24
+	WebFuzzerDefaultGroupColor   = "purple"
 )
+
+var webFuzzerGroupColors = []string{"purple", "blue", "lakeBlue", "green", "red", "orange", "bluePurple", "grey"}
+var webFuzzerGroupHexColorPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
 // WebFuzzerParamItem mirrors FuzzerParamItem in frontend advancedConfigValue.params.
 type WebFuzzerParamItem struct {
@@ -52,7 +60,7 @@ type WebFuzzerPageCacheItem struct {
 	PageParams    *WebFuzzerPageParams `json:"pageParams"`
 	SortField     int64                `json:"sortFieId"`
 	Verbose       string               `json:"verbose,omitempty"`
-	Expand        bool                 `json:"expand,omitempty"`
+	Expand        bool                 `json:"expand"`
 	Color         string               `json:"color,omitempty"`
 }
 
@@ -61,6 +69,49 @@ type WebFuzzerPageBuildOptions struct {
 	TabName   string
 	GroupID   string
 	SortField int64
+}
+
+type WebFuzzerGroupBuildOptions struct {
+	GroupID   string
+	GroupName string
+	SortField int64
+	Expand    bool
+	Color     string
+}
+
+func WebFuzzerGroupColors() []string {
+	return append([]string(nil), webFuzzerGroupColors...)
+}
+
+func WebFuzzerGroupColorPattern() string {
+	return "^(" + strings.Join(webFuzzerGroupColors, "|") + `|#[0-9A-Fa-f]{6})$`
+}
+
+func NormalizeWebFuzzerGroupName(groupName string) (string, error) {
+	groupName = strings.TrimSpace(groupName)
+	if groupName == "" {
+		return "", utils.Error("group name is required")
+	}
+	if utf8.RuneCountInString(groupName) > WebFuzzerGroupNameMaxLength {
+		return "", utils.Errorf("group name must not exceed %d characters", WebFuzzerGroupNameMaxLength)
+	}
+	return groupName, nil
+}
+
+func NormalizeWebFuzzerGroupColor(color string) (string, error) {
+	color = strings.TrimSpace(color)
+	if color == "" {
+		return WebFuzzerDefaultGroupColor, nil
+	}
+	if webFuzzerGroupHexColorPattern.MatchString(color) {
+		return strings.ToUpper(color), nil
+	}
+	for _, allowed := range webFuzzerGroupColors {
+		if color == allowed {
+			return color, nil
+		}
+	}
+	return "", utils.Errorf("unsupported group color %q; use a preset (%s) or a custom #RRGGBB color", color, strings.Join(webFuzzerGroupColors, ", "))
 }
 
 func CreateOrUpdateWebFuzzerConfig(db *gorm.DB, config *schema.WebFuzzerConfig) (int64, error) {
@@ -144,6 +195,87 @@ func BuildWebFuzzerConfig(req *ypb.FuzzerRequest, opts ...func(*WebFuzzerPageBui
 		Type:   WebFuzzerConfigTypePage,
 		Config: string(configJSON),
 	}, nil
+}
+
+// BuildWebFuzzerGroupConfig builds the synthetic top-level node used by Yakit
+// to represent a Web Fuzzer tab group. Group membership is stored on each
+// child page through groupId; groupChildren is rebuilt by the frontend.
+func BuildWebFuzzerGroupConfig(groupName string, opts ...func(*WebFuzzerGroupBuildOptions)) (*ypb.FuzzerConfig, error) {
+	options := WebFuzzerGroupBuildOptions{
+		GroupID:   uuid.NewString() + "-group",
+		GroupName: groupName,
+		SortField: 1,
+		Expand:    true,
+		Color:     WebFuzzerDefaultGroupColor,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+	options.GroupID = strings.TrimSpace(options.GroupID)
+	var err error
+	options.GroupName, err = NormalizeWebFuzzerGroupName(options.GroupName)
+	if err != nil {
+		return nil, err
+	}
+	options.Color, err = NormalizeWebFuzzerGroupColor(options.Color)
+	if err != nil {
+		return nil, err
+	}
+	if options.GroupID == "" {
+		options.GroupID = uuid.NewString() + "-group"
+	}
+	if !strings.HasSuffix(options.GroupID, "group") {
+		return nil, utils.Error("group id must end with group")
+	}
+	if options.SortField <= 0 {
+		options.SortField = 1
+	}
+
+	cacheItem := &WebFuzzerPageCacheItem{
+		GroupChildren: []any{},
+		GroupID:       "0",
+		ID:            options.GroupID,
+		SortField:     options.SortField,
+		Verbose:       options.GroupName,
+		Expand:        options.Expand,
+		Color:         options.Color,
+	}
+	configJSON, err := json.Marshal(cacheItem)
+	if err != nil {
+		return nil, utils.Wrap(err, "marshal web fuzzer group config failed")
+	}
+	return &ypb.FuzzerConfig{
+		PageId: options.GroupID,
+		Type:   WebFuzzerConfigTypePageGroup,
+		Config: string(configJSON),
+	}, nil
+}
+
+// ParseWebFuzzerConfig decodes the frontend-compatible JSON payload and checks
+// that its identity agrees with the enclosing FuzzerConfig record.
+func ParseWebFuzzerConfig(config *ypb.FuzzerConfig) (*WebFuzzerPageCacheItem, error) {
+	if config == nil {
+		return nil, utils.Error("web fuzzer config is nil")
+	}
+	if strings.TrimSpace(config.GetPageId()) == "" {
+		return nil, utils.Error("web fuzzer page id is empty")
+	}
+	var item WebFuzzerPageCacheItem
+	if err := json.Unmarshal([]byte(config.GetConfig()), &item); err != nil {
+		return nil, utils.Wrap(err, "unmarshal web fuzzer config failed")
+	}
+	if item.ID == "" {
+		item.ID = config.GetPageId()
+	}
+	if item.ID != config.GetPageId() {
+		return nil, utils.Errorf("web fuzzer config id %q does not match page id %q", item.ID, config.GetPageId())
+	}
+	if item.GroupID == "" {
+		item.GroupID = "0"
+	}
+	return &item, nil
 }
 
 func buildWebFuzzerPageParamsFromRequest(req *ypb.FuzzerRequest, pageID, request string) *WebFuzzerPageParams {

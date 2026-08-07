@@ -260,9 +260,18 @@ func newBroadcastTypeCaller(typeString string, wait time.Duration) func(func()) 
 	return utils.NewThrottle(wait.Seconds())
 }
 
+const (
+	WebFuzzerTabPushActionCreate = "create"
+	WebFuzzerTabPushActionUpdate = "update"
+	WebFuzzerTabPushActionDelete = "delete"
+)
+
 type WebFuzzerTabPush struct {
-	OpenFlag bool                `json:"openFlag"` // 创建 Web Fuzzer Tab 之后，要不要把左侧一级菜单切到「Web Fuzzer」并聚焦新 Tab
-	Data     []*ypb.FuzzerConfig `json:"data"`
+	Action      string              `json:"action,omitempty"`
+	OpenFlag    bool                `json:"openFlag"` // 创建 Web Fuzzer Tab 之后，要不要把左侧一级菜单切到「Web Fuzzer」并聚焦新 Tab
+	Data        []*ypb.FuzzerConfig `json:"data,omitempty"`
+	ChangedData []*ypb.FuzzerConfig `json:"changedData,omitempty"`
+	PageIDs     []string            `json:"pageIds,omitempty"`
 }
 
 type ProjectPush struct {
@@ -277,8 +286,27 @@ func BroadcastWebFuzzerTab(openFlag bool, data ...*ypb.FuzzerConfig) {
 		return
 	}
 	BroadcastData(ServerPushType_WebFuzzerTab, &WebFuzzerTabPush{
+		Action:   WebFuzzerTabPushActionCreate,
 		OpenFlag: openFlag,
 		Data:     data,
+	})
+}
+
+// BroadcastWebFuzzerTabChanged notifies action-aware Yakit clients about
+// updates and deletions. ChangedData intentionally uses a different JSON field
+// from Data so older clients do not mistake an update for a newly created tab.
+func BroadcastWebFuzzerTabChanged(action string, openFlag bool, changedData []*ypb.FuzzerConfig, pageIDs []string) {
+	if action != WebFuzzerTabPushActionUpdate && action != WebFuzzerTabPushActionDelete {
+		return
+	}
+	if len(changedData) == 0 && len(pageIDs) == 0 {
+		return
+	}
+	BroadcastData(ServerPushType_WebFuzzerTab, &WebFuzzerTabPush{
+		Action:      action,
+		OpenFlag:    openFlag,
+		ChangedData: changedData,
+		PageIDs:     pageIDs,
 	})
 }
 
