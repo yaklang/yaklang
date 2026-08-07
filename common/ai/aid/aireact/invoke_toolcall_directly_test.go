@@ -24,9 +24,12 @@ func mockedDirectlyCallTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 
 	if isPrimaryDecisionPrompt(prompt) {
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 直接
-		// 工具执行后 timeline 会出现 [DIRECT_CALL_PARAMS], 检测到它说明已调
-		// 过工具, 此时主动 finish 收口, 模拟 "AI 判断任务完成后主动调 finish".
-		if strings.Contains(prompt, "[DIRECT_CALL_PARAMS]") {
+		// 工具执行后 timeline 会出现该工具的 DIRECT_CALL_PARAMS 参数快照
+		// ("ToolName <tool> Parameter:"), 检测到它说明已调过工具, 此时主动
+		// finish 收口, 模拟 "AI 判断任务完成后主动调 finish".
+		// 注意: 不能匹配 "[DIRECT_CALL_PARAMS]" 字面量, 静态 prompt 散文
+		// (high_static_section.txt 的 timeline 条目说明) 已包含该字样.
+		if strings.Contains(prompt, "ToolName "+toolName+" Parameter:") {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
@@ -61,9 +64,11 @@ func mockedDirectlyCallToolLegacyWrapped(i aicommon.AICallerConfigIf, req *aicom
 	prompt := req.GetPrompt()
 
 	if isPrimaryDecisionPrompt(prompt) {
-		// 同 mockedDirectlyCallTool: 检测到 [DIRECT_CALL_PARAMS] 说明已调过
-		// 工具, 主动 finish 收口 (verification 不再自动退出).
-		if strings.Contains(prompt, "[DIRECT_CALL_PARAMS]") {
+		// 同 mockedDirectlyCallTool: 检测到该工具的 DIRECT_CALL_PARAMS 参数
+		// 快照 ("ToolName <tool> Parameter:") 说明已调过工具, 主动 finish 收口
+		// (verification 不再自动退出). 不能匹配 "[DIRECT_CALL_PARAMS]" 字面量,
+		// 静态 prompt 散文已包含该字样.
+		if strings.Contains(prompt, "ToolName "+toolName+" Parameter:") {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
@@ -98,9 +103,11 @@ func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.
 	prompt := req.GetPrompt()
 
 	if isPrimaryDecisionPrompt(prompt) {
-		// 同 mockedDirectlyCallTool: 检测到 [DIRECT_CALL_PARAMS] 说明已调过
-		// 工具, 主动 finish 收口 (verification 不再自动退出).
-		if strings.Contains(prompt, "[DIRECT_CALL_PARAMS]") {
+		// 同 mockedDirectlyCallTool: 检测到该工具的 DIRECT_CALL_PARAMS 参数
+		// 快照 ("ToolName <tool> Parameter:") 说明已调过工具, 主动 finish 收口
+		// (verification 不再自动退出). 不能匹配 "[DIRECT_CALL_PARAMS]" 字面量,
+		// 静态 prompt 散文已包含该字样.
+		if strings.Contains(prompt, "ToolName "+toolName+" Parameter:") {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
