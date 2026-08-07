@@ -190,6 +190,8 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 		"PinnedDSL":       loop.Get("pinned_dsl"),
 		// NeedsLintResearch: lint 失败且尚未 grep/yakdoc，禁止直接 modify_code。
 		"NeedsLintResearch": needsYaklangLintResearchGate(loop),
+		// ForcePatchFallback: Apply Patch 连续应用失败后强制行号/old_snippet，打断空转。
+		"ForcePatchFallback": loopinfra.IsModifyCodePatchFallbackMode(loop),
 	}
 }
 

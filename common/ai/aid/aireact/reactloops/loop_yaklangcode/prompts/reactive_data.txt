@@ -33,7 +33,16 @@ Init 从 YakDocument 抽取的权威 Decl。写码/修错优先采信；未列�
 {{ .CurrentCodeWithLineNumber }}
 <|CURRENT_CODE_END_{{ .Nonce }}|>
 
-调试可用 `desc(instance)` / `log.Info(...)`。修改用 `modify_code` + Cursor Patch（`*** Begin Patch`）。Patch 的 context / `-` 行必须从上方 CURRENT_CODE 逐字符复制。
+调试可用 `desc(instance)` / `log.Info(...)`。修改用 `modify_code` + Apply Patch（`*** Begin Patch`）。
+Patch 规则：空格开头=上下文（从 CURRENT_CODE 逐字符复制），`-` 开头=删除，`+` 开头=新增；**每个 hunk 必须至少有一行 `-` 或 `+`**，禁止把整段新代码当 context 糊进 Patch。
+{{ if .ForcePatchFallback }}
+## 【强制】Patch 空转熔断（行号/old_snippet 优先）
+Apply Patch 已连续应用失败。**禁止**继续输出 `*** Begin Patch` 空转。
+必须使用：
+- `modify_start_line` + `modify_end_line` + GEN_CODE（对照上方 CURRENT_CODE 行号），或
+- `old_snippet` + GEN_CODE（短片段精确替换）。
+降级模式下允许按行号替换完整函数体；成功写入后自动解除熔断。
+{{ end }}
 {{ else }}## 当前没有代码（create 模式）
 新建用 `@action: write_code`。JSON 后必须紧跟完整代码块：
 ```
