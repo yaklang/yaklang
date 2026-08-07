@@ -43,7 +43,7 @@ func (m *Timeline) estimateItemContentTokens(id int64, item *TimelineItem) int64
 	timeStr := t.Format(utils.DefaultTimeFormat3)
 
 	buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
-	raw := item.String()
+	raw := selectShrunkContent(item)
 	for _, line := range utils.ParseStringToRawLines(raw) {
 		buf.WriteString(fmt.Sprintf("     %s\n", line))
 	}
