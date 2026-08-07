@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,11 +13,12 @@ import (
 )
 
 // hasYaklangEditorDeliveryTarget is true when the loop should deliver code to an open editor file (replace).
+// Only .yak script paths qualify — @mention reference files (.md, etc.) must not.
 func hasYaklangEditorDeliveryTarget(loop *reactloops.ReActLoop) bool {
 	if loop == nil {
 		return false
 	}
-	return strings.TrimSpace(loop.Get("editor_file_path")) != ""
+	return aicommon.IsYaklangScriptDeliveryPath(loop.Get("editor_file_path"))
 }
 
 func isYaklangGenCodePath(path string) bool {
@@ -54,9 +56,10 @@ func resolveYaklangDeliveryTarget(loop *reactloops.ReActLoop) (path string, even
 	}
 
 	editorFile := strings.TrimSpace(loop.Get("editor_file_path"))
-	if editorFile != "" {
+	if aicommon.IsYaklangScriptDeliveryPath(editorFile) {
 		return filepath.Clean(editorFile), loopinfra.LoopYaklangCodeEventOpReplace, nil
 	}
+	// Non-.yak editor_file_path (e.g. @mention .md mis-bound as file_path) must not replace.
 
 	filename := strings.TrimSpace(loop.Get("filename"))
 	if filename != "" {

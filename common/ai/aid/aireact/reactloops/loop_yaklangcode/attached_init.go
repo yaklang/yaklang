@@ -11,12 +11,18 @@ import (
 )
 
 // initYaklangEditorContextFromAttached parses attachments, binds loop keys, and records timeline.
+// Optional userInput (FreeInput) is used to exclude :mention[...] reference paths from editor delivery.
 func initYaklangEditorContextFromAttached(
 	r aicommon.AIInvokeRuntime,
 	loop *reactloops.ReActLoop,
 	attachedDatas []*aicommon.AttachedResource,
+	userInput ...string,
 ) *aicommon.YaklangEditorContext {
-	ctx := aicommon.ParseYaklangEditorContextFromAttached(attachedDatas)
+	input := ""
+	if len(userInput) > 0 {
+		input = userInput[0]
+	}
+	ctx := aicommon.ParseYaklangEditorContextFromAttachedWithUserInput(attachedDatas, input)
 	if ctx == nil {
 		return nil
 	}
@@ -62,10 +68,11 @@ func finalizeYaklangInitFileTarget(
 	}
 
 	targetPath, fromAttached := aicommon.ResolveYaklangInitTargetPath(editorCtx, liteforgePath)
-	if targetPath == "" {
+	if targetPath == "" || !aicommon.IsYaklangScriptDeliveryPath(targetPath) {
+		// Non-.yak paths (e.g. @mention .md) must not seed full_code from disk.
 		clearYaklangLoopFileState(loop)
 		seedYaklangLoopFullCode(loop, editorCtx, "")
-		log.Infof("create mode: no resolvable target path; delivery deferred until loop flush")
+		log.Infof("create mode: no resolvable .yak target path; delivery deferred until loop flush")
 		operator.Continue()
 		return
 	}

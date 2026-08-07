@@ -165,6 +165,34 @@ func TestApply_InsertViaContext(t *testing.T) {
 	assert.Equal(t, "before\nmiddle\nafter\n", out)
 }
 
+func TestParse_RejectsContextOnlyNoOpPatch(t *testing.T) {
+	// Model dumped indented code inside Begin Patch; leading spaces become context markers,
+	// so there are no '-' / '+' change lines — must fail fast instead of no-op apply.
+	patch := `*** Begin Patch
+*** Update File: current
+   hdrOpts := []
+   for k, v := range headers {
+       hdrOpts = append(hdrOpts, http.header(k, v))
+   }
+   rsp, err := http.Request("POST", chatUrl, allOpts...)
+*** End Patch`
+	_, err := ParseCodePatch(patch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "'+' / '-'")
+	assert.Contains(t, err.Error(), "context-only")
+}
+
+func TestParse_RejectsSpaceOnlyContextHunk(t *testing.T) {
+	patch := `*** Begin Patch
+@@ noop
+ a = 1
+ b = 2
+*** End Patch`
+	_, err := ParseCodePatch(patch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no-op")
+}
+
 func TestParse_EmptyPatch(t *testing.T) {
 	_, err := ParseCodePatch("")
 	require.Error(t, err)

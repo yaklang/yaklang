@@ -58,9 +58,10 @@ func checkCodeAndFormatErrors(code string, codeLineBase ...int) (string, bool) {
 			return result[i].StartColumn < result[j].StartColumn
 		})
 
-		if len(result) > 2 {
+		// Show up to 5 compiler errors so the model can fix repeated arity/API mistakes in one pass.
+		if len(result) > 5 {
 			haveMore = true
-			result = result[:2]
+			result = result[:5]
 		}
 	} else {
 		result = linkErrors
@@ -82,9 +83,9 @@ func checkCodeAndFormatErrors(code string, codeLineBase ...int) (string, bool) {
 			return result[i].StartColumn < result[j].StartColumn
 		})
 
-		if len(result) > 2 {
+		if len(result) > 5 {
 			haveMore = true
-			result = result[:2]
+			result = result[:5]
 		}
 	}
 

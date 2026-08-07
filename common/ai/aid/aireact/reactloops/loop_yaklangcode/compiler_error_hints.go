@@ -189,9 +189,40 @@ var compilerErrorHints = []compilerErrorHint{
 		Hint:     "该函数签名不包含 error 返回值。不要对其使用 `~` 丢弃 error，或改用会返回 error 的 API。",
 	},
 	{
+		// Must be before ByteLiteralTypeError: append(a []T, vals T) also emits "T should be byte".
+		Name:        "AppendByteSliceTypeError",
+		Contains:    []string{"T should be byte"},
+		LineRegexps: []string{`append\s*\(`},
+		Hint:        "[]byte 拼接：必须 `append(a, b...)` 展开另一段 bytes；禁止 `append(a, b)`（把整段 []byte 当成单个 T）。单字节：`append(a, 0x70)` 或 `append(a, []byte{0x70}...)`。确保 a/b 都是明确的 bytes（`b\"..\"` / `[]byte{0x..}` / codec 解码结果）。",
+		Examples: []string{
+			`frame = append(lengthPrefix, rawPayload)`,
+			`frame = append(lengthPrefix, rawPayload...)`,
+		},
+	},
+	{
+		Name:        "ByteLiteralTypeError",
+		Contains:    []string{"T should be byte"},
+		LineRegexps: []string{`\[\]byte\s*\{`},
+		Hint:        "[]byte 元素必须是 byte 字面量（0x00–0xFF）。用 []byte{0xAC, 0xED, 0x00, 0x05}；禁止裸整数或 Go 风格 typed slice。",
+		Examples:    []string{"[]byte{172, 237, 0, 5}", "[]byte{0xAC, 0xED, 0x00, 0x05}"},
+	},
+	{
 		Name:     "GenericTypeError",
 		Contains: []string{"should be", "but got"},
-		Hint:     "泛型/类型参数约束不满足。检查传入类型是否与函数/generic 声明一致。",
+		Hint:     "泛型/类型参数约束不满足。检查传入类型是否与函数/generic 声明一致。若出错行是 append 拼接 []byte，改用 append(a, b...)。",
+	},
+	{
+		Name: "CallAssignmentMismatchPocHTTP",
+		AnyOf: []string{
+			"The function call returns (",
+			"The function call with ~ returns (",
+		},
+		Contains: []string{"LowhttpResponse", "variables on the left side"},
+		Hint: "poc.Get / poc.Post 返回三个值：`(lowhttp.LowhttpResponse, *http.Request, error)`。正确写法：`rsp, req, err := poc.Post(...)` 或 `rsp, req, err := poc.Get(...)`。禁止 `rsp, err := poc.Post(...)`（只接两个变量会触发本错误）。",
+		Examples: []string{
+			`rsp, err := poc.Post(url, poc.timeout(30))`,
+			`rsp, req, err := poc.Post(url, poc.timeout(30))`,
+		},
 	},
 	{
 		Name: "CallAssignmentMismatch",
@@ -409,11 +440,31 @@ var compilerErrorHints = []compilerErrorHint{
 		Hint: "map 字面量键值对解析失败。检查 `{\"key\": value}` 语法。",
 	},
 	{
+		// Multi-line "..." + "..." is invalid Yaklang; keep before generic no-viable hints.
+		Name:        "MultilineStringConcat",
+		AnyOf:       []string{"no viable alternative"},
+		LineRegexps: []string{`^\s*\+\s*"`},
+		Hint:        "Yaklang 不支持跨行 `\"...\" + \"...\"` 拼接。请写成单行字符串、`sprintf(...)`，或用 `\\n` 写在同一字面量内。",
+		Examples: []string{
+			"yakit.Warn(\"...\\n\"\n    + \"...\")",
+			`yakit.Warn(sprintf("[!] dry-run\n1) ...\n2) %s", baseUrl))`,
+		},
+	},
+	{
 		Name:        "FunctionParameterTypes",
-		Globs:       []string{"*no viable alternative at input*", "*func(*"},
-		LineRegexps: []string{`func\s*\([^)]*\s+(map\[|string|int|interface\{\}|\[\]|\*|chan)`},
-		Hint:        "Yaklang DSL 中函数参数不允许有类型声明。请移除参数的类型声明。",
-		Examples:    []string{"func(result map[string]interface{})", "func(result)"},
+		Globs:       []string{"*no viable alternative at input*", "*func(*", "*extraneous input*", "*mismatched input*"},
+		LineRegexps: []string{
+			`func\s*\([^)]*\s+(map\[|string|int|bool|interface\{\}|\[\]|byte|\*|chan)\b`,
+			`func\s*\([^)]+\s+\w+\s*\)\s*\[\]`,
+		},
+		Hint:        "Yaklang DSL 中函数参数/返回类型不允许 Go 风格声明。用 func(arg) { ... }，不要 func(arg string) []byte {。",
+		Examples:    []string{"func(gadgetB64 string) []byte {", "build = func(gadgetB64) {"},
+	},
+	{
+		Name:        "FunctionReturnTypes",
+		LineRegexps: []string{`=\s*func\s*\([^)]*\)\s*(\[\]|map\[|string|int|bool)\b`},
+		Hint:        "Yaklang 匿名函数不支持返回类型声明。删除 ) 后的 []byte / map 等，只保留 func(args) { body }。",
+		Examples:    []string{"= func(frame) []byte {", "= func(frame) {"},
 	},
 	{
 		Name: "VarTypeDeclarations",

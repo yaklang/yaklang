@@ -11,57 +11,68 @@
 {{ end }}{{ if not .AIKBAvailable }}## AIKB 不可用
 代码样例库未安装。仅用 `yakdoc_*` 查 API 签名；禁止臆造样例或 API。
 
-{{ end }}{{ if .PinnedAPIs }}## 已锁定接口签名（本任务核心库 {{ .PinnedLibraries }} 的权威签名，优先采信）
-下面是 init 阶段据你选定的核心库从 YakDocument 抽取的**权威函数签名**。写码/修错时**优先以此为准**：参数类型、参数个数、函数名都照这里来，能直接避免"参数类型错误/猜错函数名"。这里没列全的成员用 `yakdoc_function_details` 查。
+{{ end }}{{ if .PinnedDSL }}## Yaklang DSL 硬规则（Init 锁定）
+{{ .PinnedDSL }}
+
+{{ end }}{{ if .PinnedAPIs }}## 已锁定接口签名（核心库 {{ .PinnedLibraries }}）
+Init 从 YakDocument 抽取的权威 Decl。写码/修错优先采信；未列出的用 `yakdoc_function_details`。
 
 {{ .PinnedAPIs }}
 
 {{ end }}{{ if .HasInitialSamples }}## 预检索代码样例（Init 已完成）
-以下样例已在初始化阶段注入。语法通过时**禁止对相同 pattern/question 重复 grep/semantic**。
-若本轮存在【编译反馈】且 `yak_lint_ok=false`，或【运行反馈】且 `yak_run_ok=false`，允许再次 `grep_yaklang_samples` / `yakdoc_*` 补样例。
+语法通过时禁止对相同 pattern/question 重复 grep/semantic。`yak_lint_ok=false` 或 `yak_run_ok=false` 时可再检。
 
 {{ .InitialCodeSamples }}
-{{ if .InitSearchManifest }}已覆盖检索：{{ .InitSearchManifest }}
+{{ if .InitSearchManifest }}已覆盖：{{ .InitSearchManifest }}
 {{ end }}
 {{ end }}{{ if .ModuleOverviewReady }}## 模块速览可用
-不确定用哪个库时，用 `yakdoc_module_overview(library="...")` 看「库定位 + 可用 API 名」。
+不确定库时用 `yakdoc_module_overview(library="...")`。
 
 {{ end }}{{ if .Code }}## 当前代码（行号仅供定位，生成代码时绝不能带行号）
 <|CURRENT_CODE_{{ .Nonce }}|>
 {{ .CurrentCodeWithLineNumber }}
 <|CURRENT_CODE_END_{{ .Nonce }}|>
 
-调试可用 `desc(instance)` 看类型、`log.Info(...)` 打日志。修改必须使用 `modify_code` + GEN_CODE 内 Cursor 风格 Patch（`*** Begin Patch`）；系统应用后前端只拿到完整源码。Patch 的 context / `-` 行必须从上方本轮 CURRENT_CODE **逐字符**复制（`\n`/`\r\n` 禁止展开、禁止写成 `\\n`），禁止直接输出完整脚本、完整函数或复用 rebase 前的旧片段。
+调试可用 `desc(instance)` / `log.Info(...)`。修改用 `modify_code` + Apply Patch（`*** Begin Patch`）。
+Patch 规则：空格开头=上下文（从 CURRENT_CODE 逐字符复制），`-` 开头=删除，`+` 开头=新增；**每个 hunk 必须至少有一行 `-` 或 `+`**，禁止把整段新代码当 context 糊进 Patch。
+{{ if .ForcePatchFallback }}
+## 【强制】Patch 空转熔断（行号/old_snippet 优先）
+Apply Patch 已连续应用失败。**禁止**继续输出 `*** Begin Patch` 空转。
+必须使用：
+- `modify_start_line` + `modify_end_line` + GEN_CODE（对照上方 CURRENT_CODE 行号），或
+- `old_snippet` + GEN_CODE（短片段精确替换）。
+降级模式下允许按行号替换完整函数体；成功写入后自动解除熔断。
+{{ end }}
 {{ else }}## 当前没有代码（create 模式）
-要新建 Yak 脚本，用 `@action: write_code`。**JSON 行和紧随其后的代码块是同一次输出、不可分割**：输出完 JSON 不要停，必须紧接着把下面这段写完整：
+新建用 `@action: write_code`。JSON 后必须紧跟完整代码块：
 ```
 {"@action": "write_code", "human_readable_thought": "..."}
 <|GEN_CODE_{{ .Nonce }}|>
 ...你的 Yaklang 代码...
 <|GEN_CODE_END_{{ .Nonce }}|>
 ```
-禁止只发 JSON 不发代码块；禁止用 markdown ```yak 代码块（系统无法解析）。若只想先查文档/样例就别选 write_code，改用查询动作。{{ end }}
-{{ if .FeedbackMessages }}
-## 本轮编译反馈（Yaklang 编译器静态分析，必须优先处理）
+禁止只发 JSON；禁止 markdown ```yak。只想先查文档就改用查询动作。{{ end }}
+{{ if .NeedsLintResearch }}
+## 【强制】lint 修复门禁（modify_code 已隐藏）
+先 `grep_yaklang_samples` / `semantic_search_*` / `yakdoc_*`，成功检索后才开放 `modify_code`。
+
+{{ end }}{{ if .FeedbackMessages }}
+## 本轮编译反馈（必须优先处理）
 <|ERR/LINT_WARNING_{{ .Nonce }}|>
 {{ .FeedbackMessages }}
 <|ERR/LINT_WARNING_END_{{ .Nonce }}|>
 
-按 persistent 指令里的「编译错误处理规则」对症处理：
-1. API 不存在→`yakdoc_*`；SyntaxError / undefined→`grep_yaklang_samples`；参数类型/个数错→`yakdoc_function_details`。
-2. 检索（如需）后再 **一次** `modify_code`（Cursor Patch）改对。lint 失败时允许重复 Init 已用过的 pattern。
+1. API 不存在→`yakdoc_*`；SyntaxError/undefined→`grep_yaklang_samples`；参数错→`yakdoc_function_details`。
+2. 检索后一次 `modify_code`；lint 失败允许重复 Init pattern。
 {{ end }}{{ if .NeedsSelfTestBlock }}## 缺少 YAK_MAIN 自测块（语法已通过，系统无法自动运行验证）
-检测到脚本类型：`{{ .ScriptKind }}`。请用 `modify_code` 在文件末尾追加 `func runSelfTest(){...}` 与 `if YAK_MAIN { runSelfTest() }`（禁止 write_code 重置）。
+脚本类型：`{{ .ScriptKind }}`。用 `modify_code` 末尾追加 `func runSelfTest(){...}` 与 `if YAK_MAIN { runSelfTest() }`（禁止 write_code）。
 
 {{ if .SelfTestHint }}{{ .SelfTestHint }}
 {{ end }}{{ end }}{{ if .RunFeedback }}
-## 本轮运行反馈（YAK_MAIN 自测，必须优先处理）
+## 本轮运行反馈（YAK_MAIN 自测）
 <|RUNTIME_ERR_{{ .Nonce }}|>
 {{ .RunFeedback }}
 <|RUNTIME_ERR_END_{{ .Nonce }}|>
 
-语法已通过但自测运行失败：
-1. 不确定 API/字段时先 `grep_yaklang_samples` / `yakdoc_*`，再 `modify_code`；
-2. **禁止** `write_code` 重置。
-常见：assert 失败、mock 报文 `\r\n` 用了反引号、map comma-ok、未定义 `runSelfTest`、对 `[]byte` 误调对象方法。
+先 `grep`/`yakdoc_*`（如需）再 `modify_code`；禁止 `write_code`。常见：assert、mock 报文 `\r\n`、map comma-ok、未定义 `runSelfTest`、对 `[]byte` 误调方法。
 {{ end }}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1707,8 +1708,10 @@ abc = func(){
 }
 `)
 	defer os.Remove(file.Name())
-	includeTestCase := fmt.Sprintf(`include"%s"`, file.Name())
-	includeExpected := fmt.Sprintf(`include "%s"`, file.Name())
+	// Windows 路径含 `\Users` 会被 lexer 当成 `\uXXXX` 转义，include 字面量统一用 /
+	includePath := filepath.ToSlash(file.Name())
+	includeTestCase := fmt.Sprintf(`include"%s"`, includePath)
+	includeExpected := fmt.Sprintf(`include "%s"`, includePath)
 
 	// func with name
 	funcTestCase := `func abc(){a=1
@@ -1927,17 +1930,19 @@ abc = func(){
 	file.WriteString(includeCode)
 	defer os.Remove(file.Name())
 
+	// Windows 路径含 `\Users` 会被 lexer 当成 `\uXXXX` 转义，include 字面量统一用 /
+	includePath := filepath.ToSlash(file.Name())
 	code := fmt.Sprintf(`
 	include "%s"
 	assert abc() == "test"
-	`, file.Name())
+	`, includePath)
 
 	_marshallerTest(code)
 	codes := _formattest(code)
 
 	checkFilePath, checkCode := *codes[0].SourceCodeFilePath, *codes[0].SourceCodePointer
-	if checkFilePath != file.Name() {
-		t.Fatalf("include file path error, expected: %s, got: %s", file.Name(), checkFilePath)
+	if filepath.Clean(checkFilePath) != filepath.Clean(file.Name()) && checkFilePath != includePath {
+		t.Fatalf("include file path error, expected: %s (or %s), got: %s", file.Name(), includePath, checkFilePath)
 	}
 	if checkCode != includeCode {
 		t.Fatalf("include file code error, expected: %#v, got: %#v", includeCode, checkCode)
