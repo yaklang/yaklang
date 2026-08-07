@@ -55,8 +55,6 @@ func needsYaklangLintResearchGate(loop interface{ Get(string) string }) bool {
 	return hasBlockingLintErrors(loop) && !hasYaklangLintResearchDone(loop)
 }
 
-const yaklangLintResearchGateFeedback = `【lint 修复门禁】存在阻塞性错误且尚未检索。先 grep_yaklang_samples / semantic_search_* / yakdoc_*，再 modify_code。`
-
 type yaklangLoopBox struct {
 	loop *reactloops.ReActLoop
 }
