@@ -112,4 +112,5 @@ func TestBuildPinnedDSLSection(t *testing.T) {
 	require.Contains(t, section, "func(x string)")
 	require.Contains(t, section, "poc.Post")
 	require.Contains(t, section, "append(a, b...)")
+	require.Contains(t, section, "跨行")
 }

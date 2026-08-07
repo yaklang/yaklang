@@ -118,6 +118,7 @@ const pinnedDSLRules = `### Yaklang DSL 硬规则（写码前必读，禁止 Go/
 - **匿名函数**：` + "`name = func(arg) { ... }`" + `；**禁止**参数/返回类型声明
   - 错误：` + "`func(x string) []byte {`" + `、` + "`func(frame []byte) {`" + `
   - 正确：` + "`build = func(gadgetB64) {`" + `、` + "`build = func(frame) {`" + `
+- **字符串**：禁止跨行 ` + "`\"...\" + \"...\"`" + `；用单行、` + "`\\n`" + ` 或 ` + "`sprintf`" + `
 - **byte 数组**：` + "`[]byte{0xAC, 0xED, 0x00, 0x05}`" + `；元素必须是 byte 字面量（` + "`0x..`" + `），禁止裸整数
 - **[]byte 拼接**：` + "`append(a, b...)`" + `；**禁止** ` + "`append(a, b)`" + `（整段 bytes 不能当单个 T）。单字节：` + "`append(a, 0x70)`" + `
 - **poc.Get / poc.Post**：必须三变量接收 ` + "`rsp, req, err := poc.Post(...)`" + `

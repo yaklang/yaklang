@@ -143,7 +143,6 @@ var reactiveData string
 func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) map[string]any {
 	yakCode := loop.Get("full_code")
 	lineBase := loop.GetInt(loopinfra.LoopVarCodeLineBase)
-	codeWithLine := utils.PrefixLinesWithLineNumbersFrom(lineBase+1, yakCode)
 	editorFilePath := strings.TrimSpace(loop.Get("editor_file_path"))
 	hasCode := strings.TrimSpace(yakCode) != ""
 
@@ -151,6 +150,8 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 	if feedbacker != nil {
 		feedbacks = strings.TrimSpace(feedbacker.String())
 	}
+	lintFailed := hasBlockingLintErrors(loop)
+	codeWithLine := formatReactiveCurrentCode(yakCode, lineBase, feedbacks, lintFailed)
 	policy := ClassifyYakScriptRunPolicy(yakCode)
 	runFeedback := strings.TrimSpace(loop.Get(loopVarYakRunLastFeedback))
 	runOk := loop.Get(loopVarYakRunOK)
@@ -158,7 +159,7 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 	scriptKind := string(policy.Kind)
 	needsSelfTest := policy.BlockExitNoSelfTest
 
-	initialSamples := loop.Get("initial_code_samples")
+	initialSamples := shrinkReactiveSamplesAfterCodeExists(loop.Get("initial_code_samples"), hasCode)
 	hasInitialSamples := loop.Get("init_samples_ready") == "true" || strings.TrimSpace(initialSamples) != ""
 	aikbAvailable := loop.Get("aikb_available") != "false"
 

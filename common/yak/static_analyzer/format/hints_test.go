@@ -96,3 +96,12 @@ func TestLookupCompilerErrorHint_FuncReturnType(t *testing.T) {
 	hint := lookupCompilerErrorHint("mismatched input '[' expecting ')'", `build = func(frame) []byte {`)
 	require.Contains(t, hint, "返回类型")
 }
+
+func TestLookupCompilerErrorHint_MultilineStringConcat(t *testing.T) {
+	hint := lookupCompilerErrorHint(
+		`基础语法错误（Syntax Error）：no viable alternative at input 'yakit.Warn("a\n"\n+'`,
+		`        + "    1) next line"`,
+	)
+	require.Contains(t, hint, "跨行")
+	require.Contains(t, hint, "sprintf")
+}
