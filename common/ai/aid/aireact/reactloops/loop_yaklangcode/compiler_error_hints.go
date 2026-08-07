@@ -440,6 +440,17 @@ var compilerErrorHints = []compilerErrorHint{
 		Hint: "map 字面量键值对解析失败。检查 `{\"key\": value}` 语法。",
 	},
 	{
+		// Multi-line "..." + "..." is invalid Yaklang; keep before generic no-viable hints.
+		Name:        "MultilineStringConcat",
+		AnyOf:       []string{"no viable alternative"},
+		LineRegexps: []string{`^\s*\+\s*"`},
+		Hint:        "Yaklang 不支持跨行 `\"...\" + \"...\"` 拼接。请写成单行字符串、`sprintf(...)`，或用 `\\n` 写在同一字面量内。",
+		Examples: []string{
+			"yakit.Warn(\"...\\n\"\n    + \"...\")",
+			`yakit.Warn(sprintf("[!] dry-run\n1) ...\n2) %s", baseUrl))`,
+		},
+	},
+	{
 		Name:        "FunctionParameterTypes",
 		Globs:       []string{"*no viable alternative at input*", "*func(*", "*extraneous input*", "*mismatched input*"},
 		LineRegexps: []string{

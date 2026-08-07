@@ -91,9 +91,19 @@ func TestLookupCompilerErrorHint_FuncReturnType(t *testing.T) {
 	require.Contains(t, hint, "返回类型")
 }
 
+func TestLookupCompilerErrorHint_MultilineStringConcat(t *testing.T) {
+	hint := lookupCompilerErrorHint(
+		`基础语法错误（Syntax Error）：no viable alternative at input 'yakit.Warn("a\n"\n+'`,
+		`        + "    1) next line"`,
+	)
+	require.Contains(t, hint, "跨行")
+	require.Contains(t, hint, "sprintf")
+}
+
 func TestBuildPinnedDSLSection(t *testing.T) {
 	section := BuildPinnedDSLSection()
 	require.Contains(t, section, "func(x string)")
 	require.Contains(t, section, "poc.Post")
 	require.Contains(t, section, "append(a, b...)")
+	require.Contains(t, section, "跨行")
 }
