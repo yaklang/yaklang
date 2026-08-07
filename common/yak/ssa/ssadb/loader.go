@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"context"
-	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -34,17 +33,8 @@ func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) <-chan 
 	return yieldIrCodes(ctx, progName, ids)
 }
 
-// fileFilterMode selects how path sets are applied after index pluck.
-type fileFilterMode int
-
-const (
-	fileFilterNone fileFilterMode = iota
-	fileFilterExclude
-	fileFilterInclude
-)
-
 // yieldFromIrIndexWithFileFilter plucks matched value_ids then filters by file path in memory.
-func yieldFromIrIndexWithFileFilter(DB *gorm.DB, ctx context.Context, progName string, files []string, mode fileFilterMode) <-chan *IrCode {
+func yieldFromIrIndexWithFileFilter(DB *gorm.DB, ctx context.Context, progName string, files []string, mode FileFilterMode) <-chan *IrCode {
 	var matchedIds []int64
 	distinctIrIndicesValueID := "DISTINCT " + TableIrIndices + ".value_id"
 	if err := DB.Pluck(distinctIrIndicesValueID, &matchedIds).Error; err != nil {
@@ -54,88 +44,15 @@ func yieldFromIrIndexWithFileFilter(DB *gorm.DB, ctx context.Context, progName s
 	if len(matchedIds) == 0 {
 		return emptyIrCodeChan()
 	}
-	return yieldIrCodesWithFileFilter(ctx, progName, matchedIds, files, mode)
+	return FilterIrCodeChan(ctx, yieldIrCodes(ctx, progName, matchedIds), files, mode, progName)
 }
 
 func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName string, excludeFiles []string) <-chan *IrCode {
-	return yieldFromIrIndexWithFileFilter(DB, ctx, progName, excludeFiles, fileFilterExclude)
+	return yieldFromIrIndexWithFileFilter(DB, ctx, progName, excludeFiles, FileFilterExclude)
 }
 
 func yieldFromIrIndexWithIncludeFiles(DB *gorm.DB, ctx context.Context, progName string, includeFiles []string) <-chan *IrCode {
-	return yieldFromIrIndexWithFileFilter(DB, ctx, progName, includeFiles, fileFilterInclude)
-}
-
-func buildFilePathSet(files []string) map[string]struct{} {
-	if len(files) == 0 {
-		return nil
-	}
-	set := make(map[string]struct{}, len(files)*2)
-	for _, filePath := range files {
-		n := normalizeFilePath(filePath)
-		set[n] = struct{}{}
-		set[strings.TrimPrefix(n, "/")] = struct{}{}
-	}
-	return set
-}
-
-func irCodeFilePath(ir *IrCode) string {
-	if ir == nil || ir.IsEmptySourceCodeHash() {
-		return ""
-	}
-	editor, err := GetEditorByHash(ir.SourceCodeHash)
-	if err != nil || editor == nil {
-		return ""
-	}
-	path := editor.GetFilePath()
-	if path == "" {
-		path = editor.GetUrl()
-	}
-	return normalizeFilePath(path)
-}
-
-// irCodePassesFileFilter keeps empty-path IR (extern/lib) under both include and exclude.
-func irCodePassesFileFilter(ir *IrCode, pathSet map[string]struct{}, mode fileFilterMode) bool {
-	if mode == fileFilterNone || len(pathSet) == 0 {
-		return mode != fileFilterInclude // empty include set → no match; empty exclude → keep all
-	}
-	path := irCodeFilePath(ir)
-	if path == "" {
-		return true
-	}
-	_, inSet := pathSet[path]
-	if !inSet {
-		_, inSet = pathSet[strings.TrimPrefix(path, "/")]
-	}
-	switch mode {
-	case fileFilterInclude:
-		return inSet
-	case fileFilterExclude:
-		return !inSet
-	default:
-		return true
-	}
-}
-
-func yieldIrCodesWithFileFilter(ctx context.Context, progName string, ids []int64, files []string, mode fileFilterMode) <-chan *IrCode {
-	pathSet := buildFilePathSet(files)
-	if mode == fileFilterInclude && len(pathSet) == 0 {
-		return emptyIrCodeChan()
-	}
-	in := yieldIrCodes(ctx, progName, ids)
-	if mode == fileFilterNone || (mode == fileFilterExclude && len(pathSet) == 0) {
-		return in
-	}
-	outC := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-	go func() {
-		defer outC.Close()
-		for ir := range in {
-			if !irCodePassesFileFilter(ir, pathSet, mode) {
-				continue
-			}
-			outC.SafeFeed(ir)
-		}
-	}()
-	return outC.OutputChannel()
+	return yieldFromIrIndexWithFileFilter(DB, ctx, progName, includeFiles, FileFilterInclude)
 }
 
 func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrCode {
@@ -202,32 +119,15 @@ func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName str
 	}
 
 	filterLoaded := func(ch <-chan *IrCode) <-chan *IrCode {
-		mode := fileFilterNone
+		mode := FileFilterNone
 		files := excludeFiles
 		if len(includeFiles) > 0 {
-			mode = fileFilterInclude
+			mode = FileFilterInclude
 			files = includeFiles
 		} else if len(excludeFiles) > 0 {
-			mode = fileFilterExclude
+			mode = FileFilterExclude
 		}
-		if mode == fileFilterNone {
-			return ch
-		}
-		pathSet := buildFilePathSet(files)
-		if mode == fileFilterInclude && len(pathSet) == 0 {
-			return emptyIrCodeChan()
-		}
-		outC := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-		go func() {
-			defer outC.Close()
-			for ir := range ch {
-				if !irCodePassesFileFilter(ir, pathSet, mode) {
-					continue
-				}
-				outC.SafeFeed(ir)
-			}
-		}()
-		return outC.OutputChannel()
+		return FilterIrCodeChan(ctx, ch, files, mode, progName)
 	}
 
 	if matchMod&ConstType != 0 {
@@ -293,17 +193,6 @@ func applyMatchCondition(db *gorm.DB, progName string, cache *NameCache, mod Mat
 func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, progName string, opcodes ...int) <-chan *IrCode {
 	db = db.Model(&IrCode{}).Where("opcode in (?)", opcodes)
 	return YieldIrCode(db, ctx, progName)
-}
-
-// normalizeFilePath ensures a leading "/".
-func normalizeFilePath(filePath string) string {
-	if filePath == "" {
-		return ""
-	}
-	if !strings.HasPrefix(filePath, "/") {
-		return "/" + filePath
-	}
-	return filePath
 }
 
 func emptyIrCodeChan() <-chan *IrCode {
