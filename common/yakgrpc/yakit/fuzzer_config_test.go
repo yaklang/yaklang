@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -80,9 +81,99 @@ func TestBuildWebFuzzerConfig_RequestRawFallback(t *testing.T) {
 	require.Contains(t, parsed.PageParams.Request, "GET /raw")
 }
 
+func TestBuildWebFuzzerGroupConfig(t *testing.T) {
+	config, err := BuildWebFuzzerGroupConfig("authentication", func(options *WebFuzzerGroupBuildOptions) {
+		options.GroupID = "auth-group"
+		options.SortField = 3
+		options.Color = "purple"
+		options.Expand = false
+	})
+	require.NoError(t, err)
+	require.Equal(t, "auth-group", config.GetPageId())
+	require.Equal(t, WebFuzzerConfigTypePageGroup, config.GetType())
+
+	item, err := ParseWebFuzzerConfig(config)
+	require.NoError(t, err)
+	require.Equal(t, "auth-group", item.ID)
+	require.Equal(t, "0", item.GroupID)
+	require.Equal(t, "authentication", item.Verbose)
+	require.Equal(t, int64(3), item.SortField)
+	require.Equal(t, "purple", item.Color)
+	require.False(t, item.Expand)
+	require.Nil(t, item.PageParams)
+}
+
+func TestBuildWebFuzzerGroupConfigValidation(t *testing.T) {
+	_, err := BuildWebFuzzerGroupConfig("  ")
+	require.ErrorContains(t, err, "group name is required")
+
+	_, err = BuildWebFuzzerGroupConfig(strings.Repeat("组", WebFuzzerGroupNameMaxLength+1))
+	require.ErrorContains(t, err, "must not exceed 24 characters")
+
+	_, err = BuildWebFuzzerGroupConfig("demo", func(options *WebFuzzerGroupBuildOptions) {
+		options.GroupID = "not-a-yakit-group-id"
+	})
+	require.ErrorContains(t, err, "group id must end with group")
+
+	_, err = BuildWebFuzzerGroupConfig("demo", func(options *WebFuzzerGroupBuildOptions) {
+		options.Color = "pink"
+	})
+	require.ErrorContains(t, err, "unsupported group color")
+}
+
+func TestBuildWebFuzzerGroupConfigUsesDefaultColor(t *testing.T) {
+	config, err := BuildWebFuzzerGroupConfig("baseline")
+	require.NoError(t, err)
+
+	item, err := ParseWebFuzzerConfig(config)
+	require.NoError(t, err)
+	require.Equal(t, WebFuzzerDefaultGroupColor, item.Color)
+}
+
+func TestBuildWebFuzzerGroupConfigAcceptsAndNormalizesCustomHexColor(t *testing.T) {
+	config, err := BuildWebFuzzerGroupConfig("custom-color", func(options *WebFuzzerGroupBuildOptions) {
+		options.Color = "#2f80ed"
+	})
+	require.NoError(t, err)
+
+	item, err := ParseWebFuzzerConfig(config)
+	require.NoError(t, err)
+	require.Equal(t, "#2F80ED", item.Color)
+}
+
+func TestParseWebFuzzerConfigRejectsIdentityMismatch(t *testing.T) {
+	config, err := BuildWebFuzzerConfig(&ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+	}, func(options *WebFuzzerPageBuildOptions) {
+		options.PageID = "inside-id"
+	})
+	require.NoError(t, err)
+	config.PageId = "outside-id"
+
+	_, err = ParseWebFuzzerConfig(config)
+	require.ErrorContains(t, err, "does not match")
+}
+
 func TestParseWebFuzzerProxy(t *testing.T) {
 	require.Nil(t, parseWebFuzzerProxy(""))
 	require.Nil(t, parseWebFuzzerProxy("  "))
 	require.Equal(t, []string{"http://127.0.0.1:7890"}, parseWebFuzzerProxy("http://127.0.0.1:7890"))
 	require.Equal(t, []string{"http://a", "http://b"}, parseWebFuzzerProxy("http://a, http://b"))
+}
+
+func TestWebFuzzerTabUpdatePushIsBackwardCompatible(t *testing.T) {
+	raw, err := json.Marshal(&WebFuzzerTabPush{
+		Action: WebFuzzerTabPushActionUpdate,
+		ChangedData: []*ypb.FuzzerConfig{{
+			PageId: "updated-page",
+			Type:   WebFuzzerConfigTypePage,
+		}},
+	})
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(raw, &payload))
+	require.Equal(t, WebFuzzerTabPushActionUpdate, payload["action"])
+	require.NotContains(t, payload, "data", "legacy clients treat data as newly-created tabs")
+	require.Contains(t, payload, "changedData")
 }
