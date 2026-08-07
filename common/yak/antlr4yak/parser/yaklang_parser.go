@@ -579,11 +579,11 @@ func yaklangparserParserInit() {
 		1019, 1, 0, 0, 0, 1021, 1024, 1, 0, 0, 0, 1022, 1020, 1, 0, 0, 0, 1022,
 		1023, 1, 0, 0, 0, 1023, 1025, 1, 0, 0, 0, 1024, 1022, 1, 0, 0, 0, 1025,
 		1027, 3, 86, 43, 0, 1026, 1015, 1, 0, 0, 0, 1027, 1030, 1, 0, 0, 0, 1028,
-		1026, 1, 0, 0, 0, 1028, 1029, 1, 0, 0, 0, 1029, 1034, 1, 0, 0, 0, 1030,
-		1028, 1, 0, 0, 0, 1031, 1033, 3, 158, 79, 0, 1032, 1031, 1, 0, 0, 0, 1033,
+		1026, 1, 0, 0, 0, 1028, 1029, 1, 0, 0, 0, 1029, 1038, 1, 0, 0, 0, 1030,
+		1028, 1, 0, 0, 0, 1031, 1033, 5, 100, 0, 0, 1032, 1031, 1, 0, 0, 0, 1033,
 		1036, 1, 0, 0, 0, 1034, 1032, 1, 0, 0, 0, 1034, 1035, 1, 0, 0, 0, 1035,
-		1038, 1, 0, 0, 0, 1036, 1034, 1, 0, 0, 0, 1037, 1039, 5, 70, 0, 0, 1038,
-		1037, 1, 0, 0, 0, 1038, 1039, 1, 0, 0, 0, 1039, 147, 1, 0, 0, 0, 1040,
+		1037, 1, 0, 0, 0, 1036, 1034, 1, 0, 0, 0, 1037, 1039, 5, 70, 0, 0, 1038,
+		1034, 1, 0, 0, 0, 1038, 1039, 1, 0, 0, 0, 1039, 147, 1, 0, 0, 0, 1040,
 		1051, 3, 86, 43, 0, 1041, 1045, 5, 70, 0, 0, 1042, 1044, 3, 158, 79, 0,
 		1043, 1042, 1, 0, 0, 0, 1044, 1047, 1, 0, 0, 0, 1045, 1043, 1, 0, 0, 0,
 		1045, 1046, 1, 0, 0, 0, 1046, 1048, 1, 0, 0, 0, 1047, 1045, 1, 0, 0, 0,
@@ -15329,6 +15329,8 @@ type IExpressionListContext interface {
 	Comma(i int) antlr.TerminalNode
 	AllWs() []IWsContext
 	Ws(i int) IWsContext
+	AllLF() []antlr.TerminalNode
+	LF(i int) antlr.TerminalNode
 
 	// IsExpressionListContext differentiates from other interfaces.
 	IsExpressionListContext()
@@ -15456,6 +15458,14 @@ func (s *ExpressionListContext) Ws(i int) IWsContext {
 	return t.(IWsContext)
 }
 
+func (s *ExpressionListContext) AllLF() []antlr.TerminalNode {
+	return s.GetTokens(YaklangParserLF)
+}
+
+func (s *ExpressionListContext) LF(i int) antlr.TerminalNode {
+	return s.GetToken(YaklangParserLF, i)
+}
+
 func (s *ExpressionListContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -15564,41 +15574,34 @@ func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
 			goto errorExit
 		}
 	}
-	p.SetState(1034)
+	p.SetState(1038)
 	p.GetErrorHandler().Sync(p)
-	if p.HasError() {
-		goto errorExit
-	}
-	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 124, p.GetParserRuleContext())
-	if p.HasError() {
-		goto errorExit
-	}
-	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
-		if _alt == 1 {
-			{
-				p.SetState(1031)
-				p.Ws()
-			}
 
-		}
-		p.SetState(1036)
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 125, p.GetParserRuleContext()) == 1 {
+		p.SetState(1034)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 124, p.GetParserRuleContext())
-		if p.HasError() {
-			goto errorExit
-		}
-	}
-	p.SetState(1038)
-	p.GetErrorHandler().Sync(p)
-	if p.HasError() {
-		goto errorExit
-	}
-	_la = p.GetTokenStream().LA(1)
+		_la = p.GetTokenStream().LA(1)
 
-	if _la == YaklangParserComma {
+		for _la == YaklangParserLF {
+			{
+				p.SetState(1031)
+				p.Match(YaklangParserLF)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
+			}
+
+			p.SetState(1036)
+			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
+			_la = p.GetTokenStream().LA(1)
+		}
 		{
 			p.SetState(1037)
 			p.Match(YaklangParserComma)
@@ -15608,6 +15611,8 @@ func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
 			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
 errorExit:

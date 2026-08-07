@@ -344,8 +344,9 @@ sliceLiteral: '[' ws* expressionListMultiline? ws* ']';
      : sliceTypeLiteral '{' ws* expressionListMultiline? ws* ';'?'}'
      ;
 
-// 表达式列表（赋值/return 等）；允许逗号两侧换行，避免 `a, b = 1,\n2` 被截断成两句
-expressionList: expression (ws* ',' ws* expression)* ws* ','?;
+// 表达式列表（赋值/return 等）；允许逗号两侧换行，避免 `a, b = 1,\n2` 被截断成两句。
+// 尾部只用 LF* 承接可选逗号，勿用 ws*（会吞掉行尾 LINE_COMMENT，导致 formatter 丢注释）。
+expressionList: expression (ws* ',' ws* expression)* (LF* ',')?;
 expressionListMultiline: expression (',' ws* expression)* ','?;
 
 /* map literal */
