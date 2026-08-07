@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -653,6 +654,62 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 	}
 
 	return nil
+}
+
+// calculateFileSystemDiff builds the incremental compile inputs:
+//   - diffFS: only added/modified file contents (what gets compiled)
+//   - fileHashMap: -1=deleted, 0=modified, 1=added (drives overlay File/ExcludeFile)
+//
+// Walks newFS once against a base snapshot; unchanged files are never copied.
+func calculateFileSystemDiff(baseFS, newFS fi.FileSystem) (*filesys.VirtualFS, map[string]int, error) {
+	diffFS := filesys.NewVirtualFs()
+	fileHashMap := make(map[string]int)
+
+	baseFiles := make(map[string][]byte)
+	err := filesys.Recursive(".", filesys.WithFileSystem(baseFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+		if pathname == "" {
+			return nil
+		}
+		content, err := baseFS.ReadFile(pathname)
+		if err != nil {
+			return nil
+		}
+		baseFiles[pathname] = content
+		return nil
+	}))
+	if err != nil {
+		return nil, nil, utils.Wrap(err, "failed to collect baseFS files")
+	}
+
+	err = filesys.Recursive(".", filesys.WithFileSystem(newFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+		if pathname == "" {
+			return nil
+		}
+		content, err := newFS.ReadFile(pathname)
+		if err != nil {
+			return nil
+		}
+		baseContent, existsInBase := baseFiles[pathname]
+		delete(baseFiles, pathname)
+		if !existsInBase {
+			fileHashMap[pathname] = 1
+			diffFS.AddFile(pathname, string(content))
+			return nil
+		}
+		if !bytes.Equal(baseContent, content) {
+			fileHashMap[pathname] = 0
+			diffFS.AddFile(pathname, string(content))
+		}
+		return nil
+	}))
+	if err != nil {
+		return nil, nil, utils.Wrap(err, "failed to walk newFS files")
+	}
+
+	for filePath := range baseFiles {
+		fileHashMap[filePath] = -1
+	}
+	return diffFS, fileHashMap, nil
 }
 
 func hasDeleteEntries(fileHashMap map[string]int) bool {
