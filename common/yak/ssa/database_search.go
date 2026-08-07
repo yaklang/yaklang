@@ -3,7 +3,6 @@ package ssa
 import (
 	"context"
 	"regexp"
-	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
@@ -67,73 +66,24 @@ func filterInstructionsByFiles(prog *Program, insts []Instruction, includeFiles,
 	if len(insts) == 0 || (len(includeFiles) == 0 && len(excludeFiles) == 0) {
 		return insts
 	}
-	includeSet := buildFilePathSet(prog, includeFiles)
-	excludeSet := buildFilePathSet(prog, excludeFiles)
+	progName := ""
+	if prog != nil {
+		progName = prog.Name
+	}
+	includeSet := ssadb.BuildFilePathSet(includeFiles, progName)
+	excludeSet := ssadb.BuildFilePathSet(excludeFiles, progName)
 	out := make([]Instruction, 0, len(insts))
 	for _, inst := range insts {
 		filePath := getInstructionFilePath(inst)
-		if filePath == "" {
-			out = append(out, inst)
+		if len(includeSet) > 0 && !ssadb.PathPassesFileFilter(filePath, includeSet, ssadb.FileFilterInclude, progName) {
 			continue
 		}
-		if len(includeSet) > 0 && !pathInFileSet(prog, filePath, includeSet) {
-			continue
-		}
-		if pathInFileSet(prog, filePath, excludeSet) {
+		if !ssadb.PathPassesFileFilter(filePath, excludeSet, ssadb.FileFilterExclude, progName) {
 			continue
 		}
 		out = append(out, inst)
 	}
 	return out
-}
-
-func buildFilePathSet(prog *Program, files []string) map[string]struct{} {
-	if len(files) == 0 {
-		return nil
-	}
-	set := make(map[string]struct{}, len(files)*4)
-	addKey := func(path string) {
-		if path == "" {
-			return
-		}
-		n := normalizeFilePathForExclude(path)
-		set[n] = struct{}{}
-		set[strings.TrimPrefix(n, "/")] = struct{}{}
-	}
-	progName := ""
-	if prog != nil {
-		progName = prog.Name
-	}
-	for _, filePath := range files {
-		addKey(filePath)
-		if progName != "" {
-			addKey(stripProgramNamePrefixForExclude(filePath, progName))
-		}
-	}
-	return set
-}
-
-func pathInFileSet(prog *Program, filePath string, set map[string]struct{}) bool {
-	if len(set) == 0 || filePath == "" {
-		return false
-	}
-	normalizedPath := normalizeFilePathForExclude(filePath)
-	if _, ok := set[normalizedPath]; ok {
-		return true
-	}
-	if _, ok := set[strings.TrimPrefix(normalizedPath, "/")]; ok {
-		return true
-	}
-	if prog != nil && prog.Name != "" {
-		stripped := normalizeFilePathForExclude(stripProgramNamePrefixForExclude(filePath, prog.Name))
-		if _, ok := set[stripped]; ok {
-			return true
-		}
-		if _, ok := set[strings.TrimPrefix(stripped, "/")]; ok {
-			return true
-		}
-	}
-	return false
 }
 
 func MatchInstructionsByVariable(
@@ -244,39 +194,6 @@ func matchInstructionsByVariableWithFileFilter(
 		}
 	}
 	return ret
-}
-
-// normalizeFilePathForExclude 规范化文件路径用于排除匹配
-func normalizeFilePathForExclude(path string) string {
-	if path == "" {
-		return ""
-	}
-	// 确保以 / 开头
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	return path
-}
-
-// stripProgramNamePrefixForExclude mirrors ssaapi.normalizeOverlayFilePath's
-// program-prefix strip so memory-mode exclude matches overlay excludeFiles.
-func stripProgramNamePrefixForExclude(filePath, programName string) string {
-	if filePath == "" || programName == "" {
-		return filePath
-	}
-	path := strings.TrimPrefix(filePath, "/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 {
-		return filePath
-	}
-	first := parts[0]
-	if first == programName || strings.HasPrefix(first, programName+"(") {
-		if len(parts) > 1 {
-			return "/" + strings.Join(parts[1:], "/")
-		}
-		return "/"
-	}
-	return filePath
 }
 
 // getInstructionFilePath 获取指令的文件路径（不含 program-name 前缀，便于 exclude 对齐）

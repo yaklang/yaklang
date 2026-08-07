@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -675,8 +676,48 @@ func (p *ProgramOverLay) Ref(name string) Values {
 	return result
 }
 
+// relocateNameCandidates returns stable names for cross-layer SSA lookup.
+// Drops empty / operator-like noise; keeps method names (e.g. getValue) that
+// NameMatch may not index (Java methods are often stored as Class_method_<hash>).
+func relocateNameCandidates(v *Value) []string {
+	if v == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var out []string
+	for _, name := range getValueNames(v) {
+		if name == "" || strings.ContainsAny(name, "=-") {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
+func relocateNamesIntersect(cand *Value, names map[string]struct{}) bool {
+	if cand == nil || len(names) == 0 {
+		return false
+	}
+	for _, name := range getValueNames(cand) {
+		if name == "" {
+			continue
+		}
+		if _, ok := names[name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // Relocate maps a value from Base/older Diff onto the Diff layer that owns its file.
-// Lookup is layer.Ref only (include File); no SyntaxFlow.
+// Direct SSA only (no nested SyntaxFlow):
+//  1. Program.Ref by name + opcode (variables / NameMatch hits)
+//  2. MatchInstructionByOpcodes + stable name intersection (Functions keyed by
+//     method name, etc., which Ref/NameMatch alone often misses)
 func (p *ProgramOverLay) Relocate(v *Value) *Value {
 	if v == nil || p == nil {
 		return v
@@ -690,38 +731,58 @@ func (p *ProgramOverLay) Relocate(v *Value) *Value {
 		return v
 	}
 	progName := ""
-	if v.ParentProgram != nil {
-		progName = v.ParentProgram.GetProgramName()
+	if fromBase && p.Base != nil {
+		progName = p.Base.GetProgramName()
+	} else if di >= 0 && di < len(p.Diff) && p.Diff[di] != nil && p.Diff[di].Program != nil {
+		progName = p.Diff[di].Program.GetProgramName()
 	}
-	ownerDi, owned := p.ownerDiffIndex(normalizeOverlayFilePath(filePath, progName))
+	normalizedPath := normalizeOverlayFilePath(filePath, progName)
+	ownerDi, owned := p.ownerDiffIndex(normalizedPath)
 	if !owned || ownerDi < 0 || ownerDi >= len(p.Diff) {
 		return v
 	}
+	// Only relocate when value comes from Base or an older Diff than the owner.
 	if !fromBase && di >= ownerDi {
 		return v
 	}
 	layer := p.Diff[ownerDi]
-	if layer == nil {
+	if layer == nil || layer.Program == nil || layer.Program.Program == nil {
 		return v
 	}
 
-	wantOpcode := v.GetOpcode()
-	seen := make(map[string]struct{})
-	for _, name := range getValueNames(v) {
-		if name == "" || strings.ContainsAny(name, "=-") {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		for _, cand := range layer.Ref(name) {
+	names := relocateNameCandidates(v)
+	if len(names) == 0 {
+		return v
+	}
+	nameSet := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		nameSet[name] = struct{}{}
+	}
+	wantOpcode := v.getOpcode()
+
+	// Fast path: variable NameMatch index.
+	for _, name := range names {
+		for _, cand := range layer.Program.Ref(name) {
 			if cand == nil {
 				continue
 			}
-			if wantOpcode != "" && cand.GetOpcode() != wantOpcode {
+			if wantOpcode != ssa.SSAOpcodeUnKnow && cand.getOpcode() != wantOpcode {
 				continue
 			}
+			return cand
+		}
+	}
+
+	// Opcode scan: match Functions/others by stable names (method name, verbose…).
+	if wantOpcode == ssa.SSAOpcodeUnKnow {
+		return v
+	}
+	for _, inst := range ssa.MatchInstructionByOpcodes(context.Background(), layer.Program.Program, wantOpcode) {
+		cand, err := layer.Program.NewValue(inst)
+		if err != nil || cand == nil {
+			continue
+		}
+		if relocateNamesIntersect(cand, nameSet) {
 			return cand
 		}
 	}
