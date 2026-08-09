@@ -475,7 +475,7 @@ type ContextPackage struct {
 	SystemPrompt               string                 `protobuf:"bytes,2,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`                                               // empty in MVP → engine uses its PromptPrefixBuilder
 	Messages                   []*ContextMessage      `protobuf:"bytes,3,rep,name=messages,proto3" json:"messages,omitempty"`                                                                           // replayed conversation history (user + assistant only)
 	Tools                      []*ContextTool         `protobuf:"bytes,4,rep,name=tools,proto3" json:"tools,omitempty"`                                                                                 // tool definitions enabled for this session (metadata only)
-	KbFragments                []*ContextKbFragment   `protobuf:"bytes,5,rep,name=kb_fragments,json=kbFragments,proto3" json:"kb_fragments,omitempty"`                                                  // RAG retrieval results; always empty in S3 MVP
+	KbFragments                []*ContextKbFragment   `protobuf:"bytes,5,rep,name=kb_fragments,json=kbFragments,proto3" json:"kb_fragments,omitempty"`                                                  // owner-scoped RAG retrieval results for this turn
 	UserInput                  string                 `protobuf:"bytes,6,opt,name=user_input,json=userInput,proto3" json:"user_input,omitempty"`                                                        // this turn's user input text
 	ProviderPolicySnapshotJson []byte                 `protobuf:"bytes,7,opt,name=provider_policy_snapshot_json,json=providerPolicySnapshotJson,proto3" json:"provider_policy_snapshot_json,omitempty"` // model provider config (API key, base URL, headers)
 	RuntimeOptionSnapshotJson  []byte                 `protobuf:"bytes,8,opt,name=runtime_option_snapshot_json,json=runtimeOptionSnapshotJson,proto3" json:"runtime_option_snapshot_json,omitempty"`    // temperature, max_tokens, etc.
@@ -712,8 +712,7 @@ func (x *ContextTool) GetParamsJson() []byte {
 	return nil
 }
 
-// ContextKbFragment is one RAG retrieval hit. Always empty in S3 MVP
-// (kb_fragments is a reserved field for the future server-side RAG sub-project).
+// ContextKbFragment is one owner-scoped server-side RAG retrieval hit.
 type ContextKbFragment struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	KbId          string                 `protobuf:"bytes,1,opt,name=kb_id,json=kbId,proto3" json:"kb_id,omitempty"`

@@ -69,7 +69,7 @@ message ContextPackage {
   string system_prompt = 2;                   // empty in MVP → engine uses its PromptPrefixBuilder
   repeated ContextMessage messages = 3;       // replayed conversation history (user + assistant only)
   repeated ContextTool tools = 4;             // tool definitions enabled for this session (metadata only)
-  repeated ContextKbFragment kb_fragments = 5; // RAG retrieval results; always empty in S3 MVP
+  repeated ContextKbFragment kb_fragments = 5; // owner-scoped RAG retrieval results for this turn
   string user_input = 6;                      // this turn's user input text
   bytes provider_policy_snapshot_json = 7;    // model provider config (API key, base URL, headers)
   bytes runtime_option_snapshot_json = 8;     // temperature, max_tokens, etc.
@@ -96,8 +96,7 @@ message ContextTool {
   bytes params_json = 4;      // input schema (JSON Schema or equivalent)
 }
 
-// ContextKbFragment is one RAG retrieval hit. Always empty in S3 MVP
-// (kb_fragments is a reserved field for the future server-side RAG sub-project).
+// ContextKbFragment is one owner-scoped server-side RAG retrieval hit.
 message ContextKbFragment {
   string kb_id = 1;
   string text = 2;
