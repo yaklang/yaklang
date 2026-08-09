@@ -20,6 +20,8 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -57,11 +59,18 @@ func (yakAIEngineRuntimeDriver) Bind(
 	if err != nil {
 		return nil, fmt.Errorf("create yak ai engine: %w", err)
 	}
+	runtimeOptions, err := mergedYakRuntimeOptions(binding)
+	if err != nil {
+		engine.Close()
+		return nil, fmt.Errorf("decode runtime options: %w", err)
+	}
 	handle := &yakAIEngineRuntimeHandle{
 		engine:       engine,
 		emitter:      emitter,
 		binding:      binding,
 		messageQueue: make(chan yakAIQueuedMessage, 64),
+		runtime:      runtimeOptions,
+		forgeInput:   chanx.NewUnlimitedChan[*ypb.AIInputEvent](engine.Context(), 10),
 	}
 	go handle.runMessageQueue()
 	return handle, nil
@@ -72,9 +81,13 @@ type yakAIEngineRuntimeHandle struct {
 	emitter      aiSessionRuntimeEmitter
 	binding      aiSessionBinding
 	messageQueue chan yakAIQueuedMessage
+	runtime      yakRuntimeOptions
+	forgeInput   *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
-	mu     sync.Mutex
-	closed bool
+	mu           sync.Mutex
+	closed       bool
+	forgeStarted bool
+	forgeRunning bool
 }
 
 type yakAIQueuedMessage struct {
@@ -90,6 +103,9 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		event, err := buildYakAIHotpatchEvent(input)
 		if err != nil {
 			return err
+		}
+		if h.feedForgeInputIfRunning(event) {
+			return nil
 		}
 		if err := h.engine.SendInputEvent(event); err != nil {
 			return fmt.Errorf("send yak ai config hotpatch: %w", err)
@@ -113,13 +129,20 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		if eventErr != nil {
 			return eventErr
 		}
+		if h.feedForgeInputIfRunning(event) {
+			return nil
+		}
 		if err := h.engine.SendInputEvent(event); err != nil {
 			return fmt.Errorf("send yak ai interactive response: %w", err)
 		}
 		return nil
 	}
 	if syncEvent != nil {
-		if err := dispatchYakAISyncEvent(h.engine.GetOperator(), syncEvent); err != nil {
+		event := yakAISyncEventToInputEvent(syncEvent)
+		if h.feedForgeInputIfRunning(event) {
+			return nil
+		}
+		if err := h.engine.SendInputEvent(event); err != nil {
 			return fmt.Errorf("send yak ai sync event: %w", err)
 		}
 		return nil
@@ -223,6 +246,11 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(
 	}
 	h.mu.Unlock()
 
+	if h.shouldExecuteForgeDirectly() {
+		h.executeForgeDirectly(content)
+		return
+	}
+
 	if err := h.engine.SendMsg(content, options...); err != nil {
 		if h.engine.Context().Err() != nil {
 			// 上下文已取消（关闭/关停），不报失败事件。
@@ -234,6 +262,122 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(
 		}))
 	}
 }
+
+func (h *yakAIEngineRuntimeHandle) shouldExecuteForgeDirectly() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || h.forgeStarted || strings.TrimSpace(h.runtime.ForgeName) == "" {
+		return false
+	}
+	h.forgeStarted = true
+	h.forgeRunning = true
+	return true
+}
+
+func (h *yakAIEngineRuntimeHandle) feedForgeInputIfRunning(event *ypb.AIInputEvent) bool {
+	if event == nil || h.forgeInput == nil {
+		return false
+	}
+	h.mu.Lock()
+	running := h.forgeRunning && !h.closed
+	h.mu.Unlock()
+	return running && h.forgeInput.SafeFeedWithResult(event)
+}
+
+func (h *yakAIEngineRuntimeHandle) executeForgeDirectly(content string) {
+	defer func() {
+		h.mu.Lock()
+		h.forgeRunning = false
+		h.mu.Unlock()
+	}()
+
+	err := runYakAIForgeDirect(
+		h.engine.Context(),
+		h.engine.Config(),
+		h.runtime,
+		h.binding,
+		h.forgeInput,
+		h.emitter,
+		content,
+	)
+	if err != nil && h.engine.Context().Err() == nil {
+		h.emitter.Failed("yak_ai_forge_failed", err.Error(), mustJSON(map[string]string{
+			"runtime":    "yak_ai_engine",
+			"forge_name": strings.TrimSpace(h.runtime.ForgeName),
+		}))
+	}
+}
+
+func runYakAIForgeDirect(
+	ctx context.Context,
+	config *aiengine.AIEngineConfig,
+	runtime yakRuntimeOptions,
+	binding aiSessionBinding,
+	forgeInputChannel *chanx.UnlimitedChan[*ypb.AIInputEvent],
+	emitter aiSessionRuntimeEmitter,
+	content string,
+) error {
+	commonOptions := append([]aicommon.ConfigOption(nil), config.ExtOptions...)
+	commonOptions = append(commonOptions,
+		aicommon.WithID(binding.Ref.SessionID),
+		aicommon.WithEventInputChanx(forgeInputChannel),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event != nil {
+				emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
+			}
+		}),
+	)
+	if config.AICallback != nil {
+		commonOptions = append(commonOptions, aicommon.WithAICallback(config.AICallback))
+	}
+	switch strings.ToLower(strings.TrimSpace(config.ReviewPolicy)) {
+	case "manual":
+		commonOptions = append(commonOptions, aicommon.WithAgreeManual())
+	case "ai":
+		commonOptions = append(commonOptions, aicommon.WithAIAgree())
+	case "yolo":
+		commonOptions = append(commonOptions, aicommon.WithAgreeYOLO())
+	}
+	if len(config.ExtraMCPServers) > 0 {
+		commonOptions = append(commonOptions, aicommon.WithExtraMCPServers(config.ExtraMCPServers...))
+		if config.RestrictToSessionMCP {
+			commonOptions = append(commonOptions, aicommon.WithRestrictToolsToExtraMCPServers(true))
+		}
+	}
+
+	var forgeInput any = content
+	if runtime.ForgeParams != nil {
+		forgeInput = yakAIForgeExecParams(runtime.ForgeParams)
+	}
+	result, err := executeYakAIForge(
+		strings.TrimSpace(runtime.ForgeName),
+		forgeInput,
+		yak.WithContext(ctx),
+		yak.WithCoordinatorId(binding.Ref.SessionID),
+		yak.WithExtendAICommonOptions(commonOptions...),
+		yak.WithAiAgentEventHandler(func(event *schema.AiOutputEvent) {
+			if event != nil {
+				emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
+			}
+		}),
+	)
+	if err != nil {
+		return err
+	}
+	if result != nil {
+		event := &schema.AiOutputEvent{
+			CoordinatorId: binding.Ref.SessionID,
+			Type:          schema.EVENT_TYPE_STREAM,
+			IsReason:      true,
+			Content:       mustJSON(result),
+			Timestamp:     time.Now().Unix(),
+		}
+		emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
+	}
+	return nil
+}
+
+var executeYakAIForge = yak.ExecuteForge
 
 // yakAISendFailureCode 将 SendMsg 错误映射为失败事件错误码：任务中止用
 // yak_ai_task_aborted，其他发送/传输失败用 yak_ai_send_failed。
@@ -282,6 +426,7 @@ type yakRuntimeOptions struct {
 	UserPresetPrompt               string             `json:"user_preset_prompt"`
 	Source                         string             `json:"source"`
 	ForgeName                      string             `json:"forge_name"`
+	ForgeParams                    []yakAIForgeParam  `json:"forge_params"`
 	EnabledCapabilities            []yakAICapability  `json:"enabled_capabilities"`
 	Strategy                       *yakAIStrategy     `json:"strategy"`
 	AIReviewRiskControlScore       *float64           `json:"ai_review_risk_control_score"`
@@ -301,6 +446,22 @@ type yakRuntimeOptions struct {
 	Workdir                        string             `json:"workdir"`
 	Language                       string             `json:"language"`
 	SessionMCPServers              []sessionMCPServer `json:"session_mcp_servers"`
+}
+
+type yakAIForgeParam struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func yakAIForgeExecParams(params []yakAIForgeParam) []*ypb.ExecParamItem {
+	if params == nil {
+		return nil
+	}
+	items := make([]*ypb.ExecParamItem, 0, len(params))
+	for _, param := range params {
+		items = append(items, &ypb.ExecParamItem{Key: param.Key, Value: param.Value})
+	}
+	return items
 }
 
 type yakAICapability struct {
@@ -325,15 +486,10 @@ func buildYakAIEngineOptions(
 	binding aiSessionBinding,
 	emitter aiSessionRuntimeEmitter,
 ) ([]aiengine.AIEngineConfigOption, error) {
-	runtimeOptions, err := decodeYakRuntimeOptions(binding.RuntimeOptionSnapshotJSON, true)
+	options, err := mergedYakRuntimeOptions(binding)
 	if err != nil {
 		return nil, fmt.Errorf("decode runtime options: %w", err)
 	}
-	providerOptions, err := decodeYakRuntimeOptions(binding.ProviderPolicySnapshotJSON, false)
-	if err != nil {
-		return nil, fmt.Errorf("decode provider policy: %w", err)
-	}
-	options := mergeYakRuntimeOptions(providerOptions, runtimeOptions)
 
 	config := []aiengine.AIEngineConfigOption{
 		aiengine.WithContext(ctx),
@@ -408,6 +564,18 @@ func buildYakAIEngineOptions(
 		config = append(config, aiengine.WithAICallback(callback))
 	}
 	return config, nil
+}
+
+func mergedYakRuntimeOptions(binding aiSessionBinding) (yakRuntimeOptions, error) {
+	runtimeOptions, err := decodeYakRuntimeOptions(binding.RuntimeOptionSnapshotJSON, true)
+	if err != nil {
+		return yakRuntimeOptions{}, err
+	}
+	providerOptions, err := decodeYakRuntimeOptions(binding.ProviderPolicySnapshotJSON, false)
+	if err != nil {
+		return yakRuntimeOptions{}, fmt.Errorf("decode provider policy: %w", err)
+	}
+	return mergeYakRuntimeOptions(providerOptions, runtimeOptions), nil
 }
 
 func buildYakAICommonExtOptions(options yakRuntimeOptions) []aicommon.ConfigOption {
@@ -944,6 +1112,9 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	if overlay.ForgeName != "" {
 		base.ForgeName = overlay.ForgeName
 	}
+	if overlay.ForgeParams != nil {
+		base.ForgeParams = append([]yakAIForgeParam(nil), overlay.ForgeParams...)
+	}
 	if len(overlay.EnabledCapabilities) > 0 {
 		base.EnabledCapabilities = overlay.EnabledCapabilities
 	}
@@ -1020,12 +1191,19 @@ func dispatchYakAISyncEvent(operator aicommon.AIEngineOperator, syncEvent *yakAI
 	if operator == nil {
 		return fmt.Errorf("yak ai engine operator is not ready")
 	}
-	return operator.SendInputEvent(&ypb.AIInputEvent{
+	return operator.SendInputEvent(yakAISyncEventToInputEvent(syncEvent))
+}
+
+func yakAISyncEventToInputEvent(syncEvent *yakAISyncEvent) *ypb.AIInputEvent {
+	if syncEvent == nil {
+		return nil
+	}
+	return &ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      syncEvent.SyncType,
 		SyncJsonInput: syncEvent.SyncJSONInput,
 		SyncID:        syncEvent.SyncID,
-	})
+	}
 }
 
 type yakAIInputAttachedResource struct {
@@ -1114,6 +1292,7 @@ func buildYakAIHotpatchEvent(input aiSessionInput) (*ypb.AIInputEvent, error) {
 func yakRuntimeOptionsToStartParams(options yakRuntimeOptions) *ypb.AIStartParams {
 	params := &ypb.AIStartParams{
 		ForgeName:                    options.ForgeName,
+		ForgeParams:                  yakAIForgeExecParams(options.ForgeParams),
 		ReviewPolicy:                 options.ReviewPolicy,
 		ReActMaxIteration:            options.ReActMaxIteration,
 		TimelineContentSizeLimit:     options.TimelineContentSizeLimit,
