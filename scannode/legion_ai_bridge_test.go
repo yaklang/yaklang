@@ -288,10 +288,55 @@ func TestHandleAISessionInputDeduplicatesRedeliveredCommand(t *testing.T) {
 		t.Fatalf("duplicate command reached runtime %d times", inputCount)
 	}
 	fakeJS.mu.Lock()
+	published := append([]*nats.Msg(nil), fakeJS.publish...)
+	fakeJS.mu.Unlock()
+	eventCount := len(published)
+	if eventCount != 2 {
+		t.Fatalf("duplicate command must republish the idempotent acknowledgement, got %d events", eventCount)
+	}
+	firstPublished := published[0]
+	secondPublished := published[1]
+	var firstEvent, secondEvent aiv1.AISessionEvent
+	if err := proto.Unmarshal(firstPublished.Data, &firstEvent); err != nil {
+		t.Fatalf("unmarshal first input acknowledgement: %v", err)
+	}
+	if err := proto.Unmarshal(secondPublished.Data, &secondEvent); err != nil {
+		t.Fatalf("unmarshal duplicate input acknowledgement: %v", err)
+	}
+	if firstEvent.GetMetadata().GetEventId() != secondEvent.GetMetadata().GetEventId() ||
+		firstEvent.GetSeq() != secondEvent.GetSeq() {
+		t.Fatalf("duplicate acknowledgement changed identity: first=%#v second=%#v", &firstEvent, &secondEvent)
+	}
+}
+
+func TestHandleAISessionInputRepublishesAckWithoutReexecutingAfterPublishFailure(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, validAISessionBindCommand())); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+	fakeJS.failNextPublishes(1)
+	raw := mustMarshalProto(t, validAISessionInputCommand())
+	if err := bridge.handleAISessionInput(context.Background(), raw); err == nil {
+		t.Fatal("expected the first acknowledgement publish to fail")
+	}
+	if err := bridge.handleAISessionInput(context.Background(), raw); err != nil {
+		t.Fatalf("republish input acknowledgement: %v", err)
+	}
+
+	driver.mu.Lock()
+	inputCount := len(driver.inputs)
+	driver.mu.Unlock()
+	if inputCount != 1 {
+		t.Fatalf("publish retry reexecuted runtime input %d times", inputCount)
+	}
+	fakeJS.mu.Lock()
 	eventCount := len(fakeJS.publish)
 	fakeJS.mu.Unlock()
 	if eventCount != 1 {
-		t.Fatalf("duplicate command published %d input events", eventCount)
+		t.Fatalf("expected one successful acknowledgement after retry, got %d", eventCount)
 	}
 }
 
@@ -549,7 +594,7 @@ func TestHandleAISessionCancelPublishesCancelled(t *testing.T) {
 	driver.assertCancel(t, 0, "user requested")
 }
 
-func TestHandleAISessionClosePublishesDone(t *testing.T) {
+func TestHandleAISessionClosePublishesCloseAcknowledgement(t *testing.T) {
 	t.Parallel()
 
 	bridge, fakeJS, driver := newTestAISessionBridge(t)
@@ -563,7 +608,7 @@ func TestHandleAISessionClosePublishesDone(t *testing.T) {
 	}
 
 	msg := waitForPublishedMessage(t, fakeJS, 0)
-	if msg.Subject != "legion.event.ai.session.done" {
+	if msg.Subject != "legion.event.ai.session.close" {
 		t.Fatalf("unexpected subject: %s", msg.Subject)
 	}
 
@@ -574,13 +619,34 @@ func TestHandleAISessionClosePublishesDone(t *testing.T) {
 	if event.GetSession().GetSessionId() != "ai-session-1" {
 		t.Fatalf("unexpected session id: %s", event.GetSession().GetSessionId())
 	}
-	if event.GetMetadata().GetEventType() != legionEventAISessionDone {
+	if event.GetMetadata().GetEventType() != legionEventAISessionClose {
 		t.Fatalf("unexpected event type: %s", event.GetMetadata().GetEventType())
 	}
 	if !strings.Contains(string(event.GetResultJson()), "\"closed_by\":\"platform\"") {
 		t.Fatalf("unexpected done payload: %s", string(event.GetResultJson()))
 	}
 	driver.assertClose(t, 0, "platform done")
+}
+
+func TestHandleAISessionCloseAcknowledgesMissingRuntimeAfterRestart(t *testing.T) {
+	t.Parallel()
+
+	bridge, fakeJS, _ := newTestAISessionBridge(t)
+	if err := bridge.handleAISessionClose(context.Background(), mustMarshalProto(t, validAISessionCloseCommand())); err != nil {
+		t.Fatalf("handle ai close without local runtime: %v", err)
+	}
+
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	if msg.Subject != "legion.event.ai.session.close" {
+		t.Fatalf("unexpected subject: %s", msg.Subject)
+	}
+	var event aiv1.AISessionDone
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal ai session close: %v", err)
+	}
+	if !strings.Contains(string(event.GetResultJson()), `"already_terminal":"true"`) {
+		t.Fatalf("missing restart acknowledgement marker: %s", string(event.GetResultJson()))
+	}
 }
 
 func TestHandleAISessionCloseRetainsRuntimeUntilTerminalEventsPublish(t *testing.T) {
@@ -620,7 +686,7 @@ func TestHandleAISessionCloseRetainsRuntimeUntilTerminalEventsPublish(t *testing
 		t.Fatal("runtime was not removed after both terminal events published")
 	}
 	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.succeeded", 1)
-	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.close", 1)
 }
 
 func TestHandleAISessionCancelRetainsRuntimeUntilTerminalEventsPublish(t *testing.T) {
@@ -845,7 +911,7 @@ func TestCommandConsumerRoutesAISessionCloseCommand(t *testing.T) {
 	}
 
 	msg := waitForPublishedMessage(t, fakeJS, 0)
-	if msg.Subject != "legion.event.ai.session.done" {
+	if msg.Subject != "legion.event.ai.session.close" {
 		t.Fatalf("unexpected subject: %s", msg.Subject)
 	}
 }
