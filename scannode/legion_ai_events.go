@@ -145,6 +145,19 @@ func (p *aiSessionEventPublisher) PublishDone(
 	})
 }
 
+func (p *aiSessionEventPublisher) PublishClose(
+	ctx context.Context,
+	ref aiSessionCommandRef,
+	resultJSON []byte,
+) error {
+	now := time.Now().UTC()
+	return p.publish(ctx, legionEventAISessionClose, ref, eventIDWithSuffix(ref.CommandID, ref.SessionID, "close"), &aiv1.AISessionDone{
+		Session:    aiSessionProtoRef(ref),
+		FinishedAt: timestamppb.New(now),
+		ResultJson: cloneBytes(resultJSON),
+	})
+}
+
 func (p *aiSessionEventPublisher) PublishFailed(
 	ctx context.Context,
 	ref aiSessionCommandRef,
