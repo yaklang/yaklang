@@ -2,9 +2,7 @@ package ssaapi
 
 import (
 	"bytes"
-	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/yaklang/javajive/classparser"
@@ -14,7 +12,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
+
+var cloneSSAGitRepository = yakgit.Clone
 
 func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	c.Processf(0, "parse info: %s", c.GetCodeSourceKind())
@@ -117,20 +118,22 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 		return nil, utils.Errorf("git url is empty ")
 	}
 	process(0, "start git clone process from %s", codeSource.GetCodeSourceURL())
-	local := path.Join(os.TempDir(), fmt.Sprintf("%s-%s", "yakgit", utils.RandStringBytes(8)))
-	// create template director
-	if err := os.MkdirAll(local, 0755); err != nil {
-		return nil, utils.Errorf("create temp dir error: %v", err)
+	local, cleanup, err := ssagitworkdir.Prepare(codeSource.GetContext(), os.Getpid())
+	if err != nil {
+		return nil, err
 	}
-	log.Info("git clone temp dir: ", local)
-
-	// 注册清理函数，在编译完成后清理临时目录
-	codeSource.AddCleanupFunc(func() {
-		log.Infof("cleaning up git temp dir: %s", local)
-		if err := os.RemoveAll(local); err != nil {
-			log.Errorf("failed to cleanup git temp dir %s: %v", local, err)
+	cleanupOnError := true
+	cleanupWorkspace := func() {
+		if err := cleanup(); err != nil {
+			log.Errorf("failed to cleanup git workspace %s: %v", local, err)
 		}
-	})
+	}
+	defer func() {
+		if cleanupOnError {
+			cleanupWorkspace()
+		}
+	}()
+	log.Info("git clone workspace: ", local)
 
 	opts := make([]yakgit.Option, 0)
 	opts = append(opts, yakgit.WithBranch(codeSource.GetCodeSourceBranch()))
@@ -140,12 +143,22 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	}
 	authOpts := parseAuth(codeSource.GetCodeSourceAuth())
 	opts = append(opts, authOpts...)
+	opts = append(opts, yakgit.WithContext(codeSource.GetContext()))
 	opts = append(opts, yakgit.WithHTTPOptions(poc.WithRetryTimes(10)))
-	if err := yakgit.Clone(codeSource.GetCodeSourceURL(), local, opts...); err != nil {
-		return nil, err
+	if err := cloneSSAGitRepository(codeSource.GetCodeSourceURL(), local, opts...); err != nil {
+		return nil, ssagitworkdir.WrapCloneError(codeSource.GetContext(), local, err)
 	}
+
+	// DefaultConfig can fail after the clone but before ParseProject installs its
+	// defer. Register ownership only after the clone succeeds; the local defer
+	// above owns every earlier failure.
+	codeSource.AddCleanupFunc(func() {
+		log.Infof("cleaning up git workspace: %s", local)
+		cleanupWorkspace()
+	})
+	cleanupOnError = false
 	targetPath := filepath.Join(local, codeSource.GetCodeSourcePath())
-	_, err := os.Stat(targetPath)
+	_, err = os.Stat(targetPath)
 	if err != nil {
 		log.Errorf("not found this path,start compile local path")
 		targetPath = local
