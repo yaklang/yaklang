@@ -165,8 +165,6 @@ func TestBuildYakAIEngineOptionsUsesExplicitProviderSnapshotForAICallback(t *tes
 }
 
 func TestBuildYakAIEngineOptionsMapsExtendedRuntimeOptions(t *testing.T) {
-	t.Parallel()
-
 	options, err := buildYakAIEngineOptions(context.Background(), aiSessionBinding{
 		Ref: aiSessionCommandRef{SessionID: "ai-session-ext"},
 		RuntimeOptionSnapshotJSON: []byte(`{
@@ -220,10 +218,63 @@ func TestBuildYakAIEngineOptionsMapsExtendedRuntimeOptions(t *testing.T) {
 	}
 }
 
+func TestBuildYakAIEngineOptionsMapsPlanStrategyCapabilitiesAndSessionMCP(t *testing.T) {
+	options, err := buildYakAIEngineOptions(context.Background(), aiSessionBinding{
+		Ref: aiSessionCommandRef{SessionID: "ai-session-contract"},
+		RuntimeOptionSnapshotJSON: []byte(`{
+			"enable_plan":true,
+			"enable_detached_plan":true,
+			"plan_exec_task_concurrency":3,
+			"forge_name":"yak-cve-analysis",
+			"enabled_capabilities":[{"name":"httpx","type":"tool"}],
+			"strategy":{"enable_multi_agent":true,"enable_goal_mode":true,"goal_min_iterations":8},
+			"session_mcp_servers":[{"name":"irify","url":"http://legion.test/mcp/sse","allowed_tools":["get_risk"]}]
+		}`),
+	}, noopAISessionRuntimeEmitter{})
+	if err != nil {
+		t.Fatalf("build yak ai engine options: %v", err)
+	}
+
+	engineConfig := aiengine.NewAIEngineConfig(options...)
+	if len(engineConfig.ExtraMCPServers) != 1 || !engineConfig.RestrictToSessionMCP {
+		t.Fatalf("session mcp contract was not applied: %#v", engineConfig.ExtraMCPServers)
+	}
+	config := aicommon.NewConfig(context.Background(), engineConfig.ExtOptions...)
+	if !config.GetEnablePlanAndExec() || !config.GetEnableDetachedPlan() {
+		t.Fatal("plan and detached plan must both be enabled")
+	}
+	if config.GetPlanExecTaskConcurrency() != 3 {
+		t.Fatalf("unexpected plan concurrency: %d", config.GetPlanExecTaskConcurrency())
+	}
+	if config.GetForgeName() != "yak-cve-analysis" {
+		t.Fatalf("unexpected forge: %q", config.GetForgeName())
+	}
+	if !config.EnableDispatchSubReactAgents || !config.GetEnableGoalMode() || config.GetGoalMinIterations() != 8 {
+		t.Fatal("execution strategy was not applied")
+	}
+	capabilities := config.GetEnabledCapabilities()
+	if len(capabilities) != 1 || capabilities[0].Name != "httpx" || capabilities[0].Type != "tool" {
+		t.Fatalf("unexpected enabled capabilities: %#v", capabilities)
+	}
+}
+
+func TestBuildYakAIEngineOptionsRejectsUnknownRuntimeOption(t *testing.T) {
+	t.Parallel()
+
+	_, err := buildYakAIEngineOptions(context.Background(), aiSessionBinding{
+		Ref:                       aiSessionCommandRef{SessionID: "ai-session-unknown"},
+		RuntimeOptionSnapshotJSON: []byte(`{"desktop_window_id":"not-supported"}`),
+	}, noopAISessionRuntimeEmitter{})
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("expected explicit unsupported-field failure, got %v", err)
+	}
+}
+
 type stubAISyncOperator struct {
 	*aicommon.AIEngineOperatorBase
 	syncType  string
 	syncInput string
+	syncID    string
 }
 
 func newStubAISyncOperator() *stubAISyncOperator {
@@ -232,6 +283,7 @@ func newStubAISyncOperator() *stubAISyncOperator {
 		if event.GetIsSyncMessage() {
 			operator.syncType = event.GetSyncType()
 			operator.syncInput = event.GetSyncJsonInput()
+			operator.syncID = event.GetSyncID()
 		}
 		return nil
 	}, nil, nil)
@@ -417,6 +469,7 @@ func TestDispatchYakAISyncEventUsesOperator(t *testing.T) {
 	err := dispatchYakAISyncEvent(operator, &yakAISyncEvent{
 		SyncType:      "skip_subtask_in_plan",
 		SyncJSONInput: `{"skip_current_task":true}`,
+		SyncID:        "sync-123",
 	})
 	if err != nil {
 		t.Fatalf("dispatchYakAISyncEvent() error = %v", err)
@@ -424,7 +477,33 @@ func TestDispatchYakAISyncEventUsesOperator(t *testing.T) {
 	if operator.syncType != "skip_subtask_in_plan" {
 		t.Fatalf("unexpected sync type: %s", operator.syncType)
 	}
+	if operator.syncID != "sync-123" {
+		t.Fatalf("unexpected sync id: %s", operator.syncID)
+	}
 	assertJSONEqualRuntimeYak(t, []byte(operator.syncInput), `{"skip_current_task":true}`)
+}
+
+func TestBuildYakAIHotpatchEventMapsTypedConfiguration(t *testing.T) {
+	t.Parallel()
+
+	event, err := buildYakAIHotpatchEvent(aiSessionInput{
+		InputType: "hotpatch",
+		PayloadJSON: []byte(`{
+			"hotpatch_type":"EnabledCapabilities",
+			"task_id":"task-1",
+			"params":{"enabled_capabilities":[{"name":"httpx","type":"tool"}]}
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("build hotpatch: %v", err)
+	}
+	if !event.GetIsConfigHotpatch() || event.GetHotpatchType() != "EnabledCapabilities" || event.GetTaskId() != "task-1" {
+		t.Fatalf("unexpected hotpatch envelope: %#v", event)
+	}
+	capabilities := event.GetParams().GetEnabledCapabilities()
+	if len(capabilities) != 1 || capabilities[0].GetName() != "httpx" || capabilities[0].GetType() != "tool" {
+		t.Fatalf("unexpected hotpatch capabilities: %#v", capabilities)
+	}
 }
 
 func assertJSONEqualRuntimeYak(t *testing.T, got []byte, want string) {
