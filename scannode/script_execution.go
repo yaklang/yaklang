@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
 
 type ScriptExecutionRequest struct {
@@ -415,6 +416,8 @@ func (s *ScanNode) executeScript(
 		fmt.Sprintf("YAK_RUNTIME_ID=%v", runtimeID),
 	)
 	env = append(env, extraEnv...)
+	workspaceOwner := utils.RandStringBytes(16)
+	env = replaceEnvironmentValue(env, ssagitworkdir.OwnerEnv, workspaceOwner)
 	cmd.Env = env
 
 	// Use a combined output writer: stdout/stderr go to both the parent
@@ -430,25 +433,49 @@ func (s *ScanNode) executeScript(
 		cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf, taskLogWriter)
 	}
 
-	err := cmd.Run()
-	if err != nil {
-		// If it's an exit error, wrap it with stderr/stdout tail
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	childPID := cmd.Process.Pid
+	waitErr := cmd.Wait()
+	if waitErr != nil {
+		// Preserve the latest-main diagnostics while still waiting before the
+		// parent-owned workspace sweep below.
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return &scriptExecError{
+		if errors.As(waitErr, &exitErr) {
+			waitErr = &scriptExecError{
 				ExitError:  exitErr,
 				stderrTail: stderrBuf.String(),
 				stdoutTail: stdoutBuf.String(),
 			}
 		}
 	}
-	return err
+	cleanupErr := ssagitworkdir.CleanupForOwner(workspaceOwner)
+	if cleanupErr != nil {
+		if waitErr == nil {
+			return utils.Errorf("cleanup SSA Git workspaces for child process %d: %v", childPID, cleanupErr)
+		}
+		log.Errorf("cleanup SSA Git workspaces for failed child process %d: %v", childPID, cleanupErr)
+	}
+	return waitErr
+}
+
+func replaceEnvironmentValue(env []string, key string, value string) []string {
+	prefix := key + "="
+	replaced := make([]string, 0, len(env)+1)
+	for _, item := range env {
+		if strings.HasPrefix(item, prefix) {
+			continue
+		}
+		replaced = append(replaced, item)
+	}
+	return append(replaced, prefix+value)
 }
 
 // tailBuffer is a ring buffer that keeps the last N bytes written to it.
 type tailBuffer struct {
-	buf  []byte
-	max  int
+	buf []byte
+	max int
 }
 
 func newTailBuffer(max int) *tailBuffer {
