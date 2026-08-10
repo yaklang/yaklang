@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -15,6 +16,24 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 	if err != nil {
 		return err
 	}
+
+	// Wire up debug/pprof output when debug_dir is set. The standalone
+	// scan redirects its SSA database to the debug dir (single-job scan).
+	var pprofCleanup ssaapi.DebugOutputCleanup
+	if debugDir := config.GetDebugDir(); debugDir != "" {
+		cleanup, startErr := ssaapi.StartDebugOutput(debugDir, false)
+		if startErr != nil {
+			log.Warnf("[debug] start scan debug output failed: %v, continuing without debug", startErr)
+		} else {
+			pprofCleanup = cleanup
+			defer func() {
+				if pprofCleanup != nil {
+					pprofCleanup()
+				}
+			}()
+		}
+	}
+
 	var taskId string
 	var m *scanManager
 	var success bool
