@@ -23,7 +23,7 @@ func makeBigToolResultPayload(seed int, repeat int) string {
 }
 
 // TestFindCompressSplit_ByRecentKeepTokens_Even 100 个均匀 item，
-// keepTokens = currentSize/4，断言 splitIdx 落在 item 总数 75% 附近（容差 ±10%）。
+// keepTokens = currentSize/6，断言 splitIdx 落在 item 总数 ~83% 附近（容差 ±10%）。
 // 关键词: findCompressSplitByRecentKeepTokens 均匀
 func TestFindCompressSplit_ByRecentKeepTokens_Even(t *testing.T) {
 	tl := NewTimeline(nil, nil)
@@ -38,16 +38,16 @@ func TestFindCompressSplit_ByRecentKeepTokens_Even(t *testing.T) {
 	currentSize := tl.calculateActualContentSize()
 	require.Greater(t, currentSize, int64(0))
 
-	keepTokens := currentSize / 4
+	keepTokens := currentSize / 6
 	splitIdx := tl.findCompressSplitByRecentKeepTokens(keepTokens)
 	require.Greater(t, splitIdx, 0, "split must be > 0 for sufficiently large timeline")
 	require.Less(t, splitIdx, N, "split must be < N (something must remain in recent keep)")
 
-	// 期望切点在 75% 位置 ± 15% 容差（BPE 估算近似不严格线性）
-	expected := N * 3 / 4
-	tolerance := N * 15 / 100
+	// 期望切点在 ~83% 位置 ± 10% 容差（BPE 估算近似不严格线性）
+	expected := N * 5 / 6
+	tolerance := N * 10 / 100
 	require.InDelta(t, expected, splitIdx, float64(tolerance),
-		"splitIdx %d should be ~75%% of N=%d (within +-%d), currentSize=%d, keepTokens=%d",
+		"splitIdx %d should be ~83%% of N=%d (within +-%d), currentSize=%d, keepTokens=%d",
 		splitIdx, N, tolerance, currentSize, keepTokens)
 }
 
@@ -70,7 +70,7 @@ func TestFindCompressSplit_LargeNewest(t *testing.T) {
 	currentSize := tl.calculateActualContentSize()
 	require.Greater(t, currentSize, int64(0))
 
-	keepTokens := currentSize / 4
+	keepTokens := currentSize / 6
 	splitIdx := tl.findCompressSplitByRecentKeepTokens(keepTokens)
 
 	// 最新一条已大于 keepTokens，splitIdx 必须 == N-1（即只保留最后一条）

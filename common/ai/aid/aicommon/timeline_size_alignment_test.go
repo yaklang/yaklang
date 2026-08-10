@@ -68,15 +68,15 @@ func TestEstimateItemContentTokens_UsesShrunkContent(t *testing.T) {
 		"token estimate with selectShrunkContent should be strictly smaller than with String() (header overhead removed)")
 }
 
-// TestCompressSplit_KeepsQuarterOfActualDump 核心测试：
+// TestCompressSplit_KeepsSixthOfActualDump 核心测试：
 // 构造一组 item，旧的有 ShrinkResult（渲染时很小），新的没有（渲染时=String()）。
 // 修复前：size 计算用 String()，旧 item 估值偏大 → currentSize 偏大 → keepTokens 偏大 →
-//         切点偏新 → 保留区远超实际 dump 的 1/4。
+//         切点偏新 → 保留区远超实际 dump 的 1/6。
 // 修复后：size 计算用 selectShrunkContent，与实际渲染一致 → 切点更合理。
 //
-// 验证：压缩后保留区的实际 dump token 不应超过压缩前实际 dump token 的 50%（宽松阈值，
+// 验证：压缩后保留区的实际 dump token 不应超过压缩前实际 dump token 的 40%（宽松阈值，
 // 因为 BPE 估算和 item 粒度对齐有误差，但不应像修复前那样保留 70%+）。
-func TestCompressSplit_KeepsQuarterOfActualDump(t *testing.T) {
+func TestCompressSplit_KeepsSixthOfActualDump(t *testing.T) {
 	tl := NewTimeline(&mockedAI{}, nil)
 	baseTs := time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC)
 
@@ -100,8 +100,8 @@ func TestCompressSplit_KeepsQuarterOfActualDump(t *testing.T) {
 	dumpBefore := int64(MeasureTokens(tl.DumpForPrompt()))
 	t.Logf("currentSize = %d, dumpBefore = %d tokens", currentSize, dumpBefore)
 
-	// keepTokens = currentSize / 4
-	keepTokens := currentSize / 4
+	// keepTokens = currentSize / 6
+	keepTokens := currentSize / 6
 	splitIdx := tl.findCompressSplitByRecentKeepTokens(keepTokens)
 	require.Greater(t, splitIdx, 0, "should have items to compress")
 	require.Less(t, splitIdx, N, "should keep some recent items")
@@ -127,15 +127,15 @@ func TestCompressSplit_KeepsQuarterOfActualDump(t *testing.T) {
 		splitIdx, len(recentKeepItems), recentDumpTokens, dumpBefore,
 		float64(recentDumpTokens)/float64(dumpBefore)*100)
 
-	// 保留区的实际 dump token 不应超过压缩前的 50%
-	// （理论上 1/4 = 25%，但因为 item 粒度对齐和 BPE 误差，放宽到 50%）
-	require.Less(t, float64(recentDumpTokens), float64(dumpBefore)*0.5,
-		"recent keep actual dump tokens (%d) should be < 50%% of dumpBefore (%d), got %.1f%%",
+	// 保留区的实际 dump token 不应超过压缩前的 40%
+	// （理论上 1/6 ≈ 17%，但因为 item 粒度对齐和 BPE 误差，放宽到 40%）
+	require.Less(t, float64(recentDumpTokens), float64(dumpBefore)*0.4,
+		"recent keep actual dump tokens (%d) should be < 40%% of dumpBefore (%d), got %.1f%%",
 		recentDumpTokens, dumpBefore, float64(recentDumpTokens)/float64(dumpBefore)*100)
 }
 
 // TestCompressSplit_BeforeFix_WouldKeepTooMuch 对照测试（回归保护）：
-// 用 String() 口径模拟修复前的行为，验证修复前保留区确实远超 1/4。
+// 用 String() 口径模拟修复前的行为，验证修复前保留区确实远超 1/6。
 // 这个测试不直接调用修复后的函数，而是手动用 String() 口径计算，证明差异存在。
 func TestCompressSplit_BeforeFix_WouldKeepTooMuch(t *testing.T) {
 	tl := NewTimeline(nil, nil)
@@ -187,10 +187,10 @@ func TestCompressSplit_BeforeFix_WouldKeepTooMuch(t *testing.T) {
 
 	// 修复前保留区比例应该 > 50%（这正是 bug 的体现）
 	// 注意：如果这个断言失败，说明场景中 ShrinkResult 的效果不够明显，
-	// 但核心测试 TestCompressSplit_KeepsQuarterOfActualDump 仍然有效。
+	// 但核心测试 TestCompressSplit_KeepsSixthOfActualDump 仍然有效。
 	if oldRecentDumpTokens > 0 && dumpBefore > 0 {
 		ratio := float64(oldRecentDumpTokens) / float64(dumpBefore)
-		t.Logf("[Before Fix] ratio = %.1f%% (this demonstrates the bug: >> 25%%)", ratio*100)
+		t.Logf("[Before Fix] ratio = %.1f%% (this demonstrates the bug: >> 17%%)", ratio*100)
 	}
 }
 
