@@ -3,11 +3,13 @@ package scannode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiengine"
@@ -15,6 +17,226 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func boolPointer(value bool) *bool { return &value }
+
+func TestStatefulDriverRejectsNewInputWhileTerminalFailurePublicationIsBlocked(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	engine.sendErr = errors.New("provider failed")
+	emitter := newBlockingTurnFailureEmitter()
+	t.Cleanup(func() { close(emitter.release) })
+	handle := &yakAIEngineRuntimeHandle{
+		engine:       engine,
+		emitter:      emitter,
+		messageQueue: make(chan yakAIQueuedMessage, 1),
+	}
+
+	go handle.sendMessage(yakAIQueuedMessage{turnID: "turn-failed", content: "first"})
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("failing turn did not start")
+	}
+	close(engine.release)
+	select {
+	case <-emitter.started:
+	case <-time.After(time.Second):
+		t.Fatal("terminal failure publication did not start")
+	}
+
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-too-late"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"second"}`),
+	})
+	if err == nil || !strings.Contains(err.Error(), "yak ai engine is closed") {
+		t.Fatalf("new input during terminal publication error = %v, want closed runtime", err)
+	}
+}
+
+func TestStatefulControlInputIsLinearizedWithTerminalClose(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	engine.eventStarted = make(chan struct{})
+	engine.eventRelease = make(chan struct{})
+	handle := &yakAIEngineRuntimeHandle{
+		engine:       engine,
+		emitter:      noopEmitter{},
+		messageQueue: make(chan yakAIQueuedMessage, 1),
+	}
+	inputDone := make(chan error, 1)
+	go func() {
+		inputDone <- handle.SendInput(context.Background(), aiSessionInput{
+			Ref:         aiSessionCommandRef{CommandID: "hotpatch-before-close"},
+			InputType:   "hotpatch",
+			PayloadJSON: []byte(`{"hotpatch_type":"EnablePlan","params":{"enable_plan":true}}`),
+		})
+	}()
+	select {
+	case <-engine.eventStarted:
+	case <-time.After(time.Second):
+		t.Fatal("control input did not reach engine")
+	}
+	closeDone := make(chan struct{})
+	go func() {
+		handle.closeForTerminalFailure()
+		close(closeDone)
+	}()
+	select {
+	case <-closeDone:
+		t.Fatal("terminal close crossed an in-flight control delivery")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(engine.eventRelease)
+	if err := <-inputDone; err != nil {
+		t.Fatalf("linearized pre-close control input: %v", err)
+	}
+	select {
+	case <-closeDone:
+	case <-time.After(time.Second):
+		t.Fatal("terminal close did not complete after control delivery")
+	}
+	if err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "hotpatch-after-close"},
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"EnablePlan","params":{"enable_plan":true}}`),
+	}); err == nil || !strings.Contains(err.Error(), "closed") {
+		t.Fatalf("post-close hotpatch error = %v, want closed runtime", err)
+	}
+}
+
+func TestStatefulHotpatchUpdatesSnapshotUsedByFirstDirectForge(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	handle := &yakAIEngineRuntimeHandle{
+		engine:            engine,
+		emitter:           noopEmitter{},
+		binding:           aiSessionBinding{RuntimeOptionSnapshotJSON: []byte(`{"forge_name":"forge-a","review_policy":"yolo"}`)},
+		runtime:           yakRuntimeOptions{ForgeName: "forge-a", ReviewPolicy: "yolo"},
+		directForgeConfig: aiengine.NewAIEngineConfig(aiengine.WithReviewPolicy("yolo")),
+		messageQueue:      make(chan yakAIQueuedMessage, 1),
+	}
+	if err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "hotpatch-before-forge"},
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"AgreePolicy","params":{"review_policy":"manual"}}`),
+	}); err != nil {
+		t.Fatalf("hotpatch before first Forge: %v", err)
+	}
+	ok, runtime, binding, config := handle.claimDirectForge()
+	if !ok {
+		t.Fatal("expected first message to claim configured direct Forge")
+	}
+	if runtime.ReviewPolicy != "manual" || config == nil || config.ReviewPolicy != "manual" {
+		t.Fatalf("direct Forge snapshot did not include hotpatch: runtime=%q config=%#v", runtime.ReviewPolicy, config)
+	}
+	var persisted yakRuntimeOptions
+	if err := json.Unmarshal(binding.RuntimeOptionSnapshotJSON, &persisted); err != nil {
+		t.Fatalf("decode persisted runtime snapshot: %v", err)
+	}
+	if persisted.ReviewPolicy != "manual" {
+		t.Fatalf("persisted runtime review policy = %q, want manual", persisted.ReviewPolicy)
+	}
+	select {
+	case event := <-engine.events:
+		if !event.GetIsConfigHotpatch() {
+			t.Fatalf("long-lived engine received non-hotpatch event: %#v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("long-lived engine did not receive hotpatch")
+	}
+}
+
+func TestStatefulHotpatchDuringDirectForgeUpdatesLiveAndNextSnapshots(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	forgeInput := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 1)
+	handle := &yakAIEngineRuntimeHandle{
+		engine:            engine,
+		emitter:           noopEmitter{},
+		binding:           aiSessionBinding{RuntimeOptionSnapshotJSON: []byte(`{"forge_name":"forge-a","enable_plan":false}`)},
+		runtime:           yakRuntimeOptions{ForgeName: "forge-a", EnablePlan: boolPointer(false)},
+		directForgeConfig: aiengine.NewAIEngineConfig(),
+		forgeInput:        forgeInput,
+		forgeRunning:      true,
+		forgeStarted:      true,
+		messageQueue:      make(chan yakAIQueuedMessage, 1),
+	}
+	if err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "hotpatch-during-forge"},
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"EnablePlan","params":{"enable_plan":true}}`),
+	}); err != nil {
+		t.Fatalf("hotpatch during direct Forge: %v", err)
+	}
+	select {
+	case event := <-forgeInput.OutputChannel():
+		if !event.GetIsConfigHotpatch() {
+			t.Fatalf("direct Forge received non-hotpatch event: %#v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("direct Forge did not receive hotpatch")
+	}
+	if handle.runtime.EnablePlan == nil || !*handle.runtime.EnablePlan {
+		t.Fatal("next-turn runtime snapshot did not retain active-Forge hotpatch")
+	}
+	select {
+	case <-engine.events:
+	case <-time.After(time.Second):
+		t.Fatal("long-lived engine did not receive active-Forge hotpatch")
+	}
+}
+
+func TestStatefulTaskScopedCapabilityHotpatchDoesNotPersist(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	handle := &yakAIEngineRuntimeHandle{
+		engine:       engine,
+		emitter:      noopEmitter{},
+		currentTurn:  "turn-a",
+		messageQueue: make(chan yakAIQueuedMessage, 1),
+		runtime: yakRuntimeOptions{
+			EnabledCapabilities: []yakAICapability{{Name: "base", Type: "tool"}},
+		},
+	}
+	input := aiSessionInput{
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"EnabledCapabilities","task_id":"task-a","params":{"enabled_capabilities":[{"name":"temporary","type":"tool"}]}}`),
+	}
+	if err := handle.SendInput(context.Background(), input); err != nil {
+		t.Fatalf("active task-scoped hotpatch: %v", err)
+	}
+	if got := handle.runtime.EnabledCapabilities; len(got) != 1 || got[0].Name != "base" {
+		t.Fatalf("task-scoped capability leaked into next-turn snapshot: %#v", got)
+	}
+	select {
+	case <-engine.events:
+	case <-time.After(time.Second):
+		t.Fatal("active task did not receive task-scoped hotpatch")
+	}
+	handle.currentTurn = ""
+	if err := handle.SendInput(context.Background(), input); err == nil || !strings.Contains(err.Error(), "requires an active task") {
+		t.Fatalf("idle task-scoped hotpatch error = %v, want explicit rejection", err)
+	}
+}
+
+func TestStatefulMessageQueueFullFailsAdmissionWithoutBlockingConsumer(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	handle := &yakAIEngineRuntimeHandle{
+		engine:       engine,
+		emitter:      noopEmitter{},
+		messageQueue: make(chan yakAIQueuedMessage, 1),
+	}
+	handle.messageQueue <- yakAIQueuedMessage{turnID: "already-queued"}
+	started := time.Now()
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "queue-overflow"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"do not block the node consumer"}`),
+	})
+	if err == nil || !strings.Contains(err.Error(), "queue is full") {
+		t.Fatalf("queue overflow error = %v, want explicit admission failure", err)
+	}
+	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		t.Fatalf("queue overflow blocked for %s", elapsed)
+	}
+}
 
 type noopAISessionRuntimeEmitter struct{}
 
@@ -297,6 +519,47 @@ func TestYakAIForgeExecParamsPreservesYakitNilVersusEmptySemantics(t *testing.T)
 	}
 	if got := yakAIForgeExecParams([]yakAIForgeParam{}); got == nil || len(got) != 0 {
 		t.Fatalf("explicit empty forge params must remain non-nil and empty, got %#v", got)
+	}
+}
+
+func TestYakRuntimeOptionsToStartParamsMapsHotpatchModelFields(t *testing.T) {
+	params := yakRuntimeOptionsToStartParams(yakRuntimeOptions{
+		AIService:   "openai",
+		AIModelName: "gpt-test",
+	})
+	if params.GetAIService() != "openai" || params.GetAIModelName() != "gpt-test" {
+		t.Fatalf("hotpatch model fields were not mapped: %#v", params)
+	}
+}
+
+func TestBuildYakAIHotpatchEventRejectsUnsupportedAndUnknownParams(t *testing.T) {
+	for name, payload := range map[string]string{
+		"unsupported type":        `{"hotpatch_type":"UnknownPatch","params":{}}`,
+		"unknown param":           `{"hotpatch_type":"EnablePlan","params":{"enable_plan":true,"desktop_window_id":"x"}}`,
+		"missing value":           `{"hotpatch_type":"EnablePlan","params":{}}`,
+		"unknown capability type": `{"hotpatch_type":"EnabledCapabilities","params":{"enabled_capabilities":[{"name":"x","type":"unknown"}]}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := buildYakAIHotpatchEvent(aiSessionInput{PayloadJSON: []byte(payload)})
+			if err == nil {
+				t.Fatalf("expected explicit hotpatch validation failure for %s", payload)
+			}
+		})
+	}
+}
+
+func TestMergedYakRuntimeOptionsAllowsHotpatchToDisableAllProviderCapabilities(t *testing.T) {
+	t.Parallel()
+
+	options, err := mergedYakRuntimeOptions(aiSessionBinding{
+		ProviderPolicySnapshotJSON: []byte(`{"enabled_capabilities":[{"name":"terminal","type":"tool"}]}`),
+		RuntimeOptionSnapshotJSON:  []byte(`{"enabled_capabilities":[]}`),
+	})
+	if err != nil {
+		t.Fatalf("merge runtime options: %v", err)
+	}
+	if options.EnabledCapabilities == nil || len(options.EnabledCapabilities) != 0 {
+		t.Fatalf("explicit empty capability override was lost: %#v", options.EnabledCapabilities)
 	}
 }
 

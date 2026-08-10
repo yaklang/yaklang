@@ -22,6 +22,7 @@ type aiSessionCommandRef struct {
 	CommandID   string
 	SessionID   string
 	RunID       string
+	BindEpoch   uint64
 	OwnerUserID string
 }
 
@@ -313,6 +314,12 @@ func (p *aiSessionEventPublisher) publish(
 	eventID string,
 	message proto.Message,
 ) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	session, ok := p.node.GetSessionState()
 	if !ok {
 		return ErrNodeSessionNotReady
@@ -349,7 +356,7 @@ func (p *aiSessionEventPublisher) publish(
 	if js == nil {
 		return fmt.Errorf("jetstream context is not ready")
 	}
-	if _, err := js.PublishMsg(msg, nats.MsgId(eventID)); err != nil {
+	if _, err := js.PublishMsg(msg, nats.MsgId(eventID), nats.Context(ctx)); err != nil {
 		return fmt.Errorf("publish ai session event %s: %w", eventType, err)
 	}
 	logPublishedAISessionEvent(eventType, ref.SessionID, message)
@@ -3548,6 +3555,7 @@ func aiSessionProtoRef(ref aiSessionCommandRef) *aiv1.AISessionRef {
 	return &aiv1.AISessionRef{
 		SessionId: ref.SessionID,
 		RunId:     ref.RunID,
+		BindEpoch: ref.BindEpoch,
 	}
 }
 

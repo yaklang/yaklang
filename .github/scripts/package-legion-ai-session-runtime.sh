@@ -151,7 +151,7 @@ jq -n \
       module_go_version: $module_go_version,
       go_version: $runtime_go_version
     },
-    capabilities: ["ai.session.runtime", "yak.execute"],
+    capabilities: ["ai.session.bind_epoch.v1", "ai.session.runtime", "yak.execute"],
     binary: {
       path: "/usr/local/bin/legion-session-runtime",
       sha256: $binary_sha,
