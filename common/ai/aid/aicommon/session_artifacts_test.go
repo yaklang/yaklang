@@ -198,7 +198,7 @@ func TestPromptTimelineAfterCompression_KeepsSixthAndSingleHead(t *testing.T) {
 			if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
 				seq := atomic.AddInt64(&compressCount, 1)
 				rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(
-					`{"@action":"timeline-reducer","reducer_memory":"compressed-summary-v%d"}`, seq,
+					`{"@action":"timeline-reducer","key_findings":["compressed-summary-v%d"]}`, seq,
 				)))
 			} else {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action":"timeline-shrink","persistent":"noop"}`))
@@ -298,7 +298,7 @@ func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *
 			if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
 				seq := atomic.AddInt64(&compressCount, 1)
 				rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(
-					`{"@action":"timeline-reducer","reducer_memory":"compressed-summary-v%d"}`, seq,
+					`{"@action":"timeline-reducer","key_findings":["compressed-summary-v%d"]}`, seq,
 				)))
 			} else {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action":"timeline-shrink","persistent":"noop"}`))
@@ -388,6 +388,8 @@ func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *
 	require.NoError(t, err)
 	require.Contains(t, prompt, "[compressed/head]")
 	require.Contains(t, prompt, "compressed-summary-v2")
-	require.NotContains(t, prompt, "compressed-summary-v1")
+	// old head text is now preserved in the new head (not re-compressed by AI),
+	// so compressed-summary-v1 still appears in the head text
+	require.Contains(t, prompt, "compressed-summary-v1")
 	require.Contains(t, prompt, secondMarker)
 }

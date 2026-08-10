@@ -42,11 +42,11 @@ func (m *mockedAI) CallAI(req *AIRequest) (*AIResponse, error) {
 	prompt := req.GetPrompt()
 	if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
 		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "reducer_memory": "batch compressed summary via ai"}
+{"@action": "timeline-reducer", "key_findings": ["batch compressed finding via ai"]}
 `))
 	} else if strings.Contains(prompt, "timeline-reducer") || strings.Contains(prompt, "timeline reducer") {
 		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "reducer_memory": "reducer memory via ai"}
+{"@action": "timeline-reducer", "key_findings": ["reducer memory finding via ai"]}
 `))
 	} else {
 		rsp.EmitOutputStream(strings.NewReader(`
