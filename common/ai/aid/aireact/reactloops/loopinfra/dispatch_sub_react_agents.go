@@ -30,7 +30,7 @@ func verifyDispatchSubReactAgents(loop *reactloops.ReActLoop, action *aicommon.A
 		return utils.Error("dispatch_sub_react_agents is only available in top-level agent; sub agents cannot dispatch more sub agents")
 	}
 
-	jobs, err := reactloops.ParseDispatchJobs(action)
+	jobs, err := reactloops.ParseDispatchJobsWithLimit(action, loop.GetMaxSubAgents())
 	if err != nil {
 		return err
 	}

@@ -455,7 +455,7 @@ const (
 	DispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
 	DispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
 
-	MaxDispatchSubReactJobs    = 30
+	MaxDispatchSubReactJobs    = int(aicommon.AbsoluteMaxSubAgents)
 	DefaultDispatchConcurrency = 5
 	MaxDispatchConcurrency     = 10
 )
@@ -573,7 +573,13 @@ func elaborateGoal(
 
 // ParseDispatchJobs 从 AI action 的 "dispatches" 参数中提取 dispatch 任务。
 func ParseDispatchJobs(action *aicommon.Action) ([]SubAgentJob, error) {
-	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"))
+	return ParseDispatchJobsWithLimit(action, MaxDispatchSubReactJobs)
+}
+
+// ParseDispatchJobsWithLimit 与 ParseDispatchJobs 相同，但使用调用方给定的
+// 单次 dispatch 子任务上限（通常来自 Config.MaxSubAgents）。
+func ParseDispatchJobsWithLimit(action *aicommon.Action, maxJobs int) ([]SubAgentJob, error) {
+	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"), maxJobs)
 	if err != nil {
 		return nil, err
 	}
@@ -588,10 +594,10 @@ func ParseDispatchJobs(action *aicommon.Action) ([]SubAgentJob, error) {
 	if err := json.Unmarshal([]byte(raw), &jobs); err != nil {
 		return nil, utils.Wrap(err, "dispatches must be a valid array")
 	}
-	return NormalizeDispatchJobs(jobs)
+	return NormalizeDispatchJobs(jobs, maxJobs)
 }
 
-func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error) {
+func parseDispatchJobsFromArray(raw []aitool.InvokeParams, maxJobs int) ([]SubAgentJob, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
@@ -607,16 +613,18 @@ func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error
 			LoopName:   strings.TrimSpace(item.GetString("loop_name")),
 		})
 	}
-	return NormalizeDispatchJobs(jobs)
+	return NormalizeDispatchJobs(jobs, maxJobs)
 }
 
 // NormalizeDispatchJobs 校验并规范化 dispatch 任务。
-func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
+// maxJobs <= 0 时回落到 AbsoluteMaxSubAgents / DefaultMaxSubAgents。
+func NormalizeDispatchJobs(jobs []SubAgentJob, maxJobs int) ([]SubAgentJob, error) {
+	maxJobs = int(aicommon.NormalizeMaxSubAgents(int64(maxJobs)))
 	if len(jobs) == 0 {
 		return nil, utils.Error("dispatches must contain at least one sub agent job")
 	}
-	if len(jobs) > MaxDispatchSubReactJobs {
-		return nil, utils.Errorf("dispatches supports at most %d sub agents per call", MaxDispatchSubReactJobs)
+	if len(jobs) > maxJobs {
+		return nil, utils.Errorf("dispatches supports at most %d sub agents per call", maxJobs)
 	}
 
 	for i := range jobs {
