@@ -1391,9 +1391,22 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 
 				var cdp []distributionPoint
 				if rest, err := asn1.Unmarshal(e.Value, &cdp); err != nil {
-					return nil, err
+					// CRL distribution points are only informational here: Verify
+					// does not perform revocation checking. Some appliances emit an
+					// empty or otherwise malformed, non-critical CRLDP extension.
+					// Rejecting the whole certificate for that prevents even an
+					// InsecureSkipVerify TLS client from completing the handshake.
+					// Keep strict handling for critical extensions, whose semantics
+					// must not be ignored.
+					if e.Critical {
+						return nil, err
+					}
+					continue
 				} else if len(rest) != 0 {
-					return nil, errors.New("x509: trailing data after X.509 CRL distribution point")
+					if e.Critical {
+						return nil, errors.New("x509: trailing data after X.509 CRL distribution point")
+					}
+					continue
 				}
 
 				for _, dp := range cdp {
@@ -1404,7 +1417,10 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 
 					var n asn1.RawValue
 					if _, err := asn1.Unmarshal(dp.DistributionPoint.FullName.Bytes, &n); err != nil {
-						return nil, err
+						if e.Critical {
+							return nil, err
+						}
+						continue
 					}
 					// Trailing data after the fullName is
 					// allowed because other elements of
