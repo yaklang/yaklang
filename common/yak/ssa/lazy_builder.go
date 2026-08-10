@@ -35,31 +35,38 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 		log.Errorf("LazyBuilder is nil")
 		return
 	}
+	// Always queue. NEVER execute immediately even if Build() has already
+	// been called: AddGlobalVariable is invoked from buildGenDecl during
+	// PreHandler, and executing valueFunc() there compiles large global
+	// literals (gbk2utf8/gbk2unicode are 21000-entry maps) synchronously,
+	// adding 11-17s per file. Instead Build() is non-idempotent and runs
+	// queued tasks when called later (deferred build), when the resident
+	// cache is small after batch flushes.
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.tasks = append(l.tasks, lazyTask(work))
 }
 
-// Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
+// Build executes all tasks queued since the last Build call. Unlike the
+// old idempotent Build (which ran only once), this allows AddGlobalVariable
+// to register lazy builders across multiple compile batches: each batch's
+// LoadGlobalVariable calls Build(), executing that batch's registrations.
+// This also lets valueFunc() run during deferred build when the resident
+// cache is small, instead of during PreHandler where it would compile
+// large global literals (21000-entry maps) synchronously and stall.
 func (l *LazyBuilder) Build() {
 	if l == nil {
-		// log.Errorf("LazyBuilder is nil")
 		return
 	}
 
-	if l.build.Load() {
-		// log.Errorf("LazyBuilder is nil or already built")
-		return // 已经构建过，直接返回
-	}
-
+	// Mark as built so future AddLazyBuilder calls never try to execute
+	// immediately (they still queue, and next Build runs them).
 	l.build.Store(true)
 
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	tasksToRun := l.tasks
-	l.tasks = nil // 【关键】立即清空，释放对闭包和上下文的引用
-	_ = tasksToRun
+	l.tasks = nil
+	l.mu.Unlock()
 
 	defer func() {
 		if r := recover(); r != nil {

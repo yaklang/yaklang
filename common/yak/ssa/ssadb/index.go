@@ -8,8 +8,9 @@ import (
 )
 
 // irIndexBatchChunk bounds the rows per CreateInBatches call so the bind-parameter
-// count stays under SQLite's ~999 host-parameter limit: 100 rows * 8 cols = 800.
-const irIndexBatchChunk = 100
+// count stays under SQLite's MAX_VARIABLE_NUMBER=250000 ceiling. 1000 rows is
+// safe for the IrIndex model and reduces the number of INSERT statements.
+const irIndexBatchChunk = 1000
 
 // IrIndex is the database model for index entries (normalized with IDs).
 type IrIndex struct {

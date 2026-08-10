@@ -91,7 +91,7 @@ func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range, inst Instruction) {
 	editor := rangeIns.GetEditor()
 	hash := editor.GetIrSourceHash()
 	c.SourceCodeHash = hash
-	if hash != "" {
+	if hash != "" && instructionCacheEventDebugEnabled() {
 		log.Debugf("fitRange: instruction=%s, opcode=%s, hash=%s, program=%s, path=%s",
 			c.Name, c.OpcodeName, hash, editor.GetProgramName(), editor.GetFolderPath()+editor.GetFilename())
 	}
@@ -418,9 +418,13 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 		if variable == nil {
 			continue
 		}
+		// skipPersistOffsets is true during Assign (suppresses persistAllOffsets
+		// re-persistence). RestoreVariableFinish clears it AFTER Assign so
+		// subsequent AddRange/Assign calls persist offsets normally.
 		if err := variable.Assign(value); err != nil {
 			log.Debugf("restore variable %s for instruction %d failed: %v", name, ir.GetIdInt64(), err)
 		}
+		RestoreVariableFinish(variable)
 	}
 
 	// mask
@@ -519,4 +523,9 @@ func basicBlock2IrCode(inst Instruction, ir *ssadb.IrCode) {
 }
 
 func basicBlockFromIrCode(inst Instruction, ir *ssadb.IrCode) {
+	block, ok := ToBasicBlock(inst)
+	if !ok || block == nil || !utils.IsNil(block.ScopeTable) {
+		return
+	}
+	block.restoreScopeIfMissing()
 }

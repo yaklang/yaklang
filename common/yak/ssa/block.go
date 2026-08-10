@@ -105,7 +105,7 @@ func addToBlocks(block *BasicBlock) {
 
 func (b *BasicBlock) SetScope(s ScopeIF) {
 	// If block already has a scope, check if we need to create a new sub scope
-	if b.ScopeTable != nil {
+	if b.ScopeTable != nil && !b.scopeRestored {
 		// If the scope is already associated with another block, create a new sub scope
 		if existingBlock := GetBlockByScope(s); existingBlock != nil && existingBlock != b {
 			log.Warnf("block %v already has scope %v, but trying to set scope %v which is associated with block %v, creating new sub scope",
@@ -131,6 +131,7 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 		log.Errorf("block %v already has a scope %v, cannot set scope %v", b.GetName(), b.ScopeTable.GetScopeName(), s.GetScopeName())
 		return
 	}
+	b.scopeRestored = false
 
 	// If the scope is already associated with another block, create a new sub scope
 	if existingBlock := GetBlockByScope(s); existingBlock != nil && existingBlock != b {
@@ -148,6 +149,22 @@ func (b *BasicBlock) SetScope(s ScopeIF) {
 			block.Child = append(block.Child, b.GetId())
 		}
 	}
+}
+
+// restoreScopeIfMissing reconstructs a function-level placeholder scope when a
+// BasicBlock has none (e.g. reloaded from DB, or a CFG path reached the block
+// before SetScope). The placeholder is marked scopeRestored so SetScope can
+// replace it with the real CFG scope later.
+func (b *BasicBlock) restoreScopeIfMissing() {
+	if b == nil || !utils.IsNil(b.ScopeTable) {
+		return
+	}
+	function := b.GetFunc()
+	if function == nil {
+		return
+	}
+	b.ScopeTable = NewScope(function, b.GetProgram().GetProgramName())
+	b.scopeRestored = true
 }
 
 func (b *BasicBlock) HaveSubBlock(sub Value) bool {

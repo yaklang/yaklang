@@ -36,6 +36,14 @@ func TestResolveInstructionPersistenceTuning_largeProject(t *testing.T) {
 	require.GreaterOrEqual(t, limit, save*4, "persist limit should cover eviction backpressure vs save batch")
 }
 
+func TestResolveAuxAndTypeSaveSizes_largeProject(t *testing.T) {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName("large-proj"))
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(largeProjectByteThreshold)
+	require.Equal(t, largeProjectAuxiliarySave, resolveAuxiliarySaveSize(cfg, 200))
+	require.Equal(t, largeProjectTypeSave, resolveTypeSaveSize(cfg, 200))
+}
+
 func TestResolveInstructionCacheSettings(t *testing.T) {
 	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
 	require.NoError(t, err)
@@ -142,6 +150,7 @@ func TestCompileUnitWriterFlushKeepsFunctionBoundaryResident(t *testing.T) {
 	builder.Finish()
 
 	prog.Cache.FlushCompileUnit("unit-a")
+	prog.Cache.FlushInstructionSaver()
 
 	require.True(t, prog.Cache.hasResidentInstruction(builder.Function.GetId()), "compile-unit function metadata must stay resident for later cross-unit calls")
 	require.True(t, prog.Cache.hasResidentInstruction(param.GetId()), "compile-unit parameters must stay resident for later cross-unit call argument binding")
@@ -153,6 +162,72 @@ func TestCompileUnitWriterFlushKeepsFunctionBoundaryResident(t *testing.T) {
 	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, bin.GetId()))
 }
 
+func TestCompileUnitWriterFlushCallbackReportsBatchEviction(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(largeProjectByteThreshold)
+	cfg.SetCompileUnitSplit(true)
+
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	bin := builder.EmitBinOp(OpAdd, left, right)
+	builder.Finish()
+
+	done := make(chan struct{})
+	prog.Cache.instructions.Flush(func() { close(done) })
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("compile-unit flush callback must run after its own batch settles")
+	}
+
+	require.False(t, prog.Cache.hasResidentInstruction(bin.GetId()),
+		"ordinary expression instructions must be evicted once the batch drain completes")
+	require.True(t, prog.Cache.hasResidentInstruction(builder.Function.GetId()),
+		"compile-unit function metadata must stay resident for later cross-unit calls")
+
+	require.NoError(t, prog.Cache.SaveToDatabase())
+	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, bin.GetId()))
+}
+
+func TestFinalFlushAfterFinishEvictsDeferredTail(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(largeProjectByteThreshold)
+	cfg.SetCompileUnitSplit(true)
+
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	first := builder.EmitUndefined("first")
+	builder.Finish()
+	prog.Cache.FlushCompileUnit("unit-first")
+
+	secondBuilder := prog.GetAndCreateFunctionBuilder("deferred", string(MainFunctionName))
+	second := secondBuilder.EmitUndefined("second")
+	secondBuilder.Finish()
+	require.True(t, prog.Cache.hasResidentInstruction(second.GetId()),
+		"deferred tail must be resident before the final flush")
+
+	prog.Cache.FlushCompileUnit("final")
+	prog.Cache.FlushInstructionSaver()
+
+	require.False(t, prog.Cache.hasResidentInstruction(second.GetId()),
+		"final flush after Finish must evict the deferred tail before SaveToDatabase")
+	require.True(t, prog.Cache.hasResidentInstruction(secondBuilder.Function.GetId()),
+		"function boundary metadata must stay resident for the scan phase")
+	_ = first
+
+	require.NoError(t, prog.Cache.SaveToDatabase())
+	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, second.GetId()))
+}
 func TestTypeFlushUpsertsExistingTypeRows(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
@@ -858,12 +933,16 @@ func TestBasicBlockStaysResidentAfterFunctionFinish(t *testing.T) {
 	block := builder.Function.NewBasicBlock("cooldown-target")
 	block.SetScope(NewScope(builder.Function, prog.GetProgramName()))
 	blockID := block.GetId()
+	require.NotNil(t, block.ScopeTable, "the compile-time basic block must have a ScopeTable")
 
 	time.Sleep(ttl * 3)
 	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, blockID), "basic block should stay resident before function finish")
 	resident := prog.Cache.GetInstruction(blockID)
 	require.NotNil(t, resident)
 	require.Equal(t, blockID, resident.GetId())
+	residentBlock, ok := ToBasicBlock(resident)
+	require.True(t, ok)
+	require.NotNil(t, residentBlock.ScopeTable, "a resident basic block must retain its ScopeTable")
 
 	builder.Finish()
 
@@ -872,6 +951,36 @@ func TestBasicBlockStaysResidentAfterFunctionFinish(t *testing.T) {
 	resident = prog.Cache.GetInstruction(blockID)
 	require.NotNil(t, resident)
 	require.Equal(t, blockID, resident.GetId())
+	residentBlock, ok = ToBasicBlock(resident)
+	require.True(t, ok)
+	require.NotNil(t, residentBlock.ScopeTable, "a finished function must keep the block ScopeTable for deferred builds")
+}
+
+func TestReopenedFunctionBuilderUsesResidentBasicBlockScope(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, filesys.NewVirtualFs())
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	entry := builder.CurrentBlock
+	entryID := entry.GetId()
+	require.NotNil(t, entry.ScopeTable)
+	builder.EmitUndefined("deferred_scope_value")
+
+	builder.Finish()
+	require.Eventually(t, func() bool {
+		resident := prog.Cache.GetInstruction(entryID)
+		block, ok := ToBasicBlock(resident)
+		return ok && block != nil && !utils.IsNil(block.ScopeTable)
+	}, 2*time.Second, ttl, "finished function entry block must remain resident with its ScopeTable")
+
+	reopened := NewBuilder(prog.GetCurrentEditor(), builder.Function, nil)
+	require.NotNil(t, reopened.CurrentBlock)
+	require.Equal(t, entryID, reopened.CurrentBlock.GetId())
+	require.NotNil(t, reopened.CurrentBlock.ScopeTable)
+	require.NotNil(t, reopened.CreateVariable("deferred_local"),
+		"a deferred builder must be able to create variables from the resident block scope")
 }
 
 func TestFunctionScopedInstructionsSpillAfterFinish(t *testing.T) {
@@ -943,17 +1052,21 @@ func TestReloadedInstructionGetBlockUsesResidentHotBasicBlockAfterFinish(t *test
 	residentBeforeLoad := prog.Cache.hasResidentInstruction(blockID)
 	require.True(t, residentBeforeLoad, "basic block should stay resident as a hot instruction")
 	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, blockID), "hot basic block should not spill during compile")
+	residentBlock, ok := ToBasicBlock(prog.Cache.GetInstruction(blockID))
+	require.True(t, ok)
+	require.NotNil(t, residentBlock.ScopeTable, "the resident hot basic block must retain its ScopeTable")
 
 	reloaded := prog.Cache.GetInstruction(instID)
 	require.NotNil(t, reloaded)
-	_, ok := ToLazyInstruction(reloaded)
-	require.True(t, ok, "spilled instruction should reload as LazyInstruction")
+	_, lazyOK := ToLazyInstruction(reloaded)
+	require.True(t, lazyOK, "spilled instruction should reload as LazyInstruction")
 	residentAfterInstReload := prog.Cache.hasResidentInstruction(blockID)
 	require.True(t, residentAfterInstReload, "reloading the instruction should still see the resident hot block")
 
 	block := reloaded.GetBlock()
 	require.NotNil(t, block)
 	require.Equal(t, blockID, block.GetId())
+	require.NotNil(t, block.ScopeTable, "lazy instruction block lookup must use the resident block scope")
 }
 
 func TestInstruction2IrCodeReloadsSpilledBasicBlockAfterFinish(t *testing.T) {
@@ -1005,6 +1118,61 @@ func TestInstruction2IrCodeReloadsSpilledBasicBlockAfterFinish(t *testing.T) {
 	require.Equal(t, blockID, ir.CurrentBlock, "save path still needs block identity for the reloaded instruction")
 	residentAfterMarshal := prog.Cache.hasResidentInstruction(blockID)
 	require.False(t, residentAfterMarshal, "Instruction2IrCode should not reload the spilled BasicBlock when it only needs CurrentBlock id")
+}
+
+func TestReloadedBasicBlockGetsRestoredScope(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	prog.compileConfig.SetCompileProjectBytes(largeProjectByteThreshold)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	_ = builder.EmitBinOp(OpAdd, left, right)
+	blockID := builder.CurrentBlock.GetId()
+	require.NotNil(t, builder.CurrentBlock.ScopeTable, "entry block must have a scope during compile")
+
+	blockIR, err := marshalIrCode(builder.CurrentBlock)
+	require.NoError(t, err)
+	require.NoError(t, ssadb.GetDB().Save(blockIR).Error)
+
+	builder.Finish()
+	prog.Cache.deleteInstructionByID(blockID)
+	require.False(t, prog.Cache.hasResidentInstruction(blockID), "fixture must force a DB reload")
+
+	reloaded := prog.Cache.GetInstruction(blockID)
+	require.NotNil(t, reloaded)
+	reloadedBlock, ok := ToBasicBlock(reloaded)
+	require.True(t, ok, "reloaded instruction should be a BasicBlock")
+	require.NotNil(t, reloadedBlock.ScopeTable,
+		"reloaded BasicBlock must get a restored ScopeTable so deferred builds can create variables")
+
+	reopened := NewBuilder(nil, builder.Function, nil)
+	require.NotNil(t, reopened.CurrentBlock)
+	require.Equal(t, blockID, reopened.CurrentBlock.GetId())
+	require.NotNil(t, reopened.CurrentBlock.ScopeTable)
+	require.NotNil(t, reopened.CreateVariable("restored_scope_var"),
+		"a deferred builder must create variables from the restored block scope")
+}
+
+func TestCreateVariableRestoresNilBlockScope(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(uuid.NewString(), 0, ProgramCacheMemory, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	builder.CurrentBlock.ScopeTable = nil
+
+	variable := builder.CreateVariable("restored_lazy")
+	require.NotNil(t, variable, "CreateVariable must lazily restore a nil block scope")
+	require.NotNil(t, builder.CurrentBlock.ScopeTable)
+
+	realScope := NewScope(builder.Function, prog.GetProgramName())
+	builder.CurrentBlock.SetScope(realScope)
+	require.Equal(t, realScope, builder.CurrentBlock.ScopeTable,
+		"SetScope must replace the restored placeholder with the real CFG scope")
 }
 
 func TestLazyInstructionHasUsersReflectsPersistedUsers(t *testing.T) {
@@ -1255,7 +1423,7 @@ func TestIndexStore_ClosePropagatesSaverError(t *testing.T) {
 	wantErr := errors.New("simulated db write failure")
 
 	store := &indexStore{
-		mode:    ProgramCacheDBWrite,
+		mode: ProgramCacheDBWrite,
 		indexSaver: dbcache.NewSave(func(indices []*ssadb.IrIndex) error {
 			return wantErr
 		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),
@@ -1276,7 +1444,7 @@ func TestIndexStore_FlushPropagatesSaverError(t *testing.T) {
 	wantErr := errors.New("simulated flush failure")
 
 	store := &indexStore{
-		mode:    ProgramCacheDBWrite,
+		mode: ProgramCacheDBWrite,
 		indexSaver: dbcache.NewSave(func(indices []*ssadb.IrIndex) error {
 			return nil
 		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),

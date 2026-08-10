@@ -120,6 +120,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	// b.Function.SetScope(b.CurrentScope)
 	if block, ok := f.GetBasicBlockByID(f.EnterBlock); ok && block != nil {
 		b.CurrentBlock = block
+		block.restoreScopeIfMissing()
 	}
 	f.builder = b
 	return b
