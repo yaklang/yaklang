@@ -15,8 +15,8 @@ import (
 	"github.com/google/uuid"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/yaklang/gorm"
 	"github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/permutil"
@@ -127,7 +127,8 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 			"mode":          []string{"rwc"},
 			"cache":         []string{cacheMode},
 			"_busy_timeout": []string{"10000"},
-			"_synchronous":  []string{"OFF"},
+			"_synchronous":  []string{"NORMAL"},
+			"_txlock":       []string{"immediate"},
 			"_cache_size":   []string{"8000"},
 		}
 		path = fmt.Sprintf("%s?%s", path, params.Encode())
@@ -204,7 +205,7 @@ func configureAndOptimizeDBWithOptions(drive string, db *gorm.DB, options databa
 	}
 
 	if drive == SQLiteExtend || drive == SQLite {
-		db.Exec("PRAGMA synchronous = OFF;")
+		db.Exec("PRAGMA synchronous = NORMAL;")
 		// db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
 		// set journal_mode for write speed
 		db.Exec("PRAGMA journal_mode = WAL;")

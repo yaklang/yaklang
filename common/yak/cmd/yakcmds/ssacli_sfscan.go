@@ -267,6 +267,21 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 		if res == nil || res.Program == nil {
 			return nil, utils.Errorf("compile result is empty")
 		}
+
+		// Path A (optional, default OFF): after compile + SaveToDatabase,
+		// close the DBWrite cache and reload a DBRead Program from the
+		// database. This releases ~14GB of compile-time SSA objects
+		// (instructions, types, variables, scopes, ANTLR tokens, source
+		// editors) before the SyntaxFlow scan starts, reducing peak RSS
+		// and GC pressure during the scan phase.
+		//
+		// Enabled via YAK_SSA_PATH_A_RELOAD=1. When disabled (default),
+		// the compiled DBWrite Program is used directly (Path B).
+		if ssaapi.PathAEnabled() {
+			prog := ssaapi.ReloadProgramFromDatabase(res.Program)
+			return []*ssaapi.Program{prog}, nil
+		}
+
 		return []*ssaapi.Program{res.Program}, nil
 	}
 
@@ -454,6 +469,9 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	}
 	if concurrency := cfg.GetCompileConcurrency(); concurrency > 0 {
 		opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
+	}
+	if scanConcurrency := cfg.GetScanConcurrency(); scanConcurrency > 0 {
+		opts = append(opts, ssaconfig.WithScanConcurrency(scanConcurrency))
 	}
 	return opts
 }

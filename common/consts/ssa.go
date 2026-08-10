@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -24,6 +25,11 @@ const (
 	// ENV_SSA_DB_SKIP_MIGRATE disables SSA DB AutoMigrate/patches for this process.
 	// This is useful when using a read-only SSA-IR DB DSN on scan-only nodes.
 	ENV_SSA_DB_SKIP_MIGRATE = "SSA_DB_SKIP_MIGRATE"
+	// ENV_SSA_SQLITE_MAX_OPEN_CONNS overrides the SSA SQLite connection pool
+	// size. Default 1 keeps the historical single-writer behavior; scan-only
+	// runs can raise it (e.g. 8) so concurrent lazy type/instruction loads
+	// actually use multiple cores instead of queueing on one connection.
+	ENV_SSA_SQLITE_MAX_OPEN_CONNS = "YAK_SSA_SQLITE_MAX_OPEN_CONNS"
 )
 
 var (
@@ -110,7 +116,12 @@ func CreateSSAProjectDatabaseRaw(raw string) (*gorm.DB, error) {
 }
 
 func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
-	db, err := createAndConfigDatabase(path, dialect)
+	// WAL allows concurrent readers; writes queue via _txlock=immediate +
+	// busy_timeout. YAK_SSA_SQLITE_MAX_OPEN_CONNS therefore applies from open
+	// (readers parallel even during compile), and applySSAScanPoolSize keeps
+	// the same pool for the scan phase.
+	options := ssaDatabaseOpenOptions()
+	db, err := createAndConfigDatabaseWithOptions(path, options, dialect)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +131,29 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 		schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
 		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
 	}
-	configureAndOptimizeDB(dialect, db)
+	configureAndOptimizeDBWithOptions(dialect, db, options)
 	return db, nil
+}
+
+func ssaDatabaseOpenOptions() databaseOpenOptions {
+	raw := strings.TrimSpace(os.Getenv(ENV_SSA_SQLITE_MAX_OPEN_CONNS))
+	if raw == "" {
+		// Default: WAL multi-read + single-writer queue. SQLite WAL allows
+		// concurrent readers and one writer; _txlock=immediate makes write
+		// transactions queue behind busy_timeout instead of deadlocking.
+		return databaseOpenOptions{
+			sqliteMaxOpenConns: 8,
+			sqlitePrivateCache: true,
+		}
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > 16 {
+		return defaultDatabaseOpenOptions()
+	}
+	return databaseOpenOptions{
+		sqliteMaxOpenConns: n,
+		sqlitePrivateCache: n > 1,
+	}
 }
 
 func GetTempSSADataBase() (*gorm.DB, error) {
