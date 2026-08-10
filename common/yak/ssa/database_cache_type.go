@@ -1,7 +1,10 @@
 package ssa
 
 import (
+	"bytes"
 	"encoding/json"
+	"strings"
+	"sync"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -9,6 +12,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"go.uber.org/atomic"
 )
+
+// irTypeJSONBufPool reuses the temporary JSON buffer used when marshaling
+// IrType.ExtraInformation. Hadoop pprof showed type2IrType allocating ~24GB
+// cumulatively; pooling the encoder buffer removes one allocation per type.
+var irTypeJSONBufPool = sync.Pool{
+	New: func() any {
+		return bytes.NewBuffer(nil)
+	},
+}
 
 type typeStore struct {
 	mode        ProgramCacheKind
@@ -230,13 +242,21 @@ func type2IrType(typ Type, ir *ssadb.IrType) {
 		param["fullTypeName"] = t.GetFullTypeNames()
 	}
 
-	extra, err := json.Marshal(param)
+	buf := irTypeJSONBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	err := json.NewEncoder(buf).Encode(param)
 	if err != nil {
 		log.Errorf("SaveTypeToDB: %v: param: %v", err, param)
+		buf.Reset()
+		irTypeJSONBufPool.Put(buf)
+		return
 	}
+	extra := strings.TrimSuffix(buf.String(), "\n")
+	buf.Reset()
+	irTypeJSONBufPool.Put(buf)
 	ir.TypeId = uint64(typ.GetId())
 	ir.Kind = int(kind)
-	ir.ExtraInformation = utils.UnsafeBytesToString(extra)
+	ir.ExtraInformation = extra
 	ir.String = str
 }
 

@@ -8,9 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-// irOffsetBatchChunk bounds rows per CreateInBatches call under SQLite's ~999
-// host-parameter limit: 150 rows * 6 cols = 900.
-const irOffsetBatchChunk = 150
+// irOffsetBatchChunk bounds rows per CreateInBatches call under SQLite's
+// MAX_VARIABLE_NUMBER=250000 ceiling; 1000 rows is safe for the IrOffset model
+// and reduces the number of INSERT statements per flush.
+const irOffsetBatchChunk = 1000
 
 type IrOffset struct {
 	gorm.Model
@@ -46,10 +47,12 @@ func SaveIrOffset(db *gorm.DB, idx *IrOffset) {
 }
 
 // SaveIrOffsetBatch issues chunked batched INSERTs for a batch of offsets.
-// ir_offsets has no UNIQUE constraint and recompile deletes the program's rows
-// first (ssadb.DeleteProgramIrCode), so this is a pure INSERT — not an upsert —
-// matching the prior per-row SaveIrOffset path, but in one statement per chunk
-// instead of N round-trips.
+// A UNIQUE INDEX (ux_ir_offsets_program_value_file_range) prevents duplicate
+// rows. The in-memory offsetSaved dedup map should prevent duplicates from
+// reaching this point; if one slips through, the DB UNIQUE constraint returns
+// an error that propagates to Barrier/SaveToDatabase. We do NOT use
+// INSERT OR IGNORE — silent swallowing of duplicates masks bugs.
+// Recompile deletes the program's rows first (ssadb.DeleteProgramIrCode).
 func SaveIrOffsetBatch(db *gorm.DB, items []*IrOffset) error {
 	if db == nil || len(items) == 0 {
 		return nil

@@ -1202,6 +1202,12 @@ type FunctionType struct {
 	AnnotationFunc    []func(Value)
 	fullTypeName      []string
 	isAnyFunctionType bool
+
+	// stringCache caches the RawString result so repeated String() calls
+	// on FunctionType with many SideEffects don't re-allocate ~MB strings
+	// (63GB on engineercms). Cleared via resetStringCache when the type
+	// mutates (Name/params/return/side effects change).
+	stringCache string
 }
 
 var _ Type = (*FunctionType)(nil)
@@ -1260,6 +1266,12 @@ func NewAnyFunctionType() *FunctionType {
 	}
 }
 
+func (s *FunctionType) resetStringCache() {
+	if s != nil {
+		s.stringCache = ""
+	}
+}
+
 func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic bool) *FunctionType {
 	f := &FunctionType{
 		baseType:     NewBaseType(),
@@ -1278,6 +1290,7 @@ func NewFunctionTypeDefine(name string, Parameter []Type, ReturnType []Type, IsV
 
 func (s *FunctionType) SetName(name string) {
 	s.Name = name
+	s.resetStringCache()
 }
 
 func (s *FunctionType) PkgPathString() string {
@@ -1289,12 +1302,19 @@ func (s *FunctionType) PkgPathString() string {
 }
 
 func (s *FunctionType) String() string {
-	if s.Name != "" {
-		return s.Name
+	// Re-entrancy guard: RawString() may call String() on this same type
+	// (e.g. a FunctionType that contains itself as parameter or return
+	// type). Return the guard marker instead of recursing forever.
+	if s.Name == "..." {
+		return "..."
+	}
+	if s.stringCache != "" {
+		return s.stringCache
 	}
 	s.Name = "..." // avoid RawString -> String -> RawString loop
 	ret := s.RawString()
 	s.Name = ""
+	s.stringCache = ret
 	return ret
 }
 
@@ -1313,13 +1333,21 @@ func (s *FunctionType) RawString() string {
 		returnTypeStr = s.ReturnType.String()
 	}
 
-	sideEffect := ""
+	var sideEffectBuilder strings.Builder
 	if len(s.SideEffects) > 0 {
-		sideEffect = " [sideEffect]"
+		sideEffectBuilder.WriteString(" [sideEffect]")
 		for _, se := range s.SideEffects {
-			sideEffect += fmt.Sprintf(" [%s]%s", se.Name, se.VerboseName)
+			// strings.Builder avoids O(N²) reallocation from repeated +=
+			// on FunctionTypes with thousands of SideEffects (engineercms
+			// globalVarsContainer accumulates 21000+), which previously
+			// allocated ~27GB of temp strings.
+			sideEffectBuilder.WriteString(" [")
+			sideEffectBuilder.WriteString(se.Name)
+			sideEffectBuilder.WriteString("]")
+			sideEffectBuilder.WriteString(se.VerboseName)
 		}
 	}
+	sideEffect := sideEffectBuilder.String()
 
 	return fmt.Sprintf(
 		"(%s%s) -> %s",

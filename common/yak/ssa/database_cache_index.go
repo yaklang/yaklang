@@ -2,7 +2,11 @@ package ssa
 
 import (
 	"github.com/yaklang/gorm"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/utils"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -25,18 +29,28 @@ type indexStore struct {
 
 	indexSaver  *dbcache.Save[*ssadb.IrIndex]
 	offsetSaver *dbcache.Save[*ssadb.IrOffset]
+
+	// offsetSaved deduplicates offset rows by composite key
+	// (value_id + file_hash + start_offset + end_offset). Without this,
+	// compile-unit split cross-unit resolution visits the same instruction
+	// from the same file editor multiple times, creating truly identical
+	// offset rows. Different ranges for the same value_id (e.g. instruction
+	// appearing in different files) are legitimate and are NOT deduped.
+	offsetSavedMu sync.Mutex
+	offsetSaved   map[string]struct{}
 }
 
 func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, db *gorm.DB, saveSize int) *indexStore {
 	saveSize = resolveAuxiliarySaveSize(cfg, saveSize)
 	store := &indexStore{
-		mode:     mode,
-		program:  prog,
-		db:       db,
-		variable: utils.NewSafeMapWithKey[string, []int64](),
-		member:   utils.NewSafeMapWithKey[string, []int64](),
-		class:    utils.NewSafeMapWithKey[string, []int64](),
-		consts:   utils.NewSafeMapWithKey[string, []int64](),
+		mode:        mode,
+		program:     prog,
+		db:          db,
+		variable:    utils.NewSafeMapWithKey[string, []int64](),
+		member:      utils.NewSafeMapWithKey[string, []int64](),
+		class:       utils.NewSafeMapWithKey[string, []int64](),
+		consts:      utils.NewSafeMapWithKey[string, []int64](),
+		offsetSaved: make(map[string]struct{}),
 	}
 	if mode != ProgramCacheDBWrite || db == nil {
 		return store
@@ -117,7 +131,7 @@ func (s *indexStore) AddInstructionOffsets(inst Instruction) {
 		return
 	}
 	if offset := ConvertValue2Offset(inst); offset != nil {
-		s.offsetSaver.Save(offset)
+		s.saveOffsetDedup(offset)
 	}
 }
 
@@ -252,8 +266,35 @@ func (s *indexStore) SaveVariableOffset(variable *Variable, rng *memedit.Range) 
 		return
 	}
 	if offset := CreateVariableOffset(variable, rng); offset != nil {
-		s.offsetSaver.Save(offset)
+		s.saveOffsetDedup(offset)
 	}
+}
+
+// saveOffsetDedup saves an offset only if an identical row
+// (same value_id + file_hash + start_offset + end_offset) has not already
+// been saved. This prevents truly duplicate offset rows from compile-unit
+// split cross-unit resolution visiting the same instruction from the same
+// file editor multiple times. Different ranges for the same value_id are
+// legitimate and are NOT deduped.
+func (s *indexStore) saveOffsetDedup(offset *ssadb.IrOffset) {
+	if offset == nil {
+		return
+	}
+	key := offsetDedupKey(offset.ValueID, offset.FileHash, offset.StartOffset, offset.EndOffset)
+	s.offsetSavedMu.Lock()
+	if _, ok := s.offsetSaved[key]; ok {
+		s.offsetSavedMu.Unlock()
+		return
+	}
+	s.offsetSaved[key] = struct{}{}
+	s.offsetSavedMu.Unlock()
+	s.offsetSaver.Save(offset)
+}
+
+// offsetDedupKey creates a composite key for offset deduplication.
+func offsetDedupKey(valueID int64, fileHash string, start, end int64) string {
+	return strconv.FormatInt(valueID, 10) + "|" + fileHash + "|" +
+		strconv.FormatInt(start, 10) + "|" + strconv.FormatInt(end, 10)
 }
 
 func appendResidentIndex(index *utils.SafeMapWithKey[string, []int64], key string, id int64) {

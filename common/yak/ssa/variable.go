@@ -15,6 +15,14 @@ type Variable struct {
 	object      Value
 	key         Value
 	verboseName string
+
+	// skipPersistOffsets suppresses offset re-persistence when a variable
+	// is restored from DB (GetVariableFromDB → Assign → persistAllOffsets).
+	// During restore, all offsets already exist in the DB; re-persisting
+	// them only inflates the offsetSaved dedup map and UseRange map
+	// (which uses *Range pointers as keys, so each restore adds new entries).
+	// This flag is set by GetVariableFromDB and cleared after Assign.
+	skipPersistOffsets bool
 }
 
 var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
@@ -123,7 +131,7 @@ func (v *Variable) AddRange(r *memedit.Range, force bool) {
 }
 
 func (v *Variable) persistAllOffsets() {
-	if v == nil {
+	if v == nil || v.skipPersistOffsets {
 		return
 	}
 	if v.DefRange != nil {
@@ -135,7 +143,7 @@ func (v *Variable) persistAllOffsets() {
 }
 
 func (v *Variable) persistOffset(r *memedit.Range) {
-	if v == nil || utils.IsNil(r) {
+	if v == nil || utils.IsNil(r) || v.skipPersistOffsets {
 		return
 	}
 	prog := v.GetProgram()

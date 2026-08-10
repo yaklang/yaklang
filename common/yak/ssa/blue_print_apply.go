@@ -45,9 +45,6 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 func (c *Blueprint) Apply(obj Value) Type {
 	if c == nil {
 		log.Error("BUG: ClassBluePrint is nil")
-		log.Error("BUG: ClassBluePrint is nil")
-		log.Error("BUG: ClassBluePrint is nil")
-		log.Error("BUG: ClassBluePrint is nil")
 		return NewAny().GetType()
 	}
 	if obj == nil {
@@ -71,8 +68,6 @@ func (c *Blueprint) Apply(obj Value) Type {
 	for _, parent := range c.ParentBlueprints {
 		if parent == nil {
 			log.Warn("ClassBluePrint.ParentBlueprints is nil")
-			log.Warn("ClassBluePrint.ParentBlueprints is nil")
-			log.Warn("ClassBluePrint.ParentBlueprints is nil")
 			continue
 		}
 		parent.Apply(obj)
@@ -82,8 +77,6 @@ func (c *Blueprint) Apply(obj Value) Type {
 
 	for _, bp := range c.InterfaceBlueprints {
 		if bp == nil {
-			log.Warn("ClassBluePrint.ParentBlueprints is nil")
-			log.Warn("ClassBluePrint.ParentBlueprints is nil")
 			log.Warn("ClassBluePrint.ParentBlueprints is nil")
 			continue
 		}

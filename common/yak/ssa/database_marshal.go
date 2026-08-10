@@ -508,6 +508,7 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 		}
 		for k, v := range free_values {
 			variable := GetVariableFromDB(v, k, progName)
+			RestoreVariableFinish(variable)
 			ret.FreeValues[variable] = v
 		}
 		ret.ParameterMembers = utils.MapGetInt64Slice(params, "parameter_members")

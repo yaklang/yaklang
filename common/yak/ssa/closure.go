@@ -103,6 +103,9 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 			MemberCallKind: NoMemberCall,
 		},
 	})
+	if f.Type != nil {
+		f.Type.resetStringCache()
+	}
 }
 
 func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
@@ -152,6 +155,7 @@ func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
 
 func (s *FunctionType) SetSideEffect(se []*FunctionSideEffect) {
 	s.SideEffects = se
+	s.resetStringCache()
 }
 
 // getActualKeyFromCall 获取调用时的实际 key 值
