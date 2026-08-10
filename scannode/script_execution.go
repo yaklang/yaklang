@@ -59,6 +59,11 @@ func (s *ScanNode) executeScriptTask(
 		s,
 	)
 	keyValues := s.parseScriptParams(input.ScriptJSONParam)
+	cleanupSourcePayload, err := s.prepareManagedSourcePayload(taskCtx, keyValues)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanupSourcePayload()
 	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
 	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {
