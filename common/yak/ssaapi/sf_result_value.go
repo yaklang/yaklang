@@ -142,7 +142,11 @@ func (r *SyntaxFlowResult) GetValue(name string, index int) (*Value, error) {
 	}
 
 	if name == "_" {
-		return r.GetUnNameValues()[index], nil
+		vs := r.GetUnNameValues()
+		if index < 0 || index >= len(vs) {
+			return nil, utils.Errorf("index out of range: %d (len %d)", index, len(vs))
+		}
+		return vs[index], nil
 	}
 
 	if r.dbResult != nil {
