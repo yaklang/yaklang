@@ -42,11 +42,11 @@ func (m *mockedAI) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error)
 	prompt := req.GetPrompt()
 	if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
 		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "reducer_memory": "batch compressed summary via ai"}
+{"@action": "timeline-reducer", "key_findings": ["batch compressed finding via ai"]}
 `))
 	} else if strings.Contains(prompt, "timeline-reducer") || strings.Contains(prompt, "timeline reducer") {
 		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "reducer_memory": "reducer memory via ai"}
+{"@action": "timeline-reducer", "key_findings": ["reducer memory finding via ai"]}
 `))
 	} else {
 		rsp.EmitOutputStream(strings.NewReader(`
@@ -75,11 +75,11 @@ func (m *mockedAI2) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error
 	prompt := req.GetPrompt()
 	if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
 		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "reducer_memory": "batch compressed content ` + fmt.Sprint(atomic.AddInt64(m.hCompressTime, 1)) + `"}
+{"@action": "timeline-reducer", "key_findings": ["batch compressed content ` + fmt.Sprint(atomic.AddInt64(m.hCompressTime, 1)) + `"]}
 `))
 	} else if utils.MatchAllOfRegexp(prompt, `const"\s*:\s*"timeline-reducer"`) || strings.Contains(prompt, "timeline-reducer") {
 		rsp.EmitOutputStream(strings.NewReader(`
-{"@action": "timeline-reducer", "reducer_memory": "高度压缩的内容` + fmt.Sprint(atomic.AddInt64(m.hCompressTime, 1)) + `"}
+{"@action": "timeline-reducer", "key_findings": ["高度压缩的内容` + fmt.Sprint(atomic.AddInt64(m.hCompressTime, 1)) + `"]}
 `))
 	} else {
 		rsp.EmitOutputStream(strings.NewReader(`
@@ -330,7 +330,7 @@ func TestCompressionWithContentSizeLimit(t *testing.T) {
 
 	// 如果内容过大，应该触发压缩
 	if hasTimelineReducer(result) {
-		require.True(t, strings.Contains(result, "batch compressed"), "Should have batch compression result")
+		require.True(t, strings.Contains(result, "batch compressed") || strings.Contains(result, "Key Findings"), "Should have batch compression result")
 	}
 }
 
