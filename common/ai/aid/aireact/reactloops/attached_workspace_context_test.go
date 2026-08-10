@@ -11,7 +11,7 @@ import (
 
 func TestParseWorkspaceAttachedContext_TargetOverridesDirectory(t *testing.T) {
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyDirectoryPath, "/tmp/workspace"),
+		aicommon.NewAttachedResource(AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, "/tmp/workspace"),
 		aicommon.NewAttachedResource(AttachedResourceTypeFile, "skill_audit_target_path", "/tmp/skill/demo-skill"),
 	}
 	ctx := ParseWorkspaceAttachedContext(attached, "skill_audit_target_path")
@@ -25,7 +25,7 @@ func TestParseWorkspaceAttachedContext_TargetOverridesDirectory(t *testing.T) {
 
 func TestParseWorkspaceAttachedContext_FallbackToDirectory(t *testing.T) {
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyDirectoryPath, "/tmp/skill/demo-skill"),
+		aicommon.NewAttachedResource(AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, "/tmp/skill/demo-skill"),
 	}
 	ctx := ParseWorkspaceAttachedContext(attached, "skill_audit_target_path")
 	require.NotNil(t, ctx)
@@ -35,7 +35,7 @@ func TestParseWorkspaceAttachedContext_FallbackToDirectory(t *testing.T) {
 
 func TestParseWorkspaceAttachedContext_FileAndSelectionDoNotInferScanPath(t *testing.T) {
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyFilePath, "/tmp/skill/SKILL.md"),
+		aicommon.NewAttachedResource(AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/skill/SKILL.md"),
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, `{"path":"/tmp/skill/SKILL.md","content":"hello","startLine":1,"endLine":1}`),
 	}
 	ctx := ParseWorkspaceAttachedContext(attached, "skill_audit_target_path")
@@ -81,8 +81,8 @@ func TestParseWorkspaceAttachedContext_LegacyTargetOnly(t *testing.T) {
 
 func TestInitWorkspaceAttachedContext_SamePayloadForBothAudits(t *testing.T) {
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyDirectoryPath, "/tmp/shared-root"),
-		aicommon.NewAttachedResource(AttachedResourceTypeFile, AttachedResourceKeyFilePath, "/tmp/shared-root/main.go"),
+		aicommon.NewAttachedResource(AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, "/tmp/shared-root"),
+		aicommon.NewAttachedResource(AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/shared-root/main.go"),
 	}
 	for _, targetKey := range []string{"code_audit_target_path", "skill_audit_target_path"} {
 		task := aicommon.NewStatefulTaskBase("test", "", context.Background(), nil, true)

@@ -26,8 +26,8 @@ func TestYakRunnerProtocol_1_WorkspaceAndFilePathAttachments(t *testing.T) {
 	editorFile := filepath.Join(workspace, "scan.yak")
 
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.YaklangAttachedResourceKeyCodeFile, editorFile),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, editorFile),
 	}
 
 	ctx := aicommon.ParseYaklangEditorContextFromAttached(attached)
@@ -60,8 +60,8 @@ func TestYakRunnerProtocol_2_SelectedContentAttachment(t *testing.T) {
 	selectionJSON := `{"path":"` + filepath.ToSlash(editorFile) + `","startLine":10,"endLine":18,"language":"yak","content":"println(\"hi\")"}`
 
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.YaklangAttachedResourceKeyCodeFile, editorFile),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, editorFile),
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, selectionJSON),
 	}
 

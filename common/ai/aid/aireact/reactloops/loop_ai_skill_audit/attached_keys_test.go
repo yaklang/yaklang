@@ -12,7 +12,7 @@ import (
 func TestWorkspaceAttachedContext_TargetOverridesDirectory(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("test", "", context.Background(), nil, true)
 	task.SetAttachedDatas([]*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(reactloops.AttachedResourceTypeFile, reactloops.AttachedResourceKeyDirectoryPath, "/tmp/new-workspace"),
+		aicommon.NewAttachedResource(reactloops.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, "/tmp/new-workspace"),
 		aicommon.NewAttachedResource(reactloops.AttachedResourceTypeFile, AttachedResourceKeySkillAuditTargetPath, "/tmp/legacy-target"),
 	})
 	ws := reactloops.InitWorkspaceAttachedContext(nil, nil, task, AttachedResourceKeySkillAuditTargetPath)
