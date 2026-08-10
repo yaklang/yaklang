@@ -52,11 +52,14 @@ func snapshotOriginalAnchorBitsOnce(sourceValues Values) []anchorRestoreEntry {
 		}
 		savedPointers[ptrKey] = struct{}{}
 
-		var cloned *utils.BitVector
+		var saved *utils.BitVector
 		if bits := v.GetAnchorBitVector(); bits != nil && !bits.IsEmpty() {
-			cloned = bits.Clone()
+			// Anchor bits are NEVER mutated in place (load-bearing COW
+			// invariant), so storing the original pointer is safe: restore
+			// puts the same immutable object back later.
+			saved = bits
 		}
-		restores = append(restores, anchorRestoreEntry{value: v, bits: cloned})
+		restores = append(restores, anchorRestoreEntry{value: v, bits: saved})
 	}
 	return restores
 }
@@ -79,18 +82,40 @@ func collectLocalSlotBitsByIdentity(sourceValues Values, base int) map[string]*u
 }
 
 func applyScopedAnchorBits(restores []anchorRestoreEntry, localBitsByIdentity map[string]*utils.BitVector) {
+	// Count how many restore entries share each logical identity. When an
+	// identity maps to exactly one entry, its localBits is a freshly-built
+	// private BitVector owned only by that entry, so we can OR in place without
+	// cloning. Duplicated identities (multiple distinct objects with the same
+	// id) must still clone so each object gets its own copy.
+	identityCount := make(map[string]int, len(restores))
 	for _, restore := range restores {
-		localBits := localBitsByIdentity[valueIdentity(restore.value)]
+		identityCount[valueIdentity(restore.value)]++
+	}
+	for _, restore := range restores {
+		ident := valueIdentity(restore.value)
+		localBits := localBitsByIdentity[ident]
 		if localBits == nil || localBits.IsEmpty() {
 			restore.value.SetAnchorBitVector(restore.bits)
 			continue
 		}
 
-		merged := localBits.Clone()
-		if restore.bits != nil && !restore.bits.IsEmpty() {
-			merged.Or(restore.bits)
+		if identityCount[ident] > 1 {
+			// Multiple distinct objects share this identity and localBits is
+			// the shared map entry. Clone before OR so mutating this entry
+			// doesn't leak the merged bits into the others.
+			merged := localBits.Clone()
+			if restore.bits != nil && !restore.bits.IsEmpty() {
+				merged.Or(restore.bits)
+			}
+			restore.value.SetAnchorBitVector(merged)
+			continue
 		}
-		restore.value.SetAnchorBitVector(merged)
+		// Private identity: localBits is owned only by this entry, so OR in
+		// place avoids the large BitVector.Clone allocation.
+		if restore.bits != nil && !restore.bits.IsEmpty() {
+			localBits.Or(restore.bits)
+		}
+		restore.value.SetAnchorBitVector(localBits)
 	}
 }
 
@@ -176,6 +201,11 @@ func mergeAnchorBits(dst ValueOperator, sourceBits *utils.BitVector) {
 		// before Or'ing, and sourceBits is never corrupted. See the contract on
 		// ssaapi.Value.SetAnchorBitVector.
 		dst.SetAnchorBitVector(sourceBits)
+		return
+	}
+	// Idempotent merge: if sourceBits is already a subset of dstBits, the
+	// result is unchanged, so skip the clone+Or allocation entirely.
+	if dstBits.Contains(sourceBits) {
 		return
 	}
 	merged := dstBits.Clone()
