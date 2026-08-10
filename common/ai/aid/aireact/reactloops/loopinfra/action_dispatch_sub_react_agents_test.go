@@ -126,6 +126,32 @@ func TestVerifyDispatchSubReactAgents_AcceptsValidPayload(t *testing.T) {
 	assert.Contains(t, loop.Get(dispatchSubReactJobsLoopKey), "scan_a")
 	assert.Equal(t, 2, loop.GetInt(dispatchSubReactConcurrencyLoopKey))
 }
+
+func TestVerifyDispatchSubReactAgents_RejectsOverMaxSubAgents(t *testing.T) {
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithEnableMultiAgentMode(true),
+		aicommon.WithMaxSubAgents(1),
+		aicommon.WithDisableAutoSkills(true),
+	)
+	invoker := &configBackedDispatchInvoker{
+		dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(context.Background()),
+		cfg:                         cfg,
+	}
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	require.Equal(t, 1, loop.GetMaxSubAgents())
+
+	action := mustBuildDispatchSubReactAction(t, map[string]any{
+		"dispatches": dispatchSubReactJobs(
+			map[string]any{"identifier": "scan_a", "goal": "scan service A"},
+			map[string]any{"identifier": "scan_b", "goal": "scan service B"},
+		),
+	})
+	err := verifyDispatchSubReactAgents(loop, action)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at most 1")
+}
+
 func TestNewReActLoop_InjectsDispatchSubReactAgents(t *testing.T) {
 	// Dispatch sub react agents is gated by EnableDispatchSubReactAgents on the
 	// real *aicommon.Config; NewReActLoop only injects the action when the flag is on.

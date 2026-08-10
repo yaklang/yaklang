@@ -29,6 +29,19 @@ func (r *ReActLoop) GetGoalMinIterations() int {
 	return int(aicommon.DefaultGoalMinIterations)
 }
 
+// GetMaxSubAgents returns the per-dispatch sub-agent cap for multi-agent mode.
+// Like GoalMinIterations it reads from config with a normalized default; the
+// absolute ceiling remains AbsoluteMaxSubAgents.
+func (r *ReActLoop) GetMaxSubAgents() int {
+	if r == nil || r.config == nil {
+		return int(aicommon.DefaultMaxSubAgents)
+	}
+	if cfg, ok := r.config.(interface{ GetMaxSubAgents() int64 }); ok {
+		return int(cfg.GetMaxSubAgents())
+	}
+	return int(aicommon.DefaultMaxSubAgents)
+}
+
 // ShouldBlockFinishAtIteration reports whether the finish action should be
 // blocked at the given iteration. finish is allowed for iteration >=
 // GoalMinIterations; every earlier iteration is blocked.

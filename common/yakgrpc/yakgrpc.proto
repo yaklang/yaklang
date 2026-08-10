@@ -2312,6 +2312,10 @@ message AIExecutionStrategy {
 
   // Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
   int64 GoalMinIterations = 3;
+
+  // Multi 模式下单次 dispatch_sub_react_agents 允许的最大子 Agent 数量。
+  // 超出时由服务端硬性拒绝该次 dispatch。<=0 时由服务端使用默认值 3；硬上限 20。
+  int64 MaxSubAgents = 4;
 }
 
 message AITaskFilter {

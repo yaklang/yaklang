@@ -40,6 +40,8 @@ import (
 const DefaultPeriodicVerificationInterval = 20
 const DefaultGoalMinIterations = 6
 const GoalModeIterationBuffer = 2
+const DefaultMaxSubAgents = 3
+const AbsoluteMaxSubAgents = 20
 
 type ConfigOption func(*Config) error
 
@@ -243,6 +245,7 @@ type Config struct {
 	DisallowMCPServers           bool // 禁用 MCP Servers，默认为 false（即默认启用）
 	EnableDispatchSubReactAgents bool // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
 	PreferDispatchSubReactAgents bool // Bias the top-level loop toward dispatch_sub_react_agents for parallelizable work.
+	MaxSubAgents                 int64 // Cap on sub agents per dispatch_sub_react_agents call (multi-agent mode).
 
 	// ExtraMCPServers 会话级显式挂载的 MCP server（不读 profile DB、不进全局列表）。
 	// 仅在本字段非空时激活，默认 nil，对现有流程零影响。
@@ -666,6 +669,7 @@ func newConfig(ctx context.Context) *Config {
 		MaxTaskContinue:                    3,
 		PeriodicVerificationInterval:       DefaultPeriodicVerificationInterval,
 		GoalMinIterations:                  DefaultGoalMinIterations,
+		MaxSubAgents:                       DefaultMaxSubAgents,
 		GenerateReport:                     true,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
@@ -1756,6 +1760,25 @@ func WithEnableMultiAgentMode(enable bool) ConfigOption {
 			return err
 		}
 		return WithPreferDispatchSubReactAgents(enable)(c)
+	}
+}
+
+func WithMaxSubAgents(n int64) ConfigOption {
+	return func(c *Config) error {
+		if n < 0 {
+			return utils.Error("max sub agents must be >= 0")
+		}
+		if n == 0 {
+			n = DefaultMaxSubAgents
+		}
+		n = NormalizeMaxSubAgents(n)
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.MaxSubAgents = n
+		c.m.Unlock()
+		return nil
 	}
 }
 
@@ -4005,8 +4028,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithGenerateReport(i.GenerateReport))
 	// EnableDispatchSubReactAgents is intentionally omitted: only the top-level
 	// ReAct agent may dispatch sub ReAct agents; forked child configs must not inherit it.
-	// PreferDispatchSubReactAgents / GoalMode 也只对顶层 agent 生效，避免子 agent
-	// 被错误地强制并行偏好或最小轮数约束。
+	// PreferDispatchSubReactAgents / MaxSubAgents / GoalMode 也只对顶层 agent 生效，避免子 agent
+	// 被错误地强制并行偏好、子任务上限或最小轮数约束。
 
 	// Retry / limits
 	if i.AiTransactionAutoRetry > 0 {

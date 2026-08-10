@@ -327,7 +327,7 @@ func TestOverlayAISessionStartParams(t *testing.T) {
 		AIModelName:       "model-b",
 		ReviewPolicy:      "ai",
 		UserInteractLimit: 3,
-		Strategy:          &ypb.AIExecutionStrategy{EnableGoalMode: true, GoalMinIterations: 8},
+		Strategy:          &ypb.AIExecutionStrategy{EnableGoalMode: true, GoalMinIterations: 8, MaxSubAgents: 4},
 	}
 
 	next := OverlayAISessionStartParams(base, patch)
@@ -340,6 +340,7 @@ func TestOverlayAISessionStartParams(t *testing.T) {
 	require.True(t, strategy.GetEnableMultiAgent())
 	require.True(t, strategy.GetEnableGoalMode())
 	require.Equal(t, int64(8), strategy.GetGoalMinIterations())
+	require.Equal(t, int64(4), strategy.GetMaxSubAgents())
 	require.True(t, next.GetDisableToolUse())
 	require.True(t, next.GetDisableAISearchForge())
 	require.Equal(t, "cached", next.GetUserPresetPrompt())
