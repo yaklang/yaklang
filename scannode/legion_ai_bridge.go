@@ -86,6 +86,14 @@ type aiSessionRuntimeEmitter interface {
 	Failed(string, string, []byte)
 }
 
+// aiSessionRuntimeRefEmitter publishes a runtime event with the exact command
+// reference that admitted it. Control responses can otherwise be attributed
+// to a concurrent Close or replacement input after the manager advances its
+// mutable current ref.
+type aiSessionRuntimeRefEmitter interface {
+	EmitForRef(aiSessionCommandRef, string, []byte) bool
+}
+
 type aiSessionRuntimeTurnCompleter interface {
 	DoneTurn(string, []byte)
 	FailTurn(string, string, string, []byte)
@@ -1453,13 +1461,35 @@ type managedAISessionRuntimeEmitter struct {
 }
 
 func (e *managedAISessionRuntimeEmitter) Emit(eventType string, payloadJSON []byte) {
+	e.emitForRef(nil, eventType, payloadJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) EmitForRef(
+	ref aiSessionCommandRef,
+	eventType string,
+	payloadJSON []byte,
+) bool {
+	return e.emitForRef(&ref, eventType, payloadJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) emitForRef(
+	frozenRef *aiSessionCommandRef,
+	eventType string,
+	payloadJSON []byte,
+) bool {
 	if e == nil || e.runtime == nil || e.publisher == nil {
-		return
+		return false
 	}
 	if !e.runtime.beginEmission() {
-		return
+		return false
 	}
-	ref, seq := e.runtime.nextEventRefAndSeq()
+	var ref aiSessionCommandRef
+	var seq uint64
+	if frozenRef == nil {
+		ref, seq = e.runtime.nextEventRefAndSeq()
+	} else {
+		ref, seq = e.runtime.nextEventRefAndSeqFor(*frozenRef)
+	}
 	rootTerminal := isYakAIRootPlanExecutionCompleted(payloadJSON)
 	claimed := false
 	if rootTerminal {
@@ -1485,7 +1515,7 @@ func (e *managedAISessionRuntimeEmitter) Emit(eventType string, payloadJSON []by
 			e.runtime.releaseFailedAutomaticTerminal(ref)
 		}
 		e.runtime.endEmission()
-		return
+		return false
 	}
 	e.runtime.endEmission()
 	if claimed && e.manager != nil {
@@ -1493,6 +1523,7 @@ func (e *managedAISessionRuntimeEmitter) Emit(eventType string, payloadJSON []by
 			logAISessionRuntimePublishError("complete", ref.SessionID, err)
 		}
 	}
+	return true
 }
 
 func (e *managedAISessionRuntimeEmitter) Done(resultJSON []byte) {
@@ -1687,6 +1718,28 @@ func (r *aiSessionRuntime) nextEventRefAndSeq() (aiSessionCommandRef, uint64) {
 	r.mu.Unlock()
 
 	return stableAISessionRuntimeEventRef(ref, handle), seq
+}
+
+func (r *aiSessionRuntime) nextEventRefAndSeqFor(ref aiSessionCommandRef) (aiSessionCommandRef, uint64) {
+	r.mu.Lock()
+	r.seq++
+	current := r.ref
+	seq := r.seq
+	r.mu.Unlock()
+
+	if strings.TrimSpace(ref.SessionID) == "" {
+		ref.SessionID = current.SessionID
+	}
+	if strings.TrimSpace(ref.RunID) == "" {
+		ref.RunID = current.RunID
+	}
+	if ref.BindEpoch == 0 {
+		ref.BindEpoch = current.BindEpoch
+	}
+	if strings.TrimSpace(ref.OwnerUserID) == "" {
+		ref.OwnerUserID = current.OwnerUserID
+	}
+	return ref, seq
 }
 
 func stableAISessionRuntimeEventRef(

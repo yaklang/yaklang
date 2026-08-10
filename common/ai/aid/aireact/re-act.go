@@ -31,6 +31,8 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 )
 
+const MainTaskQueueName = "react-main-queue"
+
 // 同步类型常量
 const (
 	SYNC_TYPE_QUEUE_INFO                = "queue_info"
@@ -227,7 +229,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	react := &ReAct{
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
-		taskQueue:            NewTaskQueue("react-main-queue"),
+		taskQueue:            NewTaskQueue(MainTaskQueueName),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            nil, // lazy: created in ensureWorkDirectory

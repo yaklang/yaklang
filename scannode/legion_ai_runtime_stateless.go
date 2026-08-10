@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -93,6 +94,8 @@ type statelessAIEngineRuntimeHandle struct {
 	activeTurn   *statelessAITurn
 	forgeStarted bool
 	closed       bool
+	idleEmits    int
+	idleEmitDone chan struct{}
 
 	// newEngine is overridable in tests so lifecycle and control routing can
 	// be verified without a real model provider.
@@ -365,11 +368,18 @@ func (h *statelessAIEngineRuntimeHandle) sendSyncInput(input aiSessionInput) err
 	}
 	turn := h.activeTurn
 	if turn == nil {
-		h.mu.Unlock()
 		if strings.EqualFold(strings.TrimSpace(syncEvent.SyncType), "queue_info") {
-			h.emitIdleQueueInfo(syncEvent)
-			return nil
+			if h.idleEmits == 0 {
+				h.idleEmitDone = make(chan struct{})
+			}
+			h.idleEmits++
+			ref := input.Ref
+			h.mu.Unlock()
+			err := h.emitIdleQueueInfo(ref, syncEvent)
+			h.finishIdleEmit()
+			return err
 		}
+		h.mu.Unlock()
 		return fmt.Errorf("stateless sendinput: no active turn for sync event")
 	}
 	defer h.mu.Unlock()
@@ -386,9 +396,25 @@ func (h *statelessAIEngineRuntimeHandle) sendSyncInput(input aiSessionInput) err
 	return nil
 }
 
-func (h *statelessAIEngineRuntimeHandle) emitIdleQueueInfo(syncEvent *yakAISyncEvent) {
-	if h == nil || h.emitter == nil || syncEvent == nil {
+func (h *statelessAIEngineRuntimeHandle) finishIdleEmit() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.idleEmits == 0 {
 		return
+	}
+	h.idleEmits--
+	if h.idleEmits == 0 && h.idleEmitDone != nil {
+		close(h.idleEmitDone)
+		h.idleEmitDone = nil
+	}
+}
+
+func (h *statelessAIEngineRuntimeHandle) emitIdleQueueInfo(
+	ref aiSessionCommandRef,
+	syncEvent *yakAISyncEvent,
+) error {
+	if h == nil || h.emitter == nil || syncEvent == nil {
+		return fmt.Errorf("stateless sendinput: idle queue response emitter is unavailable")
 	}
 	event := &schema.AiOutputEvent{
 		Type:   schema.EVENT_TYPE_STRUCTURED,
@@ -396,7 +422,7 @@ func (h *statelessAIEngineRuntimeHandle) emitIdleQueueInfo(syncEvent *yakAISyncE
 		IsJson: true,
 		IsSync: true,
 		Content: mustJSON(map[string]any{
-			"queue_name":    "default",
+			"queue_name":    aireact.MainTaskQueueName,
 			"total_tasks":   0,
 			"is_processing": false,
 			"tasks":         []any{},
@@ -405,7 +431,16 @@ func (h *statelessAIEngineRuntimeHandle) emitIdleQueueInfo(syncEvent *yakAISyncE
 		Timestamp: time.Now().Unix(),
 		SyncID:    syncEvent.SyncID,
 	}
-	h.emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
+	eventType := classifyYakAIEvent(event)
+	payloadJSON := marshalYakAIOutputEvent(event)
+	if emitter, ok := h.emitter.(aiSessionRuntimeRefEmitter); ok {
+		if !emitter.EmitForRef(ref, eventType, payloadJSON) {
+			return fmt.Errorf("stateless sendinput: idle queue response was not published")
+		}
+		return nil
+	}
+	h.emitter.Emit(eventType, payloadJSON)
+	return nil
 }
 
 func (h *statelessAIEngineRuntimeHandle) runTurn(
@@ -501,7 +536,11 @@ func (h *statelessAIEngineRuntimeHandle) closeRuntime() {
 	h.closed = true
 	turn := h.activeTurn
 	h.activeTurn = nil
+	idleEmitDone := h.idleEmitDone
 	h.mu.Unlock()
+	if idleEmitDone != nil {
+		<-idleEmitDone
+	}
 	turn.close()
 }
 

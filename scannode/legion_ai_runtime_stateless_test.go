@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
@@ -46,6 +47,36 @@ func (e *capturingStatelessEmitter) Emit(eventType string, payload []byte) {
 }
 func (*capturingStatelessEmitter) Done([]byte)                   {}
 func (*capturingStatelessEmitter) Failed(string, string, []byte) {}
+
+type blockingRefStatelessEmitter struct {
+	started chan struct{}
+	release chan struct{}
+	mu      sync.Mutex
+	ref     aiSessionCommandRef
+}
+
+func newBlockingRefStatelessEmitter() *blockingRefStatelessEmitter {
+	return &blockingRefStatelessEmitter{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (*blockingRefStatelessEmitter) Emit(string, []byte)           {}
+func (*blockingRefStatelessEmitter) Done([]byte)                   {}
+func (*blockingRefStatelessEmitter) Failed(string, string, []byte) {}
+func (e *blockingRefStatelessEmitter) EmitForRef(
+	ref aiSessionCommandRef,
+	_ string,
+	_ []byte,
+) bool {
+	e.mu.Lock()
+	e.ref = ref
+	e.mu.Unlock()
+	close(e.started)
+	<-e.release
+	return true
+}
 
 type singleRunCompletion struct {
 	turnID string
@@ -584,8 +615,14 @@ func TestStatelessDriverIdleQueueInfoReturnsEmptyQueueAndKeepsRuntimeUsable(t *t
 		t.Fatalf("decode queue event: %v", err)
 	}
 	queue, ok := payload["content_json"].(map[string]any)
-	if !ok || queue["queue_empty"] != true || queue["total_tasks"] != float64(0) {
+	if !ok || queue["queue_name"] != aireact.MainTaskQueueName ||
+		queue["queue_empty"] != true || queue["total_tasks"] != float64(0) ||
+		queue["is_processing"] != false {
 		t.Fatalf("idle queue payload = %#v", payload)
+	}
+	tasks, ok := queue["tasks"].([]any)
+	if !ok || len(tasks) != 0 {
+		t.Fatalf("idle queue tasks = %#v", queue["tasks"])
 	}
 	if payload["node_id"] != "queue_info" || payload["is_sync"] != true || payload["sync_id"] != "queue-poll-1" {
 		t.Fatalf("idle queue envelope = %#v", payload)
@@ -608,6 +645,74 @@ func TestStatelessDriverIdleQueueInfoReturnsEmptyQueueAndKeepsRuntimeUsable(t *t
 		t.Fatal("next turn did not start after idle queue poll")
 	}
 	sh.Close("test cleanup")
+}
+
+func TestStatelessDriverIdleQueueInfoIsOrderedBeforeClose(t *testing.T) {
+	emitter := newBlockingRefStatelessEmitter()
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:                        aiSessionCommandRef{SessionID: "s-stateless-idle-close", OwnerUserID: "u1"},
+		ProviderPolicySnapshotJSON: []byte(`{}`),
+		RuntimeOptionSnapshotJSON:  []byte(`{}`),
+	}, emitter)
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	pollRef := aiSessionCommandRef{
+		CommandID:   "queue-poll-before-close",
+		SessionID:   "s-stateless-idle-close",
+		RunID:       "run-1",
+		BindEpoch:   7,
+		OwnerUserID: "u1",
+	}
+	inputDone := make(chan error, 1)
+	go func() {
+		inputDone <- sh.SendInput(context.Background(), aiSessionInput{
+			Ref:         pollRef,
+			InputType:   "sync_event",
+			PayloadJSON: []byte(`{"sync_type":"queue_info","sync_id":"queue-poll-close","sync_json_input":{}}`),
+		})
+	}()
+	select {
+	case <-emitter.started:
+	case <-time.After(time.Second):
+		t.Fatal("idle queue response did not start")
+	}
+
+	closeDone := make(chan struct{})
+	go func() {
+		sh.Close("concurrent close")
+		close(closeDone)
+	}()
+	select {
+	case <-closeDone:
+		t.Fatal("close returned before admitted idle queue response finished")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(emitter.release)
+	if err := <-inputDone; err != nil {
+		t.Fatalf("admitted idle queue response: %v", err)
+	}
+	select {
+	case <-closeDone:
+	case <-time.After(time.Second):
+		t.Fatal("close did not finish after idle queue response")
+	}
+	emitter.mu.Lock()
+	gotRef := emitter.ref
+	emitter.mu.Unlock()
+	if gotRef != pollRef {
+		t.Fatalf("idle queue ref = %#v, want %#v", gotRef, pollRef)
+	}
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "queue-poll-after-close"},
+		InputType:   "sync_event",
+		PayloadJSON: []byte(`{"sync_type":"queue_info","sync_id":"after-close","sync_json_input":{}}`),
+	}); err == nil || !contains(err.Error(), "runtime is closed") {
+		t.Fatalf("post-close idle queue poll error = %v", err)
+	}
 }
 
 func TestStatelessDriverFreeInputWithoutActiveTurnStartsNextTurn(t *testing.T) {
