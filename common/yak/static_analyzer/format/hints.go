@@ -1,4 +1,4 @@
-package loop_yaklangcode
+package format
 
 import (
 	"strings"
@@ -20,7 +20,8 @@ type compilerErrorHint struct {
 	Enrich func(normalizedMessage string) string
 }
 
-func extractCoreCompilerMessage(full string) string {
+// ExtractCoreCompilerMessage strips location suffixes from analyzer messages.
+func ExtractCoreCompilerMessage(full string) string {
 	msg := strings.TrimSpace(full)
 	msg = strings.TrimPrefix(msg, "[Error]: ")
 	msg = strings.TrimPrefix(msg, "基础语法错误（Syntax Error）：")
@@ -480,9 +481,8 @@ var compilerErrorHints = []compilerErrorHint{
 	},
 }
 
-// allBuiltinCompilerErrorMessages lists canonical messages from ssa / yak2ssa / ssa4analyze
-// for regression testing — every entry must produce a non-empty hint.
-var allBuiltinCompilerErrorMessages = []struct {
+// AllBuiltinCompilerErrorMessages lists canonical messages for hint regression tests.
+var AllBuiltinCompilerErrorMessages = []struct {
 	name    string
 	message string
 }{
