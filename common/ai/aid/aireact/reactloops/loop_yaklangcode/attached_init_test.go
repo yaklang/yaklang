@@ -40,7 +40,7 @@ func TestSeedYaklangLoopFullCode_PrefersDiskInEditMode(t *testing.T) {
 
 	selection := `{"path":"` + filepath.ToSlash(yakPath) + `","startLine":3,"endLine":5,"language":"yak","content":"urlDecoded, err := codec.DecodeUrl(urlEncoded)\ndie(err)\nyakit.Info(\"old\")"}`
 	ctx := aicommon.ParseYaklangEditorContextFromAttached([]*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.YaklangAttachedResourceKeyCodeFile, yakPath),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, selection),
 	})
 
@@ -59,7 +59,7 @@ func TestSeedYaklangLoopFullCode_SelectionFallbackSetsLineBase(t *testing.T) {
 	yakPath := filepath.Join(t.TempDir(), "unsaved.yak")
 	selection := `{"path":"` + filepath.ToSlash(yakPath) + `","startLine":28,"endLine":30,"language":"yak","content":"a\nb\nc"}`
 	ctx := aicommon.ParseYaklangEditorContextFromAttached([]*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.YaklangAttachedResourceKeyCodeFile, yakPath),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, selection),
 	})
 

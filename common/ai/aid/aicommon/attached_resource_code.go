@@ -39,7 +39,7 @@ func (d *AttachedCodeResourceData) Unmarshal(raw string) error {
 	}
 	d.Path = filepath.Clean(path)
 	if d.Key == "" {
-		d.Key = AttachedResourceKeyFilePath
+		d.Key = CONTEXT_PROVIDER_KEY_FILE_PATH
 	}
 	return nil
 }

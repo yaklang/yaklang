@@ -16,7 +16,6 @@ const (
 	AttachedResourceKeyID      = "id"
 	AttachedResourceKeyContent = "content"
 	AttachedResourceKeyIsHTTPS = "is_https"
-	AttachedResourceKeyFilePath = CONTEXT_PROVIDER_KEY_FILE_PATH
 
 	AttachedHTTPFlowRequestInlineLimit  = 3 * 1024
 	AttachedHTTPFlowResponseInlineLimit = 3 * 1024

@@ -34,13 +34,6 @@ import (
 // Other loops use domain-specific keys (e.g. code_security_audit uses code_audit_target_path).
 // Frontend strings must match CONTEXT_PROVIDER_* and AttachedResource* constants.
 
-const (
-	YaklangAttachedResourceKeyWorkspaceDirectory = CONTEXT_PROVIDER_KEY_DIRECTORY_PATH
-	YaklangAttachedResourceKeyCodeFile           = CONTEXT_PROVIDER_KEY_FILE_PATH
-	// YaklangAttachedResourceKeyEditorFile is kept for callers; prefer Type=code + this key.
-	YaklangAttachedResourceKeyEditorFile = CONTEXT_PROVIDER_KEY_FILE_PATH
-)
-
 // YaklangEditorContext carries IDE workspace state parsed from frontend attachments.
 type YaklangEditorContext struct {
 	WorkspacePath string
@@ -114,18 +107,18 @@ func ParseYaklangEditorContextFromAttached(attachedDatas []*AttachedResource) *Y
 				}
 			}
 		case data.HasType(AttachedResourceTypeCode):
-			if data.HasKey(YaklangAttachedResourceKeyCodeFile) || data.HasKey(AttachedResourceKeyFilePath) {
+			if data.HasKey(CONTEXT_PROVIDER_KEY_FILE_PATH) {
 				if path := strings.TrimSpace(data.Value); path != "" {
 					codeDeliveryCandidates = append(codeDeliveryCandidates, filepath.Clean(path))
 				}
 			}
 		case data.HasType(AttachedResourceTypeFile):
 			switch {
-			case data.HasKey(YaklangAttachedResourceKeyWorkspaceDirectory):
+			case data.HasKey(CONTEXT_PROVIDER_KEY_DIRECTORY_PATH):
 				if path := strings.TrimSpace(data.Value); path != "" {
 					ctx.WorkspacePath = filepath.Clean(path)
 				}
-			case data.HasKey(YaklangAttachedResourceKeyEditorFile):
+			case data.HasKey(CONTEXT_PROVIDER_KEY_FILE_PATH):
 				// Type=file is read-only reference context. Keep .yak only as legacy delivery fallback.
 				if path := strings.TrimSpace(data.Value); IsYaklangScriptDeliveryPath(path) {
 					legacyFileYakCandidates = append(legacyFileYakCandidates, filepath.Clean(path))

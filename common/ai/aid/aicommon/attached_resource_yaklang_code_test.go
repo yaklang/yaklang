@@ -13,8 +13,8 @@ func TestYaklangEditorContextFromAttachedFull(t *testing.T) {
 	yakPath := filepath.Join(workspace, "foo.yak")
 	payload := `{"path":"` + filepath.ToSlash(yakPath) + `","startLine":3,"endLine":5,"language":"yak","content":"println(1)"}`
 	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
-		NewAttachedResource(AttachedResourceTypeCode, YaklangAttachedResourceKeyCodeFile, yakPath),
+		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
+		NewAttachedResource(AttachedResourceTypeCode, CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload),
 	})
 	require.NotNil(t, ctx)
@@ -101,7 +101,7 @@ func TestResolveYaklangInitFullCodePrefersDiskWhenEditorFile(t *testing.T) {
 	yakPath := filepath.Join("testdata", "foo.yak")
 	payload := `{"path":"` + filepath.ToSlash(yakPath) + `","startLine":1,"endLine":2,"language":"yak","content":"attached content"}`
 	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeCode, YaklangAttachedResourceKeyCodeFile, yakPath),
+		NewAttachedResource(AttachedResourceTypeCode, CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload),
 	})
 	code, fromSelection := ResolveYaklangInitFullCode(ctx, "disk content")
@@ -113,7 +113,7 @@ func TestResolveYaklangInitFullCodeUsesAttachedWhenDiskEmpty(t *testing.T) {
 	yakPath := filepath.Join("testdata", "foo.yak")
 	payload := `{"path":"` + filepath.ToSlash(yakPath) + `","startLine":28,"endLine":31,"language":"yak","content":"println(1)"}`
 	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeCode, YaklangAttachedResourceKeyCodeFile, yakPath),
+		NewAttachedResource(AttachedResourceTypeCode, CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		NewAttachedResource(AttachedResourceTypeSelected, AttachedResourceKeyContent, payload),
 	})
 	code, fromSelection := ResolveYaklangInitFullCode(ctx, "")
@@ -147,8 +147,8 @@ func TestParseYaklangEditorContext_CodeTypeSeparatesFromFileReference(t *testing
 	refYak := filepath.Join(workspace, "helper.yak")
 
 	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
-		NewAttachedResource(AttachedResourceTypeCode, YaklangAttachedResourceKeyCodeFile, yakPath),
+		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
+		NewAttachedResource(AttachedResourceTypeCode, CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, mdPath),
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, refYak),
 	})
@@ -167,7 +167,7 @@ func TestParseYaklangEditorContext_CodeTypeSeparatesFromFileReference(t *testing
 
 	// Legacy: Type=file .yak still accepted when Type=code is absent.
 	ctx = ParseYaklangEditorContextFromAttached([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
+		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, mdPath),
 	})
@@ -175,8 +175,8 @@ func TestParseYaklangEditorContext_CodeTypeSeparatesFromFileReference(t *testing
 	require.Equal(t, filepath.Clean(yakPath), ctx.EditorFile)
 
 	filtered := FilterAttachedResourcesExcludeYaklangDelivery([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeFile, YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
-		NewAttachedResource(AttachedResourceTypeCode, YaklangAttachedResourceKeyCodeFile, yakPath),
+		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
+		NewAttachedResource(AttachedResourceTypeCode, CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, mdPath),
 	})
 	require.Len(t, filtered, 2)
@@ -188,7 +188,7 @@ func TestParseYaklangEditorContext_CodeTypeSeparatesFromFileReference(t *testing
 func TestAttachedCodeResourceData_NoTimelineDump(t *testing.T) {
 	resource, err := ParseAttachedResourceData(NewAttachedResource(
 		AttachedResourceTypeCode,
-		AttachedResourceKeyFilePath,
+		CONTEXT_PROVIDER_KEY_FILE_PATH,
 		filepath.Join("testdata", "demo.yak"),
 	))
 	require.NoError(t, err)
