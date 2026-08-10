@@ -5,16 +5,20 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// SyntaxFlowGroup is the catalog of known rule groups (package buckets).
+// Reserved SyntaxFlow rule-group names (stored in SyntaxFlowRule.RuleGroup).
+const (
+	SyntaxFlowGroupBuiltin = "builtin"
+	SyntaxFlowGroupAgent   = "agent"
+	SyntaxFlowGroupCustom  = "custom"
+)
+
+// SyntaxFlowGroup is the catalog of known rule groups.
 // Rules bind via SyntaxFlowRule.RuleGroup (scalar), not many2many.
 // The legacy join table syntax_flow_rule_and_group is left unused for soft DB compat.
 type SyntaxFlowGroup struct {
 	gorm.Model
-	GroupName   string `json:"group_name" gorm:"unique_index"`
-	IsBuildIn   bool   `json:"is_build_in" gorm:"index"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
-	Source      string `json:"source" gorm:"index"`
+	GroupName string `json:"group_name" gorm:"unique_index"`
+	IsBuildIn bool   `json:"is_build_in" gorm:"index"`
 }
 
 func (s *SyntaxFlowGroup) ToGRPCModel() *ypb.SyntaxFlowGroup {
@@ -30,20 +34,5 @@ func (s *SyntaxFlowGroup) ToGRPCModelWithCount(count int32) *ypb.SyntaxFlowGroup
 		GroupName: s.GroupName,
 		IsBuildIn: s.IsBuildIn,
 		Count:     count,
-	}
-}
-
-// ToPackageGRPCModel maps a group catalog row to the soft-compat Package RPC shape.
-func (s *SyntaxFlowGroup) ToPackageGRPCModel(ruleCount int32) *ypb.SyntaxFlowPackage {
-	if s == nil {
-		return nil
-	}
-	return &ypb.SyntaxFlowPackage{
-		Name:        s.GroupName,
-		Version:     s.Version,
-		Description: s.Description,
-		Source:      s.Source,
-		IsBuiltin:   s.IsBuildIn,
-		RuleCount:   ruleCount,
 	}
 }

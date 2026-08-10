@@ -672,7 +672,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
 		stream.Send(&ypb.SyntaxFlowScanRequest{
 			ControlMode: "start",
 			Filter: &ypb.SyntaxFlowRuleFilter{
-				GroupNames: []string{string(ssaconfig.JAVA), string(ssaconfig.PHP), string(ssaconfig.GO)},
+				// language is a column filter; groups are exclusive buckets (builtin/agent/custom)
+				Language: []string{string(ssaconfig.JAVA)},
 			},
 			ProgramName: []string{
 				progID,

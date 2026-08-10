@@ -33,9 +33,9 @@ func SyncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 	var notify func(process float64, ruleName string)
 	if len(notifies) != 0 {
 		notify = notifies[0]
-		defer notify(1, "同步SyntaxFlow规则包成功！")
+		defer notify(1, "同步SyntaxFlow规则成功！")
 	}
-	return syncAllEmbedPackagesToDB(db, fsInstance, buildin, notify)
+	return syncAllEmbedGroupsToDB(db, fsInstance, buildin, notify)
 }
 
 func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {

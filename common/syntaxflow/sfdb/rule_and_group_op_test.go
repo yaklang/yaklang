@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -134,7 +134,7 @@ func TestRule_Group_OP(t *testing.T) {
 		// remove current group → custom
 		err = RemoveGroupForRule(db, ruleName, newGroupName)
 		require.NoError(t, err)
-		require.Equal(t, schema.SyntaxFlowPackageCustom, mustRuleGroup(t, db, ruleName))
+		require.Equal(t, schema.SyntaxFlowGroupCustom, mustRuleGroup(t, db, ruleName))
 	})
 
 	t.Run("test create and delete group for rule", func(t *testing.T) {
@@ -251,7 +251,7 @@ func TestRule_Group_OP(t *testing.T) {
 		newRule, err := CreateRuleWithDefaultGroup(rule)
 		require.NoError(t, err)
 		// auto language/severity/purpose groups abandoned → default custom bucket
-		require.Equal(t, schema.SyntaxFlowPackageCustom, newRule.RuleGroup)
+		require.Equal(t, schema.SyntaxFlowGroupCustom, newRule.RuleGroup)
 	})
 }
 

@@ -110,11 +110,8 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 		return db
 	}
 
-	if len(filter.GetGroupNames()) > 0 || len(filter.GetPackageNames()) > 0 {
-		names := append([]string{}, filter.GetGroupNames()...)
-		names = append(names, filter.GetPackageNames()...)
-		names = utils.RemoveRepeatedWithStringSlice(names)
-		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_group", names)
+	if len(filter.GetGroupNames()) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_group", filter.GetGroupNames())
 	}
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", filter.GetIds())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_id", filter.GetRuleIds())
@@ -144,8 +141,6 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 		// Tags are stored in tags (comma) and mirrored to tag (pipe); match substring.
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"syntax_flow_rules.tags", "syntax_flow_rules.tag"}, filter.GetTag(), false)
 	}
-	// PackageNames already merged into rule_group filter above when present alone;
-	// keep no-op here for callers that only set PackageNames (handled in GroupNames block).
 	//if !params.GetIncludeLibraryRule() {
 	//	db = db.Where("allow_included = ?", false)
 	//}
@@ -285,9 +280,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
 	updateRule.NeedUpdate = true
 
-	if pkg := strings.TrimSpace(rule.GetPackageName()); pkg != "" {
-		updateRule.RuleGroup = pkg
-	} else if len(rule.GetGroupNames()) > 0 {
+	if len(rule.GetGroupNames()) > 0 {
 		var exclusive string
 		for _, g := range rule.GetGroupNames() {
 			if g != "" {

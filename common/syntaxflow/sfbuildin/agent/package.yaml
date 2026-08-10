@@ -1,6 +1,0 @@
-package.yaml
-name: agent
-version: "0.1.0"
-description: "AI Agent project SyntaxFlow rules"
-source: embed
-rules: []

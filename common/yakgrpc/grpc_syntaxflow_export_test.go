@@ -6,16 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"io"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -36,18 +34,13 @@ func TestGRPCMUSTPASS_SyntaxFlow_Export_And_Import(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	wantRulesCount := 16
-	wantGroupsCount := 16
 	ruleNames := make([]string, 0, wantRulesCount)
-	groupNames := make([]string, 0, wantGroupsCount)
-	// create groups
-	for i := 0; i < wantGroupsCount; i++ {
-		groupName := fmt.Sprintf("group_%s", uuid.NewString())
-		groupNames = append(groupNames, groupName)
-	}
-	err = createGroups(client, groupNames)
+	// one exclusive group for all rules (one-group-per-rule model)
+	groupName := fmt.Sprintf("group_%s", uuid.NewString())
+	err = createGroups(client, []string{groupName})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		deleteRuleGroup(client, groupNames)
+		deleteRuleGroup(client, []string{groupName})
 	})
 
 	// create rules
@@ -61,7 +54,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Export_And_Import(t *testing.T) {
 	t.Cleanup(func() {
 		deleteRuleByNames(client, ruleNames)
 	})
-	err = addGroups(client, ruleNames, groupNames)
+	err = addGroups(client, ruleNames, []string{groupName})
 	require.NoError(t, err)
 
 	exportAndImportTest := func(t *testing.T, importRequest *ypb.ImportSyntaxFlowsRequest, exportRequest *ypb.ExportSyntaxFlowsRequest) {
@@ -83,7 +76,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Export_And_Import(t *testing.T) {
 		}
 		require.Equal(t, 1.0, progress)
 		// delete, for test import
-		deleteRuleGroup(client, groupNames)
+		deleteRuleGroup(client, []string{groupName})
 		deleteRuleByNames(client, ruleNames)
 
 		// import
@@ -109,12 +102,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Export_And_Import(t *testing.T) {
 		for _, rule := range rules {
 			require.Equal(t, tag, rule.GetTag())
 		}
-		// check rule groups
-		for _, groupName := range groupNames {
-			count, err := queryRuleGroupCount(client, groupName)
-			require.NoError(t, err)
-			require.Equal(t, wantRulesCount, count)
-		}
+		count, err := queryRuleGroupCount(client, groupName)
+		require.NoError(t, err)
+		require.Equal(t, wantRulesCount, count)
 	}
 
 	t.Run("no password", func(t *testing.T) {
@@ -123,7 +113,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Export_And_Import(t *testing.T) {
 			InputPath: p,
 		}, &ypb.ExportSyntaxFlowsRequest{
 			Filter: &ypb.SyntaxFlowRuleFilter{
-				GroupNames: groupNames,
+				GroupNames: []string{groupName},
 			},
 			TargetPath: p,
 		})
@@ -137,7 +127,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Export_And_Import(t *testing.T) {
 			Password:  password,
 		}, &ypb.ExportSyntaxFlowsRequest{
 			Filter: &ypb.SyntaxFlowRuleFilter{
-				GroupNames: groupNames,
+				GroupNames: []string{groupName},
 			},
 			TargetPath: p,
 			Password:   password,
@@ -193,6 +183,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Override_BuildIn_Rule(t *testing.T) {
 	// update rule
 	newContent := `b as $b`
 	createdRule.Content = newContent
+	createdRule.RuleGroup = group // keep exclusive group; UpdateRule writes full struct
 	err = sfdb.UpdateRule(db, createdRule)
 	require.NoError(t, err)
 	// delete rule group
@@ -281,14 +272,14 @@ func TestGRPCMUSTPASS_SyntaxFlow_Override_Rule_Group(t *testing.T) {
 	// update rule
 	newContent := `b as $b`
 	createdRule.Content = newContent
+	createdRule.RuleGroup = group
 	err = sfdb.UpdateRule(db, createdRule)
 	require.NoError(t, err)
-	// update rule group
-	// 规则在被导出后又重新添加多个组
+	// update rule group: exclusive model → last group wins (count == 1)
 	newGroup1 := uuid.NewString()
 	newGroup2 := uuid.NewString()
 	count, err := sfdb.BatchAddGroupsForRulesByRuleId(db, []string{rule_id}, []string{newGroup1, newGroup2})
-	require.Equal(t, int64(2), count)
+	require.Equal(t, int64(1), count)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		sfdb.DeleteGroup(db, newGroup1)
@@ -317,14 +308,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Override_Rule_Group(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rules, 1)
 	require.Equal(t, rules[0].Content, content)
-	// check rule groups
+	// import restores exported exclusive group
 	groups, err := sfdb.QueryGroupByRuleIds(db, []string{rule.RuleId})
 	require.NoError(t, err)
-	require.Len(t, groups, 3)
-	groupNames := lo.Map(groups, func(item *schema.SyntaxFlowGroup, index int) string {
-		return item.GroupName
-	})
-	require.Contains(t, groupNames, group)
-	require.Contains(t, groupNames, newGroup1)
-	require.Contains(t, groupNames, newGroup2)
+	require.Len(t, groups, 1)
+	require.Equal(t, group, groups[0].GroupName)
 }

@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -59,7 +59,7 @@ var ProfileTables = []interface{}{
 	&GeneralRuleGroup{},
 	//syntaxFlow rule
 	&SyntaxFlowRule{},
-	&SyntaxFlowGroup{}, // catalog of rule-group / package buckets; Rule.RuleGroup is the scalar bind
+	&SyntaxFlowGroup{}, // catalog of rule groups; Rule.RuleGroup is the scalar bind
 	&PluginEnv{},
 	&HotPatchTemplate{},
 	&AIForge{},

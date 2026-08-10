@@ -1,6 +1,0 @@
-package.yaml
-name: builtin
-version: "1.0.0"
-description: "Default SyntaxFlow code-scan rules"
-source: embed
-rules: []

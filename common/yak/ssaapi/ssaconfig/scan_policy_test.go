@@ -16,7 +16,8 @@ func TestGetScanPolicy(t *testing.T) {
 	got := cfg.GetScanPolicy()
 	require.NotNil(t, got)
 	require.Equal(t, PolicyTypeCriticalHigh, got.PolicyType)
-	require.ElementsMatch(t, []string{"critical", "high"}, cfg.SyntaxFlowRule.RuleFilter.GroupNames)
+	require.Empty(t, cfg.SyntaxFlowRule.RuleFilter.GroupNames)
+	require.ElementsMatch(t, []string{"critical", "high"}, cfg.SyntaxFlowRule.RuleFilter.Severity)
 }
 
 func TestWithJsonRawConfigAppliesScanPolicyToRuleFilter(t *testing.T) {
@@ -37,9 +38,10 @@ func TestWithJsonRawConfigAppliesScanPolicyToRuleFilter(t *testing.T) {
 	require.NotNil(t, cfg.GetScanPolicy())
 	require.NotNil(t, cfg.SyntaxFlowRule)
 	require.NotNil(t, cfg.SyntaxFlowRule.RuleFilter)
+	require.Empty(t, cfg.SyntaxFlowRule.RuleFilter.GroupNames)
 	require.ElementsMatch(
 		t,
 		[]string{"OWASP 2021 A03:Injection", "go", "high"},
-		cfg.SyntaxFlowRule.RuleFilter.GroupNames,
+		cfg.SyntaxFlowRule.RuleFilter.Tag,
 	)
 }

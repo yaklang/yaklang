@@ -820,14 +820,9 @@ service Yak {
   rpc SyntaxFlowRuleToOnline(SyntaxFlowRuleToOnlineRequest) returns (stream SyntaxFlowRuleOnlineProgress);
   rpc DownloadSyntaxFlowRule(DownloadSyntaxFlowRuleRequest) returns (stream SyntaxFlowRuleOnlineProgress);
 
-  // SyntaxFlow rule packages (docs/design/rule-package.md)
-  rpc QuerySyntaxFlowPackages(QuerySyntaxFlowPackagesRequest) returns (QuerySyntaxFlowPackagesResponse);
-  rpc CreateSyntaxFlowPackage(CreateSyntaxFlowPackageRequest) returns (DbOperateMessage);
-  rpc UpdateSyntaxFlowPackage(UpdateSyntaxFlowPackageRequest) returns (DbOperateMessage);
-  rpc DeleteSyntaxFlowPackage(DeleteSyntaxFlowPackageRequest) returns (DbOperateMessage);
-  rpc ExportSyntaxFlowPackage(ExportSyntaxFlowPackageRequest) returns (stream SyntaxFlowPackageProgress);
-  rpc ImportSyntaxFlowPackage(ImportSyntaxFlowPackageRequest) returns (stream SyntaxFlowPackageProgress);
-  rpc SyncSyntaxFlowPackage(SyncSyntaxFlowPackageRequest) returns (stream SyntaxFlowPackageProgress);
+  // SyntaxFlow Scan Policy（预设 Filter；来自 scan_policies.yaml）
+  rpc QuerySyntaxFlowScanPolicies(QuerySyntaxFlowScanPoliciesRequest) returns (QuerySyntaxFlowScanPoliciesResponse);
+  rpc SyntaxFlowScanPolicyToRuleFilter(SyntaxFlowScanPolicyToRuleFilterRequest) returns (SyntaxFlowScanPolicyToRuleFilterResponse);
 
   // syntaxflow scan
   rpc SyntaxFlowScan(stream SyntaxFlowScanRequest) returns (stream SyntaxFlowScanResponse);
@@ -8220,15 +8215,13 @@ message SyntaxFlowRule{
 
   string Hash = 16;
 
-  // GroupName: deprecated (rule groups removed); kept for wire compat
+  // GroupName: exclusive rule group (len <= 1); from Rule.RuleGroup
   repeated string GroupName = 17;
 
   map<string, AlertMessage> AlertMsg = 19;
 
-  // Rule package model (docs/design/rule-package.md)
   string RuleId = 20;
   string Version = 21;
-  string PackageName = 22;
   repeated string Tags = 23;
 }
 
@@ -8251,17 +8244,16 @@ message  SyntaxFlowRuleInput{
   string Content = 2;
   string Language = 3;
   repeated string Tags = 4;
-  // GroupNames: deprecated
+  // GroupNames: exclusive group for the rule (last non-empty wins)
   repeated string GroupNames = 5;
   string Description = 6;
   map<string, AlertMessage> AlertMsg = 7;
-  string PackageName = 8;
 }
 
 message SyntaxFlowRuleFilter {
   repeated string RuleNames = 1;
   repeated string Language = 2;
-  // GroupNames: deprecated; prefer Tags / PackageNames
+  // GroupNames: filter by Rule.RuleGroup
   repeated string GroupNames = 3;
   repeated string Severity = 4;
   repeated string Purpose = 5;
@@ -8278,7 +8270,6 @@ message SyntaxFlowRuleFilter {
   string FilterLibRuleKind = 14; // "lib"library规则，"noLib"非library规则，空为所有规则
   repeated string RuleIds = 15;
   repeated uint64 Ids = 16 ;
-  repeated string PackageNames = 17;
 }
 
 message SSAProgram{
@@ -8488,88 +8479,55 @@ message DownloadSyntaxFlowRuleRequest {
   SyntaxFlowRuleFilter Filter = 2;
 }
 
-// ========== SyntaxFlow Package ==========
+// ========== SyntaxFlow Scan Policy ==========
 
-message SyntaxFlowPackage {
-  string Name = 1;
-  string Version = 2;
+message SyntaxFlowScanPolicy {
+  string Id = 1;          // owasp-web / critical-high / fullstack / custom / ...
+  string Name = 2;
   string Description = 3;
-  string Source = 4; // embed | online | local | user
-  bool IsBuiltin = 5;
-  string Hash = 6;
-  int32 RuleCount = 7;
+  string Icon = 4;
+  // 预设展开后的默认 Filter（不含 Language / GroupNames；扫描时由调用方叠加）
+  SyntaxFlowRuleFilter Filter = 5;
 }
 
-message SyntaxFlowPackageFilter {
-  repeated string Names = 1;
-  repeated string Sources = 2;
-  string Keyword = 3;
-  string FilterBuiltinKind = 4; // "builtin" | "unBuiltin" | ""
+message SyntaxFlowScanPolicyCategory {
+  string Id = 1;
+  string Name = 2;
+  repeated string PolicyIds = 3;
 }
 
-message QuerySyntaxFlowPackagesRequest {
-  SyntaxFlowPackageFilter Filter = 1;
-  Paging Pagination = 2;
-}
-
-message QuerySyntaxFlowPackagesResponse {
-  repeated SyntaxFlowPackage Packages = 1;
-  Paging Pagination = 2;
-  int64 Total = 3;
-}
-
-message CreateSyntaxFlowPackageRequest {
+message SyntaxFlowScanPolicyTagOption {
   string Name = 1;
-  string Description = 2;
-  string Version = 3; // optional, default 0.1.0
+  string DisplayName = 2;
+  string Category = 3; // framework / tech_point / ...
 }
 
-message UpdateSyntaxFlowPackageRequest {
-  string Name = 1; // current name (key)
-  string NewName = 2; // optional rename
-  string Description = 3;
-  string Version = 4;
+message QuerySyntaxFlowScanPoliciesRequest {
+  // 空则返回全部；非空则按 Id 过滤
+  repeated string PolicyIds = 1;
 }
 
-message DeleteSyntaxFlowPackageRequest {
-  repeated string Names = 1;
-  bool DeleteRules = 2; // if true, delete rules in package
+message QuerySyntaxFlowScanPoliciesResponse {
+  string Version = 1;
+  repeated SyntaxFlowScanPolicy Policies = 2;
+  repeated SyntaxFlowScanPolicyCategory Categories = 3;
+  // 自定义策略 UI 可选标准 Tag
+  repeated SyntaxFlowScanPolicyTagOption CustomTagOptions = 4;
 }
 
-message ExportSyntaxFlowPackageRequest {
-  string Name = 1;
-  string TargetPath = 2;
-  string Password = 3;
+message SyntaxFlowScanPolicyToRuleFilterRequest {
+  string PolicyId = 1; // 同 ScanPolicy.policy_type
+  // custom 策略条件（PolicyId=custom 时生效）
+  repeated string Tags = 2;
+  repeated string Severity = 3;
+  repeated string Purpose = 4;
+  // 可选叠加到结果 Filter
+  repeated string Language = 5;
+  repeated string GroupNames = 6;
 }
 
-message ImportSyntaxFlowPackageRequest {
-  string InputPath = 1;
-  string Password = 2;
-  string Name = 3; // optional override / required for legacy zip without package.yaml
-  bool ForceOverwriteConflicts = 4;
-}
-
-message SyncSyntaxFlowPackageRequest {
-  repeated string Names = 1; // empty = all embed packages
-  bool Force = 2;
-}
-
-message SyntaxFlowPackageConflict {
-  string RuleId = 1;
-  string RuleName = 2;
-  string LocalVersion = 3;
-  string RemoteVersion = 4;
-  string Reason = 5; // id_name_mismatch | name_collision | ...
-  string PackageName = 6;
-}
-
-message SyntaxFlowPackageProgress {
-  double Progress = 1;
-  string Message = 2;
-  string MessageType = 3; // info | error | conflict | success
-  SyntaxFlowPackageConflict Conflict = 4;
-  string PackageName = 5;
-  string PackageVersion = 6;
+message SyntaxFlowScanPolicyToRuleFilterResponse {
+  SyntaxFlowRuleFilter Filter = 1;
 }
 
 message SyntaxFlowScanRequest{

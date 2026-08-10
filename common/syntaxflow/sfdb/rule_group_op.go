@@ -16,10 +16,10 @@ var buildInGroupsMap map[string]struct{}
 func init() {
 	buildInGroupsMap = make(map[string]struct{})
 	var buildInGroups []string
-	// reserved package buckets
+	// reserved rule groups
 	buildInGroups = append(buildInGroups,
-		schema.SyntaxFlowPackageBuiltin,
-		schema.SyntaxFlowPackageAgent,
+		schema.SyntaxFlowGroupBuiltin,
+		schema.SyntaxFlowGroupAgent,
 	)
 	// legacy auto-group names (compat for isBuildIn checks only)
 	buildInGroups = append(buildInGroups, schema.GetAllSFSupportLanguage()...)
@@ -274,11 +274,11 @@ func BatchRemoveGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int
 			if _, ok := removeSet[rule.RuleGroup]; !ok {
 				continue
 			}
-			if err = tx.Model(rule).Update("rule_group", schema.SyntaxFlowPackageCustom).Error; err != nil {
+			if err = tx.Model(rule).Update("rule_group", schema.SyntaxFlowGroupCustom).Error; err != nil {
 				return err
 			}
-			rule.RuleGroup = schema.SyntaxFlowPackageCustom
-			_ = GetOrCreateGroups(tx, []string{schema.SyntaxFlowPackageCustom})
+			rule.RuleGroup = schema.SyntaxFlowGroupCustom
+			_ = GetOrCreateGroups(tx, []string{schema.SyntaxFlowGroupCustom})
 			count++
 		}
 		return nil
@@ -311,11 +311,11 @@ func BatchRemoveGroupsForRulesById(db *gorm.DB, ruleIds, groupNames []string) (i
 			if _, ok := removeSet[rule.RuleGroup]; !ok {
 				continue
 			}
-			if err = tx.Model(rule).Update("rule_group", schema.SyntaxFlowPackageCustom).Error; err != nil {
+			if err = tx.Model(rule).Update("rule_group", schema.SyntaxFlowGroupCustom).Error; err != nil {
 				return err
 			}
-			rule.RuleGroup = schema.SyntaxFlowPackageCustom
-			_ = GetOrCreateGroups(tx, []string{schema.SyntaxFlowPackageCustom})
+			rule.RuleGroup = schema.SyntaxFlowGroupCustom
+			_ = GetOrCreateGroups(tx, []string{schema.SyntaxFlowGroupCustom})
 			count++
 		}
 		return nil

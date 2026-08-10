@@ -1,2 +1,4 @@
-# Placeholder: AI Agent rules live here (same level as buildin/).
-# CI fills package.yaml rules[]; .sf files will be added in follow-up.
+# Agent SyntaxFlow rules
+
+Placeholder so the embed FS keeps `agent/` (rules added later).
+Reserved group name: `agent`.

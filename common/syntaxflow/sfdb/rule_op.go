@@ -143,8 +143,8 @@ func DeleteBuildInRule() error {
 			if CountRulesInGroup(tx, g.GroupName) > 0 {
 				continue
 			}
-			// keep reserved package buckets even if empty after delete (sync will refill)
-			if g.GroupName == schema.SyntaxFlowPackageBuiltin || g.GroupName == schema.SyntaxFlowPackageAgent {
+			// keep reserved groups even if empty after delete (sync will refill)
+			if g.GroupName == schema.SyntaxFlowGroupBuiltin || g.GroupName == schema.SyntaxFlowGroupAgent {
 				continue
 			}
 			if err := tx.Where("id = ?", g.ID).Unscoped().Delete(&schema.SyntaxFlowGroup{}).Error; err != nil {
@@ -175,11 +175,11 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 // CreateRuleByContentEx 创建规则（扩展版本，支持元数据增强）
 // filePath: 规则文件的相对路径，用于元数据增强
 func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
-	return CreateRuleByContentExWithDBAndPackage(db, ruleFileName, content, filePath, buildIn, "", tags...)
+	return CreateRuleByContentExWithDBAndGroup(db, ruleFileName, content, filePath, buildIn, "", tags...)
 }
 
-// CreateRuleByContentExWithDBAndPackage imports a rule into a named package.
-func CreateRuleByContentExWithDBAndPackage(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, packageName string, tags ...string) (*schema.SyntaxFlowRule, error) {
+// CreateRuleByContentExWithDBAndGroup imports a rule into a named RuleGroup.
+func CreateRuleByContentExWithDBAndGroup(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, groupName string, tags ...string) (*schema.SyntaxFlowRule, error) {
 	if db == nil {
 		return nil, utils.Errorf("profile db is nil")
 	}
@@ -224,15 +224,15 @@ func CreateRuleByContentExWithDBAndPackage(db *gorm.DB, ruleFileName string, con
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
 	rule.Language = language
-	if packageName == "" {
+	if groupName == "" {
 		if buildIn {
-			packageName = schema.SyntaxFlowPackageBuiltin
+			groupName = schema.SyntaxFlowGroupBuiltin
 		} else {
-			packageName = schema.SyntaxFlowPackageCustom
+			groupName = schema.SyntaxFlowGroupCustom
 		}
 	}
-	rule.RuleGroup = packageName
-	_ = GetOrCreateGroups(db, []string{packageName})
+	rule.RuleGroup = groupName
+	_ = GetOrCreateGroups(db, []string{groupName})
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersionFromEmbed(rule.RuleId)
 	if err == nil {
@@ -295,11 +295,11 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 // ImportRuleWithoutValidEx 导入规则（扩展版本，支持文件路径）
 // filePath: 规则文件的相对路径，用于元数据增强（匹配框架分组）
 func ImportRuleWithoutValidExWithDB(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
-	return ImportRuleWithoutValidExWithDBAndPackage(db, ruleName, content, filePath, buildin, "", tags...)
+	return ImportRuleWithoutValidExWithDBAndGroup(db, ruleName, content, filePath, buildin, "", tags...)
 }
 
-func ImportRuleWithoutValidExWithDBAndPackage(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, packageName string, tags ...string) (*schema.SyntaxFlowRule, error) {
-	rule, err := CreateRuleByContentExWithDBAndPackage(db, ruleName, content, filePath, buildin, packageName, tags...)
+func ImportRuleWithoutValidExWithDBAndGroup(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, groupName string, tags ...string) (*schema.SyntaxFlowRule, error) {
+	rule, err := CreateRuleByContentExWithDBAndGroup(db, ruleName, content, filePath, buildin, groupName, tags...)
 	if err != nil {
 		return nil, utils.Errorf("create build in rule failed: %s", err)
 	}
@@ -521,7 +521,7 @@ func createRuleEx(rule *schema.SyntaxFlowRule, needDefaultGroup bool, groups ...
 	if exclusive := pickExclusiveGroup(groups); exclusive != "" {
 		rule.RuleGroup = exclusive
 	} else if rule.RuleGroup == "" {
-		rule.RuleGroup = schema.SyntaxFlowPackageCustom
+		rule.RuleGroup = schema.SyntaxFlowGroupCustom
 	}
 	if err := db.Create(&rule).Error; err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
@@ -554,7 +554,7 @@ func CreateOrUpdateRuleWithGroup(rule *schema.SyntaxFlowRule, groups ...string) 
 	if exclusive := pickExclusiveGroup(groups); exclusive != "" {
 		rule.RuleGroup = exclusive
 	} else if rule.RuleGroup == "" {
-		rule.RuleGroup = schema.SyntaxFlowPackageCustom
+		rule.RuleGroup = schema.SyntaxFlowGroupCustom
 	}
 	if err := CreateOrUpdateSyntaxFlowRule(db, rule.RuleName, &rule); err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)

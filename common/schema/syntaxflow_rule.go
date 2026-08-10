@@ -323,7 +323,7 @@ type SyntaxFlowRule struct {
 	// 不含 language / severity / purpose（这些用列字段）。
 	Tags StringArray `gorm:"type:text" json:"tags"`
 
-	// RuleGroup 规则所属的唯一分组（规则包桶）：builtin / agent / custom / imported-*
+	// RuleGroup 规则所属的唯一分组：builtin / agent / custom / imported-*
 	// 替代原 many2many Groups；旧中间表 syntax_flow_rule_and_group 保留但不再写入。
 	// 列名 rule_group 为新列，AutoMigrate 自动添加；旧 package_name 列闲置不迁数据。
 	RuleGroup string `gorm:"index;column:rule_group" json:"rule_group"`
@@ -455,7 +455,7 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 		s.RuleId = uuid.NewString()
 	}
 	if s.RuleGroup == "" {
-		s.RuleGroup = SyntaxFlowPackageCustom
+		s.RuleGroup = SyntaxFlowGroupCustom
 	}
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
@@ -469,7 +469,7 @@ func (s *SyntaxFlowRule) BeforeCreate() error {
 		s.RuleId = uuid.NewString()
 	}
 	if s.RuleGroup == "" {
-		s.RuleGroup = SyntaxFlowPackageCustom
+		s.RuleGroup = SyntaxFlowGroupCustom
 	}
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
@@ -505,7 +505,7 @@ func (s *SyntaxFlowRule) GetInfo() *SyntaxFlowDescInfo {
 }
 
 func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
-	// Soft wire: GroupName stays repeated (len<=1); PackageName mirrors RuleGroup.
+	// GroupName is repeated for wire shape; exclusive RuleGroup → len <= 1.
 	groupNames := []string{}
 	if s.RuleGroup != "" {
 		groupNames = []string{s.RuleGroup}
@@ -547,7 +547,6 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 		Hash:          s.Hash,
 		Tag:           s.Tag,
 		Tags:          s.GetAtomicTags(),
-		PackageName:   s.RuleGroup,
 		RuleId:        s.RuleId,
 		Version:       s.Version,
 		GroupName:     groupNames,

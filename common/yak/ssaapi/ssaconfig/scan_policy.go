@@ -14,9 +14,9 @@ var scanPoliciesYAML []byte
 
 // PolicyDefinition 策略定义（从YAML加载）
 type PolicyDefinition struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	Icon        string   `yaml:"icon"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Icon        string `yaml:"icon"`
 	// RuleGroups deprecated — prefer Tags / Severity / Purpose
 	RuleGroups []string `yaml:"rule_groups"`
 	Tags       []string `yaml:"tags"`
@@ -26,10 +26,10 @@ type PolicyDefinition struct {
 
 // ScanPoliciesConfig 策略配置文件结构
 type ScanPoliciesConfig struct {
-	Version         string                      `yaml:"version"`
-	Policies        map[string]PolicyDefinition `yaml:"policies"`
-	Categories      []PolicyCategory            `yaml:"categories"`
-	CustomRuleTags  map[string][]RuleTagOption  `yaml:"custom_rule_tags"`
+	Version        string                      `yaml:"version"`
+	Policies       map[string]PolicyDefinition `yaml:"policies"`
+	Categories     []PolicyCategory            `yaml:"categories"`
+	CustomRuleTags map[string][]RuleTagOption  `yaml:"custom_rule_tags"`
 	// CustomRuleGroups kept for old YAML; unused in v2
 	CustomRuleGroups CustomRuleGroupsConfig `yaml:"custom_rule_groups"`
 }
@@ -203,6 +203,19 @@ func (p *ScanPolicyConfig) MapToFilter() *PolicyFilter {
 		}
 	}
 	return out
+}
+
+// MapToRuleFilter expands policy into a SyntaxFlowRuleFilter (Tag/Severity/Purpose).
+func (p *ScanPolicyConfig) MapToRuleFilter() *ypb.SyntaxFlowRuleFilter {
+	f := p.MapToFilter()
+	if f == nil {
+		return &ypb.SyntaxFlowRuleFilter{}
+	}
+	return &ypb.SyntaxFlowRuleFilter{
+		Tag:      append([]string{}, f.Tags...),
+		Severity: append([]string{}, f.Severity...),
+		Purpose:  append([]string{}, f.Purpose...),
+	}
 }
 
 // MapToGroups deprecated: returns tags only (no longer group names).
