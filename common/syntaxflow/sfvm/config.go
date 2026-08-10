@@ -99,6 +99,25 @@ func (b *RuleWorkBudget) Exceeded() bool {
 	return atomic.LoadInt32(&b.exceeded) != 0
 }
 
+// Visited reports the number of work units entered so far. The count can be
+// slightly above Limit when several fanout loops race to enter work at the
+// boundary; that is intentional and is useful in the rule-level diagnostic.
+func (b *RuleWorkBudget) Visited() int64 {
+	if b == nil {
+		return 0
+	}
+	return atomic.LoadInt64(&b.visited)
+}
+
+// Limit reports the configured per-rule work limit. A non-positive value means
+// that the budget is disabled.
+func (b *RuleWorkBudget) Limit() int64 {
+	if b == nil {
+		return 0
+	}
+	return atomic.LoadInt64(&b.limit)
+}
+
 // EnterWork records one unit of fanout work against the config's work budget and
 // returns true if the budget has been exceeded (caller should abort). A config
 // with no budget never overflows.

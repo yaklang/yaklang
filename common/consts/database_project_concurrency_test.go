@@ -86,7 +86,7 @@ func TestProjectSQLiteConcurrentReaderDoesNotBlockWriter(t *testing.T) {
 		require.NoError(t, conn.QueryRowContext(ctx, "PRAGMA cache_size").Scan(&cacheSize))
 		require.NoError(t, conn.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&journalMode))
 		require.Equal(t, 10000, busyTimeout)
-		require.Zero(t, synchronous)
+		require.Equal(t, 1, synchronous, "SQLite must be opened with synchronous=NORMAL, not OFF")
 		require.Equal(t, 8000, cacheSize)
 		require.Equal(t, "wal", journalMode)
 	}

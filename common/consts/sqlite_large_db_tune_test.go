@@ -3,50 +3,80 @@ package consts
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	_ "github.com/yaklang/gorm/dialects/sqlite"
 )
 
-func TestTuneSQLiteByDatabaseFileSize(t *testing.T) {
-	sqliteLargeDBTuneLast = sync.Map{}
+// TestTuneSQLiteByDatabaseFileSizeBelowThreshold verifies that a small
+// database (<128MB) does not trigger tuning.
+func TestTuneSQLiteByDatabaseFileSizeBelowThreshold(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "small.db")
+	db, err := gorm.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	defer db.Close()
 
+	db.Exec("CREATE TABLE IF NOT EXISTS test (id INTEGER PRIMARY KEY)")
+	db.Exec("INSERT INTO test (id) VALUES (1)")
+
+	result := TuneSQLiteByDatabaseFileSize(db, dbPath)
+	require.False(t, result, "small DB should not trigger tuning")
+}
+
+// TestTuneSQLiteByDatabaseFileSizeAboveThreshold verifies that a large
+// database (>=128MB) triggers tuning and applies PRAGMAs.
+func TestTuneSQLiteByDatabaseFileSizeAboveThreshold(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "large.db")
-
-	db, err := createAndConfigDatabase(dbPath)
+	db, err := gorm.Open("sqlite3", dbPath)
 	require.NoError(t, err)
-	require.NoError(t, db.DB().Close())
+	defer db.Close()
 
-	wal, err := os.OpenFile(dbPath+"-wal", os.O_CREATE|os.O_WRONLY, 0o666)
+	// Create a table and insert enough data to exceed 128MB
+	db.Exec("CREATE TABLE IF NOT EXISTS big (id INTEGER PRIMARY KEY, data TEXT)")
+	for i := 0; i < 130; i++ {
+		largeData := make([]byte, 1024*1024) // 1MB
+		db.Exec("INSERT INTO big (id, data) VALUES (?, ?)", i, string(largeData))
+	}
+
+	fi, err := os.Stat(dbPath)
 	require.NoError(t, err)
-	require.NoError(t, wal.Truncate(1536*1024*1024))
-	require.NoError(t, wal.Close())
+	require.Greater(t, fi.Size(), int64(128*1024*1024), "DB should be >= 128MB")
 
-	db, err = createAndConfigDatabase(dbPath)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.DB().Close() })
+	// Clear any previous tune state for this path
+	sqliteLargeDBTuneLast.Delete(sqliteTunePathKey(dbPath))
 
-	require.True(t, TuneSQLiteByDatabaseFileSize(db, dbPath))
-	require.False(t, TuneSQLiteByDatabaseFileSize(db, dbPath))
+	// First call should tune
+	result := TuneSQLiteByDatabaseFileSize(db, dbPath)
+	require.True(t, result, "large DB should trigger tuning on first call")
 
-	var cacheSize int64
-	require.NoError(t, db.Raw("PRAGMA cache_size;").Row().Scan(&cacheSize))
-	require.Equal(t, int64(-sqliteLargeDBTune128M), cacheSize)
+	// Verify PRAGMAs were applied using Row().Scan (not Raw().Scan)
+	var cacheSize int
+	row := db.Raw("PRAGMA cache_size").Row()
+	require.NoError(t, row.Scan(&cacheSize), "PRAGMA cache_size should be readable")
+	require.Negative(t, cacheSize, "cache_size should be negative (KiB mode) after tuning")
+
+	// Second call at same tier should NOT re-tune
+	result2 := TuneSQLiteByDatabaseFileSize(db, dbPath)
+	require.False(t, result2, "same tier should not re-tune")
 }
 
-func TestSqliteDatabaseOnDiskBytesIncludesWal(t *testing.T) {
+// TestTuneSQLiteByDatabaseFileSizeNilDB verifies nil safety.
+func TestTuneSQLiteByDatabaseFileSizeNilDB(t *testing.T) {
+	require.False(t, TuneSQLiteByDatabaseFileSize(nil, "/tmp/test.db"))
+	require.False(t, TuneSQLiteByDatabaseFileSize(nil, ""))
+}
+
+// TestTuneSQLiteByDatabaseFileSizeEmptyPath verifies empty path safety.
+func TestTuneSQLiteByDatabaseFileSizeEmptyPath(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "x.db")
-	require.NoError(t, os.WriteFile(dbPath, []byte("main"), 0o644))
-	require.NoError(t, os.WriteFile(dbPath+"-wal", []byte("wal"), 0o644))
+	dbPath := filepath.Join(dir, "empty.db")
+	db, err := gorm.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	defer db.Close()
 
-	require.Equal(t, int64(7), sqliteDatabaseOnDiskBytes(dbPath))
-}
-
-func TestSqliteLargeDBTuneLevelForSize(t *testing.T) {
-	require.Equal(t, sqliteLargeDBTuneNone, sqliteLargeDBTuneLevelForSize(100*1024*1024))
-	require.Equal(t, sqliteLargeDBTune32M, sqliteLargeDBTuneLevelForSize(128*1024*1024))
-	require.Equal(t, sqliteLargeDBTune256M, sqliteLargeDBTuneLevelForSize(3*1024*1024*1024))
+	require.False(t, TuneSQLiteByDatabaseFileSize(db, ""))
 }

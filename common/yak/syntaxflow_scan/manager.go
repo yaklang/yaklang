@@ -58,6 +58,10 @@ type scanManager struct {
 
 	// 扫描耗时（在 StartQuerySF 结束时记录，在 Stop 之后输出）
 	scanDuration time.Duration
+
+	// autoScaleLogged deduplicates the per-program auto-scale log line so a
+	// 269-rule scan does not repeat it hundreds of times.
+	autoScaleLogged sync.Map
 }
 
 // var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
