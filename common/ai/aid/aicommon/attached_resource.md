@@ -14,6 +14,7 @@ Attached Resource 用于把前端或上层任务传入的附加材料转成 ReAc
 - `attached_resource_http_flow.go`：`http_flow_id` 资源实现。
 - `attached_resource_http_fuzz_request.go`：`http_fuzz_request` 资源实现。
 - `attached_resource_selected.go`：`selected` 资源实现。
+- `attached_resource_code.go`：`code` 资源实现（可写入的脚本交付目标，与 `file` 参考附加分离）。
 
 新增资源实现按 `attached_resource_xxx.go` 命名，和资源 type 保持可读对应。
 
@@ -51,9 +52,14 @@ type AttachedResourceData interface {
 
 - `default`：当 `Type` 没有命中任何注册 factory 时，解析为 `DefaultAttachedResourceData`。它保留原始 `Type/Key/Value`，并把 raw value 渲染为普通附加上下文。
 - `file`：`Type=file` 解析为 `AttachedFileResourceData`，并识别 `Kind`。`file_path`、`filepath`、`file-path` 只是兼容别名，也会解析为同一结构。
+  - **语义：只读参考附加（`@mention` / 拖入文件）**，各 loop 通用；不应作为可覆写交付目标。
   - `text`：`ToAttachData` 直接读取前 1024 字节作为内容预览。
   - `directory`：`ToAttachData` 调用 `filesys.Glance` 生成目录树，并裁剪到 1024 字节。
   - `image` / `binary`：`ToAttachData` 只输出文件元信息，不 dump 内容；通用入口会把 file resources 交给 loop 注册的 file handler 进一步解析。
+- `code`：`Type=code` 解析为 `AttachedCodeResourceData`。`Key=file_path` 表示可写入的脚本交付目标（Yak Runner 当前打开的 `.yak`）。
+  - **语义：可写交付槽位**，与 `Type=file` 参考附加严格分离。
+  - `ToAttachData` 返回空，避免混入 `attached_file`；由 `write_yaklang_code` 写入 `yaklang_editor_context` 并走 `yaklang_code_change`。
+  - 旧客户端若仍把打开的 `.yak` 放在 `Type=file Key=file_path`，后端仅在无 `Type=code` 时做兼容回退。
 - `knowledge_base`：解析为 `AttachedKnowledgeBaseResourceData`，但 `ToAttachData` 返回空，不 dump 内容。default loop 只根据返回的资源列表判断是否需要启动 knowledge enhance loop，具体查询仍由 knowledge enhance 内部处理。
 
 ## 新增资源步骤

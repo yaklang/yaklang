@@ -25,6 +25,10 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
 	for _, resource := range event.AttachedResourceInfo {
+		// Type=code is writable delivery — never register as @/reference AutoContext.
+		if resource.GetType() == aicommon.AttachedResourceTypeCode {
+			continue
+		}
 		if resource.GetType() == aicommon.CONTEXT_PROVIDER_TYPE_FILE &&
 			resource.GetKey() == aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH {
 			path := strings.TrimSpace(resource.GetValue())

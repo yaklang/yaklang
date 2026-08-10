@@ -349,6 +349,9 @@ func NewContextProvider(typ string, key string, value string, userPrompt ...stri
 		baseInfo := fmt.Sprintf("User Prompt: %s\nType: %s\nKey: %s\nValue: %s\n", strings.Join(userPrompt, " "), typ, key, value)
 
 		switch typ {
+		case AttachedResourceTypeCode:
+			// Writable delivery slot — never inject as AutoContext/@ attachment content.
+			return "", nil
 		case CONTEXT_PROVIDER_TYPE_FILE:
 			switch key {
 			case CONTEXT_PROVIDER_KEY_FILE_PATH:
