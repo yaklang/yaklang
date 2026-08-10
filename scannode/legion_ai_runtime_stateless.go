@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
@@ -357,14 +359,20 @@ func (h *statelessAIEngineRuntimeHandle) sendSyncInput(input aiSessionInput) err
 		return fmt.Errorf("stateless sendinput: sync event is required")
 	}
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	if h.closed {
+		h.mu.Unlock()
 		return fmt.Errorf("stateless sendinput: runtime is closed")
 	}
 	turn := h.activeTurn
 	if turn == nil {
+		h.mu.Unlock()
+		if strings.EqualFold(strings.TrimSpace(syncEvent.SyncType), "queue_info") {
+			h.emitIdleQueueInfo(syncEvent)
+			return nil
+		}
 		return fmt.Errorf("stateless sendinput: no active turn for sync event")
 	}
+	defer h.mu.Unlock()
 	if err := turn.engine.SendInputEvent(&ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      syncEvent.SyncType,
@@ -376,6 +384,28 @@ func (h *statelessAIEngineRuntimeHandle) sendSyncInput(input aiSessionInput) err
 		return fmt.Errorf("stateless sendinput: active turn closed while sending sync event")
 	}
 	return nil
+}
+
+func (h *statelessAIEngineRuntimeHandle) emitIdleQueueInfo(syncEvent *yakAISyncEvent) {
+	if h == nil || h.emitter == nil || syncEvent == nil {
+		return
+	}
+	event := &schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "queue_info",
+		IsJson: true,
+		IsSync: true,
+		Content: mustJSON(map[string]any{
+			"queue_name":    "default",
+			"total_tasks":   0,
+			"is_processing": false,
+			"tasks":         []any{},
+			"queue_empty":   true,
+		}),
+		Timestamp: time.Now().Unix(),
+		SyncID:    syncEvent.SyncID,
+	}
+	h.emitter.Emit(classifyYakAIEvent(event), marshalYakAIOutputEvent(event))
 }
 
 func (h *statelessAIEngineRuntimeHandle) runTurn(
