@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"sync/atomic"
 	"unicode/utf8"
 
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
@@ -19,6 +20,16 @@ import (
 var (
 	ErrorStop = errors.New("stop")
 )
+
+// lineMappings 是一份不可变的行号映射快照（startOffsets 与 lens 成对发布）。
+// 同一 MemEditor 可能被多个扫描 goroutine 共享（ssadb.irSourceCache 按 hash
+// 复用 editor），若直接写两个字段，并发懒构建时读者可能看到两个字段分别来自
+// 不同 goroutine 的构建结果，导致 GetEndOffsetByLine 越界 panic。因此构建时
+// 先生成本地快照，再通过 atomic.Pointer 一次性发布。
+type lineMappings struct {
+	startOffsets []int
+	lens         []int
+}
 
 type MemEditor struct {
 	sourceCodeCtxStack []string
@@ -39,17 +50,15 @@ type MemEditor struct {
 	safeSourceCode *SafeString
 
 	// editor
-	lineLensMap        []int
-	lineStartOffsetMap []int
-	lineMappingsReady  bool
-	cursor             int // 模拟光标位置（指针功能）
+	lineMappings atomic.Pointer[lineMappings]
+	cursor       int // 模拟光标位置（指针功能）
 
 	// runeOffsetMap is the memoized rune→byte-offset map for the current
 	// safeSourceCode. FileFilter (sf_prog.go) used to rebuild this per call
 	// (NewRuneOffsetMap over the full source each time = ~71GB/20% of alloc on
 	// javacms-core). Built lazily by GetRuneOffsetMap; nil'd by
 	// invalidateSourceCodeState so a pushed/edited source rebuilds it.
-	runeOffsetMap *RuneOffsetMap
+	runeOffsetMap atomic.Pointer[RuneOffsetMap]
 }
 
 // NewMemEditorByBytes reuses the provided byte slice without copying it.
@@ -92,19 +101,27 @@ func NewMemEditorWithFileUrl(sourceCode string, fileUrl string) *MemEditor {
 }
 
 func (ve *MemEditor) ensureLineMappings() {
-	if ve == nil || ve.lineMappingsReady {
-		return
+	ve.getLineMappings()
+}
+
+// getLineMappings 返回当前行映射快照，必要时先懒构建。调用方应只使用本次
+// 返回的快照，不要跨调用混用多个快照。
+func (ve *MemEditor) getLineMappings() *lineMappings {
+	if ve == nil {
+		return nil
+	}
+	if lm := ve.lineMappings.Load(); lm != nil {
+		return lm
 	}
 	ve.recalculateLineMappings()
+	return ve.lineMappings.Load()
 }
 
 func (ve *MemEditor) invalidateLineMappings() {
 	if ve == nil {
 		return
 	}
-	ve.lineMappingsReady = false
-	ve.lineLensMap = nil
-	ve.lineStartOffsetMap = nil
+	ve.lineMappings.Store(nil)
 }
 
 func (ve *MemEditor) invalidateSourceCodeState() {
@@ -113,7 +130,7 @@ func (ve *MemEditor) invalidateSourceCodeState() {
 	}
 	ve.ResetSourceCodeHash()
 	ve.invalidateLineMappings()
-	ve.runeOffsetMap = nil
+	ve.runeOffsetMap.Store(nil)
 }
 
 // GetRuneOffsetMap returns the memoized rune→byte-offset map for the current
@@ -127,14 +144,15 @@ func (ve *MemEditor) GetRuneOffsetMap() *RuneOffsetMap {
 	if ve == nil {
 		return nil
 	}
-	if ve.runeOffsetMap != nil {
-		return ve.runeOffsetMap
+	if m := ve.runeOffsetMap.Load(); m != nil {
+		return m
 	}
 	// GetSourceCodeUnsafe aliases safeSourceCode.bytes (zero-copy); the map
 	// only reads it during build and stores offsets + length, not the string,
 	// so we don't retain the alias beyond this call.
-	ve.runeOffsetMap = NewRuneOffsetMap(ve.GetSourceCodeUnsafe())
-	return ve.runeOffsetMap
+	m := NewRuneOffsetMap(ve.GetSourceCodeUnsafe())
+	ve.runeOffsetMap.Store(m)
+	return m
 }
 
 func (ve *MemEditor) CodeLength() int {
@@ -142,8 +160,11 @@ func (ve *MemEditor) CodeLength() int {
 }
 
 func (ve *MemEditor) GetLineCount() int {
-	ve.ensureLineMappings()
-	return len(ve.lineLensMap)
+	lm := ve.getLineMappings()
+	if lm == nil {
+		return 0
+	}
+	return len(lm.lens)
 }
 
 func (ve *MemEditor) SetUrl(url string) {
@@ -357,7 +378,7 @@ func (ve *MemEditor) GetOffsetByPositionRaw(line, col int) int {
 }
 
 func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if line < 1 || col < 1 {
 		return 0, errors.New("line number and column number must be positive")
 	}
@@ -367,17 +388,17 @@ func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
 	adjustedCol := col - 1
 
 	// 检查行号是否超出范围
-	if adjustedLine >= len(ve.lineStartOffsetMap) || adjustedLine >= len(ve.lineLensMap) {
+	if lm == nil || adjustedLine >= len(lm.startOffsets) || adjustedLine >= len(lm.lens) {
 		return ve.safeSourceCode.Len(), errors.New("line number out of range")
 	}
 
 	// 检查列号是否超出当前行的长度
-	if adjustedCol > ve.lineLensMap[adjustedLine] {
-		adjustedCol = ve.lineLensMap[adjustedLine] // Clamp the column to the maximum length of the line
+	if adjustedCol > lm.lens[adjustedLine] {
+		adjustedCol = lm.lens[adjustedLine] // Clamp the column to the maximum length of the line
 	}
 
-	lineStartOffset := ve.lineStartOffsetMap[adjustedLine]
-	if adjustedLine < len(ve.lineLensMap)-1 {
+	lineStartOffset := lm.startOffsets[adjustedLine]
+	if adjustedLine < len(lm.lens)-1 {
 		return lineStartOffset + adjustedCol, nil
 	} else {
 		// For the last line, we need to ensure we do not exceed the length of the source code
@@ -390,31 +411,31 @@ func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
 }
 
 func (ve *MemEditor) GetStartOffsetByLine(x int) (int, error) {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if x < 1 {
 		return 0, errors.New("line number should be positive")
 	}
 
 	x = x - 1
-	if x >= len(ve.lineStartOffsetMap) {
+	if lm == nil || x >= len(lm.startOffsets) {
 		return 0, errors.New("line number out of range")
 	}
 
-	return ve.lineStartOffsetMap[x], nil
+	return lm.startOffsets[x], nil
 }
 
 func (ve *MemEditor) GetEndOffsetByLine(x int) (int, error) {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if x < 1 {
 		return 0, errors.New("line number should be positive")
 	}
 
 	x = x - 1
-	if x >= len(ve.lineStartOffsetMap) {
+	if lm == nil || x >= len(lm.startOffsets) || x >= len(lm.lens) {
 		return 0, errors.New("line number out of range")
 	}
 
-	return ve.lineStartOffsetMap[x] + ve.lineLensMap[x], nil
+	return lm.startOffsets[x] + lm.lens[x], nil
 }
 
 // 获取指定行的内容
@@ -459,9 +480,12 @@ func (ve *MemEditor) MoveCursor(position int) error {
 
 // GetCurrentLine 返回当前光标所在行的内容
 func (ve *MemEditor) GetCurrentLine() (string, error) {
-	ve.ensureLineMappings()
-	for lineNumber, startOffset := range ve.lineStartOffsetMap {
-		if ve.cursor >= startOffset && ve.cursor <= (startOffset+ve.lineLensMap[lineNumber]) {
+	lm := ve.getLineMappings()
+	if lm == nil {
+		return "", errors.New("current position is out of the source code range")
+	}
+	for lineNumber, startOffset := range lm.startOffsets {
+		if lineNumber < len(lm.lens) && ve.cursor >= startOffset && ve.cursor <= (startOffset+lm.lens[lineNumber]) {
 			return ve.GetLine(lineNumber + 1)
 		}
 	}
@@ -478,8 +502,8 @@ func (ve *MemEditor) GetPositionByLine(line, column int) *Position {
 }
 
 func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error) {
-	ve.ensureLineMappings()
-	if len(ve.lineStartOffsetMap) == 0 || len(ve.lineLensMap) == 0 {
+	lm := ve.getLineMappings()
+	if lm == nil || len(lm.startOffsets) == 0 || len(lm.lens) == 0 {
 		return NewPosition(1, 1), errors.New("empty source editor")
 	}
 	if offset < 0 {
@@ -488,12 +512,12 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error)
 	}
 	if offset >= ve.safeSourceCode.Len() {
 		// 偏移量超出最大范围，返回最后位置
-		lastLine := len(ve.lineStartOffsetMap) - 1 // 最后一行的索引（从0开始）
-		if lastLine < 0 || lastLine >= len(ve.lineLensMap) {
+		lastLine := len(lm.startOffsets) - 1 // 最后一行的索引（从0开始）
+		if lastLine < 0 || lastLine >= len(lm.lens) {
 			return NewPosition(1, 1), utils.Errorf("offset %d is out of range", offset)
 		}
-		lastLineStart := ve.lineStartOffsetMap[lastLine]
-		lastLineLen := ve.lineLensMap[lastLine]
+		lastLineStart := lm.startOffsets[lastLine]
+		lastLineLen := lm.lens[lastLine]
 		outOfRange := utils.Errorf("offset %d is out of range", offset)
 		if offset == ve.safeSourceCode.Len() && lastLineLen == 0 {
 			// 特殊情况，最后一行无内容
@@ -503,15 +527,15 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error)
 	}
 
 	// 使用二分查找定位行
-	low, high := 0, len(ve.lineStartOffsetMap)-1
+	low, high := 0, len(lm.startOffsets)-1
 	for low <= high {
 		mid := low + (high-low)/2
-		startOffset := ve.lineStartOffsetMap[mid]
+		startOffset := lm.startOffsets[mid]
 
 		if startOffset == offset {
 			return NewPosition(mid+1, 1), nil
 		} else if startOffset < offset {
-			if mid == high || mid+1 >= len(ve.lineStartOffsetMap) || ve.lineStartOffsetMap[mid+1] > offset {
+			if mid == high || mid+1 >= len(lm.startOffsets) || lm.startOffsets[mid+1] > offset {
 				column := offset - startOffset
 				return NewPosition(mid+1, column+1), nil
 			}
@@ -622,23 +646,25 @@ func (ve *MemEditor) recalculateLineMappings() {
 	data := ve.safeSourceCode.Bytes()
 	lineNums := bytes.Count(data, []byte{'\n'}) + 1
 
-	ve.lineLensMap = make([]int, 0, lineNums)
-	ve.lineStartOffsetMap = make([]int, 1, lineNums)
+	lm := &lineMappings{
+		lens:         make([]int, 0, lineNums),
+		startOffsets: make([]int, 1, lineNums),
+	}
 	currentOffset := 0
 	currentLineLen := 0
 
 	if len(data) == 0 {
-		ve.lineLensMap = append(ve.lineLensMap, 0)
-		ve.lineMappingsReady = true
+		lm.lens = append(lm.lens, 0)
+		ve.lineMappings.Store(lm)
 		return
 	}
 
 	if ve.safeSourceCode.isASCII() || !ve.safeSourceCode.utf8Valid {
 		for _, b := range data {
 			if b == '\n' {
-				ve.lineLensMap = append(ve.lineLensMap, currentLineLen)
+				lm.lens = append(lm.lens, currentLineLen)
 				currentOffset++
-				ve.lineStartOffsetMap = append(ve.lineStartOffsetMap, currentOffset)
+				lm.startOffsets = append(lm.startOffsets, currentOffset)
 				currentLineLen = 0
 				continue
 			}
@@ -650,9 +676,9 @@ func (ve *MemEditor) recalculateLineMappings() {
 			r, size := utf8.DecodeRune(data)
 			data = data[size:]
 			if r == '\n' {
-				ve.lineLensMap = append(ve.lineLensMap, currentLineLen)
+				lm.lens = append(lm.lens, currentLineLen)
 				currentOffset++
-				ve.lineStartOffsetMap = append(ve.lineStartOffsetMap, currentOffset)
+				lm.startOffsets = append(lm.startOffsets, currentOffset)
 				currentLineLen = 0
 				continue
 			}
@@ -660,8 +686,8 @@ func (ve *MemEditor) recalculateLineMappings() {
 			currentOffset++
 		}
 	}
-	ve.lineLensMap = append(ve.lineLensMap, currentLineLen)
-	ve.lineMappingsReady = true
+	lm.lens = append(lm.lens, currentLineLen)
+	ve.lineMappings.Store(lm)
 }
 
 func (ve *MemEditor) GetTextFromOffset(offset1, offset2 int) string {
@@ -794,15 +820,15 @@ func (ve *MemEditor) IsOffsetValid(offset int) bool {
 }
 
 func (ve *MemEditor) IsValidPosition(line, col int) bool {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if line < 1 || col < 0 {
 		return false
 	}
 	adjustedLine := line - 1
-	if adjustedLine >= len(ve.lineStartOffsetMap) {
+	if lm == nil || adjustedLine >= len(lm.startOffsets) || adjustedLine >= len(lm.lens) {
 		return false
 	}
-	return col <= ve.lineLensMap[adjustedLine]
+	return col <= lm.lens[adjustedLine]
 }
 
 func (ve *MemEditor) FindStringRange(feature string, callback func(*Range) error) error {
@@ -894,7 +920,10 @@ func (ve *MemEditor) GetContextAroundRange(startPos, endPos *Position, n int, pr
 }
 
 func (ve *MemEditor) GetContextAroundRangeEx(startPos, endPos *Position, n int, prefix func(i int) string, suffix func(i int) string) (string, error) {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
+	if lm == nil {
+		return "", errors.New("empty source editor")
+	}
 	start, end := ve.GetMinAndMaxOffset(startPos, endPos)
 	if start < 0 || end > ve.safeSourceCode.Len() || start > end {
 		return "", errors.New("invalid range")
@@ -904,7 +933,7 @@ func (ve *MemEditor) GetContextAroundRangeEx(startPos, endPos *Position, n int, 
 	endLine, _ := ve.GetPositionByOffsetWithError(end)
 
 	startContextLine := utils.Max(startLine.GetLine()-n, 1)
-	endContextLine := utils.Min(endLine.GetLine()+n, len(ve.lineStartOffsetMap))
+	endContextLine := utils.Min(endLine.GetLine()+n, len(lm.startOffsets))
 
 	var contextBuilder strings.Builder
 	for i := startContextLine; i <= endContextLine; i++ {
@@ -1120,20 +1149,23 @@ func (ve *MemEditor) InsertAtOffset(offset int, text string) error {
 
 // InsertAtLine 在指定行号的开头插入文本（行号从1开始）
 func (ve *MemEditor) InsertAtLine(lineNumber int, text string) error {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if lineNumber < 1 {
 		return errors.New("line number must be positive")
 	}
+	if lm == nil {
+		return errors.New("empty source editor")
+	}
 
 	// 如果行号超出范围，在最后添加新行
-	if lineNumber > len(ve.lineStartOffsetMap) {
+	if lineNumber > len(lm.startOffsets) {
 		// 添加到文件末尾，确保以换行符结尾
 		sourceCode := ve.safeSourceCode.String()
 		if !strings.HasSuffix(sourceCode, "\n") {
 			sourceCode += "\n"
 		}
 		// 添加空行直到目标行号
-		for i := len(ve.lineStartOffsetMap); i < lineNumber-1; i++ {
+		for i := len(lm.startOffsets); i < lineNumber-1; i++ {
 			sourceCode += "\n"
 		}
 		sourceCode += text
@@ -1152,12 +1184,15 @@ func (ve *MemEditor) InsertAtLine(lineNumber int, text string) error {
 
 // ReplaceLine 替换指定行的内容（行号从1开始）
 func (ve *MemEditor) ReplaceLine(lineNumber int, text string) error {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if lineNumber < 1 {
 		return errors.New("line number must be positive")
 	}
+	if lm == nil {
+		return errors.New("empty source editor")
+	}
 
-	if lineNumber > len(ve.lineStartOffsetMap) {
+	if lineNumber > len(lm.startOffsets) {
 		return errors.New("line number out of range")
 	}
 
@@ -1185,16 +1220,19 @@ func (ve *MemEditor) ReplaceLine(lineNumber int, text string) error {
 
 // ReplaceLineRange 替换指定行范围的内容（行号从1开始，包含起始和结束行）
 func (ve *MemEditor) ReplaceLineRange(startLine, endLine int, text string) error {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if startLine < 1 || endLine < 1 {
 		return errors.New("line numbers must be positive")
+	}
+	if lm == nil {
+		return errors.New("empty source editor")
 	}
 
 	if startLine > endLine {
 		return errors.New("start line must be less than or equal to end line")
 	}
 
-	if startLine > len(ve.lineStartOffsetMap) || endLine > len(ve.lineStartOffsetMap) {
+	if startLine > len(lm.startOffsets) || endLine > len(lm.startOffsets) {
 		return errors.New("line number out of range")
 	}
 
@@ -1222,12 +1260,15 @@ func (ve *MemEditor) ReplaceLineRange(startLine, endLine int, text string) error
 
 // DeleteLine 删除指定行（行号从1开始）
 func (ve *MemEditor) DeleteLine(lineNumber int) error {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if lineNumber < 1 {
 		return errors.New("line number must be positive")
 	}
+	if lm == nil {
+		return errors.New("empty source editor")
+	}
 
-	if lineNumber > len(ve.lineStartOffsetMap) {
+	if lineNumber > len(lm.startOffsets) {
 		return errors.New("line number out of range")
 	}
 
@@ -1237,7 +1278,7 @@ func (ve *MemEditor) DeleteLine(lineNumber int) error {
 	}
 
 	// 对于最后一行，需要特殊处理
-	if lineNumber == len(ve.lineStartOffsetMap) {
+	if lineNumber == len(lm.startOffsets) {
 		// 如果是最后一行，删除到文件末尾
 		before := ve.safeSourceCode.SliceBeforeStart(startOffset)
 		// 如果前面有内容且不以换行符结尾，移除前面的换行符
@@ -1271,16 +1312,19 @@ func (ve *MemEditor) DeleteLine(lineNumber int) error {
 
 // DeleteLineRange 删除指定行范围（行号从1开始，包含起始和结束行）
 func (ve *MemEditor) DeleteLineRange(startLine, endLine int) error {
-	ve.ensureLineMappings()
+	lm := ve.getLineMappings()
 	if startLine < 1 || endLine < 1 {
 		return errors.New("line numbers must be positive")
+	}
+	if lm == nil {
+		return errors.New("empty source editor")
 	}
 
 	if startLine > endLine {
 		return errors.New("start line must be less than or equal to end line")
 	}
 
-	if startLine > len(ve.lineStartOffsetMap) || endLine > len(ve.lineStartOffsetMap) {
+	if startLine > len(lm.startOffsets) || endLine > len(lm.startOffsets) {
 		return errors.New("line number out of range")
 	}
 
@@ -1291,7 +1335,7 @@ func (ve *MemEditor) DeleteLineRange(startLine, endLine int) error {
 
 	var endOffset int
 	// 对于最后一行，需要特殊处理
-	if endLine == len(ve.lineStartOffsetMap) {
+	if endLine == len(lm.startOffsets) {
 		endOffset = ve.safeSourceCode.Len()
 		// 如果删除包含最后一行，需要删除前面的换行符
 		if startLine > 1 && startOffset > 0 {
