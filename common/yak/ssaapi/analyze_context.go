@@ -201,7 +201,6 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	// exceeded it also cancels the rule ctx (budget.cancel) so execRule / other
 	// native loops bail via their existing ctx.Done() checks.
 	if a.config.workBudget != nil && a.config.workBudget.EnterWork() {
-		log.Warnf("work budget exceeded, stop dataflow descent")
 		a.reachedDepthLimited = true
 		return
 	}

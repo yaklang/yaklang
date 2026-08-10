@@ -15,6 +15,11 @@ const (
 	SFResultSaveDatabase SFResultSaveKind = "database" // in database
 )
 
+// DefaultScanRuleWorkLimit is the CLI default for the per-rule structural
+// work budget. Keep the default in one place so API documentation and the CLI
+// do not drift apart.
+const DefaultScanRuleWorkLimit int64 = 200_000
+
 type SyntaxFlowConfig struct {
 	Memory          bool                  `json:"memory"`
 	ResultSaveKind  SFResultSaveKind      `json:"result_save_kind"`
@@ -52,7 +57,7 @@ type SyntaxFlowScanConfig struct {
 	// MergeAnchor(Clone)+AppendPredecessor ops that hang for hours. This bounds
 	// the within-opcode fanout that RuleTimeout (a wall-clock backstop) only
 	// catches after the fact. 0 means no work budget (legacy: only RuleTimeout).
-	// Default in `yak code-scan` is loose (4M); tune via --rule-work-limit.
+	// Default in `yak code-scan` is 200k; tune via --rule-work-limit.
 	RuleWorkLimit int64 `json:"rule_work_limit"`
 }
 
@@ -136,8 +141,8 @@ func (c *Config) GetScanMemory() bool {
 }
 
 func (c *Config) GetScanConcurrency() uint32 {
-	if c == nil || c.SyntaxFlowScan == nil {
-		return 0
+	if c == nil || c.SyntaxFlowScan == nil || c.SyntaxFlowScan.Concurrency == 0 {
+		return uint32(DefaultCPUConcurrency())
 	}
 	return c.SyntaxFlowScan.Concurrency
 }
@@ -272,7 +277,7 @@ func WithScanRuleTimeout(timeout time.Duration) Option {
 //
 // Example:
 // ```
-// opt = syntaxflow.withScanRuleWorkLimit(4_000_000)
+// opt = syntaxflow.withScanRuleWorkLimit(200_000)
 // println(opt)
 // ```
 func WithScanRuleWorkLimit(limit int64) Option {

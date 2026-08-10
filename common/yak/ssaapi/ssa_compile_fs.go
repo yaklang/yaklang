@@ -3,16 +3,39 @@ package ssaapi
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
+
+// defaultFlushCompileUnitThreshold is the default resident instruction
+// count that triggers an immediate FlushCompileUnit mid-batch (mechanism A).
+// Tuned from Hadoop scan data: at 100K, per-batch resident stays bounded
+// at ~70-170K on Hadoop (12,581 Java files).
+const defaultFlushCompileUnitThreshold = 100000
+
+// flushCompileUnitThreshold returns the configured threshold for mid-batch
+// flush. Reads YAK_SSA_FLUSH_COMPILE_UNIT_THRESHOLD; non-positive or
+// unparseable values fall back to defaultFlushCompileUnitThreshold.
+// This is a function (not a package var) to keep tests deterministic
+// and avoid global mutable state pollution.
+func flushCompileUnitThreshold() int {
+	if raw := os.Getenv("YAK_SSA_FLUSH_COMPILE_UNIT_THRESHOLD"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			return v
+		}
+	}
+	return defaultFlushCompileUnitThreshold
+}
 
 type SaveFolder struct {
 	name string
@@ -391,34 +414,66 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 		compilePhase = "f3_unit_build"
 		unitBuildStart := time.Now()
-		if !prog.RunDeferredBuildsForUnits(unitKeys, func(index int, total int) bool {
-			return !c.isStop()
-		}) {
+		// Unit-end and batch-boundary instruction flushes enqueue ordinary
+		// instructions for asynchronous persistence. Boundary instructions stay
+		// resident for cross-unit resolution, while the completion callback logs
+		// the real post-eviction state. Incremental compile still skips both
+		// paths to preserve its overlay semantics.
+		// Skip both for incremental compile to preserve overlay.
+		flushThreshold := flushCompileUnitThreshold()
+		isIncremental := c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != ""
+		flushedUnits := make(map[string]bool)
+		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
+			func(index int, total int) bool {
+				return !c.isStop()
+			},
+			func(unitKey string) bool {
+				if !isIncremental && prog.Cache != nil && !flushedUnits[unitKey] {
+					if prog.Cache.CountInstruction() > flushThreshold {
+						prog.Cache.FlushCompileUnit(unitKey)
+						flushedUnits[unitKey] = true
+					}
+				}
+				return !c.isStop()
+			},
+		) {
 			return nil, ErrContextCancel
 		}
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
-		// Per-batch FlushCompileUnit is intentionally NOT called: every
-		// per-batch flush path breaks a suite (flushing instructions closes the
-		// dbcache async-save channel → FeedBlock panic on Python lazy reload;
-		// flushing stores breaks cross-unit SyntaxFlow resolution →
-		// TestImportClass over-resolves). The function-body release the flush
-		// gates is also a no-op (extractUnitKeyFromFunctionKey never matches
-		// bare function keys). So per-batch flushing gives no memory benefit
-		// today and only breaks tests; instructions + stores stay resident
-		// across batches and are persisted by the final SaveToDatabase flush.
-		// FlushCompileUnit (instruction-only, blocks resident) is retained for
-		// re-enable once the FeedBlock + cross-unit bugs are fixed.
+		// Per-batch flush: evict ordinary instructions to DB when resident
+		// count exceeds a threshold, keeping Function/Parameter/BasicBlock
+		// boundary instructions resident for cross-unit calls. This bounds
+		// resident memory on large projects (e.g. Apache Hadoop: 5M
+		// instructions would otherwise all stay resident until final
+		// SaveToDatabase, causing 21GB heap peak).
 		//
-		// FlushAuxSavers, by contrast, is safe per-batch: it only drains the
-		// index/offset async DB-saver channels — it spills no instructions and
-		// clears no resident maps, so the two suites above stay green. Spreading
-		// IrIndex/IrOffset writes across batches prevents the millions-of-rows
-		// final-SaveToDatabase flush that backed up FeedBlock and stalled the
-		// compile for >1h on javacms (see build/scan-logs/javacms-e2e-java.log).
+		// FlushCompileUnit uses the flushCompileUnitWriter path which keeps
+		// boundary instructions (Function, Parameter, FreeValue, BasicBlock,
+		// ParameterMember, SideEffect, ExternLib) resident for cross-unit
+		// resolution in later batches. Only ordinary instructions are evicted
+		// to DB, bounding memory without breaking cross-unit calls.
+		//
+		// The threshold avoids flushing on small projects where it provides no
+		// memory benefit and only adds DB write overhead.
 		if prog.Cache != nil {
+			// Batch boundary: flush instructions + aux savers.
+			if !isIncremental {
+				prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
+			}
 			prog.Cache.FlushAuxSavers()
+			// Tune SQLite for large SSA databases: as the DB grows past
+			// 128MB/512MB/1GB/2GB thresholds, raise cache_size, mmap_size,
+			// wal_autocheckpoint, and journal_size_limit to improve
+			// insert/read performance. Idempotent: sync.Map prevents
+			// re-applying at the same tier. No-op for small DBs (<128MB)
+			// and non-SQLite dialects.
+			if db := consts.GetGormSSAProjectDataBase(); db != nil {
+				if _, dbPath := consts.GetSSADataBaseInfo(); dbPath != "" {
+					consts.TuneSQLiteByDatabaseFileSize(db, dbPath)
+				}
+			}
 			prog.CheckMemoryPressure(batchIndex+1, len(batches))
 		}
 		if compileUnitLogEnabled() {
@@ -470,10 +525,28 @@ func (c *Config) parseProjectWithFSUnits(
 	compilePhase = "f5_save_db"
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
 	saveStart := time.Now()
+	// Finish() may have generated a large deferred-build tail after the last
+	// per-unit flush. Drain it BEFORE SaveToDatabase so f5 starts with only
+	// boundary instructions (Function/BasicBlock) resident instead of ~2.6M
+	// ordinary instructions that would otherwise be marshaled and GC-scanned
+	// during the final flush.
+	if !(c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != "") &&
+		prog.DatabaseKind != ssa.ProgramCacheMemory && prog.Cache != nil {
+		prog.Cache.FlushCompileUnit("final")
+		prog.Cache.FlushInstructionSaver()
+	}
 	remaining := prog.Cache.CountInstruction()
 	persisted := prog.Cache.InstructionPersistedCount()
 	total := remaining + persisted
 	process = 0.90
+	// Log memory state before the heaviest save phase
+	{
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		log.Infof("[ssa-compile] f5_save_db enter: program=%s remaining=%d persisted=%d total=%d heapAlloc=%.1fMB heapSys=%.1fMB heapObjects=%d numGC=%d",
+			prog.Name, remaining, persisted, total,
+			float64(ms.Alloc)/1024/1024, float64(ms.Sys)/1024/1024, ms.HeapObjects, ms.NumGC)
+	}
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
 		prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (remaining=%d persisted=%d total=%d) to database",
 			prog.Name, remaining, persisted, total)

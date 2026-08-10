@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,6 +39,11 @@ type sfCheck struct {
 	// case correct: a key merged by path 1 is NOT in this snapshot, so path 2's
 	// re-bind is correctly seen as new and merged. See sfvm.SymbolSnapshot.
 	originalSnapshot *sf.SymbolSnapshot
+
+	// fastMatchMu guards fastMatchIDs, which memoizes symbol -> id set for the
+	// simple `* & $source` / `<self> & $source` fast path.
+	fastMatchMu  sync.Mutex
+	fastMatchIDs map[string]map[int64]struct{}
 }
 
 type checkItem struct {
@@ -248,6 +254,12 @@ func (r *sfCheck) check(
 	// later path, so the later path's re-bind of it was skipped).
 	cacheKey := extractCheckNodeId(path)
 	for _, it := range items {
+		if match, ok := r.fastPathMatch(it, path); ok {
+			if !fn(it.Key, match) {
+				return
+			}
+			continue
+		}
 		if cacheKey != "" {
 			if cached, ok := it.matchCache.Load(cacheKey); ok {
 				if !fn(it.Key, cached.(bool)) {
@@ -271,6 +283,81 @@ func (r *sfCheck) check(
 			return
 		}
 	}
+}
+
+// fastPathMatch short-circuits the most common dataflow include/exclude
+// sub-rules (`* & $source`, `<self> & $source`, and their $sink variants) by
+// checking path-node ids against the already-bound symbol set. This avoids a
+// full SyntaxFlow sub-query per enumerated path, which dominated the heavy
+// log-forging / path-traversal rules. Returns ok=false for anything it cannot
+// prove equivalent, so semantics always fall back to the full query.
+func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
+	if r == nil || item == nil || item.Value == "" {
+		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
+		return false, false
+	}
+	text := strings.TrimSpace(item.Value)
+	var sym string
+	switch text {
+	case "* & $source", "<self> & $source", "*& $source", "* &$source", "<self>& $source", "<self> &$source":
+		sym = "source"
+	case "* & $sink", "<self> & $sink", "*& $sink", "* &$sink", "<self>& $sink", "<self> &$sink":
+		sym = "sink"
+	default:
+		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
+		if os.Getenv("YAK_SSA_FAST_MATCH_DEBUG") != "" && atomic.AddInt64(&fastPathFallbackLogCount, 1) <= 20 {
+			log.Infof("fast-path fallback text: %q", text)
+		}
+		return false, false
+	}
+	ids := r.fastMatchSymbolIDs(sym)
+	if len(ids) == 0 {
+		// Unbound/empty symbol: the full sub-query would also produce no match,
+		// but fall back to preserve exact semantics.
+		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
+		return false, false
+	}
+	matched := false
+	path.Recursive(func(op sf.ValueOperator) error {
+		if id, ok := op.(interface{ GetId() int64 }); ok {
+			if _, ok := ids[id.GetId()]; ok {
+				matched = true
+				return utils.Error("abort")
+			}
+		}
+		return nil
+	})
+	atomic.AddInt64(&fastPathMatchCounter.hit, 1)
+	return matched, true
+}
+
+func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
+	if r == nil || r.contextResult == nil || name == "" {
+		return nil
+	}
+	r.fastMatchMu.Lock()
+	defer r.fastMatchMu.Unlock()
+	if r.fastMatchIDs == nil {
+		r.fastMatchIDs = make(map[string]map[int64]struct{})
+	}
+	if set, ok := r.fastMatchIDs[name]; ok {
+		return set
+	}
+	vals, ok := r.contextResult.SymbolTable.Get(name)
+	if !ok {
+		r.fastMatchIDs[name] = nil
+		return nil
+	}
+	set := make(map[int64]struct{}, len(vals))
+	for _, op := range vals {
+		if id, ok := op.(interface{ GetId() int64 }); ok {
+			if id.GetId() > 0 {
+				set[id.GetId()] = struct{}{}
+			}
+		}
+	}
+	r.fastMatchIDs[name] = set
+	return set
 }
 
 // extractCheckNodeId builds a cache key from the path values.
@@ -352,6 +439,23 @@ func (r *sfCheck) clearup(sfres *sf.SFFrameResult) {
 // Tests read it to assert Opt A actually skips the useless merges deterministically
 // (alloc-profile-based assertions are too noisy on small synthetic inputs).
 var clearupMergeSkipCounter mergeSkipCounter
+
+// fastPathMatchCounter counts fast-path hits vs fallbacks so tests and the
+// scan summary can prove the simple include/exclude short-circuit is active.
+type fastPathMatchStats struct {
+	hit      int64
+	fallback int64
+}
+
+var fastPathMatchCounter fastPathMatchStats
+var fastPathFallbackLogCount int64
+
+// FastPathMatchStats returns the process-wide fast-path hit/fallback counts.
+// Exposed for tests and optional scan-summary telemetry.
+func FastPathMatchStats() (hits, fallbacks int64) {
+	return atomic.LoadInt64(&fastPathMatchCounter.hit),
+		atomic.LoadInt64(&fastPathMatchCounter.fallback)
+}
 
 type mergeSkipCounter struct {
 	skip  int64

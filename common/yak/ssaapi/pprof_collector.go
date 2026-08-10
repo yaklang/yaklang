@@ -32,9 +32,12 @@ type pprofCollector struct {
 }
 
 const (
-	defaultPprofHTTPAddr   = "127.0.0.1:18080"
-	memoryThresholdHigh    = 10 * 1024 * 1024 * 1024 // 10 GB
-	pprofInterval          = 5 * time.Minute
+	defaultPprofHTTPAddr = "127.0.0.1:18080"
+	memoryThresholdHigh  = 10 * 1024 * 1024 * 1024 // 10 GB
+	// pprofInterval is slightly longer than the high-memory CPU duration so a
+	// periodic profile never starts while the previous 5-minute profile is still
+	// finishing (observed as pprof HTTP 500 on Hadoop run4/run5).
+	pprofInterval          = 5*time.Minute + 2*time.Second
 	pprofCPUDurationNormal = 60 * time.Second
 	pprofCPUDurationHigh   = 5 * time.Minute
 	pprofInitialDelay      = 30 * time.Second
