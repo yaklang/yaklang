@@ -70,6 +70,30 @@ func (b *BitVector) Or(other *BitVector) {
 	}
 }
 
+// Contains reports whether every bit set in other is also set in b
+// (i.e. other is a subset of b). Used to short-circuit idempotent anchor
+// merges and skip an allocation.
+func (b *BitVector) Contains(other *BitVector) bool {
+	if other == nil {
+		return true
+	}
+	if b == nil {
+		return other.IsEmpty()
+	}
+	for i, word := range other.words {
+		if i >= len(b.words) {
+			if word != 0 {
+				return false
+			}
+			continue
+		}
+		if b.words[i]|word != b.words[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func (b *BitVector) IsEmpty() bool {
 	if b == nil {
 		return true

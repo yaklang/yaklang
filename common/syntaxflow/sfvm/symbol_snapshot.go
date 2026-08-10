@@ -31,9 +31,13 @@ type SymbolSnapshot struct {
 // snapshot (every child key/value is "new"). Caller is responsible for any
 // concurrency locking around table access.
 func TakeSymbolSnapshot(table *omap.OrderedMap[string, Values]) *SymbolSnapshot {
+	tableLen := 0
+	if table != nil {
+		tableLen = table.Len()
+	}
 	s := &SymbolSnapshot{
-		keys:      make(map[string]struct{}),
-		dedupKeys: make(map[dedupKey]struct{}),
+		keys:      make(map[string]struct{}, tableLen),
+		dedupKeys: make(map[dedupKey]struct{}, tableLen),
 	}
 	if table == nil {
 		return s
