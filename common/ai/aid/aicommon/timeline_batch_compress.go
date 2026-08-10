@@ -97,7 +97,7 @@ func (m *Timeline) findCompressSplitByRecentKeepTokens(keepTokens int64) int {
 
 // compressForSizeLimit 当活跃区 token 超过 totalDumpContentLimit 时，触发 batch compress：
 //
-//	keepTokens = currentSize / 4，按 token 反向累加从最新端向旧端切分，
+//	keepTokens = currentSize / 6，按 token 反向累加从最新端向旧端切分，
 //	[0, splitIdx) 进入 toCompress 一并压成 1 条 reducer，
 //	[splitIdx, end] 进入 recentKeep 不动，并作为"现在 agent 在做什么"的 prompt 上下文一并喂给 AI。
 //
@@ -129,9 +129,9 @@ func (m *Timeline) compressForSizeLimitLocked() {
 		return
 	}
 
-	// 关键词: compressForSizeLimit, keepTokens, currentSize/4
-	// 目标：保留最新约 1/4 token 的 item 不动，其余压缩
-	keepTokens := currentSize / 4
+	// 关键词: compressForSizeLimit, keepTokens, currentSize/6
+	// 目标：保留最新约 1/6 token 的 item 不动，其余压缩
+	keepTokens := currentSize / 6
 	if keepTokens < 1 {
 		keepTokens = 1
 	}
