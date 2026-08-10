@@ -26,7 +26,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 		// 从 holder 读取(可能已被上面的自动安装回填)的最新搜索器
 		docSearcher := holder.getGrep()
 		ragSearcher := holder.getRAG()
-		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
+		reactloops.RunAttachedExtraResourcesInit(
+			r,
+			loop,
+			aicommon.FilterAttachedResourcesExcludeYaklangDelivery(attachedDatas),
+		)
 		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
 		if editorCtx == nil {
 			editorCtx = &aicommon.YaklangEditorContext{}

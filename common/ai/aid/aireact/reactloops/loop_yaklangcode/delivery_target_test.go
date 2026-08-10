@@ -58,8 +58,33 @@ func TestHasYaklangEditorDeliveryTarget(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, hasYaklangEditorDeliveryTarget(loop))
 
-	loop.Set("editor_file_path", "/tmp/foo.yak")
+	loop.Set("editor_file_path", filepath.Join("testdata", "foo.yak"))
 	require.True(t, hasYaklangEditorDeliveryTarget(loop))
+
+	loop.Set("editor_file_path", filepath.Join("testdata", "security_report.md"))
+	require.False(t, hasYaklangEditorDeliveryTarget(loop))
+}
+
+func TestResolveYaklangDeliveryTarget_NonYakFallsBackToCreate(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("YAKIT_HOME", base)
+
+	loop, err := reactloops.NewReActLoop("resolve-md-fallback", mock.NewMockInvoker(context.Background()))
+	require.NoError(t, err)
+
+	refMD := filepath.Join("testdata", "security_report.md")
+	loop.Set("editor_file_path", refMD)
+	path, op, err := resolveYaklangDeliveryTarget(loop)
+	require.NoError(t, err)
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.True(t, isYaklangGenCodePath(path))
+
+	loop.Set("editor_file_path", "")
+	loop.Set("filename", refMD)
+	path, op, err = resolveYaklangDeliveryTarget(loop)
+	require.NoError(t, err)
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, op)
+	assert.True(t, isYaklangGenCodePath(path))
 }
 
 func TestNewYaklangGenCodePath(t *testing.T) {

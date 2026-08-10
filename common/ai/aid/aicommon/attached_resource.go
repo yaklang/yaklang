@@ -5,6 +5,9 @@ import "strings"
 const (
 	AttachedResourceTypeDefault         = "default"
 	AttachedResourceTypeFile            = CONTEXT_PROVIDER_TYPE_FILE
+	// AttachedResourceTypeCode is a writable code delivery target (e.g. Yak Runner open .yak).
+	// Distinct from Type=file, which is read-only reference/@mention context used across loops.
+	AttachedResourceTypeCode            = "code"
 	AttachedResourceTypeHTTPFlowID      = "http_flow_id"
 	AttachedResourceTypeKnowledgeBase   = "knowledge_base"
 	AttachedResourceTypeSelected        = "selected"
@@ -13,6 +16,7 @@ const (
 	AttachedResourceKeyID      = "id"
 	AttachedResourceKeyContent = "content"
 	AttachedResourceKeyIsHTTPS = "is_https"
+	AttachedResourceKeyFilePath = CONTEXT_PROVIDER_KEY_FILE_PATH
 
 	AttachedHTTPFlowRequestInlineLimit  = 3 * 1024
 	AttachedHTTPFlowResponseInlineLimit = 3 * 1024
