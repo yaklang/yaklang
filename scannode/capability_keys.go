@@ -2,7 +2,10 @@ package scannode
 
 import "strings"
 
-const capabilityKeySSARuleSyncExport = "ssa.rule_sync.export"
+const (
+	capabilityKeySSARuleSyncExport = "ssa.rule_sync.export"
+	capabilityKeyAIBindEpochV1     = "ai.session.bind_epoch.v1"
+)
 
 func normalizeScanNodeCapabilityKeys(input []string) []string {
 	result := make([]string, 0, len(input)+len(compiledScanNodeCapabilityKeys()))

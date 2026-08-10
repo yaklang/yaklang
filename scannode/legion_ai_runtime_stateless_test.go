@@ -2,12 +2,15 @@ package scannode
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
@@ -41,6 +44,28 @@ type recordingSingleRunEmitter struct {
 	failed chan singleRunCompletion
 }
 
+type blockingTurnFailureEmitter struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func newBlockingTurnFailureEmitter() *blockingTurnFailureEmitter {
+	return &blockingTurnFailureEmitter{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (*blockingTurnFailureEmitter) Emit(string, []byte)           {}
+func (*blockingTurnFailureEmitter) Done([]byte)                   {}
+func (*blockingTurnFailureEmitter) Failed(string, string, []byte) {}
+func (*blockingTurnFailureEmitter) DoneTurn(string, []byte)       {}
+func (e *blockingTurnFailureEmitter) FailTurn(string, string, string, []byte) {
+	e.once.Do(func() { close(e.started) })
+	<-e.release
+}
+
 func (recordingSingleRunEmitter) Emit(string, []byte) {}
 func (recordingSingleRunEmitter) Done([]byte)         {}
 func (recordingSingleRunEmitter) Failed(string, string, []byte) {
@@ -59,23 +84,34 @@ func (e recordingSingleRunEmitter) FailTurn(turnID, code, message string, detail
 }
 
 type fakeStatelessTurnEngine struct {
-	started   chan struct{}
-	release   chan struct{}
-	closed    chan struct{}
-	events    chan *ypb.AIInputEvent
-	sendErr   error
-	startOnce sync.Once
-	closeOnce sync.Once
+	ctx          context.Context
+	config       *aiengine.AIEngineConfig
+	started      chan struct{}
+	release      chan struct{}
+	closed       chan struct{}
+	events       chan *ypb.AIInputEvent
+	eventStarted chan struct{}
+	eventRelease chan struct{}
+	sendErr      error
+	eventErr     error
+	startOnce    sync.Once
+	closeOnce    sync.Once
 }
 
 func newFakeStatelessTurnEngine() *fakeStatelessTurnEngine {
 	return &fakeStatelessTurnEngine{
+		ctx:     context.Background(),
+		config:  aiengine.NewAIEngineConfig(),
 		started: make(chan struct{}),
 		release: make(chan struct{}),
 		closed:  make(chan struct{}),
 		events:  make(chan *ypb.AIInputEvent, 4),
 	}
 }
+
+func (f *fakeStatelessTurnEngine) Config() *aiengine.AIEngineConfig { return f.config }
+
+func (f *fakeStatelessTurnEngine) Context() context.Context { return f.ctx }
 
 func (f *fakeStatelessTurnEngine) SendMsg(string, ...aiengine.AIEngineConfigOption) error {
 	f.startOnce.Do(func() { close(f.started) })
@@ -87,6 +123,15 @@ func (f *fakeStatelessTurnEngine) SendMsg(string, ...aiengine.AIEngineConfigOpti
 }
 
 func (f *fakeStatelessTurnEngine) SendInputEvent(event *ypb.AIInputEvent) error {
+	if f.eventStarted != nil {
+		f.startOnce.Do(func() { close(f.eventStarted) })
+	}
+	if f.eventRelease != nil {
+		<-f.eventRelease
+	}
+	if f.eventErr != nil {
+		return f.eventErr
+	}
 	f.events <- event
 	return nil
 }
@@ -119,6 +164,236 @@ func TestStatelessDriverBindReturnsHandleWithoutEngineField(t *testing.T) {
 	if sh.newEngine == nil {
 		t.Fatal("handle.newEngine must be set (defaults to aiengine.NewAIEngine)")
 	}
+}
+
+func TestStatelessDriverRejectsNewInputWhileTerminalFailurePublicationIsBlocked(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	engine.sendErr = errors.New("provider failed")
+	emitter := newBlockingTurnFailureEmitter()
+	t.Cleanup(func() { close(emitter.release) })
+	handle := &statelessAIEngineRuntimeHandle{
+		binding: aiSessionBinding{
+			ExecutionMode: "conversation",
+		},
+		emitter: emitter,
+		newEngine: func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+			return engine, nil
+		},
+	}
+
+	if err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-failed"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"first"}`),
+	}); err != nil {
+		t.Fatalf("send failing input: %v", err)
+	}
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("failing turn did not start")
+	}
+	close(engine.release)
+	select {
+	case <-emitter.started:
+	case <-time.After(time.Second):
+		t.Fatal("terminal failure publication did not start")
+	}
+
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-too-late"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"second"}`),
+	})
+	if err == nil || !strings.Contains(err.Error(), "runtime is closed") {
+		t.Fatalf("new input during terminal publication error = %v, want closed runtime", err)
+	}
+}
+
+func TestStatelessDriverRejectsContextAfterTerminalFailureClosesHandle(t *testing.T) {
+	handle := &statelessAIEngineRuntimeHandle{closed: true}
+	err := handle.AppendContext(context.Background(), aiSessionContextUpdate{})
+	if err == nil || !strings.Contains(err.Error(), "runtime is closed") {
+		t.Fatalf("append context error = %v, want closed runtime", err)
+	}
+}
+
+func TestDefaultStatelessDriverExecutesConfiguredForgeDirectly(t *testing.T) {
+	t.Setenv("LEGION_AI_RUNTIME", "")
+	original := executeYakAIForge
+	t.Cleanup(func() { executeYakAIForge = original })
+	invoked := make(chan []*ypb.ExecParamItem, 1)
+	executeYakAIForge = func(_ string, input any, _ ...any) (any, error) {
+		params, _ := input.([]*ypb.ExecParamItem)
+		invoked <- params
+		return map[string]string{"status": "done"}, nil
+	}
+
+	driver := selectAISessionRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref: aiSessionCommandRef{SessionID: "s-stateless-direct-forge", OwnerUserID: "u1"},
+		RuntimeOptionSnapshotJSON: []byte(`{
+			"forge_name":"yak-cve-analysis",
+			"forge_params":[{"key":"target","value":"https://example.test"}]
+		}`),
+	}, noopEmitter{})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh, ok := handle.(*statelessAIEngineRuntimeHandle)
+	if !ok {
+		t.Fatalf("default driver handle is %T, want stateless", handle)
+	}
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-forge-1"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"do not replace explicit forge params"}`),
+	}); err != nil {
+		t.Fatalf("send input: %v", err)
+	}
+	select {
+	case params := <-invoked:
+		if len(params) != 1 || params[0].GetKey() != "target" || params[0].GetValue() != "https://example.test" {
+			t.Fatalf("unexpected direct forge params: %#v", params)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("default stateless driver did not execute configured forge")
+	}
+}
+
+func TestDefaultStatelessDriverAppliesIdleHotpatchToNextTurn(t *testing.T) {
+	t.Setenv("LEGION_AI_RUNTIME", "")
+	driver := selectAISessionRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref: aiSessionCommandRef{SessionID: "s-stateless-idle-hotpatch", OwnerUserID: "u1"},
+	}, noopEmitter{})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	engineCreated := false
+	sh.newEngine = func(options ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		engineCreated = true
+		config := aiengine.NewAIEngineConfig(options...)
+		runtimeConfig := aicommon.NewConfig(context.Background(), config.ExtOptions...)
+		if !runtimeConfig.GetEnablePlanAndExec() {
+			t.Fatal("idle hotpatch was not applied to the next turn config")
+		}
+		return engine, nil
+	}
+
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"EnablePlan","params":{"enable_plan":true}}`),
+	}); err != nil {
+		t.Fatalf("idle hotpatch: %v", err)
+	}
+	if engineCreated {
+		t.Fatal("idle hotpatch must not create a turn engine")
+	}
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"start after hotpatch"}`),
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("next turn did not start")
+	}
+	close(engine.release)
+}
+
+func TestDefaultStatelessDriverRoutesActiveHotpatchAndRejectsUnknownType(t *testing.T) {
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref: aiSessionCommandRef{SessionID: "s-stateless-active-hotpatch", OwnerUserID: "u1"},
+	}, noopEmitter{})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"start"}`),
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	<-engine.started
+
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"EnablePlan","params":{"enable_plan":true}}`),
+	}); err != nil {
+		t.Fatalf("active hotpatch: %v", err)
+	}
+	select {
+	case event := <-engine.events:
+		if !event.GetIsConfigHotpatch() || event.GetHotpatchType() != aicommon.HotPatchType_EnablePlan {
+			t.Fatalf("unexpected active hotpatch event: %#v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("active engine did not receive hotpatch")
+	}
+
+	err = sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"UnknownPatch","params":{}}`),
+	})
+	if err == nil || !contains(err.Error(), "unsupported ai session hotpatch_type") {
+		t.Fatalf("expected unsupported hotpatch error, got %v", err)
+	}
+	close(engine.release)
+}
+
+func TestDefaultStatelessDriverDoesNotCommitRejectedActiveHotpatch(t *testing.T) {
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref: aiSessionCommandRef{SessionID: "s-stateless-rejected-hotpatch", OwnerUserID: "u1"},
+	}, noopEmitter{})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	engine.eventErr = errors.New("engine is closing")
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-rejected-hotpatch"},
+		InputType:   "message",
+		PayloadJSON: []byte(`{"content":"start"}`),
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	<-engine.started
+
+	err = sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"EnablePlan","params":{"enable_plan":true}}`),
+	})
+	if err == nil || !contains(err.Error(), "engine is closing") {
+		t.Fatalf("expected active hotpatch delivery failure, got %v", err)
+	}
+	sh.mu.Lock()
+	committed := sh.runtime.EnablePlan
+	sh.mu.Unlock()
+	if committed != nil {
+		t.Fatalf("failed hotpatch leaked into next-turn state: %v", *committed)
+	}
+	close(engine.release)
 }
 
 func TestStatelessDriverSendInputInvokesEngineFactoryPerTurn(t *testing.T) {
@@ -365,6 +640,100 @@ func TestStatelessDriverRunsTurnAsyncAndRoutesInteractiveResponseToActiveEngine(
 		t.Fatal("active turn did not receive interactive response")
 	}
 	close(engine.release)
+}
+
+func TestStatelessControlInputsAreLinearizedWithTurnClose(t *testing.T) {
+	tests := []struct {
+		name  string
+		input aiSessionInput
+	}{
+		{
+			name: "review",
+			input: aiSessionInput{
+				InputType:   "user_intervention",
+				PayloadJSON: []byte(`{"id":"review-linearized","suggestion":"continue"}`),
+				ReviewID:    "review-linearized",
+				TurnID:      "turn-linearized",
+			},
+		},
+		{
+			name: "sync",
+			input: aiSessionInput{
+				InputType:   "sync_event",
+				PayloadJSON: []byte(`{"sync_type":"recovery_plan_and_exec","sync_json_input":{"coordinator_id":"coor-1"}}`),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			engine := newFakeStatelessTurnEngine()
+			engine.eventStarted = make(chan struct{})
+			engine.eventRelease = make(chan struct{})
+			handle := &statelessAIEngineRuntimeHandle{
+				activeTurn: &statelessAITurn{
+					engine: engine,
+					turnID: "turn-linearized",
+				},
+			}
+
+			inputDone := make(chan error, 1)
+			go func() { inputDone <- handle.SendInput(context.Background(), test.input) }()
+			select {
+			case <-engine.eventStarted:
+			case <-time.After(time.Second):
+				t.Fatal("control input did not reach active engine")
+			}
+			closeDone := make(chan struct{})
+			go func() {
+				handle.closeRuntime()
+				close(closeDone)
+			}()
+			select {
+			case <-closeDone:
+				t.Fatal("turn close crossed an in-flight control delivery")
+			case <-time.After(20 * time.Millisecond):
+			}
+			close(engine.eventRelease)
+			if err := <-inputDone; err != nil {
+				t.Fatalf("linearized control input: %v", err)
+			}
+			select {
+			case <-closeDone:
+			case <-time.After(time.Second):
+				t.Fatal("turn close did not finish after control delivery")
+			}
+		})
+	}
+}
+
+func TestStatelessTaskScopedCapabilityHotpatchDoesNotPersist(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	handle := &statelessAIEngineRuntimeHandle{
+		runtime: yakRuntimeOptions{EnabledCapabilities: []yakAICapability{{Name: "base", Type: "tool"}}},
+		activeTurn: &statelessAITurn{
+			engine: engine,
+			turnID: "turn-a",
+		},
+	}
+	input := aiSessionInput{
+		InputType:   "hotpatch",
+		PayloadJSON: []byte(`{"hotpatch_type":"EnabledCapabilities","task_id":"task-a","params":{"enabled_capabilities":[{"name":"temporary","type":"tool"}]}}`),
+	}
+	if err := handle.SendInput(context.Background(), input); err != nil {
+		t.Fatalf("active task-scoped hotpatch: %v", err)
+	}
+	if got := handle.runtime.EnabledCapabilities; len(got) != 1 || got[0].Name != "base" {
+		t.Fatalf("task-scoped capability leaked into next-turn snapshot: %#v", got)
+	}
+	select {
+	case <-engine.events:
+	case <-time.After(time.Second):
+		t.Fatal("active task did not receive task-scoped hotpatch")
+	}
+	handle.activeTurn = nil
+	if err := handle.SendInput(context.Background(), input); err == nil || !strings.Contains(err.Error(), "requires an active task") {
+		t.Fatalf("idle task-scoped hotpatch error = %v, want explicit rejection", err)
+	}
 }
 
 func TestStatelessDriverFencesReviewByTurnAndReviewID(t *testing.T) {

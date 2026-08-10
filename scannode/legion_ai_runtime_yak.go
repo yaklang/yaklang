@@ -65,32 +65,39 @@ func (yakAIEngineRuntimeDriver) Bind(
 		return nil, fmt.Errorf("decode runtime options: %w", err)
 	}
 	handle := &yakAIEngineRuntimeHandle{
-		engine:       engine,
-		emitter:      emitter,
-		binding:      binding,
-		messageQueue: make(chan yakAIQueuedMessage, 64),
-		runtime:      runtimeOptions,
-		forgeInput:   chanx.NewUnlimitedChan[*ypb.AIInputEvent](engine.Context(), 10),
+		engine:            engine,
+		emitter:           emitter,
+		binding:           binding,
+		messageQueue:      make(chan yakAIQueuedMessage, 64),
+		runtime:           runtimeOptions,
+		directForgeConfig: engine.Config(),
+		forgeInput:        chanx.NewUnlimitedChan[*ypb.AIInputEvent](engine.Context(), 10),
 	}
 	go handle.runMessageQueue()
 	return handle, nil
 }
 
 type yakAIEngineRuntimeHandle struct {
-	engine       *aiengine.AIEngine
+	engine       statelessTurnEngine
 	emitter      aiSessionRuntimeEmitter
 	binding      aiSessionBinding
 	messageQueue chan yakAIQueuedMessage
 	runtime      yakRuntimeOptions
-	forgeInput   *chanx.UnlimitedChan[*ypb.AIInputEvent]
+	// directForgeConfig is rebuilt from the same durable runtime snapshot as
+	// h.runtime. The long-lived engine applies hotpatches asynchronously, so its
+	// original Config pointer cannot be the source of truth for a first Forge.
+	directForgeConfig *aiengine.AIEngineConfig
+	forgeInput        *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	mu           sync.Mutex
 	closed       bool
 	forgeStarted bool
 	forgeRunning bool
+	currentTurn  string
 }
 
 type yakAIQueuedMessage struct {
+	turnID  string
 	content string
 	options []aiengine.AIEngineConfigOption
 }
@@ -104,51 +111,26 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		if err != nil {
 			return err
 		}
-		if h.feedForgeInputIfRunning(event) {
-			return nil
-		}
-		if err := h.engine.SendInputEvent(event); err != nil {
-			return fmt.Errorf("send yak ai config hotpatch: %w", err)
-		}
-		return nil
+		return h.sendHotpatchInput(event)
 	}
 	content, interactive, syncEvent, options, err := yakAIInputContent(input)
 	if err != nil {
 		return err
 	}
 
-	h.mu.Lock()
-	if h.closed {
-		h.mu.Unlock()
-		return fmt.Errorf("yak ai engine is closed")
-	}
-	h.mu.Unlock()
-
 	if interactive {
 		event, eventErr := buildYakAIInterventionEvent(input)
 		if eventErr != nil {
 			return eventErr
 		}
-		if h.feedForgeInputIfRunning(event) {
-			return nil
-		}
-		if err := h.engine.SendInputEvent(event); err != nil {
-			return fmt.Errorf("send yak ai interactive response: %w", err)
-		}
-		return nil
+		return h.sendControlInput(event, "interactive response")
 	}
 	if syncEvent != nil {
 		event := yakAISyncEventToInputEvent(syncEvent)
-		if h.feedForgeInputIfRunning(event) {
-			return nil
-		}
-		if err := h.engine.SendInputEvent(event); err != nil {
-			return fmt.Errorf("send yak ai sync event: %w", err)
-		}
-		return nil
+		return h.sendControlInput(event, "sync event")
 	}
 
-	return h.enqueueMessage(ctx, content, options...)
+	return h.enqueueMessage(ctx, input.Ref.CommandID, content, options...)
 }
 
 func (h *yakAIEngineRuntimeHandle) AppendContext(ctx context.Context, update aiSessionContextUpdate) error {
@@ -167,7 +149,7 @@ func (h *yakAIEngineRuntimeHandle) AppendContext(ctx context.Context, update aiS
 	if err != nil {
 		return err
 	}
-	return h.enqueueMessage(ctx, content)
+	return h.enqueueMessage(ctx, "", content)
 }
 
 func (h *yakAIEngineRuntimeHandle) Cancel(reason string) {
@@ -200,26 +182,25 @@ func (h *yakAIEngineRuntimeHandle) Close(reason string) {
 
 func (h *yakAIEngineRuntimeHandle) enqueueMessage(
 	ctx context.Context,
+	turnID string,
 	content string,
 	options ...aiengine.AIEngineConfigOption,
 ) error {
-	h.mu.Lock()
-	closed := h.closed
-	h.mu.Unlock()
-	if closed {
-		return fmt.Errorf("yak ai engine is closed")
-	}
 	queued := yakAIQueuedMessage{
+		turnID:  strings.TrimSpace(turnID),
 		content: content,
 		options: append([]aiengine.AIEngineConfigOption(nil), options...),
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || h.engine.Context().Err() != nil {
+		return fmt.Errorf("yak ai engine is closed")
 	}
 	select {
 	case h.messageQueue <- queued:
 		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-h.engine.Context().Done():
-		return fmt.Errorf("yak ai engine is closed")
+	default:
+		return fmt.Errorf("yak ai engine message queue is full")
 	}
 }
 
@@ -229,81 +210,207 @@ func (h *yakAIEngineRuntimeHandle) runMessageQueue() {
 		case <-h.engine.Context().Done():
 			return
 		case queued := <-h.messageQueue:
-			h.sendMessage(queued.content, queued.options...)
+			h.sendMessage(queued)
 		}
 	}
 }
 
-func (h *yakAIEngineRuntimeHandle) sendMessage(
-	content string,
-	options ...aiengine.AIEngineConfigOption,
-) {
-
+func (h *yakAIEngineRuntimeHandle) sendMessage(queued yakAIQueuedMessage) {
 	h.mu.Lock()
 	if h.closed {
 		h.mu.Unlock()
 		return
 	}
+	h.currentTurn = queued.turnID
 	h.mu.Unlock()
+	defer func() {
+		h.mu.Lock()
+		if h.currentTurn == queued.turnID {
+			h.currentTurn = ""
+		}
+		h.mu.Unlock()
+	}()
 
-	if h.shouldExecuteForgeDirectly() {
-		h.executeForgeDirectly(content)
+	if ok, runtime, binding, config := h.claimDirectForge(); ok {
+		h.executeForgeDirectly(queued.turnID, queued.content, runtime, binding, config)
 		return
 	}
 
-	if err := h.engine.SendMsg(content, options...); err != nil {
+	if err := h.engine.SendMsg(queued.content, queued.options...); err != nil {
 		if h.engine.Context().Err() != nil {
 			// 上下文已取消（关闭/关停），不报失败事件。
 			return
 		}
+		h.closeForTerminalFailure()
 		// 任务异常终止时上报失败事件，使绑定任务能即时收敛。
-		h.emitter.Failed(yakAISendFailureCode(err), err.Error(), mustJSON(map[string]string{
+		h.failTurn(queued.turnID, yakAISendFailureCode(err), err.Error(), mustJSON(map[string]string{
 			"runtime": "yak_ai_engine",
 		}))
 	}
 }
 
-func (h *yakAIEngineRuntimeHandle) shouldExecuteForgeDirectly() bool {
+func (h *yakAIEngineRuntimeHandle) activeTurnID() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.currentTurn
+}
+
+func (h *yakAIEngineRuntimeHandle) failTurn(turnID, code, message string, detailJSON []byte) {
+	if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok {
+		completer.FailTurn(turnID, code, message, detailJSON)
+		return
+	}
+	h.emitter.Failed(code, message, detailJSON)
+}
+
+func (h *yakAIEngineRuntimeHandle) closeForTerminalFailure() {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return
+	}
+	h.closed = true
+	engine := h.engine
+	h.mu.Unlock()
+	if engine != nil {
+		engine.Close()
+	}
+}
+
+func (h *yakAIEngineRuntimeHandle) claimDirectForge() (bool, yakRuntimeOptions, aiSessionBinding, *aiengine.AIEngineConfig) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.closed || h.forgeStarted || strings.TrimSpace(h.runtime.ForgeName) == "" {
-		return false
+		return false, yakRuntimeOptions{}, aiSessionBinding{}, nil
 	}
 	h.forgeStarted = true
 	h.forgeRunning = true
-	return true
+	config := h.directForgeConfig
+	if config == nil {
+		config = h.engine.Config()
+	}
+	return true, h.runtime, h.binding, config
 }
 
-func (h *yakAIEngineRuntimeHandle) feedForgeInputIfRunning(event *ypb.AIInputEvent) bool {
-	if event == nil || h.forgeInput == nil {
+func (h *yakAIEngineRuntimeHandle) sendHotpatchInput(event *ypb.AIInputEvent) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || h.engine.Context().Err() != nil {
+		return fmt.Errorf("yak ai engine is closed")
+	}
+	if isTaskScopedCapabilityHotpatchEvent(event) {
+		if h.currentTurn == "" && !h.forgeRunning {
+			return fmt.Errorf("task-scoped capability hotpatch requires an active task")
+		}
+		if h.forgeRunning && h.forgeInput != nil {
+			if !h.forgeInput.SafeFeedWithResult(event) {
+				return fmt.Errorf("send yak ai task-scoped hotpatch: direct forge input channel is closed")
+			}
+			return nil
+		}
+		if err := h.engine.SendInputEvent(event); err != nil {
+			return fmt.Errorf("send yak ai task-scoped hotpatch: %w", err)
+		}
+		if h.closed || h.engine.Context().Err() != nil {
+			return fmt.Errorf("yak ai engine is closed")
+		}
+		// task_id scopes this patch to the live task. Never fold it into the
+		// session snapshot or a later task would inherit temporary capability.
+		return nil
+	}
+	nextRuntime, err := applyYakAIHotpatchRuntime(h.runtime, event)
+	if err != nil {
+		return err
+	}
+	nextBinding := h.binding
+	nextBinding.RuntimeOptionSnapshotJSON, err = json.Marshal(nextRuntime)
+	if err != nil {
+		return fmt.Errorf("encode yak ai hotpatch runtime options: %w", err)
+	}
+	options, err := buildYakAIEngineOptions(h.engine.Context(), nextBinding, h.emitter)
+	if err != nil {
+		return fmt.Errorf("apply yak ai hotpatch runtime options: %w", err)
+	}
+	nextConfig := aiengine.NewAIEngineConfig(options...)
+
+	// An active direct Forge and the long-lived operator are separate input
+	// consumers. Both must accept the patch before the durable next-turn
+	// snapshot is committed and acknowledged.
+	if h.forgeRunning && h.forgeInput != nil && !h.forgeInput.SafeFeedWithResult(event) {
+		return fmt.Errorf("send yak ai config hotpatch: direct forge input channel is closed")
+	}
+	if err := h.engine.SendInputEvent(event); err != nil {
+		return fmt.Errorf("send yak ai config hotpatch: %w", err)
+	}
+	if h.closed || h.engine.Context().Err() != nil {
+		return fmt.Errorf("yak ai engine is closed")
+	}
+	h.runtime = nextRuntime
+	h.binding = nextBinding
+	h.directForgeConfig = nextConfig
+	return nil
+}
+
+func isTaskScopedCapabilityHotpatchEvent(event *ypb.AIInputEvent) bool {
+	if event == nil || strings.TrimSpace(event.GetTaskId()) == "" {
 		return false
 	}
-	h.mu.Lock()
-	running := h.forgeRunning && !h.closed
-	h.mu.Unlock()
-	return running && h.forgeInput.SafeFeedWithResult(event)
+	switch strings.TrimSpace(event.GetHotpatchType()) {
+	case aicommon.HotPatchType_EnabledCapabilities, aicommon.HotPatchType_DisabledCapabilities:
+		return true
+	default:
+		return false
+	}
 }
 
-func (h *yakAIEngineRuntimeHandle) executeForgeDirectly(content string) {
-	defer func() {
-		h.mu.Lock()
-		h.forgeRunning = false
-		h.mu.Unlock()
-	}()
+func (h *yakAIEngineRuntimeHandle) sendControlInput(event *ypb.AIInputEvent, kind string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed || h.engine.Context().Err() != nil {
+		return fmt.Errorf("yak ai engine is closed")
+	}
+	if event != nil && h.forgeRunning && h.forgeInput != nil && h.forgeInput.SafeFeedWithResult(event) {
+		return nil
+	}
+	if err := h.engine.SendInputEvent(event); err != nil {
+		return fmt.Errorf("send yak ai %s: %w", kind, err)
+	}
+	if h.closed || h.engine.Context().Err() != nil {
+		return fmt.Errorf("yak ai engine is closed")
+	}
+	return nil
+}
 
+func (h *yakAIEngineRuntimeHandle) executeForgeDirectly(
+	turnID string,
+	content string,
+	runtime yakRuntimeOptions,
+	binding aiSessionBinding,
+	config *aiengine.AIEngineConfig,
+) {
 	err := runYakAIForgeDirect(
 		h.engine.Context(),
-		h.engine.Config(),
-		h.runtime,
-		h.binding,
+		config,
+		runtime,
+		binding,
 		h.forgeInput,
 		h.emitter,
 		content,
 	)
+	// Clear the active-Forge admission flag immediately when ExecuteForge
+	// returns, before any terminal publication or other work can admit a patch
+	// into a channel with no remaining consumer.
+	h.mu.Lock()
+	h.forgeRunning = false
+	h.mu.Unlock()
 	if err != nil && h.engine.Context().Err() == nil {
-		h.emitter.Failed("yak_ai_forge_failed", err.Error(), mustJSON(map[string]string{
+		h.closeForTerminalFailure()
+		h.failTurn(turnID, "yak_ai_forge_failed", err.Error(), mustJSON(map[string]string{
 			"runtime":    "yak_ai_engine",
-			"forge_name": strings.TrimSpace(h.runtime.ForgeName),
+			"forge_name": strings.TrimSpace(runtime.ForgeName),
 		}))
 	}
 }
@@ -1115,8 +1222,9 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	if overlay.ForgeParams != nil {
 		base.ForgeParams = append([]yakAIForgeParam(nil), overlay.ForgeParams...)
 	}
-	if len(overlay.EnabledCapabilities) > 0 {
-		base.EnabledCapabilities = overlay.EnabledCapabilities
+	if overlay.EnabledCapabilities != nil {
+		base.EnabledCapabilities = make([]yakAICapability, len(overlay.EnabledCapabilities))
+		copy(base.EnabledCapabilities, overlay.EnabledCapabilities)
 	}
 	if overlay.Strategy != nil {
 		base.Strategy = overlay.Strategy
@@ -1271,26 +1379,162 @@ func yakAIInputContent(input aiSessionInput) (string, bool, *yakAISyncEvent, []a
 
 func buildYakAIHotpatchEvent(input aiSessionInput) (*ypb.AIInputEvent, error) {
 	var payload struct {
-		HotpatchType string            `json:"hotpatch_type"`
-		TaskID       string            `json:"task_id"`
-		Params       yakRuntimeOptions `json:"params"`
+		HotpatchType string          `json:"hotpatch_type"`
+		TaskID       string          `json:"task_id"`
+		Params       json.RawMessage `json:"params"`
+		// AcceptInput adds these common envelope fields to every non-sync
+		// object before it reaches the runtime. They are part of the bridge
+		// contract, not arbitrary hotpatch parameters.
+		InputType string `json:"input_type"`
+		Role      string `json:"role"`
 	}
-	if err := json.Unmarshal(input.PayloadJSON, &payload); err != nil {
+	decoder := json.NewDecoder(strings.NewReader(string(input.PayloadJSON)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
 		return nil, fmt.Errorf("decode ai session hotpatch payload: %w", err)
 	}
-	if strings.TrimSpace(payload.HotpatchType) == "" {
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("decode ai session hotpatch payload: trailing json values")
+	}
+	hotpatchType := strings.TrimSpace(payload.HotpatchType)
+	if hotpatchType == "" {
 		return nil, fmt.Errorf("ai session hotpatch_type is required")
+	}
+	params, err := decodeYakRuntimeOptions(payload.Params, true)
+	if err != nil {
+		return nil, fmt.Errorf("decode ai session hotpatch params: %w", err)
+	}
+	if err := validateYakAIHotpatch(hotpatchType, params); err != nil {
+		return nil, err
 	}
 	return &ypb.AIInputEvent{
 		IsConfigHotpatch: true,
-		HotpatchType:     strings.TrimSpace(payload.HotpatchType),
+		HotpatchType:     hotpatchType,
 		TaskId:           strings.TrimSpace(payload.TaskID),
-		Params:           yakRuntimeOptionsToStartParams(payload.Params),
+		Params:           yakRuntimeOptionsToStartParams(params),
 	}, nil
+}
+
+func validateYakAIHotpatch(hotpatchType string, params yakRuntimeOptions) error {
+	required := func(ok bool, field string) error {
+		if ok {
+			return nil
+		}
+		return fmt.Errorf("ai session hotpatch %s requires params.%s", hotpatchType, field)
+	}
+	switch hotpatchType {
+	case aicommon.HotPatchType_AllowRequireForUserInteract:
+		return required(params.DisallowRequireForUserPrompt != nil, "disallow_require_for_user_prompt")
+	case aicommon.HotPatchType_AgreePolicy:
+		policy := strings.TrimSpace(params.ReviewPolicy)
+		if policy != "manual" && policy != "ai" && policy != "yolo" {
+			return fmt.Errorf("ai session hotpatch AgreePolicy requires params.review_policy to be manual, ai, or yolo")
+		}
+		return nil
+	case aicommon.HotPatchType_AIService:
+		return required(strings.TrimSpace(params.AIService) != "", "ai_service")
+	case aicommon.HotPatchType_ModelName:
+		return required(strings.TrimSpace(params.AIModelName) != "", "ai_model_name")
+	case aicommon.HotPatchType_RiskControlScore:
+		return required(params.AIReviewRiskControlScore != nil, "ai_review_risk_control_score")
+	case aicommon.HotPatchType_EnablePlan:
+		return required(params.EnablePlan != nil, "enable_plan")
+	case aicommon.HotPatchType_AllowPlanUserInteract:
+		return required(params.AllowPlanUserInteract != nil, "allow_plan_user_interact")
+	case aicommon.HotPatchType_SyncPerceptionTrigger:
+		return required(params.SyncPerceptionTrigger != nil, "sync_perception_trigger")
+	case aicommon.HotPatchType_EnabledCapabilities, aicommon.HotPatchType_DisabledCapabilities:
+		if len(params.EnabledCapabilities) == 0 {
+			return fmt.Errorf("ai session hotpatch %s requires params.enabled_capabilities", hotpatchType)
+		}
+		for _, capability := range params.EnabledCapabilities {
+			if strings.TrimSpace(capability.Name) == "" || strings.TrimSpace(capability.Type) == "" {
+				return fmt.Errorf("ai session hotpatch %s requires capability name and type", hotpatchType)
+			}
+			if !isSupportedYakAICapabilityType(capability.Type) {
+				return fmt.Errorf(
+					"ai session hotpatch %s has unsupported capability type %q",
+					hotpatchType,
+					capability.Type,
+				)
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported ai session hotpatch_type %q", hotpatchType)
+	}
+}
+
+func isSupportedYakAICapabilityType(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case aicommon.EnabledCapabilityTypeTool, "tools",
+		aicommon.EnabledCapabilityTypeSkill, "skills",
+		aicommon.EnabledCapabilityTypePlugin, "plugins", "yakit_plugin", "yak_plugin",
+		aicommon.EnabledCapabilityTypeForge, "forges", "blueprint", "blueprints",
+		aicommon.EnabledCapabilityTypeMCPTool, "mcp", "mcp-tool", "mcptool":
+		return true
+	default:
+		return false
+	}
+}
+
+func applyYakAIHotpatchRuntime(base yakRuntimeOptions, event *ypb.AIInputEvent) (yakRuntimeOptions, error) {
+	if event == nil || !event.GetIsConfigHotpatch() || event.GetParams() == nil {
+		return base, fmt.Errorf("ai session hotpatch event is incomplete")
+	}
+	params := event.GetParams()
+	switch strings.TrimSpace(event.GetHotpatchType()) {
+	case aicommon.HotPatchType_AllowRequireForUserInteract:
+		value := params.GetDisallowRequireForUserPrompt()
+		base.DisallowRequireForUserPrompt = &value
+	case aicommon.HotPatchType_AgreePolicy:
+		base.ReviewPolicy = params.GetReviewPolicy()
+	case aicommon.HotPatchType_AIService:
+		base.AIService = params.GetAIService()
+		base.AIModelName = params.GetAIModelName()
+	case aicommon.HotPatchType_ModelName:
+		base.AIModelName = params.GetAIModelName()
+	case aicommon.HotPatchType_RiskControlScore:
+		value := params.GetAIReviewRiskControlScore()
+		base.AIReviewRiskControlScore = &value
+	case aicommon.HotPatchType_EnablePlan:
+		value := params.GetEnablePlan()
+		base.EnablePlan = &value
+	case aicommon.HotPatchType_AllowPlanUserInteract:
+		value := params.GetAllowPlanUserInteract()
+		base.AllowPlanUserInteract = &value
+	case aicommon.HotPatchType_SyncPerceptionTrigger:
+		value := params.GetSyncPerceptionTrigger()
+		base.SyncPerceptionTrigger = &value
+	case aicommon.HotPatchType_EnabledCapabilities, aicommon.HotPatchType_DisabledCapabilities:
+		baseParams := yakRuntimeOptionsToStartParams(base)
+		var capabilities []*ypb.AIEnabledCapability
+		if event.GetHotpatchType() == aicommon.HotPatchType_EnabledCapabilities {
+			capabilities = aicommon.MergeEnabledCapabilitiesHotpatch(baseParams, params)
+		} else {
+			capabilities = aicommon.SubtractEnabledCapabilitiesHotpatch(baseParams, params)
+		}
+		base.EnabledCapabilities = make([]yakAICapability, 0, len(capabilities))
+		for _, capability := range capabilities {
+			if capability == nil {
+				continue
+			}
+			base.EnabledCapabilities = append(base.EnabledCapabilities, yakAICapability{
+				Name: capability.GetName(),
+				Type: capability.GetType(),
+			})
+		}
+	default:
+		return base, fmt.Errorf("unsupported ai session hotpatch_type %q", event.GetHotpatchType())
+	}
+	return base, nil
 }
 
 func yakRuntimeOptionsToStartParams(options yakRuntimeOptions) *ypb.AIStartParams {
 	params := &ypb.AIStartParams{
+		AIService:                    options.AIService,
+		AIModelName:                  options.AIModelName,
 		ForgeName:                    options.ForgeName,
 		ForgeParams:                  yakAIForgeExecParams(options.ForgeParams),
 		ReviewPolicy:                 options.ReviewPolicy,
