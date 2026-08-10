@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -33,6 +34,18 @@ func (recordingStatelessEmitter) Done([]byte)         {}
 func (e recordingStatelessEmitter) Failed(code string, _ string, _ []byte) {
 	e.failed <- code
 }
+
+type capturingStatelessEmitter struct {
+	eventType string
+	payload   []byte
+}
+
+func (e *capturingStatelessEmitter) Emit(eventType string, payload []byte) {
+	e.eventType = eventType
+	e.payload = append([]byte(nil), payload...)
+}
+func (*capturingStatelessEmitter) Done([]byte)                   {}
+func (*capturingStatelessEmitter) Failed(string, string, []byte) {}
 
 type singleRunCompletion struct {
 	turnID string
@@ -538,6 +551,63 @@ func TestStatelessDriverInteractiveResponseRequiresActiveTurnWithoutCreatingEngi
 	if got := atomic.LoadInt32(&engineCreated); got != 0 {
 		t.Fatalf("interactive response must not create a new engine, got %d creations", got)
 	}
+}
+
+func TestStatelessDriverIdleQueueInfoReturnsEmptyQueueAndKeepsRuntimeUsable(t *testing.T) {
+	emitter := &capturingStatelessEmitter{}
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:                        aiSessionCommandRef{SessionID: "s-stateless-idle-queue", OwnerUserID: "u1"},
+		ProviderPolicySnapshotJSON: []byte(`{}`),
+		RuntimeOptionSnapshotJSON:  []byte(`{}`),
+	}, emitter)
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "sync_event",
+		PayloadJSON: []byte(`{"sync_type":"queue_info","sync_id":"queue-poll-1","sync_json_input":{}}`),
+	}); err != nil {
+		t.Fatalf("idle queue_info: %v", err)
+	}
+	if emitter.eventType != legionEventAISessionEvent {
+		t.Fatalf("event type = %q", emitter.eventType)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(emitter.payload, &payload); err != nil {
+		t.Fatalf("decode queue event: %v", err)
+	}
+	queue, ok := payload["content_json"].(map[string]any)
+	if !ok || queue["queue_empty"] != true || queue["total_tasks"] != float64(0) {
+		t.Fatalf("idle queue payload = %#v", payload)
+	}
+	if payload["node_id"] != "queue_info" || payload["is_sync"] != true || payload["sync_id"] != "queue-poll-1" {
+		t.Fatalf("idle queue envelope = %#v", payload)
+	}
+
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "turn-after-poll", SessionID: "s-stateless-idle-queue"},
+		InputType:   "free_input",
+		PayloadJSON: []byte(`{"content":"next turn"}`),
+		ContextPackage: &aiv1.ContextPackage{
+			SessionId: "s-stateless-idle-queue",
+			UserInput: "next turn",
+		},
+	}); err != nil {
+		t.Fatalf("next free input: %v", err)
+	}
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("next turn did not start after idle queue poll")
+	}
+	sh.Close("test cleanup")
 }
 
 func TestStatelessDriverFreeInputWithoutActiveTurnStartsNextTurn(t *testing.T) {
