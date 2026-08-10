@@ -38,6 +38,8 @@ var (
 	antlrCacheResetEveryFilesOnce   sync.Once
 	antlrCacheResetEveryFilesCached int
 	antlrCacheResetEveryBytesOnce   sync.Once
+	gomeMemLimitOnce                sync.Once
+	largeProjectLogOnce             sync.Once
 	antlrCacheResetEveryBytesCached int64
 )
 
@@ -405,36 +407,52 @@ func (c *Config) GetFileHandler(
 	concurrency := int(c.GetCompileConcurrency())
 	astBuildWindow := c.resolveASTBuildWindow(concurrency)
 	if astBuildWindow.largeProject {
-		if astBuildWindow.manualOverride {
-			log.Infof(
-				"[ssa-compile] large project detected (%s), AST build window controlled by YAK_SSA_AST_BUILD_WINDOW_FILES and ANTLR cache reset files=%d bytes=%s",
-				formatFileSize(int(c.GetCompileProjectBytes())),
-				parser.resetEveryFiles,
-				formatFileSize(int(parser.resetEveryBytes)),
-			)
-		} else if astBuildWindow.window > 0 {
-			log.Infof(
-				"[ssa-compile] large project detected (%s), auto AST build window=%d (language=%s diagnostics_heavy=%v budget=%s source=%s slot_cost=%s concurrency=%d), ANTLR cache reset files=%d bytes=%s",
-				formatFileSize(int(c.GetCompileProjectBytes())),
-				astBuildWindow.window,
-				c.GetLanguage(),
-				astBuildWindow.diagnosticsHeavy,
-				formatFileSize(int(astBuildWindow.budgetBytes)),
-				astBuildWindow.budgetSource,
-				formatFileSize(int(astBuildWindow.slotCostBytes)),
-				concurrency,
-				parser.resetEveryFiles,
-				formatFileSize(int(parser.resetEveryBytes)),
-			)
-		} else {
-			log.Infof(
-				"[ssa-compile] large project detected (%s), AST build window uses compile concurrency=%d (memory budget unavailable), ANTLR cache reset files=%d bytes=%s",
-				formatFileSize(int(c.GetCompileProjectBytes())),
-				concurrency,
-				parser.resetEveryFiles,
-				formatFileSize(int(parser.resetEveryBytes)),
-			)
-		}
+		// Set Go soft memory limit to help GC be more aggressive on large projects.
+		// The limit is set to 80% of system memory to leave room for OS + DB.
+		// GOMEMLIMIT is a soft limit — Go will try to keep heap below this and
+		// run GC more frequently, avoiding the OOM kill that happens when
+		// the heap grows unchecked to 20GB+ on 32GB machines.
+		// Use sync.Once to avoid setting/logging 98 times (once per concurrent worker).
+		gomeMemLimitOnce.Do(func() {
+			if totalMem := systemMemoryTotalBytes(); totalMem > 0 {
+				memLimit := totalMem * 80 / 100
+				debug.SetMemoryLimit(memLimit)
+				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (80%% of %s system memory)",
+					formatFileSize(int(memLimit)), formatFileSize(int(totalMem)))
+			}
+		})
+		largeProjectLogOnce.Do(func() {
+			if astBuildWindow.manualOverride {
+				log.Infof(
+					"[ssa-compile] large project detected (%s), AST build window controlled by YAK_SSA_AST_BUILD_WINDOW_FILES and ANTLR cache reset files=%d bytes=%s",
+					formatFileSize(int(c.GetCompileProjectBytes())),
+					parser.resetEveryFiles,
+					formatFileSize(int(parser.resetEveryBytes)),
+				)
+			} else if astBuildWindow.window > 0 {
+				log.Infof(
+					"[ssa-compile] large project detected (%s), auto AST build window=%d (language=%s diagnostics_heavy=%v budget=%s source=%s slot_cost=%s concurrency=%d), ANTLR cache reset files=%d bytes=%s",
+					formatFileSize(int(c.GetCompileProjectBytes())),
+					astBuildWindow.window,
+					c.GetLanguage(),
+					astBuildWindow.diagnosticsHeavy,
+					formatFileSize(int(astBuildWindow.budgetBytes)),
+					astBuildWindow.budgetSource,
+					formatFileSize(int(astBuildWindow.slotCostBytes)),
+					concurrency,
+					parser.resetEveryFiles,
+					formatFileSize(int(parser.resetEveryBytes)),
+				)
+			} else {
+				log.Infof(
+					"[ssa-compile] large project detected (%s), AST build window uses compile concurrency=%d (memory budget unavailable), ANTLR cache reset files=%d bytes=%s",
+					formatFileSize(int(c.GetCompileProjectBytes())),
+					concurrency,
+					parser.resetEveryFiles,
+					formatFileSize(int(parser.resetEveryBytes)),
+				)
+			}
+		})
 	}
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
