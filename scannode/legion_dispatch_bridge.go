@@ -56,6 +56,8 @@ func (b *legionJobBridge) executeDispatch(
 			ScriptContent:   command.GetScript().GetContent(),
 			ScriptJSONParam: normalizeInputJSON(command.GetInputJson()),
 			ScriptLabels:    command.GetLabels(),
+			DebugEnabled:    isDebugEnabled(command.GetLabels()),
+			DebugDir:        resolveDebugDir(command.GetLabels()),
 		},
 	)
 	if err == nil {

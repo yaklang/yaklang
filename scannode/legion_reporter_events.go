@@ -1,6 +1,7 @@
 package scannode
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -390,4 +391,37 @@ func (r *ScannerAgentReporter) touchActiveAttempt() {
 		return
 	}
 	r.agent.manager.Touch(taskIDForSubtask(r.SubTaskId))
+}
+
+// PublishArtifactReady publishes a generic JobArtifactReady event for
+// debug artifacts (pprof, logs, timing). Unlike PublishSSAArtifactReady
+// which is specialized for SSA results, this accepts arbitrary artifact kinds.
+func (r *ScannerAgentReporter) PublishArtifactReady(
+	ctx context.Context,
+	artifactKind string,
+	artifactFormat string,
+	objectKey string,
+	codec string,
+	sha256 string,
+	rawSizeBytes uint64,
+	storedSizeBytes uint64,
+	metricsJSON []byte,
+) error {
+	publisher, ref, ok, err := r.legionPublisher()
+	if err != nil || !ok {
+		return err
+	}
+	r.touchActiveAttempt()
+	return publisher.PublishArtifactReady(
+		ctx,
+		*ref,
+		artifactKind,
+		artifactFormat,
+		objectKey,
+		codec,
+		sha256,
+		rawSizeBytes,
+		storedSizeBytes,
+		metricsJSON,
+	)
 }
