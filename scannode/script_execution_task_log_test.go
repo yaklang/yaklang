@@ -14,7 +14,7 @@ import (
 func writeThroughTaskLog(t *testing.T, dir, jobID, subTaskID, runtimeID, payload string) string {
 	t.Helper()
 	t.Setenv("SCANNODE_TASK_LOG_DIR", dir)
-	w, closeFn := openTaskLogWriter(jobID, subTaskID, runtimeID)
+	w, closeFn := openTaskLogWriter(nil, jobID, subTaskID, runtimeID)
 	defer closeFn()
 	if w == nil {
 		t.Fatalf("expected non-nil writer when SCANNODE_TASK_LOG_DIR set, got nil")
@@ -26,12 +26,12 @@ func writeThroughTaskLog(t *testing.T, dir, jobID, subTaskID, runtimeID, payload
 	return filepath.Join(dir, name)
 }
 
-func TestOpenTaskLogWriter_DisabledByDefault(t *testing.T) {
+func TestOpenTaskLogWriter_DefaultsToTempDir(t *testing.T) {
 	t.Setenv("SCANNODE_TASK_LOG_DIR", "")
-	w, closeFn := openTaskLogWriter("job-1", "sub-1", "att-1")
+	w, closeFn := openTaskLogWriter(nil, "job-1", "sub-1", "att-1")
 	defer closeFn()
-	if w != nil {
-		t.Fatalf("expected nil writer when SCANNODE_TASK_LOG_DIR empty, got %T", w)
+	if w == nil {
+		t.Fatalf("expected non-nil writer (defaults to temp dir), got nil")
 	}
 }
 
@@ -52,36 +52,29 @@ func TestOpenTaskLogWriter_CreatesPerTaskFile(t *testing.T) {
 	}
 }
 
-func TestOpenTaskLogWriter_AppendsAcrossCalls(t *testing.T) {
+func TestOpenTaskLogWriter_TruncatesOnReopen(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("SCANNODE_TASK_LOG_DIR", dir)
-	// 第一次写
-	w1, close1 := openTaskLogWriter("job-1", "sub-1", "att-1")
-	if w1 == nil {
-		t.Fatal("expected non-nil writer")
-	}
+
+	w1, close1 := openTaskLogWriter(nil, "job-1", "sub-1", "att-1")
 	if _, err := io.WriteString(w1, "first line\n"); err != nil {
-		t.Fatal(err)
+		t.Fatalf("write first line: %v", err)
 	}
 	close1()
-	// 同一任务第二次写，应追加而非覆盖
-	w2, close2 := openTaskLogWriter("job-1", "sub-1", "att-1")
-	if w2 == nil {
-		t.Fatal("expected non-nil writer")
-	}
+
+	w2, close2 := openTaskLogWriter(nil, "job-1", "sub-1", "att-1")
 	if _, err := io.WriteString(w2, "second line\n"); err != nil {
-		t.Fatal(err)
+		t.Fatalf("write second line: %v", err)
 	}
 	close2()
 
 	name := sanitizeLogName("job-1") + "_" + sanitizeLogName("sub-1") + "_" + sanitizeLogName("att-1") + ".log"
-	got, err := os.ReadFile(filepath.Join(dir, name))
+	data, err := os.ReadFile(filepath.Join(dir, name))
 	if err != nil {
-		t.Fatalf("read failed: %v", err)
+		t.Fatalf("read log file: %v", err)
 	}
-	want := "first line\nsecond line\n"
-	if string(got) != want {
-		t.Fatalf("append mismatch\nwant: %q\nhave: %q", want, string(got))
+	if string(data) != "second line\n" {
+		t.Fatalf("expected truncated file with only second line, got: %q", string(data))
 	}
 }
 
@@ -89,7 +82,7 @@ func TestOpenTaskLogWriter_DegradedOnBadDir(t *testing.T) {
 	// 指向一个不存在的深层路径（父目录不可创建，比如无权限的根下），
 	// 应降级为 nil writer 而非 panic。用一个必然无法创建的路径。
 	t.Setenv("SCANNODE_TASK_LOG_DIR", "/nonexistent-root-dir-for-test/tasks")
-	w, closeFn := openTaskLogWriter("job-1", "sub-1", "att-1")
+	w, closeFn := openTaskLogWriter(nil, "job-1", "sub-1", "att-1")
 	defer closeFn()
 	if w != nil {
 		t.Fatalf("expected nil writer on bad dir, got %T", w)
