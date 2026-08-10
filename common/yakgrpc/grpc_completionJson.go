@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/format"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -234,6 +235,7 @@ func (s *Server) StaticAnalyzeError(ctx context.Context, r *ypb.StaticAnalyzeErr
 	log.Infof("[StaticAnalyze] Session '%s', Request %d completed successfully in %v, found %d issues",
 		sessionID, requestID, duration, len(tmpRes))
 
+	copyOpts := format.CopyAllDefaults(pluginType)
 	es := lo.Map(tmpRes, func(i *result.StaticAnalyzeResult, _ int) *ypb.StaticAnalyzeErrorResult {
 		return &ypb.StaticAnalyzeErrorResult{
 			Message:         []byte(i.Message),
@@ -241,9 +243,10 @@ func (s *Server) StaticAnalyzeError(ctx context.Context, r *ypb.StaticAnalyzeErr
 			EndLineNumber:   i.EndLineNumber,
 			StartColumn:     i.StartColumn,
 			EndColumn:       i.EndColumn,
-			// RawMessage:      []byte{},
-			Severity: string(i.Severity),
-			Tag:      string(i.Tag),
+			// RawMessage carries rich copy text (hints + code context) without a new proto field.
+			RawMessage: []byte(format.FormatSingleForCopy(code, i, copyOpts...)),
+			Severity:   string(i.Severity),
+			Tag:        string(i.Tag),
 		}
 	})
 	return &ypb.StaticAnalyzeErrorResponse{Result: es}, nil

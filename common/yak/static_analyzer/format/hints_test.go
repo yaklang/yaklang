@@ -1,7 +1,6 @@
-package loop_yaklangcode
+package format
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +8,7 @@ import (
 )
 
 func TestAllBuiltinCompilerErrorMessagesHaveHints(t *testing.T) {
-	for _, tc := range allBuiltinCompilerErrorMessages {
+	for _, tc := range AllBuiltinCompilerErrorMessages {
 		t.Run(tc.name, func(t *testing.T) {
 			hint := lookupCompilerErrorHint(tc.message, "")
 			require.NotEmpty(t, hint, "expected hint for %q", tc.message)
@@ -39,10 +38,10 @@ func TestLookupCompilerErrorHint_Fallback(t *testing.T) {
 
 func TestExtractCoreCompilerMessage(t *testing.T) {
 	raw := `[Error]: Value undefined:foo in [1:1 -- 1:4] from SSA:TypeCheck`
-	assert.Equal(t, "Value undefined:foo", extractCoreCompilerMessage(raw))
+	assert.Equal(t, "Value undefined:foo", ExtractCoreCompilerMessage(raw))
 }
 
-func TestCheckCodeAndFormatErrors_CommonCasesHaveHints(t *testing.T) {
+func TestCheckAndFormat_CommonCasesHaveHints(t *testing.T) {
 	cases := map[string]string{
 		"undefined":     "undefinedFunc()",
 		"invalid_field": "x=1\nx.foo",
@@ -51,21 +50,21 @@ func TestCheckCodeAndFormatErrors_CommonCasesHaveHints(t *testing.T) {
 	}
 	for name, code := range cases {
 		t.Run(name, func(t *testing.T) {
-			errorMsg, hasBlocking := checkCodeAndFormatErrors(code)
+			errorMsg, hasBlocking, _ := CheckAndFormat(code, YakRunnerDefaults(0)...)
 			require.True(t, hasBlocking, "expected blocking errors")
 			require.Contains(t, errorMsg, "AI助手提示:", "expected AI hint in output")
 		})
 	}
 }
 
-func TestCheckCodeAndFormatErrors_FunctionParameterTypesIntegration(t *testing.T) {
-	code := `bruteTask.SetResultHandler(func(result map[string]interface{}) {
-    println(result)
-})`
-	errorMsg, hasBlocking := checkCodeAndFormatErrors(code)
+func TestFormatSingleForCopy_IncludesLocation(t *testing.T) {
+	code := "undefinedFunc()\n"
+	_, hasBlocking, results := CheckAndFormat(code, CopyAllDefaults("yak")...)
 	require.True(t, hasBlocking)
-	require.Contains(t, errorMsg, "AI助手提示:")
-	require.True(t, strings.Contains(errorMsg, "函数参数不允许有类型声明") ||
-		strings.Contains(errorMsg, "语法解析失败") ||
-		strings.Contains(errorMsg, "编译器/静态分析报错"))
+	require.NotEmpty(t, results)
+
+	single := FormatSingleForCopy(code, results[0], CopyAllDefaults("yak")...)
+	require.NotEmpty(t, single)
+	require.Contains(t, single, "修改建议:")
+	require.Contains(t, single, "in [")
 }
