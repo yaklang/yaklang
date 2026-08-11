@@ -164,20 +164,8 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	// Wire up debug/pprof output when debug_dir is set.
 	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) so the
 	// two-job compile -> scan flow can reuse the compiled program.
-	var debugCleanup DebugOutputCleanup
-	if debugDir := c.GetDebugDir(); debugDir != "" {
-		cleanup, startErr := StartDebugOutput(debugDir, false)
-		if startErr != nil {
-			log.Warnf("[debug] start compile debug output failed: %v, continuing without debug", startErr)
-		} else {
-			debugCleanup = cleanup
-			defer func() {
-				if debugCleanup != nil {
-					debugCleanup()
-							}
-			}()
-		}
-	}
+	debugCleanup := SetupDebugDir(c.GetDebugDir(), false)
+	defer debugCleanup()
 
 	programName := c.GetProgramName()
 	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil

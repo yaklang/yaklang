@@ -11,17 +11,47 @@ import (
 // DebugOutputCleanup stops the pprof collector and closes the log file.
 type DebugOutputCleanup func()
 
+// noopDebugCleanup is returned when debug is disabled or setup fails non-fatally.
+func noopDebugCleanup() {}
+
+// SetupDebugDir wires debug/pprof output when debugDir is non-empty.
+// Empty debugDir returns a no-op cleanup so callers can always:
+//
+//	cleanup := ssaapi.SetupDebugDir(config.GetDebugDir(), false)
+//	defer cleanup()
+//
+// Setup failures are logged and treated as non-fatal (no-op cleanup).
+// See StartDebugOutput for redirectSSADB semantics.
+func SetupDebugDir(debugDir string, redirectSSADB bool) DebugOutputCleanup {
+	if debugDir == "" {
+		return noopDebugCleanup
+	}
+	cleanup, err := StartDebugOutput(debugDir, redirectSSADB)
+	if err != nil {
+		log.Warnf("[debug] setup debug dir %s failed: %v, continuing without debug", debugDir, err)
+		return noopDebugCleanup
+	}
+	if cleanup == nil {
+		return noopDebugCleanup
+	}
+	return cleanup
+}
+
 // StartDebugOutput wires up debug/pprof output for a scan or compile run.
-// It mirrors what the CLI `yak code-scan --debug <dir>` does:
+// It is the shared implementation used by SetupDebugDir and the CLI --debug path:
+//   - creates debugDir (MkdirAll)
 //   - redirects log output to <dir>/log
 //   - starts the periodic pprof collector (CPU/heap/goroutine snapshots)
 //   - when redirectSSADB is true, redirects the SSA database to <dir>/ssadb.db
 //
 // For two-job compile -> scan flows the compile job must keep the shared
 // Postgres SSA IR database so the scan job can reuse the compiled program, so
-// callers should pass redirectSSADB=false for the compile phase and true only
-// for standalone single-job scans.
+// callers should pass redirectSSADB=false for platform compile/scan jobs.
+// Standalone CLI scans typically pass redirectSSADB=true.
 func StartDebugOutput(debugDir string, redirectSSADB bool) (DebugOutputCleanup, error) {
+	if debugDir == "" {
+		return noopDebugCleanup, nil
+	}
 	if err := os.MkdirAll(debugDir, 0o755); err != nil {
 		return nil, err
 	}
@@ -53,7 +83,7 @@ func StartDebugOutput(debugDir string, redirectSSADB bool) (DebugOutputCleanup, 
 		if logFile != nil {
 			_ = logFile.Close()
 		}
-		return nil, nil
+		return noopDebugCleanup, nil
 	}
 
 	return func() {

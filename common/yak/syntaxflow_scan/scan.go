@@ -17,22 +17,11 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 		return err
 	}
 
-	// Wire up debug/pprof output when debug_dir is set. The standalone
-	// scan redirects its SSA database to the debug dir (single-job scan).
-	var pprofCleanup ssaapi.DebugOutputCleanup
-	if debugDir := config.GetDebugDir(); debugDir != "" {
-		cleanup, startErr := ssaapi.StartDebugOutput(debugDir, false)
-		if startErr != nil {
-			log.Warnf("[debug] start scan debug output failed: %v, continuing without debug", startErr)
-		} else {
-			pprofCleanup = cleanup
-			defer func() {
-				if pprofCleanup != nil {
-					pprofCleanup()
-				}
-			}()
-		}
-	}
+	// Wire up debug/pprof output when debug_dir is set.
+	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) for platform
+	// two-job compile -> scan reuse; CLI --debug redirects SSADB separately.
+	debugCleanup := ssaapi.SetupDebugDir(config.GetDebugDir(), false)
+	defer debugCleanup()
 
 	var taskId string
 	var m *scanManager
