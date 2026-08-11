@@ -474,6 +474,10 @@ func QueryPayloadWithoutPaging(db *gorm.DB, folder, group, keyword string) ([]*s
 }
 
 func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*bizhelper.Paginator, []*schema.Payload, error) {
+	if paging == nil {
+		paging = NewPaging()
+	}
+
 	db = db.Model(&schema.Payload{})
 	db = bizhelper.QueryOrder(db, paging.OrderBy, paging.Order)
 	db = bizhelper.ExactQueryString(db, "`folder`", folder)

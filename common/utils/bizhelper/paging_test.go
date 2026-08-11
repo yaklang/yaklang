@@ -85,3 +85,24 @@ func TestNewPaginationRecordsCountAndDataQueryDurations(t *testing.T) {
 	require.Zero(t, paginator.TotalRecord)
 	require.Len(t, items, 1)
 }
+
+func TestYakitPagingQueryAcceptsNilPaging(t *testing.T) {
+	db, err := createTempTestDatabase()
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, db.AutoMigrate(&paginationTestItem{}).Error)
+	require.NoError(t, db.Create(&paginationTestItem{Name: "alpha"}).Error)
+
+	var items []paginationTestItem
+	paginator, queryDB := YakitPagingQuery(
+		db.Model(&paginationTestItem{}),
+		nil,
+		&items,
+	)
+
+	require.NoError(t, queryDB.Error)
+	require.Equal(t, 1, paginator.Page)
+	require.Equal(t, 10, paginator.Limit)
+	require.Len(t, items, 1)
+}

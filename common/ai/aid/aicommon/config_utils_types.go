@@ -69,7 +69,9 @@ func WithForgeQueryFilter(filter *ypb.AIForgeFilter) ForgeQueryOption {
 
 func WithForgeQueryPaging(paging *ypb.Paging) ForgeQueryOption {
 	return func(config *ForgeQueryConfig) {
-		config.Paging = paging
+		if paging != nil {
+			config.Paging = paging
+		}
 	}
 }
 
@@ -84,6 +86,9 @@ func WithForgeFilter_Keyword(keyword string) ForgeQueryOption {
 func WithForgeFilter_Limit(limit int) ForgeQueryOption {
 	return func(config *ForgeQueryConfig) {
 		if limit > 0 {
+			if config.Paging == nil {
+				config.Paging = &ypb.Paging{Page: 1, Limit: 50}
+			}
 			config.Paging.Limit = int64(limit)
 		}
 	}

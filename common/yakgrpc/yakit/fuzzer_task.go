@@ -32,6 +32,13 @@ func QueryFirst50WebFuzzerTask(db *gorm.DB) []*ypb.HistoryHTTPFuzzerTask {
 }
 
 func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExParams) (*bizhelper.Paginator, []*schema.WebFuzzerTask, error) {
+	if req == nil {
+		req = &ypb.QueryHistoryHTTPFuzzerTaskExParams{}
+	}
+	if req.Pagination == nil {
+		req.Pagination = &ypb.Paging{Page: 1, Limit: 10}
+	}
+
 	db = db.Model(&schema.WebFuzzerTask{})
 	oldDB := db
 
