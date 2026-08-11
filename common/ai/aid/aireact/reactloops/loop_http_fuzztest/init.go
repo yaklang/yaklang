@@ -42,6 +42,7 @@ func init() {
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAITagFieldWithAINodeId("GEN_PACKET", generatedPacketContentField, "http_flow", aicommon.TypeCodeHTTPRequest),
 				reactloops.WithAITagFieldWithAINodeId("GEN_MODIFIED_PACKET", modifiedPacketContentField, "http_flow", aicommon.TypeCodeHTTPRequest),
+				reactloops.WithAITagFieldWithAINodeId("DECRYPT_DATA", loopHTTPFuzzDecryptContentField, loopHTTPFuzzDecryptAITagNode, aicommon.TypeTextPlain),
 				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFuzztest),
 				reactloops.WithInitTask(buildInitTask(r)),
 				BuildOnPostIterationHook(r),
@@ -107,6 +108,7 @@ func init() {
 				fuzzUploadAction(r),
 				fuzzCookieAction(r),
 				generateAndSendPacketAction(r),
+				decryptDataAction(r),
 				generateRiskAction(r),
 			}
 			preset = append(preset, opts...)
@@ -116,7 +118,7 @@ func init() {
 		reactloops.WithLoopDescriptionZh("HTTP 安全模糊测试模式：对 HTTP 请求进行变异、发送和响应差异分析，用于发现潜在安全问题。"),
 		reactloops.WithVerboseName("HTTP Fuzz Test"),
 		reactloops.WithVerboseNameZh("HTTP 安全模糊测试"),
-		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze security-relevant response differences. First use 'set_http_request' to set the target request, then use 'patch_http_request' for fine-grained single-step packet edits, auth/header/body format transforms, or repair, fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_upload, fuzz_cookie), 'modify_http_request' when the current packet must be revised with visible merge details via a full raw packet, 'generate_and_send_packet' when a complete raw packet must be constructed and sent, 'generate_risk' when validated or defensible vulnerability evidence should be saved as a Yakit risk, or 'directly_answer' for short testing-process Q&A."),
+		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze security-relevant response differences, or process encrypted data offline. First use 'set_http_request' to set the target request, then use 'patch_http_request' for fine-grained single-step packet edits, auth/header/body format transforms, or repair, fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_upload, fuzz_cookie), 'modify_http_request' when the current packet must be revised with visible merge details via a full raw packet, 'generate_and_send_packet' when a complete raw packet must be constructed and sent, 'decrypt_data' when the user provides ciphertext + key and asks to decrypt (offline, no request sent), 'generate_risk' when validated or defensible vulnerability evidence should be saved as a Yakit risk, or 'directly_answer' for short testing-process Q&A."),
 		reactloops.WithLoopOutputExample(`
 * When user requests to fuzz HTTP request:
   {"@action": "http_fuzztest", "human_readable_thought": "I need to fuzz HTTP request parameters to find vulnerabilities"}
@@ -156,8 +158,12 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 				if restoreLoopHTTPFuzzSessionContext(loop, r) {
 					reactloops.EmitStatus(loop, "已恢复会话上下文 / Restored Session Context")
 					invoker.AddToTimeline("http_fuzztest_restore", "Restored HTTP fuzz session context from persistent session history")
+				} else if looksLikeLoopHTTPFuzzNonFuzzDataTask(task.GetUserInput()) {
+					loop.Set("non_fuzz_data_task", "true")
+					reactloops.EmitStatus(loop, "Non-Fuzz Data Processing Task Detected")
+					invoker.AddToTimeline("http_fuzztest_non_fuzz", "No HTTP packet found; user input looks like an offline data-processing task (decrypt/encode/transform). Proceeding without a request.")
 				} else {
-					reactloops.EmitStatus(loop, "未找到有效 HTTP 数据包 / No Valid HTTP Packet Found")
+					reactloops.EmitStatus(loop, "No Valid HTTP Packet Found")
 					operator.Done()
 					return
 				}

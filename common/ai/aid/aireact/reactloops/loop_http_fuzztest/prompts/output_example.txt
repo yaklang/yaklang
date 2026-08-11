@@ -270,3 +270,33 @@ Content-Type: application/json
   ]
 }
 ```
+
+### 示例 17：解密数据包中的加密参数（用户给了 key）
+```json
+{
+  "@action": "decrypt_data",
+  "algorithm": "aes-cbc",
+  "key": "1234567890123456",
+  "iv": "abcdefghijklmnop",
+  "data": "eGVsbG8geWFrIGVuY3J5cHRlZCBkYXRh",
+  "data_encoding": "base64",
+  "padding": "pkcs7",
+  "reason": "用户提供的数据包中 id 参数是加密值，并提供了 AES-CBC 密钥和 IV，需要先离线解密得到明文，再决定后续测试方向。"
+}
+```
+
+### 示例 18：大段密文通过 DECRYPT_DATA AITAG 传入
+```json
+{
+  "@action": "decrypt_data",
+  "algorithm": "aes-ecb",
+  "key": "0123456789abcdef",
+  "data_encoding": "base64",
+  "padding": "pkcs7",
+  "reason": "响应体中的 token 字段是 AES-ECB 加密值，密文较长，通过 AITAG 传入完整密文。"
+}
+```
+
+<|DECRYPT_DATA_CURRENT_NONCE|>
+G9y3fHdKDyDk8sYh5ZgH2JkLmNqPvBsWxCzEfGhIjKlMnOpQrStUvWxYzAbCdEfGh
+<|DECRYPT_DATA_END_CURRENT_NONCE|>
