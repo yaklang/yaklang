@@ -160,7 +160,7 @@ func contextFocusReleaseChecksum(focusName, version, entryFile, entryCode string
 }
 
 func pinnedFocusReleaseID(runtimeOptions []byte) string {
-	options, err := decodeYakRuntimeOptions(runtimeOptions)
+	options, err := decodeYakRuntimeOptions(runtimeOptions, true)
 	if err != nil {
 		return ""
 	}
