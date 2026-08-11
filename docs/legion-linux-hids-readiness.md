@@ -49,6 +49,12 @@ ordinary branch pushes do not produce trusted Product Node packages. This
 namespace does not trigger the repository's existing general `v*` release
 workflows.
 
+The same formal tag also calls the portable Node workflow and emits native
+development nodes for macOS Intel, macOS Apple Silicon, Linux amd64, and Linux
+arm64. These four GitHub Actions artifacts use the default non-HIDS build and
+are retained for 14 days. The existing Linux HIDS Product Node artifacts and
+their immutable OSS release indexes remain unchanged for deployment consumers.
+
 ### Short-lived native alpha nodes
 
 For short-lived testing of any tagged commit, including the current head of a

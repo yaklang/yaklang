@@ -13,6 +13,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build-portable-nodes:
+    name: Build cross-platform portable Node artifacts
+    uses: ./.github/workflows/build-legion-node-alpha.yml
+    with:
+      source_mode: release
+      retention_days: 14
+      production_release: true
+
   build-and-publish:
     name: Build Linux ${{ matrix.goarch }} HIDS node
     runs-on: ${{ matrix.runner }}
