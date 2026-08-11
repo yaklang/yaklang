@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 check_release_only_workflow() {
   local workflow="$1" expected_tag="$2" trigger_block
-  trigger_block="$(awk '/^on:$/ { capture=1 } /^permissions:$/ { capture=0 } capture' "$workflow")"
+  trigger_block="$(tr -d '\r' <"$workflow" | awk '/^on:$/ { capture=1 } /^permissions:$/ { capture=0 } capture')"
 
   grep -Fxq "      - \"$expected_tag\"" <<<"$trigger_block" || {
     echo "$workflow does not declare the exact $expected_tag tag trigger" >&2
@@ -23,6 +23,29 @@ check_release_only_workflow \
 check_release_only_workflow \
   "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml" \
   'legion-runtime-v*'
+
+alpha_workflow="$repo_root/.github/workflows/build-legion-node-alpha.yml"
+check_release_only_workflow "$alpha_workflow" 'legion-node-alpha-*'
+
+grep -Fq 'macos-15-intel' "$alpha_workflow"
+grep -Fq 'macos-15' "$alpha_workflow"
+grep -Fq 'ubuntu-22.04' "$alpha_workflow"
+grep -Fq 'ubuntu-24.04-arm' "$alpha_workflow"
+grep -Fq './cmd/legion-smoke-node' "$alpha_workflow"
+grep -Fq 'retention-days: 7' "$alpha_workflow"
+grep -Fq 'Actions artifact only; not published to OSS or a stable channel' "$alpha_workflow"
+if grep -Eq 'pull-requests: read|/pulls/|OSS_KEY_(ID|SECRET)|upload-oss|build-legion-component-oss-index' "$alpha_workflow"; then
+  echo "$alpha_workflow must not resolve PR metadata or publish alpha artifacts to OSS" >&2
+  exit 1
+fi
+if grep -Fq -- '-tags hids' "$alpha_workflow"; then
+  echo "$alpha_workflow must build the portable non-HIDS node" >&2
+  exit 1
+fi
+
+alpha_tag='legion-node-alpha-0212'
+[[ "$alpha_tag" == legion-node-alpha-* ]]
+[[ "$alpha_tag" != legion-node-v* ]]
 
 grep -Fq 'ubuntu-24.04-arm' "$repo_root/.github/workflows/build-legion-product-node.yml"
 grep -Fq 'ubuntu-24.04-arm' "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml"

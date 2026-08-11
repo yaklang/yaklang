@@ -37,16 +37,52 @@ go build -tags hids -o ./legion-smoke-node-hids ./cmd/legion-smoke-node
 GOOS=linux GOARCH=amd64 go build -tags hids -o ./legion-smoke-node-hids-linux-amd64 ./cmd/legion-smoke-node
 ```
 
-## CI Product Node Package
+## CI Node Artifacts
+
+### Trusted HIDS Product Node release
 
 `.github/workflows/build-legion-product-node.yml` produces the deployable
 Linux amd64 and arm64 product nodes from the repository's declared Go version.
 The trusted packaging workflow runs only for tags in the isolated
-`legion-node-v*` namespace, including alpha tags. Pull requests and ordinary
-branch pushes do not produce Product Node packages. This namespace does not
-trigger the repository's existing general `v*` release workflows.
+`legion-node-v*` namespace, including alpha tags. The `pull_request` event and
+ordinary branch pushes do not produce trusted Product Node packages. This
+namespace does not trigger the repository's existing general `v*` release
+workflows.
 
-The workflow emits separate `legion-product-node_linux_amd64` and
+### Short-lived native alpha nodes
+
+For short-lived testing of any tagged commit, including the current head of a
+pull request, a maintainer may create a `legion-node-alpha-*` tag such as
+`legion-node-alpha-0212`. The separate
+`.github/workflows/build-legion-node-alpha.yml` workflow builds native
+development nodes for macOS Intel, macOS Apple Silicon, Linux amd64, and Linux
+arm64. The tag does not carry or resolve a pull request number: the tagged
+commit is the complete source identity.
+
+Alpha packages are kept as GitHub Actions artifacts for seven days. They are
+not uploaded to OSS, do not update a stable channel, and are not accepted as
+trusted product-release inputs. They use the default build without the `hids`
+tag, so macOS testers can run them locally while exercising `yak.execute` and
+`ssa.rule_sync.export`. Use a new alpha tag for every candidate; never move or
+reuse an existing tag.
+
+Example:
+
+```bash
+git fetch origin pull/4872/head
+git tag legion-node-alpha-0212 FETCH_HEAD
+git push origin refs/tags/legion-node-alpha-0212
+```
+
+GitHub builds the exact commit referenced by the pushed tag. If the pull
+request receives another commit, create a new tag on that new SHA. The alpha
+workflow must exist in the tagged commit. After this workflow is first merged,
+rebase an older pull request onto the updated `main` before creating its first
+alpha tag.
+
+### Trusted HIDS Product Node outputs
+
+The trusted workflow emits separate `legion-product-node_linux_amd64` and
 `legion-product-node_linux_arm64` Actions artifacts. Each architecture package
 contains its executable, `PRODUCT_NODE_MANIFEST.json`, and `SHA256SUMS`. The
 outer release artifact also contains the package archive and its checksum.
