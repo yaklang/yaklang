@@ -9,9 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -44,14 +46,16 @@ func (s *ScanNode) executeScriptTask(
 	taskID := taskIDForSubtask(input.SubTaskID)
 	taskCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s.manager.Add(taskID, newScriptTask(
+	if !s.manager.Add(taskID, newScriptTask(
 		taskCtx,
 		cancel,
 		taskID,
 		input.TaskID,
 		input.SubTaskID,
 		input.RuntimeID,
-	))
+	)) {
+		return nil, utils.Error("scan node is shutting down")
+	}
 	defer s.manager.Remove(taskID)
 
 	reporter := NewScannerAgentReporter(
@@ -416,7 +420,7 @@ func (s *ScanNode) executeScript(
 		fmt.Sprintf("YAK_RUNTIME_ID=%v", runtimeID),
 	)
 	env = append(env, extraEnv...)
-	workspaceOwner := utils.RandStringBytes(16)
+	workspaceOwner := s.nextSSAGitWorkspaceOwner()
 	env = replaceEnvironmentValue(env, ssagitworkdir.OwnerEnv, workspaceOwner)
 	cmd.Env = env
 
@@ -458,6 +462,14 @@ func (s *ScanNode) executeScript(
 		log.Errorf("cleanup SSA Git workspaces for failed child process %d: %v", childPID, cleanupErr)
 	}
 	return waitErr
+}
+
+func (s *ScanNode) nextSSAGitWorkspaceOwner() string {
+	scope := "process-" + strconv.Itoa(os.Getpid())
+	if s != nil && strings.TrimSpace(s.ssaGitOwnerScope) != "" {
+		scope = s.ssaGitOwnerScope
+	}
+	return scope + "-task-" + strings.ReplaceAll(uuid.NewString(), "-", "")
 }
 
 func replaceEnvironmentValue(env []string, key string, value string) []string {

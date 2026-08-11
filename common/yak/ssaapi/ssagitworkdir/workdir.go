@@ -32,6 +32,81 @@ var (
 	removeFile = os.Remove
 )
 
+// OwnerScopeLock serializes startup recovery for one Scan Node installation
+// within the same managed root. The lock must be held for the node lifetime so
+// a second live process cannot sweep workspaces that are still in use.
+type OwnerScopeLock struct {
+	file        *os.File
+	releaseOnce sync.Once
+	releaseErr  error
+}
+
+// AcquireOwnerScopeLock acquires the exclusive live-node lock for ownerScope.
+// Its lock file lives under the same root as the workspaces it protects, so the
+// lock and cleanup domains cannot diverge through a different node BaseDir.
+func AcquireOwnerScopeLock(ownerScope string) (*OwnerScopeLock, error) {
+	return acquireOwnerScopeFileLock(ownerScope, ".node.lock", false)
+}
+
+// AcquireOwnerScopeRecoveryLock prevents startup cleanup while any child
+// process still has a Git workspace open for this installation scope.
+func AcquireOwnerScopeRecoveryLock(ownerScope string) (*OwnerScopeLock, error) {
+	return acquireOwnerScopeFileLock(ownerScope, ".activity.lock", false)
+}
+
+func acquireOwnerScopeActivityLease(ownerScope string) (*OwnerScopeLock, error) {
+	return acquireOwnerScopeFileLock(ownerScope, ".activity.lock", true)
+}
+
+func acquireOwnerScopeFileLock(ownerScope string, suffix string, shared bool) (*OwnerScopeLock, error) {
+	if err := validateOwner(ownerScope); err != nil {
+		return nil, err
+	}
+	root, err := ResolveRoot()
+	if err != nil {
+		return nil, err
+	}
+	lockDir := filepath.Join(root, ".locks")
+	if err := os.MkdirAll(lockDir, 0o750); err != nil {
+		return nil, fmt.Errorf("create SSA Git recovery lock directory %q: %w", lockDir, err)
+	}
+	lockPath := filepath.Join(lockDir, ownerScope+suffix)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open SSA Git recovery lock %q: %w", lockPath, err)
+	}
+	lockFn := lockFileExclusive
+	if shared {
+		lockFn = lockFileShared
+	}
+	if err := lockFn(lockFile); err != nil {
+		_ = lockFile.Close()
+		return nil, fmt.Errorf("SSA Git workspace owner scope %q is already active under %q: %w", ownerScope, root, err)
+	}
+	return &OwnerScopeLock{file: lockFile}, nil
+}
+
+// Release releases the process-level owner scope lock.
+func (l *OwnerScopeLock) Release() error {
+	if l == nil {
+		return nil
+	}
+	l.releaseOnce.Do(func() {
+		if l.file == nil {
+			return
+		}
+		file := l.file
+		l.file = nil
+		if err := unlockFile(file); err != nil {
+			_ = file.Close()
+			l.releaseErr = err
+			return
+		}
+		l.releaseErr = file.Close()
+	})
+	return l.releaseErr
+}
+
 // ResolveRoot returns the absolute managed directory for SSA Git workspaces.
 func ResolveRoot() (string, error) {
 	root := strings.TrimSpace(os.Getenv(WorkDirEnv))
@@ -104,15 +179,23 @@ func Prepare(ctx context.Context, pid int) (string, func() error, error) {
 	if err != nil {
 		return "", nil, err
 	}
+	var activityLease *OwnerScopeLock
+	if ownerScope, ok := scanNodeOwnerScope(owner); ok {
+		activityLease, err = acquireOwnerScopeActivityLease(ownerScope)
+		if err != nil {
+			return "", nil, fmt.Errorf("acquire SSA Git workspace activity lease for owner %q: %w", owner, err)
+		}
+	}
 	workspace, err := mkdirTemp(root, workspaceNamePrefix(owner))
 	if err != nil {
+		_ = activityLease.Release()
 		return "", nil, preflightPathError(ctx, root, "create isolated workspace", err)
 	}
 	var once sync.Once
 	var cleanupErr error
 	cleanup := func() error {
 		once.Do(func() {
-			cleanupErr = removeAll(workspace)
+			cleanupErr = errors.Join(removeAll(workspace), activityLease.Release())
 		})
 		return cleanupErr
 	}
@@ -124,6 +207,20 @@ func CleanupForOwner(owner string) error {
 	if err := validateOwner(owner); err != nil {
 		return err
 	}
+	return cleanupMatchingPrefix(workspaceNamePrefix(owner), owner)
+}
+
+// CleanupForOwnerScope removes workspaces for one exclusive Scan Node
+// installation. The caller must hold the OwnerScopeLock for that scope so a
+// live peer cannot create or consume a workspace with the same scope.
+func CleanupForOwnerScope(ownerScope string) error {
+	if err := validateOwner(ownerScope); err != nil {
+		return err
+	}
+	return cleanupMatchingPrefix(workspaceNamePrefix(ownerScope), ownerScope)
+}
+
+func cleanupMatchingPrefix(prefix string, ownerDescription string) error {
 	root, err := ResolveRoot()
 	if err != nil {
 		return err
@@ -133,10 +230,9 @@ func CleanupForOwner(owner string) error {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("read SSA Git workdir %q for owner %q cleanup: %w", root, owner, err)
+		return fmt.Errorf("read SSA Git workdir %q for owner %q cleanup: %w", root, ownerDescription, err)
 	}
 
-	prefix := workspaceNamePrefix(owner)
 	var cleanupErr error
 	for _, entry := range entries {
 		if !strings.HasPrefix(entry.Name(), prefix) {
@@ -190,8 +286,17 @@ func currentOwner(pid int) (string, error) {
 	return owner, nil
 }
 
+func scanNodeOwnerScope(owner string) (string, bool) {
+	const taskSeparator = "-task-"
+	separator := strings.Index(owner, taskSeparator)
+	if separator <= len("node-") || !strings.HasPrefix(owner, "node-") {
+		return "", false
+	}
+	return owner[:separator], true
+}
+
 func validateOwner(owner string) error {
-	if owner == "" || len(owner) > 64 {
+	if owner == "" || len(owner) > 96 {
 		return fmt.Errorf("invalid SSA Git workspace owner %q", owner)
 	}
 	for _, char := range owner {
