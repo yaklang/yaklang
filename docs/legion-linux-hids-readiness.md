@@ -126,6 +126,14 @@ checksums. Cross-repository assembly consumes the architecture-appropriate OSS
 index URL and an independently approved index SHA-256 instead of a GitHub
 Actions run ID or repository token.
 
+For Console engine import, the same trusted tag build also emits one
+`yaklang-node-engine_<tag>_linux_<arch>.tar.gz` installation package. It
+contains exactly `manifest.json`, `release-index.json`,
+`release-index.json.sha256`, and `yaklang-node`. Administrators select this
+single package in Legion; they do not extract it or paste release metadata.
+Legion performs the package, compatibility, and digest checks server-side
+before adding the engine as a candidate version.
+
 Use `task legion_smoke_node_build_hids` for native debugging when your current host is already Linux. Use `task legion_smoke_node_build_hids_linux_amd64` when you need a deployable Linux artifact from any development host.
 
 If a future production Legion node entrypoint is added, it must also be built with `-tags hids` before the binary is expected to advertise or run the HIDS capability.

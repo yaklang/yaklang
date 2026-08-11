@@ -80,7 +80,9 @@ jobs:
           cache: true
 
       - name: Test OSS release index contract
-        run: ./.github/scripts/test-build-legion-component-oss-index.sh
+        run: |
+          ./.github/scripts/test-build-legion-component-oss-index.sh
+          ./.github/scripts/test-build-legion-node-engine-import-bundle.sh
 
       - name: Build product node package
         run: ./.github/scripts/build-legion-product-node.sh
@@ -151,6 +153,21 @@ jobs:
             echo "index_sha256=$(sha256sum "dist/artifact/$INDEX_NAME" | awk '{print $1}')"
             echo "remote_prefix=legion/components/product-node/${NODE_PACKAGE_VERSION}/${SOURCE_SHA}"
           } >>"$GITHUB_OUTPUT"
+
+      - name: Build one-file Legion engine installation package
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine_bundle="dist/artifact/yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz"
+          ./.github/scripts/build-legion-node-engine-import-bundle.sh \
+            --version "$NODE_PACKAGE_VERSION" \
+            --source-sha "$SOURCE_SHA" \
+            --artifact-dir dist/artifact \
+            --goos "$NODE_GOOS" \
+            --goarch "$NODE_GOARCH" \
+            --output "$engine_bundle"
+          gzip -t "$engine_bundle"
+          (cd dist/artifact && sha256sum -c "$(basename "$engine_bundle").sha256")
 
       - name: Build repository-owned OSS uploader
         run: go build -trimpath -o "${RUNNER_TEMP}/yak-oss-upload" ./common/yak/cmd/yak.go
@@ -223,6 +240,7 @@ jobs:
             echo
             echo "- Source: \`${SOURCE_SHA}\`"
             echo "- Package: \`${NODE_PACKAGE_NAME}.tar.gz\`"
+            echo "- Legion engine import: \`yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz\`"
             echo "- Target: \`linux/${NODE_GOARCH}\`"
             echo "- Build tags: \`hids\`"
             echo "- OSS index: \`${{ steps.oss-release.outputs.index_url }}\`"

@@ -97,6 +97,9 @@ grep -Fq 'production_release: true' "$product_workflow"
 grep -Fq 'ubuntu-24.04-arm' "$product_workflow"
 grep -Fq 'ubuntu-24.04-arm' "$runtime_workflow"
 grep -Fq 'release-index-linux-arm64.json' "$product_workflow"
+grep -Fq 'build-legion-node-engine-import-bundle.sh' "$product_workflow"
+# shellcheck disable=SC2016 # Match literal workflow environment syntax.
+grep -Fq 'yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz' "$product_workflow"
 grep -Fq 'release-index-linux-arm64.json' "$runtime_workflow"
 
 echo 'Legion component workflow contract tests passed'
