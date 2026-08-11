@@ -57,6 +57,26 @@ type AnalyzeContext struct {
 
 	// savedPath map[*Value]struct{}
 	recursiveStatusIsLeaf *utils.Stack[node]
+
+	// resolvedInstCache memoizes the resolved underlying instruction for each
+	// (program, inst-id) touched during THIS descent (one GetTopDefs /
+	// GetBottomUses AnalyzeContext lifetime). A2 in scan-perf-optimization-plan:
+	// on large projects the ProgramCache instruction residency has a short TTL /
+	// small cap, so the same inst-id can be evicted and re-resolved (re-running
+	// AnyToBytes / rune-offset / NewLazyInstructionFromIrCode / range) many times
+	// within one descent. Caching the resolved instruction here skips that repeat
+	// work. The cache is scoped to the descent and dropped when the AnalyzeContext
+	// is discarded, so it never leaks across rules / paths (design principle 1).
+	// A descent is single-threaded, so no locking is needed.
+	resolvedInstCache map[resolvedInstKey]ssa.Instruction
+}
+
+// resolvedInstKey identifies a resolved instruction by program + inst-id. The
+// program pointer is stable for the lifetime of a Program; inst-id is unique
+// within a program.
+type resolvedInstKey struct {
+	prog   *ssa.Program
+	instID int64
 }
 
 type node struct {
@@ -75,6 +95,43 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	}
 	return actx
 }
+
+// getResolvedValue returns the resolved ssa.Value for (inst, id), memoizing the
+// fully-resolved value for the rest of this descent. It is the A2 dedup point:
+// on large projects the ProgramCache instruction residency has a short TTL /
+// small cap, so the same inst-id can be evicted and re-resolved (re-running
+// AnyToBytes / rune-offset / NewLazyInstructionFromIrCode / range) many times
+// within one descent. Caching the resolved value here skips that repeat work.
+//
+// The cache is scoped to the descent (AnalyzeContext lifetime) and dropped when
+// the descent ends, so it never leaks across rules / paths (design principle 1).
+// A descent is single-threaded, so no locking is needed.
+func (a *AnalyzeContext) getResolvedValue(inst ssa.Instruction, id int64) (ssa.Value, bool) {
+	if a == nil || inst == nil || id <= 0 {
+		return nil, false
+	}
+	prog := inst.GetProgram()
+	if prog == nil {
+		return nil, false
+	}
+	if a.resolvedInstCache == nil {
+		a.resolvedInstCache = make(map[resolvedInstKey]ssa.Instruction)
+	}
+	key := resolvedInstKey{prog: prog, instID: id}
+	if cached, ok := a.resolvedInstCache[key]; ok {
+		if v, ok := ssa.ToValue(cached); ok {
+			return v, true
+		}
+		return nil, false
+	}
+	v, ok := inst.GetValueById(id)
+	if !ok || v == nil {
+		return nil, false
+	}
+	a.resolvedInstCache[key] = v
+	return v, true
+}
+
 func (a *AnalyzeContext) pushCall(call *ssa.Call) {
 	a.callStack.Push(call)
 }
