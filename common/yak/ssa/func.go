@@ -114,7 +114,11 @@ func (f *Function) SetType(t Type) {
 	if funTyp, ok := ToFunctionType(t); ok {
 		f.Type = funTyp
 	} else if t.GetTypeKind() == AnyTypeKind {
-		log.Infof("skip any type for Function: %v alias: %v", f.name, f.verboseName)
+		// Assigning AnyType to a function is an expected, benign condition that
+		// fires once per function on large projects (hadoop scan produced ~59k
+		// lines). Demote to debug so it no longer floods the scan log; use
+		// YAK_SSA_LOG_LEVEL=debug to trace it.
+		log.Debugf("skip any type for Function: %v alias: %v", f.name, f.verboseName)
 	} else if t != nil {
 		log.Warnf("ssa.Function type cannot be set type from: %v", t)
 	}
