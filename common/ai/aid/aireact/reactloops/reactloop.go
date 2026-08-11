@@ -46,7 +46,13 @@ type ActionRecord struct {
 	IterationIndex int                    `json:"iteration_index"`
 
 	// ToolName 是该 action 实际调用的工具名，供价值反馈和执行历史使用。
+	// 批量工具调用时保留第一项，兼容只识别单工具的旧消费者。
 	ToolName string `json:"tool_name,omitempty"`
+	// ToolNames 按模型输出顺序记录该 action 中的全部工具调用。
+	ToolNames []string `json:"tool_names,omitempty"`
+	// ToolCallCount 是本 action 实际声明的工具调用数。旧记录为 0 时按
+	// ToolName 是否存在回退到 0/1。
+	ToolCallCount int `json:"tool_call_count,omitempty"`
 }
 
 type ReActLoop struct {

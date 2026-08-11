@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -127,11 +128,18 @@ func appendPresetPrompt(request *AIRequest, tagName, description, prompt string)
 //     show warm notification, wait queueCount*3 seconds.
 //  3. Generic 429: show generic rate-limit message, wait random 5-15 seconds.
 func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) {
+	return c.handle429RateLimitContext(c.Ctx, rsp)
+}
+
+func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse) (is429 bool, ctxDone bool) {
 	if rsp == nil {
 		return false, false
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
-	if !rsp.WaitForHTTPHeaders(c.Ctx) {
+	if !rsp.WaitForHTTPHeaders(ctx) {
 		return false, true
 	}
 
@@ -164,7 +172,7 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 			tokensUsed, tokensLimit, sleepSec)
 
 		select {
-		case <-c.Ctx.Done():
+		case <-ctx.Done():
 			return true, true
 		case <-time.After(waitDuration):
 			return true, false
@@ -207,7 +215,7 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 	}
 
 	select {
-	case <-c.Ctx.Done():
+	case <-ctx.Done():
 		return true, true
 	case <-time.After(waitDuration):
 		return true, false
@@ -217,6 +225,8 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
+		requestCtx, stopRequestCtx := combineAIRequestAndConfigContext(c.Ctx, request.GetContext())
+		defer stopRequestCtx()
 		// check if callback is nil before calling
 		if i == nil {
 			return nil, utils.Error("AI callback is not set, please configure AI service first")
@@ -261,9 +271,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			for _idx := 0; _idx < int(c.AiAutoRetry); {
 				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-				if is429, done := c.handle429RateLimit(rsp); is429 {
+				if is429, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 					if done {
-						return nil, c.Ctx.Err()
+						return nil, requestCtx.Err()
 					}
 					continue
 				}
@@ -271,8 +281,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					_idx++
 					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
 					select {
-					case <-c.Ctx.Done():
-						return nil, c.Ctx.Err()
+					case <-requestCtx.Done():
+						return nil, requestCtx.Err()
 					case <-time.After(500 * time.Millisecond):
 					}
 					continue
@@ -282,8 +292,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				rsp = TeeAIResponse(config, rsp, nil, func() {
 					c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
 				})
-				if !waitOrigAIResponseCallback(c, origRsp) {
-					return nil, c.Ctx.Err()
+				if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
+					return nil, requestCtx.Err()
 				}
 				return rsp, err
 			}
@@ -337,9 +347,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); {
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if is429, done := c.handle429RateLimit(rsp); is429 {
+			if is429, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 				if done {
-					return nil, c.Ctx.Err()
+					return nil, requestCtx.Err()
 				}
 				continue
 			}
@@ -347,8 +357,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				_idx++
 				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
 				select {
-				case <-c.Ctx.Done():
-					return nil, c.Ctx.Err()
+				case <-requestCtx.Done():
+					return nil, requestCtx.Err()
 				case <-time.After(500 * time.Millisecond):
 				}
 				continue
@@ -495,8 +505,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					}
 				}
 			})
-			if !waitOrigAIResponseCallback(c, origRsp) {
-				return nil, c.Ctx.Err()
+			if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
+				return nil, requestCtx.Err()
 			}
 			if c.DebugPrompt {
 				rsp.Debug(true)
@@ -516,7 +526,37 @@ func waitOrigAIResponseCallback(c *Config, origRsp *AIResponse) bool {
 	if c == nil || origRsp == nil {
 		return true
 	}
-	return origRsp.WaitForCallbackDone(c.Ctx)
+	return waitOrigAIResponseCallbackContext(c.Ctx, origRsp)
+}
+
+func waitOrigAIResponseCallbackContext(ctx context.Context, origRsp *AIResponse) bool {
+	if origRsp == nil {
+		return true
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return origRsp.WaitForCallbackDone(ctx)
+}
+
+// combineAIRequestAndConfigContext preserves request-scoped values while
+// cancelling when either the child request or the long-lived config ends.
+func combineAIRequestAndConfigContext(configCtx, requestCtx context.Context) (context.Context, func()) {
+	if requestCtx == nil {
+		requestCtx = configCtx
+	}
+	if requestCtx == nil {
+		requestCtx = context.Background()
+	}
+	if configCtx == nil {
+		return requestCtx, func() {}
+	}
+	ctx, cancel := context.WithCancel(requestCtx)
+	stopConfigCancel := context.AfterFunc(configCtx, cancel)
+	return ctx, func() {
+		stopConfigCancel()
+		cancel()
+	}
 }
 
 type AIResponseSimple struct {

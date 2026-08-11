@@ -221,13 +221,44 @@ func (a *ToolCaller) invoke(
 ) (*aitool.ToolResult, error) {
 	c := a.config
 	e := a.emitter
+	if err := toolCallerContextErr(a.ctx); err != nil {
+		return nil, err
+	}
 	var finalizeResult func(*aitool.ToolResult) error
 	if len(finalizeResults) > 0 {
 		finalizeResult = finalizeResults[0]
 	}
 
-	seq := c.AcquireId()
+	seq := a.checkpointSeq
+	if seq <= 0 {
+		seq = c.AcquireId()
+	}
 	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.GetRuntimeId(), seq); ok {
+		if a.batchID != "" {
+			stored := aiddb.AiCheckPointGetRequestParams(ret)
+			storedParam := stored.GetObject("param")
+			storedIndex, hasStoredIndex := stored["call_index"]
+			if stored.GetString("batch_id") != a.batchID ||
+				!hasStoredIndex ||
+				utils.InterfaceToInt(storedIndex) != a.batchIndex ||
+				stored.GetString("call_tool_id") != a.callToolId ||
+				stored.GetString("tool_name") != tool.Name ||
+				string(utils.Jsonify(storedParam)) != string(utils.Jsonify(params)) {
+				return nil, utils.Errorf(
+					"tool batch checkpoint identity mismatch: expected batch=%s index=%d call=%s tool=%s params=%s; stored batch=%s index=%d call=%s tool=%s params=%s",
+					a.batchID,
+					a.batchIndex,
+					a.callToolId,
+					tool.Name,
+					utils.Jsonify(params),
+					stored.GetString("batch_id"),
+					utils.InterfaceToInt(storedIndex),
+					stored.GetString("call_tool_id"),
+					stored.GetString("tool_name"),
+					utils.Jsonify(storedParam),
+				)
+			}
+		}
 		if ret.Finished {
 			res := aiddb.AiCheckPointGetToolResult(ret)
 			if finalizeResult != nil && res != nil {
@@ -242,27 +273,37 @@ func (a *ToolCaller) invoke(
 		}
 	}
 	toolCheckpoint := c.CreateToolCallCheckpoint(seq)
-	err := c.SubmitCheckpointRequest(toolCheckpoint, map[string]any{
+	checkpointRequest := map[string]any{
 		"tool_name": tool.Name,
 		"param":     params,
-	})
+	}
+	if a.batchID != "" {
+		checkpointRequest["batch_id"] = a.batchID
+		checkpointRequest["call_index"] = a.batchIndex
+		checkpointRequest["call_tool_id"] = a.callToolId
+	}
+	err := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest)
 	if err != nil {
 		return nil, err
 	}
 
 	epm := c.GetEndpointManager()
-	ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
+	watcherCheckpointSeq := a.watcherCheckpointSeq
+	a.watcherCheckpointSeq = 0
+	ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_CALL_WATCHER, watcherCheckpointSeq)
 	e.EmitToolCallWatcher(a.callToolId, ep.GetId(), tool, params)
 
-	// Use task context if available (for proper cancellation), otherwise fall back to config context
-	var baseCtx context.Context
-	if a.task != nil {
+	// Prefer the caller-scoped context. Batch children derive it from both the
+	// action context and task context, so cancelling either one interrupts the
+	// plugin. Scalar callers also populate a.ctx and keep their old semantics.
+	var baseCtx = a.ctx
+	if baseCtx == nil && a.task != nil {
 		if statefulTask, ok := a.task.(AIStatefulTask); ok {
 			baseCtx = statefulTask.GetContext()
 		} else {
 			baseCtx = c.GetContext()
 		}
-	} else {
+	} else if baseCtx == nil {
 		baseCtx = c.GetContext()
 	}
 
@@ -294,9 +335,6 @@ func (a *ToolCaller) invoke(
 	}
 
 	toolCallCancel := func(result *aitool.ToolExecutionResult, err error) (*aitool.ToolExecutionResult, error) {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return result, nil
-		}
 		return result, err
 	}
 
@@ -416,6 +454,12 @@ func (a *ToolCaller) invoke(
 			return submitToolRiskToPlatformSink(resultRuntime, risk)
 		}
 	}
+	// Everything above prepares observers and runtime metadata. Cancellation can
+	// race any of those steps, so make the final callback boundary explicit: a
+	// cancelled child must never enter plugin code after being admitted earlier.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),
@@ -427,6 +471,23 @@ func (a *ToolCaller) invoke(
 		aitool.WithRuntimeConfig(runtimeCfg),
 		aitool.WithOutputCapture(false),
 	)
+	invokeCancelled := errors.Is(execErr, context.Canceled) ||
+		errors.Is(execErr, context.DeadlineExceeded) ||
+		ctx.Err() != nil
+	if invokeCancelled {
+		if execErr == nil {
+			execErr = ctx.Err()
+			if execErr == nil {
+				execErr = context.Canceled
+			}
+		}
+		if execResult != nil {
+			execResult.Success = false
+			if execResult.Error == "" {
+				execResult.Error = fmt.Sprintf("tool execution cancelled: %v", execErr)
+			}
+		}
+	}
 	if execErr != nil {
 		// Preflight failures have no script callback, so without this line their
 		// artifact would misleadingly say COMBINED OUTPUT: (empty). Mirror the final
@@ -434,7 +495,7 @@ func (a *ToolCaller) invoke(
 		// artifacts useful even when the structured error event is unavailable.
 		_, _ = fmt.Fprintf(stderrWriter, "[error] %v\n", execErr)
 	}
-	if execResult != nil && finalizeResult != nil {
+	if execResult != nil && finalizeResult != nil && !invokeCancelled {
 		if finalizeErr := finalizeResult(execResult); finalizeErr != nil {
 			if execErr == nil {
 				execErr = finalizeErr
@@ -443,7 +504,7 @@ func (a *ToolCaller) invoke(
 			}
 		}
 	}
-	if execResult != nil {
+	if execResult != nil && !invokeCancelled {
 		if checkpointErr := c.SubmitCheckpointResponse(toolCheckpoint, execResult); checkpointErr != nil {
 			if execErr == nil {
 				execErr = checkpointErr

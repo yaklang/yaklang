@@ -54,6 +54,29 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	reviewCount int,
 	callExpectations string,
 ) (bool, error) {
+	return r._invokeToolCall_IntervalReviewWithContextForTask(
+		ctx,
+		r.GetCurrentTask(),
+		tool,
+		params,
+		stdoutSnapshot,
+		stderrSnapshot,
+		startTime,
+		reviewCount,
+		callExpectations,
+	)
+}
+
+func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTask(
+	ctx context.Context,
+	task aicommon.AIStatefulTask,
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	startTime time.Time,
+	reviewCount int,
+	callExpectations string,
+) (bool, error) {
 	// Check context at the beginning
 	select {
 	case <-ctx.Done():
@@ -65,8 +88,8 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	log.Infof("toolcall interval review #%d triggered for tool [%s], elapsed: %v", reviewCount, tool.Name, elapsed)
 
 	// Generate a bounded speed-priority prompt from the newest Timeline facts.
-	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContext(
-		tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations,
+	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContextForTask(
+		task, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations,
 	)
 	if err != nil {
 		log.Errorf("failed to generate interval review prompt: %v", err)
@@ -119,20 +142,21 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 			switch decision {
 			case "continue":
 				shouldContinue = true
-				if progressSummary != "" {
-					r.AddToTimeline("interval-review-continue", fmt.Sprintf(
-						"Tool [%s] execution continues. Progress: %s. Reason: %s",
-						tool.Name, progressSummary, reviewReason,
-					))
-				}
-				log.Infof("interval review: tool [%s] should continue. Reason: %s", tool.Name, reviewReason)
+				// Interval reviews are timing-dependent auxiliary observations. Do
+				// not write them to the coordinator Timeline: AddToTimeline allocates
+				// a replay ID, so merely changing review frequency would shift every
+				// later checkpoint. The streamed review event and this runtime log
+				// retain visibility without mutating replay state.
+				log.Infof(
+					"interval review: tool [%s] should continue. Progress: %s. Reason: %s",
+					tool.Name, progressSummary, reviewReason,
+				)
 			case "cancel":
 				shouldContinue = false
-				r.AddToTimeline("interval-review-cancel", fmt.Sprintf(
-					"Tool [%s] execution cancelled by interval review. Reason: %s",
-					tool.Name, reviewReason,
-				))
-				log.Warnf("interval review: tool [%s] should be cancelled. Reason: %s", tool.Name, reviewReason)
+				log.Warnf(
+					"interval review: tool [%s] should be cancelled. Progress: %s. Reason: %s",
+					tool.Name, progressSummary, reviewReason,
+				)
 			default:
 				// Unknown decision, continue by default
 				shouldContinue = true
@@ -141,6 +165,8 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel("toolcall-interval-review"),
+		aicommon.WithAIRequest_Context(ctx),
+		aicommon.WithAIRequest_DetachCheckpoint(),
 	)
 
 	if transErr != nil {
@@ -157,6 +183,13 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 // Returns nil if interval review is disabled.
 // The handler maintains its own state (start time and review count) in a closure.
 func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
+	return r.CreateIntervalReviewHandlerForTask(r.GetCurrentTask())
+}
+
+// CreateIntervalReviewHandlerForTask binds progress reviews to the task that
+// owns the ToolCaller. Batch workers use this form instead of consulting the
+// mutable ReAct.currentTask pointer when each interval fires.
+func (r *ReAct) CreateIntervalReviewHandlerForTask(task aicommon.AIStatefulTask) func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 	if r.config.DisableIntervalReview {
 		return nil
 	}
@@ -177,7 +210,7 @@ func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *ai
 			reviewCount = fallbackReviewCount
 		}
 
-		return r._invokeToolCall_IntervalReviewWithContext(ctx, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)
+		return r._invokeToolCall_IntervalReviewWithContextForTask(ctx, task, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)
 	}
 }
 

@@ -61,10 +61,15 @@ func recentTimelineForValueFeedback(timeline *Timeline) string {
 // ValueFeedbackAction 是一次动作的轻量表示 (避免 aicommon 反向依赖 reactloops
 // 的 ActionRecord). 由上层把 ActionRecord 转换成该结构填入.
 type ValueFeedbackAction struct {
-	ActionType     string `json:"action_type"`
-	ActionName     string `json:"action_name"`
-	ToolName       string `json:"tool_name,omitempty"`
-	IterationIndex int    `json:"iteration_index"`
+	ActionType string `json:"action_type"`
+	ActionName string `json:"action_name"`
+	ToolName   string `json:"tool_name,omitempty"`
+	// ToolNames preserves model order for one action containing multiple
+	// independent tool calls. ToolName remains the first item for compatibility
+	// with older value-feedback consumers.
+	ToolNames      []string `json:"tool_names,omitempty"`
+	ToolCallCount  int      `json:"tool_call_count,omitempty"`
+	IterationIndex int      `json:"iteration_index"`
 }
 
 // approval.source 枚举: 区分"谁"做出的决定, 与 execution_policy (配置策略) 解耦.

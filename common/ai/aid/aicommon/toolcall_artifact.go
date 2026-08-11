@@ -219,7 +219,9 @@ func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, id
 		taskName = t.task.GetSemanticIdentifier()
 	}
 	callNumber := 1
-	if t.task != nil {
+	if t.artifactOrdinal > 0 {
+		callNumber = t.artifactOrdinal
+	} else if t.task != nil {
 		callNumber = len(t.task.GetAllToolCallResults()) + 1
 	}
 	name := sanitizeFilename(tool.Name)

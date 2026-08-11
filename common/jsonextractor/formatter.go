@@ -84,6 +84,17 @@ func rawValueFormatter(data any) (RAW_VALUE_TYPE, any, map[string]any, []any) {
 		if rdata.IsNil() {
 			return RAW_VALUE_TYPE_MAP, nil, make(map[string]any), nil
 		}
+		// The streaming parser represents JSON objects as string-keyed maps and
+		// JSON arrays as integer-keyed maps. The old allnumber heuristic treated
+		// every empty map as an array because its loop never observed a string
+		// key. Preserve the container type from the key kind so nested `{}` and
+		// `[]` remain distinguishable to strict protocol validators.
+		if rdata.Len() == 0 {
+			if rdata.Type().Key().Kind() == reflect.String {
+				return RAW_VALUE_TYPE_MAP, nil, make(map[string]any), nil
+			}
+			return RAW_VALUE_TYPE_ARR, nil, nil, make([]any, 0)
+		}
 
 		iter := rdata.MapRange()
 		allnumber := true

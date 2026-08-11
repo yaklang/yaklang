@@ -118,32 +118,52 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 			stderr = io.Discard
 		}
 	}
-	var res any
-	var err error
-	var finsh = make(chan struct{})
+	type callbackResult struct {
+		value any
+		err   error
+	}
+	// A tool callback is allowed to have external side effects. Do not start it
+	// when its context was already cancelled before invocation.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		execResult := &ToolExecutionResult{
+			Stdout:         "",
+			Stderr:         "",
+			CombinedOutput: "",
+		}
+		if cancelCallback != nil {
+			return cancelCallback(execResult, ctxErr)
+		}
+		return execResult, nil
+	}
+	finished := make(chan callbackResult, 1)
 	go func() {
-		res, err = t.Callback(ctx, params, runtimeConfig, stdout, stderr)
-		close(finsh)
+		res, err := t.Callback(ctx, params, runtimeConfig, stdout, stderr)
+		finished <- callbackResult{value: res, err: err}
 	}()
 
 	var execResult *ToolExecutionResult
+	var err error
 	select {
 	case <-ctx.Done():
+		// Do not read callback-owned buffers or result variables while a
+		// non-cooperative callback may still be unwinding. Context-aware tools
+		// return promptly; the buffered channel lets that goroutine exit even if
+		// this cancellation path has already returned.
 		execResult = &ToolExecutionResult{
-			Stdout:         stdoutBuf.String(),
-			Stderr:         stderrBuf.String(),
-			CombinedOutput: combinedBuf.String(),
-			Result:         res,
+			Stdout:         "",
+			Stderr:         "",
+			CombinedOutput: "",
 		}
 		if cancelCallback != nil {
-			execResult, err = cancelCallback(execResult, err)
+			execResult, err = cancelCallback(execResult, ctx.Err())
 		}
-	case <-finsh:
+	case callback := <-finished:
+		err = callback.err
 		execResult = &ToolExecutionResult{
 			Stdout:         stdoutBuf.String(),
 			Stderr:         stderrBuf.String(),
 			CombinedOutput: combinedBuf.String(),
-			Result:         res,
+			Result:         callback.value,
 		}
 	}
 	return execResult, err
