@@ -101,7 +101,7 @@ type aiSessionBinding struct {
 	CredentialRefs             []aiSessionCredentialRef
 	PlatformBearerToken        string
 	HTTPClient                 *http.Client
-	LegionResultRuntime       aicommon.LegionResultRuntime
+	LegionResultRuntime        aicommon.LegionResultRuntime
 	ExecutionMode              string
 	AuthorizedTargetURL        string
 }
@@ -180,13 +180,23 @@ type closedAISessionRuntime struct {
 	resultSink      *aiSessionResultSinkProxy
 	applyHandle     bool
 	alreadyTerminal bool
+	acknowledge     bool
 }
 
 type aiSessionRuntimeManager struct {
-	mu       sync.Mutex
-	sessions map[string]*aiSessionRuntime
-	driver   aiSessionRuntimeDriver
+	mu                 sync.Mutex
+	sessions           map[string]*aiSessionRuntime
+	terminalTombstones map[string]aiSessionTerminalTombstone
+	terminalOrder      []string
+	driver             aiSessionRuntimeDriver
 }
+
+type aiSessionTerminalTombstone struct {
+	commandID string
+	kind      string
+}
+
+const maxAISessionTerminalTombstones = 1024
 
 type aiSessionRuntime struct {
 	mu                     sync.Mutex
@@ -197,7 +207,7 @@ type aiSessionRuntime struct {
 	cancel                 context.CancelFunc
 	handle                 aiSessionRuntimeHandle
 	resultSink             *aiSessionResultSinkProxy
-	processedInputCommands map[string]struct{}
+	processedInputCommands map[string]processedAISessionInput
 	processedInputOrder    []string
 	inFlightInputCommands  map[string]struct{}
 	terminalCommandID      string
@@ -206,13 +216,20 @@ type aiSessionRuntime struct {
 	executionMode          string
 }
 
+type processedAISessionInput struct {
+	seq         uint64
+	inputType   string
+	payloadJSON []byte
+}
+
 func newAISessionRuntimeManager(driver aiSessionRuntimeDriver) *aiSessionRuntimeManager {
 	if driver == nil {
 		driver = noopAISessionRuntimeDriver{}
 	}
 	return &aiSessionRuntimeManager{
-		sessions: make(map[string]*aiSessionRuntime),
-		driver:   driver,
+		sessions:           make(map[string]*aiSessionRuntime),
+		terminalTombstones: make(map[string]aiSessionTerminalTombstone),
+		driver:             driver,
 	}
 }
 
@@ -256,7 +273,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		title:                  strings.TrimSpace(command.GetTitle()),
 		cancel:                 cancel,
 		resultSink:             resultSink,
-		processedInputCommands: make(map[string]struct{}),
+		processedInputCommands: make(map[string]processedAISessionInput),
 		inFlightInputCommands:  make(map[string]struct{}),
 		executionMode:          strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 	}
@@ -271,7 +288,7 @@ func (m *aiSessionRuntimeManager) Bind(
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
 		HTTPClient:                 options.HTTPClient,
-		LegionResultRuntime:       focusRuntime,
+		LegionResultRuntime:        focusRuntime,
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
 	}, &managedAISessionRuntimeEmitter{
@@ -313,10 +330,16 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 	}
 
 	session.mu.Lock()
-	if _, ok := session.processedInputCommands[ref.CommandID]; ok {
+	if processed, ok := session.processedInputCommands[ref.CommandID]; ok {
 		ref.RunID = session.ref.RunID
 		session.mu.Unlock()
-		return acceptedAISessionInput{ref: ref, duplicate: true}, nil
+		return acceptedAISessionInput{
+			ref:         ref,
+			seq:         processed.seq,
+			inputType:   processed.inputType,
+			payloadJSON: cloneBytes(processed.payloadJSON),
+			duplicate:   true,
+		}, nil
 	}
 	if _, ok := session.inFlightInputCommands[ref.CommandID]; ok {
 		session.mu.Unlock()
@@ -346,16 +369,16 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 	}, nil
 }
 
-func (m *aiSessionRuntimeManager) CompleteInput(sessionID, commandID string, succeeded bool) {
+func (m *aiSessionRuntimeManager) CompleteInput(accepted acceptedAISessionInput, succeeded bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	session, ok := m.sessions[strings.TrimSpace(sessionID)]
+	session, ok := m.sessions[strings.TrimSpace(accepted.ref.SessionID)]
 	if !ok {
 		return
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	commandID = strings.TrimSpace(commandID)
+	commandID := strings.TrimSpace(accepted.ref.CommandID)
 	delete(session.inFlightInputCommands, commandID)
 	if !succeeded || commandID == "" {
 		return
@@ -363,7 +386,11 @@ func (m *aiSessionRuntimeManager) CompleteInput(sessionID, commandID string, suc
 	if _, exists := session.processedInputCommands[commandID]; exists {
 		return
 	}
-	session.processedInputCommands[commandID] = struct{}{}
+	session.processedInputCommands[commandID] = processedAISessionInput{
+		seq:         accepted.seq,
+		inputType:   accepted.inputType,
+		payloadJSON: cloneBytes(accepted.payloadJSON),
+	}
 	session.processedInputOrder = append(session.processedInputOrder, commandID)
 	const processedInputLimit = 1024
 	if len(session.processedInputOrder) > processedInputLimit {
@@ -491,7 +518,14 @@ func (m *aiSessionRuntimeManager) Close(
 
 	session, ok := m.sessions[ref.SessionID]
 	if !ok {
-		return closedAISessionRuntime{ref: ref, reason: reason, alreadyTerminal: true}, nil
+		tombstone, known := m.terminalTombstones[ref.SessionID]
+		acknowledge := !known || (tombstone.kind == "close" && tombstone.commandID == ref.CommandID)
+		return closedAISessionRuntime{
+			ref:             ref,
+			reason:          reason,
+			alreadyTerminal: true,
+			acknowledge:     acknowledge,
+		}, nil
 	}
 	if session.ref.OwnerUserID != ref.OwnerUserID {
 		return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
@@ -563,10 +597,32 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 		)
 	}
 	delete(m.sessions, ref.SessionID)
+	m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
+		commandID: ref.CommandID,
+		kind:      kind,
+	})
 	if session.cancel != nil {
 		session.cancel()
 	}
 	return nil
+}
+
+func (m *aiSessionRuntimeManager) recordTerminalTombstoneLocked(
+	sessionID string,
+	tombstone aiSessionTerminalTombstone,
+) {
+	if sessionID == "" {
+		return
+	}
+	if _, exists := m.terminalTombstones[sessionID]; !exists {
+		m.terminalOrder = append(m.terminalOrder, sessionID)
+	}
+	m.terminalTombstones[sessionID] = tombstone
+	for len(m.terminalOrder) > maxAISessionTerminalTombstones {
+		oldest := m.terminalOrder[0]
+		m.terminalOrder = m.terminalOrder[1:]
+		delete(m.terminalTombstones, oldest)
+	}
 }
 
 func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) error {
@@ -636,39 +692,38 @@ func (b *legionJobBridge) handleAISessionInput(ctx context.Context, raw []byte) 
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_input_failed", err)
 	}
 	if accepted.duplicate {
-		return nil
+		return b.ensureAIPublisher().PublishEvent(
+			ctx,
+			accepted.ref,
+			accepted.seq,
+			aiSessionRuntimeEventInput,
+			accepted.payloadJSON,
+		)
 	}
 	succeeded := false
 	defer func() {
-		runtime.CompleteInput(accepted.ref.SessionID, accepted.ref.CommandID, succeeded)
+		runtime.CompleteInput(accepted, succeeded)
 	}()
-	if err := b.ensureAIPublisher().PublishEvent(
+	if accepted.handle != nil {
+		if err := accepted.handle.SendInput(ctx, aiSessionInput{
+			Ref:            accepted.ref,
+			InputType:      accepted.inputType,
+			PayloadJSON:    accepted.payloadJSON,
+			ContextPackage: accepted.contextPackage,
+			ReviewID:       accepted.reviewID,
+			TurnID:         accepted.turnID,
+		}); err != nil {
+			return b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
+		}
+	}
+	succeeded = true
+	return b.ensureAIPublisher().PublishEvent(
 		ctx,
 		accepted.ref,
 		accepted.seq,
 		aiSessionRuntimeEventInput,
 		accepted.payloadJSON,
-	); err != nil {
-		return err
-	}
-	if accepted.handle == nil {
-		succeeded = true
-		return nil
-	}
-	if err := accepted.handle.SendInput(ctx, aiSessionInput{
-		Ref:            accepted.ref,
-		InputType:      accepted.inputType,
-		PayloadJSON:    accepted.payloadJSON,
-		ContextPackage: accepted.contextPackage,
-		ReviewID:       accepted.reviewID,
-		TurnID:         accepted.turnID,
-	}); err != nil {
-		failureErr := b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
-		succeeded = failureErr == nil
-		return failureErr
-	}
-	succeeded = true
-	return nil
+	)
 }
 
 func (b *legionJobBridge) handleAISessionAppendContext(ctx context.Context, raw []byte) error {
@@ -746,8 +801,20 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 	if err != nil {
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_close_failed", err)
 	}
-	if closed.alreadyTerminal {
+	if closed.alreadyTerminal && !closed.acknowledge {
 		return nil
+	}
+	if closed.alreadyTerminal {
+		// Close is an idempotent command. The runtime can already be absent when
+		// Legion retries after losing the first acknowledgement (for example after
+		// a node restart). Re-publish the deterministic close event so the server
+		// can converge its closing state instead of timing out in close_failed.
+		resultJSON := mustJSON(map[string]string{
+			"reason":           closed.reason,
+			"closed_by":        "platform",
+			"already_terminal": "true",
+		})
+		return b.ensureAIPublisher().PublishClose(ctx, closed.ref, resultJSON)
 	}
 	if closed.applyHandle && closed.handle != nil {
 		closed.handle.Close(closed.reason)
@@ -759,7 +826,7 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 	if err := closed.resultSink.Succeed(ctx, resultJSON); err != nil {
 		return fmt.Errorf("publish focus result succeeded: %w", err)
 	}
-	if err := b.ensureAIPublisher().PublishDone(ctx, closed.ref, resultJSON); err != nil {
+	if err := b.ensureAIPublisher().PublishClose(ctx, closed.ref, resultJSON); err != nil {
 		return err
 	}
 	return b.ensureAIRuntime().CompleteTerminal(closed.ref, "close")
