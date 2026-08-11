@@ -126,11 +126,11 @@ func formatCompilerErrorHint(pattern compilerErrorHint) string {
 func lookupCompilerErrorFallback(normalizedMessage string) string {
 	switch {
 	case strings.HasPrefix(normalizedMessage, "基础语法错误"):
-		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、是否误用了 Go/JavaScript 语法；若 Init 样例未覆盖该写法，再用 grep_yaklang_samples 搜索相似写法。"
+		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、语句是否写完整；若 Init 样例未覆盖该写法，再用 grep_yaklang_samples 搜索相似写法。"
 	case strings.Contains(normalizedMessage, "no viable alternative"):
-		return "语法解析失败（no viable alternative）。常见原因：Go 风格类型声明、import/package、泛型或不被 Yaklang 支持的语法。请对照 Yaklang DSL 改写。"
+		return "语法解析失败（no viable alternative）。常见原因：import/package、泛型、未闭合括号/字符串，或不被 Yaklang 支持的语法。请对照 Yaklang DSL 改写。"
 	case strings.Contains(normalizedMessage, "mismatched input"):
-		return "语法 token 不匹配（mismatched input）。检查是否缺少括号、逗号、运算符，或混入了 Go/Java 语法。"
+		return "语法 token 不匹配（mismatched input）。检查是否缺少括号、逗号、运算符，或语句未写完整。"
 	case strings.Contains(normalizedMessage, "extraneous input"):
 		return "存在多余 token（extraneous input）。删除多余符号，或检查语句是否写完整。"
 	case strings.Contains(normalizedMessage, "expecting"):
@@ -450,22 +450,6 @@ var compilerErrorHints = []compilerErrorHint{
 			"yakit.Warn(\"...\\n\"\n    + \"...\")",
 			`yakit.Warn(sprintf("[!] dry-run\n1) ...\n2) %s", baseUrl))`,
 		},
-	},
-	{
-		Name:        "FunctionParameterTypes",
-		Globs:       []string{"*no viable alternative at input*", "*func(*", "*extraneous input*", "*mismatched input*"},
-		LineRegexps: []string{
-			`func\s*\([^)]*\s+(map\[|string|int|bool|interface\{\}|\[\]|byte|\*|chan)\b`,
-			`func\s*\([^)]+\s+\w+\s*\)\s*\[\]`,
-		},
-		Hint:        "Yaklang DSL 中函数参数/返回类型不允许 Go 风格声明。用 func(arg) { ... }，不要 func(arg string) []byte {。",
-		Examples:    []string{"func(gadgetB64 string) []byte {", "build = func(gadgetB64) {"},
-	},
-	{
-		Name:        "FunctionReturnTypes",
-		LineRegexps: []string{`=\s*func\s*\([^)]*\)\s*(\[\]|map\[|string|int|bool)\b`},
-		Hint:        "Yaklang 匿名函数不支持返回类型声明。删除 ) 后的 []byte / map 等，只保留 func(args) { body }。",
-		Examples:    []string{"= func(frame) []byte {", "= func(frame) {"},
 	},
 	{
 		Name: "VarTypeDeclarations",

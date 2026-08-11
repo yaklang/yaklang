@@ -24,10 +24,27 @@ var (
 
 func GetCachedLog() (res []string) {
 	for _, e := range cachedLog.GetElements() {
-		res = append(res, e.(string))
+		if s, ok := e.(string); ok {
+			res = append(res, s)
+		}
 	}
 	return
 }
+
+// safePanicString formats recover() values without calling Error() on possibly
+// corrupt interfaces (which can SIGSEGV during TypeAssertionError.Error).
+func safePanicString(r any) (msg string) {
+	defer func() {
+		if recover() != nil {
+			msg = fmt.Sprintf("%T", r)
+		}
+	}()
+	if r == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%T: %v", r, r)
+}
+
 func StartCacheLog(ctx context.Context, n int) {
 	cachedLog = NewCircularQueue(n)
 	if isInCached.IsSet() {
@@ -95,8 +112,7 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 		uuid := uuid.New().String()
 		attachOutputCallback.Store(uuid, func(result string) {
 			defer func() {
-				if err := recover(); err != nil {
-				}
+				_ = recover()
 			}()
 			handle(result)
 		})
@@ -108,6 +124,13 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 	} else {
 		isInAttached.Set()
 	}
+
+	// Derive cancelable ctx BEFORE any goroutine reads it.
+	// Reassigning the same `ctx` variable after a goroutine starts is a data race
+	// on interface{}/context.Context and can corrupt itab → cancelCtx.Done panic/SIGSEGV.
+	runCtx, cancelCtx := context.WithCancel(ctx)
+	defer cancelCtx()
+
 	GetDefaultYakitBaseTempDir := func() string {
 		if os.Getenv("YAKIT_HOME") != "" {
 			dirName := filepath.Join(os.Getenv("YAKIT_HOME"), "temp")
@@ -129,18 +152,19 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 	}
 	go func() {
 		defer func() {
-			if err := recover(); err != nil {
-				log.Errorf("tempfile sync panic: %s", err)
+			if r := recover(); r != nil {
+				log.Errorf("tempfile sync panic: %s", safePanicString(r))
 			}
 		}()
 
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-runCtx.Done():
 				return
-			default:
-				time.Sleep(time.Second)
-				tempOutputs.Sync()
+			case <-ticker.C:
+				_ = tempOutputs.Sync()
 			}
 		}
 	}()
@@ -154,10 +178,6 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 	if err != nil {
 		return Errorf("tail -f `%v` failed: %s", tempOutputs.Name(), err)
 	}
-	ctx, cancelCtx := context.WithCancel(ctx)
-	defer func() {
-		cancelCtx()
-	}()
 
 	sendOutput := func(result string) {
 		handle(result)
@@ -174,8 +194,8 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 	originStderr := os.Stderr
 	go func() {
 		defer func() {
-			if err := recover(); err != nil {
-				log.Errorf("attached panic: %s", err)
+			if r := recover(); r != nil {
+				log.Errorf("attached panic: %s", safePanicString(r))
 			}
 			isInAttached.UnSet()
 		}()
@@ -184,7 +204,7 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 				continue
 			}
 			select {
-			case <-ctx.Done():
+			case <-runCtx.Done():
 				return
 			case line, ok := <-tailf.Lines:
 				if !ok {
@@ -205,8 +225,8 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 		log.SetOutput(os.Stdout)
 	}
 	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("attach finished with panic: %s", err)
+		if r := recover(); r != nil {
+			log.Errorf("attach finished with panic: %s", safePanicString(r))
 		}
 		cancel()
 	}()
@@ -217,7 +237,7 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 	log.DefaultLogger.Printer.IsTerminal = true
 	for {
 		select {
-		case <-ctx.Done():
+		case <-runCtx.Done():
 			return nil
 		case <-time.After(time.Second):
 		}

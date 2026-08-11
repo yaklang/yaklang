@@ -8,16 +8,12 @@ import (
 )
 
 func TestCheckAndFormat_FunctionParameterTypes(t *testing.T) {
-	code := `
-bruteTask.SetResultHandler(func(result map[string]interface{}) {
-    if result["status"] == "success" {
-        found = true
-    }
-})
-`
+	code := `handler = func(result map[string]interface{}) {
+    println(result)
+}
+_ = handler`
 	errorMsg, hasBlockingErrors, _ := format.CheckAndFormat(code, format.YakRunnerDefaults(0)...)
-	assert.True(t, hasBlockingErrors)
-	assert.Contains(t, errorMsg, "AI助手提示:")
+	assert.False(t, hasBlockingErrors, "typed func should not block; msg=%s", errorMsg)
 }
 
 func TestCheckAndFormat_EmptyCode(t *testing.T) {

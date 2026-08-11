@@ -113,11 +113,8 @@ func BuildPinnedAPISection(libNames []string) string {
 }
 
 // pinnedDSLRules 写码前注入的 Yaklang DSL 硬规则（短文案，直接 Go 常量，不走 .txt embed）。
-// 关键词: PIN DSL, 禁止 Go/Java 语法, 匿名函数, byte 数组, poc 三返回值, YAK_MAIN 自测
-const pinnedDSLRules = `### Yaklang DSL 硬规则（写码前必读，禁止 Go/Java 语法）
-- **匿名函数**：` + "`name = func(arg) { ... }`" + `；**禁止**参数/返回类型声明
-  - 错误：` + "`func(x string) []byte {`" + `、` + "`func(frame []byte) {`" + `
-  - 正确：` + "`build = func(gadgetB64) {`" + `、` + "`build = func(frame) {`" + `
+// 关键词: PIN DSL, byte 数组, append, poc 三返回值, YAK_MAIN 自测
+const pinnedDSLRules = `### Yaklang DSL 硬规则（写码前必读）
 - **字符串**：禁止跨行 ` + "`\"...\" + \"...\"`" + `；用单行、` + "`\\n`" + ` 或 ` + "`sprintf`" + `
 - **byte 数组**：` + "`[]byte{0xAC, 0xED, 0x00, 0x05}`" + `；元素必须是 byte 字面量（` + "`0x..`" + `），禁止裸整数
 - **[]byte 拼接**：` + "`append(a, b...)`" + `；**禁止** ` + "`append(a, b)`" + `（整段 bytes 不能当单个 T）。单字节：` + "`append(a, 0x70)`" + `

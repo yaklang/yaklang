@@ -45,6 +45,9 @@ Assert: 'assert';
 Var
     : 'var'
     | 'any';
+// Go 风格类型兼容：interface{} 必须是单一 token（ASI 会在 } 前插入 ';'）
+// 不要把 error 做成关键字——会破坏 log.error；函数注解里用 Identifier 即可
+InterfaceEmptyType: 'interface{}';
 VarTypeName
     : 'uint' |  'uint8' | 'byte' | 'uint16' | 'uint32' | 'uint64'
     | 'int' | 'int8' | 'int16' | 'int32' | 'int64'

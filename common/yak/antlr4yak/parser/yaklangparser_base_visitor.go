@@ -204,6 +204,10 @@ func (v *BaseYaklangParserVisitor) VisitMapTypeLiteral(ctx *MapTypeLiteralContex
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseYaklangParserVisitor) VisitFuncTypeRef(ctx *FuncTypeRefContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseYaklangParserVisitor) VisitInstanceCode(ctx *InstanceCodeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -217,6 +221,14 @@ func (v *BaseYaklangParserVisitor) VisitFunctionNameDecl(ctx *FunctionNameDeclCo
 }
 
 func (v *BaseYaklangParserVisitor) VisitFunctionParamDecl(ctx *FunctionParamDeclContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitFunctionParam(ctx *FunctionParamContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseYaklangParserVisitor) VisitFunctionResultType(ctx *FunctionResultTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

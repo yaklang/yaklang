@@ -16,8 +16,7 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	if r.pureInvokerMode {
 		return utils.Errorf("use in prue invoker mode, cannot handle free input")
 	}
-	userInput := aicommon.NormalizeUserInputMentionPaths(event.FreeInput)
-	event.FreeInput = userInput
+	userInput := event.FreeInput
 	if userInput == "" || strings.TrimSpace(userInput) == "" {
 		return utils.Errorf("user input cannot be empty")
 	}
@@ -38,13 +37,6 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 				r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 			}
 		}
-	}
-	for _, path := range aicommon.ExtractMentionPathsFromUserInput(userInput) {
-		if aicommon.IsYaklangScriptDeliveryPath(path) {
-			continue
-		}
-		r.config.ContextProviderManager.Unregister(path)
-		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
 
 	if r.config.DebugEvent {
@@ -201,10 +193,7 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 	if event == nil {
 		return nil
 	}
-	freeInput := aicommon.NormalizeUserInputMentionPaths(event.FreeInput)
-	if freeInput != event.FreeInput {
-		event.FreeInput = freeInput
-	}
+	freeInput := event.FreeInput
 	// 创建基于aireact.Task的任务（初始状态为created）
 	sanitizedInput := sanitizeForTaskId(freeInput)
 	shortId := ksuid.New().String()

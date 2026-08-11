@@ -76,6 +76,15 @@ func TestFormatSingleForCopy_IncludesLocation(t *testing.T) {
 	require.Contains(t, single, "in [")
 }
 
+func TestCheckAndFormat_TypedFuncDoesNotBlock(t *testing.T) {
+	code := `handler = func(result map[string]interface{}) {
+    println(result)
+}
+_ = handler`
+	errorMsg, hasBlocking, _ := CheckAndFormat(code, YakRunnerDefaults(0)...)
+	require.False(t, hasBlocking, "typed func should not block; msg=%s", errorMsg)
+}
+
 func TestLookupCompilerErrorHint_ByteLiteral(t *testing.T) {
 	hint := lookupCompilerErrorHint("T should be byte, but got number", `body := []byte{172, 237}`)
 	require.Contains(t, hint, "0x")
@@ -90,11 +99,6 @@ func TestLookupCompilerErrorHint_AppendBytes(t *testing.T) {
 
 	hint2 := lookupCompilerErrorHint("T should be byte, but got number", `defaultPayload = append(defaultPayload, tcNull...)`)
 	require.Contains(t, hint2, "append")
-}
-
-func TestLookupCompilerErrorHint_FuncReturnType(t *testing.T) {
-	hint := lookupCompilerErrorHint("mismatched input '[' expecting ')'", `build = func(frame) []byte {`)
-	require.Contains(t, hint, "返回类型")
 }
 
 func TestLookupCompilerErrorHint_MultilineStringConcat(t *testing.T) {

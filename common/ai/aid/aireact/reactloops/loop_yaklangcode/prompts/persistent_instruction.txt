@@ -116,8 +116,7 @@ cli.check()                        // cli 参数声明后必须调用
 
 ### 易错点（务必牢记）
 - 无需 import 任何库，所有标准库都是内置的。
-- **不支持类/面向对象**：没有 `type X struct {}`、没有 `interface{}`。用 `{"key": "value"}` 存数据。
-- 函数声明不写类型：`func(a, b, c) { ... }`；也支持箭头函数 `i => {...}`。
+- **不支持类/面向对象**：没有 `type X struct {}`。用 `{"key": "value"}` 存数据。
 - 变量声明：`x = 10` 或 `x := 10`，不要 `var x int`。
 - 列表 `l = []`，字典 `m = {}`；`for it in list {}`、`for k, v in map {}`。
 

@@ -13,7 +13,7 @@ import (
 )
 
 // hasYaklangEditorDeliveryTarget is true when the loop should deliver code to an open editor file (replace).
-// Only .yak script paths qualify — Type=file / @mention reference files (.md, etc.) must not.
+// Only .yak script paths qualify - Type=file reference attachments must not.
 func hasYaklangEditorDeliveryTarget(loop *reactloops.ReActLoop) bool {
 	if loop == nil {
 		return false
@@ -59,7 +59,7 @@ func resolveYaklangDeliveryTarget(loop *reactloops.ReActLoop) (path string, even
 	if aicommon.IsYaklangScriptDeliveryPath(editorFile) {
 		return filepath.Clean(editorFile), loopinfra.LoopYaklangCodeEventOpReplace, nil
 	}
-	// Non-.yak editor_file_path (e.g. @mention .md mis-bound as file_path) must not replace.
+	// Non-.yak editor_file_path must not replace.
 
 	filename := strings.TrimSpace(loop.Get("filename"))
 	if filename != "" {
