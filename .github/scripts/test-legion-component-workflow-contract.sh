@@ -24,6 +24,31 @@ check_release_only_workflow \
   "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml" \
   'legion-runtime-v*'
 
+runtime_workflow="$repo_root/.github/workflows/build-legion-ai-session-runtime.yml"
+runtime_alpha_workflow="$repo_root/.github/workflows/build-legion-ai-session-runtime-alpha.yml"
+check_release_only_workflow "$runtime_alpha_workflow" 'legion-runtime-alpha-*'
+grep -Fq 'workflow_call:' "$runtime_workflow"
+grep -Fq 'source_mode: alpha' "$runtime_alpha_workflow"
+grep -Fq 'retention_days: 7' "$runtime_alpha_workflow"
+grep -Fq 'uses: ./.github/workflows/build-legion-ai-session-runtime.yml' "$runtime_alpha_workflow"
+grep -Fq 'PUBLISH_OSS' "$runtime_workflow"
+grep -Fq 'if: env.PUBLISH_OSS == '\''true'\''' "$runtime_workflow"
+[[ "$(grep -Fc "if: env.PUBLISH_OSS == 'true'" "$runtime_workflow")" -eq 4 ]]
+grep -Fq '.docker.tar.gz' "$runtime_workflow"
+grep -Fq 'contents: read' "$runtime_alpha_workflow"
+if grep -Eq 'secrets: inherit|OSS_KEY_(ID|SECRET)|upload-oss' "$runtime_alpha_workflow"; then
+  echo "$runtime_alpha_workflow must not receive Runtime release secrets or publish to OSS" >&2
+  exit 1
+fi
+if grep -Eq 'id-token:|attestations:' "$runtime_alpha_workflow"; then
+  echo "$runtime_alpha_workflow must remain a read-only Runtime candidate caller" >&2
+  exit 1
+fi
+
+runtime_alpha_tag='legion-runtime-alpha-0212'
+[[ "$runtime_alpha_tag" == legion-runtime-alpha-* ]]
+[[ "$runtime_alpha_tag" != legion-runtime-v* ]]
+
 alpha_workflow="$repo_root/.github/workflows/build-legion-node-alpha.yml"
 check_release_only_workflow "$alpha_workflow" 'legion-node-alpha-*'
 
@@ -56,8 +81,8 @@ grep -Fq 'uses: ./.github/workflows/build-legion-node-alpha.yml' "$product_workf
 grep -Fq 'source_mode: release' "$product_workflow"
 grep -Fq 'production_release: true' "$product_workflow"
 grep -Fq 'ubuntu-24.04-arm' "$product_workflow"
-grep -Fq 'ubuntu-24.04-arm' "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml"
+grep -Fq 'ubuntu-24.04-arm' "$runtime_workflow"
 grep -Fq 'release-index-linux-arm64.json' "$product_workflow"
-grep -Fq 'release-index-linux-arm64.json' "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml"
+grep -Fq 'release-index-linux-arm64.json' "$runtime_workflow"
 
 echo 'Legion component workflow contract tests passed'

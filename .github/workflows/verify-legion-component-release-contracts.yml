@@ -10,6 +10,7 @@ on:
       - ".github/scripts/test-legion-component-workflow-contract.sh"
       - ".github/scripts/test-package-legion-ai-session-runtime.sh"
       - ".github/workflows/build-legion-ai-session-runtime.yml"
+      - ".github/workflows/build-legion-ai-session-runtime-alpha.yml"
       - ".github/workflows/build-legion-node-alpha.yml"
       - ".github/workflows/build-legion-product-node.yml"
       - ".github/workflows/verify-legion-component-release-contracts.yml"
@@ -128,7 +129,13 @@ jobs:
           docker run --rm --entrypoint /bin/sh "$image" -ec \
             'test -x /usr/local/bin/legion-session-runtime; ldd /usr/local/bin/legion-session-runtime' \
             >"${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"
-          ! grep -q 'not found' "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"
+          if grep -q 'not found' "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"; then
+            echo "Runtime binary has unresolved shared libraries" >&2
+            exit 1
+          fi
+          docker save "$image" | gzip -n -1 \
+            >"${RUNNER_TEMP}/runtime-${TARGET_ARCH}.docker.tar.gz"
+          gzip -t "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.docker.tar.gz"
 
   alpha-node-targets:
     name: Compile alpha node for ${{ matrix.goos }}/${{ matrix.goarch }}
