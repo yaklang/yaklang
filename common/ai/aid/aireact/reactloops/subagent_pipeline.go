@@ -456,8 +456,8 @@ const (
 	DispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
 
 	MaxDispatchSubReactJobs    = int(aicommon.AbsoluteMaxSubAgents)
-	DefaultDispatchConcurrency = 5
-	MaxDispatchConcurrency     = 10
+	DefaultDispatchConcurrency = int(aicommon.DefaultMaxSubAgents)
+	MaxDispatchConcurrency     = int(aicommon.AbsoluteMaxSubAgents)
 )
 
 // ProcessStats 汇总已完成子 Agent 的运行期活动数据。
@@ -650,19 +650,35 @@ func NormalizeDispatchJobs(jobs []SubAgentJob, maxJobs int) ([]SubAgentJob, erro
 }
 
 // ParseConcurrency 从 AI action 中提取并发参数并限制到合法范围。
-func ParseConcurrency(action *aicommon.Action, jobCount int) int {
-	concurrency := action.GetInt("concurrency")
+// maxConcurrency 通常来自 Config.MaxSubAgents（UI「子 Agent 数量」）；<=0 时回落默认值。
+func ParseConcurrency(action *aicommon.Action, jobCount int, maxConcurrency ...int) int {
+	limit := DefaultDispatchConcurrency
+	if len(maxConcurrency) > 0 && maxConcurrency[0] > 0 {
+		limit = maxConcurrency[0]
+	}
+	limit = int(aicommon.NormalizeMaxSubAgents(int64(limit)))
+
+	concurrency := 0
+	if action != nil {
+		concurrency = action.GetInt("concurrency")
+	}
 	if concurrency <= 0 {
-		concurrency = DefaultDispatchConcurrency
+		concurrency = limit
 		if jobCount < concurrency {
 			concurrency = jobCount
 		}
+	}
+	if concurrency > limit {
+		concurrency = limit
 	}
 	if concurrency > MaxDispatchConcurrency {
 		concurrency = MaxDispatchConcurrency
 	}
 	if concurrency > jobCount {
 		concurrency = jobCount
+	}
+	if concurrency < 1 {
+		concurrency = 1
 	}
 	return concurrency
 }

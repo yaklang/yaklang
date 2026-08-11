@@ -189,7 +189,7 @@ func (c *Config) GetExecutionPolicy() string {
 			"- 【MUST】Multi-agent mode is ENABLED. For ANY task containing 2+ mostly-independent workstreams, you MUST make dispatch_sub_react_agents your FIRST move — do not start with serial tool calls. This is a mandatory strategy, not a suggestion; only fall back to serial execution when you can justify that the task is genuinely sequential or a single sub-goal.",
 			"- 【MUST】Dispatch is strictly for parallelizing INDEPENDENT workstreams. You MUST NOT use it to offload a single sequential task you should do yourself, and you MUST NOT dump every imaginable subtask into one call to avoid thinking. Before batching, you MUST verify each subtask is mutually independent.",
 			"- 【MUST】If subtask B depends on subtask A's result, you MUST NOT batch them together. Do A first (dispatch it or do it yourself), wait for its result to land in the timeline, then dispatch B in a LATER iteration. Only zero-dependency subtasks may share one dispatch.",
-			fmt.Sprintf("- MaxSubAgents is %d: each dispatch_sub_react_agents call may include at most %d sub agents; exceeding this limit is rejected.", c.GetMaxSubAgents(), c.GetMaxSubAgents()),
+			fmt.Sprintf("- MaxSubAgents is %d: run at most %d sub agents simultaneously; each dispatch_sub_react_agents call is also capped at %d jobs.", c.GetMaxSubAgents(), c.GetMaxSubAgents(), c.GetMaxSubAgents()),
 			"- When dispatching, write a crisp, self-contained goal for each sub agent and use result_contract to define the expected output shape whenever possible.",
 		)
 	}

@@ -35,7 +35,7 @@ func verifyDispatchSubReactAgents(loop *reactloops.ReActLoop, action *aicommon.A
 		return err
 	}
 
-	concurrency := reactloops.ParseConcurrency(action, len(jobs))
+	concurrency := reactloops.ParseConcurrency(action, len(jobs), loop.GetMaxSubAgents())
 	encoded, err := json.Marshal(jobs)
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func handleDispatchSubReactAgents(
 
 	concurrency := loop.GetInt(dispatchSubReactConcurrencyLoopKey)
 	if concurrency <= 0 {
-		concurrency = reactloops.ParseConcurrency(action, len(jobs))
+		concurrency = reactloops.ParseConcurrency(action, len(jobs), loop.GetMaxSubAgents())
 	}
 
 	loopInfraStatus(loop, "子 Agent 执行中/ Sub Agents Running...")
