@@ -33,3 +33,24 @@ func BenchmarkTakeSymbolSnapshot(b *testing.B) {
 	}
 	_ = sink
 }
+
+// BenchmarkTakeSymbolSnapshotMagicOnly measures the magic-`__`/empty-table case
+// that dominates real dataflow include/exclude sub-rules on large projects:
+// before Step B this allocated two maps per sfCheck (~41GB total on hadoop),
+// now it returns the shared empty snapshot with zero allocation.
+func BenchmarkTakeSymbolSnapshotMagicOnly(b *testing.B) {
+	table := omap.NewEmptyOrderedMap[string, Values]()
+	for i := 0; i < 50; i++ {
+		table.Set(fmt.Sprintf("__magic-%d", i), Values{
+			&benchmarkIDValue{id: int64(i)},
+		})
+	}
+
+	var sink *SymbolSnapshot
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sink = TakeSymbolSnapshot(table)
+	}
+	_ = sink
+}
