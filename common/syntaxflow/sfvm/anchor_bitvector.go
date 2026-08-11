@@ -200,6 +200,10 @@ func mergeAnchorBits(dst ValueOperator, sourceBits *utils.BitVector) {
 		// into this dst takes the 2nd branch, clones dstBits (== sourceBits)
 		// before Or'ing, and sourceBits is never corrupted. See the contract on
 		// ssaapi.Value.SetAnchorBitVector.
+		// COW: store sourceBits directly (no Clone). Mark it shared so a later
+		// merge into dst (or any holder of sourceBits) knows the words slice is
+		// aliased and must detach before mutating (honest ownership for O1).
+		sourceBits.ShareWords()
 		dst.SetAnchorBitVector(sourceBits)
 		return
 	}
@@ -208,6 +212,15 @@ func mergeAnchorBits(dst ValueOperator, sourceBits *utils.BitVector) {
 	if dstBits.Contains(sourceBits) {
 		return
 	}
+	if dstBits.CanMutateInPlace() {
+		// dstBits is a unique owner (freshly built, not aliased via COW), so Or
+		// in place with zero allocation (O1: was Clone()+Or() which detaches the
+		// words slice on every merge — the 26.1GB hotspot on hadoop).
+		dstBits.Or(sourceBits)
+		return
+	}
+	// dstBits is shared (aliased); clone then Or so the shared source is never
+	// corrupted. The Or detaches the clone's words, keeping dst's alias intact.
 	merged := dstBits.Clone()
 	merged.Or(sourceBits)
 	dst.SetAnchorBitVector(merged)
