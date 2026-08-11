@@ -119,33 +119,44 @@ func (c *ResidencyCacheWithKey[K, T]) GetResident(key K) (T, bool) {
 		return zero, false
 	}
 
-	var (
-		value T
-		ok    bool
-	)
-	c.mu.Lock()
+	// Fast path: when the item is not in a "pending persist" state, GetResident
+	// is a pure read. Taking the shared RLock instead of the exclusive Lock cuts
+	// writer contention on the hot read path (GetResident was ~6% of core CPU,
+	// dominated by lockSlow). Only when the item IS pending&&!persisting do we
+	// upgrade to the exclusive lock to cancel the stale queued persist.
+	c.mu.RLock()
 	if item, exists := c.data[key]; exists {
 		if item.pending && !item.persisting {
-			item.pending = false
-			item.updatedWhilePersisting = false
-			item.persistSnapshot = *new(T)
-			item.persistSnapshotSet = false
+			// Needs mutation (cancel pending persist): drop the shared lock and
+			// redo under the exclusive lock.
+			c.mu.RUnlock()
+			c.mu.Lock()
+			item2, exists2 := c.data[key]
+			if exists2 && item2.pending && !item2.persisting {
+				item2.pending = false
+				item2.updatedWhilePersisting = false
+				item2.persistSnapshot = *new(T)
+				item2.persistSnapshotSet = false
+			}
+			if exists2 {
+				c.mu.Unlock()
+				value := item2.memoryItem
+				return value, true
+			}
+			c.mu.Unlock()
+			return *new(T), false
 		}
-		value = item.memoryItem
-		ok = true
-	}
-	c.mu.Unlock()
-	if !ok {
-		var zero T
-		return zero, false
-	}
-
-	if c.evictionCache != nil && !c.IsSaveDisabled() && !c.shouldSkipEviction(value) {
-		if _, tracked := c.evictionCache.Get(key); !tracked {
-			c.evictionCache.Set(key, struct{}{})
+		c.mu.RUnlock()
+		value := item.memoryItem
+		if c.evictionCache != nil && !c.IsSaveDisabled() && !c.shouldSkipEviction(value) {
+			if _, tracked := c.evictionCache.Get(key); !tracked {
+				c.evictionCache.Set(key, struct{}{})
+			}
 		}
+		return value, true
 	}
-	return value, true
+	c.mu.RUnlock()
+	return *new(T), false
 }
 
 func (c *ResidencyCacheWithKey[K, T]) Get(key K) (T, bool) {
