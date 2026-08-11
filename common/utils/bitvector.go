@@ -88,28 +88,6 @@ func (b *BitVector) Set(index int) {
 	b.words[word] |= 1 << bit
 }
 
-// ShareWords marks b as sharing its words slice with another vector (i.e. it
-// is no longer a unique owner). Used by the anchor COW first-branch merge which
-// stores a source's bitvector directly into a destination: the source is now
-// aliased, so any later mutation of it (or the destination) must detach. Without
-// this, CanMutateInPlace would wrongly report unique ownership for an aliased
-// vector and an in-place Or could corrupt the shared source.
-func (b *BitVector) ShareWords() {
-	if b != nil {
-		b.shared.Store(true)
-	}
-}
-
-// CanMutateInPlace reports whether b is the sole owner of its words slice
-// (not aliased by any other vector via Clone/COW). A shared vector must detach
-// (copy) before mutation; a unique owner may Or/Set in place with zero alloc.
-func (b *BitVector) CanMutateInPlace() bool {
-	if b == nil {
-		return true
-	}
-	return !b.shared.Load()
-}
-
 func (b *BitVector) Has(index int) bool {
 	if b == nil || index < 0 {
 		return false
