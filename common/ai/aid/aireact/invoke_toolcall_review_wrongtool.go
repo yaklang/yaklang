@@ -10,7 +10,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) _invokeToolCall_ReviewWrongTool(ctx context.Context, oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, bool, error) {
+func (r *ReAct) _invokeToolCall_ReviewWrongToolForTask(
+	ctx context.Context,
+	task aicommon.AIStatefulTask,
+	oldTool *aitool.Tool,
+	suggestionToolName string,
+	suggestionKeyword string,
+) (*aitool.Tool, bool, error) {
 	// Check context at the beginning
 	select {
 	case <-ctx.Done():
@@ -69,14 +75,14 @@ REDO:
 	}
 
 	redo = false
-	prompt, err := r.promptManager.GenerateToolReSelectPrompt(noUserInteract, oldTool, tools)
+	prompt, err := r.promptManager.GenerateToolReSelectPromptForTask(task, noUserInteract, oldTool, tools)
 	if err != nil {
 		return oldTool, true, err
 	}
 	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			action, err := aicommon.ExtractActionFromStream(
-				r.config.GetContext(),
+				ctx,
 				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
 				"require-tool", aicommon.WithActionAlias("abandon", "ask-for-clarification"))
 			if err != nil {
@@ -124,7 +130,9 @@ REDO:
 			}
 			return nil
 		},
-		aicommon.WithAIRequest_CallerLabel("toolcall-review-wrongtool"))
+		aicommon.WithAIRequest_CallerLabel("toolcall-review-wrongtool"),
+		aicommon.WithAIRequest_Context(ctx),
+	)
 	if transErr != nil {
 		return oldTool, true, transErr
 	}

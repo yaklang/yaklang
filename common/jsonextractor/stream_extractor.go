@@ -492,13 +492,13 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 	pushStateWithIdx := func(i string, idx int) {
 		//log.Infof("push state: %v, with index: %v", i, index)
 		if i == state_jsonObj {
-			bufManager.PushContainer()
+			bufManager.PushContainer(false)
 			objectDepth++
 			if _, existed := objectDepthIndexTable[objectDepth]; !existed {
 				objectDepthIndexTable[objectDepth] = index
 			}
 		} else if i == state_jsonArray {
-			bufManager.PushContainer()
+			bufManager.PushContainer(true)
 		}
 		stack.Push(&state{
 			value: i,

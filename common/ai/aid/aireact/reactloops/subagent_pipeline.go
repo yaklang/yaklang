@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/schema"
-	"encoding/json"
 	"sort"
 )
 
@@ -136,12 +136,12 @@ func prepareSubAgents(
 		}
 
 		prepared = append(prepared, &PreparedSubAgent{
-			Job:      job,
-			Invoker:  invoker,
-			Task:     task,
-			Timeline: handle,
-			Handle:   progHandle,
-			Release:  release,
+			Job:       job,
+			Invoker:   invoker,
+			Task:      task,
+			Timeline:  handle,
+			Handle:    progHandle,
+			Release:   release,
 			StartedAt: startedAt,
 		})
 	}
@@ -695,7 +695,11 @@ func countToolCallsFromActionRecords(records []*ActionRecord) int {
 		case schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
 			schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 			schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE:
-			count++
+			if record.ToolCallCount > 0 {
+				count += record.ToolCallCount
+			} else {
+				count++
+			}
 		}
 	}
 	return count
@@ -856,7 +860,6 @@ func DefaultSubAgentLoopOptions() []ReActLoopOption {
 }
 
 // normalizeSubAgentConcurrency 将并发数归一化到合法范围。原
-// 
 func normalizeSubAgentConcurrency(concurrency, jobCount int) int {
 	if concurrency <= 0 {
 		concurrency = defaultSubAgentConcurrency
@@ -876,7 +879,6 @@ func normalizeSubAgentConcurrency(concurrency, jobCount int) int {
 // ─────────────────────────────────────────────────────────────────────
 // 兼容别名（迁移期间临时保留，旧入口删除后一并移除）
 // ─────────────────────────────────────────────────────────────────────
-
 
 // ensureSubAgentProgressRegistry 返回父 loop 已有的 ProgressRegistry，若未设置
 // 则创建并安装一个。使 stall heartbeat / verification watchdog 能观察子 Agent 活动。
@@ -914,11 +916,10 @@ type SubAgentJob struct {
 	// LoopName 是已注册的 ReAct loop factory 名称。为空时在 dispatch / nested
 	// 路径中默认取 schema.AI_REACT_LOOP_NAME_DEFAULT。
 	LoopName string `json:"loop_name"`
-
 }
 
 // SubAgentResult 是子 Agent 运行的统一结果。它内嵌 SubAgentJob，使身份字段
-//（Order / Identifier / ...）自动提升，且非泛型的 runJobsConcurrently 可以
+// （Order / Identifier / ...）自动提升，且非泛型的 runJobsConcurrently 可以
 // 把同一个切片既当作 job 载体又当作结果。结果字段的并集（SubLoop / SubTask /
 // Record / Feedback / ...）覆盖了原先所有结果类型；未使用的字段保持零值即可。
 type SubAgentResult struct {
@@ -941,7 +942,6 @@ type SubAgentResult struct {
 	// Feedback 是简短的人类可读摘要（dispatch 路径）。
 	Feedback string
 }
-
 
 // ForkInvokerCallback 在 fork 出的子 invoker 上执行任意逻辑，但不启动 ReAct
 // loop。timeline 噪音留在分支上；父 timeline 不会被截断。

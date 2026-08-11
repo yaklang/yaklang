@@ -13,12 +13,16 @@ type bufStackKv struct {
 }
 
 type bufStack struct {
-	isRoot       bool
-	key          any
-	parent       *bufStack
-	kv           func(key any, val any)
-	currentStack *vmstack.Stack
-	recorders    []*bufStackKv
+	isRoot bool
+	// containerKindKnown is set by the streaming state machine. Older direct
+	// bufStack tests/callers can omit the kind and retain the legacy generic map.
+	containerKindKnown bool
+	isArray            bool
+	key                any
+	parent             *bufStack
+	kv                 func(key any, val any)
+	currentStack       *vmstack.Stack
+	recorders          []*bufStackKv
 	// 字段流上下文，绑定到当前栈层级
 	fieldStreamContexts []*fieldStreamContext
 }
@@ -148,7 +152,7 @@ func (m *bufStackManager) PushValue(v string) {
 	m.base.PushValue(v)
 }
 
-func (m *bufStackManager) PushContainer() {
+func (m *bufStackManager) PushContainer(arrayKind ...bool) {
 	var keyRaw any
 	if ret := m.base.currentStack.Peek(); ret != nil {
 		keyRaw = ret
@@ -163,6 +167,10 @@ func (m *bufStackManager) PushContainer() {
 		// 继承父栈的字段写入器
 		fieldStreamContexts: m.base.fieldStreamContexts,
 	}
+	if len(arrayKind) > 0 {
+		sub.containerKindKnown = true
+		sub.isArray = arrayKind[0]
+	}
 	m.base = sub
 	m.stack.Push(sub)
 }
@@ -172,9 +180,30 @@ func (m *bufStackManager) PopContainer() {
 	if sub != nil {
 		if subSubStack, ok := sub.(*bufStack); ok {
 			m.base = subSubStack.parent
-			result := make(map[any]any)
-			for _, v := range subSubStack.recorders {
-				result[v.key] = v.val
+			var result any
+			switch {
+			case subSubStack.containerKindKnown && subSubStack.isArray:
+				values := make(map[int]any, len(subSubStack.recorders))
+				for _, v := range subSubStack.recorders {
+					if index, ok := v.key.(int); ok {
+						values[index] = v.val
+					}
+				}
+				result = values
+			case subSubStack.containerKindKnown:
+				values := make(map[string]any, len(subSubStack.recorders))
+				for _, v := range subSubStack.recorders {
+					if key, ok := v.key.(string); ok {
+						values[key] = v.val
+					}
+				}
+				result = values
+			default:
+				values := make(map[any]any, len(subSubStack.recorders))
+				for _, v := range subSubStack.recorders {
+					values[v.key] = v.val
+				}
+				result = values
 			}
 			m.base.emit(subSubStack.key, result)
 			m.base.recorders = append(m.base.recorders, &bufStackKv{

@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -90,9 +89,8 @@ func (t *ToolCaller) review(
 			userInput.GetString("suggestion_tool_keyword"),
 		)
 		if err != nil {
-			userCancelHandler(fmt.Sprintf("tool directly answer for review-wrong-tool failed: %v", err))
 			e.EmitError("error handling tool review: %v", err)
-			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+			return targetTool, param, nil, HandleToolUseNext_Default, err
 		}
 		if directlyAnswer {
 			userCancelHandler("tool directly answer (user 's choice)")
@@ -110,8 +108,7 @@ func (t *ToolCaller) review(
 		}
 		if err != nil {
 			e.EmitError("error handling tool review: %v", err)
-			userCancelHandler("tool directly answer(recursive call tool failed)")
-			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+			return targetTool, param, nil, HandleToolUseNext_Default, err
 		}
 		return targetTool, param, result, HandleToolUseNext_Override, nil
 	case "wrong_params":
@@ -130,8 +127,7 @@ func (t *ToolCaller) review(
 		newParam, err := t.reviewWrongParamHandler(t.ctx, targetTool, param, userInput.GetString("extra_prompt"))
 		if err != nil {
 			e.EmitError("error handling tool review: %v", err)
-			userCancelHandler("tool directly answer (err in review-wrong-params)")
-			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+			return targetTool, param, nil, HandleToolUseNext_Default, err
 		}
 
 		// Review 改了参数, 原始 reason 与新参数不符; 重置 reason 状态, 让递归的
@@ -140,8 +136,7 @@ func (t *ToolCaller) review(
 		result, directlyAnswer, err := t.CallToolWithExistedParams(targetTool, true, newParam)
 		if err != nil {
 			e.EmitError("error handling tool review: %v", err)
-			userCancelHandler("tool directly answer (err in call tool with new params)")
-			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+			return targetTool, param, nil, HandleToolUseNext_Default, err
 		}
 		if directlyAnswer {
 			userCancelHandler("tool directly answer (after param re-generation)")

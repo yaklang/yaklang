@@ -12,18 +12,31 @@ import (
 
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description: "申请工具调用，执行这个 @action 会进入工具申请流程，查看工具教程以及文档，来生成参数。仅当目标工具不在 CACHE_TOOL_CALL 最近缓存中时使用；如果缓存里已经有该工具，优先 directly_call_tool。",
+	Description: "申请工具调用，执行这个 @action 会进入工具申请流程，查看工具教程以及文档，来生成参数。仅当目标工具不在 CACHE_TOOL_CALL 最近缓存中时使用；如果缓存里已经有该工具，优先 directly_call_tool。单个工具使用 tool_require_payload；2-8 个彼此独立的工具使用 tool_require_calls，运行时会分别生成参数并并发执行。严禁同时使用两种形式。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",
-			aitool.WithParam_Description(`MUST set in {"@action": "require_tool", ... }. 根据上下文信息，提供你想要申请的工具名，只说明工具名即可，严禁包含参数.`),
+			aitool.WithParam_Description("仅在 require_tool 的单调用形式中必填；存在 tool_require_calls 时必须省略。根据上下文信息，提供一个想要申请的工具名，严禁包含参数。只申请一个工具时使用下面这个经过 CI 校验且可执行的标量格式：\n"+requireToolScalarOutputExampleJSON),
 		),
 		aitool.WithStringParam(
 			"tool_call_reason",
 			aitool.WithParam_Description(`Optional. A terse phrase (under 15 words) stating WHAT this tool call does — e.g. 'grep /api路径寻找注入点' or 'replay login with SQLi in username'. No prior-step summaries or transitions. Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
 		),
+		requireToolBatchSchemaOption(),
 	},
+	OutputExamples: requireToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+		loop.Delete(loopVarRequireToolBatch)
+		batch, hasBatch, batchErr := parseRequireToolBatchAction(loop, action)
+		if batchErr != nil {
+			return batchErr
+		}
+		if hasBatch {
+			loop.Set(loopVarRequireToolBatch, batch)
+			loop.Delete("tool_require_payload")
+			return nil
+		}
+
 		payload := action.GetString("tool_require_payload")
 		if payload == "" {
 			payload = action.GetInvokeParams("next_action").GetString("tool_require_payload")
@@ -36,6 +49,9 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+		if executeVerifiedToolBatch(loop, loopVarRequireToolBatch, operator) {
+			return
+		}
 		toolPayload := loop.Get("tool_require_payload")
 		if toolPayload == "" {
 			operator.Feedback(utils.Error("tool_require_payload is required for ActionRequireTool but empty"))

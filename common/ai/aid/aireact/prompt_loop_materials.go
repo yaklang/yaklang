@@ -70,6 +70,21 @@ func (r *ReAct) AssemblePromptPrefix(materials *aicommon.PromptMaterials) (*reac
 }
 
 func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce string) (*reactloops.LoopPromptBaseMaterials, error) {
+	var loop *reactloops.ReActLoop
+	if pm != nil && pm.react != nil {
+		loop = pm.react.GetCurrentLoop()
+	}
+	return pm.GetLoopPromptBaseMaterialsForLoop(tools, nonce, loop)
+}
+
+// GetLoopPromptBaseMaterialsForLoop builds prefix capability/tool materials
+// from an explicitly captured loop. Concurrent sub-role prompts use this path
+// so a different task becoming current cannot change their policy or inventory.
+func (pm *PromptManager) GetLoopPromptBaseMaterialsForLoop(
+	tools []*aitool.Tool,
+	nonce string,
+	loop *reactloops.ReActLoop,
+) (*reactloops.LoopPromptBaseMaterials, error) {
 	if pm == nil || pm.react == nil || pm.react.config == nil {
 		return nil, fmt.Errorf("prompt manager is not initialized")
 	}
@@ -108,14 +123,14 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 
 	tools = aicommon.ResolvePromptCandidateTools(pm.react.config, tools)
 
-	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
-		if getter := currentLoop.AllowPlanAndExec(); getter != nil {
+	if loop != nil {
+		if getter := loop.AllowPlanAndExec(); getter != nil {
 			allowPlanAndExec = allowPlanAndExec && getter()
 		}
-		if getter := currentLoop.AllowToolCall(); getter != nil {
+		if getter := loop.AllowToolCall(); getter != nil {
 			allowToolCall = getter()
 		}
-		if actions := currentLoop.Actions(); actions != nil {
+		if actions := loop.Actions(); actions != nil {
 			_, hasLoadCapability = actions.Get("load_capability")
 		}
 	}
@@ -130,8 +145,8 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 	}
 
 	var scenarioWL []string
-	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
-		scenarioWL = currentLoop.GetScenarioToolWhitelist()
+	if loop != nil {
+		scenarioWL = loop.GetScenarioToolWhitelist()
 	}
 	selection := aicommon.ResolvePromptToolInventory(pm.react.config, tools, scenarioWL, allowToolCall)
 	if len(selection.VisibleTools) == 0 {
@@ -1104,14 +1119,16 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 		"# Tool Inventory",
 		fmt.Sprintf("You have access to %d built-in tools. Below are %d prioritized entries selected within a token budget:", materials.ToolsCount, materials.TopToolsCount),
 		"",
-		"## Call Mode (single tool vs tool_compose)",
+		"## Call Mode (single, parallel batch, or tool_compose)",
 		"",
 		"- 单工具入口: 一次提一个工具 + 参数, 返回后再决策下一步; 探索 / 上游不确定 / 需要逐步收紧时的默认形态.",
-		"- 工具编排入口 (tool_compose): 一次提交 >=2 节点的 DAG, 节点间显式串行依赖或天然并行, 由 caller 拓扑跑完后再观察整体结果.",
+		"- 独立并发批次: 一次 action 提交 2-8 个真实工具调用. 已有完整参数时使用 `directly_call_tool_calls`; 仍需分别生成参数时使用 `tool_require_calls`. 全部子调用结束后才进入下一轮.",
+		"- 工具编排入口 (tool_compose): 只用于存在明确上游产物依赖的意图 DAG. 它的节点不承载模型直接给出的最终工具参数, 不能替代上述并发调用数组.",
 		"- 选择原则 (与 high-static 段实验准则保持一致):",
 		"  - 默认单步. 凡是\"调一步看一眼再定下一步\"的链路一律走单工具, 不要把猜测拼成 DAG.",
-		"  - 节点 <2 / 节点之间无依赖且互相独立 / 任务目标尚不明确 / 不可逆动作 -> 走单工具.",
-		"  - 已经知道要调哪些工具 + 上游产物喂下游 (硬数据依赖) 或同质多目标 (多 URL / 多文件 / 多参数并行) -> 走 tool_compose, 单次 DAG <=5 节点, 超出拆多轮.",
+		"  - 2-8 个无依赖、互不干扰且本轮即可确定的调用 -> 走独立并发批次; 有先后依赖的调用严禁放入同一批.",
+		"  - 上游产物必须喂给下游 (硬数据依赖) -> 才走 tool_compose, 单次 DAG <=5 节点, 超出拆多轮.",
+		"  - 任务目标尚不明确 / 不可逆动作 / 只有一个调用 -> 走单工具.",
 		"  - DAG 限定在当前 CURRENT-TASK 内, 不跨子任务串接; 探索阶段一律单步, 仅 EXEC 阶段才合法.",
 		"",
 		"## Prioritized Tools",

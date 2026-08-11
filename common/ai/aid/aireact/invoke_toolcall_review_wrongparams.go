@@ -9,7 +9,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aitool.Tool, old aitool.InvokeParams, extraPrompt string) (aitool.InvokeParams, error) {
+// _invokeToolCall_ReviewWrongParamForTask regenerates parameters against the
+// task that owns this tool call. Batch callers must pass their child/batch task
+// explicitly: consulting ReAct.currentTask here would allow another concurrent
+// call to silently change the user query used by this review.
+func (r *ReAct) _invokeToolCall_ReviewWrongParamForTask(
+	ctx context.Context,
+	task aicommon.AIStatefulTask,
+	tool *aitool.Tool,
+	old aitool.InvokeParams,
+	extraPrompt string,
+) (aitool.InvokeParams, error) {
 	// Check context at the beginning
 	select {
 	case <-ctx.Done():
@@ -17,7 +27,10 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 	default:
 	}
 
-	input := r.GetCurrentTask().GetUserInput()
+	input := ""
+	if task != nil {
+		input = task.GetUserInput()
+	}
 	if extraPrompt != "" {
 		input = input + "\n\n Extra:\n\n" + extraPrompt
 	}
@@ -47,7 +60,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 			}
 
 			action, err := aicommon.ExtractValidActionFromStream(
-				r.config.GetContext(),
+				ctx,
 				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
 				"call-tool",
 				actionOpts...,
@@ -93,6 +106,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 			}
 		},
 		aicommon.WithAIRequest_CallerLabel("toolcall-review-wrongparams"),
+		aicommon.WithAIRequest_Context(ctx),
 	)
 	if transErr != nil {
 		return nil, transErr

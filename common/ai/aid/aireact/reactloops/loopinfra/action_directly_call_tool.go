@@ -307,20 +307,20 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-	Description: "directly call a recently used tool (skip require & param-generation phases). " +
-		"Use this ONLY when the exact tool you need is already listed in the CACHE_TOOL_CALL block. " +
-		"If CACHE_TOOL_CALL is empty or does not contain a matching tool, choose require_tool instead; " +
-		"selecting directly_call_tool without a cached match will be rejected by the verifier and force a retry. " +
-		"Provide directly_call_tool_name AND directly_call_tool_params together.",
+	Description: "directly call an enabled tool with complete parameters (skip require & param-generation phases). " +
+		"Prefer tools listed in CACHE_TOOL_CALL because their Params Schema is visible. " +
+		"If no matching cached schema is available or any parameter is uncertain, choose require_tool instead. " +
+		"The runtime can resolve an enabled non-cached tool and emits a warning rather than rejecting solely on cache miss. " +
+		"For one call provide directly_call_tool_name AND directly_call_tool_params together. " +
+		"For 2-8 mutually independent calls use directly_call_tool_calls instead; never combine scalar and batch forms.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"directly_call_tool_name",
-			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". The name of the tool to call. Must be one of the cached recently-used tools.`),
+			aitool.WithParam_Description("Required only for the single-call form of directly_call_tool; omit it when directly_call_tool_calls is present. The name of one enabled tool. Prefer a cached recently-used tool whose Params Schema is visible; a non-cached enabled tool can still be resolved but produces a warning. For exactly one call, use the scalar form shown in this CI-validated executable example:\n"+directlyCallToolScalarOutputExampleJSON),
 		),
-		aitool.WithStringParam(
-			"directly_call_tool_params",
-			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". A JSON object containing the tool invocation parameters. Refer to the cached tool's Params Schema in the CACHE_TOOL_CALL block for the correct structure.`),
-		),
+		aitool.WithRawParam("directly_call_tool_params", map[string]any{
+			"type": []string{"object", "string"},
+		}, aitool.WithParam_Description(`Required only for the single-call form of directly_call_tool; omit it when directly_call_tool_calls is present. Prefer a JSON object containing the one tool invocation's parameters. A JSON-encoded object string remains accepted for legacy compatibility. Refer to the cached tool's Params Schema in the CACHE_TOOL_CALL block for the correct structure.`)),
 		aitool.WithStringParam(
 			"directly_call_identifier",
 			aitool.WithParam_Description(`short snake_case label describing the PURPOSE of this tool call, e.g. "scan_port_443", "query_large_file". Used for report file naming.`),
@@ -333,8 +333,21 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			"directly_call_reason",
 			aitool.WithParam_Description(`Optional. A terse phrase (under 15 words) stating WHAT this tool call does — e.g. 'test id param for IDOR on /api/user' or '用union注入探测字段数'. No prior-step summaries or transitions. Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
 		),
+		directlyCallToolBatchSchemaOption(),
 	},
+	OutputExamples: directlyCallToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+		loop.Delete(loopVarDirectToolBatch)
+		batch, hasBatch, batchErr := parseDirectToolBatchAction(loop, action)
+		if batchErr != nil {
+			return batchErr
+		}
+		if hasBatch {
+			loop.Set(loopVarDirectToolBatch, batch)
+			loop.Delete("directly_call_tool_name")
+			return nil
+		}
+
 		toolName := action.GetString("directly_call_tool_name")
 		if toolName == "" {
 			toolName = action.GetInvokeParams("next_action").GetString("directly_call_tool_name")
@@ -368,6 +381,9 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+		if executeVerifiedToolBatch(loop, loopVarDirectToolBatch, operator) {
+			return
+		}
 		invoker := loop.GetInvoker()
 		cacheSuccessfulTool := func(name string, result *aitool.ToolResult, callErr error) {
 			if callErr != nil || result == nil || !result.Success {

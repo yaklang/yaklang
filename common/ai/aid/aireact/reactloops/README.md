@@ -96,6 +96,11 @@ flowchart TD
 | [docs/12-debugging-and-observability.md](docs/12-debugging-and-observability.md) | `YAKIT_AI_WORKSPACE_DEBUG`、调试产物、prompt observation、timeline、测试基建 |
 | [docs/13-yak-focus-mode.md](docs/13-yak-focus-mode.md) | **进阶**：用 Yak 脚本（`*.ai-focus.yak`）写专注模式 + sidekick 自动加载 + `yak ai-focus` CLI + 三种调试模式 + `~/yakit-projects/ai-focus/` 用户扩展目录 |
 | [docs/14-streaming-ux.md](docs/14-streaming-ux.md) | **UX 实战**：让用户感知到「专注模式在思考、在生成」 —— yak / Go 双侧 emitter 用法、`stream_fields` / `__AI_TAG_FIELDS__` 精确字段、ContentType / NodeId 命名规范、终局三连、八条踩坑总结 |
+| [docs/15-perception-frequency-experiment.md](docs/15-perception-frequency-experiment.md) | Perception 触发频率的仿真实验、成本与效果分析 |
+| [docs/16-verification-frequency-experiment.md](docs/16-verification-frequency-experiment.md) | Verification 触发频率的仿真实验、节流策略分析 |
+| [docs/17-stream-helpers-guide.md](docs/17-stream-helpers-guide.md) | Go 专注模式的 Stream Helpers 使用与中间材料输出指导 |
+| [docs/18-focus-output-migration-guide.md](docs/18-focus-output-migration-guide.md) | 专注模式输出行为改造规范：克制、结构化、可追踪 |
+| [docs/19-parallel-tool-call-actions.md](docs/19-parallel-tool-call-actions.md) | **工具并发实战**：`directly_call_tool` / `require_tool` 对象数组协议、业务语义、调度、审批、恢复、Prompt 与 CI 全解 |
 
 ## 最小上手样板
 
@@ -191,6 +196,7 @@ import (
 | 想让长链路克制地校正当前路径 | [08-determinism-mechanisms.md](docs/08-determinism-mechanisms.md) CURRENT TODO 软检查点 |
 | 想让 UI 实时显示思考过程 | [06-emitter-and-streaming.md](docs/06-emitter-and-streaming.md) |
 | 想让用户感知到「在写、在流、马上好了」 | [14-streaming-ux.md](docs/14-streaming-ux.md) |
+| 想在一轮中安全并发多个独立真实工具 | [19-parallel-tool-call-actions.md](docs/19-parallel-tool-call-actions.md) |
 | 想从零写一个新专注模式 | [10-build-your-own-loop.md](docs/10-build-your-own-loop.md) |
 | 想知道某个具体 loop 怎么实现的 | [11-case-studies.md](docs/11-case-studies.md) |
 | 出问题想调试 | [12-debugging-and-observability.md](docs/12-debugging-and-observability.md) |

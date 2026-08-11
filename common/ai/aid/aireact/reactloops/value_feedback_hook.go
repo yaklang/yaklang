@@ -60,7 +60,7 @@ func (r *ReActLoop) iterationExecutedTool(iteration int) bool {
 		if a == nil {
 			continue
 		}
-		if a.IterationIndex == iteration && a.ToolName != "" {
+		if a.IterationIndex == iteration && (a.ToolName != "" || a.ToolCallCount > 0) {
 			return true
 		}
 	}
@@ -114,12 +114,7 @@ func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon
 		if a == nil {
 			continue
 		}
-		record.Actions = append(record.Actions, aicommon.ValueFeedbackAction{
-			ActionType:     a.ActionType,
-			ActionName:     a.ActionName,
-			ToolName:       a.ToolName,
-			IterationIndex: a.IterationIndex,
-		})
+		record.Actions = append(record.Actions, valueFeedbackActionFromRecord(a))
 	}
 	record.WhatHappenedSummary = summarizeValueFeedbackActions(actions)
 
@@ -137,6 +132,20 @@ func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon
 	}
 
 	aicommon.SubmitValueFeedback(cfg, record)
+}
+
+func valueFeedbackActionFromRecord(action *ActionRecord) aicommon.ValueFeedbackAction {
+	if action == nil {
+		return aicommon.ValueFeedbackAction{}
+	}
+	return aicommon.ValueFeedbackAction{
+		ActionType:     action.ActionType,
+		ActionName:     action.ActionName,
+		ToolName:       action.ToolName,
+		ToolNames:      append([]string(nil), action.ToolNames...),
+		ToolCallCount:  action.ToolCallCount,
+		IterationIndex: action.IterationIndex,
+	}
 }
 
 // SubmitRiskFeedback 在 AI 报出漏洞 (risk) 之后提交一条 risk_feedback 价值评估记录,
@@ -205,7 +214,9 @@ func summarizeValueFeedbackActions(actions []*ActionRecord) string {
 			continue
 		}
 		seg := a.ActionType
-		if a.ToolName != "" {
+		if len(a.ToolNames) > 0 {
+			seg = fmt.Sprintf("%s(%s)", a.ActionType, strings.Join(a.ToolNames, ","))
+		} else if a.ToolName != "" {
 			seg = fmt.Sprintf("%s(%s)", a.ActionType, a.ToolName)
 		}
 		parts = append(parts, seg)

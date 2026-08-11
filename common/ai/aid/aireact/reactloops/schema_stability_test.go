@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 
@@ -155,6 +156,45 @@ func TestGenerateSchema_StableAcrossMultipleAdds(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, schema0, schemaN,
 		"adding multiple recent tools must not perturb schema bytes (P2.1 invariant)")
+}
+
+func TestGenerateSchema_ToolBatchMaxItemsMatchesRuntimeConfig(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithToolBatchMaxCalls(3))
+	loop := makeSchemaStabilityTestLoop(cfg)
+
+	direct, ok := loop.actions.Get(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	require.True(t, ok)
+	direct.Options = append(direct.Options, aitool.WithStructArrayParam(
+		"directly_call_tool_calls",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Raw("minItems", 2),
+			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
+		},
+		nil,
+		aitool.WithStringParam("tool_name"),
+	))
+	requireAction, ok := loop.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+	require.True(t, ok)
+	requireAction.Options = append(requireAction.Options, aitool.WithStructArrayParam(
+		"tool_require_calls",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Raw("minItems", 2),
+			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
+		},
+		nil,
+		aitool.WithStringParam("tool_name"),
+	))
+
+	raw, err := loop.generateSchemaString(false)
+	require.NoError(t, err)
+	var root map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &root))
+	properties := root["properties"].(map[string]any)
+	for _, field := range []string{"directly_call_tool_calls", "tool_require_calls"} {
+		property := properties[field].(map[string]any)
+		require.EqualValues(t, 3, property["maxItems"], field)
+		require.EqualValues(t, 2, property["minItems"], field)
+	}
 }
 
 // configWithNilToolManager wraps an AICallerConfigIf and forces GetAiToolManager

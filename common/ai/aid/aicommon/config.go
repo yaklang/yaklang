@@ -187,7 +187,7 @@ type Config struct {
 	EventHandler           func(e *schema.AiOutputEvent)
 	DisableOutputEventType []string
 	SaveEvent              bool
-	LegionResultRuntime   LegionResultRuntime
+	LegionResultRuntime    LegionResultRuntime
 
 	// asyncGuardian process special output event
 	Guardian *AsyncGuardian
@@ -4061,6 +4061,17 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.ToolComposeConcurrency > 0 {
 		opts = append(opts, WithToolComposeConcurrency(i.ToolComposeConcurrency))
+	}
+	if i.KeyValueConfig != nil {
+		if i.HaveConfig(ConfigKeyToolBatchMaxCalls) {
+			opts = append(opts, WithToolBatchMaxCalls(i.GetConfigInt(ConfigKeyToolBatchMaxCalls, DefaultToolBatchMaxCalls)))
+		}
+		if i.HaveConfig(ConfigKeyToolBatchParamConcurrency) {
+			opts = append(opts, WithToolBatchParamConcurrency(i.GetConfigInt(ConfigKeyToolBatchParamConcurrency, DefaultToolBatchParamConcurrency)))
+		}
+		if i.HaveConfig(ConfigKeyToolBatchInvokeConcurrency) {
+			opts = append(opts, WithToolBatchInvokeConcurrency(i.GetConfigInt(ConfigKeyToolBatchInvokeConcurrency, DefaultToolBatchInvokeConcurrency)))
+		}
 	}
 	if i.PlanExecTaskConcurrency > 0 {
 		opts = append(opts, WithPlanExecTaskConcurrency(i.PlanExecTaskConcurrency))
