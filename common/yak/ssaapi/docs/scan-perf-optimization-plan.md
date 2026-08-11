@@ -172,6 +172,23 @@
 
 ---
 
+## 实测验证（A1/A2/B/C/D/F 累计，2026-08-12）
+
+DB-only hadoop 扫描（`build/stepE-hadoop/`，复用 run19 ssa.db）：
+
+| 指标 | run19 scan2（基线） | 优化后 | 变化 |
+|---|---:|---:|---:|
+| Risk | 8764 | 8764 | **不变（无语义回归）** |
+| 扫描墙钟 | ~11m21s | ~8m50s | ~-22% |
+| 检测Java 日志伪造攻击 | 680.3s（bail） | 500.0s（bail） | -26% |
+
+A/B 小项目（fortify-vs/jeepay 聚合支付）：Risk 数量、ruleId、locations 全部一致
+（仅 SSARisk Hash 因 DB 路径不同而变，属已知编译非确定性）。
+
+结论：A1/A2/B/C/D/F 已显著降分配/降墙钟且不丢 Risk。步骤 3（A3）为候选（A1+A2 已
+有可观收益，未达启动阈值）；步骤 7（E）规则剪枝仍需针对 bail 慢规则做 Risk 命中率
+对比，尚未实施。
+
 ## Todo 清单
 
 - [x] **步骤 1** A1：`Value` sync.Pool 回收（目标：`unsafe_New` flat 1.65GB → 大幅下降）
