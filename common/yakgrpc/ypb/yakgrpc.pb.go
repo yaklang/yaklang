@@ -11292,8 +11292,11 @@ type AIExecutionStrategy struct {
 	EnableGoalMode bool `protobuf:"varint,2,opt,name=EnableGoalMode,proto3" json:"EnableGoalMode,omitempty"`
 	// Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
 	GoalMinIterations int64 `protobuf:"varint,3,opt,name=GoalMinIterations,proto3" json:"GoalMinIterations,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Multi 模式下单次 dispatch 允许的子 Agent 数量（当前会话取值）。
+	// <=0 时由服务端使用默认值 3；超过 AbsoluteMaxSubAgents(20) 时由服务端钳制。
+	MaxSubAgents  int64 `protobuf:"varint,4,opt,name=MaxSubAgents,proto3" json:"MaxSubAgents,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AIExecutionStrategy) Reset() {
@@ -11343,6 +11346,13 @@ func (x *AIExecutionStrategy) GetEnableGoalMode() bool {
 func (x *AIExecutionStrategy) GetGoalMinIterations() int64 {
 	if x != nil {
 		return x.GoalMinIterations
+	}
+	return 0
+}
+
+func (x *AIExecutionStrategy) GetMaxSubAgents() int64 {
+	if x != nil {
+		return x.MaxSubAgents
 	}
 	return 0
 }
@@ -75732,11 +75742,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x17PlanExecTaskConcurrency\x18- \x01(\x03R\x17PlanExecTaskConcurrency\x12\x16\n" +
 	"\x06Attach\x18. \x01(\bR\x06Attach\x12.\n" +
 	"\x12EnableDetachedPlan\x18/ \x01(\bR\x12EnableDetachedPlan\x124\n" +
-	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\"\x97\x01\n" +
+	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\"\xbb\x01\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +
 	"\x0eEnableGoalMode\x18\x02 \x01(\bR\x0eEnableGoalMode\x12,\n" +
-	"\x11GoalMinIterations\x18\x03 \x01(\x03R\x11GoalMinIterations\"\x9e\x01\n" +
+	"\x11GoalMinIterations\x18\x03 \x01(\x03R\x11GoalMinIterations\x12\"\n" +
+	"\fMaxSubAgents\x18\x04 \x01(\x03R\fMaxSubAgents\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +
