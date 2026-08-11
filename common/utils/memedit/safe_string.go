@@ -20,6 +20,9 @@ type SafeString struct {
 	runeLen    atomic.Int64           // -1=未计算
 	runes      atomic.Pointer[[]rune] // 非 ASCII 时惰性物化的 rune 切片
 	runesOnce  sync.Once
+
+	strOnce  sync.Once
+	strCache atomic.Pointer[string] // String() 的惰性缓存，消除每次 string(s.bytes) 的拷贝
 }
 
 func NewSafeString(i any) *SafeString {
@@ -201,7 +204,24 @@ func (s *SafeString) Bytes() []byte {
 	return s.bytes
 }
 
+// String returns the string content, memoized so repeated calls don't re-copy
+// the bytes (SafeString.String was a top allocator on large scans — ~23GB in
+// the hadoop window). The cache is lazily built once and safely shared across
+// goroutines via atomic.Pointer.
 func (s *SafeString) String() string {
+	if s == nil {
+		return ""
+	}
+	if cached := s.strCache.Load(); cached != nil {
+		return *cached
+	}
+	s.strOnce.Do(func() {
+		str := string(s.bytes)
+		s.strCache.Store(&str)
+	})
+	if cached := s.strCache.Load(); cached != nil {
+		return *cached
+	}
 	return string(s.bytes)
 }
 

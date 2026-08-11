@@ -181,7 +181,7 @@
 - [x] **步骤 5** C：`BitVector` COW（目标：Clone 32.3GB + Or 9.2GB → 下降）
 - [x] **步骤 6** D：GORM 读路径瘦身（目标：~45GB → 显著下降）
 - [ ] **步骤 7** E：规则剪枝（目标：扫描墙钟减半，Risk 命中率可解释）
-- [ ] **步骤 8** F：小项（SafeString / GetResident 锁 / 日志降噪）
+- [x] **步骤 8** F：小项（SafeString String 惰性缓存已实现；GetResident 锁 / 日志降噪待评估）
 
 每个步骤完成后：
 - 独立 commit（git add 该文件 + 对应代码 + 测试）。
