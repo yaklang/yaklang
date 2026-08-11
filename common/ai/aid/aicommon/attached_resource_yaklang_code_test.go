@@ -203,53 +203,24 @@ func TestIsYaklangScriptDeliveryPath(t *testing.T) {
 	require.False(t, IsYaklangScriptDeliveryPath(``))
 }
 
-func TestExtractMentionPathsFromUserInput(t *testing.T) {
-	want := filepath.FromSlash(`C:/Users/13766/Downloads/02_security_report.md`)
-	input := `:mention[C:\Users\13766\Downloads\02\_security\_report.md]{mentionId="` + want + `"} 根据这个报告编写yak脚本`
-	paths := ExtractMentionPathsFromUserInput(input)
-	require.Len(t, paths, 1)
-	require.Equal(t, filepath.Clean(want), paths[0])
-	require.NotContains(t, paths[0], `\_`)
-}
-
-func TestNormalizeUserInputMentionPaths(t *testing.T) {
-	raw := `:mention[C:\Users\13766\work\测试\CVE\camel\disclosure\02\_security\_report.md]{mentionId="C:\Users\13766\work\测试\CVE\camel\disclosure\02_security_report.md"} 参考漏洞报告`
-	want := `C:\Users\13766\work\测试\CVE\camel\disclosure\02_security_report.md`
-	got := NormalizeUserInputMentionPaths(raw)
-	require.Contains(t, got, want)
-	require.NotContains(t, got, `\_`)
-}
-
-func TestParseYaklangEditorContext_IgnoresMentionMarkdownPrefersYak(t *testing.T) {
+func TestParseYaklangEditorContext_IgnoresNonYakPrefersYak(t *testing.T) {
 	workspace := filepath.FromSlash("/tmp/project")
 	yakPath := filepath.Join(workspace, "iotdb_poc.yak")
 	mdPath := filepath.FromSlash(`/Users/me/Downloads/02_security_report.md`)
-	userInput := `:mention[` + mdPath + `]{mentionId="` + mdPath + `"} 根据这个报告编写yak脚本`
 
-	ctx := ParseYaklangEditorContextFromAttachedWithUserInput([]*AttachedResource{
+	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, mdPath),
 		NewAttachedResource(AttachedResourceTypeCode, CONTEXT_PROVIDER_KEY_FILE_PATH, yakPath),
-	}, userInput)
+	})
 	require.NotNil(t, ctx)
 	require.Equal(t, filepath.Clean(yakPath), ctx.EditorFile)
 	require.False(t, ctx.IsCreateMode())
 }
 
-func TestParseYaklangEditorContext_MentionOnlyIsCreateMode(t *testing.T) {
+func TestParseYaklangEditorContext_NonYakOnlyIsCreateMode(t *testing.T) {
 	mdPath := filepath.FromSlash(`C:\Users\13766\Downloads\02_security_report.md`)
-	userInput := `:mention[` + mdPath + `]{mentionId="` + mdPath + `"} 根据这个报告编写yak脚本`
-	ctx := ParseYaklangEditorContextFromAttachedWithUserInput([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, mdPath),
-	}, userInput)
-	// Workspace-less mention-only: may be nil or create-mode without EditorFile
-	if ctx != nil {
-		require.True(t, ctx.IsCreateMode())
-		require.False(t, ctx.HasEditorFile())
-	}
-
-	// Non-.yak file_path alone (no FreeInput) still must not become EditorFile.
-	ctx = ParseYaklangEditorContextFromAttached([]*AttachedResource{
+	ctx := ParseYaklangEditorContextFromAttached([]*AttachedResource{
 		NewAttachedResource(AttachedResourceTypeFile, CONTEXT_PROVIDER_KEY_FILE_PATH, mdPath),
 	})
 	if ctx != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -721,10 +722,11 @@ func TestDebugger_MultiFileDebug(t *testing.T) {
 	file.WriteString(includeCode)
 	defer os.Remove(file.Name())
 
+	// Windows 路径含 `\Users` 会被 lexer 当成 `\uXXXX` 转义，include 字面量统一用 /
 	code := fmt.Sprintf(`include "%s"
 
 abc()
-println("finish")`, file.Name())
+println("finish")`, filepath.ToSlash(file.Name()))
 
 	init := func(g *yakvm.Debugger) {
 		g.SetNormalBreakPoint(3)

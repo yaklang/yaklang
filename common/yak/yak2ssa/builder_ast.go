@@ -1679,9 +1679,13 @@ func (b *astbuilder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) 
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	ellipsis := stmt.Ellipsis() // if has "...",  use array pass this argument
-	ids := stmt.AllIdentifier()
-
-	for _, id := range ids {
+	// Go 风格可选类型注解仅解析兼容，SSA 只绑定参数名
+	for _, p := range stmt.AllFunctionParam() {
+		pc, ok := p.(*yak.FunctionParamContext)
+		if !ok || pc == nil || pc.Identifier() == nil {
+			continue
+		}
+		id := pc.Identifier()
 		recoverRange := b.SetRangeFromTerminalNode(id)
 		b.NewParam(id.GetText())
 		recoverRange()

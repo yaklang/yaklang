@@ -5,32 +5,20 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCheckCodeAndFormatErrors_FunctionParameterTypes(t *testing.T) {
-	// Test the specific case from the error log
 	code := `
-// 结果处理
-found := false
-bruteTask.SetResultHandler(func(result map[string]interface{}) {
+handler = func(result map[string]interface{}) {
     if result["status"] == "success" {
-        found = true
-        yakit.StatusCard("爆破成功", "找到有效凭证", "brute-success", "success")
+        println("ok")
     }
-})
+}
+_ = handler
 `
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
-
-	// Should have blocking errors
-	assert.True(t, hasBlockingErrors, "Should have blocking errors for function parameter types")
-
-	// Should contain intelligent hint about function parameter types
-	assert.Contains(t, errorMsg, "AI助手提示:", "Should contain AI assistant hint")
-	assert.Contains(t, errorMsg, "函数参数/返回类型不允许 Go 风格声明", "Should contain specific hint about parameter types")
-	assert.Contains(t, errorMsg, "func(gadgetB64 string) []byte", "Should show incorrect syntax example")
-	assert.Contains(t, errorMsg, "build = func(gadgetB64)", "Should show correct syntax example")
+	assert.False(t, hasBlockingErrors, "typed func param should parse; blocking=%v msg=%s", hasBlockingErrors, errorMsg)
 }
 
 func TestCheckCodeAndFormatErrors_VariableTypeDeclarations(t *testing.T) {
@@ -141,24 +129,6 @@ _ = count
 	assert.Empty(t, errorMsg, "Valid code should not have error messages")
 }
 
-func TestGetIntelligentErrorHint_FunctionParameterTypes(t *testing.T) {
-	code := `bruteTask.SetResultHandler(func(result map[string]interface{}) {`
-
-	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
-	require.True(t, hasBlockingErrors, "Go-style typed func param should be a blocking syntax error")
-
-	// Align with FunctionParameterTypes in compiler_error_hints.go
-	for _, hint := range []string{
-		"AI助手提示:",
-		"函数参数/返回类型不允许 Go 风格声明",
-		"func(arg) { ... }",
-		"func(gadgetB64 string) []byte {",
-		"build = func(gadgetB64) {",
-	} {
-		assert.Contains(t, errorMsg, hint, "Should contain hint: %s", hint)
-	}
-}
-
 func TestCheckCodeAndFormatErrors_EmptyCode(t *testing.T) {
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors("")
 
@@ -183,11 +153,10 @@ func test(param string) {
 		// Should contain AI hints
 		assert.Contains(t, errorMsg, "AI助手提示:", "Should contain AI assistant hints")
 
-		// May contain hints about package, import, or parameter types
+		// May contain hints about package / import / var types
 		// depending on which error is processed first
 		hasRelevantHint := strings.Contains(errorMsg, "package 声明") ||
 			strings.Contains(errorMsg, "import 语句") ||
-			strings.Contains(errorMsg, "函数参数") ||
 			strings.Contains(errorMsg, "变量声明")
 
 		assert.True(t, hasRelevantHint, "Should contain at least one relevant hint")
@@ -195,7 +164,7 @@ func test(param string) {
 }
 
 func TestCheckCodeAndFormatErrors_CodeLineBaseOffsetsDisplayedLines(t *testing.T) {
-	code := "func bad(x string) {\n}\n"
+	code := "import \"fmt\"\n"
 	baseMsg, blocking := checkCodeAndFormatErrors(code)
 	assert.True(t, blocking)
 	assert.NotEmpty(t, baseMsg)

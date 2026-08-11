@@ -109,8 +109,8 @@ func TestYaklangLoopActionFilter_LintAllowsModifyAfterResearch(t *testing.T) {
 
 func TestBuildPinnedDSLSection(t *testing.T) {
 	section := BuildPinnedDSLSection()
-	require.Contains(t, section, "func(x string)")
 	require.Contains(t, section, "poc.Post")
 	require.Contains(t, section, "append(a, b...)")
 	require.Contains(t, section, "跨行")
+	require.Contains(t, section, "[]byte{")
 }
