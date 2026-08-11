@@ -1,8 +1,11 @@
 package ssagitworkdir
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -11,6 +14,108 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+const ownerScopeLockHelperEnv = "YAK_TEST_SSA_GIT_OWNER_SCOPE_LOCK_HELPER"
+const ownerScopeActivityHelperEnv = "YAK_TEST_SSA_GIT_OWNER_SCOPE_ACTIVITY_HELPER"
+
+func TestOwnerScopeLockIsExclusiveAcrossProcesses(t *testing.T) {
+	if os.Getenv(ownerScopeLockHelperEnv) == "1" {
+		lock, err := AcquireOwnerScopeLock("node-shared")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		fmt.Println("ready")
+		_, _ = bufio.NewReader(os.Stdin).ReadByte()
+		if err := lock.Release(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(3)
+		}
+		return
+	}
+
+	root := t.TempDir()
+	command := exec.Command(os.Args[0], "-test.run=^TestOwnerScopeLockIsExclusiveAcrossProcesses$")
+	command.Env = append(os.Environ(),
+		ownerScopeLockHelperEnv+"=1",
+		WorkDirEnv+"="+root,
+		MinFreeBytesEnv+"=0",
+	)
+	stdin, err := command.StdinPipe()
+	require.NoError(t, err)
+	stdout, err := command.StdoutPipe()
+	require.NoError(t, err)
+	command.Stderr = os.Stderr
+	require.NoError(t, command.Start())
+	t.Cleanup(func() {
+		_ = stdin.Close()
+		_ = command.Wait()
+	})
+
+	scanner := bufio.NewScanner(stdout)
+	require.True(t, scanner.Scan())
+	require.Equal(t, "ready", scanner.Text())
+	t.Setenv(WorkDirEnv, root)
+
+	_, err = AcquireOwnerScopeLock("node-shared")
+	require.ErrorContains(t, err, "already active")
+
+	require.NoError(t, stdin.Close())
+	require.NoError(t, command.Wait())
+	lock, err := AcquireOwnerScopeLock("node-shared")
+	require.NoError(t, err)
+	require.NoError(t, lock.Release())
+}
+
+func TestOwnerScopeRecoveryWaitsForChildWorkspaceAcrossProcesses(t *testing.T) {
+	if os.Getenv(ownerScopeActivityHelperEnv) == "1" {
+		_, cleanup, err := Prepare(context.Background(), os.Getpid())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		fmt.Println("ready")
+		_, _ = bufio.NewReader(os.Stdin).ReadByte()
+		if err := cleanup(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(3)
+		}
+		return
+	}
+
+	root := t.TempDir()
+	command := exec.Command(os.Args[0], "-test.run=^TestOwnerScopeRecoveryWaitsForChildWorkspaceAcrossProcesses$")
+	command.Env = append(os.Environ(),
+		ownerScopeActivityHelperEnv+"=1",
+		WorkDirEnv+"="+root,
+		MinFreeBytesEnv+"=0",
+		OwnerEnv+"=node-shared-task-child",
+	)
+	stdin, err := command.StdinPipe()
+	require.NoError(t, err)
+	stdout, err := command.StdoutPipe()
+	require.NoError(t, err)
+	command.Stderr = os.Stderr
+	require.NoError(t, command.Start())
+	t.Cleanup(func() {
+		_ = stdin.Close()
+		_ = command.Wait()
+	})
+
+	scanner := bufio.NewScanner(stdout)
+	require.True(t, scanner.Scan())
+	require.Equal(t, "ready", scanner.Text())
+	t.Setenv(WorkDirEnv, root)
+
+	_, err = AcquireOwnerScopeRecoveryLock("node-shared")
+	require.ErrorContains(t, err, "already active")
+	require.NoError(t, stdin.Close())
+	require.NoError(t, command.Wait())
+
+	recoveryLock, err := AcquireOwnerScopeRecoveryLock("node-shared")
+	require.NoError(t, err)
+	require.NoError(t, recoveryLock.Release())
+}
 
 func TestPrepareUsesConfiguredRootAndIsolatesProcesses(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "custom-root")
@@ -79,6 +184,30 @@ func TestPrepareCreatesUniqueWorkspacesConcurrently(t *testing.T) {
 	for cleanup := range cleanups {
 		require.NoError(t, cleanup())
 	}
+}
+
+func TestCleanupForOwnerScopeRemovesOnlyThatScanNodeInstallation(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv(WorkDirEnv, root)
+	first, err := os.MkdirTemp(root, "yakgit-node-a-task-first-")
+	require.NoError(t, err)
+	second, err := os.MkdirTemp(root, "yakgit-node-a-task-second-")
+	require.NoError(t, err)
+	other, err := os.MkdirTemp(root, "yakgit-node-b-task-active-")
+	require.NoError(t, err)
+
+	require.NoError(t, CleanupForOwnerScope("node-a"))
+	_, err = os.Stat(first)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(second)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(other)
+	require.NoError(t, err)
+}
+
+func TestCleanupForOwnerScopeRejectsUnsafePrefix(t *testing.T) {
+	t.Setenv(WorkDirEnv, t.TempDir())
+	require.ErrorContains(t, CleanupForOwnerScope("../node"), "invalid SSA Git workspace owner")
 }
 
 func TestResolveRootDefaultsUnderYakitHome(t *testing.T) {

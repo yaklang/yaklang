@@ -1,12 +1,18 @@
 package scannode
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
 
 type ScanNode struct {
@@ -18,7 +24,11 @@ type ScanNode struct {
 	invokeLimiter     *invokeLimiter
 	maxRunningJobs    uint32
 	bridge            *legionJobBridge
+	ssaGitOwnerScope  string
+	ssaGitScopeLock   *ssagitworkdir.OwnerScopeLock
 }
+
+var scanNodeTaskDrainTimeout = 30 * time.Second
 
 func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 	agent := &ScanNode{
@@ -58,6 +68,11 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 	}
 
 	agent.node = base
+	agent.ssaGitOwnerScope, agent.ssaGitScopeLock, err = recoverSSAGitWorkspacesForInstallation(base.AgentInstallationID())
+	if err != nil {
+		base.Shutdown()
+		return nil, utils.Errorf("recover stale SSA Git workspaces for Scan Node installation: %v", err)
+	}
 	agent.capabilityManager = newCapabilityManager(CapabilityManagerConfig{
 		NodeIDProvider: base.CurrentNodeID,
 		BaseDir:        base.BaseDir(),
@@ -67,6 +82,30 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 	agent.initInvokeLimiter()
 	agent.bridge = newLegionJobBridge(agent)
 	return agent, nil
+}
+
+func ssaGitWorkspaceOwnerScope(agentInstallationID string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(agentInstallationID)))
+	return "node-" + hex.EncodeToString(sum[:16])
+}
+
+func recoverSSAGitWorkspacesForInstallation(agentInstallationID string) (string, *ssagitworkdir.OwnerScopeLock, error) {
+	ownerScope := ssaGitWorkspaceOwnerScope(agentInstallationID)
+	ownerLock, err := ssagitworkdir.AcquireOwnerScopeLock(ownerScope)
+	if err != nil {
+		return "", nil, err
+	}
+	recoveryLock, err := ssagitworkdir.AcquireOwnerScopeRecoveryLock(ownerScope)
+	if err != nil {
+		_ = ownerLock.Release()
+		return "", nil, err
+	}
+	defer recoveryLock.Release()
+	if err := ssagitworkdir.CleanupForOwnerScope(ownerScope); err != nil {
+		_ = ownerLock.Release()
+		return "", nil, err
+	}
+	return ownerScope, ownerLock, nil
 }
 
 func (s *ScanNode) Run() {
@@ -92,12 +131,32 @@ func (s *ScanNode) Shutdown() {
 	if s == nil || s.node == nil {
 		return
 	}
+	s.manager.BeginShutdown()
 	if s.capabilityManager != nil {
 		if err := s.capabilityManager.Close(); err != nil {
 			log.Errorf("shutdown capability manager failed: %v", err)
 		}
 	}
 	s.node.Shutdown()
+	s.releaseSSAGitScopeLockAfterTasks()
+}
+
+func (s *ScanNode) releaseSSAGitScopeLockAfterTasks() {
+	drainCtx, cancelDrain := context.WithTimeout(context.Background(), scanNodeTaskDrainTimeout)
+	defer cancelDrain()
+	if err := s.manager.WaitForEmpty(drainCtx); err != nil {
+		log.Errorf("wait for Scan Node tasks before releasing SSA Git workspace owner scope lock failed: %v", err)
+		go func() {
+			_ = s.manager.WaitForEmpty(context.Background())
+			if releaseErr := s.ssaGitScopeLock.Release(); releaseErr != nil {
+				log.Errorf("release SSA Git workspace owner scope lock after delayed task drain failed: %v", releaseErr)
+			}
+		}()
+		return
+	}
+	if err := s.ssaGitScopeLock.Release(); err != nil {
+		log.Errorf("release SSA Git workspace owner scope lock failed: %v", err)
+	}
 }
 
 func (s *ScanNode) Snapshot() node.RuntimeStatus {

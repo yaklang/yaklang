@@ -39,13 +39,24 @@ download while making the capacity limitation explicit.
 ## Ownership and cleanup
 
 Each clone uses `yakgit-<owner>-<random>` under the managed root. The random
-suffix isolates concurrent clones. Scan Node gives each Yak child a validated,
-unguessable ownership token through the internal
-`YAK_SSA_GIT_WORKSPACE_OWNER` variable, then reclaims only that exact prefix.
-Standalone Yak execution falls back to a process-ID owner. SSA removes its
-workspace after successful compilation and on clone or compilation failure.
-Scan Node also removes the child owner after normal exit, timeout, or
-cancellation, covering forced process termination where child defers cannot run.
+suffix isolates concurrent clones. Scan Node derives a stable, hashed owner
+scope from its installation identity and gives every Yak child a unique task
+owner through the internal `YAK_SSA_GIT_WORKSPACE_OWNER` variable. The raw
+installation identity is not written to the filesystem. Standalone Yak
+execution falls back to a process-ID owner.
+
+SSA removes its workspace after successful compilation and on clone or
+compilation failure. Scan Node also removes the child owner after normal exit,
+timeout, or cancellation, covering forced child termination where child defers
+cannot run. Scan Node keeps an exclusive node-scope lock in the managed root for
+its lifetime. Each child workspace also keeps a shared activity lock while the
+child is alive. Startup recovery must acquire the activity lock exclusively
+before removing workspaces left by the same installation scope. Therefore a
+replacement node cannot delete a clone still used by an orphan child after the
+old parent is killed; it can retry after the operating system releases the
+child's activity lock. Placing both locks beside the protected workspaces makes
+their domain independent of the node's `BaseDir` and applies the same safety on
+Unix and Windows.
 
 Operators should not place unrelated data under names beginning with
 `yakgit-<owner>-` inside the managed root.
