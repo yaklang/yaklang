@@ -8,12 +8,12 @@ import (
 	_ "github.com/yaklang/gorm/dialects/sqlite"
 )
 
-func setupBenchDB(b *testing.B) *gorm.DB {
+func setupNativeBatchBenchDB(b *testing.B) *gorm.DB {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	if err != nil {
 		b.Fatal(err)
 	}
-	if err := db.AutoMigrate(&IrCode{}, &IrType{}).Error; err != nil {
+	if err := db.AutoMigrate(&IrCode{}).Error; err != nil {
 		b.Fatal(err)
 	}
 	for i := int64(1); i <= 500; i++ {
@@ -21,33 +21,47 @@ func setupBenchDB(b *testing.B) *gorm.DB {
 		if err := db.Create(code).Error; err != nil {
 			b.Fatal(err)
 		}
-		typ := &IrType{TypeId: uint64(i), ProgramName: "bench", Kind: 1, String: "T"}
-		if err := db.Create(typ).Error; err != nil {
-			b.Fatal(err)
-		}
 	}
 	return db
 }
 
-func BenchmarkGetIrCodeItemById_Native(b *testing.B) {
-	db := setupBenchDB(b)
+// BenchmarkNativeGetIrCodesByIds measures the O2 native batch read path.
+func BenchmarkNativeGetIrCodesByIds(b *testing.B) {
+	db := setupNativeBatchBenchDB(b)
+	ids := make([]int64, 0, 200)
+	for i := int64(1); i <= 200; i++ {
+		ids = append(ids, i)
+	}
+	b.ReportAllocs()
 	b.ResetTimer()
-	var sink *IrCode
+	var sink []*IrCode
 	for i := 0; i < b.N; i++ {
-		sink = GetIrCodeItemById(db, "bench", int64(i%500)+1)
+		r, err := nativeGetIrCodesByIds(db, "bench", ids)
+		if err != nil {
+			b.Fatal(err)
+		}
+		sink = r
 	}
 	_ = sink
 }
 
-func BenchmarkGetIrCodeItemById_GORM(b *testing.B) {
-	db := setupBenchDB(b)
+// BenchmarkGormGetIrCodesByIds measures the GORM Find(&irs) batch path that
+// PreloadIrCodesByIdsFast currently uses (the O2 baseline).
+func BenchmarkGormGetIrCodesByIds(b *testing.B) {
+	db := setupNativeBatchBenchDB(b)
+	ids := make([]int64, 0, 200)
+	for i := int64(1); i <= 200; i++ {
+		ids = append(ids, i)
+	}
+	b.ReportAllocs()
 	b.ResetTimer()
-	var sink *IrCode
+	var sink []*IrCode
 	for i := 0; i < b.N; i++ {
-		id := int64(i%500) + 1
-		ir := &IrCode{}
-		db.Model(&IrCode{}).Where("code_id = ?", id).Where("program_name = ?", "bench").First(ir)
-		sink = ir
+		var irs []*IrCode
+		if err := db.Model(&IrCode{}).Where("program_name = ?", "bench").Where("code_id in (?)", ids).Find(&irs).Error; err != nil {
+			b.Fatal(err)
+		}
+		sink = irs
 	}
 	_ = sink
 }
