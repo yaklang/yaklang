@@ -204,6 +204,19 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		} else {
 			c.Processf(0, "recompile incremental project, keep base program...")
 		}
+	} else if !isIncrementalCompile && programName != "" {
+		// A non-incremental full compile of an already-existing program name
+		// must clear the program's old IR rows before re-inserting. The
+		// UNIQUE indexes on ir_codes/ir_offsets otherwise reject the
+		// re-inserted rows (e.g. recompiling the same program twice in the
+		// risk-disposal inheritance test). This mirrors the delete-then-insert
+		// contract documented in SaveIrOffsetBatch.
+		if _, err := ssadb.GetProgram(programName, ssadb.Application); err == nil {
+			c.Processf(0, "recompile project, delete old data for existing program...")
+			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
+			ProgramCache.Remove(programName)
+			c.Processf(0, "recompile project, delete old data for existing program finish")
+		}
 	}
 
 	c.Processf(0, "recompile project, start compile")
