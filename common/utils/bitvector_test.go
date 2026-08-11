@@ -138,3 +138,26 @@ func TestBitVector_COW_ConcurrentCloneSetRace(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestBitVector_CanMutateInPlace guards the O1 ownership probe: a freshly-built
+// vector is a unique owner (can Or in place, 0 alloc); a Clone() shares the
+// backing slice so it is NOT a unique owner (Or must detach).
+func TestBitVector_CanMutateInPlace(t *testing.T) {
+	// Fresh vector: unique owner, no shared backing → can mutate in place.
+	fresh := NewBitVector()
+	fresh.Set(3)
+	require.True(t, fresh.CanMutateInPlace(), "fresh vector must be a unique owner")
+
+	// Clone: the clone shares the source's backing slice → NOT unique.
+	clone := fresh.Clone()
+	require.False(t, clone.CanMutateInPlace(), "clone must not be a unique owner (shares backing)")
+	require.False(t, fresh.CanMutateInPlace(), "source is now shared after Clone, must not be unique owner")
+
+	// After a mutation, the vector detaches and becomes a unique owner again.
+	clone.Set(100)
+	require.True(t, clone.CanMutateInPlace(), "clone detached on Set, must be unique owner again")
+	require.False(t, fresh.CanMutateInPlace(), "source still shared (clone holds its old backing until detach)")
+
+	// Empty vector is trivially a unique owner.
+	require.True(t, NewBitVector().CanMutateInPlace(), "empty vector is a unique owner")
+}
