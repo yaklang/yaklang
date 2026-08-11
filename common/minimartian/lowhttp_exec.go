@@ -1,9 +1,12 @@
 package minimartian
 
 import (
+	"context"
 	"io"
+	"mime"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,6 +16,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+const sseStreamConfiguredContextKey = "minimartian-sse-stream-configured"
+
+func isServerSentEventContentType(value string) bool {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(mediaType, "text/event-stream")
+}
 
 func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, error) {
 	// Check if mock response should be used (set by mockHTTPRequest)
@@ -64,6 +77,9 @@ func parseLowHTTPResponsePacket(packet []byte) (*http.Response, error) {
 }
 
 func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, error) {
+	upstreamContext, cancelUpstream := context.WithCancel(req.Context())
+	defer cancelUpstream()
+
 	// PlainRequestBytes is the decoded representation used by the UI, history,
 	// and plugins. It must not replace the wire packet during transparent
 	// forwarding. Explicitly hijacked bytes still take precedence.
@@ -120,6 +136,7 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		lowhttp.WithGmTLSOnly(p.gmTLSOnly),
 		lowhttp.WithGmTLSPrefer(p.gmPrefer),
 		lowhttp.WithExtendReadDeadline(true),
+		lowhttp.WithContext(upstreamContext),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
 		lowhttp.WithDiscardIntermediateResponseBody(true),
@@ -213,9 +230,28 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		if bwr == nil {
 			return
 		}
+		if httpctx.GetContextBoolInfoFromRequest(req, sseStreamConfiguredContextKey) {
+			return
+		}
 
 		// filter / forward to client conn via Content-Type
 		if key == "content-type" {
+			if isServerSentEventContentType(value) {
+				httpctx.SetContextValueInfoFromRequest(req, sseStreamConfiguredContextKey, true)
+				httpctx.SetResponseHeaderCallback(req, func(_ *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+					httpctx.SetMITMSkipFrontendFeedback(req, true)
+					if _, err := bwr.Write(headerBytes); err != nil {
+						cancelUpstream()
+						return nil, err
+					}
+					utils.FlushWriter(bwr)
+					httpctx.SetResponseFinishedCallback(req, func() {
+						utils.FlushWriter(bwr)
+					})
+					return io.TeeReader(bodyReader, utils.WriterAutoFlush(bwr)), nil
+				})
+				return
+			}
 			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
 				if ret(value) {
 					// filtered by content-type
