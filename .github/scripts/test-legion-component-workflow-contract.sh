@@ -27,12 +27,15 @@ check_release_only_workflow \
 alpha_workflow="$repo_root/.github/workflows/build-legion-node-alpha.yml"
 check_release_only_workflow "$alpha_workflow" 'legion-node-alpha-*'
 
+grep -Fq 'workflow_call:' "$alpha_workflow"
 grep -Fq 'macos-15-intel' "$alpha_workflow"
 grep -Fq 'macos-15' "$alpha_workflow"
 grep -Fq 'ubuntu-22.04' "$alpha_workflow"
 grep -Fq 'ubuntu-24.04-arm' "$alpha_workflow"
 grep -Fq './cmd/legion-smoke-node' "$alpha_workflow"
-grep -Fq 'retention-days: 7' "$alpha_workflow"
+grep -Fq 'default: 7' "$alpha_workflow"
+grep -Fq 'retention-days:' "$alpha_workflow"
+grep -Fq 'inputs.retention_days || 7' "$alpha_workflow"
 grep -Fq 'Actions artifact only; not published to OSS or a stable channel' "$alpha_workflow"
 if grep -Eq 'pull-requests: read|/pulls/|OSS_KEY_(ID|SECRET)|upload-oss|build-legion-component-oss-index' "$alpha_workflow"; then
   echo "$alpha_workflow must not resolve PR metadata or publish alpha artifacts to OSS" >&2
@@ -47,9 +50,14 @@ alpha_tag='legion-node-alpha-0212'
 [[ "$alpha_tag" == legion-node-alpha-* ]]
 [[ "$alpha_tag" != legion-node-v* ]]
 
-grep -Fq 'ubuntu-24.04-arm' "$repo_root/.github/workflows/build-legion-product-node.yml"
+product_workflow="$repo_root/.github/workflows/build-legion-product-node.yml"
+grep -Fq 'build-portable-nodes:' "$product_workflow"
+grep -Fq 'uses: ./.github/workflows/build-legion-node-alpha.yml' "$product_workflow"
+grep -Fq 'source_mode: release' "$product_workflow"
+grep -Fq 'production_release: true' "$product_workflow"
+grep -Fq 'ubuntu-24.04-arm' "$product_workflow"
 grep -Fq 'ubuntu-24.04-arm' "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml"
-grep -Fq 'release-index-linux-arm64.json' "$repo_root/.github/workflows/build-legion-product-node.yml"
+grep -Fq 'release-index-linux-arm64.json' "$product_workflow"
 grep -Fq 'release-index-linux-arm64.json' "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml"
 
 echo 'Legion component workflow contract tests passed'
