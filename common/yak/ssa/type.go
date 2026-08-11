@@ -1308,6 +1308,13 @@ func (s *FunctionType) String() string {
 	if s.Name == "..." {
 		return "..."
 	}
+	// A named function type (e.g. a Go named function type like
+	// ssaconfig.Option) prints its name, not its full signature. This
+	// matches the pre-cache behavior and keeps user-facing error messages
+	// stable.
+	if s.Name != "" {
+		return s.Name
+	}
 	if s.stringCache != "" {
 		return s.stringCache
 	}
