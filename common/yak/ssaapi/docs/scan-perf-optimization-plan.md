@@ -193,7 +193,7 @@ A/B 小项目（fortify-vs/jeepay 聚合支付）：Risk 数量、ruleId、locat
 
 - [x] **步骤 1** A1：`Value` sync.Pool 回收（目标：`unsafe_New` flat 1.65GB → 大幅下降）
 - [x] **步骤 2** A2：per-descent 指令解析去重（目标：NewValue cum 100GB → 显著下降）
-- [ ] **步骤 3** A3：分析路径状态移出 Value（候选，A1+A2 收益不足才启动）
+- [x] **步骤 3** A3：分析路径状态移出 Value（候选，A1+A2 已有可观收益 + hadoop Risk 不变，未达启动阈值）
 - [x] **步骤 4** B：`TakeSymbolSnapshot` 懒构建 + 复用（目标：41.3GB → 接近 0）
 - [x] **步骤 5** C：`BitVector` COW（目标：Clone 32.3GB + Or 9.2GB → 下降）
 - [x] **步骤 6** D：GORM 读路径瘦身（目标：~45GB → 显著下降）
