@@ -50,3 +50,61 @@ func TestTakeSymbolSnapshot_HasNewNamedValue(t *testing.T) {
 	result.SymbolTable.Set("a", Values{&snapshotIDValue{id: 1}})
 	require.False(t, snapshot.HasNewNamedValue(result), "only magic key changes must not be new")
 }
+
+// TestTakeSymbolSnapshot_EmptyTableShortCircuit verifies that a table with only
+// magic keys (or no keys) returns the shared empty snapshot instead of a fresh
+// one, and that its semantics match a manual empty snapshot (every child named
+// key/value is new → merge).
+func TestTakeSymbolSnapshot_EmptyTableShortCircuit(t *testing.T) {
+	// nil table → shared empty snapshot
+	if s := TakeSymbolSnapshot(nil); s != emptySymbolSnapshot {
+		t.Fatalf("nil table should return the shared empty snapshot")
+	}
+	// empty table → shared empty snapshot
+	empty := omap.NewEmptyOrderedMap[string, Values]()
+	if s := TakeSymbolSnapshot(empty); s != emptySymbolSnapshot {
+		t.Fatalf("empty table should return the shared empty snapshot")
+	}
+	// magic-only table → shared empty snapshot
+	magic := snapshotTable(map[string][]int64{"__m": {1}, "": {2}})
+	if s := TakeSymbolSnapshot(magic); s != emptySymbolSnapshot {
+		t.Fatalf("magic-only table should return the shared empty snapshot")
+	}
+
+	// Semantics of the empty snapshot: a child with any named key/value is new.
+	res := &SFFrameResult{
+		SymbolTable: snapshotTable(map[string][]int64{"a": {1}}),
+	}
+	if !emptySymbolSnapshot.HasNewNamedValue(res) {
+		t.Fatalf("empty snapshot must report a named child as new")
+	}
+	// A child with only magic vars is NOT new (keyOrValuesIsNew skips them).
+	res.SymbolTable = snapshotTable(map[string][]int64{"__m": {1}})
+	if emptySymbolSnapshot.HasNewNamedValue(res) {
+		t.Fatalf("empty snapshot must NOT report magic-only child as new")
+	}
+}
+
+// TestTakeSymbolSnapshot_ReuseNotRebuild verifies that the shared empty snapshot
+// is returned repeatedly (no per-call rebuild) for a magic-only table, and that
+// a named table still gets a distinct, non-shared snapshot.
+func TestTakeSymbolSnapshot_ReuseNotRebuild(t *testing.T) {
+	magic := snapshotTable(map[string][]int64{"__m": {1}})
+	s1 := TakeSymbolSnapshot(magic)
+	s2 := TakeSymbolSnapshot(magic)
+	if s1 != s2 {
+		t.Fatalf("magic-only snapshots should be the shared instance")
+	}
+	if s1 != emptySymbolSnapshot {
+		t.Fatalf("magic-only snapshot should equal emptySymbolSnapshot")
+	}
+
+	named := snapshotTable(map[string][]int64{"a": {1}})
+	ns := TakeSymbolSnapshot(named)
+	if ns == emptySymbolSnapshot {
+		t.Fatalf("named table must get a distinct snapshot")
+	}
+	if ns2 := TakeSymbolSnapshot(named); ns2 == ns {
+		t.Fatalf("named snapshots are per-call fresh instances")
+	}
+}

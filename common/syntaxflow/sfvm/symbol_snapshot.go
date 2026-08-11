@@ -27,24 +27,36 @@ type SymbolSnapshot struct {
 	dedupKeys map[dedupKey]struct{}
 }
 
+// emptySymbolSnapshot is a shared, immutable snapshot with no named keys and no
+// dedup keys. TakeSymbolSnapshot returns it for any table with zero named
+// symbols (the common include/exclude sub-rule case, where the parent only
+// carries magic `$__` vars or nothing). Semantics are identical to the old
+// per-call empty maps: HasNewNamedValue sees every child named key/value as
+// new → the symbol merge always runs. Returning a shared instance avoids
+// allocating two maps per sfCheck on the large-project hot path.
+var emptySymbolSnapshot = &SymbolSnapshot{
+	keys:      map[string]struct{}{},
+	dedupKeys: map[dedupKey]struct{}{},
+}
+
 // TakeSymbolSnapshot captures the named-symbol state of table. nil table → empty
 // snapshot (every child key/value is "new"). Caller is responsible for any
 // concurrency locking around table access.
 func TakeSymbolSnapshot(table *omap.OrderedMap[string, Values]) *SymbolSnapshot {
-	tableLen := 0
-	if table != nil {
-		tableLen = table.Len()
-	}
-	s := &SymbolSnapshot{
-		keys:      make(map[string]struct{}, tableLen),
-		dedupKeys: make(map[dedupKey]struct{}, tableLen),
-	}
 	if table == nil {
-		return s
+		return emptySymbolSnapshot
 	}
+	// Allocate the maps lazily so an empty / magic-only table (the dominant
+	// include/exclude sub-rule case on large projects) allocates nothing and
+	// returns the shared empty snapshot. Maps are created on the first named key.
+	s := &SymbolSnapshot{}
 	table.ForEach(func(key string, vals Values) bool {
 		if !isNamedSymbol(key) {
 			return true
+		}
+		if s.keys == nil {
+			s.keys = make(map[string]struct{}, table.Len())
+			s.dedupKeys = make(map[dedupKey]struct{}, table.Len())
 		}
 		s.keys[key] = struct{}{}
 		for _, v := range vals {
@@ -57,6 +69,13 @@ func TakeSymbolSnapshot(table *omap.OrderedMap[string, Values]) *SymbolSnapshot 
 		}
 		return true
 	})
+	if s.keys == nil {
+		// No named symbols (empty or magic-only table) → the snapshot is empty
+		// and the shared emptySymbolSnapshot is returned (semantics: every child
+		// named key/value is new → always merge). This avoids allocating two maps
+		// per sfCheck on the large-project hot path.
+		return emptySymbolSnapshot
+	}
 	return s
 }
 
