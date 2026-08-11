@@ -138,7 +138,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	case *ssa.Phi:
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
-		method, ok := inst.GetValueById(inst.Method)
+		method, ok := actx.getResolvedValue(inst, inst.Method)
 		if !ok || method == nil {
 			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, ")
 			return v.visitUserFallback(actx, opt...)
@@ -169,7 +169,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			if utils.IsNil(call) {
 				return method
 			}
-			function, ok := call.GetValueById(call.Method)
+			function, ok := actx.getResolvedValue(call, call.Method)
 			if !ok {
 				return method
 			}
@@ -197,7 +197,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			if val <= 0 {
 				return method
 			}
-			valValue, ok := call.GetValueById(val)
+			valValue, ok := actx.getResolvedValue(call, val)
 			if !ok {
 				return method
 			}
@@ -230,7 +230,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok {
 					continue
 				}
-				paramValue, ok := fun.GetValueById(fun.Params[index])
+				paramValue, ok := actx.getResolvedValue(fun, fun.Params[index])
 				if !ok || paramValue == nil {
 					continue
 				}
@@ -247,7 +247,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok {
 					continue
 				}
-				memberValue, ok := fun.GetValueById(fun.ParameterMembers[index])
+				memberValue, ok := actx.getResolvedValue(fun, fun.ParameterMembers[index])
 				if !ok || memberValue == nil {
 					continue
 				}
