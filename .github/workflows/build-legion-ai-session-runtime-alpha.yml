@@ -15,7 +15,9 @@ concurrency:
 jobs:
   build:
     name: Build short-lived Runtime artifacts
-    uses: ./.github/workflows/build-legion-ai-session-runtime.yml
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-legion-ai-session-runtime-common.yml
     with:
       source_mode: alpha
       retention_days: 7

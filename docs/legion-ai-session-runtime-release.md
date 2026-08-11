@@ -29,10 +29,16 @@ git push origin refs/tags/legion-runtime-alpha-0212
 
 The tagged commit is the complete source identity; the tag does not carry or
 resolve a pull request number. Each candidate tag must be new and immutable.
-The tagged commit must already contain the alpha entry workflow. Candidate
-artifacts include `linux/amd64` and `linux/arm64` Docker image archives plus
-their provenance packages. They are Actions-only and never receive OSS release
-secrets.
+The tagged commit must already contain the alpha entry workflow and its common
+Runtime artifact workflow. Candidate artifacts include `linux/amd64` and
+`linux/arm64` Docker image archives plus their provenance packages. They are
+Actions-only and never receive OSS release secrets.
+
+The alpha entry grants only `contents: read` to the common artifact workflow.
+The formal release entry separately grants the OIDC and attestation permissions
+needed for trusted publication and passes only the two named OSS secrets. This
+keeps a tagged pull request commit from receiving release credentials or
+elevating its `GITHUB_TOKEN` through the reusable workflow boundary.
 
 ## Published outputs
 
