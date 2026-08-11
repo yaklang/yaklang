@@ -441,9 +441,6 @@ func overlayAIExecutionStrategy(base, patch *ypb.AIExecutionStrategy) *ypb.AIExe
 	if patch.GetGoalMinIterations() > 0 {
 		next.GoalMinIterations = patch.GetGoalMinIterations()
 	}
-	if patch.GetMaxSubAgents() > 0 {
-		next.MaxSubAgents = patch.GetMaxSubAgents()
-	}
 	return next
 }
 
