@@ -4,8 +4,6 @@ go 1.22.12
 
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
-replace github.com/yaklang/gorm v0.0.0-20260723082407-eba53e567325 => /home/wlz/Developer/work/gorm
-
 replace github.com/wenlng/go-captcha-assets v1.0.5 => github.com/wenlng/go-captcha-assets v1.0.4
 
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
@@ -130,7 +128,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33
-	github.com/yaklang/gorm v1.9.2-yaklang.7
+	github.com/yaklang/gorm v1.9.17-0.20260811094634-87ab480108b6
 	github.com/yaklang/javajive v0.1.2
 	github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80
 	github.com/ysmood/gson v0.7.3
