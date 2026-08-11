@@ -11,6 +11,7 @@ on:
       - ".github/scripts/test-package-legion-ai-session-runtime.sh"
       - ".github/workflows/build-legion-ai-session-runtime.yml"
       - ".github/workflows/build-legion-ai-session-runtime-alpha.yml"
+      - ".github/workflows/build-legion-ai-session-runtime-common.yml"
       - ".github/workflows/build-legion-node-alpha.yml"
       - ".github/workflows/build-legion-product-node.yml"
       - ".github/workflows/verify-legion-component-release-contracts.yml"
