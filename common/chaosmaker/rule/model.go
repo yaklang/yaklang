@@ -78,6 +78,13 @@ func (*Storage) TableName() string {
 }
 
 func QueryRule(db *gorm.DB, req *ypb.QueryChaosMakerRuleRequest) (*bizhelper.Paginator, []*Storage, error) {
+	if req == nil {
+		req = &ypb.QueryChaosMakerRuleRequest{}
+	}
+	if req.Pagination == nil {
+		req.Pagination = &ypb.Paging{Page: 1, Limit: 10}
+	}
+
 	db = db.Model(&Storage{})
 
 	params := req.GetPagination()

@@ -879,7 +879,27 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 	return nil
 }
 
+func normalizeQueryOnlinePluginsRequest(req *ypb.QueryOnlinePluginsRequest) *ypb.QueryOnlinePluginsRequest {
+	if req == nil {
+		req = &ypb.QueryOnlinePluginsRequest{}
+	}
+	if req.Pagination == nil {
+		req.Pagination = &ypb.Paging{
+			Page:    1,
+			Limit:   20,
+			OrderBy: "updated_at",
+			Order:   "desc",
+		}
+	}
+	if req.Data == nil {
+		req.Data = &ypb.DownloadOnlinePluginsRequest{}
+	}
+	return req
+}
+
 func (s *OnlineClient) QueryPlugins(req *ypb.QueryOnlinePluginsRequest) ([]*OnlinePlugin, *OnlinePaging, error) {
+	req = normalizeQueryOnlinePluginsRequest(req)
+
 	raw, err := json.Marshal(DownloadOnlinePluginRequest{
 		Keywords:      req.Data.Keywords,
 		PluginType:    req.Data.PluginType,

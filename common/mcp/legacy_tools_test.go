@@ -1735,6 +1735,18 @@ func legacyFingerprintToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
 		"query_fingerprint": {
 			{
+				name:    "empty_args_use_default_paging",
+				args:    map[string]any{},
+				timeout: 5 * time.Second,
+				validate: func(t *testing.T, text string, result *rawmcp.CallToolResult) {
+					require.NotNil(t, result)
+					var response ypb.QueryFingerprintResponse
+					decodeToolResultJSON(t, text, &response)
+					require.Equal(t, int64(1), response.GetPagination().GetPage())
+					require.Equal(t, int64(10), response.GetPagination().GetLimit())
+				},
+			},
+			{
 				name:    "minimal_pagination_should_not_panic",
 				args:    pagingArgs(),
 				timeout: 5 * time.Second,
