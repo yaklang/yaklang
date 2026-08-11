@@ -4,9 +4,11 @@ on:
   pull_request:
     paths:
       - ".github/scripts/build-legion-component-oss-index.sh"
+      - ".github/scripts/build-legion-node-engine-import-bundle.sh"
       - ".github/scripts/build-legion-product-node.sh"
       - ".github/scripts/package-legion-ai-session-runtime.sh"
       - ".github/scripts/test-build-legion-component-oss-index.sh"
+      - ".github/scripts/test-build-legion-node-engine-import-bundle.sh"
       - ".github/scripts/test-legion-component-workflow-contract.sh"
       - ".github/scripts/test-package-legion-ai-session-runtime.sh"
       - ".github/workflows/build-legion-ai-session-runtime.yml"
@@ -41,9 +43,11 @@ jobs:
           set -euo pipefail
           scripts=(
             .github/scripts/build-legion-component-oss-index.sh
+            .github/scripts/build-legion-node-engine-import-bundle.sh
             .github/scripts/build-legion-product-node.sh
             .github/scripts/package-legion-ai-session-runtime.sh
             .github/scripts/test-build-legion-component-oss-index.sh
+            .github/scripts/test-build-legion-node-engine-import-bundle.sh
             .github/scripts/test-legion-component-workflow-contract.sh
             .github/scripts/test-package-legion-ai-session-runtime.sh
           )
@@ -55,6 +59,7 @@ jobs:
           set -euo pipefail
           ./.github/scripts/test-legion-component-workflow-contract.sh
           ./.github/scripts/test-build-legion-component-oss-index.sh
+          ./.github/scripts/test-build-legion-node-engine-import-bundle.sh
           ./.github/scripts/test-package-legion-ai-session-runtime.sh
 
   build-targets:
