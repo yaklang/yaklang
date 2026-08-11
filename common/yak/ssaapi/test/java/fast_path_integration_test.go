@@ -4,15 +4,24 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // TestFastPath_LogForgingIncludeHits verifies the simple `* & $source`
 // include fast path is actually exercised by the real Java log-forging rule.
 func TestFastPath_LogForgingIncludeHits(t *testing.T) {
+	// The java-servlet-param / java-spring-mvc-param / java-log-record lib
+	// rules used by the include below must be synced into the database first,
+	// otherwise the <include(...)> sub-rules resolve to nothing and sink is
+	// empty.
+	yakit.InitialDatabase()
+	require.NoError(t, sfbuildin.SyncEmbedRule())
+
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("demo/A.java", `package demo;
 import javax.servlet.http.*;
