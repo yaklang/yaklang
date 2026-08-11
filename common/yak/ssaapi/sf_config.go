@@ -31,14 +31,25 @@ type sfCheck struct {
 	// context result before this child merge.
 	beforeMergeHook func(parent *sf.SFFrameResult, child *sf.SFFrameResult)
 
-	// originalSnapshot captures the contextResult's named-symbol state at
-	// CreateCheck time (before any path/query runs). clearup uses it to decide
-	// whether a child result produced NEW named output (merge) or only re-
-	// contains inherited parent vars + magic vars (skip — the Opt A 463GB
-	// saving). Snapshotting once (not per-path) is what makes the across-path
-	// case correct: a key merged by path 1 is NOT in this snapshot, so path 2's
-	// re-bind is correctly seen as new and merged. See sfvm.SymbolSnapshot.
-	originalSnapshot *sf.SymbolSnapshot
+	// originalSnapshot captures the contextResult's named-symbol state at the
+	// first AppendItems that adds a real item (before any path/query runs for
+	// this check). clearup uses it to decide whether a child result produced NEW
+	// named output (merge) or only re-contains inherited parent vars + magic
+	// vars (skip — the Opt A 463GB saving). Snapshotting once (not per-path) is
+	// what makes the across-path case correct: a key merged by path 1 is NOT in
+	// this snapshot, so path 2's re-bind is correctly seen as new and merged.
+	//
+	// O3: the snapshot is built lazily on the first AppendItems that adds an
+	// item, NOT eagerly at CreateCheck. Empty checks (no include/exclude/until/
+	// hook sub-rules, e.g. the unconditionally-created untilCheck/hookRunner in
+	// DataFlowWithSFConfig) never build a snapshot — they never call check()/
+	// clearup, so the eager build was pure waste (43M TakeSymbolSnapshot calls /
+	// 42GB on hadoop). Building at first AppendItems is safe because AppendItems
+	// always runs before any descent for this check, and the sibling checks
+	// (untilCheck/hookRunner) are each given their items before the descent
+	// starts, so each captures its own pre-descent parent state.
+	originalSnapshot     *sf.SymbolSnapshot
+	originalSnapshotOnce sync.Once
 
 	// fastMatchMu guards fastMatchIDs, which memoizes symbol -> id set for the
 	// simple `* & $source` / `<self> & $source` fast path.
@@ -94,13 +105,9 @@ func CreateCheck(
 	}
 	contextResult.AlertSymbolTable.Delete(sf.RecursiveMagicVariable)
 	contextResult.SymbolTable.Delete(sf.RecursiveMagicVariable)
-	// Snapshot the parent's named-symbol state ONCE here (before any path/query
-	// runs) so clearup can detect child NEW named output without re-merging
-	// inherited parent vars. Taken under the config mutex (contextResult is
-	// mutated under it during merges).
-	config.Mutex.Lock()
-	res.originalSnapshot = sf.TakeSymbolSnapshot(contextResult.SymbolTable)
-	config.Mutex.Unlock()
+	// Snapshot is built lazily on the first AppendItems that adds a real item
+	// (see originalSnapshot field comment); it must reflect the parent state
+	// before this check's own descent, which AppendItems precedes.
 	res.vm.SetConfig(config)
 	res.AppendItems(configItems...)
 	return res
@@ -112,6 +119,22 @@ func (c *sfCheck) Empty() bool {
 
 func (c *sfCheck) SetBeforeMergeHook(f func(parent *sf.SFFrameResult, child *sf.SFFrameResult)) {
 	c.beforeMergeHook = f
+}
+
+// ensureOriginalSnapshot builds the parent-symbol snapshot once, on the first
+// call that actually adds a sub-rule item. It runs under config.Mutex so the
+// snapshot reflects a consistent parent state. Empty checks that never get a
+// real item never build a snapshot (O3: 43M wasted TakeSymbolSnapshot calls on
+// hadoop came from eagerly snapshoting every CreateCheck, including empty ones).
+func (c *sfCheck) ensureOriginalSnapshot() {
+	if c == nil || c.contextResult == nil || c.config == nil {
+		return
+	}
+	c.originalSnapshotOnce.Do(func() {
+		c.config.Mutex.Lock()
+		defer c.config.Mutex.Unlock()
+		c.originalSnapshot = sf.TakeSymbolSnapshot(c.contextResult.SymbolTable)
+	})
 }
 
 func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
@@ -140,6 +163,8 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		case sf.RecursiveConfig_Until, sf.RecursiveConfig_Hook:
 			c.untilItem = append(c.untilItem, checkItem)
 		}
+		// A real sub-rule item was added; build the parent snapshot lazily (once).
+		c.ensureOriginalSnapshot()
 	}
 }
 
