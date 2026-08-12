@@ -2,10 +2,22 @@ package ssadb
 
 import (
 	"database/sql"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/gorm"
 )
+
+// nativeIrCodeBatchReads is a test-only counter incremented every time
+// nativeGetIrCodesByIds performs a batch read. Tests use it to prove that
+// yieldIrCodes actually routes cold-cache misses through the native-SQL path
+// (A2) instead of the old GORM FastPagination path.
+var nativeIrCodeBatchReads atomic.Int64
+
+// NativeIrCodeBatchReads returns the test-only batch-read counter.
+func NativeIrCodeBatchReads() int64 {
+	return nativeIrCodeBatchReads.Load()
+}
 
 // Native-SQL fast paths for the hot single-row reads (GetIrTypeItemById /
 // GetIrCodeItemById). GORM's First() builds a heavy query chain per call
@@ -135,6 +147,7 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 	if len(clean) == 0 {
 		return nil, nil
 	}
+	nativeIrCodeBatchReads.Add(1)
 
 	common := db.CommonDB()
 	var out []*IrCode
