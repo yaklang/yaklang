@@ -62,8 +62,12 @@ func TestNodeBaseBootstrapSessionIncludesHostInfo(t *testing.T) {
 		displayName:         "display-node-1",
 		agentInstallationID: "install-1",
 		NodeType:            "scanner-agent",
+		kind:                "host",
+		dockerEndpoint:      "tcp://runtime-host:2376",
 		enrollmentToken:     "enroll-1",
 		version:             "dev",
+		engineReleaseID:     "sha256-release-e2",
+		engineDigest:        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		labels:              map[string]string{"zone": "cn"},
 		capabilityKeys:      []string{"yak.execute", "hids"},
 		requestTimeout:      time.Second,
@@ -95,6 +99,13 @@ func TestNodeBaseBootstrapSessionIncludesHostInfo(t *testing.T) {
 	}
 	if transport.request.AgentInstallationID != "install-1" {
 		t.Fatalf("unexpected agent installation id: %q", transport.request.AgentInstallationID)
+	}
+	if transport.request.DockerEndpoint != "tcp://runtime-host:2376" {
+		t.Fatalf("unexpected Docker endpoint: %q", transport.request.DockerEndpoint)
+	}
+	if transport.request.EngineReleaseID != "sha256-release-e2" ||
+		transport.request.EngineDigest != "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
+		t.Fatalf("unexpected engine identity: %+v", transport.request)
 	}
 	if transport.request.HostIdentity.MachineID != "machine-1" {
 		t.Fatalf("unexpected machine id: %q", transport.request.HostIdentity.MachineID)

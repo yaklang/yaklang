@@ -60,6 +60,9 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 				if request.AgentInstallationID != "agent-install-1" {
 					t.Fatalf("unexpected agent_installation_id: %s", request.AgentInstallationID)
 				}
+				if request.DockerEndpoint != "tcp://runtime-host:2376" {
+					t.Fatalf("unexpected docker_endpoint: %s", request.DockerEndpoint)
+				}
 				if request.HostIdentity.MachineID != "machine-1" {
 					t.Fatalf("unexpected host_identity.machine_id: %s", request.HostIdentity.MachineID)
 				}
@@ -92,6 +95,8 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 				AgentInstallationID:      "agent-install-1",
 				HostIdentity:             HostIdentity{MachineID: "machine-1"},
 				NodeType:                 "scanner-agent",
+				Kind:                     "host",
+				DockerEndpoint:           "tcp://runtime-host:2376",
 				HeartbeatIntervalSeconds: 30,
 				HostInfo: HostInfo{
 					Hostname:        "host-a",

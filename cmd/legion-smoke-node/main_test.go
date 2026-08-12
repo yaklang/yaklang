@@ -5,6 +5,40 @@ import (
 	"testing"
 )
 
+func TestHostDockerEndpoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		kind     string
+		endpoint string
+		want     string
+	}{
+		{name: "host", kind: "host", endpoint: " tcp://runtime-host:2376 ", want: "tcp://runtime-host:2376"},
+		{name: "default host kind", endpoint: "unix:///var/run/docker.sock", want: "unix:///var/run/docker.sock"},
+		{name: "AI session cannot advertise host daemon", kind: " ai_session ", endpoint: "tcp://runtime-host:2376", want: ""},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := hostDockerEndpoint(tt.kind, tt.endpoint); got != tt.want {
+				t.Fatalf("hostDockerEndpoint(%q, %q) = %q, want %q", tt.kind, tt.endpoint, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHostEngineValue(t *testing.T) {
+	t.Parallel()
+	if got := hostEngineValue("host", " sha256-e2 "); got != "sha256-e2" {
+		t.Fatalf("host engine value = %q", got)
+	}
+	if got := hostEngineValue("ai_session", "sha256-e2"); got != "" {
+		t.Fatalf("AI session leaked host engine identity = %q", got)
+	}
+}
+
 func TestShouldRunDistYak(t *testing.T) {
 	t.Parallel()
 
