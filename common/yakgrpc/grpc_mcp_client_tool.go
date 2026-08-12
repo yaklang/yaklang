@@ -26,19 +26,34 @@ func setMCPToolDescriptionI18n(item *ypb.MCPClientToolConfig, zh, en string) {
 	}
 }
 
-// ensureMCPToolDescriptionI18n fills DescriptionI18n from Description when missing
-// (bridge tools / DB-cached rows that never went through attachToolMeta i18n).
+// hasMCPToolDescriptionI18n reports whether DescriptionI18n already carries UI text.
+func hasMCPToolDescriptionI18n(item *ypb.MCPClientToolConfig) bool {
+	if item == nil || item.GetDescriptionI18N() == nil {
+		return false
+	}
+	return strings.TrimSpace(item.GetDescriptionI18N().GetZh()) != "" ||
+		strings.TrimSpace(item.GetDescriptionI18N().GetEn()) != ""
+}
+
+// resolveMCPToolDescriptionI18nForExport builds DescriptionI18n for UI export by source.
+func resolveMCPToolDescriptionI18nForExport(source, toolName, description string) *schema.I18n {
+	switch source {
+	case schema.MCPClientToolSourceBuiltin:
+		return mcp.ResolveBuiltinToolDescriptionI18n(toolName, description)
+	default:
+		return schema.NewI18n("", description)
+	}
+}
+
+// ensureMCPToolDescriptionI18n fills DescriptionI18n when attachToolMeta did not set it
+// (bridge tools / DB-cached rows / old engine clients reading cached responses).
 func ensureMCPToolDescriptionI18n(item *ypb.MCPClientToolConfig) {
-	if item == nil {
+	if item == nil || hasMCPToolDescriptionI18n(item) {
 		return
 	}
-	if item.GetDescriptionI18N() != nil &&
-		(strings.TrimSpace(item.GetDescriptionI18N().GetZh()) != "" ||
-			strings.TrimSpace(item.GetDescriptionI18N().GetEn()) != "") {
-		setMCPToolDescriptionI18n(item, item.GetDescriptionI18N().GetZh(), item.GetDescriptionI18N().GetEn())
-		return
+	if i18n := resolveMCPToolDescriptionI18nForExport(item.GetSource(), item.GetToolName(), item.GetDescription()); i18n != nil {
+		item.DescriptionI18N = i18n.I18nToYPB_I18n()
 	}
-	setMCPToolDescriptionI18n(item, "", item.GetDescription())
 }
 
 // GetMCPToolList returns the merged list of builtin tools and bridge tools with
@@ -292,7 +307,7 @@ func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string, a
 			return
 		}
 		item.Description = t.Description
-		if i18n := mcp.ResolveBuiltinToolDescriptionI18n(toolName, t.Description); i18n != nil {
+		if i18n := resolveMCPToolDescriptionI18nForExport(source, toolName, t.Description); i18n != nil {
 			item.DescriptionI18N = i18n.I18nToYPB_I18n()
 		}
 		params, err := parseMCPToolInputSchema(&t.InputSchema)
@@ -307,7 +322,9 @@ func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string, a
 			return
 		}
 		item.Description = at.Description
-		setMCPToolDescriptionI18n(item, "", at.Description)
+		if i18n := resolveMCPToolDescriptionI18nForExport(source, toolName, at.Description); i18n != nil {
+			item.DescriptionI18N = i18n.I18nToYPB_I18n()
+		}
 		params, err := parseMCPToolInputSchema(&at.InputSchema)
 		if err != nil {
 			log.Warnf("attachToolMeta: parse aitool-framework schema for %q: %v", toolName, err)
