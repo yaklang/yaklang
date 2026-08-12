@@ -993,16 +993,27 @@ func (c *Cache[T, D]) Barrier() error {
 		return c.saver.recordedErr()
 	}
 
-	// Wait for all pending operations to complete
-	c.resident.Wait()
-
-	// Also drain the saver
+	// A marshal request becomes a persistWG entry before it reaches the saver.
+	// Draining the saver only after resident.Wait creates a cycle for a partial
+	// batch: the wait needs FinishPersist, while FinishPersist needs a saver
+	// flush. Keep flushing until all currently pending requests settle; this
+	// also covers requests that cross marshalPipe just after an earlier flush.
 	if c.saver != nil {
-		if err := c.saver.Flush(); err != nil {
-			c.waitAsyncDrains()
-			return err
+		for c.resident.PendingCount() > 0 {
+			if err := c.saver.Flush(); err != nil {
+				c.waitAsyncDrains()
+				return err
+			}
+			if c.resident.PendingCount() > 0 {
+				time.Sleep(time.Millisecond)
+			}
 		}
 	}
+
+	// Preserve the WaitGroup boundary after observing pendingCount == 0. As
+	// with the old Barrier contract, callers must not enqueue new work
+	// concurrently with this final synchronization point.
+	c.resident.Wait()
 	// The persistence barrier also establishes the lifecycle boundary for
 	// post-flush callbacks. SaveToDatabase may close the writer immediately
 	// after Barrier returns, so do not let a callback race that close.
