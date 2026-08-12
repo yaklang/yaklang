@@ -187,6 +187,7 @@ var Exports = map[string]any{
 
 	// language:
 	"Javascript": ssaconfig.JS,
+	"GO":         ssaconfig.GO,
 	"Yak":        ssaconfig.Yak,
 	"PHP":        ssaconfig.PHP,
 	"Java":       ssaconfig.JAVA,
