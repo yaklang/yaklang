@@ -1,6 +1,7 @@
 package dbcache_test
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -365,9 +366,12 @@ func TestAsyncPersist_AsyncDrainAndShrinkEvicts(t *testing.T) {
 func TestAsyncPersist_AsyncDrainKeysAndShrinkIsBatchScoped(t *testing.T) {
 	firstRelease := make(chan struct{})
 	secondRelease := make(chan struct{})
+	firstStarted := make(chan struct{})
 	var saveCalls atomic.Int32
+	var firstStartedOnce sync.Once
 	saveFn := func(items []*flushItem) error {
 		if saveCalls.Add(1) == 1 {
+			firstStartedOnce.Do(func() { close(firstStarted) })
 			<-firstRelease
 		} else {
 			<-secondRelease
@@ -398,6 +402,22 @@ func TestAsyncPersist_AsyncDrainKeysAndShrinkIsBatchScoped(t *testing.T) {
 	secondDone := make(chan struct{})
 
 	cache.MarkDirtyAsync(firstKeys, utils.EvictionReasonCapacityReached)
+
+	// Wait until the first save batch is in flight and every first-batch item
+	// is buffered before enqueueing the second batch. The marshal pipeline
+	// runs 10 workers and the saver buffer is not ordered, so without this
+	// gate the first batch could contain second-batch keys and the test would
+	// deadlock waiting for firstDone before releasing the second batch.
+	select {
+	case <-firstStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first save batch never started")
+	}
+	require.Eventually(t, func() bool {
+		return cache.Stats().Saver.Pending == int64(len(firstKeys))
+	}, 5*time.Second, 10*time.Millisecond,
+		"every first-batch item must be buffered before the second batch is enqueued")
+
 	cache.AsyncDrainKeysAndShrink(firstKeys, func() { close(firstDone) })
 
 	// Enqueue the second batch while the first save is still blocked.
