@@ -77,6 +77,18 @@ func (r *reasonTestRuntime) AsyncPlanOnly(ctx context.Context, planPayload strin
 func (r *reasonTestRuntime) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 }
 
+func (r *reasonTestRuntime) RequireAIForgeAndExecute(ctx context.Context, forgeName string) error {
+	return nil
+}
+
+func (r *reasonTestRuntime) PlanAndExecute(ctx context.Context, planPayload string) error {
+	return nil
+}
+
+func (r *reasonTestRuntime) RecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskID string, input *ExecutePlanInput) error {
+	return nil
+}
+
 func (r *reasonTestRuntime) ReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error) {
 	return input, nil
 }

@@ -370,6 +370,9 @@ type AIInvokeRuntime interface {
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
+	RequireAIForgeAndExecute(ctx context.Context, forgeName string) error
+	PlanAndExecute(ctx context.Context, planPayload string) error
+	RecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskID string, input *ExecutePlanInput) error
 	ReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
 	ForceReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
 	BeginPlanCoordinatorSession(ctx context.Context, input *ExecutePlanInput, forceManualReview bool) (PlanCoordinatorSession, error)

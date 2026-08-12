@@ -213,20 +213,20 @@ func handleLoadForge(
 
 	log.Infof("load_capability: dispatching '%s' as blueprint/forge", identifier)
 	invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE]",
-		fmt.Sprintf("Starting AI Blueprint '%s' in async mode", identifier))
+		fmt.Sprintf("Starting AI Blueprint '%s'", identifier))
 	loopInfraStatus(loop, "蓝图已启动 / Blueprint Started")
 	loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("蓝图已启动: %s / Blueprint Started: %s", identifier, identifier))
 	recommendCapabilitiesFromForgePrompts(loop, invoker, identifier, "AI Blueprint "+identifier)
 
-	op.RequestAsyncMode()
-
 	task = op.GetTask()
-	task.SetAsyncMode(true)
 	taskCtx := task.GetContext()
-	invoker.RequireAIForgeAndAsyncExecute(taskCtx, identifier, func(err error) {
+	if err := invoker.RequireAIForgeAndExecute(taskCtx, identifier); err != nil {
 		loop.FinishAsyncTask(task, err)
-	})
+		op.Fail(err)
+		return
+	}
+	op.Exit()
 }
 
 // handleLoadSkill loads a skill into the context window.

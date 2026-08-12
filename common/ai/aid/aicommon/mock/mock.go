@@ -497,6 +497,18 @@ func (m *MockInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onF
 func (m *MockInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
 }
 
+func (m *MockInvoker) RequireAIForgeAndExecute(ctx context.Context, forgeName string) error {
+	return nil
+}
+
+func (m *MockInvoker) PlanAndExecute(ctx context.Context, planPayload string) error {
+	return nil
+}
+
+func (m *MockInvoker) RecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskID string, input *aicommon.ExecutePlanInput) error {
+	return nil
+}
+
 func (m *MockInvoker) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
 	return input, nil
 }

@@ -291,14 +291,11 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		"react_task_id":  reactTaskID,
 	}, event.SyncID)
 
-	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, "", func(err error) {
-		if err != nil {
+	go func() {
+		if err := r.RecoverPlanAndExecute(r.config.Ctx, coordinatorID, "", approvedInput); err != nil {
 			log.Errorf("execute detached plan via recovery failed: coordinator=%s err=%v", coordinatorID, err)
 		}
-	},
-		WithInvokePlanAndExecutePlanPayload(input.PlanPayload),
-		WithInvokePlanAndExecuteExecutePlanInput(approvedInput),
-	)
+	}()
 	return nil
 }
 
