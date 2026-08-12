@@ -167,7 +167,7 @@ func collectModtextSymbols(data []byte, sections []elfSection, onlyModules []str
 // function pointer), which later crashes on an indirect call. Pointing every
 // such reference at a no-op stub keeps absolute data slots, PC-relative code,
 // and function tables safe while lld still drops the module section itself.
-func neutralizeModtextRelocs(data []byte, sections []elfSection, modtextSyms map[uint32]string) (int, error) {
+func neutralizeModtextRelocs(data []byte, sections []elfSection, modtextSyms map[uint32]string, removedModules map[string]bool) (int, error) {
 	if len(modtextSyms) == 0 {
 		return 0, nil
 	}
@@ -186,9 +186,17 @@ func neutralizeModtextRelocs(data []byte, sections []elfSection, modtextSyms map
 			continue
 		}
 		if strings.HasPrefix(s.name, ".rela.modtext.") {
-			// Entries inside an unused module section are discarded together
-			// with the section by lld GC; they do not need stub redirection.
-			continue
+			// Relocations inside a removed module section are discarded
+			// together with that section by lld GC. But a USED module section
+			// (e.g. .rela.modtext.ssa) can contain references into a removed
+			// module (the language frontends); those must be redirected below
+			// or lld keeps the removed section alive.
+			if int(s.info) < len(sections) {
+				target := sections[s.info].name
+				if strings.HasPrefix(target, ".modtext.") && removedModules[strings.TrimPrefix(target, ".modtext.")] {
+					continue
+				}
+			}
 		}
 		if s.name == ".rela.data.rel.ro.yaktextmap" {
 			// The runtime text map must not keep unused module sections live.
@@ -417,7 +425,11 @@ func patchELF(data []byte, usedModules []string) (int, error) {
 	if err != nil {
 		return marked, err
 	}
-	removed, err := neutralizeModtextRelocs(data, sections, modtextSyms)
+	removedModules := map[string]bool{}
+	for _, m := range toRemove {
+		removedModules[m] = true
+	}
+	removed, err := neutralizeModtextRelocs(data, sections, modtextSyms, removedModules)
 	if err != nil {
 		return removed, err
 	}

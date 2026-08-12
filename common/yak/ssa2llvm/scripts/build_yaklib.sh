@@ -37,6 +37,15 @@ EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 # code and their dependency closures while a poc script keeps them.
 DEFAULT_MODULES="os,poc,cli,http,codec"
 MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
+# The shared poc/ssa dependency closure and the ssa language frontends live in
+# their own split groups. genfull ignores the unknown names; elfsplit splits
+# them. The compiler keeps "shared" whenever any module is used, and keeps
+# "ssafront" when the ssa module is used.
+AOT_SPLIT_MODULES="${MODULES}"
+AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},shared"
+case ",${MODULES}," in
+  *,ssa,*) AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},ssafront" ;;
+esac
 
 mkdir -p "${ASSETS_DIR}"
 rm -rf "${EXTDEPS_DIR}"
@@ -147,7 +156,7 @@ trap 'rm -rf "${SPLIT_DIR}" "${REPACK_DIR}"; rm -f "${GENFULL_OUT}"; [ -n "${STU
 # split go.o is NOT overwritten by the original member.
 llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${SPLIT_DIR}" go.o 2>/dev/null || true
 if [ -f "${SPLIT_DIR}/go.o" ]; then
-    "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${MODULES}"
+    "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${AOT_SPLIT_MODULES}"
     # Extract all original members into a fresh repack dir.
     llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${REPACK_DIR}"
     # Replace go.o with the split version.

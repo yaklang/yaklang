@@ -50,8 +50,31 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 	for mod := range deps {
 		usedModules = append(usedModules, mod)
 	}
+	// Module dependency closure for per-module DCE. "shared" (schema/lowhttp/
+	// net-http/gorm closure) is required whenever any yaklib module is used;
+	// the poc package uses cli at runtime, and the ssa module needs its
+	// language frontends. Without these, patch redirects the cross-module
+	// references to the stub and the kept module crashes or loses functions.
+	if len(usedModules) > 0 {
+		usedModules = append(usedModules, "shared")
+	}
+	if containsModule(usedModules, "poc") {
+		usedModules = append(usedModules, "cli")
+	}
+	if containsModule(usedModules, "ssa") {
+		usedModules = append(usedModules, "ssafront")
+	}
 	if err := CompileObjectToBinarySCWithPatch(objPath, outputFile, cfg.WorkDir, cfg.ObfArchives, usedModules, cfg.ExtraLinkArgs...); err != nil {
 		return "", nil, err
 	}
 	return "", nil, nil
+}
+
+func containsModule(modules []string, want string) bool {
+	for _, m := range modules {
+		if m == want {
+			return true
+		}
+	}
+	return false
 }
