@@ -134,6 +134,59 @@ func TestAsyncPersist_BarrierWaitsForWriter(t *testing.T) {
 		"all 10 items should be saved after Barrier")
 }
 
+// TestAsyncPersist_BarrierFlushesQueuedTasksBeforeWaiting proves the final
+// settlement ordering: a Barrier must first ask the saver to flush work that
+// has already crossed the marshal pipe, then wait for FinishPersist. Waiting
+// first leaves the saver timer as the only way to settle persistWG and makes a
+// final instruction-store close appear to hang under a long batch timeout.
+func TestAsyncPersist_BarrierFlushesQueuedTasksBeforeWaiting(t *testing.T) {
+	saveStarted := make(chan struct{}, 1)
+
+	cache := dbcache.NewCache[*flushItem, *flushItem](
+		0, 0,
+		func(item *flushItem, _ utils.EvictionReason) (*flushItem, error) {
+			return item, nil
+		},
+		func(items []*flushItem) error {
+			saveStarted <- struct{}{}
+			return nil
+		},
+		nil,
+		dbcache.WithSaveSize(100),
+		// A timeout much longer than this test is deliberate: the only way this
+		// request may settle is the Barrier-driven saver flush below.
+		dbcache.WithSaveTimeout(time.Hour),
+	)
+	defer cache.Close()
+
+	cache.Set(&flushItem{id: 1})
+	cache.MarkDirty([]int64{1}, utils.EvictionReasonCapacityReached)
+
+	// Ensure the marshal worker has handed the request to Save before the
+	// Barrier begins. The old ordering then waits for persistWG forever (until
+	// the one-hour timer), whereas flushing first deterministically releases it.
+	require.Eventually(t, func() bool {
+		return cache.Stats().Saver.Pending == 1
+	}, time.Second, time.Millisecond, "marshal worker must enqueue the save task")
+
+	done := make(chan error, 1)
+	go func() { done <- cache.Barrier() }()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Barrier waited for persistWG before flushing the queued saver task")
+	}
+
+	select {
+	case <-saveStarted:
+	case <-time.After(time.Second):
+		t.Fatal("Barrier returned without flushing the queued save task")
+	}
+	require.Equal(t, 0, cache.Count(), "Barrier must settle and evict the queued item")
+}
+
 // TestAsyncPersist_BackpressureBlocksEnqueue proves that when queue depth
 // exceeds the backpressure limit, MarkDirty blocks until the writer catches up.
 func TestAsyncPersist_BackpressureBlocksEnqueue(t *testing.T) {
