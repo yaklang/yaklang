@@ -293,10 +293,7 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 
 	// Create a recovery task and enqueue it so the QueueProcessor
 	// handles it serially alongside normal free-input tasks.
-	userInput := approvedInput.PlanPayload
-	if strings.TrimSpace(userInput) == "" {
-		userInput = fmt.Sprintf("执行分离计划 (detached plan: %s)", coordinatorID)
-	}
+	userInput := extractRecoveryTaskUserInput(record)
 	recoveryTask := aicommon.NewStatefulTaskBase(
 		formatRecoveryTaskID(coordinatorID),
 		userInput,
@@ -315,6 +312,43 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 	return nil
+}
+
+// extractRecoveryTaskUserInput builds a human-readable description for a
+// recovery task from the persisted plan record.  It tries the root task
+// Name/Goal stored in TaskTree first, then falls back to PlanPayload from
+// the detached-plan progress, and finally to a generic message.
+func extractRecoveryTaskUserInput(record *schema.AISessionPlanAndExec) string {
+	// Try to extract root task Name/Goal from TaskTree (serialized aid.AiTask)
+	if record != nil && strings.TrimSpace(record.TaskTree) != "" {
+		var root struct {
+			Name string `json:"name"`
+			Goal string `json:"goal"`
+		}
+		if err := json.Unmarshal([]byte(record.TaskTree), &root); err == nil {
+			name := strings.TrimSpace(root.Name)
+			goal := strings.TrimSpace(root.Goal)
+			if goal != "" {
+				if name != "" {
+					return fmt.Sprintf("恢复执行: %s — %s", name, goal)
+				}
+				return fmt.Sprintf("恢复执行: %s", goal)
+			}
+			if name != "" {
+				return fmt.Sprintf("恢复执行: %s", name)
+			}
+		}
+	}
+	// Fall back to PlanPayload from TaskProgress (detachedPlanProgress)
+	if record != nil && strings.TrimSpace(record.TaskProgress) != "" {
+		var prog detachedPlanProgress
+		if err := json.Unmarshal([]byte(record.TaskProgress), &prog); err == nil {
+			if payload := strings.TrimSpace(prog.PlanPayload); payload != "" {
+				return fmt.Sprintf("恢复执行: %s", payload)
+			}
+		}
+	}
+	return "恢复执行计划"
 }
 
 func parseExecuteDetachedPlanParams(syncJSON string) (coordinatorID, sessionID, reactTaskID string, input *aicommon.ExecutePlanInput, err error) {
