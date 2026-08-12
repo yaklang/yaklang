@@ -62,6 +62,7 @@ jq -e \
     .recipe.link_mode == "dynamic-container" and
     .recipe.module_go_version == "1.22.12" and
     (.capabilities | index("ai.session.bind_epoch.v1")) != null and
+    (.capabilities | index("ai.session.turn_lifecycle.v1")) != null and
     (.capabilities | index("ai.session.runtime")) != null and
     (.capabilities | index("yak.execute")) != null and
     .image.ref == $image_ref and

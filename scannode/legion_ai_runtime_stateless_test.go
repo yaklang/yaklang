@@ -109,6 +109,41 @@ func (e *blockingTurnFailureEmitter) FailTurn(string, string, string, []byte) {
 	e.once.Do(func() { close(e.started) })
 	<-e.release
 }
+func (*blockingTurnFailureEmitter) TurnCompleted(string, []byte) {}
+func (e *blockingTurnFailureEmitter) TurnFailed(string, string, string, []byte) {
+	e.once.Do(func() { close(e.started) })
+	<-e.release
+}
+
+type conversationTurnResult struct {
+	turnID  string
+	code    string
+	message string
+	payload []byte
+}
+
+type recordingConversationTurnEmitter struct {
+	completed chan conversationTurnResult
+	failed    chan conversationTurnResult
+}
+
+func (recordingConversationTurnEmitter) Emit(string, []byte)           {}
+func (recordingConversationTurnEmitter) Done([]byte)                   {}
+func (recordingConversationTurnEmitter) Failed(string, string, []byte) {}
+func (recordingConversationTurnEmitter) DoneTurn(string, []byte)       {}
+func (recordingConversationTurnEmitter) FailTurn(string, string, string, []byte) {
+}
+func (e recordingConversationTurnEmitter) TurnCompleted(turnID string, payload []byte) {
+	e.completed <- conversationTurnResult{turnID: turnID, payload: append([]byte(nil), payload...)}
+}
+func (e recordingConversationTurnEmitter) TurnFailed(turnID, code, message string, payload []byte) {
+	e.failed <- conversationTurnResult{
+		turnID:  turnID,
+		code:    code,
+		message: message,
+		payload: append([]byte(nil), payload...),
+	}
+}
 
 func (recordingSingleRunEmitter) Emit(string, []byte) {}
 func (recordingSingleRunEmitter) Done([]byte)         {}
@@ -210,11 +245,10 @@ func TestStatelessDriverBindReturnsHandleWithoutEngineField(t *testing.T) {
 	}
 }
 
-func TestStatelessDriverRejectsNewInputWhileTerminalFailurePublicationIsBlocked(t *testing.T) {
+func TestStatelessDriverKeepsConversationRuntimeAfterTurnFailure(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()
 	engine.sendErr = errors.New("provider failed")
 	emitter := newBlockingTurnFailureEmitter()
-	t.Cleanup(func() { close(emitter.release) })
 	handle := &statelessAIEngineRuntimeHandle{
 		binding: aiSessionBinding{
 			ExecutionMode: "conversation",
@@ -249,8 +283,73 @@ func TestStatelessDriverRejectsNewInputWhileTerminalFailurePublicationIsBlocked(
 		InputType:   "message",
 		PayloadJSON: []byte(`{"content":"second"}`),
 	})
-	if err == nil || !strings.Contains(err.Error(), "runtime is closed") {
-		t.Fatalf("new input during terminal publication error = %v, want closed runtime", err)
+	if err == nil || !strings.Contains(err.Error(), "turn already active") {
+		t.Fatalf("new input during turn-failure publication error = %v, want active turn", err)
+	}
+	close(emitter.release)
+	select {
+	case <-engine.closed:
+	case <-time.After(time.Second):
+		t.Fatal("failed per-turn engine was not closed")
+	}
+	if handle.closed {
+		t.Fatal("conversation runtime was closed by a per-turn failure")
+	}
+}
+
+func TestStatelessConversationPublishesTurnCompletionAndRemainsReusable(t *testing.T) {
+	firstEngine := newFakeStatelessTurnEngine()
+	secondEngine := newFakeStatelessTurnEngine()
+	engines := make(chan statelessTurnEngine, 2)
+	engines <- firstEngine
+	engines <- secondEngine
+	emitter := recordingConversationTurnEmitter{
+		completed: make(chan conversationTurnResult, 2),
+		failed:    make(chan conversationTurnResult, 1),
+	}
+	handle := &statelessAIEngineRuntimeHandle{
+		binding: aiSessionBinding{ExecutionMode: "conversation"},
+		emitter: emitter,
+		newEngine: func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+			return <-engines, nil
+		},
+	}
+
+	if err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref: aiSessionCommandRef{CommandID: "turn-one"}, InputType: "message",
+		PayloadJSON: []byte(`{"content":"first"}`),
+	}); err != nil {
+		t.Fatalf("send first turn: %v", err)
+	}
+	<-firstEngine.started
+	close(firstEngine.release)
+	select {
+	case result := <-emitter.completed:
+		if result.turnID != "turn-one" {
+			t.Fatalf("completed turn id = %q, want turn-one", result.turnID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("first turn completion was not published")
+	}
+
+	if err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref: aiSessionCommandRef{CommandID: "turn-two"}, InputType: "message",
+		PayloadJSON: []byte(`{"content":"second"}`),
+	}); err != nil {
+		t.Fatalf("send second turn: %v", err)
+	}
+	<-secondEngine.started
+	close(secondEngine.release)
+	select {
+	case result := <-emitter.completed:
+		if result.turnID != "turn-two" {
+			t.Fatalf("completed turn id = %q, want turn-two", result.turnID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("second turn completion was not published")
+	}
+	if handle.closed {
+		t.Fatal("conversation runtime was closed after successful turns")
 	}
 }
 

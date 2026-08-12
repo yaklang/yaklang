@@ -133,7 +133,7 @@ jq -n \
       module_go_version: $module_go_version,
       go_version: $go_version
     },
-    capabilities: ["ai.session.bind_epoch.v1", "hids", "ssa.rule_sync.export", "yak.execute"],
+    capabilities: ["ai.session.bind_epoch.v1", "ai.session.turn_lifecycle.v1", "hids", "ssa.rule_sync.export", "yak.execute"],
     binary: {
       path: $binary_name,
       sha256: $binary_sha,

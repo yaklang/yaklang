@@ -466,20 +466,24 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 
 	h.mu.Lock()
 	closed := h.closed
-	singleRunTerminal := ctx.Err() == nil && !closed &&
-		strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run")
-	terminalFailure := err != nil && ctx.Err() == nil && !closed
+	singleRun := strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run")
+	singleRunTerminal := ctx.Err() == nil && !closed && singleRun
+	turnFailure := err != nil && ctx.Err() == nil && !closed
 	autoComplete := err == nil && singleRunTerminal
-	if singleRunTerminal || terminalFailure {
+	if singleRunTerminal || (turnFailure && singleRun) {
 		h.closed = true
-	}
-	if h.activeTurn == turn {
-		h.activeTurn = nil
 	}
 	h.mu.Unlock()
 	turn.close()
+	defer func() {
+		h.mu.Lock()
+		if h.activeTurn == turn {
+			h.activeTurn = nil
+		}
+		h.mu.Unlock()
+	}()
 
-	if terminalFailure {
+	if turnFailure {
 		code := yakAISendFailureCode(err)
 		if turn.directForge {
 			code = "yak_ai_forge_failed"
@@ -487,11 +491,35 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 		detailJSON := mustJSON(map[string]string{
 			"runtime": "stateless_yak_ai_engine",
 		})
+		if singleRun {
+			if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok {
+				completer.FailTurn(turn.turnID, code, err.Error(), detailJSON)
+				return
+			}
+			h.emitter.Failed(code, err.Error(), detailJSON)
+			return
+		}
+		if reporter, ok := h.emitter.(aiSessionRuntimeTurnReporter); ok {
+			reporter.TurnFailed(turn.turnID, code, err.Error(), detailJSON)
+			return
+		}
 		if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok {
 			completer.FailTurn(turn.turnID, code, err.Error(), detailJSON)
 			return
 		}
 		h.emitter.Failed(code, err.Error(), detailJSON)
+		return
+	}
+	if err == nil && !singleRunTerminal && ctx.Err() == nil && !closed {
+		resultJSON := mustJSON(map[string]string{
+			"execution_mode": "multi_turn",
+			"turn_id":        turn.turnID,
+		})
+		if reporter, ok := h.emitter.(aiSessionRuntimeTurnReporter); ok {
+			reporter.TurnCompleted(turn.turnID, resultJSON)
+			return
+		}
+		h.emitter.Emit(aiSessionRuntimeEventTurnCompleted, resultJSON)
 		return
 	}
 	if autoComplete {
