@@ -321,6 +321,26 @@ func (r *ReAct) PlanAndExecute(ctx context.Context, planPayload string) error {
 	return finalErr
 }
 
+// executeRecovery runs invokePlanAndExecute with the recovery-specific
+// parameters stored in RecoveryTaskData.  It is called by processRecoveryTask
+// after the recovery task is dequeued by the QueueProcessor.
+func (r *ReAct) executeRecovery(task aicommon.AIStatefulTask, data *aicommon.RecoveryTaskData) error {
+	invokeOpts := []InvokePlanAndExecuteOption{
+		WithInvokePlanAndExecuteTask(task),
+		WithInvokePlanAndExecuteCoordinatorID(data.CoordinatorID),
+		WithInvokePlanAndExecuteStartTaskID(data.StartTaskID),
+	}
+	if data.ExecutePlanInput != nil {
+		invokeOpts = append(invokeOpts,
+			WithInvokePlanAndExecutePlanPayload(data.ExecutePlanInput.PlanPayload))
+		invokeOpts = append(invokeOpts,
+			WithInvokePlanAndExecuteExecutePlanInput(data.ExecutePlanInput))
+	}
+
+	taskDone := make(chan struct{})
+	return r.invokePlanAndExecute(taskDone, task.GetContext(), invokeOpts...)
+}
+
 // RecoverPlanAndExecute is the synchronous version of AsyncRecoverPlanAndExecute.
 // It recovers and executes a plan, blocking until completion.
 func (r *ReAct) RecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskID string, input *aicommon.ExecutePlanInput) error {

@@ -291,11 +291,25 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		"react_task_id":  reactTaskID,
 	}, event.SyncID)
 
-	go func() {
-		if err := r.RecoverPlanAndExecute(r.config.Ctx, coordinatorID, "", approvedInput); err != nil {
-			log.Errorf("execute detached plan via recovery failed: coordinator=%s err=%v", coordinatorID, err)
-		}
-	}()
+	// Create a recovery task and enqueue it so the QueueProcessor
+	// handles it serially alongside normal free-input tasks.
+	recoveryTask := aicommon.NewStatefulTaskBase(
+		formatRecoveryTaskID(coordinatorID),
+		approvedInput.PlanPayload,
+		r.config.GetContext(),
+		r.Emitter,
+	)
+	recoveryTask.SetTaskKind(aicommon.AITaskKind_Recovery)
+	recoveryTask.SetRecoveryData(&aicommon.RecoveryTaskData{
+		CoordinatorID:    coordinatorID,
+		StartTaskID:      "",
+		ExecutePlanInput: approvedInput,
+	})
+	recoveryTask.SetStatus(aicommon.AITaskState_Queueing)
+	if err := r.taskQueue.Append(recoveryTask); err != nil {
+		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
+		return nil
+	}
 	return nil
 }
 
