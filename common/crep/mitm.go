@@ -352,6 +352,7 @@ type MITMServer struct {
 	responseHijackHandler                 func(isHttps bool, r *http.Request, rspIns *http.Response, rsp []byte, remoteAddr string) []byte
 	responseHijackHandlerWithModification func(isHttps bool, r *http.Request, rspIns *http.Response, rsp []byte, remoteAddr string) ([]byte, bool)
 	httpFlowMirror                        func(isHttps bool, r *http.Request, rsp *http.Response, startTs int64)
+	streamRecorderFactory                 minimartian.HTTPStreamRecorderFactory
 
 	// websocket
 	websocketHijackMode            *utils.AtomicBool
@@ -494,6 +495,7 @@ func (m *MITMServer) initConfig() error {
 	m.proxy.SetHTTPForceClose(m.forceDisableKeepAlive)
 	m.proxy.SetFindProcessName(m.findProcessName)
 	m.proxy.SetDialer(m.dialer)
+	m.proxy.SetHTTPStreamRecorderFactory(m.streamRecorderFactory)
 
 	// when CA cert page is disabled, also disable the built-in branded error page
 	m.proxy.SetDisableBuiltinPage(!m.enableMITMCACertPage)

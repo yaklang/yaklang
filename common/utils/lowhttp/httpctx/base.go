@@ -422,6 +422,7 @@ const (
 	REQUEST_CONTEXT_KEY_MitmFrontendReadWriter       = "mitmFrontendReadWriter"
 	REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback     = "mitmSkipFrontendFeedback"
 	REQUEST_CONTEXT_KEY_ResponseFinishedCallback     = "responseFinishedCallback"
+	REQUEST_CONTEXT_KEY_ResponseStreamRecorder       = "responseStreamRecorder"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile   = "ResponseTooLargeHeaderFile"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile     = "ResponseTooLargeBodyFile"
 	REQUEST_CONTEXT_KEY_ResponseBodySize             = "ResponseBodySize"
@@ -439,6 +440,17 @@ const (
 	REQUEST_CONTEXT_KEY_ShouldMockResponse           = "shouldMockResponse"  // Flag to indicate mock response should be used
 	REQUEST_CONTEXT_KEY_TLS_SNI                      = "tlsSNI"              // TLS Server Name Indication (domain name for TLS handshake)
 )
+
+func SetResponseStreamRecorder(req *http.Request, recorder any) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder, recorder)
+}
+
+func GetResponseStreamRecorder(req *http.Request) any {
+	if req == nil {
+		return nil
+	}
+	return GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder)
+}
 
 func SetRequestMITMTaskID(req *http.Request, id string) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_MITMTaskID, id)

@@ -1541,6 +1541,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 	}
 
+	streamRecorderFactory := minimartian.HTTPStreamRecorderFactory(func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte) (io.WriteCloser, error) {
+		if httpctx.IsFiltered(req) {
+			return nil, nil
+		}
+		return yakit.NewHTTPFlowStreamRecorder(s.GetProjectDatabase(), isHTTPS, req, rsp, headerBytes)
+	})
+
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
 		responseMirrorAtUnixMs := time.Now().UnixMilli()
 		// Filtered responses skip the response-hijack callback, so mirror is also
@@ -1630,6 +1637,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		// 劫持过滤: 被过滤且未命中敏感信息的流量直接丢弃; 命中敏感信息的过滤流量继续走保存(以插件流量形式)。
 		if isFiltered && !tgSaveAsPlugin {
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				if err := recorder.Drop(); err != nil {
+					log.Warnf("drop filtered HTTP stream flow failed: %v", err)
+				}
+			}
 			return
 		}
 		saveBarePacketHandler := func(id uint) {
@@ -1843,9 +1855,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			// 内置高危凭证检测(TrafficGuard): 复用上面过滤前已扫描的 tgFindings, 标红并生成 Risk。
 			trafficguard.ApplyToFlow(s.GetProjectDatabase(), flow, tgFindings, plainRequest, plainResponse)
 			tags := flow.Tags
-			err := yakit.InsertHTTPFlowEx(flow, false, func() {
-				saveBarePacketHandler(flow.ID)
-			})
+			var err error
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				err = recorder.Finalize(flow)
+				if err == nil {
+					saveBarePacketHandler(flow.ID)
+				}
+			} else {
+				err = yakit.InsertHTTPFlowEx(flow, false, func() {
+					saveBarePacketHandler(flow.ID)
+				})
+			}
 			if err != nil {
 				yakit.ReleaseHTTPFlowPersistResources(flow)
 				log.Errorf("create / save httpflow from mirror error: %s", err)
@@ -1866,6 +1886,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		} else {
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				if err := recorder.Drop(); err != nil {
+					log.Warnf("drop HTTP stream flow rejected by save hook failed: %v", err)
+				}
+			}
 			yakit.ReleaseHTTPFlowPersistResources(flow)
 		}
 	}
@@ -1921,6 +1946,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_SetWebsocketRequestHijackRaw(handleHijackWsRequest),
 		crep.MITM_SetWebsocketResponseHijackRaw(handleHijackWsResponse),
 		crep.MITM_SetHTTPResponseMirror(handleMirrorResponse),
+		crep.MITM_SetHTTPStreamRecorderFactory(streamRecorderFactory),
 		crep.MITM_SetWebsocketHijackMode(true),
 		crep.MITM_SetHTTP2(firstReq.GetEnableHttp2()),
 		crep.MITM_MergeOptions(opts...),
