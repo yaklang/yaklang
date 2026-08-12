@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -459,6 +460,87 @@ func TestTaskQueue_ConcurrentOperations(t *testing.T) {
 	if !queue.IsEmpty() {
 		t.Error("Queue should be empty after all tasks retrieved")
 	}
+}
+
+func TestTaskQueue_LenConcurrentWithMutation(t *testing.T) {
+	queue := NewTaskQueue("len-concurrent-test")
+	const iterations = 1000
+
+	start := make(chan struct{})
+	done := make(chan struct{}, 2)
+	go func() {
+		defer func() { done <- struct{}{} }()
+		<-start
+		for i := 0; i < iterations; i++ {
+			task := aicommon.NewStatefulTaskBase(fmt.Sprintf("len-task-%d", i), "input", nil, nil)
+			_ = queue.Append(task)
+			_ = queue.GetFirst()
+		}
+	}()
+	go func() {
+		defer func() { done <- struct{}{} }()
+		<-start
+		for i := 0; i < iterations; i++ {
+			_ = queue.Len()
+		}
+	}()
+
+	close(start)
+	<-done
+	<-done
+}
+
+func TestTaskQueue_DequeueHooksRunOutsideQueueLock(t *testing.T) {
+	queue := NewTaskQueue("dequeue-hook-reentry-test")
+	queue.AddDequeueHook(func(task aicommon.AIStatefulTask, reason string) {
+		// ReAct's production hook does exactly this when it emits queue_len.
+		// The callback must therefore be able to re-enter the queue lock.
+		_ = queue.Len()
+	})
+
+	first := aicommon.NewStatefulTaskBase("first", "input", nil, nil)
+	require.NoError(t, queue.Append(first))
+	getDone := make(chan aicommon.AIStatefulTask, 1)
+	go func() { getDone <- queue.GetFirst() }()
+	select {
+	case got := <-getDone:
+		require.Same(t, first, got)
+	case <-time.After(time.Second):
+		t.Fatal("GetFirst deadlocked while dequeue hook read queue length")
+	}
+
+	second := aicommon.NewStatefulTaskBase("second", "input", nil, nil)
+	require.NoError(t, queue.Append(second))
+	removeDone := make(chan bool, 1)
+	go func() { removeDone <- queue.RemoveTask(second.GetId()) }()
+	select {
+	case removed := <-removeDone:
+		require.True(t, removed)
+	case <-time.After(time.Second):
+		t.Fatal("RemoveTask deadlocked while dequeue hook read queue length")
+	}
+}
+
+func TestTaskQueue_EnqueueHooksRunOutsideQueueLock(t *testing.T) {
+	queue := NewTaskQueue("enqueue-hook-reentry-test")
+	queue.AddEnqueueHook(func(task aicommon.AIStatefulTask) (bool, error) {
+		// Hooks are user callbacks and may inspect the queue just like production
+		// dequeue hooks do. Snapshotting the hook list must not keep the queue lock
+		// held while invoking them.
+		_ = queue.Len()
+		return true, nil
+	})
+
+	task := aicommon.NewStatefulTaskBase("enqueue-reentry", "input", nil, nil)
+	appendDone := make(chan error, 1)
+	go func() { appendDone <- queue.Append(task) }()
+	select {
+	case err := <-appendDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("Append deadlocked while enqueue hook read queue length")
+	}
+	require.Equal(t, 1, queue.Len())
 }
 
 // TestTaskQueue_HookWithPrependToFirst 测试插队操作的钩子处理

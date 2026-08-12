@@ -60,11 +60,11 @@ func (a *Action) WaitParse(ctx context.Context) {
 // mirrored AI tags) has been parsed and returns the parser error, if any.
 //
 // ReadFromReader intentionally remains asynchronous so callers can consume
-// individual streaming fields. Callers that are about to validate or execute
-// an action must use this method (or ExtractValidActionFromStream) as the
-// completion barrier; a partially streamed action can already contain a valid
-// @action and several flattened fields while its canonical JSON object is
-// still incomplete.
+// individual streaming fields. Protocols that need a complete canonical value
+// (notably object-array batch actions) must use this method, or
+// ExtractValidActionFromStream, as their completion barrier. Legacy scalar
+// consumers may continue waiting on individual fields through GetString /
+// GetInvokeParams without waiting for the whole action.
 func (a *Action) WaitParseResult(ctx context.Context) error {
 	if a == nil {
 		return utils.Error("cannot wait for a nil action")
@@ -155,11 +155,21 @@ func (a *Action) hasRecognizedActionWithoutCanonicalObject() bool {
 }
 
 func (a *Action) Name() string {
+	if a == nil {
+		return ""
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.name
 }
 
 func (a *Action) SetName(i string) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
 	a.name = i
+	a.mu.Unlock()
 }
 
 func (a *Action) waitKey(key ...string) {

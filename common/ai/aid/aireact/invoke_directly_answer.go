@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"io"
 
@@ -100,7 +101,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			boundEmitter := rsp.BindEmitter(r.Emitter)
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
 
-			hasAnswerPayloadKey := false
+			var hasAnswerPayloadKey atomic.Bool
 			action, err := aicommon.ExtractActionFromStream(
 				ctx,
 				stream, "object",
@@ -110,12 +111,16 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"answer_payload"},
 					func(key string, reader io.Reader) {
-						hasAnswerPayloadKey = true
+						hasAnswerPayloadKey.Store(true)
 						var out bytes.Buffer
 						reader = utils.JSONStringReader(reader)
 						reader = io.TeeReader(reader, &out)
-						var event *schema.AiOutputEvent
-						event, _ = boundEmitter.EmitTextMarkdownStreamEvent(
+						// EmitTextMarkdownStreamEvent starts its copy goroutine before it
+						// returns the start event. Pass that event to the completion callback
+						// through a one-item hand-off instead of closing over a pointer that
+						// is still being assigned.
+						eventReady := make(chan *schema.AiOutputEvent, 1)
+						event, _ := boundEmitter.EmitTextMarkdownStreamEvent(
 							"re-act-loop-answer-payload",
 							reader,
 							rsp.GetTaskIndex(),
@@ -123,11 +128,12 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 								if !config.SkipEmitResultAfterDone {
 									r.EmitResultAfterStream(out.String())
 								}
-								if event != nil {
-									emitReferenceMaterial(event)
+								if completedEvent := <-eventReady; completedEvent != nil {
+									emitReferenceMaterial(completedEvent)
 								}
 							},
 						)
+						eventReady <- event
 					}),
 			)
 			if err != nil {
@@ -141,7 +147,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			if payload == "" {
 				payload = action.GetString("next_action.answer_payload")
 			}
-			if payload == "" && !hasAnswerPayloadKey {
+			if payload == "" && !hasAnswerPayloadKey.Load() {
 				return errorWarp(utils.Error("no answer_payload key in stream"))
 			}
 			finalResult = payload

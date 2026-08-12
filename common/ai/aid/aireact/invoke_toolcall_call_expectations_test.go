@@ -60,6 +60,17 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 		return rsp, nil
 	}
 
+	// The finish action is followed by a distinct final-synthesis request. Its
+	// parser accepts directly_answer/answer_payload, not another finish action;
+	// returning the latter makes the transaction retry until slow/race suites hit
+	// their outer deadline.
+	if isDirectAnswerPrompt(prompt) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_answer","answer_payload":"mocked summary after interval-reviewed tool call"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出, 主动 finish 收口.
 	rsp := i.NewAIResponse()
 	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
@@ -110,7 +121,7 @@ func TestReAct_ToolUse_CallExpectations_InIntervalReview(t *testing.T) {
 		}
 	}()
 
-	after := time.After(15 * time.Second)
+	after := time.After(30 * time.Second)
 	reviewed := false
 
 LOOP:
@@ -178,7 +189,7 @@ func TestReAct_ToolUse_CallExpectations_InTimelineVerify(t *testing.T) {
 		}
 	}()
 
-	after := time.After(15 * time.Second)
+	after := time.After(30 * time.Second)
 	reviewed := false
 
 LOOP:
@@ -270,7 +281,7 @@ func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
 		}
 	}()
 
-	after := time.After(15 * time.Second)
+	after := time.After(30 * time.Second)
 	reviewed := false
 
 LOOP_EXTRA_PROMPT:

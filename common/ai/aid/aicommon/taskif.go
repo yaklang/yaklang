@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/segmentio/ksuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -138,6 +138,7 @@ type AIStatefulTaskBase struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	taskMutex *sync.Mutex
+	statusMu  sync.RWMutex
 	status    AITaskState
 	createdAt time.Time
 	asyncMode bool
@@ -550,7 +551,17 @@ func (s *AIStatefulTaskBase) SetRecoveryData(data *RecoveryTaskData) {
 }
 
 func (s *AIStatefulTaskBase) IsFinished() bool {
-	switch s.status {
+	if s == nil {
+		return false
+	}
+	s.statusMu.RLock()
+	status := s.status
+	s.statusMu.RUnlock()
+	return isFinishedTaskStatus(status)
+}
+
+func isFinishedTaskStatus(status AITaskState) bool {
+	switch status {
 	case AITaskState_Completed, AITaskState_Aborted, AITaskState_Skipped:
 		return true
 	default:
@@ -571,6 +582,11 @@ func (s *AIStatefulTaskBase) SetUserInput(s2 string) {
 }
 
 func (s *AIStatefulTaskBase) GetStatus() AITaskState {
+	if s == nil {
+		return AITaskState_Created
+	}
+	s.statusMu.RLock()
+	defer s.statusMu.RUnlock()
 	return s.status
 }
 
@@ -590,14 +606,18 @@ func (s *AIStatefulTaskBase) setStatus(status AITaskState, force bool) {
 	if s == nil {
 		return
 	}
-	if !force && s.IsFinished() {
+	s.statusMu.Lock()
+	if !force && isFinishedTaskStatus(s.status) {
+		s.statusMu.Unlock()
 		return // 已完成的任务状态不可更改
 	}
 	old := s.status
 	s.status = status
+	finished := isFinishedTaskStatus(status)
+	s.statusMu.Unlock()
 
 	defer func() {
-		if s.IsFinished() {
+		if finished {
 			if s.cancel != nil {
 				s.cancel()
 			}
@@ -620,7 +640,12 @@ func (s *AIStatefulTaskBase) setStatus(status AITaskState, force bool) {
 // RestoreStatus rehydrates a persisted status without triggering cancellation or events.
 // This is used when rebuilding task state from storage and the task may need a fresh context.
 func (s *AIStatefulTaskBase) RestoreStatus(status AITaskState) {
+	if s == nil {
+		return
+	}
+	s.statusMu.Lock()
 	s.status = status
+	s.statusMu.Unlock()
 }
 
 func (s *AIStatefulTaskBase) GetCreatedAt() time.Time {

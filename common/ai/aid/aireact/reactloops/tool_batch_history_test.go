@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -62,10 +63,11 @@ func TestToolBatchActionInferenceAndHistoryExtraction(t *testing.T) {
 func TestToolBatchHistoryCountsChildrenAndClonesParams(t *testing.T) {
 	records := []*ActionRecord{
 		{
-			ActionType:    schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-			ToolName:      "read_file",
-			ToolNames:     []string{"read_file", "grep"},
-			ToolCallCount: 2,
+			ActionType:            schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
+			ToolName:              "read_file",
+			ToolNames:             []string{"read_file", "grep"},
+			ToolCallCount:         2,
+			ExecutedToolCallCount: 1,
 		},
 		{
 			ActionType:    schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
@@ -86,6 +88,7 @@ func TestToolBatchHistoryCountsChildrenAndClonesParams(t *testing.T) {
 	require.Equal(t, "read_file", feedbackAction.ToolName)
 	require.Equal(t, []string{"read_file", "grep"}, feedbackAction.ToolNames)
 	require.Equal(t, 2, feedbackAction.ToolCallCount)
+	require.Equal(t, 1, feedbackAction.ExecutedToolCallCount)
 	records[0].ToolNames[0] = "mutated_after_projection"
 	require.Equal(t, []string{"read_file", "grep"}, feedbackAction.ToolNames,
 		"value-feedback projection must own its ordered tool-name slice")
@@ -97,4 +100,32 @@ func TestToolBatchHistoryCountsChildrenAndClonesParams(t *testing.T) {
 	clonedCalls := cloned["calls"].([]any)
 	clonedCalls[0].(map[string]any)["tool_name"] = "mutated"
 	require.Equal(t, "read_file", original["calls"].([]any)[0].(map[string]any)["tool_name"])
+}
+
+func TestToolExecutionFactIsIndependentFromDeclaredHistory(t *testing.T) {
+	declaredButRejected := &ActionRecord{
+		ActionType:     schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
+		IterationIndex: 7,
+		ToolName:       "read_file",
+		ToolNames:      []string{"read_file", "grep"},
+		ToolCallCount:  2,
+	}
+	loop := &ReActLoop{
+		actionHistory:      []*ActionRecord{declaredButRejected},
+		actionHistoryMutex: new(sync.Mutex),
+	}
+
+	require.False(t, loop.iterationExecutedTool(7),
+		"a declared batch rejected before callbacks must not emit iteration_end")
+
+	op := newLoopActionHandlerOperator(nil)
+	op.MarkToolExecuted(1)
+	loop.applyActionExecutionRecord(declaredButRejected, op)
+
+	require.Equal(t, []string{"read_file", "grep"}, declaredButRejected.ToolNames,
+		"execution accounting must preserve the model-declared history")
+	require.Equal(t, 2, declaredButRejected.ToolCallCount)
+	require.Equal(t, 1, declaredButRejected.ExecutedToolCallCount)
+	require.True(t, loop.iterationExecutedTool(7),
+		"one settled success-or-failure ToolResult is objective execution")
 }

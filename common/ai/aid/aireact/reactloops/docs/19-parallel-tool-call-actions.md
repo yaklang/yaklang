@@ -40,7 +40,7 @@
       "identifier": "read_go_mod"
     },
     {
-      "tool_name": "read_file",1
+      "tool_name": "read_file",
       "params": {"path": "/workspace/README.md"},
       "identifier": "read_readme"
     }
@@ -78,7 +78,8 @@
 | child call | 数组中的一项真实工具调用 |
 | direct | 模型已经给出完整工具参数，跳过参数生成 |
 | require | 模型只点名工具，运行时还要生成参数 |
-| canonical object | 模型完整闭合后的原始嵌套 JSON 根对象，不是流式扁平缓存 |
+| canonical object | parser 完整闭合后得到的原始嵌套 JSON 根对象，不是流式扁平缓存；batch 数组必须从这里读取 |
+| scalar discriminator | 旧单调用的模式判定字段：direct 是 `directly_call_tool_name`，require 是 `tool_require_payload`；它们可在字段级 reader 中先于 canonical object 读取 |
 | admission / 预准入 | 真实插件开始前的工具解析、guard、参数修改与校验 |
 | ToolCaller | 项目中负责一项工具参数、审批、执行、结果和 checkpoint 的成熟管线 |
 | callback | 工具真正开始工作的函数边界；读文件、发 HTTP、写外部系统等副作用从这里发生 |
@@ -268,11 +269,13 @@ flowchart TD
 3. 协议硬上限 8，部署配置可以调低；
 4. 数组顺序就是模型声明顺序，后续结果和历史按它排序；
 5. child `identifier` 在同一批中不能重复；
-6. 不能同时使用新数组字段与旧标量字段；
+6. **模型协议禁止**同时使用新数组字段与旧标量字段；模型、Prompt 和调用方都必须二选一；
 7. 不能同时出现 direct 数组和 require 数组；
 8. 每个数组 item 使用严格白名单，item 中未声明字段会被拒绝；顶层 Action Schema 为兼容其他通用字段仍允许额外属性；
-9. Action 必须完整闭合，截断 JSON 不允许执行；
+9. batch 必须等待 Action 完整闭合后从 canonical object 读取；截断 batch 不允许执行；
 10. 业务依赖无法完全靠 JSON Schema 判断，模型和上层业务仍必须遵守“同批独立”原则。
+
+第 6 条是“模型应该怎样输出”的协议要求；为了不破坏已经在线的旧 scalar 流式路径，Runtime 另有一个有意保留的容错例外：如果 verifier 已经读到非空的旧 scalar discriminator，就按 scalar 处理，不再等待或采用同一响应里后来出现的 batch 字段。这个例外用于兼容历史输出，不代表 Prompt 可以教模型混写。
 
 ### 3.2 `directly_call_tool_calls`
 
@@ -485,11 +488,14 @@ use the legacy scalar fields for one call
 }
 ```
 
-预期错误：
+从模型协议看，这个响应非法，正确修复仍是删除其中一种形式：
 
 ```text
-directly_call_tool_calls cannot be combined with legacy directly_call_tool_* fields
+只调用一个工具：保留 directly_call_tool_name + directly_call_tool_params
+调用 2–8 个独立工具：只保留 directly_call_tool_calls[]
 ```
+
+但生产 verifier 为旧 scalar 流式兼容保留了确定性的降级规则：上例一旦读到 `directly_call_tool_name=read_file`，就选择 scalar 的 `/scalar` 调用并忽略 batch；require 的 `tool_require_payload` 也是同样规则。也就是说，“禁止混写”是模型协议，不能依赖“混写一定被 Runtime 报错”来做业务校验。纯 batch（没有旧 scalar discriminator）才进入 canonical batch 校验；direct/require 两种 batch 数组互相混装仍会被拒绝。
 
 #### 非法 3：require child 自带 `params`
 
@@ -603,6 +609,8 @@ TOOL_PARAM_content -> __aitag__content
 
 ## 4. 从 Prompt 到结果：完整生命周期
 
+下面这张图专门描述 **batch 路径**。旧 scalar 的字段级时机与它不同，见 4.2。
+
 ```mermaid
 sequenceDiagram
     participant Loop as ReAct 主循环
@@ -661,7 +669,28 @@ ReAct 的 AI Transaction 会在解析或校验失败时重试模型响应。若 
 
 主循环中解析/Verifier 位于 [exec.go](../exec.go) 的 `callAITransaction` postHandler，ActionHandler 在 transaction 返回成功之后才调用。
 
-### 4.2 一轮模型只观察一次 batch
+### 4.2 旧 scalar 的“流式兼容”到底保证什么
+
+旧 scalar verifier 先读取模式判定字段：
+
+```text
+direct  -> directly_call_tool_name
+require -> tool_require_payload
+```
+
+一旦这个字段可读，verifier 就可以按 scalar 路由，不调用 `WaitParseResult`，也不为了确认“后面是否还会出现 batch 数组”而等待 canonical object。direct 的 ToolCaller 仍保留原有“先创建工具调用卡，再由 prepare 读取/归一化参数”的顺序，所以参数字段晚于工具名到达时，不会因为 batch 接入而被强制改成“先完整解析全部 JSON 再建卡”。
+
+这里要严格区分三个时刻：
+
+1. **字段级 reader 可读**：parser 已经提取出 scalar discriminator，verifier 可以决定走旧路径；
+2. **Action/AI transaction 返回**：外层何时调 ActionHandler，取决于 transaction/provider 的响应生命周期；
+3. **真实插件 callback 启动**：还要经过 handler、工具解析、参数准备、审批和 ToolCaller gate。
+
+因此我们能承诺的是：batch 改造没有给 scalar verifier 增加 `WaitParseResult` 屏障，并保留了 ToolCaller 的 card-first/params-later 契约。我们**不能**笼统承诺“常规 provider 的网络响应还没 EOF，真实插件就一定已经启动”；当前常用 `CallAITransaction` 路径通常会先等待 response callback 完成，再进入 post-handler。自定义 reader/provider 能更早暴露字段时，scalar 路径不会额外等待 canonical EOF，但实际卡片和 callback 时机仍由外层 transaction 与审批链路共同决定。
+
+与之相对，纯 batch 必须等完整 canonical object，因为数组 item 有重复字段名、数量约束和跨项校验；截断 batch 绝不能提前执行。
+
+### 4.3 一轮模型只观察一次 batch
 
 任一 child 先完成都不会立即触发下一轮模型。运行时必须先 `wg.Wait()`，再按数组顺序提交结果。这样下一轮模型看到的是一个完整观察，而不是：
 
@@ -697,7 +726,7 @@ ActionMaker 为了让单字段尽早可读，会把嵌套字段回调扁平保�
 - `DecodeStrictObjectArray(raw)`：严格要求“数组中的每项都是 non-null、string-key object”；空 item `{}` 会在后续因为缺少 `tool_name` 被 verifier 拒绝；
 - `GetCanonicalObjectArray(key)`：区分字段缺失、字段为 null、字段类型错误。
 
-Batch verifier 只从 canonical root 或 canonical `next_action` 读取数组。
+Batch verifier 只从 canonical root 或 canonical `next_action` 读取数组。旧 scalar getter 继续使用字段级缓存；这两个读取模型不是互相替代，而是分别服务“单项尽早判路”和“多项严格归属”。
 
 ### 5.3 为什么要区分 `{}` 和 `[]`
 
@@ -715,14 +744,29 @@ Batch verifier 只从 canonical root 或 canonical `next_action` 读取数组。
 
 旧 `jsonextractor` 在空容器没有 key 时可能把空 object 误判为空 array。现在流式状态机会保留容器类型，`rawValueFormatter` 通过 map key kind 区分空 object 与空 array。实现见 [formatter.go](../../../../../jsonextractor/formatter.go) 与 [stream_extractor.go](../../../../../jsonextractor/stream_extractor.go)。
 
-### 5.4 Verifier 的完整校验顺序
+### 5.4 Verifier 的分流与完整校验顺序
+
+两个旧 Action 的 verifier 都先做同一层分流：
+
+```text
+旧 scalar discriminator 已出现
+  -> 立即选择 legacy scalar 路径
+  -> 不等待 canonical parse
+  -> 即使后续又出现 batch 字段，也保持 scalar 优先（兼容例外）
+
+旧 scalar discriminator 不存在
+  -> 才可能是 batch
+  -> WaitParseResult(ctx)
+  -> 只读 canonical object
+  -> 截断/reader error/cancel 直接失败
+```
 
 Direct batch：
 
 ```text
 等待完整 parse
   -> 确认字段真的是 object array
-  -> 拒绝标量混用/require 字段混用
+  -> 拒绝 require batch 字段混用
   -> 校验 2..configuredMax
   -> 拒绝未知 item 字段
   -> 校验 tool_name/identifier/expectations/reason 类型
@@ -739,7 +783,7 @@ Require batch：
 ```text
 等待完整 parse
   -> 确认字段真的是 object array
-  -> 拒绝标量混用/direct 字段混用
+  -> 拒绝 direct batch 字段混用
   -> 校验 2..configuredMax
   -> item 只允许 tool_name/identifier/reason
   -> 同批 identifier 去重
@@ -747,7 +791,7 @@ Require batch：
   -> 构造无 Params 的 ToolBatchRequest
 ```
 
-Verifier 实现见 [tool_batch_action.go](../loopinfra/tool_batch_action.go) 的 `parseDirectToolBatchAction` 和 `parseRequireToolBatchAction`。
+Batch canonical 校验实现见 [tool_batch_action.go](../loopinfra/tool_batch_action.go) 的 `parseDirectToolBatchAction` 和 `parseRequireToolBatchAction`；scalar-first 分流分别位于 [action_directly_call_tool.go](../loopinfra/action_directly_call_tool.go) 与 [action_tool_require_and_call.go](../loopinfra/action_tool_require_and_call.go)。
 
 ---
 
@@ -1078,7 +1122,10 @@ pending review 数 = 1
 - interval review AIRequest 使用 detached checkpoint；
 - continue/cancel 日志不占用主 Timeline 的恢复序号；
 - stdout/stderr snapshot 使用锁保护；
+- batch child 把自己的 derived emitter 显式传给 interval review；review 的 AI response stream 和 progress-review 生命周期事件都携带该 child 的 `CallToolID/ProcessesId`，不会回落到根 emitter；
 - 只有明确 cancel 才终止工具，review 子流程出错默认继续。
+
+这个 emitter 绑定很重要：两个同名工具同时运行时，`NodeId` 可能完全相同；如果 interval review 只绑定根 emitter，UI 会把 child 0 的审查流挂到 child 1 或批次根节点。当前实现由 `CreateIntervalReviewHandlerForTaskAndEmitter` 同时固定 owning task 和 owning child emitter，计时器触发时不再读取可变的 `currentTask` 或根 emitter。
 
 ### 7.8 第三方 Runtime 的安全兼容
 
@@ -1568,10 +1615,12 @@ Tool batch finished: 3 calls
 - 写入 Timeline `[TOOL_BATCH_RESULT]`；
 - 通过 `operator.Feedback(summary)` 成为下一轮观察；
 - 对成功工具更新 recent cache；
-- 统一触发一次 satisfaction verification；
+- 若至少一个 child 真正返回了 settled `ToolResult`，统一触发一次 satisfaction verification；
 - 最后只调用一次 `operator.Continue()`。
 
 不会发生“每完成一个 child 就触发一次下一轮 AI”。
+
+如果整批在 admission、审批 `direct_answer/cancel` 或其它 callback 之前就结束，仍会保留可诊断的 batch feedback/history，但不会伪装成“工具已经执行”：不触发 satisfaction verification，也不产生本轮的 value-feedback `iteration_end` 工具执行信号。
 
 ### 12.3 batch 顶层错误
 
@@ -1611,6 +1660,7 @@ Handler 不再生成普通 batch summary，而是调用：
   "tool_name": "read_file",
   "tool_names": ["read_file", "read_file", "stat"],
   "tool_call_count": 3,
+  "executed_tool_call_count": 3,
   "iteration_index": 4
 }
 ```
@@ -1619,8 +1669,11 @@ Handler 不再生成普通 batch summary，而是调用：
 
 - `ToolName`：第一项，供旧消费者继续工作；
 - `ToolNames`：所有 child，按模型数组顺序；
-- `ToolCallCount`：真实声明数，不能再把整个 batch 永远算成 1 次工具调用；
+- `ToolCallCount`：**模型声明数**，不能再把整个 batch 永远算成 1 次工具调用；它说明模型计划了多少项，不证明插件 callback 已发生；
+- `ExecutedToolCallCount`：handler 实际拿到 settled `ToolResult` 的 callback 数。成功结果和“插件确实运行但返回失败”都计数；admission/prepare/review/cancel 等得到 nil result 的 pre-invoke 结算不计数；
 - `ActionParams`：深拷贝 canonical 嵌套数组，后续 mutator 不会改写历史。
+
+例如模型声明 3 项，但第一项参数校验失败导致 direct 全批零执行时，`ToolCallCount=3`、`ExecutedToolCallCount=0`。两者不能合并：前者用于审计模型决策和工具预算，后者才是“这一轮真的发生过插件执行”的事实源。
 
 ### 12.6 Value Feedback 与 Subagent 统计
 
@@ -1630,7 +1683,12 @@ Value feedback 投影同样携带全部工具，摘要可读成：
 directly_call_tool(read_file,read_file,stat) -> finish
 ```
 
-Subagent pipeline 的工具预算/统计按 child 数计算。例如一个含 5 项的 Action 计为 5 次工具调用，不再计为 1。
+Value-feedback action 同时保留 `ToolCallCount` 与 `ExecutedToolCallCount`。其中：
+
+- Subagent pipeline 的**声明预算/统计**按 `ToolCallCount` 计算；例如一个含 5 项的 Action 消耗 5 项声明预算，不再计为 1；
+- `iterationExecutedTool` 和 `iteration_end` 的**实际执行判断**只看 `ExecutedToolCallCount > 0`，不能因为模型写了工具名或数组就宣称已经执行；
+- 整批 zero-invoke 或审批 `direct_answer` 的 `ExecutedToolCallCount=0`，因此不会触发该工具执行信号；
+- 某个 callback 真正启动并返回失败的 `ToolResult` 仍属于执行事实，计入 `ExecutedToolCallCount`。
 
 测试 [tool_batch_history_test.go](../tool_batch_history_test.go) 覆盖 direct/require 数组提取、旧标量兼容、深拷贝和 value feedback 投影。
 
@@ -1651,6 +1709,8 @@ child 0 terminal
 
 - 每个 child 内部 start → param/log → result → terminal 的 happens-before；
 - child 通过稳定 `ExecutionCallID/ProcessId` 分组；
+- 即使两个 child 调用同名工具、stdout/stderr 使用相同的人类可读 `NodeId`，每个 stream writer 的 start/delta/finish 仍绑定各自 `CallToolID/ProcessesId/RecoveryIndexID`，不会按工具名串线；
+- interval review 的 response stream 与 progress-review 事件同样绑定 owning child emitter；
 - batch 最终结果、Task、Timeline 汇总、History 按模型 index；
 - 下一轮晚于所有 child settled。
 
@@ -1771,21 +1831,20 @@ Prompt 策略与 Schema
   ↓
 jsonextractor / ActionMaker
   ↓
-direct / require batch verifier
-  ↓
-ToolBatchRequest
-  ↓
-AI Transaction 成功、保存模型响应
-  ↓
-ActionHandler
-  ↓
-ExecuteToolBatch coordinator
-  ↓
-N 个 child ToolCaller
-  ↓
-ordered review + final barrier + bounded invoke
-  ↓
-ToolBatchResult
+  ├─ scalar discriminator 已出现
+  │    -> legacy scalar-first verifier（字段级，不等 canonical）
+  │    -> AI Transaction 成功后进入 scalar ActionHandler
+  │    -> 单个 ToolCaller（card-first / params-later）
+  │
+  └─ scalar discriminator 不存在
+       -> direct / require batch verifier（WaitParseResult + canonical）
+       -> ToolBatchRequest
+       -> AI Transaction 成功、保存模型响应
+       -> ActionHandler
+       -> ExecuteToolBatch coordinator
+       -> N 个 child ToolCaller
+       -> ordered review + final barrier + bounded invoke
+       -> ToolBatchResult
   ↓
 Task / Timeline / Feedback / History / Value Feedback
 ```
@@ -1795,11 +1854,11 @@ Task / Timeline / Feedback / History / Value Feedback
 | 层 | 文件 | 关键入口 | 改动解决的问题 |
 |----|------|----------|----------------|
 | 容器解析 | [stream_extractor.go](../../../../../jsonextractor/stream_extractor.go)、[bufstack.go](../../../../../jsonextractor/bufstack.go)、[formatter.go](../../../../../jsonextractor/formatter.go) | `PushContainer`、`rawValueFormatter` | 保留 object/array 类型，尤其区分空 `{}` 与 `[]` |
-| Action 完整性 | [action.go](../../../aicommon/action.go) | `WaitParseResult`、`LookupCanonicalParam`、`DecodeStrictObjectArray` | 不用扁平缓存猜 batch；拒绝截断和伪数组 |
+| Action 读取语义 | [action.go](../../../aicommon/action.go) | scalar getters、`WaitParseResult`、`LookupCanonicalParam`、`DecodeStrictObjectArray` | scalar 保留字段级读取；batch 不用扁平缓存猜数组，并拒绝截断和伪数组 |
 | Batch DTO/配置 | [tool_batch.go](../../../aicommon/tool_batch.go) | `ToolBatchRequest`、`ToolBatchResult`、`ToolBatchInvokeRuntime` | 给 direct/require 一个统一、独立于 compose 的内部协议 |
 | Action wire format | [tool_batch_action.go](../loopinfra/tool_batch_action.go) | 四个 exact JSON 常量（每个 Action 各含 scalar + batch）、Schema option | 同时保留单调用协议并定义批量字段、严格 item 结构、数量上限 |
-| Direct 接入 | [action_directly_call_tool.go](../loopinfra/action_directly_call_tool.go) | verifier / handler | 优先识别数组，没数组时保持原标量行为 |
-| Require 接入 | [action_tool_require_and_call.go](../loopinfra/action_tool_require_and_call.go) | verifier / handler | 同上；require item 禁止 params |
+| Direct 接入 | [action_directly_call_tool.go](../loopinfra/action_directly_call_tool.go) | verifier / handler | 旧 `directly_call_tool_name` discriminator 优先；只有纯 batch 才等待 canonical 数组 |
+| Require 接入 | [action_tool_require_and_call.go](../loopinfra/action_tool_require_and_call.go) | verifier / handler | 旧 `tool_require_payload` discriminator 优先；纯 batch 的 require item 禁止 params |
 | Transaction 边界 | [exec.go](../exec.go) | AI transaction postHandler、ActionHandler dispatch | Transaction 内只解析校验，真实副作用放到成功后 |
 | Prompt Schema | [prompt.go](../prompt.go) | `applyToolBatchSchemaMaxItems` | 模型可见最大项数与部署配置一致 |
 | Prompt 稳定规则 | [frozen_block_section.txt](../../../aicommon/prompts/prefix/frozen_block_section.txt)、[high_static_section.txt](../../../aicommon/prompts/prefix/high_static_section.txt) | Tool Inventory / call mode 文案 | 教模型独立 batch 与依赖 DAG 的选择边界 |
@@ -1812,8 +1871,8 @@ Task / Timeline / Feedback / History / Value Feedback
 | 底层工具取消 | [tool_result.go](../../../aitool/tool_result.go) | `ExecuteToolWithCapture` | pre-cancel 不启动 callback；取消不读并发 goroutine 的 buffer |
 | Built-in 工具快照 | [buildin.go](../../../aitool/buildinaitools/buildin.go) | 全局工具发布/读取 | 并发读取工具目录时无 slice alias/race |
 | 历史 | [reactloop.go](../reactloop.go)、[exec.go](../exec.go) | `ActionRecord`、`extractToolNamesFromAction` | 一次 Action 正确记录所有 child |
-| Value feedback | [value_feedback.go](../../../aicommon/value_feedback.go)、[value_feedback_hook.go](../value_feedback_hook.go) | `ToolNames` / `ToolCallCount` | 评价和摘要不丢批次后续工具 |
-| Subagent 统计 | [subagent_pipeline.go](../subagent_pipeline.go) | child count | 工具预算按真实 child 数计算 |
+| Value feedback | [value_feedback.go](../../../aicommon/value_feedback.go)、[value_feedback_hook.go](../value_feedback_hook.go) | `ToolNames` / `ToolCallCount` / `ExecutedToolCallCount` | 声明数量与真实 callback 数分离；zero-invoke 不伪造 iteration_end |
+| Subagent 统计 | [subagent_pipeline.go](../subagent_pipeline.go) | declared child count | 工具声明预算按 `ToolCallCount` 计算；是否真实执行另看 `ExecutedToolCallCount` |
 
 ### 14.3 最推荐的阅读顺序
 
@@ -1913,10 +1972,14 @@ func ExecuteToolBatch(ctx, task, request) (*ToolBatchResult, error) {
 | `TestToolCallPromptExamples_ParseAndVerifyExactBytes` | 四份 Prompt 常量（direct/require × scalar/batch）逐字经过 production streaming parser、Schema、Verifier | 新增 batch 示例后把原 scalar 用法教丢，或示例只是“长得像 JSON”但生产 parser 实际不接受 |
 | `TestToolBatchSchema_DeclaresStrictObjectArrays` | `type=array`、`minItems=2`、`maxItems=8`、required、unknown field 禁止 | Prompt Schema 与 verifier 各说各话 |
 | `TestToolBatchMaxCalls_ClampsRawConfigToPublishedSchema` | 直接写原始 KV 后，verifier 使用的 `toolBatchMaxCalls()` 仍把 99→8、1→2 | 绕过公共 Option 后 verifier 数量边界失控；完整 Schema 同步由 schema stability 测试覆盖 |
-| `TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler` | 混用、重复 identifier、未知字段、坏 params、单项等全部拒绝 | 模糊输入进入有副作用 handler |
-| `TestRequireToolBatchVerifier_RejectsParamsAndMixedForms` | require child 带 params、与 scalar/direct 混用时拒绝 | 模型偷偷改变 require 的职责边界 |
+| `TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler` | 纯 direct batch 的伪数组、重复 identifier、坏 params、单项，以及 direct/require 两个 batch 数组混装都拒绝 | 模糊 batch 输入进入有副作用 handler |
+| `TestRequireToolBatchVerifier_RejectsParamsAndMixedForms` | require child 带 params、与 direct batch 数组混装时拒绝 | 模型偷偷改变 require 的职责边界 |
+| `TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContainsBatch` | 响应错误地同时写 scalar 与 batch 时，旧 discriminator 确定性优先，batch state 不建立 | batch 接入破坏已部署 scalar 输出，或同一畸形输入在两条路径间漂移 |
 | `TestToolBatchVerifier_RejectsTruncatedAction` | 截断 exact action 无法过 verifier | parser 安全规则在 Action 接入层被绕开 |
+| `TestToolBatchVerifier_WaitsForCompleteResponseEOF` | 纯 batch JSON 已写完但 reader 尚未 EOF 时 verifier 仍等待；EOF 后才形成 request | canonical batch 在 parser 最终状态未知时提前执行 |
+| `TestToolScalarVerifier_ReturnsBeforeCompleteResponseEOF` | scalar discriminator 已可读、reader 尚未 EOF 时 verifier 即返回 | 为了探测可选 batch 而把旧 scalar 强制改成全响应等待 |
 | `TestToolBatchActionHandler_UsesBatchRuntimeOnce` | 一份已验证 request 只调用一次 batch runtime | N 个 child 被错误展开成 N 次顶层 handler/operator |
+| `TestToolBatchActionHandler_ZeroInvokeDoesNotVerifyOrMarkExecution` | 全批 admission 拒绝、审批 direct-answer、真实 callback 返回失败三种边界 | 声明数被误当执行数；zero-invoke 触发 satisfaction/iteration_end，或失败 callback 被漏记 |
 | `TestToolBatchSerialFallback_SettlesNilAndDirectAnswerOutcomes` | 旧 runtime 空结果、direct-answer、剩余取消都有明确定义 | 兼容分支与生产 batch 语义漂移 |
 | `TestToolBatchPromptExamples_ExecuteActualToolCallbacks` | exact bytes → verifier → handler → 工具 callback，参数逐项断言 | 只覆盖 parser、从未证明能执行 |
 | `TestToolScalarPromptExamples_ExecuteActualToolCallbacks` | scalar exact bytes → 旧 handler → 单个真实工具 callback | batch 接入意外破坏或掩盖既有单调用路径 |
@@ -1931,6 +1994,7 @@ func ExecuteToolBatch(ctx, task, request) (*ToolBatchResult, error) {
 |------|------|----------------|
 | `TestExecuteToolBatch_RejectsScalarRequest` | runtime 被直接传入 1 项 | 拒绝；单项必须走原协议 |
 | `TestExecuteToolBatch_DirectBoundedConcurrencyAndOrderedCommit` | 故意让后项先完成 | active 不超过上限；outcomes 与 Task commit 仍按 index；Timeline 摘要的排序是 handler 中另一处显式实现 |
+| `TestExecuteToolBatch_SameToolLiveOutputEventsStayBoundToTheirChild` | 两个 child 并发调用同名工具并交错写 stdout/stderr | 相同 NodeId 下每个 writer 的 start/delta/finish 仍按 CallToolID/ProcessesId/RecoveryIndexID 归属，且早于各自 result |
 | `TestExecuteToolBatch_DirectAdmissionFailureStartsNothing` | 一项 direct 参数非法 | 所有真实 callback 计数为 0 |
 | `TestExecuteToolBatch_FreshRequestReplaysStableCheckpointIdentity` | 新 request/新 runtime 从相同起始序号恢复 | 已完成工具不再调用，稳定 ID 命中 |
 | `TestExecuteToolBatch_ReviewCardsFollowModelArrayOrder` | 参数准备完成顺序打乱 | 审批卡仍按 0,1,... 展示 |
@@ -1959,6 +2023,7 @@ func ExecuteToolBatch(ctx, task, request) (*ToolBatchResult, error) {
 
 - [toolcall_batch_sequence_test.go](../../../aicommon/toolcall_batch_sequence_test.go)：预留参数 transaction seq 只消费一次，递归 repair 不复用；
 - [invoke_toolcall_interval_checkpoint_test.go](../../invoke_toolcall_interval_checkpoint_test.go)：interval review 不移动主 checkpoint 序号；
+- [invoke_toolcall_interval_batch_test.go](../../invoke_toolcall_interval_batch_test.go)：同批每个 interval-review response stream/progress event 使用自己的 child emitter，cancel 只影响 owning child；
 - [invoke_toolcall_review_context_test.go](../../invoke_toolcall_review_context_test.go)：wrong-tool/wrong-params/interval 子 AI 使用 owning task 与 child context，不读取 decoy current task；
 - ToolCaller invoke tests：checkpoint identity mismatch 必须失败。
 
@@ -1969,6 +2034,8 @@ func ExecuteToolBatch(ctx, task, request) (*ToolBatchResult, error) {
 | `TestExecuteToolWithCapture_PreCancelledContextDoesNotStartCallback` | callback goroutine、stdout/stderr buffer |
 | `TestAllAIToolsSnapshotConcurrentPublishAndRead` | 全局 built-in tool slice 的发布与读取 |
 | batch tests 的 `-race` 运行 | outcomes、barrier、ordered stage、endpoint、emitter/task 归属 |
+| `TestExecuteToolBatch_SameToolLiveOutputEventsStayBoundToTheirChild` 的普通与 `-race` 运行 | 同名工具 stdout/stderr writer、CallToolID 与 stream lifecycle 归属 |
+| `TestExecuteToolBatch_IntervalReviewEventsStayWithChildAndCancelIsIsolated` 的普通与 `-race` 运行 | interval review child emitter、AI response stream、cancel context 隔离 |
 | review context 测试的 `-race` 运行 | PromptManager、currentTask/currentLoop 隔离 |
 
 Race detector 不是性能 benchmark；它用于证明这些共享内存路径没有未同步读写。业务顺序仍由普通断言另外验证。
@@ -1980,9 +2047,10 @@ Race detector 不是性能 benchmark；它用于证明这些共享内存路径�
 - legacy `@action:"object"` wrapper 能根据 canonical 数组推断真实 action；
 - direct/require batch 提取全部工具名；
 - `ToolName` 保留第一项兼容；
-- `ToolCallCount` 等于 child 数；
+- `ToolCallCount` 等于模型声明的 child 数；
+- `ExecutedToolCallCount` 独立记录实际 settled callback 数，zero-invoke 声明不会触发 `iteration_end`；
 - 嵌套 params 深拷贝，原 Action 后续修改不污染历史；
-- value feedback 和 subagent 统计使用全部 child。
+- value feedback 保留全部 child 及声明/执行双计数；subagent 声明预算使用全部 child。
 
 ### 15.8 如何为未来改动补测试
 
@@ -2124,7 +2192,8 @@ go test ./common/ai/aid/aireact \
 #### direct / require Action
 
 - 两个原 Action 增加各自数组 option；
-- verifier 先尝试 batch，batch 不存在时继续旧 scalar；
+- verifier 先看旧 scalar discriminator：存在就保持字段级 scalar 路径；不存在才等待并尝试 canonical batch；
+- 模型协议仍禁止 scalar/batch 混写；Runtime 对畸形混写响应固定 scalar 优先，只作为旧输出兼容；
 - handler 从 loop typed state 读取已验证 request；
 - scalar 协议和既有 fallback 不删除。
 
@@ -2149,14 +2218,17 @@ go test ./common/ai/aid/aireact \
 - built-in tool 列表用 snapshot + RWMutex；
 - callback capture 预取消时不启动 goroutine；
 - stdout/stderr snapshot 同步；
-- batch child 使用派生 emitter，不 swap task emitter。
+- batch child 使用派生 emitter，不 swap task emitter；
+- 同名工具的 stdout/stderr 用 writer ID + child `CallToolID/ProcessesId` 归属，不靠重复的 NodeId 猜测；
+- interval review 同时绑定 owning task 和 child emitter，response stream/progress/cancel 不串 sibling。
 
 #### Prompt、History、统计
 
 - 稳定 Prompt 明确 batch 与 compose 边界；
 - Schema property 注入 exact executable JSON；
 - Schema `maxItems` 跟随 config；
-- ActionRecord / ValueFeedbackAction 记录全部 ToolNames 和数量；
+- ActionRecord / ValueFeedbackAction 同时记录全部 ToolNames、模型声明 `ToolCallCount` 和实际 `ExecutedToolCallCount`；
+- zero-invoke/direct-answer 不触发 satisfaction 或 value-feedback `iteration_end`；
 - subagent 工具计数按 child 数。
 
 ### 17.3 为什么改动看起来比“加两个数组字段”大
@@ -2164,14 +2236,14 @@ go test ./common/ai/aid/aireact \
 Wire format 只增加两个数组字段，但真正安全的并发要求把隐含的串行假设显式化：
 
 ```text
-完整解析假设       -> parseDone / canonical-only
+batch 完整解析假设 -> parseDone / canonical-only；scalar 保留字段级 getter
 共享 currentTask   -> 显式 owning task
 共享 emitter scope -> immutable child emitter
 自然完成顺序       -> 预留 seq + ordered commit
 一次只有一个审批   -> ordered review gate
 工具前无全批屏障   -> final barrier
 取消只在外层检查   -> 每个 admission boundary 二次检查
-单工具历史字段     -> ToolNames / ToolCallCount
+单工具历史字段     -> ToolNames / 声明 ToolCallCount / 实际 ExecutedToolCallCount
 ```
 
 如果只改 JSON，而不改这些基础假设，功能可能在 happy path demo 中工作，却无法在审批、取消、恢复和 race 下可靠上线。
@@ -2184,7 +2256,8 @@ Wire format 只增加两个数组字段，但真正安全的并发要求把隐�
 
 | 对象 | 兼容方式 |
 |------|----------|
-| 模型旧输出 | 原 scalar direct/require 字段继续解析和执行 |
+| 模型旧输出 | 原 scalar direct/require 字段继续字段级解析和执行；verifier 不为探测 batch 强制等待 canonical EOF |
+| 畸形 scalar+batch 混写 | 模型协议仍判定为错误写法；Runtime 为兼容旧 scalar discriminator 固定选择 scalar，不采用 batch |
 | 第三方 `AIInvokeRuntime` | 不强制实现新方法；缺少 batch interface 时串行 fallback |
 | 旧 History 消费者 | `ToolName` 保留第一项；新消费者读取 `ToolNames` |
 | 旧 Value Feedback | 单工具记录仍按原方式投影；批量增加而不替换字段 |
@@ -2276,7 +2349,7 @@ CI 会让 object 形式的 scalar exact 示例经过 Schema、parser、verifier�
 | 现象/错误 | 通常原因 | 排查与处理 |
 |-----------|----------|------------|
 | `requires at least 2 independent calls` | 数组只有 1 项 | 改用原 scalar 字段 |
-| `cannot be combined with legacy ... fields` | 同一 Action 同时写了 scalar 和 array | 二选一，删除另一组字段 |
+| 同一 Action 同时写了 scalar 和 array，但实际走了 scalar | 模型违反互斥协议；Runtime 命中旧 scalar-first 兼容规则 | 修 Prompt/调用方并删除另一组字段；不要把 Runtime 容错当成合法协议，也不要期待这类输入一定报错 |
 | `cannot be combined with require_tool fields` | direct 与 require 混装 | 按参数是否已知选择一种模式 |
 | `unknown fields: params` | 在 require child 中预填参数 | 删除 params；或整批改 direct 并为每项给完整 object |
 | `params must be a non-null JSON object` | params 是 null/string/array | 使用 JSON object；无参工具写 `{}` |
@@ -2319,7 +2392,7 @@ flowchart TD
     A["Batch 没执行或结果不对"] --> B{"完整 Action 能 parse 吗？"}
     B -->|否| P["Parser / 截断 / canonical container"]
     B -->|是| C{"Verifier 接受吗？"}
-    C -->|否| V["字段混用、类型、数量、工具、参数 Schema"]
+    C -->|否| V["纯 batch 的跨模式混用、类型、数量、工具、参数 Schema；scalar+batch 则先检查是否命中 scalar-first 兼容"]
     C -->|是| D{"进入 ExecuteToolBatch 吗？"}
     D -->|否| H["Action handler state / third-party compat runtime"]
     D -->|是| E{"真实 callback 启动吗？"}
@@ -2409,6 +2482,14 @@ Require 的职责就是让运行时基于任务上下文和工具 Schema 生成�
 
 不保证。finished 且身份匹配的 checkpoint 会 replay，不再调用；但如果外部写入已经成功、进程却在保存 finished checkpoint 前崩溃，恢复会把它视为 unfinished 并可能重试。写工具仍需幂等键、事务或业务去重。
 
+### Q20：旧 scalar 工具调用还能“流式”吗？
+
+能保留的是**字段级流式判路与 card-first 参数准备**：`directly_call_tool_name` / `tool_require_payload` 一旦可读，verifier 不等待 batch canonical object；direct ToolCaller 仍先建卡、再由 prepare 消费参数。不能把它扩大解释成“任何 provider 都会在网络 EOF 前启动插件”：常用 AI transaction 还可能先等待 response callback 完成，且真实 callback 之前仍有工具解析、参数校验和审批。测试分别锁定 scalar verifier 可在 reader EOF 前返回、纯 batch verifier 必须等待 EOF，防止两种时机再次混为一谈。
+
+### Q21：既然 Runtime 对 scalar+batch 选择 scalar，模型是否可以故意两种都写？
+
+不可以。互斥仍是 Prompt/模型协议；scalar-first 只是保护旧在线输出的兼容策略。故意混写会让 batch 被忽略，造成业务意图与实际执行不一致。调用方应在生成侧只选择一种形式，并用 CI exact example 教模型：1 项写 scalar，2–8 项独立调用才写数组。
+
 ---
 
 ## 21. 验收清单
@@ -2428,8 +2509,9 @@ Require 的职责就是让运行时基于任务上下文和工具 Schema 生成�
 - [ ] `minItems=2`，`maxItems` 与配置一致且不超过 8；
 - [ ] direct item 必须 `tool_name + params object`；
 - [ ] require item 禁止 params；
-- [ ] scalar/batch、direct/require 互斥；
-- [ ] 截断、null、伪数组、item 未知字段在 handler 前失败。
+- [ ] Prompt/模型协议要求 scalar/batch、direct/require 互斥；
+- [ ] Runtime 测试固定旧 scalar discriminator 优先，且纯 batch 才等待 canonical parse；
+- [ ] 纯 batch 的截断、null、伪数组、item 未知字段在 handler 前失败。
 
 ### 21.3 Runtime 验收
 
@@ -2457,10 +2539,13 @@ Require 的职责就是让运行时基于任务上下文和工具 Schema 生成�
 ### 21.5 数据与可观测性验收
 
 - [ ] 实时事件可按 `ExecutionCallID/ProcessId` 分 child；
+- [ ] 同名工具的 stdout/stderr start/delta/finish 不按 NodeId 串线；
+- [ ] interval review response stream/progress event 绑定 owning child emitter；
 - [ ] 最终 summary、Task、Timeline、History 按模型 index；
-- [ ] `ActionRecord.ToolNames/ToolCallCount` 完整；
+- [ ] `ActionRecord.ToolNames/ToolCallCount/ExecutedToolCallCount` 完整，声明数与执行数不混用；
+- [ ] zero-invoke/direct-answer 不触发 satisfaction 或工具执行 `iteration_end`；失败 `ToolResult` 仍计为真实执行；
 - [ ] 旧消费者仍能读第一项 `ToolName`；
-- [ ] Value feedback 和 subagent 统计按 child 数；
+- [ ] Value feedback 同时携带声明数/执行数；subagent 声明预算按 child 数；
 - [ ] compat runtime 有明确 `[TOOL_BATCH_COMPAT]` 标识。
 
 ### 21.6 CI 验收
@@ -2490,15 +2575,18 @@ tool_require_calls
 ```text
 模型知道何时组批
   -> Prompt 给出真实可执行 JSON
-  -> 流式 parser 等完整 canonical object
-  -> Verifier 在副作用前严格拒绝歧义
+  -> 旧 scalar discriminator 保持字段级优先，不被 batch 的 canonical 等待拖慢
+  -> 纯 batch 等 parser 完整 canonical object，截断即拒绝
+  -> Verifier 在副作用前严格校验批次数组；模型协议仍禁止 scalar/batch 混写
   -> Transaction 先保存模型响应
   -> Runtime 按 index 预留恢复身份
   -> 可以并行的参数/插件有界并行
   -> 必须确定的 mutator/审批保持有序
   -> 最终 barrier 阻止 direct-answer 之前的副作用
   -> 全部 settled 后按模型顺序提交
-  -> History、Timeline、Value Feedback 正确记录 N 个 child
+  -> child emitter 隔离同名 stdout/stderr 和 interval review 事件
+  -> History、Timeline、Value Feedback 分开记录声明 N 项与实际执行项
+  -> zero-invoke/direct-answer 不伪造 satisfaction 或 iteration_end
   -> CI 从 exact Prompt 一直跑到真实 callback、取消和 crash replay
 ```
 

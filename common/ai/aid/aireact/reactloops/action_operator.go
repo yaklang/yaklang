@@ -20,6 +20,13 @@ type LoopActionHandlerOperator struct {
 	failedError  error
 	isSilence    bool
 
+	// executedToolCallCount is not the number of tool calls declared by the
+	// model. It counts callbacks that actually settled with a ToolResult during
+	// this action (successful or failed). Admission failures, review
+	// direct-answer/cancel paths, and nil-result pre-invoke failures stay zero.
+	// The loop copies this value into the ActionRecord after the handler returns.
+	executedToolCallCount int
+
 	task aicommon.AIStatefulTask
 
 	// dynamic async mode: handler can request async mode at runtime
@@ -72,6 +79,30 @@ func (l *LoopActionHandlerOperator) IsTerminated() (bool, error) {
 
 func (l *LoopActionHandlerOperator) IsContinued() bool {
 	return l.isContinued
+}
+
+// MarkToolExecuted records callbacks that actually reached a settled
+// ToolResult. A failed ToolResult is still an execution; a nil result is not.
+// Batch handlers should pass the number of settled child results in one call.
+func (l *LoopActionHandlerOperator) MarkToolExecuted(count ...int) {
+	delta := 1
+	if len(count) > 0 {
+		delta = count[0]
+	}
+	if delta <= 0 {
+		return
+	}
+	l.executedToolCallCount += delta
+}
+
+// GetExecutedToolCallCount returns the actual settled callback count recorded
+// by the action handler. It deliberately differs from ActionRecord.ToolCallCount,
+// which preserves how many calls the model declared.
+func (l *LoopActionHandlerOperator) GetExecutedToolCallCount() int {
+	if l == nil {
+		return 0
+	}
+	return l.executedToolCallCount
 }
 
 func (l *LoopActionHandlerOperator) Fail(i any) {

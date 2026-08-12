@@ -41,6 +41,12 @@ func handleToolCallResult(
 	err error,
 	operator *reactloops.LoopActionHandlerOperator,
 ) {
+	// A non-nil ToolResult is the objective boundary that proves the plugin
+	// callback settled. Count both success and tool-level failure. Review-driven
+	// direct_answer/cancel is terminal user intent, not a tool execution.
+	if !directly && result != nil {
+		operator.MarkToolExecuted()
+	}
 	if err != nil {
 		errMsg := fmt.Sprintf("Tool '%s' execution failed: %v.", toolPayload, err)
 		invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)

@@ -35,6 +35,13 @@ const (
 	StatsSourceSkillIntentCatalog = "intent_catalog" // skill: 意图识别入选 catalog top-10
 )
 
+func normalizeToolCallStatsSource(source string) string {
+	if source == StatsSourceToolRequested {
+		return StatsSourceToolRequested
+	}
+	return StatsSourceToolDirect
+}
+
 // StatsRecorder 由 aistats 实现并注册. 实现必须是非阻塞的 (内部有界队列),
 // 绝不能阻塞或 panic 到调用方.
 type StatsRecorder interface {

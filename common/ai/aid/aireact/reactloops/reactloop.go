@@ -45,14 +45,19 @@ type ActionRecord struct {
 	ActionParams   map[string]interface{} `json:"action_params"`
 	IterationIndex int                    `json:"iteration_index"`
 
-	// ToolName 是该 action 实际调用的工具名，供价值反馈和执行历史使用。
-	// 批量工具调用时保留第一项，兼容只识别单工具的旧消费者。
+	// ToolName 是该 action 声明的第一个工具名，供价值反馈和执行历史使用。
+	// 批量工具调用时保留第一项，兼容只识别单工具的旧消费者。它不表示
+	// callback 已经实际执行；实际执行事实见 ExecutedToolCallCount。
 	ToolName string `json:"tool_name,omitempty"`
 	// ToolNames 按模型输出顺序记录该 action 中的全部工具调用。
 	ToolNames []string `json:"tool_names,omitempty"`
 	// ToolCallCount 是本 action 实际声明的工具调用数。旧记录为 0 时按
 	// ToolName 是否存在回退到 0/1。
 	ToolCallCount int `json:"tool_call_count,omitempty"`
+	// ExecutedToolCallCount 是 handler 实际拿到 settled ToolResult 的 callback
+	// 数量。成功和工具自身返回失败都计数；审批 direct_answer/cancel、批量准入
+	// 失败以及其它 nil-result 的 pre-invoke 失败不计数。
+	ExecutedToolCallCount int `json:"executed_tool_call_count,omitempty"`
 }
 
 type ReActLoop struct {

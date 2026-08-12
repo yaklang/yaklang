@@ -282,6 +282,8 @@ type ToolCaller struct {
 	destinationIdentifier string
 	batchID               string
 	batchIndex            int
+	statsSource           string
+	checkpointReplayed    bool
 }
 
 // ToolCallerGate bounds one phase of a tool call. The returned release
@@ -417,6 +419,16 @@ func WithToolCaller_BatchMetadata(batchID string, batchIndex int) ToolCallerOpti
 	return func(tc *ToolCaller) {
 		tc.batchID = batchID
 		tc.batchIndex = batchIndex
+	}
+}
+
+// WithToolCaller_StatsSource records how this logical tool call was selected.
+// The source is explicit call metadata rather than being inferred from the tool
+// name or action text, so scalar calls, batch children and review replacements
+// all retain the source of the original model decision.
+func WithToolCaller_StatsSource(source string) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.statsSource = normalizeToolCallStatsSource(source)
 	}
 }
 
@@ -697,10 +709,11 @@ func WithToolCaller_GenerateToolParamsBuilderWithMeta(
 
 func NewToolCaller(ctx context.Context, opts ...ToolCallerOption) (*ToolCaller, error) {
 	caller := &ToolCaller{
-		callToolId: ksuid.New().String(),
-		start:      &sync.Once{},
-		done:       &sync.Once{},
-		m:          &sync.Mutex{},
+		callToolId:  ksuid.New().String(),
+		start:       &sync.Once{},
+		done:        &sync.Once{},
+		m:           &sync.Mutex{},
+		statsSource: StatsSourceToolDirect,
 	}
 	for _, opt := range opts {
 		opt(caller)
@@ -1602,6 +1615,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stderrBuffer := &toolOutputBuffer{}
 
 	artifactBundle := t.newToolCallArtifactBundle(tool, callToolId, destinationIdentifier)
+	// finalize marks successful and ordinary failed calls as durable bundles.
+	// Cancellation deliberately skips finalize/checkpointing, so roll back the
+	// still-open streams and partial directory on every unfinished exit path.
+	defer artifactBundle.discardIfUnfinished()
 
 	// Use MultiWriter to write to both the pipe (for streaming) and the buffers (for file saving)
 	stdoutUIWriter := newBoundedToolUIWriter(stdoutWriter)
@@ -1714,8 +1731,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		t.emitter.EmitToolCallResult(callToolId, toolResult.Data)
 	}
 
-	if t.ctx == nil || t.ctx.Err() == nil {
-		NotifySessionSnapshotToolCall(t.config, toolResult)
+	if !t.checkpointReplayed && (t.ctx == nil || t.ctx.Err() == nil) {
+		NotifySessionSnapshotToolCall(t.config, toolResult, t.statsSource)
 	}
 
 	return toolResult, false, nil
