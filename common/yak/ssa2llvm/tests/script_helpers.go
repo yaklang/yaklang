@@ -231,3 +231,37 @@ func formatEnvMap(env map[string]string) string {
 	}
 	return b.String()
 }
+
+// RunYakScriptFileWithCLI compiles a yak script through the real shipping
+// ssa2llvm CLI and runs the produced binary, returning its combined
+// (stdout+stderr) output. env is passed to the compiled binary at run time.
+// The CLI is exercised end-to-end (compile -> native executable -> run),
+// matching how an end user would use ssa2llvm, instead of calling the
+// compiler package API directly.
+func RunYakScriptFileWithCLI(t *testing.T, scriptPath string, env map[string]string) string {
+	t.Helper()
+
+	scriptAbs, err := filepath.Abs(scriptPath)
+	if err != nil {
+		t.Fatalf("filepath.Abs(%q) failed: %v", scriptPath, err)
+	}
+
+	tmpDir := t.TempDir()
+	name := strings.TrimSuffix(filepath.Base(scriptAbs), filepath.Ext(scriptAbs))
+	bin := filepath.Join(tmpDir, name+".bin")
+
+	// Real CLI compile/run must match ordinary user flows (usable runtime
+	// archive + fresh rebuild), exactly like runSSA2LLVMCLI.
+	res := runSSA2LLVMCLIInDir(t, "", "compile", scriptAbs, "-o", bin, "-f", "", "-a")
+	if res.ExitCode != 0 {
+		t.Fatalf("ssa2llvm compile failed (exit %d):\n%s", res.ExitCode, res.Output)
+	}
+
+	// Run the compiled native binary under an empty environment (zero external
+	// runtime dependency), passing env explicitly if the caller needs vars.
+	run := runProcess(t, bin, env)
+	if run.ExitCode != 0 {
+		t.Fatalf("compiled binary %s failed (exit %d):\n%s", name, run.ExitCode, run.Output)
+	}
+	return run.Output
+}

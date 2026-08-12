@@ -8,7 +8,7 @@ func main() {
     println("hello-from-go")
 }`
 
-    prog, err = ssa.Parse(code, ssa.withLanguage("golang"))
+    prog, err = ssa.Parse(code, ssa.withLanguage(ssa.GO))
     if err != nil {
         println("parse error:", err)
         return 1

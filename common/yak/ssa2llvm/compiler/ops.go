@@ -32,6 +32,8 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 		return c.compileSideEffectInstruction(op)
 	case *ssa.Panic:
 		return c.compilePanic(op)
+	case *ssa.Assert:
+		return c.compileAssert(op)
 	case *ssa.Recover:
 		return c.compileRecover(op)
 	case *ssa.Make:

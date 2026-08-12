@@ -35,6 +35,16 @@ func (c *Compiler) compileYaklibExportMember(contextInst ssa.Instruction, val ss
 	if rv.IsValid() && rv.Kind() == reflect.Func {
 		return nil
 	}
+	// String exports (e.g. ssa.GO, a named string Language constant) must be
+	// lowered as a global C-string pointer, mirroring how string literals are
+	// emitted. Boxing them through runtimeValueToInt64ForCompiler would return
+	// 0 (empty string) because that helper only handles numeric/bool values.
+	if rv.IsValid() && rv.Kind() == reflect.String {
+		ptr := c.Builder.CreateGlobalStringPtr(rv.String(), fmt.Sprintf("yaklib_export_str_%d", val.GetId()))
+		tagged := c.Builder.CreateOr(llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type()), llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false), "yaklib_export_str_tag")
+		c.cacheValue(val.GetId(), tagged)
+		return c.maybeEmitMemberSet(contextInst, val, val.GetId())
+	}
 	boxed := runtimeValueToInt64ForCompiler(exported)
 	c.cacheValue(val.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(boxed), false))
 	return c.maybeEmitMemberSet(contextInst, val, val.GetId())

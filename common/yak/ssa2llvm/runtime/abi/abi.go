@@ -134,6 +134,9 @@ const (
 
 	// Dynamic equality for pointer-backed Yak values such as strings and objects.
 	IDRuntimeEq FuncID = 27
+
+	// Assert: args are (cond, msg). The runtime panics if cond is false.
+	IDAssert FuncID = 28
 )
 
 type SliceElemKind int64

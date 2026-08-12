@@ -11,6 +11,9 @@ import (
 	s2tests "github.com/yaklang/yaklang/common/yak/ssa2llvm/tests"
 )
 
+// TestPocRequest_Effect compiles poc_request.yak via the real ssa2llvm CLI,
+// points YAK_TEST_URL at a local HTTP server, and verifies the compiled binary
+// fetches and prints the server's response body.
 func TestPocRequest_Effect(t *testing.T) {
 	want := uuid.NewString()
 
@@ -20,7 +23,7 @@ func TestPocRequest_Effect(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	output := s2tests.RunYakScriptFile(t, "poc_request.yak", map[string]string{
+	output := s2tests.RunYakScriptFileWithCLI(t, "poc_request.yak", map[string]string{
 		"YAK_TEST_URL": srv.URL,
 	})
 
