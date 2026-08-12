@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,24 +50,22 @@ func TestEnsureMCPToolDescriptionI18nSkipsWhenAlreadySet(t *testing.T) {
 func TestGRPC_GetMCPToolList_BuiltinDescriptionI18n(t *testing.T) {
 	grpcSrv, err := NewServer()
 	require.NoError(t, err)
+	ctx := context.Background()
 
-	resp, err := grpcSrv.GetMCPToolList(t.Context(), &ypb.GetMCPToolListRequest{
+	// Sync builtin tool rows (pagination does not affect sync).
+	_, err = grpcSrv.GetMCPToolList(ctx, &ypb.GetMCPToolListRequest{
 		Source:     "builtin",
-		Pagination: &ypb.Paging{Page: 1, Limit: 50},
+		Pagination: &ypb.Paging{Page: 1, Limit: 1},
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, resp.GetTools())
 
-	var checked bool
-	for _, tool := range resp.GetTools() {
-		if tool.GetToolName() != "enable_global_hotpatch" {
-			continue
-		}
-		checked = true
-		require.NotNil(t, tool.GetDescriptionI18N(), "builtin tool should export DescriptionI18n")
-		assert.Contains(t, tool.GetDescriptionI18N().GetZh(), "热加载")
-		assert.NotEmpty(t, tool.GetDescriptionI18N().GetEn())
-		assert.NotEmpty(t, tool.GetDescription(), "AI/MCP English Description must remain")
-	}
-	require.True(t, checked, "expected enable_global_hotpatch in builtin tool list")
+	const toolName = "enable_global_hotpatch"
+	detail, err := grpcSrv.GetMCPToolDetail(ctx, &ypb.GetMCPToolDetailRequest{ToolName: toolName})
+	require.NoError(t, err)
+	require.Equal(t, toolName, detail.GetToolName())
+
+	require.NotNil(t, detail.GetDescriptionI18N(), "builtin tool should export DescriptionI18n")
+	assert.Contains(t, detail.GetDescriptionI18N().GetZh(), "热加载")
+	assert.NotEmpty(t, detail.GetDescriptionI18N().GetEn())
+	assert.NotEmpty(t, detail.GetDescription(), "AI/MCP English Description must remain")
 }
