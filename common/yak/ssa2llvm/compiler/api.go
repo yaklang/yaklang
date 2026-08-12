@@ -526,6 +526,11 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 			return CompileResult{}, utils.Errorf("prepare work dir failed: %v", err)
 		}
 		cfg.WorkDir = tmp
+		// Non-cached temporary work dir: remove it after the compile finishes so
+		// /tmp does not accumulate yakssa-work-* leftovers. Deterministic cached
+		// work dirs (yakssa-compile-*, from cachedWorkDirFromKey) are kept for
+		// reuse, and an explicitly configured WorkDir stays owned by the caller.
+		defer os.RemoveAll(tmp)
 	}
 	if cfg.WorkDir != "" {
 		if cfg.Force {
