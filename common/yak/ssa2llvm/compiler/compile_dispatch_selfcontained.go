@@ -43,7 +43,14 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 	if err := CompileModuleToObjectSC(comp.Mod, objPath); err != nil {
 		return "", nil, err
 	}
-	if err := CompileObjectToBinarySC(objPath, outputFile, cfg.WorkDir, cfg.ObfArchives, cfg.ExtraLinkArgs...); err != nil {
+	// Determine yaklib modules the script actually uses; pass them to the
+	// linker so unused modules are pruned from libyak.a before lld runs.
+	usedModules := make([]string, 0)
+	deps := comp.YaklibDependencies()
+	for mod := range deps {
+		usedModules = append(usedModules, mod)
+	}
+	if err := CompileObjectToBinarySCWithPatch(objPath, outputFile, cfg.WorkDir, cfg.ObfArchives, usedModules, cfg.ExtraLinkArgs...); err != nil {
 		return "", nil, err
 	}
 	return "", nil, nil
