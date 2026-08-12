@@ -35,6 +35,20 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string) error {
 	impSeen := map[string]bool{}
 	var imports []imp
 	var regs []reg
+
+	// Always import yaklib and builtin for global registration
+	globalImps := []imp{
+		{"yaklib", "github.com/yaklang/yaklang/common/yak/yaklib"},
+		{"builtin", "github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"},
+		{"_", "unsafe"},
+	}
+	for _, gi := range globalImps {
+		if !impSeen[gi.alias] {
+			impSeen[gi.alias] = true
+			imports = append(imports, gi)
+		}
+	}
+
 	for _, name := range AllModuleNames() {
 		if !useAll && !want[name] {
 			continue
@@ -76,12 +90,36 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string) error {
 		}
 		b.WriteString(")\n\n")
 	}
-	// Empty init: NO blanket registration (so --gc-sections can drop unused modules).
+	// Empty init: modules are imported for their Go init tasks, but registration
+	// is deferred to the exported functions below.
 	b.WriteString("func init() {}\n\n")
+	// Global builtins registration.
+	b.WriteString("//export yak_register_globals\n")
+	b.WriteString("func yak_register_globals() {\n")
+	b.WriteString("\truntimeRegisterYaklibGlobals(yaklib.GlobalExport)\n")
+	b.WriteString("\truntimeRegisterYaklibGlobals(builtin.YaklangBaseLib)\n")
+	b.WriteString("\truntimeRegisterYaklibGlobals(map[string]any{\n")
+	b.WriteString("\t\t\"len\": runtimeYakBuiltinLen,\n")
+	b.WriteString("\t\t\"cap\": runtimeYakBuiltinCap,\n")
+	b.WriteString("\t})\n")
+	b.WriteString("}\n\n")
+	// Compile-time pruning redirects relocations that referenced unused
+	// .modtext.<module> functions to this retained stub. Keeping the stub
+	// reachable from relocations prevents lld from collecting it and gives
+	// stale function pointers a safe no-op target instead of a garbage PC.
+	b.WriteString("//export yakUnusedModuleStub\n")
+	b.WriteString("//go:noinline\n")
+	b.WriteString("func yakUnusedModuleStub() {}\n\n")
+	// Per-module registration only reads the package export tables. The Go
+	// runtime executes init tasks for used modules through their retained
+	// inittask relocations; patching marks unused tasks done before linking.
+	// Calling a Go init function manually through linkname would execute the
+	// init ABI a second time and can corrupt runtime state.
 	for _, m := range modNames {
+		exprs := byMod[m]
 		b.WriteString(fmt.Sprintf("//export yak_register_module_%s\n", m))
 		b.WriteString(fmt.Sprintf("func yak_register_module_%s() {\n", m))
-		for _, expr := range byMod[m] {
+		for _, expr := range exprs {
 			b.WriteString(fmt.Sprintf("\truntimeRegisterYaklibModule(%q, %s)\n", m, expr))
 		}
 		b.WriteString("}\n\n")

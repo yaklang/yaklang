@@ -89,13 +89,14 @@ func makeInitialMemberCount(inst *ssa.Make) int64 {
 		return 0
 	}
 	count := int64(0)
-	inst.ForEachMember(func(key, member ssa.Value) bool {
+	for _, pair := range ssa.GetMemberPairs(inst) {
+		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
-			return true
+		continue
 		}
 		count++
-		return true
-	})
+		continue
+	}
 	return count
 }
 
@@ -626,18 +627,19 @@ func (c *Compiler) shouldSkipOutdatedMemberSet(val ssa.Value, keyStr string) boo
 		return false
 	}
 	skip := false
-	val.GetObject().ForEachMember(func(key, member ssa.Value) bool {
+	for _, pair := range ssa.GetMemberPairs(val.GetObject()) {
+		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() == currentID {
-			return true
+		continue
 		}
 		if c.resolveMemberKeyString(key) == keyStr && member.GetId() > currentID {
 			if c.memberValueOverridesInSameBlock(val, member) {
 				skip = true
-				return false
+		break
 			}
 		}
-		return true
-	})
+		continue
+	}
 	return skip
 }
 
@@ -683,16 +685,17 @@ func (c *Compiler) initialMemberValueOverridden(val ssa.Value) bool {
 		return false
 	}
 	overridden := false
-	val.GetObject().ForEachMember(func(key, member ssa.Value) bool {
+	for _, pair := range ssa.GetMemberPairs(val.GetObject()) {
+		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() == val.GetId() {
-			return true
+		continue
 		}
 		if member.GetId() > val.GetId() && c.resolveMemberKeyString(key) == keyStr {
 			overridden = true
-			return false
+		break
 		}
-		return true
-	})
+		continue
+	}
 	return overridden
 }
 
@@ -739,8 +742,7 @@ func (c *Compiler) emitAssignedMemberVariableSets(contextInst ssa.Instruction, v
 		if variable == nil || !variable.IsMemberCall() {
 			continue
 		}
-		obj := ssa.GetLatestObject(variable)
-		key := ssa.GetLatestKey(variable)
+		obj, key := variable.GetMemberCall()
 		if obj == nil || key == nil {
 			continue
 		}
@@ -1285,16 +1287,17 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 
 	seen := make(map[string]struct{})
 	var emitErr error
-	inst.ForEachMember(func(key, member ssa.Value) bool {
+	for _, pair := range ssa.GetMemberPairs(inst) {
+		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
-			return true
+		continue
 		}
 		keyStr := c.resolveMemberKeyString(key)
 		if keyStr == "" {
-			return true
+		continue
 		}
 		if _, ok := seen[keyStr]; ok {
-			return true
+		continue
 		}
 		seen[keyStr] = struct{}{}
 		c.markInitialMemberValue(member.GetId())
@@ -1306,15 +1309,14 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 		})
 		if err != nil {
 			emitErr = fmt.Errorf("emitInitialMakeMemberAssignments: field %q: %w", keyStr, err)
-			return false
+			break
 		}
 		c.emitRuntimeSetField(objVal, keyStr, llvmVal, member, member.GetId())
 		if err := c.maybeEmitMemberSet(inst, member, member.GetId()); err != nil {
 			emitErr = fmt.Errorf("emitInitialMakeMemberAssignments: field %q member variables: %w", keyStr, err)
-			return false
+			break
 		}
-		return true
-	})
+	}
 	return emitErr
 }
 
@@ -1350,21 +1352,21 @@ func (c *Compiler) emitObjectMemberAssignments(contextInst ssa.Instruction, obj 
 	}
 
 	var emitErr error
-	obj.ForEachMember(func(key, member ssa.Value) bool {
+	for _, pair := range ssa.GetMemberPairs(obj) {
+		key, member := pair.Key, pair.Member
 		if key == nil || member == nil {
-			return true
+			continue
 		}
 		keyStr := c.resolveMemberKeyString(key)
 		if keyStr == "" {
-			return true
+			continue
 		}
 		llvmVal, err := c.valueForObjectMemberAssignment(contextInst, member)
 		if err != nil {
 			emitErr = fmt.Errorf("emitObjectMemberAssignments: field %q: %w", keyStr, err)
-			return false
+			break
 		}
 		c.emitRuntimeSetField(objVal, keyStr, llvmVal, member, obj.GetId())
-		return true
-	})
+	}
 	return emitErr
 }
