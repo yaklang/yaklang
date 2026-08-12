@@ -20,9 +20,9 @@ func TestWritePrunedRuntimeImports_CodecDependency(t *testing.T) {
 	}
 
 	got := readGeneratedRuntimeImports(t, dir)
-	assertContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
-	assertContains(t, got, `runtimeRegisterYaklibModule("codec", yaklib.CodecExports)`)
-	assertNotContains(t, got, `_ "github.com/yaklang/yaklang/common/yak"`)
+	assertContains(t, got, `aotlib "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib"`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("codec", aotlib.CodecExports)`)
+	assertNotContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
 }
 
 func TestWritePrunedRuntimeImports_WholeModuleDependency(t *testing.T) {
