@@ -26,6 +26,7 @@ type legionJobBridge struct {
 	capabilityPublisher    capabilityEventReporter
 	hidsDryRunPublisher    hidsDesiredSpecDryRunReporter
 	ruleSyncPublisher      *ssaRuleSyncEventPublisher
+	gitLsRemotePublisher   *gitLsRemoteEventPublisher
 	aiPublisher            *aiSessionEventPublisher
 	aiRuntime              *aiSessionRuntimeManager
 	aiLocalModelOps        *aiLocalModelOperationManager
@@ -48,6 +49,7 @@ func newLegionJobBridge(agent *ScanNode) *legionJobBridge {
 		capabilityPublisher:    capabilityPublisher,
 		hidsDryRunPublisher:    capabilityPublisher,
 		ruleSyncPublisher:      newSSARuleSyncEventPublisher(agent.node),
+		gitLsRemotePublisher:   newGitLsRemoteEventPublisher(agent.node),
 		aiPublisher:            newAISessionEventPublisher(agent.node),
 		aiRuntime:              newAISessionRuntimeManager(selectAISessionRuntimeDriver()),
 		aiLocalModelOps:        newAILocalModelOperationManager(),
