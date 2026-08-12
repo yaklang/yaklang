@@ -35,7 +35,7 @@ EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 # libyak.a stays complete (all modules below); per-script pruning happens at
 # link time via --gc-sections, so a plain print script drops the poc/cli/http
 # code and their dependency closures while a poc script keeps them.
-DEFAULT_MODULES="os,poc,cli,http,codec,yakit"
+DEFAULT_MODULES="os,poc,cli,http,codec,yakit,ssa"
 MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
 # The shared poc/ssa dependency closure and the ssa language frontends live in
 # their own split groups. genfull ignores the unknown names; elfsplit splits
