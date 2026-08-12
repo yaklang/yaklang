@@ -705,7 +705,6 @@ func TestBuildYakAIInterventionEventCarriesEndpointID(t *testing.T) {
 
 	payload := []byte(`{"id":"interactive-1","suggestion":"continue","review_type":"tool_use_review_require"}`)
 	event, err := buildYakAIInterventionEvent(aiSessionInput{
-		Ref:         aiSessionCommandRef{CommandID: "intervention-command-1"},
 		InputType:   "user_intervention",
 		PayloadJSON: payload,
 	})
@@ -748,6 +747,7 @@ func TestBuildYakAIInterventionEventMapsFreeInputWithoutEndpointID(t *testing.T)
 	t.Parallel()
 
 	event, err := buildYakAIInterventionEvent(aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "intervention-command-1"},
 		InputType:   "user_intervention",
 		PayloadJSON: []byte(`{"content":"check the authorization path too"}`),
 	})
