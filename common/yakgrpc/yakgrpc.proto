@@ -1424,8 +1424,9 @@ message MCPClientToolConfig {
   string Source = 3;
   string ServerName = 4;
   bool Enable = 5;
-  string Description = 6;
+  string Description = 6; // English; used by AI / MCP protocol
   repeated MCPServerToolParamInfo Params = 7;
+  I18n DescriptionI18n = 8; // UI bilingual description (Zh/En); Zh falls back to En when empty
 }
 
 message GetMCPToolListRequest {
