@@ -142,3 +142,40 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncPayloadGroup_RepLabel(t *testing.T) {
 		"beta---three",
 	}, bodies)
 }
+
+func TestGRPCMUSTPASS_HTTPFuzzer_SyncPayloadGroup_PreserveStaticVariable(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	bodyCh := make(chan string, 3)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		bodyCh <- string(raw)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request:          fmt.Sprintf("POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n\r\n{{array(one|two|three)}}---{{p(token)}}", utils.HostPort(host, port)),
+		FuzzTagMode:      "standard",
+		FuzzTagSyncIndex: true,
+		Concurrent:       1,
+		Params: []*ypb.FuzzerParamItem{
+			{Key: "token", Value: "fixed-value", Type: "raw"},
+		},
+	})
+	require.NoError(t, err)
+
+	var bodies []string
+	for i := 0; i < 3; i++ {
+		rsp, err := stream.Recv()
+		require.NoError(t, err)
+		require.True(t, rsp.Ok)
+		bodies = append(bodies, waitBody(t, bodyCh))
+	}
+
+	require.Equal(t, []string{
+		"one---fixed-value",
+		"two---fixed-value",
+		"three---fixed-value",
+	}, bodies)
+}
