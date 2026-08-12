@@ -693,6 +693,18 @@ func (c *Cache[T, D]) handleSaveBatch(tasks []*saveTask[D], save SaveFunc[D]) er
 	if len(saveTasks) == 0 {
 		return nil
 	}
+	// Once the saver has failed, later batches must still be settled (the
+	// resident persist WaitGroup was incremented when they were enqueued),
+	// but they must not re-enter the real save callback. The marshal worker
+	// also settles tasks after failure, so removing these entries here would
+	// leave persistWG with unmatched Adds and Barrier/FlushKeys would hang.
+	if c.saver != nil && c.saver.failed.Load() {
+		for _, task := range saveTasks {
+			c.resident.FinishPersist(task.request.key, task.request.generation, false)
+			c.settle(task.request.key, task.request.generation, PersistFailed)
+		}
+		return nil
+	}
 	if save == nil {
 		for _, task := range saveTasks {
 			c.resident.FinishPersist(task.request.key, task.request.generation, false)
