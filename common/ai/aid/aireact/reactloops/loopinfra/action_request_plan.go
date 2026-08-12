@@ -279,10 +279,11 @@ func handleLegacyAsyncPlanAndExecute(
 	rewriteQuery string,
 	operator *reactloops.LoopActionHandlerOperator,
 ) {
-	operator.RequestAsyncMode()
-	task.SetAsyncMode(true)
-	invoker.AsyncPlanAndExecute(task.GetContext(), rewriteQuery, func(err error) {
+	if err := invoker.PlanAndExecute(task.GetContext(), rewriteQuery); err != nil {
 		loop.FinishAsyncTask(task, err)
-	})
+		operator.Fail(err)
+		return
+	}
+	operator.Exit()
 }
 

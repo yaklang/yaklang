@@ -162,11 +162,11 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		"start_task_id":  startTaskID,
 	}, event.SyncID)
 
-	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, startTaskID, func(err error) {
-		if err != nil {
+	go func() {
+		if err := r.RecoverPlanAndExecute(r.config.Ctx, coordinatorID, startTaskID, nil); err != nil {
 			log.Errorf("recover plan-and-exec failed: %v", err)
 		}
-	})
+	}()
 	return nil
 }
 
