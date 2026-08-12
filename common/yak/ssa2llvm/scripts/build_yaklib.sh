@@ -28,8 +28,12 @@ RUNTIME_GO_DIR="${RUNTIME_DIR}/runtime_go"
 IMPORTS_FILE="${RUNTIME_GO_DIR}/runtime_imports_generated.go"
 EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 
-# Default curated common-stdlib module set.
-DEFAULT_MODULES="os,poc,http,httpool,httptpl,codec,str,json,re,re2,time,math,io,sync,cli,file,filesys,env,log,gzip,zip,context,bufio,container,dictutil,judge,x,xhtml,xml,xpath,yaml,exec,dns,fuzz,yakit,ssa"
+# Default AOT module set. The AOT runtime is built with the ssa2llvm_aot build
+# tag: globals come from runtime_globals_aot.go and monolith-backed modules use
+# the lightweight aotlib export tables (os/codec), so the monolithic
+# common/yak/yaklib and its yaklang frontend dependencies stay out of libyak.a.
+# Additional modules need aotlib export tables before they can be added here.
+DEFAULT_MODULES="os,poc,cli,http,codec"
 MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
 
 mkdir -p "${ASSETS_DIR}"
@@ -43,8 +47,9 @@ trap 'rm -f "${GENFULL_OUT}"; [ -n "${STUB_BACKUP:-}" ] && cp "${STUB_BACKUP}" "
 STUB_BACKUP="$(mktemp -t ssa2llvm-stub-XXXXXX.go)"
 cp "${IMPORTS_FILE}" "${STUB_BACKUP}"
 
-# Use --permodule to generate per-module //export registration functions
-( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/runtime/embed/genfull --permodule "${GENFULL_OUT}" ${MODULES//,/ } )
+# Use --permodule --aot to generate per-module //export registration functions
+# with lightweight AOT export tables.
+( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/runtime/embed/genfull --permodule --aot "${GENFULL_OUT}" ${MODULES//,/ } )
 cp "${GENFULL_OUT}" "${IMPORTS_FILE}"
 
 # ── 2. Build libyak.a (Go c-archive runtime) ───────────────────────────────
@@ -54,7 +59,7 @@ EXTRA_LDFLAGS="-s -w"
 if [[ "${SSA2LLVM_RUNTIME_DEBUG:-}" == "1" || "${SSA2LLVM_RUNTIME_DEBUG:-}" == "true" ]]; then
     EXTRA_LDFLAGS=""
 fi
-CGO_CFLAGS="-ffunction-sections" CGO_ENABLED=1 GOWORK=off go build -trimpath -ldflags="${EXTRA_LDFLAGS}" -buildmode=c-archive -o "${RUNTIME_DIR}/libyak.a" .
+CGO_CFLAGS="-ffunction-sections" CGO_ENABLED=1 GOWORK=off go build -tags ssa2llvm_aot -trimpath -ldflags="${EXTRA_LDFLAGS}" -buildmode=c-archive -o "${RUNTIME_DIR}/libyak.a" .
 rm -f "${RUNTIME_DIR}/libyak.h" "${RUNTIME_GO_DIR}/libyak.h"
 echo "[yaklib] built libyak.a"
 
