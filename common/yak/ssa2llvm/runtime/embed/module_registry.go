@@ -36,10 +36,7 @@ type ModuleImportSpec struct {
 	IsGlobal bool
 }
 
-func (spec ModuleImportSpec) prunedExportSources() []ExportSource {
-	if spec.PrunedShim != nil {
-		return []ExportSource{*spec.PrunedShim}
-	}
+func (spec ModuleImportSpec) regularExportSources() []ExportSource {
 	if len(spec.Sources) > 0 {
 		return append([]ExportSource(nil), spec.Sources...)
 	}
@@ -51,6 +48,13 @@ func (spec ModuleImportSpec) prunedExportSources() []ExportSource {
 		ImportAlias:  spec.ImportAlias,
 		ExportExpr:   spec.ExportExpr,
 	}}
+}
+
+func (spec ModuleImportSpec) prunedExportSources() []ExportSource {
+	if spec.PrunedShim != nil {
+		return []ExportSource{*spec.PrunedShim}
+	}
+	return spec.regularExportSources()
 }
 
 // moduleRegistry is the static registry of all yaklang modules and their
@@ -80,6 +84,12 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
 		ImportAlias:  "yaklib",
 		ExportExpr:   "yaklib.CodecExports",
+		// AOT build only: lightweight table, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.CodecExports",
+		},
 	},
 
 	// === SSA/SyntaxFlow modules (composite, matches yak.initIrifyLibs) ===
@@ -199,6 +209,12 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
 		ImportAlias:  "yaklib",
 		ExportExpr:   "yaklib.SystemExports",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.SystemExports",
+		},
 	},
 	"file": {
 		ModuleName:   "file",

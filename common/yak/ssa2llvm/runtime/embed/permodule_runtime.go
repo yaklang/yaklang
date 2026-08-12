@@ -18,8 +18,11 @@ import (
 // a Go toolchain at runtime. This is the C' approach; validate before adopting.
 //
 // If modules contains "all", every registered module is used. Modules with no
-// prunedExportSources are skipped; unknown names are ignored.
-func WriteRuntimeImportsPerModule(outputPath string, modules []string) error {
+// prunedExportSources are skipped; unknown names are ignored. When aot is true
+// the generated file prefers each module's PrunedShim (lightweight AOT export
+// tables) so monolithic yaklib-backed modules do not pull the full yaklib
+// package into the AOT runtime.
+func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool) error {
 	want := map[string]bool{}
 	for _, m := range modules {
 		m = strings.TrimSpace(m)
@@ -36,10 +39,14 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string) error {
 	var imports []imp
 	var regs []reg
 
-	// Always import yaklib and builtin for global registration
+	// Global registration is provided by runtime_globals_aot.go /
+	// runtime_globals_full.go (build tag ssa2llvm_aot): the AOT runtime must
+	// not import the monolithic common/yak/yaklib or yaklang builtin packages,
+	// otherwise the whole yaklang frontend stack (typescript/java/php/python,
+	// goja, ssaapi, ...) is pulled into every binary. Module export tables are
+	// registered per module below; the full (non-AOT) build keeps the original
+	// yaklib.GlobalExport + builtin.YaklangBaseLib registration.
 	globalImps := []imp{
-		{"yaklib", "github.com/yaklang/yaklang/common/yak/yaklib"},
-		{"builtin", "github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"},
 		{"_", "unsafe"},
 	}
 	for _, gi := range globalImps {
@@ -57,7 +64,7 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string) error {
 		if !ok || len(spec.prunedExportSources()) == 0 {
 			continue
 		}
-		for _, src := range spec.prunedExportSources() {
+		for _, src := range aotExportSources(spec, aot) {
 			if !impSeen[src.ImportAlias] {
 				impSeen[src.ImportAlias] = true
 				imports = append(imports, imp{src.ImportAlias, src.GoImportPath})
@@ -96,12 +103,7 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string) error {
 	// Global builtins registration.
 	b.WriteString("//export yak_register_globals\n")
 	b.WriteString("func yak_register_globals() {\n")
-	b.WriteString("\truntimeRegisterYaklibGlobals(yaklib.GlobalExport)\n")
-	b.WriteString("\truntimeRegisterYaklibGlobals(builtin.YaklangBaseLib)\n")
-	b.WriteString("\truntimeRegisterYaklibGlobals(map[string]any{\n")
-	b.WriteString("\t\t\"len\": runtimeYakBuiltinLen,\n")
-	b.WriteString("\t\t\"cap\": runtimeYakBuiltinCap,\n")
-	b.WriteString("\t})\n")
+	b.WriteString("\tregisterRuntimeGlobals()\n")
 	b.WriteString("}\n\n")
 	// Compile-time pruning redirects relocations that referenced unused
 	// .modtext.<module> functions to this retained stub. Keeping the stub
@@ -125,4 +127,14 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string) error {
 		b.WriteString("}\n\n")
 	}
 	return os.WriteFile(outputPath, []byte(b.String()), 0o644)
+}
+
+func aotExportSources(spec ModuleImportSpec, aot bool) []ExportSource {
+	if spec.PrunedShim != nil {
+		if aot || len(spec.regularExportSources()) == 0 {
+			return []ExportSource{*spec.PrunedShim}
+		}
+		return spec.regularExportSources()
+	}
+	return spec.regularExportSources()
 }
