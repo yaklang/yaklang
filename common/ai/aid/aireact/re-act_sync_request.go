@@ -164,9 +164,10 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 
 	// Create a recovery task and enqueue it so the QueueProcessor
 	// handles it serially alongside normal free-input tasks.
+	userInput := extractRecoveryTaskUserInput(record)
 	recoveryTask := aicommon.NewStatefulTaskBase(
 		formatRecoveryTaskID(coordinatorID),
-		fmt.Sprintf("恢复执行计划 (recovery: %s)", coordinatorID),
+		userInput,
 		r.config.GetContext(),
 		r.Emitter,
 	)
