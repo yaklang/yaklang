@@ -293,9 +293,13 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 
 	// Create a recovery task and enqueue it so the QueueProcessor
 	// handles it serially alongside normal free-input tasks.
+	userInput := approvedInput.PlanPayload
+	if strings.TrimSpace(userInput) == "" {
+		userInput = fmt.Sprintf("执行分离计划 (detached plan: %s)", coordinatorID)
+	}
 	recoveryTask := aicommon.NewStatefulTaskBase(
 		formatRecoveryTaskID(coordinatorID),
-		approvedInput.PlanPayload,
+		userInput,
 		r.config.GetContext(),
 		r.Emitter,
 	)

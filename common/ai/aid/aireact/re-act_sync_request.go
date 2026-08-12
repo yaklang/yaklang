@@ -166,7 +166,7 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 	// handles it serially alongside normal free-input tasks.
 	recoveryTask := aicommon.NewStatefulTaskBase(
 		formatRecoveryTaskID(coordinatorID),
-		coordinatorID,
+		fmt.Sprintf("恢复执行计划 (recovery: %s)", coordinatorID),
 		r.config.GetContext(),
 		r.Emitter,
 	)
