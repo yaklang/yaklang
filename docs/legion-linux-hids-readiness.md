@@ -13,9 +13,9 @@ This document describes how to build, validate, and operate the current Legion H
 
 | Build mode | Host OS | Advertised capability keys | HIDS apply behavior |
 | --- | --- | --- | --- |
-| default build | any | `yak.execute`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1` | `ErrHIDSCapabilityNotCompiled` |
-| `-tags hids` | non-Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1` | `ErrHIDSCapabilityUnsupportedPlatform` |
-| `-tags hids` | Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1` | HIDS runtime starts if at least one collector comes up |
+| default build | any | `yak.execute`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | `ErrHIDSCapabilityNotCompiled` |
+| `-tags hids` | non-Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | `ErrHIDSCapabilityUnsupportedPlatform` |
+| `-tags hids` | Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | HIDS runtime starts if at least one collector comes up |
 
 Operational implication: a build that advertises `hids` must still be scheduled to Linux hosts only. Building with `-tags hids` on macOS or Windows advertises the capability key, but the runtime cannot start there.
 

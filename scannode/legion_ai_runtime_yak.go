@@ -232,21 +232,63 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(queued yakAIQueuedMessage) {
 	}()
 
 	if ok, runtime, binding, config := h.claimDirectForge(); ok {
-		h.executeForgeDirectly(queued.turnID, queued.content, runtime, binding, config)
+		err := h.executeForgeDirectly(queued.content, runtime, binding, config)
+		h.finishMessageTurn(queued.turnID, err, "yak_ai_forge_failed", map[string]string{
+			"runtime":    "yak_ai_engine",
+			"forge_name": strings.TrimSpace(runtime.ForgeName),
+		})
 		return
 	}
 
-	if err := h.engine.SendMsg(queued.content, queued.options...); err != nil {
-		if h.engine.Context().Err() != nil {
-			// 上下文已取消（关闭/关停），不报失败事件。
+	err := h.engine.SendMsg(queued.content, queued.options...)
+	h.finishMessageTurn(queued.turnID, err, yakAISendFailureCode(err), map[string]string{
+		"runtime": "yak_ai_engine",
+	})
+}
+
+func (h *yakAIEngineRuntimeHandle) finishMessageTurn(
+	turnID string,
+	err error,
+	code string,
+	detail map[string]string,
+) {
+	if h.engine.Context().Err() != nil {
+		// 上下文已取消（关闭/关停），不报轮次结果。
+		return
+	}
+	singleRun := strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run")
+	if err != nil {
+		detailJSON := mustJSON(detail)
+		if singleRun {
+			h.closeForTerminalFailure()
+			h.failTurn(turnID, code, err.Error(), detailJSON)
 			return
 		}
-		h.closeForTerminalFailure()
-		// 任务异常终止时上报失败事件，使绑定任务能即时收敛。
-		h.failTurn(queued.turnID, yakAISendFailureCode(err), err.Error(), mustJSON(map[string]string{
-			"runtime": "yak_ai_engine",
-		}))
+		if reporter, ok := h.emitter.(aiSessionRuntimeTurnReporter); ok {
+			reporter.TurnFailed(turnID, code, err.Error(), detailJSON)
+			return
+		}
+		h.emitter.Emit(aiSessionRuntimeEventTurnFailed, detailJSON)
+		return
 	}
+	resultJSON := mustJSON(map[string]string{
+		"execution_mode": map[bool]string{true: "single_run", false: "multi_turn"}[singleRun],
+		"turn_id":        turnID,
+	})
+	if singleRun {
+		h.closeForTerminalFailure()
+		if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok {
+			completer.DoneTurn(turnID, resultJSON)
+			return
+		}
+		h.emitter.Done(resultJSON)
+		return
+	}
+	if reporter, ok := h.emitter.(aiSessionRuntimeTurnReporter); ok {
+		reporter.TurnCompleted(turnID, resultJSON)
+		return
+	}
+	h.emitter.Emit(aiSessionRuntimeEventTurnCompleted, resultJSON)
 }
 
 func (h *yakAIEngineRuntimeHandle) activeTurnID() string {
@@ -385,12 +427,11 @@ func (h *yakAIEngineRuntimeHandle) sendControlInput(event *ypb.AIInputEvent, kin
 }
 
 func (h *yakAIEngineRuntimeHandle) executeForgeDirectly(
-	turnID string,
 	content string,
 	runtime yakRuntimeOptions,
 	binding aiSessionBinding,
 	config *aiengine.AIEngineConfig,
-) {
+) error {
 	err := runYakAIForgeDirect(
 		h.engine.Context(),
 		config,
@@ -406,13 +447,7 @@ func (h *yakAIEngineRuntimeHandle) executeForgeDirectly(
 	h.mu.Lock()
 	h.forgeRunning = false
 	h.mu.Unlock()
-	if err != nil && h.engine.Context().Err() == nil {
-		h.closeForTerminalFailure()
-		h.failTurn(turnID, "yak_ai_forge_failed", err.Error(), mustJSON(map[string]string{
-			"runtime":    "yak_ai_engine",
-			"forge_name": strings.TrimSpace(runtime.ForgeName),
-		}))
-	}
+	return err
 }
 
 func runYakAIForgeDirect(
@@ -1647,10 +1682,20 @@ func buildYakAIInterventionEvent(input aiSessionInput) (*ypb.AIInputEvent, error
 	if content == "" {
 		return nil, fmt.Errorf("ai session intervention content is required")
 	}
-	return &ypb.AIInputEvent{
+	event := &ypb.AIInputEvent{
 		IsFreeInput: true,
 		FreeInput:   content,
-	}, nil
+	}
+	if interventionID := strings.TrimSpace(input.Ref.CommandID); interventionID != "" {
+		event.AttachedResourceInfo = []*ypb.AttachedResourceInfo{
+			{
+				Type:  aicommon.USER_FREE_INPUT_UUID,
+				Key:   aicommon.USER_FREE_INPUT_UUID,
+				Value: interventionID,
+			},
+		}
+	}
+	return event, nil
 }
 
 func interactiveIDFromPayload(payload map[string]any) string {

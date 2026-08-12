@@ -5,6 +5,7 @@ import "strings"
 const (
 	capabilityKeySSARuleSyncExport = "ssa.rule_sync.export"
 	capabilityKeyAIBindEpochV1     = "ai.session.bind_epoch.v1"
+	capabilityKeyAITurnLifecycleV1 = "ai.session.turn_lifecycle.v1"
 )
 
 func normalizeScanNodeCapabilityKeys(input []string) []string {

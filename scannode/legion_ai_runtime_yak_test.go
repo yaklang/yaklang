@@ -20,11 +20,10 @@ import (
 
 func boolPointer(value bool) *bool { return &value }
 
-func TestStatefulDriverRejectsNewInputWhileTerminalFailurePublicationIsBlocked(t *testing.T) {
+func TestStatefulDriverKeepsConversationRuntimeAfterTurnFailure(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()
 	engine.sendErr = errors.New("provider failed")
 	emitter := newBlockingTurnFailureEmitter()
-	t.Cleanup(func() { close(emitter.release) })
 	handle := &yakAIEngineRuntimeHandle{
 		engine:       engine,
 		emitter:      emitter,
@@ -44,13 +43,23 @@ func TestStatefulDriverRejectsNewInputWhileTerminalFailurePublicationIsBlocked(t
 		t.Fatal("terminal failure publication did not start")
 	}
 
-	err := handle.SendInput(context.Background(), aiSessionInput{
-		Ref:         aiSessionCommandRef{CommandID: "turn-too-late"},
-		InputType:   "message",
-		PayloadJSON: []byte(`{"content":"second"}`),
-	})
-	if err == nil || !strings.Contains(err.Error(), "yak ai engine is closed") {
-		t.Fatalf("new input during terminal publication error = %v, want closed runtime", err)
+	close(emitter.release)
+	deadline := time.After(time.Second)
+	for {
+		handle.mu.Lock()
+		active := handle.currentTurn
+		handle.mu.Unlock()
+		if active == "" {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("stateful failed turn did not finish")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	if handle.closed {
+		t.Fatal("stateful conversation runtime was closed by a per-turn failure")
 	}
 }
 
@@ -696,6 +705,7 @@ func TestBuildYakAIInterventionEventCarriesEndpointID(t *testing.T) {
 
 	payload := []byte(`{"id":"interactive-1","suggestion":"continue","review_type":"tool_use_review_require"}`)
 	event, err := buildYakAIInterventionEvent(aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "intervention-command-1"},
 		InputType:   "user_intervention",
 		PayloadJSON: payload,
 	})
@@ -752,6 +762,11 @@ func TestBuildYakAIInterventionEventMapsFreeInputWithoutEndpointID(t *testing.T)
 	}
 	if event.GetIsInteractiveMessage() {
 		t.Fatal("free input must not be marked interactive")
+	}
+	resources := event.GetAttachedResourceInfo()
+	if len(resources) != 1 || resources[0].GetType() != aicommon.USER_FREE_INPUT_UUID ||
+		resources[0].GetValue() != "intervention-command-1" {
+		t.Fatalf("free intervention queue identity = %#v", resources)
 	}
 }
 

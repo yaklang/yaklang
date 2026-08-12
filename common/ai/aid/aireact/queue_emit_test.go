@@ -92,3 +92,17 @@ func TestEmitDequeueReActTask_IncludesUserInputUUID(t *testing.T) {
 	payload := parsePayload(t, events[0].Content)
 	require.Equal(t, "ui-uuid-dequeue-456", payload["react_task_user_input_uuid"])
 }
+
+func TestGetQueueInfoIncludesUserInputUUID(t *testing.T) {
+	queue := NewTaskQueue("test")
+	task := aicommon.NewStatefulTaskBase("task-queue-info", "follow up", nil, nil, true)
+	task.SetUserInputUUID("ui-uuid-queue-info-789")
+	require.NoError(t, queue.Append(task))
+
+	react := &ReAct{taskQueue: queue}
+	info := react.GetQueueInfo()
+	tasks, ok := info["tasks"].([]map[string]interface{})
+	require.True(t, ok)
+	require.Len(t, tasks, 1)
+	require.Equal(t, "ui-uuid-queue-info-789", tasks[0]["user_input_uuid"])
+}
