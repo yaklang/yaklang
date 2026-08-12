@@ -147,6 +147,14 @@ func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName str
 	}
 
 	if matchMod&ConstType != 0 {
+		// A3: use the native-SQL ConstType ID query (skips GORM Model+Where+
+		// Pluck+YieldIrCode — the 3.59M-call hot path on hadoop). On any native
+		// error, fall back to the original GORM path so a DB error is never
+		// mistaken for an empty result.
+		ids, err := nativeGetIrCodeIDsByConstType(GetDB(), progName, compareMode, value)
+		if err == nil {
+			return filterLoaded(yieldIrCodes(ctx, progName, ids))
+		}
 		query := GetDB().Model(&IrCode{}).
 			Where(TableIrCodes+".program_name = ?", progName).
 			Where(TableIrCodes+".opcode = ? AND "+TableIrCodes+".const_type = ?", 5, "normal")

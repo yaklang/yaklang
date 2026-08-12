@@ -19,6 +19,17 @@ func NativeIrCodeBatchReads() int64 {
 	return nativeIrCodeBatchReads.Load()
 }
 
+// nativeConstTypeIDQueries is a test-only counter incremented every time
+// nativeGetIrCodeIDsByConstType performs a ConstType ID query. Tests use it to
+// prove that SearchVariableWithFileFilter routes the ConstType hot path
+// (3.59M calls on hadoop) through native SQL instead of GORM Pluck.
+var nativeConstTypeIDQueries atomic.Int64
+
+// NativeConstTypeIDQueries returns the test-only ConstType query counter.
+func NativeConstTypeIDQueries() int64 {
+	return nativeConstTypeIDQueries.Load()
+}
+
 // Native-SQL fast paths for the hot single-row reads (GetIrTypeItemById /
 // GetIrCodeItemById). GORM's First() builds a heavy query chain per call
 // (Scope.Fields / DB.clone / search.clone / buildScanPlan — ~45GB combined in
@@ -225,4 +236,44 @@ func joinPlaceholders(ps []string) string {
 		b = append(b, p...)
 	}
 	return string(b)
+}
+
+// nativeGetIrCodeIDsByConstType returns the code_ids matching the ConstType
+// search predicate (opcode=5, const_type='normal', string exact or REGEXP),
+// mirroring the GORM Model(&IrCode{}) path used by searchVariableWithFileFilter
+// (including soft-delete deleted_at IS NULL). It is the A3 fast path: the GORM
+// version built Model+Where+Pluck+YieldIrCode per call (3.59M calls on hadoop).
+func nativeGetIrCodeIDsByConstType(db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, error) {
+	if db == nil || progName == "" {
+		return nil, nil
+	}
+	nativeConstTypeIDQueries.Add(1)
+	var q string
+	var args []interface{}
+	if compareMode == ExactCompare {
+		q = `SELECT code_id FROM ` + TableIrCodes +
+			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" = ? AND deleted_at IS NULL`
+		args = []interface{}{progName, 5, "normal", value}
+	} else {
+		q = `SELECT code_id FROM ` + TableIrCodes +
+			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" REGEXP ? AND deleted_at IS NULL`
+		args = []interface{}{progName, 5, "normal", value}
+	}
+	rows, err := db.CommonDB().Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
