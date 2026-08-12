@@ -21,9 +21,12 @@ import (
 )
 
 type batchHardeningReviewMaterial struct {
-	ID     string              `json:"id"`
-	Tool   string              `json:"tool"`
-	Params aitool.InvokeParams `json:"params"`
+	ID         string              `json:"id"`
+	Tool       string              `json:"tool"`
+	Params     aitool.InvokeParams `json:"params"`
+	BatchID    string              `json:"batch_id"`
+	CallIndex  int                 `json:"call_index"`
+	CallToolID string              `json:"call_tool_id"`
 }
 
 type batchHardeningReviewRecorder struct {
@@ -128,6 +131,129 @@ func batchHardeningRequest(targetTool, siblingTool string, params aitool.InvokeP
 			Reason:   "exercise the batch barrier",
 		},
 	}}
+}
+
+func TestExecuteToolBatch_RequireGuardRejectionSkipsOnlyRejectedChild(t *testing.T) {
+	var rejectedParamCalls int32
+	var allowedParamCalls int32
+	var rejectedInvokes int32
+	var allowedInvokes int32
+
+	rejectedTool, err := aitool.New(
+		"batch_guard_rejected_tool",
+		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
+		aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
+			atomic.AddInt32(&rejectedInvokes, 1)
+			return "must not invoke", nil
+		}),
+	)
+	require.NoError(t, err)
+	allowedTool, err := aitool.New(
+		"batch_guard_allowed_tool",
+		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
+		aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
+			atomic.AddInt32(&allowedInvokes, 1)
+			return params.GetInt("id"), nil
+		}),
+	)
+	require.NoError(t, err)
+
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+			switch {
+			case isToolParamGenerationPrompt(prompt, rejectedTool.Name):
+				atomic.AddInt32(&rejectedParamCalls, 1)
+				return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":1}}`)
+			case isToolParamGenerationPrompt(prompt, allowedTool.Name):
+				atomic.AddInt32(&allowedParamCalls, 1)
+				return batchHardeningAIResponse(config, `{"@action":"call-tool","params":{"id":2}}`)
+			default:
+				return nil, fmt.Errorf("unexpected AI call: caller=%s", request.GetCallerLabel())
+			}
+		}),
+		aicommon.WithTools(rejectedTool, allowedTool),
+		aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithDisableToolCallerIntervalReview(true),
+	)
+	require.NoError(t, err)
+	loop, err := reactloops.NewReActLoop(
+		"batch-require-guard-test",
+		react,
+		reactloops.WithToolInvokeGuard(func(toolName string, _ aitool.InvokeParams) (bool, string) {
+			if toolName == rejectedTool.Name {
+				return false, "blocked by test guard"
+			}
+			return true, ""
+		}),
+	)
+	require.NoError(t, err)
+	loop.SetCurrentTask(react.config.DefaultTask)
+
+	result, execErr := react.ExecuteToolBatch(
+		context.Background(),
+		react.config.DefaultTask,
+		&aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
+			{Mode: aicommon.ToolCallModeRequire, ToolName: rejectedTool.Name, Reason: "must be rejected"},
+			{Mode: aicommon.ToolCallModeRequire, ToolName: allowedTool.Name, Reason: "must continue"},
+		}},
+	)
+	require.NoError(t, execErr)
+	require.Len(t, result.Outcomes, 2)
+	require.Equal(t, aicommon.ToolCallStageValidationFailed, result.Outcomes[0].Stage)
+	require.ErrorContains(t, result.Outcomes[0].Err, "blocked by test guard")
+	require.Nil(t, result.Outcomes[0].Result)
+	require.Equal(t, aicommon.ToolCallStageDone, result.Outcomes[1].Stage)
+	require.NotNil(t, result.Outcomes[1].Result)
+	require.Equal(t, int32(0), atomic.LoadInt32(&rejectedParamCalls), "guarded require child must not generate params")
+	require.Equal(t, int32(0), atomic.LoadInt32(&rejectedInvokes), "guarded require child must not invoke")
+	require.Equal(t, int32(1), atomic.LoadInt32(&allowedParamCalls), "valid sibling must still prepare once")
+	require.Equal(t, int32(1), atomic.LoadInt32(&allowedInvokes), "valid sibling must still invoke once")
+}
+
+func TestExecuteToolBatch_ManualReviewMaterialsCarryStableChildIdentity(t *testing.T) {
+	tool, err := aitool.New(
+		"batch_review_identity_tool",
+		aitool.WithIntegerParam("id", aitool.WithParam_Required(true)),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
+			return params.GetInt("id"), nil
+		}),
+	)
+	require.NoError(t, err)
+	recorder := new(batchHardeningReviewRecorder)
+	react := newBatchHardeningReplayRuntime(
+		t,
+		"batch-review-identity-runtime-"+ksuid.New().String(),
+		7000,
+		nil,
+		recorder,
+		func(_ int, _ batchHardeningReviewMaterial) string {
+			return `{"suggestion":"continue"}`
+		},
+		tool,
+	)
+
+	request := batchHardeningRequest(tool.Name, tool.Name, aitool.InvokeParams{"id": 1})
+	result, execErr := react.ExecuteToolBatch(context.Background(), react.config.DefaultTask, request)
+	require.NoError(t, execErr)
+	require.Len(t, result.Outcomes, 2)
+	materials := recorder.snapshot()
+	require.Len(t, materials, 2)
+
+	for index, material := range materials {
+		require.NotEmpty(t, material.ID)
+		require.Equal(t, request.Calls[index].ToolName, material.Tool)
+		require.Equal(t, int64(index+1), material.Params.GetInt("id"))
+		require.Equal(t, result.BatchID, material.BatchID)
+		require.Equal(t, index, material.CallIndex)
+		require.Equal(t, request.Calls[index].ExecutionCallID, material.CallToolID)
+		require.NotEmpty(t, material.CallToolID)
+		require.Equal(t, material.CallToolID, result.Outcomes[index].CallID)
+		require.Equal(t, aicommon.ToolCallStageDone, result.Outcomes[index].Stage)
+	}
 }
 
 func TestExecuteToolBatch_ManualReviewCheckpointReplay_DirectAnswer(t *testing.T) {

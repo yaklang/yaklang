@@ -46,11 +46,11 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 		return
 	}
 	r.emitReActTaskStructured(t, REACT_TASK_enqueue, map[string]interface{}{
-		"react_task_id":    t.GetId(),
-		"react_task_input": t.GetUserInput(),
+		"react_task_id":              t.GetId(),
+		"react_task_input":           t.GetUserInput(),
 		"react_task_user_input_uuid": t.GetUserInputUUID(),
-		"is_recovery":      t.GetTaskKind() == aicommon.AITaskKind_Recovery,
-		"queue_len":        r.taskQueue.Len(),
+		"is_recovery":                t.GetTaskKind() == aicommon.AITaskKind_Recovery,
+		"queue_len":                  r.taskQueue.Len(),
 	})
 }
 
@@ -63,13 +63,13 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		return
 	}
 	r.emitReActTaskStructured(t, REACT_TASK_dequeue, map[string]interface{}{
-		"react_task_id":    t.GetId(),
-		"react_task_input": t.GetUserInput(),
+		"react_task_id":              t.GetId(),
+		"react_task_input":           t.GetUserInput(),
 		"react_task_user_input_uuid": t.GetUserInputUUID(),
-		"is_recovery":      t.GetTaskKind() == aicommon.AITaskKind_Recovery,
-		"reason":           reason,
-		"queue_len":        r.taskQueue.Len(),
-		"focus_mode":       t.GetFocusMode(),
+		"is_recovery":                t.GetTaskKind() == aicommon.AITaskKind_Recovery,
+		"reason":                     reason,
+		"queue_len":                  r.taskQueue.Len(),
+		"focus_mode":                 t.GetFocusMode(),
 	})
 }
 
@@ -99,12 +99,21 @@ func NewTaskQueue(name string) *TaskQueue {
 }
 
 func (tq *TaskQueue) Len() int {
+	if tq == nil {
+		return 0
+	}
+	tq.mutex.RLock()
+	defer tq.mutex.RUnlock()
 	return tq.queue.Len()
 }
 
 // executeHooks 执行所有预处理钩子
 func (tq *TaskQueue) executeHooks(task aicommon.AIStatefulTask) (bool, error) {
-	for _, hook := range tq.enqueueHook {
+	tq.mutex.RLock()
+	hooks := append([]taskEnqueueHook(nil), tq.enqueueHook...)
+	tq.mutex.RUnlock()
+
+	for _, hook := range hooks {
 		shouldQueue, err := hook(task)
 		if err != nil {
 			log.Errorf("Task queue hook execution failed: %v", err)
@@ -120,7 +129,11 @@ func (tq *TaskQueue) executeHooks(task aicommon.AIStatefulTask) (bool, error) {
 
 // executeDequeueHooks 执行所有出队钩子 warning 不要在再有锁的情况下调用这个函数
 func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason string) (bool, error) {
-	for _, hook := range tq.dequeueHooks {
+	tq.mutex.RLock()
+	hooks := append([]taskDequeueHook(nil), tq.dequeueHooks...)
+	tq.mutex.RUnlock()
+
+	for _, hook := range hooks {
 		hook(task, reason)
 	}
 	return true, nil
@@ -129,15 +142,19 @@ func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason st
 // GetFirst 获取并移除队列中的第一个任务
 func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
 	tq.mutex.Lock()
-	defer tq.mutex.Unlock()
 	front := tq.queue.Front()
 	if front == nil {
+		tq.mutex.Unlock()
 		return nil
 	}
 
 	task := front.Value.(aicommon.AIStatefulTask)
+	tq.queue.Remove(front)
+	tq.mutex.Unlock()
 
-	// 执行出队钩子
+	// The task must be removed atomically, but hooks must run after releasing the
+	// queue lock. ReAct's dequeue hook emits queue_len via Len(), and arbitrary
+	// user hooks may also inspect or mutate the queue.
 	shouldDequeue, err := tq.executeDequeueHooks(task, "normal")
 	if err != nil {
 		log.Errorf("Task dequeue hook failed: %v", err)
@@ -146,8 +163,6 @@ func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
 	if !shouldDequeue {
 		return nil
 	}
-
-	tq.queue.Remove(front)
 
 	log.Debugf("Task queue [%s]: dequeued task [%s]", tq.queueName, task.GetId())
 	return task
@@ -367,25 +382,28 @@ func (tq *TaskQueue) MoveTaskToFirst(taskId string) bool {
 // 如果找到并移除任务则返回 true，否则返回 false
 func (tq *TaskQueue) RemoveTask(taskId string) bool {
 	tq.mutex.Lock()
-	defer tq.mutex.Unlock()
-
+	var removedTask aicommon.AIStatefulTask
 	// 遍历队列查找指定的任务
 	for e := tq.queue.Front(); e != nil; e = e.Next() {
 		task := e.Value.(aicommon.AIStatefulTask)
 		if task.GetId() == taskId {
 			// 找到任务，从队列中移除
 			tq.queue.Remove(e)
-
-			// 执行 dequeue hooks 来发送事件
-			for _, hook := range tq.dequeueHooks {
-				hook(task, "manual_remove")
-			}
-
-			log.Infof("Task queue [%s]: removed task [%s] from queue", tq.queueName, taskId)
-			return true
+			removedTask = task
+			break
 		}
 	}
+	tq.mutex.Unlock()
 
-	log.Warnf("Task queue [%s]: task [%s] not found in queue, cannot remove", tq.queueName, taskId)
-	return false
+	if removedTask == nil {
+		log.Warnf("Task queue [%s]: task [%s] not found in queue, cannot remove", tq.queueName, taskId)
+		return false
+	}
+
+	// As in GetFirst, notify only after ownership of the queue lock has ended.
+	// The built-in hook observes the new queue length, and no hook can deadlock
+	// by re-entering TaskQueue.
+	_, _ = tq.executeDequeueHooks(removedTask, "manual_remove")
+	log.Infof("Task queue [%s]: removed task [%s] from queue", tq.queueName, taskId)
+	return true
 }

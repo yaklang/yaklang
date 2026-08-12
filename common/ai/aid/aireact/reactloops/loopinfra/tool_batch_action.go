@@ -663,7 +663,15 @@ func handleToolBatchActionResult(
 	outcomes := append([]aicommon.ToolCallOutcome(nil), result.Outcomes...)
 	sort.SliceStable(outcomes, func(i, j int) bool { return outcomes[i].Index < outcomes[j].Index })
 	lines := []string{fmt.Sprintf("Tool batch finished: %d calls", len(request.Calls))}
+	executedToolCallCount := 0
 	for _, outcome := range outcomes {
+		// Result is assigned only after the ToolCaller returns from the plugin
+		// callback. It is therefore the objective execution boundary: success and
+		// tool-level failure both count, while admission/review/cancel outcomes have
+		// nil Result and do not.
+		if outcome.Result != nil {
+			executedToolCallCount++
+		}
 		toolName := outcome.FinalTool
 		if toolName == "" {
 			toolName = outcome.RequestedTool
@@ -696,9 +704,16 @@ func handleToolBatchActionResult(
 	summary := strings.Join(lines, "\n")
 	invoker.AddToTimeline("[TOOL_BATCH_RESULT]", summary)
 	operator.Feedback(summary)
+	justExecutedTool := executedToolCallCount > 0
+	if justExecutedTool {
+		operator.MarkToolExecuted(executedToolCallCount)
+	}
 
 	task := loop.GetCurrentTask()
-	if task == nil {
+	// Satisfaction is meaningful only after at least one callback actually
+	// settled. A syntactically valid batch that was wholly rejected at admission
+	// must remain visible in history/feedback, but must not pretend work happened.
+	if task == nil || !justExecutedTool {
 		operator.Continue()
 		return
 	}

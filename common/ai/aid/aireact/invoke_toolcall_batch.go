@@ -336,6 +336,10 @@ func (r *ReAct) newToolCallerForBatchCall(
 		})
 	}
 
+	statsSource := aicommon.StatsSourceToolDirect
+	if work.call.Mode == aicommon.ToolCallModeRequire {
+		statsSource = aicommon.StatsSourceToolRequested
+	}
 	opts := []aicommon.ToolCallerOption{
 		aicommon.WithToolCaller_AICallerConfig(r.config),
 		aicommon.WithToolCaller_AICaller(r.config),
@@ -357,6 +361,7 @@ func (r *ReAct) newToolCallerForBatchCall(
 		aicommon.WithToolCaller_ResultID(work.resultID),
 		aicommon.WithToolCaller_ArtifactOrdinal(work.artifactOrdinal),
 		aicommon.WithToolCaller_BatchMetadata(work.batchID, work.call.Index),
+		aicommon.WithToolCaller_StatsSource(statsSource),
 		aicommon.WithToolCaller_ReviewWrongTool(func(
 			callCtx context.Context,
 			tool *aitool.Tool,
@@ -378,7 +383,7 @@ func (r *ReAct) newToolCallerForBatchCall(
 		opts = append(opts, aicommon.WithToolCaller_ParamAugmentForTool(paramMutator))
 	}
 	if !r.config.DisableIntervalReview {
-		if intervalHandler := r.CreateIntervalReviewHandlerForTask(task); intervalHandler != nil {
+		if intervalHandler := r.CreateIntervalReviewHandlerForTaskAndEmitter(task, childEmitter); intervalHandler != nil {
 			opts = append(opts, aicommon.WithToolCaller_IntervalReviewHandler(intervalHandler))
 			if r.config.IntervalReviewDuration > 0 {
 				opts = append(opts, aicommon.WithToolCaller_IntervalReviewDuration(r.config.IntervalReviewDuration))
@@ -634,6 +639,13 @@ func (r *ReAct) ExecuteToolBatch(
 				barrier.arrive(i, false)
 			}()
 
+			// Preflight may reject a require child while still having resolved its
+			// Tool (for example a loop ToolInvokeGuard veto). Preserve that settled
+			// outcome and do not let the worker generate params, request approval,
+			// invoke the plugin, or overwrite the rejection with a later result.
+			if result.Outcomes[i].Err != nil {
+				return
+			}
 			if work.tool == nil {
 				// A require-tool manager race is all-settled: a missing child does
 				// not stop valid siblings, but it still participates in the barrier.

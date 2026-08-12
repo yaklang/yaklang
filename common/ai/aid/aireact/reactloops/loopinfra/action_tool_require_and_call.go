@@ -27,6 +27,20 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	OutputExamples: requireToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		loop.Delete(loopVarRequireToolBatch)
+
+		// tool_require_payload is the legacy one-call discriminator. Preserve its
+		// field-level streaming behavior and only wait for a canonical object when
+		// the scalar form is absent and this may actually be a batch action.
+		payload := action.GetString("tool_require_payload")
+		if payload == "" {
+			payload = action.GetInvokeParams("next_action").GetString("tool_require_payload")
+		}
+		if payload != "" {
+			reactloops.MaybeWarnBashBeforeEdit(loop, payload)
+			loop.Set("tool_require_payload", payload)
+			return nil
+		}
+
 		batch, hasBatch, batchErr := parseRequireToolBatchAction(loop, action)
 		if batchErr != nil {
 			return batchErr
@@ -37,16 +51,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			return nil
 		}
 
-		payload := action.GetString("tool_require_payload")
-		if payload == "" {
-			payload = action.GetInvokeParams("next_action").GetString("tool_require_payload")
-		}
-		if payload == "" {
-			return utils.Error("tool_require_payload is required for ActionRequireTool but empty")
-		}
-		reactloops.MaybeWarnBashBeforeEdit(loop, payload)
-		loop.Set("tool_require_payload", payload)
-		return nil
+		return utils.Error("require_tool requires tool_require_payload or tool_require_calls")
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		if executeVerifiedToolBatch(loop, loopVarRequireToolBatch, operator) {

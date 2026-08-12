@@ -21,6 +21,29 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// synchronizedResponseCapture is a bytes.Buffer with snapshot reads. Action
+// parsing is asynchronous after ExtractActionFromStream returns: the mirror
+// goroutine may still be driving the tee while the transaction post-handler is
+// validating fields. Keeping synchronization at the diagnostic capture avoids
+// racing buf.String against Write without changing Action's per-field streaming
+// API.
+type synchronizedResponseCapture struct {
+	mu  sync.RWMutex
+	buf bytes.Buffer
+}
+
+func (c *synchronizedResponseCapture) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.Write(p)
+}
+
+func (c *synchronizedResponseCapture) String() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.buf.String()
+}
+
 // isJSONEmbeddedAITagPrefix 判断字段流的首批 peek 字节是否以 `<|TagName_` 开头,
 // 兼容 JSON 字段流推过来的 raw bytes 通常带外层 `"` 与零宽空白. 命中即视为 AI 把
 // AITag 块塞进了 JSON 字符串值, 触发 JSON / AITag 双 emit 重复, 让调用方静默
@@ -358,9 +381,15 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				r.GetEmitter(),
 			)
 
-			buf := bytes.NewBuffer(make([]byte, 0))
+			buf := new(synchronizedResponseCapture)
 			stream = io.TeeReader(stream, buf)
 			tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
+			// The immediate assignment below is intentionally only a snapshot. Once
+			// the parser consumes EOF, replace it with the full response for
+			// diagnostics/reference material.
+			tagOptions = append(tagOptions, aicommon.WithActionOnReaderFinished(func() {
+				r.Set("last_ai_decision_response", buf.String())
+			}))
 			streamFields := r.streamFields.Copy()
 
 			for _, i := range r.GetAllActions() {
@@ -1108,6 +1137,11 @@ LOOP:
 				operator,
 			)
 		}()
+		// Tool names/count above describe the model proposal. Only the handler can
+		// know whether a plugin callback actually ran, so commit that independent
+		// fact after it settles. This keeps rejected/cancelled/zero-invoke batches
+		// in history without falsely turning them into iteration_end training data.
+		r.applyActionExecutionRecord(actionRecord, operator)
 		if handler.ActionType != loopAction_Finish.ActionType {
 			r.recordCurrentTodoIteration(task)
 		}
@@ -1255,6 +1289,22 @@ LOOP:
 		continue
 	}
 	return nil
+}
+
+// applyActionExecutionRecord copies the handler's objective execution fact into
+// the already-appended history record. Declared ToolNames/ToolCallCount remain
+// untouched so diagnostics can still explain what the model attempted.
+func (r *ReActLoop) applyActionExecutionRecord(record *ActionRecord, operator *LoopActionHandlerOperator) {
+	if r == nil || record == nil || operator == nil {
+		return
+	}
+	executed := operator.GetExecutedToolCallCount()
+	if executed <= 0 {
+		return
+	}
+	r.actionHistoryMutex.Lock()
+	record.ExecutedToolCallCount += executed
+	r.actionHistoryMutex.Unlock()
 }
 
 func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTask) *OnPostIterationOperator {

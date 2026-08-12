@@ -62,6 +62,13 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		r.config.RunVerificationWatchdogToolBlockingStart()
 		defer r.config.RunVerificationWatchdogToolBlockingEnd()
 	}
+	statsSource := aicommon.StatsSourceToolRequested
+	if skipRequire {
+		statsSource = aicommon.StatsSourceToolDirect
+	}
+	// Runtime entry points own this classification. Append it last so a generic
+	// caller cannot accidentally relabel a require call as direct (or vice versa).
+	opt = append(opt, aicommon.WithToolCaller_StatsSource(statsSource))
 
 	return r.withTaskEmitterScope(func(currentTask aicommon.AIStatefulTask) (*aitool.ToolResult, bool, error) {
 		tool, err := r.resolveToolForCall(ctx, toolName)
@@ -356,6 +363,7 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		toolName,
 		true,
 		aicommon.WithToolCaller_OmitResultParamsInTimeline(),
+		aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
 	)
 	if err != nil {
 		return nil, false, err

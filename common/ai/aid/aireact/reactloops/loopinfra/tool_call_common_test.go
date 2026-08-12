@@ -31,6 +31,7 @@ func TestHandleToolCallResult_MCPInitializing_ErrorPath(t *testing.T) {
 	assert.Contains(t, feedback, "still connecting")
 	assert.Contains(t, feedback, "same tool")
 	assert.True(t, op.IsContinued())
+	assert.Zero(t, op.GetExecutedToolCallCount(), "pre-invoke error has no settled ToolResult")
 }
 
 func TestHandleToolCallResult_MCPInitializing_ResultErrorPath(t *testing.T) {
@@ -54,6 +55,34 @@ func TestHandleToolCallResult_MCPInitializing_ResultErrorPath(t *testing.T) {
 	assert.Contains(t, feedback, "still initializing")
 	assert.Contains(t, feedback, "same tool")
 	assert.True(t, op.IsContinued())
+	assert.Equal(t, 1, op.GetExecutedToolCallCount(), "failed ToolResult still proves callback execution")
+}
+
+func TestHandleToolCallResult_DirectAnswerDoesNotMarkExecution(t *testing.T) {
+	ctx := context.Background()
+	invoker := newTestInvoker(ctx)
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.SetCurrentTask(task)
+	op := reactloops.NewActionHandlerOperator(task)
+
+	handleToolCallResult(
+		loop,
+		ctx,
+		invoker,
+		"reviewed_tool",
+		&aitool.ToolResult{Name: "reviewed_tool", Success: true},
+		true,
+		nil,
+		op,
+	)
+
+	assert.Zero(t, op.GetExecutedToolCallCount(), "review direct_answer is user intent, not plugin execution")
+	terminated, err := op.IsTerminated()
+	require.True(t, terminated)
+	require.NoError(t, err)
 }
 
 func TestResolveToolCallReason(t *testing.T) {

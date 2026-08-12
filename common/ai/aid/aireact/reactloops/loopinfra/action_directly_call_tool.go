@@ -338,6 +338,40 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 	OutputExamples: directlyCallToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		loop.Delete(loopVarDirectToolBatch)
+
+		// Keep the established scalar streaming contract. The legacy discriminator
+		// is readable before the root JSON object closes, so a valid one-call action
+		// must not wait for the optional batch array's canonical representation.
+		// If a malformed response emits both forms, scalar wins for backward
+		// compatibility; the published Schema and prompt still forbid mixing them.
+		toolName := action.GetString("directly_call_tool_name")
+		if toolName == "" {
+			toolName = action.GetInvokeParams("next_action").GetString("directly_call_tool_name")
+		}
+		if toolName != "" {
+			mgr := loop.GetConfig().GetAiToolManager()
+			if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
+				// 工具不在 recently-used cache 中时只记录警告，不报错触发重试。
+				// 后续 ActionHandler 会通过 GetToolByName 自行决定：工具存在则继续
+				// 直接调用，工具不存在则走已有的 fallback 到 require_tool 路径。
+				emit := loop.GetEmitter()
+				if emit != nil {
+					emit.EmitWarning("tool '%s' is not in the recently-used cache; handler will resolve it", toolName)
+				}
+				loop.GetInvoker().AddToTimeline(
+					"directly_call_cache_miss",
+					fmt.Sprintf(
+						"[DIRECT_CALL_CACHE_MISS] directly_call_tool selected '%s' but it is not in the recently-used cache. "+
+							"Letting handler resolve (call if tool exists, otherwise fall back to require_tool).",
+						toolName,
+					),
+				)
+			}
+			reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
+			loop.Set("directly_call_tool_name", toolName)
+			return nil
+		}
+
 		batch, hasBatch, batchErr := parseDirectToolBatchAction(loop, action)
 		if batchErr != nil {
 			return batchErr
@@ -348,37 +382,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return nil
 		}
 
-		toolName := action.GetString("directly_call_tool_name")
-		if toolName == "" {
-			toolName = action.GetInvokeParams("next_action").GetString("directly_call_tool_name")
-		}
-		if toolName == "" {
-			return utils.Error("directly_call_tool_name is required for directly_call_tool but empty")
-		}
-
-		mgr := loop.GetConfig().GetAiToolManager()
-		if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
-			// 工具不在 recently-used cache 中时只记录警告，不报错触发重试。
-			// 后续 ActionHandler 会通过 GetToolByName 自行决定：工具存在则继续
-			// 直接调用，工具不存在则走已有的 fallback 到 require_tool 路径。
-			// 关键词: directly_call_tool, cache miss, 不触发重试, handler 自处理
-			emit := loop.GetEmitter()
-			if emit != nil {
-				emit.EmitWarning("tool '%s' is not in the recently-used cache; handler will resolve it", toolName)
-			}
-			loop.GetInvoker().AddToTimeline(
-				"directly_call_cache_miss",
-				fmt.Sprintf(
-					"[DIRECT_CALL_CACHE_MISS] directly_call_tool selected '%s' but it is not in the recently-used cache. "+
-						"Letting handler resolve (call if tool exists, otherwise fall back to require_tool).",
-					toolName,
-				),
-			)
-		}
-		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
-
-		loop.Set("directly_call_tool_name", toolName)
-		return nil
+		return utils.Error("directly_call_tool requires directly_call_tool_name or directly_call_tool_calls")
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		if executeVerifiedToolBatch(loop, loopVarDirectToolBatch, operator) {

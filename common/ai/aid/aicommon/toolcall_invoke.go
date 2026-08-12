@@ -219,6 +219,10 @@ func (a *ToolCaller) invoke(
 	stdoutSnapshotBuffer, stderrSnapshotBuffer *toolOutputBuffer,
 	finalizeResults ...func(*aitool.ToolResult) error,
 ) (*aitool.ToolResult, error) {
+	// A ToolCaller can recursively enter invoke after a review override. Track
+	// replay for the current invocation only; the outer pipeline uses this bit to
+	// suppress session/stat notifications when no plugin callback ran.
+	a.checkpointReplayed = false
 	c := a.config
 	e := a.emitter
 	if err := toolCallerContextErr(a.ctx); err != nil {
@@ -260,6 +264,7 @@ func (a *ToolCaller) invoke(
 			}
 		}
 		if ret.Finished {
+			a.checkpointReplayed = true
 			res := aiddb.AiCheckPointGetToolResult(ret)
 			if finalizeResult != nil && res != nil {
 				if err := finalizeResult(res); err != nil {
@@ -359,12 +364,17 @@ func (a *ToolCaller) invoke(
 	log.Infof("start to invoke tool[%s] with params: %v", tool.Name, params)
 
 	if !utils.IsNil(a.intervalReviewHandler) {
+		// InvokeWithParams performs small in-place normalizations while validating
+		// (notably temporarily removing runtime_id). Interval review runs in a
+		// parallel goroutine and renders params into its prompt, so it must observe
+		// an immutable deep snapshot instead of racing those tool-owned mutations.
+		intervalReviewParams := cloneEndpointParams(params)
 		intervalStart := make(chan struct{})
 		go func() {
 			close(intervalStart)
 			a.intervalReviewContext(
 				ctx, cancel,
-				tool, params,
+				tool, intervalReviewParams,
 				stdoutSnapshotBuffer.Snapshot,
 				stderrSnapshotBuffer.Snapshot,
 				userCancel,

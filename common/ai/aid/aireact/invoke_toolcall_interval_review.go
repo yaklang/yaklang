@@ -54,9 +54,10 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	reviewCount int,
 	callExpectations string,
 ) (bool, error) {
-	return r._invokeToolCall_IntervalReviewWithContextForTask(
+	return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
 		ctx,
 		r.GetCurrentTask(),
+		r.Emitter,
 		tool,
 		params,
 		stdoutSnapshot,
@@ -77,6 +78,42 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTask(
 	reviewCount int,
 	callExpectations string,
 ) (bool, error) {
+	return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
+		ctx,
+		task,
+		r.Emitter,
+		tool,
+		params,
+		stdoutSnapshot,
+		stderrSnapshot,
+		startTime,
+		reviewCount,
+		callExpectations,
+	)
+}
+
+// _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter binds both the
+// prompt context and every review stream event to the immutable owner of one
+// tool call. Scalar callers keep using r.Emitter through the wrappers above;
+// batch callers pass their associative child emitter so concurrent reviews do
+// not lose or borrow a sibling's CallToolID/ProcessesId metadata.
+func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
+	ctx context.Context,
+	task aicommon.AIStatefulTask,
+	emitter *aicommon.Emitter,
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	startTime time.Time,
+	reviewCount int,
+	callExpectations string,
+) (bool, error) {
+	if emitter == nil {
+		// Preserve the historical scalar fallback for callers that do not own a
+		// more specific emitter.
+		emitter = r.Emitter
+	}
+
 	// Check context at the beginning
 	select {
 	case <-ctx.Done():
@@ -102,10 +139,10 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTask(
 
 	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallSpeedPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
-			boundEmitter := rsp.BindEmitter(r.Emitter)
+			boundEmitter := rsp.BindEmitter(emitter)
 			action, err := aicommon.ExtractActionFromStream(
 				ctx,
-				rsp.GetOutputStreamReader("interval-review", true, r.Emitter),
+				rsp.GetOutputStreamReader("interval-review", true, emitter),
 				"interval-toolcall-review",
 				aicommon.WithActionFieldStreamHandler([]string{
 					"reason", "progress_summary", "estimated_remaining_time",
@@ -190,6 +227,14 @@ func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *ai
 // owns the ToolCaller. Batch workers use this form instead of consulting the
 // mutable ReAct.currentTask pointer when each interval fires.
 func (r *ReAct) CreateIntervalReviewHandlerForTask(task aicommon.AIStatefulTask) func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
+	return r.CreateIntervalReviewHandlerForTaskAndEmitter(task, r.Emitter)
+}
+
+// CreateIntervalReviewHandlerForTaskAndEmitter creates a handler whose prompt
+// and emitted streams belong to the same immutable tool-call child. Batch
+// workers use it with their associative emitter; scalar callers continue to use
+// CreateIntervalReviewHandlerForTask and retain the previous emitter behavior.
+func (r *ReAct) CreateIntervalReviewHandlerForTaskAndEmitter(task aicommon.AIStatefulTask, emitter *aicommon.Emitter) func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 	if r.config.DisableIntervalReview {
 		return nil
 	}
@@ -210,7 +255,7 @@ func (r *ReAct) CreateIntervalReviewHandlerForTask(task aicommon.AIStatefulTask)
 			reviewCount = fallbackReviewCount
 		}
 
-		return r._invokeToolCall_IntervalReviewWithContextForTask(ctx, task, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)
+		return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(ctx, task, emitter, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)
 	}
 }
 

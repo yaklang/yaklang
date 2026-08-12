@@ -52,7 +52,9 @@ func (r *ReActLoop) submitValueFeedbackRecord(iteration int, task aicommon.AISta
 	}
 }
 
-// iterationExecutedTool 判断指定迭代是否真正执行了工具 (ActionRecord.ToolName 非空).
+// iterationExecutedTool 判断指定迭代是否真正执行了工具。ToolName / ToolNames /
+// ToolCallCount 只描述模型声明，不能证明 callback 发生；唯一事实源是 handler
+// 在收到 settled ToolResult 后写入的 ExecutedToolCallCount。
 // 工具执行的客观成败是高价值训练信号; 纯思考 / 直接回答 / 规划等迭代不在此触发,
 // 留给 loop_end 汇总, 从而专注高价值数据.
 func (r *ReActLoop) iterationExecutedTool(iteration int) bool {
@@ -60,7 +62,7 @@ func (r *ReActLoop) iterationExecutedTool(iteration int) bool {
 		if a == nil {
 			continue
 		}
-		if a.IterationIndex == iteration && (a.ToolName != "" || a.ToolCallCount > 0) {
+		if a.IterationIndex == iteration && a.ExecutedToolCallCount > 0 {
 			return true
 		}
 	}
@@ -139,12 +141,13 @@ func valueFeedbackActionFromRecord(action *ActionRecord) aicommon.ValueFeedbackA
 		return aicommon.ValueFeedbackAction{}
 	}
 	return aicommon.ValueFeedbackAction{
-		ActionType:     action.ActionType,
-		ActionName:     action.ActionName,
-		ToolName:       action.ToolName,
-		ToolNames:      append([]string(nil), action.ToolNames...),
-		ToolCallCount:  action.ToolCallCount,
-		IterationIndex: action.IterationIndex,
+		ActionType:            action.ActionType,
+		ActionName:            action.ActionName,
+		ToolName:              action.ToolName,
+		ToolNames:             append([]string(nil), action.ToolNames...),
+		ToolCallCount:         action.ToolCallCount,
+		ExecutedToolCallCount: action.ExecutedToolCallCount,
+		IterationIndex:        action.IterationIndex,
 	}
 }
 

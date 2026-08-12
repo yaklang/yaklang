@@ -67,9 +67,12 @@ type ValueFeedbackAction struct {
 	// ToolNames preserves model order for one action containing multiple
 	// independent tool calls. ToolName remains the first item for compatibility
 	// with older value-feedback consumers.
-	ToolNames      []string `json:"tool_names,omitempty"`
-	ToolCallCount  int      `json:"tool_call_count,omitempty"`
-	IterationIndex int      `json:"iteration_index"`
+	ToolNames     []string `json:"tool_names,omitempty"`
+	ToolCallCount int      `json:"tool_call_count,omitempty"`
+	// ExecutedToolCallCount is the number of callbacks that actually settled
+	// with a ToolResult. ToolCallCount remains the model-declared cardinality.
+	ExecutedToolCallCount int `json:"executed_tool_call_count,omitempty"`
+	IterationIndex        int `json:"iteration_index"`
 }
 
 // approval.source 枚举: 区分"谁"做出的决定, 与 execution_policy (配置策略) 解耦.

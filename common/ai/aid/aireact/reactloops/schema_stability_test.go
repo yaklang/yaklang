@@ -74,7 +74,8 @@ func makeSchemaStabilityTestLoop(cfg aicommon.AICallerConfigIf) *ReActLoop {
 // 加进 disableActionList, schema enum / desc 缩短; HasRecentlyUsedTools=true 时
 // 保留, schema enum / desc 增长. 这导致每会话首次调用工具时 semi-dynamic 段
 // hash 翻转, prefix cache 必然失效一次. P2.1 改成永远保留 directly_call_tool
-// 在 schema 中, 由 ActionVerifier 在 LLM 误选时报错触发 retry.
+// 在 schema 中. 未命中 recent cache 的 enabled tool 由 handler 从完整
+// ToolManager 解析并给出 warning；真正不存在或参数非法的工具仍由后续校验处理.
 //
 // 关键词: P2.1, schema 字节稳定, HasRecentlyUsedTools 跳变消除, byte-equal 断言
 func TestGenerateSchema_StableAcrossHasRecentlyUsedTools(t *testing.T) {

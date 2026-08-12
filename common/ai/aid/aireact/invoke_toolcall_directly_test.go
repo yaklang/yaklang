@@ -464,6 +464,17 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 				return rsp, nil
 			}
 
+			// A finish decision triggers a separate final-synthesis transaction.
+			// That transaction is not another ReAct decision: its parser requires a
+			// directly_answer payload. Returning finish here makes the finalizer retry
+			// until this test's deadline, especially under the race detector.
+			if isDirectAnswerPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_answer","answer_payload":"mocked summary after require and direct calls"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 兜底
 			// 分支也返回 finish 收口 (模拟 "AI 判断任务完成后主动调 finish" 的新行为).
 			rsp := i.NewAIResponse()
@@ -486,7 +497,11 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 		}
 	}()
 
-	timeout := time.After(15 * time.Second)
+	// The loop deliberately exercises require -> direct -> finish -> soft-TODO
+	// confirmation -> final synthesis. Race instrumentation can make those
+	// production stages exceed the old 15s wall-clock deadline even though none
+	// is blocked, so leave enough room for the full protocol to settle.
+	timeout := time.After(30 * time.Second)
 	taskCompleted := false
 
 LOOP:
