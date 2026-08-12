@@ -28,6 +28,7 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 	defer b.capabilityPublisher.Close()
 	defer b.hidsDryRunPublisher.Close()
 	defer b.ruleSyncPublisher.Close()
+	defer b.gitLsRemotePublisher.Close()
 	if b.aiPublisher != nil {
 		defer b.aiPublisher.Close()
 	}
@@ -270,6 +271,8 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleHIDSResponseActionExecute(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
 		return b.handleSSARuleSyncExport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandSSAGitLsRemote):
+		return b.handleSSAGitLsRemote(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionBind):
 		return b.handleAISessionBind(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionInput):

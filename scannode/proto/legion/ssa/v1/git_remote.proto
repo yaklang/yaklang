@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package legion.ssa.v1;
+
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1;ssav1";
+
+// GitAuthSnapshot carries auth material for a one-shot remote git probe.
+// Secrets are expected only on the command path to a trusted node.
+message GitAuthSnapshot {
+  string kind = 1; // none | password | token | ssh_key
+  string username = 2;
+  string password = 3;
+  string token = 4;
+  string private_key = 5;
+}
+
+// GitLsRemoteCommand asks a node to probe a remote repository via yakgit/go-git
+// without depending on a host `git` binary.
+message GitLsRemoteCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string source_locator = 3;
+  string branch = 4;
+  GitAuthSnapshot auth = 5;
+  bool include_head = 6;
+  bool include_tags = 7;
+  // When non-empty with include_head, the node also verifies the path exists
+  // on the resolved HEAD (shallow clone).
+  string source_path = 8;
+}
+
+message GitLsRemoteCompleted {
+  legion.node.v1.EventMetadata metadata = 1;
+  string head_sha = 2;
+  map<string, string> tags = 3;
+  bool success = 4;
+  string message = 5;
+}
+
+message GitLsRemoteFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string error_code = 2;
+  string error_message = 3;
+}
