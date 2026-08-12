@@ -41,8 +41,10 @@ type Save[T any] struct {
 	// Close/Flush to report failures to the caller.
 	firstErr atomic.Pointer[error]
 
-	// failed is set to true after the first save error.
-	// Once set, runSave rejects all new batches immediately.
+	// failed is set to true after the first save error. It does not stop
+	// already-queued batches from reaching saveToDB: Cache.handleSaveBatch
+	// uses it to settle those requests without re-entering the save callback,
+	// so every pending persist still settles exactly once.
 	failed atomic.Bool
 	queued atomic.Int64
 }
@@ -298,12 +300,6 @@ func (s *Save[T]) processBuffer() {
 // It will be processed by the background goroutine.
 func (s *Save[T]) Save(item T) {
 	if !utils.IsNil(item) {
-		// Don't feed to buffer if saver has failed or is closing.
-		// This prevents send-on-closed-channel race when Close()
-		// runs concurrently with the marshalPipe worker goroutine.
-		if s.failed.Load() {
-			return
-		}
 		queued := false
 		start := time.Now()
 		s.queued.Add(1)
@@ -396,10 +392,6 @@ func (s *Save[T]) dispatchSave(ts []T) {
 }
 
 func (s *Save[T]) runSave(ts []T) {
-	// Reject new batches if saver has already failed
-	if s.failed.Load() {
-		return
-	}
 	start := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
