@@ -32,7 +32,9 @@ EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 # tag: globals come from runtime_globals_aot.go and monolith-backed modules use
 # the lightweight aotlib export tables (os/codec), so the monolithic
 # common/yak/yaklib and its yaklang frontend dependencies stay out of libyak.a.
-# Additional modules need aotlib export tables before they can be added here.
+# libyak.a stays complete (all modules below); per-script pruning happens at
+# link time via --gc-sections, so a plain print script drops the poc/cli/http
+# code and their dependency closures while a poc script keeps them.
 DEFAULT_MODULES="os,poc,cli,http,codec"
 MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
 
