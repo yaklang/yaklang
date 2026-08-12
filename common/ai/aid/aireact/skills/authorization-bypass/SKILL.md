@@ -1,5 +1,7 @@
 ---
 name: authorization-bypass
+metadata:
+  display_name_zh-CN: 越权漏洞测试
 description: >
   Web 应用越权漏洞测试技能。覆盖水平越权(IDOR)、垂直越权(权限提升)、业务逻辑绕过
   三大类测试场景。提供基于 HTTP 请求篡改的系统化测试方法论，包括参数替换、Cookie/Token

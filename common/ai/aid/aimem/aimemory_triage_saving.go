@@ -193,7 +193,7 @@ func (t *AIMemoryTriage) checkTagRepetition(entity *aicommon.MemoryEntity, thres
 
 	// 查询所有现有记忆的标签
 	var existingEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", t.sessionID).Find(&existingEntities).Error; err != nil {
+	if err := db.Table(t.entityTableName()).Where("session_id = ?", t.sessionID).Find(&existingEntities).Error; err != nil {
 		return false, utils.Errorf("failed to query existing entities: %v", err)
 	}
 
@@ -352,7 +352,7 @@ func (t *AIMemoryTriage) findSimilarByTags(entity *aicommon.MemoryEntity, limit 
 	}
 
 	var existingEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ? AND memory_id != ?", t.sessionID, entity.Id).
+	if err := db.Table(t.entityTableName()).Where("session_id = ? AND memory_id != ?", t.sessionID, entity.Id).
 		Limit(limit * 2). // 查询更多以便过滤
 		Find(&existingEntities).Error; err != nil {
 		return nil, utils.Errorf("failed to query existing entities: %v", err)
@@ -429,7 +429,7 @@ func (t *AIMemoryTriage) findSimilarByContent(entity *aicommon.MemoryEntity, lim
 		}
 
 		var existing schema.AIMemoryEntity
-		if err := db.Where("memory_id = ? AND session_id = ?", memoryID, t.sessionID).
+		if err := db.Table(t.entityTableName()).Where("memory_id = ? AND session_id = ?", memoryID, t.sessionID).
 			First(&existing).Error; err != nil {
 			continue // 记忆不存在，跳过
 		}

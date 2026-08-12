@@ -11,7 +11,7 @@ import (
 func TestForkMidtermArchiveStore_SharedBaseNodesBranchOnlyWrites(t *testing.T) {
 	db, err := getTestDatabase()
 	require.NoError(t, err)
-	parent, err := NewAIMemoryForQuery("timeline-midterm:test-parent-fork", WithDatabase(db))
+	parent, err := NewAIMemoryForQuery("timeline-midterm:test-parent-fork", WithDatabase(db), WithMidtermArchiveMode())
 	require.NoError(t, err)
 	defer func() {
 		_ = parent.Close()
@@ -66,7 +66,7 @@ func TestForkMidtermArchiveStore_SharedBaseNodesBranchOnlyWrites(t *testing.T) {
 	var row struct {
 		SessionID string
 	}
-	require.NoError(t, parent.GetDB().Table("ai_memory_entities_v1").
+	require.NoError(t, parent.GetDB().Table("ai_midterm_archive_entities_v1").
 		Select("session_id").Where("memory_id = ?", branchEntity.Id).Scan(&row).Error)
 	require.Equal(t, parent.GetSessionID(), row.SessionID)
 }
@@ -74,7 +74,7 @@ func TestForkMidtermArchiveStore_SharedBaseNodesBranchOnlyWrites(t *testing.T) {
 func TestMidtermMemoryFork_SearchIncludesBaseAndBranch(t *testing.T) {
 	db, err := getTestDatabase()
 	require.NoError(t, err)
-	parent, err := NewAIMemoryForQuery("timeline-midterm:test-search-fork", WithDatabase(db))
+	parent, err := NewAIMemoryForQuery("timeline-midterm:test-search-fork", WithDatabase(db), WithMidtermArchiveMode())
 	require.NoError(t, err)
 	defer func() {
 		_ = parent.Close()

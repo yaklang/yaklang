@@ -48,6 +48,9 @@ type ScanTaskCallback struct {
 	ProcessWithRule          bool `json:"-"`
 
 	Programs []*ssaapi.Program `json:"-"`
+	// QueryTargets are assembled via ssaapi.PrepareSyntaxFlowQueryTargets so
+	// scan runtime only uses SyntaxFlowQueryInstance (no GetOverlay branches).
+	QueryTargets []ssaapi.SyntaxFlowQueryInstance `json:"-"`
 }
 
 const (

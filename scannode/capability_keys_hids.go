@@ -3,5 +3,5 @@
 package scannode
 
 func compiledScanNodeCapabilityKeys() []string {
-	return []string{"yak.execute", "hids", capabilityKeySSARuleSyncExport}
+	return []string{"yak.execute", "hids", capabilityKeySSARuleSyncExport, capabilityKeyAIBindEpochV1}
 }

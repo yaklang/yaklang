@@ -18,22 +18,22 @@ func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
 		return item
 	}
 
-	parsed := ParseTimelineItemHumanReadable(item)
-	if parsed == nil {
-		return item
-	}
-	category := normalizeTimelinePromptCategory(parsed.EntryType)
+	// 直接从原始文本提取 entryType, 不依赖 parseTextTimelineItem
+	// (parseTextTimelineItem 已不再做正则匹配设置 EntryType).
+	entryType := extractTextEntryType(textItem.Text)
+	category := normalizeTimelinePromptCategory(entryType)
 	switch category {
 	case "TODO_DELTA", "EVIDENCE_OPS", "MODEL_THINKING":
 		return nil
 	case "ITERATION":
 		return item
 	case "TODO_DELTA_ERROR":
-		filtered := filterRedundantTodoErrorLines(parsed.Content)
+		content := extractTextTimelineContent(textItem.Text)
+		filtered := filterRedundantTodoErrorLines(content)
 		if filtered == "" {
 			return nil
 		}
-		if filtered == strings.TrimSpace(parsed.Content) {
+		if filtered == strings.TrimSpace(content) {
 			return item
 		}
 		return cloneTextTimelineItemForPrompt(item, textItem, replaceTimelineTextBody(textItem.Text, filtered))

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
@@ -38,7 +39,7 @@ func buildTestVFS() *filesys.VirtualFS {
 // --- ParseSkillMeta tests ---
 
 func TestParseSkillMeta_ValidFull(t *testing.T) {
-	content := "---\nname: my-skill\ndescription: A useful skill.\nlicense: MIT\ncompatibility: linux\nmetadata:\n  author: test\ndisable-model-invocation: true\n---\n# My Skill\n\nDetailed instructions."
+	content := "---\nname: my-skill\ndescription: A useful skill.\nlicense: MIT\ncompatibility: linux\nmetadata:\n  author: test\n  display_name_zh-CN: 我的技能\ndisable-model-invocation: true\n---\n# My Skill\n\nDetailed instructions."
 	meta, err := ParseSkillMeta(content)
 	if err != nil {
 		t.Fatalf("ParseSkillMeta failed: %v", err)
@@ -57,6 +58,9 @@ func TestParseSkillMeta_ValidFull(t *testing.T) {
 	}
 	if meta.Metadata["author"] != "test" {
 		t.Fatalf("expected metadata.author 'test', got %q", meta.Metadata["author"])
+	}
+	if meta.GetDisplayName(SkillLocaleZhCN) != "我的技能" {
+		t.Fatalf("expected metadata.%s '我的技能', got %q", SkillMetadataDisplayNameZhCN, meta.GetDisplayName(SkillLocaleZhCN))
 	}
 	if !meta.DisableModelInvocation {
 		t.Fatal("expected disable-model-invocation to be true")
@@ -92,6 +96,32 @@ func TestParseSkillMeta_MissingClosingDelimiter(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing closing delimiter")
 	}
+}
+
+func TestSkillDocumentReplaceBodyPreservesFrontmatter(t *testing.T) {
+	input := `---
+# keep this comment
+name: test-skill
+metadata:
+  display_name_zh-CN: 测试技能
+description: test description
+---
+
+# Old body`
+
+	// 替换正文应复用统一文档解析，预期 YAML 内容和注释保持原样。
+	document, err := ParseSkillDocument(input)
+	require.NoError(t, err)
+	updated, err := document.ReplaceBody("# New body\n\nupdated")
+	require.NoError(t, err)
+	require.Contains(t, updated, "# keep this comment")
+	require.NotContains(t, updated, "# Old body")
+
+	meta, err := ParseSkillMeta(updated)
+	require.NoError(t, err)
+	require.Equal(t, "test-skill", meta.Name)
+	require.Equal(t, "测试技能", meta.GetDisplayName(SkillLocaleZhCN))
+	require.Equal(t, "# New body\n\nupdated", meta.Body)
 }
 
 func TestParseSkillMeta_EmptyName(t *testing.T) {

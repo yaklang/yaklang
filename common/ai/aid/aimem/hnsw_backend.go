@@ -40,12 +40,16 @@ type AIMemoryHNSWBackend struct {
 
 	// 是否自动保存graph到数据库
 	autoSave bool
+
+	// midtermMode selects independent DB tables for midterm archive storage.
+	midtermMode bool
 }
 
 type HNSWBackendConfig struct {
-	autoSave  bool
-	sessionID string
-	db        *gorm.DB
+	autoSave    bool
+	sessionID   string
+	db          *gorm.DB
+	midtermMode bool
 }
 
 type HNSWOption func(*HNSWBackendConfig)
@@ -65,6 +69,13 @@ func WithHNSWDatabase(db *gorm.DB) HNSWOption {
 func WithHNSWSessionID(sessionID string) HNSWOption {
 	return func(b *HNSWBackendConfig) {
 		b.sessionID = sessionID
+	}
+}
+
+// WithHNSWMidtermMode configures the backend to use independent midterm archive tables.
+func WithHNSWMidtermMode(midtermMode bool) HNSWOption {
+	return func(b *HNSWBackendConfig) {
+		b.midtermMode = midtermMode
 	}
 }
 
@@ -101,8 +112,12 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 	sessionID := config.sessionID
 
 	// 查找或创建collection
+	collectionTable := "ai_memory_collections_v1"
+	if config.midtermMode {
+		collectionTable = "ai_midterm_archive_collections_v1"
+	}
 	var collection schema.AIMemoryCollection
-	err = db.Where("session_id = ?", sessionID).First(&collection).Error
+	err = db.Table(collectionTable).Where("session_id = ?", sessionID).First(&collection).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// 创建新的collection
 		collection = schema.AIMemoryCollection{
@@ -113,7 +128,7 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 			EfConstruct: 200,
 			Dimension:   7,
 		}
-		if err := db.Create(&collection).Error; err != nil {
+		if err := db.Table(collectionTable).Create(&collection).Error; err != nil {
 			return nil, utils.Errorf("create collection failed: %v", err)
 		}
 	} else if err != nil {
@@ -125,6 +140,7 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 		db:         db,
 		collection: &collection,
 		autoSave:   config.autoSave,
+		midtermMode: config.midtermMode,
 	}
 
 	// 加载或创建HNSW Graph
@@ -181,7 +197,11 @@ func (b *AIMemoryHNSWBackend) loadGraphFromBinary(graphBinary []byte) (*hnsw.Gra
 
 		// 从数据库加载记忆实体
 		var dbEntity schema.AIMemoryEntity
-		if err := b.db.Where("memory_id = ? AND session_id = ?", memoryID, b.sessionID).First(&dbEntity).Error; err != nil {
+		entityTable := "ai_memory_entities_v1"
+		if b.midtermMode {
+			entityTable = "ai_midterm_archive_entities_v1"
+		}
+		if err := b.db.Table(entityTable).Where("memory_id = ? AND session_id = ?", memoryID, b.sessionID).First(&dbEntity).Error; err != nil {
 			return nil, utils.Errorf("load memory entity failed: %v", err)
 		}
 
@@ -240,7 +260,11 @@ func (b *AIMemoryHNSWBackend) SaveGraph() error {
 	// 原子更新数据库 - 使用事务确保原子性
 	return utils.GormTransaction(b.db, func(tx *gorm.DB) error {
 		// 使用Update方法避免主键冲突
-		return tx.Model(&schema.AIMemoryCollection{}).
+		collectionTable := "ai_memory_collections_v1"
+		if b.midtermMode {
+			collectionTable = "ai_midterm_archive_collections_v1"
+		}
+		return tx.Table(collectionTable).
 			Where("session_id = ?", b.sessionID).
 			Update("graph_binary", binaryData).Error
 	})
@@ -384,8 +408,12 @@ func (b *AIMemoryHNSWBackend) Search(queryVector []float32, limit int) ([]Search
 	}
 
 	// 批量查询数据库
+	entityTable := "ai_memory_entities_v1"
+	if b.midtermMode {
+		entityTable = "ai_midterm_archive_entities_v1"
+	}
 	var dbEntities []schema.AIMemoryEntity
-	if err := b.db.Where("memory_id IN (?) AND session_id = ?", memoryIDs, b.sessionID).
+	if err := b.db.Table(entityTable).Where("memory_id IN (?) AND session_id = ?", memoryIDs, b.sessionID).
 		Find(&dbEntities).Error; err != nil {
 		return nil, utils.Errorf("batch query memory entities failed: %v", err)
 	}

@@ -51,3 +51,33 @@ func TestTaskManagerActiveAttemptHeartbeats(t *testing.T) {
 		t.Fatalf("unexpected cancel_requested status: %s", beats[0].Status)
 	}
 }
+
+func TestTaskManagerShutdownRejectsNewTasksAndDrains(t *testing.T) {
+	manager := newTaskManager()
+	ctx, cancel := context.WithCancel(context.Background())
+	task := newScriptTask(ctx, cancel, "task-active", "job", "subtask", "attempt")
+	if !manager.Add(task.TaskId, task) {
+		t.Fatal("expected active task to be accepted")
+	}
+
+	manager.BeginShutdown()
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not cancel active task")
+	}
+
+	rejectedCtx, rejectedCancel := context.WithCancel(context.Background())
+	defer rejectedCancel()
+	rejected := newScriptTask(rejectedCtx, rejectedCancel, "task-rejected", "job", "subtask", "attempt")
+	if manager.Add(rejected.TaskId, rejected) {
+		t.Fatal("expected task added after shutdown to be rejected")
+	}
+
+	manager.Remove(task.TaskId)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if err := manager.WaitForEmpty(waitCtx); err != nil {
+		t.Fatalf("wait for empty task manager: %v", err)
+	}
+}

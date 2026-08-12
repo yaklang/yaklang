@@ -19,6 +19,7 @@ import (
 type SyntaxFlowQueryInstance interface {
 	SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error)
 	SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error)
+	GetProgramName() string
 	GetLanguage() ssaconfig.Language
 	IsIncrementalCompile() bool
 	IsBaseProgram() bool
@@ -164,6 +165,10 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Overlay incremental scan uses dual-source IR routing (base exclude + owner
+	// include). Do NOT skip base IR or merge audit_results cache — effective
+	// scan scope remains the full aggregated file view (~4000 files).
 
 	total := len(frame.Codes) + 1
 	handler := 0
@@ -559,13 +564,12 @@ func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...Que
 			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
 		),
 	)
-	// Explicitly set config.program to top layer's program for saving risks
-	if len(p.Layers) > 0 {
-		topLayer := p.Layers[len(p.Layers)-1]
-		if topLayer != nil && topLayer.Program != nil {
-			opts = append(opts, QueryWithProgram(topLayer.Program))
-		}
+	// Explicitly set config.program to top program for saving risks.
+	if top := p.topProgram(); top != nil {
+		opts = append(opts, QueryWithProgram(top))
 	}
+	log.Infof("overlay SF dual-source scan: programs=%d exclude=%d diffs=%d",
+		p.ProgramCount(), len(p.ExcludeFile), len(p.Diff))
 	return QuerySyntaxflow(opts...)
 }
 
@@ -576,12 +580,8 @@ func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*Sy
 			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
 		),
 	)
-	// Explicitly set config.program to top layer's program for saving risks
-	if len(p.Layers) > 0 {
-		topLayer := p.Layers[len(p.Layers)-1]
-		if topLayer != nil && topLayer.Program != nil {
-			opts = append(opts, QueryWithProgram(topLayer.Program))
-		}
+	if top := p.topProgram(); top != nil {
+		opts = append(opts, QueryWithProgram(top))
 	}
 	return QuerySyntaxflow(opts...)
 }

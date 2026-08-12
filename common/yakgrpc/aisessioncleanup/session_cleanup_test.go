@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -19,6 +19,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&schema.AIAgentRuntime{},
 		&schema.AIMemoryEntity{},
 		&schema.AIMemoryCollection{},
+		&schema.AIMidtermArchiveEntity{},
+		&schema.AIMidtermArchiveCollection{},
 		&schema.VectorStoreCollection{},
 		&schema.VectorStoreDocument{},
 		&schema.EntityRepository{},
@@ -56,10 +58,11 @@ func TestDeleteSessionArtifacts_RemovesMidtermSessionAndFork(t *testing.T) {
 	require.Equal(t, int64(2), result.DeletedKnowledgeBases)
 	require.Equal(t, int64(2), result.DeletedKnowledgeEntries)
 
-	assertZeroCount(t, db.Model(&schema.AIMemoryEntity{}).Where("session_id IN (?)", []string{persistentSessionID, midtermSessionID, forkSessionID}))
+	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveEntity{}).Where("session_id IN (?)", []string{persistentSessionID, midtermSessionID, forkSessionID}))
+	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveCollection{}).Where("session_id IN (?)", []string{persistentSessionID, midtermSessionID, forkSessionID}))
 	assertZeroCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name IN (?)", []string{baseRAGName, forkRAGName}))
 	assertOneCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name = ?", otherRAGName))
-	assertOneCount(t, db.Model(&schema.AIMemoryEntity{}).Where("session_id = ?", memoryMidtermSessionID(otherPersistentSessionID)))
+	assertOneCount(t, db.Model(&schema.AIMidtermArchiveEntity{}).Where("session_id = ?", memoryMidtermSessionID(otherPersistentSessionID)))
 }
 
 func TestDeleteSessionArtifacts_EmptySessionID(t *testing.T) {
@@ -85,6 +88,12 @@ func TestDeleteAllSessionArtifacts_RemovesAllMidtermRAG(t *testing.T) {
 	seedMidtermSessionArtifacts(t, db, sessA, memoryMidtermSessionID(sessA), ragMidtermTableName(sessA), memoryMidtermSessionID(sessA)+"@fork1-1", ragMidtermTableName(sessA)+"@fork1-1")
 	seedMidtermSessionArtifacts(t, db, sessB, memoryMidtermSessionID(sessB), ragMidtermTableName(sessB), "", "")
 
+	// 历史遗留：分表前写入旧 ai_memory_* 表的中期数据，DeleteAll 也应一并清空
+	require.NoError(t, db.Create(&schema.AIMemoryEntity{
+		MemoryID: uuid.NewString(), SessionID: memoryMidtermSessionID(sessB), Content: "legacy-midterm",
+	}).Error)
+	require.NoError(t, db.Create(&schema.AIMemoryCollection{SessionID: memoryMidtermSessionID(sessB)}).Error)
+
 	unrelatedRepo := &schema.EntityRepository{EntityBaseName: "knowledge-base-keep", Uuid: uuid.NewString()}
 	require.NoError(t, db.Create(unrelatedRepo).Error)
 	require.NoError(t, db.Create(&schema.ERModelRelationship{
@@ -108,8 +117,8 @@ func TestDeleteAllSessionArtifacts_RemovesAllMidtermRAG(t *testing.T) {
 
 	result, err := DeleteAllSessionArtifacts(db)
 	require.NoError(t, err)
-	require.Equal(t, int64(3), result.DeletedMemoryEntities)
-	require.Equal(t, int64(3), result.DeletedMemoryCollections)
+	require.Equal(t, int64(4), result.DeletedMemoryEntities)
+	require.Equal(t, int64(4), result.DeletedMemoryCollections)
 	require.Equal(t, int64(3), result.DeletedRAGCollections)
 	require.Equal(t, int64(3), result.DeletedRAGDocuments)
 	require.Equal(t, int64(3), result.DeletedEntityRepositories)
@@ -119,6 +128,11 @@ func TestDeleteAllSessionArtifacts_RemovesAllMidtermRAG(t *testing.T) {
 	require.Equal(t, int64(3), result.DeletedKnowledgeEntries)
 
 	assertZeroCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", ragMidtermTableNamePrefix+"%"))
+	// 记忆表被 drop + recreate，中期归档表与旧表都应为空
+	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveEntity{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
+	assertZeroCount(t, db.Model(&schema.AIMidtermArchiveCollection{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
+	assertZeroCount(t, db.Model(&schema.AIMemoryEntity{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
+	assertZeroCount(t, db.Model(&schema.AIMemoryCollection{}).Where("session_id LIKE ?", memoryMidtermSessionIDPrefix+"%"))
 	assertOneCount(t, db.Model(&schema.VectorStoreCollection{}).Where("name = ?", "knowledge-base-keep"))
 	assertOneCount(t, db.Model(&schema.EntityRepository{}).Where("uuid = ?", unrelatedRepo.Uuid))
 	assertOneCount(t, db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", unrelatedKB.ID))
@@ -131,9 +145,10 @@ func seedMidtermSessionArtifacts(
 ) {
 	t.Helper()
 
-	require.NoError(t, db.Create(&schema.AIMemoryEntity{
+	// 中期记忆已分表：写入独立的归档表 ai_midterm_archive_entities_v1
+	require.NoError(t, db.Create(&schema.AIMidtermArchiveEntity{AIMemoryEntity: schema.AIMemoryEntity{
 		MemoryID: uuid.NewString(), SessionID: midtermSessionID, Content: "midterm",
-	}).Error)
+	}}).Error)
 
 	baseCol := &schema.VectorStoreCollection{Name: baseRAGName}
 	require.NoError(t, db.Create(baseCol).Error)
@@ -159,16 +174,16 @@ func seedMidtermSessionArtifacts(
 		KnowledgeType: "fact", HiddenIndex: uuid.NewString(),
 	}).Error)
 
-	require.NoError(t, db.Create(&schema.AIMemoryCollection{SessionID: midtermSessionID}).Error)
+	require.NoError(t, db.Create(&schema.AIMidtermArchiveCollection{AIMemoryCollection: schema.AIMemoryCollection{SessionID: midtermSessionID}}).Error)
 
 	if forkSessionID == "" || forkRAGName == "" {
 		return
 	}
 
-	require.NoError(t, db.Create(&schema.AIMemoryEntity{
+	require.NoError(t, db.Create(&schema.AIMidtermArchiveEntity{AIMemoryEntity: schema.AIMemoryEntity{
 		MemoryID: uuid.NewString(), SessionID: forkSessionID, Content: "fork",
-	}).Error)
-	require.NoError(t, db.Create(&schema.AIMemoryCollection{SessionID: forkSessionID}).Error)
+	}}).Error)
+	require.NoError(t, db.Create(&schema.AIMidtermArchiveCollection{AIMemoryCollection: schema.AIMemoryCollection{SessionID: forkSessionID}}).Error)
 
 	forkCol := &schema.VectorStoreCollection{Name: forkRAGName}
 	require.NoError(t, db.Create(forkCol).Error)

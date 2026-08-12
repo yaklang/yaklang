@@ -11,14 +11,21 @@ import (
 )
 
 type TaskManager struct {
-	tasks *sync.Map
+	tasks        *sync.Map
+	stateMu      sync.Mutex
+	shuttingDown bool
 }
 
 func newTaskManager() *TaskManager {
 	return &TaskManager{tasks: new(sync.Map)}
 }
 
-func (t *TaskManager) Add(taskID string, task *Task) {
+func (t *TaskManager) Add(taskID string, task *Task) bool {
+	t.stateMu.Lock()
+	defer t.stateMu.Unlock()
+	if t.shuttingDown {
+		return false
+	}
 	now := time.Now().UTC()
 	task.StartTimestamp = now.Unix()
 	ddl, ok := task.Ctx.Deadline()
@@ -27,6 +34,40 @@ func (t *TaskManager) Add(taskID string, task *Task) {
 	}
 	task.MarkRunningAt(now)
 	t.tasks.Store(taskID, task)
+	return true
+}
+
+func (t *TaskManager) BeginShutdown() {
+	if t == nil {
+		return
+	}
+	t.stateMu.Lock()
+	t.shuttingDown = true
+	t.tasks.Range(func(_, value any) bool {
+		if task, ok := value.(*Task); ok && task != nil && task.Cancel != nil {
+			task.Cancel()
+		}
+		return true
+	})
+	t.stateMu.Unlock()
+}
+
+func (t *TaskManager) WaitForEmpty(ctx context.Context) error {
+	if t == nil || t.Count() == 0 {
+		return nil
+	}
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if t.Count() == 0 {
+				return nil
+			}
+		}
+	}
 }
 
 func (t *TaskManager) Remove(taskID string) {

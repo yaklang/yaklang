@@ -9,12 +9,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
 
 type ScriptExecutionRequest struct {
@@ -24,6 +27,8 @@ type ScriptExecutionRequest struct {
 	ScriptContent   string
 	ScriptJSONParam string
 	ScriptLabels    map[string]string
+	DebugEnabled    bool
+	DebugDir        string
 }
 
 type ScriptExecutionResult struct {
@@ -41,14 +46,16 @@ func (s *ScanNode) executeScriptTask(
 	taskID := taskIDForSubtask(input.SubTaskID)
 	taskCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s.manager.Add(taskID, newScriptTask(
+	if !s.manager.Add(taskID, newScriptTask(
 		taskCtx,
 		cancel,
 		taskID,
 		input.TaskID,
 		input.SubTaskID,
 		input.RuntimeID,
-	))
+	)) {
+		return nil, utils.Error("scan node is shutting down")
+	}
 	defer s.manager.Remove(taskID)
 
 	reporter := NewScannerAgentReporter(
@@ -59,6 +66,11 @@ func (s *ScanNode) executeScriptTask(
 		s,
 	)
 	keyValues := s.parseScriptParams(input.ScriptJSONParam)
+	cleanupSourcePayload, err := s.prepareManagedSourcePayload(taskCtx, keyValues)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanupSourcePayload()
 	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
 	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {
@@ -83,15 +95,74 @@ func (s *ScanNode) executeScriptTask(
 	if err != nil {
 		return nil, utils.Errorf("fetch node path err: %s", err)
 	}
-	taskLogWriter, taskLogClose := openTaskLogWriter(input.TaskID, input.SubTaskID, input.RuntimeID)
+	taskLogWriter, taskLogClose := openTaskLogWriter(s, input.TaskID, input.SubTaskID, input.RuntimeID)
 	defer taskLogClose()
+
+	// --- Debug directory setup ---
+	// When debug is enabled, create a unique directory for this run.
+	// The yak script (via ssa.withDebugDir) and the pprof collector will
+	// write profiling data, logs, and SSA database to this directory.
+	// We do NOT start a separate profiler here — the pprof collector
+	// is started by syntaxflow_scan.Scan() when it consumes the debug_dir.
+	debugDir := ""
+	if input.DebugEnabled {
+		if input.DebugDir != "" {
+			debugDir = input.DebugDir
+		} else {
+			// Generate a unique directory under the node base dir
+			baseDir := s.debugBaseDir()
+			debugDir = filepath.Join(baseDir, "debug", fmt.Sprintf("%s_%s", sanitizeLogName(input.TaskID), sanitizeLogName(input.RuntimeID)))
+		}
+		if err := os.MkdirAll(debugDir, 0o755); err != nil {
+			log.Warnf("[debug] failed to create debug dir: %v, continuing without debug", err)
+			debugDir = ""
+		} else {
+			log.Infof("[debug] debug directory: %s", debugDir)
+		}
+	}
+
+	// Inject debug_dir into the script params so the yak script can pass it to StartScan
+	if debugDir != "" {
+		keyValues["debug_dir"] = debugDir
+		params = s.buildScriptParams(yakitServer.Addr(), input.RuntimeID, keyValues)
+	}
+
+	// Register a defer to finalize debug artifacts (analysis + zip) on both
+	// success and failure paths. The pprof collector (started by Scan() inside
+	// the child process) writes its final snapshot during script exit/cleanup.
+	// We wait briefly for the child process to finish writing, then analyze.
+	debugFinalized := false
+	if debugDir != "" {
+		defer func() {
+			if debugFinalized {
+				return
+			}
+			s.finalizeDebugRun(taskCtx, reporter, debugDir, "unknown")
+		}()
+	}
+
 	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, ssaDBEnv, taskLogWriter); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
+		// Finalize debug before returning the failure
+		if debugDir != "" {
+			s.finalizeDebugRun(taskCtx, reporter, debugDir, "failed")
+			debugFinalized = true
+		}
 		return nil, s.handleScriptFailure(err, result, taskID)
 	}
 	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
 	if err := s.finalizeSSAArtifactUpload(taskCtx, reporter, result); err != nil {
+		if debugDir != "" {
+			s.finalizeDebugRun(taskCtx, reporter, debugDir, "failed")
+			debugFinalized = true
+		}
 		return nil, err
+	}
+
+	// Finalize debug artifacts on success path
+	if debugDir != "" {
+		s.finalizeDebugRun(taskCtx, reporter, debugDir, "succeeded")
+		debugFinalized = true
 	}
 	return result, nil
 }
@@ -137,6 +208,12 @@ func (s *ScanNode) handleScriptFailure(
 	}
 	if errors.Is(err, context.Canceled) {
 		return &TaskCancelledError{}
+	}
+	// If the error is a scriptExecError, it already carries stderr/stdout
+	// tail — use it directly so the failure_message has actionable content.
+	var scriptErr *scriptExecError
+	if errors.As(err, &scriptErr) {
+		return scriptErr
 	}
 	if detailedError := extractScriptError(result); detailedError != "" {
 		return utils.Errorf("%s", detailedError)
@@ -258,6 +335,19 @@ func appendCLIParamValue(params []string, flag string, value any) []string {
 	return params
 }
 
+// debugBaseDir returns the base directory for debug run data.
+// Defaults to the node base directory; can be overridden via
+// SCANNODE_DEBUG_BASE_DIR environment variable.
+func (s *ScanNode) debugBaseDir() string {
+	if env := os.Getenv("SCANNODE_DEBUG_BASE_DIR"); env != "" {
+		return env
+	}
+	if s != nil && s.node != nil {
+		return filepath.Join(s.node.BaseDir(), "debug-runs")
+	}
+	return filepath.Join(os.TempDir(), "legion-debug-runs")
+}
+
 func (s *ScanNode) createTempScriptFile(content string) (string, error) {
 	f, err := createDistributedScriptTempFile()
 	if err != nil {
@@ -292,6 +382,26 @@ func createDistributedScriptTempFile() (*os.File, error) {
 	return f, nil
 }
 
+// scriptExecError wraps an exec.ExitError with captured stderr/stdout
+// tail so the failure message carries actionable diagnostics instead of
+// just "exit status 1".
+type scriptExecError struct {
+	*exec.ExitError
+	stderrTail string
+	stdoutTail string
+}
+
+func (e *scriptExecError) Error() string {
+	msg := fmt.Sprintf("exec yak script failed: %s", e.ExitError.Error())
+	if e.stderrTail != "" {
+		msg += "\n--- stderr (last 2KB) ---\n" + e.stderrTail
+	}
+	if e.stdoutTail != "" {
+		msg += "\n--- stdout (last 1KB) ---\n" + e.stdoutTail
+	}
+	return msg
+}
+
 func (s *ScanNode) executeScript(
 	ctx context.Context,
 	scanNodePath string,
@@ -310,30 +420,112 @@ func (s *ScanNode) executeScript(
 		fmt.Sprintf("YAK_RUNTIME_ID=%v", runtimeID),
 	)
 	env = append(env, extraEnv...)
+	workspaceOwner := s.nextSSAGitWorkspaceOwner()
+	env = replaceEnvironmentValue(env, ssagitworkdir.OwnerEnv, workspaceOwner)
 	cmd.Env = env
-	// 默认子进程 stdout/stderr 直通父进程（维持原行为）。当调用方传入
-	// per-task 日志 writer（开发测试调优：SCANNODE_TASK_LOG_DIR 开启时），
-	// 同时 tee 到该 writer，使单个扫描任务的 yak 引擎执行日志单独落盘，
-	// 便于按任务回溯调优，主日志仍保留完整视图。
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+
+	// Use a combined output writer: stdout/stderr go to both the parent
+	// process (for docker logs) and the per-task log file. We also capture
+	// the tail of stderr for inclusion in the failure message.
+	stderrBuf := newTailBuffer(2048)
+	stdoutBuf := newTailBuffer(1024)
+
+	cmd.Stdout = io.MultiWriter(os.Stdout, stdoutBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
 	if taskLogWriter != nil {
-		cmd.Stdout = io.MultiWriter(os.Stdout, taskLogWriter)
-		cmd.Stderr = io.MultiWriter(os.Stderr, taskLogWriter)
+		cmd.Stdout = io.MultiWriter(os.Stdout, stdoutBuf, taskLogWriter)
+		cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf, taskLogWriter)
 	}
-	return cmd.Run()
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	childPID := cmd.Process.Pid
+	waitErr := cmd.Wait()
+	if waitErr != nil {
+		// Preserve the latest-main diagnostics while still waiting before the
+		// parent-owned workspace sweep below.
+		var exitErr *exec.ExitError
+		if errors.As(waitErr, &exitErr) {
+			waitErr = &scriptExecError{
+				ExitError:  exitErr,
+				stderrTail: stderrBuf.String(),
+				stdoutTail: stdoutBuf.String(),
+			}
+		}
+	}
+	cleanupErr := ssagitworkdir.CleanupForOwner(workspaceOwner)
+	if cleanupErr != nil {
+		if waitErr == nil {
+			return utils.Errorf("cleanup SSA Git workspaces for child process %d: %v", childPID, cleanupErr)
+		}
+		log.Errorf("cleanup SSA Git workspaces for failed child process %d: %v", childPID, cleanupErr)
+	}
+	return waitErr
 }
 
-// openTaskLogWriter 按环境变量 SCANNODE_TASK_LOG_DIR 为单个扫描任务打开
-// 独立的日志文件，用于开发测试调优场景下的任务级日志隔离。返回的 writer
-// 为 nil 表示未启用（生产默认），调用方应原样传给 executeScript，后者会
-// 走原直通路径。返回的 close 函数保证可安全调用（nil 时为 no-op）。
+func (s *ScanNode) nextSSAGitWorkspaceOwner() string {
+	scope := "process-" + strconv.Itoa(os.Getpid())
+	if s != nil && strings.TrimSpace(s.ssaGitOwnerScope) != "" {
+		scope = s.ssaGitOwnerScope
+	}
+	return scope + "-task-" + strings.ReplaceAll(uuid.NewString(), "-", "")
+}
+
+func replaceEnvironmentValue(env []string, key string, value string) []string {
+	prefix := key + "="
+	replaced := make([]string, 0, len(env)+1)
+	for _, item := range env {
+		if strings.HasPrefix(item, prefix) {
+			continue
+		}
+		replaced = append(replaced, item)
+	}
+	return append(replaced, prefix+value)
+}
+
+// tailBuffer is a ring buffer that keeps the last N bytes written to it.
+type tailBuffer struct {
+	buf []byte
+	max int
+}
+
+func newTailBuffer(max int) *tailBuffer {
+	return &tailBuffer{max: max}
+}
+
+func (b *tailBuffer) Write(p []byte) (int, error) {
+	b.buf = append(b.buf, p...)
+	if len(b.buf) > b.max {
+		b.buf = b.buf[len(b.buf)-b.max:]
+	}
+	return len(p), nil
+}
+
+func (b *tailBuffer) String() string {
+	return string(b.buf)
+}
+
+// openTaskLogWriter opens a per-task log file for capturing stdout/stderr
+// of the yak script subprocess. By default it writes to
+// <node-base-dir>/logs/ unless SCANNODE_TASK_LOG_DIR overrides it.
+// This ensures every task execution has a persistent log file for
+// post-mortem diagnosis, not just when the env var is manually set.
 //
-// 文件名格式：<JobID>_<SubTaskID>_<AttemptID>.log，缺失字段用 "_" 占位。
-// 任一失败（目录不存在/无权限）均降级为 nil 并打 warn 日志，不阻断扫描。
-func openTaskLogWriter(jobID, subTaskID, runtimeID string) (io.Writer, func()) {
-	dir := os.Getenv("SCANNODE_TASK_LOG_DIR")
-	if strings.TrimSpace(dir) == "" {
+// File name format: <JobID>_<SubTaskID>_<AttemptID>.log
+// On failure (dir not writable), it degrades to nil and logs a warning.
+func openTaskLogWriter(s *ScanNode, jobID, subTaskID, runtimeID string) (io.Writer, func()) {
+	dir := strings.TrimSpace(os.Getenv("SCANNODE_TASK_LOG_DIR"))
+	if dir == "" {
+		// Default: node base dir / logs
+		if s != nil && s.node != nil {
+			dir = filepath.Join(s.node.BaseDir(), "logs")
+		} else {
+			dir = filepath.Join(os.TempDir(), "legion-node-logs")
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Warnf("create task log dir %s failed: %v", dir, err)
 		return nil, func() {}
 	}
 	name := fmt.Sprintf("%s_%s_%s.log",
@@ -342,11 +534,12 @@ func openTaskLogWriter(jobID, subTaskID, runtimeID string) (io.Writer, func()) {
 		sanitizeLogName(runtimeID),
 	)
 	path := filepath.Join(dir, name)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		log.Warnf("open per-task log file failed (fallback to stdout only): %s: %v", path, err)
 		return nil, func() {}
 	}
+	log.Infof("[task-log] writing to: %s", path)
 	return f, func() { _ = f.Close() }
 }
 
@@ -579,4 +772,107 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 	merged["file_count"] = event.FileCount
 	merged["dataflow_count"] = event.FlowCount
 	return json.Marshal(merged)
+}
+
+// finalizeDebugRun analyzes the debug run directory, generates a ZIP archive,
+// and publishes both as JobArtifactReady events. Failures are logged but do
+// not affect the scan result. This is called on both success and failure paths.
+func (s *ScanNode) finalizeDebugRun(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	debugDir string,
+	status string,
+) {
+	// Ensure the debug package contains the actual scan log even when the
+	// child pprof collector did not write its own log file.
+	mergeTaskLogIntoDebugDir(debugDir)
+	s.publishDebugAnalysis(ctx, reporter, debugDir, status)
+	s.publishDebugZip(ctx, reporter, debugDir)
+}
+
+// publishDebugAnalysis analyzes the debug run directory and publishes the
+// structured result as a JobArtifactReady event with artifact_kind="debug_analysis".
+// The analysis JSON is uploaded to MinIO and the event carries the object key.
+// Failures are logged but do not affect the scan result.
+func (s *ScanNode) publishDebugAnalysis(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	debugDir string,
+	status string,
+) {
+	analysis := AnalyzeDebugRunWithStatus(debugDir, status)
+	analysisJSON, err := json.Marshal(analysis)
+	if err != nil {
+		log.Warnf("[debug] marshal analysis failed: %v", err)
+		return
+	}
+
+	// Upload analysis JSON to MinIO
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		log.Warnf("[debug] no upload config available, skipping analysis upload")
+		return
+	}
+
+	// Use debug_analysis/<taskID>/<runID>/analysis.json as object key
+	taskID := strings.TrimSpace(reporter.TaskId)
+	attemptID := strings.TrimSpace(reporter.RuntimeId)
+	objKey := fmt.Sprintf("debug_analysis/%s/%s/analysis.json", taskID, attemptID)
+
+	provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
+	if err := uploadDebugArtifactBytes(analysisJSON, objKey, provider); err != nil {
+		log.Warnf("[debug] upload analysis failed: %v", err)
+		return
+	}
+
+	// Publish JobArtifactReady event
+	sha, _ := computeSHA256FromBytes(analysisJSON)
+	size := int64(len(analysisJSON))
+	if err := reporter.PublishArtifactReady(ctx, "debug_analysis", "json", objKey, "", sha, uint64(size), uint64(size), nil); err != nil {
+		log.Warnf("[debug] publish analysis artifact ready failed: %v", err)
+		return
+	}
+
+	log.Infof("[debug] analysis published: key=%s size=%d samples=%d", objKey, size, len(analysis.Samples))
+}
+
+// publishDebugZip generates a ZIP archive of the debug run directory and
+// uploads it to MinIO, then publishes a JobArtifactReady event with
+// artifact_kind="debug_zip". Failures are logged but do not affect the scan.
+func (s *ScanNode) publishDebugZip(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	debugDir string,
+) {
+	zipPath, err := GenerateDebugZip(debugDir)
+	if err != nil {
+		log.Warnf("[debug] generate zip failed: %v", err)
+		return
+	}
+	defer os.Remove(zipPath)
+
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		log.Warnf("[debug] no upload config available, skipping zip upload")
+		return
+	}
+
+	taskID := strings.TrimSpace(reporter.TaskId)
+	attemptID := strings.TrimSpace(reporter.RuntimeId)
+	objKey := fmt.Sprintf("debug_zip/%s/%s/run.zip", taskID, attemptID)
+
+	provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
+	zipSize := fileSize(zipPath)
+	if err := uploadDebugArtifactFile(zipPath, zipSize, objKey, provider); err != nil {
+		log.Warnf("[debug] upload zip failed: %v", err)
+		return
+	}
+
+	sha, _ := computeSHA256(zipPath)
+	if err := reporter.PublishArtifactReady(ctx, "debug_zip", "zip", objKey, "", sha, uint64(zipSize), uint64(zipSize), nil); err != nil {
+		log.Warnf("[debug] publish zip artifact ready failed: %v", err)
+		return
+	}
+
+	log.Infof("[debug] zip published: key=%s size=%d", objKey, zipSize)
 }

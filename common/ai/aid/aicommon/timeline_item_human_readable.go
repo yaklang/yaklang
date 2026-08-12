@@ -124,13 +124,13 @@ func parseTextTimelineItem(result *TimelineItemHumanReadable, text string) {
 		return
 	}
 
-	// 优先匹配有 task 的格式: [entryType] [task:taskId]:
+	// 保留 TaskID 解析: [entryType] [task:taskId]: 格式中的 taskId 仍被
+	// timeline render / fork merge / emitter 等下游依赖 (注释: "ParseTimelineItemHumanReadable
+	// / emitter / marshal 仍能取得逐条 TaskID"). 不再解析 EntryType, 也不做
+	// EntryType -> Type 映射; Type 统一由 ParseTimelineItemHumanReadable 按 value
+	// 类型决定 (TextTimelineItem => "text").
 	if matches := withTaskRegex.FindStringSubmatch(text); len(matches) > 2 {
-		result.EntryType = matches[1]
 		result.TaskID = matches[2]
-	} else if matches := withoutTaskRegex.FindStringSubmatch(text); len(matches) > 1 {
-		// 匹配没有 task 的格式: [entryType]:
-		result.EntryType = matches[1]
 	}
 
 	// 解析内容：找到第一个 ":\n" 之后的内容
@@ -151,9 +151,6 @@ func parseTextTimelineItem(result *TimelineItemHumanReadable, text string) {
 		}
 	}
 
-	if itemType, ok := EntryTypeToTimelineItemType[result.EntryType]; ok {
-		result.Type = itemType
-	}
 }
 
 // removeIndent 移除每行开头的指定前缀

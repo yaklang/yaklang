@@ -1356,7 +1356,7 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.NotEmpty(t, layerNames)
 				baseProgID = layerNames[0]
 				baseProgramFromDB, err := ssaapi.FromDatabase(baseProgID)
@@ -1371,7 +1371,7 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
 					return
 				}
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(layerNames), 2)
 				diffProgID = layerNames[len(layerNames)-1]
 				diffProgramFromDB, err := ssaapi.FromDatabase(diffProgID)
@@ -1623,23 +1623,23 @@ public class NewClass {
 			},
 			ExpectedTaskResults: []TaskResultConfig{
 				// 第一个任务（diff program，最新的）
-				// pair-first member 关系下，overlay diff 扫描汇总 10 条风险，新增 5 条（#-> 路径较 main 的 map 存储减少重复）。
-				{
-					Status:       "done",
-					LowCount:     0,
-					HighCount:    10,
-					RiskCount:    10,
-					NewLowCount:  0,
-					NewHighCount: 5,
-					NewRiskCount: 5,
-				},
-				// 第二个任务（base program，较旧的）
-				// pair-first member 关系下，base 扫描稳定为 5 条风险。
+				// Dual-source overlay 聚合视图覆盖全部 exec 调用点；#-> 去重后 5 条，相对 base 全部为新增。
 				{
 					Status:       "done",
 					LowCount:     0,
 					HighCount:    5,
 					RiskCount:    5,
+					NewLowCount:  0,
+					NewHighCount: 5,
+					NewRiskCount: 5,
+				},
+				// 第二个任务（base program，较旧的）
+				// 仅扫描 base 层（非 overlay 顶层）；当前 #-> 路径为 3 条。
+				{
+					Status:       "done",
+					LowCount:     0,
+					HighCount:    3,
+					RiskCount:    3,
 					NewLowCount:  0,
 					NewHighCount: 0,
 					NewRiskCount: 0,

@@ -61,7 +61,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 			CorePactVector:     schema.FloatArray(entity.CorePactVector),
 		}
 
-		if err := db.Create(dbEntity).Error; err != nil {
+		if err := db.Table(r.entityTableName()).Create(dbEntity).Error; err != nil {
 			log.Errorf("save memory entity to database failed: %v (entity id=%s)", err, entity.Id)
 			// 记录最后一次 db 错误，继续尝试保存其他 entity。
 			// 关键词: best-effort, 不因单条 db 写入失败丢失整批 memory
@@ -131,7 +131,7 @@ func (r *AIMemoryTriage) GetAllTags() ([]string, error) {
 	}
 
 	var dbEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
+	if err := db.Table(r.entityTableName()).Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 
@@ -181,7 +181,7 @@ func (r *AIMemoryTriage) DeleteMemoryEntity(memoryID string) error {
 	}
 
 	// 从数据库删除
-	if err := db.Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).
+	if err := db.Table(r.entityTableName()).Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).
 		Delete(&schema.AIMemoryEntity{}).Error; err != nil {
 		return utils.Errorf("delete memory entity from database failed: %v", err)
 	}
@@ -210,7 +210,7 @@ func (r *AIMemoryTriage) UpdateMemoryEntity(entity *aicommon.MemoryEntity) error
 
 	// 先查询现有实体
 	var existingEntity schema.AIMemoryEntity
-	if err := db.Where("memory_id = ? AND session_id = ?", entity.Id, r.sessionID).
+	if err := db.Table(r.entityTableName()).Where("memory_id = ? AND session_id = ?", entity.Id, r.sessionID).
 		First(&existingEntity).Error; err != nil {
 		return utils.Errorf("find existing memory entity failed: %v", err)
 	}
@@ -229,7 +229,7 @@ func (r *AIMemoryTriage) UpdateMemoryEntity(entity *aicommon.MemoryEntity) error
 	existingEntity.CorePactVector = schema.FloatArray(entity.CorePactVector)
 
 	// 保存更新
-	if err := db.Save(&existingEntity).Error; err != nil {
+	if err := db.Table(r.entityTableName()).Save(&existingEntity).Error; err != nil {
 		return utils.Errorf("update memory entity in database failed: %v", err)
 	}
 
@@ -254,7 +254,7 @@ func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*aicommon.MemoryEntit
 	}
 
 	var dbEntity schema.AIMemoryEntity
-	if err := db.Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).
+	if err := db.Table(r.entityTableName()).Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).
 		First(&dbEntity).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, utils.Errorf("memory entity not found: %s", memoryID)
@@ -288,7 +288,7 @@ func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*aicommon.MemoryEntity, e
 		return nil, utils.Errorf("database connection is nil")
 	}
 
-	query := db.Where("session_id = ?", r.sessionID).Order("created_at DESC")
+	query := db.Table(r.entityTableName()).Where("session_id = ?", r.sessionID).Order("created_at DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
 	}

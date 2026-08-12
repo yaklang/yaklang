@@ -23,44 +23,68 @@ type midtermTimelineSearchQuery struct {
 	DisableSemanticSearch bool
 }
 
-func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timeline) string {
-	baseTimeline := ""
-	if timeline != nil {
-		baseTimeline = timeline.DumpForPrompt()
+// ConsumeAndSearchMidtermMemory consumes any pending perception-snapshot-based
+// midterm recall queries, searches the timeline archive store, and returns the
+// rendered content string. This is the single entry point that the ReActLoop
+// layer calls (via the midtermMemoryProvider interface) to refresh midterm
+// memory — it replaces the old timeline-injection path.
+//
+// The method is safe to call concurrently: consumePendingMidtermTimelineQueries
+// is mutex-guarded and "consume once" semantics prevent duplicate searches.
+func (r *ReAct) ConsumeAndSearchMidtermMemory() string {
+	if r == nil {
+		return ""
 	}
-	queries := react.consumePendingMidtermTimelineQueries()
+	queries := r.consumePendingMidtermTimelineQueries()
 	if len(queries) == 0 {
-		return baseTimeline
+		return ""
 	}
-
-	midtermPrefix, err := buildMidtermTimelinePrefix(react, queries)
-	if err != nil {
-		return baseTimeline
-	}
-	if midtermPrefix == "" {
-		return baseTimeline
-	}
-	if strings.TrimSpace(baseTimeline) == "" {
-		return "timeline:\n" + midtermPrefix
-	}
-	body := strings.TrimPrefix(baseTimeline, "timeline:\n")
-	return "timeline:\n" + midtermPrefix + body
+	return r.searchAndRenderMidtermMemory(queries)
 }
 
-func prependMidtermTimelinePrefixForPrompt(react *ReAct, openBody string) string {
-	queries := react.consumePendingMidtermTimelineQueries()
-	if len(queries) == 0 {
-		return openBody
+// searchAndRenderMidtermMemory runs the given queries against the archive store
+// and renders the results into a single content string suitable for injection
+// into the prompt's InjectedMemory block.
+func (r *ReAct) searchAndRenderMidtermMemory(queries []midtermTimelineSearchQuery) string {
+	if r == nil || r.config == nil || r.config.TimelineArchiveStore == nil {
+		return ""
 	}
 
-	midtermPrefix, err := buildMidtermTimelinePrefix(react, queries)
-	if err != nil || midtermPrefix == "" {
-		return openBody
+	queries = deduplicateMidtermSearchQueries(queries)
+	if len(queries) == 0 {
+		return ""
 	}
-	if strings.TrimSpace(openBody) == "" {
-		return "timeline:\n" + midtermPrefix
+
+	result, err := searchMidtermTimelineQueries(r, queries)
+	if err != nil {
+		log.Debugf("midterm memory search failed: queries=%d err=%v", len(queries), err)
+		return ""
 	}
-	return "timeline:\n" + midtermPrefix + openBody
+	if result == nil || strings.TrimSpace(result.TotalContent) == "" {
+		return ""
+	}
+
+	var buf strings.Builder
+	nowStr := time.Now().Format(utils.DefaultTimeFormat3)
+	buf.WriteString(fmt.Sprintf("--[%s] midterm-memory:\n", nowStr))
+	if len(queries) == 1 {
+		buf.WriteString(fmt.Sprintf("     search-query: %s\n", utils.ShrinkString(queries[0].Query, 240)))
+	} else {
+		buf.WriteString("     search-queries:\n")
+		for _, query := range queries {
+			buf.WriteString(fmt.Sprintf("       - %s\n", utils.ShrinkString(query.Query, 240)))
+		}
+	}
+	for _, line := range utils.ParseStringToRawLines(strings.TrimSpace(result.TotalContent)) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		buf.WriteString("     ")
+		buf.WriteString(line)
+		buf.WriteString("\n")
+	}
+	return strings.TrimSpace(buf.String())
 }
 
 func (r *ReAct) ScheduleMidtermTimelineRecall(summary string) {
@@ -143,81 +167,6 @@ func buildMidtermRecallQueries(snapshot *midtermPerceptionSnapshot) []midtermTim
 		appendQuery(keyword, true)
 	}
 	return result
-}
-
-func buildMidtermTimelinePrefix(react *ReAct, queries []midtermTimelineSearchQuery) (string, error) {
-	if react == nil || react.config == nil || react.config.TimelineArchiveStore == nil {
-		return "", nil
-	}
-
-	queries = deduplicateMidtermSearchQueries(queries)
-	if len(queries) == 0 {
-		return "", nil
-	}
-
-	result, err := searchMidtermTimelineQueries(react, queries)
-	if err != nil {
-		return "", err
-	}
-	if result == nil || strings.TrimSpace(result.TotalContent) == "" {
-		return "", nil
-	}
-
-	var buf strings.Builder
-	nowStr := time.Now().Format(utils.DefaultTimeFormat3)
-	buf.WriteString(fmt.Sprintf("--[%s] midterm-memory:\n", nowStr))
-	if len(queries) == 1 {
-		buf.WriteString(fmt.Sprintf("     search-query: %s\n", utils.ShrinkString(queries[0].Query, 240)))
-	} else {
-		buf.WriteString("     search-queries:\n")
-		for _, query := range queries {
-			buf.WriteString(fmt.Sprintf("       - %s\n", utils.ShrinkString(query.Query, 240)))
-		}
-	}
-	for _, line := range utils.ParseStringToRawLines(strings.TrimSpace(result.TotalContent)) {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		buf.WriteString("     ")
-		buf.WriteString(line)
-		buf.WriteString("\n")
-	}
-	return buf.String(), nil
-}
-
-func buildMidtermRecallQuery(react *ReAct) string {
-	return strings.Join(buildMidtermRecallQueryParts(react), " ")
-}
-
-func buildMidtermRecallQueryParts(react *ReAct) []string {
-	if react == nil {
-		return nil
-	}
-
-	parts := make([]string, 0, 12)
-	if task := react.GetCurrentTask(); task != nil {
-		parts = append(parts,
-			// task.GetIndex(),
-			task.GetName(),
-			task.GetOriginUserInput(),
-			// task.GetUserInput(),
-			// task.GetSummary(),
-		)
-		parts = append(parts, task.GetUserInput())
-		if info := task.GetTaskRetrievalInfo(); info != nil {
-			parts = append(parts, info.Target)
-			parts = append(parts, info.Questions...)
-			parts = append(parts, info.Tags...)
-		}
-	}
-
-	history := react.config.GetUserInputHistory()
-	if n := len(history); n > 0 {
-		parts = append(parts, history[n-1].UserInput)
-	}
-
-	return deduplicateMidtermQueryParts(parts)
 }
 
 func searchMidtermTimelineQueries(react *ReAct, queries []midtermTimelineSearchQuery) (finalResult *aicommon.TimelineArchiveSearchResult, finalErr error) {

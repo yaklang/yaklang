@@ -33,9 +33,16 @@ func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 }
 
 func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
+	return p.compareOpcodeWithFileFilter(opcodeItems, nil, nil)
+}
+
+func (p *Program) compareOpcodeWithFileFilter(
+	opcodeItems *sfvm.OpcodeComparator,
+	includeFiles, excludeFiles []string,
+) (sfvm.Values, []bool) {
 	ctx := opcodeItems.Context
 	var res Values = lo.FilterMap(
-		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
+		ssa.MatchInstructionByOpcodesWithFileFilter(ctx, p.Program, includeFiles, excludeFiles, opcodeItems.Opcodes...),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			val, err := p.NewValue(i)
 			if err != nil {
@@ -45,19 +52,42 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.Values
 			return val, true
 		},
 	)
-	// Return matched values; VM will normalize bool mask against source width.
 	return ToSFVMValues(res), nil
 }
 
 func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
+	return p.compareStringWithFileFilter(comparator, nil, nil)
+}
+
+func (p *Program) compareStringWithFileFilter(
+	comparator *sfvm.StringComparator,
+	includeFiles, excludeFiles []string,
+) (sfvm.Values, []bool) {
 	var res []sfvm.ValueOperator
 	ctx := comparator.Context
+
+	matchByMode := func(mod ssadb.MatchMode, compareMode ssadb.CompareMode, pattern string) sfvm.Values {
+		var matched bool
+		var out sfvm.Values
+		var err error
+		if len(includeFiles) > 0 {
+			matched, out, err = p.matchVariableWithIncludeFiles(ctx, compareMode, mod, pattern, includeFiles)
+		} else if len(excludeFiles) > 0 {
+			matched, out, err = p.matchVariableWithExcludeFiles(ctx, compareMode, mod, pattern, excludeFiles)
+		} else {
+			matched, out, err = p.matchVariable(ctx, compareMode, mod, pattern)
+		}
+		if err != nil || !matched {
+			return sfvm.NewEmptyValues()
+		}
+		return out
+	}
 
 	matchCallByString := func(condition *sfvm.StringCondition) sfvm.Values {
 		callMatcher := sfvm.NewStringComparator(sfvm.MatchHave, ctx)
 		callMatcher.Conditions = []*sfvm.StringCondition{condition}
 		var out []sfvm.ValueOperator
-		for _, inst := range ssa.MatchInstructionByOpcodes(ctx, p.Program, ssa.SSAOpcodeCall) {
+		for _, inst := range ssa.MatchInstructionByOpcodesWithFileFilter(ctx, p.Program, includeFiles, excludeFiles, ssa.SSAOpcodeCall) {
 			val, err := p.NewValue(inst)
 			if err != nil || val == nil {
 				continue
@@ -74,14 +104,11 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values,
 		matchMode := ssadb.ConstType
 		switch condition.FilterMode {
 		case sfvm.GlobalConditionFilter:
-			_, out, _ := p.GlobMatch(ctx, matchMode, condition.Pattern)
-			return out
+			return matchByMode(matchMode, ssadb.GlobCompare, condition.Pattern)
 		case sfvm.RegexpConditionFilter:
-			_, out, _ := p.RegexpMatch(ctx, matchMode, condition.Pattern)
-			return out
+			return matchByMode(matchMode, ssadb.RegexpCompare, condition.Pattern)
 		case sfvm.ExactConditionFilter:
-			_, out, _ := p.RegexpMatch(ctx, matchMode, fmt.Sprintf(".*%s.*", regexp.QuoteMeta(condition.Pattern)))
-			return out
+			return matchByMode(matchMode, ssadb.RegexpCompare, fmt.Sprintf(".*%s.*", regexp.QuoteMeta(condition.Pattern)))
 		default:
 			return sfvm.NewEmptyValues()
 		}
@@ -92,11 +119,11 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values,
 		matchMode := ssadb.NameMatch
 		switch condition.FilterMode {
 		case sfvm.GlobalConditionFilter:
-			_, v, _ = p.GlobMatch(ctx, matchMode, condition.Pattern)
+			v = matchByMode(matchMode, ssadb.GlobCompare, condition.Pattern)
 		case sfvm.RegexpConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, matchMode, condition.Pattern)
+			v = matchByMode(matchMode, ssadb.RegexpCompare, condition.Pattern)
 		case sfvm.ExactConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, matchMode, fmt.Sprintf(".*%s.*", regexp.QuoteMeta(condition.Pattern)))
+			v = matchByMode(matchMode, ssadb.RegexpCompare, fmt.Sprintf(".*%s.*", regexp.QuoteMeta(condition.Pattern)))
 		}
 		callMatches := matchCallByString(condition)
 		constMatches := matchConstByString(condition)
@@ -139,7 +166,6 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values,
 			}
 		}
 	}
-	// Return matched values; VM will normalize bool mask against source width.
 	return sfvm.NewValues(res), nil
 }
 
@@ -307,6 +333,25 @@ func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode
 	)
 	// values = values.ExpandPhiClosure()
 	// 将 Values 转换为 sfvm.ValueOperator
+	return len(values) > 0, ToSFVMValues(values), nil
+}
+
+// matchVariableWithIncludeFiles 搜索变量，仅保留 includeFiles 中的结果
+func (p *Program) matchVariableWithIncludeFiles(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string, includeFiles []string) (bool, sfvm.Values, error) {
+	if len(includeFiles) == 0 {
+		return false, nil, nil
+	}
+	var values Values = lo.FilterMap(
+		ssa.MatchInstructionsByVariableWithIncludeFiles(ctx, p.Program, compareMode, mod, pattern, includeFiles),
+		func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, err := p.NewValue(i); err != nil {
+				log.Errorf("matchVariable include: new value failed: %v", err)
+				return nil, false
+			} else {
+				return v, true
+			}
+		},
+	)
 	return len(values) > 0, ToSFVMValues(values), nil
 }
 

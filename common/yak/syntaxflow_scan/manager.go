@@ -271,6 +271,7 @@ func (m *scanManager) initByConfig() error {
 			}
 			config.Programs = append(config.Programs, prog)
 		}
+		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
@@ -282,6 +283,7 @@ func (m *scanManager) initByConfig() error {
 			log.Errorf("SyntaxFlow Scan Init Program By ProjectId By %d Failed", config.GetProjectID())
 		}
 		config.Programs = append(config.Programs, prog)
+		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 		// 同步更新 BaseInfo.ProgramNames，确保保存时 programs 字段不为空
 		if config.Config != nil {
 			config.Config.SetProgramName(name)
@@ -333,7 +335,10 @@ func (m *scanManager) initByConfig() error {
 		}
 	}
 
-	programCount := len(config.Programs)
+	programCount := len(config.QueryTargets)
+	if programCount == 0 {
+		programCount = len(config.Programs)
+	}
 	log.Infof("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(programCount))
 	m.setTotalQuery(m.rulesCount * int64(programCount))
 	return nil

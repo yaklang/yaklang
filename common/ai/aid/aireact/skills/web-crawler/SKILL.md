@@ -1,5 +1,7 @@
 ---
 name: web-crawler
+metadata:
+  display_name_zh-CN: Web 爬虫与目标发现
 description: >
   Web 爬虫与目标发现技能。定义渗透测试中 Web 爬虫的使用方法论，覆盖爬取策略、
   URL/参数/表单/API 端点的发现与提取、JavaScript 渲染页面处理、爬取结果分析，

@@ -1,5 +1,7 @@
 ---
 name: code-review
+metadata:
+  display_name_zh-CN: 代码安全审计
 description: >
   基于 grep 文本搜索和文件读写的代码安全审计技能。通过正则表达式模式匹配在项目源码中
   定位危险函数调用、敏感数据流和已知漏洞模式，覆盖 30+ CWE 漏洞类型，

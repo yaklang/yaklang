@@ -211,7 +211,7 @@ func populateExtraCapabilitiesFromIntent(
 						log.Debugf("search_capabilities: skip skill %q: %v", name, err)
 						continue
 					}
-					ecm.AddSkills(reactloops.ExtraSkillInfo{
+					reactloops.AddUnloadedSkillsToExtraCapabilities(loop, reactloops.ExtraSkillInfo{
 						Name:        meta.Name,
 						Description: meta.Description,
 					})

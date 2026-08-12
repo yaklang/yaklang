@@ -1,0 +1,24 @@
+name: Build Legion AI Session Runtime Alpha
+
+on:
+  push:
+    tags:
+      - "legion-runtime-alpha-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legion-ai-session-runtime-alpha-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build short-lived Runtime artifacts
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-legion-ai-session-runtime-common.yml
+    with:
+      source_mode: alpha
+      retention_days: 7
+      producer_workflow_name: Build Legion AI Session Runtime Alpha

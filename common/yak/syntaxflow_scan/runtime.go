@@ -54,7 +54,15 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 		if m.IsPause() || m.IsStop() {
 			break
 		}
-		for _, prog := range m.Config.Programs {
+		targets := m.Config.QueryTargets
+		if len(targets) == 0 {
+			for _, prog := range m.Config.Programs {
+				if prog != nil {
+					targets = append(targets, prog)
+				}
+			}
+		}
+		for _, target := range targets {
 			if m.IsPause() || m.IsStop() {
 				break
 			}
@@ -65,25 +73,32 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			}
 
 			swg.Add()
-			go func(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
+			go func(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
 				defer m.SaveTask()
 				defer swg.Done()
-				if utils.IsNil(prog) {
-					log.Errorf("SyntaxFlow Scan Failed:the program to search is nil")
+				if utils.IsNil(target) {
+					log.Errorf("SyntaxFlow Scan Failed:the query target is nil")
 					return
 				}
-				m.Query(rule, prog)
-			}(rule, prog)
+				m.Query(rule, target)
+			}(rule, target)
 		}
 	}
 	swg.Wait()
 	return errs
 }
 
-func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
+func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
+	if target == nil {
+		return ""
+	}
+	return target.GetProgramName()
+}
+
+func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
 	// 语言匹配检查
 	if !m.Config.GetScanIgnoreLanguage() {
-		if rule.Language != ssaconfig.General && rule.Language != prog.GetLanguage() {
+		if rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
 			m.markRuleSkipped()
 			return
 		}
@@ -125,6 +140,8 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		workBudget = sf.NewRuleWorkBudget(workLimit, ruleCancel)
 	}
 
+	targetName := queryTargetName(target)
+
 	// 将查询逻辑包装到函数中
 	f := func() error {
 		var ruleRecorder *diagnostics.Recorder
@@ -133,7 +150,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			ssaapi.QueryWithContext(ruleCtx),
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
-				m.processMonitor.UpdateRuleStatus(prog.GetProgramName(), rule.RuleName, f, info)
+				m.processMonitor.UpdateRuleStatus(targetName, rule.RuleName, f, info)
 			}),
 			ssaapi.QueryWithSave(m.kind),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
@@ -149,21 +166,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			option = append(option, ssaapi.QueryWithRuleDiagnosticsRecorder(ruleRecorder))
 		}
 
-		// 执行规则查询
-		var err error
-		var res *ssaapi.SyntaxFlowResult
-		if overlay := prog.GetOverlay(); overlay != nil {
-			res, err = overlay.SyntaxFlowRule(rule, option...)
-		} else {
-			res, err = prog.SyntaxFlowRule(rule, option...)
-		}
+		// QueryTargets already selected Program or ProgramOverLay — no overlay branch.
+		res, err := target.SyntaxFlowRule(rule, option...)
 
-		// Detect a per-rule budget bail. ruleCtx.Err() is non-nil once the
-		// deadline fired OR the total-work budget cancelled ruleCtx, regardless
-		// of whether the query surfaced the ctx error or returned partial/empty
-		// results with a nil err — so this catches both. workBudget.Exceeded()
-		// covers the work-budget case even when ruleTimeout==0 (no wall-clock
-		// deadline, so ruleCtx.Err() alone wouldn't flag it).
 		bailedByBudget := (ruleTimeout > 0 && ruleCtx.Err() != nil) || (workBudget != nil && workBudget.Exceeded())
 		bailReason := ""
 		switch {
@@ -174,35 +179,26 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		}
 
 		if bailedByBudget {
-			// A per-rule budget bail (wall-clock RuleTimeout or total-work
-			// RuleWorkLimit) is a CONTROLLED PARTIAL: the rule produced what it
-			// could before the budget fired. Count it as success so heavy rules
-			// don't surface as spurious failures on large projects; the warn +
-			// error callback record the bail reason. The query may surface the
-			// ctx cancellation as err (e.g. "context done") — that's the expected
-			// bail signal, not a real rule failure.
 			if res != nil {
 				m.StatusTask(res)
 			}
 			m.markRuleSuccess()
 			log.Warnf("rule %s on program %s hit per-rule budget (%s), returned partial results",
-				rule.RuleName, prog.GetProgramName(), bailReason)
+				rule.RuleName, targetName, bailReason)
 			m.errorCallback("program %s exc rule %s hit per-rule budget (%s), bailed",
-				prog.GetProgramName(), rule.RuleName, bailReason)
+				targetName, rule.RuleName, bailReason)
 		} else if err == nil {
 			m.StatusTask(res)
 			m.markRuleSuccess()
 		} else {
-			m.processMonitor.UpdateRuleError(prog.GetProgramName(), rule.RuleName, err)
+			m.processMonitor.UpdateRuleError(targetName, rule.RuleName, err)
 			m.StatusTask(nil)
 			m.markRuleFailed()
 			m.errorCallback("program %s exc rule %s failed: %s",
-				prog.GetProgramName(), rule.RuleName, err)
+				targetName, rule.RuleName, err)
 		}
 
-		// 在规则执行完成后输出性能日志
 		if enableRulePerf && ruleRecorder != nil {
-			// 确保性能日志输出，即使日志级别较高
 			snapshots := ruleRecorder.Snapshot()
 			if len(snapshots) > 0 {
 				log.Info("========================================")
@@ -213,18 +209,12 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 				}
 				log.Info("========================================")
 			} else {
-				// 即使没有数据，也输出提示信息
 				log.Debugf("Rule Performance: %s - no performance data recorded", rule.RuleName)
 			}
 		}
 
-		// Release this rule's analysis-local accumulators before the next rule
-		// reuses the program. ResetInterRuleState is a no-op unless the cache
-		// exceeds its threshold (heavy rules), so small rules keep DB-read reuse
-		// while heavy rules' Values don't carry Predecessors/anchorBits into the
-		// next rule and don't bloat retained memory. See Program.ResetInterRuleState.
-		if prog != nil {
-			prog.ResetInterRuleState()
+		if resetter, ok := target.(interface{ ResetInterRuleState() }); ok {
+			resetter.ResetInterRuleState()
 		}
 		return nil
 	}

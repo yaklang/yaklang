@@ -11,6 +11,8 @@ option go_package = "legion/gen/proto/legion/ai/v1;aiv1";
 message AISessionRef {
   string session_id = 1;
   string run_id = 2;
+  // Bind generation that produced a runtime event. Zero is legacy/unfenced.
+  uint64 bind_epoch = 3;
 }
 
 message AISessionAttachmentRef {
@@ -41,6 +43,9 @@ message BindAISessionCommand {
   repeated AISessionAttachmentRef attachments = 9;
   repeated AISessionCredentialRef credential_refs = 10;
   AIFocusResultContext result_context = 11;
+  // Monotonic durable command sequence for this Session's bind generation.
+  // Nodes fence delayed/redelivered binds by epoch; issued_at is diagnostic.
+  uint64 bind_epoch = 12;
 }
 
 message PushAISessionInputCommand {

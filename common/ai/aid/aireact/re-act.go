@@ -31,6 +31,8 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 )
 
+const MainTaskQueueName = "react-main-queue"
+
 // 同步类型常量
 const (
 	SYNC_TYPE_QUEUE_INFO                = "queue_info"
@@ -207,6 +209,15 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		if err := cfg.LoadBuiltinSkillsFromDir(aiSkillsDir); err != nil {
 			log.Warnf("failed to load skills from %s: %v", aiSkillsDir, err)
 		}
+		// Re-scan the canonical built-in directory last. Legacy top-level copies
+		// may share a name, but edits made through the recommended-skill API must
+		// be the version that a newly-created ReAct session loads.
+		builtinSkillsDir := filepath.Join(aiSkillsDir, "builtin")
+		if utils.IsDir(builtinSkillsDir) {
+			if err := cfg.LoadBuiltinSkillsFromDir(builtinSkillsDir); err != nil {
+				log.Warnf("failed to prioritize built-in skills from %s: %v", builtinSkillsDir, err)
+			}
+		}
 	}
 
 	if du := time.Since(configLoadingStart); du > 500*time.Millisecond {
@@ -218,7 +229,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	react := &ReAct{
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
-		taskQueue:            NewTaskQueue("react-main-queue"),
+		taskQueue:            NewTaskQueue(MainTaskQueueName),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            nil, // lazy: created in ensureWorkDirectory
@@ -264,7 +275,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 
 	if cfg.TimelineArchiveStore == nil && strings.TrimSpace(cfg.PersistentSessionId) != "" {
 		midtermSessionID := aimem.PersistentSessionToMidtermMemorySessionID(cfg.PersistentSessionId)
-		midtermStore, err := aimem.NewAIMemoryForQuery(midtermSessionID, aimem.WithDatabase(cfg.GetDB()))
+		midtermStore, err := aimem.NewAIMemoryForQuery(midtermSessionID, aimem.WithDatabase(cfg.GetDB()), aimem.WithMidtermArchiveMode())
 		if err != nil {
 			log.Warnf("create timeline archive store failed for session %s: %v", cfg.PersistentSessionId, err)
 		} else {

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/javajive/classparser"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
@@ -100,6 +100,7 @@ func ParseFromReader(input io.Reader, opts ...ssaconfig.Option) (*Program, error
 	if err != nil {
 		return nil, err
 	}
+	defer config.Cleanup()
 
 	if config.EnableCache {
 		hash := config.CalcHash()

@@ -60,8 +60,8 @@ public class Main {
 			Check: func(overlay *ssaapi.ProgramOverLay, _ IncrementalCheckStage) {
 				step2Checks++
 				require.NotNil(t, overlay, "second step should create overlay")
-				require.GreaterOrEqual(t, overlay.GetLayerCount(), 2)
-				require.Greater(t, len(overlay.Layers), 0)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 2)
+				require.Greater(t, overlay.ProgramCount(), 0)
 
 				res, err := overlay.SyntaxFlowWithError(`"diff-v2" as $target`)
 				require.NoError(t, err)
@@ -91,8 +91,8 @@ public class Main {
 			Check: func(overlay *ssaapi.ProgramOverLay, _ IncrementalCheckStage) {
 				step3Checks++
 				require.NotNil(t, overlay, "third step should keep overlay")
-				require.GreaterOrEqual(t, overlay.GetLayerCount(), 2)
-				require.Greater(t, len(overlay.Layers), 0)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 2)
+				require.Greater(t, overlay.ProgramCount(), 0)
 
 				res, err := overlay.SyntaxFlowWithError(`"diff-v3" as $target`)
 				require.NoError(t, err)

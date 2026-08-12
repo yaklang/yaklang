@@ -64,9 +64,9 @@ public class NewFile {
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
 				require.NotNil(t, overlay)
-				require.GreaterOrEqual(t, overlay.GetLayerCount(), 2)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 2)
 
-				layerNames := overlay.GetLayerProgramNames()
+				layerNames := overlay.ProgramNames()
 				require.GreaterOrEqual(t, len(layerNames), 2)
 				latestName := layerNames[len(layerNames)-1]
 				require.NotEmpty(t, latestName)
@@ -163,11 +163,11 @@ public class C {
 			},
 			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
 				require.NotNil(t, overlay)
-				require.GreaterOrEqual(t, overlay.GetLayerCount(), 2)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 2)
 				require.NotEmpty(t, overlay.Ref("A"))
 
 				if stage == ssatest.IncrementalCheckStageCompile {
-					require.GreaterOrEqual(t, len(overlay.GetLayerProgramNames()), 2)
+					require.GreaterOrEqual(t, len(overlay.ProgramNames()), 2)
 				}
 			},
 		},
@@ -254,7 +254,7 @@ public class C {
 					return
 				}
 				require.NotNil(t, overlay)
-				require.GreaterOrEqual(t, overlay.GetLayerCount(), 3)
+				require.GreaterOrEqual(t, overlay.ProgramCount(), 3)
 				require.NotEmpty(t, overlay.Ref("A"))
 				require.NotEmpty(t, overlay.Ref("C"))
 				require.Empty(t, overlay.Ref("B"))

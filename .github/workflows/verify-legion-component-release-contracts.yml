@@ -10,6 +10,9 @@ on:
       - ".github/scripts/test-legion-component-workflow-contract.sh"
       - ".github/scripts/test-package-legion-ai-session-runtime.sh"
       - ".github/workflows/build-legion-ai-session-runtime.yml"
+      - ".github/workflows/build-legion-ai-session-runtime-alpha.yml"
+      - ".github/workflows/build-legion-ai-session-runtime-common.yml"
+      - ".github/workflows/build-legion-node-alpha.yml"
       - ".github/workflows/build-legion-product-node.yml"
       - ".github/workflows/verify-legion-component-release-contracts.yml"
       - "docker/session-runtime/**"
@@ -25,7 +28,7 @@ concurrency:
 
 jobs:
   contracts:
-    name: Verify release-only multi-architecture contracts
+    name: Verify release and alpha node contracts
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
@@ -127,4 +130,63 @@ jobs:
           docker run --rm --entrypoint /bin/sh "$image" -ec \
             'test -x /usr/local/bin/legion-session-runtime; ldd /usr/local/bin/legion-session-runtime' \
             >"${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"
-          ! grep -q 'not found' "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"
+          if grep -q 'not found' "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.ldd"; then
+            echo "Runtime binary has unresolved shared libraries" >&2
+            exit 1
+          fi
+          docker save "$image" | gzip -n -1 \
+            >"${RUNNER_TEMP}/runtime-${TARGET_ARCH}.docker.tar.gz"
+          gzip -t "${RUNNER_TEMP}/runtime-${TARGET_ARCH}.docker.tar.gz"
+
+  alpha-node-targets:
+    name: Compile alpha node for ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+            runner: macos-15-intel
+            file_fragment: Mach-O 64-bit executable x86_64
+          - goos: darwin
+            goarch: arm64
+            runner: macos-15
+            file_fragment: Mach-O 64-bit executable arm64
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-22.04
+            file_fragment: ELF 64-bit LSB executable, x86-64
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+            file_fragment: ELF 64-bit LSB executable, ARM aarch64
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Compile portable Legion Node
+        shell: bash
+        env:
+          TARGET_OS: ${{ matrix.goos }}
+          TARGET_ARCH: ${{ matrix.goarch }}
+          EXPECTED_FILE_FRAGMENT: ${{ matrix.file_fragment }}
+        run: |
+          set -euo pipefail
+          export GOTOOLCHAIN=local
+          binary="${RUNNER_TEMP}/legion-smoke-node-${TARGET_OS}-${TARGET_ARCH}"
+          CGO_ENABLED=1 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" go build \
+            -trimpath \
+            -buildvcs=true \
+            -ldflags '-s -w -buildid=' \
+            -o "$binary" \
+            ./cmd/legion-smoke-node
+          file "$binary" | grep -Fq "$EXPECTED_FILE_FRAGMENT"
+          go version -m "$binary"

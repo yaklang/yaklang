@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"context"
-	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -34,55 +33,26 @@ func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) <-chan 
 	return yieldIrCodes(ctx, progName, ids)
 }
 
-// yieldFromIrIndexWithExcludeFiles queries from IrIndex, excluding specified files
-// DB: query with applied matching conditions (e.g. variable_id = ?)
-// excludeFiles: list of file paths to exclude (normalized paths, e.g. "/test.go")
-func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName string, excludeFiles []string) <-chan *IrCode {
-	var ids []int64
-
-	// Step 1: Get matched value_ids from DB (DB already contains match conditions and program_name)
+// yieldFromIrIndexWithFileFilter plucks matched value_ids then filters by file path in memory.
+func yieldFromIrIndexWithFileFilter(DB *gorm.DB, ctx context.Context, progName string, files []string, mode FileFilterMode) <-chan *IrCode {
 	var matchedIds []int64
 	distinctIrIndicesValueID := "DISTINCT " + TableIrIndices + ".value_id"
 	if err := DB.Pluck(distinctIrIndicesValueID, &matchedIds).Error; err != nil {
 		log.Errorf("failed to get matched ids: %v", err)
 		return emptyIrCodeChan()
 	}
-
 	if len(matchedIds) == 0 {
 		return emptyIrCodeChan()
 	}
+	return FilterIrCodeChan(ctx, yieldIrCodes(ctx, progName, matchedIds), files, mode, progName)
+}
 
-	// Step 2: Join to exclude files based on matched value_ids
-	baseDB := GetDB()
-	query := baseDB.Model(&IrIndex{}).
-		Select(distinctIrIndicesValueID).
-		Joins("INNER JOIN "+TableIrCodes+" ON "+TableIrIndices+".value_id = "+TableIrCodes+".code_id").
-		Joins("INNER JOIN "+TableIrSources+" ON "+TableIrCodes+".source_code_hash = "+TableIrSources+".source_code_hash").
-		Where(TableIrIndices+".program_name = ?", progName).
-		Where(TableIrCodes+".program_name = ?", progName).
-		Where(TableIrSources+".program_name = ?", progName).
-		Where(TableIrIndices+".value_id IN (?)", matchedIds)
+func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName string, excludeFiles []string) <-chan *IrCode {
+	return yieldFromIrIndexWithFileFilter(DB, ctx, progName, excludeFiles, FileFilterExclude)
+}
 
-	// Add exclusion conditions if needed
-	if len(excludeFiles) > 0 {
-		concatExpr := getConcatExpression(baseDB)
-		excludeConditions := make([]string, 0, len(excludeFiles))
-		excludeArgs := make([]interface{}, 0, len(excludeFiles))
-		for _, filePath := range excludeFiles {
-			normalizedPath := normalizeFilePathForExclusion(filePath)
-			excludeConditions = append(excludeConditions, concatExpr+" != ?")
-			excludeArgs = append(excludeArgs, normalizedPath)
-		}
-		if len(excludeConditions) > 0 {
-			query = query.Where(strings.Join(excludeConditions, " AND "), excludeArgs...)
-		}
-	}
-
-	if err := query.Pluck(distinctIrIndicesValueID, &ids).Error; err != nil {
-		log.Errorf("failed to get ids from index with exclude files: %v", err)
-		return emptyIrCodeChan()
-	}
-	return yieldIrCodes(ctx, progName, ids)
+func yieldFromIrIndexWithIncludeFiles(DB *gorm.DB, ctx context.Context, progName string, includeFiles []string) <-chan *IrCode {
+	return yieldFromIrIndexWithFileFilter(DB, ctx, progName, includeFiles, FileFilterInclude)
 }
 
 func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrCode {
@@ -92,7 +62,6 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 		_ = diagnostics.TrackLow("ssadb.yieldIrCodes", func() error {
 			idsToLoad := make([]int64, 0, len(ids))
 			cache := GetIrCodeCache(progName)
-			// Load from cache first
 			for _, id := range ids {
 				if ir, ok := cache.Get(id); ok {
 					outC.SafeFeed(ir)
@@ -104,7 +73,6 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 				return nil
 			}
 
-			// Batch load missing data
 			db := GetDB().Model(&IrCode{}).Where("program_name = ?", progName)
 			ch := bizhelper.FastPagination[*IrCode](ctx, db, nil,
 				bizhelper.WithFastPaginator_IDs(idsToLoad), bizhelper.WithFastPaginator_IndexField("code_id"),
@@ -128,91 +96,68 @@ func SearchVariable(db *gorm.DB, ctx context.Context, progName string, cache *Na
 func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles []string) <-chan *IrCode {
 	var result <-chan *IrCode
 	_ = diagnostics.TrackLow("ssadb.SearchVariableWithExcludeFiles", func() error {
-		result = searchVariableWithExcludeFiles(db, ctx, progName, cache, compareMode, matchMod, value, excludeFiles)
+		result = searchVariableWithFileFilter(db, ctx, progName, cache, compareMode, matchMod, value, excludeFiles, nil)
 		return nil
 	})
 	return result
 }
 
-func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles []string) <-chan *IrCode {
-	// 1. Handle Glob -> Regexp
+// SearchVariableWithIncludeFiles searches variables, keeping only results from includeFiles.
+func SearchVariableWithIncludeFiles(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, includeFiles []string) <-chan *IrCode {
+	var result <-chan *IrCode
+	_ = diagnostics.TrackLow("ssadb.SearchVariableWithIncludeFiles", func() error {
+		result = searchVariableWithFileFilter(db, ctx, progName, cache, compareMode, matchMod, value, nil, includeFiles)
+		return nil
+	})
+	return result
+}
+
+func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles, includeFiles []string) <-chan *IrCode {
 	if compareMode == GlobCompare {
 		value = glob.Glob2Regex(value)
 		compareMode = RegexpCompare
 	}
 
-	// 2. Handle ConstType
+	filterLoaded := func(ch <-chan *IrCode) <-chan *IrCode {
+		mode := FileFilterNone
+		files := excludeFiles
+		if len(includeFiles) > 0 {
+			mode = FileFilterInclude
+			files = includeFiles
+		} else if len(excludeFiles) > 0 {
+			mode = FileFilterExclude
+		}
+		return FilterIrCodeChan(ctx, ch, files, mode, progName)
+	}
+
 	if matchMod&ConstType != 0 {
-		query := db.Model(&IrCode{}).Where("opcode=5 AND const_type = 'normal'")
+		query := GetDB().Model(&IrCode{}).
+			Where(TableIrCodes+".program_name = ?", progName).
+			Where(TableIrCodes+".opcode = ? AND "+TableIrCodes+".const_type = ?", 5, "normal")
 		if compareMode == ExactCompare {
-			query = query.Where("string = ?", value)
+			query = query.Where(TableIrCodes+".string = ?", value)
 		} else {
-			// This regex operation on the 'string' column (TEXT) is likely a full table scan if no index exists.
-			// Keep dialect compatibility:
-			// - SQLite: "REGEXP" via the registered regexp() function in sqlite3_extended driver.
-			// - MySQL:  "REGEXP"
-			// - Postgres: "~"
-			dialect := db.Dialect().GetName()
+			dialect := GetDB().Dialect().GetName()
 			switch dialect {
 			case "postgres", "postgresql":
-				query = query.Where("string ~ ?", value)
+				query = query.Where(TableIrCodes+".string ~ ?", value)
 			default:
-				query = query.Where("string REGEXP ?", value)
+				query = query.Where(TableIrCodes+".string REGEXP ?", value)
 			}
 		}
-		// ConstType query also needs file exclusion
-		if len(excludeFiles) > 0 {
-			query = query.Joins("INNER JOIN "+TableIrSources+" ON "+TableIrCodes+".source_code_hash = "+TableIrSources+".source_code_hash").
-				Where(TableIrSources+".program_name = ?", progName)
-			concatExpr := getConcatExpression(db)
-			excludeConditions := make([]string, 0, len(excludeFiles))
-			excludeArgs := make([]interface{}, 0, len(excludeFiles))
-			for _, filePath := range excludeFiles {
-				normalizedPath := normalizeFilePathForExclusion(filePath)
-				excludeConditions = append(excludeConditions, concatExpr+" != ?")
-				excludeArgs = append(excludeArgs, normalizedPath)
-			}
-			if len(excludeConditions) > 0 {
-				query = query.Where(strings.Join(excludeConditions, " AND "), excludeArgs...)
-			}
-		}
-		ch := YieldIrCode(query, ctx, progName)
-		resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-		go func() {
-			defer resultCh.Close()
-			for ir := range ch {
-				resultCh.SafeFeed(ir)
-			}
-		}()
-		return resultCh.OutputChannel()
+		return filterLoaded(YieldIrCode(query, ctx, progName))
 	}
 
-	// 3. Handle Variable/Field (Search in IrIndex)
 	query := db.Model(&IrIndex{})
-	// PASS progName to applyMatchCondition
 	query = applyMatchCondition(query, progName, cache, matchMod, compareMode, value)
 
-	var resultCh *chanx.UnlimitedChan[*IrCode]
-	if len(excludeFiles) > 0 {
-		ch := yieldFromIrIndexWithExcludeFiles(query, ctx, progName, excludeFiles)
-		resultCh = chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-		go func() {
-			defer resultCh.Close()
-			for ir := range ch {
-				resultCh.SafeFeed(ir)
-			}
-		}()
-	} else {
-		ch := yieldFromIrIndex(query, ctx, progName)
-		resultCh = chanx.NewUnlimitedChan[*IrCode](ctx, 100)
-		go func() {
-			defer resultCh.Close()
-			for ir := range ch {
-				resultCh.SafeFeed(ir)
-			}
-		}()
+	if len(includeFiles) > 0 {
+		return yieldFromIrIndexWithIncludeFiles(query, ctx, progName, includeFiles)
 	}
-	return resultCh.OutputChannel()
+	if len(excludeFiles) > 0 {
+		return yieldFromIrIndexWithExcludeFiles(query, ctx, progName, excludeFiles)
+	}
+	return yieldFromIrIndex(query, ctx, progName)
 }
 
 func applyMatchCondition(db *gorm.DB, progName string, cache *NameCache, mod MatchMode, compareMode CompareMode, value string) *gorm.DB {
@@ -248,32 +193,6 @@ func applyMatchCondition(db *gorm.DB, progName string, cache *NameCache, mod Mat
 func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, progName string, opcodes ...int) <-chan *IrCode {
 	db = db.Model(&IrCode{}).Where("opcode in (?)", opcodes)
 	return YieldIrCode(db, ctx, progName)
-}
-
-// normalizeFilePathForExclusion normalizes file path for exclusion query
-// Ensures path starts with /
-func normalizeFilePathForExclusion(filePath string) string {
-	if !strings.HasPrefix(filePath, "/") {
-		return "/" + filePath
-	}
-	return filePath
-}
-
-// getConcatExpression returns string concatenation expression based on DB dialect
-// SQLite uses ||, MySQL/PostgreSQL uses CONCAT
-func getConcatExpression(db *gorm.DB) string {
-	if db == nil {
-		db = GetDB()
-	}
-	dialect := db.Dialect().GetName()
-	switch dialect {
-	case "sqlite3", "sqlite":
-		// SQLite uses || operator
-		return "(" + TableIrSources + ".folder_path || " + TableIrSources + ".file_name)"
-	default:
-		// MySQL, PostgreSQL use CONCAT function
-		return "CONCAT(" + TableIrSources + ".folder_path, " + TableIrSources + ".file_name)"
-	}
 }
 
 func emptyIrCodeChan() <-chan *IrCode {

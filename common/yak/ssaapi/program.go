@@ -151,6 +151,19 @@ func (p *Program) GetOverlay() *ProgramOverLay {
 	return p.overlay
 }
 
+// AsSyntaxFlowQueryInstance returns the SF entrypoint for this program:
+// the ProgramOverLay when this program is the overlay top layer, otherwise the Program itself.
+// Callers that only need SyntaxFlow should prefer this (or NewProgramFromDB) over GetOverlay().
+func (p *Program) AsSyntaxFlowQueryInstance() SyntaxFlowQueryInstance {
+	if p == nil {
+		return nil
+	}
+	if overlay := p.GetOverlay(); overlay != nil && overlay.IsTopLayerProgram(p) {
+		return overlay
+	}
+	return p
+}
+
 // IsIncrementalCompile 判断这个 program 是否是增量编译的
 // 如果 IsOverlay 为 true，或者有 BaseProgramName/FileHashMap，说明这个 program 属于增量编译流程的一部分
 func (p *Program) IsIncrementalCompile() bool {
@@ -313,6 +326,25 @@ func (p *Program) refWithExcludeFiles(name string, excludeFiles []string) Values
 	)
 }
 
+// refWithIncludeFiles 搜索变量，仅保留 includeFiles 中的结果
+func (p *Program) refWithIncludeFiles(name string, includeFiles []string) Values {
+	if len(includeFiles) == 0 {
+		return nil
+	}
+	return lo.FilterMap(
+		ssa.MatchInstructionsByVariableWithIncludeFiles(
+			context.Background(), p.Program, ssadb.ExactCompare, ssadb.NameMatch, name, includeFiles,
+		),
+		func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, err := p.NewValue(i); err != nil {
+				return nil, false
+			} else {
+				return v, true
+			}
+		},
+	)
+}
+
 func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 	p.Program.OffsetRLock()
 	defer p.Program.OffsetRUnlock()
@@ -424,12 +456,19 @@ func (p *Program) getValueByIdFromOverlay(id int64) (*Value, error) {
 	if p == nil || p.overlay == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
 	}
-	for i := len(p.overlay.Layers) - 1; i >= 0; i-- {
-		layer := p.overlay.Layers[i]
+	ov := p.overlay
+	for i := len(ov.Diff) - 1; i >= 0; i-- {
+		layer := ov.Diff[i]
 		if layer == nil || layer.Program == nil || layer.Program == p {
 			continue
 		}
 		v, err := layer.Program.GetValueById(id)
+		if err == nil && v != nil {
+			return v, nil
+		}
+	}
+	if ov.Base != nil && ov.Base != p {
+		v, err := ov.Base.GetValueById(id)
 		if err == nil && v != nil {
 			return v, nil
 		}

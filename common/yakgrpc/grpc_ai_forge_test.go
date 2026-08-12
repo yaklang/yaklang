@@ -27,6 +27,19 @@ func queryForge(ctx context.Context, client ypb.YakClient, filter *ypb.AIForgeFi
 	return resp.GetData(), err
 }
 
+func TestGRPCMUSTPASS_AIForge_QueryWithNilPagination(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	resp, err := client.QueryAIForge(ctx, &ypb.QueryAIForgeRequest{})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), resp.GetPagination().GetPage())
+	require.Equal(t, int64(10), resp.GetPagination().GetLimit())
+	require.LessOrEqual(t, len(resp.GetData()), 10)
+}
+
 func createAIForge(ctx context.Context, client ypb.YakClient, forge *ypb.AIForge) (*ypb.DbOperateMessage, error) {
 	if forge == nil {
 		return client.CreateAIForge(ctx, &ypb.AIForge{})

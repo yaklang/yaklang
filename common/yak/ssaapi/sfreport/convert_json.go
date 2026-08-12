@@ -120,7 +120,7 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 	// get value
 	value, err := result.GetValue(ssarisk.Variable, int(ssarisk.Index))
 	if err != nil {
-		log.Errorf("get value by variable %s and index %d error: %v", ssarisk.Variable, ssarisk.Index, err)
+		r.convertSSARiskFromMetadata(ssarisk, result)
 		return
 	}
 
@@ -164,6 +164,41 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 	risk.SetRule(rule)
 	rule.AddRisk(risk)
 	// }}
+}
+
+// convertSSARiskFromMetadata adds an SSARisk when the result has risk metadata
+// but no matching alert value (e.g. index/variable drift).
+func (r *Report) convertSSARiskFromMetadata(ssarisk *schema.SSARisk, result *ssaapi.SyntaxFlowResult) {
+	if r == nil || ssarisk == nil || result == nil {
+		return
+	}
+	if r.GetRisk(ssarisk.Hash) != nil {
+		return
+	}
+	risk, _ := NewRisk(ssarisk, r)
+	r.AddRisks(risk)
+	r.RiskNums = len(r.Risks)
+	if file := r.firstOrCreateFileByPath(ssarisk.CodeSourceUrl); file != nil {
+		file.AddRisk(risk)
+	}
+	rule := r.FirstOrCreateRule(result.GetRule())
+	risk.SetRule(rule)
+	rule.AddRisk(risk)
+}
+
+func (r *Report) firstOrCreateFileByPath(path string) *File {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil
+	}
+	for _, f := range r.File {
+		if f != nil && f.Path == path {
+			return f
+		}
+	}
+	file := &File{Path: path}
+	r.File = append(r.File, file)
+	return file
 }
 
 func (r *Report) FirstOrCreateRule(rule *schema.SyntaxFlowRule) *Rule {

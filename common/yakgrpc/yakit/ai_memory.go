@@ -191,3 +191,109 @@ func CountAIMemoryEntityTags(ctx context.Context, db *gorm.DB, sessionID string)
 
 	return ret, nil
 }
+
+// DeleteAIMidtermArchiveEntityBatched hard-deletes AIMidtermArchiveEntity rows in small batches.
+// It mirrors DeleteAIMemoryEntityBatched but operates on the independent midterm archive table.
+func DeleteAIMidtermArchiveEntityBatched(ctx context.Context, db *gorm.DB, filter *ypb.AIMemoryEntityFilter, batchSize int, hook DeleteAIMemoryEntityBatchHook) (deletedEntities int64, err error) {
+	if db == nil {
+		return 0, utils.Errorf("database not initialized")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if batchSize <= 0 {
+		batchSize = defaultAIMemoryEntityDeleteBatchSize
+	}
+
+	var lastID uint
+	for {
+		select {
+		case <-ctx.Done():
+			return deletedEntities, ctx.Err()
+		default:
+		}
+
+		var entities []schema.AIMemoryEntity
+		q := filterAIMidtermArchiveEntity(db, filter).
+			Select("id, memory_id, session_id, potential_questions").
+			Order("id asc").
+			Limit(batchSize)
+		if lastID > 0 {
+			q = q.Where("id > ?", lastID)
+		}
+		if err := q.Find(&entities).Error; err != nil {
+			return deletedEntities, err
+		}
+		if len(entities) == 0 {
+			return deletedEntities, nil
+		}
+
+		entityIDs := make([]uint, 0, len(entities))
+		for _, entity := range entities {
+			entityIDs = append(entityIDs, entity.ID)
+			lastID = entity.ID
+		}
+
+		var batchDeletedEntities int64
+		if hook != nil {
+			if err := hook(ctx, db, entities); err != nil {
+				return deletedEntities, err
+			}
+		}
+		if err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+			res := tx.Table((&schema.AIMidtermArchiveEntity{}).TableName()).
+				Where("id IN (?)", entityIDs).
+				Unscoped().
+				Delete(&schema.AIMidtermArchiveEntity{})
+			if res.Error != nil {
+				return res.Error
+			}
+			batchDeletedEntities = res.RowsAffected
+			return nil
+		}); err != nil {
+			return deletedEntities, err
+		}
+
+		deletedEntities += batchDeletedEntities
+	}
+}
+
+// filterAIMidtermArchiveEntity builds a query on the midterm archive table, mirroring FilterAIMemoryEntity.
+func filterAIMidtermArchiveEntity(db *gorm.DB, filter *ypb.AIMemoryEntityFilter) *gorm.DB {
+	db = db.Table((&schema.AIMidtermArchiveEntity{}).TableName())
+	if filter == nil {
+		return db
+	}
+
+	if filter.GetSessionID() != "" {
+		db = db.Where("session_id = ?", filter.GetSessionID())
+	}
+	db = bizhelper.ExactQueryStringArrayOr(db, "memory_id", filter.GetMemoryID())
+
+	if kw := strings.TrimSpace(filter.GetContentKeyword()); kw != "" {
+		db = bizhelper.FuzzSearchEx(db, []string{"content"}, kw, false)
+	}
+
+	if kw := strings.TrimSpace(filter.GetPotentialQuestionKeyword()); kw != "" {
+		db = db.Where("potential_questions LIKE ?", "%"+kw+"%")
+	}
+
+	db = bizhelper.QueryByFloatRange(db, "c_score", filter.GetCScore())
+	db = bizhelper.QueryByFloatRange(db, "o_score", filter.GetOScore())
+	db = bizhelper.QueryByFloatRange(db, "r_score", filter.GetRScore())
+	db = bizhelper.QueryByFloatRange(db, "e_score", filter.GetEScore())
+	db = bizhelper.QueryByFloatRange(db, "p_score", filter.GetPScore())
+	db = bizhelper.QueryByFloatRange(db, "a_score", filter.GetAScore())
+	db = bizhelper.QueryByFloatRange(db, "t_score", filter.GetTScore())
+
+	db = bizhelper.QueryByTimeRangeUnix(db, "created_at", filter.GetCreatedAt())
+	db = bizhelper.QueryByTimeRangeUnix(db, "updated_at", filter.GetUpdatedAt())
+
+	if filter.GetTagMatchAll() {
+		db = bizhelper.FuzzQueryArrayStringAndLike(db, "tags", filter.GetTags())
+	} else {
+		db = bizhelper.FuzzQueryArrayStringOrLike(db, "tags", filter.GetTags())
+	}
+
+	return db
+}

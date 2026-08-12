@@ -147,7 +147,7 @@ func TestTimelineBatchReducerPromptUsesProjectionWithoutRewritingToolData(t *tes
 		{createdAt: time.Now(), value: &TextTimelineItem{ID: 5, Text: "[review]:\nKEEP_RECENT_REVIEW"}},
 	}
 
-	prompt := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "PROJECTION")
+	prompt := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "PROJECTION", 0, 0)
 	require.NotContains(t, prompt, "DROP_REDUCER_BREADCRUMB")
 	require.NotContains(t, prompt, "DROP_RECENT_EVIDENCE_BREADCRUMB")
 	require.Contains(t, prompt, "KEEP_REDUCER_TOOL_DATA")

@@ -95,7 +95,7 @@ func init() {
 					if !isDone {
 						return
 					}
-					lastAction := loop.GetLastAction()
+					lastAction := loop.GetLastValidAction()
 					if lastAction == nil {
 						log.Warnf("iteration %d: skip final summary because last action is empty", iteration)
 						return

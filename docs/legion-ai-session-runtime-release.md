@@ -12,11 +12,33 @@ provenance.
 | Event | Behavior | Output trust level |
 |---|---|---|
 | Pull request or ordinary branch push | Does not run or produce a Runtime package | No release artifact |
+| `legion-runtime-alpha-*` tag on any selected commit | Build Linux amd64 and arm64 image archives and provenance packages; retain Actions artifacts for 7 days without OSS credentials or publication | Short-lived integration candidate |
 | SemVer `legion-runtime-v*` tag reachable from `main` | Build amd64 and arm64 variants, then publish immutable image archives, provenance, and release indexes to OSS | Trusted producer release |
 
 The isolated tag prefix intentionally does not match the repository's generic
 `v*` release workflows. For example, an alpha producer release can use
 `legion-runtime-v0.1.0-alpha.1`.
+
+For short-lived testing of a pull request commit, use the separate candidate
+namespace:
+
+```bash
+git tag legion-runtime-alpha-0212 <commit-sha>
+git push origin refs/tags/legion-runtime-alpha-0212
+```
+
+The tagged commit is the complete source identity; the tag does not carry or
+resolve a pull request number. Each candidate tag must be new and immutable.
+The tagged commit must already contain the alpha entry workflow and its common
+Runtime artifact workflow. Candidate artifacts include `linux/amd64` and
+`linux/arm64` Docker image archives plus their provenance packages. They are
+Actions-only and never receive OSS release secrets.
+
+The alpha entry grants only `contents: read` to the common artifact workflow.
+The formal release entry separately grants the OIDC and attestation permissions
+needed for trusted publication and passes only the two named OSS secrets. This
+keeps a tagged pull request commit from receiving release credentials or
+elevating its `GITHUB_TOKEN` through the reusable workflow boundary.
 
 ## Published outputs
 

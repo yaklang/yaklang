@@ -86,6 +86,14 @@ type aiSessionRuntimeEmitter interface {
 	Failed(string, string, []byte)
 }
 
+// aiSessionRuntimeRefEmitter publishes a runtime event with the exact command
+// reference that admitted it. Control responses can otherwise be attributed
+// to a concurrent Close or replacement input after the manager advances its
+// mutable current ref.
+type aiSessionRuntimeRefEmitter interface {
+	EmitForRef(aiSessionCommandRef, string, []byte) bool
+}
+
 type aiSessionRuntimeTurnCompleter interface {
 	DoneTurn(string, []byte)
 	FailTurn(string, string, string, []byte)
@@ -101,7 +109,7 @@ type aiSessionBinding struct {
 	CredentialRefs             []aiSessionCredentialRef
 	PlatformBearerToken        string
 	HTTPClient                 *http.Client
-	LegionResultRuntime       aicommon.LegionResultRuntime
+	LegionResultRuntime        aicommon.LegionResultRuntime
 	ExecutionMode              string
 	AuthorizedTargetURL        string
 }
@@ -180,30 +188,60 @@ type closedAISessionRuntime struct {
 	resultSink      *aiSessionResultSinkProxy
 	applyHandle     bool
 	alreadyTerminal bool
+	acknowledge     bool
 }
 
 type aiSessionRuntimeManager struct {
-	mu       sync.Mutex
-	sessions map[string]*aiSessionRuntime
-	driver   aiSessionRuntimeDriver
+	mu                 sync.Mutex
+	sessions           map[string]*aiSessionRuntime
+	bindings           map[string]aiSessionBindReservation
+	terminalTombstones map[string]aiSessionTerminalTombstone
+	terminalOrder      []string
+	driver             aiSessionRuntimeDriver
 }
 
+type aiSessionBindReservation struct {
+	commandID string
+	epoch     uint64
+}
+
+type aiSessionTerminalTombstone struct {
+	commandID string
+	kind      string
+	epoch     uint64
+}
+
+const maxAISessionTerminalTombstones = 1024
+
 type aiSessionRuntime struct {
+	emissionWG             sync.WaitGroup
 	mu                     sync.Mutex
 	ref                    aiSessionCommandRef
+	bindCommandID          string
+	bindEpoch              uint64
+	bindIssuedAt           time.Time
+	bindIssuedAtValid      bool
+	retired                bool
 	projectID              string
 	title                  string
 	seq                    uint64
 	cancel                 context.CancelFunc
 	handle                 aiSessionRuntimeHandle
 	resultSink             *aiSessionResultSinkProxy
-	processedInputCommands map[string]struct{}
+	processedInputCommands map[string]processedAISessionInput
 	processedInputOrder    []string
 	inFlightInputCommands  map[string]struct{}
 	terminalCommandID      string
 	terminalKind           string
 	terminalReason         string
+	terminalPublishFailed  bool
 	executionMode          string
+}
+
+type processedAISessionInput struct {
+	seq         uint64
+	inputType   string
+	payloadJSON []byte
 }
 
 func newAISessionRuntimeManager(driver aiSessionRuntimeDriver) *aiSessionRuntimeManager {
@@ -211,10 +249,17 @@ func newAISessionRuntimeManager(driver aiSessionRuntimeDriver) *aiSessionRuntime
 		driver = noopAISessionRuntimeDriver{}
 	}
 	return &aiSessionRuntimeManager{
-		sessions: make(map[string]*aiSessionRuntime),
-		driver:   driver,
+		sessions:           make(map[string]*aiSessionRuntime),
+		bindings:           make(map[string]aiSessionBindReservation),
+		terminalTombstones: make(map[string]aiSessionTerminalTombstone),
+		driver:             driver,
 	}
 }
+
+var (
+	errAISessionBindFenced = errors.New("ai session bind was fenced")
+	errAISessionBindRetry  = errors.New("ai session bind must be retried")
+)
 
 func (m *aiSessionRuntimeManager) Bind(
 	parent context.Context,
@@ -223,21 +268,75 @@ func (m *aiSessionRuntimeManager) Bind(
 	options aiSessionRuntimeBindOptions,
 ) (aiSessionCommandRef, error) {
 	ref := aiSessionRefFromBindCommand(command)
+	bindIssuedAt, bindIssuedAtValid := aiSessionBindIssuedAt(command)
+	bindEpoch := command.GetBindEpoch()
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
+	var replaced *aiSessionRuntime
+	if pending, ok := m.bindings[ref.SessionID]; ok {
+		if bindEpoch == 0 || bindEpoch <= pending.epoch {
+			m.mu.Unlock()
+			return ref, fmt.Errorf(
+				"%w: bind %s cannot replace pending bind %s (epoch %d)",
+				errAISessionBindFenced,
+				ref.CommandID,
+				pending.commandID,
+				pending.epoch,
+			)
+		}
+	}
+	if tombstone, terminal := m.terminalTombstones[ref.SessionID]; terminal {
+		if tombstone.kind != "bind_failed" || bindEpoch == 0 || bindEpoch <= tombstone.epoch {
+			m.mu.Unlock()
+			return ref, fmt.Errorf("%w: session %s is already terminal", errAISessionBindFenced, ref.SessionID)
+		}
+	}
 	if existing, ok := m.sessions[ref.SessionID]; ok {
 		if existing.ref.OwnerUserID != ref.OwnerUserID {
+			m.mu.Unlock()
 			return ref, fmt.Errorf("ai session owner mismatch: %s", existing.ref.OwnerUserID)
 		}
-		existing.ref = ref
-		existing.projectID = strings.TrimSpace(command.GetProjectId())
-		existing.title = strings.TrimSpace(command.GetTitle())
-		existing.executionMode = strings.TrimSpace(command.GetResultContext().GetExecutionMode())
-		existing.resultSink.Set(options.ResultSink)
-		return ref, nil
+		existing.mu.Lock()
+		terminalCommandID := existing.terminalCommandID
+		terminalKind := existing.terminalKind
+		terminalPublishFailed := existing.terminalPublishFailed
+		existing.mu.Unlock()
+		if existing.bindCommandID == ref.CommandID {
+			if terminalCommandID != "" || terminalPublishFailed {
+				m.mu.Unlock()
+				return ref, fmt.Errorf(
+					"%w: original bind %s belongs to an unusable terminal runtime",
+					errAISessionBindRetry,
+					ref.CommandID,
+				)
+			}
+			existing.resultSink.Set(options.ResultSink)
+			m.mu.Unlock()
+			return ref, nil
+		}
+		if aiSessionBindIsFenced(existing, bindEpoch, bindIssuedAt, bindIssuedAtValid) {
+			m.mu.Unlock()
+			return ref, fmt.Errorf("%w: stale bind %s for session %s", errAISessionBindFenced, ref.CommandID, ref.SessionID)
+		}
+		if terminalCommandID != "" {
+			m.mu.Unlock()
+			if terminalKind == "auto" {
+				return ref, fmt.Errorf(
+					"%w: runtime is publishing terminal command %s",
+					errAISessionBindRetry,
+					terminalCommandID,
+				)
+			}
+			return ref, fmt.Errorf(
+				"%w: runtime is terminal after command %s",
+				errAISessionBindFenced,
+				terminalCommandID,
+			)
+		}
+		replaced = existing
 	}
+	m.bindings[ref.SessionID] = aiSessionBindReservation{commandID: ref.CommandID, epoch: bindEpoch}
+	m.mu.Unlock()
 
 	ctx, cancel := context.WithCancel(parent)
 	resultSink := newAISessionResultSinkProxy(options.ResultSink)
@@ -248,15 +347,21 @@ func (m *aiSessionRuntimeManager) Bind(
 	)
 	if err != nil {
 		cancel()
+		m.clearBindReservation(ref.SessionID, ref.CommandID)
 		return ref, err
 	}
 	runtime := &aiSessionRuntime{
 		ref:                    ref,
+		bindCommandID:          ref.CommandID,
+		bindEpoch:              bindEpoch,
+		bindIssuedAt:           bindIssuedAt,
+		bindIssuedAtValid:      bindIssuedAtValid,
+		retired:                true,
 		projectID:              strings.TrimSpace(command.GetProjectId()),
 		title:                  strings.TrimSpace(command.GetTitle()),
 		cancel:                 cancel,
 		resultSink:             resultSink,
-		processedInputCommands: make(map[string]struct{}),
+		processedInputCommands: make(map[string]processedAISessionInput),
 		inFlightInputCommands:  make(map[string]struct{}),
 		executionMode:          strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 	}
@@ -271,24 +376,139 @@ func (m *aiSessionRuntimeManager) Bind(
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
 		HTTPClient:                 options.HTTPClient,
-		LegionResultRuntime:       focusRuntime,
+		LegionResultRuntime:        focusRuntime,
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
 	}, &managedAISessionRuntimeEmitter{
-		ctx:       parent,
+		ctx:       ctx,
 		runtime:   runtime,
 		publisher: publisher,
 		manager:   m,
 	})
 	if err != nil {
 		cancel()
+		if handle != nil {
+			handle.Close("runtime bind failed")
+		}
+		m.clearBindReservation(ref.SessionID, ref.CommandID)
 		return ref, err
 	}
 	if handle != nil {
 		runtime.handle = handle
 	}
+	m.mu.Lock()
+	pending, reserved := m.bindings[ref.SessionID]
+	if !reserved || pending.commandID != ref.CommandID {
+		m.mu.Unlock()
+		cancel()
+		runtime.handle.Close("bind reservation superseded")
+		return ref, fmt.Errorf("%w: bind reservation changed for %s", errAISessionBindFenced, ref.SessionID)
+	}
+	current := m.sessions[ref.SessionID]
+	if current != replaced {
+		delete(m.bindings, ref.SessionID)
+		m.mu.Unlock()
+		cancel()
+		runtime.handle.Close("active runtime changed during bind")
+		return ref, fmt.Errorf("%w: active runtime changed for %s", errAISessionBindFenced, ref.SessionID)
+	}
+	if replaced != nil {
+		replaced.mu.Lock()
+		terminalCommandID := replaced.terminalCommandID
+		terminalKind := replaced.terminalKind
+		if terminalCommandID == "" {
+			runtime.seq = replaced.seq
+			runtime.processedInputCommands = cloneProcessedAISessionInputs(replaced.processedInputCommands)
+			runtime.processedInputOrder = append([]string(nil), replaced.processedInputOrder...)
+			runtime.inFlightInputCommands = cloneAISessionCommandSet(replaced.inFlightInputCommands)
+			replaced.retired = true
+			if replaced.cancel != nil {
+				replaced.cancel()
+			}
+		}
+		replaced.mu.Unlock()
+		if terminalCommandID != "" {
+			delete(m.bindings, ref.SessionID)
+			m.mu.Unlock()
+			cancel()
+			runtime.handle.Close("rebind rejected after terminal claim")
+			if terminalKind == "auto" {
+				return ref, fmt.Errorf(
+					"%w: runtime began publishing terminal command %s during bind",
+					errAISessionBindRetry,
+					terminalCommandID,
+				)
+			}
+			return ref, fmt.Errorf("%w: runtime is terminal after command %s", errAISessionBindFenced, terminalCommandID)
+		}
+	}
+	runtime.mu.Lock()
+	runtime.retired = false
+	runtime.mu.Unlock()
 	m.sessions[ref.SessionID] = runtime
+	m.deleteTerminalTombstoneLocked(ref.SessionID)
+	delete(m.bindings, ref.SessionID)
+	m.mu.Unlock()
+	if replaced != nil {
+		go func() {
+			if replaced.handle != nil {
+				replaced.handle.Close("runtime rebind")
+			}
+			replaced.emissionWG.Wait()
+		}()
+	}
 	return ref, nil
+}
+
+func cloneProcessedAISessionInputs(
+	input map[string]processedAISessionInput,
+) map[string]processedAISessionInput {
+	cloned := make(map[string]processedAISessionInput, len(input))
+	for commandID, processed := range input {
+		processed.payloadJSON = cloneBytes(processed.payloadJSON)
+		cloned[commandID] = processed
+	}
+	return cloned
+}
+
+func cloneAISessionCommandSet(input map[string]struct{}) map[string]struct{} {
+	cloned := make(map[string]struct{}, len(input))
+	for commandID := range input {
+		cloned[commandID] = struct{}{}
+	}
+	return cloned
+}
+
+func (m *aiSessionRuntimeManager) clearBindReservation(sessionID, commandID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if pending, ok := m.bindings[sessionID]; ok && pending.commandID == commandID {
+		delete(m.bindings, sessionID)
+	}
+}
+
+func aiSessionBindIsFenced(existing *aiSessionRuntime, epoch uint64, issuedAt time.Time, issuedAtValid bool) bool {
+	if existing == nil {
+		return false
+	}
+	if existing.bindEpoch > 0 || epoch > 0 {
+		return epoch == 0 || epoch <= existing.bindEpoch
+	}
+	if existing.bindIssuedAtValid {
+		return !issuedAtValid || !issuedAt.After(existing.bindIssuedAt)
+	}
+	return false
+}
+
+func aiSessionBindIssuedAt(command *aiv1.BindAISessionCommand) (time.Time, bool) {
+	if command == nil || command.GetMetadata() == nil || command.GetMetadata().GetIssuedAt() == nil {
+		return time.Time{}, false
+	}
+	issuedAt := command.GetMetadata().GetIssuedAt()
+	if err := issuedAt.CheckValid(); err != nil {
+		return time.Time{}, false
+	}
+	return issuedAt.AsTime(), true
 }
 
 func (m *aiSessionRuntimeManager) AcceptInput(
@@ -313,18 +533,41 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 	}
 
 	session.mu.Lock()
-	if _, ok := session.processedInputCommands[ref.CommandID]; ok {
+	if processed, ok := session.processedInputCommands[ref.CommandID]; ok {
 		ref.RunID = session.ref.RunID
+		ref.BindEpoch = session.ref.BindEpoch
 		session.mu.Unlock()
-		return acceptedAISessionInput{ref: ref, duplicate: true}, nil
+		return acceptedAISessionInput{
+			ref:         ref,
+			seq:         processed.seq,
+			inputType:   processed.inputType,
+			payloadJSON: cloneBytes(processed.payloadJSON),
+			duplicate:   true,
+		}, nil
 	}
 	if _, ok := session.inFlightInputCommands[ref.CommandID]; ok {
 		session.mu.Unlock()
 		return acceptedAISessionInput{ref: ref}, errAISessionInputInFlight
 	}
+	if session.terminalCommandID != "" || session.terminalPublishFailed {
+		terminalCommandID := session.terminalCommandID
+		session.mu.Unlock()
+		if terminalCommandID == "" {
+			return acceptedAISessionInput{ref: ref}, fmt.Errorf(
+				"ai session terminal publication failed; rebind is required: %s",
+				ref.SessionID,
+			)
+		}
+		return acceptedAISessionInput{ref: ref}, fmt.Errorf(
+			"ai session runtime is terminal after command %s: %s",
+			terminalCommandID,
+			ref.SessionID,
+		)
+	}
 	session.inFlightInputCommands[ref.CommandID] = struct{}{}
 	session.seq++
 	ref.RunID = session.ref.RunID
+	ref.BindEpoch = session.ref.BindEpoch
 	session.ref.CommandID = ref.CommandID
 	seq := session.seq
 	handle := session.handle
@@ -346,16 +589,16 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 	}, nil
 }
 
-func (m *aiSessionRuntimeManager) CompleteInput(sessionID, commandID string, succeeded bool) {
+func (m *aiSessionRuntimeManager) CompleteInput(accepted acceptedAISessionInput, succeeded bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	session, ok := m.sessions[strings.TrimSpace(sessionID)]
+	session, ok := m.sessions[strings.TrimSpace(accepted.ref.SessionID)]
 	if !ok {
 		return
 	}
 	session.mu.Lock()
 	defer session.mu.Unlock()
-	commandID = strings.TrimSpace(commandID)
+	commandID := strings.TrimSpace(accepted.ref.CommandID)
 	delete(session.inFlightInputCommands, commandID)
 	if !succeeded || commandID == "" {
 		return
@@ -363,7 +606,11 @@ func (m *aiSessionRuntimeManager) CompleteInput(sessionID, commandID string, suc
 	if _, exists := session.processedInputCommands[commandID]; exists {
 		return
 	}
-	session.processedInputCommands[commandID] = struct{}{}
+	session.processedInputCommands[commandID] = processedAISessionInput{
+		seq:         accepted.seq,
+		inputType:   accepted.inputType,
+		payloadJSON: cloneBytes(accepted.payloadJSON),
+	}
 	session.processedInputOrder = append(session.processedInputOrder, commandID)
 	const processedInputLimit = 1024
 	if len(session.processedInputOrder) > processedInputLimit {
@@ -394,8 +641,24 @@ func (m *aiSessionRuntimeManager) AcceptContextUpdate(
 	reason := strings.TrimSpace(command.GetReason())
 
 	session.mu.Lock()
+	if session.terminalCommandID != "" || session.terminalPublishFailed {
+		terminalCommandID := session.terminalCommandID
+		session.mu.Unlock()
+		if terminalCommandID == "" {
+			return acceptedAISessionContextUpdate{ref: ref}, fmt.Errorf(
+				"ai session terminal publication failed; rebind is required: %s",
+				ref.SessionID,
+			)
+		}
+		return acceptedAISessionContextUpdate{ref: ref}, fmt.Errorf(
+			"ai session runtime is terminal after command %s: %s",
+			terminalCommandID,
+			ref.SessionID,
+		)
+	}
 	session.seq++
 	ref.RunID = session.ref.RunID
+	ref.BindEpoch = session.ref.BindEpoch
 	session.ref.CommandID = ref.CommandID
 	seq := session.seq
 	handle := session.handle
@@ -446,6 +709,7 @@ func (m *aiSessionRuntimeManager) Cancel(
 	}
 	session.mu.Lock()
 	ref.RunID = session.ref.RunID
+	ref.BindEpoch = session.ref.BindEpoch
 	handle := session.handle
 	applyHandle := false
 	if session.terminalCommandID == "" {
@@ -491,13 +755,21 @@ func (m *aiSessionRuntimeManager) Close(
 
 	session, ok := m.sessions[ref.SessionID]
 	if !ok {
-		return closedAISessionRuntime{ref: ref, reason: reason, alreadyTerminal: true}, nil
+		tombstone, known := m.terminalTombstones[ref.SessionID]
+		acknowledge := !known || (tombstone.kind == "close" && tombstone.commandID == ref.CommandID)
+		return closedAISessionRuntime{
+			ref:             ref,
+			reason:          reason,
+			alreadyTerminal: true,
+			acknowledge:     acknowledge,
+		}, nil
 	}
 	if session.ref.OwnerUserID != ref.OwnerUserID {
 		return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
 	}
 	session.mu.Lock()
 	ref.RunID = session.ref.RunID
+	ref.BindEpoch = session.ref.BindEpoch
 	handle := session.handle
 	applyHandle := false
 	if session.terminalCommandID == "" {
@@ -549,6 +821,12 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 	switch {
 	case session.ref.OwnerUserID != ref.OwnerUserID:
 		return fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
+	case ref.BindEpoch > 0 && session.bindEpoch != ref.BindEpoch:
+		return fmt.Errorf(
+			"ai session bind epoch mismatch: got %d want %d",
+			ref.BindEpoch,
+			session.bindEpoch,
+		)
 	case session.terminalCommandID != ref.CommandID:
 		return fmt.Errorf(
 			"ai session terminal command mismatch: got %s want %s",
@@ -563,10 +841,95 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 		)
 	}
 	delete(m.sessions, ref.SessionID)
+	m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
+		commandID: ref.CommandID,
+		kind:      kind,
+		epoch:     session.bindEpoch,
+	})
 	if session.cancel != nil {
 		session.cancel()
 	}
 	return nil
+}
+
+func (m *aiSessionRuntimeManager) RetireAfterBindFailure(ref aiSessionCommandRef) {
+	m.mu.Lock()
+	if pending, ok := m.bindings[ref.SessionID]; ok && pending.epoch > ref.BindEpoch {
+		m.mu.Unlock()
+		return
+	}
+	session, ok := m.sessions[ref.SessionID]
+	if !ok {
+		if ref.BindEpoch > 0 {
+			if tombstone, exists := m.terminalTombstones[ref.SessionID]; !exists || (tombstone.kind == "bind_failed" && ref.BindEpoch > tombstone.epoch) {
+				m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
+					commandID: ref.CommandID,
+					kind:      "bind_failed",
+					epoch:     ref.BindEpoch,
+				})
+			}
+		}
+		m.mu.Unlock()
+		return
+	}
+	if session.ref.OwnerUserID != ref.OwnerUserID || ref.BindEpoch == 0 || ref.BindEpoch <= session.bindEpoch {
+		m.mu.Unlock()
+		return
+	}
+	session.mu.Lock()
+	session.retired = true
+	session.terminalCommandID = ref.CommandID
+	session.terminalKind = "bind_failed"
+	session.terminalReason = "replacement runtime bind failed"
+	if session.cancel != nil {
+		session.cancel()
+	}
+	session.mu.Unlock()
+	delete(m.sessions, ref.SessionID)
+	m.recordTerminalTombstoneLocked(ref.SessionID, aiSessionTerminalTombstone{
+		commandID: ref.CommandID,
+		kind:      "bind_failed",
+		epoch:     ref.BindEpoch,
+	})
+	m.mu.Unlock()
+	go func() {
+		if session.handle != nil {
+			session.handle.Close("replacement runtime bind failed")
+		}
+		session.emissionWG.Wait()
+	}()
+}
+
+func (m *aiSessionRuntimeManager) recordTerminalTombstoneLocked(
+	sessionID string,
+	tombstone aiSessionTerminalTombstone,
+) {
+	if sessionID == "" {
+		return
+	}
+	if _, exists := m.terminalTombstones[sessionID]; !exists {
+		m.terminalOrder = append(m.terminalOrder, sessionID)
+	}
+	m.terminalTombstones[sessionID] = tombstone
+	for len(m.terminalOrder) > maxAISessionTerminalTombstones {
+		oldest := m.terminalOrder[0]
+		m.terminalOrder = m.terminalOrder[1:]
+		delete(m.terminalTombstones, oldest)
+	}
+}
+
+func (m *aiSessionRuntimeManager) deleteTerminalTombstoneLocked(sessionID string) {
+	if _, exists := m.terminalTombstones[sessionID]; !exists {
+		return
+	}
+	delete(m.terminalTombstones, sessionID)
+	for index, candidate := range m.terminalOrder {
+		if candidate != sessionID {
+			continue
+		}
+		m.terminalOrder = append(m.terminalOrder[:index], m.terminalOrder[index+1:]...)
+		return
+	}
 }
 
 func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) error {
@@ -600,7 +963,23 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 		},
 	)
 	if err != nil {
-		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_bind_failed", err)
+		if errors.Is(err, errAISessionBindRetry) {
+			// A terminal publication is still settling, or the original bind
+			// belongs to a runtime whose terminal publication failed. Returning
+			// the error makes JetStream NAK the command so a recoverable bind is
+			// not silently consumed.
+			return err
+		}
+		if errors.Is(err, errAISessionBindFenced) {
+			// Delayed/duplicate generations are transport-successful no-ops. A
+			// terminal bind-failed event would incorrectly fail the newer runtime.
+			return nil
+		}
+		if publishErr := b.publishAISessionCommandFailure(ctx, ref, "ai_session_bind_failed", err); publishErr != nil {
+			return publishErr
+		}
+		b.ensureAIRuntime().RetireAfterBindFailure(ref)
+		return nil
 	}
 	return b.ensureAIPublisher().PublishReady(ctx, ref)
 }
@@ -636,39 +1015,38 @@ func (b *legionJobBridge) handleAISessionInput(ctx context.Context, raw []byte) 
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_input_failed", err)
 	}
 	if accepted.duplicate {
-		return nil
+		return b.ensureAIPublisher().PublishEvent(
+			ctx,
+			accepted.ref,
+			accepted.seq,
+			aiSessionRuntimeEventInput,
+			accepted.payloadJSON,
+		)
 	}
 	succeeded := false
 	defer func() {
-		runtime.CompleteInput(accepted.ref.SessionID, accepted.ref.CommandID, succeeded)
+		runtime.CompleteInput(accepted, succeeded)
 	}()
-	if err := b.ensureAIPublisher().PublishEvent(
+	if accepted.handle != nil {
+		if err := accepted.handle.SendInput(ctx, aiSessionInput{
+			Ref:            accepted.ref,
+			InputType:      accepted.inputType,
+			PayloadJSON:    accepted.payloadJSON,
+			ContextPackage: accepted.contextPackage,
+			ReviewID:       accepted.reviewID,
+			TurnID:         accepted.turnID,
+		}); err != nil {
+			return b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
+		}
+	}
+	succeeded = true
+	return b.ensureAIPublisher().PublishEvent(
 		ctx,
 		accepted.ref,
 		accepted.seq,
 		aiSessionRuntimeEventInput,
 		accepted.payloadJSON,
-	); err != nil {
-		return err
-	}
-	if accepted.handle == nil {
-		succeeded = true
-		return nil
-	}
-	if err := accepted.handle.SendInput(ctx, aiSessionInput{
-		Ref:            accepted.ref,
-		InputType:      accepted.inputType,
-		PayloadJSON:    accepted.payloadJSON,
-		ContextPackage: accepted.contextPackage,
-		ReviewID:       accepted.reviewID,
-		TurnID:         accepted.turnID,
-	}); err != nil {
-		failureErr := b.publishAISessionCommandFailure(ctx, accepted.ref, "ai_session_runtime_input_failed", err)
-		succeeded = failureErr == nil
-		return failureErr
-	}
-	succeeded = true
-	return nil
+	)
 }
 
 func (b *legionJobBridge) handleAISessionAppendContext(ctx context.Context, raw []byte) error {
@@ -746,8 +1124,20 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 	if err != nil {
 		return b.publishAISessionCommandFailure(ctx, ref, "ai_session_close_failed", err)
 	}
-	if closed.alreadyTerminal {
+	if closed.alreadyTerminal && !closed.acknowledge {
 		return nil
+	}
+	if closed.alreadyTerminal {
+		// Close is an idempotent command. The runtime can already be absent when
+		// Legion retries after losing the first acknowledgement (for example after
+		// a node restart). Re-publish the deterministic close event so the server
+		// can converge its closing state instead of timing out in close_failed.
+		resultJSON := mustJSON(map[string]string{
+			"reason":           closed.reason,
+			"closed_by":        "platform",
+			"already_terminal": "true",
+		})
+		return b.ensureAIPublisher().PublishClose(ctx, closed.ref, resultJSON)
 	}
 	if closed.applyHandle && closed.handle != nil {
 		closed.handle.Close(closed.reason)
@@ -759,7 +1149,7 @@ func (b *legionJobBridge) handleAISessionClose(ctx context.Context, raw []byte) 
 	if err := closed.resultSink.Succeed(ctx, resultJSON); err != nil {
 		return fmt.Errorf("publish focus result succeeded: %w", err)
 	}
-	if err := b.ensureAIPublisher().PublishDone(ctx, closed.ref, resultJSON); err != nil {
+	if err := b.ensureAIPublisher().PublishClose(ctx, closed.ref, resultJSON); err != nil {
 		return err
 	}
 	return b.ensureAIRuntime().CompleteTerminal(closed.ref, "close")
@@ -998,6 +1388,7 @@ func aiSessionRefFromBindCommand(command *aiv1.BindAISessionCommand) aiSessionCo
 		CommandID:   command.GetMetadata().GetCommandId(),
 		SessionID:   command.GetSession().GetSessionId(),
 		RunID:       command.GetSession().GetRunId(),
+		BindEpoch:   command.GetBindEpoch(),
 		OwnerUserID: strings.TrimSpace(command.GetOwnerUserId()),
 	}
 }
@@ -1070,19 +1461,79 @@ type managedAISessionRuntimeEmitter struct {
 }
 
 func (e *managedAISessionRuntimeEmitter) Emit(eventType string, payloadJSON []byte) {
+	e.emitForRef(nil, eventType, payloadJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) EmitForRef(
+	ref aiSessionCommandRef,
+	eventType string,
+	payloadJSON []byte,
+) bool {
+	return e.emitForRef(&ref, eventType, payloadJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) emitForRef(
+	frozenRef *aiSessionCommandRef,
+	eventType string,
+	payloadJSON []byte,
+) bool {
 	if e == nil || e.runtime == nil || e.publisher == nil {
-		return
+		return false
 	}
-	ref, seq := e.runtime.nextEventRefAndSeq()
-	if err := e.publisher.PublishEvent(e.ctx, ref, seq, eventType, payloadJSON); err != nil {
+	if !e.runtime.beginEmission() {
+		return false
+	}
+	var ref aiSessionCommandRef
+	var seq uint64
+	if frozenRef == nil {
+		ref, seq = e.runtime.nextEventRefAndSeq()
+	} else {
+		ref, seq = e.runtime.nextEventRefAndSeqFor(*frozenRef)
+	}
+	rootTerminal := isYakAIRootPlanExecutionCompleted(payloadJSON)
+	claimed := false
+	if rootTerminal {
+		ref, claimed = e.runtime.claimRootPlanTerminal(ref.CommandID)
+	}
+	publish := func(ctx context.Context) error {
+		if claimed {
+			if err := e.runtime.resultSink.Succeed(ctx, payloadJSON); err != nil {
+				return err
+			}
+		}
+		return e.publisher.PublishEvent(ctx, ref, seq, eventType, payloadJSON)
+	}
+	var err error
+	if claimed {
+		err = retryAISessionTerminalPublish(e.ctx, publish)
+	} else {
+		err = publish(e.ctx)
+	}
+	if err != nil {
 		logAISessionRuntimePublishError("event", ref.SessionID, err)
+		if claimed {
+			e.runtime.releaseFailedAutomaticTerminal(ref)
+		}
+		e.runtime.endEmission()
+		return false
 	}
+	e.runtime.endEmission()
+	if claimed && e.manager != nil {
+		if err := e.manager.CompleteTerminal(ref, "auto"); err != nil {
+			logAISessionRuntimePublishError("complete", ref.SessionID, err)
+		}
+	}
+	return true
 }
 
 func (e *managedAISessionRuntimeEmitter) Done(resultJSON []byte) {
 	if e == nil || e.runtime == nil || e.publisher == nil {
 		return
 	}
+	if !e.runtime.beginEmission() {
+		return
+	}
+	defer e.runtime.endEmission()
 	ref := e.runtime.currentRef()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Succeed(ctx, resultJSON); err != nil {
@@ -1098,8 +1549,12 @@ func (e *managedAISessionRuntimeEmitter) DoneTurn(turnID string, resultJSON []by
 	if e == nil || e.runtime == nil || e.publisher == nil || e.manager == nil {
 		return
 	}
+	if !e.runtime.beginEmission() {
+		return
+	}
 	ref, claimed := e.runtime.claimAutomaticTerminal(turnID)
 	if !claimed {
+		e.runtime.endEmission()
 		return
 	}
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
@@ -1109,8 +1564,11 @@ func (e *managedAISessionRuntimeEmitter) DoneTurn(turnID string, resultJSON []by
 		return e.publisher.PublishDone(ctx, ref, resultJSON)
 	}); err != nil {
 		logAISessionRuntimePublishError("done", ref.SessionID, err)
+		e.runtime.releaseFailedAutomaticTerminal(ref)
+		e.runtime.endEmission()
 		return
 	}
+	e.runtime.endEmission()
 	if err := e.manager.CompleteTerminal(ref, "auto"); err != nil {
 		logAISessionRuntimePublishError("complete", ref.SessionID, err)
 	}
@@ -1125,8 +1583,12 @@ func (e *managedAISessionRuntimeEmitter) FailTurn(
 	if e == nil || e.runtime == nil || e.publisher == nil || e.manager == nil {
 		return
 	}
-	ref, claimed := e.runtime.claimAutomaticTerminal(turnID)
+	if !e.runtime.beginEmission() {
+		return
+	}
+	ref, claimed := e.runtime.claimTerminalFailure(turnID)
 	if !claimed {
+		e.runtime.endEmission()
 		return
 	}
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
@@ -1136,8 +1598,11 @@ func (e *managedAISessionRuntimeEmitter) FailTurn(
 		return e.publisher.PublishFailed(ctx, ref, code, message, detailJSON)
 	}); err != nil {
 		logAISessionRuntimePublishError("failed", ref.SessionID, err)
+		e.runtime.releaseFailedAutomaticTerminal(ref)
+		e.runtime.endEmission()
 		return
 	}
+	e.runtime.endEmission()
 	if err := e.manager.CompleteTerminal(ref, "auto"); err != nil {
 		logAISessionRuntimePublishError("complete", ref.SessionID, err)
 	}
@@ -1147,6 +1612,10 @@ func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, det
 	if e == nil || e.runtime == nil || e.publisher == nil {
 		return
 	}
+	if !e.runtime.beginEmission() {
+		return
+	}
+	defer e.runtime.endEmission()
 	ref := e.runtime.currentRef()
 	if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
 		if err := e.runtime.resultSink.Fail(ctx, code, message, detailJSON); err != nil {
@@ -1158,6 +1627,30 @@ func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, det
 	}
 }
 
+func (r *aiSessionRuntime) beginEmission() bool {
+	if r == nil {
+		return false
+	}
+	r.mu.Lock()
+	retired := r.retired
+	if !retired {
+		r.emissionWG.Add(1)
+	}
+	r.mu.Unlock()
+	if retired {
+		return false
+	}
+	return true
+}
+
+func (r *aiSessionRuntime) endEmission() {
+	if r != nil {
+		r.emissionWG.Done()
+	}
+}
+
+var aiSessionTerminalPublishTimeout = 30 * time.Second
+
 func retryAISessionTerminalPublish(
 	ctx context.Context,
 	publish func(context.Context) error,
@@ -1167,6 +1660,11 @@ func retryAISessionTerminalPublish(
 
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if aiSessionTerminalPublishTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, aiSessionTerminalPublishTimeout)
+		defer cancel()
 	}
 	var err error
 	delay := initialDelay
@@ -1196,6 +1694,21 @@ func retryAISessionTerminalPublish(
 	}
 }
 
+func (r *aiSessionRuntime) releaseFailedAutomaticTerminal(ref aiSessionCommandRef) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.terminalKind != "auto" || r.terminalCommandID != ref.CommandID {
+		return
+	}
+	r.terminalCommandID = ""
+	r.terminalKind = ""
+	r.terminalReason = ""
+	r.terminalPublishFailed = true
+}
+
 func (r *aiSessionRuntime) nextEventRefAndSeq() (aiSessionCommandRef, uint64) {
 	r.mu.Lock()
 	r.seq++
@@ -1205,6 +1718,28 @@ func (r *aiSessionRuntime) nextEventRefAndSeq() (aiSessionCommandRef, uint64) {
 	r.mu.Unlock()
 
 	return stableAISessionRuntimeEventRef(ref, handle), seq
+}
+
+func (r *aiSessionRuntime) nextEventRefAndSeqFor(ref aiSessionCommandRef) (aiSessionCommandRef, uint64) {
+	r.mu.Lock()
+	r.seq++
+	current := r.ref
+	seq := r.seq
+	r.mu.Unlock()
+
+	if strings.TrimSpace(ref.SessionID) == "" {
+		ref.SessionID = current.SessionID
+	}
+	if strings.TrimSpace(ref.RunID) == "" {
+		ref.RunID = current.RunID
+	}
+	if ref.BindEpoch == 0 {
+		ref.BindEpoch = current.BindEpoch
+	}
+	if strings.TrimSpace(ref.OwnerUserID) == "" {
+		ref.OwnerUserID = current.OwnerUserID
+	}
+	return ref, seq
 }
 
 func stableAISessionRuntimeEventRef(
@@ -1247,4 +1782,64 @@ func (r *aiSessionRuntime) claimAutomaticTerminal(turnID string) (aiSessionComma
 	r.terminalKind = "auto"
 	r.terminalReason = "single run completed"
 	return ref, true
+}
+
+func (r *aiSessionRuntime) claimTerminalFailure(turnID string) (aiSessionCommandRef, bool) {
+	if r == nil {
+		return aiSessionCommandRef{}, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.terminalCommandID != "" {
+		return aiSessionCommandRef{}, false
+	}
+	ref := r.ref
+	if turnID = strings.TrimSpace(turnID); turnID != "" {
+		ref.CommandID = turnID
+	}
+	if strings.TrimSpace(ref.CommandID) == "" {
+		return aiSessionCommandRef{}, false
+	}
+	r.terminalCommandID = ref.CommandID
+	r.terminalKind = "auto"
+	r.terminalReason = "runtime failed"
+	return ref, true
+}
+
+func (r *aiSessionRuntime) claimRootPlanTerminal(turnID string) (aiSessionCommandRef, bool) {
+	if r == nil {
+		return aiSessionCommandRef{}, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.terminalCommandID != "" {
+		return r.ref, false
+	}
+	ref := r.ref
+	if turnID = strings.TrimSpace(turnID); turnID != "" {
+		ref.CommandID = turnID
+	}
+	if strings.TrimSpace(ref.CommandID) == "" {
+		return aiSessionCommandRef{}, false
+	}
+	r.terminalCommandID = ref.CommandID
+	r.terminalKind = "auto"
+	r.terminalReason = "root plan execution completed"
+	return ref, true
+}
+
+func isYakAIRootPlanExecutionCompleted(payload []byte) bool {
+	var envelope struct {
+		Type        string `json:"type"`
+		TaskIndex   string `json:"task_index"`
+		ContentJSON struct {
+			StartTaskIndex string `json:"start_task_index"`
+		} `json:"content_json"`
+	}
+	if json.Unmarshal(payload, &envelope) != nil {
+		return false
+	}
+	return envelope.Type == "end_plan_and_execution" &&
+		strings.TrimSpace(envelope.TaskIndex) == "" &&
+		strings.TrimSpace(envelope.ContentJSON.StartTaskIndex) == ""
 }

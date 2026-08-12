@@ -76,3 +76,19 @@ func TestStaticAnalyzeError_SyntaxFlowBlankRule(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Empty(t, resp.Result)
 }
+
+func TestStaticAnalyzeError_RawMessageCopyText(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	resp, err := client.StaticAnalyzeError(context.Background(), &ypb.StaticAnalyzeErrorRequest{
+		Code:       []byte("undefinedFunc()\n"),
+		PluginType: "yak",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.Result)
+	raw := string(resp.Result[0].RawMessage)
+	require.NotEmpty(t, raw)
+	require.Contains(t, raw, "修改建议:")
+	require.Contains(t, raw, "in [")
+}

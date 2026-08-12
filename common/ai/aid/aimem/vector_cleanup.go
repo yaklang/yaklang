@@ -122,10 +122,13 @@ func getOrCreateHNSWBackend(cache map[string]*AIMemoryHNSWBackend, db *gorm.DB, 
 	if backend := cache[sessionID]; backend != nil {
 		return backend, nil
 	}
+	// Midterm archive sessions use independent HNSW collection tables.
+	midtermMode := strings.HasPrefix(sessionID, MidtermSessionPrefix)
 	backend, err := NewAIMemoryHNSWBackend(
 		WithHNSWSessionID(sessionID),
 		WithHNSWDatabase(db),
 		WithHNSWAutoSave(false),
+		WithHNSWMidtermMode(midtermMode),
 	)
 	if err != nil {
 		return nil, err

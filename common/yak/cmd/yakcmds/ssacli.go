@@ -1419,18 +1419,12 @@ and exports structured report (sarif/irify).`,
 		}()
 		ctx := context.Background()
 
-		var pprofCleanup func()
 		if debugDir := c.String("debug"); debugDir != "" {
 			cleanup, err := setupDebugDir(c, debugDir)
 			if err != nil {
 				return utils.Errorf("setup debug dir failed: %v", err)
 			}
-			pprofCleanup = cleanup
-			defer func() {
-				if pprofCleanup != nil {
-					pprofCleanup()
-				}
-			}()
+			defer cleanup()
 		}
 
 		if logLevel := c.String("log-level"); logLevel != "" {

@@ -143,6 +143,8 @@ var ProjectTables = []interface{}{
 	&AiProcessAndAiEvent{},
 	&AIMemoryEntity{},
 	&AIMemoryCollection{},
+	&AIMidtermArchiveEntity{},
+	&AIMidtermArchiveCollection{},
 
 	// project level vector collection
 	&VectorStoreCollection{},

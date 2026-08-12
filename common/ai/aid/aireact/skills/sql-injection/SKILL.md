@@ -1,5 +1,7 @@
 ---
 name: sql-injection
+metadata:
+  display_name_zh-CN: SQL 注入测试
 description: >
   SQL 注入漏洞测试技能。覆盖联合注入、布尔盲注、时间盲注、报错注入、堆叠查询等攻击向量，
   提供 MySQL/PostgreSQL/MSSQL/Oracle/SQLite 多数据库的特征 Payload，
