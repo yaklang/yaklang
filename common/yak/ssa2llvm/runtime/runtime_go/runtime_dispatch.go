@@ -17,6 +17,7 @@ var runtimeDispatchTargets = map[abi.FuncID]any{
 	abi.IDPrintf:  runtimeBuiltinPrintf,
 	abi.IDPrintln: runtimeBuiltinPrintln,
 	abi.IDAppend:  runtimeSliceAppend,
+	abi.IDAssert:  runtimeBuiltinAssert,
 }
 
 func runtimeRegisterDispatchTarget(id abi.FuncID, target any) {
