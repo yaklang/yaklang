@@ -561,6 +561,15 @@ func MITM_SetHTTPResponseMirror(f func(bool, string, *http.Request, *http.Respon
 	})
 }
 
+// MITM_SetHTTPStreamRecorderFactory configures incremental persistence for
+// long-lived streaming responses before the ordinary response mirror runs.
+func MITM_SetHTTPStreamRecorderFactory(f minimartian.HTTPStreamRecorderFactory) MITMConfig {
+	return func(server *MITMServer) error {
+		server.streamRecorderFactory = f
+		return nil
+	}
+}
+
 func MITM_SetTransparentHijackMode(t bool) MITMConfig {
 	return func(server *MITMServer) error {
 		if server.transparentHijackMode == nil {

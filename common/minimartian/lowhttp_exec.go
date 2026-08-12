@@ -2,11 +2,13 @@ package minimartian
 
 import (
 	"context"
+	"errors"
 	"io"
 	"mime"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -17,7 +19,28 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-const sseStreamConfiguredContextKey = "minimartian-sse-stream-configured"
+const (
+	sseStreamConfiguredContextKey  = "minimartian-sse-stream-configured"
+	sseStreamBodyHandledContextKey = "minimartian-sse-stream-body-handled"
+)
+
+type bestEffortStreamRecorder struct {
+	writer io.Writer
+}
+
+func (w *bestEffortStreamRecorder) Write(p []byte) (int, error) {
+	if w == nil || w.writer == nil {
+		return len(p), nil
+	}
+	if n, err := w.writer.Write(p); err != nil || n != len(p) {
+		log.Warnf("mitm: persist streaming response chunk failed: wrote=%d expected=%d error=%v", n, len(p), err)
+	}
+	return len(p), nil
+}
+
+func isServerSentEventHeader(headerBytes []byte) bool {
+	return isServerSentEventContentType(lowhttp.GetHTTPPacketHeader(headerBytes, "Content-Type"))
+}
 
 func isServerSentEventContentType(value string) bool {
 	mediaType, _, err := mime.ParseMediaType(value)
@@ -140,6 +163,14 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		lowhttp.WithBorrowFixedResponsePacket(true),
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
+	if !isH2 {
+		opts = append(opts,
+			lowhttp.WithAutoDetectSSE(true),
+			lowhttp.WithBodyStreamReaderHandler(func(headerBytes []byte, bodyReader io.ReadCloser) {
+				p.handleLowHTTPBodyStream(isHttps, req, headerBytes, bodyReader, cancelUpstream)
+			}),
+		)
+	}
 
 	if p.sniResolver != nil && isHttps {
 		if sni := p.sniResolver(host); sni != nil {
@@ -233,24 +264,35 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		if key == "content-type" {
 			if isServerSentEventContentType(value) {
 				httpctx.SetContextValueInfoFromRequest(req, sseStreamConfiguredContextKey, true)
-				httpctx.SetResponseHeaderCallback(req, func(_ *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-					httpctx.SetMITMSkipFrontendFeedback(req, true)
-					if _, err := bwr.Write(headerBytes); err != nil {
-						cancelUpstream()
-						return nil, err
-					}
-					utils.FlushWriter(bwr)
-					httpctx.SetResponseFinishedCallback(req, func() {
+				if isH2 {
+					httpctx.SetResponseHeaderCallback(req, func(_ *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+						httpctx.SetMITMSkipFrontendFeedback(req, true)
+						if _, err := bwr.Write(headerBytes); err != nil {
+							cancelUpstream()
+							return nil, err
+						}
 						utils.FlushWriter(bwr)
+						httpctx.SetResponseFinishedCallback(req, func() {
+							utils.FlushWriter(bwr)
+						})
+						return io.TeeReader(bodyReader, utils.WriterAutoFlush(bwr)), nil
 					})
-					return io.TeeReader(bodyReader, utils.WriterAutoFlush(bwr)), nil
-				})
+					return
+				}
+				httpctx.SetNoBodyBuffer(req, true)
+				httpctx.SetResponseReadTooSlow(req, true)
+				// The lowhttp body-stream handler is the sole writer for SSE.
+				// A complete-body callback races with it and may send headers twice.
+				httpctx.SetContextValueInfoFromRequest(req, sseStreamBodyHandledContextKey, true)
 				return
 			}
 			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
 				if ret(value) {
 					// filtered by content-type
 					httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+						if httpctx.GetContextBoolInfoFromRequest(req, sseStreamBodyHandledContextKey) {
+							return bodyReader, nil
+						}
 						httpctx.SetMITMSkipFrontendFeedback(req, true)
 						bwr.Write(headerBytes)
 						utils.FlushWriter(bwr)
@@ -277,6 +319,9 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 		// set if chunked or content-length is too large
 		httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+			if httpctx.GetContextBoolInfoFromRequest(req, sseStreamBodyHandledContextKey) {
+				return bodyReader, nil
+			}
 			writerCloser := utils.NewTriggerWriterEx(uint64(MaxContentLength), p.maxReadWaitTime, func(buffer io.ReadCloser, triggerEvent string) {
 				httpctx.SetContextValueInfoFromRequest(req, triggerEvent, true)
 				httpctx.SetMITMSkipFrontendFeedback(req, true)
@@ -333,4 +378,95 @@ func transferFixedResponsePacket(req *http.Request, response *lowhttp.LowhttpRes
 	response.RawPacket = nil
 	response.ResponsePacketFixed = false
 	httpctx.SetFixedResponseBytesOwned(req, packet)
+}
+
+// handleLowHTTPBodyStream is invoked by lowhttp as soon as a response header
+// is parsed. The regular response builder waits for a complete body, which is
+// not compatible with a long-lived H1 chunked SSE response. This handler is
+// therefore the only path that relays SSE bytes while the upstream is open.
+func (p *Proxy) handleLowHTTPBodyStream(
+	isHTTPS bool,
+	req *http.Request,
+	headerBytes []byte,
+	bodyReader io.ReadCloser,
+	cancelUpstream context.CancelFunc,
+) {
+	if bodyReader == nil {
+		return
+	}
+	if !isServerSentEventHeader(headerBytes) {
+		_, _ = io.Copy(io.Discard, bodyReader)
+		return
+	}
+
+	bwr := httpctx.GetMITMFrontendReadWriter(req)
+	if bwr == nil {
+		_, _ = io.Copy(io.Discard, bodyReader)
+		return
+	}
+
+	response, err := utils.ReadHTTPResponseFromBytes(headerBytes, nil)
+	if err != nil {
+		log.Warnf("mitm: parse streaming response header failed: %v", err)
+		_, _ = io.Copy(io.Discard, bodyReader)
+		return
+	}
+	response.Request = req
+	httpctx.SetContextValueInfoFromRequest(req, sseStreamBodyHandledContextKey, true)
+	httpctx.SetMITMSkipFrontendFeedback(req, true)
+	httpctx.SetNoBodyBuffer(req, true)
+	httpctx.SetResponseReadTooSlow(req, true)
+
+	if _, err := bwr.Write(headerBytes); err != nil {
+		if cancelUpstream != nil {
+			cancelUpstream()
+		}
+		_ = bodyReader.Close()
+		return
+	}
+	utils.FlushWriter(bwr)
+
+	var recorder io.WriteCloser
+	var closeRecorderOnce sync.Once
+	closeRecorder := func() {
+		closeRecorderOnce.Do(func() {
+			if recorder != nil {
+				if err := recorder.Close(); err != nil {
+					log.Warnf("mitm: finalize streaming response recorder failed: %v", err)
+				}
+			}
+		})
+	}
+	if p.streamRecorder != nil {
+		recorder, err = p.streamRecorder(isHTTPS, req, response, headerBytes)
+		if err != nil {
+			log.Warnf("mitm: create streaming response recorder failed: %v", err)
+			recorder = nil
+		} else if recorder != nil {
+			httpctx.SetResponseStreamRecorder(req, recorder)
+		}
+	}
+	defer closeRecorder()
+
+	previousFinished := httpctx.GetResponseFinishedCallback(req)
+	httpctx.SetResponseFinishedCallback(req, func() {
+		if previousFinished != nil {
+			previousFinished()
+		}
+		utils.FlushWriter(bwr)
+		closeRecorder()
+	})
+
+	writers := []io.Writer{utils.WriterAutoFlush(bwr)}
+	if recorder != nil {
+		writers = append(writers, &bestEffortStreamRecorder{writer: recorder})
+	}
+	_, err = io.Copy(io.MultiWriter(writers...), bodyReader)
+	if err != nil && !errors.Is(err, io.EOF) {
+		if cancelUpstream != nil {
+			cancelUpstream()
+		}
+		_ = bodyReader.Close()
+		log.Warnf("mitm: relay streaming response body failed: %v", err)
+	}
 }

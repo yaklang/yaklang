@@ -74,6 +74,7 @@ type Proxy struct {
 	findProcessName bool
 	reqmod          RequestModifier
 	resmod          ResponseModifier
+	streamRecorder  HTTPStreamRecorderFactory
 
 	// context cache
 	ctxCacheLock     *sync.Mutex
@@ -561,4 +562,10 @@ func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
 	}
 
 	p.resmod = resmod
+}
+
+// SetHTTPStreamRecorderFactory configures incremental persistence for streaming
+// responses such as SSE. A nil factory disables stream recording.
+func (p *Proxy) SetHTTPStreamRecorderFactory(factory HTTPStreamRecorderFactory) {
+	p.streamRecorder = factory
 }
