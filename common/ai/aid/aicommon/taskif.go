@@ -58,6 +58,23 @@ const (
 	AITaskState_Skipped    AITaskState = "skipped" // 用户主动跳过
 )
 
+// AITaskKind distinguishes normal free-input tasks from special task types
+// (e.g. plan recovery) that are enqueued but require a different execution path.
+type AITaskKind string
+
+const (
+	AITaskKind_Normal   AITaskKind = ""         // 普通 free input 任务 (默认)
+	AITaskKind_Recovery AITaskKind = "recovery" // plan 恢复任务
+)
+
+// RecoveryTaskData carries the parameters needed to execute a plan recovery
+// when the task is dequeued by the QueueProcessor.
+type RecoveryTaskData struct {
+	CoordinatorID    string
+	StartTaskID      string
+	ExecutePlanInput *ExecutePlanInput
+}
+
 type AIStatefulTask interface {
 	AITask
 
@@ -104,6 +121,11 @@ type AIStatefulTask interface {
 
 	IsUserCancelled() bool
 	SetUserCancelled()
+
+	GetTaskKind() AITaskKind
+	SetTaskKind(AITaskKind)
+	GetRecoveryData() *RecoveryTaskData
+	SetRecoveryData(*RecoveryTaskData)
 }
 
 type AIStatefulTaskBase struct {
@@ -148,6 +170,11 @@ type AIStatefulTaskBase struct {
 	// parentTask records the task that created this one via NewSubTaskBase*.
 	// It is used to emit explicit parent links in the react_task_created event.
 	parentTask AIStatefulTask
+
+	// taskKind distinguishes normal tasks from recovery tasks.
+	taskKind AITaskKind
+	// recoveryData carries recovery-specific parameters when taskKind == AITaskKind_Recovery.
+	recoveryData *RecoveryTaskData
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
@@ -492,6 +519,34 @@ func (s *AIStatefulTaskBase) IsUserCancelled() bool {
 		defer s.taskMutex.Unlock()
 	}
 	return s.userCancelled
+}
+
+func (s *AIStatefulTaskBase) GetTaskKind() AITaskKind {
+	if s == nil {
+		return AITaskKind_Normal
+	}
+	return s.taskKind
+}
+
+func (s *AIStatefulTaskBase) SetTaskKind(kind AITaskKind) {
+	if s == nil {
+		return
+	}
+	s.taskKind = kind
+}
+
+func (s *AIStatefulTaskBase) GetRecoveryData() *RecoveryTaskData {
+	if s == nil {
+		return nil
+	}
+	return s.recoveryData
+}
+
+func (s *AIStatefulTaskBase) SetRecoveryData(data *RecoveryTaskData) {
+	if s == nil {
+		return
+	}
+	s.recoveryData = data
 }
 
 func (s *AIStatefulTaskBase) IsFinished() bool {
