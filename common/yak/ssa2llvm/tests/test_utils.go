@@ -255,6 +255,9 @@ func compileBinary(t *testing.T, code string, entry string, cfg *runBinaryConfig
 		_ = os.Remove(tmpFile.Name())
 		_ = os.Remove(tmpBin)
 	})
+	// Ensure temp artifacts (e.g. /tmp/test_run_*.yak.bin) are removed even when
+	// the caller forgets its own cleanup() defer or the test fails mid-way.
+	t.Cleanup(cleanup)
 
 	options := make([]compiler.CompileOption, 0, 10+len(cfg.compileOpts))
 	options = append(options,
