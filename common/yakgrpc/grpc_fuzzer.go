@@ -1203,7 +1203,27 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_WithSimple(true)))
 		}
 		if req.GetFuzzTagSyncIndex() {
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_SyncTag(true)))
+			syncOpts := []mutate.FuzzConfigOpt{mutate.Fuzz_SyncTag(true)}
+			if len(mergedParams) > 0 {
+				// Request variables are already expanded by PreRenderVariables. Treat the
+				// selected scalar as dynamic here so a single-valued {{p(...)}} remains
+				// available for every row of a longer pitchfork payload group. Keep list
+				// values non-dynamic so their indexed pitchfork behavior is unchanged.
+				paramValues := func(name string) []string {
+					if value, ok := mergedParams[name]; ok {
+						return utils.InterfaceToStringSlice(value)
+					}
+					return []string{""}
+				}
+				syncOpts = append(syncOpts, mutate.Fuzz_WithExtraFuzzTag("params", &mutate.FuzzTagDescription{
+					TagName: "params",
+					Handler: paramValues,
+					IsDynFun: func(_, name string) bool {
+						return len(paramValues(name)) <= 1
+					},
+				}))
+			}
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(syncOpts...))
 		}
 		if !isPause {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExternSwitch(sw))
