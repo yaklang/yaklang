@@ -41,7 +41,7 @@ func buildSSA2LLVMCLI(t *testing.T) string {
 		}
 		ssa2llvmCLIPath = filepath.Join(buildDir, name)
 
-		cmd := exec.Command("go", "build", "-o", ssa2llvmCLIPath, "./common/yak/ssa2llvm/cmd")
+		cmd := exec.Command("go", "build", "-o", ssa2llvmCLIPath, "./common/yak/ssa2llvm/cmd/ssa2llvm")
 		cmd.Dir = repoRoot
 		cmd.Env = append([]string{}, os.Environ()...)
 		cmd.Env = append(cmd.Env, "CGO_ENABLED=1")

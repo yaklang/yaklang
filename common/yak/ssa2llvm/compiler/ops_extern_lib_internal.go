@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
@@ -70,15 +71,19 @@ func (c *Compiler) compileExternLibMember(
 		return nil
 	}
 
+	// Pair-first SSA: extern members are stored as member pairs on the value.
+	// Resolve by exact key string (e.g. "PoCExports") or by key Value.
 	var memberValID int64
 	if keyStr != "" {
-		if id, ok := extern.MemberMap[keyStr]; ok {
-			memberValID = id
+		members := extern.GetMembersByKeyString(keyStr)
+		if len(members) > 0 && !utils.IsNil(members[0]) {
+			memberValID = members[0].GetId()
 		}
 	}
 	if memberValID == 0 && key != nil {
-		if member, ok := extern.GetMember(key); ok && member != nil {
-			memberValID = member.GetId()
+		members := extern.GetMembersByExactKey(key)
+		if len(members) > 0 && !utils.IsNil(members[0]) {
+			memberValID = members[0].GetId()
 		}
 	}
 
