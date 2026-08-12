@@ -1,8 +1,11 @@
 package tests
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,16 +97,23 @@ func runSSA2LLVMCLIInDir(t *testing.T, dir string, args ...string) processResult
 	if len(args) == 0 {
 		t.Fatal("runSSA2LLVMCLI requires args")
 	}
-	// Real CLI compile/run tests should match ordinary user flows, which expect a usable runtime archive.
-	// Force rebuild so acceptance tests never pick up stale cached artifacts after
-	// compiler/runtime refactors.
+	// Real CLI compile/run tests should match ordinary user flows, which expect
+	// a usable runtime archive. Force a rebuild only when the compiler package
+	// or the runtime tree changed since the last CLI invocation in this process;
+	// during a stable run the cached work dir (yakssa-compile-*) is reused,
+	// avoiding the ~10x cost of -a on every compile while still busting stale
+	// caches after source changes. Callers that explicitly pass -a keep their
+	// force semantics.
 	switch args[0] {
 	case "compile", "run":
 		ensureRuntimeArchiveOnce(t)
 		if dir != "" {
 			prepareRuntimeArchiveForDir(t, dir)
 		}
-		args = insertBeforeArgSeparator(args, "-a")
+		if !containsArg(args, "-a") && cliForceRebuild.needsForce(RepoRoot(t), ssa2llvmSourceFingerprint(t)) {
+			t.Logf("ssa2llvm: force rebuild (-a) enabled, compiler/runtime fingerprint changed")
+			args = insertBeforeArgSeparator(args, "-a")
+		}
 	}
 
 	cliPath := buildSSA2LLVMCLI(t)
@@ -125,6 +135,94 @@ func insertBeforeArgSeparator(args []string, item string) []string {
 		return out
 	}
 	return append(args, item)
+}
+
+// forceRebuildTracker persists the last source fingerprint under /tmp so the
+// decision survives across test processes. The first invocation (no recorded
+// fingerprint) always forces a rebuild, then a rebuild is forced again only
+// when the compiler/runtime fingerprint changes. This keeps the anti-stale
+// semantics while letting stable runs reuse the cached work dir.
+type forceRebuildTracker struct {
+	mu              sync.Mutex
+	fingerprintPath string
+}
+
+func (tr *forceRebuildTracker) needsForce(repoRoot, fingerprint string) bool {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	if tr.fingerprintPath == "" {
+		// Keep one fingerprint per worktree so concurrent checkouts never
+		// invalidate each other's cached work dirs.
+		rootHash := sha256.Sum256([]byte(repoRoot))
+		tr.fingerprintPath = filepath.Join(
+			os.TempDir(),
+			fmt.Sprintf("yakssa-compile-fingerprint-%s", hex.EncodeToString(rootHash[:8])),
+		)
+	}
+	last, err := os.ReadFile(tr.fingerprintPath)
+	if err == nil && string(last) == fingerprint {
+		return false
+	}
+	// Atomic write: temp file + rename, so concurrent processes never observe
+	// a partially written fingerprint.
+	tmp := tr.fingerprintPath + ".tmp"
+	if writeErr := os.WriteFile(tmp, []byte(fingerprint), 0o644); writeErr != nil {
+		return true
+	}
+	if renameErr := os.Rename(tmp, tr.fingerprintPath); renameErr != nil {
+		_ = os.Remove(tmp)
+		return true
+	}
+	return true
+}
+
+var cliForceRebuild forceRebuildTracker
+
+// ssa2llvmSourceFingerprint hashes the size and mtime of every source file in
+// the compiler package and every file under the ssa2llvm runtime tree (source
+// files plus generated artifacts such as libyak.a and libyak.linkflags).
+// Content is intentionally not read: mtime+size is the requested cheap signal
+// and these trees only change when the toolchain itself is rebuilt.
+func ssa2llvmSourceFingerprint(t *testing.T) string {
+	t.Helper()
+	repoRoot := RepoRoot(t)
+	h := sha256.New()
+	compilerDir := filepath.Join(repoRoot, "common", "yak", "ssa2llvm", "compiler")
+	runtimeDir := filepath.Join(repoRoot, "common", "yak", "ssa2llvm", "runtime")
+	for _, dir := range []string{compilerDir, runtimeDir} {
+		_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if dir == compilerDir && filepath.Ext(path) != ".go" {
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(repoRoot, path)
+			if err != nil {
+				return err
+			}
+			_, _ = io.WriteString(h, rel)
+			_, _ = fmt.Fprintf(h, "\x00%d\x00%d\n", info.Size(), info.ModTime().UnixNano())
+			return nil
+		})
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func containsArg(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
 }
 
 func writeYakSourceFile(t *testing.T, code string) string {

@@ -35,6 +35,10 @@ jobs:
     - name: Test
       # -x is intentionally NOT passed: it prints every external command and is
       # only useful for manual debugging. Keep CI output lean and deterministic.
+      # -a is also not forced here: the test helper only appends -a when the
+      # compiler/runtime fingerprint changes (first run, or after source
+      # edits), so stable CI runs reuse the cached work dir. Callers that
+      # explicitly pass -a keep their force semantics.
       # Known pre-existing failures/hangs at HEAD (see
       # build/ssa2llvm-test-perf.md for per-test evidence; each was reproduced
       # standalone on 2026-08-12). They are excluded here so the rest of the
