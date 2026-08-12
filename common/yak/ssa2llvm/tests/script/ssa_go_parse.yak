@@ -1,0 +1,24 @@
+// Compile a small Go snippet via ssa.Parse, run SyntaxFlow to find the argument
+// of println, and print the matched value. Validates the ssa frontend + AOT
+// runtime for a script that actually uses the ssa module.
+check = () => {
+    code = `package main
+
+func main() {
+    println("hello-from-go")
+}`
+
+    prog, err = ssa.Parse(code, ssa.withLanguage("golang"))
+    if err != nil {
+        println("parse error:", err)
+        return 1
+    }
+
+    rsp = prog.SyntaxFlow(`println(* as $arg)`)
+    vals = rsp.GetValues("arg")
+    println("matched-println-arg-count:", vals.Len())
+    if vals.Len() > 0 {
+        println("matched-value:", vals.String())
+    }
+    return 0
+}
