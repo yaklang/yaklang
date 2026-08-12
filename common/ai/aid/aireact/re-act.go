@@ -596,12 +596,13 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 
 	for _, task := range queueingTasks {
 		taskInfo := map[string]interface{}{
-			"id":              task.GetId(),
-			"user_input":      task.GetUserInput(),
+			"id":         task.GetId(),
+			"user_input": task.GetUserInput(),
 			"user_input_uuid": task.GetUserInputUUID(),
-			"status":          task.GetStatus(),
-			"created_at":      task.GetCreatedAt(),
-			"focus_mode":      task.GetFocusMode(),
+			"status":     task.GetStatus(),
+			"created_at": task.GetCreatedAt(),
+			"focus_mode": task.GetFocusMode(),
+			"is_recovery": task.GetTaskKind() == aicommon.AITaskKind_Recovery,
 		}
 
 		taskInfos = append(taskInfos, taskInfo)
