@@ -16,12 +16,25 @@ import (
 // non-zero exit or a runtime panic under ssa2llvm means the AOT path diverges
 // from the interpreter.
 //
-// Only scripts whose modules are AOT-safe are listed. Scripts that pull in the
-// monolithic yaklib (e.g. re2, str) are excluded for now because those modules
-// do not yet have lightweight AOT shims and would drag the full yaklang init
-// into every AOT binary.
+// Only scripts with actual AOT verification evidence are listed:
+//   - lowhttp_isresponse.yak: uses the poc module, which has a lightweight AOT
+//     shim (PrunedShim) so the monolithic yaklib stays out of the AOT binary.
+//     Verified: default AOT CLI compile + env -i run, exit 0, no panic.
+//   - defer-recover.yak: pure language defer/recover (no yaklib module
+//     dependency); both are AOT-supported runtime features. Verified: default
+//     AOT CLI compile + env -i run, exit 0, no panic.
+//
+// Scripts that were NOT added (no passing AOT evidence):
+//   - re2.yak / poc_replace_path_func.yak: depend on re2/str modules that do
+//     not yet have lightweight AOT shims; they drag the monolithic yaklib into
+//     the AOT binary and fail to link with the default module set.
+//   - buildin_len.yak: string slicing is not yet implemented by the AOT
+//     backend, so the script fails at runtime.
+//   - ssa.yak: ssa.YaklangScriptChecking result length assertion fails under
+//     AOT (exit 255).
 var mustpassSSA2LLVMScripts = []string{
 	"lowhttp_isresponse.yak",
+	"defer-recover.yak",
 }
 
 // TestMustPass_SSA2LLVM_DualRun compiles each supported mustpass script through
