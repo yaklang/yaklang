@@ -50,6 +50,7 @@ runtime_binary="${RUNTIME_BINARY:-}"
 runtime_ldd_file="${RUNTIME_LDD_FILE:-}"
 runtime_image_ref="${RUNTIME_IMAGE_REF:-}"
 runtime_image_tag="${RUNTIME_IMAGE_TAG:-}"
+runtime_image_archive="${RUNTIME_IMAGE_ARCHIVE:-}"
 runtime_base_image="${RUNTIME_BASE_IMAGE:-}"
 runtime_builder_image="${RUNTIME_BUILDER_IMAGE:-}"
 runtime_go_version="${RUNTIME_GO_VERSION:-}"
@@ -62,6 +63,8 @@ runtime_go_version="${RUNTIME_GO_VERSION:-}"
   die "RUNTIME_IMAGE_REF must be an immutable image@sha256 digest"
 [[ "$runtime_image_tag" =~ ^[^[:space:]@]+:[^[:space:]@]+$ ]] || \
   die "RUNTIME_IMAGE_TAG must be the human-readable build tag"
+[[ -f "$runtime_image_archive" ]] || die "RUNTIME_IMAGE_ARCHIVE must reference the gzip-compressed Docker image archive"
+gzip -t "$runtime_image_archive" || die "RUNTIME_IMAGE_ARCHIVE is not valid gzip data"
 [[ "$runtime_base_image" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || \
   die "RUNTIME_BASE_IMAGE must be pinned by sha256 digest"
 [[ "$runtime_builder_image" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || \
@@ -92,6 +95,8 @@ binary_sha="$(sha256sum "$runtime_binary" | awk '{print $1}')"
 binary_size="$(stat -c %s "$runtime_binary")"
 dockerfile_sha="$(sha256sum "$dockerfile" | awk '{print $1}')"
 dockerignore_sha="$(sha256sum "$dockerignore" | awk '{print $1}')"
+runtime_archive_sha="$(sha256sum "$runtime_image_archive" | awk '{print $1}')"
+runtime_archive_size="$(stat -c %s "$runtime_image_archive")"
 built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 jq -n \
@@ -117,6 +122,8 @@ jq -n \
   --rawfile binary_ldd "$runtime_ldd_file" \
   --arg runtime_image_ref "$runtime_image_ref" \
   --arg runtime_image_tag "$runtime_image_tag" \
+  --arg runtime_archive_sha "$runtime_archive_sha" \
+  --argjson runtime_archive_size "$runtime_archive_size" \
   --arg built_at "$built_at" \
   '{
     schema_version: "1",
@@ -161,7 +168,9 @@ jq -n \
     image: {
       ref: $runtime_image_ref,
       tag: $runtime_image_tag,
-      revision_label: $source_sha
+      revision_label: $source_sha,
+      archive_sha256: $runtime_archive_sha,
+      archive_size: $runtime_archive_size
     },
     built_at: $built_at
   }' >"$package_dir/SESSION_RUNTIME_MANIFEST.json"

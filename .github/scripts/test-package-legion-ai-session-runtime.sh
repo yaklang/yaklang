@@ -17,8 +17,11 @@ base_digest="$(printf 'b%.0s' {1..64})"
 builder_digest="$(printf 'c%.0s' {1..64})"
 runtime_binary="$test_root/legion-session-runtime"
 runtime_ldd="$test_root/runtime.ldd"
+runtime_archive="$test_root/runtime.docker.tar.gz"
 cp /bin/true "$runtime_binary"
 ldd "$runtime_binary" >"$runtime_ldd"
+printf 'runtime-image\n' | gzip -n >"$runtime_archive"
+runtime_archive_sha="$(sha256sum "$runtime_archive" | awk '{print $1}')"
 
 SOURCE_SHA="$source_sha" \
 RUNTIME_PACKAGE_VERSION="fixture-${source_sha:0:12}" \
@@ -27,6 +30,7 @@ RUNTIME_BINARY="$runtime_binary" \
 RUNTIME_LDD_FILE="$runtime_ldd" \
 RUNTIME_IMAGE_REF="registry.example/legion-ai-session-runtime@sha256:$fake_digest" \
 RUNTIME_IMAGE_TAG="registry.example/legion-ai-session-runtime:fixture" \
+RUNTIME_IMAGE_ARCHIVE="$runtime_archive" \
 RUNTIME_BASE_IMAGE="debian:bookworm-slim@sha256:$base_digest" \
 RUNTIME_BUILDER_IMAGE="golang:1.22.12-bookworm@sha256:$builder_digest" \
 RUNTIME_GOARCH="$target_arch" \
@@ -51,6 +55,7 @@ manifest="$package_dir/SESSION_RUNTIME_MANIFEST.json"
 jq -e \
   --arg source_sha "$source_sha" \
   --arg image_ref "registry.example/legion-ai-session-runtime@sha256:$fake_digest" \
+  --arg archive_sha "$runtime_archive_sha" \
   --arg target_arch "$target_arch" '
     .schema_version == "1" and
     .artifact_type == "legion-ai-session-runtime" and
@@ -67,6 +72,8 @@ jq -e \
     (.capabilities | index("yak.execute")) != null and
     .image.ref == $image_ref and
     .image.revision_label == $source_sha and
+    .image.archive_sha256 == $archive_sha and
+    .image.archive_size > 0 and
     (.binary.sha256 | test("^[0-9a-f]{64}$")) and
     (.recipe.dockerfile_sha256 | test("^[0-9a-f]{64}$")) and
     (.recipe.dockerignore_sha256 | test("^[0-9a-f]{64}$"))
