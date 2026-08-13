@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -85,6 +86,12 @@ func GetRedirectFromHTTPResponse(rawResponse []byte, jsRedirect bool) (result st
 
 	firstLine := lines[0]
 	if redirectStatusCode.MatchString(firstLine) {
+		// 304 is a cache-validation response: the client should reuse its
+		// stored representation instead of issuing a request to another URL.
+		// Keep the existing broad 3xx policy for every other status code.
+		if GetStatusCodeFromResponse(rawResponse) == http.StatusNotModified {
+			return ""
+		}
 		result := httpRedirect.FindSubmatch(rawResponse)
 		if result != nil && len(result) > 1 {
 			path := result[1]

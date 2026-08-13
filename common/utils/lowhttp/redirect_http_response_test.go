@@ -649,6 +649,44 @@ func TestGetRedirectFromHTTPResponse_MultiSlashLocation(t *testing.T) {
 	}
 }
 
+func TestGetRedirectFromHTTPResponseOnly304IsExcluded(t *testing.T) {
+	tests := []struct {
+		name     string
+		response string
+		want     string
+	}{
+		{
+			name:     "300 with location remains followable",
+			response: "HTTP/1.1 300 Multiple Choices\r\nLocation: /preferred\r\n\r\n",
+			want:     "/preferred",
+		},
+		{
+			name:     "304 ignores location",
+			response: "HTTP/1.1 304 Not Modified\r\nLocation: /must-not-follow\r\n\r\n",
+		},
+		{
+			name:     "304 does not mistake content-location for redirect",
+			response: "HTTP/1.1 304 Not Modified\r\nETag: \"abc\"\r\nContent-Location: /cached/resource\r\n\r\n",
+		},
+		{
+			name:     "305 remains followable under broad 3xx policy",
+			response: "HTTP/1.1 305 Use Proxy\r\nLocation: http://proxy.example:8080\r\n\r\n",
+			want:     "http://proxy.example:8080",
+		},
+		{
+			name:     "unknown 399 remains followable under broad 3xx policy",
+			response: "HTTP/1.1 399 Custom Redirect\r\nLocation: /custom\r\n\r\n",
+			want:     "/custom",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, GetRedirectFromHTTPResponse([]byte(tt.response), false))
+		})
+	}
+}
+
 func TestExtractCookieJarFromHTTPResponse(t *testing.T) {
 	cookies := ExtractCookieJarFromHTTPResponse([]byte(`HTTP/1.1 200 Ok
 Set-Cookie: asdfasdfasdf=1; 

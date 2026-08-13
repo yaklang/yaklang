@@ -71,13 +71,6 @@ func UrlToRequestPacket(method string, u string, originRequest []byte, originReq
 
 func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte, https bool, statusCode int, cookies ...*http.Cookie) ([]byte, error) {
 	var raw []byte
-
-	// 303/302
-	// 302在规范下也应该保留请求体和请求方法，但是实际上大部分浏览器都会改为GET请求，所以我们就不保留
-	is302Or303 := statusCode == http.StatusSeeOther || statusCode == http.StatusFound
-	if is302Or303 {
-		method = http.MethodGet
-	}
 	var (
 		originReqIns *http.Request
 		err          error
@@ -102,13 +95,20 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 			method = originReqIns.Method
 		}
 	}
+	rewriteToGet := shouldRewriteRedirectToGet(statusCode, method)
+	if rewriteToGet {
+		method = http.MethodGet
+	}
 
 	raw = NewRequestPacketFromMethod(method, targetURL, originRequest, originReqIns, https, cookies...)
-	if is302Or303 {
+	if rewriteToGet {
 		raw = ReplaceHTTPPacketBodyFast(raw, nil)
 		raw = DeleteHTTPPacketHeader(raw, "Content-Length")
 		raw = DeleteHTTPPacketHeader(raw, "Transfer-Encoding")
 		raw = DeleteHTTPPacketHeader(raw, "Content-Type")
+		raw = DeleteHTTPPacketHeader(raw, "Content-Encoding")
+		raw = DeleteHTTPPacketHeader(raw, "Content-Language")
+		raw = DeleteHTTPPacketHeader(raw, "Content-Location")
 	}
 	if originReqIns != nil && originReqIns.URL != nil {
 		raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
@@ -117,13 +117,19 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 	return FixHTTPRequest(raw), nil
 }
 
+// shouldRewriteRedirectToGet follows the Fetch/Chromium redirect algorithm:
+// 301/302 only rewrite POST, while 303 rewrites every method except GET/HEAD.
+// 307/308 (and other status codes) preserve the original method and body.
+func shouldRewriteRedirectToGet(statusCode int, method string) bool {
+	return ((statusCode == http.StatusMovedPermanently || statusCode == http.StatusFound) && method == http.MethodPost) ||
+		(statusCode == http.StatusSeeOther && method != http.MethodGet && method != http.MethodHead)
+}
+
 // BuildRedirectRequest 用于生成重定向请求包
 func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestIsHttps bool, statusCode int) ([]byte, error) {
-	// Browsers rewrite non-HEAD requests to GET for 301/302/303 and always
-	// discard the old entity. 307/308 preserve both method and body.
-	dropBody := statusCode == http.StatusSeeOther || statusCode == http.StatusFound || statusCode == http.StatusMovedPermanently
 	method := GetHTTPRequestMethod(originRequest)
-	if dropBody && method != http.MethodHead {
+	rewriteToGet := shouldRewriteRedirectToGet(statusCode, method)
+	if rewriteToGet {
 		method = http.MethodGet
 	}
 
@@ -152,8 +158,8 @@ func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestI
 	if isSameOrigin {
 		allowHeaders = append(allowHeaders, "Authorization")
 	}
-	if !dropBody {
-		allowHeaders = append(allowHeaders, "Content-Type", "Content-Encoding", "Content-Language", "Transfer-Encoding")
+	if !rewriteToGet {
+		allowHeaders = append(allowHeaders, "Content-Type", "Content-Encoding", "Content-Language", "Content-Location", "Transfer-Encoding")
 	}
 	for _, header := range allowHeaders {
 		headerValue := GetHTTPPacketHeader(originRequest, header)
@@ -162,7 +168,7 @@ func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestI
 		}
 	}
 
-	if dropBody {
+	if rewriteToGet {
 		raw = ReplaceHTTPPacketBodyFast(raw, nil)
 	} else {
 		raw = ReplaceHTTPPacketBodyFast(raw, GetHTTPPacketBody(originRequest))
