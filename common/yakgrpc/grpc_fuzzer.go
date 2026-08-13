@@ -307,18 +307,23 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		return nil, utils.Error("cannot find redirect url")
 	}
 
-	isHttps := req.GetIsHttps()
+	originIsHttps := req.GetIsHttps()
+	isHttps := originIsHttps
 	if strings.HasPrefix(result, "https://") {
 		isHttps = true
 	}
 	if strings.HasPrefix(result, "http://") {
 		isHttps = false
 	}
-	_ = isHttps
-	newUrl := lowhttp.MergeUrlFromHTTPRequest([]byte(req.GetRequest()), result, isHttps)
-	resultRequest := lowhttp.UrlToGetRequestPacket(newUrl, []byte(req.GetRequest()), isHttps, lowhttp.ExtractCookieJarFromHTTPResponse([]byte(req.GetResponse()))...)
-	if resultRequest == nil {
-		return nil, utils.Errorf("cannot merge request packet. redirect url: %s", newUrl)
+	newUrl := lowhttp.MergeUrlFromHTTPRequest([]byte(req.GetRequest()), result, originIsHttps)
+	resultRequest, err := lowhttp.BuildRedirectRequestFromResponse(
+		newUrl,
+		[]byte(req.GetRequest()),
+		[]byte(req.GetResponse()),
+		originIsHttps,
+	)
+	if err != nil {
+		return nil, utils.Wrapf(err, "cannot build redirect request. redirect url: %s", newUrl)
 	}
 	start := time.Now()
 	host, port, _ := utils.ParseStringToHostPort(newUrl)
@@ -385,8 +390,9 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 	}
 
+	method := lowhttp.GetHTTPRequestMethod(resultRequest)
 	rsp := &ypb.FuzzerResponse{
-		Method:                "GET",
+		Method:                method,
 		ResponseRaw:           rspRaw,
 		GuessResponseEncoding: Chardet(rspRaw),
 		RequestRaw:            resultRequest,
