@@ -47,6 +47,10 @@ const (
 	// NativeCall_GetObject is used to get the object of a value
 	NativeCall_GetObject = "getObject"
 
+	// NativeCall_GetObjectType is used to get the type name of the parent
+	// object of a value (equivalent to <getObject><typeName>).
+	NativeCall_GetObjectType = "getObjectType"
+
 	// NativeCall_GetMembers is used to get the members of a value
 	NativeCall_GetMembers = "getMembers"
 
@@ -1397,6 +1401,35 @@ func init() {
 			return false, nil, utils.Error("no value(parent object) found")
 		}),
 		nc_desc(`获取输入指令的父对象，一般说的是如果这个指令是一个成员，可以通过这个指令获取这个成员的父对象。`),
+	)
+	registerNativeCall(
+		NativeCall_GetObjectType,
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+			var objects []sfvm.ValueOperator
+			v.Recursive(func(operator sfvm.ValueOperator) error {
+				val, ok := operator.(*Value)
+				if !ok {
+					return nil
+				}
+				obj := resolveGetObject(val)
+				if obj == nil {
+					return nil
+				}
+				obj.AppendPredecessor(val, frame.WithPredecessorContext("getObjectType"))
+				sfvm.MergeAnchor(val, obj)
+				objects = append(objects, obj)
+				return nil
+			})
+			if len(objects) == 0 {
+				return false, nil, utils.Error("no value(parent object) found")
+			}
+			typeNameCall, err := sfvm.GetNativeCall(NativeCall_TypeName)
+			if err != nil {
+				return false, nil, err
+			}
+			return typeNameCall(sfvm.NewValues(objects), frame, actualParams)
+		}),
+		nc_desc(`获取输入指令的父对象类型名称，等价于 <getObject><typeName>。`),
 	)
 	registerNativeCall(
 		NativeCall_GetCall,

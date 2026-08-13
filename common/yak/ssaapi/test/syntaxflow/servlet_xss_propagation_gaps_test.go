@@ -231,3 +231,35 @@ alert $tainted
 	require.NotEmpty(t, res.GetValues("tainted"),
 		"getParameterValues()[i] must reach sink: $tainted empty")
 }
+
+// TestSyntaxFlowGetObjectTypeNativeCall verifies the <getObjectType> native
+// call used by the built-in java-servlet-params source library. Before the
+// implementation landed, the VM aborted with
+// "native call not found: getObjectType" (CriticalError) when a Java scan hit
+// these rules.
+func TestSyntaxFlowGetObjectTypeNativeCall(t *testing.T) {
+	const src = `
+package x;
+import java.io.PrintWriter;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+class C {
+    void doGet(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        String[] names = req.getParameterValues("name");
+        PrintWriter w = resp.getWriter();
+        w.println(names[0]);
+    }
+}
+`
+	rule := strings.NewReplacer("\t", " ").Replace(strings.TrimSpace(`
+*.getParameterValues()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $source;
+alert $source
+`))
+	prog, err := ssaapi.Parse(strings.TrimSpace(src),
+		ssaapi.WithLanguage(ssaconfig.JAVA))
+	require.NoError(t, err)
+	res, err := prog.SyntaxFlowWithError(rule)
+	require.NoError(t, err)
+	require.NotEmpty(t, res.GetValues("source"),
+		"getObjectType must resolve HttpServletRequest receiver: $source empty")
+}
