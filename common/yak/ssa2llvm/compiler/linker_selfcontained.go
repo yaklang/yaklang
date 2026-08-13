@@ -74,7 +74,17 @@ func CompileModuleToObjectSC(mod llvm.Module, objFile string) error {
 // drop yaklib modules not used by the script (usedModules lists the modules the
 // script uses; all others are candidates for removal).
 func CompileObjectToBinarySCWithPatch(objFile, binFile, workDir string, obfArchives []string, usedModules []string, extraArgs ...string) error {
-	return linkStaticWithPatch(objFile, binFile, workDir, obfArchives, usedModules, extraArgs...)
+	return linkStaticWithPatch(objFile, binFile, workDir, obfArchives, usedModules, "", extraArgs...)
+}
+
+// CompileObjectToBinarySCTier links like CompileObjectToBinarySCWithPatch but
+// against the archive of the named tier (see runtime/tiers) instead of the
+// embedded one. Pruning removes module code from whichever archive is used;
+// the tier decides how much module *metadata* the archive has in the first
+// place. An empty tier, or one with no installed archive, uses the embedded
+// archive, which is larger but always correct.
+func CompileObjectToBinarySCTier(objFile, binFile, workDir string, obfArchives []string, usedModules []string, tier string, extraArgs ...string) error {
+	return linkStaticWithPatch(objFile, binFile, workDir, obfArchives, usedModules, tier, extraArgs...)
 }
 
 // CompileObjectToBinarySC links an object + the embedded runtime archives
@@ -85,15 +95,18 @@ func CompileObjectToBinarySCWithPatch(objFile, binFile, workDir string, obfArchi
 // caller). obfArchives are additional on-disk archives (e.g. obfuscation
 // runtime deps); they are not yet embedded in v1.
 func CompileObjectToBinarySC(objFile, binFile, workDir string, obfArchives []string, extraArgs ...string) error {
-	return linkStaticWithPatch(objFile, binFile, workDir, obfArchives, nil, extraArgs...)
+	return linkStaticWithPatch(objFile, binFile, workDir, obfArchives, nil, "", extraArgs...)
 }
 
-func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string, usedModules []string, extraArgs ...string) error {
+func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string, usedModules []string, tier string, extraArgs ...string) error {
 	used := append([]string{}, usedModules...)
 	for attempt := 0; attempt < 8; attempt++ {
-		rp, err := assets.ReleaseTo(workDir)
+		rp, resolved, err := assets.ReleaseTierTo(workDir, tier)
 		if err != nil {
 			return err
+		}
+		if attempt == 0 {
+			traceTierChoice(resolved)
 		}
 		// A module the archive cannot register is an undefined symbol at link
 		// time, and the in-process lld dies on SIGSEGV while reporting it
@@ -175,6 +188,21 @@ func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string,
 		}
 	}
 	return fmt.Errorf("self-contained link did not converge on retained module set")
+}
+
+// traceTierChoice reports which runtime archive the link used. A fallback is
+// worth seeing under -x: the build is correct but the binary is bigger than the
+// script needs, and installing the wanted tier is what fixes it.
+func traceTierChoice(r assets.ResolvedTier) {
+	switch {
+	case r.Wanted == "":
+		return
+	case r.Fallback():
+		trace.Printf("runtime tier: wanted %q, using %q (%s); put a %s/libyak.a under $%s for a smaller binary",
+			r.Wanted, r.Used, r.Source, r.Wanted, assets.TierDirEnv)
+	default:
+		trace.Printf("runtime tier: %q (%s)", r.Used, r.Source)
+	}
 }
 
 // checkModulesAvailable fails when the embedded libyak.a was built without a

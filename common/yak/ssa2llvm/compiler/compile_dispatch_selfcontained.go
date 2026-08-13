@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/tiers"
 )
 
 // emitAsmModule emits assembly in-process via go-llvm TargetMachine from the
@@ -51,6 +52,11 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 	for mod := range deps {
 		usedModules = append(usedModules, mod)
 	}
+	// The tier is chosen from the script's own modules, before the closure
+	// below adds the groups those modules drag in. Groups are sections inside
+	// an archive; tiers are whole archives, and only yaklib module names name
+	// a rung of the ladder.
+	tier := selectRuntimeTier(usedModules)
 	// Module dependency closure for per-module DCE. "shared" (schema/lowhttp/
 	// net-http/gorm closure) is required whenever any yaklib module is used;
 	// the poc package uses cli at runtime, and the ssa module needs its
@@ -69,10 +75,25 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 			}
 		}
 	}
-	if err := CompileObjectToBinarySCWithPatch(objPath, outputFile, cfg.WorkDir, cfg.ObfArchives, usedModules, cfg.ExtraLinkArgs...); err != nil {
+	if err := CompileObjectToBinarySCTier(objPath, outputFile, cfg.WorkDir, cfg.ObfArchives, usedModules, tier, cfg.ExtraLinkArgs...); err != nil {
 		return "", nil, err
 	}
 	return "", nil, nil
+}
+
+// selectRuntimeTier picks the smallest pre-built archive that can register the
+// script's modules. A module outside the ladder is not an error here: the
+// embedded archive may still carry it (SSA2LLVM_EMBED_MODULES takes any list),
+// and if it does not, checkModulesAvailable says so by name before lld runs.
+func selectRuntimeTier(scriptModules []string) string {
+	if len(scriptModules) == 0 {
+		return tiers.All[0].Name
+	}
+	t, err := tiers.Select(scriptModules)
+	if err != nil {
+		return ""
+	}
+	return t.Name
 }
 
 // moduleGroupDeps is what a used module drags in besides its own section.
