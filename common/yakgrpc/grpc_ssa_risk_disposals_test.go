@@ -641,6 +641,11 @@ alert $result for {
 		})
 		require.NoError(t, err)
 
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		taskID := resp.GetTaskID()
+		require.NotEmpty(t, taskID)
+
 		// 等待扫描完成
 		for {
 			resp, err := stream.Recv()
@@ -655,12 +660,12 @@ alert $result for {
 			}
 		}
 
-		// 查询生成的 Risk
+		// 查询本次扫描生成的 Risk，不能因相同 ProgramName 复用上一次扫描的记录。
 		_, queryRisk, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
-			ProgramName: []string{programName},
+			RuntimeID: []string{taskID},
 		}, nil)
 		require.NoError(t, err)
-		require.NotEmpty(t, queryRisk)
+		require.Len(t, queryRisk, 1)
 		risks[i] = queryRisk[0]
 
 		// 添加延迟确保下次扫描的时间戳不同
@@ -680,6 +685,7 @@ alert $result for {
 	require.Equal(t, risks[0].RiskFeatureHash, risks[1].RiskFeatureHash, "RiskFeatureHash 应该相同")
 	require.NotEmpty(t, risks[0].RiskFeatureHash, "RiskFeatureHash 不应该为空")
 	require.NotEmpty(t, risks[1].RiskFeatureHash, "RiskFeatureHash 不应该为空")
+	require.NotEqual(t, risks[0].RuntimeId, risks[1].RuntimeId, "两次扫描必须使用不同的任务ID")
 
 	// 添加调试信息
 	t.Logf("Risk1: ID=%d, RiskFeatureHash=%s, RuntimeId=%s", risks[0].ID, risks[0].RiskFeatureHash, risks[0].RuntimeId)
