@@ -191,14 +191,21 @@ jobs:
           RELEASE_SIGNING_PUBLIC_KEY: ${{ vars.LEGION_NODE_RELEASE_SIGNING_PUBLIC_KEY_B64 }}
         run: |
           set -euo pipefail
-          [[ -n "$RELEASE_SIGNING_PRIVATE_KEY" && -n "$RELEASE_SIGNING_PUBLIC_KEY" ]] || {
-            echo "production-release must configure the Yaklang Node release signing key pair" >&2
-            exit 1
-          }
-          signing_key="${RUNNER_TEMP}/legion-node-release-signing-key.b64"
-          umask 077
-          printf '%s\n' "$RELEASE_SIGNING_PRIVATE_KEY" >"$signing_key"
-          trap 'rm -f "$signing_key"' EXIT
+          signing_args=()
+          if [[ -n "$RELEASE_SIGNING_PRIVATE_KEY" || -n "$RELEASE_SIGNING_PUBLIC_KEY" ]]; then
+            [[ -n "$RELEASE_SIGNING_PRIVATE_KEY" && -n "$RELEASE_SIGNING_PUBLIC_KEY" ]] || {
+              echo "production-release must configure both Yaklang Node release signing values or neither" >&2
+              exit 1
+            }
+            signing_key="${RUNNER_TEMP}/legion-node-release-signing-key.b64"
+            umask 077
+            printf '%s\n' "$RELEASE_SIGNING_PRIVATE_KEY" >"$signing_key"
+            trap 'rm -f "$signing_key"' EXIT
+            signing_args=(
+              --signing-private-key-file "$signing_key"
+              --expected-public-key "$RELEASE_SIGNING_PUBLIC_KEY"
+            )
+          fi
           engine_bundle="dist/artifact/yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz"
           ./.github/scripts/build-legion-node-engine-import-bundle.sh \
             --version "$NODE_PACKAGE_VERSION" \
@@ -206,8 +213,7 @@ jobs:
             --artifact-dir dist/artifact \
             --goos "$NODE_GOOS" \
             --goarch "$NODE_GOARCH" \
-            --signing-private-key-file "$signing_key" \
-            --expected-public-key "$RELEASE_SIGNING_PUBLIC_KEY" \
+            "${signing_args[@]}" \
             --output "$engine_bundle"
           gzip -t "$engine_bundle"
           (cd dist/artifact && sha256sum -c "$(basename "$engine_bundle").sha256")

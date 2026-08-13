@@ -19,12 +19,15 @@ Required:
   --source-sha SHA
   --artifact-dir DIR
   --output FILE
-  --signing-private-key-file FILE
-  --expected-public-key BASE64
 
 Optional:
   --goos linux
   --goarch amd64|arm64
+  --signing-private-key-file FILE
+  --expected-public-key BASE64
+
+The signing options must be provided together. If neither is provided, the
+bundle is checksum-verified but does not contain release-index.json.sig.
 EOF
 }
 
@@ -51,8 +54,10 @@ done
 case "$target_arch" in amd64|arm64) ;; *) die "unsupported target architecture: $target_arch" ;; esac
 [[ -d "$artifact_dir" ]] || die "artifact directory does not exist"
 [[ -n "$output" ]] || die "--output is required"
-[[ -f "$signing_private_key_file" ]] || die "--signing-private-key-file is required"
-[[ -n "$expected_public_key" ]] || die "--expected-public-key is required"
+if [[ -n "$signing_private_key_file" || -n "$expected_public_key" ]]; then
+  [[ -f "$signing_private_key_file" && -n "$expected_public_key" ]] || \
+    die "--signing-private-key-file and --expected-public-key must be configured together"
+fi
 
 for command in go gzip jq sha256sum stat tar; do
   command -v "$command" >/dev/null 2>&1 || die "missing required command: $command"
@@ -206,12 +211,14 @@ jq -n \
     }
   ' >"$bundle_dir/release-index.json"
 (cd "$bundle_dir" && sha256sum release-index.json >release-index.json.sha256)
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-go run "$repo_root/.github/scripts/sign-legion-node-release-index.go" \
-  --private-key-file "$signing_private_key_file" \
-  --expected-public-key "$expected_public_key" \
-  --input "$bundle_dir/release-index.json" \
-  --output "$bundle_dir/release-index.json.sig"
+if [[ -n "$signing_private_key_file" ]]; then
+  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  go run "$repo_root/.github/scripts/sign-legion-node-release-index.go" \
+    --private-key-file "$signing_private_key_file" \
+    --expected-public-key "$expected_public_key" \
+    --input "$bundle_dir/release-index.json" \
+    --output "$bundle_dir/release-index.json.sig"
+fi
 cp "$producer_binary" "$bundle_dir/yaklang-node"
 cp "$runtime_manifest" "$bundle_dir/runtime-manifest.json"
 cp "$runtime_archive" "$bundle_dir/ai-session-runtime.docker.tar.gz"
@@ -219,6 +226,16 @@ cp "$runtime_archive" "$bundle_dir/ai-session-runtime.docker.tar.gz"
 mkdir -p "$(dirname "$output")"
 [[ ! -e "$output" ]] || die "output already exists: $output"
 source_epoch="$(git -C "$(dirname "${BASH_SOURCE[0]}")/../.." show -s --format=%ct "$source_sha")"
+archive_files=(
+  ai-session-runtime.docker.tar.gz
+  manifest.json
+  release-index.json
+  release-index.json.sha256
+)
+if [[ -n "$signing_private_key_file" ]]; then
+  archive_files+=(release-index.json.sig)
+fi
+archive_files+=(runtime-manifest.json yaklang-node)
 tar \
   --sort=name \
   --mtime="@$source_epoch" \
@@ -226,8 +243,7 @@ tar \
   --group=0 \
   --numeric-owner \
   -C "$bundle_dir" \
-  -cf - ai-session-runtime.docker.tar.gz manifest.json release-index.json \
-  release-index.json.sha256 release-index.json.sig runtime-manifest.json yaklang-node | gzip -n -1 >"$output"
+  -cf - "${archive_files[@]}" | gzip -n -1 >"$output"
 (cd "$(dirname "$output")" && sha256sum "$(basename "$output")" >"$(basename "$output").sha256")
 
 printf '[legion-node-engine-bundle] created %s\n' "$output"

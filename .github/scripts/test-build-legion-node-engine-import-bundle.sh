@@ -121,6 +121,44 @@ cmp "$artifact_dir/legion-smoke-node" "$extract_dir/yaklang-node"
 cmp "$artifact_dir/SESSION_RUNTIME_MANIFEST.json" "$extract_dir/runtime-manifest.json"
 cmp "$artifact_dir/legion-ai-session-runtime_linux_amd64.docker.tar.gz" "$extract_dir/ai-session-runtime.docker.tar.gz"
 
+unsigned_output="$test_root/yaklang-node-engine_legion-node-v1.2.3_linux_amd64-unsigned.tar.gz"
+"$builder" \
+  --version legion-node-v1.2.3 \
+  --source-sha "$source_sha" \
+  --artifact-dir "$artifact_dir" \
+  --output "$unsigned_output"
+gzip -t "$unsigned_output"
+(cd "$test_root" && sha256sum -c "$(basename "$unsigned_output").sha256" >/dev/null)
+unsigned_extract_dir="$test_root/unsigned-extracted"
+mkdir -p "$unsigned_extract_dir"
+tar -xzf "$unsigned_output" -C "$unsigned_extract_dir"
+[[ "$(find "$unsigned_extract_dir" -maxdepth 1 -type f | wc -l)" == 6 ]]
+[[ ! -e "$unsigned_extract_dir/release-index.json.sig" ]]
+(cd "$unsigned_extract_dir" && sha256sum -c release-index.json.sha256 >/dev/null)
+cmp "$artifact_dir/legion-smoke-node" "$unsigned_extract_dir/yaklang-node"
+cmp "$artifact_dir/SESSION_RUNTIME_MANIFEST.json" "$unsigned_extract_dir/runtime-manifest.json"
+cmp "$artifact_dir/legion-ai-session-runtime_linux_amd64.docker.tar.gz" "$unsigned_extract_dir/ai-session-runtime.docker.tar.gz"
+
+if "$builder" \
+  --version legion-node-v1.2.3 \
+  --source-sha "$source_sha" \
+  --artifact-dir "$artifact_dir" \
+  --signing-private-key-file "$signing_key" \
+  --output "$test_root/private-key-only.tar.gz"; then
+  echo 'incomplete signing configuration unexpectedly accepted' >&2
+  exit 1
+fi
+
+if "$builder" \
+  --version legion-node-v1.2.3 \
+  --source-sha "$source_sha" \
+  --artifact-dir "$artifact_dir" \
+  --expected-public-key "$signing_public_key" \
+  --output "$test_root/public-key-only.tar.gz"; then
+  echo 'incomplete signing configuration unexpectedly accepted' >&2
+  exit 1
+fi
+
 tampered_runtime="$test_root/tampered-runtime"
 cp -a "$artifact_dir" "$tampered_runtime"
 printf 'tampered\n' >>"$tampered_runtime/legion-ai-session-runtime_linux_amd64.docker.tar.gz"
