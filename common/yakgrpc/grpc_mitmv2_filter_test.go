@@ -857,4 +857,5 @@ func TestGRPCMUSTPASS_MITMV2_Filter_Reset(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, rsp.FilterData.String(), token)
 	require.Contains(t, rsp.FilterData.String(), "google.com")
+	require.True(t, rsp.FilterData.GetFilterBundledStaticJS())
 }

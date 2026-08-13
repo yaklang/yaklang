@@ -208,13 +208,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 
-	// 是否过滤打包/构建产物的静态 JS（默认 true：过滤）
-	// 这里用原子变量：需要支持前端在运行时切换开关后立即生效（无需重启 MITM）。
-	filterBundledStaticJS := utils.NewBool(true)
-	if filterData := firstReq.GetFilterData(); filterData != nil {
-		filterBundledStaticJS.SetTo(filterData.GetFilterBundledStaticJS())
-	}
-
 	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, map[string][]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
 		// 容错处理一下代理
@@ -399,6 +392,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		filterManager       = GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
 		hijackFilterManager = GetMITMHijackFilterManager(s.GetProjectDatabase())
 	)
+	// 是否过滤打包/构建产物的静态 JS（默认 true：过滤）。
+	// 以持久化的过滤器为单一状态源，避免 GUI 和运行时行为不一致。
+	filterBundledStaticJS := utils.NewBool(filterManager.Data.GetFilterBundledStaticJS())
 
 	/*
 		设置内容替换模块，通过正则驱动
@@ -551,6 +547,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 			if reqInstance.GetResetFilter() {
 				filterManager.Recover()
+				filterBundledStaticJS.SetTo(filterManager.Data.GetFilterBundledStaticJS())
 				sendLogged(&ypb.MITMV2Response{
 					JustFilter: true,
 					FilterData: filterManager.Data,
