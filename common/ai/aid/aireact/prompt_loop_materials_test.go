@@ -25,6 +25,51 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 	return sections
 }
 
+func TestPromptManager_ModelReasoningReplayOnlyEntersMainDecisionPrompt(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	const replayMarker = `<|TIMELINE_MODEL_THINKING_scope1|>
+{"reasoning_content":"previous reasoning","content":"{\"@action\":\"object\"}"}
+<|TIMELINE_MODEL_THINKING_END_scope1|>`
+	react.AddToTimelineWithPromptProjection("model_thinking", "previous reasoning", replayMarker)
+
+	baseInput := &reactloops.LoopPromptAssemblyInput{
+		Nonce:           "scope-main",
+		UserQuery:       "continue",
+		TaskInstruction: "decide the next action",
+		Schema:          `{"type":"object"}`,
+	}
+	helpResult, err := react.promptManager.AssembleLoopPrompt(nil, baseInput)
+	require.NoError(t, err)
+	require.NotContains(t, helpResult.Prompt, "TIMELINE_MODEL_THINKING_scope1")
+
+	mainInput := *baseInput
+	mainInput.IncludeLatestModelReplay = true
+	mainResult, err := react.promptManager.AssembleLoopPrompt(nil, &mainInput)
+	require.NoError(t, err)
+	require.Contains(t, mainResult.Prompt, "TIMELINE_MODEL_THINKING_scope1")
+
+	tool := aitool.NewWithoutCallback("scope-tool", aitool.WithDescription("scope test tool"))
+	toolParams, err := react.promptManager.GenerateToolParamsPromptWithMeta(tool)
+	require.NoError(t, err)
+	require.NotContains(t, toolParams.Prompt, "TIMELINE_MODEL_THINKING_scope1")
+
+	lightInput := mainInput
+	lightInput.Nonce = "scope-light"
+	lightInput.Lightweight = true
+	lightResult, err := react.promptManager.AssembleLoopPrompt(nil, &lightInput)
+	require.NoError(t, err)
+	require.Contains(t, lightResult.Prompt, "TIMELINE_MODEL_THINKING_scope1")
+}
+
 func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
