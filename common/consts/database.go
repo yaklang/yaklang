@@ -38,10 +38,10 @@ type databaseOpenOptions struct {
 	sqliteMaxOpenConns int
 	sqlitePrivateCache bool
 	// sqliteSynchronous is the SQLite PRAGMA/DSN synchronous mode.
-	// Empty keeps the project/general default (OFF). SSA injects NORMAL.
+	// Empty keeps the generic default (OFF).
 	sqliteSynchronous string
 	// sqliteTxLock is the SQLite DSN _txlock value.
-	// Empty omits it (project/general default). SSA injects "immediate".
+	// Empty omits _txlock from the DSN.
 	sqliteTxLock string
 }
 

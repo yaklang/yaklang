@@ -26,6 +26,12 @@ const (
 	ENV_SSA_DB_SKIP_MIGRATE = "SSA_DB_SKIP_MIGRATE"
 )
 
+const (
+	ssaSQLiteMaxOpenConns = 8
+	ssaSQLiteSynchronous  = "NORMAL"
+	ssaSQLiteTxLock       = "immediate"
+)
+
 var (
 	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
 	SSA_PROJECT_DB_DIALECT = SQLiteExtend
@@ -110,9 +116,6 @@ func CreateSSAProjectDatabaseRaw(raw string) (*gorm.DB, error) {
 }
 
 func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
-	// WAL allows concurrent readers; writes queue via _txlock=immediate +
-	// busy_timeout. The SSA pool is applied from open so readers can run in
-	// parallel during compile and scan.
 	options := ssaDatabaseOpenOptions()
 	db, err := createAndConfigDatabaseWithOptions(path, options, dialect)
 	if err != nil {
@@ -132,14 +135,11 @@ func ssaDatabaseOpenOptions() databaseOpenOptions {
 	// SSA-only SQLite open settings. Project/general DBs keep
 	// defaultDatabaseOpenOptions() (single connection, synchronous=OFF,
 	// no _txlock). Injected via databaseOpenOptions so database.go stays generic.
-	// WAL multi-read + single-writer queue: SQLite WAL allows concurrent
-	// readers and one writer; _txlock=immediate makes write transactions
-	// queue behind busy_timeout instead of deadlocking.
 	return databaseOpenOptions{
-		sqliteMaxOpenConns: 8,
+		sqliteMaxOpenConns: ssaSQLiteMaxOpenConns,
 		sqlitePrivateCache: true,
-		sqliteSynchronous:  "NORMAL",
-		sqliteTxLock:       "immediate",
+		sqliteSynchronous:  ssaSQLiteSynchronous,
+		sqliteTxLock:       ssaSQLiteTxLock,
 	}
 }
 
