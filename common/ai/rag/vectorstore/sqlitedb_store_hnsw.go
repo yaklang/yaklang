@@ -72,7 +72,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 	graphWrapper, err := GraphWrapperManager.GetGraphWrapper(db, collection, collectionConfig)
 	if err != nil {
 		log.Errorf("get graph wrapper err: %v", err)
-		return nil, utils.Errorf("get graph wrapper err: %v", err)
+		return nil, utils.Wrap(err, "get graph wrapper")
 	}
 	vectorStore.hnsw = graphWrapper
 
