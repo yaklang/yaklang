@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -482,6 +483,17 @@ var graphNodesIsEmpty = errors.New("hnsw graph nodes is empty")
 var ErrGraphNodesIsEmpty = graphNodesIsEmpty
 
 func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) error {
+	return MigrateHNSWGraphWithContext(context.Background(), db, collection)
+}
+
+// MigrateHNSWGraphWithContext rebuilds a graph exclusively from persisted
+// document vectors. UID changes and the final graph binary replacement commit
+// atomically, so a timeout or build error leaves the previous graph untouched.
+func MigrateHNSWGraphWithContext(ctx context.Context, db *gorm.DB, collection *schema.VectorStoreCollection) error {
+	return migrateHNSWGraphWithContext(ctx, db, collection, false)
+}
+
+func migrateHNSWGraphWithContext(ctx context.Context, db *gorm.DB, collection *schema.VectorStoreCollection, resetPQ bool) error {
 	cacheMinSize := 100000
 	cacheMaxSize := cacheMinSize + 2000
 	cache := map[hnswspec.LazyNodeID][]float32{}
@@ -501,62 +513,118 @@ func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) err
 			}
 		}
 	}
-	hnswGraph := NewHNSWGraph(collection.Name)
+	graphOptions := []hnsw.GraphOption[string]{
+		hnsw.WithHNSWParameters[string](collection.M, collection.Ml, collection.EfSearch),
+		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collection.DistanceFuncType)),
+	}
+	if collection.EfConstruct > 0 {
+		graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](collection.EfConstruct))
+	}
+	hnswGraph := NewHNSWGraph(collection.Name, graphOptions...)
 
 	// 分页查询向量节点
 	pageSize := 1000
+	var binaryBytes []byte
 
-	getVectorByID := func(id hnswspec.LazyNodeID) ([]float32, error) {
-		idStr := fmt.Sprint(id)
-		if node, ok := cache[idStr]; ok {
-			return node, nil
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		getVectorByID := func(id hnswspec.LazyNodeID) ([]float32, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			idStr := fmt.Sprint(id)
+			if node, ok := cache[idStr]; ok {
+				return node, nil
+			}
+			doc, err := getVectorDocumentByLazyNodeID(tx.Where("collection_id = ?", collection.ID), id)
+			if err != nil {
+				return nil, err
+			}
+			clearCache()
+			cache[idStr] = doc.Embedding
+			return doc.Embedding, nil
 		}
-		doc, err := getVectorDocumentByLazyNodeID(db, id)
+
+		for page := 1; ; page++ {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			var docs []schema.VectorStoreDocument
+			err := tx.Where("collection_id = ?", collection.ID).Order("id ASC").
+				Offset((page - 1) * pageSize).Limit(pageSize).Find(&docs).Error
+			if err != nil {
+				return utils.Wrap(err, "get docs")
+			}
+			if len(docs) == 0 {
+				break
+			}
+
+			for _, doc := range docs {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				if len(doc.Embedding) == 0 {
+					return utils.Errorf("document %s has no stored embedding", doc.DocumentID)
+				}
+				if collection.Dimension > 0 && len(doc.Embedding) != collection.Dimension {
+					return utils.Errorf("document %s embedding dimension mismatch: %d != %d", doc.DocumentID, len(doc.Embedding), collection.Dimension)
+				}
+				for _, value := range doc.Embedding {
+					if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
+						return utils.Errorf("document %s has invalid stored embedding", doc.DocumentID)
+					}
+				}
+
+				uid := GetLazyNodeUIDByMd5(collection.Name, doc.DocumentID)
+				cache[fmt.Sprint(uid)] = []float32(doc.Embedding)
+				if err := tx.Model(&schema.VectorStoreDocument{}).Where("id = ?", doc.ID).Update("uid", uid).Error; err != nil {
+					return utils.Wrap(err, "update document uid")
+				}
+				hnswGraph.Add(hnsw.MakeInputNodeFromID(doc.DocumentID, hnswspec.LazyNodeID(uid), func(uid hnswspec.LazyNodeID) ([]float32, error) {
+					return getVectorByID(uid)
+				}))
+				if !hnswGraph.Has(doc.DocumentID) {
+					return utils.Errorf("rebuild hnsw graph failed to add document %s", doc.DocumentID)
+				}
+			}
+		}
+
+		if len(hnswGraph.Layers) == 0 || len(hnswGraph.Layers[0].Nodes) == 0 {
+			return graphNodesIsEmpty
+		}
+		graphBinaryReader, err := ExportHNSWGraphToBinary(hnswGraph)
 		if err != nil {
-			return nil, err
+			return utils.Wrap(err, "export hnsw graph to binary")
 		}
-		clearCache()
-		cache[idStr] = doc.Embedding
-		return doc.Embedding, nil
-	}
-
-	for page := 1; ; page++ {
-		var docs []schema.VectorStoreDocument
-		err := db.Where("collection_id = ?", collection.ID).Offset((page - 1) * pageSize).Limit(pageSize).Find(&docs).Error
+		binaryBytes, err = io.ReadAll(graphBinaryReader)
 		if err != nil {
-			return utils.Wrap(err, "get docs")
+			return utils.Wrap(err, "read graph binary")
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 
-		if len(docs) == 0 {
-			break
+		updates := map[string]interface{}{"graph_binary": binaryBytes}
+		if resetPQ {
+			updates["enable_pq_mode"] = false
+			updates["code_book_binary"] = []byte(nil)
+			if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).
+				Update("pq_code", []byte(nil)).Error; err != nil {
+				return utils.Wrap(err, "clear document pq codes")
+			}
 		}
-
-		for _, doc := range docs {
-			doc := doc
-			doc.UID = GetLazyNodeUIDByMd5(collection.Name, doc.DocumentID)
-			db.Save(doc)
-			hnswGraph.Add(hnsw.MakeInputNodeFromID(doc.DocumentID, hnswspec.LazyNodeID(doc.UID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
-				return getVectorByID(uid)
-			}))
+		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Updates(updates).Error; err != nil {
+			return utils.Wrap(err, "update graph binary")
 		}
-	}
-
-	if len(hnswGraph.Layers) == 0 || len(hnswGraph.Layers[0].Nodes) == 0 {
-		return graphNodesIsEmpty
-	}
-	graphBinaryReader, err := ExportHNSWGraphToBinary(hnswGraph)
+		return nil
+	})
 	if err != nil {
-		return utils.Wrap(err, "export hnsw graph to binary")
-	}
-	binaryBytes, err := io.ReadAll(graphBinaryReader)
-	if err != nil {
-		return utils.Wrap(err, "read graph binary")
-	}
-	err = db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Update("graph_binary", binaryBytes).Error
-	if err != nil {
-		return utils.Wrap(err, "update graph binary")
+		return err
 	}
 	collection.GraphBinary = binaryBytes
+	if resetPQ {
+		collection.EnablePQMode = false
+		collection.CodeBookBinary = nil
+	}
 	return nil
 }
 

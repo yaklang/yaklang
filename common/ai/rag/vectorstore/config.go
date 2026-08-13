@@ -1,6 +1,8 @@
 package vectorstore
 
 import (
+	"time"
+
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
@@ -49,7 +51,9 @@ type CollectionConfig struct {
 
 	KeyAsUID bool
 
-	TryRebuildHNSWIndex bool
+	TryRebuildHNSWIndex    bool
+	HNSWRebuildTimeout     time.Duration
+	AutoDeleteCorruptedRAG bool
 
 	Name string
 }
@@ -68,7 +72,9 @@ func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
 		Overlap:                    defaultChunkOverlap,
 		BigTextPlan:                defaultBigTextPlan,
 		KeyAsUID:                   false,
-		TryRebuildHNSWIndex:        false,
+		TryRebuildHNSWIndex:        true,
+		HNSWRebuildTimeout:         30 * time.Second,
+		AutoDeleteCorruptedRAG:     true,
 	}
 
 	for _, option := range options {
@@ -99,6 +105,9 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		PreCacheSize:               0,
 		KeyAsUID:                   false,
 		Name:                       collection.Name,
+		TryRebuildHNSWIndex:        true,
+		HNSWRebuildTimeout:         30 * time.Second,
+		AutoDeleteCorruptedRAG:     true,
 	}
 	for _, option := range options {
 		option(loadBasicConfig)
@@ -178,6 +187,24 @@ func WithKeyAsUID(keyAsUID bool) CollectionConfigFunc {
 func WithTryRebuildHNSWIndex(tryRebuildHNSWIndex bool) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.TryRebuildHNSWIndex = tryRebuildHNSWIndex
+	}
+}
+
+// WithHNSWRebuildTimeout bounds the single rebuild attempt made after a
+// persisted HNSW/PQ binary is found to be corrupted.
+func WithHNSWRebuildTimeout(timeout time.Duration) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		if timeout > 0 {
+			config.HNSWRebuildTimeout = timeout
+		}
+	}
+}
+
+// WithAutoDeleteCorruptedRAG controls whether an unrecoverable corrupted RAG
+// is removed after its one rebuild attempt. It defaults to true.
+func WithAutoDeleteCorruptedRAG(autoDelete bool) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.AutoDeleteCorruptedRAG = autoDelete
 	}
 }
 

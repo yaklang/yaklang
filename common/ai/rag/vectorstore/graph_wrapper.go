@@ -24,14 +24,23 @@ import (
 var GraphWrapperManager = NewGraphHNSWManager()
 
 type GraphHNSWManager struct {
-	cache map[string]*GraphWrapper[string]
-	lock  sync.Mutex
+	cache   map[string]*GraphWrapper[string]
+	loading map[string]*graphLoadCall
+	lock    sync.Mutex
+}
+
+type graphLoadCall struct {
+	done           chan struct{}
+	wrapper        *GraphWrapper[string]
+	err            error
+	collectionUUID string
+	removed        bool
 }
 
 func NewGraphHNSWManager() *GraphHNSWManager {
 	return &GraphHNSWManager{
-		make(map[string]*GraphWrapper[string]),
-		sync.Mutex{},
+		cache:   make(map[string]*GraphWrapper[string]),
+		loading: make(map[string]*graphLoadCall),
 	}
 }
 
@@ -42,6 +51,9 @@ func (gm *GraphHNSWManager) ClearCache() {
 		wrapperList = append(wrapperList, wrapper)
 	}
 	gm.cache = make(map[string]*GraphWrapper[string])
+	for _, call := range gm.loading {
+		call.removed = true
+	}
 	gm.lock.Unlock()
 
 	for _, wrapper := range wrapperList {
@@ -65,6 +77,11 @@ func (gm *GraphHNSWManager) RemoveFromCache(collectionUUID string) {
 			delete(gm.cache, cacheKey)
 		}
 	}
+	for _, call := range gm.loading {
+		if call.collectionUUID == collectionUUID {
+			call.removed = true
+		}
+	}
 	gm.lock.Unlock()
 
 	for _, wrapper := range wrapperList {
@@ -80,6 +97,9 @@ func (gm *GraphHNSWManager) RemoveCollectionFromCache(db *gorm.DB, collection *s
 	cacheKey := graphCacheKey(db, collection)
 	wrapper := gm.cache[cacheKey]
 	delete(gm.cache, cacheKey)
+	if call := gm.loading[cacheKey]; call != nil {
+		call.removed = true
+	}
 	gm.lock.Unlock()
 
 	if wrapper != nil {
@@ -88,27 +108,54 @@ func (gm *GraphHNSWManager) RemoveCollectionFromCache(db *gorm.DB, collection *s
 }
 
 func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
-	gm.lock.Lock()
-	defer gm.lock.Unlock()
 	cacheKey := graphCacheKey(db, collection)
-	wrapper, ok := gm.cache[cacheKey]
-	if ok {
+	gm.lock.Lock()
+	if wrapper, ok := gm.cache[cacheKey]; ok {
+		gm.lock.Unlock()
 		return wrapper, nil
+	}
+	if call, ok := gm.loading[cacheKey]; ok {
+		gm.lock.Unlock()
+		<-call.done
+		return call.wrapper, call.err
+	}
+	call := &graphLoadCall{
+		done:           make(chan struct{}),
+		collectionUUID: collection.UUID,
+	}
+	gm.loading[cacheKey] = call
+	gm.lock.Unlock()
 
-	}
 	var collectionCount int64
-	if err := db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Count(&collectionCount).Error; err != nil {
-		return nil, utils.Wrap(err, "check graph collection exists")
-	}
-	if collectionCount == 0 {
-		return nil, utils.Errorf("collection %s has been deleted", collection.Name)
-	}
-	wrapper, err := getGraphWrapperFromDB(db, collection, collectionConfig)
+	err := db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Count(&collectionCount).Error
 	if err != nil {
-		return nil, utils.Wrap(err, "get graph wrapper from db")
+		err = utils.Wrap(err, "check graph collection exists")
+	} else if collectionCount == 0 {
+		err = utils.Errorf("collection %s has been deleted", collection.Name)
 	}
-	gm.cache[cacheKey] = wrapper
-	return wrapper, nil
+	var wrapper *GraphWrapper[string]
+	if err == nil {
+		wrapper, err = getGraphWrapperFromDB(db, collection, collectionConfig)
+		if err != nil {
+			err = utils.Wrap(err, "get graph wrapper from db")
+		}
+	}
+
+	gm.lock.Lock()
+	delete(gm.loading, cacheKey)
+	if err == nil && call.removed {
+		err = utils.Errorf("collection %s was deleted while loading", collection.Name)
+	}
+	if err == nil {
+		gm.cache[cacheKey] = wrapper
+		call.wrapper = wrapper
+	} else if wrapper != nil {
+		wrapper.Close()
+	}
+	call.err = err
+	close(call.done)
+	gm.lock.Unlock()
+	return call.wrapper, call.err
 }
 
 func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
@@ -132,15 +179,15 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 		var err error
 		var isEmpty bool
 		if len(collection.GraphBinary) == 0 {
-			// 检测是否存在向量
 			var count int64
-			db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count)
+			if err := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count).Error; err != nil {
+				return nil, utils.Wrap(err, "count vector documents before graph migration")
+			}
 			if count == 0 {
 				isEmpty = true
 			} else {
-				// 检测到旧版向量库，开始迁移 HNSW Graph
 				log.Warnf("detect old version vector store, start to migrate to new version")
-				err := MigrateHNSWGraph(db, collection)
+				err := migrateHNSWGraphWithTimeout(db, collection, collectionConfig, false)
 				if err != nil {
 					if errors.Is(err, graphNodesIsEmpty) {
 						isEmpty = true
@@ -149,60 +196,20 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 					}
 				}
 			}
-
 		}
 		if isEmpty {
-			config := collection
-			graphOptions := []hnsw.GraphOption[string]{
-				hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
-				hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
-			}
-			if config.EfConstruct > 0 {
-				graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](config.EfConstruct))
-			}
-			hnswGraph = NewHNSWGraph(collectionName, graphOptions...)
+			hnswGraph = emptyHNSWGraph(collection)
 		} else {
-			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-			hnswGraph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, graphBinaryReader)
+			hnswGraph, err = loadPersistedHNSWGraph(db, collection, collectionConfig)
 			if err != nil {
 				if collectionConfig.TryRebuildHNSWIndex {
-					log.Warnf("load hnsw graph from binary error: %v, try to rebuild hnsw graph, migrate hnsw graph from db", err)
-					err := MigrateHNSWGraph(db, collection)
+					hnswGraph, err = recoverCorruptedHNSWGraph(db, collection, collectionConfig, err)
 					if err != nil {
-						if errors.Is(err, graphNodesIsEmpty) {
-							// 知识库没有文档，创建空的 HNSW 图
-							graphOptions := []hnsw.GraphOption[string]{
-								hnsw.WithHNSWParameters[string](collection.M, collection.Ml, collection.EfSearch),
-								hnsw.WithDistance[string](hnsw.GetDistanceFunc(collection.DistanceFuncType)),
-							}
-							if collection.EfConstruct > 0 {
-								graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](collection.EfConstruct))
-							}
-							hnswGraph = NewHNSWGraph(collection.Name, graphOptions...)
-						} else {
-							return nil, utils.Wrap(err, "migrate hnsw graph")
-						}
-					} else {
-						graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-						hnswGraph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, graphBinaryReader)
-						if err != nil {
-							return nil, utils.Wrap(err, "parse hnsw graph from binary")
-						}
+						return nil, err
 					}
 				} else {
 					return nil, utils.Wrap(err, "parse hnsw graph from binary")
 				}
-			}
-		}
-
-		if collection.EnablePQMode {
-			if len(collection.CodeBookBinary) != 0 {
-				codeBook, err := hnsw.ImportCodebook(bytes.NewReader(collection.CodeBookBinary))
-				if err != nil {
-					return nil, utils.Errorf("import codebook from binary err: %v", err)
-				}
-				hnswGraph.SetPQCodebook(codeBook)
-				hnswGraph.SetPQQuantizer(pq.NewQuantizer(codeBook))
 			}
 		}
 	}
@@ -217,6 +224,111 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 		})
 	}
 	return wrapper, nil
+}
+
+func emptyHNSWGraph(collection *schema.VectorStoreCollection) *hnsw.Graph[string] {
+	graphOptions := []hnsw.GraphOption[string]{
+		hnsw.WithHNSWParameters[string](collection.M, collection.Ml, collection.EfSearch),
+		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collection.DistanceFuncType)),
+	}
+	if collection.EfConstruct > 0 {
+		graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](collection.EfConstruct))
+	}
+	return NewHNSWGraph(collection.Name, graphOptions...)
+}
+
+func loadPersistedHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (graph *hnsw.Graph[string], err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			graph = nil
+			err = utils.Errorf("panic while decoding persisted HNSW/PQ binary: %v", recovered)
+		}
+	}()
+
+	graph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, bytes.NewReader(collection.GraphBinary))
+	if err != nil {
+		return nil, utils.Wrap(err, "decode hnsw graph binary")
+	}
+	if collection.EnablePQMode && len(collection.CodeBookBinary) != 0 {
+		codeBook, importErr := hnsw.ImportCodebook(bytes.NewReader(collection.CodeBookBinary))
+		if importErr != nil {
+			return nil, utils.Wrap(importErr, "decode pq codebook binary")
+		}
+		graph.SetPQCodebook(codeBook)
+		graph.SetPQQuantizer(pq.NewQuantizer(codeBook))
+	}
+	if graph.Len() > 0 && collection.Dimension > 0 && graph.Dims() != collection.Dimension {
+		return nil, utils.Errorf("persisted graph dimension mismatch: %d != %d", graph.Dims(), collection.Dimension)
+	}
+	return graph, nil
+}
+
+func migrateHNSWGraphWithTimeout(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig, resetPQ bool) error {
+	timeout := collectionConfig.HNSWRebuildTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return migrateHNSWGraphWithContext(ctx, db, collection, resetPQ)
+}
+
+func recoverCorruptedHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig, corruptionErr error) (*hnsw.Graph[string], error) {
+	// Rebuild a PQ collection from its retained full vectors and atomically
+	// downgrade it to standard HNSW, avoiding both damaged PQ binaries.
+	resetPQ := collection.EnablePQMode
+	log.Warnf("corrupted HNSW/PQ binary detected for collection %q: %v; attempting one rebuild from stored vectors", collection.Name, corruptionErr)
+	rebuildErr := migrateHNSWGraphWithTimeout(db, collection, collectionConfig, resetPQ)
+	if errors.Is(rebuildErr, graphNodesIsEmpty) {
+		if err := resetEmptyCorruptedGraph(db, collection, resetPQ); err == nil {
+			return emptyHNSWGraph(collection), nil
+		} else {
+			rebuildErr = err
+		}
+	}
+	if rebuildErr == nil {
+		collectionConfig.EnablePQ = collection.EnablePQMode
+		graph, validateErr := loadPersistedHNSWGraph(db, collection, collectionConfig)
+		if validateErr == nil {
+			log.Infof("successfully rebuilt corrupted HNSW/PQ binary for collection %q", collection.Name)
+			return graph, nil
+		}
+		rebuildErr = utils.Wrap(validateErr, "validate rebuilt hnsw graph")
+	}
+
+	if !collectionConfig.AutoDeleteCorruptedRAG {
+		return nil, utils.Errorf("corrupted HNSW/PQ binary rebuild failed: %v", rebuildErr)
+	}
+	deleteErr := DeleteCorruptedRAG(db, collection)
+	if deleteErr != nil {
+		return nil, utils.Errorf("corrupted HNSW/PQ binary rebuild failed: %v; delete corrupted RAG failed: %v", rebuildErr, deleteErr)
+	}
+	log.Errorf("deleted unrecoverable corrupted RAG %q after rebuild failed: %v", collection.Name, rebuildErr)
+	return nil, fmt.Errorf("%w: %s", ErrCorruptedRAGDeleted, collection.Name)
+}
+
+func resetEmptyCorruptedGraph(db *gorm.DB, collection *schema.VectorStoreCollection, resetPQ bool) error {
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		updates := map[string]interface{}{"graph_binary": []byte(nil)}
+		if resetPQ {
+			updates["enable_pq_mode"] = false
+			updates["code_book_binary"] = []byte(nil)
+			if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).
+				Update("pq_code", []byte(nil)).Error; err != nil {
+				return utils.Wrap(err, "clear empty graph pq codes")
+			}
+		}
+		return tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Updates(updates).Error
+	})
+	if err != nil {
+		return utils.Wrap(err, "reset empty corrupted graph")
+	}
+	collection.GraphBinary = nil
+	if resetPQ {
+		collection.EnablePQMode = false
+		collection.CodeBookBinary = nil
+	}
+	return nil
 }
 
 var (
