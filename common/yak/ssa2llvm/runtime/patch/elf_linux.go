@@ -95,7 +95,8 @@ func findModtextModules(sections []elfSection) []string {
 	return out
 }
 
-// collectModtextSymbols returns symtab indices of symbols in .modtext.<module> sections.
+// collectModtextSymbols maps the symtab index of every symbol living in a
+// .modtext.<module> section to that module's name.
 func collectModtextSymbols(data []byte, sections []elfSection, onlyModules []string) (map[uint32]string, error) {
 	var symtab *elfSection
 	var strtab *elfSection
@@ -113,73 +114,50 @@ func collectModtextSymbols(data []byte, sections []elfSection, onlyModules []str
 	if int(symtab.offset)+int(symtab.size) > len(data) {
 		return nil, fmt.Errorf("symtab out of range")
 	}
-	modtextSec := map[uint16]bool{}
-	if len(onlyModules) == 0 {
-		// 未指定时收集全部 .modtext.*
-		for _, s := range sections {
-			if strings.HasPrefix(s.name, ".modtext.") {
-				modtextSec[uint16(s.idx)] = true
-			}
-		}
-	} else {
-		only := map[string]bool{}
-		for _, m := range onlyModules {
-			if m != "" {
-				only[m] = true
-			}
-		}
-		for _, s := range sections {
-			if strings.HasPrefix(s.name, ".modtext.") {
-				m := strings.TrimPrefix(s.name, ".modtext.")
-				if only[m] {
-					modtextSec[uint16(s.idx)] = true
-				}
-			}
+	only := map[string]bool{}
+	for _, m := range onlyModules {
+		if m != "" {
+			only[m] = true
 		}
 	}
-	str := data[strtab.offset : strtab.offset+strtab.size]
+	// An empty onlyModules means "every .modtext.* section".
+	modtextSec := map[uint16]string{}
+	for _, s := range sections {
+		if !strings.HasPrefix(s.name, ".modtext.") {
+			continue
+		}
+		m := strings.TrimPrefix(s.name, ".modtext.")
+		if len(only) == 0 || only[m] {
+			modtextSec[uint16(s.idx)] = m
+		}
+	}
 	count := int(symtab.size) / elf64SymSize
 	modtextSyms := map[uint32]string{}
 	for i := 0; i < count; i++ {
 		off := int(symtab.offset) + i*elf64SymSize
 		shndx := binary.LittleEndian.Uint16(data[off+6:])
-		if !modtextSec[shndx] {
+		module, ok := modtextSec[shndx]
+		if !ok {
 			continue
 		}
-		nameOff := binary.LittleEndian.Uint32(data[off:])
-		name := ""
-		if int(nameOff) < len(str) {
-			end := bytes.IndexByte(str[nameOff:], 0)
-			if end >= 0 {
-				name = string(str[nameOff : nameOff+uint32(end)])
-			}
-		}
 		// symbol table index i is the RAW index (0 = null), matching r_info>>32.
-		modtextSyms[uint32(i)] = name
+		modtextSyms[uint32(i)] = module
 	}
 	return modtextSyms, nil
 }
 
 // neutralizeModtextRelocs redirects RELA entries that referenced removed
-// .modtext.<module> symbols to the retained yakUnusedModuleStub. Zeroing the
+// .modtext.<module> symbols to that module's retained stub. Zeroing the
 // relocation entries is not safe: a PC-relative relocation in retained code
 // then computes a garbage address (for example an LEA that materializes a
 // function pointer), which later crashes on an indirect call. Pointing every
-// such reference at a no-op stub keeps absolute data slots, PC-relative code,
-// and function tables safe while lld still drops the module section itself.
+// such reference at a stub keeps absolute data slots, PC-relative code, and
+// function tables safe while lld still drops the module section itself.
 func neutralizeModtextRelocs(data []byte, sections []elfSection, modtextSyms map[uint32]string, removedModules map[string]bool) (int, error) {
 	if len(modtextSyms) == 0 {
 		return 0, nil
 	}
-	stubRaw, err := findRawSymbol(data, sections, "main.yakUnusedModuleStub")
-	if err != nil {
-		// Older archives built before the stub existed cannot redirect; fall
-		// back to the previous zeroing behavior so they still link. The zeroed
-		// PC-relative slots are unsafe at runtime, which is why new archives
-		// include the stub, but a fallback keeps the tool usable with old
-		// embedded assets during migration/baseline checks.
-		stubRaw = 0
-	}
+	stubs := resolveModuleStubs(data, sections, removedModules)
 	total := 0
 	for _, s := range sections {
 		if s.typ != uint32(elf.SHT_RELA) || s.size == 0 {
@@ -227,9 +205,11 @@ func neutralizeModtextRelocs(data []byte, sections []elfSection, modtextSyms map
 			off := int(s.offset) + i*elf64RelaSize
 			rInfo := binary.LittleEndian.Uint64(data[off+8:])
 			rSym := uint32(rInfo >> 32)
-			if _, ok := modtextSyms[rSym]; !ok {
+			module, ok := modtextSyms[rSym]
+			if !ok {
 				continue
 			}
+			stubRaw := stubs[module]
 			if stubRaw == 0 {
 				for k := 0; k < elf64RelaSize; k++ {
 					data[off+k] = 0
@@ -258,6 +238,28 @@ func neutralizeModtextRelocs(data []byte, sections []elfSection, modtextSyms map
 		}
 	}
 	return total, nil
+}
+
+// resolveModuleStubs picks the redirect target for each removed module. The
+// per-module stub names the module it stands for when it is called, so a wrong
+// dependency closure reports which module to add. Archives built before the
+// per-module stubs existed only have the generic one; archives older still have
+// none, and those relocations get zeroed (unsafe at runtime, but it keeps the
+// tool usable against a baseline archive). A missing entry means "zero it".
+func resolveModuleStubs(data []byte, sections []elfSection, removedModules map[string]bool) map[string]uint32 {
+	generic, err := findRawSymbol(data, sections, "main.yakUnusedModuleStub")
+	if err != nil {
+		generic = 0
+	}
+	stubs := make(map[string]uint32, len(removedModules))
+	for module := range removedModules {
+		if raw, err := findRawSymbol(data, sections, "main.yakPrunedModuleStub_"+module); err == nil {
+			stubs[module] = raw
+			continue
+		}
+		stubs[module] = generic
+	}
+	return stubs
 }
 
 func findRawSymbol(data []byte, sections []elfSection, name string) (uint32, error) {

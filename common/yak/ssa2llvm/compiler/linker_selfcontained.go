@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed/assets"
@@ -94,6 +95,16 @@ func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string,
 		if err != nil {
 			return err
 		}
+		// A module the archive cannot register is an undefined symbol at link
+		// time, and the in-process lld dies on SIGSEGV while reporting it
+		// instead of returning an error. Check the object against the
+		// archive's symbol index first, so this ends in a sentence naming the
+		// module. The inputs do not change between attempts.
+		if attempt == 0 {
+			if err := checkModulesAvailable(objFile, rp.Libyak); err != nil {
+				return err
+			}
+		}
 		// Compile-time yaklib pruning: remove references into unused .modtext
 		// sections so lld --gc-sections can drop those modules from the final
 		// binary. Always invoked; Patch itself no-ops when there are no split
@@ -113,12 +124,17 @@ func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string,
 
 		linkArgs := append([]string{}, extraArgs...)
 		// Link-time size reduction (no libyak.a change): drop unreferenced
-		// sections, fold identical functions, and strip debug info + the symbol
-		// table. The Go c-archive puts each object's code in a single .text, so
-		// gc-sections mainly reclaims unused C/cgo + libgcc code; stripping
-		// removes DWARF/symtab. Safe for a static AOT executable (Go reflection
-		// uses its own rodata itab/typelinks, not the ELF symtab).
-		linkArgs = append(linkArgs, "--gc-sections", "--icf=safe", "-s")
+		// sections and strip debug info + the symbol table. Safe for a static
+		// AOT executable (Go reflection uses its own rodata itab/typelinks, not
+		// the ELF symtab).
+		//
+		// --icf=safe is deliberately NOT used. ld.lld's safe ICF needs the
+		// .llvm_addrsig section clang emits with -faddrsig; neither go.o nor the
+		// GCC-built system archives have it, so lld treats every symbol as
+		// address-significant and folds nothing. Worse, if it did fold, two
+		// identical Go functions would share one address and runtime.textsectmap
+		// would attribute the folded PC to the wrong function.
+		linkArgs = append(linkArgs, "--gc-sections", "-s")
 		in := llvm.StaticLinkInput{
 			ObjectPath: objFile,
 			Archives:   archives,
@@ -159,6 +175,26 @@ func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string,
 		}
 	}
 	return fmt.Errorf("self-contained link did not converge on retained module set")
+}
+
+// checkModulesAvailable fails when the embedded libyak.a was built without a
+// module the script uses. The embedded archive carries a fixed module set
+// (SSA2LLVM_EMBED_MODULES at build time), so a script reaching for anything
+// outside it can only be fixed by rebuilding the runtime.
+func checkModulesAvailable(objPath, archivePath string) error {
+	missing, err := patch.MissingModuleRegistrations(objPath, archivePath)
+	if err != nil || len(missing) == 0 {
+		return err
+	}
+	available, err := patch.ArchiveModules(archivePath)
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("the embedded runtime has no yaklib module %q; it was built with: %s\n"+
+		"rebuild it including the missing module(s):\n"+
+		"  SSA2LLVM_EMBED_MODULES=%s bash common/yak/ssa2llvm/scripts/build_yaklib.sh",
+		strings.Join(missing, ", "), strings.Join(available, ", "),
+		strings.Join(append(available, missing...), ","))
 }
 
 // resolveSCWorkDir returns the directory to release embedded assets into. It

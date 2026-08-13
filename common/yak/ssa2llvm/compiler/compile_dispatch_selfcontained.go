@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/go-llvm"
 )
@@ -58,16 +59,57 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 	if len(usedModules) > 0 {
 		usedModules = append(usedModules, "shared")
 	}
-	if containsModule(usedModules, "poc") {
-		usedModules = append(usedModules, "cli")
-	}
-	if containsModule(usedModules, "ssa") {
-		usedModules = append(usedModules, "ssafront")
+	for _, dep := range moduleGroupDeps {
+		if !containsModule(usedModules, dep.module) {
+			continue
+		}
+		for _, need := range dep.needs {
+			if !containsModule(usedModules, need) {
+				usedModules = append(usedModules, need)
+			}
+		}
 	}
 	if err := CompileObjectToBinarySCWithPatch(objPath, outputFile, cfg.WorkDir, cfg.ObfArchives, usedModules, cfg.ExtraLinkArgs...); err != nil {
 		return "", nil, err
 	}
 	return "", nil, nil
+}
+
+// moduleGroupDeps is what a used module drags in besides its own section.
+//
+// One module's code can call another's, and both call into the split shared
+// closure. `go list -deps` on the modules' entry packages is what says so:
+// common/utils/cli (the cli module) is in the closure of http, poc and ssa,
+// and common/utils/lowhttp/poc is in the closure of http and ssa. Without an
+// entry here the call lands in the missing group's stub — at run time, in
+// whatever code path first needs it.
+//
+// "sharednet" holds what the codec/os/str shims never touch (mostly the
+// network, TLS and database stacks), so a pure-computation script does not pay
+// for it. Its module list must stay equal to the one elfsplit generated into
+// generatedSharedGroupModules["sharednet"].
+var moduleGroupDeps = []struct {
+	module string
+	needs  []string
+}{
+	{"poc", []string{"cli", "sharednet"}},
+	{"http", []string{"cli", "poc", "sharednet"}},
+	{"cli", []string{"sharednet"}},
+	{"ssa", []string{"cli", "poc", "ssafront", "sharednet"}},
+}
+
+// moduleClosureKey identifies the rules above for the build cache. A cached
+// binary was linked with one particular closure; changing the rules has to
+// invalidate it, or the next build silently reuses a binary missing a module.
+func moduleClosureKey() string {
+	var b strings.Builder
+	for _, dep := range moduleGroupDeps {
+		b.WriteString(dep.module)
+		b.WriteString("=>")
+		b.WriteString(strings.Join(dep.needs, "+"))
+		b.WriteString(";")
+	}
+	return b.String()
 }
 
 func containsModule(modules []string, want string) bool {
