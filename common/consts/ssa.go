@@ -136,24 +136,31 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 }
 
 func ssaDatabaseOpenOptions() databaseOpenOptions {
+	// SSA-only SQLite open settings. Project/general DBs keep
+	// defaultDatabaseOpenOptions() (single connection, synchronous=OFF,
+	// no _txlock). Injected via databaseOpenOptions so database.go stays generic.
+	options := databaseOpenOptions{
+		sqliteMaxOpenConns: 8,
+		sqlitePrivateCache: true,
+		sqliteSynchronous:  "NORMAL",
+		sqliteTxLock:       "immediate",
+	}
 	raw := strings.TrimSpace(os.Getenv(ENV_SSA_SQLITE_MAX_OPEN_CONNS))
 	if raw == "" {
 		// Default: WAL multi-read + single-writer queue. SQLite WAL allows
 		// concurrent readers and one writer; _txlock=immediate makes write
 		// transactions queue behind busy_timeout instead of deadlocking.
-		return databaseOpenOptions{
-			sqliteMaxOpenConns: 8,
-			sqlitePrivateCache: true,
-		}
+		return options
 	}
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 1 || n > 16 {
-		return defaultDatabaseOpenOptions()
+		options.sqliteMaxOpenConns = 1
+		options.sqlitePrivateCache = false
+		return options
 	}
-	return databaseOpenOptions{
-		sqliteMaxOpenConns: n,
-		sqlitePrivateCache: n > 1,
-	}
+	options.sqliteMaxOpenConns = n
+	options.sqlitePrivateCache = n > 1
+	return options
 }
 
 func GetTempSSADataBase() (*gorm.DB, error) {

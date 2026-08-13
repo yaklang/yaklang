@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-		"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -75,5 +75,3 @@ class B {
 		)
 	})
 }
-
-
