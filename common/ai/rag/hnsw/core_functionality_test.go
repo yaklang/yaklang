@@ -1,6 +1,7 @@
 package hnsw
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"math/rand"
@@ -178,6 +179,43 @@ func TestCoreInsertAndSearch(t *testing.T) {
 
 		log.Infof("Serialization consistency test completed - all results are identical!")
 	})
+}
+
+func TestCustomDistanceIsUsed(t *testing.T) {
+	manhattan := func(af, bf Vector) float64 {
+		a, b := af(), bf()
+		var distance float64
+		for i := range a {
+			distance += math.Abs(float64(a[i] - b[i]))
+		}
+		return distance
+	}
+	graph := NewGraph[int](WithDistance[int](manhattan), WithDeterministicRng[int](1))
+	graph.Add(
+		MakeInputNode(1, []float32{10, 0}),
+		MakeInputNode(2, []float32{1, 1}),
+	)
+	results := graph.Search([]float32{1, 0}, 1)
+	require.Len(t, results, 1)
+	require.Equal(t, 2, results[0].Key)
+}
+
+func TestImportReconfiguresDistance(t *testing.T) {
+	var encoded bytes.Buffer
+	_, err := multiBinaryWrite(&encoded, encodingVersion, 16, 0.25, 20, "euclidean")
+	require.NoError(t, err)
+	_, err = binaryWrite(&encoded, 0) // no layers; add nodes after importing the settings
+	require.NoError(t, err)
+
+	restored := NewGraph[int]() // starts with cosine and must switch on Import
+	require.NoError(t, restored.Import(&encoded))
+	restored.Add(
+		MakeInputNode(1, []float32{100, 0}),
+		MakeInputNode(2, []float32{1, 1}),
+	)
+	results := restored.Search([]float32{1, 0}, 1)
+	require.Len(t, results, 1)
+	require.Equal(t, 2, results[0].Key)
 }
 
 // TestCoreDeleteFunctionality 测试删除功能
