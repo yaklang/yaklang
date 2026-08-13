@@ -285,11 +285,9 @@ func (gw *GraphWrapper[K]) Add(nodes ...hnsw.InputNode[K]) time.Duration {
 		params: fmt.Sprintf("nodes_count=%d", len(nodes)),
 		fn: func() {
 			start := time.Now()
-			defer func() {
-				pureUseTime = time.Since(start)
-			}()
 			defer close(done)
 			gw.graph.Add(nodes...)
+			pureUseTime = time.Since(start)
 		},
 	})
 	<-done
