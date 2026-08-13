@@ -985,24 +985,20 @@ func (c *Cache[T, D]) Barrier() error {
 		return nil
 	}
 
-	// Check if saver has already failed — return error immediately.
-	// Do NOT call resident.Wait() — items pending in the marshal pipe
-	// will never be FinishPersist'd (saver rejected them), so Wait()
-	// would block forever. The compile loop should stop on this error.
-	if c.saver != nil && c.saver.failed.Load() {
-		return c.saver.recordedErr()
-	}
-
 	// A marshal request becomes a persistWG entry before it reaches the saver.
 	// Draining the saver only after resident.Wait creates a cycle for a partial
 	// batch: the wait needs FinishPersist, while FinishPersist needs a saver
 	// flush. Keep flushing until all currently pending requests settle; this
 	// also covers requests that cross marshalPipe just after an earlier flush.
+	// A recorded save error must not shortcut this drain: batches already in
+	// the saver buffer (and requests still crossing the marshal pipe) settle
+	// as PersistFailed without re-entering the save callback, so Barrier can
+	// wait for every pending request and still return the error to the caller.
+	var firstErr error
 	if c.saver != nil {
 		for c.resident.PendingCount() > 0 {
-			if err := c.saver.Flush(); err != nil {
-				c.waitAsyncDrains()
-				return err
+			if err := c.saver.Flush(); err != nil && firstErr == nil {
+				firstErr = err
 			}
 			if c.resident.PendingCount() > 0 {
 				time.Sleep(time.Millisecond)
@@ -1019,7 +1015,9 @@ func (c *Cache[T, D]) Barrier() error {
 	// after Barrier returns, so do not let a callback race that close.
 	c.waitAsyncDrains()
 
-	// Return any recorded error from the saver
+	if firstErr != nil {
+		return firstErr
+	}
 	if c.saver != nil {
 		return c.saver.recordedErr()
 	}
