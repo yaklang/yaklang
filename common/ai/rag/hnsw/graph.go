@@ -120,11 +120,14 @@ type FilterFunc[K cmp.Ordered] func(key K, vector Vector) bool
 type searchCandidate[K cmp.Ordered] struct {
 	node hnswspec.LayerNode[K]
 	dist float64
+	// order preserves the legacy heap behavior for equal distances: candidates
+	// discovered earlier remain ahead of candidates discovered later.
+	order uint64
 }
 
 func (s searchCandidate[K]) Less(o searchCandidate[K]) bool {
 	if s.dist == o.dist {
-		return s.node.GetKey() < o.node.GetKey()
+		return s.order < o.order
 	}
 	return s.dist < o.dist
 }
@@ -138,7 +141,7 @@ type farthestSearchCandidate[K cmp.Ordered] struct {
 
 func (s farthestSearchCandidate[K]) Less(o farthestSearchCandidate[K]) bool {
 	if s.dist == o.dist {
-		return s.node.GetKey() > o.node.GetKey()
+		return s.order > o.order
 	}
 	return s.dist > o.dist
 }
@@ -249,6 +252,7 @@ func search[K cmp.Ordered](
 	workspace.reset()
 
 	first := searchCandidate[K]{node: entryNode, dist: distance(entryNode, targetNode)}
+	var discoveryOrder uint64
 
 	// The candidate queue is nearest-first. The found queue is farthest-first
 	// and provides the SEARCH-LAYER exploration bound.
@@ -304,7 +308,8 @@ func search[K cmp.Ordered](
 		}
 
 		for i, neighbor := range workspace.neighborNodes {
-			candidate := searchCandidate[K]{node: neighbor, dist: workspace.neighborDists[i]}
+			discoveryOrder++
+			candidate := searchCandidate[K]{node: neighbor, dist: workspace.neighborDists[i], order: discoveryOrder}
 			if found.Len() >= efSearch {
 				worst := found.Min().searchCandidate
 				if !candidate.Less(worst) {
@@ -343,6 +348,18 @@ func search[K cmp.Ordered](
 	for i := len(finalResult) - 1; i >= 0; i-- {
 		finalResult[i] = result.Pop().searchCandidate
 	}
+	// Return nearest-first while retaining discovery order for exact ties. The
+	// previous heap exposed this order to callers, and some vector-store queries
+	// legitimately contain duplicate embeddings.
+	slices.SortFunc(finalResult, func(a, b searchCandidate[K]) int {
+		if a.dist < b.dist {
+			return -1
+		}
+		if a.dist > b.dist {
+			return 1
+		}
+		return cmp.Compare(a.order, b.order)
+	})
 	return finalResult
 }
 
