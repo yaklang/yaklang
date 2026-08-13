@@ -10,7 +10,8 @@ This crawler is tuned to get results quickly: it minimizes retries and can
 automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
 
 Output includes:
-  1. Crawl summary (requests made, total URLs discovered, pending URLs)
+  1. Crawl summary (requests made, total URLs discovered, pending URLs,
+     status code distribution)
   2. Requested URLs with HTTP method, response status, content type, body size,
      and redirect location when available.
   3. Found URLs discovered in responses but NOT yet requested.
@@ -115,12 +116,24 @@ if httpsFallback {
 requestLines = []
 totalResults = 0
 lastErr = ""
+statusCodeCounts = {}
 usedFallback = false
 for currentStartUrl in targetCandidates {
     reqCh, err := crawler.Start(currentStartUrl, opts...)
     if err != nil {
-        lastErr = sprintf("crawler failed for %v: %v", currentStartUrl, err)
-        yakit.Info(lastErr)
+        lastErr = sprint(err)
+        errLower = str.ToLower(lastErr)
+        if str.Contains(errLower, "no such host") || str.Contains(errLower, "dns") || str.Contains(errLower, "lookup") || str.Contains(errLower, "resolve") {
+            yakit.Error("[crawl error: dns] crawler failed for %v: %v. Recovery: DNS resolution failed. Check the hostname spelling or verify DNS server.", currentStartUrl, err)
+        } elif str.Contains(errLower, "timeout") || str.Contains(errLower, "deadline") {
+            yakit.Error("[crawl error: timeout] crawler failed for %v: %v. Recovery: increase the timeout parameter (current: %vs) or check if the target is slow.", currentStartUrl, err, timeoutSecond)
+        } elif str.Contains(errLower, "tls") || str.Contains(errLower, "certificate") || str.Contains(errLower, "x509") {
+            yakit.Error("[crawl error: tls] crawler failed for %v: %v. Recovery: TLS handshake failed. Try http:// instead of https://, or check the certificate.", currentStartUrl, err)
+        } elif str.Contains(errLower, "connection refused") || str.Contains(errLower, "reset") || str.Contains(errLower, "EOF") {
+            yakit.Error("[crawl error: connection] crawler failed for %v: %v. Recovery: Connection was refused or reset. The target may be down or blocking connections.", currentStartUrl, err)
+        } else {
+            yakit.Error("[crawl error: unknown] crawler failed for %v: %v. Recovery: check the start URL, network connectivity, and crawler parameters, then retry.", currentStartUrl, err)
+        }
         continue
     }
 
@@ -145,6 +158,7 @@ for currentStartUrl in targetCandidates {
         contentType = ""
         bodySize = 0
         redirectLocation = ""
+        statusCode = 0
         try {
             rsp, _ := http.dump(result.Response()[0])
             _, statusCode, statusText = poc.GetHTTPPacketFirstLine(rsp)
@@ -162,6 +176,17 @@ for currentStartUrl in targetCandidates {
         if rawUrlstr != urlstr && str.HasPrefix(status, "404") {
             continue
         }
+
+        // collect status code for distribution summary
+        if statusCode > 0 {
+            sc = sprint(statusCode)
+            if sc in statusCodeCounts {
+                statusCodeCounts[sc] = statusCodeCounts[sc] + 1
+            } else {
+                statusCodeCounts[sc] = 1
+            }
+        }
+
         responseInfo = [sprintf("bytes=%v", bodySize)]
         if contentType != "" {
             responseInfo.Append("type=" + contentType)
@@ -169,7 +194,9 @@ for currentStartUrl in targetCandidates {
         if redirectLocation != "" {
             responseInfo.Append("location=" + redirectLocation)
         }
-        requestLines.Append(sprintf("[%v] [%v] [%v] %v", method, status, str.Join(responseInfo, "; "), urlstr))
+        crawlLine = sprintf("[%v] [%v] [%v] %v", method, status, str.Join(responseInfo, "; "), urlstr)
+        requestLines.Append(crawlLine)
+        yakit.Info("[crawled] %v", crawlLine)
     }
 
     if currentResults > 0 {
@@ -185,7 +212,7 @@ for currentStartUrl in targetCandidates {
 }
 
 if totalResults == 0 && lastErr != "" {
-    yakit.Info(lastErr)
+    yakit.Error("[crawl error: no results] crawler produced no results. Last error: %v. Recovery: check the start URL is reachable, verify network/DNS/TLS, or try a different URL. If HTTPS failed, the tool already tried HTTP fallback.", lastErr)
 }
 if usedFallback {
     yakit.Info("HTTP fallback succeeded after the HTTPS crawl returned no results")
@@ -227,10 +254,37 @@ output.WriteString(sprintf("Requests sent:   %v\n", requestedCount))
 output.WriteString(sprintf("URLs discovered: %v (includes URLs found in responses but not yet requested)\n", discoveredCount))
 output.WriteString(sprintf("Pending:         %v\n", pendingCount))
 
-output.WriteString("\n=== Requested URLs ===\n")
-for line in requestLines {
-    output.WriteString(line)
-    output.WriteString("\n")
+// build status code distribution line
+statusCodeParts = []
+for sc, cnt in statusCodeCounts {
+    statusCodeParts.Push(sprintf("%v=%v", sc, cnt))
+}
+// sort by status code for stable output
+statusCodePartsSorted = []
+for sc in ["200", "201", "204", "301", "302", "304", "400", "401", "403", "404", "405", "429", "500", "502", "503", "504"] {
+    for part in statusCodeParts {
+        if str.HasPrefix(part, sc + "=") {
+            statusCodePartsSorted.Push(part)
+        }
+    }
+}
+// add any remaining status codes not in the predefined list
+for part in statusCodeParts {
+    found2 = false
+    for sortedPart in statusCodePartsSorted {
+        if part == sortedPart {
+            found2 = true
+            break
+        }
+    }
+    if !found2 {
+        statusCodePartsSorted.Push(part)
+    }
+}
+if len(statusCodePartsSorted) > 0 {
+    output.WriteString(sprintf("Status codes:    %v\n", str.Join(statusCodePartsSorted, ", ")))
+} else {
+    output.WriteString("Status codes:    (none)\n")
 }
 
 output.WriteString("\n=== Found URLs ===\n")
@@ -260,8 +314,16 @@ if len(result) <= 30000 {
     yakit.Info(result[:30000] + "... (truncated)")
 }
 
+// file save includes summary + forest + requested URLs (full record)
+fileResult = result
+if len(requestLines) > 0 {
+    fileResult = fileResult + "\n=== Requested URLs ===\n"
+    for line in requestLines {
+        fileResult = fileResult + line + "\n"
+    }
+}
 try {
     name := file.TempFileName(`crawler-result-*.txt`)~
-    file.Save(name, result)~
-    yakit.Info("crawler result log saved: %v (size: %v)", name, len(result))
+    file.Save(name, fileResult)~
+    yakit.Info("crawler result log saved: %v (size: %v)", name, len(fileResult))
 } catch {}
