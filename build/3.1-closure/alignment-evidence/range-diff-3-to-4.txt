@@ -1,0 +1,37 @@
+ 1:  043488df3 =  1:  2150b29f5 perf(ssa): async persist pipeline, per-batch flush, and large-project memory
+ 2:  023ecf002 =  2:  f3e51a8f1 perf(ssaapi): Path A reload, fast-path include, and scan-phase tuning
+ 3:  674a5e0cc =  3:  eb13ee5e7 perf(sfvm): reduce symbol snapshot and anchor BitVector allocation
+ 4:  733d9b9eb =  4:  344e93c08 perf(memedit): compact rune offset map; fix(xml2): decode ISO-8859-1
+ 5:  208499448 =  5:  584c3ac82 fix(consts): SQLite WAL multi-read + single-writer, default pool=8
+ 6:  72f93150d =  6:  fdd82ead2 fix(memedit): atomic line/rune caches for concurrent shared editors
+ -:  --------- >  7:  df1fe835b build(gorm): pin online gorm hash for CreateInBatches perf
+ -:  --------- >  8:  1bf717d5d fix(ssa): restore named FunctionType String() to return its name
+ -:  --------- >  9:  02fb0b8f1 fix(ssaapi): clear old IR rows when recompiling an existing program name
+ -:  --------- > 10:  3b2b7b2af fix(ssaapi/test): sync embedded rules before java fast-path log-forging test
+ -:  --------- > 11:  fcad1921a fix(dbcache): settle every pending persist exactly once after save failure
+ -:  --------- > 12:  c88eac502 test(dbcache): make AsyncDrainKeysAndShrink batch-scope test deterministic
+ -:  --------- > 13:  f2ca24127 fix(dbcache): flush queued saver tasks before settlement barrier
+ -:  --------- > 14:  cf4709b2e docs(dbcache): record post-rebase verification for settlement fix
+ 7:  b6f69c613 = 15:  00846a731 docs(ssaapi): scan perf optimization plan with goal-mode todos
+ 8:  a768693ba = 16:  a0103c110 perf(ssaapi): pool Value structs to cut NewValue GC allocation (A1)
+ 9:  f8bf75d1a = 17:  f470f99e6 perf(ssaapi): per-descent resolved-instruction dedup cache (A2)
+10:  ac21b671e = 18:  f2989e9d6 perf(sfvm): lazily build TakeSymbolSnapshot, share empty snapshot (B)
+11:  be190e578 = 19:  875ccb626 perf(utils): BitVector copy-on-write for Clone/Or (C)
+12:  57c1f0f3b = 20:  34d725543 perf(ssadb): native-SQL fast path for hot single-row IR reads (D)
+13:  6ad2b89f7 = 21:  5d9336a7f perf(memedit): memoize SafeString.String to cut ~23GB scan allocation (F)
+14:  fdeb59f04 = 22:  da09b5724 perf(ssa): demote benign skip-any-type-for-Function log to debug (F)
+15:  de1207a05 = 23:  94e19a5a5 perf(dbcache): RLock fast path in GetResident to cut lockSlow contention (F)
+16:  aaa4c17e0 = 24:  5e417d855 docs(ssaapi): mark Step F small items complete
+17:  5aeaff91f = 25:  50082df4c docs(ssaapi): record hadoop validation of A1/A2/B/C/D/F (Risk unchanged, ~22% faster)
+18:  52d73eb21 = 26:  d299164af docs(ssaapi): close A3 as not-needed (A1+A2 sufficient, hadoop validated)
+19:  16acb1b78 = 27:  cc1815a1d perf(utils/sfvm): in-place BitVector.Or for unique owners (O1)
+20:  d0d2424b7 = 28:  8b9005724 revert(utils/sfvm): in-place BitVector.Or (O1) — alias corruption hazard
+21:  091b4cdb5 = 29:  106e7d29e perf(ssadb): native-SQL batch IR read for PreloadIrCodesByIdsFast (O2)
+22:  737e32bc9 = 30:  8c06e0951 perf(ssaapi): lazily build sfCheck originalSnapshot on first real item (O3)
+23:  ab09c0f62 = 31:  46e7dfa82 perf(ssadb): native-SQL batch read in yieldIrCodes (A2)
+24:  ef67b36a7 = 32:  a10b96fe6 perf(ssadb): native-SQL ConstType ID query in SearchVariable (A3)
+ -:  --------- > 33:  e0f62eb6d fix(dbcache): drain all pending settlements before Barrier returns save error
+ -:  --------- > 34:  4a88ec424 test(dbcache): align AsyncDrainKeysAndShrinkIsBatchScoped batches via long save timeout
+ -:  --------- > 35:  cb7598064 test(ssaconfig): assert default scan concurrency follows DefaultCPUConcurrency
+ -:  --------- > 36:  cbcaed383 ci(ssa-test): give syntaxflow_scan a 3m package timeout
+ -:  --------- > 37:  d846dea34 docs(dbcache): record 3+4 combined-branch audit and verification

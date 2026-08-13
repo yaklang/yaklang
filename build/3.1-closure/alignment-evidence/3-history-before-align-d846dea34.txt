@@ -1,0 +1,24 @@
+ef67b36a7 perf(ssadb): native-SQL ConstType ID query in SearchVariable (A3)
+ab09c0f62 perf(ssadb): native-SQL batch read in yieldIrCodes (A2)
+737e32bc9 perf(ssaapi): lazily build sfCheck originalSnapshot on first real item (O3)
+091b4cdb5 perf(ssadb): native-SQL batch IR read for PreloadIrCodesByIdsFast (O2)
+d0d2424b7 revert(utils/sfvm): in-place BitVector.Or (O1) — alias corruption hazard
+16acb1b78 perf(utils/sfvm): in-place BitVector.Or for unique owners (O1)
+52d73eb21 docs(ssaapi): close A3 as not-needed (A1+A2 sufficient, hadoop validated)
+5aeaff91f docs(ssaapi): record hadoop validation of A1/A2/B/C/D/F (Risk unchanged, ~22% faster)
+aaa4c17e0 docs(ssaapi): mark Step F small items complete
+de1207a05 perf(dbcache): RLock fast path in GetResident to cut lockSlow contention (F)
+fdeb59f04 perf(ssa): demote benign skip-any-type-for-Function log to debug (F)
+6ad2b89f7 perf(memedit): memoize SafeString.String to cut ~23GB scan allocation (F)
+57c1f0f3b perf(ssadb): native-SQL fast path for hot single-row IR reads (D)
+be190e578 perf(utils): BitVector copy-on-write for Clone/Or (C)
+ac21b671e perf(sfvm): lazily build TakeSymbolSnapshot, share empty snapshot (B)
+f8bf75d1a perf(ssaapi): per-descent resolved-instruction dedup cache (A2)
+a768693ba perf(ssaapi): pool Value structs to cut NewValue GC allocation (A1)
+b6f69c613 docs(ssaapi): scan perf optimization plan with goal-mode todos
+72f93150d fix(memedit): atomic line/rune caches for concurrent shared editors
+208499448 fix(consts): SQLite WAL multi-read + single-writer, default pool=8
+733d9b9eb perf(memedit): compact rune offset map; fix(xml2): decode ISO-8859-1
+674a5e0cc perf(sfvm): reduce symbol snapshot and anchor BitVector allocation
+023ecf002 perf(ssaapi): Path A reload, fast-path include, and scan-phase tuning
+043488df3 perf(ssa): async persist pipeline, per-batch flush, and large-project memory
