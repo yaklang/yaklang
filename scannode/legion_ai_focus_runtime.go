@@ -422,7 +422,8 @@ func normalizeServerFocusResultTarget(authorizedTarget, candidate string) (strin
 	if err != nil {
 		return "", err
 	}
-	ref, err := url.Parse(strings.TrimSpace(candidate))
+	candidate = strings.TrimSpace(candidate)
+	ref, err := parseServerFocusResultReference(authorized, candidate)
 	if err != nil {
 		return "", err
 	}
@@ -434,6 +435,35 @@ func normalizeServerFocusResultTarget(authorizedTarget, candidate string) (strin
 		return "", fmt.Errorf("focus result target is outside the authorized origin")
 	}
 	return resolved.String(), nil
+}
+
+func parseServerFocusResultReference(authorized *url.URL, candidate string) (*url.URL, error) {
+	if strings.HasPrefix(candidate, "/") {
+		return url.Parse(candidate)
+	}
+	authorityEnd := strings.IndexAny(candidate, "/?#")
+	if authorityEnd < 0 {
+		authorityEnd = len(candidate)
+	}
+	authority := candidate[:authorityEnd]
+	suffix := candidate[authorityEnd:]
+	if strings.Count(authority, ":") > 1 && !strings.HasPrefix(authority, "[") {
+		if net.ParseIP(authority) == nil {
+			return url.Parse(candidate)
+		}
+		authority = "[" + authority + "]"
+	}
+	bare, normalizeErr := normalizeServerFocusURL(authorized.Scheme + "://" + authority + suffix)
+	if normalizeErr == nil && isServerFocusNetworkHost(bare.Hostname(), authorized.Hostname()) {
+		return bare, nil
+	}
+	return url.Parse(candidate)
+}
+
+func isServerFocusNetworkHost(hostname, authorizedHostname string) bool {
+	return net.ParseIP(hostname) != nil ||
+		strings.Contains(hostname, ".") ||
+		strings.EqualFold(hostname, authorizedHostname)
 }
 
 func applyServerFocusHeaders(request *http.Request, raw any) error {
