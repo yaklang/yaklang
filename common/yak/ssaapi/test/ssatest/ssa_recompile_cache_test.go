@@ -3,6 +3,7 @@ package ssatest
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -155,4 +156,31 @@ println(target_var)
 	}
 	require.True(t, found2, "Expected to find 'new_value' after recompilation")
 	require.False(t, foundOld, "Should NOT find 'old_value' after recompilation")
+}
+
+// TestFromDatabaseReloadsWhenIrUpdatedAtChanges covers the CI yak-grpc case:
+// another process rewrites IR without this process calling ProgramCache.Remove.
+func TestFromDatabaseReloadsWhenIrUpdatedAtChanges(t *testing.T) {
+	progName := uuid.NewString()
+	prog1, err := ssaapi.Parse(`a = 1`,
+		ssaapi.WithProgramName(progName),
+		ssaapi.WithLanguage(ssaconfig.Yak),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, prog1)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+
+	cached, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+	again, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+	require.True(t, cached == again, "same IR revision should stay cached")
+
+	require.NoError(t, ssadb.GetDB().Model(&ssadb.IrProgram{}).
+		Where("program_name = ?", progName).
+		Update("updated_at", time.Now().Add(2*time.Second)).Error)
+
+	reloaded, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+	require.True(t, cached != reloaded, "FromDatabase must drop cache when ir_programs.updated_at changes")
 }
