@@ -243,16 +243,7 @@ func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType strin
 
 // Drop 删除当前知识库
 func (kb *KnowledgeBase) Drop() error {
-	err := kb.ClearDocuments()
-	if err != nil {
-		return utils.Errorf("清空知识库文档失败: %v", err)
-	}
-	err = kb.db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", kb.id).Unscoped().Delete(&schema.KnowledgeBaseInfo{}).Error
-	if err != nil {
-		return utils.Errorf("删除知识库信息失败: %v", err)
-	}
-	vectorstore.DeleteCollection(kb.db, kb.name)
-	return nil
+	return DeleteKnowledgeBaseByID(kb.db, kb.id)
 }
 
 // UpdateKnowledgeEntry 更新知识条目（使用事务）
@@ -264,10 +255,8 @@ func (kb *KnowledgeBase) UpdateKnowledgeEntry(id string, entry *schema.Knowledge
 	}
 
 	// 然后更新向量索引（事务外进行）
-	documentID := utils.InterfaceToString(entry.HiddenIndex)
-
 	// 删除旧的向量索引
-	if err := kb.vectorStore.Delete(documentID); err != nil {
+	if err := kb.deleteKnowledgeEntryVectorDocuments(entry.HiddenIndex); err != nil {
 		return utils.Errorf("删除旧向量索引失败: %v", err)
 	}
 
@@ -280,13 +269,30 @@ func (kb *KnowledgeBase) UpdateKnowledgeEntry(id string, entry *schema.Knowledge
 
 // DeleteKnowledgeEntry 删除知识条目（使用事务）
 func (kb *KnowledgeBase) DeleteKnowledgeEntry(entryID string) error {
-	if err := kb.vectorStore.Delete(entryID); err != nil {
+	if err := kb.deleteKnowledgeEntryVectorDocuments(entryID); err != nil {
 		return utils.Errorf("删除向量索引失败: %v", err)
 	}
 
 	err := yakit.DeleteKnowledgeBaseEntryByHiddenIndex(kb.db, entryID)
 	if err != nil {
 		return utils.Errorf("删除数据库条目失败: %v", err)
+	}
+	return nil
+}
+
+func (kb *KnowledgeBase) deleteKnowledgeEntryVectorDocuments(entryID string) error {
+	documentIDs := []string{entryID}
+	var questionDocumentIDs []string
+	if err := kb.db.Model(&schema.VectorStoreDocument{}).
+		Where("collection_id = ?", kb.vectorStore.GetCollectionInfo().ID).
+		Where("document_id LIKE ?", entryID+"_question_%").
+		Pluck("document_id", &questionDocumentIDs).Error; err != nil {
+		return utils.Errorf("查询知识问题索引失败: %v", err)
+	}
+	documentIDs = append(documentIDs, questionDocumentIDs...)
+
+	if err := kb.vectorStore.Delete(documentIDs...); err != nil {
+		return err
 	}
 	return nil
 }
@@ -361,8 +367,13 @@ func (kb *KnowledgeBase) CountKnowledgeEntries() (int, error) {
 
 // ClearDocuments 清空所有文档
 func (kb *KnowledgeBase) ClearDocuments() error {
-	kb.vectorStore.Clear()
-	kb.db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", kb.id).Unscoped().Delete(&schema.KnowledgeBaseEntry{})
+	if err := kb.vectorStore.Clear(); err != nil {
+		return utils.Errorf("清空向量文档失败: %v", err)
+	}
+	if err := kb.db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", kb.id).
+		Unscoped().Delete(&schema.KnowledgeBaseEntry{}).Error; err != nil {
+		return utils.Errorf("清空知识库条目失败: %v", err)
+	}
 	return nil
 }
 

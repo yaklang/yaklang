@@ -226,7 +226,7 @@ type VectorStoreDocument struct {
 	UID        []byte `gorm:"blob"`
 
 	// 所属集合的ID，建立外键关系
-	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"collection_id"`
+	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;index:idx_rag_vector_document_collection_id;not null" json:"collection_id"`
 
 	// 所属集合的 UUID，唯一值
 	CollectionUUID string `gorm:"uniqueIndex"`
@@ -365,7 +365,7 @@ type KnowledgeBaseEntry struct {
 	gorm.Model
 
 	// 知识库名称
-	KnowledgeBaseID int64 `gorm:"not null" json:"knowledge_base_id"`
+	KnowledgeBaseID int64 `gorm:"index:idx_rag_knowledge_entry_knowledge_base_id;not null" json:"knowledge_base_id"`
 
 	RelatedEntityUUIDS string // split by ","
 

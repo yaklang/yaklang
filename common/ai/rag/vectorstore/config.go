@@ -317,7 +317,36 @@ var IsMockMode = false
 
 // DeleteCollection 删除知识库
 func DeleteCollection(db *gorm.DB, name string) error {
-	return yakit.DeleteRAGCollection(db, name)
+	var collection schema.VectorStoreCollection
+	err := db.Model(&schema.VectorStoreCollection{}).
+		Select("id, uuid").
+		Where("name = ?", name).
+		First(&collection).Error
+	if err != nil {
+		return utils.Errorf("get VectorStoreCollection failed: %s", err)
+	}
+
+	err = utils.GormTransaction(db, func(tx *gorm.DB) error {
+		// Child rows are both larger and more numerous. Delete them first while
+		// the collection metadata is still available, then remove the parent.
+		if err := tx.Model(&schema.VectorStoreDocument{}).
+			Where("collection_id = ?", collection.ID).
+			Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+			return utils.Errorf("delete VectorStoreDocument failed: %s", err)
+		}
+		if err := tx.Model(&schema.VectorStoreCollection{}).
+			Where("id = ?", collection.ID).
+			Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
+			return utils.Errorf("delete VectorStoreCollection failed: %s", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	GraphWrapperManager.RemoveCollectionFromCache(db, &collection)
+	return nil
 }
 
 // ListCollections 获取所有知识库列表
