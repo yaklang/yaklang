@@ -322,6 +322,7 @@ if len(requestLines) > 0 {
         fileResult = fileResult + line + "\n"
     }
 }
+
 try {
     name := file.TempFileName(`crawler-result-*.txt`)~
     file.Save(name, fileResult)~
