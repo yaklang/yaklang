@@ -10,6 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestProjectDatabaseDefaultOpenKeepsMainBehavior(t *testing.T) {
+	t.Setenv(YakitSQLiteProjectMaxOpenConnsEnv, "")
+	db, err := createAndConfigDatabase(filepath.Join(t.TempDir(), "project-default.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.Equal(t, 1, db.DB().Stats().MaxOpenConnections,
+		"project/general SQLite must stay single-connection by default")
+	var syncMode string
+	require.NoError(t, db.Raw("PRAGMA synchronous").Row().Scan(&syncMode))
+	require.Equal(t, "0", syncMode, "project/general SQLite must keep synchronous=OFF")
+}
+
 func TestProjectDatabaseOpenOptions(t *testing.T) {
 	t.Run("default remains serialized", func(t *testing.T) {
 		t.Setenv(YakitSQLiteProjectMaxOpenConnsEnv, "")
@@ -17,6 +29,8 @@ func TestProjectDatabaseOpenOptions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, options.sqliteMaxOpenConns)
 		require.False(t, options.sqlitePrivateCache)
+		require.Empty(t, options.sqliteSynchronous)
+		require.Empty(t, options.sqliteTxLock)
 	})
 
 	t.Run("concurrent mode uses private cache", func(t *testing.T) {
@@ -86,7 +100,7 @@ func TestProjectSQLiteConcurrentReaderDoesNotBlockWriter(t *testing.T) {
 		require.NoError(t, conn.QueryRowContext(ctx, "PRAGMA cache_size").Scan(&cacheSize))
 		require.NoError(t, conn.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&journalMode))
 		require.Equal(t, 10000, busyTimeout)
-		require.Equal(t, 1, synchronous, "SQLite must be opened with synchronous=NORMAL, not OFF")
+		require.Equal(t, 0, synchronous, "project/general SQLite default remains synchronous=OFF")
 		require.Equal(t, 8000, cacheSize)
 		require.Equal(t, "wal", journalMode)
 	}

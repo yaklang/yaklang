@@ -2,7 +2,7 @@ package ssa
 
 import (
 	"fmt"
-	
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -107,7 +107,6 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 
 	// Build ensures all AddGlobalVariable lazy builders have executed.
 	prog.GlobalVariablesBlueprint.Build()
-	
 
 	// Load registered global variables from StaticMember (typically a few
 	// dozen), not all 21000+ memberPairs from globalVarsContainer.
@@ -149,7 +148,7 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 					keyVal, ok1 := rawAv.resolveLinkedValue(pair.key)
 					memberVal, ok2 := rawAv.resolveLinkedValue(pair.member)
 					if !ok1 || !ok2 {
-							continue
+						continue
 					}
 					keyStr := GetKeyString(keyVal)
 					if keyStr == "" {

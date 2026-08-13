@@ -37,6 +37,12 @@ var RegisterDriverOnce = new(sync.Once)
 type databaseOpenOptions struct {
 	sqliteMaxOpenConns int
 	sqlitePrivateCache bool
+	// sqliteSynchronous is the SQLite PRAGMA/DSN synchronous mode.
+	// Empty keeps the project/general default (OFF). SSA injects NORMAL.
+	sqliteSynchronous string
+	// sqliteTxLock is the SQLite DSN _txlock value.
+	// Empty omits it (project/general default). SSA injects "immediate".
+	sqliteTxLock string
 }
 
 func defaultDatabaseOpenOptions() databaseOpenOptions {
@@ -123,13 +129,19 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 		if options.sqlitePrivateCache {
 			cacheMode = "private"
 		}
+		syncMode := "OFF"
+		if options.sqliteSynchronous != "" {
+			syncMode = options.sqliteSynchronous
+		}
 		params := url.Values{
 			"mode":          []string{"rwc"},
 			"cache":         []string{cacheMode},
 			"_busy_timeout": []string{"10000"},
-			"_synchronous":  []string{"NORMAL"},
-			"_txlock":       []string{"immediate"},
+			"_synchronous":  []string{syncMode},
 			"_cache_size":   []string{"8000"},
+		}
+		if options.sqliteTxLock != "" {
+			params.Set("_txlock", options.sqliteTxLock)
 		}
 		path = fmt.Sprintf("%s?%s", path, params.Encode())
 	case MySQL:
@@ -205,7 +217,11 @@ func configureAndOptimizeDBWithOptions(drive string, db *gorm.DB, options databa
 	}
 
 	if drive == SQLiteExtend || drive == SQLite {
-		db.Exec("PRAGMA synchronous = NORMAL;")
+		syncMode := "OFF"
+		if options.sqliteSynchronous != "" {
+			syncMode = options.sqliteSynchronous
+		}
+		db.Exec("PRAGMA synchronous = " + syncMode + ";")
 		// db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
 		// set journal_mode for write speed
 		db.Exec("PRAGMA journal_mode = WAL;")

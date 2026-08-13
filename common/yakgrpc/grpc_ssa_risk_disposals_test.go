@@ -641,12 +641,7 @@ alert $result for {
 		})
 		require.NoError(t, err)
 
-		resp, err := stream.Recv()
-		require.NoError(t, err)
-		taskID := resp.GetTaskID()
-		require.NotEmpty(t, taskID)
-
-		// 等待扫描完成
+		var taskID string
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
@@ -655,17 +650,26 @@ alert $result for {
 				}
 				require.NoError(t, err)
 			}
+			if taskID == "" {
+				taskID = resp.GetTaskID()
+			}
 			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
 				break
 			}
 		}
+		require.NotEmpty(t, taskID)
 
 		// 查询本次扫描生成的 Risk，不能因相同 ProgramName 复用上一次扫描的记录。
-		_, queryRisk, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
-			RuntimeID: []string{taskID},
-		}, nil)
-		require.NoError(t, err)
-		require.Len(t, queryRisk, 1)
+		// Async persist can land after status=finished; wait for the task's risk.
+		var queryRisk []*schema.SSARisk
+		require.Eventually(t, func() bool {
+			_, queryRisk, err = yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+				ProgramName: []string{programName},
+				RuntimeID:   []string{taskID},
+			}, nil)
+			return err == nil && len(queryRisk) == 1
+		}, 10*time.Second, 100*time.Millisecond,
+			"scan task %s should persist exactly one risk", taskID)
 		risks[i] = queryRisk[0]
 
 		// 添加延迟确保下次扫描的时间戳不同
