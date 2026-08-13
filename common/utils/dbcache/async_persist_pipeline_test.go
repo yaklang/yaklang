@@ -440,7 +440,11 @@ func TestAsyncPersist_AsyncDrainKeysAndShrinkIsBatchScoped(t *testing.T) {
 		saveFn,
 		nil,
 		dbcache.WithSaveSize(1000),
-		dbcache.WithSaveTimeout(10*time.Millisecond),
+		// A long save timeout keeps batches aligned to WithSaveSize. A short
+		// timer can fire a partial batch before all firstKeys are buffered;
+		// the remaining firstKeys then mix into the second batch, which blocks
+		// on secondRelease until firstDone — a self-deadlock under load.
+		dbcache.WithSaveTimeout(time.Hour),
 	)
 	defer cache.Close()
 
