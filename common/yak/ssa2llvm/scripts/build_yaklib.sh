@@ -8,7 +8,7 @@ set -euo pipefail
 #   1. Generate runtime_imports_generated.go (permodule mode: empty init(),
 #      one //export yak_register_module_<m> per module)
 #   2. Build libyak.a via `go build -buildmode=c-archive`
-#   3. Post-process go.o: split .text into per-module sections (.text.mod_<m>)
+#   3. Post-process go.o: split .text into per-module sections (.modtext.<m>)
 #      using the elfsplit tool (cmd/elfsplit)
 #   4. Collect cgo C static deps (libpcap.a, libm.a, ...)
 #   5. Copy all artifacts to runtime/embed/assets/
@@ -42,7 +42,7 @@ MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
 # them. The compiler keeps "shared" whenever any module is used, and keeps
 # "ssafront" when the ssa module is used.
 AOT_SPLIT_MODULES="${MODULES}"
-AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},shared"
+AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},shared,sharednet"
 case ",${MODULES}," in
   *,ssa,*) AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},ssafront" ;;
 esac
@@ -155,8 +155,15 @@ trap 'rm -rf "${SPLIT_DIR}" "${REPACK_DIR}"; rm -f "${GENFULL_OUT}"; [ -n "${STU
 # Extract only go.o, split it, then repack the archive from a fresh dir so the
 # split go.o is NOT overwritten by the original member.
 llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${SPLIT_DIR}" go.o 2>/dev/null || true
+# Function-name folding drops ~35% of .gopclntab from every produced binary, at
+# the cost of function names in tracebacks. Opt-in until it has soaked.
+ELFSPLIT_FLAGS=()
+case "${SSA2LLVM_FOLD_FUNCNAMES:-}" in
+  1|true|yes) ELFSPLIT_FLAGS+=(-fold-funcnames); echo "[yaklib] pclntab function-name folding: ON" ;;
+esac
 if [ -f "${SPLIT_DIR}/go.o" ]; then
-    "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${AOT_SPLIT_MODULES}"
+    "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" ${ELFSPLIT_FLAGS[@]+"${ELFSPLIT_FLAGS[@]}"} \
+        "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${AOT_SPLIT_MODULES}"
     # Extract all original members into a fresh repack dir.
     llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${REPACK_DIR}"
     # Replace go.o with the split version.

@@ -4,7 +4,11 @@ package main
 // per-module sections so that lld --gc-sections can drop unused module
 // code at ssa2llvm compile time.
 //
-// Usage: elfsplit <input.go.o> <output.go.o> <comma-separated-module-names>
+// Usage: elfsplit [-fold-funcnames] <input.go.o> <output.go.o> <comma-separated-module-names>
+//
+// -fold-funcnames additionally drops the pclntab function-name table (see
+// pclntab.go). It is off by default: it trades every function name in a
+// traceback for roughly a third of .gopclntab.
 
 import (
 	"bytes"
@@ -112,13 +116,25 @@ type addedSec struct {
 }
 
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Fprintln(os.Stderr, "usage: elfsplit <input.go.o> <output.go.o> <comma-separated-modules>")
+	args := os.Args[1:]
+	foldFuncNames := false
+	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+		switch args[0] {
+		case "-fold-funcnames", "--fold-funcnames":
+			foldFuncNames = true
+		default:
+			fmt.Fprintf(os.Stderr, "elfsplit: unknown flag %q\n", args[0])
+			os.Exit(1)
+		}
+		args = args[1:]
+	}
+	if len(args) < 3 {
+		fmt.Fprintln(os.Stderr, "usage: elfsplit [-fold-funcnames] <input.go.o> <output.go.o> <comma-separated-modules>")
 		os.Exit(1)
 	}
-	inputFile := os.Args[1]
-	outputFile := os.Args[2]
-	modulesArg := os.Args[3]
+	inputFile := args[0]
+	outputFile := args[1]
+	modulesArg := args[2]
 	modules := strings.Split(modulesArg, ",")
 	for i := range modules {
 		modules[i] = strings.TrimSpace(modules[i])
@@ -128,6 +144,19 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read: %v\n", err)
 		os.Exit(1)
+	}
+
+	if foldFuncNames {
+		folded, stats, err := foldFuncNameTable(data)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "elfsplit: fold function names: %v\n", err)
+			os.Exit(1)
+		}
+		if folded != nil {
+			fmt.Fprintf(os.Stderr, "elfsplit: folded funcnametab: %d bytes (%.1f MiB) over %d functions, go.o %d -> %d bytes\n",
+				stats.tableBytes, float64(stats.tableBytes)/(1<<20), stats.funcs, len(data), len(folded))
+			data = folded
+		}
 	}
 
 	f, err := elf.NewFile(bytes.NewReader(data))
@@ -388,6 +417,14 @@ func main() {
 	}
 	sort.Slice(sourceRanges, func(i, j int) bool { return sourceRanges[i].oldOff < sourceRanges[j].oldOff })
 
+	// Start-up reachability is checked once every reference is known, so both
+	// loops below feed the same graph.
+	graph := newCallGraph(len(placements))
+	placementBySym := make(map[int]int, len(placements))
+	for i := range placements {
+		placementBySym[placements[i].symIdx] = i
+	}
+
 	textRelocOffsets := make(map[uint64]struct{})
 	relocsBySection := map[string][]byte{".text": nil}
 	if relaTextIdx >= 0 {
@@ -396,6 +433,17 @@ func main() {
 		for base := uint64(0); base+elf64RelaSize <= uint64(len(relaData)); base += elf64RelaSize {
 			rOffset := binary.LittleEndian.Uint64(relaData[base:])
 			textRelocOffsets[rOffset] = struct{}{}
+			// r_info holds the raw symbol index; placements use the
+			// debug/elf index, which omits the null symbol at raw index 0.
+			// Only PLT32 is a control transfer: Go emits it for CALL/JMP,
+			// while the PC32/64 relocations are data references, and a
+			// function whose address is merely stored is not one that runs.
+			rInfo := binary.LittleEndian.Uint64(relaData[base+8:])
+			if elf.R_X86_64(uint32(rInfo)) == elf.R_X86_64_PLT32 {
+				if dst, ok := placementBySym[int(rInfo>>32)-1]; ok {
+					graph.addReference(placements, findPlacementIndex(placements, rOffset), dst)
+				}
+			}
 			source := findPlacement(sourceRanges, rOffset)
 			if source == nil {
 				fmt.Fprintf(os.Stderr, "elfsplit: text relocation at %#x is outside retained code\n", rOffset)
@@ -416,7 +464,7 @@ func main() {
 	// Rewrite direct branches after all destinations are known. A branch whose
 	// target remains in the same input section is fixed in-place; a cross-section
 	// branch receives a synthetic ELF relocation for lld.
-	for _, fn := range placements {
+	for i, fn := range placements {
 		var destination []byte
 		section := ".text"
 		if fn.module != "" {
@@ -426,13 +474,18 @@ func main() {
 			destination = packedText
 		}
 		extraRelas, err := rewritePCRelativeBranches(
-			data, destination, textOff, fn, placements, textRelocOffsets, originalTextSize,
+			data, destination, textOff, i, placements, textRelocOffsets, originalTextSize, graph,
 		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "elfsplit: rewrite %s/%s branches: %v\n", section, fn.name, err)
 			os.Exit(1)
 		}
 		relocsBySection[section] = append(relocsBySection[section], extraRelas...)
+	}
+
+	if leaks := graph.initLeaks(placements); len(leaks) > 0 {
+		fmt.Fprintf(os.Stderr, "elfsplit: %v\n", formatInitLeaks(leaks))
+		os.Exit(1)
 	}
 	var newSections []newSec
 
@@ -659,7 +712,7 @@ func main() {
 			relaModCount++
 		}
 	}
-	fmt.Fprintf(os.Stderr, "elfsplit: wrote %s (%d bytes, %d sections, +%d .text.mod + %d .rela.text.mod)\n",
+	fmt.Fprintf(os.Stderr, "elfsplit: wrote %s (%d bytes, %d sections, +%d .modtext + %d .rela.modtext)\n",
 		outputFile, len(out), newShnum, textModCount, relaModCount)
 }
 
@@ -670,11 +723,13 @@ func main() {
 func rewritePCRelativeBranches(
 	data, destination []byte,
 	textOff uint64,
-	fn codePlacement,
+	fnIdx int,
 	placements []codePlacement,
 	textRelocOffsets map[uint64]struct{},
 	textSize uint64,
+	graph *callGraph,
 ) ([]byte, error) {
+	fn := placements[fnIdx]
 	var synthetic []byte
 	fnStart := textOff + fn.oldOff
 	fnEnd := fnStart + fn.size
@@ -703,10 +758,14 @@ func rewritePCRelativeBranches(
 		// itself lives in the Rel argument or the RIP-relative Mem operand.
 		var disp int64
 		hasDisp := false
+		// isBranch separates a control transfer from an address load: only
+		// the former means the target actually runs, which is what the
+		// start-up reachability check needs.
+		isBranch := false
 		for _, arg := range inst.Args {
 			switch v := arg.(type) {
 			case x86asm.Rel:
-				disp, hasDisp = int64(v), true
+				disp, hasDisp, isBranch = int64(v), true, true
 			case x86asm.Mem:
 				if v.Base == x86asm.RIP {
 					disp, hasDisp = v.Disp, true
@@ -735,7 +794,14 @@ func rewritePCRelativeBranches(
 			continue
 		}
 		oldTarget := uint64(oldTargetSigned)
-		target := findPlacement(placements, oldTarget)
+		targetIdx := findPlacementIndex(placements, oldTarget)
+		var target *codePlacement
+		if targetIdx >= 0 {
+			target = &placements[targetIdx]
+			if isBranch {
+				graph.addReference(placements, fnIdx, targetIdx)
+			}
+		}
 		// The Go linker resolves jumps to labels inside a function without an
 		// ELF relocation, and those labels do not have standalone symbols.
 		// The containing function is nevertheless enough to relocate the
@@ -855,6 +921,16 @@ func findKeepChunk(chunks []keepChunk, target uint64) *keepChunk {
 }
 
 func findPlacement(placements []codePlacement, target uint64) *codePlacement {
+	if idx := findPlacementIndex(placements, target); idx >= 0 {
+		return &placements[idx]
+	}
+	return nil
+}
+
+// findPlacementIndex returns the index of the placement containing target, or
+// -1. Relocations can land in padding between functions, which belongs to no
+// placement.
+func findPlacementIndex(placements []codePlacement, target uint64) int {
 	idx := sort.Search(len(placements), func(i int) bool {
 		return placements[i].oldOff > target
 	})
@@ -865,13 +941,13 @@ func findPlacement(placements []codePlacement, target uint64) *codePlacement {
 		}
 		end := placement.oldOff + placement.size
 		if end >= placement.oldOff && target < end {
-			return placement
+			return i
 		}
 		if end <= target {
 			break
 		}
 	}
-	return nil
+	return -1
 }
 
 func findAddedSection(sections []addedSec, name string) int {
@@ -1079,9 +1155,14 @@ func classifyPackage(symName string) string {
 	return pkg
 }
 
+// sharedGroup is the dependency closure every yaklib module needs. It doubles
+// as the pool for packages that are not any module's own code but whose init
+// path reaches module code — see checkInitPathLeaks.
+const sharedGroup = "shared"
+
 func buildModulePackageMap(modules []string) map[string][]string {
 	knownPaths := map[string][]string{
-		"shared": {
+		sharedGroup: {
 			"crypto/",
 			"database/sql",
 			"encoding/asn1",
@@ -1092,9 +1173,11 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/gobwas/glob",
 			"github.com/gorilla/websocket",
 			"github.com/hpcloud/tail",
-			"github.com/kataras/golog",
+			// kataras/golog and lestrrat/go-file-rotatelogs are deliberately
+			// absent: common/log imports them and common/log is base
+			// infrastructure that the AOT runtime itself uses from init
+			// onwards. A prunable group must contain nothing the base needs.
 			"github.com/klauspost/compress",
-			"github.com/lestrrat/go-file-rotatelogs",
 			"github.com/lib/pq",
 			"github.com/lunixbochs/struc",
 			"github.com/mattn/go-sqlite3",
@@ -1103,6 +1186,7 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/refraction-networking/utls",
 			"github.com/yaklang/gorm",
 			"github.com/yaklang/javajive",
+			"github.com/yaklang/yaklang/common/ai/aispec",
 			"github.com/yaklang/yaklang/common/consts",
 			"github.com/yaklang/yaklang/common/cybertunnel",
 			"github.com/yaklang/yaklang/common/domainextractor",
@@ -1115,6 +1199,8 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/minimartian",
 			"github.com/yaklang/yaklang/common/mutate",
 			"github.com/yaklang/yaklang/common/netx",
+			"github.com/yaklang/yaklang/common/pcapx",
+			"github.com/yaklang/yaklang/common/sca",
 			"github.com/yaklang/yaklang/common/schema",
 			"github.com/yaklang/yaklang/common/utils/bruteutils",
 			"github.com/yaklang/yaklang/common/utils/bufpipe",
@@ -1123,6 +1209,7 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/utils/diagnostics",
 			"github.com/yaklang/yaklang/common/utils/dnsutil",
 			"github.com/yaklang/yaklang/common/utils/dot",
+			"github.com/yaklang/yaklang/common/utils/ffmpegutils",
 			"github.com/yaklang/yaklang/common/utils/graph",
 			"github.com/yaklang/yaklang/common/utils/htmlquery",
 			"github.com/yaklang/yaklang/common/utils/jsonquery",
@@ -1151,8 +1238,13 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/utils/yakxml",
 			"github.com/yaklang/yaklang/common/utils/ziputil",
 			"github.com/yaklang/yaklang/common/utils/zipx",
+			"github.com/yaklang/yaklang/common/yak/yaklib/codec",
 			"github.com/yaklang/yaklang/common/yakgrpc/ypb",
+			"github.com/yaklang/yaklang/common/yserx",
+			"github.com/yaklang/yaklang/common/yso",
+			"golang.org/x/crypto/ssh",
 			"golang.org/x/net",
+			"google.golang.org/genproto",
 			"google.golang.org/grpc",
 			"google.golang.org/protobuf",
 			"html/template",
@@ -1230,6 +1322,12 @@ func buildModulePackageMap(modules []string) map[string][]string {
 		"iiop":       {"github.com/yaklang/yaklang/common/iiop"},
 		"jwt":        {"github.com/yaklang/yaklang/common/authhack"},
 	}
+	// The shared closure is subdivided by which modules actually reach each
+	// package (see sharedgroups_generated.go). Everything not claimed by a
+	// subgroup stays in the shared core.
+	for group, paths := range generatedSharedGroups {
+		knownPaths[group] = append(knownPaths[group], paths...)
+	}
 	result := make(map[string][]string)
 	for _, mod := range modules {
 		if paths, ok := knownPaths[mod]; ok {
@@ -1237,6 +1335,14 @@ func buildModulePackageMap(modules []string) map[string][]string {
 		}
 	}
 	return result
+}
+
+// isSharedFallbackGroup reports whether a group is part of the shared
+// dependency closure rather than a module's own code. On an equally long
+// prefix match a real module wins over these, so listing a package in both
+// places keeps it with its module.
+func isSharedFallbackGroup(group string) bool {
+	return strings.HasPrefix(group, sharedGroup)
 }
 
 // matchRegisterSymbol checks if a symbol is a module registration function.
@@ -1251,13 +1357,31 @@ func matchRegisterSymbol(symName string, modules []string) string {
 
 // matchRegisterSymbol checks if a symbol is a module registration function.
 
+// matchModule assigns a package to a module group by longest matching prefix.
+// A package may be listed under several groups (yserx is both the "java" module
+// and part of the shared closure); the longest prefix wins, and on a tie a real
+// module beats the sharedGroup fallback pool. Map iteration order must not
+// decide this: the same go.o has to split identically on every build.
 func matchModule(pkg string, modulePkgs map[string][]string) string {
-	for mod, paths := range modulePkgs {
-		for _, p := range paths {
-			if pkg == p || strings.HasPrefix(pkg, p+"/") || strings.HasPrefix(pkg, p+".") {
-				return mod
+	best, bestLen := "", -1
+	for _, mod := range sortedKeys(modulePkgs) {
+		for _, p := range modulePkgs[mod] {
+			if pkg != p && !strings.HasPrefix(pkg, p+"/") && !strings.HasPrefix(pkg, p+".") {
+				continue
+			}
+			if len(p) > bestLen || (len(p) == bestLen && isSharedFallbackGroup(best)) {
+				best, bestLen = mod, len(p)
 			}
 		}
 	}
-	return ""
+	return best
+}
+
+func sortedKeys(m map[string][]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

@@ -105,13 +105,7 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool)
 	b.WriteString("func yak_register_globals() {\n")
 	b.WriteString("\tregisterRuntimeGlobals()\n")
 	b.WriteString("}\n\n")
-	// Compile-time pruning redirects relocations that referenced unused
-	// .modtext.<module> functions to this retained stub. Keeping the stub
-	// reachable from relocations prevents lld from collecting it and gives
-	// stale function pointers a safe no-op target instead of a garbage PC.
-	b.WriteString("//export yakUnusedModuleStub\n")
-	b.WriteString("//go:noinline\n")
-	b.WriteString("func yakUnusedModuleStub() {}\n\n")
+	writePrunedModuleStubs(&b, modNames)
 	// Per-module registration only reads the package export tables. The Go
 	// runtime executes init tasks for used modules through their retained
 	// inittask relocations; patching marks unused tasks done before linking.
@@ -127,6 +121,50 @@ func WriteRuntimeImportsPerModule(outputPath string, modules []string, aot bool)
 		b.WriteString("}\n\n")
 	}
 	return os.WriteFile(outputPath, []byte(b.String()), 0o644)
+}
+
+// SplitOnlyGroups are elfsplit section groups that carry code but are not
+// yaklang modules: "shared" is the dependency closure every module needs and
+// "ssafront" holds the language frontends behind the ssa module. They get the
+// same pruned-module stubs as real modules so a wrong dependency closure fails
+// with their name too.
+var SplitOnlyGroups = []string{"shared", "sharednet", "ssafront"}
+
+// writePrunedModuleStubs emits one stub per module group. Compile-time pruning
+// redirects every relocation that referenced an unused .modtext.<module>
+// function to that module's stub, which keeps the stub reachable (so lld does
+// not collect it) and gives stale function pointers a defined target.
+//
+// The stub panics rather than returning. A no-op stub makes a wrong dependency
+// closure fail silently — the call returns, the caller reads uninitialized
+// result registers, and the damage surfaces arbitrarily far away. Panicking
+// with the module name turns that into a report naming the module to add.
+func writePrunedModuleStubs(b *strings.Builder, modNames []string) {
+	seen := map[string]bool{}
+	var groups []string
+	for _, m := range append(append([]string{}, modNames...), SplitOnlyGroups...) {
+		if m != "" && !seen[m] {
+			seen[m] = true
+			groups = append(groups, m)
+		}
+	}
+	sort.Strings(groups)
+
+	b.WriteString("//go:noinline\n")
+	b.WriteString("func yakPrunedModulePanic(module string) {\n")
+	b.WriteString("\tpanic(\"yaklib module was pruned at link time but is still reachable: \" + module +\n")
+	b.WriteString("\t\t\" (the compiler's used-module closure is missing it)\")\n")
+	b.WriteString("}\n\n")
+	// Retained for archives patched by an older toolchain, which looks this
+	// symbol up by name and has no per-module fallback.
+	b.WriteString("//export yakUnusedModuleStub\n")
+	b.WriteString("//go:noinline\n")
+	b.WriteString("func yakUnusedModuleStub() { yakPrunedModulePanic(\"<unknown>\") }\n\n")
+	for _, m := range groups {
+		b.WriteString(fmt.Sprintf("//export yakPrunedModuleStub_%s\n", m))
+		b.WriteString("//go:noinline\n")
+		b.WriteString(fmt.Sprintf("func yakPrunedModuleStub_%s() { yakPrunedModulePanic(%q) }\n\n", m, m))
+	}
 }
 
 func aotExportSources(spec ModuleImportSpec, aot bool) []ExportSource {

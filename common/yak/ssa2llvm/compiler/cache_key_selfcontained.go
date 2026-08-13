@@ -3,6 +3,8 @@ package compiler
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"runtime/debug"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed/assets"
 )
@@ -36,8 +38,30 @@ func cacheToolKeyPart(cfg *CompileConfig, write func(string)) {
 		add("extdep:" + ed.Name + "=" + ed.Sha)
 	}
 	write("embeddedRuntime=" + hex.EncodeToString(h.Sum(nil)))
-	write("llvm=18.1.3-selfcontained")
+	write("llvm=" + bundledLLVMVersion())
 	// Reflect the link-time options applied by CompileObjectToBinarySC so a
-	// change in stripping/gc-sections/icf invalidates cached artifacts.
-	write("linkOpts=gc-sections+icf-safe+strip")
+	// change in stripping/gc-sections invalidates cached artifacts.
+	write("linkOpts=gc-sections+strip")
+	// Which modules survive the link is decided by these rules, so a change
+	// to them produces a different binary from the same script.
+	write("moduleClosure=" + moduleClosureKey())
 }
+
+// bundledLLVMVersion identifies the in-process LLVM/lld that produced the
+// cached artifact. The go-llvm module version is the only identifier that
+// actually tracks the bundled toolchain: a hardcoded string silently keeps
+// stale artifacts alive across an LLVM upgrade.
+var bundledLLVMVersion = sync.OnceValue(func() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown-selfcontained"
+	}
+	for _, dep := range info.Deps {
+		if dep.Path == goLLVMModulePath {
+			return dep.Version + "-selfcontained"
+		}
+	}
+	return "unknown-selfcontained"
+})
+
+const goLLVMModulePath = "github.com/yaklang/go-llvm"
