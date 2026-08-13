@@ -439,6 +439,7 @@ const (
 	Yak_DeleteAIProvider_FullMethodName                           = "/ypb.Yak/DeleteAIProvider"
 	Yak_GetAIThirdPartyAppConfigTemplate_FullMethodName           = "/ypb.Yak/GetAIThirdPartyAppConfigTemplate"
 	Yak_GetApiKeyByOnline_FullMethodName                          = "/ypb.Yak/GetApiKeyByOnline"
+	Yak_UpdateApiKey_FullMethodName                               = "/ypb.Yak/UpdateApiKey"
 	Yak_GetFingerprint_FullMethodName                             = "/ypb.Yak/GetFingerprint"
 	Yak_AddFingerprint_FullMethodName                             = "/ypb.Yak/AddFingerprint"
 	Yak_ModifyFingerprint_FullMethodName                          = "/ypb.Yak/ModifyFingerprint"
@@ -1204,7 +1205,9 @@ type YakClient interface {
 	UpsertAIProvider(ctx context.Context, in *UpsertAIProviderRequest, opts ...grpc.CallOption) (*UpsertAIProviderResponse, error)
 	DeleteAIProvider(ctx context.Context, in *DeleteAIProviderRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetAIThirdPartyAppConfigTemplate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetThirdPartyAppConfigTemplateResponse, error)
+	// 废弃
 	GetApiKeyByOnline(ctx context.Context, in *GetApiKeyByOnlineRequest, opts ...grpc.CallOption) (*GetApiKeyByOnlineResponse, error)
+	UpdateApiKey(ctx context.Context, in *UpdateApiKeyRequest, opts ...grpc.CallOption) (*Empty, error)
 	// 指纹库
 	GetFingerprint(ctx context.Context, in *GetFingerprintRequest, opts ...grpc.CallOption) (*GetFingerprintResponse, error)
 	AddFingerprint(ctx context.Context, in *AddFingerprintRequest, opts ...grpc.CallOption) (*AddFingerprintResponse, error)
@@ -6305,6 +6308,16 @@ func (c *yakClient) GetApiKeyByOnline(ctx context.Context, in *GetApiKeyByOnline
 	return out, nil
 }
 
+func (c *yakClient) UpdateApiKey(ctx context.Context, in *UpdateApiKeyRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_UpdateApiKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetFingerprint(ctx context.Context, in *GetFingerprintRequest, opts ...grpc.CallOption) (*GetFingerprintResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFingerprintResponse)
@@ -9351,7 +9364,9 @@ type YakServer interface {
 	UpsertAIProvider(context.Context, *UpsertAIProviderRequest) (*UpsertAIProviderResponse, error)
 	DeleteAIProvider(context.Context, *DeleteAIProviderRequest) (*Empty, error)
 	GetAIThirdPartyAppConfigTemplate(context.Context, *Empty) (*GetThirdPartyAppConfigTemplateResponse, error)
+	// 废弃
 	GetApiKeyByOnline(context.Context, *GetApiKeyByOnlineRequest) (*GetApiKeyByOnlineResponse, error)
+	UpdateApiKey(context.Context, *UpdateApiKeyRequest) (*Empty, error)
 	// 指纹库
 	GetFingerprint(context.Context, *GetFingerprintRequest) (*GetFingerprintResponse, error)
 	AddFingerprint(context.Context, *AddFingerprintRequest) (*AddFingerprintResponse, error)
@@ -10890,6 +10905,9 @@ func (UnimplementedYakServer) GetAIThirdPartyAppConfigTemplate(context.Context, 
 }
 func (UnimplementedYakServer) GetApiKeyByOnline(context.Context, *GetApiKeyByOnlineRequest) (*GetApiKeyByOnlineResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetApiKeyByOnline not implemented")
+}
+func (UnimplementedYakServer) UpdateApiKey(context.Context, *UpdateApiKeyRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateApiKey not implemented")
 }
 func (UnimplementedYakServer) GetFingerprint(context.Context, *GetFingerprintRequest) (*GetFingerprintResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetFingerprint not implemented")
@@ -18536,6 +18554,24 @@ func _Yak_GetApiKeyByOnline_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_UpdateApiKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateApiKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateApiKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateApiKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateApiKey(ctx, req.(*UpdateApiKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetFingerprint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFingerprintRequest)
 	if err := dec(in); err != nil {
@@ -23520,6 +23556,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetApiKeyByOnline",
 			Handler:    _Yak_GetApiKeyByOnline_Handler,
+		},
+		{
+			MethodName: "UpdateApiKey",
+			Handler:    _Yak_UpdateApiKey_Handler,
 		},
 		{
 			MethodName: "GetFingerprint",
