@@ -114,7 +114,6 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	if redirectTimes > 0 {
 		lastPacket := raw
-		statusCode := GetStatusCodeFromResponse(lastPacket.Response)
 
 		for i := 0; i < redirectTimes; i++ {
 			target := GetRedirectFromHTTPResponse(lastPacket.Response, jsRedirect)
@@ -133,6 +132,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
 			// should not extract response cookie
+			statusCode := GetStatusCodeFromResponse(lastPacket.Response)
 			r, err = BuildRedirectRequest(targetUrl, r, lastPacket.IsHttps, statusCode)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
@@ -1237,20 +1237,16 @@ RECONNECT:
 		httpctx.SetBareResponseBytes(reqIns, rawBytes)
 	}
 
-	// 更新 cookiejar 中的 cookie
-	if session != "" && firstResponse != nil {
-		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
+	// Seed request cookies first. Leaving Domain and Path empty lets cookiejar
+	// apply host-only and RFC default-path rules instead of pinning a cookie
+	// from /login.php to that exact path.
+	if session != "" && reqIns != nil {
+		cookiejar.SetCookies(urlIns, reqIns.Cookies())
 	}
 
-	// 将请求中的cookie更新到cookiejar中
-	if session != "" && reqIns != nil {
-		reqCookies := reqIns.Cookies()
-		for _, cookie := range reqCookies {
-			// 限制domain为当前域, path为当前路径
-			cookie.Domain = urlIns.Hostname()
-			cookie.Path = urlIns.Path
-		}
-		cookiejar.SetCookies(urlIns, reqCookies)
+	// Apply Set-Cookie after request cookies so rotations and deletions win.
+	if session != "" && firstResponse != nil {
+		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
 	}
 
 	response.BareResponse = rawBytes
