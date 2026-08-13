@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/gorm"
@@ -64,10 +65,14 @@ func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.Vect
 
 func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
 	collectionName := collection.Name
-	hnswGraph := NewHNSWGraph(collectionName,
+	graphOptions := []hnsw.GraphOption[string]{
 		hnsw.WithHNSWParameters[string](collectionConfig.MaxNeighbors, collectionConfig.LayerGenerationFactor, collectionConfig.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
-	)
+	}
+	if collectionConfig.EfConstruct > 0 {
+		graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](collectionConfig.EfConstruct))
+	}
+	hnswGraph := NewHNSWGraph(collectionName, graphOptions...)
 
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
 	switch collectionConfig.buildGraphPolicy {
@@ -100,10 +105,14 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 		}
 		if isEmpty {
 			config := collection
-			hnswGraph = NewHNSWGraph(collectionName,
+			graphOptions := []hnsw.GraphOption[string]{
 				hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
 				hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
-			)
+			}
+			if config.EfConstruct > 0 {
+				graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](config.EfConstruct))
+			}
+			hnswGraph = NewHNSWGraph(collectionName, graphOptions...)
 		} else {
 			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
 			hnswGraph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, graphBinaryReader)
@@ -114,11 +123,14 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 					if err != nil {
 						if errors.Is(err, graphNodesIsEmpty) {
 							// 知识库没有文档，创建空的 HNSW 图
-							hnswGraph = NewHNSWGraph(
-								collection.Name,
+							graphOptions := []hnsw.GraphOption[string]{
 								hnsw.WithHNSWParameters[string](collection.M, collection.Ml, collection.EfSearch),
 								hnsw.WithDistance[string](hnsw.GetDistanceFunc(collection.DistanceFuncType)),
-							)
+							}
+							if collection.EfConstruct > 0 {
+								graphOptions = append(graphOptions, hnsw.WithEfConstruction[string](collection.EfConstruct))
+							}
+							hnswGraph = NewHNSWGraph(collection.Name, graphOptions...)
 						} else {
 							return nil, utils.Wrap(err, "migrate hnsw graph")
 						}
@@ -222,25 +234,18 @@ func (gw *GraphWrapper[K]) executeGraphOpInLock(op *graphOp) {
 	}
 
 	startedAt := time.Now()
-	done := make(chan struct{})
-	ticker := time.NewTicker(warnAfter)
-	go func() {
-		defer ticker.Stop()
-		elapsedWarns := 0
-		for {
-			select {
-			case <-ticker.C:
-				elapsedWarns++
-				elapsed := time.Since(startedAt)
-				log.Errorf("graph %s operation %q (%s) is running longer than %s (elapsed %s, warn #%d)", op.opType, op.desc, gw.describeOp(op), warnAfter, elapsed, elapsedWarns)
-			case <-done:
-				return
-			}
+	var finished atomic.Bool
+	timer := time.AfterFunc(warnAfter, func() {
+		if finished.Load() {
+			return
 		}
-	}()
+		elapsed := time.Since(startedAt)
+		log.Errorf("graph %s operation %q (%s) is running longer than %s (elapsed %s)", op.opType, op.desc, gw.describeOp(op), warnAfter, elapsed)
+	})
 
 	defer func() {
-		close(done)
+		finished.Store(true)
+		timer.Stop()
 		if r := recover(); r != nil {
 			log.Errorf("recovered from panic in graph %s operation %q (%s): %v", op.opType, op.desc, gw.describeOp(op), r)
 		}

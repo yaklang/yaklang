@@ -2,6 +2,7 @@ package hnswspec
 
 import (
 	"cmp"
+	"math"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -44,6 +45,57 @@ func (n *LazyLayerNode[K]) GetVector() Vector {
 		return func() []float32 { return nil }
 	}
 	return node.GetVector()
+}
+
+func (n *LazyLayerNode[K]) GetVectorNorm() float64 {
+	node := n.LoadNode()
+	if node == nil {
+		return 0
+	}
+	if normed, ok := node.(interface{ GetVectorNorm() float64 }); ok {
+		return normed.GetVectorNorm()
+	}
+	var sum float64
+	for _, value := range node.GetVector()() {
+		v := float64(value)
+		sum += v * v
+	}
+	return math.Sqrt(sum)
+}
+
+// GetVectorAndNorm forwards the optional cosine fast path with a single lazy
+// node load. Existing LayerNode implementations do not need to implement it.
+func (n *LazyLayerNode[K]) GetVectorAndNorm() ([]float32, float64) {
+	vector, norm, _ := n.GetCosineVectorAndNorm()
+	return vector, norm
+}
+
+func (n *LazyLayerNode[K]) GetCosineVectorAndNorm() ([]float32, float64, bool) {
+	node := n.LoadNode()
+	if node == nil {
+		return nil, 0, false
+	}
+	if node.IsPQEnabled() {
+		return nil, 0, true
+	}
+	if normed, ok := node.(interface {
+		GetCosineVectorAndNorm() ([]float32, float64, bool)
+	}); ok {
+		return normed.GetCosineVectorAndNorm()
+	}
+	if normed, ok := node.(interface {
+		GetVectorAndNorm() ([]float32, float64)
+	}); ok {
+		vector, norm := normed.GetVectorAndNorm()
+		return vector, norm, false
+	}
+	vector := node.GetVector()()
+	var sum float64
+	for _, value := range vector {
+		v := float64(value)
+		sum += v * v
+	}
+	return vector, math.Sqrt(sum), false
 }
 
 func (n *LazyLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {

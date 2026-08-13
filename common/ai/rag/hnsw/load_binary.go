@@ -425,6 +425,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 			Centroids:    p.PQCodebook.Centroids,
 		}
 		g.pqQuantizer = pq.NewQuantizer(g.pqCodebook)
+		g.configureNodeDistance(g.Distance)
 	}
 
 	totalNodes := len(p.Layers[0].Nodes)

@@ -223,6 +223,9 @@ func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollect
 	// }
 
 	allOpts := getDefaultHNSWGraphOptions(collectionName)
+	if collectionConfig.EfConstruct > 0 {
+		allOpts = append(allOpts, hnsw.WithEfConstruction[string](collectionConfig.EfConstruct))
+	}
 	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key string, uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
 		var data any = uid
 		if collectionConfig.KeyAsUID {
@@ -247,9 +250,11 @@ func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollect
 					return nil, err
 				}
 				clearCache()
-				cache.Store(uidStr, doc.PQCode)
-				atomic.AddInt64(&cacheCount, 1)
-				return doc.PQCode, nil
+				value, loaded := cache.LoadOrStore(uidStr, doc.PQCode)
+				if !loaded {
+					atomic.AddInt64(&cacheCount, 1)
+				}
+				return value.([]byte), nil
 			})
 		} else {
 			newNode = hnswspec.NewStandardLayerNode(docId, func() []float32 {
@@ -263,9 +268,11 @@ func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollect
 					return nil
 				}
 				clearCache()
-				cache.Store(uidStr, []float32(doc.Embedding))
-				atomic.AddInt64(&cacheCount, 1)
-				return doc.Embedding
+				value, loaded := cache.LoadOrStore(uidStr, []float32(doc.Embedding))
+				if !loaded {
+					atomic.AddInt64(&cacheCount, 1)
+				}
+				return value.([]float32)
 			})
 		}
 
@@ -322,6 +329,9 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 	// }
 
 	allOpts := getDefaultHNSWGraphOptions(collectionName)
+	if s.config.EfConstruct > 0 {
+		allOpts = append(allOpts, hnsw.WithEfConstruction[string](s.config.EfConstruct))
+	}
 	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key string, uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
 		var data any = uid
 		if s.config.KeyAsUID {
@@ -346,9 +356,11 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 					return nil, err
 				}
 				clearCache()
-				cache.Store(uidStr, doc.PQCode)
-				atomic.AddInt64(&cacheCount, 1)
-				return doc.PQCode, nil
+				value, loaded := cache.LoadOrStore(uidStr, doc.PQCode)
+				if !loaded {
+					atomic.AddInt64(&cacheCount, 1)
+				}
+				return value.([]byte), nil
 			})
 		} else {
 			newNode = hnswspec.NewStandardLayerNode(docId, func() []float32 {
@@ -362,9 +374,11 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 					return nil
 				}
 				clearCache()
-				cache.Store(uidStr, []float32(doc.Embedding))
-				atomic.AddInt64(&cacheCount, 1)
-				return doc.Embedding
+				value, loaded := cache.LoadOrStore(uidStr, []float32(doc.Embedding))
+				if !loaded {
+					atomic.AddInt64(&cacheCount, 1)
+				}
+				return value.([]float32)
 			})
 		}
 

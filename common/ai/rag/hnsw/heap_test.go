@@ -31,3 +31,11 @@ func TestHeap(t *testing.T) {
 		t.Errorf("Heap did not return sorted elements: %+v", inOrder)
 	}
 }
+
+func TestHeapMax(t *testing.T) {
+	h := NewHeap[Int]()
+	for _, value := range []Int{1, 100, 2, 3, 4, 5, 6} {
+		h.Push(value)
+	}
+	require.Equal(t, Int(100), h.Max())
+}

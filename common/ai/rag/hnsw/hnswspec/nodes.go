@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
@@ -17,6 +18,8 @@ type StandardLayerNode[K cmp.Ordered] struct {
 	key       K
 	vector    Vector
 	neighbors map[K]LayerNode[K]
+	normOnce  sync.Once
+	norm      float64
 }
 
 // NewStandardLayerNode 创建标准层节点
@@ -37,6 +40,37 @@ func (n *StandardLayerNode[K]) GetKey() K {
 
 func (n *StandardLayerNode[K]) GetVector() Vector {
 	return n.vector
+}
+
+func (n *StandardLayerNode[K]) vectorNorm(vector []float32) float64 {
+	n.normOnce.Do(func() {
+		for _, value := range vector {
+			v := float64(value)
+			n.norm += v * v
+		}
+		n.norm = math.Sqrt(n.norm)
+	})
+	return n.norm
+}
+
+// GetVectorNorm returns the cached L2 norm. Node vectors are immutable for the
+// lifetime of a graph node (updates replace the node), so computing this once
+// removes two full vector passes from every cosine-distance evaluation.
+func (n *StandardLayerNode[K]) GetVectorNorm() float64 {
+	return n.vectorNorm(n.vector())
+}
+
+// GetVectorAndNorm is an optional cosine fast path. It is intentionally not
+// part of LayerNode so existing third-party node implementations remain source
+// compatible.
+func (n *StandardLayerNode[K]) GetVectorAndNorm() ([]float32, float64) {
+	vector := n.vector()
+	return vector, n.vectorNorm(vector)
+}
+
+func (n *StandardLayerNode[K]) GetCosineVectorAndNorm() ([]float32, float64, bool) {
+	vector, norm := n.GetVectorAndNorm()
+	return vector, norm, false
 }
 
 func (n *StandardLayerNode[K]) GetData() any {
@@ -66,7 +100,11 @@ func GetGlobalPerformanceStats() *HNSWPerformanceStats {
 
 // ResetGlobalPerformanceStats 重置全局性能统计
 func ResetGlobalPerformanceStats() {
-	globalPerformanceStats = &HNSWPerformanceStats{}
+	atomic.StoreInt64(&globalPerformanceStats.DistanceCalculations, 0)
+	atomic.StoreInt64(&globalPerformanceStats.NeighborConnections, 0)
+	atomic.StoreInt64(&globalPerformanceStats.NeighborDisconnections, 0)
+	atomic.StoreInt64(&globalPerformanceStats.GraphRestructures, 0)
+	atomic.StoreInt64(&globalPerformanceStats.CascadeUpdates, 0)
 }
 
 // parallelDistanceResultForReplenish Replenish专用的并行距离计算结果
@@ -144,17 +182,7 @@ func parallelDistanceCalculationForReplenish[K cmp.Ordered](
 }
 
 func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc DistanceFunc[K]) {
-	addNeighborStart := time.Now()
-
-	// 性能统计：记录一次邻居连接
-	globalPerformanceStats.NeighborConnections++
-
-	defer func() {
-		duration := time.Since(addNeighborStart)
-		if duration > 100*time.Millisecond {
-			log.Warnf("AddNeighbor slow: node=%v, neighbors=%d, duration=%v", n.key, len(n.neighbors), duration)
-		}
-	}()
+	atomic.AddInt64(&globalPerformanceStats.NeighborConnections, 1)
 
 	if n.neighbors == nil {
 		n.neighbors = make(map[K]LayerNode[K], m)
@@ -165,53 +193,26 @@ func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFun
 		return
 	}
 
-	// 找到距离最远的邻居节点
-	findWorstStart := time.Now()
 	var (
-		worstDist     = math.Inf(-1)
-		worst         LayerNode[K]
-		distanceCalls = 0
+		worstDist = math.Inf(-1)
+		worst     LayerNode[K]
 	)
 	for _, neighborNode := range n.neighbors {
 		d := distFunc(neighborNode, n)
-		distanceCalls++
-		globalPerformanceStats.DistanceCalculations++ // 性能统计：距离计算次数
+		atomic.AddInt64(&globalPerformanceStats.DistanceCalculations, 1)
 		if d > worstDist || worst == nil {
 			worstDist = d
 			worst = neighborNode
 		}
 	}
-	findWorstDuration := time.Since(findWorstStart)
-
 	delete(n.neighbors, worst.GetKey())
-	globalPerformanceStats.NeighborDisconnections++ // 性能统计：邻居断开连接
+	atomic.AddInt64(&globalPerformanceStats.NeighborDisconnections, 1)
 
-	// 删除反向链接并补充
-	removeAndReplenishStart := time.Now()
-	worst.RemoveNeighbor(n.key)
-	worst.Replenish(m, distFunc)
-	removeAndReplenishDuration := time.Since(removeAndReplenishStart)
-	globalPerformanceStats.GraphRestructures++ // 性能统计：图结构重组
-
-	totalDuration := time.Since(addNeighborStart)
-
-	// 根据M值调整性能警告阈值
-	var warningThreshold time.Duration
-	switch {
-	case m <= 50:
-		warningThreshold = 200 * time.Millisecond
-	case m <= 100:
-		warningThreshold = 500 * time.Millisecond
-	case m <= 200:
-		warningThreshold = 1 * time.Second
-	default:
-		warningThreshold = 2 * time.Second
-	}
-
-	if totalDuration > warningThreshold {
-		log.Warnf("AddNeighbor PERFORMANCE [M=%d]: total=%v, findWorst=%v (%d distance calls), removeAndReplenish=%v, expected_complexity=O(%d)",
-			m, totalDuration, findWorstDuration, distanceCalls, removeAndReplenishDuration, m)
-	}
+	// Pruning only updates this outgoing adjacency list. Removing and
+	// replenishing the reverse edge recursively walks neighbors-of-neighbors for
+	// every insertion and can also discard a useful directed traversal edge.
+	// Explicit node deletion still removes incoming edges via Isolate.
+	atomic.AddInt64(&globalPerformanceStats.GraphRestructures, 1)
 }
 
 func (n *StandardLayerNode[K]) AddSingleNeighbor(neighbor LayerNode[K]) {
@@ -309,7 +310,7 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 	}
 
 	// 更新性能统计
-	globalPerformanceStats.DistanceCalculations += int64(distanceCalls)
+	atomic.AddInt64(&globalPerformanceStats.DistanceCalculations, int64(distanceCalls))
 
 	// 使用标准库的排序（更高效）
 	slices.SortFunc(candidatesWithDist, func(a, b candidateWithDist) int {
@@ -338,7 +339,7 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 		// 直接添加到neighbors map，避免递归调用AddNeighbor
 		n.neighbors[candidate.GetKey()] = candidate
 		addedCount++
-		globalPerformanceStats.NeighborConnections++ // 性能统计：邻居连接
+		atomic.AddInt64(&globalPerformanceStats.NeighborConnections, 1)
 
 		// 确保双向连接：让候选者也添加我们作为邻居
 		// 但要小心避免无限递归
@@ -444,10 +445,7 @@ func (n *PQLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {
 }
 
 func (n *PQLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc DistanceFunc[K]) {
-	addNeighborStart := time.Now()
-
-	// 性能统计：记录一次邻居连接
-	globalPerformanceStats.NeighborConnections++
+	atomic.AddInt64(&globalPerformanceStats.NeighborConnections, 1)
 
 	if n.neighbors == nil {
 		n.neighbors = make(map[K]LayerNode[K], m)
@@ -460,14 +458,12 @@ func (n *PQLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc Dist
 
 	// 找到距离最远的邻居节点
 	var (
-		worstDist     = math.Inf(-1)
-		worst         LayerNode[K]
-		distanceCalls = 0
+		worstDist = math.Inf(-1)
+		worst     LayerNode[K]
 	)
 	for _, neighborNode := range n.neighbors {
 		d := distFunc(neighborNode, n)
-		distanceCalls++
-		globalPerformanceStats.DistanceCalculations++ // 性能统计：距离计算次数
+		atomic.AddInt64(&globalPerformanceStats.DistanceCalculations, 1)
 		if d > worstDist || worst == nil {
 			worstDist = d
 			worst = neighborNode
@@ -475,32 +471,9 @@ func (n *PQLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc Dist
 	}
 
 	delete(n.neighbors, worst.GetKey())
-	globalPerformanceStats.NeighborDisconnections++ // 性能统计：邻居断开连接
+	atomic.AddInt64(&globalPerformanceStats.NeighborDisconnections, 1)
 
-	// 删除反向链接
-	worst.RemoveNeighbor(n.key)
-	worst.Replenish(m, distFunc)
-	globalPerformanceStats.GraphRestructures++ // 性能统计：图结构重组
-
-	totalDuration := time.Since(addNeighborStart)
-
-	// PQ节点的性能警告阈值（通常比标准节点更高效）
-	var warningThreshold time.Duration
-	switch {
-	case m <= 50:
-		warningThreshold = 100 * time.Millisecond
-	case m <= 100:
-		warningThreshold = 250 * time.Millisecond
-	case m <= 200:
-		warningThreshold = 500 * time.Millisecond
-	default:
-		warningThreshold = 1 * time.Second
-	}
-
-	if totalDuration > warningThreshold {
-		log.Warnf("PQ AddNeighbor PERFORMANCE [M=%d]: total=%v (%d distance calls), expected_complexity=O(%d)",
-			m, totalDuration, distanceCalls, m)
-	}
+	atomic.AddInt64(&globalPerformanceStats.GraphRestructures, 1)
 }
 
 func (n *PQLayerNode[K]) RemoveNeighbor(key K) {
