@@ -105,11 +105,27 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			go func(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
 				defer m.SaveTask()
 				defer swg.Done()
+				finished := false
+				defer func() {
+					if r := recover(); r != nil {
+						if !finished {
+							targetName := queryTargetName(target)
+							panicErr := fmt.Errorf("rule panic: %v", r)
+							m.processMonitor.UpdateRuleError(targetName, rule.RuleName, panicErr)
+							m.StatusTask(nil)
+							m.markRuleFailed()
+							m.errorCallback("program %s exc rule %s panicked: %v", targetName, rule.RuleName, panicErr)
+						}
+						log.Errorf("rule %s panic recovered: %v", rule.RuleName, r)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
 				if utils.IsNil(target) {
 					log.Errorf("SyntaxFlow Scan Failed:the query target is nil")
 					return
 				}
 				m.Query(rule, target)
+				finished = true
 			}(rule, target)
 		}
 	}
