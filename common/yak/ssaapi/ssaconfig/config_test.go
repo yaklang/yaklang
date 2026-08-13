@@ -366,7 +366,8 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.NotNil(t, config)
 		require.False(t, config.IgnoreLanguage)
 		require.Empty(t, config.Language)
-		require.Equal(t, uint32(5), config.Concurrency)
+		require.Equal(t, uint32(DefaultCPUConcurrency()), config.Concurrency,
+			"scan concurrency must follow DefaultCPUConcurrency (max(1, GOMAXPROCS-1)), not a fixed constant")
 	})
 
 	t.Run("defaultSyntaxFlowRuleConfig", func(t *testing.T) {
