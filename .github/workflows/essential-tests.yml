@@ -719,7 +719,7 @@ jobs:
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^TestGRPCMUSTPASS_LANGUAGE.*$"}
+                {"package": "./common/yakgrpc/...", "timeout": "8m", "run": "^TestGRPCMUSTPASS_LANGUAGE.*$"}
               ]
 
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"

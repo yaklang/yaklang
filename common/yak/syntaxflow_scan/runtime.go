@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 
@@ -50,7 +47,6 @@ func effectiveRuleWorkLimit(configured int64, totalLines int) int64 {
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	scanStart := time.Now()
-	applySSAScanPoolSize()
 	defer func() {
 		// 记录扫描耗时，但不在这里输出 Scan Summary
 		// Scan Summary 应该在 processMonitor.Close() 之后输出，以确保所有 callback 都已完成
@@ -119,29 +115,6 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	}
 	swg.Wait()
 	return errs
-}
-
-// applySSAScanPoolSize expands the SSA SQLite connection pool right before the
-// scan phase starts. Compile-time writes keep the default single-writer pool;
-// once SaveToDatabase has finished, reads can safely use more connections and
-// actually use the machine's cores. Controlled by YAK_SSA_SQLITE_MAX_OPEN_CONNS
-// (default: unchanged).
-func applySSAScanPoolSize() {
-	raw := strings.TrimSpace(os.Getenv("YAK_SSA_SQLITE_MAX_OPEN_CONNS"))
-	if raw == "" {
-		return
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < 1 || n > 16 {
-		return
-	}
-	db := consts.GetGormSSAProjectDataBase()
-	if db == nil || db.DB() == nil {
-		return
-	}
-	db.DB().SetMaxOpenConns(n)
-	db.DB().SetMaxIdleConns(n)
-	log.Infof("ssa scan pool size: %d (expanded after compile writes)", n)
 }
 
 func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
