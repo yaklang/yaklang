@@ -96,8 +96,9 @@ func (pm *PromptManager) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce 
 
 	// Timeline frozen/open 与 Session Artifacts frozen/open 必须共享同一轮
 	// FrozenTimeUnix；midterm memory 现在随 InjectedMemory 在 dynamic 段底部
-	// 拼接，不再注入 timeline-open 段。
-	// 关键词: BuildPromptFrozenOpenMaterials, artifacts frozen time
+	// 拼接，不再注入 timeline-open 段。Generic base materials never expose
+	// model reasoning; AssembleLoopPrompt opts in only for the main decision
+	// call, while every helper prompt continues through this safe default.
 	frozenOpen := aicommon.BuildPromptFrozenOpenMaterials(pm.react.config, nonce)
 	materials.PromptFrozenOpenMaterials = frozenOpen
 
@@ -156,6 +157,9 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	base, err := pm.GetLoopPromptBaseMaterials(tools, input.Nonce)
 	if err != nil {
 		return nil, err
+	}
+	if input.IncludeLatestModelReplay {
+		base.PromptFrozenOpenMaterials = aicommon.BuildPromptFrozenOpenMaterialsWithLatestModelReplay(pm.react.config, input.Nonce)
 	}
 	effectiveInput := input
 	if input.Lightweight {
@@ -222,7 +226,11 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	lightBase := *base
 	lightBase.PromptFrozenOpenMaterials = aicommon.PromptFrozenOpenMaterials{}
 	if pm != nil && pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
-		lightBase.TimelineOpen = pm.react.config.GetTimeline().DumpRecentForPrompt(lightweightLoopRecentTimelineTokens)
+		if input.IncludeLatestModelReplay {
+			lightBase.TimelineOpen = pm.react.config.GetTimeline().DumpRecentForPromptWithLatestModelReplay(lightweightLoopRecentTimelineTokens)
+		} else {
+			lightBase.TimelineOpen = pm.react.config.GetTimeline().DumpRecentForPrompt(lightweightLoopRecentTimelineTokens)
+		}
 	}
 	lightBase.AutoContext = ""
 	lightBase.UserHistory = ""

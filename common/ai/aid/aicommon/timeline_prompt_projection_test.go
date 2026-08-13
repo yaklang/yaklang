@@ -99,6 +99,45 @@ func TestTimelinePromptProjectionKeepsRealAndDropsOnlyRedundantErrorLines(t *tes
 	require.Nil(t, projectTimelineItemForPrompt(onlyRedundant))
 }
 
+func TestTimelinePromptProjectionIncludesOnlyLatestSuccessfulModelReplay(t *testing.T) {
+	base := time.Date(2026, 8, 13, 9, 0, 0, 0, time.UTC)
+	timeline := NewTimeline(nil, nil)
+	injectTimelineItem(timeline, 1, base, &TextTimelineItem{
+		ID:         1,
+		Text:       "[model_thinking]:\nDISPLAY_REASON_ONE",
+		PromptText: "[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n1|>\n{\"reasoning_content\":\"R1\",\"content\":\"A1\"}\n<|TIMELINE_MODEL_THINKING_END_n1|>",
+	})
+	injectTimelineItem(timeline, 2, base.Add(time.Second), &TextTimelineItem{ID: 2, Text: "[tool_observation]:\nOBSERVATION_ONE"})
+	injectTimelineItem(timeline, 3, base.Add(2*time.Second), &TextTimelineItem{
+		ID:         3,
+		Text:       "[model_thinking]:\nDISPLAY_REASON_TWO",
+		PromptText: "[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n2|>\n{\"reasoning_content\":\"R2\",\"content\":\"A2\"}\n<|TIMELINE_MODEL_THINKING_END_n2|>",
+	})
+	injectTimelineItem(timeline, 4, base.Add(3*time.Second), &TextTimelineItem{ID: 4, Text: "[tool_observation]:\nOBSERVATION_TWO"})
+
+	raw := timeline.Dump()
+	require.Contains(t, raw, "DISPLAY_REASON_ONE")
+	require.Contains(t, raw, "DISPLAY_REASON_TWO")
+	require.NotContains(t, raw, "TIMELINE_MODEL_THINKING_n")
+
+	blocks := timeline.GroupByMinutes(TimelineDumpDefaultIntervalMinutes).GetAllRenderable()
+	prompt := projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks).RenderOpenOnly(TimelineDumpDefaultAITagName)
+	require.NotContains(t, prompt, "DISPLAY_REASON_ONE")
+	require.NotContains(t, prompt, "DISPLAY_REASON_TWO")
+	require.NotContains(t, prompt, "TIMELINE_MODEL_THINKING_n1")
+	require.Contains(t, prompt, "TIMELINE_MODEL_THINKING_n2")
+	require.Contains(t, prompt, "OBSERVATION_ONE")
+	require.Contains(t, prompt, "OBSERVATION_TWO")
+
+	// Generic prompt helpers continue to exclude every model replay marker;
+	// only the explicit main-ReAct renderer includes the newest one.
+	require.NotContains(t, timeline.DumpForPrompt(), "TIMELINE_MODEL_THINKING_n2")
+	generic := RenderTimelineFrozenOpen(timeline)
+	require.NotContains(t, generic.Frozen+generic.Open, "TIMELINE_MODEL_THINKING_n2")
+	mainReAct := RenderTimelineFrozenOpenWithLatestModelReplay(timeline)
+	require.Contains(t, mainReAct.Frozen+mainReAct.Open, "TIMELINE_MODEL_THINKING_n2")
+}
+
 func TestTimelineDumpRecentForPromptKeepsNewestCompleteItemsWithinBudget(t *testing.T) {
 	base := time.Date(2026, 7, 18, 12, 0, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)

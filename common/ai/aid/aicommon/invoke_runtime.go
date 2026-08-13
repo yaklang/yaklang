@@ -241,6 +241,13 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 type LoopPromptAssemblyInput struct {
 	Nonce string
 
+	// IncludeLatestModelReplay is set only by the primary ReAct decision loop.
+	// Helper prompts (tool parameter generation, verification, summaries, etc.)
+	// must leave it false so a previous decision is replayed exactly once to the
+	// model that continues that decision, rather than leaking into unrelated AI
+	// calls which merely share the prefix assembly machinery.
+	IncludeLatestModelReplay bool
+
 	// Lightweight selects the bounded speed-priority projection: the full
 	// frozen session history is replaced by a recent Timeline window and large
 	// auxiliary context fields are capped. The action schema remains intact so

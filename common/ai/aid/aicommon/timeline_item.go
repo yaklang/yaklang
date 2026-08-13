@@ -233,8 +233,14 @@ func (u *UserInteraction) SetShrinkResult(s string) {
 }
 
 type TextTimelineItem struct {
-	ID                  int64  `json:"id"`
-	Text                string `json:"text"`
+	ID   int64  `json:"id"`
+	Text string `json:"text"`
+	// PromptText is an optional prompt-only rendering of this timeline item.
+	// Text remains the source for UI, persistence display, diff and human-readable
+	// output. PromptText is consumed only by the prompt projection pass, allowing
+	// internal protocol markers to reach the message rewriter without leaking into
+	// the user-facing timeline. Empty keeps the historical behavior.
+	PromptText          string `json:"prompt_text,omitempty"`
 	ShrinkResult        string `json:"shrink_result,omitempty"`
 	ShrinkSimilarResult string `json:"shrink_similar_result,omitempty"`
 }
