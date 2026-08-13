@@ -129,6 +129,11 @@ grep -Fq 'environment: production-release' "$product_workflow"
 grep -Fq 'LEGION_NODE_RELEASE_SIGNING_PRIVATE_KEY_B64' "$product_workflow"
 grep -Fq 'LEGION_NODE_RELEASE_SIGNING_PUBLIC_KEY_B64' "$product_workflow"
 grep -Fq 'release-index.json.sig' "$repo_root/.github/scripts/build-legion-node-engine-import-bundle.sh"
+grep -Fq 'both Yaklang Node release signing values or neither' "$product_workflow"
+if grep -Fq 'must configure the Yaklang Node release signing key pair' "$product_workflow"; then
+  echo 'Yaklang Node signing is unexpectedly mandatory' >&2
+  exit 1
+fi
 # shellcheck disable=SC2016 # Match literal workflow environment syntax.
 grep -Fq 'yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz' "$product_workflow"
 
