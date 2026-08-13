@@ -150,6 +150,52 @@ aaa`
 	})
 }
 
+func TestBuildRedirectRequestMethodAndBody(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		method     string
+		wantMethod string
+		wantBody   bool
+	}{
+		{name: "301 rewrites POST", statusCode: http.StatusMovedPermanently, method: http.MethodPost, wantMethod: http.MethodGet},
+		{name: "301 preserves PUT", statusCode: http.StatusMovedPermanently, method: http.MethodPut, wantMethod: http.MethodPut, wantBody: true},
+		{name: "302 rewrites POST", statusCode: http.StatusFound, method: http.MethodPost, wantMethod: http.MethodGet},
+		{name: "302 preserves PATCH", statusCode: http.StatusFound, method: http.MethodPatch, wantMethod: http.MethodPatch, wantBody: true},
+		{name: "303 rewrites DELETE", statusCode: http.StatusSeeOther, method: http.MethodDelete, wantMethod: http.MethodGet},
+		{name: "303 preserves HEAD", statusCode: http.StatusSeeOther, method: http.MethodHead, wantMethod: http.MethodHead, wantBody: true},
+		{name: "307 preserves POST", statusCode: http.StatusTemporaryRedirect, method: http.MethodPost, wantMethod: http.MethodPost, wantBody: true},
+		{name: "308 preserves PUT", statusCode: http.StatusPermanentRedirect, method: http.MethodPut, wantMethod: http.MethodPut, wantBody: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originRequest := []byte(tt.method + " /source HTTP/1.1\r\n" +
+				"Host: example.com\r\n" +
+				"Content-Type: application/json\r\n" +
+				"Content-Encoding: identity\r\n" +
+				"Content-Location: /source-body\r\n" +
+				"Content-Length: 7\r\n\r\n" +
+				`{"a":1}`)
+
+			got, err := BuildRedirectRequest("https://example.com/target", originRequest, true, tt.statusCode)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantMethod, GetHTTPRequestMethod(got))
+			if tt.wantBody {
+				require.Equal(t, `{"a":1}`, string(GetHTTPPacketBody(got)))
+				require.Equal(t, "application/json", GetHTTPPacketHeader(got, "Content-Type"))
+				require.Equal(t, "identity", GetHTTPPacketHeader(got, "Content-Encoding"))
+				require.Equal(t, "/source-body", GetHTTPPacketHeader(got, "Content-Location"))
+			} else {
+				require.Empty(t, GetHTTPPacketBody(got))
+				require.Empty(t, GetHTTPPacketHeader(got, "Content-Type"))
+				require.Empty(t, GetHTTPPacketHeader(got, "Content-Encoding"))
+				require.Empty(t, GetHTTPPacketHeader(got, "Content-Location"))
+			}
+		})
+	}
+}
+
 func TestUrlToHTTPRequest(t *testing.T) {
 	type args struct {
 		text string
