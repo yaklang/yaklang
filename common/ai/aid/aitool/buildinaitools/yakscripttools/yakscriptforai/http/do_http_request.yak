@@ -27,7 +27,18 @@ The legacy string fields `query-params` and `post-params` remain for compatibili
 - Packet mode: `packet`; optional `https` (`yes`/`no`/`auto`).
 - Common: `timeout`, `redirect-times`, `keyword`, `regexp-match`, `proxy`, `verbose`, `save-packet`.
 - `body` overrides `form` when both are present.
+- The response summary line is the dense "conclusion" of each request. It always includes: status line, `body` size, `time` (total), `md5` (body hash — compare across requests for equality), and conditionally `redirects` (full redirect chain), `server`, `content-type`, `set-cookie` when present. Read this one line to get the full request picture without scanning the raw packet. Use `verbose` for the full DNS/connect/server timing breakdown.
 - Use AITAG for `packet`, multi-line `body`, and multi-line `headers`.
+
+## Error and hint classification
+
+All error/warning/hint messages use a bracketed prefix so you can quickly classify and route them:
+
+- `[request error: <type>]` — HTTP request itself failed. Types: `dns`, `connection`, `timeout`, `tls`, `proxy`, `network`, `unknown`. Each has a specific Recovery action.
+- `[status hint]` — HTTP response status code guidance (3xx/4xx/5xx). Tells you what the status code means and what to try next.
+- `[param error: <type>]` — Tool parameter is invalid or missing. Types: `missing target`, `invalid url`, `malformed header`, `invalid regexp`. Fix the parameter and retry.
+- `[param warn: <type>]` — Tool parameter was auto-corrected. Types: `empty method`, `invalid timeout`, `invalid redirect-times`. The request still proceeds with the corrected value.
+- `[content-type hint]` — JSON body was rejected (HTTP 400); the tool auto-retried as form-encoded and the server accepted it.
 
 ## Black-box experiment loop
 
@@ -123,24 +134,25 @@ regexpMatch = cli.String("regexp-match", cli.setHelp("regex to search in respons
 // to keep output small; the packets are still printed inline (truncated for large bodies).
 // 用 cli.Bool: AI 传 JSON true 时, 执行器注入裸 --save-packet 标志, cli.Bool 读到 true.
 savePacket = cli.Bool("save-packet", cli.setHelp("dump full request+response packets to temp files (default off; packets are still printed inline)"))
-// 最终请求报文始终输出，确保 AI 能核对参数实际生成的 packet；verbose 只控制模式行和连接 trace。
-verbose = cli.Bool("verbose", cli.setHelp("verbose output: print connection trace + mode line; the generated request packet is always printed"))
+// 最终请求报文始终输出，确保 AI 能核对参数实际生成的 packet；response 行始终带 total time 和 body_md5。
+// verbose 只控制模式行和完整的 DNS/connect/server 分段耗时 trace。
+verbose = cli.Bool("verbose", cli.setHelp("verbose output: print mode line + full DNS/connect/server timing trace; total time and body_md5 are always shown in the response line"))
 proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
 cli.check()
 
 // Safe scalar recovery. Keep the correction visible so the AI knows which
 // effective values were used instead of silently changing request behavior.
 if str.TrimSpace(method) == "" {
-    yakit.Warn("empty method normalized to GET; pass method=GET explicitly next time")
+    yakit.Warn("[param warn: empty method] method was empty, normalized to GET. Pass method=GET explicitly next time to avoid ambiguity.")
     method = "GET"
 }
 method = str.ToUpper(str.TrimSpace(method))
 if timeout <= 0 {
-    yakit.Warn("timeout=%v is not a safe bounded timeout; normalized to 10 seconds", timeout)
+    yakit.Warn("[param warn: invalid timeout] timeout=%v is not a safe bounded timeout, normalized to 10 seconds. Pass a positive integer (e.g. timeout=10) next time.", timeout)
     timeout = 10
 }
 if redirectTimes < 0 {
-    yakit.Warn("redirect-times=%v is invalid; normalized to 0 (redirects disabled)", redirectTimes)
+    yakit.Warn("[param warn: invalid redirect-times] redirect-times=%v is invalid, normalized to 0 (redirects disabled). Pass a non-negative integer (e.g. redirect-times=3) next time.", redirectTimes)
     redirectTimes = 0
 }
 
@@ -236,13 +248,14 @@ legacyFormValues = normalizedPostParams["values"]
 
 // --- validation ---
 if packet == "" && urlStr == "" {
-    yakit.Error("either 'url' (URL mode) or 'packet' (Packet mode) must be provided")
+    yakit.Error("[param error: missing target] either 'url' (URL mode) or 'packet' (Packet mode) must be provided. Recovery: provide a url for URL mode (e.g. https://host/path) or a packet for Packet mode (raw HTTP request bytes). The request was not sent.")
     return
 }
 
 // --- build poc options ---
 opts = []
 redirectLogs = []
+redirectChain = []
 
 // timeout
 if timeout > 0 {
@@ -260,6 +273,7 @@ if redirectTimes <= 0 {
         redirectUrl = poc.GetHTTPPacketHeader(redirectRsp, "Location")
         statusCode = poc.GetStatusCodeFromResponse(redirectRsp)
         yakit.Info("redirect #%d [%v] -> %v", redirectCount, statusCode, redirectUrl)
+        redirectChain.Push(sprintf("%v -> %v", statusCode, redirectUrl))
         logEntry = sprintf("========== Redirect #%d [Status: %v] ==========\nTarget: %v\n\n--- Request ---\n%v\n\n--- Response ---\n%v\n\n",
             redirectCount, statusCode, redirectUrl, string(redirectReq), string(redirectRsp))
         redirectLogs.Push(logEntry)
@@ -316,7 +330,7 @@ if packet != "" {
     // parse URL to raw packet
     autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
     if err != nil {
-        yakit.Error("failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL such as https://host/path, or use packet mode when exact request bytes are required. Request was not sent.", err)
+        yakit.Error("[param error: invalid url] failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL including scheme (e.g. https://host/path or http://host:port/path). If the URL contains special characters, ensure they are properly encoded. Use packet mode when exact request bytes are required. Request was not sent.", err)
         return
     }
     rawPacket = parsedPacket
@@ -338,7 +352,7 @@ if packet != "" {
             }
             idx = str.Index(line, ":")
             if idx <= 0 {
-                yakit.Warn("ignored malformed header line #%v: expected 'Name: value'. Fix the headers parameter and retry if this header is required.", headerLineIndex)
+                yakit.Warn("[param error: malformed header] ignored header line #%v: expected 'Name: value' format. Fix the headers parameter (use one 'Key: Value' per line, or a JSON object) and retry if this header is required.", headerLineIndex)
                 continue
             }
             hKey = str.TrimSpace(line[:idx])
@@ -426,7 +440,25 @@ printRequestPacket = func(label, requestPacket) {
 printRequestPacket("request packet", rawPacket)
 rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
 if err != nil {
-    yakit.Error("HTTP request failed: %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err)
+    errStr = sprint(err)
+    errLower = str.ToLower(errStr)
+    // --- classify HTTP request error by error type ---
+    // 根据 err 字符串关键词分类, 给 agent 精准的 recovery 方向, 避免盲目重试.
+    if str.Contains(errLower, "no such host") || str.Contains(errLower, "dns") || str.Contains(errLower, "lookup") || str.Contains(errLower, "resolve") {
+        yakit.Error("[request error: dns] %v. Recovery: DNS resolution failed. Check the hostname spelling, try an IP directly in the URL, or verify DNS server / hosts file. The request was not sent.", err)
+    } elif str.Contains(errLower, "connection refused") || str.Contains(errLower, "reset by peer") || str.Contains(errLower, " EOF") || str.Contains(errLower, "broken pipe") {
+        yakit.Error("[request error: connection] %v. Recovery: Connection was refused or reset. The port may be closed, filtered, or the service crashed. Try a different port, check if the host is up, or retry with verbose=true for connection trace.", err)
+    } elif str.Contains(errLower, "timeout") || str.Contains(errLower, "deadline exceeded") || str.Contains(errLower, "i/o timeout") {
+        yakit.Error("[request error: timeout] %v. Recovery: Request timed out. Increase the timeout parameter (current: %vs), or the endpoint may be slow/hanging. For blind time-based tests, a timeout may itself be a signal — compare with a baseline request. Retry with a larger timeout if the endpoint is known to be slow.", err, timeout)
+    } elif str.Contains(errLower, "tls") || str.Contains(errLower, "certificate") || str.Contains(errLower, "x509") || str.Contains(errLower, "handshake") {
+        yakit.Error("[request error: tls] %v. Recovery: TLS handshake failed. Try https=no for plain HTTP, or check if the certificate is self-signed/expired. If you intentionally accept invalid certs, retry with a proxy that handles TLS interception.", err)
+    } elif str.Contains(errLower, "proxy") || str.Contains(errLower, "proxyconnect") || str.Contains(errLower, "proxy http") {
+        yakit.Error("[request error: proxy] %v. Recovery: Proxy connection failed. Check the proxy URL (current: %v), verify the proxy is running and reachable, or remove the proxy parameter to connect directly.", err, proxy)
+    } elif str.Contains(errLower, "no route to host") || str.Contains(errLower, "network is unreachable") {
+        yakit.Error("[request error: network] %v. Recovery: Network is unreachable. The host may be down, firewalled, or in a different network segment. Verify reachability with a simple ping or a different host.", err)
+    } else {
+        yakit.Error("[request error: unknown] %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err)
+    }
     return
 }
 
@@ -516,7 +548,13 @@ tryFormRetryOnJsonRejected = func() {
 tryFormRetryOnJsonRejected()
 
 // --- report results ---
-// connection info (verbose only; trace is noise for batch IDOR/enum flows)
+// 默认输出总耗时 (total time), 这是延时测试 / 盲注判断的关键信号, 不需要 verbose.
+// verbose 仍然控制完整的 DNS/connect/server 分段耗时和端口状态.
+totalTimeStr = "n/a"
+try {
+    totalTimeStr = rspIns.TraceInfo.TotalTime.String()
+} catch e {}
+
 if verbose {
     if rspIns.PortIsOpen {
         yakit.Info("remote %v is open", rspIns.RemoteAddr)
@@ -530,19 +568,113 @@ if verbose {
     } catch e {}
 }
 
-// status line
+// 计算响应体 MD5 hash, 用于对比实验: agent 只需比较 hash 字符串即可判断两次响应体是否一致.
+// 这在 IDOR 枚举 / 参数 fuzzing / 错误页面识别等场景中极有价值.
+bodyHash = ""
+try {
+    rspBody = poc.GetHTTPPacketBody(rsp)
+    if len(rspBody) > 0 {
+        bodyHash = codec.Md5(rspBody)
+    }
+} catch e {}
+
+// --- collect key response headers for the summary line ---
+// 提取高价值响应头, 让 agent 不用从完整报文里翻找技术栈指纹和响应类型.
+rspServer = ""
+rspContentType = ""
+rspSetCookie = ""
+try {
+    rspServer = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Server"))
+    rspContentType = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Content-Type"))
+    rspSetCookie = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Set-Cookie"))
+} catch e {}
+
+// --- build redirect chain string for the summary line ---
+// 把流式输出的重定向步骤收束为一行, 让 agent 一眼看到完整跳转路径.
+redirectChainStr = ""
+if len(redirectChain) > 0 {
+    redirectChainStr = str.Join(redirectChain, " | ")
+}
+
+// --- build the enriched response summary line ---
+// 这是流式输出的收束点: 请求已发完, 重定向已结束, 响应已收到.
+// 在这一行里把 agent 最需要的信号集中输出: 状态码、body大小、耗时、md5、
+// 重定向链、Server、Content-Type. agent 读这一行就能拿到完整请求画像.
+summaryParts = []
 try {
     rspStr = string(rsp)
     crlfIdx = str.Index(rspStr, "\r\n")
     if crlfIdx > 0 {
         statusLine = rspStr[:crlfIdx]
-        yakit.Info("response: %v (body size: %v)", statusLine, rspIns.ResponseBodySize)
     } else {
-        yakit.Info("response body size: %v", rspIns.ResponseBodySize)
+        statusLine = sprintf("HTTP (body size: %v)", rspIns.ResponseBodySize)
     }
 } catch e {
-    yakit.Info("response body size: %v", rspIns.ResponseBodySize)
+    statusLine = sprintf("HTTP (body size: %v)", rspIns.ResponseBodySize)
 }
+
+summaryParts.Push(sprintf("body: %v bytes", rspIns.ResponseBodySize))
+summaryParts.Push(sprintf("time: %v", totalTimeStr))
+if bodyHash != "" {
+    summaryParts.Push(sprintf("md5: %v", bodyHash))
+}
+if redirectChainStr != "" {
+    summaryParts.Push(sprintf("redirects: %v", redirectChainStr))
+}
+if rspServer != "" {
+    summaryParts.Push(sprintf("server: %v", rspServer))
+}
+if rspContentType != "" {
+    summaryParts.Push(sprintf("content-type: %v", rspContentType))
+}
+if rspSetCookie != "" {
+    cookieBrief = rspSetCookie
+    semiIdx = str.Index(rspSetCookie, ";")
+    if semiIdx > 0 {
+        cookieBrief = rspSetCookie[:semiIdx]
+    }
+    summaryParts.Push(sprintf("set-cookie: %v", cookieBrief))
+}
+
+yakit.Info("response: %v (%v)", statusLine, str.Join(summaryParts, ", "))
+
+// --- HTTP response status code hint ---
+// 根据状态码给 agent 精准的后续测试方向, 避免死磕单一路径.
+try {
+    rspStatusCode = poc.GetStatusCodeFromResponse(rsp)
+    if rspStatusCode >= 300 && rspStatusCode < 400 {
+        if rspStatusCode == 301 || rspStatusCode == 302 || rspStatusCode == 303 || rspStatusCode == 307 || rspStatusCode == 308 {
+            locationHeader = poc.GetHTTPPacketHeader(rsp, "Location")
+            yakit.Info("[status hint] HTTP %v redirect to: %v. Follow the redirect (redirect-times > 0) or inspect the Location target directly. For open-redirect testing, check if Location reflects user input.", rspStatusCode, locationHeader)
+        } else {
+            yakit.Info("[status hint] HTTP %v (3xx redirect). Check the Location header for the redirect target.", rspStatusCode)
+        }
+    } elif rspStatusCode == 400 {
+        yakit.Info("[status hint] HTTP 400 Bad Request. The server rejected the request format. Check: (1) Content-Type matches the body format (JSON vs form-encoded — the tool auto-retries form if JSON is rejected), (2) required parameters are present, (3) the request body is valid. Inspect the response body for the specific error message.")
+    } elif rspStatusCode == 401 {
+        yakit.Info("[status hint] HTTP 401 Unauthorized. Authentication is required. Check: (1) Authorization header / Cookie / token is present and valid, (2) credentials are correct, (3) the auth scheme (Basic/Bearer/Session). If testing auth bypass, try without credentials or with modified auth headers.")
+    } elif rspStatusCode == 403 {
+        yakit.Info("[status hint] HTTP 403 Forbidden. The server understood the request but refuses to authorize it. Check: (1) session/role permissions, (2) CSRF token or Referer/Origin requirements, (3) IP allowlisting or WAF blocking. If testing access control, try different user roles or privilege escalation payloads.")
+    } elif rspStatusCode == 404 {
+        yakit.Info("[status hint] HTTP 404 Not Found. The endpoint or resource does not exist. Check: (1) URL path spelling and case, (2) try path traversal or alternative endpoints, (3) the resource may require a different HTTP method. If testing IDOR, try different ID values or parameter names.")
+    } elif rspStatusCode == 405 {
+        yakit.Info("[status hint] HTTP 405 Method Not Allowed. The URL exists but does not accept this HTTP method. Check the Allow response header for permitted methods, then retry with a different method (GET/POST/PUT/DELETE/PATCH/OPTIONS).")
+    } elif rspStatusCode == 429 {
+        yakit.Info("[status hint] HTTP 429 Too Many Requests. Rate limiting is active. Check: (1) Retry-After header for wait time, (2) reduce request frequency, (3) rotate IP or use proxy, (4) add delay between requests. For batch testing, lower concurrency or add delay-seconds.")
+    } elif rspStatusCode >= 400 && rspStatusCode < 500 {
+        yakit.Info("[status hint] HTTP %v (4xx client error). The request was malformed or unauthorized. Inspect the response body for the specific error message, verify request parameters, headers, and authentication, then retry with corrections.", rspStatusCode)
+    } elif rspStatusCode == 500 {
+        yakit.Info("[status hint] HTTP 500 Internal Server Error. The server crashed processing the request. This may indicate: (1) a bug triggered by the input (potential vulnerability signal — check for SQLi/XSS/XXE/command injection), (2) a malformed payload the server cannot handle. Inspect the response body for stack traces or error details. Retry with a simpler payload to isolate the trigger.")
+    } elif rspStatusCode == 502 {
+        yakit.Info("[status hint] HTTP 502 Bad Gateway. An upstream server/proxy returned an invalid response. The target may be behind a reverse proxy (nginx, etc.) and the backend is down or misconfigured. Retry after a delay, or check if the endpoint works directly without proxy.")
+    } elif rspStatusCode == 503 {
+        yakit.Info("[status hint] HTTP 503 Service Unavailable. The server is temporarily unavailable (overloaded or maintaining). Retry after a delay. Check Retry-After header. If testing, the service may not be stable enough for reliable results right now.")
+    } elif rspStatusCode == 504 {
+        yakit.Info("[status hint] HTTP 504 Gateway Timeout. An upstream server did not respond in time. The backend may be slow or hanging. Increase timeout and retry, or check if the endpoint is known to be slow. For blind time-based tests, compare with baseline timing.")
+    } elif rspStatusCode >= 500 {
+        yakit.Info("[status hint] HTTP %v (5xx server error). The server failed to process the request. This may be a transient issue or triggered by the input. Inspect the response body for error details, retry with a simpler payload, or retry after a delay.", rspStatusCode)
+    }
+} catch e {}
 
 // save request/response/redirect to files only when save-packet is enabled.
 // 默认不落盘, 保持输出精简; 完整报文已在内联打印中给出 (大报文会截断).
@@ -571,6 +703,9 @@ if savePacket {
 }
 
 // print response packet inline with size/pattern-aware logic
+// 大报文采用"头+尾"截断策略: 前 8KB + 中间省略 + 后 2KB.
+// 这样 agent 既能看到响应开头 (headers + 前半 body), 又能看到结尾
+// (如 </html> 闭合标签或 JS 尾部变量), 不会完全丢失下半段信息.
 hasPattern = (keyword != "" || regexpMatch != "")
 if len(rsp) > 0 {
     if hasPattern {
@@ -587,10 +722,21 @@ if len(rsp) > 0 {
         if len(rsp) <= 10240 {
             yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
         } else {
+            // 头尾截断: 前 8KB + 省略提示 + 后 2KB
+            headSize = 8192
+            tailSize = 2048
+            if len(rsp) < headSize + tailSize {
+                headSize = len(rsp) - tailSize
+                if headSize < 0 { headSize = 0 }
+            }
+            omitted = len(rsp) - headSize - tailSize
+            rspStrFull = string(rsp)
+            headPart = rspStrFull[:headSize]
+            tailPart = rspStrFull[len(rsp)-tailSize:]
             if savePacket {
-                yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated, full response saved to file)", len(rsp), string(rsp[:10240]))
+                yakit.Info("response packet (%v bytes, head %vKB + tail %vKB):\n%v\n\n... (%v bytes omitted, full response saved to file) ...\n\n%v", len(rsp), headSize/1024, tailSize/1024, headPart, omitted, tailPart)
             } else {
-                yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated; set save-packet=true to dump the full packet to a file)", len(rsp), string(rsp[:10240]))
+                yakit.Info("response packet (%v bytes, head %vKB + tail %vKB):\n%v\n\n... (%v bytes omitted; set save-packet=true to dump the full packet to a file) ...\n\n%v", len(rsp), headSize/1024, tailSize/1024, headPart, omitted, tailPart)
             }
         }
     }
@@ -687,7 +833,7 @@ if hasPattern {
                 yakit.Info("regexp match: not found in response (%v bytes). Verify the expression or retry without regexp-match to inspect the normal response preview.", len(rsp))
             }
         } catch e {
-            yakit.Error("invalid regexp-match %q: %v. Recovery: correct or remove regexp-match and retry; the HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
+            yakit.Error("[param error: invalid regexp] regexp-match %q is not a valid regular expression: %v. Recovery: fix the regex syntax (common issues: unescaped special chars, unbalanced groups, invalid quantifiers) or remove regexp-match and retry. The HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
         }
     }
 }
