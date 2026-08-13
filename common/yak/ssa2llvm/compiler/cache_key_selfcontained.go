@@ -45,6 +45,9 @@ func cacheToolKeyPart(cfg *CompileConfig, write func(string)) {
 	// Which modules survive the link is decided by these rules, so a change
 	// to them produces a different binary from the same script.
 	write("moduleClosure=" + moduleClosureKey())
+	// Which runtime archive the link lands on depends on the tier archives
+	// installed on this machine, not just on the embedded one.
+	write("tiers=" + assets.TierStateKey())
 }
 
 // bundledLLVMVersion identifies the in-process LLVM/lld that produced the

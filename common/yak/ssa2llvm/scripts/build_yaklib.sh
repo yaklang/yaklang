@@ -36,7 +36,18 @@ EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 # link time via --gc-sections, so a plain print script drops the poc/cli/http
 # code and their dependency closures while a poc script keeps them.
 DEFAULT_MODULES="os,poc,cli,http,codec,yakit,ssa"
-MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
+# SSA2LLVM_TIER names a rung of the pre-built ladder (runtime/tiers); its module
+# set comes from the same Go definition the compiler selects with, so the two
+# cannot drift. SSA2LLVM_EMBED_MODULES still takes an arbitrary list.
+if [[ -n "${SSA2LLVM_TIER:-}" ]]; then
+  MODULES="$( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/cmd/tiers modules "${SSA2LLVM_TIER}" )"
+else
+  MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
+fi
+# The tier recorded in the manifest is the one the compiler may assume it has
+# embedded. An arbitrary module list matches no rung and is recorded as
+# "custom", which makes tier selection fall back to the embedded archive.
+TIER_NAME="$( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/cmd/tiers name "${MODULES}" )"
 # The shared poc/ssa dependency closure and the ssa language frontends live in
 # their own split groups. genfull ignores the unknown names; elfsplit splits
 # them. The compiler keeps "shared" whenever any module is used, and keeps
@@ -228,6 +239,12 @@ fi
   echo ""
   echo "package assets"
   echo ""
+  echo "// EmbeddedTier is the tier this archive was built as, or \"custom\" for an"
+  echo "// arbitrary SSA2LLVM_EMBED_MODULES list. It is the tier the compiler falls"
+  echo "// back to when a smaller one is not installed, so it must cover every"
+  echo "// module a script can ask for."
+  printf 'const EmbeddedTier = "%s"\n' "${TIER_NAME}"
+  echo ""
   echo "var EmbeddedManifest = Manifest{"
   gen_field Libyak   "${ASSETS_DIR}/libyak.a"
   gen_field Libgc    "${ASSETS_DIR}/libgc.a"
@@ -250,8 +267,22 @@ fi
   echo "}"
 } > "${ASSETS_DIR}/manifest_generated.go"
 
+# ── 7. Optionally publish this build as a tier archive ─────────────────────
+# CI builds each rung of the ladder and collects the archives into one
+# directory; the compiler finds them there at link time (assets.TierArchivePath).
+if [[ -n "${SSA2LLVM_TIER_OUT:-}" ]]; then
+  if [[ "${TIER_NAME}" == "custom" ]]; then
+    echo "[yaklib] ERROR: SSA2LLVM_TIER_OUT needs a tier build; modules '${MODULES}' match no tier" >&2
+    exit 1
+  fi
+  TIER_OUT_DIR="${SSA2LLVM_TIER_OUT}/${TIER_NAME}"
+  mkdir -p "${TIER_OUT_DIR}"
+  cp "${ASSETS_DIR}/libyak.a" "${TIER_OUT_DIR}/libyak.a"
+  echo "[yaklib] published tier '${TIER_NAME}' to ${TIER_OUT_DIR}/libyak.a"
+fi
+
 echo "[yaklib] embedded runtime assets prepared in ${ASSETS_DIR}"
-echo "[yaklib]   libyak.a $(du -h "${ASSETS_DIR}/libyak.a" | cut -f1) (modules: ${MODULES}), libgc.a $(du -h "${ASSETS_DIR}/libgc.a" | cut -f1)"
+echo "[yaklib]   libyak.a $(du -h "${ASSETS_DIR}/libyak.a" | cut -f1) (tier: ${TIER_NAME}, modules: ${MODULES}), libgc.a $(du -h "${ASSETS_DIR}/libgc.a" | cut -f1)"
 echo "[yaklib]   crt1/crti/crtn + crtbegin/crtend"
 echo "[yaklib]   libc.a $(du -h "${ASSETS_DIR}/libc.a" | cut -f1), libgcc.a $(du -h "${ASSETS_DIR}/libgcc.a" | cut -f1), libgcc_eh.a $(du -h "${ASSETS_DIR}/libgcc_eh.a" | cut -f1)"
 if [ "${#EXTDEP_NAMES[@]}" -gt 0 ]; then
