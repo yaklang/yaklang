@@ -36,6 +36,33 @@ grep -Fq 'uses: ./.github/workflows/build-legion-ai-session-runtime-common.yml' 
 grep -Fq 'Source validation mode: alpha or unified' "$runtime_workflow"
 grep -Fq 'refs/tags/legion-node-v' "$runtime_workflow"
 grep -Fq '.docker.tar.gz' "$runtime_workflow"
+# The Runtime packager verifies a clean Git checkout before generating
+# provenance. Keep the image archive outside the checkout until that gate has
+# passed, then copy it into the Actions handoff directory.
+if ! grep -Fq 'id: runtime-archive' "$runtime_workflow"; then
+  echo "$runtime_workflow must expose the runner-temp Runtime archive path" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal workflow shell syntax.
+if ! grep -Fq 'archive_dir="${RUNNER_TEMP}/runtime-archive-${RUNTIME_GOARCH}"' "$runtime_workflow"; then
+  echo "$runtime_workflow must stage the Runtime archive outside the checkout" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal GitHub Actions expression syntax.
+if ! grep -Fq 'RUNTIME_IMAGE_ARCHIVE: ${{ steps.runtime-archive.outputs.path }}' "$runtime_workflow"; then
+  echo "$runtime_workflow must pass the runner-temp archive into provenance generation" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal workflow shell syntax.
+if ! grep -Fq 'cp "$RUNTIME_IMAGE_ARCHIVE" dist/artifact/' "$runtime_workflow"; then
+  echo "$runtime_workflow must stage the verified Runtime archive for handoff" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Reject the literal checkout-local archive path.
+if grep -Fq '>"dist/artifact/${RUNTIME_PACKAGE_NAME}.docker.tar.gz"' "$runtime_workflow"; then
+  echo "$runtime_workflow must not dirty the checkout before Runtime provenance is generated" >&2
+  exit 1
+fi
 grep -Fq 'contents: read' "$runtime_alpha_workflow"
 if grep -Eq 'secrets: inherit|OSS_KEY_(ID|SECRET)|upload-oss' "$runtime_alpha_workflow"; then
   echo "$runtime_alpha_workflow must not receive Runtime release secrets or publish to OSS" >&2

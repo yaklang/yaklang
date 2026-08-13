@@ -190,15 +190,19 @@ jobs:
           } >>"$GITHUB_OUTPUT"
 
       - name: Stage Runtime image archive
+        id: runtime-archive
         shell: bash
         env:
           RUNTIME_IMAGE_ID: ${{ steps.inspect.outputs.image_id }}
         run: |
           set -euo pipefail
-          mkdir -p dist/artifact
+          archive_dir="${RUNNER_TEMP}/runtime-archive-${RUNTIME_GOARCH}"
+          archive_path="${archive_dir}/${RUNTIME_PACKAGE_NAME}.docker.tar.gz"
+          mkdir -p "$archive_dir"
           docker save "$RUNTIME_IMAGE_ID" | gzip -n -1 \
-            >"dist/artifact/${RUNTIME_PACKAGE_NAME}.docker.tar.gz"
-          gzip -t "dist/artifact/${RUNTIME_PACKAGE_NAME}.docker.tar.gz"
+            >"$archive_path"
+          gzip -t "$archive_path"
+          echo "path=$archive_path" >>"$GITHUB_OUTPUT"
 
       - name: Generate Runtime provenance package
         env:
@@ -207,7 +211,7 @@ jobs:
           RUNTIME_LDD_FILE: ${{ steps.inspect.outputs.inspect_dir }}/runtime.ldd
           RUNTIME_IMAGE_REF: ${{ steps.inspect.outputs.image_ref }}
           RUNTIME_IMAGE_TAG: ${{ steps.inspect.outputs.image_tag }}
-          RUNTIME_IMAGE_ARCHIVE: dist/artifact/${{ env.RUNTIME_PACKAGE_NAME }}.docker.tar.gz
+          RUNTIME_IMAGE_ARCHIVE: ${{ steps.runtime-archive.outputs.path }}
           RUNTIME_BASE_IMAGE: ${{ steps.bases.outputs.runtime_ref }}
           RUNTIME_BUILDER_IMAGE: ${{ steps.bases.outputs.builder_ref }}
           RUNTIME_GO_VERSION: ${{ steps.bases.outputs.go_version }}
@@ -215,6 +219,8 @@ jobs:
 
       - name: Verify and stage architecture-specific artifact contract
         shell: bash
+        env:
+          RUNTIME_IMAGE_ARCHIVE: ${{ steps.runtime-archive.outputs.path }}
         run: |
           set -euo pipefail
           package_dir="dist/${RUNTIME_PACKAGE_NAME}"
@@ -251,6 +257,7 @@ jobs:
           cp "$package_dir/SHA256SUMS" "dist/artifact/SHA256SUMS${ARTIFACT_SUFFIX}"
           cp "dist/${RUNTIME_PACKAGE_NAME}.tar.gz" dist/artifact/
           cp "dist/${RUNTIME_PACKAGE_NAME}.tar.gz.sha256" dist/artifact/
+          cp "$RUNTIME_IMAGE_ARCHIVE" dist/artifact/
 
       - name: Verify staged Runtime image archive
         shell: bash
