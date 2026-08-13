@@ -122,7 +122,8 @@ func TestDirectToolScalarParamsSchema_AcceptsObjectAndLegacyJSONString(t *testin
 // are not documentation-only pseudo-JSON. This test makes CI run all four exact
 // payloads through the production streaming parser, verifier and action-schema
 // validator. The same strings remain together in OutputExamples for custom
-// renderers, with the single-call form taught before the batch form.
+// renderers, with the preferred independent-batch form taught before the
+// single-call fallback.
 func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 	t.Run("directly_call_tool scalar", func(t *testing.T) {
 		loop, _ := newToolBatchTestLoop(t)
@@ -133,9 +134,9 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		assert.Nil(t, loop.GetVariable(loopVarDirectToolBatch))
 		assert.Equal(t, "read_file", loop.Get("directly_call_tool_name"))
 		assert.Less(t,
-			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolScalarOutputExampleJSON),
 			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolBatchOutputExampleJSON),
-			"the scalar form should be taught before the batch optimization",
+			strings.Index(loopAction_directlyCallTool.OutputExamples, directlyCallToolScalarOutputExampleJSON),
+			"the preferred independent-batch form should be taught before the scalar fallback",
 		)
 		assert.Contains(t, loopAction_directlyCallTool.OutputExamples, directlyCallToolScalarOutputExampleJSON)
 		assert.Contains(t, loopAction_directlyCallTool.OutputExamples, directlyCallToolBatchOutputExampleJSON)
@@ -167,9 +168,9 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		assert.Nil(t, loop.GetVariable(loopVarRequireToolBatch))
 		assert.Equal(t, "grep", loop.Get("tool_require_payload"))
 		assert.Less(t,
-			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON),
 			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON),
-			"the scalar form should be taught before the batch optimization",
+			strings.Index(loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON),
+			"the preferred independent-batch form should be taught before the scalar fallback",
 		)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolScalarOutputExampleJSON)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON)
@@ -190,6 +191,51 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		assert.Equal(t, "read_file", request.Calls[1].ToolName)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON)
 	})
+}
+
+func TestToolCallActionDescriptionsUseChineseBatchFirstPolicy(t *testing.T) {
+	tests := []struct {
+		name        string
+		action      *reactloops.LoopAction
+		batchField  string
+		scalarField string
+	}{
+		{
+			name:        "direct",
+			action:      loopAction_directlyCallTool,
+			batchField:  directlyCallToolBatchField,
+			scalarField: "directly_call_tool_name",
+		},
+		{
+			name:        "require",
+			action:      loopAction_toolRequireAndCall,
+			batchField:  requireToolBatchField,
+			scalarField: "tool_require_payload",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Contains(t, test.action.Description, "先枚举本轮已明确的真实调用")
+			require.Contains(t, test.action.Description, "优先使用")
+			require.Contains(t, test.action.Description, "不要拆成多个单工具轮次")
+			require.NotContains(t, test.action.Description, "For one call")
+			require.NotContains(t, test.action.Description, "Required only")
+
+			schemaOptions := make([]any, 0, len(test.action.Options))
+			for _, option := range test.action.Options {
+				schemaOptions = append(schemaOptions, option)
+			}
+			var root map[string]any
+			require.NoError(t, json.Unmarshal([]byte(aitool.NewObjectSchema(schemaOptions...)), &root))
+			properties := root["properties"].(map[string]any)
+			batchDescription := properties[test.batchField].(map[string]any)["description"].(string)
+			scalarDescription := properties[test.scalarField].(map[string]any)["description"].(string)
+			require.Contains(t, batchDescription, "优先使用本数组")
+			require.Contains(t, batchDescription, "不要为了沿用单工具而拆成多轮")
+			require.Contains(t, scalarDescription, "仅当本轮恰好一个")
+		})
+	}
 }
 
 func TestToolBatchSchema_DeclaresStrictObjectArrays(t *testing.T) {

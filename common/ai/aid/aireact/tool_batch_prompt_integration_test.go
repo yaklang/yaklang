@@ -78,6 +78,10 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 	schemaText := toolBatchActionsSchemaForPrompt(t, direct, required)
 	directExamples := exactToolCallJSONsFromExamples(t, direct.OutputExamples)
 	requireExamples := exactToolCallJSONsFromExamples(t, required.OutputExamples)
+	require.Contains(t, directExamples[0], `"directly_call_tool_calls"`, "direct batch must be taught before the scalar fallback")
+	require.Contains(t, directExamples[1], `"directly_call_tool_name"`)
+	require.Contains(t, requireExamples[0], `"tool_require_calls"`, "require batch must be taught before the scalar fallback")
+	require.Contains(t, requireExamples[1], `"tool_require_payload"`)
 	var emittedSchema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(schemaText), &emittedSchema))
 	properties := emittedSchema["properties"].(map[string]any)
@@ -85,10 +89,10 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 		field string
 		exact string
 	}{
-		{field: "directly_call_tool_name", exact: directExamples[0]},
-		{field: "directly_call_tool_calls", exact: directExamples[1]},
-		{field: "tool_require_payload", exact: requireExamples[0]},
-		{field: "tool_require_calls", exact: requireExamples[1]},
+		{field: "directly_call_tool_calls", exact: directExamples[0]},
+		{field: "directly_call_tool_name", exact: directExamples[1]},
+		{field: "tool_require_calls", exact: requireExamples[0]},
+		{field: "tool_require_payload", exact: requireExamples[1]},
 	} {
 		fieldSchema := properties[placement.field].(map[string]any)
 		require.Contains(t, fieldSchema["description"].(string), placement.exact,
@@ -106,6 +110,10 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+	require.Contains(t, result.Prompt, "先枚举本轮已经明确、可立即执行的真实工具调用")
+	require.Contains(t, result.Prompt, "不得仅为沿用单工具而拆成多轮")
+	require.NotContains(t, result.Prompt, "默认单步")
+	require.NotContains(t, result.Prompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
 
 	sectionStart := strings.Index(result.Prompt, "<|PROMPT_SECTION_semi-dynamic-2|>")
 	sectionEnd := strings.Index(result.Prompt, "<|PROMPT_SECTION_END_semi-dynamic-2|>")
@@ -127,4 +135,12 @@ func TestToolCallExamplesAreInAssembledMainLoopSchema(t *testing.T) {
 			require.Less(t, exampleIndex, sectionEnd)
 		}
 	}
+}
+
+func TestLegacyBasePromptUsesTheSameBatchFirstSelectionPolicy(t *testing.T) {
+	require.Contains(t, basePrompt, "先枚举本轮已经明确、可立即执行的真实调用")
+	require.Contains(t, basePrompt, "优先走独立并发批次")
+	require.Contains(t, basePrompt, "“任务属于探索阶段”本身不是拒绝并发的理由")
+	require.NotContains(t, basePrompt, "默认单步")
+	require.NotContains(t, basePrompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
 }

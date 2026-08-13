@@ -50,6 +50,36 @@ func TestPromptPrefixBuilder_AssemblePromptWithDynamicSection_DefaultSections(t 
 	require.Empty(t, sections[aicache.SectionRaw])
 }
 
+func TestSharedToolCallModePromptsPreferReadyIndependentBatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		prompt   string
+		decision string
+	}{
+		{
+			name:     "high static",
+			prompt:   SharedPlanAndExecHighStaticTemplate,
+			decision: "先枚举本轮已经明确、可立即执行的真实工具调用",
+		},
+		{
+			name:     "frozen tool inventory",
+			prompt:   SharedFrozenBlockTemplate,
+			decision: "先枚举本轮已经明确、可立即执行的真实调用",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Contains(t, test.prompt, test.decision)
+			require.Contains(t, test.prompt, "优先")
+			require.Contains(t, test.prompt, "不得仅为沿用单工具而拆成多轮")
+			require.Contains(t, test.prompt, "任务属于探索阶段")
+			require.NotContains(t, test.prompt, "默认单步")
+			require.NotContains(t, test.prompt, "探索 / 上游不确定 / 需要逐步收紧时的默认形态")
+		})
+	}
+}
+
 func TestPromptPrefixBuilder_AssemblePromptWithDynamicSection_CustomSemiSectionNameAndForcedWrapper(t *testing.T) {
 	builder := &PromptPrefixBuilder{
 		HighStaticTemplateName:   "high",

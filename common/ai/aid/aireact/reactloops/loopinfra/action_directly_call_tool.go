@@ -307,31 +307,30 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-	Description: "directly call an enabled tool with complete parameters (skip require & param-generation phases). " +
-		"Prefer tools listed in CACHE_TOOL_CALL because their Params Schema is visible. " +
-		"If no matching cached schema is available or any parameter is uncertain, choose require_tool instead. " +
-		"The runtime can resolve an enabled non-cached tool and emits a warning rather than rejecting solely on cache miss. " +
-		"For one call provide directly_call_tool_name AND directly_call_tool_params together. " +
-		"For 2-8 mutually independent calls use directly_call_tool_calls instead; never combine scalar and batch forms.",
+	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。先枚举本轮已明确的真实调用：" +
+		"存在 2-8 个互不依赖、互不干扰且参数完整的调用时，优先使用 directly_call_tool_calls 一次并发提交，不要拆成多个单工具轮次；" +
+		"只有本轮恰好一个调用时才同时填写 directly_call_tool_name 和 directly_call_tool_params。" +
+		"优先使用 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；已启用但未缓存的工具仍可解析并产生告警。" +
+		"参数不确定时改用 require_tool；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"directly_call_tool_name",
-			aitool.WithParam_Description("Required only for the single-call form of directly_call_tool; omit it when directly_call_tool_calls is present. The name of one enabled tool. Prefer a cached recently-used tool whose Params Schema is visible; a non-cached enabled tool can still be resolved but produces a warning. For exactly one call, use the scalar form shown in this CI-validated executable example:\n"+directlyCallToolScalarOutputExampleJSON),
+			aitool.WithParam_Description("仅当本轮恰好一个直接调用时填写；存在 directly_call_tool_calls 时必须省略。填写一个已启用工具的准确名称。优先选择 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；未缓存但已启用的工具仍可解析并产生告警。下面是经过 CI 校验且可执行的单调用格式：\n"+directlyCallToolScalarOutputExampleJSON),
 		),
 		aitool.WithRawParam("directly_call_tool_params", map[string]any{
 			"type": []string{"object", "string"},
-		}, aitool.WithParam_Description(`Required only for the single-call form of directly_call_tool; omit it when directly_call_tool_calls is present. Prefer a JSON object containing the one tool invocation's parameters. A JSON-encoded object string remains accepted for legacy compatibility. Refer to the cached tool's Params Schema in the CACHE_TOOL_CALL block for the correct structure.`)),
+		}, aitool.WithParam_Description(`仅当本轮恰好一个直接调用时填写；存在 directly_call_tool_calls 时必须省略。优先使用 JSON object 提供该工具的完整参数；为兼容旧协议仍接受包含 JSON object 的字符串。参数结构必须符合 CACHE_TOOL_CALL 中该工具的 Params Schema。`)),
 		aitool.WithStringParam(
 			"directly_call_identifier",
-			aitool.WithParam_Description(`short snake_case label describing the PURPOSE of this tool call, e.g. "scan_port_443", "query_large_file". Used for report file naming.`),
+			aitool.WithParam_Description(`可选。描述调用目的的简短 snake_case 标识，例如 "scan_port_443"、"query_large_file"；用于报告文件命名。`),
 		),
 		aitool.WithStringParam(
 			"directly_call_expectations",
-			aitool.WithParam_Description(`estimated timing and fallback strategy, e.g. "~3s, force stop if >10s". Used for interval review during execution.`),
+			aitool.WithParam_Description(`可选。预计耗时和回退策略，例如 "~3s，超过10s则停止"；用于执行期间的 interval review。`),
 		),
 		aitool.WithStringParam(
 			"directly_call_reason",
-			aitool.WithParam_Description(`Optional. A terse phrase (under 15 words) stating WHAT this tool call does — e.g. 'test id param for IDOR on /api/user' or '用union注入探测字段数'. No prior-step summaries or transitions. Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
+			aitool.WithParam_Description(`可选。用简短短语说明这次调用具体做什么，例如“测试 /api/user 的 id 参数是否存在 IDOR”或“用 union 注入探测字段数”。不要写前序总结或过渡语；仅当 human_readable_thought 已说明原因时省略。该内容会显示在工具调用卡片上。`),
 		),
 		directlyCallToolBatchSchemaOption(),
 	},
