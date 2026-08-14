@@ -13,8 +13,9 @@ import (
 // pruningCase describes one representative script and the yaklib module groups
 // it must retain (.modtext sections present) and must NOT retain (absent).
 // These reflect the production per-script module selection: a plain print
-// script needs only the core runtime, the ssa script keeps the ssa module and
-// its language frontends, and the poc script keeps the poc/cli/http groups.
+// script needs only the core runtime, the ssa script keeps the ssa module, its
+// language frontends and the network closure its dependencies drag in, and the
+// poc script keeps the poc/cli groups while dropping ssa and the frontends.
 type pruningCase struct {
 	script     string
 	outputSub  string // expected substring of the compiled binary's output
@@ -30,10 +31,16 @@ var pruningCases = []pruningCase{
 		wantAbsent: []string{"ssa", "ssafront", "poc", "cli"},
 	},
 	{
-		script:     "ssa_go_parse.yak",
-		outputSub:  "hello-from-go",
-		wantRetain: []string{"ssa", "ssafront", "shared"},
-		wantAbsent: []string{"poc", "cli"},
+		script:    "ssa_go_parse.yak",
+		outputSub: "hello-from-go",
+		// ssa's dependency closure (moduleGroupDeps) drags cli and poc in with
+		// it: common/utils/cli and common/utils/lowhttp/poc are in the
+		// go list -deps closure of the ssa entry packages, so they must stay
+		// (pruning them was a real runtime panic before the data-driven
+		// closure). What is still pruned is http, which is outside that
+		// closure.
+		wantRetain: []string{"ssa", "ssafront", "shared", "sharednet", "cli", "poc"},
+		wantAbsent: []string{"http"},
 	},
 	{
 		script:     "poc_request.yak",
@@ -74,10 +81,11 @@ func hasExecSection(f *elf.File, name string) bool {
 // TestArtifactPruning_DualEvidence compiles each representative script via the
 // real ssa2llvm CLI, then verifies three layers of pruning evidence on the
 // produced ELF:
-//   A. behavior — the binary runs under env -i and prints the expected output;
-//   B. size     — the exact byte size is recorded and printed;
-//   C. content  — required yaklib module groups are present as real executable
-//      .modtext sections, and unneeded groups are absent.
+//
+//	A. behavior — the binary runs under env -i and prints the expected output;
+//	B. size     — the exact byte size is recorded and printed;
+//	C. content  — required yaklib module groups are present as real executable
+//	   .modtext sections, and unneeded groups are absent.
 //
 // This is a regression guard: if per-script pruning stops working (e.g. all
 // modules are retained), the wantAbsent assertions fail.
