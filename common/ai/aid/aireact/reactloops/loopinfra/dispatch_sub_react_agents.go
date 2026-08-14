@@ -1,4 +1,4 @@
-﻿package loopinfra
+package loopinfra
 
 import (
 	"encoding/json"
@@ -82,8 +82,8 @@ func handleDispatchSubReactAgents(
 	}
 
 	summary := fmt.Sprintf(
-		"Dispatched %d sub react agents (concurrency=%d): %d succeeded, %d failed.",
-		len(results), concurrency, successCount, len(results)-successCount,
+		"Dispatched %d sub react agents: %d succeeded, %d failed.",
+		len(results), successCount, len(results)-successCount,
 	)
 	invoker.AddToTimeline("[DISPATCH_SUB_REACT_AGENTS_DONE]", summary)
 	loopInfraActionFinish(loop, loopInfraNodeSubReactReport, summary)
@@ -119,17 +119,13 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 		"WHAT THIS IS FOR: parallelizing genuinely independent workstreams that can run at the same time without talking to each other (e.g. scan host A and scan host B).\n" +
 		"WHAT THIS IS NOT FOR: (1) offloading a single sequential task you should do yourself — if the whole task is one chain of steps, do NOT dispatch it; (2) dumping every imaginable subtask into one call to avoid thinking. Only dispatch subtasks you have actually confirmed are independent.\n" +
 		"DEPENDENCY RULE: every sub agent in ONE dispatch MUST be mutually independent — none may depend on another's input or result. If B depends on A's result, do NOT batch them: dispatch A (or do A yourself) now, wait for its result to land in the timeline, then in a LATER loop iteration dispatch B once the prior result is available. Group only no-dependency subtasks into the same dispatch.\n" +
-		"GOAL QUALITY: give each sub agent a crisp, self-contained goal and a result_contract whenever possible, so it can finish and return a structured result without re-reading your reasoning.\n" +
-		fmt.Sprintf("CONCURRENCY: simultaneous sub-agent count is controlled by MaxSubAgents (default %d, absolute max %d); do not pass a concurrency field.", aicommon.DefaultMaxSubAgentConcurrency, aicommon.AbsoluteMaxSubAgentConcurrency),
+		"GOAL QUALITY: give each sub agent a crisp, self-contained goal and a result_contract whenever possible, so it can finish and return a structured result without re-reading your reasoning.",
 	Options: []aitool.ToolOption{
 		aitool.WithStructArrayParam("dispatches",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description(fmt.Sprintf(
-					"Sub agent jobs to dispatch in parallel (at most %d). Each item runs in an isolated timeline fork and returns one structured result back to the parent. "+
-						"All jobs in one dispatch MUST be mutually independent — none may depend on another job's input or result. Dependent sub agents must be split across separate loop iterations: dispatch the first batch, wait for completion, then dispatch the dependent batch in the next iteration.",
-					aicommon.AbsoluteMaxSubAgentConcurrency,
-				)),
+				aitool.WithParam_Description("Sub agent jobs to dispatch in parallel. Each item runs in an isolated timeline fork and returns one structured result back to the parent. " +
+					"All jobs in one dispatch MUST be mutually independent — none may depend on another job's input or result. Dependent sub agents must be split across separate loop iterations: dispatch the first batch, wait for completion, then dispatch the dependent batch in the next iteration."),
 			},
 			nil,
 			aitool.WithStringParam("identifier",

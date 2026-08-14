@@ -73,7 +73,7 @@ func runAllFindingVerifications(
 	log.Infof("[CodeAudit/Phase3] Starting forked sub-agent verify of %d findings (concurrency=%d, skipped=%d)",
 		len(jobs), concurrency, skipped)
 	r.AddToTimeline("[PHASE3_FORK_START]",
-		fmt.Sprintf("Phase 3 fork 子 Agent 并行验证 %d 个 finding（并发 %d，timeline 分支隔离）。", len(jobs), concurrency))
+		fmt.Sprintf("Phase 3 fork 子 Agent 并行验证 %d 个 finding（timeline 分支隔离）。", len(jobs)))
 
 	artifacts := newFindingArtifactStore(state)
 
