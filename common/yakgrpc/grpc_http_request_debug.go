@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -157,6 +158,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 	subEngine, err := engine.ExecuteExWithContext(streamCtx, debugScriptCode, map[string]any{
 		"REQUESTS":             reqs,
 		"NUCLEI_MOCK_RESPONSE": baseBuilderParams.MockHTTPResponse,
+		"HTTP_SESSION":         "__GRPC_DEBUG_PLUGIN__" + uuid.NewString(),
 		"CTX":                  streamCtx,
 		"PLUGIN":               scriptInstance,
 		"PLUGIN_CODE":          scriptCode,

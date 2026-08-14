@@ -26,6 +26,11 @@ if getParams("REQUESTS") != undefined {
     cliParams = getParams("CLI_PARAMS")
 }
 
+// Requests in one debug run share cookies, while separate runs must not leak
+// cookies into each other, even when the caller reuses a runtime ID.
+sessionId = getParams("HTTP_SESSION")
+defer poc.RemoveSession(sessionId)
+
 /*
 Init Yakit
 */
@@ -64,7 +69,7 @@ for req in reqs {
                     u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps )~
                     caller.MirrorHTTPFlowExSync(!isSmoking,req.IsHttps, u.String(), "", "", "") // port scan not need req and rsp
                 default:
-                    rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps), poc.session("__GRPC_TEST__"))~
+                    rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps), poc.session(sessionId))~
                     rsp = rspIns.RawPacket
                     firstRsp = rspIns.RedirectRawPackets[0].Response
                     firstReq = rspIns.RedirectRawPackets[0].Request
