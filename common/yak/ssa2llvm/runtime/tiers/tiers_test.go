@@ -44,8 +44,8 @@ func TestSelectPicksSmallestCoveringTier(t *testing.T) {
 		{"codec and yakit", []string{"codec", "yakit"}, "core"},
 		{"network", []string{"http"}, "net"},
 		{"core plus network", []string{"codec", "poc"}, "net"},
-		{"ssa", []string{"ssa"}, "full"},
-		{"ssa with codec", []string{"codec", "ssa"}, "full"},
+		{"ssa", []string{"ssa"}, "staticanalyze"},
+		{"ssa with codec", []string{"codec", "ssa"}, "staticanalyze"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := Select(tc.modules)
@@ -71,7 +71,7 @@ func TestSelectRejectsUnknownModule(t *testing.T) {
 
 func TestAtLeastReturnsTierAndLarger(t *testing.T) {
 	got := AtLeast("net")
-	want := []string{"net", "full"}
+	want := []string{"net", "staticanalyze"}
 	if len(got) != len(want) {
 		t.Fatalf("AtLeast(net) = %v, want %v", got, want)
 	}

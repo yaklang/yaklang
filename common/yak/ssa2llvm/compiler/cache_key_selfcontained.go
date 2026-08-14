@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"runtime/debug"
+	"strconv"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed/assets"
@@ -48,6 +49,10 @@ func cacheToolKeyPart(cfg *CompileConfig, write func(string)) {
 	// Which runtime archive the link lands on depends on the tier archives
 	// installed on this machine, not just on the embedded one.
 	write("tiers=" + assets.TierStateKey())
+	// A forced tier and keep-all mode change what the same script produces,
+	// so they are part of the artifact identity.
+	write("tierOverride=" + cfg.TierOverride)
+	write("keepAllModules=" + strconv.FormatBool(cfg.KeepAllModules))
 }
 
 // bundledLLVMVersion identifies the in-process LLVM/lld that produced the

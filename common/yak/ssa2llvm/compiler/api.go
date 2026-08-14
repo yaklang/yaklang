@@ -65,6 +65,15 @@ type CompileConfig struct {
 	// names when link_prep.randomize_runtime_symbols is enabled.
 	RuntimeSymManifest map[string]string
 
+	// TierOverride forces the pre-built runtime tier used for the link
+	// (runtime/tiers), bypassing auto-selection from the script's modules.
+	// Empty means auto-select.
+	TierOverride string
+	// KeepAllModules retains every module of the selected tier instead of
+	// pruning unused modules at link time. It isolates the tier's own effect
+	// on binary size from link-time pruning.
+	KeepAllModules bool
+
 	// resolvedProfile is populated by prepareCompileConfig from the --profile ref.
 	// It drives function selection and cache keys.
 	resolvedProfile *profile.Profile
@@ -164,6 +173,18 @@ func WithCompileSkipRuntimeLink(enabled bool) CompileOption {
 
 func WithCompileRuntimeArchive(path string) CompileOption {
 	return func(c *CompileConfig) { c.RuntimeArchive = path }
+}
+
+// WithCompileTierOverride forces a pre-built runtime tier by name. Empty keeps
+// auto-selection from the script's used modules.
+func WithCompileTierOverride(name string) CompileOption {
+	return func(c *CompileConfig) { c.TierOverride = name }
+}
+
+// WithCompileKeepAllModules retains every module of the selected tier at link
+// time, disabling per-script pruning within the tier.
+func WithCompileKeepAllModules(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.KeepAllModules = enabled }
 }
 
 func WithCompilePrintEntryResult(enabled bool) CompileOption {

@@ -57,6 +57,20 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 	// an archive; tiers are whole archives, and only yaklib module names name
 	// a rung of the ladder.
 	tier := selectRuntimeTier(usedModules)
+	if cfg.TierOverride != "" {
+		if t, ok := tiers.Lookup(cfg.TierOverride); ok {
+			tier = t.Name
+		} else {
+			return "", nil, fmt.Errorf("unknown runtime tier %q (available: %s)", cfg.TierOverride, tiers.Names())
+		}
+	}
+	if cfg.KeepAllModules {
+		t, ok := tiers.Lookup(tier)
+		if !ok {
+			return "", nil, fmt.Errorf("keep-all-modules needs a known runtime tier, got %q", tier)
+		}
+		usedModules = append(usedModules[:0], t.Modules...)
+	}
 	// Module dependency closure for per-module DCE. "shared" (schema/lowhttp/
 	// net-http/gorm closure) is required whenever any yaklib module is used;
 	// the poc package uses cli at runtime, and the ssa module needs its
