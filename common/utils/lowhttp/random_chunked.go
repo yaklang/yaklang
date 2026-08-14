@@ -88,6 +88,19 @@ func NewRandomChunkedSender(
 	return sender, nil
 }
 
+// refreshCallbacks updates the ctx and result handler on a cached sender.
+// GetOrCreateChunkSender may return a cached sender when the same config is
+// reused (e.g. connection-pool retries re-queue the same writeRequest). In that
+// case the ctx/handler captured at creation time could be stale, which would
+// route chunk callbacks to the wrong closure (duplicate / mis-attributed chunks).
+// Re-syncing the latest callbacks every time avoids that drift.
+func (r *RandomChunkedSender) refreshCallbacks(ctx context.Context, handler ChunkedResultHandler) {
+	if ctx != nil {
+		r.ctx = ctx
+	}
+	r.handler = handler
+}
+
 func (r *RandomChunkedSender) getRandomDelayTime() time.Duration {
 	delayRange := r.maxDelay - r.minDelay
 	if delayRange <= 0 {

@@ -1068,6 +1068,11 @@ func WithRandomChunkedHandler(handler ChunkedResultHandler) LowhttpOpt {
 
 func (o *LowhttpExecConfig) GetOrCreateChunkSender() (*RandomChunkedSender, error) {
 	if o.chunkedSender != nil {
+		// 复用缓存的 sender，但每次都把最新的 ctx / handler 同步进去。
+		// 连接池在重试（shouldRetryRequest）时会重排同一个 writeRequest，
+		// 如果不加刷新，缓存 sender 会沿用创建时固化的 handler，导致分块回调
+		// 被路由到旧的闭包，造成分块重复计数 / 归属错乱。
+		o.chunkedSender.refreshCallbacks(o.Ctx, o.ChunkedHandler)
 		return o.chunkedSender, nil
 	}
 	options := []randomChunkedHTTPOption{
