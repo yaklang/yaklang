@@ -33,6 +33,12 @@ var (
 	systemEtcOnce   = sync.Once{}
 )
 
+// maxReconnectTimes caps how many times a single request may rebuild its
+// connection. Stale pooled connections need a retry or two; an origin that
+// tears down every connection on sight needs to surface as an error instead,
+// so the caller can fall back to another protocol.
+const maxReconnectTimes = 3
+
 func GetSystemHostByName(domain string) (string, bool) {
 	systemEtcOnce.Do(func() {
 		_systemEtcHosts = GetSystemEtcHosts()
@@ -785,6 +791,33 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRequestHTTPS(reqIns, https)
 	}
+
+	// canReconnect bounds the RECONNECT loop below, but only for the failure
+	// mode that can actually spin forever.
+	//
+	// A pooled connection dying between requests — the server closed an idle
+	// keep-alive connection, or a read failed mid-flight — says nothing about
+	// whether the origin is healthy, and a busy pool can hand out several stale
+	// connections in a row. Those retries stay unbounded, as they have always
+	// been; capping them makes ordinary traffic fail under load.
+	//
+	// What must be bounded is an origin that tears down the connection the
+	// moment it receives a request — h2 fingerprinting defenses do exactly
+	// this. Unbounded, the caller never receives an error, so it never gets to
+	// fall back to HTTP/1.1 and the request simply hangs.
+	reconnectTimes := 0
+	canReconnect := func(err error) bool {
+		var poolReadErr connPoolReadFromServerError
+		if errors.Is(err, errServerClosedIdle) || errors.As(err, &poolReadErr) {
+			return true
+		}
+		if reconnectTimes >= maxReconnectTimes {
+			log.Warnf("lowhttp: giving up after %d reconnects to %v: %v", reconnectTimes, cacheKey.addr, err)
+			return false
+		}
+		reconnectTimes++
+		return true
+	}
 RECONNECT:
 	if enableHttp3 {
 		http3Conn, err := getHTTP3Conn(ctx, originAddr, dialopts...)
@@ -874,11 +907,15 @@ RECONNECT:
 			h2Stream, err := h2Conn.newStream(reqIns, requestPacket, option)
 			if err != nil {
 				if err == CreateStreamAfterGoAwayErr {
+					// Close first, then decide: the connection is unusable
+					// either way, and running out of reconnects must not leave
+					// it in the pool.
 					pc.closeConn(err) // close old connection to avoid goroutine leak
-					goto RECONNECT
-				} else {
-					return nil, err
+					if canReconnect(err) {
+						goto RECONNECT
+					}
 				}
+				return nil, err
 			}
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				h2Stream.abort()
@@ -893,14 +930,19 @@ RECONNECT:
 				}
 				if err == CreateStreamAfterGoAwayErr {
 					pc.closeConn(err)
-					goto RECONNECT
+					if canReconnect(err) {
+						goto RECONNECT
+					}
+					return nil, err
 				}
 				if h2Stream.ID <= 1 { // first stream or ID not yet assigned
 					return nil, err
-				} else {
-					pc.closeConn(err) // close old connection to avoid goroutine leak
+				}
+				pc.closeConn(err) // close old connection to avoid goroutine leak
+				if canReconnect(err) {
 					goto RECONNECT
 				}
+				return nil, err
 			}
 			serverStart := time.Now()
 			h2Stream.SetReadFirstFrameCallback(func() {
@@ -915,10 +957,11 @@ RECONNECT:
 				}
 				if conn.(*persistConn).shouldRetryRequest(err) {
 					pc.closeConn(err) // close old connection to avoid goroutine leak
-					goto RECONNECT
-				} else {
-					return nil, err
+					if canReconnect(err) {
+						goto RECONNECT
+					}
 				}
+				return nil, err
 			}
 			httpctx.SetBareResponseBytes(reqIns, responsePacket)
 			response.RawPacket = responsePacket
@@ -964,7 +1007,9 @@ RECONNECT:
 			if re.err != nil && len(rawBytes) == 0 { // get some bytes but get error too
 				if pc.shouldRetryRequest(re.err) {
 					pc.closeConn(re.err) // close old connection to avoid goroutine leak
-					goto RECONNECT
+					if canReconnect(re.err) {
+						goto RECONNECT
+					}
 				}
 				return nil, re.err
 			}
@@ -990,7 +1035,7 @@ RECONNECT:
 			if pc.closed == nil {
 				return nil, utils.Error("BUG: closeCh but closed is nil")
 			}
-			if pc.shouldRetryRequest(pc.closed) {
+			if pc.shouldRetryRequest(pc.closed) && canReconnect(pc.closed) {
 				goto RECONNECT
 			}
 			return nil, pc.closed

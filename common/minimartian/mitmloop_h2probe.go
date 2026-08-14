@@ -86,9 +86,15 @@ func (p *Proxy) detectServerH2(cacheKey, strongHostLocalAddr, proxyStr string) b
 }
 
 // detectServerH2Async runs detectServerH2 in the background (at most once per
-// origin) and caches the result, keeping origin detection off the request
-// path. Until the probe lands, requests to the origin are served over
-// HTTP/1.1 — the same downgrade Burp performs, which always works.
+// origin) and caches the result, keeping origin detection off the request path.
+//
+// The probe is the weaker of the two writers of h2Cache: it only proves the
+// origin completes an h2 handshake, while a proxied request proves whether h2
+// actually carries traffic. Fingerprinting endpoints separate the two — they
+// accept the connection and send SETTINGS, then stall any real h2 request from
+// a non-browser client. So a probe that lands after real traffic has already
+// recorded a verdict must not overwrite it; otherwise every later request
+// retries the dead h2 path and stalls until its full timeout.
 func (p *Proxy) detectServerH2Async(cacheKey, strongHostLocalAddr string) {
 	if !p.http2 || cacheKey == "" {
 		return
@@ -107,8 +113,14 @@ func (p *Proxy) detectServerH2Async(cacheKey, strongHostLocalAddr string) {
 	go func() {
 		defer p.h2ProbeInflight.Delete(cacheKey)
 		serverUseH2 := p.detectServerH2(cacheKey, strongHostLocalAddr, proxyStr)
+		// LoadOrStore, not Store: real traffic may have settled this origin
+		// while the probe was in flight, and its verdict wins.
+		if existing, loaded := p.h2Cache.LoadOrStore(cacheKey, serverUseH2); loaded {
+			log.Infof("async h2 detection for %v: %v (ignored, real traffic already decided %v)",
+				cacheKey, serverUseH2, existing)
+			return
+		}
 		log.Infof("async h2 detection for %v: %v", cacheKey, serverUseH2)
-		p.h2Cache.Store(cacheKey, serverUseH2)
 	}()
 }
 
