@@ -118,3 +118,89 @@
 - DB-only Hadoop：Risk=8764、扫描窗口、累计 alloc、GC CPU cum、RSS 峰值；与 main debug-scan2（679s / 313.3GB）及 3p4 DB-only（355s / 188.1GB）对比。
 - 完整 compile+scan：编译窗口、flush wall、扫描窗口、alloc、live heap、goroutine；与 run19 同口径对比。
 - 每个优化独立 commit；gofmt + diff --check + 相关包测试（scripts/ssa-test.sh）；不 push。
+
+---
+
+# 附录 A：2026-08-14 main vs branch 实测补充（compare-main-3p4-20260814）
+
+## A.1 运行背景与条件
+
+- main binary：main worktree f0dd37ee5（SHA 79358da9…；落后 origin/main 10 commits）。
+- branch binary：test/scan/large_projects 28a7b3c53（源码=enhance/ssa/scan_perf2 1409fc552；SHA 8ef5d41a…）。
+- 命令两侧完全一致：code-scan -t /home/wlz/Target/apache/hadoop -l java --db <fresh>/ssa.db --debug <run>/debug --format sarif --log-level info --rule-timeout 4h --file-perf-log --rule-perf-log；fresh YAKIT_HOME；RSS 每秒采样；全程 Debug+pprof（127.0.0.1:18080）。
+- main 于 12:17:30 达到 1 小时上限被终止（未进入 scan，无 Risk）；branch 完整跑完（wall 2792s，Risk=9042，SARIF=9042）。
+
+## A.2 时间线对比
+
+| 阶段 | main | branch | 差值 |
+|---|---:|---:|---:|
+| compile stage→batch121 | 19m45s | 21m15s | main 快 1m30s |
+| batch121→f4_finish（f2/f3） | 25m54s | 7m01s | branch 快 18m53s |
+| 编译窗口合计 | 46m16s | 28m54s | branch 快 17m22s（-37.5%） |
+| flush（final barrier） | 12:03:51 开始被终止 | 4m48s | — |
+| 总 wall | 终止于 3600s | 2792s | — |
+
+- 关键差异：main 编译产物 instruction 总数 20,183,803 vs branch 6,170,341（-69.4%，约 3.3 倍），直接解释 f2/f3 与 flush 的差距。
+- 编译期累计 alloc（f2/f3 同期快照 12:02 vs 12:43）：main 1,178GB vs branch 746GB（-36.7%）。
+
+## A.3 新 pprof 数值（branch run 20260814-121735）
+
+### A.3.1 扫描期新增 alloc（125324→125827，约 5m）
+
+总新增 90.3GB：
+
+| 热点 | 新增 alloc | 说明 |
+|---|---:|---|
+| ssaapi.init.func23（valuePool） | 15.1GB | 同旧 run 结论，pool 冷 |
+| BitVector.Or | 10.4GB | COW detach |
+| TakeSymbolSnapshot.func1 | 7.6GB | named 表每轮建 map |
+| gorm.DB.clone + search.clone | 10.5GB（6.8+3.7GB） | 扫描期 DB 读仍走 GORM clone |
+| nativeGetIrCodesByIds | cum 5.7GB | native 读链 |
+| SafeMapWithKey.Set | 2.7GB | Value EffectOn/DependOn |
+| BitVector.ensure | 4.4GB | 扩容复制 |
+
+### A.3.2 扫描收尾新增 alloc（125827→final，约 4.5m）
+
+总新增 32.9GB：BitVector.Or **20.1GB**、valuePool 5.4GB、TakeSymbolSnapshot 1.7GB、GetExs cum 2.4GB、BitVector.ensure 1.1GB。
+
+### A.3.3 live heap（final，15.6GB）
+
+- nativeGetIrCodesByIds 1.03GB flat / 1.34GB cum、nativeGetIrCodeItemById 0.56/0.72GB → DB 读链约 2.1GB 常驻。
+- valuePool（init.func23）0.96GB、SafeMapWithKey.Set 0.93GB、NewValue 0.86GB、codec.AnyToBytes 0.72GB、memedit.NewRuneOffsetMap 0.62GB。
+- NewValue/NewInstruction/omap/NewVersioned 合计约 2GB（Value 图结构常驻）。
+
+### A.3.4 alloc_objects（累计 106.7 亿对象）
+
+- ANTLR NewATNConfig 15.7 亿（14.8%）、reflect.unsafe_New 13.8 亿（13.0%）、gorm.commonDialect.Quote 5.9 亿（5.6%）、prepareBatchCreateRow cum 25.5 亿（23.9%）、sqlite bind 3.5 亿、Scope.Fields cum 5.5 亿、getModelStruct 2.1 亿。
+- 对象数与 alloc 字节基本同步；GORM 反射/quote 是对象数第一可优化来源。
+
+### A.3.5 flush 段 CPU（124822，300s，836% 并行）
+
+- GC 主导：spanClass 26.9%、scanObjectsSmall cum 27.8%、tryDeferToSpanScan cum 35.3%、scanSpan cum 52.9%。
+- cgocall flat 14.5%；业务热点：Value.getInstruction cum 3.2%（81s）。
+- flush 段 alloc：prepareBatchCreateRow cum 132.9GB、AddToVars 37.2GB、Fields cum 44.3GB、sqlite exec/bind 链约 40GB。
+
+### A.3.6 扫描段 CPU（125324，300s，2457% 并行）
+
+- 与旧 3p4 run 同构：spanClass 26.9%、scanObjectsSmall cum 27.8%、cgocall 9.0%、scanSpan cum 56.4%、gcDrain cum 58.4%。
+- 业务热点：QuerySyntaxflow cum 20.5%、SFFrame.exec cum 19.8%、Values.Recursive cum 18.3%、Value.getValue cum 12.2%、getBottomUses cum 11.7%、Value.getInstruction cum 4.6%（340s）、sync.Once.doSlow cum 12.9%（954s，仍未定位调用者）。
+- goroutine 峰值 1002（扫描 125827 时刻 814）。
+
+## A.4 新增/更新结论
+
+- BitVector.Or 在扫描收尾段仍是单点最大 alloc（20.1GB），且与旧 run 的 30.1GB 同源 → P0-1 优先级不变，收益确认。
+- GORM 写链（prepareBatchCreateRow/Fields/AddToVars/quote）仍是 flush 段对象数与 alloc 第一来源 → P0-2 优先级不变。
+- native 读链在 live heap 中常驻约 2.1GB，且扫描期每轮 Rows.nextLocked/GetExs 持续分配 → P0-3 增加“行对象复用/列投影”证据。
+- valuePool 与 TakeSymbolSnapshot 的扫描期新增 alloc 均再次复现（15.1/7.6GB），维持原结论（valuePool 已拒绝、TakeSymbolSnapshot 归 C 档）。
+- main 实测证明：未合并分支优化时 f2/f3 为 25m54s 且 instruction 总量 3.3 倍；后续优化验收可直接用 instruction 总数作为编译期持久化量的代理指标。
+
+---
+
+# 附录 B：早期 3.1 后续优化任务清单（归档自 .codex-next-optimizations.md）
+
+> 以下任务来自 3.1 阶段的 `.codex-next-optimizations.md`，为历史来源；状态已在当前计划中更新。
+
+- O1（BitVector.Or/ensure 分配，~26.1GB + 5.8GB）：已做 COW 与 O1 原地 Or 实验，因 alias 风险回退（d0d2424b7），作为 P0-1 遗留：需可靠所有权方案 + RED alias 测试 + AllocsPerRun 基准。
+- O2（批量 IR 读取去 GORM）：已完成——D（单行 native）、O2（PreloadIrCodesByIdsFast native）、A2/A3（yieldIrCodes/SearchVariable native）；对应当前 P0-3 读链剩余（列投影/chunk/行对象池）。
+- O3（TakeSymbolSnapshot 同 check 复用，~26.5GB）：已实现懒构建+magic-only 短路（O3，8c06e0951），当前扫描期仍约 7.6GB；per-check 复用归入 P1-6（omap version，C 档）。
+- O4（Value pool 容量/预热）：已评估拒绝（pool 冷；warmup 扩 retained heap 不降 alloc），当前扫描期仍 15.1GB，维持拒绝，仅在 P0 项完成后重审。
