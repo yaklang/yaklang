@@ -1,4 +1,4 @@
-package aicommon
+﻿package aicommon
 
 import (
 	"context"
@@ -40,8 +40,11 @@ import (
 const DefaultPeriodicVerificationInterval = 20
 const DefaultGoalMinIterations = 6
 const GoalModeIterationBuffer = 2
-const DefaultMaxSubAgents = 3
-const AbsoluteMaxSubAgents = 20
+// DefaultMaxSubAgentConcurrency 是子 Agent 默认最大并发数（同时运行数量）。
+const DefaultMaxSubAgentConcurrency = 5
+
+// AbsoluteMaxSubAgentConcurrency 是子 Agent 并发数的硬上限。
+const AbsoluteMaxSubAgentConcurrency = 20
 
 type ConfigOption func(*Config) error
 
@@ -669,7 +672,7 @@ func newConfig(ctx context.Context) *Config {
 		MaxTaskContinue:                    3,
 		PeriodicVerificationInterval:       DefaultPeriodicVerificationInterval,
 		GoalMinIterations:                  DefaultGoalMinIterations,
-		MaxSubAgents:                       DefaultMaxSubAgents,
+		MaxSubAgents:                       DefaultMaxSubAgentConcurrency,
 		GenerateReport:                     true,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
@@ -1769,9 +1772,11 @@ func WithMaxSubAgents(n int64) ConfigOption {
 			return utils.Error("max sub agents must be >= 0")
 		}
 		if n == 0 {
-			n = DefaultMaxSubAgents
+			n = DefaultMaxSubAgentConcurrency
 		}
-		n = NormalizeMaxSubAgents(n)
+		if n > AbsoluteMaxSubAgentConcurrency {
+			n = AbsoluteMaxSubAgentConcurrency
+		}
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}

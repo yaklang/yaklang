@@ -1,34 +1,39 @@
-package reactloops
+﻿package reactloops
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
-func TestNormalizeDispatchJobs_RespectsMaxSubAgents(t *testing.T) {
-	jobs := []SubAgentJob{
-		{Goal: "scan a"},
-		{Goal: "scan b"},
-		{Goal: "scan c"},
+func TestNormalizeDispatchJobs_RespectsAbsoluteMax(t *testing.T) {
+	jobs := make([]SubAgentJob, int(aicommon.AbsoluteMaxSubAgentConcurrency)+1)
+	for i := range jobs {
+		jobs[i] = SubAgentJob{Goal: "scan"}
 	}
-	_, err := NormalizeDispatchJobs(jobs, 2)
+	_, err := NormalizeDispatchJobs(jobs)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "at most 2")
-
-	// Under the limit, loop_name registration is checked next; with no factories
-	// registered in this package test, expect the factory error rather than the
-	// MaxSubAgents error.
-	_, err = NormalizeDispatchJobs(jobs[:2], 2)
-	require.Error(t, err)
-	require.NotContains(t, err.Error(), "at most 2")
-	require.Contains(t, err.Error(), "not registered")
+	require.Contains(t, err.Error(), "at most")
 }
 
-func TestNormalizeMaxSubAgents(t *testing.T) {
-	require.Equal(t, int64(aicommon.DefaultMaxSubAgents), aicommon.NormalizeMaxSubAgents(0))
-	require.Equal(t, int64(aicommon.DefaultMaxSubAgents), aicommon.NormalizeMaxSubAgents(-1))
-	require.Equal(t, int64(5), aicommon.NormalizeMaxSubAgents(5))
-	require.Equal(t, int64(aicommon.AbsoluteMaxSubAgents), aicommon.NormalizeMaxSubAgents(aicommon.AbsoluteMaxSubAgents+10))
+func TestResolveSubAgentConcurrency(t *testing.T) {
+	require.Equal(t, int(aicommon.DefaultMaxSubAgentConcurrency), ResolveSubAgentConcurrency(0, 10))
+	require.Equal(t, 5, ResolveSubAgentConcurrency(0, 10))
+	require.Equal(t, 6, ResolveSubAgentConcurrency(6, 10))
+	require.Equal(t, 3, ResolveSubAgentConcurrency(6, 3))
+	require.Equal(t, int(aicommon.AbsoluteMaxSubAgentConcurrency), ResolveSubAgentConcurrency(int(aicommon.AbsoluteMaxSubAgentConcurrency)+5, 100))
+}
+
+func TestGetMaxSubAgentsDefaults(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background())
+	require.Equal(t, int64(aicommon.DefaultMaxSubAgentConcurrency), cfg.GetMaxSubAgents())
+	require.Equal(t, int64(5), cfg.GetMaxSubAgents())
+
+	cfg = aicommon.NewConfig(context.Background(), aicommon.WithMaxSubAgents(0))
+	require.Equal(t, int64(5), cfg.GetMaxSubAgents())
+
+	cfg = aicommon.NewConfig(context.Background(), aicommon.WithMaxSubAgents(100))
+	require.Equal(t, int64(aicommon.AbsoluteMaxSubAgentConcurrency), cfg.GetMaxSubAgents())
 }

@@ -1,4 +1,4 @@
-package reactloops
+﻿package reactloops
 
 import (
 	"context"
@@ -452,12 +452,7 @@ func (defaultGoalElaborator) Elaborate(ctx context.Context, prepared *PreparedSu
 
 const (
 	// DispatchSubReactJobsLoopKey 在 loop vars 中存储 JSON 编码的 dispatch 任务。
-	DispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
-	DispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
-
-	MaxDispatchSubReactJobs    = int(aicommon.AbsoluteMaxSubAgents)
-	DefaultDispatchConcurrency = int(aicommon.DefaultMaxSubAgents)
-	MaxDispatchConcurrency     = int(aicommon.AbsoluteMaxSubAgents)
+	DispatchSubReactJobsLoopKey = "dispatch_sub_react_jobs"
 )
 
 // ProcessStats 汇总已完成子 Agent 的运行期活动数据。
@@ -572,14 +567,9 @@ func elaborateGoal(
 // --- 解析 ---
 
 // ParseDispatchJobs 从 AI action 的 "dispatches" 参数中提取 dispatch 任务。
+// 单次 dispatch 的任务数硬上限为 aicommon.AbsoluteMaxSubAgentConcurrency。
 func ParseDispatchJobs(action *aicommon.Action) ([]SubAgentJob, error) {
-	return ParseDispatchJobsWithLimit(action, MaxDispatchSubReactJobs)
-}
-
-// ParseDispatchJobsWithLimit 与 ParseDispatchJobs 相同，但使用调用方给定的
-// 单次 dispatch 子任务上限（通常来自 Config.MaxSubAgents）。
-func ParseDispatchJobsWithLimit(action *aicommon.Action, maxJobs int) ([]SubAgentJob, error) {
-	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"), maxJobs)
+	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"))
 	if err != nil {
 		return nil, err
 	}
@@ -594,10 +584,10 @@ func ParseDispatchJobsWithLimit(action *aicommon.Action, maxJobs int) ([]SubAgen
 	if err := json.Unmarshal([]byte(raw), &jobs); err != nil {
 		return nil, utils.Wrap(err, "dispatches must be a valid array")
 	}
-	return NormalizeDispatchJobs(jobs, maxJobs)
+	return NormalizeDispatchJobs(jobs)
 }
 
-func parseDispatchJobsFromArray(raw []aitool.InvokeParams, maxJobs int) ([]SubAgentJob, error) {
+func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
@@ -613,13 +603,13 @@ func parseDispatchJobsFromArray(raw []aitool.InvokeParams, maxJobs int) ([]SubAg
 			LoopName:   strings.TrimSpace(item.GetString("loop_name")),
 		})
 	}
-	return NormalizeDispatchJobs(jobs, maxJobs)
+	return NormalizeDispatchJobs(jobs)
 }
 
 // NormalizeDispatchJobs 校验并规范化 dispatch 任务。
-// maxJobs <= 0 时回落到 AbsoluteMaxSubAgents / DefaultMaxSubAgents。
-func NormalizeDispatchJobs(jobs []SubAgentJob, maxJobs int) ([]SubAgentJob, error) {
-	maxJobs = int(aicommon.NormalizeMaxSubAgents(int64(maxJobs)))
+// 单次最多 AbsoluteMaxSubAgentConcurrency 个；同时运行数量由 MaxSubAgents / ResolveSubAgentConcurrency 控制。
+func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
+	maxJobs := int(aicommon.AbsoluteMaxSubAgentConcurrency)
 	if len(jobs) == 0 {
 		return nil, utils.Error("dispatches must contain at least one sub agent job")
 	}
@@ -649,32 +639,17 @@ func NormalizeDispatchJobs(jobs []SubAgentJob, maxJobs int) ([]SubAgentJob, erro
 	return jobs, nil
 }
 
-// ParseConcurrency 从 AI action 中提取并发参数并限制到合法范围。
-// maxConcurrency 通常来自 Config.MaxSubAgents（UI「子 Agent 数量」）；<=0 时回落默认值。
-func ParseConcurrency(action *aicommon.Action, jobCount int, maxConcurrency ...int) int {
-	limit := DefaultDispatchConcurrency
-	if len(maxConcurrency) > 0 && maxConcurrency[0] > 0 {
-		limit = maxConcurrency[0]
-	}
-	limit = int(aicommon.NormalizeMaxSubAgents(int64(limit)))
-
-	concurrency := 0
-	if action != nil {
-		concurrency = action.GetInt("concurrency")
-	}
+// ResolveSubAgentConcurrency 计算同时运行的子 Agent 数。
+// maxSubAgents 通常来自 loop.GetMaxSubAgents()（UI「子 Agent 数量」）。
+func ResolveSubAgentConcurrency(maxSubAgents, jobCount int) int {
+	concurrency := maxSubAgents
 	if concurrency <= 0 {
-		concurrency = limit
-		if jobCount < concurrency {
-			concurrency = jobCount
-		}
+		concurrency = int(aicommon.DefaultMaxSubAgentConcurrency)
 	}
-	if concurrency > limit {
-		concurrency = limit
+	if concurrency > int(aicommon.AbsoluteMaxSubAgentConcurrency) {
+		concurrency = int(aicommon.AbsoluteMaxSubAgentConcurrency)
 	}
-	if concurrency > MaxDispatchConcurrency {
-		concurrency = MaxDispatchConcurrency
-	}
-	if concurrency > jobCount {
+	if jobCount < concurrency {
 		concurrency = jobCount
 	}
 	if concurrency < 1 {

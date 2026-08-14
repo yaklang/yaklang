@@ -12,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-const DefaultFindingVerifyConcurrency = 5
-
 type findingVerifyJob struct {
 	finding *model.Finding
 	index   int
@@ -70,7 +68,7 @@ func runAllFindingVerifications(
 		return nil
 	}
 
-	concurrency := resolveFindingVerifyConcurrency(loop, len(jobs))
+	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(jobs))
 
 	log.Infof("[CodeAudit/Phase3] Starting forked sub-agent verify of %d findings (concurrency=%d, skipped=%d)",
 		len(jobs), concurrency, skipped)
@@ -116,25 +114,6 @@ func runAllFindingVerifications(
 	}
 
 	return outcomes
-}
-
-// resolveFindingVerifyConcurrency uses MaxSubAgents as the simultaneous sub-agent
-// cap (UI "子 Agent 数量"). Falls back to DefaultFindingVerifyConcurrency when the
-// loop/config is unavailable.
-func resolveFindingVerifyConcurrency(loop *reactloops.ReActLoop, jobCount int) int {
-	concurrency := DefaultFindingVerifyConcurrency
-	if loop != nil {
-		if n := loop.GetMaxSubAgents(); n > 0 {
-			concurrency = n
-		}
-	}
-	if jobCount < concurrency {
-		concurrency = jobCount
-	}
-	if concurrency < 1 {
-		concurrency = 1
-	}
-	return concurrency
 }
 
 func finalizeFindingVerifyAfterFork(

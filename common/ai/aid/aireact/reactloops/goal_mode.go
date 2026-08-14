@@ -1,4 +1,4 @@
-package reactloops
+﻿package reactloops
 
 import "github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -31,15 +31,15 @@ func (r *ReActLoop) GetGoalMinIterations() int {
 
 // GetMaxSubAgents returns the per-dispatch sub-agent cap for multi-agent mode.
 // Like GoalMinIterations it reads from config with a normalized default; the
-// absolute ceiling remains AbsoluteMaxSubAgents.
+// absolute ceiling remains AbsoluteMaxSubAgentConcurrency.
 func (r *ReActLoop) GetMaxSubAgents() int {
 	if r == nil || r.config == nil {
-		return int(aicommon.DefaultMaxSubAgents)
+		return int(aicommon.DefaultMaxSubAgentConcurrency)
 	}
 	if cfg, ok := r.config.(interface{ GetMaxSubAgents() int64 }); ok {
 		return int(cfg.GetMaxSubAgents())
 	}
-	return int(aicommon.DefaultMaxSubAgents)
+	return int(aicommon.DefaultMaxSubAgentConcurrency)
 }
 
 // ShouldBlockFinishAtIteration reports whether the finish action should be

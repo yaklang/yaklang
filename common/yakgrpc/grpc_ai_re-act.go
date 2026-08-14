@@ -1,4 +1,4 @@
-package yakgrpc
+﻿package yakgrpc
 
 import (
 	"context"
@@ -156,7 +156,7 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 
 func resolveAIExecutionStrategy(i *ypb.AIStartParams) (enableMultiAgent bool, enableGoalMode bool, goalMinIterations int64, maxSubAgents int64) {
 	if i == nil {
-		return false, false, aicommon.DefaultGoalMinIterations, aicommon.DefaultMaxSubAgents
+		return false, false, aicommon.DefaultGoalMinIterations, aicommon.DefaultMaxSubAgentConcurrency
 	}
 	if strategy := i.GetStrategy(); strategy != nil {
 		enableMultiAgent = strategy.GetEnableMultiAgent()
@@ -165,7 +165,6 @@ func resolveAIExecutionStrategy(i *ypb.AIStartParams) (enableMultiAgent bool, en
 		maxSubAgents = strategy.GetMaxSubAgents()
 	}
 	goalMinIterations = aicommon.NormalizeGoalMinIterations(goalMinIterations)
-	maxSubAgents = aicommon.NormalizeMaxSubAgents(maxSubAgents)
 	return
 }
 

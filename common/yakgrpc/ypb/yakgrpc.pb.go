@@ -11284,8 +11284,8 @@ type AIExecutionStrategy struct {
 	EnableGoalMode bool `protobuf:"varint,2,opt,name=EnableGoalMode,proto3" json:"EnableGoalMode,omitempty"`
 	// Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
 	GoalMinIterations int64 `protobuf:"varint,3,opt,name=GoalMinIterations,proto3" json:"GoalMinIterations,omitempty"`
-	// Multi 模式下单次 dispatch 允许的子 Agent 数量（当前会话取值）。
-	// <=0 时由服务端使用默认值 3；超过 AbsoluteMaxSubAgents(20) 时由服务端钳制。
+	// Multi 模式下子 Agent 最大并发数（同时运行数量）。
+	// <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
 	MaxSubAgents  int64 `protobuf:"varint,4,opt,name=MaxSubAgents,proto3" json:"MaxSubAgents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

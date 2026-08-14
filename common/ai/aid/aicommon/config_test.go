@@ -1,4 +1,4 @@
-package aicommon
+﻿package aicommon
 
 import (
 	"context"
@@ -120,7 +120,7 @@ func TestConfig_EnableMultiAgentMode(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithEnableMultiAgentMode(true))
 	require.True(t, cfg.EnableDispatchSubReactAgents)
 	require.True(t, cfg.GetPreferDispatchSubReactAgents())
-	require.Equal(t, int64(DefaultMaxSubAgents), cfg.GetMaxSubAgents())
+	require.Equal(t, int64(DefaultMaxSubAgentConcurrency), cfg.GetMaxSubAgents())
 }
 
 func TestConfig_MaxSubAgentsNotPropagated(t *testing.T) {
@@ -135,7 +135,7 @@ func TestConfig_MaxSubAgentsNotPropagated(t *testing.T) {
 	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
 	require.False(t, child.GetPreferDispatchSubReactAgents(),
 		"multi-agent preference must remain top-level only and must not propagate to forked child configs")
-	require.Equal(t, int64(DefaultMaxSubAgents), child.GetMaxSubAgents())
+	require.Equal(t, int64(DefaultMaxSubAgentConcurrency), child.GetMaxSubAgents())
 }
 
 func TestConfig_GoalModeNotPropagated(t *testing.T) {

@@ -14,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-const defaultCategoryScanConcurrency = 3
-
 type categoryScanJob struct {
 	category model.VulnCategory
 	index    int
@@ -60,7 +58,7 @@ func runAllCategoryScans(
 		}
 	}
 
-	concurrency := resolveCategoryScanConcurrency(loop, len(categories))
+	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(categories))
 
 	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d)", len(categories), concurrency)
 	r.AddToTimeline("[PHASE2_START]",
@@ -110,25 +108,6 @@ func runAllCategoryScans(
 	}
 
 	return outcomes
-}
-
-// resolveCategoryScanConcurrency uses MaxSubAgents as the simultaneous sub-agent
-// cap (UI "子 Agent 数量"). Falls back to defaultCategoryScanConcurrency when the
-// loop/config is unavailable.
-func resolveCategoryScanConcurrency(loop *reactloops.ReActLoop, jobCount int) int {
-	concurrency := defaultCategoryScanConcurrency
-	if loop != nil {
-		if n := loop.GetMaxSubAgents(); n > 0 {
-			concurrency = n
-		}
-	}
-	if jobCount < concurrency {
-		concurrency = jobCount
-	}
-	if concurrency < 1 {
-		concurrency = 1
-	}
-	return concurrency
 }
 
 func finalizeCategoryScanAfterFork(
