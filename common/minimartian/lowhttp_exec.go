@@ -235,28 +235,19 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		// filter / forward to client conn via Content-Type
 		if key == "content-type" {
 			// SSE: write headers immediately and stream body via the same
-			// ResponseHeaderCallback + TeeReader path used by chunked and
-			// content-type-filtered responses. This avoids a separate
-			// BodyStreamReaderHandler channel and the double-header race
-			// that would require a suppression flag.
+			// immediateRelayCallback used by content-type-filtered responses.
+			// This avoids a separate BodyStreamReaderHandler channel and the
+			// double-header race that would require a suppression flag.
 			if isServerSentEventContentType(value) {
 				httpctx.SetNoBodyBuffer(req, true)
 				httpctx.SetResponseReadTooSlow(req, true)
-				httpctx.SetResponseHeaderCallback(req, p.makeSSEStreamCallback(isHttps, req, bwr, cancelUpstream))
+				httpctx.SetResponseHeaderCallback(req, p.makeImmediateRelayCallback(isHttps, req, bwr, cancelUpstream))
 				return
 			}
 			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
 				if ret(value) {
 					// filtered by content-type
-					httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-						httpctx.SetMITMSkipFrontendFeedback(req, true)
-						bwr.Write(headerBytes)
-						utils.FlushWriter(bwr)
-						httpctx.SetResponseFinishedCallback(req, func() {
-							utils.FlushWriter(bwr)
-						})
-						return io.TeeReader(bodyReader, bwr), nil
-					})
+					httpctx.SetResponseHeaderCallback(req, p.makeImmediateRelayCallback(isHttps, req, bwr, nil))
 					return
 				}
 			}
@@ -323,12 +314,20 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	return rsp, err
 }
 
-// makeSSEStreamCallback builds a ResponseHeaderCallback dedicated to SSE
-// responses. It writes the response header immediately and returns a TeeReader
-// that relays body chunks to the downstream client in real time while the
-// builder's chunked decoder drives the read. An optional stream recorder
-// (best-effort) persists the body to a spill file for history/audit.
-func (p *Proxy) makeSSEStreamCallback(
+// makeImmediateRelayCallback builds a ResponseHeaderCallback that writes the
+// response header immediately and returns a TeeReader relaying body chunks to
+// the downstream client in real time. This is the shared forwarding primitive
+// for both content-type-filtered responses and SSE (text/event-stream)
+// responses.
+//
+// When cancelUpstream is non-nil, a downstream write failure cancels the
+// upstream request so the blocking body reader can return — essential for
+// long-lived streams where the client may disconnect mid-stream.
+//
+// When p.streamRecorder is set, an optional best-effort recorder is created
+// to persist body chunks to a spill file for history/audit. Recorder write
+// errors never break or delay forwarding.
+func (p *Proxy) makeImmediateRelayCallback(
 	isHTTPS bool,
 	req *http.Request,
 	bwr io.ReadWriter,
@@ -352,7 +351,7 @@ func (p *Proxy) makeSSEStreamCallback(
 			closeOnce.Do(func() {
 				if recorder != nil {
 					if err := recorder.Close(); err != nil {
-						log.Warnf("mitm: finalize SSE stream recorder failed: %v", err)
+						log.Warnf("mitm: finalize stream recorder failed: %v", err)
 					}
 				}
 			})
@@ -360,12 +359,12 @@ func (p *Proxy) makeSSEStreamCallback(
 		if p.streamRecorder != nil {
 			rsp, err := utils.ReadHTTPResponseFromBytes(headerBytes, nil)
 			if err != nil {
-				log.Warnf("mitm: parse SSE response header for recorder failed: %v", err)
+				log.Warnf("mitm: parse response header for recorder failed: %v", err)
 			} else {
 				rsp.Request = req
 				recorder, err = p.streamRecorder(isHTTPS, req, rsp, headerBytes)
 				if err != nil {
-					log.Warnf("mitm: create SSE stream recorder failed: %v", err)
+					log.Warnf("mitm: create stream recorder failed: %v", err)
 					recorder = nil
 				} else if recorder != nil {
 					httpctx.SetResponseStreamRecorder(req, recorder)
@@ -373,8 +372,7 @@ func (p *Proxy) makeSSEStreamCallback(
 			}
 		}
 
-		// Chain the finished callback so the recorder is closed on EOF and
-		// the downstream writer gets a final flush.
+		// Chain the finished callback: final flush + recorder close.
 		previousFinished := httpctx.GetResponseFinishedCallback(req)
 		httpctx.SetResponseFinishedCallback(req, func() {
 			if previousFinished != nil {
@@ -384,10 +382,9 @@ func (p *Proxy) makeSSEStreamCallback(
 			closeRecorder()
 		})
 
-		// Build the TeeReader target: always forward to the client; append the
-		// recorder (wrapped best-effort) when present. The wrapper swallows
-		// recorder write errors so persistence failures never break or stall
-		// forwarding.
+		// TeeReader target: always forward to the client; append the recorder
+		// (wrapped best-effort) when present. WriterAutoFlush ensures each
+		// chunk is flushed to the downstream connection immediately.
 		writers := []io.Writer{utils.WriterAutoFlush(bwr)}
 		if recorder != nil {
 			writers = append(writers, &bestEffortStreamRecorder{writer: recorder})
