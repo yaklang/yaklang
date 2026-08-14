@@ -678,18 +678,30 @@ func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpCo
 		pc.h2Conn()
 		if err = pc.alt.preface(); err == nil {
 			go pc.alt.readLoop()
+			// Watch for a server that negotiates h2 and then never sends its
+			// SETTINGS frame; see watchServerPreface for why this must not
+			// gate setup. Requests on such a conn fail fast and the caller
+			// falls back to HTTP/1.1.
+			pc.alt.watchServerPreface()
 			// H2 conn is registered in h2ConnMap by getOrCreateH2Conn after this call returns.
 			return pc, nil
-		} else { // preface fail downgrade
-			key.scheme = H1
-			newH1Conn, err := dialXWithContext(requestCtx, key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
-			if err != nil {
-				return nil, err
-			}
-			pc.alt = nil
-			pc.conn = newH1Conn
-			return pc, nil
 		}
+		// client preface failure: tear down the broken h2 conn and
+		// downgrade to HTTP/1.1 (downgraded conns are not reused for h2)
+		key.scheme = H1
+		if pc.alt != nil {
+			pc.alt.setClose()
+		}
+		pc.alt = nil
+		if pc.conn != nil {
+			pc.conn.Close()
+		}
+		newH1Conn, err := dialXWithContext(requestCtx, key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
+		if err != nil {
+			return nil, err
+		}
+		pc.conn = newH1Conn
+		return pc, nil
 	}
 
 	pc.br = bufio.NewReader(pc)
@@ -723,6 +735,7 @@ func (pc *persistConn) h2Conn() {
 		clientPrefaceOk:   utils.NewAtomicBool(),
 		closeCh:           make(chan struct{}),
 		readLoopExited:    make(chan struct{}),
+		serverPrefaceCh:   make(chan struct{}, 1),
 		// pc back-reference: used by setClose() to evict this connection from
 		// the pool's h2ConnMap when it transitions to closed state.
 		pc: pc,

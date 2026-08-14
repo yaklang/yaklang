@@ -24,7 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/nosigpipe"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
@@ -412,56 +411,10 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 		s.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, true)
 		var serverUseH2 bool
 		if p.http2 {
-			// does remote server use h2?
-			var proxyStr string
-			if p.proxyURL != nil {
-				proxyStr = p.proxyURL.String()
-			}
-
-			// Check the cache first.
-			cacheKey := GetDialDetectionAddr(ctx, conn)
-			if cached, ok := p.h2Cache.Load(cacheKey); ok {
-				log.Infof("use cached h2 %v", cacheKey)
-				serverUseH2 = cached.(bool)
-			} else {
-				// TODO: should connect every connection?
-				basicOptions := []netx.DialXOption{
-					netx.DialX_WithTimeout(10 * time.Second),
-					netx.DialX_WithProxy(proxyStr),
-					netx.DialX_WithForceProxy(proxyStr != ""),
-					netx.DialX_WithEnableSystemProxyFromEnv(!p.disableSystemProxy),
-					netx.DialX_WithAppendTLSNextProto("h2"),
-					netx.DialX_WithTLS(true),
-					netx.DialX_WithDialer(p.dialer),
-				}
-
-				if ctx.GetSessionBoolValue("StrongHostMode") {
-					localAddrIP := ctx.GetSessionStringValue("StrongHostLocalAddr")
-					if localAddrIP != "" {
-						basicOptions = append(basicOptions, netx.DialX_WithStrongHostMode(localAddrIP))
-					}
-				}
-
-				netConn, _ := netx.DialX(
-					cacheKey, basicOptions...,
-				)
-				if netConn != nil {
-					switch ret := netConn.(type) {
-					case *tls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					case *gmtls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					}
-					netConn.Close()
-				}
-
-				// Store the result in the cache.
-				p.h2Cache.Store(cacheKey, serverUseH2)
-			}
+			// Decide the client-facing ALPN without blocking on the origin:
+			// a slow/bot-mitigated origin must never stall the client's TLS
+			// handshake. The origin h2 probe runs in the background.
+			serverUseH2 = p.offerH2ToClient(GetDialDetectionAddr(ctx, conn), strongHostLocalAddrFromCtx(ctx))
 		}
 		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2)
 		if err != nil {
@@ -586,56 +539,10 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 
 		var serverUseH2 bool
 		if p.http2 {
-			// does remote server use h2?
-			var proxyStr string
-			if p.proxyURL != nil {
-				proxyStr = p.proxyURL.String()
-			}
-
-			// Check the cache first.
-			cacheKey := GetDialDetectionAddr(ctx, conn)
-			if cached, ok := p.h2Cache.Load(cacheKey); ok {
-				log.Infof("use cached h2 %v", cacheKey)
-				serverUseH2 = cached.(bool)
-			} else {
-				// TODO: should connect every connection?
-				basicOptions := []netx.DialXOption{
-					netx.DialX_WithTimeout(10 * time.Second),
-					netx.DialX_WithProxy(proxyStr),
-					netx.DialX_WithForceProxy(proxyStr != ""),
-					netx.DialX_WithEnableSystemProxyFromEnv(!p.disableSystemProxy),
-					netx.DialX_WithAppendTLSNextProto("h2"),
-					netx.DialX_WithTLS(true),
-					netx.DialX_WithDialer(p.dialer),
-				}
-
-				if ctx.GetSessionBoolValue("StrongHostMode") {
-					localAddrIP := ctx.GetSessionStringValue("StrongHostLocalAddr")
-					if localAddrIP != "" {
-						basicOptions = append(basicOptions, netx.DialX_WithStrongHostMode(localAddrIP))
-					}
-				}
-				netConn, _ := netx.DialX(
-					cacheKey,
-					basicOptions...,
-				)
-				if netConn != nil {
-					switch ret := netConn.(type) {
-					case *tls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					case *gmtls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					}
-					netConn.Close()
-				}
-
-				// Store the result in the cache.
-				p.h2Cache.Store(cacheKey, serverUseH2)
-			}
+			// Decide the client-facing ALPN without blocking on the origin:
+			// a slow/bot-mitigated origin must never stall the client's TLS
+			// handshake. The origin h2 probe runs in the background.
+			serverUseH2 = p.offerH2ToClient(GetDialDetectionAddr(ctx, conn), strongHostLocalAddrFromCtx(ctx))
 		}
 
 		// fallback: 最普通的情况，没有任何 http2 支持
