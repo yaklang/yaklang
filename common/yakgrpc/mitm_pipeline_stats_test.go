@@ -39,8 +39,8 @@ func TestMITMPipelineTrackerRequestStages(t *testing.T) {
 	require.Equal(t, int64(1000), stats.GetOldestUpstreamAgeMs())
 	require.Equal(t, int64(3), stats.GetDatabaseWriteQueueDepth())
 
-	tracker.upstreamCompleted(req)
-	tracker.upstreamCompleted(req) // response mirror fallback must not double count
+	tracker.upstreamCompleted(req, true)
+	tracker.upstreamCompleted(req, true) // response mirror fallback must not double count
 	stats = tracker.snapshot(0, 40960)
 	require.Equal(t, uint64(1), stats.GetUpstreamCompletedTotal())
 	require.Equal(t, int64(1), stats.GetResponseProcessingActive())
@@ -72,7 +72,7 @@ func TestMITMPipelineTrackerLocalResponseAndPersistence(t *testing.T) {
 
 	tracker.requestObserved(req)
 	tracker.requestDispatched(req, true)
-	tracker.upstreamCompleted(req)
+	tracker.upstreamCompleted(req, false)
 	tracker.responseMirrored(req)
 	tracker.responseProcessingFinished(req)
 	stats := tracker.snapshot(0, 40960)
@@ -95,6 +95,22 @@ func TestMITMPipelineTrackerLocalResponseAndPersistence(t *testing.T) {
 	stats = tracker.snapshot(0, 40960)
 	require.Equal(t, uint64(1), stats.GetPersistedTotal())
 	require.Zero(t, stats.GetPersistActive())
+}
+
+func TestMITMPipelineTrackerDoesNotCountFailedUpstreamRoundTrip(t *testing.T) {
+	tracker := newMITMPipelineTracker("session-test")
+	req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
+	require.NoError(t, err)
+
+	tracker.requestObserved(req)
+	tracker.requestDispatched(req, false)
+	tracker.upstreamCompleted(req, false)
+
+	stats := tracker.snapshot(0, 40960)
+	require.Equal(t, uint64(1), stats.GetDispatchTotal())
+	require.Zero(t, stats.GetUpstreamCompletedTotal())
+	require.Zero(t, stats.GetUpstreamActive())
+	require.Equal(t, int64(1), stats.GetResponseProcessingActive())
 }
 
 func TestMITMPipelineTrackerDropIsTerminal(t *testing.T) {

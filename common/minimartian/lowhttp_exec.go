@@ -52,7 +52,11 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-	return p.execLowhttp(ctx, req)
+	res, err := p.execLowhttp(ctx, req)
+	if err == nil && res != nil {
+		httpctx.SetUpstreamRoundTripSucceeded(req, true)
+	}
+	return res, err
 }
 
 func parseLowHTTPResponsePacket(packet []byte) (*http.Response, error) {

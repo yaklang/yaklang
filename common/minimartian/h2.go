@@ -2,6 +2,7 @@ package minimartian
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net"
 	"net/url"
@@ -26,14 +27,20 @@ func (p *Proxy) proxyH2(closing chan bool, cc net.Conn, url *url.URL, ctx *Conte
 		cc.Close()
 	}()
 
-	return lowhttp.ServeHTTP2Connection(cc, func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
+	return lowhttp.ServeHTTP2ConnectionWithContext(cc, func(streamCtx context.Context, header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
 		reqBytes := bytes.NewBuffer(header)
 
-		io.Copy(reqBytes, body) //
+		if _, err := io.Copy(reqBytes, body); err != nil {
+			return nil, nil, err
+		}
+		if err := streamCtx.Err(); err != nil {
+			return nil, nil, err
+		}
 		req, err := utils.ReadHTTPRequestFromBytes(reqBytes.Bytes())
 		if err != nil {
 			return nil, nil, err
 		}
+		*req = *req.WithContext(streamCtx)
 		inherit := func(i string) {
 			v := ctx.GetSessionValue(i)
 			httpctx.SetContextValueInfoFromRequest(req, i, v)
@@ -63,6 +70,7 @@ Content-Type: text/html
 				log.Errorf("mitm: error requesting to remote server: %v", err)
 				return nil, nil, err
 			}
+			httpctx.SetUpstreamRoundTripSucceeded(req, true)
 			defer func() {
 				if rsp != nil && rsp.Body != nil {
 					rsp.Body.Close()

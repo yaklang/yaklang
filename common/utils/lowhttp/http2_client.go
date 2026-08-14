@@ -352,10 +352,25 @@ var CreateStreamAfterGoAwayErr = utils.Errorf("h2 conn can not create new stream
 // the call blocks until a slot becomes available or the connection is closed —
 // the same behaviour as Go's net/http H2 transport.
 func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, option *LowhttpExecConfig) (*http2ClientStream, error) {
+	requestCtx := context.Background()
+	if req != nil && req.Context() != nil {
+		requestCtx = req.Context()
+	}
+	stopCancelWake := context.AfterFunc(requestCtx, func() {
+		h2Conn.mu.Lock()
+		h2Conn.streamsCond.Broadcast()
+		h2Conn.mu.Unlock()
+	})
+	defer stopCancelWake()
+
 	// Wait for a concurrent-stream slot.  Access activeStreams and the
 	// connection-state flags under mu so that streamsCond.Wait() is race-free.
 	h2Conn.mu.Lock()
 	for h2Conn.activeStreams >= int(h2Conn.maxStreamsCount) {
+		if err := requestCtx.Err(); err != nil {
+			h2Conn.mu.Unlock()
+			return nil, err
+		}
 		if h2Conn.closed || h2Conn.readGoAway {
 			h2Conn.mu.Unlock()
 			return nil, CreateStreamAfterGoAwayErr
@@ -363,6 +378,10 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 		// Atomically releases mu and suspends goroutine.
 		// Woken by streamsCond.Broadcast() in waitResponse / setClose / processGoAway.
 		h2Conn.streamsCond.Wait()
+	}
+	if err := requestCtx.Err(); err != nil {
+		h2Conn.mu.Unlock()
+		return nil, err
 	}
 	if h2Conn.closed || h2Conn.readGoAway {
 		h2Conn.mu.Unlock()
@@ -690,7 +709,7 @@ func (cs *http2ClientStream) doRequest() error {
 	return nil
 }
 
-func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte, error) {
+func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Duration) (http.Response, []byte, error) {
 	// Check if h2Conn is nil to prevent panic
 	if cs.h2Conn == nil {
 		return http.Response{}, nil, utils.Error("h2 connection is nil")
@@ -700,24 +719,44 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	}
 
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var err error
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case <-timer.C:
 		err = utils.Errorf("h2 stream-id %v wait response timeout : %s, maybe you can use HTTP/1.1 retry it", cs.ID, flow)
-		cs.setEndStream()
+		cs.resetStream(http2.ErrCodeCancel)
+	case <-ctx.Done():
+		err = ctx.Err()
+		cs.resetStream(http2.ErrCodeCancel)
 	case <-cs.readEndStreamSignal:
 	case <-cs.h2Conn.closeCh:
 		err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
 	}
 
-	// Cleanup: remove stream from map, decrement slot, restart idle timer if idle.
+	cs.releaseSlot()
+
+	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
+	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
+	resp := *cs.resp
+	responsePacket := cs.respPacket
+	cs.h2Conn.http2StreamPool.Put(cs) // gc
+	return resp, responsePacket, err
+}
+
+// releaseSlot removes a stream from the connection without affecting other
+// streams sharing the same HTTP/2 connection.
+func (cs *http2ClientStream) releaseSlot() {
 	cs.h2Conn.mu.Lock()
 	if cs.ID > 0 {
 		delete(cs.h2Conn.streams, cs.ID)
 	}
-	cs.h2Conn.activeStreams--
+	if cs.h2Conn.activeStreams > 0 {
+		cs.h2Conn.activeStreams--
+	}
 	idleNow := cs.h2Conn.activeStreams <= 0
 	cs.h2Conn.mu.Unlock()
 	// Broadcast wakes any goroutines blocked in newStream waiting for a free slot.
@@ -725,11 +764,30 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	if idleNow {
 		cs.h2Conn.idleTimer.Reset(cs.h2Conn.idleTimeout)
 	}
+}
 
-	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
-	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
-	cs.h2Conn.http2StreamPool.Put(cs) // gc
-	return *cs.resp, cs.respPacket, err
+func (cs *http2ClientStream) abort() {
+	if cs == nil || cs.h2Conn == nil {
+		return
+	}
+	cs.resetStream(http2.ErrCodeCancel)
+	cs.releaseSlot()
+	cs.h2Conn.http2StreamPool.Put(cs)
+}
+
+func (cs *http2ClientStream) resetStream(code http2.ErrCode) {
+	if cs == nil || cs.h2Conn == nil {
+		return
+	}
+	if cs.ID > 0 && !cs.readEndStream.Load() {
+		cs.h2Conn.frWriteMutex.Lock()
+		writeErr := cs.h2Conn.fr.WriteRSTStream(cs.ID, code)
+		cs.h2Conn.frWriteMutex.Unlock()
+		if writeErr != nil && !errors.Is(writeErr, net.ErrClosed) {
+			log.Debugf("h2 stream-id %v reset failed: %v", cs.ID, writeErr)
+		}
+	}
+	cs.setEndStream()
 }
 
 func (cs *http2ClientStream) setEndStream() {

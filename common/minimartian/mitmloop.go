@@ -944,8 +944,8 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 	}
 
 	stopWatchingDownstream := bindHTTPRequestToDownstream(req, conn, brw.Reader)
+	defer stopWatchingDownstream()
 	res, err := p.doHTTPRequest(ctx, req)
-	stopWatchingDownstream()
 	if (err != nil && err != io.EOF) || res == nil {
 		if p.disableBuiltinPage {
 			res = proxyutil.NewResponse(502, nil, req)
@@ -1150,7 +1150,13 @@ func bindHTTPRequestToDownstream(req *http.Request, conn net.Conn, reader *bufio
 				return
 			}
 
-			cancelRequest()
+			// EOF only means that the peer closed its request/write direction.
+			// A half-closing client may still be waiting for the response, so FIN
+			// alone is not evidence that the response has been abandoned. Hard
+			// read errors such as connection reset still cancel the upstream work.
+			if !errors.Is(err, io.EOF) {
+				cancelRequest()
+			}
 			return
 		}
 	}()

@@ -136,13 +136,13 @@ func (t *mitmPipelineTracker) requestDispatched(req *http.Request, localResponse
 	t.mu.Unlock()
 }
 
-func (t *mitmPipelineTracker) upstreamCompleted(req *http.Request) {
+func (t *mitmPipelineTracker) upstreamCompleted(req *http.Request, succeeded bool) {
 	if t == nil || req == nil {
 		return
 	}
 	t.mu.Lock()
 	if state := t.requests[req]; state != nil {
-		if state.dispatched && state.stage == mitmPipelineStageUpstream {
+		if succeeded && state.dispatched && state.stage == mitmPipelineStageUpstream {
 			t.upstreamCompletedTotal.Add(1)
 		}
 		state.stage = mitmPipelineStageResponseProcessing

@@ -881,7 +881,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) (hijackRsp []byte) {
-		pipelineTracker.upstreamCompleted(req)
+		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req))
 		pluginCtx := httpctx.GetPluginContext(req)
 		urlStr := httpctx.GetRequestURL(req)
 
@@ -1545,7 +1545,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		responseMirrorAtUnixMs := time.Now().UnixMilli()
 		// Filtered responses skip the response-hijack callback, so mirror is also
 		// the fallback terminal point for their upstream stage.
-		pipelineTracker.upstreamCompleted(req)
+		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req))
 		pipelineTracker.responseMirrored(req)
 		defer pipelineTracker.responseProcessingFinished(req)
 		addCounter()
@@ -1740,7 +1740,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		hijackedFlowMutex := new(sync.Mutex)
 		isDroppedSaveFlow := utils.NewBool(false)
-		afterPersistCleanups := flow.AfterPersistCleanups
+		flow.AfterPersistCleanups = append(flow.AfterPersistCleanups, func(saved *schema.HTTPFlow) {
+			pipelineTracker.persistFinished(saved, saved != nil && saved.ID > 0)
+		})
+		afterPersistCleanups := append([]func(*schema.HTTPFlow){}, flow.AfterPersistCleanups...)
 
 		pluginCh := make(chan struct{})
 		hotPatchPipeline.HijackSaveHTTPFlowEx(
@@ -1832,9 +1835,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			// process-local diagnostics owned by the engine and out of plugin data.
 			flow.RuntimeTiming = runtimeTiming
 			pipelineTracker.persistEnqueued(flow)
-			flow.AfterPersistCleanups = append(flow.AfterPersistCleanups, func(saved *schema.HTTPFlow) {
-				pipelineTracker.persistFinished(saved, saved != nil && saved.ID > 0)
-			})
 			// 额外添加用户手动设置的标签，确保其优先级最高
 			userTags := httpctx.GetFlowTags(req)
 			if len(userTags) > 0 {
@@ -1847,6 +1847,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				saveBarePacketHandler(flow.ID)
 			})
 			if err != nil {
+				yakit.ReleaseHTTPFlowPersistResources(flow)
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else {
 				if needUpdate {
