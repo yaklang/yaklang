@@ -830,3 +830,13 @@ func MITM_SetExtraIncomingConnectionChannelLegacy(ch chan net.Conn) MITMConfig {
 		return nil
 	}
 }
+
+// MITM_SetHTTPStreamRecorderFactory configures incremental persistence for
+// long-lived streaming responses (e.g. SSE) before the ordinary response
+// mirror runs. A nil factory disables stream recording.
+func MITM_SetHTTPStreamRecorderFactory(f minimartian.HTTPStreamRecorderFactory) MITMConfig {
+	return func(server *MITMServer) error {
+		server.streamRecorderFactory = f
+		return nil
+	}
+}

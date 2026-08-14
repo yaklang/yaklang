@@ -1,9 +1,13 @@
 package minimartian
 
 import (
+	"context"
 	"io"
+	"mime"
 	"net"
 	"net/http"
+	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,6 +17,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+// isServerSentEventContentType reports whether value is a text/event-stream
+// media type, tolerating charset and other parameters.
+func isServerSentEventContentType(value string) bool {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(mediaType, "text/event-stream")
+}
 
 func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, error) {
 	// Check if mock response should be used (set by mockHTTPRequest)
@@ -60,6 +74,13 @@ func parseLowHTTPResponsePacket(packet []byte) (*http.Response, error) {
 }
 
 func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, error) {
+	// A cancellable context for the upstream request. When the downstream
+	// client disconnects during a long-lived streaming response (e.g. SSE),
+	// cancelling this context tears down the upstream connection so the
+	// blocking body reader can return.
+	upstreamContext, cancelUpstream := context.WithCancel(req.Context())
+	defer cancelUpstream()
+
 	// PlainRequestBytes is the decoded representation used by the UI, history,
 	// and plugins. It must not replace the wire packet during transparent
 	// forwarding. Explicitly hijacked bytes still take precedence.
@@ -115,6 +136,7 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		lowhttp.WithGmTLSOnly(p.gmTLSOnly),
 		lowhttp.WithGmTLSPrefer(p.gmPrefer),
 		lowhttp.WithExtendReadDeadline(true),
+		lowhttp.WithContext(upstreamContext),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
 		lowhttp.WithDiscardIntermediateResponseBody(true),
@@ -145,20 +167,21 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	if proxies := p.selectProxiesForHost(host); len(proxies) > 0 {
 		opts = append(opts, lowhttp.WithProxy(proxies...))
-	} else {
-		opts = append(opts, lowhttp.WithProxy())
 	}
 
-	//if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
-	//	portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
-	//	if !portValid {
-	//		// 修复host和port
-	//		if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
-	//			opts = append(opts, lowhttp.WithHost(host))
+	isStrongHostMode = httpctx.GetIsStrongHostMode(req)
+	upstreamPortModified = httpctx.GetUpstreamPortIsModified(req)
+
+	//	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
+	//		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
+	//		if !portValid {
+	//			// 修复host和port
+	//			if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
+	//				opts = append(opts, lowhttp.WithHost(host))
+	//			}
+	//			opts = append(opts, lowhttp.WithPort(connectedPort))
 	//		}
-	//		opts = append(opts, lowhttp.WithPort(connectedPort))
 	//	}
-	//}
 
 	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 	if isStrongHostMode || !upstreamPortModified {
@@ -211,6 +234,17 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 		// filter / forward to client conn via Content-Type
 		if key == "content-type" {
+			// SSE: write headers immediately and stream body via the same
+			// ResponseHeaderCallback + TeeReader path used by chunked and
+			// content-type-filtered responses. This avoids a separate
+			// BodyStreamReaderHandler channel and the double-header race
+			// that would require a suppression flag.
+			if isServerSentEventContentType(value) {
+				httpctx.SetNoBodyBuffer(req, true)
+				httpctx.SetResponseReadTooSlow(req, true)
+				httpctx.SetResponseHeaderCallback(req, p.makeSSEStreamCallback(isHttps, req, bwr, cancelUpstream))
+				return
+			}
 			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
 				if ret(value) {
 					// filtered by content-type
@@ -287,6 +321,95 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
 	return rsp, err
+}
+
+// makeSSEStreamCallback builds a ResponseHeaderCallback dedicated to SSE
+// responses. It writes the response header immediately and returns a TeeReader
+// that relays body chunks to the downstream client in real time while the
+// builder's chunked decoder drives the read. An optional stream recorder
+// (best-effort) persists the body to a spill file for history/audit.
+func (p *Proxy) makeSSEStreamCallback(
+	isHTTPS bool,
+	req *http.Request,
+	bwr io.ReadWriter,
+	cancelUpstream context.CancelFunc,
+) httpctx.ResponseHeaderCallbackType {
+	return func(_ *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+		httpctx.SetMITMSkipFrontendFeedback(req, true)
+
+		if _, err := bwr.Write(headerBytes); err != nil {
+			if cancelUpstream != nil {
+				cancelUpstream()
+			}
+			return nil, err
+		}
+		utils.FlushWriter(bwr)
+
+		// Create an optional best-effort recorder for incremental persistence.
+		var recorder io.WriteCloser
+		var closeOnce sync.Once
+		closeRecorder := func() {
+			closeOnce.Do(func() {
+				if recorder != nil {
+					if err := recorder.Close(); err != nil {
+						log.Warnf("mitm: finalize SSE stream recorder failed: %v", err)
+					}
+				}
+			})
+		}
+		if p.streamRecorder != nil {
+			rsp, err := utils.ReadHTTPResponseFromBytes(headerBytes, nil)
+			if err != nil {
+				log.Warnf("mitm: parse SSE response header for recorder failed: %v", err)
+			} else {
+				rsp.Request = req
+				recorder, err = p.streamRecorder(isHTTPS, req, rsp, headerBytes)
+				if err != nil {
+					log.Warnf("mitm: create SSE stream recorder failed: %v", err)
+					recorder = nil
+				} else if recorder != nil {
+					httpctx.SetResponseStreamRecorder(req, recorder)
+				}
+			}
+		}
+
+		// Chain the finished callback so the recorder is closed on EOF and
+		// the downstream writer gets a final flush.
+		previousFinished := httpctx.GetResponseFinishedCallback(req)
+		httpctx.SetResponseFinishedCallback(req, func() {
+			if previousFinished != nil {
+				previousFinished()
+			}
+			utils.FlushWriter(bwr)
+			closeRecorder()
+		})
+
+		// Build the TeeReader target: always forward to the client; append the
+		// recorder (wrapped best-effort) when present. The wrapper swallows
+		// recorder write errors so persistence failures never break or stall
+		// forwarding.
+		writers := []io.Writer{utils.WriterAutoFlush(bwr)}
+		if recorder != nil {
+			writers = append(writers, &bestEffortStreamRecorder{writer: recorder})
+		}
+		return io.TeeReader(bodyReader, io.MultiWriter(writers...)), nil
+	}
+}
+
+// bestEffortStreamRecorder wraps an io.Writer and never returns an error,
+// ensuring that recorder failures do not break or delay response forwarding.
+type bestEffortStreamRecorder struct {
+	writer io.Writer
+}
+
+func (w *bestEffortStreamRecorder) Write(p []byte) (int, error) {
+	if w == nil || w.writer == nil {
+		return len(p), nil
+	}
+	if n, err := w.writer.Write(p); err != nil || n != len(p) {
+		log.Warnf("mitm: persist streaming response chunk failed: wrote=%d expected=%d error=%v", n, len(p), err)
+	}
+	return len(p), nil
 }
 
 func transferFixedResponsePacket(req *http.Request, response *lowhttp.LowhttpResponse) {
