@@ -95,11 +95,32 @@ func TestSimpleCrawler_CoverageHint(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "todo"),
 		"hint should mention breaking work into todos")
 
-	// The standard crawl output must still be present (summary + requested URLs).
+	// The crawler output should separate requested and merely discovered URLs,
+	// without the noisy duplicated website tree.
 	assert.Assert(t, strings.Contains(stdout, "=== Crawl Summary ==="),
 		"standard crawl summary should still be present")
 	assert.Assert(t, strings.Contains(stdout, "=== Requested URLs ==="),
 		"requested URLs section should still be present")
+	assert.Assert(t, strings.Contains(stdout, "=== Found URLs ==="),
+		"found URLs section should be present")
+	assert.Assert(t, strings.Contains(stdout, "=== Follow-up Guidance ==="),
+		"follow-up guidance should be present")
+	assert.Assert(t, !strings.Contains(stdout, "Website Forest:"),
+		"website forest should no longer be emitted")
+
+	// Requested URL records carry compact response metadata useful for triage.
+	assert.Assert(t, strings.Contains(stdout, "[200 OK]"),
+		"requested URL should include status code and text; got:\n%s", stdout)
+	assert.Assert(t, strings.Contains(stdout, "type=text/html; charset=utf-8"),
+		"requested URL should include content type; got:\n%s", stdout)
+	assert.Assert(t, strings.Contains(stdout, "bytes="),
+		"requested URL should include response body size; got:\n%s", stdout)
+
+	// Guidance must explain how to crawl selected discoveries more deeply.
+	assert.Assert(t, strings.Contains(stdout, "Found URLs") && strings.Contains(stdout, "`urls`"),
+		"guidance should tell the AI to re-crawl selected Found URLs")
+	assert.Assert(t, strings.Contains(stdout, "`reqs-max`") && strings.Contains(stdout, "`max-depth`"),
+		"guidance should explain request/depth controls")
 }
 
 func TestSimpleCrawler_HidesAndDoesNotRequestURLFragments(t *testing.T) {
