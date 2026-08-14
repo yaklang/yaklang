@@ -12,6 +12,14 @@ jobs:
     name: Test
     runs-on: ubuntu-22.04
 
+    env:
+      # go-llvm vendors the LLVM 18.1.3 static archives inside the module, but
+      # not the LLVM C/C++ headers (the module zip has none). install_deps
+      # adds the official apt.llvm.org repo for jammy; point cgo at the
+      # versioned headers so the distro default (LLVM 14) cannot shadow them.
+      CGO_CFLAGS: -I/usr/lib/llvm-18/include
+      CGO_CXXFLAGS: -I/usr/lib/llvm-18/include
+
     steps:
     - name: Check out code
       uses: actions/checkout@v3
@@ -31,6 +39,12 @@ jobs:
 
     - name: Init Module
       run: go mod tidy
+
+    - name: Build embedded runtime assets
+      # The embedded libyak.a/crt/libc assets are gitignored (generated), so
+      # CI builds the default (full) tier archive before compiling tests.
+      run: |
+        bash common/yak/ssa2llvm/scripts/build_yaklib.sh
 
     - name: Test
       # -x is intentionally NOT passed: it prints every external command and is
