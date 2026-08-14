@@ -49,6 +49,27 @@ func (c *http2ConnectionConfig) removeStreamWindow(streamID uint32) {
 	c.streamWindows.Delete(streamID)
 }
 
+// h2IllegalResponseHeaderFields are HTTP/1.x connection-specific header
+// fields that must never be forwarded into an HTTP/2 response (RFC 7540
+// Section 8.1.2.2). Responses translated from an HTTP/1.x upstream (the
+// client negotiated h2 while the origin speaks h1) routinely carry these;
+// strict h2 clients (browsers, x/net) reset the stream as malformed.
+//
+// content-length is also dropped: h2 DATA frames are self-delimiting, and a
+// stale length from the h1 representation (dechunking, decompression, or a
+// MITM body rewrite) triggers CONTENT_LENGTH_MISMATCH on strict clients.
+var h2IllegalResponseHeaderFields = map[string]struct{}{
+	"connection":          {},
+	"keep-alive":          {},
+	"proxy-authenticate":  {},
+	"proxy-authorization": {},
+	"te":                  {},
+	"trailer":             {},
+	"transfer-encoding":   {},
+	"upgrade":             {},
+	"content-length":      {},
+}
+
 func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, body io.ReadCloser) error {
 	if c.frame == nil {
 		return utils.Error("h2 server frame config is nil")
@@ -59,49 +80,56 @@ func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, b
 	buf := c.hencBuf
 	frWriteMutex := c.frWriteMutex
 
-	c.hencMutex.Lock()
-	buf.Reset()
-	SplitHTTPPacket(header, nil, func(proto string, code int, codeMsg string) error {
-		henc.WriteField(hpack.HeaderField{Name: ":status", Value: fmt.Sprint(code)})
-		return nil
-	}, func(line string) string {
-		k, v := SplitHTTPHeader(line)
-		henc.WriteField(hpack.HeaderField{Name: strings.ToLower(k), Value: v})
-		return line
-	})
-	var hpackHeaderBytes = buf.Bytes()
-	buf.Reset()
-
-	//defer func() {
-	//	log.Infof("handle h2 stream(%v) done", streamId)
-	//}()
-	//log.Infof("start to write h2 response header stream-id: %v", streamId)
-	ret := funk.Chunk(hpackHeaderBytes, defaultMaxFrameSize).([][]byte)
-	first := true
-	for index, item := range ret {
-		if first {
-			first = false
-			frWriteMutex.Lock()
-			err := frame.WriteHeaders(http2.HeadersFrameParam{
-				StreamID:      uint32(streamId),
-				BlockFragment: item,
-				EndStream:     false,
-				EndHeaders:    index == len(ret)-1,
-			})
-			frWriteMutex.Unlock()
-			if err != nil {
-				return utils.Wrapf(err, "h2framer write header(%v) for stream:%v failed", len(hpackHeaderBytes), streamId)
+	// Encode and write the response headers while holding hencMutex, so the
+	// shared hpack encoder's dynamic table stays consistent with the wire
+	// order across concurrent streams.
+	headerErr := func() error {
+		c.hencMutex.Lock()
+		defer c.hencMutex.Unlock()
+		buf.Reset()
+		SplitHTTPPacket(header, nil, func(proto string, code int, codeMsg string) error {
+			henc.WriteField(hpack.HeaderField{Name: ":status", Value: fmt.Sprint(code)})
+			return nil
+		}, func(line string) string {
+			k, v := SplitHTTPHeader(line)
+			lk := strings.ToLower(k)
+			if _, illegal := h2IllegalResponseHeaderFields[lk]; illegal {
+				return line // do not encode connection-specific h1 headers into h2
 			}
-		} else {
-			frWriteMutex.Lock()
-			err := frame.WriteContinuation(uint32(streamId), index == len(ret)-1, item)
-			frWriteMutex.Unlock()
-			if err != nil {
-				return utils.Wrapf(err, "h2framer write header(%v)-continuation for stream:%v failed", len(hpackHeaderBytes), streamId)
+			henc.WriteField(hpack.HeaderField{Name: lk, Value: v})
+			return line
+		})
+		hpackHeaderBytes := append([]byte(nil), buf.Bytes()...)
+		buf.Reset()
+
+		ret := funk.Chunk(hpackHeaderBytes, defaultMaxFrameSize).([][]byte)
+		for index, item := range ret {
+			if index == 0 {
+				frWriteMutex.Lock()
+				err := frame.WriteHeaders(http2.HeadersFrameParam{
+					StreamID:      uint32(streamId),
+					BlockFragment: item,
+					EndStream:     false,
+					EndHeaders:    index == len(ret)-1,
+				})
+				frWriteMutex.Unlock()
+				if err != nil {
+					return utils.Wrapf(err, "h2framer write header(%v) for stream:%v failed", len(hpackHeaderBytes), streamId)
+				}
+			} else {
+				frWriteMutex.Lock()
+				err := frame.WriteContinuation(uint32(streamId), index == len(ret)-1, item)
+				frWriteMutex.Unlock()
+				if err != nil {
+					return utils.Wrapf(err, "h2framer write header(%v)-continuation for stream:%v failed", len(hpackHeaderBytes), streamId)
+				}
 			}
 		}
+		return nil
+	}()
+	if headerErr != nil {
+		return headerErr
 	}
-	c.hencMutex.Unlock()
 
 	results, err := io.ReadAll(body)
 	streamWindow := c.getStreamWindow(uint32(streamId))

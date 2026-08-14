@@ -77,6 +77,18 @@ func parseLowHTTPResponsePacket(packet []byte) (*http.Response, error) {
 	return utils.ReadHTTPResponseFromBytesWithBodyView(packet)
 }
 
+// forceHTTP11FirstLine rewrites a request packet's version marker to HTTP/1.1.
+//
+// A request parsed from an h2 client keeps its "HTTP/2" marker so the UI shows
+// the client-facing protocol faithfully, but lowhttp reads that same marker as
+// a force-h2 signal (see lowhttp.exec). Any hop that goes out over HTTP/1.1
+// must therefore rewrite the wire copy, or lowhttp overrides the caller's
+// choice of protocol.
+func forceHTTP11FirstLine(packet []byte) []byte {
+	method, uri, _ := lowhttp.GetHTTPPacketFirstLine(packet)
+	return lowhttp.ReplaceHTTPPacketFirstLine(packet, method+" "+uri+" HTTP/1.1")
+}
+
 func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, error) {
 	// A cancellable context for the upstream request. When the downstream
 	// client disconnects during a long-lived streaming response (e.g. SSE),
@@ -115,6 +127,23 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	if cached, ok := p.h2Cache.Load(cacheKey); ok {
 		isH2 = cached.(bool)
+	} else if p.http2 && isHttps {
+		// Origin h2 capability unknown: try h2 optimistically. Every failure
+		// mode below downgrades to HTTP/1.1 and negative-caches the origin:
+		//  - h1-only origin: ALPN does not negotiate h2 -> instant downgrade
+		//  - WAF kills the h2 conn (preface EOF/RST): closeCh -> downgrade
+		//  - WAF tarpit (no SETTINGS): bounded server-preface wait -> downgrade
+		//  - any other transport error: err fallback below
+		// so optimistic h2 never hangs the request. The probe still runs in
+		// the background to populate the cache for later requests.
+		isH2 = true
+		p.detectServerH2Async(cacheKey, "")
+	}
+
+	if !isH2 {
+		// The upstream protocol is decided by the origin h2 cache, not by the
+		// packet's version marker.
+		reqBytes = forceHTTP11FirstLine(reqBytes)
 	}
 
 	isGmTLS := p.gmTLS && isHttps
@@ -273,10 +302,38 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	})
 
 	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)
+	if err != nil && isH2 && req.Context().Err() == nil {
+		// The origin advertised h2 during detection, but the h2 upstream
+		// attempt failed at transport level. Some endpoints (WAF/bot
+		// mitigation, e.g. fingerprinting-protected APIs) kill non-browser
+		// h2 clients right after the preface. Downgrade: remember h1 for
+		// this origin and retry over HTTP/1.1 — the same behavior as Burp.
+		//
+		// The context check above matters: a request abandoned by the client
+		// also surfaces as an error here, but says nothing about the origin's
+		// h2 support. Downgrading on it would poison the cache for the whole
+		// origin and burn a second, equally doomed round trip.
+		log.Warnf("h2 upstream to %v failed: %v, downgrading to HTTP/1.1", cacheKey, err)
+		p.h2Cache.Store(cacheKey, false)
+		// Rewrite the version marker as well: leaving "HTTP/2" on the wire copy
+		// makes lowhttp force h2 again and the retry rebuilds the very
+		// connection that just failed.
+		opts = append(opts, lowhttp.WithHttp2(false), lowhttp.WithRequest(forceHTTP11FirstLine(reqBytes)))
+		lowHttpResp, err = lowhttp.HTTPWithoutRedirect(opts...)
+	}
 	if err != nil {
 		req.RemoteAddr = ""
 		httpctx.SetRemoteAddr(req, "")
 		return nil, err
+	}
+
+	// If h2 was requested (the origin advertised it during detection) but the
+	// connection was silently downgraded to HTTP/1.1 — ALPN mismatch, preface
+	// failure, or a tarpit that never sent its SETTINGS frame — remember h1
+	// for this origin so later requests skip the h2 attempt entirely.
+	if isH2 && lowHttpResp != nil && !lowHttpResp.Http2 {
+		log.Infof("h2 upstream to %v was downgraded to HTTP/1.1, caching h1 for this origin", cacheKey)
+		p.h2Cache.Store(cacheKey, false)
 	}
 
 	// set trace info

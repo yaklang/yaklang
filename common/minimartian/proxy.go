@@ -102,6 +102,8 @@ type Proxy struct {
 	maxReadWaitTime  time.Duration
 
 	h2Cache sync.Map
+	// h2ProbeInflight deduplicates background origin h2 probes (per host:port)
+	h2ProbeInflight sync.Map
 
 	forceDisableKeepAlive bool
 	disableSystemProxy    bool
