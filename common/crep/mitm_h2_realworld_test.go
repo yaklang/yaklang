@@ -21,9 +21,10 @@ import (
 //
 // Set MITM_H2_REAL_TARGET to override the origin; skipped without network.
 func TestMITMH2_RealOriginSequential(t *testing.T) {
+	// Opt-in only: needs egress to a real origin, so it must not run in CI.
 	target := os.Getenv("MITM_H2_REAL_TARGET")
 	if target == "" {
-		target = "https://www.baidu.com/"
+		t.Skip("set MITM_H2_REAL_TARGET=<url> to run this diagnostic against a real origin")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)

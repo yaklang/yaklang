@@ -22,13 +22,16 @@ import (
 //
 // MITM_H2_CURL_TARGET overrides the origin.
 func TestMITMH2_RealCurlRepeated(t *testing.T) {
+	// Opt-in only: this drives a real curl binary against a real origin, so it
+	// needs egress and is not suitable for CI. Set MITM_H2_CURL_TARGET to run
+	// it against a specific endpoint when diagnosing a report from the field.
+	target := os.Getenv("MITM_H2_CURL_TARGET")
+	if target == "" {
+		t.Skip("set MITM_H2_CURL_TARGET=<url> to run this diagnostic against a real origin")
+	}
 	curlPath, err := exec.LookPath("curl")
 	if err != nil {
 		t.Skip("curl not available")
-	}
-	target := os.Getenv("MITM_H2_CURL_TARGET")
-	if target == "" {
-		target = "https://www.zhihu.com/"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 240*time.Second)
