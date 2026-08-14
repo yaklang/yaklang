@@ -99,14 +99,17 @@ func TestSimpleCrawler_CoverageHint(t *testing.T) {
 	// without the noisy duplicated website tree.
 	assert.Assert(t, strings.Contains(stdout, "=== Crawl Summary ==="),
 		"standard crawl summary should still be present")
-	assert.Assert(t, strings.Contains(stdout, "=== Requested URLs ==="),
-		"requested URLs section should still be present")
 	assert.Assert(t, strings.Contains(stdout, "=== Found URLs ==="),
 		"found URLs section should be present")
 	assert.Assert(t, strings.Contains(stdout, "=== Follow-up Guidance ==="),
 		"follow-up guidance should be present")
 	assert.Assert(t, !strings.Contains(stdout, "Website Forest:"),
 		"website forest should no longer be emitted")
+
+	// Streamed crawled URL lines are emitted inline during the crawl,
+	// replacing the old '=== Requested URLs ===' block in stdout.
+	assert.Assert(t, strings.Contains(stdout, "[crawled]"),
+		"streamed crawled URL lines should be present")
 
 	// Requested URL records carry compact response metadata useful for triage.
 	assert.Assert(t, strings.Contains(stdout, "[200 OK]"),

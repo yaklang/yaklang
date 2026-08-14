@@ -178,8 +178,8 @@ for currentStartUrl in targetCandidates {
         }
 
         // collect status code for distribution summary
-        if statusCode > 0 {
-            sc = sprint(statusCode)
+        sc = sprint(statusCode)
+        if parseInt(sc) > 0 {
             if sc in statusCodeCounts {
                 statusCodeCounts[sc] = statusCodeCounts[sc] + 1
             } else {

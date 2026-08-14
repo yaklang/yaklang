@@ -154,17 +154,17 @@ func TestDoHTTPRequest_ResponseLargeNoPattern(t *testing.T) {
 	})
 	tool := getDoHTTPRequestTool(t)
 
-	// without save-packet: truncated inline, hint points to save-packet, no file saved
+	// without save-packet: head+tail truncation (head 8KB + tail 2KB), hint points to save-packet, no file saved
 	stdout, _ := execTool(t, tool, aitool.InvokeParams{
 		"url":     "http://" + host + ":" + strconv.Itoa(port),
 		"timeout": 10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, headMarker), "head of large response should be printed")
-	assert.Assert(t, strings.Contains(stdout, "truncated"), "large response without pattern should be truncated")
+	assert.Assert(t, strings.Contains(stdout, "omitted"), "large response without pattern should show omitted bytes")
 	assert.Assert(t, strings.Contains(stdout, "save-packet=true"), "truncation hint should point to save-packet")
 	assert.Assert(t, !strings.Contains(stdout, "saved to"), "no file should be saved when save-packet is off")
-	assert.Assert(t, !strings.Contains(stdout, tailMarker), "tail should not appear in truncated output")
+	assert.Assert(t, strings.Contains(stdout, tailMarker), "tail of large response should be printed (head+tail strategy)")
 
 	// with save-packet=true: the full response is dumped to a file
 	stdout, _ = execTool(t, tool, aitool.InvokeParams{
@@ -173,7 +173,7 @@ func TestDoHTTPRequest_ResponseLargeNoPattern(t *testing.T) {
 		"save-packet": true,
 	})
 
-	assert.Assert(t, strings.Contains(stdout, "truncated"), "large response should be truncated")
+	assert.Assert(t, strings.Contains(stdout, "omitted"), "large response should show omitted bytes")
 	assert.Assert(t, strings.Contains(stdout, "full response saved to file"), "with save-packet the full response file hint should appear")
 }
 
@@ -220,7 +220,8 @@ func TestDoHTTPRequest_MalformedHeaderIsVisibleButRequestContinues(t *testing.T)
 		"timeout": 10,
 	})
 
-	assert.Assert(t, strings.Contains(stdout, "ignored malformed header line"), "ignored input must be visible")
+	assert.Assert(t, strings.Contains(stdout, "[param error: malformed header]"), "ignored input must be visible with classified prefix")
+	assert.Assert(t, strings.Contains(stdout, "ignored header line"), "ignored input must be visible")
 	assert.Assert(t, strings.Contains(stdout, "expected 'Name: value'"), "warning must show the corrected shape")
 	assert.Assert(t, strings.Contains(stdout, "malformed_header_recovered"), "safe malformed input should not abort the request")
 }

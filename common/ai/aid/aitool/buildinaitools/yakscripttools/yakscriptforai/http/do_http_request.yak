@@ -601,17 +601,14 @@ if len(redirectChain) > 0 {
 // 在这一行里把 agent 最需要的信号集中输出: 状态码、body大小、耗时、md5、
 // 重定向链、Server、Content-Type. agent 读这一行就能拿到完整请求画像.
 summaryParts = []
+statusLine = sprintf("HTTP (body size: %v)", rspIns.ResponseBodySize)
 try {
     rspStr = string(rsp)
     crlfIdx = str.Index(rspStr, "\r\n")
     if crlfIdx > 0 {
         statusLine = rspStr[:crlfIdx]
-    } else {
-        statusLine = sprintf("HTTP (body size: %v)", rspIns.ResponseBodySize)
     }
-} catch e {
-    statusLine = sprintf("HTTP (body size: %v)", rspIns.ResponseBodySize)
-}
+} catch e {}
 
 summaryParts.Push(sprintf("body: %v bytes", rspIns.ResponseBodySize))
 summaryParts.Push(sprintf("time: %v", totalTimeStr))
