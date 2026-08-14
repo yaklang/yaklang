@@ -40,13 +40,11 @@ func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithEnableMultiAgentMode(true),
-		aicommon.WithMaxSubAgents(4),
 	)
 	text := cfg.GetExecutionPolicy()
 	require.Contains(t, text, "MUST make dispatch_sub_react_agents your FIRST move")
 	require.Contains(t, text, "MUST NOT use it to offload")
-	require.Contains(t, text, "MaxSubAgents is 4")
-	require.Contains(t, text, "run at most 4 sub agents simultaneously")
+	require.NotContains(t, text, "MaxSubAgents")
 	require.NotContains(t, text, "Goal mode")
 }
 

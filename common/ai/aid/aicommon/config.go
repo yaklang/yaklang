@@ -1,4 +1,4 @@
-﻿package aicommon
+package aicommon
 
 import (
 	"context"
@@ -248,7 +248,7 @@ type Config struct {
 	DisallowMCPServers           bool // 禁用 MCP Servers，默认为 false（即默认启用）
 	EnableDispatchSubReactAgents bool // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
 	PreferDispatchSubReactAgents bool // Bias the top-level loop toward dispatch_sub_react_agents for parallelizable work.
-	MaxSubAgents                 int64 // Cap on sub agents per dispatch_sub_react_agents call (multi-agent mode).
+	MaxSubAgents                 int64 // Max simultaneous sub-agent concurrency (multi-agent mode).
 
 	// ExtraMCPServers 会话级显式挂载的 MCP server（不读 profile DB、不进全局列表）。
 	// 仅在本字段非空时激活，默认 nil，对现有流程零影响。
@@ -4034,7 +4034,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// EnableDispatchSubReactAgents is intentionally omitted: only the top-level
 	// ReAct agent may dispatch sub ReAct agents; forked child configs must not inherit it.
 	// PreferDispatchSubReactAgents / MaxSubAgents / GoalMode 也只对顶层 agent 生效，避免子 agent
-	// 被错误地强制并行偏好、子任务上限或最小轮数约束。
+	// 被错误地强制并行偏好、并发上限或最小轮数约束。
 
 	// Retry / limits
 	if i.AiTransactionAutoRetry > 0 {
