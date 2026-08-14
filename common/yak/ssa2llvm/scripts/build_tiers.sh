@@ -28,6 +28,9 @@ REPO_ROOT="$(cd "${SSA2LLVM_DIR}/../../.." && pwd)"
 
 OUT_DIR="${1:-${REPO_ROOT}/build/tiers}"
 mkdir -p "${OUT_DIR}"
+# build_yaklib.sh chdirs into runtime_go, so a relative OUT_DIR would publish
+# tiers under the wrong directory. Resolve it to an absolute path up front.
+OUT_DIR="$(cd "${OUT_DIR}" && pwd)"
 
 cd "${REPO_ROOT}"
 TIER_LIST="$(go run ./common/yak/ssa2llvm/cmd/tiers list)"
