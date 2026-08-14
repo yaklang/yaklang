@@ -2,6 +2,7 @@ package main
 
 /*
 #cgo linux LDFLAGS: -ldl
+#define _GNU_SOURCE 1
 #include <stdint.h>
 #include <stdlib.h>
 #include <dlfcn.h>
