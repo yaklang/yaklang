@@ -92,9 +92,15 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 				if err != nil {
 					endNormally(1, "high", "review failed: "+err.Error())
 					log.Errorf("error during auto-review: %v", err)
+					if ctx.Err() != nil {
+						return
+					}
 					endpoint.SetApprovalMeta(ApprovalSourceTimeoutFallback, false, "ai_review_error_auto_continue")
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
+					return
+				}
+				if ctx.Err() != nil {
 					return
 				}
 				score := riskResult.GetFloat("risk_score")
@@ -108,7 +114,9 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 					})
 					c.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					endNormally(score, "low", "")
-					time.Sleep(duSec * time.Second)
+					if !waitAgreeCountdown(ctx, duSec*time.Second) {
+						return
+					}
 					endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "ai_low_risk_auto_continue")
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
@@ -122,7 +130,9 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 					})
 					endNormally(score, "middle", "")
 					c.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
-					time.Sleep(duSec * time.Second)
+					if !waitAgreeCountdown(ctx, duSec*time.Second) {
+						return
+					}
 					endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "ai_middle_risk_auto_continue")
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
@@ -143,22 +153,64 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 		defer cancel()
 		// 默认 manual 视为真人工审批; 若配了 assistant 回调则在回调成功时改记 model_judge.
 		endpoint.SetApprovalMeta(ApprovalSourceHuman, true, "manual_human_review")
-		if c.AgreeManualCallback != nil { // if agreeManualCallback is not nil, use it help manual agree
-			go func() {
-				res, err := c.AgreeManualCallback(manualCtx, c)
-				if err != nil {
-					log.Errorf("agree assistant callback error: %v", err)
-				} else {
-					endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "manual_assistant_auto_review")
-					endpoint.SetParams(res)
-					for i := 0; i < 3; i++ {
-						endpoint.Release()
-						time.Sleep(time.Second)
-					}
-				}
-			}()
+		if c.AgreeManualCallback == nil {
+			endpoint.WaitContext(ctx)
+			return
 		}
-		endpoint.WaitContext(ctx)
+
+		// Keep the assistant callback a pure producer. The waiter goroutine owns
+		// the endpoint mutation, so a callback that ignores cancellation may return
+		// late but cannot publish a stale decision or block while sending it.
+		type manualReviewResult struct {
+			params aitool.InvokeParams
+			err    error
+		}
+		callbackResult := make(chan manualReviewResult, 1)
+		go func() {
+			res, err := c.AgreeManualCallback(manualCtx, c)
+			callbackResult <- manualReviewResult{params: res, err: err}
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-endpoint.sig.Done():
+				// A real interactive response won the race.
+				return
+			case result := <-callbackResult:
+				if result.err != nil {
+					log.Errorf("agree assistant callback error: %v", result.err)
+					// Preserve the historical fallback: a failed assistant leaves the
+					// manual review pending for an external human response.
+					callbackResult = nil
+					continue
+				}
+				if ctx.Err() != nil {
+					return
+				}
+				endpoint.SetApprovalMeta(ApprovalSourceModelJudge, false, "manual_assistant_auto_review")
+				endpoint.SetParams(result.params)
+				endpoint.Release()
+				return
+			}
+		}
+	}
+}
+
+// waitAgreeCountdown reports whether the countdown elapsed normally. A false
+// result means the owning review was cancelled and no late approval should be
+// written or released.
+func waitAgreeCountdown(ctx context.Context, duration time.Duration) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 

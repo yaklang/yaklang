@@ -300,7 +300,80 @@ func TestSmallToolResultCanContinueWhenArtifactPersistenceFails(t *testing.T) {
 }
 
 func TestCurrentCheckpointReplayKeepsCompactedDataByteStable(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "tool_calls", "1_replay")
+	canonicalData := []struct {
+		name string
+		data string
+	}{
+		{
+			name: "distinct_result",
+			data: "COMBINED OUTPUT:\npreview\n\nRESULT:\nresult\n\nARTIFACT:\n- combined: /stable/original/combined_output.txt\n- result: /stable/original/result.txt",
+		},
+		{
+			name: "combined_equals_result_omits_result_section",
+			data: "COMBINED OUTPUT:\nsame compact bytes\n\nARTIFACT:\n- combined: /stable/original/combined_output.txt\n- result: /stable/original/result.txt",
+		},
+		{
+			name: "empty_result_omits_result_section",
+			data: "COMBINED OUTPUT:\nstdout only\n\nHINT:\nartifact_persist_failed: historical fixture",
+		},
+	}
+	for _, tc := range canonicalData {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			originalDir := filepath.Join(root, "tool_calls", "1_replay")
+			replayDir := originalDir + "_2"
+			require.NoError(t, os.MkdirAll(originalDir, 0o755))
+			originalArtifact := filepath.Join(originalDir, "combined_output.txt")
+			require.NoError(t, os.WriteFile(originalArtifact, []byte("stable-original-artifact"), 0o644))
+			require.NoError(t, os.MkdirAll(replayDir, 0o755))
+			b := &toolCallArtifactBundle{
+				dir:          replayDir,
+				combinedPath: filepath.Join(replayDir, "combined_output.txt"),
+				stdoutPath:   filepath.Join(replayDir, "stdout.txt"),
+				stderrPath:   filepath.Join(replayDir, "stderr.txt"),
+				preview:      newBoundedHeadTailBuffer(toolCapturePreviewBytes),
+				ownsDir:      true,
+			}
+			var err error
+			b.combined, err = os.Create(b.combinedPath)
+			require.NoError(t, err)
+			b.stdout, err = os.Create(b.stdoutPath)
+			require.NoError(t, err)
+			b.stderr, err = os.Create(b.stderrPath)
+			require.NoError(t, err)
+			toolResult := &aitool.ToolResult{Name: "replay", Success: true, Data: tc.data}
+			tool, err := aitool.New("replay", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
+			require.NoError(t, err)
+			require.NoError(t, b.finalize(&ToolCaller{}, tool, "replay-call", "", nil, toolResult, 0, ""))
+			require.Equal(t, tc.data, toolResult.Data, "checkpoint replay must be byte-stable")
+			require.NoDirExists(t, replayDir, "replay must remove the speculative _2 bundle")
+			originalBytes, err := os.ReadFile(originalArtifact)
+			require.NoError(t, err)
+			require.Equal(t, "stable-original-artifact", string(originalBytes))
+		})
+	}
+}
+
+func TestCanonicalToolResultDataRequiresFrameworkTailEnvelope(t *testing.T) {
+	require.True(t, isCanonicalToolResultData(
+		"COMBINED OUTPUT:\nplain\n\nARTIFACT:\n- combined: /tmp/combined_output.txt\n- result: /tmp/result.txt",
+	))
+	require.True(t, isCanonicalToolResultData(
+		"COMBINED OUTPUT:\nplain\n\nHINT:\nartifact_persist_failed: disk unavailable. This is a bounded preview; omitted content is unrecoverable.",
+	))
+	for _, rawToolString := range []string{
+		"COMBINED OUTPUT:\nthis is ordinary tool text",
+		"COMBINED OUTPUT:\nordinary text mentions\n\nARTIFACT:\nwithout framework paths",
+		"COMBINED OUTPUT:\nordinary text\n\nARTIFACT:\n- combined: /tmp/only-one-path",
+		"COMBINED OUTPUT:\nordinary text\n\nHINT:\nuser-authored hint",
+		"prefix COMBINED OUTPUT:\nplain\n\nARTIFACT:\n- combined: /tmp/a\n- result: /tmp/b",
+	} {
+		require.False(t, isCanonicalToolResultData(rawToolString), rawToolString)
+	}
+}
+
+func TestToolArtifactDiscardUnfinishedClosesStreamsAndRemovesBundle(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "tool_calls", "1_cancelled")
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	b := &toolCallArtifactBundle{
 		dir:          dir,
@@ -308,6 +381,7 @@ func TestCurrentCheckpointReplayKeepsCompactedDataByteStable(t *testing.T) {
 		stdoutPath:   filepath.Join(dir, "stdout.txt"),
 		stderrPath:   filepath.Join(dir, "stderr.txt"),
 		preview:      newBoundedHeadTailBuffer(toolCapturePreviewBytes),
+		ownsDir:      true,
 	}
 	var err error
 	b.combined, err = os.Create(b.combinedPath)
@@ -316,14 +390,62 @@ func TestCurrentCheckpointReplayKeepsCompactedDataByteStable(t *testing.T) {
 	require.NoError(t, err)
 	b.stderr, err = os.Create(b.stderrPath)
 	require.NoError(t, err)
-	original := "COMBINED OUTPUT:\npreview\n\nRESULT:\nresult\n\nARTIFACT:\n- combined: /stable/original/path"
-	toolResult := &aitool.ToolResult{Name: "replay", Success: true, Data: original}
-	tool, err := aitool.New("replay", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
+	stdout := b.Writer(artifactStdout)
+	_, err = stdout.Write([]byte("partial-before-cancel"))
 	require.NoError(t, err)
-	require.NoError(t, b.finalize(&ToolCaller{}, tool, "replay-call", "", nil, toolResult, 0, ""))
-	require.Equal(t, original, toolResult.Data)
-	_, err = os.Stat(dir)
-	require.ErrorIs(t, err, os.ErrNotExist)
+
+	b.discardIfUnfinished()
+	require.NoDirExists(t, dir)
+	// Simulate a non-cooperative callback unwinding after ToolCaller returned.
+	// Late writes are consumed and dropped instead of touching closed files.
+	n, err := stdout.Write([]byte("late-after-cancel"))
+	require.NoError(t, err)
+	require.Equal(t, len("late-after-cancel"), n)
+	require.NoDirExists(t, dir)
+}
+
+func TestToolArtifactDiscardDoesNotRemoveUnownedExistingDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "tool_calls", "existing")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	sentinel := filepath.Join(dir, "sentinel.txt")
+	require.NoError(t, os.WriteFile(sentinel, []byte("owned elsewhere"), 0o644))
+	b := &toolCallArtifactBundle{dir: dir, prepare: fmt.Errorf("reservation failed")}
+	require.NoError(t, b.discardIfUnfinished())
+	require.FileExists(t, sentinel, "failed reservation must never delete a directory the bundle did not create")
+}
+
+func TestToolArtifactLateFinalizeFailureDoesNotLeaveGhostArtifactHint(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "tool_calls", "late-persist-failure")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	b := &toolCallArtifactBundle{
+		dir:          dir,
+		reportPath:   filepath.Join(dir, "report.md"),
+		combinedPath: filepath.Join(dir, "combined_output.txt"),
+		stdoutPath:   filepath.Join(dir, "stdout.txt"),
+		stderrPath:   filepath.Join(dir, "stderr.txt"),
+		manifestPath: filepath.Join(dir, "missing-parent", "manifest.json"),
+		preview:      newBoundedHeadTailBuffer(toolCapturePreviewBytes),
+		ownsDir:      true,
+	}
+	var err error
+	b.combined, err = os.Create(b.combinedPath)
+	require.NoError(t, err)
+	b.stdout, err = os.Create(b.stdoutPath)
+	require.NoError(t, err)
+	b.stderr, err = os.Create(b.stderrPath)
+	require.NoError(t, err)
+	_, err = b.Writer(artifactStdout).Write([]byte("small output"))
+	require.NoError(t, err)
+	toolResult := &aitool.ToolResult{Name: "late-persist", Success: true, Data: &aitool.ToolExecutionResult{Result: "small result"}}
+	tool, err := aitool.New("late-persist", aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) { return nil, nil }))
+	require.NoError(t, err)
+	err = b.finalize(&ToolCaller{}, tool, "late-call", "", nil, toolResult, 0, "")
+	require.Error(t, err)
+	data := toolResult.Data.(string)
+	require.Contains(t, data, "HINT:\nartifact_persist_failed:")
+	require.NotContains(t, data, "\n\nARTIFACT:\n")
+	require.NoError(t, b.discardIfUnfinished())
+	require.NoDirExists(t, dir)
 }
 
 func TestReserveToolArtifactDirNeverOverwritesExistingBundle(t *testing.T) {

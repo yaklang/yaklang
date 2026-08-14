@@ -103,6 +103,11 @@ func TestReAct_JumpQueue_StatusChanges(t *testing.T) {
 	slowToolCalled := false
 	fastToolCalled := false
 	fastToolCompleted := false
+	// tool_call_start only means that the loading card was emitted. Request-scoped
+	// cancellation may stop parameter generation before the plugin callback starts,
+	// so synchronize the jump with the real callback rather than the card event.
+	slowToolInvocationStarted := make(chan struct{}, 1)
+	task2CreatedSignal := make(chan string, 1)
 
 	// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. 跨任务隔离
 	// 计数器: 用 atomic int32 跟踪每个任务调过工具的次数, 插队场景下 slow_task
@@ -117,6 +122,10 @@ func TestReAct_JumpQueue_StatusChanges(t *testing.T) {
 		aitool.WithNoRuntimeCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			slowToolCalled = true
 			atomic.AddInt32(&slowTaskCallCount, 1)
+			select {
+			case slowToolInvocationStarted <- struct{}{}:
+			default:
+			}
 			sleepDuration := params.GetFloat("seconds", 3.0)
 
 			fmt.Printf("Slow task started, will run for %.1f seconds\n", sleepDuration)
@@ -227,6 +236,10 @@ LOOP:
 				} else if task2Id == "" {
 					task2Id = taskId
 					task2Created = true
+					select {
+					case task2CreatedSignal <- task2Id:
+					default:
+					}
 					fmt.Printf("Task 2 created: %s\n", taskId)
 				}
 			}
@@ -258,17 +271,26 @@ LOOP:
 					slowToolStarted = true
 					fmt.Println("Slow tool started")
 
-					// 等待一下确保工具开始执行，然后发送插队请求
+					// Wait for both the real callback and the queued task. The start
+					// event itself is emitted before parameter generation and review.
 					go func() {
-						time.Sleep(200 * time.Millisecond)
-						if task2Id != "" {
-							fmt.Printf("Sending jump queue request for task: %s\n", task2Id)
-							in <- &ypb.AIInputEvent{
-								IsSyncMessage: true,
-								SyncType:      SYNC_TYPE_REACT_JUMP_QUEUE,
-								SyncJsonInput: fmt.Sprintf(`{"task_id": "%s"}`, task2Id),
-								SyncID:        syncId,
-							}
+						select {
+						case <-slowToolInvocationStarted:
+						case <-time.After(5 * time.Second):
+							return
+						}
+						var queuedTaskID string
+						select {
+						case queuedTaskID = <-task2CreatedSignal:
+						case <-time.After(5 * time.Second):
+							return
+						}
+						fmt.Printf("Sending jump queue request for task: %s\n", queuedTaskID)
+						in <- &ypb.AIInputEvent{
+							IsSyncMessage: true,
+							SyncType:      SYNC_TYPE_REACT_JUMP_QUEUE,
+							SyncJsonInput: fmt.Sprintf(`{"task_id": "%s"}`, queuedTaskID),
+							SyncID:        syncId,
 						}
 					}()
 				} else if toolName == "fast_task" {

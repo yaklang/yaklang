@@ -81,7 +81,8 @@ type ReAct struct {
 	inputChanx *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// 任务队列相关
-	currentTask aicommon.AIStatefulTask // 当前正在处理的任务
+	currentTaskMu sync.RWMutex
+	currentTask   aicommon.AIStatefulTask // 当前正在处理的任务
 
 	lastTask aicommon.AIStatefulTask // 上一个完成的任务
 
@@ -89,11 +90,12 @@ type ReAct struct {
 	RuntimeTasks           []aicommon.AIStatefulTask
 	UpdateRuntimeTaskMutex sync.Mutex
 
-	currentPlanExecution aicommon.AIStatefulTask
-	taskQueue            *TaskQueue // 任务队列
-	queueProcessor       sync.Once  // 确保队列处理器只启动一次
-	mirrorMutex          sync.RWMutex
-	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
+	currentPlanExecutionMu sync.RWMutex
+	currentPlanExecution   aicommon.AIStatefulTask
+	taskQueue              *TaskQueue // 任务队列
+	queueProcessor         sync.Once  // 确保队列处理器只启动一次
+	mirrorMutex            sync.RWMutex
+	mirrorOfAIInputEvent   map[string]func(*ypb.AIInputEvent)
 
 	saveTimelineThrottle func(func())
 	artifacts            *filesys.RelLocalFs
@@ -162,17 +164,19 @@ func (r *ReAct) SetCurrentPlanExecutionTask(t aicommon.AIStatefulTask) {
 	if r == nil {
 		return
 	}
+	r.currentPlanExecutionMu.Lock()
 	r.currentPlanExecution = t
+	r.currentPlanExecutionMu.Unlock()
 }
 
 func (r *ReAct) GetCurrentPlanExecutionTask() aicommon.AIStatefulTask {
 	if r == nil {
 		return nil
 	}
-	if r.currentPlanExecution == nil {
-		return nil
-	}
-	return r.currentPlanExecution
+	r.currentPlanExecutionMu.RLock()
+	task := r.currentPlanExecution
+	r.currentPlanExecutionMu.RUnlock()
+	return task
 }
 
 func (r *ReAct) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {

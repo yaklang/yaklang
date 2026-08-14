@@ -307,67 +307,86 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-	Description: "directly call a recently used tool (skip require & param-generation phases). " +
-		"Use this ONLY when the exact tool you need is already listed in the CACHE_TOOL_CALL block. " +
-		"If CACHE_TOOL_CALL is empty or does not contain a matching tool, choose require_tool instead; " +
-		"selecting directly_call_tool without a cached match will be rejected by the verifier and force a retry. " +
-		"Provide directly_call_tool_name AND directly_call_tool_params together.",
+	Description: "直接调用已启用且参数完整的工具，跳过申请和参数生成阶段。先枚举本轮已明确的真实调用：" +
+		"存在 2-8 个互不依赖、互不干扰且参数完整的调用时，优先使用 directly_call_tool_calls 一次并发提交，不要拆成多个单工具轮次；" +
+		"只有本轮恰好一个调用时才同时填写 directly_call_tool_name 和 directly_call_tool_params。" +
+		"优先使用 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；已启用但未缓存的工具仍可解析并产生告警。" +
+		"参数不确定时改用 require_tool；严禁混用单调用和批量字段，也不要为了凑数量发明调用。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"directly_call_tool_name",
-			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". The name of the tool to call. Must be one of the cached recently-used tools.`),
+			aitool.WithParam_Description("仅当本轮恰好一个直接调用时填写；存在 directly_call_tool_calls 时必须省略。填写一个已启用工具的准确名称。优先选择 CACHE_TOOL_CALL 中已展示参数 Schema 的工具；未缓存但已启用的工具仍可解析并产生告警。下面是经过 CI 校验且可执行的单调用格式：\n"+directlyCallToolScalarOutputExampleJSON),
 		),
-		aitool.WithStringParam(
-			"directly_call_tool_params",
-			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". A JSON object containing the tool invocation parameters. Refer to the cached tool's Params Schema in the CACHE_TOOL_CALL block for the correct structure.`),
-		),
+		aitool.WithRawParam("directly_call_tool_params", map[string]any{
+			"type": []string{"object", "string"},
+		}, aitool.WithParam_Description(`仅当本轮恰好一个直接调用时填写；存在 directly_call_tool_calls 时必须省略。优先使用 JSON object 提供该工具的完整参数；为兼容旧协议仍接受包含 JSON object 的字符串。参数结构必须符合 CACHE_TOOL_CALL 中该工具的 Params Schema。`)),
 		aitool.WithStringParam(
 			"directly_call_identifier",
-			aitool.WithParam_Description(`short snake_case label describing the PURPOSE of this tool call, e.g. "scan_port_443", "query_large_file". Used for report file naming.`),
+			aitool.WithParam_Description(`可选。描述调用目的的简短 snake_case 标识，例如 "scan_port_443"、"query_large_file"；用于报告文件命名。`),
 		),
 		aitool.WithStringParam(
 			"directly_call_expectations",
-			aitool.WithParam_Description(`estimated timing and fallback strategy, e.g. "~3s, force stop if >10s". Used for interval review during execution.`),
+			aitool.WithParam_Description(`可选。预计耗时和回退策略，例如 "~3s，超过10s则停止"；用于执行期间的 interval review。`),
 		),
 		aitool.WithStringParam(
 			"directly_call_reason",
-			aitool.WithParam_Description(`Optional. A terse phrase (under 15 words) stating WHAT this tool call does — e.g. 'test id param for IDOR on /api/user' or '用union注入探测字段数'. No prior-step summaries or transitions. Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
+			aitool.WithParam_Description(`可选。用简短短语说明这次调用具体做什么，例如“测试 /api/user 的 id 参数是否存在 IDOR”或“用 union 注入探测字段数”。不要写前序总结或过渡语；仅当 human_readable_thought 已说明原因时省略。该内容会显示在工具调用卡片上。`),
 		),
+		directlyCallToolBatchSchemaOption(),
 	},
+	OutputExamples: directlyCallToolOutputExamples,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+		loop.Delete(loopVarDirectToolBatch)
+
+		// Keep the established scalar streaming contract. The legacy discriminator
+		// is readable before the root JSON object closes, so a valid one-call action
+		// must not wait for the optional batch array's canonical representation.
+		// If a malformed response emits both forms, scalar wins for backward
+		// compatibility; the published Schema and prompt still forbid mixing them.
 		toolName := action.GetString("directly_call_tool_name")
 		if toolName == "" {
 			toolName = action.GetInvokeParams("next_action").GetString("directly_call_tool_name")
 		}
-		if toolName == "" {
-			return utils.Error("directly_call_tool_name is required for directly_call_tool but empty")
-		}
-
-		mgr := loop.GetConfig().GetAiToolManager()
-		if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
-			// 工具不在 recently-used cache 中时只记录警告，不报错触发重试。
-			// 后续 ActionHandler 会通过 GetToolByName 自行决定：工具存在则继续
-			// 直接调用，工具不存在则走已有的 fallback 到 require_tool 路径。
-			// 关键词: directly_call_tool, cache miss, 不触发重试, handler 自处理
-			emit := loop.GetEmitter()
-			if emit != nil {
-				emit.EmitWarning("tool '%s' is not in the recently-used cache; handler will resolve it", toolName)
+		if toolName != "" {
+			mgr := loop.GetConfig().GetAiToolManager()
+			if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
+				// 工具不在 recently-used cache 中时只记录警告，不报错触发重试。
+				// 后续 ActionHandler 会通过 GetToolByName 自行决定：工具存在则继续
+				// 直接调用，工具不存在则走已有的 fallback 到 require_tool 路径。
+				emit := loop.GetEmitter()
+				if emit != nil {
+					emit.EmitWarning("tool '%s' is not in the recently-used cache; handler will resolve it", toolName)
+				}
+				loop.GetInvoker().AddToTimeline(
+					"directly_call_cache_miss",
+					fmt.Sprintf(
+						"[DIRECT_CALL_CACHE_MISS] directly_call_tool selected '%s' but it is not in the recently-used cache. "+
+							"Letting handler resolve (call if tool exists, otherwise fall back to require_tool).",
+						toolName,
+					),
+				)
 			}
-			loop.GetInvoker().AddToTimeline(
-				"directly_call_cache_miss",
-				fmt.Sprintf(
-					"[DIRECT_CALL_CACHE_MISS] directly_call_tool selected '%s' but it is not in the recently-used cache. "+
-						"Letting handler resolve (call if tool exists, otherwise fall back to require_tool).",
-					toolName,
-				),
-			)
+			reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
+			loop.Set("directly_call_tool_name", toolName)
+			return nil
 		}
-		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
 
-		loop.Set("directly_call_tool_name", toolName)
-		return nil
+		batch, hasBatch, batchErr := parseDirectToolBatchAction(loop, action)
+		if batchErr != nil {
+			return batchErr
+		}
+		if hasBatch {
+			loop.Set(loopVarDirectToolBatch, batch)
+			loop.Delete("directly_call_tool_name")
+			return nil
+		}
+
+		return utils.Error("directly_call_tool requires directly_call_tool_name or directly_call_tool_calls")
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+		if executeVerifiedToolBatch(loop, loopVarDirectToolBatch, operator) {
+			return
+		}
 		invoker := loop.GetInvoker()
 		cacheSuccessfulTool := func(name string, result *aitool.ToolResult, callErr error) {
 			if callErr != nil || result == nil || !result.Success {

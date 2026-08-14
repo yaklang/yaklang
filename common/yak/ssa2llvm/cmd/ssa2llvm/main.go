@@ -55,6 +55,8 @@ type buildCommandConfig struct {
 	llvmKind   string
 	llvmPasses []string
 	llvmPack   string
+	tier       string
+	keepAll    bool
 	runArgs    []string
 }
 
@@ -123,6 +125,14 @@ func sharedBuildFlags() []cli.Flag {
 		cli.BoolFlag{
 			Name:  "a",
 			Usage: "Force rebuilding cached work directories (like `go build -a`)",
+		},
+		cli.StringFlag{
+			Name:  "tier",
+			Usage: "Force a pre-built runtime tier (core, net, staticanalyze) instead of auto-selecting from the script's modules",
+		},
+		cli.BoolFlag{
+			Name:  "keep-all-modules",
+			Usage: "Retain every module of the selected tier at link time (disable per-script pruning inside the tier)",
 		},
 	}
 }
@@ -204,6 +214,8 @@ func compileAction(c *cli.Context) error {
 		compiler.WithCompileForceRebuild(cfg.force),
 		compiler.WithCompileFinalOutputFile(finalOutput),
 		compiler.WithCompileFinalOutputAuto(finalAuto),
+		compiler.WithCompileTierOverride(cfg.tier),
+		compiler.WithCompileKeepAllModules(cfg.keepAll),
 	)
 	return err
 }
@@ -308,6 +320,8 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		llvmKind:   c.String("llvm-plugin-kind"),
 		llvmPasses: splitCSVStrings(c.StringSlice("llvm-passes")),
 		llvmPack:   c.String("llvm-pack"),
+		tier:       c.String("tier"),
+		keepAll:    c.Bool("keep-all-modules"),
 	}
 	if c.Command.Name == "run" && c.NArg() > 1 {
 		cfg.runArgs = append(cfg.runArgs, c.Args().Tail()...)

@@ -423,3 +423,68 @@ func TestYieldAIEventRecoveryHistory(t *testing.T) {
 	require.Len(t, events, 1)
 	require.Equal(t, blockAID, events[0].ID)
 }
+
+func TestYieldAIEventRecoveryHistoryKeepsInterleavedConcurrentToolBlocksSeparate(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
+
+	const (
+		sessionID = "parallel-tool-session"
+		callA     = "parallel-call-a"
+		callB     = "parallel-call-b"
+	)
+	create := func(event *schema.AiOutputEvent) uint {
+		t.Helper()
+		event.SessionId = sessionID
+		event.Timestamp = time.Now().Unix()
+		event.NormalizeRecoveryBlock()
+		require.NoError(t, db.Create(event).Error)
+		return event.ID
+	}
+
+	// Persist the order a real concurrent execution can produce: both start
+	// anchors arrive first, then child B settles before child A. Recovery must
+	// still group by CallToolID rather than treating completion order as one
+	// global tool stream.
+	startA := create(&schema.AiOutputEvent{
+		Type:       schema.EVENT_TOOL_CALL_START,
+		CallToolID: callA,
+		Content:    utils.Jsonify(map[string]any{"label": "a-start"}),
+	})
+	startB := create(&schema.AiOutputEvent{
+		Type:       schema.EVENT_TOOL_CALL_START,
+		CallToolID: callB,
+		Content:    utils.Jsonify(map[string]any{"label": "b-start"}),
+	})
+	resultB := create(&schema.AiOutputEvent{
+		Type:       schema.EVENT_TOOL_CALL_RESULT,
+		CallToolID: callB,
+		Content:    utils.Jsonify(map[string]any{"label": "b-result"}),
+	})
+	resultA := create(&schema.AiOutputEvent{
+		Type:       schema.EVENT_TOOL_CALL_RESULT,
+		CallToolID: callA,
+		Content:    utils.Jsonify(map[string]any{"label": "a-result"}),
+	})
+
+	stream, summary, err := YieldAIEventRecoveryHistory(
+		context.Background(), db, sessionID, 0, 10,
+	)
+	require.NoError(t, err)
+	var events []*schema.AiOutputEvent
+	for event := range stream {
+		events = append(events, event)
+	}
+	require.Equal(t, 2, summary.BlockCount)
+	require.Equal(t, 4, summary.EventCount)
+	require.False(t, summary.HasMore)
+
+	byRecoveryID := make(map[string][]uint, 2)
+	for _, event := range events {
+		byRecoveryID[event.RecoveryIndexID] = append(byRecoveryID[event.RecoveryIndexID], event.ID)
+	}
+	require.Equal(t, []uint{startA, resultA}, byRecoveryID[callA])
+	require.Equal(t, []uint{startB, resultB}, byRecoveryID[callB])
+	require.NotEqual(t, callA, callB)
+}

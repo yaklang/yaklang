@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"gopkg.in/yaml.v3"
@@ -255,10 +256,57 @@ type ToolCaller struct {
 	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 
-	paramAugment func(aitool.InvokeParams) aitool.InvokeParams // optional merge before tool execution
+	paramAugment        func(aitool.InvokeParams) aitool.InvokeParams               // legacy scalar callback
+	paramAugmentForTool func(*aitool.Tool, aitool.InvokeParams) aitool.InvokeParams // current-proposal-aware callback
 
 	callExpectations           string
 	omitResultParamsInTimeline bool
+
+	// Batch-only scheduling hooks. Scalar callers leave these nil and retain
+	// their historical behaviour. The hooks deliberately live on ToolCaller so
+	// parameter generation, interactive review and the actual plugin invoke can
+	// be scheduled independently without duplicating the tool-call pipeline.
+	paramGenerationGate ToolCallerGate
+	reviewGate          ToolCallerGate
+	beforeInvoke        ToolCallerBeforeInvoke
+
+	// Runtime-owned deterministic metadata. These values are allocated before a
+	// batch starts, so goroutine completion order cannot change checkpoint,
+	// result or artifact ordering.
+	checkpointSeq         int64
+	paramTransactionSeq   int64
+	reviewCheckpointSeq   int64
+	watcherCheckpointSeq  int64
+	resultID              int64
+	artifactOrdinal       int
+	destinationIdentifier string
+	batchID               string
+	batchIndex            int
+	statsSource           string
+	checkpointReplayed    bool
+}
+
+// ToolCallerGate bounds one phase of a tool call. The returned release
+// function must be idempotent; ToolCaller invokes it on every exit path.
+type ToolCallerGate func(context.Context) (release func(), err error)
+
+// ToolCallerBeforeInvoke runs after parameter generation and user review but
+// immediately before plugin execution. Batch runtimes use it as an all-calls
+// barrier and as the bounded invoke semaphore. cleanup is called after invoke.
+type ToolCallerBeforeInvoke func(
+	context.Context,
+	*aitool.Tool,
+	aitool.InvokeParams,
+) (cleanup func(), err error)
+
+func idempotentToolCallerRelease(release func()) func() {
+	if release == nil {
+		return func() {}
+	}
+	var once sync.Once
+	return func() {
+		once.Do(release)
+	}
 }
 
 const ReservedKeyCallExpectations = "__call_expectations__"
@@ -297,6 +345,90 @@ type ToolCallerOption func(tc *ToolCaller)
 func WithToolCaller_CallExpectations(expectations string) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.callExpectations = expectations
+	}
+}
+
+// WithToolCaller_ParamGenerationGate installs a batch-only gate around the AI
+// parameter-generation transaction. It has no effect on preset/direct params.
+func WithToolCaller_ParamGenerationGate(gate ToolCallerGate) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.paramGenerationGate = gate
+	}
+}
+
+// WithToolCaller_ReviewGate serializes the interactive approval endpoint. The
+// gate is released before applying a review decision, which keeps legacy
+// wrong-tool/wrong-params recursion re-entrant while ensuring only one pending
+// approval card exists at a time.
+func WithToolCaller_ReviewGate(gate ToolCallerGate) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.reviewGate = gate
+	}
+}
+
+// WithToolCaller_BeforeInvoke installs the final batch barrier/invoke gate.
+func WithToolCaller_BeforeInvoke(hook ToolCallerBeforeInvoke) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.beforeInvoke = hook
+	}
+}
+
+func WithToolCaller_CheckpointSeq(seq int64) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.checkpointSeq = seq
+	}
+}
+
+func WithToolCaller_ParamTransactionSeq(seq int64) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.paramTransactionSeq = seq
+	}
+}
+
+func WithToolCaller_ReviewCheckpointSeq(seq int64) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.reviewCheckpointSeq = seq
+	}
+}
+
+func WithToolCaller_WatcherCheckpointSeq(seq int64) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.watcherCheckpointSeq = seq
+	}
+}
+
+func WithToolCaller_ResultID(id int64) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.resultID = id
+	}
+}
+
+func WithToolCaller_ArtifactOrdinal(ordinal int) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.artifactOrdinal = ordinal
+	}
+}
+
+func WithToolCaller_DestinationIdentifier(identifier string) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.destinationIdentifier = sanitizeIdentifier(identifier)
+	}
+}
+
+func WithToolCaller_BatchMetadata(batchID string, batchIndex int) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.batchID = batchID
+		tc.batchIndex = batchIndex
+	}
+}
+
+// WithToolCaller_StatsSource records how this logical tool call was selected.
+// The source is explicit call metadata rather than being inferred from the tool
+// name or action text, so scalar calls, batch children and review replacements
+// all retain the source of the original model decision.
+func WithToolCaller_StatsSource(source string) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.statsSource = normalizeToolCallStatsSource(source)
 	}
 }
 
@@ -464,6 +596,25 @@ func WithToolCaller_ParamAugment(augment func(aitool.InvokeParams) aitool.Invoke
 	}
 }
 
+// WithToolCaller_ParamAugmentForTool installs a proposal-aware parameter
+// mutator. Review may replace the originally requested tool, so batch callers
+// need the actual current tool for each regenerated proposal. The legacy
+// WithToolCaller_ParamAugment remains unchanged for scalar callers.
+func WithToolCaller_ParamAugmentForTool(
+	augment func(*aitool.Tool, aitool.InvokeParams) aitool.InvokeParams,
+) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.paramAugmentForTool = augment
+	}
+}
+
+func toolCallerContextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
+}
+
 // WithToolCaller_IntervalReviewHandler sets the interval review handler for tool execution.
 // The handler is called periodically during tool execution to review the progress.
 // If the handler returns false, the tool execution will be cancelled.
@@ -558,10 +709,11 @@ func WithToolCaller_GenerateToolParamsBuilderWithMeta(
 
 func NewToolCaller(ctx context.Context, opts ...ToolCallerOption) (*ToolCaller, error) {
 	caller := &ToolCaller{
-		callToolId: ksuid.New().String(),
-		start:      &sync.Once{},
-		done:       &sync.Once{},
-		m:          &sync.Mutex{},
+		callToolId:  ksuid.New().String(),
+		start:       &sync.Once{},
+		done:        &sync.Once{},
+		m:           &sync.Mutex{},
+		statsSource: StatsSourceToolDirect,
 	}
 	for _, opt := range opts {
 		opt(caller)
@@ -838,6 +990,30 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	var callExpectations string
 	var paramDuration time.Duration
 	var rawAIResponse string
+	releaseParamGeneration := func() {}
+	if t.paramGenerationGate != nil {
+		releaseParamGeneration, err = t.paramGenerationGate(t.ctx)
+		releaseParamGeneration = idempotentToolCallerRelease(releaseParamGeneration)
+		if err != nil {
+			handleError(err)
+			return nil, err
+		}
+		if err = toolCallerContextErr(t.ctx); err != nil {
+			releaseParamGeneration()
+			handleError(err)
+			return nil, err
+		}
+	}
+	defer releaseParamGeneration()
+	if err = toolCallerContextErr(t.ctx); err != nil {
+		handleError(err)
+		return nil, err
+	}
+	// A reserved batch sequence belongs only to the first parameter transaction.
+	// Review-driven recursive CallTool calls must allocate a fresh sequence
+	// instead of replaying the outer transaction checkpoint.
+	paramTransactionSeq := t.paramTransactionSeq
+	t.paramTransactionSeq = 0
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
@@ -889,14 +1065,6 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		start := time.Now()
 		actionOpts = append(
 			actionOpts,
-			WithActionOnReaderFinished(func() {
-				cost := time.Since(start)
-				paramDuration = cost
-				rawAIResponse = response.String()
-				pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
-				boundEmitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), rawAIResponse)
-				pw.Close()
-			}),
 			WithActionFieldStreamHandler(paramNames, func(key string, r io.Reader) {
 				if !strings.HasPrefix(key, "__aitag__") {
 					pw.WriteString(key + ": ")
@@ -921,11 +1089,23 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			}),
 		)
 
-		callToolAction, err := ExtractValidActionFromStream(t.config.GetContext(), stream, "call-tool", actionOpts...)
+		callToolAction, err := ExtractValidActionFromStream(t.ctx, stream, "call-tool", actionOpts...)
 		if err != nil {
 			boundEmitter.EmitError("error extract tool params: %v", err)
+			pw.Close()
 			return utils.Errorf("error extracting action params: %v", err)
 		}
+		// ExtractValidActionFromStream waits for canonical parsing. Wait for field
+		// stream handlers too, then finalize response metadata synchronously. The
+		// old OnReaderFinished callback ran in the parser goroutine after parseDone
+		// and raced these variables under concurrent parameter generation.
+		callToolAction.WaitStream(t.ctx)
+		cost := time.Since(start)
+		paramDuration = cost
+		rawAIResponse = response.String()
+		pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
+		boundEmitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), rawAIResponse)
+		pw.Close()
 
 		// Extract identifier from action (destination identifier for this tool call)
 		identifier = sanitizeIdentifier(callToolAction.GetString("identifier"))
@@ -979,7 +1159,8 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		}
 
 		return nil
-	}, WithAIRequest_CallerLabel("toolcall-params"))
+	}, WithAIRequest_CallerLabel("toolcall-params"), WithAIRequest_Context(t.ctx), WithAIRequest_SeqId(paramTransactionSeq))
+	releaseParamGeneration()
 	if err != nil {
 		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
 		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))
@@ -1212,11 +1393,20 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
 		}
 	}
+	if t.destinationIdentifier != "" {
+		destinationIdentifier = t.destinationIdentifier
+	}
 	if utils.IsNil(invokeParams) {
 		invokeParams = make(aitool.InvokeParams)
 	}
-	if t.paramAugment != nil {
+	if t.paramAugmentForTool != nil {
+		invokeParams = t.paramAugmentForTool(tool, invokeParams)
+	} else if t.paramAugment != nil {
 		invokeParams = t.paramAugment(invokeParams)
+	}
+	if err := toolCallerContextErr(t.ctx); err != nil {
+		handleError(err)
+		return nil, false, err
 	}
 
 	t.emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
@@ -1226,8 +1416,26 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	if tool.NoNeedUserReview {
 		t.emitter.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", tool.Name)
 	} else {
+		releaseReview := func() {}
+		if t.reviewGate != nil {
+			var gateErr error
+			releaseReview, gateErr = t.reviewGate(t.ctx)
+			releaseReview = idempotentToolCallerRelease(releaseReview)
+			if gateErr != nil {
+				handleError(gateErr)
+				return nil, false, gateErr
+			}
+			if gateErr = toolCallerContextErr(t.ctx); gateErr != nil {
+				releaseReview()
+				handleError(gateErr)
+				return nil, false, gateErr
+			}
+		}
+		defer releaseReview()
 		t.emitter.EmitInfo("start to require review for tool use: %v", tool.Name)
-		ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
+		reviewCheckpointSeq := t.reviewCheckpointSeq
+		t.reviewCheckpointSeq = 0
+		ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, reviewCheckpointSeq)
 		ep.SetDefaultSuggestionContinue()
 		reqs := map[string]any{
 			"id":               ep.GetId(),
@@ -1237,12 +1445,51 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			"params":           invokeParams,
 			"reason":           t.reason,
 		}
-		ep.SetReviewMaterials(reqs)
-		err := t.config.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)
-		if err != nil {
-			log.Errorf("submit request review to db for tool use failed: %v", err)
+		if t.batchID != "" {
+			reqs["batch_id"] = t.batchID
+			reqs["call_index"] = t.batchIndex
+			reqs["call_tool_id"] = t.callToolId
 		}
-		t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+		ep.SetReviewMaterials(reqs)
+		reviewCheckpoint := ep.GetCheckpoint()
+		if reviewCheckpoint.RequestQuotedJson != "" {
+			stored := aiddb.AiCheckPointGetRequestParams(reviewCheckpoint)
+			storedParams := stored.GetObject("params")
+			identityMismatch := stored.GetString("tool") != tool.Name ||
+				string(utils.Jsonify(storedParams)) != string(utils.Jsonify(invokeParams))
+			if t.batchID != "" {
+				storedIndex, hasStoredIndex := stored["call_index"]
+				identityMismatch = identityMismatch ||
+					stored.GetString("batch_id") != t.batchID ||
+					!hasStoredIndex ||
+					utils.InterfaceToInt(storedIndex) != t.batchIndex ||
+					stored.GetString("call_tool_id") != t.callToolId
+			}
+			if identityMismatch {
+				reviewErr := utils.Errorf(
+					"tool review checkpoint identity mismatch: batch=%s index=%d call=%s tool=%s params=%s; stored batch=%s index=%d call=%s tool=%s params=%s",
+					t.batchID,
+					t.batchIndex,
+					t.callToolId,
+					tool.Name,
+					utils.Jsonify(invokeParams),
+					stored.GetString("batch_id"),
+					utils.InterfaceToInt(stored["call_index"]),
+					stored.GetString("call_tool_id"),
+					stored.GetString("tool"),
+					utils.Jsonify(storedParams),
+				)
+				handleError(reviewErr)
+				return nil, false, reviewErr
+			}
+		} else if reviewCheckpoint.Finished {
+			reviewErr := utils.Errorf(
+				"finished tool review checkpoint has no request identity: seq=%d",
+				reviewCheckpoint.Seq,
+			)
+			handleError(reviewErr)
+			return nil, false, reviewErr
+		}
 
 		// 审批前快照原始提议参数 (original_value), 供价值评估比对是否被改动.
 		originalReviewParams := make(aitool.InvokeParams, len(invokeParams))
@@ -1251,19 +1498,50 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		}
 		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
 
-		// wait for agree
-		config.DoWaitAgree(t.ctx, ep)
-		reviewDecidedAt := time.Now()
-		params := ep.GetParams()
-		t.emitter.EmitInteractiveRelease(ep.GetId(), params)
-		config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-		if !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
-			config.CallAfterReview(
-				ep.GetSeq(),
-				reviewQuestion,
-				params,
-			)
+		var params aitool.InvokeParams
+		reviewReplayed := reviewCheckpoint.Finished
+		if reviewReplayed {
+			// A finished review checkpoint is an immutable manual decision. A
+			// fresh runtime applies it without emitting a duplicate card or
+			// waiting for another response.
+			params = aiddb.AiCheckPointGetResponseParams(reviewCheckpoint)
+		} else {
+			if err := t.config.SubmitCheckpointRequest(reviewCheckpoint, reqs); err != nil {
+				handleError(err)
+				return nil, false, err
+			}
+			t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+
+			// wait for agree
+			config.DoWaitAgree(t.ctx, ep)
+			if waitErr := toolCallerContextErr(t.ctx); waitErr != nil {
+				releaseReview()
+				handleError(waitErr)
+				return nil, false, waitErr
+			}
+			reviewDecidedAt := time.Now()
+			params = ep.GetParams()
+			t.emitter.EmitInteractiveRelease(ep.GetId(), params)
+			config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+			if !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
+				config.CallAfterReview(
+					ep.GetSeq(),
+					reviewQuestion,
+					params,
+				)
+			}
+			if params != nil {
+				if err := t.config.SubmitCheckpointResponse(reviewCheckpoint, params); err != nil {
+					releaseReview()
+					handleError(err)
+					return nil, false, err
+				}
+			}
 		}
+		// Only the pending approval endpoint is serialized. Apply the decision
+		// outside the gate so legacy wrong_tool/wrong_params recursive calls can
+		// acquire the same gate without deadlocking.
+		releaseReview()
 		if params == nil {
 			// 价值评估: 用户取消工具审批 (空响应释放) 是高价值的人工否决信号, 不能漏采.
 			if cfg, ok := config.(*Config); ok {
@@ -1286,8 +1564,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 		// 价值评估 (review_decision): 记录审批事实 (original/final 参数 + 运行时来源),
 		// invokeParams 此时已是 review 应用后的最终参数. 非阻塞, 绝不影响主流程.
-		if cfg, ok := config.(*Config); ok {
-			cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, invokeParams)
+		if !reviewReplayed {
+			if cfg, ok := config.(*Config); ok {
+				cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, invokeParams)
+			}
 		}
 
 		switch next {
@@ -1301,6 +1581,30 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		}
 	}
 
+	// Batch callers stop here until every sibling has either reached the same
+	// boundary or terminated. Keep this before pipe/artifact allocation so a
+	// direct-answer decision leaves no per-tool filesystem side effects.
+	releaseInvoke := func() {}
+	if t.beforeInvoke != nil {
+		var hookErr error
+		releaseInvoke, hookErr = t.beforeInvoke(t.ctx, tool, invokeParams)
+		releaseInvoke = idempotentToolCallerRelease(releaseInvoke)
+		if hookErr != nil {
+			handleError(hookErr)
+			return nil, false, hookErr
+		}
+		if hookErr = toolCallerContextErr(t.ctx); hookErr != nil {
+			releaseInvoke()
+			handleError(hookErr)
+			return nil, false, hookErr
+		}
+	}
+	defer releaseInvoke()
+	if ctxErr := toolCallerContextErr(t.ctx); ctxErr != nil {
+		handleError(ctxErr)
+		return nil, false, ctxErr
+	}
+
 	stdoutReader, stdoutWriter := utils.NewPipe()
 	defer stdoutWriter.Close()
 	stderrReader, stderrWriter := utils.NewPipe()
@@ -1311,6 +1615,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stderrBuffer := &toolOutputBuffer{}
 
 	artifactBundle := t.newToolCallArtifactBundle(tool, callToolId, destinationIdentifier)
+	// finalize marks successful and ordinary failed calls as durable bundles.
+	// Cancellation deliberately skips finalize/checkpointing, so roll back the
+	// still-open streams and partial directory on every unfinished exit path.
+	defer artifactBundle.discardIfUnfinished()
 
 	// Use MultiWriter to write to both the pipe (for streaming) and the buffers (for file saving)
 	stdoutUIWriter := newBoundedToolUIWriter(stdoutWriter)
@@ -1351,6 +1659,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
 	t.emitter.EmitToolCallStatus(callToolId, schema.TOOL_CALL_STATUS_RUNNING)
+	if ctxErr := toolCallerContextErr(t.ctx); ctxErr != nil {
+		handleError(ctxErr)
+		return nil, false, ctxErr
+	}
 	t.m.Lock()
 	// Measure pure plugin execution time from real invoke start to invoke return.
 	pluginInvokeStartTime = time.Now()
@@ -1358,6 +1670,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	t.m.Unlock()
 
 	t.emitter.EmitToolCallParam(callToolId, invokeParams)
+	if ctxErr := toolCallerContextErr(t.ctx); ctxErr != nil {
+		handleError(ctxErr)
+		return nil, false, ctxErr
+	}
 	toolResult, err = t.invoke(
 		tool, invokeParams, handleUserCancel, handleError,
 		stdoutMultiWriter, stderrMultiWriter,
@@ -1388,6 +1704,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	}
 	if toolResult != nil {
 		toolResult.OmitParamsInTimeline = t.omitResultParamsInTimeline
+		if t.resultID > 0 {
+			toolResult.ID = t.resultID
+		}
 	}
 
 	// Close pipe writers to signal end of tool output. This triggers ThrottledCopy's
@@ -1412,7 +1731,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		t.emitter.EmitToolCallResult(callToolId, toolResult.Data)
 	}
 
-	NotifySessionSnapshotToolCall(t.config, toolResult)
+	if !t.checkpointReplayed && (t.ctx == nil || t.ctx.Err() == nil) {
+		NotifySessionSnapshotToolCall(t.config, toolResult, t.statsSource)
+	}
 
 	return toolResult, false, nil
 }

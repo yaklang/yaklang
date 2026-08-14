@@ -2,14 +2,17 @@ package aicommon
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 type Endpoint struct {
+	mu              sync.RWMutex
 	id              string
 	sig             *EndpointSignal
 	reviewType      schema.EventType
@@ -47,6 +50,8 @@ func (e *Endpoint) GetCreatedAtMs() int64 {
 
 // SetApprovalMeta 由审批链路在确定决定来源时调用 (就地记录运行时真相).
 func (e *Endpoint) SetApprovalMeta(source string, required bool, reason string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.approvalMeta = &ApprovalDecisionMeta{
 		Source:      source,
 		Required:    required,
@@ -56,7 +61,13 @@ func (e *Endpoint) SetApprovalMeta(source string, required bool, reason string) 
 }
 
 func (e *Endpoint) GetApprovalMeta() *ApprovalDecisionMeta {
-	return e.approvalMeta
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.approvalMeta == nil {
+		return nil
+	}
+	result := *e.approvalMeta
+	return &result
 }
 
 func (e *Endpoint) GetSeq() int64 {
@@ -64,6 +75,8 @@ func (e *Endpoint) GetSeq() int64 {
 }
 
 func (e *Endpoint) GetCheckpoint() *schema.AiCheckpoint {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	if e.checkpoint == nil {
 		e.checkpoint = &schema.AiCheckpoint{
 			Seq: e.seq,
@@ -75,16 +88,17 @@ func (e *Endpoint) GetCheckpoint() *schema.AiCheckpoint {
 func (e *Endpoint) SetReviewMaterials(
 	params aitool.InvokeParams) {
 	if !utils.IsNil(params) {
-		e.reviewMaterials = params
+		cloned := cloneEndpointParams(params)
+		e.mu.Lock()
+		e.reviewMaterials = cloned
+		e.mu.Unlock()
 	}
 }
 
 func (e *Endpoint) GetReviewMaterials() aitool.InvokeParams {
-	params := make(aitool.InvokeParams)
-	for k, v := range e.reviewMaterials {
-		params[k] = v
-	}
-	return params
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return cloneEndpointParams(e.reviewMaterials)
 }
 
 func (e *Endpoint) WaitContext(ctx context.Context) {
@@ -95,7 +109,7 @@ func (e *Endpoint) WaitContext(ctx context.Context) {
 	}
 }
 
-func (e Endpoint) ReleaseContext(ctx context.Context) {
+func (e *Endpoint) ReleaseContext(ctx context.Context) {
 	e.sig.ActiveContext(ctx)
 }
 
@@ -114,20 +128,26 @@ func (e *Endpoint) Wait() {
 
 // 修改后的 GetParams 方法，添加锁保护
 func (e *Endpoint) GetParams() aitool.InvokeParams {
-	params := make(aitool.InvokeParams)
-	for k, v := range e.activeParams {
-		params[k] = v
-	}
-	return params
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return cloneEndpointParams(e.activeParams)
 }
 
 func (e *Endpoint) SetParams(params aitool.InvokeParams) {
 	if !utils.IsNil(params) {
-		e.activeParams = params
+		cloned := cloneEndpointParams(params)
+		e.mu.Lock()
+		e.activeParams = cloned
+		e.mu.Unlock()
 	}
 }
 
 func (e *Endpoint) SetDefaultSuggestion(suggestion string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.activeParams == nil {
+		e.activeParams = make(aitool.InvokeParams)
+	}
 	e.activeParams["suggestion"] = suggestion
 }
 
@@ -149,9 +169,49 @@ func (e *Endpoint) SetDefaultSuggestionNo() {
 
 func (e *Endpoint) ActiveWithParams(ctx context.Context, params aitool.InvokeParams) {
 	if !utils.IsNil(params) {
-		e.activeParams = params
+		// The structured-input parser owns and may continue mutating its map after
+		// the callback returns. Store a deep copy so a waiter never races that
+		// parser while reading approval parameters.
+		cloned := cloneEndpointParams(params)
+		e.mu.Lock()
+		e.activeParams = cloned
+		e.mu.Unlock()
 	}
 	e.sig.ActiveAsyncContext(ctx)
+}
+
+func cloneEndpointParams(params aitool.InvokeParams) aitool.InvokeParams {
+	if params == nil {
+		return make(aitool.InvokeParams)
+	}
+	result := make(aitool.InvokeParams, len(params))
+	for key, value := range params {
+		result[key] = cloneEndpointValue(value)
+	}
+	return result
+}
+
+func cloneEndpointValue(value any) any {
+	switch typed := value.(type) {
+	case aitool.InvokeParams:
+		return cloneEndpointParams(typed)
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		for key, item := range typed {
+			result[key] = cloneEndpointValue(item)
+		}
+		return result
+	case []any:
+		result := make([]any, len(typed))
+		for index, item := range typed {
+			result[index] = cloneEndpointValue(item)
+		}
+		return result
+	case []string:
+		return append([]string(nil), typed...)
+	default:
+		return value
+	}
 }
 
 func (e *Endpoint) Release() {

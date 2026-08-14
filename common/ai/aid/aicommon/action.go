@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -28,10 +29,12 @@ type Action struct {
 	mu              sync.Mutex
 	params          aitool.InvokeParams
 	generalParamKey string
+	parseErr        error
 
 	// status
 	streamFinish context.Context
-	parseFinish  context.Context // params parsed finish condition is reader close and ai tag parse close
+	parseFinish  context.Context // releases parameter barriers on parse completion or parent cancellation
+	parseDone    chan struct{}   // unlike parseFinish, this is only closed by actual parser completion
 	barrier      *utils.CondBarrier
 }
 
@@ -50,11 +53,53 @@ func (a *Action) ValidCheck(expectName ...string) bool {
 }
 
 func (a *Action) WaitParse(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-	case <-a.parseFinish.Done():
+	_ = a.WaitParseResult(ctx)
+}
+
+// WaitParseResult waits until the complete action payload (including any
+// mirrored AI tags) has been parsed and returns the parser error, if any.
+//
+// ReadFromReader intentionally remains asynchronous so callers can consume
+// individual streaming fields. Protocols that need a complete canonical value
+// (notably object-array batch actions) must use this method, or
+// ExtractValidActionFromStream, as their completion barrier. Legacy scalar
+// consumers may continue waiting on individual fields through GetString /
+// GetInvokeParams without waiting for the whole action.
+func (a *Action) WaitParseResult(ctx context.Context) error {
+	if a == nil {
+		return utils.Error("cannot wait for a nil action")
 	}
-	return
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var parseDone <-chan struct{}
+	if a.parseDone != nil {
+		parseDone = a.parseDone
+	} else if a.parseFinish != nil {
+		// Compatibility for programmatically constructed actions.
+		parseDone = a.parseFinish.Done()
+	} else {
+		return utils.Error("action parse completion context is not initialized")
+	}
+
+	// Prefer an already completed parse over a simultaneously cancelled caller
+	// context so a successfully parsed action is not reported as cancelled.
+	select {
+	case <-parseDone:
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.parseErr
+	default:
+	}
+
+	select {
+	case <-parseDone:
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.parseErr
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (a *Action) WaitStream(ctx context.Context) {
@@ -82,12 +127,49 @@ func (a *Action) ForceSet(key string, value interface{}) {
 	a.barrier.CreateBarrier(key).Done()
 }
 
+func (a *Action) setParseError(err error) {
+	if a == nil || err == nil {
+		return
+	}
+	a.mu.Lock()
+	if a.parseErr == nil {
+		a.parseErr = err
+	}
+	a.mu.Unlock()
+}
+
+func (a *Action) hasRecognizedActionWithoutCanonicalObject() bool {
+	if a == nil {
+		return false
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.params == nil || a.params.GetString(ActionMagicKey) == "" {
+		return false
+	}
+	if a.generalParamKey == "" {
+		return false
+	}
+	_, hasCanonicalObject := a.params[a.generalParamKey]
+	return !hasCanonicalObject
+}
+
 func (a *Action) Name() string {
+	if a == nil {
+		return ""
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.name
 }
 
 func (a *Action) SetName(i string) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
 	a.name = i
+	a.mu.Unlock()
 }
 
 func (a *Action) waitKey(key ...string) {
@@ -180,6 +262,112 @@ func (a *Action) LookupParam(key string) (any, bool) {
 	}
 	value, ok := a.params[key]
 	return value, ok
+}
+
+// LookupCanonicalParam returns a raw parameter only from the complete action
+// object. Unlike LookupParam, it never falls back to the incremental flattened
+// callback cache. Nested array/object fields share names in that cache, so the
+// fallback is unsafe for protocols whose item boundaries are significant (for
+// example, a batch of tool calls).
+func (a *Action) LookupCanonicalParam(key string) (any, bool) {
+	if a == nil {
+		return nil, false
+	}
+	if a.generalParamKey != "" {
+		// Waiting on the canonical object's private key prevents an early nested
+		// field callback from releasing this lookup before the root object exists.
+		a.waitKey(a.generalParamKey)
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.generalParamKey == "" {
+		// Programmatically constructed actions (for example NewSimpleAction) use
+		// params itself as their canonical object.
+		value, ok := a.params[key]
+		return value, ok
+	}
+	general, ok := a.params[a.generalParamKey]
+	if !ok {
+		return nil, false
+	}
+	switch params := general.(type) {
+	case aitool.InvokeParams:
+		value, exists := params[key]
+		return value, exists
+	case map[string]any:
+		value, exists := params[key]
+		return value, exists
+	default:
+		return nil, false
+	}
+}
+
+// DecodeStrictObjectArray decodes a JSON-style array whose every item must be
+// a non-null object with string keys. It deliberately rejects scalar-to-array,
+// object-to-array, and non-object-item coercions performed by
+// InvokeParams.GetObjectArray.
+func DecodeStrictObjectArray(raw any) ([]aitool.InvokeParams, error) {
+	if raw == nil {
+		return nil, utils.Error("expected an array of objects, got null")
+	}
+
+	rawValue := reflect.ValueOf(raw)
+	if !rawValue.IsValid() {
+		return nil, utils.Error("expected an array of objects, got null")
+	}
+	if rawValue.Kind() != reflect.Array && rawValue.Kind() != reflect.Slice {
+		return nil, utils.Errorf("expected an array of objects, got %s", rawValue.Kind())
+	}
+	if rawValue.Kind() == reflect.Slice && rawValue.IsNil() {
+		return nil, utils.Error("expected an array of objects, got null")
+	}
+
+	result := make([]aitool.InvokeParams, rawValue.Len())
+	for index := 0; index < rawValue.Len(); index++ {
+		itemValue := rawValue.Index(index)
+		for itemValue.IsValid() && itemValue.Kind() == reflect.Interface {
+			if itemValue.IsNil() {
+				return nil, utils.Errorf("array item %d must be an object, got null", index)
+			}
+			itemValue = itemValue.Elem()
+		}
+		if !itemValue.IsValid() {
+			return nil, utils.Errorf("array item %d must be an object, got null", index)
+		}
+		if itemValue.Kind() != reflect.Map {
+			return nil, utils.Errorf("array item %d must be an object, got %s", index, itemValue.Kind())
+		}
+		if itemValue.IsNil() {
+			return nil, utils.Errorf("array item %d must be an object, got null", index)
+		}
+		if itemValue.Type().Key().Kind() != reflect.String {
+			return nil, utils.Errorf("array item %d must be an object with string keys", index)
+		}
+
+		params := make(aitool.InvokeParams, itemValue.Len())
+		iterator := itemValue.MapRange()
+		for iterator.Next() {
+			params[iterator.Key().String()] = iterator.Value().Interface()
+		}
+		result[index] = params
+	}
+	return result, nil
+}
+
+// GetCanonicalObjectArray reads a top-level canonical action parameter and
+// strictly decodes it as an object array. The boolean distinguishes an omitted
+// optional field from a present but invalid/null field.
+func (a *Action) GetCanonicalObjectArray(key string) ([]aitool.InvokeParams, bool, error) {
+	raw, exists := a.LookupCanonicalParam(key)
+	if !exists {
+		return nil, false, nil
+	}
+	items, err := DecodeStrictObjectArray(raw)
+	if err != nil {
+		return nil, true, utils.Wrapf(err, "invalid canonical action parameter %q", key)
+	}
+	return items, true, nil
 }
 
 // DeleteParam suppresses an optional sidecar parameter after parsing. Both the
@@ -351,6 +539,7 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		generalParamKey: generalParamsKey,
 		barrier:         utils.NewCondBarrierContext(parseCtx),
 		parseFinish:     parseCtx,
+		parseDone:       make(chan struct{}),
 		streamFinish:    streamCtx,
 	}
 
@@ -555,11 +744,19 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		err := jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), opts...) // extract json from stream
 		if err != nil {
 			log.Errorf("Failed to extract action from stream: %v, buffer: %s", err, buf.String())
-
+			action.setParseError(utils.Wrap(err, "failed to extract action from stream"))
+		} else if action.hasRecognizedActionWithoutCanonicalObject() {
+			// jsonextractor is intentionally tolerant and returns nil when EOF is
+			// reached inside an unfinished object/array. Flattened callbacks may
+			// already have exposed @action and earlier fields at that point. Treat
+			// the absence of the final canonical object as a parse failure so no
+			// consumer can execute a partial action.
+			action.setParseError(utils.Error("action JSON ended before the complete canonical object was parsed"))
 		}
 
 		parserWG.Wait() // wait tag parsers finished
 		parseFinish()   // signal parse finish
+		close(action.parseDone)
 
 		streamWg.Wait() // wait all stream handlers finished
 		streamFinish()  // signal stream finish
@@ -587,8 +784,11 @@ func ExtractActionFromStream(ctx context.Context, reader io.Reader, actionName s
 func ExtractValidActionFromStream(ctx context.Context, reader io.Reader, actionName string, opts ...ActionMakerOption) (*Action, error) {
 	maker := NewActionMaker(actionName, opts...)
 	action := maker.ReadFromReader(ctx, reader)
-	action.WaitParse(ctx)
+	parseErr := action.WaitParseResult(ctx)
 	action.WaitStream(ctx)
+	if parseErr != nil {
+		return nil, parseErr
+	}
 	if !action.ValidCheck(append(maker.alias, actionName)...) {
 		return nil, utils.Errorf("action @action not found or invalid, expect one of: %v", append(maker.alias, actionName))
 	}
@@ -616,7 +816,9 @@ func ExtractAction(i string, actionName string, alias ...string) (*Action, error
 	if err != nil {
 		return nil, err
 	}
-	action.WaitParse(context.Background())
+	if err := action.WaitParseResult(context.Background()); err != nil {
+		return nil, err
+	}
 	action.WaitStream(context.Background())
 	if !action.ValidCheck(append(alias, actionName)...) {
 		return nil, utils.Errorf("action @action not found or invalid, expect one of: %v", append(alias, actionName))

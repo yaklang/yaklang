@@ -1,12 +1,12 @@
 package ssadb
 
 import (
-	"strings"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/reportstore"
+	"strings"
 )
 
 var SSAProjectTables = []any{
@@ -130,9 +130,46 @@ func patchIrCodeIndex(db *gorm.DB) {
 	ensureUniqueIrOffsetsIndex(db)
 }
 
+// deleteDuplicateIrCodes removes every row except the oldest (MIN id) per
+// (program_name, code_id) using a single window query, and returns the number
+// of removed rows. The oldest row is exactly what normal single-read paths
+// return, so existing databases keep behaving identically after the cleanup.
+func deleteDuplicateIrCodes(db *gorm.DB) (int64, error) {
+	res := db.Exec(`DELETE FROM ` + TableIrCodes + ` WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (PARTITION BY program_name, code_id ORDER BY id) AS rn
+			FROM ` + TableIrCodes + `
+		) WHERE rn > 1
+	)`)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
+// deleteDuplicateIrOffsets removes every row except the oldest (MIN id) per
+// composite key using a single window query, and returns the number of
+// removed rows.
+func deleteDuplicateIrOffsets(db *gorm.DB) (int64, error) {
+	res := db.Exec(`DELETE FROM ` + TableIrOffsets + ` WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (
+				PARTITION BY program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')
+				ORDER BY id
+			) AS rn
+			FROM ` + TableIrOffsets + `
+		) WHERE rn > 1
+	)`)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
 // ensureUniqueIrCodesProgramCodeIndex creates a UNIQUE INDEX on
-// (program_name, code_id) for the ir_codes table. If duplicate rows
-// already exist, it logs them and fails — it does NOT silently dedup.
+// (program_name, code_id) for the ir_codes table. If duplicate rows already
+// exist, the extras are removed (keeping MIN(id)) before the index is
+// created, so legacy databases upgrade cleanly.
 func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 	if !db.HasTable(TableIrCodes) {
 		return
@@ -147,42 +184,17 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 		return // already created
 	}
 
-	// Check for existing duplicates BEFORE creating the unique index.
-	// If duplicates exist, we cannot create the unique index without
-	// resolving them first. We log the duplicates and return without
-	// creating the index (the caller will see duplicate INSERTs fail
-	// later, which is the desired behavior for new data).
-	type dupRow struct {
-		ProgramName string
-		CodeID      int64
-		DupCount    int64
-	}
-	var dups []dupRow
-	rows, err := db.Raw(
-		`SELECT program_name, code_id, COUNT(*) as dup_count
-		 FROM ir_codes
-		 GROUP BY program_name, code_id
-		 HAVING COUNT(*) > 1
-		 LIMIT 10`,
-	).Rows()
-	if err == nil {
-		for rows.Next() {
-			var d dupRow
-			rows.Scan(&d.ProgramName, &d.CodeID, &d.DupCount)
-			dups = append(dups, d)
-		}
-		rows.Close()
-	}
-
-	if len(dups) > 0 {
-		// Log duplicates and do NOT create the index — existing data
-		// has violations that must be resolved manually.
-		for _, d := range dups {
-			log.Errorf("[unique-constraint] DUPLICATE ir_codes: program_name=%s code_id=%d count=%d — cannot create UNIQUE INDEX, resolve duplicates first",
-				d.ProgramName, d.CodeID, d.DupCount)
-		}
-		log.Errorf("[unique-constraint] %d duplicate (program_name, code_id) groups found in ir_codes — UNIQUE INDEX ux_ir_codes_program_code NOT created", len(dups))
+	// Legacy async-persist runs can leave duplicate rows. Remove every row
+	// except the oldest (MIN id) per (program_name, code_id) in one window
+	// query, so the unique index can be created. This runs only once: after
+	// the index exists the function returns at the top.
+	removed, err := deleteDuplicateIrCodes(db)
+	if err != nil {
+		log.Warnf("[unique-constraint] failed to remove duplicate ir_codes rows: %v", err)
 		return
+	}
+	if removed > 0 {
+		log.Infof("[unique-constraint] removed %d duplicate ir_codes rows (kept MIN(id) per (program_name, code_id))", removed)
 	}
 
 	// No duplicates — safe to create the UNIQUE INDEX
@@ -199,7 +211,8 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 // for the ir_offsets table. This prevents duplicate offset INSERTs.
 //
 // If an older non-COALESCE index with the same name exists, it is dropped and
-// recreated with COALESCE. If duplicate rows exist, it logs and returns.
+// recreated with COALESCE. If duplicate rows exist, the extras are removed
+// (keeping MIN(id)) before the index is created.
 func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 	if !db.HasTable(TableIrOffsets) {
 		return
@@ -242,21 +255,16 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 		}
 	}
 
-	// Check for existing duplicates BEFORE creating the unique index
-	var dupCount int64
-	db.Raw(
-		`SELECT COALESCE(SUM(c - 1), 0) FROM (
-			SELECT program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''), COUNT(*) as c
-			FROM ir_offsets
-			GROUP BY program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')
-			HAVING COUNT(*) > 1
-		) as d`,
-	).Row().Scan(&dupCount)
-
-	if dupCount > 0 {
-		log.Errorf("[unique-constraint] %d duplicate ir_offsets rows found — UNIQUE INDEX %s NOT created, resolve duplicates first",
-			dupCount, indexName)
+	// Legacy async-persist runs can leave duplicate rows. Remove every row
+	// except the oldest (MIN id) per composite key in one window query, so
+	// the unique index can be created.
+	removed, err := deleteDuplicateIrOffsets(db)
+	if err != nil {
+		log.Warnf("[unique-constraint] failed to remove duplicate ir_offsets rows: %v", err)
 		return
+	}
+	if removed > 0 {
+		log.Infof("[unique-constraint] removed %d duplicate ir_offsets rows (kept MIN(id) per composite key)", removed)
 	}
 
 	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`

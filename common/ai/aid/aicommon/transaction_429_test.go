@@ -184,6 +184,109 @@ func TestCallAITransaction_429ContextCancel(t *testing.T) {
 	t.Logf("exited after %v with %d calls", elapsed, atomic.LoadInt64(&callCount))
 }
 
+func TestCallAITransaction_RequestContextCancelDoesNotRetryOrEmitError(t *testing.T) {
+	configCtx := context.Background()
+	cfg := newTransactionTestConfig(configCtx)
+	cfg.retryMax = 5
+
+	var captured []*schema.AiOutputEvent
+	cfg.emitter = NewEmitter("txn-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	started := make(chan context.Context, 1)
+	var callCount atomic.Int64
+	callAi := func(req *AIRequest) (*AIResponse, error) {
+		callCount.Add(1)
+		started <- req.GetContext()
+		<-req.GetContext().Done()
+		return nil, req.GetContext().Err()
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- CallAITransaction(
+			cfg,
+			"request-scoped cancellation",
+			callAi,
+			func(*AIResponse) error { return nil },
+			WithAIRequest_Context(requestCtx),
+		)
+	}()
+
+	select {
+	case actualRequestCtx := <-started:
+		require.NotNil(t, actualRequestCtx)
+		cancelRequest()
+	case <-time.After(3 * time.Second):
+		t.Fatal("AI request did not start")
+	}
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(3 * time.Second):
+		t.Fatal("transaction did not stop after request context cancellation")
+	}
+
+	require.Equal(t, int64(1), callCount.Load(), "context cancellation must not be retried")
+	for _, event := range captured {
+		if event == nil {
+			continue
+		}
+		content := string(event.Content)
+		require.NotContains(t, content, "call ai api error")
+		require.NotContains(t, content, "postHandler error")
+	}
+}
+
+func TestCallAITransaction_PostHandlerCancellationDoesNotRetryOrEmitError(t *testing.T) {
+	cfg := newTransactionTestConfig(context.Background())
+	cfg.retryMax = 5
+
+	var captured []*schema.AiOutputEvent
+	cfg.emitter = NewEmitter("txn-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	var callCount atomic.Int64
+	var postHandlerCount atomic.Int64
+	callAi := func(*AIRequest) (*AIResponse, error) {
+		callCount.Add(1)
+		rsp := NewUnboundAIResponse()
+		rsp.Close()
+		return rsp, nil
+	}
+	postHandler := func(*AIResponse) error {
+		postHandlerCount.Add(1)
+		cancelRequest()
+		return utils.Errorf("failed to parse action: %v", context.Canceled)
+	}
+
+	err := CallAITransaction(
+		cfg,
+		"post-handler cancellation",
+		callAi,
+		postHandler,
+		WithAIRequest_Context(requestCtx),
+	)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, int64(1), callCount.Load(), "post-handler cancellation must not call AI again")
+	require.Equal(t, int64(1), postHandlerCount.Load(), "post-handler cancellation must not be retried")
+	for _, event := range captured {
+		if event == nil {
+			continue
+		}
+		content := string(event.Content)
+		require.NotContains(t, content, "call ai api error")
+		require.NotContains(t, content, "postHandler error")
+	}
+}
+
 func TestCallAITransaction_Non429ErrorCountsRetry(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/schema"
 	"time"
 )
@@ -21,6 +22,7 @@ type AIRequest struct {
 	imageDataList          []*ImageData
 	modelTier              string
 	callerLabel            string
+	ctx                    context.Context
 }
 
 func (a *AIRequest) GetStartTime() time.Time {
@@ -57,6 +59,16 @@ func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 }
 
 type AIRequestOption func(req *AIRequest)
+
+// WithAIRequest_DetachCheckpoint marks an auxiliary AI request as independent
+// from the coordinator's replay sequence. Progress/interval reviews use this so
+// a timing-dependent number of reviews cannot shift later deterministic
+// checkpoints on recovery.
+func WithAIRequest_DetachCheckpoint() AIRequestOption {
+	return func(req *AIRequest) {
+		req.SetDetachCheckpoint(true)
+	}
+}
 
 func (a *AIRequest) HaveSaveCheckpointCallback() bool {
 	if a == nil {
@@ -167,6 +179,22 @@ func (a *AIRequest) SetCallerLabel(label string) {
 		return
 	}
 	a.callerLabel = label
+}
+
+// GetContext returns the request-scoped context when the caller supplied one.
+// It lets concurrent child transactions be cancelled independently instead of
+// inheriting only the much longer-lived session config context.
+func (a *AIRequest) GetContext() context.Context {
+	if a == nil {
+		return nil
+	}
+	return a.ctx
+}
+
+func WithAIRequest_Context(ctx context.Context) AIRequestOption {
+	return func(req *AIRequest) {
+		req.ctx = ctx
+	}
 }
 
 func WithAIRequest_CallerLabel(label string) AIRequestOption {

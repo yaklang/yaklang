@@ -97,8 +97,7 @@ type PromptManager struct {
 	cpm   *aicommon.ContextProviderManager
 	react *ReAct
 
-	workdir       string
-	glanceWorkdir string
+	workdir string
 }
 
 func NewPromptManager(react *ReAct, workdir string) *PromptManager {
@@ -109,11 +108,11 @@ func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 	}
 }
 
-// GetGlanceWorkdir caches and returns the directory listing snapshot used by
-// workspace-aware prompts.
+// GetGlanceWorkdir returns a fresh directory listing snapshot. Keeping the
+// snapshot on PromptManager made concurrent batch prompt builders race on one
+// shared string, while no caller relied on that value after the return.
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
-	pm.glanceWorkdir = filesys.Glance(wd)
-	return pm.glanceWorkdir
+	return filesys.Glance(wd)
 }
 
 // GetAvailableAIForgeBlueprints returns the forge inventory rendered for the
@@ -147,15 +146,34 @@ func (pm *PromptManager) currentUserInput() string {
 	return ""
 }
 
+func promptLoopForTask(task aicommon.AIStatefulTask) *reactloops.ReActLoop {
+	if task == nil {
+		return nil
+	}
+	loop, _ := task.GetReActLoop().(*reactloops.ReActLoop)
+	return loop
+}
+
 // currentLoopInstructionAndExample fetches the persistent instruction and
 // output example injected by the active ReActLoop, falling back to the
 // supplied defaults when the loop has none.
 func (pm *PromptManager) currentLoopInstructionAndExample(
 	fallbackInstruction, fallbackExample string,
 ) (instruction, example string) {
+	var loop *reactloops.ReActLoop
+	if pm != nil && pm.react != nil {
+		loop = pm.react.GetCurrentLoop()
+	}
+	return loopInstructionAndExample(loop, fallbackInstruction, fallbackExample)
+}
+
+func loopInstructionAndExample(
+	loop *reactloops.ReActLoop,
+	fallbackInstruction, fallbackExample string,
+) (instruction, example string) {
 	instruction = fallbackInstruction
 	example = fallbackExample
-	if loop := pm.react.GetCurrentLoop(); loop != nil {
+	if loop != nil {
 		if v := loop.GetPersistentInstruction(); v != "" {
 			instruction = v
 		}
@@ -170,7 +188,15 @@ func (pm *PromptManager) currentLoopInstructionAndExample(
 // prompt generation, so sub-role prompts reuse R1's semi-dynamic-2 schema for
 // prefix cache alignment.
 func (pm *PromptManager) currentLoopSchema() string {
-	if loop := pm.react.GetCurrentLoop(); loop != nil {
+	var loop *reactloops.ReActLoop
+	if pm != nil && pm.react != nil {
+		loop = pm.react.GetCurrentLoop()
+	}
+	return loopSchema(loop)
+}
+
+func loopSchema(loop *reactloops.ReActLoop) string {
+	if loop != nil {
 		return loop.GetLastLoopSchema()
 	}
 	return ""
@@ -284,6 +310,21 @@ func (pm *PromptManager) preparePromptPrefixMaterials(
 	return base, pm.NewPromptMaterials(base, input), nil
 }
 
+func (pm *PromptManager) preparePromptPrefixMaterialsForLoop(
+	tools []*aitool.Tool,
+	input *reactloops.LoopPromptAssemblyInput,
+	loop *reactloops.ReActLoop,
+) (*reactloops.LoopPromptBaseMaterials, *aicommon.PromptMaterials, error) {
+	if input == nil {
+		return nil, nil, fmt.Errorf("prompt assembly input is nil")
+	}
+	base, err := pm.GetLoopPromptBaseMaterialsForLoop(tools, input.Nonce, loop)
+	if err != nil {
+		return nil, nil, err
+	}
+	return base, pm.NewPromptMaterials(base, input), nil
+}
+
 // assemblePromptWithDynamicSection renders the dynamic tail and joins it with
 // the shared prefix sections, producing the final tagged prompt string.
 func (pm *PromptManager) assemblePromptWithDynamicSection(
@@ -315,6 +356,17 @@ func (pm *PromptManager) applyLoopInstructionAndExample(
 	materials.SkillsContext = pm.renderSkillsContextForPrompt()
 }
 
+func (pm *PromptManager) applyLoopInstructionAndExampleForLoop(
+	materials *aicommon.PromptMaterials,
+	loop *reactloops.ReActLoop,
+	fallbackInstruction, fallbackExample string,
+) {
+	instruction, example := loopInstructionAndExample(loop, fallbackInstruction, fallbackExample)
+	materials.TaskInstruction = instruction
+	materials.OutputExample = example
+	materials.SkillsContext = renderSkillsContextForLoop(loop)
+}
+
 // ToolParamsPromptResult contains the generated prompt and metadata for AITAG
 // parsing.
 type ToolParamsPromptResult struct {
@@ -328,24 +380,58 @@ type ToolParamsPromptResult struct {
 // prefix cache alignment; the tool-specific schema lives in the dynamic
 // section.
 func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
+	var loop *reactloops.ReActLoop
+	if pm != nil && pm.react != nil {
+		loop = pm.react.GetCurrentLoop()
+	}
+	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(pm.currentUserInput(), loop, tool)
+}
+
+// GenerateToolParamsPromptWithMetaForTask binds parameter generation to the
+// task that owns the ToolCaller. Concurrent batch workers must use this form
+// instead of resolving ReAct.currentTask while they are running.
+func (pm *PromptManager) GenerateToolParamsPromptWithMetaForTask(
+	task aicommon.AIStatefulTask,
+	tool *aitool.Tool,
+) (*ToolParamsPromptResult, error) {
+	userQuery := ""
+	if task != nil {
+		userQuery = task.GetUserInput()
+	}
+	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(userQuery, promptLoopForTask(task), tool)
+}
+
+// GenerateToolParamsPromptWithMetaForQuery is the task-independent core used
+// when the owning query has already been captured by the caller.
+func (pm *PromptManager) GenerateToolParamsPromptWithMetaForQuery(
+	originalQuery string,
+	tool *aitool.Tool,
+) (*ToolParamsPromptResult, error) {
+	return pm.generateToolParamsPromptWithMetaForQueryAndLoop(originalQuery, nil, tool)
+}
+
+func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
+	originalQuery string,
+	loop *reactloops.ReActLoop,
+	tool *aitool.Tool,
+) (*ToolParamsPromptResult, error) {
 	nonceString := nonce()
 	toolSchema := ""
 	if tool.Tool != nil {
 		toolSchema = tool.ToJSONSchemaString()
 	}
 	paramNames := toolParamNames(tool)
-	originalQuery := pm.currentUserInput()
 
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(nil, &reactloops.LoopPromptAssemblyInput{
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterialsForLoop(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:  nonceString,
-		Schema: pm.currentLoopSchema(),
-	})
+		Schema: loopSchema(loop),
+	}, loop)
 	if err != nil {
 		return nil, err
 	}
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
-	pm.applyLoopInstructionAndExample(prefixMaterials, toolParamsInstructionText, toolParamsOutputExampleText)
+	pm.applyLoopInstructionAndExampleForLoop(prefixMaterials, loop, toolParamsInstructionText, toolParamsOutputExampleText)
 
 	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
@@ -356,8 +442,12 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	dynamicData["ToolUsage"] = tool.Usage
 	dynamicData["ParamNames"] = paramNames
 	dynamicData["OriginalQuery"] = originalQuery
-	dynamicData["CurrentIteration"] = pm.react.currentIteration
-	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
+	dynamicData["CurrentIteration"] = 0
+	dynamicData["MaxIterations"] = 0
+	if loop != nil {
+		dynamicData["CurrentIteration"] = loop.GetCurrentIterationIndex()
+		dynamicData["MaxIterations"] = loop.GetMaxIterations()
+	}
 	dynamicData["ToolSchema"] = toolSchema
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
@@ -450,14 +540,58 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 func (pm *PromptManager) GenerateToolReSelectPrompt(
 	noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool,
 ) (string, error) {
-	nonceString := utils.RandStringBytes(4)
-	userQuery := pm.currentUserInput()
+	var loop *reactloops.ReActLoop
+	if pm != nil && pm.react != nil {
+		loop = pm.react.GetCurrentLoop()
+	}
+	return pm.generateToolReSelectPromptForQueryAndLoop(
+		pm.currentUserInput(), loop, noUserInteract, oldTool, toolList,
+	)
+}
 
-	_, prefixMaterials, err := pm.preparePromptPrefixMaterials(toolList, &reactloops.LoopPromptAssemblyInput{
+// GenerateToolReSelectPromptForTask renders the wrong-tool review against the
+// task that owns the ToolCaller, not the mutable session-level current task.
+func (pm *PromptManager) GenerateToolReSelectPromptForTask(
+	task aicommon.AIStatefulTask,
+	noUserInteract bool,
+	oldTool *aitool.Tool,
+	toolList []*aitool.Tool,
+) (string, error) {
+	userQuery := ""
+	if task != nil {
+		userQuery = task.GetUserInput()
+	}
+	return pm.generateToolReSelectPromptForQueryAndLoop(
+		userQuery, promptLoopForTask(task), noUserInteract, oldTool, toolList,
+	)
+}
+
+// GenerateToolReSelectPromptForQuery is the task-independent prompt core.
+func (pm *PromptManager) GenerateToolReSelectPromptForQuery(
+	userQuery string,
+	noUserInteract bool,
+	oldTool *aitool.Tool,
+	toolList []*aitool.Tool,
+) (string, error) {
+	return pm.generateToolReSelectPromptForQueryAndLoop(
+		userQuery, nil, noUserInteract, oldTool, toolList,
+	)
+}
+
+func (pm *PromptManager) generateToolReSelectPromptForQueryAndLoop(
+	userQuery string,
+	loop *reactloops.ReActLoop,
+	noUserInteract bool,
+	oldTool *aitool.Tool,
+	toolList []*aitool.Tool,
+) (string, error) {
+	nonceString := utils.RandStringBytes(4)
+
+	_, prefixMaterials, err := pm.preparePromptPrefixMaterialsForLoop(toolList, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
 		UserQuery: userQuery,
 		Schema:    getReSelectTool(noUserInteract),
-	})
+	}, loop)
 	if err != nil {
 		return "", err
 	}
@@ -466,7 +600,7 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(
 	prefixMaterials.HasLoadCapability = false
 	prefixMaterials.TaskInstruction = strings.TrimSpace(wrongToolInstructionText)
 	prefixMaterials.OutputExample = strings.TrimSpace(wrongToolOutputExampleText)
-	prefixMaterials.SkillsContext = pm.renderSkillsContextForPrompt()
+	prefixMaterials.SkillsContext = renderSkillsContextForLoop(loop)
 
 	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
@@ -696,11 +830,14 @@ func (pm *PromptManager) renderSkillsContextForPrompt() string {
 	if pm == nil || pm.react == nil {
 		return ""
 	}
-	currentLoop := pm.react.GetCurrentLoop()
-	if currentLoop == nil {
+	return renderSkillsContextForLoop(pm.react.GetCurrentLoop())
+}
+
+func renderSkillsContextForLoop(loop *reactloops.ReActLoop) string {
+	if loop == nil {
 		return ""
 	}
-	mgr := currentLoop.GetSkillsContextManager()
+	mgr := loop.GetSkillsContextManager()
 	if mgr == nil {
 		return ""
 	}
@@ -717,6 +854,35 @@ func (pm *PromptManager) renderSkillsContextForPrompt() string {
 //   - each dynamic field has an independent token budget; the whole prompt has
 //     a 9000-token hard cap
 func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	startTime time.Time,
+	reviewCount int,
+	callExpectations string,
+) (string, error) {
+	var task aicommon.AIStatefulTask
+	if pm != nil && pm.react != nil {
+		task = pm.react.GetCurrentTask()
+	}
+	return pm.GenerateIntervalReviewPromptWithContextForTask(
+		task,
+		tool,
+		params,
+		stdoutSnapshot,
+		stderrSnapshot,
+		startTime,
+		reviewCount,
+		callExpectations,
+	)
+}
+
+// GenerateIntervalReviewPromptWithContextForTask is the task-stable variant
+// used by concurrent tool batches. The owning task is an explicit input so
+// another call cannot change the user query/task goal while this prompt is
+// being built.
+func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
+	task aicommon.AIStatefulTask,
 	tool *aitool.Tool,
 	params aitool.InvokeParams,
 	stdoutSnapshot, stderrSnapshot []byte,
@@ -741,7 +907,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 
 	userQuery := ""
 	taskGoal := ""
-	if task := pm.react.GetCurrentTask(); task != nil {
+	if task != nil {
 		userQuery = aicommon.ShrinkTextBlockByTokens(task.GetUserInput(), intervalReviewUserQueryTokens)
 		taskGoal = aicommon.ShrinkTextBlockByTokens(task.GetName(), intervalReviewTaskGoalTokens)
 	}

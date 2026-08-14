@@ -191,12 +191,15 @@ type toolCallArtifactBundle struct {
 	resultPath   string
 	manifestPath string
 
-	combined *os.File
-	stdout   *os.File
-	stderr   *os.File
-	preview  *boundedHeadTailBuffer
-	prepare  error
-	closed   bool
+	combined  *os.File
+	stdout    *os.File
+	stderr    *os.File
+	preview   *boundedHeadTailBuffer
+	prepare   error
+	closed    bool
+	finalized bool
+	discarded bool
+	ownsDir   bool
 }
 
 func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, identifier string) *toolCallArtifactBundle {
@@ -219,7 +222,9 @@ func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, id
 		taskName = t.task.GetSemanticIdentifier()
 	}
 	callNumber := 1
-	if t.task != nil {
+	if t.artifactOrdinal > 0 {
+		callNumber = t.artifactOrdinal
+	} else if t.task != nil {
 		callNumber = len(t.task.GetAllToolCallResults()) + 1
 	}
 	name := sanitizeFilename(tool.Name)
@@ -235,6 +240,7 @@ func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, id
 	if b.prepare != nil {
 		return b
 	}
+	b.ownsDir = true
 	b.reportPath = filepath.Join(b.dir, "report.md")
 	b.combinedPath = filepath.Join(b.dir, "combined_output.txt")
 	b.stdoutPath = filepath.Join(b.dir, "stdout.txt")
@@ -287,6 +293,13 @@ func (b *toolCallArtifactBundle) Writer(stream toolArtifactStream) io.Writer {
 func (b *toolCallArtifactBundle) writeStream(stream toolArtifactStream, p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	// A context cancellation can return from a non-cooperative plugin before its
+	// callback goroutine has fully unwound. Once the unfinished bundle has been
+	// discarded, accept and drop any late writes so that the callback cannot
+	// recreate a ghost artifact or turn cancellation into an unrelated pipe error.
+	if b.discarded {
+		return len(p), nil
+	}
 	_, _ = b.preview.Write(p)
 	if b.prepare != nil {
 		return len(p), nil
@@ -308,6 +321,12 @@ func (b *toolCallArtifactBundle) writeStream(stream toolArtifactStream, p []byte
 }
 
 func (b *toolCallArtifactBundle) closeStreams() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.closeStreamsLocked()
+}
+
+func (b *toolCallArtifactBundle) closeStreamsLocked() {
 	if b.closed {
 		return
 	}
@@ -318,6 +337,79 @@ func (b *toolCallArtifactBundle) closeStreams() {
 				b.prepare = err
 			}
 		}
+	}
+}
+
+// discardIfUnfinished rolls back an artifact bundle that never reached
+// finalize. The important case is context cancellation while plugin code is
+// running: invoke intentionally does not finalize or checkpoint a cancelled
+// result, so retaining an empty/partial directory would expose a ghost artifact
+// that is not represented in task state or Timeline.
+//
+// finalized bundles (including ordinary failed tool calls) are retained. A
+// callback that outlives cancellation may still hold the writers; discarded is
+// therefore set before closing/removing files and writeStream drops late bytes.
+func (b *toolCallArtifactBundle) discardIfUnfinished() error {
+	if b == nil {
+		return nil
+	}
+	b.mu.Lock()
+	if b.finalized {
+		b.mu.Unlock()
+		return nil
+	}
+	b.discarded = true
+	b.closeStreamsLocked()
+	dir := b.dir
+	ownsDir := b.ownsDir
+	b.mu.Unlock()
+	if ownsDir && dir != "" {
+		if err := os.RemoveAll(dir); err != nil {
+			log.Warnf("failed to discard unfinished tool artifact bundle %s: %v", dir, err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *toolCallArtifactBundle) markFinalized() {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.finalized = true
+	b.mu.Unlock()
+}
+
+// isCanonicalToolResultData recognizes only the framework envelope written by
+// applyNormalizedData. RESULT is optional by design: it is omitted when the
+// structured result is empty or byte-identical to combined output. Requiring a
+// valid final ARTIFACT/HINT section avoids treating an arbitrary tool string
+// that merely starts with "COMBINED OUTPUT:" as a checkpoint replay envelope.
+func isCanonicalToolResultData(data string) bool {
+	if !strings.HasPrefix(data, "COMBINED OUTPUT:\n") {
+		return false
+	}
+	artifactMarker := "\n\nARTIFACT:\n"
+	hintMarker := "\n\nHINT:\n"
+	artifactAt := strings.LastIndex(data, artifactMarker)
+	hintAt := strings.LastIndex(data, hintMarker)
+	switch {
+	case artifactAt > hintAt:
+		section := strings.TrimSpace(data[artifactAt+len(artifactMarker):])
+		lines := strings.Split(section, "\n")
+		if len(lines) != 2 {
+			return false
+		}
+		combinedPath := strings.TrimSpace(strings.TrimPrefix(lines[0], "- combined:"))
+		resultPath := strings.TrimSpace(strings.TrimPrefix(lines[1], "- result:"))
+		return strings.HasPrefix(lines[0], "- combined:") && combinedPath != "" &&
+			strings.HasPrefix(lines[1], "- result:") && resultPath != ""
+	case hintAt >= 0:
+		section := strings.TrimSpace(data[hintAt+len(hintMarker):])
+		return strings.HasPrefix(section, "artifact_persist_failed:")
+	default:
+		return false
 	}
 }
 
@@ -528,18 +620,15 @@ func (b *toolCallArtifactBundle) finalize(
 	if toolResult == nil {
 		return nil
 	}
-	if data, ok := toolResult.Data.(string); ok && strings.Contains(data, "COMBINED OUTPUT:\n") && strings.Contains(data, "\n\nRESULT:\n") && (strings.Contains(data, "\n\nARTIFACT:\n") || strings.Contains(data, "\n\nHINT:\n")) {
+	if data, ok := toolResult.Data.(string); ok && isCanonicalToolResultData(data) {
 		// A current-format checkpoint already owns stable artifact paths. Do not
-		// wrap the preview again or rewrite its bytes during replay.
-		b.closeStreams()
-		for _, path := range []string{b.combinedPath, b.stdoutPath, b.stderrPath} {
-			if path != "" {
-				_ = os.Remove(path)
-			}
+		// wrap the preview again or rewrite its bytes during replay. RESULT is
+		// intentionally optional: canonical compact data omits that section when
+		// result is empty or byte-identical to COMBINED OUTPUT.
+		if err := b.discardIfUnfinished(); err != nil {
+			return err
 		}
-		if b.dir != "" {
-			_ = os.Remove(b.dir)
-		}
+		b.markFinalized()
 		return nil
 	}
 	b.closeStreams()
@@ -619,13 +708,21 @@ func (b *toolCallArtifactBundle) finalize(
 		err = os.WriteFile(b.manifestPath, manifestData, 0o644)
 	}
 	if err != nil {
+		// Deferred rollback will remove this incomplete bundle. Replace the
+		// already-rendered ARTIFACT paths before returning so Timeline never
+		// advertises files that no longer exist.
+		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
 		return err
 	}
 
 	report := b.renderReport(tool, identifier, params, toolResult, paramGenDuration, rawAIParamResponse)
 	if err := os.WriteFile(b.reportPath, []byte(report), 0o644); err != nil {
+		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
 		return err
 	}
+	// Only a complete manifest/report bundle is durable. Any earlier error keeps
+	// finalized=false so ToolCaller's deferred rollback removes the partial tree.
+	b.markFinalized()
 	t.emitter.EmitToolCallLogDir(callToolID, b.reportPath)
 	t.emitter.EmitPinFilename(b.reportPath)
 	t.emitter.EmitPinFilename(b.dir)

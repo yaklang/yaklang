@@ -453,7 +453,15 @@ func TestCreateUTF8StreamMirror_RealtimeError(t *testing.T) {
 	})
 
 	// Must read the main stream to avoid blocking the MultiWriter
-	go io.Copy(io.Discard, mainStream)
+	mainDone := make(chan struct{})
+	go func() {
+		defer close(mainDone)
+		_, _ = io.Copy(io.Discard, mainStream)
+	}()
 
 	cb.Wait("done")
+	// Do not let the test return while the mirror copy still owns the main
+	// stream. EOF is the ownership hand-off for anything observing upstream
+	// TeeReader side effects.
+	<-mainDone
 }

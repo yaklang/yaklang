@@ -3,6 +3,7 @@ package reactloops
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,29 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// synchronizedResponseCapture is a bytes.Buffer with snapshot reads. Action
+// parsing is asynchronous after ExtractActionFromStream returns: the mirror
+// goroutine may still be driving the tee while the transaction post-handler is
+// validating fields. Keeping synchronization at the diagnostic capture avoids
+// racing buf.String against Write without changing Action's per-field streaming
+// API.
+type synchronizedResponseCapture struct {
+	mu  sync.RWMutex
+	buf bytes.Buffer
+}
+
+func (c *synchronizedResponseCapture) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.Write(p)
+}
+
+func (c *synchronizedResponseCapture) String() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.buf.String()
+}
 
 // isJSONEmbeddedAITagPrefix 判断字段流的首批 peek 字节是否以 `<|TagName_` 开头,
 // 兼容 JSON 字段流推过来的 raw bytes 通常带外层 `"` 与零宽空白. 命中即视为 AI 把
@@ -225,14 +249,25 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 		}
 		return false
 	}
+	hasCanonicalField := func(key string) bool {
+		params := action.GetParams()
+		if _, ok := params[key]; ok {
+			return true
+		}
+		if nextAction := params.GetObject("next_action"); nextAction != nil {
+			_, ok := nextAction[key]
+			return ok
+		}
+		return false
+	}
 
 	if strings.TrimSpace(finalAnswer) != "" || hasField("answer_payload") {
 		return "directly_answer"
 	}
-	if hasField("tool_require_payload") {
+	if hasField("tool_require_payload") || hasCanonicalField("tool_require_calls") {
 		return "require_tool"
 	}
-	if hasField("directly_call_tool_name") || hasField("directly_call_identifier") {
+	if hasField("directly_call_tool_name") || hasField("directly_call_identifier") || hasCanonicalField("directly_call_tool_calls") {
 		return "directly_call_tool"
 	}
 	if hasField("tool_compose_payload") {
@@ -322,7 +357,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	if r.useSpeedPriorityAI {
 		aiCallback = r.config.CallSpeedPriorityAI
 	}
-	var promptRefOnce sync.Once
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -346,9 +380,15 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				r.GetEmitter(),
 			)
 
-			buf := bytes.NewBuffer(make([]byte, 0))
+			buf := new(synchronizedResponseCapture)
 			stream = io.TeeReader(stream, buf)
 			tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
+			// The immediate assignment below is intentionally only a snapshot. Once
+			// the parser consumes EOF, replace it with the full response for
+			// diagnostics/reference material.
+			tagOptions = append(tagOptions, aicommon.WithActionOnReaderFinished(func() {
+				r.Set("last_ai_decision_response", buf.String())
+			}))
 			streamFields := r.streamFields.Copy()
 
 			for _, i := range r.GetAllActions() {
@@ -432,7 +472,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							return
 						}
 
-						event, emitErr := boundEmitter.EmitStreamEventWithVizSource(
+						_, emitErr := boundEmitter.EmitStreamEventWithVizSource(
 							defaultNodeId,
 							preparedReader,
 							resp.GetTaskIndex(),
@@ -448,16 +488,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							log.Errorf("EmitStreamEvent for field [%s] failed: %v", key, emitErr)
 							done() // Ensure done is called even on error
 							return
-						}
-
-						// Emit prompt as reference material (only once per transaction)
-						if event != nil && prompt != "" {
-							promptRefOnce.Do(func() {
-								streamId := event.GetContentJSONPath(`$.event_writer_id`)
-								if streamId != "" {
-									boundEmitter.EmitTextReferenceMaterial(streamId, prompt)
-								}
-							})
 						}
 					}),
 			)
@@ -1003,17 +1033,17 @@ LOOP:
 
 		// 记录当前迭代索引和 Action 信息。
 		r.actionHistoryMutex.Lock()
+		toolNames := extractToolNamesFromAction(actionParams)
 		actionRecord := &ActionRecord{
 			ActionType:     actionParams.ActionType(),
 			ActionName:     actionName,
-			ActionParams:   actionParams.GetParams(),
+			ActionParams:   cloneActionParams(actionParams.GetParams()),
 			IterationIndex: iterationCount,
-			ToolName:       extractToolNameFromAction(actionParams),
+			ToolNames:      toolNames,
+			ToolCallCount:  len(toolNames),
 		}
-		// 复制 Action 参数（避免并发修改）
-		params := actionParams.GetParams()
-		for k, v := range params {
-			actionRecord.ActionParams[k] = v
+		if len(toolNames) > 0 {
+			actionRecord.ToolName = toolNames[0]
 		}
 		r.actionHistory = append(r.actionHistory, actionRecord)
 		r.actionHistoryMutex.Unlock()
@@ -1096,6 +1126,11 @@ LOOP:
 				operator,
 			)
 		}()
+		// Tool names/count above describe the model proposal. Only the handler can
+		// know whether a plugin callback actually ran, so commit that independent
+		// fact after it settles. This keeps rejected/cancelled/zero-invoke batches
+		// in history without falsely turning them into iteration_end training data.
+		r.applyActionExecutionRecord(actionRecord, operator)
 		if handler.ActionType != loopAction_Finish.ActionType {
 			r.recordCurrentTodoIteration(task)
 		}
@@ -1243,6 +1278,22 @@ LOOP:
 		continue
 	}
 	return nil
+}
+
+// applyActionExecutionRecord copies the handler's objective execution fact into
+// the already-appended history record. Declared ToolNames/ToolCallCount remain
+// untouched so diagnostics can still explain what the model attempted.
+func (r *ReActLoop) applyActionExecutionRecord(record *ActionRecord, operator *LoopActionHandlerOperator) {
+	if r == nil || record == nil || operator == nil {
+		return
+	}
+	executed := operator.GetExecutedToolCallCount()
+	if executed <= 0 {
+		return
+	}
+	r.actionHistoryMutex.Lock()
+	record.ExecutedToolCallCount += executed
+	r.actionHistoryMutex.Unlock()
 }
 
 func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTask) *OnPostIterationOperator {
@@ -1575,31 +1626,95 @@ func (r *ReActLoop) isDebugModeEnabled() bool {
 //
 // 关键词: extractToolNameFromAction, tool_name 抽取优先级
 func extractToolNameFromAction(action *aicommon.Action) string {
+	names := extractToolNamesFromAction(action)
+	if len(names) > 0 {
+		return names[0]
+	}
+	return ""
+}
+
+// extractToolNamesFromAction 按模型声明顺序提取单次或批量工具名。批量字段只从
+// canonical action object 解码，避免 ActionMaker 的扁平兼容字段把数组 item 串线。
+func extractToolNamesFromAction(action *aicommon.Action) []string {
 	if utils.IsNil(action) {
-		return ""
+		return nil
+	}
+	params := action.GetParams()
+	roots := []map[string]any{params}
+	if nextAction := params.GetObject("next_action"); len(nextAction) > 0 {
+		roots = append(roots, nextAction)
+	}
+	for _, root := range roots {
+		for _, field := range []string{"directly_call_tool_calls", "tool_require_calls"} {
+			raw, ok := root[field]
+			if !ok || raw == nil {
+				continue
+			}
+			encoded, err := json.Marshal(raw)
+			if err != nil {
+				continue
+			}
+			var items []struct {
+				ToolName string `json:"tool_name"`
+			}
+			if err := json.Unmarshal(encoded, &items); err != nil {
+				continue
+			}
+			names := make([]string, 0, len(items))
+			for _, item := range items {
+				if name := strings.TrimSpace(item.ToolName); name != "" {
+					names = append(names, name)
+				}
+			}
+			if len(names) > 0 {
+				return names
+			}
+		}
 	}
 	if name := strings.TrimSpace(action.GetString("directly_call_tool_name")); name != "" {
-		return name
+		return []string{name}
 	}
 	nextAction := action.GetInvokeParams("next_action")
 	if nextAction != nil {
 		if name := strings.TrimSpace(nextAction.GetString("directly_call_tool_name")); name != "" {
-			return name
+			return []string{name}
 		}
 		if name := strings.TrimSpace(nextAction.GetString("tool_require_payload")); name != "" {
-			return name
+			return []string{name}
 		}
 	}
 	if name := strings.TrimSpace(action.GetString("tool_require_payload")); name != "" {
-		return name
+		return []string{name}
 	}
 	if name := strings.TrimSpace(action.GetString("tool_name")); name != "" {
-		return name
+		return []string{name}
 	}
 	if name := strings.TrimSpace(action.GetString("tool")); name != "" {
-		return name
+		return []string{name}
 	}
-	return ""
+	return nil
+}
+
+func cloneActionParams(params map[string]any) map[string]any {
+	if params == nil {
+		return nil
+	}
+	encoded, err := json.Marshal(params)
+	if err != nil {
+		cloned := make(map[string]any, len(params))
+		for key, value := range params {
+			cloned[key] = value
+		}
+		return cloned
+	}
+	var cloned map[string]any
+	if err := json.Unmarshal(encoded, &cloned); err != nil {
+		cloned = make(map[string]any, len(params))
+		for key, value := range params {
+			cloned[key] = value
+		}
+	}
+	return cloned
 }
 
 func sanitizeActionFilename(name string) string {

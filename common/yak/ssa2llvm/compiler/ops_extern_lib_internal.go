@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
@@ -33,6 +34,16 @@ func (c *Compiler) compileYaklibExportMember(contextInst ssa.Instruction, val ss
 	rv := reflect.ValueOf(exported)
 	if rv.IsValid() && rv.Kind() == reflect.Func {
 		return nil
+	}
+	// String exports (e.g. ssa.GO, a named string Language constant) must be
+	// lowered as a global C-string pointer, mirroring how string literals are
+	// emitted. Boxing them through runtimeValueToInt64ForCompiler would return
+	// 0 (empty string) because that helper only handles numeric/bool values.
+	if rv.IsValid() && rv.Kind() == reflect.String {
+		ptr := c.Builder.CreateGlobalStringPtr(rv.String(), fmt.Sprintf("yaklib_export_str_%d", val.GetId()))
+		tagged := c.Builder.CreateOr(llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type()), llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false), "yaklib_export_str_tag")
+		c.cacheValue(val.GetId(), tagged)
+		return c.maybeEmitMemberSet(contextInst, val, val.GetId())
 	}
 	boxed := runtimeValueToInt64ForCompiler(exported)
 	c.cacheValue(val.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(boxed), false))
@@ -70,15 +81,19 @@ func (c *Compiler) compileExternLibMember(
 		return nil
 	}
 
+	// Pair-first SSA: extern members are stored as member pairs on the value.
+	// Resolve by exact key string (e.g. "PoCExports") or by key Value.
 	var memberValID int64
 	if keyStr != "" {
-		if id, ok := extern.MemberMap[keyStr]; ok {
-			memberValID = id
+		members := extern.GetMembersByKeyString(keyStr)
+		if len(members) > 0 && !utils.IsNil(members[0]) {
+			memberValID = members[0].GetId()
 		}
 	}
 	if memberValID == 0 && key != nil {
-		if member, ok := extern.GetMember(key); ok && member != nil {
-			memberValID = member.GetId()
+		members := extern.GetMembersByExactKey(key)
+		if len(members) > 0 && !utils.IsNil(members[0]) {
+			memberValID = members[0].GetId()
 		}
 	}
 

@@ -100,6 +100,74 @@ func TestToolCallerInvoke_PreflightValidationErrorIsReported(t *testing.T) {
 	require.Contains(t, string(stderrOutput.Snapshot()), "请求尚未发送")
 }
 
+func TestToolCallerInvoke_BatchCheckpointIdentityMismatchIsRejected(t *testing.T) {
+	setupToolCallInvokeTestProjectDB(t)
+	callToolID := "toolcall-batch-checkpoint-" + ksuid.New().String()
+	tc, _ := newToolCallerForCountTest(t, callToolID)
+	tc.batchID = "batch-a"
+	tc.batchIndex = 2
+
+	invoked := 0
+	tool, err := aitool.New(
+		"mock-batch-checkpoint",
+		aitool.WithStringParam("value", aitool.WithParam_Required(true)),
+		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
+			invoked++
+			return "unexpected", nil
+		}),
+	)
+	require.NoError(t, err)
+	params := aitool.InvokeParams{"value": "expected"}
+	baseRequest := func() map[string]any {
+		return map[string]any{
+			"batch_id":     "batch-a",
+			"call_index":   2,
+			"call_tool_id": callToolID,
+			"tool_name":    tool.Name,
+			"param":        aitool.InvokeParams{"value": "expected"},
+		}
+	}
+	cases := []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{name: "batch", mutate: func(req map[string]any) { req["batch_id"] = "batch-b" }},
+		{name: "index", mutate: func(req map[string]any) { req["call_index"] = 3 }},
+		{name: "call id", mutate: func(req map[string]any) { req["call_tool_id"] = "other-call" }},
+		{name: "tool", mutate: func(req map[string]any) { req["tool_name"] = "other-tool" }},
+		{name: "params", mutate: func(req map[string]any) { req["param"] = aitool.InvokeParams{"value": "stored"} }},
+	}
+	for i, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			seq := int64(7300 + i)
+			request := baseRequest()
+			testCase.mutate(request)
+			checkpoint := tc.config.CreateToolCallCheckpoint(seq)
+			require.NoError(t, tc.config.SubmitCheckpointRequest(checkpoint, request))
+			tc.checkpointSeq = seq
+
+			result, invokeErr := tc.invoke(
+				tool,
+				cloneToolBatchTestParams(params),
+				func(any) {},
+				func(any) {},
+				&toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{},
+			)
+			require.ErrorContains(t, invokeErr, "tool batch checkpoint identity mismatch")
+			require.Nil(t, result)
+		})
+	}
+	require.Zero(t, invoked)
+}
+
+func cloneToolBatchTestParams(params aitool.InvokeParams) aitool.InvokeParams {
+	cloned := make(aitool.InvokeParams, len(params))
+	for key, value := range params {
+		cloned[key] = value
+	}
+	return cloned
+}
+
 func TestToolCallerInvoke_HTTPFlowCountRefresh(t *testing.T) {
 	db := setupToolCallInvokeTestProjectDB(t)
 	callToolID := "toolcall-httpflow-" + ksuid.New().String()

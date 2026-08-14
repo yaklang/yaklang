@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,6 +15,89 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+func TestToolCallerIntervalReviewReceivesDeepParamsSnapshot(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	toolMutatedParams := make(chan struct{})
+	reviewObservedParams := make(chan aitool.InvokeParams, 1)
+	reviewReleasedTool := make(chan struct{})
+	var reviewOnce sync.Once
+
+	tool, err := aitool.New(
+		"interval_review_params_snapshot_tool",
+		aitool.WithStringParam("marker", aitool.WithParam_Required(true)),
+		aitool.WithStructParam(
+			"payload",
+			[]aitool.PropertyOption{aitool.WithParam_Required(true)},
+			aitool.WithStringParam("value", aitool.WithParam_Required(true)),
+		),
+		aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithNoRuntimeCallback(func(callCtx context.Context, params aitool.InvokeParams, _ io.Writer, _ io.Writer) (any, error) {
+			delete(params, "marker")
+			params["payload"].(map[string]any)["value"] = "mutated-by-tool"
+			close(toolMutatedParams)
+			select {
+			case <-reviewReleasedTool:
+				return "done", nil
+			case <-callCtx.Done():
+				return nil, callCtx.Err()
+			}
+		}),
+	)
+	require.NoError(t, err)
+
+	cfg := NewTestConfig(ctx, WithAgreeYOLO(), WithWorkdir(t.TempDir()))
+	caller, err := NewToolCaller(
+		ctx,
+		WithToolCaller_AICallerConfig(cfg),
+		WithToolCaller_AICaller(cfg),
+		WithToolCaller_Task(cfg.DefaultTask),
+		WithToolCaller_Emitter(cfg.Emitter),
+		WithToolCaller_IntervalReviewDuration(time.Millisecond),
+		WithToolCaller_IntervalReviewHandler(func(
+			reviewCtx context.Context,
+			_ *aitool.Tool,
+			params aitool.InvokeParams,
+			_, _ []byte,
+			_ string,
+		) (bool, error) {
+			select {
+			case <-toolMutatedParams:
+			case <-reviewCtx.Done():
+				return false, reviewCtx.Err()
+			}
+			reviewOnce.Do(func() {
+				reviewObservedParams <- cloneEndpointParams(params)
+				close(reviewReleasedTool)
+			})
+			return true, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	initialParams := aitool.InvokeParams{
+		"marker":  "original-marker",
+		"payload": map[string]any{"value": "original-value"},
+	}
+	result, directlyAnswer, callErr := caller.CallToolWithExistedParams(tool, true, initialParams)
+	require.NoError(t, callErr)
+	require.False(t, directlyAnswer)
+	require.NotNil(t, result)
+	require.True(t, result.Success)
+
+	select {
+	case observed := <-reviewObservedParams:
+		require.Equal(t, "original-marker", observed.GetString("marker"))
+		require.Equal(t, "original-value", observed.GetObject("payload").GetString("value"))
+		require.NotEmpty(t, observed.GetString("runtime_id"))
+	case <-ctx.Done():
+		t.Fatal("interval review did not observe its params snapshot")
+	}
+	require.Empty(t, initialParams.GetString("marker"), "the tool still owns and may mutate its original params")
+	require.Equal(t, "mutated-by-tool", initialParams.GetObject("payload").GetString("value"))
+}
 
 const (
 	// Test timing constants - keep tests fast (total < 10s)

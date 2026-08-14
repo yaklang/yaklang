@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/notifytools"
@@ -44,8 +44,29 @@ func GetBasicBuildInTools() []*aitool.Tool {
 	})
 }
 
-var allAiTools []*aitool.Tool
-var doGetAllToolsOnce sync.Once
+var (
+	allAiToolsMu      sync.RWMutex
+	allAiTools        []*aitool.Tool
+	doGetAllToolsOnce sync.Once
+)
+
+func publishAllAITools(tools []*aitool.Tool) []*aitool.Tool {
+	// Store a private backing array and return a different copy. Neither the
+	// producer nor the caller can mutate the globally published slice header or
+	// its entries through an alias.
+	published := append([]*aitool.Tool(nil), tools...)
+	allAiToolsMu.Lock()
+	allAiTools = published
+	allAiToolsMu.Unlock()
+	return append([]*aitool.Tool(nil), published...)
+}
+
+func getAllAIToolsSnapshot() []*aitool.Tool {
+	allAiToolsMu.RLock()
+	snapshot := append([]*aitool.Tool(nil), allAiTools...)
+	allAiToolsMu.RUnlock()
+	return snapshot
+}
 
 // GetAllToolsDynamically returns all built-in AI tools, dynamically get from the database
 func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
@@ -106,14 +127,14 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	}
 	tools = deduped
 
-	allAiTools = lo.Filter(tools, func(item *aitool.Tool, index int) bool {
+	tools = lo.Filter(tools, func(item *aitool.Tool, index int) bool {
 		if utils.IsNil(item) {
 			log.Errorf("tool is nil")
 			return false
 		}
 		return true
 	})
-	return allAiTools
+	return publishAllAITools(tools)
 }
 
 // GetAllTools returns all built-in AI tools, including generated ones
@@ -121,5 +142,5 @@ func GetAllTools() []*aitool.Tool {
 	doGetAllToolsOnce.Do(func() {
 		GetAllToolsDynamically(consts.GetGormProfileDatabase())
 	})
-	return allAiTools
+	return getAllAIToolsSnapshot()
 }

@@ -113,7 +113,11 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			// 把 caller config 的 context 透传给底层 AI gateway (openai/gemini),
 			// 这样 task cancel 时底层 HTTP 请求能被立即中断，而不是等到 HTTP 超时。
 			// 关键词: context 透传, cancel 即时中断, HTTP 超时修复
-			if ctx := aicf.GetContext(); ctx != nil {
+			ctx := req.GetContext()
+			if ctx == nil {
+				ctx = aicf.GetContext()
+			}
+			if ctx != nil {
 				optList = append(optList, aispec.WithContext(ctx))
 			}
 			optList = append(optList, extractUserUsageCallbackOpts(aicf)...)

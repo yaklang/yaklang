@@ -67,3 +67,23 @@ echo one
 	require.Nil(t, recovered)
 	require.Equal(t, "exact nonce aitag already merged", reason)
 }
+
+func TestRecoverSingleMismatchedAITagParamRejectsWhenJSONParamIsNonEmpty(t *testing.T) {
+	invokeParams := aitool.InvokeParams{"command": "new JSON proposal"}
+	raw := `{"@action":"call-tool","params":{"command":"new JSON proposal"}}
+<|TOOL_PARAM_command_stale12|>
+old checkpoint block
+<|TOOL_PARAM_command_END_stale12|>`
+
+	recovered, reason := recoverSingleMismatchedAITagParam(
+		invokeParams,
+		raw,
+		"fresh99",
+		[]string{"command"},
+		map[string]struct{}{},
+	)
+	require.Nil(t, recovered)
+	require.Equal(t, "param command already has a non-empty value", reason)
+	require.Equal(t, "new JSON proposal", invokeParams.GetString("command"),
+		"a stale-nonce checkpoint block must not overwrite a new non-empty proposal")
+}

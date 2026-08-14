@@ -2,12 +2,13 @@ package aicommon
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
+	"sync"
 	"time"
 )
 
 type EndpointSignal struct {
-	ch chan struct{}
+	ch   chan struct{}
+	once sync.Once
 }
 
 func NewEndpointSignal() *EndpointSignal {
@@ -17,6 +18,9 @@ func NewEndpointSignal() *EndpointSignal {
 }
 
 func (s *EndpointSignal) WaitContext(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -40,36 +44,26 @@ func (s *EndpointSignal) Wait() {
 	<-s.ch
 }
 
-func (s *EndpointSignal) activeAsyncContext(ctx context.Context) {
-	active := make(chan struct{})
-	go func() {
-		s.activeContext(active, ctx)
-	}()
-	<-active
+func (s *EndpointSignal) Done() <-chan struct{} {
+	return s.ch
 }
 
 func (s *EndpointSignal) ActiveContext(ctx context.Context) {
-	s.activeContext(nil, ctx)
+	if ctx != nil {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+	}
+	// An endpoint is a one-shot decision. Closing the channel turns the signal
+	// into a latch: every current and future waiter observes the same decision,
+	// and releasing before a waiter exists cannot strand a sender goroutine.
+	s.once.Do(func() { close(s.ch) })
 }
 
 func (s *EndpointSignal) ActiveAsyncContext(ctx context.Context) {
-	s.activeAsyncContext(ctx)
-}
-
-func (c *EndpointSignal) activeContext(started chan struct{}, ctx context.Context) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("aid EndpointSignal active async error, %v", err)
-		}
-	}()
-
-	if started != nil {
-		started <- struct{}{}
-	}
-
-	select {
-	case <-ctx.Done():
-		return
-	case c.ch <- struct{}{}:
-	}
+	// Kept for API compatibility. Activation is now non-blocking by design, so
+	// creating a goroutine here would only reintroduce a leak opportunity.
+	s.ActiveContext(ctx)
 }
