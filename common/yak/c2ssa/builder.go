@@ -312,7 +312,7 @@ var cSideEffect = map[string][]uint{
 	"malloc":   {uint(ssa.SideEffectOut)},    // size input, returns pointer
 	"calloc":   {uint(ssa.SideEffectOut), 0}, // num input, size input, returns pointer
 	"realloc":  {0, 0},                       // ptr input, size input, returns pointer (SideEffectOut for return value)
-	"free":     {0},                          // ptr input
+	"free":     {uint(ssa.SideEffectIn)},     // ptr input — lifetime kill (UAF)
 	"memalign": {uint(ssa.SideEffectOut), 0}, // alignment input, size input, returns pointer
 	"valloc":   {uint(ssa.SideEffectOut)},    // size input, returns pointer
 

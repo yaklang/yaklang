@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/lifetime"
 )
 
 func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
@@ -15,6 +16,74 @@ func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
 		return b.EmitConstInst(0)
 	}
 	return v
+}
+
+// emitHeapAllocFromArgs builds a heap allocation wrapped as PointerKind and
+// registers it for lifetime / UAF analysis.
+func (b *astbuilder) emitHeapAllocFromArgs(name string, args ssa.Values) ssa.Value {
+	var typ ssa.Type
+	switch name {
+	case "calloc":
+		// calloc(n, size) — approximate as byte slice when size is const
+		if len(args) >= 2 {
+			if c, ok := ssa.ToConstInst(args[1]); ok {
+				index, _ := strconv.Atoi(c.String())
+				st := ssa.NewSliceType(ssa.CreateByteType())
+				st.Len = index
+				typ = st
+			}
+		}
+	case "realloc":
+		if len(args) >= 2 {
+			if tv, ok := ssa.ToTypeValue(args[1]); ok {
+				typ = tv.GetType()
+			} else if c, ok := ssa.ToConstInst(args[1]); ok {
+				index, _ := strconv.Atoi(c.String())
+				st := ssa.NewSliceType(ssa.CreateByteType())
+				st.Len = index
+				typ = st
+			}
+		}
+	default: // malloc, valloc, memalign
+		if len(args) > 0 {
+			if tv, ok := ssa.ToTypeValue(args[0]); ok {
+				typ = tv.GetType()
+			} else if c, ok := ssa.ToConstInst(args[0]); ok {
+				index, _ := strconv.Atoi(c.String())
+				st := ssa.NewSliceType(ssa.CreateByteType())
+				st.Len = index
+				typ = st
+			} else if len(args) >= 2 {
+				// memalign(align, size)
+				if c, ok := ssa.ToConstInst(args[1]); ok {
+					index, _ := strconv.Atoi(c.String())
+					st := ssa.NewSliceType(ssa.CreateByteType())
+					st.Len = index
+					typ = st
+				}
+			}
+		}
+	}
+	if typ == nil {
+		typ = ssa.NewSliceType(ssa.CreateByteType())
+	}
+	return b.emitHeapPointer(typ)
+}
+
+// emitHeapPointer creates Make payload + Pointer wrapper and registers alloc.
+func (b *astbuilder) emitHeapPointer(typ ssa.Type) ssa.Value {
+	obj := b.EmitMakeBuildWithType(typ, nil, nil)
+	if utils.IsNil(obj) {
+		return b.EmitConstInst(0)
+	}
+	tmpName := fmt.Sprintf("$heap_%d", obj.GetId())
+	tmp := b.CreateLocalVariable(tmpName)
+	b.AssignVariable(tmp, obj)
+	ptr := b.EmitConstPointer(tmp)
+	if !utils.IsNil(ptr) {
+		lifetime.RegisterAlloc(ptr)
+	}
+	return ptr
 }
 
 // hasBinaryExpr is cheaper than len(ast.AllExpression()) >= 2 (avoids child slice alloc).
@@ -719,18 +788,21 @@ func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right
 			args = b.buildArgumentExpressionList(a.(*cparser.ArgumentExpressionListContext))
 		}
 
-		if right != nil && right.GetName() == "malloc" {
-			if len(args) > 0 {
-				if tv, ok := ssa.ToTypeValue(args[0]); ok {
-					right = b.EmitMakeBuildWithType(tv.GetType(), nil, nil)
-				} else if c, ok := ssa.ToConstInst(args[0]); ok {
-					index, _ := strconv.Atoi(c.String())
-					newtype := ssa.NewSliceType(ssa.CreateByteType())
-					newtype.Len = index
-					right = b.EmitMakeBuildWithType(newtype, nil, nil)
+		if right != nil {
+			switch right.GetName() {
+			case "malloc", "calloc", "valloc", "memalign":
+				right = b.emitHeapAllocFromArgs(right.GetName(), args)
+				return right, left
+			case "realloc":
+				right = b.emitHeapAllocFromArgs("realloc", args)
+				return right, left
+			case "free":
+				call := b.EmitCall(b.NewCall(right, args))
+				if call != nil && len(args) > 0 {
+					lifetime.RegisterKill(call, args[0])
 				}
+				return call, left
 			}
-			return right, left
 		}
 		right = b.EmitCall(b.NewCall(right, args))
 		return right, left
