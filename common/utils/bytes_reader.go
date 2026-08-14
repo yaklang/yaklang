@@ -519,6 +519,11 @@ type TriggerWriter struct {
 	timeTrigger         *time.Timer
 	writeFirstOnce      *sync.Once
 
+	// immediate triggers on the first Write instead of waiting for a
+	// size or time threshold. Used for streaming responses (e.g. SSE)
+	// where the body is long-lived and must be relayed without delay.
+	immediate bool
+
 	r    io.ReadCloser
 	w    io.WriteCloser
 	once *sync.Once
@@ -581,6 +586,21 @@ func NewTriggerWriterEx(sizeTrigger uint64, timeTrigger time.Duration, h func(bu
 	}
 }
 
+// NewTriggerWriterImmediate creates a TriggerWriter that fires on the first
+// Write call rather than waiting for a size or time threshold. This is used
+// for long-lived streaming responses (e.g. SSE) where the body must be
+// relayed to the downstream client without delay.
+func NewTriggerWriterImmediate(h func(buffer io.ReadCloser, triggerEvent string)) *TriggerWriter {
+	r, w := NewBufPipe(nil)
+	return &TriggerWriter{
+		immediate:      true,
+		w:              w, r: r,
+		once:           new(sync.Once),
+		writeFirstOnce: new(sync.Once),
+		h:              h,
+	}
+}
+
 func (f *TriggerWriter) GetCount() int64 {
 	return int64(atomic.LoadUint64(&f.bytesCount))
 }
@@ -598,12 +618,22 @@ func (f *TriggerWriter) initTimeTrigger() {
 func (f *TriggerWriter) Write(p []byte) (n int, err error) {
 	byteCount := atomic.AddUint64(&f.bytesCount, uint64(len(p)))
 	f.writeFirstOnce.Do(func() {
+		if f.immediate {
+			// Fire immediately on the first chunk for streaming responses
+			// so the header is written and forwarding starts without delay.
+			f.once.Do(func() {
+				f.h(f.r, httpctx.REQUEST_CONTEXT_KEY_ResponseTooSlow)
+			})
+			return
+		}
 		f.initTimeTrigger()
 	})
 	var timerC <-chan time.Time
 	if f.timeTrigger != nil {
 		timerC = f.timeTrigger.C
 	}
+	// When immediate, the once has already fired above; the select below
+	// is a no-op because once.Do is idempotent.
 	select {
 	case <-timerC:
 		f.once.Do(func() {
