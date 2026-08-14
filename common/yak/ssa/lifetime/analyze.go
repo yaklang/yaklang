@@ -329,11 +329,43 @@ func FindUAFUsesRelated(prog *ssa.Program, seeds []ssa.Value) []*Finding {
 	return out
 }
 
+// entryStateFor seeds formal parameters as abstract heap/resource objects
+// (Fortify-style rule variables). Object id == parameter value id. Parameters
+// start Alive; only an explicit free/kill in this function moves them to Freed.
+// Does not assume the caller already freed them (avoids speculative interproc FP).
+func entryStateFor(fn *ssa.Function) *pathState {
+	st := newPathState()
+	if fn == nil {
+		return st
+	}
+	for _, pid := range fn.Params {
+		if pid <= 0 {
+			continue
+		}
+		inst, ok := fn.GetInstructionById(pid)
+		if !ok || inst == nil {
+			continue
+		}
+		p, ok := ssa.ToParameter(inst)
+		if !ok || p == nil || p.IsFreeValue {
+			continue
+		}
+		id := p.GetId()
+		if id <= 0 {
+			continue
+		}
+		st.objects[id] = StateAlive
+		st.addPointsTo(id, id)
+	}
+	return st
+}
+
 func analyzeFunction(fn *ssa.Function, reg *registry, freeParams map[int64]map[int]struct{}) []*Finding {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return nil
 	}
 	allocs := discoverAllocs(fn, reg)
+	entrySeed := entryStateFor(fn)
 
 	blocks := make([]*ssa.BasicBlock, 0, len(fn.Blocks))
 	blockIndex := make(map[int64]int)
@@ -367,7 +399,9 @@ func analyzeFunction(fn *ssa.Function, reg *registry, freeParams map[int64]map[i
 		changed = false
 		for i, b := range blocks {
 			preds := make([]*pathState, 0, len(b.Preds))
-			if b.GetId() == entryID || len(b.Preds) == 0 {
+			if b.GetId() == entryID {
+				preds = append(preds, entrySeed.clone())
+			} else if len(b.Preds) == 0 {
 				preds = append(preds, newPathState())
 			}
 			for _, pid := range b.Preds {
@@ -688,6 +722,11 @@ func handleInst(inst ssa.Instruction, st *pathState, allocs map[int64]struct{}, 
 			if _, ok := allocs[obj.GetId()]; ok {
 				st.addPointsTo(v.GetId(), obj.GetId())
 			}
+			// parameter[i].@value / @pointer → formal parameter abstract object
+			if pid := paramObjectID(obj); pid > 0 {
+				st.addPointsTo(obj.GetId(), pid)
+				st.addPointsTo(v.GetId(), pid)
+			}
 		}
 	}
 
@@ -886,6 +925,9 @@ func checkUses(v ssa.Value, st *pathState) []*Finding {
 			for oid := range oidList {
 				report(oid)
 			}
+			if pid := paramObjectID(op); pid > 0 {
+				report(pid)
+			}
 		}
 	}
 
@@ -897,6 +939,9 @@ func checkUses(v ssa.Value, st *pathState) []*Finding {
 			if st.objects[obj.GetId()] == StateFreed {
 				report(obj.GetId())
 			}
+			if pid := paramObjectID(obj); pid > 0 {
+				report(pid)
+			}
 		}
 	}
 
@@ -904,5 +949,64 @@ func checkUses(v ssa.Value, st *pathState) []*Finding {
 	if st.objects[v.GetId()] == StateFreed && !v.HasValues() && !v.IsMember() {
 		report(v.GetId())
 	}
+	if pid := paramObjectID(v); pid > 0 {
+		report(pid)
+	}
 	return findings
+}
+
+// paramObjectID maps a value to its formal-parameter abstract object id when
+// the value is the parameter itself or a member rooted at a Parameter
+// (e.g. name "#15.@value" / string "parameter[0].@value").
+func paramObjectID(v ssa.Value) int64 {
+	if v == nil {
+		return 0
+	}
+	if p, ok := ssa.ToParameter(v); ok && p != nil && !p.IsFreeValue {
+		return p.GetId()
+	}
+	// Walk member parents: parameter[i].@value is a member of Parameter p.
+	seen := map[int64]struct{}{}
+	cur := v
+	for depth := 0; cur != nil && cur.IsMember() && depth < 4; depth++ {
+		id := cur.GetId()
+		if _, ok := seen[id]; ok {
+			break
+		}
+		seen[id] = struct{}{}
+		obj := cur.GetObject()
+		if obj == nil {
+			break
+		}
+		if p, ok := ssa.ToParameter(obj); ok && p != nil && !p.IsFreeValue {
+			return p.GetId()
+		}
+		cur = obj
+	}
+	name := v.GetName()
+	if name == "" || !strings.HasPrefix(name, "parameter[") {
+		name = v.String()
+	}
+	if strings.HasPrefix(name, "parameter[") {
+		end := strings.IndexByte(name, ']')
+		if end > len("parameter[") {
+			idxStr := name[len("parameter[") : end]
+			idx := 0
+			okNum := true
+			for i := 0; i < len(idxStr); i++ {
+				c := idxStr[i]
+				if c < '0' || c > '9' {
+					okNum = false
+					break
+				}
+				idx = idx*10 + int(c-'0')
+			}
+			if okNum {
+				if fn := v.GetFunc(); fn != nil && idx >= 0 && idx < len(fn.Params) {
+					return fn.Params[idx]
+				}
+			}
+		}
+	}
+	return 0
 }

@@ -327,7 +327,6 @@ int main() {
 	})
 
 	t.Run("pointer", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`
 #include <stdio.h>
 int main() {
@@ -369,6 +368,6 @@ int main() {
 	println(head);
     return 0;
 }
-`, []string{"10", "Function-malloc"}, t)
+`, []string{"10", "make(Pointer)"}, t)
 	})
 }
