@@ -1529,6 +1529,7 @@ func init() {
 	registerNativeCall(NativeCall_CFGCondition, nc_func(nativeCallCFGCondition), nc_desc(`CFG 条件摘要：返回当前 block 的条件证据（inst/value/source/schema）。config 参数：无。`))
 	registerNativeCall(NativeCall_CFGConditionValues, nc_func(nativeCallCFGConditionValues), nc_desc(`CFG 条件 value 集：返回当前 block 条件关联的 value 列表。config 参数：无。`))
 	registerNativeCall(NativeCall_ReachabilityGuard, nc_func(nativeCallReachabilityGuard), nc_desc(`可达性守卫（mustExecute）：从函数入口起 target 是否在每条出路上必执行。返回值（可多项）：入口全路径必达且 cfgPostDominates 成立时仅返回布尔常量 true；入口 CFG 不可达 target 时返回 false；否则返回到达 target 时路径上的条件 SSA value 列表（CondValueID 顺序，嵌套 if/loop/switch 等可能对应多项）。跨 Program/跨函数/无入口信息时返回 false。必达判定依赖后支配，merge 块上可能保守。管道上可选同函数 SSA 作锚；必填 target="$to"。mode 仅 mustExecute。`))
+	registerNativeCall(NativeCall_UAF, nc_func(nativeCallUAF), nc_desc(`Use-After-Free 检测：基于堆对象生命周期分析，返回 UAF / double-free 的 use 点。用法：*<uaf()> as $uaf 扫描全程序；或 $ptr<uaf()> 仅返回与选定指针/free 实参相关的 use。当前支持 C（malloc/calloc/realloc + free），过程内 + 简单拷贝别名。`))
 }
 
 func fetchProgram(v any) (*Program, error) {
