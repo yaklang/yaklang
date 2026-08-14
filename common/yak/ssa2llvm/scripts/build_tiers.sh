@@ -15,7 +15,7 @@ set -euo pipefail
 # Output layout, which is what SSA2LLVM_TIER_DIR expects:
 #   <output-dir>/core/libyak.a
 #   <output-dir>/net/libyak.a
-#   <output-dir>/full/libyak.a
+#   <output-dir>/staticanalyze/libyak.a
 #
 # Each tier build overwrites runtime/embed/assets/, so the tier built last is
 # the one a subsequent `go build` embeds. The ladder is built smallest-first and

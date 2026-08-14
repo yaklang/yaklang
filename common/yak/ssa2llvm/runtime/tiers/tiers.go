@@ -12,7 +12,7 @@
 // much metadata exists at all, pruning decides how much of the remaining code
 // reaches the binary. Measured on one hello-world script:
 //
-//	full tier + pruning    84.62 MiB
+//	staticanalyze tier + pruning    84.62 MiB
 //	net  tier + pruning    28.73 MiB
 //	core tier + pruning     7.87 MiB
 //
@@ -51,7 +51,7 @@ var All = []Tier{
 		Modules: []string{"cli", "codec", "http", "os", "poc", "yakit"},
 	},
 	{
-		Name:    "full",
+		Name:    "staticanalyze",
 		Modules: []string{"cli", "codec", "http", "os", "poc", "ssa", "yakit"},
 	},
 }

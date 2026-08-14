@@ -81,7 +81,7 @@ func yak_register_module_ssa() {
 |---|---|
 | 脚本编译期调用 `go build` 重建运行时 | 要求用户装 Go 工具链；每次编译等分钟级。与自包含前提冲突。（代码里保留了这条 legacy 路径，仅用于有完整工具链的环境） |
 | 每个模块单独打一个 c-archive，按需链接 | **硬阻断**。每个 c-archive 自带一整份 Go runtime 和 `moduledata`，两份不能共存于同一个进程 |
-| 预构建若干"档位"的 `libyak.a`（minimal / net / full） | 真正的对手方案。它更简单、零 ELF 风险，而且能用 Go 自己的 DCE 连元数据一起删（这点比本方案强）。代价是组合爆炸：模块任意组合是 2^N，每档几十到上百 MB 的分发成本。若未来模块数收敛到个位数且用户场景集中，这个方案值得重新评估 |
+| 预构建若干"档位"的 `libyak.a`（core / net / staticanalyze） | 真正的对手方案。它更简单、零 ELF 风险，而且能用 Go 自己的 DCE 连元数据一起删（这点比本方案强）。代价是组合爆炸：模块任意组合是 2^N，每档几十到上百 MB 的分发成本。若未来模块数收敛到个位数且用户场景集中，这个方案值得重新评估 |
 | 压缩 / 自解压 | 与本方案正交，减分发不减内存，可叠加 |
 | 接受现状 | 行业基线确实如此：`deno compile` 的产物官方文档给出的典型值约 70 MiB，因为整个 JS 运行时都被打进去了（[Deno Docs: deno compile](https://docs.deno.com/runtime/reference/cli/compile/)）。但我们的分发场景对单脚本产物体积敏感 |
 
@@ -561,11 +561,11 @@ SSA2LLVM_FOLD_FUNCNAMES=1 bash common/yak/ssa2llvm/scripts/build_yaklib.sh
 |---|---|---|
 | `core` | `os` `codec` `yakit` | 13 MB |
 | `net` | core + `cli` `poc` `http` | 72 MB |
-| `full` | net + `ssa` | 220 MB |
+| `staticanalyze` | net + `ssa` | 220 MB |
 
 同一个编译器二进制，按脚本用到的模块自动选最小可用档：
 
-| 脚本 | 选中档 | 原（单一 full archive） | 现 |
+| 脚本 | 选中档 | 原（单一全量档） | 现 |
 |---|---|---:|---:|
 | `println` hello world | core | 84.62 MiB | **7.87 MiB** |
 | `codec.EncodeBase64` | core | 85.62 MiB | **8.10 MiB** |
@@ -579,10 +579,10 @@ hello world **−90.7%**，比 §5.3 那个"上限" `p1.bin` 还小 21 MiB——
 
 **这条路真正的约束不是体积，是 AOT shim。** 我一开始想把 `json` `str` `re` `math` 这些"看起来很轻"的模块也塞进 core 档，结果 archive 反而涨回去了，构建期的启动路径闸门（§6）直接报了 16 条泄漏，路径里赫然是 mongo-driver、mssql、go-ora、protobuf 和 SSA 前端。原因是：只有 `os`/`codec`/`yakit` 这几个模块的入口走了轻量 AOT 导出表，其余模块的入口仍然 import 单体包 `common/yak/yaklib`，而它几乎 import 了整个世界。**所以档位阶梯能有几级，取决于有多少模块写了 shim，而不是取决于怎么划分模块。** 想让 core 档覆盖更多脚本，要写的是 shim，不是改档位表。
 
-**降级是设计的一部分，不是容错。** 档位 archive 找不到时，编译器会往上找更大的档，最后回退到内嵌的 full 档：
+**降级是设计的一部分，不是容错。** 档位 archive 找不到时，编译器会往上找更大的档，最后回退到内嵌的 staticanalyze 档：
 
 ```
-runtime tier: wanted "core", using "full" (embedded);
+runtime tier: wanted "core", using "staticanalyze" (embedded);
   put a core/libyak.a under $SSA2LLVM_TIER_DIR for a smaller binary
 ```
 
@@ -610,7 +610,7 @@ R0、R1、R3 都已做完，三者正交：
 
 - **R3 决定量级。** 一条抵得上其余所有条的两倍还多，因为它是唯一能让 Go 链接器把元数据一起删掉的。
 - **R0 只对"用了少数模块"的脚本有效。** "不用模块"那一行 R0 只省 0.51 MiB——它本来就不引用任何模块，整个 `shared` 组在拆分前就被 GC 掉了。而且公共核心现在只剩 1.01 MiB，继续切没有肉了。
-- **R1 是固定的 −14.63 MiB。** 在 full 档上占 17%，在 core 档上就是 7.87 MiB 里再挤——它折的是全 archive 的函数名表，档位越小，这张表本来就越小，收益也随之缩水。**R3 做完之后，R1 的性价比明显下降**，这也是它至今默认关闭的原因之一。
+- **R1 是固定的 −14.63 MiB。** 在 staticanalyze 档上占 17%，在 core 档上就是 7.87 MiB 里再挤——它折的是全 archive 的函数名表，档位越小，这张表本来就越小，收益也随之缩水。**R3 做完之后，R1 的性价比明显下降**，这也是它至今默认关闭的原因之一。
 
 **R2 放到最后**，并且只在有了 GC/panic 回归测试之后再动。做完 R3 再回头看，R2 要冒的风险（改 pclntab 条目、碰 GC 关键结构）换来的那十几 MiB，在 core 档的 7.87 MiB 面前已经不是同一个量级的问题了。
 
@@ -695,8 +695,8 @@ SSA2LLVM_FOLD_FUNCNAMES=1 bash common/yak/ssa2llvm/scripts/build_yaklib.sh
 go build -o build/tools/ssa2llvm ./common/yak/ssa2llvm/cmd/ssa2llvm
 ./build/tools/ssa2llvm compile t_codec_only.yak -o both.bin    # 70.99 MiB
 
-# 12. R3：构建整条档位阶梯（core/net/full），CI 跑的就是这一条
-#     每档都会覆盖 runtime/embed/assets/，脚本按小→大构建，最后停在 full，
+# 12. R3：构建整条档位阶梯（core/net/staticanalyze），CI 跑的就是这一条
+#     每档都会覆盖 runtime/embed/assets/，脚本按小→大构建，最后停在 staticanalyze，
 #     所以跑完之后内嵌的仍是覆盖面最大的那一档
 bash common/yak/ssa2llvm/scripts/build_tiers.sh        # 默认输出 build/tiers/
 go build -o build/tools/ssa2llvm ./common/yak/ssa2llvm/cmd/ssa2llvm
@@ -705,7 +705,7 @@ go build -o build/tools/ssa2llvm ./common/yak/ssa2llvm/cmd/ssa2llvm
 export SSA2LLVM_TIER_DIR="$PWD/build/tiers"
 ./build/tools/ssa2llvm compile hello.yak -o tiered.bin -x   # core 档，7.87 MiB
 unset SSA2LLVM_TIER_DIR
-./build/tools/ssa2llvm compile hello.yak -o fallback.bin -x # 回退 full，84.62 MiB
+./build/tools/ssa2llvm compile hello.yak -o fallback.bin -x # 回退 staticanalyze，84.62 MiB
 
 # 14. 查看档位定义与选档结果（脚本和编译器读的是同一份 Go 定义）
 go run ./common/yak/ssa2llvm/cmd/tiers list
