@@ -1,4 +1,4 @@
-package reactloops
+﻿package reactloops
 
 import (
 	"context"
@@ -452,12 +452,7 @@ func (defaultGoalElaborator) Elaborate(ctx context.Context, prepared *PreparedSu
 
 const (
 	// DispatchSubReactJobsLoopKey 在 loop vars 中存储 JSON 编码的 dispatch 任务。
-	DispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
-	DispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
-
-	MaxDispatchSubReactJobs    = 30
-	DefaultDispatchConcurrency = 5
-	MaxDispatchConcurrency     = 10
+	DispatchSubReactJobsLoopKey = "dispatch_sub_react_jobs"
 )
 
 // ProcessStats 汇总已完成子 Agent 的运行期活动数据。
@@ -572,6 +567,7 @@ func elaborateGoal(
 // --- 解析 ---
 
 // ParseDispatchJobs 从 AI action 的 "dispatches" 参数中提取 dispatch 任务。
+// 单次 dispatch 的任务数硬上限为 aicommon.AbsoluteMaxSubAgentConcurrency。
 func ParseDispatchJobs(action *aicommon.Action) ([]SubAgentJob, error) {
 	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"))
 	if err != nil {
@@ -611,12 +607,14 @@ func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error
 }
 
 // NormalizeDispatchJobs 校验并规范化 dispatch 任务。
+// 单次最多 AbsoluteMaxSubAgentConcurrency 个；同时运行数量由 MaxSubAgents / ResolveSubAgentConcurrency 控制。
 func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
+	maxJobs := int(aicommon.AbsoluteMaxSubAgentConcurrency)
 	if len(jobs) == 0 {
 		return nil, utils.Error("dispatches must contain at least one sub agent job")
 	}
-	if len(jobs) > MaxDispatchSubReactJobs {
-		return nil, utils.Errorf("dispatches supports at most %d sub agents per call", MaxDispatchSubReactJobs)
+	if len(jobs) > maxJobs {
+		return nil, utils.Errorf("dispatches supports at most %d sub agents per call", maxJobs)
 	}
 
 	for i := range jobs {
@@ -641,20 +639,21 @@ func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
 	return jobs, nil
 }
 
-// ParseConcurrency 从 AI action 中提取并发参数并限制到合法范围。
-func ParseConcurrency(action *aicommon.Action, jobCount int) int {
-	concurrency := action.GetInt("concurrency")
+// ResolveSubAgentConcurrency 计算同时运行的子 Agent 数。
+// maxSubAgents 通常来自 loop.GetMaxSubAgents()（UI「子 Agent 数量」）。
+func ResolveSubAgentConcurrency(maxSubAgents, jobCount int) int {
+	concurrency := maxSubAgents
 	if concurrency <= 0 {
-		concurrency = DefaultDispatchConcurrency
-		if jobCount < concurrency {
-			concurrency = jobCount
-		}
+		concurrency = int(aicommon.DefaultMaxSubAgentConcurrency)
 	}
-	if concurrency > MaxDispatchConcurrency {
-		concurrency = MaxDispatchConcurrency
+	if concurrency > int(aicommon.AbsoluteMaxSubAgentConcurrency) {
+		concurrency = int(aicommon.AbsoluteMaxSubAgentConcurrency)
 	}
-	if concurrency > jobCount {
+	if jobCount < concurrency {
 		concurrency = jobCount
+	}
+	if concurrency < 1 {
+		concurrency = 1
 	}
 	return concurrency
 }

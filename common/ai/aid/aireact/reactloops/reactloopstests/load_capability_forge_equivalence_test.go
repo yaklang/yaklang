@@ -150,13 +150,13 @@ func runForgeEquivTest(
 }
 
 // TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability verifies that
-// load_capability produces the same async lifecycle as require_ai_blueprint
+// load_capability produces the same sync lifecycle as require_ai_blueprint
 // when dispatching to a forge.
 //
 // Both paths should produce identical observable behavior:
-// 1. onAsyncTaskTrigger is called (task enters async mode)
-// 2. task.IsAsyncMode() is true
-// 3. onAsyncTaskFinished is called (forge callback completes)
+// 1. onAsyncTaskTrigger is NOT called (task stays in sync mode)
+// 2. task.IsAsyncMode() is false
+// 3. onAsyncTaskFinished is NOT called (no async callback)
 //
 // Note: invokePlanAndExecute panics due to incomplete mock (GetCurrentTask nil),
 // but this is identical in both paths and does not affect the lifecycle equivalence.
@@ -175,14 +175,14 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 			[]string{"directly_answer", "require_ai_blueprint"},
 		)
 
-		if !baselineResult.asyncTriggerCalled {
-			t.Error("expected onAsyncTaskTrigger to be called")
+		if baselineResult.asyncTriggerCalled {
+			t.Error("onAsyncTaskTrigger should NOT be called for sync forge")
 		}
-		if !baselineResult.taskIsAsync {
-			t.Error("expected task to be in async mode")
+		if baselineResult.taskIsAsync {
+			t.Error("task should NOT be in async mode for sync forge")
 		}
-		if !baselineResult.finishCalled {
-			t.Error("expected onAsyncTaskFinished to be called")
+		if baselineResult.finishCalled {
+			t.Error("onAsyncTaskFinished should NOT be called for sync forge")
 		}
 		t.Logf("baseline: asyncTrigger=%v, taskIsAsync=%v, finish=%v",
 			baselineResult.asyncTriggerCalled, baselineResult.taskIsAsync, baselineResult.finishCalled)
@@ -198,14 +198,14 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 			[]string{"directly_answer", "load_capability"},
 		)
 
-		if !loadCapResult.asyncTriggerCalled {
-			t.Error("expected onAsyncTaskTrigger to be called (equivalence)")
+		if loadCapResult.asyncTriggerCalled {
+			t.Error("onAsyncTaskTrigger should NOT be called for sync forge (equivalence)")
 		}
-		if !loadCapResult.taskIsAsync {
-			t.Error("expected task to be in async mode (equivalence)")
+		if loadCapResult.taskIsAsync {
+			t.Error("task should NOT be in async mode for sync forge (equivalence)")
 		}
-		if !loadCapResult.finishCalled {
-			t.Error("expected onAsyncTaskFinished to be called (equivalence)")
+		if loadCapResult.finishCalled {
+			t.Error("onAsyncTaskFinished should NOT be called for sync forge (equivalence)")
 		}
 
 		if baselineResult.asyncTriggerCalled != loadCapResult.asyncTriggerCalled {
@@ -223,6 +223,6 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 
 		t.Logf("load_cap: asyncTrigger=%v, taskIsAsync=%v, finish=%v",
 			loadCapResult.asyncTriggerCalled, loadCapResult.taskIsAsync, loadCapResult.finishCalled)
-		t.Log("EQUIVALENCE: require_ai_blueprint and load_capability produce identical forge async lifecycle")
+		t.Log("EQUIVALENCE: require_ai_blueprint and load_capability produce identical forge sync lifecycle")
 	})
 }

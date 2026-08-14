@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,100 @@ import (
 )
 
 func TestRedirectWithCookieAndAuthentication(t *testing.T) {
+	t.Run("SiblingPathKeepsOriginalCookie", func(t *testing.T) {
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch request.RequestURI {
+			case "/login.php":
+				writer.Header().Set("Location", "main.php")
+				writer.WriteHeader(http.StatusFound)
+			case "/main.php":
+				if request.Method != http.MethodGet || request.Header.Get("Cookie") != "PHPSESSID=original" {
+					writer.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				writer.Header().Set("Bingo", "kept-login-session")
+				writer.WriteHeader(http.StatusOK)
+			}
+		})
+
+		req := "POST /login.php HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\nCookie: PHPSESSID=original\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 3\r\n\r\na=b"
+		rsp, err := HTTP(
+			WithRequest(req),
+			WithTimeoutFloat(3),
+			WithRedirectTimes(3),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(rsp.RawPacket, []byte("Bingo: kept-login-session")) {
+			t.Fatalf("redirect should keep the login cookie for a sibling path, response: %s", rsp.RawPacket)
+		}
+	})
+
+	t.Run("ResponseCookieOverridesOriginalCookie", func(t *testing.T) {
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch request.RequestURI {
+			case "/":
+				writer.Header().Set("Location", "/main")
+				writer.Header().Set("Set-Cookie", "PHPSESSID=rotated; Path=/")
+				writer.WriteHeader(http.StatusFound)
+			case "/main":
+				if request.Header.Get("Cookie") != "PHPSESSID=rotated" {
+					writer.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				writer.Header().Set("Bingo", "used-rotated-session")
+				writer.WriteHeader(http.StatusOK)
+			}
+		})
+
+		req := "POST / HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\nCookie: PHPSESSID=original\r\nContent-Length: 3\r\n\r\na=b"
+		rsp, err := HTTP(
+			WithRequest(req),
+			WithTimeoutFloat(3),
+			WithRedirectTimes(3),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(rsp.RawPacket, []byte("Bingo: used-rotated-session")) {
+			t.Fatalf("Set-Cookie should override the original request cookie, response: %s", rsp.RawPacket)
+		}
+	})
+
+	t.Run("EachHopUsesItsOwnStatusCode", func(t *testing.T) {
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch request.RequestURI {
+			case "/start":
+				writer.Header().Set("Location", "/middle")
+				writer.WriteHeader(http.StatusTemporaryRedirect)
+			case "/middle":
+				if request.Method != http.MethodPost {
+					writer.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				writer.Header().Set("Location", "/final")
+				writer.WriteHeader(http.StatusFound)
+			case "/final":
+				if request.Method != http.MethodGet || len(lowhttpRequestBody(request)) != 0 {
+					writer.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				writer.Header().Set("Bingo", "per-hop-status")
+				writer.WriteHeader(http.StatusOK)
+			}
+		})
+
+		req := "POST /start HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 3\r\n\r\na=b"
+		rsp, err := HTTP(WithRequest(req), WithTimeoutFloat(3), WithRedirectTimes(3))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(rsp.RawPacket, []byte("Bingo: per-hop-status")) {
+			t.Fatalf("each redirect hop should use its own status code, response: %s", rsp.RawPacket)
+		}
+	})
+
 	// Test 1: 同源情况下 Cookie 和 Authorization 的处理
 	t.Run("SameOrigin", func(t *testing.T) {
 		host1, port1 := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -142,6 +237,14 @@ func TestRedirectWithCookieAndAuthentication(t *testing.T) {
 			t.Fatalf("cross origin redirect should not carry credentials, response: %s", string(rsp))
 		}
 	})
+}
+
+func lowhttpRequestBody(request *http.Request) []byte {
+	if request == nil || request.Body == nil {
+		return nil
+	}
+	body, _ := io.ReadAll(request.Body)
+	return body
 }
 
 func TestWithRedirectTimes(t *testing.T) {
@@ -542,6 +645,44 @@ func TestGetRedirectFromHTTPResponse_MultiSlashLocation(t *testing.T) {
 
 			merged := MergeUrlFromHTTPRequest(c.baseReq, r, c.isHttps)
 			test.Equalf(c.wantMerged, merged, "MergeUrlFromHTTPRequest result mismatch")
+		})
+	}
+}
+
+func TestGetRedirectFromHTTPResponseOnly304IsExcluded(t *testing.T) {
+	tests := []struct {
+		name     string
+		response string
+		want     string
+	}{
+		{
+			name:     "300 with location remains followable",
+			response: "HTTP/1.1 300 Multiple Choices\r\nLocation: /preferred\r\n\r\n",
+			want:     "/preferred",
+		},
+		{
+			name:     "304 ignores location",
+			response: "HTTP/1.1 304 Not Modified\r\nLocation: /must-not-follow\r\n\r\n",
+		},
+		{
+			name:     "304 does not mistake content-location for redirect",
+			response: "HTTP/1.1 304 Not Modified\r\nETag: \"abc\"\r\nContent-Location: /cached/resource\r\n\r\n",
+		},
+		{
+			name:     "305 remains followable under broad 3xx policy",
+			response: "HTTP/1.1 305 Use Proxy\r\nLocation: http://proxy.example:8080\r\n\r\n",
+			want:     "http://proxy.example:8080",
+		},
+		{
+			name:     "unknown 399 remains followable under broad 3xx policy",
+			response: "HTTP/1.1 399 Custom Redirect\r\nLocation: /custom\r\n\r\n",
+			want:     "/custom",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, GetRedirectFromHTTPResponse([]byte(tt.response), false))
 		})
 	}
 }

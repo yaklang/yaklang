@@ -2,6 +2,7 @@ package yakast
 
 import (
 	"fmt"
+	"strings"
 
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -96,7 +97,13 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 		}
 		y.writeString("(")
 		paramsSymbol, isVariable = y.VisitFunctionParamDecl(i.FunctionParamDecl())
-		y.writeString(") ")
+		y.writeString(")")
+		// Go 风格返回类型注解：仅 formatter 保留，运行时忽略
+		if rt := i.FunctionResultType(); rt != nil {
+			y.writeString(" ")
+			y.writeString(formatTypeLiteralText(rt.GetText()))
+		}
+		y.writeString(" ")
 		// visit代码块
 		y.VisitBlock(i.Block(), true)
 		y.pushOperator(yakvm.OpReturn)
@@ -146,6 +153,20 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 	return nil
 }
 
+func formatTypeLiteralText(text string) string {
+	// ANTLR GetText 可能丢掉空格；对常见多返回 `(int,error)` 补空格更可读
+	text = strings.TrimSpace(text)
+	if strings.HasPrefix(text, "(") && strings.HasSuffix(text, ")") {
+		inner := strings.TrimSpace(text[1 : len(text)-1])
+		parts := strings.Split(inner, ",")
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
+		}
+		return "(" + strings.Join(parts, ", ") + ")"
+	}
+	return text
+}
+
 func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) ([]int, bool) {
 	if y == nil || raw == nil {
 		return nil, false
@@ -159,16 +180,24 @@ func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) 
 	defer recoverRange()
 
 	ellipsis := i.Ellipsis()
-	ids := i.AllIdentifier()
-	lenOfIds := len(ids)
+	params := i.AllFunctionParam()
+	lenOfIds := len(params)
 	symbols := make([]int, lenOfIds)
 
 	tokenStart := i.BaseParserRuleContext.GetStart().GetColumn()
 	lineLength := tokenStart
 	eachParamOneLine := false
 	identifierTokenLengths := make([]int, lenOfIds)
-	for index, id := range ids {
-		identifierTokenLengths[index] = len(id.GetText())
+	for index, p := range params {
+		pc, _ := p.(*yak.FunctionParamContext)
+		if pc == nil || pc.Identifier() == nil {
+			continue
+		}
+		n := len(pc.Identifier().GetText())
+		if tl := pc.FuncTypeRef(); tl != nil {
+			n += 1 + len(tl.GetText())
+		}
+		identifierTokenLengths[index] = n
 		if !eachParamOneLine && identifierTokenLengths[index] > FORMATTER_RECOMMEND_PARAM_LENGTH {
 			eachParamOneLine = true
 		}
@@ -181,8 +210,12 @@ func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) 
 	hadIncIndent := false
 	comments := getIdentifersSurroundComments(i.GetParser().GetTokenStream(), i.GetStart(), i.GetStop(), lenOfIds)
 
-	for index, id := range ids {
-		idText := id.GetText()
+	for index, p := range params {
+		pc, _ := p.(*yak.FunctionParamContext)
+		if pc == nil || pc.Identifier() == nil {
+			continue
+		}
+		idText := pc.Identifier().GetText()
 		lineLength += identifierTokenLengths[index]
 
 		if lenOfIds > 1 { // 如果不是只有一个参数，超出单行最长长度或任意一个参数过长，就换行
@@ -208,6 +241,11 @@ func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) 
 		symbols[index] = symbolId
 
 		y.writeString(idText)
+		// Go 风格参数类型注解：formatter 保留，不生成类型相关 opcode
+		if tl := pc.FuncTypeRef(); tl != nil {
+			y.writeString(" ")
+			y.writeString(formatTypeLiteralText(tl.GetText()))
+		}
 
 		if comments[index] != "" {
 			y.writeString(fmt.Sprintf(" /* %s */", comments[index]))

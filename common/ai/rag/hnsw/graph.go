@@ -8,15 +8,13 @@ import (
 	"math/rand"
 	"slices"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/yaklang/yaklang/common/utils/asynchelper"
 
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/maps"
 )
 
 type Vector = func() []float32
@@ -122,10 +120,115 @@ type FilterFunc[K cmp.Ordered] func(key K, vector Vector) bool
 type searchCandidate[K cmp.Ordered] struct {
 	node hnswspec.LayerNode[K]
 	dist float64
+	// order preserves the legacy heap behavior for equal distances: candidates
+	// discovered earlier remain ahead of candidates discovered later.
+	order uint64
 }
 
 func (s searchCandidate[K]) Less(o searchCandidate[K]) bool {
+	if s.dist == o.dist {
+		return s.order < o.order
+	}
 	return s.dist < o.dist
+}
+
+// farthestSearchCandidate reverses the ordering used by searchCandidate.
+// SEARCH-LAYER needs a min-heap for candidates and a max-heap for its current
+// best results; the last element of a min-heap is not necessarily its maximum.
+type farthestSearchCandidate[K cmp.Ordered] struct {
+	searchCandidate[K]
+}
+
+func (s farthestSearchCandidate[K]) Less(o farthestSearchCandidate[K]) bool {
+	if s.dist == o.dist {
+		return s.order > o.order
+	}
+	return s.dist > o.dist
+}
+
+// searchWorkspace keeps the transient heaps and visited set across layer
+// descents. A graph query commonly searches several tiny upper layers before
+// the base layer; allocating all of these structures per layer was responsible
+// for most of the search-path allocations.
+type searchWorkspace[K cmp.Ordered] struct {
+	candidates      *Heap[searchCandidate[K]]
+	found           *Heap[farthestSearchCandidate[K]]
+	result          *Heap[farthestSearchCandidate[K]]
+	visited         map[K]uint32
+	visitGeneration uint32
+	output          []searchCandidate[K]
+	neighborNodes   []hnswspec.LayerNode[K]
+	neighborVectors [][]float32
+	neighborNorms   []float64
+	neighborDists   []float64
+}
+
+func newSearchWorkspace[K cmp.Ordered](efSearch, k int) *searchWorkspace[K] {
+	if efSearch < k {
+		efSearch = k
+	}
+	visitedCapacity := min(efSearch*16, 512)
+	workspace := &searchWorkspace[K]{
+		candidates:      NewHeap[searchCandidate[K]](),
+		found:           NewHeap[farthestSearchCandidate[K]](),
+		result:          NewHeap[farthestSearchCandidate[K]](),
+		visited:         make(map[K]uint32, visitedCapacity),
+		output:          make([]searchCandidate[K], 0, k),
+		neighborNodes:   make([]hnswspec.LayerNode[K], 0, max(k*2, 32)),
+		neighborVectors: make([][]float32, max(k*2, 32)),
+		neighborNorms:   make([]float64, max(k*2, 32)),
+		neighborDists:   make([]float64, max(k*2, 32)),
+	}
+	workspace.candidates.Init(make([]searchCandidate[K], 0, efSearch*2))
+	workspace.found.Init(make([]farthestSearchCandidate[K], 0, efSearch))
+	workspace.result.Init(make([]farthestSearchCandidate[K], 0, k))
+	return workspace
+}
+
+func (w *searchWorkspace[K]) ensureCapacity(efSearch, k int) {
+	if efSearch < k {
+		efSearch = k
+	}
+	if cap(w.candidates.Slice()) < efSearch*2 {
+		w.candidates.Init(make([]searchCandidate[K], 0, efSearch*2))
+	}
+	if cap(w.found.Slice()) < efSearch {
+		w.found.Init(make([]farthestSearchCandidate[K], 0, efSearch))
+	}
+	if cap(w.result.Slice()) < k {
+		w.result.Init(make([]farthestSearchCandidate[K], 0, k))
+	}
+	if cap(w.output) < k {
+		w.output = make([]searchCandidate[K], 0, k)
+	}
+}
+
+func (w *searchWorkspace[K]) reset() {
+	w.candidates.Init(w.candidates.Slice()[:0])
+	w.found.Init(w.found.Slice()[:0])
+	w.result.Init(w.result.Slice()[:0])
+	// A generation marker avoids clearing the visited map for every hierarchy
+	// layer. Bound retained keys so long index builds cannot grow this scratch
+	// map to the size of the graph.
+	if w.visitGeneration == ^uint32(0) || len(w.visited) > 4096 {
+		clear(w.visited)
+		w.visitGeneration = 1
+	} else {
+		w.visitGeneration++
+		if w.visitGeneration == 0 {
+			w.visitGeneration = 1
+		}
+	}
+	w.output = w.output[:0]
+	w.neighborNodes = w.neighborNodes[:0]
+}
+
+func (w *searchWorkspace[K]) prepareNeighborScratch(count int) {
+	if len(w.neighborVectors) < count {
+		w.neighborVectors = make([][]float32, count)
+		w.neighborNorms = make([]float64, count)
+		w.neighborDists = make([]float64, count)
+	}
 }
 
 // search returns the layer node closest to the target node
@@ -134,183 +237,129 @@ func search[K cmp.Ordered](
 	entryNode hnswspec.LayerNode[K],
 	k int,
 	efSearch int,
-	target Vector,
+	targetNode hnswspec.LayerNode[K],
 	distance hnswspec.DistanceFunc[K],
 	filter FilterFunc[K],
+	workspace *searchWorkspace[K],
+	batchCosine bool,
 ) []searchCandidate[K] {
-	searchStartTime := time.Now()
+	if entryNode == nil || targetNode == nil || k <= 0 {
+		return nil
+	}
+	if efSearch < k {
+		efSearch = k
+	}
+	workspace.reset()
 
-	// Check for nil entryNode to prevent panic
-	if entryNode == nil {
-		log.Errorf("search called with nil entryNode")
-		return []searchCandidate[K]{}
+	first := searchCandidate[K]{node: entryNode, dist: distance(entryNode, targetNode)}
+	var discoveryOrder uint64
+
+	// The candidate queue is nearest-first. The found queue is farthest-first
+	// and provides the SEARCH-LAYER exploration bound.
+	candidates := workspace.candidates
+	candidates.Push(first)
+	found := workspace.found
+	found.Push(farthestSearchCandidate[K]{first})
+
+	// Filtering affects returned values, not traversal: a rejected node can be
+	// the only bridge to matching nodes elsewhere in the graph.
+	result := workspace.result
+	if filter != nil && filter(entryNode.GetKey(), entryNode.GetVector()) {
+		result.Push(farthestSearchCandidate[K]{first})
 	}
 
-	// Create a temporary standard node for distance calculation with target
-	targetNodeCreationStart := time.Now()
-	targetNode := hnswspec.NewStandardLayerNode[K](
-		entryNode.GetKey(), // dummy key, not used
-		target,
-	)
-	_ = time.Since(targetNodeCreationStart) // targetNode creation time
-
-	// Performance tracking
-	totalDistanceCalls := 0
-	totalDistanceTime := time.Duration(0)
-	visitedNodesCount := 0
-
-	// This is a basic greedy algorithm to find the entry point at the given level
-	// that is closest to the target node.
-	candidates := NewHeap[searchCandidate[K]]()
-	candidates.Init(make([]searchCandidate[K], 0, efSearch))
-
-	// First distance calculation
-	firstDistanceStart := time.Now()
-	firstDist := distance(entryNode, targetNode)
-	firstDistanceTime := time.Since(firstDistanceStart)
-	totalDistanceCalls++
-	totalDistanceTime += firstDistanceTime
-
-	candidates.Push(
-		searchCandidate[K]{
-			node: entryNode,
-			dist: firstDist,
-		},
-	)
-	var (
-		result  = NewHeap[searchCandidate[K]]()
-		visited = make(map[K]bool)
-	)
-	result.Init(make([]searchCandidate[K], 0, k))
-
-	// Begin with the entry node in the result set (if it passes the filter).
-	if candidates.Len() > 0 {
-		entryCandidate := candidates.Min()
-		if filter == nil || filter(entryCandidate.node.GetKey(), entryCandidate.node.GetVector()) {
-			result.Push(entryCandidate)
-		}
-	}
-	visited[entryNode.GetKey()] = true
+	visited := workspace.visited
+	visited[entryNode.GetKey()] = workspace.visitGeneration
 
 	for candidates.Len() > 0 {
-		var (
-			current  = candidates.Pop().node
-			improved = false
-		)
-
-		// We iterate the map in a sorted, deterministic fashion for tests.
-		neighbors := current.GetNeighbors()
-		neighborKeys := maps.Keys(neighbors)
-		slices.Sort(neighborKeys)
-
-		// 收集未访问的邻居节点
-		unvisitedNeighbors := make([]hnswspec.LayerNode[K], 0, len(neighbors))
-		for _, neighborID := range neighborKeys {
-			neighbor := neighbors[neighborID]
-			if visited[neighborID] {
-				continue
-			}
-			visited[neighborID] = true
-
-			// Apply filter if provided
-			if filter != nil && !filter(neighbor.GetKey(), neighbor.GetVector()) {
-				continue
-			}
-
-			unvisitedNeighbors = append(unvisitedNeighbors, neighbor)
-		}
-
-		// 如果邻居数量足够多，使用并行距离计算
-		var neighborDistances []ParallelDistanceResult[K]
-		if len(unvisitedNeighbors) >= 8 { // 并行阈值
-			// 并行计算距离
-			parallelStart := time.Now()
-			neighborDistances = ParallelDistanceCalculation(unvisitedNeighbors, targetNode, distance)
-			parallelTime := time.Since(parallelStart)
-			totalDistanceCalls += len(unvisitedNeighbors)
-			totalDistanceTime += parallelTime
-		} else {
-			// 串行计算距离
-			neighborDistances = make([]ParallelDistanceResult[K], len(unvisitedNeighbors))
-			for i, neighbor := range unvisitedNeighbors {
-				distanceStart := time.Now()
-				dist := distance(neighbor, targetNode)
-				distanceTime := time.Since(distanceStart)
-				totalDistanceCalls++
-				totalDistanceTime += distanceTime
-
-				// Log slow distance calculations
-				if distanceTime > 10*time.Millisecond {
-					log.Debugf("slow distance calculation: %v for neighbor %v", distanceTime, neighbor.GetKey())
-				}
-
-				neighborDistances[i] = ParallelDistanceResult[K]{
-					Index:    i,
-					Node:     neighbor,
-					Distance: dist,
-				}
-			}
-		}
-
-		// 处理距离计算结果
-		for _, distResult := range neighborDistances {
-			neighbor := distResult.Node
-			dist := distResult.Distance
-
-			if result.Len() > 0 {
-				improved = improved || dist < result.Min().dist
-			} else {
-				improved = true
-			}
-			if result.Len() < k {
-				result.Push(searchCandidate[K]{node: neighbor, dist: dist})
-			} else if dist < result.Max().dist {
-				result.PopLast()
-				result.Push(searchCandidate[K]{node: neighbor, dist: dist})
-			}
-
-			candidates.Push(searchCandidate[K]{node: neighbor, dist: dist})
-			// Always store candidates if we haven't reached the limit.
-			if candidates.Len() > efSearch {
-				candidates.PopLast()
-			}
-		}
-
-		// Termination condition: no improvement in distance and at least
-		// kMin candidates in the result set.
-		if !improved && result.Len() >= k {
+		current := candidates.Pop()
+		if found.Len() >= efSearch && current.dist > found.Min().dist {
 			break
 		}
 
-		// Early termination if we can't find any more valid candidates
-		if result.Len() == 0 && candidates.Len() == 0 {
-			break
+		workspace.neighborNodes = workspace.neighborNodes[:0]
+		for neighborID, neighbor := range current.node.GetNeighbors() {
+			if visited[neighborID] == workspace.visitGeneration {
+				continue
+			}
+			visited[neighborID] = workspace.visitGeneration
+			workspace.neighborNodes = append(workspace.neighborNodes, neighbor)
+		}
+		// Keep deterministic graph construction and query behavior without the
+		// maps.Keys allocation used by the previous implementation.
+		slices.SortFunc(workspace.neighborNodes, func(a, b hnswspec.LayerNode[K]) int {
+			return cmp.Compare(a.GetKey(), b.GetKey())
+		})
+		workspace.prepareNeighborScratch(len(workspace.neighborNodes))
+		batched := false
+		if batchCosine && len(workspace.neighborNodes) > 1 {
+			batched = hnswspec.BatchCosineDistances(
+				workspace.neighborNodes,
+				targetNode,
+				workspace.neighborVectors,
+				workspace.neighborNorms,
+				workspace.neighborDists,
+			)
+		}
+		if !batched {
+			for i, neighbor := range workspace.neighborNodes {
+				workspace.neighborDists[i] = distance(neighbor, targetNode)
+			}
 		}
 
-		visitedNodesCount++
-	}
+		for i, neighbor := range workspace.neighborNodes {
+			discoveryOrder++
+			candidate := searchCandidate[K]{node: neighbor, dist: workspace.neighborDists[i], order: discoveryOrder}
+			if found.Len() >= efSearch {
+				worst := found.Min().searchCandidate
+				if !candidate.Less(worst) {
+					continue
+				}
+			}
 
-	searchTotalTime := time.Since(searchStartTime)
-	finalResult := result.Slice()
+			candidates.Push(candidate)
+			found.Push(farthestSearchCandidate[K]{candidate})
+			if found.Len() > efSearch {
+				found.Pop()
+			}
 
-	// Performance analysis and logging
-	if searchTotalTime > time.Second {
-		log.Warnf("HNSW SEARCH PERFORMANCE: k=%d, efSearch=%d, duration=%v, distanceCalls=%d, totalDistanceTime=%v, visitedNodes=%d, results=%d",
-			k, efSearch, searchTotalTime, totalDistanceCalls, totalDistanceTime, visitedNodesCount, len(finalResult))
-
-		if totalDistanceCalls > 0 {
-			avgDistanceTime := totalDistanceTime / time.Duration(totalDistanceCalls)
-			log.Warnf("DISTANCE STATS: avg_distance_time=%v, total_distance_time=%v, calls=%d",
-				avgDistanceTime, totalDistanceTime, totalDistanceCalls)
-
-			// Analyze if distance calculation is the bottleneck
-			if totalDistanceTime > searchTotalTime/2 {
-				log.Warnf("DISTANCE BOTTLENECK: distance calculations took %v (%d%% of total search time)",
-					totalDistanceTime, int(100*float64(totalDistanceTime)/float64(searchTotalTime)))
+			if filter != nil {
+				if !filter(neighbor.GetKey(), neighbor.GetVector()) {
+					continue
+				}
+				result.Push(farthestSearchCandidate[K]{candidate})
+				if result.Len() > k {
+					result.Pop()
+				}
 			}
 		}
 	}
 
+	// The unfiltered path can use the SEARCH-LAYER found heap directly. This
+	// removes a third heap and its push/pop work from every normal query.
+	if filter == nil {
+		result = found
+		for result.Len() > k {
+			result.Pop()
+		}
+	}
+	workspace.output = workspace.output[:result.Len()]
+	finalResult := workspace.output
+	for i := len(finalResult) - 1; i >= 0; i-- {
+		finalResult[i] = result.Pop().searchCandidate
+	}
+	// Return nearest-first while retaining discovery order for exact ties. The
+	// previous heap exposed this order to callers, and some vector-store queries
+	// legitimately contain duplicate embeddings.
+	slices.SortFunc(finalResult, func(a, b searchCandidate[K]) int {
+		if a.dist < b.dist {
+			return -1
+		}
+		if a.dist > b.dist {
+			return 1
+		}
+		return cmp.Compare(a.order, b.order)
+	})
 	return finalResult
 }
 
@@ -371,6 +420,10 @@ type Graph[K cmp.Ordered] struct {
 	// the expense of memory.
 	EfSearch int
 
+	// EfConstruction is the size of the dynamic candidate list used while
+	// inserting nodes. It is intentionally independent from EfSearch.
+	EfConstruction int
+
 	// Layers is a slice of Layers in the graph.
 	Layers []*Layer[K]
 
@@ -387,6 +440,10 @@ type Graph[K cmp.Ordered] struct {
 	// nodeDistance 节点距离函数（基于接口）
 	nodeDistance hnswspec.DistanceFunc[K]
 
+	// batchCosine enables the allocation-free multi-vector CGO path for the
+	// built-in cosine metric. Custom distances and PQ retain their normal path.
+	batchCosine bool
+
 	// pqAwareDistance PQ感知的距离函数
 	pqAwareDistance hnswspec.PQAwareDistanceFunc[K]
 
@@ -398,6 +455,35 @@ type Graph[K cmp.Ordered] struct {
 
 	// distanceCache 距离缓存，用于优化重复的距离计算
 	distanceCache *DistanceCache[K]
+
+	// searchPool reuses per-query heaps and visited maps. sync.Pool keeps this
+	// safe for concurrent readers while allowing the runtime to release cached
+	// workspaces under memory pressure.
+	searchPool sync.Pool
+}
+
+func (g *Graph[K]) acquireSearchWorkspace(efSearch, k int) *searchWorkspace[K] {
+	if cached := g.searchPool.Get(); cached != nil {
+		workspace := cached.(*searchWorkspace[K])
+		workspace.ensureCapacity(efSearch, k)
+		return workspace
+	}
+	return newSearchWorkspace[K](efSearch, k)
+}
+
+func (g *Graph[K]) releaseSearchWorkspace(workspace *searchWorkspace[K]) {
+	if workspace != nil {
+		// A lazy loader may return vectors that are not otherwise cached by the
+		// graph. Do not let an idle pooled workspace retain those backing arrays.
+		clear(workspace.neighborVectors)
+		if cap(workspace.neighborNodes) > 0 {
+			clear(workspace.neighborNodes[:cap(workspace.neighborNodes)])
+		}
+		workspace.neighborNodes = workspace.neighborNodes[:0]
+		clear(workspace.visited)
+		workspace.visitGeneration = 0
+		g.searchPool.Put(workspace)
+	}
 }
 
 func defaultRand() *rand.Rand {
@@ -406,10 +492,16 @@ func defaultRand() *rand.Rand {
 
 func (g *Graph[K]) SetPQCodebook(codebook *pq.Codebook) {
 	g.pqCodebook = codebook
+	if g.Distance != nil {
+		g.configureNodeDistance(g.Distance)
+	}
 }
 
 func (g *Graph[K]) SetPQQuantizer(quantizer *pq.Quantizer) {
 	g.pqQuantizer = quantizer
+	if g.Distance != nil {
+		g.configureNodeDistance(g.Distance)
+	}
 }
 func (g *Graph[K]) GetPQQuantizer() *pq.Quantizer {
 	return g.pqQuantizer
@@ -422,6 +514,31 @@ func (g *Graph[K]) Has(docId K) bool {
 
 	_, exists := g.Layers[0].Nodes[docId]
 	return exists
+}
+
+func (g *Graph[K]) configureNodeDistance(distance DistanceFunc) {
+	g.Distance = distance
+	g.batchCosine = false
+	g.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
+		return distance(a.GetVector(), b.GetVector())
+	}
+	g.pqAwareDistance = hnswspec.PQAwareCosineDistance[K]
+
+	distName, ok := distanceFuncToName(distance)
+	if ok && distName == "cosine" {
+		g.nodeDistance = hnswspec.CosineDistance[K]
+		g.batchCosine = true
+	} else if ok && distName == "euclidean" {
+		g.nodeDistance = hnswspec.EuclideanDistance[K]
+		g.pqAwareDistance = hnswspec.PQAwareEuclideanDistance[K]
+	}
+
+	if g.IsPQEnabled() {
+		g.batchCosine = false
+		g.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
+			return g.pqAwareDistance(a, b, g.pqQuantizer)
+		}
+	}
 }
 
 // GraphConfig defines the configuration parameters for creating an HNSW graph
@@ -440,6 +557,9 @@ type GraphConfig[K cmp.Ordered] struct {
 	// EfSearch is the number of nodes to consider in the search phase
 	// 20 is a reasonable default. Higher values improve search accuracy at the expense of memory
 	EfSearch int
+
+	// EfConstruction controls the index-time accuracy/build-time trade-off.
+	EfConstruction int
 
 	// Rng is used for level generation. It may be set to a deterministic value for reproducibility
 	// Note: deterministic number generation can lead to degenerate graphs when exposed to adversarial inputs
@@ -466,13 +586,16 @@ type GraphOption[K cmp.Ordered] func(*GraphConfig[K])
 // DefaultGraphConfig returns the default graph configuration
 func DefaultGraphConfig[K cmp.Ordered]() *GraphConfig[K] {
 	return &GraphConfig[K]{
-		M:                   16,
-		Ml:                  0.25,
-		Distance:            CosineDistance,
-		EfSearch:            20,
-		Rng:                 defaultRand(),
-		EnableDistanceCache: true, // 默认启用距离缓存
-		DistanceCacheSize:   1000, // 默认缓存1000个距离计算结果
+		M:              16,
+		Ml:             0.25,
+		Distance:       CosineDistance,
+		EfSearch:       20,
+		EfConstruction: 200,
+		Rng:            defaultRand(),
+		// Preserve the historical default. The current search implementation does
+		// not consult this cache because its compact key is not collision-safe.
+		EnableDistanceCache: true,
+		DistanceCacheSize:   1000,
 	}
 }
 
@@ -543,6 +666,14 @@ func WithEfSearch[K cmp.Ordered](efSearch int) GraphOption[K] {
 	}
 }
 
+// WithEfConstruction sets the number of candidates considered during index
+// construction. Larger values improve graph quality at additional build cost.
+func WithEfConstruction[K cmp.Ordered](efConstruction int) GraphOption[K] {
+	return func(config *GraphConfig[K]) {
+		config.EfConstruction = efConstruction
+	}
+}
+
 // WithRng sets the random number generator
 func WithRng[K cmp.Ordered](rng *rand.Rand) GraphOption[K] {
 	return func(config *GraphConfig[K]) {
@@ -590,6 +721,9 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 	if config.EfSearch <= 0 {
 		panic("EfSearch must be greater than 0")
 	}
+	if config.EfConstruction <= 0 {
+		panic("EfConstruction must be greater than 0")
+	}
 	if config.Distance == nil {
 		panic("Distance function must be set")
 	}
@@ -607,37 +741,20 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 		Ml:               config.Ml,
 		Distance:         config.Distance,
 		EfSearch:         config.EfSearch,
+		EfConstruction:   config.EfConstruction,
 		Rng:              config.Rng,
 		convertToUIDFunc: config.ConvertToUIDFunc,
 		distanceCache:    distanceCache,
-	}
-
-	// 设置节点距离函数为基于接口的版本
-	graph.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
-		if graph.IsPQEnabled() {
-			return hnswspec.PQAwareCosineDistance(a, b, graph.pqQuantizer)
-		}
-		return hnswspec.CosineDistance[K](a, b)
-	}
-	graph.pqAwareDistance = hnswspec.PQAwareCosineDistance[K]
-
-	// 使用函数名来判断距离函数类型
-	distName, ok := distanceFuncToName(config.Distance)
-	if ok && distName == "euclidean" {
-		graph.nodeDistance = hnswspec.EuclideanDistance[K]
-		graph.pqAwareDistance = hnswspec.PQAwareEuclideanDistance[K]
 	}
 
 	// 初始化PQ优化
 	if config.PQCodebook != nil {
 		graph.pqCodebook = config.PQCodebook
 		graph.pqQuantizer = pq.NewQuantizer(config.PQCodebook)
-
-		// 创建一个包装函数，将quantizer传给距离函数
-		graph.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
-			return graph.pqAwareDistance(a, b, graph.pqQuantizer)
-		}
 	}
+	// Set the optimized built-in node distance, while preserving custom
+	// registered distance functions instead of silently treating them as cosine.
+	graph.configureNodeDistance(config.Distance)
 
 	return graph
 }
@@ -741,15 +858,12 @@ func (g *Graph[K]) getNodeType() InputNodeType {
 // Add inserts nodes into the graph.
 // If another node with the same ID exists, it is replaced.
 func (g *Graph[K]) Add(nodes ...InputNode[K]) {
-	helper := asynchelper.NewAsyncPerformanceHelper("HNSW Graph Add")
-	defer helper.Close()
-	addStart := helper.MarkNow()
+	addStart := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("recover from panic when adding nodes: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
-		helper.SetStatus("LayersChage Callback")
 		if g.OnLayersChange != nil {
 			g.OnLayersChange(g.Layers)
 		}
@@ -758,36 +872,29 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 	log.Debugf("HNSW Add starting: %d nodes, current graph size: %d", len(nodes), g.Len())
 
 	nodeType := g.getNodeType()
+	workspace := g.acquireSearchWorkspace(max(g.EfConstruction, g.M), g.M)
+	defer g.releaseSearchWorkspace(workspace)
 	for _, node := range nodes {
-		nodeStart := helper.MarkNow()
-
 		if nodeType == InputNodeTypeNone {
 			nodeType = node.NodeType
 			g.nodeType = nodeType
 		}
 		key := node.Key
 		vec := node.ToVector()
+		searchTarget := hnswspec.NewStandardLayerNode(key, vec)
 
-		helper.SetStatus("delete existing node")
-		deleteStart := time.Now()
 		if g.Has(key) {
 			g.Delete(key)
 		}
-		deleteTime := time.Since(deleteStart)
 
 		g.assertDims(vec)
 
-		helper.SetStatus("insert level")
-		levelGenStart := time.Now()
 		insertLevel := g.randomLevel()
-		levelGenTime := time.Since(levelGenStart)
 
 		// Create layers that don't exist yet.
-		layersCreateStart := time.Now()
 		for insertLevel >= len(g.Layers) {
 			g.Layers = append(g.Layers, &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K])})
 		}
-		layersCreateTime := time.Since(layersCreateStart)
 
 		if insertLevel < 0 {
 			log.Errorf("HNSW invalid level %d for node %v, skipping this node", insertLevel, key)
@@ -796,12 +903,6 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 		var elevator *K
 		preLen := g.Len()
-
-		// Performance tracking variables
-		totalSearchTime := time.Duration(0)
-		totalNodeCreationTime := time.Duration(0)
-		totalNeighborUpdateTime := time.Duration(0)
-		searchCallCount := 0
 
 		// Phase 1: Search from highest layer down to insertLevel+1 (search only, no insertion)
 		// Phase 2: Search and insert from insertLevel down to layer 0
@@ -813,8 +914,6 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			var err error
 
 			if i <= insertLevel {
-				helper.SetStatus("create node")
-				nodeCreationStart := time.Now()
 				if g.IsPQEnabled() {
 					// 创建PQ节点
 					newNode, err = hnswspec.NewPQLayerNode(key, vec, g.pqQuantizer)
@@ -851,8 +950,6 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 						}
 					}
 				}
-				nodeCreationTime := time.Since(nodeCreationStart)
-				totalNodeCreationTime += nodeCreationTime
 			}
 
 			// Handle empty layer case - only insert if i <= insertLevel
@@ -891,29 +988,15 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 			// Use different search parameters based on layer and phase
 			searchK := 1 // For search-only layers (above insertLevel), only need 1 best result
-			searchEf := g.EfSearch
+			searchEf := 1
 
 			if i <= insertLevel {
 				// For insertion layers, search for more candidates
 				searchK = g.M
-				if i == 0 {
-					// Use larger ef for layer 0 to ensure good connectivity
-					searchEf = max(g.EfSearch, g.M*2)
-				}
+				searchEf = max(g.EfConstruction, g.M)
 			}
 
-			searchCallStart := time.Now()
-			helper.SetStatus("search layer")
-			neighborhood := search(searchPoint, searchK, searchEf, vec, g.nodeDistance, nil)
-			searchCallTime := time.Since(searchCallStart)
-			totalSearchTime += searchCallTime
-			searchCallCount++
-
-			// Log slow searches
-			if searchCallTime > time.Second {
-				log.Warnf("HNSW slow search: layer=%d, searchK=%d, efSearch=%d, duration=%v, candidates=%d",
-					i, searchK, searchEf, searchCallTime, len(neighborhood))
-			}
+			neighborhood := search(searchPoint, searchK, searchEf, searchTarget, g.nodeDistance, nil, workspace, g.batchCosine)
 
 			if len(neighborhood) == 0 {
 				// This should not happen because the searchPoint itself
@@ -927,15 +1010,17 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 			if i <= insertLevel {
 				// Insert the new node into the layer.
-				neighborUpdateStart := time.Now()
 				layer.Nodes[key] = newNode
+				maxNeighbors := g.M
+				if i == 0 {
+					// The original HNSW design uses a denser base layer (M0=2*M).
+					maxNeighbors = g.M * 2
+				}
 				for _, candidate := range neighborhood {
 					// Create connections between the new node and the best nodes
-					candidate.node.AddNeighbor(newNode, g.M, g.nodeDistance)
-					newNode.AddNeighbor(candidate.node, g.M, g.nodeDistance)
+					candidate.node.AddNeighbor(newNode, maxNeighbors, g.nodeDistance)
+					newNode.AddNeighbor(candidate.node, maxNeighbors, g.nodeDistance)
 				}
-				neighborUpdateTime := time.Since(neighborUpdateStart)
-				totalNeighborUpdateTime += neighborUpdateTime
 			}
 		}
 
@@ -946,17 +1031,12 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			}
 		}
 
-		// Performance logging for this node
-		nodeTotalTime := helper.CheckMarkAndLog(nodeStart, 5*time.Second, "node addition")
-		if nodeTotalTime > 5*time.Second {
-			log.Warnf("HNSW slow node insertion [%v]: total=%v, delete=%v, levelGen=%v, layersCreate=%v, searchCalls=%d, totalSearch=%v, nodeCreate=%v, neighborUpdate=%v",
-				key, nodeTotalTime, deleteTime, levelGenTime, layersCreateTime, searchCallCount, totalSearchTime, totalNodeCreationTime, totalNeighborUpdateTime)
-		}
 	}
 
-	totalAddTime := helper.CheckMarkAndLog(addStart, 3*time.Second, fmt.Sprintf("HNSW SLOW ADD PERFORMANCE: %d nodes", len(nodes)))
-	helper.CheckMarkAndLog(addStart, 10*time.Second, fmt.Sprintf("HNSW CRITICAL ADD PERFORMANCE: %d nodes", len(nodes)))
-
+	totalAddTime := time.Since(addStart)
+	if totalAddTime > 3*time.Second {
+		log.Warnf("HNSW slow add: nodes=%d, final_size=%d, duration=%v", len(nodes), g.Len(), totalAddTime)
+	}
 	log.Debugf("HNSW Add completed: %d nodes added, final graph size: %d, total time: %v", len(nodes), g.Len(), totalAddTime)
 }
 
@@ -1012,6 +1092,13 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 	if len(h.Layers) == 0 {
 		return nil
 	}
+	entryNode := h.Layers[len(h.Layers)-1].entry()
+	if entryNode == nil {
+		return nil
+	}
+	targetNode := hnswspec.NewStandardLayerNode(entryNode.GetKey(), near)
+	workspace := h.acquireSearchWorkspace(max(h.EfSearch, k), k)
+	defer h.releaseSearchWorkspace(workspace)
 
 	var (
 		efSearch = h.EfSearch
@@ -1026,7 +1113,7 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 
 		// Descending hierarchies
 		if layer > 0 {
-			nodes := search(searchPoint, 1, efSearch, near, h.nodeDistance, filter)
+			nodes := search(searchPoint, 1, 1, targetNode, h.nodeDistance, nil, workspace, h.batchCosine)
 			if len(nodes) == 0 {
 				log.Warnf("search returned no nodes at layer %d, this should not happen, continue to next layer directly", layer)
 				continue
@@ -1035,7 +1122,7 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 			continue
 		}
 
-		nodes := search(searchPoint, k, efSearch, near, h.nodeDistance, filter)
+		nodes := search(searchPoint, k, efSearch, targetNode, h.nodeDistance, filter, workspace, h.batchCosine)
 		out := make([]SearchResult[K], 0, len(nodes))
 
 		for _, candidate := range nodes {
@@ -1229,6 +1316,7 @@ func (h *Graph[K]) Import(r io.Reader) error {
 	if h.Rng == nil {
 		h.Rng = defaultRand()
 	}
+	h.configureNodeDistance(h.Distance)
 
 	if version != encodingVersion {
 		return fmt.Errorf("incompatible encoding version: %d", version)
@@ -1287,10 +1375,14 @@ func (h *Graph[K]) Import(r io.Reader) error {
 		}
 
 		// 建立邻居连接
+		maxNeighbors := h.M
+		if i == 0 {
+			maxNeighbors = h.M * 2
+		}
 		for key, node := range nodes {
 			for _, neighborKey := range neighborMap[key] {
 				if neighborNode, exists := nodes[neighborKey]; exists {
-					node.AddNeighbor(neighborNode, h.M, h.nodeDistance)
+					node.AddNeighbor(neighborNode, maxNeighbors, h.nodeDistance)
 				}
 			}
 		}

@@ -1,16 +1,16 @@
 package tests
 
 import (
-	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 )
 
+// TestScriptFolder_CompileAndRun compiles every *.yak under tests/script through
+// the real shipping ssa2llvm CLI, then runs the produced native binary. This
+// exercises the full user-facing flow (compile -> executable -> run) rather
+// than the compiler package API directly, and verifies the binary runs
+// correctly with no external runtime dependencies.
 func TestScriptFolder_CompileAndRun(t *testing.T) {
 	repoRoot := RepoRoot(t)
 	scriptDir := filepath.Join(repoRoot, "common", "yak", "ssa2llvm", "tests", "script")
@@ -19,34 +19,14 @@ func TestScriptFolder_CompileAndRun(t *testing.T) {
 		t.Fatalf("no yak scripts found under %s", scriptDir)
 	}
 
-	EnsureRuntimeArchive(t, repoRoot)
-
-	tmpDir := t.TempDir()
 	for _, script := range scripts {
 		script := script
 		name := strings.TrimSuffix(filepath.Base(script), filepath.Ext(script))
 		t.Run(name, func(t *testing.T) {
-			out := filepath.Join(tmpDir, name)
-
-			if _, err := compiler.CompileToExecutable(
-				compiler.WithCompileSourceFile(script),
-				compiler.WithCompileLanguage("yak"),
-				compiler.WithCompileOutputFile(out),
-			); err != nil {
-				t.Fatalf("compile failed: %v", err)
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			defer cancel()
-
-			cmd := exec.CommandContext(ctx, out)
-			output, runErr := cmd.CombinedOutput()
-			if ctx.Err() == context.DeadlineExceeded {
-				t.Fatalf("execution timed out: %s", output)
-			}
-			if runErr != nil {
-				t.Fatalf("execution failed: %v\n%s", runErr, output)
-			}
+			// Compile + run via the real CLI. Exit code 0 and a non-empty
+			// (or empty, for pure-side-effect scripts) output are the success
+			// criteria; the CLI helper asserts both.
+			_ = RunYakScriptFileWithCLI(t, script, nil)
 		})
 	}
 }

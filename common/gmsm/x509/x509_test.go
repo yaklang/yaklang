@@ -155,6 +155,52 @@ func TestX509(t *testing.T) {
 	}
 }
 
+func TestParseCertificateMalformedCRLDistributionPoints(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newCertificate := func(critical bool) []byte {
+		t.Helper()
+		template := &Certificate{
+			SerialNumber: big.NewInt(1),
+			Subject:      pkix.Name{CommonName: "malformed-crldp.example"},
+			NotBefore:    time.Unix(0, 0),
+			NotAfter:     time.Unix(3600, 0),
+			ExtraExtensions: []pkix.Extension{{
+				Id:       oidExtensionCRLDistributionPoints,
+				Critical: critical,
+				// A SEQUENCE claims three content bytes, but only one is
+				// present. This reproduces "truncated tag or length" from
+				// affected appliance certificates.
+				Value: []byte{0x30, 0x03, 0x30},
+			}},
+		}
+		der, err := CreateCertificate(template, template, &privateKey.PublicKey, privateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return der
+	}
+
+	t.Run("non-critical extension is ignored", func(t *testing.T) {
+		cert, err := ParseCertificate(newCertificate(false))
+		if err != nil {
+			t.Fatalf("ParseCertificate rejected a malformed non-critical CRL distribution points extension: %v", err)
+		}
+		if len(cert.CRLDistributionPoints) != 0 {
+			t.Fatalf("unexpected CRL distribution points: %v", cert.CRLDistributionPoints)
+		}
+	})
+
+	t.Run("critical extension is rejected", func(t *testing.T) {
+		if _, err := ParseCertificate(newCertificate(true)); err == nil {
+			t.Fatal("ParseCertificate accepted a malformed critical CRL distribution points extension")
+		}
+	})
+}
+
 func TestCreateRevocationList(t *testing.T) {
 	priv, err := sm2.GenerateKey(nil) // 生成密钥对
 	if err != nil {

@@ -37,6 +37,7 @@ func yakdocHandleSuccess(
 	reactloops.EmitActionLog(loop, "query_yaklang_document", finishLine, reference)
 	invoker.AddToTimeline(timelineKey, fmt.Sprintf("%s\n%s", finishLine, summary))
 	log.Infof("%s: query completed", actionName)
+	markYaklangLintResearchDone(loop)
 	op.Continue()
 }
 

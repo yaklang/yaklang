@@ -314,6 +314,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 【后果警告】：不重新搜索将导致代码错误和调试失败！`, questionsStr)
 				log.Infof("no semantic search results found for questions: %s", questionsStr)
 				invoker.AddToTimeline("semantic_search_no_results_warning", noResultMsg)
+				markYaklangLintResearchDone(loop)
 				op.Continue()
 				return
 			}
@@ -447,6 +448,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			invoker.AddToTimeline(timelineKey, suggestionMsg)
 
 			log.Infof("semantic search completed: %d results found for %d questions", len(results), len(questions))
+			markYaklangLintResearchDone(loop)
 
 			// 检查是否有语法错误 - 参考 action_modify_code.go 的实现
 			fullcode := loop.Get("full_code")

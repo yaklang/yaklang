@@ -26,6 +26,12 @@ const (
 	ENV_SSA_DB_SKIP_MIGRATE = "SSA_DB_SKIP_MIGRATE"
 )
 
+const (
+	ssaSQLiteMaxOpenConns = 8
+	ssaSQLiteSynchronous  = "NORMAL"
+	ssaSQLiteTxLock       = "immediate"
+)
+
 var (
 	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
 	SSA_PROJECT_DB_DIALECT = SQLiteExtend
@@ -110,7 +116,8 @@ func CreateSSAProjectDatabaseRaw(raw string) (*gorm.DB, error) {
 }
 
 func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
-	db, err := createAndConfigDatabase(path, dialect)
+	options := ssaDatabaseOpenOptions()
+	db, err := createAndConfigDatabaseWithOptions(path, options, dialect)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +127,20 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 		schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
 		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
 	}
-	configureAndOptimizeDB(dialect, db)
+	configureAndOptimizeDBWithOptions(dialect, db, options)
 	return db, nil
+}
+
+func ssaDatabaseOpenOptions() databaseOpenOptions {
+	// SSA-only SQLite open settings. Project/general DBs keep
+	// defaultDatabaseOpenOptions() (single connection, synchronous=OFF,
+	// no _txlock). Injected via databaseOpenOptions so database.go stays generic.
+	return databaseOpenOptions{
+		sqliteMaxOpenConns: ssaSQLiteMaxOpenConns,
+		sqlitePrivateCache: true,
+		sqliteSynchronous:  ssaSQLiteSynchronous,
+		sqliteTxLock:       ssaSQLiteTxLock,
+	}
 }
 
 func GetTempSSADataBase() (*gorm.DB, error) {

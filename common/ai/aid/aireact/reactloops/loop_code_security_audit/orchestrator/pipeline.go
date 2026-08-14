@@ -236,7 +236,7 @@ func runPhase3(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	}
 	log.Infof("[CodeAudit] Starting Phase 3 (Verify), %d findings", len(findings))
 	reactloops.EmitActionLog(loop, util.VerifyNodeID, "Phase 3：漏洞验证 / Phase 3: Vulnerability verification")
-	r.AddToTimeline("[PHASE3_START]", fmt.Sprintf("开始 Phase 3：fork 子 Agent 并行验证 %d 个 finding（并发 %d）", len(findings), phase3.DefaultFindingVerifyConcurrency))
+	r.AddToTimeline("[PHASE3_START]", fmt.Sprintf("开始 Phase 3：fork 子 Agent 并行验证 %d 个 finding", len(findings)))
 	emitPhaseMarker(loop, task, "phase", "code_audit_phase3_orchestrator", "Phase 3：漏洞验证", task.GetId())
 	verifyLoop, err := phase3.BuildVerifyLoop(r, state)
 	if err != nil {

@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - ".github/scripts/build-legion-component-oss-index.sh"
+      - ".github/scripts/build-legion-node-engine-import-bundle.sh"
       - ".github/scripts/build-legion-product-node.sh"
       - ".github/scripts/package-legion-ai-session-runtime.sh"
+      - ".github/scripts/sign-legion-node-release-index.go"
       - ".github/scripts/test-build-legion-component-oss-index.sh"
+      - ".github/scripts/test-build-legion-node-engine-import-bundle.sh"
       - ".github/scripts/test-legion-component-workflow-contract.sh"
       - ".github/scripts/test-package-legion-ai-session-runtime.sh"
-      - ".github/workflows/build-legion-ai-session-runtime.yml"
       - ".github/workflows/build-legion-ai-session-runtime-alpha.yml"
       - ".github/workflows/build-legion-ai-session-runtime-common.yml"
       - ".github/workflows/build-legion-node-alpha.yml"
@@ -41,20 +43,25 @@ jobs:
           set -euo pipefail
           scripts=(
             .github/scripts/build-legion-component-oss-index.sh
+            .github/scripts/build-legion-node-engine-import-bundle.sh
             .github/scripts/build-legion-product-node.sh
             .github/scripts/package-legion-ai-session-runtime.sh
             .github/scripts/test-build-legion-component-oss-index.sh
+            .github/scripts/test-build-legion-node-engine-import-bundle.sh
             .github/scripts/test-legion-component-workflow-contract.sh
             .github/scripts/test-package-legion-ai-session-runtime.sh
           )
           bash -n "${scripts[@]}"
           shellcheck "${scripts[@]}"
+          gofmt -w .github/scripts/sign-legion-node-release-index.go
+          git diff --exit-code -- .github/scripts/sign-legion-node-release-index.go
 
       - name: Test tag, architecture, and package metadata contracts
         run: |
           set -euo pipefail
           ./.github/scripts/test-legion-component-workflow-contract.sh
           ./.github/scripts/test-build-legion-component-oss-index.sh
+          ./.github/scripts/test-build-legion-node-engine-import-bundle.sh
           ./.github/scripts/test-package-legion-ai-session-runtime.sh
 
   build-targets:

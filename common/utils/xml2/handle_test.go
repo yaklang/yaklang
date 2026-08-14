@@ -75,3 +75,26 @@ func TestHandle(t *testing.T) {
 	}))
 	assert.Greater(t, len(m), 0)
 }
+
+func TestHandle_ISO8859_1(t *testing.T) {
+	// Hadoop web.xml / resources declare iso-8859-1 with a DOCTYPE.
+	// Without CharsetReader the decoder errors with "CharsetReader is nil"
+	// and the XML is skipped. With CharsetReader the ISO-8859-1 bytes
+	// decode and the handler fires.
+	prefix := `<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
+<web-app><filter><filter-name>`
+	suffix := `</filter-name></filter></web-app>`
+	src := prefix + "caf" + string([]byte{0xe9}) + suffix
+	var elementFound bool
+	var got string
+	Handle(src, WithStartElementHandler(func(e xml.StartElement) {
+		if e.Name.Local == "filter-name" {
+			elementFound = true
+		}
+	}), WithCharDataHandler(func(data xml.CharData, _ int64) {
+		got = string(data)
+	}))
+	assert.True(t, elementFound, "iso-8859-1 XML with DOCTYPE should be parsed")
+	assert.Equal(t, "café", got, "ISO-8859-1 bytes should be decoded as UTF-8")
+}

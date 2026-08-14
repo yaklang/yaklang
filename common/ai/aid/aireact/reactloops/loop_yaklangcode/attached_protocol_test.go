@@ -20,14 +20,14 @@ import (
 // TestYakRunnerProtocol_1_WorkspaceAndFilePathAttachments verifies the「选择工作区」协议：
 //
 //	{ Type: "file", Key: "directory_path", Value: workspace }
-//	{ Type: "file", Key: "file_path", Value: open file }
+//	{ Type: "code", Key: "file_path", Value: open .yak file }  // writable delivery
 func TestYakRunnerProtocol_1_WorkspaceAndFilePathAttachments(t *testing.T) {
-	workspace := filepath.FromSlash("/Users/me/yakit-projects/demo")
+	workspace := filepath.Join("testdata", "demo")
 	editorFile := filepath.Join(workspace, "scan.yak")
 
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyEditorFile, editorFile),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, editorFile),
 	}
 
 	ctx := aicommon.ParseYaklangEditorContextFromAttached(attached)
@@ -38,7 +38,7 @@ func TestYakRunnerProtocol_1_WorkspaceAndFilePathAttachments(t *testing.T) {
 
 	md := aicommon.FormatYaklangEditorContextMarkdown(ctx)
 	assert.Contains(t, md, "Workspace:")
-	assert.Contains(t, md, "yakit-projects")
+	assert.Contains(t, md, "testdata")
 	assert.Contains(t, md, "scan.yak")
 
 	runtime := mock.NewMockInvoker(context.Background())
@@ -55,13 +55,13 @@ func TestYakRunnerProtocol_1_WorkspaceAndFilePathAttachments(t *testing.T) {
 //
 //	{ Type: "selected", Key: "content", Value: AttachedCodeSelection JSON }
 func TestYakRunnerProtocol_2_SelectedContentAttachment(t *testing.T) {
-	workspace := filepath.FromSlash("/Users/me/yakit-projects/demo")
+	workspace := filepath.Join("testdata", "demo")
 	editorFile := filepath.Join(workspace, "scan.yak")
-	selectionJSON := `{"path":"/Users/me/yakit-projects/demo/scan.yak","startLine":10,"endLine":18,"language":"yak","content":"println(\"hi\")"}`
+	selectionJSON := `{"path":"` + filepath.ToSlash(editorFile) + `","startLine":10,"endLine":18,"language":"yak","content":"println(\"hi\")"}`
 
 	attached := []*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyWorkspaceDirectory, workspace),
-		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.YaklangAttachedResourceKeyEditorFile, editorFile),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, workspace),
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeCode, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, editorFile),
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, selectionJSON),
 	}
 

@@ -64,8 +64,11 @@ func runNode(args []string) error {
 	displayName := flags.String("name", "smoke-node", "Display name reported to Legion")
 	agentInstallationID := flags.String("agent-installation-id", "", "Override persisted agent installation ID")
 	kind := flags.String("kind", "", "Node kind: empty/host=host node, ai_session=AI session container node")
+	dockerEndpoint := flags.String("docker-endpoint", strings.TrimSpace(os.Getenv("LEGION_DOCKER_ENDPOINT")), "Session-Manager-reachable Docker endpoint advertised by a host node")
 	baseDir := flags.String("base-dir", "", "Node local state base directory")
 	version := flags.String("version", "smoke", "Node version")
+	engineReleaseID := flags.String("engine-release-id", strings.TrimSpace(os.Getenv("ENGINE_RELEASE_ID")), "Installed unified Yaklang release ID")
+	engineDigest := flags.String("engine-digest", strings.TrimSpace(os.Getenv("ENGINE_RELEASE_SHA256")), "Installed Yaklang Node binary SHA-256")
 	heartbeatInterval := flags.Duration(
 		"heartbeat-interval",
 		node.DefaultHeartbeatInterval,
@@ -168,6 +171,7 @@ func runNode(args []string) error {
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
 		NodeType:             spec.NodeType_Scanner,
 		Kind:                 strings.TrimSpace(*kind),
+		DockerEndpoint:       hostDockerEndpoint(*kind, *dockerEndpoint),
 		NodeID:               *nodeID,
 		DisplayName:          *displayName,
 		AgentInstallationID:  *agentInstallationID,
@@ -175,6 +179,8 @@ func runNode(args []string) error {
 		EnrollmentToken:      *enrollmentToken,
 		PlatformAPIBaseURL:   *apiURL,
 		Version:              *version,
+		EngineReleaseID:      hostEngineValue(*kind, *engineReleaseID),
+		EngineDigest:         hostEngineValue(*kind, *engineDigest),
 		HeartbeatInterval:    *heartbeatInterval,
 		HostIdentityProvider: hostIdentityProvider,
 		PostBootstrapHook:    postBootstrapHook,
@@ -193,6 +199,20 @@ func runNode(args []string) error {
 	scanNode.Shutdown()
 	<-done
 	return nil
+}
+
+func hostDockerEndpoint(kind, endpoint string) string {
+	if strings.TrimSpace(kind) == "ai_session" {
+		return ""
+	}
+	return strings.TrimSpace(endpoint)
+}
+
+func hostEngineValue(kind, value string) string {
+	if strings.TrimSpace(kind) == "ai_session" {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 // initializeAISessionCapabilities keeps host Scan Nodes on their existing

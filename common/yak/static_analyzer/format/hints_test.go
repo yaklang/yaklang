@@ -36,6 +36,13 @@ func TestLookupCompilerErrorHint_Fallback(t *testing.T) {
 	require.Contains(t, hint, "编译器/静态分析报错")
 }
 
+func TestLookupCompilerErrorHint_PocPostArity(t *testing.T) {
+	msg := `The function call returns (lowhttp.LowhttpResponse, http.Request, error) type, but 2 variables on the left side.`
+	hint := lookupCompilerErrorHint(msg, `rsp, err := poc.Post(url)`)
+	require.Contains(t, hint, "rsp, req, err")
+	require.Contains(t, hint, "poc.Post")
+}
+
 func TestExtractCoreCompilerMessage(t *testing.T) {
 	raw := `[Error]: Value undefined:foo in [1:1 -- 1:4] from SSA:TypeCheck`
 	assert.Equal(t, "Value undefined:foo", ExtractCoreCompilerMessage(raw))
@@ -67,4 +74,38 @@ func TestFormatSingleForCopy_IncludesLocation(t *testing.T) {
 	require.NotEmpty(t, single)
 	require.Contains(t, single, "修改建议:")
 	require.Contains(t, single, "in [")
+}
+
+func TestCheckAndFormat_TypedFuncDoesNotBlock(t *testing.T) {
+	code := `handler = func(result map[string]interface{}) {
+    println(result)
+}
+_ = handler`
+	errorMsg, hasBlocking, _ := CheckAndFormat(code, YakRunnerDefaults(0)...)
+	require.False(t, hasBlocking, "typed func should not block; msg=%s", errorMsg)
+}
+
+func TestLookupCompilerErrorHint_ByteLiteral(t *testing.T) {
+	hint := lookupCompilerErrorHint("T should be byte, but got number", `body := []byte{172, 237}`)
+	require.Contains(t, hint, "0x")
+	require.Contains(t, hint, "byte")
+	require.NotContains(t, hint, "append(a, b...)")
+}
+
+func TestLookupCompilerErrorHint_AppendBytes(t *testing.T) {
+	hint := lookupCompilerErrorHint("T should be byte, but got bytes|[]any", `frame = append(lengthPrefix, rawPayload...)`)
+	require.Contains(t, hint, "append(a, b...)")
+	require.NotContains(t, hint, "[]byte{172")
+
+	hint2 := lookupCompilerErrorHint("T should be byte, but got number", `defaultPayload = append(defaultPayload, tcNull...)`)
+	require.Contains(t, hint2, "append")
+}
+
+func TestLookupCompilerErrorHint_MultilineStringConcat(t *testing.T) {
+	hint := lookupCompilerErrorHint(
+		`基础语法错误（Syntax Error）：no viable alternative at input 'yakit.Warn("a\n"\n+'`,
+		`        + "    1) next line"`,
+	)
+	require.Contains(t, hint, "跨行")
+	require.Contains(t, hint, "sprintf")
 }

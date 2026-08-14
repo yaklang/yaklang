@@ -6,9 +6,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// irTypeBatchChunk bounds rows per CreateInBatches call under SQLite's ~999
-// host-parameter limit: 150 rows * 5 cols = 750.
-const irTypeBatchChunk = 150
+// irTypeBatchChunk bounds rows per CreateInBatches call under SQLite's
+// MAX_VARIABLE_NUMBER=250000 ceiling; 1000 rows is safe for the wide IrType
+// model and reduces the number of multi-row INSERT statements per flush.
+const irTypeBatchChunk = 1000
 
 type IrType struct {
 	gorm.Model
@@ -141,6 +142,11 @@ func EmptyIrType(progName string, id uint64) *IrType {
 func GetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
 	if id < 0 {
 		return nil
+	}
+	// Native-SQL fast path (see GetIrCodeItemById comment). Same result as the
+	// GORM First() path; falls back to GORM on any native error.
+	if native := nativeGetIrTypeItemById(db, progName, id); native != nil {
+		return native
 	}
 	// check cache
 	ir := &IrType{}

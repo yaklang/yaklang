@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
+
+	"golang.org/x/net/publicsuffix"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -68,13 +71,6 @@ func UrlToRequestPacket(method string, u string, originRequest []byte, originReq
 
 func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte, https bool, statusCode int, cookies ...*http.Cookie) ([]byte, error) {
 	var raw []byte
-
-	// 303/302
-	// 302在规范下也应该保留请求体和请求方法，但是实际上大部分浏览器都会改为GET请求，所以我们就不保留
-	is302Or303 := statusCode == http.StatusSeeOther || statusCode == http.StatusFound
-	if is302Or303 {
-		method = http.MethodGet
-	}
 	var (
 		originReqIns *http.Request
 		err          error
@@ -99,13 +95,20 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 			method = originReqIns.Method
 		}
 	}
+	rewriteToGet := shouldRewriteRedirectToGet(statusCode, method)
+	if rewriteToGet {
+		method = http.MethodGet
+	}
 
 	raw = NewRequestPacketFromMethod(method, targetURL, originRequest, originReqIns, https, cookies...)
-	if is302Or303 {
+	if rewriteToGet {
 		raw = ReplaceHTTPPacketBodyFast(raw, nil)
 		raw = DeleteHTTPPacketHeader(raw, "Content-Length")
 		raw = DeleteHTTPPacketHeader(raw, "Transfer-Encoding")
 		raw = DeleteHTTPPacketHeader(raw, "Content-Type")
+		raw = DeleteHTTPPacketHeader(raw, "Content-Encoding")
+		raw = DeleteHTTPPacketHeader(raw, "Content-Language")
+		raw = DeleteHTTPPacketHeader(raw, "Content-Location")
 	}
 	if originReqIns != nil && originReqIns.URL != nil {
 		raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
@@ -114,29 +117,36 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 	return FixHTTPRequest(raw), nil
 }
 
+// shouldRewriteRedirectToGet follows the Fetch/Chromium redirect algorithm:
+// 301/302 only rewrite POST, while 303 rewrites every method except GET/HEAD.
+// 307/308 (and other status codes) preserve the original method and body.
+func shouldRewriteRedirectToGet(statusCode int, method string) bool {
+	return ((statusCode == http.StatusMovedPermanently || statusCode == http.StatusFound) && method == http.MethodPost) ||
+		(statusCode == http.StatusSeeOther && method != http.MethodGet && method != http.MethodHead)
+}
+
 // BuildRedirectRequest 用于生成重定向请求包
 func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestIsHttps bool, statusCode int) ([]byte, error) {
-	// 重写方法
-	rewriteMethod := statusCode == http.StatusSeeOther || statusCode == http.StatusFound || statusCode == http.StatusMovedPermanently
-	method := http.MethodGet
-	if !rewriteMethod {
-		method = GetHTTPRequestMethod(originRequest)
+	method := GetHTTPRequestMethod(originRequest)
+	rewriteToGet := shouldRewriteRedirectToGet(statusCode, method)
+	if rewriteToGet {
+		method = http.MethodGet
 	}
 
 	// 解析原始请求
 	originReqIns, err := ParseBytesToHttpRequest(originRequest)
 	if err != nil && err != io.EOF {
-		raw := NewRequestPacketFromMethod(method, targetUrl, nil, originReqIns, false)
-		return FixHTTPRequest(raw), nil
+		return nil, utils.Wrap(err, "parse redirect origin request")
 	}
-	copyedUrl := *originReqIns.URL
-	if originRequestIsHttps {
-		copyedUrl.Scheme = "https"
-	} else {
-		copyedUrl.Scheme = "http"
+	if originReqIns == nil {
+		return nil, utils.Error("parse redirect origin request: empty request")
+	}
+	originURL, err := ExtractURLFromHTTPRequest(originReqIns, originRequestIsHttps)
+	if err != nil {
+		return nil, utils.Wrap(err, "extract redirect origin URL")
 	}
 	// 判断同源，如果同源，则允许保留Authorization头
-	isSameOrigin, err := isSameOrigin(copyedUrl.String(), targetUrl)
+	isSameOrigin, err := isSameOrigin(originURL.String(), targetUrl)
 	if err != nil {
 		log.Errorf("is same origin error: %v", err)
 		isSameOrigin = false
@@ -144,10 +154,12 @@ func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestI
 
 	// 生成重定向请求包
 	raw := NewRequestPacketFromMethod(method, targetUrl, nil, originReqIns, false)
-	raw = ReplaceHTTPPacketBodyFast(raw, nil)
 	allowHeaders := []string{"User-Agent", "Accept", "Accept-Encoding", "Accept-Language"}
 	if isSameOrigin {
 		allowHeaders = append(allowHeaders, "Authorization")
+	}
+	if !rewriteToGet {
+		allowHeaders = append(allowHeaders, "Content-Type", "Content-Encoding", "Content-Language", "Content-Location", "Transfer-Encoding")
 	}
 	for _, header := range allowHeaders {
 		headerValue := GetHTTPPacketHeader(originRequest, header)
@@ -156,10 +168,64 @@ func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestI
 		}
 	}
 
-	if originReqIns != nil && originReqIns.URL != nil {
-		raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
+	if rewriteToGet {
+		raw = ReplaceHTTPPacketBodyFast(raw, nil)
+	} else {
+		raw = ReplaceHTTPPacketBodyFast(raw, GetHTTPPacketBody(originRequest))
+	}
+	raw = ReplaceHTTPPacketHeader(raw, "Referer", originURL.String())
+
+	return FixHTTPRequest(raw), nil
+}
+
+// BuildRedirectRequestFromResponse builds one redirect hop using browser-like
+// method/header rules and a short-lived cookie jar. Request cookies are seeded
+// first, then response Set-Cookie values are applied so rotations and deletions
+// take precedence while Domain, Path, Secure, and cross-host rules are honored.
+func BuildRedirectRequestFromResponse(targetUrl string, originRequest, originResponse []byte, originRequestIsHttps bool) ([]byte, error) {
+	statusCode := GetStatusCodeFromResponse(originResponse)
+	raw, err := BuildRedirectRequest(targetUrl, originRequest, originRequestIsHttps, statusCode)
+	if err != nil {
+		return nil, err
 	}
 
+	originReqIns, err := ParseBytesToHttpRequest(originRequest)
+	if err != nil && err != io.EOF {
+		return nil, utils.Wrap(err, "parse redirect origin request for cookies")
+	}
+	originURL, err := ExtractURLFromHTTPRequest(originReqIns, originRequestIsHttps)
+	if err != nil {
+		return nil, utils.Wrap(err, "extract redirect origin URL for cookies")
+	}
+
+	if !utils.IsHttpOrHttpsUrl(targetUrl) {
+		targetUrl = MergeUrlFromHTTPRequest(originRequest, targetUrl, originRequestIsHttps)
+	}
+	targetURL, err := url.Parse(targetUrl)
+	if err != nil || targetURL == nil || targetURL.Host == "" {
+		return nil, utils.Errorf("parse redirect target URL for cookies: %s", targetUrl)
+	}
+
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		return nil, utils.Wrap(err, "create redirect cookie jar")
+	}
+	jar.SetCookies(originURL, originReqIns.Cookies())
+
+	originRspIns, err := ParseBytesToHTTPResponse(originResponse)
+	if err != nil && err != io.EOF {
+		return nil, utils.Wrap(err, "parse redirect origin response for cookies")
+	}
+	if originRspIns != nil {
+		jar.SetCookies(originURL, originRspIns.Cookies())
+	}
+
+	cookies := jar.Cookies(targetURL)
+	if len(cookies) == 0 {
+		raw = DeleteHTTPPacketHeader(raw, "Cookie")
+	} else {
+		raw = ReplaceHTTPPacketHeader(raw, "Cookie", CookiesToString(cookies))
+	}
 	return FixHTTPRequest(raw), nil
 }
 
@@ -175,10 +241,6 @@ func isSameOrigin(originUrl, targetUrl string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if originUrlIns.Scheme != targetUrlIns.Scheme {
-		return false, nil
-	}
-
 	// scheme/host 比较（大小写不敏感）
 	if !strings.EqualFold(originUrlIns.Scheme, targetUrlIns.Scheme) {
 		return false, nil

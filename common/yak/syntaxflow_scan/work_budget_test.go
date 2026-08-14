@@ -97,6 +97,8 @@ func TestStartScan_WorkBudget_BailsHeavyTopDefRule(t *testing.T) {
 	budgetElapsed, budgetErrs := runHeavyScanWithWorkLimit(t, progID, 5000, 5*time.Minute, 60*time.Second)
 	require.True(t, budgetErrs.has("per-rule budget"),
 		"work-budget scan should bail the heavy rule (expected 'per-rule budget' error callback), got: %v", budgetErrs.msgs)
+	require.True(t, budgetErrs.has("visited="),
+		"work-budget diagnostic should include actual usage, got: %v", budgetErrs.msgs)
 	require.Less(t, budgetElapsed, 30*time.Second,
 		"scan with workLimit=5000 should finish fast, took %s", budgetElapsed)
 	require.Less(t, budgetElapsed, baselineElapsed,
@@ -121,4 +123,17 @@ func TestStartScan_WorkBudget_BailIsPartialNotFatal(t *testing.T) {
 		"work-budget bail should emit 'per-rule budget' callback, got: %v", errs.msgs)
 	require.Less(t, elapsed, 30*time.Second,
 		"work-budget bail should finish fast, took %s", elapsed)
+}
+
+func TestEffectiveRuleWorkLimitAutoScale(t *testing.T) {
+	require.Equal(t, int64(200_000), effectiveRuleWorkLimit(200_000, 100_000),
+		"small projects keep the CLI default")
+	require.Equal(t, int64(600_000), effectiveRuleWorkLimit(200_000, 1_000_000),
+		"large projects scale by source lines")
+	require.Equal(t, int64(1_000_000), effectiveRuleWorkLimit(200_000, 5_000_000),
+		"auto-scale is capped")
+	require.Equal(t, int64(5_000), effectiveRuleWorkLimit(5_000, 5_000_000),
+		"non-default explicit limits are never auto-scaled")
+	require.Equal(t, int64(0), effectiveRuleWorkLimit(0, 5_000_000),
+		"disabled work limit stays disabled")
 }

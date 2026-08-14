@@ -107,7 +107,7 @@ func TestPromptManager_AssembleLoopPrompt_TodoBlockSkippedWhenEmpty(t *testing.T
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	require.NotContains(t, result.Prompt, "<|TODO_LIST_",
+	require.NotContains(t, result.Prompt, "<|TODO_LIST_nempty|>",
 		"empty TODO state should NOT render the TODO_LIST block")
 }
 

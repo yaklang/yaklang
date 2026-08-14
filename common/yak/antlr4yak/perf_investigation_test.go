@@ -18,8 +18,8 @@ import (
 // 本测试用于定位大脚本（几百 K）编译慢的瓶颈：Lexer 还是 Parser。
 // 通过分别计时 词法分析 / 语法分析(LL) / 语法分析(SLL) / 完整编译 来对比。
 //
-// 纯计时类测试仅用于人工基准测量，默认跳过，避免拖慢常规测试。设置 YAK_PARSER_BENCH=1 开启。
-// SLL/LL 正确性守卫(TestPerf_SLLBailDiagnostic)始终运行。
+// 纯计时 / 大脚本 SLL·LL 诊断仅用于人工基准测量，默认跳过，避免拖慢常规测试。
+// 设置 YAK_PARSER_BENCH=1 开启（含 TestPerf_SLLBailDiagnostic）。
 
 func benchGate(t *testing.T) {
 	t.Helper()
@@ -185,7 +185,9 @@ func sllBailParse(code string) (tree string, bailed bool, listenerErr error) {
 
 // TestPerf_SLLBailDiagnostic 诊断：对每个 coreplugin，SLL(+Bail) 是否会 bail 回退到 LL。
 // 若 SLL 未 bail 且无错误，则其解析树必须与 LL 完全一致(两阶段正确性的关键保证)。
+// 会解析大量大脚本，默认 skip；设 YAK_PARSER_BENCH=1 开启。
 func TestPerf_SLLBailDiagnostic(t *testing.T) {
+	benchGate(t)
 	plugins := loadLargestCorePlugins(t, 100)
 	if len(plugins) == 0 {
 		t.Skip("no coreplugin scripts found")

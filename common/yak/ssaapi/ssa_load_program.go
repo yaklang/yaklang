@@ -36,14 +36,30 @@ func SetProgramCache(program *Program, ttls ...time.Duration) {
 // ```
 func FromDatabase(programName string) (p *Program, err error) {
 	if prog, ok := ProgramCache.Get(programName); ok && prog != nil {
-		if prog.Program != nil &&
+		closedWrite := prog.Program != nil &&
 			prog.Program.DatabaseKind == ssa.ProgramCacheDBWrite &&
 			prog.Program.Cache != nil &&
-			prog.Program.Cache.IsClosed() {
+			prog.Program.Cache.IsClosed()
+		staleIR := false
+		var irProg *ssadb.IrProgram
+		if !closedWrite {
+			loaded, getErr := ssadb.GetProgram(programName, ssadb.Application)
+			if getErr == nil && loaded != nil {
+				irProg = loaded
+				// Long-lived processes (CI yak grpc, yaklang engine) cache
+				// FromDatabase results for 10m. Recompile in another process
+				// deletes IR rows and writes a new ir_programs.updated_at;
+				// returning the cached Program would scan deleted instruction
+				// IDs and produce 0 matches.
+				if prog.irProgram != nil && !loaded.UpdatedAt.Equal(prog.irProgram.UpdatedAt) {
+					staleIR = true
+				}
+			}
+		}
+		if closedWrite || staleIR {
 			ProgramCache.Remove(programName)
 		} else {
-			irProg, err := ssadb.GetProgram(programName, ssadb.Application)
-			if err == nil && irProg != nil {
+			if irProg != nil {
 				prog.irProgram = irProg
 				if irProg.IsOverlay && len(irProg.OverlayLayers) > 0 {
 					if prog.GetOverlay() == nil {

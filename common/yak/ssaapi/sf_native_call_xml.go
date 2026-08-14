@@ -151,7 +151,7 @@ var nativeCallMybatisXML = func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm
 		mapper := newMybatisXMLMapper(prog, frame)
 		mapperStack.Push(mapper)
 
-		runeOffsetMap := memedit.NewRuneOffsetMap(content)
+		runeOffsetMap := me.GetRuneOffsetMap()
 		onDirective := xml2.WithDirectiveHandler(func(directive xml.Directive) bool {
 			offset += len(directive)
 			if utils.MatchAnyOfSubString(string(directive), "ibatis", "mybatis") {

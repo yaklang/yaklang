@@ -785,6 +785,7 @@ func (lz *LazyInstruction) GetVariable(n string) *Variable {
 	{
 		v := GetVariableFromDB(lz.id, n, lz.programName)
 		v.Assign(lz)
+		RestoreVariableFinish(v)
 		lz.variable[n] = v
 		return v
 	}

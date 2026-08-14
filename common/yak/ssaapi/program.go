@@ -401,18 +401,13 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 		// TODO(scan-log): split-compile + lazy IR reload can surface nil here during TopDef/BottomUse.
 		return nil, utils.Errorf("instruction is nil")
 	}
-	var v *Value
-	// strconv.AppendInt/FormatInt is ~5x cheaper than fmt.Sprintf and avoids the
-	// format-string parse + reflect boxing. NewValue is called per instruction in
-	// hot dataflow paths (alloc_objects showed fmt.Sprintf ~22% of all allocs /
-	// ~480M calls on large projects), so this is a high-frequency allocator.
-	v = &Value{
-		runtimeCtx:    nil,
-		ParentProgram: p,
-		uid:           p.id.Inc(),
-		EffectOn:      nil,
-		DependOn:      nil,
-	}
+	// NewValue is called per instruction in hot dataflow paths, so the struct
+	// allocation is pooled (A1). acquireValue returns a fully zeroed struct with a
+	// brand-new identity: every Value here is independent even if its underlying
+	// memory came from the pool. uid stays unique via p.id.Inc().
+	v := acquireValue()
+	v.ParentProgram = p
+	v.uid = p.id.Inc()
 
 	// if lazy, get the real inst
 	checkInst := inst
@@ -426,6 +421,9 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 		v.innerUser = n
 	}
 	if v.getValue() == nil && v.innerUser == nil {
+		// The value was never observed by any caller, so it is safe to hand the
+		// struct back to the pool instead of leaking it to the GC.
+		releaseValue(v)
 		return nil, utils.Errorf("instruction is not a value or user: %s", inst.String())
 	}
 	return v, nil

@@ -1,4 +1,4 @@
-package aicommon
+﻿package aicommon
 
 import (
 	"fmt"
@@ -139,6 +139,20 @@ func (c *Config) GetPreferDispatchSubReactAgents() bool {
 		return false
 	}
 	return c.PreferDispatchSubReactAgents
+}
+
+func (c *Config) GetMaxSubAgents() int64 {
+	if c == nil {
+		return DefaultMaxSubAgentConcurrency
+	}
+	n := c.MaxSubAgents
+	if n <= 0 {
+		return DefaultMaxSubAgentConcurrency
+	}
+	if n > AbsoluteMaxSubAgentConcurrency {
+		return AbsoluteMaxSubAgentConcurrency
+	}
+	return n
 }
 
 func (c *Config) GetEnableGoalMode() bool {

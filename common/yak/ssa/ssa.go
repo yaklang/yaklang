@@ -508,6 +508,11 @@ type BasicBlock struct {
 	// for build
 	ScopeTable ScopeIF
 	finish     bool // if emitJump finish!
+	// scopeRestored marks a ScopeTable reconstructed from a DB reload. Such a
+	// placeholder may be replaced by SetScope when the deferred build reaches
+	// the block; without this flag SetScope would treat the placeholder as a
+	// real scope and refuse to attach the CFG scope.
+	scopeRestored bool
 }
 
 // BlockConditionSummary is a readonly condition projection for CFG/native-call usage.

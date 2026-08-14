@@ -34,7 +34,10 @@ type BootstrapRequest struct {
 	HostIdentity             HostIdentity      `json:"host_identity"`
 	NodeType                 string            `json:"node_type"`
 	Kind                     string            `json:"kind"`
+	DockerEndpoint           string            `json:"docker_endpoint,omitempty"`
 	Version                  string            `json:"version"`
+	EngineReleaseID          string            `json:"engine_release_id,omitempty"`
+	EngineDigest             string            `json:"engine_digest,omitempty"`
 	Labels                   map[string]string `json:"labels"`
 	CapabilityKeys           []string          `json:"capability_keys"`
 	HeartbeatIntervalSeconds uint32            `json:"heartbeat_interval_seconds"`

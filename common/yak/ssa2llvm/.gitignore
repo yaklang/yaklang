@@ -23,3 +23,6 @@ runtime/embed/assets/manifest_generated.go
 
 # Test binaries
 *.test
+
+# elfsplit tool binary (produced by scripts/build_yaklib.sh)
+cmd/elfsplit/elfsplit

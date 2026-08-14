@@ -1,2 +1,32 @@
 b = 1
 dump(b)
+
+# multiline paren / expressionList (ws* around '(' ')' and ',')
+paren1 = (
+	1
+)
+paren2 = (
+	1 + 2
+)
+paren3 = (1 +
+2)
+x, y = 1,
+2
+a,
+c = 3, 4
+f = func(p1, p2, p3) {
+	return p1
+}
+ret = f(
+	"POST",
+	x,
+	y
+)
+arr = [1,
+	2,
+	3]
+m = {"a": 1,
+	"b": 2}
+s = [9]
+v = s[0]
+dump(paren1, paren2, paren3, x, y, a, c, ret, arr, m, v)

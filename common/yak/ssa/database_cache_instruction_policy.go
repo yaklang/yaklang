@@ -19,11 +19,22 @@ const (
 	largeProjectCacheMax         = 1024
 	// Instruction DB batches for repos >= largeProjectByteThreshold: larger batches
 	// mean fewer SQLite transactions per million IR rows (bounded by maxSaveSize).
-	// Persist limit stays >= 4x batch so dbcache eviction backpressure matches writer.
-	largeProjectInstructionSave = 4096
-	largeProjectPersistLimit    = 32768
-	largeProjectAuxiliarySave   = 512
-	largeProjectTypeSave        = 256
+	// Bumped from 4096 to 16384 based on Hadoop pprof: compile-phase CPU was
+	// 38% runtime.cgocall (SQLite writes). Larger batches amortize the SQLite
+	// transaction + cgo overhead across more rows.
+	largeProjectInstructionSave = 16384
+	largeProjectPersistLimit    = 65536
+	// Auxiliary (index/offset) and type stores share the same rationale: the
+	// per-batch flush owns one SQLite transaction, so larger batches directly
+	// cut transaction count. Bumped from 512/256 to 4096 after the run2 pprof
+	// still showed ~38% CPU in runtime.cgocall during the type-store close.
+	largeProjectAuxiliarySave = 4096
+	largeProjectTypeSave      = 4096
+	// Rows per CreateInBatches statement for IrCode inserts. The wide IrCode
+	// model has ~50 columns, so 500 rows is the largest batch that stays under
+	// the driver's 32766 host-parameter ceiling (500*50=25000). Type/index/
+	// offset stores are narrower and use 1000-row chunks.
+	saveIrCodeInsertBatchSize = 500
 )
 
 var hotInstructionOpcodeBlacklist = map[Opcode]struct{}{

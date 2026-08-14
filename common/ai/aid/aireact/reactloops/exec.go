@@ -316,12 +316,12 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
 	r.resetModelThinkingBuffer()
+	r.Set("last_ai_decision_response", "")
 	r.loadingStatus("等待 AI 回应 / Waiting AI Respond...")
 	aiCallback := r.config.CallAI
 	if r.useSpeedPriorityAI {
 		aiCallback = r.config.CallSpeedPriorityAI
 	}
-	var promptRefOnce sync.Once
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -330,9 +330,14 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if ctxCanceled.IsSet() {
 				return nil
 			}
-			resp.SetOnReasonChunk(func(b []byte) {
-				r.appendModelThinkingChunk(b)
-			})
+			// The action parser can return after it has enough fields while the
+			// output stream is still draining. Capture the exact action response
+			// only after the stream finishes; assigning buf.String() immediately
+			// after ExtractActionFromStream can otherwise persist an empty or
+			// truncated action and make the replay record unusable.
+			// This also resets reasoning per concrete response, so rejected retry
+			// attempts cannot leak into the accepted replay record.
+			r.bindDecisionResponseCapture(resp)
 			boundEmitter := resp.BindEmitter(r.GetEmitter())
 			stream := resp.GetOutputStreamReader(
 				r.loopName,
@@ -426,7 +431,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							return
 						}
 
-						event, emitErr := boundEmitter.EmitStreamEventWithVizSource(
+						_, emitErr := boundEmitter.EmitStreamEventWithVizSource(
 							defaultNodeId,
 							preparedReader,
 							resp.GetTaskIndex(),
@@ -443,16 +448,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							done() // Ensure done is called even on error
 							return
 						}
-
-						// Emit prompt as reference material (only once per transaction)
-						if event != nil && prompt != "" {
-							promptRefOnce.Do(func() {
-								streamId := event.GetContentJSONPath(`$.event_writer_id`)
-								if streamId != "" {
-									boundEmitter.EmitTextReferenceMaterial(streamId, prompt)
-								}
-							})
-						}
 					}),
 			)
 
@@ -467,7 +462,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			log.Debugf("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
 			r.Set("last_ai_decision_prompt", prompt)
 			r.Set("last_ai_decision_nonce", nonce)
-			r.Set("last_ai_decision_response", buf.String())
 
 			if actionErr != nil {
 				r.loadingStatus("解析响应失败 / Parse Response Failed")
@@ -846,7 +840,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	// on the perception snapshot, consumed from the invoker.
 	r.refreshMidtermMemoryAsync()
 
-
 	go func() {
 		if !utils.IsNil(r.memoryTriage) {
 			log.Info("start to handle searching memory for ReActLoop with AI")
@@ -961,16 +954,13 @@ LOOP:
 		streamWg.Wait()
 
 		// Capture the pure model reasoning/thinking stream accumulated during
-		// this AI transaction and emit it as a standalone timeline entry. Unlike
-		// the legacy code which concatenated it with the iteration decision body,
-		// we keep it as a separate entry so the thinking is cleanly isolated for
-		// UI display. It is excluded from prompt projection (display-only).
+		// this AI transaction. Failed/unparseable attempts remain display-only;
+		// a successful action is stored with a prompt-only replay projection that
+		// the aicache hijacker converts into assistant.reasoning_content.
 		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
-		if iterationModelThinking != "" {
-			r.GetInvoker().AddToTimeline(TimelineEntryModelThinking, iterationModelThinking)
-		}
 
 		if transactionErr != nil {
+			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			needSummary.SetTo(true)
@@ -984,11 +974,18 @@ LOOP:
 		})
 
 		if utils.IsNil(actionParams) {
+			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
 			r.finishIterationLoopWithError(iterationCount, task, utils.Error("action is nil in ReActLoop"))
 			log.Error("action is nil in ReActLoop")
 			needSummary.SetTo(true)
 			return utils.Error("action is nil in ReActLoop")
 		}
+		r.recordModelThinkingTimeline(
+			iterationModelThinking,
+			r.Get("last_ai_decision_response"),
+			nonce,
+			true,
+		)
 		actionName := actionParams.Name()
 
 		r.loadingStatus(fmt.Sprintf("[%v]执行中 / [%v] executing action...", actionName, actionName))

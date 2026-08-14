@@ -3,7 +3,9 @@
 // yaklib modules (or "all"). With --permodule it emits an empty init() plus one
 // C-exported yak_register_module_<m>() per module (the C' approach: the compiler
 // calls only the used modules' register functions, so lld --gc-sections can drop
-// the unused ones from a single full libyak.a).
+// the unused ones from a single full libyak.a). With --aot the per-module
+// export tables come from PrunedShim (lightweight AOT tables) instead of the
+// monolithic yaklib package.
 package main
 
 import (
@@ -16,12 +18,17 @@ import (
 func main() {
 	args := os.Args[1:]
 	perModule := false
+	aot := false
 	if len(args) > 0 && args[0] == "--permodule" {
 		perModule = true
 		args = args[1:]
 	}
+	if len(args) > 0 && args[0] == "--aot" {
+		aot = true
+		args = args[1:]
+	}
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: genfull [--permodule] <output-path> [module... | all]")
+		fmt.Fprintln(os.Stderr, "usage: genfull [--permodule] [--aot] <output-path> [module... | all]")
 		os.Exit(2)
 	}
 	outputPath := args[0]
@@ -32,7 +39,7 @@ func main() {
 
 	var err error
 	if perModule {
-		err = embed.WriteRuntimeImportsPerModule(outputPath, modules)
+		err = embed.WriteRuntimeImportsPerModule(outputPath, modules, aot)
 	} else {
 		err = embed.WriteRuntimeImports(outputPath, modules)
 	}

@@ -73,3 +73,12 @@ func runtimeBuiltinPrintln(args ...any) {
 func runtimeBuiltinPrintf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, format, normalizePrintArgs(args)...)
 }
+
+// runtimeBuiltinAssert implements the yak assert builtin for the AOT runtime.
+// args are (cond, msg). If cond is false the function panics with msg so the
+// failure is visible and (via the main wrapper) produces a non-zero exit.
+func runtimeBuiltinAssert(cond bool, msg string) {
+	if !cond {
+		panic(msg)
+	}
+}

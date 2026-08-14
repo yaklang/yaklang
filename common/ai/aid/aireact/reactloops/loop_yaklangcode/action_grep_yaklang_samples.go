@@ -449,6 +449,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 【后果警告】：不重新搜索将导致代码错误和调试失败！`, pattern)
 				log.Infof("no grep results found for pattern: %s", pattern)
 				invoker.AddToTimeline("grep_no_results_warning", noResultMsg)
+				markYaklangLintResearchDone(loop)
 				op.Feedback(noResultMsg)
 				op.Continue()
 				return
@@ -589,6 +590,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			invoker.AddToTimeline(timelineKey, suggestionMsg)
 
 			log.Infof("grep search completed: %d results found for pattern: %s", len(results), pattern)
+			markYaklangLintResearchDone(loop)
 
 			// 检查是否有语法错误 - 参考 action_modify_code.go 的实现
 			fullcode := loop.Get("full_code")

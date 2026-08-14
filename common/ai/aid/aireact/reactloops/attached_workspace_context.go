@@ -13,12 +13,6 @@ import (
 const (
 	// AttachedResourceTypeFile matches AIInputEvent AttachedResourceInfo.Type for file resources.
 	AttachedResourceTypeFile = aicommon.AttachedResourceTypeFile
-
-	// AttachedResourceKeyDirectoryPath is the frontend workspace / current directory key.
-	AttachedResourceKeyDirectoryPath = aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH
-
-	// AttachedResourceKeyFilePath is the frontend open-file key.
-	AttachedResourceKeyFilePath = aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH
 )
 
 // WorkspaceAttachedContext carries IDE workspace state parsed from AttachedResourceInfo.
@@ -145,11 +139,11 @@ func ParseWorkspaceAttachedContext(attached []*aicommon.AttachedResource, target
 				if path := strings.TrimSpace(data.Value); path != "" {
 					ctx.TargetPath = filepath.Clean(path)
 				}
-			case data.HasKey(AttachedResourceKeyDirectoryPath):
+			case data.HasKey(aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH):
 				if path := strings.TrimSpace(data.Value); path != "" {
 					ctx.DirectoryPath = filepath.Clean(path)
 				}
-			case data.HasKey(AttachedResourceKeyFilePath):
+			case data.HasKey(aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH):
 				if ctx.FilePath == "" {
 					if path := strings.TrimSpace(data.Value); path != "" {
 						ctx.FilePath = filepath.Clean(path)
@@ -257,7 +251,7 @@ func FormatAttachedDirectoryValidationError(scanPath, targetKey string, err erro
 	}
 	return fmt.Sprintf(
 		"附件指定的扫描目录无效: %q（%v）。请确认 Type=%q、Key=%q 或 Key=%q Value 为存在的目录绝对路径",
-		scanPath, err, AttachedResourceTypeFile, AttachedResourceKeyDirectoryPath, targetKey,
+		scanPath, err, AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, targetKey,
 	)
 }
 

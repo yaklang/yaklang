@@ -33,9 +33,7 @@ type SQLiteVectorStoreHNSW struct {
 	embedder EmbeddingClient
 	hnsw     *GraphWrapper[string]
 
-	asyncDBOnce  sync.Once
-	asyncDBQueue *chanx.UnlimitedChan[func(tx *gorm.DB) error]
-	db           *gorm.DB
+	db *gorm.DB
 
 	mu sync.RWMutex // 用于并发安全的互斥锁
 }
@@ -47,9 +45,7 @@ const (
 
 func initSQLiteVectorStoreHNSW() *SQLiteVectorStoreHNSW { // 初始化 SQLiteVectorStoreHNSW 结构体
 	return &SQLiteVectorStoreHNSW{
-		asyncDBQueue: chanx.NewUnlimitedChan[func(tx *gorm.DB) error](context.Background(), 100),
-		asyncDBOnce:  sync.Once{},
-		mu:           sync.RWMutex{},
+		mu: sync.RWMutex{},
 	}
 }
 
@@ -76,7 +72,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 	graphWrapper, err := GraphWrapperManager.GetGraphWrapper(db, collection, collectionConfig)
 	if err != nil {
 		log.Errorf("get graph wrapper err: %v", err)
-		return nil, utils.Errorf("get graph wrapper err: %v", err)
+		return nil, utils.Wrap(err, "get graph wrapper")
 	}
 	vectorStore.hnsw = graphWrapper
 
@@ -283,25 +279,7 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 }
 
 func (s *SQLiteVectorStoreHNSW) Remove() error {
-	collectionName := s.collection.Name
-	return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-		var collections []schema.VectorStoreCollection
-		if err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error; err != nil {
-			return err
-		}
-		if len(collections) == 0 {
-			return utils.Errorf("集合 %s 不存在", collectionName)
-		}
-		collection := collections[0]
-
-		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
-			return err
-		}
-		return nil
-	})
+	return DeleteCollection(s.db, s.collection.Name)
 }
 
 // 将 schema.VectorStoreDocument 转换为 Document
@@ -341,7 +319,15 @@ func (s *SQLiteVectorStoreHNSW) Has(docId string) bool {
 }
 
 func (s *SQLiteVectorStoreHNSW) requireWriteCollection() error {
-	if s.GetArchived() {
+	var collection schema.VectorStoreCollection
+	err := s.db.Model(&schema.VectorStoreCollection{}).
+		Select("id, archived").
+		Where("id = ?", s.collection.ID).
+		First(&collection).Error
+	if err != nil {
+		return utils.Wrap(err, "current vector store is unavailable")
+	}
+	if collection.Archived {
 		return utils.Errorf("current vector store is archived, please unarchive first")
 	}
 	return nil
@@ -433,13 +419,12 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	var txInitTime, transactionDuration, nodeCreationTime, commitTime time.Duration
 	var totalDbQueryTime, totalDocUpdateTime, totalDocCreateTime time.Duration
 	var dbQueryCount, docUpdateCount, docCreateCount int
-	var finishSingle = make(chan struct{})
-
-	s.enqueueDbAction(func(db *gorm.DB) error {
-		defer close(finishSingle)
-
+	dbErr := func() error {
 		waitTxStart := time.Now()
 		tx := s.db.Begin()
+		if tx.Error != nil {
+			return utils.Wrap(tx.Error, "begin document transaction")
+		}
 		txInitTime = time.Since(waitTxStart)
 		for _, doc := range docs {
 
@@ -505,9 +490,10 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 		}
 		transactionDuration = time.Since(waitTxStart)
 		return nil
-	})
-
-	<-finishSingle
+	}()
+	if dbErr != nil {
+		return dbErr
+	}
 
 	nodeCreationStartTime := time.Now()
 	nodes := make([]hnsw.InputNode[string], len(docs))
@@ -520,7 +506,23 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	nodeCreationTime = time.Since(nodeCreationStartTime)
 
 	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
-	hnswAddTime := s.hnsw.Add(nodes...) // 纯粹的 add 使用的时间不加排队使用的的时间
+	hnswAddTime, err := s.hnsw.AddWithError(nodes...) // 纯粹的 add 使用的时间不加排队使用的的时间
+	if err != nil {
+		// A concurrent collection delete can commit after requireWriteCollection
+		// but before graph insertion. Remove any rows inserted after that delete
+		// so a stale store cannot recreate orphan documents.
+		documentIDs := make([]string, 0, len(docs))
+		for _, doc := range docs {
+			documentIDs = append(documentIDs, doc.ID)
+		}
+		cleanupErr := s.db.Model(&schema.VectorStoreDocument{}).
+			Where("collection_id = ? AND document_id IN (?)", s.collection.ID, documentIDs).
+			Unscoped().Delete(&schema.VectorStoreDocument{}).Error
+		if cleanupErr != nil {
+			return utils.Errorf("add graph failed: %v (cleanup orphan documents failed: %v)", err, cleanupErr)
+		}
+		return utils.Wrap(err, "add graph")
+	}
 
 	// 计算平均指标
 	var avgQueryTime, avgUpdateTime, avgCreateTime time.Duration
@@ -714,10 +716,8 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 		return nil
 	}
 
-	s.hnsw.Delete(ids...)
-
 	const deleteBatchSize = 200
-	utils.GormTransactionReturnDb(s.db, func(tx *gorm.DB) {
+	err := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
 		for start := 0; start < len(ids); start += deleteBatchSize {
 			end := start + deleteBatchSize
 			if end > len(ids) {
@@ -727,10 +727,20 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 				Where("collection_id = ? AND document_id IN (?)", s.collection.ID, ids[start:end]).
 				Unscoped().
 				Delete(&schema.VectorStoreDocument{}).Error; err != nil {
-				log.Errorf("删除文档批次失败: %v", err)
+				return utils.Errorf("删除文档批次失败: %v", err)
 			}
 		}
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Only mutate the in-memory graph after the durable delete commits. This
+	// avoids reporting success while leaving database rows behind.
+	if err := s.hnsw.DeleteWithError(ids...); err != nil {
+		return utils.Wrap(err, "delete graph nodes")
+	}
 
 	return nil
 }
@@ -902,19 +912,17 @@ func (s *SQLiteVectorStoreHNSW) Clear() error {
 	if err := s.requireWriteCollection(); err != nil {
 		return utils.Wrap(err, "require write vector store")
 	}
-	docs, err := s.List()
-	if err != nil {
-		return err
+	// Only fetch identifiers. Loading every document used to materialize all
+	// content, metadata and embedding blobs before a clear, causing avoidable
+	// latency and peak-memory growth on large collections.
+	var ids []string
+	if err := s.db.Model(&schema.VectorStoreDocument{}).
+		Where("collection_id = ?", s.collection.ID).
+		Where("document_id <> ?", DocumentTypeCollectionInfo).
+		Pluck("document_id", &ids).Error; err != nil {
+		return utils.Wrap(err, "list vector document ids")
 	}
-	ids := []string{}
-	for _, doc := range docs {
-		ids = append(ids, doc.ID)
-	}
-	err = s.Delete(ids...)
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.Delete(ids...)
 }
 
 // 确保 SQLiteVectorStoreHNSW 实现了 VectorStore 接口

@@ -21,10 +21,20 @@ jobs:
       retention_days: 14
       production_release: true
 
+  build-session-runtimes:
+    name: Build matching AI Session Runtime artifacts
+    uses: ./.github/workflows/build-legion-ai-session-runtime-common.yml
+    with:
+      source_mode: unified
+      retention_days: 14
+      producer_workflow_name: Build Trusted Legion Product Node
+
   build-and-publish:
     name: Build Linux ${{ matrix.goarch }} HIDS node
+    needs: [build-portable-nodes, build-session-runtimes]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    environment: production-release
     strategy:
       fail-fast: false
       matrix:
@@ -80,7 +90,9 @@ jobs:
           cache: true
 
       - name: Test OSS release index contract
-        run: ./.github/scripts/test-build-legion-component-oss-index.sh
+        run: |
+          ./.github/scripts/test-build-legion-component-oss-index.sh
+          ./.github/scripts/test-build-legion-node-engine-import-bundle.sh
 
       - name: Build product node package
         run: ./.github/scripts/build-legion-product-node.sh
@@ -113,7 +125,8 @@ jobs:
               .recipe.build_tags == "hids" and
               .ci.workflow == "Build Trusted Legion Product Node" and
               (.capabilities | index("hids") != null) and
-              (.capabilities | index("ai.session.bind_epoch.v1") != null)
+              (.capabilities | index("ai.session.bind_epoch.v1") != null) and
+              (.capabilities | index("ai.session.turn_lifecycle.v1") != null)
             ' PRODUCT_NODE_MANIFEST.json >/dev/null
 
       - name: Stage architecture-specific artifact contract
@@ -130,6 +143,26 @@ jobs:
           cp "$package_dir/SHA256SUMS" "$artifact_dir/SHA256SUMS${ARTIFACT_SUFFIX}"
           cp "dist/${NODE_PACKAGE_NAME}.tar.gz" "$artifact_dir/"
           cp "dist/${NODE_PACKAGE_NAME}.tar.gz.sha256" "$artifact_dir/"
+
+      - name: Download matching AI Session Runtime artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: legion-ai-session-runtime_linux_${{ matrix.goarch }}
+          path: dist/runtime-artifact
+
+      - name: Stage unified Runtime contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_suffix=""
+          if [[ "$NODE_GOARCH" != amd64 ]]; then
+            runtime_suffix="_${NODE_GOOS}_${NODE_GOARCH}"
+          fi
+          runtime_manifest="dist/runtime-artifact/SESSION_RUNTIME_MANIFEST${runtime_suffix}.json"
+          runtime_archive="dist/runtime-artifact/legion-ai-session-runtime_${NODE_GOOS}_${NODE_GOARCH}.docker.tar.gz"
+          [[ -f "$runtime_manifest" && -f "$runtime_archive" ]]
+          cp "$runtime_manifest" "dist/artifact/SESSION_RUNTIME_MANIFEST${ARTIFACT_SUFFIX}.json"
+          cp "$runtime_archive" "dist/artifact/"
 
       - name: Build immutable OSS release index
         id: oss-release
@@ -150,6 +183,40 @@ jobs:
             echo "index_sha256=$(sha256sum "dist/artifact/$INDEX_NAME" | awk '{print $1}')"
             echo "remote_prefix=legion/components/product-node/${NODE_PACKAGE_VERSION}/${SOURCE_SHA}"
           } >>"$GITHUB_OUTPUT"
+
+      - name: Build one-file Legion engine installation package
+        shell: bash
+        env:
+          RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.LEGION_NODE_RELEASE_SIGNING_PRIVATE_KEY_B64 }}
+          RELEASE_SIGNING_PUBLIC_KEY: ${{ vars.LEGION_NODE_RELEASE_SIGNING_PUBLIC_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          signing_args=()
+          if [[ -n "$RELEASE_SIGNING_PRIVATE_KEY" || -n "$RELEASE_SIGNING_PUBLIC_KEY" ]]; then
+            [[ -n "$RELEASE_SIGNING_PRIVATE_KEY" && -n "$RELEASE_SIGNING_PUBLIC_KEY" ]] || {
+              echo "production-release must configure both Yaklang Node release signing values or neither" >&2
+              exit 1
+            }
+            signing_key="${RUNNER_TEMP}/legion-node-release-signing-key.b64"
+            umask 077
+            printf '%s\n' "$RELEASE_SIGNING_PRIVATE_KEY" >"$signing_key"
+            trap 'rm -f "$signing_key"' EXIT
+            signing_args=(
+              --signing-private-key-file "$signing_key"
+              --expected-public-key "$RELEASE_SIGNING_PUBLIC_KEY"
+            )
+          fi
+          engine_bundle="dist/artifact/yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz"
+          ./.github/scripts/build-legion-node-engine-import-bundle.sh \
+            --version "$NODE_PACKAGE_VERSION" \
+            --source-sha "$SOURCE_SHA" \
+            --artifact-dir dist/artifact \
+            --goos "$NODE_GOOS" \
+            --goarch "$NODE_GOARCH" \
+            "${signing_args[@]}" \
+            --output "$engine_bundle"
+          gzip -t "$engine_bundle"
+          (cd dist/artifact && sha256sum -c "$(basename "$engine_bundle").sha256")
 
       - name: Build repository-owned OSS uploader
         run: go build -trimpath -o "${RUNNER_TEMP}/yak-oss-upload" ./common/yak/cmd/yak.go
@@ -222,6 +289,7 @@ jobs:
             echo
             echo "- Source: \`${SOURCE_SHA}\`"
             echo "- Package: \`${NODE_PACKAGE_NAME}.tar.gz\`"
+            echo "- Legion engine import: \`yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz\`"
             echo "- Target: \`linux/${NODE_GOARCH}\`"
             echo "- Build tags: \`hids\`"
             echo "- OSS index: \`${{ steps.oss-release.outputs.index_url }}\`"

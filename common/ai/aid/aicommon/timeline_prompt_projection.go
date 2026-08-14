@@ -9,6 +9,10 @@ import (
 // Timeline item: UI, diff, persistence, fork and rollback continue to observe
 // the original event stream.
 func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
+	return projectTimelineItemForPromptWithModelReplay(item, false)
+}
+
+func projectTimelineItemForPromptWithModelReplay(item *TimelineItem, allowModelReplay bool) *TimelineItem {
 	if item == nil || item.deleted || item.value == nil {
 		return nil
 	}
@@ -23,8 +27,13 @@ func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
 	entryType := extractTextEntryType(textItem.Text)
 	category := normalizeTimelinePromptCategory(entryType)
 	switch category {
-	case "TODO_DELTA", "EVIDENCE_OPS", "MODEL_THINKING":
+	case "TODO_DELTA", "EVIDENCE_OPS":
 		return nil
+	case "MODEL_THINKING":
+		if !allowModelReplay || strings.TrimSpace(textItem.PromptText) == "" {
+			return nil
+		}
+		return cloneTextTimelineItemForPrompt(item, textItem, textItem.PromptText)
 	case "ITERATION":
 		return item
 	case "TODO_DELTA_ERROR":
@@ -83,9 +92,14 @@ func cloneTextTimelineItemForPrompt(item *TimelineItem, textItem *TextTimelineIt
 }
 
 func projectTimelineItemsForPrompt(items []*TimelineItem) []*TimelineItem {
+	return projectTimelineItemsForPromptWithLatestModelReplay(items, 0)
+}
+
+func projectTimelineItemsForPromptWithLatestModelReplay(items []*TimelineItem, latestReplayID int64) []*TimelineItem {
 	projected := make([]*TimelineItem, 0, len(items))
 	for _, item := range items {
-		if promptItem := projectTimelineItemForPrompt(item); promptItem != nil {
+		allowReplay := latestReplayID > 0 && item != nil && item.GetID() == latestReplayID
+		if promptItem := projectTimelineItemForPromptWithModelReplay(item, allowReplay); promptItem != nil {
 			projected = append(projected, promptItem)
 		}
 	}
@@ -96,6 +110,35 @@ func projectTimelineItemsForPrompt(items []*TimelineItem) []*TimelineItem {
 // and stable nonces. Empty projected interval blocks remain present so noise
 // filtering cannot move the Frozen/Open boundary.
 func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
+	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, false)
+}
+
+// projectTimelineRenderableBlocksForPromptWithLatestModelReplay preserves the
+// existing bucket topology while allowing exactly the newest successful model
+// replay record into the prompt. Older model thinking remains UI-only.
+func projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
+	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, true)
+}
+
+func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRenderableBlocks, includeLatestReplay bool) TimelineRenderableBlocks {
+	var latestReplayID int64
+	if includeLatestReplay {
+		for _, block := range blocks {
+			interval, ok := block.(*TimelineIntervalBlock)
+			if !ok || interval == nil {
+				continue
+			}
+			for _, item := range interval.Items {
+				textItem, ok := timelineTextItem(item)
+				if !ok || strings.TrimSpace(textItem.PromptText) == "" || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "MODEL_THINKING" {
+					continue
+				}
+				if id := item.GetID(); id > latestReplayID {
+					latestReplayID = id
+				}
+			}
+		}
+	}
 	projected := make(TimelineRenderableBlocks, 0, len(blocks))
 	for _, block := range blocks {
 		switch typed := block.(type) {
@@ -104,7 +147,7 @@ func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) T
 				continue
 			}
 			copyBlock := *typed
-			copyBlock.Items = projectTimelineItemsForPrompt(typed.Items)
+			copyBlock.Items = projectTimelineItemsForPromptWithLatestModelReplay(typed.Items, latestReplayID)
 			projected = append(projected, &copyBlock)
 		default:
 			// Existing compressed heads are historical facts. Rewriting them here
@@ -115,4 +158,12 @@ func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) T
 		}
 	}
 	return projected
+}
+
+func timelineTextItem(item *TimelineItem) (*TextTimelineItem, bool) {
+	if item == nil || item.deleted || item.value == nil {
+		return nil, false
+	}
+	textItem, ok := item.value.(*TextTimelineItem)
+	return textItem, ok && textItem != nil
 }

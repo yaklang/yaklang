@@ -73,11 +73,27 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 				return nil
 			}
 
-			db := GetDB().Model(&IrCode{}).Where("program_name = ?", progName)
-			ch := bizhelper.FastPagination[*IrCode](ctx, db, nil,
-				bizhelper.WithFastPaginator_IDs(idsToLoad), bizhelper.WithFastPaginator_IndexField("code_id"),
-			)
-			for ir := range ch {
+			// A2: use the parameterized native-SQL batch read (same O2 fast path
+			// as PreloadIrCodesByIdsFast) to skip GORM's heavy per-page chain
+			// (FastPagination built Scope.Fields/search.clone/DB.clone per page).
+			// On any native error, fall back to the old FastPagination path so a
+			// DB error is never mistaken for an empty result.
+			irs, err := nativeGetIrCodesByIds(GetDB(), progName, idsToLoad)
+			if err != nil {
+				db := GetDB().Model(&IrCode{}).Where("program_name = ?", progName)
+				ch := bizhelper.FastPagination[*IrCode](ctx, db, nil,
+					bizhelper.WithFastPaginator_IDs(idsToLoad), bizhelper.WithFastPaginator_IndexField("code_id"),
+				)
+				for ir := range ch {
+					cache.Set(ir.CodeID, ir)
+					outC.SafeFeed(ir)
+				}
+				return nil
+			}
+			for _, ir := range irs {
+				if ir == nil {
+					continue
+				}
 				cache.Set(ir.CodeID, ir)
 				outC.SafeFeed(ir)
 			}
@@ -131,6 +147,14 @@ func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName str
 	}
 
 	if matchMod&ConstType != 0 {
+		// A3: use the native-SQL ConstType ID query (skips GORM Model+Where+
+		// Pluck+YieldIrCode — the 3.59M-call hot path on hadoop). On any native
+		// error, fall back to the original GORM path so a DB error is never
+		// mistaken for an empty result.
+		ids, err := nativeGetIrCodeIDsByConstType(GetDB(), progName, compareMode, value)
+		if err == nil {
+			return filterLoaded(yieldIrCodes(ctx, progName, ids))
+		}
 		query := GetDB().Model(&IrCode{}).
 			Where(TableIrCodes+".program_name = ?", progName).
 			Where(TableIrCodes+".opcode = ? AND "+TableIrCodes+".const_type = ?", 5, "normal")

@@ -106,7 +106,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 			return
 		}
 		origin := variable.GetValue()
-		if capturedVariable := variable.GetCaptured(); capturedVariable.GetLocal() {
+		if capturedVariable := variable.GetCaptured(); !utils.IsNil(capturedVariable) && capturedVariable.GetLocal() {
 			if canCapture {
 				origin = ver.GetValue()
 			}
@@ -133,7 +133,11 @@ func (base *ScopedVersionedTable[T]) Merge(
 		if canCapture {
 			tmpPhiCapture.Set(v, ret)
 		}
-		if variable.GetCaptured().GetScope().Compare(ver.GetCaptured().GetScope()) {
+		capturedVariable := variable.GetCaptured()
+		capturedVersion := ver.GetCaptured()
+		if !utils.IsNil(capturedVariable) && !utils.IsNil(capturedVersion) &&
+			!utils.IsNil(capturedVariable.GetScope()) && !utils.IsNil(capturedVersion.GetScope()) &&
+			capturedVariable.GetScope().Compare(capturedVersion.GetScope()) {
 			tmpPhiScope.Set(v, ret)
 		}
 	}

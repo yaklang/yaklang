@@ -144,7 +144,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		actionName,
 		`Modify existing code. Preferred mode:
-1) Patch (default): put a Cursor-style Apply Patch in the GEN_CODE / content tag
+1) Patch (default): put an Apply Patch block in the GEN_CODE / content tag
    (*** Begin Patch ... *** End Patch). System applies it to full_code then emits the merged full file (never raw patch) to the frontend.
 Legacy fallbacks when GEN_CODE is NOT a patch:
 2) Small snippet only: old_snippet + optional replace_all.
@@ -196,7 +196,9 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 
 			action.WaitStream(op.GetContext())
 
-			// Preferred path: Cursor-style patch inside GEN_CODE (ignores old_snippet / line range).
+			// Preferred path: Apply Patch inside GEN_CODE (ignores old_snippet / line range).
+			// When patch-fallback mode is on, still accept a correct patch (compatible), but
+			// prefer line-range / old_snippet after repeated apply failures.
 			if LooksLikeCodePatch(loop.Get(codeVar)) {
 				f.handleModifyByPatch(loop, action, op, actionName, filename, fullCodeVar, codeVar)
 				return
@@ -206,10 +208,11 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 			oldSnippet := strings.TrimSpace(action.GetString("old_snippet"))
 			modifyStartParam := action.GetInt("modify_start_line")
 			modifyEndParam := action.GetInt("modify_end_line")
-			if looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode, modifyStartParam, modifyEndParam) {
+			patchFallback := IsPatchFallbackMode(loop, actionName)
+			if !patchFallback && looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode, modifyStartParam, modifyEndParam) {
 				msg := fmt.Sprintf(`【modify_code 失败】检测到 GEN_CODE 是完整文件或大段源码，但缺少 *** Begin Patch。
 
-modify_code 必须输出 Cursor 风格 Patch；禁止直接输出完整 beforeRequest、runSelfTest、完整函数或整份脚本。
+modify_code 必须输出 Apply Patch；禁止直接输出完整 beforeRequest、runSelfTest、完整函数或整份脚本。
 请基于本轮 CURRENT_CODE 原样复制上下文和删除行，重新输出：
 *** Begin Patch
 *** Update File: current
@@ -225,6 +228,18 @@ GEN_CODE 预览：
 				op.Continue()
 				return
 			}
+			if patchFallback && looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode, modifyStartParam, modifyEndParam) &&
+				(modifyStartParam <= 0 || modifyEndParam <= 0 || modifyEndParam < modifyStartParam) && oldSnippet == "" {
+				msg := fmt.Sprintf(`【modify_code 失败】当前处于 Patch 降级模式：禁止再输出无定位信息的大段代码。
+
+请提供 modify_start_line/modify_end_line（对照 CURRENT_CODE 行号）或 old_snippet。
+GEN_CODE 预览：
+%s`, utils.ShrinkTextBlock(generatedCode, 300))
+				runtime.AddToTimeline("modify_fallback_needs_locator", msg)
+				op.Feedback(msg)
+				op.Continue()
+				return
+			}
 
 			if oldSnippet != "" {
 				f.handleModifyByOldSnippet(loop, action, op, actionName, filename, fullCodeVar, codeVar)
@@ -234,9 +249,19 @@ GEN_CODE 预览：
 			start := modifyStartParam
 			end := modifyEndParam
 			if start <= 0 || end <= 0 || end < start {
-				msg := fmt.Sprintf(`【modify_code 失败】GEN_CODE 不是 Patch（缺少 *** Begin Patch），且未提供 old_snippet / 有效行号。
+				var msg string
+				if IsPatchFallbackMode(loop, actionName) {
+					msg = fmt.Sprintf(`【modify_code 失败】Patch 降级模式：必须提供 old_snippet 或有效行号 modify_start_line/modify_end_line。
 
-请优先输出 Cursor 风格 Patch：
+示例：
+{"@action":"modify_code","modify_start_line":10,"modify_end_line":25,"modify_code_reason":"..."}
+<|%s_<nonce>|>
+...该行号范围内的新代码...
+<|%s_END_<nonce>|>`, f.aiTagName, f.aiTagName)
+				} else {
+					msg = fmt.Sprintf(`【modify_code 失败】GEN_CODE 不是 Patch（缺少 *** Begin Patch），且未提供 old_snippet / 有效行号。
+
+请优先输出 Apply Patch：
 {"@action":"modify_code","modify_code_reason":"..."}
 <|%s_<nonce>|>
 *** Begin Patch
@@ -248,6 +273,7 @@ GEN_CODE 预览：
 <|%s_END_<nonce>|>
 
 或回退：old_snippet / modify_start_line+modify_end_line。`, f.aiTagName, f.aiTagName)
+				}
 				runtime.AddToTimeline("modify_no_locator", msg)
 				op.Feedback(msg)
 				op.Continue()
@@ -321,6 +347,7 @@ GEN_CODE 解析行号：[%d-%d]
 				op.Fail(fmt.Sprintf("failed to write modified content to file: %v", writeErr))
 				return
 			}
+			resetPatchApplyFail(loop, actionName)
 			loop.Set(fullCodeVar, fullCode)
 
 			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{

@@ -95,6 +95,10 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 				vals = append(vals, ret...)
 			}
 		}
+		// shadow is a pure factory shell used only as a ParentProgram carrier for
+		// the mask defs; it is never appended to vals/edges/results itself, so it
+		// is unreachable after this loop. Release it.
+		releaseValue(shadow)
 	}
 	return vals
 }
@@ -156,6 +160,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				if raw, ok := key.GetConstValue().(string); ok && strings.HasPrefix(raw, "$") {
 					normalizedKey := i.NewValue(ssa.NewConst(strings.TrimPrefix(raw, "$")))
 					members = i.GetMember(normalizedKey)
+					// normalizedKey is a pure factory shell used only as a lookup
+					// key; GetMember never retains it. Release it now that it is
+					// unreachable.
+					releaseValue(normalizedKey)
 				}
 			}
 			for i, m := range members {
@@ -233,7 +241,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if calleeId <= 0 {
 			return Values{i} // return self
 		}
-		calleeInst, ok := inst.GetValueById(calleeId)
+		calleeInst, ok := actx.getResolvedValue(inst, calleeId)
 		if !ok {
 			return Values{i} // return self
 		}
@@ -278,7 +286,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			callee := i.NewValue(calleeInst)
 			nodes := Values{callee}
 			for _, val := range inst.Args {
-				val, ok := inst.GetValueById(val)
+				val, ok := actx.getResolvedValue(inst, val)
 				if ok && val != nil {
 					arg := i.NewValue(val)
 					if arg != nil {
@@ -287,7 +295,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				}
 			}
 			for _, value := range inst.Binding {
-				value, ok := inst.GetValueById(value)
+				value, ok := actx.getResolvedValue(inst, value)
 				if ok && value != nil {
 					arg := i.NewValue(value)
 					if arg != nil {
@@ -316,7 +324,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				targetIdx := codec.Atoi(retIndexRawStr)
 				var traceRets Values
 				for _, retId := range inst.Return {
-					retInst, ok := inst.GetValueById(retId)
+					retInst, ok := actx.getResolvedValue(inst, retId)
 					if !ok {
 						continue
 					}
@@ -327,7 +335,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					}
 					for idx, traceId := range retIns.Results {
 						if idx == targetIdx {
-							traceVal, ok := inst.GetValueById(traceId)
+							traceVal, ok := actx.getResolvedValue(inst, traceId)
 							if ok && traceVal != nil {
 								topDefValue := i.NewValue(traceVal)
 								if topDefValue != nil {
@@ -344,7 +352,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				// string literal member
 				var traceRets Values
 				for _, retId := range inst.Return {
-					retInst, ok := inst.GetValueById(retId)
+					retInst, ok := actx.getResolvedValue(inst, retId)
 					if !ok {
 						continue
 					}
@@ -354,7 +362,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						continue
 					}
 					for _, traceId := range retIns.Results {
-						traceValue, ok := inst.GetValueById(traceId)
+						traceValue, ok := actx.getResolvedValue(inst, traceId)
 						if !ok {
 							continue
 						}
@@ -392,7 +400,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				return
 			}
 			for _, retId := range fun.Return {
-				retInst, ok := fun.GetValueById(retId)
+				retInst, ok := actx.getResolvedValue(fun, retId)
 				if !ok {
 					continue
 				}
@@ -436,7 +444,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				return Values{i}
 			}
 
-			memberKey, ok := inst.GetValueById(inst.MemberCallKey)
+			memberKey, ok := actx.getResolvedValue(inst, inst.MemberCallKey)
 			if !ok {
 				memberKey = nil
 			}
@@ -526,9 +534,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					// Prefer call-site scope (same as formal parameters): binding id refers to
 					// the actual SSA value at the call, which may not resolve on inst alone.
 					// TODO(scan-log): binding id may not reload after split-compile flush (GetValueById miss).
-					actualParam, ok = calledInstance.GetValueById(binding)
+					actualParam, ok = actx.getResolvedValue(calledInstance, binding)
 					if !ok {
-						actualParam, ok = inst.GetValueById(binding)
+						actualParam, ok = actx.getResolvedValue(inst, binding)
 						if !ok {
 							actualParam = nil
 						}
@@ -559,10 +567,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				}
 				argID := calledInstance.Args[inst.FormalParameterIndex]
 				// Prefer resolving actual argument in the call-site scope first.
-				actualParam, ok = calledInstance.GetValueById(argID)
+				actualParam, ok = actx.getResolvedValue(calledInstance, argID)
 				if !ok {
 					// Fallback to current instruction scope for compatibility.
-					actualParam, ok = inst.GetValueById(argID)
+					actualParam, ok = actx.getResolvedValue(inst, argID)
 					if !ok {
 						actualParam = nil
 					}
@@ -623,7 +631,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	case *ssa.SideEffect:
 		callIns := inst.CallSite
 		if callIns >= 0 {
-			v, ok := inst.GetValueById(inst.Value)
+			v, ok := actx.getResolvedValue(inst, inst.Value)
 			if !ok || utils.IsNil(v) {
 				return getMemberCall(i, i.getValue(), actx)
 			}
@@ -668,12 +676,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	case *ssa.BinOp:
 		// Binary operations: track the operands X and Y
 		var results Values
-		if x, ok := inst.GetValueById(inst.X); ok && x != nil {
+		if x, ok := actx.getResolvedValue(inst, inst.X); ok && x != nil {
 			if xVal := i.NewValue(x); xVal != nil {
 				results = append(results, xVal.getTopDefs(actx, opt...)...)
 			}
 		}
-		if y, ok := inst.GetValueById(inst.Y); ok && y != nil {
+		if y, ok := actx.getResolvedValue(inst, inst.Y); ok && y != nil {
 			if yVal := i.NewValue(y); yVal != nil {
 				results = append(results, yVal.getTopDefs(actx, opt...)...)
 			}
@@ -684,7 +692,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		return results
 	case *ssa.UnOp:
 		// Unary operations: track the operand X
-		if x, ok := inst.GetValueById(inst.X); ok && x != nil {
+		if x, ok := actx.getResolvedValue(inst, inst.X); ok && x != nil {
 			if xVal := i.NewValue(x); xVal != nil {
 				return xVal.getTopDefs(actx, opt...)
 			}
@@ -692,7 +700,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		return Values{i}
 	case *ssa.Next:
 		// Next operations: track the iterator
-		if iter, ok := inst.GetValueById(inst.Iter); ok && iter != nil {
+		if iter, ok := actx.getResolvedValue(inst, inst.Iter); ok && iter != nil {
 			if iterVal := i.NewValue(iter); iterVal != nil {
 				return iterVal.getTopDefs(actx, opt...)
 			}

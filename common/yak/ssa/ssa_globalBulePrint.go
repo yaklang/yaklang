@@ -1,6 +1,10 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"fmt"
+
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 func memberKeyNameForGlobal(key Value) string {
 	if utils.IsNil(key) {
@@ -29,27 +33,21 @@ func (b *FunctionBuilder) AddGlobalVariable(name string, valueFunc func() Value)
 		initContainer(b)
 	}
 
+	// Use lazy builder to register global variables. The lazy builder
+	// defers valueFunc execution until GlobalVariablesBlueprint.Build()
+	// is called. Build() is called:
+	// 1. In buildFunctionDeclFront before init() block compilation
+	// 2. In LoadGlobalVariable before restoring globals to scope
+	// 3. In build(ast) after all declarations and functions are processed
+	// This ensures valueFunc runs with a valid FunctionBuilder context
+	// (before Finish), and the AddLazyBuilder fix (immediate execution
+	// if Build() already ran) handles out-of-order cases.
 	prog.GlobalVariablesBlueprint.AddLazyBuilder(func() {
 		value := valueFunc()
 		if utils.IsNil(value) {
 			return
 		}
-
 		prog.GlobalVariablesBlueprint.RegisterStaticMember(name, value, false)
-		globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
-		if utils.IsNil(globalVarsContainer) {
-			return
-		}
-
-		scope := b.CurrentBlock.ScopeTable
-		for _, v := range scope.GetAllVariables() {
-			if object := GetLatestObject(v.GetValue()); object != nil && object.GetId() == value.GetId() {
-				variable := b.CreateMemberCallVariable(globalVarsContainer, b.EmitConstInstPlaceholder(v.GetName()))
-				b.AssignVariable(variable, v.GetValue())
-			}
-		}
-		variable := b.CreateMemberCallVariable(globalVarsContainer, b.EmitConstInstPlaceholder(name))
-		b.AssignVariable(variable, value)
 	})
 }
 
@@ -65,15 +63,10 @@ func (b *FunctionBuilder) TryUpdateGlobalVariableByName(name string, r Value) bo
 		initContainer(b)
 	}
 
-	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
-	if globalVarsContainer == nil {
+	if prog.GlobalVariablesBlueprint.GetStaticMember(name) == nil {
 		return false
 	}
-
-	if _, ok := GetLatestMemberByKeyString(globalVarsContainer, name); !ok {
-		return false
-	}
-	setMemberCallRelationship(globalVarsContainer, b.EmitConstInstPlaceholder(name), r)
+	prog.GlobalVariablesBlueprint.RegisterStaticMember(name, r, false)
 	return true
 }
 
@@ -85,13 +78,13 @@ func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {
 		initContainer(b)
 	}
 
-	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
-	if globalVarsContainer == nil {
-		return variables
-	}
-
-	for _, pair := range GetLastWinsMemberPairs(globalVarsContainer) {
-		variables[pair.KeyString()] = pair.Member
+	for name := range prog.GlobalVariablesBlueprint.StaticMember {
+		if name == "" {
+			continue
+		}
+		if v := prog.GlobalVariablesBlueprint.GetStaticMember(name); v != nil {
+			variables[name] = v
+		}
 	}
 	return variables
 }
@@ -108,25 +101,80 @@ func (b *FunctionBuilder) GetGlobalVariableR(name string) Value {
 func (b *FunctionBuilder) LoadGlobalVariable() {
 	prog := b.GetProgram()
 
-	if utils.IsNil(prog.GlobalVariablesBlueprint) {
-		log.Errorf("global variables blueprint is nil")
+	if utils.IsNil(prog) || utils.IsNil(prog.GlobalVariablesBlueprint) {
 		return
 	}
 
-	if utils.IsNil(prog.GlobalVariablesBlueprint.Container()) {
-		initContainer(b)
-	}
+	// Build ensures all AddGlobalVariable lazy builders have executed.
+	prog.GlobalVariablesBlueprint.Build()
 
-	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
-	for _, pair := range GetLastWinsMemberPairs(globalVarsContainer) {
-		variable := b.CreateVariableCross(pair.KeyString())
+	// Load registered global variables from StaticMember (typically a few
+	// dozen), not all 21000+ memberPairs from globalVarsContainer.
+	// The old code traversed GetLastWinsMemberPairs which included all
+	// member call relationships (str[0], Store.Get, Fatal(...)), causing
+	// 20-30s hangs on engineercms.
+	//
+	// For each global variable, also restore its member call results
+	// (e.g. str[0] -> "alpha") into the current scope, so that cross-file
+	// references like str[0] resolve correctly. We only traverse the
+	// global variable's own memberPairs (a few per variable), not the
+	// globalVarsContainer's 21000+ pairs.
+	for name := range prog.GlobalVariablesBlueprint.StaticMember {
+		if name == "" {
+			continue
+		}
+		member := prog.GlobalVariablesBlueprint.GetStaticMember(name)
+		if member == nil {
+			continue
+		}
+		variable := b.CreateVariableCross(name)
 		if variable == nil {
 			continue
 		}
-		if current := variable.GetValue(); !utils.IsNil(current) && current.GetId() == pair.Member.GetId() {
+		if current := variable.GetValue(); !utils.IsNil(current) && current.GetId() == member.GetId() {
 			continue
 		}
-		b.AssignVariable(variable, pair.Member)
+		b.AssignVariable(variable, member)
+
+		// Restore member call results for this global variable.
+		// Skip globals with huge memberPairs (e.g. gb2312 map with 21792
+		// entries): restoring all of them per block is O(N) and only needed
+		// within the declaring file, not cross-file. Normal globals have a
+		// handful of member call results.
+		if av, ok := ToValue(member); ok && av != nil {
+			rawAv := av.getAnValue()
+			if rawAv != nil && len(rawAv.memberPairs) <= 5000 {
+				for _, pair := range rawAv.memberPairs {
+					keyVal, ok1 := rawAv.resolveLinkedValue(pair.key)
+					memberVal, ok2 := rawAv.resolveLinkedValue(pair.member)
+					if !ok1 || !ok2 {
+						continue
+					}
+					keyStr := GetKeyString(keyVal)
+					if keyStr == "" {
+						continue
+					}
+					// Member call variable name must match the format used
+					// by checkCanMemberCallExist:
+					// - Number key (slice index):  #objectId[number]
+					// - String key (map/struct):   #objectId.keyStr
+					var mcName string
+					if constInst, ok := ToConstInst(keyVal); ok && constInst.IsNumber() {
+						mcName = fmt.Sprintf("#%d[%d]", member.GetId(), constInst.Number())
+					} else {
+						mcName = fmt.Sprintf("#%d.%s", member.GetId(), keyStr)
+					}
+					mcVar := b.CreateVariableCross(mcName)
+					if mcVar == nil {
+						continue
+					}
+					if cur := mcVar.GetValue(); !utils.IsNil(cur) && cur.GetId() == memberVal.GetId() {
+						continue
+					}
+					b.AssignVariable(mcVar, memberVal)
+				}
+			}
+		}
 	}
 }
 
@@ -136,10 +184,12 @@ func (p *Program) GetGlobalVariable(name string) (Value, bool) {
 	}
 
 	p.GlobalVariablesBlueprint.Build()
-	globalVarsContainer := p.GlobalVariablesBlueprint.Container()
-	if globalVarsContainer == nil {
-		return nil, false
-	}
 
-	return GetLatestMemberByKeyString(globalVarsContainer, name)
+	// Direct O(1) lookup from StaticMember instead of O(N) traversal
+	// of globalVarsContainer memberPairs via GetLatestMemberByKeyString.
+	v := p.GlobalVariablesBlueprint.GetStaticMember(name)
+	if v != nil {
+		return v, true
+	}
+	return nil, false
 }

@@ -20,31 +20,49 @@ check_release_only_workflow() {
 check_release_only_workflow \
   "$repo_root/.github/workflows/build-legion-product-node.yml" \
   'legion-node-v*'
-check_release_only_workflow \
-  "$repo_root/.github/workflows/build-legion-ai-session-runtime.yml" \
-  'legion-runtime-v*'
 
 runtime_release_workflow="$repo_root/.github/workflows/build-legion-ai-session-runtime.yml"
 runtime_workflow="$repo_root/.github/workflows/build-legion-ai-session-runtime-common.yml"
 runtime_alpha_workflow="$repo_root/.github/workflows/build-legion-ai-session-runtime-alpha.yml"
+[[ ! -e "$runtime_release_workflow" ]] || {
+  echo "AI Session Runtime must not retain a separate formal release workflow" >&2
+  exit 1
+}
 check_release_only_workflow "$runtime_alpha_workflow" 'legion-runtime-alpha-*'
 grep -Fq 'workflow_call:' "$runtime_workflow"
-grep -Fq 'source_mode: release' "$runtime_release_workflow"
-grep -Fq 'retention_days: 14' "$runtime_release_workflow"
-grep -Fq 'uses: ./.github/workflows/build-legion-ai-session-runtime-common.yml' "$runtime_release_workflow"
-grep -Fq 'id-token: write' "$runtime_release_workflow"
-grep -Fq 'attestations: write' "$runtime_release_workflow"
-# shellcheck disable=SC2016 # Match literal GitHub expression syntax.
-grep -Fq 'OSS_KEY_ID: ${{ secrets.OSS_KEY_ID }}' "$runtime_release_workflow"
-# shellcheck disable=SC2016 # Match literal GitHub expression syntax.
-grep -Fq 'OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}' "$runtime_release_workflow"
 grep -Fq 'source_mode: alpha' "$runtime_alpha_workflow"
 grep -Fq 'retention_days: 7' "$runtime_alpha_workflow"
 grep -Fq 'uses: ./.github/workflows/build-legion-ai-session-runtime-common.yml' "$runtime_alpha_workflow"
-grep -Fq 'PUBLISH_OSS' "$runtime_workflow"
-grep -Fq 'if: env.PUBLISH_OSS == '\''true'\''' "$runtime_workflow"
-[[ "$(grep -Fc "if: env.PUBLISH_OSS == 'true'" "$runtime_workflow")" -eq 4 ]]
+grep -Fq 'Source validation mode: alpha or unified' "$runtime_workflow"
+grep -Fq 'refs/tags/legion-node-v' "$runtime_workflow"
 grep -Fq '.docker.tar.gz' "$runtime_workflow"
+# The Runtime packager verifies a clean Git checkout before generating
+# provenance. Keep the image archive outside the checkout until that gate has
+# passed, then copy it into the Actions handoff directory.
+if ! grep -Fq 'id: runtime-archive' "$runtime_workflow"; then
+  echo "$runtime_workflow must expose the runner-temp Runtime archive path" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal workflow shell syntax.
+if ! grep -Fq 'archive_dir="${RUNNER_TEMP}/runtime-archive-${RUNTIME_GOARCH}"' "$runtime_workflow"; then
+  echo "$runtime_workflow must stage the Runtime archive outside the checkout" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal GitHub Actions expression syntax.
+if ! grep -Fq 'RUNTIME_IMAGE_ARCHIVE: ${{ steps.runtime-archive.outputs.path }}' "$runtime_workflow"; then
+  echo "$runtime_workflow must pass the runner-temp archive into provenance generation" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal workflow shell syntax.
+if ! grep -Fq 'cp "$RUNTIME_IMAGE_ARCHIVE" dist/artifact/' "$runtime_workflow"; then
+  echo "$runtime_workflow must stage the verified Runtime archive for handoff" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Reject the literal checkout-local archive path.
+if grep -Fq '>"dist/artifact/${RUNTIME_PACKAGE_NAME}.docker.tar.gz"' "$runtime_workflow"; then
+  echo "$runtime_workflow must not dirty the checkout before Runtime provenance is generated" >&2
+  exit 1
+fi
 grep -Fq 'contents: read' "$runtime_alpha_workflow"
 if grep -Eq 'secrets: inherit|OSS_KEY_(ID|SECRET)|upload-oss' "$runtime_alpha_workflow"; then
   echo "$runtime_alpha_workflow must not receive Runtime release secrets or publish to OSS" >&2
@@ -56,6 +74,10 @@ if grep -Eq 'id-token:|attestations:' "$runtime_alpha_workflow"; then
 fi
 if grep -Eq '^[[:space:]]+(id-token|attestations):' "$runtime_workflow"; then
   echo "$runtime_workflow must inherit, not elevate, caller permissions" >&2
+  exit 1
+fi
+if grep -Eq 'legion-runtime-v|PUBLISH_OSS|OSS_KEY_(ID|SECRET)|upload-oss|components/session-runtime' "$runtime_workflow"; then
+  echo "$runtime_workflow must produce handoff artifacts, not a separate Runtime release" >&2
   exit 1
 fi
 
@@ -94,9 +116,25 @@ grep -Fq 'build-portable-nodes:' "$product_workflow"
 grep -Fq 'uses: ./.github/workflows/build-legion-node-alpha.yml' "$product_workflow"
 grep -Fq 'source_mode: release' "$product_workflow"
 grep -Fq 'production_release: true' "$product_workflow"
+grep -Fq 'build-session-runtimes:' "$product_workflow"
+grep -Fq 'source_mode: unified' "$product_workflow"
+grep -Fq 'producer_workflow_name: Build Trusted Legion Product Node' "$product_workflow"
+grep -Fq 'Download matching AI Session Runtime artifacts' "$product_workflow"
+grep -Fq 'ai-session-runtime.docker.tar.gz' "$repo_root/.github/scripts/build-legion-node-engine-import-bundle.sh"
 grep -Fq 'ubuntu-24.04-arm' "$product_workflow"
 grep -Fq 'ubuntu-24.04-arm' "$runtime_workflow"
 grep -Fq 'release-index-linux-arm64.json' "$product_workflow"
-grep -Fq 'release-index-linux-arm64.json' "$runtime_workflow"
+grep -Fq 'build-legion-node-engine-import-bundle.sh' "$product_workflow"
+grep -Fq 'environment: production-release' "$product_workflow"
+grep -Fq 'LEGION_NODE_RELEASE_SIGNING_PRIVATE_KEY_B64' "$product_workflow"
+grep -Fq 'LEGION_NODE_RELEASE_SIGNING_PUBLIC_KEY_B64' "$product_workflow"
+grep -Fq 'release-index.json.sig' "$repo_root/.github/scripts/build-legion-node-engine-import-bundle.sh"
+grep -Fq 'both Yaklang Node release signing values or neither' "$product_workflow"
+if grep -Fq 'must configure the Yaklang Node release signing key pair' "$product_workflow"; then
+  echo 'Yaklang Node signing is unexpectedly mandatory' >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal workflow environment syntax.
+grep -Fq 'yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz' "$product_workflow"
 
 echo 'Legion component workflow contract tests passed'

@@ -20,10 +20,9 @@ const (
 	loopInfraNodeCodeVerify          = "infra-code-verify"
 	loopInfraNodeQueryMCPServers     = "query_mcp_servers"
 	loopInfraNodeQueryMCPTools       = "query_mcp_tools"
-	loopInfraNodeDispatchSubReact    = "dispatch_sub_react_agents"
-	loopInfraNodeSubReactReport      = "sub_react_agents_report"
-	loopInfraNodeDispatchConcurrency = "dispatch_sub_react_concurrency"
-	loopInfraNodeSubReactGoal        = "sub_react_agent_goal"
+	loopInfraNodeDispatchSubReact = "dispatch_sub_react_agents"
+	loopInfraNodeSubReactReport   = "sub_react_agents_report"
+	loopInfraNodeSubReactGoal     = "sub_react_agent_goal"
 )
 
 func loopInfraStatus(loop *reactloops.ReActLoop, message string) {

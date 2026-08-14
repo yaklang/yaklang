@@ -253,3 +253,106 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 	})
 
 }
+
+func TestUpdateApiKey_ReplaceAllAPIKeys(t *testing.T) {
+	if isCI() {
+		t.Skip("skip grpc ai config local test in CI environment")
+	}
+
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.NotNil(t, server)
+	t.Cleanup(func() {
+		if server.profileDatabase != nil {
+			_ = server.profileDatabase.Close()
+		}
+		if server.projectDatabase != nil {
+			_ = server.projectDatabase.Close()
+		}
+	})
+	ctx := context.Background()
+
+	oldKey := "old-key-for-test"
+	cfg := &ypb.AIGlobalConfig{
+		Enabled:         true,
+		RoutingPolicy:   "performance",
+		DisableFallback: true,
+		DefaultModelId:  "default-model",
+		GlobalWeight:    0.88,
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-intel-aibalance",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "aibalance",
+					APIKey:  oldKey,
+					BaseURL: "https://aibalance.yaklang.com/v1",
+				},
+			},
+			{
+				ModelName: "model-intel-openai",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "openai",
+					APIKey:  oldKey,
+					BaseURL: "https://api.openai.com/v1",
+				},
+			},
+		},
+		LightweightModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-light-openai",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "openai",
+					APIKey:  oldKey,
+					BaseURL: "https://api.openai.com/v1",
+				},
+			},
+		},
+		VisionModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-vision-aibalance",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "aibalance",
+					APIKey:  "not-free-user",
+					BaseURL: "https://aibalance.yaklang.com/v1",
+				},
+			},
+			{
+				ModelName: "model-vision-nil-provider",
+				Provider:  nil,
+			},
+		},
+	}
+
+	_, err = client.SetAIGlobalConfig(ctx, cfg)
+	require.NoError(t, err)
+
+	// 空参数应报错
+	_, err = client.UpdateApiKey(ctx, &ypb.UpdateApiKeyRequest{ApiKey: ""})
+	require.Error(t, err)
+
+	newKey := "mf-mock-created-key"
+	_, err = client.UpdateApiKey(ctx, &ypb.UpdateApiKeyRequest{ApiKey: newKey})
+	require.NoError(t, err)
+
+	got, err := client.GetAIGlobalConfig(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.NotNil(t, got)
+
+	// 所有 provider 的 APIKey 都应被替换为新 key
+	for _, m := range got.IntelligentModels {
+		if m.Provider != nil {
+			assert.Equal(t, newKey, m.Provider.APIKey)
+		}
+	}
+	for _, m := range got.LightweightModels {
+		if m.Provider != nil {
+			assert.Equal(t, newKey, m.Provider.APIKey)
+		}
+	}
+	for _, m := range got.VisionModels {
+		if m.Provider != nil {
+			assert.Equal(t, newKey, m.Provider.APIKey)
+		}
+	}
+}

@@ -63,6 +63,14 @@ func (t *testInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeNa
 	t.forgeOnFinish = onFinish
 }
 
+func (t *testInvoker) RequireAIForgeAndExecute(ctx context.Context, forgeName string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.forgeCalled = true
+	t.forgeCallName = forgeName
+	return nil
+}
+
 func (t *testInvoker) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -320,10 +328,9 @@ func TestLoadCapability_Handler_Forge_AsyncMode(t *testing.T) {
 	action := buildAction("my-forge")
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.forgeCalled, "forge async execute should be called")
+	assert.True(t, invoker.forgeCalled, "forge execute should be called")
 	assert.Equal(t, "my-forge", invoker.forgeCallName)
-	assert.True(t, op.IsAsyncModeRequested(), "should request async mode for forge")
-	assert.NotNil(t, invoker.forgeOnFinish, "forge callback should be set")
+	assert.False(t, op.IsAsyncModeRequested(), "should not request async mode for sync forge")
 }
 
 func TestLoadCapability_Handler_Forge_DisabledByConfig(t *testing.T) {
@@ -598,7 +605,7 @@ func TestLoadCapability_E2E_ForgeFlow(t *testing.T) {
 
 	assert.True(t, invoker.forgeCalled, "forge should be invoked")
 	assert.Equal(t, "e2e-forge", invoker.forgeCallName)
-	assert.True(t, op.IsAsyncModeRequested(), "forge should request async mode")
+	assert.False(t, op.IsAsyncModeRequested(), "forge should not request async mode (sync)")
 }
 
 func TestLoadCapability_E2E_UnknownFallbackFlow(t *testing.T) {
@@ -768,7 +775,7 @@ func TestLoadCapability_Handler_Forge_AllowedWhenTaskNotAsync(t *testing.T) {
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
 	assert.True(t, invoker.forgeCalled, "forge should be called when task is NOT async")
-	assert.True(t, op.IsAsyncModeRequested(), "should request async mode")
+	assert.False(t, op.IsAsyncModeRequested(), "should not request async mode (sync)")
 }
 
 // --- Handler Tests: Focus Mode Timeline Feedback ---

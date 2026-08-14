@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,11 +13,12 @@ import (
 )
 
 // hasYaklangEditorDeliveryTarget is true when the loop should deliver code to an open editor file (replace).
+// Only .yak script paths qualify - Type=file reference attachments must not.
 func hasYaklangEditorDeliveryTarget(loop *reactloops.ReActLoop) bool {
 	if loop == nil {
 		return false
 	}
-	return strings.TrimSpace(loop.Get("editor_file_path")) != ""
+	return aicommon.IsYaklangScriptDeliveryPath(loop.Get("editor_file_path"))
 }
 
 func isYaklangGenCodePath(path string) bool {
@@ -46,24 +48,26 @@ func newYaklangGenCodePath() (string, error) {
 }
 
 // resolveYaklangDeliveryTarget picks the single frontend delivery path and yaklang_code_change op.
-// Editor file always wins (replace). Without editor: gen_code_* => create; other real paths => replace;
-// aispace staging or empty => allocate yakit-projects/code/gen_code_*.yak (create).
+// Editor file always wins (replace). Without editor: gen_code_* => create; other .yak paths => replace;
+// aispace staging / non-.yak / empty => allocate yakit-projects/code/gen_code_*.yak (create).
 func resolveYaklangDeliveryTarget(loop *reactloops.ReActLoop) (path string, eventOp string, err error) {
 	if loop == nil {
 		return "", "", utils.Error("loop is nil")
 	}
 
 	editorFile := strings.TrimSpace(loop.Get("editor_file_path"))
-	if editorFile != "" {
+	if aicommon.IsYaklangScriptDeliveryPath(editorFile) {
 		return filepath.Clean(editorFile), loopinfra.LoopYaklangCodeEventOpReplace, nil
 	}
+	// Non-.yak editor_file_path must not replace.
 
 	filename := strings.TrimSpace(loop.Get("filename"))
 	if filename != "" {
 		if isYaklangGenCodePath(filename) {
 			return filepath.Clean(filename), loopinfra.LoopYaklangCodeEventOpCreate, nil
 		}
-		if !isYaklangAspaceArtifactPath(filename) {
+		// Never fall back to Type=file reference paths (.md, etc.).
+		if aicommon.IsYaklangScriptDeliveryPath(filename) && !isYaklangAspaceArtifactPath(filename) {
 			return filepath.Clean(filename), loopinfra.LoopYaklangCodeEventOpReplace, nil
 		}
 	}

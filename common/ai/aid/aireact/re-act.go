@@ -495,29 +495,44 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) (ret error) {
 
 // AddToTimeline 添加条目到时间线
 func (r *ReAct) AddToTimeline(entryType, content string) {
-	msg := new(bytes.Buffer)
-	if entryType != "" {
-		msg.WriteString(fmt.Sprintf("[%s]", entryType))
-	} else {
-		msg.WriteString("[note]")
+	r.addToTimelineWithPromptProjection(entryType, content, "")
+}
+
+// AddToTimelineWithPromptProjection records a display-safe timeline entry and
+// an alternate prompt-only representation. It is intentionally not part of the
+// public AIInvokeRuntime contract; ReActLoop discovers it through a narrow
+// optional interface so existing runtimes and test doubles remain compatible.
+func (r *ReAct) AddToTimelineWithPromptProjection(entryType, content, promptContent string) {
+	r.addToTimelineWithPromptProjection(entryType, content, promptContent)
+}
+
+func (r *ReAct) addToTimelineWithPromptProjection(entryType, content, promptContent string) {
+	buildMessage := func(body string) string {
+		msg := new(bytes.Buffer)
+		if entryType != "" {
+			msg.WriteString(fmt.Sprintf("[%s]", entryType))
+		} else {
+			msg.WriteString("[note]")
+		}
+
+		t := r.GetCurrentTask()
+		if t != nil {
+			msg.WriteString(fmt.Sprintf(" [task:%s]:\n", t.GetId()))
+		} else {
+			msg.WriteString(":\n")
+		}
+		// Keep body text unindented; the timeline renderer already emits a
+		// per-item header and legacy readers safely tolerate the compact form.
+		msg.WriteString(body)
+		return msg.String()
 	}
 
-	t := r.GetCurrentTask()
-	taskId := ""
-	if t != nil {
-		taskId = t.GetId()
-		msg.WriteString(fmt.Sprintf(" [task:%s]:\n", taskId))
-	} else {
-		msg.WriteString(":\n")
+	displayText := buildMessage(content)
+	promptText := ""
+	if promptContent != "" {
+		promptText = buildMessage(promptContent)
 	}
-	// 旧实现给 body 整体加过 '  ' 缩进, 当时是为了让人类阅读 dump 时一眼区分
-	// 'header line' 与 'body lines'. timeline 渲染 (TimelineIntervalBlock.Render)
-	// 现在已经为每个 item 输出独立的 'HH:MM:SS [type/...]' 行头, 缩进对 LLM 不再
-	// 提供任何信息, 只消耗 token. 直接拼 body 即可, humanReadable parser 端的
-	// removeIndent 在新数据无前缀时是 no-op, 向后兼容历史持久化.
-	// 关键词: ReAct.AddToTimeline 去掉 body 缩进, prompt token 节省
-	msg.WriteString(content)
-	r.config.Timeline.PushText(r.config.AcquireId(), msg.String())
+	r.config.Timeline.PushTextWithPromptProjection(r.config.AcquireId(), displayText, promptText)
 	r.SaveTimeline()
 }
 
@@ -583,9 +598,11 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 		taskInfo := map[string]interface{}{
 			"id":         task.GetId(),
 			"user_input": task.GetUserInput(),
+			"user_input_uuid": task.GetUserInputUUID(),
 			"status":     task.GetStatus(),
 			"created_at": task.GetCreatedAt(),
 			"focus_mode": task.GetFocusMode(),
+			"is_recovery": task.GetTaskKind() == aicommon.AITaskKind_Recovery,
 		}
 
 		taskInfos = append(taskInfos, taskInfo)

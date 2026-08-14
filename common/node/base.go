@@ -19,10 +19,11 @@ type NodeBase struct {
 	rootCtx context.Context
 	cancel  context.CancelFunc
 
-	identityMu sync.RWMutex
-	NodeType   spec.NodeType
-	kind       string
-	NodeId     string
+	identityMu     sync.RWMutex
+	NodeType       spec.NodeType
+	kind           string
+	dockerEndpoint string
+	NodeId         string
 
 	legacyNodeID        string
 	displayName         string
@@ -30,6 +31,8 @@ type NodeBase struct {
 	baseDir             string
 	enrollmentToken     string
 	version             string
+	engineReleaseID     string
+	engineDigest        string
 	labels              map[string]string
 	capabilityKeys      []string
 	maxRunningJobs      uint32
@@ -78,6 +81,7 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		cancel:               cancel,
 		NodeType:             normalized.NodeType,
 		kind:                 normalized.Kind,
+		dockerEndpoint:       strings.TrimSpace(normalized.DockerEndpoint),
 		NodeId:               bootstrapNodeLogRef(normalized),
 		legacyNodeID:         normalized.NodeID,
 		displayName:          normalized.DisplayName,
@@ -85,6 +89,8 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		baseDir:              normalized.BaseDir,
 		enrollmentToken:      normalized.EnrollmentToken,
 		version:              normalized.Version,
+		engineReleaseID:      strings.TrimSpace(normalized.EngineReleaseID),
+		engineDigest:         strings.ToLower(strings.TrimSpace(normalized.EngineDigest)),
 		labels:               cloneStringMap(normalized.Labels),
 		capabilityKeys:       cloneStringSlice(normalized.CapabilityKeys),
 		maxRunningJobs:       normalized.MaxRunningJobs,

@@ -765,8 +765,10 @@ service Yak {
   rpc UpsertAIProvider(UpsertAIProviderRequest) returns (UpsertAIProviderResponse);
   rpc DeleteAIProvider(DeleteAIProviderRequest) returns (Empty);
   rpc GetAIThirdPartyAppConfigTemplate(Empty) returns (GetThirdPartyAppConfigTemplateResponse);
-
+  // 废弃
   rpc GetApiKeyByOnline(GetApiKeyByOnlineRequest) returns (GetApiKeyByOnlineResponse);
+
+  rpc UpdateApiKey(UpdateApiKeyRequest) returns (Empty);
 
   // 指纹库
   rpc GetFingerprint(GetFingerprintRequest) returns (GetFingerprintResponse);
@@ -1424,8 +1426,9 @@ message MCPClientToolConfig {
   string Source = 3;
   string ServerName = 4;
   bool Enable = 5;
-  string Description = 6;
+  string Description = 6; // English; used by AI / MCP protocol
   repeated MCPServerToolParamInfo Params = 7;
+  I18n DescriptionI18n = 8; // UI bilingual description (Zh/En); Zh falls back to En when empty
 }
 
 message GetMCPToolListRequest {
@@ -2312,6 +2315,10 @@ message AIExecutionStrategy {
 
   // Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
   int64 GoalMinIterations = 3;
+
+  // Multi 模式下子 Agent 最大并发数（同时运行数量）。
+  // <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
+  int64 MaxSubAgents = 4;
 }
 
 message AITaskFilter {
@@ -8028,6 +8035,10 @@ message GetApiKeyByOnlineRequest {
 }
 
 message GetApiKeyByOnlineResponse {
+  string ApiKey = 1;
+}
+
+message UpdateApiKeyRequest {
   string ApiKey = 1;
 }
 

@@ -49,6 +49,7 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"react_task_user_input_uuid": t.GetUserInputUUID(),
+		"is_recovery":      t.GetTaskKind() == aicommon.AITaskKind_Recovery,
 		"queue_len":        r.taskQueue.Len(),
 	})
 }
@@ -65,6 +66,7 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"react_task_user_input_uuid": t.GetUserInputUUID(),
+		"is_recovery":      t.GetTaskKind() == aicommon.AITaskKind_Recovery,
 		"reason":           reason,
 		"queue_len":        r.taskQueue.Len(),
 		"focus_mode":       t.GetFocusMode(),

@@ -241,6 +241,13 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 type LoopPromptAssemblyInput struct {
 	Nonce string
 
+	// IncludeLatestModelReplay is set only by the primary ReAct decision loop.
+	// Helper prompts (tool parameter generation, verification, summaries, etc.)
+	// must leave it false so a previous decision is replayed exactly once to the
+	// model that continues that decision, rather than leaking into unrelated AI
+	// calls which merely share the prefix assembly machinery.
+	IncludeLatestModelReplay bool
+
 	// Lightweight selects the bounded speed-priority projection: the full
 	// frozen session history is replaced by a recent Timeline window and large
 	// auxiliary context fields are capped. The action schema remains intact so
@@ -370,6 +377,9 @@ type AIInvokeRuntime interface {
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
+	RequireAIForgeAndExecute(ctx context.Context, forgeName string) error
+	PlanAndExecute(ctx context.Context, planPayload string) error
+	RecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskID string, input *ExecutePlanInput) error
 	ReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
 	ForceReviewExecutePlan(ctx context.Context, input *ExecutePlanInput) (*ExecutePlanInput, error)
 	BeginPlanCoordinatorSession(ctx context.Context, input *ExecutePlanInput, forceManualReview bool) (PlanCoordinatorSession, error)

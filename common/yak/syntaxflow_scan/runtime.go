@@ -2,7 +2,9 @@ package syntaxflow_scan
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -10,11 +12,38 @@ import (
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 
 	"github.com/yaklang/yaklang/common/schema"
+	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
+
+const (
+	// autoScaleWorkLimitLineThreshold is the source-line threshold at which the
+	// CLI default per-rule work limit is auto-scaled. On Hadoop-scale repos
+	// (2-3M lines) the 200k budget bails ~21 rules that would otherwise need a
+	// larger fanout budget; a 5M-instruction graph is simply more work than the
+	// small-project default.
+	autoScaleWorkLimitLineThreshold = 500_000
+	// maxAutoScaledRuleWorkLimit caps the auto-scale so a pathological rule
+	// cannot grow the budget without bound. The per-rule wall-clock budget still
+	// applies as the hard backstop.
+	maxAutoScaledRuleWorkLimit = 1_000_000
+)
+
+// effectiveRuleWorkLimit returns the per-rule work budget for a program. The
+// auto-scale applies only when the caller used the CLI default (200k): non-
+// default explicit limits (including 0=disabled) are never modified.
+func effectiveRuleWorkLimit(configured int64, totalLines int) int64 {
+	if configured != ssaconfig.DefaultScanRuleWorkLimit || totalLines < autoScaleWorkLimitLineThreshold {
+		return configured
+	}
+	scaled := configured * (int64(totalLines)/autoScaleWorkLimitLineThreshold + 1)
+	if scaled > maxAutoScaledRuleWorkLimit {
+		scaled = maxAutoScaledRuleWorkLimit
+	}
+	return scaled
+}
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	scanStart := time.Now()
@@ -134,13 +163,23 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 	// for hours even within the wall-clock budget. Exceeding it cancels ruleCtx
 	// (via ruleCancel) so the existing ctx-bail path surfaces partial results.
 	// 0 means no work budget (only the wall-clock RuleTimeout applies).
-	workLimit := m.Config.GetScanRuleWorkLimit()
+	targetName := queryTargetName(target)
+	baseWorkLimit := m.Config.GetScanRuleWorkLimit()
+	totalLines := 0
+	if lineCounter, ok := target.(interface{ TotalLines() int }); ok {
+		totalLines = lineCounter.TotalLines()
+	}
+	workLimit := effectiveRuleWorkLimit(baseWorkLimit, totalLines)
+	if workLimit != baseWorkLimit {
+		if _, loaded := m.autoScaleLogged.LoadOrStore(targetName, struct{}{}); !loaded {
+			log.Infof("rule work limit auto-scaled for program %s: %d -> %d (source lines=%d)",
+				targetName, baseWorkLimit, workLimit, totalLines)
+		}
+	}
 	var workBudget *sf.RuleWorkBudget
 	if workLimit > 0 {
 		workBudget = sf.NewRuleWorkBudget(workLimit, ruleCancel)
 	}
-
-	targetName := queryTargetName(target)
 
 	// 将查询逻辑包装到函数中
 	f := func() error {
@@ -169,13 +208,19 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		// QueryTargets already selected Program or ProgramOverLay — no overlay branch.
 		res, err := target.SyntaxFlowRule(rule, option...)
 
-		bailedByBudget := (ruleTimeout > 0 && ruleCtx.Err() != nil) || (workBudget != nil && workBudget.Exceeded())
+		// Detect a per-rule budget bail. A parent scan cancellation is not a
+		// rule-timeout event, so check the cancellation cause instead of treating
+		// every non-nil ruleCtx.Err() as a timeout. workBudget.Exceeded() covers
+		// the work-budget case even when ruleTimeout==0.
+		bailedByWork := workBudget != nil && workBudget.Exceeded()
+		bailedByTimeout := ruleTimeout > 0 && errors.Is(context.Cause(ruleCtx), context.DeadlineExceeded)
+		bailedByBudget := bailedByWork || bailedByTimeout
 		bailReason := ""
 		switch {
-		case workBudget != nil && workBudget.Exceeded():
-			bailReason = fmt.Sprintf("work-limit=%d", workLimit)
-		case ruleTimeout > 0:
-			bailReason = ruleTimeout.String()
+		case bailedByWork:
+			bailReason = fmt.Sprintf("work-limit=%d visited=%d", workBudget.Limit(), workBudget.Visited())
+		case bailedByTimeout:
+			bailReason = fmt.Sprintf("rule-timeout=%s", ruleTimeout)
 		}
 
 		if bailedByBudget {
@@ -185,6 +230,8 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			m.markRuleSuccess()
 			log.Warnf("rule %s on program %s hit per-rule budget (%s), returned partial results",
 				rule.RuleName, targetName, bailReason)
+			m.processMonitor.UpdateRuleStatus(targetName, rule.RuleName, 1,
+				fmt.Sprintf("partial result: per-rule budget (%s)", bailReason))
 			m.errorCallback("program %s exc rule %s hit per-rule budget (%s), bailed",
 				targetName, rule.RuleName, bailReason)
 		} else if err == nil {
@@ -213,6 +260,21 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			}
 		}
 
+		// Explicit cleanup: release rule-local references to help GC reclaim
+		// SyntaxFlowResult, recorder, and work budget immediately after the
+		// rule completes (success, failure, or budget bail). This is defensive
+		// nil'ing — the variables would go out of scope when f() returns, but
+		// explicit nil'ing helps the GC reclaim large result objects before
+		// the next rule starts allocating.
+		res = nil
+		ruleRecorder = nil
+		workBudget = nil
+
+		// Release this rule's analysis-local accumulators before the next rule
+		// reuses the program. ResetInterRuleState is a no-op unless the cache
+		// exceeds its threshold (heavy rules), so small rules keep DB-read reuse
+		// while heavy rules' Values don't carry Predecessors/anchorBits into the
+		// next rule and don't bloat retained memory. See Program.ResetInterRuleState.
 		if resetter, ok := target.(interface{ ResetInterRuleState() }); ok {
 			resetter.ResetInterRuleState()
 		}
@@ -264,6 +326,10 @@ func (m *scanManager) logScanPerformance(totalDuration time.Duration, enableRule
 	log.Info("=== Scan Total ===")
 	log.Infof("Time: %v", totalDuration)
 	log.Info("==================")
+	if os.Getenv("YAK_SSA_FAST_MATCH_DEBUG") != "" {
+		hits, fallbacks := ssaapi.FastPathMatchStats()
+		log.Infof("fast-path match stats: hits=%d fallbacks=%d", hits, fallbacks)
+	}
 
 	if enableRulePerf && m.ruleProfiler != nil {
 		snapshots := m.ruleProfiler.Snapshot()

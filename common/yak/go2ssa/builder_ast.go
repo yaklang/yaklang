@@ -56,7 +56,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			global := application.GlobalVariablesBlueprint.Container()
 			if global == nil {
-				return
+				// Container not yet initialized (InitHandler hasn't run yet
+				// for the first file). Initialize it here so that subsequent
+				// code (import handling, declaration processing) can use it.
+				container := b.EmitEmptyContainer()
+				application.GlobalVariablesBlueprint.InitializeWithContainer(container)
+				global = container
 			}
 
 			initHandler := func(name string) {
@@ -858,20 +863,33 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}, false)
 
 	if funcName == goInitFunctionName {
+		// Build global variables BEFORE the init() block body is compiled.
+		// buildBlock(true) calls LoadGlobalVariable() which restores globals
+		// into the current scope from StaticMember. Building first ensures
+		// the values are available when init() references them.
+		if prog := b.GetProgram(); prog != nil && prog.GlobalVariablesBlueprint != nil {
+			prog.GlobalVariablesBlueprint.Build()
+		}
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block, true)
 		}
+		// After the init() block is compiled, update global variables that
+		// are visible in this function scope. Iterate registered names from
+		// StaticMember directly (O(1) per name) instead of GetLastWinsMemberPairs
+		// which resolved every member pair via resolveLinkedValue (O(N²)).
 		if prog := b.GetProgram(); prog != nil && prog.GlobalVariablesBlueprint != nil {
-			prog.GlobalVariablesBlueprint.Build()
-			if c := prog.GlobalVariablesBlueprint.Container(); c != nil {
-				for _, pair := range ssa.GetLastWinsMemberPairs(c) {
-					name := pair.KeyString()
-					if name == "" {
-						continue
-					}
-					if v := b.PeekValueInThisFunction(name); v != nil {
-						_ = b.TryUpdateGlobalVariableByName(name, v)
-					}
+			for name := range prog.GlobalVariablesBlueprint.StaticMember {
+				if name == "" {
+					continue
+				}
+				// Use PeekValue (with closure support) instead of
+				// PeekValueInThisFunction. In DB mode, PeekValueInThisFunction
+				// may fail to find the variable if the current block's scope
+				// doesn't directly contain it (e.g. after block transitions).
+				// PeekValue searches parent scopes and closure free values,
+				// ensuring init() updates to globals are correctly propagated.
+				if v := b.PeekValue(name); v != nil {
+					_ = b.TryUpdateGlobalVariableByName(name, v)
 				}
 			}
 		}

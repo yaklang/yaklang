@@ -132,16 +132,18 @@ func defaultCodeSourceConfig() *CodeSourceInfo {
 	}
 }
 
+// DefaultCPUConcurrency returns the unified CPU concurrency budget:
+// max(1, GOMAXPROCS-1). Both compile and scan concurrency default to this.
+func DefaultCPUConcurrency() int {
+	c := runtime.GOMAXPROCS(0)
+	if c <= 1 {
+		return 1
+	}
+	return c - 1
+}
+
 func defaultCompileConcurrency() int {
-	concurrency := runtime.GOMAXPROCS(0)
-	if concurrency <= 0 {
-		return 1
-	}
-	concurrency /= 2
-	if concurrency <= 0 {
-		return 1
-	}
-	return concurrency
+	return DefaultCPUConcurrency()
 }
 
 func defaultSSACompileConfig() *SSACompileConfig {
@@ -173,7 +175,7 @@ func defaultSyntaxFlowConfig() *SyntaxFlowConfig {
 func defaultSyntaxFlowScanConfig() *SyntaxFlowScanConfig {
 	return &SyntaxFlowScanConfig{
 		IgnoreLanguage: false,
-		Concurrency:    5,
+		Concurrency:    uint32(DefaultCPUConcurrency()),
 	}
 }
 

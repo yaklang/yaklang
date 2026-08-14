@@ -184,7 +184,7 @@ func TestAISessionRuntimeManagerFailedRebindKeepsPreviousRuntime(t *testing.T) {
 	recorder.assertInput(t, 0, "hello")
 }
 
-func TestAISessionRuntimeManagerCarriesInputIdempotencyAcrossRebind(t *testing.T) {
+func TestAISessionRuntimeManagerFencesProcessedInputReplayAcrossRebind(t *testing.T) {
 	recorder := &recordingAISessionRuntimeDriver{}
 	manager := newAISessionRuntimeManager(recorder)
 	first := validAISessionBindCommand()
@@ -213,17 +213,40 @@ func TestAISessionRuntimeManagerCarriesInputIdempotencyAcrossRebind(t *testing.T
 	// The old handle can finish after the swap. Completion must update the
 	// Session-wide command ledger inherited by the new generation.
 	manager.CompleteInput(accepted, true)
-	replayed, err := manager.AcceptInput(input)
-	if err != nil {
-		t.Fatalf("replayed input: %v", err)
-	}
-	if !replayed.duplicate {
-		t.Fatal("replayed pre-rebind command was admitted to the new runtime")
+	if _, err := manager.AcceptInput(input); err == nil {
+		t.Fatal("processed pre-rebind command bypassed the new bind epoch fence")
 	}
 	recorder.mu.Lock()
 	defer recorder.mu.Unlock()
 	if len(recorder.inputs) != 1 {
 		t.Fatalf("input executed %d times, want once", len(recorder.inputs))
+	}
+}
+
+func TestAISessionRuntimeManagerRejectsMissingEpochOnModernRuntime(t *testing.T) {
+	manager := newAISessionRuntimeManager(&recordingAISessionRuntimeDriver{})
+	if _, err := manager.Bind(context.Background(), validAISessionBindCommand(), nil, aiSessionRuntimeBindOptions{}); err != nil {
+		t.Fatalf("bind runtime: %v", err)
+	}
+	input := validAISessionInputCommand()
+	input.Session.BindEpoch = 0
+	if _, err := manager.AcceptInput(input); err == nil {
+		t.Fatal("modern runtime accepted an input without bind epoch")
+	}
+	contextCommand := validAISessionContextCommand()
+	contextCommand.Session.BindEpoch = 0
+	if _, err := manager.AcceptContextUpdate(contextCommand); err == nil {
+		t.Fatal("modern runtime accepted context without bind epoch")
+	}
+	cancelCommand := validAISessionCancelCommand()
+	cancelCommand.Session.BindEpoch = 0
+	if _, err := manager.Cancel(cancelCommand); err == nil {
+		t.Fatal("modern runtime accepted cancel without bind epoch")
+	}
+	closeCommand := validAISessionCloseCommand()
+	closeCommand.Session.BindEpoch = 0
+	if _, err := manager.Close(closeCommand); err == nil {
+		t.Fatal("modern runtime accepted close without bind epoch")
 	}
 }
 
@@ -406,7 +429,15 @@ func TestAISessionRuntimeRebindDrainDoesNotBlockOtherSessions(t *testing.T) {
 func TestAISessionRootTerminalEventFencesLaterRebind(t *testing.T) {
 	bridge, fakeJS, driver := newTestAISessionBridge(t)
 	first := validAISessionBindCommand()
-	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, first)); err != nil {
+	first.ResultContext = validAIFocusResultContext()
+	first.ResultContext.ExecutionMode = "single_run"
+	first.Session.RunId = first.ResultContext.FocusRunId
+	if _, err := bridge.aiRuntime.Bind(
+		context.Background(),
+		first,
+		bridge.ensureAIPublisher(),
+		aiSessionRuntimeBindOptions{},
+	); err != nil {
 		t.Fatalf("first bind: %v", err)
 	}
 	driver.mu.Lock()
@@ -435,6 +466,9 @@ func TestAISessionRootTerminalCompletesFocusResult(t *testing.T) {
 	bridge, _, driver := newTestAISessionBridge(t)
 	sink := &recordingLifecycleAIFocusResultSink{}
 	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.ResultContext.ExecutionMode = "single_run"
+	command.Session.RunId = command.ResultContext.FocusRunId
 	if _, err := bridge.aiRuntime.Bind(
 		context.Background(),
 		command,
@@ -462,6 +496,9 @@ func TestAISessionRootTerminalPublishTimeoutAllowsHigherEpochRebind(t *testing.T
 	defer func() { aiSessionTerminalPublishTimeout = oldTimeout }()
 
 	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.ResultContext.ExecutionMode = "single_run"
+	command.Session.RunId = command.ResultContext.FocusRunId
 	if _, err := bridge.aiRuntime.Bind(
 		context.Background(),
 		command,
@@ -496,6 +533,9 @@ func TestAISessionRootTerminalPublicationNAKsRecoveryBindUntilClaimSettles(t *te
 	defer func() { aiSessionTerminalPublishTimeout = oldTimeout }()
 
 	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.ResultContext.ExecutionMode = "single_run"
+	command.Session.RunId = command.ResultContext.FocusRunId
 	if _, err := bridge.aiRuntime.Bind(
 		context.Background(),
 		command,
@@ -1395,20 +1435,55 @@ func TestRuntimeEmitterConversationResultKeepsRuntimeAfterTurn(t *testing.T) {
 	driver.mu.Lock()
 	emitter := driver.emitters[0]
 	driver.mu.Unlock()
-	completer, ok := emitter.(aiSessionRuntimeTurnCompleter)
+	reporter, ok := emitter.(aiSessionRuntimeTurnReporter)
 	if !ok {
-		t.Fatal("managed runtime emitter does not support turn completion")
+		t.Fatal("managed runtime emitter does not support conversation turn completion")
 	}
-	completer.DoneTurn("cmd-input-1", []byte(`{"status":"done"}`))
+	reporter.TurnCompleted("cmd-input-1", []byte(`{"status":"done"}`))
 
 	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.succeeded", 0)
 	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 0)
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	var event aiv1.AISessionEvent
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal conversation turn completion: %v", err)
+	}
+	if event.GetEventType() != aiSessionRuntimeEventTurnCompleted || event.GetSession().GetBindEpoch() != 1 {
+		t.Fatalf("turn completion event = %#v", &event)
+	}
 	if !hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
 		t.Fatal("multi-turn conversation runtime was removed after one turn")
 	}
 }
 
-func TestRuntimeEmitterConversationFailureCompletesTerminalRuntime(t *testing.T) {
+func TestRuntimeEmitterConversationTurnPublicationOutlivesTerminalTimeout(t *testing.T) {
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.ResultContext.FocusMode = legionAIConversationAuditResultMode
+	command.ResultContext.FocusReleaseId = ""
+	command.ResultContext.ExecutionMode = legionAIConversationExecutionMode
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle conversation bind: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+	previousTimeout := aiSessionTerminalPublishTimeout
+	aiSessionTerminalPublishTimeout = time.Millisecond
+	defer func() { aiSessionTerminalPublishTimeout = previousTimeout }()
+	fakeJS.failNextPublishes(3)
+
+	driver.mu.Lock()
+	reporter := driver.emitters[0].(aiSessionRuntimeTurnReporter)
+	driver.mu.Unlock()
+	reporter.TurnCompleted("cmd-input-1", []byte(`{"status":"done"}`))
+
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.event", 1)
+}
+
+func TestRuntimeEmitterConversationFailureKeepsRuntime(t *testing.T) {
 	bridge, fakeJS, driver := newTestAISessionBridge(t)
 	command := validAISessionBindCommand()
 	command.ResultContext = validAIFocusResultContext()
@@ -1429,21 +1504,52 @@ func TestRuntimeEmitterConversationFailureCompletesTerminalRuntime(t *testing.T)
 	driver.mu.Lock()
 	emitter := driver.emitters[0]
 	driver.mu.Unlock()
-	completer, ok := emitter.(aiSessionRuntimeTurnCompleter)
+	reporter, ok := emitter.(aiSessionRuntimeTurnReporter)
 	if !ok {
-		t.Fatal("managed runtime emitter does not support turn failure")
+		t.Fatal("managed runtime emitter does not support conversation turn failure")
 	}
-	completer.FailTurn(
+	reporter.TurnFailed(
 		"cmd-input-1",
 		"yak_ai_forge_failed",
 		"forge failed",
 		[]byte(`{"runtime":"stateless_yak_ai_engine"}`),
 	)
 
-	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.failed", 1)
-	if hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
-		t.Fatal("failed conversation runtime was not removed after terminal publication")
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.failed", 0)
+	msg := waitForPublishedMessage(t, fakeJS, 0)
+	var event aiv1.AISessionEvent
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal conversation turn failure: %v", err)
 	}
+	if event.GetEventType() != aiSessionRuntimeEventTurnFailed {
+		t.Fatalf("turn failure event type = %q", event.GetEventType())
+	}
+	if !hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("failed conversation turn removed reusable runtime")
+	}
+}
+
+func TestAISessionConversationRootPlanMarkerDoesNotTerminalizeRuntime(t *testing.T) {
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.ResultContext.ExecutionMode = legionAIConversationExecutionMode
+	command.ResultContext.FocusMode = legionAIConversationAuditResultMode
+	command.ResultContext.FocusReleaseId = ""
+	command.Session.RunId = command.ResultContext.FocusRunId
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("bind conversation runtime: %v", err)
+	}
+	driver.mu.Lock()
+	emitter := driver.emitters[0]
+	driver.mu.Unlock()
+	resetPublishedMessages(fakeJS)
+	emitter.Emit("ai.session.event", []byte(`{"type":"end_plan_and_execution","task_index":"","content_json":{}}`))
+	if !hasAISessionRuntime(bridge.aiRuntime, command.GetSession().GetSessionId()) {
+		t.Fatal("multi-turn root plan marker terminalized reusable runtime")
+	}
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.event", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 0)
 }
 
 func TestRuntimeManagerRejectsNewCommandsAfterTerminalFailureClaim(t *testing.T) {
@@ -1720,10 +1826,78 @@ func validAISessionInputCommand() *aiv1.PushAISessionInputCommand {
 		Session: &aiv1.AISessionRef{
 			SessionId: "ai-session-1",
 			RunId:     "run-1",
+			BindEpoch: 1,
 		},
 		OwnerUserId: "user-1",
 		InputType:   "message",
 		InputJson:   []byte(`{"content":"hello"}`),
+	}
+}
+
+func TestRuntimeManagerRejectsDelayedInputFromOldBindEpoch(t *testing.T) {
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	first := validAISessionBindCommand()
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, first)); err != nil {
+		t.Fatalf("bind epoch one: %v", err)
+	}
+	rebind := validAISessionBindCommand()
+	rebind.Metadata.CommandId = "cmd-bind-2"
+	rebind.BindEpoch = 2
+	rebind.Session.BindEpoch = 2
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, rebind)); err != nil {
+		t.Fatalf("bind epoch two: %v", err)
+	}
+
+	delayed := validAISessionInputCommand()
+	delayed.Metadata.CommandId = "cmd-input-delayed"
+	delayed.TurnId = delayed.Metadata.CommandId
+	delayed.Session.BindEpoch = 1
+	resetPublishedMessages(fakeJS)
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, delayed)); err != nil {
+		t.Fatalf("publish delayed old-epoch input failure: %v", err)
+	}
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.failed", 1)
+	driver.mu.Lock()
+	defer driver.mu.Unlock()
+	if got := len(driver.inputs); got != 0 {
+		t.Fatalf("old-epoch input reached current runtime: inputs=%d", got)
+	}
+}
+
+func TestRuntimeManagerRejectsDelayedControlCommandsFromOldBindEpoch(t *testing.T) {
+	bridge, _, _ := newTestAISessionBridge(t)
+	first := validAISessionBindCommand()
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, first)); err != nil {
+		t.Fatalf("bind epoch one: %v", err)
+	}
+	rebind := validAISessionBindCommand()
+	rebind.Metadata.CommandId = "cmd-bind-control-2"
+	rebind.BindEpoch = 2
+	rebind.Session.BindEpoch = 2
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, rebind)); err != nil {
+		t.Fatalf("bind epoch two: %v", err)
+	}
+
+	contextCommand := validAISessionContextCommand()
+	contextCommand.Metadata.CommandId = "cmd-context-delayed"
+	contextCommand.Session.BindEpoch = 1
+	if _, err := bridge.aiRuntime.AcceptContextUpdate(contextCommand); err == nil {
+		t.Fatal("old-epoch context command was accepted")
+	}
+	cancelCommand := validAISessionCancelCommand()
+	cancelCommand.Metadata.CommandId = "cmd-cancel-delayed"
+	cancelCommand.Session.BindEpoch = 1
+	if _, err := bridge.aiRuntime.Cancel(cancelCommand); err == nil {
+		t.Fatal("old-epoch cancel command was accepted")
+	}
+	closeCommand := validAISessionCloseCommand()
+	closeCommand.Metadata.CommandId = "cmd-close-delayed"
+	closeCommand.Session.BindEpoch = 1
+	if _, err := bridge.aiRuntime.Close(closeCommand); err == nil {
+		t.Fatal("old-epoch close command was accepted")
+	}
+	if !hasAISessionRuntime(bridge.aiRuntime, first.GetSession().GetSessionId()) {
+		t.Fatal("old-epoch control command retired the current runtime")
 	}
 }
 
@@ -1735,6 +1909,7 @@ func validAISessionCancelCommand() *aiv1.CancelAISessionCommand {
 		Session: &aiv1.AISessionRef{
 			SessionId: "ai-session-1",
 			RunId:     "run-1",
+			BindEpoch: 1,
 		},
 		OwnerUserId: "user-1",
 		Reason:      "user requested",
@@ -1749,6 +1924,7 @@ func validAISessionContextCommand() *aiv1.AppendAISessionContextCommand {
 		Session: &aiv1.AISessionRef{
 			SessionId: "ai-session-1",
 			RunId:     "run-1",
+			BindEpoch: 1,
 		},
 		OwnerUserId: "user-1",
 		Attachments: []*aiv1.AISessionAttachmentRef{
@@ -1770,6 +1946,7 @@ func validAISessionCloseCommand() *aiv1.CloseAISessionCommand {
 		Session: &aiv1.AISessionRef{
 			SessionId: "ai-session-1",
 			RunId:     "run-1",
+			BindEpoch: 1,
 		},
 		OwnerUserId: "user-1",
 		Reason:      "platform done",

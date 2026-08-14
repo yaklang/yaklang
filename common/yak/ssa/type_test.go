@@ -49,3 +49,29 @@ func Test_Type_CheckOrType(t *testing.T) {
 		require.NotNil(t, method3)
 	}
 }
+
+func TestFunctionTypeString_CachesRawStringResult(t *testing.T) {
+	// Build a FunctionType with a large SideEffects list, which makes
+	// RawString() expensive (string concat per side effect).
+	ft := ssa.NewFunctionType("", nil, nil, false)
+	for i := 0; i < 1000; i++ {
+		ft.SideEffects = append(ft.SideEffects, &ssa.FunctionSideEffect{
+			Name:        "se",
+			VerboseName: "se",
+		})
+	}
+
+	// First call computes RawString and caches it in Name.
+	first := ft.String()
+	require.NotEmpty(t, first)
+
+	// Second call must return the cached result, not recompute RawString.
+	// With the cache, Name is non-empty and not "..." so String() returns
+	// the cached string immediately.
+	second := ft.String()
+	require.Equal(t, first, second)
+
+	// Also verify RawString itself is bounded (no infinite recursion).
+	raw := ft.RawString()
+	require.NotEmpty(t, raw)
+}

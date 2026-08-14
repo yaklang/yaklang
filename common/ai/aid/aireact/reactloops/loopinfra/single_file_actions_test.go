@@ -750,7 +750,7 @@ func TestModifyAction_OldSnippet_NotFound_Continue(t *testing.T) {
 	assert.True(t, op.IsContinued())
 	assert.True(t, runtime.timelineContains("modify_snippet_not_found"))
 	assert.Contains(t, op.GetFeedback().String(), "CURRENT_CODE")
-	assert.Contains(t, op.GetFeedback().String(), "Cursor Patch")
+	assert.Contains(t, op.GetFeedback().String(), "Apply Patch")
 }
 
 func TestModifyAction_OldSnippet_Ambiguous_Continue(t *testing.T) {

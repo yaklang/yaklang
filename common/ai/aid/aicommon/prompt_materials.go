@@ -207,6 +207,17 @@ type TimelineFrozenOpenBlocks struct {
 }
 
 func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
+	return renderTimelineFrozenOpen(timeline, false)
+}
+
+// RenderTimelineFrozenOpenWithLatestModelReplay is reserved for the main ReAct
+// decision prompt. Helper prompts use RenderTimelineFrozenOpen and therefore
+// never receive an internal replay marker.
+func RenderTimelineFrozenOpenWithLatestModelReplay(timeline *Timeline) TimelineFrozenOpenBlocks {
+	return renderTimelineFrozenOpen(timeline, true)
+}
+
+func renderTimelineFrozenOpen(timeline *Timeline, includeLatestModelReplay bool) TimelineFrozenOpenBlocks {
 	if timeline == nil {
 		return TimelineFrozenOpenBlocks{}
 	}
@@ -222,6 +233,9 @@ func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
 	}
 	promotedSemi1, openDeltas := timeline.projectPromoted(sealedBeforeID)
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
+	if includeLatestModelReplay {
+		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
+	}
 	return TimelineFrozenOpenBlocks{
 		Frozen:               promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
 		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
@@ -248,6 +262,18 @@ type PromptFrozenOpenMaterials struct {
 }
 
 func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
+	return buildPromptFrozenOpenMaterials(config, false, openNonce...)
+}
+
+// BuildPromptFrozenOpenMaterialsWithLatestModelReplay is the main ReAct
+// counterpart of BuildPromptFrozenOpenMaterials. Keeping this opt-in prevents
+// LiteForge, verification, summarizers and other shared prompt builders from
+// replaying a decision that belongs to the ReAct action protocol.
+func BuildPromptFrozenOpenMaterialsWithLatestModelReplay(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
+	return buildPromptFrozenOpenMaterials(config, true, openNonce...)
+}
+
+func buildPromptFrozenOpenMaterials(config *Config, includeLatestModelReplay bool, openNonce ...string) PromptFrozenOpenMaterials {
 	if config == nil {
 		return PromptFrozenOpenMaterials{}
 	}
@@ -256,6 +282,9 @@ func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptF
 		nonce = openNonce[0]
 	}
 	timelineBlocks := RenderTimelineFrozenOpen(config.GetTimeline())
+	if includeLatestModelReplay {
+		timelineBlocks = RenderTimelineFrozenOpenWithLatestModelReplay(config.GetTimeline())
+	}
 	evidenceBlocks := config.GetSessionPromptState().GetSessionEvidenceFrozenOpenBlocks(timelineBlocks.FrozenTimeUnix, nonce)
 	return PromptFrozenOpenMaterials{
 		TimelineFrozen:         timelineBlocks.Frozen,

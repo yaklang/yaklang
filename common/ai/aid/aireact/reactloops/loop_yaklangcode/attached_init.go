@@ -11,11 +11,14 @@ import (
 )
 
 // initYaklangEditorContextFromAttached parses attachments, binds loop keys, and records timeline.
+// Optional userInput is accepted for call-site compat; FreeInput enrichment happens in init_task via Enrich*.
 func initYaklangEditorContextFromAttached(
 	r aicommon.AIInvokeRuntime,
 	loop *reactloops.ReActLoop,
 	attachedDatas []*aicommon.AttachedResource,
+	userInput ...string,
 ) *aicommon.YaklangEditorContext {
+	_ = userInput
 	ctx := aicommon.ParseYaklangEditorContextFromAttached(attachedDatas)
 	if ctx == nil {
 		return nil
@@ -62,10 +65,11 @@ func finalizeYaklangInitFileTarget(
 	}
 
 	targetPath, fromAttached := aicommon.ResolveYaklangInitTargetPath(editorCtx, liteforgePath)
-	if targetPath == "" {
+	if targetPath == "" || !aicommon.IsYaklangScriptDeliveryPath(targetPath) {
+		// Non-.yak paths must not seed full_code from disk.
 		clearYaklangLoopFileState(loop)
 		seedYaklangLoopFullCode(loop, editorCtx, "")
-		log.Infof("create mode: no resolvable target path; delivery deferred until loop flush")
+		log.Infof("create mode: no resolvable .yak target path; delivery deferred until loop flush")
 		operator.Continue()
 		return
 	}

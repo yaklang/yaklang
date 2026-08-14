@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -203,6 +204,17 @@ func (b *FunctionBuilder) readValueEx(
 		return ret
 	}
 
+	// Fallback: try GlobalVariablesBlueprint for package-level globals.
+	// This handles closures and other cases where LoadGlobalVariable was
+	// not called (buildGlobal=false) but a global variable is referenced.
+	if program != nil && program.GlobalVariablesBlueprint != nil {
+		if gv, ok := program.GetGlobalVariable(name); ok && gv != nil && !utils.IsNil(gv) {
+			variable := b.CreateVariable(name)
+			b.AssignVariable(variable, gv)
+			return gv
+		}
+	}
+
 	if enableReadParent && create {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
@@ -227,10 +239,49 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 
 // ------------------- Assign
 
+func (b *FunctionBuilder) builderDebugContext() string {
+	if b == nil {
+		return "builder=<nil>"
+	}
+
+	programName := "<nil>"
+	cacheMode := "<nil>"
+	functionName := "<nil>"
+	var functionID int64
+	if b.Function != nil {
+		functionName = b.Function.GetName()
+		functionID = b.Function.GetId()
+		if program := b.Function.GetProgram(); program != nil {
+			programName = program.GetProgramName()
+			if program.Cache != nil {
+				cacheMode = program.Cache.InstructionCacheMode()
+			}
+		}
+	}
+
+	blockName := "<nil>"
+	var blockID int64
+	scopeName := "<nil>"
+	if b.CurrentBlock != nil {
+		blockName = b.CurrentBlock.GetName()
+		blockID = b.CurrentBlock.GetId()
+		if scope := b.CurrentBlock.ScopeTable; !utils.IsNil(scope) {
+			scopeName = scope.GetScopeName()
+		}
+	}
+
+	return fmt.Sprintf("program=%q function=%s#%d block=%s#%d scope=%s cache=%s",
+		programName, functionName, functionID, blockName, blockID, scopeName, cacheMode)
+}
+
 // AssignVariable  assign value to variable
 func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	if variable == nil {
-		log.Errorf("assign variable is nil")
+		valueName := "<nil>"
+		if !utils.IsNil(value) {
+			valueName = value.GetName()
+		}
+		log.Errorf("assign variable is nil: value=%q %s", valueName, b.builderDebugContext())
 		return
 	}
 	// log.Infof("AssignVariable: %v, %v typ %s", variable.GetName(), value.GetName(), value.GetType())
@@ -240,7 +291,19 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		log.Debugf("assign nil value to variable: %v, it will not work on ssa ir format", name)
 		return
 	}
+	if b == nil || b.CurrentBlock == nil {
+		log.Errorf("assign variable %q: current block is nil (%s)", name, b.builderDebugContext())
+		return
+	}
 	scope := b.CurrentBlock.ScopeTable
+	if utils.IsNil(scope) {
+		b.CurrentBlock.restoreScopeIfMissing()
+		scope = b.CurrentBlock.ScopeTable
+	}
+	if utils.IsNil(scope) {
+		log.Errorf("assign variable %q: ScopeTable is nil (%s)", name, b.builderDebugContext())
+		return
+	}
 	if variable.IsPointer() {
 		// variable.SetPointHandler(func(valueTmp Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
 		// 	tmp := b.CurrentBlock.ScopeTable
@@ -298,6 +361,19 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	} else {
 		scope.AssignVariable(variable, value)
+	}
+
+	// If this variable is a global variable (registered in StaticMember),
+	// update StaticMember immediately so that subsequent files/functions
+	// see the updated value. This replaces the old approach of traversing
+	// GetLastWinsMemberPairs after init() to call TryUpdateGlobalVariableByName.
+	// The immediate update works in both memory and DB modes because it
+	// doesn't depend on scope lookup after block transitions.
+	if prog := b.GetProgram(); prog != nil && prog.GlobalVariablesBlueprint != nil {
+		name := variable.GetName()
+		if name != "" && prog.GlobalVariablesBlueprint.GetStaticMember(name) != nil {
+			prog.GlobalVariablesBlueprint.RegisterStaticMember(name, value, false)
+		}
 	}
 
 	if val, ok := b.RefParameter[variable.GetName()]; ok {
@@ -416,8 +492,17 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 }
 
 func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
+	if b == nil || b.CurrentBlock == nil {
+		log.Errorf("create variable %q: current block is nil (%s)", name, b.builderDebugContext())
+		return nil
+	}
 	scope := b.CurrentBlock.ScopeTable
 	if utils.IsNil(scope) {
+		b.CurrentBlock.restoreScopeIfMissing()
+		scope = b.CurrentBlock.ScopeTable
+	}
+	if utils.IsNil(scope) {
+		log.Errorf("create variable %q: ScopeTable is nil (%s)", name, b.builderDebugContext())
 		return nil
 	}
 	ret := scope.CreateVariable(name, isLocal)

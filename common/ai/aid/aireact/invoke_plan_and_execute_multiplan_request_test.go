@@ -116,7 +116,7 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 			if strings.Contains(payload, flag) {
 				planMatchFlag = true
 			}
-			time.Sleep(time.Second * 30)
+			time.Sleep(time.Second * 1)
 			return nil
 		}),
 	)
@@ -177,15 +177,19 @@ LOOP:
 
 			if e.Type == string(schema.EVENT_TYPE_RESULT) {
 				directlyAnswer = true
-				break LOOP
 			}
 			if e.Type == string(schema.EVENT_TYPE_STREAM) && e.NodeId == "re-act-loop-answer-payload" {
 				answerStream.Write(e.GetContent())
 				if strings.Contains(answerStream.String(), "mocked answer directly after plan") ||
 					strings.Contains(answerStream.String(), "mocked post-iteration summary") {
 					directlyAnswer = true
-					break LOOP
 				}
+			}
+			// In sync mode, both tasks run plan execution serially.
+			// Break when we've seen 2 plan starts and the second plan ends,
+			// or when directlyAnswer is true.
+			if planStart && planEnd && directlyAnswer {
+				break LOOP
 			}
 		case <-after:
 			break LOOP
@@ -197,8 +201,8 @@ LOOP:
 		t.Fatal("Expected plan start event")
 	}
 
-	if planEnd {
-		t.Fatal("Did not expect plan end event")
+	if !planEnd {
+		t.Fatal("Expected plan end event (sync mode: plan completes before next task)")
 	}
 
 	if toolCalled {

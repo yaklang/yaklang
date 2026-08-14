@@ -11,9 +11,9 @@ import (
 
 // PIN 接口的预算上限: 控制注入到反应数据里的体积, 避免每轮重复渲染撑爆上下文。
 const (
-	pinMaxLibraries   = 4    // 最多 PIN 几个库
-	pinMaxFuncsPerLib = 26   // 每个库最多 PIN 多少条函数签名
-	pinMaxTotalBytes  = 7000 // PIN 段总字节上限(超出则截断, 已 PIN 的足够用)
+	pinMaxLibraries   = 3    // 最多 PIN 几个库
+	pinMaxFuncsPerLib = 12   // 每个库最多 PIN 多少条函数签名
+	pinMaxTotalBytes  = 3500 // PIN 段总字节上限(超出则截断)
 )
 
 // patternLibPrefixRe 从 search_pattern 里提取库名前缀, 兼容 `poc\.HTTPEx` 与 `poc.HTTPEx` 两种写法。
@@ -56,11 +56,8 @@ func CollectPinnedLibraries(coreLibraries, searchPatterns []string) []string {
 	return out
 }
 
-// BuildPinnedAPISection 为给定库生成紧凑的"接口速查卡": 每个库 = 一句话定位(OverviewShort)
-// + 该库的函数签名(Decl, 单行)。在 init 阶段一次性算好, 注入反应数据, 让模型上手即有
-// 权威签名(参数类型/个数), 从源头减少"参数类型错误/参数个数错误/猜错函数名"。
-// 体积受 pinMax* 预算约束; 无任何有效签名时返回 ""(优雅降级)。
-// 关键词: PIN 接口, 接口速查卡, 权威签名, 降低语法/类型错误
+// BuildPinnedAPISection 为给定库生成紧凑签名卡: 仅库名 + Decl 单行(无 overview)。
+// Init 算一次后注入反应数据; 体积受 pinMax* 约束。
 func BuildPinnedAPISection(libNames []string) string {
 	if len(libNames) == 0 {
 		return ""
@@ -82,10 +79,6 @@ func BuildPinnedAPISection(libNames []string) string {
 		var card strings.Builder
 		card.WriteString("### ")
 		card.WriteString(lib)
-		if short := doc.GetLibOverviewShort(lib); short != "" {
-			card.WriteString(" — ")
-			card.WriteString(strings.TrimSpace(strings.SplitN(short, "\n", 2)[0]))
-		}
 		card.WriteString("\n```\n")
 		shown := 0
 		for _, name := range names {
@@ -100,7 +93,7 @@ func BuildPinnedAPISection(libNames []string) string {
 			shown++
 			if shown >= pinMaxFuncsPerLib {
 				if remain := len(names) - shown; remain > 0 {
-					card.WriteString(fmt.Sprintf("... (%d more, 用 yakdoc_function_details 查完整签名)\n", remain))
+					card.WriteString(fmt.Sprintf("... (%d more → yakdoc_function_details)\n", remain))
 				}
 				break
 			}
@@ -110,7 +103,6 @@ func BuildPinnedAPISection(libNames []string) string {
 		if shown == 0 {
 			continue
 		}
-		// 预算控制: 已有内容且再加会超预算就停, 已 PIN 的足够用。
 		if total > 0 && total+card.Len() > pinMaxTotalBytes {
 			break
 		}
@@ -118,4 +110,18 @@ func BuildPinnedAPISection(libNames []string) string {
 		total += card.Len()
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// pinnedDSLRules 写码前注入的 Yaklang DSL 硬规则（短文案，直接 Go 常量，不走 .txt embed）。
+// 关键词: PIN DSL, byte 数组, append, poc 三返回值, YAK_MAIN 自测
+const pinnedDSLRules = `### Yaklang DSL 硬规则（写码前必读）
+- **字符串**：禁止跨行 ` + "`\"...\" + \"...\"`" + `；用单行、` + "`\\n`" + ` 或 ` + "`sprintf`" + `
+- **byte 数组**：` + "`[]byte{0xAC, 0xED, 0x00, 0x05}`" + `；元素必须是 byte 字面量（` + "`0x..`" + `），禁止裸整数
+- **[]byte 拼接**：` + "`append(a, b...)`" + `；**禁止** ` + "`append(a, b)`" + `（整段 bytes 不能当单个 T）。单字节：` + "`append(a, 0x70)`" + `
+- **poc.Get / poc.Post**：必须三变量接收 ` + "`rsp, req, err := poc.Post(...)`" + `
+- **PoC/插件脚本**：末尾加 ` + "`func runSelfTest(){...}`" + ` 与 ` + "`if YAK_MAIN { runSelfTest() }`" + ``
+
+// BuildPinnedDSLSection 返回 Init 阶段注入的 DSL 硬规则，与 BuildPinnedAPISection 成对使用。
+func BuildPinnedDSLSection() string {
+	return pinnedDSLRules
 }

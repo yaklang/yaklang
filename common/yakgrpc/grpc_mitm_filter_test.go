@@ -646,6 +646,37 @@ func TestGRPCMUSTPASS_MITM_Filter_Set_Get(t *testing.T) {
 	require.Equal(t, []string{"abc"}, filter.FilterData.IncludeUri[0].Group)
 }
 
+func TestMITMFilterData_FilterBundledStaticJSPersistence(t *testing.T) {
+	t.Run("legacy missing field uses default true", func(t *testing.T) {
+		data, err := unmarshalMITMFilterData(`{"ExcludeSuffix":[]}`)
+		require.NoError(t, err)
+		require.True(t, data.GetFilterBundledStaticJS())
+	})
+
+	t.Run("explicit false survives persistence", func(t *testing.T) {
+		serialized, err := marshalMITMFilterData(&ypb.MITMFilterData{
+			FilterBundledStaticJS: false,
+		})
+		require.NoError(t, err)
+		require.JSONEq(t, `{"FilterBundledStaticJS":false}`, string(serialized))
+
+		data, err := unmarshalMITMFilterData(string(serialized))
+		require.NoError(t, err)
+		require.False(t, data.GetFilterBundledStaticJS())
+	})
+
+	t.Run("explicit true survives persistence", func(t *testing.T) {
+		serialized, err := marshalMITMFilterData(&ypb.MITMFilterData{
+			FilterBundledStaticJS: true,
+		})
+		require.NoError(t, err)
+
+		data, err := unmarshalMITMFilterData(string(serialized))
+		require.NoError(t, err)
+		require.True(t, data.GetFilterBundledStaticJS())
+	})
+}
+
 func TestGRPCMUSTPASS_MITM_Filter_Reset(t *testing.T) {
 	ctx := utils.TimeoutContextSeconds(5)
 	client, err := NewLocalClient()
@@ -663,4 +694,5 @@ func TestGRPCMUSTPASS_MITM_Filter_Reset(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, rsp.FilterData.String(), token)
 	require.Contains(t, rsp.FilterData.String(), "google.com")
+	require.True(t, rsp.FilterData.GetFilterBundledStaticJS())
 }

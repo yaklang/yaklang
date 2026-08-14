@@ -226,9 +226,11 @@ LOOP:
 				waitCancelTaskDone <- struct{}{}
 				cancelTaskSuccess = true
 			}
-			if e.Type == string(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC) {
-				task_id := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$..task_id"))
-				currentTaskID = task_id
+			if e.NodeId == "react_task_dequeue" {
+				task_id := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$..react_task_id"))
+				if task_id != "" {
+					currentTaskID = task_id
+				}
 			}
 			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
 				hasPlanEnd = true

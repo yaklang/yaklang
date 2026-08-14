@@ -66,7 +66,7 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime, holder *sear
 		timeoutSec := yakRunSelfTestTimeoutSec(cfg)
 		emitYaklangRunStart(loop, absPath, policy)
 
-		result, err := RunYakSelfTest(task.GetContext(), code, absPath, timeoutSec)
+		result, err := RunYakSelfTest(task.GetContext(), code, absPath, timeoutSec, yakRunSelfTestPreferSubprocess(cfg))
 		emitYaklangRunFinish(loop, absPath, result, err)
 		if err == nil {
 			loop.Set(loopVarYakRunOK, "true")

@@ -162,11 +162,25 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		"start_task_id":  startTaskID,
 	}, event.SyncID)
 
-	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, startTaskID, func(err error) {
-		if err != nil {
-			log.Errorf("recover plan-and-exec failed: %v", err)
-		}
+	// Create a recovery task and enqueue it so the QueueProcessor
+	// handles it serially alongside normal free-input tasks.
+	userInput := extractRecoveryTaskUserInput(record)
+	recoveryTask := aicommon.NewStatefulTaskBase(
+		formatRecoveryTaskID(coordinatorID),
+		userInput,
+		r.config.GetContext(),
+		r.Emitter,
+	)
+	recoveryTask.SetTaskKind(aicommon.AITaskKind_Recovery)
+	recoveryTask.SetRecoveryData(&aicommon.RecoveryTaskData{
+		CoordinatorID: coordinatorID,
+		StartTaskID:   startTaskID,
 	})
+	recoveryTask.SetStatus(aicommon.AITaskState_Queueing)
+	if err := r.taskQueue.Append(recoveryTask); err != nil {
+		r.EmitSyncEventError("recover_plan_and_exec", err, event.SyncID)
+		return nil
+	}
 	return nil
 }
 

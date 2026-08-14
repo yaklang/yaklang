@@ -25,6 +25,10 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
 	for _, resource := range event.AttachedResourceInfo {
+		// Type=code is writable delivery — never register as @/reference AutoContext.
+		if resource.GetType() == aicommon.AttachedResourceTypeCode {
+			continue
+		}
 		if resource.GetType() == aicommon.CONTEXT_PROVIDER_TYPE_FILE &&
 			resource.GetKey() == aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH {
 			path := strings.TrimSpace(resource.GetValue())
@@ -189,8 +193,9 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 	if event == nil {
 		return nil
 	}
+	freeInput := event.FreeInput
 	// 创建基于aireact.Task的任务（初始状态为created）
-	sanitizedInput := sanitizeForTaskId(event.FreeInput)
+	sanitizedInput := sanitizeForTaskId(freeInput)
 	shortId := ksuid.New().String()
 	if len(shortId) > 8 {
 		shortId = shortId[:8]
@@ -198,7 +203,7 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 	taskId := fmt.Sprintf("react-%s-%s", sanitizedInput, shortId)
 	task := aicommon.NewStatefulTaskBase(
 		taskId,
-		event.FreeInput,
+		freeInput,
 		r.config.GetContext(),
 		r.Emitter)
 	if r.config.DebugEvent {

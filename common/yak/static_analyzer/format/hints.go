@@ -126,11 +126,11 @@ func formatCompilerErrorHint(pattern compilerErrorHint) string {
 func lookupCompilerErrorFallback(normalizedMessage string) string {
 	switch {
 	case strings.HasPrefix(normalizedMessage, "基础语法错误"):
-		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、是否误用了 Go/JavaScript 语法；若 Init 样例未覆盖该写法，再用 grep_yaklang_samples 搜索相似写法。"
+		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、语句是否写完整；若 Init 样例未覆盖该写法，再用 grep_yaklang_samples 搜索相似写法。"
 	case strings.Contains(normalizedMessage, "no viable alternative"):
-		return "语法解析失败（no viable alternative）。常见原因：Go 风格类型声明、import/package、泛型或不被 Yaklang 支持的语法。请对照 Yaklang DSL 改写。"
+		return "语法解析失败（no viable alternative）。常见原因：import/package、泛型、未闭合括号/字符串，或不被 Yaklang 支持的语法。请对照 Yaklang DSL 改写。"
 	case strings.Contains(normalizedMessage, "mismatched input"):
-		return "语法 token 不匹配（mismatched input）。检查是否缺少括号、逗号、运算符，或混入了 Go/Java 语法。"
+		return "语法 token 不匹配（mismatched input）。检查是否缺少括号、逗号、运算符，或语句未写完整。"
 	case strings.Contains(normalizedMessage, "extraneous input"):
 		return "存在多余 token（extraneous input）。删除多余符号，或检查语句是否写完整。"
 	case strings.Contains(normalizedMessage, "expecting"):
@@ -190,9 +190,40 @@ var compilerErrorHints = []compilerErrorHint{
 		Hint:     "该函数签名不包含 error 返回值。不要对其使用 `~` 丢弃 error，或改用会返回 error 的 API。",
 	},
 	{
+		// Must be before ByteLiteralTypeError: append(a []T, vals T) also emits "T should be byte".
+		Name:        "AppendByteSliceTypeError",
+		Contains:    []string{"T should be byte"},
+		LineRegexps: []string{`append\s*\(`},
+		Hint:        "[]byte 拼接：必须 `append(a, b...)` 展开另一段 bytes；禁止 `append(a, b)`（把整段 []byte 当成单个 T）。单字节：`append(a, 0x70)` 或 `append(a, []byte{0x70}...)`。确保 a/b 都是明确的 bytes（`b\"..\"` / `[]byte{0x..}` / codec 解码结果）。",
+		Examples: []string{
+			`frame = append(lengthPrefix, rawPayload)`,
+			`frame = append(lengthPrefix, rawPayload...)`,
+		},
+	},
+	{
+		Name:        "ByteLiteralTypeError",
+		Contains:    []string{"T should be byte"},
+		LineRegexps: []string{`\[\]byte\s*\{`},
+		Hint:        "[]byte 元素必须是 byte 字面量（0x00–0xFF）。用 []byte{0xAC, 0xED, 0x00, 0x05}；禁止裸整数或 Go 风格 typed slice。",
+		Examples:    []string{"[]byte{172, 237, 0, 5}", "[]byte{0xAC, 0xED, 0x00, 0x05}"},
+	},
+	{
 		Name:     "GenericTypeError",
 		Contains: []string{"should be", "but got"},
-		Hint:     "泛型/类型参数约束不满足。检查传入类型是否与函数/generic 声明一致。",
+		Hint:     "泛型/类型参数约束不满足。检查传入类型是否与函数/generic 声明一致。若出错行是 append 拼接 []byte，改用 append(a, b...)。",
+	},
+	{
+		Name: "CallAssignmentMismatchPocHTTP",
+		AnyOf: []string{
+			"The function call returns (",
+			"The function call with ~ returns (",
+		},
+		Contains: []string{"LowhttpResponse", "variables on the left side"},
+		Hint: "poc.Get / poc.Post 返回三个值：`(lowhttp.LowhttpResponse, *http.Request, error)`。正确写法：`rsp, req, err := poc.Post(...)` 或 `rsp, req, err := poc.Get(...)`。禁止 `rsp, err := poc.Post(...)`（只接两个变量会触发本错误）。",
+		Examples: []string{
+			`rsp, err := poc.Post(url, poc.timeout(30))`,
+			`rsp, req, err := poc.Post(url, poc.timeout(30))`,
+		},
 	},
 	{
 		Name: "CallAssignmentMismatch",
@@ -410,11 +441,15 @@ var compilerErrorHints = []compilerErrorHint{
 		Hint: "map 字面量键值对解析失败。检查 `{\"key\": value}` 语法。",
 	},
 	{
-		Name:        "FunctionParameterTypes",
-		Globs:       []string{"*no viable alternative at input*", "*func(*"},
-		LineRegexps: []string{`func\s*\([^)]*\s+(map\[|string|int|interface\{\}|\[\]|\*|chan)`},
-		Hint:        "Yaklang DSL 中函数参数不允许有类型声明。请移除参数的类型声明。",
-		Examples:    []string{"func(result map[string]interface{})", "func(result)"},
+		// Multi-line "..." + "..." is invalid Yaklang; keep before generic no-viable hints.
+		Name:        "MultilineStringConcat",
+		AnyOf:       []string{"no viable alternative"},
+		LineRegexps: []string{`^\s*\+\s*"`},
+		Hint:        "Yaklang 不支持跨行 `\"...\" + \"...\"` 拼接。请写成单行字符串、`sprintf(...)`，或用 `\\n` 写在同一字面量内。",
+		Examples: []string{
+			"yakit.Warn(\"...\\n\"\n    + \"...\")",
+			`yakit.Warn(sprintf("[!] dry-run\n1) ...\n2) %s", baseUrl))`,
+		},
 	},
 	{
 		Name: "VarTypeDeclarations",

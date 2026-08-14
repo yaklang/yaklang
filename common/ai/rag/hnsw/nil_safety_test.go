@@ -13,12 +13,14 @@ func TestSearchWithNilEntry(t *testing.T) {
 
 	// Test search function directly with nil entryNode
 	results := search[string](
-		nil, // nil entryNode should not cause panic
-		5,   // k
-		10,  // efSearch
-		func() []float32 { return []float32{1.0, 2.0, 3.0} }, // target vector
-		hnswspec.EuclideanDistance[string],                   // distance function
-		nil,                                                  // filter
+		nil,                                // nil entryNode should not cause panic
+		5,                                  // k
+		10,                                 // efSearch
+		nil,                                // target node
+		hnswspec.EuclideanDistance[string], // distance function
+		nil,                                // filter
+		nil,                                // workspace is unused for a nil entry
+		false,                              // batch cosine
 	)
 
 	// Should return empty results instead of panicking

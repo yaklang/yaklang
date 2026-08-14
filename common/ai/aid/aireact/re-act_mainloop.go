@@ -110,6 +110,13 @@ func (r *ReAct) processReActFromQueue() {
 
 // processReActTask 处理单个 Task
 func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
+	// Recovery tasks have a different execution path: they skip the ReAct loop
+	// and directly invoke plan-and-execute with the recovery parameters.
+	if task.GetTaskKind() == aicommon.AITaskKind_Recovery {
+		r.processRecoveryTask(task)
+		return
+	}
+
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
 		r.SaveTimeline()
@@ -156,6 +163,46 @@ func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
 	parsedQuery, focus, loopOptions := r.selectLoopForTask(task)
 	task.SetUserInput(parsedQuery)
 	return r.ExecuteLoopTask(focus, task, loopOptions...)
+}
+
+// processRecoveryTask handles a recovery task that was enqueued from a sync
+// event handler (recovery_plan_and_exec or execute_detached_plan).  Unlike
+// normal tasks, it does not enter the ReAct loop; instead it directly calls
+// invokePlanAndExecute with the recovery-specific parameters stored in the
+// task's RecoveryData.
+func (r *ReAct) processRecoveryTask(task aicommon.AIStatefulTask) {
+	defer func() {
+		r.SaveTimeline()
+		r.setCurrentTask(nil)
+		if err := recover(); err != nil {
+			log.Errorf("recovery task panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+			task.SetStatus(aicommon.AITaskState_Aborted)
+			r.AddToTimeline("error", fmt.Sprintf("recovery task panic: %v", err))
+		}
+	}()
+
+	data := task.GetRecoveryData()
+	if data == nil {
+		log.Errorf("recovery task %s has no recovery data", task.GetId())
+		task.SetStatus(aicommon.AITaskState_Aborted)
+		r.AddToTimeline("error", "recovery task has no recovery data")
+		return
+	}
+
+	log.Infof("start to execute recovery task: %s (coordinator=%s)", task.GetId(), data.CoordinatorID)
+
+	err := r.executeRecovery(task, data)
+	if err != nil {
+		log.Errorf("recovery task execution failed: %v", err)
+		task.SetStatus(aicommon.AITaskState_Aborted)
+		r.AddToTimeline("error", fmt.Sprintf("recovery task execution failed: %v", err))
+		return
+	}
+	task.SetStatus(aicommon.AITaskState_Completed)
+	r.AddToTimeline("success", "recovery task execution succeeded")
+	r.AddToTimeline("plan_executeion", fmt.Sprintf("plan recovery: %v is finished", utils.ShrinkString(data.CoordinatorID, 128)))
+	r.emitArtifactsSummaryToTimeline()
 }
 
 func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string, []reactloops.ReActLoopOption) {

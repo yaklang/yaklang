@@ -44,6 +44,7 @@ func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 	text := cfg.GetExecutionPolicy()
 	require.Contains(t, text, "MUST make dispatch_sub_react_agents your FIRST move")
 	require.Contains(t, text, "MUST NOT use it to offload")
+	require.NotContains(t, text, "MaxSubAgents")
 	require.NotContains(t, text, "Goal mode")
 }
 

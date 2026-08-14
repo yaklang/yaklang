@@ -58,6 +58,8 @@ func normalizeAISessionRuntimeMode(rawMode string) (string, bool) {
 
 const aiSessionRuntimeEventInput = "ai.session.input"
 const aiSessionRuntimeEventContextUpdated = "ai.session.context_updated"
+const aiSessionRuntimeEventTurnCompleted = "ai.session.turn.completed"
+const aiSessionRuntimeEventTurnFailed = "ai.session.turn.failed"
 
 var errAISessionInputInFlight = errors.New("ai session input command is already in flight")
 
@@ -97,6 +99,14 @@ type aiSessionRuntimeRefEmitter interface {
 type aiSessionRuntimeTurnCompleter interface {
 	DoneTurn(string, []byte)
 	FailTurn(string, string, string, []byte)
+}
+
+// aiSessionRuntimeTurnReporter closes a logical turn without closing the
+// reusable multi-turn Session runtime. Session terminal completion continues
+// to use aiSessionRuntimeTurnCompleter for single_run execution only.
+type aiSessionRuntimeTurnReporter interface {
+	TurnCompleted(string, []byte)
+	TurnFailed(string, string, string, []byte)
 }
 
 type aiSessionBinding struct {
@@ -533,6 +543,16 @@ func (m *aiSessionRuntimeManager) AcceptInput(
 	}
 
 	session.mu.Lock()
+	if ref.BindEpoch != session.ref.BindEpoch {
+		currentEpoch := session.ref.BindEpoch
+		session.mu.Unlock()
+		return acceptedAISessionInput{ref: ref}, fmt.Errorf(
+			"ai session bind epoch mismatch: command=%d runtime=%d session=%s",
+			ref.BindEpoch,
+			currentEpoch,
+			ref.SessionID,
+		)
+	}
 	if processed, ok := session.processedInputCommands[ref.CommandID]; ok {
 		ref.RunID = session.ref.RunID
 		ref.BindEpoch = session.ref.BindEpoch
@@ -641,6 +661,16 @@ func (m *aiSessionRuntimeManager) AcceptContextUpdate(
 	reason := strings.TrimSpace(command.GetReason())
 
 	session.mu.Lock()
+	if ref.BindEpoch != session.ref.BindEpoch {
+		currentEpoch := session.ref.BindEpoch
+		session.mu.Unlock()
+		return acceptedAISessionContextUpdate{ref: ref}, fmt.Errorf(
+			"ai session bind epoch mismatch: command=%d runtime=%d session=%s",
+			ref.BindEpoch,
+			currentEpoch,
+			ref.SessionID,
+		)
+	}
 	if session.terminalCommandID != "" || session.terminalPublishFailed {
 		terminalCommandID := session.terminalCommandID
 		session.mu.Unlock()
@@ -708,6 +738,16 @@ func (m *aiSessionRuntimeManager) Cancel(
 		return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
 	}
 	session.mu.Lock()
+	if ref.BindEpoch != session.ref.BindEpoch {
+		currentEpoch := session.ref.BindEpoch
+		session.mu.Unlock()
+		return cancelledAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
+			"ai session bind epoch mismatch: command=%d runtime=%d session=%s",
+			ref.BindEpoch,
+			currentEpoch,
+			ref.SessionID,
+		)
+	}
 	ref.RunID = session.ref.RunID
 	ref.BindEpoch = session.ref.BindEpoch
 	handle := session.handle
@@ -768,6 +808,16 @@ func (m *aiSessionRuntimeManager) Close(
 		return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
 	}
 	session.mu.Lock()
+	if ref.BindEpoch != session.ref.BindEpoch {
+		currentEpoch := session.ref.BindEpoch
+		session.mu.Unlock()
+		return closedAISessionRuntime{ref: ref, reason: reason}, fmt.Errorf(
+			"ai session bind epoch mismatch: command=%d runtime=%d session=%s",
+			ref.BindEpoch,
+			currentEpoch,
+			ref.SessionID,
+		)
+	}
 	ref.RunID = session.ref.RunID
 	ref.BindEpoch = session.ref.BindEpoch
 	handle := session.handle
@@ -1398,6 +1448,7 @@ func aiSessionRefFromInputCommand(command *aiv1.PushAISessionInputCommand) aiSes
 		CommandID:   command.GetMetadata().GetCommandId(),
 		SessionID:   command.GetSession().GetSessionId(),
 		RunID:       command.GetSession().GetRunId(),
+		BindEpoch:   command.GetSession().GetBindEpoch(),
 		OwnerUserID: strings.TrimSpace(command.GetOwnerUserId()),
 	}
 }
@@ -1407,6 +1458,7 @@ func aiSessionRefFromContextCommand(command *aiv1.AppendAISessionContextCommand)
 		CommandID:   command.GetMetadata().GetCommandId(),
 		SessionID:   command.GetSession().GetSessionId(),
 		RunID:       command.GetSession().GetRunId(),
+		BindEpoch:   command.GetSession().GetBindEpoch(),
 		OwnerUserID: strings.TrimSpace(command.GetOwnerUserId()),
 	}
 }
@@ -1416,6 +1468,7 @@ func aiSessionRefFromCancelCommand(command *aiv1.CancelAISessionCommand) aiSessi
 		CommandID:   command.GetMetadata().GetCommandId(),
 		SessionID:   command.GetSession().GetSessionId(),
 		RunID:       command.GetSession().GetRunId(),
+		BindEpoch:   command.GetSession().GetBindEpoch(),
 		OwnerUserID: strings.TrimSpace(command.GetOwnerUserId()),
 	}
 }
@@ -1425,6 +1478,7 @@ func aiSessionRefFromCloseCommand(command *aiv1.CloseAISessionCommand) aiSession
 		CommandID:   command.GetMetadata().GetCommandId(),
 		SessionID:   command.GetSession().GetSessionId(),
 		RunID:       command.GetSession().GetRunId(),
+		BindEpoch:   command.GetSession().GetBindEpoch(),
 		OwnerUserID: strings.TrimSpace(command.GetOwnerUserId()),
 	}
 }
@@ -1490,7 +1544,7 @@ func (e *managedAISessionRuntimeEmitter) emitForRef(
 	} else {
 		ref, seq = e.runtime.nextEventRefAndSeqFor(*frozenRef)
 	}
-	rootTerminal := isYakAIRootPlanExecutionCompleted(payloadJSON)
+	rootTerminal := e.runtime.singleRunExecution() && isYakAIRootPlanExecutionCompleted(payloadJSON)
 	claimed := false
 	if rootTerminal {
 		ref, claimed = e.runtime.claimRootPlanTerminal(ref.CommandID)
@@ -1608,6 +1662,65 @@ func (e *managedAISessionRuntimeEmitter) FailTurn(
 	}
 }
 
+func (e *managedAISessionRuntimeEmitter) TurnCompleted(turnID string, resultJSON []byte) {
+	e.publishTurnState(
+		turnID,
+		aiSessionRuntimeEventTurnCompleted,
+		mustJSON(map[string]any{
+			"turn_id":     strings.TrimSpace(turnID),
+			"status":      "completed",
+			"finished_at": time.Now().UTC().Format(time.RFC3339Nano),
+			"result":      json.RawMessage(cloneBytes(resultJSON)),
+		}),
+	)
+}
+
+func (e *managedAISessionRuntimeEmitter) TurnFailed(
+	turnID string,
+	code string,
+	message string,
+	detailJSON []byte,
+) {
+	e.publishTurnState(
+		turnID,
+		aiSessionRuntimeEventTurnFailed,
+		mustJSON(map[string]any{
+			"turn_id":     strings.TrimSpace(turnID),
+			"status":      "failed",
+			"finished_at": time.Now().UTC().Format(time.RFC3339Nano),
+			"error": map[string]any{
+				"code":    strings.TrimSpace(code),
+				"message": strings.TrimSpace(message),
+				"detail":  json.RawMessage(cloneBytes(detailJSON)),
+			},
+		}),
+	)
+}
+
+func (e *managedAISessionRuntimeEmitter) publishTurnState(
+	turnID string,
+	eventType string,
+	payloadJSON []byte,
+) {
+	if e == nil || e.runtime == nil || e.publisher == nil {
+		return
+	}
+	turnID = strings.TrimSpace(turnID)
+	if turnID == "" || !e.runtime.beginEmission() {
+		return
+	}
+	ref := e.runtime.currentRef()
+	ref.CommandID = turnID
+	ref, seq := e.runtime.nextEventRefAndSeqFor(ref)
+	err := retryAISessionTurnPublish(e.ctx, func(ctx context.Context) error {
+		return e.publisher.PublishEvent(ctx, ref, seq, eventType, payloadJSON)
+	})
+	e.runtime.endEmission()
+	if err != nil {
+		logAISessionRuntimePublishError("turn", ref.SessionID, err)
+	}
+}
+
 func (e *managedAISessionRuntimeEmitter) Failed(code string, message string, detailJSON []byte) {
 	if e == nil || e.runtime == nil || e.publisher == nil {
 		return
@@ -1670,6 +1783,48 @@ func retryAISessionTerminalPublish(
 	delay := initialDelay
 	for {
 		err = publish(ctx)
+		if err == nil {
+			return nil
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return errors.Join(err, ctx.Err())
+		case <-timer.C:
+		}
+		if delay < maxDelay {
+			delay *= 2
+			if delay > maxDelay {
+				delay = maxDelay
+			}
+		}
+	}
+}
+
+// Turn completion is the durable boundary that makes a reusable Session
+// accept the next free input. Unlike a Session terminal command, it must not
+// be abandoned after a local timeout: doing so leaves the platform with an
+// active Turn while the runtime silently advances. Retry until the runtime is
+// explicitly cancelled or retired; the handle keeps the Turn active while
+// this call is blocked.
+func retryAISessionTurnPublish(
+	ctx context.Context,
+	publish func(context.Context) error,
+) error {
+	const initialDelay = 100 * time.Millisecond
+	const maxDelay = 5 * time.Second
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	delay := initialDelay
+	for {
+		err := publish(ctx)
 		if err == nil {
 			return nil
 		}
@@ -1782,6 +1937,15 @@ func (r *aiSessionRuntime) claimAutomaticTerminal(turnID string) (aiSessionComma
 	r.terminalKind = "auto"
 	r.terminalReason = "single run completed"
 	return ref, true
+}
+
+func (r *aiSessionRuntime) singleRunExecution() bool {
+	if r == nil {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return strings.EqualFold(strings.TrimSpace(r.executionMode), "single_run")
 }
 
 func (r *aiSessionRuntime) claimTerminalFailure(turnID string) (aiSessionCommandRef, bool) {

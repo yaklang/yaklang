@@ -11,7 +11,12 @@ func TestNormalizeScanNodeCapabilityKeysDefaultsToNonHIDSBuildSurface(t *testing
 	t.Parallel()
 
 	got := normalizeScanNodeCapabilityKeys(nil)
-	want := []string{"yak.execute", capabilityKeySSARuleSyncExport, capabilityKeyAIBindEpochV1}
+	want := []string{
+		"yak.execute",
+		capabilityKeySSARuleSyncExport,
+		capabilityKeyAIBindEpochV1,
+		capabilityKeyAITurnLifecycleV1,
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}
@@ -27,7 +32,13 @@ func TestNormalizeScanNodeCapabilityKeysKeepsExplicitExtrasWithoutDuplicates(t *
 		" ",
 		"extra.capability",
 	})
-	want := []string{"yak.execute", capabilityKeySSARuleSyncExport, capabilityKeyAIBindEpochV1, "extra.capability"}
+	want := []string{
+		"yak.execute",
+		capabilityKeySSARuleSyncExport,
+		capabilityKeyAIBindEpochV1,
+		capabilityKeyAITurnLifecycleV1,
+		"extra.capability",
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}

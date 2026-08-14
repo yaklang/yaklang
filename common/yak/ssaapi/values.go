@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -12,6 +13,52 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
+
+// valuePool reuses *Value structs to cut the flat reflect.unsafe_New allocation
+// (the &Value{} inside Program.NewValue) that dominates GC on large-project scans
+// (~1.65GB flat / ~605M objects on hadoop, see scan-perf-optimization-plan A1).
+//
+// SAFETY (design principle 1): a Value carries per-descent analysis state
+// (EffectOn/DependOn/Predecessors/anchorBits/cfgSiteInstID/runtimeCtx), so a
+// pooled Value is ALWAYS a brand-new independent object: acquireValue returns a
+// fully zeroed struct and Program.NewValue assigns a fresh uid (p.id.Inc()) plus
+// ParentProgram/inner identity. Two prior attempts to identity-share Values
+// across a descent were semantically rejected (missing anchor bits /
+// Test_Values_Graph_Dot), so we NEVER reuse a Value that escaped into a result,
+// an edge graph, the users/operands cache, Predecessors, or nodeId2ValueCache.
+//
+// Only provably-dead factory shells are returned via releaseValue; all other
+// Values rely on the GC as fallback.
+var valuePool = sync.Pool{
+	New: func() interface{} {
+		return &Value{}
+	},
+}
+
+// acquireValue returns a fully zeroed *Value from the pool. The caller must set
+// ParentProgram, uid, and the inner identity before the Value becomes observable.
+func acquireValue() *Value {
+	v := valuePool.Get().(*Value)
+	*v = Value{} // full zero — clears every analysis-state and identity field
+	return v
+}
+
+// releaseValue returns a *Value to the pool AFTER the caller has provably dropped
+// the last reference to it. The struct is zeroed first so a later acquireValue
+// can never observe stale analysis state.
+//
+// SAFETY CONTRACT: only call on a value that (a) was created this descent as a
+// pure factory shell, (b) was never appended to a result / EffectOn / DependOn /
+// users / operands / Predecessors / nodeId2ValueCache, and (c) is unreachable by
+// all live code once the call returns. When in doubt, do NOT release — let GC
+// reclaim it.
+func releaseValue(v *Value) {
+	if v == nil {
+		return
+	}
+	*v = Value{}
+	valuePool.Put(v)
+}
 
 type Value struct {
 	runtimeCtx    *omap.OrderedMap[ContextID, *Value]

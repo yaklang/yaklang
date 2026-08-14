@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"strings"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -120,6 +121,149 @@ func patchIrCodeIndex(db *gorm.DB) {
 		if err := db.Exec(idx.query).Error; err != nil {
 			log.Warnf("failed to add index %s: %v", idx.name, err)
 		}
+	}
+
+	// Add UNIQUE constraint on (program_name, code_id) to prevent
+	// duplicate instruction INSERTs from race conditions in the async
+	// persist pipeline. This is a hard database invariant.
+	ensureUniqueIrCodesProgramCodeIndex(db)
+	ensureUniqueIrOffsetsIndex(db)
+}
+
+// ensureUniqueIrCodesProgramCodeIndex creates a UNIQUE INDEX on
+// (program_name, code_id) for the ir_codes table. If duplicate rows
+// already exist, it logs them and fails — it does NOT silently dedup.
+func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
+	if !db.HasTable(TableIrCodes) {
+		return
+	}
+
+	indexName := "ux_ir_codes_program_code"
+
+	// Check if the unique index already exists
+	var exists int64
+	db.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='ir_codes' AND name=?`, indexName).Row().Scan(&exists)
+	if exists > 0 {
+		return // already created
+	}
+
+	// Check for existing duplicates BEFORE creating the unique index.
+	// If duplicates exist, we cannot create the unique index without
+	// resolving them first. We log the duplicates and return without
+	// creating the index (the caller will see duplicate INSERTs fail
+	// later, which is the desired behavior for new data).
+	type dupRow struct {
+		ProgramName string
+		CodeID      int64
+		DupCount    int64
+	}
+	var dups []dupRow
+	rows, err := db.Raw(
+		`SELECT program_name, code_id, COUNT(*) as dup_count
+		 FROM ir_codes
+		 GROUP BY program_name, code_id
+		 HAVING COUNT(*) > 1
+		 LIMIT 10`,
+	).Rows()
+	if err == nil {
+		for rows.Next() {
+			var d dupRow
+			rows.Scan(&d.ProgramName, &d.CodeID, &d.DupCount)
+			dups = append(dups, d)
+		}
+		rows.Close()
+	}
+
+	if len(dups) > 0 {
+		// Log duplicates and do NOT create the index — existing data
+		// has violations that must be resolved manually.
+		for _, d := range dups {
+			log.Errorf("[unique-constraint] DUPLICATE ir_codes: program_name=%s code_id=%d count=%d — cannot create UNIQUE INDEX, resolve duplicates first",
+				d.ProgramName, d.CodeID, d.DupCount)
+		}
+		log.Errorf("[unique-constraint] %d duplicate (program_name, code_id) groups found in ir_codes — UNIQUE INDEX ux_ir_codes_program_code NOT created", len(dups))
+		return
+	}
+
+	// No duplicates — safe to create the UNIQUE INDEX
+	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`
+	if err := db.Exec(query).Error; err != nil {
+		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
+	} else {
+		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_codes (program_name, code_id)", indexName)
+	}
+}
+
+// ensureUniqueIrOffsetsIndex creates a UNIQUE INDEX with COALESCE on
+// (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))
+// for the ir_offsets table. This prevents duplicate offset INSERTs.
+//
+// If an older non-COALESCE index with the same name exists, it is dropped and
+// recreated with COALESCE. If duplicate rows exist, it logs and returns.
+func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
+	if !db.HasTable(TableIrOffsets) {
+		return
+	}
+
+	indexName := "ux_ir_offsets_program_value_file_range"
+
+	// Check if the index exists and whether its SQL uses COALESCE
+	type idxInfo struct {
+		Name string
+		SQL  string
+	}
+	var existing []idxInfo
+	rows, err := db.Raw(
+		`SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`,
+		indexName,
+	).Rows()
+	if err == nil {
+		for rows.Next() {
+			var info idxInfo
+			rows.Scan(&info.Name, &info.SQL)
+			existing = append(existing, info)
+		}
+		rows.Close()
+	}
+
+	// If the index exists with COALESCE, it's up to date — nothing to do
+	for _, info := range existing {
+		if strings.Contains(strings.ToUpper(info.SQL), "COALESCE") {
+			return // already the COALESCE version
+		}
+	}
+
+	// If the index exists WITHOUT COALESCE, drop it so we can recreate
+	if len(existing) > 0 {
+		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
+		if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
+			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
+			return
+		}
+	}
+
+	// Check for existing duplicates BEFORE creating the unique index
+	var dupCount int64
+	db.Raw(
+		`SELECT COALESCE(SUM(c - 1), 0) FROM (
+			SELECT program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''), COUNT(*) as c
+			FROM ir_offsets
+			GROUP BY program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')
+			HAVING COUNT(*) > 1
+		) as d`,
+	).Row().Scan(&dupCount)
+
+	if dupCount > 0 {
+		log.Errorf("[unique-constraint] %d duplicate ir_offsets rows found — UNIQUE INDEX %s NOT created, resolve duplicates first",
+			dupCount, indexName)
+		return
+	}
+
+	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`
+	if err := db.Exec(query).Error; err != nil {
+		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
+	} else {
+		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_offsets (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))", indexName)
 	}
 }
 

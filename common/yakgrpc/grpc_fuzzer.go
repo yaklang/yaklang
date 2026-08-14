@@ -307,18 +307,23 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		return nil, utils.Error("cannot find redirect url")
 	}
 
-	isHttps := req.GetIsHttps()
+	originIsHttps := req.GetIsHttps()
+	isHttps := originIsHttps
 	if strings.HasPrefix(result, "https://") {
 		isHttps = true
 	}
 	if strings.HasPrefix(result, "http://") {
 		isHttps = false
 	}
-	_ = isHttps
-	newUrl := lowhttp.MergeUrlFromHTTPRequest([]byte(req.GetRequest()), result, isHttps)
-	resultRequest := lowhttp.UrlToGetRequestPacket(newUrl, []byte(req.GetRequest()), isHttps, lowhttp.ExtractCookieJarFromHTTPResponse([]byte(req.GetResponse()))...)
-	if resultRequest == nil {
-		return nil, utils.Errorf("cannot merge request packet. redirect url: %s", newUrl)
+	newUrl := lowhttp.MergeUrlFromHTTPRequest([]byte(req.GetRequest()), result, originIsHttps)
+	resultRequest, err := lowhttp.BuildRedirectRequestFromResponse(
+		newUrl,
+		[]byte(req.GetRequest()),
+		[]byte(req.GetResponse()),
+		originIsHttps,
+	)
+	if err != nil {
+		return nil, utils.Wrapf(err, "cannot build redirect request. redirect url: %s", newUrl)
 	}
 	start := time.Now()
 	host, port, _ := utils.ParseStringToHostPort(newUrl)
@@ -385,8 +390,9 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 	}
 
+	method := lowhttp.GetHTTPRequestMethod(resultRequest)
 	rsp := &ypb.FuzzerResponse{
-		Method:                "GET",
+		Method:                method,
 		ResponseRaw:           rspRaw,
 		GuessResponseEncoding: Chardet(rspRaw),
 		RequestRaw:            resultRequest,
@@ -1203,7 +1209,27 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_WithSimple(true)))
 		}
 		if req.GetFuzzTagSyncIndex() {
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_SyncTag(true)))
+			syncOpts := []mutate.FuzzConfigOpt{mutate.Fuzz_SyncTag(true)}
+			if len(mergedParams) > 0 {
+				// Request variables are already expanded by PreRenderVariables. Treat the
+				// selected scalar as dynamic here so a single-valued {{p(...)}} remains
+				// available for every row of a longer pitchfork payload group. Keep list
+				// values non-dynamic so their indexed pitchfork behavior is unchanged.
+				paramValues := func(name string) []string {
+					if value, ok := mergedParams[name]; ok {
+						return utils.InterfaceToStringSlice(value)
+					}
+					return []string{""}
+				}
+				syncOpts = append(syncOpts, mutate.Fuzz_WithExtraFuzzTag("params", &mutate.FuzzTagDescription{
+					TagName: "params",
+					Handler: paramValues,
+					IsDynFun: func(_, name string) bool {
+						return len(paramValues(name)) <= 1
+					},
+				}))
+			}
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(syncOpts...))
 		}
 		if !isPause {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExternSwitch(sw))

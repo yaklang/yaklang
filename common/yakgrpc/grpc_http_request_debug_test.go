@@ -560,6 +560,20 @@ func TestGRPCMUSTPASS_HTTP_FuzzPacket(t *testing.T) {
 	}
 	// path 合并
 	targetUrl := "http://" + utils.HostPort(host, port) + "/aa"
+	sharedRuntimeID := uuid.NewString()
+	// Seed a cookie in a separate DebugPlugin invocation. A later invocation
+	// must use a different session and must not inherit this cookie, even if
+	// the caller reuses the runtime ID.
+	fuzz(targetUrl, &ypb.DebugPluginRequest{
+		Code:       `mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {}`,
+		PluginType: "mitm",
+		RuntimeId:  sharedRuntimeID,
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			Headers: []*ypb.KVPair{{Key: "Cookie", Value: "debug-session-cookie=1"}},
+		},
+		Input: targetUrl,
+	})
+
 	res := fuzz(targetUrl, &ypb.DebugPluginRequest{
 		Code: `
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
@@ -570,6 +584,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 }
 `,
 		PluginType: "mitm",
+		RuntimeId:  sharedRuntimeID,
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
 			Path: []string{"bb"},
 		},

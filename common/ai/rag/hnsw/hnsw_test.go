@@ -153,6 +153,18 @@ func TestSearchKGreaterThanNodes(t *testing.T) {
 	})
 }
 
+func TestEqualDistanceResultOrderCompatibility(t *testing.T) {
+	g := NewGraph[string](WithDeterministicRng[string](0))
+	g.Add(
+		MakeInputNode("doc1", []float32{1, 0, 0}),
+		MakeInputNode("doc2", []float32{1, 0, 0}),
+	)
+	result := g.Search([]float32{1, 0, 0}, 2)
+	require.Len(t, result, 2)
+	require.Equal(t, "doc2", result[0].Key)
+	require.Equal(t, "doc1", result[1].Key)
+}
+
 func TestMoreNodes(t *testing.T) {
 	g := NewGraph[int]()
 	g.Add(

@@ -13,9 +13,9 @@ This document describes how to build, validate, and operate the current Legion H
 
 | Build mode | Host OS | Advertised capability keys | HIDS apply behavior |
 | --- | --- | --- | --- |
-| default build | any | `yak.execute`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1` | `ErrHIDSCapabilityNotCompiled` |
-| `-tags hids` | non-Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1` | `ErrHIDSCapabilityUnsupportedPlatform` |
-| `-tags hids` | Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1` | HIDS runtime starts if at least one collector comes up |
+| default build | any | `yak.execute`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | `ErrHIDSCapabilityNotCompiled` |
+| `-tags hids` | non-Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | `ErrHIDSCapabilityUnsupportedPlatform` |
+| `-tags hids` | Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | HIDS runtime starts if at least one collector comes up |
 
 Operational implication: a build that advertises `hids` must still be scheduled to Linux hosts only. Building with `-tags hids` on macOS or Windows advertises the capability key, but the runtime cannot start there.
 
@@ -125,6 +125,14 @@ source commit, target platform, producer manifest, archive, raw binary, and
 checksums. Cross-repository assembly consumes the architecture-appropriate OSS
 index URL and an independently approved index SHA-256 instead of a GitHub
 Actions run ID or repository token.
+
+For Console engine import, the same trusted tag build also emits one
+`yaklang-node-engine_<tag>_linux_<arch>.tar.gz` installation package. It
+contains exactly `manifest.json`, `release-index.json`,
+`release-index.json.sha256`, and `yaklang-node`. Administrators select this
+single package in Legion; they do not extract it or paste release metadata.
+Legion performs the package, compatibility, and digest checks server-side
+before adding the engine as a candidate version.
 
 Use `task legion_smoke_node_build_hids` for native debugging when your current host is already Linux. Use `task legion_smoke_node_build_hids_linux_amd64` when you need a deployable Linux artifact from any development host.
 
