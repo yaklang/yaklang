@@ -6,13 +6,78 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func TestVerifyUserSatisfaction_TaskCancellationStopsRequestWithoutRetry(t *testing.T) {
+	var (
+		events   []*schema.AiOutputEvent
+		eventsMu sync.Mutex
+		calls    atomic.Int64
+	)
+	requestStarted := make(chan context.Context, 1)
+
+	ins, err := NewTestReAct(
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			eventsMu.Lock()
+			defer eventsMu.Unlock()
+			events = append(events, e)
+		}),
+		aicommon.WithAICallback(func(_ aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			calls.Add(1)
+			requestStarted <- req.GetContext()
+			<-req.GetContext().Done()
+			return nil, req.GetContext().Err()
+		}),
+	)
+	require.NoError(t, err)
+
+	taskCtx, cancelTask := context.WithCancel(context.Background())
+	type verifyOutcome struct {
+		result *aicommon.VerifySatisfactionResult
+		err    error
+	}
+	outcomeCh := make(chan verifyOutcome, 1)
+	go func() {
+		result, verifyErr := ins.VerifyUserSatisfaction(taskCtx, "completed report", false, "report saved")
+		outcomeCh <- verifyOutcome{result: result, err: verifyErr}
+	}()
+
+	select {
+	case requestCtx := <-requestStarted:
+		require.NotNil(t, requestCtx)
+		cancelTask()
+	case <-time.After(3 * time.Second):
+		t.Fatal("verification request did not start")
+	}
+
+	select {
+	case outcome := <-outcomeCh:
+		require.NoError(t, outcome.err)
+		require.Nil(t, outcome.result, "cancelled observation should be quietly skipped")
+	case <-time.After(3 * time.Second):
+		t.Fatal("verification did not stop after task completion")
+	}
+
+	require.Equal(t, int64(1), calls.Load(), "cancelled verification must not retry")
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+	for _, event := range events {
+		if event == nil {
+			continue
+		}
+		content := string(event.Content)
+		require.NotContains(t, content, "call ai api error")
+		require.NotContains(t, content, "postHandler error")
+	}
+}
 
 func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *testing.T) {
 	var (

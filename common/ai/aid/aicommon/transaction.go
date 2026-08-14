@@ -142,6 +142,13 @@ func callAITransaction(
 		)
 		lastReq = aiReq
 		rsp, err := callAi(aiReq)
+		// A request-scoped cancellation is a terminal control signal, not an AI
+		// failure. Check it before classifying callAi errors so a task finishing
+		// while the provider is in flight cannot emit a misleading model-error
+		// event or enter the retry loop.
+		if ctxErr := transactionCtx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		if err != nil {
 			lastErr = err
 			lastCallAiErr = err
@@ -193,7 +200,16 @@ func callAITransaction(
 		if !rsp.WaitForCallbackDone(transactionCtx) {
 			return transactionCtx.Err()
 		}
+		if ctxErr := transactionCtx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		postHandlerErr = postHandler(rsp)
+		// The post-handler may consume a stream with the same request context.
+		// If that context was cancelled while parsing, do not reinterpret the
+		// cancellation as malformed model output and retry it.
+		if ctxErr := transactionCtx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		// 归一化空响应错误，再与 rsp 的回调错误（由 AIChatToAICallbackType 等设置）合并
 		postHandlerErr = normalizeTransactionPostHandlerError(rsp, postHandlerErr)
 		postHandlerErr = mergePostHandlerAndCallbackError(postHandlerErr, rsp.GetError())
