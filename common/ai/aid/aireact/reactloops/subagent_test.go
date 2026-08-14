@@ -1,4 +1,4 @@
-package reactloops
+﻿package reactloops
 
 import (
 	"context"
@@ -269,7 +269,7 @@ func TestBuildSubAgentInvoker_StripsTopLevelStrategies(t *testing.T) {
 		"sub agent must not inherit goal mode")
 	assert.False(t, capturedCfg.GetPreferDispatchSubReactAgents(),
 		"sub agent must not inherit the multi-agent dispatch preference")
-	assert.Equal(t, int64(aicommon.DefaultMaxSubAgents), capturedCfg.GetMaxSubAgents(),
+	assert.Equal(t, int64(aicommon.DefaultMaxSubAgentConcurrency), capturedCfg.GetMaxSubAgents(),
 		"sub agent must not inherit the multi-agent MaxSubAgents cap")
 	assert.False(t, capturedCfg.GetEnablePlanAndExec(),
 		"sub agent must not open plans")
