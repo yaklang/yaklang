@@ -352,6 +352,70 @@ int main() {
 `,
 			wantUAF: false,
 		},
+		// Step1: formal-parameter abstract objects (no malloc in callee).
+		// Note: bare `*p = …` on a formal int* is lowered via PointerSideEffect and
+		// does not attach a member-use on the Parameter in SSA; use call/arrow uses.
+		{
+			name: "param free then call use",
+			code: `
+#include <stdlib.h>
+void sink(int *q);
+void f(int *p) {
+    free(p);
+    sink(p);
+}
+`,
+			wantUAF: true,
+		},
+		{
+			name: "param free then arrow member write",
+			code: `
+#include <stdlib.h>
+struct Node { int x; };
+void f(struct Node *p) {
+    free(p);
+    p->x = 1;
+}
+`,
+			wantUAF: true,
+			contain: []string{"1"},
+		},
+		{
+			name: "param may-free then call use after join",
+			code: `
+#include <stdlib.h>
+void sink(int *q);
+void f(int *p, int c) {
+    if (c) {
+        free(p);
+    }
+    sink(p);
+}
+`,
+			wantUAF: true,
+		},
+		{
+			name: "param use then free is safe",
+			code: `
+#include <stdlib.h>
+void sink(int *q);
+void f(int *p) {
+    sink(p);
+    free(p);
+}
+`,
+			wantUAF: false,
+		},
+		{
+			name: "param free without later use is safe",
+			code: `
+#include <stdlib.h>
+void f(int *p) {
+    free(p);
+}
+`,
+			wantUAF: false,
+		},
 	}
 
 	for _, tc := range cases {

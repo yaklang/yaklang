@@ -54,3 +54,25 @@ int main() {
 		require.NotEqual(t, "uaf", f.Kind, "unexpected UAF: %+v use=%v", f, f.Use)
 	}
 }
+
+func Test_UAF_Lifetime_ParamFreeThenUse(t *testing.T) {
+	code := `
+#include <stdlib.h>
+void sink(int *q);
+void f(int *p) {
+    free(p);
+    sink(p);
+}
+`
+	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.C))
+	require.NoError(t, err)
+	findings := lifetime.FindUAFUses(prog.Program)
+	require.Greater(t, len(findings), 0, "expected UAF on formal parameter")
+	hasUAF := false
+	for _, f := range findings {
+		if f.Kind == "uaf" {
+			hasUAF = true
+		}
+	}
+	require.True(t, hasUAF)
+}
