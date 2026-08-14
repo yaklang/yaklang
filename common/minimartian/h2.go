@@ -40,7 +40,13 @@ func (p *Proxy) proxyH2(closing chan bool, cc net.Conn, url *url.URL, ctx *Conte
 		if err != nil {
 			return nil, nil, err
 		}
-		*req = *req.WithContext(streamCtx)
+		requestCtx, cancelRequest := context.WithCancel(req.Context())
+		stopStreamCancel := context.AfterFunc(streamCtx, cancelRequest)
+		defer func() {
+			stopStreamCancel()
+			cancelRequest()
+		}()
+		*req = *req.WithContext(requestCtx)
 		inherit := func(i string) {
 			v := ctx.GetSessionValue(i)
 			httpctx.SetContextValueInfoFromRequest(req, i, v)
