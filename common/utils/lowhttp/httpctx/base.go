@@ -381,6 +381,7 @@ const (
 	RESPONSE_CONTEXT_KEY_Timestamp                   = "timestamp_response"
 	REQUEST_CONTEXT_KEY_RequestIsModified            = "requestIsModified"
 	REQUEST_CONTEXT_KEY_UpstreamPortIsModified       = "upstreamPortIsModified"
+	REQUEST_CONTEXT_KEY_UpstreamRoundTripSucceeded   = "upstreamRoundTripSucceeded"
 	REQUEST_CONTEXT_KEY_ResponseIsModified           = "responseIsModified"
 	REQUEST_CONTEXT_KEY_RequestModifiedBy            = "requestIsModifiedBy"
 	REQUEST_CONTEXT_KEY_ResponseModifiedBy           = "responseIsModifiedBy"
@@ -737,6 +738,17 @@ func SetUpstreamPortModified(req *http.Request, modified bool) {
 
 func GetUpstreamPortIsModified(req *http.Request) bool {
 	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamPortIsModified)
+}
+
+// SetUpstreamRoundTripSucceeded records whether a real upstream round trip
+// completed successfully. Proxy-generated responses (for example a local 502)
+// must not be counted as upstream completions.
+func SetUpstreamRoundTripSucceeded(req *http.Request, succeeded bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamRoundTripSucceeded, succeeded)
+}
+
+func GetUpstreamRoundTripSucceeded(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamRoundTripSucceeded)
 }
 
 func SetResponseModified(req *http.Request, by ...string) {

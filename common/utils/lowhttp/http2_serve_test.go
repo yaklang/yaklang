@@ -2,10 +2,13 @@ package lowhttp
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -13,6 +16,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/net/http2"
 )
 
 func TestH2_Serve(t *testing.T) {
@@ -104,5 +108,104 @@ func TestH2_Serve(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("serveH2 did not exit after closing connection")
+	}
+}
+
+func TestH2ServeRSTStreamCancelsOnlyCurrentStream(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	serveDone := make(chan error, 1)
+	slowStarted := make(chan struct{})
+	slowCanceled := make(chan struct{})
+
+	go func() {
+		serverConn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			serveDone <- acceptErr
+			return
+		}
+		serveDone <- ServeHTTP2ConnectionWithContext(serverConn, func(ctx context.Context, header []byte, _ io.ReadCloser) ([]byte, io.ReadCloser, error) {
+			if strings.Contains(string(header), " /slow ") {
+				close(slowStarted)
+				<-ctx.Done()
+				close(slowCanceled)
+				return nil, nil, ctx.Err()
+			}
+			return []byte("HTTP/2 200 OK\r\nContent-Length: 2\r\n\r\n"), io.NopCloser(strings.NewReader("ok")), nil
+		})
+	}()
+
+	var dialCount atomic.Int32
+	transport := &http2.Transport{
+		AllowHTTP: true,
+		DialTLSContext: func(ctx context.Context, _, _ string, _ *tls.Config) (net.Conn, error) {
+			if dialCount.Add(1) != 1 {
+				return nil, errors.New("unexpected second HTTP/2 connection")
+			}
+			var dialer net.Dialer
+			return dialer.DialContext(ctx, "tcp", listener.Addr().String())
+		},
+	}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport}
+
+	slowCtx, cancelSlow := context.WithCancel(context.Background())
+	slowReq, err := http.NewRequestWithContext(slowCtx, http.MethodGet, "http://example.test/slow", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slowResult := make(chan error, 1)
+	go func() {
+		_, requestErr := client.Do(slowReq)
+		slowResult <- requestErr
+	}()
+
+	select {
+	case <-slowStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("slow downstream H2 stream did not start")
+	}
+	cancelSlow()
+	select {
+	case err := <-slowResult:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("canceled downstream H2 request error = %v, want context canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("downstream H2 request did not return after cancellation")
+	}
+	select {
+	case <-slowCanceled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("RST_STREAM did not cancel the downstream stream context")
+	}
+
+	response, err := client.Get("http://example.test/fast")
+	if err != nil {
+		t.Fatalf("second stream on shared downstream H2 connection failed: %v", err)
+	}
+	responseBody, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(responseBody) != "ok" {
+		t.Fatalf("second stream body = %q, want ok", responseBody)
+	}
+	if got := dialCount.Load(); got != 1 {
+		t.Fatalf("HTTP/2 connection count = %d, want 1", got)
+	}
+
+	transport.CloseIdleConnections()
+	select {
+	case err := <-serveDone:
+		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) && !strings.Contains(err.Error(), "EOF") && !strings.Contains(err.Error(), "closed pipe") {
+			t.Fatalf("HTTP/2 server returned unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("HTTP/2 server did not stop after closing the connection")
 	}
 }

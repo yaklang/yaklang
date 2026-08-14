@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,7 +15,7 @@ import (
 )
 
 type http2ConnectionConfig struct {
-	handler      func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)
+	handler      func(context.Context, []byte, io.ReadCloser) ([]byte, io.ReadCloser, error)
 	frame        *http2.Framer
 	conn         net.Conn
 	frWriteMutex *sync.Mutex
@@ -139,6 +140,14 @@ type h2Option func(*http2ConnectionConfig)
 
 func withH2Handler(h func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)) h2Option {
 	return func(c *http2ConnectionConfig) {
+		c.handler = func(_ context.Context, header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
+			return h(header, body)
+		}
+	}
+}
+
+func withH2ContextHandler(h func(context.Context, []byte, io.ReadCloser) ([]byte, io.ReadCloser, error)) h2Option {
+	return func(c *http2ConnectionConfig) {
 		c.handler = h
 	}
 }
@@ -147,7 +156,7 @@ func (c *http2ConnectionConfig) handleRequest(wrapper *h2RequestState, header []
 	if c == nil || c.handler == nil {
 		return utils.Error("h2 server handler config is nil")
 	}
-	header, rc, err := c.handler(header, body)
+	header, rc, err := c.handler(wrapper.ctx, header, body)
 	if err != nil {
 		return utils.Errorf("waiting for userspace handling for h2 stream(%v) failed: %v", wrapper.streamId, err)
 	}

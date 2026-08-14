@@ -2,6 +2,8 @@ package lowhttp
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,6 +21,8 @@ import (
 
 type h2RequestState struct {
 	config *http2ConnectionConfig
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	streamId       int
 	headerHPackBuf *bytes.Buffer
@@ -44,13 +48,14 @@ func (w *h2RequestState) headerDone(req *http.Request, pairs []*ypb.KVPair) erro
 		err := w.emitRequestHeader(req, pairs)
 		if err != nil {
 			log.Errorf("h2 stream(%v) header failed: %s", w.streamId, err)
-			w.Close()
+			_ = w.Close()
 		}
 	}()
 	return nil
 }
 
 func (w *h2RequestState) Close() error {
+	w.cancel()
 	w.bodyReader.Close()
 	w.bodyBuf.Close()
 	return nil
@@ -61,8 +66,11 @@ func newH2RequestState(
 	streamId int, config *http2ConnectionConfig,
 ) *h2RequestState {
 	r, w := utils.NewBufPipe(nil)
+	ctx, cancel := context.WithCancel(context.Background())
 	return &h2RequestState{
 		config:         config,
+		ctx:            ctx,
+		cancel:         cancel,
 		streamId:       int(streamId),
 		headerHPackBuf: new(bytes.Buffer),
 		bodyReader:     r,
@@ -71,6 +79,7 @@ func newH2RequestState(
 }
 
 func (w *h2RequestState) emitRequestHeader(req *http.Request, pairs []*ypb.KVPair) error {
+	defer w.cancel()
 	var buf = new(bytes.Buffer)
 	if req == nil {
 		return utils.Error("h2 server request is nil")
@@ -90,6 +99,9 @@ func (w *h2RequestState) emitRequestHeader(req *http.Request, pairs []*ypb.KVPai
 	buf.WriteString("\r\n\r\n")
 	err := w.config.handleRequest(w, buf.Bytes(), w.bodyReader)
 	if err != nil && err != io.EOF {
+		if w.ctx.Err() != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil
+		}
 		log.Errorf("emitRequestHeader failed: %v", err)
 		if err := w.config.close(); err != nil {
 			log.Errorf("close h2 conn fail:%v", err)
@@ -100,7 +112,7 @@ func (w *h2RequestState) emitRequestHeader(req *http.Request, pairs []*ypb.KVPai
 
 func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 	var config = &http2ConnectionConfig{
-		handler: func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
+		handler: func(context.Context, []byte, io.ReadCloser) ([]byte, io.ReadCloser, error) {
 			return nil, nil, utils.Errorf("h2 config is nil")
 		},
 		wg: new(sync.WaitGroup),
@@ -171,6 +183,12 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 
 	// read settings
 	streamToBuf := new(sync.Map)
+	defer streamToBuf.Range(func(_, value any) bool {
+		if req, ok := value.(*h2RequestState); ok {
+			_ = req.Close()
+		}
+		return true
+	})
 	getReq := func(streamIdU21 uint32) *h2RequestState {
 		streamId := int(streamIdU21)
 		var req *h2RequestState
@@ -338,8 +356,9 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 		case *http2.RSTStreamFrame:
 			// close stream
 			log.Infof("h2 stream-id closed: %v reason: %v", ret.StreamID, ret.ErrCode.String())
-			req := getReq(ret.StreamID)
-			req.Close()
+			if raw, ok := streamToBuf.Load(int(ret.StreamID)); ok {
+				_ = raw.(*h2RequestState).Close()
+			}
 			streamToBuf.Delete(int(ret.StreamID))
 			streamToBuf.Delete(ret.StreamID)
 		case *http2.GoAwayFrame:
@@ -364,4 +383,11 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 
 func ServeHTTP2Connection(conn net.Conn, handler func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)) error {
 	return serveH2(conn, conn, withH2Handler(handler))
+}
+
+// ServeHTTP2ConnectionWithContext gives each downstream HTTP/2 stream its own
+// context. Receiving RST_STREAM cancels only that stream and leaves the shared
+// client connection available for other requests.
+func ServeHTTP2ConnectionWithContext(conn net.Conn, handler func(context.Context, []byte, io.ReadCloser) ([]byte, io.ReadCloser, error)) error {
+	return serveH2(conn, conn, withH2ContextHandler(handler))
 }

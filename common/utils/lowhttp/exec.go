@@ -357,7 +357,15 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 	// ctx
 	if ctx == nil {
-		ctx = context.Background()
+		if reqIns != nil {
+			ctx = reqIns.Context()
+		}
+		if ctx == nil {
+			ctx = context.Background()
+		}
+	}
+	if reqIns != nil {
+		*reqIns = *reqIns.WithContext(ctx)
 	}
 	// fix some field
 	response.Source = source
@@ -789,9 +797,9 @@ RECONNECT:
 		response.RawPacket = responsePacket
 		return response, nil
 	} else if withConnPool {
-		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
+		conn, err = connPool.getIdleConn(ctx, cacheKey, dialopts...)
 	} else {
-		conn, err = netx.DialX(originAddr, dialopts...)
+		conn, err = dialXWithContext(ctx, originAddr, dialopts...)
 	}
 
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
@@ -802,6 +810,9 @@ RECONNECT:
 	oldVersionProxyChecking := false
 	var tryOldVersionProxy []string
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return response, ctxErr
+		}
 		errMsg := err.Error()
 		if strings.Contains(errMsg, `no proxy available`) {
 			noProxyDial := make([]netx.DialXOption, len(dialopts), len(dialopts)+1)
@@ -821,9 +832,9 @@ RECONNECT:
 				}
 				if withConnPool {
 					cacheKey.addr = utils.ExtractHostPort(basicProxy)
-					conn, err = connPool.getIdleConn(cacheKey, noProxyDial...)
+					conn, err = connPool.getIdleConn(ctx, cacheKey, noProxyDial...)
 				} else {
-					conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
+					conn, err = dialXWithContext(ctx, utils.ExtractHostPort(basicProxy), noProxyDial...)
 				}
 				if err != nil {
 					log.Debugf("try old version proxy failed: %s", err)
@@ -868,9 +879,17 @@ RECONNECT:
 					return nil, err
 				}
 			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				h2Stream.abort()
+				return nil, ctxErr
+			}
 
 			currentRPS.Add(1)
 			if err := h2Stream.doRequest(); err != nil {
+				h2Stream.abort()
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return nil, ctxErr
+				}
 				if err == CreateStreamAfterGoAwayErr {
 					pc.closeConn(err)
 					goto RECONNECT
@@ -887,9 +906,12 @@ RECONNECT:
 				traceInfo.ServerTime = time.Now().Sub(serverStart)
 			})
 
-			resp, responsePacket, err := h2Stream.waitResponse(timeout)
+			resp, responsePacket, err := h2Stream.waitResponse(ctx, timeout)
 			_ = resp
 			if err != nil {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return nil, ctxErr
+				}
 				if conn.(*persistConn).shouldRetryRequest(err) {
 					pc.closeConn(err) // close old connection to avoid goroutine leak
 					goto RECONNECT
@@ -954,7 +976,16 @@ RECONNECT:
 			if option != nil && option.BodyStreamReaderHandler != nil {
 				bodyStreamReaderHandled.Set()
 			}
+		case <-ctx.Done():
+			// A pooled HTTP/1 connection has a dedicated read loop waiting for
+			// this response. Close that connection when the individual request is
+			// canceled so the read loop cannot outlive its caller.
+			pc.closeConn(ctx.Err())
+			return nil, ctx.Err()
 		case <-pc.ctx.Done(): // if persistConn closed before read response , check error can retry or not
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
 			if pc.closed == nil {
 				return nil, utils.Error("BUG: closeCh but closed is nil")
 			}
