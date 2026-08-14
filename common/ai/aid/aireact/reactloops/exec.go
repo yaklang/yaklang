@@ -322,7 +322,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	if r.useSpeedPriorityAI {
 		aiCallback = r.config.CallSpeedPriorityAI
 	}
-	var promptRefOnce sync.Once
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -432,7 +431,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							return
 						}
 
-						event, emitErr := boundEmitter.EmitStreamEventWithVizSource(
+						_, emitErr := boundEmitter.EmitStreamEventWithVizSource(
 							defaultNodeId,
 							preparedReader,
 							resp.GetTaskIndex(),
@@ -448,16 +447,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							log.Errorf("EmitStreamEvent for field [%s] failed: %v", key, emitErr)
 							done() // Ensure done is called even on error
 							return
-						}
-
-						// Emit prompt as reference material (only once per transaction)
-						if event != nil && prompt != "" {
-							promptRefOnce.Do(func() {
-								streamId := event.GetContentJSONPath(`$.event_writer_id`)
-								if streamId != "" {
-									boundEmitter.EmitTextReferenceMaterial(streamId, prompt)
-								}
-							})
 						}
 					}),
 			)
