@@ -789,9 +789,9 @@ RECONNECT:
 		response.RawPacket = responsePacket
 		return response, nil
 	} else if withConnPool {
-		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
+		conn, err = connPool.getIdleConn(ctx, cacheKey, dialopts...)
 	} else {
-		conn, err = netx.DialX(originAddr, dialopts...)
+		conn, err = dialXWithContext(ctx, originAddr, dialopts...)
 	}
 
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
@@ -821,7 +821,7 @@ RECONNECT:
 				}
 				if withConnPool {
 					cacheKey.addr = utils.ExtractHostPort(basicProxy)
-					conn, err = connPool.getIdleConn(cacheKey, noProxyDial...)
+					conn, err = connPool.getIdleConn(ctx, cacheKey, noProxyDial...)
 				} else {
 					conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
 				}
@@ -954,6 +954,12 @@ RECONNECT:
 			if option != nil && option.BodyStreamReaderHandler != nil {
 				bodyStreamReaderHandled.Set()
 			}
+		case <-ctx.Done():
+			// A pooled HTTP/1 connection has a dedicated read loop waiting for
+			// this response. Close that connection when the individual request is
+			// canceled so the read loop cannot outlive its caller.
+			pc.closeConn(ctx.Err())
+			return nil, ctx.Err()
 		case <-pc.ctx.Done(): // if persistConn closed before read response , check error can retry or not
 			if pc.closed == nil {
 				return nil, utils.Error("BUG: closeCh but closed is nil")

@@ -943,7 +943,9 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 		return nil
 	}
 
+	stopWatchingDownstream := bindHTTPRequestToDownstream(req, conn, brw.Reader)
 	res, err := p.doHTTPRequest(ctx, req)
+	stopWatchingDownstream()
 	if (err != nil && err != io.EOF) || res == nil {
 		if p.disableBuiltinPage {
 			res = proxyutil.NewResponse(502, nil, req)
@@ -1079,6 +1081,98 @@ func isExpectedDownstreamWriteError(err error) bool {
 		}
 	}
 	return false
+}
+
+const downstreamDisconnectPollInterval = 100 * time.Millisecond
+
+// bindHTTPRequestToDownstream cancels the request context when the client
+// connection closes while the proxy is waiting for the upstream response.
+// Peek observes the connection without consuming a pipelined request byte.
+func bindHTTPRequestToDownstream(req *http.Request, conn net.Conn, reader *bufio.Reader) func() {
+	if req == nil || conn == nil || reader == nil {
+		return func() {}
+	}
+
+	requestCtx, cancelRequest := context.WithCancel(req.Context())
+	*req = *req.WithContext(requestCtx)
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	var deadlineMu sync.Mutex
+
+	go func() {
+		defer close(done)
+
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+
+			deadlineMu.Lock()
+			select {
+			case <-stop:
+				deadlineMu.Unlock()
+				return
+			default:
+			}
+			err := conn.SetReadDeadline(time.Now().Add(downstreamDisconnectPollInterval))
+			deadlineMu.Unlock()
+			if err != nil {
+				cancelRequest()
+				return
+			}
+
+			// Ask for one byte beyond the current buffer. This observes the
+			// underlying connection while preserving pipelined request bytes for
+			// the next proxy loop.
+			peekSize := reader.Buffered() + 1
+			if peekSize > reader.Size() {
+				<-stop
+				return
+			}
+			_, err = reader.Peek(peekSize)
+			if err == nil {
+				continue
+			}
+
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if timeoutErr, ok := err.(net.Error); ok && timeoutErr.Timeout() {
+				continue
+			}
+			if errors.Is(err, bufio.ErrBufferFull) {
+				<-stop
+				return
+			}
+
+			cancelRequest()
+			return
+		}
+	}()
+
+	var stopOnce sync.Once
+	return func() {
+		stopOnce.Do(func() {
+			close(stop)
+
+			// Wake a blocked Peek. Read deadlines do not affect the response
+			// write, and the deadline is cleared before feedback begins.
+			deadlineMu.Lock()
+			_ = conn.SetReadDeadline(time.Now())
+			deadlineMu.Unlock()
+			<-done
+
+			deadlineMu.Lock()
+			_ = conn.SetReadDeadline(time.Time{})
+			deadlineMu.Unlock()
+			cancelRequest()
+		})
+	}
 }
 
 func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 bool) (net.Conn, bool, error) {

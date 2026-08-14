@@ -109,6 +109,7 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	opts := append(
 		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
+		lowhttp.WithContext(req.Context()),
 		lowhttp.WithHttp2(isH2),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithGmTLS(isGmTLS),

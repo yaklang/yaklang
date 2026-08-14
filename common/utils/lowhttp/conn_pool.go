@@ -144,7 +144,7 @@ func addGetIdleConnFinishedCounter() {
 
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
-func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getIdleConn(ctx context.Context, key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
 	//addGetIdleConnRequiredCounter()
 	if l.contextDone() {
 		return nil, utils.Error("lowhttp: context done")
@@ -154,7 +154,7 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 
 	// H2 connections are managed separately and do not consume the H1 semaphore.
 	if key.scheme == H2 {
-		return l.getOrCreateH2Conn(key, opts...)
+		return l.getOrCreateH2Conn(ctx, key, opts...)
 	}
 
 	// 尝试获取复用连接（H1）
@@ -166,7 +166,7 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 	if !l.acquireConnSlot() {
 		return nil, utils.Error("lowhttp: conn pool context done")
 	}
-	pConn, err := newPersistConn(key, l, opts...)
+	pConn, err := newPersistConn(ctx, key, l, opts...)
 	if err != nil {
 		l.releaseConnSlot()
 		// try get idle conn
@@ -188,7 +188,7 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 // Concurrent-stream throttling (SETTINGS_MAX_CONCURRENT_STREAMS) is handled
 // inside newStream via streamsCond.Wait() — this function only needs to check
 // whether the connection itself is still structurally usable.
-func (l *LowHttpConnPool) getOrCreateH2Conn(key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getOrCreateH2Conn(ctx context.Context, key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
 	hash := key.hash()
 
 	// connUsable returns true when the connection can accept new streams.
@@ -213,7 +213,7 @@ func (l *LowHttpConnPool) getOrCreateH2Conn(key *connectKey, opts ...netx.DialXO
 	l.h2Mu.Unlock()
 
 	// Slow path: establish a new H2 connection (no semaphore consumed).
-	pConn, err := newPersistConn(key, l, opts...)
+	pConn, err := newPersistConn(ctx, key, l, opts...)
 	if err != nil {
 		// Another goroutine may have concurrently established a usable connection.
 		l.h2Mu.Lock()
@@ -532,10 +532,54 @@ func (es *bodyEOFSignal) condfn(err error) error {
 	return err
 }
 
-func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
+type dialXResult struct {
+	conn net.Conn
+	err  error
+}
+
+// dialXWithContext lets an individual request stop waiting for connection
+// establishment even though DialX's legacy dialer interface has no context
+// parameter. A connection that completes after cancellation is closed instead
+// of being returned to the pool.
+func dialXWithContext(ctx context.Context, target string, opt ...netx.DialXOption) (net.Conn, error) {
+	if ctx == nil || ctx.Done() == nil {
+		return netx.DialX(target, opt...)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	resultCh := make(chan dialXResult)
+	go func() {
+		conn, err := netx.DialX(target, opt...)
+		result := dialXResult{conn: conn, err: err}
+		select {
+		case resultCh <- result:
+		case <-ctx.Done():
+			if conn != nil {
+				_ = conn.Close()
+			}
+		}
+	}()
+
+	select {
+	case result := <-resultCh:
+		if err := ctx.Err(); err != nil {
+			if result.conn != nil {
+				_ = result.conn.Close()
+			}
+			return nil, err
+		}
+		return result.conn, result.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func newPersistConn(ctx context.Context, key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
 	needProxy := len(key.proxy) > 0
 	opt = append(opt, netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
-	newConn, err := netx.DialX(key.addr, opt...)
+	newConn, err := dialXWithContext(ctx, key.addr, opt...)
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +628,7 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 			return pc, nil
 		} else { // preface fail downgrade
 			key.scheme = H1
-			newH1Conn, err := netx.DialX(key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
+			newH1Conn, err := dialXWithContext(ctx, key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
 			if err != nil {
 				return nil, err
 			}

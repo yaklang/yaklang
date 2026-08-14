@@ -149,6 +149,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}()
 
 	var mServer *crep.MITMServer
+	var streamSendMu sync.Mutex
 
 	send := func(rsp *ypb.MITMV2Response) (sendError error) {
 		defer func() {
@@ -159,6 +160,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 
+		streamSendMu.Lock()
+		defer streamSendMu.Unlock()
 		sendError = stream.Send(safeUTF8MITMV2Resp(rsp))
 		return
 	}
@@ -382,6 +385,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
+	pipelineTracker := newMITMPipelineTracker(ksuid.New().String())
 
 	log.Infof("start to create mitm server instance for %v", addr)
 
@@ -877,6 +881,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) (hijackRsp []byte) {
+		pipelineTracker.upstreamCompleted(req)
 		pluginCtx := httpctx.GetPluginContext(req)
 		urlStr := httpctx.GetRequestURL(req)
 
@@ -1026,6 +1031,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
 
+		pipelineTracker.manualWaitStarted(req, true)
+		defer pipelineTracker.manualWaitFinished(req, true)
 		sendPacket := taskInfo.Response
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
@@ -1193,6 +1200,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) (hijackReq []byte) {
+		pipelineTracker.requestObserved(originReqIns)
+		defer func() {
+			if hijackReq == nil || httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+				pipelineTracker.requestDropped(originReqIns)
+				return
+			}
+			pipelineTracker.requestDispatched(originReqIns, httpctx.GetShouldMockResponse(originReqIns))
+		}()
 		if httpctx.GetContextAnyFromRequest(originReqIns, mitmRequestHijackAtTimingKey) == nil {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, mitmRequestHijackAtTimingKey, time.Now().UnixMilli())
 		}
@@ -1385,6 +1400,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		taskInfo := task.infoMessage
+		pipelineTracker.manualWaitStarted(originReqIns, false)
+		defer pipelineTracker.manualWaitFinished(originReqIns, false)
 
 		// Capture encoding from wire packet; UI shows plain (or truncated plain for oversized bodies).
 		if viewReq, st, ok := lowhttp.AutoUnzipPacketEncoding(wireReq); ok && st != nil {
@@ -1470,6 +1487,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						RequestHijackAtUnixMs: requestHijackAt,
 						FlowBuiltAtUnixMs:     time.Now().UnixMilli(),
 					}
+					pipelineTracker.flowBuilt()
+					pipelineTracker.persistEnqueued(flow)
+					persisted := false
 					for i := 0; i < 3; i++ {
 						startCreateFlow = time.Now()
 						// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
@@ -1480,8 +1500,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 							time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
 							continue
 						}
+						persisted = true
 						break
 					}
+					pipelineTracker.persistFinished(flow, persisted)
 					return nil
 				}
 
@@ -1521,6 +1543,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
 		responseMirrorAtUnixMs := time.Now().UnixMilli()
+		// Filtered responses skip the response-hijack callback, so mirror is also
+		// the fallback terminal point for their upstream stage.
+		pipelineTracker.upstreamCompleted(req)
+		pipelineTracker.responseMirrored(req)
+		defer pipelineTracker.responseProcessingFinished(req)
 		addCounter()
 
 		// 不符合劫持条件就不劫持
@@ -1669,6 +1696,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			FlowBuiltAtUnixMs:      time.Now().UnixMilli(),
 		}
 		flow.RuntimeTiming = runtimeTiming
+		pipelineTracker.flowBuilt()
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
 		// 额外，获取进程名
@@ -1803,6 +1831,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			// A hijackSaveHTTPFlow plugin may replace the public flow model. Keep
 			// process-local diagnostics owned by the engine and out of plugin data.
 			flow.RuntimeTiming = runtimeTiming
+			pipelineTracker.persistEnqueued(flow)
+			flow.AfterPersistCleanups = append(flow.AfterPersistCleanups, func(saved *schema.HTTPFlow) {
+				pipelineTracker.persistFinished(saved, saved != nil && saved.ID > 0)
+			})
 			// 额外添加用户手动设置的标签，确保其优先级最高
 			userTags := httpctx.GetFlowTags(req)
 			if len(userTags) > 0 {
@@ -1917,6 +1949,25 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	recoverFilterAndReplacerSend()
 	// 发送第二个来设置 replacer
 	recoverFilterAndReplacerSend()
+
+	sendPipelineStats := func() {
+		sendLogged(&ypb.MITMV2Response{
+			PipelineStats: pipelineTracker.snapshot(len(yakit.DBSaveAsyncChannel), cap(yakit.DBSaveAsyncChannel)),
+		})
+	}
+	sendPipelineStats()
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-streamCtx.Done():
+				return
+			case <-ticker.C:
+				sendPipelineStats()
+			}
+		}
+	}()
 
 	extraPorts := firstReq.GetExtraPorts()
 	if len(extraPorts) == 0 {
