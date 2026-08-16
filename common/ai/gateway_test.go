@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,6 +20,12 @@ import (
 	"testing"
 	"time"
 )
+
+func TestExportsReasoningEffortOption(t *testing.T) {
+	option, ok := Exports["reasoningEffort"]
+	require.True(t, ok)
+	require.IsType(t, (func(string) aispec.AIConfigOption)(nil), option)
+}
 
 func TestDashscope_Search(t *testing.T) {
 	if utils.InGithubActions() {

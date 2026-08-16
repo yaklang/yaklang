@@ -40,12 +40,13 @@ func TestBuildModelThinkingReplayProjection(t *testing.T) {
 		` {"@action":"finish"} `,
 	)
 	require.NoError(t, err)
-	require.Contains(t, projection, "<|TIMELINE_MODEL_THINKING_turnbadnonce1|>")
+	require.Contains(t, projection, "<|TIMELINE_MODEL_THINKING_V1_turnbadnonce1|>")
 	result, err := aitag.SplitViaTAG(projection, timelineModelThinkingReplayTagName)
 	require.NoError(t, err)
 	require.Len(t, result.GetTaggedBlocks(), 1)
 	var replay modelThinkingReplayRecord
 	require.NoError(t, json.Unmarshal([]byte(result.GetTaggedBlocks()[0].Content), &replay))
+	require.Equal(t, timelineModelThinkingReplayVersion, replay.Version)
 	require.Equal(t, "reasoning body", replay.ReasoningContent)
 	require.Equal(t, ` {"@action":"finish"} `, replay.Content)
 }

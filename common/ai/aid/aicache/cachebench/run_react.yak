@@ -44,6 +44,8 @@ aiType     = cli.String("ai-type", cli.setDefault("aibalance"),
     cli.setHelp("aim.aiConfig 的第一个参数, 选 aispec 注册的 provider 名 (aibalance/openai/...)"))
 aiModel    = cli.String("ai-model", cli.setDefault(""),
     cli.setHelp("可选, 强制覆盖 chater 默认 model (aibalance 多模型路由建议留空)"))
+reasoningEffort = cli.String("reasoning-effort", cli.setDefault(""),
+    cli.setHelp("可选, 透传 reasoning_effort (low/medium/high); 留空保持模型默认"))
 timeoutSec = cli.Int("timeout", cli.setDefault(60*20),
     cli.setHelp("aim.InvokeReAct 与单次 LLM 调用超时, 默认 1200 秒"))
 maxIter    = cli.Int("max-iteration", cli.setDefault(15),
@@ -100,8 +102,8 @@ if sessionID == "" {
     sessionID = sprintf("cachebench-%d-%d", time.Now().Unix(), os.Getpid())
 }
 
-log.info("aicache cachebench - input=%s ai-type=%s session-id=%s disable-plan=%v max-iteration=%d max-prompts=%d max-intelligent-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v fatal-error-threshold=%d",
-    inputText, aiType, sessionID, disablePlan, maxIter, maxPrompts, maxIntelligentPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError, fatalErrorThreshold)
+log.info("aicache cachebench - input=%s ai-type=%s ai-model=%s reasoning-effort=%s session-id=%s disable-plan=%v max-iteration=%d max-prompts=%d max-intelligent-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v fatal-error-threshold=%d",
+    inputText, aiType, aiModel, reasoningEffort, sessionID, disablePlan, maxIter, maxPrompts, maxIntelligentPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError, fatalErrorThreshold)
 
 // =============================================================================
 // 取消上下文 (用于 max-prompts 限流 / max-duration 时间硬截断)
@@ -486,6 +488,9 @@ aiOpts = [ai.usageCallback(captureUsage), ai.timeout(timeoutSec)]
 if aiModel != "" {
     aiOpts = append(aiOpts, ai.model(aiModel))
 }
+if reasoningEffort != "" {
+    aiOpts = append(aiOpts, ai.reasoningEffort(reasoningEffort))
+}
 
 invokeStart = time.Now()
 invokeStartUnix = invokeStart.Unix()
@@ -495,6 +500,12 @@ err = aim.InvokeReAct(
     inputText,
     aim.context(benchCtx),
     aim.aiConfig(aiType, aiOpts...),
+    // ReAct enables tiered routing by default. aiConfig only overrides the
+    // original callback, so the main intelligent loop would otherwise keep
+    // using the globally configured model and make --ai-model a false A/B.
+    // Override the quality tier explicitly while leaving lightweight calls on
+    // their configured model.
+    aim.qualityPriorityAIConfig(aiType, aiOpts...),
     aim.sessionID(sessionID),
     aim.timeout(timeoutSec),
     aim.maxIteration(maxIter),
@@ -568,6 +579,7 @@ benchReport = analyzeBenchmarkWithModels(sessionDir, usageList, modelList, event
 benchReport["durationSec"] = durationSec
 benchReport["aiType"] = aiType
 benchReport["aiModel"] = aiModel
+benchReport["reasoningEffort"] = reasoningEffort
 benchReport["maxIteration"] = maxIter
 benchReport["disablePlan"] = disablePlan
 benchReport["maxPrompts"] = maxPrompts

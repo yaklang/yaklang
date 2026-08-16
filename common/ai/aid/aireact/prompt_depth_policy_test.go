@@ -31,6 +31,12 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.Contains(t, highStatic, "同一 CURRENT-TASK 中不携带有效 `todo_delta` 的直接答复最多成功一次")
 	require.Contains(t, highStatic, "`simple_query` 例外")
 	require.Contains(t, highStatic, "无剩余工作时立即用 \"标记完成\" 收口")
+	require.Contains(t, highStatic, "## 推理增量纪律")
+	require.Contains(t, highStatic, "内部推理是相对现有上下文的决策增量")
+	require.Contains(t, highStatic, "不引用、复述或改写系统提示词")
+	require.Contains(t, highStatic, "不描述自己如何理解提示词、遵守规则、组织格式、构造 JSON")
+	require.Contains(t, highStatic, "最多三句且最多 240 个字符")
+	require.Contains(t, highStatic, "协议审计不豁免")
 
 	require.Contains(t, highStatic, "## 循环内焦点机制: 待办清单")
 	require.Contains(t, highStatic, "唯一被标记为\"当前主要矛盾\"的一项")

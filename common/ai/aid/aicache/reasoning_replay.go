@@ -3,16 +3,26 @@ package aicache
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-const timelineModelThinkingReplayTagName = "TIMELINE_MODEL_THINKING"
+const (
+	timelineModelThinkingReplayTagName       = "TIMELINE_MODEL_THINKING_V1"
+	legacyTimelineModelThinkingReplayTagName = "TIMELINE_MODEL_THINKING"
+	timelineModelThinkingReplayVersion       = 1
+)
 
 type modelThinkingReplayRecord struct {
+	Version          int    `json:"v"`
+	ReasoningContent string `json:"reasoning_content"`
+	Content          string `json:"content"`
+}
+
+type legacyModelThinkingReplayRecord struct {
 	ReasoningContent string `json:"reasoning_content"`
 	Content          string `json:"content"`
 }
@@ -23,9 +33,11 @@ type reasoningReplayPart struct {
 }
 
 // expandReasoningReplayMessages converts internal TIMELINE_MODEL_THINKING
-// markers inside user messages into standard assistant messages. Conversion is
-// atomic: a malformed marker, invalid payload, or unsafe terminal assistant
-// leaves the complete original message list untouched.
+// markers inside user messages into standard assistant messages. Malformed or
+// untrusted marker-like text is isolated as ordinary user content so one bad
+// Timeline item cannot suppress later valid replay records. Conversion still
+// fails closed when cache-control ownership cannot be preserved or when the
+// transformed request would end in an assistant message.
 func expandReasoningReplayMessages(result *aispec.ChatBaseMirrorResult) *aispec.ChatBaseMirrorResult {
 	if result == nil || !result.IsHijacked || len(result.Messages) == 0 {
 		return result
@@ -80,46 +92,196 @@ func expandReasoningReplayUserMessage(message aispec.ChatDetail) ([]aispec.ChatD
 }
 
 func splitReasoningReplayText(input string) ([]reasoningReplayPart, bool, error) {
-	result, err := aitag.SplitViaTAG(input, timelineModelThinkingReplayTagName)
-	if err != nil {
-		return nil, false, err
-	}
-	if result == nil {
-		return nil, false, nil
-	}
-
-	parts := make([]reasoningReplayPart, 0, result.Len())
+	parts := make([]reasoningReplayPart, 0, 4)
 	found := false
-	for _, block := range result.GetOrderedBlocks() {
-		if block == nil {
-			continue
+	textStart := 0
+	searchFrom := 0
+	for searchFrom < len(input) {
+		markerStart, tagName, legacy := nextReasoningReplayCandidate(input, searchFrom)
+		if markerStart < 0 {
+			break
 		}
-		if block.IsText() {
-			if block.Content != "" {
-				parts = append(parts, reasoningReplayPart{text: block.Content})
-			}
+		markerPrefix := "<|" + tagName + "_"
+		// Prompt projections are emitted as standalone lines. Protocol literals
+		// outside a Timeline-owned container, or inside source code/diffs/prose,
+		// must remain ordinary text rather than becoming an assistant message.
+		if (markerStart > 0 && input[markerStart-1] != '\n' && !(found && markerStart == textStart)) ||
+			!isInsideReasoningReplayContainer(input, markerStart) ||
+			(legacy && !hasLegacyModelThinkingHeader(input, markerStart)) {
+			searchFrom = markerStart + len(markerPrefix)
 			continue
-		}
-		if strings.Contains(block.Content, "<|"+timelineModelThinkingReplayTagName+"_") {
-			return nil, false, fmt.Errorf("nested %s marker is not allowed", timelineModelThinkingReplayTagName)
 		}
 
-		var replay modelThinkingReplayRecord
-		if err := json.Unmarshal([]byte(block.Content), &replay); err != nil {
-			return nil, false, fmt.Errorf("decode %s payload: %w", timelineModelThinkingReplayTagName, err)
+		openEndRelative := strings.Index(input[markerStart:], "|>")
+		if openEndRelative < 0 {
+			break
 		}
-		if strings.Contains(replay.ReasoningContent, "<|"+timelineModelThinkingReplayTagName+"_") ||
-			strings.Contains(replay.Content, "<|"+timelineModelThinkingReplayTagName+"_") {
-			return nil, false, fmt.Errorf("nested %s marker is not allowed", timelineModelThinkingReplayTagName)
+		openEnd := markerStart + openEndRelative + len("|>")
+		nonce := input[markerStart+len(markerPrefix) : markerStart+openEndRelative]
+		if !isReasoningReplayNonce(nonce) || openEnd >= len(input) || input[openEnd] != '\n' {
+			searchFrom = markerStart + len(markerPrefix)
+			continue
 		}
-		if strings.TrimSpace(replay.ReasoningContent) == "" || strings.TrimSpace(replay.Content) == "" {
-			return nil, false, fmt.Errorf("%s payload requires non-empty reasoning_content and content", timelineModelThinkingReplayTagName)
+
+		endMarker := "\n<|" + tagName + "_END_" + nonce + "|>"
+		payloadStart := openEnd + 1
+		endRelative := strings.Index(input[payloadStart:], endMarker)
+		if endRelative < 0 {
+			searchFrom = markerStart + len(markerPrefix)
+			continue
+		}
+		payloadEnd := payloadStart + endRelative
+		payload := input[payloadStart:payloadEnd]
+		if strings.Contains(payload, "<|TIMELINE_MODEL_THINKING") {
+			searchFrom = markerStart + len(markerPrefix)
+			continue
+		}
+
+		replay, ok := decodeReasoningReplayPayload(payload, legacy)
+		if !ok {
+			searchFrom = markerStart + len(markerPrefix)
+			continue
+		}
+		if markerStart > textStart {
+			parts = append(parts, reasoningReplayPart{text: input[textStart:markerStart]})
 		}
 		assistant := aispec.NewAssistantChatDetailWithReasoningContent(replay.Content, replay.ReasoningContent)
 		parts = append(parts, reasoningReplayPart{assistant: &assistant})
 		found = true
+		textStart = payloadEnd + len(endMarker)
+		searchFrom = textStart
+	}
+	if !found {
+		return nil, false, nil
+	}
+	if textStart < len(input) {
+		parts = append(parts, reasoningReplayPart{text: input[textStart:]})
 	}
 	return parts, found, nil
+}
+
+func nextReasoningReplayCandidate(input string, searchFrom int) (int, string, bool) {
+	currentPrefix := "<|" + timelineModelThinkingReplayTagName + "_"
+	legacyPrefix := "<|" + legacyTimelineModelThinkingReplayTagName + "_"
+	currentAt := strings.Index(input[searchFrom:], currentPrefix)
+	legacyAt := strings.Index(input[searchFrom:], legacyPrefix)
+	if currentAt < 0 && legacyAt < 0 {
+		return -1, "", false
+	}
+	if currentAt >= 0 && (legacyAt < 0 || currentAt <= legacyAt) {
+		return searchFrom + currentAt, timelineModelThinkingReplayTagName, false
+	}
+	return searchFrom + legacyAt, legacyTimelineModelThinkingReplayTagName, true
+}
+
+func decodeReasoningReplayPayload(payload string, legacy bool) (modelThinkingReplayRecord, bool) {
+	if legacy {
+		var old legacyModelThinkingReplayRecord
+		if !decodeStrictReplayJSON(payload, &old) {
+			return modelThinkingReplayRecord{}, false
+		}
+		return modelThinkingReplayRecord{
+			Version:          timelineModelThinkingReplayVersion,
+			ReasoningContent: old.ReasoningContent,
+			Content:          old.Content,
+		}, strings.TrimSpace(old.ReasoningContent) != "" && strings.TrimSpace(old.Content) != ""
+	}
+
+	var replay modelThinkingReplayRecord
+	if !decodeStrictReplayJSON(payload, &replay) || replay.Version != timelineModelThinkingReplayVersion {
+		return modelThinkingReplayRecord{}, false
+	}
+	return replay, strings.TrimSpace(replay.ReasoningContent) != "" && strings.TrimSpace(replay.Content) != ""
+}
+
+func decodeStrictReplayJSON(payload string, target any) bool {
+	decoder := json.NewDecoder(strings.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return false
+	}
+	return decoder.Decode(&struct{}{}) == io.EOF
+}
+
+func isInsideReasoningReplayContainer(input string, markerStart int) bool {
+	if markerStart < 0 || markerStart > len(input) {
+		return false
+	}
+	for _, container := range []struct {
+		openPrefix string
+		fixedNonce string
+	}{
+		{openPrefix: "<|TIMELINE_b"},
+		{openPrefix: "<|TIMELINE_RECENT|>", fixedNonce: "RECENT"},
+	} {
+		searchFrom := 0
+		for searchFrom < markerStart {
+			relative := strings.Index(input[searchFrom:markerStart], container.openPrefix)
+			if relative < 0 {
+				break
+			}
+			openStart := searchFrom + relative
+			searchFrom = openStart + len(container.openPrefix)
+			if openStart > 0 && input[openStart-1] != '\n' {
+				continue
+			}
+
+			nonce := container.fixedNonce
+			openEnd := openStart + len(container.openPrefix)
+			if nonce == "" {
+				relativeEnd := strings.Index(input[openStart:], "|>")
+				if relativeEnd < 0 {
+					continue
+				}
+				openEnd = openStart + relativeEnd + len("|>")
+				nonce = input[openStart+len("<|TIMELINE_") : openStart+relativeEnd]
+				if !isReasoningReplayNonce(nonce) || !strings.HasPrefix(nonce, "b") {
+					continue
+				}
+			}
+			if openEnd >= len(input) || input[openEnd] != '\n' || markerStart <= openEnd {
+				continue
+			}
+			endMarker := "\n<|TIMELINE_END_" + nonce + "|>"
+			endRelative := strings.Index(input[openEnd+1:], endMarker)
+			if endRelative < 0 {
+				continue
+			}
+			endStart := openEnd + 1 + endRelative
+			if markerStart < endStart {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasLegacyModelThinkingHeader(input string, markerStart int) bool {
+	if markerStart <= 0 {
+		return false
+	}
+	before := strings.TrimSuffix(input[:markerStart], "\n")
+	lineStart := strings.LastIndex(before, "\n") + 1
+	lastLine := strings.TrimSpace(before[lineStart:])
+	if !strings.Contains(strings.ToLower(lastLine), "[model_thinking]") {
+		return false
+	}
+	// Full Timeline rendering has an additional typed entry header. The recent
+	// lightweight projection only has the model_thinking line, so that line is
+	// the minimum compatibility proof accepted for persisted legacy records.
+	return true
+}
+
+func isReasoningReplayNonce(nonce string) bool {
+	if nonce == "" || strings.HasPrefix(nonce, "END_") {
+		return false
+	}
+	for _, char := range nonce {
+		if (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') && (char < '0' || char > '9') {
+			return false
+		}
+	}
+	return true
 }
 
 func buildStringReplayMessages(source aispec.ChatDetail, parts []reasoningReplayPart) []aispec.ChatDetail {
