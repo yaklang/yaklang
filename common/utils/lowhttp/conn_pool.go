@@ -702,9 +702,11 @@ func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpCo
 }
 
 func (pc *persistConn) h2Conn() {
+	chromeFingerprint := pc.cacheKey != nil && pc.cacheKey.chromeFingerprint
 	newH2Conn := &http2ClientConn{
 		conn:              pc.conn,
 		ctx:               pc.p.ctx,
+		chromeFingerprint: chromeFingerprint,
 		mu:                new(sync.Mutex),
 		streams:           make(map[uint32]*http2ClientStream),
 		currentStreamID:   1,
@@ -1276,10 +1278,13 @@ type connectKey struct {
 	clientHelloSpec *utls.ClientHelloSpec
 	sni             string
 	strongHost      string
+	// chromeFingerprint 开启后 h2 连接使用 Chrome 的 SETTINGS 与帧行为，
+	// 与默认行为的连接不可互相复用
+	chromeFingerprint bool
 }
 
 func (c *connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni, c.strongHost)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni, c.strongHost, c.chromeFingerprint)
 }
 
 type connLRU struct {

@@ -57,6 +57,10 @@ type http2ClientConn struct {
 	headerListMaxSize uint32
 	connWindowControl *windowSizeControl
 
+	// chromeFingerprint 开启后，SETTINGS、WINDOW_UPDATE、伪头顺序与
+	// HEADERS 帧标志均按 Chrome 的行为发送
+	chromeFingerprint bool
+
 	full         bool
 	readGoAway   bool
 	lastStreamID uint32
@@ -253,13 +257,25 @@ func (h2Conn *http2ClientConn) preface() error {
 	if err != nil {
 		return utils.Wrapf(err, "write h2 preface failed")
 	}
-	h2Conn.frWriteMutex.Lock()
-	err = h2Conn.fr.WriteSettings([]http2.Setting{
+	settings := []http2.Setting{
 		{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
 		{ID: http2.SettingMaxFrameSize, Val: defaultMaxFrameSize},
 		{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
 		{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
-	}...)
+	}
+	connWindowIncrease := defaultStreamReceiveWindowSize - 65535
+	if h2Conn.chromeFingerprint {
+		settings = []http2.Setting{
+			{ID: http2.SettingHeaderTableSize, Val: defaultHeaderTableSize},
+			{ID: http2.SettingEnablePush, Val: 0},
+			{ID: http2.SettingInitialWindowSize, Val: chromeH2InitialWindowSize},
+			{ID: http2.SettingMaxHeaderListSize, Val: chromeH2MaxHeaderListSize},
+		}
+		connWindowIncrease = chromeH2ConnWindowIncrement
+	}
+
+	h2Conn.frWriteMutex.Lock()
+	err = h2Conn.fr.WriteSettings(settings...)
 	if err != nil {
 		h2Conn.frWriteMutex.Unlock()
 		return utils.Wrapf(err, "write h2 setting failed")
@@ -267,7 +283,6 @@ func (h2Conn *http2ClientConn) preface() error {
 	// Increase connection-level flow control window from default 65535 to our desired size.
 	// RFC 7540 Section 6.9.2: SETTINGS only affects stream-level windows.
 	// Connection window must be increased via WINDOW_UPDATE.
-	connWindowIncrease := defaultStreamReceiveWindowSize - 65535
 	if connWindowIncrease > 0 {
 		err = h2Conn.fr.WriteWindowUpdate(0, uint32(connWindowIncrease))
 	}
@@ -602,6 +617,9 @@ func (cs *http2ClientStream) doRequest() error {
 			}
 		}
 	})
+	if cs.h2Conn.chromeFingerprint {
+		requestHeaders = reorderChromePseudoHeaders(requestHeaders)
+	}
 	for _, h := range requestHeaders {
 		hPackEnc.WriteField(h)
 	}
@@ -616,13 +634,20 @@ func (cs *http2ClientStream) doRequest() error {
 			hdrs = hdrs[len(chunk):]
 			endHeaders := len(hdrs) == 0
 			if first {
-				//endStream = endStream && endHeaders
-				err := frame.WriteHeaders(http2.HeadersFrameParam{ // some server not accept endStream flag in headers frame
+				param := http2.HeadersFrameParam{
 					StreamID:      streamID,
 					BlockFragment: chunk,
-					//EndStream:     endStream,
-					EndHeaders: endHeaders,
-				})
+					EndStream:     endStream,
+					EndHeaders:    endHeaders,
+				}
+				if cs.h2Conn.chromeFingerprint {
+					param.Priority = http2.PriorityParam{
+						StreamDep: 0,
+						Exclusive: true,
+						Weight:    chromeH2HeadersWeight - 1,
+					}
+				}
+				err := frame.WriteHeaders(param)
 				first = false
 				if err != nil {
 					return err
@@ -664,7 +689,8 @@ func (cs *http2ClientStream) doRequest() error {
 		cs.h2Conn.full = true
 	}
 	// activeStreams was already incremented in newStream when the slot was reserved.
-	err := h2HeaderWriter(fr, cs.ID, false, maxFrameSize, hPackBuf.Bytes())
+	endStreamOnHeaders := cs.h2Conn.chromeFingerprint && len(body) == 0
+	err := h2HeaderWriter(fr, cs.ID, endStreamOnHeaders, maxFrameSize, hPackBuf.Bytes())
 	cs.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
 		// Check if error is due to closed connection, which should trigger retry
@@ -695,7 +721,7 @@ func (cs *http2ClientStream) doRequest() error {
 				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
 			}
 		}
-	} else {
+	} else if !endStreamOnHeaders {
 		//if !cs.sentEndStream {
 		cs.h2Conn.frWriteMutex.Lock()
 		dataFrameErr := fr.WriteData(cs.ID, true, []byte{})
