@@ -92,14 +92,13 @@ func cloneTextTimelineItemForPrompt(item *TimelineItem, textItem *TextTimelineIt
 }
 
 func projectTimelineItemsForPrompt(items []*TimelineItem) []*TimelineItem {
-	return projectTimelineItemsForPromptWithLatestModelReplay(items, 0)
+	return projectTimelineItemsForPromptWithModelReplay(items, false)
 }
 
-func projectTimelineItemsForPromptWithLatestModelReplay(items []*TimelineItem, latestReplayID int64) []*TimelineItem {
+func projectTimelineItemsForPromptWithModelReplay(items []*TimelineItem, includeModelReplay bool) []*TimelineItem {
 	projected := make([]*TimelineItem, 0, len(items))
 	for _, item := range items {
-		allowReplay := latestReplayID > 0 && item != nil && item.GetID() == latestReplayID
-		if promptItem := projectTimelineItemForPromptWithModelReplay(item, allowReplay); promptItem != nil {
+		if promptItem := projectTimelineItemForPromptWithModelReplay(item, includeModelReplay); promptItem != nil {
 			projected = append(projected, promptItem)
 		}
 	}
@@ -114,31 +113,15 @@ func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) T
 }
 
 // projectTimelineRenderableBlocksForPromptWithLatestModelReplay preserves the
-// existing bucket topology while allowing exactly the newest successful model
-// replay record into the prompt. Older model thinking remains UI-only.
+// existing bucket topology while allowing every successful model replay still
+// present in the visible frozen/open interval blocks into the prompt. Existing
+// compressed heads remain untouched, so reduced or evicted items are not
+// reconstructed here.
 func projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
 	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, true)
 }
 
-func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRenderableBlocks, includeLatestReplay bool) TimelineRenderableBlocks {
-	var latestReplayID int64
-	if includeLatestReplay {
-		for _, block := range blocks {
-			interval, ok := block.(*TimelineIntervalBlock)
-			if !ok || interval == nil {
-				continue
-			}
-			for _, item := range interval.Items {
-				textItem, ok := timelineTextItem(item)
-				if !ok || strings.TrimSpace(textItem.PromptText) == "" || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "MODEL_THINKING" {
-					continue
-				}
-				if id := item.GetID(); id > latestReplayID {
-					latestReplayID = id
-				}
-			}
-		}
-	}
+func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRenderableBlocks, includeModelReplay bool) TimelineRenderableBlocks {
 	projected := make(TimelineRenderableBlocks, 0, len(blocks))
 	for _, block := range blocks {
 		switch typed := block.(type) {
@@ -147,7 +130,7 @@ func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRend
 				continue
 			}
 			copyBlock := *typed
-			copyBlock.Items = projectTimelineItemsForPromptWithLatestModelReplay(typed.Items, latestReplayID)
+			copyBlock.Items = projectTimelineItemsForPromptWithModelReplay(typed.Items, includeModelReplay)
 			projected = append(projected, &copyBlock)
 		default:
 			// Existing compressed heads are historical facts. Rewriting them here
