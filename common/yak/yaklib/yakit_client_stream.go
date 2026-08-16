@@ -47,7 +47,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 		if err := recover(); err != nil {
 			log.Errorf("stream panic: %v", err)
 		}
-		err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+		err := c.YakitLog("stream", "%s", string(utils.Jsonify(map[string]any{
 			"type":       "stream",
 			"action":     "stop",
 			"streamType": streamType,
@@ -66,7 +66,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+		err := c.YakitLog("stream", "%s", string(utils.Jsonify(map[string]any{
 			"type":       "stream",
 			"action":     "start",
 			"streamType": streamType,
@@ -80,7 +80,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 		var buf = bytes.NewBufferString("")
 		defer func() {
 			if buf.Len() > 0 {
-				err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+				err := c.YakitLog("stream", "%s", string(utils.Jsonify(map[string]any{
 					"action":     "data",
 					"data":       buf.String(),
 					"streamId":   streamId,
@@ -106,7 +106,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 				buf.WriteString(msg)
 			default:
 				if buf.Len() > 0 && time.Now().UnixMilli()-lastTimeMS > 200 {
-					err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+					err := c.YakitLog("stream", "%s", string(utils.Jsonify(map[string]any{
 						"action":     "data",
 						"data":       buf.String(),
 						"streamId":   streamId,

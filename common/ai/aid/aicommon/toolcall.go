@@ -1146,13 +1146,13 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 				}
 				message := fmt.Sprintf("tool[%s] generated mismatched AITAG nonce, expected=%s observed=%s", tool.Name, promptMeta.Nonce, strings.Join(parts, ", "))
 				log.Warn(message)
-				emitter.EmitWarning(message)
+				emitter.EmitWarning("%s", message)
 			}
 
 			if recovered, reason := recoverSingleMismatchedAITagParam(invokeParams, rawAIResponse, promptMeta.Nonce, promptMeta.ParamNames, mergedAITagParams); recovered != nil {
 				message := fmt.Sprintf("tool[%s] recovered single AITAG param[%s] from mismatched nonce[%s], expected nonce[%s]", tool.Name, recovered.ParamName, recovered.Nonce, promptMeta.Nonce)
 				log.Warn(message)
-				emitter.EmitWarning(message)
+				emitter.EmitWarning("%s", message)
 			} else if len(mismatched) > 0 {
 				log.Debugf("tool[%s] skipped AITAG nonce fallback: %s", tool.Name, reason)
 			}

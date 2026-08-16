@@ -21,10 +21,10 @@ func newAILocalModelOperation(
 	targetNodeID string,
 ) *aiv1.AILocalModelOperation {
 	return &aiv1.AILocalModelOperation{
-		OperationId: strings.TrimSpace(operationID),
-		Kind:        strings.TrimSpace(kind),
-		ModelName:   strings.TrimSpace(modelName),
-		Title:       strings.TrimSpace(title),
+		OperationId:  strings.TrimSpace(operationID),
+		Kind:         strings.TrimSpace(kind),
+		ModelName:    strings.TrimSpace(modelName),
+		Title:        strings.TrimSpace(title),
 		TargetNodeId: strings.TrimSpace(targetNodeID),
 	}
 }
@@ -625,7 +625,7 @@ func ensureLocalModelGeneralResponse(response *ypb.GeneralResponse) error {
 		if reason == "" {
 			reason = "local model operation failed"
 		}
-		return fmt.Errorf(reason)
+		return fmt.Errorf("%s", reason)
 	default:
 		return nil
 	}
@@ -710,7 +710,7 @@ func newLocalModelExecStream(ctx context.Context, onEvent func(*ypb.ExecResult))
 	return &localModelExecStream{ctx: ctx, onEvent: onEvent}
 }
 
-func (s *localModelExecStream) SetHeader(metadata.MD) error { return nil }
+func (s *localModelExecStream) SetHeader(metadata.MD) error  { return nil }
 func (s *localModelExecStream) SendHeader(metadata.MD) error { return nil }
 func (s *localModelExecStream) SetTrailer(metadata.MD)       {}
 func (s *localModelExecStream) Context() context.Context     { return s.ctx }

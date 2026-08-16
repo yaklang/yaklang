@@ -45,7 +45,7 @@ func (t *T3Paylaod) debugf(format string, args ...interface{}) {
 }
 
 func (t *T3Paylaod) debug(format string) {
-	t.debugf(format)
+	t.debugf("%s", format)
 }
 
 func (t *T3Paylaod) Exec(cmd string) (_ string, err error) {

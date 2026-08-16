@@ -224,7 +224,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			proxys = append(proxys, proxyUrl.String())
 		}
 		if len(proxys) == 0 && len(proxyErrors) > 0 {
-			return nil, utils.Errorf(strings.Join(proxyErrors, "; "))
+			return nil, utils.Errorf("%s", strings.Join(proxyErrors, "; "))
 		}
 		return proxys, nil
 	}
@@ -2316,7 +2316,7 @@ func parseDownstreamProxy(proxy string) (*url.URL, error) {
 	}
 	_, port, err := utils.ParseStringToHostPort(u.Host)
 	if err != nil {
-		return nil, utils.Errorf("parse host to host:port failed " + err.Error())
+		return nil, utils.Errorf("%s", "parse host to host:port failed "+err.Error())
 	}
 	if port <= 0 {
 		return nil, utils.Errorf("缺乏端口（Miss Port）")

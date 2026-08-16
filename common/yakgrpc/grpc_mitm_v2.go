@@ -239,7 +239,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		// 如果全部是致命错误（格式等），依然报错；连通性失败只告警不阻塞
 		if len(proxys) == 0 && len(proxyErrors) > 0 {
-			return nil, nil, utils.Errorf(strings.Join(proxyErrors, "; "))
+			return nil, nil, utils.Errorf("%s", strings.Join(proxyErrors, "; "))
 		}
 		ruleID := strings.TrimSpace(request.GetDownstreamProxyRuleId())
 		var routeMap map[string][]string

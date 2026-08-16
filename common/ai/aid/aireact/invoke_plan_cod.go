@@ -113,7 +113,7 @@ func (s *planCoordinatorSession) fail(err error) {
 	}
 	s.endOnce.Do(func() {
 		if s.r != nil {
-			s.r.EmitPlanExecFail(err.Error())
+			s.r.EmitPlanExecFail("%s", err.Error())
 			s.r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, s.r.config.Id, s.eventParams)
 		}
 	})
@@ -168,7 +168,7 @@ func (r *ReAct) BeginPlanCoordinatorSession(
 		cancel()
 		unregisterMirror()
 		r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
-		r.EmitPlanExecFail(err.Error())
+		r.EmitPlanExecFail("%s", err.Error())
 		r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, eventParams)
 		return nil, utils.Errorf("failed to create coordinator for plan review: %v", err)
 	}
@@ -219,7 +219,7 @@ func (r *ReAct) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFin
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 			if finalErr != nil {
-				r.EmitPlanExecFail(finalErr.Error())
+				r.EmitPlanExecFail("%s", finalErr.Error())
 			}
 			r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, eventParams)
 			if onFinished != nil {

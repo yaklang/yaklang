@@ -317,7 +317,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 				case reactloops.LoopFinishSilent:
 					return
 				case reactloops.LoopFinishFail:
-					r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
+					r.Emitter.EmitReActFail("%s", fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
 				default:
 					r.Emitter.EmitReActSuccess("ReAct task execution success")
 				}

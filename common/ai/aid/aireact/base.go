@@ -30,7 +30,7 @@ func (r *ReAct) _requireUserInteract(question string, options []map[string]any) 
 	ep.SetReviewMaterials(result)
 	err := r.config.SubmitCheckpointRequest(ep.GetCheckpoint(), result)
 	if err != nil {
-		log.Errorf(err.Error())
+		log.Errorf("%s", err.Error())
 	}
 	r.config.EmitInteractiveJSON(
 		ep.GetId(),

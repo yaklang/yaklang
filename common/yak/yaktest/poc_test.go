@@ -42,7 +42,7 @@ func TestPocRequestUri(t *testing.T) {
 		inst, err := lowhttp.ParseBytesToHttpRequest(req)
 		require.NoError(t, err)
 		uri = inst.RequestURI
-		log.Infof(inst.RequestURI)
+		log.Infof("%s", inst.RequestURI)
 		return []byte("OK")
 	})
 	target := fmt.Sprintf("http://%s:%d/${eval(danger)}", host, port)

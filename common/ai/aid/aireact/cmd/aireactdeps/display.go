@@ -143,7 +143,7 @@ func displayStatus() {
 	fmt.Printf("====================\n")
 
 	// 强制显示提示
-	fmt.Printf("\n" + strings.Repeat("=", 60) + "\n")
+	fmt.Printf("%s", "\n"+strings.Repeat("=", 60)+"\n")
 	fmt.Printf("🎯 Manual prompt trigger! Ready for next question.\n")
 	showWelcomeMessage()
 }

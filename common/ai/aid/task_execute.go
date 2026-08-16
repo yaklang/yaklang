@@ -158,7 +158,7 @@ func (t *AiTask) execute() error {
 						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextSteps)
 					}
 					if timeline := t.CurrentTimeline(); timeline != nil {
-						timeline.PushText(t.Coordinator.AcquireId(), timelineMsg)
+						timeline.PushText(t.Coordinator.AcquireId(), "%s", timelineMsg)
 					}
 				}
 			}

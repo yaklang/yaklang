@@ -127,7 +127,7 @@ func TestEmitThoughtStream_Truncation(t *testing.T) {
 				return e, nil
 			})
 
-			emitter.EmitThoughtStream("task-1", tc.content)
+			emitter.EmitThoughtStream("task-1", "%s", tc.content)
 
 			// Wait for stream to finish with timeout
 			done := make(chan struct{})

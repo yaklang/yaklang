@@ -118,8 +118,8 @@ func checkDuplicateTitles(fsInstance filesys_interface.FileSystem) error {
 	// 如果有重复，返回错误
 	if len(duplicateErrors) > 0 {
 		errorMsg := "发现重复的 title 或 title_zh:\n" + strings.Join(duplicateErrors, "\n\n")
-		log.Errorf(errorMsg)
-		return utils.Errorf(errorMsg)
+		log.Errorf("%s", errorMsg)
+		return utils.Errorf("%s", errorMsg)
 	}
 
 	return nil

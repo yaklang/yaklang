@@ -990,7 +990,7 @@ func TestGRPCMUSTPASS_DebugPlugin_Nuclei_MockResponse(t *testing.T) {
 	rspFlag := utils.RandStringBytes(10)
 
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
-		Code: fmt.Sprintf(`id: basic-example
+		Code: fmt.Sprintf("%s", `id: basic-example
 info:
     name: Test HTTP Template
 http:
@@ -1001,7 +1001,7 @@ http:
         - type: word
           part: body
           words:
-          - "` + rspFlag + `"
+          - "`+rspFlag+`"
           condition: and
 `),
 		PluginType: "nuclei",

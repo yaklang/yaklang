@@ -201,7 +201,7 @@ func TestDEBUG_MITM(t *testing.T) {
 		t.Fatalf("start mitm stream failed: %s", err)
 	}
 	var port = utils.GetRandomAvailableTCPPort()
-	var mitmProxy = fmt.Sprintf("http://127.0.0.1:" + fmt.Sprint(port))
+	var mitmProxy = fmt.Sprintf("%s", "http://127.0.0.1:"+fmt.Sprint(port))
 	err = stream.Send(&ypb.MITMRequest{
 		Host:             "127.0.0.1",
 		Port:             uint32(port),

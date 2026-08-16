@@ -273,7 +273,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 						for _, name := range result.GetAlertVariables() {
 							val := result.GetValues(name)
 							msg := fmt.Sprintf("%v\n%s\n%s\n\n", r.Severity, name, val)
-							t.Logf(msg)
+							t.Logf("%s", msg)
 							if len(c.ContainsAll) > 0 {
 								if !utils.MatchAllOfSubString(msg, c.ContainsAll...) {
 									t.Fatal("not all contains")

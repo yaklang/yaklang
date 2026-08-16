@@ -91,7 +91,7 @@ func (r *ReAct) invokePlanOnly(doneChannel chan struct{}, ctx context.Context, o
 	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.Id, eventParams)
 	defer func() {
 		if finalErr != nil {
-			r.EmitPlanExecFail(finalErr.Error())
+			r.EmitPlanExecFail("%s", finalErr.Error())
 		}
 		r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, eventParams)
 	}()

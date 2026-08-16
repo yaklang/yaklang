@@ -56,7 +56,7 @@ func (h *icmpGenerator) generator(count int) {
 
 	surigen, err := generate.New(h.rule)
 	if err != nil {
-		log.Errorf("new generator failed: " + err.Error())
+		log.Errorf("%s", "new generator failed: "+err.Error())
 		return
 	}
 

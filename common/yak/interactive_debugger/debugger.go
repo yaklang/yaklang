@@ -109,7 +109,7 @@ func (i *InteractiveDebugger) CallBack() func(g *yakvm.Debugger) {
 			commands := strings.Split(input, " ")
 			switch commands[0] {
 			case "h", "help":
-				fmt.Printf(HelpInfo)
+				fmt.Printf("%s", HelpInfo)
 			case "exit":
 				fmt.Println("Interactive debugger exit")
 				os.Exit(0)

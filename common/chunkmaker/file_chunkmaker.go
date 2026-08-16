@@ -94,7 +94,7 @@ func NewChunkMakerFromPath(targetPath string, opts ...Option) (ChunkMaker, error
 			return nil
 		}))
 		if err != nil {
-			log.Errorf(err.Error())
+			log.Errorf("%s", err.Error())
 			return
 		}
 	}()

@@ -77,7 +77,7 @@ func (t *HTTPTrigger) serveRequest(isTls bool, req []byte, conn net.Conn) error 
 	log.Infof("found token: %v from: %v", token, uStr)
 	fetcher, haveToken := t.responseFetcherCache.Get(token)
 	if !haveToken {
-		log.Infof("no token found: log" + logMsg.String())
+		log.Infof("%s", "no token found: log"+logMsg.String())
 		return nil
 	}
 	rsp := fetcher(req)

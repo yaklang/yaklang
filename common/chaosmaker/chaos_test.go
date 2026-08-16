@@ -87,7 +87,7 @@ func TestMUSTPASS_CrossVerify(t *testing.T) {
 			lastErr = nil
 		}
 
-		t.Logf("RULE\n" + r + fmt.Sprintf(`
+		t.Logf("%s", "RULE\n"+r+fmt.Sprintf(`
 need: %d
 got: %d
 match %d
@@ -141,7 +141,7 @@ func TestMUSTPASS_CrossVerifyGroup(t *testing.T) {
 
 	for k, v := range wantMap {
 		// tcp not implement yet don't check it
-		t.Logf("RULE\n" + strings.TrimSpace(k) + fmt.Sprintf("\nneed: %d\nmatch %d\n", v, getMap[k]))
+		t.Logf("%s", "RULE\n"+strings.TrimSpace(k)+fmt.Sprintf("\nneed: %d\nmatch %d\n", v, getMap[k]))
 		if float64(getMap[k]) < 0.6*float64(v) {
 			t.Fatalf("match error or no enough traffic")
 			return
