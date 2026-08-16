@@ -114,9 +114,10 @@ func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) T
 
 // projectTimelineRenderableBlocksForPromptWithLatestModelReplay preserves the
 // existing bucket topology while allowing every successful model replay still
-// present in the visible frozen/open interval blocks into the prompt. Existing
-// compressed heads remain untouched, so reduced or evicted items are not
-// reconstructed here.
+// present in the visible frozen/open interval blocks into the prompt. Reduced
+// or evicted items are never reconstructed; compressed heads remain ordinary
+// historical facts, with control-looking delimiters escaped only in their
+// ephemeral prompt copy.
 func projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
 	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, true)
 }
@@ -131,10 +132,17 @@ func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRend
 			}
 			copyBlock := *typed
 			copyBlock.Items = projectTimelineItemsForPromptWithModelReplay(typed.Items, includeModelReplay)
+			copyBlock.promptProjection = true
+			projected = append(projected, &copyBlock)
+		case *TimelineCompressedHeadBlock:
+			if typed == nil {
+				continue
+			}
+			copyBlock := *typed
+			copyBlock.Text = strings.ReplaceAll(copyBlock.Text, "<|", "&lt;|")
 			projected = append(projected, &copyBlock)
 		default:
-			// Existing compressed heads are historical facts. Rewriting them here
-			// would alter reducer semantics and is outside projection cleanup.
+			// Preserve unknown renderable types byte-for-byte.
 			if block != nil {
 				projected = append(projected, block)
 			}

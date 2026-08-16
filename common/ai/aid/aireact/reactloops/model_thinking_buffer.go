@@ -8,9 +8,13 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
-const timelineModelThinkingReplayTagName = "TIMELINE_MODEL_THINKING"
+const (
+	timelineModelThinkingReplayTagName = "TIMELINE_MODEL_THINKING_V1"
+	timelineModelThinkingReplayVersion = 1
+)
 
 type modelThinkingReplayRecord struct {
+	Version          int    `json:"v"`
 	ReasoningContent string `json:"reasoning_content"`
 	Content          string `json:"content"`
 }
@@ -80,6 +84,7 @@ func buildModelThinkingReplayProjection(nonce, reasoning, content string) (strin
 	}
 	nonce = sanitizeModelThinkingReplayNonce(nonce)
 	record, err := json.Marshal(modelThinkingReplayRecord{
+		Version:          timelineModelThinkingReplayVersion,
 		ReasoningContent: reasoning,
 		Content:          content,
 	})
