@@ -98,3 +98,6 @@ CLAUDE.md
 /legion-node
 /legion-smoke-node
 /bin/
+
+# Go workspace local checksum cache (should not be tracked)
+/go.work.sum
