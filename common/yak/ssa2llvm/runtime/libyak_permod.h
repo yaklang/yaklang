@@ -43,7 +43,6 @@ void yak_invoke_callable(uintptr_t fn, void* ctx);
 #line 3 "vm_invoke.go"
 
 
-#define _GNU_SOURCE 1
 #include <stdint.h>
 #include <stdlib.h>
 #include <dlfcn.h>
