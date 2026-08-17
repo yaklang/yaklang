@@ -911,7 +911,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	dynamicData["StderrSnapshot"] = aicommon.ShrinkTextBlockByTokens(string(stderrSnapshot), intervalReviewStderrTokens)
 	dynamicData["CallExpectations"] = aicommon.ShrinkTextBlockByTokens(callExpectations, intervalReviewCallExpectationTokens)
 	dynamicData["ExtraPrompt"] = aicommon.ShrinkTextBlockByTokens(
-		strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt)),
+		buildIntervalReviewExtraPrompt(pm, tool),
 		intervalReviewExtraInstructionTokens,
 	)
 	dynamicData["TaskGoal"] = taskGoal
@@ -961,6 +961,30 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 		return "", fmt.Errorf("interval review prompt exceeds %d-token hard limit: %d", intervalReviewMaxPromptTokens, tokens)
 	}
 	return prompt, nil
+}
+
+const intervalReviewLongSearchHint = "Large-repo grep/find_file/tree often takes several minutes and may only show a start banner before the first match. Continue unless stderr has a real error, the same search already finished, or there has been no new stdout for more than 15 minutes after the first output. Do not cancel just because Timeline mentions LOOP_STALL_DETECTED — that usually means the ReAct loop is waiting on this tool."
+
+func isLongRunningSearchTool(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "grep", "find_file", "tree":
+		return true
+	default:
+		return false
+	}
+}
+
+func buildIntervalReviewExtraPrompt(pm *PromptManager, tool *aitool.Tool) string {
+	var parts []string
+	if pm != nil && pm.react != nil && pm.react.config != nil {
+		if extra := strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt)); extra != "" {
+			parts = append(parts, extra)
+		}
+	}
+	if tool != nil && isLongRunningSearchTool(tool.Name) {
+		parts = append(parts, intervalReviewLongSearchHint)
+	}
+	return strings.Join(parts, "\n")
 }
 
 // formatDuration formats a duration into a human-readable string.
