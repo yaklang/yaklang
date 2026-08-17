@@ -754,27 +754,42 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 	}
 
-	if !r.DisablePeriodicVerification {
-		r.startVerificationWatchdog(task)
-		var clearWatchdogToolHooks func()
-		if inv := r.GetInvoker(); inv != nil {
-			if cfg, ok := inv.GetConfig().(*aicommon.Config); ok {
-				cfg.SetVerificationWatchdogToolBlockingHooks(
-					r.BeginVerificationWatchdogToolSuppression,
-					r.EndVerificationWatchdogToolSuppression,
-				)
-				clearWatchdogToolHooks = func() {
-					cfg.SetVerificationWatchdogToolBlockingHooks(nil, nil)
-				}
+	// 工具 in-flight 必须始终挂到 config hook 上, 即使本 loop 关闭了
+	// periodic verification: stall heartbeat 靠它判断"长 grep 还在跑",
+	// 不能跟 verification watchdog 绑死.
+	var clearWatchdogToolHooks func()
+	if inv := r.GetInvoker(); inv != nil {
+		if cfg, ok := inv.GetConfig().(*aicommon.Config); ok {
+			cfg.SetVerificationWatchdogToolBlockingHooks(
+				func() {
+					r.BeginToolActivity()
+					if !r.DisablePeriodicVerification {
+						r.BeginVerificationWatchdogToolSuppression()
+					}
+				},
+				func() {
+					if !r.DisablePeriodicVerification {
+						r.EndVerificationWatchdogToolSuppression()
+					}
+					r.EndToolActivity()
+				},
+			)
+			clearWatchdogToolHooks = func() {
+				cfg.SetVerificationWatchdogToolBlockingHooks(nil, nil)
 			}
 		}
-		defer func() {
-			if clearWatchdogToolHooks != nil {
-				clearWatchdogToolHooks()
-			}
-			r.stopVerificationWatchdogForTask(task) // 退出循环则停止验证看门狗，因为异步长任务不需要验证
-		}()
 	}
+	if !r.DisablePeriodicVerification {
+		r.startVerificationWatchdog(task)
+	}
+	defer func() {
+		if clearWatchdogToolHooks != nil {
+			clearWatchdogToolHooks()
+		}
+		if !r.DisablePeriodicVerification {
+			r.stopVerificationWatchdogForTask(task) // 退出循环则停止验证看门狗，因为异步长任务不需要验证
+		}
+	}()
 
 	done := utils.NewOnce()
 	abort := func(err error) {

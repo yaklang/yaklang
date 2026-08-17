@@ -1264,6 +1264,39 @@ func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
 	}
 }
 
+func TestGenerateIntervalReviewPrompt_GrepKeepsLongSearchHint(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "decision": "continue"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	tool := aitool.NewWithoutCallback(
+		"grep",
+		aitool.WithStringParam("pattern"),
+	)
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool,
+		aitool.InvokeParams{"pattern": "Runtime.exec", "path": "/repo"},
+		[]byte("=== Start Grep ==="),
+		nil,
+		time.Now().Add(-3*time.Minute),
+		2,
+		"",
+	)
+	if err != nil {
+		t.Fatalf("GenerateIntervalReviewPromptWithContext failed: %v", err)
+	}
+	require.Contains(t, prompt, "LOOP_STALL_DETECTED")
+	require.Contains(t, prompt, "start banner")
+}
+
 // TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法
 func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 	// 创建一个基本的 ReAct 实例来测试 GenerateAIBlueprintForgeParamsPrompt 方法
