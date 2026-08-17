@@ -590,3 +590,231 @@ alert $uaf for {
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.C))
 }
+
+// TestC_UAF_SyntaxFlow_Ex extends coverage toward known gaps (summary fixpoint,
+// globals, null-clear, nested wrappers, bare *param, field alias).
+// These encode *desired* behavior after future improvements; failures are expected
+// until the corresponding capability lands — do not gate CI on this test alone.
+func TestC_UAF_SyntaxFlow_Ex(t *testing.T) {
+	cases := []uafSFCase{
+		{
+			// gap: free-param summary fixpoint (freep2 → freep → free)
+			name: "nested wrapper freep2 then use",
+			code: `
+#include <stdlib.h>
+void freep(int *p) { free(p); }
+void freep2(int *p) { freep(p); }
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    freep2(p);
+    *p = 7;
+    return 0;
+}
+`,
+			wantUAF: true,
+			contain: []string{"7"},
+		},
+		{
+			// gap: nested wrapper double-free via freep2 then free
+			name: "nested wrapper freep2 then free is double free",
+			code: `
+#include <stdlib.h>
+void freep(int *p) { free(p); }
+void freep2(int *p) { freep(p); }
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    freep2(p);
+    free(p);
+    return 0;
+}
+`,
+			wantUAF: true,
+		},
+		{
+			// gap: p=NULL after free should clear dangling use (UAF Step3)
+			name: "null after free then deref is safe",
+			code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    free(p);
+    p = 0;
+    *p = 1;
+    return 0;
+}
+`,
+			wantUAF: false,
+		},
+		{
+			// gap: same-TU global pointer lifetime
+			name: "global free then use",
+			code: `
+#include <stdlib.h>
+int *g;
+int main() {
+    g = (int*)malloc(sizeof(int));
+    free(g);
+    *g = 3;
+    return 0;
+}
+`,
+			wantUAF: true,
+			contain: []string{"3"},
+		},
+		// gap: cross-func global typestate — skip until kill of g in helper
+		// propagates to use in main.
+		// {
+		// 	name: "global free in helper then use in main",
+		// 	code: `
+		// #include <stdlib.h>
+		// int *g;
+		// void killg(void) { free(g); }
+		// int main() {
+		//     g = (int*)malloc(sizeof(int));
+		//     killg();
+		//     *g = 4;
+		//     return 0;
+		// }
+		// `,
+		// 	wantUAF: true,
+		// 	contain: []string{"4"},
+		// },
+		{
+			// gap: bare *p on formal after free (c2ssa SideEffect / member attach)
+			name: "param free then bare star write",
+			code: `
+#include <stdlib.h>
+void f(int *p) {
+    free(p);
+    *p = 9;
+}
+`,
+			wantUAF: true,
+			contain: []string{"9"},
+		},
+		{
+			// gap: struct field holding heap pointer, free via field then use
+			name: "struct field free then use",
+			code: `
+#include <stdlib.h>
+struct Box { int *buf; };
+int main() {
+    struct Box b;
+    b.buf = (int*)malloc(sizeof(int));
+    free(b.buf);
+    *b.buf = 5;
+    return 0;
+}
+`,
+			wantUAF: true,
+			contain: []string{"5"},
+		},
+		{
+			// gap: realloc as free of old pointer when size 0 / move then use old
+			name: "use old pointer after realloc move",
+			code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(8);
+    int *q = (int*)realloc(p, 16);
+    *p = 6;
+    free(q);
+    return 0;
+}
+`,
+			wantUAF: true,
+			contain: []string{"6"},
+		},
+		{
+			// gap: store freed pointer, later load and use (memory alias / store)
+			name: "store freed ptr then load and use",
+			code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    int **slot = (int**)malloc(sizeof(int*));
+    free(p);
+    *slot = p;
+    *(*slot) = 8;
+    free(slot);
+    return 0;
+}
+`,
+			wantUAF: true,
+			contain: []string{"8"},
+		},
+		{
+			// desired: callee that only stores should ideally not be UAF; today may FP.
+			// Document target: after "reads/writes" summary, storing-only is safe.
+			name: "free then pass to store-only sink is safe target",
+			code: `
+#include <stdlib.h>
+static int *held;
+void hold(int *p) { held = p; }
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    free(p);
+    hold(p);
+    return 0;
+}
+`,
+			wantUAF: false,
+		},
+		{
+			// gap: three-level wrapper
+			name: "triple wrapper freep3 then use",
+			code: `
+#include <stdlib.h>
+void freep(int *p) { free(p); }
+void freep2(int *p) { freep(p); }
+void freep3(int *p) { freep2(p); }
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    freep3(p);
+    *p = 2;
+    return 0;
+}
+`,
+			wantUAF: true,
+			contain: []string{"2"},
+		},
+		{
+			// gap: free via alias through function that frees q=p copy inside
+			name: "wrapper frees local alias of param",
+			code: `
+#include <stdlib.h>
+void freep(int *p) {
+    int *q = p;
+    free(q);
+}
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    freep(p);
+    *p = 11;
+    return 0;
+}
+`,
+			wantUAF: true,
+			contain: []string{"11"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ssatest.CheckWithNameOnlyInMemory("", t, tc.code, func(prog *ssaapi.Program) error {
+				res, err := prog.SyntaxFlowWithError(uafSFRule)
+				require.NoError(t, err)
+				got := res.GetValues("uaf")
+				if !tc.wantUAF {
+					require.Equal(t, 0, got.Len(), "unexpected UAF: %v", got)
+					return nil
+				}
+				require.Greater(t, got.Len(), 0, "expected UAF findings")
+				if len(tc.contain) > 0 {
+					ssatest.CompareResult(t, true, res, map[string][]string{"uaf": tc.contain})
+				}
+				return nil
+			}, ssaapi.WithLanguage(ssaconfig.C))
+		})
+	}
+}

@@ -1,6 +1,8 @@
 package lifetime
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -202,9 +204,15 @@ func analyzeFunctionNPD(fn *ssa.Function, reg *registry) []*Finding {
 				preds = append(preds, newNPDState())
 			}
 			for _, pid := range b.Preds {
-				if idx, ok := blockIndex[pid]; ok {
-					preds = append(preds, outState[idx])
+				idx, ok := blockIndex[pid]
+				if !ok {
+					continue
 				}
+				edge := outState[idx].clone()
+				if pred := blocks[idx]; pred != nil {
+					applyNullGuardOnEdge(pred, b, edge)
+				}
+				preds = append(preds, edge)
 			}
 			merged := mergeNPDStates(preds)
 			if !equalNPDState(inState[i], merged) {
@@ -261,7 +269,7 @@ func transferBlockNPD(b *ssa.BasicBlock, st *npdState, allocs map[int64]struct{}
 		if inst == nil {
 			continue
 		}
-		findings = append(findings, handleInstNPD(inst, st, allocs)...)
+		findings = append(findings, handleInstNPD(b, inst, st, allocs)...)
 	}
 	return findings
 }
@@ -302,6 +310,9 @@ func nullnessOf(v ssa.Value, st *npdState, allocs map[int64]struct{}) NullState 
 	if isNullish(v) {
 		return NullIsNull
 	}
+	if isPointerWithNullValue(v) {
+		return NullIsNull
+	}
 	if st != nil {
 		if s := st.get(id); s != NullUnknown {
 			return s
@@ -310,7 +321,53 @@ func nullnessOf(v ssa.Value, st *npdState, allocs map[int64]struct{}) NullState 
 	return NullUnknown
 }
 
-func handleInstNPD(inst ssa.Instruction, st *npdState, allocs map[int64]struct{}) []*Finding {
+// isPointerWithNullValue reports pointer-like objects whose @value is nullish
+// (emitNullPointer / ensurePointerValue wrappers around 0).
+func isPointerWithNullValue(v ssa.Value) bool {
+	if v == nil {
+		return false
+	}
+	if m, ok := v.GetStringMember("@value"); ok && isNullish(m) {
+		return true
+	}
+	for _, m := range v.GetMembersByKeyString("@value") {
+		if isNullish(m) {
+			return true
+		}
+	}
+	return false
+}
+
+// nullnessOfMemberRoot walks member parents so stores like
+// `1 memberOf #phi.@value` still see the pointer object's nullness.
+func nullnessOfMemberRoot(obj ssa.Value, st *npdState, allocs map[int64]struct{}) NullState {
+	seen := map[int64]struct{}{}
+	for depth := 0; obj != nil && depth < 6; depth++ {
+		id := obj.GetId()
+		if id > 0 {
+			if _, ok := seen[id]; ok {
+				break
+			}
+			seen[id] = struct{}{}
+		}
+		ns := nullnessOf(obj, st, allocs)
+		if ns != NullUnknown {
+			return ns
+		}
+		if st != nil && id > 0 {
+			if s := st.get(id); s != NullUnknown {
+				return s
+			}
+		}
+		if !obj.IsMember() {
+			break
+		}
+		obj = obj.GetObject()
+	}
+	return NullUnknown
+}
+
+func handleInstNPD(b *ssa.BasicBlock, inst ssa.Instruction, st *npdState, allocs map[int64]struct{}) []*Finding {
 	v, isVal := inst.(ssa.Value)
 	if !isVal || v == nil {
 		return nil
@@ -328,6 +385,45 @@ func handleInstNPD(inst ssa.Instruction, st *npdState, allocs map[int64]struct{}
 		return nil
 	}
 
+	if isPointerWithNullValue(v) {
+		st.set(id, NullIsNull)
+		return nil
+	}
+
+	var findings []*Finding
+
+	// Explicit *p load sites registered by c2ssa (distinct from @value payload).
+	if prog := v.GetProgram(); prog != nil {
+		if r := getReg(prog); r != nil {
+			if ptrID, ok := r.derefPtr(id); ok && ptrID > 0 {
+				ptr, ok := v.GetValueById(ptrID)
+				if !ok || ptr == nil {
+					if b != nil {
+						if fn := b.GetFunc(); fn != nil {
+							if pv, ok := fn.GetValueById(ptrID); ok {
+								ptr = pv
+							}
+						}
+					}
+				}
+				stPtr := NullUnknown
+				if ptr != nil {
+					stPtr = nullnessOf(ptr, st, allocs)
+				} else if st != nil {
+					stPtr = st.get(ptrID)
+				}
+				if isDangerousNull(stPtr) {
+					findings = append(findings, &Finding{
+						Use:      v,
+						FreedObj: ptrID,
+						Kind:     KindNPD,
+					})
+				}
+				return findings
+			}
+		}
+	}
+
 	if call, ok := ssa.ToCall(v); ok && call != nil {
 		// Calls are not NPD uses in phase 1 (unlike UAF). Still propagate return if needed.
 		_ = call
@@ -337,6 +433,28 @@ func handleInstNPD(inst ssa.Instruction, st *npdState, allocs map[int64]struct{}
 	if phi, ok := ssa.ToPhi(v); ok && phi != nil {
 		handlePhiNPD(v, st, allocs)
 		return nil
+	}
+
+	// return *p — results may be member of null / @value load.
+	if ret, ok := ssa.ToReturn(v); ok && ret != nil {
+		for _, rid := range ret.Results {
+			rv, ok := ret.GetValueById(rid)
+			if !ok || rv == nil {
+				continue
+			}
+			if rv.IsMember() && !isUndefinedValue(rv) {
+				if obj := rv.GetObject(); obj != nil {
+					if isDangerousNull(nullnessOf(obj, st, allocs)) {
+						findings = append(findings, &Finding{
+							Use:      rv,
+							FreedObj: obj.GetId(),
+							Kind:     KindNPD,
+						})
+					}
+				}
+			}
+		}
+		return findings
 	}
 
 	// Propagate nullness from operands (copies / casts).
@@ -354,32 +472,144 @@ func handleInstNPD(inst ssa.Instruction, st *npdState, allocs map[int64]struct{}
 	}
 
 	// Member access: treating member write/read of a null pointer as NPD.
-	var findings []*Finding
+	// Undefined field placeholders are often created at joins before a later
+	// `if (p)` guard; skip those when the block flows into a null-check of the
+	// same object. Definite-null and real (non-Undefined) members still report.
 	if v.IsMember() {
-		if obj := v.GetObject(); obj != nil {
-			oids := []int64{obj.GetId()}
-			if pid := paramObjectID(obj); pid > 0 {
-				oids = append(oids, pid)
+		if isPointerMetaMember(v) {
+			return findings
+		}
+		// Skip null @value *payload writes* while constructing a null pointer
+		// (ConstInst 0 memberOf ptr.@value). Do not skip Undefined @value loads.
+		if key := v.GetKey(); key != nil && strings.Contains(key.String(), "@value") &&
+			isNullish(v) && !isUndefinedValue(v) {
+			return findings
+		}
+		obj := v.GetObject()
+		if obj == nil {
+			return findings
+		}
+		stObj := nullnessOfMemberRoot(obj, st, allocs)
+		if isUndefinedValue(v) {
+			if key := v.GetKey(); key != nil && strings.Contains(key.String(), "@pointer") {
+				return findings
 			}
-			for _, oid := range oids {
-				stObj := st.get(oid)
-				if stObj == NullUnknown {
-					stObj = nullnessOf(obj, st, allocs)
+			if !isDangerousNull(stObj) {
+				return findings
+			}
+			// Nested placeholders like p.@value.x before if (p) are not real uses.
+			if stObj == NullMaybe && memberPlaceholderGuarded(b, rootPointerObject(obj)) {
+				return findings
+			}
+			findings = append(findings, &Finding{
+				Use:      v,
+				FreedObj: obj.GetId(),
+				Kind:     KindNPD,
+			})
+			return findings
+		}
+		oids := []int64{obj.GetId()}
+		if pid := paramObjectID(obj); pid > 0 {
+			oids = append(oids, pid)
+		}
+		// Also consider root pointer id when obj is nested (@value / field).
+		root := obj
+		for depth := 0; root != nil && root.IsMember() && depth < 4; depth++ {
+			root = root.GetObject()
+		}
+		if root != nil && root.GetId() != obj.GetId() {
+			oids = append(oids, root.GetId())
+		}
+		for _, oid := range oids {
+			stObj := st.get(oid)
+			if stObj == NullUnknown {
+				if ov, ok := v.GetValueById(oid); ok && ov != nil {
+					stObj = nullnessOf(ov, st, allocs)
+				} else {
+					stObj = nullnessOfMemberRoot(obj, st, allocs)
 				}
-				if isDangerousNull(stObj) {
-					findings = append(findings, &Finding{
-						Use:      v,
-						FreedObj: oid,
-						Kind:     KindNPD,
-					})
-					break
-				}
 			}
-			// Member inherits object's nullness for further aliasing (weak).
-			if cur := st.get(obj.GetId()); cur != NullUnknown {
-				st.set(id, cur)
+			if isDangerousNull(stObj) {
+				findings = append(findings, &Finding{
+					Use:      v,
+					FreedObj: oid,
+					Kind:     KindNPD,
+				})
+				break
 			}
+		}
+		if cur := nullnessOfMemberRoot(obj, st, allocs); cur != NullUnknown {
+			st.set(id, cur)
 		}
 	}
 	return findings
+}
+
+// rootPointerObject walks out of nested members to the outermost object.
+func rootPointerObject(obj ssa.Value) ssa.Value {
+	seen := map[int64]struct{}{}
+	for depth := 0; obj != nil && obj.IsMember() && depth < 6; depth++ {
+		id := obj.GetId()
+		if id > 0 {
+			if _, ok := seen[id]; ok {
+				break
+			}
+			seen[id] = struct{}{}
+		}
+		parent := obj.GetObject()
+		if parent == nil {
+			break
+		}
+		obj = parent
+	}
+	return obj
+}
+
+// memberPlaceholderGuarded is true when this block jumps into an if-condition
+// that tests obj (or a value that aliases it), so Undefined #phi.field is not
+// a real NPD use yet.
+func memberPlaceholderGuarded(b *ssa.BasicBlock, obj ssa.Value) bool {
+	if b == nil || obj == nil {
+		return false
+	}
+	obj = rootPointerObject(obj)
+	objID := obj.GetId()
+	fn := b.GetFunc()
+	if fn == nil {
+		return false
+	}
+	for _, sid := range b.Succs {
+		succ, ok := fn.GetBasicBlockByID(sid)
+		if !ok || succ == nil {
+			continue
+		}
+		name := succ.GetName()
+		if !strings.HasPrefix(name, ssa.IfCondition) && !strings.Contains(name, "if.condition") {
+			continue
+		}
+		for _, iid := range succ.Insts {
+			inst, ok := succ.GetInstructionById(iid)
+			if !ok || inst == nil {
+				continue
+			}
+			inst = resolveInstruction(inst)
+			ifInst, ok := ssa.ToIfInstruction(inst)
+			if !ok || ifInst == nil {
+				continue
+			}
+			cond, ok := ifInst.GetValueById(ifInst.Cond)
+			if !ok || cond == nil {
+				continue
+			}
+			target, _ := resolveNullCheckTarget(cond)
+			if target != nil && (target.GetId() == objID || paramObjectID(target) == objID) {
+				return true
+			}
+			// Condition may be the pointer phi itself.
+			if cond.GetId() == objID {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -162,6 +162,70 @@ func pointerRelatedIDs(v ssa.Value) []int64 {
 // paramObjectID maps a value to its formal-parameter abstract object id when
 // the value is the parameter itself or a member rooted at a Parameter
 // (e.g. name "#15.@value" / string "parameter[0].@value").
+
+// isUndefinedValue reports SSA Undefined placeholders (e.g. pre-created #phi.x).
+func isUndefinedValue(v ssa.Value) bool {
+	if v == nil {
+		return false
+	}
+	_, ok := ssa.ToUndefined(v)
+	return ok
+}
+
+// isPointerMetaMember reports EmitConstPointer / heap-pointer bookkeeping
+// members (@pointer identity strings, $pval_*) that are not real C uses.
+func isPointerMetaMember(v ssa.Value) bool {
+	if v == nil || !v.IsMember() {
+		return false
+	}
+	name := v.GetName()
+	if name == "" {
+		name = v.String()
+	}
+	if strings.HasPrefix(name, "$pval_") || strings.HasPrefix(name, "$heap_") {
+		return true
+	}
+	if strings.Contains(name, "@pointer") {
+		return true
+	}
+	s := strings.TrimSpace(v.String())
+	return s == "@pointer" || s == "@value"
+}
+
+// starDerefPointer returns the pointer operand of a c2ssa bare-* artifact.
+// Local null/*p often lowers as BinOp: <nil> mul <nullish> (missing left).
+// Do NOT treat ordinary integer `x * 0` as a deref.
+func starDerefPointer(v ssa.Value) ssa.Value {
+	if v == nil {
+		return nil
+	}
+	bin, ok := ssa.ToBinOp(v)
+	if !ok || bin == nil || bin.Op != ssa.OpMul {
+		return nil
+	}
+	x, xok := bin.GetValueById(bin.X)
+	y, yok := bin.GetValueById(bin.Y)
+	xMissing := !xok || x == nil
+	yMissing := !yok || y == nil
+	if xMissing && !yMissing && isNullish(y) {
+		return y
+	}
+	if yMissing && !xMissing && isNullish(x) {
+		return x
+	}
+	if !xMissing {
+		if t := x.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+			return x
+		}
+	}
+	if !yMissing {
+		if t := y.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+			return y
+		}
+	}
+	return nil
+}
+
 func paramObjectID(v ssa.Value) int64 {
 	if v == nil {
 		return 0
@@ -213,4 +277,188 @@ func paramObjectID(v ssa.Value) int64 {
 		}
 	}
 	return 0
+}
+
+// collectParamAliases maps SSA value ids that are must-aliases of a formal
+// parameter (the formal itself, pure copies, casts, and non-conflicting phis)
+// to that parameter's index. Used by free-param summary for free(q) where q=p.
+func collectParamAliases(fn *ssa.Function) map[int64]int {
+	out := make(map[int64]int)
+	if fn == nil {
+		return out
+	}
+	for i, pid := range fn.Params {
+		if pid > 0 {
+			out[pid] = i
+		}
+	}
+	for iter := 0; iter < 32; iter++ {
+		changed := false
+		for _, bid := range fn.Blocks {
+			b, ok := fn.GetBasicBlockByID(bid)
+			if !ok || b == nil {
+				continue
+			}
+			scan := func(iid int64) {
+				inst, ok := b.GetInstructionById(iid)
+				if !ok || inst == nil {
+					return
+				}
+				inst = resolveInstruction(inst)
+				v, ok := inst.(ssa.Value)
+				if !ok || v == nil || v.GetId() <= 0 {
+					return
+				}
+				id := v.GetId()
+				if _, ok := out[id]; ok {
+					return
+				}
+				if _, ok := ssa.ToCall(v); ok {
+					return
+				}
+				if isNullish(v) || isHeapAllocValue(v) {
+					return
+				}
+				ops := v.GetValues()
+				if len(ops) == 0 {
+					return
+				}
+				seenIdx := -1
+				conflict := false
+				knownOps := 0
+				for _, op := range ops {
+					if op == nil {
+						continue
+					}
+					idx, ok := out[op.GetId()]
+					if !ok {
+						continue
+					}
+					knownOps++
+					if seenIdx < 0 {
+						seenIdx = idx
+					} else if seenIdx != idx {
+						conflict = true
+					}
+				}
+				if conflict || seenIdx < 0 {
+					return
+				}
+				_, isPhi := ssa.ToPhi(v)
+				_, isCast := ssa.ToTypeCast(v)
+				// Pure copy / cast / phi of a single formal alias only.
+				if isPhi || isCast || len(ops) == 1 || knownOps == len(ops) && len(ops) <= 2 && !v.IsMember() {
+					if isPhi || isCast || len(ops) == 1 {
+						out[id] = seenIdx
+						changed = true
+					}
+				}
+			}
+			for _, pid := range b.Phis {
+				scan(pid)
+			}
+			for _, iid := range b.Insts {
+				scan(iid)
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+	return out
+}
+
+// applyNullGuardOnEdge refines nullness when control flows from an If
+// predecessor into its true/false successor (if (p) / if (!p) / comparisons).
+func applyNullGuardOnEdge(pred, succ *ssa.BasicBlock, st *npdState) {
+	if pred == nil || succ == nil || st == nil {
+		return
+	}
+	succID := succ.GetId()
+	for _, iid := range pred.Insts {
+		inst, ok := pred.GetInstructionById(iid)
+		if !ok || inst == nil {
+			continue
+		}
+		inst = resolveInstruction(inst)
+		ifInst, ok := ssa.ToIfInstruction(inst)
+		if !ok || ifInst == nil {
+			continue
+		}
+		enteringTrue := ifInst.True == succID
+		enteringFalse := ifInst.False == succID
+		if !enteringTrue && !enteringFalse {
+			continue
+		}
+		cond, ok := ifInst.GetValueById(ifInst.Cond)
+		if !ok || cond == nil {
+			continue
+		}
+		target, wantNull := resolveNullCheckTarget(cond)
+		if target == nil || target.GetId() <= 0 {
+			continue
+		}
+		// if (p) true → NonNull; if (p) false → IsNull
+		// if (!p) true → IsNull; if (!p) false → NonNull
+		var ns NullState
+		if enteringTrue {
+			if wantNull {
+				ns = NullIsNull
+			} else {
+				ns = NullNonNull
+			}
+		} else {
+			if wantNull {
+				ns = NullNonNull
+			} else {
+				ns = NullIsNull
+			}
+		}
+		st.set(target.GetId(), ns)
+		if pid := paramObjectID(target); pid > 0 {
+			st.set(pid, ns)
+		}
+	}
+}
+
+// resolveNullCheckTarget returns the pointer under test and whether the
+// condition means "is null" (true) or "is non-null" (false) when the
+// condition itself is true.
+func resolveNullCheckTarget(cond ssa.Value) (ssa.Value, bool) {
+	if cond == nil {
+		return nil, false
+	}
+	if u, ok := ssa.ToUnOp(cond); ok && u != nil && u.Op == ssa.OpNot {
+		x, ok := cond.GetValueById(u.X)
+		if !ok || x == nil {
+			return nil, false
+		}
+		inner, wantNull := resolveNullCheckTarget(x)
+		if inner == nil {
+			return nil, false
+		}
+		return inner, !wantNull
+	}
+	if bin, ok := ssa.ToBinOp(cond); ok && bin != nil {
+		x, _ := cond.GetValueById(bin.X)
+		y, _ := cond.GetValueById(bin.Y)
+		switch bin.Op {
+		case ssa.OpEq:
+			if isNullish(x) && y != nil {
+				return y, true
+			}
+			if isNullish(y) && x != nil {
+				return x, true
+			}
+		case ssa.OpNotEq:
+			if isNullish(x) && y != nil {
+				return y, false
+			}
+			if isNullish(y) && x != nil {
+				return x, false
+			}
+		}
+	}
+	// Bare `if (p)`: condition true ⇒ non-null.
+	return cond, false
 }

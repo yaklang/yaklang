@@ -18,9 +18,10 @@ const (
 
 // registry tracks heap allocation sites and optional free kills for a program.
 type registry struct {
-	mu    sync.RWMutex
-	alloc map[int64]struct{} // value id -> heap object (obj id == value id)
-	kills map[int64][]int64  // free-call id -> argument value ids
+	mu     sync.RWMutex
+	alloc  map[int64]struct{} // value id -> heap object (obj id == value id)
+	kills  map[int64][]int64  // free-call id -> argument value ids
+	derefs map[int64]int64    // explicit *p load site id -> pointer object id
 }
 
 var (
@@ -35,8 +36,9 @@ func getReg(prog *ssa.Program) *registry {
 		return v.(*registry)
 	}
 	r := &registry{
-		alloc: make(map[int64]struct{}),
-		kills: make(map[int64][]int64),
+		alloc:  make(map[int64]struct{}),
+		kills:  make(map[int64][]int64),
+		derefs: make(map[int64]int64),
 	}
 	actual, _ := progRegs.LoadOrStore(prog, r)
 	return actual.(*registry)
@@ -87,6 +89,36 @@ func RegisterKill(call ssa.Value, args ...ssa.Value) {
 	r.mu.Lock()
 	r.kills[call.GetId()] = ids
 	r.mu.Unlock()
+}
+
+// RegisterDeref records an explicit pointer dereference load site (*p as rvalue).
+// Needed when the @value payload ConstInst is reused as both construction and load,
+// so member-walk alone cannot see a distinct use instruction.
+func RegisterDeref(site, ptr ssa.Value) {
+	if site == nil || ptr == nil || site.GetId() <= 0 || ptr.GetId() <= 0 {
+		return
+	}
+	prog := site.GetProgram()
+	if prog == nil {
+		prog = ptr.GetProgram()
+	}
+	r := getReg(prog)
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.derefs[site.GetId()] = ptr.GetId()
+	r.mu.Unlock()
+}
+
+func (r *registry) derefPtr(siteID int64) (int64, bool) {
+	if r == nil || siteID <= 0 {
+		return 0, false
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	id, ok := r.derefs[siteID]
+	return id, ok
 }
 
 // IsAlloc reports whether value id is a registered heap allocation.
