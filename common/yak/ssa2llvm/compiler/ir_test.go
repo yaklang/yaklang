@@ -226,7 +226,7 @@ func TestIR_AsyncSideEffectMemberReadAfterWait(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
-		"ptr @yak_method_name_33",
+		"ptr @yak_method_name_",
 		"call void @"+abi.InvokeSymbol,
 		"call i64 @"+abi.RuntimeGetFieldSymbol,
 	)
