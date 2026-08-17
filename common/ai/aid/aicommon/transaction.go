@@ -156,14 +156,21 @@ func callAITransaction(
 			rspEmitter := bindEmitter(rsp)
 
 			if is429Response(transactionCtx, rsp) {
-				rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())
-				attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
-				select {
-				case <-transactionCtx.Done():
-					return transactionCtx.Err()
-				case <-time.After(5 * time.Second):
-					continue
+				if is429Retryable(transactionCtx, rsp) {
+					// 频率限流/过载类：可重试，不消耗重试次数。
+					rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())
+					attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
+					retryAfter := parseRetryAfterSeconds(rsp, 5)
+					waitSec := capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
+					select {
+					case <-transactionCtx.Done():
+						return transactionCtx.Err()
+					case <-time.After(time.Duration(waitSec) * time.Second):
+						continue
+					}
 				}
+				// 额度耗尽类 429：不可重试，消耗重试次数让上层暴露错误。
+				rspEmitter.EmitWarning("429 quota exceeded in transaction layer (seq=%d), not retryable", getSeq())
 			}
 
 			i++

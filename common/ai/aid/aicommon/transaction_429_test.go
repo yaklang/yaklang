@@ -136,7 +136,10 @@ func TestCallAITransaction_429DoesNotCountRetry(t *testing.T) {
 	callAi := func(req *AIRequest) (*AIResponse, error) {
 		n := atomic.AddInt64(&callCount, 1)
 		if n <= num429Responses {
-			rsp := make429Response()
+			// Retryable 429: must have Retry-After header so the transaction
+			// layer classifies it as rate-limit (retryable) rather than
+			// quota-exceeded (not retryable).
+			rsp := make429Response("Retry-After: 1")
 			return rsp, utils.Errorf("429 rate limited")
 		}
 		rsp := NewUnboundAIResponse()
@@ -167,7 +170,8 @@ func TestCallAITransaction_429ContextCancel(t *testing.T) {
 		if n >= 3 {
 			cancel()
 		}
-		rsp := make429Response()
+		// Retryable 429 with Retry-After so it doesn't consume retry count
+		rsp := make429Response("Retry-After: 1")
 		return rsp, utils.Errorf("429 rate limited")
 	}
 

@@ -35,16 +35,17 @@ func TestHandle429_WithRetryAfter_RateLimitNotify(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
-	// 有 Retry-After → rate-limit 通知
+	// 有 Retry-After → rate-limit 通知，可重试
 	rsp := make429ResponseWithBody(
 		[]string{"Retry-After: 10"},
 		`{"error":{"message":"too many requests","type":"rate_limit_exceeded"}}`,
 	)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
+	assert.True(t, shouldRetry, "rate-limit 429 should be retryable")
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
 	require.Equal(t, "rate-limit", payload["type"])
@@ -58,13 +59,14 @@ func TestHandle429_NoRetryAfter_QuotaExceededNotify(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
-	// 无 Retry-After → quota-exceeded 通知
+	// 无 Retry-After → quota-exceeded 通知，不可重试
 	rsp := make429KindResponse("token", nil, `{"error":{"message":"token exhausted","type":"token_limit_exceeded","limit_kind":"token"}}`)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
+	assert.False(t, shouldRetry, "quota-exceeded 429 should not be retryable")
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
 	require.Equal(t, "quota-exceeded", payload["type"])
@@ -77,16 +79,18 @@ func TestHandle429_LargeRetryAfter_3600_CappedTo30s(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
-	// AIBalance daily_token/free_ip 发送 Retry-After:3600，应限制到 [5,30]s
+	// AIBalance daily_token/free_ip 发送 Retry-After:3600（额度到次日才恢复），
+	// 不可重试，等待限制到 [5,30]s
 	rsp := make429KindResponse("daily_token",
 		[]string{"Retry-After: 3600"},
 		`{"error":{"message":"daily token exceeded","limit_kind":"daily_token_quota","tokens_used":100000000,"tokens_limit":100000000}}`,
 	)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
+	assert.False(t, shouldRetry, "large Retry-After (>=3600) means quota exhaustion, not retryable")
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
 	// 大额 Retry-After → quota-exceeded 通知
@@ -106,7 +110,7 @@ func TestHandle429_RetryAfterCappedAt120(t *testing.T) {
 		`{"error":{"message":"x"}}`,
 	)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -127,7 +131,7 @@ func TestHandle429_ExtractsMessageFromAIBalanceBody(t *testing.T) {
 	body := `{"type":"error","error":{"message":"` + msg + `","type":"token_limit_exceeded","limit_kind":"token"}}`
 	rsp := make429KindResponse("token", nil, body)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -147,7 +151,7 @@ func TestHandle429_ExtractsMessageFromOpenAIBody(t *testing.T) {
 		`{"error":{"message":"You exceeded your current quota, please check your plan and billing details.","type":"rate_limit_exceeded","code":"insufficient_quota"}}`,
 	)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -166,7 +170,7 @@ func TestHandle429_ExtractsMessageFromAnthropicBody(t *testing.T) {
 		`{"type":"error","error":{"type":"rate_limit_error","message":"Number of request resources exceeded."}}`,
 	)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -184,7 +188,7 @@ func TestHandle429_EmptyMessage_FallsBackToDefault(t *testing.T) {
 		`{"error":{"message":"","type":"rate_limit_exceeded"}}`,
 	)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -201,7 +205,7 @@ func TestHandle429_NoBody_FallsBackToDefault(t *testing.T) {
 	// JSON 解析会失败，body 为 nil，回退到默认文案。
 	rsp := make429Response()
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -221,7 +225,7 @@ func TestHandle429_LimitKindFromBody_WhenHeaderMissing(t *testing.T) {
 	body := `{"type":"error","error":{"message":"daily exceeded","limit_kind":"daily_token_quota","tokens_used":100000000,"tokens_limit":100000000}}`
 	rsp := make429ResponseWithBody(headers, body)
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -237,7 +241,7 @@ func TestHandle429_UnknownLimitKind_StillHandledByRetryAfter(t *testing.T) {
 	// 未知 kind 有 Retry-After → rate-limit 路径
 	rsp := make429KindResponse("some_unknown_kind", []string{"Retry-After: 8"}, "")
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
@@ -255,10 +259,11 @@ func TestHandle429_LegacyQueue_ParseableQueue(t *testing.T) {
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
 	rsp := make429Response("X-AIBalance-Info: 2")
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
+	assert.True(t, shouldRetry, "legacy queue 429 is rate-limit, should be retryable")
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
 	require.Contains(t, payload["content"], "此刻有 2 位用户正在与我深度对话中")
@@ -271,7 +276,7 @@ func TestHandle429_LegacyQueue_ZeroQueue(t *testing.T) {
 	rsp := make429Response("X-AIBalance-Info: 0")
 
 	start := time.Now()
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	elapsed := time.Since(start)
 
 	assert.True(t, is429)
@@ -437,3 +442,35 @@ func TestGetHTTPResponseBody_ReturnsCopy(t *testing.T) {
 	assert.Equal(t, "original", string(rsp.GetHTTPResponseBody()))
 }
 
+
+// --- is429Retryable ---
+
+func TestIs429Retryable_WithRetryAfter(t *testing.T) {
+	rsp := make429ResponseWithBody(
+		[]string{"Retry-After: 10"},
+		`{"error":{"message":"x"}}`,
+	)
+	assert.True(t, is429Retryable(context.Background(), rsp))
+}
+
+func TestIs429Retryable_NoRetryAfter(t *testing.T) {
+	rsp := make429KindResponse("token", nil, `{"error":{"message":"x","limit_kind":"token"}}`)
+	assert.False(t, is429Retryable(context.Background(), rsp))
+}
+
+func TestIs429Retryable_LargeRetryAfter(t *testing.T) {
+	rsp := make429KindResponse("daily_token",
+		[]string{"Retry-After: 3600"},
+		`{"error":{"message":"x","limit_kind":"daily_token"}}`,
+	)
+	assert.False(t, is429Retryable(context.Background(), rsp))
+}
+
+func TestIs429Retryable_Non429(t *testing.T) {
+	rsp := make200Response()
+	assert.False(t, is429Retryable(context.Background(), rsp))
+}
+
+func TestIs429Retryable_Nil(t *testing.T) {
+	assert.False(t, is429Retryable(context.Background(), nil))
+}

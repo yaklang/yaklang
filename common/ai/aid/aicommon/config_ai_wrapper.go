@@ -159,9 +159,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			for _idx := 0; _idx < int(c.AiAutoRetry); {
 				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-				if is429, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
+				if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 					if done {
 						return nil, requestCtx.Err()
+					}
+					if !shouldRetry {
+						_idx++
 					}
 					continue
 				}
@@ -235,9 +238,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); {
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if is429, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
+			if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 				if done {
 					return nil, requestCtx.Err()
+				}
+				if !shouldRetry {
+					_idx++
 				}
 				continue
 			}
