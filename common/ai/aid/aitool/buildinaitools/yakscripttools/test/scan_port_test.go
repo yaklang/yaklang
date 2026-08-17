@@ -88,3 +88,11 @@ func TestScanPortTool_SynMode_UsesSynscanxForPointToPointRoute(t *testing.T) {
 	assert.Assert(t, strings.Contains(combined, "http") || strings.Contains(combined, target+":80"), "expected http/80 evidence in output:\n%s", combined)
 	assert.Assert(t, strings.Contains(combined, "scan completed"), "expected completion marker in output:\n%s", combined)
 }
+
+func TestScanPort_AIOutputDualChannelEnabled(t *testing.T) {
+	embedFS := yakscripttools.GetEmbedFS()
+	content, err := embedFS.ReadFile("yakscriptforai/pentest/scan_port.yak")
+	assert.NilError(t, err)
+	level := yakscripttools.ParseAIToolEnableAIOutputLog(string(content))
+	assert.Equal(t, level, 2, "scan_port.yak must contain yakit.AIOutput to enable dual-channel mode")
+}

@@ -124,15 +124,15 @@ for currentStartUrl in targetCandidates {
         lastErr = sprint(err)
         errLower = str.ToLower(lastErr)
         if str.Contains(errLower, "no such host") || str.Contains(errLower, "dns") || str.Contains(errLower, "lookup") || str.Contains(errLower, "resolve") {
-            yakit.Error("[crawl error: dns] crawler failed for %v: %v. Recovery: DNS resolution failed. Check the hostname spelling or verify DNS server.", currentStartUrl, err)
+            yakit.AIOutput("[crawl error: dns] crawler failed for %v: %v. Recovery: DNS resolution failed. Check the hostname spelling or verify DNS server.", currentStartUrl, err)
         } elif str.Contains(errLower, "timeout") || str.Contains(errLower, "deadline") {
-            yakit.Error("[crawl error: timeout] crawler failed for %v: %v. Recovery: increase the timeout parameter (current: %vs) or check if the target is slow.", currentStartUrl, err, timeoutSecond)
+            yakit.AIOutput("[crawl error: timeout] crawler failed for %v: %v. Recovery: increase the timeout parameter (current: %vs) or check if the target is slow.", currentStartUrl, err, timeoutSecond)
         } elif str.Contains(errLower, "tls") || str.Contains(errLower, "certificate") || str.Contains(errLower, "x509") {
-            yakit.Error("[crawl error: tls] crawler failed for %v: %v. Recovery: TLS handshake failed. Try http:// instead of https://, or check the certificate.", currentStartUrl, err)
+            yakit.AIOutput("[crawl error: tls] crawler failed for %v: %v. Recovery: TLS handshake failed. Try http:// instead of https://, or check the certificate.", currentStartUrl, err)
         } elif str.Contains(errLower, "connection refused") || str.Contains(errLower, "reset") || str.Contains(errLower, "EOF") {
-            yakit.Error("[crawl error: connection] crawler failed for %v: %v. Recovery: Connection was refused or reset. The target may be down or blocking connections.", currentStartUrl, err)
+            yakit.AIOutput("[crawl error: connection] crawler failed for %v: %v. Recovery: Connection was refused or reset. The target may be down or blocking connections.", currentStartUrl, err)
         } else {
-            yakit.Error("[crawl error: unknown] crawler failed for %v: %v. Recovery: check the start URL, network connectivity, and crawler parameters, then retry.", currentStartUrl, err)
+            yakit.AIOutput("[crawl error: unknown] crawler failed for %v: %v. Recovery: check the start URL, network connectivity, and crawler parameters, then retry.", currentStartUrl, err)
         }
         continue
     }
@@ -212,10 +212,10 @@ for currentStartUrl in targetCandidates {
 }
 
 if totalResults == 0 && lastErr != "" {
-    yakit.Error("[crawl error: no results] crawler produced no results. Last error: %v. Recovery: check the start URL is reachable, verify network/DNS/TLS, or try a different URL. If HTTPS failed, the tool already tried HTTP fallback.", lastErr)
+    yakit.AIOutput("[crawl error: no results] crawler produced no results. Last error: %v. Recovery: check the start URL is reachable, verify network/DNS/TLS, or try a different URL. If HTTPS failed, the tool already tried HTTP fallback.", lastErr)
 }
 if usedFallback {
-    yakit.Info("HTTP fallback succeeded after the HTTPS crawl returned no results")
+    yakit.AIOutput("HTTP fallback succeeded after the HTTPS crawl returned no results")
 }
 
 discoveredCount = len(discoveredUrlSet)
@@ -309,9 +309,9 @@ if subdomainCount > 1 || pendingCount > 0 {
 
 result = string(output.String())
 if len(result) <= 30000 {
-    yakit.Info(result)
+    yakit.AIOutput(result)
 } else {
-    yakit.Info(result[:30000] + "... (truncated)")
+    yakit.AIOutput(result[:30000] + "... (truncated)")
 }
 
 // file save includes summary + forest + requested URLs (full record)

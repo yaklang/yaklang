@@ -164,3 +164,11 @@ func TestSimpleCrawler_HidesAndDoesNotRequestURLFragments(t *testing.T) {
 	assert.Assert(t, !strings.Contains(stdout, "404 Not Found"),
 		"fragment-only 404 should not be shown in crawler output; got:\n%s", stdout)
 }
+
+func TestSimpleCrawler_AIOutputDualChannelEnabled(t *testing.T) {
+	embedFS := yakscripttools.GetEmbedFS()
+	content, err := embedFS.ReadFile("yakscriptforai/http/simple_crawler.yak")
+	assert.NilError(t, err)
+	level := yakscripttools.ParseAIToolEnableAIOutputLog(string(content))
+	assert.Equal(t, level, 2, "simple_crawler.yak must contain yakit.AIOutput to enable dual-channel mode")
+}

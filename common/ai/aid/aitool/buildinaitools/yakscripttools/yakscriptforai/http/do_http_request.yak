@@ -143,16 +143,16 @@ cli.check()
 // Safe scalar recovery. Keep the correction visible so the AI knows which
 // effective values were used instead of silently changing request behavior.
 if str.TrimSpace(method) == "" {
-    yakit.Warn("[param warn: empty method] method was empty, normalized to GET. Pass method=GET explicitly next time to avoid ambiguity.")
+    yakit.AIOutput("[param warn: empty method] method was empty, normalized to GET. Pass method=GET explicitly next time to avoid ambiguity.")
     method = "GET"
 }
 method = str.ToUpper(str.TrimSpace(method))
 if timeout <= 0 {
-    yakit.Warn("[param warn: invalid timeout] timeout=%v is not a safe bounded timeout, normalized to 10 seconds. Pass a positive integer (e.g. timeout=10) next time.", timeout)
+    yakit.AIOutput("[param warn: invalid timeout] timeout=%v is not a safe bounded timeout, normalized to 10 seconds. Pass a positive integer (e.g. timeout=10) next time.", timeout)
     timeout = 10
 }
 if redirectTimes < 0 {
-    yakit.Warn("[param warn: invalid redirect-times] redirect-times=%v is invalid, normalized to 0 (redirects disabled). Pass a non-negative integer (e.g. redirect-times=3) next time.", redirectTimes)
+    yakit.AIOutput("[param warn: invalid redirect-times] redirect-times=%v is invalid, normalized to 0 (redirects disabled). Pass a non-negative integer (e.g. redirect-times=3) next time.", redirectTimes)
     redirectTimes = 0
 }
 
@@ -248,7 +248,7 @@ legacyFormValues = normalizedPostParams["values"]
 
 // --- validation ---
 if packet == "" && urlStr == "" {
-    yakit.Error("[param error: missing target] either 'url' (URL mode) or 'packet' (Packet mode) must be provided. Recovery: provide a url for URL mode (e.g. https://host/path) or a packet for Packet mode (raw HTTP request bytes). The request was not sent.")
+    yakit.AIOutput("[param error: missing target] either 'url' (URL mode) or 'packet' (Packet mode) must be provided. Recovery: provide a url for URL mode (e.g. https://host/path) or a packet for Packet mode (raw HTTP request bytes). The request was not sent.")
     return
 }
 
@@ -330,7 +330,7 @@ if packet != "" {
     // parse URL to raw packet
     autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
     if err != nil {
-        yakit.Error("[param error: invalid url] failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL including scheme (e.g. https://host/path or http://host:port/path). If the URL contains special characters, ensure they are properly encoded. Use packet mode when exact request bytes are required. Request was not sent.", err)
+        yakit.AIOutput("[param error: invalid url] failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL including scheme (e.g. https://host/path or http://host:port/path). If the URL contains special characters, ensure they are properly encoded. Use packet mode when exact request bytes are required. Request was not sent.", err)
         return
     }
     rawPacket = parsedPacket
@@ -352,7 +352,7 @@ if packet != "" {
             }
             idx = str.Index(line, ":")
             if idx <= 0 {
-                yakit.Warn("[param error: malformed header] ignored header line #%v: expected 'Name: value' format. Fix the headers parameter (use one 'Key: Value' per line, or a JSON object) and retry if this header is required.", headerLineIndex)
+                yakit.AIOutput("[param error: malformed header] ignored header line #%v: expected 'Name: value' format. Fix the headers parameter (use one 'Key: Value' per line, or a JSON object) and retry if this header is required.", headerLineIndex)
                 continue
             }
             hKey = str.TrimSpace(line[:idx])
@@ -445,19 +445,19 @@ if err != nil {
     // --- classify HTTP request error by error type ---
     // 根据 err 字符串关键词分类, 给 agent 精准的 recovery 方向, 避免盲目重试.
     if str.Contains(errLower, "no such host") || str.Contains(errLower, "dns") || str.Contains(errLower, "lookup") || str.Contains(errLower, "resolve") {
-        yakit.Error("[request error: dns] %v. Recovery: DNS resolution failed. Check the hostname spelling, try an IP directly in the URL, or verify DNS server / hosts file. The request was not sent.", err)
+        yakit.AIOutput("[request error: dns] %v. Recovery: DNS resolution failed. Check the hostname spelling, try an IP directly in the URL, or verify DNS server / hosts file. The request was not sent.", err)
     } elif str.Contains(errLower, "connection refused") || str.Contains(errLower, "reset by peer") || str.Contains(errLower, " EOF") || str.Contains(errLower, "broken pipe") {
-        yakit.Error("[request error: connection] %v. Recovery: Connection was refused or reset. The port may be closed, filtered, or the service crashed. Try a different port, check if the host is up, or retry with verbose=true for connection trace.", err)
+        yakit.AIOutput("[request error: connection] %v. Recovery: Connection was refused or reset. The port may be closed, filtered, or the service crashed. Try a different port, check if the host is up, or retry with verbose=true for connection trace.", err)
     } elif str.Contains(errLower, "timeout") || str.Contains(errLower, "deadline exceeded") || str.Contains(errLower, "i/o timeout") {
-        yakit.Error("[request error: timeout] %v. Recovery: Request timed out. Increase the timeout parameter (current: %vs), or the endpoint may be slow/hanging. For blind time-based tests, a timeout may itself be a signal — compare with a baseline request. Retry with a larger timeout if the endpoint is known to be slow.", err, timeout)
+        yakit.AIOutput("[request error: timeout] %v. Recovery: Request timed out. Increase the timeout parameter (current: %vs), or the endpoint may be slow/hanging. For blind time-based tests, a timeout may itself be a signal — compare with a baseline request. Retry with a larger timeout if the endpoint is known to be slow.", err, timeout)
     } elif str.Contains(errLower, "tls") || str.Contains(errLower, "certificate") || str.Contains(errLower, "x509") || str.Contains(errLower, "handshake") {
-        yakit.Error("[request error: tls] %v. Recovery: TLS handshake failed. Try https=no for plain HTTP, or check if the certificate is self-signed/expired. If you intentionally accept invalid certs, retry with a proxy that handles TLS interception.", err)
+        yakit.AIOutput("[request error: tls] %v. Recovery: TLS handshake failed. Try https=no for plain HTTP, or check if the certificate is self-signed/expired. If you intentionally accept invalid certs, retry with a proxy that handles TLS interception.", err)
     } elif str.Contains(errLower, "proxy") || str.Contains(errLower, "proxyconnect") || str.Contains(errLower, "proxy http") {
-        yakit.Error("[request error: proxy] %v. Recovery: Proxy connection failed. Check the proxy URL (current: %v), verify the proxy is running and reachable, or remove the proxy parameter to connect directly.", err, proxy)
+        yakit.AIOutput("[request error: proxy] %v. Recovery: Proxy connection failed. Check the proxy URL (current: %v), verify the proxy is running and reachable, or remove the proxy parameter to connect directly.", err, proxy)
     } elif str.Contains(errLower, "no route to host") || str.Contains(errLower, "network is unreachable") {
-        yakit.Error("[request error: network] %v. Recovery: Network is unreachable. The host may be down, firewalled, or in a different network segment. Verify reachability with a simple ping or a different host.", err)
+        yakit.AIOutput("[request error: network] %v. Recovery: Network is unreachable. The host may be down, firewalled, or in a different network segment. Verify reachability with a simple ping or a different host.", err)
     } else {
-        yakit.Error("[request error: unknown] %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err)
+        yakit.AIOutput("[request error: unknown] %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err)
     }
     return
 }
@@ -538,7 +538,7 @@ tryFormRetryOnJsonRejected = func() {
     if retryStatusCode == 400 {
         return false
     }
-    yakit.Info("[content-type hint] JSON body was rejected with HTTP 400 (likely '%v'). Retried the SAME request as application/x-www-form-urlencoded and the server accepted it (now HTTP %v). => This endpoint expects FORM-ENCODED bodies, NOT JSON. For login/form endpoints like this, use post-params (or content-type=application/x-www-form-urlencoded) instead of a JSON body. The response being JSON does NOT mean the request should be JSON.", str.TrimSpace(poc.GetHTTPPacketBody(rsp)), retryStatusCode)
+    yakit.AIOutput("[content-type hint] JSON body was rejected with HTTP 400 (likely '%v'). Retried the SAME request as application/x-www-form-urlencoded and the server accepted it (now HTTP %v). => This endpoint expects FORM-ENCODED bodies, NOT JSON. For login/form endpoints like this, use post-params (or content-type=application/x-www-form-urlencoded) instead of a JSON body. The response being JSON does NOT mean the request should be JSON.", str.TrimSpace(poc.GetHTTPPacketBody(rsp)), retryStatusCode)
     rspIns = retryRspIns
     rsp = retryRspIns.RawPacket
     req = retryRspIns.RawRequest
@@ -633,7 +633,7 @@ if rspSetCookie != "" {
     summaryParts.Push(sprintf("set-cookie: %v", cookieBrief))
 }
 
-yakit.Info("response: %v (%v)", statusLine, str.Join(summaryParts, ", "))
+yakit.AIOutput("response: %v (%v)", statusLine, str.Join(summaryParts, ", "))
 
 // --- HTTP response status code hint ---
 // 根据状态码给 agent 精准的后续测试方向, 避免死磕单一路径.
@@ -642,34 +642,34 @@ try {
     if rspStatusCode >= 300 && rspStatusCode < 400 {
         if rspStatusCode == 301 || rspStatusCode == 302 || rspStatusCode == 303 || rspStatusCode == 307 || rspStatusCode == 308 {
             locationHeader = poc.GetHTTPPacketHeader(rsp, "Location")
-            yakit.Info("[status hint] HTTP %v redirect to: %v. Follow the redirect (redirect-times > 0) or inspect the Location target directly. For open-redirect testing, check if Location reflects user input.", rspStatusCode, locationHeader)
+            yakit.AIOutput("[status hint] HTTP %v redirect to: %v. Follow the redirect (redirect-times > 0) or inspect the Location target directly. For open-redirect testing, check if Location reflects user input.", rspStatusCode, locationHeader)
         } else {
-            yakit.Info("[status hint] HTTP %v (3xx redirect). Check the Location header for the redirect target.", rspStatusCode)
+            yakit.AIOutput("[status hint] HTTP %v (3xx redirect). Check the Location header for the redirect target.", rspStatusCode)
         }
     } elif rspStatusCode == 400 {
-        yakit.Info("[status hint] HTTP 400 Bad Request. The server rejected the request format. Check: (1) Content-Type matches the body format (JSON vs form-encoded — the tool auto-retries form if JSON is rejected), (2) required parameters are present, (3) the request body is valid. Inspect the response body for the specific error message.")
+        yakit.AIOutput("[status hint] HTTP 400 Bad Request. The server rejected the request format. Check: (1) Content-Type matches the body format (JSON vs form-encoded — the tool auto-retries form if JSON is rejected), (2) required parameters are present, (3) the request body is valid. Inspect the response body for the specific error message.")
     } elif rspStatusCode == 401 {
-        yakit.Info("[status hint] HTTP 401 Unauthorized. Authentication is required. Check: (1) Authorization header / Cookie / token is present and valid, (2) credentials are correct, (3) the auth scheme (Basic/Bearer/Session). If testing auth bypass, try without credentials or with modified auth headers.")
+        yakit.AIOutput("[status hint] HTTP 401 Unauthorized. Authentication is required. Check: (1) Authorization header / Cookie / token is present and valid, (2) credentials are correct, (3) the auth scheme (Basic/Bearer/Session). If testing auth bypass, try without credentials or with modified auth headers.")
     } elif rspStatusCode == 403 {
-        yakit.Info("[status hint] HTTP 403 Forbidden. The server understood the request but refuses to authorize it. Check: (1) session/role permissions, (2) CSRF token or Referer/Origin requirements, (3) IP allowlisting or WAF blocking. If testing access control, try different user roles or privilege escalation payloads.")
+        yakit.AIOutput("[status hint] HTTP 403 Forbidden. The server understood the request but refuses to authorize it. Check: (1) session/role permissions, (2) CSRF token or Referer/Origin requirements, (3) IP allowlisting or WAF blocking. If testing access control, try different user roles or privilege escalation payloads.")
     } elif rspStatusCode == 404 {
-        yakit.Info("[status hint] HTTP 404 Not Found. The endpoint or resource does not exist. Check: (1) URL path spelling and case, (2) try path traversal or alternative endpoints, (3) the resource may require a different HTTP method. If testing IDOR, try different ID values or parameter names.")
+        yakit.AIOutput("[status hint] HTTP 404 Not Found. The endpoint or resource does not exist. Check: (1) URL path spelling and case, (2) try path traversal or alternative endpoints, (3) the resource may require a different HTTP method. If testing IDOR, try different ID values or parameter names.")
     } elif rspStatusCode == 405 {
-        yakit.Info("[status hint] HTTP 405 Method Not Allowed. The URL exists but does not accept this HTTP method. Check the Allow response header for permitted methods, then retry with a different method (GET/POST/PUT/DELETE/PATCH/OPTIONS).")
+        yakit.AIOutput("[status hint] HTTP 405 Method Not Allowed. The URL exists but does not accept this HTTP method. Check the Allow response header for permitted methods, then retry with a different method (GET/POST/PUT/DELETE/PATCH/OPTIONS).")
     } elif rspStatusCode == 429 {
-        yakit.Info("[status hint] HTTP 429 Too Many Requests. Rate limiting is active. Check: (1) Retry-After header for wait time, (2) reduce request frequency, (3) rotate IP or use proxy, (4) add delay between requests. For batch testing, lower concurrency or add delay-seconds.")
+        yakit.AIOutput("[status hint] HTTP 429 Too Many Requests. Rate limiting is active. Check: (1) Retry-After header for wait time, (2) reduce request frequency, (3) rotate IP or use proxy, (4) add delay between requests. For batch testing, lower concurrency or add delay-seconds.")
     } elif rspStatusCode >= 400 && rspStatusCode < 500 {
-        yakit.Info("[status hint] HTTP %v (4xx client error). The request was malformed or unauthorized. Inspect the response body for the specific error message, verify request parameters, headers, and authentication, then retry with corrections.", rspStatusCode)
+        yakit.AIOutput("[status hint] HTTP %v (4xx client error). The request was malformed or unauthorized. Inspect the response body for the specific error message, verify request parameters, headers, and authentication, then retry with corrections.", rspStatusCode)
     } elif rspStatusCode == 500 {
-        yakit.Info("[status hint] HTTP 500 Internal Server Error. The server crashed processing the request. This may indicate: (1) a bug triggered by the input (potential vulnerability signal — check for SQLi/XSS/XXE/command injection), (2) a malformed payload the server cannot handle. Inspect the response body for stack traces or error details. Retry with a simpler payload to isolate the trigger.")
+        yakit.AIOutput("[status hint] HTTP 500 Internal Server Error. The server crashed processing the request. This may indicate: (1) a bug triggered by the input (potential vulnerability signal — check for SQLi/XSS/XXE/command injection), (2) a malformed payload the server cannot handle. Inspect the response body for stack traces or error details. Retry with a simpler payload to isolate the trigger.")
     } elif rspStatusCode == 502 {
-        yakit.Info("[status hint] HTTP 502 Bad Gateway. An upstream server/proxy returned an invalid response. The target may be behind a reverse proxy (nginx, etc.) and the backend is down or misconfigured. Retry after a delay, or check if the endpoint works directly without proxy.")
+        yakit.AIOutput("[status hint] HTTP 502 Bad Gateway. An upstream server/proxy returned an invalid response. The target may be behind a reverse proxy (nginx, etc.) and the backend is down or misconfigured. Retry after a delay, or check if the endpoint works directly without proxy.")
     } elif rspStatusCode == 503 {
-        yakit.Info("[status hint] HTTP 503 Service Unavailable. The server is temporarily unavailable (overloaded or maintaining). Retry after a delay. Check Retry-After header. If testing, the service may not be stable enough for reliable results right now.")
+        yakit.AIOutput("[status hint] HTTP 503 Service Unavailable. The server is temporarily unavailable (overloaded or maintaining). Retry after a delay. Check Retry-After header. If testing, the service may not be stable enough for reliable results right now.")
     } elif rspStatusCode == 504 {
-        yakit.Info("[status hint] HTTP 504 Gateway Timeout. An upstream server did not respond in time. The backend may be slow or hanging. Increase timeout and retry, or check if the endpoint is known to be slow. For blind time-based tests, compare with baseline timing.")
+        yakit.AIOutput("[status hint] HTTP 504 Gateway Timeout. An upstream server did not respond in time. The backend may be slow or hanging. Increase timeout and retry, or check if the endpoint is known to be slow. For blind time-based tests, compare with baseline timing.")
     } elif rspStatusCode >= 500 {
-        yakit.Info("[status hint] HTTP %v (5xx server error). The server failed to process the request. This may be a transient issue or triggered by the input. Inspect the response body for error details, retry with a simpler payload, or retry after a delay.", rspStatusCode)
+        yakit.AIOutput("[status hint] HTTP %v (5xx server error). The server failed to process the request. This may be a transient issue or triggered by the input. Inspect the response body for error details, retry with a simpler payload, or retry after a delay.", rspStatusCode)
     }
 } catch e {}
 
@@ -738,7 +738,7 @@ if len(rsp) > 0 {
         }
     }
 } else {
-    yakit.Error("response packet is empty after HTTP execution. Recovery: inspect the request packet and connection trace (verbose=true), verify the server did not close the connection, and retry with save-packet=true if the problem persists.")
+    yakit.AIOutput("response packet is empty after HTTP execution. Recovery: inspect the request packet and connection trace (verbose=true), verify the server did not close the connection, and retry with save-packet=true if the problem persists.")
 }
 
 // --- 表单接口探测提示 (治本) ---
@@ -787,9 +787,9 @@ if method == "GET" || (method == "POST" && body == "") {
             }
         }
         if len(uniqueFields) > 0 {
-            yakit.Info("[form-endpoint hint] This response contains an HTML <form> / form-submit JS. The likely login/form fields are: [%v]. Such form endpoints usually expect application/x-www-form-urlencoded (use post-params), NOT a JSON body — even when the API response is JSON. Verify the real encoding (e.g. via the page's JS) before sending.", str.Join(uniqueFields, ", "))
+            yakit.AIOutput("[form-endpoint hint] This response contains an HTML <form> / form-submit JS. The likely login/form fields are: [%v]. Such form endpoints usually expect application/x-www-form-urlencoded (use post-params), NOT a JSON body — even when the API response is JSON. Verify the real encoding (e.g. via the page's JS) before sending.", str.Join(uniqueFields, ", "))
         } else {
-            yakit.Info("[form-endpoint hint] This response contains form-submit JS (URLSearchParams / x-www-form-urlencoded). The endpoint likely expects FORM-ENCODED bodies, NOT JSON. Use post-params instead of a JSON body.")
+            yakit.AIOutput("[form-endpoint hint] This response contains form-submit JS (URLSearchParams / x-www-form-urlencoded). The endpoint likely expects FORM-ENCODED bodies, NOT JSON. Use post-params instead of a JSON body.")
         }
     }
 }
@@ -810,7 +810,7 @@ if hasPattern {
             }
         })
         if keywordMatchCount == 0 {
-            yakit.Info("keyword match: not found in response (%v bytes). The HTTP response is still shown above; verify keyword spelling/case or retry without keyword to inspect the normal response preview.", len(rsp))
+            yakit.AIOutput("keyword match: not found in response (%v bytes). The HTTP response is still shown above; verify keyword spelling/case or retry without keyword to inspect the normal response preview.", len(rsp))
         }
     }
     if regexpMatch != "" {
@@ -827,10 +827,10 @@ if hasPattern {
                 }
             })
             if regexpMatchCount == 0 {
-                yakit.Info("regexp match: not found in response (%v bytes). Verify the expression or retry without regexp-match to inspect the normal response preview.", len(rsp))
+                yakit.AIOutput("regexp match: not found in response (%v bytes). Verify the expression or retry without regexp-match to inspect the normal response preview.", len(rsp))
             }
         } catch e {
-            yakit.Error("[param error: invalid regexp] regexp-match %q is not a valid regular expression: %v. Recovery: fix the regex syntax (common issues: unescaped special chars, unbalanced groups, invalid quantifiers) or remove regexp-match and retry. The HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
+            yakit.AIOutput("[param error: invalid regexp] regexp-match %q is not a valid regular expression: %v. Recovery: fix the regex syntax (common issues: unescaped special chars, unbalanced groups, invalid quantifiers) or remove regexp-match and retry. The HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
         }
     }
 }

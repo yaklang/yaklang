@@ -792,3 +792,15 @@ func TestDoHTTPRequest_HttpsMode(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, flag), "https=no should work for plain HTTP")
 }
+
+func TestDoHTTPRequest_AIOutputDualChannelEnabled(t *testing.T) {
+	// ParseAIToolEnableAIOutputLog must return 2 when the script contains
+	// yakit.AIOutput calls, so the framework auto-activates dual-channel mode:
+	//   yakit.Info  -> GUI only (progress/debug, NOT in Timeline)
+	//   yakit.AIOutput -> Timeline (results for AI decision-making)
+	embedFS := yakscripttools.GetEmbedFS()
+	content, err := embedFS.ReadFile("yakscriptforai/http/do_http_request.yak")
+	assert.NilError(t, err)
+	level := yakscripttools.ParseAIToolEnableAIOutputLog(string(content))
+	assert.Equal(t, level, 2, "do_http_request.yak must contain yakit.AIOutput to enable dual-channel mode")
+}
