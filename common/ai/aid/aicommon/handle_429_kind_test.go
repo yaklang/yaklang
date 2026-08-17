@@ -89,8 +89,8 @@ func TestHandle429_Quota_DailyTokenKind_NoBody_FallsBackToGenericMessage(t *test
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
-	// 响应体不含 tokens_used/tokens_limit，应使用回退文案。
-	rsp := make429KindResponse("daily_token", nil, `{"error":{"message":"x","limit_kind":"daily_token"}}`)
+	// 响应体和响应头都不含 tokens_used/tokens_limit，应使用回退文案。
+	rsp := make429KindResponse("daily_token", nil, `{"error":{"message":"x","limit_kind":"daily_token_quota"}}`)
 
 	is429, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
@@ -100,6 +100,80 @@ func TestHandle429_Quota_DailyTokenKind_NoBody_FallsBackToGenericMessage(t *test
 	payload := requireNotifyPayload(t, snapshot())
 	require.Equal(t, "quota-exceeded", payload["type"])
 	require.Contains(t, payload["content"], "免费词元额度已经全部消耗完毕")
+}
+
+func TestHandle429_Quota_DailyTokenKind_TokenValuesFromHeaders(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 响应体不含 tokens_used/tokens_limit，但响应头 X-AIBalance-Token-Used/Limit
+	// 存在（服务端 daily_token 同时发送 header 和 body），应从 header 读取。
+	headers := []string{
+		"X-AIBalance-Limit-Kind: daily_token",
+		"X-AIBalance-Token-Used: 50000000",
+		"X-AIBalance-Token-Limit: 200000000",
+	}
+	body := `{"error":{"message":"x","limit_kind":"daily_token_quota"}}`
+	rsp := make429ResponseWithBody(headers, body)
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "quota-exceeded", payload["type"])
+	require.Contains(t, payload["content"], "额度 2.00 亿")
+	require.Contains(t, payload["content"], "已消耗 0.50 亿")
+}
+
+func TestHandle429_Quota_DailyTokenKind_RetryAfter3600Capped(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 服务端对 daily_token 发送 Retry-After: 3600，客户端应限制到 [5,30]s。
+	headers := []string{
+		"X-AIBalance-Limit-Kind: daily_token",
+		"Retry-After: 3600",
+		"X-AIBalance-Token-Used: 100000000",
+		"X-AIBalance-Token-Limit: 100000000",
+	}
+	body := `{"error":{"message":"x","limit_kind":"daily_token_quota","tokens_used":100000000,"tokens_limit":100000000}}`
+	rsp := make429ResponseWithBody(headers, body)
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	dur := payload["duration"].(float64)
+	require.GreaterOrEqual(t, dur, float64(5))
+	require.LessOrEqual(t, dur, float64(30))
+}
+
+func TestHandle429_Quota_FreeIPKind_RetryAfter3600Capped(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 服务端对 free_ip 也发送 Retry-After: 3600，客户端应限制到 [5,30]s。
+	headers := []string{
+		"X-AIBalance-Limit-Kind: free_ip",
+		"Retry-After: 3600",
+	}
+	body := `{"error":{"message":"x","limit_kind":"free_ip_quota","exceeded_kind":"token"}}`
+	rsp := make429ResponseWithBody(headers, body)
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "quota-exceeded", payload["type"])
+	dur := payload["duration"].(float64)
+	require.GreaterOrEqual(t, dur, float64(5))
+	require.LessOrEqual(t, dur, float64(30))
 }
 
 func TestHandle429_Quota_APIUserTokenKind_ReasonExhausted(t *testing.T) {
@@ -422,9 +496,10 @@ func TestHandle429_LimitKindFromBody_WhenHeaderMissing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
-	// 不带 X-AIBalance-Limit-Kind 头，但响应体 error.limit_kind=daily_token
+	// 不带 X-AIBalance-Limit-Kind 头，响应体 error.limit_kind=daily_token_quota
+	// （服务端 ResponseKind 与 HeaderKind 不同），客户端应经别名归一化识别为 daily_token。
 	headers := []string{"Content-Type: application/json"}
-	body := `{"type":"error","error":{"message":"daily exceeded","limit_kind":"daily_token","tokens_used":100000000,"tokens_limit":100000000}}`
+	body := `{"type":"error","error":{"message":"daily exceeded","limit_kind":"daily_token_quota","tokens_used":100000000,"tokens_limit":100000000}}`
 	rsp := make429ResponseWithBody(headers, body)
 
 	is429, ctxDone := cfg.handle429RateLimit(rsp)
@@ -435,6 +510,25 @@ func TestHandle429_LimitKindFromBody_WhenHeaderMissing(t *testing.T) {
 	payload := requireNotifyPayload(t, snapshot())
 	require.Equal(t, "quota-exceeded", payload["type"])
 	require.Contains(t, payload["content"], "06:00")
+}
+
+func TestHandle429_LimitKindFromBody_FreeIPQuotaAlias(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 不带 X-AIBalance-Limit-Kind 头，响应体 error.limit_kind=free_ip_quota
+	headers := []string{"Content-Type: application/json"}
+	body := `{"type":"error","error":{"message":"free ip exceeded","limit_kind":"free_ip_quota","exceeded_kind":"request"}}`
+	rsp := make429ResponseWithBody(headers, body)
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "quota-exceeded", payload["type"])
+	require.Contains(t, payload["content"], "请求数")
 }
 
 func TestHandle429_UnknownLimitKind_FallsBackToGeneric(t *testing.T) {

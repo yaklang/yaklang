@@ -17,9 +17,11 @@ import (
 // AIBalance 的 429 响应通过响应头 X-AIBalance-Limit-Kind 标识具体的限流原因，
 // 共 17 种 kind，按恢复方式分为三大类（参见 AIBalance HTTP 429 错误信息参考）：
 //
-//   - quotaCategory   账户与额度（6 种）：用量已达上限，不会短期自动恢复，不携带
-//                     Retry-After。客户端不应立即重试，应引导用户配置有效 API Key、
-//                     联系管理员提升额度或等待北京时间 06:00 重置。
+//   - quotaCategory   账户与额度（6 种）：用量已达上限，多数不会短期自动恢复。
+//                     token/api_user_token/paid_daily_token/memfit_version 不携带
+//                     Retry-After；daily_token/free_ip 携带 Retry-After:3600（建议
+//                     等到次日 06:00 重置）。客户端等待较短时间后由上层有限重试
+//                     循环继续，最终暴露错误。
 //   - frequencyCategory 频率与 QoS（8 种）：请求过快 / 并发超限，携带 Retry-After，
 //                     应读取 Retry-After 并指数退避重试。
 //   - systemCategory  系统与上游（3 种）：服务器侧 / 上游侧暂时不可用，携带
@@ -29,7 +31,9 @@ import (
 // tokens_used / tokens_limit / queue_length / exceeded_kind /
 // upstream_last_error 等）以精确判断触发原因。
 const (
-	// 账户与额度类：不会短期自动恢复，不携带 Retry-After。
+	// 账户与额度类：多数不会短期自动恢复。
+	// token/api_user_token/paid_daily_token/memfit_version 不携带 Retry-After；
+	// daily_token/free_ip 携带 Retry-After:3600。
 	kindToken             = "token"             // 单 Key Token 硬上限
 	kindAPIUserToken      = "api_user_token"    // UID 共享 Token 额度未初始化/已用尽
 	kindDailyToken        = "daily_token"       // 全局/模型日额度耗尽（06:00 重置）
@@ -151,8 +155,21 @@ func isSystemKind(kind string) bool {
 	}
 }
 
+// bodyLimitKindAliases 把响应体 error.limit_kind（服务端 catalog 的
+// ResponseKind）中与响应头 X-AIBalance-Limit-Kind（HeaderKind/Kind）不一致的值
+// 映射回客户端分类所用的稳定 header kind。
+//
+// 服务端 custom_429.go 中以下 kind 的 ResponseKind != Kind：
+//   - daily_token       -> daily_token_quota
+//   - free_ip           -> free_ip_quota
+// 其余 kind 的 ResponseKind 与 Kind 相同，无需映射。
+var bodyLimitKindAliases = map[string]string{
+	"daily_token_quota": "daily_token",
+	"free_ip_quota":     "free_ip",
+}
+
 // resolveLimitKind 优先从 X-AIBalance-Limit-Kind 响应头读取稳定的限流标识；
-// 若响应头缺失，则回退到响应体 error.limit_kind 字段。
+// 若响应头缺失，则回退到响应体 error.limit_kind 字段（经别名归一化）。
 func resolveLimitKind(rsp *AIResponse, body *aibalance429Body) string {
 	if rsp != nil {
 		if hk := strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Limit-Kind")); hk != "" {
@@ -160,7 +177,11 @@ func resolveLimitKind(rsp *AIResponse, body *aibalance429Body) string {
 		}
 	}
 	if body != nil {
-		if bk := strings.TrimSpace(body.Error.LimitKind); bk != "" {
+		bk := strings.TrimSpace(body.Error.LimitKind)
+		if bk != "" {
+			if alias, ok := bodyLimitKindAliases[bk]; ok {
+				return alias
+			}
 			return bk
 		}
 	}
@@ -225,8 +246,10 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 //  2. 通过 X-AIBalance-Limit-Kind 响应头（回退到响应体 error.limit_kind）确定
 //     限流类别：账户与额度 / 频率与 QoS / 系统与上游 / 未知。
 //  3. 按类别选择等待策略与用户提示文案：
-//     - 账户与额度类：不会短期自动恢复，不携带 Retry-After；展示对应额度耗尽
-//       友好提示，等待较短时间（5-15s）后由上层重试循环继续（最终耗尽重试次数）。
+//     - 账户与额度类：多数不会短期自动恢复；展示对应额度耗尽友好提示。
+//       token/api_user_token/paid_daily_token/memfit_version 等待 5-15s；
+//       daily_token/free_ip 携带 Retry-After:3600，客户端限制到 [5,30]s，
+//       由上层有限重试循环继续（最终耗尽重试次数）。
 //     - 频率与 QoS 类：读取 Retry-After，叠加随机抖动后退避重试。
 //     - 系统与上游类：读取 Retry-After 退避重试，提示非客户端问题。
 //  4. 兼容旧版 X-AIBalance-Info 队列头：当无 limit_kind 但存在队列头时，沿用
@@ -253,7 +276,7 @@ func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse)
 
 	switch {
 	case isQuotaKind(limitKind):
-		return c.handleQuota429(ctx, limitKind, body)
+		return c.handleQuota429(ctx, limitKind, rsp, body)
 	case isFrequencyKind(limitKind):
 		return c.handleFrequency429(ctx, limitKind, rsp, body)
 	case isSystemKind(limitKind):
@@ -271,15 +294,31 @@ func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse)
 	}
 }
 
-// handleQuota429 处理"账户与额度"类 429。这类限流表示用量已达上限，不会短期
-// 自动恢复，响应不携带 Retry-After。按各 kind 生成针对性友好提示，等待 5-15s
-// 后由上层重试循环继续（重试次数有限，最终会停止并向用户暴露错误）。
-func (c *Config) handleQuota429(ctx context.Context, kind string, body *aibalance429Body) (bool, bool) {
+// handleQuota429 处理"账户与额度"类 429。这类限流表示用量已达上限，多数不会
+// 短期自动恢复。按各 kind 生成针对性友好提示并选择等待时长：
+//   - token / api_user_token / paid_daily_token / memfit_version：服务端不携带
+//     Retry-After，等待 5-15s 后由上层重试循环继续（重试次数有限，最终停止）。
+//   - daily_token / free_ip：服务端携带 Retry-After: 3600（建议等到次日 06:00
+//     重置）。客户端不应真的等 1 小时，而是等待较短时间后让上层重试循环耗尽
+//     次数并暴露错误，因此将 Retry-After 限制到 [5, 30] 秒。
+func (c *Config) handleQuota429(ctx context.Context, kind string, rsp *AIResponse, body *aibalance429Body) (bool, bool) {
 	const yiUnit = 100_000_000 // 1 亿 = 1e8 token
-	sleepSec := 5 + rand.Intn(11)
-	waitDuration := time.Duration(sleepSec) * time.Second
+
+	var waitSec int
+	switch kind {
+	case kindDailyToken, kindFreeIP:
+		// 服务端发送 Retry-After: 3600，但客户端不应长时间阻塞。
+		// 限制到 [5, 30] 秒，让上层有限重试循环逐步暴露错误。
+		baseSec := parseRetryAfterSeconds(rsp, 10)
+		waitSec = capRetryAfterSeconds(baseSec, 5, 30)
+	default:
+		// token / api_user_token / paid_daily_token / memfit_version：
+		// 服务端不携带 Retry-After，等待 5-15s。
+		waitSec = 5 + rand.Intn(11)
+	}
+	waitDuration := time.Duration(waitSec) * time.Second
 	notifyType := "quota-exceeded"
-	msg := buildQuotaMessage(kind, body, yiUnit)
+	msg := buildQuotaMessage(kind, rsp, body, yiUnit)
 
 	c.EmitDefaultSystemStreamEvent(notifyType, strings.NewReader(msg), "")
 	c.emit429Notify(notifyType, msg, waitDuration, kind)
@@ -287,7 +326,9 @@ func (c *Config) handleQuota429(ctx context.Context, kind string, body *aibalanc
 }
 
 // buildQuotaMessage 根据具体的额度类 kind 生成用户可读的提示文案。
-func buildQuotaMessage(kind string, body *aibalance429Body, yiUnit int64) string {
+// daily_token 的 tokens_used/tokens_limit 同时存在于响应头
+// (X-AIBalance-Token-Used/Limit) 和响应体中，优先读响应体，回退到响应头。
+func buildQuotaMessage(kind string, rsp *AIResponse, body *aibalance429Body, yiUnit int64) string {
 	switch kind {
 	case kindToken:
 		return "当前 API Key 的 Token 额度已用尽。\n" +
@@ -304,12 +345,19 @@ func buildQuotaMessage(kind string, body *aibalance429Body, yiUnit int64) string
 		return "该 API Key 所属 API 用户的共享 Token 额度未初始化或已用尽。\n" +
 			"同一用户下所有 Key 共用此额度，请联系管理员初始化、提升或重置用户额度。" + extra
 	case kindDailyToken:
-		usedYi := 0.0
-		limitYi := 0.0
+		// tokens_used/tokens_limit 同时存在于响应体和响应头
+		// (X-AIBalance-Token-Used/Limit)，优先读响应体，回退到响应头。
+		var tokensUsed, tokensLimit int64
 		if body != nil {
-			usedYi = float64(body.Error.TokensUsed) / float64(yiUnit)
-			limitYi = float64(body.Error.TokensLimit) / float64(yiUnit)
+			tokensUsed = body.Error.TokensUsed
+			tokensLimit = body.Error.TokensLimit
 		}
+		if tokensLimit <= 0 && rsp != nil {
+			tokensUsed, _ = strconv.ParseInt(strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Token-Used")), 10, 64)
+			tokensLimit, _ = strconv.ParseInt(strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Token-Limit")), 10, 64)
+		}
+		usedYi := float64(tokensUsed) / float64(yiUnit)
+		limitYi := float64(tokensLimit) / float64(yiUnit)
 		if limitYi > 0 {
 			return fmt.Sprintf(
 				"今日免费词元额度 %.2f 亿 已消耗 %.2f 亿，额度已用尽。\n"+
