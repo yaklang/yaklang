@@ -385,6 +385,9 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				if !ok {
 					return fmt.Errorf("catch target block %d not found", targetID)
 				}
+				if err := c.clearContextPanic(); err != nil {
+					return err
+				}
 				c.Builder.CreateBr(targetBB)
 				hasTerminator = true
 			}
