@@ -421,6 +421,24 @@ func (a *AIResponse) GetHTTPHeader(name string) string {
 	return lowhttp.GetHTTPPacketHeader(header, name)
 }
 
+// GetHTTPResponseBody returns the cached raw HTTP response body preview that was
+// set via SetRawHTTPResponseData. For non-streaming / error responses (e.g. 429)
+// the full body up to maxBodyPreview (4KB) is captured by the upstream stream
+// reader, so callers can inspect structured error payloads.
+func (a *AIResponse) GetHTTPResponseBody() []byte {
+	if a == nil {
+		return nil
+	}
+	a.rawHTTPResponseHeaderMu.Lock()
+	defer a.rawHTTPResponseHeaderMu.Unlock()
+	if len(a.rawHTTPResponseBody) == 0 {
+		return nil
+	}
+	out := make([]byte, len(a.rawHTTPResponseBody))
+	copy(out, a.rawHTTPResponseBody)
+	return out
+}
+
 func (a *AIResponse) SetFirstOutputByteTime(t time.Time) {
 	if a == nil {
 		return
