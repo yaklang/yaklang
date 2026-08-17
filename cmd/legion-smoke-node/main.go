@@ -65,6 +65,8 @@ func runNode(args []string) error {
 	agentInstallationID := flags.String("agent-installation-id", "", "Override persisted agent installation ID")
 	kind := flags.String("kind", "", "Node kind: empty/host=host node, ai_session=AI session container node")
 	dockerEndpoint := flags.String("docker-endpoint", strings.TrimSpace(os.Getenv("LEGION_DOCKER_ENDPOINT")), "Session-Manager-reachable Docker endpoint advertised by a host node")
+	runtimeHost := flags.Bool("runtime-host", environmentBool("LEGION_RUNTIME_HOST"), "Allow this node to run AI session containers using its local Docker Engine")
+	runtimeNetwork := flags.String("runtime-network", environmentValue("LEGION_RUNTIME_NETWORK", "bridge"), "Fixed local Docker network for AI session containers")
 	baseDir := flags.String("base-dir", "", "Node local state base directory")
 	version := flags.String("version", "smoke", "Node version")
 	engineReleaseID := flags.String("engine-release-id", strings.TrimSpace(os.Getenv("ENGINE_RELEASE_ID")), "Installed unified Yaklang release ID")
@@ -168,6 +170,14 @@ func runNode(args []string) error {
 		postBootstrapHook = buildAISessionRegisterHook()
 	}
 
+	scanNodeOptions := []scannode.ScanNodeOption{}
+	if *runtimeHost && strings.TrimSpace(*kind) != "ai_session" {
+		scanNodeOptions = append(scanNodeOptions, scannode.WithRuntimeHost(scannode.RuntimeHostConfig{
+			Enabled: true, PlatformAPIBaseURL: *apiURL, EnrollmentToken: *enrollmentToken,
+			AgentInstallationID: *agentInstallationID, Network: *runtimeNetwork,
+			EngineReleaseID: *engineReleaseID, EngineDigest: *engineDigest,
+		}))
+	}
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
 		NodeType:             spec.NodeType_Scanner,
 		Kind:                 strings.TrimSpace(*kind),
@@ -184,7 +194,7 @@ func runNode(args []string) error {
 		HeartbeatInterval:    *heartbeatInterval,
 		HostIdentityProvider: hostIdentityProvider,
 		PostBootstrapHook:    postBootstrapHook,
-	})
+	}, scanNodeOptions...)
 	if err != nil {
 		return err
 	}
@@ -199,6 +209,22 @@ func runNode(args []string) error {
 	scanNode.Shutdown()
 	<-done
 	return nil
+}
+
+func environmentBool(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func environmentValue(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func hostDockerEndpoint(kind, endpoint string) string {

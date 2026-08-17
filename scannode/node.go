@@ -26,11 +26,33 @@ type ScanNode struct {
 	bridge            *legionJobBridge
 	ssaGitOwnerScope  string
 	ssaGitScopeLock   *ssagitworkdir.OwnerScopeLock
+	runtimeHost       *runtimeHostExecutor
 }
 
 var scanNodeTaskDrainTimeout = 30 * time.Second
 
-func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
+type ScanNodeOption func(*scanNodeOptions)
+
+type scanNodeOptions struct {
+	runtimeHost RuntimeHostConfig
+}
+
+func WithRuntimeHost(cfg RuntimeHostConfig) ScanNodeOption {
+	return func(options *scanNodeOptions) {
+		options.runtimeHost = cfg
+	}
+}
+
+func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, error) {
+	var resolvedOptions scanNodeOptions
+	for _, option := range options {
+		if option != nil {
+			option(&resolvedOptions)
+		}
+	}
+	if resolvedOptions.runtimeHost.Enabled {
+		cfg.CapabilityKeys = append(cfg.CapabilityKeys, AIRuntimeHostCapabilityKey)
+	}
 	agent := &ScanNode{
 		manager:        newTaskManager(),
 		maxRunningJobs: cfg.MaxRunningJobs,
@@ -78,6 +100,21 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 		BaseDir:        base.BaseDir(),
 		RootContext:    base.GetRootContext(),
 	})
+	if resolvedOptions.runtimeHost.Enabled {
+		resolvedOptions.runtimeHost.BaseDir = base.BaseDir()
+		resolvedOptions.runtimeHost.AgentInstallationID = base.AgentInstallationID()
+		resolvedOptions.runtimeHost.NodeIDProvider = base.CurrentNodeID
+		resolvedOptions.runtimeHost.SessionProvider = base.GetSessionState
+		agent.runtimeHost, err = newRuntimeHostExecutor(resolvedOptions.runtimeHost)
+		if err != nil {
+			base.Shutdown()
+			return nil, utils.Errorf("initialize AI Runtime Host: %v", err)
+		}
+		agent.capabilityManager.runtimeStatusProviders = append(
+			agent.capabilityManager.runtimeStatusProviders,
+			agent.runtimeHost,
+		)
+	}
 	agent.httpClient = cfg.HTTPClient
 	agent.initInvokeLimiter()
 	agent.bridge = newLegionJobBridge(agent)
@@ -136,6 +173,9 @@ func (s *ScanNode) Shutdown() {
 		if err := s.capabilityManager.Close(); err != nil {
 			log.Errorf("shutdown capability manager failed: %v", err)
 		}
+	}
+	if s.runtimeHost != nil {
+		_ = s.runtimeHost.Close()
 	}
 	s.node.Shutdown()
 	s.releaseSSAGitScopeLockAfterTasks()
