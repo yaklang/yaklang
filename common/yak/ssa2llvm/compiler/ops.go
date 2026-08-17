@@ -342,20 +342,28 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 15. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
-		if err := c.compileMemberCall(contextInst, valObj, mc); err != nil {
-			return llvm.Value{}, err
+		if _, isFn := ssa.ToFunction(valObj); isFn {
+			// A function value stored as an object member is a closure/function
+			// pointer, not a member read: fall through to case 16 so it is
+			// materialized directly instead of being read back through the object.
+		} else {
+			if err := c.compileMemberCall(contextInst, valObj, mc); err != nil {
+				return llvm.Value{}, err
+			}
+			if val, ok := c.getCachedValue(contextInst, id); ok {
+				return val, nil
+			}
+			return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 		}
-		if val, ok := c.getCachedValue(contextInst, id); ok {
-			return val, nil
-		}
-		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 	}
 
 	// 16. Function values are materialized as i64 function pointers in the
 	// unified InvokeContext representation.
 	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
-		return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64"), nil
+		val := c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64")
+		c.cacheValue(id, val)
+		return val, nil
 	}
 
 	// 17. Return error if not found and not a constant
