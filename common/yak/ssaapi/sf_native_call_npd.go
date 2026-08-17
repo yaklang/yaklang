@@ -7,17 +7,16 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/lifetime"
 )
 
-// NativeCall_UAF finds use-after-free sites via lifetime analysis.
-// Double-free is included as a UAF subtype (second free of a Freed object).
+// NativeCall_NPD finds null-pointer dereference sites (independent of UAF).
 // Usage:
-//   - *<uaf()> as $uaf                 // all UAF / double-free sites in the program
-//   - $ptr<uaf()> as $uaf              // findings related to selected pointers / free args
-const NativeCall_UAF = "uaf"
+//   - *<npd()> as $npd                 // all NPD sites in the program
+//   - $ptr<npd()> as $npd              // NPD related to selected pointers
+const NativeCall_NPD = "npd"
 
-func nativeCallUAF(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+func nativeCallNPD(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	prog, err := fetchProgram(vs)
 	if err != nil || prog == nil || prog.Program == nil {
-		return false, sfvm.NewEmptyValues(), utils.Errorf("uaf: no program context: %v", err)
+		return false, sfvm.NewEmptyValues(), utils.Errorf("npd: no program context: %v", err)
 	}
 
 	var seeds []ssa.Value
@@ -25,7 +24,6 @@ func nativeCallUAF(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallA
 	_ = vs.Recursive(func(operator sfvm.ValueOperator) error {
 		switch v := operator.(type) {
 		case *Program:
-			// keep onlyProgram
 		case *Value:
 			onlyProgram = false
 			if iv := v.getValue(); iv != nil {
@@ -39,9 +37,9 @@ func nativeCallUAF(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallA
 
 	var findings []*lifetime.Finding
 	if onlyProgram || len(seeds) == 0 {
-		findings = lifetime.FindUAFUses(prog.Program)
+		findings = lifetime.FindNPDUses(prog.Program)
 	} else {
-		findings = lifetime.FindUAFUsesRelated(prog.Program, seeds)
+		findings = lifetime.FindNPDUsesRelated(prog.Program, seeds)
 	}
 
 	results := make([]sfvm.ValueOperator, 0, len(findings))
@@ -50,7 +48,7 @@ func nativeCallUAF(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallA
 		if f == nil || f.Use == nil {
 			continue
 		}
-		if f.Kind != lifetime.KindUAF && f.Kind != lifetime.KindDoubleFree {
+		if f.Kind != lifetime.KindNPD {
 			continue
 		}
 		id := f.Use.GetId()

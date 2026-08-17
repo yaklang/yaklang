@@ -28,7 +28,7 @@ int main() {
 
 	hasUAF := false
 	for _, f := range findings {
-		if f.Kind == "uaf" {
+		if f.Kind == lifetime.KindUAF {
 			hasUAF = true
 			require.NotNil(t, f.Use)
 			require.Greater(t, f.FreedObj, int64(0))
@@ -51,7 +51,8 @@ int main() {
 	require.NoError(t, err)
 	findings := lifetime.FindUAFUses(prog.Program)
 	for _, f := range findings {
-		require.NotEqual(t, "uaf", f.Kind, "unexpected UAF: %+v use=%v", f, f.Use)
+		require.NotEqual(t, lifetime.KindUAF, f.Kind, "unexpected UAF: %+v use=%v", f, f.Use)
+		require.NotEqual(t, lifetime.KindDoubleFree, f.Kind, "unexpected double-free: %+v use=%v", f, f.Use)
 	}
 }
 
@@ -70,9 +71,33 @@ void f(int *p) {
 	require.Greater(t, len(findings), 0, "expected UAF on formal parameter")
 	hasUAF := false
 	for _, f := range findings {
-		if f.Kind == "uaf" {
+		if f.Kind == lifetime.KindUAF {
 			hasUAF = true
 		}
 	}
 	require.True(t, hasUAF)
+}
+
+func Test_UAF_Lifetime_DoubleFree(t *testing.T) {
+	code := `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(4);
+    free(p);
+    free(p);
+    return 0;
+}
+`
+	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.C))
+	require.NoError(t, err)
+	findings := lifetime.FindUAFUses(prog.Program)
+	require.Greater(t, len(findings), 0)
+	hasDF := false
+	for _, f := range findings {
+		if f.Kind == lifetime.KindDoubleFree {
+			hasDF = true
+			require.NotNil(t, f.Use)
+		}
+	}
+	require.True(t, hasDF, "expected double-free finding")
 }
