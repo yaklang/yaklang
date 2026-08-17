@@ -51,6 +51,9 @@ func (c *Compiler) emitSSABlockTerminator(blockID int64, blockObj *ssa.BasicBloc
 			if !ok {
 				return fmt.Errorf("catch target block %d not found", targetID)
 			}
+			if err := c.clearContextPanic(); err != nil {
+				return err
+			}
 			c.Builder.CreateBr(targetBB)
 			return nil
 		}
