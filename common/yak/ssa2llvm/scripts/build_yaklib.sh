@@ -159,34 +159,46 @@ echo "[yaklib] post-processing go.o (per-module .text split)..."
 # Build the elfsplit tool
 ( cd "${REPO_ROOT}" && go build -o "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" ./common/yak/ssa2llvm/cmd/elfsplit )
 
-# Extract go.o from libyak.a, split it, repack
+# Extract go.o from libyak.a, split it, repack. The archiver is not called
+# `llvm-ar` everywhere (Ubuntu ships llvm-ar-18; the bare name exists only when
+# the default LLVM is on PATH), so resolve the first available one. Splitting
+# is essential to per-script pruning: if it is skipped the archive stays a
+# monolithic .text and every produced binary carries the full yaklib. A missing
+# archiver or member is a hard error, not a silent skip.
+LLVM_AR=""
+for cand in llvm-ar llvm-ar-18 llvm-ar-17 ar; do
+  if command -v "${cand}" >/dev/null 2>&1; then LLVM_AR="${cand}"; break; fi
+done
+if [[ -z "${LLVM_AR}" ]]; then
+  echo "[yaklib] no archiver found (tried llvm-ar, llvm-ar-18, llvm-ar-17, ar)" >&2
+  exit 1
+fi
+
 SPLIT_DIR="$(mktemp -d)"
 REPACK_DIR="$(mktemp -d)"
 trap 'rm -rf "${SPLIT_DIR}" "${REPACK_DIR}"; rm -f "${GENFULL_OUT}"; [ -n "${STUB_BACKUP:-}" ] && cp "${STUB_BACKUP}" "${IMPORTS_FILE}" 2>/dev/null || true; rm -f "${STUB_BACKUP:-/dev/null}" 2>/dev/null || true' EXIT
 # Extract only go.o, split it, then repack the archive from a fresh dir so the
 # split go.o is NOT overwritten by the original member.
-llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${SPLIT_DIR}" go.o 2>/dev/null || true
+( cd "${SPLIT_DIR}" && "${LLVM_AR}" x "${RUNTIME_DIR}/libyak.a" go.o )
+if [[ ! -f "${SPLIT_DIR}/go.o" ]]; then
+  echo "[yaklib] go.o not found in libyak.a; cannot split runtime for pruning" >&2
+  exit 1
+fi
 # Function-name folding drops ~35% of .gopclntab from every produced binary, at
 # the cost of function names in tracebacks. Opt-in until it has soaked.
 ELFSPLIT_FLAGS=()
 case "${SSA2LLVM_FOLD_FUNCNAMES:-}" in
   1|true|yes) ELFSPLIT_FLAGS+=(-fold-funcnames); echo "[yaklib] pclntab function-name folding: ON" ;;
 esac
-if [ -f "${SPLIT_DIR}/go.o" ]; then
-    "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" ${ELFSPLIT_FLAGS[@]+"${ELFSPLIT_FLAGS[@]}"} \
-        "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${AOT_SPLIT_MODULES}"
-    # Extract all original members into a fresh repack dir.
-    llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${REPACK_DIR}"
-    # Replace go.o with the split version.
-    cp "${SPLIT_DIR}/go_split.o" "${REPACK_DIR}/go.o"
-    # Repack all members (keep original order via listing).
-    cd "${REPACK_DIR}"
-    llvm-ar rcs "${RUNTIME_DIR}/libyak.a" $(ls *.o)
-    cd - >/dev/null
-    echo "[yaklib] go.o split into per-module sections"
-else
-    echo "[yaklib] WARNING: go.o not found in libyak.a, skipping split"
-fi
+"${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" ${ELFSPLIT_FLAGS[@]+"${ELFSPLIT_FLAGS[@]}"} \
+    "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${AOT_SPLIT_MODULES}"
+# Extract all original members into a fresh repack dir.
+( cd "${REPACK_DIR}" && "${LLVM_AR}" x "${RUNTIME_DIR}/libyak.a" )
+# Replace go.o with the split version.
+cp "${SPLIT_DIR}/go_split.o" "${REPACK_DIR}/go.o"
+# Repack all members (keep original order via listing).
+( cd "${REPACK_DIR}" && "${LLVM_AR}" rcs "${RUNTIME_DIR}/libyak.a" $(ls *.o) )
+echo "[yaklib] go.o split into per-module sections"
 rm -rf "${SPLIT_DIR}" "${REPACK_DIR}"
 
 # ── 4. Locate system libraries (libgc, crt, libc, libgcc) ───────────────────
