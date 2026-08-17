@@ -1,8 +1,8 @@
 package main
 
 /*
+#cgo linux CFLAGS: -D_GNU_SOURCE
 #cgo linux LDFLAGS: -ldl
-#define _GNU_SOURCE 1
 #include <stdint.h>
 #include <stdlib.h>
 #include <dlfcn.h>
