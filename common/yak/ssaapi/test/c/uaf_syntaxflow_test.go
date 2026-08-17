@@ -416,6 +416,89 @@ void f(int *p) {
 `,
 			wantUAF: false,
 		},
+		// Double-free is a UAF subtype (second free of a Freed object).
+		{
+			name: "double free basic",
+			code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    free(p);
+    free(p);
+    return 0;
+}
+`,
+			wantUAF: true,
+		},
+		{
+			name: "double free via alias q=p",
+			code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    int *q = p;
+    free(p);
+    free(q);
+    return 0;
+}
+`,
+			wantUAF: true,
+		},
+		{
+			name: "double free freep then free",
+			code: `
+#include <stdlib.h>
+void freep(int *p) {
+    free(p);
+}
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    freep(p);
+    free(p);
+    return 0;
+}
+`,
+			wantUAF: true,
+		},
+		{
+			name: "double free on formal parameter",
+			code: `
+#include <stdlib.h>
+void f(int *p) {
+    free(p);
+    free(p);
+}
+`,
+			wantUAF: true,
+		},
+		{
+			name: "may-free then free is double free",
+			code: `
+#include <stdlib.h>
+int main(int abrt) {
+    int *p = (int*)malloc(sizeof(int));
+    if (abrt) {
+        free(p);
+    }
+    free(p);
+    return 0;
+}
+`,
+			wantUAF: true,
+		},
+		{
+			name: "free once is safe not double free",
+			code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    *p = 1;
+    free(p);
+    return 0;
+}
+`,
+			wantUAF: false,
+		},
 	}
 
 	for _, tc := range cases {
@@ -452,6 +535,32 @@ int main() {
 	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
 		findings := lifetime.FindUAFUses(prog.Program)
 		require.Greater(t, len(findings), 0)
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.C))
+}
+
+func TestC_UAF_LifetimeAPI_DoubleFree(t *testing.T) {
+	code := `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    free(p);
+    free(p);
+    return 0;
+}
+`
+	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
+		findings := lifetime.FindUAFUses(prog.Program)
+		require.Greater(t, len(findings), 0)
+		hasDF := false
+		for _, f := range findings {
+			if f.Kind == lifetime.KindDoubleFree {
+				hasDF = true
+				require.NotNil(t, f.Use)
+				require.Greater(t, f.FreedObj, int64(0))
+			}
+		}
+		require.True(t, hasDF, "expected KindDoubleFree finding, got %#v", findings)
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.C))
 }
