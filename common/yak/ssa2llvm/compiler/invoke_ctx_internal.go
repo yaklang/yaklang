@@ -94,6 +94,17 @@ func (c *Compiler) storeContextPanic(val llvm.Value, flags uint64) error {
 	return nil
 }
 
+// clearContextPanic resets the invoke-context panic state after a yak-level
+// catch handler has consumed the panic. Without this, a caught panic still
+// leaves WordPanic/flags set and the main wrapper exits 255 even though the
+// catch/finally bodies ran.
+func (c *Compiler) clearContextPanic() error {
+	if err := c.storeContextWord(abi.WordPanic, llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
+		return err
+	}
+	return c.clearContextFlags(abi.FlagPanicTaggedPointer)
+}
+
 func (c *Compiler) loadContextPanic(name string) (llvm.Value, error) {
 	if c == nil || c.function == nil || c.function.invokeCtx.IsNil() {
 		return llvm.Value{}, fmt.Errorf("missing invoke context")
