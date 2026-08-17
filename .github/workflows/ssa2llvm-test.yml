@@ -19,6 +19,11 @@ jobs:
       # versioned headers so the distro default (LLVM 14) cannot shadow them.
       CGO_CFLAGS: -I/usr/lib/llvm-18/include
       CGO_CXXFLAGS: -I/usr/lib/llvm-18/include
+      # go-llvm's bundled LLVM 18.1.3 static archives were built against a
+      # newer glibc (they reference __isoc23_*/arc4random, absent on Ubuntu
+      # 22.04's glibc 2.35). Put the system LLVM 18.1.8 lib dir first so the
+      # link uses the distro-compatible archives.
+      CGO_LDFLAGS: -L/usr/lib/llvm-18/lib
 
     steps:
     - name: Check out code
@@ -29,7 +34,11 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version-file: ./go.mod
+        # The runtime patch (runtime/patch, elfsplit) is validated against the
+        # Go 1.26 moduledata layout. go.mod only declares a minimum (1.22.12);
+        # using 1.22.12 here produces binaries whose moduledata fields sit at
+        # different offsets and fail runtime.moduledataverify.
+        go-version: '1.26.5'
         cache: false
       id: go
 
@@ -40,11 +49,13 @@ jobs:
     - name: Init Module
       run: go mod tidy
 
-    - name: Build embedded runtime assets
-      # The embedded libyak.a/crt/libc assets are gitignored (generated), so
-      # CI builds the default (full) tier archive before compiling tests.
+    - name: Build CLI and embedded runtime assets
+      # The embedded libyak.a/crt/libc assets are gitignored (generated), and
+      # the CLI embeds them, so build the whole self-contained CLI up front:
+      # later test builds reuse the Go build cache and EnsureRuntimeArchive
+      # sees a fresh runtime/libyak.a.
       run: |
-        bash common/yak/ssa2llvm/scripts/build_yaklib.sh
+        bash common/yak/ssa2llvm/scripts/build_cli.sh -o build/tools/ssa2llvm
 
     - name: Test
       # -x is intentionally NOT passed: it prints every external command and is

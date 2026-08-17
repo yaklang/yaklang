@@ -50,6 +50,8 @@ esac
 # go-llvm expects. libxml2-dev/libffi-dev/libncurses-dev are the static-link
 # system deps go-llvm's linux LDFLAGS reference (-lxml2 -lffi -ltinfo).
 PACKAGES=(
+  gcc
+  g++
   llvm-18-dev
   libclang-18-dev
   liblld-18-dev
