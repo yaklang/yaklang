@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package legion.node.v1;
+
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1;nodev1";
+
+// AIRuntimeOperation is the closed set of privileged Docker operations that a
+// Runtime Host may execute. Arbitrary Docker API calls are intentionally not
+// part of the node protocol.
+enum AIRuntimeOperation {
+  AI_RUNTIME_OPERATION_UNSPECIFIED = 0;
+  AI_RUNTIME_OPERATION_ENSURE_IMAGE = 1;
+  AI_RUNTIME_OPERATION_START = 2;
+  AI_RUNTIME_OPERATION_INSPECT = 3;
+  AI_RUNTIME_OPERATION_STOP = 4;
+}
+
+// AIRuntimeRelease pins the exact Node + Runtime producer release. The host
+// verifies the archive digest before loading it into its local Docker daemon.
+message AIRuntimeRelease {
+  string release_id = 1;
+  string engine_digest = 2;
+  string image_id = 3;
+  string archive_sha256 = 4;
+  int64 archive_size = 5;
+}
+
+// AIRuntimeContainerSpec contains only the values a Runtime Host is allowed to
+// vary per AI Session. Image source, mounts and the executable are derived from
+// the trusted release and the node's local configuration.
+message AIRuntimeContainerSpec {
+  string container_name = 1;
+  string network = 2;
+  repeated string arguments = 3;
+  map<string, string> environment = 4;
+}
+
+// AIRuntimeCommand is authenticated for one active host Node session. The
+// auth_tag is HMAC-SHA256 over the deterministic protobuf encoding with this
+// field cleared, using the installation-bound per-session command key.
+message AIRuntimeCommand {
+  CommandMetadata metadata = 1;
+  NodeRef target = 2;
+  AIRuntimeOperation operation = 3;
+  string reply_subject = 4;
+  string ai_session_id = 5;
+  string cleanup_key = 6;
+  string lease_token = 7;
+  AIRuntimeRelease release = 8;
+  AIRuntimeContainerSpec container = 9;
+  bytes auth_tag = 10;
+}
+
+// AIRuntimeResult is the authenticated, idempotent outcome for one command.
+// Replayed commands return the same authoritative container identity.
+message AIRuntimeResult {
+  EventMetadata metadata = 1;
+  string command_id = 2;
+  AIRuntimeOperation operation = 3;
+  string ai_session_id = 4;
+  string cleanup_key = 5;
+  string lease_token = 6;
+  bool success = 7;
+  string error_code = 8;
+  string error_message = 9;
+  string container_id = 10;
+  string resolved_image = 11;
+  bool running = 12;
+  bytes auth_tag = 13;
+}

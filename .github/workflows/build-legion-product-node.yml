@@ -126,6 +126,7 @@ jobs:
               .ci.workflow == "Build Trusted Legion Product Node" and
               (.capabilities | index("hids") != null) and
               (.capabilities | index("ai.session.bind_epoch.v1") != null) and
+              (.capabilities | index("ai.runtime.host.v1") != null) and
               (.capabilities | index("ai.session.turn_lifecycle.v1") != null)
             ' PRODUCT_NODE_MANIFEST.json >/dev/null
 

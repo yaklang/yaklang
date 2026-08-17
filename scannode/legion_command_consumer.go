@@ -232,6 +232,11 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 		for _, message := range messages {
 			if err := b.handleMessage(ctx, message); err != nil {
 				log.Errorf("handle legion command failed: %v", err)
+				var rejected *runtimeHostCommandRejectedError
+				if errors.As(err, &rejected) {
+					_ = message.Term()
+					continue
+				}
 				_ = message.Nak()
 				continue
 			}
@@ -260,6 +265,11 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleCancel(message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCapabilityApply):
 		return b.handleCapabilityApply(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeImageEnsure),
+		strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeContainerStart),
+		strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeContainerInspect),
+		strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeContainerStop):
+		return b.handleAIRuntimeHostCommand(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSDesiredSpecDryRun):
 		return b.handleHIDSDesiredSpecDryRun(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSCurrentStateCollect):

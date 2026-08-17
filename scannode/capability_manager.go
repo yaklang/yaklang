@@ -92,13 +92,18 @@ type CapabilityRuntimeObservation struct {
 }
 
 type CapabilityManager struct {
-	nodeID         string
-	nodeIDProvider func() string
-	storeDir       string
-	rootCtx        context.Context
-	hidsHooks      capabilityHIDSHooks
-	alerts         chan CapabilityRuntimeAlert
-	observations   chan CapabilityRuntimeObservation
+	nodeID                 string
+	nodeIDProvider         func() string
+	storeDir               string
+	rootCtx                context.Context
+	hidsHooks              capabilityHIDSHooks
+	alerts                 chan CapabilityRuntimeAlert
+	observations           chan CapabilityRuntimeObservation
+	runtimeStatusProviders []capabilityRuntimeStatusProvider
+}
+
+type capabilityRuntimeStatusProvider interface {
+	CurrentStatus() (CapabilityRuntimeStatus, bool)
 }
 
 type capabilityDocument struct {
@@ -281,14 +286,23 @@ func (m *CapabilityManager) Observations() <-chan CapabilityRuntimeObservation {
 }
 
 func (m *CapabilityManager) RuntimeStatuses() []CapabilityRuntimeStatus {
-	if m == nil || m.hidsHooks == nil {
+	if m == nil {
 		return nil
 	}
-	status, ok := m.hidsHooks.CurrentStatus()
-	if !ok {
-		return nil
+	providers := append([]capabilityRuntimeStatusProvider(nil), m.runtimeStatusProviders...)
+	if m.hidsHooks != nil {
+		providers = append(providers, m.hidsHooks)
 	}
-	return []CapabilityRuntimeStatus{status}
+	statuses := make([]CapabilityRuntimeStatus, 0, len(providers))
+	for _, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		if status, ok := provider.CurrentStatus(); ok {
+			statuses = append(statuses, status)
+		}
+	}
+	return statuses
 }
 
 func (m *CapabilityManager) CollectHIDSCurrentState(ctx context.Context, collectType string) error {

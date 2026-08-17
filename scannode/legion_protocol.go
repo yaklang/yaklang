@@ -80,6 +80,10 @@ const (
 	legionCommandAIMemoryEntityTagsCount              = "ai.memory_entity_tags.count"
 	legionCommandAIHTTPFlowsQuery                     = "ai.http_flows.query"
 	legionCommandAIRisksQuery                         = "ai.risks.query"
+	legionCommandAIRuntimeImageEnsure                 = "ai.runtime.image.ensure"
+	legionCommandAIRuntimeContainerStart              = "ai.runtime.container.start"
+	legionCommandAIRuntimeContainerInspect            = "ai.runtime.container.inspect"
+	legionCommandAIRuntimeContainerStop               = "ai.runtime.container.stop"
 
 	legionEventClaimed                                    = "job.claimed"
 	legionEventStarted                                    = "job.started"
