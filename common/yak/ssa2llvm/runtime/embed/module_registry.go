@@ -169,10 +169,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yakit.ReportExports",
 	},
 	"json": {
-		ModuleName:   "json",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.JsonExports",
+		ModuleName: "json",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.JsonExports",
+		},
 	},
 	"xml": {
 		ModuleName:   "xml",
@@ -193,10 +196,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yaklib.RegexpExport",
 	},
 	"str": {
-		ModuleName:   "str",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.StringsExport",
+		ModuleName: "str",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.StringsExports",
+		},
 	},
 	"math": {
 		ModuleName:   "math",
@@ -217,10 +223,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		},
 	},
 	"file": {
-		ModuleName:   "file",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.FileExport",
+		ModuleName: "file",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.FileExports",
+		},
 	},
 	"io": {
 		ModuleName:   "io",
@@ -229,10 +238,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yaklib.IoExports",
 	},
 	"sync": {
-		ModuleName:   "sync",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.SyncExport",
+		ModuleName: "sync",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.SyncExports",
+		},
 	},
 	"context": {
 		ModuleName:   "context",
