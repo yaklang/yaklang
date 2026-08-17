@@ -233,13 +233,18 @@ expression
     | castExpression
     | assignmentExpression
     | statementsExpression
-    | declarationSpecifier
+    // NOTE: do NOT allow declarationSpecifier here. Type keywords (int/void/…)
+    // in expression FIRST make AdaptivePredict prefer statement for
+    // `int *p = 0;`, which is not an lvalue/`a*b` form and breaks SSA.
     ;
 
 // --- Declarations ---
 declaration
     : declarationSpecifier eos* initDeclaratorList? eos* Semi
-    | macroCallExpression declaratorSuffix* eos* ('=' initializer)? eos* Semi  // Support macro calls as declarations, e.g., DECLARE_ALIGNED(...)[8] = {...}
+    // Macro-as-declaration only when there is an initializer (e.g. DECLARE_ALIGNED(...)[8] = {...}).
+    // Without requiring '=', call-like forms such as free(p); would be misparsed as declarations
+    // if blockItem preferred declaration over statement.
+    | macroCallExpression declaratorSuffix* eos* '=' eos* initializer eos* Semi
     | staticAssertDeclaration
     ;
 
@@ -577,6 +582,9 @@ blockItemList
     ;
 
 blockItem
+    // statement first: call-like `free(p);` must not become a declaration.
+    // Safe once type keywords are not in expression FIRST (see expression rule).
+    // `int *p = 0;` then falls through to declaration.
     : statement
     | declaration
     ;

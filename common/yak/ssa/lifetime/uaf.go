@@ -176,6 +176,7 @@ func FindUAFUses(prog *ssa.Program) []*Finding {
 	reg := getReg(prog)
 	// Callee summaries: function id -> formal param indexes that are freed.
 	freeParams := buildFreeParamSummary(prog)
+	derefParams := buildParamDerefSummary(prog)
 	var findings []*Finding
 	seen := make(map[int64]struct{}) // use value id
 
@@ -197,7 +198,7 @@ func FindUAFUses(prog *ssa.Program) []*Finding {
 				// closed save channels; skip that function rather than abort all.
 			}
 		}()
-		for _, f := range analyzeFunction(fn, reg, freeParams) {
+		for _, f := range analyzeFunction(fn, reg, freeParams, derefParams) {
 			add(f)
 		}
 	})
@@ -205,23 +206,33 @@ func FindUAFUses(prog *ssa.Program) []*Finding {
 }
 
 // buildFreeParamSummary records which formal parameters each function frees
-// (directly via free(param) / RegisterKill). Used for simple interprocedural UAF.
+// (directly via free(param), or indirectly by calling another function that
+// frees the corresponding actual). Fixpoint covers nested wrappers:
+// freep2 → freep → free.
 func buildFreeParamSummary(prog *ssa.Program) map[int64]map[int]struct{} {
 	out := make(map[int64]map[int]struct{})
 	if prog == nil {
 		return out
 	}
 	reg := getReg(prog)
+
+	ensure := func(fid int64) map[int]struct{} {
+		m := out[fid]
+		if m == nil {
+			m = make(map[int]struct{})
+			out[fid] = m
+		}
+		return m
+	}
+
+	// Pass 1: direct free(param) / free(alias-of-param) / RegisterKill on formals.
 	prog.EachFunction(func(fn *ssa.Function) {
 		if fn == nil {
 			return
 		}
 		defer func() { _ = recover() }()
-		paramIndexByID := make(map[int64]int)
-		for i, pid := range fn.Params {
-			paramIndexByID[pid] = i
-		}
-		freed := make(map[int]struct{})
+		paramIndexByID := collectParamAliases(fn)
+		freed := ensure(fn.GetId())
 		for _, bid := range fn.Blocks {
 			b, ok := fn.GetBasicBlockByID(bid)
 			if !ok || b == nil {
@@ -256,11 +267,213 @@ func buildFreeParamSummary(prog *ssa.Program) map[int64]map[int]struct{} {
 				}
 			}
 		}
-		if len(freed) > 0 {
-			out[fn.GetId()] = freed
+		if len(freed) == 0 {
+			delete(out, fn.GetId())
 		}
 	})
+
+	// Pass 2: fixpoint — calling a known free-wrapper on a formal also frees it.
+	for iter := 0; iter < 16; iter++ {
+		changed := false
+		prog.EachFunction(func(fn *ssa.Function) {
+			if fn == nil {
+				return
+			}
+			defer func() { _ = recover() }()
+			paramIndexByID := collectParamAliases(fn)
+			freed := ensure(fn.GetId())
+			before := len(freed)
+			for _, bid := range fn.Blocks {
+				b, ok := fn.GetBasicBlockByID(bid)
+				if !ok || b == nil {
+					continue
+				}
+				for _, iid := range b.Insts {
+					inst, ok := b.GetInstructionById(iid)
+					if !ok || inst == nil {
+						continue
+					}
+					inst = resolveInstruction(inst)
+					call, ok := ssa.ToCall(inst)
+					if !ok || call == nil || isFreeCall(call, reg) {
+						continue
+					}
+					for _, cid := range resolveCalleeFuncIDs(call) {
+						idxs, ok := out[cid]
+						if !ok || len(idxs) == 0 {
+							continue
+						}
+						for idx := range idxs {
+							if idx < 0 || idx >= len(call.Args) {
+								continue
+							}
+							aid := call.Args[idx]
+							if pidx, ok := paramIndexByID[aid]; ok {
+								freed[pidx] = struct{}{}
+								continue
+							}
+							if av, ok := call.GetValueById(aid); ok && av != nil {
+								if p, ok := ssa.ToParameter(av); ok && p != nil && !p.IsFreeValue {
+									freed[p.FormalParameterIndex] = struct{}{}
+								}
+							}
+						}
+					}
+				}
+			}
+			if len(freed) == 0 {
+				delete(out, fn.GetId())
+			} else if len(freed) > before {
+				changed = true
+			}
+		})
+		if !changed {
+			break
+		}
+	}
 	return out
+}
+
+// buildParamDerefSummary records which formals each function may dereference
+// (member access, bare-* artifact, or passed to another deref-er). Used so
+// store-only sinks (held = p) are not reported as UAF call-arg uses.
+func buildParamDerefSummary(prog *ssa.Program) map[int64]map[int]struct{} {
+	out := make(map[int64]map[int]struct{})
+	if prog == nil {
+		return out
+	}
+	ensure := func(fid int64) map[int]struct{} {
+		m := out[fid]
+		if m == nil {
+			m = make(map[int]struct{})
+			out[fid] = m
+		}
+		return m
+	}
+	markValue := func(aliases map[int64]int, deref map[int]struct{}, v ssa.Value) {
+		if v == nil {
+			return
+		}
+		if idx, ok := aliases[v.GetId()]; ok {
+			deref[idx] = struct{}{}
+		}
+		if pid := paramObjectID(v); pid > 0 {
+			if idx, ok := aliases[pid]; ok {
+				deref[idx] = struct{}{}
+			}
+		}
+	}
+
+	prog.EachFunction(func(fn *ssa.Function) {
+		if fn == nil {
+			return
+		}
+		defer func() { _ = recover() }()
+		aliases := collectParamAliases(fn)
+		if len(aliases) == 0 {
+			return
+		}
+		deref := ensure(fn.GetId())
+		for _, bid := range fn.Blocks {
+			b, ok := fn.GetBasicBlockByID(bid)
+			if !ok || b == nil {
+				continue
+			}
+			for _, iid := range append(append([]int64{}, b.Phis...), b.Insts...) {
+				inst, ok := b.GetInstructionById(iid)
+				if !ok || inst == nil {
+					continue
+				}
+				inst = resolveInstruction(inst)
+				v, ok := inst.(ssa.Value)
+				if !ok || v == nil {
+					continue
+				}
+				if v.IsMember() && !isUndefinedValue(v) {
+					markValue(aliases, deref, v.GetObject())
+				}
+				if ptr := starDerefPointer(v); ptr != nil {
+					markValue(aliases, deref, ptr)
+				}
+			}
+		}
+		if len(deref) == 0 {
+			delete(out, fn.GetId())
+		}
+	})
+
+	for iter := 0; iter < 16; iter++ {
+		changed := false
+		prog.EachFunction(func(fn *ssa.Function) {
+			if fn == nil {
+				return
+			}
+			defer func() { _ = recover() }()
+			aliases := collectParamAliases(fn)
+			deref := ensure(fn.GetId())
+			before := len(deref)
+			for _, bid := range fn.Blocks {
+				b, ok := fn.GetBasicBlockByID(bid)
+				if !ok || b == nil {
+					continue
+				}
+				for _, iid := range b.Insts {
+					inst, ok := b.GetInstructionById(iid)
+					if !ok || inst == nil {
+						continue
+					}
+					inst = resolveInstruction(inst)
+					call, ok := ssa.ToCall(inst)
+					if !ok || call == nil {
+						continue
+					}
+					for _, cid := range resolveCalleeFuncIDs(call) {
+						idxs, ok := out[cid]
+						if !ok {
+							continue
+						}
+						for idx := range idxs {
+							if idx < 0 || idx >= len(call.Args) {
+								continue
+							}
+							if av, ok := call.GetValueById(call.Args[idx]); ok {
+								markValue(aliases, deref, av)
+							}
+						}
+					}
+				}
+			}
+			if len(deref) == 0 {
+				delete(out, fn.GetId())
+			} else if len(deref) > before {
+				changed = true
+			}
+		})
+		if !changed {
+			break
+		}
+	}
+	return out
+}
+
+// functionHasNontrivialBody is true when fn has more than an empty entry
+// (used to distinguish store-only definitions from extern declarations).
+func functionHasNontrivialBody(fn *ssa.Function) bool {
+	if fn == nil {
+		return false
+	}
+	n := 0
+	for _, bid := range fn.Blocks {
+		b, ok := fn.GetBasicBlockByID(bid)
+		if !ok || b == nil {
+			continue
+		}
+		n += len(b.Insts) + len(b.Phis)
+		if n > 2 {
+			return true
+		}
+	}
+	return n > 0
 }
 
 // FindUAFUsesRelated returns UAF uses related to the given pointer/alloc values.
@@ -337,7 +550,7 @@ func entryStateFor(fn *ssa.Function) *pathState {
 	return st
 }
 
-func analyzeFunction(fn *ssa.Function, reg *registry, freeParams map[int64]map[int]struct{}) []*Finding {
+func analyzeFunction(fn *ssa.Function, reg *registry, freeParams, derefParams map[int64]map[int]struct{}) []*Finding {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return nil
 	}
@@ -392,7 +605,7 @@ func analyzeFunction(fn *ssa.Function, reg *registry, freeParams map[int64]map[i
 				changed = true
 			}
 			st := inState[i].clone()
-			_ = transferBlock(b, st, allocs, reg, freeParams)
+			_ = transferBlock(b, st, allocs, reg, freeParams, derefParams)
 			if !equalState(outState[i], st) {
 				outState[i] = st
 				changed = true
@@ -404,7 +617,7 @@ func analyzeFunction(fn *ssa.Function, reg *registry, freeParams map[int64]map[i
 	var findings []*Finding
 	for i, b := range blocks {
 		st := inState[i].clone()
-		findings = append(findings, transferBlock(b, st, allocs, reg, freeParams)...)
+		findings = append(findings, transferBlock(b, st, allocs, reg, freeParams, derefParams)...)
 	}
 
 	// Dedup findings within function by use id
@@ -423,7 +636,7 @@ func analyzeFunction(fn *ssa.Function, reg *registry, freeParams map[int64]map[i
 	return out
 }
 
-func transferBlock(b *ssa.BasicBlock, st *pathState, allocs map[int64]struct{}, reg *registry, freeParams map[int64]map[int]struct{}) []*Finding {
+func transferBlock(b *ssa.BasicBlock, st *pathState, allocs map[int64]struct{}, reg *registry, freeParams, derefParams map[int64]map[int]struct{}) []*Finding {
 	var findings []*Finding
 	// Phis first
 	for _, pid := range b.Phis {
@@ -463,7 +676,7 @@ func transferBlock(b *ssa.BasicBlock, st *pathState, allocs map[int64]struct{}, 
 		if inst == nil {
 			continue
 		}
-		fs := handleInst(inst, st, allocs, reg, freeParams)
+		fs := handleInst(inst, st, allocs, reg, freeParams, derefParams)
 		if len(fs) > 0 && len(allocInstIndex) > 0 {
 			fs = filterFindingsBeforeAllocRedef(fs, i, allocInstIndex)
 		}
@@ -531,7 +744,7 @@ func handlePhiOrValue(v ssa.Value, st *pathState, allocs map[int64]struct{}) {
 	st.setPointsTo(v.GetId(), merged)
 }
 
-func handleInst(inst ssa.Instruction, st *pathState, allocs map[int64]struct{}, reg *registry, freeParams map[int64]map[int]struct{}) []*Finding {
+func handleInst(inst ssa.Instruction, st *pathState, allocs map[int64]struct{}, reg *registry, freeParams, derefParams map[int64]map[int]struct{}) []*Finding {
 	var findings []*Finding
 	v, isVal := inst.(ssa.Value)
 	if !isVal || v == nil {
@@ -564,7 +777,7 @@ func handleInst(inst ssa.Instruction, st *pathState, allocs map[int64]struct{}, 
 	}
 
 	if call, ok := ssa.ToCall(v); ok && call != nil {
-		return handleCall(call, st, allocs, reg, freeParams)
+		return handleCall(call, st, allocs, reg, freeParams, derefParams)
 	}
 
 	if phi, ok := ssa.ToPhi(v); ok && phi != nil {
@@ -576,7 +789,7 @@ func handleInst(inst ssa.Instruction, st *pathState, allocs map[int64]struct{}, 
 	propagateFromOperands(v, st, allocs)
 
 	// Member access: object relationship may not appear in GetValues()
-	if v.IsMember() {
+	if v.IsMember() && !isUndefinedValue(v) {
 		if obj := v.GetObject(); obj != nil {
 			for o := range st.objsOf(obj.GetId()) {
 				st.addPointsTo(v.GetId(), o)
@@ -592,6 +805,16 @@ func handleInst(inst ssa.Instruction, st *pathState, allocs map[int64]struct{}, 
 				st.addPointsTo(obj.GetId(), pid)
 				st.addPointsTo(v.GetId(), pid)
 			}
+		}
+	}
+
+	// Bare-* artifact may carry points-to of the pointer operand.
+	if ptr := starDerefPointer(v); ptr != nil {
+		for o := range st.objsOf(ptr.GetId()) {
+			st.addPointsTo(v.GetId(), o)
+		}
+		if pid := paramObjectID(ptr); pid > 0 {
+			st.addPointsTo(v.GetId(), pid)
 		}
 	}
 
@@ -621,7 +844,7 @@ func propagateFromOperands(v ssa.Value, st *pathState, allocs map[int64]struct{}
 	}
 }
 
-func handleCall(call *ssa.Call, st *pathState, allocs map[int64]struct{}, reg *registry, freeParams map[int64]map[int]struct{}) []*Finding {
+func handleCall(call *ssa.Call, st *pathState, allocs map[int64]struct{}, reg *registry, freeParams, derefParams map[int64]map[int]struct{}) []*Finding {
 	var findings []*Finding
 	isFree := isFreeCall(call, reg)
 
@@ -689,6 +912,13 @@ func handleCall(call *ssa.Call, st *pathState, allocs map[int64]struct{}, reg *r
 		return findings
 	}
 
+	// realloc invalidates the old pointer (first arg); result is a fresh alloc.
+	if strings.EqualFold(callMethodName(call), "realloc") && len(call.Args) > 0 {
+		findings = append(findings, checkUses(call, st)...)
+		applyKill([]int64{call.Args[0]})
+		return findings
+	}
+
 	// Interprocedural: callee frees formal parameter(s) → kill matching actual args.
 	if freeParams != nil {
 		calleeIDs := resolveCalleeFuncIDs(call)
@@ -717,9 +947,43 @@ func handleCall(call *ssa.Call, st *pathState, allocs map[int64]struct{}, reg *r
 		}
 	}
 
-	// Non-free call: using freed pointer as argument is UAF
-	findings = append(findings, checkUses(call, st)...)
+	// Non-free call: using freed pointer as argument is UAF — unless every
+	// resolved callee has a nontrivial body and does not dereference that formal
+	// (store-only sinks like `held = p`).
+	if shouldCheckCallArgUAF(call, derefParams) {
+		findings = append(findings, checkUses(call, st)...)
+	}
 	return findings
+}
+
+func shouldCheckCallArgUAF(call *ssa.Call, derefParams map[int64]map[int]struct{}) bool {
+	if call == nil {
+		return true
+	}
+	calleeIDs := resolveCalleeFuncIDs(call)
+	if len(calleeIDs) == 0 {
+		return true // extern / unresolved → conservative
+	}
+	prog := call.GetProgram()
+	for _, cid := range calleeIDs {
+		var fn *ssa.Function
+		if prog != nil {
+			prog.EachFunction(func(f *ssa.Function) {
+				if f != nil && f.GetId() == cid {
+					fn = f
+				}
+			})
+		}
+		if fn == nil || !functionHasNontrivialBody(fn) {
+			return true
+		}
+		if derefParams != nil {
+			if idxs, ok := derefParams[cid]; ok && len(idxs) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func resolveCalleeFuncIDs(call *ssa.Call) []int64 {
@@ -796,7 +1060,19 @@ func checkUses(v ssa.Value, st *pathState) []*Finding {
 		}
 	}
 
-	if v.IsMember() {
+	if ptr := starDerefPointer(v); ptr != nil {
+		for oid := range st.objsOf(ptr.GetId()) {
+			report(oid)
+		}
+		if st.objects[ptr.GetId()] == StateFreed {
+			report(ptr.GetId())
+		}
+		if pid := paramObjectID(ptr); pid > 0 {
+			report(pid)
+		}
+	}
+
+	if v.IsMember() && !isUndefinedValue(v) {
 		if obj := v.GetObject(); obj != nil {
 			for oid := range st.objsOf(obj.GetId()) {
 				report(oid)
