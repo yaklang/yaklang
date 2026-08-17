@@ -21,45 +21,24 @@ import (
 // 自身携带的标准信号驱动：
 //
 //   - Retry-After 响应头：HTTP 429 标准契约，所有主流 AI 提供商均支持。
-//     有值 → 限流/过载类，应按 Retry-After 退避重试。
-//     无值 → 额度耗尽类，不会短期自动恢复，等待短时间后由上层有限重试循环
-//     继续并最终暴露错误。
+//     有合理值（< 3600）→ 限流/过载类，可重试，按 Retry-After 退避。
+//     无值 → 额度耗尽类，不会短期自动恢复，不应重试。
+//     大额值（>= 3600）→ 额度到次日才恢复（如 AIBalance daily_token），
+//     不应重试。
 //   - error.message：响应体 JSON 的 error.message 字段，兼容 OpenAI /
-//     Anthropic / AIBalance 三种格式。直接展示服务端返回的原始文案，客户端
-//     不再重复维护一份 per-kind 文案表。
+//     Anthropic / AIBalance 三种格式。直接展示服务端返回的原始文案。
 //   - X-AIBalance-Limit-Kind 响应头：AIBalance 的稳定限流标识，仅用于日志
 //     记录和旧版队列头兼容，不参与分类逻辑。
 //
-// 当 AIBalance 新增/重命名 kind 时，只要响应体 error.message 和 Retry-After
-// 契约不变，客户端无需任何改动。
+// 返回值 (is429, shouldRetry, ctxDone)：
+//   - is429:       是否检测到 429
+//   - shouldRetry: 该 429 是否应该重试（频率限流/过载类=true，额度耗尽类=false）
+//   - ctxDone:     context 在等待期间是否被取消
 
 // aibalance429Body 是 429 响应体 JSON 的最小子集，仅解析客户端所需的通用字段。
 // 该结构兼容 OpenAI / Anthropic / AIBalance 三种 error 格式，因为它们都用
-// error.message 承载错误描述。AIBalance 专有的动态字段（limit_kind / reason /
-// tokens_used / queue_length 等）也一并列出，供日志记录和未来扩展使用。
-//
-// 响应体格式（统一）：
-//
-//	{
-//	  "type": "error",                          // Anthropic 必需，OpenAI 忽略
-//	  "error": {
-//	    "message": "...",                       // 通用：错误描述
-//	    "type": "rate_limit_exceeded | ...",    // 通用：错误类型
-//	    "limit_kind": "rpm | token | ...",      // AIBalance 专有
-//	    "limit_kind_zh": "...",                 // AIBalance 专有
-//	    "code": "...",                          // 可选
-//	    "notice": "...",                        // AIBalance 可选
-//	    "reason": "quota_exhausted | ...",      // AIBalance: api_user_token
-//	    "model": "...",                         // AIBalance: daily_token 等
-//	    "tokens_used": 12345,                   // AIBalance: daily_token
-//	    "tokens_limit": 99999,                  // AIBalance: daily_token
-//	    "exceeded_kind": "request | token",     // AIBalance: free_ip
-//	    "queue_length": 5,                      // AIBalance: rpm
-//	    "retry_after": 10,                      // AIBalance: web_search_rpm
-//	    "upstream_last_error": "...",           // AIBalance: upstream_rate_limit
-//	    "...": "动态字段(因提供商/kind而异)"
-//	  }
-//	}
+// error.message 承载错误描述。AIBalance 专有的动态字段也一并列出，供日志和
+// 未来扩展使用。
 type aibalance429Body struct {
 	Error struct {
 		Message           string `json:"message"`
@@ -97,21 +76,15 @@ func parse429Body(rsp *AIResponse) *aibalance429Body {
 	return &parsed
 }
 
-// bodyLimitKindAliases 把 AIBalance 响应体 error.limit_kind（服务端 catalog 的
-// ResponseKind）中与响应头 X-AIBalance-Limit-Kind（HeaderKind）不一致的值
-// 映射回稳定标识，仅用于日志记录。
-//
-// 服务端 custom_429.go 中以下 kind 的 ResponseKind != Kind：
-//   - daily_token       -> daily_token_quota
-//   - free_ip           -> free_ip_quota
-// 其余 kind 的 ResponseKind 与 Kind 相同，无需映射。
+// bodyLimitKindAliases 把 AIBalance 响应体 error.limit_kind 中与响应头
+// X-AIBalance-Limit-Kind 不一致的值映射回稳定标识，仅用于日志记录。
 var bodyLimitKindAliases = map[string]string{
 	"daily_token_quota": "daily_token",
 	"free_ip_quota":     "free_ip",
 }
 
 // resolveLimitKind 优先从 X-AIBalance-Limit-Kind 响应头读取 AIBalance 的限流
-// 标识；若响应头缺失，则回退到响应体 error.limit_kind 字段（经别名归一化）。
+// 标识；若响应头缺失，则回退到响应体 error.limit_kind（经别名归一化）。
 // 返回值仅用于日志记录和旧版队列头兼容判断，不参与分类逻辑。
 func resolveLimitKind(rsp *AIResponse, body *aibalance429Body) string {
 	if rsp != nil {
@@ -144,8 +117,21 @@ func parseRetryAfterSeconds(rsp *AIResponse, fallback int) int {
 	return fallback
 }
 
-// capRetryAfterSeconds 将 Retry-After 秒数限制在 [minSec, maxSec] 区间，
-// 防止上游给出异常大的等待值导致客户端长时间卡死。maxSec <= 0 表示不限上限。
+// is429Retryable 判断一个 429 响应是否值得重试。
+// 用于无法调用 handle429RateLimitContext 的场景（如 transaction 层只有
+// AICallerConfigIf 接口）。分类逻辑与 handle429RateLimitContext 一致：
+//   - 有合理 Retry-After（< 3600）：限流/过载类，可重试。
+//   - 无 Retry-After 或大额 Retry-After（>= 3600）：额度耗尽类，不可重试。
+func is429Retryable(ctx context.Context, rsp *AIResponse) bool {
+	if !is429Response(ctx, rsp) {
+		return false
+	}
+	retryAfter := parseRetryAfterSeconds(rsp, 0)
+	return retryAfter > 0 && retryAfter < 3600
+}
+
+// capRetryAfterSeconds 将秒数限制在 [minSec, maxSec] 区间。
+// maxSec <= 0 表示不限上限。
 func capRetryAfterSeconds(sec, minSec, maxSec int) int {
 	if sec < minSec {
 		return minSec
@@ -157,7 +143,7 @@ func capRetryAfterSeconds(sec, minSec, maxSec int) int {
 }
 
 // jitterSeconds 在 base 秒的基础上叠加最多 maxJitter 秒的随机抖动，
-// 用于退避重试，避免大量客户端在同一时刻同时重试（惊群）。
+// 避免大量客户端在同一时刻同时重试（惊群）。
 func jitterSeconds(base, maxJitter int) int {
 	if maxJitter <= 0 {
 		return base
@@ -166,8 +152,6 @@ func jitterSeconds(base, maxJitter int) int {
 }
 
 // emit429Notify 统一发出 429 通知事件并记录日志。
-// source 用于日志标识 429 来源（"aibalance" / "generic"），kind 用于记录
-// 限流标识（AIBalance 的 limit_kind 或 "generic" / "legacy-queue"）。
 func (c *Config) emit429Notify(notifyType, msg string, waitDuration time.Duration, source, kind string) {
 	c.EmitNotify(notifyType, msg, waitDuration)
 	log.Infof("%s 429 [kind=%s] %s | waiting %s", source, kind, strings.ReplaceAll(msg, "\n", " "), waitDuration)
@@ -178,9 +162,11 @@ func (c *Config) emit429Notify(notifyType, msg string, waitDuration time.Duratio
 // context-aware select so the wait can be interrupted by context cancellation.
 //
 // Returns:
-//   - is429:   true if a 429 was detected
-//   - ctxDone: true if the context was cancelled during the wait
-func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) {
+//   - is429:       true if a 429 was detected
+//   - shouldRetry: true if this 429 is retryable (rate-limit/overload), false if
+//                 it's a quota-exhaustion that won't recover short-term
+//   - ctxDone:     true if the context was cancelled during the wait
+func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, shouldRetry bool, ctxDone bool) {
 	return c.handle429RateLimitContext(c.Ctx, rsp)
 }
 
@@ -190,29 +176,26 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 //  1. 等待响应头就绪，校验状态码为 429。
 //  2. 解析响应体 JSON，提取 error.message 和 AIBalance limit_kind（用于日志）。
 //  3. 按 Retry-After 响应头有无分流：
-//     - 有 Retry-After（含 AIBalance 频率/系统类、直连 OpenAI/Anthropic）：
-//       读取 Retry-After 做退避，叠加抖动，限制到 [1,120]s。
-//     - 无 Retry-After（AIBalance 额度耗尽类 token/api_user_token 等、
-//       无 Retry-After 的通用 429）：等待 5-15s，由上层有限重试循环继续。
-//  4. 特殊处理：AIBalance 的 daily_token/free_ip 携带 Retry-After:3600
-//     （建议等到次日 06:00），客户端不应长时间阻塞，限制到 [5,30]s。
-//  5. 兼容旧版 X-AIBalance-Info 队列头：无 limit_kind 但存在队列头时，
-//     按队列长度估算等待时间。
-//  6. 用户文案统一从响应体 error.message 提取，提取失败时回退到默认文案。
-func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse) (is429 bool, ctxDone bool) {
+//     - 有合理 Retry-After（< 3600）：限流/过载类，可重试，按 Retry-After 退避。
+//     - 无 Retry-After：额度耗尽类，不可重试，等待短时间后由上层处理。
+//     - 大额 Retry-After（>= 3600）：额度到次日才恢复（如 daily_token），不可重试。
+//  4. 兼容旧版 X-AIBalance-Info 队列头：无 limit_kind 但存在队列头时，
+//     按队列长度估算等待时间（可重试）。
+//  5. 用户文案统一从响应体 error.message 提取，提取失败时回退到默认文案。
+func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse) (is429 bool, shouldRetry bool, ctxDone bool) {
 	if rsp == nil {
-		return false, false
+		return false, false, false
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	if !rsp.WaitForHTTPHeaders(ctx) {
-		return false, true
+		return false, false, true
 	}
 
 	if rsp.GetHTTPStatusCode() != 429 {
-		return false, false
+		return false, false, false
 	}
 
 	body := parse429Body(rsp)
@@ -236,23 +219,24 @@ func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse)
 	var notifyType string
 
 	switch {
+	case retryAfter >= 3600:
+		// 大额 Retry-After（如 AIBalance daily_token/free_ip 的 3600）：
+		// 额度到次日才恢复，不可重试。限制到 [5,30]s 避免长时间阻塞，
+		// 由上层立即暴露错误。
+		waitSec = capRetryAfterSeconds(jitterSeconds(retryAfter, 0), 5, 30)
+		notifyType = "quota-exceeded"
+		shouldRetry = false
 	case retryAfter > 0:
-		// 有 Retry-After：限流/过载类，按 Retry-After 退避。
-		// AIBalance 的 daily_token/free_ip 发送 3600（建议等到 06:00），
-		// 客户端不应长时间阻塞，限制到 [5,30]s；其余限制到 [1,120]s。
-		if retryAfter >= 3600 {
-			// 大额 Retry-After（如 AIBalance daily_token/free_ip 的 3600）：
-			// 不会短期自动恢复，限制到 [5,30]s，由上层重试循环逐步耗尽。
-			waitSec = capRetryAfterSeconds(jitterSeconds(retryAfter, 0), 5, 30)
-			notifyType = "quota-exceeded"
-		} else {
-			waitSec = capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
-			notifyType = "rate-limit"
-		}
+		// 有合理 Retry-After：限流/过载类，可重试，按 Retry-After 退避。
+		waitSec = capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
+		notifyType = "rate-limit"
+		shouldRetry = true
 	default:
-		// 无 Retry-After：额度耗尽类或无标准信号的通用 429，等待 5-15s。
+		// 无 Retry-After：额度耗尽类（如 token/api_user_token），不可重试。
+		// 等待短时间后由上层处理（消耗重试次数或暴露错误）。
 		waitSec = 5 + rand.Intn(11)
 		notifyType = "quota-exceeded"
+		shouldRetry = false
 	}
 
 	waitDuration := time.Duration(waitSec) * time.Second
@@ -265,7 +249,8 @@ func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse)
 	}
 
 	c.emit429Notify(notifyType, msg, waitDuration, source, kindLabel)
-	return c.wait429(ctx, waitDuration)
+	done := c.wait429(ctx, waitDuration)
+	return true, shouldRetry, done
 }
 
 // extract429Message 从 429 响应体提取用户可见的错误信息。
@@ -286,7 +271,8 @@ const default429Message = "当前遇到 429 服务器访问人数过多，稍后
 
 // handleLegacyQueue429 兼容旧版 X-AIBalance-Info 队列头：当响应未携带
 // X-AIBalance-Limit-Kind 但存在 X-AIBalance-Info 时，按队列长度估算等待时间。
-func (c *Config) handleLegacyQueue429(ctx context.Context, queueInfo string) (bool, bool) {
+// 队列限流属于频率类，可重试。
+func (c *Config) handleLegacyQueue429(ctx context.Context, queueInfo string) (is429 bool, shouldRetry bool, ctxDone bool) {
 	queueCount, parseErr := strconv.Atoi(queueInfo)
 	var waitDuration time.Duration
 	if parseErr == nil && queueCount > 0 {
@@ -308,16 +294,17 @@ func (c *Config) handleLegacyQueue429(ctx context.Context, queueInfo string) (bo
 		waitDuration = 15 * time.Second
 		c.emit429Notify("rate-limit", msg, waitDuration, "aibalance", "legacy-queue")
 	}
-	return c.wait429(ctx, waitDuration)
+	done := c.wait429(ctx, waitDuration)
+	return true, true, done
 }
 
 // wait429 在给定的等待时长内阻塞，期间响应 context 取消。
-// 返回 (is429=true, ctxDone)。
-func (c *Config) wait429(ctx context.Context, waitDuration time.Duration) (bool, bool) {
+// 返回 ctxDone。
+func (c *Config) wait429(ctx context.Context, waitDuration time.Duration) bool {
 	select {
 	case <-ctx.Done():
-		return true, true
+		return true
 	case <-time.After(waitDuration):
-		return true, false
+		return false
 	}
 }
