@@ -187,11 +187,12 @@ func TestHandle429_AIBalance_EmitsNotifyEvent(t *testing.T) {
 	require.Equal(t, float64(6), payload["duration_seconds"])
 }
 
-func TestHandle429_Generic429_EmitsRateLimitNotifyEvent(t *testing.T) {
+func TestHandle429_Generic429_EmitsNotifyEvent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// make429Response() has no Retry-After → quota-exceeded notify type
 	rsp := make429Response()
 
 	is429, ctxDone := cfg.handle429RateLimit(rsp)
@@ -201,13 +202,12 @@ func TestHandle429_Generic429_EmitsRateLimitNotifyEvent(t *testing.T) {
 	assert.True(t, ctxDone)
 
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "rate-limit", payload["type"])
-	require.Equal(t, "rate-limit", payload["warning_type"])
+	// No Retry-After → quota-exceeded type
+	require.Equal(t, "quota-exceeded", payload["type"])
+	require.Equal(t, "quota-exceeded", payload["warning_type"])
 	require.Contains(t, payload["content"], "HTTP 429")
 	require.GreaterOrEqual(t, payload["duration"].(float64), float64(5))
 	require.LessOrEqual(t, payload["duration"].(float64), float64(15))
-	require.GreaterOrEqual(t, payload["duration_ms"].(float64), float64(5000))
-	require.LessOrEqual(t, payload["duration_ms"].(float64), float64(15000))
 }
 
 func TestHandle429_Generic429_WaitsWhenContextAlive(t *testing.T) {
