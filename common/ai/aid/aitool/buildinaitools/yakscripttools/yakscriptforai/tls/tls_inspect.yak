@@ -1,30 +1,308 @@
-__DESC__ = "用于检查指定域名的TLS证书信息，尝试不同的协议版本进行扫描，并打印证书详情。"
+__DESC__ = "Inspect TLS certificates and connection details for a target domain. Tries multiple protocol probes (auto, force HTTP/1.1, force HTTP/2), reports certificate validity, issuer/subject, version/cipher, protocol negotiation, SAN domains, and GM TLS (国密) detection. Emits a dense summary line for AI decision-making plus full certificate details. 检查目标域名的 TLS 证书信息，尝试多种协议版本探测，报告证书有效性、颁发者/主题、版本/加密套件、协议协商、SAN 域名和国密 TLS 检测。"
 __VERBOSE_NAME__ = "TLS Inspector"
 __VERBOSE_NAME_ZH__ = "TLS证书检查"
-__KEYWORDS__ = "security,https,ssl,加密,网络安全,证书详情,安全工具,certificate validation,encryption,certificate authority,domain verification,tls证书,域名扫描,tls certificates,domain inspection,network security,web security,证书检查"
+__KEYWORDS__ = "security,https,ssl,加密,网络安全,证书详情,安全工具,certificate validation,encryption,certificate authority,domain verification,tls证书,域名扫描,tls certificates,domain inspection,network security,web security,证书检查,cert expired,self-signed,cipher suite,tls version,h2,http2,negotiated protocol,gmtls,国密,sm2"
 
 __USAGE__ = <<<USAGE_BLOCK
-TLS Certificate Inspect Tool - Parameter Description for JSON Tool Calls
+TLS Certificate Inspector - Usage Guide for AI Parameter Calls
 
-Required Parameters:
-  domain          (string)  Target domain to inspect TLS certificates.
-                            Example: "www.example.com".
+Inspects TLS certificates and connection parameters for a target domain.
+Tries three probe methods in sequence (auto, force HTTP/1.1, force HTTP/2)
+and returns results from the first successful one.
+
+## Parameters
+
+Required:
+  domain    (string)  Target domain (with optional :port, default 443).
+                      Example: "www.example.com" or "www.example.com:8443".
+
+Optional:
+  timeout   (int)     Connection timeout in seconds. Default: 10.
+  verbose   (bool)    When true, prints per-probe progress and timing.
+                      Default: false (quiet — only summary + cert details).
+
+## What you get
+
+1. A dense summary line (one line, all key signals):
+   domain | protocol | tls-version | cipher | cert-status | issuer | not-after | san-domains | gm-tls
+   - protocol: negotiated ALPN (h2 / http/1.1 / none)
+   - cert-status: valid / expired / not-yet-valid / self-signed
+   - gm-tls: yes / no (国密 TLS / SM2 certificate detection)
+
+2. Full certificate text (Subject, Issuer, Validity, Serial, Signature Algorithm,
+   X509v3 extensions, SAN domains, Key Usage).
+
+3. Error classification with recovery hints when all probes fail.
+
+## Error classification
+
+- `[tls error: dns]` — DNS resolution failed for the domain.
+- `[tls error: connection]` — TCP connection refused or reset (port may be closed).
+- `[tls error: timeout]` — Connection or handshake timed out.
+- `[tls error: handshake]` — TLS handshake failed (version mismatch, no common cipher, cert rejected).
+- `[tls error: unknown]` — Other failure.
+
+## Examples
+
+```json
+{"@action":"call-tool","tool":"tls_inspect","identifier":"check_tls","params":{"domain":"www.example.com"}}
+```
+
+```json
+{"@action":"call-tool","tool":"tls_inspect","identifier":"check_tls_verbose","params":{"domain":"www.example.com:8443","timeout":15,"verbose":true}}
+```
 USAGE_BLOCK
 
-// domain := "www.example.com"
-domain = cli.String("domain", cli.setHelp("the domain u want to check tls certificates"), cli.setRequired(true))
+yakit.AutoInitYakit()
+
+domain = cli.String("domain", cli.setHelp("target domain to inspect TLS certificates, e.g. www.example.com or www.example.com:8443"), cli.setRequired(true))
+timeoutSec = cli.Int("timeout", cli.setHelp("connection timeout in seconds"), cli.setDefault(10))
+verbose = cli.Bool("verbose", cli.setHelp("print per-probe progress and timing"), cli.setDefault(false))
 cli.check()
 
-for inspectCall in [tls.Inspect, tls.InspectForceHttp1_1, tls.InspectForceHttp2] {
-    result, err = tls.Inspect(domain)
-    if err != nil {
-        yakit.Error("tls check failed: %v", err)
+// --- normalize target: ensure host:port format ---
+target = str.TrimSpace(domain)
+if target == "" {
+    yakit.AIOutput("[param error: missing domain] domain parameter is required. Recovery: provide a domain name (e.g. www.example.com) or host:port (e.g. www.example.com:8443).")
+    return
+}
+
+// extract host and port
+host = target
+port = 443
+lastColon = str.LastIndex(target, ":")
+if lastColon > 0 {
+    possiblePort = parseInt(target[lastColon+1:])
+    if possiblePort > 0 && possiblePort <= 65535 {
+        host = target[:lastColon]
+        port = possiblePort
+    }
+}
+// strip scheme if present
+host = str.ReplaceAll(host, "https://", "")
+host = str.ReplaceAll(host, "http://", "")
+host = str.TrimSpace(host)
+
+// --- TLS version to readable string ---
+tlsVersionName = func(ver) {
+    if ver == 0x0301 { return "TLS 1.0" }
+    if ver == 0x0302 { return "TLS 1.1" }
+    if ver == 0x0303 { return "TLS 1.2" }
+    if ver == 0x0304 { return "TLS 1.3" }
+    if ver == 0x0300 { return "SSL 3.0" }
+    if ver == 0x0101 { return "GM SSL (国密)" }
+    return sprintf("0x%04x", ver)
+}
+
+// --- classify TLS error by error string ---
+classifyTlsError = fn(errStr) {
+    errLower = str.ToLower(errStr)
+    if str.Contains(errLower, "no such host") || str.Contains(errLower, "dns") || str.Contains(errLower, "lookup") || str.Contains(errLower, "resolve") {
+        return "dns", sprintf("DNS resolution failed for %v. Recovery: check the domain spelling, try an IP address directly, or verify DNS server / hosts file.", host)
+    }
+    if str.Contains(errLower, "connection refused") || str.Contains(errLower, "reset by peer") || str.Contains(errLower, "EOF") {
+        return "connection", sprintf("TCP connection to %v:%v was refused or reset. Recovery: the port may be closed or filtered. Verify the port is open (use scan_port), check if the host is up, or try a different port.", host, port)
+    }
+    if str.Contains(errLower, "timeout") || str.Contains(errLower, "deadline") || str.Contains(errLower, "i/o timeout") {
+        return "timeout", sprintf("Connection or TLS handshake timed out (current timeout: %vs). Recovery: increase the timeout parameter, or the server may be slow/unreachable. A timeout on port 443 may indicate the service is not running or is firewalled.", timeoutSec)
+    }
+    if str.Contains(errLower, "handshake") || str.Contains(errLower, "no cipher") || str.Contains(errLower, "protocol version") || str.Contains(errLower, "tls") || str.Contains(errLower, "certificate") || str.Contains(errLower, "x509") {
+        return "handshake", sprintf("TLS handshake failed: %v. Recovery: the server may not support standard TLS, may require a specific version/cipher, or the certificate chain is broken. Try a different port, or use do_http_request with https=no for plain HTTP.", errStr)
+    }
+    return "unknown", sprintf("TLS inspection failed: %v. Recovery: verify the domain and port, check network connectivity, or try scan_port to confirm the service is running.", errStr)
+}
+
+// --- try three probe methods in sequence ---
+// BUG FIX: original code iterated [tls.Inspect, tls.InspectForceHttp1_1, tls.InspectForceHttp2]
+// but always called tls.Inspect(domain) inside the loop, ignoring the loop variable.
+// Now each probe calls its actual function.
+probeNames = ["auto (ALPN h2+http/1.1)", "force HTTP/1.1", "force HTTP/2"]
+probeFuncs = [tls.Inspect, tls.InspectForceHttp1_1, tls.InspectForceHttp2]
+
+allResults = []
+firstErr = ""
+firstErrType = ""
+successProbe = ""
+
+for probeIdx := 0; probeIdx < len(probeFuncs); probeIdx++ {
+    probeName = probeNames[probeIdx]
+    probeFn = probeFuncs[probeIdx]
+
+    if verbose {
+        yakit.Info("probe [%d/3] %s: %s:%d ...", probeIdx+1, probeName, host, port)
     }
 
-    if result.Len() > 0 {
-        for i in result {
-            yakit.Info("RESULT: %#v", i.String())
+    results, err = probeFn(sprintf("%s:%d", host, port))
+    if err != nil {
+        errStr = sprint(err)
+        if firstErr == "" {
+            firstErr = errStr
+            firstErrType, _ = classifyTlsError(errStr)
         }
-        return
+        if verbose {
+            yakit.Info("probe [%d/3] %s failed: %v", probeIdx+1, probeName, errStr)
+        }
+        continue
+    }
+
+    if len(results) > 0 {
+        allResults = results
+        successProbe = probeName
+        break
+    }
+
+    if verbose {
+        yakit.Info("probe [%d/3] %s: no results", probeIdx+1, probeName)
+    }
+}
+
+// --- all probes failed ---
+if len(allResults) == 0 {
+    errType, recovery = classifyTlsError(firstErr)
+    yakit.AIOutput("[tls error: %v] %v. Recovery: %v", errType, firstErr, recovery)
+    return
+}
+
+// --- build dense summary line ---
+// Extract key signals from the first result for the one-line summary.
+firstResult = allResults[0]
+
+// parse certificate details from the Description text
+certStatus = "valid"
+certIssuer = ""
+certNotAfter = ""
+certNotBefore = ""
+certSubject = ""
+sanDomains = []
+isGmTls = false
+
+// check GM TLS
+try {
+    isGmTls = firstResult.IsGMTLS()
+} catch e {}
+
+// extract issuer, validity, subject from Description text
+descLines = str.Split(firstResult.Description, "\n")
+for line in descLines {
+    lineTrim = str.TrimSpace(line)
+    lowerLine = str.ToLower(lineTrim)
+    if str.HasPrefix(lowerLine, "issuer:") {
+        certIssuer = str.TrimSpace(lineTrim[str.Index(lineTrim, ":")+1:])
+    }
+    if str.HasPrefix(lowerLine, "not before:") {
+        certNotBefore = str.TrimSpace(lineTrim[str.Index(lineTrim, ":")+1:])
+    }
+    if str.HasPrefix(lowerLine, "not after") {
+        certNotAfter = str.TrimSpace(lineTrim[str.Index(lineTrim, ":")+1:])
+    }
+    if str.HasPrefix(lowerLine, "subject:") {
+        certSubject = str.TrimSpace(lineTrim[str.Index(lineTrim, ":")+1:])
+    }
+}
+
+// collect SAN domains from all results
+for r in allResults {
+    for d in r.RelativeDomains {
+        if d != "" && !(d in sanDomains) {
+            sanDomains.Push(d)
+        }
+    }
+}
+
+// determine cert status (expired / not-yet-valid / self-signed)
+now = time.Now()
+if certNotAfter != "" {
+    try {
+        notAfterTime = time.Parse("Jan 2 15:04:05 2006 MST", certNotAfter)~
+        if notAfterTime.Before(now) {
+            certStatus = "expired"
+        }
+    } catch e {}
+}
+if certNotBefore != "" {
+    try {
+        notBeforeTime = time.Parse("Jan 2 15:04:05 2006 MST", certNotBefore)~
+        if notBeforeTime.After(now) {
+            certStatus = "not-yet-valid"
+        }
+    } catch e {}
+}
+// self-signed: issuer == subject
+if certIssuer != "" && certSubject != "" && certIssuer == certSubject {
+    if certStatus == "valid" {
+        certStatus = "self-signed"
+    }
+}
+
+// build summary parts
+summaryParts = []
+summaryParts.Push(sprintf("domain: %s:%d", host, port))
+summaryParts.Push(sprintf("protocol: %v", firstResult.Protocol))
+summaryParts.Push(sprintf("tls-version: %v", tlsVersionName(firstResult.Version)))
+summaryParts.Push(sprintf("cipher: 0x%04x", firstResult.CipherSuite))
+summaryParts.Push(sprintf("cert-status: %v", certStatus))
+if certIssuer != "" {
+    // truncate issuer for summary line
+    issuerBrief = certIssuer
+    if len(issuerBrief) > 60 {
+        issuerBrief = issuerBrief[:60] + "..."
+    }
+    summaryParts.Push(sprintf("issuer: %v", issuerBrief))
+}
+if certNotAfter != "" {
+    summaryParts.Push(sprintf("not-after: %v", certNotAfter))
+}
+if len(sanDomains) > 0 {
+    sanBrief = str.Join(sanDomains, ", ")
+    if len(sanBrief) > 120 {
+        sanBrief = sanBrief[:120] + "..."
+    }
+    summaryParts.Push(sprintf("san-domains: %v", sanBrief))
+}
+if isGmTls {
+    summaryParts.Push("gm-tls: yes (国密)")
+} else {
+    summaryParts.Push("gm-tls: no")
+}
+if successProbe != "" && successProbe != "auto (ALPN h2+http/1.1)" {
+    summaryParts.Push(sprintf("probe: %v", successProbe))
+}
+
+yakit.AIOutput("tls_inspect: %v", str.Join(summaryParts, " | "))
+
+// --- cert status hint ---
+if certStatus == "expired" {
+    yakit.AIOutput("[cert hint] Certificate is EXPIRED (not-after: %v). The server is serving an expired certificate. This may indicate neglect, a misconfigured CA, or a test/staging environment. For penetration testing, expired certs are common in internal apps and dev environments. The TLS connection still works because the tool skips verification, but browsers would reject it.", certNotAfter)
+} elif certStatus == "not-yet-valid" {
+    yakit.AIOutput("[cert hint] Certificate is NOT YET VALID (not-before: %v). The server's clock or the CA issuance date is in the future. This is unusual and may indicate a misconfigured server or CA.", certNotBefore)
+} elif certStatus == "self-signed" {
+    yakit.AIOutput("[cert hint] Certificate is SELF-SIGNED (issuer == subject). Common in dev/test environments, internal applications, and IoT devices. The connection is not trust-chain validated. For recon, note the subject CN/SAN for asset mapping.")
+}
+
+// --- full certificate details ---
+// The certificate text is a core result for AI decision-making (cert chain
+// analysis, SAN domain discovery, key usage inspection). Emit via AIOutput so
+// it enters the Timeline. The framework's normalizeToolResultData handles
+// token-budget truncation automatically.
+// Verbose-only debug lines (per-cert metadata, relative domains/emails) stay
+// as yakit.Info for GUI display.
+if verbose {
+    yakit.Info("=== Full Certificate Details ===")
+}
+for idx, r in allResults {
+    if verbose {
+        yakit.Info("--- Certificate #%d ---", idx+1)
+        yakit.Info("Protocol: %v | TLS Version: %v | CipherSuite: 0x%04x | ServerName: %v",
+            r.Protocol, tlsVersionName(r.Version), r.CipherSuite, r.ServerName)
+    }
+    yakit.AIOutput("%v", r.Description)
+    if verbose && len(r.RelativeDomains) > 0 {
+        yakit.Info("Relative Domains: %v", str.Join(r.RelativeDomains, ", "))
+    }
+    if verbose && len(r.RelativeEmail) > 0 {
+        yakit.Info("Relative Emails: %v", str.Join(r.RelativeEmail, ", "))
+    }
+    if verbose {
+        yakit.Info("")
     }
 }
