@@ -187,6 +187,17 @@ type ReActLoop struct {
 	// 关键词: lastIterationTickAt, 主循环心跳, [LOOP_STALL_DETECTED]
 	lastIterationTickAt atomic.Int64
 
+	// lastActivityAt 记录最近一次"非 iteration 推进"的活动 (工具开始执行等).
+	// 与 lastIterationTickAt 分开: 长工具调用不会推进 iteration, 但必须算作
+	// 有进度, 否则 stall heartbeat 会把全仓 grep 误判成死锁并 hard abort.
+	// 关键词: lastActivityAt, 工具 in-flight, stall 旁路
+	lastActivityAt atomic.Int64
+
+	// toolActivityInflight 是正在执行的工具调用深度. >0 时 stall heartbeat
+	// 跳过报警和硬抢断 (工具还在跑 ≠ 主循环死锁).
+	// 关键词: toolActivityInflight, 长工具调用不误杀
+	toolActivityInflight atomic.Int32
+
 	// verificationInFlight 标记 verification AI 调用是否正在飞行中, 用于
 	// 让 watchdog 在不持锁的情况下感知 "上一次还没回来". 与 verificationMutex
 	// 解耦后, watchdog 即便正赶上 verification 卡死也能立刻拿到这个原子
