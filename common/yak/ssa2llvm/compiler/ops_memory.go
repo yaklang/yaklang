@@ -92,7 +92,7 @@ func makeInitialMemberCount(inst *ssa.Make) int64 {
 	for _, pair := range ssa.GetMemberPairs(inst) {
 		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
-		continue
+			continue
 		}
 		count++
 		continue
@@ -325,8 +325,7 @@ func (c *Compiler) compileDynamicMemberValue(contextInst ssa.Instruction, val ss
 }
 
 func (c *Compiler) dynamicMemberReadValue(contextInst ssa.Instruction, val ssa.Value, memberID int64) (llvm.Value, error) {
-	obj := val.GetObject()
-	key := val.GetKey()
+	obj, key := c.firstOwnerObjectKey(val)
 	keyStr := c.resolveMemberKeyString(key)
 	if obj == nil || keyStr == "" {
 		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
@@ -337,6 +336,21 @@ func (c *Compiler) dynamicMemberReadValue(contextInst ssa.Instruction, val ssa.V
 		return llvm.Value{}, fmt.Errorf("dynamicMemberReadValue: failed to get object value: %w", err)
 	}
 	return c.emitRuntimeGetField(parentVal, keyStr, memberID), nil
+}
+
+// firstOwnerObjectKey returns the first (definition) owner pair of a member
+// value. GetObject()/GetKey() return the latest owner, which for a value
+// reused by a later assignment is the assignment target, not the object the
+// member was originally read from.
+func (c *Compiler) firstOwnerObjectKey(val ssa.Value) (ssa.Value, ssa.Value) {
+	if val == nil {
+		return nil, nil
+	}
+	pairs := val.GetObjectKeyPairs()
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	return pairs[0].Object, pairs[0].Key
 }
 
 func (c *Compiler) valueForMemberObject(contextInst ssa.Instruction, obj ssa.Value) (llvm.Value, error) {
@@ -583,7 +597,7 @@ func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value
 	if initialMemberValue && c.isInitializingMemberValue(resultID) {
 		return nil
 	}
-	if val.IsMember() && !initialMemberValue {
+	if val.IsMember() {
 		switch val.(type) {
 		case *ssa.ParameterMember, *ssa.Undefined:
 		default:
@@ -630,12 +644,12 @@ func (c *Compiler) shouldSkipOutdatedMemberSet(val ssa.Value, keyStr string) boo
 	for _, pair := range ssa.GetMemberPairs(val.GetObject()) {
 		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() == currentID {
-		continue
+			continue
 		}
 		if c.resolveMemberKeyString(key) == keyStr && member.GetId() > currentID {
 			if c.memberValueOverridesInSameBlock(val, member) {
 				skip = true
-		break
+				break
 			}
 		}
 		continue
@@ -667,13 +681,38 @@ func (c *Compiler) shouldReadMemberValueDynamically(val ssa.Value, id int64) boo
 	if current := c.currentFunction(); current != nil && val.GetFunc() != nil && val.GetFunc() != current {
 		return false
 	}
+
+	// A function value stored as an object member is a closure/function pointer,
+	// not a dynamic field read: materialize it directly instead of reading the
+	// member back through the object.
+	if ssaFn, ok := ssa.ToFunction(val); ok && ssaFn != nil {
+		return false
+	}
+	// A value whose latest owner object lives in another function is a shared
+	// definition (e.g. a constant reused by two object literals), not a member
+	// read of the current function's object. Reading it through that foreign
+	// object would compile a call into the other function (infinite recursion
+	// for self-referential factories).
+	if current := c.currentFunction(); current != nil {
+		if obj := val.GetObject(); obj != nil && obj.GetFunc() != nil && obj.GetFunc() != current {
+			return false
+		}
+	}
+
+	if current := c.currentFunction(); current != nil {
+		if obj, _ := c.firstOwnerObjectKey(val); obj != nil && obj.GetFunc() != nil && obj.GetFunc() != current {
+			return false
+		}
+	}
 	switch val.(type) {
 	case *ssa.Parameter, *ssa.ParameterMember, *ssa.SideEffect:
 		return false
 	case *ssa.Undefined:
-		return !val.IsExtern() && val.GetObject() != nil && val.GetKey() != nil
+		obj, key := c.firstOwnerObjectKey(val)
+		return !val.IsExtern() && obj != nil && key != nil
 	}
-	return val.GetObject() != nil && val.GetKey() != nil
+	obj, key := c.firstOwnerObjectKey(val)
+	return obj != nil && key != nil
 }
 
 func (c *Compiler) initialMemberValueOverridden(val ssa.Value) bool {
@@ -688,11 +727,11 @@ func (c *Compiler) initialMemberValueOverridden(val ssa.Value) bool {
 	for _, pair := range ssa.GetMemberPairs(val.GetObject()) {
 		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() == val.GetId() {
-		continue
+			continue
 		}
 		if member.GetId() > val.GetId() && c.resolveMemberKeyString(key) == keyStr {
 			overridden = true
-		break
+			break
 		}
 		continue
 	}
@@ -751,6 +790,9 @@ func (c *Compiler) emitAssignedMemberVariableSets(contextInst ssa.Instruction, v
 		}
 		keyStr := c.resolveMemberKeyString(key)
 		if keyStr == "" || c.sameMemberTarget(val, obj, keyStr) {
+			continue
+		}
+		if c.memberHasOwnerPair(val, obj, keyStr) {
 			continue
 		}
 		if !c.memberAssignmentObjectAvailable(contextInst, obj) {
@@ -1024,7 +1066,36 @@ func (c *Compiler) shouldReadInitialMemberValueForMemberSet(source ssa.Value) bo
 		source.GetObject() != nil &&
 		source.GetKey() != nil &&
 		c.isInitialMemberValue(source.GetId()) &&
-		!c.isInitializingMemberValue(source.GetId())
+		!c.isInitializingMemberValue(source.GetId()) &&
+		c.initialMemberValueObjectInCurrentFunction(source) &&
+		!c.initialMemberValueIsFunction(source)
+}
+
+// A function value stored as an object member is a closure/function pointer;
+// syncing its member variables must not re-read it through the object.
+func (c *Compiler) initialMemberValueIsFunction(source ssa.Value) bool {
+	if source == nil {
+		return false
+	}
+	_, ok := ssa.ToFunction(source)
+	return ok
+}
+
+// A shared initial member value whose latest owner object lives in another
+// function must not be re-read through that foreign object: the value was
+// already materialized at its definition site (e.g. a constant reused by two
+// object literals), and reading it back would compile a call into the other
+// function.
+func (c *Compiler) initialMemberValueObjectInCurrentFunction(source ssa.Value) bool {
+	if source == nil || source.GetObject() == nil {
+		return true
+	}
+	current := c.currentFunction()
+	if current == nil {
+		return true
+	}
+	objFn := source.GetObject().GetFunc()
+	return objFn == nil || objFn == current
 }
 
 func (c *Compiler) memberSourceForMemberSetDynamicRead(source ssa.Value) ssa.Value {
@@ -1265,6 +1336,27 @@ func (c *Compiler) sameMemberTarget(val ssa.Value, obj ssa.Value, keyStr string)
 	return val.GetObject().GetId() == obj.GetId() && c.resolveMemberKeyString(val.GetKey()) == keyStr
 }
 
+// memberHasOwnerPair reports whether val is stored as (obj, keyStr) in ANY of its
+// owner pairs. GetObject() only returns the latest owner, which can live in a
+// different function when one SSA value is reused by several object literals
+// (e.g. a shared constant); the initial-make path must still recognize the
+// current owner so it materializes the value directly instead of reading it
+// back through a foreign object.
+func (c *Compiler) memberHasOwnerPair(val ssa.Value, obj ssa.Value, keyStr string) bool {
+	if val == nil || obj == nil || keyStr == "" || !val.IsMember() {
+		return false
+	}
+	for _, pair := range val.GetObjectKeyPairs() {
+		if pair.Object == nil || pair.Key == nil {
+			continue
+		}
+		if pair.Object.GetId() == obj.GetId() && c.resolveMemberKeyString(pair.Key) == keyStr {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Compiler) valueForObjectMemberAssignment(contextInst ssa.Instruction, member ssa.Value) (llvm.Value, error) {
 	if member == nil || !member.IsMember() || member.GetObject() == nil || member.GetKey() == nil {
 		return c.getValue(contextInst, member.GetId())
@@ -1290,14 +1382,14 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 	for _, pair := range ssa.GetMemberPairs(inst) {
 		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
-		continue
+			continue
 		}
 		keyStr := c.resolveMemberKeyString(key)
 		if keyStr == "" {
-		continue
+			continue
 		}
 		if _, ok := seen[keyStr]; ok {
-		continue
+			continue
 		}
 		seen[keyStr] = struct{}{}
 		c.markInitialMemberValue(member.GetId())
@@ -1331,7 +1423,7 @@ func (c *Compiler) shouldReadMemberValueForInitialMakeMember(member ssa.Value, o
 	if member == nil || !member.IsMember() || member.GetObject() == nil || member.GetKey() == nil {
 		return false
 	}
-	if c.sameMemberTarget(member, owner, keyStr) {
+	if c.memberHasOwnerPair(member, owner, keyStr) {
 		return false
 	}
 	if current := c.currentFunction(); current != nil && member.GetFunc() != nil && member.GetFunc() != current {
