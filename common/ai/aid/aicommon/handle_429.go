@@ -223,9 +223,11 @@ func jitterSeconds(base, maxJitter int) int {
 }
 
 // emit429Notify 统一发出 429 通知事件并记录日志。notifyType 用于区分前端展示样式。
-func (c *Config) emit429Notify(notifyType, msg string, waitDuration time.Duration, kind string) {
+// source 用于日志中标识 429 来源（如 "aibalance" / "generic"），避免把非 AIBalance
+// 的 429 误标为 aibalance。
+func (c *Config) emit429Notify(notifyType, msg string, waitDuration time.Duration, source, kind string) {
 	c.EmitNotify(notifyType, msg, waitDuration)
-	log.Infof("aibalance 429 [kind=%s] %s | waiting %s", kind, strings.ReplaceAll(msg, "\n", " "), waitDuration)
+	log.Infof("%s 429 [kind=%s] %s | waiting %s", source, kind, strings.ReplaceAll(msg, "\n", " "), waitDuration)
 }
 
 // handle429RateLimit checks the AI response for a 429 status code, emits the
@@ -254,7 +256,8 @@ func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) 
 //     - 系统与上游类：读取 Retry-After 退避重试，提示非客户端问题。
 //  4. 兼容旧版 X-AIBalance-Info 队列头：当无 limit_kind 但存在队列头时，沿用
 //     队列长度估算等待时间。
-//  5. 其余未知 429：作为通用限流处理，等待 5-15s。
+//  5. 通用 429 兜底（非 AIBalance 提供商或未知来源）：读标准 Retry-After 头
+//     做退避，尝试提取响应体 error.message 展示，无 Retry-After 时回退到 5-15s。
 func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse) (is429 bool, ctxDone bool) {
 	if rsp == nil {
 		return false, false
@@ -282,15 +285,16 @@ func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse)
 	case isSystemKind(limitKind):
 		return c.handleSystem429(ctx, limitKind, rsp, body)
 	case limitKind == "":
-		// 没有 limit_kind：兼容旧版 X-AIBalance-Info 队列头，否则走通用 429。
+		// 没有 AIBalance limit_kind：可能是非 AIBalance 提供商（直连 OpenAI/Anthropic 等）。
+		// 先兼容旧版 X-AIBalance-Info 队列头，否则走通用 429（读标准 Retry-After）。
 		if queueInfo := strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Info")); queueInfo != "" {
 			return c.handleLegacyQueue429(ctx, queueInfo)
 		}
-		return c.handleGeneric429(ctx)
+		return c.handleGeneric429(ctx, rsp, body)
 	default:
 		// 存在 limit_kind 但不在已知 17 种之内：按通用 429 兜底，日志记录未知 kind。
-		log.Infof("aibalance 429 with unknown limit_kind=%q, falling back to generic 429", limitKind)
-		return c.handleGeneric429(ctx)
+		log.Infof("429 with unknown limit_kind=%q, falling back to generic 429", limitKind)
+		return c.handleGeneric429(ctx, rsp, body)
 	}
 }
 
@@ -321,7 +325,7 @@ func (c *Config) handleQuota429(ctx context.Context, kind string, rsp *AIRespons
 	msg := buildQuotaMessage(kind, rsp, body, yiUnit)
 
 	c.EmitDefaultSystemStreamEvent(notifyType, strings.NewReader(msg), "")
-	c.emit429Notify(notifyType, msg, waitDuration, kind)
+	c.emit429Notify(notifyType, msg, waitDuration, "aibalance", kind)
 	return c.wait429(ctx, waitDuration)
 }
 
@@ -411,7 +415,7 @@ func (c *Config) handleFrequency429(ctx context.Context, kind string, rsp *AIRes
 
 	msg := buildFrequencyMessage(kind, body, waitSec)
 	notifyType := "rate-limit"
-	c.emit429Notify(notifyType, msg, waitDuration, kind)
+	c.emit429Notify(notifyType, msg, waitDuration, "aibalance", kind)
 	if body != nil && body.Error.Message != "" {
 		log.Infof("aibalance 429 [kind=%s] server message: %s", kind, body.Error.Message)
 	}
@@ -481,7 +485,7 @@ func (c *Config) handleSystem429(ctx context.Context, kind string, rsp *AIRespon
 
 	msg := buildSystemMessage(kind, body, waitSec)
 	notifyType := "rate-limit"
-	c.emit429Notify(notifyType, msg, waitDuration, kind)
+	c.emit429Notify(notifyType, msg, waitDuration, "aibalance", kind)
 	if body != nil && body.Error.Message != "" {
 		log.Infof("aibalance 429 [kind=%s] server message: %s", kind, body.Error.Message)
 	}
@@ -542,25 +546,61 @@ func (c *Config) handleLegacyQueue429(ctx context.Context, queueInfo string) (bo
 				"预计等待约 %d 秒，感谢您的耐心",
 			queueCount, waitSec)
 		waitDuration = time.Duration(waitSec) * time.Second
-		c.emit429Notify("rate-limit", msg, waitDuration, "legacy-queue")
+		c.emit429Notify("rate-limit", msg, waitDuration, "aibalance", "legacy-queue")
 	} else {
 		msg := "当前有大量用户正在与我深度对话中\n" +
 			"您的任务同样重要，我不想敷衍任何一位\n" +
 			"预计等待一段时间后自动请求，感谢您的耐心"
 		waitDuration = 15 * time.Second
-		c.emit429Notify("rate-limit", msg, waitDuration, "legacy-queue")
+		c.emit429Notify("rate-limit", msg, waitDuration, "aibalance", "legacy-queue")
 	}
 	return c.wait429(ctx, waitDuration)
 }
 
-// handleGeneric429 处理未知来源的通用 429：等待 5-15s 后由上层重试。
-func (c *Config) handleGeneric429(ctx context.Context) (bool, bool) {
-	msg := "当前遇到 429 服务器访问人数过多，稍后自动重试\n" +
-		"Current request was rate-limited (HTTP 429), retrying shortly..."
-	sleepSec := 5 + rand.Intn(11)
-	waitDuration := time.Duration(sleepSec) * time.Second
-	c.emit429Notify("rate-limit", msg, waitDuration, "generic")
+// handleGeneric429 处理非 AIBalance 来源或未知来源的通用 429（如直连
+// OpenAI/Anthropic/Azure）。这类 429 遵循 HTTP 标准 429 契约：
+//   - 通过标准 Retry-After 响应头告知等待时长（所有主流 AI 提供商均支持）；
+//   - 响应体遵循各自的 error 格式，但 message 字段通用可提取：
+//       OpenAI:    {"error":{"message":"...","type":"rate_limit_exceeded",...}}
+//       Anthropic: {"type":"error","error":{"type":"rate_limit_error","message":"..."}}
+//       通用:      {"error":{"message":"..."}}
+//
+// 处理策略：
+//  1. 优先读标准 Retry-After 头做退避（叠加抖动，限制到 [5,120]s）；
+//  2. 尝试从响应体提取 error.message 展示给用户，提取失败时回退到默认文案；
+//  3. 日志标记为 "generic" 而非 "aibalance"，避免误导来源判断。
+func (c *Config) handleGeneric429(ctx context.Context, rsp *AIResponse, body *aibalance429Body) (bool, bool) {
+	// 1. 退避时长：优先标准 Retry-After 头，无则回退到 5-15s 随机。
+	baseSec := parseRetryAfterSeconds(rsp, 0)
+	if baseSec <= 0 {
+		baseSec = 5 + rand.Intn(11)
+	}
+	waitSec := capRetryAfterSeconds(jitterSeconds(baseSec, 3), 5, 120)
+	waitDuration := time.Duration(waitSec) * time.Second
+
+	// 2. 提取用户可见的错误信息。
+	msg := extractGeneric429Message(body)
+
+	c.emit429Notify("rate-limit", msg, waitDuration, "generic", "generic")
 	return c.wait429(ctx, waitDuration)
+}
+
+// defaultGeneric429Message 是无法从响应体提取错误信息时的回退文案。
+const defaultGeneric429Message = "当前遇到 429 服务器访问人数过多，稍后自动重试\n" +
+	"Current request was rate-limited (HTTP 429), retrying shortly..."
+
+// extractGeneric429Message 尝试从 429 响应体中提取用户可见的错误信息。
+// 兼容 OpenAI / Anthropic / 通用三种 error 格式，它们都用 error.message 承载
+// 错误描述（aibalance429Body 的 Error.Message 字段已覆盖这三种格式）。
+// 提取失败时回退到 defaultGeneric429Message。
+func extractGeneric429Message(body *aibalance429Body) string {
+	if body != nil {
+		if msg := strings.TrimSpace(body.Error.Message); msg != "" {
+			// 若服务端返回了非空的 message，直接展示原始信息，让用户看到真实原因。
+			return msg
+		}
+	}
+	return defaultGeneric429Message
 }
 
 // wait429 在给定的等待时长内阻塞，期间响应 context 取消。

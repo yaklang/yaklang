@@ -535,6 +535,8 @@ func TestHandle429_UnknownLimitKind_FallsBackToGeneric(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 未知 limit_kind 走通用 429 兜底；make429KindResponse 的 body 含
+	// error.message="rate limited"，应被提取展示（而非回退默认文案）。
 	rsp := make429KindResponse("some_unknown_kind", nil, "")
 
 	is429, ctxDone := cfg.handle429RateLimit(rsp)
@@ -544,7 +546,8 @@ func TestHandle429_UnknownLimitKind_FallsBackToGeneric(t *testing.T) {
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
 	require.Equal(t, "rate-limit", payload["type"])
-	require.Contains(t, payload["content"], "HTTP 429")
+	// 通用路径从响应体提取 message
+	require.Contains(t, payload["content"], "rate limited")
 }
 
 // --- Retry-After 解析与上限 ---
@@ -767,3 +770,159 @@ func TestHandle429_FullResponseBodyContract(t *testing.T) {
 	require.Contains(t, content, "06:00")
 }
 
+
+// --- 通用 429 兜底路径（非 AIBalance 提供商） ---
+
+func TestHandle429_Generic_NoRetryAfter_Waits5to15s(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 非 AIBalance 提供商的 429：无 limit_kind 头、无 Retry-After、body 非标准 JSON。
+	rsp := make429Response()
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "rate-limit", payload["type"])
+	// 无 Retry-After 时回退到默认文案（含 HTTP 429）
+	require.Contains(t, payload["content"], "HTTP 429")
+	dur := payload["duration"].(float64)
+	require.GreaterOrEqual(t, dur, float64(5))
+	require.LessOrEqual(t, dur, float64(15))
+}
+
+func TestHandle429_Generic_RetryAfterHeader_Honored(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 直连 OpenAI 风格的 429：有标准 Retry-After 头，无 limit_kind。
+	rsp := make429Response("Retry-After: 20")
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	// Retry-After=20 + jitter(0-3) => 20-23s
+	dur := payload["duration"].(float64)
+	require.GreaterOrEqual(t, dur, float64(20))
+	require.LessOrEqual(t, dur, float64(23))
+}
+
+func TestHandle429_Generic_RetryAfterCappedAt120(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 异常大的 Retry-After 应被限制到 120s。
+	rsp := make429Response("Retry-After: 9999")
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	dur := payload["duration"].(float64)
+	require.LessOrEqual(t, dur, float64(123)) // 120 + max 3 jitter
+}
+
+func TestHandle429_Generic_OpenAIBody_ExtractsMessage(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// OpenAI 风格 429 body：{"error":{"message":"...","type":"rate_limit_exceeded"}}
+	headers := []string{"Retry-After: 5"}
+	body := `{"error":{"message":"You exceeded your current quota, please check your plan and billing details.","type":"rate_limit_exceeded","code":"insufficient_quota"}}`
+	rsp := make429ResponseWithBody(headers, body)
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "rate-limit", payload["type"])
+	// 应从响应体提取 OpenAI 的原始 message
+	require.Contains(t, payload["content"], "exceeded your current quota")
+	require.NotContains(t, payload["content"], "HTTP 429")
+}
+
+func TestHandle429_Generic_AnthropicBody_ExtractsMessage(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// Anthropic 风格 429 body：{"type":"error","error":{"type":"rate_limit_error","message":"..."}}
+	headers := []string{"Retry-After: 10"}
+	body := `{"type":"error","error":{"type":"rate_limit_error","message":"Number of request resources exceeded."}}`
+	rsp := make429ResponseWithBody(headers, body)
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "rate-limit", payload["type"])
+	// 应从响应体提取 Anthropic 的原始 message
+	require.Contains(t, payload["content"], "Number of request resources exceeded")
+}
+
+func TestHandle429_Generic_EmptyErrorMessage_FallsBackToDefault(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// error.message 为空字符串时应回退到默认文案。
+	headers := []string{"Retry-After: 5"}
+	body := `{"error":{"message":"","type":"rate_limit_exceeded"}}`
+	rsp := make429ResponseWithBody(headers, body)
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Contains(t, payload["content"], "HTTP 429")
+}
+
+func TestHandle429_Generic_NoBody_FallsBackToDefault(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// 无响应体时应回退到默认文案。
+	rsp := make429Response("Retry-After: 5")
+
+	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	payload := requireNotifyPayload(t, snapshot())
+	require.Contains(t, payload["content"], "HTTP 429")
+}
+
+func TestExtractGeneric429Message_NilBody(t *testing.T) {
+	assert.Equal(t, defaultGeneric429Message, extractGeneric429Message(nil))
+}
+
+func TestExtractGeneric429Message_EmptyMessage(t *testing.T) {
+	body := &aibalance429Body{}
+	body.Error.Message = ""
+	assert.Equal(t, defaultGeneric429Message, extractGeneric429Message(body))
+}
+
+func TestExtractGeneric429Message_WithMessage(t *testing.T) {
+	body := &aibalance429Body{}
+	body.Error.Message = "rate limit from provider"
+	assert.Equal(t, "rate limit from provider", extractGeneric429Message(body))
+}
+
+func TestExtractGeneric429Message_WhitespaceMessage(t *testing.T) {
+	body := &aibalance429Body{}
+	body.Error.Message = "   "
+	assert.Equal(t, defaultGeneric429Message, extractGeneric429Message(body))
+}
