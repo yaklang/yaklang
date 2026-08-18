@@ -8,6 +8,12 @@ import (
 type functionCompileContext struct {
 	current *ssa.Function
 
+	// ownerValueIDs is the set of SSA value ids that belong to current. It is
+	// used to reject cross-function references (front-end artifacts where a
+	// value from another function leaks into this function's instruction
+	// graph) before they are lazily compiled.
+	ownerValueIDs map[int64]struct{}
+
 	invokeCtx      llvm.Value
 	returnBlock    llvm.BasicBlock
 	llvmFn         llvm.Value
@@ -53,4 +59,37 @@ func (c *Compiler) currentFunction() *ssa.Function {
 		return nil
 	}
 	return c.function.current
+}
+
+func (c *Compiler) ensureOwnerValueIDs(fn *ssa.Function) {
+	if c == nil || c.function == nil || fn == nil || c.function.ownerValueIDs != nil {
+		return
+	}
+	ids := make(map[int64]struct{})
+	for _, pid := range fn.Params {
+		ids[pid] = struct{}{}
+	}
+	for _, pid := range fn.ParameterMembers {
+		ids[pid] = struct{}{}
+	}
+	for _, vid := range fn.FreeValues {
+		ids[vid] = struct{}{}
+	}
+	for _, blockID := range fn.Blocks {
+		blockVal, ok := fn.GetValueById(blockID)
+		if !ok {
+			continue
+		}
+		bb, ok := ssa.ToBasicBlock(blockVal)
+		if !ok || bb == nil {
+			continue
+		}
+		for _, iid := range bb.Insts {
+			ids[iid] = struct{}{}
+		}
+		for _, pid := range bb.Phis {
+			ids[pid] = struct{}{}
+		}
+	}
+	c.function.ownerValueIDs = ids
 }

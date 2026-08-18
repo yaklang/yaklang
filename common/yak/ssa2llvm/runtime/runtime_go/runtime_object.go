@@ -506,3 +506,26 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 
 	return callRuntimeValue(method, rawArgs)
 }
+
+//export yak_runtime_concat
+func yak_runtime_concat(a, b unsafe.Pointer) unsafe.Pointer {
+	defer recoverRuntimePanic()
+	as := runtimePtrToString(a)
+	bs := runtimePtrToString(b)
+	return newStdlibShadow(as + bs)
+}
+
+func runtimePtrToString(ptr unsafe.Pointer) string {
+	if ptr == nil {
+		return ""
+	}
+	if s, ok := tryResolveShadowString(ptr); ok {
+		return s
+	}
+	raw := uint64(uintptr(ptr))
+	raw &^= yakTaggedPointerMask
+	if !looksLikeCStringPointer(raw) {
+		return ""
+	}
+	return runtimeCStringToGoString(unsafe.Pointer(uintptr(raw)))
+}

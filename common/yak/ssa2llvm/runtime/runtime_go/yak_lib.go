@@ -122,7 +122,11 @@ func yak_runtime_to_cstring(ptr unsafe.Pointer) *C.char {
 		// Intentionally leaked: used by native binary as an owned C string.
 		return C.CString(s)
 	}
-	return (*C.char)(ptr)
+	// A tagged C-string pointer (compiler tagged a literal) must have its tag
+	// cleared before it is used as an address.
+	raw := uint64(uintptr(ptr))
+	raw &^= yakTaggedPointerMask
+	return (*C.char)(unsafe.Pointer(uintptr(raw)))
 }
 
 // --- Handle Management ---

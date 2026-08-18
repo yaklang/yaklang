@@ -142,3 +142,14 @@ func (c *Compiler) isSSAValueStored(id int64) bool {
 	_, ok := c.function.storedValues[id]
 	return ok
 }
+
+func llvmIsZeroValue(v llvm.Value) bool {
+	if v.IsNil() {
+		return true
+	}
+	rv := (C.LLVMValueRef)(unsafe.Pointer(v.C))
+	if rv == nil {
+		return true
+	}
+	return C.LLVMIsNull(rv) != 0
+}
