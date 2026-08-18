@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
@@ -358,8 +359,19 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	}
 
 	// 16. Function values are materialized as i64 function pointers in the
-	// unified InvokeContext representation.
+	// unified InvokeContext representation. A yaklib export used as a value is
+	// materialized as a dispatch closure instead of an undefined symbol.
 	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
+		if ssaFn.IsExtern() {
+			if pkg, method, ok := splitQualifiedName(ssaFn.GetName()); ok {
+				if _, ok := yaklang.LookupExport(pkg, method); ok {
+					c.recordYaklibDependency(pkg, method)
+					val := c.materializeYaklibExportCallable(valObj, pkg, method)
+					c.cacheValue(id, val)
+					return val, nil
+				}
+			}
+		}
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
 		val := c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64")
 		c.cacheValue(id, val)

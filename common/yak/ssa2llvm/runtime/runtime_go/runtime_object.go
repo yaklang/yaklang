@@ -221,6 +221,18 @@ func runtimeCallableClosureValue(value any) (runtimeCallableClosure, bool) {
 func runtimeMakeCallableWrapper(raw uint64, paramMemberCount int, freeValues []uint64, targetType reflect.Type) reflect.Value {
 	captures := append([]uint64(nil), freeValues...)
 	return reflect.MakeFunc(targetType, func(args []reflect.Value) []reflect.Value {
+		if raw == abi.YaklibExportCallableMarker && len(captures) >= 2 {
+			callArgs := make([]uint64, 0, len(args)+2)
+			callArgs = append(callArgs, captures[0], captures[1])
+			for _, arg := range args {
+				callArgs = append(callArgs, uint64(runtimeValueToInt64(arg)))
+			}
+			ret, err := runtimeDispatchYaklibCall(callArgs)
+			if err != nil {
+				panic(err)
+			}
+			return runtimeDecodeYaklibExportReturns(ret, targetType)
+		}
 		paramc := len(args)
 		argc := paramc + paramMemberCount + len(captures)
 		words := make([]uint64, abi.HeaderWords+argc*2)
@@ -245,6 +257,25 @@ func runtimeMakeCallableWrapper(raw uint64, paramMemberCount int, freeValues []u
 func runtimeStoreCallableContextArg(ctx unsafe.Pointer, argc int, index int, raw uint64) {
 	ctxStoreWord(ctx, abi.HeaderWords+index, raw)
 	ctxStoreWord(ctx, abi.HeaderWords+argc+index, raw&^yakTaggedPointerMask)
+}
+
+// runtimeDecodeYaklibExportReturns decodes a single yaklib export return value
+// into the Go func wrapper's result values.
+func runtimeDecodeYaklibExportReturns(ret int64, targetType reflect.Type) []reflect.Value {
+	if targetType == nil || targetType.NumOut() == 0 {
+		return nil
+	}
+	out := make([]reflect.Value, targetType.NumOut())
+	for i := range out {
+		if i == 0 {
+			if value, err := runtimeDecodeArg(uint64(ret), targetType.Out(i)); err == nil {
+				out[i] = value
+				continue
+			}
+		}
+		out[i] = reflect.Zero(targetType.Out(i))
+	}
+	return out
 }
 
 func runtimeDecodeCallableReturns(ctx unsafe.Pointer, targetType reflect.Type) []reflect.Value {
