@@ -52,7 +52,7 @@ var All = []Tier{
 	},
 	{
 		Name:    "staticanalyze",
-		Modules: []string{"cli", "codec", "file", "http", "json", "os", "poc", "ssa", "str", "sync", "yakit"},
+		Modules: []string{"cli", "codec", "file", "filesys", "http", "json", "os", "poc", "ssa", "str", "sync", "yakit"},
 	},
 }
 

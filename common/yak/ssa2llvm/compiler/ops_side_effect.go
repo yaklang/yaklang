@@ -19,11 +19,20 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 		return nil
 	}
 	if inst.IsMember() && inst.GetObject() != nil && inst.GetKey() != nil {
-		objVal, err := c.getValue(inst, inst.GetObject().GetId())
+		// The side-effect writes at its definition site, which is the FIRST
+		// owner pair. GetObject() returns the latest owner: when the written
+		// value is later reused (e.g. params.language also feeds
+		// result["language"]), that latest owner is a forward reference and
+		// pulling it here would emit later calls before the write.
+		obj, key := c.firstOwnerObjectKey(inst)
+		if obj == nil || key == nil {
+			obj, key = inst.GetObject(), inst.GetKey()
+		}
+		objVal, err := c.getValue(inst, obj.GetId())
 		if err != nil {
 			return err
 		}
-		keyStr := c.resolveMemberKeyString(inst.GetKey())
+		keyStr := c.resolveMemberKeyString(key)
 		if keyStr == "" {
 			c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 			return nil
