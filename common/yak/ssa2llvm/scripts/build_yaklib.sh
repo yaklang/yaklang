@@ -35,7 +35,7 @@ EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 # libyak.a stays complete (all modules below); per-script pruning happens at
 # link time via --gc-sections, so a plain print script drops the poc/cli/http
 # code and their dependency closures while a poc script keeps them.
-DEFAULT_MODULES="os,poc,cli,http,codec,yakit,ssa,json,sync,file,str,filesys"
+DEFAULT_MODULES="ai,bufio,cli,codec,context,db,file,filesys,fuzz,http,httpool,js,json,jsonschema,liteforge,log,math,mitm,netstack,os,poc,pprof,rag,re,risk,sfreport,ssa,str,sync,syntaxflow,time,tls,xhtml,xpath,yakit,yso,zip"
 # SSA2LLVM_TIER names a rung of the pre-built ladder (runtime/tiers); its module
 # set comes from the same Go definition the compiler selects with, so the two
 # cannot drift. SSA2LLVM_EMBED_MODULES still takes an arbitrary list.
@@ -291,6 +291,14 @@ if [[ -n "${SSA2LLVM_TIER_OUT:-}" ]]; then
   mkdir -p "${TIER_OUT_DIR}"
   cp "${ASSETS_DIR}/libyak.a" "${TIER_OUT_DIR}/libyak.a"
   echo "[yaklib] published tier '${TIER_NAME}' to ${TIER_OUT_DIR}/libyak.a"
+fi
+
+# Every tier build also publishes its archive into the embedded assets so the
+# compiler can switch tiers by dependency without an on-disk tier directory.
+if [[ "${TIER_NAME}" != "custom" ]]; then
+  EMBED_TIER_DIR="${ASSETS_DIR}/tiers/${TIER_NAME}"
+  mkdir -p "${EMBED_TIER_DIR}"
+  cp "${ASSETS_DIR}/libyak.a" "${EMBED_TIER_DIR}/libyak.a"
 fi
 
 echo "[yaklib] embedded runtime assets prepared in ${ASSETS_DIR}"
