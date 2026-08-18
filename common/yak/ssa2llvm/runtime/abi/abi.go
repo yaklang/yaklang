@@ -60,6 +60,7 @@ const (
 	RuntimeLoadPanicValueSymbol = "yak_runtime_load_panic_value"
 	RuntimeInvokeVMSymbol       = "yak_runtime_invoke_vm"
 	RuntimeTestAdd1CtxSymbol    = "yak_runtime_test_add1_ctx"
+	RuntimeConcatSymbol         = "yak_runtime_concat"
 
 	// Compiler renames clashing user main/@main (not part of linkprep manifest).
 	InternalAtMainSymbol = "yak_internal_atmain"
