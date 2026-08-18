@@ -113,6 +113,23 @@ int main() {
 `,
 			wantNPD: false,
 		},
+		{
+			name: "nullify through int-star-star side-effect then deref",
+			code: `
+#include <stdlib.h>
+void free2(int **a) {
+    free(*a);
+    *a = 0;
+}
+int main() {
+    int *p = (int*)malloc(20);
+    free2(&p);
+    *p = 10;
+    return 0;
+}
+`,
+			wantNPD: true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -336,6 +353,23 @@ int main() {
 int f(void) {
     int *p = 0;
     return *p;
+}
+`,
+			wantNPD: true,
+		},
+		{
+			name: "nullify through int-star-star side-effect then deref",
+			code: `
+#include <stdlib.h>
+void free2(int **a) {
+    free(*a);
+    *a = 0;
+}
+int main() {
+    int *p = (int*)malloc(20);
+    free2(&p);
+    *p = 10;
+    return 0;
 }
 `,
 			wantNPD: true,

@@ -122,16 +122,18 @@ func cIsNullishConst(v ssa.Value) bool {
 	return s == "0" || s == "null" || s == "nil" || s == "<nil>" || s == "nullptr"
 }
 
-// assignToVar assigns rhs to left, preserving PointerKind when wrapping nulls.
+// assignToVar assigns rhs to left. Only wrap nullish constants as PointerKind
+// (p = NULL). Never wrap numbers, strings, functions, or existing pointers —
+// that would break *p write-through, char*, and function pointers.
 func (b *astbuilder) assignToVar(left *ssa.Variable, right ssa.Value) {
 	if left == nil || utils.IsNil(right) {
 		return
 	}
-	if b.wantPointerAssign(left) &&
-		(cIsNullishConst(right) || right.GetType() == nil || right.GetType().GetTypeKind() != ssa.PointerKind) {
+	if b.wantPointerAssign(left) && cIsNullishConst(right) {
 		right = b.ensurePointerValue(right)
 	}
 	b.AssignVariable(left, right)
+	b.flushExtraStarAssign(right)
 }
 
 // wantPointerAssign is true when the LHS is (or is typed as) a pointer.
@@ -156,24 +158,80 @@ func (b *astbuilder) wantPointerAssign(left *ssa.Variable) bool {
 	return false
 }
 
-// materializeStarLoad records an explicit *ptr rvalue use for NPD/UAF and
-// returns the loaded payload.
+// materializeStarLoad records an explicit *ptr rvalue use for NPD/UAF.
+// Stack aliases must load the live origin (GetOriginValue). Heap slots
+// (*int** after *slot = p) keep the stored @value payload.
 func (b *astbuilder) materializeStarLoad(ptr ssa.Value) ssa.Value {
 	if utils.IsNil(ptr) {
 		return b.EmitConstInst(0)
 	}
-	key := b.EmitConstInstPlaceholder("@value")
-	loaded := b.ReadMemberCallValue(ptr, key)
-	if utils.IsNil(loaded) {
-		loaded = b.GetOriginValue(ptr)
+	origin := b.GetOriginValue(ptr)
+	stored := b.ReadMemberCallValue(ptr, b.EmitConstInstPlaceholder("@value"))
+	loaded := origin
+	if starLoadPreferStored(origin) && !utils.IsNil(stored) {
+		loaded = stored
 	}
-	// Distinct site: construction payload ConstInst is often reused as the load.
-	site := b.EmitUndefined(fmt.Sprintf("*%d", ptr.GetId()))
-	lifetime.RegisterDeref(site, ptr)
+	if utils.IsNil(loaded) {
+		loaded = stored
+	}
+	b.registerStarDeref(ptr)
 	if utils.IsNil(loaded) {
 		return b.EmitConstInst(0)
 	}
 	return loaded
+}
+
+func starLoadPreferStored(origin ssa.Value) bool {
+	if utils.IsNil(origin) || origin.GetType() == nil {
+		return true
+	}
+	switch origin.GetType().GetTypeKind() {
+	case ssa.PointerKind, ssa.SliceTypeKind, ssa.ObjectTypeKind, ssa.MapTypeKind, ssa.StructTypeKind:
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *astbuilder) flushExtraStarAssign(right ssa.Value) {
+	extra := b.extraStarAssign
+	b.extraStarAssign = nil
+	if extra != nil && !utils.IsNil(right) {
+		b.AssignVariable(extra, right)
+	}
+}
+
+func (b *astbuilder) registerStarDeref(ptr ssa.Value) {
+	if utils.IsNil(ptr) {
+		return
+	}
+	site := b.EmitUndefined(fmt.Sprintf("*%d", ptr.GetId()))
+	lifetime.RegisterDeref(site, ptr)
+}
+
+// starPtrAccess implements *ptr. Parameter stores wrap the param variable as a
+// pointer object so PointerSideEffect writes back to the caller origin.
+func (b *astbuilder) starPtrAccess(ptr ssa.Value, ptrVar *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
+	if utils.IsNil(ptr) || ptr.GetType() == nil || ptr.GetType().GetTypeKind() != ssa.PointerKind {
+		return ptr, ptrVar
+	}
+	if isLeft {
+		if p, ok := ssa.ToParameter(ptr); ok {
+			b.ReferenceParameter(ptr.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+			if !p.IsFreeValue && ptrVar != nil {
+				b.extraStarAssign = b.GetAndCreateOriginPointer(ptr)
+				obj := b.EmitConstPointer(ptrVar)
+				left := b.GetAndCreateOriginPointer(obj)
+				return b.GetOriginValue(obj), left
+			}
+		}
+		left := b.GetAndCreateOriginPointer(ptr)
+		return b.GetOriginValue(ptr), left
+	}
+	if p, ok := ssa.ToParameter(ptr); ok {
+		b.ReferenceParameter(ptr.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+	}
+	return b.materializeStarLoad(ptr), ptrVar
 }
 
 // hasBinaryExpr is cheaper than len(ast.AllExpression()) >= 2 (avoids child slice alloc).
@@ -482,25 +540,7 @@ func (b *astbuilder) buildCoreExpression(ast *cparser.CoreExpressionContext) ssa
 
 func (b *astbuilder) leftFromStarCast(castCtx *cparser.CastExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
 	right, innerLeft := b.buildCastExpression(castCtx, false)
-	left := innerLeft
-	if right != nil && right.GetType() != nil && right.GetType().GetTypeKind() == ssa.PointerKind {
-		if p, ok := ssa.ToParameter(right); ok {
-			b.ReferenceParameter(right.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-			// Keep SideEffect registration, but also attach an origin-pointer
-			// lvalue so *p stores are member-uses of the Parameter (UAF/NPD).
-			if isLeft {
-				left = b.GetAndCreateOriginPointer(right)
-			} else {
-				right = b.GetOriginValue(right)
-			}
-			return right, left
-		}
-		if isLeft {
-			left = b.GetAndCreateOriginPointer(right)
-		}
-		right = b.GetOriginValue(right)
-	}
-	return right, left
+	return b.starPtrAccess(right, innerLeft, isLeft)
 }
 
 func (b *astbuilder) derefCastLvalue(castCtx *cparser.CastExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
@@ -539,6 +579,7 @@ func (b *astbuilder) applyAssignmentFromStarCast(
 	if left != nil {
 		// Do not SetType from RHS — that clobbers PointerKind / member types.
 		b.AssignVariable(left, right)
+		b.flushExtraStarAssign(right)
 	}
 
 	if utils.IsNil(right) {
@@ -766,24 +807,7 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 	if len(ast.AllStar()) > 0 {
 		if u := ast.UnaryExpression(); u != nil {
 			right, left = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
-			if right != nil {
-				if right.GetType().GetTypeKind() == ssa.PointerKind {
-					if param, ok := ssa.ToParameter(right); ok && !param.IsFreeValue {
-						b.ReferenceParameter(right.GetName(), param.FormalParameterIndex, ssa.PointerSideEffect)
-						if isLeft {
-							left = b.GetAndCreateOriginPointer(right)
-						} else {
-							right = b.materializeStarLoad(right)
-						}
-					} else {
-						if isLeft {
-							left = b.GetAndCreateOriginPointer(right)
-						} else {
-							right = b.materializeStarLoad(right)
-						}
-					}
-				}
-			}
+			right, left = b.starPtrAccess(right, left, isLeft)
 		}
 	}
 
@@ -1088,18 +1112,7 @@ func (b *astbuilder) buildLeftExpression(ast *cparser.LeftExpressionContext, isL
 	if ast.Star() != nil {
 		if u := ast.UnaryExpression(); u != nil {
 			right, left := b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
-			if right != nil && right.GetType().GetTypeKind() == ssa.PointerKind {
-				if p, ok := ssa.ToParameter(right); ok {
-					b.ReferenceParameter(right.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-				}
-				if isLeft {
-					left = b.GetAndCreateOriginPointer(right)
-					right = b.GetOriginValue(right)
-				} else {
-					right = b.materializeStarLoad(right)
-				}
-			}
-			return right, left
+			return b.starPtrAccess(right, left, isLeft)
 		}
 		if c := ast.CastExpression(); c != nil {
 			return b.derefCastLvalue(c.(*cparser.CastExpressionContext), isLeft)

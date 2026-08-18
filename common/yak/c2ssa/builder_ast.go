@@ -553,13 +553,10 @@ func (b *astbuilder) buildDeclarator(ast *cparser.DeclaratorContext, kinds ...Co
 	}
 
 	if p := ast.Pointer(); p != nil {
-		if utils.IsNil(value) && variable != nil && kind == VARIABLE_KIND {
-			// VARIABLE_KIND yields a name-only variable; create a typed
-			// placeholder so pointer modifiers and later *p see PointerKind.
-			value = b.EmitUndefined(variable.GetName())
-			value.SetType(ssa.NewPointerType())
-			b.AssignVariable(variable, value)
-		}
+		// Do not assign an Undefined PointerKind placeholder. Undefined is not
+		// a pointer object, so later *p hits ObjectError (@pointer on type {})
+		// and never writes through to the origin. Uninitialized `int *p;`
+		// stays valueless; `p = &x` then supplies a real pointer object.
 		b.applyPointerModifiers(p.(*cparser.PointerContext), value)
 	}
 
@@ -846,7 +843,9 @@ func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext, ssa
 		isPtr := decl.Pointer() != nil || strings.Contains(decl.GetText(), "*")
 		if e := ast.Initializer(); e != nil {
 			initial := b.buildInitializer(e.(*cparser.InitializerContext), ssatype...)
-			if isPtr {
+			// Only wrap NULL/0. Wrapping strings, functions, or aggregates
+			// as PointerKind breaks char*, function pointers, and int *arr[].
+			if isPtr && cIsNullishConst(initial) {
 				initial = b.ensurePointerValue(initial)
 			}
 			b.AssignVariable(left, initial)
