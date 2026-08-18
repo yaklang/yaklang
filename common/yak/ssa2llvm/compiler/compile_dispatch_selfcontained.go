@@ -100,10 +100,18 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 // embedded archive may still carry it (SSA2LLVM_EMBED_MODULES takes any list),
 // and if it does not, checkModulesAvailable says so by name before lld runs.
 func selectRuntimeTier(scriptModules []string) string {
-	if len(scriptModules) == 0 {
+	// Global callables (die, sprintf, ...) are recorded with an empty module;
+	// they are runtime globals, not tier modules, so drop them before lookup.
+	filtered := make([]string, 0, len(scriptModules))
+	for _, mod := range scriptModules {
+		if mod != "" {
+			filtered = append(filtered, mod)
+		}
+	}
+	if len(filtered) == 0 {
 		return tiers.All[0].Name
 	}
-	t, err := tiers.Select(scriptModules)
+	t, err := tiers.Select(filtered)
 	if err != nil {
 		return ""
 	}
