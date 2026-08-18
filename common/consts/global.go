@@ -53,8 +53,8 @@ var (
 	// disable httpflow slow query notification
 	GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED = utils.NewBool(false)
 
-	//control response max content-length
-	GLOBAL_MAXSIZE_CONTENT_LENGTH = atomic.NewUint64(1024 * 1024 * 10)
+	// control response max content-length
+	GLOBAL_MAXSIZE_CONTENT_LENGTH = atomic.NewUint64(defaultGlobalContentLengthLimit)
 
 	OnceYakitHome = new(sync.Once)
 
@@ -66,6 +66,11 @@ var (
 	// tls global config
 	GLOBAL_TLS_MIN_VERSION uint16 = gmtls.VersionSSL30
 	GLOBAL_TLS_MAX_VERSION uint16 = gmtls.VersionTLS13
+)
+
+const (
+	defaultGlobalContentLengthLimit uint64 = 10 * 1024 * 1024
+	maximumGlobalContentLengthLimit uint64 = 50 * 1024 * 1024
 )
 
 func SimpleYakGlobalConfig() {
@@ -127,8 +132,8 @@ func GetGlobalMaxContentLength() uint64 {
 	return GLOBAL_MAXSIZE_CONTENT_LENGTH.Load()
 }
 func SetGlobalMaxContentLength(i uint64) {
-	if i > uint64(1024*1024*10) {
-		GLOBAL_MAXSIZE_CONTENT_LENGTH.Store(1024 * 1024 * 10)
+	if i > maximumGlobalContentLengthLimit {
+		GLOBAL_MAXSIZE_CONTENT_LENGTH.Store(maximumGlobalContentLengthLimit)
 		return
 	}
 	GLOBAL_MAXSIZE_CONTENT_LENGTH.Store(i)

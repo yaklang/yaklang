@@ -25,8 +25,8 @@ func withGlobalMaxContentLength(t *testing.T, limit uint64) {
 
 func TestGetMaxHTTPFlowRequestBodyInDBBytes_FollowsGlobal(t *testing.T) {
 	t.Run("follows_global", func(t *testing.T) {
-		withGlobalMaxContentLength(t, 10*1024*1024)
-		require.Equal(t, 10*1024*1024, GetMaxHTTPFlowRequestBodyInDBBytes())
+		withGlobalMaxContentLength(t, 50*1024*1024)
+		require.Equal(t, 50*1024*1024, GetMaxHTTPFlowRequestBodyInDBBytes())
 	})
 	t.Run("fallback_when_unset", func(t *testing.T) {
 		withGlobalMaxContentLength(t, 0)
