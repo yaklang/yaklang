@@ -301,6 +301,11 @@ func nullnessOf(v ssa.Value, st *npdState, allocs map[int64]struct{}) NullState 
 		return NullUnknown
 	}
 	id := v.GetId()
+	if st != nil {
+		if s := st.get(id); s != NullUnknown {
+			return s
+		}
+	}
 	if _, ok := allocs[id]; ok {
 		return NullNonNull
 	}
@@ -312,11 +317,6 @@ func nullnessOf(v ssa.Value, st *npdState, allocs map[int64]struct{}) NullState 
 	}
 	if isPointerWithNullValue(v) {
 		return NullIsNull
-	}
-	if st != nil {
-		if s := st.get(id); s != NullUnknown {
-			return s
-		}
 	}
 	return NullUnknown
 }
@@ -367,6 +367,117 @@ func nullnessOfMemberRoot(obj ssa.Value, st *npdState, allocs map[int64]struct{}
 	return NullUnknown
 }
 
+// nullnessFromSideEffectPayload reads callee write-back. *a = NULL often
+// surfaces as a SideEffect whose payload is param.@pointer; the null sits
+// on that parameter's @value member.
+func nullnessFromSideEffectPayload(payload ssa.Value, st *npdState, allocs map[int64]struct{}) NullState {
+	if payload == nil {
+		return NullUnknown
+	}
+	ns := nullnessOf(payload, st, allocs)
+	if ns != NullUnknown {
+		return ns
+	}
+	if isNullish(payload) || isPointerWithNullValue(payload) {
+		return NullIsNull
+	}
+	obj := payload.GetObject()
+	if obj == nil {
+		if pid := paramObjectID(payload); pid > 0 {
+			if pv, ok := payload.GetValueById(pid); ok {
+				obj = pv
+			}
+		}
+	}
+	if obj == nil {
+		return NullUnknown
+	}
+	if isPointerWithNullValue(obj) {
+		return NullIsNull
+	}
+	if m, ok := obj.GetStringMember("@value"); ok {
+		if isNullish(m) || isPointerWithNullValue(m) {
+			return NullIsNull
+		}
+		if s := nullnessOf(m, st, allocs); s != NullUnknown {
+			return s
+		}
+	}
+	for _, m := range obj.GetMembersByKeyString("@value") {
+		if isNullish(m) {
+			return NullIsNull
+		}
+	}
+	return nullnessOf(obj, st, allocs)
+}
+
+func applyCallNullWriteback(call *ssa.Call, st *npdState, allocs map[int64]struct{}) {
+	if call == nil || st == nil || !calleeNullifiesStarParam(call) {
+		return
+	}
+	markNull := func(id int64) {
+		if id > 0 {
+			st.set(id, NullIsNull)
+		}
+	}
+	for _, m := range call.GetAllMember() {
+		if m != nil {
+			markNull(m.GetId())
+		}
+	}
+	for _, id := range call.ArgMember {
+		markNull(id)
+	}
+	for _, id := range call.SideEffectValue {
+		markNull(id)
+		if se, ok := call.GetValueById(id); ok && se != nil {
+			if obj := se.GetObject(); obj != nil {
+				markNull(obj.GetId())
+			}
+		}
+	}
+	for _, aid := range call.Args {
+		av, ok := call.GetValueById(aid)
+		if !ok || av == nil {
+			continue
+		}
+		for _, pid := range pointerPointeeIDs(av) {
+			markNull(pid)
+		}
+	}
+}
+
+func calleeNullifiesStarParam(call *ssa.Call) bool {
+	if call == nil {
+		return false
+	}
+	prog := call.GetProgram()
+	if prog == nil {
+		return false
+	}
+	for _, cid := range resolveCalleeFuncIDs(call) {
+		var fn *ssa.Function
+		prog.EachFunction(func(f *ssa.Function) {
+			if f != nil && f.GetId() == cid {
+				fn = f
+			}
+		})
+		if fn == nil {
+			continue
+		}
+		for _, pid := range fn.Params {
+			pv, ok := fn.GetValueById(pid)
+			if !ok || pv == nil {
+				continue
+			}
+			if isPointerWithNullValue(pv) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func handleInstNPD(b *ssa.BasicBlock, inst ssa.Instruction, st *npdState, allocs map[int64]struct{}) []*Finding {
 	v, isVal := inst.(ssa.Value)
 	if !isVal || v == nil {
@@ -382,6 +493,21 @@ func handleInstNPD(b *ssa.BasicBlock, inst ssa.Instruction, st *npdState, allocs
 	if isNullish(v) {
 		st.set(id, NullIsNull)
 		// Null constants themselves are not dereferences.
+		return nil
+	}
+
+	if se, ok := ssa.ToSideEffect(v); ok && se != nil {
+		payload, _ := se.GetValueById(se.Value)
+		ns := nullnessFromSideEffectPayload(payload, st, allocs)
+		if ns != NullUnknown {
+			st.set(id, ns)
+			if obj := v.GetObject(); obj != nil {
+				st.set(obj.GetId(), ns)
+				if root := rootPointerObject(obj); root != nil {
+					st.set(root.GetId(), ns)
+				}
+			}
+		}
 		return nil
 	}
 
@@ -425,8 +551,7 @@ func handleInstNPD(b *ssa.BasicBlock, inst ssa.Instruction, st *npdState, allocs
 	}
 
 	if call, ok := ssa.ToCall(v); ok && call != nil {
-		// Calls are not NPD uses in phase 1 (unlike UAF). Still propagate return if needed.
-		_ = call
+		applyCallNullWriteback(call, st, allocs)
 		return nil
 	}
 

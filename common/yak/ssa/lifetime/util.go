@@ -226,6 +226,25 @@ func starDerefPointer(v ssa.Value) ssa.Value {
 	return nil
 }
 
+func registeredDerefPointer(v ssa.Value, reg *registry) ssa.Value {
+	if v == nil || reg == nil {
+		return nil
+	}
+	ptrID, ok := reg.derefPtr(v.GetId())
+	if !ok || ptrID <= 0 {
+		return nil
+	}
+	if ptr, ok := v.GetValueById(ptrID); ok && ptr != nil {
+		return ptr
+	}
+	if fn := v.GetFunc(); fn != nil {
+		if ptr, ok := fn.GetValueById(ptrID); ok && ptr != nil {
+			return ptr
+		}
+	}
+	return nil
+}
+
 func paramObjectID(v ssa.Value) int64 {
 	if v == nil {
 		return 0
@@ -366,6 +385,67 @@ func collectParamAliases(fn *ssa.Function) map[int64]int {
 		}
 	}
 	return out
+}
+
+// classifyFreeArg reports whether a free() argument is a formal (value)
+// or a dereference of a formal (*p / origin-of-p).
+func classifyFreeArg(av ssa.Value, aliases map[int64]int) (idx int, throughStar bool, ok bool) {
+	if av == nil || aliases == nil {
+		return 0, false, false
+	}
+	if i, hit := aliases[av.GetId()]; hit {
+		return i, false, true
+	}
+	if p, pok := ssa.ToParameter(av); pok && p != nil && !p.IsFreeValue {
+		return p.FormalParameterIndex, false, true
+	}
+	if av.IsMember() {
+		if obj := av.GetObject(); obj != nil {
+			if i, hit := aliases[obj.GetId()]; hit {
+				return i, true, true
+			}
+			if p, pok := ssa.ToParameter(obj); pok && p != nil && !p.IsFreeValue {
+				return p.FormalParameterIndex, true, true
+			}
+		}
+	}
+	if pid := paramObjectID(av); pid > 0 && pid != av.GetId() {
+		if i, hit := aliases[pid]; hit {
+			return i, true, true
+		}
+	}
+	return 0, false, false
+}
+
+// pointerPointeeIDs returns @value / origin objects of a pointer (e.g. &p → p).
+func pointerPointeeIDs(v ssa.Value) []int64 {
+	if v == nil {
+		return nil
+	}
+	seen := map[int64]struct{}{}
+	var ids []int64
+	add := func(x ssa.Value) {
+		if x == nil || x.GetId() <= 0 {
+			return
+		}
+		if _, ok := seen[x.GetId()]; ok {
+			return
+		}
+		seen[x.GetId()] = struct{}{}
+		ids = append(ids, x.GetId())
+	}
+	if m, ok := v.GetStringMember("@value"); ok {
+		add(m)
+	}
+	for _, m := range v.GetMembersByKeyString("@value") {
+		add(m)
+	}
+	if v.IsMember() {
+		if key := v.GetKey(); key != nil && strings.Contains(key.String(), "@value") {
+			add(v)
+		}
+	}
+	return ids
 }
 
 // applyNullGuardOnEdge refines nullness when control flows from an If

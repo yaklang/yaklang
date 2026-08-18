@@ -134,6 +134,9 @@ type astbuilder struct {
 	memberKeys     map[string]ssa.Value // interned field-name consts for this file build
 	pkgNameCurrent string
 	SetGlobal      bool
+	// extraStarAssign is a Parameter origin-pointer lvalue filled when *formal
+	// stores also write through EmitConstPointer for caller SideEffect.
+	extraStarAssign *ssa.Variable
 }
 
 // emitMemberKey returns a reused ConstInst for struct/union member names.

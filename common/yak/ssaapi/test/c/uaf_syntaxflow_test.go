@@ -418,6 +418,22 @@ void f(int *p) {
 		},
 		// Double-free is a UAF subtype (second free of a Freed object).
 		{
+			name: "double free via int-star-star wrapper",
+			code: `
+#include <stdlib.h>
+void free2(int **a) {
+    free(*a);
+}
+int main() {
+    int *p = (int*)malloc(20);
+    free2(&p);
+    free2(&p);
+    return 0;
+}
+`,
+			wantUAF: true,
+		},
+		{
 			name: "double free basic",
 			code: `
 #include <stdlib.h>
@@ -796,6 +812,22 @@ int main() {
 `,
 			wantUAF: true,
 			contain: []string{"11"},
+		},
+		{
+			name: "double free via int-star-star wrapper ex",
+			code: `
+#include <stdlib.h>
+void free2(int **a) {
+    free(*a);
+}
+int main() {
+    int *p = (int*)malloc(20);
+    free2(&p);
+    free2(&p);
+    return 0;
+}
+`,
+			wantUAF: true,
 		},
 	}
 
