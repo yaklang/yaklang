@@ -474,3 +474,114 @@ func TestIs429Retryable_Non429(t *testing.T) {
 func TestIs429Retryable_Nil(t *testing.T) {
 	assert.False(t, is429Retryable(context.Background(), nil))
 }
+
+// --- WaitForHTTPBody: body 异步到达 ---
+
+func TestHandle429_AsyncBodySet_429BodyParsedAfterArrival(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	rsp := NewUnboundAIResponse()
+
+	done := make(chan struct{})
+	var is429, shouldRetry, ctxDone bool
+	go func() {
+		is429, shouldRetry, ctxDone = cfg.handle429RateLimit(rsp)
+		close(done)
+	}()
+
+	// Step 1: set header only (simulates SetRawHTTPResponseHeader firing first).
+	// handle429 should wait for the body, not parse immediately.
+	time.Sleep(100 * time.Millisecond)
+	header429 := "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 5\r\n\r\n"
+	rsp.SetRawHTTPResponseHeader([]byte(header429))
+
+	// Give it time to potentially race — it should be waiting on WaitForHTTPBody.
+	time.Sleep(100 * time.Millisecond)
+
+	// Step 2: set header + body (simulates deferred SetRawHTTPResponseData).
+	rsp.SetRawHTTPResponseData([]byte(header429), []byte(`{"error":{"message":"quota exceeded - body arrived","type":"rate_limit_exceeded"}}`))
+
+	// Now body is available, handle429 should proceed and wait 5s.
+	// Cancel after the body is parsed to exit promptly.
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		assert.True(t, is429, "should detect 429 after body arrives")
+		assert.True(t, shouldRetry, "Retry-After present means retryable")
+		assert.True(t, ctxDone, "should exit via context cancel during wait")
+	case <-time.After(5 * time.Second):
+		t.Fatal("handle429RateLimit blocked too long after async body set")
+	}
+
+	cfg.Emitter.WaitForStream()
+	payload := requireNotifyPayload(t, snapshot())
+	// Should have parsed the body's error.message, not the default fallback.
+	require.Contains(t, payload["content"], "body arrived")
+}
+
+func TestHandle429_AsyncBodySet_ContextCancelBeforeBody(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := NewUnboundAIResponse()
+
+	done := make(chan struct{})
+	var is429, _, ctxDone bool
+	go func() {
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
+		close(done)
+	}()
+
+	// Set header only — handle429 will be waiting on WaitForHTTPBody.
+	time.Sleep(100 * time.Millisecond)
+	header429 := "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 5\r\n\r\n"
+	rsp.SetRawHTTPResponseHeader([]byte(header429))
+
+	// Cancel before body arrives.
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		assert.True(t, is429, "should detect 429 from header")
+		assert.True(t, ctxDone, "should exit via context cancel while waiting for body")
+	case <-time.After(5 * time.Second):
+		t.Fatal("handle429RateLimit blocked too long")
+	}
+}
+
+func TestWaitForHTTPBody_ImmediateBodySet(t *testing.T) {
+	rsp := NewUnboundAIResponse()
+	rsp.SetRawHTTPResponseData(
+		[]byte("HTTP/1.1 429 Too Many Requests\r\n\r\n"),
+		[]byte(`{"error":"x"}`),
+	)
+	// Body already set — should return immediately.
+	assert.True(t, rsp.WaitForHTTPBody(context.Background()))
+}
+
+func TestWaitForHTTPBody_NilResponse(t *testing.T) {
+	var rsp *AIResponse
+	assert.False(t, rsp.WaitForHTTPBody(context.Background()))
+}
+
+func TestWaitForHTTPBody_ContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	rsp := NewUnboundAIResponse()
+
+	done := make(chan bool)
+	go func() {
+		done <- rsp.WaitForHTTPBody(ctx)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case ok := <-done:
+		assert.False(t, ok, "should return false on context cancel")
+	case <-time.After(2 * time.Second):
+		t.Fatal("WaitForHTTPBody did not return after cancel")
+	}
+}

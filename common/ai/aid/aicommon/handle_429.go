@@ -198,6 +198,14 @@ func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse)
 		return false, false, false
 	}
 
+	// Wait for the response body before parsing the 429 error JSON.
+	// The header callback (SetRawHTTPResponseHeader) fires before the body
+	// callback (SetRawHTTPResponseData) — if we parse the body immediately
+	// after headers arrive, the body may not be set yet.
+	if !rsp.WaitForHTTPBody(ctx) {
+		return true, false, true
+	}
+
 	body := parse429Body(rsp)
 	limitKind := resolveLimitKind(rsp, body)
 	source := "generic"

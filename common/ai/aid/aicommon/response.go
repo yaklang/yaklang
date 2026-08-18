@@ -64,6 +64,13 @@ type AIResponse struct {
 	httpHeaderReady     chan struct{}
 	httpHeaderReadyOnce sync.Once
 
+	// httpBodyReady is closed when SetRawHTTPResponseData sets the body,
+	// so callers waiting for the response body (e.g. 429 error parsing) can
+	// block until the body arrives rather than racing with the header-only
+	// SetRawHTTPResponseHeader path.
+	httpBodyReady     chan struct{}
+	httpBodyReadyOnce sync.Once
+
 	usageInfo *aispec.ChatUsage
 
 	// plainOutput / plainReason hold the pure AI output / thinking text
@@ -204,6 +211,17 @@ func (a *AIResponse) SetHeaderReady() {
 	})
 }
 
+// SetHTTPBodyReady signals that the raw HTTP response body has been set
+// (via SetRawHTTPResponseData). Callers waiting via WaitForHTTPBody will
+// unblock. Safe to call multiple times (only the first takes effect).
+func (a *AIResponse) SetHTTPBodyReady() {
+	a.httpBodyReadyOnce.Do(func() {
+		if a.httpBodyReady != nil {
+			close(a.httpBodyReady)
+		}
+	})
+}
+
 func (a *AIResponse) SetResponseStartTime(t time.Time) {
 	if a == nil {
 		return
@@ -316,6 +334,31 @@ func (a *AIResponse) WaitForHTTPHeaders(ctx context.Context) bool {
 	}
 }
 
+// WaitForHTTPBody blocks until the raw HTTP response body has been set
+// (via SetRawHTTPResponseData) or the context is cancelled. This is needed
+// because the header callback (SetRawHTTPResponseHeader) fires before the
+// body callback (SetRawHTTPResponseData) — the 429 handler must wait for
+// the body to arrive before parsing the error JSON.
+//
+// Returns true if the body arrived, false if the context was cancelled or
+// the response was closed before the body could be set.
+func (a *AIResponse) WaitForHTTPBody(ctx context.Context) bool {
+	if a == nil || a.httpBodyReady == nil {
+		return false
+	}
+	select {
+	case <-a.httpBodyReady:
+		return true
+	default:
+	}
+	select {
+	case <-a.httpBodyReady:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
 func (a *AIResponse) SetRawHTTPResponseData(header []byte, body []byte) {
 	if a == nil {
 		return
@@ -326,6 +369,7 @@ func (a *AIResponse) SetRawHTTPResponseData(header []byte, body []byte) {
 	a.rawHTTPResponseHeaderMu.Unlock()
 
 	a.SetHeaderReady()
+	a.SetHTTPBodyReady()
 }
 
 func (a *AIResponse) SetRawHTTPResponseHeader(header []byte) {
@@ -745,6 +789,7 @@ func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 			caller.CallAIResponseOutputFinishedCallback(s)
 		},
 		httpHeaderReady: make(chan struct{}),
+		httpBodyReady:   make(chan struct{}),
 		asyncState:      newAIResponseAsyncState(false),
 		setErrorFunc: func(e error) {
 			errMu.Lock()
@@ -873,6 +918,7 @@ func newUnboundAIResponse() *AIResponse {
 		consumptionCallback: func(current int) {},
 		onOutputFinished:    func(s string) {},
 		httpHeaderReady:     make(chan struct{}),
+		httpBodyReady:       make(chan struct{}),
 		asyncState:          newAIResponseAsyncState(true),
 	}
 }
