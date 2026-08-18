@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/tiers"
 )
 
 func (c *Compiler) getOrDeclareExternCallable(symbol string) llvm.Value {
@@ -92,6 +93,12 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 	methodName := c.resolveMemberKeyString(key)
 	if methodName == "" {
 		return contextCallSpec{}, false, nil
+	}
+	// Shadow-method dispatch is used for both plain objects and yaklib module
+	// members (e.g. poc.RenderString). Record the yaklib dependency so tier
+	// selection and per-module DCE know the module is used.
+	if pkg := c.yaklibModuleNameFromObject(obj); pkg != "" {
+		c.recordYaklibDependency(pkg, methodName)
 	}
 
 	methodNamePtr := c.Builder.CreateGlobalStringPtr(methodName, fmt.Sprintf("yak_method_name_%d", inst.GetId()))
@@ -236,4 +243,22 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	}
 
 	return fmt.Errorf("compileCall: unable to resolve callee %q", calleeName)
+}
+
+func (c *Compiler) yaklibModuleNameFromObject(obj ssa.Value) string {
+	if obj == nil {
+		return ""
+	}
+	name := obj.GetName()
+	if name == "" {
+		return ""
+	}
+	for _, tier := range tiers.All {
+		for _, mod := range tier.Modules {
+			if mod == name {
+				return name
+			}
+		}
+	}
+	return ""
 }
