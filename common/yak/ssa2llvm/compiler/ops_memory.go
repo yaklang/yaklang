@@ -286,26 +286,35 @@ func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value,
 	} else {
 		loadCtx = contextInst
 	}
-	var emitErr error
-	c.withSSADefInsertPoint(memberID, func() {
+	emitMemberRead := func() error {
 		if !c.isSSAValueStored(obj.GetId()) && !c.hasValueSlot(obj.GetId()) {
 			if _, err := c.getValue(loadCtx, obj.GetId()); err != nil {
-				emitErr = fmt.Errorf("compileMemberCall: failed to get object value: %w", err)
-				return
+				return fmt.Errorf("compileMemberCall: failed to get object value: %w", err)
 			}
 		}
-		c.reanchorSSADefInsertPoint(memberID)
 		slot := c.ensureValueSlot(memberID)
 		if slot.IsNil() {
-			emitErr = fmt.Errorf("compileMemberCall: slot for value %d unavailable", memberID)
-			return
+			return fmt.Errorf("compileMemberCall: slot for value %d unavailable", memberID)
 		}
-		c.reanchorSSADefInsertPoint(memberID)
 		parentVal := c.loadSSAValue(obj.GetId())
 		valResult := c.emitRuntimeGetField(parentVal, keyStr, memberID)
 		c.Builder.CreateStore(c.coerceToInt64(valResult), slot)
 		c.markSSAValueStored(memberID)
-	})
+		return nil
+	}
+	var emitErr error
+	if c.initializingMemberDepth > 0 {
+		// The member read is part of an object/slice literal being built at the
+		// Make's position; it must be emitted there so it dominates the
+		// following set_field, not at its own (possibly later) SSA def block.
+		// The depth covers nested reads compiled while a member value is being
+		// materialized.
+		emitErr = emitMemberRead()
+	} else {
+		c.withSSADefInsertPoint(memberID, func() {
+			emitErr = emitMemberRead()
+		})
+	}
 	if emitErr != nil {
 		return emitErr
 	}
@@ -518,11 +527,13 @@ func (c *Compiler) withInitializingMemberValue(id int64, fn func() error) error 
 		c.initializingMemberValueIDs = make(map[int64]int)
 	}
 	c.initializingMemberValueIDs[id]++
+	c.initializingMemberDepth++
 	defer func() {
 		c.initializingMemberValueIDs[id]--
 		if c.initializingMemberValueIDs[id] <= 0 {
 			delete(c.initializingMemberValueIDs, id)
 		}
+		c.initializingMemberDepth--
 	}()
 	return fn()
 }
@@ -1382,6 +1393,7 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 	}
 
 	seen := make(map[string]struct{})
+	makeBB := c.restoreInsertBlock(inst)
 	var emitErr error
 	for _, pair := range ssa.GetMemberPairs(inst) {
 		key, member := pair.Key, pair.Member
@@ -1407,6 +1419,13 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 			emitErr = fmt.Errorf("emitInitialMakeMemberAssignments: field %q: %w", keyStr, err)
 			break
 		}
+		// Member value compilation can leave the Builder in another block (a
+		// lazily compiled call or a nested read anchored at its own def point).
+		// Force the set_field back to the Make's block so the value dominates
+		// the write.
+		if !makeBB.IsNil() {
+			c.restoreInsertPoint(makeBB)
+		}
 		c.emitRuntimeSetField(objVal, keyStr, llvmVal, member, member.GetId())
 		if err := c.maybeEmitMemberSet(inst, member, member.GetId()); err != nil {
 			emitErr = fmt.Errorf("emitInitialMakeMemberAssignments: field %q member variables: %w", keyStr, err)
@@ -1427,8 +1446,14 @@ func (c *Compiler) shouldReadMemberValueForInitialMakeMember(member ssa.Value, o
 	if member == nil || !member.IsMember() || member.GetObject() == nil || member.GetKey() == nil {
 		return false
 	}
-	if c.memberHasOwnerPair(member, owner, keyStr) {
-		return false
+	// Only skip the dynamic read when the member's *definition* (first owner
+	// pair) is the object being created; a shared value whose first owner is a
+	// different object must still be read dynamically at the Make's position
+	// (and re-emitted there even if an earlier use cached it in another block).
+	if obj, key := c.firstOwnerObjectKey(member); obj != nil && key != nil {
+		if obj.GetId() == owner.GetId() && c.resolveMemberKeyString(key) == keyStr {
+			return false
+		}
 	}
 	if current := c.currentFunction(); current != nil && member.GetFunc() != nil && member.GetFunc() != current {
 		return false
