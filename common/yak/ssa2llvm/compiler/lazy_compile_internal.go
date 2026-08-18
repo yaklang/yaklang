@@ -19,6 +19,15 @@ func (c *Compiler) restoreInsertPoint(bb llvm.BasicBlock) {
 }
 
 func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instruction, compile func() error) error {
+	if c == nil || targetInst == nil || targetInst.GetFunc() == nil {
+		return nil
+	}
+	if current := c.currentFunction(); current != nil && targetInst.GetFunc() != current {
+		// Cross-function references are front-end artifacts (a value from
+		// another function leaking into this function's instruction graph).
+		// Never emit them here; the owning function compiles them itself.
+		return nil
+	}
 	restoreBB := c.restoreInsertBlock(contextInst)
 	prevActive := int64(0)
 	if c != nil && c.function != nil {
@@ -43,10 +52,12 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 	targetBlockID := targetInst.GetBlock().GetId()
 	if c.function != nil {
 		if _, compiled := c.function.compiledBlocks[targetBlockID]; !compiled {
-			// Forward reference: emit in the entry block so the value dominates all uses.
-			if fn := c.function.current; fn != nil && fn.EnterBlock > 0 {
-				if entryBB, ok := c.Blocks[fn.EnterBlock]; ok && !entryBB.IsNil() {
-					c.function.activeBlockID = fn.EnterBlock
+			// Forward reference: emit in the entry block of the target
+			// instruction own function (not the currently active one) so the
+			// value dominates its uses inside that function.
+			if targetFn := targetInst.GetFunc(); targetFn != nil && targetFn.EnterBlock > 0 {
+				if entryBB, ok := c.Blocks[targetFn.EnterBlock]; ok && !entryBB.IsNil() {
+					c.function.activeBlockID = targetFn.EnterBlock
 					c.setInsertPointBeforeTerminator(entryBB)
 					err := compile()
 					if !restoreBB.IsNil() {
