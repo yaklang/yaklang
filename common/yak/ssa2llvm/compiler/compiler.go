@@ -62,6 +62,7 @@ type Compiler struct {
 
 	initialMemberValueIDs      map[int64]struct{}
 	initializingMemberValueIDs map[int64]int
+	initializingMemberDepth    int
 	emittedMemberVariableSets  map[string]struct{}
 	materializingCallableIDs   map[int64]int
 
