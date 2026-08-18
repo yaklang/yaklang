@@ -122,9 +122,12 @@ func cIsNullishConst(v ssa.Value) bool {
 	return s == "0" || s == "null" || s == "nil" || s == "<nil>" || s == "nullptr"
 }
 
-// assignToVar assigns rhs to left. Only wrap nullish constants as PointerKind
-// (p = NULL). Never wrap numbers, strings, functions, or existing pointers —
-// that would break *p write-through, char*, and function pointers.
+// assignToVar is the single assignment channel for lvalue stores. After
+// writing left it consults the builder's starAssignExtra registry and, if left
+// was registered by starPtrAccess as a *formal store, writes the same rhs to
+// the Parameter's @pointer so UAF sees it as a member-use of the formal.
+// Callers never carry the extra lvalue — pointer-state convergence is
+// registered per-lvalue and resolved here.
 func (b *astbuilder) assignToVar(left *ssa.Variable, right ssa.Value) {
 	if left == nil || utils.IsNil(right) {
 		return
@@ -133,7 +136,10 @@ func (b *astbuilder) assignToVar(left *ssa.Variable, right ssa.Value) {
 		right = b.ensurePointerValue(right)
 	}
 	b.AssignVariable(left, right)
-	b.flushExtraStarAssign(right)
+	if extra, ok := b.starAssignExtra[left]; ok && extra != nil {
+		b.AssignVariable(extra, right)
+		delete(b.starAssignExtra, left)
+	}
 }
 
 // wantPointerAssign is true when the LHS is (or is typed as) a pointer.
@@ -193,14 +199,6 @@ func starLoadPreferStored(origin ssa.Value) bool {
 	}
 }
 
-func (b *astbuilder) flushExtraStarAssign(right ssa.Value) {
-	extra := b.extraStarAssign
-	b.extraStarAssign = nil
-	if extra != nil && !utils.IsNil(right) {
-		b.AssignVariable(extra, right)
-	}
-}
-
 func (b *astbuilder) registerStarDeref(ptr ssa.Value) {
 	if utils.IsNil(ptr) {
 		return
@@ -209,8 +207,13 @@ func (b *astbuilder) registerStarDeref(ptr ssa.Value) {
 	lifetime.RegisterDeref(site, ptr)
 }
 
-// starPtrAccess implements *ptr. Parameter stores wrap the param variable as a
-// pointer object so PointerSideEffect writes back to the caller origin.
+// starPtrAccess implements *ptr.
+// For *formal stores, two lvalues are needed: left (EmitConstPointer wrapper
+// so PointerSideEffect writes back to the caller) and the formal's @pointer
+// (so UAF sees the store as a member-use of the formal). Rather than threading
+// the second lvalue back through every caller, starPtrAccess registers
+// (left -> @pointer) in the builder's starAssignExtra map; the unified
+// assignToVar channel picks it up and writes both with the same rhs.
 func (b *astbuilder) starPtrAccess(ptr ssa.Value, ptrVar *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
 	if utils.IsNil(ptr) || ptr.GetType() == nil || ptr.GetType().GetTypeKind() != ssa.PointerKind {
 		return ptr, ptrVar
@@ -219,9 +222,13 @@ func (b *astbuilder) starPtrAccess(ptr ssa.Value, ptrVar *ssa.Variable, isLeft b
 		if p, ok := ssa.ToParameter(ptr); ok {
 			b.ReferenceParameter(ptr.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
 			if !p.IsFreeValue && ptrVar != nil {
-				b.extraStarAssign = b.GetAndCreateOriginPointer(ptr)
+				extra := b.GetAndCreateOriginPointer(ptr)
 				obj := b.EmitConstPointer(ptrVar)
 				left := b.GetAndCreateOriginPointer(obj)
+				if b.starAssignExtra == nil {
+					b.starAssignExtra = make(map[*ssa.Variable]*ssa.Variable)
+				}
+				b.starAssignExtra[left] = extra
 				return b.GetOriginValue(obj), left
 			}
 		}
@@ -578,8 +585,7 @@ func (b *astbuilder) applyAssignmentFromStarCast(
 	right = b.applyAssignmentOp(op.GetText(), right, newRight)
 	if left != nil {
 		// Do not SetType from RHS — that clobbers PointerKind / member types.
-		b.AssignVariable(left, right)
-		b.flushExtraStarAssign(right)
+		b.assignToVar(left, right)
 	}
 
 	if utils.IsNil(right) {
@@ -787,7 +793,7 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 				} else if ast.MinusMinus() != nil {
 					right = b.EmitBinOp(ssa.OpSub, right, b.EmitConstInst(1))
 				}
-				b.AssignVariable(left, right)
+				b.assignToVar(left, right)
 			}
 			return right, left
 		}

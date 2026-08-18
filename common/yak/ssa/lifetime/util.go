@@ -24,6 +24,166 @@ const (
 	KindNPD        = "npd"         // null pointer dereference (independent of UAF)
 )
 
+func isPointerish(v ssa.Value) bool {
+	if v == nil {
+		return false
+	}
+	if _, ok := ssa.ToConstInst(v); ok {
+		return false
+	}
+	if isHeapAllocValue(v) {
+		return true
+	}
+	if t := v.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+		return true
+	}
+	if _, ok := ssa.ToParameter(v); ok {
+		return true
+	}
+	if _, ok := ssa.ToPhi(v); ok {
+		return true
+	}
+	return false
+}
+
+// expandLifetimeSeedIDs collects SSA ids that identify the same pointer/object
+// as the SyntaxFlow seeds: the value itself, pointer copies/phis, and free() args.
+// Constants (malloc size, store RHS) are excluded so two pointers cannot collide
+// via a shared interned integer.
+func expandLifetimeSeedIDs(seeds []ssa.Value) map[int64]struct{} {
+	ids := make(map[int64]struct{})
+	var walk func(ssa.Value, int, bool)
+	walk = func(v ssa.Value, depth int, isSeed bool) {
+		if v == nil || depth > 24 {
+			return
+		}
+		id := v.GetId()
+		if id <= 0 {
+			return
+		}
+		if _, ok := ids[id]; ok {
+			return
+		}
+		if _, ok := ssa.ToConstInst(v); ok {
+			if isSeed {
+				ids[id] = struct{}{}
+			}
+			return
+		}
+		ids[id] = struct{}{}
+		if pid := paramObjectID(v); pid > 0 {
+			ids[pid] = struct{}{}
+		}
+		if isPointerish(v) {
+			if _, isCall := ssa.ToCall(v); !isCall {
+				for _, u := range v.GetUsers() {
+					if u == nil || u.GetId() <= 0 {
+						continue
+					}
+					ids[u.GetId()] = struct{}{}
+				}
+			}
+		}
+		if c, ok := ssa.ToCall(v); ok && c != nil {
+			for _, aid := range c.Args {
+				if aid <= 0 {
+					continue
+				}
+				av, ok := c.GetValueById(aid)
+				if !ok || av == nil {
+					continue
+				}
+				if !isPointerish(av) {
+					continue
+				}
+				walk(av, depth+1, false)
+			}
+			return
+		}
+		if v.HasValues() {
+			for _, op := range v.GetValues() {
+				walk(op, depth+1, false)
+			}
+		}
+		if v.IsMember() {
+			if obj := v.GetObject(); obj != nil {
+				walk(obj, depth+1, false)
+			}
+		}
+	}
+	for _, s := range seeds {
+		walk(s, 0, true)
+	}
+	return ids
+}
+
+func findingRelatedToSeeds(f *Finding, seedIDs map[int64]struct{}, reg *registry) bool {
+	if f == nil || len(seedIDs) == 0 {
+		return false
+	}
+	if _, ok := seedIDs[f.FreedObj]; ok {
+		return true
+	}
+	if f.FreeCall != nil {
+		if _, ok := seedIDs[f.FreeCall.GetId()]; ok {
+			return true
+		}
+	}
+	use := f.Use
+	if use == nil {
+		return false
+	}
+	if _, ok := seedIDs[use.GetId()]; ok {
+		return true
+	}
+	inSeeds := func(v ssa.Value) bool {
+		if v == nil || v.GetId() <= 0 {
+			return false
+		}
+		_, ok := seedIDs[v.GetId()]
+		return ok
+	}
+	if inSeeds(starDerefPointer(use)) {
+		return true
+	}
+	if inSeeds(registeredDerefPointer(use, reg)) {
+		return true
+	}
+	if obj := use.GetObject(); obj != nil {
+		seen := map[int64]struct{}{}
+		for depth := 0; obj != nil && depth < 8; obj, depth = obj.GetObject(), depth+1 {
+			oid := obj.GetId()
+			if oid <= 0 {
+				break
+			}
+			if _, ok := seen[oid]; ok {
+				break
+			}
+			seen[oid] = struct{}{}
+			if _, ok := seedIDs[oid]; ok {
+				return true
+			}
+			if !obj.IsMember() {
+				break
+			}
+		}
+	}
+	if use.HasValues() {
+		for _, op := range use.GetValues() {
+			if op == nil {
+				continue
+			}
+			if _, ok := ssa.ToConstInst(op); ok {
+				continue
+			}
+			if _, ok := seedIDs[op.GetId()]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func isNullish(v ssa.Value) bool {
 	if utils.IsNil(v) {
 		return true

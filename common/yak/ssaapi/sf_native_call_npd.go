@@ -3,14 +3,14 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/lifetime"
 )
 
 // NativeCall_NPD finds null-pointer dereference sites (independent of UAF).
 // Usage:
-//   - *<npd()> as $npd                 // all NPD sites in the program
-//   - $ptr<npd()> as $npd              // NPD related to selected pointers
+//   - *<npd()> as $npd                      // all NPD sites
+//   - $ptr<npd()> as $npd                   // NPD related to $ptr
+//   - <npd(target=$ptr)> as $npd            // same, named target (receiver may be *)
 const NativeCall_NPD = "npd"
 
 func nativeCallNPD(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
@@ -19,24 +19,14 @@ func nativeCallNPD(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallA
 		return false, sfvm.NewEmptyValues(), utils.Errorf("npd: no program context: %v", err)
 	}
 
-	var seeds []ssa.Value
-	onlyProgram := true
-	_ = vs.Recursive(func(operator sfvm.ValueOperator) error {
-		switch v := operator.(type) {
-		case *Program:
-		case *Value:
-			onlyProgram = false
-			if iv := v.getValue(); iv != nil {
-				seeds = append(seeds, iv)
-			}
-		default:
-			onlyProgram = false
-		}
-		return nil
-	})
+	targetSeeds, targetSpecified := resolveLifetimeTargetSeeds(frame, params)
+	seeds := collectSSAValues(vs)
+	if targetSpecified {
+		seeds = targetSeeds
+	}
 
 	var findings []*lifetime.Finding
-	if onlyProgram || len(seeds) == 0 {
+	if !targetSpecified && (receiverIsProgramOnly(vs) || len(seeds) == 0) {
 		findings = lifetime.FindNPDUses(prog.Program)
 	} else {
 		findings = lifetime.FindNPDUsesRelated(prog.Program, seeds)
