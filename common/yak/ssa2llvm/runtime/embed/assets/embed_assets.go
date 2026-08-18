@@ -44,5 +44,13 @@ var embeddedLibgccEh []byte
 //go:embed extdeps
 var embeddedExtDeps embed.FS
 
+// embeddedTiers holds the pre-built tier archives (tiers/<name>/libyak.a) so
+// the compiler can switch core/net/staticanalyze by the script's dependencies
+// without an on-disk tier directory. Populated by scripts/build_yaklib.sh
+// (tier builds) and consumed by assets.ReleaseTierTo.
+//
+//go:embed all:tiers
+var embeddedTiers embed.FS
+
 // EmbeddedAvailable is true when the real embedded assets are compiled in.
 const EmbeddedAvailable = true
