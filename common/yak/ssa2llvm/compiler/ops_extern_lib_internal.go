@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -35,13 +36,23 @@ func (c *Compiler) compileYaklibExportMember(contextInst ssa.Instruction, val ss
 	if rv.IsValid() && rv.Kind() == reflect.Func {
 		return nil
 	}
+	if rv.IsValid() && rv.Kind() == reflect.Func {
+		c.recordYaklibDependency(pkg, keyStr)
+		c.cacheValue(val.GetId(), c.materializeYaklibExportCallable(val, pkg, keyStr))
+		return c.maybeEmitMemberSet(contextInst, val, val.GetId())
+	}
 	// String exports (e.g. ssa.GO, a named string Language constant) must be
 	// lowered as a global C-string pointer, mirroring how string literals are
 	// emitted. Boxing them through runtimeValueToInt64ForCompiler would return
 	// 0 (empty string) because that helper only handles numeric/bool values.
 	if rv.IsValid() && rv.Kind() == reflect.String {
 		ptr := c.Builder.CreateGlobalStringPtr(rv.String(), fmt.Sprintf("yaklib_export_str_%d", val.GetId()))
-		tagged := c.Builder.CreateOr(llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type()), llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false), "yaklib_export_str_tag")
+		// The OR instruction must dominate every use (member-set syncs can run in
+		// other blocks), so anchor it at the value's definition point.
+		var tagged llvm.Value
+		c.withSSADefInsertPoint(val.GetId(), func() {
+			tagged = c.Builder.CreateOr(llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type()), llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false), "yaklib_export_str_tag")
+		})
 		c.cacheValue(val.GetId(), tagged)
 		return c.maybeEmitMemberSet(contextInst, val, val.GetId())
 	}
@@ -163,4 +174,39 @@ func runtimeValueToInt64ForCompiler(v any) int64 {
 	default:
 		return 0
 	}
+}
+
+// materializeYaklibExportCallable builds a first-class callable for a yaklib
+// export used as a value (e.g. f = poc.ReplaceHTTPPacketHeader; f(...)). The
+// closure's fn is the runtime's YaklibExportCallableMarker and its freeValues
+// carry (pkg, method), so invoking it dispatches through the yaklib table
+// instead of calling an undefined symbol.
+func (c *Compiler) materializeYaklibExportCallable(val ssa.Value, pkg, method string) llvm.Value {
+	i64 := c.LLVMCtx.Int64Type()
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	i64Ptr := llvm.PointerType(i64, 0)
+
+	pkgPtr := c.Builder.CreateGlobalStringPtr(pkg, fmt.Sprintf("yaklib_pkg_%d", val.GetId()))
+	methodPtr := c.Builder.CreateGlobalStringPtr(method, fmt.Sprintf("yaklib_method_%d", val.GetId()))
+
+	var closure llvm.Value
+	c.withSSADefInsertPoint(val.GetId(), func() {
+		mallocFn, mallocType := c.getOrInsertMalloc()
+		raw := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{llvm.ConstInt(i64, 16, false)}, "yaklib_export_free_mem")
+		freeI64Ptr := c.Builder.CreateIntToPtr(raw, i64Ptr, "yaklib_export_free_i64p")
+		slot0 := c.Builder.CreateGEP(i64, freeI64Ptr, []llvm.Value{llvm.ConstInt(i64, 0, false)}, "")
+		c.Builder.CreateStore(llvm.ConstPtrToInt(pkgPtr, i64), slot0)
+		slot1 := c.Builder.CreateGEP(i64, freeI64Ptr, []llvm.Value{llvm.ConstInt(i64, 1, false)}, "")
+		c.Builder.CreateStore(llvm.ConstPtrToInt(methodPtr, i64), slot1)
+
+		makeFn, makeType := c.getOrInsertRuntimeMakeCallable()
+		closure = c.Builder.CreateCall(makeType, makeFn, []llvm.Value{
+			llvm.ConstInt(i64, abi.YaklibExportCallableMarker, false),
+			llvm.ConstInt(i64, 0, false),
+			llvm.ConstInt(i64, 2, false),
+			freeI64Ptr,
+		}, "yaklib_export_callable")
+	})
+	_ = i8Ptr
+	return closure
 }

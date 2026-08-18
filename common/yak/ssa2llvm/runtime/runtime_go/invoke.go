@@ -114,8 +114,40 @@ func runtimeCallableClosureValueFromRaw(raw uint64) (runtimeCallableClosure, boo
 	return runtimeCallableClosureValue(handle.Value())
 }
 
+// invokeYaklibExportCallable dispatches a first-class yaklib export function
+// value. The closure's freeValues carry (pkg, method) as untagged C-string
+// pointers; the context args are the real call arguments.
+func invokeYaklibExportCallable(ctx unsafe.Pointer, closure runtimeCallableClosure) {
+	defer func() {
+		if r := recover(); r != nil {
+			value, flags := recoveredPanicValue(r)
+			ctxSetPanic(ctx, value, flags)
+		}
+	}()
+	if ctx == nil || len(closure.freeValues) < 2 {
+		return
+	}
+	argc := ctxArgc(ctx)
+	if argc < 0 {
+		return
+	}
+	inArgs := ctxArgsSlice(ctx, argc)
+	callArgs := make([]uint64, 0, len(inArgs)+2)
+	callArgs = append(callArgs, closure.freeValues[0], closure.freeValues[1])
+	callArgs = append(callArgs, inArgs...)
+	ret, err := runtimeDispatchYaklibCall(callArgs)
+	if err != nil {
+		panic(err)
+	}
+	ctxSetRet(ctx, ret)
+}
+
 func invokeCallableClosure(ctx unsafe.Pointer, closure runtimeCallableClosure) {
 	if ctx == nil || closure.fn == 0 {
+		return
+	}
+	if closure.fn == abi.YaklibExportCallableMarker {
+		invokeYaklibExportCallable(ctx, closure)
 		return
 	}
 	argc := ctxArgc(ctx)

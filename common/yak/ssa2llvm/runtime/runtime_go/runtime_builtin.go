@@ -27,8 +27,20 @@ func normalizePrintArg(v any) any {
 }
 
 func decodeTaggedArg(v uint64) any {
-	// Untagged values are just integers in our current calling convention.
+	// Untagged values are usually integers, but an untagged pointer can also
+	// reach the runtime when the compiler could not prove the SSA type (e.g. a
+	// string flowing through a loop-carried phi). Decode canonical C-string and
+	// shadow pointers before falling back to int64.
 	if (v & yakTaggedPointerMask) == 0 {
+		// Shadow pointers and C-string pointers share the same canonical
+		// address range, so resolve the shadow handle first (exact map lookup)
+		// before treating the address as a C string.
+		if h, ok := handleFromShadow(unsafe.Pointer(uintptr(v))); ok {
+			return h.Value()
+		}
+		if looksLikeCStringPointer(v) {
+			return C.GoString((*C.char)(unsafe.Pointer(uintptr(v))))
+		}
 		return int64(v)
 	}
 

@@ -26,6 +26,13 @@ const (
 	Version uint64 = 1
 )
 
+// YaklibExportCallableMarker is the closure fn value for a yaklib export
+// used as a first-class function value (e.g. f = poc.ReplaceHTTPPacketHeader;
+// f(...)). Real function pointers are never this small; the runtime
+// intercepts it and dispatches through the yaklib table using the closure's
+// freeValues (pkg, method).
+const YaklibExportCallableMarker uint64 = 1
+
 const (
 	KindCallable uint64 = 1
 	KindDispatch uint64 = 2
