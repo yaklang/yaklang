@@ -110,6 +110,11 @@ func startPprofHTTPServer(addr string) {
 
 func (c *pprofCollector) collectLoop(ctx context.Context) {
 	defer c.wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("[pprof] collector loop panicked: %v", r)
+		}
+	}()
 
 	select {
 	case <-ctx.Done():
@@ -163,6 +168,11 @@ func (c *pprofCollector) collectSnapshot(tag string, syncCPU bool) {
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("[pprof] periodic CPU snapshot panicked: %v", r)
+				}
+			}()
 			c.fetchCPU(label, cpuDuration)
 		}()
 	}

@@ -14,6 +14,10 @@ type DebugOutputCleanup func()
 // noopDebugCleanup is returned when debug is disabled or setup fails non-fatally.
 func noopDebugCleanup() {}
 
+// startDebugOutputImpl is an indirection over StartDebugOutput so tests can
+// simulate a panic during debug setup.
+var startDebugOutputImpl = StartDebugOutput
+
 // SetupDebugDir wires debug/pprof output when debugDir is non-empty.
 // Empty debugDir returns a no-op cleanup so callers can always:
 //
@@ -22,11 +26,17 @@ func noopDebugCleanup() {}
 //
 // Setup failures are logged and treated as non-fatal (no-op cleanup).
 // See StartDebugOutput for redirectSSADB semantics.
-func SetupDebugDir(debugDir string, redirectSSADB bool) DebugOutputCleanup {
+func SetupDebugDir(debugDir string, redirectSSADB bool) (cleanup DebugOutputCleanup) {
 	if debugDir == "" {
 		return noopDebugCleanup
 	}
-	cleanup, err := StartDebugOutput(debugDir, redirectSSADB)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("[debug] setup debug dir %s panicked: %v, continuing without debug", debugDir, r)
+			cleanup = noopDebugCleanup
+		}
+	}()
+	cleanup, err := startDebugOutputImpl(debugDir, redirectSSADB)
 	if err != nil {
 		log.Warnf("[debug] setup debug dir %s failed: %v, continuing without debug", debugDir, err)
 		return noopDebugCleanup

@@ -32,3 +32,15 @@ func TestSetupDebugDirCreatesLogAndDirs(t *testing.T) {
 	_, err = os.Stat(filepath.Join(target, "cpu-pprof"))
 	require.NoError(t, err)
 }
+
+func TestSetupDebugDirPanicDoesNotEscape(t *testing.T) {
+	orig := startDebugOutputImpl
+	startDebugOutputImpl = func(string, bool) (DebugOutputCleanup, error) {
+		panic("boom: debug setup")
+	}
+	t.Cleanup(func() { startDebugOutputImpl = orig })
+
+	cleanup := SetupDebugDir(t.TempDir(), false)
+	require.NotNil(t, cleanup)
+	require.NotPanics(t, func() { cleanup() })
+}
