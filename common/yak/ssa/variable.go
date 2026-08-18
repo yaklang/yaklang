@@ -67,6 +67,30 @@ func (variable *Variable) Assign(value Value) error {
 		// setMemberVerboseName(value)
 		value.SetVerboseName(getMemberVerboseName(variable.object, variable.key))
 		obj, key := variable.GetMemberCall()
+		if len(value.GetObjectKeyPairs()) > 0 {
+			// Reusing an existing member value would re-parent it to this
+			// object/key and corrupt its original ownership (e.g.
+			// result["kind"] = params.info.kind). Assign a fresh placeholder
+			// so both member references keep their own object/key pairs.
+			if und, ok := ToUndefined(value); ok && und != nil {
+				fresh := NewUndefined(variable.GetName())
+				if fn := value.GetFunc(); fn != nil {
+					fresh.SetFunc(fn)
+				}
+				if blk := value.GetBlock(); blk != nil {
+					fresh.SetBlock(blk)
+				}
+				fresh.SetType(value.GetType())
+				fresh.SetRange(value.GetRange())
+				if prog := value.GetProgram(); prog != nil {
+					prog.SetVirtualRegister(fresh)
+				}
+				if blk := value.GetBlock(); blk != nil {
+					blk.Insts = append([]int64{fresh.GetId()}, blk.Insts...)
+				}
+				value = fresh
+			}
+		}
 		setMemberCallRelationship(obj, key, value)
 		if objTyp, ok := ToObjectType(obj.GetType()); ok {
 			objTyp.AddField(key, value.GetType())

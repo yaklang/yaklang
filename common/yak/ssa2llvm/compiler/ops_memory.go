@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/go-llvm"
@@ -251,6 +252,12 @@ func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value,
 	}
 	obj := ssa.GetLatestObject(val)
 	key := ssa.GetLatestKey(val)
+	if nameObj := c.memberObjectFromValueName(val); nameObj != nil && (obj == nil || nameObj.GetId() != obj.GetId()) {
+		// The front end can re-parent a member value (e.g. result["kind"] =
+		// params.info.kind) without renaming it; trust the name's object id so
+		// params.info.kind still reads through params.info instead of result.
+		obj = nameObj
+	}
 	keyStr := c.resolveMemberKeyString(key)
 
 	if obj != nil {
@@ -333,6 +340,9 @@ func (c *Compiler) compileDynamicMemberValue(contextInst ssa.Instruction, val ss
 
 func (c *Compiler) dynamicMemberReadValue(contextInst ssa.Instruction, val ssa.Value, memberID int64) (llvm.Value, error) {
 	obj, key := c.firstOwnerObjectKey(val)
+	if nameObj := c.memberObjectFromValueName(val); nameObj != nil && (obj == nil || nameObj.GetId() != obj.GetId()) {
+		obj = nameObj
+	}
 	keyStr := c.resolveRuntimeMemberKeyString(key)
 	if obj == nil || keyStr == "" {
 		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
@@ -1652,4 +1662,32 @@ func (c *Compiler) emitObjectMemberAssignments(contextInst ssa.Instruction, obj 
 		c.emitRuntimeSetFieldByKey(contextInst, objVal, key, keyStr, llvmVal, member, obj.GetId())
 	}
 	return emitErr
+}
+
+// memberObjectFromValueName resolves the object id embedded in a member
+// value's SSA name (e.g. "#1981.kind" -> value 1981). The front end can
+// re-parent a member value to a different object/key without updating its
+// name; when the name and the latest owner disagree, the name is the more
+// reliable record of which object the read should go through.
+func (c *Compiler) memberObjectFromValueName(val ssa.Value) ssa.Value {
+	if val == nil || val.GetFunc() == nil {
+		return nil
+	}
+	name := val.GetName()
+	if len(name) < 3 || name[0] != '#' {
+		return nil
+	}
+	dot := strings.IndexByte(name, '.')
+	if dot <= 1 {
+		return nil
+	}
+	id, err := strconv.ParseInt(name[1:dot], 10, 64)
+	if err != nil {
+		return nil
+	}
+	obj, ok := val.GetFunc().GetValueById(id)
+	if !ok || obj == nil {
+		return nil
+	}
+	return obj
 }
