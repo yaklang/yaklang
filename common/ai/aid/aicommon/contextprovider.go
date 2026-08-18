@@ -40,6 +40,15 @@ const (
 	CONTEXT_PROVIDER_VALUE_AUTO_SELECT_KNOWLEDGE_BASE = "auto_select_knowledge_base"
 
 	USER_FREE_INPUT_UUID = "user_free_input_uuid"
+	USER_INPUT_SOURCE    = "user_input_source"
+
+	USER_INPUT_SOURCE_KEY       = "source"
+	USER_INPUT_SOURCE_SCHEDULE  = "schedule"
+	USER_INPUT_SCHEDULE_CONTEXT = "scheduled_task_context"
+	USER_INPUT_SCHEDULE_UUID    = "uuid"
+	USER_INPUT_SCHEDULE_NAME    = "name"
+	USER_INPUT_SCHEDULED_AT     = "scheduled_at"
+	USER_INPUT_SCHEDULE_TRIGGER = "trigger"
 )
 
 type ContextProviderEntry struct {

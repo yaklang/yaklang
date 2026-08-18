@@ -46,11 +46,16 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 		return
 	}
 	r.emitReActTaskStructured(t, REACT_TASK_enqueue, map[string]interface{}{
-		"react_task_id":              t.GetId(),
-		"react_task_input":           t.GetUserInput(),
-		"react_task_user_input_uuid": t.GetUserInputUUID(),
-		"is_recovery":                t.GetTaskKind() == aicommon.AITaskKind_Recovery,
-		"queue_len":                  r.taskQueue.Len(),
+		"react_task_id":               t.GetId(),
+		"react_task_input":            t.GetUserInput(),
+		"react_task_user_input_uuid":  t.GetUserInputUUID(),
+		"react_task_input_source":     t.GetInputSource(),
+		"react_task_schedule_uuid":    t.GetScheduleUUID(),
+		"react_task_schedule_name":    t.GetScheduleName(),
+		"react_task_scheduled_at":     t.GetScheduledAt(),
+		"react_task_schedule_trigger": t.GetScheduleTrigger(),
+		"is_recovery":                 t.GetTaskKind() == aicommon.AITaskKind_Recovery,
+		"queue_len":                   r.taskQueue.Len(),
 	})
 }
 
@@ -63,13 +68,18 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		return
 	}
 	r.emitReActTaskStructured(t, REACT_TASK_dequeue, map[string]interface{}{
-		"react_task_id":              t.GetId(),
-		"react_task_input":           t.GetUserInput(),
-		"react_task_user_input_uuid": t.GetUserInputUUID(),
-		"is_recovery":                t.GetTaskKind() == aicommon.AITaskKind_Recovery,
-		"reason":                     reason,
-		"queue_len":                  r.taskQueue.Len(),
-		"focus_mode":                 t.GetFocusMode(),
+		"react_task_id":               t.GetId(),
+		"react_task_input":            t.GetUserInput(),
+		"react_task_user_input_uuid":  t.GetUserInputUUID(),
+		"react_task_input_source":     t.GetInputSource(),
+		"react_task_schedule_uuid":    t.GetScheduleUUID(),
+		"react_task_schedule_name":    t.GetScheduleName(),
+		"react_task_scheduled_at":     t.GetScheduledAt(),
+		"react_task_schedule_trigger": t.GetScheduleTrigger(),
+		"is_recovery":                 t.GetTaskKind() == aicommon.AITaskKind_Recovery,
+		"reason":                      reason,
+		"queue_len":                   r.taskQueue.Len(),
+		"focus_mode":                  t.GetFocusMode(),
 	})
 }
 
