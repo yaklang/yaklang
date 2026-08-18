@@ -83,22 +83,34 @@ func ReleaseTierTo(dir, wanted string) (ReleasedPaths, ResolvedTier, error) {
 		return rp, res, nil
 	}
 	// Walk up from the wanted tier: the first installed archive is the
-	// smallest one that still covers every module the script uses.
+	// smallest one that still covers every module the script uses. Embedded
+	// tier archives are the default; an on-disk archive (SSA2LLVM_TIER_DIR or
+	// the search path) overrides the embedded one.
 	for _, t := range tiers.AtLeast(wanted) {
 		if t.Name == EmbeddedTier {
 			break
 		}
-		src := TierArchivePath(t.Name)
-		if src == "" {
-			continue
+		if src := TierArchivePath(t.Name); src != "" {
+			if err := copyFile(src, rp.Libyak); err != nil {
+				return rp, res, fmt.Errorf("install tier %q archive: %w", t.Name, err)
+			}
+			res.Used, res.Source = t.Name, src
+			break
 		}
-		if err := copyFile(src, rp.Libyak); err != nil {
-			return rp, res, fmt.Errorf("install tier %q archive: %w", t.Name, err)
+		if data, err := embeddedTierArchive(t.Name); err == nil && len(data) > 0 {
+			if err := os.WriteFile(rp.Libyak, data, 0o644); err != nil {
+				return rp, res, fmt.Errorf("install embedded tier %q archive: %w", t.Name, err)
+			}
+			res.Used, res.Source = t.Name, "embedded:"+t.Name
+			break
 		}
-		res.Used, res.Source = t.Name, src
-		break
 	}
 	return rp, res, nil
+}
+
+// embeddedTierArchive returns the embedded libyak.a bytes for a tier name.
+func embeddedTierArchive(name string) ([]byte, error) {
+	return embeddedTiers.ReadFile("tiers/" + name + "/libyak.a")
 }
 
 // TierStateKey identifies the installed tier archives for the compile cache.

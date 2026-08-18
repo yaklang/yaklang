@@ -27,9 +27,12 @@ fi
 
 cd "${REPO_ROOT}"
 
-# 1. Build yaklib (runtime + per-module .text split + embed assets)
-echo "[ssa2llvm] building yaklib..."
-"${SSA2LLVM_DIR}/scripts/build_yaklib.sh"
+# 1. Build the full runtime tier ladder (core/net/staticanalyze) so the
+# compiler can switch archives by the script's yaklib dependencies by default;
+# each tier is also embedded into the CLI. The ladder ends on the largest tier,
+# leaving the embedded assets in the right state for a normal build.
+echo "[ssa2llvm] building runtime tier ladder..."
+"${SSA2LLVM_DIR}/scripts/build_tiers.sh"
 
 # 2. Build the ssa2llvm CLI
 echo "[ssa2llvm] building static self-contained CLI -> ${OUT}"

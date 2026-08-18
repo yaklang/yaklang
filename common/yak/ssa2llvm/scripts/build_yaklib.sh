@@ -293,6 +293,14 @@ if [[ -n "${SSA2LLVM_TIER_OUT:-}" ]]; then
   echo "[yaklib] published tier '${TIER_NAME}' to ${TIER_OUT_DIR}/libyak.a"
 fi
 
+# Every tier build also publishes its archive into the embedded assets so the
+# compiler can switch tiers by dependency without an on-disk tier directory.
+if [[ "${TIER_NAME}" != "custom" ]]; then
+  EMBED_TIER_DIR="${ASSETS_DIR}/tiers/${TIER_NAME}"
+  mkdir -p "${EMBED_TIER_DIR}"
+  cp "${ASSETS_DIR}/libyak.a" "${EMBED_TIER_DIR}/libyak.a"
+fi
+
 echo "[yaklib] embedded runtime assets prepared in ${ASSETS_DIR}"
 echo "[yaklib]   libyak.a $(du -h "${ASSETS_DIR}/libyak.a" | cut -f1) (tier: ${TIER_NAME}, modules: ${MODULES}), libgc.a $(du -h "${ASSETS_DIR}/libgc.a" | cut -f1)"
 echo "[yaklib]   crt1/crti/crtn + crtbegin/crtend"
