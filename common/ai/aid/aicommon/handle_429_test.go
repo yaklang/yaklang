@@ -179,8 +179,8 @@ func TestHandle429_AIBalance_EmitsNotifyEvent(t *testing.T) {
 	assert.True(t, ctxDone)
 
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "rate-limit", payload["type"])
-	require.Equal(t, "rate-limit", payload["warning_type"])
+	require.Equal(t, "限流", payload["type"])
+	require.Equal(t, "限流", payload["warning_type"])
 	require.Contains(t, payload["content"], "此刻有 2 位用户正在与我深度对话中")
 	require.Equal(t, float64(6), payload["duration"])
 	require.Equal(t, float64(6000), payload["duration_ms"])
@@ -203,8 +203,8 @@ func TestHandle429_Generic429_EmitsNotifyEvent(t *testing.T) {
 
 	payload := requireNotifyPayload(t, snapshot())
 	// No Retry-After → quota-exceeded type
-	require.Equal(t, "quota-exceeded", payload["type"])
-	require.Equal(t, "quota-exceeded", payload["warning_type"])
+	require.Equal(t, "额度耗尽", payload["type"])
+	require.Equal(t, "额度耗尽", payload["warning_type"])
 	require.Contains(t, payload["content"], "HTTP 429")
 	require.GreaterOrEqual(t, payload["duration"].(float64), float64(5))
 	require.LessOrEqual(t, payload["duration"].(float64), float64(15))

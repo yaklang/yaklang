@@ -232,18 +232,18 @@ func (c *Config) handle429RateLimitContext(ctx context.Context, rsp *AIResponse)
 		// 额度到次日才恢复，不可重试。限制到 [5,30]s 避免长时间阻塞，
 		// 由上层立即暴露错误。
 		waitSec = capRetryAfterSeconds(jitterSeconds(retryAfter, 0), 5, 30)
-		notifyType = "quota-exceeded"
+		notifyType = "额度耗尽"
 		shouldRetry = false
 	case retryAfter > 0:
 		// 有合理 Retry-After：限流/过载类，可重试，按 Retry-After 退避。
 		waitSec = capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
-		notifyType = "rate-limit"
+		notifyType = "限流"
 		shouldRetry = true
 	default:
 		// 无 Retry-After：额度耗尽类（如 token/api_user_token），不可重试。
 		// 等待短时间后由上层处理（消耗重试次数或暴露错误）。
 		waitSec = 5 + rand.Intn(11)
-		notifyType = "quota-exceeded"
+		notifyType = "额度耗尽"
 		shouldRetry = false
 	}
 
@@ -294,13 +294,13 @@ func (c *Config) handleLegacyQueue429(ctx context.Context, queueInfo string) (is
 				"预计等待约 %d 秒，感谢您的耐心",
 			queueCount, waitSec)
 		waitDuration = time.Duration(waitSec) * time.Second
-		c.emit429Notify("rate-limit", msg, waitDuration, "aibalance", "legacy-queue")
+		c.emit429Notify("限流", msg, waitDuration, "aibalance", "legacy-queue")
 	} else {
 		msg := "当前有大量用户正在与我深度对话中\n" +
 			"您的任务同样重要，我不想敷衍任何一位\n" +
 			"预计等待一段时间后自动请求，感谢您的耐心"
 		waitDuration = 15 * time.Second
-		c.emit429Notify("rate-limit", msg, waitDuration, "aibalance", "legacy-queue")
+		c.emit429Notify("限流", msg, waitDuration, "aibalance", "legacy-queue")
 	}
 	done := c.wait429(ctx, waitDuration)
 	return true, true, done
