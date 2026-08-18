@@ -154,7 +154,9 @@ func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption)
 func (c *Compiler) recordYaklibDependency(module, method string) {
 	module = strings.TrimSpace(module)
 	method = strings.TrimSpace(method)
-	if c == nil || method == "" {
+	if c == nil || method == "" || module == "" {
+		// Global callables (e.g. die, println) are not yaklib module members;
+		// recording an empty module would poison tier selection.
 		return
 	}
 	if c.yaklibDeps == nil {

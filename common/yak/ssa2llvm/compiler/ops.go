@@ -391,6 +391,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 					c.cacheValue(id, val)
 					return val, nil
 				}
+				// Modules registered only in the AOT runtime table (e.g. poc,
+				// http via runtimeRegisterYaklibModule) are still yaklib
+				// dependencies for tier selection and per-module DCE.
+				c.recordYaklibDependency(pkg, method)
 			}
 		}
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
