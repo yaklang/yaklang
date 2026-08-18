@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -20,8 +21,14 @@ import (
 )
 
 type ToolRuntimeConfig struct {
-	FeedBacker func(result *ypb.ExecResult) error
-	RuntimeID  string
+	FeedBacker          func(result *ypb.ExecResult) error
+	RuntimeID           string
+	ProjectDatabase     *gorm.DB
+	PersistentSessionID string
+	// CurrentTaskUserInput is the unmodified user request that led to this tool
+	// invocation. Durable tools use it for provenance while keeping their
+	// normalized execution payload separate.
+	CurrentTaskUserInput string
 	// RiskSaveHandler replaces the process-local SQLite write for a risk when
 	// the current AI runtime is bound to a platform-owned result sink.
 	RiskSaveHandler func(context.Context, *schema.Risk) error

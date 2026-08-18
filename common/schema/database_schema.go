@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -135,6 +135,7 @@ var ProjectTables = []interface{}{
 
 	// AI
 	&AISession{},
+	&AIReActSchedule{},
 	&AISessionPlanAndExec{},
 	&AIAgentRuntime{},
 	&AiCheckpoint{},

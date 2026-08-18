@@ -1,4 +1,4 @@
-﻿package yakgrpc
+package yakgrpc
 
 import (
 	"context"
@@ -280,6 +280,43 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
 	}
 
+	// A scheduled run reserves its target session at the trigger boundary. A
+	// user turn arriving in the narrow interval before that run publishes its
+	// ReAct instance waits and attaches, so it cannot steal initialization and
+	// make the scheduled occurrence execute late behind it.
+	_, isScheduledStream := stream.(*inProcessAIReActStream)
+	if !isScheduledStream {
+		for {
+			manager := s.currentAIReActScheduler()
+			if manager == nil || !manager.isSessionReserved(persistentSession) {
+				break
+			}
+			if runningReAct, ok := aireact.GetRunningSession(persistentSession); ok {
+				return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
+			}
+			select {
+			case <-baseCtx.Done():
+				return nil
+			case <-time.After(20 * time.Millisecond):
+			}
+		}
+	}
+
+	releaseSessionStart, ownsSessionStart := aireact.TryBeginSessionStart(persistentSession)
+	if !ownsSessionStart {
+		runningReAct, err := aireact.WaitRunningSession(persistentSession, time.Minute)
+		if err != nil {
+			return err
+		}
+		return s.attachToRunningAIReActSession(stream, baseCtx, runningReAct, firstMsg, persistentSession, startParams)
+	}
+	sessionStartHeld := true
+	defer func() {
+		if sessionStartHeld {
+			releaseSessionStart()
+		}
+	}()
+
 	resolvedStartParams, err := resolveAISessionStartParams(
 		s.GetProjectDatabase(),
 		persistentSession,
@@ -335,6 +372,8 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		log.Errorf("create re-act failed: %v", err)
 		return utils.Errorf("create re-act instance failed: %v", err)
 	}
+	releaseSessionStart()
+	sessionStartHeld = false
 
 	reAct.GetConfig().SetConfig("MustProcessAttachedData", true)
 

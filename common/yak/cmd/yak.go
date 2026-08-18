@@ -653,6 +653,7 @@ var startGRPCServerCommand = cli.Command{
 			return err
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
+		s.StartAIReActScheduler()
 
 		// 确定监听地址和端口
 		var host string
@@ -994,6 +995,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			return
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
+		s.StartAIReActScheduler()
 
 		// 启动服务器
 		log.Infof("starting test grpc server on %s", addr)

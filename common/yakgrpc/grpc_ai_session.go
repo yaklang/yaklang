@@ -154,6 +154,16 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 	projectDB := s.GetProjectDatabase()
 
 	if req.GetDeleteAll() {
+		attachedScheduleUUIDs, err := yakit.QueryAllAttachedAIReActScheduleUUIDs(projectDB)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := yakit.DeleteAllAttachedAIReActSchedules(projectDB); err != nil {
+			return nil, err
+		}
+		for _, scheduleUUID := range attachedScheduleUUIDs {
+			s.cancelAIReActScheduleExecution(scheduleUUID)
+		}
 		deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForAllSessions(projectDB)
 		if err != nil {
 			return nil, err
@@ -202,6 +212,16 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			EffectRows:   0,
 			ExtraMessage: "no session matched",
 		}, nil
+	}
+	attachedScheduleUUIDs, err := yakit.QueryAttachedAIReActScheduleUUIDs(projectDB, targetSessionIDs)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := yakit.DeleteAttachedAIReActSchedules(projectDB, targetSessionIDs); err != nil {
+		return nil, err
+	}
+	for _, scheduleUUID := range attachedScheduleUUIDs {
+		s.cancelAIReActScheduleExecution(scheduleUUID)
 	}
 
 	deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForSessions(projectDB, targetSessionIDs)
