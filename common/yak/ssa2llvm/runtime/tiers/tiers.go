@@ -52,7 +52,7 @@ var All = []Tier{
 	},
 	{
 		Name:    "staticanalyze",
-		Modules: []string{"cli", "codec", "file", "filesys", "http", "json", "os", "poc", "ssa", "str", "sync", "yakit"},
+		Modules: []string{"ai", "bufio", "cli", "codec", "context", "db", "file", "filesys", "fuzz", "http", "httpool", "js", "json", "jsonschema", "liteforge", "log", "math", "mitm", "netstack", "os", "poc", "pprof", "rag", "re", "risk", "sfreport", "ssa", "str", "sync", "syntaxflow", "time", "tls", "xhtml", "xpath", "yakit", "yso", "zip"},
 	},
 }
 

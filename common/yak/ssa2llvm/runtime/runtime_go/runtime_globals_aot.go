@@ -2,6 +2,8 @@
 
 package main
 
+import "fmt"
+
 // registerRuntimeGlobals registers the minimal global set for the AOT runtime.
 // print/println/printf/append are handled by the runtime dispatch table, so the
 // globals map only needs the builtins the compiler emits directly. Keeping
@@ -9,7 +11,8 @@ package main
 // the whole yaklang frontend stack from being pulled into every binary.
 func registerRuntimeGlobals() {
 	runtimeRegisterYaklibGlobals(map[string]any{
-		"len": runtimeYakBuiltinLen,
-		"cap": runtimeYakBuiltinCap,
+		"len":     runtimeYakBuiltinLen,
+		"cap":     runtimeYakBuiltinCap,
+		"sprintf": fmt.Sprintf,
 	})
 }

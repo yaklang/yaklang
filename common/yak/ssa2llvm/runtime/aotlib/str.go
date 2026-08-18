@@ -19,21 +19,38 @@ func StrReplace(s, old, new string, n int) string {
 func StrRepeat(s string, count int) string { return strings.Repeat(s, count) }
 func StrIndex(s, substr string) int        { return strings.Index(s, substr) }
 func StrLen(s string) int                  { return len(s) }
+func StrReplaceAll(s, old, new string) string {
+	return strings.ReplaceAll(s, old, new)
+}
+func StrPathJoin(parts []string) string {
+	return strings.Join(parts, "/")
+}
+func StrMatchAllOfSubString(s string, subs ...string) bool {
+	for _, sub := range subs {
+		if !strings.Contains(s, sub) {
+			return false
+		}
+	}
+	return true
+}
 
 // StringsExports mirrors the str module's export table (the AOT-supported
 // subset). Entries match common/yak/yaklib.StringsExport signatures.
 var StringsExports = map[string]any{
-	"Split":     StrSplit,
-	"Trim":      StrTrim,
-	"TrimSpace": StrTrimSpace,
-	"Join":      StrJoin,
-	"ToLower":   StrToLower,
-	"ToUpper":   StrToUpper,
-	"HasPrefix": StrHasPrefix,
-	"HasSuffix": StrHasSuffix,
-	"Contains":  StrContains,
-	"Replace":   StrReplace,
-	"Repeat":    StrRepeat,
-	"Index":     StrIndex,
-	"Len":       StrLen,
+	"Split":               StrSplit,
+	"Trim":                StrTrim,
+	"TrimSpace":           StrTrimSpace,
+	"Join":                StrJoin,
+	"ToLower":             StrToLower,
+	"ToUpper":             StrToUpper,
+	"HasPrefix":           StrHasPrefix,
+	"HasSuffix":           StrHasSuffix,
+	"Contains":            StrContains,
+	"Replace":             StrReplace,
+	"Repeat":              StrRepeat,
+	"Index":               StrIndex,
+	"Len":                 StrLen,
+	"ReplaceAll":          StrReplaceAll,
+	"PathJoin":            StrPathJoin,
+	"MatchAllOfSubString": StrMatchAllOfSubString,
 }
