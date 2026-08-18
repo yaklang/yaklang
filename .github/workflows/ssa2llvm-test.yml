@@ -72,5 +72,5 @@ jobs:
       #     nested member writes through closures are emitted before the mutating
       #     call (stale read).
       env:
-        SSA2LLVM_TEST_SKIP: 'TestCorePlugin(?:BaseYakPluginsCompileToIR|_CompileAll|_RunSSADetectProject|_RunResetKnowledgeBase)|TestYaklibSSA_(LocalProjectProbeFeedsConfigOptions|FilesysRecursiveCallbackUpdatesOuterMap|FunctionUpdatesOuterOrderedMap|NestedFunctionUpdatesOuterOrderedMap|SwitchDefaultUpdatesNestedOuterMap|SwitchDefaultNestedMapFeedsResultAndConfig|SideEffectMemberPhiFeedsYaklibOption)'
+        SSA2LLVM_TEST_SKIP: 'TestCorePlugin_RunSSADetectProject'
       run: go test -count=1 -timeout 30m -v -skip "$SSA2LLVM_TEST_SKIP" ./common/yak/ssa2llvm/...

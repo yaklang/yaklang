@@ -34,11 +34,13 @@ func decodeTaggedArg(v uint64) any {
 	if (v & yakTaggedPointerMask) == 0 {
 		// Shadow pointers and C-string pointers share the same canonical
 		// address range, so resolve the shadow handle first (exact map lookup)
-		// before treating the address as a C string.
+		// before treating the address as a C string. The C-string guess is
+		// guarded to values above the static binary's mapped base so ordinary
+		// small integers (e.g. 12345) are never misread as pointers.
 		if h, ok := handleFromShadow(unsafe.Pointer(uintptr(v))); ok {
 			return h.Value()
 		}
-		if looksLikeCStringPointer(v) {
+		if v > 0x100000 && looksLikeCStringPointer(v) {
 			return C.GoString((*C.char)(unsafe.Pointer(uintptr(v))))
 		}
 		return int64(v)

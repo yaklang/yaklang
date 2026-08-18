@@ -244,6 +244,11 @@ func (c *Compiler) resolveParameterMemberParentID(fn *ssa.Function, inst *ssa.Pa
 // compileMemberCall handles generic member access (MemberCall interface)
 func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value, mc ssa.MemberCall) error {
 	_ = mc
+	if val != nil && val.GetFunc() != nil && c.currentFunction() != nil && val.GetFunc() != c.currentFunction() {
+		if !c.valueHasLocalDependency(val.GetFunc(), val) {
+			return nil
+		}
+	}
 	obj := ssa.GetLatestObject(val)
 	key := ssa.GetLatestKey(val)
 	keyStr := c.resolveMemberKeyString(key)
@@ -297,24 +302,17 @@ func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value,
 			return fmt.Errorf("compileMemberCall: slot for value %d unavailable", memberID)
 		}
 		parentVal := c.loadSSAValue(obj.GetId())
-		valResult := c.emitRuntimeGetField(parentVal, keyStr, memberID)
+		valResult := c.emitRuntimeGetFieldByKey(parentVal, key, loadCtx, memberID)
 		c.Builder.CreateStore(c.coerceToInt64(valResult), slot)
 		c.markSSAValueStored(memberID)
 		return nil
 	}
 	var emitErr error
-	if c.initializingMemberDepth > 0 {
-		// The member read is part of an object/slice literal being built at the
-		// Make's position; it must be emitted there so it dominates the
-		// following set_field, not at its own (possibly later) SSA def block.
-		// The depth covers nested reads compiled while a member value is being
-		// materialized.
-		emitErr = emitMemberRead()
-	} else {
-		c.withSSADefInsertPoint(memberID, func() {
-			emitErr = emitMemberRead()
-		})
-	}
+	// Member reads are emitted at the use site rather than anchored to the
+	// value's SSA def block. Objects shared across functions (e.g. a global
+	// params map mutated by callees) must be re-read where they are used;
+	// anchoring to the def block would cache a stale (often entry-time) value.
+	emitErr = emitMemberRead()
 	if emitErr != nil {
 		return emitErr
 	}
@@ -329,13 +327,13 @@ func (c *Compiler) compileDynamicMemberValue(contextInst ssa.Instruction, val ss
 	if err != nil {
 		return err
 	}
-	c.cacheValue(val.GetId(), valResult)
+	c.storeSSAValue(val.GetId(), valResult)
 	return c.maybeEmitMemberSet(contextInst, val, val.GetId())
 }
 
 func (c *Compiler) dynamicMemberReadValue(contextInst ssa.Instruction, val ssa.Value, memberID int64) (llvm.Value, error) {
 	obj, key := c.firstOwnerObjectKey(val)
-	keyStr := c.resolveMemberKeyString(key)
+	keyStr := c.resolveRuntimeMemberKeyString(key)
 	if obj == nil || keyStr == "" {
 		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 	}
@@ -344,7 +342,7 @@ func (c *Compiler) dynamicMemberReadValue(contextInst ssa.Instruction, val ssa.V
 	if err != nil {
 		return llvm.Value{}, fmt.Errorf("dynamicMemberReadValue: failed to get object value: %w", err)
 	}
-	return c.emitRuntimeGetField(parentVal, keyStr, memberID), nil
+	return c.emitRuntimeGetFieldByKey(parentVal, key, contextInst, memberID), nil
 }
 
 // firstOwnerObjectKey returns the first (definition) owner pair of a member
@@ -370,13 +368,58 @@ func (c *Compiler) valueForMemberObject(contextInst ssa.Instruction, obj ssa.Val
 }
 
 func (c *Compiler) compileUndefined(inst *ssa.Undefined) error {
-	if inst == nil || !inst.IsMember() || !c.hasAssignedMemberCallVariable(inst) {
+	if inst == nil {
+		return nil
+	}
+	if inst.GetFunc() != nil && c.currentFunction() != nil && inst.GetFunc() != c.currentFunction() {
+		if !c.valueHasLocalDependency(inst.GetFunc(), inst) {
+			return nil
+		}
+	}
+	if !inst.IsMember() || !c.hasAssignedMemberCallVariable(inst) {
+		if c.shouldReadMemberValueDynamically(inst, inst.GetId()) {
+			return nil
+		}
+		// A range-loop variable is an Undefined placeholder whose body
+		// references never see the condition block's binding. Resolve the
+		// variable's current value through the scope chain (e.g. a
+		// "#<id>.k" member variable whose name part matches "k" in the loop
+		// condition scope) so m[k] uses the per-iteration field value.
+		if resolved := c.resolveUndefinedScopeValue(inst); resolved != nil {
+			val, err := c.getValue(inst, resolved.GetId())
+			if err == nil {
+				c.cacheValue(inst.GetId(), val)
+				return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+			}
+		}
 		return nil
 	}
 	if c.shouldReadMemberValueDynamically(inst, inst.GetId()) {
 		return c.compileDynamicMemberValue(inst, inst)
 	}
 	return c.compileMemberCall(inst, inst, inst)
+}
+
+func (c *Compiler) resolveUndefinedScopeValue(inst *ssa.Undefined) ssa.Value {
+	if inst == nil || inst.GetBlock() == nil || inst.GetBlock().ScopeTable == nil {
+		return nil
+	}
+	scope := inst.GetBlock().ScopeTable
+	for name := range inst.GetAllVariables() {
+		base := name
+		if idx := strings.LastIndex(base, "."); idx >= 0 {
+			base = base[idx+1:]
+		}
+		if base == "" {
+			continue
+		}
+		if variable := ssa.ReadVariableFromScopeAndParent(scope, base); variable != nil {
+			if value := variable.GetValue(); value != nil && value.GetId() != inst.GetId() {
+				return value
+			}
+		}
+	}
+	return nil
 }
 
 func (c *Compiler) getOrInsertRuntimeGetField() (llvm.Value, llvm.Type) {
@@ -416,6 +459,24 @@ func (c *Compiler) getOrInsertRuntimeToCString() (llvm.Value, llvm.Type) {
 		fn = llvm.AddFunction(c.Mod, name, fnType)
 	}
 	return fn, fnType
+}
+
+// resolveRuntimeMemberKeyString resolves a member key for a runtime field
+// read. Next-tuple members are placeholder constants whose SSA name is
+// "#<id>.key/field/ok"; the runtime tuple's actual keys are the suffix.
+func (c *Compiler) resolveRuntimeMemberKeyString(key ssa.Value) string {
+	if key == nil {
+		return ""
+	}
+	name := strings.Trim(key.GetName(), "\"")
+	if idx := strings.LastIndex(name, "."); idx >= 0 {
+		suffix := name[idx+1:]
+		switch suffix {
+		case "key", "field", "ok":
+			return suffix
+		}
+	}
+	return c.resolveMemberKeyString(key)
 }
 
 func (c *Compiler) resolveMemberKeyString(key ssa.Value) string {
@@ -463,7 +524,37 @@ func (c *Compiler) emitRuntimeGetField(objVal llvm.Value, keyStr string, id int6
 	return c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr, keyPtr}, "member_get")
 }
 
+// memberKeyIsStaticString reports whether an SSA member key is a string
+// constant (so it can be lowered to a static member_key global).
+func (c *Compiler) memberKeyIsStaticString(key ssa.Value) bool {
+	if key == nil {
+		return false
+	}
+	_, ok := ssa.ToConstInst(key)
+	return ok
+}
+
+// emitRuntimeGetFieldByKey lowers a member read for a possibly dynamic key
+// (e.g. m[k] where k is a loop variable). Static string keys use the existing
+// global-string path; dynamic keys are converted to a C string at runtime.
+func (c *Compiler) emitRuntimeGetFieldByKey(objVal llvm.Value, key ssa.Value, contextInst ssa.Instruction, id int64) llvm.Value {
+	if c.memberKeyIsStaticString(key) {
+		return c.emitRuntimeGetField(objVal, c.resolveMemberKeyString(key), id)
+	}
+	if keyVal, err := c.getValue(contextInst, key.GetId()); err == nil && !keyVal.IsNil() && !c.isZeroRuntimeKey(keyVal) {
+		toCStrFn, toCStrType := c.getOrInsertRuntimeToCString()
+		keyPtr := c.Builder.CreateCall(toCStrType, toCStrFn, []llvm.Value{c.coerceToI8Ptr(keyVal)}, fmt.Sprintf("member_key_ptr_%d", id))
+		fn, fnType := c.getOrInsertRuntimeGetField()
+		return c.Builder.CreateCall(fnType, fn, []llvm.Value{c.coerceToI8Ptr(objVal), keyPtr}, "member_get")
+	}
+	// A dynamic key that cannot be resolved at the current use site (e.g. a
+	// cross-function front-end artifact) yields zero instead of reading the
+	// placeholder SSA name as a real key.
+	return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+}
+
 func (c *Compiler) emitRuntimeSetField(objVal llvm.Value, keyStr string, val llvm.Value, ssaVal ssa.Value, id int64) {
+
 	fn, fnType := c.getOrInsertRuntimeSetField()
 	keyPtr := c.Builder.CreateGlobalStringPtr(keyStr, fmt.Sprintf("member_key_%d", id))
 	objPtr := c.coerceToI8Ptr(objVal)
@@ -489,6 +580,77 @@ func (c *Compiler) emitRuntimeSetField(objVal llvm.Value, keyStr string, val llv
 	}
 	flagVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), flags, false)
 	c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr, keyPtr, intVal, flagVal}, "")
+}
+
+func (c *Compiler) getOrInsertRuntimeConcat() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeConcatSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(i8Ptr, []llvm.Type{i8Ptr, i8Ptr}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) emitRuntimeConcat(lhs, rhs llvm.Value, name string) llvm.Value {
+	fn, fnType := c.getOrInsertRuntimeConcat()
+	res := c.Builder.CreateCall(fnType, fn, []llvm.Value{c.coerceToI8Ptr(lhs), c.coerceToI8Ptr(rhs)}, name)
+	return c.coerceToInt64(res)
+}
+
+// emitRuntimeSetFieldByKey lowers a member write for a possibly dynamic key
+// (e.g. extToLanguage[ext] where ext is a loop variable). Static keys use the
+// global-string path; dynamic keys are converted to a C string at runtime so
+// the placeholder SSA name (e.g. "#55.field") is never written as the key.
+func (c *Compiler) emitRuntimeSetFieldByKey(contextInst ssa.Instruction, objVal llvm.Value, key ssa.Value, keyStr string, val llvm.Value, ssaVal ssa.Value, id int64) {
+	if key != nil && !c.memberKeyIsStaticString(key) {
+		if keyVal, err := c.getValue(contextInst, key.GetId()); err == nil && !keyVal.IsNil() && !c.isZeroRuntimeKey(keyVal) {
+			toCStrFn, toCStrType := c.getOrInsertRuntimeToCString()
+			keyPtr := c.Builder.CreateCall(toCStrType, toCStrFn, []llvm.Value{c.coerceToI8Ptr(keyVal)}, fmt.Sprintf("member_key_ptr_set_%d", id))
+			fn, fnType := c.getOrInsertRuntimeSetField()
+			intVal := c.coerceToInt64(val)
+			flags := uint64(0)
+			ssaVal = c.effectiveRuntimeFieldValue(ssaVal)
+			if ssaVal != nil && c.ssaValueIsPointer(ssaVal, ssaVal.GetFunc()) {
+				tag := llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false)
+				intVal = c.Builder.CreateOr(intVal, tag, "yak_set_field_arg_tag")
+			}
+			if ssaVal != nil {
+				if typ := ssaVal.GetType(); typ != nil {
+					switch typ.GetTypeKind() {
+					case ssa.BooleanTypeKind:
+						flags |= abi.FlagFieldBool
+					case ssa.StringTypeKind:
+						flags |= abi.FlagFieldString
+					}
+				}
+				if flags&abi.FlagFieldString == 0 && c.memberTargetFieldTypeKind(ssaVal) == ssa.StringTypeKind {
+					flags |= abi.FlagFieldString
+				}
+			}
+			flagVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), flags, false)
+			c.Builder.CreateCall(fnType, fn, []llvm.Value{c.coerceToI8Ptr(objVal), keyPtr, intVal, flagVal}, "")
+			return
+		}
+	}
+	if !c.memberKeyIsStaticString(key) {
+		// Dynamic key that cannot be resolved: skip the write rather than
+		// storing under the placeholder SSA name.
+		return
+	}
+	c.emitRuntimeSetField(objVal, keyStr, val, ssaVal, id)
+}
+
+// isZeroRuntimeKey reports whether an SSA member key lowered to a runtime
+// value is a compile-time zero. Cross-function references (front-end artifacts)
+// resolve to zero constants; passing those to yak_runtime_to_cstring would
+// produce a nil C string and a misleading runtime failure.
+func (c *Compiler) isZeroRuntimeKey(keyVal llvm.Value) bool {
+	if keyVal.IsNil() {
+		return true
+	}
+	return llvmIsZeroValue(keyVal)
 }
 
 func (c *Compiler) markInitialMemberValue(id int64) {
@@ -629,7 +791,7 @@ func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value
 					if err != nil {
 						return err
 					}
-					c.emitRuntimeSetField(objVal, keyStr, llvmVal, c.assignedSSAValue(contextInst, resultID), val.GetId())
+					c.emitRuntimeSetFieldByKey(contextInst, objVal, key, keyStr, llvmVal, c.assignedSSAValue(contextInst, resultID), val.GetId())
 					c.markMemberVariableSetEmitted(resultID, obj, keyStr)
 				}
 			}
@@ -831,7 +993,7 @@ func (c *Compiler) emitAssignedMemberVariableSets(contextInst ssa.Instruction, v
 			if err != nil {
 				return err
 			}
-			c.emitRuntimeSetField(currentObjVal, keyStr, llvmVal, c.assignedSSAValue(contextInst, resultID), resultID)
+			c.emitRuntimeSetFieldByKey(contextInst, currentObjVal, key, keyStr, llvmVal, c.assignedSSAValue(contextInst, resultID), resultID)
 			c.markMemberVariableSetEmitted(resultID, obj, keyStr)
 			return nil
 		}
@@ -899,7 +1061,7 @@ func (c *Compiler) emitDirectMemberValueSetIfReady(contextInst ssa.Instruction, 
 	if err != nil || llvmVal.IsNil() {
 		return false
 	}
-	c.emitRuntimeSetField(objVal, keyStr, llvmVal, source, resultID)
+	c.emitRuntimeSetFieldByKey(contextInst, objVal, source.GetKey(), keyStr, llvmVal, source, resultID)
 	c.markMemberVariableSetEmitted(resultID, obj, keyStr)
 	return true
 }
@@ -1053,7 +1215,7 @@ func (c *Compiler) emitMemberVariableSetIfReady(contextInst ssa.Instruction, sou
 	if c.memberVariableSetEmitted(resultID, obj, keyStr) {
 		return true
 	}
-	c.emitRuntimeSetField(objVal, keyStr, llvmVal, c.assignedSSAValue(contextInst, resultID), resultID)
+	c.emitRuntimeSetFieldByKey(contextInst, objVal, source.GetKey(), keyStr, llvmVal, c.assignedSSAValue(contextInst, resultID), resultID)
 	c.markMemberVariableSetEmitted(resultID, obj, keyStr)
 	return true
 }
@@ -1426,7 +1588,7 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 		if !makeBB.IsNil() {
 			c.restoreInsertPoint(makeBB)
 		}
-		c.emitRuntimeSetField(objVal, keyStr, llvmVal, member, member.GetId())
+		c.emitRuntimeSetFieldByKey(inst, objVal, key, keyStr, llvmVal, member, member.GetId())
 		if err := c.maybeEmitMemberSet(inst, member, member.GetId()); err != nil {
 			emitErr = fmt.Errorf("emitInitialMakeMemberAssignments: field %q member variables: %w", keyStr, err)
 			break
@@ -1487,7 +1649,7 @@ func (c *Compiler) emitObjectMemberAssignments(contextInst ssa.Instruction, obj 
 			emitErr = fmt.Errorf("emitObjectMemberAssignments: field %q: %w", keyStr, err)
 			break
 		}
-		c.emitRuntimeSetField(objVal, keyStr, llvmVal, member, obj.GetId())
+		c.emitRuntimeSetFieldByKey(contextInst, objVal, key, keyStr, llvmVal, member, obj.GetId())
 	}
 	return emitErr
 }
