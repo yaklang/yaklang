@@ -392,3 +392,38 @@ int main() {
 		})
 	}
 }
+
+func TestC_NPD_SyntaxFlow_Target(t *testing.T) {
+	code := `
+#include <stdlib.h>
+struct Node { int x; };
+int main() {
+    struct Node *pa = 0;
+    struct Node *pb = 0;
+    struct Node *ok = (struct Node*)malloc(sizeof(struct Node));
+    pa->x = 11;
+    pb->x = 22;
+    ok->x = 33;
+    return 0;
+}
+`
+	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+pa as $pa
+<npd(target=$pa)> as $npd
+`)
+		require.NoError(t, err)
+		got := res.GetValues("npd")
+		require.Greater(t, got.Len(), 0)
+		ssatest.CompareResult(t, true, res, map[string][]string{"npd": {"11"}})
+		require.NotContains(t, got.String(), "22")
+
+		resSafe, err := prog.SyntaxFlowWithError(`
+ok as $ok
+<npd(target=$ok)> as $npd
+`)
+		require.NoError(t, err)
+		require.Equal(t, 0, resSafe.GetValues("npd").Len())
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.C))
+}

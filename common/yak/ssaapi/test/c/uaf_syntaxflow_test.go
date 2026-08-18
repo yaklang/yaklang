@@ -607,6 +607,99 @@ alert $uaf for {
 	}, ssaapi.WithLanguage(ssaconfig.C))
 }
 
+func TestC_UAF_SyntaxFlow_Target(t *testing.T) {
+	code := `
+#include <stdlib.h>
+int main() {
+    int *pa = (int*)malloc(sizeof(int));
+    int *pb = (int*)malloc(sizeof(int));
+    int *safe = (int*)malloc(sizeof(int));
+    *safe = 0;
+    free(pa);
+    *pa = 11;
+    free(pb);
+    *pb = 22;
+    return 0;
+}
+`
+	run := func(t *testing.T, rule string, wantContain, wantAbsent []string) {
+		t.Helper()
+		ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
+			res, err := prog.SyntaxFlowWithError(rule)
+			require.NoError(t, err)
+			got := res.GetValues("uaf")
+			if len(wantContain) == 0 {
+				require.Equal(t, 0, got.Len(), "unexpected UAF: %v", got)
+				return nil
+			}
+			require.Greater(t, got.Len(), 0, "expected UAF for rule %s", rule)
+			ssatest.CompareResult(t, true, res, map[string][]string{"uaf": wantContain})
+			if len(wantAbsent) > 0 {
+				all := got.String()
+				for _, s := range wantAbsent {
+					require.NotContains(t, all, s, "UAF should not include pointer %s", s)
+				}
+			}
+			return nil
+		}, ssaapi.WithLanguage(ssaconfig.C))
+	}
+
+	t.Run("named target pa only", func(t *testing.T) {
+		run(t, `
+pa as $pa
+<uaf(target=$pa)> as $uaf
+`, []string{"11"}, []string{"22"})
+	})
+	t.Run("star receiver with target pa", func(t *testing.T) {
+		run(t, `
+pa as $pa
+*<uaf(target=$pa)> as $uaf
+`, []string{"11"}, []string{"22"})
+	})
+	t.Run("receiver chain $pa<uaf()>", func(t *testing.T) {
+		run(t, `
+pa as $pa
+$pa<uaf()> as $uaf
+`, []string{"11"}, []string{"22"})
+	})
+	t.Run("named target pb only", func(t *testing.T) {
+		run(t, `
+pb as $pb
+<uaf(target=$pb)> as $uaf
+`, []string{"22"}, []string{"11"})
+	})
+	t.Run("safe pointer has no uaf", func(t *testing.T) {
+		run(t, `
+safe as $safe
+<uaf(target=$safe)> as $uaf
+`, nil, nil)
+	})
+}
+
+func TestC_UAF_SyntaxFlow_Target_Alias(t *testing.T) {
+	code := `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    int *q = p;
+    free(p);
+    *q = 3;
+    return 0;
+}
+`
+	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+q as $q
+<uaf(target=$q)> as $uaf
+`)
+		require.NoError(t, err)
+		got := res.GetValues("uaf")
+		require.Greater(t, got.Len(), 0)
+		ssatest.CompareResult(t, true, res, map[string][]string{"uaf": {"3"}})
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.C))
+}
+
 // TestC_UAF_SyntaxFlow_Ex extends coverage toward known gaps (summary fixpoint,
 // globals, null-clear, nested wrappers, bare *param, field alias).
 // These encode *desired* behavior after future improvements; failures are expected

@@ -141,21 +141,20 @@ func FindNPDUses(prog *ssa.Program) []*Finding {
 }
 
 // FindNPDUsesRelated filters NPD findings related to seed pointer values.
+// Empty seeds yield no findings (unlike FindNPDUses, which scans the whole program).
 func FindNPDUsesRelated(prog *ssa.Program, seeds []ssa.Value) []*Finding {
-	all := FindNPDUses(prog)
 	if len(seeds) == 0 {
-		return all
+		return nil
 	}
-	seedIDs := make(map[int64]struct{})
-	for _, s := range seeds {
-		if s == nil || s.GetId() <= 0 {
-			continue
-		}
-		seedIDs[s.GetId()] = struct{}{}
+	seedIDs := expandLifetimeSeedIDs(seeds)
+	if len(seedIDs) == 0 {
+		return nil
 	}
+	all := FindNPDUses(prog)
+	reg := getReg(prog)
 	var out []*Finding
 	for _, f := range all {
-		if _, ok := seedIDs[f.FreedObj]; ok {
+		if findingRelatedToSeeds(f, seedIDs, reg) {
 			out = append(out, f)
 		}
 	}

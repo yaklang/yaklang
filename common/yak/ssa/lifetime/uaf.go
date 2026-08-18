@@ -603,43 +603,21 @@ func functionHasNontrivialBody(fn *ssa.Function) bool {
 }
 
 // FindUAFUsesRelated returns UAF uses related to the given pointer/alloc values.
+// Empty seeds yield no findings (unlike FindUAFUses, which scans the whole program).
 func FindUAFUsesRelated(prog *ssa.Program, seeds []ssa.Value) []*Finding {
-	all := FindUAFUses(prog)
 	if len(seeds) == 0 {
-		return all
+		return nil
 	}
-	seedObjs := make(map[int64]struct{})
-	reg := getReg(prog)
-	allocs := map[int64]struct{}{}
-	if reg != nil {
-		allocs = reg.snapshotAlloc()
+	seedIDs := expandLifetimeSeedIDs(seeds)
+	if len(seedIDs) == 0 {
+		return nil
 	}
-	for _, s := range seeds {
-		if s == nil {
-			continue
-		}
-		id := s.GetId()
-		seedObjs[id] = struct{}{}
-		if _, ok := allocs[id]; ok {
-			seedObjs[id] = struct{}{}
-		}
-		// If seed is free() call, include its args' objects.
-		if c, ok := ssa.ToCall(s); ok && c != nil {
-			for _, aid := range c.Args {
-				seedObjs[aid] = struct{}{}
-			}
-		}
-	}
+	all := FindUAFUses(prog)
 	var out []*Finding
+	reg := getReg(prog)
 	for _, f := range all {
-		if _, ok := seedObjs[f.FreedObj]; ok {
+		if findingRelatedToSeeds(f, seedIDs, reg) {
 			out = append(out, f)
-			continue
-		}
-		if f.FreeCall != nil {
-			if _, ok := seedObjs[f.FreeCall.GetId()]; ok {
-				out = append(out, f)
-			}
 		}
 	}
 	return out
