@@ -980,6 +980,38 @@ func TestStatelessControlInputsAreLinearizedWithTurnClose(t *testing.T) {
 	}
 }
 
+func TestStatelessActiveTurnPreservesSyncID(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	handle := &statelessAIEngineRuntimeHandle{
+		activeTurn: &statelessAITurn{
+			engine: engine,
+			turnID: "turn-sync-id",
+		},
+	}
+
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		InputType: "sync_event",
+		PayloadJSON: []byte(
+			`{"sync_type":"skip_subtask_in_plan","sync_id":"sync-skip-1","sync_json_input":{"skip_current_task":true}}`,
+		),
+	})
+	if err != nil {
+		t.Fatalf("send sync input: %v", err)
+	}
+
+	select {
+	case event := <-engine.events:
+		if event.GetSyncID() != "sync-skip-1" {
+			t.Fatalf("sync id = %q, want sync-skip-1", event.GetSyncID())
+		}
+		if event.GetSyncType() != "skip_subtask_in_plan" {
+			t.Fatalf("sync type = %q", event.GetSyncType())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("active turn did not receive sync input")
+	}
+}
+
 func TestStatelessTaskScopedCapabilityHotpatchDoesNotPersist(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()
 	handle := &statelessAIEngineRuntimeHandle{
