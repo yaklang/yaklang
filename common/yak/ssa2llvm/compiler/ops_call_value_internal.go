@@ -6,7 +6,7 @@ import (
 )
 
 func (c *Compiler) resolveSSAValueAsInt64(contextInst ssa.Instruction, valueID int64, ptrName string) (llvm.Value, error) {
-	if c.hasValueSlot(valueID) {
+	if c.hasValueSlot(valueID) && !c.isDynamicMemberValueID(valueID) {
 		return c.coerceToInt64(c.loadSSAValue(valueID)), nil
 	}
 	argVal, err := c.getValue(contextInst, valueID)
@@ -36,4 +36,15 @@ func (c *Compiler) resolveSSAValueAsInt64(contextInst ssa.Instruction, valueID i
 	}
 	llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
 	return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), ptrName), nil
+}
+
+func (c *Compiler) isDynamicMemberValueID(id int64) bool {
+	if c == nil || c.function == nil || c.function.current == nil || id <= 0 {
+		return false
+	}
+	val, ok := c.function.current.GetValueById(id)
+	if !ok || val == nil {
+		return false
+	}
+	return c.shouldReadMemberValueDynamically(val, id)
 }

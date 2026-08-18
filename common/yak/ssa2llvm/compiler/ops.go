@@ -95,6 +95,18 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if !ok {
 		return llvm.Value{}, fmt.Errorf("getValue: value %d not found in function", id)
 	}
+	c.ensureOwnerValueIDs(fn)
+	if _, owned := c.function.ownerValueIDs[id]; !owned {
+		// Cross-function reference (front-end artifact): never compile a value
+		// owned by another function from this function's context. The front end
+		// can misplace loop-body values (e.g. "#<next>.field") into the entry
+		// function while the referenced Next belongs to the callee; allow those
+		// only when their object/key chain points back into the current
+		// function so the callee can compile them correctly.
+		if !c.valueHasLocalDependency(fn, valObj) {
+			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+		}
+	}
 	if se, ok := valObj.(*ssa.SideEffect); ok {
 		err := c.withLazyCompileInsertPoint(contextInst, se, func() error {
 			return c.compileSideEffectValue(se)
@@ -162,6 +174,9 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 4. Lazy compile if Parameter (function argument / closure binding)
 	if param, ok := ssa.ToParameter(valObj); ok && param != nil {
+		if param.GetFunc() != nil && c.currentFunction() != nil && param.GetFunc() != c.currentFunction() {
+			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+		}
 		var loadedOK bool
 		err := c.withEntryInsertPoint(fn, func() error {
 			val, ok := c.loadBoundParameterValue(fn, param)
@@ -329,16 +344,22 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 14. Lazy compile if Next
 	if next, ok := valObj.(*ssa.Next); ok {
-		err := c.withLazyCompileInsertPoint(contextInst, next, func() error {
-			return c.compileNext(next)
-		})
-		if err != nil {
-			return llvm.Value{}, err
+		if next.GetFunc() != nil && c.currentFunction() != nil && next.GetFunc() != c.currentFunction() {
+			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 		}
-		if val, ok := c.getCachedValue(contextInst, id); ok {
-			return val, nil
+		if !c.isSSAValueStored(id) {
+			err := c.withLazyCompileInsertPoint(contextInst, next, func() error {
+				return c.compileNext(next)
+			})
+			if err != nil {
+				return llvm.Value{}, err
+			}
+			if val, ok := c.getCachedValue(contextInst, id); ok {
+				return val, nil
+			}
+			return llvm.Value{}, fmt.Errorf("getValue: compileNext succeeded but value %d not cached", id)
 		}
-		return llvm.Value{}, fmt.Errorf("getValue: compileNext succeeded but value %d not cached", id)
+		return c.loadSSAValue(id), nil
 	}
 
 	// 15. Generic MemberCall
@@ -402,7 +423,11 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 
 	switch inst.Op {
 	case ssa.OpAdd:
-		val = c.Builder.CreateAdd(lhs, rhs, name)
+		if inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.StringTypeKind {
+			val = c.emitRuntimeConcat(lhs, rhs, name)
+		} else {
+			val = c.Builder.CreateAdd(lhs, rhs, name)
+		}
 	case ssa.OpSub:
 		val = c.Builder.CreateSub(lhs, rhs, name)
 	case ssa.OpMul:
@@ -560,4 +585,33 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Compiler) valueHasLocalDependency(fn *ssa.Function, val ssa.Value) bool {
+	if c == nil || c.function == nil || c.function.ownerValueIDs == nil || val == nil {
+		return false
+	}
+	for _, pair := range val.GetObjectKeyPairs() {
+		if pair.Object != nil {
+			if _, ok := c.function.ownerValueIDs[pair.Object.GetId()]; ok {
+				return true
+			}
+		}
+		if pair.Key != nil {
+			if _, ok := c.function.ownerValueIDs[pair.Key.GetId()]; ok {
+				return true
+			}
+		}
+	}
+	for _, variable := range val.GetAllVariables() {
+		if variable == nil {
+			continue
+		}
+		if value := variable.GetValue(); value != nil {
+			if _, ok := c.function.ownerValueIDs[value.GetId()]; ok {
+				return true
+			}
+		}
+	}
+	return false
 }

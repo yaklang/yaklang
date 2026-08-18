@@ -117,7 +117,6 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 	return nil
 }
 
-
 // emitModuleRegistrationCall declares and calls a C-exported registration
 // function (e.g. yak_register_module_poc, yak_register_globals) in the
 // libyak.a runtime. The call creates a link-time reference that prevents

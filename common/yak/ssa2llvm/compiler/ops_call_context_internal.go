@@ -136,6 +136,13 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 		ctxName = "yak_call_ctx"
 	}
 
+	// Allocate and initialize the invoke context at the final insert point
+	// (the call instruction's own block), not at the position the caller had
+	// when lazy compilation started. Otherwise a forward-referenced call is
+	// split: ctx malloc lands in the caller's block while argument stores and
+	// the invoke land in the callee instruction's block, reusing a context
+	// whose parameter values were computed in the wrong place.
+	restoreCallInsertPoint()
 	ctxI8, ctxI64, err := c.allocInvokeContext(argc, ctxName)
 	if err != nil {
 		return llvm.Value{}, err

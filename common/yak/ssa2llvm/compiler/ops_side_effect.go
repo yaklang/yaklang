@@ -41,7 +41,7 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 			actualVal, err := c.getValue(inst, actualID)
 			if err == nil && !actualVal.IsNil() {
 				c.cacheValue(inst.GetId(), actualVal)
-				c.emitRuntimeSetField(objVal, keyStr, actualVal, c.assignedSSAValue(inst, actualID), inst.GetId())
+				c.emitRuntimeSetFieldByKey(inst, objVal, key, keyStr, actualVal, c.assignedSSAValue(inst, actualID), inst.GetId())
 				return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 			}
 		}
