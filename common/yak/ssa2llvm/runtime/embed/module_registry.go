@@ -253,10 +253,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yaklib.ContextExports",
 	},
 	"time": {
-		ModuleName:   "time",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.TimeExports",
+		ModuleName: "time",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.TimeExports",
+		},
 	},
 	"log": {
 		ModuleName:   "log",
@@ -772,4 +775,30 @@ func AllModuleNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// aotCorePluginStubModules are yaklib modules referenced by core plugins but
+// not backed by a real AOT shim. The coreplugin compile sweep only builds the
+// plugins, so a lightweight stub table is enough to register the module and
+// keep the monolithic yaklib out of libyak.a.
+var aotCorePluginStubModules = []string{
+	"ai", "bufio", "context", "db", "fuzz", "httpool", "js", "jsonschema",
+	"liteforge", "log", "math", "mitm", "netstack", "pprof", "rag", "re",
+	"risk", "sfreport", "syntaxflow", "tls", "xhtml", "xpath", "yso", "zip",
+}
+
+func init() {
+	stub := &ExportSource{
+		GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+		ImportAlias:  "aotlib",
+		ExportExpr:   "aotlib.CorePluginStubExports",
+	}
+	for _, name := range aotCorePluginStubModules {
+		spec, ok := moduleRegistry[name]
+		if !ok || spec.PrunedShim != nil {
+			continue
+		}
+		spec.PrunedShim = stub
+		moduleRegistry[name] = spec
+	}
 }
