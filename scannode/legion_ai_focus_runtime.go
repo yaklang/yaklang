@@ -1,21 +1,25 @@
 package scannode
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/net/html"
 
@@ -25,10 +29,17 @@ import (
 )
 
 const (
-	serverFocusCapabilityHTTPRequest       = "http.request"
-	serverFocusCapabilityExtractReferences = "web.extract_references"
-	serverFocusCapabilitySubmitAsset       = "result.asset"
-	serverFocusCapabilitySubmitRisk        = "result.risk"
+	serverFocusCapabilityHTTPRequest         = "http.request"
+	serverFocusCapabilityExtractReferences   = "web.extract_references"
+	serverFocusCapabilitySubmitAsset         = "result.asset"
+	serverFocusCapabilitySubmitRisk          = "result.risk"
+	serverFocusCapabilitySourceWorkspaceInfo = "source.workspace.info"
+	serverFocusCapabilitySourceList          = "source.list"
+	serverFocusCapabilitySourceRead          = "source.read"
+	serverFocusCapabilitySourceSearch        = "source.search"
+	serverFocusCapabilitySubmitCodeFinding   = "result.code_finding"
+	serverFocusCapabilitySubmitCodeAudit     = "result.code_audit_report"
+	serverFocusCapabilityProgressPhase       = "progress.phase"
 
 	maxServerFocusRequests       = 32
 	maxServerFocusResponseBytes  = 512 * 1024
@@ -57,6 +68,13 @@ type legionServerFocusRuntime struct {
 	authorized *url.URL
 	client     *http.Client
 	sink       aiFocusAssetResultSink
+	workspace  *legionCodeWorkspaceRuntime
+	emitEvent  func(string, []byte)
+	// A source workspace belongs to one server-authorized Focus Run. The
+	// capability surface is dormant between Turns and is activated only while
+	// the matching immutable Focus Release executes.
+	authorizedFocusReleaseID string
+	activeFocusReleaseID     string
 
 	mu           sync.Mutex
 	requestCount int
@@ -66,8 +84,16 @@ func newLegionServerFocusRuntime(
 	ctx context.Context,
 	authorizedTarget string,
 	sink aiFocusResultSink,
+	workspaces ...*legionCodeWorkspaceRuntime,
 ) (aicommon.LegionResultRuntime, error) {
+	var workspace *legionCodeWorkspaceRuntime
+	if len(workspaces) > 0 {
+		workspace = workspaces[0]
+	}
 	if sink == nil || strings.TrimSpace(authorizedTarget) == "" {
+		if workspace != nil {
+			return nil, fmt.Errorf("source workspace runtime requires a result sink and authorized sentinel target")
+		}
 		return nil, nil
 	}
 	assetSink, ok := sink.(aiFocusAssetResultSink)
@@ -90,7 +116,8 @@ func newLegionServerFocusRuntime(
 				return http.ErrUseLastResponse
 			},
 		},
-		sink: assetSink,
+		sink:      assetSink,
+		workspace: workspace,
 	}, nil
 }
 
@@ -111,18 +138,235 @@ func (r *legionServerFocusRuntime) Execute(
 	if params == nil {
 		params = map[string]any{}
 	}
+	if r.workspace != nil {
+		r.mu.Lock()
+		active := strings.TrimSpace(r.activeFocusReleaseID)
+		authorized := strings.TrimSpace(r.authorizedFocusReleaseID)
+		r.mu.Unlock()
+		if active == "" || authorized == "" || active != authorized {
+			return nil, fmt.Errorf("source workspace capabilities are available only during the authorized Focus Turn")
+		}
+	}
 	switch strings.TrimSpace(capability) {
 	case serverFocusCapabilityHTTPRequest:
+		if r.workspace != nil {
+			return nil, fmt.Errorf("http.request is disabled for source workspace sessions")
+		}
 		return r.executeHTTPRequest(params)
 	case serverFocusCapabilityExtractReferences:
+		if r.workspace != nil {
+			return nil, fmt.Errorf("web.extract_references is disabled for source workspace sessions")
+		}
 		return r.extractReferences(params)
 	case serverFocusCapabilitySubmitAsset:
+		if r.workspace != nil {
+			return nil, fmt.Errorf("result.asset is disabled for source workspace sessions")
+		}
 		return r.submitAsset(params)
 	case serverFocusCapabilitySubmitRisk:
+		if r.workspace != nil {
+			return nil, fmt.Errorf("result.risk is disabled for source workspace sessions; use result.code_finding")
+		}
 		return r.submitRisk(params)
+	case serverFocusCapabilitySourceWorkspaceInfo:
+		if r.workspace == nil {
+			return nil, fmt.Errorf("source workspace is unavailable")
+		}
+		return r.workspace.info(), nil
+	case serverFocusCapabilitySourceList:
+		if r.workspace == nil {
+			return nil, fmt.Errorf("source workspace is unavailable")
+		}
+		return r.workspace.list(params)
+	case serverFocusCapabilitySourceRead:
+		if r.workspace == nil {
+			return nil, fmt.Errorf("source workspace is unavailable")
+		}
+		return r.workspace.read(params)
+	case serverFocusCapabilitySourceSearch:
+		if r.workspace == nil {
+			return nil, fmt.Errorf("source workspace is unavailable")
+		}
+		return r.workspace.search(params)
+	case serverFocusCapabilitySubmitCodeFinding:
+		return r.submitCodeFinding(params)
+	case serverFocusCapabilitySubmitCodeAudit:
+		return r.submitCodeAuditReport(params)
+	case serverFocusCapabilityProgressPhase:
+		return r.publishCodeAuditPhase(params)
 	default:
 		return nil, fmt.Errorf("unsupported server focus capability %q", capability)
 	}
+}
+
+func (r *legionServerFocusRuntime) activateFocusTurn(releaseID string) error {
+	if r == nil || r.workspace == nil {
+		return nil
+	}
+	releaseID = strings.TrimSpace(releaseID)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if releaseID == "" || releaseID != strings.TrimSpace(r.authorizedFocusReleaseID) {
+		return fmt.Errorf("focus release is not authorized for the bound source workspace")
+	}
+	if r.activeFocusReleaseID != "" {
+		return fmt.Errorf("a source workspace Focus Turn is already active")
+	}
+	r.activeFocusReleaseID = releaseID
+	return nil
+}
+
+func (r *legionServerFocusRuntime) deactivateFocusTurn(releaseID string) {
+	if r == nil || r.workspace == nil {
+		return
+	}
+	r.mu.Lock()
+	cleanup := false
+	if r.activeFocusReleaseID == strings.TrimSpace(releaseID) {
+		r.activeFocusReleaseID = ""
+		cleanup = true
+	}
+	r.mu.Unlock()
+	if cleanup {
+		_ = r.workspace.Cleanup()
+	}
+}
+
+func (r *legionServerFocusRuntime) publishCodeAuditPhase(params map[string]any) (map[string]any, error) {
+	if r.workspace == nil {
+		return nil, fmt.Errorf("progress.phase requires a source workspace")
+	}
+	if r.emitEvent == nil {
+		return nil, fmt.Errorf("progress.phase event publisher is unavailable")
+	}
+	phase := focusRuntimeString(params, "phase")
+	status := strings.ToLower(focusRuntimeString(params, "status"))
+	if !isLegionCodeAuditPhase(phase) {
+		return nil, fmt.Errorf("progress.phase phase is not part of the immutable code-audit lifecycle")
+	}
+	switch status {
+	case "started", "progress", "completed", "failed":
+	default:
+		return nil, fmt.Errorf("progress.phase status %q is unsupported", status)
+	}
+	payload := map[string]any{
+		"workspace_id": r.workspace.spec.WorkspaceID,
+		"phase":        phase,
+		"status":       status,
+	}
+	if message := focusRuntimeRawString(params, "message"); message != "" {
+		if len(message) > 2048 {
+			return nil, fmt.Errorf("progress.phase message exceeds 2048 bytes")
+		}
+		payload["message"] = message
+	}
+	if progress, ok := params["progress"]; ok {
+		value := utils.InterfaceToFloat64(progress)
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
+			return nil, fmt.Errorf("progress.phase progress must be between 0 and 1")
+		}
+		payload["progress"] = value
+	}
+	r.emitEvent("code_audit.phase", mustJSON(payload))
+	return payload, nil
+}
+
+func isLegionCodeAuditPhase(phase string) bool {
+	switch phase {
+	case "source_prepare", "project_understanding", "vulnerability_discovery", "evidence_verification", "report_generation":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *legionServerFocusRuntime) submitCodeFinding(params map[string]any) (map[string]any, error) {
+	if r.workspace == nil {
+		return nil, fmt.Errorf("result.code_finding requires a source workspace")
+	}
+	sink, ok := r.sink.(aiFocusCodeResultSink)
+	if !ok {
+		return nil, fmt.Errorf("server focus result sink does not accept code findings")
+	}
+	finding := aiFocusCodeFinding{
+		WorkspaceID:        r.workspace.spec.WorkspaceID,
+		File:               focusRuntimeString(params, "file"),
+		StartLine:          utils.InterfaceToInt(params["start_line"]),
+		EndLine:            utils.InterfaceToInt(params["end_line"]),
+		StartColumn:        utils.InterfaceToInt(params["start_column"]),
+		EndColumn:          utils.InterfaceToInt(params["end_column"]),
+		CWE:                focusRuntimeString(params, "cwe"),
+		VulnerabilityType:  focusRuntimeString(params, "vulnerability_type"),
+		Category:           focusRuntimeString(params, "category"),
+		Module:             focusRuntimeString(params, "module"),
+		Severity:           focusRuntimeString(params, "severity"),
+		Confidence:         utils.InterfaceToFloat64(params["confidence"]),
+		VerificationStatus: focusRuntimeString(params, "verification_status"),
+		Title:              focusRuntimeString(params, "title"),
+		Description:        focusRuntimeRawString(params, "description"),
+		Evidence:           focusRuntimeRawString(params, "evidence"),
+		DataFlow:           focusRuntimeRawString(params, "data_flow"),
+		ExploitScenario:    focusRuntimeRawString(params, "exploit_scenario"),
+		Recommendation:     focusRuntimeRawString(params, "recommendation"),
+		DedupeKey:          focusRuntimeString(params, "dedupe_key"),
+	}
+	resolved, _, err := r.workspace.resolve(finding.File)
+	if err != nil {
+		return nil, fmt.Errorf("result.code_finding file: %w", err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("result.code_finding file must be a regular source file")
+	}
+	if info.Size() > r.workspace.spec.MaxFileBytes {
+		return nil, fmt.Errorf("result.code_finding file exceeds source workspace max_file_bytes")
+	}
+	content, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, fmt.Errorf("result.code_finding read file: %w", err)
+	}
+	if bytes.IndexByte(content, 0) >= 0 || !utf8.Valid(content) {
+		return nil, fmt.Errorf("result.code_finding file must be UTF-8 source text")
+	}
+	lineCount := bytes.Count(content, []byte{'\n'})
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		lineCount++
+	}
+	if finding.StartLine <= 0 || finding.EndLine < finding.StartLine || finding.EndLine > lineCount {
+		return nil, fmt.Errorf("result.code_finding line range is outside the source file")
+	}
+	receipt, err := sink.SubmitCodeFinding(r.ctx, finding)
+	if err != nil {
+		return nil, err
+	}
+	return focusResultReceiptMap(receipt), nil
+}
+
+func (r *legionServerFocusRuntime) submitCodeAuditReport(params map[string]any) (map[string]any, error) {
+	if r.workspace == nil {
+		return nil, fmt.Errorf("result.code_audit_report requires a source workspace")
+	}
+	sink, ok := r.sink.(aiFocusCodeResultSink)
+	if !ok {
+		return nil, fmt.Errorf("server focus result sink does not accept code audit reports")
+	}
+	summaryValue := params["structured_summary"]
+	if summaryValue == nil {
+		summaryValue = params["structured_summary_json"]
+	}
+	summary, err := marshalServerFocusPayload(summaryValue)
+	if err != nil {
+		return nil, fmt.Errorf("result.code_audit_report structured_summary: %w", err)
+	}
+	receipt, err := sink.SubmitCodeAuditReport(r.ctx, aiFocusCodeAuditReport{
+		WorkspaceID:       r.workspace.spec.WorkspaceID,
+		Markdown:          focusRuntimeRawString(params, "markdown"),
+		StructuredSummary: summary,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return focusResultReceiptMap(receipt), nil
 }
 
 func (r *legionServerFocusRuntime) executeHTTPRequest(params map[string]any) (map[string]any, error) {

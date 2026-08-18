@@ -43,6 +43,7 @@ type recordingAIFocusRiskPublisher struct {
 	lifecycleRef jobExecutionRef
 	reports      [][]byte
 	reportIDs    []string
+	reportKinds  []string
 	order        []string
 }
 
@@ -133,11 +134,12 @@ func (p *recordingAIFocusRiskPublisher) PublishReportWithEventID(
 	_ context.Context,
 	ref jobExecutionRef,
 	eventID string,
-	_ string,
+	reportKind string,
 	reportJSON []byte,
 ) error {
 	p.lifecycleRef = ref
 	p.reportIDs = append(p.reportIDs, eventID)
+	p.reportKinds = append(p.reportKinds, reportKind)
 	p.reports = append(p.reports, append([]byte(nil), reportJSON...))
 	p.order = append(p.order, "report")
 	return nil

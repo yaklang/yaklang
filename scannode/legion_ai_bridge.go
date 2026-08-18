@@ -60,6 +60,7 @@ const aiSessionRuntimeEventInput = "ai.session.input"
 const aiSessionRuntimeEventContextUpdated = "ai.session.context_updated"
 const aiSessionRuntimeEventTurnCompleted = "ai.session.turn.completed"
 const aiSessionRuntimeEventTurnFailed = "ai.session.turn.failed"
+const aiSessionRuntimeEventTurnCancelled = "ai.session.turn.cancelled"
 
 var errAISessionInputInFlight = errors.New("ai session input command is already in flight")
 
@@ -109,6 +110,15 @@ type aiSessionRuntimeTurnReporter interface {
 	TurnFailed(string, string, string, []byte)
 }
 
+// aiSessionRuntimeFocusTurnReporter completes the run-scoped result sink while
+// keeping the reusable AI Chat Session alive. A Focus release is a Turn/Task
+// policy, not a Session terminal mode.
+type aiSessionRuntimeFocusTurnReporter interface {
+	FocusTurnCompleted(string, []byte)
+	FocusTurnFailed(string, string, string, []byte)
+	FocusTurnCancelled(string, string)
+}
+
 type aiSessionBinding struct {
 	Ref                        aiSessionCommandRef
 	ProjectID                  string
@@ -121,6 +131,7 @@ type aiSessionBinding struct {
 	HTTPClient                 *http.Client
 	LegionResultRuntime        aicommon.LegionResultRuntime
 	ExecutionMode              string
+	AuthorizedFocusReleaseID   string
 	AuthorizedTargetURL        string
 }
 
@@ -142,8 +153,27 @@ type aiSessionCredentialRef struct {
 
 type aiSessionRuntimeBindOptions struct {
 	PlatformBearerToken string
+	PlatformAPIBaseURL  string
+	NodeSessionID       string
 	HTTPClient          *http.Client
 	ResultSink          aiFocusResultSink
+}
+
+func bindAIFocusCodeWorkspaceEvidence(
+	sink aiFocusResultSink,
+	workspace *legionCodeWorkspaceRuntime,
+) error {
+	if workspace == nil {
+		return nil
+	}
+	binder, ok := sink.(aiFocusCodeWorkspaceEvidenceBinder)
+	if !ok {
+		return fmt.Errorf("ai code finding result sink does not accept bound source evidence")
+	}
+	if err := binder.bindCodeWorkspaceEvidence(workspace.lockedRevision, workspace.sha256); err != nil {
+		return fmt.Errorf("bind ai code finding source evidence: %w", err)
+	}
+	return nil
 }
 
 type aiSessionInput struct {
@@ -246,6 +276,7 @@ type aiSessionRuntime struct {
 	terminalReason         string
 	terminalPublishFailed  bool
 	executionMode          string
+	codeWorkspace          *legionCodeWorkspaceRuntime
 }
 
 type processedAISessionInput struct {
@@ -320,6 +351,10 @@ func (m *aiSessionRuntimeManager) Bind(
 					ref.CommandID,
 				)
 			}
+			if err := bindAIFocusCodeWorkspaceEvidence(options.ResultSink, existing.codeWorkspace); err != nil {
+				m.mu.Unlock()
+				return ref, err
+			}
 			existing.resultSink.Set(options.ResultSink)
 			m.mu.Unlock()
 			return ref, nil
@@ -349,16 +384,50 @@ func (m *aiSessionRuntimeManager) Bind(
 	m.mu.Unlock()
 
 	ctx, cancel := context.WithCancel(parent)
+	codeWorkspace, publicRuntimeOptions, err := prepareLegionCodeWorkspace(
+		ctx,
+		command.GetRuntimeOptionSnapshotJson(),
+		legionCodeWorkspaceMaterializeOptions{
+			HTTPClient:          options.HTTPClient,
+			PlatformAPIBaseURL:  options.PlatformAPIBaseURL,
+			NodeSessionID:       options.NodeSessionID,
+			PlatformBearerToken: options.PlatformBearerToken,
+		},
+	)
+	if err != nil {
+		cancel()
+		m.clearBindReservation(ref.SessionID, ref.CommandID)
+		return ref, fmt.Errorf("prepare source workspace: %w", err)
+	}
+	if err := bindAIFocusCodeWorkspaceEvidence(options.ResultSink, codeWorkspace); err != nil {
+		cancel()
+		_ = codeWorkspace.Cleanup()
+		m.clearBindReservation(ref.SessionID, ref.CommandID)
+		return ref, err
+	}
 	resultSink := newAISessionResultSinkProxy(options.ResultSink)
 	focusRuntime, err := newLegionServerFocusRuntime(
 		ctx,
 		strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
 		resultSink,
+		codeWorkspace,
 	)
 	if err != nil {
 		cancel()
+		_ = codeWorkspace.Cleanup()
 		m.clearBindReservation(ref.SessionID, ref.CommandID)
 		return ref, err
+	}
+	if codeWorkspace != nil {
+		if _, err := resultSink.SubmitAsset(
+			ctx,
+			codeWorkspace.lockedAsset(strings.TrimSpace(command.GetResultContext().GetTargetUrl())),
+		); err != nil {
+			cancel()
+			_ = codeWorkspace.Cleanup()
+			m.clearBindReservation(ref.SessionID, ref.CommandID)
+			return ref, fmt.Errorf("publish source_locked asset: %w", err)
+		}
 	}
 	runtime := &aiSessionRuntime{
 		ref:                    ref,
@@ -374,37 +443,49 @@ func (m *aiSessionRuntimeManager) Bind(
 		processedInputCommands: make(map[string]processedAISessionInput),
 		inFlightInputCommands:  make(map[string]struct{}),
 		executionMode:          strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
+		codeWorkspace:          codeWorkspace,
 	}
 	runtime.handle = noopAISessionRuntimeHandle{}
+	managedEmitter := &managedAISessionRuntimeEmitter{
+		ctx:       ctx,
+		runtime:   runtime,
+		publisher: publisher,
+		manager:   m,
+	}
+	if serverRuntime, ok := focusRuntime.(*legionServerFocusRuntime); ok {
+		serverRuntime.emitEvent = managedEmitter.Emit
+		serverRuntime.authorizedFocusReleaseID = strings.TrimSpace(command.GetResultContext().GetFocusReleaseId())
+	}
 	handle, err := m.driver.Bind(ctx, aiSessionBinding{
 		Ref:                        ref,
 		ProjectID:                  runtime.projectID,
 		Title:                      runtime.title,
 		ProviderPolicySnapshotJSON: cloneBytes(command.GetProviderPolicySnapshotJson()),
-		RuntimeOptionSnapshotJSON:  cloneBytes(command.GetRuntimeOptionSnapshotJson()),
+		RuntimeOptionSnapshotJSON:  publicRuntimeOptions,
 		Attachments:                cloneAISessionAttachmentRefs(command.GetAttachments()),
 		CredentialRefs:             cloneAISessionCredentialRefs(command.GetCredentialRefs()),
 		PlatformBearerToken:        strings.TrimSpace(options.PlatformBearerToken),
 		HTTPClient:                 options.HTTPClient,
 		LegionResultRuntime:        focusRuntime,
 		ExecutionMode:              strings.TrimSpace(command.GetResultContext().GetExecutionMode()),
+		AuthorizedFocusReleaseID:   strings.TrimSpace(command.GetResultContext().GetFocusReleaseId()),
 		AuthorizedTargetURL:        strings.TrimSpace(command.GetResultContext().GetTargetUrl()),
-	}, &managedAISessionRuntimeEmitter{
-		ctx:       ctx,
-		runtime:   runtime,
-		publisher: publisher,
-		manager:   m,
-	})
+	}, managedEmitter)
 	if err != nil {
 		cancel()
 		if handle != nil {
 			handle.Close("runtime bind failed")
 		}
+		_ = codeWorkspace.Cleanup()
 		m.clearBindReservation(ref.SessionID, ref.CommandID)
 		return ref, err
 	}
 	if handle != nil {
-		runtime.handle = handle
+		if codeWorkspace != nil {
+			runtime.handle = &legionCodeWorkspaceRuntimeHandle{handle: handle, workspace: codeWorkspace}
+		} else {
+			runtime.handle = handle
+		}
 	}
 	m.mu.Lock()
 	pending, reserved := m.bindings[ref.SessionID]
@@ -466,6 +547,17 @@ func (m *aiSessionRuntimeManager) Bind(
 			}
 			replaced.emissionWG.Wait()
 		}()
+	}
+	if codeWorkspace != nil {
+		managedEmitter.Emit("source.workspace.ready", mustJSON(map[string]any{
+			"workspace_id":    codeWorkspace.spec.WorkspaceID,
+			"kind":            codeWorkspace.spec.Kind,
+			"locked_revision": codeWorkspace.lockedRevision,
+			"sha256":          codeWorkspace.sha256,
+			"files":           codeWorkspace.files,
+			"bytes":           codeWorkspace.bytes,
+			"subpath":         codeWorkspace.spec.Subpath,
+		}))
 	}
 	return ref, nil
 }
@@ -860,34 +952,43 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 	kind string,
 ) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	session, ok := m.sessions[ref.SessionID]
 	if !ok {
+		m.mu.Unlock()
 		return nil
 	}
 	session.mu.Lock()
-	defer session.mu.Unlock()
 	switch {
 	case session.ref.OwnerUserID != ref.OwnerUserID:
+		session.mu.Unlock()
+		m.mu.Unlock()
 		return fmt.Errorf("ai session owner mismatch: %s", session.ref.OwnerUserID)
 	case ref.BindEpoch > 0 && session.bindEpoch != ref.BindEpoch:
+		currentEpoch := session.bindEpoch
+		session.mu.Unlock()
+		m.mu.Unlock()
 		return fmt.Errorf(
 			"ai session bind epoch mismatch: got %d want %d",
 			ref.BindEpoch,
-			session.bindEpoch,
+			currentEpoch,
 		)
 	case session.terminalCommandID != ref.CommandID:
+		currentCommandID := session.terminalCommandID
+		session.mu.Unlock()
+		m.mu.Unlock()
 		return fmt.Errorf(
 			"ai session terminal command mismatch: got %s want %s",
 			ref.CommandID,
-			session.terminalCommandID,
+			currentCommandID,
 		)
 	case session.terminalKind != kind:
+		currentKind := session.terminalKind
+		session.mu.Unlock()
+		m.mu.Unlock()
 		return fmt.Errorf(
 			"ai session terminal kind mismatch: got %s want %s",
 			kind,
-			session.terminalKind,
+			currentKind,
 		)
 	}
 	delete(m.sessions, ref.SessionID)
@@ -899,7 +1000,10 @@ func (m *aiSessionRuntimeManager) CompleteTerminal(
 	if session.cancel != nil {
 		session.cancel()
 	}
-	return nil
+	workspace := session.codeWorkspace
+	session.mu.Unlock()
+	m.mu.Unlock()
+	return workspace.Cleanup()
 }
 
 func (m *aiSessionRuntimeManager) RetireAfterBindFailure(ref aiSessionCommandRef) {
@@ -1008,6 +1112,8 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 		b.ensureAIPublisher(),
 		aiSessionRuntimeBindOptions{
 			PlatformBearerToken: session.SessionToken,
+			PlatformAPIBaseURL:  b.agent.resolvePlatformAPIBaseURL(),
+			NodeSessionID:       session.SessionID,
 			HTTPClient:          b.agent.httpClient,
 			ResultSink:          resultSink,
 		},
@@ -1025,7 +1131,24 @@ func (b *legionJobBridge) handleAISessionBind(ctx context.Context, raw []byte) e
 			// terminal bind-failed event would incorrectly fail the newer runtime.
 			return nil
 		}
-		if publishErr := b.publishAISessionCommandFailure(ctx, ref, "ai_session_bind_failed", err); publishErr != nil {
+		failureErr := err
+		if strings.Contains(err.Error(), "prepare source workspace") ||
+			strings.Contains(err.Error(), "source_workspace") {
+			if publishErr := b.ensureAIPublisher().PublishEvent(
+				ctx,
+				ref,
+				1,
+				"source.workspace.failed",
+				mustJSON(map[string]string{
+					"code":    "source_workspace_materialize_failed",
+					"message": "source workspace could not be materialized",
+				}),
+			); publishErr != nil {
+				return publishErr
+			}
+			failureErr = fmt.Errorf("source workspace materialization failed")
+		}
+		if publishErr := b.publishAISessionCommandFailure(ctx, ref, "ai_session_bind_failed", failureErr); publishErr != nil {
 			return publishErr
 		}
 		b.ensureAIRuntime().RetireAfterBindFailure(ref)
@@ -1315,6 +1438,33 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 			strings.TrimSpace(resultContext.GetFocusRunId()) {
 			return fmt.Errorf("ai session run_id must match focus result focus_run_id")
 		}
+	}
+	runtimeOptions, err := decodeYakRuntimeOptions(command.GetRuntimeOptionSnapshotJson(), true)
+	if err != nil {
+		return fmt.Errorf("invalid ai session runtime options: %w", err)
+	}
+	if runtimeOptions.SourceWorkspace != nil {
+		spec := *runtimeOptions.SourceWorkspace
+		if err := normalizeLegionCodeWorkspaceSpec(&spec); err != nil {
+			return err
+		}
+		if command.GetResultContext() == nil {
+			return fmt.Errorf("source_workspace requires an ai focus result context")
+		}
+		if strings.TrimSpace(command.GetResultContext().GetFocusMode()) != legionAICodeSecurityAuditResultMode {
+			return fmt.Errorf("source_workspace requires focus_mode=%s", legionAICodeSecurityAuditResultMode)
+		}
+		expectedTarget, err := legionCodeWorkspaceSentinel(spec.WorkspaceID)
+		if err != nil {
+			return err
+		}
+		target, err := normalizeServerFocusURL(command.GetResultContext().GetTargetUrl())
+		if err != nil || target.String() != expectedTarget {
+			return fmt.Errorf("source_workspace target_url must equal %s", expectedTarget)
+		}
+	} else if command.GetResultContext() != nil &&
+		strings.TrimSpace(command.GetResultContext().GetFocusMode()) == legionAICodeSecurityAuditResultMode {
+		return fmt.Errorf("focus_mode=%s requires source_workspace", legionAICodeSecurityAuditResultMode)
 	}
 	return nil
 }
@@ -1693,6 +1843,79 @@ func (e *managedAISessionRuntimeEmitter) TurnFailed(
 				"message": strings.TrimSpace(message),
 				"detail":  json.RawMessage(cloneBytes(detailJSON)),
 			},
+		}),
+	)
+}
+
+func (e *managedAISessionRuntimeEmitter) FocusTurnCompleted(turnID string, resultJSON []byte) {
+	if e == nil || e.runtime == nil || e.publisher == nil {
+		return
+	}
+	if !e.runtime.beginEmission() {
+		return
+	}
+	err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
+		return e.runtime.resultSink.Succeed(ctx, resultJSON)
+	})
+	e.runtime.endEmission()
+	if err != nil {
+		detail := mustJSON(map[string]string{"cause": err.Error()})
+		if e.runtime.beginEmission() {
+			_ = retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
+				return e.runtime.resultSink.Fail(ctx, "focus_result_finalize_failed", err.Error(), detail)
+			})
+			e.runtime.endEmission()
+		}
+		e.TurnFailed(turnID, "focus_result_finalize_failed", err.Error(), detail)
+		return
+	}
+	e.TurnCompleted(turnID, resultJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) FocusTurnFailed(
+	turnID string,
+	code string,
+	message string,
+	detailJSON []byte,
+) {
+	if e == nil || e.runtime == nil || e.publisher == nil {
+		return
+	}
+	if e.runtime.beginEmission() {
+		if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
+			return e.runtime.resultSink.Fail(ctx, code, message, detailJSON)
+		}); err != nil {
+			logAISessionRuntimePublishError("focus-turn-failed", e.runtime.currentRef().SessionID, err)
+		}
+		e.runtime.endEmission()
+	}
+	e.TurnFailed(turnID, code, message, detailJSON)
+}
+
+func (e *managedAISessionRuntimeEmitter) FocusTurnCancelled(turnID string, reason string) {
+	if e == nil || e.runtime == nil || e.publisher == nil {
+		return
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "user requested cancellation"
+	}
+	if e.runtime.beginEmission() {
+		if err := retryAISessionTerminalPublish(e.ctx, func(ctx context.Context) error {
+			return e.runtime.resultSink.Cancel(ctx, reason)
+		}); err != nil {
+			logAISessionRuntimePublishError("focus-turn-cancelled", e.runtime.currentRef().SessionID, err)
+		}
+		e.runtime.endEmission()
+	}
+	e.publishTurnState(
+		turnID,
+		aiSessionRuntimeEventTurnCancelled,
+		mustJSON(map[string]any{
+			"turn_id":     strings.TrimSpace(turnID),
+			"status":      "cancelled",
+			"reason":      reason,
+			"finished_at": time.Now().UTC().Format(time.RFC3339Nano),
 		}),
 	)
 }

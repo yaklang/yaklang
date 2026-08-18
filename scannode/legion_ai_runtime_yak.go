@@ -537,63 +537,64 @@ func yakAISendFailureCode(err error) string {
 }
 
 type yakRuntimeOptions struct {
-	UseDefaultAIConfig             *bool              `json:"use_default_ai_config"`
-	AIService                      string             `json:"ai_service"`
-	AIModelName                    string             `json:"ai_model_name"`
-	APIKey                         string             `json:"api_key"`
-	BaseURL                        string             `json:"base_url"`
-	APIType                        string             `json:"api_type"`
-	Domain                         string             `json:"domain"`
-	Proxy                          string             `json:"proxy"`
-	Endpoint                       string             `json:"endpoint"`
-	EnableEndpoint                 *bool              `json:"enable_endpoint"`
-	NoHTTPS                        *bool              `json:"no_https"`
-	Headers                        map[string]string  `json:"headers"`
-	MaxIteration                   int                `json:"max_iteration"`
-	ReActMaxIteration              int64              `json:"react_max_iteration"`
-	ReviewPolicy                   string             `json:"review_policy"`
-	EnableSystemFileSystemOperator *bool              `json:"enable_system_file_system_operator"`
-	DisableToolUse                 *bool              `json:"disable_tool_use"`
-	EnableAISearchTool             *bool              `json:"enable_ai_search_tool"`
-	EnableAISearchInternet         *bool              `json:"enable_ai_search_internet"`
-	IncludeSuggestedToolNames      []string           `json:"include_suggested_tool_names"`
-	IncludeSuggestedToolKeywords   []string           `json:"include_suggested_tool_keywords"`
-	ExcludeToolNames               []string           `json:"exclude_tool_names"`
-	EnableQwenNoThinkMode          *bool              `json:"enable_qwen_no_think_mode"`
-	DisallowRequireForUserPrompt   *bool              `json:"disallow_require_for_user_prompt"`
-	AllowUserInteract              *bool              `json:"allow_user_interact"`
-	AllowPlanUserInteract          *bool              `json:"allow_plan_user_interact"`
-	AllowGenerateReport            *bool              `json:"allow_generate_report"`
-	TaskMaxContinueCount           int64              `json:"task_max_continue_count"`
-	DisableToolIntervalReview      *bool              `json:"disable_tool_interval_review"`
-	SyncPerceptionTrigger          *bool              `json:"sync_perception_trigger"`
-	EnablePlan                     *bool              `json:"enable_plan"`
-	EnableDetachedPlan             *bool              `json:"enable_detached_plan"`
-	PlanExecTaskConcurrency        int64              `json:"plan_exec_task_concurrency"`
-	UserPlanPrompt                 string             `json:"user_plan_prompt"`
-	UserPresetPrompt               string             `json:"user_preset_prompt"`
-	Source                         string             `json:"source"`
-	ForgeName                      string             `json:"forge_name"`
-	ForgeParams                    []yakAIForgeParam  `json:"forge_params"`
-	EnabledCapabilities            []yakAICapability  `json:"enabled_capabilities"`
-	Strategy                       *yakAIStrategy     `json:"strategy"`
-	AIReviewRiskControlScore       *float64           `json:"ai_review_risk_control_score"`
-	AICallAutoRetry                *int64             `json:"ai_call_auto_retry"`
-	AITransactionRetry             *int64             `json:"ai_transaction_retry"`
-	AICallTokenLimit               *int64             `json:"ai_call_token_limit"`
-	UserInteractLimit              int64              `json:"user_interact_limit"`
-	PlanUserInteractMaxCount       int64              `json:"plan_user_interact_max_count"`
-	TimelineContentSizeLimit       int64              `json:"timeline_content_size_limit"`
-	Focus                          string             `json:"focus"`
-	FocusModeLoop                  string             `json:"focus_mode_loop"`
-	FocusReleaseID                 string             `json:"focus_release_id"`
-	FocusReleaseSHA256             string             `json:"focus_release_sha256"`
-	FocusRuntimeName               string             `json:"focus_runtime_name"`
-	FocusTargetURL                 string             `json:"focus_target_url"`
-	ConversationResultTargetURL    string             `json:"conversation_result_target_url"`
-	Workdir                        string             `json:"workdir"`
-	Language                       string             `json:"language"`
-	SessionMCPServers              []sessionMCPServer `json:"session_mcp_servers"`
+	UseDefaultAIConfig             *bool                    `json:"use_default_ai_config"`
+	AIService                      string                   `json:"ai_service"`
+	AIModelName                    string                   `json:"ai_model_name"`
+	APIKey                         string                   `json:"api_key"`
+	BaseURL                        string                   `json:"base_url"`
+	APIType                        string                   `json:"api_type"`
+	Domain                         string                   `json:"domain"`
+	Proxy                          string                   `json:"proxy"`
+	Endpoint                       string                   `json:"endpoint"`
+	EnableEndpoint                 *bool                    `json:"enable_endpoint"`
+	NoHTTPS                        *bool                    `json:"no_https"`
+	Headers                        map[string]string        `json:"headers"`
+	MaxIteration                   int                      `json:"max_iteration"`
+	ReActMaxIteration              int64                    `json:"react_max_iteration"`
+	ReviewPolicy                   string                   `json:"review_policy"`
+	EnableSystemFileSystemOperator *bool                    `json:"enable_system_file_system_operator"`
+	DisableToolUse                 *bool                    `json:"disable_tool_use"`
+	EnableAISearchTool             *bool                    `json:"enable_ai_search_tool"`
+	EnableAISearchInternet         *bool                    `json:"enable_ai_search_internet"`
+	IncludeSuggestedToolNames      []string                 `json:"include_suggested_tool_names"`
+	IncludeSuggestedToolKeywords   []string                 `json:"include_suggested_tool_keywords"`
+	ExcludeToolNames               []string                 `json:"exclude_tool_names"`
+	EnableQwenNoThinkMode          *bool                    `json:"enable_qwen_no_think_mode"`
+	DisallowRequireForUserPrompt   *bool                    `json:"disallow_require_for_user_prompt"`
+	AllowUserInteract              *bool                    `json:"allow_user_interact"`
+	AllowPlanUserInteract          *bool                    `json:"allow_plan_user_interact"`
+	AllowGenerateReport            *bool                    `json:"allow_generate_report"`
+	TaskMaxContinueCount           int64                    `json:"task_max_continue_count"`
+	DisableToolIntervalReview      *bool                    `json:"disable_tool_interval_review"`
+	SyncPerceptionTrigger          *bool                    `json:"sync_perception_trigger"`
+	EnablePlan                     *bool                    `json:"enable_plan"`
+	EnableDetachedPlan             *bool                    `json:"enable_detached_plan"`
+	PlanExecTaskConcurrency        int64                    `json:"plan_exec_task_concurrency"`
+	UserPlanPrompt                 string                   `json:"user_plan_prompt"`
+	UserPresetPrompt               string                   `json:"user_preset_prompt"`
+	Source                         string                   `json:"source"`
+	ForgeName                      string                   `json:"forge_name"`
+	ForgeParams                    []yakAIForgeParam        `json:"forge_params"`
+	EnabledCapabilities            []yakAICapability        `json:"enabled_capabilities"`
+	Strategy                       *yakAIStrategy           `json:"strategy"`
+	AIReviewRiskControlScore       *float64                 `json:"ai_review_risk_control_score"`
+	AICallAutoRetry                *int64                   `json:"ai_call_auto_retry"`
+	AITransactionRetry             *int64                   `json:"ai_transaction_retry"`
+	AICallTokenLimit               *int64                   `json:"ai_call_token_limit"`
+	UserInteractLimit              int64                    `json:"user_interact_limit"`
+	PlanUserInteractMaxCount       int64                    `json:"plan_user_interact_max_count"`
+	TimelineContentSizeLimit       int64                    `json:"timeline_content_size_limit"`
+	Focus                          string                   `json:"focus"`
+	FocusModeLoop                  string                   `json:"focus_mode_loop"`
+	FocusReleaseID                 string                   `json:"focus_release_id"`
+	FocusReleaseSHA256             string                   `json:"focus_release_sha256"`
+	FocusRuntimeName               string                   `json:"focus_runtime_name"`
+	FocusTargetURL                 string                   `json:"focus_target_url"`
+	ConversationResultTargetURL    string                   `json:"conversation_result_target_url"`
+	Workdir                        string                   `json:"workdir"`
+	Language                       string                   `json:"language"`
+	SessionMCPServers              []sessionMCPServer       `json:"session_mcp_servers"`
+	SourceWorkspace                *legionCodeWorkspaceSpec `json:"source_workspace,omitempty"`
 }
 
 type yakAIForgeParam struct {
@@ -1323,6 +1324,9 @@ func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) y
 	}
 	if len(overlay.SessionMCPServers) > 0 {
 		base.SessionMCPServers = overlay.SessionMCPServers
+	}
+	if overlay.SourceWorkspace != nil {
+		base.SourceWorkspace = overlay.SourceWorkspace
 	}
 	return base
 }
