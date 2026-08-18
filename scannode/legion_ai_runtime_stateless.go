@@ -47,11 +47,11 @@ func (statelessAIEngineRuntimeDriver) Bind(
 		return nil, fmt.Errorf("stateless bind: decode runtime options: %w", err)
 	}
 	return &statelessAIEngineRuntimeHandle{
-		binding:              binding,
-		emitter:              emitter,
-		cachedOptions:        cachedOptions,
-		runtime:              runtimeOptions,
-		pinnedFocusReleaseID: pinnedFocusReleaseID(binding.RuntimeOptionSnapshotJSON),
+		binding:                  binding,
+		emitter:                  emitter,
+		cachedOptions:            cachedOptions,
+		runtime:                  runtimeOptions,
+		authorizedFocusReleaseID: strings.TrimSpace(binding.AuthorizedFocusReleaseID),
 		newEngine: func(opts ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
 			return aiengine.NewAIEngine(opts...)
 		},
@@ -68,13 +68,18 @@ type statelessTurnEngine interface {
 }
 
 type statelessAITurn struct {
-	engine      statelessTurnEngine
-	turnID      string
-	directForge bool
-	runtime     yakRuntimeOptions
-	binding     aiSessionBinding
-	forgeInput  *chanx.UnlimitedChan[*ypb.AIInputEvent]
-	closeOnce   sync.Once
+	engine         statelessTurnEngine
+	turnID         string
+	directForge    bool
+	focusSingleRun bool
+	focusReleaseID string
+	focusRuntime   *legionServerFocusRuntime
+	focusCancelled bool
+	cancelReason   string
+	runtime        yakRuntimeOptions
+	binding        aiSessionBinding
+	forgeInput     *chanx.UnlimitedChan[*ypb.AIInputEvent]
+	closeOnce      sync.Once
 }
 
 func (t *statelessAITurn) close() {
@@ -85,11 +90,11 @@ func (t *statelessAITurn) close() {
 }
 
 type statelessAIEngineRuntimeHandle struct {
-	binding              aiSessionBinding
-	emitter              aiSessionRuntimeEmitter
-	cachedOptions        []aiengine.AIEngineConfigOption
-	pinnedFocusReleaseID string
-	runtime              yakRuntimeOptions
+	binding                  aiSessionBinding
+	emitter                  aiSessionRuntimeEmitter
+	cachedOptions            []aiengine.AIEngineConfigOption
+	authorizedFocusReleaseID string
+	runtime                  yakRuntimeOptions
 
 	mu           sync.Mutex
 	activeTurn   *statelessAITurn
@@ -128,6 +133,16 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 	}
 	if isSyncAISessionInput(input.InputType) {
 		return h.sendSyncInput(input)
+	}
+	var contextRuntimeOptions []byte
+	if input.ContextPackage != nil {
+		contextRuntimeOptions = input.ContextPackage.GetRuntimeOptionSnapshotJson()
+	}
+	if err := validateLegionCodeWorkspaceContextPin(
+		h.binding.RuntimeOptionSnapshotJSON,
+		contextRuntimeOptions,
+	); err != nil {
+		return fmt.Errorf("stateless sendinput: %w", err)
 	}
 
 	// Build a fresh engine per turn with WithStateless(true) + cached options +
@@ -171,12 +186,12 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 	if input.ContextPackage != nil {
 		contextFocusRelease = input.ContextPackage.GetFocusRelease()
 	}
-	if h.pinnedFocusReleaseID != "" {
+	if h.authorizedFocusReleaseID != "" {
 		if contextFocusRelease == nil {
-			return fmt.Errorf("stateless sendinput: pinned focus release %q is missing from context package", h.pinnedFocusReleaseID)
+			return fmt.Errorf("stateless sendinput: authorized focus release %q is missing from this Turn context", h.authorizedFocusReleaseID)
 		}
-		if strings.TrimSpace(contextFocusRelease.GetReleaseId()) != h.pinnedFocusReleaseID {
-			return fmt.Errorf("stateless sendinput: focus release mismatch: pinned %q, received %q", h.pinnedFocusReleaseID, contextFocusRelease.GetReleaseId())
+		if strings.TrimSpace(contextFocusRelease.GetReleaseId()) != h.authorizedFocusReleaseID {
+			return fmt.Errorf("stateless sendinput: focus release mismatch: authorized %q, received %q", h.authorizedFocusReleaseID, contextFocusRelease.GetReleaseId())
 		}
 	}
 	runtimeFocusName, err := registerContextFocusRelease(contextFocusRelease)
@@ -200,12 +215,28 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 		h.mu.Unlock()
 		return fmt.Errorf("stateless sendinput: turn already active")
 	}
+	var focusRuntime *legionServerFocusRuntime
+	if runtimeFocusName != "" {
+		focusRuntime, _ = h.binding.LegionResultRuntime.(*legionServerFocusRuntime)
+		if focusRuntime != nil {
+			if err := focusRuntime.activateFocusTurn(strings.TrimSpace(contextFocusRelease.GetReleaseId())); err != nil {
+				h.mu.Unlock()
+				return fmt.Errorf("stateless sendinput: activate Focus Turn: %w", err)
+			}
+		}
+	}
 	engine, err := h.newEngine(options...)
 	if err != nil {
+		if focusRuntime != nil {
+			focusRuntime.deactivateFocusTurn(strings.TrimSpace(contextFocusRelease.GetReleaseId()))
+		}
 		h.mu.Unlock()
 		return fmt.Errorf("stateless sendinput: new engine: %w", err)
 	}
 	if engine == nil {
+		if focusRuntime != nil {
+			focusRuntime.deactivateFocusTurn(strings.TrimSpace(contextFocusRelease.GetReleaseId()))
+		}
 		h.mu.Unlock()
 		return fmt.Errorf("stateless sendinput: new engine returned nil")
 	}
@@ -214,11 +245,14 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 		h.forgeStarted = true
 	}
 	turn := &statelessAITurn{
-		engine:      engine,
-		turnID:      strings.TrimSpace(input.Ref.CommandID),
-		directForge: directForge,
-		runtime:     h.runtime,
-		binding:     h.binding,
+		engine:         engine,
+		turnID:         strings.TrimSpace(input.Ref.CommandID),
+		directForge:    directForge,
+		focusSingleRun: runtimeFocusName != "" && strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run"),
+		focusReleaseID: strings.TrimSpace(contextFocusRelease.GetReleaseId()),
+		focusRuntime:   focusRuntime,
+		runtime:        h.runtime,
+		binding:        h.binding,
 	}
 	if directForge {
 		turn.forgeInput = chanx.NewUnlimitedChan[*ypb.AIInputEvent](engine.Context(), 10)
@@ -388,23 +422,49 @@ func (h *statelessAIEngineRuntimeHandle) sendSyncInput(input aiSessionInput) err
 		return fmt.Errorf("stateless sendinput: no active turn for sync event")
 	}
 	defer h.mu.Unlock()
+	cancelFocusTurn := turn.focusSingleRun && strings.EqualFold(
+		strings.TrimSpace(syncEvent.SyncType),
+		"react_cancel_current_task",
+	)
+	if cancelFocusTurn {
+		turn.focusCancelled = true
+		turn.cancelReason = focusTurnCancelReason(syncEvent.SyncJSONInput)
+	}
 	event := &ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      syncEvent.SyncType,
 		SyncJsonInput: syncEvent.SyncJSONInput,
 		SyncID:        syncEvent.SyncID,
 	}
+	var sendErr error
 	if turn.directForge && turn.forgeInput != nil {
 		if !turn.forgeInput.SafeFeedWithResult(event) {
-			return fmt.Errorf("stateless sendinput: direct forge sync channel is closed")
+			sendErr = fmt.Errorf("direct forge sync channel is closed")
 		}
-	} else if err := turn.engine.SendInputEvent(event); err != nil {
-		return fmt.Errorf("stateless sendinput: send sync event: %w", err)
+	} else {
+		sendErr = turn.engine.SendInputEvent(event)
 	}
-	if h.closed || h.activeTurn != turn || turn.engine.Context().Err() != nil {
+	if sendErr != nil {
+		if cancelFocusTurn {
+			turn.focusCancelled = false
+			turn.cancelReason = ""
+		}
+		return fmt.Errorf("stateless sendinput: send sync event: %w", sendErr)
+	}
+	if h.closed || h.activeTurn != turn || (!cancelFocusTurn && turn.engine.Context().Err() != nil) {
 		return fmt.Errorf("stateless sendinput: active turn closed while sending sync event")
 	}
 	return nil
+}
+
+func focusTurnCancelReason(raw string) string {
+	var payload struct {
+		Reason string `json:"reason"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(raw)), &payload) == nil && strings.TrimSpace(payload.Reason) != "" {
+		return strings.TrimSpace(payload.Reason)
+	}
+	return "user requested cancellation"
 }
 
 func (h *statelessAIEngineRuntimeHandle) finishIdleEmit() {
@@ -483,15 +543,14 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 
 	h.mu.Lock()
 	closed := h.closed
-	singleRun := strings.EqualFold(strings.TrimSpace(h.binding.ExecutionMode), "single_run")
-	singleRunTerminal := ctx.Err() == nil && !closed && singleRun
 	turnFailure := err != nil && ctx.Err() == nil && !closed
-	autoComplete := err == nil && singleRunTerminal
-	if singleRunTerminal || (turnFailure && singleRun) {
-		h.closed = true
-	}
+	focusCancelled := turn.focusCancelled
+	cancelReason := turn.cancelReason
 	h.mu.Unlock()
 	turn.close()
+	if turn.focusRuntime != nil {
+		turn.focusRuntime.deactivateFocusTurn(turn.focusReleaseID)
+	}
 	defer func() {
 		h.mu.Lock()
 		if h.activeTurn == turn {
@@ -499,6 +558,12 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 		}
 		h.mu.Unlock()
 	}()
+	if focusCancelled && !closed {
+		if reporter, ok := h.emitter.(aiSessionRuntimeFocusTurnReporter); ok {
+			reporter.FocusTurnCancelled(turn.turnID, cancelReason)
+			return
+		}
+	}
 
 	if turnFailure {
 		code := yakAISendFailureCode(err)
@@ -508,13 +573,11 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 		detailJSON := mustJSON(map[string]string{
 			"runtime": "stateless_yak_ai_engine",
 		})
-		if singleRun {
-			if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok {
-				completer.FailTurn(turn.turnID, code, err.Error(), detailJSON)
+		if turn.focusSingleRun {
+			if reporter, ok := h.emitter.(aiSessionRuntimeFocusTurnReporter); ok {
+				reporter.FocusTurnFailed(turn.turnID, code, err.Error(), detailJSON)
 				return
 			}
-			h.emitter.Failed(code, err.Error(), detailJSON)
-			return
 		}
 		if reporter, ok := h.emitter.(aiSessionRuntimeTurnReporter); ok {
 			reporter.TurnFailed(turn.turnID, code, err.Error(), detailJSON)
@@ -527,29 +590,23 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 		h.emitter.Failed(code, err.Error(), detailJSON)
 		return
 	}
-	if err == nil && !singleRunTerminal && ctx.Err() == nil && !closed {
+	if err == nil && ctx.Err() == nil && !closed {
 		resultJSON := mustJSON(map[string]string{
-			"execution_mode": "multi_turn",
+			"execution_mode": "turn",
 			"turn_id":        turn.turnID,
 		})
+		if turn.focusSingleRun {
+			if reporter, ok := h.emitter.(aiSessionRuntimeFocusTurnReporter); ok {
+				reporter.FocusTurnCompleted(turn.turnID, resultJSON)
+				return
+			}
+		}
 		if reporter, ok := h.emitter.(aiSessionRuntimeTurnReporter); ok {
 			reporter.TurnCompleted(turn.turnID, resultJSON)
 			return
 		}
 		h.emitter.Emit(aiSessionRuntimeEventTurnCompleted, resultJSON)
 		return
-	}
-	if autoComplete {
-		resultJSON := mustJSON(map[string]string{
-			"execution_mode": "single_run",
-			"target_url":     strings.TrimSpace(h.binding.AuthorizedTargetURL),
-			"turn_id":        turn.turnID,
-		})
-		if completer, ok := h.emitter.(aiSessionRuntimeTurnCompleter); ok {
-			completer.DoneTurn(turn.turnID, resultJSON)
-			return
-		}
-		h.emitter.Done(resultJSON)
 	}
 }
 
@@ -587,6 +644,9 @@ func (h *statelessAIEngineRuntimeHandle) closeRuntime() {
 		<-idleEmitDone
 	}
 	turn.close()
+	if turn != nil && turn.focusRuntime != nil {
+		turn.focusRuntime.deactivateFocusTurn(turn.focusReleaseID)
+	}
 }
 
 // buildContextPackageHistoryBlock formats the replayed conversation messages

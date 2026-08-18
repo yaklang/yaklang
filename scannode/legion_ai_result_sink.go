@@ -6,7 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
+	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -22,9 +25,14 @@ const (
 	legionAIFocusResultSchemaV1         = "legion.focus-result.v1"
 	legionAIConversationAuditResultMode = "conversation_audit"
 	legionAIConversationExecutionMode   = "multi_turn"
+	legionAICodeSecurityAuditResultMode = "code_security_audit"
 	maxInlineFocusRiskFieldBytes        = 64 * 1024
 	maxInlineFocusAssetBytes            = 64 * 1024
+	maxInlineCodeAuditReportBytes       = 512 * 1024
+	maxInlineCodeAuditSummaryBytes      = 64 * 1024
 )
+
+var legionCodeFindingCWEPattern = regexp.MustCompile(`^CWE-[1-9][0-9]*$`)
 
 type aiFocusResultReceipt struct {
 	ResultID  string
@@ -40,6 +48,38 @@ type aiFocusAssetResult struct {
 	Payload     []byte
 }
 
+type aiFocusCodeFinding struct {
+	WorkspaceID        string  `json:"workspace_id"`
+	LockedRevision     string  `json:"locked_revision"`
+	SourceSHA256       string  `json:"source_sha256"`
+	File               string  `json:"file"`
+	StartLine          int     `json:"start_line"`
+	EndLine            int     `json:"end_line"`
+	StartColumn        int     `json:"start_column,omitempty"`
+	EndColumn          int     `json:"end_column,omitempty"`
+	CWE                string  `json:"cwe"`
+	VulnerabilityType  string  `json:"vulnerability_type"`
+	Category           string  `json:"category"`
+	Module             string  `json:"module,omitempty"`
+	Severity           string  `json:"severity"`
+	Confidence         float64 `json:"confidence"`
+	VerificationStatus string  `json:"verification_status"`
+	Title              string  `json:"title"`
+	Description        string  `json:"description,omitempty"`
+	Evidence           string  `json:"evidence"`
+	DataFlow           string  `json:"data_flow"`
+	ExploitScenario    string  `json:"exploit_scenario"`
+	Recommendation     string  `json:"recommendation,omitempty"`
+	DedupeKey          string  `json:"dedupe_key"`
+	Target             string  `json:"target"`
+}
+
+type aiFocusCodeAuditReport struct {
+	WorkspaceID       string          `json:"workspace_id"`
+	Markdown          string          `json:"markdown"`
+	StructuredSummary json.RawMessage `json:"structured_summary"`
+}
+
 type aiFocusResultSink interface {
 	SubmitRisk(context.Context, *schema.Risk) (aiFocusResultReceipt, error)
 }
@@ -47,6 +87,16 @@ type aiFocusResultSink interface {
 type aiFocusAssetResultSink interface {
 	aiFocusResultSink
 	SubmitAsset(context.Context, aiFocusAssetResult) (aiFocusResultReceipt, error)
+}
+
+type aiFocusCodeResultSink interface {
+	aiFocusAssetResultSink
+	SubmitCodeFinding(context.Context, aiFocusCodeFinding) (aiFocusResultReceipt, error)
+	SubmitCodeAuditReport(context.Context, aiFocusCodeAuditReport) (aiFocusResultReceipt, error)
+}
+
+type aiFocusCodeWorkspaceEvidenceBinder interface {
+	bindCodeWorkspaceEvidence(lockedRevision string, sourceSHA256 string) error
 }
 
 type aiFocusResultEventPublisher interface {
@@ -78,16 +128,19 @@ type aiFocusResultEventPublisher interface {
 }
 
 type legionAIFocusResultSink struct {
-	publisher      aiFocusResultEventPublisher
-	ref            jobExecutionRef
-	focusRunID     string
-	focusMode      string
-	focusReleaseID string
-	targetURL      string
-	mu             sync.Mutex
-	assetIDs       map[string]struct{}
-	riskIDs        map[string]struct{}
-	targets        map[string]struct{}
+	publisher                aiFocusResultEventPublisher
+	ref                      jobExecutionRef
+	focusRunID               string
+	focusMode                string
+	focusReleaseID           string
+	targetURL                string
+	mu                       sync.Mutex
+	assetIDs                 map[string]struct{}
+	riskIDs                  map[string]struct{}
+	targets                  map[string]struct{}
+	codeAuditReportPublished bool
+	codeWorkspaceLockedRev   string
+	codeWorkspaceSHA256      string
 }
 
 func newLegionAIFocusResultSink(
@@ -183,6 +236,38 @@ func (p *aiSessionResultSinkProxy) SubmitAsset(
 	return assetSink.SubmitAsset(ctx, asset)
 }
 
+func (p *aiSessionResultSinkProxy) SubmitCodeFinding(
+	ctx context.Context,
+	finding aiFocusCodeFinding,
+) (aiFocusResultReceipt, error) {
+	if p == nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	sink, ok := p.sink.(aiFocusCodeResultSink)
+	if !ok {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink does not accept code findings")
+	}
+	return sink.SubmitCodeFinding(ctx, finding)
+}
+
+func (p *aiSessionResultSinkProxy) SubmitCodeAuditReport(
+	ctx context.Context,
+	report aiFocusCodeAuditReport,
+) (aiFocusResultReceipt, error) {
+	if p == nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	sink, ok := p.sink.(aiFocusCodeResultSink)
+	if !ok {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink does not accept code audit reports")
+	}
+	return sink.SubmitCodeAuditReport(ctx, report)
+}
+
 func (p *aiSessionResultSinkProxy) Succeed(ctx context.Context, resultJSON []byte) error {
 	if p == nil {
 		return nil
@@ -238,6 +323,9 @@ func validateLegionAIFocusResultContext(
 		ref.SubtaskID = strings.TrimSpace(job.GetSubtaskId())
 		ref.AttemptID = strings.TrimSpace(job.GetAttemptId())
 	}
+	targetURL := strings.TrimSpace(resultContext.GetTargetUrl())
+	parsedTarget, targetErr := normalizeServerFocusURL(targetURL)
+	isWorkspaceSentinel := targetErr == nil && strings.EqualFold(parsedTarget.Hostname(), "workspace.invalid")
 	switch {
 	case ref.CommandID == "":
 		return jobExecutionRef{}, fmt.Errorf("ai focus result bind command_id is required")
@@ -275,9 +363,193 @@ func validateLegionAIFocusResultContext(
 		)
 	case strings.TrimSpace(resultContext.GetTargetUrl()) == "":
 		return jobExecutionRef{}, fmt.Errorf("ai focus result target_url is required")
+	case targetErr != nil:
+		return jobExecutionRef{}, fmt.Errorf("ai focus result target_url: %w", targetErr)
+	case strings.TrimSpace(resultContext.GetFocusMode()) == legionAICodeSecurityAuditResultMode && !isWorkspaceSentinel:
+		return jobExecutionRef{}, fmt.Errorf("ai code security audit target_url must use the workspace.invalid sentinel")
+	case strings.TrimSpace(resultContext.GetFocusMode()) != legionAICodeSecurityAuditResultMode && isWorkspaceSentinel:
+		return jobExecutionRef{}, fmt.Errorf("workspace.invalid sentinel is reserved for ai code security audit")
 	default:
 		return ref, nil
 	}
+}
+
+func (s *legionAIFocusResultSink) SubmitCodeFinding(
+	ctx context.Context,
+	finding aiFocusCodeFinding,
+) (aiFocusResultReceipt, error) {
+	finding.WorkspaceID = strings.TrimSpace(finding.WorkspaceID)
+	finding.LockedRevision = ""
+	finding.SourceSHA256 = ""
+	finding.File = strings.TrimSpace(finding.File)
+	finding.CWE = strings.ToUpper(strings.TrimSpace(finding.CWE))
+	finding.VulnerabilityType = strings.TrimSpace(finding.VulnerabilityType)
+	finding.Category = strings.TrimSpace(finding.Category)
+	finding.Module = strings.TrimSpace(finding.Module)
+	finding.Severity = strings.ToLower(strings.TrimSpace(finding.Severity))
+	finding.VerificationStatus = strings.ToLower(strings.TrimSpace(finding.VerificationStatus))
+	finding.Title = strings.TrimSpace(finding.Title)
+	finding.Evidence = strings.TrimSpace(finding.Evidence)
+	finding.Description = strings.TrimSpace(finding.Description)
+	finding.DataFlow = strings.TrimSpace(finding.DataFlow)
+	finding.ExploitScenario = strings.TrimSpace(finding.ExploitScenario)
+	finding.Recommendation = strings.TrimSpace(finding.Recommendation)
+	finding.DedupeKey = ""
+	cleanedFile, err := cleanLegionCodeRelativePath(finding.File, false)
+	if err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding file: %w", err)
+	}
+	finding.File = cleanedFile
+	switch {
+	case s.focusMode != legionAICodeSecurityAuditResultMode:
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding requires focus_mode=%s", legionAICodeSecurityAuditResultMode)
+	case finding.WorkspaceID == "":
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding workspace_id is required")
+	case finding.StartLine <= 0 || finding.EndLine < finding.StartLine:
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding line range is invalid")
+	case finding.StartColumn < 0 || finding.EndColumn < 0 || (finding.EndColumn > 0 && finding.StartColumn > finding.EndColumn):
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding column range is invalid")
+	case !legionCodeFindingCWEPattern.MatchString(finding.CWE):
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding cwe must use CWE-<number>")
+	case finding.VulnerabilityType == "" || finding.Category == "":
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding vulnerability_type and category are required")
+	case len(finding.VulnerabilityType) > 256 || len(finding.Category) > 128 || len(finding.Module) > 256:
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding classification fields are too long")
+	case !isLegionCodeFindingSeverity(finding.Severity):
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding severity %q is unsupported", finding.Severity)
+	case math.IsNaN(finding.Confidence) || math.IsInf(finding.Confidence, 0) || finding.Confidence <= 0 || finding.Confidence > 1:
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding confidence must be greater than 0 and at most 1")
+	case finding.VerificationStatus != "confirmed" && finding.VerificationStatus != "uncertain":
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding verification_status must be confirmed or uncertain")
+	case finding.Title == "":
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding title is required")
+	case len(finding.Title) > 512:
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding title exceeds 512 bytes")
+	case finding.Description == "" || finding.Evidence == "" || finding.DataFlow == "" || finding.ExploitScenario == "" || finding.Recommendation == "":
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding description, evidence, data_flow, exploit_scenario, and recommendation are required")
+	case len(finding.Description) > maxInlineFocusRiskFieldBytes ||
+		len(finding.Evidence) > maxInlineFocusRiskFieldBytes ||
+		len(finding.DataFlow) > maxInlineFocusRiskFieldBytes ||
+		len(finding.ExploitScenario) > maxInlineFocusRiskFieldBytes ||
+		len(finding.Recommendation) > maxInlineFocusRiskFieldBytes:
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding evidence fields exceed %d bytes", maxInlineFocusRiskFieldBytes)
+	}
+	lockedRevision, sourceSHA256, err := s.codeWorkspaceEvidence()
+	if err != nil {
+		return aiFocusResultReceipt{}, err
+	}
+	finding.LockedRevision = lockedRevision
+	finding.SourceSHA256 = sourceSHA256
+	finding.DedupeKey = legionCodeFindingDedupeKey(finding)
+	target, err := legionCodeFindingTarget(s.targetURL, finding.WorkspaceID, finding.File)
+	if err != nil {
+		return aiFocusResultReceipt{}, err
+	}
+	finding.Target = target
+	raw, err := json.Marshal(finding)
+	if err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("marshal ai code finding: %w", err)
+	}
+	eventID := focusRiskEventID(s.ref.JobID, finding.DedupeKey)
+	if err := s.publisher.PublishRiskWithEventID(
+		ctx,
+		s.ref,
+		eventID,
+		"ai_code_finding",
+		finding.Title,
+		target,
+		finding.Severity,
+		finding.DedupeKey,
+		raw,
+	); err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("publish ai code finding: %w", err)
+	}
+	s.recordRisk(eventID, target)
+	return aiFocusResultReceipt{ResultID: eventID, DedupeKey: finding.DedupeKey, BackendID: s.ref.JobID}, nil
+}
+
+func (s *legionAIFocusResultSink) bindCodeWorkspaceEvidence(lockedRevision string, sourceSHA256 string) error {
+	if s == nil {
+		return fmt.Errorf("ai code finding result sink is unavailable")
+	}
+	lockedRevision = strings.TrimSpace(lockedRevision)
+	sourceSHA256 = strings.ToLower(strings.TrimSpace(sourceSHA256))
+	if len(sourceSHA256) != sha256.Size*2 || !isLowerHex(sourceSHA256) {
+		return fmt.Errorf("ai code finding source_sha256 is invalid")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.codeWorkspaceSHA256 != "" &&
+		(s.codeWorkspaceLockedRev != lockedRevision || s.codeWorkspaceSHA256 != sourceSHA256) {
+		return fmt.Errorf("ai code finding source evidence is already bound")
+	}
+	s.codeWorkspaceLockedRev = lockedRevision
+	s.codeWorkspaceSHA256 = sourceSHA256
+	return nil
+}
+
+func (s *legionAIFocusResultSink) codeWorkspaceEvidence() (string, string, error) {
+	if s == nil {
+		return "", "", fmt.Errorf("ai code finding result sink is unavailable")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.codeWorkspaceSHA256 == "" {
+		return "", "", fmt.Errorf("ai code finding source evidence is not bound")
+	}
+	return s.codeWorkspaceLockedRev, s.codeWorkspaceSHA256, nil
+}
+
+func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
+	ctx context.Context,
+	report aiFocusCodeAuditReport,
+) (aiFocusResultReceipt, error) {
+	report.WorkspaceID = strings.TrimSpace(report.WorkspaceID)
+	report.Markdown = strings.TrimSpace(report.Markdown)
+	if s.focusMode != legionAICodeSecurityAuditResultMode {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report requires focus_mode=%s", legionAICodeSecurityAuditResultMode)
+	}
+	if report.WorkspaceID == "" || report.Markdown == "" {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report workspace_id and markdown are required")
+	}
+	if len(report.Markdown) > maxInlineCodeAuditReportBytes {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report markdown exceeds %d bytes", maxInlineCodeAuditReportBytes)
+	}
+	if len(report.StructuredSummary) == 0 || len(report.StructuredSummary) > maxInlineCodeAuditSummaryBytes {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report structured_summary must contain at most %d bytes", maxInlineCodeAuditSummaryBytes)
+	}
+	if !json.Valid(report.StructuredSummary) || string(report.StructuredSummary) == "null" {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report structured_summary must be valid JSON")
+	}
+	var structured map[string]any
+	if err := json.Unmarshal(report.StructuredSummary, &structured); err != nil || structured == nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report structured_summary must be a JSON object")
+	}
+	canonicalSummary, err := json.Marshal(structured)
+	if err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("canonicalize ai code audit report structured_summary: %w", err)
+	}
+	report.StructuredSummary = canonicalSummary
+	expectedTarget, err := legionCodeWorkspaceSentinel(report.WorkspaceID)
+	if err != nil {
+		return aiFocusResultReceipt{}, err
+	}
+	actualTarget, err := normalizeServerFocusURL(s.targetURL)
+	if err != nil || actualTarget.String() != expectedTarget {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report workspace_id does not match the authorized target")
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("marshal ai code audit report: %w", err)
+	}
+	eventID := codeAuditReportEventID(s.ref.JobID)
+	if err := s.publisher.PublishReportWithEventID(ctx, s.ref, eventID, "ai_code_audit_v1", raw); err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("publish ai code audit report: %w", err)
+	}
+	s.mu.Lock()
+	s.codeAuditReportPublished = true
+	s.mu.Unlock()
+	return aiFocusResultReceipt{ResultID: eventID, DedupeKey: "ai_code_audit_v1", BackendID: s.ref.JobID}, nil
 }
 
 func (s *legionAIFocusResultSink) SubmitRisk(
@@ -401,6 +673,14 @@ func (s *legionAIFocusResultSink) Succeed(
 	ctx context.Context,
 	resultJSON []byte,
 ) error {
+	if s.focusMode == legionAICodeSecurityAuditResultMode {
+		s.mu.Lock()
+		hasCodeAuditReport := s.codeAuditReportPublished
+		s.mu.Unlock()
+		if !hasCodeAuditReport {
+			return fmt.Errorf("ai code security audit cannot complete without ai_code_audit_v1 report")
+		}
+	}
 	result := make(map[string]any)
 	if len(resultJSON) > 0 {
 		var decoded map[string]any
@@ -546,6 +826,23 @@ func focusRiskDedupeKey(risk *schema.Risk, target string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func legionCodeFindingDedupeKey(finding aiFocusCodeFinding) string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{
+		"ai_code_finding.v1",
+		finding.File,
+		fmt.Sprintf("%d", finding.StartLine),
+		fmt.Sprintf("%d", finding.EndLine),
+		strings.ToUpper(strings.TrimSpace(finding.CWE)),
+		normalizeLegionCodeFindingIdentityText(finding.VulnerabilityType),
+		normalizeLegionCodeFindingIdentityText(finding.Category),
+	}, "\x00")))
+	return hex.EncodeToString(sum[:])
+}
+
+func normalizeLegionCodeFindingIdentityText(value string) string {
+	return strings.ToLower(strings.Join(strings.Fields(value), " "))
+}
+
 func focusAssetEventID(
 	jobID string,
 	assetKind string,
@@ -571,6 +868,49 @@ func focusRiskEventID(jobID string, dedupeKey string) string {
 func focusSummaryReportEventID(jobID string) string {
 	name := strings.Join([]string{strings.TrimSpace(jobID), "ai_focus_summary"}, "\x00")
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
+}
+
+func codeAuditReportEventID(jobID string) string {
+	name := strings.Join([]string{strings.TrimSpace(jobID), "ai_code_audit_v1"}, "\x00")
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
+}
+
+func isLegionCodeFindingSeverity(severity string) bool {
+	switch severity {
+	case "critical", "high", "medium", "low", "info":
+		return true
+	default:
+		return false
+	}
+}
+
+func legionCodeWorkspaceSentinel(workspaceID string) (string, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	if !legionCodeWorkspaceIDPattern.MatchString(workspaceID) {
+		return "", fmt.Errorf("source_workspace workspace_id is invalid")
+	}
+	return (&url.URL{Scheme: "https", Host: "workspace.invalid", Path: "/" + workspaceID + "/"}).String(), nil
+}
+
+func legionCodeFindingTarget(authorizedTarget, workspaceID, filename string) (string, error) {
+	expected, err := legionCodeWorkspaceSentinel(workspaceID)
+	if err != nil {
+		return "", err
+	}
+	authorized, err := normalizeServerFocusURL(authorizedTarget)
+	if err != nil {
+		return "", err
+	}
+	if authorized.String() != expected {
+		return "", fmt.Errorf("ai code finding workspace_id does not match the authorized target")
+	}
+	cleaned, err := cleanLegionCodeRelativePath(filename, false)
+	if err != nil {
+		return "", err
+	}
+	authorized.Path = strings.TrimSuffix(authorized.Path, "/") + "/" + cleaned
+	authorized.RawPath = ""
+	return authorized.String(), nil
 }
 
 func truncateFocusRiskField(value string) string {

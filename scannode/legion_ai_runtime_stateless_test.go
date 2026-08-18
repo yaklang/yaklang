@@ -85,8 +85,9 @@ type singleRunCompletion struct {
 }
 
 type recordingSingleRunEmitter struct {
-	done   chan singleRunCompletion
-	failed chan singleRunCompletion
+	done      chan singleRunCompletion
+	failed    chan singleRunCompletion
+	cancelled chan singleRunCompletion
 }
 
 type blockingTurnFailureEmitter struct {
@@ -161,6 +162,18 @@ func (e recordingSingleRunEmitter) FailTurn(turnID, code, message string, detail
 		turnID: turnID,
 		result: append([]byte(code+":"+message+":"), detail...),
 	}
+}
+func (e recordingSingleRunEmitter) FocusTurnCompleted(turnID string, result []byte) {
+	e.DoneTurn(turnID, result)
+}
+func (e recordingSingleRunEmitter) FocusTurnFailed(turnID, code, message string, detail []byte) {
+	e.FailTurn(turnID, code, message, detail)
+}
+func (e recordingSingleRunEmitter) FocusTurnCancelled(turnID, reason string) {
+	if e.cancelled == nil {
+		return
+	}
+	e.cancelled <- singleRunCompletion{turnID: turnID, result: []byte(reason)}
 }
 
 type fakeStatelessTurnEngine struct {
@@ -669,18 +682,18 @@ func TestStatelessDriverSendInputEmptyUserInputErrors(t *testing.T) {
 	}
 }
 
-func TestStatelessDriverRequiresPinnedFocusReleaseInContextPackage(t *testing.T) {
-	handle := &statelessAIEngineRuntimeHandle{pinnedFocusReleaseID: "http_fuzztest@1.0.0+abcdef123456"}
+func TestStatelessDriverRequiresAuthorizedFocusReleaseInTurnContext(t *testing.T) {
+	handle := &statelessAIEngineRuntimeHandle{authorizedFocusReleaseID: "http_fuzztest@1.0.0+abcdef123456"}
 	err := handle.SendInput(context.Background(), aiSessionInput{
 		ContextPackage: &aiv1.ContextPackage{UserInput: "run"},
 	})
-	if err == nil || !contains(err.Error(), "is missing from context package") {
+	if err == nil || !contains(err.Error(), "is missing from this Turn context") {
 		t.Fatalf("expected missing focus release error, got %v", err)
 	}
 }
 
-func TestStatelessDriverRejectsMismatchedPinnedFocusRelease(t *testing.T) {
-	handle := &statelessAIEngineRuntimeHandle{pinnedFocusReleaseID: "http_fuzztest@1.0.0+abcdef123456"}
+func TestStatelessDriverRejectsMismatchedAuthorizedFocusRelease(t *testing.T) {
+	handle := &statelessAIEngineRuntimeHandle{authorizedFocusReleaseID: "http_fuzztest@1.0.0+abcdef123456"}
 	err := handle.SendInput(context.Background(), aiSessionInput{
 		ContextPackage: &aiv1.ContextPackage{
 			UserInput: "run",
@@ -694,10 +707,10 @@ func TestStatelessDriverRejectsMismatchedPinnedFocusRelease(t *testing.T) {
 	}
 }
 
-func TestStatelessDriverAppliesPinnedFocusReleaseToEngineConstruction(t *testing.T) {
+func TestStatelessDriverAppliesTurnFocusReleaseToEngineConstruction(t *testing.T) {
 	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Pinned Runtime Focus"`)
 	handle := &statelessAIEngineRuntimeHandle{
-		pinnedFocusReleaseID: release.ReleaseId,
+		authorizedFocusReleaseID: release.ReleaseId,
 		newEngine: func(options ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
 			config := aiengine.NewAIEngineConfig(options...)
 			if config.Focus != release.RuntimeName {
@@ -1351,12 +1364,23 @@ func TestStatelessDriverStartsFreshEngineAfterTurnCompletes(t *testing.T) {
 	close(engines[1].release)
 }
 
-func TestStatelessDriverSingleRunCompletesAndRejectsSecondTurn(t *testing.T) {
+func TestStatelessDriverSingleFocusTurnCompletesWithoutClosingChatSession(t *testing.T) {
+	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Turn Focus"`)
 	emitter := recordingSingleRunEmitter{done: make(chan singleRunCompletion, 1)}
+	cleanupCalls := 0
+	focusRuntime := &legionServerFocusRuntime{
+		authorizedFocusReleaseID: release.ReleaseId,
+		workspace: &legionCodeWorkspaceRuntime{cleanup: func() error {
+			cleanupCalls++
+			return nil
+		}},
+	}
 	driver := newStatelessAIEngineRuntimeDriver()
 	handle, err := driver.Bind(context.Background(), aiSessionBinding{
-		Ref:           aiSessionCommandRef{SessionID: "s-stateless-single-run", OwnerUserID: "u1"},
-		ExecutionMode: "single_run",
+		Ref:                      aiSessionCommandRef{SessionID: "s-stateless-single-run", OwnerUserID: "u1"},
+		ExecutionMode:            "single_run",
+		AuthorizedFocusReleaseID: release.ReleaseId,
+		LegionResultRuntime:      focusRuntime,
 	}, emitter)
 	if err != nil {
 		t.Fatalf("bind: %v", err)
@@ -1368,9 +1392,11 @@ func TestStatelessDriverSingleRunCompletesAndRejectsSecondTurn(t *testing.T) {
 	}
 
 	if err := sh.SendInput(context.Background(), aiSessionInput{
-		Ref:         aiSessionCommandRef{CommandID: "turn-single-1"},
-		InputType:   "message",
-		PayloadJSON: []byte(`{"content":"start"}`),
+		Ref:       aiSessionCommandRef{CommandID: "turn-single-1"},
+		InputType: "message",
+		ContextPackage: &aiv1.ContextPackage{
+			UserInput: "start", FocusRelease: release,
+		},
 	}); err != nil {
 		t.Fatalf("start turn: %v", err)
 	}
@@ -1386,25 +1412,102 @@ func TestStatelessDriverSingleRunCompletesAndRejectsSecondTurn(t *testing.T) {
 		t.Fatal("single run did not complete automatically")
 	}
 
+	sh.mu.Lock()
+	closed := sh.closed
+	sh.mu.Unlock()
+	if closed {
+		t.Fatal("Focus Turn completion closed the reusable chat Session")
+	}
+	if cleanupCalls != 1 {
+		t.Fatalf("Focus Turn completion did not clean the source workspace exactly once: %d", cleanupCalls)
+	}
 	err = sh.SendInput(context.Background(), aiSessionInput{
 		Ref:         aiSessionCommandRef{CommandID: "turn-single-2"},
 		InputType:   "message",
 		PayloadJSON: []byte(`{"content":"again"}`),
 	})
-	if err == nil || !contains(err.Error(), "runtime is closed") {
-		t.Fatalf("expected closed runtime after single run, got %v", err)
+	if err == nil || !contains(err.Error(), "missing from this Turn context") {
+		t.Fatalf("expected the audit binding to require a fresh ordinary rebind, got %v", err)
 	}
 }
 
-func TestStatelessDriverSingleRunFailureTerminatesTheOwningTurn(t *testing.T) {
+func TestStatelessDriverDeactivatesFocusCapabilitiesWhenEngineCreationFails(t *testing.T) {
+	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Turn Focus Create Failure"`)
+	focusRuntime := &legionServerFocusRuntime{authorizedFocusReleaseID: release.ReleaseId}
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:                      aiSessionCommandRef{SessionID: "s-stateless-focus-create-fail", OwnerUserID: "u1"},
+		ExecutionMode:            "single_run",
+		AuthorizedFocusReleaseID: release.ReleaseId,
+		LegionResultRuntime:      focusRuntime,
+	}, noopEmitter{})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return nil, nil
+	}
+	err = sh.SendInput(context.Background(), aiSessionInput{
+		Ref: aiSessionCommandRef{CommandID: "turn-create-fail"}, InputType: "message",
+		ContextPackage: &aiv1.ContextPackage{UserInput: "start", FocusRelease: release},
+	})
+	if err == nil || !strings.Contains(err.Error(), "new engine returned nil") {
+		t.Fatalf("unexpected engine creation result: %v", err)
+	}
+	focusRuntime.mu.Lock()
+	active := focusRuntime.activeFocusReleaseID
+	focusRuntime.mu.Unlock()
+	if active != "" {
+		t.Fatalf("Focus capabilities remained active after engine creation failure: %q", active)
+	}
+}
+
+func TestStatelessDriverCloseDeactivatesActiveFocusCapabilities(t *testing.T) {
+	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Turn Focus Close Capability"`)
+	focusRuntime := &legionServerFocusRuntime{authorizedFocusReleaseID: release.ReleaseId}
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:                      aiSessionCommandRef{SessionID: "s-stateless-focus-close-capability", OwnerUserID: "u1"},
+		ExecutionMode:            "single_run",
+		AuthorizedFocusReleaseID: release.ReleaseId,
+		LegionResultRuntime:      focusRuntime,
+	}, noopEmitter{})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+		return engine, nil
+	}
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref: aiSessionCommandRef{CommandID: "turn-close-capability"}, InputType: "message",
+		ContextPackage: &aiv1.ContextPackage{UserInput: "start", FocusRelease: release},
+	}); err != nil {
+		t.Fatalf("start Focus Turn: %v", err)
+	}
+	<-engine.started
+	sh.Close("session closed")
+	focusRuntime.mu.Lock()
+	active := focusRuntime.activeFocusReleaseID
+	focusRuntime.mu.Unlock()
+	if active != "" {
+		t.Fatalf("Focus capabilities remained active after runtime close: %q", active)
+	}
+}
+
+func TestStatelessDriverSingleFocusTurnFailureDoesNotTerminateChatSession(t *testing.T) {
+	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Turn Focus Failure"`)
 	emitter := recordingSingleRunEmitter{
 		done:   make(chan singleRunCompletion, 1),
 		failed: make(chan singleRunCompletion, 1),
 	}
 	driver := newStatelessAIEngineRuntimeDriver()
 	handle, err := driver.Bind(context.Background(), aiSessionBinding{
-		Ref:           aiSessionCommandRef{SessionID: "s-stateless-single-fail", OwnerUserID: "u1"},
-		ExecutionMode: "single_run",
+		Ref:                      aiSessionCommandRef{SessionID: "s-stateless-single-fail", OwnerUserID: "u1"},
+		ExecutionMode:            "single_run",
+		AuthorizedFocusReleaseID: release.ReleaseId,
 	}, emitter)
 	if err != nil {
 		t.Fatalf("bind: %v", err)
@@ -1417,9 +1520,11 @@ func TestStatelessDriverSingleRunFailureTerminatesTheOwningTurn(t *testing.T) {
 	}
 
 	if err := sh.SendInput(context.Background(), aiSessionInput{
-		Ref:         aiSessionCommandRef{CommandID: "turn-fail-1"},
-		InputType:   "message",
-		PayloadJSON: []byte(`{"content":"start"}`),
+		Ref:       aiSessionCommandRef{CommandID: "turn-fail-1"},
+		InputType: "message",
+		ContextPackage: &aiv1.ContextPackage{
+			UserInput: "start", FocusRelease: release,
+		},
 	}); err != nil {
 		t.Fatalf("start turn: %v", err)
 	}
@@ -1435,22 +1540,67 @@ func TestStatelessDriverSingleRunFailureTerminatesTheOwningTurn(t *testing.T) {
 		t.Fatal("single-run failure did not terminate automatically")
 	}
 
-	err = sh.SendInput(context.Background(), aiSessionInput{
-		Ref:         aiSessionCommandRef{CommandID: "turn-fail-2"},
-		InputType:   "message",
-		PayloadJSON: []byte(`{"content":"again"}`),
-	})
-	if err == nil || !contains(err.Error(), "runtime is closed") {
-		t.Fatalf("expected closed runtime after single-run failure, got %v", err)
+	sh.mu.Lock()
+	closed := sh.closed
+	sh.mu.Unlock()
+	if closed {
+		t.Fatal("failed Focus Turn closed the reusable chat Session")
+	}
+}
+
+func TestStatelessDriverCancelsOnlyTheActiveFocusTurn(t *testing.T) {
+	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Turn Focus Cancel"`)
+	emitter := recordingSingleRunEmitter{cancelled: make(chan singleRunCompletion, 1)}
+	driver := newStatelessAIEngineRuntimeDriver()
+	handle, err := driver.Bind(context.Background(), aiSessionBinding{
+		Ref:                      aiSessionCommandRef{SessionID: "s-stateless-focus-cancel", OwnerUserID: "u1"},
+		ExecutionMode:            "single_run",
+		AuthorizedFocusReleaseID: release.ReleaseId,
+	}, emitter)
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	sh := handle.(*statelessAIEngineRuntimeHandle)
+	engine := newFakeStatelessTurnEngine()
+	sh.newEngine = func(...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) { return engine, nil }
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		Ref: aiSessionCommandRef{CommandID: "turn-cancel-1"}, InputType: "message",
+		ContextPackage: &aiv1.ContextPackage{UserInput: "start", FocusRelease: release},
+	}); err != nil {
+		t.Fatalf("start turn: %v", err)
+	}
+	<-engine.started
+	if err := sh.SendInput(context.Background(), aiSessionInput{
+		InputType:   "sync_event",
+		PayloadJSON: []byte(`{"sync_type":"react_cancel_current_task","sync_json_input":{"reason":"operator stopped audit"}}`),
+	}); err != nil {
+		t.Fatalf("cancel Focus Turn: %v", err)
+	}
+	close(engine.release)
+	select {
+	case cancelled := <-emitter.cancelled:
+		if cancelled.turnID != "turn-cancel-1" || string(cancelled.result) != "operator stopped audit" {
+			t.Fatalf("unexpected Focus Turn cancellation: %#v", cancelled)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Focus Turn cancellation was not reported")
+	}
+	sh.mu.Lock()
+	closed := sh.closed
+	sh.mu.Unlock()
+	if closed {
+		t.Fatal("cancelling the Focus Turn closed the chat Session")
 	}
 }
 
 func TestStatelessDriverCloseWinsAgainstSingleRunCompletion(t *testing.T) {
+	release := testContextFocusRelease(`__VERBOSE_NAME__ = "Turn Focus Close"`)
 	emitter := recordingSingleRunEmitter{done: make(chan singleRunCompletion, 1)}
 	driver := newStatelessAIEngineRuntimeDriver()
 	handle, err := driver.Bind(context.Background(), aiSessionBinding{
-		Ref:           aiSessionCommandRef{SessionID: "s-stateless-single-close", OwnerUserID: "u1"},
-		ExecutionMode: "single_run",
+		Ref:                      aiSessionCommandRef{SessionID: "s-stateless-single-close", OwnerUserID: "u1"},
+		ExecutionMode:            "single_run",
+		AuthorizedFocusReleaseID: release.ReleaseId,
 	}, emitter)
 	if err != nil {
 		t.Fatalf("bind: %v", err)
@@ -1461,9 +1611,11 @@ func TestStatelessDriverCloseWinsAgainstSingleRunCompletion(t *testing.T) {
 		return engine, nil
 	}
 	if err := sh.SendInput(context.Background(), aiSessionInput{
-		Ref:         aiSessionCommandRef{CommandID: "turn-close-1"},
-		InputType:   "message",
-		PayloadJSON: []byte(`{"content":"start"}`),
+		Ref:       aiSessionCommandRef{CommandID: "turn-close-1"},
+		InputType: "message",
+		ContextPackage: &aiv1.ContextPackage{
+			UserInput: "start", FocusRelease: release,
+		},
 	}); err != nil {
 		t.Fatalf("start turn: %v", err)
 	}

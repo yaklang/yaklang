@@ -1414,6 +1414,71 @@ func TestRuntimeEmitterSingleRunCompletesWithTurnCausationAndRemovesRuntime(t *t
 	}
 }
 
+func TestRuntimeEmitterFocusTurnCompletesRunWithoutClosingChatSession(t *testing.T) {
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, validAISessionInputCommand())); err != nil {
+		t.Fatalf("handle ai input: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+
+	driver.mu.Lock()
+	emitter := driver.emitters[0]
+	driver.mu.Unlock()
+	reporter, ok := emitter.(aiSessionRuntimeFocusTurnReporter)
+	if !ok {
+		t.Fatal("managed runtime emitter does not support Focus Turn completion")
+	}
+	reporter.FocusTurnCompleted("cmd-input-1", []byte(`{"status":"done"}`))
+
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.report", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.succeeded", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.event", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.done", 0)
+	if !hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("Focus Turn completion removed the reusable chat runtime")
+	}
+}
+
+func TestRuntimeEmitterFocusTurnCancellationCancelsRunWithoutClosingChatSession(t *testing.T) {
+	bridge, fakeJS, driver := newTestAISessionBridge(t)
+	command := validAISessionBindCommand()
+	command.ResultContext = validAIFocusResultContext()
+	command.Session.RunId = command.ResultContext.FocusRunId
+	bridge.publisher.js = fakeJS
+	bridge.publisher.natsURL = "nats://node-ai.test"
+	if err := bridge.handleAISessionBind(context.Background(), mustMarshalProto(t, command)); err != nil {
+		t.Fatalf("handle ai bind: %v", err)
+	}
+	if err := bridge.handleAISessionInput(context.Background(), mustMarshalProto(t, validAISessionInputCommand())); err != nil {
+		t.Fatalf("handle ai input: %v", err)
+	}
+	resetPublishedMessages(fakeJS)
+
+	driver.mu.Lock()
+	emitter := driver.emitters[0]
+	driver.mu.Unlock()
+	reporter, ok := emitter.(aiSessionRuntimeFocusTurnReporter)
+	if !ok {
+		t.Fatal("managed runtime emitter does not support Focus Turn cancellation")
+	}
+	reporter.FocusTurnCancelled("cmd-input-1", "operator stopped audit")
+
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.job.cancelled", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.event", 1)
+	assertPublishedSubjectCount(t, fakeJS, "legion.event.ai.session.cancelled", 0)
+	if !hasAISessionRuntime(bridge.aiRuntime, "ai-session-1") {
+		t.Fatal("Focus Turn cancellation removed the reusable chat runtime")
+	}
+}
+
 func TestRuntimeEmitterConversationResultKeepsRuntimeAfterTurn(t *testing.T) {
 	bridge, fakeJS, driver := newTestAISessionBridge(t)
 	command := validAISessionBindCommand()

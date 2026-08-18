@@ -78,7 +78,7 @@ message ContextPackage {
   string user_input = 6;                      // this turn's user input text
   bytes provider_policy_snapshot_json = 7;    // model provider config (API key, base URL, headers)
   bytes runtime_option_snapshot_json = 8;     // temperature, max_tokens, etc.
-  ContextFocusRelease focus_release = 9;      // immutable server-published Yak Focus release pinned to the session
+  ContextFocusRelease focus_release = 9;      // immutable server-published Yak Focus release selected for this Turn
 }
 
 // ContextMessage is one replayed conversation turn. Only user inputs and
