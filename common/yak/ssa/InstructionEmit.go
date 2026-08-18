@@ -528,6 +528,9 @@ func (f *FunctionBuilder) EmitNextOnly(iter Value, isIn bool) *Next {
 		return nil
 	}
 	n := NewNext(iter, isIn)
+	if n == nil {
+		return nil
+	}
 	f.emit(n)
 	return n
 }
@@ -537,6 +540,9 @@ func (f *FunctionBuilder) EmitNext(iter Value, isIn bool) (key, field, ok Value)
 		return nil, nil, nil
 	}
 	n := f.EmitNextOnly(iter, isIn)
+	if n == nil {
+		return nil, nil, nil
+	}
 	// n iter-type: map[T]U   n-type {key: T, field: U, ok: bool}
 	key = f.ReadMemberCallValue(n, f.EmitConstInstPlaceholder(NextKey.String()))
 	field = f.ReadMemberCallValue(n, f.EmitConstInstPlaceholder(NextField.String()))
