@@ -387,6 +387,7 @@ func (h *statelessAIEngineRuntimeHandle) sendSyncInput(input aiSessionInput) err
 		IsSyncMessage: true,
 		SyncType:      syncEvent.SyncType,
 		SyncJsonInput: syncEvent.SyncJSONInput,
+		SyncID:        syncEvent.SyncID,
 	}); err != nil {
 		return fmt.Errorf("stateless sendinput: send sync event: %w", err)
 	}
