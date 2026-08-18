@@ -142,6 +142,9 @@ func NewAssert(cond, msgValue Value, msg string) *Assert {
 }
 
 func NewNext(iter Value, isIn bool) *Next {
+	if utils.IsNil(iter) {
+		return nil
+	}
 	n := &Next{
 		anValue: NewValue(),
 		Iter:    iter.GetId(),
