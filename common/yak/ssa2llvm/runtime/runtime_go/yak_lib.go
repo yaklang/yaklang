@@ -43,6 +43,11 @@ func tryResolveShadowString(ptr unsafe.Pointer) (string, bool) {
 	defer func() {
 		_ = recover()
 	}()
+	// The compiler tags pointer values before passing them as call args; clear
+	// the tag so the shadow handle lookup sees the real address.
+	raw := uint64(uintptr(ptr))
+	raw &^= yakTaggedPointerMask
+	ptr = unsafe.Pointer(uintptr(raw))
 	h, ok := handleFromShadow(ptr)
 	if !ok {
 		return "", false
