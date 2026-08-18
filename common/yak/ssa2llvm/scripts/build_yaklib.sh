@@ -35,7 +35,7 @@ EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 # libyak.a stays complete (all modules below); per-script pruning happens at
 # link time via --gc-sections, so a plain print script drops the poc/cli/http
 # code and their dependency closures while a poc script keeps them.
-DEFAULT_MODULES="os,poc,cli,http,codec,yakit,ssa,json,sync,file,str"
+DEFAULT_MODULES="os,poc,cli,http,codec,yakit,ssa,json,sync,file,str,filesys"
 # SSA2LLVM_TIER names a rung of the pre-built ladder (runtime/tiers); its module
 # set comes from the same Go definition the compiler selects with, so the two
 # cannot drift. SSA2LLVM_EMBED_MODULES still takes an arbitrary list.
