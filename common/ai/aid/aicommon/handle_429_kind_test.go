@@ -48,7 +48,7 @@ func TestHandle429_WithRetryAfter_RateLimitNotify(t *testing.T) {
 	assert.True(t, shouldRetry, "rate-limit 429 should be retryable")
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "rate-limit", payload["type"])
+	require.Equal(t, "限流", payload["type"])
 	// Retry-After=10 + jitter(0-3) => 10-13s
 	dur := payload["duration"].(float64)
 	require.GreaterOrEqual(t, dur, float64(10))
@@ -69,7 +69,7 @@ func TestHandle429_NoRetryAfter_QuotaExceededNotify(t *testing.T) {
 	assert.False(t, shouldRetry, "quota-exceeded 429 should not be retryable")
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "quota-exceeded", payload["type"])
+	require.Equal(t, "额度耗尽", payload["type"])
 	dur := payload["duration"].(float64)
 	require.GreaterOrEqual(t, dur, float64(5))
 	require.LessOrEqual(t, dur, float64(15))
@@ -94,7 +94,7 @@ func TestHandle429_LargeRetryAfter_3600_CappedTo30s(t *testing.T) {
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
 	// 大额 Retry-After → quota-exceeded 通知
-	require.Equal(t, "quota-exceeded", payload["type"])
+	require.Equal(t, "额度耗尽", payload["type"])
 	dur := payload["duration"].(float64)
 	require.GreaterOrEqual(t, dur, float64(5))
 	require.LessOrEqual(t, dur, float64(30))
@@ -247,7 +247,7 @@ func TestHandle429_UnknownLimitKind_StillHandledByRetryAfter(t *testing.T) {
 	assert.True(t, is429)
 	assert.True(t, ctxDone)
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "rate-limit", payload["type"])
+	require.Equal(t, "限流", payload["type"])
 	require.Contains(t, payload["content"], "rate limited")
 }
 
