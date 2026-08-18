@@ -789,10 +789,14 @@ func (c *Compiler) emitAssignedMemberVariableSets(contextInst ssa.Instruction, v
 			continue
 		}
 		keyStr := c.resolveMemberKeyString(key)
-		if keyStr == "" || c.sameMemberTarget(val, obj, keyStr) {
+		if keyStr == "" {
 			continue
 		}
-		if c.memberHasOwnerPair(val, obj, keyStr) {
+		// An Undefined value with member-call variables is a write placeholder
+		// (e.g. a computed value assigned to captured members): its variables
+		// are the writes, and the direct maybeEmitMemberSet path skips Undefined,
+		// so sameMemberTarget must not suppress them.
+		if _, isUndef := val.(*ssa.Undefined); !isUndef && c.sameMemberTarget(val, obj, keyStr) {
 			continue
 		}
 		if !c.memberAssignmentObjectAvailable(contextInst, obj) {
