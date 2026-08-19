@@ -84,6 +84,41 @@ func (p *jobEventPublisher) PublishProgress(
 	})
 }
 
+func (p *jobEventPublisher) PublishRuleSnapshotPrepared(
+	ctx context.Context,
+	ref jobExecutionRef,
+	receipt RuleSnapshotPreparationReceipt,
+) error {
+	preparedAt := receipt.PreparedAt
+	if preparedAt.IsZero() {
+		preparedAt = time.Now().UTC()
+	}
+	receipt.PreparedAt = preparedAt
+	return p.publish(
+		ctx,
+		legionEventRuleSnapshotPrepared,
+		ref,
+		ref.AttemptID+":rule-snapshot-prepared:"+receipt.ContentSHA256,
+		buildRuleSnapshotPreparedEvent(p.jobRef(ref), receipt),
+	)
+}
+
+func buildRuleSnapshotPreparedEvent(
+	job *jobv1.JobRef,
+	receipt RuleSnapshotPreparationReceipt,
+) *jobv1.JobRuleSnapshotPrepared {
+	return &jobv1.JobRuleSnapshotPrepared{
+		Job:           job,
+		SnapshotId:    receipt.SnapshotID,
+		ContentSha256: receipt.ContentSHA256,
+		SchemaVersion: receipt.SchemaVersion,
+		BundleFormat:  receipt.BundleFormat,
+		RuleCount:     uint32(receipt.AssetCount),
+		CacheHit:      receipt.CacheHit,
+		PreparedAt:    timestamppb.New(receipt.PreparedAt),
+	}
+}
+
 func (p *jobEventPublisher) PublishAsset(
 	ctx context.Context,
 	ref jobExecutionRef,
@@ -399,6 +434,8 @@ func attachEventMetadata(message proto.Message, metadata *nodev1.EventMetadata) 
 	case *jobv1.JobStarted:
 		value.Metadata = metadata
 	case *jobv1.JobProgressed:
+		value.Metadata = metadata
+	case *jobv1.JobRuleSnapshotPrepared:
 		value.Metadata = metadata
 	case *jobv1.JobAsset:
 		value.Metadata = metadata

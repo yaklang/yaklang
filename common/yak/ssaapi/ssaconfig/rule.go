@@ -1,6 +1,8 @@
 package ssaconfig
 
 import (
+	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -8,6 +10,50 @@ type SyntaxFlowRuleConfig struct {
 	RuleNames  []string                   `json:"rule_names"`
 	RuleInput  []*ypb.SyntaxFlowRuleInput `json:"rule_input"`
 	RuleFilter *ypb.SyntaxFlowRuleFilter  `json:"rule_filter"`
+	// TaskLocal marks an immutable, dispatch-scoped rule input. It is consumed
+	// only by syntaxflow_scan and keeps ordinary inline/debug rule behavior
+	// backward compatible.
+	TaskLocal            bool   `json:"task_local,omitempty"`
+	TaskLocalInputFile   string `json:"task_local_input_file,omitempty"`
+	TaskLocalInputSHA256 string `json:"task_local_input_sha256,omitempty"`
+	TaskLocalInputCount  int    `json:"task_local_input_count,omitempty"`
+}
+
+const TaskLocalRuleInputFileVersionV1 = "syntaxflow_rule_input.v1"
+
+type TaskLocalRuleInputFile struct {
+	Version  string                           `json:"version"`
+	Rules    []*ypb.SyntaxFlowRuleInput       `json:"rules"`
+	Metadata map[string]TaskLocalRuleMetadata `json:"metadata"`
+}
+
+type TaskLocalRuleMetadata struct {
+	AssetID       string          `json:"asset_id"`
+	SourceRuleID  string          `json:"source_rule_id,omitempty"`
+	Title         string          `json:"title,omitempty"`
+	TitleZh       string          `json:"title_zh,omitempty"`
+	Language      string          `json:"language,omitempty"`
+	Purpose       string          `json:"purpose,omitempty"`
+	Tag           string          `json:"tag,omitempty"`
+	CWE           []string        `json:"cwe,omitempty"`
+	CVE           string          `json:"cve,omitempty"`
+	RiskType      string          `json:"risk_type,omitempty"`
+	Type          string          `json:"type,omitempty"`
+	Severity      string          `json:"severity,omitempty"`
+	Description   string          `json:"description,omitempty"`
+	Solution      string          `json:"solution,omitempty"`
+	Version       string          `json:"version,omitempty"`
+	ContentHash   string          `json:"content_hash,omitempty"`
+	IsBuiltin     bool            `json:"is_builtin"`
+	Verified      bool            `json:"verified"`
+	AllowIncluded bool            `json:"allow_included"`
+	IncludedName  string          `json:"included_name,omitempty"`
+	Groups        []string        `json:"groups,omitempty"`
+	AlertDesc     json.RawMessage `json:"alert_desc,omitempty"`
+}
+
+func (c *Config) IsTaskLocalRuleInput() bool {
+	return c != nil && c.Mode&ModeSyntaxFlowRule != 0 && c.SyntaxFlowRule != nil && c.SyntaxFlowRule.TaskLocal
 }
 
 // --- 规则配置 Get 方法 ---
