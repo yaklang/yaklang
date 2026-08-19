@@ -75,3 +75,27 @@ func TestFunctionTypeString_CachesRawStringResult(t *testing.T) {
 	raw := ft.RawString()
 	require.NotEmpty(t, raw)
 }
+
+// Test_FunctionType_StringCacheInvalidatedByMutation verifies String() output
+// changes when the string-affecting fields mutate through the setters, and
+// that self-referential types still terminate (review A5).
+func Test_FunctionType_StringCacheInvalidatedByMutation(t *testing.T) {
+	ft := ssa.NewFunctionType("", []ssa.Type{ssa.CreateStringType()}, ssa.CreateNumberType(), false)
+	first := ft.String()
+	require.Contains(t, first, "string")
+	require.Contains(t, first, "-> number")
+
+	// Same object mutates: cached String() must not stay stale.
+	ft.SetReturnType(ssa.CreateBooleanType())
+	second := ft.String()
+	require.Contains(t, second, "-> boolean", "return type mutation must invalidate stringCache")
+
+	ft.SetParameter([]ssa.Type{ssa.CreateNumberType()})
+	third := ft.String()
+	require.Contains(t, third, "(number)")
+	require.NotEqual(t, second, third, "parameter mutation must invalidate stringCache")
+
+	// Self-referential type must not recurse forever.
+	ft.SetParameter([]ssa.Type{ft})
+	require.NotPanics(t, func() { _ = ft.String() })
+}

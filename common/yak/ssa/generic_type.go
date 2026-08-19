@@ -121,7 +121,8 @@ func ApplyGenericType(raw Type, symbolsTypeMap map[string]Type) Type {
 		for i, typ := range t.Parameter {
 			t.Parameter[i] = ApplyGenericType(typ, symbolsTypeMap)
 		}
-		t.ReturnType = ApplyGenericType(t.ReturnType, symbolsTypeMap)
+		t.SetParameter(t.Parameter)
+		t.SetReturnType(ApplyGenericType(t.ReturnType, symbolsTypeMap))
 	case OrTypeKind:
 		t := cloned.(*OrType)
 		for i, typ := range t.types {

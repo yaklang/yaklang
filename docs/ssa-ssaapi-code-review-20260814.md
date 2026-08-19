@@ -352,3 +352,12 @@
 
 ### 验证（第五轮）
 - 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
+
+
+## 更新记录（2026-08-19 第六轮，@ cfdc87702）
+
+- **A5（部分，缓存失效修复）**：新增 `FunctionType.SetParameter/SetReturnType/SetParameterLen/SetIsVariadic`，把 `return.go`（Finish 推导参数/返回类型）、`extern_instance.go`（InsertSliceItem 前插参数）、`generic_type.go`（ApplyGenericType 改写）等 string-affecting 变更统一走 setter，`stringCache` 不再过期返回旧签名；新增 `Test_FunctionType_StringCacheInvalidatedByMutation`（含自引用终止）。
+- **A5 剩余**：`String()` 的 `Name`/`stringCache` 并发写与重入保护仍需锁或原子指针，留作下一项（涉及并发语义与重入，单独做）。
+
+### 验证（第六轮）
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。

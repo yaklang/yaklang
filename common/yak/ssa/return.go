@@ -249,30 +249,30 @@ func (f *Function) Finish() {
 	}
 	funType := f.Type
 
-	funType.Parameter = lo.Map(f.Params, func(id int64, _ int) Type {
+	funType.SetParameter(lo.Map(f.Params, func(id int64, _ int) Type {
 		p, ok := f.GetValueById(id)
 		if !ok {
 			return CreateAnyType()
 		}
 		t := p.GetType()
 		return t
-	})
+	}))
 	// 优先使用显式设置的返回类型（如 TypeScript 的类型注解）
 	// 否则从 return 语句中推导
 	if f.currentReturnType != nil {
-		funType.ReturnType = f.currentReturnType
+		funType.SetReturnType(f.currentReturnType)
 	} else {
-		funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
+		funType.SetReturnType(handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
 			inst, ok := f.GetValueById(i)
 			if !ok {
 				return nil, false
 			}
 			return ToReturn(inst)
-		}), funType)
+		}), funType))
 	}
-	funType.IsVariadic = f.hasEllipsis
+	funType.SetIsVariadic(f.hasEllipsis)
 	funType.This = f
-	funType.ParameterLen = f.ParamLength
+	funType.SetParameterLen(f.ParamLength)
 	funType.ParameterValue = lo.FilterMap(f.Params, func(i int64, _ int) (*Parameter, bool) {
 		inst, ok := f.GetValueById(i)
 		if !ok {

@@ -1293,6 +1293,41 @@ func (s *FunctionType) SetName(name string) {
 	s.resetStringCache()
 }
 
+// Setters for the fields that affect String() output. Direct field writes are
+// the root cause of stale stringCache after the type mutates (review A5), so
+// production mutation sites must go through these and reset the cache.
+func (s *FunctionType) SetParameter(parameter Types) {
+	if s == nil {
+		return
+	}
+	s.Parameter = parameter
+	s.resetStringCache()
+}
+
+func (s *FunctionType) SetReturnType(returnType Type) {
+	if s == nil {
+		return
+	}
+	s.ReturnType = returnType
+	s.resetStringCache()
+}
+
+func (s *FunctionType) SetParameterLen(parameterLen int) {
+	if s == nil {
+		return
+	}
+	s.ParameterLen = parameterLen
+	s.resetStringCache()
+}
+
+func (s *FunctionType) SetIsVariadic(isVariadic bool) {
+	if s == nil {
+		return
+	}
+	s.IsVariadic = isVariadic
+	s.resetStringCache()
+}
+
 func (s *FunctionType) PkgPathString() string {
 	result := s.pkgPath
 	if result == "" {

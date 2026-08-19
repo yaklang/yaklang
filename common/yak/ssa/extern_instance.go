@@ -409,7 +409,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 				method := typ.Method(i)
 				funTyp := prog.CoverReflectFunctionType(method.Type, level)
 				if isInterface {
-					funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
+					funTyp.SetParameter(utils.InsertSliceItem(funTyp.Parameter, ret, 0))
 				}
 				funTyp.SetName(fmt.Sprintf("%s.%s", pkgPathName, method.Name))
 				methods[method.Name] = NewFunctionWithType(method.Name, funTyp)
