@@ -45,8 +45,9 @@ func (prog *Program) CurrentCompileUnit() string {
 
 // ReleaseCompletedUnitMemory releases the completed compile units' function
 // bodies and clears program-level caches that the per-unit flush path no
-// longer needs. Called once per unit at the end of FlushCompileUnit; the GC
-// itself runs once in FlushCompileUnit after this returns.
+// longer needs. Called once per unit at the end of FlushCompileUnit; GC is
+// not forced here — the caller (final save / CleanBaseline) decides when to
+// reclaim memory.
 func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 	if prog == nil || len(unitKeys) == 0 {
 		return 0

@@ -483,10 +483,9 @@ func (c *Config) parseProjectWithFSUnits(
 		// resident for cross-unit resolution, while the completion callback logs
 		// the real post-eviction state. Incremental compile still skips both
 		// paths to preserve its overlay semantics.
-		// Skip both for incremental compile to preserve overlay.
 		flushThreshold := flushCompileUnitThreshold()
 		isIncremental := c.GetEnableIncrementalCompile() || c.GetBaseProgramName() != ""
-		flushedUnits := make(map[string]bool)
+		flushedUnits := make(map[string]struct{})
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
 				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.
@@ -496,10 +495,10 @@ func (c *Config) parseProjectWithFSUnits(
 				return !c.isStop()
 			},
 			func(unitKey string) bool {
-				if !isIncremental && prog.Cache != nil && !flushedUnits[unitKey] {
-					if prog.Cache.CountInstruction() > flushThreshold {
+				if !isIncremental && prog.Cache != nil {
+					if _, flushed := flushedUnits[unitKey]; !flushed && prog.Cache.CountInstruction() > flushThreshold {
 						prog.Cache.FlushCompileUnit(unitKey)
-						flushedUnits[unitKey] = true
+						flushedUnits[unitKey] = struct{}{}
 					}
 				}
 				return !c.isStop()
@@ -526,8 +525,9 @@ func (c *Config) parseProjectWithFSUnits(
 		// The threshold avoids flushing on small projects where it provides no
 		// memory benefit and only adds DB write overhead.
 		if prog.Cache != nil {
-			// Batch boundary: flush instructions + aux savers.
-			if !isIncremental {
+			// Batch boundary: flush instructions + aux savers when the resident
+			// count exceeds the threshold.
+			if !isIncremental && prog.Cache.CountInstruction() > flushThreshold {
 				prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
 			}
 			prog.Cache.FlushAuxSavers()

@@ -390,38 +390,18 @@ func (s *instructionStore) flushCompileUnitWriter(onComplete func()) {
 		ids = append(ids, id)
 		return true
 	})
-	// Mark dirty for async persistence with persistedIDs guard.
-	// MarkDirty enqueues dirty keys (non-blocking, with dedup), Barrier
-	// waits for writer completion. The persistedIDs guard prevents
-	// duplicate INSERTs when Close() encounters items that were already
-	// persisted by a previous MarkDirty+Barrier (e.g. re-added during
-	// cross-unit resolution).
-	// Use FlushKeys (synchronous, no persistLimit backpressure) instead of
-	// MarkDirty+Barrier. MarkDirty's persistLimit backpressure (32768 for
-	// large projects) causes PersistRejected for items above the limit —
-	// those items stay in cache with pending=false, unsaved to DB. When
-	// later compile units access them, resolveLinkedValue falls through to
-	// lazy creation, which under pair-first member relations triggers O(N)
-	// GetMembersByKeyString traversal. This was the root cause of chat.go
-	// taking 26 minutes to compile (vs 38ms on main).
-	//
-	// FlushKeys calls QueueKeys (no persistLimit) + Wait (synchronous).
-	// This matches main's behavior exactly. persistedIDs guard in
-	// saveInstructionPersistRecords prevents duplicate INSERTs.
+	// Mark dirty for async persistence. The persistedIDs guard prevents
+	// duplicate INSERTs when the async pipeline or a later unit revisit
+	// re-encounters an already-persisted instruction.
 	for _, id := range ids {
 		s.reserveID(id)
 	}
-	// Use MarkDirtyAsync (async, no backpressure) instead of FlushKeys (sync).
-	// MarkDirtyAsync enqueues keys for background persistence and returns
-	// immediately — the compile thread is never blocked by serialization or
-	// DB writes. The saver goroutine drains the pipeline and evicts each
-	// saved entry via FinishPersist -> delete(c.data, key), so memory is
-	// released asynchronously while compilation continues.
-	//
-	// FlushKeys was synchronous (Wait for all saves to complete), blocking
-	// compilation during DB writes. MarkDirty (with backpressure) also
-	// blocked when PendingCount exceeded persistLimit. MarkDirtyAsync has
-	// no such blocking — SaveToDatabase's Barrier drains the pipeline.
+	// MarkDirtyAsync enqueues keys without persistLimit backpressure and
+	// returns immediately — the compile thread is never blocked by
+	// serialization or DB writes. The saver goroutine drains the pipeline and
+	// evicts each saved entry via FinishPersist, so memory is released
+	// asynchronously while compilation continues; SaveToDatabase's Barrier
+	// drains the pipeline before the final save.
 	s.writer.MarkDirtyAsync(ids, utils.EvictionReasonCapacityReached)
 	// Asynchronously drain the persist pipeline (wait for saves to finish,
 	// evict saved entries via FinishPersist -> delete) and shrink the map.

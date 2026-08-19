@@ -121,9 +121,9 @@ func (c *ProgramCache) CloseWithoutSave() {
 	if c.instructions != nil {
 		c.instructions.CloseWithoutSave()
 	}
-	// Type/index/source stores don't have CloseWithoutSave, but nil-ing
-	// the references allows GC to reclaim the resident maps. This is safe
-	// because SaveToDatabase already persisted all data to the DB.
+	// Type/index/source stores have their own Close paths, but all data was
+	// already persisted by SaveToDatabase, so nil-ing the references lets GC
+	// reclaim the resident maps without an extra close cycle.
 	c.types = nil
 	c.indexes = nil
 	c.sources = nil
@@ -642,12 +642,13 @@ func (c *ProgramCache) GetFlushAccounting() *FlushAccounting {
 // This is the v3 step E "clean baseline" — no compilation state retained.
 //
 // After CleanBaseline:
-// - All writers/pending channels are closed
-// - AST/token/parser, Function/BasicBlock/Value/Instruction graphs are nil'd
-// - Variable/Scope/VersionedTable, types/index/source resident maps are nil'd
-// - Diagnostics, recorder, callbacks, builders are nil'd
-// - The Program is removed from ssaapi.ProgramCache
-// - runtime.GC() is called to reclaim released memory
+//   - All writers/pending channels are closed
+//   - AST/token/parser, Function/BasicBlock/Value/Instruction graphs are nil'd
+//   - Variable/Scope/VersionedTable, types/index/source resident maps are nil'd
+//   - Diagnostics, recorder, callbacks, builders are nil'd
+//   - The ssaapi caller (ReloadProgramFromDatabase) removes the Program from
+//     ProgramCache after CleanBaseline returns
+//   - runtime.GC() is called to reclaim released memory
 //
 // The caller must call this only after SaveToDatabase has succeeded.
 // After CleanBaseline, the cache cannot be used for further writes.

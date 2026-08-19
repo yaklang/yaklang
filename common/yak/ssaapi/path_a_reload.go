@@ -5,8 +5,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-
-	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 // pathAEnabled returns true when YAK_SSA_PATH_A_RELOAD is set to a
@@ -97,6 +95,3 @@ func ReloadProgramFromDatabase(prog *Program) *Program {
 
 	return newProg
 }
-
-// ensure PathA reload is only called when SaveToDatabase succeeded.
-var _ = ssa.ProgramCacheKind(0) // keep ssa import used

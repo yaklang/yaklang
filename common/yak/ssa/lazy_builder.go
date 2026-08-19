@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
-	"go.uber.org/atomic"
 )
 
 // lazyTask is the unit of deferred work queued in a LazyBuilder.
@@ -16,7 +15,6 @@ type LazyBuilder struct {
 	_lazybuild_name string
 	tasks           []lazyTask
 	mu              sync.RWMutex
-	build           atomic.Bool
 }
 
 // NewLazyBuilder 创建一个新的 LazyBuilder 实例
@@ -58,10 +56,6 @@ func (l *LazyBuilder) Build() {
 	if l == nil {
 		return
 	}
-
-	// Mark as built so future AddLazyBuilder calls never try to execute
-	// immediately (they still queue, and next Build runs them).
-	l.build.Store(true)
 
 	l.mu.Lock()
 	tasksToRun := l.tasks
