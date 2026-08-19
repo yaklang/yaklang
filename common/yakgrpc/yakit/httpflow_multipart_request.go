@@ -36,7 +36,7 @@ const multipartSkeletonMarker = "[[yakit: multipart file spilled"
 // spillMultipartFilesIfNeeded. Kept for callers that want to parse part
 // index/filename/size out of a skeleton (e.g. a future single-part download).
 var multipartSpillMarkerPattern = regexp.MustCompile(
-	`(?m)^\[\[yakit: multipart file spilled, part=(\d+), file=(.*?), size=(\d+)\]\]$`,
+	`(?m)^\[\[yakit: multipart file spilled, part=(\d+), file=(.*?), size=(\d+)\]\]\r?$`,
 )
 
 // multipartSpillResult is the multipart-aware counterpart of
@@ -450,7 +450,7 @@ func detectBoundary(body []byte) (string, error) {
 // multipart skeleton placeholder. Used to detect legacy/serialized flows that
 // were skeletonized.
 func containsMultipartSpillMarker(packet []byte) bool {
-	return bytes.Contains(packet, []byte(multipartSkeletonMarker))
+	return multipartSpillMarkerPattern.Match(packet)
 }
 
 // FlowIsMultipartSpill reports whether a stored HTTPFlow's request was

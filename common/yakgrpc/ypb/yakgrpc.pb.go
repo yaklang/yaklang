@@ -70901,18 +70901,20 @@ type SingleManualHijackControlMessage struct {
 	Request    []byte `protobuf:"bytes,9,opt,name=Request,proto3" json:"Request,omitempty"`
 	Response   []byte `protobuf:"bytes,10,opt,name=Response,proto3" json:"Response,omitempty"`
 	Payload    []byte `protobuf:"bytes,11,opt,name=Payload,proto3" json:"Payload,omitempty"`
-	// Stream a local replacement file for one spilled multipart file part.
-	// Chunks are written to an engine-side temporary file and applied when the
-	// hijacked request is forwarded, so the renderer never loads the full file.
-	IsMultipartFileChunk bool   `protobuf:"varint,12,opt,name=IsMultipartFileChunk,proto3" json:"IsMultipartFileChunk,omitempty"`
-	MultipartPartIndex   int32  `protobuf:"varint,13,opt,name=MultipartPartIndex,proto3" json:"MultipartPartIndex,omitempty"`
-	MultipartFilename    string `protobuf:"bytes,14,opt,name=MultipartFilename,proto3" json:"MultipartFilename,omitempty"`
-	MultipartFileData    []byte `protobuf:"bytes,15,opt,name=MultipartFileData,proto3" json:"MultipartFileData,omitempty"`
-	MultipartFileStart   bool   `protobuf:"varint,16,opt,name=MultipartFileStart,proto3" json:"MultipartFileStart,omitempty"`
-	MultipartFileEOF     bool   `protobuf:"varint,17,opt,name=MultipartFileEOF,proto3" json:"MultipartFileEOF,omitempty"`
-	MultipartFileCancel  bool   `protobuf:"varint,18,opt,name=MultipartFileCancel,proto3" json:"MultipartFileCancel,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Stream a local replacement file for an oversized request. Chunks are
+	// written to an engine-side temporary file and applied when the hijacked
+	// request is forwarded, so the renderer never loads the full file.
+	IsLargeRequestFileChunk bool   `protobuf:"varint,12,opt,name=IsLargeRequestFileChunk,proto3" json:"IsLargeRequestFileChunk,omitempty"`
+	LargeRequestPartIndex   int32  `protobuf:"varint,13,opt,name=LargeRequestPartIndex,proto3" json:"LargeRequestPartIndex,omitempty"`
+	LargeRequestFilename    string `protobuf:"bytes,14,opt,name=LargeRequestFilename,proto3" json:"LargeRequestFilename,omitempty"`
+	LargeRequestFileData    []byte `protobuf:"bytes,15,opt,name=LargeRequestFileData,proto3" json:"LargeRequestFileData,omitempty"`
+	LargeRequestFileStart   bool   `protobuf:"varint,16,opt,name=LargeRequestFileStart,proto3" json:"LargeRequestFileStart,omitempty"`
+	LargeRequestFileEOF     bool   `protobuf:"varint,17,opt,name=LargeRequestFileEOF,proto3" json:"LargeRequestFileEOF,omitempty"`
+	LargeRequestFileCancel  bool   `protobuf:"varint,18,opt,name=LargeRequestFileCancel,proto3" json:"LargeRequestFileCancel,omitempty"`
+	// Replace the complete request body instead of one multipart file part.
+	LargeRequestReplaceBody bool `protobuf:"varint,19,opt,name=LargeRequestReplaceBody,proto3" json:"LargeRequestReplaceBody,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *SingleManualHijackControlMessage) Reset() {
@@ -71022,51 +71024,58 @@ func (x *SingleManualHijackControlMessage) GetPayload() []byte {
 	return nil
 }
 
-func (x *SingleManualHijackControlMessage) GetIsMultipartFileChunk() bool {
+func (x *SingleManualHijackControlMessage) GetIsLargeRequestFileChunk() bool {
 	if x != nil {
-		return x.IsMultipartFileChunk
+		return x.IsLargeRequestFileChunk
 	}
 	return false
 }
 
-func (x *SingleManualHijackControlMessage) GetMultipartPartIndex() int32 {
+func (x *SingleManualHijackControlMessage) GetLargeRequestPartIndex() int32 {
 	if x != nil {
-		return x.MultipartPartIndex
+		return x.LargeRequestPartIndex
 	}
 	return 0
 }
 
-func (x *SingleManualHijackControlMessage) GetMultipartFilename() string {
+func (x *SingleManualHijackControlMessage) GetLargeRequestFilename() string {
 	if x != nil {
-		return x.MultipartFilename
+		return x.LargeRequestFilename
 	}
 	return ""
 }
 
-func (x *SingleManualHijackControlMessage) GetMultipartFileData() []byte {
+func (x *SingleManualHijackControlMessage) GetLargeRequestFileData() []byte {
 	if x != nil {
-		return x.MultipartFileData
+		return x.LargeRequestFileData
 	}
 	return nil
 }
 
-func (x *SingleManualHijackControlMessage) GetMultipartFileStart() bool {
+func (x *SingleManualHijackControlMessage) GetLargeRequestFileStart() bool {
 	if x != nil {
-		return x.MultipartFileStart
+		return x.LargeRequestFileStart
 	}
 	return false
 }
 
-func (x *SingleManualHijackControlMessage) GetMultipartFileEOF() bool {
+func (x *SingleManualHijackControlMessage) GetLargeRequestFileEOF() bool {
 	if x != nil {
-		return x.MultipartFileEOF
+		return x.LargeRequestFileEOF
 	}
 	return false
 }
 
-func (x *SingleManualHijackControlMessage) GetMultipartFileCancel() bool {
+func (x *SingleManualHijackControlMessage) GetLargeRequestFileCancel() bool {
 	if x != nil {
-		return x.MultipartFileCancel
+		return x.LargeRequestFileCancel
+	}
+	return false
+}
+
+func (x *SingleManualHijackControlMessage) GetLargeRequestReplaceBody() bool {
+	if x != nil {
+		return x.LargeRequestReplaceBody
 	}
 	return false
 }
@@ -81400,7 +81409,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vLoadingFlag\x18\x0e \x01(\bR\vLoadingFlag\x126\n" +
 	"\x16ManualHijackListAction\x18\x0f \x01(\tR\x16ManualHijackListAction\x12N\n" +
 	"\x10ManualHijackList\x18\x10 \x03(\v2\".ypb.SingleManualHijackInfoMessageR\x10ManualHijackList\x12<\n" +
-	"\rPipelineStats\x18\x11 \x01(\v2\x16.ypb.MITMPipelineStatsR\rPipelineStats\"\xb6\x05\n" +
+	"\rPipelineStats\x18\x11 \x01(\v2\x16.ypb.MITMPipelineStatsR\rPipelineStats\"\x9a\x06\n" +
 	" SingleManualHijackControlMessage\x12\x16\n" +
 	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12&\n" +
 	"\x0eHijackResponse\x18\x02 \x01(\bR\x0eHijackResponse\x122\n" +
@@ -81417,14 +81426,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aRequest\x18\t \x01(\fR\aRequest\x12\x1a\n" +
 	"\bResponse\x18\n" +
 	" \x01(\fR\bResponse\x12\x18\n" +
-	"\aPayload\x18\v \x01(\fR\aPayload\x122\n" +
-	"\x14IsMultipartFileChunk\x18\f \x01(\bR\x14IsMultipartFileChunk\x12.\n" +
-	"\x12MultipartPartIndex\x18\r \x01(\x05R\x12MultipartPartIndex\x12,\n" +
-	"\x11MultipartFilename\x18\x0e \x01(\tR\x11MultipartFilename\x12,\n" +
-	"\x11MultipartFileData\x18\x0f \x01(\fR\x11MultipartFileData\x12.\n" +
-	"\x12MultipartFileStart\x18\x10 \x01(\bR\x12MultipartFileStart\x12*\n" +
-	"\x10MultipartFileEOF\x18\x11 \x01(\bR\x10MultipartFileEOF\x120\n" +
-	"\x13MultipartFileCancel\x18\x12 \x01(\bR\x13MultipartFileCancel\"\xb9\x03\n" +
+	"\aPayload\x18\v \x01(\fR\aPayload\x128\n" +
+	"\x17IsLargeRequestFileChunk\x18\f \x01(\bR\x17IsLargeRequestFileChunk\x124\n" +
+	"\x15LargeRequestPartIndex\x18\r \x01(\x05R\x15LargeRequestPartIndex\x122\n" +
+	"\x14LargeRequestFilename\x18\x0e \x01(\tR\x14LargeRequestFilename\x122\n" +
+	"\x14LargeRequestFileData\x18\x0f \x01(\fR\x14LargeRequestFileData\x124\n" +
+	"\x15LargeRequestFileStart\x18\x10 \x01(\bR\x15LargeRequestFileStart\x120\n" +
+	"\x13LargeRequestFileEOF\x18\x11 \x01(\bR\x13LargeRequestFileEOF\x126\n" +
+	"\x16LargeRequestFileCancel\x18\x12 \x01(\bR\x16LargeRequestFileCancel\x128\n" +
+	"\x17LargeRequestReplaceBody\x18\x13 \x01(\bR\x17LargeRequestReplaceBody\"\xb9\x03\n" +
 	"\x1dSingleManualHijackInfoMessage\x12\x16\n" +
 	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12\x18\n" +
 	"\aRequest\x18\x02 \x01(\fR\aRequest\x12\x1a\n" +

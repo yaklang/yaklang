@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
@@ -68,6 +70,47 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_Large(t *testing.T) {
 	rawBody, err := os.ReadFile(res.BodyFile)
 	require.NoError(t, err)
 	require.Equal(t, body, string(rawBody))
+}
+
+func TestRebuildFlatSpillRequestPacket(t *testing.T) {
+	const limit = 64 * 1024
+	withGlobalMaxContentLength(t, limit)
+	body := strings.Repeat("A", limit+1024)
+	packet := []byte("PUT /upload HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/octet-stream\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\nX-Edit: before\r\n\r\n" + body)
+	spill, err := spillLargeHTTPFlowRequestIfNeeded(packet)
+	require.NoError(t, err)
+	require.True(t, spill.IsTooLarge)
+	require.True(t, IsFlatSpillRequestPacket(spill.StoredPacket))
+	require.False(t, IsFlatSpillRequestPacket([]byte("prefix [[request too large(1MB), truncated]]")))
+	t.Cleanup(func() {
+		_ = os.Remove(spill.HeaderFile)
+		_ = os.Remove(spill.BodyFile)
+	})
+
+	replacement := []byte("replacement raw body")
+	replacementPath := filepath.Join(t.TempDir(), "replacement.bin")
+	require.NoError(t, os.WriteFile(replacementPath, replacement, 0o644))
+	edited := []byte(strings.Replace(string(spill.StoredPacket), "X-Edit: before", "X-Edit: after", 1))
+	rebuilt, err := RebuildFlatSpillRequestPacket(edited, spill.BodyFile, replacementPath)
+	require.NoError(t, err)
+	require.False(t, IsFlatSpillRequestPacket(rebuilt))
+	require.Equal(t, "after", lowhttp.GetHTTPPacketHeader(rebuilt, "X-Edit"))
+	_, rebuiltBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rebuilt)
+	require.Equal(t, replacement, rebuiltBody)
+	require.Equal(t, strconv.Itoa(len(replacement)), lowhttp.GetHTTPPacketHeader(rebuilt, "Content-Length"))
+
+	restored, err := RebuildFlatSpillRequestPacket(edited, spill.BodyFile, "")
+	require.NoError(t, err)
+	_, restoredBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(restored)
+	require.Equal(t, body, string(restoredBody))
+
+	emptyPath := filepath.Join(t.TempDir(), "empty.bin")
+	require.NoError(t, os.WriteFile(emptyPath, nil, 0o644))
+	empty, err := RebuildFlatSpillRequestPacket(edited, spill.BodyFile, emptyPath)
+	require.NoError(t, err)
+	_, emptyBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(empty)
+	require.Empty(t, emptyBody)
+	require.Equal(t, "0", lowhttp.GetHTTPPacketHeader(empty, "Content-Length"))
 }
 
 func TestSpillLargeHTTPFlowRequestIfNeeded_RespectsGlobalMaxContentLength(t *testing.T) {

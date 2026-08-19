@@ -1,115 +1,147 @@
 package yakgrpc
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type manualMultipartReplacementUpload struct {
+type manualLargeRequestReplacementTarget struct {
+	replaceBody bool
+	partIndex   int
+}
+
+func newManualLargeRequestReplacementTarget(replaceBody bool, partIndex int) (manualLargeRequestReplacementTarget, error) {
+	if replaceBody {
+		return manualLargeRequestReplacementTarget{replaceBody: true}, nil
+	}
+	if partIndex < 0 {
+		return manualLargeRequestReplacementTarget{}, utils.Errorf("invalid multipart part index %d", partIndex)
+	}
+	return manualLargeRequestReplacementTarget{partIndex: partIndex}, nil
+}
+
+func (t manualLargeRequestReplacementTarget) description() string {
+	if t.replaceBody {
+		return "request body"
+	}
+	return fmt.Sprintf("multipart part %d", t.partIndex)
+}
+
+type manualLargeRequestReplacementUpload struct {
 	file *os.File
 	path string
 }
 
-// manualMultipartReplacementStore owns the bounded chunks uploaded while a
-// request is waiting in manual hijack. Completed files remain engine-local and
-// are removed as soon as the hijack task finishes.
-type manualMultipartReplacementStore struct {
-	active    map[int]*manualMultipartReplacementUpload
-	completed map[int]string
+// manualLargeRequestReplacementStore owns the bounded chunks uploaded while
+// an oversized request is waiting in manual hijack. A target is either the
+// complete non-multipart request body or one multipart file part. Completed
+// files remain engine-local and are removed when the hijack task finishes.
+type manualLargeRequestReplacementStore struct {
+	active    map[manualLargeRequestReplacementTarget]*manualLargeRequestReplacementUpload
+	completed map[manualLargeRequestReplacementTarget]string
 }
 
-func newManualMultipartReplacementStore() *manualMultipartReplacementStore {
-	return &manualMultipartReplacementStore{
-		active:    make(map[int]*manualMultipartReplacementUpload),
-		completed: make(map[int]string),
+func newManualLargeRequestReplacementStore() *manualLargeRequestReplacementStore {
+	return &manualLargeRequestReplacementStore{
+		active:    make(map[manualLargeRequestReplacementTarget]*manualLargeRequestReplacementUpload),
+		completed: make(map[manualLargeRequestReplacementTarget]string),
 	}
 }
 
-func (s *manualMultipartReplacementStore) consume(
+func (s *manualLargeRequestReplacementStore) consume(
+	replaceBody bool,
 	partIndex int,
 	data []byte,
 	start bool,
 	eof bool,
 	cancel bool,
 ) error {
-	if partIndex < 0 {
-		return utils.Errorf("invalid multipart part index %d", partIndex)
+	target, err := newManualLargeRequestReplacementTarget(replaceBody, partIndex)
+	if err != nil {
+		return err
 	}
 	if cancel {
-		s.discard(partIndex)
+		s.discard(target)
 		return nil
 	}
 	if start {
-		s.discard(partIndex)
+		s.discard(target)
 		tempDir := consts.GetDefaultYakitBaseTempDir()
 		if err := os.MkdirAll(tempDir, 0o755); err != nil {
 			return err
 		}
-		f, err := os.CreateTemp(tempDir, "mitm-multipart-replacement-*")
+		f, err := os.CreateTemp(tempDir, "mitm-large-request-replacement-*")
 		if err != nil {
 			return err
 		}
-		s.active[partIndex] = &manualMultipartReplacementUpload{file: f, path: f.Name()}
+		s.active[target] = &manualLargeRequestReplacementUpload{file: f, path: f.Name()}
 	}
-	upload := s.active[partIndex]
+	upload := s.active[target]
 	if upload == nil {
-		return utils.Errorf("multipart replacement part %d was not started", partIndex)
+		return utils.Errorf("large request replacement %s was not started", target.description())
 	}
 	if len(data) > 0 {
 		if _, err := upload.file.Write(data); err != nil {
-			s.discard(partIndex)
+			s.discard(target)
 			return err
 		}
 	}
 	if eof {
 		if err := upload.file.Close(); err != nil {
-			s.discard(partIndex)
+			s.discard(target)
 			return err
 		}
 		upload.file = nil
-		delete(s.active, partIndex)
-		s.completed[partIndex] = upload.path
+		delete(s.active, target)
+		s.completed[target] = upload.path
 	}
 	return nil
 }
 
-func (s *manualMultipartReplacementStore) hasCompleted() bool {
+func (s *manualLargeRequestReplacementStore) hasCompleted() bool {
 	return len(s.completed) > 0
 }
 
-func (s *manualMultipartReplacementStore) hasActive() bool {
+func (s *manualLargeRequestReplacementStore) hasActive() bool {
 	return len(s.active) > 0
 }
 
-func (s *manualMultipartReplacementStore) paths() map[int]string {
+func (s *manualLargeRequestReplacementStore) multipartPaths() map[int]string {
 	out := make(map[int]string, len(s.completed))
-	for partIndex, path := range s.completed {
-		out[partIndex] = path
+	for target, path := range s.completed {
+		if !target.replaceBody {
+			out[target.partIndex] = path
+		}
 	}
 	return out
 }
 
-func (s *manualMultipartReplacementStore) discard(partIndex int) {
-	if upload := s.active[partIndex]; upload != nil {
+func (s *manualLargeRequestReplacementStore) bodyPath() string {
+	return s.completed[manualLargeRequestReplacementTarget{replaceBody: true}]
+}
+
+func (s *manualLargeRequestReplacementStore) discard(target manualLargeRequestReplacementTarget) {
+	if upload := s.active[target]; upload != nil {
 		if upload.file != nil {
 			_ = upload.file.Close()
 		}
 		_ = os.Remove(upload.path)
-		delete(s.active, partIndex)
+		delete(s.active, target)
 	}
-	if path := s.completed[partIndex]; path != "" {
+	if path := s.completed[target]; path != "" {
 		_ = os.Remove(path)
-		delete(s.completed, partIndex)
+		delete(s.completed, target)
 	}
 }
 
-func (s *manualMultipartReplacementStore) close() {
-	for partIndex := range s.active {
-		s.discard(partIndex)
+func (s *manualLargeRequestReplacementStore) close() {
+	for target := range s.active {
+		s.discard(target)
 	}
-	for partIndex := range s.completed {
-		s.discard(partIndex)
+	for target := range s.completed {
+		s.discard(target)
 	}
 }
