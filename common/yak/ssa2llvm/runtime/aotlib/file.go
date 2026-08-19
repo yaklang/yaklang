@@ -20,12 +20,13 @@ func FileIsDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func FileJoin(parts ...string) string   { return filepath.Join(parts...) }
-func FileGetBase(path string) string    { return filepath.Base(path) }
-func FileGetExt(path string) string     { return filepath.Ext(path) }
-func FileGetDirPath(path string) string { return filepath.Dir(path) }
-func FileClean(path string) string      { return filepath.Clean(path) }
-func FileIsAbs(path string) bool        { return filepath.IsAbs(path) }
+func FileJoin(parts ...string) string        { return filepath.Join(parts...) }
+func FileGetBase(path string) string         { return filepath.Base(path) }
+func FileGetExt(path string) string          { return filepath.Ext(path) }
+func FileGetDirPath(path string) string      { return filepath.Dir(path) }
+func FileClean(path string) string           { return filepath.Clean(path) }
+func FileIsAbs(path string) bool             { return filepath.IsAbs(path) }
+func FileSplit(path string) (string, string) { return filepath.Split(path) }
 func FileAbs(path string) string {
 	p, err := filepath.Abs(path)
 	if err != nil {
@@ -47,4 +48,5 @@ var FileExports = map[string]any{
 	"Clean":      FileClean,
 	"IsAbs":      FileIsAbs,
 	"Abs":        FileAbs,
+	"Split":      FileSplit,
 }
