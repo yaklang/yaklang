@@ -1488,3 +1488,24 @@ func TestIndexStore_SaveOffsetDedupMatchesDBUniqueKey(t *testing.T) {
 	require.NoError(t, store.offsetSaver.Flush())
 	require.Equal(t, int32(2), saved, "only the exact duplicate should be deduped")
 }
+
+// TestIndexStore_CloseClearsOffsetDedup verifies the offset dedup map is
+// cleared when the store closes, so it does not grow across programs (A3).
+func TestIndexStore_CloseClearsOffsetDedup(t *testing.T) {
+	store := &indexStore{
+		mode: ProgramCacheDBWrite,
+		offsetSaver: dbcache.NewSave(func(offsets []*ssadb.IrOffset) error {
+			return nil
+		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),
+	}
+	store.saveOffsetDedup(&ssadb.IrOffset{ValueID: 1, FileHash: "h", StartOffset: 1, EndOffset: 2, VariableName: "v"})
+	store.saveOffsetDedup(&ssadb.IrOffset{ValueID: 1, FileHash: "h", StartOffset: 1, EndOffset: 2, VariableName: "v"})
+	store.offsetSavedMu.Lock()
+	require.Len(t, store.offsetSaved, 1, "duplicate offset must be deduped before close")
+	store.offsetSavedMu.Unlock()
+
+	require.NoError(t, store.Close())
+	store.offsetSavedMu.Lock()
+	require.Nil(t, store.offsetSaved, "offset dedup map must be released on close")
+	store.offsetSavedMu.Unlock()
+}

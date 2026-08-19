@@ -418,3 +418,12 @@
 
 ### 验证（第十二轮）
 - `TestJarRecompile` 单独与全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 均通过；`go build` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第十三轮，@ d3dfae305）
+
+- **A3（剩余）完成**：`offsetSaved` 去重 map 改为按 indexStore 生命周期释放——`Close()` 时清空（编译结束、offset saver 关闭后不再有新的 offset），大项目上不再随唯一 offset 数跨 program 线性增长；`Flush`（中途批量）不清空，避免重复入队触发 DB UNIQUE 冲突。新增 `TestIndexStore_CloseClearsOffsetDedup`。
+- **B2 补充**：`flush_observability_test.go` 里“FlushStats 尚不存在/RED”的过时注释更新为当前实现描述。
+
+### 验证（第十三轮）
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。

@@ -16,9 +16,8 @@ type flushItem struct{ id int64 }
 func (i *flushItem) GetId() int64   { return i.id }
 func (i *flushItem) SetId(id int64) { i.id = id }
 
-// FlushStats is the per-flush observability struct that the async persist
-// pipeline MUST expose. It does not exist yet; these tests will be RED until
-// FlushStats and FlushKeysStats() are implemented on dbcache.Cache.
+// FlushStats mirrors dbcache.FlushStats, the per-flush observability struct
+// accumulated by the async persist pipeline.
 type FlushStats struct {
 	FlushRequestCount    int64
 	DedupSkipped         int64

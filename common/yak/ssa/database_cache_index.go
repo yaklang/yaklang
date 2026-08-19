@@ -105,6 +105,15 @@ func (s *indexStore) Close() error {
 			errs = append(errs, err)
 		}
 	}
+	// The dedup map only needs to live for one program compile: after the
+	// offset saver is closed, all rows have been handed to the writer, so
+	// clearing it bounds memory instead of growing with unique offsets across
+	// programs (review A3). Clearing mid-compile (Flush) is unsafe because a
+	// later re-visit would re-enqueue duplicates that the DB UNIQUE index
+	// rejects.
+	s.offsetSavedMu.Lock()
+	s.offsetSaved = nil
+	s.offsetSavedMu.Unlock()
 	return utils.JoinErrors(errs...)
 }
 
