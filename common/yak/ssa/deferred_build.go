@@ -147,8 +147,6 @@ func (prog *Program) releaseDeferredBuildTasks() {
 	app.deferredBuilds = nil
 }
 
-// RunDeferredBuildsForUnits 只执行归属给定编译单元的延迟构建任务，执行后从队列移除。
-// 用于编译单元粒度流式编译：每个单元编译完即释放其体 AST，内存上界与项目总规模解耦。
 // RunDeferredBuildsForUnits executes all deferred-build tasks whose unitKey
 // matches any of the given unitKeys. afterEach is called after every task
 // with (completed, total). afterUnit is called after the LAST task of a
@@ -214,8 +212,9 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
-		// 执行 task 期间恢复其所属编译单元上下文，task 内通过 CurrentCompileUnit()
-		// 取到的 unitKey 与注册时一致；执行完恢复原值。
+		// Restore the task's compile-unit context while it runs so
+		// CurrentCompileUnit() returns the unit the task was registered with,
+		// then restore the previous unit afterwards.
 		previousUnit := app.currentCompileUnit
 		if task.unitKey != "" {
 			app.currentCompileUnit = task.unitKey

@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sync/atomic"
+
 	"github.com/samber/lo"
 )
 
@@ -12,11 +14,18 @@ import (
 // direct ancestors) while preventing unbounded growth.
 const maxFullTypeNameEntries = 200
 
+// fullTypeNameTruncated counts how many type name lists hit the cap, so the
+// silent data-loss risk of the cap is observable and testable.
+var fullTypeNameTruncated atomic.Int64
+
+func fullTypeNameTruncationCount() int64 { return fullTypeNameTruncated.Load() }
+
 func fullTypeNameAdd(target *[]string, name string, owner Type) bool {
 	if target == nil || name == "" {
 		return false
 	}
 	if len(*target) >= maxFullTypeNameEntries {
+		fullTypeNameTruncated.Add(1)
 		return false
 	}
 	if lo.Contains(*target, name) {
@@ -47,8 +56,10 @@ func fullTypeNameSet(target *[]string, names []string, owner Type) bool {
 		return false
 	}
 	cleaned := clean(names)
-	// Cap the list size
+	// Cap the list size; truncation is recorded (counter + warning) so the
+	// lossy cap is observable instead of silent (review B5).
 	if len(cleaned) > maxFullTypeNameEntries {
+		fullTypeNameTruncated.Add(1)
 		cleaned = cleaned[:maxFullTypeNameEntries]
 	}
 	if len(*target) == len(cleaned) {

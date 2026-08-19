@@ -10,14 +10,14 @@ import (
 // lazyTask is the unit of deferred work queued in a LazyBuilder.
 type lazyTask func()
 
-// LazyBuilder 是一个并发安全、内存安全的延迟执行器
+// LazyBuilder is a concurrency-safe, memory-safe deferred executor.
 type LazyBuilder struct {
 	_lazybuild_name string
 	tasks           []lazyTask
 	mu              sync.RWMutex
 }
 
-// NewLazyBuilder 创建一个新的 LazyBuilder 实例
+// NewLazyBuilder creates a new LazyBuilder instance.
 func NewLazyBuilder(name string) *LazyBuilder {
 	lz := &LazyBuilder{
 		_lazybuild_name: name + "||" + uuid.NewString(),
@@ -26,8 +26,7 @@ func NewLazyBuilder(name string) *LazyBuilder {
 	return lz
 }
 
-// Add 添加一个延迟执行的任务。
-// work 是要执行的函数，ctx 是要传递给该函数的上下文数据。
+// AddLazyBuilder queues a task for deferred execution.
 func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 	if l == nil {
 		log.Errorf("LazyBuilder is nil")
@@ -69,7 +68,7 @@ func (l *LazyBuilder) Build() {
 		}
 	}()
 
-	// // 依次执行所有任务
+	// // Execute all queued tasks in order
 	for _, task := range tasksToRun {
 		if task != nil {
 			task()
@@ -94,7 +93,7 @@ func (p *Program) LazyBuild() {
 	}
 
 	for len(stack) > 0 {
-		// 深度优先遍历函数与其子函数，确保所有 LazyBuilder 均被执行
+		// Depth-first traversal of functions and their children so every LazyBuilder runs
 		fun := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 		if fun == nil {

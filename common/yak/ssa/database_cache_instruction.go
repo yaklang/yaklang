@@ -633,9 +633,11 @@ func (s *instructionStore) Close(progress func(int)) error {
 		// a hard error occurs, or maxPasses is exhausted. This replaces
 		// the old fixed-two-pass approach that could not handle large
 		// resident counts (>persistLimit).
-		const maxPasses = 16
+		// closeFlushMaxPasses bounds the Close drain loop: each pass retries
+		// persisted-but-still-resident items, and no-progress passes fail fast.
+		const closeFlushMaxPasses = 16
 		var lastRemaining int
-		for pass := 0; pass < maxPasses; pass++ {
+		for pass := 0; pass < closeFlushMaxPasses; pass++ {
 			s.flushRequests.Add(1)
 			s.flushAllUnpersisted()
 			if err := s.writer.Barrier(); err != nil {
@@ -643,7 +645,7 @@ func (s *instructionStore) Close(progress func(int)) error {
 				return err
 			}
 			remaining := s.writer.Count()
-			log.Infof("[ssa-instruction-store] program=%s Close: writer mode, pass %d/%d, remaining=%d", progName, pass+1, maxPasses, remaining)
+			log.Infof("[ssa-instruction-store] program=%s Close: writer mode, pass %d/%d, remaining=%d", progName, pass+1, closeFlushMaxPasses, remaining)
 			if remaining == 0 {
 				break
 			}

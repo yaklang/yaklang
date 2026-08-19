@@ -372,3 +372,12 @@
 ### 验证（第七轮）
 
 - `go test -race -run 'Test_FunctionType_String' ./common/yak/ssa` 通过；完整 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第八轮，@ 9155d75f）
+
+- **B3 完成（本批文件）**：`lazy_builder.go` / `deferred_build.go` 的中英混杂注释统一为英文；项目其余历史中文注释保留（大规模统一需单独 PR，避免噪音 diff）。
+- **B5 完成（本批）**：instruction-store Close 的 `maxPasses=16` 改为命名常量 `closeFlushMaxPasses`；`fullTypeName` 截断不再是静默丢失——`fullTypeNameAdd`/`fullTypeNameSet` 截断时增加原子计数，新增 `TestFullTypeNameTruncationObservable`。
+
+### 验证（第八轮）
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
