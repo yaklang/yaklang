@@ -127,6 +127,17 @@ func patchIrCodeIndex(db *gorm.DB) {
 		}
 	}
 
+	// Unique-index repair/creation is a one-time database migration, kept
+	// separate from the routine performance indexes above (review A10).
+	migrateUniqueIrCodeIndexes(db)
+}
+
+// migrateUniqueIrCodeIndexes applies the unique-index migration for
+// ir_codes/ir_offsets. It is idempotent and one-time per database: both
+// helpers use dialect-aware catalog checks and return immediately once the
+// index exists, so the expensive duplicate-scan/repair only runs for legacy
+// databases that still lack the index (review A10).
+func migrateUniqueIrCodeIndexes(db *gorm.DB) {
 	// Add UNIQUE constraint on (program_name, code_id) to prevent
 	// duplicate instruction INSERTs from race conditions in the async
 	// persist pipeline. This is a hard database invariant.

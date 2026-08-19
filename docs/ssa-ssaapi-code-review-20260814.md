@@ -460,3 +460,11 @@
 
 ### 验证（第十六轮）
 - 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第十七轮，@ c0a864e8a）
+
+- **A10 完成**：唯一索引修复/创建抽成独立的 `migrateUniqueIrCodeIndexes(db)`，与常规性能索引路径分离，代码结构上即为“一次性迁移”：两个 helper 都先做 dialect-aware 目录检查，索引已存在直接返回，只有缺少索引的 legacy 库才触发重复扫描/去重/建索引。原有全部唯一索引测试继续通过。
+
+### 验证（第十七轮）
+- 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
