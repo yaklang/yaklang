@@ -143,10 +143,12 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 		return reflect.Value{}, fmt.Errorf("missing target type")
 	}
 
-	// nil (0) is a valid value for nullable targets (nil slice/map/ptr/iface).
+	// nil (0) is a valid value for nullable container targets. Interfaces are
+	// intentionally excluded: a zero raw for an interface target must still go
+	// through decodeTaggedArg so nil/error semantics stay unchanged.
 	if raw == 0 {
 		switch targetType.Kind() {
-		case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Interface, reflect.Func, reflect.Chan:
+		case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
 			return reflect.Zero(targetType), nil
 		}
 	}
@@ -423,7 +425,9 @@ func runtimeDecodeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Va
 	variadicArgs := rawArgs[fixedCount:]
 
 	// Yak may pass a single slice value (e.g. ssa.withExcludeFile([])) instead of unpacked strings.
-	if len(variadicArgs) == 1 {
+	// raw == 0 is an int64 zero, not a nil slice: the nil-arg decode would turn
+	// it into a nil slice and swallow the argument (e.g. println(0)).
+	if len(variadicArgs) == 1 && variadicArgs[0] != 0 {
 		candidateTypes := []reflect.Type{variadicSliceType, reflect.TypeOf([]any(nil))}
 		var sliceArg reflect.Value
 		for _, candidate := range candidateTypes {
