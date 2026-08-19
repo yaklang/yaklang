@@ -114,32 +114,18 @@ func parseMemoryBudgetEnv(raw string) (int64, bool) {
 	return 0, false
 }
 
-func systemMemoryTotalBytes() int64 {
-	raw, err := os.ReadFile("/proc/meminfo")
-	if err != nil {
-		return 0
-	}
-	for _, line := range strings.Split(string(raw), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 || fields[0] != "MemTotal:" {
-			continue
-		}
-		kb, err := strconv.ParseInt(fields[1], 10, 64)
-		if err != nil {
-			return 0
-		}
-		return kb * 1024
-	}
-	return 0
-}
-
 // defaultLargeProjectMemLimit returns the soft memory limit (80% of system
 // memory) the legacy large-project path should apply, and whether it should
 // apply one at all. An explicitly configured GOMEMLIMIT is always respected:
 // the compile path must not silently override the user/process setting
 // (review A12).
 func defaultLargeProjectMemLimit(totalMem int64) (int64, bool) {
+	// Explicit user/process configuration always wins: GOMEMLIMIT itself, or
+	// the opt-in adaptive compile policy (review A12).
 	if raw := strings.TrimSpace(os.Getenv("GOMEMLIMIT")); raw != "" {
+		return 0, false
+	}
+	if raw := strings.TrimSpace(os.Getenv(ssaCompileMemLimitEnv)); raw != "" {
 		return 0, false
 	}
 	if totalMem <= 0 {

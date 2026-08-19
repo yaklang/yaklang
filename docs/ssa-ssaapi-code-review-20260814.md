@@ -427,3 +427,16 @@
 
 ### 验证（第十三轮）
 - 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第十四轮，@ d08fdb57e）
+
+- **A12（剩余）完成**：`systemMemoryTotalBytes` 从共享文件拆为 build-tag 实现：
+  - `system_memory_linux.go`：`/proc/meminfo`（原实现）
+  - `system_memory_darwin.go`：`unix.SysctlUint64("hw.memsize")`（新增支持）
+  - `system_memory_other.go`：返回 0，非 Linux/macOS 不再“静默失效”，而是显式跳过 legacy 80% 限制
+  - `defaultLargeProjectMemLimit` 同时尊重 `YAK_SSA_COMPILE_MEM_LIMIT`（opt-in adaptive GC 策略），避免两条路径互相覆盖；测试补充该分支
+
+### 验证（第十四轮）
+- Linux 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过。
+- Darwin/Windows 交叉编译被仓库既有 cgo 依赖（go-pcre2-lite、yaklang/pcap 无对应原生绑定）阻塞，与本改动无关；Darwin 分支 API 与 `golang.org/x/sys v0.30.0` 的 `unix.SysctlUint64` 匹配。

@@ -489,4 +489,10 @@ func TestDefaultLargeProjectMemLimitRespectsGOMEMLIMIT(t *testing.T) {
 	require.Equal(t, int64(32*1024*1024*1024*80/100), limit)
 	_, ok = defaultLargeProjectMemLimit(0)
 	require.False(t, ok, "unknown system memory must not force a limit")
+
+	// The opt-in adaptive compile policy also wins over the legacy 80% path.
+	t.Setenv(ssaCompileMemLimitEnv, "1GiB")
+	limit, ok = defaultLargeProjectMemLimit(32 * 1024 * 1024 * 1024)
+	require.False(t, ok, "adaptive compile mem-limit config must be respected")
+	require.Zero(t, limit)
 }
