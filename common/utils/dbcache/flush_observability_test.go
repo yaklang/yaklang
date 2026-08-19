@@ -20,19 +20,19 @@ func (i *flushItem) SetId(id int64) { i.id = id }
 // pipeline MUST expose. It does not exist yet; these tests will be RED until
 // FlushStats and FlushKeysStats() are implemented on dbcache.Cache.
 type FlushStats struct {
-	FlushRequestCount     int64
-	DedupSkipped          int64
-	EnqueueCount          int64
-	SavedDelta            int64
-	ResidentBefore        int
-	ResidentAfter         int
-	EnqueueDuration       time.Duration
-	BackpressureDuration  time.Duration
+	FlushRequestCount    int64
+	DedupSkipped         int64
+	EnqueueCount         int64
+	SavedDelta           int64
+	ResidentBefore       int
+	ResidentAfter        int
+	EnqueueDuration      time.Duration
+	BackpressureDuration time.Duration
 }
 
 // TestA_DedupCountForRepeatedFlush proves that when the same keys are
 // flushed twice while items are still pending, the second flush should
-// count dedup_skipped > 0. Uses MarkDirtyForTest (non-blocking) to
+// count dedup_skipped > 0. Uses MarkDirtyAsync (non-blocking) to
 // simulate the async scenario where items are pending but not yet persisted.
 func TestA_DedupCountForRepeatedFlush(t *testing.T) {
 	releaseSave := make(chan struct{})
@@ -64,13 +64,13 @@ func TestA_DedupCountForRepeatedFlush(t *testing.T) {
 	}
 
 	// First mark-dirty of keys 1..5 (non-blocking — items become pending)
-	cache.MarkDirtyForTest([]int64{1, 2, 3, 4, 5}, utils.EvictionReasonCapacityReached)
+	cache.MarkDirtyAsync([]int64{1, 2, 3, 4, 5}, utils.EvictionReasonCapacityReached)
 
 	// Wait a moment for the marshal pipe to process
 	time.Sleep(50 * time.Millisecond)
 
 	// Second mark-dirty of the SAME keys 1..5 — items still pending → dedup
-	cache.MarkDirtyForTest([]int64{1, 2, 3, 4, 5}, utils.EvictionReasonCapacityReached)
+	cache.MarkDirtyAsync([]int64{1, 2, 3, 4, 5}, utils.EvictionReasonCapacityReached)
 
 	// Release the first save
 	close(releaseSave)

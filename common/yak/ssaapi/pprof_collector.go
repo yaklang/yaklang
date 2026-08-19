@@ -52,7 +52,7 @@ const (
 	// pprofInterval is slightly longer than the high-memory CPU duration so a
 	// periodic profile never starts while the previous 5-minute profile is still
 	// finishing (observed as pprof HTTP 500 on Hadoop run4/run5).
-	pprofInterval          = 5*time.Minute + 2*time.Second
+	pprofInterval          = pprofCPUDurationHigh + 2*time.Second
 	pprofCPUDurationNormal = 60 * time.Second
 	pprofCPUDurationHigh   = 5 * time.Minute
 	pprofInitialDelay      = 30 * time.Second

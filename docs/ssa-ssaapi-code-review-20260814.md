@@ -398,3 +398,12 @@
 
 ### 验证（第十轮）
 - 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第十一轮，@ cfa60e19f）
+
+- **B4（dbcache）**：删除生产代码里的 `MarkDirtyForTest`，测试改走真实非阻塞 API `MarkDirtyAsync`（覆盖同样的 dedup 场景）；`FlushKeysStats`/`FlushStats` 保留为通用可观测 API（外部测试包引用）。
+- **B5（剩余魔数）**：`databasex.go` 的 close 轮数 `8` 命名化为 `closeFlushMaxPasses`；`pprof_collector.go` 的 `5*time.Minute+2s` 改为基于 `pprofCPUDurationHigh` 的表达式。
+
+### 验证（第十一轮）
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。

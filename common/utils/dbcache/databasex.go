@@ -527,20 +527,23 @@ func (c *Cache[T, D]) IsClosed() bool {
 	return c.resident != nil && c.resident.IsClosed()
 }
 
+// closeFlushMaxPasses bounds the Close drain loop; each pass retries
+// persisted-but-still-resident items and no-progress paths fail fast.
+const closeFlushMaxPasses = 8
+
 func (c *Cache[T, D]) drainResidentForClose() {
 	if c == nil || c.resident == nil {
 		return
 	}
-	const maxPasses = 8
-	for pass := 0; pass < maxPasses; pass++ {
+	for pass := 0; pass < closeFlushMaxPasses; pass++ {
 		remaining := c.resident.Count()
 		if remaining == 0 {
 			return
 		}
-		log.Infof("[dbcache-close] pass %d/%d: resident=%d items remaining", pass+1, maxPasses, remaining)
+		log.Infof("[dbcache-close] pass %d/%d: resident=%d items remaining", pass+1, closeFlushMaxPasses, remaining)
 		c.Flush(utils.EvictionReasonDeleted)
 		after := c.resident.Count()
-		log.Infof("[dbcache-close] pass %d/%d: after flush resident=%d items remaining (evicted=%d)", pass+1, maxPasses, after, remaining-after)
+		log.Infof("[dbcache-close] pass %d/%d: after flush resident=%d items remaining (evicted=%d)", pass+1, closeFlushMaxPasses, after, remaining-after)
 		if c.marshalPipe != nil && c.marshalPipe.Error() != nil {
 			return
 		}
@@ -551,7 +554,7 @@ func (c *Cache[T, D]) drainResidentForClose() {
 			return
 		}
 	}
-	log.Warnf("[dbcache-close] maxPasses=%d exhausted, %d items still resident", maxPasses, c.resident.Count())
+	log.Warnf("[dbcache-close] maxPasses=%d exhausted, %d items still resident", closeFlushMaxPasses, c.resident.Count())
 }
 
 // minPersistLimit floors the auto-computed persist limit so a tiny save size
@@ -712,35 +715,6 @@ func (c *Cache[T, D]) FlushKeysStats() FlushStats {
 		EnqueueDuration:      c.flushEnqueueDuration,
 		BackpressureDuration: c.flushBackpressureDuration,
 	}
-}
-
-// MarkDirtyForTest marks keys as pending without waiting for the writer.
-// This is a test-only method to verify dedup tracking. It does NOT block.
-func (c *Cache[T, D]) MarkDirtyForTest(keys []int64, reason utils.EvictionReason) {
-	if c == nil || c.resident == nil || len(keys) == 0 {
-		return
-	}
-
-	// Count dedup: items already pending
-	dedupSkipped := int64(0)
-	c.resident.mu.RLock()
-	for _, key := range keys {
-		if item, ok := c.resident.data[key]; ok && item.pending {
-			dedupSkipped++
-		}
-	}
-	c.resident.mu.RUnlock()
-
-	// Queue keys (non-blocking — MarkPending + enqueue)
-	c.resident.QueueKeys(keys, reason)
-
-	enqueueCount := int64(len(keys)) - dedupSkipped
-
-	c.flushMu.Lock()
-	c.flushRequestCount++
-	c.flushDedupSkipped += dedupSkipped
-	c.flushEnqueueCount += enqueueCount
-	c.flushMu.Unlock()
 }
 
 // MarkDirty marks keys as dirty for asynchronous persistence without blocking.
