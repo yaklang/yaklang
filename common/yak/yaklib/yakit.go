@@ -1516,10 +1516,6 @@ func (c *YakitClient) AIOutput(tmp string, items ...interface{}) {
 	c.Output(logItem)
 }
 
-func init() {
-	AutoInitYakit()
-}
-
 // InitYakit 初始化全局 Yakit 客户端实例（导出名为 yakit.InitYakit）
 // 参数:
 //   - y: Yakit 客户端对象

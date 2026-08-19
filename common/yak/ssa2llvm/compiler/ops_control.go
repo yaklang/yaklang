@@ -193,6 +193,20 @@ func (c *Compiler) compilePhi(inst *ssa.Phi) error {
 	return nil
 }
 
+// phiMemberIsLoopCarriedMapRead reports whether a phi is a loop-carried
+// member read (e.g. the front end's m[i] merge) rather than a genuine member
+// write. Such phis must not emit set_field against the freshly created map.
+func (c *Compiler) phiMemberIsLoopCarriedMapRead(phi *ssa.Phi) bool {
+	if phi == nil || !phi.IsMember() || phi.GetObject() == nil {
+		return false
+	}
+	obj := phi.GetObject()
+	if mk, ok := obj.(*ssa.Make); ok && mk != nil && phi.GetBlock() != nil && mk.GetBlock() != nil {
+		return mk.GetBlock().GetId() != phi.GetBlock().GetId()
+	}
+	return false
+}
+
 func (c *Compiler) ensurePhiNode(phi *ssa.Phi) error {
 	if phi == nil {
 		return fmt.Errorf("ensurePhiNode: nil phi")
@@ -210,6 +224,19 @@ func (c *Compiler) llvmValueTypeForSSA(t ssa.Type) llvm.Type {
 
 func (c *Compiler) inferPhiType(inst *ssa.Phi) llvm.Type {
 	return c.llvmValueTypeForSSA(inst.GetType())
+}
+
+func (c *Compiler) ssaValueIsFunction(val ssa.Value) bool {
+	if val == nil {
+		return false
+	}
+	if t := val.GetType(); t != nil && t.GetTypeKind() == ssa.FunctionTypeKind {
+		return true
+	}
+	if _, ok := ssa.ToFunction(val); ok {
+		return true
+	}
+	return false
 }
 
 func (c *Compiler) ssaValueIsPointer(val ssa.Value, fn *ssa.Function) bool {
@@ -364,13 +391,36 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		if c.function != nil {
 			c.function.activeBlockID = blockID
 		}
+		if c.phiMemberIsLoopCarriedMapRead(inst) && c.hasAssignedMemberCallVariable(inst) {
+			// The front end represents a loop-body member write (m[i] = i)
+			// as a loop-carried member phi: the write is merged into the
+			// condition block. Emit it here, in the phi's own block, where
+			// both the key (the loop phi) and the value (this phi) hold the
+			// current iteration's words.
+			if err := c.maybeEmitMemberSet(inst, inst, phiID); err != nil {
+				return err
+			}
+			obj := inst.GetObject()
+			key := inst.GetKey()
+			if obj == nil || key == nil {
+				return nil
+			}
+			if !c.hasValueSlot(obj.GetId()) {
+				if _, err := c.getValue(inst, obj.GetId()); err != nil {
+					return err
+				}
+			}
+			objVal := c.loadSSAValue(obj.GetId())
+			phiVal := c.loadSSAValue(phiID)
+			c.emitRuntimeSetFieldByKey(inst, objVal, key, c.resolveMemberKeyString(key), phiVal, inst, phiID)
+			return nil
+		}
 		if err := c.maybeEmitMemberSet(inst, inst, phiID); err != nil {
 			return err
 		}
 		if inst.IsMember() && inst.GetObject() != nil {
 			if objInst, ok := inst.GetObject().(ssa.Instruction); ok && objInst != nil {
 				return c.withInstructionInsertPoint(objInst, func() error {
-					c.emitDirectMemberValueSetIfReady(objInst, inst, phiID)
 					return c.flushPendingMemberSets(objInst, inst.GetObject(), inst.GetKey())
 				})
 			}
@@ -406,6 +456,11 @@ func (c *Compiler) resolvePhiIncomingValue(contextInst *ssa.Phi, fn *ssa.Functio
 	}
 	edgeObj, ok := fn.GetValueById(edgeValID)
 	if !ok || edgeObj == nil {
+		return zero, nil
+	}
+	// An undefined member placeholder (e.g. the front end's m[i] read merge
+	// in a loop) is resolved at its real use site, not as a phi edge.
+	if undef, ok := edgeObj.(*ssa.Undefined); ok && undef != nil && undef.IsMember() {
 		return zero, nil
 	}
 	if sideEffect, ok := edgeObj.(*ssa.SideEffect); ok && sideEffect != nil && sideEffect.GetBlock() != nil &&

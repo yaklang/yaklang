@@ -113,20 +113,28 @@ func yak_runtime_make_callable(fn uintptr, paramMemberCount int64, freeCount int
 }
 
 //export yak_runtime_to_cstring
-func yak_runtime_to_cstring(ptr unsafe.Pointer) *C.char {
+func yak_runtime_to_cstring(ptr uintptr) *C.char {
 	defer recoverRuntimePanic()
-	if ptr == nil {
-		return nil
-	}
-	if s, ok := tryResolveShadowString(ptr); ok {
-		// Intentionally leaked: used by native binary as an owned C string.
-		return C.CString(s)
-	}
-	// A tagged C-string pointer (compiler tagged a literal) must have its tag
-	// cleared before it is used as an address.
-	raw := uint64(uintptr(ptr))
+	raw := uint64(ptr)
 	raw &^= yakTaggedPointerMask
-	return (*C.char)(unsafe.Pointer(uintptr(raw)))
+	objPtr := unsafe.Pointer(uintptr(raw))
+	if raw != 0 {
+		if s, ok := tryResolveShadowString(objPtr); ok {
+			// Intentionally leaked: used by native binary as an owned C string.
+			return C.CString(s)
+		}
+	}
+	if !looksLikeCStringPointer(raw) {
+		// A small integer (e.g. a map key or index) is not a C-string address;
+		// convert it to its string form so dynamic member keys work. Passing
+		// such a value as unsafe.Pointer would trip cgo's unpinned-pointer
+		// check before the function body runs, so the ABI takes uintptr.
+		// Zero is a valid integer key ("0"), not a nil C string.
+		return C.CString(fmt.Sprintf("%d", int64(raw)))
+	}
+	// Always hand back a C-owned copy: cgo refuses to return a raw Go/static
+	// binary pointer from an exported function ("unpinned Go pointer").
+	return C.CString(runtimeCStringToGoString(unsafe.Pointer(uintptr(raw))))
 }
 
 // --- Handle Management ---

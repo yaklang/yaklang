@@ -56,7 +56,7 @@ func (c *Compiler) withLazyCompileInsertPoint(contextInst, targetInst ssa.Instru
 			// instruction own function (not the currently active one) so the
 			// value dominates its uses inside that function.
 			if targetFn := targetInst.GetFunc(); targetFn != nil && targetFn.EnterBlock > 0 {
-				if entryBB, ok := c.Blocks[targetFn.EnterBlock]; ok && !entryBB.IsNil() {
+				if entryBB := c.entryBlockFor(targetFn); !entryBB.IsNil() {
 					c.function.activeBlockID = targetFn.EnterBlock
 					c.setInsertPointBeforeTerminator(entryBB)
 					err := compile()

@@ -146,7 +146,13 @@ func (b *FunctionBuilder) readValueEx(
 
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
 		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() {
-			ret = local
+			// A loop-condition spin variable lives in the current scope; its
+			// global index differs from the parent's local variable, but
+			// replacing it would turn the loop-carried Phi into the initial
+			// constant and make the loop condition fold to a literal.
+			if ret.GetScope() != scope {
+				ret = local
+			}
 		}
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)

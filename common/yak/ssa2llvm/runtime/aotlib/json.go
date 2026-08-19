@@ -162,6 +162,77 @@ func JsonNoEscapeHTML() interface{} {
 	return jsonNoEscapeHTMLOption{}
 }
 
+// JsonFindPath implements the subset of json.FindPath the mustpass suite uses:
+// recursive-descent `$..key` / `$..a..b` lookups returning the first match.
+func JsonFindPath(v any, path string) any {
+	segs := strings.Split(strings.TrimPrefix(strings.TrimSpace(path), "$"), "..")
+	var segs2 []string
+	for _, s := range segs {
+		if s != "" {
+			segs2 = append(segs2, s)
+		}
+	}
+	if len(segs2) == 0 {
+		return v
+	}
+	return jsonFindPathRec(v, segs2)
+}
+
+func jsonFindPathRec(v any, segs []string) any {
+	if len(segs) == 0 {
+		return v
+	}
+	key := segs[0]
+	rest := segs[1:]
+	var found any
+	walkJSON(v, func(cur any) bool {
+		if m, ok := asJSONMap(cur); ok {
+			if val, ok := m[key]; ok {
+				if len(rest) == 0 {
+					found = val
+					return false
+				}
+				if r := jsonFindPathRec(val, rest); r != nil {
+					found = r
+					return false
+				}
+			}
+		}
+		return true
+	})
+	return found
+}
+
+func asJSONMap(v any) (map[string]any, bool) {
+	switch m := v.(type) {
+	case map[string]any:
+		return m, true
+	case *orderedMap:
+		return m.values, true
+	}
+	return nil, false
+}
+
+func walkJSON(v any, visit func(any) bool) {
+	if !visit(v) {
+		return
+	}
+	switch val := v.(type) {
+	case map[string]any:
+		for _, child := range val {
+			walkJSON(child, visit)
+		}
+	case *orderedMap:
+		for _, child := range val.values {
+			walkJSON(child, visit)
+		}
+	case []any:
+		for _, child := range val {
+			walkJSON(child, visit)
+		}
+	}
+}
+
 // JsonDumps serializes a value to a JSON string. Shadow objects (e.g. the
 // runtime's ordered map or this package's orderedMap) implement MarshalJSON,
 // so nested yak objects keep their key order.
@@ -250,4 +321,5 @@ var JsonExports = map[string]any{
 	"dumps":        JsonDumps,
 	"withIndent":   JsonWithIndent,
 	"noEscapeHTML": JsonNoEscapeHTML,
+	"FindPath":     JsonFindPath,
 }

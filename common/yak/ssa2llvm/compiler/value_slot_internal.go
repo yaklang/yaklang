@@ -111,6 +111,11 @@ func (c *Compiler) hasValueSlot(id int64) bool {
 }
 
 func (c *Compiler) loadSSAValue(id int64) llvm.Value {
+	if c != nil && c.function != nil && c.function.freeValuePointers != nil {
+		if ptr, ok := c.function.freeValuePointers[id]; ok && !ptr.IsNil() {
+			return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), ptr, fmt.Sprintf("yak_free_load_%d", id))
+		}
+	}
 	slot := c.ensureValueSlot(id)
 	if slot.IsNil() {
 		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
@@ -121,6 +126,16 @@ func (c *Compiler) loadSSAValue(id int64) llvm.Value {
 func (c *Compiler) storeSSAValue(id int64, val llvm.Value) {
 	if c == nil || id <= 0 || val.IsNil() {
 		return
+	}
+	if c.function != nil && c.function.freeValuePointers != nil {
+		if ptr, ok := c.function.freeValuePointers[id]; ok && !ptr.IsNil() {
+			c.Builder.CreateStore(c.coerceToInt64(val), ptr)
+			if c.function.storedValues == nil {
+				c.function.storedValues = make(map[int64]struct{})
+			}
+			c.function.storedValues[id] = struct{}{}
+			return
+		}
 	}
 	slot := c.ensureValueSlot(id)
 	if slot.IsNil() {

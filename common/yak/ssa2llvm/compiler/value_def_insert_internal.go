@@ -25,7 +25,7 @@ func (c *Compiler) ssaDefBlock(id int64) (int64, llvm.BasicBlock, bool) {
 
 	targetBB, ok := c.Blocks[defBlockID]
 	if (!ok || targetBB.IsNil()) && fn.EnterBlock > 0 {
-		if entryBB, ok := c.Blocks[fn.EnterBlock]; ok && !entryBB.IsNil() {
+		if entryBB := c.entryBlockFor(fn); !entryBB.IsNil() {
 			targetBB = entryBB
 			defBlockID = fn.EnterBlock
 			ok = true
@@ -39,7 +39,7 @@ func (c *Compiler) ssaDefBlock(id int64) (int64, llvm.BasicBlock, bool) {
 			if c.function.activeBlockID == defBlockID {
 				return defBlockID, targetBB, true
 			}
-			if entryBB, ok := c.Blocks[fn.EnterBlock]; ok && !entryBB.IsNil() {
+			if entryBB := c.entryBlockFor(fn); !entryBB.IsNil() {
 				targetBB = entryBB
 				defBlockID = fn.EnterBlock
 			}

@@ -261,6 +261,15 @@ func (c *Compiler) compileMemberCall(contextInst ssa.Instruction, val ssa.Value,
 	keyStr := c.resolveMemberKeyString(key)
 
 	if obj != nil {
+		// A closure free-value parameter whose default is an extern lib (e.g.
+		// tcp captured by a go func) must be resolved to the extern lib at
+		// compile time; the runtime represents extern libs as 0 and cannot
+		// dispatch methods on them.
+		if param, ok := ssa.ToParameter(obj); ok && param != nil && param.GetDefault() != nil {
+			if extern, ok := ssa.ToExternLib(param.GetDefault()); ok && extern != nil {
+				obj = extern
+			}
+		}
 		if extern, ok := ssa.ToExternLib(obj); ok && extern != nil {
 			if err := c.compileExternLibMember(contextInst, val, extern, key, keyStr); err != nil {
 				return err
@@ -464,7 +473,11 @@ func (c *Compiler) getOrInsertRuntimeToCString() (llvm.Value, llvm.Type) {
 	fn := c.Mod.NamedFunction(name)
 
 	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
-	fnType := llvm.FunctionType(i8Ptr, []llvm.Type{i8Ptr}, false)
+	i64 := c.LLVMCtx.Int64Type()
+	// The runtime export takes uintptr (not unsafe.Pointer): integer member
+	// keys (m[0], m[i]) must be able to reach the conversion without cgo's
+	// unpinned-pointer check rejecting small raw words.
+	fnType := llvm.FunctionType(i8Ptr, []llvm.Type{i64}, false)
 	if fn.IsNil() {
 		fn = llvm.AddFunction(c.Mod, name, fnType)
 	}
@@ -544,6 +557,19 @@ func (c *Compiler) memberKeyIsStaticString(key ssa.Value) bool {
 	return ok
 }
 
+// memberKeyIsStringConst reports whether the member key is a string constant
+// (a method name), as opposed to a numeric index or a dynamic key.
+func (c *Compiler) memberKeyIsStringConst(key ssa.Value) bool {
+	if key == nil {
+		return false
+	}
+	ci, ok := ssa.ToConstInst(key)
+	if !ok {
+		return false
+	}
+	return ci.IsString()
+}
+
 // emitRuntimeGetFieldByKey lowers a member read for a possibly dynamic key
 // (e.g. m[k] where k is a loop variable). Static string keys use the existing
 // global-string path; dynamic keys are converted to a C string at runtime.
@@ -553,7 +579,7 @@ func (c *Compiler) emitRuntimeGetFieldByKey(objVal llvm.Value, key ssa.Value, co
 	}
 	if keyVal, err := c.getValue(contextInst, key.GetId()); err == nil && !keyVal.IsNil() && !c.isZeroRuntimeKey(keyVal) {
 		toCStrFn, toCStrType := c.getOrInsertRuntimeToCString()
-		keyPtr := c.Builder.CreateCall(toCStrType, toCStrFn, []llvm.Value{c.coerceToI8Ptr(keyVal)}, fmt.Sprintf("member_key_ptr_%d", id))
+		keyPtr := c.Builder.CreateCall(toCStrType, toCStrFn, []llvm.Value{c.coerceToInt64(keyVal)}, fmt.Sprintf("member_key_ptr_%d", id))
 		fn, fnType := c.getOrInsertRuntimeGetField()
 		return c.Builder.CreateCall(fnType, fn, []llvm.Value{c.coerceToI8Ptr(objVal), keyPtr}, "member_get")
 	}
@@ -571,7 +597,20 @@ func (c *Compiler) emitRuntimeSetField(objVal llvm.Value, keyStr string, val llv
 	intVal := c.coerceToInt64(val)
 	flags := uint64(0)
 	ssaVal = c.effectiveRuntimeFieldValue(ssaVal)
-	if ssaVal != nil && c.ssaValueIsPointer(ssaVal, ssaVal.GetFunc()) {
+	if ssaVal != nil && c.ssaValueIsFunction(ssaVal) {
+		// A function value stored in a container must be a materialized
+		// closure object (shadow handle), not a raw function pointer: the
+		// runtime decodes untagged addresses above 1 MiB as C strings, and a
+		// later call through the container would either crash or call the
+		// wrong target. Materialize the closure so free values travel with it.
+		if fn := ssaVal.GetFunc(); fn != nil {
+			if ssaFn, ok := c.functionValueForArg(fn, ssaVal.GetId()); ok && ssaFn != nil && !ssaFn.IsExtern() {
+				if closure, err := c.materializeCallableClosure(nil, ssaFn); err == nil {
+					intVal = c.coerceToInt64(closure)
+				}
+			}
+		}
+	} else if ssaVal != nil && c.ssaValueIsPointer(ssaVal, ssaVal.GetFunc()) {
 		tag := llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false)
 		intVal = c.Builder.CreateOr(intVal, tag, "yak_set_field_arg_tag")
 	}
@@ -617,7 +656,7 @@ func (c *Compiler) emitRuntimeSetFieldByKey(contextInst ssa.Instruction, objVal 
 	if key != nil && !c.memberKeyIsStaticString(key) {
 		if keyVal, err := c.getValue(contextInst, key.GetId()); err == nil && !keyVal.IsNil() && !c.isZeroRuntimeKey(keyVal) {
 			toCStrFn, toCStrType := c.getOrInsertRuntimeToCString()
-			keyPtr := c.Builder.CreateCall(toCStrType, toCStrFn, []llvm.Value{c.coerceToI8Ptr(keyVal)}, fmt.Sprintf("member_key_ptr_set_%d", id))
+			keyPtr := c.Builder.CreateCall(toCStrType, toCStrFn, []llvm.Value{c.coerceToInt64(keyVal)}, fmt.Sprintf("member_key_ptr_set_%d", id))
 			fn, fnType := c.getOrInsertRuntimeSetField()
 			intVal := c.coerceToInt64(val)
 			flags := uint64(0)
@@ -782,7 +821,10 @@ func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value
 	}
 	if val.IsMember() {
 		switch val.(type) {
-		case *ssa.ParameterMember, *ssa.Undefined:
+		case *ssa.ParameterMember, *ssa.Undefined, *ssa.Phi:
+			// Phis are loop-carried member *reads* merged from side effects;
+			// writing the phi back would overwrite the freshly assigned value
+			// with the pre-loop value.
 		default:
 			obj := val.GetObject()
 			key := val.GetKey()
@@ -888,7 +930,7 @@ func (c *Compiler) shouldReadMemberValueDynamically(val ssa.Value, id int64) boo
 		}
 	}
 	switch val.(type) {
-	case *ssa.Parameter, *ssa.ParameterMember, *ssa.SideEffect:
+	case *ssa.Parameter, *ssa.ParameterMember, *ssa.SideEffect, *ssa.Phi:
 		return false
 	case *ssa.Undefined:
 		obj, key := c.firstOwnerObjectKey(val)
@@ -962,6 +1004,11 @@ func (c *Compiler) emitAssignedMemberVariableSets(contextInst ssa.Instruction, v
 
 	for _, variable := range vars {
 		if variable == nil || !variable.IsMemberCall() {
+			continue
+		}
+		// Loop-carried phis are member *reads* merged from side effects; their
+		// member-call variables must not be re-written at every merge point.
+		if _, isPhi := val.(*ssa.Phi); isPhi {
 			continue
 		}
 		obj, key := variable.GetMemberCall()
@@ -1109,6 +1156,11 @@ func (c *Compiler) valueAvailableAtInstruction(value ssa.Value, contextInst ssa.
 
 func (c *Compiler) queuePendingMemberSet(source ssa.Value, resultID int64, obj, key ssa.Value, direct bool) {
 	if c == nil || c.function == nil || source == nil || resultID <= 0 || obj == nil || key == nil {
+		return
+	}
+	// Loop-carried member phis are reads merged by the front end, not writes
+	// to queue: flushing them writes stale/uninitialized keys into the map.
+	if phi, ok := source.(*ssa.Phi); ok && phi != nil && c.phiMemberIsLoopCarriedMapRead(phi) {
 		return
 	}
 	keyStr := c.resolveMemberKeyString(key)
@@ -1566,11 +1618,59 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 
 	seen := make(map[string]struct{})
 	makeBB := c.restoreInsertBlock(inst)
+	makeIndex := -1
+	if inst.GetBlock() != nil {
+		for i, id := range inst.GetBlock().Insts {
+			if id == inst.GetId() {
+				makeIndex = i
+				break
+			}
+		}
+	}
 	var emitErr error
 	for _, pair := range ssa.GetMemberPairs(inst) {
 		key, member := pair.Key, pair.Member
 		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
 			continue
+		}
+		// Undefined member placeholders (e.g. m[i] or m[0] later in the
+		// program) are resolved at their real use site, not during the Make.
+		if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil {
+			continue
+		}
+		if u, isUndef := key.(*ssa.Undefined); isUndef && u != nil {
+			continue
+		}
+		// Loop-carried member phis are reads merged by the front end, not
+		// literal members to initialize here.
+		if _, isPhi := member.(*ssa.Phi); isPhi {
+			continue
+		}
+		if _, isPhi := key.(*ssa.Phi); isPhi {
+			continue
+		}
+		memberInst, memberIsInst := member.(ssa.Instruction)
+		if memberIsInst && memberInst.GetBlock() != nil && inst.GetBlock() != nil {
+			if memberInst.GetBlock().GetId() != inst.GetBlock().GetId() {
+				continue
+			}
+			if makeIndex >= 0 {
+				if idx := instructionIndex(memberInst.GetBlock(), memberInst.GetId()); idx > makeIndex {
+					continue
+				}
+			}
+		}
+		if keyInst, keyIsInst := key.(ssa.Instruction); keyIsInst && keyInst.GetBlock() != nil && inst.GetBlock() != nil {
+			if keyInst.GetBlock().GetId() != inst.GetBlock().GetId() {
+				continue
+			}
+			// Constant literal keys (slice/array indices) are always valid
+			// initial members even when they appear after the Make.
+			if _, isConst := key.(*ssa.ConstInst); !isConst && makeIndex >= 0 {
+				if idx := instructionIndex(keyInst.GetBlock(), keyInst.GetId()); idx > makeIndex {
+					continue
+				}
+			}
 		}
 		keyStr := c.resolveMemberKeyString(key)
 		if keyStr == "" {
