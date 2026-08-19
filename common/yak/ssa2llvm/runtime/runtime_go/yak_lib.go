@@ -224,7 +224,7 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 	if om, ok := obj.(runtimeStringMap); ok {
 		value, exists := om.Get(name)
 		if !exists {
-			return reflect.Value{}, fmt.Errorf("ordered map key %q not found", name)
+			return reflect.Value{}, nil
 		}
 		return reflect.ValueOf(value), nil
 	}
@@ -254,7 +254,7 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 		}
 		f := v.MapIndex(key)
 		if !f.IsValid() {
-			return reflect.Value{}, fmt.Errorf("map key %q not found", name)
+			return reflect.Value{}, nil
 		}
 		return f, nil
 	case reflect.Slice, reflect.Array:
