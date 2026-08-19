@@ -70,8 +70,8 @@ func (c *Compiler) ensureValueSlot(id int64) llvm.Value {
 	if fn == nil || fn.EnterBlock <= 0 {
 		return llvm.Value{}
 	}
-	entryBB, ok := c.Blocks[fn.EnterBlock]
-	if !ok || entryBB.IsNil() {
+	entryBB := c.entryBlockFor(fn)
+	if entryBB.IsNil() {
 		return llvm.Value{}
 	}
 
