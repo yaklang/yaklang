@@ -6,6 +6,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// maxRestoredGlobalMemberPairs bounds per-global member-call restoration:
+// huge globals (e.g. gb2312 maps with 21792 entries) are skipped because
+// restoring all results per block is O(N) and only needed within the
+// declaring file, not cross-file (review B5).
+const maxRestoredGlobalMemberPairs = 5000
+
 func memberKeyNameForGlobal(key Value) string {
 	if utils.IsNil(key) {
 		return ""
@@ -143,7 +149,7 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 		// handful of member call results.
 		if av, ok := ToValue(member); ok && av != nil {
 			rawAv := av.getAnValue()
-			if rawAv != nil && len(rawAv.memberPairs) <= 5000 {
+			if rawAv != nil && len(rawAv.memberPairs) <= maxRestoredGlobalMemberPairs {
 				for _, pair := range rawAv.memberPairs {
 					keyVal, ok1 := rawAv.resolveLinkedValue(pair.key)
 					memberVal, ok2 := rawAv.resolveLinkedValue(pair.member)

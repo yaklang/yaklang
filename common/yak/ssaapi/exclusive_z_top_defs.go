@@ -96,9 +96,9 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 			}
 		}
 		// shadow is a pure factory shell used only as a ParentProgram carrier for
-		// the mask defs; it is never appended to vals/edges/results itself, so it
-		// is unreachable after this loop. Release it.
-		releaseValue(shadow)
+		// the mask defs. Even though it is not appended to vals/edges/results,
+		// getTopDefs may retain it through EffectOn/DependOn/Predecessors, so it
+		// is deliberately left to the GC instead of being pooled (review A4).
 	}
 	return vals
 }
@@ -160,10 +160,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				if raw, ok := key.GetConstValue().(string); ok && strings.HasPrefix(raw, "$") {
 					normalizedKey := i.NewValue(ssa.NewConst(strings.TrimPrefix(raw, "$")))
 					members = i.GetMember(normalizedKey)
-					// normalizedKey is a pure factory shell used only as a lookup
-					// key; GetMember never retains it. Release it now that it is
-					// unreachable.
-					releaseValue(normalizedKey)
+					// normalizedKey is a factory shell used only as a lookup key.
+					// GetMember may retain it internally, so it is deliberately
+					// left to the GC instead of being pooled (review A4).
 				}
 			}
 			for i, m := range members {

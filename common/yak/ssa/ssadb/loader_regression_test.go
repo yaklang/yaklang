@@ -506,3 +506,14 @@ func TestNativeGetIrCodesByIds_Concurrent(t *testing.T) {
 		<-done
 	}
 }
+
+// TestConstTypeRegexpOperatorByDialect verifies the native ConstType regex
+// operator mirrors the GORM fallback's dialect switch (review A7): PostgreSQL
+// uses ~, everything else uses REGEXP.
+func TestConstTypeRegexpOperatorByDialect(t *testing.T) {
+	require.Equal(t, "REGEXP", constTypeRegexpOperator("sqlite"))
+	require.Equal(t, "REGEXP", constTypeRegexpOperator("mysql"))
+	require.Equal(t, "REGEXP", constTypeRegexpOperator(""))
+	require.Equal(t, "~", constTypeRegexpOperator("postgres"))
+	require.Equal(t, "~", constTypeRegexpOperator("postgresql"))
+}

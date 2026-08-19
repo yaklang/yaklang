@@ -554,6 +554,10 @@ func (c *Cache[T, D]) drainResidentForClose() {
 	log.Warnf("[dbcache-close] maxPasses=%d exhausted, %d items still resident", maxPasses, c.resident.Count())
 }
 
+// minPersistLimit floors the auto-computed persist limit so a tiny save size
+// cannot create pathological backpressure churn (review B5).
+const minPersistLimit = 512
+
 func resolvePersistLimit(maxEntries, saveSize, override int) int {
 	if override > 0 {
 		return override
@@ -572,7 +576,7 @@ func resolvePersistLimit(maxEntries, saveSize, override int) int {
 	if limit <= 0 {
 		limit = saveSize
 	}
-	return max(limit, 512)
+	return max(limit, minPersistLimit)
 }
 
 func (c *Cache[T, D]) CloseWithoutSave() {

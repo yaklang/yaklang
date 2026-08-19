@@ -128,6 +128,15 @@ func SearchVariableWithIncludeFiles(db *gorm.DB, ctx context.Context, progName s
 	return result
 }
 
+// ConstType search predicate shared by the GORM fallback and the native-SQL
+// fast path: ir_codes rows with this opcode and const_type represent normal
+// constant values. Keeping the pair in one place prevents silent divergence
+// between the two query paths (review A7).
+const (
+	constTypeOpcode = 5
+	constTypeName   = "normal"
+)
+
 func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles, includeFiles []string) <-chan *IrCode {
 	if compareMode == GlobCompare {
 		value = glob.Glob2Regex(value)
@@ -157,7 +166,7 @@ func searchVariableWithFileFilter(db *gorm.DB, ctx context.Context, progName str
 		}
 		query := GetDB().Model(&IrCode{}).
 			Where(TableIrCodes+".program_name = ?", progName).
-			Where(TableIrCodes+".opcode = ? AND "+TableIrCodes+".const_type = ?", 5, "normal")
+			Where(TableIrCodes+".opcode = ? AND "+TableIrCodes+".const_type = ?", constTypeOpcode, constTypeName)
 		if compareMode == ExactCompare {
 			query = query.Where(TableIrCodes+".string = ?", value)
 		} else {

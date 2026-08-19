@@ -277,12 +277,12 @@
 
 > 本报告只做 review，未修改任何生产代码。
 
-
 ## 更新记录（2026-08-19，`test/scan/large_projects` @ 55dfad995）
 
 本轮按本报告做了“代码结构与逻辑”修复，并逐项复核当前源码：
 
 ### 已修复（本轮）
+
 - **A1**：`fastMatchSymbolIDs` 不再缓存 `fastMatchIDs`。符号集合在 descent 中会增长，旧缓存会静默错判 include/exclude；现在每次在 `config.Mutex` 下重建（集合通常很小），并删除 `fastMatchMu`/`fastMatchIDs` 字段。
 - **A2**：`persistLimitBypass` 由一次性 `atomic.Bool` 改为作用域计数（`atomic.Int32`），`MarkDirtyAsync` 返回即复位；新增回归测试 `TestMarkDirtyAsync_ResetsPersistLimitBypass`。
 - **A3（部分）**：内存去重 key 加入 `variable_name`，与 DB 唯一索引 `(program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name,''))` 对齐；标记移到 enqueue 之后，避免 enqueue 失败即“永久 poison”。`offsetSaved` 无界增长仍未处理（保留为后续项）。
@@ -297,12 +297,15 @@
 - **B1**：`ssadb/database.go` 注释中的 `COALESCE(variable_name, '')` 改为无引号描述，`gofmt -l` 干净。
 
 ### 已验证（无需改）
+
 - **A14**：当前源码已经是先 `Add(1)` 再 `Done()`（`FinishPersist` 内 retry 计数在锁内先加），报告所述顺序问题已不存在。
 
 ### 仍为风险/未改（语义变更，保持假设状态）
+
 - A4（Value pool 契约）、A5（FunctionType.String 并发）、A6（全局 StaticMember 遮蔽/无界）、A7（native SQL 方言/魔数）、A9（yieldIrCodes 全量物化）、A10（启动全表查重/索引迁移）、A11（UpdatedAt 判断 stale）、A12（GOMEMLIMIT 全局副作用）、A16（GC/FreeOSMemory 有意保留；仅删除 hack/import）、B3（中英混杂注释）、B4（测试钩子进生产）、B5（魔数/截断）、B9（默认并发语义）。
 
 ### 验证记录（2026-08-19 17:20 CST）
+
 - `go build -o /tmp/yak-gate-build ./common/yak/cmd/yak.go` 通过；本轮全部改动文件 `gofmt -l` 干净。
 - `scripts/ssa-test.sh` 全量门禁：在 `common/yak/go2ssa/test` 因 30s 包超时中止（goroutine dump 显示仍在做 ANTLR 反序列化）。该包在本机 baseline（main worktree，干净代码）单独跑也需 30.4s+，属于门禁超时过紧/机器负载，非本批改动引入；用宽松超时单独跑该包通过（本 worktree 49.6s）。
 - 目标包在隔离 `YAKIT_HOME` 下全部通过：
@@ -312,3 +315,14 @@
   - `common/yak/ssaapi` ok（含 `TestSFCheck_FastPath_SymbolTableGrowthIsFresh`）
   - `common/yak/ssaapi/test/ssatest` ok
 - 说明：未使用共享 `.db/`（其 `default-yakssa.db` 有历史残留，会让 `TestProgram_NewProgram` 计数多 1），与 `scripts/ssa-test.sh` 相同用临时 `YAKIT_HOME` 验证。
+
+## 更新记录（2026-08-19 第二轮，@ 254434248）
+
+- **A4 已处理**：移除 `exclusive_z_top_defs.go` 两处 `releaseValue`（mask `shadow` 与 `normalizedKey`），只保留 `NewValue` 失败路径的池回收。按报告建议“去掉 release 只靠 GC 兜底（保留 acquire 池化）”，不再依赖注释契约保证可达性。
+- **A7 已修复**：抽出 `constTypeOpcode` / `constTypeName` 常量，GORM fallback 与 native-SQL 共用，防止一侧改动另一侧分叉；native ConstType 非精确匹配按 dialect 选择操作符（postgres/postgresql 用 `~`，其余用 `REGEXP`），与 GORM fallback 的 switch 完全一致；新增 `TestConstTypeRegexpOperatorByDialect`。
+- **B5（部分）**：`resolvePersistLimit` 的 `512` 下限与 `ssa_globalBulePrint.go` 的 `5000` memberPairs 上限提取为命名常量（`minPersistLimit`、`maxRestoredGlobalMemberPairs`）。
+
+### 验证（第二轮）
+
+- 隔离 `YAKIT_HOME` 下 `common/utils/dbcache/...`、`common/yak/ssa/...`（含 ssadb）、`common/yak/ssaapi` 全部通过。
+- 改动文件 `gofmt -l` 干净；`go build -o /tmp/yak-gate-build ./common/yak/cmd/yak.go` 通过。

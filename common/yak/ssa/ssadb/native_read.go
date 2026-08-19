@@ -293,6 +293,17 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 	return out, nil
 }
 
+// constTypeRegexpOperator mirrors the GORM ConstType fallback: PostgreSQL uses
+// the POSIX regex operator (~), other dialects use SQLite's REGEXP (review A7).
+func constTypeRegexpOperator(dialect string) string {
+	switch dialect {
+	case "postgres", "postgresql":
+		return "~"
+	default:
+		return "REGEXP"
+	}
+}
+
 // joinPlaceholders joins a slice of "?" placeholders with commas.
 func joinPlaceholders(ps []string) string {
 	if len(ps) == 0 {
@@ -309,10 +320,11 @@ func joinPlaceholders(ps []string) string {
 }
 
 // nativeGetIrCodeIDsByConstType returns the code_ids matching the ConstType
-// search predicate (opcode=5, const_type='normal', string exact or REGEXP),
+// search predicate (constTypeOpcode/constTypeName, string exact or regex),
 // mirroring the GORM Model(&IrCode{}) path used by searchVariableWithFileFilter
-// (including soft-delete deleted_at IS NULL). It is the A3 fast path: the GORM
-// version built Model+Where+Pluck+YieldIrCode per call (3.59M calls on hadoop).
+// (including soft-delete deleted_at IS NULL, and the same postgres ~ vs
+// default REGEXP dialect switch). It is the A3 fast path: the GORM version
+// built Model+Where+Pluck+YieldIrCode per call (3.59M calls on hadoop).
 func nativeGetIrCodeIDsByConstType(db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, error) {
 	if db == nil || progName == "" {
 		return nil, nil
@@ -323,11 +335,11 @@ func nativeGetIrCodeIDsByConstType(db *gorm.DB, progName string, compareMode Com
 	if compareMode == ExactCompare {
 		q = bindSQLPlaceholdersDB(db, `SELECT code_id FROM `+TableIrCodes+
 			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" = ? AND deleted_at IS NULL`)
-		args = []interface{}{progName, 5, "normal", value}
+		args = []interface{}{progName, constTypeOpcode, constTypeName, value}
 	} else {
 		q = bindSQLPlaceholdersDB(db, `SELECT code_id FROM `+TableIrCodes+
-			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" REGEXP ? AND deleted_at IS NULL`)
-		args = []interface{}{progName, 5, "normal", value}
+			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" `+constTypeRegexpOperator(db.Dialect().GetName())+` ? AND deleted_at IS NULL`)
+		args = []interface{}{progName, constTypeOpcode, constTypeName, value}
 	}
 	started := time.Now()
 	ctx, cancel := nativeQueryContext(context.Background())
