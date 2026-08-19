@@ -110,9 +110,13 @@ func runtimeResolveStringMethod(s string, name string) (reflect.Value, bool) {
 	case "HasSuffix", "EndsWith":
 		return reflect.ValueOf(func(suffix string) bool { return strings.HasSuffix(s, suffix) }), true
 	case "RemovePrefix":
-		return reflect.ValueOf(func(prefix string) string { return strings.TrimPrefix(s, prefix) }), true
+		return reflect.ValueOf(func(prefix string) string {
+			return strings.TrimPrefix(s, prefix)
+		}), true
 	case "RemoveSuffix":
-		return reflect.ValueOf(func(suffix string) string { return strings.TrimSuffix(s, suffix) }), true
+		return reflect.ValueOf(func(suffix string) string {
+			return strings.TrimSuffix(s, suffix)
+		}), true
 	case "Split":
 		return reflect.ValueOf(func(sep string) []string { return strings.Split(s, sep) }), true
 	case "SplitN":
@@ -137,6 +141,14 @@ type runtimeCallableClosure struct {
 func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error) {
 	if targetType == nil {
 		return reflect.Value{}, fmt.Errorf("missing target type")
+	}
+
+	// nil (0) is a valid value for nullable targets (nil slice/map/ptr/iface).
+	if raw == 0 {
+		switch targetType.Kind() {
+		case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Interface, reflect.Func, reflect.Chan:
+			return reflect.Zero(targetType), nil
+		}
 	}
 
 	if targetType.Kind() == reflect.Func {
@@ -496,6 +508,23 @@ func callRuntimeValue(target reflect.Value, rawArgs []uint64) (int64, error) {
 func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs []uint64) (int64, error) {
 	handle, ok := handleFromShadow(objPtr)
 	if !ok {
+		// String receivers are passed as C-string pointers (or string shadows)
+		// rather than shadow handles; resolve the string method directly.
+		if s, ok := tryResolveShadowString(objPtr); ok {
+			if method, ok := runtimeResolveStringMethod(s, methodName); ok {
+				return callRuntimeValue(method, rawArgs)
+			}
+			return 0, fmt.Errorf("method %q not found on string", methodName)
+		}
+		raw := uint64(uintptr(objPtr))
+		raw &^= yakTaggedPointerMask
+		if looksLikeCStringPointer(raw) {
+			s := runtimeCStringToGoString(unsafe.Pointer(uintptr(raw)))
+			if method, ok := runtimeResolveStringMethod(s, methodName); ok {
+				return callRuntimeValue(method, rawArgs)
+			}
+			return 0, fmt.Errorf("method %q not found on string", methodName)
+		}
 		return 0, fmt.Errorf("invalid shadow object for method %q", methodName)
 	}
 
