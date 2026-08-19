@@ -326,3 +326,11 @@
 
 - 隔离 `YAKIT_HOME` 下 `common/utils/dbcache/...`、`common/yak/ssa/...`（含 ssadb）、`common/yak/ssaapi` 全部通过。
 - 改动文件 `gofmt -l` 干净；`go build -o /tmp/yak-gate-build ./common/yak/cmd/yak.go` 通过。
+
+
+## 更新记录（2026-08-19 第三轮，@ a3f74ee3）
+
+- **B4（部分）**：`NativeIrCodeBatchReads` / `NativeConstTypeIDQueries` 两个仅测试使用的导出访问器移入 `loader_regression_test.go`（同包），生产文件只保留未导出的计数器与自增；`MarkDirtyForTest`/`FlushKeysStats` 因外部测试包引用暂留（后续可加 build tag 或专用测试辅助包再处理）。
+
+### 验证（第三轮）
+- 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 通过；改动文件 `gofmt -l` 干净。

@@ -35,21 +35,11 @@ func nativeQueryContext(parent context.Context) (context.Context, context.Cancel
 // (A2) instead of the old GORM FastPagination path.
 var nativeIrCodeBatchReads atomic.Int64
 
-// NativeIrCodeBatchReads returns the test-only batch-read counter.
-func NativeIrCodeBatchReads() int64 {
-	return nativeIrCodeBatchReads.Load()
-}
-
-// nativeConstTypeIDQueries is a test-only counter incremented every time
-// nativeGetIrCodeIDsByConstType performs a ConstType ID query. Tests use it to
-// prove that SearchVariableWithFileFilter routes the ConstType hot path
-// (3.59M calls on hadoop) through native SQL instead of GORM Pluck.
+// nativeConstTypeIDQueries is incremented every time the ConstType fast path
+// runs. Both counters are read only by in-package tests; the exported
+// accessors live in loader_regression_test.go so the test hooks do not pollute
+// the production API (review B4).
 var nativeConstTypeIDQueries atomic.Int64
-
-// NativeConstTypeIDQueries returns the test-only ConstType query counter.
-func NativeConstTypeIDQueries() int64 {
-	return nativeConstTypeIDQueries.Load()
-}
 
 // Native-SQL fast paths for the hot single-row reads (GetIrTypeItemById /
 // GetIrCodeItemById). GORM's First() builds a heavy query chain per call

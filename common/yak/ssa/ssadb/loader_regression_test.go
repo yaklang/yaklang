@@ -12,6 +12,16 @@ import (
 
 // --- from loader_a2_test.go ---
 
+// NativeIrCodeBatchReads returns the test-only batch-read counter.
+func NativeIrCodeBatchReads() int64 {
+	return nativeIrCodeBatchReads.Load()
+}
+
+// NativeConstTypeIDQueries returns the test-only ConstType query counter.
+func NativeConstTypeIDQueries() int64 {
+	return nativeConstTypeIDQueries.Load()
+}
+
 // setupA2LoaderDB creates a shared temp-file DB (not :memory:) with the IrCode
 // schema, so yieldIrCodes' internal GetDB() and the test share the same file.
 func setupA2LoaderDB(t *testing.T) *gorm.DB {
