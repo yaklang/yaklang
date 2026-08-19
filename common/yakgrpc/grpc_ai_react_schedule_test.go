@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/aischedule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -62,14 +64,21 @@ func TestAIReActScheduleCRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), queried.GetTotal())
 	require.Len(t, queried.GetData(), 1)
+	var executionCancelled atomic.Bool
+	unregisterExecution := aischedule.RegisterExecution(created.GetUUID(), func() {
+		executionCancelled.Store(true)
+	})
+	defer unregisterExecution()
 
 	paused, err := server.SetAIReActScheduleEnabled(ctx, &ypb.SetAIReActScheduleEnabledRequest{UUID: created.GetUUID(), Enabled: false})
 	require.NoError(t, err)
 	require.Equal(t, schema.AIReActScheduleStatusPaused, paused.GetStatus())
+	require.False(t, executionCancelled.Load(), "pausing must not cancel an execution that already started")
 
 	deleted, err := server.DeleteAIReActSchedule(ctx, &ypb.DeleteAIReActScheduleRequest{UUID: created.GetUUID()})
 	require.NoError(t, err)
 	require.Equal(t, int64(1), deleted.GetEffectRows())
+	require.False(t, executionCancelled.Load(), "deleting must not cancel an execution that already started")
 }
 
 func TestAIReActScheduleForcesUnattendedReviewPolicy(t *testing.T) {
@@ -109,6 +118,52 @@ func TestAIReActScheduleSupportsBothSessionTargets(t *testing.T) {
 	require.Equal(t, schema.AIReActScheduleTargetContinueSession, legacy.GetTargetMode())
 	require.Equal(t, "busy-user-session", legacy.GetTargetSessionID())
 	require.Equal(t, "yolo", legacy.GetPayload().GetStartParams().GetReviewPolicy())
+}
+
+func TestPrepareIsolatedScheduleSessionIsImmediatelyQueryable(t *testing.T) {
+	server := newScheduleTestServer(t)
+	const sessionID = "ai-schedule-running-session"
+	startedAt := time.Now().Add(-time.Second).Truncate(time.Second)
+	params := &ypb.AIStartParams{TimelineSessionID: sessionID, Source: "ai", ReviewPolicy: "yolo"}
+	schedule := &schema.AIReActSchedule{
+		Name:       "成都香年广场天气查询",
+		Prompt:     "查询四川省成都市香年广场的最新天气情况",
+		TargetMode: schema.AIReActScheduleTargetNewSession,
+	}
+
+	require.NoError(t, prepareIsolatedScheduleSession(
+		server.GetProjectDatabase(),
+		schedule,
+		params,
+		sessionID,
+		startedAt,
+	))
+	manager := newAIReActScheduler(server, server.GetProjectDatabase())
+	server.aiReActScheduler = manager
+	manager.activeBySession[sessionID] = "running-execution"
+
+	response, err := server.QueryAISession(context.Background(), &ypb.QueryAISessionRequest{
+		Pagination: &ypb.Paging{Page: 1, Limit: 10, OrderBy: "last_used_at", Order: "desc"},
+		Filter:     &ypb.AISessionFilter{Source: []string{"ai", ""}},
+	})
+	require.NoError(t, err)
+	require.Len(t, response.GetData(), 1)
+	visible := response.GetData()[0]
+	require.Equal(t, sessionID, visible.GetSessionID())
+	require.Equal(t, schedule.Name, visible.GetTitle())
+	require.True(t, visible.GetTitleInitialized())
+	require.Equal(t, "ai", visible.GetSource())
+	require.Equal(t, startedAt.Unix(), visible.GetLastUsedAt())
+	require.True(t, visible.GetIsRunning())
+
+	delete(manager.activeBySession, sessionID)
+	response, err = server.QueryAISession(context.Background(), &ypb.QueryAISessionRequest{
+		Pagination: &ypb.Paging{Page: 1, Limit: 10},
+		Filter:     &ypb.AISessionFilter{SessionID: []string{sessionID}},
+	})
+	require.NoError(t, err)
+	require.Len(t, response.GetData(), 1)
+	require.False(t, response.GetData()[0].GetIsRunning())
 }
 
 func TestContinueSessionScheduleKeepsChatReviewPolicy(t *testing.T) {
@@ -305,17 +360,21 @@ func TestAIReActSchedulerCancelsActiveExecutionInMemory(t *testing.T) {
 	job := &scheduledReActJob{
 		executionID:  "active-execution",
 		scheduleUUID: "schedule",
+		sessionID:    "ai-schedule-active-execution",
 		ctx:          jobCtx,
 		cancel:       cancel,
 	}
 	manager.jobs[job.executionID] = job
 	manager.activeBySchedule[job.scheduleUUID] = job.executionID
+	manager.activeBySession[job.sessionID] = job.executionID
+	require.True(t, manager.isSessionReserved(job.sessionID))
 
 	manager.cancelSchedule(job.scheduleUUID)
 	require.Eventually(t, func() bool { return job.ctx.Err() == context.Canceled }, time.Second, 10*time.Millisecond)
 	manager.unregisterJob(job)
 	require.Empty(t, manager.jobs)
 	require.Empty(t, manager.activeBySchedule)
+	require.Empty(t, manager.activeBySession)
 }
 
 func TestScheduleAttentionWaitsForActualAIEscalation(t *testing.T) {

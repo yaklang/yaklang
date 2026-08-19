@@ -41,7 +41,7 @@ const (
 type scheduledReActJob struct {
 	executionID         string
 	scheduleUUID        string
-	targetSessionID     string
+	sessionID           string
 	scheduledAt         time.Time
 	trigger             string
 	ctx                 context.Context
@@ -330,15 +330,17 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 			return utils.Errorf("%s: %v", message, err)
 		}
 	}
+	executionID := uuid.NewString()
+	sessionID := scheduleExecutionSessionID(schedule, executionID)
 	jobCtx, cancel := context.WithCancel(m.ctx)
 	job := &scheduledReActJob{
-		executionID:     uuid.NewString(),
-		scheduleUUID:    schedule.UUID,
-		targetSessionID: targetSessionID,
-		scheduledAt:     scheduledAt.UTC(),
-		trigger:         trigger,
-		ctx:             jobCtx,
-		cancel:          cancel,
+		executionID:  executionID,
+		scheduleUUID: schedule.UUID,
+		sessionID:    sessionID,
+		scheduledAt:  scheduledAt.UTC(),
+		trigger:      trigger,
+		ctx:          jobCtx,
+		cancel:       cancel,
 	}
 	m.jobsMu.Lock()
 	if _, active := m.activeBySchedule[schedule.UUID]; active {
@@ -346,8 +348,8 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 		cancel()
 		return &scheduleEnqueueError{reason: "schedule_overlap", message: "schedule already has a queued or running execution"}
 	}
-	if targetSessionID != "" {
-		if _, active := m.activeBySession[targetSessionID]; active || isAIReActSessionBusy(targetSessionID) {
+	if sessionID != "" {
+		if _, active := m.activeBySession[sessionID]; active || isAIReActSessionBusy(sessionID) {
 			m.jobsMu.Unlock()
 			cancel()
 			return &scheduleEnqueueError{reason: "session_busy", message: "target session is busy"}
@@ -363,8 +365,8 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 	}
 	m.jobs[job.executionID] = job
 	m.activeBySchedule[schedule.UUID] = job.executionID
-	if targetSessionID != "" {
-		m.activeBySession[targetSessionID] = job.executionID
+	if sessionID != "" {
+		m.activeBySession[sessionID] = job.executionID
 	}
 	job.unregisterExecution = aischedule.RegisterExecution(schedule.UUID, cancel)
 	m.jobsMu.Unlock()
@@ -393,8 +395,8 @@ func (m *aiReActScheduler) unregisterJob(job *scheduledReActJob) {
 	if activeID := m.activeBySchedule[job.scheduleUUID]; activeID == job.executionID {
 		delete(m.activeBySchedule, job.scheduleUUID)
 	}
-	if activeID := m.activeBySession[job.targetSessionID]; job.targetSessionID != "" && activeID == job.executionID {
-		delete(m.activeBySession, job.targetSessionID)
+	if activeID := m.activeBySession[job.sessionID]; job.sessionID != "" && activeID == job.executionID {
+		delete(m.activeBySession, job.sessionID)
 	}
 	if job.workerReserved {
 		select {
@@ -438,6 +440,7 @@ func (m *aiReActScheduler) execute(job *scheduledReActJob) {
 	defer func() {
 		job.cancel()
 		m.unregisterJob(job)
+		yakit.BroadcastAISessionChanged(yakit.AISessionPushActionFinished, job.sessionID)
 	}()
 
 	schedule, err := getAIReActScheduleRecord(m.db, job.scheduleUUID)
@@ -459,7 +462,10 @@ func (m *aiReActScheduler) execute(job *scheduledReActJob) {
 	}
 	runCtx, runCancel := context.WithTimeout(job.ctx, time.Duration(maxRuntime)*time.Second)
 	defer runCancel()
-	sessionID := scheduleExecutionSessionID(schedule, job.executionID)
+	sessionID := job.sessionID
+	if sessionID == "" {
+		sessionID = scheduleExecutionSessionID(schedule, job.executionID)
+	}
 
 	outcome := m.runReAct(runCtx, schedule, job, sessionID)
 	if runCtx.Err() != nil && outcome.status == "" {
@@ -556,6 +562,35 @@ func scheduleRunStartParams(db *gorm.DB, schedule *schema.AIReActSchedule, captu
 	return params, nil
 }
 
+// prepareIsolatedScheduleSession makes a new-session-per-run execution visible
+// to history queries before the ReAct loop starts producing output. Interactive
+// sessions are announced optimistically by the renderer; scheduled sessions
+// persist the same durable row and then push an invalidation to the renderer.
+// Use the schedule name as the stable title instead of waiting for asynchronous
+// title generation near the end of the run.
+func prepareIsolatedScheduleSession(
+	db *gorm.DB,
+	schedule *schema.AIReActSchedule,
+	params *ypb.AIStartParams,
+	sessionID string,
+	startedAt time.Time,
+) error {
+	if schedule == nil || schedule.TargetMode == schema.AIReActScheduleTargetContinueSession {
+		return nil
+	}
+	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(db, sessionID, params, startedAt); err != nil {
+		return utils.Errorf("persist isolated scheduled session start failed: %v", err)
+	}
+	title := strings.TrimSpace(schedule.Name)
+	if title == "" {
+		title = strings.TrimSpace(schedule.Prompt)
+	}
+	if _, err := yakit.InitAISessionTitleIfNeeded(db, sessionID, title); err != nil {
+		return utils.Errorf("initialize isolated scheduled session title failed: %v", err)
+	}
+	return nil
+}
+
 func (m *aiReActScheduler) runReAct(
 	ctx context.Context,
 	schedule *schema.AIReActSchedule,
@@ -571,6 +606,13 @@ func (m *aiReActScheduler) runReAct(
 		return scheduledReActOutcome{status: scheduledOutcomeFailed, errorMessage: err.Error()}
 	}
 	params.TimelineSessionID = sessionID
+	if err := prepareIsolatedScheduleSession(m.db, schedule, params, sessionID, time.Now()); err != nil {
+		// Keep the execution semantics consistent with interactive ReAct startup:
+		// metadata persistence failure is observable in logs but does not suppress
+		// the actual task.
+		log.Warnf("prepare isolated scheduled session %s failed: %v", sessionID, err)
+	}
+	yakit.BroadcastAISessionChanged(yakit.AISessionPushActionStarted, sessionID)
 
 	outcomeCh := make(chan scheduledReActOutcome, 1)
 	serverErrCh := make(chan error, 1)
@@ -674,6 +716,10 @@ func (m *aiReActScheduler) runReAct(
 	select {
 	case outcome := <-outcomeCh:
 		stream.cancel()
+		select {
+		case <-serverErrCh:
+		case <-time.After(time.Second):
+		}
 		return outcome
 	case err := <-serverErrCh:
 		stateMu.Lock()
