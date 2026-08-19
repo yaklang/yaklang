@@ -32,4 +32,7 @@ var CodecExports = map[string]any{
 	"AESECBDecryptWithZeroPadding":  codec.AESDecryptECBWithZeroPadding,
 	"AESECBEncryptWithPKCS7Padding": codec.AESEncryptECBWithPKCSPadding,
 	"AESECBDecryptWithPKCS7Padding": codec.AESDecryptECBWithPKCSPadding,
+	"StrconvUnquote":                codec.StrConvUnquote,
+	"StrconvQuote":                  codec.StrConvQuote,
+	"EscapeQueryUrl":                codec.QueryEscape,
 }

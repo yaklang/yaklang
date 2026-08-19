@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"unicode"
@@ -67,6 +68,12 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 		}
 	}
 
+	if value.IsValid() && (value.Kind() == reflect.Slice || value.Kind() == reflect.Array) {
+		if method, ok := runtimeResolveSliceMethod(value, name); ok {
+			return method, nil
+		}
+	}
+
 	if value.IsValid() && value.Kind() != reflect.Ptr && value.CanAddr() {
 		if method := value.Addr().MethodByName(name); method.IsValid() {
 			return method, nil
@@ -74,6 +81,43 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 	}
 
 	return reflect.Value{}, fmt.Errorf("method %q not found", name)
+}
+
+// runtimeResolveSliceMethod implements the yak slice/array methods that the
+// AOT runtime must provide (Go slices have no methods of their own).
+func runtimeResolveSliceMethod(v reflect.Value, name string) (reflect.Value, bool) {
+	switch name {
+	case "Append":
+		return reflect.ValueOf(func(items ...any) any {
+			elems := make([]reflect.Value, 0, len(items))
+			for _, item := range items {
+				elems = append(elems, runtimeSliceAppendValue(v.Type().Elem(), item))
+			}
+			return reflect.Append(v, elems...).Interface()
+		}), true
+	case "Length", "Len":
+		return reflect.ValueOf(func() int { return v.Len() }), true
+	case "Get", "At":
+		return reflect.ValueOf(func(i int) any {
+			if i < 0 || i >= v.Len() {
+				return nil
+			}
+			return v.Index(i).Interface()
+		}), true
+	case "Set":
+		return reflect.ValueOf(func(i int, item any) {
+			if i < 0 || i >= v.Len() {
+				return
+			}
+			converted, ok := valueForSet(v.Type().Elem(), int64(0))
+			_ = converted
+			_ = ok
+			// Use the same conversion path as append for consistency.
+			rv := runtimeSliceAppendValue(v.Type().Elem(), item)
+			v.Index(i).Set(rv)
+		}), true
+	}
+	return reflect.Value{}, false
 }
 
 func runtimeResolveStringMethod(s string, name string) (reflect.Value, bool) {
@@ -141,6 +185,28 @@ type runtimeCallableClosure struct {
 func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error) {
 	if targetType == nil {
 		return reflect.Value{}, fmt.Errorf("missing target type")
+	}
+
+	// Numeric targets: the raw word is the value itself. decodeTaggedArg's
+	// C-string fallback would misread a large integer (e.g. a nanosecond
+	// duration like 5e9) as a pointer and crash.
+	switch targetType.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return reflect.ValueOf(int64(raw &^ yakTaggedPointerMask)).Convert(targetType), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return reflect.ValueOf(raw &^ yakTaggedPointerMask).Convert(targetType), nil
+	case reflect.Float32, reflect.Float64:
+		bits := raw &^ yakTaggedPointerMask
+		// The compiler encodes float constants as float64 bit patterns and int
+		// constants as int64 words. Reinterpret the bits when they form a
+		// normal float (large word); otherwise treat the word as an integer.
+		if f := math.Float64frombits(bits); !math.IsInf(f, 0) && !math.IsNaN(f) &&
+			math.Abs(f) >= 1e-300 && math.Abs(f) <= 1e300 && bits > 1<<32 {
+			return reflect.ValueOf(f).Convert(targetType), nil
+		}
+		return reflect.ValueOf(float64(int64(bits))).Convert(targetType), nil
+	case reflect.Bool:
+		return reflect.ValueOf(raw&^yakTaggedPointerMask != 0).Convert(targetType), nil
 	}
 
 	// nil (0) is a valid value for nullable container targets. Interfaces are
@@ -472,12 +538,7 @@ func runtimeCallReturnValue(results []reflect.Value) int64 {
 		return 0
 	}
 
-	errorType := reflect.TypeOf((*error)(nil)).Elem()
 	if len(results) == 1 {
-		last := results[0]
-		if last.IsValid() && last.Type().Implements(errorType) && !last.IsNil() {
-			panic(last.Interface().(error))
-		}
 		return runtimeValueToInt64(results[0])
 	}
 
@@ -558,7 +619,9 @@ func runtimePtrToString(ptr unsafe.Pointer) string {
 	raw := uint64(uintptr(ptr))
 	raw &^= yakTaggedPointerMask
 	if !looksLikeCStringPointer(raw) {
-		return ""
+		// Not a string pointer: yak template interpolation converts the value
+		// to its string form (e.g. an int port becomes "41925").
+		return fmt.Sprintf("%d", int64(raw))
 	}
 	return runtimeCStringToGoString(unsafe.Pointer(uintptr(raw)))
 }

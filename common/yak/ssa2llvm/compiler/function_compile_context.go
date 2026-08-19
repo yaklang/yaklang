@@ -16,11 +16,21 @@ type functionCompileContext struct {
 
 	invokeCtx      llvm.Value
 	returnBlock    llvm.BasicBlock
+	// entryBlock is the function's real entry block. compileAssert rebinds
+	// c.Blocks[fn.EnterBlock] to the assert continuation, so slot allocation
+	// and def anchoring must use this stable reference instead of looking up
+	// the (possibly rebound) entry id.
+	entryBlock     llvm.BasicBlock
 	llvmFn         llvm.Value
 	activeBlockID  int64
 	compiledBlocks map[int64]struct{}
 	valueSlots     map[int64]llvm.Value
 	storedValues   map[int64]struct{}
+	// freeValuePointers maps a closure free-value parameter id to the slot
+	// pointer captured at closure creation. Reads/writes of by-reference free
+	// values go through this pointer so mutable captures persist across calls
+	// and shared loop variables see the final value.
+	freeValuePointers map[int64]llvm.Value
 
 	exceptionValueIDs    map[int64]struct{}
 	activeHandlerByBlock map[int64]int64
@@ -59,6 +69,22 @@ func (c *Compiler) currentFunction() *ssa.Function {
 		return nil
 	}
 	return c.function.current
+}
+
+// entryBlockFor returns the function's real entry block. compileAssert
+// rebinds c.Blocks[fn.EnterBlock] to an assert continuation, so callers that
+// must anchor allocas/defs at the true entry use this stable reference.
+func (c *Compiler) entryBlockFor(fn *ssa.Function) llvm.BasicBlock {
+	if c == nil || fn == nil {
+		return llvm.BasicBlock{}
+	}
+	if c.function != nil && c.function.current == fn && !c.function.entryBlock.IsNil() {
+		return c.function.entryBlock
+	}
+	if bb, ok := c.Blocks[fn.EnterBlock]; ok && !bb.IsNil() {
+		return bb
+	}
+	return llvm.BasicBlock{}
 }
 
 func (c *Compiler) ensureOwnerValueIDs(fn *ssa.Function) {

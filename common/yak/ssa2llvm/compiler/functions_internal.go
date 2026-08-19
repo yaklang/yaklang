@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -18,15 +19,20 @@ func (c *Compiler) llvmFunctionName(fn *ssa.Function) string {
 	}
 
 	// YakSSA uses a synthetic "@main" container; functions declared at the
-	// top-level typically have parent "@main". Keep those names stable so
-	// entry resolution (e.g. "check") continues to work.
+	// top-level keep their names stable so entry resolution (e.g. "check")
+	// continues to work. Anonymous closures nested in @main are also named
+	// "@main$<n>" and their IDs differ per closure; using the human name
+	// would make all of them share one LLVM function, silently dropping
+	// distinct closure bodies.
 	parent := fn.GetParent()
 	if parent == nil || parent.GetName() == "@main" {
-		return fn.GetName()
+		if !strings.HasPrefix(fn.GetName(), "@main$") {
+			return fn.GetName()
+		}
 	}
 
 	// Nested/anonymous functions can have duplicate human names (e.g. "f$1").
-	// Use an ID-based name to ensure a stable unique LLVM symbol.
+	// Use an ID-based name to ensure a unique LLVM symbol.
 	return fmt.Sprintf("yak_fn_%d", fn.GetId())
 }
 
