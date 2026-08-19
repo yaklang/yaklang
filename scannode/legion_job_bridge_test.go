@@ -24,6 +24,12 @@ func TestValidateDispatchCommand(t *testing.T) {
 			name: "valid command",
 		},
 		{
+			name: "valid rule snapshot command",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.RuleSnapshot = validRuleSnapshotRef()
+			},
+		},
+		{
 			name: "missing metadata",
 			mutate: func(command *jobv1.DispatchJobCommand) {
 				command.Metadata = nil
@@ -72,6 +78,30 @@ func TestValidateDispatchCommand(t *testing.T) {
 			},
 			wantErr: "unsupported execution_kind: binary_payload",
 		},
+		{
+			name: "rule snapshot missing digest",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.RuleSnapshot = validRuleSnapshotRef()
+				command.RuleSnapshot.ContentSha256 = ""
+			},
+			wantErr: "dispatch rule_snapshot content_sha256 is required",
+		},
+		{
+			name: "rule snapshot missing assets",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.RuleSnapshot = validRuleSnapshotRef()
+				command.RuleSnapshot.AssetIds = nil
+			},
+			wantErr: "dispatch rule_snapshot asset_ids are required",
+		},
+		{
+			name: "rule snapshot unsupported schema",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.RuleSnapshot = validRuleSnapshotRef()
+				command.RuleSnapshot.SchemaVersion = "ssa_rule_snapshot_bundle.v99"
+			},
+			wantErr: "unsupported expected rule snapshot schema version: ssa_rule_snapshot_bundle.v99",
+		},
 	}
 
 	for _, tt := range tests {
@@ -98,6 +128,26 @@ func TestValidateDispatchCommand(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestRuleSnapshotExpectationFromCommand(t *testing.T) {
+	t.Parallel()
+
+	command := validDispatchCommand()
+	command.RuleSnapshot = validRuleSnapshotRef()
+	expectation := ruleSnapshotExpectationFromCommand(command)
+	if expectation == nil {
+		t.Fatal("expected protobuf rule snapshot expectation")
+	}
+	if expectation.SnapshotID != "rulesnapshot-a" ||
+		expectation.ContentSHA256 != strings.Repeat("a", 64) ||
+		!equalStringSlices(expectation.AssetIDs, []string{"asset-a", "asset-b"}) {
+		t.Fatalf("unexpected rule snapshot expectation: %#v", expectation)
+	}
+	command.RuleSnapshot.AssetIds[0] = "mutated"
+	if expectation.AssetIDs[0] != "asset-a" {
+		t.Fatalf("expectation aliases mutable protobuf input: %#v", expectation.AssetIDs)
 	}
 }
 
@@ -201,5 +251,15 @@ func validDispatchCommand() *jobv1.DispatchJobCommand {
 			Content: `println("test")`,
 		},
 		ExecutionKind: "yak_script",
+	}
+}
+
+func validRuleSnapshotRef() *jobv1.RuleSnapshotRef {
+	return &jobv1.RuleSnapshotRef{
+		SnapshotId:    "rulesnapshot-a",
+		ContentSha256: strings.Repeat("a", 64),
+		SchemaVersion: ruleSnapshotSchemaVersionV1,
+		BundleFormat:  ruleSnapshotBundleFormatJSON,
+		AssetIds:      []string{"asset-a", "asset-b"},
 	}
 }
