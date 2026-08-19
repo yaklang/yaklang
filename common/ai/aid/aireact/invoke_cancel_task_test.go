@@ -48,6 +48,47 @@ func mockedToolCallingForCancel(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
+func TestReAct_CancelCurrentTaskTargetsQueueRootDuringNestedLoop(t *testing.T) {
+	emitter := aicommon.NewDummyEmitter()
+	rootTask := aicommon.NewStatefulTaskBase(
+		"queue-root",
+		"root task",
+		context.Background(),
+		emitter,
+	)
+	rootTask.SetStatus(aicommon.AITaskState_Processing)
+	nestedTask := aicommon.NewStatefulTaskBase(
+		"queue-root_intent",
+		"intent task",
+		rootTask.GetContext(),
+		emitter,
+		true,
+	)
+	nestedTask.SetStatus(aicommon.AITaskState_Processing)
+
+	react := &ReAct{
+		Emitter:      emitter,
+		currentTask:  nestedTask,
+		RuntimeTasks: []aicommon.AIStatefulTask{rootTask},
+	}
+
+	err := react.HandleSyncTypeReactCancelCurrentTaskEvent(&ypb.AIInputEvent{SyncID: "stop-root"})
+	if err != nil {
+		t.Fatalf("cancel current task: %v", err)
+	}
+	if got := rootTask.GetStatus(); got != aicommon.AITaskState_Skipped {
+		t.Fatalf("root task status = %s, want %s", got, aicommon.AITaskState_Skipped)
+	}
+	if got := nestedTask.GetStatus(); got != aicommon.AITaskState_Processing {
+		t.Fatalf("nested task status = %s, want unchanged %s", got, aicommon.AITaskState_Processing)
+	}
+	select {
+	case <-rootTask.GetContext().Done():
+	default:
+		t.Fatal("root task context was not cancelled")
+	}
+}
+
 // TestReAct_CancelCurrentTask_StatusChanges 测试取消当前任务对状态的影响
 func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 	flag := ksuid.New().String()
