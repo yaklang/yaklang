@@ -79,6 +79,21 @@ type runtimeMapIterator struct {
 	values reflect.Value
 }
 
+type runtimeOrderedMapIterator struct {
+	m     *runtimeOrderedMap
+	index int
+}
+
+func (it *runtimeOrderedMapIterator) Next() (any, any, bool) {
+	if it == nil || it.m == nil || it.index >= len(it.m.keys) {
+		return nil, nil, false
+	}
+	key := it.m.keys[it.index]
+	val := it.m.values[key]
+	it.index++
+	return key, val, true
+}
+
 func (it *runtimeMapIterator) Next() (any, any, bool) {
 	if it.index >= len(it.keys) {
 		return nil, nil, false
@@ -105,6 +120,11 @@ func runtimeDecodeIterValue(raw uint64) any {
 func newRuntimeIterator(value any, inNext bool) (runtimeIterator, error) {
 	if value == nil {
 		return nil, fmt.Errorf("cannot iterate nil value")
+	}
+	// The AOT runtime represents yak maps as runtimeOrderedMap; iterate its
+	// string keys in insertion order.
+	if om, ok := value.(*runtimeOrderedMap); ok && om != nil {
+		return &runtimeOrderedMapIterator{m: om}, nil
 	}
 	v := reflect.ValueOf(value)
 	for v.IsValid() && v.Kind() == reflect.Interface {
