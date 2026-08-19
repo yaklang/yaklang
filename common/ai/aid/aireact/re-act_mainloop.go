@@ -82,14 +82,16 @@ func (r *ReAct) updateRuntimeTasks() {
 // getProcessingRuntimeTask returns the queue-owned root task. ReAct sub-loops
 // temporarily publish their own task through SetCurrentTask, so GetCurrentTask
 // may point at an intent or other nested task while a user presses Stop. The
-// runtime task list is the stable owner of the queued root task.
+// runtime task list is the stable owner of the queued root task. It also holds
+// sub-agent tasks, which must be ignored because cancelling a child does not
+// cancel the queue-owned root context.
 func (r *ReAct) getProcessingRuntimeTask() aicommon.AIStatefulTask {
 	r.UpdateRuntimeTaskMutex.Lock()
 	defer r.UpdateRuntimeTaskMutex.Unlock()
 
 	for index := len(r.RuntimeTasks) - 1; index >= 0; index-- {
 		task := r.RuntimeTasks[index]
-		if task != nil && task.GetStatus() == aicommon.AITaskState_Processing {
+		if task != nil && !task.IsSubAgent() && task.GetStatus() == aicommon.AITaskState_Processing {
 			return task
 		}
 	}
