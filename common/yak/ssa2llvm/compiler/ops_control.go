@@ -459,8 +459,18 @@ func (c *Compiler) resolvePhiIncomingValue(contextInst *ssa.Phi, fn *ssa.Functio
 		return zero, nil
 	}
 	// An undefined member placeholder (e.g. the front end's m[i] read merge
-	// in a loop) is resolved at its real use site, not as a phi edge.
+	// in a loop) is normally resolved at its real use site, not as a phi
+	// edge. But a genuine member read (e.g. the && chain's m["a"] operand)
+	// must be resolved dynamically here; only fall back to zero when the
+	// object/key chain is unavailable.
 	if undef, ok := edgeObj.(*ssa.Undefined); ok && undef != nil && undef.IsMember() {
+		if c.shouldReadMemberValueDynamically(undef, edgeValID) {
+			if err := c.compileDynamicMemberValue(contextInst, undef); err == nil {
+				if val, ok := c.getCachedValue(contextInst, edgeValID); ok && !val.IsNil() {
+					return val, nil
+				}
+			}
+		}
 		return zero, nil
 	}
 	if sideEffect, ok := edgeObj.(*ssa.SideEffect); ok && sideEffect != nil && sideEffect.GetBlock() != nil &&

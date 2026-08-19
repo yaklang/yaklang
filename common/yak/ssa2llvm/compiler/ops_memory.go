@@ -202,14 +202,13 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 	if !ok {
 		return fmt.Errorf("key value %d not found", keyID)
 	}
-	keyStr := c.resolveMemberKeyString(keyVal)
 
 	parentVal, err := c.getValue(inst, parentID)
 	if err != nil {
 		return fmt.Errorf("parent value %d for ParameterMember %s: %w", parentID, inst.GetName(), err)
 	}
 
-	val := c.emitRuntimeGetField(parentVal, keyStr, inst.GetId())
+	val := c.emitRuntimeGetFieldByKey(parentVal, keyVal, inst, inst.GetId())
 	c.cacheValue(inst.GetId(), val)
 	return nil
 }
@@ -509,7 +508,13 @@ func (c *Compiler) resolveMemberKeyString(key ssa.Value) string {
 	if cinst, ok := ssa.ToConstInst(key); ok {
 		return strings.Trim(cinst.String(), "\"")
 	}
-	return strings.Trim(key.GetName(), "\"")
+	if name := strings.Trim(key.GetName(), "\""); name != "" {
+		return name
+	}
+	if key.GetId() > 0 {
+		return fmt.Sprintf("#%d", key.GetId())
+	}
+	return ""
 }
 
 func (c *Compiler) coerceToI8Ptr(val llvm.Value) llvm.Value {
@@ -903,6 +908,9 @@ func (c *Compiler) shouldReadMemberValueDynamically(val ssa.Value, id int64) boo
 	if val == nil || id <= 0 || c.isInitializingMemberValue(id) || !val.IsMember() {
 		return false
 	}
+	if _, isConst := val.(*ssa.ConstInst); isConst {
+		return false
+	}
 	if current := c.currentFunction(); current != nil && val.GetFunc() != nil && val.GetFunc() != current {
 		return false
 	}
@@ -1284,6 +1292,9 @@ func (c *Compiler) emitMemberVariableSetIfReady(contextInst ssa.Instruction, sou
 
 func (c *Compiler) valueForMemberSet(contextInst ssa.Instruction, source ssa.Value, resultID int64, dynamicMemberRead bool) (llvm.Value, error) {
 	if source != nil {
+		if _, isConst := source.(*ssa.ConstInst); isConst {
+			return c.finishGetValue(contextInst, resultID)
+		}
 		if _, ok := source.(*ssa.Phi); ok && c.hasValueSlot(resultID) {
 			return c.loadSSAValue(resultID), nil
 		}
@@ -1339,6 +1350,9 @@ func (c *Compiler) initialMemberValueObjectInCurrentFunction(source ssa.Value) b
 
 func (c *Compiler) memberSourceForMemberSetDynamicRead(source ssa.Value) ssa.Value {
 	if source == nil {
+		return nil
+	}
+	if _, isConst := source.(*ssa.ConstInst); isConst {
 		return nil
 	}
 	memberSource := c.effectiveRuntimeFieldValue(source)
@@ -1608,7 +1622,7 @@ func (c *Compiler) valueForObjectMemberAssignment(contextInst ssa.Instruction, m
 	if keyStr == "" {
 		return c.getValue(contextInst, member.GetId())
 	}
-	return c.emitRuntimeGetField(objVal, keyStr, member.GetId()), nil
+	return c.emitRuntimeGetFieldByKey(objVal, member.GetKey(), contextInst, member.GetId()), nil
 }
 
 func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.Value) error {

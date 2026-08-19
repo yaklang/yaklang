@@ -530,12 +530,13 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
-	} else if inst.IsString() {
+	} else if inst.IsString() || (inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.BytesTypeKind) {
 		ptr := c.Builder.CreateGlobalStringPtr(inst.VarString(), fmt.Sprintf("str_%d", id))
 		// Represent pointers as i64 (uintptr) in LLVM IR.
 		// NOTE: Do not tag here. Tagging is applied selectively at stdlib
 		// call sites (e.g. print/println) so non-print stdlib calls can receive
-		// raw C-string pointers.
+		// raw C-string pointers. Bytes constants use the same C-string
+		// representation; the runtime converts them to []byte on demand.
 		llvmVal := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
