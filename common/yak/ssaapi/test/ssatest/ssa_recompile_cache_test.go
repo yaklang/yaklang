@@ -158,9 +158,12 @@ println(target_var)
 	require.False(t, foundOld, "Should NOT find 'old_value' after recompilation")
 }
 
-// TestFromDatabaseReloadsWhenIrUpdatedAtChanges covers the CI yak-grpc case:
-// another process rewrites IR without this process calling ProgramCache.Remove.
-func TestFromDatabaseReloadsWhenIrUpdatedAtChanges(t *testing.T) {
+// TestFromDatabaseReloadsWhenCompileGenerationChanges covers the CI yak-grpc
+// case: another process rewrites IR without this process calling
+// ProgramCache.Remove. The compile-generation counter is the authoritative
+// signal (review A11); a metadata-only updated_at change must NOT drop the
+// IR cache.
+func TestFromDatabaseReloadsWhenCompileGenerationChanges(t *testing.T) {
 	progName := uuid.NewString()
 	prog1, err := ssaapi.Parse(`a = 1`,
 		ssaapi.WithProgramName(progName),
@@ -176,11 +179,59 @@ func TestFromDatabaseReloadsWhenIrUpdatedAtChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, cached == again, "same IR revision should stay cached")
 
+	// Metadata-only update (updated_at changes, generation unchanged) must
+	// keep the cached IR: the counter, not the timestamp, drives freshness.
 	require.NoError(t, ssadb.GetDB().Model(&ssadb.IrProgram{}).
 		Where("program_name = ?", progName).
 		Update("updated_at", time.Now().Add(2*time.Second)).Error)
+	againMeta, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+	require.True(t, cached == againMeta, "metadata-only updated_at change must keep cache")
+
+	ir, err := ssadb.GetProgram(progName, ssadb.Application)
+	require.NoError(t, err)
+	require.NoError(t, ssadb.GetDB().Model(&ssadb.IrProgram{}).
+		Where("program_name = ?", progName).
+		Update("compile_generation", ir.CompileGeneration+1).Error)
 
 	reloaded, err := ssaapi.FromDatabase(progName)
 	require.NoError(t, err)
-	require.True(t, cached != reloaded, "FromDatabase must drop cache when ir_programs.updated_at changes")
+	require.True(t, cached != reloaded, "FromDatabase must drop cache when compile_generation changes")
+}
+
+// TestFromDatabaseStaleOnCompileGeneration proves the compile-generation
+// business field drives cache invalidation: when another process bumps
+// compile_generation (and deletes IR rows), a cached FromDatabase program
+// must be replaced instead of scanning deleted instruction IDs (review A11).
+func TestFromDatabaseStaleOnCompileGeneration(t *testing.T) {
+	progName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+
+	_, err := ssaapi.Parse("a = 1\nprintln(a)",
+		ssaapi.WithProgramName(progName),
+		ssaapi.WithLanguage(ssaconfig.TS),
+	)
+	require.NoError(t, err)
+
+	ir, err := ssadb.GetProgram(progName, ssadb.Application)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, ir.CompileGeneration, int64(1),
+		"compile must bump the program's compile generation")
+
+	prog1, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+	require.NotNil(t, prog1)
+
+	// Simulate another process recompiling: delete IR rows and bump the
+	// generation directly (not through UpdateProgramWithError, which would
+	// bump again).
+	ssadb.DeleteProgramIrCode(ssadb.GetDB(), progName)
+	require.NoError(t, ssadb.GetDB().Model(&ssadb.IrProgram{}).
+		Where("program_name = ?", progName).
+		Update("compile_generation", ir.CompileGeneration+1).Error)
+
+	prog2, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+	require.True(t, prog1 != prog2,
+		"a compile-generation bump must invalidate the cached program")
 }

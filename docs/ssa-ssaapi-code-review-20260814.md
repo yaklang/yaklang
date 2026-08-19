@@ -448,3 +448,15 @@
 
 ### 验证（第十五轮）
 - `memedit`/`ssa`（含 ssadb）/`ssaapi` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第十六轮，@ 09aff33f9）
+
+- **A11 完成**：`IrProgram` 新增 `CompileGeneration` 业务字段（gorm AutoMigrate 自动加列，旧行默认 0）；`UpdateProgramWithError` 每次元数据/编译保存自增。`FromDatabase` 缓存命中以 generation 为主判据（`loaded > cached` → 失效），仅当双方 generation 均为 0（legacy 行）才回退 `updated_at.After` 判断；程序行不存在仍判 stale。编译产生的 nil `irProgram` 缓存项保留完整加载路径。
+- 测试：
+  - `TestGetProgramFreshnessLightQuery`（updated_at + generation 轻量查询）
+  - `TestFromDatabaseStaleOnCompileGeneration`（跨进程模拟：删 IR + 直接 bump generation → 缓存替换）
+  - 原 `TestFromDatabaseReloadsWhenIrUpdatedAtChanges` 改为 `TestFromDatabaseReloadsWhenCompileGenerationChanges`：元数据-only 的 updated_at 变化不再丢 IR 缓存，generation bump 才丢。
+
+### 验证（第十六轮）
+- 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。

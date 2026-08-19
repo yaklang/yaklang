@@ -47,7 +47,7 @@ func FromDatabase(programName string) (p *Program, err error) {
 				// check freshness with a light updated_at-only query instead of
 				// loading the full IrProgram row (large FileList/ExtraFile
 				// columns) on every hit (review A11).
-				loadedUpdatedAt, found, getErr := ssadb.GetProgramUpdatedAt(programName, ssadb.Application)
+				loadedUpdatedAt, loadedGeneration, found, getErr := ssadb.GetProgramFreshness(programName, ssadb.Application)
 				if getErr != nil {
 					log.Warnf("failed to check program %s freshness: %v", programName, getErr)
 				} else if !found {
@@ -56,14 +56,19 @@ func FromDatabase(programName string) (p *Program, err error) {
 					staleIR = true
 				} else {
 					// Recompile in another process deletes IR rows and writes a new
-					// ir_programs.updated_at; returning the cached Program would
-					// scan deleted instruction IDs and produce 0 matches. A strict
-					// After comparison avoids invalidating on timestamp-precision
-					// noise.
-					if loadedUpdatedAt.After(prog.irProgram.UpdatedAt) {
+					// compile_generation; returning the cached Program would scan
+					// deleted instruction IDs and produce 0 matches. The business
+					// counter is authoritative; updated_at is only a fallback for
+					// legacy rows that still have generation 0 (review A11).
+					recompiled := loadedGeneration > prog.irProgram.CompileGeneration
+					legacy := loadedGeneration == 0 && prog.irProgram.CompileGeneration == 0
+					if recompiled || (legacy && loadedUpdatedAt.After(prog.irProgram.UpdatedAt)) {
 						staleIR = true
 					} else {
 						prog.irProgram.UpdatedAt = loadedUpdatedAt
+						if loadedGeneration > 0 {
+							prog.irProgram.CompileGeneration = loadedGeneration
+						}
 					}
 				}
 			} else {

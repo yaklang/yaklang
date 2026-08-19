@@ -28,6 +28,10 @@ type IrProgram struct {
 
 	Version       string `json:"package_version" gorm:"index"`
 	EngineVersion string `json:"engine_version" gorm:"type:varchar(255)"`
+	// CompileGeneration is a monotonically increasing compile counter used by
+	// FromDatabase to detect that another process recompiled a program,
+	// replacing the fragile updated_at equality check (review A11).
+	CompileGeneration int64 `json:"compile_generation"`
 
 	// Language: yak, java, php, js, etc
 	// if the program contains many language,
@@ -133,33 +137,37 @@ func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	return &p, nil
 }
 
-// GetProgramUpdatedAt returns only the updated_at of a program row, so
-// cache-freshness checks avoid loading the full IrProgram (including large
-// FileList/ExtraFile text columns). found=false means no such program row
-// exists (review A11).
-func GetProgramUpdatedAt(name string, kind ProgramKind) (time.Time, bool, error) {
+// GetProgramFreshness returns only the updated_at and compile_generation
+// columns of a program row, so cache-freshness checks avoid loading the full
+// IrProgram (including large FileList/ExtraFile text columns). found=false
+// means no such program row exists (review A11).
+func GetProgramFreshness(name string, kind ProgramKind) (time.Time, int64, bool, error) {
 	if name == "" {
-		return time.Time{}, false, utils.Errorf("program name is empty")
+		return time.Time{}, 0, false, utils.Errorf("program name is empty")
 	}
 	db := GetDB().Model(&IrProgram{}).Where("program_name = ?", name)
 	if kind != "" {
 		db = db.Where("program_kind = ?", kind)
 	}
 	var updatedAt time.Time
-	row := db.Select("updated_at").Row()
-	if err := row.Scan(&updatedAt); err != nil {
+	var generation int64
+	row := db.Select("updated_at, compile_generation").Row()
+	if err := row.Scan(&updatedAt, &generation); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return time.Time{}, false, nil
+			return time.Time{}, 0, false, nil
 		}
-		return time.Time{}, false, err
+		return time.Time{}, 0, false, err
 	}
-	return updatedAt, true, nil
+	return updatedAt, generation, true, nil
 }
 
 func UpdateProgramWithError(prog *IrProgram) error {
 	if prog == nil {
 		return utils.Errorf("update program failed: program is nil")
 	}
+	// Bump the compile generation so FromDatabase in other processes can
+	// detect the change without comparing timestamps (review A11).
+	prog.CompileGeneration++
 	return GetDB().Model(&IrProgram{}).
 		Where("id = ?", prog.ID).
 		Where("program_name = ?", prog.ProgramName).
