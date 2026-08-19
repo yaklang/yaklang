@@ -344,7 +344,11 @@ func (h *statelessAIEngineRuntimeHandle) sendInterventionInput(input aiSessionIn
 			turn.turnID,
 		)
 	}
-	if err := turn.engine.SendInputEvent(event); err != nil {
+	if turn.directForge && turn.forgeInput != nil {
+		if !turn.forgeInput.SafeFeedWithResult(event) {
+			return true, fmt.Errorf("stateless sendinput: direct forge intervention channel is closed")
+		}
+	} else if err := turn.engine.SendInputEvent(event); err != nil {
 		return true, fmt.Errorf("stateless sendinput: send user intervention: %w", err)
 	}
 	if h.closed || h.activeTurn != turn || turn.engine.Context().Err() != nil {
@@ -383,12 +387,17 @@ func (h *statelessAIEngineRuntimeHandle) sendSyncInput(input aiSessionInput) err
 		return fmt.Errorf("stateless sendinput: no active turn for sync event")
 	}
 	defer h.mu.Unlock()
-	if err := turn.engine.SendInputEvent(&ypb.AIInputEvent{
+	event := &ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      syncEvent.SyncType,
 		SyncJsonInput: syncEvent.SyncJSONInput,
 		SyncID:        syncEvent.SyncID,
-	}); err != nil {
+	}
+	if turn.directForge && turn.forgeInput != nil {
+		if !turn.forgeInput.SafeFeedWithResult(event) {
+			return fmt.Errorf("stateless sendinput: direct forge sync channel is closed")
+		}
+	} else if err := turn.engine.SendInputEvent(event); err != nil {
 		return fmt.Errorf("stateless sendinput: send sync event: %w", err)
 	}
 	if h.closed || h.activeTurn != turn || turn.engine.Context().Err() != nil {
