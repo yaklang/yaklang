@@ -9502,6 +9502,17 @@ message SingleManualHijackControlMessage{
   bytes Request = 9;
   bytes Response = 10;
   bytes Payload = 11;
+
+  // Stream a local replacement file for one spilled multipart file part.
+  // Chunks are written to an engine-side temporary file and applied when the
+  // hijacked request is forwarded, so the renderer never loads the full file.
+  bool IsMultipartFileChunk = 12;
+  int32 MultipartPartIndex = 13;
+  string MultipartFilename = 14;
+  bytes MultipartFileData = 15;
+  bool MultipartFileStart = 16;
+  bool MultipartFileEOF = 17;
+  bool MultipartFileCancel = 18;
 }
 
 message SingleManualHijackInfoMessage{
