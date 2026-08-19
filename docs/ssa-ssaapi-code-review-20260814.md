@@ -381,3 +381,12 @@
 
 ### 验证（第八轮）
 - 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第九轮，@ d2b6b1b8）
+
+- **A6（遮蔽污染）已修复**：`AssignVariable` 的 StaticMember 同步更新只对非 local 变量生效（`!variable.GetLocal()`）。函数内局部变量遮蔽全局名时，不再把局部值写进 `GlobalVariablesBlueprint`，避免跨文件/跨函数读到错误全局值；全局变量的正常更新路径（`AddGlobalVariable` 声明 / `TryUpdateGlobalVariableByName` / `storeField`）不受影响。新增 `TestLocalShadowDoesNotOverwriteGlobalStaticMember`（Build 全局在前、局部赋值在后，修复前会失败）。
+- **A6 剩余**：`appendBlueprintMember` 只对最后一个值去重导致交替赋值时 StaticMember slice 无界增长，需要限制历史长度/去重策略（涉及 `GetStaticMembers` 消费者语义，保留）。
+
+### 验证（第九轮）
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；改动文件 gofmt 干净。

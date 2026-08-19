@@ -363,13 +363,18 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		scope.AssignVariable(variable, value)
 	}
 
-	// If this variable is a global variable (registered in StaticMember),
-	// update StaticMember immediately so that subsequent files/functions
-	// see the updated value. This replaces the old approach of traversing
+	// If this variable is a GLOBAL variable (registered in StaticMember),
+	// update StaticMember immediately so that subsequent files/functions see
+	// the updated value. This replaces the old approach of traversing
 	// GetLastWinsMemberPairs after init() to call TryUpdateGlobalVariableByName.
-	// The immediate update works in both memory and DB modes because it
-	// doesn't depend on scope lookup after block transitions.
-	if prog := b.GetProgram(); prog != nil && prog.GlobalVariablesBlueprint != nil {
+	// The immediate update works in both memory and DB modes because it doesn't
+	// depend on scope lookup after block transitions.
+	//
+	// Local variables must NOT update StaticMember: a function-local variable
+	// that shadows a global name (e.g. `x` in a closure) would otherwise
+	// overwrite the real global value and leak across files/functions
+	// (review A6).
+	if prog := b.GetProgram(); prog != nil && prog.GlobalVariablesBlueprint != nil && !variable.GetLocal() {
 		name := variable.GetName()
 		if name != "" && prog.GlobalVariablesBlueprint.GetStaticMember(name) != nil {
 			prog.GlobalVariablesBlueprint.RegisterStaticMember(name, value, false)
