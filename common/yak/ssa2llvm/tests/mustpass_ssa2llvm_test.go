@@ -19,22 +19,25 @@ import (
 // Only scripts with actual AOT verification evidence are listed:
 //   - lowhttp_isresponse.yak: uses the poc module, which has a lightweight AOT
 //     shim (PrunedShim) so the monolithic yaklib stays out of the AOT binary.
-//     Verified: default AOT CLI compile + env -i run, exit 0, no panic.
-//   - defer-recover.yak: pure language defer/recover (no yaklib module
-//     dependency); both are AOT-supported runtime features. Verified: default
-//     AOT CLI compile + env -i run, exit 0, no panic.
+//   - defer-recover.yak: pure language defer/recover.
+//   - json.yak / json-dumps.yak / json_dump_no_escape_html.yak: json module
+//     AOT shim (loads/dumps/withIndent/noEscapeHTML).
+//   - codec_decrypt.yak: codec AES-ECB exports with nil iv handling.
 //
 // Scripts that were NOT added (no passing AOT evidence):
 //   - re2.yak / poc_replace_path_func.yak: depend on re2/str modules that do
-//     not yet have lightweight AOT shims; they drag the monolithic yaklib into
-//     the AOT binary and fail to link with the default module set.
+//     not yet have lightweight AOT shims.
 //   - buildin_len.yak: string slicing is not yet implemented by the AOT
-//     backend, so the script fails at runtime.
+//     backend.
 //   - ssa.yak: ssa.YaklangScriptChecking result length assertion fails under
 //     AOT (exit 255).
 var mustpassSSA2LLVMScripts = []string{
 	"lowhttp_isresponse.yak",
 	"defer-recover.yak",
+	"json.yak",
+	"json-dumps.yak",
+	"json_dump_no_escape_html.yak",
+	"codec_decrypt.yak",
 }
 
 // TestMustPass_SSA2LLVM_DualRun compiles each supported mustpass script through

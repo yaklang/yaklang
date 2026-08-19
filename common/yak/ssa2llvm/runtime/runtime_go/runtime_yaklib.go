@@ -59,6 +59,20 @@ func (it *runtimeSliceIterator) Next() (any, any, bool) {
 	return current, elem, true
 }
 
+type runtimeIntIterator struct {
+	index int64
+	limit int64
+}
+
+func (it *runtimeIntIterator) Next() (any, any, bool) {
+	if it.index >= it.limit {
+		return nil, nil, false
+	}
+	cur := it.index
+	it.index++
+	return cur, nil, true
+}
+
 type runtimeMapIterator struct {
 	keys   []reflect.Value
 	index  int
@@ -100,6 +114,14 @@ func newRuntimeIterator(value any, inNext bool) (runtimeIterator, error) {
 		v = v.Elem()
 	}
 	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		limit := v.Int()
+		if limit < 0 {
+			limit = 0
+		}
+		return &runtimeIntIterator{limit: limit}, nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return &runtimeIntIterator{limit: int64(v.Uint())}, nil
 	case reflect.Slice, reflect.Array:
 		return &runtimeSliceIterator{value: v, inNext: inNext}, nil
 	case reflect.Map:
