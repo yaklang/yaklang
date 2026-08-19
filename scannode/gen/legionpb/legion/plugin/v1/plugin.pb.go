@@ -379,6 +379,651 @@ func (x *PluginSyncFailed) GetObservedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type ListPluginGroupsCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPluginGroupsCommand) Reset() {
+	*x = ListPluginGroupsCommand{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPluginGroupsCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPluginGroupsCommand) ProtoMessage() {}
+
+func (x *ListPluginGroupsCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPluginGroupsCommand.ProtoReflect.Descriptor instead.
+func (*ListPluginGroupsCommand) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListPluginGroupsCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListPluginGroupsCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+type PluginGroupInfo struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Group           string                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`
+	Total           int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	CompatibleTotal int32                  `protobuf:"varint,3,opt,name=compatible_total,json=compatibleTotal,proto3" json:"compatible_total,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PluginGroupInfo) Reset() {
+	*x = PluginGroupInfo{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginGroupInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginGroupInfo) ProtoMessage() {}
+
+func (x *PluginGroupInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginGroupInfo.ProtoReflect.Descriptor instead.
+func (*PluginGroupInfo) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *PluginGroupInfo) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *PluginGroupInfo) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *PluginGroupInfo) GetCompatibleTotal() int32 {
+	if x != nil {
+		return x.CompatibleTotal
+	}
+	return 0
+}
+
+type PluginGroupScript struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Group         string                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`
+	ScriptName    string                 `protobuf:"bytes,2,opt,name=script_name,json=scriptName,proto3" json:"script_name,omitempty"`
+	ScriptType    string                 `protobuf:"bytes,3,opt,name=script_type,json=scriptType,proto3" json:"script_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginGroupScript) Reset() {
+	*x = PluginGroupScript{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginGroupScript) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginGroupScript) ProtoMessage() {}
+
+func (x *PluginGroupScript) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginGroupScript.ProtoReflect.Descriptor instead.
+func (*PluginGroupScript) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *PluginGroupScript) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *PluginGroupScript) GetScriptName() string {
+	if x != nil {
+		return x.ScriptName
+	}
+	return ""
+}
+
+func (x *PluginGroupScript) GetScriptType() string {
+	if x != nil {
+		return x.ScriptType
+	}
+	return ""
+}
+
+type ListPluginGroupsResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Groups        []*PluginGroupInfo     `protobuf:"bytes,1,rep,name=groups,proto3" json:"groups,omitempty"`
+	Scripts       []*PluginGroupScript   `protobuf:"bytes,2,rep,name=scripts,proto3" json:"scripts,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,3,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPluginGroupsResult) Reset() {
+	*x = ListPluginGroupsResult{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPluginGroupsResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPluginGroupsResult) ProtoMessage() {}
+
+func (x *ListPluginGroupsResult) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPluginGroupsResult.ProtoReflect.Descriptor instead.
+func (*ListPluginGroupsResult) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListPluginGroupsResult) GetGroups() []*PluginGroupInfo {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+func (x *ListPluginGroupsResult) GetScripts() []*PluginGroupScript {
+	if x != nil {
+		return x.Scripts
+	}
+	return nil
+}
+
+func (x *ListPluginGroupsResult) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *ListPluginGroupsResult) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type SyncPluginStoreCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncPluginStoreCommand) Reset() {
+	*x = SyncPluginStoreCommand{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncPluginStoreCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncPluginStoreCommand) ProtoMessage() {}
+
+func (x *SyncPluginStoreCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncPluginStoreCommand.ProtoReflect.Descriptor instead.
+func (*SyncPluginStoreCommand) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SyncPluginStoreCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *SyncPluginStoreCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+type PluginStoreSyncProgress struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`       // running | succeeded | failed
+	Progress      float64                `protobuf:"fixed64,3,opt,name=progress,proto3" json:"progress,omitempty"` // 0..1
+	Total         int32                  `protobuf:"varint,4,opt,name=total,proto3" json:"total,omitempty"`
+	Completed     int32                  `protobuf:"varint,5,opt,name=completed,proto3" json:"completed,omitempty"`
+	Succeeded     int32                  `protobuf:"varint,6,opt,name=succeeded,proto3" json:"succeeded,omitempty"`
+	Failed        int32                  `protobuf:"varint,7,opt,name=failed,proto3" json:"failed,omitempty"`
+	CurrentPlugin string                 `protobuf:"bytes,8,opt,name=current_plugin,json=currentPlugin,proto3" json:"current_plugin,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,9,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,10,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginStoreSyncProgress) Reset() {
+	*x = PluginStoreSyncProgress{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginStoreSyncProgress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginStoreSyncProgress) ProtoMessage() {}
+
+func (x *PluginStoreSyncProgress) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginStoreSyncProgress.ProtoReflect.Descriptor instead.
+func (*PluginStoreSyncProgress) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PluginStoreSyncProgress) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PluginStoreSyncProgress) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *PluginStoreSyncProgress) GetProgress() float64 {
+	if x != nil {
+		return x.Progress
+	}
+	return 0
+}
+
+func (x *PluginStoreSyncProgress) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *PluginStoreSyncProgress) GetCompleted() int32 {
+	if x != nil {
+		return x.Completed
+	}
+	return 0
+}
+
+func (x *PluginStoreSyncProgress) GetSucceeded() int32 {
+	if x != nil {
+		return x.Succeeded
+	}
+	return 0
+}
+
+func (x *PluginStoreSyncProgress) GetFailed() int32 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *PluginStoreSyncProgress) GetCurrentPlugin() string {
+	if x != nil {
+		return x.CurrentPlugin
+	}
+	return ""
+}
+
+func (x *PluginStoreSyncProgress) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *PluginStoreSyncProgress) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *PluginStoreSyncProgress) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type QueryPluginStoreSyncStatusCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId  string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	CommandId     string                 `protobuf:"bytes,3,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueryPluginStoreSyncStatusCommand) Reset() {
+	*x = QueryPluginStoreSyncStatusCommand{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueryPluginStoreSyncStatusCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueryPluginStoreSyncStatusCommand) ProtoMessage() {}
+
+func (x *QueryPluginStoreSyncStatusCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueryPluginStoreSyncStatusCommand.ProtoReflect.Descriptor instead.
+func (*QueryPluginStoreSyncStatusCommand) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *QueryPluginStoreSyncStatusCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *QueryPluginStoreSyncStatusCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *QueryPluginStoreSyncStatusCommand) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+type ImportPluginStoreCommand struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Metadata     *v1.CommandMetadata    `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	TargetNodeId string                 `protobuf:"bytes,2,opt,name=target_node_id,json=targetNodeId,proto3" json:"target_node_id,omitempty"`
+	// Platform-served download URL of the uploaded SQLite plugin database.
+	ArtifactUrl       string `protobuf:"bytes,3,opt,name=artifact_url,json=artifactUrl,proto3" json:"artifact_url,omitempty"`
+	ArtifactSha256    string `protobuf:"bytes,4,opt,name=artifact_sha256,json=artifactSha256,proto3" json:"artifact_sha256,omitempty"`
+	ArtifactSizeBytes int64  `protobuf:"varint,5,opt,name=artifact_size_bytes,json=artifactSizeBytes,proto3" json:"artifact_size_bytes,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ImportPluginStoreCommand) Reset() {
+	*x = ImportPluginStoreCommand{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportPluginStoreCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportPluginStoreCommand) ProtoMessage() {}
+
+func (x *ImportPluginStoreCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportPluginStoreCommand.ProtoReflect.Descriptor instead.
+func (*ImportPluginStoreCommand) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ImportPluginStoreCommand) GetMetadata() *v1.CommandMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ImportPluginStoreCommand) GetTargetNodeId() string {
+	if x != nil {
+		return x.TargetNodeId
+	}
+	return ""
+}
+
+func (x *ImportPluginStoreCommand) GetArtifactUrl() string {
+	if x != nil {
+		return x.ArtifactUrl
+	}
+	return ""
+}
+
+func (x *ImportPluginStoreCommand) GetArtifactSha256() string {
+	if x != nil {
+		return x.ArtifactSha256
+	}
+	return ""
+}
+
+func (x *ImportPluginStoreCommand) GetArtifactSizeBytes() int64 {
+	if x != nil {
+		return x.ArtifactSizeBytes
+	}
+	return 0
+}
+
+type PluginStoreImportResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CommandId     string                 `protobuf:"bytes,1,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                               // running | succeeded | failed
+	PluginCount   int32                  `protobuf:"varint,3,opt,name=plugin_count,json=pluginCount,proto3" json:"plugin_count,omitempty"` // informational count reported by node
+	BackupPath    string                 `protobuf:"bytes,4,opt,name=backup_path,json=backupPath,proto3" json:"backup_path,omitempty"`
+	ErrorCode     string                 `protobuf:"bytes,5,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,6,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PluginStoreImportResult) Reset() {
+	*x = PluginStoreImportResult{}
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PluginStoreImportResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PluginStoreImportResult) ProtoMessage() {}
+
+func (x *PluginStoreImportResult) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_plugin_v1_plugin_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PluginStoreImportResult.ProtoReflect.Descriptor instead.
+func (*PluginStoreImportResult) Descriptor() ([]byte, []int) {
+	return file_legion_plugin_v1_plugin_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PluginStoreImportResult) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PluginStoreImportResult) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *PluginStoreImportResult) GetPluginCount() int32 {
+	if x != nil {
+		return x.PluginCount
+	}
+	return 0
+}
+
+func (x *PluginStoreImportResult) GetBackupPath() string {
+	if x != nil {
+		return x.BackupPath
+	}
+	return ""
+}
+
+func (x *PluginStoreImportResult) GetErrorCode() string {
+	if x != nil {
+		return x.ErrorCode
+	}
+	return ""
+}
+
+func (x *PluginStoreImportResult) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *PluginStoreImportResult) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 var File_legion_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_legion_plugin_v1_plugin_proto_rawDesc = "" +
@@ -416,7 +1061,68 @@ const file_legion_plugin_v1_plugin_proto_rawDesc = "" +
 	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
 	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\x12;\n" +
 	"\vobserved_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"observedAtBLZJgithub.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1;pluginv1b\x06proto3"
+	"observedAt\"|\n" +
+	"\x17ListPluginGroupsCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\"h\n" +
+	"\x0fPluginGroupInfo\x12\x14\n" +
+	"\x05group\x18\x01 \x01(\tR\x05group\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12)\n" +
+	"\x10compatible_total\x18\x03 \x01(\x05R\x0fcompatibleTotal\"k\n" +
+	"\x11PluginGroupScript\x12\x14\n" +
+	"\x05group\x18\x01 \x01(\tR\x05group\x12\x1f\n" +
+	"\vscript_name\x18\x02 \x01(\tR\n" +
+	"scriptName\x12\x1f\n" +
+	"\vscript_type\x18\x03 \x01(\tR\n" +
+	"scriptType\"\xd6\x01\n" +
+	"\x16ListPluginGroupsResult\x129\n" +
+	"\x06groups\x18\x01 \x03(\v2!.legion.plugin.v1.PluginGroupInfoR\x06groups\x12=\n" +
+	"\ascripts\x18\x02 \x03(\v2#.legion.plugin.v1.PluginGroupScriptR\ascripts\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"{\n" +
+	"\x16SyncPluginStoreCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\"\xfc\x02\n" +
+	"\x17PluginStoreSyncProgress\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1a\n" +
+	"\bprogress\x18\x03 \x01(\x01R\bprogress\x12\x14\n" +
+	"\x05total\x18\x04 \x01(\x05R\x05total\x12\x1c\n" +
+	"\tcompleted\x18\x05 \x01(\x05R\tcompleted\x12\x1c\n" +
+	"\tsucceeded\x18\x06 \x01(\x05R\tsucceeded\x12\x16\n" +
+	"\x06failed\x18\a \x01(\x05R\x06failed\x12%\n" +
+	"\x0ecurrent_plugin\x18\b \x01(\tR\rcurrentPlugin\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\t \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\n" +
+	" \x01(\tR\ferrorMessage\x129\n" +
+	"\n" +
+	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xa5\x01\n" +
+	"!QueryPluginStoreSyncStatusCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x03 \x01(\tR\tcommandId\"\xf9\x01\n" +
+	"\x18ImportPluginStoreCommand\x12;\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1f.legion.node.v1.CommandMetadataR\bmetadata\x12$\n" +
+	"\x0etarget_node_id\x18\x02 \x01(\tR\ftargetNodeId\x12!\n" +
+	"\fartifact_url\x18\x03 \x01(\tR\vartifactUrl\x12'\n" +
+	"\x0fartifact_sha256\x18\x04 \x01(\tR\x0eartifactSha256\x12.\n" +
+	"\x13artifact_size_bytes\x18\x05 \x01(\x03R\x11artifactSizeBytes\"\x93\x02\n" +
+	"\x17PluginStoreImportResult\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x01 \x01(\tR\tcommandId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12!\n" +
+	"\fplugin_count\x18\x03 \x01(\x05R\vpluginCount\x12\x1f\n" +
+	"\vbackup_path\x18\x04 \x01(\tR\n" +
+	"backupPath\x12\x1d\n" +
+	"\n" +
+	"error_code\x18\x05 \x01(\tR\terrorCode\x12#\n" +
+	"\rerror_message\x18\x06 \x01(\tR\ferrorMessage\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtBLZJgithub.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1;pluginv1b\x06proto3"
 
 var (
 	file_legion_plugin_v1_plugin_proto_rawDescOnce sync.Once
@@ -430,32 +1136,49 @@ func file_legion_plugin_v1_plugin_proto_rawDescGZIP() []byte {
 	return file_legion_plugin_v1_plugin_proto_rawDescData
 }
 
-var file_legion_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_legion_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_legion_plugin_v1_plugin_proto_goTypes = []any{
-	(*PluginReleaseRef)(nil),      // 0: legion.plugin.v1.PluginReleaseRef
-	(*PluginArtifactRef)(nil),     // 1: legion.plugin.v1.PluginArtifactRef
-	(*SyncPluginCommand)(nil),     // 2: legion.plugin.v1.SyncPluginCommand
-	(*PluginSyncStatus)(nil),      // 3: legion.plugin.v1.PluginSyncStatus
-	(*PluginSyncFailed)(nil),      // 4: legion.plugin.v1.PluginSyncFailed
-	(*v1.CommandMetadata)(nil),    // 5: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),      // 6: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*PluginReleaseRef)(nil),                  // 0: legion.plugin.v1.PluginReleaseRef
+	(*PluginArtifactRef)(nil),                 // 1: legion.plugin.v1.PluginArtifactRef
+	(*SyncPluginCommand)(nil),                 // 2: legion.plugin.v1.SyncPluginCommand
+	(*PluginSyncStatus)(nil),                  // 3: legion.plugin.v1.PluginSyncStatus
+	(*PluginSyncFailed)(nil),                  // 4: legion.plugin.v1.PluginSyncFailed
+	(*ListPluginGroupsCommand)(nil),           // 5: legion.plugin.v1.ListPluginGroupsCommand
+	(*PluginGroupInfo)(nil),                   // 6: legion.plugin.v1.PluginGroupInfo
+	(*PluginGroupScript)(nil),                 // 7: legion.plugin.v1.PluginGroupScript
+	(*ListPluginGroupsResult)(nil),            // 8: legion.plugin.v1.ListPluginGroupsResult
+	(*SyncPluginStoreCommand)(nil),            // 9: legion.plugin.v1.SyncPluginStoreCommand
+	(*PluginStoreSyncProgress)(nil),           // 10: legion.plugin.v1.PluginStoreSyncProgress
+	(*QueryPluginStoreSyncStatusCommand)(nil), // 11: legion.plugin.v1.QueryPluginStoreSyncStatusCommand
+	(*ImportPluginStoreCommand)(nil),          // 12: legion.plugin.v1.ImportPluginStoreCommand
+	(*PluginStoreImportResult)(nil),           // 13: legion.plugin.v1.PluginStoreImportResult
+	(*v1.CommandMetadata)(nil),                // 14: legion.node.v1.CommandMetadata
+	(*v1.EventMetadata)(nil),                  // 15: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil),             // 16: google.protobuf.Timestamp
 }
 var file_legion_plugin_v1_plugin_proto_depIdxs = []int32{
-	5, // 0: legion.plugin.v1.SyncPluginCommand.metadata:type_name -> legion.node.v1.CommandMetadata
-	0, // 1: legion.plugin.v1.SyncPluginCommand.release:type_name -> legion.plugin.v1.PluginReleaseRef
-	1, // 2: legion.plugin.v1.SyncPluginCommand.artifact:type_name -> legion.plugin.v1.PluginArtifactRef
-	6, // 3: legion.plugin.v1.PluginSyncStatus.metadata:type_name -> legion.node.v1.EventMetadata
-	0, // 4: legion.plugin.v1.PluginSyncStatus.release:type_name -> legion.plugin.v1.PluginReleaseRef
-	7, // 5: legion.plugin.v1.PluginSyncStatus.observed_at:type_name -> google.protobuf.Timestamp
-	6, // 6: legion.plugin.v1.PluginSyncFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0, // 7: legion.plugin.v1.PluginSyncFailed.release:type_name -> legion.plugin.v1.PluginReleaseRef
-	7, // 8: legion.plugin.v1.PluginSyncFailed.observed_at:type_name -> google.protobuf.Timestamp
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	14, // 0: legion.plugin.v1.SyncPluginCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	0,  // 1: legion.plugin.v1.SyncPluginCommand.release:type_name -> legion.plugin.v1.PluginReleaseRef
+	1,  // 2: legion.plugin.v1.SyncPluginCommand.artifact:type_name -> legion.plugin.v1.PluginArtifactRef
+	15, // 3: legion.plugin.v1.PluginSyncStatus.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 4: legion.plugin.v1.PluginSyncStatus.release:type_name -> legion.plugin.v1.PluginReleaseRef
+	16, // 5: legion.plugin.v1.PluginSyncStatus.observed_at:type_name -> google.protobuf.Timestamp
+	15, // 6: legion.plugin.v1.PluginSyncFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 7: legion.plugin.v1.PluginSyncFailed.release:type_name -> legion.plugin.v1.PluginReleaseRef
+	16, // 8: legion.plugin.v1.PluginSyncFailed.observed_at:type_name -> google.protobuf.Timestamp
+	14, // 9: legion.plugin.v1.ListPluginGroupsCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	6,  // 10: legion.plugin.v1.ListPluginGroupsResult.groups:type_name -> legion.plugin.v1.PluginGroupInfo
+	7,  // 11: legion.plugin.v1.ListPluginGroupsResult.scripts:type_name -> legion.plugin.v1.PluginGroupScript
+	14, // 12: legion.plugin.v1.SyncPluginStoreCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	16, // 13: legion.plugin.v1.PluginStoreSyncProgress.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 14: legion.plugin.v1.QueryPluginStoreSyncStatusCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	14, // 15: legion.plugin.v1.ImportPluginStoreCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	16, // 16: legion.plugin.v1.PluginStoreImportResult.updated_at:type_name -> google.protobuf.Timestamp
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_legion_plugin_v1_plugin_proto_init() }
@@ -469,7 +1192,7 @@ func file_legion_plugin_v1_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_plugin_v1_plugin_proto_rawDesc), len(file_legion_plugin_v1_plugin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

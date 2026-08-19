@@ -207,6 +207,19 @@ func BindProfileDatabase(db *gorm.DB, path string) {
 	schema.SetGormProfileDatabase(db)
 }
 
+// CloseProfileDatabase closes the global profile DB handle and clears the
+// binding so the underlying SQLite file can be replaced on disk. Used by the
+// plugin store import flow to atomically swap the local plugin database.
+func CloseProfileDatabase() {
+	if profileDatabase != nil {
+		if sqlDB := profileDatabase.DB(); sqlDB != nil {
+			_ = sqlDB.Close()
+		}
+	}
+	profileDatabase = nil
+	schema.SetGormProfileDatabase(nil)
+}
+
 func GetGormProfileDatabase() *gorm.DB {
 	if profileDatabase != nil {
 		if debugProfileDatabase {
