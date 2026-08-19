@@ -198,7 +198,9 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	if c.GetCompileReCompile() {
 		if !isIncrementalCompile {
 			c.Processf(0, "recompile project, delete old data...")
-			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
+			if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
+				return nil, utils.Errorf("recompile: delete old IR data for %s failed: %w", programName, err)
+			}
 			ProgramCache.Remove(programName)
 			c.Processf(0, "recompile project, delete old data finish")
 		} else {
@@ -213,7 +215,9 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		// contract documented in SaveIrOffsetBatch.
 		if _, err := ssadb.GetProgram(programName, ssadb.Application); err == nil {
 			c.Processf(0, "recompile project, delete old data for existing program...")
-			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
+			if err := ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName); err != nil {
+				return nil, utils.Errorf("recompile: delete old IR data for %s failed: %w", programName, err)
+			}
 			ProgramCache.Remove(programName)
 			c.Processf(0, "recompile project, delete old data for existing program finish")
 		}

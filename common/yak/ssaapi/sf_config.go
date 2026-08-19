@@ -50,11 +50,6 @@ type sfCheck struct {
 	// starts, so each captures its own pre-descent parent state.
 	originalSnapshot     *sf.SymbolSnapshot
 	originalSnapshotOnce sync.Once
-
-	// fastMatchMu guards fastMatchIDs, which memoizes symbol -> id set for the
-	// simple `* & $source` / `<self> & $source` fast path.
-	fastMatchMu  sync.Mutex
-	fastMatchIDs map[string]map[int64]struct{}
 }
 
 type checkItem struct {
@@ -360,17 +355,16 @@ func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
 	if r == nil || r.contextResult == nil || name == "" {
 		return nil
 	}
-	r.fastMatchMu.Lock()
-	defer r.fastMatchMu.Unlock()
-	if r.fastMatchIDs == nil {
-		r.fastMatchIDs = make(map[string]map[int64]struct{})
-	}
-	if set, ok := r.fastMatchIDs[name]; ok {
-		return set
+	// The SymbolTable grows during descent (clearup -> MergeByResultLocked), so
+	// a memoized id set would go stale and make include/exclude membership
+	// diverge from the full sub-query. Rebuild the (small) set on each call
+	// under config.Mutex, which guards all SymbolTable writes.
+	if r.config != nil {
+		r.config.Mutex.Lock()
+		defer r.config.Mutex.Unlock()
 	}
 	vals, ok := r.contextResult.SymbolTable.Get(name)
 	if !ok {
-		r.fastMatchIDs[name] = nil
 		return nil
 	}
 	set := make(map[int64]struct{}, len(vals))
@@ -381,7 +375,6 @@ func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
 			}
 		}
 	}
-	r.fastMatchIDs[name] = set
 	return set
 }
 

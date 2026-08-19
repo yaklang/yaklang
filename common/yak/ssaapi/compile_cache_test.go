@@ -306,3 +306,29 @@ func TestFastPathMatchStats_TracksHitsAndFallbacks(t *testing.T) {
 }
 
 var _ = utils.Error // keep import
+
+// TestSFCheck_FastPath_SymbolTableGrowthIsFresh verifies the fast path does
+// not memoize the symbol set: a symbol bound after the first fast-path call
+// must be visible to later calls (review A1).
+func TestSFCheck_FastPath_SymbolTableGrowthIsFresh(t *testing.T) {
+	prog := NewTmpProgram("sf-check-fastmatch-growth")
+	table := omap.NewEmptyOrderedMap[string, sf.Values]()
+	table.Set("source", sf.Values{fastMatchTestValue(t, prog, 1)})
+	result := &sf.SFFrameResult{SymbolTable: table}
+	check := &sfCheck{contextResult: result}
+	item := &checkItem{RecursiveConfigItem: &sf.RecursiveConfigItem{
+		Key:   string(sf.RecursiveConfig_Include),
+		Value: "* & $source",
+	}}
+
+	match, ok := check.fastPathMatch(item, sf.Values{fastMatchTestValue(t, prog, 2)})
+	require.True(t, ok)
+	require.False(t, match, "id 2 is not in the initial source set")
+
+	// The symbol table grows during descent; the next fast-path call must see
+	// the new member instead of a stale memoized set.
+	table.Set("source", sf.Values{fastMatchTestValue(t, prog, 1), fastMatchTestValue(t, prog, 2)})
+	match, ok = check.fastPathMatch(item, sf.Values{fastMatchTestValue(t, prog, 2)})
+	require.True(t, ok)
+	require.True(t, match, "newly bound source id must be visible without cache invalidation")
+}

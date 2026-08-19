@@ -207,7 +207,7 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 }
 
 // ensureUniqueIrOffsetsIndex creates a UNIQUE INDEX with COALESCE on
-// (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))
+// (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, empty string))
 // for the ir_offsets table. This prevents duplicate offset INSERTs.
 //
 // If an older non-COALESCE index with the same name exists, it is dropped and
@@ -286,43 +286,60 @@ func SetDB(db *gorm.DB) {
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
-	utils.GormTransaction(db, func(tx *gorm.DB) error {
+	if err := utils.GormTransaction(db, func(tx *gorm.DB) error {
 		tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
-		deleteProgramCodeOnly(tx, program)
-		deleteProgramAuditResult(tx, program)
+		if err := deleteProgramCodeOnly(tx, program); err != nil {
+			return err
+		}
+		if err := deleteProgramAuditResult(tx, program); err != nil {
+			return err
+		}
 		deleteProgramRiskAndScanTask(tx, program)
 		return nil
-	})
+	}); err != nil {
+		log.Warnf("failed to delete program %s: %v", program, err)
+	}
 }
 
-func DeleteProgramIrCode(db *gorm.DB, program string) {
-	utils.GormTransaction(db, func(tx *gorm.DB) error {
-		deleteProgramCodeOnly(tx, program)
-		deleteProgramAuditResult(tx, program) // because audit result depends on ir code
+func DeleteProgramIrCode(db *gorm.DB, program string) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		if err := deleteProgramCodeOnly(tx, program); err != nil {
+			return err
+		}
+		// audit results depend on ir code
+		if err := deleteProgramAuditResult(tx, program); err != nil {
+			return err
+		}
 		return nil
 	})
 }
 
-func deleteProgramCodeOnly(db *gorm.DB, program string) {
+func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 	deleteCache(program)
 	// Batch all DELETEs into a single Exec call to reduce round-trips.
 	// Each DELETE is still a separate statement but they're sent in one
 	// batch to SQLite, cutting 7 round-trips to 1.
-	db.Exec(`DELETE FROM `+TableIrCodes+` WHERE program_name = ?;
+	if err := db.Exec(`DELETE FROM `+TableIrCodes+` WHERE program_name = ?;
 DELETE FROM `+TableIrIndices+` WHERE program_name = ?;
 DELETE FROM `+TableIrNamePool+` WHERE program_name = ?;
 DELETE FROM `+TableIrSources+` WHERE program_name = ?;
 DELETE FROM `+TableIrSources+` WHERE folder_path = ? AND file_name = ?;
 DELETE FROM `+TableIrTypes+` WHERE program_name = ?;
 DELETE FROM `+TableIrOffsets+` WHERE program_name = ?;`,
-		program, program, program, program, "/", program, program, program)
+		program, program, program, program, "/", program, program, program).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
-func deleteProgramAuditResult(db *gorm.DB, program string) {
-	db.Exec(`DELETE FROM `+TableAuditResults+` WHERE program_name = ?;
+func deleteProgramAuditResult(db *gorm.DB, program string) error {
+	if err := db.Exec(`DELETE FROM `+TableAuditResults+` WHERE program_name = ?;
 DELETE FROM `+TableAuditNodes+` WHERE program_name = ?;
 DELETE FROM `+TableAuditEdges+` WHERE program_name = ?;`,
-		program, program, program)
+		program, program, program).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
 func deleteProgramRiskAndScanTask(db *gorm.DB, program string) {

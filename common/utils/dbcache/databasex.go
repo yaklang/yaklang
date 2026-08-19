@@ -95,11 +95,12 @@ type Cache[T MemoryItem, D any] struct {
 	// loop is skipped. This ensures all remaining instructions are persisted
 	// without PersistRejected during the final drain.
 	finalDraining atomic.Bool
-	// persistLimitBypass is set true by MarkDirtyAsync to bypass the
-	// persistLimit PersistRejected check. Mid-compile flush must never
-	// reject keys (rejected keys stay resident unsaved). The saver
-	// goroutine drains in the background and evicts on success.
-	persistLimitBypass atomic.Bool
+	// persistLimitBypass is a scoped counter raised by MarkDirtyAsync to bypass
+	// the persistLimit PersistRejected check while that call is enqueuing.
+	// Mid-compile flush must never reject keys (rejected keys stay resident
+	// unsaved), but the exemption must not leak into later MarkDirty/TTL
+	// enqueues, so the counter is released when MarkDirtyAsync returns.
+	persistLimitBypass atomic.Int32
 	cancel             context.CancelFunc
 	wg                 sync.WaitGroup
 
@@ -159,7 +160,7 @@ func NewCache[T MemoryItem, D any](
 			resident.FinishPersist(key, generation, true)
 			return true
 		}
-		if !cache.closing.Load() && !cache.finalDraining.Load() && !cache.persistLimitBypass.Load() && cache.persistLimit > 0 && resident.PendingCount() > cache.persistLimit {
+		if !cache.closing.Load() && !cache.finalDraining.Load() && cache.persistLimitBypass.Load() <= 0 && cache.persistLimit > 0 && resident.PendingCount() > cache.persistLimit {
 			cache.settle(key, generation, PersistRejected)
 			return false
 		}
@@ -553,56 +554,6 @@ func (c *Cache[T, D]) drainResidentForClose() {
 	log.Warnf("[dbcache-close] maxPasses=%d exhausted, %d items still resident", maxPasses, c.resident.Count())
 }
 
-func (c *Cache[T, D]) enqueueCloseRequests() {
-	if c == nil || c.resident == nil {
-		return
-	}
-	keys := c.resident.Keys()
-	if len(keys) == 0 {
-		return
-	}
-	if c.marshalPipe == nil {
-		c.resident.QueueKeys(keys, utils.EvictionReasonDeleted)
-		return
-	}
-
-	limit := len(keys)
-	if c.persistLimit > 0 && int(c.persistLimit) < limit {
-		limit = int(c.persistLimit)
-	}
-	if limit <= 0 {
-		limit = len(keys)
-	}
-	if c.persistLimit <= 0 || len(keys) <= limit {
-		c.resident.QueueKeys(keys, utils.EvictionReasonDeleted)
-		return
-	}
-	lowWatermark := limit / 2
-	if lowWatermark <= 0 {
-		lowWatermark = 1
-	}
-
-	for start := 0; start < len(keys); start += limit {
-		end := start + limit
-		if end > len(keys) {
-			end = len(keys)
-		}
-		c.resident.QueueKeys(keys[start:end], utils.EvictionReasonDeleted)
-		if end < len(keys) {
-			c.waitPendingBelow(int64(lowWatermark))
-		}
-	}
-}
-
-func (c *Cache[T, D]) waitPendingBelow(limit int64) {
-	if c == nil || c.resident == nil || limit <= 0 {
-		return
-	}
-	for c.resident.PendingCount() > limit {
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 func resolvePersistLimit(maxEntries, saveSize, override int) int {
 	if override > 0 {
 		return override
@@ -728,9 +679,9 @@ func (c *Cache[T, D]) handleSaveBatch(tasks []*saveTask[D], save SaveFunc[D]) er
 	return nil
 }
 
-// FlushStats is a per-flush observability snapshot. Currently a stub
-// with zero values — will be populated by the async persist pipeline.
-// This is a minimal test hook, not production observability.
+// FlushStats is a per-flush observability snapshot accumulated by the
+// MarkDirty/MarkDirtyAsync/Flush paths. Tests use it to assert dedup and
+// backpressure behavior deterministically.
 type FlushStats struct {
 	FlushRequestCount    int64
 	DedupSkipped         int64
@@ -743,8 +694,7 @@ type FlushStats struct {
 }
 
 // FlushKeysStats returns flush observability metrics accumulated since
-// cache creation. This is a minimal test hook; the async persist pipeline
-// will replace this with per-flush structured stats.
+// cache creation.
 func (c *Cache[T, D]) FlushKeysStats() FlushStats {
 	c.flushMu.Lock()
 	defer c.flushMu.Unlock()
@@ -948,7 +898,11 @@ func (c *Cache[T, D]) MarkDirtyAsync(keys []int64, reason utils.EvictionReason) 
 		return
 	}
 	start := time.Now()
-	c.persistLimitBypass.Store(true)
+	// Scope the persist-limit exemption to this call only: QueueKeys enqueues
+	// synchronously, so the counter can be released as soon as it returns.
+	// A counter (not a bool) keeps concurrent MarkDirtyAsync calls safe.
+	c.persistLimitBypass.Add(1)
+	defer c.persistLimitBypass.Add(-1)
 
 	// Count dedup: items already pending
 	dedupSkipped := int64(0)

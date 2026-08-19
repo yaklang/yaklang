@@ -1462,3 +1462,29 @@ func TestIndexStore_FlushPropagatesSaverError(t *testing.T) {
 	require.ErrorIs(t, err, wantErr)
 	_ = store.Close()
 }
+
+// TestIndexStore_SaveOffsetDedupMatchesDBUniqueKey verifies the in-memory
+// offset dedup key matches the DB UNIQUE index: identical rows are enqueued
+// once, while the same range with a different variable_name is a legitimate
+// distinct row (review A3).
+func TestIndexStore_SaveOffsetDedupMatchesDBUniqueKey(t *testing.T) {
+	var saved int32
+	store := &indexStore{
+		mode: ProgramCacheDBWrite,
+		offsetSaver: dbcache.NewSave(func(offsets []*ssadb.IrOffset) error {
+			saved += int32(len(offsets))
+			return nil
+		}, dbcache.WithSaveSize(1), dbcache.WithSaveTimeout(10*time.Millisecond)),
+	}
+	defer store.Close()
+
+	base := &ssadb.IrOffset{ValueID: 7, FileHash: "h", StartOffset: 1, EndOffset: 2, VariableName: "a"}
+	store.saveOffsetDedup(base)
+	store.saveOffsetDedup(base) // exact duplicate must be deduped
+
+	diffVar := &ssadb.IrOffset{ValueID: 7, FileHash: "h", StartOffset: 1, EndOffset: 2, VariableName: "b"}
+	store.saveOffsetDedup(diffVar) // same range, different variable: not a duplicate
+
+	require.NoError(t, store.offsetSaver.Flush())
+	require.Equal(t, int32(2), saved, "only the exact duplicate should be deduped")
+}

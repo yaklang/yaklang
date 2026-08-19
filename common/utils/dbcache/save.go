@@ -226,6 +226,9 @@ func (s *Save[T]) processBuffer() {
 		s.dispatchSave(ts)
 	}
 
+	// Bound the adaptive batch size so a huge backlog cannot create one
+	// giant slice: growth stops at 16x the base batch size.
+	maxAdaptiveSaveSize := max(s.config.saveSize*16, defaultBatchSize*16)
 	currentSaveSize := s.config.saveSize
 	items := make([]T, 0, currentSaveSize)
 	for {
@@ -274,9 +277,9 @@ func (s *Save[T]) processBuffer() {
 				save(items)
 				bufferSize := s.buffer.Len()
 				if bufferSize > currentSaveSize*2 {
-					currentSaveSize *= 10
+					currentSaveSize = min(currentSaveSize*10, maxAdaptiveSaveSize)
 				} else if bufferSize > currentSaveSize {
-					currentSaveSize *= 5
+					currentSaveSize = min(currentSaveSize*5, maxAdaptiveSaveSize)
 				} else if bufferSize > saveSize {
 					// currentSaveSize = currentSaveSize
 					// pass

@@ -61,7 +61,47 @@ func NativeConstTypeIDQueries() int64 {
 //
 // Soft-delete semantics are preserved: the query adds "deleted_at IS NULL"
 // exactly like GORM's non-Unscoped First().
-//
+
+// rowScanner is satisfied by both *sql.Row and *sql.Rows, so the 50-column
+// ir_codes Scan is shared between the single-row and the batch native paths.
+type rowScanner interface{ Scan(dest ...any) error }
+
+// scanIrCode scans one row of nativeIrCodeColumns into an IrCode, including
+// the custom Int64Slice/Int64Map/StringSlice scanners and the soft-delete
+// timestamps, so the two native paths cannot drift apart.
+func scanIrCode(row rowScanner) (*IrCode, error) {
+	ir := &IrCode{}
+	var (
+		deletedAt sql.NullTime
+		createdAt time.Time
+		updatedAt time.Time
+	)
+	if err := row.Scan(
+		&ir.ID, &createdAt, &updatedAt, &deletedAt,
+		&ir.CodeID, &ir.ProgramName, &ir.Version,
+		&ir.SourceCodeStartOffset, &ir.SourceCodeEndOffset, &ir.SourceCodeHash,
+		&ir.Opcode, &ir.OpcodeName, &ir.OpcodeOperator,
+		&ir.Name, &ir.VerboseName, &ir.ShortVerboseName, &ir.String, &ir.ReadableName, &ir.ReadableNameShort,
+		&ir.CurrentBlock, &ir.CurrentFunction, &ir.IsFunction, &ir.FormalArgs, &ir.FreeValues, &ir.MemberCallArgs,
+		&ir.SideEffects, &ir.IsVariadic, &ir.ReturnCodes, &ir.IsExternal, &ir.CodeBlocks,
+		&ir.EnterBlock, &ir.ExitBlock, &ir.DeferBlock, &ir.ChildrenFunction, &ir.ParentFunction,
+		&ir.IsBlock, &ir.PredBlock, &ir.SuccBlock, &ir.Phis, &ir.HasDefs, &ir.Users, &ir.Occulatation,
+		&ir.IsObject, &ir.ObjectMembers, &ir.ObjectMemberPairs, &ir.IsObjectMember,
+		&ir.ObjectParent, &ir.ObjectKey, &ir.ObjectOwnerPairs,
+		&ir.MaskedCodes, &ir.IsMasked, &ir.Variable, &ir.ProgramCompileHash,
+		&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
+	); err != nil {
+		return nil, err
+	}
+	ir.CreatedAt = createdAt
+	ir.UpdatedAt = updatedAt
+	if deletedAt.Valid {
+		t := deletedAt.Time
+		ir.DeletedAt = &t
+	}
+	return ir, nil
+}
+
 // All native queries run through bindSQLPlaceholdersDB so Postgres gets $n
 // placeholders (database/sql rejects raw "?").
 func nativeGetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
@@ -139,27 +179,7 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 		RecordDBRead(time.Since(started), true)
 		return nil, sql.ErrConnDone
 	}
-	ir := &IrCode{}
-	var (
-		deletedAt sql.NullTime
-		createdAt time.Time
-		updatedAt time.Time
-	)
-	err := row.Scan(
-		&ir.ID, &createdAt, &updatedAt, &deletedAt,
-		&ir.CodeID, &ir.ProgramName, &ir.Version,
-		&ir.SourceCodeStartOffset, &ir.SourceCodeEndOffset, &ir.SourceCodeHash,
-		&ir.Opcode, &ir.OpcodeName, &ir.OpcodeOperator,
-		&ir.Name, &ir.VerboseName, &ir.ShortVerboseName, &ir.String, &ir.ReadableName, &ir.ReadableNameShort,
-		&ir.CurrentBlock, &ir.CurrentFunction, &ir.IsFunction, &ir.FormalArgs, &ir.FreeValues, &ir.MemberCallArgs,
-		&ir.SideEffects, &ir.IsVariadic, &ir.ReturnCodes, &ir.IsExternal, &ir.CodeBlocks,
-		&ir.EnterBlock, &ir.ExitBlock, &ir.DeferBlock, &ir.ChildrenFunction, &ir.ParentFunction,
-		&ir.IsBlock, &ir.PredBlock, &ir.SuccBlock, &ir.Phis, &ir.HasDefs, &ir.Users, &ir.Occulatation,
-		&ir.IsObject, &ir.ObjectMembers, &ir.ObjectMemberPairs, &ir.IsObjectMember,
-		&ir.ObjectParent, &ir.ObjectKey, &ir.ObjectOwnerPairs,
-		&ir.MaskedCodes, &ir.IsMasked, &ir.Variable, &ir.ProgramCompileHash,
-		&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
-	)
+	ir, err := scanIrCode(row)
 	if err != nil {
 		logNativeSQL(bound, time.Since(started), err)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -172,12 +192,6 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 	}
 	RecordDBRead(time.Since(started), false)
 	logNativeSQL(bound, time.Since(started), nil)
-	ir.CreatedAt = createdAt
-	ir.UpdatedAt = updatedAt
-	if deletedAt.Valid {
-		t := deletedAt.Time
-		ir.DeletedAt = &t
-	}
 	return ir, nil
 }
 
@@ -254,38 +268,13 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 			return nil, err
 		}
 		for rows.Next() {
-			ir := &IrCode{}
-			var (
-				deletedAt sql.NullTime
-				createdAt time.Time
-				updatedAt time.Time
-			)
-			if err := rows.Scan(
-				&ir.ID, &createdAt, &updatedAt, &deletedAt,
-				&ir.CodeID, &ir.ProgramName, &ir.Version,
-				&ir.SourceCodeStartOffset, &ir.SourceCodeEndOffset, &ir.SourceCodeHash,
-				&ir.Opcode, &ir.OpcodeName, &ir.OpcodeOperator,
-				&ir.Name, &ir.VerboseName, &ir.ShortVerboseName, &ir.String, &ir.ReadableName, &ir.ReadableNameShort,
-				&ir.CurrentBlock, &ir.CurrentFunction, &ir.IsFunction, &ir.FormalArgs, &ir.FreeValues, &ir.MemberCallArgs,
-				&ir.SideEffects, &ir.IsVariadic, &ir.ReturnCodes, &ir.IsExternal, &ir.CodeBlocks,
-				&ir.EnterBlock, &ir.ExitBlock, &ir.DeferBlock, &ir.ChildrenFunction, &ir.ParentFunction,
-				&ir.IsBlock, &ir.PredBlock, &ir.SuccBlock, &ir.Phis, &ir.HasDefs, &ir.Users, &ir.Occulatation,
-				&ir.IsObject, &ir.ObjectMembers, &ir.ObjectMemberPairs, &ir.IsObjectMember,
-				&ir.ObjectParent, &ir.ObjectKey, &ir.ObjectOwnerPairs,
-				&ir.MaskedCodes, &ir.IsMasked, &ir.Variable, &ir.ProgramCompileHash,
-				&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
-			); err != nil {
+			ir, err := scanIrCode(rows)
+			if err != nil {
 				rows.Close()
 				cancel()
 				RecordDBRead(time.Since(started), true)
 				logNativeSQL(q, time.Since(started), err)
 				return nil, err
-			}
-			ir.CreatedAt = createdAt
-			ir.UpdatedAt = updatedAt
-			if deletedAt.Valid {
-				t := deletedAt.Time
-				ir.DeletedAt = &t
 			}
 			out = append(out, ir)
 		}

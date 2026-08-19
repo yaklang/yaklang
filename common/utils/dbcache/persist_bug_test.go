@@ -28,7 +28,7 @@ func TestPersistLimitCloseWithExistingPending(t *testing.T) {
 	var started atomic.Bool
 
 	cache := NewCache[*bugItem, int](
-		5*time.Millisecond,  // short TTL — trigger evictions quickly
+		5*time.Millisecond, // short TTL — trigger evictions quickly
 		0,
 		func(item *bugItem, _ utils.EvictionReason) (int, error) {
 			return int(item.id), nil
@@ -67,7 +67,7 @@ func TestPersistLimitCloseWithExistingPending(t *testing.T) {
 		closeDone <- cache.Close()
 	}()
 
-	// Give enqueueCloseRequests time to try processing
+	// Give the close path time to start processing
 	time.Sleep(100 * time.Millisecond)
 
 	// Release the save — allow everything to drain
@@ -85,5 +85,30 @@ func TestPersistLimitCloseWithExistingPending(t *testing.T) {
 
 	if int(savedCount.Load()) != total {
 		t.Fatalf("not all items saved: %d of %d", savedCount.Load(), total)
+	}
+}
+
+// TestMarkDirtyAsync_ResetsPersistLimitBypass verifies that the persist-limit
+// exemption used by MarkDirtyAsync is scoped to that call: after it returns,
+// the bypass counter is back to zero so later MarkDirty/TTL enqueues still
+// honor persistLimit (review A2).
+func TestMarkDirtyAsync_ResetsPersistLimitBypass(t *testing.T) {
+	cache := NewCache[*bugItem, int](
+		0, 0,
+		func(item *bugItem, _ utils.EvictionReason) (int, error) {
+			return int(item.id), nil
+		},
+		func(items []int) error { return nil },
+		nil,
+		WithSaveSize(1),
+		WithSaveTimeout(10*time.Millisecond),
+		WithPersistLimit(1),
+	)
+	defer cache.Close()
+
+	cache.Set(&bugItem{id: 1})
+	cache.MarkDirtyAsync([]int64{1}, utils.EvictionReasonCapacityReached)
+	if got := cache.persistLimitBypass.Load(); got != 0 {
+		t.Fatalf("persistLimitBypass leaked after MarkDirtyAsync returned: %d", got)
 	}
 }

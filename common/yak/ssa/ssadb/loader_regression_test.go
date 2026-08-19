@@ -250,7 +250,8 @@ func TestNativeGetIrTypeItemById_Equivalent(t *testing.T) {
 	}
 	require.NoError(t, db.Create(item).Error)
 
-	native := nativeGetIrTypeItemById(db, prog, 42)
+	native, err := nativeGetIrTypeItemByIdErr(db, prog, 42)
+	require.NoError(t, err)
 	require.NotNil(t, native)
 	require.Equal(t, item.TypeId, native.TypeId)
 	require.Equal(t, item.Kind, native.Kind)
@@ -259,9 +260,13 @@ func TestNativeGetIrTypeItemById_Equivalent(t *testing.T) {
 	require.Equal(t, item.ExtraInformation, native.ExtraInformation)
 
 	// nonexistent id
-	require.Nil(t, nativeGetIrTypeItemById(db, prog, 999))
+	got, err := nativeGetIrTypeItemByIdErr(db, prog, 999)
+	require.NoError(t, err)
+	require.Nil(t, got)
 	// negative id
-	require.Nil(t, nativeGetIrTypeItemById(db, prog, -1))
+	gotNeg, err := nativeGetIrTypeItemByIdErr(db, prog, -1)
+	require.NoError(t, err)
+	require.Nil(t, gotNeg)
 }
 
 func TestNativeGetIrCodeItemById_Equivalent(t *testing.T) {
@@ -285,7 +290,8 @@ func TestNativeGetIrCodeItemById_Equivalent(t *testing.T) {
 	}
 	require.NoError(t, db.Create(item).Error)
 
-	native := nativeGetIrCodeItemById(db, prog, 7)
+	native, err := nativeGetIrCodeItemByIdErr(db, prog, 7)
+	require.NoError(t, err)
 	require.NotNil(t, native)
 	require.Equal(t, item.CodeID, native.CodeID)
 	require.Equal(t, item.ProgramName, native.ProgramName)
@@ -305,7 +311,9 @@ func TestNativeGetIrCodeItemById_Equivalent(t *testing.T) {
 	require.Equal(t, item.ExtraInformation, native.ExtraInformation)
 
 	// nonexistent
-	require.Nil(t, nativeGetIrCodeItemById(db, prog, 999))
+	got, err := nativeGetIrCodeItemByIdErr(db, prog, 999)
+	require.NoError(t, err)
+	require.Nil(t, got)
 }
 
 // TestNativeGetIrCodesByIds_EquivalentToPreload asserts that a native-SQL batch

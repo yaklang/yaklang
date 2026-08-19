@@ -270,31 +270,40 @@ func (s *indexStore) SaveVariableOffset(variable *Variable, rng *memedit.Range) 
 	}
 }
 
-// saveOffsetDedup saves an offset only if an identical row
-// (same value_id + file_hash + start_offset + end_offset) has not already
-// been saved. This prevents truly duplicate offset rows from compile-unit
-// split cross-unit resolution visiting the same instruction from the same
-// file editor multiple times. Different ranges for the same value_id are
-// legitimate and are NOT deduped.
+// saveOffsetDedup saves an offset only if an identical row (same value_id +
+// file_hash + start_offset + end_offset + variable_name, matching the DB
+// UNIQUE index) has not already been enqueued. This prevents duplicate offset
+// rows from compile-unit split cross-unit resolution visiting the same
+// instruction from the same file editor multiple times. Different ranges or
+// different variable names for the same value_id are legitimate and are NOT
+// deduped.
 func (s *indexStore) saveOffsetDedup(offset *ssadb.IrOffset) {
 	if offset == nil {
 		return
 	}
-	key := offsetDedupKey(offset.ValueID, offset.FileHash, offset.StartOffset, offset.EndOffset)
+	key := offsetDedupKey(offset.ValueID, offset.FileHash, offset.StartOffset, offset.EndOffset, offset.VariableName)
 	s.offsetSavedMu.Lock()
+	if s.offsetSaved == nil {
+		s.offsetSaved = make(map[string]struct{})
+	}
 	if _, ok := s.offsetSaved[key]; ok {
 		s.offsetSavedMu.Unlock()
 		return
 	}
+	s.offsetSavedMu.Unlock()
+	// Mark only after the enqueue attempt: if the saver cannot accept the item
+	// here (failures are surfaced later by Flush/Close), the offset is not
+	// poisoned and a later visit can retry it.
+	s.offsetSaver.Save(offset)
+	s.offsetSavedMu.Lock()
 	s.offsetSaved[key] = struct{}{}
 	s.offsetSavedMu.Unlock()
-	s.offsetSaver.Save(offset)
 }
 
 // offsetDedupKey creates a composite key for offset deduplication.
-func offsetDedupKey(valueID int64, fileHash string, start, end int64) string {
+func offsetDedupKey(valueID int64, fileHash string, start, end int64, variableName string) string {
 	return strconv.FormatInt(valueID, 10) + "|" + fileHash + "|" +
-		strconv.FormatInt(start, 10) + "|" + strconv.FormatInt(end, 10)
+		strconv.FormatInt(start, 10) + "|" + strconv.FormatInt(end, 10) + "|" + variableName
 }
 
 func appendResidentIndex(index *utils.SafeMapWithKey[string, []int64], key string, id int64) {
