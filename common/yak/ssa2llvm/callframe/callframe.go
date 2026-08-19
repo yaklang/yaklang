@@ -120,6 +120,16 @@ func ResolveDirectCallee(program *ssa.Program, fn *ssa.Function, call *ssa.Call)
 	if !ok || calleeVal == nil {
 		return nil, false
 	}
+	// A call result is a runtime value (possibly a materialized closure object
+	// returned by a factory function), not a statically known callee.
+	if _, isCall := calleeVal.(*ssa.Call); isCall {
+		return nil, false
+	}
+	// A member read (e.g. fns[0] or obj.method) yields a runtime value: the
+	// closure object stored in the collection, or a method bound to the object.
+	if mc, ok := calleeVal.(ssa.MemberCall); ok && mc.IsMember() {
+		return nil, false
+	}
 	if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil && !ssaFn.IsExtern() {
 		return ssaFn, true
 	}

@@ -20,7 +20,6 @@ package main
 
 import (
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 )
@@ -69,13 +68,105 @@ func keptImplies(a, b string) bool {
 	if a == sharedGroup {
 		return false
 	}
-	bSet := groupModules(b)
 	for _, m := range groupModules(a) {
-		if !slices.Contains(bSet, m) {
+		if !moduleKeeps(m, b) {
 			return false
 		}
 	}
 	return true
+}
+
+// elfsplitModuleGroupDeps mirrors compiler/moduleGroupDeps: using a module
+// keeps the groups it lists. The compiler's copy is authoritative; keep the
+// two in sync so the start-up reachability check sees the same closure the
+// linker will use.
+var elfsplitModuleGroupDeps = map[string][]string{
+	"poc":       {"cli", "sharednet"},
+	"http":      {"cli", "poc", "sharednet"},
+	"cli":       {"sharednet"},
+	"ssa":       {"cli", "poc", "ssafront", "sharednet", "ai"},
+	"ai":        {"ssa"},
+	"liteforge": {"ai"},
+	"sandbox":   {"ai"},
+	"rag":       {"ai"},
+	"dyn":       {"ai"},
+	"hook":      {"ai"},
+	"simulator": {"ssa"},
+	"suricata":  {"ssa"},
+	"pprof":     {"ssa"},
+	"nuclei":    {"httptpl"},
+	"atoi":      {"ssafront"},
+	"bot":       {"ssafront"},
+	"bufio":     {"ssafront"},
+	"context":   {"ssafront"},
+	"csrf":      {"ssafront"},
+	"db":        {"ssafront"},
+	"dictutil":  {"ssafront"},
+	"dns":       {"ssafront"},
+	"dnslog":    {"ssafront"},
+	"env":       {"ssafront"},
+	"exec":      {"ssafront"},
+	"filemonitor": {"ssafront"},
+	"filescanner": {"ssafront"},
+	"fuzz":      {"ssafront"},
+	"fuzzx":     {"ssafront"},
+	"gzip":      {"ssafront"},
+	"httpool":   {"ssafront"},
+	"httpserver": {"ssafront"},
+	"io":        {"ssafront"},
+	"js":        {"ssafront"},
+	"jsonstream": {"ssafront"},
+	"ldap":      {"ssafront"},
+	"math":      {"ssafront"},
+	"mitm":      {"ssafront"},
+	"mmdb":      {"ssafront"},
+	"rdp":       {"ssafront"},
+	"re":        {"ssafront"},
+	"re2":       {"ssafront"},
+	"redis":     {"ssafront"},
+	"regen":     {"ssafront"},
+	"risk":      {"ssafront"},
+	"smb":       {"ssafront"},
+	"spacengine": {"ssafront"},
+	"ssh":       {"ssafront"},
+	"tcp":       {"ssafront"},
+	"timezone":  {"ssafront"},
+	"tls":       {"ssafront"},
+	"traceroute": {"ssafront"},
+	"udp":       {"ssafront"},
+	"x":         {"ssafront"},
+	"xml":       {"ssafront"},
+	"yaml":      {"ssafront"},
+	"zip":       {"ssafront"},
+	"brute":     {"tools"},
+	"finscan":   {"tools"},
+	"ping":      {"tools"},
+	"servicescan": {"tools"},
+	"subdomain": {"tools"},
+	"synscan":   {"tools"},
+}
+
+// moduleKeeps reports whether using module m keeps group b, following the
+// module dependency closure. A group is kept when the script uses one of its
+// own modules or any module that transitively drags it in.
+func moduleKeeps(m, b string) bool {
+	return moduleKeepsSeen(m, b, map[string]bool{})
+}
+
+func moduleKeepsSeen(m, b string, seen map[string]bool) bool {
+	if m == b {
+		return true
+	}
+	if seen[m] {
+		return false
+	}
+	seen[m] = true
+	for _, need := range elfsplitModuleGroupDeps[m] {
+		if moduleKeepsSeen(need, b, seen) {
+			return true
+		}
+	}
+	return false
 }
 
 // groupModules is the module set a group is kept for.
@@ -232,6 +323,11 @@ func isInitFuncName(name string) bool {
 	}
 	idx := strings.LastIndex(name, ".init")
 	if idx < 0 {
+		return false
+	}
+	// A method named init ("pkg.(*T).init") is not a package init task; only
+	// package-level init functions run at start-up.
+	if strings.Contains(name[:idx], ".(") {
 		return false
 	}
 	rest := name[idx+len(".init"):]
