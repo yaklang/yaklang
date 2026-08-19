@@ -72,11 +72,19 @@ In cumulative_summary, besides an objective description of the image, explicitly
 		}
 
 		log.Infof("attached extra resources: vision analyze attached image %q (%d/%d)", imagePath, i+1, len(imagePaths))
-		analysis, err := aiforge.AnalyzeImageFile(imagePath,
+		analysisOptions := []any{
 			aiforge.WithAnalyzeContext(runCtx),
 			aiforge.WithExtraPrompt(extra),
 			aiforge.WithAnalyzeStatusCard(statusCb),
-		)
+		}
+		if config, ok := loop.GetConfig().(interface {
+			GetVisionPriorityAICallback() aicommon.AICallbackType
+		}); ok {
+			if callback := config.GetVisionPriorityAICallback(); callback != nil {
+				analysisOptions = append(analysisOptions, aiforge.WithVisionAICallback(callback))
+			}
+		}
+		analysis, err := aiforge.AnalyzeImageFile(imagePath, analysisOptions...)
 
 		buf.WriteString(fmt.Sprintf("### %s\n\n", imagePath))
 		if err != nil {

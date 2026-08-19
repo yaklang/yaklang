@@ -23,12 +23,15 @@ func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
 	require.NotNil(t, cfg.GetOriginalAICallback())
 	require.NotNil(t, cfg.GetQualityPriorityAICallback())
 	require.NotNil(t, cfg.GetSpeedPriorityAICallback())
+	require.NotNil(t, cfg.GetVisionPriorityAICallback())
 
 	_, err := cfg.GetOriginalAICallback()(cfg, NewAIRequest("original"))
 	require.NoError(t, err)
 	_, err = cfg.GetQualityPriorityAICallback()(cfg, NewAIRequest("quality"))
 	require.NoError(t, err)
 	_, err = cfg.GetSpeedPriorityAICallback()(cfg, NewAIRequest("speed"))
+	require.NoError(t, err)
+	_, err = cfg.GetVisionPriorityAICallback()(cfg, NewAIRequest("vision"))
 	require.NoError(t, err)
 
 	origCfg, ok := seen["original"].(*Config)
@@ -42,6 +45,10 @@ func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
 	speedCfg, ok := seen["speed"].(*tierAwareConsumptionCaller)
 	require.True(t, ok)
 	require.Equal(t, consts.TierLightweight, speedCfg.tier)
+
+	visionCfg, ok := seen["vision"].(*tierAwareConsumptionCaller)
+	require.True(t, ok)
+	require.Equal(t, consts.TierVision, visionCfg.tier)
 }
 
 func TestWithAICallback_WithAICallbackNegative(t *testing.T) {
@@ -61,12 +68,15 @@ func TestWithAICallback_WithAICallbackNegative(t *testing.T) {
 	require.NotNil(t, cfg.GetOriginalAICallback())
 	require.NotNil(t, cfg.GetQualityPriorityAICallback())
 	require.NotNil(t, cfg.GetSpeedPriorityAICallback())
+	require.NotNil(t, cfg.GetVisionPriorityAICallback())
 
 	_, err := cfg.GetOriginalAICallback()(cfg, NewAIRequest("original"))
 	require.NoError(t, err)
 	_, err = cfg.GetQualityPriorityAICallback()(cfg, NewAIRequest("quality"))
 	require.NoError(t, err)
 	_, err = cfg.GetSpeedPriorityAICallback()(cfg, NewAIRequest("speed"))
+	require.NoError(t, err)
+	_, err = cfg.GetVisionPriorityAICallback()(cfg, NewAIRequest("vision"))
 	require.NoError(t, err)
 
 	origCfg, ok := seen["original"].(*Config)
@@ -80,6 +90,10 @@ func TestWithAICallback_WithAICallbackNegative(t *testing.T) {
 	speedCfg, ok := seen["speed"].(*tierAwareConsumptionCaller)
 	require.True(t, ok)
 	require.Equal(t, consts.TierLightweight, speedCfg.tier)
+
+	visionCfg, ok := seen["vision"].(*tierAwareConsumptionCaller)
+	require.True(t, ok)
+	require.Equal(t, consts.TierVision, visionCfg.tier)
 }
 
 func TestWithFastAICallback_OnlySetsOriginal(t *testing.T) {
@@ -97,6 +111,7 @@ func TestWithFastAICallback_OnlySetsOriginal(t *testing.T) {
 	require.NotNil(t, cfg.GetOriginalAICallback())
 	require.Nil(t, cfg.GetQualityPriorityAICallback())
 	require.Nil(t, cfg.GetSpeedPriorityAICallback())
+	require.Nil(t, cfg.GetVisionPriorityAICallback())
 
 	_, err := cfg.GetOriginalAICallback()(cfg, NewAIRequest("original"))
 	require.NoError(t, err)
@@ -126,10 +141,13 @@ func TestWithAutoTieredAICallback_FallbackWhenTieredDisabled(t *testing.T) {
 	require.NotNil(t, cfg.GetOriginalAICallback())
 	require.NotNil(t, cfg.GetQualityPriorityAICallback())
 	require.NotNil(t, cfg.GetSpeedPriorityAICallback())
+	require.NotNil(t, cfg.GetVisionPriorityAICallback())
 
 	_, err := cfg.GetQualityPriorityAICallback()(cfg, NewAIRequest("quality"))
 	require.NoError(t, err)
 	_, err = cfg.GetSpeedPriorityAICallback()(cfg, NewAIRequest("speed"))
+	require.NoError(t, err)
+	_, err = cfg.GetVisionPriorityAICallback()(cfg, NewAIRequest("vision"))
 	require.NoError(t, err)
 
 	qualityCfg, ok := seen["quality"].(*tierAwareConsumptionCaller)
@@ -139,4 +157,8 @@ func TestWithAutoTieredAICallback_FallbackWhenTieredDisabled(t *testing.T) {
 	speedCfg, ok := seen["speed"].(*tierAwareConsumptionCaller)
 	require.True(t, ok)
 	require.Equal(t, consts.TierLightweight, speedCfg.tier)
+
+	visionCfg, ok := seen["vision"].(*tierAwareConsumptionCaller)
+	require.True(t, ok)
+	require.Equal(t, consts.TierVision, visionCfg.tier)
 }
