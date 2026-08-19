@@ -164,3 +164,20 @@ func TestBlueprintStaticMembersAreNotInstanceMembers(t *testing.T) {
 	instanceWithNormal.SetType(class)
 	require.Equal(t, normalValue.GetId(), builder.ReadMemberCallValue(instanceWithNormal, key).GetId())
 }
+
+// TestStaticMemberHistoryBounded verifies RegisterStaticMember keeps only the
+// most recent maxStaticMemberHistory values for a name (review A6): the
+// latest value stays authoritative and the slice cannot grow without bound.
+func TestStaticMemberHistoryBounded(t *testing.T) {
+	blueprint := NewBlueprint("history-test")
+	for i := 0; i < maxStaticMemberHistory+10; i++ {
+		v := NewConst(i)
+		v.SetId(int64(i))
+		blueprint.RegisterStaticMember("field", v, false)
+	}
+	members := blueprint.GetStaticMembers("field")
+	require.Len(t, members, maxStaticMemberHistory)
+	require.Equal(t, int64(maxStaticMemberHistory+9), members[len(members)-1].GetId(),
+		"the latest value must remain authoritative")
+	require.Equal(t, int64(maxStaticMemberHistory+9), blueprint.GetStaticMember("field").GetId())
+}

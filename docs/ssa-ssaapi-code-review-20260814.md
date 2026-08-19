@@ -390,3 +390,11 @@
 
 ### 验证（第九轮）
 - 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第十轮，@ 26678bdf）
+
+- **A6 完成**：`RegisterStaticMember` 增加每名历史上限 `maxStaticMemberHistory = 16`（保留最近值，`GetStaticMember` 始终读最新），交替赋值不再无界增长；新增 `TestStaticMemberHistoryBounded`。叠加上一轮的 local 遮蔽修复，A6 两个子问题（遮蔽污染、无界增长）均已处理。
+
+### 验证（第十轮）
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。

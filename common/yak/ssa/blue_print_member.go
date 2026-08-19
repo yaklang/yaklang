@@ -63,10 +63,19 @@ func (c *Blueprint) GetNormalMembers(name string) []Value {
 	return members
 }
 
+// maxStaticMemberHistory caps the per-name StaticMember history so a hot
+// global that is alternately assigned distinct values cannot grow the slice
+// without bound (review A6). The latest value remains the authoritative one
+// (GetStaticMember reads the last entry); only older assignments are dropped.
+const maxStaticMemberHistory = 16
+
 // static member
 func (c *Blueprint) RegisterStaticMember(name string, val Value, store ...bool) {
 	if !appendBlueprintMember(c.StaticMember, name, val) {
 		return
+	}
+	if values := c.StaticMember[name]; len(values) > maxStaticMemberHistory {
+		c.StaticMember[name] = values[len(values)-maxStaticMemberHistory:]
 	}
 	if len(store) == 0 || store[0] {
 		c.storeField(name, val, BluePrintStaticMember)
