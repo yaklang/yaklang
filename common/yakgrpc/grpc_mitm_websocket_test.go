@@ -219,6 +219,10 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 		}
 		rspMsg := string(rpcResponse.GetMessage().GetMessage())
 		if rpcResponse.GetIsWebsocket() && len(rpcResponse.GetPayload()) > 0 {
+			require.Equal(t,
+				ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_MANUAL,
+				rpcResponse.GetHijackTaskSource(),
+			)
 			payload := rpcResponse.GetPayload()
 			require.NotNil(t, rpcResponse.GetRequest(), "rpcResponse.GetRequest() is nil")
 
@@ -253,6 +257,10 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 		}
 
 		if !handshakeForwarded && len(rpcResponse.GetRequest()) > 0 {
+			require.Equal(t,
+				ypb.MITMHijackTaskSource_MITM_HIJACK_TASK_SOURCE_MANUAL,
+				rpcResponse.GetHijackTaskSource(),
+			)
 			// Request manual response interception, then forward the opening request.
 			// A 101 response is intentionally bypassed and may not produce a response event.
 			require.NoError(t, stream.Send(&ypb.MITMRequest{

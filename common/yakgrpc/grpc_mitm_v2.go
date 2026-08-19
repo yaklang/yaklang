@@ -553,12 +553,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				message.Payload = lowhttp.ConvertHTTPRequestToFuzzTag(message.Payload)
 			}
 		}
-		if hijackManger.isManual() {
-			sendLogged(&ypb.MITMV2Response{
-				ManualHijackListAction: action,
-				ManualHijackList:       resp,
-			})
-		}
+		// A task can be registered by either manual mode or a one-off conditional
+		// hijack. Registered conditional tasks must be visible without promoting
+		// the whole session to manual mode.
+		sendLogged(&ypb.MITMV2Response{
+			ManualHijackListAction: action,
+			ManualHijackList:       resp,
+		})
 	}
 
 	// 手动劫持：是否启用自动解压/自动压缩（需要热加载）
@@ -879,7 +880,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			Method:      "WS",
 		}
 
-		task := hijackManger.register(feedbackOrigin)
+		conditionalHijack := httpctx.GetContextBoolInfoFromRequest(req, mitmConditionalHijackContextKey)
+		task := hijackManger.register(feedbackOrigin, conditionalHijack)
 		if task == nil {
 			return raw
 		}
@@ -1198,10 +1200,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				}
 			})
 		}()
-		// 条件劫持
-		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
+		// 条件劫持只作用于当前请求，不能改变会话级手动劫持状态。
+		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(req.Method, req.Host, urlStr, extName)
+		if conditionalHijack {
 			log.Infof("[mitm] hijack ws request by hijack filter")
-			hijackManger.setCanRegister(true)
+			httpctx.SetContextValueInfoFromRequest(req, mitmConditionalHijackContextKey, true)
 		}
 
 		var encode []string
@@ -1219,7 +1222,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			Method:          "WS",
 		}
 
-		task := hijackManger.register(feedbackOrigin)
+		task := hijackManger.register(feedbackOrigin, conditionalHijack)
 		if task == nil {
 			return raw
 		}
@@ -1423,10 +1426,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			req = httpctx.GetHijackedRequestBytes(originReqIns)
 		}
 
-		// 条件劫持
-		if hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName) {
+		// 条件劫持只作用于当前请求，不能改变会话级手动劫持状态。
+		conditionalHijack := hijackFilterManager != nil && !hijackFilterManager.IsEmpty() && hijackFilterManager.IsPassed(method, hostname, urlStr, extName)
+		if conditionalHijack {
 			log.Infof("[mitm] hijack request by hijack filter")
-			hijackManger.setCanRegister(true)
 		}
 
 		// IsHttps: 配置国密时强制视为 HTTPS（不再依赖 rsp.TLS）
@@ -1445,7 +1448,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			Status:     Hijack_Status_Request,
 		}
 
-		task := hijackManger.register(feedbackOrigin)
+		task := hijackManger.register(feedbackOrigin, conditionalHijack)
 		if task == nil {
 			return req
 		}
@@ -2286,22 +2289,18 @@ func (m *manualHijackManager) getHijackingTaskInfo() []*ypb.SingleManualHijackIn
 	return tasks
 }
 
-func (m *manualHijackManager) isManual() bool {
+func (m *manualHijackManager) register(resp *ypb.SingleManualHijackInfoMessage, conditionalHijack bool) *manualHijackTask {
 	m.hijackLock.Lock()
 	defer m.hijackLock.Unlock()
-	return m.manualHijacking
-}
-
-func (m *manualHijackManager) register(resp *ypb.SingleManualHijackInfoMessage) *manualHijackTask {
-	m.hijackLock.Lock()
-	defer m.hijackLock.Unlock()
-	if !m.manualHijacking {
+	if !m.manualHijacking && !conditionalHijack {
 		return nil
 	}
+	taskSourceIsConditional := !m.manualHijacking && conditionalHijack
 	id := ksuid.New().String()
 	ch := make(chan *ypb.SingleManualHijackControlMessage, 2)
 
 	resp.TaskID = id
+	resp.HijackTaskSource = resolveMITMHijackTaskSource(taskSourceIsConditional)
 	m.messageChan[id] = ch
 	task := &manualHijackTask{
 		taskID:      id,
