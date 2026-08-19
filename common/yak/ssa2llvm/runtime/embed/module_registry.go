@@ -603,6 +603,66 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ImportAlias:  "yaklib",
 		ExportExpr:   "yaklib.DictUtilExports",
 	},
+	"bin": {
+		ModuleName:   "bin",
+		GoImportPath: "github.com/yaklang/yaklang/common/binx",
+		ImportAlias:  "binx",
+		ExportExpr:   "binx.Exports",
+	},
+	"crawlerx": {
+		ModuleName:   "crawlerx",
+		GoImportPath: "github.com/yaklang/yaklang/common/crawlerx",
+		ImportAlias:  "crawlerx",
+		ExportExpr:   "crawlerx.CrawlerXExports",
+	},
+	"diff": {
+		ModuleName:   "diff",
+		GoImportPath: "github.com/yaklang/yaklang/common/utils/yakgit/yakdiff",
+		ImportAlias:  "yakdiff",
+		ExportExpr:   "yakdiff.Exports",
+	},
+	"git": {
+		ModuleName:   "git",
+		GoImportPath: "github.com/yaklang/yaklang/common/utils/yakgit",
+		ImportAlias:  "yakgit",
+		ExportExpr:   "yakgit.Exports",
+	},
+	"omnisearch": {
+		ModuleName:   "omnisearch",
+		GoImportPath: "github.com/yaklang/yaklang/common/omnisearch",
+		ImportAlias:  "omnisearch",
+		ExportExpr:   "omnisearch.Exports",
+	},
+	"openapi": {
+		ModuleName:   "openapi",
+		GoImportPath: "github.com/yaklang/yaklang/common/openapi",
+		ImportAlias:  "openapi",
+		ExportExpr:   "openapi.Exports",
+	},
+	"sandbox": {
+		ModuleName:   "sandbox",
+		GoImportPath: "github.com/yaklang/yaklang/common/yak",
+		ImportAlias:  "yak",
+		ExportExpr:   "yak.SandboxExports",
+	},
+	"sca": {
+		ModuleName:   "sca",
+		GoImportPath: "github.com/yaklang/yaklang/common/sca",
+		ImportAlias:  "sca",
+		ExportExpr:   "sca.Exports",
+	},
+	"simulator": {
+		ModuleName:   "simulator",
+		GoImportPath: "github.com/yaklang/yaklang/common/simulator",
+		ImportAlias:  "simulator",
+		ExportExpr:   "simulator.Exports",
+	},
+	"suricata": {
+		ModuleName:   "suricata",
+		GoImportPath: "github.com/yaklang/yaklang/common/chaosmaker",
+		ImportAlias:  "chaosmaker",
+		ExportExpr:   "chaosmaker.ChaosMakerExports",
+	},
 	"webforest": {
 		ModuleName:   "webforest",
 		GoImportPath: "github.com/yaklang/yaklang/common/utils/webforest",
@@ -783,15 +843,13 @@ func AllModuleNames() []string {
 	return names
 }
 
-// aotCorePluginStubModules are yaklib modules referenced by core plugins but
-// not backed by a real AOT shim. The coreplugin compile sweep only builds the
-// plugins, so a lightweight stub table is enough to register the module and
-// keep the monolithic yaklib out of libyak.a.
-var aotCorePluginStubModules = []string{
-	"ai", "bufio", "context", "db", "fuzz", "httpool", "js", "jsonschema",
-	"liteforge", "log", "math", "mitm", "netstack", "pprof", "rag", "re",
-	"risk", "sfreport", "syntaxflow", "tls", "xhtml", "xpath", "yso", "zip",
-}
+// aotCorePluginStubModules is intentionally empty. It used to replace the
+// real yaklib export tables of these modules with a compile-only stub for the
+// coreplugin sweep, but the mustpass suite executes the produced binaries:
+// a stub table makes every real call fail with "yaklib export not found".
+// The monolithic yaklib is already retained in the archive through the
+// ssafront group, so registering the real tables costs nothing extra.
+var aotCorePluginStubModules = []string{}
 
 func init() {
 	stub := &ExportSource{

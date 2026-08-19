@@ -45,7 +45,7 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 				return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 			}
 		}
-		c.cacheValue(inst.GetId(), c.emitRuntimeGetField(objVal, keyStr, inst.GetId()))
+		c.cacheValue(inst.GetId(), c.emitRuntimeGetFieldByKey(objVal, key, inst, inst.GetId()))
 		return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 	}
 	if actual := c.resolveSideEffectActualValue(inst); actual != nil && actual.IsMember() && actual.GetObject() != nil && actual.GetKey() != nil {
@@ -58,7 +58,7 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 			c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 			return nil
 		}
-		c.cacheValue(inst.GetId(), c.emitRuntimeGetField(objVal, keyStr, inst.GetId()))
+		c.cacheValue(inst.GetId(), c.emitRuntimeGetFieldByKey(objVal, actual.GetKey(), inst, inst.GetId()))
 		return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 	}
 	if val, ok := c.getCachedValue(inst, inst.GetId()); ok && !val.IsNil() {

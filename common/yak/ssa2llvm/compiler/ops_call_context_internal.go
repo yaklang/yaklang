@@ -2,10 +2,12 @@ package compiler
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 const yakTaggedPointerMask uint64 = 1 << 62
@@ -48,15 +50,28 @@ func (c *Compiler) resolveContextCallArg(inst ssa.Instruction, argID int64, tagP
 	if inst != nil {
 		if fn := inst.GetFunc(); fn != nil {
 			if ssaFn, ok := c.functionValueForArg(fn, argID); ok && ssaFn != nil {
-				closure, err := c.materializeCallableClosure(inst, ssaFn)
-				if err != nil {
-					return llvm.Value{}, llvm.Value{}, err
+				// A call result that is a function value was already
+				// materialized as a closure by the callee's return (see
+				// compileReturn). Re-materializing here would resolve the
+				// free values from the caller's scope, where the callee's
+				// locals do not exist.
+				alreadyClosure := false
+				if val, ok := fn.GetValueById(argID); ok {
+					if _, isCall := val.(*ssa.Call); isCall {
+						alreadyClosure = true
+					}
 				}
-				if tagPointerArgs {
-					tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
-					return c.Builder.CreateOr(closure, tag, "yak_ctx_callable_tag"), closure, nil
+				if !alreadyClosure {
+					closure, err := c.materializeCallableClosure(inst, ssaFn)
+					if err != nil {
+						return llvm.Value{}, llvm.Value{}, err
+					}
+					if tagPointerArgs {
+						tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
+						return c.Builder.CreateOr(closure, tag, "yak_ctx_callable_tag"), closure, nil
+					}
+					return closure, closure, nil
 				}
-				return closure, closure, nil
 			}
 		}
 	}
@@ -195,9 +210,46 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 	ret = c.coerceToInt64(ret)
 	if spec.inst.GetId() > 0 {
 		c.setActiveBlockFromInstruction(spec.inst)
+		// A `call~` (drop-error) on a multi-return yaklib function receives the
+		// whole []any tuple from the runtime; the frontend typed the call as
+		// the first return, so extract index "0" before storing. When the
+		// call is unpacked into multiple left-hand values (rsp, req = f()~),
+		// the tuple must stay intact so the member reads can index "0"/"1";
+		// the trailing error is simply never read.
+		if call, ok := spec.inst.(*ssa.Call); ok && call.IsDropError && !call.Unpack && c.callReturnCount(spec.inst) > 1 {
+			ret = c.emitRuntimeGetField(ret, "0", call.GetId())
+		}
 		c.storeSSAValue(spec.inst.GetId(), ret)
 	}
 	return ret, nil
+}
+
+// callReturnCount reports how many Go values the callee returns. It is used to
+// unpack the runtime's multi-return tuple for drop-error calls.
+func (c *Compiler) callReturnCount(inst ssa.Instruction) int {
+	call, ok := inst.(*ssa.Call)
+	if !ok || call == nil {
+		return 1
+	}
+	fn := call.GetFunc()
+	if fn == nil {
+		return 1
+	}
+	calleeVal, ok := fn.GetValueById(call.Method)
+	if !ok || calleeVal == nil {
+		return 1
+	}
+	if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil && ssaFn.IsExtern() {
+		if pkg, method, ok := splitQualifiedName(ssaFn.GetName()); ok {
+			if exported, ok := yaklang.LookupExport(pkg, method); ok && exported != nil {
+				t := reflect.TypeOf(exported)
+				if t != nil && t.Kind() == reflect.Func {
+					return t.NumOut()
+				}
+			}
+		}
+	}
+	return 1
 }
 
 func (c *Compiler) setActiveBlockFromInstruction(inst ssa.Instruction) {
