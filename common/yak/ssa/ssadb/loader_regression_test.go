@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 	_ "github.com/yaklang/gorm/dialects/sqlite"
@@ -526,4 +527,34 @@ func TestConstTypeRegexpOperatorByDialect(t *testing.T) {
 	require.Equal(t, "REGEXP", constTypeRegexpOperator(""))
 	require.Equal(t, "~", constTypeRegexpOperator("postgres"))
 	require.Equal(t, "~", constTypeRegexpOperator("postgresql"))
+}
+
+// TestYieldIrCodes_A9_StreamsChunksInAscendingOrder proves the chunked
+// streaming path (review A9) keeps the documented order contract: cached hits
+// first, then all DB misses in ascending code_id order even when the miss set
+// spans multiple native batch chunks and the input ids are descending.
+func TestYieldIrCodes_A9_StreamsChunksInAscendingOrder(t *testing.T) {
+	db := setupA2LoaderDB(t)
+	prog := "a9-chunk-prog"
+	const total = 2500 // > nativeIrCodeBatchChunk, forces multiple chunks
+	codes := make([]*IrCode, 0, total)
+	for i := int64(1); i <= total; i++ {
+		codes = append(codes, &IrCode{CodeID: i, ProgramName: prog, Opcode: 1, Name: fmt.Sprintf("c%d", i)})
+	}
+	require.NoError(t, db.CreateInBatches(codes, 500).Error)
+	deleteCache(prog)
+
+	ids := make([]int64, 0, total)
+	for i := int64(total); i >= 1; i-- {
+		ids = append(ids, i)
+	}
+	var got []int64
+	ch := yieldIrCodes(context.Background(), prog, ids)
+	for ir := range ch {
+		got = append(got, ir.CodeID)
+	}
+	require.Len(t, got, total)
+	for i, id := range got {
+		require.Equal(t, int64(i+1), id, "misses must be yielded in ascending code_id order across chunks")
+	}
 }

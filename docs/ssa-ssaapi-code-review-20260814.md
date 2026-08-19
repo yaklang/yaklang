@@ -334,3 +334,11 @@
 
 ### 验证（第三轮）
 - 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 通过；改动文件 `gofmt -l` 干净。
+
+
+## 更新记录（2026-08-19 第四轮，@ 36837d6f）
+
+- **A9 已修复**：`yieldIrCodes` 的 DB miss 集合先排序再去重，再按 `nativeIrCodeBatchChunk` 分块查询并逐块 `SafeFeed`，不再一次性物化全部行；块内/块间仍保持升序 code_id，顺序契约不变（新增 `TestYieldIrCodes_A9_StreamsChunksInAscendingOrder`，2500 行跨多块验证）。任意块 native 出错时，剩余部分回退 GORM `FastPagination`，不会把 DB 错误当成空结果。
+
+### 验证（第四轮）
+- 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 全量通过（含 A2/A3/A8/A9 相关测试）；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。

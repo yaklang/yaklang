@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+	"sort"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -61,13 +62,18 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 		defer outC.Close()
 		_ = diagnostics.TrackLow("ssadb.yieldIrCodes", func() error {
 			idsToLoad := make([]int64, 0, len(ids))
+			seenMiss := make(map[int64]struct{}, len(ids))
 			cache := GetIrCodeCache(progName)
 			for _, id := range ids {
 				if ir, ok := cache.Get(id); ok {
 					outC.SafeFeed(ir)
-				} else {
-					idsToLoad = append(idsToLoad, id)
+					continue
 				}
+				if _, dup := seenMiss[id]; dup {
+					continue
+				}
+				seenMiss[id] = struct{}{}
+				idsToLoad = append(idsToLoad, id)
 			}
 			if len(idsToLoad) == 0 {
 				return nil
@@ -78,24 +84,33 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 			// (FastPagination built Scope.Fields/search.clone/DB.clone per page).
 			// On any native error, fall back to the old FastPagination path so a
 			// DB error is never mistaken for an empty result.
-			irs, err := nativeGetIrCodesByIds(GetDB(), progName, idsToLoad)
-			if err != nil {
-				db := GetDB().Model(&IrCode{}).Where("program_name = ?", progName)
-				ch := bizhelper.FastPagination[*IrCode](ctx, db, nil,
-					bizhelper.WithFastPaginator_IDs(idsToLoad), bizhelper.WithFastPaginator_IndexField("code_id"),
-				)
-				for ir := range ch {
+			//
+			// A9: stream in bounded chunks instead of materializing every row at
+			// once. Sorting the miss set first keeps the per-chunk ascending
+			// code_id order composing into the same global ascending order as the
+			// single native query, so the observable order contract is unchanged.
+			sort.Slice(idsToLoad, func(i, j int) bool { return idsToLoad[i] < idsToLoad[j] })
+			for start := 0; start < len(idsToLoad); start += nativeIrCodeBatchChunk {
+				end := min(start+nativeIrCodeBatchChunk, len(idsToLoad))
+				irs, err := nativeGetIrCodesByIds(GetDB(), progName, idsToLoad[start:end])
+				if err != nil {
+					db := GetDB().Model(&IrCode{}).Where("program_name = ?", progName)
+					ch := bizhelper.FastPagination[*IrCode](ctx, db, nil,
+						bizhelper.WithFastPaginator_IDs(idsToLoad[start:]), bizhelper.WithFastPaginator_IndexField("code_id"),
+					)
+					for ir := range ch {
+						cache.Set(ir.CodeID, ir)
+						outC.SafeFeed(ir)
+					}
+					return nil
+				}
+				for _, ir := range irs {
+					if ir == nil {
+						continue
+					}
 					cache.Set(ir.CodeID, ir)
 					outC.SafeFeed(ir)
 				}
-				return nil
-			}
-			for _, ir := range irs {
-				if ir == nil {
-					continue
-				}
-				cache.Set(ir.CodeID, ir)
-				outC.SafeFeed(ir)
 			}
 			return nil
 		})
