@@ -43,3 +43,71 @@ message PluginSyncFailed {
   string error_message = 4;
   google.protobuf.Timestamp observed_at = 5;
 }
+
+message ListPluginGroupsCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+}
+
+message PluginGroupInfo {
+  string group = 1;
+  int32 total = 2;
+  int32 compatible_total = 3;
+}
+
+message PluginGroupScript {
+  string group = 1;
+  string script_name = 2;
+  string script_type = 3;
+}
+
+message ListPluginGroupsResult {
+  repeated PluginGroupInfo groups = 1;
+  repeated PluginGroupScript scripts = 2;
+  string error_code = 3;
+  string error_message = 4;
+}
+
+message SyncPluginStoreCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+}
+
+message PluginStoreSyncProgress {
+  string command_id = 1;
+  string status = 2; // running | succeeded | failed
+  double progress = 3; // 0..1
+  int32 total = 4;
+  int32 completed = 5;
+  int32 succeeded = 6;
+  int32 failed = 7;
+  string current_plugin = 8;
+  string error_code = 9;
+  string error_message = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message QueryPluginStoreSyncStatusCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string command_id = 3;
+}
+
+message ImportPluginStoreCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  // Platform-served download URL of the uploaded SQLite plugin database.
+  string artifact_url = 3;
+  string artifact_sha256 = 4;
+  int64 artifact_size_bytes = 5;
+}
+
+message PluginStoreImportResult {
+  string command_id = 1;
+  string status = 2; // running | succeeded | failed
+  int32 plugin_count = 3; // informational count reported by node
+  string backup_path = 4;
+  string error_code = 5;
+  string error_message = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}

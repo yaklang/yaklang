@@ -168,6 +168,34 @@ func (p *capabilityEventPublisher) PublishResponseActionResult(
 	})
 }
 
+// PublishRaw 在核心 NATS（非 JetStream）上发布一条实时结果消息，
+// 供平台同步等待的查询命令（如 plugin.groups.list）按 commandID 派生 subject 接收。
+func (p *capabilityEventPublisher) PublishRaw(ctx context.Context, subject string, raw []byte) error {
+	session, ok := p.node.GetSessionState()
+	if !ok {
+		return ErrNodeSessionNotReady
+	}
+	if err := p.ensureJetStream(session.NATSURL); err != nil {
+		return err
+	}
+
+	p.mu.Lock()
+	conn := p.conn
+	p.mu.Unlock()
+	if conn == nil {
+		return fmt.Errorf("capability event nats connection is not ready")
+	}
+	if err := conn.Publish(subject, raw); err != nil {
+		return fmt.Errorf("publish raw realtime result: %w", err)
+	}
+	flushCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	if err := conn.FlushWithContext(flushCtx); err != nil {
+		return fmt.Errorf("flush raw realtime result: %w", err)
+	}
+	return nil
+}
+
 func (p *capabilityEventPublisher) PublishDesiredSpecDryRunResult(
 	ctx context.Context,
 	ref capabilityCommandRef,
