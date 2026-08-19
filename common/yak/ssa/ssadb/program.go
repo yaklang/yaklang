@@ -1,6 +1,10 @@
 package ssadb
 
 import (
+	"database/sql"
+	"errors"
+	"time"
+
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -127,6 +131,29 @@ func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 		return nil, err
 	}
 	return &p, nil
+}
+
+// GetProgramUpdatedAt returns only the updated_at of a program row, so
+// cache-freshness checks avoid loading the full IrProgram (including large
+// FileList/ExtraFile text columns). found=false means no such program row
+// exists (review A11).
+func GetProgramUpdatedAt(name string, kind ProgramKind) (time.Time, bool, error) {
+	if name == "" {
+		return time.Time{}, false, utils.Errorf("program name is empty")
+	}
+	db := GetDB().Model(&IrProgram{}).Where("program_name = ?", name)
+	if kind != "" {
+		db = db.Where("program_kind = ?", kind)
+	}
+	var updatedAt time.Time
+	row := db.Select("updated_at").Row()
+	if err := row.Scan(&updatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, false, nil
+		}
+		return time.Time{}, false, err
+	}
+	return updatedAt, true, nil
 }
 
 func UpdateProgramWithError(prog *IrProgram) error {

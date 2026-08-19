@@ -407,3 +407,14 @@
 
 ### 验证（第十一轮）
 - 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
+
+
+## 更新记录（2026-08-19 第十二轮，@ 234ccd834）
+
+- **A11（部分）**：新增 `GetProgramUpdatedAt` 轻量查询（只取 `updated_at`，不加载 FileList/ExtraFile 大列）。`FromDatabase` 缓存命中时：
+  - `irProgram` 已存在（长期缓存）：走轻量查询；程序行不存在 → 判定 stale 并移除缓存（原实现会漏掉“程序被删除”的场景）；时间比较从 `!Equal` 改为 `After`，避免时间精度噪声误判；命中且未过期时顺带刷新 `UpdatedAt`。
+  - `irProgram` 为 nil（编译产生的缓存项）：保留原完整 `GetProgram` 行为，一次补齐 Recompile 所需 ConfigInput/overlay 元数据（否则 TestJarRecompile 会因“引擎版本过旧”失败）。
+- 新增 `TestGetProgramUpdatedAtLightQuery`（存在/不存在两种路径）。
+
+### 验证（第十二轮）
+- `TestJarRecompile` 单独与全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 均通过；`go build` 通过；改动文件 gofmt 干净。

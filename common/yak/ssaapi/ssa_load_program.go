@@ -41,29 +41,41 @@ func FromDatabase(programName string) (p *Program, err error) {
 			prog.Program.Cache != nil &&
 			prog.Program.Cache.IsClosed()
 		staleIR := false
-		var irProg *ssadb.IrProgram
 		if !closedWrite {
-			loaded, getErr := ssadb.GetProgram(programName, ssadb.Application)
-			if getErr == nil && loaded != nil {
-				irProg = loaded
-				// Long-lived processes (CI yak grpc, yaklang engine) cache
-				// FromDatabase results for 10m. Recompile in another process
-				// deletes IR rows and writes a new ir_programs.updated_at;
-				// returning the cached Program would scan deleted instruction
-				// IDs and produce 0 matches.
-				if prog.irProgram != nil && !loaded.UpdatedAt.Equal(prog.irProgram.UpdatedAt) {
+			if prog.irProgram != nil {
+				// Long-lived cache entries (set by an earlier FromDatabase load):
+				// check freshness with a light updated_at-only query instead of
+				// loading the full IrProgram row (large FileList/ExtraFile
+				// columns) on every hit (review A11).
+				loadedUpdatedAt, found, getErr := ssadb.GetProgramUpdatedAt(programName, ssadb.Application)
+				if getErr != nil {
+					log.Warnf("failed to check program %s freshness: %v", programName, getErr)
+				} else if !found {
+					// The program row is gone (deleted/recompiled from scratch):
+					// the cached Program would scan deleted instruction IDs.
 					staleIR = true
+				} else {
+					// Recompile in another process deletes IR rows and writes a new
+					// ir_programs.updated_at; returning the cached Program would
+					// scan deleted instruction IDs and produce 0 matches. A strict
+					// After comparison avoids invalidating on timestamp-precision
+					// noise.
+					if loadedUpdatedAt.After(prog.irProgram.UpdatedAt) {
+						staleIR = true
+					} else {
+						prog.irProgram.UpdatedAt = loadedUpdatedAt
+					}
 				}
-			}
-		}
-		if closedWrite || staleIR {
-			ProgramCache.Remove(programName)
-		} else {
-			if irProg != nil {
-				prog.irProgram = irProg
-				if irProg.IsOverlay && len(irProg.OverlayLayers) > 0 {
-					if prog.GetOverlay() == nil {
-						overlay, err := loadOverlayFromDatabase(irProg.OverlayLayers, make(map[string]bool))
+			} else {
+				// Compile-created cache entry (irProgram is nil): load the full row
+				// once so Recompile/config metadata is available, mirroring the
+				// pre-A11 behavior. Subsequent hits reuse the populated irProgram
+				// and take the light path above.
+				loaded, getErr := ssadb.GetProgram(programName, ssadb.Application)
+				if getErr == nil && loaded != nil {
+					prog.irProgram = loaded
+					if loaded.IsOverlay && len(loaded.OverlayLayers) > 0 && prog.GetOverlay() == nil {
+						overlay, err := loadOverlayFromDatabase(loaded.OverlayLayers, make(map[string]bool))
 						if err != nil {
 							log.Warnf("failed to load overlay from cache: %v", err)
 						} else {
@@ -72,6 +84,13 @@ func FromDatabase(programName string) (p *Program, err error) {
 					}
 				}
 			}
+		}
+		if closedWrite || staleIR {
+			ProgramCache.Remove(programName)
+		} else {
+			// Overlay metadata is loaded on first load and only changes when the
+			// program is recompiled (which bumps updated_at and invalidates the
+			// cache), so no per-hit overlay refresh is needed here.
 			return prog, nil
 		}
 	}
