@@ -1205,7 +1205,10 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 	// function call
 	if s, ok := stmt.FunctionCall().(*yak.FunctionCallContext); ok {
-		return b.EmitCall(b.buildFunctionCallWarp(stmt, s))
+		if c := b.buildFunctionCallWarp(stmt, s); c != nil {
+			return b.EmitCall(c)
+		}
+		return nil
 	}
 
 	// paren expression
@@ -1698,6 +1701,9 @@ func (b *astbuilder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) 
 
 func (b *astbuilder) buildFunctionCallWarp(exprstmt *yak.ExpressionContext, stmt *yak.FunctionCallContext) *ssa.Call {
 	if expr, ok := exprstmt.Expression(0).(*yak.ExpressionContext); ok {
+		if b.tryBuildConstantEval(expr, stmt) {
+			return nil
+		}
 		v := b.buildExpression(expr)
 		if v != nil {
 			return b.buildFunctionCall(stmt, v)

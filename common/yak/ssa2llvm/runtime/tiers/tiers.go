@@ -52,7 +52,7 @@ var All = []Tier{
 	},
 	{
 		Name:    "staticanalyze",
-		Modules: []string{"ai", "bufio", "cli", "codec", "context", "db", "file", "filesys", "fuzz", "http", "httpool", "js", "json", "jsonschema", "liteforge", "log", "math", "mitm", "netstack", "os", "poc", "pprof", "rag", "re", "risk", "sfreport", "ssa", "str", "sync", "syntaxflow", "time", "tls", "xhtml", "xpath", "yakit", "yso", "zip"},
+		Modules: []string{"ai", "atoi", "bin", "bot", "brute", "bufio", "cli", "codec", "container", "context", "crawler", "crawlerx", "csrf", "db", "dictutil", "diff", "dns", "dnslog", "dyn", "env", "excel", "exec", "facades", "file", "filemonitor", "fileparser", "filescanner", "filesys", "finscan", "fuzz", "fuzzx", "git", "gzip", "hids", "hook", "http", "httpool", "httpserver", "httptpl", "iiop", "io", "java", "js", "json", "jsonschema", "jsonstream", "judge", "jwt", "ldap", "liteforge", "log", "math", "mitm", "mmdb", "nasl", "netstack", "nuclei", "omnisearch", "openapi", "os", "ping", "poc", "pprof", "rag", "rdp", "re", "re2", "redis", "regen", "report", "risk", "sandbox", "sca", "servicescan", "sfreport", "simulator", "smb", "spacengine", "sprint", "sprintf", "ssa", "ssh", "str", "subdomain", "suricata", "sync", "synscan", "syntaxflow", "systemd", "t3", "tcp", "time", "timezone", "tls", "tools", "traceroute", "udp", "webforest", "x", "xhtml", "xml", "xpath", "yakit", "yaml", "yso", "zip"},
 	},
 }
 

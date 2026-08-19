@@ -90,6 +90,12 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 	if obj == nil || key == nil {
 		return contextCallSpec{}, false, nil
 	}
+	// Numeric/dynamic keys (slice index, map lookup) yield a callable VALUE
+	// (e.g. fns[0] is a closure stored in the slice), not a method name.
+	// Only string-constant keys are method dispatches.
+	if key != nil && !c.memberKeyIsStringConst(key) {
+		return contextCallSpec{}, false, nil
+	}
 	methodName := c.resolveMemberKeyString(key)
 	if methodName == "" {
 		return contextCallSpec{}, false, nil
