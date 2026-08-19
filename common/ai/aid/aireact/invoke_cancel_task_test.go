@@ -65,11 +65,18 @@ func TestReAct_CancelCurrentTaskTargetsQueueRootDuringNestedLoop(t *testing.T) {
 		true,
 	)
 	nestedTask.SetStatus(aicommon.AITaskState_Processing)
+	processingSubAgent := aicommon.NewSubTaskBaseWithOptions(
+		rootTask,
+		"queue-root_sub-agent",
+		"sub agent task",
+		aicommon.WithStatefulTaskBaseSubAgent(),
+	)
+	processingSubAgent.SetStatus(aicommon.AITaskState_Processing)
 
 	react := &ReAct{
 		Emitter:      emitter,
 		currentTask:  nestedTask,
-		RuntimeTasks: []aicommon.AIStatefulTask{rootTask},
+		RuntimeTasks: []aicommon.AIStatefulTask{rootTask, processingSubAgent},
 	}
 
 	err := react.HandleSyncTypeReactCancelCurrentTaskEvent(&ypb.AIInputEvent{SyncID: "stop-root"})
@@ -81,6 +88,9 @@ func TestReAct_CancelCurrentTaskTargetsQueueRootDuringNestedLoop(t *testing.T) {
 	}
 	if got := nestedTask.GetStatus(); got != aicommon.AITaskState_Processing {
 		t.Fatalf("nested task status = %s, want unchanged %s", got, aicommon.AITaskState_Processing)
+	}
+	if got := processingSubAgent.GetStatus(); got != aicommon.AITaskState_Processing {
+		t.Fatalf("sub-agent task status = %s, want unchanged %s", got, aicommon.AITaskState_Processing)
 	}
 	select {
 	case <-rootTask.GetContext().Done():
