@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -466,6 +467,20 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 			return err
 		}
 		return c.lowerResolvedContextCall(spec)
+	case ssa.OpShl:
+		val = c.Builder.CreateShl(lhs, rhs, name)
+	case ssa.OpShr:
+		val = c.Builder.CreateAShr(lhs, rhs, name)
+	case ssa.OpAnd:
+		val = c.Builder.CreateAnd(lhs, rhs, name)
+	case ssa.OpLogicAnd:
+		val = c.Builder.CreateAnd(lhs, rhs, name)
+	case ssa.OpOr:
+		val = c.Builder.CreateOr(lhs, rhs, name)
+	case ssa.OpLogicOr:
+		val = c.Builder.CreateOr(lhs, rhs, name)
+	case ssa.OpXor:
+		val = c.Builder.CreateXor(lhs, rhs, name)
 	default:
 		return fmt.Errorf("unknown BinOp opcode: %v", inst.Op)
 	}
@@ -515,12 +530,13 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
-	} else if inst.IsString() {
+	} else if inst.IsString() || (inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.BytesTypeKind) {
 		ptr := c.Builder.CreateGlobalStringPtr(inst.VarString(), fmt.Sprintf("str_%d", id))
 		// Represent pointers as i64 (uintptr) in LLVM IR.
 		// NOTE: Do not tag here. Tagging is applied selectively at stdlib
 		// call sites (e.g. print/println) so non-print stdlib calls can receive
-		// raw C-string pointers.
+		// raw C-string pointers. Bytes constants use the same C-string
+		// representation; the runtime converts them to []byte on demand.
 		llvmVal := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
@@ -543,6 +559,53 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 			return err
 		}
 		retVal = c.coerceToInt64(val)
+		// A returned closure must be materialized in the function that owns its
+		// free values (e.g. a counter factory returning func() { n++; return n }).
+		// Materializing at the caller's call site would resolve the captured
+		// variable from the caller's scope, where it does not exist.
+		if fn := inst.GetFunc(); fn != nil {
+			if ssaFn, ok := c.functionValueForArg(fn, inst.Results[0]); ok && ssaFn != nil && !ssaFn.IsExtern() && len(ssaFn.FreeValues) > 0 {
+				closure, err := c.materializeCallableClosure(inst, ssaFn)
+				if err != nil {
+					return fmt.Errorf("compileReturn: materialize returned closure: %w", err)
+				}
+				retVal = c.coerceToInt64(closure)
+			}
+		}
+		// Apply the closure's return side effects: writes to captured
+		// variables must go through the by-reference free-value slots so
+		// mutable state persists across calls (counter factories, i++ in
+		// per-iteration loop closures).
+		if fn := inst.GetFunc(); fn != nil && c.function != nil && c.function.freeValuePointers != nil {
+			for _, ser := range fn.SideEffectsReturn {
+				for variable, se := range ser {
+					if variable == nil || se == nil || se.Modify <= 0 {
+						continue
+					}
+					for _, binding := range callframe.OrderedFreeValueBindings(fn) {
+						paramDefault := int64(0)
+						if p, ok := fn.GetValueById(binding.ValueID); ok {
+							if param, ok := ssa.ToParameter(p); ok && param != nil && param.GetDefault() != nil {
+								paramDefault = param.GetDefault().GetId()
+							}
+						}
+						if paramDefault != se.Modify && binding.Variable.GetValue().GetId() != se.Modify {
+							continue
+						}
+						ptr, ok := c.function.freeValuePointers[binding.ValueID]
+						if !ok || ptr.IsNil() {
+							continue
+						}
+						modifyVal, err := c.getValue(inst, se.Modify)
+						if err != nil {
+							continue
+						}
+						c.Builder.CreateStore(c.coerceToInt64(modifyVal), ptr)
+						break
+					}
+				}
+			}
+		}
 	}
 	if err := c.storeContextReturn(retVal); err != nil {
 		return err
@@ -578,8 +641,8 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 		}
 		if sourceKind == ssa.BytesTypeKind || sourceKind == ssa.StringTypeKind {
 			fn, fnType := c.getOrInsertRuntimeToCString()
-			argPtr := c.coerceToI8Ptr(val)
-			val = c.Builder.CreateCall(fnType, fn, []llvm.Value{argPtr}, fmt.Sprintf("to_cstring_%d", inst.GetId()))
+			argWord := c.coerceToInt64(val)
+			val = c.Builder.CreateCall(fnType, fn, []llvm.Value{argWord}, fmt.Sprintf("to_cstring_%d", inst.GetId()))
 		}
 	}
 

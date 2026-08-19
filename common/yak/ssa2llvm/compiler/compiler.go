@@ -277,6 +277,9 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	if fn.DeferBlock > 0 {
 		c.function.returnBlock = c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("yak_ret_%d", fn.GetId()))
 	}
+	if entryBB, ok := c.Blocks[fn.EnterBlock]; ok && !entryBB.IsNil() {
+		c.function.entryBlock = entryBB
+	}
 
 	// 3b. Pre-create all Phi nodes before compiling any block instructions.
 	// Other blocks may reference phis before their defining block is visited.

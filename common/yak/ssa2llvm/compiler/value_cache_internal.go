@@ -65,8 +65,8 @@ func (c *Compiler) withEntryInsertPoint(fn *ssa.Function, fnDo func() error) err
 	if c == nil || fn == nil || fn.EnterBlock <= 0 {
 		return fnDo()
 	}
-	entryBB, ok := c.Blocks[fn.EnterBlock]
-	if !ok || entryBB.IsNil() {
+	entryBB := c.entryBlockFor(fn)
+	if entryBB.IsNil() {
 		return fnDo()
 	}
 
