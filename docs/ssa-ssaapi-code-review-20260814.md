@@ -361,3 +361,12 @@
 
 ### 验证（第六轮）
 - 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
+
+
+## 更新记录（2026-08-19 第七轮，@ 50b1f7ae）
+
+- **A5 完成**：`FunctionType.String()` 不再把 `Name` 当重入标记写（消除并发踩踏），改用 `atomic.Pointer[string]` 做 stringCache、`atomic.Bool` 做计算中标记、`atomic.Int64` 版本号在变更时失效缓存；并发调用要么拿完整签名，要么短暂拿 `...` 占位符，不会死锁/无限递归/写坏 Name。`-race` 下通过新增的 `Test_FunctionType_StringConcurrentSafe`。
+- **A11（文档部分）**：`UpdatedAt` 仍是唯一权威新鲜度字段；`createDeleteOnlyProgram` 里对 `irProg.ID==0` 的防御分支与 `UpdateProgramWithError`（按 id 更新）行为一致，属于死代码，已顺手清理。
+
+### 验证（第七轮）
+- `go test -race -run 'Test_FunctionType_String' ./common/yak/ssa` 通过；完整 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。

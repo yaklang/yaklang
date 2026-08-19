@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -1205,9 +1206,16 @@ type FunctionType struct {
 
 	// stringCache caches the RawString result so repeated String() calls
 	// on FunctionType with many SideEffects don't re-allocate ~MB strings
-	// (63GB on engineercms). Cleared via resetStringCache when the type
-	// mutates (Name/params/return/side effects change).
-	stringCache string
+	// (63GB on engineercms). The pointer is atomic: String() can be called
+	// from concurrent scan goroutines without racing on the cache field.
+	stringCache atomic.Pointer[string]
+	// stringVersion is bumped on every string-affecting mutation. A goroutine
+	// that computed RawString only stores the result when the version is
+	// unchanged, so a concurrent setter cannot leave a stale cached signature.
+	stringVersion atomic.Int64
+	// stringComputing is the re-entrancy guard: while one goroutine renders
+	// this type, any nested/other call returns "..." instead of recursing.
+	stringComputing atomic.Bool
 }
 
 var _ Type = (*FunctionType)(nil)
@@ -1268,7 +1276,8 @@ func NewAnyFunctionType() *FunctionType {
 
 func (s *FunctionType) resetStringCache() {
 	if s != nil {
-		s.stringCache = ""
+		s.stringCache.Store(nil)
+		s.stringVersion.Add(1)
 	}
 }
 
@@ -1339,7 +1348,9 @@ func (s *FunctionType) PkgPathString() string {
 func (s *FunctionType) String() string {
 	// Re-entrancy guard: RawString() may call String() on this same type
 	// (e.g. a FunctionType that contains itself as parameter or return
-	// type). Return the guard marker instead of recursing forever.
+	// type). Return the guard marker instead of recursing forever. The guard
+	// is an atomic computing flag rather than a write to Name, so concurrent
+	// String() calls cannot observe each other's in-progress state.
 	if s.Name == "..." {
 		return "..."
 	}
@@ -1350,13 +1361,24 @@ func (s *FunctionType) String() string {
 	if s.Name != "" {
 		return s.Name
 	}
-	if s.stringCache != "" {
-		return s.stringCache
+	if cached := s.stringCache.Load(); cached != nil {
+		return *cached
 	}
-	s.Name = "..." // avoid RawString -> String -> RawString loop
+	if !s.stringComputing.CompareAndSwap(false, true) {
+		// Another goroutine is rendering this type. If it has already stored
+		// the result, use it; otherwise return the placeholder instead of
+		// waiting/recursing (same observable shape as the old guard).
+		if cached := s.stringCache.Load(); cached != nil {
+			return *cached
+		}
+		return "..."
+	}
+	defer s.stringComputing.Store(false)
+	version := s.stringVersion.Load()
 	ret := s.RawString()
-	s.Name = ""
-	s.stringCache = ret
+	if s.stringVersion.Load() == version {
+		s.stringCache.Store(&ret)
+	}
 	return ret
 }
 

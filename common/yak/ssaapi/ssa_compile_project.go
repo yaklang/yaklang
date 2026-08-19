@@ -796,10 +796,8 @@ func createDeleteOnlyProgram(ctx context.Context, programName string, projectID 
 	}
 	if projectID > 0 {
 		irProg.ProjectID = projectID
-		if irProg.ID > 0 {
-			if err := ssadb.UpdateProgramWithError(irProg); err != nil {
-				log.Errorf("update delete-only program project id failed: name=%s err=%v", irProg.ProgramName, err)
-			}
+		if err := ssadb.UpdateProgramWithError(irProg); err != nil {
+			log.Errorf("update delete-only program project id failed: name=%s err=%v", irProg.ProgramName, err)
 		}
 	}
 	cfg, err := ssaconfig.New(

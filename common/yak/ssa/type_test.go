@@ -1,6 +1,8 @@
 package ssa_test
 
 import (
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -66,8 +68,8 @@ func TestFunctionTypeString_CachesRawStringResult(t *testing.T) {
 	require.NotEmpty(t, first)
 
 	// Second call must return the cached result, not recompute RawString.
-	// With the cache, Name is non-empty and not "..." so String() returns
-	// the cached string immediately.
+	// With the atomic stringCache, String() returns the cached signature
+	// immediately.
 	second := ft.String()
 	require.Equal(t, first, second)
 
@@ -98,4 +100,35 @@ func Test_FunctionType_StringCacheInvalidatedByMutation(t *testing.T) {
 	// Self-referential type must not recurse forever.
 	ft.SetParameter([]ssa.Type{ft})
 	require.NotPanics(t, func() { _ = ft.String() })
+}
+
+// Test_FunctionType_StringConcurrentSafe verifies concurrent String() calls
+// on one FunctionType neither race on the cache/guard state nor hang: each
+// call returns either the full signature or the "..." placeholder while
+// another goroutine is computing, and the cache settles to the full
+// signature afterwards (review A5).
+func Test_FunctionType_StringConcurrentSafe(t *testing.T) {
+	ft := ssa.NewFunctionType("", []ssa.Type{ssa.CreateStringType()}, ssa.CreateNumberType(), false)
+	for i := 0; i < 200; i++ {
+		ft.SideEffects = append(ft.SideEffects, &ssa.FunctionSideEffect{Name: "se", VerboseName: "se"})
+	}
+
+	const workers = 64
+	results := make([]string, workers)
+	var wg sync.WaitGroup
+	for i := range results {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = ft.String()
+		}(i)
+	}
+	wg.Wait()
+
+	for _, r := range results {
+		require.NotEmpty(t, r, "String() must never return an empty result")
+		require.True(t, r == "..." || strings.Contains(r, "-> number"),
+			"result must be the placeholder or a full signature, got %q", r)
+	}
+	require.Contains(t, ft.String(), "-> number", "cache must settle to the full signature")
 }
