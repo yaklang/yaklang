@@ -342,3 +342,13 @@
 
 ### 验证（第四轮）
 - 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 全量通过（含 A2/A3/A8/A9 相关测试）；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
+
+
+## 更新记录（2026-08-19 第五轮，@ 708f5efa3）
+
+- **A10（部分）**：`ensureUniqueIrCodesProgramCodeIndex` / `ensureUniqueIrOffsetsIndex` 的目录查询改为按 dialect 走 `sqlite_master`（SQLite）或 `pg_indexes`（PostgreSQL），不再假设 `sqlite_master`；`Row().Scan` 错误不再静默吞掉（记 Warn）；新增 `TestUniqueIndexCatalogHelpers_DialectAware`。启动时“全表查重”仍只在索引不存在时执行一次，未做大迁移重构。
+- **A12（部分）**：大型项目路径的 80% GOMEMLIMIT 现在尊重已显式配置的 `GOMEMLIMIT` 环境变量（`defaultLargeProjectMemLimit`），不再无条件覆盖进程设置；新增对应单元测试。`/proc/meminfo` 仅 Linux 的局限与 80% 默认值语义仍保留。
+- **A16（部分）**：`ReloadProgramFromDatabase` 删除 `CleanBaseline` 之后冗余的 `runtime.GC()`（`debug.FreeOSMemory` 本身会先 GC 再归还内存），保留 Path A 的显式内存归还设计。
+
+### 验证（第五轮）
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。

@@ -1,12 +1,16 @@
 package ssadb
 
 import (
+	"database/sql"
+	"errors"
+
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/reportstore"
-	"strings"
 )
 
 var SSAProjectTables = []any{
@@ -170,6 +174,58 @@ func deleteDuplicateIrOffsets(db *gorm.DB) (int64, error) {
 // (program_name, code_id) for the ir_codes table. If duplicate rows already
 // exist, the extras are removed (keeping MIN(id)) before the index is
 // created, so legacy databases upgrade cleanly.
+// uniqueIndexInDatabase reports whether indexName exists on table using a
+// dialect-appropriate catalog query: sqlite_master for SQLite, pg_indexes for
+// PostgreSQL. Previously the check always assumed sqlite_master, which failed
+// (and was silently ignored) on PG (review A10).
+func uniqueIndexInDatabase(db *gorm.DB, table, indexName string) bool {
+	if db == nil {
+		return false
+	}
+	var q string
+	var args []interface{}
+	switch db.Dialect().GetName() {
+	case "postgres", "postgresql":
+		q = `SELECT COUNT(*) FROM pg_indexes WHERE schemaname = current_schema() AND tablename = ? AND indexname = ?`
+		args = []interface{}{table, indexName}
+	default:
+		q = `SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name=? AND name=?`
+		args = []interface{}{table, indexName}
+	}
+	var exists int64
+	if err := db.Raw(q, args...).Row().Scan(&exists); err != nil {
+		log.Warnf("[unique-constraint] failed to check index %s on %s: %v", indexName, table, err)
+		return false
+	}
+	return exists > 0
+}
+
+// uniqueIndexSQL returns the catalog definition for indexName on table, or ""
+// when missing/unreadable, using the dialect-appropriate catalog (review A10).
+func uniqueIndexSQL(db *gorm.DB, table, indexName string) string {
+	if db == nil {
+		return ""
+	}
+	var q string
+	var args []interface{}
+	switch db.Dialect().GetName() {
+	case "postgres", "postgresql":
+		q = `SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = ? AND indexname = ?`
+		args = []interface{}{table, indexName}
+	default:
+		q = `SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=? AND name=?`
+		args = []interface{}{table, indexName}
+	}
+	var def string
+	if err := db.Raw(q, args...).Row().Scan(&def); err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			log.Warnf("[unique-constraint] failed to read index %s on %s: %v", indexName, table, err)
+		}
+		return ""
+	}
+	return def
+}
+
 func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 	if !db.HasTable(TableIrCodes) {
 		return
@@ -177,10 +233,8 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 
 	indexName := "ux_ir_codes_program_code"
 
-	// Check if the unique index already exists
-	var exists int64
-	db.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='ir_codes' AND name=?`, indexName).Row().Scan(&exists)
-	if exists > 0 {
+	// Check if the unique index already exists (dialect-aware catalog).
+	if uniqueIndexInDatabase(db, TableIrCodes, indexName) {
 		return // already created
 	}
 
@@ -221,33 +275,14 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 	indexName := "ux_ir_offsets_program_value_file_range"
 
 	// Check if the index exists and whether its SQL uses COALESCE
-	type idxInfo struct {
-		Name string
-		SQL  string
-	}
-	var existing []idxInfo
-	rows, err := db.Raw(
-		`SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`,
-		indexName,
-	).Rows()
-	if err == nil {
-		for rows.Next() {
-			var info idxInfo
-			rows.Scan(&info.Name, &info.SQL)
-			existing = append(existing, info)
-		}
-		rows.Close()
-	}
-
-	// If the index exists with COALESCE, it's up to date — nothing to do
-	for _, info := range existing {
-		if strings.Contains(strings.ToUpper(info.SQL), "COALESCE") {
+	// (dialect-aware catalog: sqlite_master for SQLite, pg_indexes for PG).
+	def := uniqueIndexSQL(db, TableIrOffsets, indexName)
+	if def != "" {
+		// If the index exists with COALESCE, it's up to date — nothing to do
+		if strings.Contains(strings.ToUpper(def), "COALESCE") {
 			return // already the COALESCE version
 		}
-	}
-
-	// If the index exists WITHOUT COALESCE, drop it so we can recreate
-	if len(existing) > 0 {
+		// If the index exists WITHOUT COALESCE, drop it so we can recreate
 		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
 		if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
 			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)

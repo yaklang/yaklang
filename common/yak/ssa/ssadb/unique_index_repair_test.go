@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -148,4 +149,26 @@ func TestUniqueIndexPatch_RepairsMixedDuplicateGroup(t *testing.T) {
 	require.Equal(t, "A", kept.Name, "MIN(id) row must be kept")
 	require.True(t, uniqueIndexExists(t, db, "ir_codes", "ux_ir_codes_program_code"),
 		"unique index must be created after dedup")
+}
+
+// TestUniqueIndexCatalogHelpers_DialectAware verifies the catalog helpers
+// report SQLite indexes correctly and return a non-empty definition for the
+// COALESCE offsets index, so ensureUniqueIrOffsetsIndex can skip recreation
+// (review A10).
+func TestUniqueIndexCatalogHelpers_DialectAware(t *testing.T) {
+	db := openRepairTestDB(t)
+
+	require.False(t, uniqueIndexInDatabase(db, TableIrCodes, "ux_ir_codes_program_code"),
+		"index must not exist before the patch")
+	require.Empty(t, uniqueIndexSQL(db, TableIrOffsets, "ux_ir_offsets_program_value_file_range"),
+		"missing index must return an empty definition")
+
+	patchIrCodeIndex(db)
+
+	require.True(t, uniqueIndexInDatabase(db, TableIrCodes, "ux_ir_codes_program_code"),
+		"created ir_codes index must be visible through the catalog helper")
+	require.True(t, uniqueIndexInDatabase(db, TableIrOffsets, "ux_ir_offsets_program_value_file_range"),
+		"created ir_offsets index must be visible through the catalog helper")
+	require.Contains(t, strings.ToUpper(uniqueIndexSQL(db, TableIrOffsets, "ux_ir_offsets_program_value_file_range")),
+		"COALESCE", "offsets index definition must contain COALESCE")
 }

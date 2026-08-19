@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"os"
-	"runtime"
 	"runtime/debug"
 	"strconv"
 )
@@ -64,11 +63,10 @@ func ReloadProgramFromDatabase(prog *Program) *Program {
 			prog.Program.Cache.CleanBaseline()
 		}
 	}
-	// Force collection and return memory to the OS BEFORE the DBRead scan
-	// program starts allocating Values/editors. Without this, compile-time SSA
-	// objects may still be pending GC while scan memory grows, so peak RSS does
-	// not drop even though CleanBaseline released the references.
-	runtime.GC()
+	// Return memory to the OS BEFORE the DBRead scan program starts allocating
+	// Values/editors. CleanBaseline already ran runtime.GC(), and
+	// debug.FreeOSMemory itself forces a GC before releasing memory, so the
+	// extra explicit runtime.GC() was redundant (review A16).
 	debug.FreeOSMemory()
 	log.Infof("[path-a] released compile memory for program %s before DBRead reload", programName)
 

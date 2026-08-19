@@ -473,3 +473,20 @@ func TestCompileUnitPlanCIncludes(t *testing.T) {
 	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:b", Kind: "include", Raw: "b/b.h"})
 	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:c", Kind: "include", Raw: "c/c.h"})
 }
+
+// TestDefaultLargeProjectMemLimitRespectsGOMEMLIMIT verifies the legacy
+// large-project memory limit does not override an explicitly configured
+// GOMEMLIMIT (review A12).
+func TestDefaultLargeProjectMemLimitRespectsGOMEMLIMIT(t *testing.T) {
+	t.Setenv("GOMEMLIMIT", "512MiB")
+	limit, ok := defaultLargeProjectMemLimit(32 * 1024 * 1024 * 1024)
+	require.False(t, ok, "explicit GOMEMLIMIT must be respected, not overridden")
+	require.Zero(t, limit)
+
+	t.Setenv("GOMEMLIMIT", "")
+	limit, ok = defaultLargeProjectMemLimit(32 * 1024 * 1024 * 1024)
+	require.True(t, ok)
+	require.Equal(t, int64(32*1024*1024*1024*80/100), limit)
+	_, ok = defaultLargeProjectMemLimit(0)
+	require.False(t, ok, "unknown system memory must not force a limit")
+}

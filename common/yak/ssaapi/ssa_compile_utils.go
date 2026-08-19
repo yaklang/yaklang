@@ -133,6 +133,21 @@ func systemMemoryTotalBytes() int64 {
 	return 0
 }
 
+// defaultLargeProjectMemLimit returns the soft memory limit (80% of system
+// memory) the legacy large-project path should apply, and whether it should
+// apply one at all. An explicitly configured GOMEMLIMIT is always respected:
+// the compile path must not silently override the user/process setting
+// (review A12).
+func defaultLargeProjectMemLimit(totalMem int64) (int64, bool) {
+	if raw := strings.TrimSpace(os.Getenv("GOMEMLIMIT")); raw != "" {
+		return 0, false
+	}
+	if totalMem <= 0 {
+		return 0, false
+	}
+	return totalMem * 80 / 100, true
+}
+
 func autoASTMemoryBudgetBytes() (int64, string) {
 	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_AST_MEMORY_BUDGET")); raw != "" {
 		if budget, ok := parseMemoryBudgetEnv(raw); ok {
@@ -414,8 +429,8 @@ func (c *Config) GetFileHandler(
 		// the heap grows unchecked to 20GB+ on 32GB machines.
 		// Use sync.Once to avoid setting/logging 98 times (once per concurrent worker).
 		goMemLimitOnce.Do(func() {
-			if totalMem := systemMemoryTotalBytes(); totalMem > 0 {
-				memLimit := totalMem * 80 / 100
+			totalMem := systemMemoryTotalBytes()
+			if memLimit, ok := defaultLargeProjectMemLimit(totalMem); ok {
 				debug.SetMemoryLimit(memLimit)
 				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (80%% of %s system memory)",
 					formatFileSize(int(memLimit)), formatFileSize(int(totalMem)))
