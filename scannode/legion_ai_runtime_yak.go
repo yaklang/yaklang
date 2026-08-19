@@ -465,7 +465,17 @@ func runYakAIForgeDirect(
 	emitter aiSessionRuntimeEmitter,
 	content string,
 ) error {
-	commonOptions := append([]aicommon.ConfigOption(nil), config.ExtOptions...)
+	commonOptions := make([]aicommon.ConfigOption, 0, len(config.ExtOptions)+5)
+	if config.AICallback != nil {
+		commonOptions = append(commonOptions, aicommon.WithAICallback(config.AICallback))
+	}
+	if config.QualityPriorityAICallback != nil {
+		commonOptions = append(commonOptions, aicommon.WithQualityPriorityAICallback(config.QualityPriorityAICallback))
+	}
+	if config.SpeedPriorityAICallback != nil {
+		commonOptions = append(commonOptions, aicommon.WithSpeedPriorityAICallback(config.SpeedPriorityAICallback))
+	}
+	commonOptions = append(commonOptions, config.ExtOptions...)
 	commonOptions = append(commonOptions,
 		aicommon.WithID(binding.Ref.SessionID),
 		aicommon.WithEventInputChanx(forgeInputChannel),
@@ -475,9 +485,6 @@ func runYakAIForgeDirect(
 			}
 		}),
 	)
-	if config.AICallback != nil {
-		commonOptions = append(commonOptions, aicommon.WithAICallback(config.AICallback))
-	}
 	switch strings.ToLower(strings.TrimSpace(config.ReviewPolicy)) {
 	case "manual":
 		commonOptions = append(commonOptions, aicommon.WithAgreeManual())
@@ -537,64 +544,86 @@ func yakAISendFailureCode(err error) string {
 }
 
 type yakRuntimeOptions struct {
-	UseDefaultAIConfig             *bool                    `json:"use_default_ai_config"`
-	AIService                      string                   `json:"ai_service"`
-	AIModelName                    string                   `json:"ai_model_name"`
-	APIKey                         string                   `json:"api_key"`
-	BaseURL                        string                   `json:"base_url"`
-	APIType                        string                   `json:"api_type"`
-	Domain                         string                   `json:"domain"`
-	Proxy                          string                   `json:"proxy"`
-	Endpoint                       string                   `json:"endpoint"`
-	EnableEndpoint                 *bool                    `json:"enable_endpoint"`
-	NoHTTPS                        *bool                    `json:"no_https"`
-	Headers                        map[string]string        `json:"headers"`
-	MaxIteration                   int                      `json:"max_iteration"`
-	ReActMaxIteration              int64                    `json:"react_max_iteration"`
-	ReviewPolicy                   string                   `json:"review_policy"`
-	EnableSystemFileSystemOperator *bool                    `json:"enable_system_file_system_operator"`
-	DisableToolUse                 *bool                    `json:"disable_tool_use"`
-	EnableAISearchTool             *bool                    `json:"enable_ai_search_tool"`
-	EnableAISearchInternet         *bool                    `json:"enable_ai_search_internet"`
-	IncludeSuggestedToolNames      []string                 `json:"include_suggested_tool_names"`
-	IncludeSuggestedToolKeywords   []string                 `json:"include_suggested_tool_keywords"`
-	ExcludeToolNames               []string                 `json:"exclude_tool_names"`
-	EnableQwenNoThinkMode          *bool                    `json:"enable_qwen_no_think_mode"`
-	DisallowRequireForUserPrompt   *bool                    `json:"disallow_require_for_user_prompt"`
-	AllowUserInteract              *bool                    `json:"allow_user_interact"`
-	AllowPlanUserInteract          *bool                    `json:"allow_plan_user_interact"`
-	AllowGenerateReport            *bool                    `json:"allow_generate_report"`
-	TaskMaxContinueCount           int64                    `json:"task_max_continue_count"`
-	DisableToolIntervalReview      *bool                    `json:"disable_tool_interval_review"`
-	SyncPerceptionTrigger          *bool                    `json:"sync_perception_trigger"`
-	EnablePlan                     *bool                    `json:"enable_plan"`
-	EnableDetachedPlan             *bool                    `json:"enable_detached_plan"`
-	PlanExecTaskConcurrency        int64                    `json:"plan_exec_task_concurrency"`
-	UserPlanPrompt                 string                   `json:"user_plan_prompt"`
-	UserPresetPrompt               string                   `json:"user_preset_prompt"`
-	Source                         string                   `json:"source"`
-	ForgeName                      string                   `json:"forge_name"`
-	ForgeParams                    []yakAIForgeParam        `json:"forge_params"`
-	EnabledCapabilities            []yakAICapability        `json:"enabled_capabilities"`
-	Strategy                       *yakAIStrategy           `json:"strategy"`
-	AIReviewRiskControlScore       *float64                 `json:"ai_review_risk_control_score"`
-	AICallAutoRetry                *int64                   `json:"ai_call_auto_retry"`
-	AITransactionRetry             *int64                   `json:"ai_transaction_retry"`
-	AICallTokenLimit               *int64                   `json:"ai_call_token_limit"`
-	UserInteractLimit              int64                    `json:"user_interact_limit"`
-	PlanUserInteractMaxCount       int64                    `json:"plan_user_interact_max_count"`
-	TimelineContentSizeLimit       int64                    `json:"timeline_content_size_limit"`
-	Focus                          string                   `json:"focus"`
-	FocusModeLoop                  string                   `json:"focus_mode_loop"`
-	FocusReleaseID                 string                   `json:"focus_release_id"`
-	FocusReleaseSHA256             string                   `json:"focus_release_sha256"`
-	FocusRuntimeName               string                   `json:"focus_runtime_name"`
-	FocusTargetURL                 string                   `json:"focus_target_url"`
-	ConversationResultTargetURL    string                   `json:"conversation_result_target_url"`
-	Workdir                        string                   `json:"workdir"`
-	Language                       string                   `json:"language"`
-	SessionMCPServers              []sessionMCPServer       `json:"session_mcp_servers"`
-	SourceWorkspace                *legionCodeWorkspaceSpec `json:"source_workspace,omitempty"`
+	ProviderPolicySchema           string                    `json:"schema"`
+	ProviderPolicyEnabled          *bool                     `json:"enabled"`
+	RoutingPolicy                  string                    `json:"routing_policy"`
+	DisableFallback                *bool                     `json:"disable_fallback"`
+	IntelligentModels              []yakProviderModelOptions `json:"intelligent_models"`
+	LightweightModels              []yakProviderModelOptions `json:"lightweight_models"`
+	VisionModels                   []yakProviderModelOptions `json:"vision_models"`
+	UseDefaultAIConfig             *bool                     `json:"use_default_ai_config"`
+	AIService                      string                    `json:"ai_service"`
+	AIModelName                    string                    `json:"ai_model_name"`
+	APIKey                         string                    `json:"api_key"`
+	BaseURL                        string                    `json:"base_url"`
+	APIType                        string                    `json:"api_type"`
+	Domain                         string                    `json:"domain"`
+	Proxy                          string                    `json:"proxy"`
+	Endpoint                       string                    `json:"endpoint"`
+	EnableEndpoint                 *bool                     `json:"enable_endpoint"`
+	NoHTTPS                        *bool                     `json:"no_https"`
+	Headers                        map[string]string         `json:"headers"`
+	MaxIteration                   int                       `json:"max_iteration"`
+	ReActMaxIteration              int64                     `json:"react_max_iteration"`
+	ReviewPolicy                   string                    `json:"review_policy"`
+	EnableSystemFileSystemOperator *bool                     `json:"enable_system_file_system_operator"`
+	DisableToolUse                 *bool                     `json:"disable_tool_use"`
+	EnableAISearchTool             *bool                     `json:"enable_ai_search_tool"`
+	EnableAISearchInternet         *bool                     `json:"enable_ai_search_internet"`
+	IncludeSuggestedToolNames      []string                  `json:"include_suggested_tool_names"`
+	IncludeSuggestedToolKeywords   []string                  `json:"include_suggested_tool_keywords"`
+	ExcludeToolNames               []string                  `json:"exclude_tool_names"`
+	EnableQwenNoThinkMode          *bool                     `json:"enable_qwen_no_think_mode"`
+	DisallowRequireForUserPrompt   *bool                     `json:"disallow_require_for_user_prompt"`
+	AllowUserInteract              *bool                     `json:"allow_user_interact"`
+	AllowPlanUserInteract          *bool                     `json:"allow_plan_user_interact"`
+	AllowGenerateReport            *bool                     `json:"allow_generate_report"`
+	TaskMaxContinueCount           int64                     `json:"task_max_continue_count"`
+	DisableToolIntervalReview      *bool                     `json:"disable_tool_interval_review"`
+	SyncPerceptionTrigger          *bool                     `json:"sync_perception_trigger"`
+	EnablePlan                     *bool                     `json:"enable_plan"`
+	EnableDetachedPlan             *bool                     `json:"enable_detached_plan"`
+	PlanExecTaskConcurrency        int64                     `json:"plan_exec_task_concurrency"`
+	UserPlanPrompt                 string                    `json:"user_plan_prompt"`
+	UserPresetPrompt               string                    `json:"user_preset_prompt"`
+	Source                         string                    `json:"source"`
+	ForgeName                      string                    `json:"forge_name"`
+	ForgeParams                    []yakAIForgeParam         `json:"forge_params"`
+	EnabledCapabilities            []yakAICapability         `json:"enabled_capabilities"`
+	Strategy                       *yakAIStrategy            `json:"strategy"`
+	AIReviewRiskControlScore       *float64                  `json:"ai_review_risk_control_score"`
+	AICallAutoRetry                *int64                    `json:"ai_call_auto_retry"`
+	AITransactionRetry             *int64                    `json:"ai_transaction_retry"`
+	AICallTokenLimit               *int64                    `json:"ai_call_token_limit"`
+	UserInteractLimit              int64                     `json:"user_interact_limit"`
+	PlanUserInteractMaxCount       int64                     `json:"plan_user_interact_max_count"`
+	TimelineContentSizeLimit       int64                     `json:"timeline_content_size_limit"`
+	Focus                          string                    `json:"focus"`
+	FocusModeLoop                  string                    `json:"focus_mode_loop"`
+	FocusReleaseID                 string                    `json:"focus_release_id"`
+	FocusReleaseSHA256             string                    `json:"focus_release_sha256"`
+	FocusRuntimeName               string                    `json:"focus_runtime_name"`
+	FocusTargetURL                 string                    `json:"focus_target_url"`
+	ConversationResultTargetURL    string                    `json:"conversation_result_target_url"`
+	Workdir                        string                    `json:"workdir"`
+	Language                       string                    `json:"language"`
+	SessionMCPServers              []sessionMCPServer        `json:"session_mcp_servers"`
+	SourceWorkspace                *legionCodeWorkspaceSpec  `json:"source_workspace,omitempty"`
+}
+
+type yakProviderModelOptions struct {
+	ProviderID     string            `json:"provider_id"`
+	AIService      string            `json:"ai_service"`
+	AIModelName    string            `json:"ai_model_name"`
+	APIKey         string            `json:"api_key"`
+	BaseURL        string            `json:"base_url"`
+	APIType        string            `json:"api_type"`
+	Domain         string            `json:"domain"`
+	Proxy          string            `json:"proxy"`
+	Endpoint       string            `json:"endpoint"`
+	EnableEndpoint *bool             `json:"enable_endpoint"`
+	NoHTTPS        *bool             `json:"no_https"`
+	Headers        map[string]string `json:"headers"`
 }
 
 type yakAIForgeParam struct {
@@ -674,7 +703,14 @@ func buildYakAIEngineOptions(
 	if options.TimelineContentSizeLimit > 0 {
 		config = append(config, aiengine.WithTimelineContentLimit(int(options.TimelineContentSizeLimit)))
 	}
+	callbacks, err := loadYakSessionAICallbacks(options)
+	if err != nil {
+		return nil, err
+	}
 	extOptions := buildYakAICommonExtOptions(options)
+	if callbacks.Vision != nil {
+		extOptions = append(extOptions, aicommon.WithVisionPriorityAICallback(callbacks.Vision))
+	}
 	if binding.LegionResultRuntime != nil {
 		extOptions = append(extOptions, aicommon.WithLegionResultRuntime(binding.LegionResultRuntime))
 	}
@@ -705,12 +741,14 @@ func buildYakAIEngineOptions(
 	if projection := renderCredentialProjection(binding.CredentialRefs); projection != "" {
 		config = append(config, aiengine.WithAttachedFileContent(projection))
 	}
-	callback, err := loadYakAICallback(options)
-	if err != nil {
-		return nil, err
+	if callbacks.Original != nil {
+		config = append(config, aiengine.WithAICallback(callbacks.Original))
 	}
-	if callback != nil {
-		config = append(config, aiengine.WithAICallback(callback))
+	if callbacks.Quality != nil {
+		config = append(config, aiengine.WithQualityPriorityAICallback(callbacks.Quality))
+	}
+	if callbacks.Speed != nil {
+		config = append(config, aiengine.WithSpeedPriorityAICallback(callbacks.Speed))
 	}
 	return config, nil
 }
@@ -854,7 +892,125 @@ func buildYakSessionMCPServers(options yakRuntimeOptions) ([]*aicommon.ExtraMCPS
 	return servers, len(servers) > 0
 }
 
+type yakSessionAICallbacks struct {
+	Original aicommon.AICallbackType
+	Quality  aicommon.AICallbackType
+	Speed    aicommon.AICallbackType
+	Vision   aicommon.AICallbackType
+}
+
+func loadYakSessionAICallbacks(options yakRuntimeOptions) (yakSessionAICallbacks, error) {
+	tiered := strings.TrimSpace(options.ProviderPolicySchema) != "" ||
+		len(options.IntelligentModels) > 0 || len(options.LightweightModels) > 0 || len(options.VisionModels) > 0
+	if !tiered {
+		callback, err := loadYakAICallback(options)
+		if err != nil {
+			return yakSessionAICallbacks{}, err
+		}
+		return yakSessionAICallbacks{
+			Original: callback,
+			Quality:  callback,
+			Speed:    callback,
+			Vision:   callback,
+		}, nil
+	}
+	if options.ProviderPolicyEnabled != nil && !*options.ProviderPolicyEnabled {
+		return yakSessionAICallbacks{}, fmt.Errorf("tiered ai provider policy is disabled")
+	}
+	disableFallback := options.DisableFallback != nil && *options.DisableFallback
+	quality, err := loadYakTierAICallback(options.IntelligentModels, consts.TierIntelligent, disableFallback)
+	if err != nil {
+		return yakSessionAICallbacks{}, fmt.Errorf("load intelligent model policy: %w", err)
+	}
+	speed, err := loadYakTierAICallback(options.LightweightModels, consts.TierLightweight, disableFallback)
+	if err != nil {
+		return yakSessionAICallbacks{}, fmt.Errorf("load lightweight model policy: %w", err)
+	}
+	vision, err := loadYakTierAICallback(options.VisionModels, consts.TierVision, disableFallback)
+	if err != nil {
+		return yakSessionAICallbacks{}, fmt.Errorf("load vision model policy: %w", err)
+	}
+	original := quality
+	if original == nil {
+		original = speed
+	}
+	if original == nil {
+		original = vision
+	}
+	if original == nil {
+		return yakSessionAICallbacks{}, fmt.Errorf("tiered ai provider policy contains no usable model")
+	}
+	if quality == nil {
+		quality = original
+	}
+	if speed == nil {
+		speed = original
+	}
+	if vision == nil {
+		vision = original
+	}
+	return yakSessionAICallbacks{Original: original, Quality: quality, Speed: speed, Vision: vision}, nil
+}
+
+func loadYakTierAICallback(
+	models []yakProviderModelOptions,
+	tier consts.ModelTier,
+	disableFallback bool,
+) (aicommon.AICallbackType, error) {
+	callbacks := make([]aicommon.AICallbackType, 0, len(models))
+	var loadErrors []error
+	for _, model := range models {
+		callback, err := loadYakProviderCallback(model.runtimeOptions(), tier)
+		if err != nil {
+			loadErrors = append(loadErrors, err)
+			continue
+		}
+		if callback != nil {
+			callbacks = append(callbacks, callback)
+		}
+		if disableFallback && len(callbacks) > 0 {
+			break
+		}
+	}
+	if len(callbacks) == 0 {
+		if len(models) == 0 {
+			return nil, nil
+		}
+		return nil, errors.Join(loadErrors...)
+	}
+	if disableFallback || len(callbacks) == 1 {
+		return callbacks[0], nil
+	}
+	return func(caller aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		var lastErr error
+		for _, callback := range callbacks {
+			response, err := callback(caller, request)
+			if err == nil {
+				return response, nil
+			}
+			lastErr = err
+			if caller != nil && caller.GetContext() != nil && caller.GetContext().Err() != nil {
+				return nil, err
+			}
+		}
+		return nil, lastErr
+	}, nil
+}
+
+func (options yakProviderModelOptions) runtimeOptions() yakRuntimeOptions {
+	return yakRuntimeOptions{
+		AIService: options.AIService, AIModelName: options.AIModelName, APIKey: options.APIKey,
+		BaseURL: options.BaseURL, APIType: options.APIType, Domain: options.Domain, Proxy: options.Proxy,
+		Endpoint: options.Endpoint, EnableEndpoint: options.EnableEndpoint, NoHTTPS: options.NoHTTPS,
+		Headers: options.Headers,
+	}
+}
+
 func loadYakAICallback(options yakRuntimeOptions) (aicommon.AICallbackType, error) {
+	return loadYakAICallbackForTier(options, consts.TierIntelligent)
+}
+
+func loadYakAICallbackForTier(options yakRuntimeOptions, tier consts.ModelTier) (aicommon.AICallbackType, error) {
 	aiService := strings.TrimSpace(options.AIService)
 	aiModelName := strings.TrimSpace(options.AIModelName)
 	if aiService != "" {
@@ -865,7 +1021,7 @@ func loadYakAICallback(options yakRuntimeOptions) (aicommon.AICallbackType, erro
 				return aicommon.AIChatToAICallbackType(chat), nil
 			}
 			callback, err := aicommon.GetAIModelCallbackByTierAndProviderAndModel(
-				consts.TierIntelligent,
+				tier,
 				aiService,
 				aiModelName,
 			)
@@ -876,7 +1032,7 @@ func loadYakAICallback(options yakRuntimeOptions) (aicommon.AICallbackType, erro
 		}
 
 		callback, err := aicommon.GetAIModelCallbackByTierAndProviderAndModel(
-			consts.TierIntelligent,
+			tier,
 			aiService,
 			aiModelName,
 		)
@@ -892,7 +1048,7 @@ func loadYakAICallback(options yakRuntimeOptions) (aicommon.AICallbackType, erro
 	}
 
 	if options.UseDefaultAIConfig != nil && *options.UseDefaultAIConfig {
-		callback, err := aicommon.GetIntelligentAIModelCallback()
+		callback, err := aicommon.GetCallbackByTier(tier)
 		if err != nil {
 			return nil, fmt.Errorf("load default ai config: %w", err)
 		}
@@ -901,6 +1057,8 @@ func loadYakAICallback(options yakRuntimeOptions) (aicommon.AICallbackType, erro
 
 	return nil, nil
 }
+
+var loadYakProviderCallback = loadYakAICallbackForTier
 
 func buildYakExplicitAIConfigOptions(options yakRuntimeOptions) []aispec.AIConfigOption {
 	aiConfigOptions := make([]aispec.AIConfigOption, 0, 8)
@@ -1153,6 +1311,27 @@ func decodeYakRuntimeOptions(raw []byte, rejectUnknown bool) (yakRuntimeOptions,
 }
 
 func mergeYakRuntimeOptions(base yakRuntimeOptions, overlay yakRuntimeOptions) yakRuntimeOptions {
+	if overlay.ProviderPolicySchema != "" {
+		base.ProviderPolicySchema = overlay.ProviderPolicySchema
+	}
+	if overlay.ProviderPolicyEnabled != nil {
+		base.ProviderPolicyEnabled = overlay.ProviderPolicyEnabled
+	}
+	if overlay.RoutingPolicy != "" {
+		base.RoutingPolicy = overlay.RoutingPolicy
+	}
+	if overlay.DisableFallback != nil {
+		base.DisableFallback = overlay.DisableFallback
+	}
+	if len(overlay.IntelligentModels) > 0 {
+		base.IntelligentModels = overlay.IntelligentModels
+	}
+	if len(overlay.LightweightModels) > 0 {
+		base.LightweightModels = overlay.LightweightModels
+	}
+	if len(overlay.VisionModels) > 0 {
+		base.VisionModels = overlay.VisionModels
+	}
 	if overlay.UseDefaultAIConfig != nil {
 		base.UseDefaultAIConfig = overlay.UseDefaultAIConfig
 	}
