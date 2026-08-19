@@ -302,6 +302,8 @@
 
 ### 仍为风险/未改（语义变更，保持假设状态）
 
+（第七轮后：A6 全局遮蔽、A11 stale 判断需要 schema/语义决策；A10 大迁移、B9 默认并发语义需单独验证；B3 中文注释统一、B5 剩余魔数/截断为纯风格项。）
+
 - A4（Value pool 契约）、A5（FunctionType.String 并发）、A6（全局 StaticMember 遮蔽/无界）、A7（native SQL 方言/魔数）、A9（yieldIrCodes 全量物化）、A10（启动全表查重/索引迁移）、A11（UpdatedAt 判断 stale）、A12（GOMEMLIMIT 全局副作用）、A16（GC/FreeOSMemory 有意保留；仅删除 hack/import）、B3（中英混杂注释）、B4（测试钩子进生产）、B5（魔数/截断）、B9（默认并发语义）。
 
 ### 验证记录（2026-08-19 17:20 CST）
@@ -327,22 +329,21 @@
 - 隔离 `YAKIT_HOME` 下 `common/utils/dbcache/...`、`common/yak/ssa/...`（含 ssadb）、`common/yak/ssaapi` 全部通过。
 - 改动文件 `gofmt -l` 干净；`go build -o /tmp/yak-gate-build ./common/yak/cmd/yak.go` 通过。
 
-
 ## 更新记录（2026-08-19 第三轮，@ a3f74ee3）
 
 - **B4（部分）**：`NativeIrCodeBatchReads` / `NativeConstTypeIDQueries` 两个仅测试使用的导出访问器移入 `loader_regression_test.go`（同包），生产文件只保留未导出的计数器与自增；`MarkDirtyForTest`/`FlushKeysStats` 因外部测试包引用暂留（后续可加 build tag 或专用测试辅助包再处理）。
 
 ### 验证（第三轮）
-- 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 通过；改动文件 `gofmt -l` 干净。
 
+- 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 通过；改动文件 `gofmt -l` 干净。
 
 ## 更新记录（2026-08-19 第四轮，@ 36837d6f）
 
 - **A9 已修复**：`yieldIrCodes` 的 DB miss 集合先排序再去重，再按 `nativeIrCodeBatchChunk` 分块查询并逐块 `SafeFeed`，不再一次性物化全部行；块内/块间仍保持升序 code_id，顺序契约不变（新增 `TestYieldIrCodes_A9_StreamsChunksInAscendingOrder`，2500 行跨多块验证）。任意块 native 出错时，剩余部分回退 GORM `FastPagination`，不会把 DB 错误当成空结果。
 
 ### 验证（第四轮）
-- 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 全量通过（含 A2/A3/A8/A9 相关测试）；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
 
+- 隔离 `YAKIT_HOME` 下 `common/yak/ssa/ssadb` 全量通过（含 A2/A3/A8/A9 相关测试）；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
 
 ## 更新记录（2026-08-19 第五轮，@ 708f5efa3）
 
@@ -351,8 +352,8 @@
 - **A16（部分）**：`ReloadProgramFromDatabase` 删除 `CleanBaseline` 之后冗余的 `runtime.GC()`（`debug.FreeOSMemory` 本身会先 GC 再归还内存），保留 Path A 的显式内存归还设计。
 
 ### 验证（第五轮）
-- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
 
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
 
 ## 更新记录（2026-08-19 第六轮，@ cfdc87702）
 
@@ -360,8 +361,8 @@
 - **A5 剩余**：`String()` 的 `Name`/`stringCache` 并发写与重入保护仍需锁或原子指针，留作下一项（涉及并发语义与重入，单独做）。
 
 ### 验证（第六轮）
-- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
 
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build ./common/yak/cmd/yak.go` 通过；改动文件 `gofmt -l` 干净。
 
 ## 更新记录（2026-08-19 第七轮，@ 50b1f7ae）
 
@@ -369,4 +370,5 @@
 - **A11（文档部分）**：`UpdatedAt` 仍是唯一权威新鲜度字段；`createDeleteOnlyProgram` 里对 `irProg.ID==0` 的防御分支与 `UpdateProgramWithError`（按 id 更新）行为一致，属于死代码，已顺手清理。
 
 ### 验证（第七轮）
+
 - `go test -race -run 'Test_FunctionType_String' ./common/yak/ssa` 通过；完整 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
