@@ -185,6 +185,74 @@ func TestSpillMultipartFilesIfNeeded_MultipleFiles(t *testing.T) {
 	require.Equal(t, f3, parts["file3"].body)
 }
 
+func TestRebuildMultipartRequestPacket_WithReplacement(t *testing.T) {
+	const limit = 64 * 1024
+	withGlobalMaxContentLength(t, limit)
+	originalFile := bytes.Repeat([]byte("A"), limit+1024)
+	untouchedFile := []byte("keep-original")
+	packet, boundary := buildMultipartRequest(t,
+		map[string]string{"description": "before"},
+		map[string]struct {
+			Filename    string
+			ContentType string
+			Content     []byte
+		}{
+			"replaceMe": {Filename: "original.bin", ContentType: "application/octet-stream", Content: originalFile},
+			"untouched": {Filename: "untouched.txt", ContentType: "text/plain", Content: untouchedFile},
+		},
+	)
+
+	spill, err := spillMultipartFilesIfNeeded(packet)
+	require.NoError(t, err)
+	require.True(t, spill.IsTooLarge)
+	defer func() {
+		_ = os.RemoveAll(spill.MultipartDir)
+		_ = os.Remove(spill.HeaderFile)
+	}()
+
+	replacement := []byte("replacement-file-content")
+	replacementPath := filepath.Join(t.TempDir(), "replacement.bin")
+	require.NoError(t, os.WriteFile(replacementPath, replacement, 0o644))
+	replacementPartIndex := -1
+	for _, meta := range spill.Manifest {
+		if meta.FieldName == "replaceMe" {
+			replacementPartIndex = meta.Index
+			break
+		}
+	}
+	require.GreaterOrEqual(t, replacementPartIndex, 0)
+
+	editedSkeleton := bytes.Replace(spill.StoredPacket, []byte("before"), []byte("after"), 1)
+	// The rebuild must use the manifest's part index rather than deriving the
+	// sidecar filename from editable Content-Disposition metadata.
+	editedSkeleton = bytes.Replace(editedSkeleton, []byte(`filename="untouched.txt"`), []byte(`filename="renamed.txt"`), 1)
+	rebuiltPacket, err := RebuildMultipartRequestPacket(
+		editedSkeleton,
+		spill.BodyFile,
+		map[int]string{replacementPartIndex: replacementPath},
+	)
+	require.NoError(t, err)
+	require.False(t, IsMultipartSpillRequestPacket(rebuiltPacket))
+
+	_, rebuiltBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rebuiltPacket)
+	parts := parseMultipartParts(t, rebuiltBody, boundary)
+	require.Equal(t, "after", string(parts["description"].body))
+	require.Equal(t, replacement, parts["replaceMe"].body)
+	require.Equal(t, untouchedFile, parts["untouched"].body)
+	require.Contains(t, parts["untouched"].header.Get("Content-Disposition"), `filename="renamed.txt"`)
+
+	contentLength, err := strconv.Atoi(lowhttp.GetHTTPPacketHeader(rebuiltPacket, "Content-Length"))
+	require.NoError(t, err)
+	require.Equal(t, len(rebuiltBody), contentLength)
+
+	_, err = RebuildMultipartRequestPacket(
+		editedSkeleton,
+		spill.BodyFile,
+		map[int]string{999: replacementPath},
+	)
+	require.ErrorContains(t, err, "part 999 not found in manifest")
+}
+
 func TestSpillMultipartFilesIfNeeded_TextOnlyNotSpilled(t *testing.T) {
 	// Oversized multipart but no file parts: must NOT skeletonize; fall back
 	// to flat spill is handled by the caller, so here IsTooLarge is false.

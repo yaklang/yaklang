@@ -70895,14 +70895,24 @@ type SingleManualHijackControlMessage struct {
 	UpdateTags           bool     `protobuf:"varint,4,opt,name=UpdateTags,proto3" json:"UpdateTags,omitempty"`
 	Tags                 []string `protobuf:"bytes,5,rep,name=Tags,proto3" json:"Tags,omitempty"` //--------------------------
 	// send packet action: every hijack just can process a send packet action, if set drop|forward|sendpacket hijack will done
-	Drop          bool   `protobuf:"varint,6,opt,name=Drop,proto3" json:"Drop,omitempty"`             // drop request|response|payload
-	Forward       bool   `protobuf:"varint,7,opt,name=Forward,proto3" json:"Forward,omitempty"`       // send origin request|response|payload
-	SendPacket    bool   `protobuf:"varint,8,opt,name=SendPacket,proto3" json:"SendPacket,omitempty"` // send request|response|payload
-	Request       []byte `protobuf:"bytes,9,opt,name=Request,proto3" json:"Request,omitempty"`
-	Response      []byte `protobuf:"bytes,10,opt,name=Response,proto3" json:"Response,omitempty"`
-	Payload       []byte `protobuf:"bytes,11,opt,name=Payload,proto3" json:"Payload,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Drop       bool   `protobuf:"varint,6,opt,name=Drop,proto3" json:"Drop,omitempty"`             // drop request|response|payload
+	Forward    bool   `protobuf:"varint,7,opt,name=Forward,proto3" json:"Forward,omitempty"`       // send origin request|response|payload
+	SendPacket bool   `protobuf:"varint,8,opt,name=SendPacket,proto3" json:"SendPacket,omitempty"` // send request|response|payload
+	Request    []byte `protobuf:"bytes,9,opt,name=Request,proto3" json:"Request,omitempty"`
+	Response   []byte `protobuf:"bytes,10,opt,name=Response,proto3" json:"Response,omitempty"`
+	Payload    []byte `protobuf:"bytes,11,opt,name=Payload,proto3" json:"Payload,omitempty"`
+	// Stream a local replacement file for one spilled multipart file part.
+	// Chunks are written to an engine-side temporary file and applied when the
+	// hijacked request is forwarded, so the renderer never loads the full file.
+	IsMultipartFileChunk bool   `protobuf:"varint,12,opt,name=IsMultipartFileChunk,proto3" json:"IsMultipartFileChunk,omitempty"`
+	MultipartPartIndex   int32  `protobuf:"varint,13,opt,name=MultipartPartIndex,proto3" json:"MultipartPartIndex,omitempty"`
+	MultipartFilename    string `protobuf:"bytes,14,opt,name=MultipartFilename,proto3" json:"MultipartFilename,omitempty"`
+	MultipartFileData    []byte `protobuf:"bytes,15,opt,name=MultipartFileData,proto3" json:"MultipartFileData,omitempty"`
+	MultipartFileStart   bool   `protobuf:"varint,16,opt,name=MultipartFileStart,proto3" json:"MultipartFileStart,omitempty"`
+	MultipartFileEOF     bool   `protobuf:"varint,17,opt,name=MultipartFileEOF,proto3" json:"MultipartFileEOF,omitempty"`
+	MultipartFileCancel  bool   `protobuf:"varint,18,opt,name=MultipartFileCancel,proto3" json:"MultipartFileCancel,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *SingleManualHijackControlMessage) Reset() {
@@ -71010,6 +71020,55 @@ func (x *SingleManualHijackControlMessage) GetPayload() []byte {
 		return x.Payload
 	}
 	return nil
+}
+
+func (x *SingleManualHijackControlMessage) GetIsMultipartFileChunk() bool {
+	if x != nil {
+		return x.IsMultipartFileChunk
+	}
+	return false
+}
+
+func (x *SingleManualHijackControlMessage) GetMultipartPartIndex() int32 {
+	if x != nil {
+		return x.MultipartPartIndex
+	}
+	return 0
+}
+
+func (x *SingleManualHijackControlMessage) GetMultipartFilename() string {
+	if x != nil {
+		return x.MultipartFilename
+	}
+	return ""
+}
+
+func (x *SingleManualHijackControlMessage) GetMultipartFileData() []byte {
+	if x != nil {
+		return x.MultipartFileData
+	}
+	return nil
+}
+
+func (x *SingleManualHijackControlMessage) GetMultipartFileStart() bool {
+	if x != nil {
+		return x.MultipartFileStart
+	}
+	return false
+}
+
+func (x *SingleManualHijackControlMessage) GetMultipartFileEOF() bool {
+	if x != nil {
+		return x.MultipartFileEOF
+	}
+	return false
+}
+
+func (x *SingleManualHijackControlMessage) GetMultipartFileCancel() bool {
+	if x != nil {
+		return x.MultipartFileCancel
+	}
+	return false
 }
 
 type SingleManualHijackInfoMessage struct {
@@ -81341,7 +81400,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vLoadingFlag\x18\x0e \x01(\bR\vLoadingFlag\x126\n" +
 	"\x16ManualHijackListAction\x18\x0f \x01(\tR\x16ManualHijackListAction\x12N\n" +
 	"\x10ManualHijackList\x18\x10 \x03(\v2\".ypb.SingleManualHijackInfoMessageR\x10ManualHijackList\x12<\n" +
-	"\rPipelineStats\x18\x11 \x01(\v2\x16.ypb.MITMPipelineStatsR\rPipelineStats\"\xe8\x02\n" +
+	"\rPipelineStats\x18\x11 \x01(\v2\x16.ypb.MITMPipelineStatsR\rPipelineStats\"\xb6\x05\n" +
 	" SingleManualHijackControlMessage\x12\x16\n" +
 	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12&\n" +
 	"\x0eHijackResponse\x18\x02 \x01(\bR\x0eHijackResponse\x122\n" +
@@ -81358,7 +81417,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aRequest\x18\t \x01(\fR\aRequest\x12\x1a\n" +
 	"\bResponse\x18\n" +
 	" \x01(\fR\bResponse\x12\x18\n" +
-	"\aPayload\x18\v \x01(\fR\aPayload\"\xb9\x03\n" +
+	"\aPayload\x18\v \x01(\fR\aPayload\x122\n" +
+	"\x14IsMultipartFileChunk\x18\f \x01(\bR\x14IsMultipartFileChunk\x12.\n" +
+	"\x12MultipartPartIndex\x18\r \x01(\x05R\x12MultipartPartIndex\x12,\n" +
+	"\x11MultipartFilename\x18\x0e \x01(\tR\x11MultipartFilename\x12,\n" +
+	"\x11MultipartFileData\x18\x0f \x01(\fR\x11MultipartFileData\x12.\n" +
+	"\x12MultipartFileStart\x18\x10 \x01(\bR\x12MultipartFileStart\x12*\n" +
+	"\x10MultipartFileEOF\x18\x11 \x01(\bR\x10MultipartFileEOF\x120\n" +
+	"\x13MultipartFileCancel\x18\x12 \x01(\bR\x13MultipartFileCancel\"\xb9\x03\n" +
 	"\x1dSingleManualHijackInfoMessage\x12\x16\n" +
 	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12\x18\n" +
 	"\aRequest\x18\x02 \x01(\fR\aRequest\x12\x1a\n" +

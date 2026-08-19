@@ -1436,6 +1436,22 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 		sendPacket := taskInfo.Request
+		multipartReplacements := newManualMultipartReplacementStore()
+		defer multipartReplacements.close()
+		notifyMultipartReplacementError := func(err error) {
+			log.Errorf("MITM multipart file replacement failed: %v", err)
+			sendLogged(&ypb.MITMV2Response{
+				HaveNotification:    true,
+				NotificationContent: []byte(fmt.Sprintf("替换超大 multipart 文件失败：%v", err)),
+			})
+		}
+		rebuildMultipartRequest := func(packet []byte) ([]byte, error) {
+			return yakit.RebuildMultipartRequestPacket(
+				packet,
+				httpctx.GetRequestTooLargeBodyFile(originReqIns),
+				multipartReplacements.paths(),
+			)
+		}
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
@@ -1460,6 +1476,23 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if controlReq.GetUpdateTags() {
 					taskInfo.Tags = controlReq.GetTags()
 					httpctx.SetFlowTags(originReqIns, controlReq.GetTags())
+				}
+
+				if controlReq.GetIsMultipartFileChunk() {
+					if !yakit.IsMultipartSpillRequestPacket(sendPacket) {
+						notifyMultipartReplacementError(utils.Error("current request is not an oversized multipart skeleton"))
+						continue
+					}
+					if err := multipartReplacements.consume(
+						int(controlReq.GetMultipartPartIndex()),
+						controlReq.GetMultipartFileData(),
+						controlReq.GetMultipartFileStart(),
+						controlReq.GetMultipartFileEOF(),
+						controlReq.GetMultipartFileCancel(),
+					); err != nil {
+						notifyMultipartReplacementError(err)
+					}
+					continue
 				}
 
 				if controlReq.GetDrop() {
@@ -1508,10 +1541,32 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				}
 
 				if controlReq.GetForward() {
+					if multipartReplacements.hasActive() {
+						notifyMultipartReplacementError(utils.Error("multipart replacement upload is still in progress"))
+						continue
+					}
+					if multipartReplacements.hasCompleted() {
+						current, err := rebuildMultipartRequest(sendPacket)
+						if err != nil {
+							notifyMultipartReplacementError(err)
+							return req
+						}
+						if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
+							if encoded, ok := lowhttp.AutoZipPacketEncoding(current, st); ok {
+								current = encoded
+							}
+						}
+						setModifiedRequest("user.multipart-file-replacement", current)
+						return current
+					}
 					return req
 				}
 
 				if controlReq.GetSendPacket() {
+					if multipartReplacements.hasActive() {
+						notifyMultipartReplacementError(utils.Error("multipart replacement upload is still in progress"))
+						continue
+					}
 					// 这里是用户自定义的请求
 					current := controlReq.GetRequest()
 					taskInfo.Request = current // use for front ,should not render fuzztag
@@ -1523,8 +1578,20 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						}
 					}
 
-					// 没改动的话，保持 forward 行为（避免因重新压缩导致“被修改”误判）
-					if !packetModified(sendPacket, current) {
+					requestModified := packetModified(sendPacket, current)
+					// 没改动且没有替换文件时，保持 forward 行为（避免因重新压缩导致“被修改”误判）
+					if !requestModified && !multipartReplacements.hasCompleted() {
+						return req
+					}
+					if yakit.IsMultipartSpillRequestPacket(current) {
+						rebuilt, err := rebuildMultipartRequest(current)
+						if err != nil {
+							notifyMultipartReplacementError(err)
+							return req
+						}
+						current = rebuilt
+					} else if multipartReplacements.hasCompleted() {
+						notifyMultipartReplacementError(utils.Error("multipart replacement marker was removed from the edited request"))
 						return req
 					}
 
