@@ -71,6 +71,7 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 			StartParams:       startParams,
 			Source:            item.Source,
 			IMSourceMeta:      imMeta,
+			IsRunning:         s.isAISessionRunning(item.SessionID),
 		})
 	}
 
@@ -84,6 +85,17 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 		Total: int64(pag.TotalRecord),
 		Data:  respData,
 	}, nil
+}
+
+func (s *Server) isAISessionRunning(sessionID string) bool {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return false
+	}
+	if manager := s.currentAIReActScheduler(); manager != nil && manager.isSessionReserved(sessionID) {
+		return true
+	}
+	return isAIReActSessionBusy(sessionID)
 }
 
 func (s *Server) UpdateAISessionTitle(ctx context.Context, req *ypb.UpdateAISessionTitleRequest) (*ypb.DbOperateMessage, error) {

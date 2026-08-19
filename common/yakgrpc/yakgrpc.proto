@@ -2438,6 +2438,8 @@ message AISession {
   string Source = 10;
   // source=im 时的结构化 IM 元数据（平台/会话类型/可读标题等）；其它来源为空。
   IMSourceMeta IMSourceMeta = 11;
+  // 当前会话是否正在执行。包含交互式 ReAct 与计划任务的预留/运行阶段。
+  bool IsRunning = 12;
 }
 
 message QueryAISessionRequest {

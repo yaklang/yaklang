@@ -175,7 +175,7 @@ func updateSchedulesTool() (*aitool.Tool, error) {
 func setScheduleEnabledTool() (*aitool.Tool, error) {
 	return aitool.New(
 		SetScheduleEnabledToolName,
-		aitool.WithDescription("Pause or resume an existing scheduled AI task."),
+		aitool.WithDescription("Pause future triggers or resume an existing scheduled AI task. Pausing does not cancel an execution that has already started."),
 		aitool.WithVerboseName("Pause or Resume Scheduled AI Task"),
 		aitool.WithVerboseNameZh("暂停或恢复 AI 定时任务"),
 		aitool.WithKeywords([]string{"pause schedule", "resume schedule", "暂停定时任务", "恢复定时任务"}),
@@ -208,9 +208,6 @@ func setScheduleEnabledTool() (*aitool.Tool, error) {
 			if err := runtimeConfig.ProjectDatabase.Save(record).Error; err != nil {
 				return nil, err
 			}
-			if !params.GetBool("enabled") {
-				aischedule.CancelExecution(record.UUID)
-			}
 			return map[string]any{"updated": true, "schedule": scheduleResult(record)}, nil
 		}),
 	)
@@ -219,7 +216,7 @@ func setScheduleEnabledTool() (*aitool.Tool, error) {
 func deleteScheduleTool() (*aitool.Tool, error) {
 	return aitool.New(
 		DeleteScheduleToolName,
-		aitool.WithDescription("Permanently delete a scheduled AI task and cancel its current in-process execution."),
+		aitool.WithDescription("Permanently delete a scheduled AI task so it cannot trigger again. An execution that has already started continues."),
 		aitool.WithVerboseName("Delete Scheduled AI Task"),
 		aitool.WithVerboseNameZh("删除 AI 定时任务"),
 		aitool.WithKeywords([]string{"delete schedule", "remove scheduled task", "删除定时任务"}),
@@ -236,7 +233,6 @@ func deleteScheduleTool() (*aitool.Tool, error) {
 			if result.Error != nil {
 				return nil, result.Error
 			}
-			aischedule.CancelExecution(record.UUID)
 			return map[string]any{"deleted": result.RowsAffected > 0, "schedule_uuid": record.UUID, "name": record.Name}, nil
 		}),
 	)

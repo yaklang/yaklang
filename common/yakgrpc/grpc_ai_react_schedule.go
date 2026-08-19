@@ -124,7 +124,6 @@ func (s *Server) DeleteAIReActSchedule(ctx context.Context, req *ypb.DeleteAIReA
 	if db.Error != nil {
 		return nil, db.Error
 	}
-	s.cancelAIReActScheduleExecution(record.UUID)
 	s.wakeAIReActScheduler()
 	return &ypb.DbOperateMessage{TableName: record.TableName(), Operation: DbOperationDelete, EffectRows: db.RowsAffected}, nil
 }
@@ -219,9 +218,6 @@ func (s *Server) SetAIReActScheduleEnabled(ctx context.Context, req *ypb.SetAIRe
 	}
 	if err := s.GetProjectDatabase().Save(record).Error; err != nil {
 		return nil, err
-	}
-	if !req.GetEnabled() {
-		s.cancelAIReActScheduleExecution(record.UUID)
 	}
 	s.ensureAIReActScheduler()
 	s.wakeAIReActScheduler()

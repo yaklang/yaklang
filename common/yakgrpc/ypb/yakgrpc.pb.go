@@ -12183,7 +12183,9 @@ type AISession struct {
 	// 会话来源（与 AIStartParams.Source 对应），用于统计/筛选
 	Source string `protobuf:"bytes,10,opt,name=Source,proto3" json:"Source,omitempty"`
 	// source=im 时的结构化 IM 元数据（平台/会话类型/可读标题等）；其它来源为空。
-	IMSourceMeta  *IMSourceMeta `protobuf:"bytes,11,opt,name=IMSourceMeta,proto3" json:"IMSourceMeta,omitempty"`
+	IMSourceMeta *IMSourceMeta `protobuf:"bytes,11,opt,name=IMSourceMeta,proto3" json:"IMSourceMeta,omitempty"`
+	// 当前会话是否正在执行。包含交互式 ReAct 与计划任务的预留/运行阶段。
+	IsRunning     bool `protobuf:"varint,12,opt,name=IsRunning,proto3" json:"IsRunning,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -12293,6 +12295,13 @@ func (x *AISession) GetIMSourceMeta() *IMSourceMeta {
 		return x.IMSourceMeta
 	}
 	return nil
+}
+
+func (x *AISession) GetIsRunning() bool {
+	if x != nil {
+		return x.IsRunning
+	}
+	return false
 }
 
 type QueryAISessionRequest struct {
@@ -78114,7 +78123,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tSessionID\x18\x01 \x03(\tR\tSessionID\x12\x18\n" +
 	"\aKeyword\x18\x02 \x01(\tR\aKeyword\x12\x16\n" +
 	"\x06Source\x18\x03 \x03(\tR\x06Source\x12\x1a\n" +
-	"\bPlatform\x18\x04 \x03(\tR\bPlatform\"\x8a\x03\n" +
+	"\bPlatform\x18\x04 \x03(\tR\bPlatform\"\xa8\x03\n" +
 	"\tAISession\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tSessionID\x18\x02 \x01(\tR\tSessionID\x12\x14\n" +
@@ -78129,7 +78138,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"LastUsedAt\x12\x16\n" +
 	"\x06Source\x18\n" +
 	" \x01(\tR\x06Source\x125\n" +
-	"\fIMSourceMeta\x18\v \x01(\v2\x11.ypb.IMSourceMetaR\fIMSourceMeta\"r\n" +
+	"\fIMSourceMeta\x18\v \x01(\v2\x11.ypb.IMSourceMetaR\fIMSourceMeta\x12\x1c\n" +
+	"\tIsRunning\x18\f \x01(\bR\tIsRunning\"r\n" +
 	"\x15QueryAISessionRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
