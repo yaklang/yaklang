@@ -88,6 +88,7 @@ const (
 	legionEventClaimed                                    = "job.claimed"
 	legionEventStarted                                    = "job.started"
 	legionEventProgress                                   = "job.progressed"
+	legionEventRuleSnapshotPrepared                       = "job.rule_snapshot_prepared"
 	legionEventAsset                                      = "job.asset"
 	legionEventRisk                                       = "job.risk"
 	legionEventReport                                     = "job.report"

@@ -23,6 +23,7 @@ func TestAttachEventMetadata(t *testing.T) {
 		{name: "claimed", message: &jobv1.JobClaimed{}},
 		{name: "started", message: &jobv1.JobStarted{}},
 		{name: "progressed", message: &jobv1.JobProgressed{}},
+		{name: "rule_snapshot_prepared", message: &jobv1.JobRuleSnapshotPrepared{}},
 		{name: "asset", message: &jobv1.JobAsset{}},
 		{name: "risk", message: &jobv1.JobRisk{}},
 		{name: "report", message: &jobv1.JobReport{}},
@@ -53,6 +54,25 @@ func TestAttachEventMetadataUnsupported(t *testing.T) {
 	err := attachEventMetadata(&emptypb.Empty{}, &nodev1.EventMetadata{EventId: "event-1"})
 	if err == nil {
 		t.Fatal("expected unsupported event error")
+	}
+}
+
+func TestBuildRuleSnapshotPreparedEvent(t *testing.T) {
+	t.Parallel()
+
+	preparedAt := time.Date(2026, time.August, 19, 12, 0, 0, 0, time.UTC)
+	event := buildRuleSnapshotPreparedEvent(
+		&jobv1.JobRef{JobId: "job-a", SubtaskId: "sub-a", AttemptId: "attempt-a"},
+		RuleSnapshotPreparationReceipt{
+			SnapshotID: "rulesnapshot-a", ContentSHA256: "digest-a",
+			SchemaVersion: ruleSnapshotSchemaVersionV1, BundleFormat: ruleSnapshotBundleFormatJSON,
+			AssetCount: 3, CacheHit: true, PreparedAt: preparedAt,
+		},
+	)
+	if event.GetJob().GetAttemptId() != "attempt-a" || event.GetSnapshotId() != "rulesnapshot-a" ||
+		event.GetContentSha256() != "digest-a" || event.GetRuleCount() != 3 || !event.GetCacheHit() ||
+		!event.GetPreparedAt().AsTime().Equal(preparedAt) {
+		t.Fatalf("unexpected prepared event: %#v", event)
 	}
 }
 
@@ -296,6 +316,8 @@ func eventMetadataFromMessage(message proto.Message) *nodev1.EventMetadata {
 	case *jobv1.JobStarted:
 		return value.Metadata
 	case *jobv1.JobProgressed:
+		return value.Metadata
+	case *jobv1.JobRuleSnapshotPrepared:
 		return value.Metadata
 	case *jobv1.JobAsset:
 		return value.Metadata

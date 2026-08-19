@@ -14,6 +14,7 @@ func TestNormalizeScanNodeCapabilityKeysDefaultsToNonHIDSBuildSurface(t *testing
 	want := []string{
 		"yak.execute",
 		capabilityKeySSARuleSyncExport,
+		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
 	}
@@ -35,6 +36,7 @@ func TestNormalizeScanNodeCapabilityKeysKeepsExplicitExtrasWithoutDuplicates(t *
 	want := []string{
 		"yak.execute",
 		capabilityKeySSARuleSyncExport,
+		capabilityKeySSARuleSnapshotExecutionV2,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
 		"extra.capability",

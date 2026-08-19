@@ -58,6 +58,10 @@ func (b *legionJobBridge) executeDispatch(
 			ScriptLabels:    command.GetLabels(),
 			DebugEnabled:    isDebugEnabled(command.GetLabels()),
 			DebugDir:        resolveDebugDir(command.GetLabels()),
+			RuleSnapshot:    ruleSnapshotExpectationFromCommand(command),
+			RuleSnapshotPrepared: func(ctx context.Context, receipt RuleSnapshotPreparationReceipt) error {
+				return b.publisher.PublishRuleSnapshotPrepared(ctx, ref, receipt)
+			},
 		},
 	)
 	if err == nil {
@@ -76,12 +80,24 @@ func (b *legionJobBridge) executeDispatch(
 		b.publishCancelled(ref, cancelled)
 		return
 	}
+	failureCode := "script_execution_failed"
+	failureDetail := dispatchFailureDetail(command)
+	var preparationErr *ruleSnapshotPreparationError
+	if errors.As(err, &preparationErr) {
+		failureCode = "rule_snapshot_prepare_failed"
+		if preparationErr.Expectation.SnapshotID != "" {
+			failureDetail["rule_snapshot_id"] = preparationErr.Expectation.SnapshotID
+		}
+		if preparationErr.Expectation.ContentSHA256 != "" {
+			failureDetail["rule_snapshot_content_sha256"] = preparationErr.Expectation.ContentSHA256
+		}
+	}
 	if publishErr := b.publisher.PublishFailed(
 		b.agent.node.GetRootContext(),
 		ref,
-		"script_execution_failed",
+		failureCode,
 		err.Error(),
-		dispatchFailureDetail(command),
+		failureDetail,
 	); publishErr != nil {
 		logDispatchPublishError("failed", publishErr)
 	}
@@ -141,9 +157,11 @@ func validateDispatchCommand(
 		return fmt.Errorf("dispatch script release_id is required")
 	case strings.TrimSpace(command.GetScript().GetContent()) == "":
 		return fmt.Errorf("dispatch script content is required")
-	default:
-		return validateDispatchExecutionKind(command.GetExecutionKind())
 	}
+	if err := validateRuleSnapshotRef(command.GetRuleSnapshot()); err != nil {
+		return err
+	}
+	return validateDispatchExecutionKind(command.GetExecutionKind())
 }
 
 func (b *legionJobBridge) publishDispatchFailure(
@@ -202,9 +220,58 @@ func dispatchFailureDetail(command *jobv1.DispatchJobCommand) map[string]string 
 	if command.GetScript() != nil && command.GetScript().GetVersion() != nil {
 		scriptVersion = command.GetScript().GetVersion().GetReleaseId()
 	}
-	return map[string]string{
+	detail := map[string]string{
 		"script_release_id": scriptVersion,
 		"execution_kind":    command.GetExecutionKind(),
+	}
+	if snapshot := command.GetRuleSnapshot(); snapshot != nil {
+		detail["rule_snapshot_id"] = snapshot.GetSnapshotId()
+		detail["rule_snapshot_content_sha256"] = snapshot.GetContentSha256()
+		detail["rule_snapshot_schema_version"] = snapshot.GetSchemaVersion()
+		detail["rule_snapshot_bundle_format"] = snapshot.GetBundleFormat()
+	}
+	return detail
+}
+
+func validateRuleSnapshotRef(ref *jobv1.RuleSnapshotRef) error {
+	if ref == nil {
+		return nil
+	}
+	switch {
+	case strings.TrimSpace(ref.GetSnapshotId()) == "":
+		return fmt.Errorf("dispatch rule_snapshot snapshot_id is required")
+	case strings.TrimSpace(ref.GetContentSha256()) == "":
+		return fmt.Errorf("dispatch rule_snapshot content_sha256 is required")
+	case strings.TrimSpace(ref.GetSchemaVersion()) == "":
+		return fmt.Errorf("dispatch rule_snapshot schema_version is required")
+	case strings.TrimSpace(ref.GetBundleFormat()) == "":
+		return fmt.Errorf("dispatch rule_snapshot bundle_format is required")
+	case len(ref.GetAssetIds()) == 0:
+		return fmt.Errorf("dispatch rule_snapshot asset_ids are required")
+	}
+	_, err := normalizeRuleSnapshotExpectation(RuleSnapshotExpectation{
+		SnapshotID:    ref.GetSnapshotId(),
+		ContentSHA256: ref.GetContentSha256(),
+		SchemaVersion: ref.GetSchemaVersion(),
+		BundleFormat:  ref.GetBundleFormat(),
+		AssetIDs:      append([]string(nil), ref.GetAssetIds()...),
+	})
+	return err
+}
+
+func ruleSnapshotExpectationFromCommand(
+	command *jobv1.DispatchJobCommand,
+) *RuleSnapshotExpectation {
+	if command == nil || command.GetRuleSnapshot() == nil {
+		return nil
+	}
+	ref := command.GetRuleSnapshot()
+	return &RuleSnapshotExpectation{
+		SnapshotID:    strings.TrimSpace(ref.GetSnapshotId()),
+		ContentSHA256: strings.TrimSpace(ref.GetContentSha256()),
+		SchemaVersion: strings.TrimSpace(ref.GetSchemaVersion()),
+		BundleFormat:  strings.TrimSpace(ref.GetBundleFormat()),
+		AssetIDs:      append([]string(nil), ref.GetAssetIds()...),
 	}
 }
 
