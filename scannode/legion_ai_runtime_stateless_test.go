@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
 )
@@ -1009,6 +1010,84 @@ func TestStatelessActiveTurnPreservesSyncID(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("active turn did not receive sync input")
+	}
+}
+
+func TestStatelessDirectForgeRoutesQueuedInterventionToForgeInput(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	forgeInput := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 2)
+	t.Cleanup(forgeInput.CloseForce)
+	handle := &statelessAIEngineRuntimeHandle{
+		activeTurn: &statelessAITurn{
+			engine:      engine,
+			turnID:      "turn-direct-forge-intervention",
+			directForge: true,
+			forgeInput:  forgeInput,
+		},
+	}
+
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		Ref:         aiSessionCommandRef{CommandID: "queued-follow-up-1"},
+		InputType:   "user_intervention",
+		PayloadJSON: []byte(`{"content":"run after the current task stops"}`),
+	})
+	if err != nil {
+		t.Fatalf("send queued intervention: %v", err)
+	}
+
+	select {
+	case event := <-forgeInput.OutputChannel():
+		if !event.GetIsFreeInput() || event.GetFreeInput() != "run after the current task stops" {
+			t.Fatalf("unexpected Forge intervention: %#v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("direct Forge did not receive the queued intervention")
+	}
+	select {
+	case event := <-engine.events:
+		t.Fatalf("queued intervention reached unused turn engine input: %#v", event)
+	default:
+	}
+}
+
+func TestStatelessDirectForgeRoutesSyncControlToForgeInput(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	forgeInput := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 2)
+	t.Cleanup(forgeInput.CloseForce)
+	handle := &statelessAIEngineRuntimeHandle{
+		activeTurn: &statelessAITurn{
+			engine:      engine,
+			turnID:      "turn-direct-forge-sync",
+			directForge: true,
+			forgeInput:  forgeInput,
+		},
+	}
+
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		InputType: "sync_event",
+		PayloadJSON: []byte(
+			`{"sync_type":"react_cancel_current_task","sync_id":"sync-stop-1","sync_json_input":{}}`,
+		),
+	})
+	if err != nil {
+		t.Fatalf("send sync control: %v", err)
+	}
+
+	select {
+	case event := <-forgeInput.OutputChannel():
+		if event.GetSyncType() != "react_cancel_current_task" {
+			t.Fatalf("sync type = %q", event.GetSyncType())
+		}
+		if event.GetSyncID() != "sync-stop-1" {
+			t.Fatalf("sync id = %q, want sync-stop-1", event.GetSyncID())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("direct Forge did not receive the sync control")
+	}
+	select {
+	case event := <-engine.events:
+		t.Fatalf("sync control reached unused turn engine input: %#v", event)
+	default:
 	}
 }
 
