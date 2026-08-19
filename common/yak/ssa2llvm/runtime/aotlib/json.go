@@ -84,7 +84,6 @@ func (m *orderedMap) MarshalJSON() ([]byte, error) {
 	}
 	var buf bytes.Buffer
 	buf.WriteByte('{')
-	enc := json.NewEncoder(&buf)
 	for i, key := range m.keys {
 		if i > 0 {
 			buf.WriteByte(',')
@@ -95,14 +94,11 @@ func (m *orderedMap) MarshalJSON() ([]byte, error) {
 		}
 		buf.Write(kb)
 		buf.WriteByte(':')
-		if err := enc.Encode(m.values[key]); err != nil {
+		vb, err := json.Marshal(m.values[key])
+		if err != nil {
 			return nil, err
 		}
-		// Encoder appends a newline; trim it.
-		b := buf.Bytes()
-		if len(b) > 0 && b[len(b)-1] == '\n' {
-			buf.Truncate(len(b) - 1)
-		}
+		buf.Write(vb)
 	}
 	buf.WriteByte('}')
 	return buf.Bytes(), nil
@@ -139,21 +135,119 @@ func JsonLoads(raw interface{}) interface{} {
 	return newOrderedMap()
 }
 
+// jsonDumpOption is the AOT representation of json.dumps options. The
+// option functions return these values; JsonDumps inspects them by type.
+type jsonDumpOption interface{ apply(*jsonDumpConfig) }
+
+type jsonDumpConfig struct {
+	indent       string
+	noEscapeHTML bool
+}
+
+type jsonIndentOption string
+
+func (o jsonIndentOption) apply(c *jsonDumpConfig) { c.indent = string(o) }
+
+type jsonNoEscapeHTMLOption struct{}
+
+func (jsonNoEscapeHTMLOption) apply(c *jsonDumpConfig) { c.noEscapeHTML = true }
+
+// JsonWithIndent returns a json.dumps option that sets the indent string.
+func JsonWithIndent(indent interface{}) interface{} {
+	return jsonIndentOption(fmt.Sprint(indent))
+}
+
+// JsonNoEscapeHTML returns a json.dumps option that disables HTML escaping.
+func JsonNoEscapeHTML() interface{} {
+	return jsonNoEscapeHTMLOption{}
+}
+
 // JsonDumps serializes a value to a JSON string. Shadow objects (e.g. the
 // runtime's ordered map or this package's orderedMap) implement MarshalJSON,
 // so nested yak objects keep their key order.
-func JsonDumps(raw interface{}) string {
-	// Match common/yak/yaklib._jsonDumps default config: indent "  ".
-	b, err := json.MarshalIndent(raw, "", "  ")
+func JsonDumps(raw interface{}, opts ...interface{}) string {
+	cfg := jsonDumpConfig{indent: "  "}
+	for _, opt := range opts {
+		if o, ok := opt.(jsonDumpOption); ok {
+			o.apply(&cfg)
+		}
+	}
+	if cfg.noEscapeHTML {
+		if om, ok := raw.(*orderedMap); ok {
+			return marshalOrderedMapNoEscape(om)
+		}
+		if ne, ok := raw.(interface{ MarshalJSONNoEscape() ([]byte, error) }); ok {
+			if b, err := ne.MarshalJSONNoEscape(); err == nil {
+				return string(b)
+			}
+		}
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		if cfg.indent != "" {
+			enc.SetIndent("", cfg.indent)
+		}
+		if err := enc.Encode(raw); err != nil {
+			return ""
+		}
+		result := buf.String()
+		if len(result) > 0 && result[len(result)-1] == '\n' {
+			result = result[:len(result)-1]
+		}
+		return result
+	}
+	var b []byte
+	var err error
+	if cfg.indent == "" {
+		// json.Marshal keeps custom MarshalJSON output compact; MarshalIndent
+		// with an empty indent still re-indents every line.
+		b, err = json.Marshal(raw)
+	} else {
+		b, err = json.MarshalIndent(raw, "", cfg.indent)
+	}
 	if err != nil {
 		return ""
 	}
 	return string(b)
 }
 
+func marshalOrderedMapNoEscape(m *orderedMap) string {
+	if m == nil {
+		return "{}"
+	}
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i, key := range m.keys {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		kb, err := json.Marshal(key)
+		if err != nil {
+			return ""
+		}
+		buf.Write(kb)
+		buf.WriteByte(':')
+		var vb bytes.Buffer
+		enc := json.NewEncoder(&vb)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(m.values[key]); err != nil {
+			return ""
+		}
+		s := vb.String()
+		if len(s) > 0 && s[len(s)-1] == '\n' {
+			s = s[:len(s)-1]
+		}
+		buf.WriteString(s)
+	}
+	buf.WriteByte('}')
+	return buf.String()
+}
+
 // JsonExports mirrors the json module's export table (the AOT-supported
 // subset). Entries match common/yak/yaklib.JsonExports signatures.
 var JsonExports = map[string]any{
-	"loads": JsonLoads,
-	"dumps": JsonDumps,
+	"loads":        JsonLoads,
+	"dumps":        JsonDumps,
+	"withIndent":   JsonWithIndent,
+	"noEscapeHTML": JsonNoEscapeHTML,
 }
