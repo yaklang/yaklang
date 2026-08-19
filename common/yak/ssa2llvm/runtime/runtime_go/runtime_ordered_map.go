@@ -50,25 +50,44 @@ func (m *runtimeOrderedMap) Len() int {
 	return len(m.keys)
 }
 
-func (m *runtimeOrderedMap) MarshalJSON() ([]byte, error) {
+func (m *runtimeOrderedMap) marshalJSON(noEscape bool) ([]byte, error) {
 	if m == nil {
 		return []byte("{}"), nil
 	}
 	var buf bytes.Buffer
 	buf.WriteByte('{')
-	encoder := json.NewEncoder(&buf)
 	for i, key := range m.keys {
 		if i > 0 {
 			buf.WriteByte(',')
 		}
-		if err := encoder.Encode(key); err != nil {
+		kb, err := json.Marshal(key)
+		if err != nil {
 			return nil, err
 		}
+		buf.Write(kb)
 		buf.WriteByte(':')
-		if err := encoder.Encode(m.values[key]); err != nil {
+		var vb bytes.Buffer
+		enc := json.NewEncoder(&vb)
+		enc.SetEscapeHTML(!noEscape)
+		if err := enc.Encode(m.values[key]); err != nil {
 			return nil, err
 		}
+		v := vb.Bytes()
+		if len(v) > 0 && v[len(v)-1] == '\n' {
+			v = v[:len(v)-1]
+		}
+		buf.Write(v)
 	}
 	buf.WriteByte('}')
 	return buf.Bytes(), nil
+}
+
+func (m *runtimeOrderedMap) MarshalJSON() ([]byte, error) {
+	return m.marshalJSON(false)
+}
+
+// MarshalJSONNoEscape is used by the AOT json.dumps noEscapeHTML option;
+// encoding/json cannot disable HTML escaping for custom MarshalJSON types.
+func (m *runtimeOrderedMap) MarshalJSONNoEscape() ([]byte, error) {
+	return m.marshalJSON(true)
 }

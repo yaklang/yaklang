@@ -266,6 +266,12 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
 		ImportAlias:  "yaklib",
 		ExportExpr:   "yaklib.LogExports",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.LogExports",
+		},
 	},
 	"env": {
 		ModuleName:   "env",
