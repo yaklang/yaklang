@@ -440,3 +440,11 @@
 ### 验证（第十四轮）
 - Linux 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过。
 - Darwin/Windows 交叉编译被仓库既有 cgo 依赖（go-pcre2-lite、yaklang/pcap 无对应原生绑定）阻塞，与本改动无关；Darwin 分支 API 与 `golang.org/x/sys v0.30.0` 的 `unix.SysctlUint64` 匹配。
+
+
+## 更新记录（2026-08-19 第十五轮，@ d883858b3）
+
+- **B3（memedit/editor.go）**：评审文档点名的 `memedit/editor.go` 全部 106 处中英混杂注释统一为英文（含并发安全说明、路径拼接语义、编辑 API 描述），无行为变更。
+
+### 验证（第十五轮）
+- `memedit`/`ssa`（含 ssadb）/`ssaapi` 通过；改动文件 gofmt 干净。
