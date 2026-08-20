@@ -135,7 +135,7 @@ func invokeYaklibExportCallable(ctx unsafe.Pointer, closure runtimeCallableClosu
 	callArgs := make([]uint64, 0, len(inArgs)+2)
 	callArgs = append(callArgs, closure.freeValues[0], closure.freeValues[1])
 	callArgs = append(callArgs, inArgs...)
-	ret, err := runtimeDispatchYaklibCall(callArgs)
+	ret, err := runtimeDispatchYaklibCall(callArgs, false)
 	if err != nil {
 		panic(err)
 	}
