@@ -540,6 +540,16 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		llvmVal := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
+	} else if rawBool, ok := inst.GetRawValue().(bool); ok {
+		// A boolean whose SSA type is Any (e.g. true written through a
+		// dynamic map key) still must compile to 0/1.
+		iVal := uint64(0)
+		if rawBool {
+			iVal = 1
+		}
+		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
+		c.cacheValue(id, llvmVal)
+		return c.finishConstValue(inst, id)
 	}
 
 	// Fallback/TODO: floats, nil

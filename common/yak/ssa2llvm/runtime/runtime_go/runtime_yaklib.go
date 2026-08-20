@@ -170,6 +170,12 @@ func newRuntimeIterator(value any, inNext bool) (runtimeIterator, error) {
 			inNext: true,
 		}, nil
 	default:
+		// container.Set / container.LinkedList (and similar wrappers) expose
+		// ToSlice(); make them iterable like yakvm does.
+		if m := v.MethodByName("ToSlice"); m.IsValid() && m.Type().NumIn() == 0 && m.Type().NumOut() == 1 && m.Type().Out(0).Kind() == reflect.Slice {
+			res := m.Call(nil)
+			return &runtimeSliceIterator{value: res[0], inNext: inNext}, nil
+		}
 		return nil, fmt.Errorf("cannot iterate over %T", value)
 	}
 }
