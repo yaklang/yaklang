@@ -43,15 +43,15 @@ type ruleSyncer interface {
 type RuleSyncBundleImporter func(context.Context, RuleSnapshotBundle) (int, error)
 
 type RuleSyncConfig struct {
-	ServerURL   string                 `json:"server_url"`
-	BearerToken string                 `json:"bearer_token,omitempty"`
+	ServerURL   string `json:"server_url"`
+	BearerToken string `json:"bearer_token,omitempty"`
 	// NodeSessionID is the node session id sent as the node_session_id query
 	// parameter so the server can authenticate the node via its session token.
 	// It is populated after bootstrap completes (see UpdateCredentials).
-	NodeSessionID string               `json:"node_session_id,omitempty"`
-	SyncEnabled   bool                 `json:"sync_enabled"`
-	CacheDir      string               `json:"cache_dir,omitempty"`
-	Client        *http.Client         `json:"-"`
+	NodeSessionID string                 `json:"node_session_id,omitempty"`
+	SyncEnabled   bool                   `json:"sync_enabled"`
+	CacheDir      string                 `json:"cache_dir,omitempty"`
+	Client        *http.Client           `json:"-"`
 	Importer      RuleSyncBundleImporter `json:"-"`
 }
 
@@ -182,7 +182,7 @@ func (c *RuleSyncClient) DownloadSnapshotBundle(
 	if err := json.Unmarshal(raw, &bundle); err != nil {
 		return nil, utils.Wrap(err, "decode snapshot bundle failed")
 	}
-	if err := validateRuleSnapshotBundle(bundle, normalizedID); err != nil {
+	if err := validateRuleSnapshotBundle(bundle, normalizedID, raw); err != nil {
 		return nil, err
 	}
 
@@ -333,7 +333,7 @@ func validateRuleSnapshotManifest(manifest RuleSnapshotManifest) error {
 	return nil
 }
 
-func validateRuleSnapshotBundle(bundle RuleSnapshotBundle, expectedSnapshotID string) error {
+func validateRuleSnapshotBundle(bundle RuleSnapshotBundle, expectedSnapshotID string, raw []byte) error {
 	if err := validateRuleSnapshotManifest(bundle.RuleSnapshotManifest); err != nil {
 		return err
 	}
@@ -345,7 +345,7 @@ func validateRuleSnapshotBundle(bundle RuleSnapshotBundle, expectedSnapshotID st
 			bundle.SnapshotID,
 		)
 	}
-	computedHash, err := calculateRuleSnapshotItemsSHA256(bundle.Items)
+	computedHash, err := calculateRuleSnapshotItemsSHA256FromRaw(raw)
 	if err != nil {
 		return err
 	}
@@ -365,6 +365,24 @@ func calculateRuleSnapshotItemsSHA256(items []RuleSnapshotItem) (string, error) 
 		return "", utils.Wrap(err, "marshal snapshot items failed")
 	}
 	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// calculateRuleSnapshotItemsSHA256FromRaw hashes the exact items array bytes
+// received over the wire. The server computes content_sha256 over the same
+// canonical JSON it serializes, so re-marshaling the decoded struct would
+// silently accept a payload whose wire fields differ from the hash input.
+func calculateRuleSnapshotItemsSHA256FromRaw(raw []byte) (string, error) {
+	var payload struct {
+		Items json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return "", utils.Wrap(err, "decode snapshot bundle items failed")
+	}
+	if len(payload.Items) == 0 {
+		return "", utils.Error("snapshot bundle items are required")
+	}
+	sum := sha256.Sum256(payload.Items)
 	return hex.EncodeToString(sum[:]), nil
 }
 
@@ -487,7 +505,7 @@ func (c *RuleSyncClient) loadCachedSnapshotBundle(
 	if err := json.Unmarshal(raw, &bundle); err != nil {
 		return nil, err
 	}
-	if err := validateRuleSnapshotBundle(bundle, snapshotID); err != nil {
+	if err := validateRuleSnapshotBundle(bundle, snapshotID, raw); err != nil {
 		return nil, err
 	}
 	return &bundle, nil
