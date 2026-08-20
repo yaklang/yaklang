@@ -267,7 +267,9 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 		}
 		return v.Index(idx), nil
 	default:
-		return reflect.Value{}, fmt.Errorf("type %s does not support member access", v.Kind())
+		// Weak-typed member reads on unsupported receivers (e.g. a string
+		// probed as an object) read as nil instead of panicking.
+		return reflect.Value{}, nil
 	}
 }
 
@@ -561,7 +563,8 @@ func setRuntimeField(obj any, name string, val int64, flags ...uint64) error {
 		target.Set(converted)
 		return nil
 	default:
-		return fmt.Errorf("type %s does not support member write", v.Kind())
+		// Weak-typed member writes on unsupported receivers are no-ops.
+		return nil
 	}
 }
 
