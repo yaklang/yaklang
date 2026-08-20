@@ -122,6 +122,7 @@ func newHTTPFlowStreamRecorder(
 	flow.BodyLength = 0
 	flow.Duration = 0
 	flow.IsReadTooSlowResponse = true
+	flow.IsTooLargeResponse = true
 	flow.TooLargeResponseHeaderFile = headerPath
 	flow.TooLargeResponseBodyFile = bodyPath
 	if name := httpctx.GetProcessName(req); name != "" {
@@ -131,6 +132,7 @@ func newHTTPFlowStreamRecorder(
 	flow.Hash = flow.CalcHash()
 
 	httpctx.SetResponseReadTooSlow(req, true)
+	httpctx.SetResponseTooLarge(req, true)
 	httpctx.SetResponseTooLargeHeaderFile(req, headerPath)
 	httpctx.SetResponseTooLargeBodyFile(req, bodyPath)
 
@@ -251,6 +253,7 @@ func (r *HTTPFlowStreamRecorder) updateProgress(syncFile bool) {
 		"body_length":                    bodyLength,
 		"duration":                       int64(duration),
 		"is_read_too_slow_response":      true,
+		"is_too_large_response":           true,
 		"too_large_response_header_file": r.headerFile,
 		"too_large_response_body_file":   r.bodyPath,
 		"updated_at":                     time.Now(),
@@ -348,6 +351,7 @@ func (r *HTTPFlowStreamRecorder) Finalize(flow *schema.HTTPFlow) error {
 	flow.BodyLength = bodyLength
 	flow.Duration = int64(duration)
 	flow.IsReadTooSlowResponse = true
+	flow.IsTooLargeResponse = true
 	flow.TooLargeResponseHeaderFile = r.headerFile
 	flow.TooLargeResponseBodyFile = r.bodyPath
 	return SaveHTTPFlow(r.db, flow)
