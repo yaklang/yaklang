@@ -251,3 +251,81 @@ func (w *failAfterHeaderWriter) Write(p []byte) (int, error) {
 func (w *failAfterHeaderWriter) Read(p []byte) (int, error) {
 	return 0, io.EOF
 }
+
+// TestClassifyStreamResponse verifies the single decision point that picks the
+// streaming forwarding kind, covering every branch of classifyStreamResponse:
+//
+//   - SSE (text/event-stream, with/without charset)               -> streamKindSSE
+//   - content-type filtered (matcher hit / miss)                  -> streamKindFiltered / None
+//   - chunked Transfer-Encoding (case-insensitive)               -> streamKindChunkedLarge
+//   - Content-Length >= MaxContentLength (boundary >= vs <)      -> streamKindChunkedLarge / None
+//   - nil response                                                -> streamKindNone
+//
+// The immediate-vs-buffered trigger and cancel-on-write-fail choices in
+// makeStreamResponseCallback are derived from this kind, so this guards the
+// invariants the rest of the forwarding code depends on.
+func TestClassifyStreamResponse(t *testing.T) {
+	const maxCL = 1024 * 1024 // 1 MiB
+
+	mkReq := func() *http.Request {
+		req, err := http.NewRequest("GET", "http://example.com/events", nil)
+		require.NoError(t, err)
+		return req
+	}
+	mkRsp := func(ct string, transferEncoding []string, contentLength int64) *http.Response {
+		rsp := &http.Response{
+			StatusCode: 200,
+			Header:     http.Header{},
+			Request:    mkReq(),
+		}
+		if ct != "" {
+			rsp.Header.Set("Content-Type", ct)
+		}
+		rsp.TransferEncoding = transferEncoding
+		rsp.ContentLength = contentLength
+		return rsp
+	}
+
+	cases := []struct {
+		name            string
+		rsp             *http.Response
+		filterMatcher   func(string) bool
+		want            streamKind
+	}{
+		{"sse plain", mkRsp("text/event-stream", nil, -1), nil, streamKindSSE},
+		{"sse with charset", mkRsp("text/event-stream; charset=utf-8", nil, -1), nil, streamKindSSE},
+		{"sse with params", mkRsp("text/event-stream;charset=utf-8", nil, -1), nil, streamKindSSE},
+		{"filtered hit", mkRsp("application/x-ndjson", nil, -1), func(ct string) bool {
+			return strings.EqualFold(ct, "application/x-ndjson")
+		}, streamKindFiltered},
+		{"filtered miss (no matcher set)", mkRsp("application/json", nil, -1), nil, streamKindNone},
+		{"filtered miss (matcher rejects)", mkRsp("application/json", nil, -1), func(ct string) bool {
+			return false
+		}, streamKindNone},
+		{"chunked lowercase", mkRsp("text/plain", []string{"chunked"}, -1), nil, streamKindChunkedLarge},
+		{"chunked mixedcase", mkRsp("text/plain", []string{"ChUnKeD"}, -1), nil, streamKindChunkedLarge},
+		{"chunked + sse -> sse wins", mkRsp("text/event-stream", []string{"chunked"}, -1), nil, streamKindSSE},
+		{"content-length over threshold", mkRsp("text/plain", nil, int64(maxCL) + 1), nil, streamKindChunkedLarge},
+		{"content-length at threshold (>=)", mkRsp("text/plain", nil, int64(maxCL)), nil, streamKindChunkedLarge},
+		{"content-length under threshold", mkRsp("text/plain", nil, int64(maxCL) - 1), nil, streamKindNone},
+		{"content-length unknown (-1) small body", mkRsp("text/plain", nil, -1), nil, streamKindNone},
+		{"plain html no stream", mkRsp("text/html", nil, 100), nil, streamKindNone},
+		{"empty content-type", mkRsp("", nil, 100), nil, streamKindNone},
+		{"nil response", nil, nil, streamKindNone},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := NewProxy()
+			p.SetMaxContentLength(maxCL)
+
+			req := mkReq()
+			if tc.filterMatcher != nil {
+				httpctx.SetResponseContentTypeFiltered(req, tc.filterMatcher)
+			}
+
+			got := p.classifyStreamResponse(req, tc.rsp)
+			require.Equal(t, tc.want, got, "classifyStreamResponse kind mismatch")
+		})
+	}
+}
