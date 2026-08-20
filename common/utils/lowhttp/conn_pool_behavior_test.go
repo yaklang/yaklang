@@ -906,3 +906,157 @@ func TestConnPool_H2_NoStreamLeakOnForceClose(t *testing.T) {
 		t.Logf("tombstone: host=%s finalActiveStreams=%d reason=%s", ts.host, ts.finalActiveStreams, ts.closeReason)
 	}
 }
+
+// ─── 14. Per-request context cancel closes the upstream connection ────────────
+
+// TestConnPool_H1_RequestContextCancelClosesUpstream verifies that cancelling
+// the per-request context (WithContext) tears down the blocking H1 upstream
+// connection, so a long-lived streaming response (SSE-like) does not block
+// forever. ExtendReadDeadline disables the hard timeout and the pool's own
+// context derives from Background, so only the per-request context watcher in
+// readLoop can close pc.conn and unblock the read.
+//
+// Assertions:
+//  1. The in-flight request returns (with an error) promptly after cancel,
+//     instead of hanging until the pool idle timeout.
+//  2. The server observes its connection being closed (the blocking read
+//     returns), proving the upstream was actually torn down — not just the
+//     client side abandoned.
+//  3. No persistConn readLoop/writeLoop goroutine leaks after the cancel.
+func TestConnPool_H1_RequestContextCancelClosesUpstream(t *testing.T) {
+	// Build an SSE-like server: send the headers + one chunk, flush, then hold
+	// the connection open until the client side closes it.
+	serverClosed := make(chan struct{})
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher, _ := w.(http.Flusher)
+		_, _ = w.Write([]byte("data: ready\n\n"))
+		if flusher != nil {
+			flusher.Flush()
+		}
+		// Block until the underlying connection is torn down by the cancel.
+		// r.Context() is done when the client disconnects.
+		<-r.Context().Done()
+		close(serverClosed)
+	})
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("SSE-like server not ready")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	pool := NewHttpConnPool(ctx, 10, 2)
+	defer pool.Clear()
+
+	// Establish the goroutine baseline before issuing the request so the leak
+	// checker only counts goroutines created by this request.
+	checker := newGoroutineLeakChecker(t, 2, 3*time.Second)
+
+	req := buildBasicRequest(host, port)
+	requestDone := make(chan error, 1)
+	go func() {
+		_, err := HTTP(
+			WithPacketBytes(req),
+			WithConnPool(true),
+			ConnPool(pool),
+			WithContext(ctx),
+			// Mimic the SSE path: extend the read deadline so the hard-timeout
+			// timer does NOT fire — only the per-request context watcher can
+			// close the connection.
+			WithExtendReadDeadline(true),
+			WithTimeout(0),
+		)
+		requestDone <- err
+	}()
+
+	// Give the upstream a moment to start streaming, then cancel.
+	time.Sleep(300 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-requestDone:
+		// The request must return (with an error) promptly after cancel.
+	case <-time.After(3 * time.Second):
+		t.Fatal("streaming request did not return after per-request context cancel")
+	}
+
+	// The server must observe its connection being closed — the upstream was
+	// actually torn down, not merely abandoned by the client.
+	select {
+	case <-serverClosed:
+	case <-time.After(3 * time.Second):
+		t.Fatal("server did not observe upstream connection close after cancel")
+	}
+
+	// No persistConn goroutines should remain stuck in readLoop/writeLoop.
+	if c := countPersistConnGoroutines(); c != 0 {
+		t.Fatalf("expected 0 persistConn goroutines after cancel, got %d\n%s", c, dumpAllGoroutines())
+	}
+	checker.Check()
+}
+
+// TestConnPool_H1_RequestContextCancelDoesNotAffectNextRequest verifies that a
+// stale per-request context cancel does NOT close the connection when it has
+// already been reused for a subsequent request (reqSeq advanced). This guards
+// against the watcher closing pc.conn for the wrong request iteration.
+func TestConnPool_H1_RequestContextCancelDoesNotAffectNextRequest(t *testing.T) {
+	// A normal server that returns immediately, so the connection is returned
+	// to the pool and can be reused.
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("server not ready")
+	}
+
+	poolCtx, cancelPool := context.WithCancel(context.Background())
+	defer cancelPool()
+	pool := NewHttpConnPool(poolCtx, 10, 2)
+	defer pool.Clear()
+
+	// First request with its own cancellable context; let it complete normally
+	// so the connection is recycled. Keep the context around (do not cancel
+	// yet) — we cancel it only AFTER a second request has taken the conn.
+	firstCtx, cancelFirst := context.WithCancel(context.Background())
+	defer cancelFirst()
+	req := buildBasicRequest(host, port)
+	if _, err := HTTP(
+		WithPacketBytes(req),
+		WithConnPool(true),
+		ConnPool(pool),
+		WithContext(firstCtx),
+		WithTimeout(2*time.Second),
+	); err != nil {
+		t.Fatalf("first request failed: %v", err)
+	}
+
+	// Second request reuses the pooled connection with a fresh context.
+	secondCtx, cancelSecond := context.WithCancel(context.Background())
+	defer cancelSecond()
+	if _, err := HTTP(
+		WithPacketBytes(req),
+		WithConnPool(true),
+		ConnPool(pool),
+		WithContext(secondCtx),
+		WithTimeout(2*time.Second),
+	); err != nil {
+		t.Fatalf("second request failed: %v", err)
+	}
+
+	// Cancelling the FIRST (stale) request context must not perturb the pool —
+	// the connection is now serving/has served a different iteration.
+	cancelFirst()
+
+	// A third request must still succeed, proving the pool/connection was not
+	// corrupted by the stale cancel.
+	if _, err := HTTP(
+		WithPacketBytes(req),
+		WithConnPool(true),
+		ConnPool(pool),
+		WithTimeout(2*time.Second),
+	); err != nil {
+		t.Fatalf("third request failed after stale context cancel: %v", err)
+	}
+}

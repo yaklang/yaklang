@@ -441,23 +441,27 @@ const (
 	REQUEST_CONTEXT_KEY_TLS_SNI                      = "tlsSNI"              // TLS Server Name Indication (domain name for TLS handshake)
 )
 
-func SetResponseStreamRecorder(req *http.Request, recorder any) {
-	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder, recorder)
-}
-
-func GetResponseStreamRecorder(req *http.Request) any {
-	if req == nil {
-		return nil
-	}
-	return GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder)
-}
-
 func SetRequestMITMTaskID(req *http.Request, id string) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_MITMTaskID, id)
 }
 
 func GetRequestMITMTaskID(req *http.Request) string {
 	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_MITMTaskID)
+}
+
+// SetResponseStreamRecorder stores an optional stream recorder (e.g. for SSE
+// persistence) on the request context so the mirror stage can retrieve it.
+func SetResponseStreamRecorder(req *http.Request, recorder any) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder, recorder)
+}
+
+// GetResponseStreamRecorder returns the stream recorder previously stored via
+// SetResponseStreamRecorder, or nil.
+func GetResponseStreamRecorder(req *http.Request) any {
+	if req == nil {
+		return nil
+	}
+	return GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder)
 }
 
 func SetRequestProxyProtocol(req *http.Request, p string) {

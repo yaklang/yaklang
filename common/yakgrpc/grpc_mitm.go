@@ -1889,13 +1889,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					}()
 				}
 			}
+
+			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		} else if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
 			if err := recorder.Drop(); err != nil {
 				log.Warnf("drop HTTP stream flow rejected by save hook failed: %v", err)
 			}
 		}
-
-		log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 	}
 	// 核心 MITM 服务器
 	var opts []crep.MITMConfig
