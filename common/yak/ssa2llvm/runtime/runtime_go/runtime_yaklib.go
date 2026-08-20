@@ -73,6 +73,21 @@ func (it *runtimeIntIterator) Next() (any, any, bool) {
 	return cur, nil, true
 }
 
+type runtimeChanIterator struct {
+	value reflect.Value
+}
+
+func (it *runtimeChanIterator) Next() (any, any, bool) {
+	if it == nil || !it.value.IsValid() || it.value.Kind() != reflect.Chan {
+		return nil, nil, false
+	}
+	recv, ok := it.value.Recv()
+	if !ok {
+		return nil, nil, false
+	}
+	return recv.Interface(), nil, true
+}
+
 type runtimeMapIterator struct {
 	keys   []reflect.Value
 	index  int
@@ -146,6 +161,8 @@ func newRuntimeIterator(value any, inNext bool) (runtimeIterator, error) {
 		return &runtimeSliceIterator{value: v, inNext: inNext}, nil
 	case reflect.Map:
 		return &runtimeMapIterator{keys: v.MapKeys(), values: v}, nil
+	case reflect.Chan:
+		return &runtimeChanIterator{value: v}, nil
 	case reflect.String:
 		runes := []rune(v.String())
 		return &runtimeSliceIterator{
@@ -356,4 +373,58 @@ func runtimeDispatchEq(args []uint64) (int64, error) {
 		return 1, nil
 	}
 	return 0, nil
+}
+
+func runtimeDecodeChannel(raw uint64) (reflect.Value, bool) {
+	value := runtimeDecodeIterValue(raw)
+	rv := reflect.ValueOf(value)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return reflect.Value{}, false
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() || rv.Kind() != reflect.Chan {
+		return reflect.Value{}, false
+	}
+	return rv, true
+}
+
+func runtimeDispatchMakeChan(args []uint64) (int64, error) {
+	size := 0
+	if len(args) > 0 {
+		size = int(int64(args[0]))
+	}
+	if size < 0 {
+		size = 0
+	}
+	ch := make(chan any, size)
+	return int64(uintptr(newRuntimeShadow(ch))), nil
+}
+
+func runtimeDispatchChanSend(args []uint64) (int64, error) {
+	if len(args) < 2 {
+		return 0, fmt.Errorf("chan send expects channel and value")
+	}
+	rv, ok := runtimeDecodeChannel(args[0])
+	if !ok {
+		return 0, fmt.Errorf("chan send on non-channel %T", runtimeDecodeIterValue(args[0]))
+	}
+	value := runtimeDecodeIterValue(args[1])
+	rv.Send(reflect.ValueOf(value))
+	return 0, nil
+}
+
+func runtimeBuiltinClose(ch any) {
+	rv := reflect.ValueOf(ch)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			panic("close of nil channel")
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() || rv.Kind() != reflect.Chan {
+		panic(fmt.Sprintf("close of non-channel %T", ch))
+	}
+	rv.Close()
 }

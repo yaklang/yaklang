@@ -156,6 +156,26 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	switch c.instructionTag(inst.GetId()) {
 	case callLowerTagInternal:
 		if resolvedCallee, ok := callframe.ResolveDirectCallee(c.Program, fn, inst); ok && resolvedCallee != nil {
+			if len(resolvedCallee.FreeValues) > 0 || len(resolvedCallee.ParameterMembers) > 0 {
+				// Closure invocation: pass the materialized closure object so
+				// the runtime fills parameter members and free values from the
+				// captured slots (which are by-ref pointers). The call context
+				// only carries the user arguments.
+				closure, err := c.materializeCallableClosure(inst, resolvedCallee)
+				if err != nil {
+					return err
+				}
+				spec := contextCallSpec{
+					inst:      inst,
+					kind:      abi.KindCallable,
+					target:    c.coerceToInt64(closure),
+					args:      ssaArgs(append([]int64{}, inst.Args...), false),
+					async:     inst.Async,
+					ctxName:   "yak_call_ctx",
+					errPrefix: "emitCallableContextCall",
+				}
+				return c.lowerResolvedContextCall(spec)
+			}
 			llvmFn, _ := c.getOrDeclareLLVMFunction(resolvedCallee)
 			spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, resolvedCallee), "yak_call_target")
 			if err != nil {
