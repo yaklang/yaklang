@@ -26,6 +26,13 @@ func (c *Compiler) shouldUseYaklibDispatch(calleeName string) bool {
 	if _, ok := c.getExternBinding(calleeName); ok {
 		return false
 	}
+	// AOT runtime globals that are not part of yaklang's callable table
+	// (param reads CLI/environment parameters) still dispatch through the
+	// empty-package yaklib path.
+	switch calleeName {
+	case "param":
+		return true
+	}
 	if _, ok := yaklang.LookupGlobalCallable(calleeName); ok {
 		return true
 	}
