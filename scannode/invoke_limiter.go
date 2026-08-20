@@ -1,88 +1,97 @@
 package scannode
 
 import (
-	"context"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/log"
 )
 
-const (
-	envScanNodeMaxParallel = "SCANNODE_MAX_PARALLEL"
-)
+const envScanNodeMaxParallel = "SCANNODE_MAX_PARALLEL"
 
+// invokeLimiter is deliberately non-blocking. A nil slots channel means that
+// the Node is unbounded, while active still tracks the jobs that actually own
+// an execution slot for heartbeat reporting.
 type invokeLimiter struct {
-	total  chan struct{}
-	totalN int
+	slots   chan struct{}
+	maximum uint32
+	active  atomic.Uint32
 }
 
-func (l *invokeLimiter) activeCount() int {
-	if l == nil || l.total == nil {
-		return 0
+func newInvokeLimiter(maximum uint32) *invokeLimiter {
+	limiter := &invokeLimiter{maximum: maximum}
+	if maximum > 0 {
+		limiter.slots = make(chan struct{}, int(maximum))
 	}
-	return len(l.total)
+	return limiter
 }
 
-func (l *invokeLimiter) capacity() int {
+func (l *invokeLimiter) activeCount() uint32 {
 	if l == nil {
 		return 0
 	}
-	return l.totalN
+	return l.active.Load()
 }
 
-func (l *invokeLimiter) acquire(ctx context.Context) (release func(), err error) {
+func (l *invokeLimiter) capacity() uint32 {
 	if l == nil {
-		return func() {}, nil
+		return 0
 	}
-	if err := acquireToken(ctx, l.total); err != nil {
-		return nil, err
+	return l.maximum
+}
+
+// TryAcquire reserves capacity without turning the command consumer into a
+// local waiting queue. The returned release function is safe to call more than
+// once, which lets every terminal path share the same cleanup code.
+func (l *invokeLimiter) TryAcquire() (release func(), acquired bool) {
+	if l == nil {
+		return func() {}, true
 	}
+	if l.slots != nil {
+		select {
+		case l.slots <- struct{}{}:
+		default:
+			return nil, false
+		}
+	}
+	l.active.Add(1)
+	var once sync.Once
 	return func() {
-		releaseToken(l.total)
-	}, nil
+		once.Do(func() {
+			l.active.Add(^uint32(0))
+			if l.slots != nil {
+				<-l.slots
+			}
+		})
+	}, true
 }
 
-func acquireToken(ctx context.Context, ch chan struct{}) error {
-	if ch == nil {
-		return nil
+func effectiveMaxRunningJobs(configured uint32) uint32 {
+	raw := strings.TrimSpace(os.Getenv(envScanNodeMaxParallel))
+	if raw == "" {
+		return configured
 	}
-	select {
-	case ch <- struct{}{}:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	override, err := strconv.ParseUint(raw, 10, 32)
+	if err != nil || override == 0 {
+		log.Warnf(
+			"ignore invalid %s=%q; using configured max_running_jobs=%d",
+			envScanNodeMaxParallel,
+			raw,
+			configured,
+		)
+		return configured
 	}
+	return uint32(override)
 }
 
-func releaseToken(ch chan struct{}) {
-	if ch == nil {
+func (s *ScanNode) initInvokeLimiter(maximum uint32) {
+	s.invokeLimiter = newInvokeLimiter(maximum)
+	if maximum == 0 {
+		log.Infof("invoke limiter initialized: total=unlimited")
 		return
 	}
-	select {
-	case <-ch:
-	default:
-	}
-}
-
-func readIntEnv(name string, def int) int {
-	v := strings.TrimSpace(os.Getenv(name))
-	if v == "" {
-		return def
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n <= 0 {
-		return def
-	}
-	return n
-}
-
-func (s *ScanNode) initInvokeLimiter() {
-	totalN := readIntEnv(envScanNodeMaxParallel, 1)
-	s.invokeLimiter = &invokeLimiter{
-		total:  make(chan struct{}, totalN),
-		totalN: totalN,
-	}
-	log.Infof("invoke limiter initialized: total=%d", totalN)
+	log.Infof("invoke limiter initialized: total=%d", maximum)
 }

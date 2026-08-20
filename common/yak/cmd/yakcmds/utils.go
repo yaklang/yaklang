@@ -969,6 +969,10 @@ var DistributionCommands = []*cli.Command{
 		Before: nil,
 		After:  nil,
 		Action: func(c *cli.Context) error {
+			maxRunningJobs, err := nodeMaxRunningJobsFromInt(c.Int("max-running-jobs"))
+			if err != nil {
+				return err
+			}
 			scanNode, err := scannode.NewScanNode(node.BaseConfig{
 				NodeType:            spec.NodeType_Scanner,
 				NodeID:              c.String("id"),
@@ -978,7 +982,7 @@ var DistributionCommands = []*cli.Command{
 				EnrollmentToken:     c.String("enrollment-token"),
 				PlatformAPIBaseURL:  c.String("api-url"),
 				Version:             c.String("version"),
-				MaxRunningJobs:      uint32(c.Int("max-running-jobs")),
+				MaxRunningJobs:      maxRunningJobs,
 				HeartbeatInterval:   c.Duration("heartbeat-interval"),
 			}, scannode.WithRuleSnapshotCacheDir(c.String("rule-snapshot-cache-dir")))
 			if err != nil {
@@ -1139,6 +1143,16 @@ var DistributionCommands = []*cli.Command{
 			return nil
 		},
 	},
+}
+
+func nodeMaxRunningJobsFromInt(value int) (uint32, error) {
+	if value < 0 {
+		return 0, fmt.Errorf("max-running-jobs must be zero or a positive integer")
+	}
+	if uint64(value) > uint64(^uint32(0)) {
+		return 0, fmt.Errorf("max-running-jobs exceeds uint32 range")
+	}
+	return uint32(value), nil
 }
 
 var XPathCommand = &cli.Command{

@@ -23,6 +23,7 @@ type ScanNode struct {
 	httpClient        *http.Client
 	invokeLimiter     *invokeLimiter
 	maxRunningJobs    uint32
+	heartbeatInterval time.Duration
 	bridge            *legionJobBridge
 	ssaGitOwnerScope  string
 	ssaGitScopeLock   *ssagitworkdir.OwnerScopeLock
@@ -53,6 +54,10 @@ func WithRuleSnapshotCacheDir(cacheDir string) ScanNodeOption {
 }
 
 func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, error) {
+	if cfg.HeartbeatInterval <= 0 {
+		cfg.HeartbeatInterval = node.DefaultHeartbeatInterval
+	}
+	cfg.MaxRunningJobs = effectiveMaxRunningJobs(cfg.MaxRunningJobs)
 	var resolvedOptions scanNodeOptions
 	for _, option := range options {
 		if option != nil {
@@ -63,8 +68,9 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		cfg.CapabilityKeys = append(cfg.CapabilityKeys, AIRuntimeHostCapabilityKey)
 	}
 	agent := &ScanNode{
-		manager:        newTaskManager(),
-		maxRunningJobs: cfg.MaxRunningJobs,
+		manager:           newTaskManager(),
+		maxRunningJobs:    cfg.MaxRunningJobs,
+		heartbeatInterval: cfg.HeartbeatInterval,
 	}
 	if cfg.NodeType == "" {
 		cfg.NodeType = spec.NodeType_Scanner
@@ -126,7 +132,7 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		)
 	}
 	agent.httpClient = cfg.HTTPClient
-	agent.initInvokeLimiter()
+	agent.initInvokeLimiter(cfg.MaxRunningJobs)
 	agent.bridge = newLegionJobBridge(agent)
 	return agent, nil
 }
@@ -178,6 +184,9 @@ func (s *ScanNode) Shutdown() {
 	if s == nil || s.node == nil {
 		return
 	}
+	if s.bridge != nil {
+		s.bridge.BeginShutdown()
+	}
 	s.manager.BeginShutdown()
 	if s.capabilityManager != nil {
 		if err := s.capabilityManager.Close(); err != nil {
@@ -212,7 +221,7 @@ func (s *ScanNode) releaseSSAGitScopeLockAfterTasks() {
 func (s *ScanNode) Snapshot() node.RuntimeStatus {
 	return node.RuntimeStatus{
 		LifecycleState: node.DefaultLifecycleState,
-		RunningJobs:    uint32(s.manager.Count()),
+		RunningJobs:    s.invokeLimiter.activeCount(),
 		MaxRunningJobs: s.maxRunningJobs,
 		ActiveAttempts: s.manager.ActiveAttemptHeartbeats(time.Now().UTC()),
 	}
