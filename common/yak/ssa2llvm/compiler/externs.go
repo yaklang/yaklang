@@ -53,6 +53,10 @@ var defaultExternBindings = map[string]ExternBinding{
 		Return:     ExternTypePtr,
 		DispatchID: abi.IDAppend,
 	},
+	"__yak_chan_send": {
+		Return:     ExternTypeVoid,
+		DispatchID: abi.IDRuntimeChanSend,
+	},
 }
 
 func cloneExternBindings(src map[string]ExternBinding) map[string]ExternBinding {

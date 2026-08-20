@@ -254,7 +254,27 @@ func (lb *LoopBuilder) Finish() {
 		}
 		SSABuild.EmitJump(condition)
 	})
-	endScope := LoopBuilder.Build(SpinHandle, generatePhi(SSABuild, latch, lb.enter), generatePhi(SSABuild, exit, lb.enter))
+	// Loop merge phis order their edges as [subScopes..., self] while the
+	// exit/latch CFG predecessors are [self/header, break/continue scopes...].
+	// Rotate the trailing self value to the front so phi edges line up with
+	// the block predecessors (a mismatched order silently produces the wrong
+	// merged value, e.g. x = i inside a break body).
+	rotateSelfLast := func(merge ssautil.MergeHandle[Value]) ssautil.MergeHandle[Value] {
+		return func(name string, vs []Value) Value {
+			if len(vs) > 1 {
+				last := vs[len(vs)-1]
+				rotated := make([]Value, 0, len(vs))
+				rotated = append(rotated, last)
+				rotated = append(rotated, vs[:len(vs)-1]...)
+				vs = rotated
+			}
+			return merge(name, vs)
+		}
+	}
+	endScope := LoopBuilder.Build(SpinHandle,
+		generatePhi(SSABuild, latch, lb.enter),
+		rotateSelfLast(generatePhi(SSABuild, exit, lb.enter)),
+	)
 
 	exit.SetScope(endScope)
 	SSABuild.CurrentBlock = exit

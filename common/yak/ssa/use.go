@@ -258,7 +258,10 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 	})
 
 	lo.ForEach(c.ArgMember, func(id int64, index int) {
-		c.ArgMember[index] = to.GetId()
+		if id == v.GetId() {
+			c.ArgMember[index] = to.GetId()
+		}
+		return
 	})
 }
 
