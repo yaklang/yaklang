@@ -16,14 +16,17 @@ func (s *ScanNode) needIsolateSSARuntimeDB() bool {
 	if s == nil || s.invokeLimiter == nil {
 		return false
 	}
-	// Only enable isolation when parallelism is explicitly increased.
-	return s.invokeLimiter.totalN > 1
+	// Unlimited and explicitly parallel Nodes must never let child processes
+	// share the implicit local project/SSA SQLite files.
+	return s.invokeLimiter.capacity() == 0 || s.invokeLimiter.capacity() > 1
 }
 
 func buildSSARuntimeDBPaths(runtimeID string) (projectDB string, ssaDB string) {
 	runtimeID = strings.TrimSpace(runtimeID)
 	if runtimeID == "" {
 		runtimeID = fmt.Sprintf("runtime-%d", time.Now().UnixNano())
+	} else {
+		runtimeID = sanitizeLogName(runtimeID)
 	}
 	base := filepath.Join(consts.GetDefaultYakitBaseTempDir(), ssaRuntimeDBDirName)
 	_ = os.MkdirAll(base, 0o755)

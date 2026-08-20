@@ -13,6 +13,40 @@ import (
 
 const commandPollInterval = time.Second
 
+type messageDispositionKind uint8
+
+const (
+	messageAck messageDispositionKind = iota
+	messageAckSync
+	messageNak
+	messageNakDelayed
+	messageTerm
+)
+
+type messageDisposition struct {
+	kind       messageDispositionKind
+	delay      time.Duration
+	afterAck   func()
+	onAckError func()
+}
+
+func ackMessage() messageDisposition { return messageDisposition{kind: messageAck} }
+func ackSyncMessage(afterAck func()) messageDisposition {
+	return messageDisposition{kind: messageAckSync, afterAck: afterAck}
+}
+func ackSyncDispatchMessage(afterAck, onAckError func()) messageDisposition {
+	return messageDisposition{
+		kind:       messageAckSync,
+		afterAck:   afterAck,
+		onAckError: onAckError,
+	}
+}
+func nakMessage() messageDisposition { return messageDisposition{kind: messageNak} }
+func nakDelayedMessage(delay time.Duration) messageDisposition {
+	return messageDisposition{kind: messageNakDelayed, delay: delay}
+}
+func termMessage() messageDisposition { return messageDisposition{kind: messageTerm} }
+
 type commandConsumer struct {
 	sessionID string
 	cancel    context.CancelFunc
@@ -113,9 +147,14 @@ func (b *legionJobBridge) forwardCapabilityAlerts(ctx context.Context) {
 }
 
 func (b *legionJobBridge) syncConsumer(parent context.Context) {
+	if b.shuttingDown.Load() {
+		b.stopConsumer()
+		return
+	}
 	session, ok := b.agent.node.GetSessionState()
 	if !ok {
 		b.stopConsumer()
+		b.switchDispatchSession("")
 		b.resetCapabilityStatusSync()
 		return
 	}
@@ -128,6 +167,7 @@ func (b *legionJobBridge) syncConsumer(parent context.Context) {
 	}
 
 	b.stopConsumer()
+	b.switchDispatchSession(session.SessionID)
 	consumer, err := b.startConsumer(parent, session.NATSURL, session.SessionID, session.CommandSubject)
 	if err != nil {
 		log.Errorf("start legion command consumer failed: %v", err)
@@ -230,18 +270,38 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			continue
 		}
 		for _, message := range messages {
-			if err := b.handleMessage(ctx, message); err != nil {
+			disposition, err := b.handleMessageWithDisposition(ctx, consumer.sessionID, message)
+			if err != nil {
 				log.Errorf("handle legion command failed: %v", err)
-				var rejected *runtimeHostCommandRejectedError
-				if errors.As(err, &rejected) {
-					_ = message.Term()
-					continue
-				}
-				_ = message.Nak()
-				continue
 			}
-			_ = message.Ack()
+			if err := applyMessageDisposition(message, disposition); err != nil {
+				log.Errorf("apply legion command disposition failed: %v", err)
+			}
 		}
+	}
+}
+
+func applyMessageDisposition(message *nats.Msg, disposition messageDisposition) error {
+	switch disposition.kind {
+	case messageAckSync:
+		if err := message.AckSync(); err != nil {
+			if disposition.onAckError != nil {
+				disposition.onAckError()
+			}
+			return err
+		}
+		if disposition.afterAck != nil {
+			disposition.afterAck()
+		}
+		return nil
+	case messageNak:
+		return message.Nak()
+	case messageNakDelayed:
+		return message.NakWithDelay(disposition.delay)
+	case messageTerm:
+		return message.Term()
+	default:
+		return message.Ack()
 	}
 }
 
@@ -254,15 +314,41 @@ func isCommandConsumerResetError(err error) bool {
 		errors.Is(err, nats.ErrSubscriptionClosed)
 }
 
-func (b *legionJobBridge) handleMessage(
+func (b *legionJobBridge) handleMessageWithDisposition(
 	ctx context.Context,
+	sessionID string,
+	message *nats.Msg,
+) (messageDisposition, error) {
+	if strings.HasSuffix(message.Subject, "."+legionCommandDispatch) {
+		return b.handleDispatch(ctx, sessionID, message.Data)
+	}
+	err := b.handleMessagePayload(ctx, sessionID, message)
+	if err == nil {
+		return ackMessage(), nil
+	}
+	var rejected *runtimeHostCommandRejectedError
+	if errors.As(err, &rejected) {
+		return termMessage(), err
+	}
+	return nakMessage(), err
+}
+
+// handleMessage remains the direct, non-consumer test/adapter entry. The
+// consume loop uses handleMessageWithDisposition so it can apply AckSync and
+// run dispatch only after the server confirms the acknowledgement.
+func (b *legionJobBridge) handleMessage(ctx context.Context, message *nats.Msg) error {
+	_, err := b.handleMessageWithDisposition(ctx, "", message)
+	return err
+}
+
+func (b *legionJobBridge) handleMessagePayload(
+	ctx context.Context,
+	sessionID string,
 	message *nats.Msg,
 ) error {
 	switch {
-	case strings.HasSuffix(message.Subject, "."+legionCommandDispatch):
-		return b.handleDispatch(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCancel):
-		return b.handleCancel(message.Data)
+		return b.handleCancelForSession(sessionID, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCapabilityApply):
 		return b.handleCapabilityApply(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeImageEnsure),

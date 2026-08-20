@@ -1,6 +1,6 @@
 # Legion Node Session And Job Bridge Refactor
 
-更新时间：2026-03-28
+更新时间：2026-08-20
 
 ## 本轮已经落地的边界
 
@@ -135,10 +135,14 @@
 处理过程是：
 
 1. 校验 `command_id/job_id/subtask_id/attempt_id/target_node_id/plugin_release_id`
-2. 按 `plugin_release_id` 从本地 Legion 插件缓存读取脚本内容
-3. 先发 `job.claimed`
-4. 再发 `job.started`
-5. 调用本地脚本执行服务
+2. 用 session 内存 registry 按 `attempt_id` 预留 dispatch identity；同一 `command_id + attempt_id + payload` 的重投只确认、不重复执行，身份冲突直接 `Term`
+3. 非阻塞申请执行 slot；满载时不发 `job.claimed/job.started`，而是 `NakWithDelay(1s)`
+4. 在 `TaskManager` 以 `attempt_id` 原子登记 claimed attempt
+5. 发布 `job.claimed`
+6. 对 dispatch 消息执行 `AckSync`
+7. 只有 `AckSync` 成功后才发布 `job.started`，随后调用本地脚本执行服务
+
+满载 reservation 的截止时间是 `command.issued_at + 当前 heartbeat interval`。截止后或 node session 已切换时，消息直接 `Term`，由 Legion 的 lease/reclaim 流程收敛。节点不把满载命令变成本地 claimed waiting queue，也不把 reservation 写入磁盘；进程重启后的恢复仍由 Legion 负责，因此这里不承诺跨重启 exactly-once。
 
 桥接关系如下：
 
@@ -161,6 +165,33 @@
 - `script-task-<subtask_id>`
 
 然后通过 `TaskManager` 找到任务，写入取消原因并调用 `Cancel()`。
+
+如果取消发生在 slot 可用之前，registry 会把 pending reservation 变为当前 session 内的 tombstone，并发布 `job.cancelled`；即使 cancel 先于首次 dispatch 到达，也会按 `attempt_id` 预登记 tombstone，迟到的 dispatch 只补发 cancelled 并确认，不会执行。取消首先校验 consumer session，并按 `job_id + subtask_id + attempt_id` 精确匹配；只有旧协议明确缺少 `attempt_id` 时才回退到 subtask 查询，避免旧 session 或旧 Attempt 的 cancel 误杀新执行。tombstone 不持久化，终态会清除 Task/context/release 等执行对象，并只在 command stream 的 24 小时 MaxAge 窗口内保留轻量 identity，之后惰性回收；session 切换会整体清空。
+
+`AckSync` 返回错误时不能确定服务端是否已经接受 ACK。节点不会在这个不确定窗口执行任务：它会幂等释放 slot、移除 ActiveAttempt，但保留已发布 claimed 的 identity。若消息随后重投，节点重新申请 slot，只重试 ACK 确认，不重复发布 claimed；确认成功后才 started/execute。如果服务端实际已接受 ACK 而不再重投，节点停止该 Attempt 的 heartbeat，由 Legion lease/reclaim 收敛。
+
+## Node 容量与 heartbeat 口径
+
+`BaseConfig.MaxRunningJobs` 是主配置，最终生效值按下面优先级计算：
+
+1. `SCANNODE_MAX_PARALLEL` 为正整数时，作为旧部署兼容 override
+2. env 未设置、不是整数、为负数或为 `0` 时，回退到 `BaseConfig.MaxRunningJobs`
+
+最终 effective max 同时用于执行 limiter 和 heartbeat 的 `max_running_jobs`，不会出现“实际只跑 1 个、heartbeat 却上报其他值”的分叉。
+
+- `max_running_jobs = 1`：默认串行执行；`yak node` 和 Legion Smoke Node 均默认 1
+- `max_running_jobs > 1`：最多并发对应数量的作业
+- `max_running_jobs = 0`：显式 unlimited；limiter 不设上限，但仍准确统计 `running_jobs`
+- `yak node --max-running-jobs` 拒绝负数和超出 `uint32` 的值，避免有符号转无符号溢出
+- Legion Smoke Node 支持 `--max-running-jobs`，默认 1，显式传 0 表示 unlimited
+
+三个运行态口径彼此不同：
+
+- reservation：session 内存中的投递身份与 pending/cancel tombstone；不代表平台已 claimed
+- slot / `running_jobs`：已经成功占用本地执行容量的数量，包括 unlimited 模式下的实际占用数
+- `active_attempts`：仅包含已经登记为 `claimed`、`running` 或 `cancel_requested` 的 attempt；满载 pending reservation 不进入 heartbeat
+
+当 effective max 为 unlimited 或大于 1 时，节点为每个 child runtime 隔离隐式本地 project/SSA SQLite 文件；平台显式注入的共享 SSA DSN 保持不变。这样本地默认数据库不会因为并行 child process 相互覆盖。
 
 ### 5. 节点回传 `job.* / plugin.*`
 
@@ -289,6 +320,8 @@ yak node \
 - `--version`
 - `--max-running-jobs`
 - `--heartbeat-interval`
+
+`--max-running-jobs` 默认 1；传 0 表示 unlimited。正整数 `SCANNODE_MAX_PARALLEL` 只用于兼容旧部署，并覆盖 CLI 写入的主配置；无效值和 0 不覆盖。
 
 ## 当前结论
 

@@ -82,6 +82,7 @@ func runNode(args []string) error {
 		node.DefaultHeartbeatInterval,
 		"Heartbeat interval",
 	)
+	maxRunningJobs := smokeNodeMaxRunningJobsFlag(flags)
 	pprofAddr := flags.String("pprof-addr", "", "Optional pprof HTTP listen address, e.g. 127.0.0.1:18080")
 	heapMonitorInterval := flags.Duration(
 		"heap-monitor-interval",
@@ -124,6 +125,10 @@ func runNode(args []string) error {
 		"Optional host identity instance_id override for isolated local testing",
 	)
 	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	resolvedMaxRunningJobs, err := smokeNodeMaxRunningJobs(*maxRunningJobs)
+	if err != nil {
 		return err
 	}
 	if err := initializeAISessionCapabilities(*kind, syncAISessionCapabilities); err != nil {
@@ -200,6 +205,7 @@ func runNode(args []string) error {
 		EngineReleaseID:      hostEngineValue(*kind, *engineReleaseID),
 		EngineDigest:         hostEngineValue(*kind, *engineDigest),
 		HeartbeatInterval:    *heartbeatInterval,
+		MaxRunningJobs:       resolvedMaxRunningJobs,
 		HostIdentityProvider: hostIdentityProvider,
 		PostBootstrapHook:    postBootstrapHook,
 	}, scanNodeOptions...)
@@ -217,6 +223,21 @@ func runNode(args []string) error {
 	scanNode.Shutdown()
 	<-done
 	return nil
+}
+
+func smokeNodeMaxRunningJobsFlag(flags *flag.FlagSet) *uint64 {
+	return flags.Uint64(
+		"max-running-jobs",
+		1,
+		"Maximum concurrent jobs; zero means unlimited",
+	)
+}
+
+func smokeNodeMaxRunningJobs(value uint64) (uint32, error) {
+	if value > uint64(^uint32(0)) {
+		return 0, fmt.Errorf("max-running-jobs exceeds uint32 range")
+	}
+	return uint32(value), nil
 }
 
 func environmentBool(name string) bool {

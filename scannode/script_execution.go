@@ -63,27 +63,16 @@ func (e *ruleSnapshotPreparationError) Unwrap() error {
 }
 
 func (s *ScanNode) executeScriptTask(
-	ctx context.Context,
+	task *Task,
 	input ScriptExecutionRequest,
 ) (*ScriptExecutionResult, error) {
 	if strings.TrimSpace(input.ScriptContent) == "" {
 		return nil, utils.Error("empty script_content")
 	}
-
-	taskID := taskIDForSubtask(input.SubTaskID)
-	taskCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	if !s.manager.Add(taskID, newScriptTask(
-		taskCtx,
-		cancel,
-		taskID,
-		input.TaskID,
-		input.SubTaskID,
-		input.RuntimeID,
-	)) {
-		return nil, utils.Error("scan node is shutting down")
+	if task == nil || task.Ctx == nil {
+		return nil, utils.Error("claimed script task is required")
 	}
-	defer s.manager.Remove(taskID)
+	taskCtx := task.Ctx
 
 	reporter := NewScannerAgentReporter(
 		input.TaskID,
@@ -117,6 +106,17 @@ func (s *ScanNode) executeScriptTask(
 		defer reporter.ssaCollector.Cleanup()
 	}
 	ssaDBEnv := extractSSADatabaseEnv(keyValues)
+	ssaDBCleanup := func() {}
+	if s.needIsolateSSARuntimeDB() {
+		ssaOverride := environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DATABASE_RAW)
+		isolatedEnv, cleanup := buildSSARuntimeDBEnv(input.RuntimeID, ssaOverride)
+		if environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DB_SKIP_MIGRATE) != "" {
+			isolatedEnv = append(isolatedEnv, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
+		}
+		ssaDBEnv = isolatedEnv
+		ssaDBCleanup = cleanup
+	}
+	defer ssaDBCleanup()
 	if preparedSnapshot != nil {
 		ssaDBEnv = append(ssaDBEnv, "YAKIT_HOME="+preparedSnapshot.taskYakitHome)
 	}
@@ -193,7 +193,7 @@ func (s *ScanNode) executeScriptTask(
 			s.finalizeDebugRun(taskCtx, reporter, debugDir, "failed")
 			debugFinalized = true
 		}
-		return nil, s.handleScriptFailure(err, result, taskID)
+		return nil, s.handleScriptFailure(err, result, task.AttemptID)
 	}
 	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
 	if err := s.finalizeSSAArtifactUpload(taskCtx, reporter, result); err != nil {
@@ -210,6 +210,16 @@ func (s *ScanNode) executeScriptTask(
 		debugFinalized = true
 	}
 	return result, nil
+}
+
+func environmentValueFromEntries(entries []string, key string) string {
+	prefix := key + "="
+	for i := len(entries) - 1; i >= 0; i-- {
+		if strings.HasPrefix(entries[i], prefix) {
+			return strings.TrimPrefix(entries[i], prefix)
+		}
+	}
+	return ""
 }
 
 func newScriptTask(
@@ -243,12 +253,12 @@ func (s *ScanNode) buildScriptParams(
 func (s *ScanNode) handleScriptFailure(
 	err error,
 	result *ScriptExecutionResult,
-	taskID string,
+	attemptID string,
 ) error {
 	if err == nil {
 		return nil
 	}
-	if reason := s.cancelReasonForTask(taskID); reason != "" {
+	if reason := s.cancelReasonForAttempt(attemptID); reason != "" {
 		return &TaskCancelledError{Reason: reason}
 	}
 	if errors.Is(err, context.Canceled) {
@@ -266,8 +276,8 @@ func (s *ScanNode) handleScriptFailure(
 	return utils.Errorf("exec yak script failed: %s", err)
 }
 
-func (s *ScanNode) cancelReasonForTask(taskID string) string {
-	task, err := s.manager.GetTaskById(taskID)
+func (s *ScanNode) cancelReasonForAttempt(attemptID string) string {
+	task, err := s.manager.GetTaskByAttemptID(attemptID)
 	if err != nil {
 		return ""
 	}
