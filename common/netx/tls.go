@@ -46,7 +46,28 @@ func UpgradeToTLSConnection(conn net.Conn, sni string, i any, spec *utls.ClientH
 }
 
 func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout time.Duration, spec *utls.ClientHelloSpec, tlsNextProto ...string) (net.Conn, error) {
+	return upgradeToTLSConnectionWithTimeout(conn, sni, i, timeout, spec, nil, tlsNextProto...)
+}
+
+func upgradeToTLSConnectionWithTimeout(
+	conn net.Conn,
+	sni string,
+	i any,
+	timeout time.Duration,
+	spec *utls.ClientHelloSpec,
+	profile *ClientHelloProfile,
+	tlsNextProto ...string,
+) (net.Conn, error) {
 	var handshakeConn HandshakeConn
+	var preset *clientHelloPreset
+	if spec == nil && profile != nil {
+		var err error
+		preset, err = profile.newClientHelloPreset()
+		if err != nil {
+			return nil, utils.Wrapf(err, "build TLS fingerprint profile %s", profile.ID())
+		}
+		spec = preset.spec
+	}
 	minVer, maxVer := consts.GetGlobalTLSVersion()
 	if i == nil {
 		i = &gmtls.Config{ // use gmtls for
@@ -130,6 +151,11 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 		err = uConn.ApplyPreset(&spec)
 		if err != nil {
 			return nil, utils.Wrap(err, "uConn.ApplyPreset error")
+		}
+		if preset != nil && preset.applyState != nil {
+			if err := preset.applyState(uConn); err != nil {
+				return nil, utils.Wrap(err, "apply TLS fingerprint handshake state")
+			}
 		}
 		handshakeConn = uConn
 	} else {
