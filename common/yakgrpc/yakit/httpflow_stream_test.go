@@ -55,6 +55,7 @@ func TestHTTPFlowStreamRecorderPersistsBeforeEOF(t *testing.T) {
 	require.Equal(t, int64(200), initial.StatusCode)
 	require.Equal(t, "text/event-stream", initial.ContentType)
 	require.True(t, initial.IsReadTooSlowResponse)
+	require.True(t, initial.IsTooLargeResponse)
 	require.Equal(t, string(header), initial.GetResponse())
 
 	body := []byte("d\r\ndata: ready\n\n\r\n")
@@ -81,6 +82,8 @@ func TestHTTPFlowStreamRecorderPersistsBeforeEOF(t *testing.T) {
 	final, err := GetHTTPFlow(db, int64(recorder.FlowID()))
 	require.NoError(t, err)
 	require.Equal(t, int64(len(body)), final.BodyLength)
+	require.True(t, final.IsReadTooSlowResponse)
+	require.True(t, final.IsTooLargeResponse)
 	require.Equal(t, recorder.HeaderFile(), final.TooLargeResponseHeaderFile)
 	require.Equal(t, recorder.BodyFile(), final.TooLargeResponseBodyFile)
 
@@ -238,4 +241,69 @@ func TestHTTPFlowStreamRecorderInsertFailureDoesNotBreakCapture(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 	_, err = os.Stat(bodyFile)
 	require.True(t, os.IsNotExist(err))
+}
+
+func TestHTTPFlowStreamRecorderMarksTooLargeResponse(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&schema.HTTPFlow{}).Error)
+
+	requestRaw := lowhttp.FixHTTPRequest([]byte("GET /events HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+	req, err := lowhttp.ParseBytesToHttpRequest(requestRaw)
+	require.NoError(t, err)
+	httpctx.SetBareRequestBytes(req, requestRaw)
+	httpctx.SetPlainRequestBytes(req, requestRaw)
+	httpctx.SetRequestURL(req, "https://example.com/events")
+
+	header := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")
+	rsp := &http.Response{
+		StatusCode: 200,
+		Header: http.Header{
+			"Content-Type": []string{"text/event-stream"},
+		},
+		Request: req,
+	}
+	recorder, err := NewHTTPFlowStreamRecorder(db, true, req, rsp, header)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = recorder.Close()
+		_ = os.Remove(recorder.HeaderFile())
+		_ = os.Remove(recorder.BodyFile())
+	})
+
+	// The header-first insert must already mark IsTooLargeResponse so the
+	// frontend can show the "associated response body file" button before
+	// the stream reaches EOF.
+	initial, err := GetHTTPFlow(db, int64(recorder.FlowID()))
+	require.NoError(t, err)
+	require.True(t, initial.IsTooLargeResponse, "initial flow must mark IsTooLargeResponse before EOF")
+	require.True(t, initial.IsReadTooSlowResponse)
+
+	// httpctx must also be tagged so the ordinary mirror path can read the
+	// flag via GetResponseTooLarge.
+	require.True(t, httpctx.GetResponseTooLarge(req))
+
+	// Writing body data triggers updateProgress, which must persist
+	// is_too_large_response alongside the body length.
+	body := []byte("data: chunk1\n\n")
+	_, err = recorder.Write(body)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		flow, err := GetHTTPFlow(db, int64(recorder.FlowID()))
+		return err == nil && flow.BodyLength == int64(len(body)) && flow.IsTooLargeResponse
+	}, 2*time.Second, 50*time.Millisecond, "updateProgress must persist IsTooLargeResponse")
+
+	// Finalize must preserve IsTooLargeResponse on the final row.
+	finalFlow, err := CreateHTTPFlowFromHTTPWithNoRspSaved(true, req, "mitm", "https://example.com/events", "127.0.0.1:443")
+	require.NoError(t, err)
+	finalFlow.StatusCode = 200
+	finalFlow.ContentType = "text/event-stream"
+	require.NoError(t, recorder.Finalize(finalFlow))
+
+	final, err := GetHTTPFlow(db, int64(recorder.FlowID()))
+	require.NoError(t, err)
+	require.True(t, final.IsTooLargeResponse, "finalized flow must mark IsTooLargeResponse")
+	require.True(t, final.IsReadTooSlowResponse)
 }
