@@ -159,6 +159,7 @@ type http2ClientStream struct {
 	bodyStreamWriter    io.WriteCloser
 	bodyStreamOnce      sync.Once
 	bodyStreamCloseOnce sync.Once
+	bodyStreamDone      chan struct{}
 	headersHandled      bool
 	noBodyBuffer        bool
 }
@@ -191,8 +192,7 @@ func (s *http2ClientStream) handleHeadersDone() {
 
 	headerRaw := s.buildResponseHeaderRaw()
 	if s.option != nil && s.option.AutoDetectSSE {
-		headerLower := strings.ToLower(string(headerRaw))
-		if strings.Contains(headerLower, "content-type:") && strings.Contains(headerLower, "text/event-stream") {
+		if IsSSEContentTypeHeader(headerRaw) {
 			s.noBodyBuffer = true
 			if s.req != nil {
 				httpctx.SetNoBodyBuffer(s.req, true)
@@ -244,10 +244,16 @@ func (s *http2ClientStream) startBodyStreamHandler(headerRaw []byte) {
 	reader := s.bodyStreamReader
 	handler := s.option.BodyStreamReaderHandler
 	s.bodyStreamOnce.Do(func() {
+		if s.option.bodyStreamReaderHandled != nil {
+			s.option.bodyStreamReaderHandled.Set()
+		}
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
 					log.Errorf("BodyStreamReaderHandler panic in http2: %v", r)
+				}
+				if s.bodyStreamDone != nil {
+					close(s.bodyStreamDone)
 				}
 			}()
 			handler(headerCopy, reader)
@@ -261,6 +267,25 @@ func (s *http2ClientStream) closeBodyStreamWriter() {
 			_ = s.bodyStreamWriter.Close()
 		}
 	})
+}
+
+func (s *http2ClientStream) waitBodyStreamHandler() {
+	if s.bodyStreamDone == nil || s.option == nil || s.option.bodyStreamReaderHandled == nil || !s.option.bodyStreamReaderHandled.IsSet() {
+		return
+	}
+	select {
+	case <-s.bodyStreamDone:
+		return
+	case <-time.After(2 * time.Second):
+	}
+	if s.bodyStreamReader != nil {
+		_ = s.bodyStreamReader.Close()
+	}
+	select {
+	case <-s.bodyStreamDone:
+	case <-time.After(2 * time.Second):
+		log.Warn("stream handler wait timeout: http2 stream handler")
+	}
 }
 
 type http2ClientConnReadLoop struct {
@@ -474,6 +499,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 	cs.headersHandled = false
 	cs.bodyStreamOnce = sync.Once{}
 	cs.bodyStreamCloseOnce = sync.Once{}
+	cs.bodyStreamDone = nil
 	cs.bodyStreamReader = nil
 	cs.bodyStreamWriter = nil
 	cs.noBodyBuffer = false
@@ -483,6 +509,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 			reader, writer := utils.NewBufPipe(nil)
 			cs.bodyStreamReader = reader
 			cs.bodyStreamWriter = writer
+			cs.bodyStreamDone = make(chan struct{})
 		}
 	}
 
@@ -797,6 +824,8 @@ func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Dura
 			err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
 		}
 	}
+	cs.closeBodyStreamWriter()
+	cs.waitBodyStreamHandler()
 
 	cs.releaseSlot()
 
