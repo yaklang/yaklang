@@ -72,6 +72,7 @@ const (
 	FlagPanicTaggedPointer uint64 = 1 << 1
 	FlagFieldBool          uint64 = 1 << 2
 	FlagFieldString        uint64 = 1 << 3
+	FlagEllipsis           uint64 = 1 << 4
 )
 
 const (

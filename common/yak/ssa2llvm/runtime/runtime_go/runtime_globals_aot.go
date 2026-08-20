@@ -78,6 +78,36 @@ func runtimeBuiltinUUID() string {
 	return string(dst)
 }
 
+// runtimeBuiltinRetry mirrors yak's global retry(times, handler): call handler
+// up to times times; handler returning false (or panicking) stops the loop.
+func runtimeBuiltinRetry(maxTimes int, handler func() bool) {
+	for i := 0; i < maxTimes; i++ {
+		var ret bool
+		func() {
+			defer func() { _ = recover() }()
+			ret = handler()
+		}()
+		if !ret {
+			return
+		}
+	}
+}
+
+// runtimeBuiltinParam mirrors yak's global param(name, defaults...): read a
+// CLI/environment parameter. In AOT binaries parameters come from the
+// environment, with an optional default value.
+func runtimeBuiltinParam(name string, defaults ...string) any {
+	if name != "" {
+		if v, ok := os.LookupEnv(name); ok {
+			return v
+		}
+	}
+	if len(defaults) > 0 {
+		return defaults[0]
+	}
+	return nil
+}
+
 func registerRuntimeGlobals() {
 	runtimeRegisterYaklibGlobals(map[string]any{
 		"len":     runtimeYakBuiltinLen,
@@ -91,5 +121,7 @@ func registerRuntimeGlobals() {
 		"randstr": runtimeBuiltinRandstr,
 		"uuid":    runtimeBuiltinUUID,
 		"close":   runtimeBuiltinClose,
+		"retry":   runtimeBuiltinRetry,
+		"param":   runtimeBuiltinParam,
 	})
 }

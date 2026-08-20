@@ -8,7 +8,7 @@ import (
 	"unsafe"
 )
 
-func runtimeDispatchYaklibCall(args []uint64) (int64, error) {
+func runtimeDispatchYaklibCall(args []uint64, ellipsis bool) (int64, error) {
 	if len(args) < 2 {
 		return 0, fmt.Errorf("yaklib call expects module and method name")
 	}
@@ -21,7 +21,7 @@ func runtimeDispatchYaklibCall(args []uint64) (int64, error) {
 		}
 		return 0, fmt.Errorf("yaklib export %q.%q not found", pkg, method)
 	}
-	return callRuntimeValue(reflect.ValueOf(fn), args[2:])
+	return callRuntimeValue(reflect.ValueOf(fn), args[2:], ellipsis)
 }
 
 type runtimeIterSlot struct {
@@ -148,6 +148,12 @@ func newRuntimeIterator(value any, inNext bool) (runtimeIterator, error) {
 		}
 		v = v.Elem()
 	}
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil, fmt.Errorf("cannot iterate nil pointer")
+		}
+		v = v.Elem()
+	}
 	switch v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		limit := v.Int()
@@ -171,16 +177,22 @@ func newRuntimeIterator(value any, inNext bool) (runtimeIterator, error) {
 		}, nil
 	default:
 		// container.Set / container.LinkedList (and similar wrappers) expose
-		// ToSlice(); make them iterable like yakvm does.
-		if m := v.MethodByName("ToSlice"); m.IsValid() && m.Type().NumIn() == 0 && m.Type().NumOut() == 1 && m.Type().Out(0).Kind() == reflect.Slice {
-			res := m.Call(nil)
-			return &runtimeSliceIterator{value: res[0], inNext: inNext}, nil
+		// ToSlice(); make them iterable like yakvm does. Try the original
+		// receiver first (pointer methods) and the dereferenced value after.
+		for _, candidate := range []reflect.Value{reflect.ValueOf(value), v} {
+			if !candidate.IsValid() {
+				continue
+			}
+			if m := candidate.MethodByName("ToSlice"); m.IsValid() && m.Type().NumIn() == 0 && m.Type().NumOut() == 1 && m.Type().Out(0).Kind() == reflect.Slice {
+				res := m.Call(nil)
+				return &runtimeSliceIterator{value: res[0], inNext: inNext}, nil
+			}
 		}
 		return nil, fmt.Errorf("cannot iterate over %T", value)
 	}
 }
 
-func runtimeDispatchNext(args []uint64) (int64, error) {
+func runtimeDispatchNext(args []uint64, _ bool) (int64, error) {
 	if len(args) < 3 {
 		return 0, fmt.Errorf("runtime next expects iter, inNext, and next id")
 	}
@@ -217,7 +229,7 @@ func runtimeDispatchNext(args []uint64) (int64, error) {
 	return int64(uintptr(newRuntimeShadow(result))), nil
 }
 
-func runtimeDispatchChanRecv(args []uint64) (int64, error) {
+func runtimeDispatchChanRecv(args []uint64, _ bool) (int64, error) {
 	if len(args) < 1 {
 		return 0, fmt.Errorf("chan recv expects channel argument")
 	}
@@ -288,7 +300,7 @@ func runtimeMatchInContainer(left, right any) bool {
 	}
 }
 
-func runtimeDispatchIn(args []uint64) (int64, error) {
+func runtimeDispatchIn(args []uint64, _ bool) (int64, error) {
 	if len(args) < 2 {
 		return 0, fmt.Errorf("runtime in expects left and right operands")
 	}
@@ -367,7 +379,7 @@ func runtimeValuesEqual(left, right any) bool {
 	return false
 }
 
-func runtimeDispatchEq(args []uint64) (int64, error) {
+func runtimeDispatchEq(args []uint64, _ bool) (int64, error) {
 	if len(args) < 2 {
 		return 0, fmt.Errorf("runtime eq expects left and right operands")
 	}
@@ -396,7 +408,7 @@ func runtimeDecodeChannel(raw uint64) (reflect.Value, bool) {
 	return rv, true
 }
 
-func runtimeDispatchMakeChan(args []uint64) (int64, error) {
+func runtimeDispatchMakeChan(args []uint64, _ bool) (int64, error) {
 	size := 0
 	if len(args) > 0 {
 		size = int(int64(args[0]))
@@ -408,7 +420,7 @@ func runtimeDispatchMakeChan(args []uint64) (int64, error) {
 	return int64(uintptr(newRuntimeShadow(ch))), nil
 }
 
-func runtimeDispatchChanSend(args []uint64) (int64, error) {
+func runtimeDispatchChanSend(args []uint64, _ bool) (int64, error) {
 	if len(args) < 2 {
 		return 0, fmt.Errorf("chan send expects channel and value")
 	}
