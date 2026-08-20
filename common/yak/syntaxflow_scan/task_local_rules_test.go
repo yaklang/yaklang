@@ -8,8 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -141,6 +145,57 @@ func TestParseTaskLocalSyntaxFlowRulesFailsClosedOnInvalidRule(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected invalid task-local rule to fail closed")
 	}
+}
+
+func TestTaskLocalRuleUsesContentAlertsWhenBundleOmitsDerivedAlertMetadata(t *testing.T) {
+	const ruleName = "snapshot-marker.sf"
+	rules, _, err := parseTaskLocalSyntaxFlowRulesWithMetadata(
+		[]*ypb.SyntaxFlowRuleInput{{
+			RuleName: ruleName,
+			Language: "java",
+			Content: `desc(title: "Snapshot marker", type: vuln, level: low)
+wmllhfUniqueMarker() as $sink;
+alert $sink for {
+  title: "Snapshot marker",
+  level: "low",
+  risk: "snapshot-marker",
+  name: "snapshot-marker",
+}`,
+		}},
+		map[string]ssaconfig.TaskLocalRuleMetadata{
+			ruleName: {
+				AssetID:  "asset-snapshot-marker",
+				Title:    "Snapshot marker",
+				Language: "java",
+				Purpose:  "vuln",
+				Severity: "low",
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, rules, 1)
+	require.Contains(t, rules[0].AlertDesc, "sink",
+		"alert metadata derived from canonical rule content must survive when the bundle omits the redundant projection")
+
+	programName := "task-local-snapshot-alert-test-" + uuid.NewString()
+	program, err := ssaapi.Parse(`public class WmllhfUniqueFixture {
+    private static void wmllhfUniqueMarker() {}
+    public static void run() { wmllhfUniqueMarker(); }
+}`,
+		ssaapi.WithLanguage(ssaconfig.JAVA),
+		ssaapi.WithProgramName(programName),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, program)
+	t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), programName) })
+
+	result, err := program.SyntaxFlowRule(rules[0], ssaapi.QueryWithMemory())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.GetAlertValue("sink"), 1,
+		"canonical rule content must still match the unique source marker")
+	require.Equal(t, 1, result.RiskCount(),
+		"task-local snapshot execution must materialize risks declared by canonical rule content")
 }
 
 func TestRuleInputResultKindPreservesOrdinaryDebugSemantics(t *testing.T) {
