@@ -582,39 +582,15 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 				retVal = c.coerceToInt64(closure)
 			}
 		}
-		// Apply the closure's return side effects: writes to captured
-		// variables must go through the by-reference free-value slots so
-		// mutable state persists across calls (counter factories, i++ in
-		// per-iteration loop closures).
-		if fn := inst.GetFunc(); fn != nil && c.function != nil && c.function.freeValuePointers != nil {
-			for _, ser := range fn.SideEffectsReturn {
-				for variable, se := range ser {
-					if variable == nil || se == nil || se.Modify <= 0 {
-						continue
-					}
-					for _, binding := range callframe.OrderedFreeValueBindings(fn) {
-						paramDefault := int64(0)
-						if p, ok := fn.GetValueById(binding.ValueID); ok {
-							if param, ok := ssa.ToParameter(p); ok && param != nil && param.GetDefault() != nil {
-								paramDefault = param.GetDefault().GetId()
-							}
-						}
-						if paramDefault != se.Modify && binding.Variable.GetValue().GetId() != se.Modify {
-							continue
-						}
-						ptr, ok := c.function.freeValuePointers[binding.ValueID]
-						if !ok || ptr.IsNil() {
-							continue
-						}
-						modifyVal, err := c.getValue(inst, se.Modify)
-						if err != nil {
-							continue
-						}
-						c.Builder.CreateStore(c.coerceToInt64(modifyVal), ptr)
-						break
-					}
-				}
-			}
+	}
+	// Apply the closure's return side effects: writes to captured variables
+	// must go through the by-reference free-value slots so mutable state
+	// persists across calls (counter factories, i++ in per-iteration loop
+	// closures). This must also run for implicit exits (functions without an
+	// explicit ret), so closures like `func() { count += 1 }` still write back.
+	if fn := inst.GetFunc(); fn != nil {
+		if err := c.applyClosureSideEffectWriteback(fn, inst); err != nil {
+			return err
 		}
 	}
 	if err := c.storeContextReturn(retVal); err != nil {
@@ -633,6 +609,45 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	}
 
 	c.Builder.CreateRetVoid()
+	return nil
+}
+
+// applyClosureSideEffectWriteback stores the closure's modified captured
+// variables back into their by-reference free-value slots. It is shared by
+// explicit returns and implicit function exits so mutable captures persist
+// across calls even when the closure body has no ret statement.
+func (c *Compiler) applyClosureSideEffectWriteback(fn *ssa.Function, contextInst ssa.Instruction) error {
+	if fn == nil || c.function == nil || c.function.freeValuePointers == nil {
+		return nil
+	}
+	for _, ser := range fn.SideEffectsReturn {
+		for variable, se := range ser {
+			if variable == nil || se == nil || se.Modify <= 0 {
+				continue
+			}
+			for _, binding := range callframe.OrderedFreeValueBindings(fn) {
+				paramDefault := int64(0)
+				if p, ok := fn.GetValueById(binding.ValueID); ok {
+					if param, ok := ssa.ToParameter(p); ok && param != nil && param.GetDefault() != nil {
+						paramDefault = param.GetDefault().GetId()
+					}
+				}
+				if paramDefault != se.Modify && binding.Variable.GetValue().GetId() != se.Modify {
+					continue
+				}
+				ptr, ok := c.function.freeValuePointers[binding.ValueID]
+				if !ok || ptr.IsNil() {
+					continue
+				}
+				modifyVal, err := c.getValue(contextInst, se.Modify)
+				if err != nil {
+					continue
+				}
+				c.Builder.CreateStore(c.coerceToInt64(modifyVal), ptr)
+				break
+			}
+		}
+	}
 	return nil
 }
 

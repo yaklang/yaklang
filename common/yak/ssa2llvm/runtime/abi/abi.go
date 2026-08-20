@@ -61,6 +61,9 @@ const (
 	RuntimeInvokeVMSymbol       = "yak_runtime_invoke_vm"
 	RuntimeTestAdd1CtxSymbol    = "yak_runtime_test_add1_ctx"
 	RuntimeConcatSymbol         = "yak_runtime_concat"
+	RuntimeReadClosureFreeValueSymbol = "yak_runtime_read_closure_free_value"
+	RuntimeStringSliceSymbol       = "yak_runtime_string_slice"
+	RuntimeDropErrorSymbol         = "yak_runtime_drop_error"
 
 	// Compiler renames clashing user main/@main (not part of linkprep manifest).
 	InternalAtMainSymbol = "yak_internal_atmain"

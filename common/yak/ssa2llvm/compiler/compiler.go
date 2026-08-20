@@ -373,6 +373,14 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				hasTerminator = true
 				break
 			}
+			// A non-terminator instruction may still terminate its block
+			// (e.g. die/fail lowered to a context-panic branch). Stop so
+			// trailing dead instructions (the next Jump) are not emitted
+			// after the terminator.
+			if bb, ok := c.Blocks[blockID]; ok && !bb.IsNil() && c.blockHasTerminator(bb) {
+				hasTerminator = true
+				break
+			}
 		}
 
 		// Add terminator based on block structure if not already present

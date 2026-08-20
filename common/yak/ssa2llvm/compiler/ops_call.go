@@ -165,6 +165,15 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 				if err != nil {
 					return err
 				}
+				// Remember the materialized closure so SideEffect instructions
+				// after the call can read captured variables back from its
+				// free-value slots (e.g. `f(); count` where f mutates count).
+				if c.function != nil {
+					if c.function.materializedClosures == nil {
+						c.function.materializedClosures = make(map[int64]llvm.Value)
+					}
+					c.function.materializedClosures[inst.GetId()] = closure
+				}
 				spec := contextCallSpec{
 					inst:      inst,
 					kind:      abi.KindCallable,

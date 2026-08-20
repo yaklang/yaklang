@@ -27,6 +27,10 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 		return c.compileMakeGeneric(inst)
 	case ssa.SliceTypeKind, ssa.BytesTypeKind:
 		return c.compileMakeSlice(inst, typ)
+	case ssa.StringTypeKind:
+		// String slicing (s[low:high]) carries the parent string and rune
+		// bounds; plain string constants never go through Make.
+		return c.compileMakeStringSlice(inst)
 	case ssa.MapTypeKind:
 		return c.compileMakeGeneric(inst)
 	case ssa.ChanTypeKind:
@@ -36,6 +40,53 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 		c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 		return nil
 	}
+}
+
+// compileMakeStringSlice lowers s[low:high] where s is a yak string. Bounds
+// are rune indices (len(str) == len([]rune(str))), so slicing must operate on
+// runes, not bytes.
+func (c *Compiler) compileMakeStringSlice(inst *ssa.Make) error {
+	i64 := c.LLVMCtx.Int64Type()
+	parentVal := llvm.ConstInt(i64, 0, false)
+	if parentID := inst.GetParent(); parentID > 0 {
+		val, err := c.getValue(inst, parentID)
+		if err != nil {
+			return err
+		}
+		parentVal = c.coerceToInt64(val)
+	}
+	low := llvm.ConstInt(i64, 0, false)
+	if lowID := inst.GetLow(); lowID > 0 {
+		val, err := c.getValue(inst, lowID)
+		if err != nil {
+			return err
+		}
+		low = c.coerceToInt64(val)
+	}
+	high := llvm.ConstInt(i64, ^uint64(0), false) // -1: slice to end
+	if highID := inst.GetHigh(); highID > 0 {
+		val, err := c.getValue(inst, highID)
+		if err != nil {
+			return err
+		}
+		high = c.coerceToInt64(val)
+	}
+	fn, fnType := c.getOrInsertRuntimeStringSlice()
+	val := c.Builder.CreateCall(fnType, fn, []llvm.Value{parentVal, low, high}, fmt.Sprintf("string_slice_%d", inst.GetId()))
+	val = c.coerceToInt64(val)
+	c.cacheValue(inst.GetId(), val)
+	return nil
+}
+
+func (c *Compiler) getOrInsertRuntimeStringSlice() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeStringSliceSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
 }
 
 func (c *Compiler) compileMakeChan(inst *ssa.Make) error {
@@ -577,6 +628,23 @@ func (c *Compiler) coerceToInt64(val llvm.Value) llvm.Value {
 		return c.Builder.CreateSExt(val, c.LLVMCtx.Int64Type(), "val_i64")
 	}
 	return c.Builder.CreatePtrToInt(val, c.LLVMCtx.Int64Type(), "ptr_i64")
+}
+
+func (c *Compiler) emitRuntimeDropError(ret llvm.Value) llvm.Value {
+	fn, fnType := c.getOrInsertRuntimeDropError()
+	objPtr := c.coerceToI8Ptr(ret)
+	return c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr}, "drop_error")
+}
+
+func (c *Compiler) getOrInsertRuntimeDropError() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeDropErrorSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(c.LLVMCtx.Int64Type(), []llvm.Type{i8Ptr}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
 }
 
 func (c *Compiler) emitRuntimeGetField(objVal llvm.Value, keyStr string, id int64) llvm.Value {
