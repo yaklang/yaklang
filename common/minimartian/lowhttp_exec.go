@@ -315,8 +315,10 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 // size or time threshold is exceeded.
 //
 // When p.streamRecorder is set, an optional best-effort recorder is created
-// to persist body chunks to a spill file for history/audit. Recorder write
-// errors never break or delay forwarding.
+// to persist body chunks to a spill file for history/audit. The recorder is
+// only created for SSE responses (see the kind == streamKindSSE guard below):
+// SSE disables body buffering, so the spill file is the only way to persist
+// the long-lived body. Recorder write errors never break or delay forwarding.
 func (p *Proxy) makeStreamResponseCallback(
 	isHTTPS bool,
 	req *http.Request,
@@ -344,6 +346,23 @@ func (p *Proxy) makeStreamResponseCallback(
 		// Create an optional best-effort recorder for incremental persistence.
 		// The recorder is set up before the trigger fires so the goroutine
 		// can tee body chunks into it.
+		//
+		// Only SSE responses need a recorder: SSE sets NoBodyBuffer so the
+		// response builder never buffers the long-lived body, and the only
+		// way to persist it for history/audit is the spill file the recorder
+		// writes incrementally. The recorder also marks the flow as
+		// read-too-slow so History/API reconstruct the response from the
+		// spill file instead of the (empty) DB body.
+		//
+		// Filtered and chunked/large responses do NOT set NoBodyBuffer, so
+		// the response builder still buffers the full body and the ordinary
+		// mirror path persists it. Creating a recorder for them would
+		// unconditionally mark the flow read-too-slow and attach spill files
+		// even when the body is smaller than MaxContentLength (e.g. a chunked
+		// 4 MB response under a 5 MB limit), which is incorrect. The
+		// too-large decision for those kinds stays with the response builder,
+		// which judges by the actual body size — matching the pre-SSE
+		// behavior.
 		var recorder io.WriteCloser
 		var closeOnce sync.Once
 		closeRecorder := func() {
@@ -355,7 +374,7 @@ func (p *Proxy) makeStreamResponseCallback(
 				}
 			})
 		}
-		if p.streamRecorder != nil {
+		if kind == streamKindSSE && p.streamRecorder != nil {
 			recorderRsp, err := utils.ReadHTTPResponseFromBytes(headerBytes, nil)
 			if err != nil {
 				log.Warnf("mitm: parse response header for recorder failed: %v", err)
