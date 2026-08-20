@@ -216,6 +216,56 @@ func PrepareLargeHTTPFlowRequest(req *http.Request, fullPacket []byte) []byte {
 	return res.StoredPacket
 }
 
+// RefreshPreparedLargeHTTPFlowRequest replaces the request-scoped spill with a
+// snapshot of the packet that will actually be sent upstream. Manual hijack can
+// rebuild an oversized skeleton with edited headers or replacement file bytes;
+// keeping the first spill in the request context would make HTTP History point
+// at the pre-edit sidecar instead of the wire request.
+//
+// The old spill is removed only after the new packet has been prepared
+// successfully, so a failed refresh leaves the existing snapshot usable.
+func RefreshPreparedLargeHTTPFlowRequest(req *http.Request, fullPacket []byte) ([]byte, error) {
+	if req == nil || len(fullPacket) == 0 {
+		return fullPacket, nil
+	}
+
+	res, err := spillLargeHTTPFlowRequestIfNeeded(fullPacket)
+	if err != nil {
+		return nil, err
+	}
+
+	oldHeaderFile := httpctx.GetRequestTooLargeHeaderFile(req)
+	oldBodyFile := httpctx.GetRequestTooLargeBodyFile(req)
+
+	httpctx.SetRequestTooLarge(req, res.IsTooLarge)
+	httpctx.SetRequestTooLargeHeaderFile(req, res.HeaderFile)
+	httpctx.SetRequestTooLargeBodyFile(req, res.BodyFile)
+	httpctx.SetRequestTooLargeSize(req, int64(res.OriginalBodyLen))
+	if res.IsTooLarge {
+		httpctx.SetRequestDisplayPacket(req, res.StoredPacket)
+	} else {
+		// Keep the complete, below-threshold packet only in the normal modified
+		// request slot. The display cache exists solely for spill skeletons.
+		httpctx.SetRequestDisplayPacket(req, nil)
+	}
+
+	removeLargeRequestSpillFiles(oldHeaderFile, oldBodyFile)
+	return res.StoredPacket, nil
+}
+
+func removeLargeRequestSpillFiles(headerFile, bodyFile string) {
+	cleanupMultipartSidecar(bodyFile)
+	if bodyFile != "" {
+		// For multipart spills cleanupMultipartSidecar already removed the
+		// containing directory; Remove is harmless in that case. Flat spills
+		// need the body file removed directly.
+		_ = os.Remove(bodyFile)
+	}
+	if headerFile != "" {
+		_ = os.Remove(headerFile)
+	}
+}
+
 func applyPreparedLargeRequestSpill(reqIns *http.Request, reqRaw []byte) (stored []byte, isTooLarge bool, headerFile, bodyFile string, bodyLen int, err error) {
 	stored = reqRaw
 	if reqIns != nil && httpctx.GetRequestTooLarge(reqIns) {

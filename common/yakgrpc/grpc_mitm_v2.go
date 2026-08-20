@@ -1572,6 +1572,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 							notifyLargeRequestReplacementError(err)
 							continue
 						}
+						if _, err := yakit.RefreshPreparedLargeHTTPFlowRequest(originReqIns, current); err != nil {
+							notifyLargeRequestReplacementError(utils.Wrap(err, "refresh replaced request spill"))
+							continue
+						}
 						if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
 							if encoded, ok := lowhttp.AutoZipPacketEncoding(current, st); ok {
 								current = encoded
@@ -1604,6 +1608,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					if !requestModified && !largeRequestReplacements.hasCompleted() {
 						return req
 					}
+					largeRequestRebuilt := false
 					if yakit.IsMultipartSpillRequestPacket(current) {
 						rebuilt, err := rebuildMultipartRequest(current)
 						if err != nil {
@@ -1611,6 +1616,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 							continue
 						}
 						current = rebuilt
+						largeRequestRebuilt = true
 					} else if yakit.IsFlatSpillRequestPacket(current) {
 						rebuilt, err := rebuildFlatRequest(current)
 						if err != nil {
@@ -1618,9 +1624,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 							continue
 						}
 						current = rebuilt
+						largeRequestRebuilt = true
 					} else if largeRequestReplacements.hasCompleted() {
 						notifyLargeRequestReplacementError(utils.Error("large request replacement marker was removed from the edited request"))
 						continue
+					}
+					if largeRequestRebuilt {
+						if _, err := yakit.RefreshPreparedLargeHTTPFlowRequest(originReqIns, current); err != nil {
+							notifyLargeRequestReplacementError(utils.Wrap(err, "refresh edited request spill"))
+							continue
+						}
 					}
 
 					if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
