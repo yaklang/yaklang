@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
-type runtimeDispatchFunc func(args []uint64) (int64, error)
+type runtimeDispatchFunc func(args []uint64, ellipsis bool) (int64, error)
 
 // runtimeDispatchTargets holds minimal runtime builtins that are not registered
 // via yaklib module imports (print/append). All other stdlib calls use IDYaklibCall.
@@ -48,13 +48,14 @@ func executeRuntimeDispatch(ctx unsafe.Pointer) {
 		return
 	}
 
+	flags := ctxLoadWord(ctx, abi.WordFlags)
 	args := ctxArgsSlice(ctx, argc)
-	ctxSetRet(ctx, dispatchRuntimeCall(abi.FuncID(int64(ctxLoadWord(ctx, abi.WordTarget))), args))
+	ctxSetRet(ctx, dispatchRuntimeCall(abi.FuncID(int64(ctxLoadWord(ctx, abi.WordTarget))), args, flags&abi.FlagEllipsis != 0))
 }
 
-func dispatchRuntimeCall(id abi.FuncID, args []uint64) int64 {
+func dispatchRuntimeCall(id abi.FuncID, args []uint64, ellipsis bool) int64 {
 	if handler, ok := runtimeDispatchHandlers[id]; ok && handler != nil {
-		ret, err := handler(args)
+		ret, err := handler(args, ellipsis)
 		if err != nil {
 			panic(err)
 		}
@@ -76,5 +77,5 @@ func callRuntimeFunction(fn any, rawArgs []uint64) (int64, error) {
 	if !value.IsValid() || value.Kind() != reflect.Func {
 		return 0, fmt.Errorf("invalid runtime dispatch target %T", fn)
 	}
-	return callRuntimeValue(value, rawArgs)
+	return callRuntimeValue(value, rawArgs, false)
 }

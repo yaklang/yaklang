@@ -23,7 +23,20 @@ func runtimeYakBuiltinLen(v any) int {
 	if s, ok := v.(string); ok {
 		return utf8.RuneCountInString(s)
 	}
-	return reflect.ValueOf(v).Len()
+	rv := reflect.ValueOf(v)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return 0
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return 0
+		}
+		rv = rv.Elem()
+	}
+	return rv.Len()
 }
 
 func runtimeYakBuiltinCap(v any) int {
@@ -33,5 +46,18 @@ func runtimeYakBuiltinCap(v any) int {
 	if canCap, ok := v.(runtimeYakCapper); ok {
 		return canCap.Cap()
 	}
-	return reflect.ValueOf(v).Cap()
+	rv := reflect.ValueOf(v)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return 0
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return 0
+		}
+		rv = rv.Elem()
+	}
+	return rv.Cap()
 }
