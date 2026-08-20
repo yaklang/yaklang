@@ -27,7 +27,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/contextmenu"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	staticresult "github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -305,14 +308,39 @@ func isYakScriptNameDuplicateErr(err error) bool {
 
 func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb.YakScript, error) {
 	switch script.Type {
-	case "yak", "mitm", "port-scan":
+	case "yak", "mitm", "port-scan", contextmenu.PluginType:
 		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
 		if err != nil {
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
 		}
 	}
+	if script.Type == contextmenu.PluginType {
+		for _, analyzeResult := range static_analyzer.StaticAnalyze(script.GetContent(), contextmenu.PluginType, static_analyzer.Analyze) {
+			if analyzeResult.Severity == staticresult.Error {
+				return nil, utils.Errorf("save context-menu plugin failed: %s", analyzeResult.Message)
+			}
+		}
+	}
 
 	toSave := GRPCYakScriptToYakitScript(script)
+	if script.Type == contextmenu.PluginType {
+		// Plugin UUID is the stable identity used by local bindings. Preserve it
+		// across edits and create one when an old or new plugin has none.
+		toSave.Uuid = strings.TrimSpace(script.GetUUID())
+		if script.GetId() > 0 {
+			if existing, err := yakit.GetYakScript(s.GetProfileDatabase(), script.GetId()); err == nil {
+				if existing.Uuid != "" {
+					toSave.Uuid = existing.Uuid
+				}
+				// Editing a core plugin must not silently demote it and thereby
+				// bypass the server-side disable/delete protection.
+				toSave.IsCorePlugin = existing.IsCorePlugin
+			}
+		}
+		if toSave.Uuid == "" {
+			toSave.Uuid = uuid.NewString()
+		}
+	}
 	completeYakScriptAIFieldsOnSave(ctx, s.GetProfileDatabase(), script.GetId(), toSave)
 
 	err := yakit.CreateOrUpdateYakScriptByID(s.GetProfileDatabase(), script.GetId(), toSave)
@@ -521,6 +549,8 @@ func typeToDirname(s string) string {
 		return "yak_module"
 	case "codec":
 		return "yak_codec"
+	case contextmenu.PluginType:
+		return "yak_context_menu"
 	case "packet-hack":
 		return "yak_packet"
 	case "port-scan":
@@ -990,6 +1020,16 @@ func (s *Server) SaveNewYakScript(ctx context.Context, request *ypb.SaveNewYakSc
 	script := LegacyGRPCSaveNewYakScriptRequestGetYakScript(request)
 	if script.Type == "nuclei" {
 		script.Params = buildinNucleiYakScriptParam
+	}
+	if script.Type == contextmenu.PluginType {
+		script.ScriptName = strings.TrimSpace(script.ScriptName)
+		isUpdate := script.Id > 0
+		data, err := s.SaveYakScript(ctx, script)
+		if err != nil {
+			return nil, err
+		}
+		data.IsUpdate = isUpdate
+		return data, nil
 	}
 	switch script.Type {
 	case "yak", "mitm", "port-scan":

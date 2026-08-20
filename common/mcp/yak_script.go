@@ -20,7 +20,7 @@ var filterYakScriptToolOptions = []mcp.ToolOption{
 		mcp.Description(`Pagination settings for the query`)),
 	mcp.WithString("type",
 		mcp.Description("Script type"),
-		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
+		mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan", "context-menu"),
 	),
 	mcp.WithString("keyword",
 		mcp.Description("Keyword search in script content/name"),
@@ -56,7 +56,7 @@ var filterOnlinePluginToolOptions = []mcp.ToolOption{
 	mcp.WithStringArray("scriptName"),
 	mcp.WithStringArray("pluginType",
 		mcp.Description("Script type"),
-		mcp.ItemsEnum("yak", "codec", "mitm", "nuclei", "port-scan"),
+		mcp.ItemsEnum("yak", "codec", "mitm", "nuclei", "port-scan", "context-menu"),
 	),
 	mcp.WithStringArray("tags",
 		mcp.Description("Tags associated with the scripts"),
@@ -66,7 +66,7 @@ var filterOnlinePluginToolOptions = []mcp.ToolOption{
 	),
 	mcp.WithStringArray("excludeTypes",
 		mcp.Description("Script types to exclude from the query"),
-		mcp.ItemsEnum("yak", "codec", "mitm", "nuclei", "port-scan"),
+		mcp.ItemsEnum("yak", "codec", "mitm", "nuclei", "port-scan", "context-menu"),
 	),
 	mcp.WithString("group",
 		mcp.Description("Script Group"),
@@ -87,7 +87,7 @@ func init() {
 			mcp.WithString("pluginType",
 				mcp.Description("The type of the yak script"),
 				mcp.Required(),
-				mcp.Enum("yak", "mitm", "port-scan", "codec", "syntaxflow"),
+				mcp.Enum("yak", "mitm", "port-scan", "codec", "context-menu", "syntaxflow"),
 			),
 		), handleStaticAnalyzeYakScript),
 
@@ -115,14 +115,14 @@ func init() {
 		), handleExecYakScript),
 
 		WithTool(mcp.NewTool("save_yak_script",
-			mcp.WithDescription("Create or update a local Yakit plugin (YakScript). Runs yaklang engine static analysis first for yak/mitm/port-scan/codec; blocking Error results refuse save and return readable issues for the AI to fix. Prefer: write code → static_analyze_yak_script → save_yak_script. Pass id>0 to update; omit id (or 0) to create."),
+			mcp.WithDescription("Create or update a local Yakit plugin (YakScript). Runs yaklang engine static analysis first for yak/mitm/port-scan/codec/context-menu; blocking Error results refuse save and return readable issues for the AI to fix. Prefer: write code → static_analyze_yak_script → save_yak_script. Pass id>0 to update; omit id (or 0) to create."),
 			mcp.WithString("scriptName",
 				mcp.Description("Plugin name (unique). Required."),
 				mcp.Required(),
 			),
 			mcp.WithString("type",
 				mcp.Description("Plugin type"),
-				mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan"),
+				mcp.Enum("yak", "codec", "mitm", "nuclei", "port-scan", "context-menu"),
 				mcp.Required(),
 			),
 			mcp.WithString("content",
@@ -287,7 +287,7 @@ func handleSaveYakScript(s *MCPServer) server.ToolHandlerFunc {
 		skipAnalyze := utils.MapGetBool(args, "skipStaticAnalyze")
 		if !skipAnalyze {
 			switch strings.TrimSpace(req.GetType()) {
-			case "yak", "mitm", "port-scan", "codec":
+			case "yak", "mitm", "port-scan", "codec", "context-menu":
 				analysis, err := analyzeYakScriptForAI(ctx, s, req.GetContent(), req.GetType())
 				if err != nil {
 					return nil, utils.Wrap(err, "failed to static analyze before save")

@@ -204,7 +204,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	}
 	// static analyze
 	if slices.Contains([]string{
-		schema.SCRIPT_TYPE_MITM, schema.SCRIPT_TYPE_PORT_SCAN, schema.SCRIPT_TYPE_CODEC, schema.SCRIPT_TYPE_YAK,
+		schema.SCRIPT_TYPE_MITM, schema.SCRIPT_TYPE_PORT_SCAN, schema.SCRIPT_TYPE_CODEC, schema.SCRIPT_TYPE_CONTEXT_MENU, schema.SCRIPT_TYPE_YAK,
 	}, pluginType) {
 		staticResults := yak.StaticAnalyze(pluginCode,
 			yak.WithStaticAnalyzePluginType(pluginType),

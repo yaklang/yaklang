@@ -10,12 +10,13 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/yaklang/gorm"
 	"github.com/segmentio/ksuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/contextmenu"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -45,6 +46,43 @@ func normalizeYakScriptUpsertData(script *schema.YakScript) map[string]interface
 		return nil
 	}
 	return script.ToUpdateMap()
+}
+
+func preserveCoreContextMenuFields(query *gorm.DB, script *schema.YakScript) {
+	if query == nil || script == nil {
+		return
+	}
+	var existing schema.YakScript
+	if err := query.Where("type IN (?) AND is_core_plugin = ?", []string{
+		schema.SCRIPT_TYPE_CONTEXT_MENU,
+		schema.SCRIPT_TYPE_CODEC,
+	}, true).First(&existing).Error; err != nil {
+		return
+	}
+	if existing.Type == schema.SCRIPT_TYPE_CODEC && len(contextmenu.LegacyActionsForTags(existing.Tags)) == 0 {
+		return
+	}
+	script.Type = existing.Type
+	script.IsCorePlugin = true
+	if existing.Uuid != "" {
+		script.Uuid = existing.Uuid
+	}
+	if existing.Type == schema.SCRIPT_TYPE_CODEC {
+		for _, tag := range []string{
+			contextmenu.LegacyTagHistorySingle,
+			contextmenu.LegacyTagHistoryMulti,
+			contextmenu.LegacyTagPacketContext,
+			contextmenu.LegacyTagPacketMutate,
+		} {
+			if contextmenu.HasTag(existing.Tags, tag) && !contextmenu.HasTag(script.Tags, tag) {
+				if strings.TrimSpace(script.Tags) == "" {
+					script.Tags = tag
+				} else {
+					script.Tags += "," + tag
+				}
+			}
+		}
+	}
 }
 
 func setYakScriptCreateField(script *schema.YakScript, field string, value interface{}) {
@@ -93,6 +131,7 @@ func CreateOrUpdateYakScriptByID(db *gorm.DB, id int64, script *schema.YakScript
 
 	db = db.Model(&schema.YakScript{})
 	setYakScriptCreateField(script, "id", id)
+	preserveCoreContextMenuFields(db.Where("id = ?", id), script)
 	if db := db.Where("id = ?", id).
 		Assign(normalizeYakScriptUpsertData(script)).
 		FirstOrCreate(script); db.Error != nil {
@@ -108,9 +147,11 @@ func DeleteYakScriptByOnlineId(db *gorm.DB, onlineId int64) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&schema.YakScript{}).Where(
-		"online_id = ?", onlineId,
-	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+	query := db.Model(&schema.YakScript{}).Where("online_id = ?", onlineId)
+	if err := rejectCoreContextMenuDeletion(query); err != nil {
+		return err
+	}
+	if db := query.Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -155,6 +196,7 @@ func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, script *schem
 	// 锁住更新步骤，太快容易整体被锁
 	yakScriptOpLock.Lock()
 	setYakScriptCreateField(script, "script_name", scriptName)
+	preserveCoreContextMenuFields(db.Where("script_name = ?", scriptName), script)
 	if db := db.Where("script_name = ?", scriptName).
 		Assign(normalizeYakScriptUpsertData(script)).
 		FirstOrCreate(script); db.Error != nil {
@@ -334,8 +376,11 @@ func DeleteYakScriptByIDs(db *gorm.DB, ids ...int64) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
-	if db := db.Model(&schema.YakScript{}).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+	query := bizhelper.ExactQueryInt64ArrayOr(db.Model(&schema.YakScript{}), "id", ids)
+	if err := rejectCoreContextMenuDeletion(query); err != nil {
+		return err
+	}
+	if db := query.Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -345,9 +390,11 @@ func DeleteYakScriptByName(db *gorm.DB, s string) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&schema.YakScript{}).Where(
-		"script_name = ?", s,
-	).Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+	query := db.Model(&schema.YakScript{}).Where("script_name = ?", s)
+	if err := rejectCoreContextMenuDeletion(query); err != nil {
+		return err
+	}
+	if db := query.Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
 	return nil
@@ -357,6 +404,9 @@ func DeleteYakScriptByNames(DB *gorm.DB, s []string) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 	db := bizhelper.ExactQueryStringArrayOr(DB.Model(&schema.YakScript{}), "script_name", s)
+	if err := rejectCoreContextMenuDeletion(db); err != nil {
+		return err
+	}
 	if db = db.Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
 	}
@@ -375,6 +425,9 @@ func DeleteYakScriptByUserID(db *gorm.DB, s int64, onlineBaseUrl string) error {
 	)
 	if onlineBaseUrl != "" {
 		db = db.Where("online_base_url = ?", onlineBaseUrl)
+	}
+	if err := rejectCoreContextMenuDeletion(db); err != nil {
+		return err
 	}
 	db = db.Unscoped().Delete(&schema.YakScript{})
 	if db.Error != nil {
@@ -732,10 +785,31 @@ func DeleteYakScriptByNameOrUUID(db *gorm.DB, name, uuid string) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
-	if db := db.Model(&schema.YakScript{}).Where(
+	query := db.Model(&schema.YakScript{}).Where(
 		"script_name = ? or uuid = ?", name, uuid,
-	).Where("skip_update = false").Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
+	).Where("skip_update = false")
+	if err := rejectCoreContextMenuDeletion(query); err != nil {
+		return err
+	}
+	if db := query.Unscoped().Delete(&schema.YakScript{}); db.Error != nil {
 		return db.Error
+	}
+	return nil
+}
+
+func rejectCoreContextMenuDeletion(query *gorm.DB) error {
+	var scripts []*schema.YakScript
+	result := query.Where("type IN (?) AND is_core_plugin = ?", []string{
+		schema.SCRIPT_TYPE_CONTEXT_MENU,
+		schema.SCRIPT_TYPE_CODEC,
+	}, true).Find(&scripts)
+	if result.Error != nil {
+		return result.Error
+	}
+	for _, script := range scripts {
+		if script.Type == schema.SCRIPT_TYPE_CONTEXT_MENU || len(contextmenu.LegacyActionsForTags(script.Tags)) > 0 {
+			return utils.Error("core context-menu plugins cannot be deleted")
+		}
 	}
 	return nil
 }
@@ -749,6 +823,7 @@ func CreateOrSkipUpdateYakScriptByName(db *gorm.DB, scriptName string, script *s
 	// 锁住更新步骤，太快容易整体被锁
 	yakScriptOpLock.Lock()
 	setYakScriptCreateField(script, "script_name", scriptName)
+	preserveCoreContextMenuFields(db.Where("script_name = ?", scriptName), script)
 	if db := db.Where("script_name = ?", scriptName).
 		Where("COALESCE(skip_update, false) = false").
 		Assign(normalizeYakScriptUpsertData(script)).

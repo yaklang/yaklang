@@ -11,11 +11,12 @@ import (
 type PluginType string
 
 const (
-	// plugin type : "yak" "mitm" "port-scan" "codec"
-	PluginTypeYak      PluginType = "yak"
-	PluginTypeMitm     PluginType = "mitm"
-	PluginTypePortScan PluginType = "port-scan"
-	PluginTypeCodec    PluginType = "codec"
+	// plugin type : "yak" "mitm" "port-scan" "codec" "context-menu"
+	PluginTypeYak         PluginType = "yak"
+	PluginTypeMitm        PluginType = "mitm"
+	PluginTypePortScan    PluginType = "port-scan"
+	PluginTypeCodec       PluginType = "codec"
+	PluginTypeContextMenu PluginType = "context-menu"
 )
 
 func ToPluginType(plugin string) PluginType {
@@ -28,6 +29,8 @@ func ToPluginType(plugin string) PluginType {
 		return PluginTypePortScan
 	case "codec":
 		return PluginTypeCodec
+	case "context-menu":
+		return PluginTypeContextMenu
 	default:
 		log.Errorf("unknown plugin type: %s", plugin)
 		return PluginTypeYak
