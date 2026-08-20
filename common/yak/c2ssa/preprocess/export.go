@@ -102,8 +102,7 @@ func ExpandSourceWithTablesState(src string, tables MacroTables, st *macroScanSt
 func ExpandAndStripDefines(src string, base MacroTables) (string, MacroTables) {
 	collected := collectFunctionMacros(src, exportToMacroTables(base))
 	env := &macroEnv{
-		tables:   collected.tables,
-		maxDepth: maxMacroExpandDepth,
+		tables: collected.tables,
 	}
 	expanded := env.expandSource(collected.output)
 	expanded = CollapsePreprocessorContinuations(expanded)
