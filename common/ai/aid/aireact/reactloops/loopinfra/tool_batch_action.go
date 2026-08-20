@@ -35,7 +35,7 @@ const directlyCallToolScalarOutputExampleJSON = `{
   "identifier": "read_project_config",
   "human_readable_thought": "读取单个项目配置",
   "directly_call_tool_name": "read_file",
-  "directly_call_tool_params": {"path": "/workspace/go.mod"},
+  "directly_call_tool_params": {"file": "/workspace/go.mod"},
   "directly_call_identifier": "read_go_mod",
   "directly_call_expectations": "~1s",
   "directly_call_reason": "读取模块定义"
@@ -48,14 +48,14 @@ const directlyCallToolBatchOutputExampleJSON = `{
   "directly_call_tool_calls": [
     {
       "tool_name": "read_file",
-      "params": {"path": "/workspace/go.mod"},
+      "params": {"file": "/workspace/go.mod"},
       "identifier": "read_go_mod",
       "expectations": "~1s",
       "reason": "读取模块定义"
     },
     {
       "tool_name": "read_file",
-      "params": {"path": "/workspace/README.md"},
+      "params": {"file": "/workspace/README.md"},
       "identifier": "read_readme",
       "expectations": "~1s",
       "reason": "读取项目说明"
