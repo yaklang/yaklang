@@ -103,6 +103,7 @@ type dialXConfig struct {
 
 	// ClientHelloSpec
 	ClientHelloSpec *utls.ClientHelloSpec
+	TLSFingerprint  string
 
 	LocalAddr *net.UDPAddr
 
@@ -327,6 +328,12 @@ func DialX_WithEnableSystemProxyFromEnv(b bool) DialXOption {
 func DialX_WithClientHelloSpec(spec *utls.ClientHelloSpec) DialXOption {
 	return func(c *dialXConfig) {
 		c.ClientHelloSpec = spec
+	}
+}
+
+func DialX_WithTLSFingerprint(name string) DialXOption {
+	return func(c *dialXConfig) {
+		c.TLSFingerprint = name
 	}
 }
 

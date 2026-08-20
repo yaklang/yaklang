@@ -269,6 +269,14 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}()
 
 	clientHelloSpec := config.ClientHelloSpec
+	var clientHelloProfile *ClientHelloProfile
+	if clientHelloSpec == nil && config.TLSFingerprint != "" {
+		var err error
+		clientHelloProfile, err = GetClientHelloProfile(config.TLSFingerprint)
+		if err != nil {
+			return nil, err
+		}
+	}
 	useTls := config.EnableTLS || config.GMTLSSupport
 
 	if !useTls {
@@ -330,14 +338,14 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		switch strategy {
 		case TLS_Strategy_Ordinary:
 			tempTlsConfig.GMSupport = nil
-			tlsConn, tlsHandshakeDur, tlsErr = dialTLSWithRetry(target, config, tempTlsConfig, sni, tlsTimeout, clientHelloSpec, strategy)
+			tlsConn, tlsHandshakeDur, tlsErr = dialTLSWithRetry(target, config, tempTlsConfig, sni, tlsTimeout, clientHelloSpec, clientHelloProfile, strategy)
 		case TLS_Strategy_GMDail:
 			if len(errs) > 0 {
 				config.TraceInfo.AddTLSRetryTip("普通 TLS 失败，已尝试国密 TLS 兼容握手")
 			} else {
 				config.TraceInfo.AddTLSRetryTip("已尝试国密 TLS 兼容握手")
 			}
-			tlsConn, tlsHandshakeDur, tlsErr = dialTLSWithGMTLSCipherFallback(target, config, tempTlsConfig, sni, tlsTimeout, clientHelloSpec)
+			tlsConn, tlsHandshakeDur, tlsErr = dialTLSWithGMTLSCipherFallback(target, config, tempTlsConfig, sni, tlsTimeout)
 		default:
 			return nil, utils.Errorf("unknown tls strategy %v", strategy)
 		}
@@ -451,7 +459,7 @@ func getFriendlyTLSError(err error) (en, cn, suggestion string) {
 	switch {
 	case strings.Contains(msg, "EOF"), strings.Contains(msg, "unexpected EOF"):
 		return "Connection Closed by Remote", "连接被远程关闭(目标服务器主动断开连接)",
-			"建议: 1.检查目标是否支持HTTPS 2.尝试开启「随机TLS指纹」 3.检查是否与其他代理软件冲突: 如Clash/V2Ray开启了TUN或Fake-IP模式请尝试关闭"
+			"建议: 1.检查目标是否支持HTTPS 2.尝试切换TLS指纹 3.检查是否与其他代理软件冲突: 如Clash/V2Ray开启了TUN或Fake-IP模式请尝试关闭"
 	case strings.Contains(msg, "permission denied"):
 		return "Permission Denied", "连接被系统拒绝(权限不足或被防火墙拦截)",
 			"建议: 1.检查防火墙设置 2.尝试以管理员权限运行 3.国产系统(如银河麒麟)请检查「安全中心」-「网络保护」-「应用程序联网」是否拦截了本程序"
@@ -460,7 +468,7 @@ func getFriendlyTLSError(err error) (en, cn, suggestion string) {
 			"建议: 1.确认目标端口正确 2.确认目标服务已启动"
 	case strings.Contains(msg, "connection reset"):
 		return "Connection Reset", "连接被重置(可能被防火墙或安全设备拦截)",
-			"建议: 1.尝试开启「随机TLS指纹」绕过检测 2.检查是否被WAF拦截 3.尝试使用代理"
+			"建议: 1.尝试切换TLS指纹 2.检查是否被WAF拦截 3.尝试使用代理"
 	case strings.Contains(msg, "i/o timeout"), strings.Contains(msg, "deadline exceeded"):
 		return "Connection Timeout", "连接超时(网络不通或目标无响应)",
 			"建议: 1.检查网络连接 2.确认目标可达 3.尝试增加超时时间"
@@ -472,7 +480,7 @@ func getFriendlyTLSError(err error) (en, cn, suggestion string) {
 			"建议: 1.目标使用自签名证书属正常现象 2.如目标为国密站点可尝试开启「国密TLS」"
 	case strings.Contains(msg, "handshake failure"):
 		return "TLS Handshake Failed", "TLS握手失败(协议不兼容)",
-			"建议: 1.尝试开启「随机TLS指纹」 2.如目标为国密站点可尝试开启「国密TLS」 3.检查TLS版本兼容性"
+			"建议: 1.尝试切换TLS指纹 2.如目标为国密站点可尝试开启「国密TLS」 3.检查TLS版本兼容性"
 	case strings.Contains(msg, "network is unreachable"):
 		return "Network Unreachable", "网络不可达",
 			"建议: 1.检查网络连接 2.检查路由配置"
@@ -481,12 +489,12 @@ func getFriendlyTLSError(err error) (en, cn, suggestion string) {
 			"建议: 1.检查目标IP是否正确 2.检查网络和路由配置"
 	case strings.Contains(msg, "protocol version"):
 		return "TLS Version Mismatch", "TLS协议版本不兼容",
-			"建议: 1.尝试开启「随机TLS指纹」 2.如目标为国密站点可尝试开启「国密TLS」"
+			"建议: 1.尝试切换TLS指纹 2.如目标为国密站点可尝试开启「国密TLS」"
 	case strings.Contains(msg, "closed"):
 		return "Connection Closed", "连接已关闭",
-			"建议: 1.尝试开启「随机TLS指纹」 2.检查是否与其他代理软件冲突: 如Clash/V2Ray开启了TUN或Fake-IP模式请尝试关闭"
+			"建议: 1.尝试切换TLS指纹 2.检查是否与其他代理软件冲突: 如Clash/V2Ray开启了TUN或Fake-IP模式请尝试关闭"
 	default:
 		return "Connection Failed", "连接失败",
-			"建议: 1.尝试开启「随机TLS指纹」 2.检查网络连接"
+			"建议: 1.尝试切换TLS指纹 2.检查网络连接"
 	}
 }

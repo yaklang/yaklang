@@ -73,17 +73,17 @@ func TestBuildTLSRetryCandidates(t *testing.T) {
 		MaxVersion: gmtls.VersionTLS13,
 	}
 
-	candidates := buildTLSRetryCandidates("example.com:443", config, tlsConfig, "example.com", nil, tlsErrorKindALPN, "alpn suggestion")
+	candidates := buildTLSRetryCandidates("example.com:443", config, tlsConfig, "example.com", nil, nil, tlsErrorKindALPN, "alpn suggestion")
 	require.Len(t, candidates, 2)
 	require.Equal(t, "alpn-http11", candidates[0].name)
 	require.Equal(t, "alpn-disabled", candidates[1].name)
 
-	candidates = buildTLSRetryCandidates("example.com:443", config, tlsConfig, "example.com", nil, tlsErrorKindVersion, "version suggestion")
+	candidates = buildTLSRetryCandidates("example.com:443", config, tlsConfig, "example.com", nil, nil, tlsErrorKindVersion, "version suggestion")
 	require.Len(t, candidates, 1)
 	require.Equal(t, "tls12-only", candidates[0].name)
 
 	config.ShouldOverrideSNI = true
-	candidates = buildTLSRetryCandidates("example.com:443", config, tlsConfig, "bad.example", nil, tlsErrorKindSNI, "sni suggestion")
+	candidates = buildTLSRetryCandidates("example.com:443", config, tlsConfig, "bad.example", nil, nil, tlsErrorKindSNI, "sni suggestion")
 	require.Empty(t, candidates)
 	require.Contains(t, strings.Join(config.TraceInfo.TLSRetryTips, "\n"), "用户已显式设置 SNI")
 }
