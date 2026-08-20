@@ -137,6 +137,7 @@ type LowhttpExecConfig struct {
 
 	RandomJA3FingerPrint bool
 	ClientHelloSpec      *utls.ClientHelloSpec
+	TLSFingerprint       string
 
 	Tags []string
 
@@ -1019,6 +1020,12 @@ func WithRandomJA3FingerPrint(b bool) LowhttpOpt {
 func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ClientHelloSpec = spec
+	}
+}
+
+func WithTLSFingerprint(name string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.TLSFingerprint = name
 	}
 }
 
