@@ -110,6 +110,7 @@ type tlsRetryCandidate struct {
 	sni        string
 	nextProtos []string
 	spec       *utls.ClientHelloSpec
+	profile    *ClientHelloProfile
 	config     func(*gmtls.Config)
 }
 
@@ -169,6 +170,7 @@ func dialTLSWithRetry(
 	sni string,
 	tlsTimeout time.Duration,
 	clientHelloSpec *utls.ClientHelloSpec,
+	clientHelloProfile *ClientHelloProfile,
 	strategy TLSStrategy,
 ) (net.Conn, time.Duration, error) {
 	var attempts []tlsRetryAttempt
@@ -182,7 +184,7 @@ func dialTLSWithRetry(
 	baseConfig.GMSupport = nil
 
 	startUpgrade := time.Now()
-	tlsConn, err := UpgradeToTLSConnectionWithTimeout(baseConn, sni, baseConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+	tlsConn, err := upgradeToTLSConnectionWithTimeout(baseConn, sni, baseConfig, tlsTimeout, clientHelloSpec, clientHelloProfile, config.TLSNextProto...)
 	handshakeDuration := time.Since(startUpgrade)
 	totalHandshakeDuration += handshakeDuration
 	if err == nil {
@@ -203,7 +205,7 @@ func dialTLSWithRetry(
 		return nil, totalHandshakeDuration, &tlsRetryError{target: target, kind: kind, attempts: attempts, suggestion: suggestion}
 	}
 
-	candidates := buildTLSRetryCandidates(target, config, tlsConfig, sni, clientHelloSpec, kind, suggestion)
+	candidates := buildTLSRetryCandidates(target, config, tlsConfig, sni, clientHelloSpec, clientHelloProfile, kind, suggestion)
 	if len(candidates) == 0 {
 		addTLSNoRetryTip(config.TraceInfo, kind, suggestion)
 		return nil, totalHandshakeDuration, &tlsRetryError{target: target, kind: kind, attempts: attempts, suggestion: suggestion}
@@ -236,7 +238,7 @@ func dialTLSWithRetry(
 		}
 
 		startUpgrade := time.Now()
-		tlsConn, err = UpgradeToTLSConnectionWithTimeout(conn, candidate.sni, tempTlsConfig, tlsTimeout, candidate.spec, candidate.nextProtos...)
+		tlsConn, err = upgradeToTLSConnectionWithTimeout(conn, candidate.sni, tempTlsConfig, tlsTimeout, candidate.spec, candidate.profile, candidate.nextProtos...)
 		handshakeDuration = time.Since(startUpgrade)
 		totalHandshakeDuration += handshakeDuration
 		attempt := tlsRetryAttempt{
@@ -280,6 +282,7 @@ func buildTLSRetryCandidates(
 	tlsConfig *gmtls.Config,
 	sni string,
 	clientHelloSpec *utls.ClientHelloSpec,
+	clientHelloProfile *ClientHelloProfile,
 	kind string,
 	suggestion string,
 ) []tlsRetryCandidate {
@@ -310,6 +313,7 @@ func buildTLSRetryCandidates(
 			sni:        sni,
 			nextProtos: cloneStringSlice(config.TLSNextProto),
 			spec:       clientHelloSpec,
+			profile:    clientHelloProfile,
 			config: func(c *gmtls.Config) {
 				c.MinVersion = gmtls.VersionTLS12
 				c.MaxVersion = gmtls.VersionTLS12
@@ -318,13 +322,13 @@ func buildTLSRetryCandidates(
 	}
 
 	addChromeCandidate := func() {
-		spec, err := utls.UTLSIdToSpec(utls.HelloChrome_120)
+		profile, err := GetClientHelloProfile(DefaultTLSFingerprint)
 		if err != nil {
 			config.TraceInfo.AddTLSRetryTip("TLS 握手失败，生成 Chrome TLS 指纹失败，未进行指纹重试")
 			return
 		}
 		reason := "retry with Chrome TLS fingerprint"
-		if clientHelloSpec != nil {
+		if clientHelloSpec != nil || clientHelloProfile != nil {
 			reason = "fallback from custom ClientHello to Chrome TLS fingerprint"
 		}
 		add(tlsRetryCandidate{
@@ -334,7 +338,7 @@ func buildTLSRetryCandidates(
 			suggestion: suggestion,
 			sni:        sni,
 			nextProtos: cloneStringSlice(config.TLSNextProto),
-			spec:       &spec,
+			profile:    profile,
 		})
 	}
 
@@ -350,6 +354,7 @@ func buildTLSRetryCandidates(
 			sni:        sni,
 			nextProtos: []string{"http/1.1"},
 			spec:       clientHelloSpec,
+			profile:    clientHelloProfile,
 			config: func(c *gmtls.Config) {
 				c.NextProtos = []string{"http/1.1"}
 			},
@@ -362,6 +367,7 @@ func buildTLSRetryCandidates(
 			sni:        sni,
 			nextProtos: nil,
 			spec:       clientHelloSpec,
+			profile:    clientHelloProfile,
 			config: func(c *gmtls.Config) {
 				c.NextProtos = nil
 			},
@@ -391,6 +397,7 @@ func buildTLSRetryCandidates(
 			sni:        nextSNI,
 			nextProtos: cloneStringSlice(config.TLSNextProto),
 			spec:       clientHelloSpec,
+			profile:    clientHelloProfile,
 			config: func(c *gmtls.Config) {
 				c.ServerName = nextSNI
 			},
@@ -415,11 +422,11 @@ func buildTLSRetryCandidates(
 
 func tlsRetryCandidateKey(candidate tlsRetryCandidate) string {
 	specKey := "default"
+	if candidate.profile != nil {
+		specKey = candidate.profile.ID()
+	}
 	if candidate.spec != nil {
 		specKey = "custom"
-		if candidate.name == "chrome-client-hello" {
-			specKey = "chrome120"
-		}
 	}
 	return strings.Join([]string{
 		candidate.sni,
