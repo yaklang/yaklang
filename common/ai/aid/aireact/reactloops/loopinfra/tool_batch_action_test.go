@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -22,7 +24,10 @@ func newToolBatchTestManager(t *testing.T) (*buildinaitools.AiToolManager, *aito
 	t.Helper()
 	readFile := mustNewTool(
 		"read_file",
-		aitool.WithStringParam("path", aitool.WithParam_Required(true)),
+		// Keep this fixture aligned with the production read_file Yak tool. A
+		// stale "path" fixture previously let prompt examples pass CI while the
+		// real tool rejected them and forced an extra reasoning-model retry.
+		aitool.WithStringParam("file", aitool.WithParam_Required(true)),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			return "content", nil
 		}),
@@ -102,8 +107,8 @@ func TestDirectToolScalarParamsSchema_AcceptsObjectAndLegacyJSONString(t *testin
 		params any
 		valid  bool
 	}{
-		{name: "preferred object", params: map[string]any{"path": "/workspace/go.mod"}, valid: true},
-		{name: "legacy JSON string", params: `{"path":"/workspace/go.mod"}`, valid: true},
+		{name: "preferred object", params: map[string]any{"file": "/workspace/go.mod"}, valid: true},
+		{name: "legacy JSON string", params: `{"file":"/workspace/go.mod"}`, valid: true},
 		{name: "array remains invalid", params: []any{"/workspace/go.mod"}, valid: false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -153,9 +158,9 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		require.Len(t, request.Calls, 2)
 		assert.Equal(t, aicommon.ToolCallModeDirect, request.Calls[0].Mode)
 		assert.Equal(t, "read_file", request.Calls[0].ToolName)
-		assert.Equal(t, "/workspace/go.mod", request.Calls[0].Params.GetString("path"))
+		assert.Equal(t, "/workspace/go.mod", request.Calls[0].Params.GetString("file"))
 		assert.Equal(t, "read_go_mod", request.Calls[0].Identifier)
-		assert.Equal(t, "/workspace/README.md", request.Calls[1].Params.GetString("path"))
+		assert.Equal(t, "/workspace/README.md", request.Calls[1].Params.GetString("file"))
 		assert.Contains(t, loopAction_directlyCallTool.OutputExamples, directlyCallToolBatchOutputExampleJSON)
 	})
 
@@ -191,6 +196,38 @@ func TestToolCallPromptExamples_ParseAndVerifyExactBytes(t *testing.T) {
 		assert.Equal(t, "read_file", request.Calls[1].ToolName)
 		assert.Contains(t, loopAction_toolRequireAndCall.OutputExamples, requireToolBatchOutputExampleJSON)
 	})
+}
+
+// Cross-check the prompt fixture against the embedded production read_file
+// definition, rather than only against the test double. This catches a future
+// CLI parameter rename before a highly weighted few-shot teaches every model
+// an invalid direct-call payload.
+func TestToolCallPromptExamples_MatchProductionReadFileParameter(t *testing.T) {
+	source, err := yakscripttools.GetEmbedFS().ReadFile("yakscriptforai/fs/read_file.yak")
+	require.NoError(t, err)
+
+	pathParamPattern := regexp.MustCompile(`cli\.String\("([^"]+)",\s*cli\.setRequired\(true\),\s*cli\.setHelp\("target file absolute path`)
+	match := pathParamPattern.FindSubmatch(source)
+	require.Len(t, match, 2, "production read_file must expose a required absolute-path parameter")
+	pathParamName := string(match[1])
+
+	var scalar map[string]any
+	require.NoError(t, json.Unmarshal([]byte(directlyCallToolScalarOutputExampleJSON), &scalar))
+	scalarParams, ok := scalar["directly_call_tool_params"].(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, scalarParams, pathParamName)
+
+	var batch map[string]any
+	require.NoError(t, json.Unmarshal([]byte(directlyCallToolBatchOutputExampleJSON), &batch))
+	calls, ok := batch[directlyCallToolBatchField].([]any)
+	require.True(t, ok)
+	for index, rawCall := range calls {
+		call, ok := rawCall.(map[string]any)
+		require.True(t, ok, "call %d must be an object", index)
+		params, ok := call["params"].(map[string]any)
+		require.True(t, ok, "call %d params must be an object", index)
+		assert.Contains(t, params, pathParamName, "call %d must match production read_file", index)
+	}
 }
 
 func TestToolCallActionDescriptionsUseChineseBatchFirstPolicy(t *testing.T) {
@@ -317,12 +354,12 @@ func TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler(t *
 	}{
 		{
 			name:       "not_an_array",
-			payload:    `{"@action":"directly_call_tool","directly_call_tool_calls":{"tool_name":"read_file","params":{"path":"/a"}}}`,
+			payload:    `{"@action":"directly_call_tool","directly_call_tool_calls":{"tool_name":"read_file","params":{"file":"/a"}}}`,
 			errContain: "array of objects",
 		},
 		{
 			name:       "one_item",
-			payload:    `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{"path":"/a"}}]}`,
+			payload:    `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"/a"}}]}`,
 			errContain: "at least 2",
 		},
 		{
@@ -330,7 +367,7 @@ func TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler(t *
 			payload: `{
 				"@action":"directly_call_tool",
 				"directly_call_tool_calls":[
-					{"tool_name":"read_file","params":{"path":"/valid"}},
+					{"tool_name":"read_file","params":{"file":"/valid"}},
 					{"tool_name":"read_file","params":{}}
 				]
 			}`,
@@ -341,8 +378,8 @@ func TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler(t *
 			payload: `{
 				"@action":"directly_call_tool",
 				"directly_call_tool_calls":[
-					{"tool_name":"read_file","params":{"path":"/a"},"identifier":"same"},
-					{"tool_name":"read_file","params":{"path":"/b"},"identifier":"same"}
+					{"tool_name":"read_file","params":{"file":"/a"},"identifier":"same"},
+					{"tool_name":"read_file","params":{"file":"/b"},"identifier":"same"}
 				]
 			}`,
 			errContain: "duplicates",
@@ -352,8 +389,8 @@ func TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler(t *
 			payload: `{
 				"@action":"directly_call_tool",
 				"directly_call_tool_calls":[
-					{"tool_name":"read_file","params":{"path":"/a"}},
-					{"tool_name":"read_file","params":{"path":"/b"}}
+					{"tool_name":"read_file","params":{"file":"/a"}},
+					{"tool_name":"read_file","params":{"file":"/b"}}
 				],
 				"tool_require_calls":[
 					{"tool_name":"grep"},
@@ -368,7 +405,7 @@ func TestDirectToolBatchVerifier_RejectsAmbiguousOrInvalidBatchBeforeHandler(t *
 				"@action":"directly_call_tool",
 				"directly_call_tool_calls":[
 					{"tool_name":"read_file","params":[]},
-					{"tool_name":"read_file","params":{"path":"/b"}}
+					{"tool_name":"read_file","params":{"file":"/b"}}
 				]
 			}`,
 			errContain: "params must be a non-null JSON object",
@@ -411,8 +448,8 @@ func TestRequireToolBatchVerifier_RejectsParamsAndMixedForms(t *testing.T) {
 					{"tool_name":"read_file"}
 				],
 				"directly_call_tool_calls":[
-					{"tool_name":"read_file","params":{"path":"/a"}},
-					{"tool_name":"read_file","params":{"path":"/b"}}
+					{"tool_name":"read_file","params":{"file":"/a"}},
+					{"tool_name":"read_file","params":{"file":"/b"}}
 				]
 			}`,
 			errContain: "cannot be combined with directly_call_tool fields",
@@ -441,7 +478,7 @@ func TestToolScalarVerifier_PreservesLegacyPriorityWhenMalformedActionAlsoContai
 		{
 			name:       "direct",
 			actionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-			payload:    `{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"path":"/scalar"},"directly_call_tool_calls":[{"tool_name":"read_file","params":{"path":"/a"}},{"tool_name":"read_file","params":{"path":"/b"}}]}`,
+			payload:    `{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/scalar"},"directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"/a"}},{"tool_name":"read_file","params":{"file":"/b"}}]}`,
 			verify:     loopAction_directlyCallTool.ActionVerifier,
 			stateKey:   "directly_call_tool_name",
 			wantValue:  "read_file",
@@ -471,7 +508,7 @@ func TestToolBatchVerifier_RejectsTruncatedAction(t *testing.T) {
 	loop, _ := newToolBatchTestLoop(t)
 	action, err := aicommon.ExtractActionFromStream(
 		context.Background(),
-		strings.NewReader(`{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{"path":"/a"}},{"tool_name":`),
+		strings.NewReader(`{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"/a"}},{"tool_name":`),
 		schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 	)
 	require.NoError(t, err)
@@ -496,7 +533,7 @@ func (r *eofGateReader) Read(p []byte) (int, error) {
 }
 
 func TestToolBatchVerifier_WaitsForCompleteResponseEOF(t *testing.T) {
-	payload := `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{"path":"/a"}},{"tool_name":"read_file","params":{"path":"/b"}}]}`
+	payload := `{"@action":"directly_call_tool","directly_call_tool_calls":[{"tool_name":"read_file","params":{"file":"/a"}},{"tool_name":"read_file","params":{"file":"/b"}}]}`
 	source := &eofGateReader{
 		reader:  strings.NewReader(payload),
 		waiting: make(chan struct{}),
@@ -534,7 +571,7 @@ func TestToolScalarVerifier_ReturnsBeforeCompleteResponseEOF(t *testing.T) {
 		{
 			name:       "direct",
 			actionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-			payload:    `{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"path":"/a"}}`,
+			payload:    `{"@action":"directly_call_tool","directly_call_tool_name":"read_file","directly_call_tool_params":{"file":"/a"}}`,
 			verify:     loopAction_directlyCallTool.ActionVerifier,
 			stateKey:   "directly_call_tool_name",
 			want:       "read_file",
@@ -686,7 +723,7 @@ func (i *executingToolBatchTestInvoker) ExecuteToolBatch(
 			case "grep":
 				params = aitool.InvokeParams{"path": "/workspace", "pattern": "auth"}
 			case "read_file":
-				params = aitool.InvokeParams{"path": "/workspace/project.json"}
+				params = aitool.InvokeParams{"file": "/workspace/project.json"}
 			}
 		}
 		tool, lookupErr := i.manager.GetToolByName(call.ToolName)
@@ -829,7 +866,7 @@ func TestToolBatchActionHandler_CachesOnlySuccessfulChildren(t *testing.T) {
 	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
 	loop.SetCurrentTask(task)
 	request := &aicommon.ToolBatchRequest{Calls: []aicommon.ToolBatchCall{
-		{Index: 0, Mode: aicommon.ToolCallModeDirect, ToolName: readFile.Name, Params: aitool.InvokeParams{"path": "/workspace/go.mod"}},
+		{Index: 0, Mode: aicommon.ToolCallModeDirect, ToolName: readFile.Name, Params: aitool.InvokeParams{"file": "/workspace/go.mod"}},
 		{Index: 1, Mode: aicommon.ToolCallModeDirect, ToolName: grep.Name, Params: aitool.InvokeParams{"pattern": "auth"}},
 	}}
 
@@ -991,7 +1028,7 @@ func TestToolScalarPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			actionType:    schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 			action:        loopAction_directlyCallTool,
 			expectedTool:  "read_file",
-			expectedParam: "path",
+			expectedParam: "file",
 			expectedValue: "/workspace/go.mod",
 		},
 		{

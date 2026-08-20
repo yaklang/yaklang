@@ -10,8 +10,15 @@
 # markdown in mass
 <|FINAL_ANSWER_END_CURRENT_NONCE|>
 
-*. 如果你想要使用工具：
-    * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "先读取配置"}`
+*. 所有 action 必须直接输出使用 Schema 原始英文键名的 JSON object；禁止 `<@action=...>` 标签、中文字段说明、YAML 或 JSON 外包装。
+*. 缺少任务所需的一手证据时，本轮工具 action 就是执行机会；立即选择工具，禁止回答“没有工具执行机会”或要求重发任务。
+
+*. 如果你想要使用工具，先枚举本轮可立即执行的真实调用：
+    * 选择门：1 个真实调用用标量；2-8 个独立真实调用用批次；存在数据依赖或写入冲突时只执行当前已就绪的一层。不要凑调用，也不要把已明确的独立调用留到下一轮。
+    * 有 2-8 个彼此独立的调用时，优先一次批量申请，运行时会分别生成参数并并发执行：
+      `{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"并发收集独立证据","tool_require_calls":[{"tool_name":"grep","identifier":"find_handlers","reason":"定位处理函数"},{"tool_name":"read_file","identifier":"read_config","reason":"读取独立配置"}]}`
+    * 若动态段已经展示真实工具参数 Schema 且全部参数明确，可改用一个 `directly_call_tool_calls` 批次直接执行；没有 Schema 时禁止猜参数。
+    * 只有本轮恰好一个调用或调用之间存在依赖/冲突时，才使用标量：`{"@action":"require_tool","tool_require_payload":"..[your-toolname]..","human_readable_thought":"先读取配置"}`
 
 *. `todo_delta` 使用案例（维护 TODO 工作集，与正常动作同轮携带）：
     * 任务一开始就需要拆成多个入口时，第一条动作同时建立初始 TODO 并指定 current：
@@ -38,7 +45,7 @@
 同时你必须遵循动作选择优先级：
 1. 复杂/不确定任务，或需要新建/修订 Plan：优先 `request_plan`
 2. 需要领域指导：优先加载技能（`loading_skills` / `load_skill_resources`）
-3. 仅在“已知多工具且存在明确依赖图”时使用 `tool_compose`
+3. 仅在后序参数依赖前序真实输出时使用 `tool_compose`；独立多调用使用 `tool_require_calls` / `directly_call_tool_calls` 批次
 4. AI Blueprint 必须使用 `require_ai_blueprint`，禁止通过 `tool_compose` 代替
 
 反例（禁止）：
