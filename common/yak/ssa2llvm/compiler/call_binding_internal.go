@@ -7,6 +7,8 @@ import (
 
 func (c *Compiler) callableContextArgs(inst *ssa.Call, calleeFn *ssa.Function) []contextCallArg {
 	argIDs := callframe.BuildCallFrameArgIDs(c.Program, inst, calleeFn)
+	if inst != nil && inst.Async {
+	}
 	args := make([]contextCallArg, 0, len(argIDs))
 	for _, argID := range argIDs {
 		args = append(args, contextCallArg{

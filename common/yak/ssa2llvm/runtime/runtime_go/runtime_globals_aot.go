@@ -90,5 +90,6 @@ func registerRuntimeGlobals() {
 		"sleep":   runtimeBuiltinSleep,
 		"randstr": runtimeBuiltinRandstr,
 		"uuid":    runtimeBuiltinUUID,
+		"close":   runtimeBuiltinClose,
 	})
 }
