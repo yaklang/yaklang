@@ -148,11 +148,16 @@ func parseTaskLocalSyntaxFlowRulesWithMetadata(
 		}
 		rule.Hash = strings.TrimSpace(item.ContentHash)
 		rule.NeedUpdate = false
-		rule.AlertDesc = nil
+		// AlertDesc is a derived projection of the canonical rule content. Keep
+		// the parser-produced value when an older/minimal bundle omits it;
+		// otherwise a matching `alert` still executes but cannot materialize a
+		// risk. A present JSON object remains authoritative and replaces it.
 		if raw := bytes.TrimSpace(item.AlertDesc); len(raw) > 0 && !bytes.Equal(raw, []byte("null")) {
-			if err := json.Unmarshal(raw, &rule.AlertDesc); err != nil {
+			var alertDesc schema.MapEx[string, *schema.SyntaxFlowDescInfo]
+			if err := json.Unmarshal(raw, &alertDesc); err != nil {
 				return nil, nil, utils.Wrapf(err, "decode task-local rule %s alert metadata", rule.RuleName)
 			}
+			rule.AlertDesc = alertDesc
 		}
 		if rule.AllowIncluded {
 			for _, libraryName := range []string{rule.Title, rule.IncludedName} {
