@@ -165,9 +165,16 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 	if err := c.initInvokeContext(ctxI64, spec.kind, spec.target, argc); err != nil {
 		return llvm.Value{}, err
 	}
+	flags := uint64(0)
 	if spec.async {
+		flags |= abi.FlagAsync
+	}
+	if call, ok := spec.inst.(*ssa.Call); ok && call != nil && call.IsEllipsis {
+		flags |= abi.FlagEllipsis
+	}
+	if flags != 0 {
 		i64 := c.LLVMCtx.Int64Type()
-		if err := c.storeCtxWordFrom(ctxI64, abi.WordFlags, llvm.ConstInt(i64, abi.FlagAsync, false)); err != nil {
+		if err := c.storeCtxWordFrom(ctxI64, abi.WordFlags, llvm.ConstInt(i64, flags, false)); err != nil {
 			return llvm.Value{}, err
 		}
 	}
