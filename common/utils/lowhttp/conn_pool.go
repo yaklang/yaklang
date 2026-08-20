@@ -723,12 +723,45 @@ func (pc *persistConn) readLoop() {
 				_ = pc.conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
 			})
 		}
+
+		// Watch the per-request context (e.g. the MITM upstream context that
+		// is cancelled when the downstream client disconnects during a
+		// long-lived streaming response). When it is cancelled, close the
+		// upstream connection so the blocking conn.Read returns immediately.
+		// Closing (rather than setting a past read deadline) is required
+		// because deadlineExtendingReader resets the deadline to the future
+		// on every Read, which would defeat a past-deadline approach. Without
+		// this watcher, a streaming response (SSE) blocks forever:
+		// ExtendReadDeadline disables the hard timeout and pc.ctx is derived
+		// from context.Background(), not the request context.
+		var ctxWatcherStop chan struct{}
+		if rc.option != nil && rc.option.Ctx != nil {
+			ctxWatcherStop = make(chan struct{})
+			go func(seq uint64, stop chan struct{}) {
+				select {
+				case <-rc.option.Ctx.Done():
+					if atomic.LoadUint64(&pc.reqSeq) != seq {
+						return
+					}
+					_ = pc.conn.Close()
+				case <-stop:
+				}
+			}(seq, ctxWatcherStop)
+		}
+		stopCtxWatcher := func() {
+			if ctxWatcherStop != nil {
+				close(ctxWatcherStop)
+				ctxWatcherStop = nil
+			}
+		}
+
 		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
 		_, err := pc.br.Peek(1)
 		if err != nil {
 			if hardTimeoutTimer != nil {
 				hardTimeoutTimer.Stop()
 			}
+			stopCtxWatcher()
 			if errors.Is(err, io.EOF) {
 				pc.sawEOF = true
 				closeErr = errServerClosedIdle
@@ -926,6 +959,11 @@ func (pc *persistConn) readLoop() {
 		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
 			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "conn pool stream handler")
 		}
+
+		// Stop the per-request context watcher before sending the response:
+		// the read is done, so a late cancel must not perturb the next
+		// iteration's deadline.
+		stopCtxWatcher()
 
 		//pc.mu.Lock()
 		////pc.numExpectedResponses-- // 减少预期响应数量

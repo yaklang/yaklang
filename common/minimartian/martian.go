@@ -35,9 +35,10 @@ type ResponseModifier interface {
 	ModifyResponse(res *http.Response) error
 }
 
-// HTTPStreamRecorderFactory creates an optional recorder after streaming
-// response headers have been parsed. Recorder failures must not affect
-// forwarding to the downstream client.
+// HTTPStreamRecorderFactory creates an optional best-effort recorder for
+// streaming responses (e.g. SSE). The recorder receives body chunks as they
+// are relayed to the downstream client. Recorder failures must not affect
+// forwarding; a nil return disables recording for this response.
 type HTTPStreamRecorderFactory func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte) (io.WriteCloser, error)
 
 // RequestResponseModifier is an interface that is both a ResponseModifier and
