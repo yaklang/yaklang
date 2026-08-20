@@ -66,6 +66,17 @@ func (c *Compiler) resolveContextCallArg(inst ssa.Instruction, argID int64, tagP
 					if err != nil {
 						return llvm.Value{}, llvm.Value{}, err
 					}
+					// Record the closure argument so SideEffect instructions
+					// after this call can read captured variables back from
+					// its free-value slots (e.g. retry(100, f) where f
+					// mutates count).
+					if c.function != nil && inst != nil {
+						if c.function.materializedClosureArgs == nil {
+							c.function.materializedClosureArgs = make(map[int64][]llvm.Value)
+						}
+						c.function.materializedClosureArgs[inst.GetId()] = append(
+							c.function.materializedClosureArgs[inst.GetId()], closure)
+					}
 					if tagPointerArgs {
 						tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
 						return c.Builder.CreateOr(closure, tag, "yak_ctx_callable_tag"), closure, nil
@@ -223,8 +234,15 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 		// call is unpacked into multiple left-hand values (rsp, req = f()~),
 		// the tuple must stay intact so the member reads can index "0"/"1";
 		// the trailing error is simply never read.
-		if call, ok := spec.inst.(*ssa.Call); ok && call.IsDropError && !call.Unpack && c.callReturnCount(spec.inst) > 1 {
-			ret = c.emitRuntimeGetField(ret, "0", call.GetId())
+		if call, ok := spec.inst.(*ssa.Call); ok && call.IsDropError && !call.Unpack {
+			// A `call~` (drop-error) on a multi-return yaklib function receives
+			// the whole []any tuple from the runtime; the frontend typed the
+			// call as the first return, so drop the trailing error(s). The
+			// runtime helper is a no-op for single-return calls. When the call
+			// is unpacked into multiple left-hand values (rsp, req = f()~),
+			// the tuple must stay intact so the member reads can index
+			// "0"/"1"; the trailing error is simply never read.
+			ret = c.emitRuntimeDropError(ret)
 		}
 		c.storeSSAValue(spec.inst.GetId(), ret)
 	}

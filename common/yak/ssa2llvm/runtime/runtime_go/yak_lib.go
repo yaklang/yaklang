@@ -112,6 +112,24 @@ func yak_runtime_make_callable(fn uintptr, paramMemberCount int64, freeCount int
 	})))
 }
 
+//export yak_runtime_read_closure_free_value
+func yak_runtime_read_closure_free_value(closureRaw uint64, index int64, byRef int64) int64 {
+	defer recoverRuntimePanic()
+	closure, ok := runtimeCallableClosureValueFromRaw(closureRaw)
+	if !ok || index < 0 || int(index) >= len(closure.freeValues) {
+		return 0
+	}
+	raw := closure.freeValues[index]
+	if byRef != 0 {
+		ptr := unsafe.Pointer(uintptr(raw))
+		if ptr == nil {
+			return 0
+		}
+		return int64(*(*uint64)(ptr))
+	}
+	return int64(raw)
+}
+
 //export yak_runtime_to_cstring
 func yak_runtime_to_cstring(ptr uintptr) *C.char {
 	defer recoverRuntimePanic()
