@@ -29,6 +29,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/minimartian/mitm"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -369,8 +370,8 @@ type MITMServer struct {
 	// disable websocket compression
 	enableWebsocketCompression *utils.AtomicBool
 
-	// random JA3 fingerprint
-	randomJA3 bool
+	// TLS fingerprint used for ordinary upstream connections.
+	tlsFingerprint string
 
 	// SNI (Server Name Indication) configuration
 	sni          string            // SNI 值
@@ -475,8 +476,8 @@ func (m *MITMServer) initConfig() error {
 	if m.preferHostMappingBeforeDownstreamProxy {
 		config = append(config, lowhttp.WithPreferEtcHostsBeforeProxy(true))
 	}
-	if m.randomJA3 {
-		config = append(config, lowhttp.WithRandomJA3FingerPrint(true))
+	if m.tlsFingerprint != "" {
+		config = append(config, lowhttp.WithTLSFingerprint(m.tlsFingerprint))
 	}
 
 	m.sniResolver = NewSNIResolver(m.sniMapping, m.overwriteSNI, m.sni)
@@ -763,6 +764,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 		enableWebsocketCompression: utils.NewAtomicBool(),
 		websocketHijackMode:        utils.NewAtomicBool(),
 		forceTextFrame:             utils.NewAtomicBool(),
+		tlsFingerprint:             netx.DefaultTLSFingerprint,
 	}
 	for _, op := range options {
 		err := op(server)
