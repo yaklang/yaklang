@@ -7,8 +7,11 @@ void yak_invoke_callable(uintptr_t fn, void* ctx);
 import "C"
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"reflect"
 	"strings"
 	"unicode"
@@ -24,7 +27,7 @@ func runtimeCStringToGoString(ptr unsafe.Pointer) string {
 	return C.GoString((*C.char)(ptr))
 }
 
-func runtimeDispatchShadowMethod(args []uint64) (int64, error) {
+func runtimeDispatchShadowMethod(args []uint64, _ bool) (int64, error) {
 	if len(args) < 2 {
 		return 0, fmt.Errorf("runtime shadow method expects at least 2 args, got %d", len(args))
 	}
@@ -36,7 +39,9 @@ func runtimeDispatchShadowMethod(args []uint64) (int64, error) {
 
 	objPtr := unsafe.Pointer(uintptr(args[0]))
 	if objPtr == nil {
-		return 0, fmt.Errorf("runtime shadow method missing receiver")
+		// A nil receiver (e.g. a dropped error left the object nil) reads as
+		// nil instead of panicking, matching yak's weak-typed method calls.
+		return 0, nil
 	}
 
 	return callRuntimeShadowMethod(objPtr, runtimeCStringToGoString(methodNamePtr), args[2:])
@@ -50,6 +55,12 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 
 	if method := value.MethodByName(name); method.IsValid() {
 		return method, nil
+	}
+
+	if f, ok := obj.(*os.File); ok {
+		if method, ok := runtimeResolveOSFileMethod(f, name); ok {
+			return method, nil
+		}
 	}
 
 	for value.IsValid() && value.Kind() == reflect.Interface {
@@ -73,6 +84,14 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 			return method, nil
 		}
 	}
+	if value.IsValid() && value.Kind() == reflect.Ptr && !value.IsNil() {
+		elem := value.Elem()
+		if elem.IsValid() && (elem.Kind() == reflect.Slice || elem.Kind() == reflect.Array) {
+			if method, ok := runtimeResolveSliceMethod(value, name); ok {
+				return method, nil
+			}
+		}
+	}
 
 	if value.IsValid() && value.Kind() != reflect.Ptr && value.CanAddr() {
 		if method := value.Addr().MethodByName(name); method.IsValid() {
@@ -83,9 +102,92 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 	return reflect.Value{}, fmt.Errorf("method %q not found", name)
 }
 
+// runtimeResolveOSFileMethod implements the yak file methods that os.File
+// does not provide natively (WriteLine/ReadLines/Tell/...).
+func runtimeResolveOSFileMethod(f *os.File, name string) (reflect.Value, bool) {
+	if f == nil {
+		return reflect.Value{}, false
+	}
+	switch name {
+	case "WriteLine":
+		return reflect.ValueOf(func(line any) (int, error) {
+			return f.WriteString(fmt.Sprintf("%v\n", line))
+		}), true
+	case "ReadLines":
+		return reflect.ValueOf(func() []string {
+			lines := make([]string, 0)
+			sc := bufio.NewScanner(f)
+			for sc.Scan() {
+				lines = append(lines, sc.Text())
+			}
+			return lines
+		}), true
+	case "ReadLine":
+		return reflect.ValueOf(func() (string, error) {
+			sc := bufio.NewScanner(f)
+			if sc.Scan() {
+				return sc.Text(), nil
+			}
+			if err := sc.Err(); err != nil {
+				return "", err
+			}
+			return "", io.EOF
+		}), true
+	case "Seek":
+		return reflect.ValueOf(func(offset int64, whence int) (int64, error) {
+			return f.Seek(offset, whence)
+		}), true
+	case "Tell":
+		return reflect.ValueOf(func() (int64, error) {
+			return f.Seek(0, io.SeekCurrent)
+		}), true
+	case "ReadAll":
+		return reflect.ValueOf(func() ([]byte, error) { return io.ReadAll(f) }), true
+	case "ReadString":
+		return reflect.ValueOf(func() (string, error) {
+			b, err := io.ReadAll(f)
+			return string(b), err
+		}), true
+	case "Write":
+		return reflect.ValueOf(func(data any) (int, error) {
+			switch d := data.(type) {
+			case string:
+				return f.WriteString(d)
+			case []byte:
+				return f.Write(d)
+			default:
+				return f.WriteString(fmt.Sprint(d))
+			}
+		}), true
+	case "WriteString":
+		return reflect.ValueOf(func(s string) (int, error) { return f.WriteString(s) }), true
+	case "Name":
+		return reflect.ValueOf(func() string { return f.Name() }), true
+	}
+	return reflect.Value{}, false
+}
+
 // runtimeResolveSliceMethod implements the yak slice/array methods that the
-// AOT runtime must provide (Go slices have no methods of their own).
+// AOT runtime must provide (Go slices have no methods of their own). The
+// receiver may be a *[]T shadow (yak reference semantics) or a plain []T.
 func runtimeResolveSliceMethod(v reflect.Value, name string) (reflect.Value, bool) {
+	ptr := reflect.Value{}
+	for v.IsValid() && v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return reflect.Value{}, false
+		}
+		v = v.Elem()
+	}
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return reflect.Value{}, false
+		}
+		ptr = v
+		v = v.Elem()
+	}
+	if !v.IsValid() || (v.Kind() != reflect.Slice && v.Kind() != reflect.Array) {
+		return reflect.Value{}, false
+	}
 	switch name {
 	case "Append", "Push":
 		return reflect.ValueOf(func(items ...any) any {
@@ -93,7 +195,12 @@ func runtimeResolveSliceMethod(v reflect.Value, name string) (reflect.Value, boo
 			for _, item := range items {
 				elems = append(elems, runtimeSliceAppendValue(v.Type().Elem(), item))
 			}
-			return reflect.Append(v, elems...).Interface()
+			appended := reflect.Append(v, elems...)
+			if ptr.IsValid() {
+				ptr.Elem().Set(appended)
+				return ptr.Interface()
+			}
+			return appended.Interface()
 		}), true
 	case "Map":
 		return reflect.ValueOf(func(fn any) []any {
@@ -257,17 +364,41 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 
 	value := reflect.ValueOf(decoded)
 	if value.IsValid() {
+		if targetType.Kind() == reflect.Interface {
+			// AOT slice/map shadows are pointers; yak code sees them as
+			// values, so pass the dereferenced container to yaklib before the
+			// generic assignable-to-interface path.
+			if value.Kind() == reflect.Ptr && !value.IsNil() {
+				elem := value.Elem()
+				if elem.IsValid() && (elem.Kind() == reflect.Slice || elem.Kind() == reflect.Map) {
+					return elem, nil
+				}
+			}
+			if value.Type().Implements(targetType) {
+				return value, nil
+			}
+		}
 		if value.Type().AssignableTo(targetType) {
 			return value, nil
 		}
 		if value.Type().ConvertibleTo(targetType) {
 			return value.Convert(targetType), nil
 		}
-		if targetType.Kind() == reflect.Interface && value.Type().Implements(targetType) {
-			return value, nil
-		}
 		if targetType.Kind() == reflect.Ptr && value.Kind() != reflect.Ptr && value.CanAddr() && value.Addr().Type().AssignableTo(targetType) {
 			return value.Addr(), nil
+		}
+		if value.Kind() == reflect.Ptr && !value.IsNil() && value.Elem().Type().AssignableTo(targetType) {
+			return value.Elem(), nil
+		}
+		if targetType.Kind() == reflect.Map {
+			if converted, ok := convertMapValue(value, targetType); ok {
+				return converted, nil
+			}
+		}
+		if targetType.Kind() == reflect.Slice {
+			if converted, ok := convertSliceValue(value, targetType); ok {
+				return converted, nil
+			}
 		}
 	}
 
@@ -323,7 +454,7 @@ func runtimeMakeCallableWrapper(raw uint64, paramMemberCount int, freeValues []u
 			for _, arg := range args {
 				callArgs = append(callArgs, uint64(runtimeValueToInt64(arg)))
 			}
-			ret, err := runtimeDispatchYaklibCall(callArgs)
+			ret, err := runtimeDispatchYaklibCall(callArgs, false)
 			if err != nil {
 				panic(err)
 			}
@@ -420,7 +551,124 @@ func runtimeDecodeShadowArg(raw uint64, targetType reflect.Type) (reflect.Value,
 	if targetType.Kind() == reflect.Ptr && value.Kind() != reflect.Ptr && value.CanAddr() && value.Addr().Type().AssignableTo(targetType) {
 		return value.Addr(), true
 	}
+	if targetType.Kind() == reflect.Map {
+		if converted, ok := convertMapValue(value, targetType); ok {
+			return converted, true
+		}
+	}
+	if targetType.Kind() == reflect.Slice {
+		if converted, ok := convertSliceValue(value, targetType); ok {
+			return converted, true
+		}
+	}
 	return reflect.Value{}, false
+}
+
+// convertMapValue converts an AOT runtimeOrderedMap (or a Go map) into the
+// target map type yaklib expects (e.g. map[string]interface{}), copying keys
+// and values element-wise.
+func convertMapValue(value reflect.Value, targetType reflect.Type) (reflect.Value, bool) {
+	if !value.IsValid() || targetType == nil || targetType.Kind() != reflect.Map {
+		return reflect.Value{}, false
+	}
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return reflect.Value{}, false
+		}
+		value = value.Elem()
+	}
+	var keys []string
+	var values map[string]any
+	if om, ok := value.Interface().(*runtimeOrderedMap); ok && om != nil {
+		keys = om.keys
+		values = om.values
+	} else if value.Kind() == reflect.Map {
+		keys = make([]string, 0, value.Len())
+		values = make(map[string]any, value.Len())
+		iter := value.MapRange()
+		for iter.Next() {
+			k := fmt.Sprint(iter.Key().Interface())
+			keys = append(keys, k)
+			values[k] = iter.Value().Interface()
+		}
+	} else {
+		return reflect.Value{}, false
+	}
+
+	keyType := targetType.Key()
+	elemType := targetType.Elem()
+	out := reflect.MakeMapWithSize(targetType, len(keys))
+	for _, k := range keys {
+		kv := reflect.ValueOf(k)
+		if !kv.Type().AssignableTo(keyType) {
+			if !kv.Type().ConvertibleTo(keyType) {
+				return reflect.Value{}, false
+			}
+			kv = kv.Convert(keyType)
+		}
+		ev := reflect.ValueOf(values[k])
+		if !ev.IsValid() {
+			ev = reflect.Zero(elemType)
+		}
+		if !ev.Type().AssignableTo(elemType) {
+			if !ev.Type().ConvertibleTo(elemType) {
+				return reflect.Value{}, false
+			}
+			ev = ev.Convert(elemType)
+		}
+		out.SetMapIndex(kv, ev)
+	}
+	return out, true
+}
+
+// convertSliceValue converts a Go slice (usually []any) into the target slice
+// type yaklib expects, converting elements one by one.
+func convertSliceValue(value reflect.Value, targetType reflect.Type) (reflect.Value, bool) {
+	if !value.IsValid() || targetType == nil || targetType.Kind() != reflect.Slice {
+		return reflect.Value{}, false
+	}
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return reflect.Value{}, false
+		}
+		value = value.Elem()
+	}
+	if value.Kind() != reflect.Slice {
+		return reflect.Value{}, false
+	}
+	if value.Type().AssignableTo(targetType) {
+		return value, true
+	}
+	elemType := targetType.Elem()
+	out := reflect.MakeSlice(targetType, value.Len(), value.Len())
+	for i := 0; i < value.Len(); i++ {
+		elem := value.Index(i)
+		for elem.IsValid() && elem.Kind() == reflect.Interface {
+			if elem.IsNil() {
+				elem = reflect.Zero(elemType)
+				break
+			}
+			elem = elem.Elem()
+		}
+		if !elem.IsValid() {
+			out.Index(i).Set(reflect.Zero(elemType))
+			continue
+		}
+		if elem.Type().AssignableTo(elemType) {
+			out.Index(i).Set(elem)
+			continue
+		}
+		if elem.Type().ConvertibleTo(elemType) {
+			out.Index(i).Set(elem.Convert(elemType))
+			continue
+		}
+		if elemType.Kind() == reflect.String {
+			out.Index(i).SetString(fmt.Sprint(elem.Interface()))
+			continue
+		}
+		return reflect.Value{}, false
+	}
+	return out, true
 }
 
 func convertSliceForVariadicCall(val reflect.Value, targetSliceType reflect.Type) (reflect.Value, bool) {
@@ -462,7 +710,7 @@ func convertSliceForVariadicCall(val reflect.Value, targetSliceType reflect.Type
 	return out, true
 }
 
-func runtimeDecodeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Value, error) {
+func runtimeDecodeCallArgs(target reflect.Value, rawArgs []uint64, ellipsis bool) ([]reflect.Value, error) {
 	methodType := target.Type()
 	if !methodType.IsVariadic() {
 		if len(rawArgs) != methodType.NumIn() {
@@ -506,27 +754,34 @@ func runtimeDecodeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Va
 
 	variadicArgs := rawArgs[fixedCount:]
 
-	// Yak may pass a single slice value (e.g. ssa.withExcludeFile([])) instead of unpacked strings.
-	// raw == 0 is an int64 zero, not a nil slice: the nil-arg decode would turn
-	// it into a nil slice and swallow the argument (e.g. println(0)).
-	if len(variadicArgs) == 1 && variadicArgs[0] != 0 {
-		candidateTypes := []reflect.Type{variadicSliceType, reflect.TypeOf([]any(nil))}
-		var sliceArg reflect.Value
-		for _, candidate := range candidateTypes {
-			arg, err := runtimeDecodeArg(variadicArgs[0], candidate)
-			if err != nil {
-				continue
+	// `f(slice...)` unpacks the slice into variadic elements; `f(slice)`
+	// passes the slice as a single element. The compiler marks ellipsis calls
+	// with FlagEllipsis so the two are distinguishable at runtime.
+	if ellipsis && len(variadicArgs) == 1 {
+		if sliceVal, ok := runtimeDecodeVariadicSliceValue(variadicArgs[0]); ok {
+			elems := make([]reflect.Value, 0, sliceVal.Len())
+			for i := 0; i < sliceVal.Len(); i++ {
+				e := sliceVal.Index(i)
+				for e.IsValid() && e.Kind() == reflect.Interface {
+					if e.IsNil() {
+						e = reflect.Zero(variadicElemType)
+						break
+					}
+					e = e.Elem()
+				}
+				if e.IsValid() && e.Kind() == reflect.Ptr && !e.IsNil() {
+					ee := e.Elem()
+					if ee.IsValid() && (ee.Kind() == reflect.Slice || ee.Kind() == reflect.Map) {
+						e = ee
+					}
+				}
+				elems = append(elems, e)
 			}
-			if arg.IsValid() && arg.Kind() == reflect.Slice {
-				sliceArg = arg
-				break
+			slice := reflect.MakeSlice(variadicSliceType, len(elems), len(elems))
+			for i, elem := range elems {
+				slice.Index(i).Set(elem)
 			}
-		}
-		if sliceArg.IsValid() && sliceArg.Kind() == reflect.Slice {
-			converted, ok := convertSliceForVariadicCall(sliceArg, variadicSliceType)
-			if ok {
-				return append(fixed, converted), nil
-			}
+			return append(fixed, slice), nil
 		}
 	}
 
@@ -547,6 +802,36 @@ func runtimeDecodeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Va
 		slice.Index(i).Set(elem)
 	}
 	return append(fixed, slice), nil
+}
+
+// runtimeDecodeVariadicSliceValue resolves a single raw argument that is an
+// AOT slice shadow (*[]T) into its underlying slice reflect.Value.
+func runtimeDecodeVariadicSliceValue(raw uint64) (reflect.Value, bool) {
+	ptr := unsafe.Pointer(uintptr(raw &^ yakTaggedPointerMask))
+	if ptr == nil {
+		return reflect.Value{}, false
+	}
+	handle, ok := handleFromShadow(ptr)
+	if !ok {
+		return reflect.Value{}, false
+	}
+	value := reflect.ValueOf(handle.Value())
+	for value.IsValid() && value.Kind() == reflect.Interface {
+		if value.IsNil() {
+			return reflect.Value{}, false
+		}
+		value = value.Elem()
+	}
+	if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return reflect.Value{}, false
+		}
+		value = value.Elem()
+	}
+	if !value.IsValid() || value.Kind() != reflect.Slice {
+		return reflect.Value{}, false
+	}
+	return value, true
 }
 
 func runtimeCallReturnValue(results []reflect.Value) int64 {
@@ -571,15 +856,45 @@ func runtimeCallReturnValue(results []reflect.Value) int64 {
 	return int64(uintptr(newRuntimeShadow(tuple)))
 }
 
-func callRuntimeValue(target reflect.Value, rawArgs []uint64) (int64, error) {
-	args, err := runtimeDecodeCallArgs(target, rawArgs)
+func callRuntimeValue(target reflect.Value, rawArgs []uint64, ellipsis bool) (int64, error) {
+	args, err := runtimeDecodeCallArgs(target, rawArgs, ellipsis)
 	if err != nil {
 		return 0, err
 	}
 	methodType := target.Type()
 	if methodType.IsVariadic() && len(args) > 0 {
 		last := args[len(args)-1]
-		if last.IsValid() && last.Kind() == reflect.Slice {
+		unwrapped := last
+		for unwrapped.IsValid() && unwrapped.Kind() == reflect.Interface {
+			if unwrapped.IsNil() {
+				break
+			}
+			unwrapped = unwrapped.Elem()
+		}
+		if unwrapped.IsValid() && unwrapped.Kind() == reflect.Ptr && !unwrapped.IsNil() {
+			unwrapped = unwrapped.Elem()
+		}
+		if unwrapped.IsValid() && unwrapped.Kind() == reflect.Slice {
+			// For interface{} variadic targets, unwrap AOT slice/map shadow
+			// elements so yaklib sees the container values, not pointers.
+			if methodType.NumIn() > 0 && methodType.In(methodType.NumIn()-1).Kind() == reflect.Interface {
+				for i := 0; i < unwrapped.Len(); i++ {
+					e := unwrapped.Index(i)
+					for e.IsValid() && e.Kind() == reflect.Interface {
+						if e.IsNil() {
+							break
+						}
+						e = e.Elem()
+					}
+					if e.IsValid() && e.Kind() == reflect.Ptr && !e.IsNil() {
+						ee := e.Elem()
+						if ee.IsValid() && (ee.Kind() == reflect.Slice || ee.Kind() == reflect.Map) {
+							unwrapped.Index(i).Set(ee)
+						}
+					}
+				}
+			}
+			args[len(args)-1] = unwrapped
 			return runtimeCallReturnValue(target.CallSlice(args)), nil
 		}
 	}
@@ -593,7 +908,7 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 		// rather than shadow handles; resolve the string method directly.
 		if s, ok := tryResolveShadowString(objPtr); ok {
 			if method, ok := runtimeResolveStringMethod(s, methodName); ok {
-				return callRuntimeValue(method, rawArgs)
+				return callRuntimeValue(method, rawArgs, false)
 			}
 			return 0, fmt.Errorf("method %q not found on string", methodName)
 		}
@@ -602,7 +917,7 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 		if looksLikeCStringPointer(raw) {
 			s := runtimeCStringToGoString(unsafe.Pointer(uintptr(raw)))
 			if method, ok := runtimeResolveStringMethod(s, methodName); ok {
-				return callRuntimeValue(method, rawArgs)
+				return callRuntimeValue(method, rawArgs, false)
 			}
 			return 0, fmt.Errorf("method %q not found on string", methodName)
 		}
@@ -614,7 +929,7 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 		return 0, err
 	}
 
-	return callRuntimeValue(method, rawArgs)
+	return callRuntimeValue(method, rawArgs, false)
 }
 
 //export yak_runtime_concat

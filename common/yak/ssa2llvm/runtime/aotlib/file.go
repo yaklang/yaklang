@@ -73,7 +73,8 @@ func FileTempFileName(prefix string) string {
 }
 
 func FileOpen(path string) (any, error) {
-	return os.Open(path)
+	// yak's file.Open creates the file when missing and opens read-write.
+	return os.OpenFile(path, os.O_CREATE|os.O_RDWR, os.ModePerm)
 }
 
 func FileCat(path string) (string, error) {
@@ -107,24 +108,24 @@ func FileCopy(dst, src string) error {
 // FileExports mirrors the file module's export table (the AOT-supported
 // subset). Entries match common/yak/yaklib.FileExport signatures.
 var FileExports = map[string]any{
-	"IsExisted":  FileIsExisted,
-	"IsFile":     FileIsFile,
-	"IsDir":      FileIsDir,
-	"Join":       FileJoin,
-	"GetBase":    FileGetBase,
-	"GetExt":     FileGetExt,
-	"GetDirPath": FileGetDirPath,
-	"Clean":      FileClean,
-	"IsAbs":      FileIsAbs,
-	"Abs":        FileAbs,
-	"Split":      FileSplit,
-	"MkdirAll":   FileMkdirAll,
-	"Remove":     FileRemove,
-	"ReadFile":   FileReadFile,
-	"Save":       FileSave,
+	"IsExisted":    FileIsExisted,
+	"IsFile":       FileIsFile,
+	"IsDir":        FileIsDir,
+	"Join":         FileJoin,
+	"GetBase":      FileGetBase,
+	"GetExt":       FileGetExt,
+	"GetDirPath":   FileGetDirPath,
+	"Clean":        FileClean,
+	"IsAbs":        FileIsAbs,
+	"Abs":          FileAbs,
+	"Split":        FileSplit,
+	"MkdirAll":     FileMkdirAll,
+	"Remove":       FileRemove,
+	"ReadFile":     FileReadFile,
+	"Save":         FileSave,
 	"TempFileName": FileTempFileName,
-	"Open":       FileOpen,
-	"Cat":        FileCat,
-	"Walk":       FileWalk,
-	"Copy":       FileCopy,
+	"Open":         FileOpen,
+	"Cat":          FileCat,
+	"Walk":         FileWalk,
+	"Copy":         FileCopy,
 }
