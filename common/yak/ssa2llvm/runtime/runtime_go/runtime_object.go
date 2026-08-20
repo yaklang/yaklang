@@ -87,13 +87,21 @@ func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 // AOT runtime must provide (Go slices have no methods of their own).
 func runtimeResolveSliceMethod(v reflect.Value, name string) (reflect.Value, bool) {
 	switch name {
-	case "Append":
+	case "Append", "Push":
 		return reflect.ValueOf(func(items ...any) any {
 			elems := make([]reflect.Value, 0, len(items))
 			for _, item := range items {
 				elems = append(elems, runtimeSliceAppendValue(v.Type().Elem(), item))
 			}
 			return reflect.Append(v, elems...).Interface()
+		}), true
+	case "Map":
+		return reflect.ValueOf(func(fn any) []any {
+			out := make([]any, 0, v.Len())
+			for i := 0; i < v.Len(); i++ {
+				out = append(out, runtimeCallMappedElement(fn, v.Index(i).Interface()))
+			}
+			return out
 		}), true
 	case "Length", "Len":
 		return reflect.ValueOf(func() int { return v.Len() }), true
@@ -171,6 +179,14 @@ func runtimeResolveStringMethod(s string, name string) (reflect.Value, bool) {
 		return reflect.ValueOf(func(substr string) int { return strings.Index(s, substr) }), true
 	case "Rfind", "LastIndexOf":
 		return reflect.ValueOf(func(substr string) int { return strings.LastIndex(s, substr) }), true
+	case "Join":
+		return reflect.ValueOf(func(items []any) string {
+			strs := make([]string, 0, len(items))
+			for _, item := range items {
+				strs = append(strs, fmt.Sprint(item))
+			}
+			return strings.Join(strs, s)
+		}), true
 	default:
 		return reflect.Value{}, false
 	}
@@ -624,4 +640,19 @@ func runtimePtrToString(ptr unsafe.Pointer) string {
 		return fmt.Sprintf("%d", int64(raw))
 	}
 	return runtimeCStringToGoString(unsafe.Pointer(uintptr(raw)))
+}
+
+func runtimeCallMappedElement(fn any, elem any) any {
+	if fn == nil {
+		return elem
+	}
+	fv := reflect.ValueOf(fn)
+	if !fv.IsValid() || fv.Kind() != reflect.Func {
+		return elem
+	}
+	out := fv.Call([]reflect.Value{reflect.ValueOf(elem)})
+	if len(out) == 0 {
+		return nil
+	}
+	return out[0].Interface()
 }
