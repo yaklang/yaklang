@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
@@ -49,7 +50,9 @@ func TestMustPass_SSA2LLVM_AllScripts(t *testing.T) {
 		name := name
 		t.Run(name, func(t *testing.T) {
 			script := filepath.Join(mpDir, name)
-			output := RunYakScriptFileWithCLI(t, script, env)
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			defer cancel()
+			output := RunYakScriptFileWithCLITimeout(t, ctx, script, env)
 			if strings.Contains(output, "panic") {
 				t.Fatalf("ssa2llvm run of %s produced a runtime panic:\n%s", name, output)
 			}

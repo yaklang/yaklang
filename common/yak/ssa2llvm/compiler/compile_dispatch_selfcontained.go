@@ -168,7 +168,8 @@ var moduleGroupDeps = []struct {
 	{"ai", []string{"ssa"}},
 	{"liteforge", []string{"ai"}},
 	{"sandbox", []string{"ai"}},
-	{"rag", []string{"ai"}},
+	{"rag", []string{"ai", "liteforge"}},
+	{"ai", []string{"ssa", "liteforge"}},
 	{"dyn", []string{"ai"}},
 	{"hook", []string{"ai"}},
 	// Modules whose export tables live in the ssa group (their own packages
