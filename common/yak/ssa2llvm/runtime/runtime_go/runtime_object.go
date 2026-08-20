@@ -571,17 +571,32 @@ func convertMapValue(value reflect.Value, targetType reflect.Type) (reflect.Valu
 	if !value.IsValid() || targetType == nil || targetType.Kind() != reflect.Map {
 		return reflect.Value{}, false
 	}
-	if value.Kind() == reflect.Ptr {
-		if value.IsNil() {
-			return reflect.Value{}, false
-		}
-		value = value.Elem()
-	}
 	var keys []string
 	var values map[string]any
 	if om, ok := value.Interface().(*runtimeOrderedMap); ok && om != nil {
 		keys = om.keys
 		values = om.values
+	} else if value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return reflect.Value{}, false
+		}
+		if om, ok := value.Interface().(*runtimeOrderedMap); ok && om != nil {
+			keys = om.keys
+			values = om.values
+		} else {
+			value = value.Elem()
+			if !value.IsValid() || value.Kind() != reflect.Map {
+				return reflect.Value{}, false
+			}
+			keys = make([]string, 0, value.Len())
+			values = make(map[string]any, value.Len())
+			iter := value.MapRange()
+			for iter.Next() {
+				k := fmt.Sprint(iter.Key().Interface())
+				keys = append(keys, k)
+				values[k] = iter.Value().Interface()
+			}
+		}
 	} else if value.Kind() == reflect.Map {
 		keys = make([]string, 0, value.Len())
 		values = make(map[string]any, value.Len())
