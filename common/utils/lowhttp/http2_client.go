@@ -943,9 +943,27 @@ func (rl *http2ClientConnReadLoop) processContinuation(f *http2.ContinuationFram
 
 func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 	cs := rl.h2Conn.streamByID(f.StreamID) // get stream by id
+	if cs == nil {
+		// DATA already in flight when we canceled a stream still consumes the
+		// connection-level receive window. Discard the payload, but return that
+		// credit so an abandoned response cannot stall every other stream on the
+		// connection. The frame length includes the pad-length byte and padding,
+		// both of which are flow controlled by RFC 7540 section 6.9.
+		if frameLen := f.Header().Length; frameLen > 0 {
+			rl.h2Conn.frWriteMutex.Lock()
+			err := rl.h2Conn.fr.WriteWindowUpdate(0, frameLen)
+			rl.h2Conn.frWriteMutex.Unlock()
+			if err != nil {
+				log.Debugf("h2 stream-id %v return canceled DATA connection window failed: %v", f.StreamID, err)
+				return
+			}
+		}
+		log.Debugf("h2 stream-id %v processData ignored: unknown stream id: %v", f.StreamID, f.StreamID)
+		return
+	}
 	if err := streamAliveCheck(cs, f.StreamID); err != nil {
 		// Server sent DATA after END_STREAM — protocol violation, silently ignore.
-		log.Warnf("h2 stream-id %v processData ignored: %v", f.StreamID, err)
+		log.Debugf("h2 stream-id %v processData ignored: %v", f.StreamID, err)
 		return
 	}
 
