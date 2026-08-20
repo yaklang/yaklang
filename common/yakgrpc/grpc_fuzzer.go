@@ -1778,9 +1778,9 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 							}
 						}
 					}
+					redirectRsp.TaskId = int64(taskID)
 					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.Uuid, redirectRsp)
 					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
-					redirectRsp.TaskId = int64(taskID)
 					err := feedbackResponse(redirectRsp, false, false)
 					if err != nil {
 						log.Errorf("send to client failed: %s", err)
@@ -1792,9 +1792,9 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
 			}
+			rsp.TaskId = int64(taskID)
 			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.Uuid, rsp)
 			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
-			rsp.TaskId = int64(taskID)
 			err := feedbackResponse(rsp, false, skipSendForSSEFinal)
 			if du := time.Now().Sub(feedbackNormalResponseStart); du > time.Second {
 				log.Warnf("feedbackNormalResponse cost too much time, try investigate it, cost: %v", du)

@@ -1393,12 +1393,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						}
 
 						if needSSEStream {
-							if httpPoolIsSSERequest(targetRequest) {
-								lowhttpOptions = append(lowhttpOptions, lowhttp.WithNoBodyBuffer(true))
-							}
-							if config.AutoDetectSSE {
-								lowhttpOptions = append(lowhttpOptions, lowhttp.WithAutoDetectSSE(true))
-							}
+							// Accept: text/event-stream only says that the client can consume SSE.
+							// Streamable HTTP endpoints (including MCP) may still return a normal
+							// application/json response, so defer NoBodyBuffer to lowhttp's
+							// response Content-Type detection instead of discarding the body here.
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithAutoDetectSSE(true))
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithBodyStreamReaderHandler(func(respHeaderRaw []byte, bodyReader io.ReadCloser) {
 								defer bodyReader.Close()
 
