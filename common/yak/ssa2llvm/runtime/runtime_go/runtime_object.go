@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"math"
@@ -230,6 +231,25 @@ func runtimeResolveSliceMethod(v reflect.Value, name string) (reflect.Value, boo
 			// Use the same conversion path as append for consistency.
 			rv := runtimeSliceAppendValue(v.Type().Elem(), item)
 			v.Index(i).Set(rv)
+		}), true
+	case "Contains":
+		return reflect.ValueOf(func(item any) bool {
+			// []byte.Contains("...") matches bytes.Contains semantics.
+			if v.IsValid() && v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
+				raw := v.Bytes()
+				switch sub := item.(type) {
+				case string:
+					return bytes.Contains(raw, []byte(sub))
+				case []byte:
+					return bytes.Contains(raw, sub)
+				}
+			}
+			for i := 0; i < v.Len(); i++ {
+				if runtimeValuesEqual(v.Index(i).Interface(), item) {
+					return true
+				}
+			}
+			return false
 		}), true
 	}
 	return reflect.Value{}, false
@@ -945,6 +965,40 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 	}
 
 	return callRuntimeValue(method, rawArgs, false)
+}
+
+//export yak_runtime_drop_error
+func yak_runtime_drop_error(value unsafe.Pointer) int64 {
+	defer recoverRuntimePanic()
+	if value == nil {
+		return 0
+	}
+	if h, ok := handleFromShadow(value); ok {
+		if tuple, ok := h.Value().([]any); ok && len(tuple) > 0 {
+			// Multi-return tuple from a yaklib call: `f()~` keeps the first
+			// value and drops the trailing error.
+			return runtimeValueToInt64(reflect.ValueOf(tuple[0]))
+		}
+	}
+	// Single-return call: the value is already the result; preserve its word.
+	return int64(uintptr(value))
+}
+
+//export yak_runtime_string_slice
+func yak_runtime_string_slice(parent unsafe.Pointer, low, high int64) unsafe.Pointer {
+	defer recoverRuntimePanic()
+	s := runtimePtrToString(parent)
+	runes := []rune(s)
+	if low < 0 {
+		low = 0
+	}
+	if high < 0 || high > int64(len(runes)) {
+		high = int64(len(runes))
+	}
+	if low > high {
+		low = high
+	}
+	return newStdlibShadow(string(runes[low:high]))
 }
 
 //export yak_runtime_concat

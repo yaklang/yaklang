@@ -14,8 +14,8 @@ type functionCompileContext struct {
 	// graph) before they are lazily compiled.
 	ownerValueIDs map[int64]struct{}
 
-	invokeCtx      llvm.Value
-	returnBlock    llvm.BasicBlock
+	invokeCtx   llvm.Value
+	returnBlock llvm.BasicBlock
 	// entryBlock is the function's real entry block. compileAssert rebinds
 	// c.Blocks[fn.EnterBlock] to the assert continuation, so slot allocation
 	// and def anchoring must use this stable reference instead of looking up
@@ -31,6 +31,14 @@ type functionCompileContext struct {
 	// values go through this pointer so mutable captures persist across calls
 	// and shared loop variables see the final value.
 	freeValuePointers map[int64]llvm.Value
+	// materializedClosures maps a direct closure call instruction id to the
+	// closure object value materialized at that call site. SideEffect
+	// instructions after the call read captured variables through these slots.
+	materializedClosures map[int64]llvm.Value
+	// materializedClosureArgs maps a call instruction id to closure objects
+	// passed as call arguments (extern/yaklib callbacks). SideEffects after
+	// the call read captured variables from these slots as well.
+	materializedClosureArgs map[int64][]llvm.Value
 
 	exceptionValueIDs    map[int64]struct{}
 	activeHandlerByBlock map[int64]int64

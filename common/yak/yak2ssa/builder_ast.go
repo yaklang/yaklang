@@ -1779,23 +1779,51 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
-	exprLen := len(stmt.AllColon()) + 1
-	exprs := stmt.AllExpression()
+	colonCount := len(stmt.AllColon())
+	exprLen := colonCount + 1
+	if colonCount == 0 {
+		// Single index form [key]; the caller treats it as a member read.
+		exprs := stmt.AllExpression()
+		if len(exprs) == 0 {
+			b.NewError(ssa.Error, TAG, SliceCallExpressionIsEmpty())
+			return nil
+		}
+		if len(exprs) > 1 {
+			b.NewError(ssa.Error, TAG, SliceCallExpressionTooMuch())
+			return nil
+		}
+		return []ssa.Value{b.buildExpression(exprs[0].(*yak.ExpressionContext))}
+	}
+	// Position each expression by its grammar slot relative to the colons:
+	// `[a:b]` -> values[0]=a, values[1]=b; `[:b]` -> values[0]=nil, values[1]=b;
+	// `[a:]` -> values[0]=a, values[1]=nil. AllExpression() drops absent
+	// slots, so iterating children is required to tell [:b] apart from [b:].
 	values := make([]ssa.Value, exprLen)
-	if len(exprs) == 0 {
+	slot := 0
+	exprSeen := 0
+	for _, child := range stmt.GetChildren() {
+		if expr, ok := child.(*yak.ExpressionContext); ok {
+			if slot >= exprLen {
+				return nil
+			}
+			values[slot] = b.buildExpression(expr)
+			exprSeen++
+			slot++
+			continue
+		}
+		if terminal, ok := child.(antlr.TerminalNode); ok {
+			if terminal.GetSymbol().GetTokenType() == yak.YaklangParserColon {
+				slot++
+			}
+		}
+	}
+	if exprSeen == 0 {
 		b.NewError(ssa.Error, TAG, SliceCallExpressionIsEmpty())
 		return nil
 	}
-	if len(exprs) > 3 {
+	if exprSeen > 3 {
 		b.NewError(ssa.Error, TAG, SliceCallExpressionTooMuch())
 		return nil
-	}
-	for i, expr := range exprs {
-		if s, ok := expr.(*yak.ExpressionContext); ok {
-			values[i] = b.buildExpression(s)
-		} else {
-			values[i] = b.EmitConstInstPlaceholder(0)
-		}
 	}
 	return values
 }

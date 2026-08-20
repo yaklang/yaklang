@@ -1205,6 +1205,38 @@ var (
 	_ Instruction = (*Make)(nil)
 )
 
+// GetParent returns the parent value id for slice expressions (e.g. s[1:3]).
+func (m *Make) GetParent() int64 {
+	if m == nil {
+		return 0
+	}
+	return m.parentI
+}
+
+// GetLow returns the lower-bound value id for slice expressions.
+func (m *Make) GetLow() int64 {
+	if m == nil {
+		return 0
+	}
+	return m.low
+}
+
+// GetHigh returns the upper-bound value id for slice expressions.
+func (m *Make) GetHigh() int64 {
+	if m == nil {
+		return 0
+	}
+	return m.high
+}
+
+// GetStep returns the step value id for slice expressions.
+func (m *Make) GetStep() int64 {
+	if m == nil {
+		return 0
+	}
+	return m.step
+}
+
 // ------------- Next
 type Next struct {
 	*anValue

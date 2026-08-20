@@ -368,6 +368,12 @@ func (c *Call) handleCalleeFunction() {
 		// Try to get the FunctionType from the call's return value
 		funcTyp = c.tryGetFunctionTypeFromCallReturn(method)
 		if funcTyp == nil {
+			// Extern/yaklib callees (e.g. retry) have no SSA body or typed
+			// signature, but callback arguments with side effects still need
+			// propagation to the call site. handleArgumentFunctionSideEffect
+			// handles nil callee types by treating every function-typed
+			// argument as potentially invoked.
+			handleArgumentFunctionSideEffect(c, nil)
 			return
 		}
 	}

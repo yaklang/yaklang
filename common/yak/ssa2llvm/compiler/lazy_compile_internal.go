@@ -121,6 +121,14 @@ func (c *Compiler) instructionIsTerminator(inst llvm.Value) bool {
 }
 
 func (c *Compiler) emitImplicitFunctionExit(fn *ssa.Function) error {
+	// Closures without an explicit ret still need their captured-variable
+	// writeback (e.g. `func() { count += 1 }`), otherwise the parent never
+	// observes the mutation.
+	if fn != nil {
+		if err := c.applyClosureSideEffectWriteback(fn, nil); err != nil {
+			return err
+		}
+	}
 	if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
 		return err
 	}

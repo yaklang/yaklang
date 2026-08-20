@@ -767,10 +767,6 @@ func isParameterCalledInFunction(calleeFunc *Function, paramIndex int) bool {
 // 2. If the corresponding parameter is actually called inside the callee
 // 3. If both conditions are met, create SideEffect instructions at the call site
 func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
-	if calleeFuncTyp == nil {
-		return
-	}
-
 	function := c.GetFunc()
 	if function == nil {
 		return
@@ -785,16 +781,16 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 		return
 	}
 
-	// Get the callee function (not just its type) to analyze parameter usage
+	// Get the callee function (not just its type) to analyze parameter usage.
+	// Extern/yaklib callees have no body to analyze, so we fall back to the
+	// declared parameter types below: a function-typed parameter may be
+	// invoked by the extern implementation (retry, Each, go, ...), and
+	// propagating the side effect is a no-op when it is not.
 	method, ok := c.GetValueById(c.Method)
 	if !ok || utils.IsNil(method) {
 		return
 	}
 	calleeFunc, isCalleeFunc := ToFunction(method)
-	if !isCalleeFunc {
-		// Cannot analyze parameter usage without function implementation
-		return
-	}
 
 	// Check each argument to see if it's a function with side effects
 	for i, argId := range c.Args {
@@ -815,11 +811,36 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 			continue
 		}
 
-		// CRITICAL: Check if the parameter is actually called inside the callee function
-		// Only propagate side effects if the parameter function is invoked
-		if !isParameterCalledInFunction(calleeFunc, i) {
-			// The parameter function is not called inside the callee,
-			// so its side effects should not be propagated
+		// Bind the argument function's free values to the current call-site
+		// scope so closure materialization captures the pre-call values (e.g.
+		// count=0 before retry runs) instead of resolving the post-call
+		// side-effect value, which would create a circular dependency.
+		if len(argFuncTyp.FreeValue) > 0 {
+			c.HandleFreeValue(argFuncTyp.FreeValue)
+		}
+
+		// CRITICAL: Only propagate side effects if the parameter function is
+		// actually invoked inside the callee. For extern callees we cannot
+		// inspect the body, so we accept any function-typed parameter: extern
+		// functions taking callbacks (retry, Each, go, ...) invoke them, and a
+		// false positive is harmless because the side-effect reads the
+		// closure's current slot, which is unchanged when the callback never
+		// ran.
+		if isCalleeFunc {
+			if !calleeFunc.IsExtern() {
+				// Real function body: only propagate when the parameter is
+				// actually invoked inside the callee.
+				if !isParameterCalledInFunction(calleeFunc, i) {
+					continue
+				}
+			} else if calleeFuncTyp != nil && !calleeParameterIsFunctionType(calleeFuncTyp, i) {
+				// Extern callee with a declared signature: propagate when the
+				// parameter is function-typed. Without a signature we fall
+				// through and propagate, because extern callbacks (retry,
+				// Each, go, ...) are invoked by the implementation.
+				continue
+			}
+		} else if calleeFuncTyp != nil && !calleeParameterIsFunctionType(calleeFuncTyp, i) {
 			continue
 		}
 
@@ -856,4 +877,15 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 		}
 		recoverBuilder()
 	}
+}
+
+// calleeParameterIsFunctionType reports whether the callee's i-th declared
+// parameter has a function type. Used for extern/yaklib callees whose body is
+// not available for call-site analysis.
+func calleeParameterIsFunctionType(calleeFuncTyp *FunctionType, i int) bool {
+	if calleeFuncTyp == nil || i < 0 || i >= len(calleeFuncTyp.Parameter) {
+		return false
+	}
+	_, ok := ToFunctionType(calleeFuncTyp.Parameter[i])
+	return ok
 }

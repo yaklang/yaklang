@@ -101,6 +101,13 @@ func (c *Compiler) compileRecover(inst *ssa.Recover) error {
 	if err != nil {
 		return err
 	}
+	// recover() both returns the captured panic value and clears it: the
+	// function resumes normally and the panic does not propagate to callers.
+	// Without this, `defer recover()` in a closure still propagates the panic
+	// (e.g. retry's die(111) escapes and the loop never observes count>=4).
+	if err := c.clearContextPanic(); err != nil {
+		return err
+	}
 	if inst.GetId() > 0 {
 		c.cacheValue(inst.GetId(), c.coerceToInt64(val))
 	}
