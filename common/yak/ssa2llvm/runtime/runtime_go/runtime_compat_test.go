@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"unsafe"
 )
 
 func TestConvertMapValue_OrderedMapToGoMap(t *testing.T) {
@@ -204,5 +205,84 @@ func TestRuntimeDispatchShadowMethod_NilReceiver(t *testing.T) {
 	}
 	if ret != 0 {
 		t.Fatalf("nil receiver ret = %d, want 0", ret)
+	}
+}
+
+func TestRuntimeOrderedMap_KeysValuesHasDelete(t *testing.T) {
+	m := newRuntimeOrderedMap()
+	m.Set("a", int64(1))
+	m.Set("b", "x")
+	m.Set("c", int64(3))
+	keys := m.Keys()
+	if len(keys) != 3 || keys[0] != "a" || keys[2] != "c" {
+		t.Fatalf("Keys = %#v", keys)
+	}
+	values := m.Values()
+	if len(values) != 3 || values[0] != int64(1) || values[2] != int64(3) {
+		t.Fatalf("Values = %#v", values)
+	}
+	if !m.Has("b") || m.Has("z") {
+		t.Fatalf("Has mismatch")
+	}
+	m.Delete("b")
+	if m.Has("b") || m.Len() != 2 {
+		t.Fatalf("Delete failed: %#v", m.Keys())
+	}
+	if keys := m.Keys(); keys[0] != "a" || keys[1] != "c" {
+		t.Fatalf("Keys after delete = %#v", keys)
+	}
+}
+
+func TestRuntimeStringSlice_RuneBounds(t *testing.T) {
+	s := "你好"
+	ptr := newStdlibShadow(s)
+	out := yak_runtime_string_slice(ptr, 0, 2)
+	got := runtimePtrToString(out)
+	if got != s {
+		t.Fatalf("slice 0:2 = %q, want %q", got, s)
+	}
+	out2 := yak_runtime_string_slice(ptr, 1, 2)
+	got2 := runtimePtrToString(out2)
+	if got2 != "好" {
+		t.Fatalf("slice 1:2 = %q, want 好", got2)
+	}
+	// Negative/absent bounds slice to the full string.
+	out3 := yak_runtime_string_slice(ptr, 0, -1)
+	if got3 := runtimePtrToString(out3); got3 != s {
+		t.Fatalf("slice 0:-1 = %q, want %q", got3, s)
+	}
+}
+
+func TestRuntimeDropError_TupleAndSingle(t *testing.T) {
+	// Multi-return tuple: drop error, keep first value.
+	tuple := []any{int64(7), "boom"}
+	raw := uintptr(newStdlibShadow(tuple))
+	if got := yak_runtime_drop_error(unsafe.Pointer(raw)); got != 7 {
+		t.Fatalf("drop_error tuple = %d, want 7", got)
+	}
+	// Single value (a string shadow): returned unchanged as its word.
+	s := "abc"
+	raw2 := uintptr(newStdlibShadow(s))
+	out := yak_runtime_drop_error(unsafe.Pointer(raw2))
+	if h, ok := handleFromShadow(unsafe.Pointer(uintptr(out))); !ok {
+		t.Fatalf("drop_error single = %#x, want shadow handle", out)
+	} else if h.Value() != s {
+		t.Fatalf("drop_error single = %v, want %s", h.Value(), s)
+	}
+}
+
+func TestRuntimeReadClosureFreeValue_ByRefSlot(t *testing.T) {
+	slot := uint64(42)
+	closure := runtimeCallableClosure{
+		fn:         123,
+		freeValues: []uint64{uint64(uintptr(unsafe.Pointer(&slot))), uint64(uintptr(unsafe.Pointer(&slot)))},
+	}
+	raw := uint64(uintptr(newRuntimeShadow(closure)))
+	if got := yak_runtime_read_closure_free_value(raw, 1, 1); got != 42 {
+		t.Fatalf("read closure free value = %d, want 42", got)
+	}
+	slot = 99
+	if got := yak_runtime_read_closure_free_value(raw, 0, 1); got != 99 {
+		t.Fatalf("read closure free value after update = %d, want 99", got)
 	}
 }
