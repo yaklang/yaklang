@@ -25,6 +25,7 @@ func yakCompileSSAOptions() []ssaconfig.Option {
 		}
 		valueTable[name] = item
 	}
+	valueTable["__yak_chan_send"] = func(ch any, v any) {}
 	if len(valueTable) > 0 {
 		opts = append(opts, ssaapi.WithExternValue(valueTable))
 	}
