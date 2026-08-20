@@ -63,7 +63,7 @@ func TestRuntimeCallReturnValueMulti(t *testing.T) {
 func TestRuntimeDecodeCallArgsVariadicSliceArg(t *testing.T) {
 	fn := reflect.ValueOf(ssaconfig.WithCompileExcludeFiles)
 	raw := []uint64{uint64(uintptr(newRuntimeShadow([]any{})))}
-	args, err := runtimeDecodeCallArgs(fn, raw)
+	args, err := runtimeDecodeCallArgs(fn, raw, true)
 	if err != nil {
 		t.Fatalf("runtimeDecodeCallArgs: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestRuntimeDispatchEqComparesShadowAndCStringStrings(t *testing.T) {
 	cstrBuf := []byte{'p', 'h', 'p', 0}
 	cstr := uint64(uintptr(unsafe.Pointer(&cstrBuf[0]))) | yakTaggedPointerMask
 
-	got, err := runtimeDispatchEq([]uint64{shadow, cstr, 0})
+	got, err := runtimeDispatchEq([]uint64{shadow, cstr, 0}, false)
 	if err != nil {
 		t.Fatalf("runtimeDispatchEq: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestRuntimeDispatchEqComparesShadowAndCStringStrings(t *testing.T) {
 		t.Fatalf("want equal strings, got %d", got)
 	}
 
-	got, err = runtimeDispatchEq([]uint64{shadow, cstr, 1})
+	got, err = runtimeDispatchEq([]uint64{shadow, cstr, 1}, false)
 	if err != nil {
 		t.Fatalf("runtimeDispatchEq not equal: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestRuntimeDispatchEqComparesShadowAndCStringStrings(t *testing.T) {
 
 func TestRuntimeDispatchEqTreatsTaggedNilAsNil(t *testing.T) {
 	taggedNil := yakTaggedPointerMask
-	got, err := runtimeDispatchEq([]uint64{taggedNil, 0, 0})
+	got, err := runtimeDispatchEq([]uint64{taggedNil, 0, 0}, false)
 	if err != nil {
 		t.Fatalf("runtimeDispatchEq tagged nil: %v", err)
 	}
@@ -300,7 +300,7 @@ func TestRuntimeDispatchEqTreatsTaggedNilAsNil(t *testing.T) {
 		t.Fatalf("want tagged nil to equal nil, got %d", got)
 	}
 
-	got, err = runtimeDispatchEq([]uint64{taggedNil, 0, 1})
+	got, err = runtimeDispatchEq([]uint64{taggedNil, 0, 1}, false)
 	if err != nil {
 		t.Fatalf("runtimeDispatchEq negated tagged nil: %v", err)
 	}
