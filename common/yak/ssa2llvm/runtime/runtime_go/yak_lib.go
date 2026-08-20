@@ -260,9 +260,13 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 	case reflect.Slice, reflect.Array:
 		idx, ok := resolveCollectionIndex(v.Len(), name)
 		if !ok {
-			// A non-numeric key on a slice is either a method-name probe
-			// emitted by the compiler for member-callee materialization or a
-			// genuinely missing index; both read as nil instead of panicking.
+			// Numeric names are index reads: preserve the negative-index
+			// support and report out-of-range errors. Non-numeric member
+			// names are method probes emitted by the compiler for member
+			// callees; those read as nil.
+			if _, err := strconv.Atoi(name); err == nil {
+				return reflect.Value{}, fmt.Errorf("index %q out of range", name)
+			}
 			return reflect.Value{}, nil
 		}
 		return v.Index(idx), nil
