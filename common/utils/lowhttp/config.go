@@ -121,6 +121,9 @@ type LowhttpExecConfig struct {
 
 	// BodyStreamReaderHandler is a callback function to handle the body stream reader
 	BodyStreamReaderHandler func(responseHeader []byte, closer io.ReadCloser)
+	// bodyStreamReaderHandled coordinates the transport-specific stream handler
+	// with HTTPWithoutRedirect's fallback. It keeps the callback exactly-once.
+	bodyStreamReaderHandled *utils.AtomicBool
 	// AutoDetectSSE enables SSE auto-detection by response headers (Content-Type: text/event-stream)
 	// to automatically switch into stream/no-body-buffer mode even when request headers don't include
 	// Accept: text/event-stream.

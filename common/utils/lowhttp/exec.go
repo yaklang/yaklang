@@ -341,6 +341,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 	// 用于检查 BodyStreamReaderHandler 是否被正常调用
 	bodyStreamReaderHandled := utils.NewAtomicBool()
+	option.bodyStreamReaderHandled = bodyStreamReaderHandled
 	var streamBodyReaderCh chan io.ReadCloser
 	var streamHandlerDone chan struct{}
 	defer func() {

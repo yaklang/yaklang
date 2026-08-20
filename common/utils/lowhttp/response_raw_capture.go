@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bytes"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -27,6 +28,23 @@ type responseRawCaptureWriter struct {
 	headerBuf     bytes.Buffer
 
 	discardBody bool
+}
+
+// IsSSEContentTypeHeader reports whether headerRaw declares the SSE media type.
+// It deliberately examines only the Content-Type field's primary media type:
+// Streamable HTTP responses may mention text/event-stream in another header or
+// in an application/json parameter without actually being an SSE response.
+func IsSSEContentTypeHeader(headerRaw []byte) bool {
+	contentType := strings.TrimSpace(GetHTTPPacketHeader(headerRaw, "Content-Type"))
+	if contentType == "" {
+		return false
+	}
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		mediaType, _, _ = strings.Cut(contentType, ";")
+		mediaType = strings.TrimSpace(mediaType)
+	}
+	return strings.EqualFold(mediaType, "text/event-stream")
 }
 
 func (w *responseRawCaptureWriter) Write(p []byte) (int, error) {
@@ -72,8 +90,7 @@ func (w *responseRawCaptureWriter) Write(p []byte) (int, error) {
 				w.matchState = 0
 
 				if w.autoDetectSSE {
-					headerLower := strings.ToLower(w.headerBuf.String())
-					if strings.Contains(headerLower, "content-type:") && strings.Contains(headerLower, "text/event-stream") {
+					if IsSSEContentTypeHeader(w.headerBuf.Bytes()) {
 						w.discardBody = true
 						if w.req != nil {
 							httpctx.SetNoBodyBuffer(w.req, true)
