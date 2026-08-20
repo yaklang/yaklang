@@ -5,6 +5,8 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func (c *Compiler) compileSideEffectInstruction(inst *ssa.SideEffect) error {
@@ -69,6 +71,27 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 		return err
 	}
 
+	// A side effect after a closure call (e.g. `f(); count` or
+	// `retry(100, f); count` where f mutates the captured count) refers to a
+	// value owned by the closure function. Resolve it through the closure's
+	// free-value slots instead of the cross-function fallback (which returns 0).
+	if closureVal, index, byRef, ok := c.resolveClosureSideEffect(inst, actualID); ok {
+		readFn, readType := c.getOrInsertRuntimeReadClosureFreeValue()
+		idx := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(index), false)
+		byRefWord := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		if byRef {
+			byRefWord = llvm.ConstInt(c.LLVMCtx.Int64Type(), 1, false)
+		}
+		val := c.Builder.CreateCall(readType, readFn, []llvm.Value{
+			c.coerceToInt64(closureVal), idx, byRefWord,
+		}, fmt.Sprintf("yak_closure_fv_read_%d", inst.GetId()))
+		val = c.coerceToInt64(val)
+		if inst.GetId() > 0 {
+			c.cacheValue(inst.GetId(), val)
+		}
+		return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+	}
+
 	actualVal, err := c.getValue(inst, actualID)
 	if err != nil {
 		return err
@@ -79,6 +102,68 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 	}
 
 	return c.maybeEmitMemberSet(inst, inst, inst.GetId())
+}
+
+// resolveClosureSideEffect resolves a side-effect whose modified value belongs
+// to a closure function called at the side-effect's call site (either directly
+// as the call target or passed as a callback argument). It returns the
+// materialized closure object, the free-value binding index for the captured
+// variable, whether the capture is by-reference, and ok.
+func (c *Compiler) resolveClosureSideEffect(inst *ssa.SideEffect, actualID int64) (llvm.Value, uint64, bool, bool) {
+	if inst == nil || inst.CallSite <= 0 || actualID <= 0 || c.function == nil {
+		return llvm.Value{}, 0, false, false
+	}
+	fn := inst.GetFunc()
+	if fn == nil {
+		return llvm.Value{}, 0, false, false
+	}
+	valObj, ok := fn.GetValueById(actualID)
+	if !ok || valObj == nil {
+		return llvm.Value{}, 0, false, false
+	}
+	closureFn := valObj.GetFunc()
+	if closureFn == nil || closureFn == fn {
+		return llvm.Value{}, 0, false, false
+	}
+	index := -1
+	byRef := false
+	for i, binding := range callframe.OrderedFreeValueBindings(closureFn) {
+		if binding.Variable.GetValue().GetId() != actualID {
+			continue
+		}
+		index = i
+		byRef = c.freeValueCaptureMode(closureFn, binding) != freeValueCaptureByValue
+		break
+	}
+	if index < 0 {
+		return llvm.Value{}, 0, false, false
+	}
+	// Direct closure target.
+	if c.function.materializedClosures != nil {
+		if closureVal, ok := c.function.materializedClosures[inst.CallSite]; ok && !closureVal.IsNil() {
+			return closureVal, uint64(index), byRef, true
+		}
+	}
+	// Closure passed as a callback argument (extern/yaklib callee).
+	if c.function.materializedClosureArgs != nil {
+		for _, closureVal := range c.function.materializedClosureArgs[inst.CallSite] {
+			if !closureVal.IsNil() {
+				return closureVal, uint64(index), byRef, true
+			}
+		}
+	}
+	return llvm.Value{}, 0, false, false
+}
+
+func (c *Compiler) getOrInsertRuntimeReadClosureFreeValue() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeReadClosureFreeValueSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
 }
 
 func (c *Compiler) isAsyncSideEffect(inst *ssa.SideEffect) bool {
