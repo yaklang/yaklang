@@ -178,6 +178,9 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 			}
 		case FrameInputParamMember:
 			actualID := resolveCallArgMemberID(call, calleeFn, input)
+			if actualID <= 0 && call != nil && input.Index < len(call.ArgMember) && call.ArgMember[input.Index] > 0 {
+				actualID = call.ArgMember[input.Index]
+			}
 			if actualID > 0 {
 				if shouldDeferParameterMemberArg(call, calleeFn, input, actualID) {
 					argIDs = append(argIDs, zero)
@@ -193,25 +196,9 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 			if input.Variable != nil {
 				name = input.Variable.GetName()
 			}
-			callerFn := call.GetFunc()
-			if name != "" && callerFn != nil {
-				if !resolved {
-					for variable, valueID := range callerFn.FreeValues {
-						if variable != nil && variable.GetName() == name && valueID > 0 {
-							argIDs = append(argIDs, valueID)
-							resolved = true
-							break
-						}
-					}
-				}
-				if !resolved {
-					if actualID, ok := call.Binding[name]; ok && actualID > 0 {
-						if valueBelongsToFunctionOrParent(callerFn, actualID) {
-							argIDs = append(argIDs, actualID)
-							resolved = true
-						}
-					}
-				}
+			if actualID := resolveCapturedValueID(call, calleeFn, name, input.Value); actualID > 0 {
+				argIDs = append(argIDs, actualID)
+				resolved = true
 			}
 			if !resolved {
 				argIDs = append(argIDs, zero)
@@ -221,6 +208,57 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 		}
 	}
 	return argIDs
+}
+
+func formalMemberKeyString(input FrameInput) string {
+	if input.Value == nil {
+		return ""
+	}
+	pm, ok := ssa.ToParameterMember(input.Value)
+	if !ok || pm == nil || pm.GetKey() == nil {
+		return ""
+	}
+	return memberKeyString(pm.GetKey())
+}
+
+func resolveCapturedValueID(call *ssa.Call, calleeFn *ssa.Function, name string, fallback ssa.Value) int64 {
+	if call == nil || name == "" {
+		return 0
+	}
+	callerFn := call.GetFunc()
+	if callerFn != nil {
+		for variable, valueID := range callerFn.FreeValues {
+			if variable != nil && variable.GetName() == name && valueID > 0 {
+				return valueID
+			}
+		}
+	}
+	if callerFn != nil {
+		if actualID, ok := call.Binding[name]; ok && actualID > 0 && valueBelongsToFunctionOrParent(callerFn, actualID) {
+			return actualID
+		}
+	}
+	// The binding id may belong to the callee's free-value parameter; its
+	// default is the captured caller-side value.
+	if calleeFn != nil {
+		for variable, valueID := range calleeFn.FreeValues {
+			if variable != nil && variable.GetName() == name && valueID > 0 {
+				if param, ok := calleeFn.GetValueById(valueID); ok {
+					if p, ok := ssa.ToParameter(param); ok && p != nil && p.GetDefault() != nil {
+						return p.GetDefault().GetId()
+					}
+				}
+			}
+		}
+	}
+	if fallback != nil {
+		if param, ok := ssa.ToParameter(fallback); ok && param != nil && param.GetDefault() != nil {
+			if def := param.GetDefault(); callerFn == nil || def.GetFunc() == callerFn {
+				return def.GetId()
+			}
+		}
+	}
+	return 0
 }
 
 func valueBelongsToFunctionOrParent(fn *ssa.Function, valueID int64) bool {
@@ -233,16 +271,16 @@ func valueBelongsToFunctionOrParent(fn *ssa.Function, valueID int64) bool {
 }
 
 func resolveCallArgMemberID(call *ssa.Call, calleeFn *ssa.Function, input FrameInput) int64 {
-	if call == nil || input.Kind != FrameInputParamMember {
+	if call == nil || input.Kind != FrameInputParamMember || input.Index < 0 {
 		return 0
 	}
-
 	if formal, ok := ssa.ToParameterMember(input.Value); ok && formal != nil {
-		if actualID := findMatchingCallArgMember(call, calleeFn, formal); actualID > 0 {
-			return actualID
+		if formal.MemberCallKind == ssa.FreeValueMemberCall {
+			if id := resolveCapturedValueID(call, calleeFn, formal.ObjectName, nil); id > 0 {
+				return id
+			}
 		}
 	}
-
 	if input.Index < len(call.ArgMember) && call.ArgMember[input.Index] > 0 {
 		return call.ArgMember[input.Index]
 	}
@@ -338,6 +376,9 @@ func shouldDeferParameterMemberArg(call *ssa.Call, calleeFn *ssa.Function, input
 
 	formalMember, ok := ssa.ToParameterMember(input.Value)
 	if !ok || formalMember == nil || !formalParameterMemberUsedOnlyAsCallTarget(formalMember) {
+		return false
+	}
+	if formalMember.MemberCallKind == ssa.FreeValueMemberCall {
 		return false
 	}
 

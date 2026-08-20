@@ -145,6 +145,12 @@ const (
 
 	// Assert: args are (cond, msg). The runtime panics if cond is false.
 	IDAssert FuncID = 28
+
+	// Channel send for `ch <- v`.
+	IDRuntimeChanSend FuncID = 29
+
+	// Channel creation for `make(chan T, n)`.
+	IDRuntimeMakeChan FuncID = 30
 )
 
 type SliceElemKind int64

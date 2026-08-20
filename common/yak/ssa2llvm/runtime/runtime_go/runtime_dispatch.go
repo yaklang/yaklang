@@ -34,6 +34,8 @@ var runtimeDispatchHandlers = map[abi.FuncID]runtimeDispatchFunc{
 	abi.IDRuntimeIn:           runtimeDispatchIn,
 	abi.IDRuntimeEq:           runtimeDispatchEq,
 	abi.IDRuntimeChanRecv:     runtimeDispatchChanRecv,
+	abi.IDRuntimeChanSend:     runtimeDispatchChanSend,
+	abi.IDRuntimeMakeChan:     runtimeDispatchMakeChan,
 }
 
 func executeRuntimeDispatch(ctx unsafe.Pointer) {

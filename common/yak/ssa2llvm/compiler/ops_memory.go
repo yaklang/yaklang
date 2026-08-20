@@ -29,11 +29,45 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 		return c.compileMakeSlice(inst, typ)
 	case ssa.MapTypeKind:
 		return c.compileMakeGeneric(inst)
+	case ssa.ChanTypeKind:
+		return c.compileMakeChan(inst)
 	default:
 		// For unhandled types, create a null/zero placeholder
 		c.cacheValue(inst.GetId(), llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 		return nil
 	}
+}
+
+func (c *Compiler) compileMakeChan(inst *ssa.Make) error {
+	i64 := c.LLVMCtx.Int64Type()
+	size := llvm.ConstInt(i64, 0, false)
+	if inst.Len > 0 {
+		val, err := c.getValue(inst, inst.Len)
+		if err != nil {
+			return err
+		}
+		size = c.coerceToInt64(val)
+	}
+	spec := contextCallSpec{
+		inst: inst,
+		kind: abi.KindDispatch,
+		target: llvm.ConstInt(
+			i64,
+			uint64(abi.IDRuntimeMakeChan),
+			false,
+		),
+		args: []contextCallArg{
+			{value: size},
+		},
+		ctxName:   "yak_make_chan_ctx",
+		errPrefix: "emitRuntimeMakeChan",
+	}
+	result, err := c.emitContextCall(spec)
+	if err != nil {
+		return err
+	}
+	c.cacheValue(inst.GetId(), c.coerceToInt64(result))
+	return nil
 }
 
 func (c *Compiler) getOrInsertRuntimeMakeSlice() (llvm.Value, llvm.Type) {
