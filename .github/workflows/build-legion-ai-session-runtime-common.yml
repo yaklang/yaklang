@@ -193,13 +193,13 @@ jobs:
         id: runtime-archive
         shell: bash
         env:
-          RUNTIME_IMAGE_ID: ${{ steps.inspect.outputs.image_id }}
+          RUNTIME_IMAGE_TAG: ${{ steps.inspect.outputs.image_tag }}
         run: |
           set -euo pipefail
           archive_dir="${RUNNER_TEMP}/runtime-archive-${RUNTIME_GOARCH}"
           archive_path="${archive_dir}/${RUNTIME_PACKAGE_NAME}.docker.tar.gz"
           mkdir -p "$archive_dir"
-          docker save "$RUNTIME_IMAGE_ID" | gzip -n -1 \
+          docker save "$RUNTIME_IMAGE_TAG" | gzip -n -1 \
             >"$archive_path"
           gzip -t "$archive_path"
           echo "path=$archive_path" >>"$GITHUB_OUTPUT"

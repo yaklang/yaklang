@@ -65,6 +65,30 @@ runtime_go_version="${RUNTIME_GO_VERSION:-}"
   die "RUNTIME_IMAGE_TAG must be the human-readable build tag"
 [[ -f "$runtime_image_archive" ]] || die "RUNTIME_IMAGE_ARCHIVE must reference the gzip-compressed Docker image archive"
 gzip -t "$runtime_image_archive" || die "RUNTIME_IMAGE_ARCHIVE is not valid gzip data"
+runtime_image_id="${runtime_image_ref##*@}"
+runtime_image_digest="${runtime_image_id#sha256:}"
+if ! runtime_archive_manifest="$(tar -xOzf "$runtime_image_archive" manifest.json 2>/dev/null)"; then
+  die "RUNTIME_IMAGE_ARCHIVE does not contain Docker manifest.json"
+fi
+runtime_archive_config="$({
+  jq -er --arg image_tag "$runtime_image_tag" '
+    select(type == "array" and length == 1) |
+    .[0] |
+    select((.RepoTags | type) == "array" and (.RepoTags | index($image_tag)) != null) |
+    .Config
+  ' <<<"$runtime_archive_manifest"
+} 2>/dev/null)" || die "RUNTIME_IMAGE_ARCHIVE must contain exactly one image tagged as RUNTIME_IMAGE_TAG"
+case "$runtime_archive_config" in
+  "$runtime_image_digest.json"|"blobs/sha256/$runtime_image_digest") ;;
+  *)
+    die "RUNTIME_IMAGE_ARCHIVE config path does not match the immutable image ID"
+    ;;
+esac
+if ! runtime_archive_config_sha="$(tar -xOzf "$runtime_image_archive" "$runtime_archive_config" 2>/dev/null | sha256sum | awk '{print $1}')"; then
+  die "RUNTIME_IMAGE_ARCHIVE does not contain its declared image config"
+fi
+[[ "$runtime_archive_config_sha" == "$runtime_image_digest" ]] || \
+  die "RUNTIME_IMAGE_ARCHIVE config digest does not match the immutable image ID"
 [[ "$runtime_base_image" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || \
   die "RUNTIME_BASE_IMAGE must be pinned by sha256 digest"
 [[ "$runtime_builder_image" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || \
