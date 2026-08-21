@@ -198,7 +198,7 @@ func (e *AIEngine) SendMsg(input string, options ...AIEngineConfigOption) error 
 var ErrAITaskAborted = utils.Error("ai task aborted")
 
 // WaitTaskFinishByTaskName 等待指定任务完成
-// 传入任务ID，等待该任务状态变为 Completed 或 Aborted
+// 传入任务ID，等待该任务进入 Completed、Aborted 或 Skipped 终态。
 func (e *AIEngine) WaitTaskFinishByTaskName(taskID string) error {
 	if taskID == "" {
 		return utils.Error("taskID cannot be empty")
@@ -207,7 +207,7 @@ func (e *AIEngine) WaitTaskFinishByTaskName(taskID string) error {
 	// 检查任务是否已经完成
 	e.tasksMutex.RLock()
 	status, exists := e.activeTasks[taskID]
-	if exists && (status == aicommon.AITaskState_Completed || status == aicommon.AITaskState_Aborted) {
+	if exists && isTerminalAITaskState(status) {
 		e.tasksMutex.RUnlock()
 		return waitTaskFinishByTaskNameResult(status)
 	}
@@ -244,16 +244,27 @@ func (e *AIEngine) WaitTaskFinishByTaskName(taskID string) error {
 	return waitTaskFinishByTaskNameResult(finalStatus)
 }
 
-// waitTaskFinishByTaskNameResult 将终态映射为返回值：Completed -> nil，
-// Aborted -> ErrAITaskAborted，非终态（防御性，正常不应发生）-> error。
+// waitTaskFinishByTaskNameResult 将终态映射为返回值：Completed/Skipped ->
+// nil，Aborted -> ErrAITaskAborted，非终态（防御性，正常不应发生）-> error。
+// Skipped 是用户主动停止当前任务的正常终态；把它视为完成，才能让上层
+// SendMsg 返回并发布 turn terminal event，而不是永远阻塞当前 turn 和后续队列。
 func waitTaskFinishByTaskNameResult(status aicommon.AITaskState) error {
 	switch status {
-	case aicommon.AITaskState_Completed:
+	case aicommon.AITaskState_Completed, aicommon.AITaskState_Skipped:
 		return nil
 	case aicommon.AITaskState_Aborted:
 		return ErrAITaskAborted
 	default:
 		return utils.Errorf("ai task ended in non-terminal state: %s", status)
+	}
+}
+
+func isTerminalAITaskState(status aicommon.AITaskState) bool {
+	switch status {
+	case aicommon.AITaskState_Completed, aicommon.AITaskState_Aborted, aicommon.AITaskState_Skipped:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -276,7 +287,7 @@ func (e *AIEngine) hasActiveTasks() bool {
 	defer e.tasksMutex.RUnlock()
 
 	for _, status := range e.activeTasks {
-		if status != aicommon.AITaskState_Completed && status != aicommon.AITaskState_Aborted {
+		if !isTerminalAITaskState(status) {
 			return true
 		}
 	}
@@ -428,8 +439,9 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 			e.activeTasks[taskID] = nowStatus
 			e.tasksMutex.Unlock()
 
-			// 检查任务是否完成或中止
-			if nowStatus == aicommon.AITaskState_Completed || nowStatus == aicommon.AITaskState_Aborted {
+			// 检查任务是否进入任一终态。Skipped 是 Stop 当前任务的正常终态，
+			// 也必须释放 SendMsg 的等待者和全局完成信号。
+			if isTerminalAITaskState(nowStatus) {
 				// 通知该任务的等待者
 				e.tasksMutex.Lock()
 				if taskEndpoint, exists := e.taskEndpoints[taskID]; exists {
