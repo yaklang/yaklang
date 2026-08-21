@@ -310,7 +310,21 @@ func (m *scanManager) initByConfig() error {
 	}
 
 	// log.Errorf("config: %v", config.Config.GetRuleInput())
-	if input := config.GetRuleInput(); len(input) != 0 {
+	if config.IsTaskLocalRuleInput() {
+		parsedRules, libraries, err := loadTaskLocalSyntaxFlowRules(config.SyntaxFlowRule)
+		if err != nil {
+			return err
+		}
+		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
+		for _, rule := range parsedRules {
+			ruleCh <- rule
+		}
+		close(ruleCh)
+		m.ruleChan = ruleCh
+		m.rulesCount = int64(len(parsedRules))
+		m.kind = ruleInputResultKind(true)
+		m.ctx = ssaapi.WithTaskLocalSyntaxFlowRuleLibraries(m.ctx, libraries)
+	} else if input := config.GetRuleInput(); len(input) != 0 {
 		// start debug mode scan task (use provided rule inputs)
 		rules := make([]*schema.SyntaxFlowRule, 0, len(input))
 		for _, rinput := range input {
@@ -328,7 +342,7 @@ func (m *scanManager) initByConfig() error {
 		close(ruleCh)
 		m.ruleChan = ruleCh
 		m.rulesCount = int64(len(rules))
-		m.kind = schema.SFResultKindDebug
+		m.kind = ruleInputResultKind(false)
 	} else if config.GetRuleFilter() != nil {
 		if err := setRuleChan(config.GetRuleFilter()); err != nil {
 			return err
