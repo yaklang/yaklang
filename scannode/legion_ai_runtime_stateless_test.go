@@ -174,7 +174,11 @@ type fakeStatelessTurnEngine struct {
 	eventRelease chan struct{}
 	sendErr      error
 	eventErr     error
+	drainStarted chan struct{}
+	drainRelease chan struct{}
+	drainErr     error
 	startOnce    sync.Once
+	drainOnce    sync.Once
 	closeOnce    sync.Once
 }
 
@@ -200,6 +204,20 @@ func (f *fakeStatelessTurnEngine) SendMsg(string, ...aiengine.AIEngineConfigOpti
 	case <-f.closed:
 	}
 	return f.sendErr
+}
+
+func (f *fakeStatelessTurnEngine) WaitTaskFinish() error {
+	if f.drainStarted == nil {
+		return f.drainErr
+	}
+	f.drainOnce.Do(func() { close(f.drainStarted) })
+	if f.drainRelease != nil {
+		select {
+		case <-f.drainRelease:
+		case <-f.closed:
+		}
+	}
+	return f.drainErr
 }
 
 func (f *fakeStatelessTurnEngine) SendInputEvent(event *ypb.AIInputEvent) error {

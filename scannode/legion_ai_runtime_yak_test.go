@@ -63,6 +63,49 @@ func TestStatefulDriverKeepsConversationRuntimeAfterTurnFailure(t *testing.T) {
 	}
 }
 
+func TestStatefulTurnWaitsForReActQueueDrainBeforeCompleting(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	engine.drainStarted = make(chan struct{})
+	engine.drainRelease = make(chan struct{})
+	emitter := recordingConversationTurnEmitter{
+		completed: make(chan conversationTurnResult, 1),
+		failed:    make(chan conversationTurnResult, 1),
+	}
+	handle := &yakAIEngineRuntimeHandle{
+		engine:       engine,
+		emitter:      emitter,
+		messageQueue: make(chan yakAIQueuedMessage, 1),
+	}
+
+	go handle.sendMessage(yakAIQueuedMessage{turnID: "turn-with-queued-follow-up", content: "first"})
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("root task did not start")
+	}
+	close(engine.release)
+	select {
+	case <-engine.drainStarted:
+	case <-time.After(time.Second):
+		t.Fatal("stateful runtime did not wait for the ReAct queue to drain")
+	}
+	select {
+	case completed := <-emitter.completed:
+		t.Fatalf("turn completed before queued follow-up drained: %#v", completed)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(engine.drainRelease)
+	select {
+	case completed := <-emitter.completed:
+		if completed.turnID != "turn-with-queued-follow-up" {
+			t.Fatalf("completed turn = %q", completed.turnID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("turn did not complete after queued follow-up drained")
+	}
+}
+
 func TestStatefulControlInputIsLinearizedWithTerminalClose(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()
 	engine.eventStarted = make(chan struct{})

@@ -60,6 +60,7 @@ func (statelessAIEngineRuntimeDriver) Bind(
 
 type statelessTurnEngine interface {
 	SendMsg(string, ...aiengine.AIEngineConfigOption) error
+	WaitTaskFinish() error
 	SendInputEvent(*ypb.AIInputEvent) error
 	Config() *aiengine.AIEngineConfig
 	Context() context.Context

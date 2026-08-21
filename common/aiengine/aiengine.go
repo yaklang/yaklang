@@ -204,17 +204,16 @@ func (e *AIEngine) WaitTaskFinishByTaskName(taskID string) error {
 		return utils.Error("taskID cannot be empty")
 	}
 
-	// 检查任务是否已经完成
-	e.tasksMutex.RLock()
+	// 终态检查与 endpoint 注册必须在同一个临界区内完成。
+	// 否则任务在两步之间进入终态时，状态处理器看不到
+	// 尚未注册的 endpoint，后续等待将永久错过释放信号。
+	e.tasksMutex.Lock()
 	status, exists := e.activeTasks[taskID]
 	if exists && isTerminalAITaskState(status) {
-		e.tasksMutex.RUnlock()
+		e.tasksMutex.Unlock()
 		return waitTaskFinishByTaskNameResult(status)
 	}
-	e.tasksMutex.RUnlock()
 
-	// 创建该任务的 endpoint
-	e.tasksMutex.Lock()
 	taskEndpoint, exists := e.taskEndpoints[taskID]
 	if !exists {
 		epm := aicommon.NewEndpointManagerContext(e.ctx)
@@ -271,22 +270,33 @@ func isTerminalAITaskState(status aicommon.AITaskState) bool {
 // WaitTaskFinish 等待所有任务完成
 // 通过监听任务状态变化来判断所有任务是否完成
 func (e *AIEngine) WaitTaskFinish() error {
-	// 检查是否还有活跃任务
-	if !e.hasActiveTasks() {
-		return nil
-	}
+	for {
+		e.tasksMutex.RLock()
+		if !hasActiveTasksLocked(e.activeTasks) {
+			e.tasksMutex.RUnlock()
+			return nil
+		}
+		endpoint := e.allTasksEndpoint
+		e.tasksMutex.RUnlock()
 
-	// 等待所有任务完成
-	e.allTasksEndpoint.WaitContext(e.ctx)
-	return e.ctx.Err()
+		// 等待当前任务代际完成。唤醒后重新检查，以覆盖
+		// 终态信号与同时到达的后续任务之间的竞态。
+		endpoint.WaitContext(e.ctx)
+		if err := e.ctx.Err(); err != nil {
+			return err
+		}
+	}
 }
 
 // hasActiveTasks 检查是否还有活跃的任务（未完成或未中止的任务）
 func (e *AIEngine) hasActiveTasks() bool {
 	e.tasksMutex.RLock()
 	defer e.tasksMutex.RUnlock()
+	return hasActiveTasksLocked(e.activeTasks)
+}
 
-	for _, status := range e.activeTasks {
+func hasActiveTasksLocked(tasks map[string]aicommon.AITaskState) bool {
+	for _, status := range tasks {
 		if !isTerminalAITaskState(status) {
 			return true
 		}
@@ -301,7 +311,7 @@ func (e *AIEngine) GetActiveTaskCount() int {
 
 	count := 0
 	for _, status := range e.activeTasks {
-		if status != aicommon.AITaskState_Completed && status != aicommon.AITaskState_Aborted {
+		if !isTerminalAITaskState(status) {
 			count++
 		}
 	}
@@ -409,8 +419,14 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 			taskID := utils.InterfaceToString(taskInfo["react_task_id"])
 			taskStatus := aicommon.AITaskState(utils.InterfaceToString(taskInfo["react_task_status"]))
 
-			// 记录新任务
+			// 记录新任务。上一代任务全部结束时 allTasksEndpoint
+			// 已经释放；新一代的首个任务必须换用新 endpoint，
+			// 否则多轮 runtime 中 WaitTaskFinish 会被旧信号立即唤醒。
 			e.tasksMutex.Lock()
+			if !hasActiveTasksLocked(e.activeTasks) {
+				epm := aicommon.NewEndpointManagerContext(e.ctx)
+				e.allTasksEndpoint = epm.CreateEndpoint()
+			}
 			e.activeTasks[taskID] = taskStatus
 
 			// 通知任务已创建（如果有等待的 endpoint）
