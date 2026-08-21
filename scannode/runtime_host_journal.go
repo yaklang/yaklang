@@ -26,6 +26,7 @@ type runtimeHostOperationRecord struct {
 type runtimeHostOperationJournal struct {
 	Version    int                                   `json:"version"`
 	Operations map[string]runtimeHostOperationRecord `json:"operations"`
+	Images     map[string]runtimeHostImageRecord     `json:"images,omitempty"`
 }
 
 func (e *runtimeHostExecutor) journalPath() string {
@@ -37,6 +38,7 @@ func (e *runtimeHostExecutor) loadOperationJournal() error {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		e.operations = make(map[string]runtimeHostOperationRecord)
+		e.images = make(map[string]runtimeHostImageRecord)
 		return nil
 	}
 	if err != nil {
@@ -52,7 +54,11 @@ func (e *runtimeHostExecutor) loadOperationJournal() error {
 	if journal.Operations == nil {
 		journal.Operations = make(map[string]runtimeHostOperationRecord)
 	}
+	if journal.Images == nil {
+		journal.Images = make(map[string]runtimeHostImageRecord)
+	}
 	e.operations = journal.Operations
+	e.images = journal.Images
 	return nil
 }
 
@@ -62,7 +68,7 @@ func (e *runtimeHostExecutor) saveOperationJournal() error {
 		return err
 	}
 	payload, err := json.MarshalIndent(runtimeHostOperationJournal{
-		Version: runtimeHostJournalVersion, Operations: e.operations,
+		Version: runtimeHostJournalVersion, Operations: e.operations, Images: e.images,
 	}, "", "  ")
 	if err != nil {
 		return err
