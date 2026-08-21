@@ -329,6 +329,16 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	var actionNames = r.GetAllActionNames()
+	// Bind the provider request to the immutable task that owns this
+	// transaction. ReAct.currentTask may temporarily point at a nested loop,
+	// while Stop cancels the queue-owned task context. If the request only uses
+	// the session config context, the runtime can emit a successful cancellation
+	// receipt yet continue streaming model output until the provider finishes.
+	activeTask := r.GetCurrentTask()
+	activeTaskCtx := r.config.GetContext()
+	if activeTask != nil && !utils.IsNil(activeTask.GetContext()) {
+		activeTaskCtx = activeTask.GetContext()
+	}
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
 		return inferActionTypeFromPayload(a, r.Get("tag_final_answer"))
@@ -336,9 +346,9 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 	ctxCanceled := utils.NewBool(false)
 	currentCtxCanceled := func() bool {
-		if r.GetCurrentTask() != nil {
+		if !utils.IsNil(activeTaskCtx) {
 			select {
-			case <-r.GetCurrentTask().GetContext().Done():
+			case <-activeTaskCtx.Done():
 				ctxCanceled.SetTo(true)
 				return true
 			default:
@@ -495,7 +505,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			r.loadingStatus("解析 AI 响应中 / Parsing AI Response...")
 			extractStart := time.Now()
 			action, actionErr = aicommon.ExtractActionFromStream(
-				r.GetCurrentTask().GetContext(),
+				activeTaskCtx,
 				stream,
 				"object",
 				options...,
@@ -553,6 +563,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
+		aicommon.WithAIRequest_Context(activeTaskCtx),
 	)
 	if transactionErr != nil {
 		r.loadingStatus(fmt.Sprintf("AI 事务失败 / AI Transaction Failed: %v", transactionErr))
@@ -594,7 +605,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	waitDone := make(chan struct{})
 	go func() {
 		defer close(waitDone)
-		action.WaitStream(r.GetCurrentTask().GetContext())
+		action.WaitStream(activeTaskCtx)
 	}()
 
 	select {

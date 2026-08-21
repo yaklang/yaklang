@@ -154,6 +154,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel("directly-answer"),
+		aicommon.WithAIRequest_Context(ctx),
 	)
 	if finalResult != "" {
 		return finalResult, nil
