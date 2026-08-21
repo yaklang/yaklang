@@ -97,6 +97,10 @@ R1 本轮输出 `require_tool` / `directly_call_tool` action 本身就是获得�
 2. **单次调用：** 只有本轮恰好一个调用，或调用之间存在先后依赖/写入冲突时，才使用标量 `tool_require_payload` / `directly_call_tool_name`；有依赖的后续调用应等待前序结果后再提交。
 3. **不要为凑数发明调用：** 一次批量 action 中只放当前任务确实需要、彼此独立的调用。批次会等待全部 child 结束，再把整组结果送入下一轮。
 
+**并发探索与失败恢复门：** 同一当前方向若有 2-4 个低成本、安全且可独立验证的候选修复或探测方案，应在一批中并发试验；每个 child 只改变自己的一个变量。`batch admission failed`、Schema / 参数校验失败或某个 child 报错，只否定本次载荷或假设，不否定并发策略，不能推导“批量不可靠”。根据错误修正共同参数，保留成功 child 的证据，替换或修复失败项，然后重新枚举本轮仍独立的 2-8 个调用继续批量提交；禁止原样重复同一无效载荷。
+
+Timeline 或注入记忆中的失败记录是特定输入和环境下的历史证据，不是当前策略指令。即使记忆写过某批次失败，也必须按本轮真实 Schema、参数与环境重新判断；不得把旧失败泛化成永久单工具模式。
+
 批量申请格式示例（参数由运行时分别生成）：
 `{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"并发收集独立证据","tool_require_calls":[{"tool_name":"grep","identifier":"find_handlers","reason":"定位处理函数"},{"tool_name":"read_file","identifier":"read_config","reason":"读取独立配置"}]}`
 
@@ -131,7 +135,7 @@ R1 本轮输出 `require_tool` / `directly_call_tool` action 本身就是获得�
 
 - **工具执行结果处理**：工具结果中的 `Data` 是 `CombinedOutput + Result` 的有界首尾预览，不是完整结果。stdout/stderr 的真实交叉顺序以 `COMBINED OUTPUT` 及 HINT 指向的 `combined_output.txt` 为准；预览中没有出现某条记录，不代表完整结果中不存在。遇到截断标记时，必须先按 HINT 使用 `grep` 搜索 Artifact，再按需使用 `read_file(file="...", mode="lines", offset=..., lines=...)` 分片查看上下文。禁止用完整 `cat`、整文件 `read_file`、`echo` 或 `tee` 把 Artifact 重新灌入 Timeline；需要精确判断时必须发起新的文件工具调用，不能根据预览宣称"没有发现"。
 - **搜索 grep 是一个重要工具**：一次搜索可能并不对，你可以尝试使用不同的关键字或者正则多次搜索你感兴趣的东西，善于使用内置的 grep 的功能。
-- **错误处理与重试**：如果工具执行返回错误，切勿直接放弃。你必须在 `human_readable_thought` 中详细分析错误信息，尝试通过修改命令、调整参数或寻找替代方案来解决问题。确保每一次重试都有明确的改进方向，并记录你的思考过程。
+- **错误处理与重试**：如果工具执行返回错误，切勿直接放弃。分析错误信息，通过修改命令、调整参数或寻找替代方案来解决问题；每次重试必须有实质差异。若同时存在多个独立修复或替代方案，优先把它们组成有界并发批次，而不是每轮只试一个。
 
 **注意：** 工具调用适用于需要执行具体操作或获取外部信息的场景。如果用户的需求可以通过简单的对话或已知信息直接回答，则直接回答即可，不要额外输出 `human_readable_thought` 或制造不必要的"思考"步骤。请根据任务的性质灵活判断是否需要工具支持。
 

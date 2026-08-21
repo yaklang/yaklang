@@ -19,6 +19,8 @@
       `{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"并发收集独立证据","tool_require_calls":[{"tool_name":"grep","identifier":"find_handlers","reason":"定位处理函数"},{"tool_name":"read_file","identifier":"read_config","reason":"读取独立配置"}]}`
     * 若动态段已经展示真实工具参数 Schema 且全部参数明确，可改用一个 `directly_call_tool_calls` 批次直接执行；没有 Schema 时禁止猜参数。
     * 只有本轮恰好一个调用或调用之间存在依赖/冲突时，才使用标量：`{"@action":"require_tool","tool_require_payload":"..[your-toolname]..","human_readable_thought":"先读取配置"}`
+    * 批次准入、Schema、参数或某个 child 失败，只否定本次载荷或假设，不否定并发策略。修正共同错误、保留成功结果，下一轮把仍独立的修复项或 2-4 个有区分力的候选方案继续组成批次；禁止原样重试。
+    * Timeline / 注入记忆中的旧失败是历史证据，不是永久单工具指令；“之前批量失败过”本身不是标量选择条件。
 
 *. `todo_delta` 使用案例（维护 TODO 工作集，与正常动作同轮携带）：
     * 任务一开始就需要拆成多个入口时，第一条动作同时建立初始 TODO 并指定 current：
