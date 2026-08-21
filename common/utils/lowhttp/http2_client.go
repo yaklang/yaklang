@@ -247,17 +247,21 @@ func (s *http2ClientStream) startBodyStreamHandler(headerRaw []byte) {
 		if s.option.bodyStreamReaderHandled != nil {
 			s.option.bodyStreamReaderHandled.Set()
 		}
-		go func() {
+		// Capture the completion channel owned by this handler. The stream object
+		// can be returned to sync.Pool and reused if a slow handler outlives the
+		// bounded wait in waitBodyStreamHandler.
+		done := s.bodyStreamDone
+		go func(done chan struct{}) {
 			defer func() {
 				if r := recover(); r != nil {
 					log.Errorf("BodyStreamReaderHandler panic in http2: %v", r)
 				}
-				if s.bodyStreamDone != nil {
-					close(s.bodyStreamDone)
+				if done != nil {
+					close(done)
 				}
 			}()
 			handler(headerCopy, reader)
-		}()
+		}(done)
 	})
 }
 
