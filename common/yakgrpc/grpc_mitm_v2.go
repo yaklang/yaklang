@@ -60,6 +60,42 @@ var (
 
 const mitmRequestHijackAtTimingKey = "yakit_mitm_request_hijack_at_unix_ms"
 
+const storedMITMBareRequestTruncateNotice = "[[yakit: original request body truncated for storage, original=%s, limit=%s]]"
+
+// truncateMITMBareRequestForStorage bounds the original request snapshot that
+// is persisted to project KV after a request is modified. Large-request spill
+// sidecars protect the normal HTTPFlow request, but the bare/original request
+// is stored independently and must not bypass the same global body limit.
+func truncateMITMBareRequestForStorage(packet []byte) (stored []byte, truncated bool, originalBodyLen, limit int) {
+	limit = yakit.GetMaxHTTPFlowRequestBodyInDBBytes()
+	if len(packet) == 0 || limit <= 0 {
+		return packet, false, 0, limit
+	}
+
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
+	originalBodyLen = len(body)
+	if originalBodyLen <= limit {
+		return packet, false, originalBodyLen, limit
+	}
+
+	notice := []byte(fmt.Sprintf(
+		storedMITMBareRequestTruncateNotice,
+		utils.ByteSize(uint64(originalBodyLen)),
+		utils.ByteSize(uint64(limit)),
+	))
+	keep := limit - len(notice)
+	if keep < 0 {
+		// The UI currently configures this value in MiB, so the notice normally
+		// fits. Keep the hard storage bound even for an unusually tiny limit.
+		keep = 0
+		notice = notice[:limit]
+	}
+	bodyForStorage := make([]byte, keep+len(notice))
+	copy(bodyForStorage, body[:keep])
+	copy(bodyForStorage[keep:], notice)
+	return lowhttp.ReplaceHTTPPacketBody([]byte(header), bodyForStorage, false), true, originalBodyLen, limit
+}
+
 func cacheModifiedPlainResponseBytes(req *http.Request, plainResponse []byte) {
 	if len(plainResponse) == 0 || !httpctx.GetResponseIsModified(req) {
 		return
@@ -1744,6 +1780,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			// 存储KV，将flow ID作为key，bare request和bare response作为value
 			if httpctx.GetRequestIsModified(req) {
 				bareReq := httpctx.GetBareRequestBytes(req)
+				bareReq, truncated, originalBodyLen, limit := truncateMITMBareRequestForStorage(bareReq)
+				if truncated {
+					sendLogged(&ypb.MITMV2Response{
+						HaveNotification: true,
+						NotificationContent: []byte(fmt.Sprintf(
+							"原始请求 Body 大小为 %s，超过全局转储数据包大小 %s，HTTP History 中的原始请求仅保存截断内容",
+							utils.ByteSize(uint64(originalBodyLen)),
+							utils.ByteSize(uint64(limit)),
+						)),
+					})
+				}
 				log.Debugf("[KV] save bare Request(%d)", id)
 
 				if len(bareReq) > 0 && id > 0 {
