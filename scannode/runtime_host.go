@@ -68,6 +68,7 @@ type runtimeHostExecutor struct {
 	nodeIDProvider      func() string
 	sessionProvider     func() (node.SessionState, bool)
 	operations          map[string]runtimeHostOperationRecord
+	images              map[string]runtimeHostImageRecord
 	mu                  sync.Mutex
 }
 
@@ -404,7 +405,7 @@ func (e *runtimeHostExecutor) execute(ctx context.Context, command *nodev1.AIRun
 }
 
 func (e *runtimeHostExecutor) ensureImage(ctx context.Context, release *nodev1.AIRuntimeRelease) (string, error) {
-	if imageID, exists, err := e.docker.ResolveImageID(ctx, release.ImageId); err != nil || exists {
+	if imageID, exists, err := e.resolveRuntimeImage(ctx, release); err != nil || exists {
 		return imageID, err
 	}
 	archive, cleanup, err := e.downloadRuntimeArchive(ctx, release)
@@ -412,15 +413,25 @@ func (e *runtimeHostExecutor) ensureImage(ctx context.Context, release *nodev1.A
 		return "", err
 	}
 	defer cleanup()
-	if err := e.docker.LoadImage(ctx, archive); err != nil {
-		return "", fmt.Errorf("load verified Runtime image: %w", err)
-	}
-	imageID, exists, err := e.docker.ResolveImageID(ctx, release.ImageId)
+	imageTag, err := inspectRuntimeImageArchive(archive, release)
 	if err != nil {
 		return "", err
 	}
-	if !exists || imageID != release.ImageId {
-		return "", fmt.Errorf("loaded Runtime image does not match the pinned identity")
+	if _, err := archive.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	if err := e.docker.LoadImage(ctx, archive); err != nil {
+		return "", fmt.Errorf("load verified Runtime image: %w", err)
+	}
+	imageID, exists, err := e.docker.ResolveImageID(ctx, imageTag)
+	if err != nil {
+		return "", err
+	}
+	if !exists || !runtimeHostImageIDPattern.MatchString(strings.ToLower(strings.TrimSpace(imageID))) {
+		return "", fmt.Errorf("loaded Runtime image has no target-local identity")
+	}
+	if err := e.recordRuntimeImage(release, imageTag, imageID); err != nil {
+		return "", fmt.Errorf("persist target-local Runtime image identity: %w", err)
 	}
 	return imageID, nil
 }
@@ -482,11 +493,11 @@ func (e *runtimeHostExecutor) start(ctx context.Context, command *nodev1.AIRunti
 			return "", false, fmt.Errorf("runtime container ownership does not match the active generation")
 		}
 	}
-	imageID, exists, err := e.docker.ResolveImageID(ctx, command.Release.ImageId)
+	imageID, exists, err := e.resolveRuntimeImage(ctx, command.Release)
 	if err != nil {
 		return "", false, err
 	}
-	if !exists || imageID != command.Release.ImageId {
+	if !exists {
 		return "", false, fmt.Errorf("pinned Runtime image is not ready")
 	}
 	if existing, found, err := e.docker.FindContainer(ctx, command.CleanupKey); err != nil {
