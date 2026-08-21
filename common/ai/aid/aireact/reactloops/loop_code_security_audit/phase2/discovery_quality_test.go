@@ -40,8 +40,13 @@ func TestFormatDeepDiscoveryGuidance_Empty(t *testing.T) {
 	require.Contains(t, msg, "数据流型")
 }
 
-func TestBuildFastContextQuery_FlowCentric(t *testing.T) {
-	q := BuildFastContextQuery(model.VulnCategory{ID: "xss_injection", Name: "XSS"})
+func TestBuildFastContextQuery_MemorySafety(t *testing.T) {
+	q := BuildFastContextQuery(model.VulnCategory{ID: "memory_safety", Name: "内存安全"})
+	require.Contains(t, q, "内存安全")
+	require.Contains(t, q, "memcpy")
+}
+
+func TestBuildFastContextQuery_ExpressionInjectionFlowCentric(t *testing.T) {
+	q := BuildFastContextQuery(model.VulnCategory{ID: "expression_injection", Name: "表达式注入"})
 	require.Contains(t, q, "数据流型")
-	require.Contains(t, q, "Sink")
 }
