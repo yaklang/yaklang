@@ -334,8 +334,17 @@ func TestRuntimeHostRejectsReleaseDifferentFromInstalledNode(t *testing.T) {
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
 	command.Release.EngineDigest = strings.Repeat("e", 64)
 	runtimeHostSignTestCommand(t, command)
-	if err := executor.validateCommand(command, session); err == nil {
+	err := executor.validateCommand(command, session)
+	if !errors.Is(err, errRuntimeHostReleaseMismatch) {
 		t.Fatal("validateCommand() accepted a release different from the installed node")
+	}
+	result := runtimeHostRejectedResult(command, session, "release_mismatch", err)
+	if result.Success || result.ErrorCode != "release_mismatch" || result.ErrorMessage != err.Error() ||
+		result.CommandId != command.Metadata.CommandId || result.Metadata.Node.NodeSessionId != session.SessionID {
+		t.Fatalf("release mismatch result lost its command binding: %+v", result)
+	}
+	if signErr := signRuntimeHostResult(result, executor.enrollmentToken, session.SessionID); signErr != nil || len(result.AuthTag) == 0 {
+		t.Fatalf("release mismatch result was not signed: tag=%x err=%v", result.AuthTag, signErr)
 	}
 }
 
