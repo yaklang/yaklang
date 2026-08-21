@@ -41,35 +41,37 @@ var runtimeHostSHA256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var runtimeHostReleaseIDPattern = regexp.MustCompile(`^sha256-[a-f0-9]{64}$`)
 
 type RuntimeHostConfig struct {
-	Enabled             bool
-	BaseDir             string
-	PlatformAPIBaseURL  string
-	EnrollmentToken     string
-	AgentInstallationID string
-	EngineReleaseID     string
-	EngineDigest        string
-	Network             string
-	HTTPClient          *http.Client
-	NodeIDProvider      func() string
-	SessionProvider     func() (node.SessionState, bool)
-	docker              runtimeHostDocker
+	Enabled                   bool
+	BaseDir                   string
+	PlatformAPIBaseURL        string
+	RuntimePlatformAPIBaseURL string
+	EnrollmentToken           string
+	AgentInstallationID       string
+	EngineReleaseID           string
+	EngineDigest              string
+	Network                   string
+	HTTPClient                *http.Client
+	NodeIDProvider            func() string
+	SessionProvider           func() (node.SessionState, bool)
+	docker                    runtimeHostDocker
 }
 
 type runtimeHostExecutor struct {
-	docker              runtimeHostDocker
-	baseDir             string
-	platformAPIBaseURL  string
-	enrollmentToken     string
-	agentInstallationID string
-	engineReleaseID     string
-	engineDigest        string
-	network             string
-	httpClient          *http.Client
-	nodeIDProvider      func() string
-	sessionProvider     func() (node.SessionState, bool)
-	operations          map[string]runtimeHostOperationRecord
-	images              map[string]runtimeHostImageRecord
-	mu                  sync.Mutex
+	docker                    runtimeHostDocker
+	baseDir                   string
+	platformAPIBaseURL        string
+	runtimePlatformAPIBaseURL string
+	enrollmentToken           string
+	agentInstallationID       string
+	engineReleaseID           string
+	engineDigest              string
+	network                   string
+	httpClient                *http.Client
+	nodeIDProvider            func() string
+	sessionProvider           func() (node.SessionState, bool)
+	operations                map[string]runtimeHostOperationRecord
+	images                    map[string]runtimeHostImageRecord
+	mu                        sync.Mutex
 }
 
 type runtimeHostStatusDetail struct {
@@ -106,21 +108,31 @@ func newRuntimeHostExecutor(cfg RuntimeHostConfig) (*runtimeHostExecutor, error)
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Minute}
 	}
+	platformAPIBaseURL := strings.TrimRight(strings.TrimSpace(cfg.PlatformAPIBaseURL), "/")
+	runtimePlatformAPIBaseURL := strings.TrimRight(strings.TrimSpace(cfg.RuntimePlatformAPIBaseURL), "/")
+	if runtimePlatformAPIBaseURL == "" {
+		runtimePlatformAPIBaseURL = platformAPIBaseURL
+	}
 	executor := &runtimeHostExecutor{
-		docker:              dockerClient,
-		baseDir:             strings.TrimSpace(cfg.BaseDir),
-		platformAPIBaseURL:  strings.TrimRight(strings.TrimSpace(cfg.PlatformAPIBaseURL), "/"),
-		enrollmentToken:     strings.TrimSpace(cfg.EnrollmentToken),
-		agentInstallationID: strings.TrimSpace(cfg.AgentInstallationID),
-		engineReleaseID:     strings.TrimSpace(cfg.EngineReleaseID),
-		engineDigest:        strings.ToLower(strings.TrimSpace(cfg.EngineDigest)),
-		network:             network,
-		httpClient:          client,
-		nodeIDProvider:      cfg.NodeIDProvider,
-		sessionProvider:     cfg.SessionProvider,
+		docker:                    dockerClient,
+		baseDir:                   strings.TrimSpace(cfg.BaseDir),
+		platformAPIBaseURL:        platformAPIBaseURL,
+		runtimePlatformAPIBaseURL: runtimePlatformAPIBaseURL,
+		enrollmentToken:           strings.TrimSpace(cfg.EnrollmentToken),
+		agentInstallationID:       strings.TrimSpace(cfg.AgentInstallationID),
+		engineReleaseID:           strings.TrimSpace(cfg.EngineReleaseID),
+		engineDigest:              strings.ToLower(strings.TrimSpace(cfg.EngineDigest)),
+		network:                   network,
+		httpClient:                client,
+		nodeIDProvider:            cfg.NodeIDProvider,
+		sessionProvider:           cfg.SessionProvider,
 	}
 	if executor.baseDir == "" {
 		return nil, fmt.Errorf("runtime host base directory is required")
+	}
+	if !runtimeHostURLHasScheme(executor.platformAPIBaseURL, "http", "https") ||
+		!runtimeHostURLHasScheme(executor.runtimePlatformAPIBaseURL, "http", "https") {
+		return nil, fmt.Errorf("runtime host platform API URLs must use http or https")
 	}
 	if executor.enrollmentToken == "" || executor.agentInstallationID == "" ||
 		executor.nodeIDProvider == nil || executor.sessionProvider == nil {
@@ -316,7 +328,11 @@ func (e *runtimeHostExecutor) validateContainerSpec(spec *nodev1.AIRuntimeContai
 	if spec.Environment["LEGION_AI_SESSION_ID"] != sessionID || strings.TrimSpace(spec.Environment["LEGION_ENROLLMENT_TOKEN"]) == "" {
 		return fmt.Errorf("runtime container startup credential is missing")
 	}
-	if strings.TrimRight(spec.Environment["LEGION_API_URL"], "/") != e.platformAPIBaseURL ||
+	runtimePlatformAPIBaseURL := e.runtimePlatformAPIBaseURL
+	if runtimePlatformAPIBaseURL == "" {
+		runtimePlatformAPIBaseURL = e.platformAPIBaseURL
+	}
+	if strings.TrimRight(spec.Environment["LEGION_API_URL"], "/") != runtimePlatformAPIBaseURL ||
 		spec.Environment["LEGION_AI_RUNTIME"] != "stateless" ||
 		!runtimeHostURLHasScheme(spec.Environment["LEGION_SESSIONMGR_URL"], "http", "https") ||
 		!runtimeHostURLHasScheme(spec.Environment["LEGION_NATS_URL"], "nats") {
