@@ -473,6 +473,12 @@ func (h *statelessAIEngineRuntimeHandle) runTurn(
 		)
 	} else {
 		err = turn.engine.SendMsg(userInput, options...)
+		if err == nil {
+			// SendMsg 只等待根任务。活跃 turn 期间接收的
+			// user_intervention 可能已进入同一 ReAct 队列；必须等它们
+			// 排空后才能 close stateless engine 并发布 turn.completed。
+			err = turn.engine.WaitTaskFinish()
+		}
 	}
 
 	h.mu.Lock()
