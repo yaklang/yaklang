@@ -230,6 +230,31 @@ func TestRuntimeHostCommandAuthenticationRejectsTampering(t *testing.T) {
 	}
 }
 
+func TestRuntimeHostAcceptsPinnedContainerAPIOriginDistinctFromHostBootstrap(t *testing.T) {
+	command := runtimeHostTestCommand(t)
+	const runtimeAPIURL = "http://host.docker.internal:8080"
+	command.Container.Environment["LEGION_API_URL"] = runtimeAPIURL
+	command.Container.Arguments[1] = runtimeAPIURL
+	runtimeHostSignTestCommand(t, command)
+	executor := &runtimeHostExecutor{
+		enrollmentToken: "enrollment-ticket", network: "bridge",
+		platformAPIBaseURL: "http://127.0.0.1:8080", runtimePlatformAPIBaseURL: runtimeAPIURL,
+		engineReleaseID: command.Release.ReleaseId, engineDigest: command.Release.EngineDigest,
+		nodeIDProvider: func() string { return "node-1" },
+	}
+	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
+	if err := executor.validateCommand(command, session); err != nil {
+		t.Fatalf("validateCommand() rejected the pinned container API origin: %v", err)
+	}
+
+	command.Container.Environment["LEGION_API_URL"] = "http://another.invalid"
+	command.Container.Arguments[1] = "http://another.invalid"
+	runtimeHostSignTestCommand(t, command)
+	if err := executor.validateCommand(command, session); err == nil {
+		t.Fatal("validateCommand() accepted a container API origin outside the pinned startup contract")
+	}
+}
+
 func TestRuntimeHostCommandRejectionIsTerminallyTyped(t *testing.T) {
 	cause := errors.New("targets another node session")
 	err := rejectRuntimeHostCommand(cause)
@@ -249,6 +274,22 @@ func TestRuntimeHostCannotEnableWithoutAuthenticatedNodeIdentity(t *testing.T) {
 		},
 	})
 	if err == nil || !strings.Contains(err.Error(), "authenticated node identity") {
+		t.Fatalf("newRuntimeHostExecutor() error = %v", err)
+	}
+}
+
+func TestRuntimeHostRejectsInvalidRuntimePlatformAPIURL(t *testing.T) {
+	_, err := newRuntimeHostExecutor(RuntimeHostConfig{
+		Enabled: true, BaseDir: t.TempDir(), PlatformAPIBaseURL: "http://platform.invalid",
+		RuntimePlatformAPIBaseURL: "file:///tmp/platform.sock",
+		EnrollmentToken:           "enrollment-ticket", AgentInstallationID: "host-installation-1",
+		EngineReleaseID: "sha256-" + strings.Repeat("d", 64), EngineDigest: strings.Repeat("a", 64),
+		Network: "bridge", docker: &runtimeHostDockerStub{}, NodeIDProvider: func() string { return "node-1" },
+		SessionProvider: func() (node.SessionState, bool) {
+			return node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}, true
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "platform API URLs") {
 		t.Fatalf("newRuntimeHostExecutor() error = %v", err)
 	}
 }

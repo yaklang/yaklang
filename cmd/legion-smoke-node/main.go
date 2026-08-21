@@ -59,6 +59,7 @@ func runDistYak(args []string) error {
 func runNode(args []string) error {
 	flags := flag.NewFlagSet("legion-smoke-node", flag.ContinueOnError)
 	apiURL := flags.String("api-url", "http://127.0.0.1:8080", "Legion platform HTTP API base URL")
+	runtimeAPIURL := flags.String("runtime-api-url", strings.TrimSpace(os.Getenv("LEGION_RUNTIME_API_URL")), "Container-facing Legion platform HTTP API base URL for Runtime Host commands")
 	enrollmentToken := flags.String("enrollment-token", "", "Legion node enrollment token")
 	nodeID := flags.String("id", "", "Legacy node ID fallback; canonical node_id is assigned by platform")
 	displayName := flags.String("name", "smoke-node", "Display name reported to Legion")
@@ -173,7 +174,7 @@ func runNode(args []string) error {
 	scanNodeOptions := []scannode.ScanNodeOption{}
 	if *runtimeHost && strings.TrimSpace(*kind) != "ai_session" {
 		scanNodeOptions = append(scanNodeOptions, scannode.WithRuntimeHost(scannode.RuntimeHostConfig{
-			Enabled: true, PlatformAPIBaseURL: *apiURL, EnrollmentToken: *enrollmentToken,
+			Enabled: true, PlatformAPIBaseURL: *apiURL, RuntimePlatformAPIBaseURL: *runtimeAPIURL, EnrollmentToken: *enrollmentToken,
 			AgentInstallationID: *agentInstallationID, Network: *runtimeNetwork,
 			EngineReleaseID: *engineReleaseID, EngineDigest: *engineDigest,
 		}))
