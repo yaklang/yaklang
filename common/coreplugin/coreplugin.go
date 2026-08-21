@@ -638,6 +638,11 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		return
 	}
 	databasePlugin := databasePlugins[0]
+	if scriptData.Type == schema.SCRIPT_TYPE_CONTEXT_MENU && databasePlugin.Uuid != "" {
+		// Context-menu bindings use the plugin UUID as their stable identity.
+		// A builtin code update must not turn into a different local action.
+		scriptData.Uuid = databasePlugin.Uuid
+	}
 	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored, databasePlugin.EnableForAI, databasePlugin.AIDesc, databasePlugin.AIKeywords) && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return

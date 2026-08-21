@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -47,7 +47,7 @@ func KeySchemaToName(i uint8) string {
 
 // ProfileTables 这些表是独立与项目之外的，每一个用户的数据都不一样
 var ProfileTables = []interface{}{
-	&YakScript{}, &Payload{}, &MenuItem{},
+	&YakScript{}, &Payload{}, &MenuItem{}, &ContextMenuBinding{},
 	&GeneralStorage{}, &MarkdownDoc{},
 	&Project{},
 	&NavigationBar{}, &NaslScript{},

@@ -22,6 +22,7 @@ func init() {
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, RuleRiskLocation)
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, RuleRiskLocation)
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, RuleRiskLocation)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeContextMenu, RuleRiskLocation)
 }
 
 // 检查 risk 是否符合规范
