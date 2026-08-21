@@ -241,6 +241,12 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(queued yakAIQueuedMessage) {
 	}
 
 	err := h.engine.SendMsg(queued.content, queued.options...)
+	if err == nil {
+		// SendMsg 只等待本次根任务。用户可能在它执行期间已经
+		// 追加了 ReAct 队列任务；Stop 会让根任务进入 Skipped，但
+		// 平台 Turn 必须等这些同一 runtime 内的任务排空后才能完成。
+		err = h.engine.WaitTaskFinish()
+	}
 	h.finishMessageTurn(queued.turnID, err, yakAISendFailureCode(err), map[string]string{
 		"runtime": "yak_ai_engine",
 	})

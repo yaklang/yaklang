@@ -141,6 +141,101 @@ func TestProcessOutputEventSkippedReleasesWaiter(t *testing.T) {
 	}
 }
 
+func TestWaitTaskFinishDrainsQueuedTaskAfterCurrentTaskIsSkipped(t *testing.T) {
+	e := newEngineForTerminalTest(t)
+	e.activeTasks["task-current"] = aicommon.AITaskState_Processing
+	e.activeTasks["task-queued"] = aicommon.AITaskState_Queueing
+
+	done := make(chan error, 1)
+	go func() { done <- e.WaitTaskFinish() }()
+	time.Sleep(20 * time.Millisecond)
+
+	e.processOutputEvent(&schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "react_task_status_changed",
+		Content: []byte(`{
+			"react_task_id":"task-current",
+			"react_task_now_status":"skipped",
+			"react_task_old_status":"processing"
+		}`),
+	})
+	select {
+	case err := <-done:
+		t.Fatalf("queue drain returned while queued task was still active: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	e.processOutputEvent(&schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "react_task_status_changed",
+		Content: []byte(`{
+			"react_task_id":"task-queued",
+			"react_task_now_status":"completed",
+			"react_task_old_status":"processing"
+		}`),
+	})
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("queue drain returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("queue drain did not return after every task became terminal")
+	}
+}
+
+func TestWaitTaskFinishUsesFreshEndpointForNextTaskGeneration(t *testing.T) {
+	e := newEngineForTerminalTest(t)
+	complete := func(taskID string) {
+		t.Helper()
+		e.processOutputEvent(&schema.AiOutputEvent{
+			Type:   schema.EVENT_TYPE_STRUCTURED,
+			NodeId: "react_task_status_changed",
+			Content: []byte(`{
+				"react_task_id":"` + taskID + `",
+				"react_task_now_status":"completed",
+				"react_task_old_status":"processing"
+			}`),
+		})
+	}
+	create := func(taskID string) {
+		t.Helper()
+		e.processOutputEvent(&schema.AiOutputEvent{
+			Type:   schema.EVENT_TYPE_STRUCTURED,
+			NodeId: "react_task_created",
+			Content: []byte(`{
+				"react_task_id":"` + taskID + `",
+				"react_task_status":"processing"
+			}`),
+		})
+	}
+	waitAndAssertBlocked := func(taskID string) chan error {
+		t.Helper()
+		done := make(chan error, 1)
+		go func() { done <- e.WaitTaskFinish() }()
+		select {
+		case err := <-done:
+			t.Fatalf("task generation %s reused a released endpoint: %v", taskID, err)
+		case <-time.After(50 * time.Millisecond):
+		}
+		return done
+	}
+
+	create("task-generation-1")
+	done1 := waitAndAssertBlocked("task-generation-1")
+	complete("task-generation-1")
+	if err := <-done1; err != nil {
+		t.Fatalf("first task generation: %v", err)
+	}
+
+	create("task-generation-2")
+	done2 := waitAndAssertBlocked("task-generation-2")
+	complete("task-generation-2")
+	if err := <-done2; err != nil {
+		t.Fatalf("second task generation: %v", err)
+	}
+}
+
 // TestWaitTaskFinishByTaskNameAbortedReleasesEndpoint verifies that when the
 // endpoint is created and the task is then flipped to Aborted (which calls
 // Release()), WaitTaskFinishByTaskName unblocks and returns ErrAITaskAborted.
