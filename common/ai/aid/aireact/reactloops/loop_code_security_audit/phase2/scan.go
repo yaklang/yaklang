@@ -301,6 +301,11 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 **技术栈**: {{ .TechStack }}
 **入口点摘要**: {{ .EntryPoints }}
 
+{{ if .LanguageFocus }}
+### 语言画像与本类侧重点
+{{ .LanguageFocus }}
+{{ end }}
+
 {{ if .HasSelectionFocus }}
 **[优先] 用户选中片段**（必须先覆盖文件 {{ .FocusFilePath }}）:
 {{ .Selection }}
@@ -514,6 +519,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				"CategoryID":              category.ID,
 				"CategoryName":            category.Name,
 				"TechStack":               state.TechStack,
+				"LanguageFocus":           model.LanguageFocusForCategory(state.TechStack, category.ID),
 				"EntryPoints":             state.EntryPoints,
 				"ReconOutline":            state.GetReconOutline(),
 				"ReconFileHint":           reconFileHint,
@@ -927,7 +933,11 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 
 const planPromptTemplate = `你是代码安全审计专家。现在需要确定本次审计的漏洞扫描计划。
 
-## 默认扫描类别（8 个）
+## 默认扫描类别（%d 个：Web/应用层 + 基础设施常见面）
+
+%s
+
+## Phase1 技术栈与语言画像（决定审计侧重点）
 
 %s
 
@@ -937,8 +947,12 @@ const planPromptTemplate = `你是代码安全审计专家。现在需要确定�
 
 ## 任务
 
-1. 从默认类别中选择本次审计应该包含的类别（通常全选，除非用户明确说要跳过某类）
-2. 如果用户提到了默认类别之外的特殊漏洞关注点，为每个额外关注点生成一个扫描类别
+1. **按语言画像区分侧重点（侧重 ≠ 只扫一类）**：
+   - C/C++/类 C 原生项目：主攻 memory_safety / resource_exhaustion / race_condition 等**内存与解析器**面；网络注入类仅在有 HTTP/管理面时保留
+   - Java/PHP/Python/Node/C# 等托管语言：主攻 sql/auth/ssrf/deserialization/expression/xss 等**网络入口与鉴权注入**面；memory_safety 通常低优先（除非 JNI/native）
+   - Go：主攻鉴权、SSRF、路径/命令、竞态、资源耗尽；unsafe/cgo 才升级内存类
+2. selected_category_ids：**主攻类必须包含且靠前**；次要类建议保留；低优先类无信号时可省略但须符合画像，不要无故全选或无故砍掉主攻类
+3. 如果用户提到了默认类别之外的特殊漏洞关注点，为每个额外关注点生成一个扫描类别
 
 对于 extra_categories 中的每项，格式如下：
 - id：类别标识（小写字母+下划线）
@@ -997,7 +1011,19 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 		userInput = "（用户未提供额外说明）"
 	}
 
-	prompt := fmt.Sprintf(planPromptTemplate, defaultDesc.String(), userInput)
+	techStack := ""
+	if state != nil {
+		techStack = state.TechStack
+	}
+	if techStack == "" {
+		techStack = "（Phase1 未提供技术栈，按未识别画像处理）"
+	}
+	focusBlock := model.FormatFocusPlanForPrompt(techStack)
+	prompt := fmt.Sprintf(planPromptTemplate, len(model.DefaultVulnCategories), defaultDesc.String(), focusBlock, userInput)
+
+	fallback := func() []model.VulnCategory {
+		return model.OrderCategoriesByFocus(techStack, model.DefaultVulnCategories)
+	}
 
 	var action *aicommon.Action
 	planErr := reactloops.RunForkInvokerCallback(r, task, reactloops.SubAgentJob{
@@ -1013,7 +1039,7 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 			[]aitool.ToolOption{
 				aitool.WithStringArrayParam("selected_category_ids",
 					aitool.WithParam_Required(true),
-					aitool.WithParam_Description("从默认 8 个类别中选择的 ID 列表，通常全选"),
+					aitool.WithParam_Description("按语言画像选择类别 ID：主攻类必须包含且建议靠前；次要保留；低优先无信号可省略"),
 				),
 				aitool.WithStringParam("extra_categories_json",
 					aitool.WithParam_Required(false),
@@ -1026,18 +1052,18 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 		return err
 	})
 	if planErr != nil {
-		log.Warnf("[CodeAudit/Phase2] Plan AI call failed: %v, falling back to default categories", planErr)
-		return model.DefaultVulnCategories
+		log.Warnf("[CodeAudit/Phase2] Plan AI call failed: %v, falling back to language-focused defaults", planErr)
+		return fallback()
 	}
 
 	if action == nil {
-		log.Warnf("[CodeAudit/Phase2] Plan returned nil action, using all defaults")
-		return model.DefaultVulnCategories
+		log.Warnf("[CodeAudit/Phase2] Plan returned nil action, using language-focused defaults")
+		return fallback()
 	}
 
 	selectedIDs := action.GetStringSlice("selected_category_ids")
 	if len(selectedIDs) == 0 {
-		log.Warnf("[CodeAudit/Phase2] Plan returned empty selected_category_ids, using all defaults")
+		log.Warnf("[CodeAudit/Phase2] Plan returned empty selected_category_ids, using language-focused defaults")
 		selectedIDs = make([]string, 0, len(model.DefaultVulnCategories))
 		for _, c := range model.DefaultVulnCategories {
 			selectedIDs = append(selectedIDs, c.ID)
@@ -1086,13 +1112,17 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 	}
 
 	if len(result) == 0 {
-		return model.DefaultVulnCategories
+		return fallback()
 	}
 
+	result = model.OrderCategoriesByFocus(techStack, result)
+
 	var planSummary strings.Builder
-	planSummary.WriteString(fmt.Sprintf("扫描计划确定：共 %d 个类别\n", len(result)))
+	planSummary.WriteString(fmt.Sprintf("扫描计划确定：共 %d 个类别（tech=%s profile=%s）\n",
+		len(result), techStack, model.DetectLanguageProfile(techStack)))
 	for i, c := range result {
-		planSummary.WriteString(fmt.Sprintf("  %d. %s（%s）\n", i+1, c.Name, c.ID))
+		planSummary.WriteString(fmt.Sprintf("  %d. %s（%s）[%s]\n",
+			i+1, c.Name, c.ID, model.CategoryFocusTier(techStack, c.ID)))
 	}
 	r.AddToTimeline("[SCAN_PLAN]", planSummary.String())
 	log.Infof("[CodeAudit/Phase2] Scan plan: %s", planSummary.String())
