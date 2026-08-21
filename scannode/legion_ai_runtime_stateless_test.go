@@ -238,6 +238,56 @@ func (f *fakeStatelessTurnEngine) Close() {
 	f.closeOnce.Do(func() { close(f.closed) })
 }
 
+func TestStatelessTurnWaitsForReActQueueDrainBeforeCompleting(t *testing.T) {
+	engine := newFakeStatelessTurnEngine()
+	engine.drainStarted = make(chan struct{})
+	engine.drainRelease = make(chan struct{})
+	emitter := recordingConversationTurnEmitter{
+		completed: make(chan conversationTurnResult, 1),
+		failed:    make(chan conversationTurnResult, 1),
+	}
+	turn := &statelessAITurn{engine: engine, turnID: "turn-with-queued-follow-up"}
+	handle := &statelessAIEngineRuntimeHandle{
+		emitter:    emitter,
+		activeTurn: turn,
+	}
+
+	go handle.runTurn(context.Background(), turn, "first")
+	select {
+	case <-engine.started:
+	case <-time.After(time.Second):
+		t.Fatal("root task did not start")
+	}
+	close(engine.release)
+	select {
+	case <-engine.drainStarted:
+	case <-time.After(time.Second):
+		t.Fatal("stateless runtime did not wait for the ReAct queue to drain")
+	}
+	select {
+	case completed := <-emitter.completed:
+		t.Fatalf("turn completed before queued follow-up drained: %#v", completed)
+	case <-engine.closed:
+		t.Fatal("stateless engine closed before queued follow-up drained")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(engine.drainRelease)
+	select {
+	case completed := <-emitter.completed:
+		if completed.turnID != "turn-with-queued-follow-up" {
+			t.Fatalf("completed turn = %q", completed.turnID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("turn did not complete after queued follow-up drained")
+	}
+	select {
+	case <-engine.closed:
+	case <-time.After(time.Second):
+		t.Fatal("stateless engine did not close after queue drain")
+	}
+}
+
 func TestStatelessDriverBindReturnsHandleWithoutEngineField(t *testing.T) {
 	driver := newStatelessAIEngineRuntimeDriver()
 	binding := aiSessionBinding{
