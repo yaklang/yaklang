@@ -39,6 +39,7 @@ const (
 var runtimeHostIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,191}$`)
 var runtimeHostSHA256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var runtimeHostReleaseIDPattern = regexp.MustCompile(`^sha256-[a-f0-9]{64}$`)
+var errRuntimeHostReleaseMismatch = errors.New("runtime release does not match the installed node release")
 
 type RuntimeHostConfig struct {
 	Enabled                   bool
@@ -213,12 +214,25 @@ func (b *legionJobBridge) handleAIRuntimeHostCommand(ctx context.Context, payloa
 		return rejectRuntimeHostCommand(fmt.Errorf("node session is unavailable"))
 	}
 	if err := b.agent.runtimeHost.validateCommand(command, session); err != nil {
+		if errors.Is(err, errRuntimeHostReleaseMismatch) {
+			// The command was authenticated for this live Node session, but it
+			// belongs to a container pinned to an older release. Return a signed
+			// terminal result so Session Manager can release its cleanup claim and
+			// continue reconciling new sessions instead of waiting forever.
+			return b.publishRuntimeHostResult(
+				runtimeHostRejectedResult(command, session, "release_mismatch", err),
+				session,
+			)
+		}
 		// Authentication, expiry, target-session and fixed-spec failures cannot
 		// become valid on redelivery. Mark them terminal so an old node-session
 		// message cannot occupy the durable consumer after a restart.
 		return rejectRuntimeHostCommand(err)
 	}
-	result := b.agent.runtimeHost.execute(ctx, command, session)
+	return b.publishRuntimeHostResult(b.agent.runtimeHost.execute(ctx, command, session), session)
+}
+
+func (b *legionJobBridge) publishRuntimeHostResult(result *nodev1.AIRuntimeResult, session node.SessionState) error {
 	if err := signRuntimeHostResult(result, b.agent.runtimeHost.enrollmentToken, session.SessionID); err != nil {
 		return err
 	}
@@ -232,7 +246,7 @@ func (b *legionJobBridge) handleAIRuntimeHostCommand(ctx context.Context, payloa
 	if consumer == nil || consumer.conn == nil {
 		return fmt.Errorf("runtime host reply transport is unavailable")
 	}
-	return consumer.conn.Publish(command.ReplySubject, encoded)
+	return consumer.conn.Publish(runtimeHostReplyPrefix+result.CommandId, encoded)
 }
 
 func (e *runtimeHostExecutor) validateCommand(command *nodev1.AIRuntimeCommand, session node.SessionState) error {
@@ -270,7 +284,7 @@ func (e *runtimeHostExecutor) validateCommand(command *nodev1.AIRuntimeCommand, 
 	}
 	if command.Release.ReleaseId != e.engineReleaseID ||
 		!strings.EqualFold(command.Release.EngineDigest, e.engineDigest) {
-		return fmt.Errorf("runtime release does not match the installed node release")
+		return errRuntimeHostReleaseMismatch
 	}
 	if command.Operation == nodev1.AIRuntimeOperation_AI_RUNTIME_OPERATION_START {
 		return e.validateContainerSpec(command.Container, command.AiSessionId)
@@ -388,15 +402,7 @@ func runtimeHostArgumentsMatch(arguments []string, flag, expected string) bool {
 }
 
 func (e *runtimeHostExecutor) execute(ctx context.Context, command *nodev1.AIRuntimeCommand, session node.SessionState) *nodev1.AIRuntimeResult {
-	result := &nodev1.AIRuntimeResult{
-		Metadata: &nodev1.EventMetadata{
-			EventId: uuid.NewString(), EventType: "ai.runtime.result", CausationId: command.Metadata.CommandId,
-			CorrelationId: command.AiSessionId, EmittedAt: timestamppb.Now(),
-			Node: &nodev1.NodeRef{NodeId: command.Target.NodeId, NodeSessionId: session.SessionID},
-		},
-		CommandId: command.Metadata.CommandId, Operation: command.Operation,
-		AiSessionId: command.AiSessionId, CleanupKey: command.CleanupKey, LeaseToken: command.LeaseToken,
-	}
+	result := newRuntimeHostResult(command, session)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	var err error
@@ -415,6 +421,27 @@ func (e *runtimeHostExecutor) execute(ctx context.Context, command *nodev1.AIRun
 	result.Success = err == nil
 	if err != nil {
 		result.ErrorCode = runtimeHostOperationErrorCode(err)
+		result.ErrorMessage = err.Error()
+	}
+	return result
+}
+
+func newRuntimeHostResult(command *nodev1.AIRuntimeCommand, session node.SessionState) *nodev1.AIRuntimeResult {
+	return &nodev1.AIRuntimeResult{
+		Metadata: &nodev1.EventMetadata{
+			EventId: uuid.NewString(), EventType: "ai.runtime.result", CausationId: command.Metadata.CommandId,
+			CorrelationId: command.AiSessionId, EmittedAt: timestamppb.Now(),
+			Node: &nodev1.NodeRef{NodeId: command.Target.NodeId, NodeSessionId: session.SessionID},
+		},
+		CommandId: command.Metadata.CommandId, Operation: command.Operation,
+		AiSessionId: command.AiSessionId, CleanupKey: command.CleanupKey, LeaseToken: command.LeaseToken,
+	}
+}
+
+func runtimeHostRejectedResult(command *nodev1.AIRuntimeCommand, session node.SessionState, code string, err error) *nodev1.AIRuntimeResult {
+	result := newRuntimeHostResult(command, session)
+	result.ErrorCode = strings.TrimSpace(code)
+	if err != nil {
 		result.ErrorMessage = err.Error()
 	}
 	return result
