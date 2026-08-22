@@ -47,6 +47,7 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	if req.GetId() <= 0 {
 		switch req.GetType() {
 		case yakit.TypeProject:
+			s.stopAIReActScheduler()
 			consts.GetGormProjectDatabase().Close()
 		case yakit.TypeSSAProject:
 			consts.GetGormSSAProjectDataBase().Close()
@@ -82,8 +83,12 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	log.Infof("Set project db by grpc: %s", path)
 	switch req.GetType() {
 	case yakit.TypeProject:
+		s.stopAIReActScheduler()
 		consts.SetDefaultYakitProjectDatabaseName(path)
 		err = consts.SetGormProjectDatabase(path)
+		if err == nil {
+			s.StartAIReActScheduler()
+		}
 	case yakit.TypeSSAProject:
 		raw := proj.DatabasePath
 		consts.SetSSADatabaseInfo(raw)

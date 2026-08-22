@@ -93,6 +93,25 @@ func TestEmitDequeueReActTask_IncludesUserInputUUID(t *testing.T) {
 	require.Equal(t, "ui-uuid-dequeue-456", payload["react_task_user_input_uuid"])
 }
 
+func TestEmitDequeueReActTask_IncludesInputSource(t *testing.T) {
+	var events []*schema.AiOutputEvent
+	react := &ReAct{
+		Emitter: aicommon.NewEmitter("react-dequeue-source", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+			events = append(events, e)
+			return e, nil
+		}),
+		taskQueue: NewTaskQueue("test"),
+	}
+	task := aicommon.NewStatefulTaskBase("task-dequeue-source", "hello", nil, react.Emitter, true)
+	task.SetInputSource(aicommon.USER_INPUT_SOURCE_SCHEDULE)
+
+	react.EmitDequeueReActTask(task, "normal")
+
+	require.Len(t, events, 1)
+	payload := parsePayload(t, events[0].Content)
+	require.Equal(t, aicommon.USER_INPUT_SOURCE_SCHEDULE, payload["react_task_input_source"])
+}
+
 func TestGetQueueInfoIncludesUserInputUUID(t *testing.T) {
 	queue := NewTaskQueue("test")
 	task := aicommon.NewStatefulTaskBase("task-queue-info", "follow up", nil, nil, true)

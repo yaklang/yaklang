@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/imcontrol"
@@ -11,8 +12,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
@@ -33,6 +34,9 @@ type Server struct {
 	projectReadDatabase *gorm.DB
 	// imEngine 是 IM 远程控制引擎（可选，StartIMControl 启动后非 nil）。
 	imEngine *imcontrol.Engine
+
+	aiReActSchedulerMu sync.Mutex
+	aiReActScheduler   *aiReActScheduler
 }
 
 type ServerOpts func(config *ServerConfig)

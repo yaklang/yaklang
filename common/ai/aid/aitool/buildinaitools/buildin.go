@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/notifytools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/scheduletools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/ssatools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
@@ -35,6 +36,7 @@ func GetBasicBuildInTools() []*aitool.Tool {
 	}
 
 	tools := []*aitool.Tool{nowTime}
+	tools = append(tools, scheduletools.CreateScheduleTools()...)
 	return lo.Filter(tools, func(item *aitool.Tool, index int) bool {
 		if utils.IsNil(item) {
 			log.Errorf("tool is nil")
