@@ -383,6 +383,27 @@ func TestPerceptionState_ShouldUpdate_NilNewState(t *testing.T) {
 	}
 }
 
+func TestBuildPerceptionInputHidesHostIterationBudget(t *testing.T) {
+	ctx := context.Background()
+	invoker := mockcfg.NewMockInvoker(ctx)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.loopName = "default"
+	loop.currentIterationIndex = 9
+	loop.maxIterations = 10
+	loop.actionHistory = []*ActionRecord{{
+		ActionType:     "tool_call",
+		ActionName:     "read_file",
+		IterationIndex: 9,
+	}}
+
+	input, _ := loop.buildPerceptionInput(PerceptionTriggerPostAction)
+	require.Contains(t, input, "Loop: default")
+	require.Contains(t, input, "read_file (tool_call)")
+	require.NotContains(t, input, "iteration")
+	require.NotContains(t, input, "9/10")
+	require.NotContains(t, input, "[iter 9]")
+}
+
 func TestPerceptionController_IntervalThrottling(t *testing.T) {
 	pc := newPerceptionController(perceptionDefaultIterationInterval)
 

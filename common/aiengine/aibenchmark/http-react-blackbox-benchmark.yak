@@ -365,10 +365,47 @@ func inspectTimeline(result, pinnedActionFiles) {
             }
         }
     }
+
+    firstFinishIndex = -1
+    workActionsAfterFirstFinish = 0
+    answersAfterFirstFinish = 0
+    actionIndex = 0
+    for name in actionFiles {
+        if str.Contains(name, "_finish.md") {
+            if firstFinishIndex < 0 {
+                firstFinishIndex = actionIndex
+            }
+            actionIndex++
+            continue
+        }
+        if firstFinishIndex >= 0 && actionIndex > firstFinishIndex {
+            if str.Contains(name, "_directly_answer.md") {
+                answersAfterFirstFinish++
+            } else {
+                workActionsAfterFirstFinish++
+            }
+        }
+        actionIndex++
+    }
     result["timeline"] = {
         "action_counts": actionCounts,
         "action_files": actionFiles,
         "has_finish_action": actionCounts["finish"] > 0,
+        "first_finish_action_index": firstFinishIndex,
+        "work_actions_after_first_finish": workActionsAfterFirstFinish,
+        "answers_after_first_finish": answersAfterFirstFinish,
+    }
+}
+
+func inspectFinishStability(result, traceText) {
+    lower = str.ToLower(traceText)
+    result["finish_stability"] = {
+        "soft_checkpoint_count": len(re.FindAll(traceText, `SOFT_TODO_CHECKPOINT(_REQUESTED)?`)),
+        "finish_blocked_by_todo_count": len(re.FindAll(traceText, `FINISH_BLOCKED_BY_TODO`)),
+        "todo_delta_error_count": len(re.FindAll(traceText, `TODO_DELTA_ERROR`)),
+        "duplicate_answer_rejection_count": len(re.FindAll(lower, `assistant output was already delivered`)),
+        "iteration_deadline_leak_count": len(re.FindAll(lower, `(last|final|current) iteration|最后一次迭代|最后一轮迭代|当前迭代|迭代上限`)),
+        "administrative_todo_close_language_count": len(re.FindAll(lower, `(bulk|batch|force|批量|强行).{0,24}(close|reset|done|resolved|deferred|关闭|清空)`)),
     }
 }
 
@@ -497,6 +534,28 @@ func evaluateCase(caseConfig, result, allResultText) {
     timeline = result["timeline"]
     if timeline != nil && timeline != undefined && !timeline["has_finish_action"] {
         reasons = append(reasons, "timeline has no finish action")
+    }
+    finishActionCount = 0
+    directAnswerCount = 0
+    if timeline != nil && timeline != undefined {
+        finishActionCount = int(timeline["action_counts"]["finish"])
+        directAnswerCount = int(timeline["action_counts"]["directly_answer"])
+    }
+    if int(caseConfig["min_finish_actions"]) > 0 && finishActionCount < int(caseConfig["min_finish_actions"]) {
+        reasons = append(reasons, sprintf("finish actions %d < expected minimum %d", finishActionCount, int(caseConfig["min_finish_actions"])))
+    }
+    if caseConfig["max_finish_actions"] != nil && caseConfig["max_finish_actions"] != undefined && finishActionCount > int(caseConfig["max_finish_actions"]) {
+        reasons = append(reasons, sprintf("finish actions %d > expected maximum %d", finishActionCount, int(caseConfig["max_finish_actions"])))
+    }
+    if caseConfig["max_direct_answers"] != nil && caseConfig["max_direct_answers"] != undefined && directAnswerCount > int(caseConfig["max_direct_answers"]) {
+        reasons = append(reasons, sprintf("direct answers %d > expected maximum %d", directAnswerCount, int(caseConfig["max_direct_answers"])))
+    }
+    stability = result["finish_stability"]
+    if int(stability["todo_delta_error_count"]) > int(caseConfig["max_todo_delta_errors"]) {
+        reasons = append(reasons, sprintf("todo_delta errors %d > expected maximum %d", int(stability["todo_delta_error_count"]), int(caseConfig["max_todo_delta_errors"])))
+    }
+    if int(stability["iteration_deadline_leak_count"]) > int(caseConfig["max_iteration_deadline_leaks"]) {
+        reasons = append(reasons, sprintf("agent-visible iteration deadline leaks %d > expected maximum %d", int(stability["iteration_deadline_leak_count"]), int(caseConfig["max_iteration_deadline_leaks"])))
     }
 
     result["evaluation"] = {
@@ -710,6 +769,17 @@ func runCase(caseConfig, oracle) {
     }
     eventLock.Unlock()
     inspectTimeline(result, pinnedActionFiles)
+    traceText = timelineText
+    // Timeline additions are transported as structured events in current
+    // builds, while older builds used timeline_item. Scan both representations
+    // so finish/TODO diagnostics are comparable across baseline and candidate.
+    for eventRecord in eventRecords {
+        traceText += "\n" + clean(eventRecord["content"])
+    }
+    for output in modelOutputs {
+        traceText += "\n" + clean(output["content"])
+    }
+    inspectFinishStability(result, traceText)
     inspectToolArtifacts(result)
     inspectWorkspace(caseConfig, result)
     runFileVerifications(caseConfig, result)
