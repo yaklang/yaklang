@@ -540,21 +540,14 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if utils.IsNil(verifier) {
 				return utils.Errorf("action[%s] verifier is nil", actionType)
 			}
+			// TODO validation must run first. Otherwise an invalid delta can
+			// masquerade as progress while an action verifier runs (notably the
+			// duplicate directly_answer guard), then be removed afterwards.
+			validateTodoDeltaBeforeActionVerifier(r, action)
 			if verifier.ActionVerifier != nil {
 				r.loadingStatus(fmt.Sprintf("验证动作 [%s] / Verifying Action [%s]", actionType, actionType))
 				if err := verifier.ActionVerifier(r, action); err != nil {
 					return err
-				}
-			}
-			delta, err := aicommon.NormalizeTodoDelta(action)
-			if err != nil {
-				suppressInvalidTodoDelta(r, action, err)
-				return nil
-			}
-			if delta != nil {
-				if err := r.config.ValidateTodoDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), delta); err != nil {
-					suppressInvalidTodoDelta(r, action, err)
-					return nil
 				}
 			}
 			return nil
@@ -1053,12 +1046,6 @@ LOOP:
 		// 落地 todo_delta 并判定本轮是否为有效推进 (空转轮不计入迭代预算).
 		appliedTodoDelta := applyTodoDeltaBottomLine(r, task, iterationCount, actionParams)
 		r.advanceEffectiveIteration(task, appliedTodoDelta)
-		// Legacy object wrappers keep ActionType()=="object" while the selected
-		// handler is finish. Reset based on the resolved handler so consecutive
-		// finish requests remain in the same soft-checkpoint flow.
-		if handler == nil || handler.ActionType != "finish" {
-			r.resetSoftTodoFinishFlow()
-		}
 
 		if handler.AsyncMode {
 			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
@@ -1367,7 +1354,7 @@ func (r *ReActLoop) GetMaxIterationInterruptSummary() string {
 // hook (见各 loop 的 WithOnPostIteraction), 以便复用每个 loop 已有的答复渲染.
 //
 // 关键词: max iteration 软性中断, 待办 deferred 留痕, 单条软提示, 复用单源 helper
-func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aicommon.AIStatefulTask, maxIterations int) {
+func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aicommon.AIStatefulTask, _ int) {
 	if r == nil || utils.IsNil(task) {
 		return
 	}
@@ -1400,7 +1387,7 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 	// 完全一致的单源 helper, 保证 store 更新 + todo_list_update 广播 + timeline
 	// breadcrumb 字节级对齐.
 	if cfg != nil && len(activeItems) > 0 {
-		reason := fmt.Sprintf("Reached the ReAct iteration limit (%d) after the recorded attempts; unfinished work is deferred until a later continuation.", maxIterations)
+		reason := "Host execution capacity ended after the recorded attempts; unfinished work is deferred until a later continuation."
 		delta := aicommon.BuildDeferredDeltaForOpenTodos(activeItems, reason)
 		if delta != nil {
 			var timelineHook func(category, line string)
@@ -1428,10 +1415,10 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 			loopName = "general-purpose"
 		}
 		msg := fmt.Sprintf(
-			"[%v] reached iteration limit (%d); the task was softly interrupted (NOT a failure). %d unfinished TODO(s) were closed as deferred with an explicit reason. A direct answer will summarize what was left undone; reply \"继续\" to resume, or give a new direction.",
-			loopName, maxIterations, len(activeItems),
+			"[%v] host execution capacity ended and the task was paused (NOT a failure). %d unfinished TODO(s) were preserved as deferred with explicit reasons. A direct answer will summarize what remains; reply \"继续\" to resume, or give a new direction.",
+			loopName, len(activeItems),
 		)
-		invoker.AddToTimeline("iteration_limit_interrupt", msg)
+		invoker.AddToTimeline("execution_paused", msg)
 	}
 }
 

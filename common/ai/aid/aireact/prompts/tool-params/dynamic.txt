@@ -47,7 +47,6 @@ User's original request: {{ .OriginalQuery }}
 {{ end }}
 
 # Parameter Generation Task
-Current iteration: {{ .CurrentIteration }}/{{ .MaxIterations }}
 This call is part of a multi-step ReAct process. Generate parameters that help the overall task continue to converge.
 
 # Current Response Contract

@@ -87,7 +87,7 @@ func TestSaveEvidence_Handler_BuildsDefaultPayloadWhenEmpty(t *testing.T) {
 
 	assert.Equal(t, 1, invoker.verifyCalls)
 	assert.Contains(t, invoker.verifyPayload, "Agent explicitly requested verification")
-	assert.Contains(t, invoker.verifyPayload, "Current iteration:")
+	assert.NotContains(t, invoker.verifyPayload, "Current iteration:")
 	assert.Contains(t, invoker.verifyPayload, "Use the full timeline, TODO snapshot, and shared context as the primary evidence for acceptance.")
 	assert.True(t, op.IsContinued())
 	assert.Contains(t, op.GetFeedback().String(), "need one more step")

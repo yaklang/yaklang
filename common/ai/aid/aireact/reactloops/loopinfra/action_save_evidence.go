@@ -17,10 +17,9 @@ func buildDefaultVerificationPayload(loop *reactloops.ReActLoop) string {
 
 	var parts []string
 	parts = append(parts, "Agent explicitly requested verification of the current work.")
-	parts = append(parts, fmt.Sprintf("Current iteration: %d.", loop.GetCurrentIterationIndex()))
 
 	if last := loop.GetLastAction(); last != nil {
-		parts = append(parts, fmt.Sprintf("Last action: %s (iteration %d).", last.ActionType, last.IterationIndex))
+		parts = append(parts, fmt.Sprintf("Last action: %s.", last.ActionType))
 	}
 
 	if recent := loop.GetLastNAction(3); len(recent) > 0 {

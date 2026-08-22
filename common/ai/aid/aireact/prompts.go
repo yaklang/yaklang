@@ -442,12 +442,6 @@ func (pm *PromptManager) generateToolParamsPromptWithMetaForQueryAndLoop(
 	dynamicData["ToolUsage"] = tool.Usage
 	dynamicData["ParamNames"] = paramNames
 	dynamicData["OriginalQuery"] = originalQuery
-	dynamicData["CurrentIteration"] = 0
-	dynamicData["MaxIterations"] = 0
-	if loop != nil {
-		dynamicData["CurrentIteration"] = loop.GetCurrentIterationIndex()
-		dynamicData["MaxIterations"] = loop.GetMaxIterations()
-	}
 	dynamicData["ToolSchema"] = toolSchema
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
@@ -492,11 +486,9 @@ func (pm *PromptManager) GenerateVerificationPrompt(
 	dynamicData["Payload"] = payload
 	dynamicData["TodoSnapshot"] = pm.react.RenderVerificationTodoSnapshot()
 	dynamicData["EnhanceData"] = enhanceData
-	dynamicData["IterationIndex"] = 0
-	dynamicData["MaxIterations"] = 0
+	dynamicData["HasRepeatedExecutionPath"] = false
 	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
-		dynamicData["IterationIndex"] = currentLoop.GetCurrentIterationIndex()
-		dynamicData["MaxIterations"] = currentLoop.GetMaxIterations()
+		dynamicData["HasRepeatedExecutionPath"] = currentLoop.GetCurrentIterationIndex() > 5
 	}
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
@@ -748,8 +740,6 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	}
 	dynamicData["IsBlueprint"] = true
 	dynamicData["ExtraPrompt"] = extraPrompt
-	dynamicData["CurrentIteration"] = pm.react.currentIteration
-	dynamicData["MaxIterations"] = int(pm.react.config.GetMaxIterations())
 	return pm.assemblePromptWithDynamicSection(
 		prefixMaterials, "tool-params-dynamic", toolParamsDynamicTemplate, dynamicData,
 	)

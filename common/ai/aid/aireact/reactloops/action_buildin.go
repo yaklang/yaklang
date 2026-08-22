@@ -18,19 +18,15 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 		lines = append(lines, aicommon.FormatVerificationTodoLine(item))
 	}
 	return fmt.Sprintf(
-		"current task still has %d open TODO item(s); %s cannot exit until each one is closed through todo_delta.close with outcome resolved, dismissed, or deferred and a non-empty reason. Do not fabricate completion.\nRemaining TODOs:\n%s",
+		"current task still has %d open TODO item(s); %s cannot exit yet. Do not retry finish, bulk-close items, or express TODO changes in prose or custom tags: only the action JSON's todo_delta field changes state. Continue unresolved work with a tool action. When existing observations already prove an item terminal, close that exact open ID through todo_delta.close with an evidence-backed outcome, non-empty reason, and refs in the next action.\nRemaining TODOs:\n%s",
 		len(items),
 		actionName,
 		strings.Join(lines, "\n"),
 	)
 }
 
-func buildFinishBlockedByGoalModeMessage(currentIteration, goalMinIterations int) string {
-	return fmt.Sprintf(
-		"goal mode is enabled; finish is blocked until iteration %d. current iteration: %d. Keep executing the task and only use directly_answer for progress updates before the minimum iteration gate is reached.",
-		goalMinIterations,
-		currentIteration,
-	)
+func buildFinishBlockedByGoalModeMessage() string {
+	return "goal mode's host-side completion gate is not open yet. Do not retry finish or clear unfinished TODOs to satisfy it. Continue the most valuable evidence-producing work, and use directly_answer only for a necessary progress update."
 }
 
 var loopAction_Finish = &LoopAction{
@@ -41,14 +37,26 @@ var loopAction_Finish = &LoopAction{
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +
-		"CRITICAL: if the current task still owns active TODO items, finish will be rejected until those TODOs are explicitly closed. " +
+		"CRITICAL: finish is a claim that the requested work is exhausted, not a TODO-reset command. If the current task still owns active TODO items, finish will be rejected until each is actually resolved, discriminatively dismissed, or externally blocked and deferred with evidence. " +
+		"Never bulk-close, downgrade, or fabricate outcomes merely to pass finish. A deferred item remains unfinished history; if its continuation condition is now satisfied, create a new open continuation TODO with a new ID and execute it before trying finish again. " +
 		"If the user needs a structured Markdown answer emitted to the chat, use 'directly_answer' first " +
 		"(it delivers the answer but does NOT end the task), then call 'finish'. " +
 		"Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
-			msg := buildFinishBlockedByGoalModeMessage(loop.GetCurrentIterationIndex(), loop.GetGoalMinIterations())
+			msg := buildFinishBlockedByGoalModeMessage()
 			loop.invoker.AddToTimeline("[GOAL_MODE_FINISH_BLOCKED]", msg)
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
+		// Known open work is a concrete blocker and should be reported before the
+		// general completion audit. Showing the soft checkpoint first makes the
+		// model audit an impossible finish, then retry finish instead of advancing
+		// or applying an evidence-backed todo_delta.
+		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
+			msg := buildExitBlockedByTodoMessage("finish", items)
+			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
 			operator.Feedback(msg)
 			operator.Continue()
 			return
@@ -58,13 +66,6 @@ var loopAction_Finish = &LoopAction{
 			if loop.invoker != nil {
 				loop.invoker.AddToTimeline("SOFT_TODO_CHECKPOINT_REQUESTED", msg)
 			}
-			operator.Feedback(msg)
-			operator.Continue()
-			return
-		}
-		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
-			msg := buildExitBlockedByTodoMessage("finish", items)
-			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
 			operator.Feedback(msg)
 			operator.Continue()
 			return

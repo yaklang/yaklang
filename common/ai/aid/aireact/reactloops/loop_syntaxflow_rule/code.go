@@ -147,7 +147,6 @@ func init() {
 						"FeedbackMessages":          feedbacks,
 						"SfFilename":                sfFilename,
 						"SfHasCodeSample":           sfHasCodeSample,
-						"IterationCount":            iteration,
 						"IterationHigh":             iteration >= 10,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)

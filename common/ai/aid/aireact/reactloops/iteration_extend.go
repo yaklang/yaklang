@@ -190,9 +190,9 @@ func (r *ReActLoop) requestIterationExtension(
 	delta, ok := matchIterationExtensionOption(suggestion, maxIterations)
 	if !ok {
 		if invoker := r.GetInvoker(); invoker != nil {
-			invoker.AddToTimeline("iteration_extend", fmt.Sprintf(
-				"[%v] user declined iteration extension (suggestion=%q), will soft-interrupt",
-				loopName, suggestion))
+			invoker.AddToTimeline("execution_control", fmt.Sprintf(
+				"[%v] user declined additional host execution capacity; preserve unfinished work for a later continuation",
+				loopName))
 		}
 		return false, 0, nil
 	}
@@ -200,9 +200,9 @@ func (r *ReActLoop) requestIterationExtension(
 	// 记录扩充次数 + timeline 痕迹.
 	r.incrementIterationExtensionCount()
 	if invoker := r.GetInvoker(); invoker != nil {
-		invoker.AddToTimeline("iteration_extend", fmt.Sprintf(
-			"[%v] user agreed to extend max iterations by %d (new cap=%d, extension #%d/%d)",
-			loopName, delta, maxIterations+delta, r.getIterationExtensionCount(), maxIterationExtensionCount))
+		invoker.AddToTimeline("execution_control", fmt.Sprintf(
+			"[%v] user granted additional host execution capacity; continue from the existing evidence and TODO state without guessing the remaining budget",
+			loopName))
 	}
 	log.Infof("ReactLoop[%v] iteration extended by %d (new max=%d)",
 		r.loopName, delta, maxIterations+delta)

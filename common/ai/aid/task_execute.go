@@ -151,8 +151,8 @@ func (t *AiTask) execute() error {
 
 				if t.Coordinator != nil && summary != "" {
 					timelineMsg := fmt.Sprintf(
-						"[task-verification] Task %s iteration %d verification: not yet complete. Reason: %s",
-						t.Index, iteration, summary,
+						"[task-verification] Task %s verification: not yet complete. Reason: %s",
+						t.Index, summary,
 					)
 					if nextSteps != "" {
 						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextSteps)
@@ -164,7 +164,7 @@ func (t *AiTask) execute() error {
 			}
 		}),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
-			currentIteration := loop.GetCurrentIterationIndex()
+			hasRepeatedExecutionPath := loop.GetCurrentIterationIndex() > 5
 
 			var lastVerificationInfo string
 			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
@@ -177,7 +177,7 @@ func (t *AiTask) execute() error {
 			if recentActions := loop.GetLastNAction(3); len(recentActions) > 0 {
 				var parts []string
 				for _, a := range recentActions {
-					parts = append(parts, fmt.Sprintf("iter%d: %s(%s)", a.IterationIndex, a.ActionType, a.ActionName))
+					parts = append(parts, fmt.Sprintf("%s(%s)", a.ActionType, a.ActionName))
 				}
 				recentActionsSummary = strings.Join(parts, " -> ")
 			}
@@ -194,8 +194,7 @@ func (t *AiTask) execute() error {
 
 <|PROGRESS_TASK_END_{{ .Nonce }}|>
 
---- TASK_ITERATION_INFO ---
-当前子任务迭代次数: {{ .CurrentIteration }}
+--- TASK_EXECUTION_INFO ---
 {{ if .StatusSummary }}当前状态分析: {{ .StatusSummary }}{{ end }}
 {{ if .LastVerificationInfo }}上次验证结果: {{ .LastVerificationInfo }}{{ end }}
 {{ if .FeedbackMessages }}
@@ -203,15 +202,15 @@ func (t *AiTask) execute() error {
 {{ .FeedbackMessages }}
 {{ end }}
 {{ if .RecentActions }}最近执行动作: {{ .RecentActions }}{{ end }}
-{{ if gt .CurrentIteration 5 }}
-** 警告: 当前子任务已执行 {{ .CurrentIteration }} 次迭代，请认真评估：
+{{ if .HasRepeatedExecutionPath }}
+** 警告: 当前子任务已多次经过相似执行路径，请认真评估：
   1. 任务目标是否实际上已经完成？如果工具已返回足够结果，请允许任务完成。
   2. 当前策略是否有效？如果反复失败，请更换工具或方法。
-  3. 不要重复执行相同的操作，这会浪费迭代次数。
+  3. 不要重复执行相同的操作，应换用能产生新证据的方法。
   4. 如果你当前执行的动作与 CURRENT_TASK 目标领域不相关（例如当前任务是 FTP 后门验证但你在做 Web 漏洞扫描），说明当前子任务实际已完成，应使用 directly_answer 输出任务总结并结束。
   5. 安全测试中，"漏洞不存在"是有效的否定结论，不需要继续尝试——请直接总结结果并完成任务。**
 {{ end }}
---- TASK_ITERATION_INFO_END ---
+--- TASK_EXECUTION_INFO_END ---
 
 - 进度信息语义约定：
   1) 任务树状态约定
@@ -226,7 +225,7 @@ func (t *AiTask) execute() error {
   3) 行为准则（必须遵守）
      - 不要假设或回填未在进度信息中出现的状态。
      - 不要“预完成”尚未执行的步骤；只就“当前任务”进行计划、细化与必要的状态更新建议。
-     - 工具调用与继续决策次数受系统限制（见“任务次数执行信息”），你必须在该限制下规划行为，避免无效尝试。
+     - 持续以新证据驱动下一步；反复失败时更换工具、假设或验证方法。
      - 若需要外部信息或权限，先在输出中请求或声明前置条件，而非擅自推进其他任务。
   4) 只读规则（重要）
      - 进度信息对 AI 是只读的。框架会根据实际执行进度自动更新任务清单与状态。
@@ -237,14 +236,14 @@ func (t *AiTask) execute() error {
      - 用于计划：仅对“当前任务”制定可执行的下一步子步骤清单与完成判据（Done Criteria）。
 
 `, map[string]interface{}{
-				"Progress":             t.rootTask.Progress(),
-				"CurrentProgress":      t.Progress(),
-				"Nonce":                nonce,
-				"CurrentIteration":     currentIteration,
-				"FeedbackMessages":     feedback.String(),
-				"StatusSummary":        t.StatusSummary,
-				"LastVerificationInfo": lastVerificationInfo,
-				"RecentActions":        recentActionsSummary,
+				"Progress":                 t.rootTask.Progress(),
+				"CurrentProgress":          t.Progress(),
+				"Nonce":                    nonce,
+				"HasRepeatedExecutionPath": hasRepeatedExecutionPath,
+				"FeedbackMessages":         feedback.String(),
+				"StatusSummary":            t.StatusSummary,
+				"LastVerificationInfo":     lastVerificationInfo,
+				"RecentActions":            recentActionsSummary,
 			})
 
 			return reactiveData, nil

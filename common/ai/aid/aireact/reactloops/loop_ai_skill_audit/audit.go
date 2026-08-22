@@ -41,7 +41,6 @@ const auditReactiveDataTpl = `## 当前审计状态
 {{ .Selection }}
 {{ else if .HasOpenFileFocus }}**前端打开文件**: {{ .FocusFilePath }}（优先审计此文件及其关联脚本）
 {{ end }}
-**审计进度**: 已执行 {{ .IterationCount }} 次操作
 {{ if .NoteFiles }}**已写出审计笔记文件（{{ .NoteFileCount }} 个）**:
 {{ .NoteFiles }}{{ else }}尚未写出任何审计笔记（建议先写 skill_audit_notes.md）{{ end }}
 {{ if .FeedbackMessages }}
@@ -307,7 +306,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 
 		// Reactive data: current progress snapshot
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-			iterCount := loop.GetCurrentIterationIndex()
 			noteFilesList := ""
 			for _, f := range noteFiles {
 				noteFilesList += "  - " + f + "\n"
@@ -315,7 +313,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			vars := map[string]any{
 				"Nonce":            nonce,
 				"SkillPath":        state.SkillPath,
-				"IterationCount":   iterCount,
 				"NoteFiles":        noteFilesList,
 				"NoteFileCount":    len(noteFiles),
 				"FeedbackMessages": feedbacker.String(),
