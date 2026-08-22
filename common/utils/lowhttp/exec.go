@@ -17,7 +17,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -710,10 +709,10 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		if clientHelloSpec != nil {
 			dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(clientHelloSpec))
 		} else if randomJA3FingerPrint {
-			spec, err := utls.UTLSIdToSpec(utls.HelloChrome_120)
+			spec, err := netx.ChromeClientHelloSpec()
 			if err == nil {
-				clientHelloSpec = &spec
-				dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(&spec))
+				clientHelloSpec = spec
+				dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(spec))
 			} else {
 				log.Debugf("generate Chrome TLS fingerprint failed: %v", err)
 			}
@@ -773,12 +772,13 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	}
 
 	cacheKey := &connectKey{
-		proxy:           proxy,
-		scheme:          reqSchema,
-		addr:            originAddr,
-		https:           option.Https,
-		gmTls:           option.GmTLS,
-		clientHelloSpec: clientHelloSpec,
+		proxy:             proxy,
+		scheme:            reqSchema,
+		addr:              originAddr,
+		https:             option.Https,
+		gmTls:             option.GmTLS,
+		clientHelloSpec:   clientHelloSpec,
+		chromeFingerprint: randomJA3FingerPrint,
 	}
 	if sni != nil {
 		cacheKey.sni = *sni

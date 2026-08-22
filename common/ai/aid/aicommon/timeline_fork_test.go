@@ -186,8 +186,8 @@ func TestTimelineFork_CompressDoesNotTouchProtectedPrefix(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fork)
 
-	fork.Branch.PushText(3, strings.Repeat("x", 400))
-	fork.Branch.PushText(4, strings.Repeat("y", 400))
+	fork.Branch.PushText(3, "%s", strings.Repeat("x", 400))
+	fork.Branch.PushText(4, "%s", strings.Repeat("y", 400))
 
 	baseItem, _ := fork.Branch.idToTimelineItem.Get(1)
 	newItem, _ := fork.Branch.idToTimelineItem.Get(3)

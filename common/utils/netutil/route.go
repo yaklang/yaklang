@@ -216,7 +216,7 @@ func Route(timeout time.Duration, target string) (iface *net.Interface, gateway,
 		}
 		return iface, gIp, sIp, nil
 	case "openbsd", "darwin":
-		log.Infof("cannot call native route calling, use /sbin/route -n get " + ip.String())
+		log.Infof("%s", "cannot call native route calling, use /sbin/route -n get "+ip.String())
 		cmd := exec.CommandContext(ctx, "/sbin/route", "-n", "get", ip.String())
 		result, err := cmd.CombinedOutput()
 		if err != nil {

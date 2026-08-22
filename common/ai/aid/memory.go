@@ -348,7 +348,7 @@ func (m *PromptContextProvider) SetTimelineInstance(timeline *aicommon.Timeline)
 }
 
 func (m *PromptContextProvider) PushText(id int64, i any) {
-	m.timeline.PushText(id, utils.InterfaceToString(i))
+	m.timeline.PushText(id, "%s", utils.InterfaceToString(i))
 }
 
 func (m *PromptContextProvider) TimelineWithout(n ...any) string {

@@ -1416,13 +1416,13 @@ func (v Values) GetOperands() Values {
 }
 func (v *Value) ShowDot() {
 	dotStr := v.DotGraph()
-	log.Infof(dotStr)
+	log.Infof("%s", dotStr)
 	// dot.ShowDotGraphToAsciiArt(dotStr)
 }
 
 func (vs Values) ShowDot() Values {
 	dotStr := vs.DotGraph()
-	log.Infof(dotStr)
+	log.Infof("%s", dotStr)
 	// dot.ShowDotGraphToAsciiArt(dotStr)
 	return vs
 }

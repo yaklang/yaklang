@@ -153,10 +153,10 @@ func TestConvertExecResultIntoAIToolCallStdoutLog_AIOutputOnly(t *testing.T) {
 	}, runtimeID)
 
 	aiOuptputStr := utils.RandString(20)
-	client.AIOutput(aiOuptputStr)
+	client.AIOutput("%s", aiOuptputStr)
 
 	infoLogStr := utils.RandString(20)
-	client.YakitInfo(infoLogStr)
+	client.YakitInfo("%s", infoLogStr)
 
 	joined := strings.Join(outputs, "\n")
 	if !strings.Contains(joined, aiOuptputStr) {

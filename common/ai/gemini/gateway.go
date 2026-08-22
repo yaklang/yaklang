@@ -321,7 +321,7 @@ func (c *Client) internalStreamGenerateContent(ctx context.Context, req Generate
 				if statusCode != http.StatusOK {
 					bodyBytes, _ := io.ReadAll(bodyReader) // Consume body to get error details
 					errMsg := fmt.Sprintf("gemini API request failed with status %d: %s", statusCode, string(bodyBytes))
-					log.Errorf(errMsg)
+					log.Errorf("%s", errMsg)
 					errToSend := errors.New(errMsg)
 					if c.config.HTTPErrorHandler != nil {
 						go c.config.HTTPErrorHandler(errToSend)
@@ -777,7 +777,7 @@ func (c *Client) GetModelList() ([]*aispec.ModelMeta, error) {
 	bodyBytes := resp.GetBody()
 	if resp.GetStatusCode() != http.StatusOK {
 		errMsg := fmt.Sprintf("gemini API model list request failed with status %d: %s", resp.GetStatusCode(), string(bodyBytes))
-		log.Errorf(errMsg)
+		log.Errorf("%s", errMsg)
 		errToSend := errors.New(errMsg)
 		if c.config.HTTPErrorHandler != nil {
 			go c.config.HTTPErrorHandler(errToSend)

@@ -1,6 +1,6 @@
 module github.com/yaklang/yaklang
 
-go 1.22.12
+go 1.24
 
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
@@ -105,7 +105,7 @@ require (
 	github.com/projectdiscovery/gostruct v0.0.0-20230520110439-bbdedaae3c35
 	github.com/quic-go/quic-go v0.49.1
 	github.com/rabbitmq/amqp091-go v1.9.0
-	github.com/refraction-networking/utls v1.6.7
+	github.com/refraction-networking/utls v1.8.2
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/samber/lo v1.38.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
@@ -135,15 +135,15 @@ require (
 	github.com/ysmood/leakless v0.9.0
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/image v0.18.0
 	golang.org/x/mod v0.19.0
-	golang.org/x/net v0.35.0
-	golang.org/x/sync v0.11.0
-	golang.org/x/sys v0.30.0
-	golang.org/x/term v0.29.0
-	golang.org/x/text v0.22.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/sys v0.31.0
+	golang.org/x/term v0.30.0
+	golang.org/x/text v0.23.0
 	golang.org/x/time v0.5.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/grpc v1.69.4

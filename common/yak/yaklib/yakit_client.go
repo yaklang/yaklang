@@ -215,7 +215,7 @@ func (c *YakitClient) YakitDraw(level string, data interface{}) {
 // ```
 func (c *YakitClient) Output(i interface{}) error {
 	level, msg := MarshalYakitOutput(i)
-	return c.YakitLog(level, msg)
+	return c.YakitLog(level, "%s", msg)
 }
 func (c *YakitClient) SendRaw(y *YakitLog) error {
 	if c == nil {

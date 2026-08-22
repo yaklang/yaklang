@@ -176,7 +176,7 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 	}
 
 	_ = rt
-	coordinator.Timeline.PushText(coordinator.AcquireId(), timelineFlag)
+	coordinator.Timeline.PushText(coordinator.AcquireId(), "%s", timelineFlag)
 	coordinator.Timeline.Save(coordinator.Config.GetDB(), timelineId)
 
 	go coordinator.Run()

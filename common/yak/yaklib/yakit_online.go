@@ -792,7 +792,7 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 	)
 	if err != nil {
 		log.Errorf("save yakScript to online failed: %s", err.Error())
-		return utils.Errorf(err.Error())
+		return utils.Errorf("%s", err.Error())
 	}
 
 	return nil

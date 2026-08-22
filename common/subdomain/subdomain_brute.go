@@ -128,7 +128,7 @@ func (s *SubdomainScanner) BruteWithSubDictionarySelection(ctx context.Context, 
 			"subdomain brute aborted for %s: all %d random probes resolved but returned %d distinct IPs (e.g. %s) — DNS appears to be hijacked/taken over (e.g. local TUN mode). Brute force is meaningless here.",
 			target, len(tested), len(blacklistIP), strings.Join(tested, ", "),
 		)
-		s.logger.Errorf(reason)
+		s.logger.Errorf("%s", reason)
 		s.onScanAborted(reason)
 		return
 	case WildcardSingleIP:

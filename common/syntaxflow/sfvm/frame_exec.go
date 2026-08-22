@@ -347,7 +347,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		} else {
 			buffer.WriteString(lt + ")")
 		}
-		s.debugSubLog(buffer.String())
+		s.debugSubLog("%s", buffer.String())
 		var res []bool
 		_ = value.Recursive(func(v ValueOperator) error {
 			ok, _, _ := call(ValuesOf(v), s, params)
@@ -1090,7 +1090,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}
 
 		if !haveResult {
-			s.debugSubLog("-   error: " + elseStr)
+			s.debugSubLog("%s", "-   error: "+elseStr)
 			s.result.Errors = append(s.result.Errors, elseStr)
 			if s.config.FailFast {
 				return true, utils.Wrapf(AbortError, "check params failed: %v", elseStr)

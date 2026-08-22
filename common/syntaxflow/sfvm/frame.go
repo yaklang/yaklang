@@ -423,7 +423,7 @@ func (s *SFFrame) execRule(feedValue Values) error {
 			} else {
 				msg = "exec rule finished"
 			}
-			s.ProcessCallback(msg)
+			s.ProcessCallback("%s", msg)
 		}
 		if s.idx >= len(s.Codes) {
 			break
@@ -638,7 +638,7 @@ func (s *SFFrame) debugLog(i string, item ...any) {
 	prefix := strings.Repeat("\t", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
 	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
-		log.Infof(prefix + line)
+		log.Infof("%s", prefix+line)
 	}
 }
 
@@ -660,7 +660,7 @@ func (s *SFFrame) debugSubLog(i string, item ...any) {
 		}
 		result.WriteString(prefix + line)
 	}
-	s.debugLog(result.String())
+	s.debugLog("%s", result.String())
 }
 
 func (s *SFFrame) startValueOpTiming(name string) func() {

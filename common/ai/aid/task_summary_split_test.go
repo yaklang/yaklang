@@ -44,10 +44,10 @@ func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 		timeline := aicommon.NewTimeline(cfg, nil)
 		timeline.SetTimelineBucketByteSize(80)
 		if fixture.TimelineFrozen != "" {
-			timeline.PushText(101, fixture.TimelineFrozen+" "+strings.Repeat("A", 120))
+			timeline.PushText(101, "%s", fixture.TimelineFrozen+" "+strings.Repeat("A", 120))
 		}
 		if fixture.TimelineOpen != "" {
-			timeline.PushText(102, fixture.TimelineOpen+" "+strings.Repeat("B", 120))
+			timeline.PushText(102, "%s", fixture.TimelineOpen+" "+strings.Repeat("B", 120))
 		}
 		cfg.Timeline = timeline
 	}
@@ -145,8 +145,8 @@ func TestGenerateTaskSummaryPrompt_UsesConfigTimelineFrozenOpen(t *testing.T) {
 	task.Config.TopToolsCount = 100
 	timeline.SetTimelineBucketByteSize(80)
 
-	timeline.PushText(101, "first current task timeline block "+strings.Repeat("A", 120))
-	timeline.PushText(102, "second current task timeline block "+strings.Repeat("B", 120))
+	timeline.PushText(101, "%s", "first current task timeline block "+strings.Repeat("A", 120))
+	timeline.PushText(102, "%s", "second current task timeline block "+strings.Repeat("B", 120))
 
 	prompt, err := task.GenerateTaskSummaryPrompt()
 	require.NoError(t, err)

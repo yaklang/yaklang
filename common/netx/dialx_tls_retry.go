@@ -318,7 +318,7 @@ func buildTLSRetryCandidates(
 	}
 
 	addChromeCandidate := func() {
-		spec, err := utls.UTLSIdToSpec(utls.HelloChrome_120)
+		spec, err := ChromeClientHelloSpec()
 		if err != nil {
 			config.TraceInfo.AddTLSRetryTip("TLS 握手失败，生成 Chrome TLS 指纹失败，未进行指纹重试")
 			return
@@ -334,7 +334,7 @@ func buildTLSRetryCandidates(
 			suggestion: suggestion,
 			sni:        sni,
 			nextProtos: cloneStringSlice(config.TLSNextProto),
-			spec:       &spec,
+			spec:       spec,
 		})
 	}
 

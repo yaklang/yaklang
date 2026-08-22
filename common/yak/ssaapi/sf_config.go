@@ -147,7 +147,7 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 			keyName := recursiveCheckKeyLabel(item.Key)
 			// 暴露编译错误，添加到结果中以便前端可以获取
 			errorMsg := utils.Errorf("SyntaxFlow compile error for %s rule [%s]: %v", keyName, item.Value, err).Error()
-			log.Errorf(errorMsg)
+			log.Errorf("%s", errorMsg)
 			if c.contextResult != nil {
 				c.contextResult.Errors = append(c.contextResult.Errors, errorMsg)
 			}

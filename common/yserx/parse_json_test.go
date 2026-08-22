@@ -32,7 +32,7 @@ func TestParseJavaSerialized_1(t *testing.T) {
 
 	res, err := ParseJavaSerialized(raw2)
 	if err != nil {
-		log.Errorf(err.Error())
+		log.Errorf("%s", err.Error())
 		panic(1)
 		return
 	}

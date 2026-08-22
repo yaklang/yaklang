@@ -75,7 +75,7 @@ func ReadDirsRecursivelyCallback(p string, i func(info *FileInfo) bool) error {
 func ReadDirsRecursively(p string) ([]*FileInfo, error) {
 	files, err := ReadFilesRecursively(p)
 	if err != nil {
-		return nil, Errorf(err.Error())
+		return nil, Errorf("%s", err.Error())
 	}
 
 	var i []*FileInfo

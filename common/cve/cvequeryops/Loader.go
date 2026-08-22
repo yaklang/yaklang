@@ -84,7 +84,7 @@ func LoadCVE(fileDir, DbPath string, years ...int) {
 
 		fileName = path.Join(fileDir, fileName)
 		startTime := time.Now()
-		log.Infof("LoadCVE begin: " + fileName)
+		log.Infof("%s", "LoadCVE begin: "+fileName)
 		exitNow, err := LoadCVEByFileName(fileName, manager)
 		if err != nil {
 			log.Errorf("LoadCVE: %v failed: %v", fileName, err)

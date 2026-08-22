@@ -72,7 +72,7 @@ func (t *AiTask) DeepThink(suggestion string) error {
 		aicommon.WithAIRequest_CallerLabel("subtask-decomposition"),
 	)
 	if err != nil {
-		t.EmitError(err.Error())
+		t.EmitError("%s", err.Error())
 		return err
 	}
 	t.Coordinator.standardizeTaskTreeAndNotify(t, "deep think subtasks updated")

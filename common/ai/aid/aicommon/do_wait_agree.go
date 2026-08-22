@@ -112,7 +112,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 						"score":          score,
 						"level":          "low",
 					})
-					c.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
+					c.Emitter.EmitInfo("%s", "Auto-review score is low, suggesting to continue in "+fmt.Sprint(int(duSec))+" seconds...")
 					endNormally(score, "low", "")
 					if !waitAgreeCountdown(ctx, duSec*time.Second) {
 						return
@@ -129,7 +129,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 						"level":          "middle",
 					})
 					endNormally(score, "middle", "")
-					c.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
+					c.Emitter.EmitInfo("%s", "Auto-review score is middle, suggesting to continue in "+fmt.Sprint(int(duSec))+" seconds...")
 					if !waitAgreeCountdown(ctx, duSec*time.Second) {
 						return
 					}
