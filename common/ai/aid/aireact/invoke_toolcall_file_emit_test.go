@@ -37,14 +37,13 @@ func mockPostIterationDirectAnswer(i aicommon.AICallerConfigIf, prompt string) (
 	return rsp, true
 }
 
-
 // toolResultAppearedInPrompt checks whether a tool result (identified by its
-// "COMBINED OUTPUT:" header) is already present in the prompt timeline. After
+// semantic "RESULT:" header) is already present in the prompt timeline. After
 // the iteration timeline entries were removed, the human_readable_thought text
 // no longer appears in the next iteration's prompt; the tool result is the
 // reliable signal that a tool has already been executed.
 func toolResultAppearedInPrompt(prompt string) bool {
-	return strings.Contains(prompt, "COMBINED OUTPUT:")
+	return strings.Contains(prompt, "RESULT:")
 }
 
 func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
@@ -582,9 +581,10 @@ LOOP:
 	require.NoError(t, err)
 	contentStr := string(reportContent)
 
-	// 空 stdout/stderr 仍在统一预览中明确标记。
+	// 空 stdout/stderr 仍在观察信息中明确标记，语义结果保持在前。
 	require.Contains(t, contentStr, "## Execution Result Preview")
-	require.Contains(t, contentStr, "COMBINED OUTPUT:")
+	require.Contains(t, contentStr, "RESULT:")
+	require.Contains(t, contentStr, "OBSERVATIONS:")
 	require.Contains(t, contentStr, "(empty)")
 
 	// 验证仍然包含参数和结果
