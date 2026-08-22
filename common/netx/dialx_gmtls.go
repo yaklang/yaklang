@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	utls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -66,7 +65,6 @@ func dialTLSWithGMTLSCipherFallback(
 	baseConfig *gmtls.Config,
 	sni string,
 	tlsTimeout time.Duration,
-	clientHelloSpec *utls.ClientHelloSpec,
 ) (net.Conn, time.Duration, error) {
 	attempts := gmtlsCipherSuiteDialAttempts(baseConfig, config.GMTLSDisableCompatMode)
 	var lastErr error
@@ -86,7 +84,9 @@ func dialTLSWithGMTLSCipherFallback(
 		}
 
 		startUpgrade := time.Now()
-		tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, clientHelloSpec, config.TLSNextProto...)
+		// A Chrome/uTLS ClientHello is an ordinary TLS profile and cannot carry
+		// the TLCP/GMSSL cipher suites required by this strategy.
+		tlsConn, err := upgradeToTLSConnectionWithTimeout(conn, sni, tempTlsConfig, tlsTimeout, nil, nil, config.TLSNextProto...)
 		handshakeDur := time.Since(startUpgrade)
 		if err == nil {
 			return tlsConn, handshakeDur, nil

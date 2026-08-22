@@ -441,7 +441,8 @@ func mitmMaxContentLength(i int) MitmConfigOpt {
 	}
 }
 
-// randomJA3 是一个选项函数，用于指定中间人代理服务器是否开启随机 JA3 指纹模式，默认为 false
+// randomJA3 是一个兼容选项。MITM 默认已经使用推荐的 Chrome TLS 指纹；
+// 传入 true 继续选择该默认指纹，传入 false 不再关闭默认行为。
 // 参数:
 //   - b: 是否开启随机 JA3 指纹
 //
@@ -719,9 +720,11 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),
-		crep.MITM_RandomJA3(config.randomJA3),
 		crep.MITM_SetSNI(config.sni, config.overwriteSNI),
 	)
+	if config.randomJA3 {
+		mitmOpts = append(mitmOpts, crep.MITM_RandomJA3(true))
+	}
 
 	// Add extra incoming connection channels (legacy)
 	for _, ch := range config.extraIncomingConnChans {

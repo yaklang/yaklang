@@ -2073,10 +2073,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 	}()
 
+	if randomJA3 {
+		opts = append(opts, crep.MITM_RandomJA3(true))
+	}
 	opts = append(opts,
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
-		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_SetSNI(sni, overwriteSNI),
 		crep.MITM_SetSNIMapping(sniMapping),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),

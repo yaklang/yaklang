@@ -17,7 +17,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -307,9 +306,23 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		maxContentLength        = option.MaxContentLength
 		randomJA3FingerPrint    = option.RandomJA3FingerPrint
 		clientHelloSpec         = option.ClientHelloSpec
+		tlsFingerprint          = option.TLSFingerprint
 		dialer                  = option.Dialer
 		fixQueryEscape          = option.FixQueryEscape
 	)
+	if clientHelloSpec != nil {
+		tlsFingerprint = ""
+	} else if tlsFingerprint == "" && randomJA3FingerPrint {
+		tlsFingerprint = netx.DefaultTLSFingerprint
+	}
+	chromeFingerprint := false
+	if tlsFingerprint != "" {
+		profile, err := netx.GetClientHelloProfile(tlsFingerprint)
+		if err != nil {
+			return response, err
+		}
+		chromeFingerprint = profile.UsesChromeHTTP2()
+	}
 
 	failureChecker := func(rsp *LowhttpResponse) error {
 		if customFailureChecker != nil && rsp != nil {
@@ -709,14 +722,8 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 		if clientHelloSpec != nil {
 			dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(clientHelloSpec))
-		} else if randomJA3FingerPrint {
-			spec, err := utls.UTLSIdToSpec(utls.HelloChrome_120)
-			if err == nil {
-				clientHelloSpec = &spec
-				dialopts = append(dialopts, netx.DialX_WithClientHelloSpec(&spec))
-			} else {
-				log.Debugf("generate Chrome TLS fingerprint failed: %v", err)
-			}
+		} else if tlsFingerprint != "" {
+			dialopts = append(dialopts, netx.DialX_WithTLSFingerprint(tlsFingerprint))
 		}
 		if sni != nil {
 			dialopts = append(dialopts, netx.DialX_WithSNI(*sni))
@@ -773,12 +780,14 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	}
 
 	cacheKey := &connectKey{
-		proxy:           proxy,
-		scheme:          reqSchema,
-		addr:            originAddr,
-		https:           option.Https,
-		gmTls:           option.GmTLS,
-		clientHelloSpec: clientHelloSpec,
+		proxy:             proxy,
+		scheme:            reqSchema,
+		addr:              originAddr,
+		https:             option.Https,
+		gmTls:             option.GmTLS,
+		clientHelloSpec:   clientHelloSpec,
+		tlsFingerprint:    tlsFingerprint,
+		chromeFingerprint: chromeFingerprint,
 	}
 	if sni != nil {
 		cacheKey.sni = *sni

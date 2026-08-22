@@ -714,9 +714,11 @@ func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpCo
 }
 
 func (pc *persistConn) h2Conn() {
+	chromeFingerprint := pc.cacheKey != nil && pc.cacheKey.chromeFingerprint
 	newH2Conn := &http2ClientConn{
 		conn:              pc.conn,
 		ctx:               pc.p.ctx,
+		chromeFingerprint: chromeFingerprint,
 		mu:                new(sync.Mutex),
 		streams:           make(map[uint32]*http2ClientStream),
 		currentStreamID:   1,
@@ -1320,17 +1322,19 @@ func (e connPoolReadFromServerError) Error() string {
 }
 
 type connectKey struct {
-	proxy           []string // 可以使用的代理
-	scheme, addr    string   // 协议和目标地址
-	https           bool
-	gmTls           bool
-	clientHelloSpec *utls.ClientHelloSpec
-	sni             string
-	strongHost      string
+	proxy             []string // 可以使用的代理
+	scheme, addr      string   // 协议和目标地址
+	https             bool
+	gmTls             bool
+	clientHelloSpec   *utls.ClientHelloSpec
+	tlsFingerprint    string
+	chromeFingerprint bool
+	sni               string
+	strongHost        string
 }
 
 func (c *connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni, c.strongHost)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.tlsFingerprint, c.chromeFingerprint, c.sni, c.strongHost)
 }
 
 type connLRU struct {

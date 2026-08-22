@@ -26,6 +26,42 @@ const defaultMaxFrameSize = 1 << 14
 const defaultMaxConcurrentStreamSize = 40
 const defaultMaxHeaderListSize = 10 << 18
 
+// Chrome 151 HTTP/2 fingerprint:
+// 1:65536;2:0;4:6291456;6:262144|15663105|0|m,a,s,p
+const (
+	chromeH2InitialWindowSize   = 6291456
+	chromeH2MaxHeaderListSize   = 262144
+	chromeH2ConnWindowIncrement = 15663105
+	chromeH2HeadersWeight       = 256
+)
+
+var chromePseudoHeaderOrder = []string{":method", ":authority", ":scheme", ":path"}
+
+func reorderChromePseudoHeaders(fields []hpack.HeaderField) []hpack.HeaderField {
+	out := make([]hpack.HeaderField, 0, len(fields))
+	picked := make(map[string]bool, len(chromePseudoHeaderOrder))
+	for _, name := range chromePseudoHeaderOrder {
+		for _, field := range fields {
+			if field.Name == name {
+				out = append(out, field)
+				picked[name] = true
+				break
+			}
+		}
+	}
+	for _, field := range fields {
+		if strings.HasPrefix(field.Name, ":") && !picked[field.Name] {
+			out = append(out, field)
+		}
+	}
+	for _, field := range fields {
+		if !strings.HasPrefix(field.Name, ":") {
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
 // requires cc.wmu be held
 func h2FramerWriteHeaders(frame *http2.Framer, streamID uint32, endStream bool, maxFrameSize uint32, hdrs []byte) error {
 	first := true // first frame written (HEADERS is first, then CONTINUATION)
