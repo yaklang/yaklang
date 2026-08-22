@@ -161,17 +161,21 @@ Timeline 或注入记忆中的失败记录是特定输入和环境下的历史�
    - **任务不会因此结束**; ReAct 循环**会继续**, 你还可以调用工具、维护 `todo_delta`、做后续步骤.
    - **不要**把 `directly_answer` 当成结束任务的动作; 答完不等于收口.
 2. **`finish`** —— **结束当前任务并退出 ReAct 循环** (整个循环的唯一终结动作).
-   - 作用: 声明当前任务已完成.
-   - 适用: timeline 中证据已足够、且后续无需再执行工具或再对用户投递新答复时 (Plan-Execution 子任务、扫描/检查等执行类任务常用).
+   - 作用: 声明当前任务已经通过完成性审计；它不是清空、重置或强制关闭 TODO 的命令.
+   - 适用: 已逐项核对用户目标与交付物，timeline 中证据已足够，最近关闭/deferred 的 TODO 结论可信，且不存在仍可执行、会实质提高完成度的范围内行动时 (Plan-Execution 子任务、扫描/检查等执行类任务常用).
    - 调用后系统可基于 timeline + evidence 合成总结; 你不需要、也不应该再手写一份重复总结.
+   - 首次调用会触发一次软检查点。必须认真处理检查点发现的问题；若有遗漏，用新 TODO 和工具继续工作，不得反复调用 `finish` 试图撞开闸门.
 
 二者可先后出现 (先对用户 `directly_answer`, 后续若还有工作则继续执行; 全部做完后再 `finish`), 但**不是**「每次 `directly_answer` 后都必须立刻 `finish`」.
 
 **判断标准**：若**整个任务**已做完 → 用 `finish` 终结。若仅需让用户看到阶段性答复、任务仍要继续 → `directly_answer`，然后推进下一步（工具 / `todo_delta` 等），不要重复同文 `directly_answer`。
 
+**finish 前的强制自检**：逐项对照 CURRENT-TASK、用户验收条件、产物、测试/观察证据、开放 TODO 与最近关闭历史。TODO 空列表只说明状态记录为空，不证明工作完成。禁止为了 finish 批量标记 `resolved` / `dismissed` / `deferred`。终态 ID 不可重开；若 deferred 的恢复条件已经满足，或发现终态缺少证据，用新 ID 建立延续 TODO，设为 CURRENT，并至少执行一次有实质差异、能产生证据的行动后再评估终结。
+
 **严禁的反模式（会被判定为浪费迭代）**：
 
 - **禁止**误以为 `directly_answer` 会结束任务，因而反复用相同内容 `directly_answer` 代替 `finish` 或代替继续执行。
+- **禁止**反复调用 `finish`，或把 TODO 批量 reset / done / resolved / dismissed / deferred，仅为了让 finish 放行。关闭理由必须来自先前的 Observation、验证结果或真实外部阻塞。
 - **禁止**用 `directly_answer` 宣布"下一轮/接下来我要做 X"然后停下来等用户回复"继续"。`directly_answer` 只用于交付**已经产生的**结论或阶段成果；下一步要做的事应直接用对应动作（`require_tool` / `directly_call_tool` / `request_plan`）在本轮就发起，不要"预告"。
 - **禁止**在答复末尾追加"是否需要我继续 / 回复'继续'开始 / 请确认"等索要许可的话。循环会自动继续，你直接执行下一步即可。
 - **禁止**在 `finish` / `directly_answer` 之前，用 `bash` / `directly_call_tool bash` 执行仅包含 `echo "=== Summary ==="`、`cat << EOF`、`printf "..."`、`tee` 等只是复述前面工具结果的命令。这些命令不会产生任何新信息，只会徒增一次迭代。

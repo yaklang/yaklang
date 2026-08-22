@@ -21,7 +21,7 @@
 **⚠️ 【必须验证】修改后请立即调用 `check-syntaxflow-syntax` 验证**（传入 path 或 syntaxflow-code）{{ if .SfHasCodeSample }}，并传入 sample_code、filename、language 做正例自检{{ end }}。禁止在未调用验证工具的情况下再次 modify_rule。验证通过或得到 matched=true 后方可 directly_answer。
 {{ if .IterationHigh }}
 
-**⚠️ 已迭代 {{ .IterationCount }} 次**：禁止继续叠加条件或重写复杂逻辑。必须**回归 initial_rule_samples** 中与漏洞类型最接近的规则（如 SSTI→golang-template-ssti.sf），复制其规则体结构，仅调整方法名以适配样例，或先用最小模式 `.dangerousMethod(* #-> as $x); alert $x` 验证 sink 能否匹配。
+**⚠️ 当前修复路径已持续多次但仍未通过**：禁止继续叠加条件或重写复杂逻辑。必须**回归 initial_rule_samples** 中与漏洞类型最接近的规则（如 SSTI→golang-template-ssti.sf），复制其规则体结构，仅调整方法名以适配样例，或先用最小模式 `.dangerousMethod(* #-> as $x); alert $x` 验证 sink 能否匹配。
 {{ end }}
 
 **若反馈涉及 desc、heredoc 或元数据语法错误**：请根据任务开始时已提供的规则样例及 golang-reflected-xss-gin-context.sf 确认正确结构。heredoc 结束符（TEXT、DESC 等）必须**行首无空格**。禁止盲目继续修改。

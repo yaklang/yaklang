@@ -338,6 +338,11 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 	}
 
 	prompt := result.Prompt
+	for _, forbidden := range []string{"Current iteration:", "last iteration", "final iteration", "最后一次迭代", "最后一轮"} {
+		if strings.Contains(strings.ToLower(prompt), strings.ToLower(forbidden)) {
+			t.Fatalf("tool parameter prompt must hide host iteration limits, found %q", forbidden)
+		}
+	}
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic-1|>",
@@ -1038,6 +1043,11 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 	) {
 		t.Fatalf("verification prompt should be composed by prompt sections. Got:\n%s", prompt)
 	}
+	for _, forbidden := range []string{"当前子任务已执行", "last iteration", "final iteration", "最后一次迭代", "最后一轮"} {
+		if strings.Contains(strings.ToLower(prompt), strings.ToLower(forbidden)) {
+			t.Fatalf("verification prompt must hide host iteration limits, found %q", forbidden)
+		}
+	}
 }
 
 func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testing.T) {
@@ -1364,8 +1374,8 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 			t.Fatal("Generated prompt should contain cumulative summary")
 		}
 
-		if !utils.MatchAllOfSubString(prompt, "2/10") {
-			t.Fatal("Generated prompt should contain iteration information")
+		if utils.MatchAllOfSubString(prompt, "2/10") {
+			t.Fatal("Generated prompt must not expose host iteration information")
 		}
 
 		// 验证包含 AIForge 的信息

@@ -395,7 +395,7 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 {{ end }}
 <|SCAN_TASK_END_{{ .Nonce }}|>
 
-**当前迭代**: {{ .IterationCount }} | **本轮 Finding 数**: {{ .FindingsCount }}
+**当前 Finding 数**: {{ .FindingsCount }}
 
 {{ if not .IsSearchPhase }}[终止规则] complete_scan 仅在**全部**目标文件均已 mark_file_done 后才会被接受。每个文件：read_file → mark_file_done；不可用 todo_delta 跳过 mark。{{ end }}`
 
@@ -442,7 +442,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 		reactloops.WithOutputExample(phase2OutputExample),
 
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-			iterCount := loop.GetCurrentIterationIndex()
 			reconFileHint := state.GetReconFilePath()
 
 			scan.mu.Lock()
@@ -535,7 +534,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				"AuditRemaining":          auditRemaining,
 				"FeedbackMessages":        feedbacker.String(),
 				"FindingsCount":           len(state.GetFindings()),
-				"IterationCount":          iterCount,
 				"PhaseASpotReads":         scan.PhaseASpotReadCount(),
 			}, state))
 			return reactivePrompt, err
