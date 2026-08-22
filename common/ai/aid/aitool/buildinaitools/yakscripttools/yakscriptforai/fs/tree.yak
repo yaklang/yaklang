@@ -315,4 +315,5 @@ if truncated {
     }
 }
 
-yakit.Info("%s", result.String())
+RESULT = result.String()
+yakit.Info("%s", RESULT)

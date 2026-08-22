@@ -128,6 +128,24 @@ verbose = cli.Bool("verbose", cli.setHelp("verbose output: print connection trac
 proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
 cli.check()
 
+// RESULT is the objective HTTP execution channel. A received 404/500 is still
+// a received response; it must not be collapsed into a protocol failure.
+RESULT = {
+    "request_built": false,
+    "request_sent": false,
+    "response_received": false,
+    "status_code": nil,
+    "body_size": 0,
+    "keyword": keyword,
+    "keyword_match_count": 0,
+    "regexp": regexpMatch,
+    "regexp_match_count": 0,
+    "regexp_valid": true,
+    "redirect_count": 0,
+    "duration_ms": 0,
+    "transport_error": nil,
+}
+
 // Safe scalar recovery. Keep the correction visible so the AI knows which
 // effective values were used instead of silently changing request behavior.
 if str.TrimSpace(method) == "" {
@@ -236,8 +254,7 @@ legacyFormValues = normalizedPostParams["values"]
 
 // --- validation ---
 if packet == "" && urlStr == "" {
-    yakit.Error("either 'url' (URL mode) or 'packet' (Packet mode) must be provided")
-    return
+    die("either 'url' (URL mode) or 'packet' (Packet mode) must be provided")
 }
 
 // --- build poc options ---
@@ -317,6 +334,7 @@ if packet != "" {
     autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
     if err != nil {
         yakit.Error("failed to parse URL to HTTP request: %v. Recovery: provide an absolute URL such as https://host/path, or use packet mode when exact request bytes are required. Request was not sent.", err)
+        RESULT["transport_error"] = "request_build_error: " + sprint(err)
         return
     }
     rawPacket = parsedPacket
@@ -402,6 +420,7 @@ if packet != "" {
 }
 
 opts.Push(poc.https(isHttps))
+RESULT["request_built"] = rawPacket != nil && len(rawPacket) > 0
 
 // AI 必须在请求成功或失败前都能看到参数实际生成的 packet，才能快速修订编码、
 // header 和 body。大报文仅截断展示；save-packet 仍负责把完整报文落盘。
@@ -424,14 +443,21 @@ printRequestPacket = func(label, requestPacket) {
 
 // --- execute request ---
 printRequestPacket("request packet", rawPacket)
+RESULT["request_sent"] = true
+requestStartedAt = time.Now()
 rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
+RESULT["duration_ms"] = time.Since(requestStartedAt).Milliseconds()
 if err != nil {
     yakit.Error("HTTP request failed: %v. Recovery: inspect the generated request packet above, verify URL/DNS/TLS/proxy and authentication headers, then retry; increase timeout only for a known-slow endpoint, or use packet mode for exact bytes. No response packet was received.", err)
+    RESULT["transport_error"] = sprint(err)
     return
 }
 
 rsp = rspIns.RawPacket
 req = rspIns.RawRequest
+RESULT["response_received"] = true
+RESULT["status_code"] = poc.GetStatusCodeFromResponse(rsp)
+RESULT["body_size"] = rspIns.ResponseBodySize
 
 // --- form-encoded 兜底重试 ---
 // 现场问题: AI 对登录/表单类接口习惯发 application/json, 但很多服务端只收
@@ -514,6 +540,9 @@ tryFormRetryOnJsonRejected = func() {
 }
 
 tryFormRetryOnJsonRejected()
+RESULT["status_code"] = poc.GetStatusCodeFromResponse(rsp)
+RESULT["body_size"] = rspIns.ResponseBodySize
+RESULT["redirect_count"] = redirectCount
 
 // --- report results ---
 // connection info (verbose only; trace is noise for batch IDOR/enum flows)
@@ -652,11 +681,12 @@ if method == "GET" || (method == "POST" && body == "") {
 }
 
 // keyword and regex matching
+keywordMatchCount = 0
+regexpMatchCount = 0
 if hasPattern {
     edt := memeditor.New(string(rsp))
     if keyword != "" {
         yakit.Info("searching keyword pattern: %v", keyword)
-        keywordMatchCount = 0
         edt.FindStringRange(keyword, rg => {
             keywordMatchCount++
             matchContent := rg.GetTextContextWithPrompt(3)
@@ -672,7 +702,6 @@ if hasPattern {
     }
     if regexpMatch != "" {
         yakit.Info("searching regexp pattern: %v", regexpMatch)
-        regexpMatchCount = 0
         try {
             edt.FindRegexpRange(regexpMatch, rg => {
                 regexpMatchCount++
@@ -687,7 +716,15 @@ if hasPattern {
                 yakit.Info("regexp match: not found in response (%v bytes). Verify the expression or retry without regexp-match to inspect the normal response preview.", len(rsp))
             }
         } catch e {
+            RESULT["regexp_valid"] = false
             yakit.Error("invalid regexp-match %q: %v. Recovery: correct or remove regexp-match and retry; the HTTP request itself completed and its response summary is shown above.", regexpMatch, e)
         }
     }
+}
+
+if keyword != "" {
+    RESULT["keyword_match_count"] = keywordMatchCount
+}
+if regexpMatch != "" {
+    RESULT["regexp_match_count"] = regexpMatchCount
 }

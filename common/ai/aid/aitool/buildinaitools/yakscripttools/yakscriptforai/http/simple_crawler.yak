@@ -254,6 +254,7 @@ if subdomainCount > 1 || pendingCount > 0 {
 }
 
 result = string(output.String())
+RESULT = result
 if len(result) <= 30000 {
     yakit.Info(result)
 } else {

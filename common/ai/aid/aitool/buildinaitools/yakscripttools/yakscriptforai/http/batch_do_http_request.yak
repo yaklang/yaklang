@@ -233,8 +233,7 @@ pathsStr = normalizePaths(pathsStr)
 
 // --- validation ---
 if packet == "" && baseUrl == "" && pathsStr == "" {
-    yakit.Error("at least one of 'base-url', 'packet', or 'paths' must be provided")
-    return
+    die("at least one of 'base-url', 'packet', or 'paths' must be provided")
 }
 
 // If paths contains full URLs, we can work without base-url
@@ -244,8 +243,7 @@ if str.Contains(pathsStr, "://") {
 }
 
 if packet == "" && baseUrl == "" && !hasFullUrls {
-    yakit.Error("either 'base-url' or full URLs in 'paths' must be provided for URL mode")
-    return
+    die("either 'base-url' or full URLs in 'paths' must be provided for URL mode")
 }
 
 // --- parse paths ---
@@ -292,8 +290,7 @@ if prefix != "" && len(paths) > 0 {
 }
 
 if len(paths) == 0 {
-    yakit.Error("no valid paths provided")
-    return
+    die("no valid paths provided")
 }
 
 // --- merge curl-style headers with headers ---
@@ -567,7 +564,7 @@ executeRequest = fn(idx, path, base) {
 
     if err != nil {
         yakit.Error("Request #%d failed to build request for '%s': %v", idx, path, err)
-        return {"idx": idx, "path": path, "success": false, "error": sprint(err)}
+        return {"idx": idx, "path": path, "request_built": false, "request_sent": false, "request_completed": true, "response_received": false, "transport_error": "request_build_error: " + sprint(err)}
     }
 
     opts.Push(poc.https(isHttps))
@@ -576,7 +573,7 @@ executeRequest = fn(idx, path, base) {
     rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
     if err != nil {
         yakit.Error("Request #%d failed for '%s': %v", idx, path, err)
-        return {"idx": idx, "path": path, "success": false, "error": sprint(err), "request": rawPacket}
+        return {"idx": idx, "path": path, "request_built": true, "request_sent": true, "request_completed": true, "response_received": false, "transport_error": sprint(err), "request": rawPacket}
     }
 
     rsp = rspIns.RawPacket
@@ -584,21 +581,24 @@ executeRequest = fn(idx, path, base) {
 
     // Check exclude/include codes
     if len(excludeCodeSet) > 0 && excludeCodeSet[statusCode] {
-        return {"idx": idx, "path": path, "success": true, "filtered": true, "reason": "excluded-code", "status": statusCode}
+        return {"idx": idx, "path": path, "request_built": true, "request_sent": true, "request_completed": true, "response_received": true, "filtered": true, "reason": "excluded-code", "status": statusCode, "size": rspIns.ResponseBodySize}
     }
     if len(includeCodeSet) > 0 && !includeCodeSet[statusCode] {
-        return {"idx": idx, "path": path, "success": true, "filtered": true, "reason": "not-in-include-code", "status": statusCode}
+        return {"idx": idx, "path": path, "request_built": true, "request_sent": true, "request_completed": true, "response_received": true, "filtered": true, "reason": "not-in-include-code", "status": statusCode, "size": rspIns.ResponseBodySize}
     }
 
     // Check exclude size
     if shouldExcludeSize(rspIns.ResponseBodySize) {
-        return {"idx": idx, "path": path, "success": true, "filtered": true, "reason": "excluded-size", "status": statusCode, "size": rspIns.ResponseBodySize}
+        return {"idx": idx, "path": path, "request_built": true, "request_sent": true, "request_completed": true, "response_received": true, "filtered": true, "reason": "excluded-size", "status": statusCode, "size": rspIns.ResponseBodySize}
     }
 
     result = {
         "idx": idx,
         "path": path,
-        "success": true,
+        "request_built": true,
+        "request_sent": true,
+        "request_completed": true,
+        "response_received": true,
         "filtered": false,
         "status": statusCode,
         "size": rspIns.ResponseBodySize,
@@ -613,7 +613,7 @@ executeRequest = fn(idx, path, base) {
 // --- results collection ---
 results = make([]map[string]any)
 resultsLock = sync.NewLock()
-successCount = 0
+responseCount = 0
 filteredCount = 0
 errorCount = 0
 
@@ -631,17 +631,18 @@ if concurrent > 1 {
 
             resultsLock.Lock()
             results = append(results, result)
-            if result["success"] == true && result["filtered"] != true {
-                successCount++
-            } elif result["filtered"] == true {
+            if result["response_received"] == true {
+                responseCount++
+            }
+            if result["filtered"] == true {
                 filteredCount++
-            } else {
+            } elif result["response_received"] != true {
                 errorCount++
             }
             resultsLock.Unlock()
 
             // Progress indicator
-            if result["filtered"] != true && result["success"] == true {
+            if result["filtered"] != true && result["response_received"] == true {
                 status = result["status"]
                 size = result["size"]
                 yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", idx+1, len(paths), path, status, size)
@@ -656,16 +657,17 @@ if concurrent > 1 {
         result = executeRequest(i+1, p, baseUrl)
 
         results = append(results, result)
-        if result["success"] == true && result["filtered"] != true {
-            successCount++
-        } elif result["filtered"] == true {
+        if result["response_received"] == true {
+            responseCount++
+        }
+        if result["filtered"] == true {
             filteredCount++
-        } else {
+        } elif result["response_received"] != true {
             errorCount++
         }
 
         // Progress indicator
-        if result["filtered"] != true && result["success"] == true {
+        if result["filtered"] != true && result["response_received"] == true {
             status = result["status"]
             size = result["size"]
             yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", i+1, len(paths), p, status, size)
@@ -679,7 +681,7 @@ if concurrent > 1 {
 }
 
 yakit.Info("=== Batch Request Summary ===")
-yakit.Info("Total: %d, Success: %d, Filtered: %d, Errors: %d", len(paths), successCount, filteredCount, errorCount)
+yakit.Info("Total: %d, Responses: %d, Filtered: %d, Transport errors: %d", len(paths), responseCount, filteredCount, errorCount)
 
 // --- output results ---
 outputFile, err := file.TempFileName("batch-http-results-*.txt")
@@ -688,7 +690,7 @@ if err != nil {
 } else {
     outputContent = sprintf("=== Batch HTTP Request Results ===\n")
     outputContent += sprintf("Total Requests: %d\n", len(paths))
-    outputContent += sprintf("Successful: %d\n", successCount)
+    outputContent += sprintf("Responses received: %d\n", responseCount)
     outputContent += sprintf("Filtered: %d\n", filteredCount)
     outputContent += sprintf("Errors: %d\n\n", errorCount)
 
@@ -698,10 +700,10 @@ if err != nil {
         if result["filtered"] == true {
             continue
         }
-        if result["success"] != true {
-            outputContent += sprintf("--- Request #%d [ERROR] ---\n", result["idx"])
+        if result["response_received"] != true {
+            outputContent += sprintf("--- Request #%d [TRANSPORT ERROR] ---\n", result["idx"])
             outputContent += sprintf("Path: %s\n", result["path"])
-            outputContent += sprintf("Error: %s\n\n", result["error"])
+            outputContent += sprintf("Transport error: %s\n\n", result["transport_error"])
             continue
         }
 
@@ -770,7 +772,7 @@ for _, result:= range results {
     if result["filtered"] == true {
         continue
     }
-    if result["success"] == true {
+    if result["response_received"] == true {
         path = result["path"]
         if len(path) > 48 {
             path = path[:45] + "..."
@@ -783,6 +785,42 @@ for _, result:= range results {
         }
         yakit.Info("%-6d %-50s %-8s %-10s", result["idx"], path, "ERROR", "-")
     }
+}
+
+statusCodeDistribution = {}
+compactResults = []
+for _, item := range results {
+    statusCode = item["status"]
+    if item["response_received"] == true {
+        statusKey = sprint(statusCode)
+        if !statusCodeDistribution[statusKey] {
+            statusCodeDistribution[statusKey] = 0
+        }
+        statusCodeDistribution[statusKey] = statusCodeDistribution[statusKey] + 1
+    }
+    compactResults = append(compactResults, {
+        "idx": item["idx"],
+        "path": item["path"],
+        "request_built": item["request_built"],
+        "request_sent": item["request_sent"],
+        "request_completed": item["request_completed"],
+        "response_received": item["response_received"],
+        "status_code": item["status"],
+        "body_size": item["size"],
+        "filtered": item["filtered"],
+        "filter_reason": item["reason"],
+        "transport_error": item["transport_error"],
+    })
+}
+
+RESULT = {
+    "request_count": len(paths),
+    "request_completed_count": len(results),
+    "response_received_count": responseCount,
+    "filtered_count": filteredCount,
+    "transport_error_count": errorCount,
+    "status_code_distribution": statusCodeDistribution,
+    "items": compactResults,
 }
 
 yakit.Info("\n=== Batch HTTP Request Complete ===")

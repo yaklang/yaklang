@@ -658,7 +658,7 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextSteps, statusSum
 			failCount++
 		}
 	}
-	contentBuilder.WriteString(fmt.Sprintf("Total Tool Calls: %d (Success: %d, Failed: %d)\n", len(toolCallResults), successCount, failCount))
+	contentBuilder.WriteString(fmt.Sprintf("Total Tool Calls: %d (Completed: %d, Protocol Failed: %d)\n", len(toolCallResults), successCount, failCount))
 
 	contentBuilder.WriteString("\n")
 

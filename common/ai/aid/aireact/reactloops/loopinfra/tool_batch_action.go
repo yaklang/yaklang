@@ -682,6 +682,10 @@ func handleToolBatchActionResult(
 		status := string(outcome.Stage)
 		if status == "" {
 			status = "unknown"
+		} else if outcome.Stage == aicommon.ToolCallStageDone {
+			status = "protocol-completed; inspect result"
+		} else if outcome.Stage == aicommon.ToolCallStageInvokeFailed {
+			status = "protocol-error"
 		}
 		if outcome.Err != nil {
 			status += ": " + outcome.Err.Error()

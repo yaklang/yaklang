@@ -335,7 +335,7 @@ func (a *ToolCaller) invoke(
 	toolCallErr := func(err error) (*aitool.ToolResult, error) {
 		reportError(err)
 		res := newToolCallRes()
-		res.Error = fmt.Sprintf("tool execution failed: %v", err)
+		res.Error = fmt.Sprintf("tool invocation protocol failed: %v", err)
 		return res, err
 	}
 
@@ -494,7 +494,7 @@ func (a *ToolCaller) invoke(
 		if execResult != nil {
 			execResult.Success = false
 			if execResult.Error == "" {
-				execResult.Error = fmt.Sprintf("tool execution cancelled: %v", execErr)
+				execResult.Error = fmt.Sprintf("tool invocation cancelled: %v", execErr)
 			}
 		}
 	}
@@ -516,16 +516,15 @@ func (a *ToolCaller) invoke(
 	}
 	if execResult != nil && !invokeCancelled {
 		if checkpointErr := c.SubmitCheckpointResponse(toolCheckpoint, execResult); checkpointErr != nil {
-			if execErr == nil {
-				execErr = checkpointErr
-			} else {
-				execErr = errors.Join(execErr, checkpointErr)
-			}
+			// The callback has already produced a result envelope. Checkpoint
+			// persistence is an infrastructure observation and must not rewrite
+			// protocol completion into a tool failure.
+			log.Warnf("failed to persist completed tool result checkpoint: %v", checkpointErr)
 		}
 	}
 
 	// Some failures happen outside the tool callback (for example JSON Schema
-	// validation, artifact finalization, or checkpoint persistence). Those paths can
+	// validation or cancellation). Those paths can
 	// return a ToolResult and an error without passing through WithErrorCallback.
 	// Always report the final aggregated error here so the UI receives tool_call_error
 	// instead of a silent done card. The caller's handler is guarded by sync.Once, so

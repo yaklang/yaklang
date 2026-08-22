@@ -27,6 +27,10 @@ __USAGE__ = <<<USAGE_BLOCK
                       默认：自动检测（linux/mac -> bash，
                       windows -> 如果存在 Git Bash/MSYS/Cygwin bash 则用 bash，
                       否则用 powershell/cmd）
+  accepted-exit-codes (string) 可接受的退出码，逗号分隔，默认 "0"。
+  accepted_exit_codes (string) 兼容旧式下划线拼写；仍须传逗号分隔字符串。
+                      例如 grep 未匹配也属于预期时传 "0,1"。原始 exit_code
+                      始终保留；该参数只影响 exit_code_accepted。
 
 ## 执行特性
 
@@ -354,8 +358,65 @@ yakit.AutoInitYakit()
 timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the shell command, default 60. Commands exceeding this timeout will be killed. Set a reasonable value to avoid hanging. IMPORTANT: Avoid indefinite commands like 'tail -f', 'ping' without -c, 'watch', etc."), cli.setDefault(60))
 shellType := cli.String("shell", cli.setRequired(false), cli.setHelp("shell type: bash, cmd, powershell. Auto-detect if not specified (linux/mac: bash, windows: bash if available, otherwise powershell/cmd)"), cli.setDefault(""))
 command := cli.String("command", cli.setRequired(true), cli.setHelp("the shell command you want to execute. IMPORTANT: Avoid commands that run indefinitely (e.g., tail -f, ping without -c, watch). For potentially long-running commands, use timeout wrapper or add limits."))
+acceptedExitCodesRaw := cli.String("accepted-exit-codes", cli.setRequired(false), cli.setDefault("0"), cli.setHelp("comma-separated accepted process exit codes; default 0, for example 0,1"))
+acceptedExitCodesCompat := cli.String("accepted_exit_codes", cli.setRequired(false), cli.setDefault(""), cli.setHelp("deprecated underscore alias; must still be a comma-separated string, prefer accepted-exit-codes"))
 
 cli.check()
+
+// Declaring the observed underscore spelling makes a wrong array value fail
+// schema validation instead of being silently ignored. A valid string remains
+// compatible without changing the canonical parameter or its default.
+if acceptedExitCodesCompat != "" {
+    if acceptedExitCodesRaw == "0" {
+        acceptedExitCodesRaw = acceptedExitCodesCompat
+    } else {
+        yakit.Info("Ignoring deprecated accepted_exit_codes because accepted-exit-codes is also set")
+    }
+}
+
+acceptedExitCodes = []
+acceptedExitCodeSet = {}
+for _, rawCode := range str.Split(acceptedExitCodesRaw, ",") {
+    codeText = str.TrimSpace(rawCode)
+    if codeText == "" {
+        continue
+    }
+    if !str.MatchAllOfRegexp(codeText, `^-?\d+$`) {
+        yakit.Info("Ignoring invalid accepted exit code: %v", codeText)
+        continue
+    }
+    code = parseInt(codeText)
+    normalizedCodeText = sprint(code)
+    if !acceptedExitCodeSet[normalizedCodeText] {
+        acceptedExitCodeSet[normalizedCodeText] = true
+        acceptedExitCodes = append(acceptedExitCodes, code)
+    }
+}
+if len(acceptedExitCodes) == 0 {
+    acceptedExitCodes = [0]
+    acceptedExitCodeSet["0"] = true
+}
+
+// RESULT is the semantic channel consumed by the AI tool host. Log messages
+// remain observations and must not be interpreted as the process outcome.
+RESULT = {
+    "shell": shellType,
+    "process_started": false,
+    "process_completed": false,
+    "timed_out": false,
+    "exit_code": nil,
+    "exit_code_available": false,
+    "accepted_exit_codes": acceptedExitCodes,
+    "exit_code_accepted": false,
+    "duration_ms": 0,
+    "termination_reason": "not_started",
+}
+
+setProcessResultError = (reason, message)=>{
+    RESULT["shell"] = shellType
+    RESULT["termination_reason"] = reason
+    RESULT["process_error"] = sprint(message)
+}
 
 // 获取操作系统类型
 osType = os.OS
@@ -511,6 +572,7 @@ case "bash":
     }
     if bashPath == "" {
         yakit.Error("bash shell not found. Install bash or set shell to cmd/powershell on Windows.")
+        setProcessResultError("shell_not_found", "bash shell not found")
         return
     }
     
@@ -535,6 +597,7 @@ case "bash":
     scriptFile, err = file.TempFileName("ai_bash_script_*.sh")
     if err != nil {
         yakit.Error("Failed to create temporary script file: %v", err)
+        setProcessResultError("script_create_error", err)
         return
     }
     
@@ -552,6 +615,7 @@ case "bash":
     err = file.Save(scriptFile, scriptContent)
     if err != nil {
         yakit.Error("Failed to write script content to file: %v", err)
+        setProcessResultError("script_write_error", err)
         return
     }
     
@@ -584,6 +648,7 @@ case "powershell":
     }
     if powershellPath == "" {
         yakit.Error("PowerShell shell not found.")
+        setProcessResultError("shell_not_found", "PowerShell shell not found")
         return
     }
 
@@ -598,6 +663,7 @@ case "powershell":
     scriptFile, err = file.TempFileName("ai_powershell_script_*.ps1")
     if err != nil {
         yakit.Error("Failed to create temporary PowerShell script file: %v", err)
+        setProcessResultError("script_create_error", err)
         return
     }
     
@@ -613,6 +679,7 @@ case "powershell":
     err = file.Save(scriptFile, scriptContent)
     if err != nil {
         yakit.Error("Failed to write PowerShell script content to file: %v", err)
+        setProcessResultError("script_write_error", err)
         return
     }
     
@@ -624,11 +691,15 @@ case "powershell":
     
 default:
     yakit.Error("Unsupported shell type: %v. Supported types: bash, cmd, powershell", shellType)
+    setProcessResultError("unsupported_shell", shellType)
     return
 }
 
+RESULT["shell"] = shellType
+
 if err != nil {
     yakit.Error("Failed to create %v command: %v", shellType, err)
+    setProcessResultError("command_create_error", err)
     return
 }
 
@@ -661,11 +732,13 @@ stderrbuf = bufio.NewBuffer()
 stdoutPipe, stdoutPipeErr := cmd.StdoutPipe()
 if stdoutPipeErr != nil {
     yakit.Error("Failed to create stdout pipe: %v", stdoutPipeErr)
+    setProcessResultError("stdout_pipe_error", stdoutPipeErr)
     return
 }
 stderrPipe, stderrPipeErr := cmd.StderrPipe()
 if stderrPipeErr != nil {
     yakit.Error("Failed to create stderr pipe: %v", stderrPipeErr)
+    setProcessResultError("stderr_pipe_error", stderrPipeErr)
     return
 }
 
@@ -710,30 +783,51 @@ err = cmd.Run()
 streamWg.Wait()
 elapsed = time.Since(startTime)
 elapsedSec = int(elapsed.Seconds())
-isTimeout = false
-exitCode = 0
+elapsedMs = elapsed.Milliseconds()
+// Some CommandContext implementations return from Run just before ctx.Err()
+// becomes visible. The command is owned by this deadline, so an execution error
+// at the configured deadline is also objective timeout evidence.
+deadlineWindowMs = timeoutSeconds * 1000
+isTimeout = ctx.Err() != nil || (err != nil && elapsedMs >= deadlineWindowMs - 20)
+exitCode = nil
+exitCodeAvailable = false
+
+if cmd.ProcessState != nil {
+    RESULT["process_started"] = true
+    RESULT["process_completed"] = true
+    processExitCode = cmd.ProcessState.ExitCode()
+    if processExitCode >= 0 {
+        exitCode = processExitCode
+        exitCodeAvailable = true
+    }
+}
+
+RESULT["duration_ms"] = elapsedMs
+RESULT["timed_out"] = isTimeout
+RESULT["exit_code"] = exitCode
+RESULT["exit_code_available"] = exitCodeAvailable
+if exitCodeAvailable {
+    RESULT["exit_code_accepted"] = acceptedExitCodeSet[sprint(exitCode)] == true
+}
 
 if err != nil {
-    errStr = sprint(err)
-    // 检查是否是超时导致的错误（通过错误信息判断）
-    if str.Contains(errStr, "killed") || str.Contains(errStr, "signal: killed") || str.Contains(errStr, "context deadline exceeded") {
-        isTimeout = true
+    RESULT["process_error"] = sprint(err)
+    if isTimeout {
+        RESULT["termination_reason"] = "timeout"
         yakit.Info("COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)
         yakit.Info("SUGGESTION: For long-running commands, consider using 'timeout' command wrapper (e.g., 'timeout 30 your_command'), or add limits to your command (e.g., 'ping -c 5' instead of 'ping').")
+    } elif exitCodeAvailable {
+        RESULT["termination_reason"] = "exit"
+        yakit.Info("%v process exited with code %d (accepted=%v)", shellType, exitCode, RESULT["exit_code_accepted"])
     } else {
-        // Extract exit code if available
-        if str.Contains(errStr, "exit status") {
-            // Parse exit code from error message like "exit status 1"
-            parts = str.Split(errStr, " ")
-            if len(parts) >= 3 {
-                exitCode = parseInt(parts[len(parts)-1])
-            }
-        }
-        yakit.Error("%v command execution failed (exit code %d): %v", shellType, exitCode, err)
+        RESULT["termination_reason"] = "signal_or_unavailable"
+        yakit.Info("%v process ended without an available exit code: %v", shellType, err)
         if shellType == "bash" {
             yakit.Info("TIP: Bash is executed as a login shell. If PATH/env differs from your terminal, check /etc/profile and your bash profile files.")
         }
     }
+} else {
+    RESULT["termination_reason"] = "exit"
 }
 
 // 输出已经在执行过程中实时流式打印；这里仅处理无输出场景。
@@ -741,11 +835,11 @@ if stdoutbuf.Len() <= 0 && stderrbuf.Len() <= 0 {
     if isTimeout {
         yakit.Info("No output captured before timeout")
     } else {
-        yakit.Info("No output found, %v command execution completed (possibly with empty output)", shellType)
+        yakit.Info("No stdout/stderr observations were produced by the %v process", shellType)
     }
 }
 
-yakit.Info("Execution completed in %ds", elapsedSec)
+yakit.Info("Process observation complete in %dms: exit_code=%v, exit_code_available=%v, accepted=%v, timed_out=%v", elapsedMs, exitCode, exitCodeAvailable, RESULT["exit_code_accepted"], isTimeout)
 
 if elapsedSec > 20 && !isTimeout {
     stdoutStr = stdoutbuf.String()
