@@ -65,8 +65,8 @@ func TestSplit_TaskReviewPrompt_FourSections(t *testing.T) {
 	defer cancel()
 	cfg := NewTestConfig(ctx)
 	cfg.Timeline.SetTimelineBucketByteSize(80)
-	cfg.Timeline.PushText(101, "frozen task review timeline "+strings.Repeat("A", 120))
-	cfg.Timeline.PushText(102, "open task review timeline "+strings.Repeat("B", 120))
+	cfg.Timeline.PushText(101, "%s", "frozen task review timeline "+strings.Repeat("A", 120))
+	cfg.Timeline.PushText(102, "%s", "open task review timeline "+strings.Repeat("B", 120))
 
 	materials := aitool.InvokeParams{
 		"short_summary": "OK",

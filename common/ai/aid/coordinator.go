@@ -638,7 +638,7 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 
 	// 辅助函数：发送失败响应（不返回错误）
 	sendFailResponse := func(errMsg string) {
-		c.EmitError(errMsg)
+		c.EmitError("%s", errMsg)
 		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skip_subtask_in_plan", map[string]any{
 			"success": false,
 			"error":   errMsg,
@@ -759,7 +759,7 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 
 	// 辅助函数：发送失败响应（不返回错误）
 	sendFailResponse := func(errMsg string) {
-		c.EmitError(errMsg)
+		c.EmitError("%s", errMsg)
 		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
 			"success": false,
 			"error":   errMsg,

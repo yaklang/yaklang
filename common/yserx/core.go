@@ -1153,7 +1153,7 @@ func (p *JavaSerializationParser) readClassData(r io.Reader, c *JavaClassDesc) (
 
 func (p *JavaSerializationParser) readClassDataField(r io.Reader, f *JavaClassField) (*JavaFieldValue, error) {
 
-	p.debug(f.Name)
+	p.debug("%s", f.Name)
 	p.increaseIndent()
 	defer p.decreaseIndent()
 	return p.readFieldValue(r, f.FieldType)

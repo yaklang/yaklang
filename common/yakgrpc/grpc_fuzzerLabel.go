@@ -33,7 +33,7 @@ func (s *Server) SaveFuzzerLabel(ctx context.Context, req *ypb.SaveFuzzerLabelRe
 		}
 	}
 	if len(errLabel) > 0 {
-		return nil, utils.Errorf(strings.Join(errLabel, ",") + "添加失败")
+		return nil, utils.Errorf("%s", strings.Join(errLabel, ",")+"添加失败")
 	}
 	return &ypb.Empty{}, nil
 }

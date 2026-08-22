@@ -11,8 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
-	"github.com/yaklang/antlr/v4"
 	"github.com/google/uuid"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
@@ -227,7 +227,7 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 		case *sf.AlertContext:
 			f.VisitAlertStatement(stmt.AlertStatement())
 		default:
-			f.Write(f.GetTextFromToken(stmt))
+			f.Write("%s", f.GetTextFromToken(stmt))
 		}
 	}
 
@@ -316,13 +316,13 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 			if strings.Contains(res, "MISSING") {
 				log.Warnf("alert item %s value is missing, please check the rule: %s", key, res)
 			}
-			f.Write(res)
+			f.Write("%s", res)
 		} else {
 			res := fmt.Sprintf("\t%s: \"%s\",\n", key, newVal)
 			if strings.Contains(res, "MISSING") {
 				log.Warnf("alert item %s value is missing, please check the rule: %s", key, res)
 			}
-			f.Write(res)
+			f.Write("%s", res)
 		}
 		return true
 	})

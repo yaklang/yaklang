@@ -21,7 +21,7 @@ func TestTLSConfigAuth(t *testing.T) {
 	addr := utils.HostPort("127.0.0.1", port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		t.Errorf("dial " + addr + " failed: " + err.Error())
+		t.Errorf("dial %s failed: %v", addr, err)
 		t.FailNow()
 	}
 	defer lis.Close()
@@ -59,7 +59,7 @@ func TestTLSConfigAuth2_WithoutAuth(t *testing.T) {
 	addr := utils.HostPort("127.0.0.1", port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		t.Errorf("dial " + addr + " failed: " + err.Error())
+		t.Errorf("dial %s failed: %v", addr, err)
 		t.FailNow()
 	}
 	defer lis.Close()
@@ -117,7 +117,7 @@ func TestTLSConfigAuth2(t *testing.T) {
 	addr := utils.HostPort("127.0.0.1", port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		t.Errorf("dial " + addr + " failed: " + err.Error())
+		t.Errorf("dial %s failed: %v", addr, err)
 		t.FailNow()
 	}
 	defer lis.Close()

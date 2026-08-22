@@ -186,7 +186,7 @@ func parse2ContentGen(rules []*rule.ContentRule, opts ...ContentGenOpt) *Content
 					str = strings.Trim(str, "!")
 					v, err := strconv.Atoi(str)
 					if err != nil {
-						log.Warnf("parse isdataat modifier:" + r.IsDataAt)
+						log.Warnf("%s", "parse isdataat modifier:"+r.IsDataAt)
 					}
 					pos = v
 				}

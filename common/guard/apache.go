@@ -107,7 +107,7 @@ func getApachePid(c context.Context) []int {
 		case 1:
 			raw, err := searchApacheProcess(c)
 			if err != nil {
-				log.Errorf(err.Error())
+				log.Errorf("%s", err.Error())
 			}
 			return raw
 		}

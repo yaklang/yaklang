@@ -128,7 +128,7 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 		// 记录详细的错误信息到 Timeline，使用明显的标识符
 		resultMsg := fmt.Sprintf("无法找到 AI 智能应用 '%s'，请检查应用名称是否正确。可用的应用可以通过工具搜索查看。", forgeName)
 		r.AddToTimeline("[BLUEPRINT_NOT_FOUND]", fmt.Sprintf("AI Blueprint '%s' does not exist. Error: %v\n%s", forgeName, err, resultMsg))
-		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' not found", forgeName))
+		r.Emitter.EmitError("%s", fmt.Sprintf("AI Blueprint '%s' not found", forgeName))
 		return nil, nil, utils.Errorf("AI Blueprint '%s' not found: %v", forgeName, err)
 	}
 
@@ -136,13 +136,13 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 	if ins == nil {
 		r.AddToTimeline("[BLUEPRINT_NULL_INSTANCE]", fmt.Sprintf(
 			"AI Blueprint '%s' returned nil instance. 配置异常可能导致无法执行。", forgeName))
-		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' configuration error", forgeName))
+		r.Emitter.EmitError("%s", fmt.Sprintf("AI Blueprint '%s' configuration error", forgeName))
 		return nil, nil, utils.Errorf("AI Blueprint '%s' instance is nil", forgeName)
 	}
 	if !schema.IsRunnableForgeType(ins.ForgeType) {
 		err := utils.Errorf("AI Blueprint '%s' is not runnable, forge_type=%s", forgeName, ins.ForgeType)
 		r.AddToTimeline("[BLUEPRINT_NON_RUNNABLE]", err.Error())
-		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' is not runnable", forgeName))
+		r.Emitter.EmitError("%s", fmt.Sprintf("AI Blueprint '%s' is not runnable", forgeName))
 		return nil, nil, err
 	}
 
@@ -152,14 +152,14 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 	forgeSchema, err := manager.GenerateAIJSONSchemaFromSchemaAIForge(ins)
 	if err != nil {
 		r.AddToTimeline("[BLUEPRINT_SCHEMA_ERROR]", fmt.Sprintf("Failed to generate schema for '%s'", forgeName))
-		r.Emitter.EmitError(fmt.Sprintf("Failed to generate schema for AI Blueprint '%s'", forgeName))
+		r.Emitter.EmitError("%s", fmt.Sprintf("Failed to generate schema for AI Blueprint '%s'", forgeName))
 		return nil, nil, utils.Errorf("generate ai json schema from schema ai forge failed: %v", err)
 	}
 
 	prompt, err := r.promptManager.GenerateAIBlueprintForgeParamsPrompt(ins, forgeSchema)
 	if err != nil {
 		r.AddToTimeline("[BLUEPRINT_PROMPT_ERROR]", fmt.Sprintf("Failed to generate prompt for '%s'", forgeName))
-		r.Emitter.EmitError(fmt.Sprintf("Failed to generate prompt for AI Blueprint '%s'", forgeName))
+		r.Emitter.EmitError("%s", fmt.Sprintf("Failed to generate prompt for AI Blueprint '%s'", forgeName))
 		return nil, nil, utils.Errorf("generate prompt (for ai-forge) failed: %v", err)
 	}
 
@@ -231,7 +231,7 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 		aicommon.WithAIRequest_CallerLabel("blueprint"),
 	)
 	if err != nil {
-		r.Emitter.EmitError(fmt.Sprintf("Failed to prepare AI Blueprint '%s': %v", forgeName, err))
+		r.Emitter.EmitError("%s", fmt.Sprintf("Failed to prepare AI Blueprint '%s': %v", forgeName, err))
 		return nil, nil, err
 	}
 

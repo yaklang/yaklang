@@ -89,7 +89,7 @@ func (c *Config) HandleSyncUserIntervention(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
-	c.Timeline.PushText(c.AcquireId(), "[User Intervention] "+content)
+	c.Timeline.PushText(c.AcquireId(), "%s", "[User Intervention] "+content)
 	if _, err := c.AppendUserInputHistory(content, time.Now()); err != nil {
 		c.EmitError("append user intervention history failed: %v", err)
 	}

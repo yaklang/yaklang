@@ -23,13 +23,13 @@ func handleRequestBreakpoint(prompt string) {
 		globalEventMonitor.CloseMenu()
 	}
 
-	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
+	fmt.Printf("%s", "\n"+strings.Repeat("=", 80)+"\n")
 	fmt.Printf("🛑 BREAKPOINT: AI Interaction Paused\n")
-	fmt.Printf(strings.Repeat("=", 80) + "\n")
+	fmt.Printf("%s", strings.Repeat("=", 80)+"\n")
 	fmt.Printf("PROMPT TO BE SENT:\n")
-	fmt.Printf(strings.Repeat("-", 40) + "\n")
+	fmt.Printf("%s", strings.Repeat("-", 40)+"\n")
 	fmt.Printf("%s\n", prompt)
-	fmt.Printf(strings.Repeat("-", 40) + "\n\n")
+	fmt.Printf("%s", strings.Repeat("-", 40)+"\n\n")
 
 	// 定义选项
 	options := []BreakpointOption{
@@ -73,7 +73,7 @@ func handleRequestBreakpoint(prompt string) {
 		switch selectedOption.Value {
 		case "continue":
 			fmt.Printf("✅ 继续执行 AI 请求...\n")
-			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+			fmt.Printf("%s", strings.Repeat("=", 80)+"\n\n")
 		case "exit":
 			fmt.Printf("🚪 用户请求退出\n")
 			os.Exit(0)
@@ -84,10 +84,10 @@ func handleRequestBreakpoint(prompt string) {
 			os.Exit(0)
 		}
 		fmt.Printf("🤷 输入错误，继续执行 AI 请求...\n")
-		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+		fmt.Printf("%s", strings.Repeat("=", 80)+"\n\n")
 	case <-time.After(60 * time.Second): // 60秒超时
 		fmt.Printf("\n⏰ 60秒超时，继续执行 AI 请求...\n")
-		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+		fmt.Printf("%s", strings.Repeat("=", 80)+"\n\n")
 	}
 }
 
@@ -98,11 +98,11 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 		globalEventMonitor.CloseMenu()
 	}
 
-	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
+	fmt.Printf("%s", "\n"+strings.Repeat("=", 80)+"\n")
 	fmt.Printf("🛑 RESPONSE BREAKPOINT: AI Response Received\n")
-	fmt.Printf(strings.Repeat("=", 80) + "\n")
+	fmt.Printf("%s", strings.Repeat("=", 80)+"\n")
 	fmt.Printf("AI RESPONSE CONTENT:\n")
-	fmt.Printf(strings.Repeat("-", 40) + "\n")
+	fmt.Printf("%s", strings.Repeat("-", 40)+"\n")
 
 	// 安全地提取和显示响应内容
 	if resp != nil {
@@ -115,7 +115,7 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 		fmt.Printf("❌ Response is nil\n")
 	}
 
-	fmt.Printf(strings.Repeat("-", 40) + "\n\n")
+	fmt.Printf("%s", strings.Repeat("-", 40)+"\n\n")
 
 	// 定义选项
 	options := []BreakpointOption{
@@ -159,7 +159,7 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 		switch selectedOption.Value {
 		case "continue":
 			fmt.Printf("✅ 继续处理响应...\n")
-			fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+			fmt.Printf("%s", strings.Repeat("=", 80)+"\n\n")
 		case "exit":
 			fmt.Printf("🚪 用户请求退出\n")
 			os.Exit(0)
@@ -170,9 +170,9 @@ func handleResponseBreakpoint(resp *aicommon.AIResponse) {
 			os.Exit(0)
 		}
 		fmt.Printf("🤷 输入错误，继续处理响应...\n")
-		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+		fmt.Printf("%s", strings.Repeat("=", 80)+"\n\n")
 	case <-time.After(60 * time.Second): // 60秒超时
 		fmt.Printf("\n⏰ 60秒超时，继续处理响应...\n")
-		fmt.Printf(strings.Repeat("=", 80) + "\n\n")
+		fmt.Printf("%s", strings.Repeat("=", 80)+"\n\n")
 	}
 }

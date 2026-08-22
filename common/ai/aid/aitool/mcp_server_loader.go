@@ -416,7 +416,7 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 		if err != nil {
 			errMsg := fmt.Sprintf("call mcp tool failed: %v", err)
 			stderr.Write([]byte(errMsg))
-			return nil, utils.Errorf(errMsg)
+			return nil, utils.Errorf("%s", errMsg)
 		}
 
 		// 处理结果
@@ -427,7 +427,7 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 			}
 			log.Errorf("mcp tool %s execution error: %s, content: %#v", toolName, errMsg, result.Content)
 			stderr.Write([]byte(errMsg))
-			return nil, utils.Errorf(errMsg)
+			return nil, utils.Errorf("%s", errMsg)
 		}
 
 		// 提取结果内容

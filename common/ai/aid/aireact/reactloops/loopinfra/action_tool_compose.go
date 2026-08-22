@@ -214,7 +214,7 @@ Example - Sequential file operations(With AI-Tag tags):
 			result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, node.ToolName)
 			if err != nil {
 				errMsg := fmt.Sprintf("Tool '%s' (call_id: %s) execution failed: %v", node.ToolName, node.CallID, err)
-				log.Warnf(errMsg)
+				log.Warnf("%s", errMsg)
 				invoker.AddToTimeline(fmt.Sprintf("[TOOL_COMPOSE_ERROR:%s]", node.CallID), errMsg)
 
 				errorsMu.Lock()
