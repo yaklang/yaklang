@@ -151,7 +151,7 @@ func (h *TimelineCompressedHeadBlock) IsOpen() bool         // 恒为 false
 
 ```
 # bucket=2026/05/02 10:00:00-10:03:00 interval=3m
-10:00:30 [tool/scan ok]
+10:00:30 [tool/scan]
 result-line-1
 result-line-2
 10:01:45 [user/review]
@@ -177,7 +177,7 @@ compressed-batch-summary
 <|TL_END_r42t1746179400|>
 <|TL_b3t1746180000|>
 # bucket=2026/05/02 10:00:00-10:03:00 interval=3m
-10:00:30 [tool/scan ok]
+10:00:30 [tool/scan]
 result-line-1
 10:01:45 [user/review]
 user-answer
@@ -200,7 +200,7 @@ compressed-batch-summary
 <|TL_END_r42t1746179400|>
 <|TL_b3t1746180000|>
 # bucket=2026/05/02 10:00:00-10:03:00 interval=3m
-10:00:30 [tool/scan ok]
+10:00:30 [tool/scan]
 result-line-1
 10:01:45 [user/review]
 user-answer
@@ -248,13 +248,13 @@ for _, blk := range result.GetTaggedBlocks() {
 假设 timeline 中有 5 条相邻几分钟内产生的 ToolResult，每条原始数据都是一段 ~1KB 的扫描结果：
 
 ```text
-id=101 09:50:01 [tool/scan ok]   data="<1024 字节扫描原文>"
-id=102 09:51:30 [tool/scan ok]   data="<1024 字节扫描原文>"
-id=103 09:53:11 [tool/scan ok]   data="<1024 字节扫描原文>"
-id=104 09:54:42 [tool/scan ok]   data="<1024 字节扫描原文>"
-id=105 09:55:22 [tool/scan ok]   data="<1024 字节扫描原文>"
+id=101 09:50:01 [tool/scan]      data="<1024 字节扫描原文>"
+id=102 09:51:30 [tool/scan]      data="<1024 字节扫描原文>"
+id=103 09:53:11 [tool/scan]      data="<1024 字节扫描原文>"
+id=104 09:54:42 [tool/scan]      data="<1024 字节扫描原文>"
+id=105 09:55:22 [tool/scan]      data="<1024 字节扫描原文>"
 ... 后续还有几条仍在活跃中的 entry：
-id=106 09:58:00 [tool/cat ok]    data="cat-result-A"
+id=106 09:58:00 [tool/cat]       data="cat-result-A"
 id=107 10:01:30 [user/review]    "looks good"
 id=108 10:04:10 [text/note]      "[normal] noted"
 ```
@@ -264,26 +264,26 @@ id=108 10:04:10 [text/note]      "[normal] noted"
 ```
 <|TL_b3t1746179400|>
 # bucket=2026/05/02 09:48:00-09:51:00 interval=3m
-09:50:01 [tool/scan ok]
+09:50:01 [tool/scan]
 <1024 字节扫描原文>
 <|TL_END_b3t1746179400|>
 <|TL_b3t1746179580|>
 # bucket=2026/05/02 09:51:00-09:54:00 interval=3m
-09:51:30 [tool/scan ok]
+09:51:30 [tool/scan]
 <1024 字节扫描原文>
-09:53:11 [tool/scan ok]
+09:53:11 [tool/scan]
 <1024 字节扫描原文>
 <|TL_END_b3t1746179580|>
 <|TL_b3t1746179760|>
 # bucket=2026/05/02 09:54:00-09:57:00 interval=3m
-09:54:42 [tool/scan ok]
+09:54:42 [tool/scan]
 <1024 字节扫描原文>
-09:55:22 [tool/scan ok]
+09:55:22 [tool/scan]
 <1024 字节扫描原文>
 <|TL_END_b3t1746179760|>
 <|TL_b3t1746179940|>
 # bucket=2026/05/02 09:57:00-10:00:00 interval=3m
-09:58:00 [tool/cat ok]
+09:58:00 [tool/cat]
 cat-result-A
 <|TL_END_b3t1746179940|>
 <|TL_b3t1746180060|>
@@ -330,7 +330,7 @@ looks good
 <|TL_END_r105t1746179722|>
 <|TL_b3t1746179940|>
 # bucket=2026/05/02 09:57:00-10:00:00 interval=3m
-09:58:00 [tool/cat ok]
+09:58:00 [tool/cat]
 cat-result-A
 <|TL_END_b3t1746179940|>
 <|TL_b3t1746180060|>

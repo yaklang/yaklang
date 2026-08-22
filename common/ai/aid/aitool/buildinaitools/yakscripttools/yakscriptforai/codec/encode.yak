@@ -88,4 +88,5 @@ default:
     yakit.Error("unknown encode type: " + tn)
     return
 }
+RESULT = result
 yakit.Info("encode result: " + result)

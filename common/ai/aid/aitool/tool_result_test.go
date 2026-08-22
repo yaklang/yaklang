@@ -2,6 +2,7 @@ package aitool
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -205,6 +206,30 @@ func TestExecuteToolWithCapture_PreCancelledContextDoesNotStartCallback(t *testi
 	}
 	if got := cancelCalls.Load(); got != 1 {
 		t.Fatalf("cancel callback calls = %d, want 1", got)
+	}
+}
+
+func TestInvokeWithParams_CancelledContextIsProtocolFailure(t *testing.T) {
+	callbackStarted := false
+	tool, err := New("cancelled", WithCallback(func(context.Context, InvokeParams, *ToolRuntimeConfig, io.Writer, io.Writer) (any, error) {
+		callbackStarted = true
+		return "unexpected", nil
+	}))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result, invokeErr := tool.InvokeWithParams(InvokeParams{}, WithContext(ctx))
+	if !errors.Is(invokeErr, context.Canceled) {
+		t.Fatalf("InvokeWithParams error = %v, want %v", invokeErr, context.Canceled)
+	}
+	if result == nil || result.Success {
+		t.Fatalf("cancelled invocation result = %#v, want protocol failure", result)
+	}
+	if callbackStarted {
+		t.Fatal("callback started for a pre-cancelled invocation")
 	}
 }
 

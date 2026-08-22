@@ -6,14 +6,28 @@
 //
 // 用法（仓库根目录）：
 //   yak common/aiengine/aibenchmark/http-react-blackbox-benchmark.yak \
-//     --case single-query-escaping
+//     --suite execution-semantics --intelligent-model memfit-standard-free
+//
+// API key 只从环境变量读取，不接受 CLI 参数，也不会进入报告。
 
 configFile = cli.String("config", cli.setDefault("common/aiengine/aibenchmark/http-react-blackbox-cases.json"), cli.setHelp("测试任务 JSON"))
 caseName = cli.String("case", cli.setDefault(""), cli.setHelp("只运行指定 case；留空运行全部"))
 outputDir = cli.String("output-dir", cli.setDefault("./benchmark-reports/tool-react-blackbox"), cli.setHelp("报告输出目录"))
 timeoutSec = cli.Int("timeout", cli.setDefault(120), cli.setHelp("每个 case 的硬超时秒数"))
 maxIteration = cli.Int("max-iteration", cli.setDefault(6), cli.setHelp("每个 case 的最大 ReAct 迭代数"))
+suiteName = cli.String("suite", cli.setDefault(""), cli.setHelp("只运行指定 suite；留空运行全部"))
+phaseName = cli.String("phase", cli.setDefault("candidate"), cli.setHelp("实验阶段标签，例如 baseline/candidate"))
+providerName = cli.String("provider", cli.setDefault("aibalance"), cli.setHelp("AI provider"))
+aiDomain = cli.String("domain", cli.setDefault("https://aibalance.yaklang.com/"), cli.setHelp("AI provider HTTPS domain"))
+intelligentModel = cli.String("intelligent-model", cli.setDefault("memfit-standard-free"), cli.setHelp("主循环/质量模型"))
+lightweightModel = cli.String("lightweight-model", cli.setDefault("memfit-light-free"), cli.setHelp("轻量模型"))
+apiKeyEnv = cli.String("api-key-env", cli.setDefault("AIBALANCE_API_KEY"), cli.setHelp("API key 环境变量名；值不会落盘"))
 cli.check()
+
+apiKey = os.Getenv(apiKeyEnv)
+if str.TrimSpace(apiKey) == "" {
+    die("missing AI API key environment variable: " + apiKeyEnv)
+}
 
 func clean(value) {
     if value == nil || value == undefined {
@@ -74,6 +88,91 @@ func preview(text, limit) {
     return text[:limit] + "..."
 }
 
+// A local controlled HTTP oracle makes HTTP status, timeout and request-count
+// assertions independent from public network behavior. Every request is logged
+// separately from the agent event stream.
+oracleRequests = []
+oracleLock = sync.NewLock()
+
+func startHTTPOracle() {
+    oracleCtx, oracleCancel = context.WithCancel(context.Background())
+    oraclePort = os.GetRandomAvailableTCPPort()
+    oracleURL = "http://" + str.HostPort("127.0.0.1", oraclePort)
+    go func {
+        serveErr = httpserver.Serve("127.0.0.1", oraclePort,
+            httpserver.context(oracleCtx),
+            httpserver.handler(func(w, req) {
+                body, _ = io.ReadAll(req.Body)
+                oracleLock.Lock()
+                oracleRequests = append(oracleRequests, {
+                    "timestamp_unix_ms": time.Now().UnixMilli(),
+                    "method": req.Method,
+                    "path": req.URL.Path,
+                    "body_size": len(body),
+                    "body_sha256": codec.Sha256(body),
+                })
+                oracleLock.Unlock()
+
+                switch req.URL.Path {
+                case "/status/404":
+                    w.WriteHeader(404)
+                    w.Write("oracle-not-found")
+                case "/status/500":
+                    w.WriteHeader(500)
+                    w.Write("oracle-server-error")
+                case "/delay/3":
+                    time.sleep(3)
+                    w.WriteHeader(200)
+                    w.Write("oracle-delayed")
+                case "/no-response":
+                    time.sleep(timeoutSec + 2)
+                    w.WriteHeader(200)
+                    w.Write("oracle-too-late")
+                case "/echo":
+                    w.WriteHeader(200)
+                    w.Write(body)
+                default:
+                    w.WriteHeader(200)
+                    w.Write("oracle-ok")
+                }
+            }),
+        )
+        if serveErr != nil && oracleCtx.Err() == nil {
+            log.error("controlled HTTP oracle stopped unexpectedly: %v", serveErr)
+        }
+    }
+    os.WaitConnect(str.HostPort("127.0.0.1", oraclePort), 5)~
+
+    // Resolve a currently unused port without starting a listener. Connection
+    // refusal is therefore an objective transport oracle, not an HTTP status.
+    refusedPort = os.GetRandomAvailableTCPPort()
+    refusedURL = "http://" + str.HostPort("127.0.0.1", refusedPort)
+    return {
+        "url": oracleURL,
+        "refused_url": refusedURL,
+        "cancel": oracleCancel,
+    }
+}
+
+func oracleRequestOffset() {
+    oracleLock.Lock()
+    defer oracleLock.Unlock()
+    return len(oracleRequests)
+}
+
+func oracleRequestsSince(offset) {
+    oracleLock.Lock()
+    defer oracleLock.Unlock()
+    snapshot = []
+    if offset < 0 {
+        offset = 0
+    }
+    for idx = offset; idx < len(oracleRequests); idx++ {
+        snapshot = append(snapshot, oracleRequests[idx])
+    }
+    return snapshot
+}
+
 func readSize(path) {
     if path == "" || !file.IsExisted(path) {
         return 0
@@ -112,9 +211,12 @@ func prepareWorkspace(caseConfig, startedAt) {
     return workspaceDir
 }
 
-func renderCasePrompt(caseConfig, workspaceDir) {
+func renderCasePrompt(caseConfig, workspaceDir, oracle) {
     prompt = clean(caseConfig["prompt"])
-    return str.ReplaceAll(prompt, "{{WORKDIR}}", workspaceDir)
+    prompt = str.ReplaceAll(prompt, "{{WORKDIR}}", workspaceDir)
+    prompt = str.ReplaceAll(prompt, "{{ORACLE_URL}}", oracle["url"])
+    prompt = str.ReplaceAll(prompt, "{{REFUSED_URL}}", oracle["refused_url"])
+    return prompt
 }
 
 func inspectWorkspace(caseConfig, result) {
@@ -153,6 +255,7 @@ func inspectWorkspace(caseConfig, result) {
             "path": targetPath,
             "exists": exists,
             "size": len(content),
+            "sha256": exists ? file.Sha256(targetPath) : "",
             "missing_tokens": missingTokens,
             "forbidden_tokens_found": forbiddenTokens,
             "content_preview": preview(content, 1600),
@@ -174,9 +277,18 @@ func runFileVerifications(caseConfig, result) {
         verifyCtx, verifyCancel = context.WithTimeout(context.Background(), time.ParseDuration("15s")~)
         cmd, commandErr = exec.CommandContext(verifyCtx, command)
         output = ""
+        exitCode = nil
+        exitCodeAvailable = false
         if commandErr == nil {
-            rawOutput, runErr = cmd.Output()
+            rawOutput, runErr = cmd.CombinedOutput()
             output = string(rawOutput)
+            if cmd.ProcessState != nil {
+                processExitCode = cmd.ProcessState.ExitCode()
+                if processExitCode >= 0 {
+                    exitCode = processExitCode
+                    exitCodeAvailable = true
+                }
+            }
             if runErr != nil {
                 commandErr = runErr
             }
@@ -192,6 +304,8 @@ func runFileVerifications(caseConfig, result) {
             "command": command,
             "output": preview(output, 2000),
             "error": commandErr == nil ? "" : sprintf("%v", commandErr),
+            "exit_code": exitCode,
+            "exit_code_available": exitCodeAvailable,
             "missing_tokens": missingTokens,
             "passed": commandErr == nil && len(missingTokens) == 0,
         })
@@ -269,7 +383,12 @@ func inspectToolArtifacts(result) {
             continue
         }
         combinedBytes = readSize(file.Join(callDir, "combined_output.txt"))
-        rawResultBytes = readSize(file.Join(callDir, "result.txt"))
+        // Structured semantic results are persisted as result.json. Keep the
+        // legacy text fallback so the same runner can measure origin/main.
+        rawResultBytes = readSize(file.Join(callDir, "result.json"))
+        if rawResultBytes == 0 {
+            rawResultBytes = readSize(file.Join(callDir, "result.txt"))
+        }
         call["combined_output_bytes"] = combinedBytes
         call["raw_result_bytes"] = rawResultBytes
         combinedTotal += combinedBytes
@@ -313,7 +432,7 @@ func evaluateCase(caseConfig, result, allResultText) {
         if call["result_empty"] {
             emptyResults++
         }
-        if call["status"] == "done" || call["status"] == "error" {
+        if call["status"] == "completed" || call["status"] == "protocol_error" {
             terminalEvents++
         }
     }
@@ -390,12 +509,13 @@ func evaluateCase(caseConfig, result, allResultText) {
     }
 }
 
-func runCase(caseConfig) {
+func runCase(caseConfig, oracle) {
     startedAt = time.Now()
-    sessionID = sprintf("tool-react-blackbox-%s-%d", caseConfig["name"], startedAt.Unix())
+    sessionID = sprintf("tool-react-blackbox-%s-%s-%s-%d", phaseName, intelligentModel, caseConfig["name"], startedAt.Unix())
     workspaceDir = prepareWorkspace(caseConfig, startedAt)
-    renderedPrompt = renderCasePrompt(caseConfig, workspaceDir)
-    benchCtx, benchCancel = context.WithCancel(context.Background())
+    renderedPrompt = renderCasePrompt(caseConfig, workspaceDir, oracle)
+    oracleOffset = oracleRequestOffset()
+    benchCtx, benchCancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSec) + "s")~)
     finishedCallback = false
     hardTimeoutTriggered = false
     resultText = ""
@@ -404,16 +524,17 @@ func runCase(caseConfig) {
     toolCalls = {}
     pinnedActionFiles = []
     taskDir = ""
+    timelineText = ""
+    timelineContextSamples = []
+    modelOutputs = []
+    activeToolCalls = 0
+    maxConcurrentToolCalls = 0
+    toolStartTimes = []
+    eventLock = sync.NewLock()
 
     includeTools = caseConfig["include_tools"]
     if includeTools == nil || includeTools == undefined || len(includeTools) == 0 {
         includeTools = ["do_http_request", "batch_do_http_request"]
-    }
-
-    go func {
-        time.sleep(timeoutSec)
-        hardTimeoutTriggered = true
-        benchCancel()
     }
 
     opts = [
@@ -425,15 +546,38 @@ func runCase(caseConfig) {
         aim.yoloMode(),
         aim.allowUserInteract(false),
         aim.includeToolNames(includeTools...),
+        aim.aiConfig(providerName,
+            ai.apiKey(apiKey), ai.domain(aiDomain), ai.model(intelligentModel)),
+        aim.qualityPriorityAIConfig(providerName,
+            ai.apiKey(apiKey), ai.domain(aiDomain), ai.model(intelligentModel)),
+        aim.speedPriorityAIConfig(providerName,
+            ai.apiKey(apiKey), ai.domain(aiDomain), ai.model(lightweightModel)),
         aim.onFinished(func(react) {
+            eventLock.Lock()
             finishedCallback = true
+            eventLock.Unlock()
             // 给 finish/timeline 落盘留出时间；若 InvokeReAct 的后台收尾卡住，主动取消。
             go func {
                 time.sleep(2)
                 benchCancel()
             }
         }),
+        aim.onStreamContent(func(react, event, nodeID, totalContent) {
+            if len(totalContent) == 0 {
+                return
+            }
+            eventLock.Lock()
+            defer eventLock.Unlock()
+            modelOutputs = append(modelOutputs, {
+                "node_id": nodeID,
+                "event_type": string(event.Type),
+                "content": preview(string(totalContent), 8000),
+                "content_bytes": len(totalContent),
+            })
+        }),
         aim.onEvent(func(react, event) {
+            eventLock.Lock()
+            defer eventLock.Unlock()
             eventType = string(event.Type)
             eventCounts[eventType] = int(eventCounts[eventType]) + 1
             payload = parseEventContent(event.Content)
@@ -446,15 +590,31 @@ func runCase(caseConfig) {
                 }
             }
 
+            if eventType == "timeline_item" {
+                timelineItemText = string(event.Content)
+                timelineText += "\n" + timelineItemText
+                timelineContextSamples = append(timelineContextSamples, preview(timelineItemText, 5000))
+            }
+
             if eventType == "tool_call_start" {
                 call = getOrCreateToolCall(toolCalls, callID)
                 call["tool"] = clean(payload["tool"]["name"])
+                call["started_unix_ms"] = time.Now().UnixMilli()
+                activeToolCalls++
+                if activeToolCalls > maxConcurrentToolCalls {
+                    maxConcurrentToolCalls = activeToolCalls
+                }
+                toolStartTimes = append(toolStartTimes, call["started_unix_ms"])
             } else if eventType == "tool_call_param" {
                 call = getOrCreateToolCall(toolCalls, callID)
                 call["params"] = payload["params"]
             } else if eventType == "tool_call_done" || eventType == "tool_call_error" {
                 call = getOrCreateToolCall(toolCalls, callID)
-                call["status"] = eventType == "tool_call_done" ? "done" : "error"
+                call["status"] = eventType == "tool_call_done" ? "completed" : "protocol_error"
+                call["ended_unix_ms"] = time.Now().UnixMilli()
+                if activeToolCalls > 0 {
+                    activeToolCalls--
+                }
                 call["duration_ms"] = int(payload["duration_ms"])
                 call["total_duration_ms"] = int(payload["total_duration_ms"])
                 if eventType == "tool_call_error" {
@@ -493,7 +653,7 @@ func runCase(caseConfig) {
             }
 
             // 完整保留工具生命周期；其余事件只保留短预览，足够重建 timeline。
-            keepFull = str.HasPrefix(eventType, "tool_call_")
+            keepFull = str.HasPrefix(eventType, "tool_call_") || eventType == "timeline_item"
             content = string(event.Content)
             eventRecords = append(eventRecords, {
                 "index": len(eventRecords) + 1,
@@ -506,9 +666,11 @@ func runCase(caseConfig) {
     ]
 
     invokeErr = aim.InvokeReAct(renderedPrompt, opts...)
+    hardTimeoutTriggered = sprint(benchCtx.Err()) == "context deadline exceeded"
     benchCancel()
     endedAt = time.Now()
 
+    eventLock.Lock()
     calls = []
     for _, call in toolCalls {
         calls = append(calls, call)
@@ -516,6 +678,11 @@ func runCase(caseConfig) {
     result = {
         "case": caseConfig["name"],
         "description": caseConfig["description"],
+        "suite": caseConfig["suite"],
+        "phase": phaseName,
+        "provider": providerName,
+        "intelligent_model": intelligentModel,
+        "lightweight_model": lightweightModel,
         "prompt": renderedPrompt,
         "included_tools": includeTools,
         "workspace_dir": workspaceDir,
@@ -527,9 +694,21 @@ func runCase(caseConfig) {
         "hard_timeout_triggered": hardTimeoutTriggered,
         "event_counts": eventCounts,
         "events": eventRecords,
+        "model_outputs": modelOutputs,
+        "timeline_model_context_samples": timelineContextSamples,
+        "timeline_semantic_violations": {
+            "legacy_tool_header_count": len(re.FindAll(timelineText, `\[tool/[^\]]+ (ok|fail)\]`)),
+            "success_boolean_count": len(re.FindAll(timelineText, `success["']?\s*[:=]\s*true`)),
+        },
         "tool_calls": calls,
         "task_dir": taskDir,
+        "efficiency": {
+            "max_concurrent_tool_calls": maxConcurrentToolCalls,
+            "tool_start_times_unix_ms": toolStartTimes,
+        },
+        "oracle_requests": oracleRequestsSince(oracleOffset),
     }
+    eventLock.Unlock()
     inspectTimeline(result, pinnedActionFiles)
     inspectToolArtifacts(result)
     inspectWorkspace(caseConfig, result)
@@ -545,7 +724,9 @@ if err != nil {
 cases = json.loads(content)
 selected = []
 for caseConfig in cases {
-    if caseName == "" || caseConfig["name"] == caseName {
+    caseMatches = caseName == "" || caseConfig["name"] == caseName
+    suiteMatches = suiteName == "" || clean(caseConfig["suite"]) == suiteName
+    if caseMatches && suiteMatches {
         selected = append(selected, caseConfig)
     }
 }
@@ -554,12 +735,15 @@ if len(selected) == 0 {
 }
 
 file.MkdirAll(outputDir)~
+oracle = startHTTPOracle()
+stopOracle = oracle["cancel"]
+defer stopOracle()
 results = []
 currentCase = 0
 for caseConfig in selected {
     currentCase++
     log.info("[%d/%d] running ReAct tool blackbox case: %s", currentCase, len(selected), caseConfig["name"])
-    result = runCase(caseConfig)
+    result = runCase(caseConfig, oracle)
     results = append(results, result)
     log.info("case=%s passed=%v tool_calls=%d duration_ms=%d task_dir=%s",
         result["case"], result["evaluation"]["passed"], len(result["tool_calls"]), result["duration_ms"], result["task_dir"])
@@ -569,6 +753,12 @@ report = {
     "report_type": "tool-react-blackbox-benchmark",
     "generated_at": time.Now().Format("2006-01-02 15:04:05"),
     "config": configFile,
+    "suite": suiteName,
+    "phase": phaseName,
+    "provider": providerName,
+    "domain": aiDomain,
+    "intelligent_model": intelligentModel,
+    "lightweight_model": lightweightModel,
     "timeout_seconds": timeoutSec,
     "max_iteration": maxIteration,
     "results": results,

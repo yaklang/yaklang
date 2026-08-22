@@ -2,12 +2,49 @@ package aitool
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+func TestToolExecutionResultJSONKeepsAllSemanticChannels(t *testing.T) {
+	raw, err := json.Marshal(&ToolExecutionResult{})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"stdout":"","stderr":"","combined_output":"","result":null}`, string(raw))
+}
+
+func TestToolResultDumpAndTimelineUseNeutralProtocolSemantics(t *testing.T) {
+	tr := &ToolResult{
+		Name:    "bash",
+		Success: true,
+		Data: &ToolExecutionResult{
+			Stdout:         "SUCCESS from stdout",
+			Stderr:         "ERROR from stderr",
+			CombinedOutput: "SUCCESS from stdout\nERROR from stderr",
+			Result: map[string]any{
+				"exit_code":          7,
+				"exit_code_accepted": false,
+			},
+		},
+	}
+
+	dump := tr.Dump()
+	require.Contains(t, dump, `"protocol_completed":true`)
+	require.NotContains(t, dump, `"success"`)
+	require.Contains(t, dump, `"exit_code":7`)
+
+	timeline := tr.String()
+	require.Less(t, strings.Index(timeline, "execution_result:"), strings.Index(timeline, "observations:"))
+	require.NotContains(t, timeline, "success: true")
+	require.NotContains(t, timeline, "tool/bash ok")
+
+	failed := (&ToolResult{Name: "bash", Success: false, Error: "validation failed"}).String()
+	require.Contains(t, failed, "protocol_error: validation failed")
+	require.NotContains(t, failed, "execution failed")
+}
 
 func TestToolResult_DumpTimelineItem_ParamsOption(t *testing.T) {
 	tr := &ToolResult{

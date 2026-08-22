@@ -888,18 +888,18 @@ func TestHijack_FrozenBoundary_TimelineDumpFormat(t *testing.T) {
 		"<|AI_CACHE_FROZEN_semi-dynamic|>",
 		"<|TIMELINE_b3t1746180000|>",
 		"# bucket=2026/05/02 10:00:00-10:03:00 interval=3m",
-		"10:00:30 [tool/scan ok]",
+		"10:00:30 [tool/scan]",
 		"data-A",
 		"<|TIMELINE_END_b3t1746180000|>",
 		"<|TIMELINE_b3t1746180180|>",
 		"# bucket=2026/05/02 10:03:00-10:06:00 interval=3m",
-		"10:04:00 [tool/scan ok]",
+		"10:04:00 [tool/scan]",
 		"data-B",
 		"<|TIMELINE_END_b3t1746180180|>",
 		"<|AI_CACHE_FROZEN_END_semi-dynamic|>",
 		"<|TIMELINE_b3t1746180360|>",
 		"# bucket=2026/05/02 10:06:00-10:09:00 interval=3m",
-		"10:07:00 [tool/scan ok]",
+		"10:07:00 [tool/scan]",
 		"data-C-OPEN",
 		"<|TIMELINE_END_b3t1746180360|>",
 	}, "\n")
@@ -936,10 +936,11 @@ func TestHijack_FrozenBoundary_TimelineDumpFormat(t *testing.T) {
 // hijacker 切成 4 段消息: [system+cc, user1+cc, user2+cc, user3].
 //
 // 端到端 prompt 形态:
-//   SYSTEM (high-static)        -> system + cc
-//   AI_CACHE_FROZEN ... END     -> user1 + cc
-//   AI_CACHE_SEMI   ... END     -> user2 + cc (内含 PROMPT_SECTION_semi-dynamic + 内容)
-//   timeline-open + dynamic     -> user3 (无 cc)
+//
+//	SYSTEM (high-static)        -> system + cc
+//	AI_CACHE_FROZEN ... END     -> user1 + cc
+//	AI_CACHE_SEMI   ... END     -> user2 + cc (内含 PROMPT_SECTION_semi-dynamic + 内容)
+//	timeline-open + dynamic     -> user3 (无 cc)
 //
 // 关键词: TestHijack_SemiBoundary, 4 段切分, P1 双 cache 边界, 双 cc 主路径
 func TestHijack_SemiBoundary_HappyPath4Segments(t *testing.T) {

@@ -42,15 +42,15 @@ func handleToolCallResult(
 	operator *reactloops.LoopActionHandlerOperator,
 ) {
 	// A non-nil ToolResult is the objective boundary that proves the plugin
-	// callback settled. Count both success and tool-level failure. Review-driven
+	// callback settled. Count both completed and protocol-failed calls. Review-driven
 	// direct_answer/cancel is terminal user intent, not a tool execution.
 	if !directly && result != nil {
 		operator.MarkToolExecuted()
 	}
 	if err != nil {
-		errMsg := fmt.Sprintf("Tool '%s' execution failed: %v.", toolPayload, err)
-		invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
-		loopInfraStatus(loop, "工具调用失败 / Tool Call Failed")
+		errMsg := fmt.Sprintf("Tool '%s' invocation protocol failed: %v.", toolPayload, err)
+		invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)
+		loopInfraStatus(loop, "工具协议失败 / Tool Protocol Failed")
 
 		resolved := loop.ResolveIdentifier(toolPayload)
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingError(err) {
@@ -92,8 +92,8 @@ func handleToolCallResult(
 	}
 
 	if result.Error != "" {
-		invoker.AddToTimeline("call["+toolPayload+"] error", result.Error)
-		loopInfraStatus(loop, "工具返回错误 / Tool Returned Error")
+		invoker.AddToTimeline("call["+toolPayload+"] protocol-error", result.Error)
+		loopInfraStatus(loop, "工具协议错误 / Tool Protocol Error")
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingMessage(result.Error) {
 			operator.Feedback(
 				"[MCP] Tool '" + toolPayload + "' is still initializing. " +

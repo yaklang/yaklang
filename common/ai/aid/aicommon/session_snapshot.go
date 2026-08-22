@@ -46,17 +46,19 @@ type SessionSnapshotBackgroundProcess struct {
 }
 
 type SessionSnapshotExecution struct {
-	TaskName          string `json:"task_name"`
-	Status            string `json:"status"`
-	StartedAt         int64  `json:"started_at"`
-	EndedAt           int64  `json:"ended_at"`
-	ToolCallSuccess   int    `json:"tool_call_success"`
-	ToolCallFailed    int    `json:"tool_call_failed"`
-	ToolCallTotal     int    `json:"tool_call_total"`
-	ExecutionMinutes  int    `json:"execution_minutes"`
-	HTTPFlowCount     int    `json:"http_flow_count"`
-	RiskCount         int    `json:"risk_count"`
-	ModifiedFileCount int    `json:"modified_file_count"`
+	TaskName  string `json:"task_name"`
+	Status    string `json:"status"`
+	StartedAt int64  `json:"started_at"`
+	EndedAt   int64  `json:"ended_at"`
+	// Legacy wire names retained for frontend compatibility. These count
+	// protocol-completed and protocol-failed calls, not execution outcomes.
+	ToolCallSuccess   int `json:"tool_call_success"`
+	ToolCallFailed    int `json:"tool_call_failed"`
+	ToolCallTotal     int `json:"tool_call_total"`
+	ExecutionMinutes  int `json:"execution_minutes"`
+	HTTPFlowCount     int `json:"http_flow_count"`
+	RiskCount         int `json:"risk_count"`
+	ModifiedFileCount int `json:"modified_file_count"`
 }
 
 type SessionSnapshotPerception struct {

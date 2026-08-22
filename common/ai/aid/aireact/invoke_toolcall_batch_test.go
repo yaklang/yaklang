@@ -522,7 +522,7 @@ func TestExecuteToolBatch_ArtifactsAreIsolatedAndOrderedDespiteOutOfOrderComplet
 		manifest := readBatchArtifactManifest(t, dir)
 		require.Equal(t, identifiers[i], manifest.Identifier)
 		require.Equal(t, request.Calls[i].ExecutionCallID, manifest.CallToolID)
-		require.Equal(t, "success", manifest.Status)
+		require.Equal(t, "completed", manifest.Status)
 		require.True(t, manifest.Success)
 
 		stdout, readErr := os.ReadFile(filepath.Join(dir, "stdout.txt"))
@@ -1094,7 +1094,7 @@ func TestExecuteToolBatch_OrdinaryFailureRetainsFailedArtifact(t *testing.T) {
 	failedDir := dirs[0]
 	require.Contains(t, filepath.Base(failedDir), "failed_child")
 	manifest := readBatchArtifactManifest(t, failedDir)
-	require.Equal(t, "failed", manifest.Status)
+	require.Equal(t, "protocol_failed", manifest.Status)
 	require.False(t, manifest.Success)
 	require.Contains(t, manifest.Identifier, "failed_child")
 	combined, err := os.ReadFile(filepath.Join(failedDir, "combined_output.txt"))

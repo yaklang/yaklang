@@ -557,6 +557,8 @@ func (r *Emitter) EmitToolCallProgressReview(callToolID string, payload ToolCall
 }
 
 func (r *Emitter) EmitToolCallDone(callToolId string, endTime time.Time, startTime time.Time, purePluginDuration time.Duration) (*schema.AiOutputEvent, error) {
+	// EVENT_TOOL_CALL_DONE is a lifecycle boundary only. Execution semantics are
+	// carried separately by EVENT_TOOL_CALL_RESULT.
 	if purePluginDuration < 0 {
 		purePluginDuration = 0
 	}
