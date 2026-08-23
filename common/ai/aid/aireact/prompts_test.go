@@ -1048,6 +1048,16 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 			t.Fatalf("verification prompt must hide host iteration limits, found %q", forbidden)
 		}
 	}
+	if !utils.MatchAllOfSubString(prompt,
+		"语义停滞判定",
+		"调用次数多、轮次增加或耗时变长本身都不是重复证据",
+		"同一工具用于不同目标、参数 / payload、对照、假设、观察通道或独立复核属于有效探索",
+	) {
+		t.Fatalf("verification prompt must judge stalled execution by semantic information gain. Got:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "当前子任务已多次经过相似执行路径") {
+		t.Fatal("verification prompt must not infer semantic repetition from a host-side counter")
+	}
 }
 
 func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testing.T) {

@@ -96,6 +96,13 @@ execution and the TODO store's terminal-state model are otherwise unchanged.
 5. Prompt cache diagnostics repeatedly reported dynamic sections above the
    8192-byte guidance threshold. Hoisting stable task/fact/document blocks is a
    separate performance opportunity and should be measured independently.
+6. A follow-up review found that the candidate still converted a raw loop index
+   above five into a “similar execution path” warning. That proxy was invalid:
+   repeated use of one tool can be a sequence of independent targets, controls,
+   hypotheses, or observations. The counter-based warning is now removed. The
+   shared prompt defines semantic stall as materially unchanged goal/hypothesis,
+   controllable inputs, observation channel, and evidence with no expected
+   information gain; tool name and call count alone are explicitly insufficient.
 
 ## Reproduction
 
