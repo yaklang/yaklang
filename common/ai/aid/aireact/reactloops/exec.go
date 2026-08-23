@@ -294,6 +294,19 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 	return ""
 }
 
+func actionTypeResolutionError(requested string, availableActions []string, reason string) error {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		requested = "<missing>"
+	}
+	return utils.Errorf(
+		"action resolution failed: requested=%q; matcher=exact registered action or alias; available_actions=%v; reason=%s",
+		requested,
+		availableActions,
+		reason,
+	)
+}
+
 func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string) error {
 	task := aicommon.NewStatefulTaskBase(
 		taskId,
@@ -522,21 +535,49 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				}
 				return utils.Wrap(actionErr, "failed to parse action")
 			}
+			observedActionType := ""
+			admittedActionType := ""
+			if action != nil {
+				// ActionType waits until @action is admitted or parsing finishes.
+				// Read the raw observation afterwards so an unsupported value cannot
+				// race with the asynchronous parser and be mislabeled as missing.
+				admittedActionType = strings.TrimSpace(action.ActionType())
+				observedActionType = strings.TrimSpace(action.ObservedActionType())
+			}
 			actionType := getNextActionType(action)
-			if actionType == "" {
-				r.loadingStatus("动作类型为空 / Action Type Empty")
+			if observedActionType != "" && admittedActionType == "" {
+				r.loadingStatus(fmt.Sprintf("动作不受支持 [%s] / Unsupported Action [%s]", observedActionType, observedActionType))
 				log.Errorf("ai response stream content before error: %s", buf.String())
-				if action != nil {
-					println("=== [DEBUG] action type is empty, raw params dump ===")
-					println(action.DumpRawParams())
-					println("=== [DEBUG] end raw params dump ===")
-				}
-				emptyErr := utils.Errorf("action type is empty (available_actions=%v)",
-					actionNames)
+				unsupportedErr := actionTypeResolutionError(
+					observedActionType,
+					actionNames,
+					"a non-empty @action value was parsed, but it did not exactly match any action registered in this loop",
+				)
 				if currentCtxCanceled() {
-					emptyErr = utils.Wrap(emptyErr, "task context canceled while parsing action")
+					unsupportedErr = utils.Wrap(unsupportedErr, "task context canceled while parsing action")
 				}
-				return emptyErr
+				return unsupportedErr
+			}
+			if actionType == "" {
+				r.loadingStatus("动作类型缺失 / Action Type Missing")
+				log.Errorf("ai response stream content before error: %s", buf.String())
+				missingErr := actionTypeResolutionError(
+					"",
+					actionNames,
+					"no non-empty @action value was found and legacy payload inference found no known action",
+				)
+				if currentCtxCanceled() {
+					missingErr = utils.Wrap(missingErr, "task context canceled while parsing action")
+				}
+				return missingErr
+			}
+			if !utils.StringArrayContains(actionNames, actionType) {
+				r.loadingStatus(fmt.Sprintf("动作未注册 [%s] / Unregistered Action [%s]", actionType, actionType))
+				return actionTypeResolutionError(
+					actionType,
+					actionNames,
+					"legacy payload inference produced an action type that has no handler in this loop",
+				)
 			}
 
 			r.loadingStatus(fmt.Sprintf("处理动作 [%s] / Processing Action [%s]", actionType, actionType))
@@ -544,8 +585,13 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 			verifier, err := r.GetActionHandler(actionType)
 			if err != nil {
-				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionType, err))
-				return utils.Wrapf(err, "action[%s] GetActionHandler failed", actionType)
+				resolutionErr := actionTypeResolutionError(
+					actionType,
+					actionNames,
+					fmt.Sprintf("the action name was admitted but handler lookup failed: %v", err),
+				)
+				r.GetInvoker().AddToTimeline("error", resolutionErr.Error())
+				return resolutionErr
 			}
 			if utils.IsNil(verifier) {
 				return utils.Errorf("action[%s] verifier is nil", actionType)

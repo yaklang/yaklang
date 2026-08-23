@@ -162,6 +162,35 @@ func TestSupperAction_WaitString_MissingParam(t *testing.T) {
 	require.Equal(t, action.GetString("not_exist"), "")
 }
 
+func TestActionParser_PreservesUnsupportedObservedActionType(t *testing.T) {
+	ctx := context.Background()
+	action, err := ExtractActionFromStream(
+		ctx,
+		strings.NewReader(`{"@action":"save_evidence","verification_payload":"confirmed finding"}`),
+		"object",
+		WithActionAlias("require_tool", "finish"),
+	)
+	require.NoError(t, err)
+	require.Empty(t, action.ActionType(), "unsupported action must not become an admitted action")
+	require.Equal(t, "save_evidence", action.ObservedActionType(), "raw action must be available after admitted ActionType resolves")
+	require.NoError(t, action.WaitParseResult(ctx))
+	require.Equal(t, "confirmed finding", action.GetString("verification_payload"))
+}
+
+func TestActionParser_ObservedActionMatchesAdmittedAction(t *testing.T) {
+	ctx := context.Background()
+	action, err := ExtractActionFromStream(
+		ctx,
+		strings.NewReader(`{"@action":"require_tool","tool_require_payload":"grep"}`),
+		"object",
+		WithActionAlias("require_tool", "finish"),
+	)
+	require.NoError(t, err)
+	require.NoError(t, action.WaitParseResult(ctx))
+	require.Equal(t, "require_tool", action.ObservedActionType())
+	require.Equal(t, "require_tool", action.ActionType())
+}
+
 func TestSupperAction_WaitObject(t *testing.T) {
 	token := uuid.NewString()
 	raw := `{ "type": "object", "required": [ "@action", "main_task", "info" ], "properties": { "@action": {"const": "plan"}, "main_task": {"type": "string"}, "info": { "type": "object", "mytest": "` + token + `", "age": 18 } } }`
@@ -317,7 +346,8 @@ func TestSupperAction_TagToKeyStream(t *testing.T) {
 //     和 "[current-nonce]" 两个 callback, 字面量分支命中
 //
 // 关键词: TestActionMaker, ExtraNonces, [current-nonce] 字面照抄,
-//        CACHE_TOOL_CALL, 双注册兜底
+//
+//	CACHE_TOOL_CALL, 双注册兜底
 func TestActionMaker_ExtraNonces_LLMUsesStableLiteral(t *testing.T) {
 	turnNonce := uuid.NewString()
 	stableNonce := "[current-nonce]"

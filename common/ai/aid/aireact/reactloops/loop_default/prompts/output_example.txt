@@ -32,9 +32,9 @@
 
 *. `save_evidence` 使用案例（确认关键事实后主动沉淀，不等任务结束）：
     * 确认一个安全风险后，先落证据再继续，同时把新发现的关联入口记为待探索：
-      `{"@action": "save_evidence", "verification_payload": "确认 /api/v2/token/refresh 存在重放漏洞：同一 refresh_token 重放两次均返回 200 且下发新的有效 access_token，未做一次性校验，响应字段 access_token 每次不同但均可正常鉴权", "todo_delta": {"add": [{"id": "check_logout_invalidate", "text": "待探索：验证退出登录后 refresh_token 是否失效，来源为本次重放漏洞的关联假设"}]}}`
+      `{"@action": "save_evidence", "evidence_id": "refresh-token-replay", "verification_payload": "确认 /api/v2/token/refresh 存在重放漏洞：同一 refresh_token 重放两次均返回 200 且下发新的有效 access_token，未做一次性校验，响应字段 access_token 每次不同但均可正常鉴权", "todo_delta": {"add": [{"id": "check_logout_invalidate", "text": "待探索：验证退出登录后 refresh_token 是否失效，来源为本次重放漏洞的关联假设"}]}}`
     * 排除一条路径时，写明实验条件和对照，而不是单次未命中就下结论：
-      `{"@action": "save_evidence", "verification_payload": "排除 /admin/ 路径存在未授权访问：对比携带有效 session 与清空 Cookie 两种请求，未登录时返回 302 跳转至登录页，与预期基线一致，字段和状态码均无差异"}`
+      `{"@action": "save_evidence", "evidence_id": "admin-anonymous-access", "verification_payload": "排除 /admin/ 路径存在未授权访问：对比携带有效 session 与清空 Cookie 两种请求，未登录时返回 302 跳转至登录页，与预期基线一致，字段和状态码均无差异"}`
 
 {{ if .AllowKnowledgeEnhanceAnswer }}*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:
     * `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "..[rewrite-user-query]..", "human_readable_thought": "先补充资料"}

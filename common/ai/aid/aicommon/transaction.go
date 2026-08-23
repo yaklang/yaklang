@@ -27,7 +27,9 @@ func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
 	if rsp.GetTotalOutputBytes() != 0 {
 		return err
 	}
-	if strings.Contains(lower, "action type is empty") || strings.Contains(lower, "action @action not found or invalid") {
+	if strings.Contains(lower, "action type is empty") ||
+		strings.Contains(lower, "action @action not found or invalid") ||
+		strings.Contains(lower, `action resolution failed: requested="<missing>"`) {
 		provider := strings.TrimSpace(rsp.GetProviderName())
 		model := strings.TrimSpace(rsp.GetModelName())
 		if provider != "" || model != "" {
