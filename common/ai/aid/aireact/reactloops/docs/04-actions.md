@@ -112,7 +112,7 @@ func init() {
 | `tool_compose` | 是 | `action_tool_compose.go` | `allowToolCall=true` | 表达有硬数据依赖的意图 DAG；节点不承载模型直接输出的最终工具参数 |
 | `ask_for_clarification` | 否 | `action_ask_for_clarification.go` | `allowUserInteract=true` | 信息不足问用户 |
 | `knowledge_enhance` | 否 | `action_enhance_knowledge_answer.go` | `allowRAG=true` | RAG 检索回答 |
-| `save_evidence` | 否 | `action_save_evidence.go` | 总是 | AI 主动要求验证当前结果 |
+| `save_evidence` | 是 | `reactloops/action_save_evidence.go` | 总是 | 幂等写入共享 Session Evidence Store 后继续任务 |
 | `request_plan_execution` | 是 | `action_request_plan_execution.go` | `allowPlanAndExec=true` | 切到任务规划模式 |
 | `require_ai_blueprint` | 是 | `action_require_ai_blueprint_forge.go` | `allowAIForge=true` | 启动一个 forge 蓝图 |
 | `loading_skills` | 否 | `action_loading_skills.go` | `allowSkillLoading=true` | 加载未加载的技能 |

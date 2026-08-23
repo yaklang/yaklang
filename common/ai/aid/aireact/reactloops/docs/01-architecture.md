@@ -280,7 +280,7 @@ operator.Exit() // 这一行不会生效，因为 Continue 已经先到
 `Continue` 表示"当前 action 处理完毕，继续主循环"。它**不**意味着任务完成。任务完成必须靠：
 
 - `operator.Exit()`（成功退出）
-- 验证门返回 `Satisfied=true` 后某些 action 会调 `operator.Exit()`（如 `enhance_knowledge_answer`、`tool_compose`、`save_evidence`）
+- 验证门返回 `Satisfied=true` 后某些 action 会调 `operator.Exit()`（如 `enhance_knowledge_answer`、`tool_compose`）；`save_evidence` 只负责幂等写入 Session Evidence Store 并继续任务
 - 普通反馈 + 后续轮次中模型选择 `finish` / `directly_answer`
 - 达到 `maxIterations`
 
