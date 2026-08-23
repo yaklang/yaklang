@@ -486,10 +486,6 @@ func (pm *PromptManager) GenerateVerificationPrompt(
 	dynamicData["Payload"] = payload
 	dynamicData["TodoSnapshot"] = pm.react.RenderVerificationTodoSnapshot()
 	dynamicData["EnhanceData"] = enhanceData
-	dynamicData["HasRepeatedExecutionPath"] = false
-	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
-		dynamicData["HasRepeatedExecutionPath"] = currentLoop.GetCurrentIterationIndex() > 5
-	}
 
 	prompt, err := pm.assemblePromptWithDynamicSection(
 		prefixMaterials, "verification-dynamic", verificationDynamicTemplate, dynamicData,

@@ -19,6 +19,11 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.Contains(t, highStatic, "区分性实验")
 	require.Contains(t, highStatic, "性价比优先")
 	require.Contains(t, highStatic, "单次未命中只说明本次未命中, 不单独证明目标不存在")
+	require.Contains(t, highStatic, "## 实验方法论")
+	require.Contains(t, highStatic, "**语义停滞判定**")
+	require.Contains(t, highStatic, "调用次数多、轮次增加或耗时变长本身都不是重复证据")
+	require.Contains(t, highStatic, "同一工具用于不同目标、参数 / payload、对照、假设、观察通道或独立复核属于有效探索")
+	require.Contains(t, highStatic, "确认语义停滞后至少改变一项假设 / 关键变量 / 工具 / 观察通道再试")
 	require.Contains(t, highStatic, "`todo_delta` 是唯一写入通道")
 	require.Contains(t, highStatic, "待办清单管循环内焦点")
 	require.Contains(t, highStatic, "Plan 管跨循环分治")
@@ -62,8 +67,8 @@ func TestPromptPolicyRequiresDiscriminatingEvidenceBeforeVerificationClosure(t *
 	require.NotContains(t, verificationInstructionText, "安全测试否定结果 = 子任务完成")
 	require.NotContains(t, verificationInstructionText, "只有当工具执行完全失败或没有任何相关输出时")
 
-	require.Contains(t, verificationDynamicTemplate, "漂移只用于纠偏")
-	require.Contains(t, verificationDynamicTemplate, "单次失败、扫描未命中或无明显报错")
+	require.NotContains(t, verificationDynamicTemplate, "HasRepeatedExecutionPath")
+	require.NotContains(t, verificationDynamicTemplate, "当前子任务已多次经过相似执行路径")
 	require.Contains(t, verificationOutputExampleText, "单次阴性尝试不等于验证完成")
 }
 

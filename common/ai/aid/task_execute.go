@@ -164,22 +164,11 @@ func (t *AiTask) execute() error {
 			}
 		}),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
-			hasRepeatedExecutionPath := loop.GetCurrentIterationIndex() > 5
-
 			var lastVerificationInfo string
 			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
 				// 注: verification 收缩为纯观测角色后不再产出 TodoDelta,
 				// 这里只沉淀 satisfied + reasoning 作为观测信号.
 				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
-			}
-
-			var recentActionsSummary string
-			if recentActions := loop.GetLastNAction(3); len(recentActions) > 0 {
-				var parts []string
-				for _, a := range recentActions {
-					parts = append(parts, fmt.Sprintf("%s(%s)", a.ActionType, a.ActionName))
-				}
-				recentActionsSummary = strings.Join(parts, " -> ")
 			}
 
 			reactiveData := utils.MustRenderTemplate(`
@@ -200,15 +189,6 @@ func (t *AiTask) execute() error {
 {{ if .FeedbackMessages }}
 最近反馈信息:
 {{ .FeedbackMessages }}
-{{ end }}
-{{ if .RecentActions }}最近执行动作: {{ .RecentActions }}{{ end }}
-{{ if .HasRepeatedExecutionPath }}
-** 警告: 当前子任务已多次经过相似执行路径，请认真评估：
-  1. 任务目标是否实际上已经完成？如果工具已返回足够结果，请允许任务完成。
-  2. 当前策略是否有效？如果反复失败，请更换工具或方法。
-  3. 不要重复执行相同的操作，应换用能产生新证据的方法。
-  4. 如果你当前执行的动作与 CURRENT_TASK 目标领域不相关（例如当前任务是 FTP 后门验证但你在做 Web 漏洞扫描），说明当前子任务实际已完成，应使用 directly_answer 输出任务总结并结束。
-  5. 安全测试中，"漏洞不存在"是有效的否定结论，不需要继续尝试——请直接总结结果并完成任务。**
 {{ end }}
 --- TASK_EXECUTION_INFO_END ---
 
@@ -236,14 +216,12 @@ func (t *AiTask) execute() error {
      - 用于计划：仅对“当前任务”制定可执行的下一步子步骤清单与完成判据（Done Criteria）。
 
 `, map[string]interface{}{
-				"Progress":                 t.rootTask.Progress(),
-				"CurrentProgress":          t.Progress(),
-				"Nonce":                    nonce,
-				"HasRepeatedExecutionPath": hasRepeatedExecutionPath,
-				"FeedbackMessages":         feedback.String(),
-				"StatusSummary":            t.StatusSummary,
-				"LastVerificationInfo":     lastVerificationInfo,
-				"RecentActions":            recentActionsSummary,
+				"Progress":             t.rootTask.Progress(),
+				"CurrentProgress":      t.Progress(),
+				"Nonce":                nonce,
+				"FeedbackMessages":     feedback.String(),
+				"StatusSummary":        t.StatusSummary,
+				"LastVerificationInfo": lastVerificationInfo,
 			})
 
 			return reactiveData, nil
