@@ -606,10 +606,17 @@ func executeToolBatchSerialFallback(
 			stage = aicommon.ToolCallStageInvokeFailed
 		}
 		result.Outcomes[index] = aicommon.ToolCallOutcome{
-			Index:          call.Index,
-			RequestedTool:  call.ToolName,
-			FinalTool:      call.ToolName,
-			Stage:          stage,
+			Index:         call.Index,
+			RequestedTool: call.ToolName,
+			FinalTool:     call.ToolName,
+			Stage:         stage,
+			ExecutionStatus: func() aitool.ToolExecutionStatus {
+				if toolResult == nil {
+					return ""
+				}
+				status, _ := toolResult.GetExecutionStatus()
+				return status
+			}(),
 			Result:         toolResult,
 			Err:            err,
 			DirectlyAnswer: directlyAnswer,
@@ -662,7 +669,33 @@ func handleToolBatchActionResult(
 
 	outcomes := append([]aicommon.ToolCallOutcome(nil), result.Outcomes...)
 	sort.SliceStable(outcomes, func(i, j int) bool { return outcomes[i].Index < outcomes[j].Index })
-	lines := []string{fmt.Sprintf("Tool batch finished: %d calls", len(request.Calls))}
+	var executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun int
+	for i := range outcomes {
+		outcome := &outcomes[i]
+		if outcome.Result == nil {
+			notRun++
+			continue
+		}
+		if !outcome.Result.Success || outcome.Stage == aicommon.ToolCallStageInvokeFailed {
+			protocolFailed++
+			continue
+		}
+		if outcome.ExecutionStatus == "" {
+			outcome.ExecutionStatus, _ = outcome.Result.GetExecutionStatus()
+		}
+		switch outcome.ExecutionStatus {
+		case aitool.ToolExecutionStatusSucceeded:
+			executionSucceeded++
+		case aitool.ToolExecutionStatusFailed:
+			executionFailed++
+		default:
+			executionUnknown++
+		}
+	}
+	lines := []string{fmt.Sprintf(
+		"Tool batch settled: %d calls; execution_succeeded=%d; execution_failed=%d; execution_unknown=%d; protocol_failed=%d; not_run=%d",
+		len(request.Calls), executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun,
+	)}
 	executedToolCallCount := 0
 	for _, outcome := range outcomes {
 		// Result is assigned only after the ToolCaller returns from the plugin
@@ -683,7 +716,26 @@ func handleToolBatchActionResult(
 		if status == "" {
 			status = "unknown"
 		} else if outcome.Stage == aicommon.ToolCallStageDone {
-			status = "protocol-completed; inspect result"
+			executionStatus := outcome.ExecutionStatus
+			detail := ""
+			if outcome.Result != nil {
+				if executionStatus == "" {
+					executionStatus, detail = outcome.Result.GetExecutionStatus()
+				} else {
+					_, detail = outcome.Result.GetExecutionStatus()
+				}
+			}
+			switch executionStatus {
+			case aitool.ToolExecutionStatusSucceeded:
+				status = "protocol-completed; execution-succeeded"
+			case aitool.ToolExecutionStatusFailed:
+				status = "protocol-completed; execution-failed"
+			default:
+				status = "protocol-completed; execution-outcome-unknown; inspect execution_result"
+			}
+			if detail != "" {
+				status += " (" + detail + ")"
+			}
 		} else if outcome.Stage == aicommon.ToolCallStageInvokeFailed {
 			status = "protocol-error"
 		}

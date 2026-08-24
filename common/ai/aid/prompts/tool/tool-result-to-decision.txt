@@ -24,6 +24,13 @@
 
 {{ .ContextProvider.TimelineWithout .Result.ID }}
 
+## 工具结果状态语义（必须遵守）
+
+1. 严格区分：调用协议结束、工具执行结果、当前任务验收。`Success=true`、`stage=done`、`protocol-completed` 或回调返回，只表示调用协议已经结束。
+2. 必须优先检查 `execution_status` 与 `execution_result`。`execution_status=failed`、`exit_code_accepted=false`、`timed_out=true`、`transport_error` 是明确失败证据，不能总结成“已完成”。
+3. 明确失败的结果只有在它本身就是当前任务期望观察的证据，或已有更晚的独立成功/验收证据时，才可能支持结束当前任务；其他批量成员成功不能抵消该成员失败。
+4. 在 `summary_tool_call_result`、`status_summary` 等压缩字段中，保留执行状态、退出码/超时/传输错误及未解决状态，不能只保留 stdout 中的乐观措辞。
+
 {{ if .ContextProvider.CurrentTask.CanContinue }}
 当前任务可以继续，你需要判断是否需要继续执行当前任务，并输出符合Schema的JSON数据实例。
 1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
@@ -31,9 +38,9 @@
 3. 你可以在 continue-current-task 中通过 status_summary 更新任务状态。
 4. 注意：你必须专注当前任务是否满足需要即可，其他的任务会有别的办法完成。
 {{ else }}
-当前任务已经超过了最大执行次数，你不能在继续执行这个任务了，并输出符合Schema的JSON数据实例。
+当前任务当前无法继续调用工具，请基于已有客观证据输出符合 Schema 的 JSON 数据实例。不要推测或提及任何内部迭代次数、次数限制或剩余预算。
 1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
-2. 你已经超过了单任务的继续执行次数限制，因此需要判断是否此任务可以不再执行，如果满足了一定的效果既可以标记结束或者跳过，继续执行后面的任务
+2. 若缺少完成所需的客观证据，必须明确标记未完成/受阻并保留失败原因，不得因为当前无法继续调用工具而降低验收标准。
 3. 注意：你必须专注当前任务是否满足需要即可，其他的任务会有别的办法完成。
 {{ end}}
 
