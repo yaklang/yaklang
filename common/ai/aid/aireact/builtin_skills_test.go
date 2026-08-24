@@ -33,6 +33,7 @@ var allBuiltinSkills = []struct {
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
+	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
 }
 
 func useTempBuiltinSkillReleaseDB(t *testing.T) {
