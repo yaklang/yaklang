@@ -1,0 +1,22 @@
+__DESC__ = "探测 Java 项目构建系统、主流框架与 CMS，并推荐后续审计工具。"
+__VERBOSE_NAME__ = "Java 项目探测"
+__KEYWORDS__ = "java,audit,probe,framework detection,spring boot,struts,mybatis,Java审计,框架探测"
+
+target = cli.String("target", cli.setRequired(true), cli.setHelp("Java 项目根目录绝对路径"))
+detectionMode = cli.String("detection-mode", cli.setDefault("balanced"), cli.setHelp("permissive | balanced | strict"))
+scopeModules = cli.String("scope-modules", cli.setDefault(""), cli.setHelp("逗号分隔子模块名"))
+scopeExclude = cli.String("scope-exclude", cli.setDefault(""), cli.setHelp("排除路径片段"))
+cmsProducts = cli.String("cms-products", cli.setDefault(""), cli.setHelp("强制 CMS id"))
+dedupeFindings = cli.String("dedupe-findings", cli.setDefault("true"))
+cli.check()
+
+opts = [codeaudit.withLanguage("java"), codeaudit.withDetectionMode(detectionMode)]
+if scopeModules != "" { opts = append(opts, codeaudit.withScopeModules(scopeModules)) }
+if scopeExclude != "" { opts = append(opts, codeaudit.withScopeExclude(scopeExclude)) }
+if cmsProducts != "" { opts = append(opts, codeaudit.withCmsProducts(cmsProducts)) }
+if dedupeFindings != "" { opts = append(opts, codeaudit.withDedupeFindings(dedupeFindings != "false")) }
+
+report = codeaudit.ProbeProject(target, opts...)
+out = json.dumps(report)
+yakit.AIOutput(out)
+println(out)
