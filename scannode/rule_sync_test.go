@@ -35,6 +35,16 @@ func TestRuleSyncClientRejectsOversizedResponseBeforeReadingBody(t *testing.T) {
 	}
 }
 
+func TestWithRuleSnapshotCacheDirTrimsConfiguredPath(t *testing.T) {
+	t.Parallel()
+
+	var options scanNodeOptions
+	WithRuleSnapshotCacheDir("  /tmp/node-a/rule-cache  ")(&options)
+	if got, want := options.ruleSnapshotCacheDir, "/tmp/node-a/rule-cache"; got != want {
+		t.Fatalf("rule snapshot cache dir = %q, want %q", got, want)
+	}
+}
+
 func TestRuleSyncClientGetActiveSnapshot(t *testing.T) {
 	t.Parallel()
 
