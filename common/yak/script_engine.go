@@ -59,6 +59,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/chaosmaker"
+	"github.com/yaklang/yaklang/common/codeaudit"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/crawlerx"
@@ -331,6 +332,8 @@ func initYaklangLib() {
 	// sca
 	yaklang.Import("sca", sca.Exports)
 
+	// codeaudit
+	yaklang.Import("codeaudit", codeaudit.Exports)
 	// git
 	yaklang.Import("git", yakgit.Exports)
 
