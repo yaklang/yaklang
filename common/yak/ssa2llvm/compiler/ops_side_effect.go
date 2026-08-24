@@ -75,13 +75,33 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 	// `retry(100, f); count` where f mutates the captured count) refers to a
 	// value owned by the closure function. Resolve it through the closure's
 	// free-value slots instead of the cross-function fallback (which returns 0).
-	if closureVal, index, byRef, ok := c.resolveClosureSideEffect(inst, actualID); ok {
-		readFn, readType := c.getOrInsertRuntimeReadClosureFreeValue()
-		idx := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(index), false)
-		byRefWord := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-		if byRef {
-			byRefWord = llvm.ConstInt(c.LLVMCtx.Int64Type(), 1, false)
+	closureVal, closureIndex, closureByRef, closureOK := c.resolveClosureSideEffect(inst, actualID)
+	if closureOK {
+		if closureByRef {
+			// Redirect this side-effect's storage to the closure's heap
+			// free-value slot: reads at ANY later program point (including
+			// after the closure is invoked indirectly through a wrapper such
+			// as filesys.onFileStat -> Recursive) observe the final value.
+			slotFn, slotType := c.getOrInsertRuntimeGetClosureFreeSlot()
+			idx := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(closureIndex), false)
+			slotRaw := c.Builder.CreateCall(slotType, slotFn, []llvm.Value{
+				c.coerceToInt64(closureVal), idx,
+			}, fmt.Sprintf("yak_closure_fv_slot_%d", inst.GetId()))
+			i64Ptr := llvm.PointerType(c.LLVMCtx.Int64Type(), 0)
+			heapPtr := c.Builder.CreateIntToPtr(c.coerceToInt64(slotRaw), i64Ptr, fmt.Sprintf("yak_closure_fv_slotp_%d", inst.GetId()))
+			if c.function.redirectedSlots == nil {
+				c.function.redirectedSlots = make(map[int64]llvm.Value)
+			}
+			c.function.redirectedSlots[inst.GetId()] = heapPtr
+			if c.function.storedValues == nil {
+				c.function.storedValues = make(map[int64]struct{})
+			}
+			c.function.storedValues[inst.GetId()] = struct{}{}
+			return c.maybeEmitMemberSet(inst, inst, inst.GetId())
 		}
+		readFn, readType := c.getOrInsertRuntimeReadClosureFreeValue()
+		idx := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(closureIndex), false)
+		byRefWord := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 		val := c.Builder.CreateCall(readType, readFn, []llvm.Value{
 			c.coerceToInt64(closureVal), idx, byRefWord,
 		}, fmt.Sprintf("yak_closure_fv_read_%d", inst.GetId()))
@@ -125,10 +145,30 @@ func (c *Compiler) resolveClosureSideEffect(inst *ssa.SideEffect, actualID int64
 	if closureFn == nil || closureFn == fn {
 		return llvm.Value{}, 0, false, false
 	}
+	// The modified value's variable name comes from the side-effect
+	// instruction's own variable bindings (e.g. `files` for
+	// `files = append(files, x)`), not from the modified value's id: the
+	// value belongs to the closure function and its id is the closure-local
+	// append result, which never equals the caller's free-value binding id.
+	modifyName := ""
+	if vars := inst.GetAllVariables(); len(vars) > 0 {
+		for name := range vars {
+			modifyName = name
+			break
+		}
+	}
+	if modifyName == "" {
+		if last := inst.GetLastVariable(); last != nil {
+			modifyName = last.GetName()
+		}
+	}
+	if modifyName == "" {
+		return llvm.Value{}, 0, false, false
+	}
 	index := -1
 	byRef := false
 	for i, binding := range callframe.OrderedFreeValueBindings(closureFn) {
-		if binding.Variable.GetValue().GetId() != actualID {
+		if binding.Variable.GetName() != modifyName {
 			continue
 		}
 		index = i
@@ -153,6 +193,17 @@ func (c *Compiler) resolveClosureSideEffect(inst *ssa.SideEffect, actualID int64
 		}
 	}
 	return llvm.Value{}, 0, false, false
+}
+
+func (c *Compiler) getOrInsertRuntimeGetClosureFreeSlot() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeGetClosureFreeSlotSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
 }
 
 func (c *Compiler) getOrInsertRuntimeReadClosureFreeValue() (llvm.Value, llvm.Type) {
@@ -236,15 +287,4 @@ func (c *Compiler) resolveSideEffectActualValue(inst *ssa.SideEffect) ssa.Value 
 		return nil
 	}
 	return value
-}
-
-func coerceLLVMValueSliceToI64(c *Compiler, vals []llvm.Value) []llvm.Value {
-	if c == nil {
-		return vals
-	}
-	out := make([]llvm.Value, 0, len(vals))
-	for _, v := range vals {
-		out = append(out, c.coerceToInt64(v))
-	}
-	return out
 }

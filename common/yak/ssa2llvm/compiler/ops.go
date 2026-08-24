@@ -620,19 +620,41 @@ func (c *Compiler) applyClosureSideEffectWriteback(fn *ssa.Function, contextInst
 	if fn == nil || c.function == nil || c.function.freeValuePointers == nil {
 		return nil
 	}
+	var retBlock *ssa.BasicBlock
+	if contextInst != nil {
+		retBlock = contextInst.GetBlock()
+	}
+	if retBlock == nil && c.function != nil && c.function.activeBlockID > 0 {
+		if blockInst, ok := fn.GetInstructionById(c.function.activeBlockID); ok {
+			if blk, ok := ssa.ToBasicBlock(blockInst); ok {
+				retBlock = blk
+			}
+		}
+	}
 	for _, ser := range fn.SideEffectsReturn {
 		for variable, se := range ser {
 			if variable == nil || se == nil || se.Modify <= 0 {
 				continue
 			}
+			// Only write back on return paths where the modification actually
+			// executed: an early-return branch that skips the assignment (e.g.
+			// `if dir { return }` before `files = append(files, x)`) must not
+			// clobber the free-value slot with an uninitialized value. The
+			// modified value's defining block dominates the return iff every
+			// path to the return executed the side effect.
+			if !c.sideEffectModifyDominates(fn, se, retBlock) {
+				continue
+			}
 			for _, binding := range callframe.OrderedFreeValueBindings(fn) {
-				paramDefault := int64(0)
-				if p, ok := fn.GetValueById(binding.ValueID); ok {
-					if param, ok := ssa.ToParameter(p); ok && param != nil && param.GetDefault() != nil {
-						paramDefault = param.GetDefault().GetId()
+				// Match the side-effect's variable to the free-value binding by
+				// name: the binding's variable value is the free-value
+				// parameter, which differs from the modified value when the
+				// captured variable is reassigned (e.g. files = append(files, x)).
+				if se.Variable != nil && binding.Variable != nil {
+					if se.Variable.GetName() != binding.Variable.GetName() {
+						continue
 					}
-				}
-				if paramDefault != se.Modify && binding.Variable.GetValue().GetId() != se.Modify {
+				} else if se.Name != binding.Name {
 					continue
 				}
 				ptr, ok := c.function.freeValuePointers[binding.ValueID]
@@ -649,6 +671,108 @@ func (c *Compiler) applyClosureSideEffectWriteback(fn *ssa.Function, contextInst
 		}
 	}
 	return nil
+}
+
+// sideEffectModifyDominates reports whether the block defining the side
+// effect's modified value dominates the return instruction's block, i.e. the
+// modification is guaranteed to have executed on every path reaching the
+// return. A nil defining block (e.g. a constant) is treated as dominating so
+// constant assignments keep their previous writeback behavior.
+func (c *Compiler) sideEffectModifyDominates(fn *ssa.Function, se *ssa.FunctionSideEffect, retBlock *ssa.BasicBlock) bool {
+	if fn == nil || se == nil || se.Modify <= 0 || retBlock == nil {
+		return false
+	}
+	modifyVal, ok := fn.GetValueById(se.Modify)
+	if !ok || modifyVal == nil {
+		return false
+	}
+	modifyBlock := modifyVal.GetBlock()
+	if modifyBlock == nil {
+		return true
+	}
+	return blockDominatesInFunction(fn, modifyBlock, retBlock)
+}
+
+// blockDominatesInFunction reports whether block a dominates block b in fn's
+// CFG: every path from the function entry to b passes through a.
+func blockDominatesInFunction(fn *ssa.Function, a, b *ssa.BasicBlock) bool {
+	if fn == nil || a == nil || b == nil {
+		return false
+	}
+	if a.GetId() == b.GetId() {
+		return true
+	}
+	// Classic iterative dominator dataflow over the function's block graph:
+	// dom[b] = {b} ∪ (∩ dom[p] for p in preds(b)), iterated to a fixpoint.
+	entryID := fn.EnterBlock
+	blockIDs := fn.Blocks
+	dom := make(map[int64]map[int64]struct{}, len(blockIDs))
+	for _, id := range blockIDs {
+		dom[id] = make(map[int64]struct{})
+	}
+	if d, ok := dom[entryID]; ok {
+		d[entryID] = struct{}{}
+	}
+	changed := true
+	for changed {
+		changed = false
+		for _, id := range blockIDs {
+			if id == entryID {
+				continue
+			}
+			blockInst, ok := fn.GetInstructionById(id)
+			if !ok || blockInst == nil {
+				continue
+			}
+			block, ok := ssa.ToBasicBlock(blockInst)
+			if !ok || block == nil {
+				continue
+			}
+			newDom := make(map[int64]struct{})
+			newDom[id] = struct{}{}
+			first := true
+			for _, pred := range block.Preds {
+				predDom, ok := dom[pred]
+				if !ok {
+					continue
+				}
+				if first {
+					for k := range predDom {
+						newDom[k] = struct{}{}
+					}
+					first = false
+				} else {
+					for k := range newDom {
+						if _, ok := predDom[k]; !ok {
+							delete(newDom, k)
+						}
+					}
+				}
+			}
+			if !domSetEqual(dom[id], newDom) {
+				dom[id] = newDom
+				changed = true
+			}
+		}
+	}
+	domB, ok := dom[b.GetId()]
+	if !ok {
+		return false
+	}
+	_, dominates := domB[a.GetId()]
+	return dominates
+}
+
+func domSetEqual(a, b map[int64]struct{}) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if _, ok := b[k]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
