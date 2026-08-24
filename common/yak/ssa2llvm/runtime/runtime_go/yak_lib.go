@@ -112,6 +112,18 @@ func yak_runtime_make_callable(fn uintptr, paramMemberCount int64, freeCount int
 	})))
 }
 
+//export yak_runtime_get_closure_free_slot
+func yak_runtime_get_closure_free_slot(closureRaw uint64, index int64) int64 {
+	defer recoverRuntimePanic()
+	closure, ok := runtimeCallableClosureValueFromRaw(closureRaw)
+	if !ok || index < 0 || int(index) >= len(closure.freeValues) {
+		return 0
+	}
+	// By-reference captures store a slot pointer; return it so the compiler
+	// can redirect the caller's variable reads through the same heap slot.
+	return int64(closure.freeValues[index])
+}
+
 //export yak_runtime_read_closure_free_value
 func yak_runtime_read_closure_free_value(closureRaw uint64, index int64, byRef int64) int64 {
 	defer recoverRuntimePanic()
@@ -413,7 +425,13 @@ func valueForSet(targetType reflect.Type, val int64) (reflect.Value, bool) {
 	}
 	switch targetType.Kind() {
 	case reflect.Interface:
-		return reflect.ValueOf(val), true
+		// Only the empty interface accepts any value directly. A non-empty
+		// interface (e.g. error) must not receive a raw int64 word; callers
+		// fall back to a zero value instead.
+		if targetType.NumMethod() == 0 {
+			return reflect.ValueOf(val), true
+		}
+		return reflect.Value{}, false
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		ret := reflect.New(targetType).Elem()
 		ret.SetInt(val)

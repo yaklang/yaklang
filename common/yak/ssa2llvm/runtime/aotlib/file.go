@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func FileIsExisted(path string) bool {
@@ -25,7 +26,18 @@ func FileIsDir(path string) bool {
 func FileJoin(parts ...string) string        { return filepath.Join(parts...) }
 func FileGetBase(path string) string         { return filepath.Base(path) }
 func FileGetExt(path string) string          { return filepath.Ext(path) }
-func FileGetDirPath(path string) string      { return filepath.Dir(path) }
+func FileGetDirPath(path string) string {
+	// Match yaklib's file.GetDirPath: return the directory WITH the trailing
+	// separator ("" stays "").
+	dirPath := filepath.Dir(path)
+	if dirPath == "" {
+		return dirPath
+	}
+	if strings.HasSuffix(dirPath, string(os.PathSeparator)) {
+		return dirPath
+	}
+	return dirPath + string(os.PathSeparator)
+}
 func FileClean(path string) string           { return filepath.Clean(path) }
 func FileIsAbs(path string) bool             { return filepath.IsAbs(path) }
 func FileSplit(path string) (string, string) { return filepath.Split(path) }
