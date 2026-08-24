@@ -1199,6 +1199,7 @@ func TestGenerateIntervalReviewPrompt_UsesOnlyBoundedRecentTimeline(t *testing.T
 	)
 	require.NoError(t, err)
 	react.AddToTimeline("note", "ANCIENT_INTERVAL_CONTEXT "+strings.Repeat("old ", 12000))
+	react.AddToTimeline("[LOOP_STALL_DETECTED]", "main loop has not advanced; waiting on tool")
 	react.AddToTimeline("note", "RECENT_INTERVAL_FACT")
 
 	tool := aitool.NewWithoutCallback(
@@ -1219,6 +1220,7 @@ func TestGenerateIntervalReviewPrompt_UsesOnlyBoundedRecentTimeline(t *testing.T
 	require.Contains(t, prompt, "RECENT_INTERVAL_FACT")
 	require.NotContains(t, prompt, "ANCIENT_INTERVAL_CONTEXT")
 	require.NotContains(t, prompt, "Timeline Memory (Frozen)")
+	require.NotContains(t, prompt, "LOOP_STALL_DETECTED")
 	promptTokens := aicommon.MeasureTokens(prompt)
 	t.Logf("bounded interval-review prompt tokens: %d", promptTokens)
 	require.LessOrEqual(t, promptTokens, 9000)
@@ -1264,7 +1266,7 @@ func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
 	}
 }
 
-func TestGenerateIntervalReviewPrompt_GrepKeepsLongSearchHint(t *testing.T) {
+func TestGenerateIntervalReviewPrompt_GrepOmitsLongSearchHint(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -1293,8 +1295,9 @@ func TestGenerateIntervalReviewPrompt_GrepKeepsLongSearchHint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateIntervalReviewPromptWithContext failed: %v", err)
 	}
-	require.Contains(t, prompt, "LOOP_STALL_DETECTED")
-	require.Contains(t, prompt, "start banner")
+	require.NotContains(t, prompt, "LOOP_STALL_DETECTED")
+	require.NotContains(t, prompt, "start banner")
+	require.Contains(t, prompt, "(no recent Timeline items)")
 }
 
 // TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法
