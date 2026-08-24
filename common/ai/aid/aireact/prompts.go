@@ -942,11 +942,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 		return "", err
 	}
 	recentTimeline := ""
-	if tool != nil && isLongRunningSearchTool(tool.Name) {
-		// Parent-loop Timeline is not a progress signal for grep/find_file/tree.
-		// LOOP_STALL_DETECTED usually means the ReAct loop is waiting on this tool.
-		recentTimeline = "<|TIMELINE_RECENT|>\n(no recent Timeline items)\n<|TIMELINE_RECENT_END|>"
-	} else if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
+	if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
 		recentTimeline = stripLoopStallFromIntervalReviewTimeline(
 			pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens),
 		)
