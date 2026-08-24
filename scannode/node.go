@@ -34,12 +34,21 @@ var scanNodeTaskDrainTimeout = 30 * time.Second
 type ScanNodeOption func(*scanNodeOptions)
 
 type scanNodeOptions struct {
-	runtimeHost RuntimeHostConfig
+	runtimeHost          RuntimeHostConfig
+	ruleSnapshotCacheDir string
 }
 
 func WithRuntimeHost(cfg RuntimeHostConfig) ScanNodeOption {
 	return func(options *scanNodeOptions) {
 		options.runtimeHost = cfg
+	}
+}
+
+// WithRuleSnapshotCacheDir isolates the immutable snapshot bundle cache for a
+// node installation. An empty value keeps the legacy user-home default.
+func WithRuleSnapshotCacheDir(cacheDir string) ScanNodeOption {
+	return func(options *scanNodeOptions) {
+		options.ruleSnapshotCacheDir = strings.TrimSpace(cacheDir)
 	}
 }
 
@@ -74,6 +83,7 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 	agent.ruleSyncClient = NewRuleSyncClient(&RuleSyncConfig{
 		ServerURL:   cfg.PlatformAPIBaseURL,
 		SyncEnabled: true,
+		CacheDir:    resolvedOptions.ruleSnapshotCacheDir,
 		Client:      cfg.HTTPClient,
 	})
 	existingHook := cfg.PostBootstrapHook

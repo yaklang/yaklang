@@ -980,7 +980,7 @@ var DistributionCommands = []*cli.Command{
 				Version:             c.String("version"),
 				MaxRunningJobs:      uint32(c.Int("max-running-jobs")),
 				HeartbeatInterval:   c.Duration("heartbeat-interval"),
-			})
+			}, scannode.WithRuleSnapshotCacheDir(c.String("rule-snapshot-cache-dir")))
 			if err != nil {
 				return err
 			}
@@ -1029,6 +1029,10 @@ var DistributionCommands = []*cli.Command{
 			cli.StringFlag{
 				Name:  "base-dir",
 				Usage: "Node local state base directory",
+			},
+			cli.StringFlag{
+				Name:  "rule-snapshot-cache-dir",
+				Usage: "Immutable rule snapshot bundle cache directory",
 			},
 			cli.StringFlag{
 				Name:  "version",

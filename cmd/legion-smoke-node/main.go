@@ -69,6 +69,11 @@ func runNode(args []string) error {
 	runtimeHost := flags.Bool("runtime-host", environmentBool("LEGION_RUNTIME_HOST"), "Allow this node to run AI session containers using its local Docker Engine")
 	runtimeNetwork := flags.String("runtime-network", environmentValue("LEGION_RUNTIME_NETWORK", "bridge"), "Fixed local Docker network for AI session containers")
 	baseDir := flags.String("base-dir", "", "Node local state base directory")
+	ruleSnapshotCacheDir := flags.String(
+		"rule-snapshot-cache-dir",
+		strings.TrimSpace(os.Getenv("LEGION_RULE_SNAPSHOT_CACHE_DIR")),
+		"Immutable rule snapshot bundle cache directory",
+	)
 	version := flags.String("version", "smoke", "Node version")
 	engineReleaseID := flags.String("engine-release-id", strings.TrimSpace(os.Getenv("ENGINE_RELEASE_ID")), "Installed unified Yaklang release ID")
 	engineDigest := flags.String("engine-digest", strings.TrimSpace(os.Getenv("ENGINE_RELEASE_SHA256")), "Installed Yaklang Node binary SHA-256")
@@ -171,7 +176,9 @@ func runNode(args []string) error {
 		postBootstrapHook = buildAISessionRegisterHook()
 	}
 
-	scanNodeOptions := []scannode.ScanNodeOption{}
+	scanNodeOptions := []scannode.ScanNodeOption{
+		scannode.WithRuleSnapshotCacheDir(*ruleSnapshotCacheDir),
+	}
 	if *runtimeHost && strings.TrimSpace(*kind) != "ai_session" {
 		scanNodeOptions = append(scanNodeOptions, scannode.WithRuntimeHost(scannode.RuntimeHostConfig{
 			Enabled: true, PlatformAPIBaseURL: *apiURL, RuntimePlatformAPIBaseURL: *runtimeAPIURL, EnrollmentToken: *enrollmentToken,
