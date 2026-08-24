@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
+	pluginv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1"
 )
 
 type ScriptExecutionRequest struct {
@@ -27,6 +28,7 @@ type ScriptExecutionRequest struct {
 	ScriptContent   string
 	ScriptJSONParam string
 	ScriptLabels    map[string]string
+	PluginBundle    *pluginv1.PluginBundleRef
 	DebugEnabled    bool
 	DebugDir        string
 }
@@ -66,11 +68,21 @@ func (s *ScanNode) executeScriptTask(
 		s,
 	)
 	keyValues := s.parseScriptParams(input.ScriptJSONParam)
+	// plugin_bundle_path is a platform-owned local capability. Never honor a
+	// job-provided path, even when no immutable bundle reference was dispatched.
+	delete(keyValues, "plugin_bundle_path")
 	cleanupSourcePayload, err := s.prepareManagedSourcePayload(taskCtx, keyValues)
 	if err != nil {
 		return nil, err
 	}
 	defer cleanupSourcePayload()
+	pluginBundlePath, err := s.preparePluginBundle(taskCtx, input.PluginBundle)
+	if err != nil {
+		return nil, err
+	}
+	if pluginBundlePath != "" {
+		keyValues["plugin_bundle_path"] = pluginBundlePath
+	}
 	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
 	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {

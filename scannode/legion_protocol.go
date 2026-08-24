@@ -15,7 +15,6 @@ const (
 	legionCommandHIDSCurrentStateCollect              = "hids.current_state.collect"
 	legionCommandHIDSFileEvidenceCollect              = "hids.file_evidence.collect"
 	legionCommandSSARuleSyncExport                    = "ssa.rule_sync.export"
-	legionCommandPluginGroupsList                     = "plugin.groups.list"
 	legionCommandPluginStoreSync                      = "plugin.store.sync"
 	legionCommandPluginStoreSyncStatusQuery           = "plugin.store.sync.status"
 	legionCommandPluginStoreImport                    = "plugin.store.import"
@@ -251,8 +250,6 @@ const (
 
 const legionRealtimeHIDSDesiredSpecDryRunResultPrefix = legionRealtimePrefix + ".hids.desired_spec_dry_run.result"
 
-const legionRealtimePluginGroupsResultPrefix = legionRealtimePrefix + ".plugin.groups.result"
-
 const legionRealtimePluginStoreSyncResultPrefix = legionRealtimePrefix + ".plugin.store.sync.result"
 
 func commandSubjectWildcard(base string) string {
@@ -280,14 +277,6 @@ func hidsDesiredSpecDryRunResultSubject(commandID string) string {
 		return legionRealtimeHIDSDesiredSpecDryRunResultPrefix
 	}
 	return legionRealtimeHIDSDesiredSpecDryRunResultPrefix + "." + commandID
-}
-
-func pluginGroupsResultSubject(commandID string) string {
-	commandID = strings.TrimSpace(commandID)
-	if commandID == "" {
-		return legionRealtimePluginGroupsResultPrefix
-	}
-	return legionRealtimePluginGroupsResultPrefix + "." + commandID
 }
 
 func pluginStoreSyncResultSubject(commandID string) string {

@@ -280,8 +280,6 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleHIDSResponseActionExecute(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
 		return b.handleSSARuleSyncExport(ctx, message.Data)
-	case strings.HasSuffix(message.Subject, "."+legionCommandPluginGroupsList):
-		return b.handlePluginGroupsList(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSync):
 		return b.handlePluginStoreSync(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSyncStatusQuery):

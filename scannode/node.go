@@ -20,6 +20,7 @@ type ScanNode struct {
 	manager           *TaskManager
 	capabilityManager *CapabilityManager
 	ruleSyncClient    ruleSyncer
+	pluginBundles     pluginBundleInstaller
 	httpClient        *http.Client
 	invokeLimiter     *invokeLimiter
 	maxRunningJobs    uint32
@@ -90,6 +91,14 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 	}
 
 	agent.node = base
+	agent.pluginBundles, err = NewPluginBundleManager(PluginBundleManagerConfig{
+		BaseDir: base.BaseDir(),
+		Client:  cfg.HTTPClient,
+	})
+	if err != nil {
+		base.Shutdown()
+		return nil, utils.Errorf("initialize plugin bundle manager: %v", err)
+	}
 	agent.ssaGitOwnerScope, agent.ssaGitScopeLock, err = recoverSSAGitWorkspacesForInstallation(base.AgentInstallationID())
 	if err != nil {
 		base.Shutdown()

@@ -4,6 +4,7 @@ package legion.job.v1;
 
 import "google/protobuf/timestamp.proto";
 import "legion/node/v1/node.proto";
+import "legion/plugin/v1/plugin.proto";
 
 option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1;jobv1";
 
@@ -36,6 +37,7 @@ message DispatchJobCommand {
   bytes input_json = 6;
   map<string, string> labels = 7;
   InlineScript script = 8;
+  legion.plugin.v1.PluginBundleRef plugin_bundle = 9;
 }
 
 message CancelJobCommand {

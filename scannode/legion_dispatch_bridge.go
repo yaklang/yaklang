@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,8 +10,12 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/yaklang/yaklang/common/log"
+	commonbundle "github.com/yaklang/yaklang/common/pluginbundle"
 	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
+	pluginv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1"
 )
+
+const pluginBundleManifestSchemaVersion = "legion_plugin_bundle.v1"
 
 func (b *legionJobBridge) handleDispatch(
 	ctx context.Context,
@@ -56,6 +61,7 @@ func (b *legionJobBridge) executeDispatch(
 			ScriptContent:   command.GetScript().GetContent(),
 			ScriptJSONParam: normalizeInputJSON(command.GetInputJson()),
 			ScriptLabels:    command.GetLabels(),
+			PluginBundle:    command.GetPluginBundle(),
 			DebugEnabled:    isDebugEnabled(command.GetLabels()),
 			DebugDir:        resolveDebugDir(command.GetLabels()),
 		},
@@ -142,8 +148,37 @@ func validateDispatchCommand(
 	case strings.TrimSpace(command.GetScript().GetContent()) == "":
 		return fmt.Errorf("dispatch script content is required")
 	default:
-		return validateDispatchExecutionKind(command.GetExecutionKind())
+		if err := validateDispatchExecutionKind(command.GetExecutionKind()); err != nil {
+			return err
+		}
+		return validatePluginBundleRef(command.GetPluginBundle())
 	}
+}
+
+func validatePluginBundleRef(ref *pluginv1.PluginBundleRef) error {
+	if ref == nil {
+		return nil
+	}
+	if strings.TrimSpace(ref.GetBundleId()) == "" {
+		return fmt.Errorf("plugin bundle_id is required")
+	}
+	digest, err := hex.DecodeString(strings.TrimSpace(ref.GetArtifactSha256()))
+	if err != nil || len(digest) != 32 {
+		return fmt.Errorf("plugin bundle artifact_sha256 is invalid")
+	}
+	if ref.GetArtifactSizeBytes() <= 0 || ref.GetArtifactSizeBytes() > commonbundle.MaxArtifactSize {
+		return fmt.Errorf("plugin bundle artifact_size_bytes is outside the allowed range")
+	}
+	if ref.GetItemCount() <= 0 || ref.GetItemCount() > commonbundle.MaxMemberCount {
+		return fmt.Errorf("plugin bundle item_count is outside the allowed range")
+	}
+	if strings.TrimSpace(ref.GetArchiveFormat()) != "zip" {
+		return fmt.Errorf("unsupported plugin bundle archive_format: %s", ref.GetArchiveFormat())
+	}
+	if strings.TrimSpace(ref.GetSchemaVersion()) != pluginBundleManifestSchemaVersion {
+		return fmt.Errorf("unsupported plugin bundle schema_version: %s", ref.GetSchemaVersion())
+	}
+	return nil
 }
 
 func (b *legionJobBridge) publishDispatchFailure(

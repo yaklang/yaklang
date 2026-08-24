@@ -169,7 +169,7 @@ func (p *capabilityEventPublisher) PublishResponseActionResult(
 }
 
 // PublishRaw 在核心 NATS（非 JetStream）上发布一条实时结果消息，
-// 供平台同步等待的查询命令（如 plugin.groups.list）按 commandID 派生 subject 接收。
+// 供平台同步等待的查询命令按 commandID 派生 subject 接收。
 func (p *capabilityEventPublisher) PublishRaw(ctx context.Context, subject string, raw []byte) error {
 	session, ok := p.node.GetSessionState()
 	if !ok {
