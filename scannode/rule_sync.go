@@ -141,9 +141,9 @@ type RuleSnapshotItem struct {
 	Solution      string          `json:"solution,omitempty"`
 	Version       string          `json:"version,omitempty"`
 	ContentHash   string          `json:"content_hash,omitempty"`
-	IsBuiltin     bool            `json:"is_builtin"`
-	Verified      bool            `json:"verified"`
-	AllowIncluded bool            `json:"allow_included"`
+	IsBuiltin     bool            `json:"is_builtin,omitempty"`
+	Verified      bool            `json:"verified,omitempty"`
+	AllowIncluded bool            `json:"allow_included,omitempty"`
 	IncludedName  string          `json:"included_name,omitempty"`
 	Groups        []string        `json:"groups,omitempty"`
 	AlertDesc     json.RawMessage `json:"alert_desc,omitempty"`
