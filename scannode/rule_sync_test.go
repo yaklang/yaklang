@@ -215,7 +215,7 @@ func TestRuleSnapshotCanonicalDigestMatchesLegionContract(t *testing.T) {
 			Content: `desc(title: "A");`,
 		},
 	}
-	canonicalJSON := `[{"asset_id":"asset-a","source_rule_id":"source-a","name":"a-rule","title":"A","title_zh":"甲","language":"java","purpose":"audit","tag":"cwe|owasp","cwe":["CWE-89"],"cve":"CVE-1","risk_type":"sqli","type":"sf","severity":"high","description":"desc","solution":"fix","version":"1","content_hash":"source-hash","is_builtin":true,"verified":true,"allow_included":true,"included_name":"lib-a","groups":["java"],"alert_desc":{"risk":{"title":"A"}},"content":"desc(title: \"A\");"},{"asset_id":"asset-z","name":"z-rule","is_builtin":false,"verified":false,"allow_included":false,"content":"desc(title: \"Z\");"}]`
+	canonicalJSON := `[{"asset_id":"asset-a","source_rule_id":"source-a","name":"a-rule","title":"A","title_zh":"甲","language":"java","purpose":"audit","tag":"cwe|owasp","cwe":["CWE-89"],"cve":"CVE-1","risk_type":"sqli","type":"sf","severity":"high","description":"desc","solution":"fix","version":"1","content_hash":"source-hash","is_builtin":true,"verified":true,"allow_included":true,"included_name":"lib-a","groups":["java"],"alert_desc":{"risk":{"title":"A"}},"content":"desc(title: \"A\");"},{"asset_id":"asset-z","name":"z-rule","content":"desc(title: \"Z\");"}]`
 	raw, err := json.Marshal(canonicalRuleSnapshotItems(items))
 	if err != nil {
 		t.Fatalf("marshal canonical items: %v", err)
