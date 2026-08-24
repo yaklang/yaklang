@@ -219,18 +219,30 @@ dirCount = 0
 fileCount = 0
 truncated = false
 
+// Normalize separators before computing relative depth. AI often passes
+// forward-slash paths (C:/proj) while filesys.Recursive on Windows yields
+// native paths (C:\proj\src\file.go). TrimPrefix then fails, the full
+// absolute path is treated as relative, and default max-depth=6 drops
+// almost every entry during reconnaissance.
+normalizeTreePath = (p) => {
+    return str.TrimRight(str.ReplaceAll(p, "\\", "/"), "/")
+}
+rootPath = normalizeTreePath(path)
+
 filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
     defer func { recover() }
 
     if truncated { return }
 
-    // Get relative path
-    relPath = str.TrimPrefix(pathname, path)
-    relPath = str.TrimLeft(relPath, "/\\")
-    if relPath == "" { return } // skip root itself
+    fullPath = normalizeTreePath(pathname)
+    if fullPath == rootPath { return } // skip root itself
 
-    // Normalize path separators
-    relPath = str.ReplaceAll(relPath, "\\", "/")
+    prefix = rootPath + "/"
+    if !str.HasPrefix(fullPath, prefix) {
+        return
+    }
+    relPath = str.TrimPrefix(fullPath, prefix)
+    if relPath == "" { return }
 
     // Get entry name (last component)
     parts = str.Split(relPath, "/")
