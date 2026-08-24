@@ -70,6 +70,16 @@ func (s *MCPServer) getProfileDatabase() *gorm.DB {
 	return s.profileDB
 }
 
+// getProjectDatabase resolves the project database at call time. Yakit can
+// switch projects while an MCP server is still running, so tool handlers must
+// not retain the handle that was current when the MCP server started.
+func (s *MCPServer) getProjectDatabase() *gorm.DB {
+	if s.projectDBProvider != nil {
+		return s.projectDBProvider()
+	}
+	return s.projectDB
+}
+
 func marshalMCPHistoryValue(value any) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {

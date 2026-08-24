@@ -285,18 +285,8 @@ func applyHTTPFlowQueryDefaults(req *ypb.QueryHTTPFlowRequest) {
 	}
 }
 
-func currentHTTPFlowProjectDB(s *MCPServer) *gorm.DB {
-	if s == nil {
-		return nil
-	}
-	if s.projectDBProvider != nil {
-		return s.projectDBProvider()
-	}
-	return s.projectDB
-}
-
 func queryHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowResponse, error) {
-	db := currentHTTPFlowProjectDB(s)
+	db := s.getProjectDatabase()
 	if db == nil {
 		return s.grpcClient.QueryHTTPFlows(ctx, req)
 	}
@@ -328,7 +318,7 @@ func queryHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.QueryHTTPFlowReq
 }
 
 func setTagForHTTPFlow(ctx context.Context, s *MCPServer, req *ypb.SetTagForHTTPFlowRequest) error {
-	db := currentHTTPFlowProjectDB(s)
+	db := s.getProjectDatabase()
 	if db == nil {
 		_, err := s.grpcClient.SetTagForHTTPFlow(ctx, req)
 		return err
@@ -347,7 +337,7 @@ func setTagForHTTPFlow(ctx context.Context, s *MCPServer, req *ypb.SetTagForHTTP
 }
 
 func deleteHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.DeleteHTTPFlowRequest) error {
-	db := currentHTTPFlowProjectDB(s)
+	db := s.getProjectDatabase()
 	if db == nil {
 		_, err := s.grpcClient.DeleteHTTPFlows(ctx, req)
 		return err
