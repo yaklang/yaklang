@@ -28,6 +28,7 @@ func TestCoordinator_AICallSummaryEvent(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"test-ai-call-summary",
+		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outChan.SafeFeed(event)
