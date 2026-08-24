@@ -39,6 +39,12 @@ type functionCompileContext struct {
 	// passed as call arguments (extern/yaklib callbacks). SideEffects after
 	// the call read captured variables from these slots as well.
 	materializedClosureArgs map[int64][]llvm.Value
+	// redirectedSlots maps an SSA value id whose storage was redirected to a
+	// closure's heap free-value slot. Reads/writes of that id go through the
+	// heap slot, so closures invoked indirectly (filesys/zip callbacks)
+	// propagate scalar mutations to the caller without a direct call-site
+	// side-effect readback.
+	redirectedSlots map[int64]llvm.Value
 
 	exceptionValueIDs    map[int64]struct{}
 	activeHandlerByBlock map[int64]int64
