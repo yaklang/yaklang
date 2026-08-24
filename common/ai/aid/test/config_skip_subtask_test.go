@@ -1110,6 +1110,7 @@ func TestCoordinator_RedoSubtaskInPlan_MissingUserMessage(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"测试重做子任务缺少用户消息",
+		testAIRetryWaitOption(),
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {

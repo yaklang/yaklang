@@ -214,6 +214,7 @@ type Config struct {
 	AiCallTokenLimit       int64
 	AiAutoRetry            int64
 	AiTransactionAutoRetry int64
+	aiRetryWaitFunc        func(context.Context, time.Duration) error
 	PromptHook             func(string) string
 
 	/*
@@ -679,6 +680,7 @@ func newConfig(ctx context.Context) *Config {
 		m:                                  new(sync.Mutex),
 		InitStatus:                         initStatus,
 		AiCallTokenLimit:                   40 * 1024, // Default to 40 k
+		aiRetryWaitFunc:                    aiRetryWaitFuncFromContext(ctx),
 		SessionPromptState:                 NewSessionPromptState(),
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
@@ -1130,6 +1132,31 @@ func WithAITransactionAutoRetry(n int64) ConfigOption {
 		c.m.Unlock()
 		return nil
 	}
+}
+
+// WithAIRetryWaitFunc overrides how retry delays are waited. It is primarily
+// useful for deterministic tests that need to observe retries without sleeping
+// for the production backoff duration. A nil function restores the default,
+// context-aware timer.
+func WithAIRetryWaitFunc(wait func(context.Context, time.Duration) error) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.aiRetryWaitFunc = wait
+		c.Ctx = withAIRetryWaitFuncContext(c.Ctx, wait)
+		return nil
+	}
+}
+
+// GetAIRetryWaitFunc returns the configured retry waiter for child runtimes.
+func (c *Config) GetAIRetryWaitFunc() func(context.Context, time.Duration) error {
+	if c == nil {
+		return nil
+	}
+	return c.aiRetryWaitFunc
 }
 
 func WithAiCallTokenLimit(limit int64) ConfigOption {
@@ -4042,6 +4069,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.AiAutoRetry > 0 {
 		opts = append(opts, WithAIAutoRetry(i.AiAutoRetry))
+	}
+	if i.aiRetryWaitFunc != nil {
+		opts = append(opts, WithAIRetryWaitFunc(i.aiRetryWaitFunc))
 	}
 	if i.AiCallTokenLimit > 0 {
 		opts = append(opts, WithAiCallTokenLimit(i.AiCallTokenLimit))

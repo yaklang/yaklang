@@ -69,6 +69,9 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 		aicommon.WithPersistentSessionId(r.config.PersistentSessionId),
 		aicommon.WithDisableCreateDBRuntime(true), // disable create db runtime because ReAct loop will create it before invoking liteforge, and creating it again in liteforge may
 	}
+	if retryWait := r.config.GetAIRetryWaitFunc(); retryWait != nil {
+		execOpts = append(execOpts, aicommon.WithAIRetryWaitFunc(retryWait))
+	}
 	if userUsageCb := r.config.GetUserUsageCallback(); userUsageCb != nil {
 		execOpts = append(execOpts, aicommon.WithUserUsageCallback(userUsageCb))
 	}

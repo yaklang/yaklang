@@ -20,10 +20,11 @@ type transactionTestConfig struct {
 	*KeyValueConfig
 	*BaseInteractiveHandler
 	*BaseCheckpointableStorage
-	ctx      context.Context
-	emitter  *Emitter
-	idSeq    int64
-	retryMax int64
+	ctx       context.Context
+	emitter   *Emitter
+	idSeq     int64
+	retryMax  int64
+	retryWait func(context.Context, time.Duration) error
 }
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)
@@ -62,6 +63,12 @@ func (t *transactionTestConfig) IsCtxDone() bool {
 func (t *transactionTestConfig) GetContext() context.Context           { return t.ctx }
 func (t *transactionTestConfig) CallAIResponseConsumptionCallback(int) {}
 func (t *transactionTestConfig) GetAITransactionAutoRetryCount() int64 { return t.retryMax }
+func (t *transactionTestConfig) waitBeforeAIRetry(ctx context.Context, delay time.Duration) error {
+	if t.retryWait != nil {
+		return t.retryWait(ctx, delay)
+	}
+	return nil
+}
 func (t *transactionTestConfig) GetToolComposeConcurrency() int        { return 2 }
 func (t *transactionTestConfig) GetPlanExecTaskConcurrency() int       { return 1 }
 func (t *transactionTestConfig) GetTimelineContentSizeLimit() int64    { return 1000 }

@@ -85,6 +85,7 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"test",
+		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithAIAutoRetry(1),
 		aicommon.WithAITransactionAutoRetry(3),

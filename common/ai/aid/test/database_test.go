@@ -27,6 +27,7 @@ func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := aid.NewCoordinator(
 		uuid.New().String(),
+		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event

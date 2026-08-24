@@ -170,11 +170,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				}
 				if err != nil || rsp == nil {
 					_idx++
-					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
-					select {
-					case <-requestCtx.Done():
-						return nil, requestCtx.Err()
-					case <-time.After(500 * time.Millisecond):
+					if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, int(c.AiAutoRetry)); waitErr != nil {
+						return nil, waitErr
 					}
 					continue
 				}
@@ -249,11 +246,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			if err != nil || rsp == nil {
 				_idx++
-				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
-				select {
-				case <-requestCtx.Done():
-					return nil, requestCtx.Err()
-				case <-time.After(500 * time.Millisecond):
+				if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, int(c.AiAutoRetry)); waitErr != nil {
+					return nil, waitErr
 				}
 				continue
 			}

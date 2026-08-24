@@ -33,6 +33,7 @@ func TestPlanRetry(t *testing.T) {
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 	ins, err := aid.NewCoordinator(
 		"test",
+		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
