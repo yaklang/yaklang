@@ -3,6 +3,7 @@ package scannode
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -31,9 +32,8 @@ const (
 	legionCodeWorkspaceKindUploadedArchive = "uploaded_archive"
 	legionCodeWorkspaceArchiveLocator      = "managed-source"
 
-	legionCodeWorkspaceMaxFiles       = 20_000
-	legionCodeWorkspaceMaxTotalBytes  = int64(256 * 1024 * 1024)
-	legionCodeWorkspaceMaxFileBytes   = int64(1024 * 1024)
+	legionCodeArchiveMaxFiles         = 20_000
+	legionCodeArchiveMaxTotalBytes    = int64(256 * 1024 * 1024)
 	legionCodeWorkspaceMaxReadBytes   = int64(256 * 1024)
 	legionCodeWorkspaceMaxSearchItems = 200
 	legionCodeWorkspaceMaxPathDepth   = 32
@@ -57,18 +57,19 @@ type legionCodeWorkspaceProxy struct {
 }
 
 type legionCodeWorkspaceSpec struct {
-	WorkspaceID      string                    `json:"workspace_id"`
-	Kind             string                    `json:"kind"`
-	Locator          string                    `json:"locator"`
-	Branch           string                    `json:"branch,omitempty"`
-	Subpath          string                    `json:"subpath,omitempty"`
-	PayloadID        string                    `json:"payload_id,omitempty"`
-	ExpectedRevision string                    `json:"expected_revision,omitempty"`
-	ExpectedSHA256   string                    `json:"expected_sha256,omitempty"`
-	ReadOnly         bool                      `json:"read_only"`
-	MaxFiles         int                       `json:"max_files"`
-	MaxTotalBytes    int64                     `json:"max_total_bytes"`
-	MaxFileBytes     int64                     `json:"max_file_bytes"`
+	WorkspaceID      string `json:"workspace_id"`
+	Kind             string `json:"kind"`
+	Locator          string `json:"locator"`
+	Branch           string `json:"branch,omitempty"`
+	Subpath          string `json:"subpath,omitempty"`
+	PayloadID        string `json:"payload_id,omitempty"`
+	ExpectedRevision string `json:"expected_revision,omitempty"`
+	ExpectedSHA256   string `json:"expected_sha256,omitempty"`
+	ReadOnly         bool   `json:"read_only"`
+	// Deprecated admission fields are accepted for rolling compatibility but are not enforced.
+	MaxFiles         int                       `json:"max_files,omitempty"`
+	MaxTotalBytes    int64                     `json:"max_total_bytes,omitempty"`
+	MaxFileBytes     int64                     `json:"max_file_bytes,omitempty"`
 	MaxReadBytes     int64                     `json:"max_read_bytes"`
 	MaxSearchResults int                       `json:"max_search_results"`
 	Auth             *legionCodeWorkspaceAuth  `json:"auth,omitempty"`
@@ -207,15 +208,6 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 		if _, err := cleanLegionCodeRelativePath(spec.Subpath, false); err != nil {
 			return fmt.Errorf("source_workspace subpath: %w", err)
 		}
-	}
-	if spec.MaxFiles <= 0 || spec.MaxFiles > legionCodeWorkspaceMaxFiles {
-		return fmt.Errorf("source_workspace max_files must be between 1 and %d", legionCodeWorkspaceMaxFiles)
-	}
-	if spec.MaxTotalBytes <= 0 || spec.MaxTotalBytes > legionCodeWorkspaceMaxTotalBytes {
-		return fmt.Errorf("source_workspace max_total_bytes must be between 1 and %d", legionCodeWorkspaceMaxTotalBytes)
-	}
-	if spec.MaxFileBytes <= 0 || spec.MaxFileBytes > legionCodeWorkspaceMaxFileBytes {
-		return fmt.Errorf("source_workspace max_file_bytes must be between 1 and %d", legionCodeWorkspaceMaxFileBytes)
 	}
 	if spec.MaxReadBytes <= 0 || spec.MaxReadBytes > legionCodeWorkspaceMaxReadBytes {
 		return fmt.Errorf("source_workspace max_read_bytes must be between 1 and %d", legionCodeWorkspaceMaxReadBytes)
@@ -408,7 +400,7 @@ func materializeLegionCodeGitWorkspace(
 	if err != nil {
 		return nil, err
 	}
-	files, bytesCount, digest, err := inspectLegionCodeWorkspace(root, spec)
+	files, bytesCount, digest, err := inspectLegionCodeWorkspace(root)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +430,7 @@ func materializeLegionCodeArchiveWorkspace(
 		options.NodeSessionID,
 		options.PlatformBearerToken,
 		spec.PayloadID,
-		spec.MaxTotalBytes,
+		legionCodeArchiveMaxTotalBytes,
 		spec.ExpectedSHA256,
 	)
 	if err != nil {
@@ -456,14 +448,17 @@ func materializeLegionCodeArchiveWorkspace(
 			finalErr = errors.Join(finalErr, cleanup())
 		}
 	}()
-	if err := extractLegionCodeWorkspaceZip(archivePath, workspaceRoot, spec); err != nil {
+	if err := extractLegionCodeWorkspaceZip(archivePath, workspaceRoot, legionCodeArchiveLimits{
+		MaxFiles:      legionCodeArchiveMaxFiles,
+		MaxTotalBytes: legionCodeArchiveMaxTotalBytes,
+	}); err != nil {
 		return nil, err
 	}
 	root, err := legionCodeWorkspaceSubpath(workspaceRoot, spec.Subpath)
 	if err != nil {
 		return nil, err
 	}
-	files, bytesCount, _, err := inspectLegionCodeWorkspace(root, spec)
+	files, bytesCount, _, err := inspectLegionCodeWorkspace(root)
 	if err != nil {
 		return nil, err
 	}
@@ -478,11 +473,19 @@ func materializeLegionCodeArchiveWorkspace(
 	}, nil
 }
 
+type legionCodeArchiveLimits struct {
+	MaxFiles      int
+	MaxTotalBytes int64
+}
+
 func extractLegionCodeWorkspaceZip(
 	archivePath string,
 	destination string,
-	spec legionCodeWorkspaceSpec,
+	limits legionCodeArchiveLimits,
 ) error {
+	if limits.MaxFiles <= 0 || limits.MaxTotalBytes <= 0 {
+		return fmt.Errorf("source_workspace archive limits are invalid")
+	}
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return fmt.Errorf("open source_workspace zip: %w", err)
@@ -516,15 +519,12 @@ func extractLegionCodeWorkspaceZip(
 			continue
 		}
 		files++
-		if files > spec.MaxFiles {
-			return fmt.Errorf("source_workspace file count exceeds %d", spec.MaxFiles)
+		if files > limits.MaxFiles {
+			return fmt.Errorf("source_workspace archive file count exceeds safety limit %d", limits.MaxFiles)
 		}
-		declared := int64(entry.UncompressedSize64)
-		if declared > spec.MaxFileBytes {
-			return fmt.Errorf("source_workspace file %q exceeds %d bytes", name, spec.MaxFileBytes)
-		}
-		if declared > spec.MaxTotalBytes-total {
-			return fmt.Errorf("source_workspace total bytes exceed %d", spec.MaxTotalBytes)
+		remaining := limits.MaxTotalBytes - total
+		if entry.UncompressedSize64 > uint64(remaining) {
+			return fmt.Errorf("source_workspace archive total bytes exceed safety limit %d", limits.MaxTotalBytes)
 		}
 		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 			return fmt.Errorf("create source_workspace parent for %q: %w", name, err)
@@ -538,26 +538,20 @@ func extractLegionCodeWorkspaceZip(
 			input.Close()
 			return fmt.Errorf("create source_workspace file %q: %w", name, err)
 		}
-		written, copyErr := io.Copy(output, io.LimitReader(input, spec.MaxFileBytes+1))
+		written, copyErr := io.Copy(output, io.LimitReader(input, remaining+1))
 		closeErr := errors.Join(output.Close(), input.Close())
 		if copyErr != nil || closeErr != nil {
 			return fmt.Errorf("extract source_workspace file %q: %w", name, errors.Join(copyErr, closeErr))
 		}
-		if written > spec.MaxFileBytes {
-			return fmt.Errorf("source_workspace file %q exceeds %d bytes", name, spec.MaxFileBytes)
-		}
 		total += written
-		if total > spec.MaxTotalBytes {
-			return fmt.Errorf("source_workspace total bytes exceed %d", spec.MaxTotalBytes)
+		if total > limits.MaxTotalBytes {
+			return fmt.Errorf("source_workspace archive total bytes exceed safety limit %d", limits.MaxTotalBytes)
 		}
 	}
 	return nil
 }
 
-func inspectLegionCodeWorkspace(
-	root string,
-	spec legionCodeWorkspaceSpec,
-) (files int, bytesCount int64, digest string, finalErr error) {
+func inspectLegionCodeWorkspace(root string) (files int, bytesCount int64, digest string, finalErr error) {
 	hash := sha256.New()
 	err := filepath.WalkDir(root, func(current string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -579,9 +573,6 @@ func inspectLegionCodeWorkspace(
 			return err
 		}
 		files++
-		if files > spec.MaxFiles {
-			return fmt.Errorf("source_workspace file count exceeds %d", spec.MaxFiles)
-		}
 		_, _ = io.WriteString(hash, rel+"\x00")
 		if info.Mode()&os.ModeSymlink != 0 {
 			target, err := os.Readlink(current)
@@ -594,13 +585,7 @@ func inspectLegionCodeWorkspace(
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("source_workspace path %q has unsupported file type %s", rel, info.Mode().Type())
 		}
-		if info.Size() > spec.MaxFileBytes {
-			return fmt.Errorf("source_workspace file %q exceeds %d bytes", rel, spec.MaxFileBytes)
-		}
 		bytesCount += info.Size()
-		if bytesCount > spec.MaxTotalBytes {
-			return fmt.Errorf("source_workspace total bytes exceed %d", spec.MaxTotalBytes)
-		}
 		input, err := os.Open(current)
 		if err != nil {
 			return err
@@ -646,9 +631,6 @@ func (w *legionCodeWorkspaceRuntime) info() map[string]any {
 			"expected_revision":  w.spec.ExpectedRevision,
 			"expected_sha256":    w.spec.ExpectedSHA256,
 			"read_only":          true,
-			"max_files":          w.spec.MaxFiles,
-			"max_total_bytes":    w.spec.MaxTotalBytes,
-			"max_file_bytes":     w.spec.MaxFileBytes,
 			"max_read_bytes":     w.spec.MaxReadBytes,
 			"max_search_results": w.spec.MaxSearchResults,
 		},
@@ -746,7 +728,7 @@ func (w *legionCodeWorkspaceRuntime) appendListEntry(
 		return nil
 	}
 	info, err := os.Stat(resolved)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > w.spec.MaxFileBytes {
+	if err != nil || !info.Mode().IsRegular() {
 		return nil
 	}
 	binary, err := legionCodeFileIsBinary(resolved, info.Size())
@@ -765,9 +747,6 @@ func (w *legionCodeWorkspaceRuntime) read(params map[string]any) (map[string]any
 	info, err := os.Stat(resolved)
 	if err != nil || !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("source.read path %q is not a regular file", rel)
-	}
-	if info.Size() > w.spec.MaxFileBytes {
-		return nil, fmt.Errorf("source.read file %q exceeds %d bytes", rel, w.spec.MaxFileBytes)
 	}
 	binary, err := legionCodeFileIsBinary(resolved, info.Size())
 	if err != nil {
@@ -860,7 +839,7 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 			return nil
 		}
 		info, err := os.Stat(resolved)
-		if err != nil || !info.Mode().IsRegular() || info.Size() > w.spec.MaxFileBytes {
+		if err != nil || !info.Mode().IsRegular() {
 			return nil
 		}
 		binary, err := legionCodeFileIsBinary(resolved, info.Size())
@@ -1014,6 +993,64 @@ func legionCodeFileIsBinary(filename string, size int64) (bool, error) {
 		return false, err
 	}
 	return strings.IndexByte(string(probe), 0) >= 0, nil
+}
+
+func legionCodeTextContainsLine(filename string, targetLine int) (bool, error) {
+	if targetLine <= 0 {
+		return false, nil
+	}
+	input, err := os.Open(filename)
+	if err != nil {
+		return false, err
+	}
+	defer input.Close()
+
+	buffer := make([]byte, 64*1024)
+	pending := make([]byte, 0, utf8.UTFMax)
+	lineBreaks := 0
+	for {
+		n, readErr := input.Read(buffer)
+		if n > 0 {
+			chunk := buffer[:n]
+			if bytes.IndexByte(chunk, 0) >= 0 {
+				return false, fmt.Errorf("file is not UTF-8 source text")
+			}
+			data := make([]byte, len(pending)+len(chunk))
+			copy(data, pending)
+			copy(data[len(pending):], chunk)
+			complete := len(data)
+			if readErr != io.EOF {
+				lastStart := complete - 1
+				minimum := complete - utf8.UTFMax
+				if minimum < 0 {
+					minimum = 0
+				}
+				for lastStart >= minimum && !utf8.RuneStart(data[lastStart]) {
+					lastStart--
+				}
+				if lastStart >= minimum && !utf8.FullRune(data[lastStart:]) {
+					complete = lastStart
+				}
+			}
+			if !utf8.Valid(data[:complete]) {
+				return false, fmt.Errorf("file is not UTF-8 source text")
+			}
+			pending = append(pending[:0], data[complete:]...)
+			lineBreaks += bytes.Count(chunk, []byte{'\n'})
+			if lineBreaks >= targetLine || (complete > 0 && lineBreaks == targetLine-1 && data[complete-1] != '\n') {
+				return true, nil
+			}
+		}
+		if readErr == io.EOF {
+			if len(pending) > 0 && !utf8.Valid(pending) {
+				return false, fmt.Errorf("file is not UTF-8 source text")
+			}
+			return false, nil
+		}
+		if readErr != nil {
+			return false, readErr
+		}
+	}
 }
 
 func validateLegionCodeProxyURL(raw string) error {
