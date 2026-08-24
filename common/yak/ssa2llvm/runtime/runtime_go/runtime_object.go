@@ -385,6 +385,16 @@ func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 	value := reflect.ValueOf(decoded)
 	if value.IsValid() {
 		if targetType.Kind() == reflect.Interface {
+			// Yak maps are AOT-internal runtimeOrderedMap values; yaklib
+			// expects real Go maps (utils.IsMap / range), so convert before
+			// crossing the interface boundary.
+			if om, ok := decoded.(*runtimeOrderedMap); ok && om != nil {
+				m := make(map[string]any, len(om.keys))
+				for _, k := range om.keys {
+					m[k] = om.values[k]
+				}
+				return reflect.ValueOf(m), nil
+			}
 			// AOT slice/map shadows are pointers; yak code sees them as
 			// values, so pass the dereferenced container to yaklib before the
 			// generic assignable-to-interface path.
