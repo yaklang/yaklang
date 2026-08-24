@@ -911,7 +911,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	dynamicData["StderrSnapshot"] = aicommon.ShrinkTextBlockByTokens(string(stderrSnapshot), intervalReviewStderrTokens)
 	dynamicData["CallExpectations"] = aicommon.ShrinkTextBlockByTokens(callExpectations, intervalReviewCallExpectationTokens)
 	dynamicData["ExtraPrompt"] = aicommon.ShrinkTextBlockByTokens(
-		buildIntervalReviewExtraPrompt(pm, tool),
+		buildIntervalReviewExtraPrompt(pm),
 		intervalReviewExtraInstructionTokens,
 	)
 	dynamicData["TaskGoal"] = taskGoal
@@ -942,8 +942,14 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 		return "", err
 	}
 	recentTimeline := ""
-	if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
-		recentTimeline = pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens)
+	if tool != nil && isLongRunningSearchTool(tool.Name) {
+		// Parent-loop Timeline is not a progress signal for grep/find_file/tree.
+		// LOOP_STALL_DETECTED usually means the ReAct loop is waiting on this tool.
+		recentTimeline = "<|TIMELINE_RECENT|>\n(no recent Timeline items)\n<|TIMELINE_RECENT_END|>"
+	} else if pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
+		recentTimeline = stripLoopStallFromIntervalReviewTimeline(
+			pm.react.config.GetTimeline().DumpRecentForPrompt(intervalReviewTimelineTokens),
+		)
 	}
 	if recentTimeline == "" {
 		recentTimeline = "<|TIMELINE_RECENT|>\n(no recent Timeline items)\n<|TIMELINE_RECENT_END|>"
@@ -963,28 +969,41 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContextForTask(
 	return prompt, nil
 }
 
-const intervalReviewLongSearchHint = "Large-repo grep/find_file/tree often takes several minutes and may only show a start banner before the first match. Continue unless stderr has a real error, the same search already finished, or there has been no new stdout for more than 15 minutes after the first output. Do not cancel just because Timeline mentions LOOP_STALL_DETECTED — that usually means the ReAct loop is waiting on this tool."
-
-func isLongRunningSearchTool(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "grep", "find_file", "tree":
-		return true
-	default:
-		return false
+func buildIntervalReviewExtraPrompt(pm *PromptManager) string {
+	if pm == nil || pm.react == nil || pm.react.config == nil {
+		return ""
 	}
+	return strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt))
 }
 
-func buildIntervalReviewExtraPrompt(pm *PromptManager, tool *aitool.Tool) string {
-	var parts []string
-	if pm != nil && pm.react != nil && pm.react.config != nil {
-		if extra := strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt)); extra != "" {
-			parts = append(parts, extra)
+func stripLoopStallFromIntervalReviewTimeline(dump string) string {
+	if dump == "" || !strings.Contains(dump, "LOOP_STALL") {
+		return dump
+	}
+	const (
+		header = "<|TIMELINE_RECENT|>"
+		footer = "<|TIMELINE_RECENT_END|>"
+	)
+	body := dump
+	if i := strings.Index(dump, header); i >= 0 {
+		body = dump[i+len(header):]
+		if j := strings.LastIndex(body, footer); j >= 0 {
+			body = body[:j]
 		}
 	}
-	if tool != nil && isLongRunningSearchTool(tool.Name) {
-		parts = append(parts, intervalReviewLongSearchHint)
+	parts := strings.Split(strings.TrimSpace(body), "\n\n")
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" || strings.Contains(part, "LOOP_STALL_DETECTED") || strings.Contains(part, "LOOP_STALL_HARD_ABORT") {
+			continue
+		}
+		kept = append(kept, part)
 	}
-	return strings.Join(parts, "\n")
+	if len(kept) == 0 {
+		return header + "\n(no recent Timeline items)\n" + footer
+	}
+	return header + "\n" + strings.Join(kept, "\n\n") + "\n" + footer
 }
 
 // formatDuration formats a duration into a human-readable string.
