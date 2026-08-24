@@ -117,6 +117,9 @@ func (s *ScanNode) executeScriptTask(
 		defer reporter.ssaCollector.Cleanup()
 	}
 	ssaDBEnv := extractSSADatabaseEnv(keyValues)
+	if preparedSnapshot != nil {
+		ssaDBEnv = append(ssaDBEnv, "YAKIT_HOME="+preparedSnapshot.taskYakitHome)
+	}
 	result := &ScriptExecutionResult{}
 	if preparedSnapshot != nil {
 		receipt := preparedSnapshot.Receipt
@@ -359,7 +362,19 @@ func (s *ScanNode) prepareRuleSnapshotForExecution(
 	if err != nil {
 		return nil, &ruleSnapshotPreparationError{Expectation: expectation, Err: err}
 	}
-	prepared.cleanup = cleanup
+	taskYakitHome, cleanupTaskYakitHome, err := createRuleSnapshotTaskYakitHome()
+	if err != nil {
+		cleanup()
+		return nil, &ruleSnapshotPreparationError{
+			Expectation: expectation,
+			Err:         utils.Wrap(err, "create isolated task rule runtime"),
+		}
+	}
+	prepared.taskYakitHome = taskYakitHome
+	prepared.cleanup = func() {
+		cleanup()
+		cleanupTaskYakitHome()
+	}
 	return prepared, nil
 }
 
@@ -689,6 +704,19 @@ func createRuleSnapshotTaskInputFile() (*os.File, error) {
 	return file, nil
 }
 
+func createRuleSnapshotTaskYakitHome() (string, func(), error) {
+	dir, err := os.MkdirTemp("", "rule-snapshot-task-home-*")
+	if err != nil {
+		return "", func() {}, err
+	}
+	cleanup := func() {
+		if err := os.RemoveAll(dir); err != nil {
+			log.Warnf("remove task-local rule runtime %s failed: %v", dir, err)
+		}
+	}
+	return dir, cleanup, nil
+}
+
 func splitRuleSnapshotTags(value string) []string {
 	parts := strings.FieldsFunc(value, func(r rune) bool { return r == '|' || r == ',' })
 	result := make([]string, 0, len(parts))
@@ -815,11 +843,15 @@ func (s *ScanNode) executeScript(
 	log.Infof("yak %v %v", scriptFile, params)
 
 	cmd := exec.CommandContext(ctx, scanNodePath, append(baseCmd, params...)...)
-	env := append(os.Environ(),
-		fmt.Sprintf("YAKIT_HOME=%v", os.Getenv("YAKIT_HOME")),
-		fmt.Sprintf("YAK_RUNTIME_ID=%v", runtimeID),
-	)
-	env = append(env, extraEnv...)
+	env := replaceEnvironmentValue(os.Environ(), "YAKIT_HOME", os.Getenv("YAKIT_HOME"))
+	env = replaceEnvironmentValue(env, "YAK_RUNTIME_ID", runtimeID)
+	for _, item := range extraEnv {
+		key, value, ok := strings.Cut(item, "=")
+		if !ok || strings.TrimSpace(key) == "" {
+			continue
+		}
+		env = replaceEnvironmentValue(env, key, value)
+	}
 	workspaceOwner := s.nextSSAGitWorkspaceOwner()
 	env = replaceEnvironmentValue(env, ssagitworkdir.OwnerEnv, workspaceOwner)
 	cmd.Env = env
