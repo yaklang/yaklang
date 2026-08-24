@@ -45,13 +45,17 @@ func (s *Server) QueryContextMenuActions(ctx context.Context, req *ypb.QueryCont
 		bindingByKey[contextMenuBindingKey(binding.PluginUUID, binding.ActionID)] = binding
 	}
 
-	response := &ypb.QueryContextMenuActionsResponse{MaxCustomPluginCount: int64(contextmenu.MaxCustomPlugins)}
+	response := &ypb.QueryContextMenuActionsResponse{MaxCustomPluginCount: int64(contextmenu.MaxCustomPluginsPerScene)}
 	enabledCustomPlugins := make(map[string]struct{})
 	scriptByUUID := make(map[string]*schema.YakScript, len(scripts))
 	for _, script := range scripts {
 		scriptByUUID[script.Uuid] = script
 	}
 	for _, binding := range bindings {
+		bindingScene, ok := contextmenu.SceneForAction(binding.ActionID)
+		if !ok || req.GetScene() == "" || bindingScene != req.GetScene() {
+			continue
+		}
 		script, exists := scriptByUUID[binding.PluginUUID]
 		if exists && binding.Enabled && !script.IsCorePlugin && contextMenuScriptImplements(script, binding.ActionID) {
 			enabledCustomPlugins[binding.PluginUUID] = struct{}{}

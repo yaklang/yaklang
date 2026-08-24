@@ -46,7 +46,7 @@ handle = func(input) {
 7. 右键插件默认按需执行，不因安装数量增加而常驻加载大量 Yak Engine。
 8. 提供独立的右键管理：
    - 核心/引擎内置右键插件不可停用或移除。
-   - 用户可安装任意数量的右键插件，但最多启用 15 个自定义右键插件。
+   - 用户可安装任意数量的右键插件；History 单选、History 多选、HTTP 数据包每个场景分别最多启用 15 个自定义插件。
    - 支持排序、快捷键绑定和结果展示方式覆盖。
 9. 右键点击和快捷键触发复用同一执行链。
 10. 为旧 CODEC 右键配置和 `packet-hack` 提供兼容迁移路径。
@@ -483,7 +483,7 @@ handleMultiHTTPFlows -> history-multi
 handleHTTPPacket     -> http-packet
 ```
 
-保存插件时执行静态分析。v1 不增加 capabilities 持久化字段：菜单查询只对核心插件和最多 15 个已启用插件检查 Hook 定义；管理页显式请求全部插件时再检查全部已安装右键插件。SSA 可以使用现有缓存，但不会执行插件代码。
+保存插件时执行静态分析。v1 不增加 capabilities 持久化字段：单个场景的菜单查询只对核心插件和该场景最多 15 个已启用插件检查 Hook 定义；管理页显式请求全部插件时再检查全部已安装右键插件。SSA 可以使用现有缓存，但不会执行插件代码。
 
 这个选择少维护一个元数据状态源，避免插件内容与 capabilities 字段不一致。只有性能数据证明现有 SSA 缓存仍不足时，才考虑在保存时持久化能力索引。
 
@@ -776,6 +776,7 @@ PluginUUID + ActionID
 管理界面交互参考“快捷键管理”，至少提供：
 
 - 搜索已安装的右键插件。
+- 从已配置和待添加列表按 Plugin UUID 直接打开对应插件编辑器；保存后刷新管理列表和右键菜单。
 - 查看支持的 Scene。
 - 启用/停用自定义插件。
 - 查看核心锁定状态。
@@ -812,17 +813,20 @@ v1 规则：
 
 ```text
 内置核心右键插件：不占自定义额度，始终展示
-用户自定义已启用的右键插件或兼容 CODEC：合计最多 15 个
+History 单选：最多启用 15 个自定义右键插件或兼容 CODEC
+History 多选：最多启用 15 个自定义右键插件或兼容 CODEC
+HTTP 数据包：最多启用 15 个自定义右键插件或兼容 CODEC
 已安装但未启用插件：数量不限
 ```
 
 计数规则：
 
-- 按不同 Plugin UUID 计数。
-- 一个插件实现多个 Scene 仍只占一个名额。
+- 在每个 Scene 内按不同 Plugin UUID 去重计数。
+- 一个插件实现多个 Scene 时，在每个已启用的 Scene 中分别占一个名额；不同 Scene 的额度互不影响。
+- 同一插件在同一 Scene 提供多个兼容 Action 时只占一个名额。
 - 只有 `Enabled == true` 且非 core 的插件占额度。
 - 新安装的普通右键插件默认不自动启用。
-- 达到 15 个后，启用第 16 个时返回明确的结构化错误，并提示先停用一个。
+- 当前 Scene 达到 15 个后，在该 Scene 启用第 16 个时返回明确错误，并提示先停用该场景的一个插件；其他 Scene 仍可继续配置。
 
 上限必须在 Profile DB 事务中由后端原子校验。不能只由前端控制开关，否则多个窗口、旧客户端或直接 RPC 可能绕过限制。
 
@@ -918,7 +922,7 @@ SetContextMenuActionBinding(PluginUUID, ActionID, Enabled, Sort,
 Profile DB 事务和进程内写锁负责首版并发保护。服务端在写入时统一执行：
 
 - 核心动作不可停用。
-- 15 个自定义启用上限。
+- 当前 Scene 的 15 个自定义启用上限。
 - Result Mode 校验。
 - 插件存在性检查。
 
@@ -1124,7 +1128,7 @@ handleHTTPPacket = func(ctx, request, response) {
 - 冻结三个 v1 Hook 签名。
 - 冻结 ActionContext v1 方法及 HTTPS 四态语义。
 - 冻结 ActionID 与 Scene 映射。
-- 确认 15 个上限不包含 core。
+- 确认每个 Scene 的 15 个上限不包含 core，且不同 Scene 额度互不影响。
 - 确认 Result Mode 枚举。
 
 ### Phase 1：插件类型和静态分析（已完成）
@@ -1147,8 +1151,9 @@ handleHTTPPacket = func(ctx, request, response) {
 
 - 新增 ContextMenuBinding Profile 表及 RPC。
 - 使用 `Type + IsCorePlugin` 实现 core 不可停用、不可删除校验。
-- 实现自定义启用上限 15 的事务校验。
+- 实现按 Scene 分别计算的自定义启用上限 15 的事务校验。
 - 实现按 Scene 管理、搜索、添加/移除、排序、快捷键和 Result Mode 覆盖。
+- 从管理列表一键进入插件编辑器，并在切换编辑目标前保护未保存内容。
 - 使用同一结果渲染器承载 dialog/drawer/tab。
 - “管理右键插件”打开或聚焦独立单例 TAB，并定位到当前 Scene。
 
@@ -1213,9 +1218,9 @@ handleHTTPPacket = func(ctx, request, response) {
 ### 25.7 管理约束
 
 - core 无法通过 Binding 写入停用，也无法通过现有插件删除接口移除。
-- 15 个自定义插件可以启用。
-- 第 16 个启用请求被原子拒绝。
-- 同一插件多个 Action 只占一个额度。
+- 每个 Scene 分别可以启用 15 个自定义插件。
+- 当前 Scene 的第 16 个启用请求被原子拒绝，不影响其他 Scene。
+- 同一插件在同一 Scene 的多个 Action 只占一个额度。
 - 插件改名后 Binding 仍通过 UUID 生效。
 - 新安装自定义插件默认不启用。
 
@@ -1239,7 +1244,7 @@ handleHTTPPacket = func(ctx, request, response) {
 
 ### 风险 3：右键插件过多导致启动或菜单卡顿
 
-对策：菜单阶段只对核心和已启用插件做缓存 SSA 定义检查；最多启用 15 个自定义插件；点击后按需执行。
+对策：菜单阶段只对核心和已启用插件做缓存 SSA 定义检查；每个 Scene 最多启用 15 个自定义插件；点击后按需执行。
 
 ### 风险 4：结果展示逻辑分裂成三套
 
@@ -1278,4 +1283,4 @@ handleHTTPPacket = func(ctx, request, response) {
 - `ctx` 是包装真实 Go context 的 ActionContext，不再额外传 config。
 - HTTPS 使用可表达 unknown 和 mixed 的状态模型。
 - 右键和快捷键复用同一执行链。
-- 核心插件保护和 15 个自定义启用上限由服务端保证。
+- 核心插件保护和每个 Scene 分别 15 个的自定义启用上限由服务端保证。

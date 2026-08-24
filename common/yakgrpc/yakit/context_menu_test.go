@@ -3,6 +3,7 @@ package yakit
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -25,9 +26,13 @@ func newContextMenuTestDB(t *testing.T) *gorm.DB {
 func createContextMenuTestPlugin(t *testing.T, db *gorm.DB, name string, core bool) *schema.YakScript {
 	t.Helper()
 	script := &schema.YakScript{
-		ScriptName:   name,
-		Type:         contextmenu.PluginType,
-		Content:      `handleOneHTTPFlow = func(ctx, flow) {}`,
+		ScriptName: name,
+		Type:       contextmenu.PluginType,
+		Content: `
+handleOneHTTPFlow = func(ctx, flow) {}
+handleMultiHTTPFlows = func(ctx, flows) {}
+handleHTTPPacket = func(ctx, request, response) {}
+`,
 		Uuid:         uuid.NewString(),
 		IsCorePlugin: core,
 	}
@@ -49,11 +54,11 @@ func createLegacyContextMenuTestPlugin(t *testing.T, db *gorm.DB, name, tags str
 	return script
 }
 
-func TestSetContextMenuBindingCountsDistinctCustomPlugins(t *testing.T) {
+func TestSetContextMenuBindingCountsDistinctCustomPluginsPerScene(t *testing.T) {
 	db := newContextMenuTestDB(t)
 	first := createContextMenuTestPlugin(t, db, "plugin-0", false)
 
-	for i := 0; i < contextmenu.MaxCustomPlugins; i++ {
+	for i := 0; i < contextmenu.MaxCustomPluginsPerScene; i++ {
 		plugin := first
 		if i > 0 {
 			plugin = createContextMenuTestPlugin(t, db, fmt.Sprintf("plugin-%d", i), false)
@@ -66,13 +71,20 @@ func TestSetContextMenuBindingCountsDistinctCustomPlugins(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// A second action from an already-enabled plugin does not consume another slot.
-	_, err := SetContextMenuBinding(db, &schema.ContextMenuBinding{
+	historyCount, err := countEnabledCustomContextMenuPluginsByScene(db, contextmenu.ActionHistorySingle)
+	require.NoError(t, err)
+	require.Equal(t, contextmenu.MaxCustomPluginsPerScene, historyCount)
+
+	// A full History-single scene does not consume the independent HTTP-packet quota.
+	_, err = SetContextMenuBinding(db, &schema.ContextMenuBinding{
 		PluginUUID: first.Uuid,
 		ActionID:   contextmenu.ActionHTTPPacket,
 		Enabled:    true,
 	})
 	require.NoError(t, err)
+	packetCount, err := countEnabledCustomContextMenuPluginsByScene(db, contextmenu.ActionHTTPPacket)
+	require.NoError(t, err)
+	require.Equal(t, 1, packetCount)
 
 	overLimit := createContextMenuTestPlugin(t, db, "plugin-over-limit", false)
 	_, err = SetContextMenuBinding(db, &schema.ContextMenuBinding{
@@ -83,6 +95,41 @@ func TestSetContextMenuBindingCountsDistinctCustomPlugins(t *testing.T) {
 	require.ErrorContains(t, err, "at most 15")
 	_, err = GetContextMenuBinding(db, overLimit.Uuid, contextmenu.ActionHistorySingle)
 	require.Error(t, err, "over-limit binding must be rolled back")
+
+	// The same plugin can still be enabled in another scene.
+	_, err = SetContextMenuBinding(db, &schema.ContextMenuBinding{
+		PluginUUID: overLimit.Uuid,
+		ActionID:   contextmenu.ActionHistoryMulti,
+		Enabled:    true,
+	})
+	require.NoError(t, err)
+	multiCount, err := countEnabledCustomContextMenuPluginsByScene(db, contextmenu.ActionHistoryMulti)
+	require.NoError(t, err)
+	require.Equal(t, 1, multiCount)
+}
+
+func TestSetContextMenuBindingCountsLegacyActionsOnceWithinScene(t *testing.T) {
+	db := newContextMenuTestDB(t)
+	legacy := createLegacyContextMenuTestPlugin(t, db, "legacy-packet", strings.Join([]string{
+		contextmenu.LegacyTagPacketContext,
+		contextmenu.LegacyTagPacketMutate,
+	}, ","), false)
+
+	for _, actionID := range []string{
+		contextmenu.ActionLegacyPacketContext,
+		contextmenu.ActionLegacyPacketMutate,
+	} {
+		_, err := SetContextMenuBinding(db, &schema.ContextMenuBinding{
+			PluginUUID: legacy.Uuid,
+			ActionID:   actionID,
+			Enabled:    true,
+		})
+		require.NoError(t, err)
+	}
+
+	count, err := countEnabledCustomContextMenuPluginsByScene(db, contextmenu.ActionHTTPPacket)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
 }
 
 func TestCoreContextMenuBindingCannotBeDisabledAndDoesNotConsumeLimit(t *testing.T) {
@@ -102,7 +149,7 @@ func TestCoreContextMenuBindingCannotBeDisabledAndDoesNotConsumeLimit(t *testing
 		Enabled:    true,
 	})
 	require.NoError(t, err)
-	count, err := countEnabledCustomContextMenuPlugins(db)
+	count, err := countEnabledCustomContextMenuPluginsByScene(db, contextmenu.ActionHistorySingle)
 	require.NoError(t, err)
 	require.Zero(t, count)
 

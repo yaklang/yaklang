@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	PluginType       = "context-menu"
-	LegacyPluginType = "codec"
-	MaxCustomPlugins = 15
+	PluginType               = "context-menu"
+	LegacyPluginType         = "codec"
+	MaxCustomPluginsPerScene = 15
 
 	ActionHistorySingle = "history-single"
 	ActionHistoryMulti  = "history-multi"

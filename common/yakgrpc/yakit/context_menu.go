@@ -37,6 +37,10 @@ func SetContextMenuBinding(db *gorm.DB, binding *schema.ContextMenuBinding) (*sc
 	if script.IsCorePlugin && !binding.Enabled {
 		return nil, utils.Errorf("core context-menu action %s cannot be disabled", binding.PluginUUID)
 	}
+	scene, ok := contextmenu.SceneForAction(binding.ActionID)
+	if !ok {
+		return nil, utils.Errorf("unknown context-menu scene for action: %s", binding.ActionID)
+	}
 
 	contextMenuBindingLock.Lock()
 	defer contextMenuBindingLock.Unlock()
@@ -59,12 +63,16 @@ func SetContextMenuBinding(db *gorm.DB, binding *schema.ContextMenuBinding) (*sc
 			return utils.Errorf("save context-menu binding failed: %s", result.Error)
 		}
 
-		count, err := countEnabledCustomContextMenuPlugins(tx)
+		count, err := countEnabledCustomContextMenuPluginsByScene(tx, scene)
 		if err != nil {
 			return err
 		}
-		if count > contextmenu.MaxCustomPlugins {
-			return utils.Errorf("at most %d custom context-menu plugins can be enabled", contextmenu.MaxCustomPlugins)
+		if count > contextmenu.MaxCustomPluginsPerScene {
+			return utils.Errorf(
+				"at most %d custom context-menu plugins can be enabled in scene %s",
+				contextmenu.MaxCustomPluginsPerScene,
+				scene,
+			)
 		}
 		return nil
 	})
@@ -103,7 +111,10 @@ func QueryContextMenuBindings(db *gorm.DB) ([]*schema.ContextMenuBinding, error)
 	return bindings, nil
 }
 
-func countEnabledCustomContextMenuPlugins(db *gorm.DB) (int, error) {
+func countEnabledCustomContextMenuPluginsByScene(db *gorm.DB, scene string) (int, error) {
+	if !contextmenu.IsKnownScene(scene) {
+		return 0, utils.Errorf("unknown context-menu scene: %s", scene)
+	}
 	var bindings []*schema.ContextMenuBinding
 	if result := db.Model(&schema.ContextMenuBinding{}).Where("enabled = ?", true).Find(&bindings); result.Error != nil {
 		return 0, result.Error
@@ -111,6 +122,10 @@ func countEnabledCustomContextMenuPlugins(db *gorm.DB) (int, error) {
 
 	seen := make(map[string]struct{}, len(bindings))
 	for _, binding := range bindings {
+		bindingScene, ok := contextmenu.SceneForAction(binding.ActionID)
+		if !ok || bindingScene != scene {
+			continue
+		}
 		if _, ok := seen[binding.PluginUUID]; ok {
 			continue
 		}

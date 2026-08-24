@@ -71,7 +71,7 @@ handleOneHTTPFlow = func(ctx, flow) { return nil }
 	require.NoError(t, err)
 	require.Len(t, management.Actions, 1)
 	require.False(t, management.Actions[0].Enabled)
-	require.EqualValues(t, contextmenu.MaxCustomPlugins, management.MaxCustomPluginCount)
+	require.EqualValues(t, contextmenu.MaxCustomPluginsPerScene, management.MaxCustomPluginCount)
 
 	action, err := server.SetContextMenuActionBinding(context.Background(), &ypb.SetContextMenuActionBindingRequest{
 		PluginUUID: script.Uuid,
@@ -83,6 +83,15 @@ handleOneHTTPFlow = func(ctx, flow) { return nil }
 	require.NoError(t, err)
 	require.True(t, action.Enabled)
 	require.Equal(t, contextmenu.ResultModeDrawer, action.ResultMode)
+	packetScript := createContextMenuServerTestPlugin(t, server, `
+handleHTTPPacket = func(ctx, request, response) { return nil }
+`, false)
+	_, err = server.SetContextMenuActionBinding(context.Background(), &ypb.SetContextMenuActionBindingRequest{
+		PluginUUID: packetScript.Uuid,
+		ActionID:   contextmenu.ActionHTTPPacket,
+		Enabled:    true,
+	})
+	require.NoError(t, err)
 
 	menu, err := server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
 		Scene: contextmenu.ActionHistorySingle,
@@ -90,6 +99,13 @@ handleOneHTTPFlow = func(ctx, flow) { return nil }
 	require.NoError(t, err)
 	require.Len(t, menu.Actions, 1)
 	require.EqualValues(t, 1, menu.EnabledCustomPluginCount)
+
+	packetMenu, err := server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
+		Scene: contextmenu.ActionHTTPPacket,
+	})
+	require.NoError(t, err)
+	require.Len(t, packetMenu.Actions, 1)
+	require.EqualValues(t, 1, packetMenu.EnabledCustomPluginCount)
 }
 
 func TestContextMenuQueryIncludesLegacyCodecCapabilities(t *testing.T) {
