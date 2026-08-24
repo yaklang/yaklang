@@ -94,9 +94,10 @@ type RuleSnapshotPreparationReceipt struct {
 }
 
 type PreparedRuleSnapshot struct {
-	Bundle  RuleSnapshotBundle
-	Receipt RuleSnapshotPreparationReceipt
-	cleanup func()
+	Bundle        RuleSnapshotBundle
+	Receipt       RuleSnapshotPreparationReceipt
+	taskYakitHome string
+	cleanup       func()
 }
 
 func (p *PreparedRuleSnapshot) Cleanup() {

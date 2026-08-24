@@ -53,7 +53,16 @@ func TestPrepareRuleSnapshotForExecutionInjectsTaskLocalRules(t *testing.T) {
 	if got == nil || got.Receipt.SnapshotID != "rulesnapshot-a" {
 		t.Fatalf("unexpected prepared snapshot: %#v", got)
 	}
+	if info, statErr := os.Stat(got.taskYakitHome); statErr != nil || info.Mode().Perm() != 0o700 {
+		t.Fatalf("task-local rule runtime is not private: info=%v err=%v", info, statErr)
+	}
+	taskYakitHome := got.taskYakitHome
 	defer got.Cleanup()
+	t.Cleanup(func() {
+		if _, statErr := os.Stat(taskYakitHome); !os.IsNotExist(statErr) {
+			t.Errorf("task-local rule runtime survived snapshot cleanup: %v", statErr)
+		}
+	})
 	if stub.callCount != 1 || stub.expectation.SnapshotID != "rulesnapshot-a" {
 		t.Fatalf("unexpected sync call: count=%d expectation=%#v", stub.callCount, stub.expectation)
 	}
@@ -114,6 +123,26 @@ func TestPrepareRuleSnapshotForExecutionInjectsTaskLocalRules(t *testing.T) {
 	if !typedConfig.IsTaskLocalRuleInput() || len(typedConfig.GetRuleInput()) != 0 ||
 		typedConfig.SyntaxFlowRule.TaskLocalInputFile != inputPath {
 		t.Fatalf("scan contract did not preserve task-local snapshot input: %#v", typedConfig.SyntaxFlowRule)
+	}
+}
+
+func TestCreateRuleSnapshotTaskYakitHomeIsPrivateAndRemoved(t *testing.T) {
+	t.Parallel()
+
+	dir, cleanup, err := createRuleSnapshotTaskYakitHome()
+	if err != nil {
+		t.Fatalf("create isolated task rule runtime: %v", err)
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("stat isolated task rule runtime: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o700 {
+		t.Fatalf("isolated task rule runtime mode=%#o, want 0700", got)
+	}
+	cleanup()
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("isolated task rule runtime survived cleanup: %v", err)
 	}
 }
 
