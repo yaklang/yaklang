@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/pluginbundle"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
@@ -618,6 +619,34 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 	return m.LoadPluginByName(m.ctx, scriptName, params)
 }
 
+// LoadPluginBundle loads the exact structured scripts from a validated Legion
+// bundle directory. It deliberately bypasses the local profile database, so a
+// task cannot drift to a same-name plugin with different content.
+func (m *MixPluginCaller) LoadPluginBundle(bundlePath string, params ...*ypb.ExecParamItem) (int, error) {
+	bundle, err := pluginbundle.LoadDirectory(bundlePath, pluginbundle.Expected{})
+	if err != nil {
+		return 0, utils.Errorf("load plugin bundle: %v", err)
+	}
+	ctx := m.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	loaded := 0
+	for _, member := range bundle.Members {
+		document := member.Document
+		script := &schema.YakScript{
+			ScriptName: document.Name,
+			Type:       document.Type,
+			Content:    document.Content,
+		}
+		if err := m.LoadPluginEx(ctx, script, params...); err != nil {
+			return loaded, utils.Errorf("load plugin bundle member %s (%s): %v", document.Name, document.ReleaseID, err)
+		}
+		loaded++
+	}
+	return loaded, nil
+}
+
 // LoadPluginByID loads a plugin by its database ID or UUID
 // Supports various integer types (int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64)
 // as database ID, or string as UUID
@@ -736,7 +765,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 		err := m.callers.AddForYakit(ctx, script, paramMap, code, YakitCallerIf(m.feedbackHandler), HOOK_NucleiScanHandle)
 		if err != nil {
 			m.FeedbackOrdinary(fmt.Sprintf("Initailzed Nuclei Plugin[%v] Failed: %v", name, err))
-			return nil
+			return err
 		}
 		return nil
 	}

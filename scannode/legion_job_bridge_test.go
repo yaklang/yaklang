@@ -9,6 +9,7 @@ import (
 	"github.com/nats-io/nats.go"
 	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
 	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
+	pluginv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -72,6 +73,36 @@ func TestValidateDispatchCommand(t *testing.T) {
 			},
 			wantErr: "unsupported execution_kind: binary_payload",
 		},
+		{
+			name: "invalid plugin bundle digest",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.PluginBundle = validPluginBundleRef()
+				command.PluginBundle.ArtifactSha256 = "invalid"
+			},
+			wantErr: "plugin bundle artifact_sha256 is invalid",
+		},
+		{
+			name: "unsupported plugin bundle schema",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.PluginBundle = validPluginBundleRef()
+				command.PluginBundle.SchemaVersion = "legion_plugin_bundle.v2"
+			},
+			wantErr: "unsupported plugin bundle schema_version: legion_plugin_bundle.v2",
+		},
+		{
+			name: "oversized plugin bundle",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.PluginBundle = validPluginBundleRef()
+				command.PluginBundle.ArtifactSizeBytes = 256<<20 + 1
+			},
+			wantErr: "plugin bundle artifact_size_bytes is outside the allowed range",
+		},
+		{
+			name: "valid plugin bundle",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.PluginBundle = validPluginBundleRef()
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -98,6 +129,17 @@ func TestValidateDispatchCommand(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func validPluginBundleRef() *pluginv1.PluginBundleRef {
+	return &pluginv1.PluginBundleRef{
+		BundleId:          "bundle-1",
+		ArtifactSha256:    strings.Repeat("ab", 32),
+		ArchiveFormat:     "zip",
+		SchemaVersion:     pluginBundleManifestSchemaVersion,
+		ItemCount:         2,
+		ArtifactSizeBytes: 4096,
 	}
 }
 

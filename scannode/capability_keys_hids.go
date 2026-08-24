@@ -9,5 +9,6 @@ func compiledScanNodeCapabilityKeys() []string {
 		capabilityKeySSARuleSyncExport,
 		capabilityKeyAIBindEpochV1,
 		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyPluginBundleV1,
 	}
 }
