@@ -15,46 +15,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// defaultIntervalReviewLongSearchSilence is how long grep/find_file/tree may stay
-// unchanged (stdout+stderr) before interval review is allowed to call the model.
-// Until then the handler returns continue without an AI turn.
-const defaultIntervalReviewLongSearchSilence = 15 * time.Minute
-
-// intervalReviewLongSearchSilence is overridable in tests.
-var intervalReviewLongSearchSilence = defaultIntervalReviewLongSearchSilence
-
-type longSearchStdoutGuard struct {
-	prevStdout   []byte
-	prevStderr   []byte
-	lastChangeAt time.Time
+type intervalReviewOutputGuard struct {
+	prevStdout []byte
+	prevStderr []byte
 }
 
-func (g *longSearchStdoutGuard) observe(stdout, stderr []byte, now time.Time) {
+func (g *intervalReviewOutputGuard) outputChanged(stdout, stderr []byte) bool {
 	if g == nil {
-		return
+		return false
 	}
 	if bytes.Equal(g.prevStdout, stdout) && bytes.Equal(g.prevStderr, stderr) {
-		return
+		return false
 	}
 	g.prevStdout = append([]byte(nil), stdout...)
 	g.prevStderr = append([]byte(nil), stderr...)
-	g.lastChangeAt = now
-}
-
-func (g *longSearchStdoutGuard) shouldSkipAI(now, startedAt time.Time, silence time.Duration) bool {
-	if silence <= 0 {
-		silence = defaultIntervalReviewLongSearchSilence
-	}
-	if g == nil {
-		return true
-	}
-	if !g.lastChangeAt.IsZero() {
-		return now.Sub(g.lastChangeAt) < silence
-	}
-	if startedAt.IsZero() {
-		return true
-	}
-	return now.Sub(startedAt) < silence
+	return true
 }
 
 func intervalReviewToolName(tool *aitool.Tool) string {
@@ -62,15 +37,6 @@ func intervalReviewToolName(tool *aitool.Tool) string {
 		return ""
 	}
 	return tool.Name
-}
-
-func isLongRunningSearchTool(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "grep", "find_file", "tree":
-		return true
-	default:
-		return false
-	}
 }
 
 func normalizeIntervalReviewFieldContent(reader io.Reader) (string, bool) {
@@ -302,7 +268,7 @@ func (r *ReAct) CreateIntervalReviewHandlerForTaskAndEmitter(task aicommon.AISta
 	// context. Keep local fallbacks for direct handler callers and old tests.
 	fallbackStartTime := time.Now()
 	var fallbackReviewCount int
-	var searchStdoutGuard longSearchStdoutGuard
+	var outputGuard intervalReviewOutputGuard
 
 	return func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 		startTime := fallbackStartTime
@@ -315,16 +281,12 @@ func (r *ReAct) CreateIntervalReviewHandlerForTaskAndEmitter(task aicommon.AISta
 			reviewCount = fallbackReviewCount
 		}
 
-		now := time.Now()
-		if isLongRunningSearchTool(intervalReviewToolName(tool)) {
-			searchStdoutGuard.observe(stdoutSnapshot, stderrSnapshot, now)
-			if searchStdoutGuard.shouldSkipAI(now, startTime, intervalReviewLongSearchSilence) {
-				log.Infof(
-					"interval review #%d: skip AI for long-running search tool [%s] (output still live or silence < %s)",
-					reviewCount, tool.Name, intervalReviewLongSearchSilence,
-				)
-				return true, nil
-			}
+		if outputGuard.outputChanged(stdoutSnapshot, stderrSnapshot) {
+			log.Infof(
+				"interval review #%d: skip AI for tool [%s] (stdout/stderr still changing)",
+				reviewCount, intervalReviewToolName(tool),
+			)
+			return true, nil
 		}
 
 		return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(ctx, task, emitter, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)

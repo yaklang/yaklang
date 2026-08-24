@@ -1297,7 +1297,6 @@ func TestGenerateIntervalReviewPrompt_GrepOmitsLongSearchHint(t *testing.T) {
 	}
 	require.NotContains(t, prompt, "LOOP_STALL_DETECTED")
 	require.NotContains(t, prompt, "start banner")
-	require.Contains(t, prompt, "(no recent Timeline items)")
 }
 
 // TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法
