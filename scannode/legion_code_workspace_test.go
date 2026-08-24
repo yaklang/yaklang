@@ -47,9 +47,6 @@ func validLegionCodeWorkspaceSpec(kind string) legionCodeWorkspaceSpec {
 		Kind:             kind,
 		Locator:          locator,
 		ReadOnly:         true,
-		MaxFiles:         100,
-		MaxTotalBytes:    1024 * 1024,
-		MaxFileBytes:     128 * 1024,
 		MaxReadBytes:     64 * 1024,
 		MaxSearchResults: 20,
 	}
@@ -252,6 +249,72 @@ func TestLegionCodeWorkspaceGitLocksExactRevisionAndCleansUp(t *testing.T) {
 	}
 }
 
+func TestLegionCodeWorkspaceGitDoesNotRejectLargeProjectFiles(t *testing.T) {
+	managedRoot := t.TempDir()
+	t.Setenv(ssagitworkdir.WorkDirEnv, managedRoot)
+	t.Setenv(ssagitworkdir.MinFreeBytesEnv, "0")
+	source, _ := createLocalGitRepository(t)
+	repository, err := git.PlainOpen(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	largeContent := []byte("const AI_AUDIT_LARGE_FILE = true;\n" + strings.Repeat("x", 2*1024*1024))
+	if err := os.WriteFile(filepath.Join(source, "large.js"), largeContent, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	worktree, err := repository.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := worktree.Add("large.js"); err != nil {
+		t.Fatal(err)
+	}
+	revision, err := worktree.Commit("add large source", &git.CommitOptions{Author: &object.Signature{
+		Name: "Test", Email: "test@example.invalid", When: time.Unix(2, 0),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
+	spec.Branch = "master"
+	spec.ExpectedRevision = revision.String()
+	spec.MaxFiles = 1
+	spec.MaxTotalBytes = 1
+	spec.MaxFileBytes = 1
+	originalClone := cloneLegionCodeGitWorkspace
+	cloneLegionCodeGitWorkspace = func(_ string, local string, _ ...yakgit.Option) error {
+		_, err := git.PlainClone(local, false, &git.CloneOptions{URL: source})
+		return err
+	}
+	t.Cleanup(func() { cloneLegionCodeGitWorkspace = originalClone })
+
+	workspace, err := materializeLegionCodeGitWorkspace(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("materialize git workspace with large source file: %v", err)
+	}
+	defer workspace.Cleanup()
+	if workspace.files != 2 || workspace.bytes <= int64(len(largeContent)) {
+		t.Fatalf("large source was not included in workspace metadata: %#v", workspace.info())
+	}
+	listed, err := workspace.list(map[string]any{"recursive": true})
+	if err != nil || listed["count"] != 2 {
+		t.Fatalf("large source was not listed: result=%#v err=%v", listed, err)
+	}
+	read, err := workspace.read(map[string]any{"path": "large.js", "max_bytes": 512})
+	if err != nil || read["truncated"] != true || read["file_size"].(int64) != int64(len(largeContent)) {
+		t.Fatalf("large source did not support bounded reads: result=%#v err=%v", read, err)
+	}
+	search, err := workspace.search(map[string]any{"path": "large.js", "query": "AI_AUDIT_LARGE_FILE"})
+	if err != nil || search["count"] != 1 {
+		t.Fatalf("large source did not support bounded search: result=%#v err=%v", search, err)
+	}
+	containsLine, err := legionCodeTextContainsLine(filepath.Join(workspace.root, "large.js"), 2)
+	if err != nil || !containsLine {
+		t.Fatalf("large source line did not support finding validation: contains=%v err=%v", containsLine, err)
+	}
+}
+
 func TestPrepareLegionCodeWorkspaceSanitizesBackendAuthAndProxy(t *testing.T) {
 	managedRoot := t.TempDir()
 	t.Setenv(ssagitworkdir.WorkDirEnv, managedRoot)
@@ -426,7 +489,7 @@ func zipPayload(t *testing.T, entries map[string][]byte, modes map[string]os.Fil
 }
 
 func TestLegionCodeWorkspaceArchiveRejectsUnsafeZipHashAndDownloadLimit(t *testing.T) {
-	spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindUploadedArchive)
+	limits := legionCodeArchiveLimits{MaxFiles: 100, MaxTotalBytes: 4 * 1024 * 1024}
 	for name, archive := range map[string][]byte{
 		"traversal": zipPayload(t, map[string][]byte{"../escape.go": []byte("bad")}, nil),
 		"backslash": zipPayload(t, map[string][]byte{"dir\\escape.go": []byte("bad")}, nil),
@@ -439,10 +502,30 @@ func TestLegionCodeWorkspaceArchiveRejectsUnsafeZipHashAndDownloadLimit(t *testi
 			if err := os.WriteFile(archivePath, archive, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if err := extractLegionCodeWorkspaceZip(archivePath, t.TempDir(), spec); err == nil {
+			if err := extractLegionCodeWorkspaceZip(archivePath, t.TempDir(), limits); err == nil {
 				t.Fatal("expected unsafe zip rejection")
 			}
 		})
+	}
+
+	largeSource := bytes.Repeat([]byte("x"), 2*1024*1024)
+	largeArchive := zipPayload(t, map[string][]byte{"large.js": largeSource}, nil)
+	largeArchivePath := filepath.Join(t.TempDir(), "large-source.zip")
+	if err := os.WriteFile(largeArchivePath, largeArchive, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	largeDestination := t.TempDir()
+	if err := extractLegionCodeWorkspaceZip(largeArchivePath, largeDestination, limits); err != nil {
+		t.Fatalf("archive rejected a common large source file: %v", err)
+	}
+	files, total, _, err := inspectLegionCodeWorkspace(largeDestination)
+	if err != nil || files != 1 || total != int64(len(largeSource)) {
+		t.Fatalf("unexpected extracted large source metadata: files=%d total=%d err=%v", files, total, err)
+	}
+	if err := extractLegionCodeWorkspaceZip(largeArchivePath, t.TempDir(), legionCodeArchiveLimits{
+		MaxFiles: 10, MaxTotalBytes: int64(len(largeSource)) - 1,
+	}); err == nil || !strings.Contains(err.Error(), "safety limit") {
+		t.Fatalf("expected archive aggregate safety rejection, got %v", err)
 	}
 
 	body := zipPayload(t, map[string][]byte{"main.go": []byte("package main\n")}, nil)

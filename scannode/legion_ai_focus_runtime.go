@@ -1,7 +1,6 @@
 package scannode
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -19,7 +18,6 @@ import (
 	"sync"
 	"time"
 	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/net/html"
 
@@ -318,21 +316,11 @@ func (r *legionServerFocusRuntime) submitCodeFinding(params map[string]any) (map
 	if err != nil || !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("result.code_finding file must be a regular source file")
 	}
-	if info.Size() > r.workspace.spec.MaxFileBytes {
-		return nil, fmt.Errorf("result.code_finding file exceeds source workspace max_file_bytes")
-	}
-	content, err := os.ReadFile(resolved)
+	containsEndLine, err := legionCodeTextContainsLine(resolved, finding.EndLine)
 	if err != nil {
-		return nil, fmt.Errorf("result.code_finding read file: %w", err)
+		return nil, fmt.Errorf("result.code_finding inspect file: %w", err)
 	}
-	if bytes.IndexByte(content, 0) >= 0 || !utf8.Valid(content) {
-		return nil, fmt.Errorf("result.code_finding file must be UTF-8 source text")
-	}
-	lineCount := bytes.Count(content, []byte{'\n'})
-	if len(content) > 0 && content[len(content)-1] != '\n' {
-		lineCount++
-	}
-	if finding.StartLine <= 0 || finding.EndLine < finding.StartLine || finding.EndLine > lineCount {
+	if finding.StartLine <= 0 || finding.EndLine < finding.StartLine || !containsEndLine {
 		return nil, fmt.Errorf("result.code_finding line range is outside the source file")
 	}
 	receipt, err := sink.SubmitCodeFinding(r.ctx, finding)
