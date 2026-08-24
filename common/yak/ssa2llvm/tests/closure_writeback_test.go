@@ -97,3 +97,65 @@ assert count == 2, count
 		t.Fatalf("unexpected output: %s", output)
 	}
 }
+
+// TestClosureSliceWritebackEarlyReturn covers a closure that appends to an
+// outer slice while an early-return branch skips the assignment: the parent
+// must observe only the appended elements, and the early-return path must not
+// clobber the captured slot with an uninitialized value.
+func TestClosureSliceWritebackEarlyReturn(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "closure_slice_early_return.yak")
+	if err := os.WriteFile(script, []byte(`
+files = []
+f = (dir, path) => {
+    if dir {
+        return
+    }
+    files = append(files, path)
+}
+f(1, "a")
+f(0, "b")
+f(0, "c")
+assert len(files) == 2, len(files)
+assert files[0] == "b", files
+assert files[1] == "c", files
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := RunYakScriptFileWithCLI(t, script, nil)
+	if output != "" {
+		t.Fatalf("unexpected output: %s", output)
+	}
+}
+
+// TestClosureSliceWritebackIndirect covers a closure invoked through a yaklib
+// callback (filesys.walk-style indirection) that appends to an outer slice:
+// the parent reads the final value through the closure's by-ref free-value
+// slot after the callback completes.
+func TestClosureSliceWritebackIndirect(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "closure_slice_indirect.yak")
+	if err := os.WriteFile(script, []byte(`
+files = []
+each = (items, cb) => {
+    for item in items {
+        cb(item)
+    }
+}
+each(["a", "b", "c"], (p) => {
+    if p == "b" {
+        return
+    }
+    files = append(files, p)
+})
+assert len(files) == 2, len(files)
+assert files[0] == "a", files
+assert files[1] == "c", files
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := RunYakScriptFileWithCLI(t, script, nil)
+	if output != "" {
+		t.Fatalf("unexpected output: %s", output)
+	}
+}
