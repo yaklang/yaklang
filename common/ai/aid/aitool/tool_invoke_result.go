@@ -102,6 +102,8 @@ func (t *ToolResult) dumpTimelineParams(buf io.Writer) {
 
 func (t *ToolResult) dumpTimelineResult(writer io.Writer) {
 	buf := bytes.NewBuffer(nil)
+	executionStatus, _ := t.GetExecutionStatus()
+	fmt.Fprintf(buf, "execution_status: %s\n", executionStatus)
 
 	if t.ShrinkResult != "" { // shrink result preface
 		buf.WriteString(t.ShrinkResult)
@@ -264,15 +266,16 @@ func (t *ToolResult) Dump() string {
 		CombinedOutput string `json:"combined_output,omitempty"`
 	}
 	type dumpView struct {
-		ID                int64         `json:"id,omitempty"`
-		Name              string        `json:"name"`
-		Description       string        `json:"description,omitempty"`
-		Param             any           `json:"param,omitempty"`
-		ExecutionResult   any           `json:"execution_result"`
-		Observations      *observations `json:"observations,omitempty"`
-		ProtocolCompleted bool          `json:"protocol_completed"`
-		ProtocolError     string        `json:"protocol_error,omitempty"`
-		ToolCallID        string        `json:"call_tool_id,omitempty"`
+		ID                int64               `json:"id,omitempty"`
+		Name              string              `json:"name"`
+		Description       string              `json:"description,omitempty"`
+		Param             any                 `json:"param,omitempty"`
+		ExecutionResult   any                 `json:"execution_result"`
+		ExecutionStatus   ToolExecutionStatus `json:"execution_status"`
+		Observations      *observations       `json:"observations,omitempty"`
+		ProtocolCompleted bool                `json:"protocol_completed"`
+		ProtocolError     string              `json:"protocol_error,omitempty"`
+		ToolCallID        string              `json:"call_tool_id,omitempty"`
 	}
 
 	view := dumpView{
@@ -281,10 +284,12 @@ func (t *ToolResult) Dump() string {
 		Description:       t.Description,
 		Param:             t.Param,
 		ExecutionResult:   t.Data,
+		ExecutionStatus:   ToolExecutionStatusUnknown,
 		ProtocolCompleted: t.Success,
 		ProtocolError:     t.Error,
 		ToolCallID:        t.ToolCallID,
 	}
+	view.ExecutionStatus, _ = t.GetExecutionStatus()
 	if execution, ok := t.Data.(*ToolExecutionResult); ok {
 		view.ExecutionResult = execution.Result
 		if execution.Stdout != "" || execution.Stderr != "" || execution.CombinedOutput != "" {

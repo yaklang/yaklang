@@ -560,7 +560,7 @@ func TestExecuteToolBatch_ArtifactsAreIsolatedAndOrderedDespiteOutOfOrderComplet
 	}, react.config.Timeline.GetTimelineItemIDs(), "Timeline must commit in model-index order")
 }
 
-func TestExecuteToolBatch_DirectAdmissionFailureStartsNothing(t *testing.T) {
+func TestExecuteToolBatch_DirectAdmissionFailureSkipsOnlyRejectedChild(t *testing.T) {
 	var invoked int32
 	tool, err := aitool.New(
 		"batch_validate_tool",
@@ -581,9 +581,11 @@ func TestExecuteToolBatch_DirectAdmissionFailureStartsNothing(t *testing.T) {
 		},
 	})
 	require.NoError(t, execErr)
-	require.Equal(t, int32(0), atomic.LoadInt32(&invoked))
-	require.Equal(t, aicommon.ToolCallStageCancelled, batchResult.Outcomes[0].Stage)
+	require.Equal(t, int32(1), atomic.LoadInt32(&invoked))
+	require.Equal(t, aicommon.ToolCallStageDone, batchResult.Outcomes[0].Stage)
+	require.NotNil(t, batchResult.Outcomes[0].Result)
 	require.Equal(t, aicommon.ToolCallStageValidationFailed, batchResult.Outcomes[1].Stage)
+	require.Nil(t, batchResult.Outcomes[1].Result)
 }
 
 func TestExecuteToolBatch_FreshRequestReplaysStableCheckpointIdentity(t *testing.T) {

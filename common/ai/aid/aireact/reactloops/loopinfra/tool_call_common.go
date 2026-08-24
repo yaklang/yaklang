@@ -88,7 +88,7 @@ func handleToolCallResult(
 
 	if result.Success {
 		reactloops.MarkEditBeforeExecutionCompleted(loop, toolPayload)
-		loopInfraStatus(loop, "工具调用完成 / Tool Call Complete")
+		loopInfraStatus(loop, "工具调用已结束 / Tool Invocation Settled")
 	}
 
 	if result.Error != "" {

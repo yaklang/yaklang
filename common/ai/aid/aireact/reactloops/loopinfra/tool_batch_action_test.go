@@ -785,7 +785,8 @@ func TestToolBatchActionHandler_UsesBatchRuntimeOnce(t *testing.T) {
 	require.NotNil(t, invoker.request)
 	assert.Len(t, invoker.request.Calls, 2)
 	assert.True(t, op.IsContinued())
-	assert.Contains(t, op.GetFeedback().String(), "Tool batch finished: 2 calls")
+	assert.Contains(t, op.GetFeedback().String(), "Tool batch settled: 2 calls")
+	assert.Contains(t, op.GetFeedback().String(), "execution_unknown=2")
 	assert.Contains(t, invoker.getTimelineString(), "TOOL_BATCH_RESULT")
 	assert.Equal(t, 2, op.GetExecutedToolCallCount())
 	assert.Equal(t, 1, invoker.verifyCalls)
@@ -850,9 +851,33 @@ func TestToolBatchActionHandler_ZeroInvokeDoesNotVerifyOrMarkExecution(t *testin
 			"a settled failed ToolResult is still high-value objective feedback")
 		require.True(t, op.IsContinued())
 	})
+
+	t.Run("protocol-complete semantic failure stays failed", func(t *testing.T) {
+		result := &aicommon.ToolBatchResult{Outcomes: []aicommon.ToolCallOutcome{
+			{
+				Index:         0,
+				RequestedTool: "bash",
+				FinalTool:     "bash",
+				Stage:         aicommon.ToolCallStageDone,
+				Result: &aitool.ToolResult{Name: "bash", Success: true, Data: &aitool.ToolExecutionResult{Result: map[string]any{
+					"exit_code":          7,
+					"exit_code_accepted": false,
+				}}},
+			},
+			{Index: 1, RequestedTool: "grep", Stage: aicommon.ToolCallStageValidationFailed, Err: assert.AnError},
+		}}
+		invoker, loop, op, request := newFixture(result)
+		handleToolBatchActionResult(loop, context.Background(), invoker, request, result, nil, op)
+
+		feedback := op.GetFeedback().String()
+		require.Contains(t, feedback, "execution_failed=1")
+		require.Contains(t, feedback, "protocol-completed; execution-failed")
+		require.Contains(t, feedback, "exit_code=7")
+		require.NotContains(t, feedback, "bash: done")
+	})
 }
 
-func TestToolBatchActionHandler_CachesOnlySuccessfulChildren(t *testing.T) {
+func TestToolBatchActionHandler_CachesOnlyProtocolCompleteChildren(t *testing.T) {
 	ctx := context.Background()
 	manager, readFile, grep := newToolBatchTestManager(t)
 	cfg := &aicommon.Config{AiToolManager: manager, Timeline: aicommon.NewTimeline(nil, nil)}
@@ -873,7 +898,7 @@ func TestToolBatchActionHandler_CachesOnlySuccessfulChildren(t *testing.T) {
 	op := reactloops.NewActionHandlerOperator(task)
 	handleToolBatchActionResult(loop, ctx, invoker, request, invoker.result, nil, op)
 
-	require.True(t, manager.IsRecentlyUsedTool(readFile.Name), "a successful child must remain available for future scalar direct calls")
+	require.True(t, manager.IsRecentlyUsedTool(readFile.Name), "a protocol-complete child must remain available for future scalar direct calls")
 	require.False(t, manager.IsRecentlyUsedTool(grep.Name), "a failed child must not be promoted into the direct-call cache")
 	require.Equal(t, []string{readFile.Name}, manager.GetRecentToolNames())
 	materials := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
@@ -1003,7 +1028,7 @@ func TestToolBatchPromptExamples_ExecuteActualToolCallbacks(t *testing.T) {
 			require.Equal(t, 1, invoker.requests, "one model action must dispatch one joined batch")
 			require.Equal(t, test.expected, invoker.executed)
 			require.True(t, op.IsContinued())
-			require.Contains(t, op.GetFeedback().String(), "Tool batch finished: 2 calls")
+			require.Contains(t, op.GetFeedback().String(), "Tool batch settled: 2 calls")
 		})
 	}
 }

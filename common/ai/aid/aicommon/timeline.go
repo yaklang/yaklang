@@ -801,10 +801,19 @@ func (m *Timeline) createEmergencySummary(item *TimelineItem, id int64) string {
 	var summary string
 	switch v := item.value.(type) {
 	case *aitool.ToolResult:
-		if v.Success {
-			summary = fmt.Sprintf("[%s] tool:%s completed", timeStr, v.Name)
-		} else {
+		executionStatus, detail := v.GetExecutionStatus()
+		switch {
+		case !v.Success:
 			summary = fmt.Sprintf("[%s] tool:%s protocol-error", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusFailed:
+			summary = fmt.Sprintf("[%s] tool:%s execution-failed", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusSucceeded:
+			summary = fmt.Sprintf("[%s] tool:%s execution-succeeded", timeStr, v.Name)
+		default:
+			summary = fmt.Sprintf("[%s] tool:%s protocol-completed; execution-outcome-unknown", timeStr, v.Name)
+		}
+		if detail != "" {
+			summary += " (" + detail + ")"
 		}
 	case *UserInteraction:
 		summary = fmt.Sprintf("[%s] user-interaction stage:%v", timeStr, v.Stage)
