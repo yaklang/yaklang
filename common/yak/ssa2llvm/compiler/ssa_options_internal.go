@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"os"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -26,6 +27,16 @@ func yakCompileSSAOptions() []ssaconfig.Option {
 		valueTable[name] = item
 	}
 	valueTable["__yak_chan_send"] = func(ch any, v any) {}
+	// Inject well-known runner globals from the environment: yak.Execute
+	// receives them as vars (SetVars), and scripts reference them directly
+	// (e.g. f`${VULINBOX}/gitserver/...`). Exporting them here keeps the
+	// AOT compile/run flow equivalent for mustpass-style runners.
+	if v := os.Getenv("VULINBOX"); v != "" {
+		valueTable["VULINBOX"] = v
+	}
+	if v := os.Getenv("VULINBOX_HOST"); v != "" {
+		valueTable["VULINBOX_HOST"] = v
+	}
 	if len(valueTable) > 0 {
 		opts = append(opts, ssaapi.WithExternValue(valueTable))
 	}
