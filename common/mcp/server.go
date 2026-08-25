@@ -74,6 +74,9 @@ func (s *MCPServer) getProfileDatabase() *gorm.DB {
 // switch projects while an MCP server is still running, so tool handlers must
 // not retain the handle that was current when the MCP server started.
 func (s *MCPServer) getProjectDatabase() *gorm.DB {
+	if s == nil {
+		return nil
+	}
 	if s.projectDBProvider != nil {
 		return s.projectDBProvider()
 	}

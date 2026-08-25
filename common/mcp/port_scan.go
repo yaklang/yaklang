@@ -10,7 +10,10 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -298,11 +301,65 @@ func handleQueryPort(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		rsp, err := s.grpcClient.QueryPorts(ctx, &req)
+		rsp, err := queryPorts(ctx, s, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to query ports")
 		}
 		return NewCommonCallToolResult(rsp.Data)
+	}
+}
+
+func queryPorts(ctx context.Context, s *MCPServer, req *ypb.QueryPortsRequest) (*ypb.QueryPortsResponse, error) {
+	db := s.getProjectDatabase()
+	if db == nil {
+		return s.grpcClient.QueryPorts(ctx, req)
+	}
+	var results []*ypb.Port
+	if req.GetAll() {
+		filtered := yakit.FilterPort(db, req)
+		count := bizhelper.QueryCount(filtered, &schema.Port{}, nil)
+		filtered = bizhelper.QueryOrder(filtered, req.GetOrderBy(), req.GetOrder())
+		for r := range yakit.YieldPorts(filtered, ctx) {
+			results = append(results, schemaPortToYPB(r))
+		}
+		return &ypb.QueryPortsResponse{
+			Pagination: req.Pagination,
+			Total:      int64(count),
+			Data:       results,
+		}, nil
+	}
+	p, res, err := yakit.QueryPorts(db, req)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range res {
+		results = append(results, schemaPortToYPB(r))
+	}
+	return &ypb.QueryPortsResponse{
+		Pagination: req.Pagination,
+		Total:      int64(p.TotalRecord),
+		Data:       results,
+	}, nil
+}
+
+func schemaPortToYPB(r *schema.Port) *ypb.Port {
+	if r == nil {
+		return nil
+	}
+	return &ypb.Port{
+		Host:        r.Host,
+		IPInteger:   int64(r.IPInteger),
+		Port:        int64(r.Port),
+		Proto:       r.Proto,
+		ServiceType: r.ServiceType,
+		State:       r.State,
+		Reason:      r.Reason,
+		Fingerprint: r.Fingerprint,
+		HtmlTitle:   r.HtmlTitle,
+		Id:          int64(r.ID),
+		CreatedAt:   r.CreatedAt.Unix(),
+		UpdatedAt:   r.UpdatedAt.Unix(),
+		TaskName:    r.TaskName,
 	}
 }
 
