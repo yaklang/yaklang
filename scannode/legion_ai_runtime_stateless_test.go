@@ -1765,6 +1765,7 @@ func TestStatelessDriverCancelDoesNotReportTurnFailure(t *testing.T) {
 func TestBuildContextPackageHistoryBlockFormatsMessages(t *testing.T) {
 	block := buildContextPackageHistoryBlock(&aiv1.ContextPackage{
 		Messages: []*aiv1.ContextMessage{
+			{Role: "system", Content: "authoritative task result"},
 			{Role: "user", Content: "hello"},
 			{Role: "assistant", Content: "hi there"},
 		},
@@ -1775,6 +1776,9 @@ func TestBuildContextPackageHistoryBlockFormatsMessages(t *testing.T) {
 	if !contains(block, "user: hello") || !contains(block, "assistant: hi there") {
 		t.Fatalf("history block missing messages: %q", block)
 	}
+	if contains(block, "authoritative task result") {
+		t.Fatalf("system context must not be flattened into history: %q", block)
+	}
 }
 
 func TestBuildContextPackageHistoryBlockEmptyReturnsEmpty(t *testing.T) {
@@ -1783,6 +1787,52 @@ func TestBuildContextPackageHistoryBlockEmptyReturnsEmpty(t *testing.T) {
 	}
 	if s := buildContextPackageHistoryBlock(&aiv1.ContextPackage{}); s != "" {
 		t.Fatalf("no messages should yield empty, got %q", s)
+	}
+}
+
+func TestBuildContextPackageSystemPromptFormatsOnlySystemMessages(t *testing.T) {
+	prompt := buildContextPackageSystemPrompt(&aiv1.ContextPackage{
+		Messages: []*aiv1.ContextMessage{
+			{Role: "system", Content: "confirmed_count: 4"},
+			{Role: "user", Content: "how many findings?"},
+		},
+	})
+	if !contains(prompt, "Server-authorized system context") || !contains(prompt, "confirmed_count: 4") {
+		t.Fatalf("system prompt missing authoritative context: %q", prompt)
+	}
+	if contains(prompt, "how many findings?") {
+		t.Fatalf("ordinary history must not be promoted to system context: %q", prompt)
+	}
+}
+
+func TestStatelessDriverInjectsSystemContextWithoutDroppingRuntimePreset(t *testing.T) {
+	handle := &statelessAIEngineRuntimeHandle{
+		cachedOptions: []aiengine.AIEngineConfigOption{
+			aiengine.WithExtOptions(aicommon.WithUserPresetPrompt("existing provider preset")),
+		},
+		newEngine: func(options ...aiengine.AIEngineConfigOption) (statelessTurnEngine, error) {
+			engineConfig := aiengine.NewAIEngineConfig(options...)
+			commonConfig := aicommon.NewConfig(context.Background(), engineConfig.ExtOptions...)
+			if !contains(commonConfig.UserPresetPrompt, "existing provider preset") {
+				t.Fatalf("existing runtime preset was dropped: %q", commonConfig.UserPresetPrompt)
+			}
+			if !contains(commonConfig.UserPresetPrompt, "confirmed_count: 4") {
+				t.Fatalf("server system context was not injected into prompt: %q", commonConfig.UserPresetPrompt)
+			}
+			return nil, errFakeEngineFactory
+		},
+	}
+
+	err := handle.SendInput(context.Background(), aiSessionInput{
+		ContextPackage: &aiv1.ContextPackage{
+			UserInput: "how many findings?",
+			Messages: []*aiv1.ContextMessage{
+				{Role: "system", Content: "confirmed_count: 4"},
+			},
+		},
+	})
+	if err == nil || !contains(err.Error(), errFakeEngineFactory.Error()) {
+		t.Fatalf("expected injected engine factory error after prompt assertion, got %v", err)
 	}
 }
 
