@@ -211,6 +211,22 @@ func TestLegionCodeWorkspaceArchiveLocatorIsManagedOnly(t *testing.T) {
 	}
 }
 
+func TestLegionCodeWorkspaceRuntimeOptionsAcceptUploadedPayloadSizeMetadata(t *testing.T) {
+	spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindUploadedArchive)
+	spec.SizeBytes = 1164
+	raw, err := json.Marshal(yakRuntimeOptions{SourceWorkspace: &spec})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := decodeYakRuntimeOptions(raw, true)
+	if err != nil {
+		t.Fatalf("strict runtime option decode rejected platform size metadata: %v", err)
+	}
+	if decoded.SourceWorkspace == nil || decoded.SourceWorkspace.SizeBytes != spec.SizeBytes {
+		t.Fatalf("uploaded payload size metadata was not preserved: %#v", decoded.SourceWorkspace)
+	}
+}
+
 func createLocalGitRepository(t *testing.T) (string, string) {
 	t.Helper()
 	directory := t.TempDir()

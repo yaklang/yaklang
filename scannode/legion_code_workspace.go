@@ -57,12 +57,16 @@ type legionCodeWorkspaceProxy struct {
 }
 
 type legionCodeWorkspaceSpec struct {
-	WorkspaceID      string `json:"workspace_id"`
-	Kind             string `json:"kind"`
-	Locator          string `json:"locator"`
-	Branch           string `json:"branch,omitempty"`
-	Subpath          string `json:"subpath,omitempty"`
-	PayloadID        string `json:"payload_id,omitempty"`
+	WorkspaceID string `json:"workspace_id"`
+	Kind        string `json:"kind"`
+	Locator     string `json:"locator"`
+	Branch      string `json:"branch,omitempty"`
+	Subpath     string `json:"subpath,omitempty"`
+	PayloadID   string `json:"payload_id,omitempty"`
+	// SizeBytes is immutable platform metadata for an uploaded payload. The
+	// workspace runtime accepts and preserves it but keeps download/extraction
+	// safety policy under Node control.
+	SizeBytes        int64  `json:"size_bytes,omitempty"`
 	ExpectedRevision string `json:"expected_revision,omitempty"`
 	ExpectedSHA256   string `json:"expected_sha256,omitempty"`
 	ReadOnly         bool   `json:"read_only"`
