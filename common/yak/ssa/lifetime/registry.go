@@ -24,26 +24,6 @@ type registry struct {
 	derefs map[int64]int64    // explicit *p load site id -> pointer object id
 }
 
-var (
-	progRegs sync.Map // *ssa.Program -> *registry
-)
-
-func getReg(prog *ssa.Program) *registry {
-	if prog == nil {
-		return nil
-	}
-	if v, ok := progRegs.Load(prog); ok {
-		return v.(*registry)
-	}
-	r := &registry{
-		alloc:  make(map[int64]struct{}),
-		kills:  make(map[int64][]int64),
-		derefs: make(map[int64]int64),
-	}
-	actual, _ := progRegs.LoadOrStore(prog, r)
-	return actual.(*registry)
-}
-
 // RegisterAlloc marks v as a heap allocation site (object id == v.GetId()).
 // Also stamps a durable VerboseName so analysis works after DB reload.
 func RegisterAlloc(v ssa.Value) {

@@ -114,30 +114,39 @@ func isDangerousNull(st NullState) bool {
 }
 
 // FindNPDUses analyzes prog for null-pointer dereferences (independent of UAF).
+// Results are memoized per Program for subsequent Related / native-call queries.
 func FindNPDUses(prog *ssa.Program) []*Finding {
 	if prog == nil {
 		return nil
 	}
-	reg := getReg(prog)
-	var findings []*Finding
-	seen := make(map[int64]struct{})
-	add := func(f *Finding) {
-		if f == nil || f.Use == nil || f.Use.GetId() <= 0 {
-			return
-		}
-		if _, ok := seen[f.Use.GetId()]; ok {
-			return
-		}
-		seen[f.Use.GetId()] = struct{}{}
-		findings = append(findings, f)
+	st := getState(prog)
+	if st == nil {
+		return nil
 	}
-	prog.EachFunction(func(fn *ssa.Function) {
-		defer func() { _ = recover() }()
-		for _, f := range analyzeFunctionNPD(fn, reg) {
-			add(f)
+	st.npdOnce.Do(func() {
+		st.ensureIndex(prog)
+		reg := st.reg
+		var findings []*Finding
+		seen := make(map[int64]struct{})
+		add := func(f *Finding) {
+			if f == nil || f.Use == nil || f.Use.GetId() <= 0 {
+				return
+			}
+			if _, ok := seen[f.Use.GetId()]; ok {
+				return
+			}
+			seen[f.Use.GetId()] = struct{}{}
+			findings = append(findings, f)
 		}
+		prog.EachFunction(func(fn *ssa.Function) {
+			defer func() { _ = recover() }()
+			for _, f := range analyzeFunctionNPD(fn, reg) {
+				add(f)
+			}
+		})
+		st.npdFindings = findings
 	})
-	return findings
+	return st.npdFindings
 }
 
 // FindNPDUsesRelated filters NPD findings related to seed pointer values.
@@ -194,35 +203,57 @@ func analyzeFunctionNPD(fn *ssa.Function, reg *registry) []*Finding {
 	}
 	// Params stay Unknown — do not assume they are null (conservative).
 
-	changed := true
-	for iter := 0; changed && iter < len(blocks)*8+8; iter++ {
-		changed = false
-		for i, b := range blocks {
-			preds := make([]*npdState, 0, len(b.Preds)+1)
-			if b.GetId() == entryID || len(b.Preds) == 0 {
-				preds = append(preds, newNPDState())
+	work := make([]int, 0, len(blocks))
+	inWork := make([]bool, len(blocks))
+	enqueue := func(i int) {
+		if i < 0 || i >= len(blocks) || inWork[i] {
+			return
+		}
+		inWork[i] = true
+		work = append(work, i)
+	}
+	for i := range blocks {
+		enqueue(i)
+	}
+
+	maxIter := len(blocks)*8 + 8
+	for iter := 0; len(work) > 0 && iter < maxIter; iter++ {
+		i := work[0]
+		work = work[1:]
+		inWork[i] = false
+		b := blocks[i]
+
+		preds := make([]*npdState, 0, len(b.Preds)+1)
+		if b.GetId() == entryID || len(b.Preds) == 0 {
+			preds = append(preds, newNPDState())
+		}
+		for _, pid := range b.Preds {
+			idx, ok := blockIndex[pid]
+			if !ok {
+				continue
 			}
-			for _, pid := range b.Preds {
-				idx, ok := blockIndex[pid]
-				if !ok {
-					continue
-				}
+			pred := blocks[idx]
+			// Clone only when an If edge may refine nullness; otherwise share OUT.
+			if pred != nil && predMayGuardSucc(pred, b) {
 				edge := outState[idx].clone()
-				if pred := blocks[idx]; pred != nil {
-					applyNullGuardOnEdge(pred, b, edge)
-				}
+				applyNullGuardOnEdge(pred, b, edge)
 				preds = append(preds, edge)
+			} else {
+				preds = append(preds, outState[idx])
 			}
-			merged := mergeNPDStates(preds)
-			if !equalNPDState(inState[i], merged) {
-				inState[i] = merged
-				changed = true
-			}
-			st := inState[i].clone()
-			_ = transferBlockNPD(b, st, allocs)
-			if !equalNPDState(outState[i], st) {
-				outState[i] = st
-				changed = true
+		}
+		merged := mergeNPDStates(preds)
+		if !equalNPDState(inState[i], merged) {
+			inState[i] = merged
+		}
+		st := inState[i].clone()
+		_ = transferBlockNPD(b, st, allocs)
+		if !equalNPDState(outState[i], st) {
+			outState[i] = st
+			for _, sid := range b.Succs {
+				if idx, ok := blockIndex[sid]; ok {
+					enqueue(idx)
+				}
 			}
 		}
 	}
@@ -245,6 +276,30 @@ func analyzeFunctionNPD(fn *ssa.Function, reg *registry) []*Finding {
 		out = append(out, f)
 	}
 	return out
+}
+
+// predMayGuardSucc reports whether pred contains an If whose true/false
+// successor is succ (so nullness may be refined on that edge).
+func predMayGuardSucc(pred, succ *ssa.BasicBlock) bool {
+	if pred == nil || succ == nil {
+		return false
+	}
+	succID := succ.GetId()
+	for _, iid := range pred.Insts {
+		inst, ok := pred.GetInstructionById(iid)
+		if !ok || inst == nil {
+			continue
+		}
+		inst = resolveInstruction(inst)
+		ifInst, ok := ssa.ToIfInstruction(inst)
+		if !ok || ifInst == nil {
+			continue
+		}
+		if ifInst.True == succID || ifInst.False == succID {
+			return true
+		}
+	}
+	return false
 }
 
 func transferBlockNPD(b *ssa.BasicBlock, st *npdState, allocs map[int64]struct{}) []*Finding {
@@ -454,13 +509,15 @@ func calleeNullifiesStarParam(call *ssa.Call) bool {
 	if prog == nil {
 		return false
 	}
+	st := getState(prog)
+	if st != nil {
+		st.ensureIndex(prog)
+	}
 	for _, cid := range resolveCalleeFuncIDs(call) {
 		var fn *ssa.Function
-		prog.EachFunction(func(f *ssa.Function) {
-			if f != nil && f.GetId() == cid {
-				fn = f
-			}
-		})
+		if st != nil {
+			fn = st.funcByID(cid)
+		}
 		if fn == nil {
 			continue
 		}

@@ -222,18 +222,28 @@ func resolveInstruction(inst ssa.Instruction) ssa.Instruction {
 
 func discoverAllocs(fn *ssa.Function, reg *registry) map[int64]struct{} {
 	allocs := map[int64]struct{}{}
-	if reg != nil {
-		for id := range reg.snapshotAlloc() {
-			allocs[id] = struct{}{}
-		}
-	}
 	mark := func(v ssa.Value) {
 		if v == nil || v.GetId() <= 0 {
 			return
 		}
+		id := v.GetId()
 		if isHeapAllocValue(v) {
-			allocs[v.GetId()] = struct{}{}
+			allocs[id] = struct{}{}
+			return
 		}
+		// Only consult registry for values that appear in this function —
+		// do not copy the whole-program alloc set into every function.
+		if reg != nil {
+			reg.mu.RLock()
+			_, ok := reg.alloc[id]
+			reg.mu.RUnlock()
+			if ok {
+				allocs[id] = struct{}{}
+			}
+		}
+	}
+	if fn == nil {
+		return allocs
 	}
 	for _, bid := range fn.Blocks {
 		b, ok := fn.GetBasicBlockByID(bid)
