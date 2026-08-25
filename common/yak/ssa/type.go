@@ -596,6 +596,14 @@ func CreateNumberType() Type {
 	return NewBasicType(NumberTypeKind, "number")
 }
 
+// CreateFloatType is the target type of a float() cast. It shares the
+// NumberTypeKind (so type compatibility is unchanged) but carries a distinct
+// name so the ssa2llvm compiler can tell float() casts apart from int() casts,
+// which otherwise produce identical TypeCast instructions.
+func CreateFloatType() Type {
+	return NewBasicType(NumberTypeKind, "float")
+}
+
 func CreateStringType() Type {
 	return NewBasicType(StringTypeKind, "string")
 }
@@ -651,7 +659,7 @@ func GetTypeByStr(typ string) Type {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64", "uintptr":
 		return CreateNumberType()
 	case "float", "float32", "float64", "double", "complex128", "complex64":
-		return CreateNumberType()
+		return CreateFloatType()
 	case "string":
 		return CreateStringType()
 	case "bool":
