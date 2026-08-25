@@ -26,7 +26,7 @@ func (r *ReActLoop) shouldRenderTodoSnapshot() bool {
 //go:embed prompts/todo_list.txt
 var todoListTemplate string
 
-func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
+func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) (string, error) {
 	// loop
 	// build in code
 	values := r.GetAllActions()
@@ -79,6 +79,14 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		disableActionList = append(disableActionList, r.initActionDisabled...)
 		log.Infof("applied init action disabled list: %v", r.initActionDisabled)
 	}
+	var nextActionOperator *LoopActionHandlerOperator
+	if len(actionOperators) > 0 {
+		nextActionOperator = actionOperators[0]
+	}
+	if nextActionOperator != nil && len(nextActionOperator.GetNextActionDisabled()) > 0 {
+		disableActionList = append(disableActionList, nextActionOperator.GetNextActionDisabled()...)
+		log.Infof("applied next-iteration action disabled list: %v", nextActionOperator.GetNextActionDisabled())
+	}
 
 	filterFunc := func(action *LoopAction) bool {
 		if r.actionFilters == nil {
@@ -116,6 +124,26 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 			filteredValues = mustUseFiltered
 		} else {
 			log.Warnf("init action must-use list %v did not match any available actions, keeping all", r.initActionMustUse)
+		}
+	}
+
+	// Action handlers may narrow the immediately following model turn. This is
+	// evaluated after the normal action filters so it cannot re-enable a hidden,
+	// unsafe, or unavailable action.
+	if nextActionOperator != nil && len(nextActionOperator.GetNextActionMustUse()) > 0 {
+		var mustUseFiltered []*LoopAction
+		for _, v := range filteredValues {
+			if slices.Contains(nextActionOperator.GetNextActionMustUse(), v.ActionType) {
+				mustUseFiltered = append(mustUseFiltered, v)
+			}
+		}
+		if len(mustUseFiltered) > 0 {
+			log.Infof("applied next-iteration action must-use list: %v, filtered from %d to %d actions",
+				nextActionOperator.GetNextActionMustUse(), len(filteredValues), len(mustUseFiltered))
+			filteredValues = mustUseFiltered
+		} else {
+			log.Warnf("next-iteration action must-use list %v did not match any available actions, keeping all",
+				nextActionOperator.GetNextActionMustUse())
 		}
 	}
 
@@ -209,7 +237,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		tools = r.toolsGetter()
 	}
 
-	schema, err := r.generateSchemaString(operator.disallowLoopExit)
+	schema, err := r.generateSchemaString(operator.disallowLoopExit, operator)
 	if err != nil {
 		return "", err
 	}
