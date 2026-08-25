@@ -278,6 +278,16 @@ func resolveField(obj any, name string) (reflect.Value, error) {
 	}
 
 	switch v.Kind() {
+	case reflect.String:
+		runes := []rune(v.String())
+		idx, ok := resolveCollectionIndex(len(runes), name)
+		if !ok {
+			if _, err := strconv.Atoi(name); err == nil {
+				return reflect.Value{}, fmt.Errorf("index %q out of range", name)
+			}
+			return reflect.Value{}, nil
+		}
+		return reflect.ValueOf(runes[idx]), nil
 	case reflect.Struct:
 		f := v.FieldByName(name)
 		if !f.IsValid() {
