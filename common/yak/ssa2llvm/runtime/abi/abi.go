@@ -71,6 +71,8 @@ const (
 	RuntimeBoolToStringSymbol         = "yak_runtime_bool_to_string"
 	RuntimeParseIntSymbol             = "yak_runtime_parse_int"
 	RuntimeParseFloatSymbol           = "yak_runtime_parse_float"
+	RuntimeFuzztagSymbol              = "yak_runtime_fuzztag"
+	RuntimeFloatBinopSymbol           = "yak_runtime_float_binop"
 	RuntimeGetClosureFreeSlotSymbol   = "yak_runtime_get_closure_free_slot"
 
 	// Compiler renames clashing user main/@main (not part of linkprep manifest).
