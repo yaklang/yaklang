@@ -834,6 +834,7 @@ func TestLegionCodeFindingAndAuditReportContracts(t *testing.T) {
 
 	report, err := sink.SubmitCodeAuditReport(context.Background(), "ai_code_audit_v1", aiFocusCodeAuditReport{
 		WorkspaceID: testLegionCodeWorkspaceID,
+		Title:       "代码安全审计报告",
 		Markdown:    "# Code audit\n\nOne confirmed finding; three safe candidates.",
 		StructuredSummary: json.RawMessage(`{
 			"confirmed_count":1,
@@ -847,6 +848,10 @@ func TestLegionCodeFindingAndAuditReportContracts(t *testing.T) {
 	if report.ResultID != focusResultReportEventID("job-code-1", "ai_code_audit_v1") ||
 		len(publisher.reportKinds) != 1 || publisher.reportKinds[0] != "ai_code_audit_v1" {
 		t.Fatalf("unexpected dedicated report: receipt=%#v publisher=%#v", report, publisher)
+	}
+	var publishedReport aiFocusCodeAuditReport
+	if err := json.Unmarshal(publisher.reports[0], &publishedReport); err != nil || publishedReport.Title != "代码安全审计报告" {
+		t.Fatalf("dedicated report title was not preserved: report=%#v err=%v", publishedReport, err)
 	}
 	if err := rawSink.(*legionAIFocusResultSink).Succeed(context.Background(), []byte(`{"completed":true}`)); err != nil {
 		t.Fatalf("complete code audit: %v", err)

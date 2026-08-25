@@ -75,6 +75,7 @@ type aiFocusCodeFinding struct {
 
 type aiFocusCodeAuditReport struct {
 	WorkspaceID       string          `json:"workspace_id"`
+	Title             string          `json:"title"`
 	Markdown          string          `json:"markdown"`
 	StructuredSummary json.RawMessage `json:"structured_summary"`
 }
@@ -532,12 +533,19 @@ func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 ) (aiFocusResultReceipt, error) {
 	kind = strings.TrimSpace(kind)
 	report.WorkspaceID = strings.TrimSpace(report.WorkspaceID)
+	report.Title = strings.TrimSpace(report.Title)
+	if report.Title == "" {
+		report.Title = "代码安全审计报告"
+	}
 	report.Markdown = strings.TrimSpace(report.Markdown)
 	if kind == "" {
 		return aiFocusResultReceipt{}, fmt.Errorf("report result kind is required")
 	}
 	if report.WorkspaceID == "" || report.Markdown == "" {
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report workspace_id and markdown are required")
+	}
+	if len(report.Title) > 256 {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report title exceeds 256 bytes")
 	}
 	if len(report.Markdown) > maxInlineCodeAuditReportBytes {
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report markdown exceeds %d bytes", maxInlineCodeAuditReportBytes)
