@@ -3,6 +3,7 @@ package aimem
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -12,6 +13,30 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// TTL 过期天数常量（基于 T_Score 区间）
+const (
+	TTLTransientDays = 7.0  // T_Score 0.0-0.3: 瞬时记忆
+	TTLShortTermDays = 30.0 // T_Score 0.3-0.6: 短期记忆
+	TTLMidTermDays   = 90.0 // T_Score 0.6-0.8: 中期记忆
+)
+
+// CalcExpiresAt 根据 T_Score 计算过期时间。T_Score >= 0.8 的长期记忆返回 nil 表示不过期。
+func CalcExpiresAt(tScore float64, createdAt time.Time) *time.Time {
+	var days float64
+	switch {
+	case tScore < 0.3:
+		days = TTLTransientDays
+	case tScore < 0.6:
+		days = TTLShortTermDays
+	case tScore < 0.8:
+		days = TTLMidTermDays
+	default:
+		return nil // 长期/核心记忆不过期
+	}
+	expires := createdAt.Add(time.Duration(days * 24 * float64(time.Hour)))
+	return &expires
+}
 
 // SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW。
 //
@@ -59,6 +84,14 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 			A_Score:            entity.A_Score,
 			T_Score:            entity.T_Score,
 			CorePactVector:     schema.FloatArray(entity.CorePactVector),
+		}
+
+		// 根据T_Score自动计算过期时间
+		now := time.Now()
+		dbEntity.ExpiresAt = CalcExpiresAt(entity.T_Score, now)
+		// 如果外部已经设置了ExpiresAt，优先使用外部值
+		if entity.ExpiresAt != nil {
+			dbEntity.ExpiresAt = entity.ExpiresAt
 		}
 
 		if err := db.Table(r.entityTableName()).Create(dbEntity).Error; err != nil {
@@ -227,6 +260,11 @@ func (r *AIMemoryTriage) UpdateMemoryEntity(entity *aicommon.MemoryEntity) error
 	existingEntity.A_Score = entity.A_Score
 	existingEntity.T_Score = entity.T_Score
 	existingEntity.CorePactVector = schema.FloatArray(entity.CorePactVector)
+	if entity.ExpiresAt != nil {
+		existingEntity.ExpiresAt = entity.ExpiresAt
+	} else {
+		existingEntity.ExpiresAt = CalcExpiresAt(entity.T_Score, existingEntity.CreatedAt)
+	}
 
 	// 保存更新
 	if err := db.Table(r.entityTableName()).Save(&existingEntity).Error; err != nil {
@@ -276,6 +314,7 @@ func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*aicommon.MemoryEntit
 		A_Score:            dbEntity.A_Score,
 		T_Score:            dbEntity.T_Score,
 		CorePactVector:     []float32(dbEntity.CorePactVector),
+		ExpiresAt:          dbEntity.ExpiresAt,
 	}
 
 	return entity, nil
@@ -314,6 +353,7 @@ func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*aicommon.MemoryEntity, e
 			A_Score:            dbEntity.A_Score,
 			T_Score:            dbEntity.T_Score,
 			CorePactVector:     []float32(dbEntity.CorePactVector),
+		ExpiresAt:          dbEntity.ExpiresAt,
 		}
 		results = append(results, entity)
 	}
