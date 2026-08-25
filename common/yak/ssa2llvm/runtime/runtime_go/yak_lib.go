@@ -8,6 +8,11 @@ package main
 
 // Forward declaration of the proxy function defined in c_stub.c
 void yak_finalizer_proxy(void* obj, void* client_data);
+
+// GC control wrappers defined in c_stub.c (they call GC_disable/GC_enable
+// from local_gc.h).
+void yak_gc_disable(void);
+void yak_gc_enable(void);
 */
 import "C"
 import (
@@ -159,8 +164,10 @@ func yak_runtime_to_cstring(ptr uintptr) *C.char {
 		// convert it to its string form so dynamic member keys work. Passing
 		// such a value as unsafe.Pointer would trip cgo's unpinned-pointer
 		// check before the function body runs, so the ABI takes uintptr.
-		// Zero is a valid integer key ("0"), not a nil C string.
-		return C.CString(fmt.Sprintf("%d", int64(raw)))
+		// Zero is a valid integer key ("0"), not a nil C string. Negative
+		// integers must keep their sign: -1 is an index, not the huge
+		// positive word produced by masking the tag bit.
+		return C.CString(fmt.Sprintf("%d", int64(ptr)))
 	}
 	// Always hand back a C-owned copy: cgo refuses to return a raw Go/static
 	// binary pointer from an exported function ("unpinned Go pointer").
@@ -653,8 +660,14 @@ func yak_runtime_dump_handle(objPtr unsafe.Pointer) {
 //export yak_runtime_gc
 func yak_runtime_gc() {
 	defer recoverRuntimePanic()
-	// Manual GC trigger if needed
+	// Automatic Boehm collections cannot see shadow references held on Go's
+	// cgo callback stacks (LLVM alloca slots/registers), so they would
+	// reclaim live shadows mid-script (finalizers drop the cgo handle and
+	// later lookups miss). Keep collections explicit: enable only around
+	// this call, which runs after the script's main has finished.
+	C.yak_gc_enable()
 	C.GC_gcollect()
+	C.yak_gc_disable()
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
 }
