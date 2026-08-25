@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -59,6 +60,41 @@ var (
 )
 
 const mitmRequestHijackAtTimingKey = "yakit_mitm_request_hijack_at_unix_ms"
+
+// wrapMITMV2ExtraIncomingConn preserves the generic extra-connection contract:
+// an arbitrary injected net.Conn is still a normal proxy frontend connection.
+// Only producers that explicitly implement minimartian.TransparentConn may
+// provide an original destination and bypass frontend SOCKS5 detection.
+func wrapMITMV2ExtraIncomingConn(conn net.Conn, strongHostLocalAddr string) (*minimartian.WrapperedConn, error) {
+	if conn == nil {
+		return nil, utils.Error("mitm: extra incoming connection is nil")
+	}
+
+	transparentConn, ok := conn.(minimartian.TransparentConn)
+	if !ok {
+		return minimartian.NewWrapperedConnWithStrongLocalHost(conn, strongHostLocalAddr, nil), nil
+	}
+
+	originalAddr := transparentConn.OriginalDestination()
+	if originalAddr == nil {
+		return nil, utils.Error("mitm: transparent incoming connection has no original destination")
+	}
+	originalDestination := originalAddr.String()
+	targetHost, targetPort, err := utils.ParseStringToHostPort(originalDestination)
+	if err != nil {
+		return nil, utils.Errorf("mitm: transparent incoming connection has invalid original destination %q: %v", originalDestination, err)
+	}
+	if targetHost == "" || targetPort <= 0 {
+		return nil, utils.Errorf("mitm: transparent incoming connection has invalid original destination %q", originalDestination)
+	}
+
+	return minimartian.NewWrapperedConnWithStrongLocalHostAndOriginalDestination(
+		conn,
+		strongHostLocalAddr,
+		originalDestination,
+		nil,
+	), nil
+}
 
 // prepareMITMBareRequestForStorage stores original requests with the same
 // fuzzable representation used by MITM and HTTPFlow. No bytes are truncated:
@@ -2050,8 +2086,25 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	go func() {
 		for {
 			select {
-			case conn := <-extraIncome.OutputChannel():
-				wrapperConnChan <- minimartian.NewWrapperedConnWithStrongLocalHost(conn, publicIP.String(), nil)
+			case conn, ok := <-extraIncome.OutputChannel():
+				if !ok {
+					return
+				}
+				if conn == nil {
+					continue
+				}
+				wrapped, wrapErr := wrapMITMV2ExtraIncomingConn(conn, publicIP.String())
+				if wrapErr != nil {
+					log.Errorf("wrap mitm extra incoming connection failed: %v", wrapErr)
+					_ = conn.Close()
+					continue
+				}
+				select {
+				case wrapperConnChan <- wrapped:
+				case <-streamCtx.Done():
+					_ = conn.Close()
+					return
+				}
 			case <-streamCtx.Done():
 				return
 			}
