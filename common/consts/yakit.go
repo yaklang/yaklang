@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -165,7 +166,38 @@ func CreateProfileDatabase(path string) (*gorm.DB, error) {
 	return db, nil
 }
 
+func isSQLiteRetryableErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "database is locked") ||
+		strings.Contains(msg, "sqlite_busy") ||
+		strings.Contains(msg, "sqlite_locked") ||
+		strings.Contains(msg, "being used by another") ||
+		strings.Contains(msg, "unable to open database file")
+}
+
 func SetGormProjectDatabase(path string) error {
+	var lastErr error
+	for i := 0; i < 8; i++ {
+		lastErr = setGormProjectDatabaseOnce(path)
+		if lastErr == nil {
+			return nil
+		}
+		if !isSQLiteRetryableErr(lastErr) {
+			return lastErr
+		}
+		shift := i
+		if shift > 5 {
+			shift = 5
+		}
+		time.Sleep(time.Duration(50*(1<<shift)) * time.Millisecond)
+	}
+	return lastErr
+}
+
+func setGormProjectDatabaseOnce(path string) error {
 	d, err := CreateProjectDatabase(path)
 	if err != nil {
 		return err
@@ -176,7 +208,6 @@ func SetGormProjectDatabase(path string) error {
 		return err
 	}
 	BindProjectDatabaseWithReader(d, readDB, path)
-	schema.AutoMigrate(d, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	return nil
 }
 

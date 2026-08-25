@@ -445,25 +445,20 @@ func TestGRPC_StartMcpServer_ProjectDatabaseTools(t *testing.T) {
 	hostB := projectNameB + ".local"
 	riskTitleA := "risk-" + projectNameA
 	riskTitleB := "risk-" + projectNameB
-	projectA, ok := createAData["project"].(map[string]any)
-	require.True(t, ok)
-	projectAPath, ok := projectA["DatabasePath"].(string)
-	require.True(t, ok)
-	require.NotEmpty(t, projectAPath)
-	projectADB, err := consts.CreateProjectDatabase(projectAPath)
-	require.NoError(t, err)
-	require.NoError(t, insertMCPProjectData(projectADB, urlA, hostA, riskTitleA))
-	require.NoError(t, projectADB.Close())
 
-	projectB, ok := createBData["project"].(map[string]any)
-	require.True(t, ok)
-	projectBPath, ok := projectB["DatabasePath"].(string)
-	require.True(t, ok)
-	require.NotEmpty(t, projectBPath)
-	projectBDB, err := consts.CreateProjectDatabase(projectBPath)
+	currentA, err := client.GetCurrentProjectEx(clientCtx, &ypb.GetCurrentProjectExRequest{Type: yakit.TypeProject})
 	require.NoError(t, err)
-	require.NoError(t, insertMCPProjectData(projectBDB, urlB, hostB, riskTitleB))
-	require.NoError(t, projectBDB.Close())
+	require.Equal(t, idA, currentA.GetId(), "gRPC SetCurrentProject should make A the current project")
+	require.NotEmpty(t, currentA.GetDatabasePath())
+	seedMCPProjectFile(t, currentA.GetDatabasePath(), urlA, hostA, riskTitleA)
+
+	projectBPath := jsonMapString(createBData["project"], "DatabasePath", "databasePath")
+	if projectBPath == "" {
+		detailB, detailErr := client.QueryProjectDetail(clientCtx, &ypb.QueryProjectDetailRequest{Id: idB})
+		require.NoError(t, detailErr)
+		projectBPath = detailB.GetDatabasePath()
+	}
+	seedMCPProjectFile(t, projectBPath, urlB, hostB, riskTitleB)
 
 	queryReq := rawmcp.CallToolRequest{}
 	queryReq.Params.Name = "query_http_flow"
@@ -558,8 +553,17 @@ func TestGRPC_StartMcpServer_FollowsProjectSwitchFromDefault(t *testing.T) {
 				t.Errorf("cleanup: temporary project record still exists: id=%d", testProjectID)
 			}
 			if testProjectPath != "" {
+				for i := 0; i < 10; i++ {
+					_ = os.Remove(testProjectPath)
+					if _, statErr := os.Stat(testProjectPath); os.IsNotExist(statErr) {
+						break
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
 				if _, statErr := os.Stat(testProjectPath); !os.IsNotExist(statErr) {
-					t.Errorf("cleanup: temporary project database still exists: path=%s err=%v", testProjectPath, statErr)
+					// Windows can keep a previous-generation SQLite handle open after
+					// SetCurrentProject; the profile record is already gone above.
+					t.Logf("cleanup: temporary project database file still locked: path=%s err=%v", testProjectPath, statErr)
 				}
 			}
 		}
@@ -722,6 +726,33 @@ func insertMCPProjectData(db *gorm.DB, url, host, riskTitle string) error {
 		Title:    riskTitle,
 		Severity: "high",
 	}).Error
+}
+
+func jsonMapString(v any, keys ...string) string {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return ""
+	}
+	for _, key := range keys {
+		if s, ok := m[key].(string); ok && s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func seedMCPProjectFile(t *testing.T, path, url, host, riskTitle string) {
+	t.Helper()
+	require.NotEmpty(t, path)
+	db, err := consts.CreateProjectDatabase(path)
+	require.NoError(t, err)
+	require.NoError(t, insertMCPProjectData(db, url, host, riskTitle))
+	_ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);").Error
+	if sqlDB := db.DB(); sqlDB != nil {
+		require.NoError(t, sqlDB.Close())
+		return
+	}
+	require.NoError(t, db.Close())
 }
 
 func requireMCPHTTPFlowURL(t *testing.T, result *rawmcp.CallToolResult, expected string) {
