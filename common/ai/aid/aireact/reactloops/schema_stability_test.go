@@ -130,6 +130,38 @@ func TestGenerateSchema_DirectlyCallToolDisabledWhenNoToolManager(t *testing.T) 
 		"directly_call_tool MUST be disabled when toolManager is nil (NPE 兜底)")
 }
 
+func TestGenerateSchema_AppliesOneShotHandlerActionConstraints(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background())
+	loop := makeSchemaStabilityTestLoop(cfg)
+
+	mustUse := newLoopActionHandlerOperator(nil)
+	mustUse.NextAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+	constrained, err := loop.generateSchemaString(false, mustUse)
+	require.NoError(t, err)
+	var constrainedRoot map[string]any
+	require.NoError(t, json.Unmarshal([]byte(constrained), &constrainedRoot))
+	constrainedActions := constrainedRoot["properties"].(map[string]any)["@action"].(map[string]any)["enum"].([]any)
+	require.Equal(t, []any{schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL}, constrainedActions)
+
+	disabled := newLoopActionHandlerOperator(nil)
+	disabled.RemoveNextAction(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	withoutDirectCall, err := loop.generateSchemaString(false, disabled)
+	require.NoError(t, err)
+	var disabledRoot map[string]any
+	require.NoError(t, json.Unmarshal([]byte(withoutDirectCall), &disabledRoot))
+	disabledActions := disabledRoot["properties"].(map[string]any)["@action"].(map[string]any)["enum"].([]any)
+	require.Contains(t, disabledActions, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+	require.NotContains(t, disabledActions, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+
+	unconstrained, err := loop.generateSchemaString(false)
+	require.NoError(t, err)
+	var unconstrainedRoot map[string]any
+	require.NoError(t, json.Unmarshal([]byte(unconstrained), &unconstrainedRoot))
+	unconstrainedActions := unconstrainedRoot["properties"].(map[string]any)["@action"].(map[string]any)["enum"].([]any)
+	require.Contains(t, unconstrainedActions, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
+		"handler constraints must only affect the immediately following prompt")
+}
+
 // TestGenerateSchema_StableAcrossMultipleAdds 双重保险: 多次 AddRecentlyUsedTool
 // 后 schema 仍与初始空 schema 字节相等 (验证 LRU 增减不影响 schema 字节).
 //
