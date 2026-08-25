@@ -1535,6 +1535,10 @@ func init() {
 	registerNativeCall(NativeCall_HeapAlloc, nc_func(nativeCallHeapAlloc), nc_desc(`堆分配点查询：返回 malloc/calloc/realloc 等注册的堆对象。用法：*<heapAlloc()> / <heapAlloc(target=$ptr)> / $ptr<heapAlloc()>。`))
 	registerNativeCall(NativeCall_FreeCall, nc_func(nativeCallFreeCall), nc_desc(`释放调用查询：返回 free / RegisterKill 调用点。用法：*<freeCall()> / <freeCall(target=$ptr)> / $ptr<freeCall()>。`))
 	registerNativeCall(NativeCall_DerefSite, nc_func(nativeCallDerefSite), nc_desc(`显式解引用点查询：返回 c2ssa RegisterDeref 记录的 *p 加载点。用法：*<derefSite()> / <derefSite(target=$ptr)> / $ptr<derefSite()>。`))
+	registerNativeCall(NativeCall_MemLeak, nc_func(nativeCallMemLeak), nc_desc(`内存泄漏检测：堆对象在函数出口仍可能 Alive，且未通过 return 逃逸。用法：*<memLeak()> / <memLeak(target=$ptr)> / $ptr<memLeak()>。形式参数不报告。`))
+	registerNativeCall(NativeCall_NullCheck, nc_func(nativeCallNullCheck), nc_desc(`空指针检查条件：返回 if (p) / if (!p) / p==NULL / p!=NULL 等条件 SSA。用法：*<nullCheck()> / <nullCheck(target=$ptr)> / $ptr<nullCheck()>。`))
+	registerNativeCall(NativeCall_PointsTo, nc_func(nativeCallPointsTo), nc_desc(`may-points-to：返回指针可能指向的抽象对象（函数内 OUT 并集）。用法：$p<pointsTo()>。`))
+	registerNativeCall(NativeCall_Aliases, nc_func(nativeCallAliases), nc_desc(`may-alias：保留与 target 可能同对象的 receiver。用法：$a<aliases(target=$b)>。`))
 }
 
 func fetchProgram(v any) (*Program, error) {
