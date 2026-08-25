@@ -1451,9 +1451,6 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 		if command.GetResultContext() == nil {
 			return fmt.Errorf("source_workspace requires an ai focus result context")
 		}
-		if strings.TrimSpace(command.GetResultContext().GetFocusMode()) != legionAICodeSecurityAuditResultMode {
-			return fmt.Errorf("source_workspace requires focus_mode=%s", legionAICodeSecurityAuditResultMode)
-		}
 		expectedTarget, err := legionCodeWorkspaceSentinel(spec.WorkspaceID)
 		if err != nil {
 			return err
@@ -1462,9 +1459,11 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 		if err != nil || target.String() != expectedTarget {
 			return fmt.Errorf("source_workspace target_url must equal %s", expectedTarget)
 		}
-	} else if command.GetResultContext() != nil &&
-		strings.TrimSpace(command.GetResultContext().GetFocusMode()) == legionAICodeSecurityAuditResultMode {
-		return fmt.Errorf("focus_mode=%s requires source_workspace", legionAICodeSecurityAuditResultMode)
+	} else if command.GetResultContext() != nil {
+		target, targetErr := normalizeServerFocusURL(command.GetResultContext().GetTargetUrl())
+		if targetErr == nil && strings.EqualFold(target.Hostname(), "workspace.invalid") {
+			return fmt.Errorf("workspace.invalid target requires source_workspace")
+		}
 	}
 	return nil
 }
