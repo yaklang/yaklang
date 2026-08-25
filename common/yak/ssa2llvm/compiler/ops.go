@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -781,17 +782,51 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 		return err
 	}
 
-	if inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.StringTypeKind {
+	if inst.GetType() != nil {
 		sourceKind := ssa.AnyTypeKind
 		if fn := inst.GetFunc(); fn != nil {
 			if sourceVal, ok := fn.GetValueById(inst.Value); ok && sourceVal != nil && sourceVal.GetType() != nil {
 				sourceKind = sourceVal.GetType().GetTypeKind()
 			}
 		}
-		if sourceKind == ssa.BytesTypeKind || sourceKind == ssa.StringTypeKind {
-			fn, fnType := c.getOrInsertRuntimeToCString()
-			argWord := c.coerceToInt64(val)
-			val = c.Builder.CreateCall(fnType, fn, []llvm.Value{argWord}, fmt.Sprintf("to_cstring_%d", inst.GetId()))
+		switch inst.GetType().GetTypeKind() {
+		case ssa.StringTypeKind:
+			if sourceKind == ssa.BytesTypeKind || sourceKind == ssa.StringTypeKind {
+				fn, fnType := c.getOrInsertRuntimeToCString()
+				argWord := c.coerceToInt64(val)
+				val = c.Builder.CreateCall(fnType, fn, []llvm.Value{argWord}, fmt.Sprintf("to_cstring_%d", inst.GetId()))
+			} else if sourceKind == ssa.BooleanTypeKind {
+				castFn, castType := c.getOrInsertRuntimeBoolToString()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("bool_to_str_%d", inst.GetId()))
+			} else {
+				// Number/null/any source: format through the runtime, which
+				// recognizes float bit patterns and keeps nil as "".
+				castFn, castType := c.getOrInsertRuntimeToString()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_string_%d", inst.GetId()))
+			}
+		case ssa.NumberTypeKind:
+			// int()/float() casts share the NumberTypeKind; the float() target
+			// carries the "float" type name so the conversion direction is
+			// distinguishable at compile time. String sources are parsed.
+			if sourceKind == ssa.StringTypeKind {
+				if inst.GetType().String() == "float" {
+					castFn, castType := c.getOrInsertRuntimeParseFloat()
+					val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("parse_float_%d", inst.GetId()))
+				} else {
+					castFn, castType := c.getOrInsertRuntimeParseInt()
+					val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("parse_int_%d", inst.GetId()))
+				}
+			} else if inst.GetType().String() == "float" {
+				castFn, castType := c.getOrInsertRuntimeToFloat()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_float_%d", inst.GetId()))
+			} else {
+				castFn, castType := c.getOrInsertRuntimeToInt()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_int_%d", inst.GetId()))
+			}
+		case ssa.BooleanTypeKind:
+			// bool(x): any non-zero word is true (float bit patterns included).
+			cond := c.coerceToI1(c.coerceToInt64(val), "bool_cast_cond")
+			val = c.Builder.CreateZExt(cond, c.LLVMCtx.Int64Type(), "bool_cast")
 		}
 	}
 
@@ -801,6 +836,72 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Compiler) getOrInsertRuntimeToInt() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeToIntSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeToFloat() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeToFloatSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeToString() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeToStringSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeBoolToString() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeBoolToStringSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeParseInt() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeParseIntSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeParseFloat() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeParseFloatSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
 }
 
 func (c *Compiler) valueHasLocalDependency(fn *ssa.Function, val ssa.Value) bool {

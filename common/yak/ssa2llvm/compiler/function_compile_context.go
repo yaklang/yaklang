@@ -5,6 +5,17 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+// redirectedSlotSource records where an SSA value's storage was redirected:
+// the free-value binding index whose heap slot now holds the value, plus an
+// entry-block alloca that holds the materialized closure object. The closure
+// is stored into the alloca at the redirecting side-effect and reloaded at
+// each use site, so the closure word dominates every redirected load/store
+// even when the side-effect lives in a different block (loop-carried phis).
+type redirectedSlotSource struct {
+	closureSlot llvm.Value
+	index       int64
+}
+
 type functionCompileContext struct {
 	current *ssa.Function
 
@@ -40,11 +51,15 @@ type functionCompileContext struct {
 	// the call read captured variables from these slots as well.
 	materializedClosureArgs map[int64][]llvm.Value
 	// redirectedSlots maps an SSA value id whose storage was redirected to a
-	// closure's heap free-value slot. Reads/writes of that id go through the
-	// heap slot, so closures invoked indirectly (filesys/zip callbacks)
-	// propagate scalar mutations to the caller without a direct call-site
-	// side-effect readback.
-	redirectedSlots map[int64]llvm.Value
+	// closure's heap free-value slot. Reads/writes of that id resolve the slot
+	// pointer lazily at each use site (calling yak_runtime_get_closure_free_slot),
+	// so closures invoked indirectly (filesys/zip callbacks) propagate scalar
+	// mutations to the caller without a direct call-site side-effect readback.
+	redirectedSlots map[int64]redirectedSlotSource
+	// redirectedClosureAllocas holds the entry-block alloca that parks the
+	// closure object word for each redirected SSA value, so the closure stays
+	// dominant over every redirected load/store.
+	redirectedClosureAllocas map[int64]llvm.Value
 
 	exceptionValueIDs    map[int64]struct{}
 	activeHandlerByBlock map[int64]int64

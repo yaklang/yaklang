@@ -147,7 +147,7 @@ func linkStaticWithPatch(objFile, binFile, workDir string, obfArchives []string,
 		// address-significant and folds nothing. Worse, if it did fold, two
 		// identical Go functions would share one address and runtime.textsectmap
 		// would attribute the folded PC to the wrong function.
-		linkArgs = append(linkArgs, "--gc-sections", "-s")
+		linkArgs = append(linkArgs, "--gc-sections")
 		in := llvm.StaticLinkInput{
 			ObjectPath: objFile,
 			Archives:   archives,

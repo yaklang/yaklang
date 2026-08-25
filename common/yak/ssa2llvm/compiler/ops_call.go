@@ -90,6 +90,11 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 	if obj == nil || key == nil {
 		return contextCallSpec{}, false, nil
 	}
+	// Map lookups yield values, not methods: a["c"] is a closure stored in
+	// the map (callable value), not a method dispatch on the map object.
+	if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.MapTypeKind {
+		return contextCallSpec{}, false, nil
+	}
 	// Numeric/dynamic keys (slice index, map lookup) yield a callable VALUE
 	// (e.g. fns[0] is a closure stored in the slice), not a method name.
 	// Only string-constant keys are method dispatches.

@@ -18,8 +18,73 @@ func (c *Compiler) compileJump(inst *ssa.Jump) error {
 	if !ok {
 		return fmt.Errorf("compileJump: target block %d not found", inst.To)
 	}
+	// A jump into a loop exit (break) bypasses the latch, so loop-carried
+	// phi values computed in the current iteration (e.g. t24 from
+	// `t += 1; if i == 10 { break }`) are never flushed by the normal
+	// latch-side writeback and the exit reads a stale value. Flush the
+	// condition block's phi slots with their latch-edge values here.
+	if fn := inst.GetFunc(); fn != nil {
+		c.emitLoopExitPhiWriteback(fn, inst.To)
+	}
 	c.Builder.CreateBr(targetBlock)
 	return nil
+}
+
+// emitLoopExitPhiWriteback flushes loop-carried phi values when a jump
+// targets a loop exit block directly (break). For every loop whose exit is
+// the jump target, the condition block's phis receive their latch-edge value
+// (the current iteration's computed value) so reads after the loop observe
+// the final iteration's state.
+func (c *Compiler) emitLoopExitPhiWriteback(fn *ssa.Function, exitBlockID int64) {
+	if fn == nil || exitBlockID <= 0 || c.function == nil {
+		return
+	}
+	for _, blockID := range fn.Blocks {
+		blockVal, ok := fn.GetValueById(blockID)
+		if !ok {
+			continue
+		}
+		block, ok := ssa.ToBasicBlock(blockVal)
+		if !ok || block == nil {
+			continue
+		}
+		for _, instID := range block.Insts {
+			instVal, ok := fn.GetInstructionById(instID)
+			if !ok {
+				continue
+			}
+			loop, ok := instVal.(*ssa.Loop)
+			if !ok || loop == nil || loop.Exit != exitBlockID {
+				continue
+			}
+			condBlock := loop.GetBlock()
+			if condBlock == nil {
+				continue
+			}
+			for _, phiID := range condBlock.Phis {
+				phiVal, ok := fn.GetValueById(phiID)
+				if !ok {
+					continue
+				}
+				phi, ok := phiVal.(*ssa.Phi)
+				if !ok || phi == nil || len(phi.Edge) == 0 {
+					continue
+				}
+				// The latch-edge value is the last edge (entry values come
+				// first; rotateSelfLast keeps edge order aligned with the CFG
+				// predecessors). Skip when it is not resolvable here.
+				latchValueID := phi.Edge[len(phi.Edge)-1]
+				if latchValueID <= 0 {
+					continue
+				}
+				val, err := c.getValue(loop, latchValueID)
+				if err != nil || val.IsNil() {
+					continue
+				}
+				c.storeSSAValue(phiID, val)
+			}
+		}
+	}
 }
 
 func (c *Compiler) switchHandlerForJump(inst *ssa.Jump) *switchHandlerInfo {

@@ -132,6 +132,17 @@ func (c *Compiler) getOrInsertRuntimeMakeSlice() (llvm.Value, llvm.Type) {
 	return fn, fnType
 }
 
+func (c *Compiler) getOrInsertRuntimeSliceSlice() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeSliceSliceSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
 func (c *Compiler) getOrInsertRuntimeMakeObject() (llvm.Value, llvm.Type) {
 	name := c.runtimeSymName(abi.MakeObjectSymbol)
 	fn := c.Mod.NamedFunction(name)
@@ -180,14 +191,60 @@ func makeInitialMemberCount(inst *ssa.Make) int64 {
 		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
 			continue
 		}
+		// Reads merged into the Make's pair list (e.g. a[-1] later in the
+		// program) carry an Undefined member placeholder; they must not
+		// inflate the initial length. Loop-carried member phis are reads too.
+		if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil {
+			continue
+		}
+		if u, isUndef := key.(*ssa.Undefined); isUndef && u != nil {
+			continue
+		}
+		if _, isPhi := member.(*ssa.Phi); isPhi {
+			continue
+		}
+		if _, isPhi := key.(*ssa.Phi); isPhi {
+			continue
+		}
 		count++
-		continue
 	}
 	return count
 }
 
 func (c *Compiler) compileMakeSlice(inst *ssa.Make, typ ssa.Type) error {
 	i64 := c.LLVMCtx.Int64Type()
+	// Slice-of-slice (a[low:high] on a yak slice): copy the selected window
+	// through the runtime, mirroring compileMakeStringSlice for strings.
+	// Unspecified bounds are -1 so the runtime can apply the correct defaults
+	// for positive and negative (reverse) steps.
+	if parentID := inst.GetParent(); parentID > 0 {
+		parentVal := llvm.ConstInt(i64, 0, false)
+		if val, err := c.getValue(inst, parentID); err == nil {
+			parentVal = c.coerceToInt64(val)
+		}
+		low := llvm.ConstInt(i64, ^uint64(0), false) // -1: unspecified
+		if lowID := inst.GetLow(); lowID > 0 {
+			if val, err := c.getValue(inst, lowID); err == nil {
+				low = c.coerceToInt64(val)
+			}
+		}
+		high := llvm.ConstInt(i64, ^uint64(0), false) // -1: slice to end
+		if highID := inst.GetHigh(); highID > 0 {
+			if val, err := c.getValue(inst, highID); err == nil {
+				high = c.coerceToInt64(val)
+			}
+		}
+		step := llvm.ConstInt(i64, 1, false)
+		if maxID := inst.GetStep(); maxID > 0 {
+			if val, err := c.getValue(inst, maxID); err == nil {
+				step = c.coerceToInt64(val)
+			}
+		}
+		fn, fnType := c.getOrInsertRuntimeSliceSlice()
+		val := c.Builder.CreateCall(fnType, fn, []llvm.Value{parentVal, low, high, step}, fmt.Sprintf("slice_slice_%d", inst.GetId()))
+		c.cacheValue(inst.GetId(), c.coerceToInt64(val))
+		return nil
+	}
 	length := llvm.ConstInt(i64, 0, false)
 	if inst.Len > 0 {
 		val, err := c.getValue(inst, inst.Len)
@@ -1050,29 +1107,6 @@ func (c *Compiler) shouldReadMemberValueDynamically(val ssa.Value, id int64) boo
 	return obj != nil && key != nil
 }
 
-func (c *Compiler) initialMemberValueOverridden(val ssa.Value) bool {
-	if val == nil || !c.isInitialMemberValue(val.GetId()) || val.GetObject() == nil || val.GetKey() == nil {
-		return false
-	}
-	keyStr := c.resolveMemberKeyString(val.GetKey())
-	if keyStr == "" {
-		return false
-	}
-	overridden := false
-	for _, pair := range ssa.GetMemberPairs(val.GetObject()) {
-		key, member := pair.Key, pair.Member
-		if key == nil || member == nil || member.GetId() == val.GetId() {
-			continue
-		}
-		if member.GetId() > val.GetId() && c.resolveMemberKeyString(key) == keyStr {
-			overridden = true
-			break
-		}
-		continue
-	}
-	return overridden
-}
-
 func (c *Compiler) assignedSSAValue(contextInst ssa.Instruction, resultID int64) ssa.Value {
 	var fn *ssa.Function
 	if contextInst != nil {
@@ -1691,42 +1725,6 @@ func (c *Compiler) sameMemberTarget(val ssa.Value, obj ssa.Value, keyStr string)
 	return val.GetObject().GetId() == obj.GetId() && c.resolveMemberKeyString(val.GetKey()) == keyStr
 }
 
-// memberHasOwnerPair reports whether val is stored as (obj, keyStr) in ANY of its
-// owner pairs. GetObject() only returns the latest owner, which can live in a
-// different function when one SSA value is reused by several object literals
-// (e.g. a shared constant); the initial-make path must still recognize the
-// current owner so it materializes the value directly instead of reading it
-// back through a foreign object.
-func (c *Compiler) memberHasOwnerPair(val ssa.Value, obj ssa.Value, keyStr string) bool {
-	if val == nil || obj == nil || keyStr == "" || !val.IsMember() {
-		return false
-	}
-	for _, pair := range val.GetObjectKeyPairs() {
-		if pair.Object == nil || pair.Key == nil {
-			continue
-		}
-		if pair.Object.GetId() == obj.GetId() && c.resolveMemberKeyString(pair.Key) == keyStr {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *Compiler) valueForObjectMemberAssignment(contextInst ssa.Instruction, member ssa.Value) (llvm.Value, error) {
-	if member == nil || !member.IsMember() || member.GetObject() == nil || member.GetKey() == nil {
-		return c.getValue(contextInst, member.GetId())
-	}
-	objVal, err := c.getValue(contextInst, member.GetObject().GetId())
-	if err != nil {
-		return llvm.Value{}, err
-	}
-	keyStr := c.resolveMemberKeyString(member.GetKey())
-	if keyStr == "" {
-		return c.getValue(contextInst, member.GetId())
-	}
-	return c.emitRuntimeGetFieldByKey(objVal, member.GetKey(), contextInst, member.GetId()), nil
-}
-
 func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.Value) error {
 	if inst == nil || objVal.IsNil() {
 		return nil
@@ -1853,31 +1851,6 @@ func (c *Compiler) shouldReadMemberValueForInitialMakeMember(member ssa.Value, o
 		return !v.IsExtern()
 	}
 	return true
-}
-
-func (c *Compiler) emitObjectMemberAssignments(contextInst ssa.Instruction, obj ssa.Value, objVal llvm.Value) error {
-	if obj == nil || objVal.IsNil() {
-		return nil
-	}
-
-	var emitErr error
-	for _, pair := range ssa.GetMemberPairs(obj) {
-		key, member := pair.Key, pair.Member
-		if key == nil || member == nil {
-			continue
-		}
-		keyStr := c.resolveMemberKeyString(key)
-		if keyStr == "" {
-			continue
-		}
-		llvmVal, err := c.valueForObjectMemberAssignment(contextInst, member)
-		if err != nil {
-			emitErr = fmt.Errorf("emitObjectMemberAssignments: field %q: %w", keyStr, err)
-			break
-		}
-		c.emitRuntimeSetFieldByKey(contextInst, objVal, key, keyStr, llvmVal, member, obj.GetId())
-	}
-	return emitErr
 }
 
 // memberObjectFromValueName resolves the object id embedded in a member
