@@ -199,7 +199,12 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		opts = append(opts, lowhttp.WithDialer(p.dialer))
 	}
 
-	if proxies := p.selectProxiesForHost(host); len(proxies) > 0 {
+	if p.isDownstreamProxyBypassedForHost(host) {
+		// Clear the default downstream proxy installed by lowhttpConfig. This
+		// bypass is scoped to MITM downstream proxies; netx global policy remains
+		// responsible for any process-wide proxy configuration.
+		opts = append(opts, lowhttp.WithProxy())
+	} else if proxies := p.selectProxiesForHost(host); len(proxies) > 0 {
 		opts = append(opts, lowhttp.WithProxy(proxies...))
 	}
 
