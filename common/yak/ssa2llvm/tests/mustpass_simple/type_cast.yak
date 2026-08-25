@@ -1,0 +1,25 @@
+// Regression: int()/float()/string()/bool() casts. The SSA TypeCast target
+// for both int() and float() is NumberTypeKind, so the compiler must tell the
+// conversion direction apart (float() target carries the "float" type name)
+// and route float bit patterns / string sources through the right runtime
+// helpers. Also covers -6 == 0xfffffffffffffffa not being mistaken for a
+// tagged pointer, and make([]string) == nil semantics.
+assert int(1) == 1
+assert int(1.2) == 1
+assert int("1") == 1
+assert int(true) == 1
+assert int(nil) == 0
+assert float(1) == 1.0
+assert float(1.2) == 1.2
+assert float("1.2") == 1.2
+assert float(true) == 1.0
+assert float(nil) == 0.0
+assert string(1) == "1"
+assert string(1.2) == "1.2"
+assert string(true) == "true"
+assert string(nil) == ""
+assert bool(1) == true
+assert bool(1.2) == true
+assert bool(nil) == false
+assert ^5 == -6
+assert make([]string) == nil

@@ -82,17 +82,20 @@ func (c *Compiler) compileSideEffectValue(inst *ssa.SideEffect) error {
 			// free-value slot: reads at ANY later program point (including
 			// after the closure is invoked indirectly through a wrapper such
 			// as filesys.onFileStat -> Recursive) observe the final value.
-			slotFn, slotType := c.getOrInsertRuntimeGetClosureFreeSlot()
-			idx := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(closureIndex), false)
-			slotRaw := c.Builder.CreateCall(slotType, slotFn, []llvm.Value{
-				c.coerceToInt64(closureVal), idx,
-			}, fmt.Sprintf("yak_closure_fv_slot_%d", inst.GetId()))
-			i64Ptr := llvm.PointerType(c.LLVMCtx.Int64Type(), 0)
-			heapPtr := c.Builder.CreateIntToPtr(c.coerceToInt64(slotRaw), i64Ptr, fmt.Sprintf("yak_closure_fv_slotp_%d", inst.GetId()))
-			if c.function.redirectedSlots == nil {
-				c.function.redirectedSlots = make(map[int64]llvm.Value)
+			// The closure object is parked in an entry-block alloca so it
+			// dominates every redirected use; the slot pointer itself is
+			// resolved lazily at each use site.
+			closureSlot := c.ensureRedirectedClosureAlloca(inst.GetId())
+			if !closureSlot.IsNil() {
+				c.Builder.CreateStore(c.coerceToInt64(closureVal), closureSlot)
 			}
-			c.function.redirectedSlots[inst.GetId()] = heapPtr
+			if c.function.redirectedSlots == nil {
+				c.function.redirectedSlots = make(map[int64]redirectedSlotSource)
+			}
+			c.function.redirectedSlots[inst.GetId()] = redirectedSlotSource{
+				closureSlot: closureSlot,
+				index:       int64(closureIndex),
+			}
 			if c.function.storedValues == nil {
 				c.function.storedValues = make(map[int64]struct{})
 			}
