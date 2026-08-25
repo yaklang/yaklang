@@ -12,6 +12,7 @@ import (
 
 // SearchBySemanticsMemoryIDs 仅执行语义检索并返回命中的 memory_id（不加载数据库实体）
 func (r *AIMemoryTriage) SearchBySemanticsMemoryIDs(query string, limit int) ([]*aicommon.SearchResult, error) {
+	MaybeCleanup(r.db)
 	return r.semanticSearchMemoryIDs(query, limit)
 }
 
@@ -72,6 +73,7 @@ func (r *AIMemoryTriage) semanticSearchMemoryIDs(query string, limit int) ([]*ai
 
 // SearchBySemantics 通过语义搜索记忆
 func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon.SearchResult, error) {
+	MaybeCleanup(r.db)
 	idResults, err := r.semanticSearchMemoryIDs(query, limit)
 	if err != nil {
 		return nil, err
@@ -132,6 +134,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon
 
 // SearchByScores 按照C.O.R.E. P.A.C.T.评分搜索
 func (r *AIMemoryTriage) SearchByScores(filter *aicommon.ScoreFilter, limit int) ([]*aicommon.MemoryEntity, error) {
+	MaybeCleanup(r.db)
 	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
@@ -219,6 +222,7 @@ func (r *AIMemoryTriage) SearchByScores(filter *aicommon.ScoreFilter, limit int)
 
 // SearchByScoreVectorMemoryIDs 仅执行 HNSW 检索并返回命中的 memory_id（不加载数据库实体）
 func (r *AIMemoryTriage) SearchByScoreVectorMemoryIDs(queryVector []float32, limit int) ([]*aicommon.SearchResult, error) {
+	MaybeCleanup(r.db)
 	if r.hnswBackend == nil {
 		return nil, utils.Errorf("HNSW backend is not initialized")
 	}
@@ -246,6 +250,7 @@ func (r *AIMemoryTriage) SearchByScoreVectorMemoryIDs(queryVector []float32, lim
 
 // SearchByScoreVector 通过分数向量搜索相似的记忆（基于HNSW）
 func (r *AIMemoryTriage) SearchByScoreVector(targetScores *aicommon.MemoryEntity, limit int) ([]*aicommon.SearchResult, error) {
+	MaybeCleanup(r.db)
 	// 构建目标向量
 	queryVector := []float32{
 		float32(targetScores.C_Score),
@@ -281,6 +286,7 @@ func (r *AIMemoryTriage) SearchByScoreVector(targetScores *aicommon.MemoryEntity
 
 // SearchByTags 按照标签搜索
 func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*aicommon.MemoryEntity, error) {
+	MaybeCleanup(r.db)
 	if len(tags) == 0 {
 		return nil, utils.Errorf("at least one tag is required")
 	}
