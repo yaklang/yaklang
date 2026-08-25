@@ -346,3 +346,72 @@ func TestReasoningReplayRawMessagesReachChatBaseRequest(t *testing.T) {
 	}
 	require.True(t, foundAssistant)
 }
+
+func TestReasoningReplayPromptExampleContaminationReachesChatRequest(t *testing.T) {
+	const contaminatedReasoning = `The output examples are:
+{"@action":"directly_answer","answer_payload":"...[your-answer not a markdown].."}
+{"@action":"directly_answer"}
+<|FINAL_ANSWER_CURRENT_NONCE|>
+# markdown in mass
+<|FINAL_ANSWER_END_CURRENT_NONCE|>`
+	tag := buildReasoningReplayTag(
+		t,
+		"contaminated1",
+		contaminatedReasoning,
+		`{"@action":"record_note","note":"continue"}`,
+	)
+	prompt := buildFourSectionPrompt(
+		"contaminatedNonce",
+		"current query",
+		"tool schema",
+		"system policy",
+		wrapReasoningReplayTimeline("prior context\n"+tag+"\ntool observation"),
+		"memory",
+	)
+	hijacked := hijackHighStatic(prompt)
+	require.NotNil(t, hijacked)
+
+	var requestBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+		requestBody = append([]byte(nil), body...)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	_, err := aispec.ChatBase(
+		server.URL,
+		"deepseek-v4-flash",
+		"ignored-flat-prompt",
+		aispec.WithChatBase_RawMessages(hijacked.Messages),
+		aispec.WithChatBase_DisableStream(true),
+		aispec.WithChatBase_EnableThinkingEx("enable_thinking", true),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) { _, _ = io.Copy(io.Discard, reader) }),
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) { return nil, nil }),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, requestBody)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(requestBody, &payload))
+	messages := payload["messages"].([]any)
+	foundContaminatedAssistant := false
+	for _, rawMessage := range messages {
+		message := rawMessage.(map[string]any)
+		if message["role"] != "assistant" {
+			continue
+		}
+		reasoning, _ := message["reasoning_content"].(string)
+		if !strings.Contains(reasoning, "...[your-answer not a markdown]..") {
+			continue
+		}
+		foundContaminatedAssistant = true
+		require.Contains(t, reasoning, "FINAL_ANSWER_CURRENT_NONCE")
+		require.Contains(t, reasoning, "# markdown in mass")
+		require.Contains(t, message["content"], `"@action":"record_note"`)
+	}
+	require.True(t, foundContaminatedAssistant,
+		"protocol examples captured in reasoning must be observable in the actual chat-completions request")
+}
