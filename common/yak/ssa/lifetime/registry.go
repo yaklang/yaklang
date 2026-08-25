@@ -123,8 +123,275 @@ func (r *registry) snapshotAlloc() map[int64]struct{} {
 	return out
 }
 
+func (r *registry) snapshotKills() map[int64][]int64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make(map[int64][]int64, len(r.kills))
+	for k, v := range r.kills {
+		out[k] = append([]int64(nil), v...)
+	}
+	return out
+}
+
+func (r *registry) snapshotDerefs() map[int64]int64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make(map[int64]int64, len(r.derefs))
+	for k, v := range r.derefs {
+		out[k] = v
+	}
+	return out
+}
+
 func (r *registry) killArgs(callID int64) []int64 {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return append([]int64(nil), r.kills[callID]...)
+}
+
+func resolveProgValue(prog *ssa.Program, id int64) ssa.Value {
+	if prog == nil || id <= 0 {
+		return nil
+	}
+	inst, ok := prog.GetInstructionById(id)
+	if !ok || inst == nil {
+		return nil
+	}
+	inst = resolveInstruction(inst)
+	v, _ := inst.(ssa.Value)
+	return v
+}
+
+// ListHeapAllocs returns registered / stamped heap allocation values in prog.
+func ListHeapAllocs(prog *ssa.Program) []ssa.Value {
+	if prog == nil {
+		return nil
+	}
+	seen := make(map[int64]struct{})
+	var out []ssa.Value
+	add := func(v ssa.Value) {
+		if v == nil || v.GetId() <= 0 {
+			return
+		}
+		id := v.GetId()
+		if _, ok := seen[id]; ok {
+			return
+		}
+		if !isHeapAllocValue(v) && !IsAlloc(prog, id) {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, v)
+	}
+	r := getReg(prog)
+	if r != nil {
+		for id := range r.snapshotAlloc() {
+			add(resolveProgValue(prog, id))
+		}
+	}
+	prog.EachFunction(func(fn *ssa.Function) {
+		if fn == nil {
+			return
+		}
+		defer func() { _ = recover() }()
+		for _, bid := range fn.Blocks {
+			b, ok := fn.GetBasicBlockByID(bid)
+			if !ok || b == nil {
+				continue
+			}
+			for _, iid := range append(append([]int64{}, b.Phis...), b.Insts...) {
+				inst, ok := b.GetInstructionById(iid)
+				if !ok || inst == nil {
+					continue
+				}
+				if v, ok := resolveInstruction(inst).(ssa.Value); ok {
+					add(v)
+				}
+			}
+		}
+	})
+	return out
+}
+
+// ListFreeCalls returns free / RegisterKill call sites in prog.
+func ListFreeCalls(prog *ssa.Program) []ssa.Value {
+	if prog == nil {
+		return nil
+	}
+	seen := make(map[int64]struct{})
+	var out []ssa.Value
+	add := func(v ssa.Value) {
+		if v == nil || v.GetId() <= 0 {
+			return
+		}
+		id := v.GetId()
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, v)
+	}
+	r := getReg(prog)
+	if r != nil {
+		for id := range r.snapshotKills() {
+			add(resolveProgValue(prog, id))
+		}
+	}
+	// Also pick up free() calls that may lack RegisterKill (e.g. DB reload).
+	prog.EachFunction(func(fn *ssa.Function) {
+		if fn == nil {
+			return
+		}
+		defer func() { _ = recover() }()
+		for _, bid := range fn.Blocks {
+			b, ok := fn.GetBasicBlockByID(bid)
+			if !ok || b == nil {
+				continue
+			}
+			for _, iid := range b.Insts {
+				inst, ok := b.GetInstructionById(iid)
+				if !ok || inst == nil {
+					continue
+				}
+				call, ok := ssa.ToCall(resolveInstruction(inst))
+				if !ok || call == nil || !isFreeCall(call, r) {
+					continue
+				}
+				add(call)
+			}
+		}
+	})
+	return out
+}
+
+// ListDerefSites returns explicit *p load sites registered via RegisterDeref.
+// After DB reload the in-memory registry is empty; sites may be missing.
+func ListDerefSites(prog *ssa.Program) []ssa.Value {
+	if prog == nil {
+		return nil
+	}
+	r := getReg(prog)
+	if r == nil {
+		return nil
+	}
+	var out []ssa.Value
+	seen := make(map[int64]struct{})
+	for siteID := range r.snapshotDerefs() {
+		v := resolveProgValue(prog, siteID)
+		if v == nil || v.GetId() <= 0 {
+			continue
+		}
+		if _, ok := seen[v.GetId()]; ok {
+			continue
+		}
+		seen[v.GetId()] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+// ListHeapAllocsRelated filters ListHeapAllocs by pointer/object seed relatedness.
+func ListHeapAllocsRelated(prog *ssa.Program, seeds []ssa.Value) []ssa.Value {
+	return filterValuesBySeeds(ListHeapAllocs(prog), seeds)
+}
+
+// ListFreeCallsRelated filters ListFreeCalls by seed relatedness (call or killed args).
+func ListFreeCallsRelated(prog *ssa.Program, seeds []ssa.Value) []ssa.Value {
+	if len(seeds) == 0 {
+		return nil
+	}
+	seedIDs := expandLifetimeSeedIDs(seeds)
+	if len(seedIDs) == 0 {
+		return nil
+	}
+	r := getReg(prog)
+	var out []ssa.Value
+	for _, c := range ListFreeCalls(prog) {
+		if c == nil {
+			continue
+		}
+		if _, ok := seedIDs[c.GetId()]; ok {
+			out = append(out, c)
+			continue
+		}
+		if r != nil {
+			for _, aid := range r.killArgs(c.GetId()) {
+				if _, ok := seedIDs[aid]; ok {
+					out = append(out, c)
+					break
+				}
+			}
+		}
+		if call, ok := ssa.ToCall(c); ok && call != nil {
+			for _, aid := range call.Args {
+				if _, ok := seedIDs[aid]; ok {
+					out = append(out, c)
+					break
+				}
+			}
+		}
+	}
+	return out
+}
+
+// ListDerefSitesRelated filters deref sites whose pointer operand relates to seeds.
+func ListDerefSitesRelated(prog *ssa.Program, seeds []ssa.Value) []ssa.Value {
+	if len(seeds) == 0 {
+		return nil
+	}
+	seedIDs := expandLifetimeSeedIDs(seeds)
+	if len(seedIDs) == 0 {
+		return nil
+	}
+	r := getReg(prog)
+	var out []ssa.Value
+	for _, site := range ListDerefSites(prog) {
+		if site == nil {
+			continue
+		}
+		if _, ok := seedIDs[site.GetId()]; ok {
+			out = append(out, site)
+			continue
+		}
+		if r != nil {
+			if ptrID, ok := r.derefPtr(site.GetId()); ok {
+				if _, hit := seedIDs[ptrID]; hit {
+					out = append(out, site)
+					continue
+				}
+			}
+		}
+		if ptr := registeredDerefPointer(site, r); ptr != nil {
+			if _, ok := seedIDs[ptr.GetId()]; ok {
+				out = append(out, site)
+			}
+		}
+	}
+	return out
+}
+
+func filterValuesBySeeds(vals []ssa.Value, seeds []ssa.Value) []ssa.Value {
+	if len(seeds) == 0 {
+		return nil
+	}
+	seedIDs := expandLifetimeSeedIDs(seeds)
+	if len(seedIDs) == 0 {
+		return nil
+	}
+	var out []ssa.Value
+	for _, v := range vals {
+		if v == nil {
+			continue
+		}
+		if _, ok := seedIDs[v.GetId()]; ok {
+			out = append(out, v)
+			continue
+		}
+		if pid := paramObjectID(v); pid > 0 {
+			if _, ok := seedIDs[pid]; ok {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
 }
