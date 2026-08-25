@@ -69,6 +69,14 @@ func (r *ReActLoop) requestIterationExtension(
 	if utils.IsNil(cfg) {
 		return false, 0, nil
 	}
+	// A Focus that explicitly disables user interaction is a bounded
+	// single-run workflow. Never emit a review checkpoint for iteration
+	// extension in that mode: there is no product surface allowed to answer it,
+	// so waiting would strand the Turn indefinitely.
+	if r.allowUserInteract != nil && !r.allowUserInteract() {
+		log.Infof("ReactLoop[%v] iteration extension skipped because user interaction is disabled", r.loopName)
+		return false, 0, nil
+	}
 
 	if cfg.GetConfigBool(aicommon.DisableIncreaseIteration) {
 		log.Infof("ReactLoop[%v] iteration extension disabled by config, fallback to soft interrupt", r.loopName)
