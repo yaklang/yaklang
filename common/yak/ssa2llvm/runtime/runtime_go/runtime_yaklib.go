@@ -413,6 +413,18 @@ func runtimeValuesEqual(left, right any) bool {
 			return ln == rn
 		}
 	}
+	// yak treats string and []byte as comparable by content
+	// (x`你好`[0] == codec.DecodeHex("e4bda0e5a5bd")~ is true).
+	if ls, ok := left.(string); ok {
+		if rb, ok := right.([]byte); ok {
+			return ls == string(rb)
+		}
+	}
+	if lb, ok := left.([]byte); ok {
+		if rs, ok := right.(string); ok {
+			return string(lb) == rs
+		}
+	}
 	// yak semantics: an empty slice/map equals nil (and any other empty
 	// container of the same kind): make([]string) == nil is true, while a
 	// non-empty container is never nil.
