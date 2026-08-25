@@ -15,51 +15,21 @@ import (
 //   - *<uaf()> as $uaf                      // all UAF / double-free sites
 //   - $ptr<uaf()> as $uaf                   // findings related to $ptr
 //   - <uaf(target=$ptr)> as $uaf            // same, named target (receiver may be *)
+//   - <uaf(kind="double-free")>             // optional kind filter
 const NativeCall_UAF = "uaf"
 
 func nativeCallUAF(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgram(vs)
-	if err != nil || prog == nil || prog.Program == nil {
-		return false, sfvm.NewEmptyValues(), utils.Errorf("uaf: no program context: %v", err)
-	}
-
-	targetSeeds, targetSpecified := resolveLifetimeTargetSeeds(frame, params)
-	seeds := collectSSAValues(vs)
-	if targetSpecified {
-		seeds = targetSeeds
-	}
-
-	var findings []*lifetime.Finding
-	if !targetSpecified && (receiverIsProgramOnly(vs) || len(seeds) == 0) {
-		findings = lifetime.FindUAFUses(prog.Program)
-	} else {
-		findings = lifetime.FindUAFUsesRelated(prog.Program, seeds)
-	}
-
-	results := make([]sfvm.ValueOperator, 0, len(findings))
-	seen := make(map[int64]struct{})
-	for _, f := range findings {
-		if f == nil || f.Use == nil {
-			continue
-		}
-		if f.Kind != lifetime.KindUAF && f.Kind != lifetime.KindDoubleFree {
-			continue
-		}
-		id := f.Use.GetId()
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		val, err := prog.NewValue(f.Use)
-		if err != nil || val == nil {
-			continue
-		}
-		results = append(results, val)
-	}
-	if len(results) == 0 {
-		return false, sfvm.NewEmptyValues(), nil
-	}
-	return true, sfvm.NewValues(results), nil
+	return runLifetimeNativeCall(vs, frame, params, "uaf",
+		func(prog *ssa.Program, seeds []ssa.Value, full bool) []*lifetime.Finding {
+			if full {
+				return lifetime.FindUAFUses(prog)
+			}
+			return lifetime.FindUAFUsesRelated(prog, seeds)
+		},
+		func(kind string) bool {
+			return kind == lifetime.KindUAF || kind == lifetime.KindDoubleFree
+		},
+	)
 }
 
 func collectSSAValues(vs sfvm.Values) []ssa.Value {
@@ -112,4 +82,69 @@ func resolveLifetimeTargetSeeds(frame *sfvm.SFFrame, params *sfvm.NativeCallActu
 		return nil, true
 	}
 	return collectSSAValues(vals), true
+}
+
+type lifetimeFindFn func(prog *ssa.Program, seeds []ssa.Value, fullScan bool) []*lifetime.Finding
+
+func runLifetimeNativeCall(
+	vs sfvm.Values,
+	frame *sfvm.SFFrame,
+	params *sfvm.NativeCallActualParams,
+	opName string,
+	find lifetimeFindFn,
+	kindOK func(string) bool,
+) (bool, sfvm.Values, error) {
+	prog, err := fetchProgram(vs)
+	if err != nil || prog == nil || prog.Program == nil {
+		return false, sfvm.NewEmptyValues(), utils.Errorf("%s: no program context: %v", opName, err)
+	}
+
+	targetSeeds, targetSpecified := resolveLifetimeTargetSeeds(frame, params)
+	seeds := collectSSAValues(vs)
+	if targetSpecified {
+		seeds = targetSeeds
+	}
+
+	fullScan := !targetSpecified && (receiverIsProgramOnly(vs) || len(seeds) == 0)
+	findings := find(prog.Program, seeds, fullScan)
+
+	kindFilter := ""
+	if params != nil {
+		kindFilter = strings.ToLower(strings.TrimSpace(params.GetString("kind")))
+	}
+
+	results := make([]sfvm.ValueOperator, 0, len(findings))
+	seen := make(map[int64]struct{})
+	for _, f := range findings {
+		if f == nil || f.Use == nil {
+			continue
+		}
+		if !kindOK(f.Kind) {
+			continue
+		}
+		if kindFilter != "" && f.Kind != kindFilter {
+			// Allow "uaf" filter to still include double-free when caller asks kind=uaf? Plan:
+			// kind="double-free" optional; default unchanged. Strict equality is fine.
+			continue
+		}
+		id := f.Use.GetId()
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		val, err := prog.NewValue(f.Use)
+		if err != nil || val == nil {
+			continue
+		}
+		if f.FreeCall != nil && frame != nil {
+			if fc, err := prog.NewValue(f.FreeCall); err == nil && fc != nil {
+				val.AppendPredecessor(fc, frame.WithPredecessorContext(opName+":free"))
+			}
+		}
+		results = append(results, val)
+	}
+	if len(results) == 0 {
+		return false, sfvm.NewEmptyValues(), nil
+	}
+	return true, sfvm.NewValues(results), nil
 }

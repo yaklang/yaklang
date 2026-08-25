@@ -1529,7 +1529,7 @@ func init() {
 	registerNativeCall(NativeCall_CFGCondition, nc_func(nativeCallCFGCondition), nc_desc(`CFG 条件摘要：返回当前 block 的条件证据（inst/value/source/schema）。config 参数：无。`))
 	registerNativeCall(NativeCall_CFGConditionValues, nc_func(nativeCallCFGConditionValues), nc_desc(`CFG 条件 value 集：返回当前 block 条件关联的 value 列表。config 参数：无。`))
 	registerNativeCall(NativeCall_ReachabilityGuard, nc_func(nativeCallReachabilityGuard), nc_desc(`可达性守卫（mustExecute）：从函数入口起 target 是否在每条出路上必执行。返回值（可多项）：入口全路径必达且 cfgPostDominates 成立时仅返回布尔常量 true；入口 CFG 不可达 target 时返回 false；否则返回到达 target 时路径上的条件 SSA value 列表（CondValueID 顺序，嵌套 if/loop/switch 等可能对应多项）。跨 Program/跨函数/无入口信息时返回 false。必达判定依赖后支配，merge 块上可能保守。管道上可选同函数 SSA 作锚；必填 target="$to"。mode 仅 mustExecute。`))
-	registerNativeCall(NativeCall_UAF, nc_func(nativeCallUAF), nc_desc(`Use-After-Free 检测：基于堆对象生命周期分析。Double-free 视为 UAF 子类一并返回。用法：*<uaf()> 扫描全程序；<uaf(target=$ptr)> 或 $ptr<uaf()> 仅返回与选定指针相关的命中。当前支持 C（malloc/calloc/realloc + free），过程内 + 简单拷贝别名 + 浅 free-param summary。`))
+	registerNativeCall(NativeCall_UAF, nc_func(nativeCallUAF), nc_desc(`Use-After-Free 检测：基于堆对象生命周期分析。Double-free 视为 UAF 子类一并返回。用法：*<uaf()> 扫描全程序；<uaf(target=$ptr)> 或 $ptr<uaf()> 仅返回与选定指针相关的命中；可选 kind="double-free" / kind="uaf" 过滤。当前支持 C（malloc/calloc/realloc + free），过程内 + 简单拷贝别名 + 浅 free-param summary。`))
 	registerNativeCall(NativeCall_NPD, nc_func(nativeCallNPD), nc_desc(`空指针解引用（NPD）检测：独立于 UAF。路径上跟踪指针空性（Null/MaybeNull），在 *p / p->f 等成员解引用处报警。用法：*<npd()> 扫描全程序；<npd(target=$ptr)> 或 $ptr<npd()> 仅返回与选定指针相关的命中。不将 call 实参视为解引用。当前支持 C 过程内。`))
 }
 
