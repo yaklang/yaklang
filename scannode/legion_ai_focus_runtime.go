@@ -394,6 +394,7 @@ func (r *legionServerFocusRuntime) submitReportV1(capability string, params map[
 	}
 	receipt, err := sink.SubmitCodeAuditReport(r.ctx, resultContract.Kind, aiFocusCodeAuditReport{
 		WorkspaceID:       r.workspace.spec.WorkspaceID,
+		Title:             focusRuntimeRawString(params, "title"),
 		Markdown:          focusRuntimeRawString(params, "markdown"),
 		StructuredSummary: summary,
 	})
