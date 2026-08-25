@@ -26,9 +26,8 @@ const (
 // ClientHelloProfile describes a built-in TLS fingerprint. A profile creates a
 // fresh preset for every connection so ephemeral key shares are never reused.
 type ClientHelloProfile struct {
-	id          string
-	chromeHTTP2 bool
-	newPreset   func() (*clientHelloPreset, error)
+	id        string
+	newPreset func() (*clientHelloPreset, error)
 }
 
 type clientHelloPreset struct {
@@ -38,14 +37,12 @@ type clientHelloPreset struct {
 
 var clientHelloProfiles = map[string]*ClientHelloProfile{
 	TLSFingerprintChrome120: {
-		id:          TLSFingerprintChrome120,
-		chromeHTTP2: true,
-		newPreset:   newChrome120Preset,
+		id:        TLSFingerprintChrome120,
+		newPreset: newChrome120Preset,
 	},
 	TLSFingerprintChrome151: {
-		id:          TLSFingerprintChrome151,
-		chromeHTTP2: true,
-		newPreset:   newChrome151Preset,
+		id:        TLSFingerprintChrome151,
+		newPreset: newChrome151Preset,
 	},
 }
 
@@ -54,10 +51,6 @@ func (p *ClientHelloProfile) ID() string {
 		return ""
 	}
 	return p.id
-}
-
-func (p *ClientHelloProfile) UsesChromeHTTP2() bool {
-	return p != nil && p.chromeHTTP2
 }
 
 func (p *ClientHelloProfile) newClientHelloPreset() (*clientHelloPreset, error) {

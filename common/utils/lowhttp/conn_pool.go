@@ -1325,12 +1325,13 @@ type connectKey struct {
 	https           bool
 	gmTls           bool
 	clientHelloSpec *utls.ClientHelloSpec
+	tlsFingerprint  string
 	sni             string
 	strongHost      string
 }
 
 func (c *connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni, c.strongHost)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.tlsFingerprint, c.sni, c.strongHost)
 }
 
 type connLRU struct {
