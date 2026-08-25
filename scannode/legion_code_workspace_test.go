@@ -803,6 +803,26 @@ func TestLegionCodeFindingAndAuditReportContracts(t *testing.T) {
 		t.Fatalf("code finding payload did not use bound identity and source evidence: %#v", publishedFinding)
 	}
 
+	multiLine := validCodeFinding()
+	multiLine.File = "src/SpringBootController.java"
+	multiLine.StartLine = 60
+	multiLine.StartColumn = 13
+	multiLine.EndLine = 85
+	multiLine.EndColumn = 9
+	multiLine.Title = "Unsafe deserialization across a multi-line data flow"
+	if _, err := sink.SubmitCodeFinding(context.Background(), "ai_code_finding", multiLine); err != nil {
+		t.Fatalf("multi-line finding may end at an earlier column on its final line: %v", err)
+	}
+
+	invalidSameLine := validCodeFinding()
+	invalidSameLine.StartLine = 60
+	invalidSameLine.StartColumn = 13
+	invalidSameLine.EndLine = 60
+	invalidSameLine.EndColumn = 9
+	if _, err := sink.SubmitCodeFinding(context.Background(), "ai_code_finding", invalidSameLine); err == nil || !strings.Contains(err.Error(), "column range is invalid") {
+		t.Fatalf("same-line reversed columns must remain invalid, got %v", err)
+	}
+
 	safe := validCodeFinding()
 	safe.VerificationStatus = "safe"
 	if _, err := sink.SubmitCodeFinding(context.Background(), "ai_code_finding", safe); err == nil || !strings.Contains(err.Error(), "confirmed or uncertain") {

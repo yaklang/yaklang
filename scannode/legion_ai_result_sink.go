@@ -428,7 +428,8 @@ func (s *legionAIFocusResultSink) SubmitCodeFinding(
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding workspace_id is required")
 	case finding.StartLine <= 0 || finding.EndLine < finding.StartLine:
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding line range is invalid")
-	case finding.StartColumn < 0 || finding.EndColumn < 0 || (finding.EndColumn > 0 && finding.StartColumn > finding.EndColumn):
+	case finding.StartColumn < 0 || finding.EndColumn < 0 ||
+		(finding.StartLine == finding.EndLine && finding.EndColumn > 0 && finding.StartColumn > finding.EndColumn):
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding column range is invalid")
 	case !legionCodeFindingCWEPattern.MatchString(finding.CWE):
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding cwe must use CWE-<number>")
