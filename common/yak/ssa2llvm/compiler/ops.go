@@ -105,7 +105,14 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		// function while the referenced Next belongs to the callee; allow those
 		// only when their object/key chain points back into the current
 		// function so the callee can compile them correctly.
-		if !c.valueHasLocalDependency(fn, valObj) {
+		// Extern value placeholders (e.g. VULINBOX injected from the compile
+		// environment) belong to no function, so keep them flowing into the
+		// extern-value lowering below instead of folding to zero here.
+		isExternUndef := false
+		if undef, ok := valObj.(*ssa.Undefined); ok && undef != nil && undef.IsExtern() {
+			isExternUndef = true
+		}
+		if !isExternUndef && !c.valueHasLocalDependency(fn, valObj) {
 			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 		}
 	}
@@ -231,6 +238,8 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 						return val, nil
 					}
 				}
+			} else if val, ok := c.compileExternInstanceValue(contextInst, undef, id); ok {
+				return val, nil
 			} else {
 				switch undef.Kind {
 				case ssa.UndefinedValueValid, ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
@@ -532,6 +541,20 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
 	} else if inst.IsString() || (inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.BytesTypeKind) {
+		// x`...` fuzztag templates expand at runtime into a string slice
+		// (like yakvm's FuzzTagExec): the first element is the expanded
+		// value. Non-x strings keep the C-string representation.
+		if inst.Unary == 'x' {
+			// x`...` templates need the fuzz/mutate engine at runtime; record
+			// the dependency so tier selection keeps the module and elfsplit
+			// does not prune its shared groups (e.g. sharednet).
+			c.recordYaklibDependency("fuzz", "fuzztag")
+			ptr := c.Builder.CreateGlobalStringPtr(inst.VarString(), fmt.Sprintf("str_%d", id))
+			fn, fnType := c.getOrInsertRuntimeFuzztag()
+			val := c.Builder.CreateCall(fnType, fn, []llvm.Value{llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())}, fmt.Sprintf("fuzztag_%d", id))
+			c.cacheValue(id, c.coerceToInt64(val))
+			return c.finishConstValue(inst, id)
+		}
 		ptr := c.Builder.CreateGlobalStringPtr(inst.VarString(), fmt.Sprintf("str_%d", id))
 		// Represent pointers as i64 (uintptr) in LLVM IR.
 		// NOTE: Do not tag here. Tagging is applied selectively at stdlib
@@ -902,6 +925,50 @@ func (c *Compiler) getOrInsertRuntimeParseFloat() (llvm.Value, llvm.Type) {
 		fn = llvm.AddFunction(c.Mod, name, fnType)
 	}
 	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeFuzztag() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeFuzztagSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+// compileExternInstanceValue lowers a plain extern value placeholder (e.g.
+// VULINBOX injected from the compile environment via WithExternValue) to its
+// constant runtime representation. String values become C-string pointers;
+// other kinds fall back to zero so callers keep the previous behavior.
+func (c *Compiler) compileExternInstanceValue(contextInst ssa.Instruction, undef *ssa.Undefined, id int64) (llvm.Value, bool) {
+	if undef == nil {
+		return llvm.Value{}, false
+	}
+	fn := c.currentFunction()
+	if fn == nil && contextInst != nil {
+		fn = contextInst.GetFunc()
+	}
+	if fn == nil {
+		return llvm.Value{}, false
+	}
+	prog := fn.GetProgram()
+	if prog == nil || prog.ExternInstance == nil {
+		return llvm.Value{}, false
+	}
+	v, ok := prog.ExternInstance[undef.GetName()]
+	if !ok {
+		return llvm.Value{}, false
+	}
+	s, ok := v.(string)
+	if !ok {
+		return llvm.Value{}, false
+	}
+	ptr := c.Builder.CreateGlobalStringPtr(s, fmt.Sprintf("extern_str_%d", id))
+	val := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
+	c.cacheValue(id, val)
+	return val, true
 }
 
 func (c *Compiler) valueHasLocalDependency(fn *ssa.Function, val ssa.Value) bool {
