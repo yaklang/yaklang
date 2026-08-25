@@ -24,6 +24,13 @@ type programState struct {
 
 	npdOnce     sync.Once
 	npdFindings []*Finding
+
+	leakOnce     sync.Once
+	leakFindings []*Finding
+
+	pointsOnce sync.Once
+	// funcID -> valueID -> set of object IDs (union of OUT pointsTo)
+	pointsByFunc map[int64]map[int64]map[int64]struct{}
 }
 
 var progStates sync.Map // *ssa.Program -> *programState

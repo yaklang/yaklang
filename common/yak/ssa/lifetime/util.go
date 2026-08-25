@@ -8,20 +8,22 @@ import (
 )
 
 // Finding is a lifetime / nullness violation site.
-// Double-free is a UAF subtype. NPD is independent (KindNPD).
+// Double-free is a UAF subtype. NPD and Leak are independent.
 // For KindNPD, FreedObj holds the pointer value id that was Null/MaybeNull.
+// For KindLeak, Use is the leaked alloc; FreedObj is the object id.
 type Finding struct {
-	Use      ssa.Value // violating use (deref / 2nd free / …)
+	Use      ssa.Value // violating use (deref / 2nd free / leaked alloc / …)
 	FreedObj int64     // heap/abstract object id; for NPD: pointer value id
 	FreeCall ssa.Value // optional prior free (UAF/double-free only)
-	Kind     string    // KindUAF | KindDoubleFree | KindNPD
+	Kind     string    // KindUAF | KindDoubleFree | KindNPD | KindLeak
 }
 
-// Finding kinds returned by FindUAFUses / FindNPDUses.
+// Finding kinds returned by FindUAFUses / FindNPDUses / FindMemLeaks.
 const (
 	KindUAF        = "uaf"
 	KindDoubleFree = "double-free" // UAF subtype: free after free
 	KindNPD        = "npd"         // null pointer dereference (independent of UAF)
+	KindLeak       = "mem-leak"    // heap alloc still Alive at exit (may-leak)
 )
 
 func isPointerish(v ssa.Value) bool {
