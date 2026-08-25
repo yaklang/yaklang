@@ -19,19 +19,26 @@ func (c *Compiler) newDynamicCallableContextCallSpec(inst *ssa.Call, fn *ssa.Fun
 		// yields a callable VALUE: materialize the member and call it.
 		// Tuple/Next fields (#<id>.key / .field / .ok) are field reads that
 		// yield values (e.g. the closure from a for-in iterator), not method
-		// calls on the tuple object.
+		// calls on the tuple object. Map lookups (a["c"]) also yield values:
+		// the closure stored in the map, not a method on the map object.
 		if key := mc.GetKey(); key != nil && c.memberKeyIsStringConst(key) {
-			memberName := calleeVal.GetName()
-			// Only Next/tuple fields (#<id>.key / .field / .ok) are field
-			// reads that yield values. Other #<id>.name members (e.g.
-			// #5.Trim on a string) are method calls.
-			if !strings.HasPrefix(memberName, "#") {
-				return contextCallSpec{}, false, nil
+			isMapLookup := false
+			if obj := ssa.GetLatestObject(calleeVal); obj != nil && obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.MapTypeKind {
+				isMapLookup = true
 			}
-			if idx := strings.LastIndexByte(memberName, '.'); idx >= 0 {
-				suffix := memberName[idx+1:]
-				if suffix != "key" && suffix != "field" && suffix != "ok" {
+			if !isMapLookup {
+				memberName := calleeVal.GetName()
+				// Only Next/tuple fields (#<id>.key / .field / .ok) are field
+				// reads that yield values. Other #<id>.name members (e.g.
+				// #5.Trim on a string) are method calls.
+				if !strings.HasPrefix(memberName, "#") {
 					return contextCallSpec{}, false, nil
+				}
+				if idx := strings.LastIndexByte(memberName, '.'); idx >= 0 {
+					suffix := memberName[idx+1:]
+					if suffix != "key" && suffix != "field" && suffix != "ok" {
+						return contextCallSpec{}, false, nil
+					}
 				}
 			}
 		}

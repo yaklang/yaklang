@@ -353,7 +353,13 @@ func runtimeDecodeEqValue(raw uint64) any {
 		if h, ok := handleFromShadow(ptr); ok {
 			return h.Value()
 		}
-		return runtimeCStringToGoString(ptr)
+		if looksLikeCStringPointer(raw) {
+			return runtimeCStringToGoString(ptr)
+		}
+		// Negative integers (e.g. -6 = 0xfffffffffffffffa) set the tag bit but
+		// are not pointers. Restore the tag bit so the signed word survives
+		// numeric comparison.
+		return int64(raw | yakTaggedPointerMask)
 	}
 
 	if raw == 0 {
@@ -405,6 +411,57 @@ func runtimeValuesEqual(left, right any) bool {
 	if ln, ok := runtimeNumericValue(left); ok {
 		if rn, ok := runtimeNumericValue(right); ok {
 			return ln == rn
+		}
+	}
+	// yak semantics: an empty slice/map equals nil (and any other empty
+	// container of the same kind): make([]string) == nil is true, while a
+	// non-empty container is never nil.
+	if runtimeContainerIsEmpty(left) && runtimeContainerIsEmpty(right) {
+		return true
+	}
+	return false
+}
+
+// runtimeContainerIsEmpty reports whether a value is nil or an empty
+// slice/map (including AOT's pointer-shadow representation of them).
+func runtimeContainerIsEmpty(v any) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			return true
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() {
+		return true
+	}
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Map, reflect.Array:
+		return rv.Len() == 0
+	case reflect.Ptr:
+		if rv.IsNil() {
+			return true
+		}
+		elem := rv.Elem()
+		for elem.IsValid() && elem.Kind() == reflect.Interface {
+			if elem.IsNil() {
+				return true
+			}
+			elem = elem.Elem()
+		}
+		if elem.IsValid() {
+			switch elem.Kind() {
+			case reflect.Slice, reflect.Map, reflect.Array:
+				return elem.Len() == 0
+			case reflect.Struct:
+				// AOT's ordered map shadow.
+				if om, ok := elem.Interface().(runtimeOrderedMap); ok {
+					return len(om.keys) == 0
+				}
+			}
 		}
 	}
 	return false
@@ -462,18 +519,4 @@ func runtimeDispatchChanSend(args []uint64, _ bool) (int64, error) {
 	value := runtimeDecodeIterValue(args[1])
 	rv.Send(reflect.ValueOf(value))
 	return 0, nil
-}
-
-func runtimeBuiltinClose(ch any) {
-	rv := reflect.ValueOf(ch)
-	for rv.IsValid() && rv.Kind() == reflect.Interface {
-		if rv.IsNil() {
-			panic("close of nil channel")
-		}
-		rv = rv.Elem()
-	}
-	if !rv.IsValid() || rv.Kind() != reflect.Chan {
-		panic(fmt.Sprintf("close of non-channel %T", ch))
-	}
-	rv.Close()
 }

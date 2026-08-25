@@ -1,6 +1,8 @@
 package yak2ssa
 
 import (
+	"strconv"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -1760,7 +1762,26 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 			if len(memberPairs) == 0 {
 				values = append(values, ellipsisValue)
 			}
-			for _, pair := range memberPairs {
+			// GetLastWinsMemberPairs walks the pair list backwards (last wins),
+			// so iterate in reverse to restore element order. Skip read
+			// placeholders (Undefined members) and negative-index reads
+			// (a[-1] merged into the Make's pair list) that are not literal
+			// members of the container.
+			for i := len(memberPairs) - 1; i >= 0; i-- {
+				pair := memberPairs[i]
+				if pair.Member == nil || pair.Member.GetId() <= 0 {
+					continue
+				}
+				if u, isUndef := pair.Member.(*ssa.Undefined); isUndef && u != nil {
+					continue
+				}
+				if pair.Key != nil {
+					if keyStr := ssa.GetKeyString(pair.Key); keyStr != "" {
+						if idx, err := strconv.Atoi(keyStr); err == nil && idx < 0 {
+							continue
+						}
+					}
+				}
 				values = append(values, pair.Member)
 			}
 		}
@@ -1799,21 +1820,22 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 	// `[a:]` -> values[0]=a, values[1]=nil. AllExpression() drops absent
 	// slots, so iterating children is required to tell [:b] apart from [b:].
 	values := make([]ssa.Value, exprLen)
-	slot := 0
+	colonSeen := 0
 	exprSeen := 0
 	for _, child := range stmt.GetChildren() {
 		if expr, ok := child.(*yak.ExpressionContext); ok {
-			if slot >= exprLen {
+			// The expression's slot is the number of colons seen before it:
+			// `[a:b]` -> a at 0, b at 1; `[:b]` -> b at 1; `[a:]` -> a at 0.
+			if colonSeen >= exprLen {
 				return nil
 			}
-			values[slot] = b.buildExpression(expr)
+			values[colonSeen] = b.buildExpression(expr)
 			exprSeen++
-			slot++
 			continue
 		}
 		if terminal, ok := child.(antlr.TerminalNode); ok {
 			if terminal.GetSymbol().GetTokenType() == yak.YaklangParserColon {
-				slot++
+				colonSeen++
 			}
 		}
 	}
