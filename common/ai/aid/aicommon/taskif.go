@@ -407,12 +407,14 @@ func (s *AIStatefulTaskBase) CallAsyncDeferCallback(err error) {
 			return
 		}
 		callback = s.asyncDeferCallback
+		s.asyncDeferCallback = nil // 清除回调，保证只调用一次
 		s.taskMutex.Unlock()
 	} else {
 		if s.asyncDeferCallback == nil {
 			return
 		}
 		callback = s.asyncDeferCallback
+		s.asyncDeferCallback = nil
 	}
 
 	callback(err)
