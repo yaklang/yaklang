@@ -9,5 +9,7 @@ extern void GC_register_finalizer(void * obj, void (*fn)(void * obj, void * clie
 typedef void (*GC_finalization_proc)(void * obj, void * client_data);
 extern void GC_gcollect(void);
 extern size_t GC_get_heap_size(void);
+extern void GC_disable(void);
+extern void GC_enable(void);
 
 #endif
