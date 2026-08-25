@@ -1249,6 +1249,21 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 	return nil
 }
 
+// FinalizeHTTPFlowTableRecreation rotates the logical project generation and
+// clears process-local live-flow state after the HTTP flow table has been
+// dropped and recreated. Callers must pass the binding captured for the
+// database on which the recreation succeeded.
+func FinalizeHTTPFlowTableRecreation(binding consts.ProjectDatabaseBinding) {
+	if binding.Generation == 0 {
+		return
+	}
+	_, _ = consts.AdvanceProjectDatabaseGeneration(binding.Generation)
+	ResetHTTPFlowRuntimeState(
+		HTTPFlowDatabaseIdentity(binding.Path),
+		binding.Generation,
+	)
+}
+
 func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	subQuery := db
 	db = db.Model(&schema.HTTPFlow{}) //.Debug()
