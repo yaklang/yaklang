@@ -26,10 +26,43 @@ import (
 const testLegionCodeWorkspaceID = "aicw_0123456789abcdef0123456789abcdef"
 const testLegionCodeWorkspaceFocusReleaseID = "code_security_audit@1.0.0+abcdef123456"
 
+const testLegionProfessionalTaskFocusMode = "professional_task_fixture"
+
+func testLegionCodeWorkspaceExecutionContract(t *testing.T) *legionFocusExecutionContract {
+	t.Helper()
+	contract := legionFocusExecutionContract{
+		SchemaVersion: legionFocusExecutionContractSchemaV1,
+		Stages: []legionFocusExecutionStage{
+			{Key: "source_prepare"},
+			{Key: "project_understanding"},
+			{Key: "vulnerability_discovery"},
+			{Key: "evidence_verification"},
+			{Key: "report_generation"},
+		},
+		Capabilities: []string{
+			"result.finding.v1", "result.report.v1", "source.list", "source.read",
+			"source.search", "source.workspace.info", "task.stage",
+		},
+		Results: []legionFocusExecutionResultContract{
+			{Key: "findings", Capability: "result.finding.v1", Kind: "ai_code_finding"},
+			{Key: "report", Capability: "result.report.v1", Kind: "ai_code_audit_v1", Required: true},
+		},
+	}
+	raw, err := json.Marshal(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parseLegionFocusExecutionContract(string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parsed
+}
+
 func activateTestLegionCodeWorkspaceFocusTurn(t *testing.T, runtime *legionServerFocusRuntime) {
 	t.Helper()
 	runtime.authorizedFocusReleaseID = testLegionCodeWorkspaceFocusReleaseID
-	if err := runtime.activateFocusTurn(testLegionCodeWorkspaceFocusReleaseID); err != nil {
+	if err := runtime.activateFocusTurn(testLegionCodeWorkspaceFocusReleaseID, testLegionCodeWorkspaceExecutionContract(t)); err != nil {
 		t.Fatalf("activate source workspace Focus Turn: %v", err)
 	}
 	t.Cleanup(func() {
@@ -626,16 +659,16 @@ func TestLegionCodeWorkspaceReadOnlyToolsEnforceTraversalSymlinkAndBudgets(t *te
 			t.Fatalf("expected source.read rejection for %q", bad)
 		}
 	}
-	if _, err := runtime.Execute(serverFocusCapabilityHTTPRequest, nil); err == nil || !strings.Contains(err.Error(), "disabled") {
+	if _, err := runtime.Execute(serverFocusCapabilityHTTPRequest, nil); err == nil || !strings.Contains(err.Error(), "not allowed") {
 		t.Fatalf("expected HTTP capability disabled, got %v", err)
 	}
-	if _, err := runtime.Execute(serverFocusCapabilityExtractReferences, nil); err == nil || !strings.Contains(err.Error(), "disabled") {
+	if _, err := runtime.Execute(serverFocusCapabilityExtractReferences, nil); err == nil || !strings.Contains(err.Error(), "not allowed") {
 		t.Fatalf("expected web reference capability disabled, got %v", err)
 	}
-	if _, err := runtime.Execute(serverFocusCapabilitySubmitRisk, map[string]any{"verified": true}); err == nil || !strings.Contains(err.Error(), "result.code_finding") {
+	if _, err := runtime.Execute(serverFocusCapabilitySubmitRisk, map[string]any{"verified": true}); err == nil || !strings.Contains(err.Error(), "not allowed") {
 		t.Fatalf("expected generic risk capability disabled, got %v", err)
 	}
-	if _, err := runtime.Execute(serverFocusCapabilitySubmitAsset, map[string]any{}); err == nil || !strings.Contains(err.Error(), "disabled") {
+	if _, err := runtime.Execute(serverFocusCapabilitySubmitAsset, map[string]any{}); err == nil || !strings.Contains(err.Error(), "not allowed") {
 		t.Fatalf("expected generic asset capability disabled, got %v", err)
 	}
 	if _, err := runtime.Execute(serverFocusCapabilityProgressPhase, map[string]any{
@@ -648,7 +681,7 @@ func TestLegionCodeWorkspaceReadOnlyToolsEnforceTraversalSymlinkAndBudgets(t *te
 	}); err == nil {
 		t.Fatal("progress.phase accepted a phase outside the immutable lifecycle")
 	}
-	if phaseEventType != "code_audit.phase" || !bytes.Contains(phaseEventPayload, []byte(`"workspace_id":"`+testLegionCodeWorkspaceID+`"`)) {
+	if phaseEventType != "task.stage" || !bytes.Contains(phaseEventPayload, []byte(`"workspace_id":"`+testLegionCodeWorkspaceID+`"`)) {
 		t.Fatalf("unexpected code audit phase event: type=%q payload=%s", phaseEventType, phaseEventPayload)
 	}
 	info, err := runtime.Execute(serverFocusCapabilitySourceWorkspaceInfo, nil)
@@ -695,7 +728,7 @@ func TestStatelessCodeWorkspacePinRejectsMismatchAndPrivateFields(t *testing.T) 
 func validCodeAuditResultContext() *aiv1.AIFocusResultContext {
 	return &aiv1.AIFocusResultContext{
 		FocusRunId:     "code-run-1",
-		FocusMode:      legionAICodeSecurityAuditResultMode,
+		FocusMode:      testLegionProfessionalTaskFocusMode,
 		FocusReleaseId: "code_security_audit@1.0.0+abcdef123456",
 		SchemaVersion:  legionAIFocusResultSchemaV1,
 		ExecutionMode:  "single_run",
@@ -741,10 +774,13 @@ func TestLegionCodeFindingAndAuditReportContracts(t *testing.T) {
 		t.Fatalf("bind code workspace evidence: %v", err)
 	}
 	sink := rawSink.(aiFocusCodeResultSink)
+	if err := rawSink.(aiFocusExecutionContractBinder).bindFocusExecutionContract(testLegionCodeWorkspaceExecutionContract(t)); err != nil {
+		t.Fatalf("bind Focus execution contract: %v", err)
+	}
 	finding := validCodeFinding()
 	finding.LockedRevision = "model-selected-revision"
 	finding.SourceSHA256 = strings.Repeat("f", 64)
-	receipt, err := sink.SubmitCodeFinding(context.Background(), finding)
+	receipt, err := sink.SubmitCodeFinding(context.Background(), "ai_code_finding", finding)
 	if err != nil {
 		t.Fatalf("submit code finding: %v", err)
 	}
@@ -768,14 +804,14 @@ func TestLegionCodeFindingAndAuditReportContracts(t *testing.T) {
 
 	safe := validCodeFinding()
 	safe.VerificationStatus = "safe"
-	if _, err := sink.SubmitCodeFinding(context.Background(), safe); err == nil || !strings.Contains(err.Error(), "confirmed or uncertain") {
+	if _, err := sink.SubmitCodeFinding(context.Background(), "ai_code_finding", safe); err == nil || !strings.Contains(err.Error(), "confirmed or uncertain") {
 		t.Fatalf("expected safe finding to be rejected from JobRisk, got %v", err)
 	}
 	if err := rawSink.(*legionAIFocusResultSink).Succeed(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "ai_code_audit_v1") {
 		t.Fatalf("expected dedicated report completion gate, got %v", err)
 	}
 
-	report, err := sink.SubmitCodeAuditReport(context.Background(), aiFocusCodeAuditReport{
+	report, err := sink.SubmitCodeAuditReport(context.Background(), "ai_code_audit_v1", aiFocusCodeAuditReport{
 		WorkspaceID: testLegionCodeWorkspaceID,
 		Markdown:    "# Code audit\n\nOne confirmed finding; three safe candidates.",
 		StructuredSummary: json.RawMessage(`{
@@ -787,7 +823,7 @@ func TestLegionCodeFindingAndAuditReportContracts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("submit code audit report: %v", err)
 	}
-	if report.ResultID != codeAuditReportEventID("job-code-1") ||
+	if report.ResultID != focusResultReportEventID("job-code-1", "ai_code_audit_v1") ||
 		len(publisher.reportKinds) != 1 || publisher.reportKinds[0] != "ai_code_audit_v1" {
 		t.Fatalf("unexpected dedicated report: receipt=%#v publisher=%#v", report, publisher)
 	}
@@ -796,6 +832,30 @@ func TestLegionCodeFindingAndAuditReportContracts(t *testing.T) {
 	}
 	if len(publisher.reportKinds) != 2 || publisher.reportKinds[1] != "ai_focus_summary" || publisher.succeeded != 1 {
 		t.Fatalf("expected dedicated and compatibility reports before success: %#v", publisher)
+	}
+}
+
+func TestLegionRequiredFindingResultSatisfiesCompletionContract(t *testing.T) {
+	publisher := &recordingAIFocusRiskPublisher{}
+	rawSink, err := newLegionAIFocusResultSink(publisher, "bind-required-finding", validCodeAuditResultContext())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rawSink.(aiFocusCodeWorkspaceEvidenceBinder).bindCodeWorkspaceEvidence(strings.Repeat("a", 40), strings.Repeat("b", 64)); err != nil {
+		t.Fatal(err)
+	}
+	contract := testLegionCodeWorkspaceExecutionContract(t)
+	for index := range contract.Results {
+		contract.Results[index].Required = contract.Results[index].Capability == serverFocusCapabilitySubmitFindingV1
+	}
+	if err := rawSink.(aiFocusExecutionContractBinder).bindFocusExecutionContract(contract); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rawSink.(aiFocusCodeResultSink).SubmitCodeFinding(context.Background(), "ai_code_finding", validCodeFinding()); err != nil {
+		t.Fatal(err)
+	}
+	if err := rawSink.(*legionAIFocusResultSink).Succeed(context.Background(), nil); err != nil {
+		t.Fatalf("published required finding did not satisfy completion contract: %v", err)
 	}
 }
 
@@ -826,7 +886,7 @@ func TestLegionCodeFindingDedupeStableAcrossWorkspaceAndRun(t *testing.T) {
 	first := validCodeFinding()
 	first.DedupeKey = "model-key-first"
 	firstSink := newSink(testLegionCodeWorkspaceID, "run-first", "job-first")
-	firstReceipt, err := firstSink.SubmitCodeFinding(context.Background(), first)
+	firstReceipt, err := firstSink.SubmitCodeFinding(context.Background(), "ai_code_finding", first)
 	if err != nil {
 		t.Fatalf("submit first code finding: %v", err)
 	}
@@ -836,7 +896,7 @@ func TestLegionCodeFindingDedupeStableAcrossWorkspaceAndRun(t *testing.T) {
 	second.WorkspaceID = secondWorkspaceID
 	second.DedupeKey = "model-key-second"
 	secondSink := newSink(secondWorkspaceID, "run-second", "job-second")
-	secondReceipt, err := secondSink.SubmitCodeFinding(context.Background(), second)
+	secondReceipt, err := secondSink.SubmitCodeFinding(context.Background(), "ai_code_finding", second)
 	if err != nil {
 		t.Fatalf("submit cross-run code finding: %v", err)
 	}
@@ -847,7 +907,7 @@ func TestLegionCodeFindingDedupeStableAcrossWorkspaceAndRun(t *testing.T) {
 	moved := second
 	moved.StartLine++
 	moved.EndLine++
-	movedReceipt, err := secondSink.SubmitCodeFinding(context.Background(), moved)
+	movedReceipt, err := secondSink.SubmitCodeFinding(context.Background(), "ai_code_finding", moved)
 	if err != nil {
 		t.Fatalf("submit moved code finding: %v", err)
 	}
@@ -857,7 +917,7 @@ func TestLegionCodeFindingDedupeStableAcrossWorkspaceAndRun(t *testing.T) {
 
 	reclassified := second
 	reclassified.VulnerabilityType = "Command injection"
-	reclassifiedReceipt, err := secondSink.SubmitCodeFinding(context.Background(), reclassified)
+	reclassifiedReceipt, err := secondSink.SubmitCodeFinding(context.Background(), "ai_code_finding", reclassified)
 	if err != nil {
 		t.Fatalf("submit reclassified code finding: %v", err)
 	}
@@ -881,7 +941,7 @@ func TestLegionCodeAuditReportAcceptsCanonicalObjectStringOnly(t *testing.T) {
 	}
 	for name, summary := range invalid {
 		t.Run(name, func(t *testing.T) {
-			if _, err := sink.SubmitCodeAuditReport(context.Background(), aiFocusCodeAuditReport{
+			if _, err := sink.SubmitCodeAuditReport(context.Background(), "ai_code_audit_v1", aiFocusCodeAuditReport{
 				WorkspaceID:       testLegionCodeWorkspaceID,
 				Markdown:          "# Audit",
 				StructuredSummary: summary,
@@ -920,18 +980,38 @@ func TestLegionCodeAuditReportAcceptsCanonicalObjectStringOnly(t *testing.T) {
 	}
 }
 
-func TestValidateLegionAIFocusResultContextReservesWorkspaceSentinel(t *testing.T) {
+func TestValidateAISessionBindPairsWorkspaceWithSentinelTarget(t *testing.T) {
 	if _, err := validateLegionAIFocusResultContext("bind-code", validCodeAuditResultContext()); err != nil {
-		t.Fatalf("code audit sentinel rejected: %v", err)
+		t.Fatalf("professional task result context rejected: %v", err)
 	}
+
 	ordinary := validAIFocusResultContext()
 	ordinary.TargetUrl = "https://workspace.invalid/" + testLegionCodeWorkspaceID + "/"
-	if _, err := validateLegionAIFocusResultContext("bind-http", ordinary); err == nil || !strings.Contains(err.Error(), "reserved") {
-		t.Fatalf("expected ordinary HTTP focus sentinel rejection, got %v", err)
+	ordinaryCommand := validAISessionBindCommand()
+	ordinaryCommand.ResultContext = ordinary
+	ordinaryCommand.Session.RunId = ordinary.FocusRunId
+	if err := validateAISessionBindCommand("node-ai", ordinaryCommand); err == nil || !strings.Contains(err.Error(), "requires source_workspace") {
+		t.Fatalf("expected sentinel without workspace rejection, got %v", err)
 	}
+
 	code := validCodeAuditResultContext()
 	code.TargetUrl = "https://example.com/source"
-	if _, err := validateLegionAIFocusResultContext("bind-code", code); err == nil || !strings.Contains(err.Error(), "sentinel") {
-		t.Fatalf("expected non-sentinel code target rejection, got %v", err)
+	workspace := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
+	runtimeOptions, err := json.Marshal(yakRuntimeOptions{SourceWorkspace: &workspace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codeCommand := validAISessionBindCommand()
+	codeCommand.ResultContext = code
+	codeCommand.Session.RunId = code.FocusRunId
+	codeCommand.RuntimeOptionSnapshotJson = runtimeOptions
+	if err := validateAISessionBindCommand("node-ai", codeCommand); err == nil || !strings.Contains(err.Error(), "target_url must equal") {
+		t.Fatalf("expected workspace with non-sentinel rejection, got %v", err)
+	}
+
+	codeCommand.ResultContext = validCodeAuditResultContext()
+	codeCommand.Session.RunId = codeCommand.ResultContext.FocusRunId
+	if err := validateAISessionBindCommand("node-ai", codeCommand); err != nil {
+		t.Fatalf("matching workspace sentinel rejected: %v", err)
 	}
 }

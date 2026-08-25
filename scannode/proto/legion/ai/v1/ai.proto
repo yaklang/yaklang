@@ -2060,4 +2060,5 @@ message ContextFocusRelease {
   string entry_code = 6;
   repeated ContextFocusSidekick sidekicks = 7;
   string sha256 = 8;
+  string execution_contract_json = 9; // checksummed engine capability/stage/result contract
 }

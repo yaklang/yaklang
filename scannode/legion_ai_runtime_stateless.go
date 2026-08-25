@@ -205,6 +205,7 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 		// still ran through the default loop.
 		options = append(options, aiengine.WithFocus(runtimeFocusName))
 	}
+	executionContract := registeredLegionFocusExecutionContract(runtimeFocusName)
 
 	h.mu.Lock()
 	if h.closed {
@@ -219,7 +220,7 @@ func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input ai
 	if runtimeFocusName != "" {
 		focusRuntime, _ = h.binding.LegionResultRuntime.(*legionServerFocusRuntime)
 		if focusRuntime != nil {
-			if err := focusRuntime.activateFocusTurn(strings.TrimSpace(contextFocusRelease.GetReleaseId())); err != nil {
+			if err := focusRuntime.activateFocusTurn(strings.TrimSpace(contextFocusRelease.GetReleaseId()), executionContract); err != nil {
 				h.mu.Unlock()
 				return fmt.Errorf("stateless sendinput: activate Focus Turn: %w", err)
 			}

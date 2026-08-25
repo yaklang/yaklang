@@ -25,7 +25,6 @@ const (
 	legionAIFocusResultSchemaV1         = "legion.focus-result.v1"
 	legionAIConversationAuditResultMode = "conversation_audit"
 	legionAIConversationExecutionMode   = "multi_turn"
-	legionAICodeSecurityAuditResultMode = "code_security_audit"
 	maxInlineFocusRiskFieldBytes        = 64 * 1024
 	maxInlineFocusAssetBytes            = 64 * 1024
 	maxInlineCodeAuditReportBytes       = 512 * 1024
@@ -91,8 +90,12 @@ type aiFocusAssetResultSink interface {
 
 type aiFocusCodeResultSink interface {
 	aiFocusAssetResultSink
-	SubmitCodeFinding(context.Context, aiFocusCodeFinding) (aiFocusResultReceipt, error)
-	SubmitCodeAuditReport(context.Context, aiFocusCodeAuditReport) (aiFocusResultReceipt, error)
+	SubmitCodeFinding(context.Context, string, aiFocusCodeFinding) (aiFocusResultReceipt, error)
+	SubmitCodeAuditReport(context.Context, string, aiFocusCodeAuditReport) (aiFocusResultReceipt, error)
+}
+
+type aiFocusExecutionContractBinder interface {
+	bindFocusExecutionContract(*legionFocusExecutionContract) error
 }
 
 type aiFocusCodeWorkspaceEvidenceBinder interface {
@@ -128,19 +131,20 @@ type aiFocusResultEventPublisher interface {
 }
 
 type legionAIFocusResultSink struct {
-	publisher                aiFocusResultEventPublisher
-	ref                      jobExecutionRef
-	focusRunID               string
-	focusMode                string
-	focusReleaseID           string
-	targetURL                string
-	mu                       sync.Mutex
-	assetIDs                 map[string]struct{}
-	riskIDs                  map[string]struct{}
-	targets                  map[string]struct{}
-	codeAuditReportPublished bool
-	codeWorkspaceLockedRev   string
-	codeWorkspaceSHA256      string
+	publisher              aiFocusResultEventPublisher
+	ref                    jobExecutionRef
+	focusRunID             string
+	focusMode              string
+	focusReleaseID         string
+	targetURL              string
+	mu                     sync.Mutex
+	assetIDs               map[string]struct{}
+	riskIDs                map[string]struct{}
+	targets                map[string]struct{}
+	requiredResultKinds    map[string]struct{}
+	publishedResultKinds   map[string]struct{}
+	codeWorkspaceLockedRev string
+	codeWorkspaceSHA256    string
 }
 
 func newLegionAIFocusResultSink(
@@ -159,15 +163,17 @@ func newLegionAIFocusResultSink(
 		return nil, err
 	}
 	return &legionAIFocusResultSink{
-		publisher:      publisher,
-		ref:            ref,
-		focusRunID:     strings.TrimSpace(resultContext.GetFocusRunId()),
-		focusMode:      strings.TrimSpace(resultContext.GetFocusMode()),
-		focusReleaseID: strings.TrimSpace(resultContext.GetFocusReleaseId()),
-		targetURL:      strings.TrimSpace(resultContext.GetTargetUrl()),
-		assetIDs:       make(map[string]struct{}),
-		riskIDs:        make(map[string]struct{}),
-		targets:        make(map[string]struct{}),
+		publisher:            publisher,
+		ref:                  ref,
+		focusRunID:           strings.TrimSpace(resultContext.GetFocusRunId()),
+		focusMode:            strings.TrimSpace(resultContext.GetFocusMode()),
+		focusReleaseID:       strings.TrimSpace(resultContext.GetFocusReleaseId()),
+		targetURL:            strings.TrimSpace(resultContext.GetTargetUrl()),
+		assetIDs:             make(map[string]struct{}),
+		riskIDs:              make(map[string]struct{}),
+		targets:              make(map[string]struct{}),
+		requiredResultKinds:  make(map[string]struct{}),
+		publishedResultKinds: make(map[string]struct{}),
 	}, nil
 }
 
@@ -238,6 +244,7 @@ func (p *aiSessionResultSinkProxy) SubmitAsset(
 
 func (p *aiSessionResultSinkProxy) SubmitCodeFinding(
 	ctx context.Context,
+	kind string,
 	finding aiFocusCodeFinding,
 ) (aiFocusResultReceipt, error) {
 	if p == nil {
@@ -249,11 +256,12 @@ func (p *aiSessionResultSinkProxy) SubmitCodeFinding(
 	if !ok {
 		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink does not accept code findings")
 	}
-	return sink.SubmitCodeFinding(ctx, finding)
+	return sink.SubmitCodeFinding(ctx, kind, finding)
 }
 
 func (p *aiSessionResultSinkProxy) SubmitCodeAuditReport(
 	ctx context.Context,
+	kind string,
 	report aiFocusCodeAuditReport,
 ) (aiFocusResultReceipt, error) {
 	if p == nil {
@@ -265,7 +273,20 @@ func (p *aiSessionResultSinkProxy) SubmitCodeAuditReport(
 	if !ok {
 		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink does not accept code audit reports")
 	}
-	return sink.SubmitCodeAuditReport(ctx, report)
+	return sink.SubmitCodeAuditReport(ctx, kind, report)
+}
+
+func (p *aiSessionResultSinkProxy) bindFocusExecutionContract(contract *legionFocusExecutionContract) error {
+	if p == nil {
+		return fmt.Errorf("ai session result sink is unavailable")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	binder, ok := p.sink.(aiFocusExecutionContractBinder)
+	if !ok {
+		return fmt.Errorf("ai session result sink does not accept a Focus execution contract")
+	}
+	return binder.bindFocusExecutionContract(contract)
 }
 
 func (p *aiSessionResultSinkProxy) Succeed(ctx context.Context, resultJSON []byte) error {
@@ -365,10 +386,8 @@ func validateLegionAIFocusResultContext(
 		return jobExecutionRef{}, fmt.Errorf("ai focus result target_url is required")
 	case targetErr != nil:
 		return jobExecutionRef{}, fmt.Errorf("ai focus result target_url: %w", targetErr)
-	case strings.TrimSpace(resultContext.GetFocusMode()) == legionAICodeSecurityAuditResultMode && !isWorkspaceSentinel:
-		return jobExecutionRef{}, fmt.Errorf("ai code security audit target_url must use the workspace.invalid sentinel")
-	case strings.TrimSpace(resultContext.GetFocusMode()) != legionAICodeSecurityAuditResultMode && isWorkspaceSentinel:
-		return jobExecutionRef{}, fmt.Errorf("workspace.invalid sentinel is reserved for ai code security audit")
+	case strings.TrimSpace(resultContext.GetFocusMode()) == legionAIConversationAuditResultMode && isWorkspaceSentinel:
+		return jobExecutionRef{}, fmt.Errorf("workspace.invalid sentinel is reserved for server-managed Professional Tasks")
 	default:
 		return ref, nil
 	}
@@ -376,8 +395,10 @@ func validateLegionAIFocusResultContext(
 
 func (s *legionAIFocusResultSink) SubmitCodeFinding(
 	ctx context.Context,
+	kind string,
 	finding aiFocusCodeFinding,
 ) (aiFocusResultReceipt, error) {
+	kind = strings.TrimSpace(kind)
 	finding.WorkspaceID = strings.TrimSpace(finding.WorkspaceID)
 	finding.LockedRevision = ""
 	finding.SourceSHA256 = ""
@@ -401,8 +422,8 @@ func (s *legionAIFocusResultSink) SubmitCodeFinding(
 	}
 	finding.File = cleanedFile
 	switch {
-	case s.focusMode != legionAICodeSecurityAuditResultMode:
-		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding requires focus_mode=%s", legionAICodeSecurityAuditResultMode)
+	case kind == "":
+		return aiFocusResultReceipt{}, fmt.Errorf("finding result kind is required")
 	case finding.WorkspaceID == "":
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code finding workspace_id is required")
 	case finding.StartLine <= 0 || finding.EndLine < finding.StartLine:
@@ -455,7 +476,7 @@ func (s *legionAIFocusResultSink) SubmitCodeFinding(
 		ctx,
 		s.ref,
 		eventID,
-		"ai_code_finding",
+		kind,
 		finding.Title,
 		target,
 		finding.Severity,
@@ -465,6 +486,9 @@ func (s *legionAIFocusResultSink) SubmitCodeFinding(
 		return aiFocusResultReceipt{}, fmt.Errorf("publish ai code finding: %w", err)
 	}
 	s.recordRisk(eventID, target)
+	s.mu.Lock()
+	s.publishedResultKinds[kind] = struct{}{}
+	s.mu.Unlock()
 	return aiFocusResultReceipt{ResultID: eventID, DedupeKey: finding.DedupeKey, BackendID: s.ref.JobID}, nil
 }
 
@@ -502,12 +526,14 @@ func (s *legionAIFocusResultSink) codeWorkspaceEvidence() (string, string, error
 
 func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 	ctx context.Context,
+	kind string,
 	report aiFocusCodeAuditReport,
 ) (aiFocusResultReceipt, error) {
+	kind = strings.TrimSpace(kind)
 	report.WorkspaceID = strings.TrimSpace(report.WorkspaceID)
 	report.Markdown = strings.TrimSpace(report.Markdown)
-	if s.focusMode != legionAICodeSecurityAuditResultMode {
-		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report requires focus_mode=%s", legionAICodeSecurityAuditResultMode)
+	if kind == "" {
+		return aiFocusResultReceipt{}, fmt.Errorf("report result kind is required")
 	}
 	if report.WorkspaceID == "" || report.Markdown == "" {
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report workspace_id and markdown are required")
@@ -542,14 +568,36 @@ func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 	if err != nil {
 		return aiFocusResultReceipt{}, fmt.Errorf("marshal ai code audit report: %w", err)
 	}
-	eventID := codeAuditReportEventID(s.ref.JobID)
-	if err := s.publisher.PublishReportWithEventID(ctx, s.ref, eventID, "ai_code_audit_v1", raw); err != nil {
+	eventID := focusResultReportEventID(s.ref.JobID, kind)
+	if err := s.publisher.PublishReportWithEventID(ctx, s.ref, eventID, kind, raw); err != nil {
 		return aiFocusResultReceipt{}, fmt.Errorf("publish ai code audit report: %w", err)
 	}
 	s.mu.Lock()
-	s.codeAuditReportPublished = true
+	s.publishedResultKinds[kind] = struct{}{}
 	s.mu.Unlock()
-	return aiFocusResultReceipt{ResultID: eventID, DedupeKey: "ai_code_audit_v1", BackendID: s.ref.JobID}, nil
+	return aiFocusResultReceipt{ResultID: eventID, DedupeKey: kind, BackendID: s.ref.JobID}, nil
+}
+
+func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFocusExecutionContract) error {
+	if s == nil || contract == nil {
+		return fmt.Errorf("Focus execution contract is required")
+	}
+	required := make(map[string]struct{})
+	for _, result := range contract.Results {
+		if result.Required {
+			required[result.Kind] = struct{}{}
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.requiredResultKinds) > 0 {
+		if !sameStringSet(s.requiredResultKinds, required) {
+			return fmt.Errorf("Focus execution result contract is already bound")
+		}
+		return nil
+	}
+	s.requiredResultKinds = required
+	return nil
 }
 
 func (s *legionAIFocusResultSink) SubmitRisk(
@@ -673,13 +721,17 @@ func (s *legionAIFocusResultSink) Succeed(
 	ctx context.Context,
 	resultJSON []byte,
 ) error {
-	if s.focusMode == legionAICodeSecurityAuditResultMode {
-		s.mu.Lock()
-		hasCodeAuditReport := s.codeAuditReportPublished
-		s.mu.Unlock()
-		if !hasCodeAuditReport {
-			return fmt.Errorf("ai code security audit cannot complete without ai_code_audit_v1 report")
+	s.mu.Lock()
+	missingRequired := make([]string, 0)
+	for kind := range s.requiredResultKinds {
+		if _, published := s.publishedResultKinds[kind]; !published {
+			missingRequired = append(missingRequired, kind)
 		}
+	}
+	s.mu.Unlock()
+	if len(missingRequired) > 0 {
+		sort.Strings(missingRequired)
+		return fmt.Errorf("Focus execution cannot complete without required results: %s", strings.Join(missingRequired, ", "))
 	}
 	result := make(map[string]any)
 	if len(resultJSON) > 0 {
@@ -870,9 +922,21 @@ func focusSummaryReportEventID(jobID string) string {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
 }
 
-func codeAuditReportEventID(jobID string) string {
-	name := strings.Join([]string{strings.TrimSpace(jobID), "ai_code_audit_v1"}, "\x00")
+func focusResultReportEventID(jobID string, kind string) string {
+	name := strings.Join([]string{strings.TrimSpace(jobID), strings.TrimSpace(kind)}, "\x00")
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
+}
+
+func sameStringSet(left, right map[string]struct{}) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for key := range left {
+		if _, ok := right[key]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func isLegionCodeFindingSeverity(severity string) bool {
