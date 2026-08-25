@@ -45,6 +45,10 @@ func TestMustPass_SSA2LLVM_AllScripts(t *testing.T) {
 		"VULINBOX_HOST": utils.ExtractHostPort(addr),
 		"YAKIT_HOME":    t.TempDir(),
 	}
+	// Scripts reference VULINBOX directly (f`${VULINBOX}/...`); yak.Execute
+	// injects it as a var, so the AOT CLI must see it at compile time too.
+	t.Setenv("VULINBOX", addr)
+	t.Setenv("VULINBOX_HOST", utils.ExtractHostPort(addr))
 
 	for _, name := range names {
 		name := name

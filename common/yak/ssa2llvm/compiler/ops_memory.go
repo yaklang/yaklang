@@ -531,6 +531,20 @@ func (c *Compiler) compileUndefined(inst *ssa.Undefined) error {
 	if inst == nil {
 		return nil
 	}
+	// Extern value placeholders (e.g. VULINBOX injected from the compile
+	// environment via WithExternValue) carry their real value in
+	// Program.ExternInstance; compile them as constants instead of zero.
+	if inst.IsExtern() && inst.GetFunc() != nil {
+		if prog := inst.GetFunc().GetProgram(); prog != nil && prog.ExternInstance != nil {
+			if v, ok := prog.ExternInstance[inst.GetName()]; ok {
+				if s, ok := v.(string); ok {
+					ptr := c.Builder.CreateGlobalStringPtr(s, fmt.Sprintf("extern_str_%d", inst.GetId()))
+					c.cacheValue(inst.GetId(), llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type()))
+					return nil
+				}
+			}
+		}
+	}
 	if inst.GetFunc() != nil && c.currentFunction() != nil && inst.GetFunc() != c.currentFunction() {
 		if !c.valueHasLocalDependency(inst.GetFunc(), inst) {
 			return nil
