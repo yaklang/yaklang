@@ -118,6 +118,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon
 			A_Score:            dbEntity.A_Score,
 			T_Score:            dbEntity.T_Score,
 			CorePactVector:     []float32(dbEntity.CorePactVector),
+			ExpiresAt:          dbEntity.ExpiresAt,
 		}
 
 		results = append(results, &aicommon.SearchResult{
@@ -208,6 +209,7 @@ func (r *AIMemoryTriage) SearchByScores(filter *aicommon.ScoreFilter, limit int)
 			A_Score:            dbEntity.A_Score,
 			T_Score:            dbEntity.T_Score,
 			CorePactVector:     []float32(dbEntity.CorePactVector),
+			ExpiresAt:          dbEntity.ExpiresAt,
 		}
 		results = append(results, entity)
 	}
@@ -349,6 +351,7 @@ func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) (
 			A_Score:            dbEntity.A_Score,
 			T_Score:            dbEntity.T_Score,
 			CorePactVector:     []float32(dbEntity.CorePactVector),
+			ExpiresAt:          dbEntity.ExpiresAt,
 		}
 		results = append(results, entity)
 
@@ -359,3 +362,4 @@ func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) (
 
 	return results, nil
 }
+

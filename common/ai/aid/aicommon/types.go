@@ -27,6 +27,9 @@ type MemoryEntity struct {
 
 	// designed for rag searching
 	PotentialQuestions []string
+
+	// 自动清理相关字段
+	ExpiresAt *time.Time // 过期时间，nil=不过期
 }
 
 // SearchResult 搜索结果

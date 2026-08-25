@@ -262,6 +262,7 @@ func memoryEntityFromDBEntity(dbEntity schema.AIMemoryEntity) *aicommon.MemoryEn
 		A_Score:            dbEntity.A_Score,
 		T_Score:            dbEntity.T_Score,
 		CorePactVector:     []float32(dbEntity.CorePactVector),
+		ExpiresAt:          dbEntity.ExpiresAt,
 	}
 }
 

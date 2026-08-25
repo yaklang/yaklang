@@ -56,6 +56,7 @@ type AIMemoryTriage struct {
 
 	// midtermArchiveMode makes this instance use independent DB tables for midterm archives.
 	midtermArchiveMode bool
+
 }
 
 func (a *AIMemoryTriage) SetInvoker(invoker aicommon.AIInvokeRuntime) {
