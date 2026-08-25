@@ -405,6 +405,10 @@ func (r *runtime) invokeTask(current *AiTask) error {
 
 	if current.GetStatus() == aicommon.AITaskState_Skipped {
 		r.config.planUserStatus(fmt.Sprintf("已跳过「%s」，正在继续", current.Name), fmt.Sprintf("Skipped %q and continuing", current.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
+		// 触发 HandleSkipSubtaskInPlan 注册的 asyncDeferCallback，
+		// 发送取消确认消息。任务可能在执行中被取消（execute() 触发），
+		// 也可能在执行前就被取消（此处触发），统一在此收口。
+		current.CallAsyncDeferCallback(nil)
 		r.config.EmitInfo("subtask %s was skipped by user, moving to next task", current.Name)
 		return nil
 	}
@@ -420,6 +424,8 @@ func (r *runtime) invokeTask(current *AiTask) error {
 	if current.IsCtxDone() {
 		if current.GetStatus() == aicommon.AITaskState_Skipped {
 			r.config.planUserStatus(fmt.Sprintf("已跳过「%s」，正在继续", current.Name), fmt.Sprintf("Skipped %q and continuing", current.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
+			// 触发 HandleSkipSubtaskInPlan 注册的 asyncDeferCallback
+			current.CallAsyncDeferCallback(nil)
 			r.config.EmitInfo("subtask %s context cancelled (skipped), moving to next task", current.Name)
 			return nil
 		}
