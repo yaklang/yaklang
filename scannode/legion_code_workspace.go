@@ -830,7 +830,7 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 		if entry.IsDir() {
 			return nil
 		}
-		if len(results) >= limit || scannedBytes >= w.spec.MaxReadBytes {
+		if len(results) >= limit {
 			truncated = true
 			return filepath.SkipAll
 		}
@@ -846,12 +846,11 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 		if err != nil || binary {
 			return nil
 		}
-		remaining := w.spec.MaxReadBytes - scannedBytes
 		input, err := os.Open(resolved)
 		if err != nil {
 			return nil
 		}
-		reader := bufio.NewReader(io.LimitReader(input, remaining))
+		reader := bufio.NewReader(input)
 		lineNumber := 0
 		for {
 			line, readErr := reader.ReadString('\n')
@@ -879,10 +878,6 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 			}
 		}
 		_ = input.Close()
-		if scannedBytes >= w.spec.MaxReadBytes {
-			truncated = true
-			return filepath.SkipAll
-		}
 		return nil
 	})
 	if err != nil {
@@ -890,7 +885,7 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 	}
 	return map[string]any{
 		"path": rel, "query": query, "results": results, "count": len(results),
-		"scanned_bytes": scannedBytes, "max_read_bytes": w.spec.MaxReadBytes, "truncated": truncated,
+		"scanned_bytes": scannedBytes, "max_search_results": limit, "truncated": truncated,
 	}, nil
 }
 
