@@ -25,6 +25,8 @@ func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, tokenLimit int) (*aic
 }
 
 func (t *AIMemoryTriage) SearchMemoryWithoutAIAndSemantics(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
+	MaybeCleanup(t.db)
+
 	queryText := utils.InterfaceToString(origin)
 	if task, ok := origin.(aicommon.AIStatefulTask); ok {
 		queryText = strings.TrimSpace(task.GetUserInput())
@@ -267,6 +269,9 @@ func memoryEntityFromDBEntity(dbEntity schema.AIMemoryEntity) *aicommon.MemoryEn
 }
 
 func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, tokenLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
+	// 惰性触发自动清理检查（全局协调，不阻塞搜索）
+	MaybeCleanup(t.db)
+
 	queryText := utils.InterfaceToString(origin)
 	if task, ok := origin.(aicommon.AIStatefulTask); ok {
 		return t.searchMemoryForAITask(task, tokenLimit, disableAI)

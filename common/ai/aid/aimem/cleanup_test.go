@@ -2,6 +2,8 @@ package aimem
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -391,4 +393,178 @@ func TestScanAllCleanupMemories(t *testing.T) {
 	assert.True(t, idSet["scan-expired"])
 	assert.True(t, idSet["scan-lowval"])
 	assert.False(t, idSet["scan-healthy"])
+}
+
+// --- ScanOverCountMemories ---
+
+func TestScanOverCountMemories(t *testing.T) {
+	sessionID := "test-cleanup-overcount-" + t.Name()
+	mem := createCleanupTestMemory(t, sessionID)
+	defer mem.Close()
+
+	db := mem.GetDB()
+	tableName := mem.entityTableName()
+	sid := mem.GetSessionID()
+
+	config := DefaultCleanupConfig()
+	config.MaxMemoryCount = 5
+	config.OverEvictMargin = 2
+
+	// Create 8 memories, all low-value so they're eligible for eviction
+	for i := 0; i < 8; i++ {
+		entity := &schema.AIMemoryEntity{
+			MemoryID:  fmt.Sprintf("overcount-mem-%d", i),
+			SessionID: sid,
+			Content:   fmt.Sprintf("memory %d", i),
+			Tags:      schema.StringArray{"test"},
+			T_Score:   0.2,
+			C_Score:   0.1, O_Score: 0.1, R_Score: 0.1, E_Score: 0.1, P_Score: 0.1, A_Score: 0.1,
+		}
+		entity.CreatedAt = time.Now().Add(-time.Duration(i+1) * time.Hour)
+		require.NoError(t, db.Table(tableName).Create(entity).Error)
+	}
+
+	// totalCount=8, MaxMemoryCount=5, OverEvictMargin=2
+	// toEvict = 8 - 5 + 2 = 5
+	ids, err := ScanOverCountMemories(db, tableName, sid, config)
+	require.NoError(t, err)
+	assert.Len(t, ids, 5)
+
+	// Create a long-term memory (T >= 0.8) — should be exempt
+	longTermEntity := &schema.AIMemoryEntity{
+		MemoryID:  "longterm-protected",
+		SessionID: sid,
+		Content:   "long term memory",
+		Tags:      schema.StringArray{"test"},
+		T_Score:   0.9,
+		C_Score:   0.1, O_Score: 0.1, R_Score: 0.1, E_Score: 0.1, P_Score: 0.1, A_Score: 0.1,
+	}
+	longTermEntity.CreatedAt = time.Now().Add(-1 * time.Hour)
+	require.NoError(t, db.Table(tableName).Create(longTermEntity).Error)
+
+	// totalCount=9, MaxMemoryCount=5, OverEvictMargin=2
+	// toEvict = 9 - 5 + 2 = 6, but only 8 non-exempt memories exist
+	ids, err = ScanOverCountMemories(db, tableName, sid, config)
+	require.NoError(t, err)
+	assert.Len(t, ids, 6) // 6 lowest-value non-exempt memories
+
+	// Verify long-term memory is NOT in the eviction list
+	for _, id := range ids {
+		assert.NotEqual(t, "longterm-protected", id)
+	}
+
+	// Test: under limit → no eviction
+	config.MaxMemoryCount = 100
+	ids, err = ScanOverCountMemories(db, tableName, sid, config)
+	require.NoError(t, err)
+	assert.Empty(t, ids)
+}
+
+// --- OverCount margin effectiveness ---
+
+func TestScanOverCountMemories_MarginEffectiveness(t *testing.T) {
+	sessionID := "test-cleanup-margin-" + t.Name()
+	mem := createCleanupTestMemory(t, sessionID)
+	defer mem.Close()
+
+	db := mem.GetDB()
+	tableName := mem.entityTableName()
+	sid := mem.GetSessionID()
+
+	config := DefaultCleanupConfig()
+	config.MaxMemoryCount = 5
+	config.OverEvictMargin = 3
+
+	// Create exactly 6 memories (1 over limit)
+	for i := 0; i < 6; i++ {
+		entity := &schema.AIMemoryEntity{
+			MemoryID:  fmt.Sprintf("margin-mem-%d", i),
+			SessionID: sid,
+			Content:   fmt.Sprintf("memory %d", i),
+			Tags:      schema.StringArray{"test"},
+			T_Score:   0.2,
+			C_Score:   0.1, O_Score: 0.1, R_Score: 0.1, E_Score: 0.1, P_Score: 0.1, A_Score: 0.1,
+		}
+		entity.CreatedAt = time.Now().Add(-time.Duration(i+1) * time.Hour)
+		require.NoError(t, db.Table(tableName).Create(entity).Error)
+	}
+
+	// totalCount=6, MaxMemoryCount=5, OverEvictMargin=3
+	// toEvict = 6 - 5 + 3 = 4
+	ids, err := ScanOverCountMemories(db, tableName, sid, config)
+	require.NoError(t, err)
+	assert.Len(t, ids, 4)
+
+	// After cleaning these 4, remaining = 6 - 4 = 2, which is < MaxMemoryCount=5
+	// So new writes won't immediately re-trigger (need 3 more writes to reach 6 again)
+}
+
+// --- Coordinator integration (lazy timer trigger) ---
+
+func TestMaybeCleanup_LazyTimerTrigger(t *testing.T) {
+	sessionID := "test-cleanup-coordinator-" + t.Name()
+	mem := createCleanupTestMemory(t, sessionID)
+	defer mem.Close()
+
+	db := mem.GetDB()
+	tableName := mem.entityTableName()
+	sid := mem.GetSessionID()
+
+	// Reset global coordinator state for test
+	resetCleanupCoordinatorForTest()
+
+	// Create 53 low-value, expired memories to exceed MaxMemoryCount and be expired
+	for i := 0; i < 53; i++ {
+		entity := &schema.AIMemoryEntity{
+			MemoryID:  fmt.Sprintf("coord-mem-%d", i),
+			SessionID: sid,
+			Content:   fmt.Sprintf("memory %d", i),
+			Tags:      schema.StringArray{"test"},
+			T_Score:   0.1, // transient → expires in 7 days
+			C_Score:   0.1, O_Score: 0.1, R_Score: 0.1, E_Score: 0.1, P_Score: 0.1, A_Score: 0.1,
+		}
+		entity.CreatedAt = time.Now().Add(-8 * 24 * time.Hour) // 8 days ago → expired
+		expires := time.Now().Add(-1 * time.Hour)                // already expired
+		entity.ExpiresAt = &expires
+		require.NoError(t, db.Table(tableName).Create(entity).Error)
+	}
+
+	// Trigger cleanup via MaybeCleanup (first call → lastCleanupTime=0 → triggers)
+	MaybeCleanup(db)
+
+	// Wait for async cleanup to complete
+	time.Sleep(3 * time.Second)
+
+	// Verify cleanup happened: totalCount should be reduced
+	var totalCount int64
+	db.Table(tableName).Where("session_id = ?", sid).Count(&totalCount)
+
+	// All 53 are expired (ExpiresAt < NOW()), so all should be cleaned
+	assert.Equal(t, int64(0), totalCount, "cleanup should have evicted all expired memories")
+}
+
+func TestMaybeCleanup_RateLimit(t *testing.T) {
+	sessionID := "test-cleanup-ratelimit-" + t.Name()
+	mem := createCleanupTestMemory(t, sessionID)
+	defer mem.Close()
+
+	db := mem.GetDB()
+
+	// Reset and set lastCleanupTime to now → should NOT trigger
+	resetCleanupCoordinatorForTest()
+	atomicStoreLastCleanupNow()
+
+	// Call MaybeCleanup multiple times — should not trigger because within interval
+	for i := 0; i < 10; i++ {
+		MaybeCleanup(db)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	// cleanupRunning should still be 0 (never triggered)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&globalCoordinator.cleanupRunning))
+}
+
+func atomicStoreLastCleanupNow() {
+	atomic.StoreInt64(&globalCoordinator.lastCleanupTime, time.Now().UnixNano())
 }

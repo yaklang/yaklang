@@ -1,6 +1,7 @@
 package aimem
 
 import (
+	"sort"
 	"time"
 
 	"github.com/yaklang/gorm"
@@ -21,6 +22,11 @@ type CleanupConfig struct {
 	MinValueThreshold      float64 // 综合评分低于此值才考虑淘汰，默认 0.35
 	ColdMemoryDays         int     // 记忆存在超过此天数且评分低才考虑淘汰，默认 14
 
+	// 数量上限策略
+	EnableMaxMemoryCount bool
+	MaxMemoryCount       int // 记忆总数上限，默认 200。超过时按综合评分从低到高淘汰
+	OverEvictMargin      int // 超量淘汰安全余量，默认 20。实际删除 (超出量 + margin) 条，避免刚删完又触发
+
 	// 批量限制
 	MaxBatchSize int // 每次扫描最多返回多少条，默认 100
 }
@@ -35,6 +41,9 @@ func DefaultCleanupConfig() CleanupConfig {
 		EnableLowValueEviction: true,
 		MinValueThreshold:      0.35,
 		ColdMemoryDays:         14,
+		EnableMaxMemoryCount:   true,
+		MaxMemoryCount:         200,
+		OverEvictMargin:        20,
 		MaxBatchSize:           100,
 	}
 }
@@ -136,7 +145,84 @@ func ScanLowValueMemories(db *gorm.DB, tableName, sessionID string, config Clean
 	return ids, nil
 }
 
-// ScanAllCleanupMemories 一次性扫描过期 + 低价值记忆 ID，合并去重后返回
+// ScanOverCountMemories 扫描因数量超限需要淘汰的记忆 ID（只 SELECT，不删除）
+//
+// 当 session 内记忆总数超过 MaxMemoryCount 时，按综合评分从低到高选出需要淘汰的记忆。
+// 实际淘汰数量 = (totalCount - MaxMemoryCount) + OverEvictMargin，确保清理后不会立即再次触发。
+// 长期记忆 (T_Score >= 0.8) 豁免，不参与淘汰。
+func ScanOverCountMemories(db *gorm.DB, tableName, sessionID string, config CleanupConfig) ([]string, error) {
+	if db == nil || tableName == "" || sessionID == "" {
+		return nil, nil
+	}
+	if !config.EnableMaxMemoryCount || config.MaxMemoryCount <= 0 {
+		return nil, nil
+	}
+
+	// 统计当前 session 内的记忆总数
+	var totalCount int64
+	if err := db.Table(tableName).
+		Where("session_id = ?", sessionID).
+		Count(&totalCount).Error; err != nil {
+		return nil, err
+	}
+
+	// 未超限，无需淘汰
+	if int(totalCount) <= config.MaxMemoryCount {
+		return nil, nil
+	}
+
+	// 需要淘汰的数量 = 超出量 + 安全余量
+	toEvict := int(totalCount) - config.MaxMemoryCount + config.OverEvictMargin
+	if toEvict <= 0 {
+		return nil, nil
+	}
+
+	// 查询所有非豁免记忆 (T_Score < 0.8)，按综合评分从低到高排序
+	var candidates []schema.AIMemoryEntity
+	err := db.Table(tableName).
+		Where("session_id = ? AND t_score < 0.8", sessionID).
+		Find(&candidates).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 计算综合评分并排序
+	type scoredEntity struct {
+		id    string
+		value float64
+	}
+	scored := make([]scoredEntity, 0, len(candidates))
+	for _, e := range candidates {
+		entity := &aicommon.MemoryEntity{
+			C_Score: e.C_Score,
+			O_Score: e.O_Score,
+			R_Score: e.R_Score,
+			E_Score: e.E_Score,
+			P_Score: e.P_Score,
+			A_Score: e.A_Score,
+			T_Score: e.T_Score,
+		}
+		scored = append(scored, scoredEntity{
+			id:    e.MemoryID,
+			value: CalcMemoryValue(entity),
+		})
+	}
+
+	// 按综合评分升序（最低价值优先淘汰）
+	sort.Slice(scored, func(i, j int) bool {
+		return scored[i].value < scored[j].value
+	})
+
+	// 取前 toEvict 个
+	ids := make([]string, 0, toEvict)
+	for i := 0; i < toEvict && i < len(scored); i++ {
+		ids = append(ids, scored[i].id)
+	}
+
+	return ids, nil
+}
+
+// ScanAllCleanupMemories 一次性扫描过期 + 低价值 + 超量记忆 ID，合并去重后返回
 func ScanAllCleanupMemories(db *gorm.DB, tableName, sessionID string, config CleanupConfig) ([]string, error) {
 	var allIDs []string
 
@@ -154,6 +240,14 @@ func ScanAllCleanupMemories(db *gorm.DB, tableName, sessionID string, config Cle
 			return nil, err
 		}
 		allIDs = append(allIDs, lowValueIDs...)
+	}
+
+	if config.EnableMaxMemoryCount {
+		overCountIDs, err := ScanOverCountMemories(db, tableName, sessionID, config)
+		if err != nil {
+			return nil, err
+		}
+		allIDs = append(allIDs, overCountIDs...)
 	}
 
 	// 去重

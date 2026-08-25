@@ -153,6 +153,9 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 	if savedCount == 0 && lastDBErr != nil {
 		return lastDBErr
 	}
+
+	// 惰性触发自动清理检查（全局协调，不阻塞写入）
+	MaybeCleanup(r.db)
 	return nil
 }
 
