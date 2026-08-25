@@ -237,9 +237,18 @@ func (t *AiTask) execute() error {
 			t.SetStatus(aicommon.AITaskState_Aborted)
 		}
 		if t.GetStatus() == aicommon.AITaskState_Skipped {
+			// 用户通过 sync 事件跳过了任务（HandleSkipSubtaskInPlan），
+			// 取消确认消息已通过 asyncDeferCallback 延迟注册，
+			// 此处 loop 已退出，触发回调发送取消确认消息。
+			t.CallAsyncDeferCallback(nil)
 			return nil
 		}
 		return err
+	}
+	// 正常完成时，如果有用户取消标记（例如在 execute 完成后才收到取消），
+	// 也触发回调发送取消确认消息。
+	if t.IsUserCancelled() {
+		t.CallAsyncDeferCallback(nil)
 	}
 	return nil
 }

@@ -1712,6 +1712,7 @@ func TestCoordinator_SkipSubtaskInPlan_SubtaskIdTakesPrecedence(t *testing.T) {
 
 	skipSent := false
 	skipSuccess := false
+	sawPushTask12 := false
 	planSyncId := uuid.New().String()
 	skipSyncId := uuid.New().String()
 
@@ -1774,10 +1775,16 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TYPE_STRUCTURED && utils.StringContainsAllOfSubString(string(result.Content), []string{"push_task", "1-2"}) {
-				// 如果来到了 1-2，说明 1-3 被跳过了，1-2 正常执行
+				sawPushTask12 = true
+				// 1-2 正常执行说明 1-3 被跳过了（subtask_id 优先）
 				if skipSuccess {
 					break LOOP
 				}
+			}
+			// skip 响应延迟到任务 1-3 被处理时才发出（asyncDeferCallback），
+			// 可能晚于 push_task 1-2，因此两者都满足时即跳出。
+			if skipSuccess && sawPushTask12 {
+				break LOOP
 			}
 
 		case <-ctx.Done():
