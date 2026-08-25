@@ -277,6 +277,22 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 			return NewConst(x.Number() <= y.Number())
 		}
 	case OpEq:
+		// Compare by value, not by the raw interface word: the same literal
+		// reaches the fold as different Go types (int from the parser,
+		// int64 from a previous fold such as 2*3), and interface equality
+		// would report 6 == 6 as false.
+		if x.IsNumber() && y.IsNumber() {
+			return NewConst(x.Number() == y.Number())
+		}
+		if x.IsFloat() && y.IsFloat() {
+			return NewConst(x.Float() == y.Float())
+		}
+		if x.IsString() && y.IsString() {
+			return NewConst(x.VarString() == y.VarString())
+		}
+		if x.IsBoolean() && y.IsBoolean() {
+			return NewConst(x.Boolean() == y.Boolean())
+		}
 		if x.GetTypeKind() == y.GetTypeKind() {
 			return NewConst(x.value == y.value)
 		}
