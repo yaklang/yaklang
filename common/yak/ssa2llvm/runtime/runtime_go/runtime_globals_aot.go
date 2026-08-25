@@ -204,6 +204,36 @@ func yak_runtime_fuzztag(raw int64) int64 {
 	return int64(uintptr(newStdlibShadow(values)))
 }
 
+//export yak_runtime_float_binop
+func yak_runtime_float_binop(op int64, a, b int64) int64 {
+	defer recoverRuntimePanic()
+	af, aok := runtimeWordAsFloat(uint64(a))
+	bf, bok := runtimeWordAsFloat(uint64(b))
+	if !aok {
+		af = float64(a)
+	}
+	if !bok {
+		bf = float64(b)
+	}
+	var r float64
+	switch op {
+	case 0:
+		r = af + bf
+	case 1:
+		r = af - bf
+	case 2:
+		r = af * bf
+	case 3:
+		if bf == 0 {
+			return 0
+		}
+		r = af / bf
+	default:
+		return 0
+	}
+	return int64(math.Float64bits(r))
+}
+
 func registerRuntimeGlobals() {
 	runtimeRegisterYaklibGlobals(map[string]any{
 		"len":     runtimeYakBuiltinLen,

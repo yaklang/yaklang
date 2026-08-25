@@ -50,6 +50,12 @@ func decodeTaggedArg(v uint64) any {
 	raw := v &^ yakTaggedPointerMask
 	ptr := unsafe.Pointer(uintptr(raw))
 	if ptr == nil {
+		// 2.0 = 0x4000000000000000 sets the tag bit, so the masked word is
+		// zero; reinterpret the ORIGINAL word as a float before giving up.
+		if f := math.Float64frombits(v); !math.IsInf(f, 0) && !math.IsNaN(f) &&
+			math.Abs(f) >= 1e-300 && math.Abs(f) <= 1e300 && v > 1<<32 {
+			return f
+		}
 		return ""
 	}
 	if h, ok := handleFromShadow(ptr); ok {
