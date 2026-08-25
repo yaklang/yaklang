@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
@@ -343,10 +344,18 @@ func deleteHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.DeleteHTTPFlowR
 		return err
 	}
 	if req.GetDeleteAll() {
+		projectBinding := consts.CaptureProjectDatabaseBinding()
+		usesCurrentProjectDatabase := sameGormDatabase(db, projectBinding.Database)
 		yakit.DropWebsocketFlowTable(db)
 		yakit.DropExtractedDataTable(db)
 		grpcmodel.DropHTTPFlowCacheGRPCModelByFlow()
-		return yakit.DeleteHTTPFlow(db, req)
+		if err := yakit.DeleteHTTPFlow(db, req); err != nil {
+			return err
+		}
+		if usesCurrentProjectDatabase {
+			yakit.FinalizeHTTPFlowTableRecreation(projectBinding)
+		}
+		return nil
 	}
 
 	queryDB := yakit.QueryWebsocketFlowsByHTTPFlowHash(db, req).Select([]string{"id", "websocket_hash", "hash"})
@@ -378,6 +387,17 @@ func deleteHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.DeleteHTTPFlowR
 		}
 	}
 	return yakit.DeleteHTTPFlow(db, req)
+}
+
+func sameGormDatabase(left, right *gorm.DB) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	if left == right {
+		return true
+	}
+	leftSQLDB, rightSQLDB := left.DB(), right.DB()
+	return leftSQLDB != nil && leftSQLDB == rightSQLDB
 }
 
 func handleQueryHTTPFlows(s *MCPServer) server.ToolHandlerFunc {

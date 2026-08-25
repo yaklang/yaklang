@@ -103,11 +103,7 @@ func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowReque
 		// DropRecreateTable resets SQLite IDs. Rotate the logical database
 		// generation before invalidating the old stream so a concurrent frontend
 		// bootstrap can never pair lower IDs with the previous generation.
-		_, _ = consts.AdvanceProjectDatabaseGeneration(projectBinding.Generation)
-		yakit.ResetHTTPFlowRuntimeState(
-			yakit.HTTPFlowDatabaseIdentity(projectBinding.Path),
-			projectBinding.Generation,
-		)
+		yakit.FinalizeHTTPFlowTableRecreation(projectBinding)
 	}
 	return &ypb.Empty{}, nil
 }
