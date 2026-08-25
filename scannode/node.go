@@ -57,7 +57,11 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 	if cfg.HeartbeatInterval <= 0 {
 		cfg.HeartbeatInterval = node.DefaultHeartbeatInterval
 	}
-	cfg.MaxRunningJobs = effectiveMaxRunningJobs(cfg.MaxRunningJobs)
+	maxRunningJobs, err := effectiveMaxRunningJobs(cfg.MaxRunningJobs)
+	if err != nil {
+		return nil, err
+	}
+	cfg.MaxRunningJobs = maxRunningJobs
 	var resolvedOptions scanNodeOptions
 	for _, option := range options {
 		if option != nil {

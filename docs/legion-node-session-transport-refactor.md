@@ -174,8 +174,9 @@
 
 `BaseConfig.MaxRunningJobs` 是主配置，最终生效值按下面优先级计算：
 
-1. `SCANNODE_MAX_PARALLEL` 为正整数时，作为旧部署兼容 override
-2. env 未设置、不是整数、为负数或为 `0` 时，回退到 `BaseConfig.MaxRunningJobs`
+1. `SCANNODE_MAX_PARALLEL` 显式设置为 `0..uint32` 时，作为旧部署兼容 override；`0` 表示 unlimited
+2. env 未设置时，使用 `BaseConfig.MaxRunningJobs`
+3. env 已设置但为空、不是整数、为负数或超出 `uint32` 时，节点启动失败；不会静默回退到另一个容量
 
 最终 effective max 同时用于执行 limiter 和 heartbeat 的 `max_running_jobs`，不会出现“实际只跑 1 个、heartbeat 却上报其他值”的分叉。
 
@@ -321,7 +322,7 @@ yak node \
 - `--max-running-jobs`
 - `--heartbeat-interval`
 
-`--max-running-jobs` 默认 1；传 0 表示 unlimited。正整数 `SCANNODE_MAX_PARALLEL` 只用于兼容旧部署，并覆盖 CLI 写入的主配置；无效值和 0 不覆盖。
+`--max-running-jobs` 默认 1；传 0 表示 unlimited。`SCANNODE_MAX_PARALLEL` 只用于兼容旧部署，并在显式设置为合法 `0..uint32` 时覆盖 CLI 写入的主配置；无效值会阻止节点启动。
 
 ## 当前结论
 

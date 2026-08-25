@@ -1,6 +1,7 @@
 package scannode
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -69,22 +70,22 @@ func (l *invokeLimiter) TryAcquire() (release func(), acquired bool) {
 	}, true
 }
 
-func effectiveMaxRunningJobs(configured uint32) uint32 {
-	raw := strings.TrimSpace(os.Getenv(envScanNodeMaxParallel))
-	if raw == "" {
-		return configured
+func effectiveMaxRunningJobs(configured uint32) (uint32, error) {
+	rawValue, configuredByEnvironment := os.LookupEnv(envScanNodeMaxParallel)
+	if !configuredByEnvironment {
+		return configured, nil
 	}
+	raw := strings.TrimSpace(rawValue)
 	override, err := strconv.ParseUint(raw, 10, 32)
-	if err != nil || override == 0 {
-		log.Warnf(
-			"ignore invalid %s=%q; using configured max_running_jobs=%d",
+	if err != nil {
+		return 0, fmt.Errorf(
+			"%s must be an integer between 0 and %d: %q",
 			envScanNodeMaxParallel,
-			raw,
-			configured,
+			uint64(^uint32(0)),
+			rawValue,
 		)
-		return configured
 	}
-	return uint32(override)
+	return uint32(override), nil
 }
 
 func (s *ScanNode) initInvokeLimiter(maximum uint32) {

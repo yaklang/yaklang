@@ -1,6 +1,12 @@
 package scannode
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/yaklang/yaklang/common/node"
+)
 
 func TestInvokeLimiterMaxOneIsNonBlockingAndReleaseIsIdempotent(t *testing.T) {
 	limiter := newInvokeLimiter(1)
@@ -44,23 +50,70 @@ func TestInvokeLimiterMaxZeroIsUnlimitedAndStillCountsRunningJobs(t *testing.T) 
 func TestEffectiveMaxRunningJobsEnvOverride(t *testing.T) {
 	tests := []struct {
 		name       string
-		env        string
+		env        *string
 		configured uint32
 		want       uint32
+		wantError  bool
 	}{
 		{name: "unset uses config", configured: 3, want: 3},
-		{name: "positive overrides", env: "5", configured: 3, want: 5},
-		{name: "zero falls back", env: "0", configured: 3, want: 3},
-		{name: "negative falls back", env: "-1", configured: 3, want: 3},
-		{name: "invalid falls back", env: "many", configured: 3, want: 3},
+		{name: "positive overrides", env: stringPointer("5"), configured: 3, want: 5},
+		{name: "zero means unlimited", env: stringPointer("0"), configured: 3, want: 0},
+		{name: "surrounding whitespace is accepted", env: stringPointer(" 4 "), configured: 3, want: 4},
+		{name: "negative is rejected", env: stringPointer("-1"), configured: 3, wantError: true},
+		{name: "non numeric is rejected", env: stringPointer("many"), configured: 3, wantError: true},
+		{name: "overflow is rejected", env: stringPointer("4294967296"), configured: 3, wantError: true},
+		{name: "explicit empty is rejected", env: stringPointer(""), configured: 3, wantError: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv(envScanNodeMaxParallel, tt.env)
-			if got := effectiveMaxRunningJobs(tt.configured); got != tt.want {
+			setOptionalEnvironment(t, envScanNodeMaxParallel, tt.env)
+			got, err := effectiveMaxRunningJobs(tt.configured)
+			if tt.wantError {
+				if err == nil || !strings.Contains(err.Error(), envScanNodeMaxParallel) {
+					t.Fatalf("effective max error = %v, want %s validation error", err, envScanNodeMaxParallel)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("effective max error = %v", err)
+			}
+			if got != tt.want {
 				t.Fatalf("effective max = %d, want %d", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNewScanNodeRejectsInvalidMaxParallelOverride(t *testing.T) {
+	t.Setenv(envScanNodeMaxParallel, "invalid")
+	if _, err := NewScanNode(node.BaseConfig{}); err == nil ||
+		!strings.Contains(err.Error(), envScanNodeMaxParallel) {
+		t.Fatalf("NewScanNode error = %v, want %s validation error", err, envScanNodeMaxParallel)
+	}
+}
+
+func stringPointer(value string) *string {
+	return &value
+}
+
+func setOptionalEnvironment(t *testing.T, name string, value *string) {
+	t.Helper()
+	previous, existed := os.LookupEnv(name)
+	t.Cleanup(func() {
+		if existed {
+			_ = os.Setenv(name, previous)
+			return
+		}
+		_ = os.Unsetenv(name)
+	})
+	if value == nil {
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatalf("unset %s: %v", name, err)
+		}
+		return
+	}
+	if err := os.Setenv(name, *value); err != nil {
+		t.Fatalf("set %s: %v", name, err)
 	}
 }
 
