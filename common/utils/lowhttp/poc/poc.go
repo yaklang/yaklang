@@ -24,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -106,6 +107,7 @@ type PocConfig struct {
 
 	ClientHelloSpec *utls.ClientHelloSpec
 	RandomJA3       bool
+	TLSFingerprint  string
 
 	GmTLS                  bool
 	GmTLSOnly              bool
@@ -255,6 +257,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 
 	if c.RandomJA3 {
 		opts = append(opts, lowhttp.WithRandomJA3FingerPrint(c.RandomJA3))
+	}
+	if c.TLSFingerprint != "" {
+		opts = append(opts, lowhttp.WithTLSFingerprint(c.TLSFingerprint))
 	}
 	if c.GmTLSOnly {
 		opts = append(opts, lowhttp.WithGmTLSOnly(c.GmTLSOnly))
@@ -954,6 +959,18 @@ func WithRandomJA3(b bool) PocConfigOption {
 	return func(c *PocConfig) {
 		c.RandomJA3 = b
 	}
+}
+
+// WithTLSFingerprint selects a built-in TLS fingerprint profile.
+// Available profiles can be queried with TLSFingerprintProfiles.
+func WithTLSFingerprint(name string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.TLSFingerprint = name
+	}
+}
+
+func TLSFingerprintProfiles() []string {
+	return netx.AvailableClientHelloProfiles()
 }
 
 // not export
@@ -3622,6 +3639,8 @@ var PoCExports = map[string]interface{}{
 	"username":               WithUsername,
 	"password":               WithPassword,
 	"randomJA3":              WithRandomJA3,
+	"tlsFingerprint":         WithTLSFingerprint,
+	"tlsFingerprintProfiles": TLSFingerprintProfiles,
 	"gmTls":                  WithGmTls,
 	"gmTlsOnly":              WithGmTlsOnly,
 	"gmTLSPrefer":            WithGmTLSPrefer,
