@@ -651,8 +651,9 @@ func TestLegionCodeWorkspaceReadOnlyToolsEnforceTraversalSymlinkAndBudgets(t *te
 	if err != nil {
 		t.Fatalf("source.search: %v", err)
 	}
-	if search["truncated"] != true || search["scanned_bytes"].(int64) > spec.MaxReadBytes {
-		t.Fatalf("search did not honor read budget: %#v", search)
+	results := search["results"].([]map[string]any)
+	if search["truncated"] != false || len(results) != 1 || results[0]["path"] != "src/main.go" || search["scanned_bytes"].(int64) <= spec.MaxReadBytes {
+		t.Fatalf("workspace search was incorrectly limited by the per-read byte budget: %#v", search)
 	}
 	for _, bad := range []string{"../secret.go", "/etc/passwd", "src/../binary.bin", "escape.go"} {
 		if _, err := runtime.Execute(serverFocusCapabilitySourceRead, map[string]any{"path": bad}); err == nil {
