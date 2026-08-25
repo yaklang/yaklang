@@ -445,8 +445,15 @@ func TestGRPC_StartMcpServer_ProjectDatabaseTools(t *testing.T) {
 	hostB := projectNameB + ".local"
 	riskTitleA := "risk-" + projectNameA
 	riskTitleB := "risk-" + projectNameB
-	projectADB := consts.GetGormProjectDatabase()
+	projectA, ok := createAData["project"].(map[string]any)
+	require.True(t, ok)
+	projectAPath, ok := projectA["DatabasePath"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, projectAPath)
+	projectADB, err := consts.CreateProjectDatabase(projectAPath)
+	require.NoError(t, err)
 	require.NoError(t, insertMCPProjectData(projectADB, urlA, hostA, riskTitleA))
+	require.NoError(t, projectADB.Close())
 
 	projectB, ok := createBData["project"].(map[string]any)
 	require.True(t, ok)
