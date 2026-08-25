@@ -1,14 +1,19 @@
 * 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
+
+* `directly_answer` 必须且只能选择以下一种答案承载方式。下面两个示例是互斥的独立响应，禁止在同一次响应中拼接或同时输出：
+    * 短答案：使用非空 `answer_payload`；JSON 结束后立即停止，禁止再输出 `FINAL_ANSWER` AI Tag。
     * `{"@action": "directly_answer", "answer_payload": "...[your-answer not a markdown].."}`
 
 *. 简单直接回答时，默认不要输出 `human_readable_thought`
 
-* 在 directly_answer 的 Action 中，如果 answer_payload 的内容较大，设计到代码等多样化内容，请使用 AI Tag 回答
+* 长答案、Markdown 或代码：省略 `answer_payload` 或将其保持为空，仅使用 `FINAL_ANSWER` AI Tag；禁止同时提供非空 `answer_payload`。
 
 {"@action": "directly_answer"}
 <|FINAL_ANSWER_CURRENT_NONCE|>
 # markdown in mass
 <|FINAL_ANSWER_END_CURRENT_NONCE|>
+
+* 再次强调：非空 `answer_payload` 与 `FINAL_ANSWER` AI Tag 严格互斥；任一响应只能出现其中一种答案内容。
 
 *. 所有 action 必须直接输出使用 Schema 原始英文键名的 JSON object；禁止 `<@action=...>` 标签、中文字段说明、YAML 或 JSON 外包装。
 *. 缺少任务所需的一手证据时，本轮工具 action 就是执行机会；立即选择工具，禁止回答“没有工具执行机会”或要求重发任务。
