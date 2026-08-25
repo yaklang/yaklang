@@ -7,6 +7,7 @@ import "C"
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"runtime/cgo"
 	"unsafe"
@@ -54,7 +55,19 @@ func decodeTaggedArg(v uint64) any {
 	if h, ok := handleFromShadow(ptr); ok {
 		return h.Value()
 	}
-	return C.GoString((*C.char)(ptr))
+	if looksLikeCStringPointer(raw) {
+		return C.GoString((*C.char)(ptr))
+	}
+	// The tag bit alone does not prove a pointer: float64 bit patterns such
+	// as 3.1415926 (0x400921fb9d12d84a) set bit 62 for the exponent, and a
+	// non-canonical address must not be dereferenced. Reinterpret the word as
+	// a float when it forms a normal finite double; otherwise preserve the
+	// raw integer so callers can fall back instead of crashing.
+	if f := math.Float64frombits(raw); !math.IsInf(f, 0) && !math.IsNaN(f) &&
+		math.Abs(f) >= 1e-300 && math.Abs(f) <= 1e300 && raw > 1<<32 {
+		return f
+	}
+	return int64(v)
 }
 
 func newStdlibShadow(value any) unsafe.Pointer {

@@ -2,14 +2,23 @@
 
 package main
 
+/*
+#include <stdint.h>
+*/
+import "C"
+
 import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 // registerRuntimeGlobals registers the minimal global set for the AOT runtime.
@@ -76,6 +85,105 @@ func runtimeBuiltinUUID() string {
 	dst[23] = '-'
 	hex.Encode(dst[24:36], b[10:16])
 	return string(dst)
+}
+
+// runtimeBuiltinClose mirrors yaklib's close(channel).
+func runtimeBuiltinClose(ch any) {
+	rv := reflect.ValueOf(ch)
+	for rv.IsValid() && rv.Kind() == reflect.Interface {
+		if rv.IsNil() {
+			panic("close of nil channel")
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() || rv.Kind() != reflect.Chan {
+		panic(fmt.Sprintf("close of non-channel %T", ch))
+	}
+	rv.Close()
+}
+
+// runtimeWordAsFloat reports whether a raw word is a normal finite float64
+// bit pattern (the same heuristic the arg decoder uses).
+func runtimeWordAsFloat(raw uint64) (float64, bool) {
+	f := math.Float64frombits(raw)
+	if math.IsInf(f, 0) || math.IsNaN(f) {
+		return 0, false
+	}
+	if math.Abs(f) >= 1e-300 && math.Abs(f) <= 1e300 && raw > 1<<32 {
+		return f, true
+	}
+	return 0, false
+}
+
+//export yak_runtime_to_int
+func yak_runtime_to_int(raw int64) int64 {
+	defer recoverRuntimePanic()
+	if f, ok := runtimeWordAsFloat(uint64(raw)); ok {
+		return int64(f)
+	}
+	return raw
+}
+
+//export yak_runtime_to_float
+func yak_runtime_to_float(raw int64) int64 {
+	defer recoverRuntimePanic()
+	if _, ok := runtimeWordAsFloat(uint64(raw)); ok {
+		return raw
+	}
+	return int64(math.Float64bits(float64(raw)))
+}
+
+//export yak_runtime_to_string
+func yak_runtime_to_string(raw int64) int64 {
+	defer recoverRuntimePanic()
+	if raw == 0 {
+		return int64(uintptr(newStdlibShadow("")))
+	}
+	if f, ok := runtimeWordAsFloat(uint64(raw)); ok {
+		return int64(uintptr(newStdlibShadow(strconv.FormatFloat(f, 'g', -1, 64))))
+	}
+	return int64(uintptr(newStdlibShadow(strconv.FormatInt(raw, 10))))
+}
+
+//export yak_runtime_bool_to_string
+func yak_runtime_bool_to_string(raw int64) int64 {
+	defer recoverRuntimePanic()
+	if raw != 0 {
+		return int64(uintptr(newStdlibShadow("true")))
+	}
+	return int64(uintptr(newStdlibShadow("false")))
+}
+
+// runtimeParseStringWord resolves a raw word to a Go string: either a shadow
+// handle or a C-string pointer.
+func runtimeParseStringWord(raw int64) string {
+	ptr := unsafe.Pointer(uintptr(raw))
+	if h, ok := handleFromShadow(ptr); ok {
+		if s, ok := h.Value().(string); ok {
+			return s
+		}
+	}
+	return runtimeCStringToGoString(ptr)
+}
+
+//export yak_runtime_parse_int
+func yak_runtime_parse_int(raw int64) int64 {
+	defer recoverRuntimePanic()
+	n, err := strconv.ParseInt(runtimeParseStringWord(raw), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+//export yak_runtime_parse_float
+func yak_runtime_parse_float(raw int64) int64 {
+	defer recoverRuntimePanic()
+	f, err := strconv.ParseFloat(runtimeParseStringWord(raw), 64)
+	if err != nil {
+		return 0
+	}
+	return int64(math.Float64bits(f))
 }
 
 func registerRuntimeGlobals() {

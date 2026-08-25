@@ -1,0 +1,14 @@
+// Regression: ellipsis expansion (b(a...)) must expand the container's
+// literal members in order (reverse walk of GetLastWinsMemberPairs) and skip
+// read placeholders such as a[-1] merged into the Make's pair list.
+a = [1, 2, 3]
+b = (a, b, c) => c
+assert b(a...) == 3
+
+// Regression: a["c"](1) is a closure stored in a map, not a method dispatch
+// on the map object (previously routed to shadow-method dispatch and failed
+// with "method c not found").
+m = {"a": 1, "b": 2, "c": x => x + 1}
+assert m["a"] == 1
+assert m["b"] == 2
+assert m["c"](1) == 2

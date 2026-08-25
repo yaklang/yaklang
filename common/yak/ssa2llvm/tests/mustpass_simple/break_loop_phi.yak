@@ -1,0 +1,12 @@
+// Regression: a break inside a loop body bypasses the latch, so loop-carried
+// phi values computed in the current iteration (t += 1 before `if i == 10 {
+// break }`) must be flushed at the break edge; otherwise the exit reads a
+// stale value (t == 10 instead of 11).
+t = 0
+for i = range 100 {
+    t += 1
+    if i == 10 {
+        break
+    }
+}
+assert t == 11, t
