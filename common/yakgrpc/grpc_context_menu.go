@@ -32,11 +32,11 @@ func (s *Server) QueryContextMenuActions(ctx context.Context, req *ypb.QueryCont
 		return nil, utils.Errorf("unknown context-menu scene: %s", req.GetScene())
 	}
 
-	scripts, err := s.queryContextMenuScripts(req.GetIncludeDisabled())
+	bindings, err := yakit.QueryEffectiveContextMenuBindings(s.GetProfileDatabase(), req.GetScene())
 	if err != nil {
 		return nil, err
 	}
-	bindings, err := yakit.QueryContextMenuBindings(s.GetProfileDatabase())
+	scripts, err := s.queryContextMenuScripts(req.GetIncludeDisabled(), bindings)
 	if err != nil {
 		return nil, err
 	}
@@ -251,15 +251,11 @@ func (s *Server) ExecuteContextMenuAction(req *ypb.ExecuteContextMenuActionReque
 	})
 }
 
-func (s *Server) queryContextMenuScripts(includeDisabled bool) ([]*schema.YakScript, error) {
+func (s *Server) queryContextMenuScripts(includeDisabled bool, bindings []*schema.ContextMenuBinding) ([]*schema.YakScript, error) {
 	var scripts []*schema.YakScript
 	db := s.GetProfileDatabase().Model(&schema.YakScript{}).
 		Where("type IN (?)", []string{contextmenu.PluginType, contextmenu.LegacyPluginType})
 	if !includeDisabled {
-		bindings, err := yakit.QueryContextMenuBindings(s.GetProfileDatabase())
-		if err != nil {
-			return nil, err
-		}
 		uuidSet := make(map[string]struct{})
 		for _, binding := range bindings {
 			if binding.Enabled {
@@ -314,26 +310,7 @@ func (s *Server) getContextMenuManagedScript(pluginUUID string) (*schema.YakScri
 }
 
 func (s *Server) ensureContextMenuManagedScriptUUID(script *schema.YakScript) error {
-	if script == nil || script.Uuid != "" {
-		return nil
-	}
-	generated := uuid.NewString()
-	result := s.GetProfileDatabase().Model(&schema.YakScript{}).
-		Where("id = ? AND (uuid = '' OR uuid IS NULL)", script.ID).
-		UpdateColumn("uuid", generated)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected > 0 {
-		script.Uuid = generated
-		return nil
-	}
-	refreshed, err := yakit.GetYakScript(s.GetProfileDatabase(), int64(script.ID))
-	if err != nil {
-		return err
-	}
-	script.Uuid = refreshed.Uuid
-	return nil
+	return yakit.EnsureContextMenuScriptUUID(s.GetProfileDatabase(), script)
 }
 
 func contextMenuScriptImplements(script *schema.YakScript, actionID string) bool {

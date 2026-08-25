@@ -112,23 +112,67 @@ func TestContextMenuQueryIncludesLegacyCodecCapabilities(t *testing.T) {
 	server := newContextMenuServerForTest(t)
 	legacy := createLegacyCodecServerTestPlugin(t, server, strings.Join([]string{
 		contextmenu.LegacyTagHistorySingle,
+		contextmenu.LegacyTagHistoryMulti,
+		contextmenu.LegacyTagPacketContext,
 		contextmenu.LegacyTagPacketMutate,
+		"AI工具",
 	}, ","), false)
 
 	management, err := server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
 		IncludeDisabled: true,
 	})
 	require.NoError(t, err)
-	require.Len(t, management.Actions, 2)
+	require.Len(t, management.Actions, 4)
 	for _, action := range management.Actions {
 		require.Equal(t, contextmenu.LegacyPluginType, action.PluginType)
 		require.False(t, action.SupportsResultMode)
-		require.False(t, action.Enabled)
+		require.True(t, action.Enabled)
+		require.True(t, action.IsAIPlugin)
 		require.NotEmpty(t, action.Scene)
 		require.NotEmpty(t, action.ExecutionType)
 	}
 	legacy.Uuid = management.Actions[0].PluginUUID
 	require.NotEmpty(t, legacy.Uuid, "query should backfill UUIDs for old CODEC plugins")
+
+	historyMenu, err := server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
+		Scene: contextmenu.ActionHistorySingle,
+	})
+	require.NoError(t, err)
+	require.Len(t, historyMenu.Actions, 1)
+	require.Equal(t, contextmenu.ActionLegacyHistorySingle, historyMenu.Actions[0].ActionID)
+	require.EqualValues(t, 1, historyMenu.EnabledCustomPluginCount)
+
+	historyMultiMenu, err := server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
+		Scene: contextmenu.ActionHistoryMulti,
+	})
+	require.NoError(t, err)
+	require.Len(t, historyMultiMenu.Actions, 1)
+	require.Equal(t, contextmenu.ActionLegacyHistoryMulti, historyMultiMenu.Actions[0].ActionID)
+	require.EqualValues(t, 1, historyMultiMenu.EnabledCustomPluginCount)
+
+	packetMenu, err := server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
+		Scene: contextmenu.ActionHTTPPacket,
+	})
+	require.NoError(t, err)
+	require.Len(t, packetMenu.Actions, 2)
+	require.ElementsMatch(t, []string{
+		contextmenu.ActionLegacyPacketContext,
+		contextmenu.ActionLegacyPacketMutate,
+	}, []string{packetMenu.Actions[0].ActionID, packetMenu.Actions[1].ActionID})
+	require.EqualValues(t, 1, packetMenu.EnabledCustomPluginCount)
+
+	_, err = server.SetContextMenuActionBinding(context.Background(), &ypb.SetContextMenuActionBindingRequest{
+		PluginUUID: legacy.Uuid,
+		ActionID:   contextmenu.ActionLegacyHistorySingle,
+		Enabled:    false,
+	})
+	require.NoError(t, err)
+	historyMenu, err = server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
+		Scene: contextmenu.ActionHistorySingle,
+	})
+	require.NoError(t, err)
+	require.Empty(t, historyMenu.Actions, "an explicit disabled binding must override the compatibility default")
+	require.Zero(t, historyMenu.EnabledCustomPluginCount)
 
 	action, err := server.SetContextMenuActionBinding(context.Background(), &ypb.SetContextMenuActionBindingRequest{
 		PluginUUID: legacy.Uuid,
@@ -140,12 +184,11 @@ func TestContextMenuQueryIncludesLegacyCodecCapabilities(t *testing.T) {
 	require.True(t, action.Enabled)
 	require.Equal(t, contextmenu.ResultModeAuto, action.ResultMode, "legacy execution keeps its existing result pipeline")
 
-	packetMenu, err := server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
+	packetMenu, err = server.QueryContextMenuActions(context.Background(), &ypb.QueryContextMenuActionsRequest{
 		Scene: contextmenu.ActionHTTPPacket,
 	})
 	require.NoError(t, err)
-	require.Len(t, packetMenu.Actions, 1)
-	require.Equal(t, contextmenu.ActionLegacyPacketMutate, packetMenu.Actions[0].ActionID)
+	require.Len(t, packetMenu.Actions, 2)
 	require.EqualValues(t, 1, packetMenu.EnabledCustomPluginCount)
 
 	err = server.ExecuteContextMenuAction(&ypb.ExecuteContextMenuActionRequest{

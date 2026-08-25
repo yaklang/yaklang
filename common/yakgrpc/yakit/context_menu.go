@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -46,6 +47,20 @@ func SetContextMenuBinding(db *gorm.DB, binding *schema.ContextMenuBinding) (*sc
 	defer contextMenuBindingLock.Unlock()
 
 	err = utils.GormTransaction(db, func(tx *gorm.DB) error {
+		if binding.Enabled && !script.IsCorePlugin {
+			enabledPlugins, err := queryEnabledCustomContextMenuPluginUUIDsByScene(tx, scene)
+			if err != nil {
+				return err
+			}
+			if _, alreadyEnabled := enabledPlugins[binding.PluginUUID]; !alreadyEnabled && len(enabledPlugins) >= contextmenu.MaxCustomPluginsPerScene {
+				return utils.Errorf(
+					"at most %d custom context-menu plugins can be enabled in scene %s",
+					contextmenu.MaxCustomPluginsPerScene,
+					scene,
+				)
+			}
+		}
+
 		binding.Hash = binding.CalcHash()
 		assign := map[string]any{
 			"plugin_uuid":    binding.PluginUUID,
@@ -63,17 +78,6 @@ func SetContextMenuBinding(db *gorm.DB, binding *schema.ContextMenuBinding) (*sc
 			return utils.Errorf("save context-menu binding failed: %s", result.Error)
 		}
 
-		count, err := countEnabledCustomContextMenuPluginsByScene(tx, scene)
-		if err != nil {
-			return err
-		}
-		if count > contextmenu.MaxCustomPluginsPerScene {
-			return utils.Errorf(
-				"at most %d custom context-menu plugins can be enabled in scene %s",
-				contextmenu.MaxCustomPluginsPerScene,
-				scene,
-			)
-		}
 		return nil
 	})
 	if err != nil {
@@ -99,6 +103,178 @@ func QueryContextMenuBindings(db *gorm.DB) ([]*schema.ContextMenuBinding, error)
 	if result.Error != nil {
 		return nil, result.Error
 	}
+	sortContextMenuBindings(bindings)
+	return bindings, nil
+}
+
+// QueryEffectiveContextMenuBindings returns explicit user bindings plus the
+// legacy CODEC actions that the pre-refactor frontend displayed by default.
+// An explicit binding, including Enabled=false, always overrides the default.
+func QueryEffectiveContextMenuBindings(db *gorm.DB, scene string) ([]*schema.ContextMenuBinding, error) {
+	explicit, err := QueryContextMenuBindings(db)
+	if err != nil {
+		return nil, err
+	}
+	defaults, err := queryDefaultLegacyContextMenuBindings(db, scene, explicit)
+	if err != nil {
+		return nil, err
+	}
+
+	bindingsByKey := make(map[string]*schema.ContextMenuBinding, len(defaults)+len(explicit))
+	for _, binding := range defaults {
+		bindingsByKey[contextMenuBindingKey(binding.PluginUUID, binding.ActionID)] = binding
+	}
+	for _, binding := range explicit {
+		bindingsByKey[contextMenuBindingKey(binding.PluginUUID, binding.ActionID)] = binding
+	}
+
+	bindings := make([]*schema.ContextMenuBinding, 0, len(bindingsByKey))
+	for _, binding := range bindingsByKey {
+		bindingScene, ok := contextmenu.SceneForAction(binding.ActionID)
+		if !ok || (scene != "" && bindingScene != scene) {
+			continue
+		}
+		bindings = append(bindings, binding)
+	}
+	sortContextMenuBindings(bindings)
+	return bindings, nil
+}
+
+func queryDefaultLegacyContextMenuBindings(
+	db *gorm.DB,
+	scene string,
+	explicit []*schema.ContextMenuBinding,
+) ([]*schema.ContextMenuBinding, error) {
+	if scene != "" && !contextmenu.IsKnownScene(scene) {
+		return nil, utils.Errorf("unknown context-menu scene: %s", scene)
+	}
+	explicitByKey := make(map[string]struct{}, len(explicit))
+	explicitUUIDs := make([]string, 0, len(explicit))
+	explicitUUIDSet := make(map[string]struct{}, len(explicit))
+	for _, binding := range explicit {
+		explicitByKey[contextMenuBindingKey(binding.PluginUUID, binding.ActionID)] = struct{}{}
+		if !binding.Enabled {
+			continue
+		}
+		if _, exists := explicitUUIDSet[binding.PluginUUID]; !exists {
+			explicitUUIDSet[binding.PluginUUID] = struct{}{}
+			explicitUUIDs = append(explicitUUIDs, binding.PluginUUID)
+		}
+	}
+
+	selectedByScene := make(map[string]map[string]struct{})
+	if len(explicitUUIDs) > 0 {
+		var explicitScripts []*schema.YakScript
+		result := db.Model(&schema.YakScript{}).Where("uuid IN (?)", explicitUUIDs).Find(&explicitScripts)
+		if result.Error != nil {
+			return nil, result.Error
+		}
+		explicitScriptByUUID := make(map[string]*schema.YakScript, len(explicitScripts))
+		for _, script := range explicitScripts {
+			explicitScriptByUUID[script.Uuid] = script
+		}
+		for _, binding := range explicit {
+			if !binding.Enabled {
+				continue
+			}
+			bindingScene, ok := contextmenu.SceneForAction(binding.ActionID)
+			if !ok || (scene != "" && bindingScene != scene) {
+				continue
+			}
+			script := explicitScriptByUUID[binding.PluginUUID]
+			if script == nil || script.IsCorePlugin || !isContextMenuManagedScript(script, binding.ActionID) {
+				continue
+			}
+			if selectedByScene[bindingScene] == nil {
+				selectedByScene[bindingScene] = make(map[string]struct{})
+			}
+			selectedByScene[bindingScene][binding.PluginUUID] = struct{}{}
+		}
+	}
+
+	actionIDs := []string{
+		contextmenu.ActionLegacyHistorySingle,
+		contextmenu.ActionLegacyHistoryMulti,
+		contextmenu.ActionLegacyPacketContext,
+		contextmenu.ActionLegacyPacketMutate,
+	}
+	bindings := make([]*schema.ContextMenuBinding, 0, len(actionIDs)*contextmenu.LegacyDefaultPluginLimit)
+	for _, actionID := range actionIDs {
+		actionScene, _ := contextmenu.SceneForAction(actionID)
+		if scene != "" && actionScene != scene {
+			continue
+		}
+		tag, _ := contextmenu.LegacyTagForAction(actionID)
+		var scripts []*schema.YakScript
+		result := db.Model(&schema.YakScript{}).
+			Where("ignored = ?", false).
+			Where("type = ?", contextmenu.LegacyPluginType).
+			Where("tags LIKE ?", "%"+tag+"%").
+			Order("updated_at desc").
+			Limit(contextmenu.LegacyDefaultPluginLimit).
+			Find(&scripts)
+		if result.Error != nil {
+			return nil, result.Error
+		}
+		if selectedByScene[actionScene] == nil {
+			selectedByScene[actionScene] = make(map[string]struct{})
+		}
+		selected := selectedByScene[actionScene]
+		for index, script := range scripts {
+			if err := EnsureContextMenuScriptUUID(db, script); err != nil {
+				return nil, err
+			}
+			if _, configured := explicitByKey[contextMenuBindingKey(script.Uuid, actionID)]; configured {
+				continue
+			}
+			if !script.IsCorePlugin {
+				if _, exists := selected[script.Uuid]; !exists {
+					if len(selected) >= contextmenu.MaxCustomPluginsPerScene {
+						continue
+					}
+					selected[script.Uuid] = struct{}{}
+				}
+			}
+			bindings = append(bindings, &schema.ContextMenuBinding{
+				PluginUUID: script.Uuid,
+				ActionID:   actionID,
+				Enabled:    true,
+				Sort:       int64(index + 1),
+				ResultMode: contextmenu.ResultModeAuto,
+			})
+		}
+	}
+	return bindings, nil
+}
+
+func EnsureContextMenuScriptUUID(db *gorm.DB, script *schema.YakScript) error {
+	if script == nil || script.Uuid != "" {
+		return nil
+	}
+	generated := uuid.NewString()
+	result := db.Model(&schema.YakScript{}).
+		Where("id = ? AND (uuid = '' OR uuid IS NULL)", script.ID).
+		UpdateColumn("uuid", generated)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected > 0 {
+		script.Uuid = generated
+		return nil
+	}
+	refreshed, err := GetYakScript(db, int64(script.ID))
+	if err != nil {
+		return err
+	}
+	script.Uuid = refreshed.Uuid
+	return nil
+}
+
+func contextMenuBindingKey(pluginUUID, actionID string) string {
+	return strings.TrimSpace(pluginUUID) + "\x00" + strings.TrimSpace(actionID)
+}
+
+func sortContextMenuBindings(bindings []*schema.ContextMenuBinding) {
 	sort.SliceStable(bindings, func(i, j int) bool {
 		if bindings[i].Sort != bindings[j].Sort {
 			return bindings[i].Sort < bindings[j].Sort
@@ -108,20 +284,30 @@ func QueryContextMenuBindings(db *gorm.DB) ([]*schema.ContextMenuBinding, error)
 		}
 		return bindings[i].ActionID < bindings[j].ActionID
 	})
-	return bindings, nil
 }
 
 func countEnabledCustomContextMenuPluginsByScene(db *gorm.DB, scene string) (int, error) {
-	if !contextmenu.IsKnownScene(scene) {
-		return 0, utils.Errorf("unknown context-menu scene: %s", scene)
+	plugins, err := queryEnabledCustomContextMenuPluginUUIDsByScene(db, scene)
+	if err != nil {
+		return 0, err
 	}
-	var bindings []*schema.ContextMenuBinding
-	if result := db.Model(&schema.ContextMenuBinding{}).Where("enabled = ?", true).Find(&bindings); result.Error != nil {
-		return 0, result.Error
+	return len(plugins), nil
+}
+
+func queryEnabledCustomContextMenuPluginUUIDsByScene(db *gorm.DB, scene string) (map[string]struct{}, error) {
+	if !contextmenu.IsKnownScene(scene) {
+		return nil, utils.Errorf("unknown context-menu scene: %s", scene)
+	}
+	bindings, err := QueryEffectiveContextMenuBindings(db, scene)
+	if err != nil {
+		return nil, err
 	}
 
 	seen := make(map[string]struct{}, len(bindings))
 	for _, binding := range bindings {
+		if !binding.Enabled {
+			continue
+		}
 		bindingScene, ok := contextmenu.SceneForAction(binding.ActionID)
 		if !ok || bindingScene != scene {
 			continue
@@ -137,7 +323,7 @@ func countEnabledCustomContextMenuPluginsByScene(db *gorm.DB, scene string) (int
 			seen[binding.PluginUUID] = struct{}{}
 		}
 	}
-	return len(seen), nil
+	return seen, nil
 }
 
 func isContextMenuManagedScript(script *schema.YakScript, actionID string) bool {

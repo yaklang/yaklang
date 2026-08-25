@@ -12,6 +12,7 @@ const (
 	PluginType               = "context-menu"
 	LegacyPluginType         = "codec"
 	MaxCustomPluginsPerScene = 15
+	LegacyDefaultPluginLimit = 10
 
 	ActionHistorySingle = "history-single"
 	ActionHistoryMulti  = "history-multi"
@@ -410,6 +411,21 @@ func LegacyActionsForTags(tags string) []string {
 		}
 	}
 	return actions
+}
+
+func LegacyTagForAction(actionID string) (string, bool) {
+	switch actionID {
+	case ActionLegacyHistorySingle:
+		return LegacyTagHistorySingle, true
+	case ActionLegacyHistoryMulti:
+		return LegacyTagHistoryMulti, true
+	case ActionLegacyPacketContext:
+		return LegacyTagPacketContext, true
+	case ActionLegacyPacketMutate:
+		return LegacyTagPacketMutate, true
+	default:
+		return "", false
+	}
 }
 
 func HasTag(tags, expected string) bool {

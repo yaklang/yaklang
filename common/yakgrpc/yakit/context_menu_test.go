@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
@@ -130,6 +131,136 @@ func TestSetContextMenuBindingCountsLegacyActionsOnceWithinScene(t *testing.T) {
 	count, err := countEnabledCustomContextMenuPluginsByScene(db, contextmenu.ActionHTTPPacket)
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
+}
+
+func TestEffectiveContextMenuBindingsUseLegacyFrontendDefaults(t *testing.T) {
+	db := newContextMenuTestDB(t)
+	plugins := make([]*schema.YakScript, 0, contextmenu.LegacyDefaultPluginLimit+1)
+	for i := 0; i < contextmenu.LegacyDefaultPluginLimit+1; i++ {
+		plugin := createLegacyContextMenuTestPlugin(
+			t,
+			db,
+			fmt.Sprintf("legacy-history-%02d", i),
+			contextmenu.LegacyTagHistorySingle,
+			false,
+		)
+		require.NoError(t, db.Model(plugin).UpdateColumn("updated_at", time.Unix(int64(i+1), 0)).Error)
+		plugins = append(plugins, plugin)
+	}
+
+	bindings, err := QueryEffectiveContextMenuBindings(db, contextmenu.ActionHistorySingle)
+	require.NoError(t, err)
+	require.Len(t, bindings, contextmenu.LegacyDefaultPluginLimit)
+
+	byUUID := make(map[string]*schema.ContextMenuBinding, len(bindings))
+	for _, binding := range bindings {
+		byUUID[binding.PluginUUID] = binding
+		require.True(t, binding.Enabled)
+		require.Equal(t, contextmenu.ActionLegacyHistorySingle, binding.ActionID)
+	}
+	require.NotContains(t, byUUID, plugins[0].Uuid, "the oldest plugin should remain outside the old frontend's top ten")
+	require.EqualValues(t, 1, byUUID[plugins[len(plugins)-1].Uuid].Sort)
+	require.EqualValues(t, contextmenu.LegacyDefaultPluginLimit, byUUID[plugins[1].Uuid].Sort)
+
+	explicit, err := QueryContextMenuBindings(db)
+	require.NoError(t, err)
+	require.Empty(t, explicit, "compatibility defaults must not create migration records")
+
+	_, err = SetContextMenuBinding(db, &schema.ContextMenuBinding{
+		PluginUUID: plugins[len(plugins)-1].Uuid,
+		ActionID:   contextmenu.ActionLegacyHistorySingle,
+		Enabled:    false,
+	})
+	require.NoError(t, err)
+	bindings, err = QueryEffectiveContextMenuBindings(db, contextmenu.ActionHistorySingle)
+	require.NoError(t, err)
+	require.Len(t, bindings, contextmenu.LegacyDefaultPluginLimit)
+	require.False(t, findContextMenuTestBinding(t, bindings, plugins[len(plugins)-1].Uuid).Enabled)
+
+	count, err := countEnabledCustomContextMenuPluginsByScene(db, contextmenu.ActionHistorySingle)
+	require.NoError(t, err)
+	require.Equal(t, contextmenu.LegacyDefaultPluginLimit-1, count)
+}
+
+func TestLegacyFrontendDefaultsCountTowardSceneLimit(t *testing.T) {
+	db := newContextMenuTestDB(t)
+	for i := 0; i < contextmenu.LegacyDefaultPluginLimit; i++ {
+		createLegacyContextMenuTestPlugin(
+			t,
+			db,
+			fmt.Sprintf("legacy-default-%02d", i),
+			contextmenu.LegacyTagHistorySingle,
+			false,
+		)
+	}
+
+	remaining := contextmenu.MaxCustomPluginsPerScene - contextmenu.LegacyDefaultPluginLimit
+	for i := 0; i < remaining; i++ {
+		plugin := createContextMenuTestPlugin(t, db, fmt.Sprintf("native-context-menu-%02d", i), false)
+		_, err := SetContextMenuBinding(db, &schema.ContextMenuBinding{
+			PluginUUID: plugin.Uuid,
+			ActionID:   contextmenu.ActionHistorySingle,
+			Enabled:    true,
+		})
+		require.NoError(t, err)
+	}
+
+	overLimit := createContextMenuTestPlugin(t, db, "native-context-menu-over-limit", false)
+	_, err := SetContextMenuBinding(db, &schema.ContextMenuBinding{
+		PluginUUID: overLimit.Uuid,
+		ActionID:   contextmenu.ActionHistorySingle,
+		Enabled:    true,
+	})
+	require.ErrorContains(t, err, "at most 15")
+}
+
+func TestLegacyFrontendDefaultsRespectExistingSceneCapacity(t *testing.T) {
+	db := newContextMenuTestDB(t)
+	for i := 0; i < 10; i++ {
+		plugin := createContextMenuTestPlugin(t, db, fmt.Sprintf("existing-native-%02d", i), false)
+		_, err := SetContextMenuBinding(db, &schema.ContextMenuBinding{
+			PluginUUID: plugin.Uuid,
+			ActionID:   contextmenu.ActionHistorySingle,
+			Enabled:    true,
+		})
+		require.NoError(t, err)
+	}
+	for i := 0; i < contextmenu.LegacyDefaultPluginLimit; i++ {
+		createLegacyContextMenuTestPlugin(
+			t,
+			db,
+			fmt.Sprintf("later-legacy-default-%02d", i),
+			contextmenu.LegacyTagHistorySingle,
+			false,
+		)
+	}
+
+	bindings, err := QueryEffectiveContextMenuBindings(db, contextmenu.ActionHistorySingle)
+	require.NoError(t, err)
+	enabledUUIDs := make(map[string]struct{})
+	legacyCount := 0
+	for _, binding := range bindings {
+		if !binding.Enabled {
+			continue
+		}
+		enabledUUIDs[binding.PluginUUID] = struct{}{}
+		if binding.ActionID == contextmenu.ActionLegacyHistorySingle {
+			legacyCount++
+		}
+	}
+	require.Len(t, enabledUUIDs, contextmenu.MaxCustomPluginsPerScene)
+	require.Equal(t, contextmenu.MaxCustomPluginsPerScene-10, legacyCount)
+}
+
+func findContextMenuTestBinding(t *testing.T, bindings []*schema.ContextMenuBinding, pluginUUID string) *schema.ContextMenuBinding {
+	t.Helper()
+	for _, binding := range bindings {
+		if binding.PluginUUID == pluginUUID {
+			return binding
+		}
+	}
+	require.FailNow(t, "context-menu binding not found", pluginUUID)
+	return nil
 }
 
 func TestCoreContextMenuBindingCannotBeDisabledAndDoesNotConsumeLimit(t *testing.T) {
