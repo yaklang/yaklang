@@ -238,14 +238,29 @@ func (openAICompatibleReasoningMatcher) MatchModel(modelName string) bool {
 	return false
 }
 
+// knownOpenAIEffortLevels lists all effort values that OpenAI-compatible
+// providers accept for the "reasoning.effort" field.  Standard OpenAI
+// models recognise low/medium/high; some extended providers (e.g. certain
+// Alibaba / Volcengine proxies) additionally accept xhigh and max.
+var knownOpenAIEffortLevels = map[string]bool{
+	"low":    true,
+	"medium": true,
+	"high":   true,
+	"xhigh":  true,
+	"max":    true,
+}
+
 func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort string) map[string]any {
 	effort := "none"
 	if enabled {
 		re := strings.TrimSpace(strings.ToLower(reasoningEffort))
-		switch re {
-		case "low", "medium", "high":
+		if knownOpenAIEffortLevels[re] {
 			effort = re
-		default:
+		} else if re != "" {
+			// Unknown but non-empty: passthrough so provider-specific
+			// custom levels are not silently downgraded.
+			effort = re
+		} else {
 			effort = "medium"
 		}
 	}
@@ -253,7 +268,7 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 }
 
 // MapThinkingEffortToConfig maps a frontend-friendly thinking effort enum
-// ("off" / "low" / "medium" / "high" / "auto") to the low-level
+// ("off" / "low" / "medium" / "high" / "xhigh" / "max" / "auto") to the low-level
 // (EnableThinking, ReasoningEffort) pair used by AIConfig.
 //
 //   - "" / "auto"  → (false, "")       — do not inject any thinking params
@@ -261,6 +276,8 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 //   - "low"        → (true, "low")     — enable thinking with low effort
 //   - "medium"     → (true, "medium")  — enable thinking with medium effort
 //   - "high"       → (true, "high")    — enable thinking with high effort
+//   - "xhigh"      → (true, "xhigh")   — enable thinking with extra-high effort
+//   - "max"        → (true, "max")     — enable thinking with maximum effort
 //   - other        → (true, <raw>)     — passthrough custom value
 func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEffort string) {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
@@ -274,6 +291,10 @@ func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEff
 		return true, "medium"
 	case "high":
 		return true, "high"
+	case "xhigh":
+		return true, "xhigh"
+	case "max":
+		return true, "max"
 	default:
 		return true, strings.ToLower(strings.TrimSpace(effort))
 	}
