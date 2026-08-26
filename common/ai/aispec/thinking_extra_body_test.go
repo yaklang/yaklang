@@ -155,7 +155,7 @@ func TestMapReasoningEffortToThinkingConfig(t *testing.T) {
 		{"medium", true, "medium"},
 		{"high", true, "high"},
 		{"HIGH", true, "high"},
-		// xhigh/max are preserved by MapThinkingEffortToConfig;
+		// xhigh/max are preserved by MapReasoningEffortToThinkingConfig;
 		// per-provider matchers are responsible for clamping.
 		{"xhigh", true, "xhigh"},
 		{"max", true, "max"},
