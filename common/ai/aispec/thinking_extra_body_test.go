@@ -8,52 +8,52 @@ import (
 )
 
 func TestThinkingExtraBodyForProvider_QwenHost(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("", "foo", "https://dashscope.aliyuncs.com/compatible-mode/v1", "", true)
+	m := ThinkingExtraBodyForProvider("", "foo", "https://dashscope.aliyuncs.com/compatible-mode/v1", "", true, "")
 	require.Contains(t, m, "enable_thinking")
 	assert.Equal(t, true, m["enable_thinking"])
-	m2 := ThinkingExtraBodyForProvider("", "foo", "", "dashscope-intl.aliyuncs.com", false)
+	m2 := ThinkingExtraBodyForProvider("", "foo", "", "dashscope-intl.aliyuncs.com", false, "")
 	assert.Equal(t, false, m2["enable_thinking"])
 }
 
 func TestThinkingExtraBodyForProvider_QwenModel(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("", "my-qwen-max", "https://example.com", "", true)
+	m := ThinkingExtraBodyForProvider("", "my-qwen-max", "https://example.com", "", true, "")
 	assert.Equal(t, true, m["enable_thinking"])
 }
 
 func TestThinkingExtraBodyForProvider_DeepseekHost(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("", "x", "https://api.deepseek.com/v1", "", true)
+	m := ThinkingExtraBodyForProvider("", "x", "https://api.deepseek.com/v1", "", true, "")
 	inner, ok := m["thinking"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "enabled", inner["type"])
 }
 
 func TestThinkingExtraBodyForProvider_DeepseekModel(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("", "deepseek-chat", "https://proxy.local", "", false)
+	m := ThinkingExtraBodyForProvider("", "deepseek-chat", "https://proxy.local", "", false, "")
 	inner, ok := m["thinking"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "disabled", inner["type"])
 }
 
 func TestThinkingExtraBodyForProvider_OpenAIHost(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("", "custom", "https://api.openai.com/v1/chat/completions", "", true)
+	m := ThinkingExtraBodyForProvider("", "custom", "https://api.openai.com/v1/chat/completions", "", true, "")
 	inner, ok := m["reasoning"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "medium", inner["effort"])
-	m2 := ThinkingExtraBodyForProvider("", "x", "", "generativelanguage.googleapis.com", false)
+	m2 := ThinkingExtraBodyForProvider("", "x", "", "generativelanguage.googleapis.com", false, "")
 	inner2, ok := m2["reasoning"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "none", inner2["effort"])
 }
 
 func TestThinkingExtraBodyForProvider_OpenAIModel(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("", "gpt-4.1-mini", "https://unknown.example", "", false)
+	m := ThinkingExtraBodyForProvider("", "gpt-4.1-mini", "https://unknown.example", "", false, "")
 	inner, ok := m["reasoning"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "none", inner["effort"])
 }
 
 func TestThinkingExtraBodyForProvider_Default(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("", "unknown-model-xyz", "https://unknown.example", "", true)
+	m := ThinkingExtraBodyForProvider("", "unknown-model-xyz", "https://unknown.example", "", true, "")
 	inner, ok := m["thinking"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "enabled", inner["type"])
@@ -61,12 +61,12 @@ func TestThinkingExtraBodyForProvider_Default(t *testing.T) {
 
 func TestThinkingExtraBodyForProvider_TypeBeforeHost(t *testing.T) {
 	// tongyi 厂商名优先：无 dashscope 域名也应走 Qwen 的 enable_thinking
-	m := ThinkingExtraBodyForProvider("tongyi", "foo", "https://proxy.example/v1", "", true)
+	m := ThinkingExtraBodyForProvider("tongyi", "foo", "https://proxy.example/v1", "", true, "")
 	assert.Equal(t, true, m["enable_thinking"])
 }
 
 func TestThinkingExtraBodyForProvider_VolcengineTypeUsesThinkingMap(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("volcengine", "x", "", "", true)
+	m := ThinkingExtraBodyForProvider("volcengine", "x", "", "", true, "")
 	inner, ok := m["thinking"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "enabled", inner["type"])
@@ -74,7 +74,7 @@ func TestThinkingExtraBodyForProvider_VolcengineTypeUsesThinkingMap(t *testing.T
 
 func TestThinkingExtraBodyForProvider_MiniMaxUnderTongyi(t *testing.T) {
 	// MiniMax 经百炼(tongyi)代理时，必须用 thinking.type，而非 enable_thinking。
-	mOff := ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "", false)
+	mOff := ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", "", false, "")
 	_, hasEnableThinking := mOff["enable_thinking"]
 	assert.False(t, hasEnableThinking, "MiniMax 不应注入 enable_thinking")
 	innerOff, ok := mOff["thinking"].(map[string]any)
@@ -82,15 +82,65 @@ func TestThinkingExtraBodyForProvider_MiniMaxUnderTongyi(t *testing.T) {
 	assert.Equal(t, "disabled", innerOff["type"])
 
 	// 开启思考使用 adaptive（MiniMax 不接受 enabled）。
-	mOn := ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "", "", true)
+	mOn := ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "", "", true, "")
 	innerOn, ok := mOn["thinking"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "adaptive", innerOn["type"])
 }
 
 func TestThinkingExtraBodyForProvider_OpenAITypeBeforeModel(t *testing.T) {
-	m := ThinkingExtraBodyForProvider("openai", "non-gpt-id", "https://other.example", "", true)
+	m := ThinkingExtraBodyForProvider("openai", "non-gpt-id", "https://other.example", "", true, "")
 	inner, ok := m["reasoning"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "medium", inner["effort"])
+}
+
+func TestThinkingExtraBodyForProvider_OpenAIEffortLevels(t *testing.T) {
+	// low
+	m := ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "low")
+	inner, ok := m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "low", inner["effort"])
+
+	// high
+	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "high")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "high", inner["effort"])
+
+	// empty effort → default medium
+	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "medium", inner["effort"])
+
+	// disabled → none regardless of effort
+	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", false, "high")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "none", inner["effort"])
+}
+
+func TestMapThinkingEffortToConfig(t *testing.T) {
+	tests := []struct {
+		effort       string
+		enable       bool
+		reasoningEff string
+	}{
+		{"", false, ""},
+		{"auto", false, ""},
+		{"default", false, ""},
+		{"off", true, "none"},
+		{"none", true, "none"},
+		{"disabled", true, "none"},
+		{"low", true, "low"},
+		{"medium", true, "medium"},
+		{"high", true, "high"},
+		{"HIGH", true, "high"},
+	}
+	for _, tt := range tests {
+		enable, reasoning := MapThinkingEffortToConfig(tt.effort)
+		assert.Equal(t, tt.enable, enable, "effort=%q enable mismatch", tt.effort)
+		assert.Equal(t, tt.reasoningEff, reasoning, "effort=%q reasoning mismatch", tt.effort)
+	}
 }

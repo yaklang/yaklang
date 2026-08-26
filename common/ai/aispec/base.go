@@ -310,7 +310,7 @@ func ChatBaseThinkingOptions(cfg *AIConfig, resolvedTargetURL string) ChatBaseOp
 		if baseURL == "" {
 			baseURL = resolvedTargetURL
 		}
-		m := ThinkingExtraBodyForProvider(cfg.Type, cfg.Model, baseURL, cfg.Domain, *cfg.EnableThinking)
+		m := ThinkingExtraBodyForProvider(cfg.Type, cfg.Model, baseURL, cfg.Domain, *cfg.EnableThinking, cfg.ReasoningEffort)
 		mergeChatBaseExtraBody(c, m)
 	}
 }
