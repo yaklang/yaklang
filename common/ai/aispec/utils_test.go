@@ -127,6 +127,88 @@ func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
 	assert.Equal(t, "high", resolved.ReasoningEffort)
 }
 
+func TestBuildOptionsFromConfig_ThinkingEffort(t *testing.T) {
+	effort := "high"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:           "openai",
+			APIKey:         "test-key",
+			ThinkingEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "high", resolved.ReasoningEffort)
+}
+
+func TestBuildOptionsFromConfig_ThinkingEffortOff(t *testing.T) {
+	effort := "off"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:           "openai",
+			APIKey:         "test-key",
+			ThinkingEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking) // off maps to enable=true + reasoning_effort=none
+	assert.Equal(t, "none", resolved.ReasoningEffort)
+}
+
+func TestBuildOptionsFromConfig_ThinkingEffortAuto(t *testing.T) {
+	effort := "auto"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:           "openai",
+			APIKey:         "test-key",
+			ThinkingEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Nil(t, resolved.EnableThinking) // auto → do not inject
+	assert.Empty(t, resolved.ReasoningEffort)
+}
+
+func TestBuildOptionsFromConfig_ThinkingEffortOverridesLegacyFields(t *testing.T) {
+	effort := "low"
+	legacyEffort := "high"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:             "openai",
+			APIKey:           "test-key",
+			EnableThinking:   true,
+			ReasoningEffort:  &legacyEffort,
+			ThinkingEffort:   &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "low", resolved.ReasoningEffort) // ThinkingEffort wins over ReasoningEffort
+}
+
 func TestGetBaseURLFromConfig_UsesResponsesAPIType(t *testing.T) {
 	config := NewDefaultAIConfig(
 		WithType("openai"),

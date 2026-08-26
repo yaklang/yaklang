@@ -111,7 +111,7 @@ func TestEnableThinkingConfig_Volcengine(t *testing.T) {
 		if !*config.EnableThinking {
 			t.Fatalf("expected EnableThinking=true")
 		}
-		m := aispec.ThinkingExtraBodyForProvider(config.Type, config.Model, config.BaseURL, config.Domain, *config.EnableThinking)
+		m := aispec.ThinkingExtraBodyForProvider(config.Type, config.Model, config.BaseURL, config.Domain, *config.EnableThinking, config.ReasoningEffort)
 		inner, ok := m["thinking"].(map[string]any)
 		if !ok {
 			t.Fatalf("expected thinking map, got %T", m["thinking"])

@@ -236,6 +236,10 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 		v := *cfg.EnableThinkingOpt
 		provider.EnableThinkingOpt = &v
 	}
+	if cfg.ThinkingEffort != nil {
+		s := *cfg.ThinkingEffort
+		provider.ThinkingEffort = &s
+	}
 
 	return &ypb.AIModelConfig{
 		Provider:    provider,
