@@ -146,3 +146,64 @@ func isRetryableGitCloneError(err error) bool {
 	}
 	return false
 }
+
+// cloneSSAGitRepositoryPreferShallow tries a depth-1 (or default) clone first,
+// then falls back to Depth(0) when the remote rejects shallow fetch. Permanent
+// auth/not-found/disk errors are not retried as full clones.
+func cloneSSAGitRepositoryPreferShallow(
+	url string,
+	local string,
+	opts []yakgit.Option,
+	report func(format string, args ...any),
+) error {
+	err := cloneSSAGitRepositoryWithRetry(url, local, opts, report)
+	if err == nil {
+		return nil
+	}
+	if !shouldFallbackFromShallowClone(err) {
+		return err
+	}
+	if report != nil {
+		report("git clone shallow rejected; falling back to full clone: %v", err)
+	}
+	log.Warnf("SSA Git shallow clone rejected for %s; falling back to full clone: %v", url, err)
+	if resetErr := resetCloneWorkspace(local); resetErr != nil {
+		return fmt.Errorf("reset SSA Git workspace before full clone fallback: %w", resetErr)
+	}
+	return cloneSSAGitRepositoryWithRetry(url, local, withoutShallowCloneOptions(opts), report)
+}
+
+func shouldFallbackFromShallowClone(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, transport.ErrAuthenticationRequired) ||
+		errors.Is(err, transport.ErrAuthorizationFailed) ||
+		errors.Is(err, transport.ErrRepositoryNotFound) ||
+		errors.Is(err, transport.ErrEmptyRemoteRepository) ||
+		errors.Is(err, syscall.ENOSPC) {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	permanent := []string{
+		"authentication required",
+		"authorization failed",
+		"repository not found",
+		"empty repository",
+		"no space left on device",
+		"disk quota exceeded",
+		"invalid proxy url",
+		"remote repository is empty",
+	}
+	for _, needle := range permanent {
+		if strings.Contains(message, needle) {
+			return false
+		}
+	}
+	return true
+}
+
+func withoutShallowCloneOptions(opts []yakgit.Option) []yakgit.Option {
+	// yakgit defaults Depth=1; append Depth(0) last so go-git does a full clone.
+	return append(append([]yakgit.Option{}, opts...), yakgit.WithDepth(0))
+}
