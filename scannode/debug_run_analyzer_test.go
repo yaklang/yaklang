@@ -19,6 +19,7 @@ func createTestDebugDir(t *testing.T) string {
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cpu-pprof"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "memory-pprof"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "goroutine-pprof"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "db-stats"), 0o755))
 
 	// Write cmd.txt
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "cmd.txt"), []byte("test command"), 0o644))
@@ -46,6 +47,24 @@ func createTestDebugDir(t *testing.T) string {
 	writeFakePprof(t, filepath.Join(dir, "memory-pprof", "20260805-120030-initial.mem.prof"))
 	writeFakePprof(t, filepath.Join(dir, "goroutine-pprof", "20260805-120030-initial.goroutine.prof"))
 
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "db-stats", "20260805-120030-initial.db.json"), []byte(`{
+  "dialect": "postgres",
+  "ops": {
+    "query": {"count": 10, "total_ms": 100, "avg_ms": 10, "min_ms": 1, "max_ms": 40},
+    "create": {"count": 2, "total_ms": 20, "avg_ms": 10}
+  },
+  "total_count": 12,
+  "total_ms": 120
+}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "db-stats", "20260805-121000-121000.db.json"), []byte(`{
+  "dialect": "postgres",
+  "ops": {
+    "query": {"count": 3, "total_ms": 30, "avg_ms": 10}
+  },
+  "total_count": 3,
+  "total_ms": 30
+}`), 0o644))
+
 	return dir
 }
 
@@ -72,6 +91,22 @@ func TestAnalyzeDebugRun_Complete(t *testing.T) {
 	assert.Equal(t, 1, result.Summary.HeapProfileFiles)
 	assert.True(t, result.Summary.CompilePhaseFound)
 	assert.True(t, result.Summary.ScanPhaseFound)
+
+	var initial *SampleSummary
+	for i := range result.Samples {
+		if result.Samples[i].Label == "20260805-120030-initial" {
+			initial = &result.Samples[i]
+			break
+		}
+	}
+	require.NotNil(t, initial)
+	require.NotNil(t, initial.DBStats)
+	assert.Equal(t, "postgres", initial.DBStats.Dialect)
+	assert.Equal(t, int64(12), initial.DBStats.TotalCount)
+	require.NotNil(t, result.Summary.DBStatsTotal)
+	assert.Equal(t, int64(15), result.Summary.DBStatsTotal.TotalCount)
+	assert.Equal(t, int64(150), result.Summary.DBStatsTotal.TotalMs)
+	assert.Equal(t, int64(13), result.Summary.DBStatsTotal.Ops["query"].Count)
 }
 
 func TestAnalyzeDebugRun_MissingDir(t *testing.T) {
@@ -131,6 +166,8 @@ func TestAnalyzeSample_WithPprof(t *testing.T) {
 	if detail.CPUProfile != nil {
 		assert.NotEmpty(t, detail.CPUProfile.TopFunctions)
 	}
+	require.NotNil(t, detail.DBStats)
+	assert.Equal(t, int64(12), detail.DBStats.TotalCount)
 }
 
 func TestAnalyzeSample_MissingLabel(t *testing.T) {
@@ -247,4 +284,3 @@ func TestAnalyzeDebugRun_EnrichesPhasesFromTaskLog(t *testing.T) {
 	assert.Equal(t, "compile", result.Samples[0].Phase)
 	assert.Equal(t, "log_inferred", result.Samples[0].PhaseSource)
 }
-

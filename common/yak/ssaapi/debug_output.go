@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 // DebugOutputCleanup stops the pprof collector and closes the log file.
@@ -51,6 +52,7 @@ func SetupDebugDir(debugDir string, redirectSSADB bool) (cleanup DebugOutputClea
 // It is the shared implementation used by SetupDebugDir and the CLI --debug path:
 //   - creates debugDir (MkdirAll)
 //   - redirects log output to <dir>/log
+//   - writes GORM / slow native SQL to <dir>/db.log
 //   - starts the periodic pprof collector (CPU/heap/goroutine snapshots)
 //   - when redirectSSADB is true, redirects the SSA database to <dir>/ssadb.db
 //
@@ -86,6 +88,12 @@ func StartDebugOutput(debugDir string, redirectSSADB bool) (DebugOutputCleanup, 
 		log.SetOutput(io.MultiWriter(logFile, os.Stdout))
 	}
 
+	sqlLogCleanup, err := ssadb.StartSQLFileLog(debugDir)
+	if err != nil {
+		log.Warnf("[debug] start SSA SQL log failed: %v", err)
+		sqlLogCleanup = func() {}
+	}
+
 	// Start pprof collector (periodic CPU/heap/goroutine snapshots).
 	cleanup, err := StartPprofCollector(debugDir)
 	if err != nil {
@@ -93,11 +101,13 @@ func StartDebugOutput(debugDir string, redirectSSADB bool) (DebugOutputCleanup, 
 		if logFile != nil {
 			_ = logFile.Close()
 		}
+		sqlLogCleanup()
 		return noopDebugCleanup, nil
 	}
 
 	return func() {
 		cleanup()
+		sqlLogCleanup()
 		if logFile != nil {
 			_ = logFile.Close()
 		}

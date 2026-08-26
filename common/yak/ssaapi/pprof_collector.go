@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 // pprofCollector manages periodic pprof collection during a scan.
@@ -27,8 +30,11 @@ type pprofCollector struct {
 	cpuDir       string
 	memDir       string
 	goroutineDir string
+	dbStatsDir   string
 	httpAddr     string
 	wg           sync.WaitGroup
+	lastDBStats  ssadb.DBOpStats
+	dbStatsMu    sync.Mutex
 }
 
 const (
@@ -52,8 +58,9 @@ func StartPprofCollector(debugDir string) (func(), error) {
 	cpuDir := filepath.Join(debugDir, "cpu-pprof")
 	memDir := filepath.Join(debugDir, "memory-pprof")
 	goroutineDir := filepath.Join(debugDir, "goroutine-pprof")
+	dbStatsDir := filepath.Join(debugDir, "db-stats")
 
-	for _, dir := range []string{cpuDir, memDir, goroutineDir} {
+	for _, dir := range []string{cpuDir, memDir, goroutineDir, dbStatsDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("create pprof dir %s: %w", dir, err)
 		}
@@ -62,13 +69,17 @@ func StartPprofCollector(debugDir string) (func(), error) {
 	addr := defaultPprofHTTPAddr
 	startPprofHTTPServer(addr)
 
+	ssadb.EnsureDBOpCallbacks(ssadb.GetDB())
+
 	ctx, cancel := context.WithCancel(context.Background())
 	collector := &pprofCollector{
 		dir:          debugDir,
 		cpuDir:       cpuDir,
 		memDir:       memDir,
 		goroutineDir: goroutineDir,
+		dbStatsDir:   dbStatsDir,
 		httpAddr:     addr,
+		lastDBStats:  ssadb.SnapshotDBOpStats(),
 	}
 
 	collector.wg.Add(1)
@@ -159,6 +170,7 @@ func (c *pprofCollector) collectSnapshot(tag string, syncCPU bool) {
 	// Memory and goroutine snapshots are fast (non-blocking)
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
+	c.fetchDBStats(label)
 
 	if syncCPU {
 		// For final snapshot: wait for CPU profile to complete
@@ -199,7 +211,38 @@ func (c *pprofCollector) collectSnapshotFinal(tag string) {
 
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
+	c.fetchDBStats(label)
 	c.fetchCPU(label, cpuDuration) // synchronous
+}
+
+func (c *pprofCollector) fetchDBStats(label string) {
+	if c == nil || c.dbStatsDir == "" {
+		return
+	}
+	current := ssadb.SnapshotDBOpStats()
+	c.dbStatsMu.Lock()
+	delta := ssadb.DeltaDBOpStats(c.lastDBStats, current)
+	c.lastDBStats = current
+	c.dbStatsMu.Unlock()
+
+	raw, err := json.MarshalIndent(delta, "", "  ")
+	if err != nil {
+		log.Errorf("[pprof] marshal db stats failed: %v", err)
+		return
+	}
+	target := filepath.Join(c.dbStatsDir, label+".db.json")
+	if err := os.WriteFile(target, raw, 0o644); err != nil {
+		log.Errorf("[pprof] write db stats failed: %v", err)
+		return
+	}
+	log.Infof("[pprof] db stats saved: %s total=%d query=%d create=%d update=%d delete=%d",
+		target,
+		delta.TotalCount,
+		delta.Ops[ssadb.DBOpQuery].Count,
+		delta.Ops[ssadb.DBOpCreate].Count,
+		delta.Ops[ssadb.DBOpUpdate].Count,
+		delta.Ops[ssadb.DBOpDelete].Count,
+	)
 }
 
 func (c *pprofCollector) fetchCPU(label string, duration time.Duration) {

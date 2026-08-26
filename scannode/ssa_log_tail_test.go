@@ -135,3 +135,32 @@ func TestResolveTaskLogPath(t *testing.T) {
 		t.Fatalf("expected no match for missing attempt: %q", got)
 	}
 }
+
+func TestResolveDBLogPathAndLogKind(t *testing.T) {
+	dir := t.TempDir()
+	dbLog := filepath.Join(dir, "db.log")
+	if err := os.WriteFile(dbLog, []byte("SELECT 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanDebugDirs.register(filepath.Dir(dir), "job-db", "att-db", dir)
+	t.Cleanup(func() { scanDebugDirs.unregister("job-db", "att-db") })
+
+	bridge := &legionJobBridge{}
+	got := bridge.resolveDBLogPath("job-db", "att-db")
+	if got != dbLog {
+		t.Fatalf("db log path = %q, want %q", got, dbLog)
+	}
+
+	path, reason := bridge.resolveLogTailPath("job-db", "att-db", "db")
+	if path != dbLog || reason != "" {
+		t.Fatalf("log kind db: path=%q reason=%q", path, reason)
+	}
+	path, reason = bridge.resolveLogTailPath("job-db", "att-db", "weird")
+	if path != "" || reason != "unsupported log_kind" {
+		t.Fatalf("unsupported kind: path=%q reason=%q", path, reason)
+	}
+	path, reason = bridge.resolveLogTailPath("missing", "missing", "db")
+	if path != "" || reason != "db log not found for this attempt" {
+		t.Fatalf("missing db log: path=%q reason=%q", path, reason)
+	}
+}

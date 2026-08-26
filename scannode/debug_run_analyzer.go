@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,21 +18,21 @@ import (
 type DebugRunAnalysis struct {
 	// RunDir is intentionally NOT returned to the frontend (security).
 	// It is kept for internal use but not serialized.
-	RunDir     string             `json:"-"`
-	Status     string             `json:"status"` // running | completed | failed | unknown
-	StartedAt  *time.Time         `json:"started_at,omitempty"`
-	FinishedAt *time.Time         `json:"finished_at,omitempty"`
-	Duration   string             `json:"duration,omitempty"`
-	Phases     []PhaseAnalysis    `json:"phases,omitempty"`
-	Samples    []SampleSummary    `json:"samples,omitempty"`
-	Summary    *RunSummary         `json:"summary,omitempty"`
-	Errors     []string            `json:"errors,omitempty"`
-	Partial    bool               `json:"partial,omitempty"`
+	RunDir     string          `json:"-"`
+	Status     string          `json:"status"` // running | completed | failed | unknown
+	StartedAt  *time.Time      `json:"started_at,omitempty"`
+	FinishedAt *time.Time      `json:"finished_at,omitempty"`
+	Duration   string          `json:"duration,omitempty"`
+	Phases     []PhaseAnalysis `json:"phases,omitempty"`
+	Samples    []SampleSummary `json:"samples,omitempty"`
+	Summary    *RunSummary     `json:"summary,omitempty"`
+	Errors     []string        `json:"errors,omitempty"`
+	Partial    bool            `json:"partial,omitempty"`
 }
 
 // PhaseAnalysis is a per-phase summary.
 type PhaseAnalysis struct {
-	Phase      string     `json:"phase"` // compile | scan | unknown
+	Phase      string     `json:"phase"`  // compile | scan | unknown
 	Source     string     `json:"source"` // log_inferred | status_card | unknown
 	StartedAt  *time.Time `json:"started_at,omitempty"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
@@ -65,28 +66,48 @@ type SampleSummary struct {
 	Goroutines     int                `json:"goroutines,omitempty"`
 	LogExcerpt     string             `json:"log_excerpt,omitempty"`
 	Status         string             `json:"status,omitempty"` // available | partial | error | pending
+	DBStats        *DBOpStatsSummary  `json:"db_stats,omitempty"`
+}
+
+// DBOpStatsSummary mirrors ssadb.DBOpStats JSON written to db-stats/*.db.json.
+type DBOpStatsSummary struct {
+	Dialect    string                       `json:"dialect,omitempty"`
+	Ops        map[string]DBOpBucketSummary `json:"ops,omitempty"`
+	TotalCount int64                        `json:"total_count"`
+	TotalMs    int64                        `json:"total_ms"`
+	ErrorCount int64                        `json:"error_count,omitempty"`
+}
+
+// DBOpBucketSummary mirrors ssadb.DBOpBucket JSON.
+type DBOpBucketSummary struct {
+	Count      int64 `json:"count"`
+	TotalMs    int64 `json:"total_ms"`
+	MinMs      int64 `json:"min_ms,omitempty"`
+	MaxMs      int64 `json:"max_ms,omitempty"`
+	AvgMs      int64 `json:"avg_ms,omitempty"`
+	ErrorCount int64 `json:"error_count,omitempty"`
 }
 
 // SampleDetail is the detailed view of a single 5-minute sample.
 type SampleDetail struct {
 	SampleSummary
-	CPUProfile   *PprofTopAnalysis `json:"cpu_profile,omitempty"`
-	HeapProfile  *PprofTopAnalysis  `json:"heap_profile,omitempty"`
-	Goroutines   int                `json:"goroutines,omitempty"`
-	LogExcerpt   string             `json:"log_excerpt,omitempty"`
+	CPUProfile  *PprofTopAnalysis `json:"cpu_profile,omitempty"`
+	HeapProfile *PprofTopAnalysis `json:"heap_profile,omitempty"`
+	Goroutines  int               `json:"goroutines,omitempty"`
+	LogExcerpt  string            `json:"log_excerpt,omitempty"`
 }
 
 // PprofTopAnalysis contains top functions from a pprof profile.
 type PprofTopAnalysis struct {
-	Kind           string            `json:"kind"`
-	TopFunctions   []PprofTopFunction `json:"top_functions,omitempty"`
-	YaklangTop     []PprofTopFunction `json:"yaklang_top,omitempty"`
-	SampleCount    int64             `json:"sample_count"`
-	TotalValue     int64             `json:"total_value"`
-	SampleUnit     string            `json:"sample_unit,omitempty"`
-	ParseError     string            `json:"parse_error,omitempty"`
-	TimeNanos      int64             `json:"time_nanos,omitempty"`
-	DurationNanos  int64             `json:"duration_nanos,omitempty"`
+	Kind          string             `json:"kind"`
+	TopFunctions  []PprofTopFunction `json:"top_functions,omitempty"`
+	YaklangTop    []PprofTopFunction `json:"yaklang_top,omitempty"`
+	SampleCount   int64              `json:"sample_count"`
+	TotalValue    int64              `json:"total_value"`
+	SampleUnit    string             `json:"sample_unit,omitempty"`
+	ParseError    string             `json:"parse_error,omitempty"`
+	TimeNanos     int64              `json:"time_nanos,omitempty"`
+	DurationNanos int64              `json:"duration_nanos,omitempty"`
 }
 
 // PprofTopFunction is a single function entry.
@@ -100,16 +121,17 @@ type PprofTopFunction struct {
 
 // RunSummary is the overall run summary.
 type RunSummary struct {
-	TotalDurationMS  int64  `json:"total_duration_ms"`
-	CPUProfileFiles  int    `json:"cpu_profile_files"`
-	HeapProfileFiles int    `json:"heap_profile_files"`
-	GoroutineFiles   int    `json:"goroutine_files"`
-	HasLog           bool   `json:"has_log"`
-	HasReport        bool   `json:"has_report"`
-	HasSSADB         bool   `json:"has_ssadb"`
-	HasCmd           bool   `json:"has_cmd"`
-	CompilePhaseFound bool  `json:"compile_phase_found"`
-	ScanPhaseFound    bool  `json:"scan_phase_found"`
+	TotalDurationMS   int64             `json:"total_duration_ms"`
+	CPUProfileFiles   int               `json:"cpu_profile_files"`
+	HeapProfileFiles  int               `json:"heap_profile_files"`
+	GoroutineFiles    int               `json:"goroutine_files"`
+	HasLog            bool              `json:"has_log"`
+	HasReport         bool              `json:"has_report"`
+	HasSSADB          bool              `json:"has_ssadb"`
+	HasCmd            bool              `json:"has_cmd"`
+	CompilePhaseFound bool              `json:"compile_phase_found"`
+	ScanPhaseFound    bool              `json:"scan_phase_found"`
+	DBStatsTotal      *DBOpStatsSummary `json:"db_stats_total,omitempty"`
 }
 
 // AnalyzeDebugRun parses a debug run directory and returns structured analysis.
@@ -183,11 +205,7 @@ func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 	}
 
 	// Parse pprof samples
-	cpuDir := filepath.Join(dir, "cpu-pprof")
-	memDir := filepath.Join(dir, "memory-pprof")
-	goroutineDir := filepath.Join(dir, "goroutine-pprof")
-
-	samples := result.collectSamples(cpuDir, memDir, goroutineDir, logContent)
+	samples := result.collectSamples(dir, logContent)
 	result.Samples = samples
 
 	// Build summary
@@ -249,6 +267,8 @@ func AnalyzeSample(dir string, label string) (SampleDetail, error) {
 	if logData, err := os.ReadFile(logPath); err == nil {
 		detail.LogExcerpt = extractLogExcerpt(string(logData), label, 4096)
 	}
+
+	detail.DBStats = loadSampleDBStats(dir, label)
 
 	return detail, nil
 }
@@ -409,17 +429,23 @@ func (r *DebugRunAnalysis) determineStatus(logContent string) string {
 	return "unknown"
 }
 
-func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logContent string) []SampleSummary {
+func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummary {
 	type fileEntry struct {
 		dir      string
 		suffix   string
 		fileType string
 	}
 
+	cpuDir := filepath.Join(dir, "cpu-pprof")
+	memDir := filepath.Join(dir, "memory-pprof")
+	goroutineDir := filepath.Join(dir, "goroutine-pprof")
+	dbStatsDir := filepath.Join(dir, "db-stats")
+
 	entries := []fileEntry{
 		{cpuDir, ".cpu.prof", "cpu"},
 		{memDir, ".mem.prof", "heap"},
 		{goroutineDir, ".goroutine.prof", "goroutine"},
+		{dbStatsDir, ".db.json", "db_stats"},
 	}
 
 	// Collect all sample labels
@@ -462,6 +488,8 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 			case "goroutine":
 				s.HasGoroutine = true
 				s.GoroutineFile = filepath.Join(entry.dir, name)
+			case "db_stats":
+				s.DBStats = loadDBStatsFile(filepath.Join(entry.dir, name))
 			}
 		}
 	}
@@ -503,22 +531,14 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 				s.Goroutines = count
 			}
 		}
+		if s.DBStats == nil {
+			s.DBStats = loadSampleDBStats(dir, s.Label)
+		}
 		// Log excerpt limited to 500 chars
 		if s.Label != "" {
-			firstFile := s.CPUFile
-			if firstFile == "" {
-				firstFile = s.HeapFile
-			}
-			if firstFile == "" {
-				firstFile = s.GoroutineFile
-			}
-			if firstFile == "" {
-				continue
-			}
-			logPath := filepath.Join(filepath.Dir(filepath.Dir(firstFile)), "log")
-			if logData, err := os.ReadFile(logPath); err == nil {
+			if logData, err := os.ReadFile(filepath.Join(dir, "log")); err == nil {
 				s.LogExcerpt = extractLogExcerpt(string(logData), s.Label, 500)
-			} else if taskLog := resolveNodeTaskLogFallback(firstFile); taskLog != "" {
+			} else if taskLog := resolveTaskLogByDebugDir(dir); taskLog != "" {
 				if logData, err := os.ReadFile(taskLog); err == nil {
 					s.LogExcerpt = extractLogExcerpt(string(logData), s.Label, 500)
 				}
@@ -579,7 +599,70 @@ func (r *DebugRunAnalysis) buildSummary(dir string, samples []SampleSummary) *Ru
 		}
 	}
 
+	summary.DBStatsTotal = aggregateDBStats(samples)
+
 	return summary
+}
+
+func loadSampleDBStats(dir, label string) *DBOpStatsSummary {
+	if dir == "" || label == "" {
+		return nil
+	}
+	return loadDBStatsFile(filepath.Join(dir, "db-stats", label+".db.json"))
+}
+
+func loadDBStatsFile(path string) *DBOpStatsSummary {
+	raw, err := os.ReadFile(path)
+	if err != nil || len(raw) == 0 {
+		return nil
+	}
+	var stats DBOpStatsSummary
+	if err := json.Unmarshal(raw, &stats); err != nil {
+		return nil
+	}
+	return &stats
+}
+
+func aggregateDBStats(samples []SampleSummary) *DBOpStatsSummary {
+	ops := make(map[string]DBOpBucketSummary)
+	total := DBOpStatsSummary{Ops: ops}
+	any := false
+	for _, s := range samples {
+		if s.DBStats == nil {
+			continue
+		}
+		any = true
+		if total.Dialect == "" {
+			total.Dialect = s.DBStats.Dialect
+		}
+		total.TotalCount += s.DBStats.TotalCount
+		total.TotalMs += s.DBStats.TotalMs
+		total.ErrorCount += s.DBStats.ErrorCount
+		for kind, bucket := range s.DBStats.Ops {
+			cur := ops[kind]
+			cur.Count += bucket.Count
+			cur.TotalMs += bucket.TotalMs
+			cur.ErrorCount += bucket.ErrorCount
+			if bucket.MaxMs > cur.MaxMs {
+				cur.MaxMs = bucket.MaxMs
+			}
+			if bucket.MinMs > 0 && (cur.MinMs == 0 || bucket.MinMs < cur.MinMs) {
+				cur.MinMs = bucket.MinMs
+			}
+			ops[kind] = cur
+		}
+	}
+	if !any {
+		return nil
+	}
+	for kind, bucket := range ops {
+		if bucket.Count > 0 {
+			bucket.AvgMs = bucket.TotalMs / bucket.Count
+		}
+		ops[kind] = bucket
+	}
+	total.Ops = ops
+	return &total
 }
 
 func parsePprofFile(path string, kind string) *PprofTopAnalysis {
