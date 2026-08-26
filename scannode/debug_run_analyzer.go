@@ -43,24 +43,28 @@ type PhaseAnalysis struct {
 // Detail fields are populated inline so the frontend can expand a row
 // without a second request.
 type SampleSummary struct {
-	Sequence   int        `json:"sequence"`
-	Label      string     `json:"label"` // e.g. "20260805-120030-initial"
-	Timestamp  *time.Time `json:"timestamp,omitempty"`
-	Phase      string     `json:"phase,omitempty"`
-	PhaseSource string    `json:"phase_source,omitempty"` // explicit | boundary_inferred | log_inferred | unknown
-	HasCPU     bool       `json:"has_cpu"`
-	HasHeap    bool       `json:"has_heap"`
-	HasGoroutine bool     `json:"has_goroutine"`
+	Sequence     int        `json:"sequence"`
+	Label        string     `json:"label"` // e.g. "20260805-120030-initial"
+	Timestamp    *time.Time `json:"timestamp,omitempty"`
+	EndedAt      *time.Time `json:"ended_at,omitempty"`
+	DurationMS   int64      `json:"duration_ms,omitempty"`
+	Phase        string     `json:"phase,omitempty"`
+	PhaseSource  string     `json:"phase_source,omitempty"` // explicit | boundary_inferred | log_inferred | unknown
+	HasCPU       bool       `json:"has_cpu"`
+	HasHeap      bool       `json:"has_heap"`
+	HasGoroutine bool       `json:"has_goroutine"`
 	// File paths are internal only, not serialized to JSON
 	CPUFile       string `json:"-"`
 	HeapFile      string `json:"-"`
 	GoroutineFile string `json:"-"`
 	// Inline detail (limited to avoid oversized analysis JSON)
-	CPUTop     []PprofTopFunction `json:"cpu_top,omitempty"`
-	HeapTop    []PprofTopFunction `json:"heap_top,omitempty"`
-	Goroutines int                `json:"goroutines,omitempty"`
-	LogExcerpt string             `json:"log_excerpt,omitempty"`
-	Status     string             `json:"status,omitempty"` // available | partial | error | pending
+	CPUTop         []PprofTopFunction `json:"cpu_top,omitempty"`
+	CPUTopYaklang  []PprofTopFunction `json:"cpu_top_yaklang,omitempty"`
+	HeapTop        []PprofTopFunction `json:"heap_top,omitempty"`
+	HeapTopYaklang []PprofTopFunction `json:"heap_top_yaklang,omitempty"`
+	Goroutines     int                `json:"goroutines,omitempty"`
+	LogExcerpt     string             `json:"log_excerpt,omitempty"`
+	Status         string             `json:"status,omitempty"` // available | partial | error | pending
 }
 
 // SampleDetail is the detailed view of a single 5-minute sample.
@@ -74,12 +78,15 @@ type SampleDetail struct {
 
 // PprofTopAnalysis contains top functions from a pprof profile.
 type PprofTopAnalysis struct {
-	Kind         string             `json:"kind"`
-	TopFunctions []PprofTopFunction  `json:"top_functions,omitempty"`
-	SampleCount  int64              `json:"sample_count"`
-	TotalValue   int64              `json:"total_value"`
-	SampleUnit   string             `json:"sample_unit,omitempty"`
-	ParseError   string             `json:"parse_error,omitempty"`
+	Kind           string            `json:"kind"`
+	TopFunctions   []PprofTopFunction `json:"top_functions,omitempty"`
+	YaklangTop     []PprofTopFunction `json:"yaklang_top,omitempty"`
+	SampleCount    int64             `json:"sample_count"`
+	TotalValue     int64             `json:"total_value"`
+	SampleUnit     string            `json:"sample_unit,omitempty"`
+	ParseError     string            `json:"parse_error,omitempty"`
+	TimeNanos      int64             `json:"time_nanos,omitempty"`
+	DurationNanos  int64             `json:"duration_nanos,omitempty"`
 }
 
 // PprofTopFunction is a single function entry.
@@ -213,11 +220,23 @@ func AnalyzeSample(dir string, label string) (SampleDetail, error) {
 	// Parse CPU profile
 	if cpuFile != "" {
 		detail.CPUProfile = parsePprofFile(cpuFile, "cpu")
+		if detail.CPUProfile != nil {
+			detail.CPUTop = limitTopFunctions(detail.CPUProfile.TopFunctions, 10)
+			detail.CPUTopYaklang = limitTopFunctions(detail.CPUProfile.YaklangTop, 10)
+			ts := parseLabelTimestamp(label)
+			detail.Label = label
+			detail.Timestamp = ts
+			applySampleWindow(&detail.SampleSummary, detail.CPUProfile)
+		}
 	}
 
 	// Parse heap profile
 	if heapFile != "" {
 		detail.HeapProfile = parsePprofFile(heapFile, "heap")
+		if detail.HeapProfile != nil {
+			detail.HeapTop = limitTopFunctions(detail.HeapProfile.TopFunctions, 10)
+			detail.HeapTopYaklang = limitTopFunctions(detail.HeapProfile.YaklangTop, 10)
+		}
 	}
 
 	// Count goroutines from goroutine profile
@@ -454,7 +473,7 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 		}
 	}
 
-	// Populate inline details for each sample (limited to top 5 functions)
+	// Populate inline details for each sample (limited top lists for UI)
 	for _, s := range labelMap {
 		s.Status = "available"
 		if s.CPUFile != "" {
@@ -463,6 +482,8 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 					s.Status = "partial"
 				}
 				s.CPUTop = limitTopFunctions(p.TopFunctions, 10)
+				s.CPUTopYaklang = limitTopFunctions(p.YaklangTop, 10)
+				applySampleWindow(s, p)
 			}
 		}
 		if s.HeapFile != "" {
@@ -471,6 +492,8 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 					s.Status = "partial"
 				}
 				s.HeapTop = limitTopFunctions(p.TopFunctions, 10)
+				s.HeapTopYaklang = limitTopFunctions(p.YaklangTop, 10)
+				// Heap snapshots are instantaneous; only fill window from CPU.
 			}
 		}
 		if s.GoroutineFile != "" {
@@ -581,6 +604,9 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		return result
 	}
 
+	result.TimeNanos = p.TimeNanos
+	result.DurationNanos = p.DurationNanos
+
 	sampleTypeIdx := 0
 	for i, st := range p.SampleType {
 		if st.Type == "samples" || st.Type == "cpu" || st.Type == "alloc_space" || st.Type == "inuse_space" || st.Type == "alloc_objects" || st.Type == "inuse_objects" {
@@ -589,12 +615,7 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		}
 	}
 
-	type funcStats struct {
-		name string
-		flat int64
-		cum  int64
-	}
-	funcMap := make(map[string]*funcStats)
+	funcMap := make(map[string]*pprofFuncStats)
 	var totalValue int64
 
 	for _, sample := range p.Sample {
@@ -611,7 +632,7 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 					name := line.Function.Name
 					fs, ok := funcMap[name]
 					if !ok {
-						fs = &funcStats{name: name}
+						fs = &pprofFuncStats{name: name}
 						funcMap[name] = fs
 					}
 					fs.flat += value
@@ -628,7 +649,7 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 						seen[name] = true
 						fs, ok := funcMap[name]
 						if !ok {
-							fs = &funcStats{name: name}
+							fs = &pprofFuncStats{name: name}
 							funcMap[name] = fs
 						}
 						fs.cum += value
@@ -638,7 +659,7 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		}
 	}
 
-	var stats []*funcStats
+	var stats []*pprofFuncStats
 	for _, fs := range funcMap {
 		stats = append(stats, fs)
 	}
@@ -649,28 +670,71 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		return stats[i].name < stats[j].name
 	})
 
-	const topN = 20
-	if len(stats) > topN {
-		stats = stats[:topN]
-	}
-
-	for _, fs := range stats {
-		var cumPct, flatPct string
-		if totalValue > 0 {
-			cumPct = fmt.Sprintf("%.2f%%", float64(fs.cum)*100/float64(totalValue))
-			flatPct = fmt.Sprintf("%.2f%%", float64(fs.flat)*100/float64(totalValue))
-		}
-		result.TopFunctions = append(result.TopFunctions, PprofTopFunction{
-			Name: fs.name, CumValue: fs.cum, CumPct: cumPct, FlatValue: fs.flat, FlatPct: flatPct,
-		})
-	}
-
+	result.TopFunctions = pprofTopFromStats(stats, totalValue, 20, nil)
+	result.YaklangTop = pprofTopFromStats(stats, totalValue, 20, isYaklangPprofFunc)
 	result.SampleCount = int64(len(p.Sample))
 	result.TotalValue = totalValue
 	if len(p.SampleType) > sampleTypeIdx {
 		result.SampleUnit = p.SampleType[sampleTypeIdx].Unit
 	}
 	return result
+}
+
+type pprofFuncStats struct {
+	name string
+	flat int64
+	cum  int64
+}
+
+func pprofTopFromStats(
+	stats []*pprofFuncStats,
+	totalValue int64,
+	n int,
+	pred func(string) bool,
+) []PprofTopFunction {
+	out := make([]PprofTopFunction, 0, n)
+	for _, fs := range stats {
+		if pred != nil && !pred(fs.name) {
+			continue
+		}
+		var cumPct, flatPct string
+		if totalValue > 0 {
+			cumPct = fmt.Sprintf("%.2f%%", float64(fs.cum)*100/float64(totalValue))
+			flatPct = fmt.Sprintf("%.2f%%", float64(fs.flat)*100/float64(totalValue))
+		}
+		out = append(out, PprofTopFunction{
+			Name: fs.name, CumValue: fs.cum, CumPct: cumPct, FlatValue: fs.flat, FlatPct: flatPct,
+		})
+		if len(out) >= n {
+			break
+		}
+	}
+	return out
+}
+
+const yaklangPprofPrefix = "github.com/yaklang/yaklang"
+
+func isYaklangPprofFunc(name string) bool {
+	return strings.Contains(name, yaklangPprofPrefix)
+}
+
+// applySampleWindow sets EndedAt / DurationMS from the CPU profile duration.
+func applySampleWindow(s *SampleSummary, p *PprofTopAnalysis) {
+	if s == nil || p == nil || p.DurationNanos <= 0 {
+		return
+	}
+	s.DurationMS = p.DurationNanos / int64(time.Millisecond)
+	var start time.Time
+	if s.Timestamp != nil {
+		start = *s.Timestamp
+	} else if p.TimeNanos > 0 {
+		start = time.Unix(0, p.TimeNanos).UTC()
+		s.Timestamp = &start
+	} else {
+		return
+	}
+	end := start.Add(time.Duration(p.DurationNanos))
+	s.EndedAt = &end
 }
 
 func countGoroutines(path string) int {
