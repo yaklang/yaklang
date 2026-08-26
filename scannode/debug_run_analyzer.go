@@ -59,15 +59,19 @@ type SampleSummary struct {
 	HeapFile      string `json:"-"`
 	GoroutineFile string `json:"-"`
 	// Inline detail (limited to avoid oversized analysis JSON)
-	CPUTop         []PprofTopFunction `json:"cpu_top,omitempty"`
-	CPUTopYaklang  []PprofTopFunction `json:"cpu_top_yaklang,omitempty"`
-	HeapTop        []PprofTopFunction `json:"heap_top,omitempty"`
-	HeapTopYaklang []PprofTopFunction `json:"heap_top_yaklang,omitempty"`
-	Goroutines     int                `json:"goroutines,omitempty"`
-	LogExcerpt     string             `json:"log_excerpt,omitempty"`
-	Status         string             `json:"status,omitempty"` // available | partial | error | pending
-	DBStats        *DBOpStatsSummary  `json:"db_stats,omitempty"`
-	Runtime        *RuntimeStatsSummary `json:"runtime,omitempty"`
+	CPUTop            []PprofTopFunction `json:"cpu_top,omitempty"`
+	CPUTopYaklang     []PprofTopFunction `json:"cpu_top_yaklang,omitempty"`
+	CPUStacks         []PprofStackPath   `json:"cpu_stacks,omitempty"`
+	CPUStacksYaklang  []PprofStackPath   `json:"cpu_stacks_yaklang,omitempty"`
+	HeapTop           []PprofTopFunction `json:"heap_top,omitempty"`
+	HeapTopYaklang    []PprofTopFunction `json:"heap_top_yaklang,omitempty"`
+	HeapStacks        []PprofStackPath   `json:"heap_stacks,omitempty"`
+	HeapStacksYaklang []PprofStackPath   `json:"heap_stacks_yaklang,omitempty"`
+	Goroutines        int                `json:"goroutines,omitempty"`
+	LogExcerpt        string             `json:"log_excerpt,omitempty"`
+	Status            string             `json:"status,omitempty"` // available | partial | error | pending
+	DBStats           *DBOpStatsSummary  `json:"db_stats,omitempty"`
+	Runtime           *RuntimeStatsSummary `json:"runtime,omitempty"`
 }
 
 // RuntimeStatsSummary mirrors runtime-stats/*.runtime.json written by the
@@ -121,6 +125,8 @@ type PprofTopAnalysis struct {
 	Kind          string             `json:"kind"`
 	TopFunctions  []PprofTopFunction `json:"top_functions,omitempty"`
 	YaklangTop    []PprofTopFunction `json:"yaklang_top,omitempty"`
+	TopStacks     []PprofStackPath   `json:"top_stacks,omitempty"`
+	YaklangStacks []PprofStackPath   `json:"yaklang_stacks,omitempty"`
 	SampleCount   int64              `json:"sample_count"`
 	TotalValue    int64              `json:"total_value"`
 	SampleUnit    string             `json:"sample_unit,omitempty"`
@@ -136,6 +142,13 @@ type PprofTopFunction struct {
 	CumPct    string `json:"cum_pct"`
 	FlatValue int64  `json:"flat_value"`
 	FlatPct   string `json:"flat_pct"`
+}
+
+// PprofStackPath is one folded call path (root → leaf) with its sample share.
+type PprofStackPath struct {
+	Frames []string `json:"frames"`
+	Value  int64    `json:"value"`
+	Pct    string   `json:"pct"`
 }
 
 // RunSummary is the overall run summary.
@@ -260,6 +273,8 @@ func AnalyzeSample(dir string, label string) (SampleDetail, error) {
 		if detail.CPUProfile != nil {
 			detail.CPUTop = limitTopFunctions(detail.CPUProfile.TopFunctions, 10)
 			detail.CPUTopYaklang = limitTopFunctions(detail.CPUProfile.YaklangTop, 10)
+			detail.CPUStacks = limitStackPaths(detail.CPUProfile.TopStacks, 10)
+			detail.CPUStacksYaklang = limitStackPaths(detail.CPUProfile.YaklangStacks, 10)
 			ts := parseLabelTimestamp(label)
 			detail.Label = label
 			detail.Timestamp = ts
@@ -273,6 +288,8 @@ func AnalyzeSample(dir string, label string) (SampleDetail, error) {
 		if detail.HeapProfile != nil {
 			detail.HeapTop = limitTopFunctions(detail.HeapProfile.TopFunctions, 10)
 			detail.HeapTopYaklang = limitTopFunctions(detail.HeapProfile.YaklangTop, 10)
+			detail.HeapStacks = limitStackPaths(detail.HeapProfile.TopStacks, 10)
+			detail.HeapStacksYaklang = limitStackPaths(detail.HeapProfile.YaklangStacks, 10)
 		}
 	}
 
@@ -534,6 +551,8 @@ func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummar
 				}
 				s.CPUTop = limitTopFunctions(p.TopFunctions, 10)
 				s.CPUTopYaklang = limitTopFunctions(p.YaklangTop, 10)
+				s.CPUStacks = limitStackPaths(p.TopStacks, 10)
+				s.CPUStacksYaklang = limitStackPaths(p.YaklangStacks, 10)
 				applySampleWindow(s, p)
 			}
 		}
@@ -544,6 +563,8 @@ func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummar
 				}
 				s.HeapTop = limitTopFunctions(p.TopFunctions, 10)
 				s.HeapTopYaklang = limitTopFunctions(p.YaklangTop, 10)
+				s.HeapStacks = limitStackPaths(p.TopStacks, 10)
+				s.HeapStacksYaklang = limitStackPaths(p.YaklangStacks, 10)
 				// Heap snapshots are instantaneous; only fill window from CPU.
 			}
 		}
@@ -734,6 +755,7 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 	}
 
 	funcMap := make(map[string]*pprofFuncStats)
+	stackMap := make(map[string]*pprofStackStats)
 	var totalValue int64
 
 	for _, sample := range p.Sample {
@@ -775,6 +797,18 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 				}
 			}
 		}
+
+		frames := stackFramesRootToLeaf(sample)
+		if len(frames) == 0 {
+			continue
+		}
+		key := strings.Join(frames, "\x00")
+		ss, ok := stackMap[key]
+		if !ok {
+			ss = &pprofStackStats{frames: frames}
+			stackMap[key] = ss
+		}
+		ss.value += value
 	}
 
 	var stats []*pprofFuncStats
@@ -788,8 +822,21 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		return stats[i].name < stats[j].name
 	})
 
+	var stacks []*pprofStackStats
+	for _, ss := range stackMap {
+		stacks = append(stacks, ss)
+	}
+	sort.Slice(stacks, func(i, j int) bool {
+		if stacks[i].value != stacks[j].value {
+			return stacks[i].value > stacks[j].value
+		}
+		return strings.Join(stacks[i].frames, "/") < strings.Join(stacks[j].frames, "/")
+	})
+
 	result.TopFunctions = pprofTopFromStats(stats, totalValue, 20, nil)
 	result.YaklangTop = pprofTopFromStats(stats, totalValue, 20, isYaklangPprofFunc)
+	result.TopStacks = pprofStacksFromStats(stacks, totalValue, 20, false)
+	result.YaklangStacks = pprofStacksFromStats(stacks, totalValue, 20, true)
 	result.SampleCount = int64(len(p.Sample))
 	result.TotalValue = totalValue
 	if len(p.SampleType) > sampleTypeIdx {
@@ -802,6 +849,135 @@ type pprofFuncStats struct {
 	name string
 	flat int64
 	cum  int64
+}
+
+type pprofStackStats struct {
+	frames []string
+	value  int64
+}
+
+const pprofStackMaxFrames = 8
+
+// stackFramesRootToLeaf returns the call path outer→inner. Go profiles keep
+// the leaf at location[0]; reverse so the UI reads top-down like a call tree.
+func stackFramesRootToLeaf(sample *profile.Sample) []string {
+	if sample == nil || len(sample.Location) == 0 {
+		return nil
+	}
+	raw := make([]string, 0, len(sample.Location))
+	for i := len(sample.Location) - 1; i >= 0; i-- {
+		loc := sample.Location[i]
+		if loc == nil || len(loc.Line) == 0 {
+			continue
+		}
+		// Prefer the last line on the location (outermost inline frame).
+		line := loc.Line[len(loc.Line)-1]
+		if line.Function == nil || strings.TrimSpace(line.Function.Name) == "" {
+			continue
+		}
+		name := line.Function.Name
+		if len(raw) > 0 && raw[len(raw)-1] == name {
+			continue
+		}
+		raw = append(raw, name)
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	if len(raw) <= pprofStackMaxFrames {
+		return raw
+	}
+	// Keep the deepest frames (closest to the leaf where time is spent).
+	trimmed := make([]string, 0, pprofStackMaxFrames+1)
+	trimmed = append(trimmed, "…")
+	trimmed = append(trimmed, raw[len(raw)-pprofStackMaxFrames:]...)
+	return trimmed
+}
+
+func pprofStacksFromStats(
+	stacks []*pprofStackStats,
+	totalValue int64,
+	n int,
+	yaklangOnly bool,
+) []PprofStackPath {
+	selected := stacks
+	if yaklangOnly {
+		merged := make(map[string]*pprofStackStats)
+		for _, ss := range stacks {
+			focused := focusYaklangStackFrames(ss.frames)
+			if len(focused) == 0 {
+				continue
+			}
+			key := strings.Join(focused, "\x00")
+			cur, ok := merged[key]
+			if !ok {
+				cur = &pprofStackStats{frames: focused}
+				merged[key] = cur
+			}
+			cur.value += ss.value
+		}
+		selected = make([]*pprofStackStats, 0, len(merged))
+		for _, ss := range merged {
+			selected = append(selected, ss)
+		}
+		sort.Slice(selected, func(i, j int) bool {
+			if selected[i].value != selected[j].value {
+				return selected[i].value > selected[j].value
+			}
+			return strings.Join(selected[i].frames, "/") < strings.Join(selected[j].frames, "/")
+		})
+	}
+
+	out := make([]PprofStackPath, 0, n)
+	for _, ss := range selected {
+		var pct string
+		if totalValue > 0 {
+			pct = fmt.Sprintf("%.2f%%", float64(ss.value)*100/float64(totalValue))
+		}
+		out = append(out, PprofStackPath{
+			Frames: append([]string(nil), ss.frames...),
+			Value:  ss.value,
+			Pct:    pct,
+		})
+		if len(out) >= n {
+			break
+		}
+	}
+	return out
+}
+
+// focusYaklangStackFrames keeps one parent context plus yaklang frames through
+// the leaf so the path stays readable without runtime noise.
+func focusYaklangStackFrames(frames []string) []string {
+	first := -1
+	for i, name := range frames {
+		if isYaklangPprofFunc(name) {
+			first = i
+			break
+		}
+	}
+	if first < 0 {
+		return nil
+	}
+	start := first
+	if start > 0 {
+		start--
+	}
+	out := append([]string(nil), frames[start:]...)
+	if len(out) <= pprofStackMaxFrames {
+		return out
+	}
+	trimmed := make([]string, 0, pprofStackMaxFrames+1)
+	trimmed = append(trimmed, "…")
+	trimmed = append(trimmed, out[len(out)-pprofStackMaxFrames:]...)
+	return trimmed
+}
+
+func limitStackPaths(paths []PprofStackPath, n int) []PprofStackPath {
+	if n <= 0 || len(paths) <= n {
+		return paths
+	}
+	return paths[:n]
 }
 
 func pprofTopFromStats(
