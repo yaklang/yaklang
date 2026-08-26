@@ -157,6 +157,33 @@ func TestGenerateDebugZip_PathTraversal(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestIsYaklangPprofFunc(t *testing.T) {
+	assert.True(t, isYaklangPprofFunc("github.com/yaklang/yaklang/common/yak/ssa.Scan"))
+	assert.False(t, isYaklangPprofFunc("runtime.mallocgc"))
+}
+
+func TestApplySampleWindow(t *testing.T) {
+	start := time.Date(2026, 8, 26, 13, 0, 23, 0, time.UTC)
+	s := &SampleSummary{Timestamp: &start}
+	applySampleWindow(s, &PprofTopAnalysis{DurationNanos: int64(60 * time.Second)})
+	require.NotNil(t, s.EndedAt)
+	assert.Equal(t, int64(60_000), s.DurationMS)
+	assert.Equal(t, start.Add(60*time.Second), *s.EndedAt)
+}
+
+func TestPprofTopFromStatsYaklang(t *testing.T) {
+	// Caller must pass cum-desc sorted stats (same as buildPprofTopAnalysis).
+	stats := []*pprofFuncStats{
+		{name: "runtime.mallocgc", cum: 100, flat: 90},
+		{name: "github.com/yaklang/yaklang/common/yak/ssa.A", cum: 50, flat: 25},
+		{name: "github.com/yaklang/yaklang/common/yak/ssa.B", cum: 40, flat: 20},
+	}
+	top := pprofTopFromStats(stats, 190, 10, isYaklangPprofFunc)
+	require.Len(t, top, 2)
+	assert.Equal(t, "github.com/yaklang/yaklang/common/yak/ssa.A", top[0].Name)
+	assert.Equal(t, "github.com/yaklang/yaklang/common/yak/ssa.B", top[1].Name)
+}
+
 func TestParseLabelTimestamp(t *testing.T) {
 	ts := parseLabelTimestamp("20260805-120030-initial")
 	require.NotNil(t, ts)
