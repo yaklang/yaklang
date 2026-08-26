@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
@@ -136,7 +137,18 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	log.Info("git clone workspace: ", local)
 
 	opts := make([]yakgit.Option, 0)
-	opts = append(opts, yakgit.WithBranch(codeSource.GetCodeSourceBranch()))
+	// Scan compiles only need the tip of the configured branch. A full clone
+	// downloads every ref/history and is the main reason large git sources
+	// feel slow; mirror `git clone --depth 1 --single-branch --no-tags -b <branch>`.
+	opts = append(opts,
+		yakgit.WithDepth(1),
+		yakgit.WithSingleBranch(true),
+		yakgit.WithNoFetchTags(true),
+		yakgit.WithRecuriveSubmodule(false),
+	)
+	if branch := strings.TrimSpace(codeSource.GetCodeSourceBranch()); branch != "" {
+		opts = append(opts, yakgit.WithBranch(branch))
+	}
 	if proxyURL := codeSource.GetCodeSourceProxyURL(); proxyURL != "" {
 		proxyUser, proxyPassword := codeSource.GetCodeSourceProxyAuth()
 		opts = append(opts, yakgit.WithProxy(proxyURL, proxyUser, proxyPassword))

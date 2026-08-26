@@ -34,6 +34,7 @@ type config struct {
 	Force        bool
 	NoFetchTags  bool
 	FetchAllTags bool
+	SingleBranch bool
 
 	CheckoutCreate bool
 	CheckoutForce  bool
@@ -333,6 +334,14 @@ func WithRemote(remote string) Option {
 func WithBranch(branch string) Option {
 	return func(c *config) error {
 		c.Branch = branch
+		return nil
+	}
+}
+
+// WithSingleBranch limits clone/fetch to ReferenceName only (git --single-branch).
+func WithSingleBranch(b bool) Option {
+	return func(c *config) error {
+		c.SingleBranch = b
 		return nil
 	}
 }
