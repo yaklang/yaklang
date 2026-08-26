@@ -139,7 +139,7 @@ func TestThinkingExtraBodyForProvider_OpenAIEffortLevels(t *testing.T) {
 	assert.Equal(t, "high", inner["effort"])
 }
 
-func TestMapThinkingEffortToConfig(t *testing.T) {
+func TestMapReasoningEffortToThinkingConfig(t *testing.T) {
 	tests := []struct {
 		effort       string
 		enable       bool
@@ -163,7 +163,7 @@ func TestMapThinkingEffortToConfig(t *testing.T) {
 		{"turbo", true, "turbo"},
 	}
 	for _, tt := range tests {
-		enable, reasoning := MapThinkingEffortToConfig(tt.effort)
+		enable, reasoning := MapReasoningEffortToThinkingConfig(tt.effort)
 		assert.Equal(t, tt.enable, enable, "effort=%q enable mismatch", tt.effort)
 		assert.Equal(t, tt.reasoningEff, reasoning, "effort=%q reasoning mismatch", tt.effort)
 	}

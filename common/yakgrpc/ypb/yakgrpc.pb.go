@@ -18830,11 +18830,8 @@ type ThirdPartyApplicationConfig struct {
 	FrequencyPenalty  *float64 `protobuf:"fixed64,22,opt,name=FrequencyPenalty,proto3,oneof" json:"FrequencyPenalty,omitempty"`
 	ReasoningEffort   *string  `protobuf:"bytes,23,opt,name=ReasoningEffort,proto3,oneof" json:"ReasoningEffort,omitempty"`
 	EnableThinkingOpt *bool    `protobuf:"varint,24,opt,name=EnableThinkingOpt,proto3,oneof" json:"EnableThinkingOpt,omitempty"`
-	// 思考强度统一抽象层（前端友好）：off / low / medium / high / auto
-	// 设置后会自动映射为 EnableThinking + ReasoningEffort；空串表示不覆盖现有配置
-	ThinkingEffort *string `protobuf:"bytes,25,opt,name=ThinkingEffort,proto3,oneof" json:"ThinkingEffort,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ThirdPartyApplicationConfig) Reset() {
@@ -19033,13 +19030,6 @@ func (x *ThirdPartyApplicationConfig) GetEnableThinkingOpt() bool {
 		return *x.EnableThinkingOpt
 	}
 	return false
-}
-
-func (x *ThirdPartyApplicationConfig) GetThinkingEffort() string {
-	if x != nil && x.ThinkingEffort != nil {
-		return *x.ThinkingEffort
-	}
-	return ""
 }
 
 type DiagnoseNetworkRequest struct {
@@ -76871,7 +76861,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fAuthPassword\x18\x02 \x01(\tR\fAuthPassword\x12\x1a\n" +
 	"\bAuthType\x18\x03 \x01(\tR\bAuthType\x12\x12\n" +
 	"\x04Host\x18\x04 \x01(\tR\x04Host\x12\x1c\n" +
-	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xe7\a\n" +
+	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xa7\a\n" +
 	"\x1bThirdPartyApplicationConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x16\n" +
 	"\x06APIKey\x18\x02 \x01(\tR\x06APIKey\x12&\n" +
@@ -76901,8 +76891,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04TopK\x18\x15 \x01(\x03H\x03R\x04TopK\x88\x01\x01\x12/\n" +
 	"\x10FrequencyPenalty\x18\x16 \x01(\x01H\x04R\x10FrequencyPenalty\x88\x01\x01\x12-\n" +
 	"\x0fReasoningEffort\x18\x17 \x01(\tH\x05R\x0fReasoningEffort\x88\x01\x01\x121\n" +
-	"\x11EnableThinkingOpt\x18\x18 \x01(\bH\x06R\x11EnableThinkingOpt\x88\x01\x01\x12+\n" +
-	"\x0eThinkingEffort\x18\x19 \x01(\tH\aR\x0eThinkingEffort\x88\x01\x01B\f\n" +
+	"\x11EnableThinkingOpt\x18\x18 \x01(\bH\x06R\x11EnableThinkingOpt\x88\x01\x01B\f\n" +
 	"\n" +
 	"_MaxTokensB\x0e\n" +
 	"\f_TemperatureB\a\n" +
@@ -76910,8 +76899,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05_TopKB\x13\n" +
 	"\x11_FrequencyPenaltyB\x12\n" +
 	"\x10_ReasoningEffortB\x14\n" +
-	"\x12_EnableThinkingOptB\x11\n" +
-	"\x0f_ThinkingEffort\"\xb2\x02\n" +
+	"\x12_EnableThinkingOpt\"\xb2\x02\n" +
 	"\x16DiagnoseNetworkRequest\x12&\n" +
 	"\x0eNetworkTimeout\x18\x01 \x01(\x01R\x0eNetworkTimeout\x12$\n" +
 	"\rConnectTarget\x18\x02 \x01(\tR\rConnectTarget\x12\x14\n" +

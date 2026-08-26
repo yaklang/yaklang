@@ -3283,9 +3283,6 @@ message ThirdPartyApplicationConfig {
   optional double FrequencyPenalty = 22;
   optional string ReasoningEffort = 23;
   optional bool EnableThinkingOpt = 24;
-  // 思考强度统一抽象层（前端友好）：off / low / medium / high / auto
-  // 设置后会自动映射为 EnableThinking + ReasoningEffort；空串表示不覆盖现有配置
-  optional string ThinkingEffort = 25;
 }
 
 message DiagnoseNetworkRequest {

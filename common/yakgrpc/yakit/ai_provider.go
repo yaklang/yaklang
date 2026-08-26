@@ -368,7 +368,6 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		optionalInt64Sig(cfg.TopK),
 		optionalFloat64Sig(cfg.FrequencyPenalty),
 		reasoningEffortSig(cfg.ReasoningEffort),
-		reasoningEffortSig(cfg.ThinkingEffort),
 	)
 }
 
