@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Template Unescaped With Safe",
+	mode: "source"
+	language: "general"
+	title: "Template Unescaped With Safe"
 	title_zh: "检测到Template Unescaped With Safe",
-	type: vuln,
-	level: middle,
-	rule_id: "source-insecure-api-template-unescaped-with-safe",
-	risk: "Security",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-template-unescaped-with-safe"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `template-unescaped-with-safe` (/tmp/semgrep-rules/python/flask/security/xss/audit/template-unescaped-with-safe.yaml).
 Original message: Detected a segment of a Flask template where autoescaping is explicitly disabled with '| safe' filter. This allows rendering of raw HTML in this segment. Ensure no user data is rendered here, otherwise this is a cross-site scripting (XSS) vulnerability.
@@ -14,20 +14,20 @@ Original message: Detected a segment of a Flask template where autoescaping is e
 CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
 References:
 - https://flask.palletsprojects.com/en/1.1.x/security/#cross-site-scripting-xss
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.html": <<<POS
 {{3"G$5y|	safe
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*.html}.pattern_regex(/{{.*?\|\s*safe(\s*}})?/) as $p0

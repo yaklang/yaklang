@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Template Explicit Unescape",
+	mode: "source"
+	language: "general"
+	title: "Template Explicit Unescape"
 	title_zh: "检测到Template Explicit Unescape",
-	type: vuln,
-	level: middle,
-	rule_id: "source-insecure-api-template-explicit-unescape",
-	risk: "Security",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-template-explicit-unescape"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `template-explicit-unescape` (/tmp/semgrep-rules/javascript/express/security/audit/xss/ejs/explicit-unescape.yaml).
 Original message: Detected an explicit unescape in an EJS template, using '<%- ... %>' If external data can reach these locations, your application is exposed to a cross-site scripting (XSS) vulnerability. Use '<%= ... %>' to escape this data. If you need escaping, ensure no external data can reach this location.
@@ -14,20 +14,20 @@ Original message: Detected an explicit unescape in an EJS template, using '<%- .
 CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
 References:
 - http://www.managerjs.com/blog/2015/05/will-ejs-escape-save-me-from-xss-sorta/
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.ejs": <<<POS
 <%-K%(1%>
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*.ejs}.pattern_regex(/<%-((?!include).)*?%>/) as $p0

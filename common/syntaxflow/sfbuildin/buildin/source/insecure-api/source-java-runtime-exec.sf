@@ -1,33 +1,33 @@
 desc(
-	mode: "source",
-	language: "java",
-	title: "Detect Java Runtime.exec Usage",
+	mode: "source"
+	language: "java"
+	title: "Detect Java Runtime.exec Usage"
 	title_zh: "检测 Java Runtime.exec 调用",
-	type: vuln,
-	level: medium,
-	rule_id: "source-java-runtime-exec",
-	risk: "Command Injection",
+	type: vuln
+	level: medium
+	rule_id: "source-java-runtime-exec"
+	risk: "Command Injection"
 	desc: <<<DESC
 Flags Runtime.getRuntime().exec(...) which often leads to command injection when fed with untrusted input.
-DESC,
+DESC
 	solution: <<<SOLUTION
 Avoid shelling out; if required, use ProcessBuilder with argument lists and strict allowlists.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://Run.java": <<<POS
 class Run {
   void bad(String cmd) throws Exception {
     Runtime.getRuntime().exec(cmd);
   }
 }
-POS,
+POS
 	"safefile://RunSafe.java": <<<NEG
 class RunSafe {
   void ok() {
     System.out.println("no exec");
   }
 }
-NEG,
+NEG
 )
 
 ${*.java}.pattern_regex(/Runtime\.getRuntime\(\)\.exec\s*\(/) as $hit

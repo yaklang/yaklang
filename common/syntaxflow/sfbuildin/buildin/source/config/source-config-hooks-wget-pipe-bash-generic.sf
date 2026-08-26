@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Hooks Wget Pipe Bash Generic",
+	mode: "source"
+	language: "general"
+	title: "Hooks Wget Pipe Bash Generic"
 	title_zh: "检测到Hooks Wget Pipe Bash Generic",
-	type: vuln,
-	level: critical,
-	rule_id: "source-config-hooks-wget-pipe-bash-generic",
-	risk: "Security",
+	type: vuln
+	level: critical
+	rule_id: "source-config-hooks-wget-pipe-bash-generic"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `hooks-wget-pipe-bash-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-wget-pipe-bash/hooks-wget-pipe-bash.yaml).
 Original message: Remote script is fetched and piped directly to a shell interpreter. In Claude Code and Cursor hooks, this enables remote code execution from untrusted sources. Download the script first, inspect it, then execute it separately.
@@ -15,21 +15,21 @@ CWE: CWE-829: Inclusion of Functionality from Untrusted Control Sphere
 References:
 - https://docs.anthropic.com/en/docs/claude-code/hooks
 - https://cursor.com/docs/agent/hooks
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.sh": <<<POS
 wget
 W67+SQc|zsh
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*.sh}.pattern_regex(/(curl|wget)\s+.*\|\s*(bash|sh|zsh)\b/) as $p0

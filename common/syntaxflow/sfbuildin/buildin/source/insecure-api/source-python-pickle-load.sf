@@ -1,27 +1,27 @@
 desc(
-	mode: "source",
-	language: "python",
-	title: "Detect Python pickle.load Usage",
+	mode: "source"
+	language: "python"
+	title: "Detect Python pickle.load Usage"
 	title_zh: "检测 Python pickle.load",
-	type: vuln,
-	level: high,
-	rule_id: "source-python-pickle-load",
-	risk: "Insecure Deserialization",
+	type: vuln
+	level: high
+	rule_id: "source-python-pickle-load"
+	risk: "Insecure Deserialization"
 	desc: <<<DESC
 Flags pickle.load / loads which can execute code when deserializing untrusted data.
-DESC,
+DESC
 	solution: <<<SOLUTION
 Prefer json or other safe formats; never unpickle untrusted bytes.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://ser.py": <<<POS
 import pickle
 obj = pickle.loads(data)
-POS,
+POS
 	"safefile://ser-safe.py": <<<NEG
 import json
 obj = json.loads(data)
-NEG,
+NEG
 )
 
 ${*.py}.pattern_regex(/\bpickle\.(loads?|Unpickler)\s*\(/) as $hit

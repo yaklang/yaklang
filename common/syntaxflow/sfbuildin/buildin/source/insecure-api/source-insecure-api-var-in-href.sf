@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Var In Href",
+	mode: "source"
+	language: "general"
+	title: "Var In Href"
 	title_zh: "检测到Var In Href",
-	type: vuln,
-	level: middle,
-	rule_id: "source-insecure-api-var-in-href",
-	risk: "Security",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-var-in-href"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `var-in-href` (/tmp/semgrep-rules/javascript/express/security/audit/xss/ejs/var-in-href.yaml).
 Original message: Detected a template variable used in an anchor tag with the 'href' attribute. This allows a malicious actor to input the 'javascript:' URI and is subject to cross- site scripting (XSS) attacks. If using a relative URL, start with a literal forward slash and concatenate the URL, like this: href='/<%= link %>'. You may also consider setting the Content Security Policy (CSP) header.
@@ -15,22 +15,22 @@ CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross
 References:
 - https://flask.palletsprojects.com/en/1.1.x/security/#cross-site-scripting-xss#:~:text=javascript:%20URI
 - https://github.com/pugjs/pug/issues/2952
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.ejs": <<<POS
 <a"sy[0 utL&88 ""Q<href
 		
 =YJM(8q<%%>6;[>
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*.ejs}.pattern_regex(/<a.*href\s*=[^>]*?[^\/&=]<%.*?%>.*?>/) as $p0

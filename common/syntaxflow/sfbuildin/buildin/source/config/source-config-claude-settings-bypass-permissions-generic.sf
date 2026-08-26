@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Claude Settings Bypass Permissions Generic",
+	mode: "source"
+	language: "general"
+	title: "Claude Settings Bypass Permissions Generic"
 	title_zh: "检测到Claude Settings Bypass Permissions Generic",
-	type: vuln,
-	level: critical,
-	rule_id: "source-config-claude-settings-bypass-permissions-generic",
-	risk: "Security",
+	type: vuln
+	level: critical
+	rule_id: "source-config-claude-settings-bypass-permissions-generic"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `claude-settings-bypass-permissions-generic` (/tmp/semgrep-rules/ai/ai-best-practices/claude-settings-bypass-permissions/claude-settings-bypass-permissions.yaml).
 Original message: Dangerous permission bypass detected in Claude Code or Cursor settings. Settings like "bypassPermissions", "allowUnsandboxedCommands: true", or "enableWeakerNestedSandbox: true" disable critical security controls that protect against malicious tool use. Remove these settings or set them to false to maintain proper sandboxing and permission checks.
@@ -14,20 +14,20 @@ Original message: Dangerous permission bypass detected in Claude Code or Cursor 
 CWE: CWE-862: Missing Authorization
 References:
 - https://docs.anthropic.com/en/docs/claude-code/security
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos/settings.json": <<<POS
 "bypassPermissions"
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${/.*\/settings\.json/}.pattern_regex(/"bypassPermissions"/) as $p0

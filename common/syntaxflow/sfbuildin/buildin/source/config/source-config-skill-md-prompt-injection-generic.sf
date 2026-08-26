@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Skill Md Prompt Injection Generic",
+	mode: "source"
+	language: "general"
+	title: "Skill Md Prompt Injection Generic"
 	title_zh: "检测到Skill Md Prompt Injection Generic",
-	type: vuln,
-	level: critical,
-	rule_id: "source-config-skill-md-prompt-injection-generic",
-	risk: "Security",
+	type: vuln
+	level: critical
+	rule_id: "source-config-skill-md-prompt-injection-generic"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `skill-md-prompt-injection-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-prompt-injection/skill-md-prompt-injection.yaml).
 Original message: SKILL.md or AGENT.md frontmatter description contains prompt-injection markers that may override agent behavior. Phrases like "ignore previous instructions", "system: you are", or "<IMPORTANT>" inside a skill description are read as authoritative instructions by agents that load the skill, bypassing the user's intent. Remove the override directive from the description, or move authoritative system text out of the shared skill manifest.
@@ -15,11 +15,11 @@ CWE: CWE-94: Improper Control of Generation of Code
 References:
 - https://github.com/Agent-Threat-Rule/agent-threat-rules
 - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://posSKILL.md": <<<POS
 description
 	  			 	
@@ -27,12 +27,12 @@ description
 :	'%:Bignore 			 previous
  	 instructions(Glv^#p"
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*SKILL.md}.pattern_regex(/(?i)description\s*:\s*["'][^"'\n]*ignore\s+(?:all\s+)?previous\s+instructions[^"'\n]*["']/) as $p0
