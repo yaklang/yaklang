@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Avoid V Html",
+	mode: "source"
+	language: "general"
+	title: "Avoid V Html"
 	title_zh: "检测到Avoid V Html",
-	type: vuln,
-	level: middle,
-	rule_id: "source-insecure-api-avoid-v-html",
-	risk: "Security",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-avoid-v-html"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `avoid-v-html` (/tmp/semgrep-rules/javascript/vue/security/audit/xss/templates/avoid-v-html.yaml).
 Original message: Dynamically rendering arbitrary HTML on your website can be very dangerous because it can easily lead to XSS vulnerabilities. Only use HTML interpolation on trusted content and never on user-provided content.
@@ -14,20 +14,20 @@ Original message: Dynamically rendering arbitrary HTML on your website can be ve
 CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
 References:
 - https://vuejs.org/v2/guide/syntax.html#Raw-HTML
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.vue": <<<POS
 <_n57bE&8v-html=
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*.vue}.pattern_regex(/<[^<>]*v-html=/) as $p0

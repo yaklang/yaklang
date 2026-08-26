@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Use Escapexml",
+	mode: "source"
+	language: "general"
+	title: "Use Escapexml"
 	title_zh: "检测到Use Escapexml",
-	type: vuln,
-	level: middle,
-	rule_id: "source-insecure-api-use-escapexml",
-	risk: "Security",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-use-escapexml"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `use-escapexml` (/tmp/semgrep-rules/java/lang/security/audit/xss/jsp/use-escapexml.yaml).
 Original message: Detected an Expression Language segment that does not escape output. This is dangerous because if any data in this expression can be controlled externally, it is a cross-site scripting vulnerability. Instead, use the 'escapeXml' function from the JSTL taglib. See https://www.tutorialspoint.com/jsp/jstl_function_escapexml.htm for more information.
@@ -18,24 +18,24 @@ References:
 - https://stackoverflow.com/a/3180202
 
 False-positive hardening: drop JS template/string uses of ${...} (backtick templates and single-quoted JS strings).
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.jsp": <<<POS
 <input value="${param.foo}" />
 <div>
 ${param.foo}
 </div>
-POS,
+POS
 	"safefile://neg.jsp": <<<NEG
 <input type="text" name="foo" value="${fn:escapeXml(param.foo)}" />
 <script>
 const id = `row-${id}`;
 applyPermissionChanges('${id}');
 </script>
-NEG,
+NEG
 )
 
 ${*.jsp}.pattern_regex_not(/\$\{(?![^}]*escapeXml)[^}\n]{1,120}\}/, /\$\{[^}\n]+\}`/, /'\$\{[^}\n]+\}'/, /`[^`\n]*\$\{/) as $p0

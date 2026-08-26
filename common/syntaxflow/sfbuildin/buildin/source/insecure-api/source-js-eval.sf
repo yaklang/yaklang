@@ -1,25 +1,25 @@
 desc(
-	mode: "source",
-	language: "javascript",
-	title: "Detect JavaScript eval Usage",
+	mode: "source"
+	language: "javascript"
+	title: "Detect JavaScript eval Usage"
 	title_zh: "检测 JavaScript eval 调用",
-	type: vuln,
-	level: high,
-	rule_id: "source-js-eval",
-	risk: "Code Injection",
+	type: vuln
+	level: high
+	rule_id: "source-js-eval"
+	risk: "Code Injection"
 	desc: <<<DESC
 Flags eval(...) in JS/TS sources which enables code injection.
-DESC,
+DESC
 	solution: <<<SOLUTION
 Avoid eval; use JSON.parse or safer interpreters for structured data.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://app.js": <<<POS
 function run(code) { return eval(code); }
-POS,
+POS
 	"safefile://app-safe.js": <<<NEG
 function run(code) { return JSON.parse(code); }
-NEG,
+NEG
 )
 
 ${*.js}.pattern_regex(/(?m)(?<![\w.])eval\s*\(/) as $hit

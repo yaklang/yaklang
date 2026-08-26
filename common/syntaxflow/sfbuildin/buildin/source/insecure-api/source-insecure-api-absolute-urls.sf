@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Absolute URLs",
+	mode: "source"
+	language: "general"
+	title: "Absolute URLs"
 	title_zh: "检测到Absolute URLs",
-	type: vuln,
-	level: middle,
-	rule_id: "source-insecure-api-absolute-urls",
-	risk: "Best-Practice",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-absolute-urls"
+	risk: "Best-Practice"
 	desc: <<<DESC
 Migrated from Semgrep rule `absolute-urls` (/tmp/semgrep-rules/apex/lang/best-practice/ncino/urls/AbsoluteUrls.yaml).
 Original message: Using absolute URLs to Salesforce Pages is bug prone. Different sandboxes and production environments will have different instance names (like "na10", "na15" etc.). Code using absolute URLs will only work when it runs in the corresponding salesforce instances. It will break as soon as it is deployed in another one. Thus only relative URLs, i.e. without the domain and subdomain names, should be used when pointing to a salesforce page.
@@ -15,20 +15,20 @@ CWE: -
 References:
 - 
 Note: original paths.exclude ['*Test*', '*test*'] not applied (SF path filter limitation).
-DESC,
+DESC
 	solution: <<<SOLUTION
 Follow the framework's secure configuration guidance; remove or replace the flagged pattern.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.cls": <<<POS
 http://nZXvisualforce.com.................
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*.cls}.pattern_regex(/(http|https):\/\/.*(salesforce|force|visualforce)\.com\.*/) as $p0

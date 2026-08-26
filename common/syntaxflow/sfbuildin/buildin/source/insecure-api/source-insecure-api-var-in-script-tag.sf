@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Var In Script Tag",
+	mode: "source"
+	language: "general"
+	title: "Var In Script Tag"
 	title_zh: "检测到Var In Script Tag",
-	type: vuln,
-	level: middle,
-	rule_id: "source-insecure-api-var-in-script-tag",
-	risk: "Security",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-var-in-script-tag"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `var-in-script-tag` (/tmp/semgrep-rules/javascript/express/security/audit/xss/pug/var-in-script-tag.yaml).
 Original message: Detected a template variable used in a script tag. Although template variables are HTML escaped, HTML escaping does not always prevent cross-site scripting (XSS) attacks when used directly in JavaScript. If you need this data on the rendered page, consider placing it in the HTML portion (outside of a script tag). Alternatively, use a JavaScript-specific encoder, such as the one available in OWASP ESAPI.
@@ -15,22 +15,22 @@ CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross
 References:
 - https://www.veracode.com/blog/secure-development/nodejs-template-engines-why-default-encoders-are-not-enough
 - https://github.com/ESAPI/owasp-esapi-js
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://pos.pug": <<<POS
 script 
  
 =OWeYuLbIXW4eo
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*.pug}.pattern_regex(/script\s*=[A-Za-z0-9]+/) as $p0

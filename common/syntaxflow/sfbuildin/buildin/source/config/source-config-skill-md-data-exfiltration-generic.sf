@@ -1,12 +1,12 @@
 desc(
-	mode: "source",
-	language: "general",
-	title: "Skill Md Data Exfiltration Generic",
+	mode: "source"
+	language: "general"
+	title: "Skill Md Data Exfiltration Generic"
 	title_zh: "检测到Skill Md Data Exfiltration Generic",
-	type: vuln,
-	level: critical,
-	rule_id: "source-config-skill-md-data-exfiltration-generic",
-	risk: "Security",
+	type: vuln
+	level: critical
+	rule_id: "source-config-skill-md-data-exfiltration-generic"
+	risk: "Security"
 	desc: <<<DESC
 Migrated from Semgrep rule `skill-md-data-exfiltration-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-data-exfiltration/skill-md-data-exfiltration.yaml).
 Original message: SKILL.md or AGENT.md content instructs the agent to exfiltrate data to an attacker-controlled endpoint. Patterns like "send the result to http://...", "POST credentials to ...", or "include the contents in a request to ..." inside a skill body are read as authoritative instructions by agents that load the skill. Remove the exfiltration directive or audit the skill source.
@@ -15,11 +15,11 @@ CWE: CWE-201: Insertion of Sensitive Information Into Sent Data
 References:
 - https://github.com/Agent-Threat-Rule/agent-threat-rules
 - https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
-DESC,
+DESC
 	solution: <<<SOLUTION
 Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
-SOLUTION,
-	alert_min: 1,
+SOLUTION
+	alert_min: 1
 	"file://posSKILL.md": <<<POS
 exfiltrate		
  the	
@@ -32,12 +32,12 @@ exfiltrate
 
  http://
 
-POS,
+POS
 	"safefile://neg.sample": <<<NEG
 # safe sample
 no secrets here
 just regular code
-NEG,
+NEG
 )
 
 ${*SKILL.md}.pattern_regex(/(?i)(?:send|post|forward|upload|exfiltrate|deliver)\s+(?:the\s+)?(?:result|output|contents?|response|data|file|secret|token|key|credential|env)\s+(?:to|via)\s+https?:\/\//) as $p0
