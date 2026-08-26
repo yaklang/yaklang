@@ -16,16 +16,16 @@ type ThinkingBodyMatcher interface {
 	Params(enabled bool, reasoningEffort string) map[string]any
 }
 
-var (
-	thinkingMatchersMu      sync.RWMutex
-	prependThinkingMatchers []ThinkingBodyMatcher // evaluated before built-ins
-	extraThinkingMatchers   []ThinkingBodyMatcher // evaluated after built-ins
-	builtinThinkingMatchers = []ThinkingBodyMatcher{
-		qwenThinkingMatcher{},
-		deepseekFamilyThinkingMatcher{},
-		openAICompatibleReasoningMatcher{},
-	}
-)
+
+
+func allThinkingMatchers() []ThinkingBodyMatcher {
+	thinkingMatchersMu.RLock()
+	defer thinkingMatchersMu.RUnlock()
+	out := make([]ThinkingBodyMatcher, 0, len(builtinThinkingMatchers)+len(extraThinkingMatchers))
+	out = append(out, builtinThinkingMatchers...)
+	out = append(out, extraThinkingMatchers...)
+	return out
+}
 
 // RegisterThinkingBodyMatcher registers an extra matcher evaluated after built-ins.
 func RegisterThinkingBodyMatcher(m ThinkingBodyMatcher) {
@@ -37,27 +37,15 @@ func RegisterThinkingBodyMatcher(m ThinkingBodyMatcher) {
 	extraThinkingMatchers = append(extraThinkingMatchers, m)
 }
 
-// RegisterPriorityThinkingBodyMatcher registers a matcher evaluated BEFORE built-ins.
-// Use this for provider-specific matchers that need to override a built-in match
-// (e.g. a provider that supports xhigh/max while the built-in matcher would clamp them).
-func RegisterPriorityThinkingBodyMatcher(m ThinkingBodyMatcher) {
-	if m == nil {
-		return
+var (
+	thinkingMatchersMu    sync.RWMutex
+	extraThinkingMatchers []ThinkingBodyMatcher // evaluated after built-ins
+	builtinThinkingMatchers = []ThinkingBodyMatcher{
+		qwenThinkingMatcher{},
+		deepseekFamilyThinkingMatcher{},
+		openAICompatibleReasoningMatcher{},
 	}
-	thinkingMatchersMu.Lock()
-	defer thinkingMatchersMu.Unlock()
-	prependThinkingMatchers = append(prependThinkingMatchers, m)
-}
-
-func allThinkingMatchers() []ThinkingBodyMatcher {
-	thinkingMatchersMu.RLock()
-	defer thinkingMatchersMu.RUnlock()
-	out := make([]ThinkingBodyMatcher, 0, len(prependThinkingMatchers)+len(builtinThinkingMatchers)+len(extraThinkingMatchers))
-	out = append(out, prependThinkingMatchers...)
-	out = append(out, builtinThinkingMatchers...)
-	out = append(out, extraThinkingMatchers...)
-	return out
-}
+)
 
 // ThinkingExtraBodyForProvider returns top-level JSON fields to merge into the request body
 // when the user has set EnableThinking (non-nil). Match order:
