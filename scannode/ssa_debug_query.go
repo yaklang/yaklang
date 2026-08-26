@@ -131,9 +131,13 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
 	}
 
+	// Fold the node task log into debug/log before cache/analysis so live
+	// queries see SSA phase markers (compile/scan) while the run is in progress.
+	mergeTaskLogIntoDebugDir(dir)
+
 	// Serve the cached analysis when it is newer than every pprof/log input,
 	// so repeated queries do not re-parse large profiles.
-	if cached, ok := readCachedDebugAnalysis(dir); ok {
+	if cached, ok := readCachedDebugAnalysis(dir); ok && cachedAnalysisHasPhases(cached) {
 		response.Found = true
 		response.Analysis = cached
 		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=true (cached) dir=%s", payload.JobID, payload.AttemptID, dir)
@@ -213,6 +217,33 @@ func readCachedDebugAnalysis(dir string) (json.RawMessage, bool) {
 		return nil, false
 	}
 	return json.RawMessage(data), true
+}
+
+func cachedAnalysisHasPhases(raw json.RawMessage) bool {
+	var payload struct {
+		Phases []struct {
+			Phase string `json:"phase"`
+		} `json:"phases"`
+		Samples []struct {
+			Phase string `json:"phase"`
+		} `json:"samples"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return false
+	}
+	for _, phase := range payload.Phases {
+		name := strings.ToLower(strings.TrimSpace(phase.Phase))
+		if name != "" && name != "unknown" {
+			return true
+		}
+	}
+	for _, sample := range payload.Samples {
+		name := strings.ToLower(strings.TrimSpace(sample.Phase))
+		if name != "" && name != "unknown" {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *legionJobBridge) publishDebugQueryResponse(ctx context.Context, queryID string, response ssaDebugQueryResponse) error {

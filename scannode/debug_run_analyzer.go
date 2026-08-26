@@ -159,6 +159,22 @@ func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 		result.Status = normalizeTaskStatus(taskStatus)
 	}
 
+	// Child collector logs often only contain ERROR/pprof lines and miss the
+	// SSA phase markers that live in the node task log. Fold that log in when
+	// phase detection came up empty so live/cancel analysis still shows compile.
+	if !hasRecognizedDebugPhases(result.Phases) {
+		if enriched := enrichLogWithTaskLog(dir, logContent); enriched != logContent && strings.TrimSpace(enriched) != "" {
+			logContent = enriched
+			result.setTimesFromLog(logContent)
+			result.setPhasesFromLog(logContent)
+			if taskStatus == "" {
+				result.Status = result.determineStatus(logContent)
+			} else {
+				result.Status = normalizeTaskStatus(taskStatus)
+			}
+		}
+	}
+
 	// Parse pprof samples
 	cpuDir := filepath.Join(dir, "cpu-pprof")
 	memDir := filepath.Join(dir, "memory-pprof")
@@ -280,27 +296,33 @@ func (r *DebugRunAnalysis) setPhasesFromLog(logContent string) {
 	compileStart, scanStart := findPhaseTransitionsInLog(logContent)
 
 	if compileStart != nil {
-		finished := r.FinishedAt
+		var finished *time.Time
+		phaseStatus := "completed"
 		if scanStart != nil {
 			finished = scanStart
+		} else if isActiveDebugStatus(r.Status) {
+			// Still compiling: leave the window open so later samples map here.
+			phaseStatus = "running"
+		} else {
+			finished = r.FinishedAt
 		}
 		phases = append(phases, PhaseAnalysis{
-			Phase:     "compile",
-			Source:    "log_inferred",
-			StartedAt: compileStart,
+			Phase:      "compile",
+			Source:     "log_inferred",
+			StartedAt:  compileStart,
 			FinishedAt: finished,
-			Duration:  durationStr(compileStart, finished),
-			Status:    "completed",
+			Duration:   durationStr(compileStart, finished),
+			Status:     phaseStatus,
 		})
 	}
 	if scanStart != nil {
 		phases = append(phases, PhaseAnalysis{
-			Phase:     "scan",
-			Source:    "log_inferred",
-			StartedAt: scanStart,
+			Phase:      "scan",
+			Source:     "log_inferred",
+			StartedAt:  scanStart,
 			FinishedAt: r.FinishedAt,
-			Duration:  durationStr(scanStart, r.FinishedAt),
-			Status:    r.Status,
+			Duration:   durationStr(scanStart, r.FinishedAt),
+			Status:     r.Status,
 		})
 	}
 
@@ -313,6 +335,44 @@ func (r *DebugRunAnalysis) setPhasesFromLog(logContent string) {
 	}
 
 	r.Phases = phases
+}
+
+func isActiveDebugStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running", "partial", "cancel_requested", "unknown", "":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasRecognizedDebugPhases(phases []PhaseAnalysis) bool {
+	for _, phase := range phases {
+		name := strings.ToLower(strings.TrimSpace(phase.Phase))
+		if name != "" && name != "unknown" {
+			return true
+		}
+	}
+	return false
+}
+
+func enrichLogWithTaskLog(debugDir, logContent string) string {
+	taskLog := resolveTaskLogByDebugDir(debugDir)
+	if taskLog == "" {
+		return logContent
+	}
+	data, err := os.ReadFile(taskLog)
+	if err != nil || len(data) == 0 {
+		return logContent
+	}
+	taskText := string(data)
+	if strings.TrimSpace(logContent) == "" {
+		return taskText
+	}
+	if strings.Contains(logContent, taskText) {
+		return logContent
+	}
+	return logContent + "\n--- node task log ---\n" + taskText
 }
 
 func (r *DebugRunAnalysis) determineStatus(logContent string) string {
@@ -701,14 +761,12 @@ func findPhaseTransitionsInLog(logContent string) (compileStart, scanStart *time
 		ts := parseLogTimestamp(line)
 
 		if compileStart == nil && ts != nil {
-			if (strings.Contains(lower, "compile") || strings.Contains(lower, "load-program")) &&
-				(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+			if looksLikeCompilePhaseLine(lower) {
 				compileStart = ts
 			}
 		}
 		if scanStart == nil && ts != nil {
-			if (strings.Contains(lower, "scan") || strings.Contains(lower, "ingest")) &&
-				(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+			if looksLikeScanPhaseLine(lower) {
 				scanStart = ts
 			}
 		}
@@ -725,6 +783,38 @@ func findPhaseTransitionsInLog(logContent string) (compileStart, scanStart *time
 		}
 	}
 	return
+}
+
+func looksLikeCompilePhaseLine(lower string) bool {
+	if strings.Contains(lower, `"id":"ssa-phase"`) && strings.Contains(lower, `"data":"compile"`) {
+		return true
+	}
+	if strings.Contains(lower, "ssa 任务阶段: compile") || strings.Contains(lower, "ssa 任务阶段：compile") {
+		return true
+	}
+	if (strings.Contains(lower, "compile") || strings.Contains(lower, "load-program")) &&
+		(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+		return true
+	}
+	return false
+}
+
+func looksLikeScanPhaseLine(lower string) bool {
+	if strings.Contains(lower, `"id":"ssa-phase"`) && strings.Contains(lower, `"data":"scan"`) {
+		return true
+	}
+	if strings.Contains(lower, "ssa 任务阶段: scan") || strings.Contains(lower, "ssa 任务阶段：scan") {
+		return true
+	}
+	if (strings.Contains(lower, "scan") || strings.Contains(lower, "ingest")) &&
+		(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+		// Avoid treating compile-phase lines that also mention scan tooling.
+		if strings.Contains(lower, "compile") && !strings.Contains(lower, `"data":"scan"`) {
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func assignPhase(ts *time.Time, phases []PhaseAnalysis) (string, string) {

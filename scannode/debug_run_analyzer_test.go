@@ -191,3 +191,33 @@ func TestAssignPhase(t *testing.T) {
 	phase, _ = assignPhase(&midScan, phases)
 	assert.Equal(t, "scan", phase)
 }
+
+func TestAnalyzeDebugRun_EnrichesPhasesFromTaskLog(t *testing.T) {
+	nodeRoot := t.TempDir()
+	debugDir := filepath.Join(nodeRoot, "debug-runs", "debug", "job-1_attempt-1")
+	require.NoError(t, os.MkdirAll(filepath.Join(debugDir, "cpu-pprof"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(nodeRoot, "logs"), 0o755))
+
+	// Collector log has compile errors but no SSA phase markers.
+	require.NoError(t, os.WriteFile(
+		filepath.Join(debugDir, "log"),
+		[]byte("[ERRO] 2026-08-26 19:27:12 [ssaLog:ssa_compile_fs:360] parse failed\n"),
+		0o644,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(nodeRoot, "logs", "job-1_subtask_attempt-1.log"),
+		[]byte(`[INFO] 2026-08-26 19:26:16 {"id":"ssa-phase","data":"compile","tags":[]}
+[INFO] 2026-08-26 19:26:16 SSA 任务阶段: compile
+`),
+		0o644,
+	))
+	writeFakePprof(t, filepath.Join(debugDir, "cpu-pprof", "20260826-192720-initial.cpu.prof"))
+
+	result := AnalyzeDebugRunWithStatus(debugDir, "running")
+	require.True(t, hasRecognizedDebugPhases(result.Phases), "phases=%+v", result.Phases)
+	assert.Equal(t, "compile", result.Phases[0].Phase)
+	require.NotEmpty(t, result.Samples)
+	assert.Equal(t, "compile", result.Samples[0].Phase)
+	assert.Equal(t, "log_inferred", result.Samples[0].PhaseSource)
+}
+
