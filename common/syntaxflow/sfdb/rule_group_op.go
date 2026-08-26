@@ -2,6 +2,7 @@ package sfdb
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
@@ -26,6 +27,16 @@ func init() {
 	})
 }
 
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "constraint failed")
+}
+
 // CreateGroup 通过组名创建SyntaxFlow规则组
 func CreateGroup(db *gorm.DB, groupName string, isBuildIn ...bool) (*schema.SyntaxFlowGroup, error) {
 	buildIn := false
@@ -33,13 +44,27 @@ func CreateGroup(db *gorm.DB, groupName string, isBuildIn ...bool) (*schema.Synt
 		buildIn = isBuildIn[0]
 	}
 
-	db = db.Model(&schema.SyntaxFlowGroup{})
+	if existing, err := queryGroupByNamePure(db, groupName); err == nil && existing != nil {
+		return existing, nil
+	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
 	i := &schema.SyntaxFlowGroup{
 		GroupName: groupName,
 		IsBuildIn: buildIn,
 	}
-	if db = db.Create(&i); db.Error != nil {
-		return nil, db.Error
+	// Silence GORM's ERROR log for the expected concurrent UNIQUE race; we recover below.
+	silent := db.New().LogMode(false).Model(&schema.SyntaxFlowGroup{})
+	if err := silent.Create(&i).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			existing, qerr := queryGroupByNamePure(db, groupName)
+			if qerr != nil {
+				return nil, qerr
+			}
+			return existing, nil
+		}
+		return nil, err
 	}
 	return i, nil
 }
@@ -50,14 +75,14 @@ func GetOrCreateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGro
 	updateBuildInGroup := func(group *schema.SyntaxFlowGroup, isBuildIn bool) (*schema.SyntaxFlowGroup, error) {
 		if group.IsBuildIn != isBuildIn {
 			group.IsBuildIn = isBuildIn
-			err := db.Update(group).Error
+			err := db.Model(group).Update("is_build_in", isBuildIn).Error
 			return group, err
 		}
 		return group, nil
 	}
 	for _, groupName := range groupNames {
 		isBuildIn := isBuildInGroup(groupName)
-		group, err := QueryGroupByName(db, groupName)
+		group, err := queryGroupByNamePure(db, groupName)
 		if err == nil && group != nil {
 			group, err = updateBuildInGroup(group, isBuildIn)
 			if err != nil {
@@ -67,11 +92,11 @@ func GetOrCreateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGro
 			groups = append(groups, group)
 			continue
 		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Errorf("get group %s failed: %s", groupName, err)
 			continue
 		}
-		// if not found, create it
+		// if not found, create it (race-safe)
 		group, err = CreateGroup(db, groupName, isBuildIn)
 		if err != nil {
 			log.Errorf("create group %s failed: %s", groupName, err)
@@ -99,6 +124,15 @@ func QueryGroupByName(db *gorm.DB, groupName string) (*schema.SyntaxFlowGroup, e
 	i := &schema.SyntaxFlowGroup{}
 	if db = db.Preload("Rules").Where("group_name = ?", groupName).First(i); db.Error != nil {
 		return nil, db.Error
+	}
+	return i, nil
+}
+
+// queryGroupByNamePure looks up a group without preloading Rules (hot path for get-or-create).
+func queryGroupByNamePure(db *gorm.DB, groupName string) (*schema.SyntaxFlowGroup, error) {
+	i := &schema.SyntaxFlowGroup{}
+	if err := db.Model(&schema.SyntaxFlowGroup{}).Where("group_name = ?", groupName).First(i).Error; err != nil {
+		return nil, err
 	}
 	return i, nil
 }
@@ -401,10 +435,33 @@ func CreateOrUpdateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlow
 }
 
 func CreateOrUpdateGroup(db *gorm.DB, groupName string, i *schema.SyntaxFlowGroup) (*schema.SyntaxFlowGroup, error) {
-	db = db.Model(&schema.SyntaxFlowGroup{})
+	if existing, err := queryGroupByNamePure(db, groupName); err == nil && existing != nil {
+		if i != nil {
+			existing.IsBuildIn = i.IsBuildIn
+			if err := db.Model(existing).Update("is_build_in", existing.IsBuildIn).Error; err != nil {
+				return nil, utils.Errorf("update SyntaxFlowGroup failed: %s", err)
+			}
+		}
+		return existing, nil
+	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, utils.Errorf("create/update SyntaxFlowGroup failed: %s", err)
+	}
+
 	group := schema.SyntaxFlowGroup{}
-	if db := db.Where("group_name = ?", groupName).Assign(i).FirstOrCreate(&group); db.Error != nil {
-		return nil, utils.Errorf("create/update SyntaxFlowGroup failed: %s", db.Error)
+	if i != nil {
+		group = *i
+	}
+	group.GroupName = groupName
+	silent := db.New().LogMode(false).Model(&schema.SyntaxFlowGroup{})
+	if err := silent.Where("group_name = ?", groupName).Assign(i).FirstOrCreate(&group).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			existing, qerr := queryGroupByNamePure(db, groupName)
+			if qerr != nil {
+				return nil, utils.Errorf("create/update SyntaxFlowGroup failed: %s", qerr)
+			}
+			return existing, nil
+		}
+		return nil, utils.Errorf("create/update SyntaxFlowGroup failed: %s", err)
 	}
 
 	return &group, nil

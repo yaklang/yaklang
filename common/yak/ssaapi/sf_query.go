@@ -79,8 +79,13 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s error: %v", config.rule.RuleName, err)
 		}
 		if resave {
-			// save rule to db
-			sfdb.MigrateSyntaxFlow("", config.rule)
+			// Persist recompiled opcodes only for rules already stored in the
+			// profile DB. Task-local / ephemeral rules (ID==0) must not Create
+			// into syntax_flow_rules / syntax_flow_groups — that races on shared
+			// group names and floods scan logs with UNIQUE constraint errors.
+			if config.rule.ID > 0 {
+				sfdb.MigrateSyntaxFlow("", config.rule)
+			}
 		}
 		return frame, nil
 	}
