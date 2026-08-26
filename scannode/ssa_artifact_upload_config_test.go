@@ -1,6 +1,8 @@
 package scannode
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -116,4 +118,131 @@ func TestExtractSSADatabaseEnv(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestResolveSSADatabaseEnvSQLiteLivePath(t *testing.T) {
+	nodeBase := t.TempDir()
+	debugDir := filepath.Join(t.TempDir(), "debug-run")
+	if err := os.MkdirAll(debugDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	env, sqlitePath := resolveSSADatabaseEnvWithBase(nodeBase, map[string]interface{}{
+		scannodeSSADatabaseBackendParamKey: "sqlite",
+		scannodeSSASqliteKeyParamKey:       "batch-1",
+		scannodeSSADatabaseRawParamKey:     "postgres://ignored@host/db",
+	}, debugDir, "runtime-x")
+
+	want := filepath.Join(nodeBase, ssaIRSQLiteDirName, "batch-1", "ssadb.db")
+	if sqlitePath != want {
+		t.Fatalf("sqlite path = %q, want %q", sqlitePath, want)
+	}
+	if _, err := os.Stat(filepath.Dir(want)); err != nil {
+		t.Fatalf("expected sqlite parent dir: %v", err)
+	}
+	joined := strings.Join(env, "\n")
+	if !strings.Contains(joined, consts.ENV_SSA_DATABASE_RAW+"="+want) {
+		t.Fatalf("expected SSA_DATABASE_RAW=%s, got %v", want, env)
+	}
+	if strings.Contains(joined, debugDir) {
+		t.Fatalf("live sqlite path must not be under debugDir, got %v", env)
+	}
+	if strings.Contains(joined, consts.ENV_SSA_DB_SKIP_MIGRATE) {
+		t.Fatalf("compile/sqlite without skip_migrate must not set skip, got %v", env)
+	}
+}
+
+func TestResolveSSADatabaseEnvSQLiteHonorsSkipMigrate(t *testing.T) {
+	nodeBase := t.TempDir()
+	env, sqlitePath := resolveSSADatabaseEnvWithBase(nodeBase, map[string]interface{}{
+		scannodeSSADatabaseBackendParamKey: "sqlite",
+		scannodeSSASqliteKeyParamKey:       "k1",
+		scannodeSSASkipMigrateParamKey:     true,
+	}, "", "runtime")
+	want := filepath.Join(nodeBase, ssaIRSQLiteDirName, "k1", "ssadb.db")
+	if sqlitePath != want {
+		t.Fatalf("sqlite path = %q, want %q", sqlitePath, want)
+	}
+	var foundSkip bool
+	for _, e := range env {
+		if strings.Contains(e, consts.ENV_SSA_DB_SKIP_MIGRATE+"=1") {
+			foundSkip = true
+		}
+	}
+	if !foundSkip {
+		t.Fatalf("expected skip_migrate for scan sqlite, got %v", env)
+	}
+}
+
+func TestResolveSSADatabaseEnvSQLiteKeyFallsBackToRuntimeID(t *testing.T) {
+	nodeBase := t.TempDir()
+	_, sqlitePath := resolveSSADatabaseEnvWithBase(nodeBase, map[string]interface{}{
+		scannodeSSADatabaseBackendParamKey: "sqlite",
+	}, "", "att-9")
+	want := filepath.Join(nodeBase, ssaIRSQLiteDirName, "att-9", "ssadb.db")
+	if sqlitePath != want {
+		t.Fatalf("sqlite path = %q, want %q", sqlitePath, want)
+	}
+}
+
+func TestResolveSSADatabaseEnvPostgresUnchanged(t *testing.T) {
+	const dsn = "postgres://legion:legion@127.0.0.1:5436/ssa_ir?sslmode=disable"
+	env, sqlitePath := resolveSSADatabaseEnvWithBase(t.TempDir(), map[string]interface{}{
+		scannodeSSADatabaseRawParamKey: dsn,
+		scannodeSSASkipMigrateParamKey: true,
+	}, "", "runtime")
+	if sqlitePath != "" {
+		t.Fatalf("expected empty sqlite path for postgres, got %q", sqlitePath)
+	}
+	legacy := extractSSADatabaseEnv(map[string]interface{}{
+		scannodeSSADatabaseRawParamKey: dsn,
+		scannodeSSASkipMigrateParamKey: true,
+	})
+	if strings.Join(env, "\n") != strings.Join(legacy, "\n") {
+		t.Fatalf("postgres resolve must match extractSSADatabaseEnv: got %v want %v", env, legacy)
+	}
+}
+
+func TestCopySQLiteIRIntoDebugDir(t *testing.T) {
+	liveDir := t.TempDir()
+	live := filepath.Join(liveDir, "ssadb.db")
+	if err := os.WriteFile(live, []byte("db-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(live+"-wal", []byte("wal-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	debugDir := t.TempDir()
+	copySQLiteIRIntoDebugDir(debugDir, live)
+
+	got, err := os.ReadFile(filepath.Join(debugDir, "ssadb.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "db-bytes" {
+		t.Fatalf("copied db = %q", got)
+	}
+	wal, err := os.ReadFile(filepath.Join(debugDir, "ssadb.db-wal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(wal) != "wal-bytes" {
+		t.Fatalf("copied wal = %q", wal)
+	}
+}
+
+func TestCopySQLiteIRIntoDebugDirSkipsWhenAlreadyInside(t *testing.T) {
+	debugDir := t.TempDir()
+	live := filepath.Join(debugDir, "ssadb.db")
+	if err := os.WriteFile(live, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	copySQLiteIRIntoDebugDir(debugDir, live)
+	got, err := os.ReadFile(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "keep" {
+		t.Fatalf("expected no overwrite, got %q", got)
+	}
 }
