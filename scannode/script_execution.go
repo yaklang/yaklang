@@ -106,21 +106,6 @@ func (s *ScanNode) executeScriptTask(
 	if reporter.ssaCollector != nil {
 		defer reporter.ssaCollector.Cleanup()
 	}
-	ssaDBEnv := extractSSADatabaseEnv(keyValues)
-	ssaDBCleanup := func() {}
-	if s.needIsolateSSARuntimeDB() {
-		ssaOverride := environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DATABASE_RAW)
-		isolatedEnv, cleanup := buildSSARuntimeDBEnv(input.RuntimeID, ssaOverride)
-		if environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DB_SKIP_MIGRATE) != "" {
-			isolatedEnv = append(isolatedEnv, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
-		}
-		ssaDBEnv = isolatedEnv
-		ssaDBCleanup = cleanup
-	}
-	defer ssaDBCleanup()
-	if preparedSnapshot != nil {
-		ssaDBEnv = append(ssaDBEnv, "YAKIT_HOME="+preparedSnapshot.taskYakitHome)
-	}
 	result := &ScriptExecutionResult{}
 	if preparedSnapshot != nil {
 		receipt := preparedSnapshot.Receipt
@@ -176,6 +161,22 @@ func (s *ScanNode) executeScriptTask(
 		params = s.buildScriptParams(yakitServer.Addr(), input.RuntimeID, keyValues)
 	}
 
+	ssaDBEnv, sqliteLivePath := resolveSSADatabaseEnv(s, keyValues, debugDir, input.RuntimeID)
+	ssaDBCleanup := func() {}
+	if s.needIsolateSSARuntimeDB() {
+		ssaOverride := environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DATABASE_RAW)
+		isolatedEnv, cleanup := buildSSARuntimeDBEnv(input.RuntimeID, ssaOverride)
+		if environmentValueFromEntries(ssaDBEnv, consts.ENV_SSA_DB_SKIP_MIGRATE) != "" {
+			isolatedEnv = append(isolatedEnv, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
+		}
+		ssaDBEnv = isolatedEnv
+		ssaDBCleanup = cleanup
+	}
+	defer ssaDBCleanup()
+	if preparedSnapshot != nil {
+		ssaDBEnv = append(ssaDBEnv, "YAKIT_HOME="+preparedSnapshot.taskYakitHome)
+	}
+
 	// Register a defer to finalize debug artifacts (analysis + zip) on both
 	// success and failure paths. The pprof collector (started by Scan() inside
 	// the child process) writes its final snapshot during script exit/cleanup.
@@ -187,6 +188,7 @@ func (s *ScanNode) executeScriptTask(
 			if debugFinalized {
 				return
 			}
+			copySQLiteIRIntoDebugDir(debugDir, sqliteLivePath)
 			s.finalizeDebugRun(taskCtx, reporter, debugDir, "unknown")
 		}()
 	}
@@ -200,6 +202,7 @@ func (s *ScanNode) executeScriptTask(
 		// Finalize debug before returning the failure. Cancel / shutdown leaves
 		// taskCtx cancelled; finalize must still upload and write local cache.
 		if debugDir != "" {
+			copySQLiteIRIntoDebugDir(debugDir, sqliteLivePath)
 			s.finalizeDebugRun(taskCtx, reporter, debugDir, debugStatusForScriptError(s, task.AttemptID, err))
 			scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 			debugFinalized = true
@@ -209,6 +212,7 @@ func (s *ScanNode) executeScriptTask(
 	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
 	if err := s.finalizeSSAArtifactUpload(taskCtx, reporter, result); err != nil {
 		if debugDir != "" {
+			copySQLiteIRIntoDebugDir(debugDir, sqliteLivePath)
 			s.finalizeDebugRun(taskCtx, reporter, debugDir, debugStatusForScriptError(s, task.AttemptID, err))
 			scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 			debugFinalized = true
@@ -218,6 +222,7 @@ func (s *ScanNode) executeScriptTask(
 
 	// Finalize debug artifacts on success path
 	if debugDir != "" {
+		copySQLiteIRIntoDebugDir(debugDir, sqliteLivePath)
 		s.finalizeDebugRun(taskCtx, reporter, debugDir, "succeeded")
 		scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 		debugFinalized = true
