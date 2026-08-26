@@ -2,10 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"strings"
 
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -175,4 +179,84 @@ func (s *Server) UpdateApiKey(ctx context.Context, req *ypb.UpdateApiKeyRequest)
 	}
 
 	return &ypb.Empty{}, nil
+}
+
+func (s *Server) ProbeReasoningEffort(ctx context.Context, req *ypb.ProbeReasoningEffortRequest) (*ypb.ProbeReasoningEffortResponse, error) {
+	if req == nil || req.Config == nil {
+		return nil, utils.Error("config is nil")
+	}
+	if strings.TrimSpace(req.Config.GetType()) == "" {
+		return nil, utils.Error("config.type is empty")
+	}
+	if !ai.HaveAI(req.Config.GetType()) {
+		return nil, utils.Errorf("unsupported ai type: %s", req.Config.GetType())
+	}
+
+	model := strings.TrimSpace(req.GetModel())
+	resp := &ypb.ProbeReasoningEffortResponse{}
+
+	probeOne := func(effort string) (bool, string) {
+		config := cloneThirdPartyApplicationConfig(req.Config)
+		config.ReasoningEffort = &effort
+
+		var statusCode int32
+		var errMsg string
+
+		opts := aispec.BuildOptionsFromConfig(&ypb.AIModelConfig{
+			Provider:  config,
+			ModelName: model,
+		})
+		opts = append(opts,
+			aispec.WithContext(ctx),
+			aispec.WithDisableProviderFallback(true),
+			aispec.WithDisableStream(true),
+			aispec.WithRawHTTPRequestResponseCallback(func(_ []byte, headerBytes []byte, bodyPreview []byte, _ *aispec.ChatUsage) {
+				statusCode = int32(lowhttp.GetStatusCodeFromResponse(headerBytes))
+				if statusCode >= 400 {
+					errMsg = string(bodyPreview)
+				}
+			}),
+		)
+
+		result, err := ai.Chat("hi", opts...)
+		if err != nil {
+			return false, err.Error()
+		}
+		if statusCode == 0 {
+			return false, "no response received"
+		}
+		if statusCode >= 400 {
+			return false, errMsg
+		}
+		if isLikelyErrorResponse(result) {
+			return false, result
+		}
+		return true, ""
+	}
+
+	xhighOK, xhighErr := probeOne("xhigh")
+	resp.XhighSupported = xhighOK
+	if !xhighOK {
+		resp.XhighErrorMessage = xhighErr
+	}
+
+	maxOK, maxErr := probeOne("max")
+	resp.MaxSupported = maxOK
+	if !maxOK {
+		resp.MaxErrorMessage = maxErr
+	}
+
+	return resp, nil
+}
+
+func isLikelyErrorResponse(result string) bool {
+	result = strings.TrimSpace(result)
+	if result == "" {
+		return true
+	}
+	lower := strings.ToLower(result)
+	if strings.Contains(lower, "\"error\"") && strings.Contains(lower, "\"message\"") {
+		return true
+	}
+	return false
 }

@@ -18,7 +18,8 @@ type ThinkingBodyMatcher interface {
 
 var (
 	thinkingMatchersMu      sync.RWMutex
-	extraThinkingMatchers   []ThinkingBodyMatcher
+	prependThinkingMatchers []ThinkingBodyMatcher // evaluated before built-ins
+	extraThinkingMatchers   []ThinkingBodyMatcher // evaluated after built-ins
 	builtinThinkingMatchers = []ThinkingBodyMatcher{
 		qwenThinkingMatcher{},
 		deepseekFamilyThinkingMatcher{},
@@ -36,10 +37,23 @@ func RegisterThinkingBodyMatcher(m ThinkingBodyMatcher) {
 	extraThinkingMatchers = append(extraThinkingMatchers, m)
 }
 
+// RegisterPriorityThinkingBodyMatcher registers a matcher evaluated BEFORE built-ins.
+// Use this for provider-specific matchers that need to override a built-in match
+// (e.g. a provider that supports xhigh/max while the built-in matcher would clamp them).
+func RegisterPriorityThinkingBodyMatcher(m ThinkingBodyMatcher) {
+	if m == nil {
+		return
+	}
+	thinkingMatchersMu.Lock()
+	defer thinkingMatchersMu.Unlock()
+	prependThinkingMatchers = append(prependThinkingMatchers, m)
+}
+
 func allThinkingMatchers() []ThinkingBodyMatcher {
 	thinkingMatchersMu.RLock()
 	defer thinkingMatchersMu.RUnlock()
-	out := make([]ThinkingBodyMatcher, 0, len(builtinThinkingMatchers)+len(extraThinkingMatchers))
+	out := make([]ThinkingBodyMatcher, 0, len(prependThinkingMatchers)+len(builtinThinkingMatchers)+len(extraThinkingMatchers))
+	out = append(out, prependThinkingMatchers...)
 	out = append(out, builtinThinkingMatchers...)
 	out = append(out, extraThinkingMatchers...)
 	return out
@@ -246,10 +260,11 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 		case "low", "medium", "high":
 			effort = re
 		case "xhigh", "max":
-			// These are provider-specific extensions that standard OpenAI
-			// models do not accept. Clamp to high to avoid 400 errors.
-			// If a specific provider supports them, it should have its own
-			// matcher that handles them explicitly.
+			// Provider-specific extensions. Standard OpenAI models reject these.
+			// Clamp to high as a safety net. The frontend uses ProbeReasoningEffort
+			// to discover which models support xhigh/max and only exposes those
+			// options when supported. If a value still reaches here (e.g. probe
+			// not yet done, or config changed), clamping prevents a 400.
 			effort = "high"
 		default:
 			if re == "" {
@@ -266,22 +281,23 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 // and derives the (EnableThinking, ReasoningEffort) pair to inject into
 // AIConfig.
 //
-// ReasoningEffort now serves double duty:
+// ReasoningEffort serves double duty:
 //   - Control values: "off" → disable thinking; "auto"/"" → don't inject
 //   - Effort levels:  "low"/"medium"/"high"/"xhigh"/"max" → enable + level
 //
-// This function only handles the semantic mapping. It does NOT clamp
-// provider-specific extensions — that is the job of the per-provider
-// matchers, which know what the matched provider/model actually accepts.
+// The frontend can expose all values including xhigh and max. This function
+// only handles the semantic mapping — it does NOT clamp provider-specific
+// extensions. Per-provider matchers are responsible for clamping unsupported
+// values (e.g. xhigh → high for standard OpenAI models).
 //
 //   - "" / "auto"  → (false, "")      — do not inject any thinking params
 //   - "off"        → (true, "none")   — explicitly disable thinking
 //   - "low"        → (true, "low")    — enable thinking with low effort
 //   - "medium"     → (true, "medium") — enable thinking with medium effort
 //   - "high"       → (true, "high")   — enable thinking with high effort
-//   - "xhigh"      → (true, "xhigh")  — map to xhigh (matcher will clamp)
-//   - "max"        → (true, "max")    — map to max (matcher will clamp)
-//   - other        → (true, <raw>)    — passthrough (matcher will clamp)
+//   - "xhigh"      → (true, "xhigh")  — extra-high (matcher clamps if unsupported)
+//   - "max"        → (true, "max")    — maximum (matcher clamps if unsupported)
+//   - other        → (true, <raw>)    — passthrough (matcher clamps if unsupported)
 func MapReasoningEffortToThinkingConfig(effort string) (enableThinking bool, reasoningEffort string) {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
 	case "", "auto", "default":
