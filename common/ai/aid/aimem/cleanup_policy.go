@@ -149,7 +149,11 @@ func ScanLowValueMemories(db *gorm.DB, tableName, sessionID string, config Clean
 //
 // 当 session 内记忆总数超过 MaxMemoryCount 时，按综合评分从低到高选出需要淘汰的记忆。
 // 实际淘汰数量 = (totalCount - MaxMemoryCount) + OverEvictMargin，确保清理后不会立即再次触发。
-// 长期记忆 (T_Score >= 0.8) 豁免，不参与淘汰。
+//
+// 注意：所有记忆（包括 T_Score >= 0.8 的长期记忆）都参与排序。
+// 综合评分 CalcMemoryValue 中 T_Score 占 0.10 权重，高 T 记忆天然排在最后被淘汰。
+// 这确保了即使低 T 记忆全部清理完仍然超限时，高 T 记忆中价值最低的也会被淘汰，
+// 不会出现僵尸记忆。
 func ScanOverCountMemories(db *gorm.DB, tableName, sessionID string, config CleanupConfig) ([]string, error) {
 	if db == nil || tableName == "" || sessionID == "" {
 		return nil, nil
@@ -177,10 +181,10 @@ func ScanOverCountMemories(db *gorm.DB, tableName, sessionID string, config Clea
 		return nil, nil
 	}
 
-	// 查询所有非豁免记忆 (T_Score < 0.8)，按综合评分从低到高排序
+	// 查询所有记忆（不豁免任何 T_Score），按综合评分从低到高排序
 	var candidates []schema.AIMemoryEntity
 	err := db.Table(tableName).
-		Where("session_id = ? AND t_score < 0.8", sessionID).
+		Where("session_id = ?", sessionID).
 		Find(&candidates).Error
 	if err != nil {
 		return nil, err
