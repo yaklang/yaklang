@@ -45,6 +45,7 @@ var Exports = map[string]any{
 	"noFetchTags":    WithNoFetchTags,
 	"fetchAllTags":   WithFetchAllTags,
 	"branch":         WithBranch,
+	"singleBranch":   WithSingleBranch,
 
 	// inspect
 	"handleCommit":    WithHandleGitCommit,
