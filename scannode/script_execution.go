@@ -163,6 +163,9 @@ func (s *ScanNode) executeScriptTask(
 			debugDir = ""
 		} else {
 			log.Infof("[debug] debug directory: %s", debugDir)
+			// Register the directory so ssa.debug.query can serve live pprof/
+			// log data while the task is still running (or after a cancel).
+			scanDebugDirs.register(s.debugBaseDir(), input.TaskID, input.RuntimeID, debugDir)
 		}
 	}
 
@@ -179,6 +182,7 @@ func (s *ScanNode) executeScriptTask(
 	debugFinalized := false
 	if debugDir != "" {
 		defer func() {
+			scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 			if debugFinalized {
 				return
 			}
@@ -191,6 +195,7 @@ func (s *ScanNode) executeScriptTask(
 		// Finalize debug before returning the failure
 		if debugDir != "" {
 			s.finalizeDebugRun(taskCtx, reporter, debugDir, "failed")
+			scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 			debugFinalized = true
 		}
 		return nil, s.handleScriptFailure(err, result, task.AttemptID)
@@ -199,6 +204,7 @@ func (s *ScanNode) executeScriptTask(
 	if err := s.finalizeSSAArtifactUpload(taskCtx, reporter, result); err != nil {
 		if debugDir != "" {
 			s.finalizeDebugRun(taskCtx, reporter, debugDir, "failed")
+			scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 			debugFinalized = true
 		}
 		return nil, err
@@ -207,6 +213,7 @@ func (s *ScanNode) executeScriptTask(
 	// Finalize debug artifacts on success path
 	if debugDir != "" {
 		s.finalizeDebugRun(taskCtx, reporter, debugDir, "succeeded")
+		scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 		debugFinalized = true
 	}
 	return result, nil
