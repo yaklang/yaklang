@@ -126,3 +126,53 @@ func TestGitFSWrapsExhaustedCloneRetriesWithoutCompilePrefix(t *testing.T) {
 	require.ErrorContains(t, err, "SSA Git clone failed")
 	require.False(t, strings.Contains(err.Error(), "编译失败"))
 }
+
+func TestCloneSSAGitRepositoryPreferShallowFallsBackToFullClone(t *testing.T) {
+	originalClone := cloneSSAGitRepository
+	originalSleep := ssaGitCloneSleep
+	t.Cleanup(func() {
+		cloneSSAGitRepository = originalClone
+		ssaGitCloneSleep = originalSleep
+	})
+	ssaGitCloneSleep = func(time.Duration) {}
+
+	var depths []int
+	cloneSSAGitRepository = func(_, local string, opts ...yakgit.Option) error {
+		settings := yakgit.InspectCloneSettings(opts...)
+		depths = append(depths, settings.Depth)
+		if settings.Depth != 0 {
+			return errors.New(`unexpected client error: unexpected requesting "http://127.0.0.1/repo.git/git-upload-pack" status code: 500`)
+		}
+		return os.WriteFile(filepath.Join(local, "ok"), []byte("1"), 0o600)
+	}
+
+	dir := t.TempDir()
+	err := cloneSSAGitRepositoryPreferShallow(
+		"https://example.invalid/repo.git",
+		dir,
+		[]yakgit.Option{yakgit.WithDepth(1), yakgit.WithSingleBranch(true)},
+		nil,
+	)
+	require.NoError(t, err)
+	require.Equal(t, []int{1, 0}, depths)
+}
+
+func TestCloneSSAGitRepositoryPreferShallowKeepsPermanentErrors(t *testing.T) {
+	originalClone := cloneSSAGitRepository
+	t.Cleanup(func() { cloneSSAGitRepository = originalClone })
+
+	var attempts int
+	cloneSSAGitRepository = func(_, _ string, _ ...yakgit.Option) error {
+		attempts++
+		return transport.ErrAuthenticationRequired
+	}
+
+	err := cloneSSAGitRepositoryPreferShallow(
+		"https://example.invalid/repo.git",
+		t.TempDir(),
+		[]yakgit.Option{yakgit.WithDepth(1)},
+		nil,
+	)
+	require.ErrorIs(t, err, transport.ErrAuthenticationRequired)
+	require.Equal(t, 1, attempts)
+}

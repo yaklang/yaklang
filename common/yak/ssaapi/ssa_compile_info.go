@@ -142,15 +142,15 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	log.Info("git clone workspace: ", local)
 
 	opts := make([]yakgit.Option, 0)
-	// Scan compiles only need the tip of the configured branch. A full clone
-	// downloads every ref/history and is the main reason large git sources
-	// feel slow; mirror `git clone --depth 1 --single-branch --no-tags -b <branch>`.
-	opts = append(opts,
+	// Prefer a shallow tip clone for scan throughput. Servers that reject
+	// `shallow` (e.g. minimal test git daemons) fall back to a full clone below.
+	shallowOpts := append([]yakgit.Option{},
 		yakgit.WithDepth(1),
 		yakgit.WithSingleBranch(true),
 		yakgit.WithNoFetchTags(true),
 		yakgit.WithRecuriveSubmodule(false),
 	)
+	opts = append(opts, shallowOpts...)
 	if branch := strings.TrimSpace(codeSource.GetCodeSourceBranch()); branch != "" {
 		opts = append(opts, yakgit.WithBranch(branch))
 	}
@@ -162,13 +162,14 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	opts = append(opts, authOpts...)
 	opts = append(opts, yakgit.WithContext(codeSource.GetContext()))
 	opts = append(opts, yakgit.WithHTTPOptions(poc.WithRetryTimes(10)))
-	if err := cloneSSAGitRepositoryWithRetry(
+	report := func(format string, args ...any) {
+		process(0, format, args...)
+	}
+	if err := cloneSSAGitRepositoryPreferShallow(
 		codeSource.GetCodeSourceURL(),
 		local,
 		opts,
-		func(format string, args ...any) {
-			process(0, format, args...)
-		},
+		report,
 	); err != nil {
 		return nil, ssagitworkdir.WrapCloneError(codeSource.GetContext(), local, err)
 	}
