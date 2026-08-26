@@ -236,8 +236,20 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
-	rule.Language = language
-	rule.Tag = strings.Join(tags, "|")
+	// Prefer filename language only when valid; keep desc(language) otherwise
+	// (e.g. source-*.sf under buildin/source/ must not wipe language: general).
+	if language != "" {
+		rule.Language = language
+	}
+	contentTag := rule.Tag
+	merged := ""
+	for _, t := range tags {
+		merged = sfvm.AppendRuleTag(merged, t)
+	}
+	for _, t := range strings.Split(contentTag, "|") {
+		merged = sfvm.AppendRuleTag(merged, t)
+	}
+	rule.Tag = merged
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersionFromEmbed(rule.RuleId)
 	if err == nil {

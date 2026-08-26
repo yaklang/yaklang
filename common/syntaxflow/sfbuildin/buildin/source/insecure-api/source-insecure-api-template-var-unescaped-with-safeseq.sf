@@ -1,0 +1,43 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Template Var Unescaped With Safeseq",
+	title_zh: "检测到Template Var Unescaped With Safeseq",
+	type: vuln,
+	level: middle,
+	rule_id: "source-insecure-api-template-var-unescaped-with-safeseq",
+	risk: "Security",
+	desc: <<<DESC
+Migrated from Semgrep rule `template-var-unescaped-with-safeseq` (/tmp/semgrep-rules/python/django/security/audit/xss/template-var-unescaped-with-safeseq.yaml).
+Original message: Detected a template variable where autoescaping is explicitly disabled with '| safeseq' filter. This allows rendering of raw HTML in this segment. Ensure no user data is rendered here, otherwise this is a cross-site scripting (XSS) vulnerability. If you must do this, use `mark_safe` in your Python code.
+
+CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+References:
+- https://docs.djangoproject.com/en/3.0/ref/templates/builtins/#safeseq
+DESC,
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.html": <<<POS
+{{,[<jxt'Z|	
+ 
+	  	
+ 	safeseq
+
+POS,
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG,
+)
+
+${*.html}.pattern_regex(/{{.*?\|\s+safeseq(\s+}})?/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Template Var Unescaped With Safeseq",
+	title_zh: "检测到Template Var Unescaped With Safeseq",
+	message: "Template Var Unescaped With Safeseq",
+}

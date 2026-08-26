@@ -1,0 +1,41 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Global Access Modifiers",
+	title_zh: "检测到Global Access Modifiers",
+	type: vuln,
+	level: middle,
+	rule_id: "source-insecure-api-global-access-modifiers",
+	risk: "Best-Practice",
+	desc: <<<DESC
+Migrated from Semgrep rule `global-access-modifiers` (/tmp/semgrep-rules/apex/lang/best-practice/ncino/accessModifiers/GlobalAccessModifiers.yaml).
+Original message: Global classes, methods, and variables should be avoided (especially in managed packages) as they can never be deleted or changed in signature. Always check twice if something needs to be global.
+
+CWE: CWE-284: Improper Access Control
+References:
+- https://cwe.mitre.org/data/definitions/284.html
+Note: original paths.exclude ['*Test*', '*test*'] not applied (SF path filter limitation).
+DESC,
+	solution: <<<SOLUTION
+Follow the framework's secure configuration guidance; remove or replace the flagged pattern.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.cls": <<<POS
+global wyVuHK9XQoiyEygHCclVZf
+
+POS,
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG,
+)
+
+${*.cls}.pattern_regex_not(/global [A-Za-z0-9_]{3,}/, /\/\/(\s+([a-zA-Z]+\s+)+)[a-zA-Z]+/, /[*](\s+([a-zA-Z]+\s+)+)[a-zA-Z]+/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Global Access Modifiers",
+	title_zh: "检测到Global Access Modifiers",
+	message: "Global Access Modifiers",
+}

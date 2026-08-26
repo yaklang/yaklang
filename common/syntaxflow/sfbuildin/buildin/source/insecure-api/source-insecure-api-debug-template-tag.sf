@@ -1,0 +1,41 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Debug Template Tag",
+	title_zh: "检测到Debug Template Tag",
+	type: vuln,
+	level: middle,
+	rule_id: "source-insecure-api-debug-template-tag",
+	risk: "Security",
+	desc: <<<DESC
+Migrated from Semgrep rule `debug-template-tag` (/tmp/semgrep-rules/python/django/security/audit/templates/debug-template-tag.yaml).
+Original message: Detected a debug template tag in a Django template. This dumps debugging information to the page when debug mode is enabled. Showing debug information to users is dangerous because it may reveal information about your environment that malicious actors can use to gain access to the system. Remove the debug tag.
+
+CWE: CWE-489: Active Debug Code
+References:
+- https://docs.djangoproject.com/en/4.2/ref/templates/builtins/#debug
+- https://stackoverflow.com/questions/2213977/django-debug-display-all-variables-of-a-page
+DESC,
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.html": <<<POS
+{% debug %}
+
+POS,
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG,
+)
+
+${*.html}.pattern_regex(/({% debug %})/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Debug Template Tag",
+	title_zh: "检测到Debug Template Tag",
+	message: "Debug Template Tag",
+}

@@ -1236,6 +1236,8 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		strOpcode := opcode2strMap[i.OpCode]
 		var res Values
 		var err error
+		// When feed root is sfvm.PatternRoot (from sfpattern.NewRoot), FileFilter
+		// runs sfpattern regexp matching — no SSA Program involved.
 		if trackErr := s.track("value-op:FileFilter", func() error {
 			done := s.startValueOpTiming("FileFilter")
 			defer done()

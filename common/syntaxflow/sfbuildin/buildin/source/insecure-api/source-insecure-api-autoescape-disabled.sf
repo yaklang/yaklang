@@ -1,0 +1,41 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Autoescape Disabled",
+	title_zh: "检测到Autoescape Disabled",
+	type: vuln,
+	level: middle,
+	rule_id: "source-insecure-api-autoescape-disabled",
+	risk: "Security",
+	desc: <<<DESC
+Migrated from Semgrep rule `autoescape-disabled` (/tmp/semgrep-rules/java/lang/security/audit/xss/jsf/autoescape-disabled.yaml).
+Original message: Detected an element with disabled HTML escaping. If external data can reach this, this is a cross-site scripting (XSS) vulnerability. Ensure no external data can reach here, or remove 'escape=false' from this element.
+
+CWE: CWE-150: Improper Neutralization of Escape, Meta, or Control Sequences
+References:
+- https://stackoverflow.com/a/7442668
+
+False-positive hardening: match only escape=false (not escape=true ... parse=false).
+DESC,
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.html": <<<POS
+<h:outputText value="#{user.input}" escape="false" />
+POS,
+	"safefile://neg.html": <<<NEG
+<textarea escape="true"><#include "demo.html" parse=false/></textarea>
+<h:outputText value="#{user.input}" escape="true" />
+NEG,
+)
+
+${*.html}.pattern_regex(/(?i)\bescape\s*=\s*["']?false["']?/) as $p0
+${*.xhtml}.pattern_regex(/(?i)\bescape\s*=\s*["']?false["']?/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Autoescape Disabled",
+	title_zh: "检测到Autoescape Disabled",
+	message: "Autoescape Disabled",
+}
