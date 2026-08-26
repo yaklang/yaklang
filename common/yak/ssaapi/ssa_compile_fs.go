@@ -58,6 +58,47 @@ func emitCompileScale(processCallback func(float64, string, ...any), process flo
 	processCallback(process, payload)
 }
 
+// deferredBuildProcessFraction maps deferred-build progress into the legacy
+// [0.40, 0.88) band. Unit-mode compile runs many batches; each batch must only
+// own its slice of that band. Mapping every batch onto the full 0.40→0.88 range
+// made the first batch report ~87% within milliseconds while most IR work was
+// still ahead (Legion monitor showed a false compile jump).
+func deferredBuildProcessFraction(batchIndex, batchCount, index, total int) float64 {
+	if batchCount <= 0 {
+		batchCount = 1
+	}
+	if batchIndex < 0 {
+		batchIndex = 0
+	}
+	if batchIndex >= batchCount {
+		batchIndex = batchCount - 1
+	}
+	const (
+		bandStart = 0.40
+		bandEnd   = 0.88
+	)
+	bandSpan := bandEnd - bandStart
+	batchSpan := bandSpan / float64(batchCount)
+	batchBase := bandStart + float64(batchIndex)*batchSpan
+	if total <= 0 {
+		return batchBase + batchSpan
+	}
+	if index < 0 {
+		index = 0
+	}
+	if index > total {
+		index = total
+	}
+	process := batchBase + (float64(index)/float64(total))*batchSpan
+	if process > bandEnd {
+		return bandEnd
+	}
+	if process < bandStart {
+		return bandStart
+	}
+	return process
+}
+
 type SaveFolder struct {
 	name string
 	path []string
@@ -448,15 +489,10 @@ func (c *Config) parseProjectWithFSUnits(
 		flushedUnits := make(map[string]bool)
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
-				if total <= 0 {
-					return !c.isStop()
-				}
 				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.
-				process = 0.4 + (float64(index)/float64(total))*0.48
-				if process > 0.88 {
-					process = 0.88
-				}
-				processCallback(process, fmt.Sprintf("[%s] deferred build progress(%d/%d)", compilePhase, index, total))
+				// Spread that band across all batches so batch 1/N cannot claim ~87%.
+				process = deferredBuildProcessFraction(batchIndex, len(batches), index, total)
+				processCallback(process, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
 				return !c.isStop()
 			},
 			func(unitKey string) bool {
