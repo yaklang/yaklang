@@ -37,6 +37,27 @@ func flushCompileUnitThreshold() int {
 	return defaultFlushCompileUnitThreshold
 }
 
+// emitCompileScale publishes an early project-size signal after filesystem scan
+// so Legion/Yakit can show compile scale before AST work starts. Line counts are
+// not available yet; files/bytes come from ScanProjectFiles.
+func emitCompileScale(processCallback func(float64, string, ...any), process float64, scanResult *ScanResult) {
+	if processCallback == nil || scanResult == nil {
+		return
+	}
+	files := scanResult.HandlerTotal
+	if scanResult.PreHandlerTotal > files {
+		files = scanResult.PreHandlerTotal
+	}
+	payload := fmt.Sprintf(
+		`ssa-compile-scale:{"total_files":%d,"handler_files":%d,"prehandler_files":%d,"total_bytes":%d}`,
+		files,
+		scanResult.HandlerTotal,
+		scanResult.PreHandlerTotal,
+		scanResult.HandlerBytes,
+	)
+	processCallback(process, payload)
+}
+
 type SaveFolder struct {
 	name string
 	path []string
@@ -178,6 +199,7 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	calculateTime = time.Since(start)
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
+	emitCompileScale(processCallback, process, scanResult)
 	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
@@ -286,6 +308,7 @@ func (c *Config) parseProjectWithFSUnits(
 		if process > 0.4 {
 			process = 0.4
 		}
+		processCallback(process, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, preHandlerNum, preHandlerTotal))
 	}
 
 	compilePhase = "f1_units"
@@ -425,6 +448,15 @@ func (c *Config) parseProjectWithFSUnits(
 		flushedUnits := make(map[string]bool)
 		if !prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys,
 			func(index int, total int) bool {
+				if total <= 0 {
+					return !c.isStop()
+				}
+				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.
+				process = 0.4 + (float64(index)/float64(total))*0.48
+				if process > 0.88 {
+					process = 0.88
+				}
+				processCallback(process, fmt.Sprintf("[%s] deferred build progress(%d/%d)", compilePhase, index, total))
 				return !c.isStop()
 			},
 			func(unitKey string) bool {
@@ -667,6 +699,7 @@ func (c *Config) parseProjectWithFSLegacy(
 	// Feed the total compile-input bytes into the adaptive IR cache policy.
 	// This is runtime tuning input, not persistent project metadata.
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
+	emitCompileScale(processCallback, 0, scanResult)
 	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
@@ -734,6 +767,7 @@ func (c *Config) parseProjectWithFSLegacy(
 			if process > 0.4 {
 				process = 0.4
 			}
+			processCallback(process, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, preHandlerNum, preHandlerTotal))
 		}
 		prog.SetPreHandler(true)
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString())
