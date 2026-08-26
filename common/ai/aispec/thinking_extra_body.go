@@ -262,23 +262,27 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 	return map[string]any{"reasoning": map[string]any{"effort": effort}}
 }
 
-// MapThinkingEffortToConfig maps a frontend-friendly thinking effort enum
-// to the low-level (EnableThinking, ReasoningEffort) pair used by AIConfig.
+// MapReasoningEffortToThinkingConfig interprets the ReasoningEffort field
+// and derives the (EnableThinking, ReasoningEffort) pair to inject into
+// AIConfig.
 //
-// This function only handles the semantic mapping (enable/disable + effort
-// level). It does NOT clamp provider-specific extensions — that is the job of
-// the per-provider matchers, which know what the matched provider/model
-// actually accepts.
+// ReasoningEffort now serves double duty:
+//   - Control values: "off" → disable thinking; "auto"/"" → don't inject
+//   - Effort levels:  "low"/"medium"/"high"/"xhigh"/"max" → enable + level
 //
-//   - "" / "auto"  → (false, "")       — do not inject any thinking params
-//   - "off"        → (true, "none")    — explicitly disable thinking
-//   - "low"        → (true, "low")     — enable thinking with low effort
-//   - "medium"     → (true, "medium")  — enable thinking with medium effort
-//   - "high"       → (true, "high")    — enable thinking with high effort
-//   - "xhigh"      → (true, "xhigh")   — map to xhigh (matcher will clamp)
-//   - "max"        → (true, "max")     — map to max (matcher will clamp)
-//   - other        → (true, <raw>)     — passthrough (matcher will clamp)
-func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEffort string) {
+// This function only handles the semantic mapping. It does NOT clamp
+// provider-specific extensions — that is the job of the per-provider
+// matchers, which know what the matched provider/model actually accepts.
+//
+//   - "" / "auto"  → (false, "")      — do not inject any thinking params
+//   - "off"        → (true, "none")   — explicitly disable thinking
+//   - "low"        → (true, "low")    — enable thinking with low effort
+//   - "medium"     → (true, "medium") — enable thinking with medium effort
+//   - "high"       → (true, "high")   — enable thinking with high effort
+//   - "xhigh"      → (true, "xhigh")  — map to xhigh (matcher will clamp)
+//   - "max"        → (true, "max")    — map to max (matcher will clamp)
+//   - other        → (true, <raw>)    — passthrough (matcher will clamp)
+func MapReasoningEffortToThinkingConfig(effort string) (enableThinking bool, reasoningEffort string) {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
 	case "", "auto", "default":
 		return false, ""
