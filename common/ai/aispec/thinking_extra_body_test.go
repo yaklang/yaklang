@@ -119,6 +119,24 @@ func TestThinkingExtraBodyForProvider_OpenAIEffortLevels(t *testing.T) {
 	inner, ok = m["reasoning"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "none", inner["effort"])
+
+	// xhigh
+	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "xhigh")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "xhigh", inner["effort"])
+
+	// max
+	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "max")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "max", inner["effort"])
+
+	// custom unknown level passthrough
+	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "turbo")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "turbo", inner["effort"])
 }
 
 func TestMapThinkingEffortToConfig(t *testing.T) {
@@ -137,6 +155,9 @@ func TestMapThinkingEffortToConfig(t *testing.T) {
 		{"medium", true, "medium"},
 		{"high", true, "high"},
 		{"HIGH", true, "high"},
+		{"xhigh", true, "xhigh"},
+		{"max", true, "max"},
+		{"MAX", true, "max"},
 	}
 	for _, tt := range tests {
 		enable, reasoning := MapThinkingEffortToConfig(tt.effort)
