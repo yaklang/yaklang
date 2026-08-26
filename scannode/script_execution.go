@@ -286,12 +286,97 @@ func (s *ScanNode) handleScriptFailure(
 	// tail — use it directly so the failure_message has actionable content.
 	var scriptErr *scriptExecError
 	if errors.As(err, &scriptErr) {
+		if coded := scriptFailureFromResult(result); coded != nil {
+			return &scriptFailureError{
+				Code:    coded.Code,
+				Message: firstNonEmpty(coded.Message, scriptErr.Error()),
+				Cause:   scriptErr,
+			}
+		}
 		return scriptErr
+	}
+	if coded := scriptFailureFromResult(result); coded != nil {
+		return coded
 	}
 	if detailedError := extractScriptError(result); detailedError != "" {
 		return utils.Errorf("%s", detailedError)
 	}
 	return utils.Errorf("exec yak script failed: %s", err)
+}
+
+type scriptFailureError struct {
+	Code    string
+	Message string
+	Cause   error
+}
+
+func (e *scriptFailureError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if strings.TrimSpace(e.Message) != "" {
+		return e.Message
+	}
+	if e.Cause != nil {
+		return e.Cause.Error()
+	}
+	return "script execution failed"
+}
+
+func (e *scriptFailureError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
+type scriptFailurePayload struct {
+	Code    string
+	Message string
+}
+
+func scriptFailureFromResult(result *ScriptExecutionResult) *scriptFailureError {
+	payload := extractScriptFailurePayload(result)
+	if payload == nil {
+		return nil
+	}
+	return &scriptFailureError{
+		Code:    payload.Code,
+		Message: payload.Message,
+	}
+}
+
+func extractScriptFailurePayload(result *ScriptExecutionResult) *scriptFailurePayload {
+	if result == nil || result.Data == nil {
+		return nil
+	}
+	dataMap, ok := result.Data.(map[string]any)
+	if !ok {
+		return nil
+	}
+	msg, _ := dataMap["error"].(string)
+	msg = strings.TrimSpace(msg)
+	code := ""
+	for _, key := range []string{"error_code", "errorCode", "failure_code"} {
+		if raw, ok := dataMap[key].(string); ok {
+			code = strings.TrimSpace(raw)
+			if code != "" {
+				break
+			}
+		}
+	}
+	if msg == "" && code == "" {
+		return nil
+	}
+	return &scriptFailurePayload{Code: code, Message: msg}
+}
+
+func extractScriptError(result *ScriptExecutionResult) string {
+	payload := extractScriptFailurePayload(result)
+	if payload == nil {
+		return ""
+	}
+	return payload.Message
 }
 
 func (s *ScanNode) cancelReasonForAttempt(attemptID string) string {
@@ -300,22 +385,6 @@ func (s *ScanNode) cancelReasonForAttempt(attemptID string) string {
 		return ""
 	}
 	return task.CancelReason()
-}
-
-func extractScriptError(result *ScriptExecutionResult) string {
-	if result == nil || result.Data == nil {
-		return ""
-	}
-
-	dataMap, ok := result.Data.(map[string]any)
-	if !ok {
-		return ""
-	}
-	errMsg, ok := dataMap["error"].(string)
-	if !ok || errMsg == "" {
-		return ""
-	}
-	return errMsg
 }
 
 func (s *ScanNode) parseScriptParams(jsonParam string) map[string]any {

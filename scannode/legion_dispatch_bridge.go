@@ -328,6 +328,10 @@ func (b *legionJobBridge) executeDispatch(
 			failureDetail["rule_snapshot_content_sha256"] = preparationErr.Expectation.ContentSHA256
 		}
 	}
+	var scriptFail *scriptFailureError
+	if errors.As(err, &scriptFail) && strings.TrimSpace(scriptFail.Code) != "" {
+		failureCode = strings.TrimSpace(scriptFail.Code)
+	}
 	b.finishDispatch(reservation, task, func(ctx context.Context) error {
 		return b.dispatchReporter().PublishFailed(
 			ctx,
