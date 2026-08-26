@@ -758,6 +758,7 @@ service Yak {
   rpc CheckHahValidAiConfig(Empty) returns (GeneralResponse);
   rpc ListAiModel(ListAiModelRequest) returns (ListAiModelResponse);
   rpc AIConfigHealthCheck(AIConfigHealthCheckRequest) returns (AIConfigHealthCheckResponse);
+  rpc ProbeReasoningEffort(ProbeReasoningEffortRequest) returns (ProbeReasoningEffortResponse);
   rpc GetAIGlobalConfig(Empty) returns (AIGlobalConfig);
   rpc SetAIGlobalConfig(AIGlobalConfig) returns (Empty);
   rpc ListAIProviders(Empty) returns (ListAIProvidersResponse);
@@ -9187,6 +9188,18 @@ message AIConfigHealthCheckResponse{
   bool Success = 9;
 }
 
+message ProbeReasoningEffortRequest{
+  ThirdPartyApplicationConfig Config = 1;
+  string Model = 2;
+}
+
+message ProbeReasoningEffortResponse{
+  bool XhighSupported = 1;
+  bool MaxSupported = 2;
+  string XhighErrorMessage = 3;
+  string MaxErrorMessage = 4;
+}
+
 message AIProvider {
   int64 Id = 1;
   ThirdPartyApplicationConfig Config = 2;
@@ -9231,6 +9244,9 @@ message AIModelConfig {
   string ModelName = 3;
   repeated KVPair ExtraParams = 4;
   bool   IsOnline = 5;
+  // 探测到的扩展思考强度（如 ["xhigh","max"]）；为空表示未探测或不支持。
+  // 前端据此动态显示 xhigh/max 下拉选项，无需用户手动配置。
+  repeated string ProbedExtendedEfforts = 6;
 }
 
 message AIGlobalConfig {
