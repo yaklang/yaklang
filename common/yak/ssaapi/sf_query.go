@@ -10,6 +10,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
@@ -181,7 +182,16 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 
 	// runtime
 	var res *sfvm.SFFrameResult
-	res, err = frame.Feed(value, config.opts...)
+	if sfvm.FrameIsSourceMode(frame) {
+		files, ferr := collectFilesForSourceMode(config)
+		if ferr != nil {
+			return nil, ferr
+		}
+		root := sfpattern.NewRoot(files)
+		res, err = frame.Feed(sfvm.ValuesOf(root), config.opts...)
+	} else {
+		res, err = frame.Feed(value, config.opts...)
+	}
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
 	}

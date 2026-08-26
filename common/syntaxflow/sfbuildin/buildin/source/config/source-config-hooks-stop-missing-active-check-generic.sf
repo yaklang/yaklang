@@ -1,0 +1,42 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Hooks Stop Missing Active Check Generic",
+	title_zh: "检测到Hooks Stop Missing Active Check Generic",
+	type: vuln,
+	level: middle,
+	rule_id: "source-config-hooks-stop-missing-active-check-generic",
+	risk: "Security",
+	desc: <<<DESC
+Migrated from Semgrep rule `hooks-stop-missing-active-check-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-stop-missing-active-check/hooks-stop-missing-active-check.yaml).
+Original message: Stop hook outputs a "block" decision. Ensure you check stop_hook_active first and exit 0 if true, otherwise the hook will cause an infinite loop by blocking its own stop attempts.
+
+CWE: CWE-835: Loop with Unreachable Exit Condition
+References:
+- https://docs.anthropic.com/en/docs/claude-code/hooks
+- https://cursor.com/docs/agent/hooks
+DESC,
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.sh": <<<POS
+"decision"#8<l8v"<6F"block"
+
+POS,
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG,
+)
+
+${*.sh}.pattern_regex(/"decision".*"block"/) as $p0
+${*.bash}.pattern_regex(/"decision".*"block"/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Hooks Stop Missing Active Check Generic",
+	title_zh: "检测到Hooks Stop Missing Active Check Generic",
+	message: "Hooks Stop Missing Active Check Generic",
+}

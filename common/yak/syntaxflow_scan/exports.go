@@ -10,7 +10,17 @@ var Exports = map[string]any{
 	"withScanProcessCallback": WithProcessCallback,
 	"withScanResultCallback":  WithScanResultCallback,
 	"withScanPrograms":        withPrograms,
+	"withScanSourceFiles":     WithSourceFiles,
+	"withScanSourceDir":       WithSourceDir,
+	"withScanQueryTargets":    WithQueryTargets,
 	"withScanConcurrency":     ssaconfig.WithScanConcurrency,
 	"withScanRuleTimeout":     ssaconfig.WithScanRuleTimeout,
 	"withScanRuleWorkLimit":   ssaconfig.WithScanRuleWorkLimit,
+	"withReporter":            WithReporter,
+	// Rule filter (builtin DB rules; prefer Tag=source for source-mode)
+	"withRuleFilter":            ssaconfig.WithRuleFilter,
+	"withRuleFilterTag":         ssaconfig.WithRuleFilterTag,
+	"withRuleFilterKeyword":     ssaconfig.WithRuleFilterKeyword,
+	"withRuleFilterGroupNames":  ssaconfig.WithRuleFilterGroupNames,
+	"withRuleFilterLibRuleKind": ssaconfig.WithRuleFilterLibRuleKind,
 }

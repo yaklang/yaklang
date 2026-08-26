@@ -1,0 +1,40 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Template And Attributes",
+	title_zh: "检测到Template And Attributes",
+	type: vuln,
+	level: middle,
+	rule_id: "source-insecure-api-template-and-attributes",
+	risk: "Security",
+	desc: <<<DESC
+Migrated from Semgrep rule `template-and-attributes` (/tmp/semgrep-rules/javascript/express/security/audit/xss/pug/and-attributes.yaml).
+Original message: Detected a unescaped variables using '&attributes'. If external data can reach these locations, your application is exposed to a cross-site scripting (XSS) vulnerability. If you must do this, ensure no external data can reach this location.
+
+CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+References:
+- https://pugjs.org/language/attributes.html#attributes
+DESC,
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.pug": <<<POS
+(]IZ0Ui)W9c&attributes290
+
+POS,
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG,
+)
+
+${*.pug}.pattern_regex(/.*&attributes.*/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Template And Attributes",
+	title_zh: "检测到Template And Attributes",
+	message: "Template And Attributes",
+}

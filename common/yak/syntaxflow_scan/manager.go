@@ -275,7 +275,11 @@ func (m *scanManager) initByConfig() error {
 			}
 			config.Programs = append(config.Programs, prog)
 		}
+		existingTargets := config.QueryTargets
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+		if len(existingTargets) > 0 {
+			config.QueryTargets = append(existingTargets, config.QueryTargets...)
+		}
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
@@ -287,11 +291,17 @@ func (m *scanManager) initByConfig() error {
 			log.Errorf("SyntaxFlow Scan Init Program By ProjectId By %d Failed", config.GetProjectID())
 		}
 		config.Programs = append(config.Programs, prog)
+		existingTargets := config.QueryTargets
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+		if len(existingTargets) > 0 {
+			config.QueryTargets = append(existingTargets, config.QueryTargets...)
+		}
 		// 同步更新 BaseInfo.ProgramNames，确保保存时 programs 字段不为空
 		if config.Config != nil {
 			config.Config.SetProgramName(name)
 		}
+	} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
+		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
@@ -404,8 +414,7 @@ func (m *scanManager) ScanNewTask() error {
 	if m.Config == nil {
 		return utils.Errorf("Start SyntaxFlow Scan Failed:config is nil")
 	}
-	programs := m.Config.Programs
-	if len(programs) == 0 {
+	if len(m.Config.Programs) == 0 && len(m.Config.QueryTargets) == 0 {
 		return utils.Errorf("Start SyntaxFlow Scan Failed:programs is empty")
 	}
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING

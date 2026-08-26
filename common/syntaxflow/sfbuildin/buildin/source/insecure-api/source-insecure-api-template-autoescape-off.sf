@@ -1,0 +1,46 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Template Autoescape Off",
+	title_zh: "检测到Template Autoescape Off",
+	type: vuln,
+	level: middle,
+	rule_id: "source-insecure-api-template-autoescape-off",
+	risk: "Security",
+	desc: <<<DESC
+Migrated from Semgrep rule `template-autoescape-off` (/tmp/semgrep-rules/python/django/security/audit/xss/template-autoescape-off.yaml).
+Original message: Detected a template block where autoescaping is explicitly disabled with '{% autoescape off %}'. This allows rendering of raw HTML in this segment. Turn autoescaping on to prevent cross-site scripting (XSS). If you must do this, consider instead, using `mark_safe` in Python code.
+
+CWE: CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+References:
+- https://docs.djangoproject.com/en/3.1/ref/templates/builtins/#autoescape
+DESC,
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.html": <<<POS
+{% 	 	 
+ 	 
+	autoescape		off
+
+
+
+%}
+
+POS,
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG,
+)
+
+${*.html}.pattern_regex(/{%\s+autoescape\s+off\s+%}/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Template Autoescape Off",
+	title_zh: "检测到Template Autoescape Off",
+	message: "Template Autoescape Off",
+}

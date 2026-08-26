@@ -1,0 +1,114 @@
+# source-scan.yak
+#
+# Source-mode SyntaxFlow scan (no SSA compile).
+# Uses builtin rules already synced into the DB, filtered by tag/mode "source"
+# (same path as code-scan, without compile).
+#
+# Usage:
+#   ./yak scripts/source-scan.yak --target /path/to/project --output ./out
+#   ./yak scripts/source-scan.yak --target /path/to/project --output ./out --format sarif
+#   ./yak scripts/source-scan.yak --target /path/to/project --output ./out --rule-keyword aws
+
+target = cli.String("target", cli.setHelp("target source path to scan"), cli.setRequired(true))
+output = cli.String("output", cli.setHelp("output directory (or file path) for sarif/irify report"), cli.setDefault(""))
+format = cli.String("format", cli.setHelp("output format: sarif | irify (default irify)"), cli.setDefault("irify"))
+ruleKeyword = cli.String("rule-keyword", cli.setHelp("optional keyword filter on builtin rules"), cli.setDefault(""))
+ruleGroups = cli.StringSlice("rule-group", cli.setHelp("optional group name filter (comma-separated)"), cli.setDefault(""))
+concurrency = cli.Int("concurrency", cli.setHelp("scan concurrency"), cli.setDefault(8))
+cli.check()
+
+die(str.TrimSpace(target) == "" ? "--target is required" : undefined)
+
+yakit.Info("sync builtin SyntaxFlow rules into database...")
+yakit.ForceSyncSyntaxFlowRule(func(p, msg) {
+    yakit.Info("[sync] %.0f%% %v", p * 100, msg)
+})~
+
+reportFormat = sfreport.ReportTypeFromString(format)
+report = sfreport.ConvertSyntaxFlowResultToReport(reportFormat)~
+
+outPath = ""
+if str.TrimSpace(output) != "" {
+    outPath = output
+    // Treat bare paths without extension as a directory; write report inside.
+    ext = file.GetExt(outPath)
+    isDirLike = (ext == "" || file.IsDir(outPath))
+    if isDirLike {
+        file.MkdirAll(outPath)~
+        name = "source-scan"
+        if reportFormat == sfreport.SarifReportType {
+            outPath = file.Join(outPath, name + ".sarif")
+        } else {
+            outPath = file.Join(outPath, name + ".json")
+        }
+    } else {
+        parent = file.GetDirPath(outPath)
+        if parent != "" && parent != "." {
+            file.MkdirAll(parent)~
+        }
+        if reportFormat == sfreport.SarifReportType && !str.HasSuffix(str.ToLower(outPath), ".sarif") {
+            outPath = outPath + ".sarif"
+        }
+        if reportFormat != sfreport.SarifReportType && file.GetExt(outPath) == "" {
+            outPath = outPath + ".json"
+        }
+    }
+    f = file.OpenFile(outPath, file.O_CREATE|file.O_RDWR|file.O_TRUNC, 0o644)~
+    defer f.Close()
+    report.SetWriter(f)~
+    yakit.Info("report output = %s (format=%s)", outPath, format)
+} else {
+    yakit.Info("output not set; report will not be written to a file")
+}
+
+progName = file.GetBase(target)
+if progName == "" || progName == "/" || progName == "." {
+    progName = "source-target"
+}
+
+opts = [
+    syntaxflow.withScanSourceDir(progName, target),
+    syntaxflow.withScanConcurrency(concurrency),
+    syntaxflow.withRuleFilterTag("source"),
+    syntaxflow.withRuleFilterLibRuleKind("noLib"),
+    syntaxflow.withReporter(report),
+]
+
+if str.TrimSpace(ruleKeyword) != "" {
+    opts = append(opts, syntaxflow.withRuleFilterKeyword(ruleKeyword))
+}
+if len(ruleGroups) > 0 {
+    opts = append(opts, syntaxflow.withRuleFilterGroupNames(ruleGroups...))
+}
+
+alertTotal = 0
+opts = append(opts, syntaxflow.withScanResultCallback((sr) => {
+    if sr == undefined || sr.Result == undefined {
+        return
+    }
+    res = sr.Result
+    alerts = res.GetAlertVariables()
+    if len(alerts) <= 0 {
+        return
+    }
+    ruleName = res.GetRule().RuleName
+    if ruleName == "" {
+        ruleName = res.GetRule().Title
+    }
+    for name in alerts {
+        vs = res.GetValues(name)
+        n = len(vs)
+        alertTotal += n
+        yakit.Info("[HIT] rule=%s var=%s count=%d", ruleName, name, n)
+    }
+}))
+
+yakit.Info("start source-mode scan: target=%s tag=source", target)
+err = syntaxflow.StartScan(context.Background(), opts...)
+die(err)
+
+yakit.Info("======== SOURCE SCAN DONE ========")
+yakit.Info("alertTotal=%d", alertTotal)
+if outPath != "" {
+    yakit.Info("report saved: %s", outPath)
+}

@@ -1,0 +1,44 @@
+desc(
+	mode: "source",
+	language: "general",
+	title: "Use JSTL Escaping",
+	title_zh: "检测到Use JSTL Escaping",
+	type: vuln,
+	level: middle,
+	rule_id: "source-insecure-api-use-jstl-escaping",
+	risk: "Security",
+	desc: <<<DESC
+Migrated from Semgrep rule `use-jstl-escaping` (/tmp/semgrep-rules/java/lang/security/audit/xss/jsp/use-jstl-escaping.yaml).
+Original message: Detected an Expression Language segment in a tag that does not escape output. This is dangerous because if any data in this expression can be controlled externally, it is a cross-site scripting vulnerability. Instead, use the 'out' tag from the JSTL taglib to escape this expression. See https://www.tutorialspoint.com/jsp/jstl_core_out_tag.htm for more information.
+
+CWE: CWE-116: Improper Encoding or Escaping of Output
+References:
+- https://www.tutorialspoint.com/jsp/jstl_core_out_tag.htm
+- https://stackoverflow.com/a/4948856
+- https://stackoverflow.com/a/3180202
+
+False-positive hardening: ignore ${...} inside scriptlets and single-quoted JS strings inside tags.
+DESC,
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION,
+	alert_min: 1,
+	"file://pos.jsp": <<<POS
+<input value="${param.foo}" />
+POS,
+	"safefile://neg.jsp": <<<NEG
+<c:out value="${param.foo}" />
+<button onClick="applyPermissionChanges('${id}')">go</button>
+<a href="javascript:viewUser(\'${userId}\');">u</a>
+<%=LanguageUtil.get(pageContext, "msg", "${owners}")%>
+NEG,
+)
+
+${*.jsp}.pattern_regex_not(/<(?![A-Za-z0-9]+:out)[^>\n]*\$\{[^}\n]*\}[^>\n]*>/, /'\$\{[^}\n]*\}'/, /\\'\$\{[^}\n]*\}\\'/, /javascript:[^>\n]*\$\{/, /<%[=!]?[^%]*\$\{/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Use JSTL Escaping",
+	title_zh: "检测到Use JSTL Escaping",
+	message: "Use JSTL Escaping",
+}
