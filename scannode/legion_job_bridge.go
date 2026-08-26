@@ -53,6 +53,10 @@ type legionJobBridge struct {
 	consumer     *commandConsumer
 	shuttingDown atomic.Bool
 
+	// unsupportedWarn rate-limits warnings for legion command subjects this
+	// node binary does not implement (see unsupportedCommandWarnState).
+	unsupportedWarn unsupportedCommandWarnState
+
 	statusMu            sync.Mutex
 	lastStatusSessionID string
 	lastStatusSync      time.Time

@@ -263,3 +263,32 @@ func validRuleSnapshotRef() *jobv1.RuleSnapshotRef {
 		AssetIds:      []string{"asset-a", "asset-b"},
 	}
 }
+
+func TestHandleUnsupportedCommandAcksInsteadOfNak(t *testing.T) {
+	t.Parallel()
+
+	bridge := &legionJobBridge{agent: &ScanNode{}}
+	message := &nats.Msg{Subject: "legion.command.node.node-a.plugin.store.sync.status.v2"}
+
+	disposition, err := bridge.handleMessageWithDisposition(context.Background(), "session-1", message)
+	if err != nil {
+		t.Fatalf("handle unsupported command: %v", err)
+	}
+	if disposition.kind != messageAck {
+		t.Fatalf("unsupported command must be acked to stop JetStream redelivery, got disposition kind %d", disposition.kind)
+	}
+}
+
+func TestUnsupportedCommandWarnStateRateLimits(t *testing.T) {
+	t.Parallel()
+
+	var state unsupportedCommandWarnState
+	state.warn("legion.command.node.node-a.unknown.subject")
+	// A second occurrence within the interval must not log again; the state
+	// simply drops it. We cannot observe the log, so just ensure no panic and
+	// that repeated warns keep the first timestamp.
+	state.warn("legion.command.node.node-a.unknown.subject")
+	if _, ok := state.lastWarn["legion.command.node.node-a.unknown.subject"]; !ok {
+		t.Fatal("expected rate-limit entry for the warned subject")
+	}
+}

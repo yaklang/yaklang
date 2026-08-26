@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -46,6 +47,51 @@ func nakDelayedMessage(delay time.Duration) messageDisposition {
 	return messageDisposition{kind: messageNakDelayed, delay: delay}
 }
 func termMessage() messageDisposition { return messageDisposition{kind: messageTerm} }
+
+// errUnsupportedCommandSubject is returned for legion command subjects this
+// node binary does not implement (e.g. a newer platform than the node). It is
+// handled specially: the message is acked (not nak'd) so JetStream does not
+// redeliver it in a tight loop, and the warning is rate-limited per subject.
+var errUnsupportedCommandSubject = errors.New("unsupported legion command subject")
+
+type unsupportedCommandError struct {
+	subject string
+}
+
+func (e *unsupportedCommandError) Error() string {
+	return fmt.Sprintf("%s: %s", errUnsupportedCommandSubject, e.subject)
+}
+
+func (e *unsupportedCommandError) Unwrap() error { return errUnsupportedCommandSubject }
+
+// unsupportedCommandWarnState rate-limits warnings for unknown command
+// subjects. Without it, a single unsupported subject can flood the node log
+// at thousands of lines per second when the platform keeps delivering it.
+type unsupportedCommandWarnState struct {
+	mu       sync.Mutex
+	lastWarn map[string]time.Time
+}
+
+const unsupportedCommandWarnInterval = 5 * time.Minute
+
+func (s *unsupportedCommandWarnState) warn(subject string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.lastWarn == nil {
+		s.lastWarn = make(map[string]time.Time)
+	}
+	now := time.Now()
+	if last, ok := s.lastWarn[subject]; ok && now.Sub(last) < unsupportedCommandWarnInterval {
+		return
+	}
+	s.lastWarn[subject] = now
+	log.Warnf(
+		"%s: %s (acked to stop redelivery; further occurrences suppressed for %v)",
+		errUnsupportedCommandSubject,
+		subject,
+		unsupportedCommandWarnInterval,
+	)
+}
 
 type commandConsumer struct {
 	sessionID string
@@ -330,6 +376,14 @@ func (b *legionJobBridge) handleMessageWithDisposition(
 	if errors.As(err, &rejected) {
 		return termMessage(), err
 	}
+	var unsupported *unsupportedCommandError
+	if errors.As(err, &unsupported) {
+		// Ack instead of Nak: Nak causes JetStream to redeliver the message
+		// immediately, and each redelivery logs another error — an unsupported
+		// subject from a newer platform then becomes a multi-GB log flood.
+		b.unsupportedWarn.warn(unsupported.subject)
+		return ackMessage(), nil
+	}
 	return nakMessage(), err
 }
 
@@ -505,7 +559,7 @@ func (b *legionJobBridge) handleMessagePayload(
 	case strings.HasSuffix(message.Subject, "."+legionCommandAIRisksQuery):
 		return b.handleAIRisksQuery(ctx, message.Data)
 	default:
-		return fmt.Errorf("unsupported legion command subject: %s", message.Subject)
+		return &unsupportedCommandError{subject: message.Subject}
 	}
 }
 
