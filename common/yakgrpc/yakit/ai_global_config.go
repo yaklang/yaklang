@@ -133,6 +133,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 				ExtraParams:            cloneKVPairs(model.GetExtraParams()),
 				IsOnline:               model.GetIsOnline(),
 				ProbedExtendedEfforts:  cloneStringSlice(model.GetProbedExtendedEfforts()),
+				EffortProbed:           model.GetEffortProbed(),
 			})
 		}
 		return result
@@ -200,6 +201,7 @@ func cloneAIModelConfigs(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 			ModelName:              model.GetModelName(),
 			ExtraParams:            cloneKVPairs(model.GetExtraParams()),
 			ProbedExtendedEfforts:  cloneStringSlice(model.GetProbedExtendedEfforts()),
+			EffortProbed:           model.GetEffortProbed(),
 		})
 	}
 	return cloned
