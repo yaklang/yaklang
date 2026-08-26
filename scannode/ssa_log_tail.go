@@ -91,6 +91,7 @@ func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) erro
 		log.Warnf("[log-tail] job=%s attempt=%s read failed: %v", payload.JobID, payload.AttemptID, err)
 		return b.publishLogTailResponse(ctx, payload.QueryID, response)
 	}
+	response.Found = true
 	response.TotalBytes = totalBytes
 	response.HasMore = hasMore
 	response.Content = content
