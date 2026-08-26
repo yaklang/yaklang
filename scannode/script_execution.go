@@ -220,12 +220,15 @@ func (s *ScanNode) executeScriptTask(
 		return nil, err
 	}
 
-	// Finalize debug artifacts on success path
+	// Finalize debug AFTER returning success so PublishSucceeded is not blocked
+	// by pprof analysis / zip upload (can take tens of seconds). Blocking here
+	// previously let attempt leases expire → attempt_missing_from_heartbeat
+	// while the scan had already finished and published artifacts.
 	if debugDir != "" {
 		copySQLiteIRIntoDebugDir(debugDir, sqliteLivePath)
-		s.finalizeDebugRun(taskCtx, reporter, debugDir, "succeeded")
 		scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 		debugFinalized = true
+		s.finalizeDebugRunAsync(reporter, debugDir, "succeeded")
 	}
 	return result, nil
 }
@@ -1333,6 +1336,23 @@ func (s *ScanNode) finalizeDebugRun(
 	mergeTaskLogIntoDebugDir(debugDir)
 	s.publishDebugAnalysis(uploadCtx, reporter, debugDir, status)
 	s.publishDebugZip(uploadCtx, reporter, debugDir)
+}
+
+// finalizeDebugRunAsync runs finalizeDebugRun off the success-return path so
+// JobSucceeded can be published before heavy debug analysis finishes.
+func (s *ScanNode) finalizeDebugRunAsync(
+	reporter *ScannerAgentReporter,
+	debugDir string,
+	status string,
+) {
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				log.Errorf("[debug] async finalize panic: %v", recovered)
+			}
+		}()
+		s.finalizeDebugRun(context.Background(), reporter, debugDir, status)
+	}()
 }
 
 const debugFinalizeTimeout = 45 * time.Second

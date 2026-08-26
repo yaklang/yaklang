@@ -136,10 +136,12 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 	mergeTaskLogIntoDebugDir(dir)
 
 	// Serve the cached analysis when it is newer than every pprof/log input,
-	// so repeated queries do not re-parse large profiles.
+	// so repeated queries do not re-parse large profiles. Always overlay the
+	// Legion task status so a stale "failed" badge from log heuristics cannot
+	// stick while the attempt is still running.
 	if cached, ok := readCachedDebugAnalysis(dir); ok && cachedAnalysisHasPhases(cached) {
 		response.Found = true
-		response.Analysis = cached
+		response.Analysis = overlayDebugAnalysisStatus(cached, payload.TaskStatus)
 		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=true (cached) dir=%s", payload.JobID, payload.AttemptID, dir)
 		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
 	}
@@ -168,6 +170,33 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 // debugAnalysisCacheName is the JSON file used to cache a parsed debug run
 // analysis next to the run directory.
 const debugAnalysisCacheName = "analysis.cache.json"
+
+// overlayDebugAnalysisStatus rewrites analysis JSON "status" from the live
+// Legion task status so cached analyses never keep a log-heuristic "failed".
+func overlayDebugAnalysisStatus(analysisJSON json.RawMessage, taskStatus string) json.RawMessage {
+	if len(analysisJSON) == 0 {
+		return analysisJSON
+	}
+	normalized := normalizeTaskStatus(taskStatus)
+	if normalized == "" {
+		return analysisJSON
+	}
+	status := resolveDebugAnalysisStatus(taskStatus, "", 1)
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(analysisJSON, &obj); err != nil {
+		return analysisJSON
+	}
+	encoded, err := json.Marshal(status)
+	if err != nil {
+		return analysisJSON
+	}
+	obj["status"] = encoded
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return analysisJSON
+	}
+	return out
+}
 
 func writeCachedDebugAnalysis(dir string, analysisJSON []byte) error {
 	return os.WriteFile(filepath.Join(dir, debugAnalysisCacheName), analysisJSON, 0o644)

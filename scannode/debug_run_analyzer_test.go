@@ -94,7 +94,7 @@ func writeFakePprof(t *testing.T, path string) {
 
 func TestAnalyzeDebugRun_Complete(t *testing.T) {
 	dir := createTestDebugDir(t)
-	result := AnalyzeDebugRun(dir)
+	result := AnalyzeDebugRunWithStatus(dir, "succeeded")
 
 	assert.Equal(t, "completed", result.Status)
 	require.NotNil(t, result.StartedAt)
@@ -172,8 +172,23 @@ func TestAnalyzeDebugRun_Failed(t *testing.T) {
 	logContent := "2026/08/05 12:00:00 [INFO] start\n2026/08/05 12:01:00 [ERROR] code scan failed: something went wrong\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "log"), []byte(logContent), 0o644))
 
-	result := AnalyzeDebugRun(dir)
+	result := AnalyzeDebugRunWithStatus(dir, "failed")
 	assert.Equal(t, "failed", result.Status)
+}
+
+func TestAnalyzeDebugRun_DoesNotFailOnPanicInRuleComments(t *testing.T) {
+	dir := t.TempDir()
+	logContent := "2026/08/05 12:00:00 [INFO] start\n" +
+		"[DBUG] syntaxflow met statement: // which would otherwise cause the VM to panic or\n" +
+		"[DBUG] syntaxflow met statement: // return a \"BUG: get stack top failed, empty stack\" error.\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "log"), []byte(logContent), 0o644))
+
+	result := AnalyzeDebugRunWithStatus(dir, "running")
+	assert.Equal(t, "running", result.Status)
+
+	// Without task status, still must not invent "failed" from the word panic.
+	result = AnalyzeDebugRun(dir)
+	assert.Equal(t, "running", result.Status)
 }
 
 func TestAnalyzeSample_WithPprof(t *testing.T) {
