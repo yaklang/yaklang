@@ -291,10 +291,31 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithAPIType(provider.APIType))
 	}
 
-	if provider.EnableThinkingOpt != nil {
-		opts = append(opts, WithEnableThinking(*provider.EnableThinkingOpt))
-	} else if provider.GetEnableThinking() {
-		opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
+	if provider.ThinkingEffort != nil {
+		s := strings.TrimSpace(*provider.ThinkingEffort)
+		if s != "" {
+			enable, effort := MapThinkingEffortToConfig(s)
+			// auto/default → (false, ""): do not inject any thinking params
+			if !enable && effort == "" {
+				// skip — let model/provider defaults apply
+			} else {
+				opts = append(opts, WithEnableThinking(enable))
+				if effort != "" {
+					opts = append(opts, WithReasoningEffort(effort))
+				}
+			}
+		}
+	} else {
+		if provider.EnableThinkingOpt != nil {
+			opts = append(opts, WithEnableThinking(*provider.EnableThinkingOpt))
+		} else if provider.GetEnableThinking() {
+			opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
+		}
+		if provider.ReasoningEffort != nil {
+			if s := strings.TrimSpace(*provider.ReasoningEffort); s != "" {
+				opts = append(opts, WithReasoningEffort(s))
+			}
+		}
 	}
 
 	if provider.MaxTokens != nil {
@@ -311,11 +332,6 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	}
 	if provider.FrequencyPenalty != nil {
 		opts = append(opts, WithFrequencyPenalty(*provider.FrequencyPenalty))
-	}
-	if provider.ReasoningEffort != nil {
-		if s := strings.TrimSpace(*provider.ReasoningEffort); s != "" {
-			opts = append(opts, WithReasoningEffort(s))
-		}
 	}
 
 	if modelName != "" {

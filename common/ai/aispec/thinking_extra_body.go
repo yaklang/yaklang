@@ -13,7 +13,7 @@ type ThinkingBodyMatcher interface {
 	MatchType(typeName string) bool
 	MatchHost(baseURL, domain string) bool
 	MatchModel(modelName string) bool
-	Params(enabled bool) map[string]any
+	Params(enabled bool, reasoningEffort string) map[string]any
 }
 
 var (
@@ -47,11 +47,15 @@ func allThinkingMatchers() []ThinkingBodyMatcher {
 
 // ThinkingExtraBodyForProvider returns top-level JSON fields to merge into the request body
 // when the user has set EnableThinking (non-nil). Match order:
-//  1) every matcher’s MatchType(typeName)（厂商 / aispec 注册名）；
-//  2) every matcher’s MatchHost(baseURL, domain)；
-//  3) every matcher’s MatchModel(modelName)；
+//  1) every matcher's MatchType(typeName)（厂商 / aispec 注册名）；
+//  2) every matcher's MatchHost(baseURL, domain)；
+//  3) every matcher's MatchModel(modelName)；
 // 若仍无命中，默认 {"thinking":{"type":"enabled"|"disabled"}}。
-func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain string, enabled bool) map[string]any {
+//
+// reasoningEffort is the raw reasoning effort string (e.g. "low", "medium", "high", "none")
+// from AIConfig.ReasoningEffort; it is forwarded to matchers so that providers like OpenAI
+// can emit the correct effort level instead of a hardcoded "medium".
+func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain string, enabled bool, reasoningEffort string) map[string]any {
 	// MiniMax 系模型（百炼直供 / 稀宇科技直供）忽略 enable_thinking，仅通过 thinking.type 控制思考。
 	// 由于 type=tongyi 会在 MatchType 阶段被 qwenThinkingMatcher 先命中（注入 enable_thinking），
 	// 基于模型名的判定无法走到 MatchModel 阶段，因此在此先行短路处理。
@@ -64,20 +68,20 @@ func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain string, e
 	typ := strings.ToLower(strings.TrimSpace(typeName))
 	for _, m := range ms {
 		if m.MatchType(typ) {
-			return shallowCloneTopMap(m.Params(enabled))
+			return shallowCloneTopMap(m.Params(enabled, reasoningEffort))
 		}
 	}
 	bu := strings.ToLower(baseURL)
 	dm := strings.ToLower(domain)
 	for _, m := range ms {
 		if m.MatchHost(bu, dm) {
-			return shallowCloneTopMap(m.Params(enabled))
+			return shallowCloneTopMap(m.Params(enabled, reasoningEffort))
 		}
 	}
 	ml := strings.ToLower(modelName)
 	for _, m := range ms {
 		if m.MatchModel(ml) {
-			return shallowCloneTopMap(m.Params(enabled))
+			return shallowCloneTopMap(m.Params(enabled, reasoningEffort))
 		}
 	}
 	return defaultThinkingExtraBody(enabled)
@@ -153,7 +157,7 @@ func (qwenThinkingMatcher) MatchModel(modelName string) bool {
 	return strings.Contains(modelName, "qwen")
 }
 
-func (qwenThinkingMatcher) Params(enabled bool) map[string]any {
+func (qwenThinkingMatcher) Params(enabled bool, _ string) map[string]any {
 	return map[string]any{"enable_thinking": enabled}
 }
 
@@ -194,7 +198,7 @@ func (deepseekFamilyThinkingMatcher) MatchModel(modelName string) bool {
 	return false
 }
 
-func (deepseekFamilyThinkingMatcher) Params(enabled bool) map[string]any {
+func (deepseekFamilyThinkingMatcher) Params(enabled bool, _ string) map[string]any {
 	t := "disabled"
 	if enabled {
 		t = "enabled"
@@ -234,10 +238,43 @@ func (openAICompatibleReasoningMatcher) MatchModel(modelName string) bool {
 	return false
 }
 
-func (openAICompatibleReasoningMatcher) Params(enabled bool) map[string]any {
+func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort string) map[string]any {
 	effort := "none"
 	if enabled {
-		effort = "medium"
+		re := strings.TrimSpace(strings.ToLower(reasoningEffort))
+		switch re {
+		case "low", "medium", "high":
+			effort = re
+		default:
+			effort = "medium"
+		}
 	}
 	return map[string]any{"reasoning": map[string]any{"effort": effort}}
+}
+
+// MapThinkingEffortToConfig maps a frontend-friendly thinking effort enum
+// ("off" / "low" / "medium" / "high" / "auto") to the low-level
+// (EnableThinking, ReasoningEffort) pair used by AIConfig.
+//
+//   - "" / "auto"  → (false, "")       — do not inject any thinking params
+//   - "off"        → (true, "none")    — explicitly disable thinking
+//   - "low"        → (true, "low")     — enable thinking with low effort
+//   - "medium"     → (true, "medium")  — enable thinking with medium effort
+//   - "high"       → (true, "high")    — enable thinking with high effort
+//   - other        → (true, <raw>)     — passthrough custom value
+func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEffort string) {
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "", "auto", "default":
+		return false, ""
+	case "off", "none", "disabled":
+		return true, "none"
+	case "low":
+		return true, "low"
+	case "medium":
+		return true, "medium"
+	case "high":
+		return true, "high"
+	default:
+		return true, strings.ToLower(strings.TrimSpace(effort))
+	}
 }
