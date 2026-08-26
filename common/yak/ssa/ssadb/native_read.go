@@ -1,12 +1,33 @@
 package ssadb
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/gorm"
 )
+
+const defaultNativeQueryTimeout = 30 * time.Second
+
+// nativeQueryTimeout is the default bound for native single-row / batch IR
+// reads. Postgres hangs (e.g. raw "?" placeholders) must not block a scan
+// forever.
+func nativeQueryTimeout() time.Duration {
+	return defaultNativeQueryTimeout
+}
+
+func nativeQueryContext(parent context.Context) (context.Context, context.CancelFunc) {
+	if parent == nil {
+		parent = context.Background()
+	}
+	if _, ok := parent.Deadline(); ok {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, nativeQueryTimeout())
+}
 
 // nativeIrCodeBatchReads is a test-only counter incremented every time
 // nativeGetIrCodesByIds performs a batch read. Tests use it to prove that
@@ -40,13 +61,29 @@ func NativeConstTypeIDQueries() int64 {
 //
 // Soft-delete semantics are preserved: the query adds "deleted_at IS NULL"
 // exactly like GORM's non-Unscoped First().
+//
+// All native queries run through bindSQLPlaceholdersDB so Postgres gets $n
+// placeholders (database/sql rejects raw "?").
 func nativeGetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
+	ir, _ := nativeGetIrTypeItemByIdErr(db, progName, id)
+	return ir
+}
+
+func nativeGetIrTypeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrType, error) {
 	if db == nil || id < 0 {
-		return nil
+		return nil, nil
 	}
 	const q = `SELECT id, created_at, updated_at, deleted_at, type_id, kind, program_name, "string", extra_information ` +
 		`FROM ` + TableIrTypes + ` WHERE type_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1`
-	row := db.CommonDB().QueryRow(q, id, progName)
+	started := time.Now()
+	ctx, cancel := nativeQueryContext(context.Background())
+	defer cancel()
+	bound := bindSQLPlaceholdersDB(db, q)
+	row := nativeQueryRowContext(db, ctx, bound, id, progName)
+	if row == nil {
+		RecordDBRead(time.Since(started), true)
+		return nil, sql.ErrConnDone
+	}
 	ir := &IrType{}
 	var (
 		deletedAt sql.NullTime
@@ -55,20 +92,32 @@ func nativeGetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
 	)
 	if err := row.Scan(&ir.ID, &createdAt, &updatedAt, &deletedAt,
 		&ir.TypeId, &ir.Kind, &ir.ProgramName, &ir.String, &ir.ExtraInformation); err != nil {
-		return nil
+		RecordDBRead(time.Since(started), true)
+		logNativeSQL(bound, time.Since(started), err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
 	}
+	RecordDBRead(time.Since(started), false)
+	logNativeSQL(bound, time.Since(started), nil)
 	ir.CreatedAt = createdAt
 	ir.UpdatedAt = updatedAt
 	if deletedAt.Valid {
 		t := deletedAt.Time
 		ir.DeletedAt = &t
 	}
-	return ir
+	return ir, nil
 }
 
 func nativeGetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
+	ir, _ := nativeGetIrCodeItemByIdErr(db, progName, id)
+	return ir
+}
+
+func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode, error) {
 	if db == nil || id < 0 {
-		return nil
+		return nil, nil
 	}
 	const q = `SELECT id, created_at, updated_at, deleted_at, code_id, program_name, version, ` +
 		`source_code_start_offset, source_code_end_offset, source_code_hash, opcode, opcode_name, opcode_operator, ` +
@@ -79,7 +128,15 @@ func nativeGetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 		`is_object, object_members, object_member_pairs, is_object_member, object_parent, object_key, object_owner_pairs, ` +
 		`masked_codes, is_masked, variable, program_compile_hash, type_id, point, pointer, extra_information, const_type ` +
 		`FROM ` + TableIrCodes + ` WHERE code_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1`
-	row := db.CommonDB().QueryRow(q, id, progName)
+	started := time.Now()
+	ctx, cancel := nativeQueryContext(context.Background())
+	defer cancel()
+	bound := bindSQLPlaceholdersDB(db, q)
+	row := nativeQueryRowContext(db, ctx, bound, id, progName)
+	if row == nil {
+		RecordDBRead(time.Since(started), true)
+		return nil, sql.ErrConnDone
+	}
 	ir := &IrCode{}
 	var (
 		deletedAt sql.NullTime
@@ -102,15 +159,22 @@ func nativeGetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 		&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
 	)
 	if err != nil {
-		return nil
+		RecordDBRead(time.Since(started), true)
+		logNativeSQL(bound, time.Since(started), err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
 	}
+	RecordDBRead(time.Since(started), false)
+	logNativeSQL(bound, time.Since(started), nil)
 	ir.CreatedAt = createdAt
 	ir.UpdatedAt = updatedAt
 	if deletedAt.Valid {
 		t := deletedAt.Time
 		ir.DeletedAt = &t
 	}
-	return ir
+	return ir, nil
 }
 
 // nativeIrCodeColumns is the exact AutoMigrate column list for ir_codes, shared
@@ -160,7 +224,6 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 	}
 	nativeIrCodeBatchReads.Add(1)
 
-	common := db.CommonDB()
 	var out []*IrCode
 	for start := 0; start < len(clean); start += nativeIrCodeBatchChunk {
 		end := start + nativeIrCodeBatchChunk
@@ -175,10 +238,15 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 			placeholders[i] = "?"
 			args = append(args, id)
 		}
-		q := `SELECT ` + nativeIrCodeColumns + ` FROM ` + TableIrCodes +
-			` WHERE program_name = ? AND code_id IN (` + joinPlaceholders(placeholders) + `) AND deleted_at IS NULL ORDER BY code_id`
-		rows, err := common.Query(q, args...)
+		q := bindSQLPlaceholdersDB(db, `SELECT `+nativeIrCodeColumns+` FROM `+TableIrCodes+
+			` WHERE program_name = ? AND code_id IN (`+joinPlaceholders(placeholders)+`) AND deleted_at IS NULL ORDER BY code_id`)
+		started := time.Now()
+		ctx, cancel := nativeQueryContext(context.Background())
+		rows, err := nativeQueryContextDB(db, ctx, q, args...)
 		if err != nil {
+			cancel()
+			RecordDBRead(time.Since(started), true)
+			logNativeSQL(q, time.Since(started), err)
 			return nil, err
 		}
 		for rows.Next() {
@@ -204,6 +272,9 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 				&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
 			); err != nil {
 				rows.Close()
+				cancel()
+				RecordDBRead(time.Since(started), true)
+				logNativeSQL(q, time.Since(started), err)
 				return nil, err
 			}
 			ir.CreatedAt = createdAt
@@ -216,9 +287,15 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
+			cancel()
+			RecordDBRead(time.Since(started), true)
+			logNativeSQL(q, time.Since(started), err)
 			return nil, err
 		}
 		rows.Close()
+		cancel()
+		RecordDBRead(time.Since(started), false)
+		logNativeSQL(q, time.Since(started), nil)
 	}
 	return out, nil
 }
@@ -251,16 +328,21 @@ func nativeGetIrCodeIDsByConstType(db *gorm.DB, progName string, compareMode Com
 	var q string
 	var args []interface{}
 	if compareMode == ExactCompare {
-		q = `SELECT code_id FROM ` + TableIrCodes +
-			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" = ? AND deleted_at IS NULL`
+		q = bindSQLPlaceholdersDB(db, `SELECT code_id FROM `+TableIrCodes+
+			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" = ? AND deleted_at IS NULL`)
 		args = []interface{}{progName, 5, "normal", value}
 	} else {
-		q = `SELECT code_id FROM ` + TableIrCodes +
-			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" REGEXP ? AND deleted_at IS NULL`
+		q = bindSQLPlaceholdersDB(db, `SELECT code_id FROM `+TableIrCodes+
+			` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" REGEXP ? AND deleted_at IS NULL`)
 		args = []interface{}{progName, 5, "normal", value}
 	}
-	rows, err := db.CommonDB().Query(q, args...)
+	started := time.Now()
+	ctx, cancel := nativeQueryContext(context.Background())
+	defer cancel()
+	rows, err := nativeQueryContextDB(db, ctx, q, args...)
 	if err != nil {
+		RecordDBRead(time.Since(started), true)
+		logNativeSQL(q, time.Since(started), err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -268,12 +350,63 @@ func nativeGetIrCodeIDsByConstType(db *gorm.DB, progName string, compareMode Com
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
+			RecordDBRead(time.Since(started), true)
+			logNativeSQL(q, time.Since(started), err)
 			return nil, err
 		}
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
+		RecordDBRead(time.Since(started), true)
+		logNativeSQL(q, time.Since(started), err)
 		return nil, err
 	}
+	RecordDBRead(time.Since(started), false)
+	logNativeSQL(q, time.Since(started), nil)
 	return ids, nil
+}
+
+func nativeContextErr(err error) bool {
+	return err != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded))
+}
+
+func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args ...interface{}) *sql.Row {
+	if db == nil {
+		return nil
+	}
+	common := db.CommonDB()
+	if common == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	switch q := common.(type) {
+	case *sql.DB:
+		return q.QueryRowContext(ctx, query, args...)
+	case *sql.Tx:
+		return q.QueryRowContext(ctx, query, args...)
+	default:
+		return common.QueryRow(query, args...)
+	}
+}
+
+func nativeQueryContextDB(db *gorm.DB, ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	if db == nil {
+		return nil, sql.ErrConnDone
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	switch q := db.CommonDB().(type) {
+	case *sql.DB:
+		return q.QueryContext(ctx, query, args...)
+	case *sql.Tx:
+		return q.QueryContext(ctx, query, args...)
+	default:
+		return db.CommonDB().Query(query, args...)
+	}
 }

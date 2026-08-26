@@ -122,10 +122,14 @@ func GetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 	// Native-SQL fast path: skips GORM's per-query chain (Scope.Fields /
 	// DB.clone / search.clone / buildScanPlan, ~45GB combined on hadoop).
 	// Results are identical to the GORM First() path (same column set,
-	// soft-delete semantics, custom scanners); falls back to GORM only if the
-	// native scan errors or the db doesn't expose CommonDB.
-	if native := nativeGetIrCodeItemById(db, progName, id); native != nil {
+	// soft-delete semantics, custom scanners). Context timeout/cancel on the
+	// native path does not fall back to GORM (that would re-hang).
+	native, err := nativeGetIrCodeItemByIdErr(db, progName, id)
+	if native != nil {
 		return native
+	}
+	if nativeContextErr(err) {
+		return nil
 	}
 	// check cache
 	ir := &IrCode{}
