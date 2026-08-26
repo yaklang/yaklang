@@ -191,7 +191,11 @@ func (s *ScanNode) executeScriptTask(
 		}()
 	}
 
-	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, ssaDBEnv, taskLogWriter); err != nil {
+	// Debug mode: lower yaklog threshold so the task log carries Debug lines the
+	// console can filter (Info/Warn/Error remain available).
+	scriptEnv := scriptEnvWithDebugLogLevel(ssaDBEnv, input.DebugEnabled)
+
+	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, scriptEnv, taskLogWriter); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
 		// Finalize debug before returning the failure. Cancel / shutdown leaves
 		// taskCtx cancelled; finalize must still upload and write local cache.
@@ -933,6 +937,17 @@ func replaceEnvironmentValue(env []string, key string, value string) []string {
 		replaced = append(replaced, item)
 	}
 	return append(replaced, prefix+value)
+}
+
+// scriptEnvWithDebugLogLevel copies base env entries and forces LOG_LEVEL=debug
+// when the scan attempt has debug mode enabled, so yaklog Debug lines land in
+// the per-task log the console filters.
+func scriptEnvWithDebugLogLevel(base []string, debugEnabled bool) []string {
+	out := append([]string(nil), base...)
+	if !debugEnabled {
+		return out
+	}
+	return replaceEnvironmentValue(out, "LOG_LEVEL", "debug")
 }
 
 // tailBuffer is a ring buffer that keeps the last N bytes written to it.
