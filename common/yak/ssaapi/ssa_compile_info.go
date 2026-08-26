@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,7 +17,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
 
-var cloneSSAGitRepository = yakgit.Clone
+var (
+	cloneSSAGitRepository = yakgit.Clone
+	// ssaGitCloneSleep is replaced in tests to avoid real backoff delays.
+	ssaGitCloneSleep = time.Sleep
+)
 
 func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	c.Processf(0, "parse info: %s", c.GetCodeSourceKind())
@@ -157,7 +162,14 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	opts = append(opts, authOpts...)
 	opts = append(opts, yakgit.WithContext(codeSource.GetContext()))
 	opts = append(opts, yakgit.WithHTTPOptions(poc.WithRetryTimes(10)))
-	if err := cloneSSAGitRepository(codeSource.GetCodeSourceURL(), local, opts...); err != nil {
+	if err := cloneSSAGitRepositoryWithRetry(
+		codeSource.GetCodeSourceURL(),
+		local,
+		opts,
+		func(format string, args ...any) {
+			process(0, format, args...)
+		},
+	); err != nil {
 		return nil, ssagitworkdir.WrapCloneError(codeSource.GetContext(), local, err)
 	}
 
