@@ -50,6 +50,10 @@ func (s *ScanNode) createLogHandler(
 			s.handleStatusCardLog(reporter, info)
 		case "ssa-stream":
 			s.handleSSAStreamLog(reporter, info)
+		case "info":
+			// Fallback when StatusCard webhook is dropped under progress flood:
+			// yak scripts also emit a one-line ssa-scan-detail: JSON prefix.
+			s.handleScanDetailInfoFallback(reporter, info)
 		}
 	}
 }
@@ -177,7 +181,8 @@ func (s *ScanNode) handleStatusCardLog(
 	switch card.Id {
 	case "ssa-scan-detail":
 		if reporter != nil {
-			if pubErr := reporter.PublishScanDetail("rule-detail", card.Data); pubErr != nil {
+			stage := scanDetailStage(card.Data)
+			if pubErr := reporter.PublishScanDetail(stage, card.Data); pubErr != nil {
 				log.Warnf("publish scan detail failed: %v", pubErr)
 			}
 		}
@@ -190,6 +195,47 @@ func (s *ScanNode) handleStatusCardLog(
 			reporter.setSSAScanPhase(card.Data)
 		}
 	}
+}
+
+const scanDetailInfoPrefix = "ssa-scan-detail:"
+
+// handleScanDetailInfoFallback publishes scan detail JSON that yak scripts
+// emit via yakit.Info("ssa-scan-detail:{...}") when the StatusCard path is
+// unreliable under HTTP webhook contention.
+func (s *ScanNode) handleScanDetailInfoFallback(
+	reporter *ScannerAgentReporter,
+	info string,
+) {
+	if reporter == nil {
+		return
+	}
+	trimmed := strings.TrimSpace(info)
+	if !strings.HasPrefix(trimmed, scanDetailInfoPrefix) {
+		return
+	}
+	detailJSON := strings.TrimSpace(strings.TrimPrefix(trimmed, scanDetailInfoPrefix))
+	if detailJSON == "" || detailJSON[0] != '{' {
+		return
+	}
+	stage := scanDetailStage(detailJSON)
+	if pubErr := reporter.PublishScanDetail(stage, detailJSON); pubErr != nil {
+		log.Warnf("publish scan detail (info fallback) failed: %v", pubErr)
+	}
+}
+
+// scanDetailStage prefers the phase field inside the detail JSON so early
+// compile scale cards are not mis-labeled as rule-detail.
+func scanDetailStage(detailJSON string) string {
+	var detail struct {
+		Phase string `json:"phase"`
+	}
+	if err := json.Unmarshal([]byte(detailJSON), &detail); err == nil {
+		phase := strings.TrimSpace(detail.Phase)
+		if phase == "compile" || phase == "load-program" || phase == "scan" || phase == "ingest" {
+			return phase
+		}
+	}
+	return "rule-detail"
 }
 
 func (s *ScanNode) handleSSAStreamLog(
