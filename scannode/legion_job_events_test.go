@@ -3,8 +3,10 @@ package scannode
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
 	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
@@ -335,5 +337,73 @@ func eventMetadataFromMessage(message proto.Message) *nodev1.EventMetadata {
 		return value.Metadata
 	default:
 		return nil
+	}
+}
+
+func TestSanitizeUTF8StringEscapesInvalidBytes(t *testing.T) {
+	t.Parallel()
+
+	raw := "clone failed: Get \"https://x/info/refs\": EOF" + string([]byte{0xff, 0xfe, 0x80})
+	cleaned := sanitizeUTF8String(raw)
+	if !utf8.ValidString(cleaned) {
+		t.Fatalf("sanitized string still contains invalid utf-8: %q", cleaned)
+	}
+	if !strings.Contains(cleaned, "clone failed") {
+		t.Fatalf("sanitized string lost content: %q", cleaned)
+	}
+	if !strings.Contains(cleaned, `\xff`) {
+		t.Fatalf("invalid bytes should be escaped for debugging: %q", cleaned)
+	}
+	// Already-valid strings must pass through unchanged.
+	if sanitizeUTF8String("plain message") != "plain message" {
+		t.Fatal("valid string must not be modified")
+	}
+}
+
+func TestSanitizeUTF8MapEscapesKeysAndValues(t *testing.T) {
+	t.Parallel()
+
+	input := map[string]string{
+		"key" + string([]byte{0xff}): "value",
+		"plain":                      "text" + string([]byte{0xfe}),
+	}
+	cleaned := sanitizeUTF8Map(input)
+	if len(cleaned) != 2 {
+		t.Fatalf("unexpected map size: %d", len(cleaned))
+	}
+	for key, value := range cleaned {
+		if !utf8.ValidString(key) || !utf8.ValidString(value) {
+			t.Fatalf("cleaned map still invalid: %q -> %q", key, value)
+		}
+	}
+}
+
+func TestJobFailedWithInvalidUTF8StillMarshals(t *testing.T) {
+	t.Parallel()
+
+	// Regression: a failure event whose message contains invalid UTF-8 (e.g.
+	// git output) must still be publishable — otherwise the terminal event is
+	// dropped and the platform marks the attempt lost.
+	message := &jobv1.JobFailed{
+		ErrorMessage: "SSA Git clone failed: " + string([]byte{0xff, 0xfe}),
+	}
+	if _, err := proto.Marshal(message); err == nil {
+		t.Fatal("precondition failed: invalid utf-8 must fail proto.Marshal")
+	}
+
+	sanitizeJobEventUTF8(message)
+	raw, err := proto.Marshal(message)
+	if err != nil {
+		t.Fatalf("marshal sanitized job failed event: %v", err)
+	}
+	var decoded jobv1.JobFailed
+	if err := proto.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("unmarshal sanitized event: %v", err)
+	}
+	if !strings.Contains(decoded.GetErrorMessage(), "SSA Git clone failed") {
+		t.Fatalf("error message content lost: %q", decoded.GetErrorMessage())
+	}
+	if !utf8.ValidString(decoded.GetErrorMessage()) {
+		t.Fatalf("error message still invalid after sanitize: %q", decoded.GetErrorMessage())
 	}
 }
