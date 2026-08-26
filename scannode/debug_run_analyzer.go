@@ -172,9 +172,10 @@ func AnalyzeDebugRun(dir string) DebugRunAnalysis {
 	return AnalyzeDebugRunWithStatus(dir, "")
 }
 
-// AnalyzeDebugRunWithStatus analyzes a debug run directory. When taskStatus
-// is non-empty (e.g. "succeeded"/"failed"), it takes precedence over the
-// log-derived status because the log may not contain a completion marker.
+// AnalyzeDebugRunWithStatus analyzes a debug run directory.
+// Status always comes from the Legion task/attempt status when provided.
+// Logs are never used to invent failed/completed — rule comments contain
+// words like "panic" and previously false-triggered "失败".
 func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 	result := DebugRunAnalysis{
 		RunDir: dir,
@@ -212,12 +213,6 @@ func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 	if strings.TrimSpace(logContent) != "" {
 		result.setTimesFromLog(logContent)
 		result.setPhasesFromLog(logContent)
-		if taskStatus == "" {
-			result.Status = result.determineStatus(logContent)
-		}
-	}
-	if taskStatus != "" {
-		result.Status = normalizeTaskStatus(taskStatus)
 	}
 
 	// Child collector logs often only contain ERROR/pprof lines and miss the
@@ -228,11 +223,6 @@ func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 			logContent = enriched
 			result.setTimesFromLog(logContent)
 			result.setPhasesFromLog(logContent)
-			if taskStatus == "" {
-				result.Status = result.determineStatus(logContent)
-			} else {
-				result.Status = normalizeTaskStatus(taskStatus)
-			}
 		}
 	}
 
@@ -244,7 +234,31 @@ func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 	result.Summary = result.buildSummary(dir, samples)
 	result.Partial = len(result.Errors) > 0
 
+	result.Status = resolveDebugAnalysisStatus(taskStatus, logContent, len(samples))
 	return result
+}
+
+// resolveDebugAnalysisStatus maps the Legion attempt/job status onto the
+// debug analysis badge. Never infer failure from log text.
+func resolveDebugAnalysisStatus(taskStatus, logContent string, sampleCount int) string {
+	if normalized := normalizeTaskStatus(taskStatus); normalized != "" {
+		switch normalized {
+		case "succeeded", "completed", "ok":
+			return "completed"
+		case "failed", "error":
+			return "failed"
+		case "cancelled", "canceled", "timed_out", "lost":
+			return normalized
+		case "running", "claimed", "dispatched", "queued", "created":
+			return "running"
+		default:
+			return normalized
+		}
+	}
+	if sampleCount > 0 || strings.TrimSpace(logContent) != "" {
+		return "running"
+	}
+	return "unknown"
 }
 
 // AnalyzeSample returns detailed analysis for a single pprof sample.
@@ -451,18 +465,9 @@ func enrichLogWithTaskLog(debugDir, logContent string) string {
 }
 
 func (r *DebugRunAnalysis) determineStatus(logContent string) string {
-	lower := strings.ToLower(logContent)
-	if strings.Contains(lower, "code scan done") {
-		return "completed"
-	}
-	if strings.Contains(lower, "code scan failed") || strings.Contains(lower, "panic") {
-		return "failed"
-	}
-	// If log is still being written (file exists but no completion marker)
-	if len(logContent) > 0 {
-		return "running"
-	}
-	return "unknown"
+	// Deprecated: status must come from the Legion task/attempt, not log text.
+	// Kept as a thin wrapper for older call sites/tests.
+	return resolveDebugAnalysisStatus("", logContent, 0)
 }
 
 func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummary {
