@@ -242,41 +242,42 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 	effort := "none"
 	if enabled {
 		re := strings.TrimSpace(strings.ToLower(reasoningEffort))
-		if re != "" {
-			// Passthrough whatever the caller set. Values arriving here
-			// from ThinkingEffort have already been sanitised by
-			// MapThinkingEffortToConfig to standard levels
-			// (low/medium/high/none). Values from the raw ReasoningEffort
-			// field are set by advanced users who know their provider's
-			// capabilities (e.g. xhigh/max for certain Alibaba proxies).
+		switch re {
+		case "low", "medium", "high":
 			effort = re
-		} else {
-			effort = "medium"
+		case "xhigh", "max":
+			// These are provider-specific extensions that standard OpenAI
+			// models do not accept. Clamp to high to avoid 400 errors.
+			// If a specific provider supports them, it should have its own
+			// matcher that handles them explicitly.
+			effort = "high"
+		default:
+			if re == "" {
+				effort = "medium"
+			} else {
+				effort = "high"
+			}
 		}
 	}
 	return map[string]any{"reasoning": map[string]any{"effort": effort}}
 }
 
 // MapThinkingEffortToConfig maps a frontend-friendly thinking effort enum
-// ("off" / "low" / "medium" / "high" / "auto") to the low-level
-// (EnableThinking, ReasoningEffort) pair used by AIConfig.
+// to the low-level (EnableThinking, ReasoningEffort) pair used by AIConfig.
 //
-// This is the **sanitisation layer**: it guarantees that values flowing into
-// AIConfig.ReasoningEffort via the ThinkingEffort field are always safe for
-// every provider. Non-standard levels (xhigh, max, or any unknown value) are
-// downgraded to the nearest standard level (high) so that models which do not
-// support them will not receive a 400 error.
-//
-// Advanced users who need xhigh/max or provider-specific custom levels should
-// set the raw ReasoningEffort field directly — that path bypasses this
-// sanitisation and is passed through verbatim by the matchers.
+// This function only handles the semantic mapping (enable/disable + effort
+// level). It does NOT clamp provider-specific extensions — that is the job of
+// the per-provider matchers, which know what the matched provider/model
+// actually accepts.
 //
 //   - "" / "auto"  → (false, "")       — do not inject any thinking params
 //   - "off"        → (true, "none")    — explicitly disable thinking
 //   - "low"        → (true, "low")     — enable thinking with low effort
 //   - "medium"     → (true, "medium")  — enable thinking with medium effort
 //   - "high"       → (true, "high")    — enable thinking with high effort
-//   - other        → (true, "high")    — downgrade to high (safest upper bound)
+//   - "xhigh"      → (true, "xhigh")   — map to xhigh (matcher will clamp)
+//   - "max"        → (true, "max")     — map to max (matcher will clamp)
+//   - other        → (true, <raw>)     — passthrough (matcher will clamp)
 func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEffort string) {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
 	case "", "auto", "default":
@@ -287,9 +288,13 @@ func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEff
 		return true, "low"
 	case "medium":
 		return true, "medium"
-	case "high", "xhigh", "max":
+	case "high":
 		return true, "high"
+	case "xhigh":
+		return true, "xhigh"
+	case "max":
+		return true, "max"
 	default:
-		return true, "high"
+		return true, strings.ToLower(strings.TrimSpace(effort))
 	}
 }

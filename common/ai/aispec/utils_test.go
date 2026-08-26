@@ -209,6 +209,26 @@ func TestBuildOptionsFromConfig_ThinkingEffortOverridesLegacyFields(t *testing.T
 	assert.Equal(t, "low", resolved.ReasoningEffort) // ThinkingEffort wins over ReasoningEffort
 }
 
+func TestBuildOptionsFromConfig_ThinkingEffortXhigh(t *testing.T) {
+	effort := "xhigh"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:           "openai",
+			APIKey:         "test-key",
+			ThinkingEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "xhigh", resolved.ReasoningEffort) // preserved, matcher will clamp
+}
+
 func TestGetBaseURLFromConfig_UsesResponsesAPIType(t *testing.T) {
 	config := NewDefaultAIConfig(
 		WithType("openai"),
