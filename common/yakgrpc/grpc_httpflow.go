@@ -128,22 +128,6 @@ func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdReques
 	return model.ToHTTPFlowGRPCModelFull(flow)
 }
 
-func getHTTPFlowByHiddenIndexWait(db *gorm.DB, hiddenIndex string) (*schema.HTTPFlow, error) {
-	var lastErr error
-	for i := 0; i < 20; i++ {
-		flow, err := yakit.GetHTTPFlowByHiddenIndex(db, hiddenIndex)
-		if err == nil && flow != nil {
-			return flow, nil
-		}
-		lastErr = err
-		time.Sleep(50 * time.Millisecond)
-	}
-	if lastErr != nil {
-		return nil, lastErr
-	}
-	return nil, utils.Error("get HTTPFlow by hidden index failed")
-}
-
 func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream ypb.Yak_GetHTTPFlowBodyByIdServer) error {
 	bufSize := int(r.GetBufSize())
 	var (
@@ -165,7 +149,7 @@ func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream y
 	} else if r.Id != 0 {
 		flow, err = yakit.GetHTTPFlow(s.GetProjectDatabase(), r.GetId())
 	} else if r.GetHiddenIndex() != "" {
-		flow, err = getHTTPFlowByHiddenIndexWait(s.GetProjectDatabase(), r.GetHiddenIndex())
+		flow, err = yakit.GetHTTPFlowByHiddenIndex(s.GetProjectDatabase(), r.GetHiddenIndex())
 	} else if r.RuntimeId != "" {
 		flow, err = yakit.GetHttpFlowByRuntimeId(s.GetProjectDatabase(), r.GetRuntimeId())
 	}
