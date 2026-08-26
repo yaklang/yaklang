@@ -92,11 +92,13 @@ func nativeGetIrTypeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrType
 	)
 	if err := row.Scan(&ir.ID, &createdAt, &updatedAt, &deletedAt,
 		&ir.TypeId, &ir.Kind, &ir.ProgramName, &ir.String, &ir.ExtraInformation); err != nil {
-		RecordDBRead(time.Since(started), true)
 		logNativeSQL(bound, time.Since(started), err)
 		if errors.Is(err, sql.ErrNoRows) {
+			// Miss is a normal lookup result, not a DB failure.
+			RecordDBRead(time.Since(started), false)
 			return nil, nil
 		}
+		RecordDBRead(time.Since(started), true)
 		return nil, err
 	}
 	RecordDBRead(time.Since(started), false)
@@ -159,11 +161,13 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 		&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
 	)
 	if err != nil {
-		RecordDBRead(time.Since(started), true)
 		logNativeSQL(bound, time.Since(started), err)
 		if errors.Is(err, sql.ErrNoRows) {
+			// Miss is a normal lookup result, not a DB failure.
+			RecordDBRead(time.Since(started), false)
 			return nil, nil
 		}
+		RecordDBRead(time.Since(started), true)
 		return nil, err
 	}
 	RecordDBRead(time.Since(started), false)
