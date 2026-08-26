@@ -67,6 +67,24 @@ type SampleSummary struct {
 	LogExcerpt     string             `json:"log_excerpt,omitempty"`
 	Status         string             `json:"status,omitempty"` // available | partial | error | pending
 	DBStats        *DBOpStatsSummary  `json:"db_stats,omitempty"`
+	Runtime        *RuntimeStatsSummary `json:"runtime,omitempty"`
+}
+
+// RuntimeStatsSummary mirrors runtime-stats/*.runtime.json written by the
+// scan-task pprof collector (host vs this process CPU/memory).
+type RuntimeStatsSummary struct {
+	Timestamp             string  `json:"timestamp,omitempty"`
+	NumCPU                int     `json:"num_cpu,omitempty"`
+	Load1                 float64 `json:"load1,omitempty"`
+	HostCPUPercent        float64 `json:"host_cpu_percent"`
+	ProcessCPUPercent     float64 `json:"process_cpu_percent"`
+	HostMemTotalBytes     uint64  `json:"host_mem_total_bytes"`
+	HostMemUsedBytes      uint64  `json:"host_mem_used_bytes"`
+	HostMemAvailableBytes uint64  `json:"host_mem_available_bytes"`
+	ProcessRSSBytes       uint64  `json:"process_rss_bytes"`
+	ProcessHeapAllocBytes uint64  `json:"process_heap_alloc_bytes"`
+	ProcessHeapSysBytes   uint64  `json:"process_heap_sys_bytes"`
+	Goroutines            int     `json:"goroutines,omitempty"`
 }
 
 // DBOpStatsSummary mirrors ssadb.DBOpStats JSON written to db-stats/*.db.json.
@@ -75,6 +93,7 @@ type DBOpStatsSummary struct {
 	Ops        map[string]DBOpBucketSummary `json:"ops,omitempty"`
 	TotalCount int64                        `json:"total_count"`
 	TotalMs    int64                        `json:"total_ms"`
+	WindowMs   int64                        `json:"window_ms,omitempty"`
 	ErrorCount int64                        `json:"error_count,omitempty"`
 }
 
@@ -440,12 +459,14 @@ func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummar
 	memDir := filepath.Join(dir, "memory-pprof")
 	goroutineDir := filepath.Join(dir, "goroutine-pprof")
 	dbStatsDir := filepath.Join(dir, "db-stats")
+	runtimeStatsDir := filepath.Join(dir, "runtime-stats")
 
 	entries := []fileEntry{
 		{cpuDir, ".cpu.prof", "cpu"},
 		{memDir, ".mem.prof", "heap"},
 		{goroutineDir, ".goroutine.prof", "goroutine"},
 		{dbStatsDir, ".db.json", "db_stats"},
+		{runtimeStatsDir, ".runtime.json", "runtime"},
 	}
 
 	// Collect all sample labels
@@ -490,6 +511,8 @@ func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummar
 				s.GoroutineFile = filepath.Join(entry.dir, name)
 			case "db_stats":
 				s.DBStats = loadDBStatsFile(filepath.Join(entry.dir, name))
+			case "runtime":
+				s.Runtime = loadRuntimeStatsFile(filepath.Join(entry.dir, name))
 			}
 		}
 	}
@@ -617,6 +640,18 @@ func loadDBStatsFile(path string) *DBOpStatsSummary {
 		return nil
 	}
 	var stats DBOpStatsSummary
+	if err := json.Unmarshal(raw, &stats); err != nil {
+		return nil
+	}
+	return &stats
+}
+
+func loadRuntimeStatsFile(path string) *RuntimeStatsSummary {
+	raw, err := os.ReadFile(path)
+	if err != nil || len(raw) == 0 {
+		return nil
+	}
+	var stats RuntimeStatsSummary
 	if err := json.Unmarshal(raw, &stats); err != nil {
 		return nil
 	}
