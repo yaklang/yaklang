@@ -34,6 +34,7 @@ type ssaLogTailPayload struct {
 	Offset     int64  `json:"offset"`    // bytes to skip from the end of the file
 	MaxBytes   int64  `json:"max_bytes"` // requested chunk size (clamped by the node)
 	TaskStatus string `json:"task_status,omitempty"`
+	LogKind    string `json:"log_kind,omitempty"` // ""|"task"|"db"
 }
 
 // ssaLogTailResponse is the JSON body published back to the platform.
@@ -78,10 +79,13 @@ func (b *legionJobBridge) handleSSALogTail(ctx context.Context, raw []byte) erro
 	}
 
 	response := ssaLogTailResponse{Offset: payload.Offset}
-	logPath := b.resolveTaskLogPath(payload.JobID, payload.AttemptID)
+	logPath, reason := b.resolveLogTailPath(payload.JobID, payload.AttemptID, payload.LogKind)
 	if logPath == "" {
-		response.Reason = "task log not found for this attempt"
-		log.Infof("[log-tail] answered: job=%s attempt=%s found=false (no log file)", payload.JobID, payload.AttemptID)
+		if reason == "" {
+			reason = "task log not found for this attempt"
+		}
+		response.Reason = reason
+		log.Infof("[log-tail] answered: job=%s attempt=%s kind=%s found=false (%s)", payload.JobID, payload.AttemptID, payload.LogKind, reason)
 		return b.publishLogTailResponse(ctx, payload.QueryID, response)
 	}
 
@@ -136,6 +140,44 @@ func (b *legionJobBridge) resolveTaskLogPath(jobID, attemptID string) string {
 	}
 	dirs = append(dirs, filepath.Join(os.TempDir(), "legion-node-logs"))
 	return resolveTaskLogPathInDirs(dirs, jobID, attemptID)
+}
+
+func (b *legionJobBridge) resolveLogTailPath(jobID, attemptID, logKind string) (string, string) {
+	switch strings.ToLower(strings.TrimSpace(logKind)) {
+	case "", "task":
+		path := b.resolveTaskLogPath(jobID, attemptID)
+		if path == "" {
+			return "", "task log not found for this attempt"
+		}
+		return path, ""
+	case "db":
+		path := b.resolveDBLogPath(jobID, attemptID)
+		if path == "" {
+			return "", "db log not found for this attempt"
+		}
+		return path, ""
+	default:
+		return "", "unsupported log_kind"
+	}
+}
+
+func (b *legionJobBridge) resolveDBLogPath(jobID, attemptID string) string {
+	dir := scanDebugDirs.resolve(jobID, attemptID)
+	if dir == "" && b != nil && b.agent != nil {
+		key := debugDirKey(jobID, attemptID)
+		fallback := filepath.Join(b.agent.debugBaseDir(), "debug", key)
+		if info, err := os.Stat(fallback); err == nil && info.IsDir() {
+			dir = fallback
+		}
+	}
+	if dir == "" {
+		return ""
+	}
+	path := filepath.Join(dir, "db.log")
+	if _, err := os.Stat(path); err != nil {
+		return ""
+	}
+	return path
 }
 
 // resolveTaskLogPathWithDirs is the testable core of resolveTaskLogPath.
