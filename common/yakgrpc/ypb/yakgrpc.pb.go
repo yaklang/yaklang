@@ -69308,11 +69308,14 @@ type AIModelConfig struct {
 	ModelName   string                       `protobuf:"bytes,3,opt,name=ModelName,proto3" json:"ModelName,omitempty"`
 	ExtraParams []*KVPair                    `protobuf:"bytes,4,rep,name=ExtraParams,proto3" json:"ExtraParams,omitempty"`
 	IsOnline    bool                         `protobuf:"varint,5,opt,name=IsOnline,proto3" json:"IsOnline,omitempty"`
-	// 探测到的扩展思考强度（如 ["xhigh","max"]）；为空表示未探测或不支持。
+	// 探测到的扩展思考强度（如 ["xhigh","max"]）；为空且 EffortProbed=true 表示探测过但不支持。
 	// 前端据此动态显示 xhigh/max 下拉选项，无需用户手动配置。
 	ProbedExtendedEfforts []string `protobuf:"bytes,6,rep,name=ProbedExtendedEfforts,proto3" json:"ProbedExtendedEfforts,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// 是否已对 xhigh/max 做过探测。false=未探测（首次操作下拉框时触发）；
+	// true=已探测（ProbedExtendedEfforts 即最终结果，不再重复探测）。
+	EffortProbed  bool `protobuf:"varint,7,opt,name=EffortProbed,proto3" json:"EffortProbed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AIModelConfig) Reset() {
@@ -69385,6 +69388,13 @@ func (x *AIModelConfig) GetProbedExtendedEfforts() []string {
 		return x.ProbedExtendedEfforts
 	}
 	return nil
+}
+
+func (x *AIModelConfig) GetEffortProbed() bool {
+	if x != nil {
+		return x.EffortProbed
+	}
+	return false
 }
 
 type AIGlobalConfig struct {
@@ -81377,7 +81387,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18UpsertAIProviderResponse\x12+\n" +
 	"\bProvider\x18\x01 \x01(\v2\x0f.ypb.AIProviderR\bProvider\")\n" +
 	"\x17DeleteAIProviderRequest\x12\x0e\n" +
-	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\x8c\x02\n" +
+	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\xb0\x02\n" +
 	"\rAIModelConfig\x12\x1e\n" +
 	"\n" +
 	"ProviderId\x18\x01 \x01(\x03R\n" +
@@ -81386,7 +81396,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tModelName\x18\x03 \x01(\tR\tModelName\x12-\n" +
 	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\x12\x1a\n" +
 	"\bIsOnline\x18\x05 \x01(\bR\bIsOnline\x124\n" +
-	"\x15ProbedExtendedEfforts\x18\x06 \x03(\tR\x15ProbedExtendedEfforts\"\xce\x03\n" +
+	"\x15ProbedExtendedEfforts\x18\x06 \x03(\tR\x15ProbedExtendedEfforts\x12\"\n" +
+	"\fEffortProbed\x18\a \x01(\bR\fEffortProbed\"\xce\x03\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +

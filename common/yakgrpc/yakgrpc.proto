@@ -9244,9 +9244,12 @@ message AIModelConfig {
   string ModelName = 3;
   repeated KVPair ExtraParams = 4;
   bool   IsOnline = 5;
-  // 探测到的扩展思考强度（如 ["xhigh","max"]）；为空表示未探测或不支持。
+  // 探测到的扩展思考强度（如 ["xhigh","max"]）；为空且 EffortProbed=true 表示探测过但不支持。
   // 前端据此动态显示 xhigh/max 下拉选项，无需用户手动配置。
   repeated string ProbedExtendedEfforts = 6;
+  // 是否已对 xhigh/max 做过探测。false=未探测（首次操作下拉框时触发）；
+  // true=已探测（ProbedExtendedEfforts 即最终结果，不再重复探测）。
+  bool EffortProbed = 7;
 }
 
 message AIGlobalConfig {
