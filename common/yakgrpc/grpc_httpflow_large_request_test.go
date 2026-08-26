@@ -17,25 +17,12 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTP_QueryHTTPFlow_Oversize_Request(t *testing.T) {
-	var client, err = NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	client := isolateMITMTestSideEffects(t)
+	var err error
 
 	prev := consts.GetGlobalMaxContentLength()
 	consts.SetGlobalMaxContentLength(1024 * 1024) // 1MB so 3MB request spills
 	t.Cleanup(func() { consts.SetGlobalMaxContentLength(prev) })
-
-	yakit.DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
-		DeleteAll: false,
-		Id:        nil,
-		ItemHash:  nil,
-		URLPrefix: "",
-		Filter: &ypb.QueryHTTPFlowRequest{
-			SourceType: "cccc",
-		},
-		URLPrefixBatch: nil,
-	})
 
 	rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Server: test
@@ -52,8 +39,21 @@ Host: www.example.com
 	if err != nil {
 		t.Fatal(err)
 	}
+	db := consts.GetGormProjectDatabase()
+	// Register cleanup before persistence and before any later assertion can
+	// abort the test. The isolated project/YAKIT_HOME above is the hard-kill
+	// fallback; this cleanup removes the row and its request sidecars during a
+	// normal success, failure, or panic.
+	t.Cleanup(func() {
+		if flow.ID > 0 {
+			_ = yakit.DeleteHTTPFlowByID(db, int64(flow.ID))
+		}
+		yakit.ReleaseHTTPFlowPersistResources(flow)
+	})
 	flow.CalcHash()
-	consts.GetGormProjectDatabase().Save(flow)
+	if result := db.Save(flow); result.Error != nil {
+		t.Fatal(result.Error)
+	}
 
 	resp, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
 		Pagination: &ypb.Paging{
@@ -113,8 +113,8 @@ Host: www.example.com
 	if !response.GetIsTooLargeRequest() {
 		t.Fatal("3MB request should be marked as too large when GlobalMaxContentLength is 1MB")
 	}
-	if !strings.Contains(string(response.GetRequest()), "request too large") {
-		t.Fatal("GetHTTPFlowById should return truncate notice for oversized request")
+	if !strings.Contains(string(response.GetRequest()), "{{file(") {
+		t.Fatal("GetHTTPFlowById should return a file-backed request for an oversized body")
 	}
 
 	reqBodyStream, err := client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{

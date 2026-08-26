@@ -3,7 +3,6 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -34,7 +33,6 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
-	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -147,23 +145,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	})
 	feedbackToUser := feedbackFactory(s.GetProjectDatabase(), execFeedback, false, "")
 
-	getPlainRequestBytes := func(req *http.Request) []byte {
-		if req != nil && httpctx.GetRequestTooLarge(req) {
-			if cached := httpctx.GetRequestDisplayPacket(req); len(cached) > 0 {
-				return cached
-			}
-		}
-		var plainRequest []byte
-		if httpctx.GetRequestIsModified(req) {
-			plainRequest = httpctx.GetHijackedRequestBytes(req)
-		} else {
-			plainRequest = httpctx.GetPlainRequestBytes(req)
-			if len(plainRequest) <= 0 {
-				plainRequest = decodeAndCachePlainRequestBytesIfStorable(req, httpctx.GetBareRequestBytes(req))
-			}
-		}
-		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
-	}
+	getPlainRequestBytes := getMITMDisplayRequestBytes
 	getPlainResponseBytes := func(req *http.Request) []byte {
 		var plainResponse []byte
 		if httpctx.GetResponseIsModified(req) {
@@ -1578,13 +1560,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					return originReqRaw
 				}
 
-				current := reqInstance.GetRequest()
-				if bytes.Contains(current, []byte{'{', '{'}) || bytes.Contains(current, []byte{'}', '}'}) {
-					// 在这可能包含 fuzztag
-					result := mutate.MutateQuick(current)
-					if len(result) > 0 {
-						current = []byte(result[0])
-					}
+				current, renderErr := renderMITMSubmittedRequest(reqInstance.GetRequest())
+				if renderErr != nil {
+					log.Errorf("render manually submitted MITM request failed: %v", renderErr)
+					mitmSendRespLogged(&ypb.MITMResponse{
+						HaveNotification:    true,
+						NotificationContent: []byte(fmt.Sprintf("渲染请求中的 Fuzztag 失败：%v", renderErr)),
+					})
+					goto RECV
 				}
 				if handleRequestModified(current) {
 					setModifiedRequest("user", current)
@@ -1614,7 +1597,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 		isModified := isRequestModified || isResponseModified
 
-		plainRequest := getPlainRequestBytes(req)
+		plainRequest := getMITMPlainRequestBytes(req)
 		plainResponse := getPlainResponseBytes(req)
 		responseOverSize := false
 		if len(plainResponse) > packetLimit {
@@ -1683,6 +1666,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					log.Warnf("drop filtered HTTP stream flow failed: %v", err)
 				}
 			}
+			yakit.CleanupPreparedLargeHTTPFlowRequest(req)
 			return
 		}
 		saveBarePacketHandler := func(id uint) {
