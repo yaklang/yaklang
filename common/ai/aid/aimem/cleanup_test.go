@@ -430,7 +430,7 @@ func TestScanOverCountMemories(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, ids, 5)
 
-	// Create a long-term memory (T >= 0.8) — should be exempt
+	// Create a long-term memory (T >= 0.8) — high value, should be last to evict
 	longTermEntity := &schema.AIMemoryEntity{
 		MemoryID:  "longterm-protected",
 		SessionID: sid,
@@ -443,12 +443,15 @@ func TestScanOverCountMemories(t *testing.T) {
 	require.NoError(t, db.Table(tableName).Create(longTermEntity).Error)
 
 	// totalCount=9, MaxMemoryCount=5, OverEvictMargin=2
-	// toEvict = 9 - 5 + 2 = 6, but only 8 non-exempt memories exist
+	// toEvict = 9 - 5 + 2 = 6
+	// longterm-protected value = 0.25*0.1+0.20*0.1+0.15*0.1+0.15*0.1+0.10*0.1+0.05*0.1+0.10*0.9 = 0.19
+	// low-value mem value      = 0.25*0.1+0.20*0.1+0.15*0.1+0.15*0.1+0.10*0.1+0.05*0.1+0.10*0.2 = 0.10
+	// longterm-protected (0.19) > low-value mem (0.10), so it survives
 	ids, err = ScanOverCountMemories(db, tableName, sid, config)
 	require.NoError(t, err)
-	assert.Len(t, ids, 6) // 6 lowest-value non-exempt memories
+	assert.Len(t, ids, 6)
 
-	// Verify long-term memory is NOT in the eviction list
+	// Verify long-term memory is NOT in the eviction list (higher value than low-T memories)
 	for _, id := range ids {
 		assert.NotEqual(t, "longterm-protected", id)
 	}
@@ -458,6 +461,45 @@ func TestScanOverCountMemories(t *testing.T) {
 	ids, err = ScanOverCountMemories(db, tableName, sid, config)
 	require.NoError(t, err)
 	assert.Empty(t, ids)
+}
+
+// --- OverCount: no zombie memories (all high-T still over limit) ---
+
+func TestScanOverCountMemories_NoZombieMemories(t *testing.T) {
+	sessionID := "test-cleanup-no-zombie-" + t.Name()
+	mem := createCleanupTestMemory(t, sessionID)
+	defer mem.Close()
+
+	db := mem.GetDB()
+	tableName := mem.entityTableName()
+	sid := mem.GetSessionID()
+
+	config := DefaultCleanupConfig()
+	config.MaxMemoryCount = 3
+	config.OverEvictMargin = 1
+
+	// Create 5 ALL high-T memories (T >= 0.8)
+	for i := 0; i < 5; i++ {
+		entity := &schema.AIMemoryEntity{
+			MemoryID:  fmt.Sprintf("hight-mem-%d", i),
+			SessionID: sid,
+			Content:   fmt.Sprintf("high t memory %d", i),
+			Tags:      schema.StringArray{"test"},
+			T_Score:   0.9,
+			C_Score:   0.1, O_Score: 0.1, R_Score: 0.1, E_Score: 0.1, P_Score: 0.1, A_Score: 0.1,
+		}
+		entity.CreatedAt = time.Now().Add(-time.Duration(i+1) * time.Hour)
+		require.NoError(t, db.Table(tableName).Create(entity).Error)
+	}
+
+	// totalCount=5, MaxMemoryCount=3, OverEvictMargin=1
+	// toEvict = 5 - 3 + 1 = 3
+	// All are T>=0.8 but there's no exemption now — lowest value ones get evicted
+	ids, err := ScanOverCountMemories(db, tableName, sid, config)
+	require.NoError(t, err)
+	assert.Len(t, ids, 3, "high-T memories should still be evicted when over limit")
+
+	// Remaining should be 5 - 3 = 2 <= MaxMemoryCount=3
 }
 
 // --- OverCount margin effectiveness ---
