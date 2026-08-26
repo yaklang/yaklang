@@ -22,6 +22,13 @@ func LoadHTTPFlowRequestPacket(flow *schema.HTTPFlow) ([]byte, error) {
 	if FlowIsMultipartSpill(flow) {
 		return loadMultipartSpillRequestPacket(flow)
 	}
+	// The in-DB request deliberately keeps an executable file tag
+	// for History/WebFuzzer. Callers that explicitly request the complete
+	// packet should use the sidecars directly rather than evaluating arbitrary
+	// fuzztags from stored user input.
+	if flow.IsTooLargeRequest && flow.TooLargeRequestHeaderFile != "" && flow.TooLargeRequestBodyFile != "" {
+		return readHTTPFlowSpillPacket(flow.TooLargeRequestHeaderFile, flow.TooLargeRequestBodyFile)
+	}
 	if flow.Request != "" {
 		reqRaw, err := strconv.Unquote(flow.Request)
 		if err != nil {
@@ -30,9 +37,6 @@ func LoadHTTPFlowRequestPacket(flow *schema.HTTPFlow) ([]byte, error) {
 		if len(reqRaw) > 0 {
 			return []byte(reqRaw), nil
 		}
-	}
-	if flow.IsTooLargeRequest && flow.TooLargeRequestHeaderFile != "" && flow.TooLargeRequestBodyFile != "" {
-		return readHTTPFlowSpillPacket(flow.TooLargeRequestHeaderFile, flow.TooLargeRequestBodyFile)
 	}
 	return nil, nil
 }

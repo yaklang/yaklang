@@ -138,6 +138,22 @@ func TestGRPCNewCodec(t *testing.T) {
 	}
 }
 
+func TestGRPCNewCodec_StrUnQuoteReturnsRawBinaryBytes(t *testing.T) {
+	// Binary chip opens the HEX editor from RawResult, not the display string.
+	// This RPC contract prevents a single 0x11 byte from degrading into the
+	// four printable bytes 5c 78 31 31 at the frontend/backend boundary.
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1), &ypb.CodecRequestFlow{
+		Text: `"\x11PK\x03\x04"`,
+		WorkFlow: []*ypb.CodecWork{
+			{CodecType: "StrUnQuote"},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []byte{0x11, 'P', 'K', 0x03, 0x04}, rsp.GetRawResult())
+}
+
 func TestGRPCNewCodec_YakScript(t *testing.T) {
 	workFlow := []*ypb.CodecWork{
 		{

@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -478,12 +478,6 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool,
 	return p
 }
 
-// multipartSkeletonMarker mirrors yakit.multipartSkeletonMarker — the prefix
-// of the in-DB skeleton placeholder for a spilled file part. Duplicated here
-// because model cannot import yakit (yakit imports model); keeping the marker
-// literal in sync is the only coupling.
-const modelMultipartSkeletonMarker = "[[yakit: multipart file spilled"
-
 // modelMultipartSidecarDirFromBodyFile mirrors yakit.multipartSidecarDirFromBodyFile.
 // For multipart spills the body file is the first spilled part file, so its
 // parent directory is the sidecar.
@@ -512,10 +506,12 @@ func loadFlowMultipartFiles(f *schema.HTTPFlow) []*ypb.MultipartFileInfo {
 	if f == nil || !f.IsTooLargeRequest || f.TooLargeRequestBodyFile == "" {
 		return nil
 	}
-	if !bytes.Contains([]byte(f.GetRequest()), []byte(modelMultipartSkeletonMarker)) {
-		return nil
-	}
 	dir := modelMultipartSidecarDirFromBodyFile(f.TooLargeRequestBodyFile)
+	// manifest.json is the authoritative multipart discriminator. Current
+	// Editor-safe flows store file resource tags, while older flows may store
+	// [[yakit: multipart file spilled...]] markers; checking packet text
+	// here would make one representation silently lose MultipartFiles metadata.
+	// Flat spills have no adjacent manifest and naturally return nil below.
 	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
 		return nil

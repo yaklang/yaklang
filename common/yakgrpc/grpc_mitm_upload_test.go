@@ -6,6 +6,8 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -160,6 +162,75 @@ func TestMITM_LargeRequestWireForward(t *testing.T) {
 			require.True(t, flowMsg.Data[0].IsTooLargeRequest, "300KB body should spill when GlobalMaxContentLength is 200KB")
 		}),
 	)
+}
+
+func TestGRPCMUSTPASS_MITM_ManualRequestRendersFileAndUserFuzzTag(t *testing.T) {
+	client := isolateMITMTestSideEffects(t)
+	token := uuid.New().String()
+	registerHTTPFlowTokenCleanup(t, token)
+
+	filePayload := []byte{0xff, 0x00, 'A'}
+	filePath := filepath.Join(t.TempDir(), "mitm-v1-resource.bin")
+	require.NoError(t, os.WriteFile(filePath, filePayload, 0o600))
+
+	captured := make(chan []byte, 1)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		select {
+		case captured <- bytes.Clone(req):
+		default:
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+	})
+	target := utils.HostPort(host, port)
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	requestDone := make(chan error, 1)
+	var submitted atomic.Bool
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		require.NoError(t, stream.Send(&ypb.MITMRequest{Host: "127.0.0.1", Port: uint32(mitmPort)}))
+		require.NoError(t, stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false}))
+	}, func(stream ypb.Yak_MITMClient) {
+		time.Sleep(200 * time.Millisecond)
+		_, _, requestErr := poc.DoPOST(
+			"http://"+target+"/original?token="+token,
+			poc.WithBody("original"),
+			poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(mitmPort)),
+			poc.WithSave(false),
+			poc.WithTimeout(10),
+		)
+		requestDone <- requestErr
+		cancel()
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+		if len(msg.GetRequest()) == 0 || submitted.Swap(true) {
+			return
+		}
+		edited := lowhttp.ReplaceHTTPPacketFirstLine(
+			msg.GetRequest(),
+			"POST /rendered-{{int(7)}}?token="+token+" HTTP/1.1",
+		)
+		edited = lowhttp.ReplaceHTTPPacketBody(edited, []byte("{{file("+filePath+")}}"), false)
+		edited = lowhttp.ReplaceHTTPPacketHeader(edited, "Content-Length", "999")
+		require.NoError(t, stream.Send(&ypb.MITMRequest{Id: msg.GetId(), Request: edited}))
+	})
+
+	select {
+	case requestErr := <-requestDone:
+		require.NoError(t, requestErr)
+	case <-time.After(12 * time.Second):
+		t.Fatal("timed out waiting for MITMv1 request completion")
+	}
+	select {
+	case request := <-captured:
+		require.Contains(t, string(request), "POST /rendered-7?token="+token+" HTTP/1.1")
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(request)
+		require.Equal(t, filePayload, body)
+		require.Equal(t, fmt.Sprint(len(filePayload)), lowhttp.GetHTTPPacketHeader(request, "Content-Length"))
+	case <-time.After(2 * time.Second):
+		t.Fatal("target server did not receive the rendered MITMv1 request")
+	}
 }
 
 func TestMITM_InvalidUTF8Request(t *testing.T) {

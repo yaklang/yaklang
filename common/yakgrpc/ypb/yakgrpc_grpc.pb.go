@@ -657,6 +657,7 @@ const (
 	Yak_GetAIReActRecommendedSkills_FullMethodName                = "/ypb.Yak/GetAIReActRecommendedSkills"
 	Yak_UpdateAIReActRecommendedSkill_FullMethodName              = "/ypb.Yak/UpdateAIReActRecommendedSkill"
 	Yak_ResetAIReActRecommendedSkill_FullMethodName               = "/ypb.Yak/ResetAIReActRecommendedSkill"
+	Yak_UploadToTemporaryFile_FullMethodName                      = "/ypb.Yak/UploadToTemporaryFile"
 )
 
 // YakClient is the client API for Yak service.
@@ -1477,6 +1478,10 @@ type YakClient interface {
 	UpdateAIReActRecommendedSkill(ctx context.Context, in *UpdateAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error)
 	// 将推荐技能完整恢复为随当前版本发布的内置默认内容。
 	ResetAIReActRecommendedSkill(ctx context.Context, in *ResetAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error)
+	// Upload GUI-local bytes into the currently connected engine's temporary
+	// filesystem. Returned paths are engine paths and can be used by file
+	// Fuzztags in both local and remote-engine modes.
+	UploadToTemporaryFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse], error)
 }
 
 type yakClient struct {
@@ -8818,6 +8823,19 @@ func (c *yakClient) ResetAIReActRecommendedSkill(ctx context.Context, in *ResetA
 	return out, nil
 }
 
+func (c *yakClient) UploadToTemporaryFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[117], Yak_UploadToTemporaryFile_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_UploadToTemporaryFileClient = grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -9636,6 +9654,10 @@ type YakServer interface {
 	UpdateAIReActRecommendedSkill(context.Context, *UpdateAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error)
 	// 将推荐技能完整恢复为随当前版本发布的内置默认内容。
 	ResetAIReActRecommendedSkill(context.Context, *ResetAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error)
+	// Upload GUI-local bytes into the currently connected engine's temporary
+	// filesystem. Returned paths are engine paths and can be used by file
+	// Fuzztags in both local and remote-engine modes.
+	UploadToTemporaryFile(grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -11559,6 +11581,9 @@ func (UnimplementedYakServer) UpdateAIReActRecommendedSkill(context.Context, *Up
 }
 func (UnimplementedYakServer) ResetAIReActRecommendedSkill(context.Context, *ResetAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetAIReActRecommendedSkill not implemented")
+}
+func (UnimplementedYakServer) UploadToTemporaryFile(grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method UploadToTemporaryFile not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -22178,6 +22203,13 @@ func _Yak_ResetAIReActRecommendedSkill_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_UploadToTemporaryFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).UploadToTemporaryFile(&grpc.GenericServerStream[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_UploadToTemporaryFileServer = grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -24872,6 +24904,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "SubscribeHTTPFlows",
 			Handler:       _Yak_SubscribeHTTPFlows_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "UploadToTemporaryFile",
+			Handler:       _Yak_UploadToTemporaryFile_Handler,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "yakgrpc.proto",

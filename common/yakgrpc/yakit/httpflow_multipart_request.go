@@ -45,12 +45,10 @@ var multipartSpillMarkerPattern = regexp.MustCompile(
 //   - StoredPacket is the in-DB skeleton (header + skeleton body with
 //     placeholders) — small and editable.
 //   - HeaderFile holds the request headers (same contract as flat spill).
-//   - BodyFile is a 0-byte placeholder: the real file contents live in the
-//     sidecar part files (MultipartDir). The complete multipart body is
-//     rebuilt on demand by GetHTTPFlowBodyById via io.Pipe streaming. The
-//     placeholder name anchors the sidecar directory derivation
-//     (multipartSidecarDirFromBodyFile) so cleanup/locating parts work from
-//     the persisted TooLargeRequestBodyFile path alone.
+//   - BodyFile points to the first real spilled part file inside MultipartDir.
+//     Its parent directory anchors cleanup and manifest lookup from the
+//     persisted TooLargeRequestBodyFile path alone. The complete multipart
+//     body is rebuilt on demand by GetHTTPFlowBodyById via io.Pipe streaming.
 //   - MultipartDir is the sidecar directory containing the per-part files
 //     and manifest.json.
 //   - Manifest lists every file part; also persisted to manifest.json in
@@ -72,18 +70,53 @@ type multipartPartMeta struct {
 	Filename    string
 	ContentType string
 	Size        int64
-	File        string // disk filename inside MultipartDir (part-N-<sanitized>)
+	File        string // disk filename inside MultipartDir (part-N-data.txt)
+}
+
+type multipartPartReader interface {
+	NextPart() (*customMultipart.Part, error)
+}
+
+// multipartSpillOps keeps filesystem and streaming failures deterministic in
+// tests. The production wrapper below always supplies the real os/io helpers;
+// no mutable package-level hook is shared by concurrent MITM requests.
+type multipartSpillOps struct {
+	newReader     func(io.Reader) multipartPartReader
+	mkdirAll      func(string, os.FileMode) error
+	create        func(string) (*os.File, error)
+	copy          func(io.Writer, io.Reader) (int64, error)
+	writeHeaders  func(io.Writer, textproto.MIMEHeader) error
+	openTempFile  func(string) (*os.File, error)
+	writeManifest func(string, []multipartPartMeta) error
+}
+
+func defaultMultipartSpillOps() multipartSpillOps {
+	return multipartSpillOps{
+		newReader: func(reader io.Reader) multipartPartReader {
+			return customMultipart.NewReader(reader)
+		},
+		mkdirAll:      os.MkdirAll,
+		create:        os.Create,
+		copy:          io.Copy,
+		writeHeaders:  writePartHeaders,
+		openTempFile:  utils.OpenTempFile,
+		writeManifest: writeMultipartManifest,
+	}
 }
 
 // spillMultipartFilesIfNeeded inspects an oversized request packet and, when
 // it is a multipart/form-data body carrying at least one file part, spills each
-// file part to a sidecar file, writes manifest.json, leaves a 0-byte body
-// placeholder, and returns a skeleton packet safe to store in the DB. The
+// file part to a sidecar file, writes manifest.json, points BodyFile at the
+// first spilled part, and returns a skeleton packet safe to store in the DB. The
 // complete multipart body is rebuilt on demand by GetHTTPFlowBodyById.
 //
 // When the packet is not multipart or carries no file part, IsTooLarge is false
 // and the caller falls back to the flat large-request spill path.
 func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
+	return spillMultipartFilesIfNeededWithOps(packet, defaultMultipartSpillOps())
+}
+
+func spillMultipartFilesIfNeededWithOps(packet []byte, ops multipartSpillOps) (multipartSpillResult, error) {
 	var res multipartSpillResult
 	if len(packet) == 0 {
 		return res, nil
@@ -91,9 +124,13 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 	res.OriginalBodyLen = len(body)
-	// Only engage for oversized bodies; small multiparts take the normal path.
+	// Keep the original multipart body inline when its exact editor-facing
+	// representation (including unquote expansion) remains within D.
 	if len(body) <= GetMaxHTTPFlowRequestBodyInDBBytes() {
-		return res, nil
+		inlineBodySize, _, measureErr := lowhttp.MeasureHTTPRequestFuzzTagBodySize(packet)
+		if measureErr == nil && inlineBodySize <= GetMaxHTTPFlowRequestBodyInDBBytes() {
+			return res, nil
+		}
 	}
 
 	ct := lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type")
@@ -108,11 +145,8 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 
 	// First pass: enumerate parts using the boundary-tolerant reader and
 	// decide whether this is worth skeletonizing (>=1 file part).
-	mr := customMultipart.NewReader(bytes.NewReader(body))
-	var partInfos []struct {
-		header textproto.MIMEHeader
-		isFile bool
-	}
+	mr := ops.newReader(bytes.NewReader(body))
+	hasFilePart := false
 	for {
 		p, err := mr.NextPart()
 		if err != nil {
@@ -123,19 +157,12 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 			return res, nil
 		}
 		isFile := p.FileName() != ""
-		partInfos = append(partInfos, struct {
-			header textproto.MIMEHeader
-			isFile bool
-		}{header: copyMIMEHeader(p.Header), isFile: isFile})
-	}
-	if len(partInfos) == 0 {
-		return res, nil
-	}
-	hasFilePart := false
-	for _, pi := range partInfos {
-		if pi.isFile {
+		if isFile {
 			hasFilePart = true
-			break
+			_, copyErr := ops.copy(io.Discard, p)
+			if copyErr != nil {
+				return res, nil
+			}
 		}
 	}
 	if !hasFilePart {
@@ -143,7 +170,6 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 		// benefit in skeletonizing tiny editable fields.
 		return res, nil
 	}
-
 	// Prepare sidecar directory for per-part files. Its name is derived from
 	// the spill suffix so cleanup can locate it from the persisted
 	// TooLargeRequestBodyFile path (its parent dir) without extra state.
@@ -151,7 +177,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	suffix := fmt.Sprintf("%v_%v", time.Now().Format(utils.DatetimePretty()), uid)
 	tempDir := consts.GetDefaultYakitBaseTempDir()
 	dir := filepath.Join(tempDir, fmt.Sprintf("large-request-body-%v-parts", suffix))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := ops.mkdirAll(dir, 0o755); err != nil {
 		return res, err
 	}
 	res.MultipartDir = dir
@@ -160,7 +186,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	// We write the multipart framing manually into skeletonBuf so the
 	// skeleton keeps the original boundary and part headers verbatim (the
 	// standard multipart.Writer would normalize them).
-	mr = customMultipart.NewReader(bytes.NewReader(body))
+	mr = ops.newReader(bytes.NewReader(body))
 	skeletonBuf := new(bytes.Buffer)
 
 	partIndex := 0
@@ -177,7 +203,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 		isFile := p.FileName() != ""
 		// Opening boundary line for this part.
 		skeletonBuf.WriteString("--" + boundary + "\r\n")
-		if err := writePartHeaders(skeletonBuf, p.Header); err != nil {
+		if err := ops.writeHeaders(skeletonBuf, p.Header); err != nil {
 			_ = os.RemoveAll(dir)
 			return res, err
 		}
@@ -191,14 +217,17 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 				contentType = "application/octet-stream"
 			}
 
-			partFileName := fmt.Sprintf("part-%d-%s.txt", partIndex, sanitizeFilename(filename))
+			// The original filename remains in Content-Disposition and the
+			// manifest. Do not place it in the sidecar path: characters such as
+			// ')', '|', or '{{' are valid filename text but delimit {{file(...)}}.
+			partFileName := fmt.Sprintf("part-%d-data.txt", partIndex)
 			partPath := filepath.Join(dir, partFileName)
-			f, err := os.Create(partPath)
+			f, err := ops.create(partPath)
 			if err != nil {
 				_ = os.RemoveAll(dir)
 				return res, err
 			}
-			n, copyErr := io.Copy(f, p)
+			n, copyErr := ops.copy(f, p)
 			f.Close()
 			if copyErr != nil {
 				_ = os.RemoveAll(dir)
@@ -220,7 +249,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 				multipartSkeletonMarker, partIndex, filename, n)
 		} else {
 			// Text field: preserve value verbatim in the skeleton.
-			if _, err := io.Copy(skeletonBuf, p); err != nil {
+			if _, err := ops.copy(skeletonBuf, p); err != nil {
 				_ = os.RemoveAll(dir)
 				return res, err
 			}
@@ -232,7 +261,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	skeletonBuf.WriteString("--" + boundary + "--\r\n")
 
 	// Write the header file (same contract as flat spill).
-	headerFP, err := utils.OpenTempFile(fmt.Sprintf("large-request-header-%v.txt", suffix))
+	headerFP, err := ops.openTempFile(fmt.Sprintf("large-request-header-%v.txt", suffix))
 	if err != nil {
 		_ = os.RemoveAll(dir)
 		return res, err
@@ -248,7 +277,7 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	// Write manifest.json into the sidecar directory so downstream readers
 	// (toHTTPFlowGRPCModel, GetHTTPFlowBodyById) can enumerate file parts
 	// without re-parsing the skeleton.
-	if err := writeMultipartManifest(dir, res.Manifest); err != nil {
+	if err := ops.writeManifest(dir, res.Manifest); err != nil {
 		_ = os.RemoveAll(dir)
 		_ = os.Remove(headerPath)
 		return res, err
@@ -399,7 +428,21 @@ func rebuildMultipartBodyToWriterWithReplacements(
 // IsMultipartSpillRequestPacket reports whether packet is the editable
 // skeleton representation of an oversized multipart request.
 func IsMultipartSpillRequestPacket(packet []byte) bool {
-	return containsMultipartSpillMarker(packet)
+	if containsMultipartSpillMarker(packet) {
+		return true
+	}
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
+	contentType := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type")))
+	if !strings.HasPrefix(contentType, "multipart/") {
+		return false
+	}
+	for _, path := range fileFuzzTagPaths(body) {
+		dirBase := filepath.Base(filepath.Dir(path))
+		if isEngineOwnedLargeRequestPath(path) && strings.HasSuffix(dirBase, "-parts") {
+			return true
+		}
+	}
+	return false
 }
 
 // RebuildMultipartRequestPacket reconstructs a complete request packet from
@@ -460,7 +503,7 @@ func FlowIsMultipartSpill(flow *schema.HTTPFlow) bool {
 	if flow == nil || !flow.IsTooLargeRequest || flow.TooLargeRequestBodyFile == "" {
 		return false
 	}
-	return containsMultipartSpillMarker([]byte(flow.GetRequest()))
+	return IsMultipartSpillRequestPacket([]byte(flow.GetRequest()))
 }
 
 // FlowMultipartSidecarDir returns the sidecar directory path for a flow's
@@ -527,33 +570,6 @@ func RebuildFlowMultipartBody(flow *schema.HTTPFlow) (io.Reader, error) {
 	return rebuildMultipartBodyToReader(FlowMultipartSkeletonBody(flow), FlowMultipartSidecarDir(flow)), nil
 }
 
-// sanitizeFilename strips path separators and other filesystem-unsafe chars
-// from a part filename so it can be used as a disk filename inside the
-// sidecar directory.
-func sanitizeFilename(name string) string {
-	if name == "" {
-		return "unnamed"
-	}
-	base := filepath.Base(name)
-	if base == "" || base == "." || base == string(os.PathSeparator) {
-		base = "unnamed"
-	}
-	// Replace any remaining separators inside the base just in case.
-	base = strings.ReplaceAll(base, string(os.PathSeparator), "_")
-	base = strings.ReplaceAll(base, "/", "_")
-	return base
-}
-
-func copyMIMEHeader(h textproto.MIMEHeader) textproto.MIMEHeader {
-	out := make(textproto.MIMEHeader, len(h))
-	for k, vs := range h {
-		cp := make([]string, len(vs))
-		copy(cp, vs)
-		out[k] = cp
-	}
-	return out
-}
-
 // multipartSidecarDirFromBodyFile derives the per-part sidecar directory path
 // from the persisted TooLargeRequestBodyFile path. For multipart spills the
 // body file is the first spilled part file, so its parent directory is the
@@ -572,16 +588,11 @@ func multipartSidecarDirFromBodyFile(bodyFile string) string {
 // spills — whose body file also lives in the temp root — only a directory
 // whose base name ends with "-parts" is removed. Safe to call for any flow.
 func cleanupMultipartSidecar(bodyFile string) {
-	dir := multipartSidecarDirFromBodyFile(bodyFile)
-	if dir == "" {
+	_, multipart, ok := engineOwnedLargeRequestBodySuffix(bodyFile)
+	if !ok || !multipart {
 		return
 	}
-	if !strings.HasSuffix(filepath.Base(dir), "-parts") {
-		return
-	}
-	if info, err := os.Stat(dir); err == nil && info.IsDir() {
-		_ = os.RemoveAll(dir)
-	}
+	_ = os.RemoveAll(multipartSidecarDirFromBodyFile(bodyFile))
 }
 
 // manifestFileName is the sidecar file recording the per-part metadata so
@@ -593,10 +604,7 @@ func writeMultipartManifest(sidecarDir string, manifest []multipartPartMeta) err
 	if sidecarDir == "" {
 		return utils.Error("empty sidecar dir")
 	}
-	data, err := jsonMarshalManifest(manifest)
-	if err != nil {
-		return err
-	}
+	data := jsonMarshalManifest(manifest)
 	return os.WriteFile(filepath.Join(sidecarDir, manifestFileName), data, 0o644)
 }
 
@@ -635,7 +643,7 @@ type manifestJSONEntry struct {
 	File        string `json:"file"`
 }
 
-func jsonMarshalManifest(manifest []multipartPartMeta) ([]byte, error) {
+func jsonMarshalManifest(manifest []multipartPartMeta) []byte {
 	entries := make([]manifestJSONEntry, len(manifest))
 	for i, m := range manifest {
 		entries[i] = manifestJSONEntry{
@@ -647,7 +655,11 @@ func jsonMarshalManifest(manifest []multipartPartMeta) ([]byte, error) {
 			File:        m.File,
 		}
 	}
-	return json.MarshalIndent(entries, "", "  ")
+	// manifestJSONEntry contains only JSON-native scalar fields, therefore this
+	// marshal cannot fail. Keeping an impossible error branch would obscure the
+	// real filesystem failures that callers must handle.
+	data, _ := json.MarshalIndent(entries, "", "  ")
+	return data
 }
 
 func jsonUnmarshalManifest(data []byte) ([]multipartPartMeta, error) {
