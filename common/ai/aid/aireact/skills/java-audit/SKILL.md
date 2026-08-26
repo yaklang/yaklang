@@ -3,7 +3,7 @@ name: java-audit
 metadata:
   display_name_zh-CN: Java 静态审计
 description: >
-  Java 项目静态安全审计技能。基于 codeaudit 内置工具链：先 java_project_probe 识别构建系统、
+  Java 项目静态安全审计技能。基于 codeaudit Go 原生工具链：先 java_project_probe 识别构建系统、
   框架与 CMS，再按推荐列表调用依赖 SCA、硬编码密钥、框架配置审计、CMS 专项规则。
   支持 Maven/Gradle 单体与 monorepo（如 RuoYi-Cloud）、scope-modules 模块过滤、
   detection-mode strict/balanced 控制误报。
@@ -11,8 +11,8 @@ description: >
 
 # Java 静态安全审计 (java-audit)
 
-使用 codeaudit 内置 java_audit/* AI 工具对 Java 项目进行确定性静态审计。
-所有工具输出 JSON 报告（含 findings、artifacts、meta.files_scanned）。
+使用 codeaudit Go 原生 AI 工具对 Java 项目进行确定性静态审计。
+所有工具输出 JSON 报告（含 findings、artifacts、meta.files_scanned）。工具集前缀 java_audit/*。
 
 **执行类任务**：加载本技能后必须调用工具并汇总 findings，不能只描述计划。
 

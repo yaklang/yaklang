@@ -1,5 +1,8 @@
 # Java Audit Tools Reference
 
+> All tools are Go-native AI tools registered in the `codeaudittools` package.
+> They wrap the `codeaudit` library directly — no yak script involvement.
+
 ## java_project_probe
 
 探测 Java 项目的构建系统、框架和 CMS 产品。
