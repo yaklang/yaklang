@@ -76,7 +76,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		userInput := task.GetUserInput()
 
-		reactloops.EmitStatus(loop, "初始化报告任务... / Initializing report task...")
+		reactloops.EmitStatus(loop, "正在准备这份报告 / Preparing the report")
 		log.Infof("report_generating init task: analyzing user requirements")
 
 		// Step 1: 解析用户输入，确定输出文件路径和参考资料
@@ -107,7 +107,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		// Step 2: 使用 LiteForge 分析用户意图
 		isModifyExisting := false
 		if outputFilename == "" {
-			reactloops.EmitStatus(loop, "分析用户需求... / Analyzing user requirements...")
+			reactloops.EmitStatus(loop, "正在了解报告重点 / Understanding the report's focus")
 			isModify, targetFile, err := analyzeUserIntent(task.GetContext(), r, userInput, referenceFiles)
 			if err == nil {
 				isModifyExisting = isModify
@@ -216,7 +216,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			"Report task initialized: %s, output=%s (%d bytes), ref_files=%d, knowledge_bases=%d",
 			modeDescription, outputFilename, len(existingContent), len(referenceFiles), len(knowledgeBases)))
 
-		reactloops.EmitStatus(loop, "报告任务就绪 / Report task ready")
+		reactloops.EmitStatus(loop, "已经明确报告重点，正在开始整理 / The report focus is clear; starting to organize it")
 
 		log.Infof("report_generating init completed: filename=%s, is_modify=%v, existing_content=%d bytes, references=%d, kbs=%d",
 			outputFilename, isModifyExisting, len(existingContent), len(referenceFiles), len(knowledgeBases))

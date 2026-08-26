@@ -517,7 +517,11 @@ func executeVerifiedToolBatch(
 		ctx = task.GetContext()
 	}
 
-	loopInfraStatus(loop, fmt.Sprintf("准备并发工具调用（%d 项） / Preparing Parallel Tool Calls...", len(request.Calls)))
+	toolNames := make([]string, 0, len(request.Calls))
+	for _, call := range request.Calls {
+		toolNames = append(toolNames, call.ToolName)
+	}
+	emitToolsPreparingStatus(loop, toolNames)
 	batchRuntime, supported := invoker.(aicommon.ToolBatchInvokeRuntime)
 	var (
 		result *aicommon.ToolBatchResult
@@ -760,6 +764,11 @@ func handleToolBatchActionResult(
 	summary := strings.Join(lines, "\n")
 	invoker.AddToTimeline("[TOOL_BATCH_RESULT]", summary)
 	operator.Feedback(summary)
+	emitToolBatchResultStatus(loop, request, outcomes)
+	toolNames := make([]string, 0, len(request.Calls))
+	for _, call := range request.Calls {
+		toolNames = append(toolNames, call.ToolName)
+	}
 	justExecutedTool := executedToolCallCount > 0
 	if justExecutedTool {
 		operator.MarkToolExecuted(executedToolCallCount)
@@ -772,10 +781,6 @@ func handleToolBatchActionResult(
 	if task == nil || !justExecutedTool {
 		operator.Continue()
 		return
-	}
-	toolNames := make([]string, 0, len(request.Calls))
-	for _, call := range request.Calls {
-		toolNames = append(toolNames, call.ToolName)
 	}
 	verifyResult, triggered, verifyErr := loop.MaybeVerifyUserSatisfaction(ctx, task.GetUserInput(), true, strings.Join(toolNames, ","))
 	if verifyErr != nil {

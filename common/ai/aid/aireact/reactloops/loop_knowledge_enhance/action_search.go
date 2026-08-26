@@ -40,7 +40,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 		desc, toolOpts,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			loop.Set("search_mode", mode)
-			loop.LoadingStatus(fmt.Sprintf("验证参数中 - search_knowledge:%s / validating parameters - mode:%s", mode, mode))
+			loop.LoadingStatus("正在确认查找方向 / Confirming the search direction")
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
 			if len(knowledgeBases) == 0 {
 				// 使用初始化阶段加载的知识库
@@ -253,7 +253,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			// loop.Set("all_compressed_results", allResults)
 
 			// 使用 LiteForge 评估下一步行动
-			loop.LoadingStatus("评估搜索结果与下一步计划 - evaluating next steps")
+			loop.LoadingStatus("正在判断现有信息是否足够 / Checking whether the available information is sufficient")
 			evalResult := evaluateNextSearch(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
 			if evalResult.Finished {
 				// 知识收集已完成，保存总结并退出循环

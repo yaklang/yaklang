@@ -35,7 +35,12 @@ func makeWebSearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption 
 			if query == "" {
 				query = action.GetString("search_query")
 			}
-			loop.LoadingStatus(fmt.Sprintf("searching internet: %s", query))
+			loop.UserStatus(
+				"正在查找最新资料",
+				"Searching for up-to-date information",
+				aicommon.WithStatusCode("answer.web.searching"),
+				aicommon.WithStatusDetail(fmt.Sprintf("本轮关注：%s", query), fmt.Sprintf("Current focus: %s", query)),
+			)
 
 			params := aitool.InvokeParams{"query": query}
 			result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, "web_search", params)

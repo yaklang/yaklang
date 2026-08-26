@@ -131,7 +131,7 @@ func Phase2ScanPlan(loop *reactloops.ReActLoop, categories []model.VulnCategory)
 		ids = append(ids, c.ID)
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, b.String())
-	reactloops.EmitStatus(loop, fmt.Sprintf("Phase 2：%d 个类别待扫描 / Phase 2: %d categories", len(categories), len(categories)))
+	reactloops.EmitStatus(loop, fmt.Sprintf("正在排查 %d 类潜在风险 / Reviewing %d potential risk categories", len(categories), len(categories)))
 	Structured(loop, "code_audit_scan_plan", map[string]any{
 		"category_count": len(categories),
 		"category_ids":   ids,
@@ -224,7 +224,7 @@ func Phase2FindingAdded(loop *reactloops.ReActLoop, category model.VulnCategory,
 		"Finding [%s] %s %s — %s:%d (%s) / %s",
 		category.Name, f.Severity, f.ID, shortFile, f.Line, utils.ShrinkString(f.Title, 80), f.Title,
 	))
-	reactloops.EmitStatus(loop, fmt.Sprintf("已发现 %d 个 finding / %d findings so far", totalFindings, totalFindings))
+	reactloops.EmitStatus(loop, fmt.Sprintf("已找到 %d 个需要进一步确认的位置 / Found %d areas that need further validation", totalFindings, totalFindings))
 }
 
 func Phase2CategoryScanComplete(loop *reactloops.ReActLoop, category model.VulnCategory, findingCount int, coveragePreview string) {
@@ -302,7 +302,7 @@ func Phase3VerifyScope(loop *reactloops.ReActLoop, findings []*model.Finding, by
 		b.WriteString(fmt.Sprintf("  • %s: %s\n", cat, strings.Join(byCategory[cat], ", ")))
 	}
 	reactloops.EmitActionLog(loop, util.VerifyNodeID, b.String())
-	reactloops.EmitStatus(loop, fmt.Sprintf("已确定验证范围 (%d findings) / Verification scope confirmed", len(findings)))
+	reactloops.EmitStatus(loop, fmt.Sprintf("已确定 %d 个重点位置，正在逐一确认 / Identified %d priority areas for validation", len(findings), len(findings)))
 	Structured(loop, "code_audit_verify_scope", map[string]any{
 		"finding_count": len(findings),
 		"type_count":    len(byCategory),

@@ -37,7 +37,7 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 		streamFields,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			// 验证参数
-			loop.LoadingStatus("验证最终总结参数 - validating final summary parameters")
+			loop.LoadingStatus("正在确认关键信息是否完整 / Checking that the key information is complete")
 			summary := action.GetString("summary")
 			if summary == "" {
 				return utils.Error("summary is required")
@@ -45,7 +45,7 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			loop.LoadingStatus("生成最终总结中 - generating final summary")
+			loop.LoadingStatus("正在组织回答 / Preparing the answer")
 
 			summary := action.GetString("summary")
 			if summary == "" {
