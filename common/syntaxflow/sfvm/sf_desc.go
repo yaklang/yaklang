@@ -2,6 +2,8 @@ package sfvm
 
 import (
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type SFDescKeyType string
@@ -31,6 +33,8 @@ const (
 const (
 	// RuleModeSource marks rules that scan source files without SSA IR (sfpattern).
 	RuleModeSource = "source"
+	// RuleModeSSA marks rules that run on SSA IR (default).
+	RuleModeSSA = "ssa"
 )
 
 func ValidDescItemKeyType(key string) SFDescKeyType {
@@ -113,6 +117,26 @@ func RuleHasSourceMode(tag string, extra map[string]string) bool {
 	return false
 }
 
+// RuleIsSourceMode reports whether rule should run via sfpattern.
+func RuleIsSourceMode(rule *schema.SyntaxFlowRule, extra map[string]string) bool {
+	if rule != nil {
+		switch schema.ValidRuleMode(rule.Mode) {
+		case schema.SFR_MODE_SOURCE:
+			return true
+		case schema.SFR_MODE_SSA:
+			return false
+		}
+	}
+	return RuleHasSourceMode(ruleTag(rule), extra)
+}
+
+func ruleTag(rule *schema.SyntaxFlowRule) string {
+	if rule == nil {
+		return ""
+	}
+	return rule.Tag
+}
+
 // FrameIsSourceMode reports whether a compiled frame should run via sfpattern.
 func FrameIsSourceMode(frame *SFFrame) bool {
 	if frame == nil {
@@ -131,11 +155,7 @@ func FrameIsSourceMode(frame *SFFrame) bool {
 			extra[k] = v
 		}
 	}
-	if RuleHasSourceMode(rule.Tag, extra) {
-		return true
-	}
-	// Also check rule Description / raw fields via Tag alone after compile.
-	return RuleHasSourceMode(rule.Tag, nil)
+	return RuleIsSourceMode(rule, extra)
 }
 
 // GetSupplyInfoDescKeyType 拿到所有desc item中，

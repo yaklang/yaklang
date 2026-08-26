@@ -20,6 +20,7 @@ var Exports = map[string]any{
 	// Rule filter (builtin DB rules; prefer Tag=source for source-mode)
 	"withRuleFilter":            ssaconfig.WithRuleFilter,
 	"withRuleFilterTag":         ssaconfig.WithRuleFilterTag,
+	"withRuleFilterMode":        ssaconfig.WithRuleFilterMode,
 	"withRuleFilterKeyword":     ssaconfig.WithRuleFilterKeyword,
 	"withRuleFilterGroupNames":  ssaconfig.WithRuleFilterGroupNames,
 	"withRuleFilterLibRuleKind": ssaconfig.WithRuleFilterLibRuleKind,

@@ -447,6 +447,7 @@ func buildSyntaxFlowRuleFromSnapshotItem(item RuleSnapshotItem) (*schema.SyntaxF
 		rule.Severity = schema.ValidSeverityType(severity)
 	}
 	rule.NeedUpdate = false
+	rule.NormalizeMode()
 	return rule, nil
 }
 

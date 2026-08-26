@@ -307,6 +307,7 @@ func (m *scanManager) initByConfig() error {
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
 		db := consts.GetGormProfileDatabase()
 		db = yakit.FilterSyntaxFlowRule(db, filter)
+		db = yakit.ApplySyntaxFlowRuleModeFilter(db, config.GetRuleFilterMode())
 		// get all rule name
 		var ruleNames []string
 		err := db.Pluck("rule_name", &ruleNames).Error
@@ -325,6 +326,7 @@ func (m *scanManager) initByConfig() error {
 		if err != nil {
 			return err
 		}
+		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, config.GetRuleFilterMode())
 		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
 		for _, rule := range parsedRules {
 			ruleCh <- rule

@@ -198,6 +198,41 @@ alert $sink for {
 		"task-local snapshot execution must materialize risks declared by canonical rule content")
 }
 
+func TestFilterTaskLocalSyntaxFlowRulesByMode(t *testing.T) {
+	rules, _, err := parseTaskLocalSyntaxFlowRules([]*ypb.SyntaxFlowRuleInput{
+		{
+			RuleName: "source-rule",
+			Content: `desc(mode: "source", language: general, title: src)
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+		},
+		{
+			RuleName: "ssa-rule",
+			Content: `desc(mode: "ssa", language: general, title: ssa)
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, rules, 2)
+
+	filtered := filterTaskLocalSyntaxFlowRulesByMode(rules, []string{"source"})
+	require.Len(t, filtered, 1)
+	require.Equal(t, "source-rule", filtered[0].RuleName)
+	require.Equal(t, schema.SFR_MODE_SOURCE, filtered[0].Mode)
+}
+
+func TestFilterTaskLocalSyntaxFlowRulesByModeKeepsAllRulesWhenUnset(t *testing.T) {
+	rules, _, err := parseTaskLocalSyntaxFlowRules([]*ypb.SyntaxFlowRuleInput{
+		{RuleName: "source-rule", Content: `desc(mode: "source", language: general, title: src); alert $x`},
+		{RuleName: "ssa-rule", Content: `desc(mode: "ssa", language: general, title: ssa); alert $x`},
+	})
+	require.NoError(t, err)
+
+	filtered := filterTaskLocalSyntaxFlowRulesByMode(rules, nil)
+	require.Len(t, filtered, 2)
+}
+
 func TestRuleInputResultKindPreservesOrdinaryDebugSemantics(t *testing.T) {
 	if got := ruleInputResultKind(false); got != schema.SFResultKindDebug {
 		t.Fatalf("ordinary inline rule input kind changed: %s", got)

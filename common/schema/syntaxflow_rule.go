@@ -113,6 +113,47 @@ func ValidRuleType(i any) SyntaxFlowRuleType {
 	}
 }
 
+// SyntaxFlowRuleModeType selects the rule execution backend stored in DB.
+type SyntaxFlowRuleModeType string
+
+const (
+	// SFR_MODE_SSA runs SyntaxFlow against SSA IR (default).
+	SFR_MODE_SSA SyntaxFlowRuleModeType = "ssa"
+	// SFR_MODE_SOURCE runs sfpattern against raw source files (no SSA IR).
+	SFR_MODE_SOURCE SyntaxFlowRuleModeType = "source"
+)
+
+func ValidRuleMode(i any) SyntaxFlowRuleModeType {
+	raw := strings.TrimSpace(codec.AnyToString(i))
+	raw = strings.Trim(raw, `"`)
+	switch strings.ToLower(raw) {
+	case "source", "pattern", "sfpattern":
+		return SFR_MODE_SOURCE
+	case "ssa", "":
+		return SFR_MODE_SSA
+	default:
+		return SFR_MODE_SSA
+	}
+}
+
+func (s *SyntaxFlowRule) NormalizeMode() {
+	if s == nil {
+		return
+	}
+	if strings.TrimSpace(string(s.Mode)) != "" {
+		s.Mode = ValidRuleMode(string(s.Mode))
+		return
+	}
+	for _, part := range strings.Split(s.Tag, "|") {
+		switch strings.ToLower(strings.TrimSpace(part)) {
+		case "source", "pattern", "sfpattern":
+			s.Mode = SFR_MODE_SOURCE
+			return
+		}
+	}
+	s.Mode = SFR_MODE_SSA
+}
+
 func ValidSeverityType(i any) SyntaxFlowSeverity {
 	switch strings.ToLower(yakunquote.TryUnquote(codec.AnyToString(i))) {
 	case "info", "i", "verbose", "debug", "prompt":
@@ -320,6 +361,11 @@ type SyntaxFlowRule struct {
 	// 用于分类和筛选，可包含多个标签，如 "injection,security,owasp"
 	Tag string
 
+	// Mode 规则执行模式
+	// source: sfpattern 源码扫描（无需 SSA IR）
+	// ssa: 默认 SSA IR 扫描
+	Mode SyntaxFlowRuleModeType
+
 	// CWE 通用弱点枚举列表
 	// Common Weakness Enumeration，如 ["CWE-89", "CWE-564"]
 	// 用于标准化漏洞分类
@@ -419,6 +465,7 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
 	}
+	s.NormalizeMode()
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
 	s.Type = ValidRuleType(s.Type)
@@ -430,6 +477,7 @@ func (s *SyntaxFlowRule) BeforeCreate() error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
 	}
+	s.NormalizeMode()
 	s.CalcHash()
 	s.Purpose = ValidPurpose(s.Purpose)
 	s.Type = ValidRuleType(s.Type)
