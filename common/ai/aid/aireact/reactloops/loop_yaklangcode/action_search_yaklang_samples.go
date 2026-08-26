@@ -204,7 +204,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 
 			nodeID := "semantic_search_yaklang_samples"
 			startLine := fmt.Sprintf("语义搜索: %d 个问题, top_n=%d, threshold=%.2f", len(questions), topN, scoreThreshold)
-			reactloops.EmitStatus(loop, "语义搜索中 / Semantic searching...")
+			reactloops.EmitStatus(loop, "正在寻找最相关的代码样例 / Finding the most relevant code examples")
 
 			invoker.AddToTimeline("start_semantic_search_yaklang_samples", startLine)
 

@@ -351,7 +351,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 
 			nodeID := "grep_yaklang_samples"
 			startLine := fmt.Sprintf("Grep 搜索: pattern=%s, case_sensitive=%v, context=%d", pattern, caseSensitive, contextLines)
-			reactloops.EmitStatus(loop, "Grep 搜索中 / Grep searching...")
+			reactloops.EmitStatus(loop, "正在定位相关代码样例 / Locating relevant code examples")
 
 			invoker.AddToTimeline("start_grep_yaklang_samples", startLine)
 

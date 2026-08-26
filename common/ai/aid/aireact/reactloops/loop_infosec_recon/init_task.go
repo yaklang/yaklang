@@ -93,7 +93,7 @@ func workDirFromInvoker(r aicommon.AIInvokeRuntime) string {
 
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-		reactloops.EmitStatus(loop, "初始化信息搜集任务... / Initializing infosec recon task...")
+		reactloops.EmitStatus(loop, "正在准备收集相关信息 / Preparing to gather relevant information")
 
 		wd := workDirFromInvoker(r)
 		if wd == "" {
@@ -119,7 +119,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 
 		r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → "+ToolCrawlJsCollector+" (optional deep_js) → "+ToolJsStaticExtractAI+"(paths / verified JS dir) → api_pool_merge / probe_api_candidates as needed.")
-		reactloops.EmitStatus(loop, "信息搜集任务就绪 / Infosec recon task ready")
+		reactloops.EmitStatus(loop, "已经明确目标，正在开始查找线索 / The target is clear; starting to look for leads")
 		operator.Continue()
 	}
 }

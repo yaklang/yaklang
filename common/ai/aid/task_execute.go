@@ -51,16 +51,17 @@ func (t *AiTask) execute() error {
 	}
 
 	// Emit task execution start status
-	t.planLoadingStatus(fmt.Sprintf("执行子任务 [%s] / Executing Subtask [%s]: %s", t.Index, t.Index, t.Name))
+	t.planUserStatus(
+		fmt.Sprintf("正在处理「%s」", t.Name),
+		fmt.Sprintf("Working on %q", t.Name),
+		aicommon.WithStatusCode("plan.task_running"),
+	)
 
 	err := t.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,
 		t,
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
-
-			// Emit iteration status
-			t.planLoadingStatus(fmt.Sprintf("任务 [%s] 迭代 %d 完成 / Task [%s] Iteration %d Completed", t.Index, iteration, t.Index, iteration))
 
 			// Log current task status for debugging - similar to prompt context format
 			log.Infof("=== Post Iteration Task Status ===")
@@ -128,21 +129,25 @@ func (t *AiTask) execute() error {
 
 			if shouldComplete {
 				// Emit task completing status
-				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 正在总结 / Task [%s] Generating Summary...", t.Index, t.Index))
+				t.planUserStatus(
+					fmt.Sprintf("正在归纳「%s」的结果", t.Name),
+					fmt.Sprintf("Summarizing the results of %q", t.Name),
+					aicommon.WithStatusCode("plan.task_summarizing"),
+				)
 
 				err := t.generateTaskSummary(summary, nextSteps)
 				if err != nil {
 					log.Errorf("iteration task summary failed: %v", err)
-					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结失败 / Task [%s] Summary Failed", t.Index, t.Index))
+					t.planUserStatus(fmt.Sprintf("暂时没能归纳「%s」的结果", t.Name), fmt.Sprintf("Unable to summarize %q", t.Name), aicommon.WithStatusCode("plan.task_summary_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 				} else {
-					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 已完成 / Task [%s] Completed", t.Index, t.Index))
+					t.planUserStatus(fmt.Sprintf("「%s」已经完成", t.Name), fmt.Sprintf("%q is complete", t.Name), aicommon.WithStatusCode("plan.task_completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
 				}
 
 				// Signal the loop to end - this ensures the loop terminates after this iteration
 				operator.EndIteration("task completed via completed_task_index or isDone")
 			} else {
 				// Emit continuing status
-				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
+				t.planUserStatus(fmt.Sprintf("正在继续处理「%s」", t.Name), fmt.Sprintf("Continuing to work on %q", t.Name), aicommon.WithStatusCode("plan.task_continuing"))
 
 				// Combine summary (reasoning) and todo_delta as Processing status
 				// This ensures both are captured in StatusSummary to avoid context loss
@@ -261,19 +266,19 @@ func (t *AiTask) executeTask() error {
 		if t.GetStatus() == aicommon.AITaskState_Processing {
 			t.SetStatus(aicommon.AITaskState_Aborted)
 		}
-		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 上下文已取消 / Task [%s] Context Cancelled", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("「%s」已经停止", t.Name), fmt.Sprintf("%q has stopped", t.Name), aicommon.WithStatusCode("plan.task_stopped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 		return utils.Errorf("context is done")
 	}
 
 	// Execute the task
 	if err := t.execute(); err != nil {
-		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 执行出错 / Task [%s] Execution Error", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("处理「%s」时遇到问题", t.Name), fmt.Sprintf("A problem occurred while working on %q", t.Name), aicommon.WithStatusCode("plan.task_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		return err
 	}
 
 	if t.GetStatus() != aicommon.AITaskState_Skipped {
 		// Start to wait for user review
-		t.planLoadingStatus(fmt.Sprintf("等待用户审查任务 [%s] / Waiting User Review for Task [%s]", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("「%s」已经处理好，等你确认", t.Name), fmt.Sprintf("%q is ready for your review", t.Name), aicommon.WithStatusCode("plan.task_awaiting_review"), aicommon.WithStatusState(aicommon.StatusStateWaiting))
 		ep := t.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 		t.EmitInfo("start to wait for user review current task")
@@ -285,7 +290,7 @@ func (t *AiTask) executeTask() error {
 		t.DoWaitAgree(t.Ctx, ep)
 
 		// User review finished
-		t.planLoadingStatus(fmt.Sprintf("处理任务 [%s] 审查结果 / Processing Review for Task [%s]", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("正在根据你的意见调整「%s」", t.Name), fmt.Sprintf("Updating %q based on your feedback", t.Name), aicommon.WithStatusCode("plan.task_revising"))
 		reviewResult := ep.GetParams()
 		t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
 		t.EmitInfo("start to handle review task event: %v", ep.GetId())
@@ -297,7 +302,7 @@ func (t *AiTask) executeTask() error {
 			log.Warnf("error handling review result: %v", err)
 		}
 	} else {
-		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 已跳过 / Task [%s] Skipped", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("已跳过「%s」", t.Name), fmt.Sprintf("Skipped %q", t.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 		t.EmitInfo("task %s was skipped by user, skip review", t.Name)
 		log.Infof("task %s was skipped by user, skip review", t.Name)
 	}
@@ -306,7 +311,7 @@ func (t *AiTask) executeTask() error {
 }
 
 func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
-	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 生成总结提示 / Task [%s] Generating Summary Prompt...", t.Index, t.Index))
+	t.planUserStatus(fmt.Sprintf("正在整理「%s」的关键信息", t.Name), fmt.Sprintf("Organizing the key information from %q", t.Name), aicommon.WithStatusCode("plan.task_summary_preparing"))
 
 	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
 	if err != nil {
@@ -319,7 +324,7 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 	// reference material emission tracking (once per transaction, not per key)
 	var referenceEmittedOnce sync.Once
 
-	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 等待 AI 生成总结 / Task [%s] Waiting AI Summary...", t.Index, t.Index))
+	t.planUserStatus(fmt.Sprintf("正在归纳「%s」的结果", t.Name), fmt.Sprintf("Summarizing the results of %q", t.Name), aicommon.WithStatusCode("plan.task_summarizing"))
 	extractStart := time.Now()
 	err = t.CallAITransaction(summaryPromptWellFormed, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
 		boundEmitter := summaryReader.BindEmitter(t.GetEmitter())
@@ -335,7 +340,6 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 					}()
 
 					log.Debugf("summary stream handler started for field [%s]", key)
-					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 处理 %s / Task [%s] Processing %s", t.Index, key, t.Index, key))
 
 					nodeId := "summary-long"
 
@@ -448,7 +452,7 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 		}
 	}
 
-	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))
+	t.planUserStatus(fmt.Sprintf("「%s」的结果已经整理完成", t.Name), fmt.Sprintf("The results of %q are ready", t.Name), aicommon.WithStatusCode("plan.task_summary_ready"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
 
 	// Save timeline diff and result summary artifacts
 	if err := t.saveTaskArtifacts(summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary); err != nil {

@@ -103,7 +103,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("fixed_files", 0)
 		loop.Set("rewritten_files", 0)
 
-		reactloops.EmitStatus(loop, "初始化 Java 反编译任务 / Initializing Java Decompiler Task")
+		reactloops.EmitStatus(loop, "正在了解 Java 文件和处理目标 / Understanding the Java files and requested changes")
 		r.AddToTimeline("task_initialized", utils.ShrinkString(userQuery, 200))
 		operator.Continue()
 	}

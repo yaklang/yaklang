@@ -2,12 +2,13 @@ package phase2
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
-	"strings"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -43,9 +44,9 @@ func emitPhase2LockTargetFiles(
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, lines)
 	if done {
-		reactloops.EmitStatus(loop, fmt.Sprintf("阶段B 逐文件审计：%s (%d 个文件) / Phase B audit: %s", category.Name, total, category.ID))
+		reactloops.EmitStatus(loop, fmt.Sprintf("正在逐一检查「%s」相关的 %d 个文件 / Reviewing %d files related to %s", category.Name, total, total, category.Name))
 	} else {
-		reactloops.EmitStatus(loop, fmt.Sprintf("阶段A 已锁定 %d 个候选 / Phase A: %d targets locked", total, total))
+		reactloops.EmitStatus(loop, fmt.Sprintf("已找到 %d 个需要重点关注的位置 / Found %d priority areas", total, total))
 	}
 	emitPhase2Structured(loop, "code_audit_scan_lock_targets", map[string]any{
 		"category_id":   category.ID,
@@ -77,7 +78,7 @@ func emitPhase2FastContextResult(
 		lines += "\n摘要: " + utils.ShrinkString(strings.TrimSpace(summaryMarkdown), 400)
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, lines)
-	reactloops.EmitStatus(loop, fmt.Sprintf("阶段A：%d 个 fast_context 候选 / Phase A: %d candidates", len(paths), len(paths)))
+	reactloops.EmitStatus(loop, fmt.Sprintf("正在筛选 %d 个可能相关的位置 / Reviewing %d potentially relevant locations", len(paths), len(paths)))
 	emitPhase2Structured(loop, "code_audit_scan_fast_context", map[string]any{
 		"category_id":     category.ID,
 		"category_name":   category.Name,
@@ -114,7 +115,13 @@ func emitPhase2MarkFileDone(
 		lines += "\n全部目标文件已审计，请 complete_scan / All files done — call complete_scan"
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, lines)
-	reactloops.EmitStatus(loop, fmt.Sprintf("审计进度 %d/%d / Progress %d/%d", done, total, done, total))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("正在检查「%s」相关文件（%d/%d）", category.Name, done, total),
+		fmt.Sprintf("Reviewing files related to %s (%d/%d)", category.Name, done, total),
+		aicommon.WithStatusCode("audit.file.reviewing"),
+		aicommon.WithStatusProgress(int64(done), int64(total), "file"),
+	)
 	emitPhase2Structured(loop, "code_audit_scan_mark_file_done", map[string]any{
 		"category_id":   category.ID,
 		"category_name": category.Name,

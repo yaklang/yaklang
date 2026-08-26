@@ -50,7 +50,7 @@ func handleToolCallResult(
 	if err != nil {
 		errMsg := fmt.Sprintf("Tool '%s' invocation protocol failed: %v.", toolPayload, err)
 		invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)
-		loopInfraStatus(loop, "工具协议失败 / Tool Protocol Failed")
+		emitToolResultStatus(loop, toolPayload, false)
 
 		resolved := loop.ResolveIdentifier(toolPayload)
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingError(err) {
@@ -81,19 +81,19 @@ func handleToolCallResult(
 	if result == nil {
 		msg := fmt.Sprintf("tool call [%v] returned nil result", toolPayload)
 		invoker.AddToTimeline("error", msg)
-		loopInfraStatus(loop, "工具无结果 / Tool Returned No Result")
+		emitToolResultStatus(loop, toolPayload, false)
 		operator.Continue()
 		return
 	}
 
 	if result.Success {
 		reactloops.MarkEditBeforeExecutionCompleted(loop, toolPayload)
-		loopInfraStatus(loop, "工具调用已结束 / Tool Invocation Settled")
+		emitToolResultStatus(loop, toolPayload, true)
 	}
 
 	if result.Error != "" {
 		invoker.AddToTimeline("call["+toolPayload+"] protocol-error", result.Error)
-		loopInfraStatus(loop, "工具协议错误 / Tool Protocol Error")
+		emitToolResultStatus(loop, toolPayload, false)
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingMessage(result.Error) {
 			operator.Feedback(
 				"[MCP] Tool '" + toolPayload + "' is still initializing. " +
