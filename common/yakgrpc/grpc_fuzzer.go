@@ -48,6 +48,16 @@ var (
 	fuzzerSessionPreFix  = "__FUZZER_SESSION__"
 )
 
+func ensureLowhttpHiddenIndex(r *lowhttp.LowhttpResponse) string {
+	if r == nil {
+		return uuid.NewString()
+	}
+	if strings.TrimSpace(r.HiddenIndex) == "" {
+		r.HiddenIndex = uuid.NewString()
+	}
+	return r.HiddenIndex
+}
+
 func Chardet(raw []byte) string {
 	res, err := chardet.NewTextDetector().DetectBest(raw)
 	if err != nil {
@@ -1368,6 +1378,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					TaskId:      int64(taskID),
 					Payloads:    result.Payloads,
 					RuntimeID:   runtimeID,
+					HiddenIndex: ensureLowhttpHiddenIndex(result.LowhttpResponse),
 					BodyLength:  totalLen,
 					DurationMs:  result.DurationMs,
 				}
@@ -1414,7 +1425,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 
 			if result.Error != nil {
 				log.Errorf("http pool error: %s", result.Error)
-				hiddenIndex := ""
+				hiddenIndex := ensureLowhttpHiddenIndex(result.LowhttpResponse)
 				rsp := &ypb.FuzzerResponse{}
 				rsp.RequestRaw = result.RequestRaw
 				rsp.UUID = uuid.New().String()
@@ -1424,14 +1435,11 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				rsp.TaskId = int64(taskID)
 				rsp.Payloads = payloads
 				rsp.RuntimeID = runtimeID
+				rsp.HiddenIndex = hiddenIndex
 				rsp.ResponseRaw = result.ResponseRaw
 				if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
 					SetFuzzerRespTraceInfo(rsp, result.LowhttpResponse.TraceInfo)
 					rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
-					hiddenIndex = result.LowhttpResponse.HiddenIndex
-				}
-				if hiddenIndex == "" {
-					hiddenIndex = uuid.NewString()
 				}
 
 				task.HTTPFlowFailedCount++
@@ -1510,6 +1518,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			}
 
 			if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() && result.LowhttpResponse != nil {
+				ensureLowhttpHiddenIndex(result.LowhttpResponse)
 				yakit.SaveLowHTTPFlow(result.LowhttpResponse, false)
 			}
 
@@ -1557,6 +1566,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,
 				RuntimeID:                  runtimeID,
+				HiddenIndex:                ensureLowhttpHiddenIndex(result.LowhttpResponse),
 				IsAutoFixContentType:       isAutoFixContentType,
 				OriginalContentType:        originContentType,
 				FixContentType:             fixContentType,
@@ -1710,6 +1720,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					}
 
 					if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+						ensureLowhttpHiddenIndex(redirectRes)
 						yakit.SaveLowHTTPFlow(redirectRes, false)
 					}
 
@@ -1722,6 +1733,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 						Payloads:              payloads,
 						IsHTTPS:               redirectRes.Https,
 						RuntimeID:             runtimeID,
+						HiddenIndex:           ensureLowhttpHiddenIndex(redirectRes),
 					}
 					if redirectRes != nil && redirectRes.TraceInfo != nil {
 						SetFuzzerRespTraceInfo(redirectRsp, redirectRes.TraceInfo)
@@ -1780,7 +1792,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					}
 					redirectRsp.TaskId = int64(taskID)
 					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.Uuid, redirectRsp)
-					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
+					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRsp.HiddenIndex, redirectRsp)
 					err := feedbackResponse(redirectRsp, false, false)
 					if err != nil {
 						log.Errorf("send to client failed: %s", err)
@@ -1794,7 +1806,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			}
 			rsp.TaskId = int64(taskID)
 			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.Uuid, rsp)
-			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
+			yakit.SaveWebFuzzerResponseEx(int(task.ID), rsp.HiddenIndex, rsp)
 			err := feedbackResponse(rsp, false, skipSendForSSEFinal)
 			if du := time.Now().Sub(feedbackNormalResponseStart); du > time.Second {
 				log.Warnf("feedbackNormalResponse cost too much time, try investigate it, cost: %v", du)

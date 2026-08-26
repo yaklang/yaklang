@@ -50554,8 +50554,10 @@ type FuzzerResponse struct {
 	FixContentType             string                   `protobuf:"bytes,60,opt,name=FixContentType,proto3" json:"FixContentType,omitempty"`
 	IsSetContentTypeOptions    bool                     `protobuf:"varint,61,opt,name=IsSetContentTypeOptions,proto3" json:"IsSetContentTypeOptions,omitempty"`
 	RandomChunkedData          []*RandomChunkedResponse `protobuf:"bytes,62,rep,name=RandomChunkedData,proto3" json:"RandomChunkedData,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// 与 http_flows / web_fuzzer_response 对齐的唯一键，下载 body 用它而不是 RuntimeID。
+	HiddenIndex   string `protobuf:"bytes,64,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FuzzerResponse) Reset() {
@@ -50901,6 +50903,13 @@ func (x *FuzzerResponse) GetRandomChunkedData() []*RandomChunkedResponse {
 		return x.RandomChunkedData
 	}
 	return nil
+}
+
+func (x *FuzzerResponse) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
 }
 
 type RandomChunkedResponse struct {
@@ -51296,7 +51305,9 @@ type GetHTTPFlowBodyByIdRequest struct {
 	// multipart 请求：指定要流式返回的文件 part 索引（来自 HTTPFlow.MultipartFiles）。
 	// 未设 = 返回完整 body（multipart 时现场流式重建完整 body）。
 	// 用 optional 以区分「未设」与「part 0」。
-	PartIndex     *int32 `protobuf:"varint,6,opt,name=PartIndex,proto3,oneof" json:"PartIndex,omitempty"`
+	PartIndex *int32 `protobuf:"varint,6,opt,name=PartIndex,proto3,oneof" json:"PartIndex,omitempty"`
+	// WebFuzzer 单条结果：按 HiddenIndex 定位 HTTPFlow，避免 RuntimeId 命中任务内其它 hop。
+	HiddenIndex   string `protobuf:"bytes,7,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -51371,6 +51382,13 @@ func (x *GetHTTPFlowBodyByIdRequest) GetPartIndex() int32 {
 		return *x.PartIndex
 	}
 	return 0
+}
+
+func (x *GetHTTPFlowBodyByIdRequest) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
 }
 
 type MITMExtractAggregateFlowFilterRow struct {
@@ -79604,7 +79622,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fUrlWithoutQuery\x18\x02 \x01(\tR\x0fUrlWithoutQuery\"w\n" +
 	"\x16FuzzerSequenceResponse\x12,\n" +
 	"\aRequest\x18\x01 \x01(\v2\x12.ypb.FuzzerRequestR\aRequest\x12/\n" +
-	"\bResponse\x18\x02 \x01(\v2\x13.ypb.FuzzerResponseR\bResponse\"\xed\r\n" +
+	"\bResponse\x18\x02 \x01(\v2\x13.ypb.FuzzerResponseR\bResponse\"\x8f\x0e\n" +
 	"\x0eFuzzerResponse\x12\x16\n" +
 	"\x06Method\x18\x01 \x01(\tR\x06Method\x12\x1e\n" +
 	"\n" +
@@ -79661,7 +79679,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13OriginalContentType\x18; \x01(\tR\x13OriginalContentType\x12&\n" +
 	"\x0eFixContentType\x18< \x01(\tR\x0eFixContentType\x128\n" +
 	"\x17IsSetContentTypeOptions\x18= \x01(\bR\x17IsSetContentTypeOptions\x12H\n" +
-	"\x11RandomChunkedData\x18> \x03(\v2\x1a.ypb.RandomChunkedResponseR\x11RandomChunkedData\"\x9c\x02\n" +
+	"\x11RandomChunkedData\x18> \x03(\v2\x1a.ypb.RandomChunkedResponseR\x11RandomChunkedData\x12 \n" +
+	"\vHiddenIndex\x18@ \x01(\tR\vHiddenIndex\"\x9c\x02\n" +
 	"\x15RandomChunkedResponse\x12\x14\n" +
 	"\x05Index\x18\x01 \x01(\x03R\x05Index\x12\x12\n" +
 	"\x04Data\x18\x02 \x01(\fR\x04Data\x12$\n" +
@@ -79687,14 +79706,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16GetHTTPFlowByIdRequest\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\"+\n" +
 	"\x17GetHTTPFlowByIdsRequest\x12\x10\n" +
-	"\x03Ids\x18\x02 \x03(\x03R\x03Ids\"\xcb\x01\n" +
+	"\x03Ids\x18\x02 \x03(\x03R\x03Ids\"\xed\x01\n" +
 	"\x1aGetHTTPFlowBodyByIdRequest\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tIsRequest\x18\x02 \x01(\bR\tIsRequest\x12\x18\n" +
 	"\aBufSize\x18\x03 \x01(\x03R\aBufSize\x12\x1c\n" +
 	"\tRuntimeId\x18\x04 \x01(\tR\tRuntimeId\x12\x16\n" +
 	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\x12!\n" +
-	"\tPartIndex\x18\x06 \x01(\x05H\x00R\tPartIndex\x88\x01\x01B\f\n" +
+	"\tPartIndex\x18\x06 \x01(\x05H\x00R\tPartIndex\x88\x01\x01\x12 \n" +
+	"\vHiddenIndex\x18\a \x01(\tR\vHiddenIndexB\f\n" +
 	"\n" +
 	"_PartIndex\"g\n" +
 	"!MITMExtractAggregateFlowFilterRow\x12 \n" +

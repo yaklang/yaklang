@@ -309,6 +309,83 @@ Host: %v
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_GetHTTPFlowBodyByHiddenIndex(t *testing.T) {
+	firstBody := "first-" + uuid.NewString()
+	finalBody := "final-" + uuid.NewString()
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.RequestURI != "/admin" {
+			writer.Header().Set("Location", "/admin")
+			writer.WriteHeader(http.StatusMovedPermanently)
+			_, _ = writer.Write([]byte(firstBody))
+			return
+		}
+		_, _ = writer.Write([]byte(finalBody))
+	})
+
+	c, err := NewLocalClient()
+	require.NoError(t, err)
+
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %v
+
+`, utils.HostPort(host, port)),
+		IsHTTPS:                  false,
+		PerRequestTimeoutSeconds: 5,
+		NoFollowRedirect:         false,
+		RedirectTimes:            3,
+	})
+	require.NoError(t, err)
+
+	var responses []*ypb.FuzzerResponse
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+		}
+		responses = append(responses, rsp)
+	}
+	require.GreaterOrEqual(t, len(responses), 2)
+
+	indexes := make(map[string]struct{})
+	runtimeID := responses[0].GetRuntimeID()
+	require.NotEmpty(t, runtimeID)
+	for _, rsp := range responses {
+		require.Equal(t, runtimeID, rsp.GetRuntimeID())
+		require.NotEmpty(t, rsp.GetHiddenIndex(), "FuzzerResponse.HiddenIndex should be set")
+		_, dup := indexes[rsp.GetHiddenIndex()]
+		require.False(t, dup, "each hop should have unique HiddenIndex")
+		indexes[rsp.GetHiddenIndex()] = struct{}{}
+	}
+
+	for _, rsp := range responses {
+		wantBody := string(lowhttp.GetHTTPPacketBody(rsp.ResponseRaw))
+		stream, err := c.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
+			HiddenIndex: rsp.GetHiddenIndex(),
+			IsRequest:   false,
+		})
+		require.NoError(t, err)
+
+		var gotBody strings.Builder
+		count := 0
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			count++
+			if count > 1 {
+				gotBody.Write(msg.GetData())
+			}
+		}
+		require.GreaterOrEqual(t, count, 2)
+		require.Equal(t, wantBody, gotBody.String(), "body by HiddenIndex should match the selected hop")
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_WITHPLUGIN(t *testing.T) {
 	var token string
 	name, clearFunc, err := httptpl.MockEchoPlugin(func(s string) {
