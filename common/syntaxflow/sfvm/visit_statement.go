@@ -136,7 +136,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			y.rule.RuleId = value
 		case SFDescKeyType_Mode:
 			extraDesc.rawDesc["mode"] = value
-			if IsSourceMode(value) {
+			y.rule.Mode = schema.ValidRuleMode(value)
+			if y.rule.Mode == schema.SFR_MODE_SOURCE {
 				y.rule.Tag = AppendRuleTag(y.rule.Tag, RuleModeSource)
 			}
 		default:

@@ -126,7 +126,7 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
 	// 语言匹配检查（source 模式规则按文件 glob 过滤，不强制语言对齐）
-	if !m.Config.GetScanIgnoreLanguage() && !sfvm.RuleHasSourceMode(rule.Tag, nil) {
+	if !m.Config.GetScanIgnoreLanguage() && !sfvm.RuleIsSourceMode(rule, nil) {
 		if rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
 			m.markRuleSkipped()
 			return

@@ -7,9 +7,10 @@ import (
 )
 
 type SyntaxFlowRuleConfig struct {
-	RuleNames  []string                   `json:"rule_names"`
-	RuleInput  []*ypb.SyntaxFlowRuleInput `json:"rule_input"`
-	RuleFilter *ypb.SyntaxFlowRuleFilter  `json:"rule_filter"`
+	RuleNames      []string                   `json:"rule_names"`
+	RuleInput      []*ypb.SyntaxFlowRuleInput `json:"rule_input"`
+	RuleFilter     *ypb.SyntaxFlowRuleFilter  `json:"rule_filter"`
+	RuleFilterMode []string                   `json:"rule_filter_mode,omitempty"`
 	// TaskLocal marks an immutable, dispatch-scoped rule input. It is consumed
 	// only by syntaxflow_scan and keeps ordinary inline/debug rule behavior
 	// backward compatible.
@@ -64,6 +65,14 @@ func (c *Config) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
 		return nil
 	}
 	return c.SyntaxFlowRule.RuleFilter
+}
+
+// GetRuleFilterMode returns persisted execution mode filters (source | ssa).
+func (c *Config) GetRuleFilterMode() []string {
+	if c == nil || c.Mode&ModeSyntaxFlowRule == 0 || c.SyntaxFlowRule == nil {
+		return nil
+	}
+	return c.SyntaxFlowRule.RuleFilterMode
 }
 
 // SetRuleFilter 设置规则过滤器
@@ -283,6 +292,17 @@ func WithRuleFilterTag(tag ...string) Option {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
 		}
 		c.SyntaxFlowRule.RuleFilter.Tag = tag
+		return nil
+	}
+}
+
+// WithRuleFilterMode 设置规则执行模式过滤器（source | ssa），对应 DB mode 列。
+func WithRuleFilterMode(mode ...string) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlowRule("Rule Filter Mode"); err != nil {
+			return err
+		}
+		c.SyntaxFlowRule.RuleFilterMode = mode
 		return nil
 	}
 }

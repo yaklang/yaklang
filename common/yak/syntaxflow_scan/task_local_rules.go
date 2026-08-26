@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -225,6 +226,7 @@ func parseTaskLocalSyntaxFlowRules(
 			rule.Description = description
 		}
 
+		rule.NormalizeMode()
 		rules = append(rules, rule)
 		if rule.AllowIncluded {
 			for _, libraryName := range []string{rule.Title, rule.IncludedName} {
@@ -238,6 +240,35 @@ func parseTaskLocalSyntaxFlowRules(
 		}
 	}
 	return rules, libraries, nil
+}
+
+func filterTaskLocalSyntaxFlowRulesByMode(
+	rules []*schema.SyntaxFlowRule,
+	modes []string,
+) []*schema.SyntaxFlowRule {
+	if len(rules) == 0 || len(modes) == 0 {
+		return rules
+	}
+	normalized := make([]string, 0, len(modes))
+	for _, mode := range modes {
+		if trimmed := strings.TrimSpace(mode); trimmed != "" {
+			normalized = append(normalized, string(schema.ValidRuleMode(trimmed)))
+		}
+	}
+	if len(normalized) == 0 {
+		return rules
+	}
+	filtered := make([]*schema.SyntaxFlowRule, 0, len(rules))
+	for _, rule := range rules {
+		if rule == nil {
+			continue
+		}
+		rule.NormalizeMode()
+		if slices.Contains(normalized, string(rule.Mode)) {
+			filtered = append(filtered, rule)
+		}
+	}
+	return filtered
 }
 
 func ruleInputResultKind(taskLocal bool) schema.SyntaxflowResultKind {
