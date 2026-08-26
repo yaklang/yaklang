@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -192,9 +193,10 @@ func (s *ScanNode) executeScriptTask(
 
 	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, ssaDBEnv, taskLogWriter); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
-		// Finalize debug before returning the failure
+		// Finalize debug before returning the failure. Cancel / shutdown leaves
+		// taskCtx cancelled; finalize must still upload and write local cache.
 		if debugDir != "" {
-			s.finalizeDebugRun(taskCtx, reporter, debugDir, "failed")
+			s.finalizeDebugRun(taskCtx, reporter, debugDir, debugStatusForScriptError(s, task.AttemptID, err))
 			scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 			debugFinalized = true
 		}
@@ -203,7 +205,7 @@ func (s *ScanNode) executeScriptTask(
 	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
 	if err := s.finalizeSSAArtifactUpload(taskCtx, reporter, result); err != nil {
 		if debugDir != "" {
-			s.finalizeDebugRun(taskCtx, reporter, debugDir, "failed")
+			s.finalizeDebugRun(taskCtx, reporter, debugDir, debugStatusForScriptError(s, task.AttemptID, err))
 			scanDebugDirs.unregister(input.TaskID, input.RuntimeID)
 			debugFinalized = true
 		}
@@ -1225,24 +1227,54 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 
 // finalizeDebugRun analyzes the debug run directory, generates a ZIP archive,
 // and publishes both as JobArtifactReady events. Failures are logged but do
-// not affect the scan result. This is called on both success and failure paths.
+// not affect the scan result. This is called on success, failure, cancel, and
+// shutdown paths. Upload uses a detached timeout so a cancelled task context
+// cannot skip persistence.
 func (s *ScanNode) finalizeDebugRun(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
 	debugDir string,
 	status string,
 ) {
+	uploadCtx, cancel := debugFinalizeContext(ctx)
+	defer cancel()
+
 	// Ensure the debug package contains the actual scan log even when the
 	// child pprof collector did not write its own log file.
 	mergeTaskLogIntoDebugDir(debugDir)
-	s.publishDebugAnalysis(ctx, reporter, debugDir, status)
-	s.publishDebugZip(ctx, reporter, debugDir)
+	s.publishDebugAnalysis(uploadCtx, reporter, debugDir, status)
+	s.publishDebugZip(uploadCtx, reporter, debugDir)
+}
+
+const debugFinalizeTimeout = 45 * time.Second
+
+// debugFinalizeContext returns a timeout context that is not cancelled when
+// the parent task context is cancelled (cancel / shutdown / lease loss paths).
+func debugFinalizeContext(parent context.Context) (context.Context, context.CancelFunc) {
+	base := context.Background()
+	if parent != nil {
+		base = context.WithoutCancel(parent)
+	}
+	return context.WithTimeout(base, debugFinalizeTimeout)
+}
+
+// debugStatusForScriptError maps a script/task error onto the debug analysis
+// status string used in analysis JSON and the console.
+func debugStatusForScriptError(s *ScanNode, attemptID string, err error) string {
+	if s != nil && strings.TrimSpace(s.cancelReasonForAttempt(attemptID)) != "" {
+		return "cancelled"
+	}
+	if err != nil && errors.Is(err, context.Canceled) {
+		return "cancelled"
+	}
+	return "failed"
 }
 
 // publishDebugAnalysis analyzes the debug run directory and publishes the
 // structured result as a JobArtifactReady event with artifact_kind="debug_analysis".
-// The analysis JSON is uploaded to MinIO and the event carries the object key.
-// Failures are logged but do not affect the scan result.
+// The analysis JSON is always written to the local debug dir first so live
+// queries still work after cancel / lost / node restart even when MinIO upload
+// fails. Failures are logged but do not affect the scan result.
 func (s *ScanNode) publishDebugAnalysis(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
@@ -1255,8 +1287,15 @@ func (s *ScanNode) publishDebugAnalysis(
 		log.Warnf("[debug] marshal analysis failed: %v", err)
 		return
 	}
+	if err := writeCachedDebugAnalysis(debugDir, analysisJSON); err != nil {
+		log.Warnf("[debug] write local analysis cache failed: %v", err)
+	}
 
 	// Upload analysis JSON to MinIO
+	if reporter == nil {
+		log.Warnf("[debug] no reporter available, skipping analysis upload")
+		return
+	}
 	cfg := reporter.ssaUploadCfg
 	if cfg == nil {
 		log.Warnf("[debug] no upload config available, skipping analysis upload")
