@@ -128,36 +128,105 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 	if dir == "" {
 		response.Reason = "debug directory not found for this task attempt"
 		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=false (no debug dir)", payload.JobID, payload.AttemptID)
-	} else {
-		analysis := AnalyzeDebugRunWithStatus(dir, payload.TaskStatus)
-		hasContent := len(analysis.Samples) > 0 || analysis.Summary != nil ||
-			analysis.StartedAt != nil || strings.TrimSpace(analysis.Status) != ""
-		if !hasContent && len(analysis.Errors) > 0 {
-			response.Reason = strings.Join(analysis.Errors, "; ")
-		} else {
-			analysisJSON, err := json.Marshal(analysis)
-			if err != nil {
-				return fmt.Errorf("marshal ssa debug analysis: %w", err)
-			}
-			response.Found = true
-			response.Analysis = analysisJSON
-		}
-		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=%v samples=%d dir=%s",
-			payload.JobID, payload.AttemptID, response.Found, len(analysis.Samples), dir)
+		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
 	}
 
+	// Serve the cached analysis when it is newer than every pprof/log input,
+	// so repeated queries do not re-parse large profiles.
+	if cached, ok := readCachedDebugAnalysis(dir); ok {
+		response.Found = true
+		response.Analysis = cached
+		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=true (cached) dir=%s", payload.JobID, payload.AttemptID, dir)
+		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+	}
+
+	analysis := AnalyzeDebugRunWithStatus(dir, payload.TaskStatus)
+	hasContent := len(analysis.Samples) > 0 || analysis.Summary != nil ||
+		analysis.StartedAt != nil || strings.TrimSpace(analysis.Status) != ""
+	if !hasContent && len(analysis.Errors) > 0 {
+		response.Reason = strings.Join(analysis.Errors, "; ")
+	} else {
+		analysisJSON, err := json.Marshal(analysis)
+		if err != nil {
+			return fmt.Errorf("marshal ssa debug analysis: %w", err)
+		}
+		if err := writeCachedDebugAnalysis(dir, analysisJSON); err != nil {
+			log.Warnf("[debug] cache analysis json failed: %v", err)
+		}
+		response.Found = true
+		response.Analysis = analysisJSON
+	}
+	log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=%v samples=%d dir=%s",
+		payload.JobID, payload.AttemptID, response.Found, len(analysis.Samples), dir)
+	return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+}
+
+// debugAnalysisCacheName is the JSON file used to cache a parsed debug run
+// analysis next to the run directory.
+const debugAnalysisCacheName = "analysis.cache.json"
+
+func writeCachedDebugAnalysis(dir string, analysisJSON []byte) error {
+	return os.WriteFile(filepath.Join(dir, debugAnalysisCacheName), analysisJSON, 0o644)
+}
+
+// readCachedDebugAnalysis returns the cached analysis JSON when it is at least
+// as new as every profile/log input file of the debug run.
+func readCachedDebugAnalysis(dir string) (json.RawMessage, bool) {
+	cachePath := filepath.Join(dir, debugAnalysisCacheName)
+	cacheInfo, err := os.Stat(cachePath)
+	if err != nil {
+		return nil, false
+	}
+	newestInput := time.Time{}
+	inputs := []string{"cpu-pprof", "memory-pprof", "goroutine-pprof", "log"}
+	for _, name := range inputs {
+		path := filepath.Join(dir, name)
+		info, err := os.Stat(path)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			entries, err := os.ReadDir(path)
+			if err != nil {
+				continue
+			}
+			for _, entry := range entries {
+				entryInfo, err := entry.Info()
+				if err != nil {
+					continue
+				}
+				if entryInfo.ModTime().After(newestInput) {
+					newestInput = entryInfo.ModTime()
+				}
+			}
+			continue
+		}
+		if info.ModTime().After(newestInput) {
+			newestInput = info.ModTime()
+		}
+	}
+	if !newestInput.IsZero() && newestInput.After(cacheInfo.ModTime()) {
+		return nil, false
+	}
+	data, err := os.ReadFile(cachePath)
+	if err != nil || len(data) == 0 {
+		return nil, false
+	}
+	return json.RawMessage(data), true
+}
+
+func (b *legionJobBridge) publishDebugQueryResponse(ctx context.Context, queryID string, response ssaDebugQueryResponse) error {
 	responseRaw, err := json.Marshal(response)
 	if err != nil {
 		return fmt.Errorf("marshal ssa debug query response: %w", err)
 	}
-
 	publisher, ok := b.capabilityPublisher.(*capabilityEventPublisher)
 	if !ok || publisher == nil {
 		return fmt.Errorf("capability event publisher is not ready")
 	}
 	publishCtx, cancel := context.WithTimeout(b.agent.node.GetRootContext(), 5*time.Second)
 	defer cancel()
-	subject := ssaDebugQueryResultSubject(payload.QueryID)
+	subject := ssaDebugQueryResultSubject(queryID)
 	if err := publisher.PublishRaw(publishCtx, subject, responseRaw); err != nil {
 		return fmt.Errorf("publish ssa debug query response: %w", err)
 	}
