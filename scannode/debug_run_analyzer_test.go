@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/pprof/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -239,6 +240,45 @@ func TestPprofTopFromStatsYaklang(t *testing.T) {
 	require.Len(t, top, 2)
 	assert.Equal(t, "github.com/yaklang/yaklang/common/yak/ssa.A", top[0].Name)
 	assert.Equal(t, "github.com/yaklang/yaklang/common/yak/ssa.B", top[1].Name)
+}
+
+func TestBuildPprofTopAnalysis_Stacks(t *testing.T) {
+	fRoot := &profile.Function{ID: 1, Name: "main.main"}
+	fMid := &profile.Function{ID: 2, Name: "github.com/yaklang/yaklang/common/yak/ssaapi.Compile"}
+	fLeaf := &profile.Function{ID: 3, Name: "github.com/yaklang/gorm.(*DB).FirstOrCreate"}
+	fOther := &profile.Function{ID: 4, Name: "runtime.systemstack"}
+
+	loc := func(id uint64, fn *profile.Function) *profile.Location {
+		return &profile.Location{ID: id, Line: []profile.Line{{Function: fn}}}
+	}
+	// Leaf at location[0], root at the end — Go pprof convention.
+	p := &profile.Profile{
+		SampleType: []*profile.ValueType{{Type: "cpu", Unit: "nanoseconds"}},
+		Sample: []*profile.Sample{
+			{
+				Location: []*profile.Location{loc(1, fLeaf), loc(2, fMid), loc(3, fRoot)},
+				Value:    []int64{80},
+			},
+			{
+				Location: []*profile.Location{loc(4, fOther), loc(5, fRoot)},
+				Value:    []int64{20},
+			},
+		},
+	}
+
+	result := buildPprofTopAnalysis(p, "cpu")
+	require.Empty(t, result.ParseError)
+	require.NotEmpty(t, result.TopStacks)
+	assert.Equal(t, []string{
+		"main.main",
+		"github.com/yaklang/yaklang/common/yak/ssaapi.Compile",
+		"github.com/yaklang/gorm.(*DB).FirstOrCreate",
+	}, result.TopStacks[0].Frames)
+	assert.Equal(t, int64(80), result.TopStacks[0].Value)
+	assert.Equal(t, "80.00%", result.TopStacks[0].Pct)
+
+	require.NotEmpty(t, result.YaklangStacks)
+	assert.Contains(t, result.YaklangStacks[0].Frames, "github.com/yaklang/yaklang/common/yak/ssaapi.Compile")
 }
 
 func TestParseLabelTimestamp(t *testing.T) {
