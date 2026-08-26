@@ -16,6 +16,7 @@ const (
 	legionCommandHIDSFileEvidenceCollect              = "hids.file_evidence.collect"
 	legionCommandSSARuleSyncExport                    = "ssa.rule_sync.export"
 	legionCommandSSADebugQuery                        = "ssa.debug.query"
+	legionCommandSSALogTail                           = "ssa.log.tail"
 	legionCommandPluginGroupsList                     = "plugin.groups.list"
 	legionCommandPluginStoreSync                      = "plugin.store.sync"
 	legionCommandPluginStoreSyncStatusQuery           = "plugin.store.sync.status"
