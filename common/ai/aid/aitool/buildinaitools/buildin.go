@@ -8,6 +8,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/codeaudittools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/notifytools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/ssatools"
@@ -94,6 +95,9 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	} else {
 		tools = append(tools, ssaToolsList...)
 	}
+
+	// Add code audit tools from codeaudittools package (Java static security audit)
+	tools = append(tools, codeaudittools.CreateCodeAuditTools()...)
 
 	// Add IM notify tools (send_im_message / configure_im_credentials) from notifytools package
 	tools = append(tools, notifytools.CreateNotifySendTools()...)
