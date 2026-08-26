@@ -20,6 +20,7 @@ func createTestDebugDir(t *testing.T) string {
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "memory-pprof"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "goroutine-pprof"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "db-stats"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "runtime-stats"), 0o755))
 
 	// Write cmd.txt
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "cmd.txt"), []byte("test command"), 0o644))
@@ -64,6 +65,20 @@ func createTestDebugDir(t *testing.T) string {
   "total_count": 3,
   "total_ms": 30
 }`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "runtime-stats", "20260805-120030-initial.runtime.json"), []byte(`{
+  "timestamp": "2026-08-05T12:00:30Z",
+  "num_cpu": 32,
+  "load1": 2.5,
+  "host_cpu_percent": 41.2,
+  "process_cpu_percent": 9.6,
+  "host_mem_total_bytes": 34359738368,
+  "host_mem_used_bytes": 8589934592,
+  "host_mem_available_bytes": 25769803776,
+  "process_rss_bytes": 765460480,
+  "process_heap_alloc_bytes": 512000000,
+  "process_heap_sys_bytes": 600000000,
+  "goroutines": 41
+}`), 0o644))
 
 	return dir
 }
@@ -103,6 +118,11 @@ func TestAnalyzeDebugRun_Complete(t *testing.T) {
 	require.NotNil(t, initial.DBStats)
 	assert.Equal(t, "postgres", initial.DBStats.Dialect)
 	assert.Equal(t, int64(12), initial.DBStats.TotalCount)
+	require.NotNil(t, initial.Runtime)
+	assert.Equal(t, 32, initial.Runtime.NumCPU)
+	assert.InDelta(t, 41.2, initial.Runtime.HostCPUPercent, 0.01)
+	assert.InDelta(t, 9.6, initial.Runtime.ProcessCPUPercent, 0.01)
+	assert.Equal(t, uint64(765460480), initial.Runtime.ProcessRSSBytes)
 	require.NotNil(t, result.Summary.DBStatsTotal)
 	assert.Equal(t, int64(15), result.Summary.DBStatsTotal.TotalCount)
 	assert.Equal(t, int64(150), result.Summary.DBStatsTotal.TotalMs)

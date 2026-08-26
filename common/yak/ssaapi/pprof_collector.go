@@ -14,6 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/load"
+	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v4/process"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -28,15 +32,17 @@ import (
 //   - An initial snapshot is collected 30 seconds after start
 //   - A final snapshot is collected on shutdown
 type pprofCollector struct {
-	dir          string
-	cpuDir       string
-	memDir       string
-	goroutineDir string
-	dbStatsDir   string
-	httpAddr     string
-	wg           sync.WaitGroup
-	lastDBStats  ssadb.DBOpStats
-	dbStatsMu    sync.Mutex
+	dir             string
+	cpuDir          string
+	memDir          string
+	goroutineDir    string
+	dbStatsDir      string
+	runtimeStatsDir string
+	httpAddr        string
+	wg              sync.WaitGroup
+	lastDBStats     ssadb.DBOpStats
+	lastDBStatsAt   time.Time
+	dbStatsMu       sync.Mutex
 }
 
 const (
@@ -63,8 +69,9 @@ func StartPprofCollector(debugDir string) (func(), error) {
 	memDir := filepath.Join(debugDir, "memory-pprof")
 	goroutineDir := filepath.Join(debugDir, "goroutine-pprof")
 	dbStatsDir := filepath.Join(debugDir, "db-stats")
+	runtimeStatsDir := filepath.Join(debugDir, "runtime-stats")
 
-	for _, dir := range []string{cpuDir, memDir, goroutineDir, dbStatsDir} {
+	for _, dir := range []string{cpuDir, memDir, goroutineDir, dbStatsDir, runtimeStatsDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("create pprof dir %s: %w", dir, err)
 		}
@@ -79,13 +86,15 @@ func StartPprofCollector(debugDir string) (func(), error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	collector := &pprofCollector{
-		dir:          debugDir,
-		cpuDir:       cpuDir,
-		memDir:       memDir,
-		goroutineDir: goroutineDir,
-		dbStatsDir:   dbStatsDir,
-		httpAddr:     addr,
-		lastDBStats:  ssadb.SnapshotDBOpStats(),
+		dir:             debugDir,
+		cpuDir:          cpuDir,
+		memDir:          memDir,
+		goroutineDir:    goroutineDir,
+		dbStatsDir:      dbStatsDir,
+		runtimeStatsDir: runtimeStatsDir,
+		httpAddr:        addr,
+		lastDBStats:     ssadb.SnapshotDBOpStats(),
+		lastDBStatsAt:   time.Now(),
 	}
 
 	collector.wg.Add(1)
@@ -199,6 +208,7 @@ func (c *pprofCollector) collectSnapshot(tag string, syncCPU bool) {
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
 	c.fetchDBStats(label)
+	c.fetchRuntimeStats(label)
 
 	if syncCPU {
 		// For final snapshot: wait for CPU profile to complete
@@ -240,6 +250,7 @@ func (c *pprofCollector) collectSnapshotFinal(tag string) {
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
 	c.fetchDBStats(label)
+	c.fetchRuntimeStats(label)
 	c.fetchCPU(label, cpuDuration) // synchronous
 }
 
@@ -247,10 +258,22 @@ func (c *pprofCollector) fetchDBStats(label string) {
 	if c == nil || c.dbStatsDir == "" {
 		return
 	}
+	now := time.Now()
 	current := ssadb.SnapshotDBOpStats()
 	c.dbStatsMu.Lock()
 	delta := ssadb.DeltaDBOpStats(c.lastDBStats, current)
+	// DB counters accumulate across the full interval between snapshots
+	// (~5 minutes), unlike CPU profiles which only sample 1 minute in the
+	// normal-memory path. Record the actual wall window for UI share %.
+	if !c.lastDBStatsAt.IsZero() {
+		windowMs := now.Sub(c.lastDBStatsAt).Milliseconds()
+		if windowMs < 0 {
+			windowMs = 0
+		}
+		delta.WindowMs = windowMs
+	}
 	c.lastDBStats = current
+	c.lastDBStatsAt = now
 	c.dbStatsMu.Unlock()
 
 	raw, err := json.MarshalIndent(delta, "", "  ")
@@ -263,14 +286,109 @@ func (c *pprofCollector) fetchDBStats(label string) {
 		log.Errorf("[pprof] write db stats failed: %v", err)
 		return
 	}
-	log.Infof("[pprof] db stats saved: %s total=%d query=%d create=%d update=%d delete=%d",
+	log.Infof("[pprof] db stats saved: %s window=%dms total_ms=%d total=%d query=%d create=%d update=%d delete=%d",
 		target,
+		delta.WindowMs,
+		delta.TotalMs,
 		delta.TotalCount,
 		delta.Ops[ssadb.DBOpQuery].Count,
 		delta.Ops[ssadb.DBOpCreate].Count,
 		delta.Ops[ssadb.DBOpUpdate].Count,
 		delta.Ops[ssadb.DBOpDelete].Count,
 	)
+}
+
+// RuntimeStatsSnapshot captures host vs scan-task CPU/memory at one sample.
+type RuntimeStatsSnapshot struct {
+	Timestamp             string  `json:"timestamp"`
+	NumCPU                int     `json:"num_cpu"`
+	Load1                 float64 `json:"load1,omitempty"`
+	HostCPUPercent        float64 `json:"host_cpu_percent"`
+	ProcessCPUPercent     float64 `json:"process_cpu_percent"`
+	HostMemTotalBytes     uint64  `json:"host_mem_total_bytes"`
+	HostMemUsedBytes      uint64  `json:"host_mem_used_bytes"`
+	HostMemAvailableBytes uint64  `json:"host_mem_available_bytes"`
+	ProcessRSSBytes       uint64  `json:"process_rss_bytes"`
+	ProcessHeapAllocBytes uint64  `json:"process_heap_alloc_bytes"`
+	ProcessHeapSysBytes   uint64  `json:"process_heap_sys_bytes"`
+	Goroutines            int     `json:"goroutines"`
+}
+
+const runtimeStatsSampleWindow = 200 * time.Millisecond
+
+func (c *pprofCollector) fetchRuntimeStats(label string) {
+	if c == nil || c.runtimeStatsDir == "" {
+		return
+	}
+	snapshot, err := captureRuntimeStats()
+	if err != nil {
+		log.Warnf("[pprof] capture runtime stats failed: %v", err)
+		return
+	}
+	raw, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		log.Errorf("[pprof] marshal runtime stats failed: %v", err)
+		return
+	}
+	target := filepath.Join(c.runtimeStatsDir, label+".runtime.json")
+	if err := os.WriteFile(target, raw, 0o644); err != nil {
+		log.Errorf("[pprof] write runtime stats failed: %v", err)
+		return
+	}
+	log.Infof(
+		"[pprof] runtime stats saved: %s host_cpu=%.1f%% task_cpu=%.1f%% host_mem=%dMiB task_rss=%dMiB",
+		target,
+		snapshot.HostCPUPercent,
+		snapshot.ProcessCPUPercent,
+		snapshot.HostMemUsedBytes/(1024*1024),
+		snapshot.ProcessRSSBytes/(1024*1024),
+	)
+}
+
+func captureRuntimeStats() (*RuntimeStatsSnapshot, error) {
+	snapshot := &RuntimeStatsSnapshot{
+		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		NumCPU:     runtime.NumCPU(),
+		Goroutines: runtime.NumGoroutine(),
+	}
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	snapshot.ProcessHeapAllocBytes = memStats.HeapAlloc
+	snapshot.ProcessHeapSysBytes = memStats.HeapSys
+
+	if vm, err := mem.VirtualMemory(); err == nil && vm != nil {
+		snapshot.HostMemTotalBytes = vm.Total
+		snapshot.HostMemUsedBytes = vm.Used
+		snapshot.HostMemAvailableBytes = vm.Available
+	} else if err != nil {
+		return snapshot, err
+	}
+
+	if avg, err := load.Avg(); err == nil && avg != nil {
+		snapshot.Load1 = avg.Load1
+	}
+
+	hostPercents, err := cpu.Percent(runtimeStatsSampleWindow, false)
+	if err != nil {
+		return snapshot, err
+	}
+	if len(hostPercents) > 0 {
+		snapshot.HostCPUPercent = hostPercents[0]
+	}
+
+	proc, err := process.NewProcess(int32(os.Getpid()))
+	if err != nil {
+		return snapshot, err
+	}
+	if rss, err := proc.MemoryInfo(); err == nil && rss != nil {
+		snapshot.ProcessRSSBytes = rss.RSS
+	}
+	if pct, err := proc.Percent(runtimeStatsSampleWindow); err == nil {
+		snapshot.ProcessCPUPercent = pct
+	}
+
+	return snapshot, nil
 }
 
 func (c *pprofCollector) fetchCPU(label string, duration time.Duration) {

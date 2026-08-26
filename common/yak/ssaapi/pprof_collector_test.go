@@ -35,3 +35,14 @@ func TestStartPprofHTTPServerUsesRandomFreePort(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, addr, again)
 }
+
+func TestCaptureRuntimeStats(t *testing.T) {
+	snapshot, err := captureRuntimeStats()
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	require.Greater(t, snapshot.NumCPU, 0)
+	require.Greater(t, snapshot.HostMemTotalBytes, uint64(0))
+	require.Greater(t, snapshot.ProcessRSSBytes, uint64(0))
+	require.GreaterOrEqual(t, snapshot.HostCPUPercent, 0.0)
+	require.GreaterOrEqual(t, snapshot.ProcessCPUPercent, 0.0)
+}

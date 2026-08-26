@@ -40,6 +40,10 @@ type DBOpStats struct {
 	Ops        map[DBOpKind]DBOpBucket `json:"ops,omitempty"`
 	TotalCount int64                   `json:"total_count"`
 	TotalMs    int64                   `json:"total_ms"`
+	// WindowMs is the wall-clock span this delta covers (set by the pprof
+	// collector when writing db-stats/*.db.json). UI uses it as the
+	// denominator for "DB time / window · xx%" evaluation.
+	WindowMs   int64                   `json:"window_ms,omitempty"`
 	ErrorCount int64                   `json:"error_count,omitempty"`
 }
 
