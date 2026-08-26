@@ -238,27 +238,17 @@ func (openAICompatibleReasoningMatcher) MatchModel(modelName string) bool {
 	return false
 }
 
-// knownOpenAIEffortLevels lists all effort values that OpenAI-compatible
-// providers accept for the "reasoning.effort" field.  Standard OpenAI
-// models recognise low/medium/high; some extended providers (e.g. certain
-// Alibaba / Volcengine proxies) additionally accept xhigh and max.
-var knownOpenAIEffortLevels = map[string]bool{
-	"low":    true,
-	"medium": true,
-	"high":   true,
-	"xhigh":  true,
-	"max":    true,
-}
-
 func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort string) map[string]any {
 	effort := "none"
 	if enabled {
 		re := strings.TrimSpace(strings.ToLower(reasoningEffort))
-		if knownOpenAIEffortLevels[re] {
-			effort = re
-		} else if re != "" {
-			// Unknown but non-empty: passthrough so provider-specific
-			// custom levels are not silently downgraded.
+		if re != "" {
+			// Passthrough whatever the caller set. Values arriving here
+			// from ThinkingEffort have already been sanitised by
+			// MapThinkingEffortToConfig to standard levels
+			// (low/medium/high/none). Values from the raw ReasoningEffort
+			// field are set by advanced users who know their provider's
+			// capabilities (e.g. xhigh/max for certain Alibaba proxies).
 			effort = re
 		} else {
 			effort = "medium"
@@ -268,17 +258,25 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 }
 
 // MapThinkingEffortToConfig maps a frontend-friendly thinking effort enum
-// ("off" / "low" / "medium" / "high" / "xhigh" / "max" / "auto") to the low-level
+// ("off" / "low" / "medium" / "high" / "auto") to the low-level
 // (EnableThinking, ReasoningEffort) pair used by AIConfig.
+//
+// This is the **sanitisation layer**: it guarantees that values flowing into
+// AIConfig.ReasoningEffort via the ThinkingEffort field are always safe for
+// every provider. Non-standard levels (xhigh, max, or any unknown value) are
+// downgraded to the nearest standard level (high) so that models which do not
+// support them will not receive a 400 error.
+//
+// Advanced users who need xhigh/max or provider-specific custom levels should
+// set the raw ReasoningEffort field directly — that path bypasses this
+// sanitisation and is passed through verbatim by the matchers.
 //
 //   - "" / "auto"  → (false, "")       — do not inject any thinking params
 //   - "off"        → (true, "none")    — explicitly disable thinking
 //   - "low"        → (true, "low")     — enable thinking with low effort
 //   - "medium"     → (true, "medium")  — enable thinking with medium effort
 //   - "high"       → (true, "high")    — enable thinking with high effort
-//   - "xhigh"      → (true, "xhigh")   — enable thinking with extra-high effort
-//   - "max"        → (true, "max")     — enable thinking with maximum effort
-//   - other        → (true, <raw>)     — passthrough custom value
+//   - other        → (true, "high")    — downgrade to high (safest upper bound)
 func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEffort string) {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
 	case "", "auto", "default":
@@ -289,13 +287,9 @@ func MapThinkingEffortToConfig(effort string) (enableThinking bool, reasoningEff
 		return true, "low"
 	case "medium":
 		return true, "medium"
-	case "high":
+	case "high", "xhigh", "max":
 		return true, "high"
-	case "xhigh":
-		return true, "xhigh"
-	case "max":
-		return true, "max"
 	default:
-		return true, strings.ToLower(strings.TrimSpace(effort))
+		return true, "high"
 	}
 }
