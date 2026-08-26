@@ -66,7 +66,10 @@ for _ in {1..60}; do
   if ! kill -0 "$grpc_pid" 2>/dev/null; then
     break
   fi
-  if nc -z localhost 8087 && grep -q "yak grpc ok" "$grpc_log" 2>/dev/null; then
+  # The structured ready event is written immediately after the listener is
+  # bound. Do not wait for the later human-readable startup log: initialization
+  # between those two messages may be slow even though gRPC is already ready.
+  if nc -z localhost 8087 && grep -q '^yak grpc ready {' "$grpc_log" 2>/dev/null; then
     grpc_ready=1
     break
   fi
