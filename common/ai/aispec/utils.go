@@ -291,10 +291,13 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithAPIType(provider.APIType))
 	}
 
-	if provider.ThinkingEffort != nil {
-		s := strings.TrimSpace(*provider.ThinkingEffort)
+	// ReasoningEffort now serves double duty: it can be a control value
+	// ("off"/"auto"/"") or an effort level ("low"/"medium"/"high"/"xhigh"/"max").
+	// When set, it takes priority and derives EnableThinking automatically.
+	if provider.ReasoningEffort != nil {
+		s := strings.TrimSpace(*provider.ReasoningEffort)
 		if s != "" {
-			enable, effort := MapThinkingEffortToConfig(s)
+			enable, effort := MapReasoningEffortToThinkingConfig(s)
 			// auto/default → (false, ""): do not inject any thinking params
 			if !enable && effort == "" {
 				// skip — let model/provider defaults apply
@@ -305,17 +308,10 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 				}
 			}
 		}
-	} else {
-		if provider.EnableThinkingOpt != nil {
-			opts = append(opts, WithEnableThinking(*provider.EnableThinkingOpt))
-		} else if provider.GetEnableThinking() {
-			opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
-		}
-		if provider.ReasoningEffort != nil {
-			if s := strings.TrimSpace(*provider.ReasoningEffort); s != "" {
-				opts = append(opts, WithReasoningEffort(s))
-			}
-		}
+	} else if provider.EnableThinkingOpt != nil {
+		opts = append(opts, WithEnableThinking(*provider.EnableThinkingOpt))
+	} else if provider.GetEnableThinking() {
+		opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
 	}
 
 	if provider.MaxTokens != nil {

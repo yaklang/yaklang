@@ -36,7 +36,6 @@ type AIThirdPartyConfig struct {
 	TopK               *int64   `json:"top_k,omitempty" gorm:"column:top_k"`
 	FrequencyPenalty   *float64 `json:"frequency_penalty,omitempty" gorm:"column:frequency_penalty"`
 	ReasoningEffort    string   `json:"reasoning_effort,omitempty" gorm:"column:reasoning_effort"`
-	ThinkingEffort    *string  `json:"thinking_effort,omitempty" gorm:"column:thinking_effort"`
 	WebhookURL         string   `json:"webhook_url"`
 	ExtraParams    MapStringString `json:"extra_params" gorm:"type:text"`
 	APIType        string          `json:"api_type"`
@@ -82,7 +81,6 @@ func (c *AIThirdPartyConfig) CalcHash() string {
 		optionalInt64ForHash(c.TopK),
 		optionalFloat64ForHash(c.FrequencyPenalty),
 		c.ReasoningEffort,
-		optionalStringPtrForHash(c.ThinkingEffort),
 	)
 }
 
@@ -98,13 +96,6 @@ func optionalFloat64ForHash(p *float64) string {
 		return ""
 	}
 	return fmt.Sprintf("%g", *p)
-}
-
-func optionalStringPtrForHash(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
 }
 
 func (c *AIThirdPartyConfig) BeforeSave() error {
@@ -160,12 +151,6 @@ func (c *AIThirdPartyConfig) ToThirdPartyConfig() *ypb.ThirdPartyApplicationConf
 	if strings.TrimSpace(c.ReasoningEffort) != "" {
 		s := strings.TrimSpace(c.ReasoningEffort)
 		cfg.ReasoningEffort = &s
-	}
-	if c.ThinkingEffort != nil {
-		s := strings.TrimSpace(*c.ThinkingEffort)
-		if s != "" {
-			cfg.ThinkingEffort = &s
-		}
 	}
 	if len(c.ExtraParams) > 0 {
 		cfg.ExtraParams = make([]*ypb.KVPair, 0, len(c.ExtraParams))
@@ -240,12 +225,6 @@ func AIThirdPartyConfigFromGRPC(cfg *ypb.ThirdPartyApplicationConfig) *AIThirdPa
 	}
 	if cfg.ReasoningEffort != nil {
 		out.ReasoningEffort = strings.TrimSpace(*cfg.ReasoningEffort)
-	}
-	if cfg.ThinkingEffort != nil {
-		s := strings.TrimSpace(*cfg.ThinkingEffort)
-		if s != "" {
-			out.ThinkingEffort = &s
-		}
 	}
 	return out
 }
