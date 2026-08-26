@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -38,8 +40,9 @@ type pprofCollector struct {
 }
 
 const (
-	defaultPprofHTTPAddr = "127.0.0.1:18080"
-	memoryThresholdHigh  = 10 * 1024 * 1024 * 1024 // 10 GB
+	// pprof listens on a random free localhost port (not a fixed 18080) so
+	// concurrent debug compiles / leftover servers do not collide.
+	memoryThresholdHigh = 10 * 1024 * 1024 * 1024 // 10 GB
 	// pprofInterval is slightly longer than the high-memory CPU duration so a
 	// periodic profile never starts while the previous 5-minute profile is still
 	// finishing (observed as pprof HTTP 500 on Hadoop run4/run5).
@@ -48,6 +51,7 @@ const (
 	pprofCPUDurationHigh   = 5 * time.Minute
 	pprofInitialDelay      = 30 * time.Second
 	pprofHTTPTimeout       = 10 * time.Minute
+	pprofListenAttempts    = 8
 )
 
 // StartPprofCollector creates the output directories, starts the pprof HTTP server,
@@ -66,8 +70,10 @@ func StartPprofCollector(debugDir string) (func(), error) {
 		}
 	}
 
-	addr := defaultPprofHTTPAddr
-	startPprofHTTPServer(addr)
+	addr, err := startPprofHTTPServer()
+	if err != nil {
+		return nil, err
+	}
 
 	ssadb.EnsureDBOpCallbacks(ssadb.GetDB())
 
@@ -101,22 +107,44 @@ func StartPprofCollector(debugDir string) (func(), error) {
 var (
 	pprofServerMu      sync.Mutex
 	pprofServerStarted bool
+	pprofServerAddr    string
 )
 
-func startPprofHTTPServer(addr string) {
+// startPprofHTTPServer binds net/http/pprof on a random free localhost port.
+// One process shares a single server; later callers reuse the bound address.
+func startPprofHTTPServer() (string, error) {
 	pprofServerMu.Lock()
 	defer pprofServerMu.Unlock()
-	if pprofServerStarted {
-		return
+	if pprofServerStarted && pprofServerAddr != "" {
+		return pprofServerAddr, nil
 	}
-	pprofServerStarted = true
-	go func() {
-		log.Infof("[pprof] starting HTTP server on %s", addr)
-		if err := http.ListenAndServe(addr, nil); err != nil {
-			log.Errorf("[pprof] HTTP server error: %v", err)
+
+	var lastErr error
+	for attempt := 0; attempt < pprofListenAttempts; attempt++ {
+		port := utils.GetRandomAvailableTCPPort()
+		addr := utils.HostPort("127.0.0.1", port)
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			lastErr = err
+			continue
 		}
-	}()
-	time.Sleep(100 * time.Millisecond)
+		bound := ln.Addr().String()
+		pprofServerAddr = bound
+		pprofServerStarted = true
+		go func(listener net.Listener, listenAddr string) {
+			log.Infof("[pprof] starting HTTP server on %s", listenAddr)
+			if err := http.Serve(listener, nil); err != nil {
+				log.Errorf("[pprof] HTTP server error: %v", err)
+			}
+		}(ln, bound)
+		// Brief wait so Accept is ready for the first profile fetch.
+		time.Sleep(50 * time.Millisecond)
+		return bound, nil
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no free localhost port after %d attempts", pprofListenAttempts)
+	}
+	return "", fmt.Errorf("start pprof HTTP server: %w", lastErr)
 }
 
 func (c *pprofCollector) collectLoop(ctx context.Context) {
