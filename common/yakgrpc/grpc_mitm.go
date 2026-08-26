@@ -842,13 +842,28 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetPlainResponseBytes(req, plainResponse)
 			rsp = plainResponse
 		}
+		plainResponseHash := codec.Sha256(plainResponse)
 
 		// use handled request
 		plainRequest := getPlainRequestBytes(req)
 
-		plainResponseHash := codec.Sha256(plainResponse)
+		// 插件 Hook 的判定基准: 插件收到的是原始 plainResponse, 原样返回时不应被误判为修改。
 		handleResponseModified := func(r []byte) bool {
 			if codec.Sha256(r) != plainResponseHash {
+				return true
+			}
+			return false
+		}
+		// 规则 Hook 的判定基准: 规则在 FixHTTPResponse 规范化后的报文上匹配/替换,
+		// 因此"是否被规则修改"应比较 规范化报文 vs 规则处理结果, 而不是原始报文 vs 结果;
+		// 否则未命中规则时, 规范化造成的字节差异(如 Content-Type 重组)会被误判为规则修改。
+		ruleHookBaseline, _, err := lowhttp.FixHTTPResponse(plainResponse)
+		if err != nil {
+			ruleHookBaseline = plainResponse
+		}
+		ruleHookBaselineHash := codec.Sha256(ruleHookBaseline)
+		handleRuleResponseModified := func(r []byte) bool {
+			if codec.Sha256(r) != ruleHookBaselineHash {
 				return true
 			}
 			return false
@@ -936,7 +951,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					return nil
 				}
 				httpctx.AppendMatchedRule(req, rules...)
-				if handleResponseModified(rspHooked) {
+				if handleRuleResponseModified(rspHooked) {
 					httpctx.SetResponseModified(req, "yakit.rule.hook")
 					httpctx.SetHijackedResponseBytes(req, rspHooked)
 				}
@@ -975,7 +990,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 			return nil
 		}
-		if handleResponseModified(rsp1) {
+		if handleRuleResponseModified(rsp1) {
 			rsp = rsp1
 		}
 		httpctx.AppendMatchedRule(req, rules...)
@@ -993,7 +1008,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return rsp
 		}
 
-		rsp, _, err := lowhttp.FixHTTPResponse(rsp)
+		rsp, _, err = lowhttp.FixHTTPResponse(rsp)
 		if err != nil {
 			log.Errorf("fix http response packet failed: %s", err)
 			return originRspRaw
@@ -1059,7 +1074,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			response := reqInstance.GetResponse()
-			if handleResponseModified(response) {
+			if handleRuleResponseModified(response) {
 				httpctx.SetResponseModified(req, "manual")
 				httpctx.SetHijackedResponseBytes(req, response)
 			}

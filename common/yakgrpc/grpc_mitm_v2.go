@@ -1029,7 +1029,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				return nil
 			}
 			httpctx.AppendMatchedRule(req, rules...)
-			if packetModified(rsp, rspHooked) {
+			// 规则在 FixHTTPResponse 规范化后的报文上匹配/替换, 因此判定基准是规范化报文
+			// 而非原始报文: 未命中时 Hook 返回的规范化报文与基准一致, 不会误判为规则修改。
+			ruleHookBaseline, _, err := lowhttp.FixHTTPResponse(rsp)
+			if err != nil {
+				ruleHookBaseline = rsp
+			}
+			if packetModified(ruleHookBaseline, rspHooked) {
 				httpctx.SetResponseModified(req, "yakit.rule.hook")
 				httpctx.SetHijackedResponseBytes(req, rspHooked)
 				rsp = rspHooked
