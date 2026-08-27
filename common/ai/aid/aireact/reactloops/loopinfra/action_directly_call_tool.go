@@ -406,7 +406,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 
 		toolName := loop.Get("directly_call_tool_name")
 		if toolName == "" {
-			loopInfraStatus(loop, "没有找到要使用的工具")
+			loopInfraStatus(loop, "没有找到要使用的工具", "No suitable tool was found")
 			reportStatus(strings.TrimSpace(`
 Error: directly_call_tool_name is missing in loop state.
 Fast-path directly_call_tool failed before execution and cannot be recovered in-place because the target tool is unknown.
@@ -428,7 +428,7 @@ Few-shot example 2 (valid directly_call_tool):
 		_, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolName)
 		if lookupErr != nil {
 			reportStatus(fmt.Sprintf("cached tool lookup failed for '%s': %v", toolName, lookupErr))
-			loopInfraStatus(loop, "当前工具暂时不可用，正在换一种方式继续")
+			loopInfraStatus(loop, "当前工具暂时不可用，正在换一种方式继续", "The current tool is unavailable; trying another approach")
 			msg := fmt.Sprintf("directly_call_tool cached tool lookup failed for '%s'; switch to @action=require_tool", toolName)
 			operator.Feedback(utils.Error(msg))
 			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)

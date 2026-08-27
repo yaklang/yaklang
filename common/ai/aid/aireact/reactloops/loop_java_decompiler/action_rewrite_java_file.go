@@ -145,13 +145,13 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			invoker := loop.GetInvoker()
 			startLine := fmt.Sprintf("重写 Java 文件: %s (%s)", filepath.Base(filePath), mode)
 			reactloops.EmitActionLog(loop, nodeID, startLine)
-			reactloops.EmitStatus(loop, "重写文件中 / Rewriting File...")
+			reactloops.EmitStatusI18n(loop, "重写文件中", "Rewriting File...")
 
 			fs := filesys.NewLocalFs()
 			content, err := fs.ReadFile(filePath)
 			if err != nil {
 				log.Errorf("[rewrite_java_file] failed to read %s: %v", filePath, err)
-				reactloops.EmitStatus(loop, "读取失败 / Read Failed")
+				reactloops.EmitStatusI18n(loop, "读取失败", "Read Failed")
 				r.AddToTimeline("rewrite_read_failed", fmt.Sprintf(`【读取文件失败】无法读取文件内容：%s
 
 【错误信息】：%v
@@ -191,7 +191,7 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			}
 			if newCode == "" {
 				log.Warnf("[rewrite_java_file] no rewritten code provided for %s", filePath)
-				reactloops.EmitStatus(loop, "缺少重写代码 / No Rewritten Code")
+				reactloops.EmitStatusI18n(loop, "缺少重写代码", "No Rewritten Code")
 				r.AddToTimeline("rewrite_no_code", `【缺少重写代码】未提供新的Java代码
 
 【原因】：
@@ -225,7 +225,7 @@ public class Example {
 				lines := strings.Split(string(content), "\n")
 				if rewriteStartLine > len(lines) || rewriteEndLine > len(lines) {
 					log.Warnf("[rewrite_java_file] line range %d-%d exceeds file length %d", rewriteStartLine, rewriteEndLine, len(lines))
-					reactloops.EmitStatus(loop, "行号超出范围 / Line Range Out of Bounds")
+					reactloops.EmitStatusI18n(loop, "行号超出范围", "Line Range Out of Bounds")
 					r.AddToTimeline("rewrite_line_out_of_range", fmt.Sprintf(`【行号超出范围】指定的行号超出文件范围
 
 【文件信息】：
@@ -263,7 +263,7 @@ public class Example {
 			err = fs.WriteFile(filePath, []byte(finalContent), 0644)
 			if err != nil {
 				log.Errorf("[rewrite_java_file] failed to write %s: %v", filePath, err)
-				reactloops.EmitStatus(loop, "写入失败 / Write Failed")
+				reactloops.EmitStatusI18n(loop, "写入失败", "Write Failed")
 				r.AddToTimeline("rewrite_write_failed", fmt.Sprintf(`【写入文件失败】无法保存重写后的代码：%s
 
 【错误信息】：%v
@@ -315,9 +315,9 @@ public class Example {
 			finishLine := fmt.Sprintf("完成: %s (%s, %d 字节, %s)",
 				filepath.Base(filePath), mode, len(finalContent), syntaxStatus)
 			if hasSyntaxErrors {
-				reactloops.EmitStatus(loop, "重写完成，仍有语法问题 / Rewrite Complete, Syntax Issues Remain")
+				reactloops.EmitStatusI18n(loop, "重写完成，仍有语法问题", "Rewrite Complete, Syntax Issues Remain")
 			} else {
-				reactloops.EmitStatus(loop, "重写完成 / Rewrite Complete")
+				reactloops.EmitStatusI18n(loop, "重写完成", "Rewrite Complete")
 			}
 
 			reference := fmt.Sprintf("备份: %s\n新代码预览:\n%s", backupPath, preview)

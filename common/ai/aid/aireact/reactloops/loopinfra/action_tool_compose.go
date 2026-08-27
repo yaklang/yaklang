@@ -96,7 +96,7 @@ Example - Sequential file operations(With AI-Tag tags):
 	<|WORKFLOW_DAG_END_{{.Nonce}}|>
 `,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		loopInfraStatus(loop, "正在安排多个工具协同工作 / Coordinating multiple tools for this task")
+		loopInfraStatus(loop, "正在安排多个工具协同工作", "Coordinating multiple tools for this task")
 		action.WaitStream(loop.GetCurrentTask().GetContext())
 
 		payload := action.GetString("tool_compose_payload")
@@ -166,7 +166,7 @@ Example - Sequential file operations(With AI-Tag tags):
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to build tool compose DAG: %v", err)
 			invoker.AddToTimeline("[TOOL_COMPOSE_ERROR]", errMsg)
-			loopInfraStatus(loop, "这组工具暂时没能顺利配合 / The tool sequence could not be prepared")
+			loopInfraStatus(loop, "这组工具暂时没能顺利配合", "The tool sequence could not be prepared")
 			loopInfraActionFinish(loop, loopInfraNodeToolCompose,
 				"暂时没能安排好这组工具 / Unable to prepare the tool sequence",
 				utils.ShrinkTextBlock(errMsg, 800))
@@ -247,7 +247,7 @@ Example - Sequential file operations(With AI-Tag tags):
 		if err != nil {
 			errMsg := fmt.Sprintf("Tool compose DAG execution failed: %v", err)
 			invoker.AddToTimeline("[TOOL_COMPOSE_FAILED]", errMsg)
-			loopInfraStatus(loop, "这组工具暂时没能完成任务 / The tool sequence could not complete the task")
+			loopInfraStatus(loop, "这组工具暂时没能完成任务", "The tool sequence could not complete the task")
 			loopInfraActionFinish(loop, loopInfraNodeToolCompose,
 				"这组工具暂时没能完成任务 / The tool sequence could not complete the task",
 				utils.ShrinkTextBlock(errMsg, 800))
@@ -270,7 +270,7 @@ Example - Sequential file operations(With AI-Tag tags):
 
 		invoker.AddToTimeline("[TOOL_COMPOSE_COMPLETE]",
 			fmt.Sprintf("All tool calls completed. Results: %v", resultSummary))
-		loopInfraStatus(loop, "多个工具已经协同完成这一步 / The tools completed this step together")
+		loopInfraStatus(loop, "多个工具已经协同完成这一步", "The tools completed this step together")
 		loopInfraActionFinish(loop, loopInfraNodeToolCompose,
 			fmt.Sprintf("多个工具已经协同完成这一步（%d 项） / The tools completed this step together (%d items)", len(resultSummary), len(resultSummary)),
 			strings.Join(resultSummary, "\n"))

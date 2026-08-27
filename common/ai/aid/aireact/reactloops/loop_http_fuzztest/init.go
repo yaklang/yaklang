@@ -150,20 +150,20 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			switch bootstrapResult {
 			case "raw":
 				loop.Set("bootstrap_source", "user_input_raw")
-				reactloops.EmitStatus(loop, "已复用用户输入的 HTTP 数据包 / Reused HTTP Packet from User Input")
+				reactloops.EmitStatusI18n(loop, "已复用用户输入的 HTTP 数据包", "Reused HTTP Packet from User Input")
 			case "url":
 				loop.Set("bootstrap_source", "user_input_url")
-				reactloops.EmitStatus(loop, "已从 URL 构造 HTTP 数据包 / Constructed HTTP Packet from URL")
+				reactloops.EmitStatusI18n(loop, "已从 URL 构造 HTTP 数据包", "Constructed HTTP Packet from URL")
 			default:
 				if restoreLoopHTTPFuzzSessionContext(loop, r) {
-					reactloops.EmitStatus(loop, "已恢复会话上下文 / Restored Session Context")
+					reactloops.EmitStatusI18n(loop, "已恢复会话上下文", "Restored Session Context")
 					invoker.AddToTimeline("http_fuzztest_restore", "Restored HTTP fuzz session context from persistent session history")
 				} else if looksLikeLoopHTTPFuzzNonFuzzDataTask(task.GetUserInput()) {
 					loop.Set("non_fuzz_data_task", "true")
-					reactloops.EmitStatus(loop, "这次任务不需要模糊测试，正在选择更合适的处理方式 / This task does not require fuzzing; choosing a better approach")
+					reactloops.EmitStatusI18n(loop, "这次任务不需要模糊测试，正在选择更合适的处理方式", "This task does not require fuzzing; choosing a better approach")
 					invoker.AddToTimeline("http_fuzztest_non_fuzz", "No HTTP packet found; user input looks like an offline data-processing task (decrypt/encode/transform). Proceeding without a request.")
 				} else {
-					reactloops.EmitStatus(loop, "还没有找到可用的 HTTP 请求，正在重新确认输入 / No valid HTTP request was found; checking the input again")
+					reactloops.EmitStatusI18n(loop, "还没有找到可用的 HTTP 请求，正在重新确认输入", "No valid HTTP request was found; checking the input again")
 					operator.Done()
 					return
 				}

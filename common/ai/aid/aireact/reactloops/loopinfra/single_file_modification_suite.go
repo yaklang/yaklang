@@ -293,24 +293,26 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 ) (postHookBlocked bool) {
 	lintStatusVar := f.GetLintStatusVariableName()
 	reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "开始静态分析与语法检查 / Starting static analysis and syntax check...")
-	reactloops.EmitStatus(loop, "验证代码中 / Verifying code...")
+	reactloops.EmitStatusI18n(loop, "验证代码中", "Verifying code...")
 
 	if hasBlockingErrors {
 		loop.Set(lintStatusVar, "false")
 		reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, buildSyntaxVerifyFailureActionLog(errMsg))
-		status := "验证代码失败，修复中 / Code verification failed, fixing..."
+		statusZh := "验证代码失败，正在修复"
+		statusEn := "Code verification failed; fixing…"
 		if first := firstSyntaxLintIssueLine(errMsg); first != "" {
-			status = fmt.Sprintf("验证失败: %s / Verification failed: %s",
-				utils.ShrinkTextBlock(first, 96), utils.ShrinkTextBlock(first, 96))
+			issue := utils.ShrinkTextBlock(first, 96)
+			statusZh = fmt.Sprintf("验证失败：%s", issue)
+			statusEn = fmt.Sprintf("Verification failed: %s", issue)
 		}
-		reactloops.EmitStatus(loop, status)
+		reactloops.EmitStatusI18n(loop, statusZh, statusEn)
 		op.DisallowNextLoopExit()
 		op.Continue()
 		return false
 	}
 	loop.Set(lintStatusVar, "true")
 	reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "验证通过 / Code verification passed")
-	reactloops.EmitStatus(loop, "验证代码通过 / Code verification passed")
+	reactloops.EmitStatusI18n(loop, "验证代码通过", "Code verification passed")
 
 	// postSyntaxCleanHook（如 YAK_MAIN 自测）与 exitOnClean 解耦：
 	// 语法通过时始终执行 hook，无论是否需要自动退出。
@@ -438,7 +440,7 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 
 	loopInfraActionStart(loop, loopInfraNodeSingleFileModify,
 		fmt.Sprintf("Patch 修改文件: %s (%d hunks) / Patch modify: %s (%d hunks)", filename, len(hunks), filename, len(hunks)),
-		"修改文件中 / Modifying File...")
+		"正在修改文件", "Modifying file…")
 
 	editorSummary := SummarizeAppliedPatch(hunks)
 	successMsg := fmt.Sprintf("SUCCESS: applied patch (%d hunks), wrote %d bytes to file: %s", len(hunks), len(newFull), filename)
@@ -459,7 +461,7 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	})
 
 	log.Infof("modify_code (patch) done: %d hunks", len(hunks))
-	loopInfraStatus(loop, "文件修改完成 / File Modify Complete")
+	loopInfraStatus(loop, "文件修改完成", "File Modify Complete")
 	loopInfraActionFinish(loop, loopInfraNodeSingleFileModify,
 		fmt.Sprintf("Patch 修改完成: %s / Patch applied: %s", filename, filename),
 		utils.ShrinkTextBlock(editorSummary, 256))

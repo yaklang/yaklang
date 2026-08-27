@@ -563,7 +563,11 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 					emitPhase2CategoryBanner(loop, category, categoryIndex, categoryTotal, "阶段A：关键词搜索 / Phase A: search")
 				}
 			} else {
-				reactloops.EmitStatus(loop, fmt.Sprintf("扫描类别 %s / Scanning category %s", category.Name, category.ID))
+				reactloops.EmitStatusI18n(
+					loop,
+					fmt.Sprintf("正在扫描类别「%s」", category.Name),
+					fmt.Sprintf("Scanning category %s", category.ID),
+				)
 			}
 			log.Infof("[CodeAudit/Phase2] Category '%s' scan started (phase=%s, targets=%d)", category.ID, phase, scan.TargetFileCount())
 			op.Continue()

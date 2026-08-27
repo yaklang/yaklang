@@ -75,7 +75,7 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime, holder *sear
 			msg := fmt.Sprintf("YAK_MAIN self-test passed (%d bytes log)", len(result.Output))
 			r.AddToTimeline("run_passed", msg)
 			log.Infof("yaklang self-test passed: path=%s log_bytes=%d", absPath, len(result.Output))
-			reactloops.EmitStatus(loop, "运行自测通过 / Self-test passed")
+			reactloops.EmitStatusI18n(loop, "运行自测通过", "Self-test passed")
 			return "", false
 		}
 
@@ -102,7 +102,7 @@ func emitYaklangRunStart(loop *reactloops.ReActLoop, absPath string, policy YakS
 		absPath, kind, absPath, kind,
 	)
 	reactloops.EmitActionLog(loop, yaklangNodeRunSelfTest, startLine)
-	reactloops.EmitStatus(loop, "运行自测中 / Running self-test...")
+	reactloops.EmitStatusI18n(loop, "运行自测中", "Running self-test...")
 }
 
 func emitYaklangRunFinish(loop *reactloops.ReActLoop, absPath string, result YakRunResult, runErr error) {
@@ -132,9 +132,9 @@ func emitYaklangRunFinish(loop *reactloops.ReActLoop, absPath string, result Yak
 	}
 	reactloops.EmitActionLog(loop, yaklangNodeRunSelfTest, finishLine, reference)
 	if runErr == nil {
-		reactloops.EmitStatus(loop, "YAK_MAIN 自测通过 / Self-test passed")
+		reactloops.EmitStatusI18n(loop, "YAK_MAIN 自测通过", "Self-test passed")
 	} else {
-		reactloops.EmitStatus(loop, "运行自测失败，修复中 / Self-test failed, fixing...")
+		reactloops.EmitStatusI18n(loop, "运行自测失败，修复中", "Self-test failed, fixing...")
 	}
 }
 
@@ -144,7 +144,8 @@ func emitYaklangRunSkipped(loop *reactloops.ReActLoop, reason string) {
 	}
 	line := fmt.Sprintf("跳过自测: %s / Skipped self-test: %s", reason, reason)
 	reactloops.EmitActionLog(loop, yaklangNodeRunSelfTest, line)
-	reactloops.EmitStatus(loop, FormatRunSkippedStatus(YakScriptRunPolicy{SkipReason: reason}))
+	zh, en := FormatRunSkippedStatusI18n(YakScriptRunPolicy{SkipReason: reason})
+	reactloops.EmitStatusI18n(loop, zh, en)
 }
 
 func emitYaklangRunNeedSelfTest(loop *reactloops.ReActLoop, policy YakScriptRunPolicy) {
@@ -157,5 +158,5 @@ func emitYaklangRunNeedSelfTest(loop *reactloops.ReActLoop, policy YakScriptRunP
 		kind, kind,
 	)
 	reactloops.EmitActionLog(loop, yaklangNodeRunSelfTest, line)
-	reactloops.EmitStatus(loop, "需要 YAK_MAIN 自测块 / YAK_MAIN self-test required")
+	reactloops.EmitStatusI18n(loop, "需要 YAK_MAIN 自测块", "YAK_MAIN self-test required")
 }

@@ -226,7 +226,11 @@ func emitPhase2DiscoveryGateBlocked(loop *reactloops.ReActLoop, category model.V
 		formatPathListForFeedback(unresolved, 12),
 	)
 	reactloops.EmitActionLog(loop, util.ScanNodeID, lines)
-	reactloops.EmitStatus(loop, fmt.Sprintf("还有 %d 个位置需要进一步确认 / %d locations still need further review", len(unresolved), len(unresolved)))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("还有 %d 个位置需要进一步确认", len(unresolved)),
+		fmt.Sprintf("%d locations still need further review", len(unresolved)),
+	)
 	emitPhase2Structured(loop, "code_audit_scan_discovery_gate", map[string]any{
 		"category_id":   category.ID,
 		"category_name": category.Name,

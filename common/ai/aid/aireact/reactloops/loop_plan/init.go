@@ -16,7 +16,7 @@ func buildPlanInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLo
 		config := r.GetConfig()
 
 		if !config.GetConfigBool("DisableIntentRecognition") {
-			reactloops.EmitStatus(loop, "深度意图识别中 / Deep intent recognition...")
+			reactloops.EmitStatusI18n(loop, "深度意图识别中", "Deep intent recognition...")
 			log.Infof("plan: invoking deep intent recognition directly")
 
 			capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), task.GetUserInput())

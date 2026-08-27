@@ -10,12 +10,14 @@ import (
 )
 
 // EmitStatus 发送瞬时状态（状态栏覆盖显示）。历史双语字符串会拆分为
-// value（默认中文）与 value_i18n；新代码优先使用 EmitStatusI18n。
+// value（默认中文）与 value_i18n。
+// Deprecated: 仅供外部旧调用兼容；生产代码应使用 EmitStatusI18n。
 func EmitStatus(loop *ReActLoop, message string) {
 	if loop == nil || message == "" {
 		return
 	}
-	loop.LoadingStatus(message)
+	zh, en := aicommon.SplitLegacyStatusI18n(message)
+	loop.UserStatus(zh, en)
 }
 
 // EmitStatusI18n emits a product-facing status with structured metadata while

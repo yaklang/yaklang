@@ -44,9 +44,17 @@ func emitPhase2LockTargetFiles(
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, lines)
 	if done {
-		reactloops.EmitStatus(loop, fmt.Sprintf("正在逐一检查「%s」相关的 %d 个文件 / Reviewing %d files related to %s", category.Name, total, total, category.Name))
+		reactloops.EmitStatusI18n(
+			loop,
+			fmt.Sprintf("正在逐一检查「%s」相关的 %d 个文件", category.Name, total),
+			fmt.Sprintf("Reviewing %d files related to %s", total, category.Name),
+		)
 	} else {
-		reactloops.EmitStatus(loop, fmt.Sprintf("已找到 %d 个需要重点关注的位置 / Found %d priority areas", total, total))
+		reactloops.EmitStatusI18n(
+			loop,
+			fmt.Sprintf("已找到 %d 个需要重点关注的位置", total),
+			fmt.Sprintf("Found %d priority areas", total),
+		)
 	}
 	emitPhase2Structured(loop, "code_audit_scan_lock_targets", map[string]any{
 		"category_id":   category.ID,
@@ -78,7 +86,11 @@ func emitPhase2FastContextResult(
 		lines += "\n摘要: " + utils.ShrinkString(strings.TrimSpace(summaryMarkdown), 400)
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, lines)
-	reactloops.EmitStatus(loop, fmt.Sprintf("正在筛选 %d 个可能相关的位置 / Reviewing %d potentially relevant locations", len(paths), len(paths)))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("正在筛选 %d 个可能相关的位置", len(paths)),
+		fmt.Sprintf("Reviewing %d potentially relevant locations", len(paths)),
+	)
 	emitPhase2Structured(loop, "code_audit_scan_fast_context", map[string]any{
 		"category_id":     category.ID,
 		"category_name":   category.Name,

@@ -49,7 +49,7 @@ func makeReconRequireAction(
 					invoker.AddToTimeline(actionName+"_intent", thought)
 				}
 				reactloops.EmitActionLog(loop, planReconNodeID, fmt.Sprintf("开始: %s / Start: %s", actionName, targetToolName))
-				reactloops.EmitStatus(loop, "执行侦察工具中 / Executing recon tool...")
+				reactloops.EmitStatusI18n(loop, "执行侦察工具中", "Executing recon tool...")
 
 				result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, targetToolName)
 				if err != nil {
@@ -101,7 +101,7 @@ func makeReconRequireAction(
 					fmt.Sprintf("[%s] %s\n\n%s", targetToolName, thoughtHint, utils.ShrinkString(content, 2048)))
 
 				op.Feedback(fmt.Sprintf("%s completed: '%s'", actionName, thoughtHint))
-				reactloops.EmitStatus(loop, "完成 / Complete")
+				reactloops.EmitStatusI18n(loop, "完成", "Complete")
 				reactloops.EmitActionLog(loop, planReconNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", actionName, len(content), targetToolName, len(content)))
 				op.Continue()
 			},

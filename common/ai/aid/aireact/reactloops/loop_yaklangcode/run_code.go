@@ -304,10 +304,18 @@ func FormatMissingSelfTestFeedback(policy YakScriptRunPolicy) string {
 	return strings.TrimSpace(b.String())
 }
 
-// FormatRunSkippedStatus builds a short UI status when auto-run is intentionally skipped.
-func FormatRunSkippedStatus(policy YakScriptRunPolicy) string {
+// FormatRunSkippedStatusI18n builds localized UI statuses when auto-run is
+// intentionally skipped.
+func FormatRunSkippedStatusI18n(policy YakScriptRunPolicy) (zh, en string) {
 	if policy.SkipReason != "" {
-		return "跳过自测: " + policy.SkipReason + " / Skipped self-test"
+		return "跳过自测: " + policy.SkipReason, "Skipped self-test"
 	}
-	return "跳过自测（无 YAK_MAIN）/ Skipped self-test (no YAK_MAIN)"
+	return "跳过自测（无 YAK_MAIN）", "Skipped self-test (no YAK_MAIN)"
+}
+
+// FormatRunSkippedStatus preserves the historical bilingual string for logs
+// and callers that have not migrated to structured status events yet.
+func FormatRunSkippedStatus(policy YakScriptRunPolicy) string {
+	zh, en := FormatRunSkippedStatusI18n(policy)
+	return zh + " / " + en
 }
