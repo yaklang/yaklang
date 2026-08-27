@@ -1,13 +1,20 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httputil"
+	"net/textproto"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -1529,33 +1536,134 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncFuzzTag(t *testing.T) {
 	}
 }
 
+type bigRequestMultipartPart struct {
+	fieldName   string
+	filename    string
+	contentType string
+	body        []byte
+}
+
+type bigRequestTargetCapture struct {
+	method        string
+	path          string
+	contentType   string
+	contentLength int64
+	body          []byte
+	err           error
+}
+
+func parseBigRequestMultipartBody(t *testing.T, contentType string, body []byte) []bigRequestMultipartPart {
+	t.Helper()
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	require.NoError(t, err)
+	require.Equal(t, "multipart/form-data", mediaType)
+	require.NotEmpty(t, params["boundary"])
+
+	reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	var parts []bigRequestMultipartPart
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err, "multipart framing must be valid through the closing boundary")
+		partBody, err := io.ReadAll(part)
+		require.NoError(t, err)
+		parts = append(parts, bigRequestMultipartPart{
+			fieldName:   part.FormName(),
+			filename:    part.FileName(),
+			contentType: part.Header.Get("Content-Type"),
+			body:        partBody,
+		})
+	}
+	return parts
+}
+
+func parseBigRequestMultipartPacket(t *testing.T, packet []byte) []bigRequestMultipartPart {
+	t.Helper()
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	return parseBigRequestMultipartBody(t, lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type"), body)
+}
+
+func requireBigRequestContentLength(t *testing.T, packet []byte, label string) {
+	t.Helper()
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	require.Equal(t, fmt.Sprint(len(body)), lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Length"), label)
+}
+
+func requireBigRequestMultipartParts(t *testing.T, got, want []bigRequestMultipartPart, label string) {
+	t.Helper()
+	require.Len(t, got, len(want), "%s part count", label)
+	for index := range want {
+		require.Equal(t, want[index].fieldName, got[index].fieldName, "%s part %d field name", label, index)
+		require.Equal(t, want[index].filename, got[index].filename, "%s part %d filename", label, index)
+		require.Equal(t, want[index].contentType, got[index].contentType, "%s part %d content type", label, index)
+		require.Equal(t, len(want[index].body), len(got[index].body), "%s part %d body length", label, index)
+		require.True(t, bytes.Equal(want[index].body, got[index].body), "%s part %d body bytes", label, index)
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFUZZER_BigRequest(t *testing.T) {
 	uid := uuid.New().String()
-
-	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
-		"Content-Length: 0\r\n\r\n"))
+	receivedByTarget := make(chan bigRequestTargetCapture, 1)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, readErr := io.ReadAll(request.Body)
+		select {
+		case receivedByTarget <- bigRequestTargetCapture{
+			method:        request.Method,
+			path:          request.URL.Path,
+			contentType:   request.Header.Get("Content-Type"),
+			contentLength: request.ContentLength,
+			body:          body,
+			err:           readErr,
+		}:
+		default:
+		}
+		writer.WriteHeader(http.StatusOK)
+	})
 	target := utils.HostPort(host, port)
-	origin := []byte(`GET /` + uid + ` HTTP/1.1
-Host: ` + target + `
-Content-Type: multipart/form-data; boundary=X-INSOMNIA-BOUNDARY
+	const boundary = "X-INSOMNIA-BOUNDARY"
+	largeOrdinaryBody := bytes.Repeat([]byte{0x99}, 11_000_000)
+	smallFileBody := []byte("11")
+	var multipartBody bytes.Buffer
+	multipartWriter := multipart.NewWriter(&multipartBody)
+	require.NoError(t, multipartWriter.SetBoundary(boundary))
+	ordinaryHeader := make(textproto.MIMEHeader)
+	ordinaryHeader.Set("Content-Disposition", `form-data; name="large-note"`)
+	ordinaryPart, err := multipartWriter.CreatePart(ordinaryHeader)
+	require.NoError(t, err)
+	_, err = ordinaryPart.Write(largeOrdinaryBody)
+	require.NoError(t, err)
+	fileHeader := make(textproto.MIMEHeader)
+	fileHeader.Set("Content-Disposition", `form-data; name="upload"; filename="small.jpg"`)
+	fileHeader.Set("Content-Type", "image/jpeg")
+	filePart, err := multipartWriter.CreatePart(fileHeader)
+	require.NoError(t, err)
+	_, err = filePart.Write(smallFileBody)
+	require.NoError(t, err)
+	require.NoError(t, multipartWriter.Close())
 
---X-INSOMNIA-BOUNDARY
-Content-Disposition: form-data; name=""
+	originHeader := fmt.Sprintf(
+		"POST /%s HTTP/1.1\r\nHost: %s\r\nContent-Type: multipart/form-data; boundary=%s\r\nContent-Length: %d\r\n\r\n",
+		uid, target, boundary, multipartBody.Len(),
+	)
+	origin := append([]byte(originHeader), multipartBody.Bytes()...)
+	expectedParts := []bigRequestMultipartPart{
+		{fieldName: "large-note", body: largeOrdinaryBody},
+		{fieldName: "upload", filename: "small.jpg", contentType: "image/jpeg", body: smallFileBody},
+	}
+	requireBigRequestContentLength(t, origin, "test fixture Content-Length")
+	requireBigRequestMultipartParts(t, parseBigRequestMultipartPacket(t, origin), expectedParts, "test fixture")
 
-` + strings.Repeat("\x99", 11000000) /* 11,000,000 B ~ 11M */ + `
---X-INSOMNIA-BOUNDARY
-Content-Disposition: form-data; name=""; filename="small.jpg"
-Content-Type: image/jpeg
-
-11
-`)
-	client, _ := NewLocalClient()
-	stream, _ := client.MITM(context.Background())
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	stream, err := client.MITM(context.Background())
+	require.NoError(t, err)
 	portMITM := int64(utils.GetRandomAvailableTCPPort())
-	stream.Send(&ypb.MITMRequest{
+	require.NoError(t, stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
 		Port: uint32(portMITM),
-	})
+	}))
 	go func() {
 		for {
 			_, err := stream.Recv()
@@ -1564,14 +1672,32 @@ Content-Type: image/jpeg
 			}
 		}
 	}()
-	err := utils.WaitConnect("127.0.0.1:"+fmt.Sprint(portMITM), 5)
+	err = utils.WaitConnect("127.0.0.1:"+fmt.Sprint(portMITM), 5)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, reqRaw, _ := poc.HTTP(origin, poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(portMITM)))
+	_, reqRaw, err := poc.HTTP(origin, poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(portMITM)))
+	require.NoError(t, err)
 	if len(reqRaw) < 11000000 {
 		t.Fatal("response raw is too small")
 	}
+	var targetCapture bigRequestTargetCapture
+	select {
+	case targetCapture = <-receivedByTarget:
+	case <-time.After(5 * time.Second):
+		t.Fatal("target server did not receive the multipart request")
+	}
+	require.NoError(t, targetCapture.err)
+	require.Equal(t, "POST", targetCapture.method)
+	require.Equal(t, "/"+uid, targetCapture.path)
+	require.Equal(t, int64(len(targetCapture.body)), targetCapture.contentLength)
+	requireBigRequestMultipartParts(
+		t,
+		parseBigRequestMultipartBody(t, targetCapture.contentType, targetCapture.body),
+		expectedParts,
+		"target server",
+	)
+
 	var rsp *ypb.QueryHTTPFlowResponse
 	for i := 0; i < 20; i++ {
 		rsp, _ = client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
@@ -1584,6 +1710,8 @@ Content-Type: image/jpeg
 			break
 		}
 	}
+	require.NotNil(t, rsp)
+	require.NotEmpty(t, rsp.GetData())
 
 	listItem := rsp.GetData()[0]
 	if !listItem.IsTooLargeRequest || !listItem.IsRequestOversize {
@@ -1594,6 +1722,9 @@ Content-Type: image/jpeg
 	}
 
 	reqId := listItem.Id
+	t.Cleanup(func() {
+		_, _ = client.DeleteHTTPFlows(context.Background(), &ypb.DeleteHTTPFlowRequest{Id: []int64{int64(reqId)}})
+	})
 	flow, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{Id: int64(reqId)})
 	if err != nil {
 		t.Fatal(err)
@@ -1604,12 +1735,75 @@ Content-Type: image/jpeg
 	if flow.TooLargeRequestBodyFile == "" {
 		t.Fatal("too large request body file path missing")
 	}
-	// Oversized multipart requests carrying a file part are skeletonized: the
-	// in-DB request holds an editable multipart skeleton with a per-file
-	// placeholder, not the flat "request too large" truncate notice.
-	if !strings.Contains(string(flow.Request), "multipart file spilled") {
-		t.Fatal("GetHTTPFlowById should return multipart skeleton with spilled-file placeholder, got: " + utils.ByteSize(uint64(len(flow.Request))))
+	require.Empty(t, flow.MultipartFiles, "an externalized ordinary field must not appear as an uploaded file")
+	publicParts := parseBigRequestMultipartPacket(t, flow.Request)
+	require.Len(t, publicParts, 2)
+	require.Equal(t, "large-note", publicParts[0].fieldName)
+	require.Empty(t, publicParts[0].filename)
+	require.Equal(t, []byte("{{file("+flow.TooLargeRequestBodyFile+")}}"), publicParts[0].body)
+	require.Equal(t, expectedParts[1].fieldName, publicParts[1].fieldName)
+	require.Equal(t, expectedParts[1].filename, publicParts[1].filename)
+	require.Equal(t, expectedParts[1].contentType, publicParts[1].contentType)
+	require.Equal(t, expectedParts[1].body, publicParts[1].body)
+
+	var persisted schema.HTTPFlow
+	require.NoError(t, consts.GetGormProjectDatabase().First(&persisted, reqId).Error)
+	require.True(t, persisted.IsTooLargeRequest)
+	require.Equal(t, flow.TooLargeRequestHeaderFile, persisted.TooLargeRequestHeaderFile)
+	require.Equal(t, flow.TooLargeRequestBodyFile, persisted.TooLargeRequestBodyFile)
+	persistedPacket := []byte(persisted.GetRequest())
+	storedParts := parseBigRequestMultipartPacket(t, persistedPacket)
+	require.Len(t, storedParts, 2)
+	require.Equal(t, "large-note", storedParts[0].fieldName)
+	require.Equal(t, publicParts[0].body, storedParts[0].body, "database must persist the executable part resource")
+	require.Equal(t, expectedParts[1].fieldName, storedParts[1].fieldName)
+	require.Equal(t, expectedParts[1].filename, storedParts[1].filename)
+	require.Equal(t, expectedParts[1].contentType, storedParts[1].contentType)
+	require.Equal(t, expectedParts[1].body, storedParts[1].body)
+
+	require.FileExists(t, persisted.TooLargeRequestHeaderFile)
+	require.FileExists(t, persisted.TooLargeRequestBodyFile)
+	headerOnDisk, err := os.ReadFile(persisted.TooLargeRequestHeaderFile)
+	require.NoError(t, err)
+	require.Equal(t, []byte(originHeader), headerOnDisk)
+	largePartOnDisk, err := os.ReadFile(persisted.TooLargeRequestBodyFile)
+	require.NoError(t, err)
+	require.Equal(t, len(largeOrdinaryBody), len(largePartOnDisk))
+	require.True(t, bytes.Equal(largeOrdinaryBody, largePartOnDisk))
+
+	type manifestEntry struct {
+		PartIndex   int    `json:"partIndex"`
+		FieldName   string `json:"fieldName"`
+		Filename    string `json:"filename"`
+		ContentType string `json:"contentType"`
+		Size        int64  `json:"size"`
+		File        string `json:"file"`
 	}
+	sidecarDir := filepath.Dir(persisted.TooLargeRequestBodyFile)
+	manifestPath := filepath.Join(sidecarDir, "manifest.json")
+	manifestJSON, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	var manifest []manifestEntry
+	require.NoError(t, json.Unmarshal(manifestJSON, &manifest))
+	require.Equal(t, []manifestEntry{{
+		PartIndex: 0,
+		FieldName: "large-note",
+		Size:      int64(len(largeOrdinaryBody)),
+		File:      "part-0-data.txt",
+	}}, manifest)
+	require.Equal(t, filepath.Join(sidecarDir, manifest[0].File), persisted.TooLargeRequestBodyFile)
+	sidecarEntries, err := os.ReadDir(sidecarDir)
+	require.NoError(t, err)
+	var sidecarNames []string
+	for _, entry := range sidecarEntries {
+		sidecarNames = append(sidecarNames, entry.Name())
+	}
+	require.ElementsMatch(t, []string{"manifest.json", "part-0-data.txt"}, sidecarNames)
+
+	loadedPacket, err := yakit.LoadHTTPFlowRequestPacket(&persisted)
+	require.NoError(t, err)
+	requireBigRequestContentLength(t, loadedPacket, "HTTPFlow reconstructed packet Content-Length")
+	requireBigRequestMultipartParts(t, parseBigRequestMultipartPacket(t, loadedPacket), expectedParts, "HTTPFlow reconstructed packet")
 
 	bodyStream, err := client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
 		Id:        int64(reqId),
@@ -1635,13 +1829,12 @@ Content-Type: image/jpeg
 			break
 		}
 	}
-	if len(bodyChunks) < 11000000 {
-		t.Fatal("request body is too small, truncated for some reason got: " + utils.ByteSize(uint64(len(bodyChunks))))
-	}
-	suffix := bodyChunks[len(bodyChunks)-200:]
-	if !strings.Contains(string(suffix), "11") {
-		t.Fatalf("request body suffix should preserve trailing multipart part, got: %q", suffix)
-	}
+	requireBigRequestMultipartParts(
+		t,
+		parseBigRequestMultipartBody(t, lowhttp.GetHTTPPacketHeader(origin, "Content-Type"), bodyChunks),
+		expectedParts,
+		"GetHTTPFlowBodyById rebuilt body",
+	)
 }
 
 func TestHTTPRequest_Fuzz_FromPlugin(t *testing.T) {

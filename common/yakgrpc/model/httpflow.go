@@ -523,6 +523,12 @@ func loadFlowMultipartFiles(f *schema.HTTPFlow) []*ypb.MultipartFileInfo {
 	}
 	out := make([]*ypb.MultipartFileInfo, 0, len(entries))
 	for _, e := range entries {
+		// Ordinary form fields may also be externalized to keep a valid
+		// multipart skeleton bounded. They remain part resources internally but
+		// must not appear in the frontend's uploaded-file dropdown.
+		if e.Filename == "" {
+			continue
+		}
 		out = append(out, &ypb.MultipartFileInfo{
 			PartIndex:   int32(e.PartIndex),
 			FieldName:   utf8safe(e.FieldName),

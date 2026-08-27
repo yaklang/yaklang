@@ -320,7 +320,7 @@ func TestBuildFuzzableHTTPFlowRequestPacket_MultipartSpillConvertsInvalidOrdinar
 }
 
 func TestRequestRepresentationMultipartAggregateAndSkeletonBounds(t *testing.T) {
-	t.Run("aggregate expanded size at D remains inline and D plus one externalizes every file", func(t *testing.T) {
+	t.Run("aggregate expanded size at D remains inline and D plus one collapses the largest part", func(t *testing.T) {
 		files := map[string]struct {
 			Filename    string
 			ContentType string
@@ -345,7 +345,7 @@ func TestRequestRepresentationMultipartAggregateAndSkeletonBounds(t *testing.T) 
 			wantResources int
 		}{
 			{name: "D", limit: measured},
-			{name: "D plus one", limit: measured - 1, wantSpill: true, wantResources: 2},
+			{name: "D plus one", limit: measured - 1, wantSpill: true, wantResources: 1},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				withGlobalMaxContentLength(t, uint64(tc.limit))
@@ -366,7 +366,7 @@ func TestRequestRepresentationMultipartAggregateAndSkeletonBounds(t *testing.T) 
 		}
 	})
 
-	t.Run("over-D ordinary field falls back to one bounded whole-body resource", func(t *testing.T) {
+	t.Run("over-D ordinary field collapses without losing multipart skeleton", func(t *testing.T) {
 		const dumpLimit = 512 * 1024
 		withGlobalMaxContentLength(t, dumpLimit)
 		largeText := string(bytes.Repeat([]byte("x"), dumpLimit+1))
@@ -381,14 +381,14 @@ func TestRequestRepresentationMultipartAggregateAndSkeletonBounds(t *testing.T) 
 		require.NoError(t, err)
 		t.Cleanup(func() { removeLargeRequestSpillFiles(spill.HeaderFile, spill.BodyFile) })
 		require.True(t, spill.IsTooLarge)
-		require.True(t, IsFlatSpillRequestPacket(spill.StoredPacket))
-		require.False(t, IsMultipartSpillRequestPacket(spill.StoredPacket))
+		require.False(t, IsFlatSpillRequestPacket(spill.StoredPacket))
+		require.True(t, IsMultipartSpillRequestPacket(spill.StoredPacket))
 
 		fuzzable, err := BuildFuzzableHTTPFlowRequestPacket(spill.StoredPacket, spill.BodyFile)
 		require.NoError(t, err)
-		require.Less(t, len(fuzzable), 4*1024)
 		paths := fileFuzzTagPaths(fuzzable)
 		require.Equal(t, []string{spill.BodyFile}, paths)
+		require.Contains(t, string(fuzzable), `filename="tiny.bin"`)
 
 		rendered := renderRepresentationTestPacket(t, fuzzable)
 		_, originalBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
@@ -401,7 +401,7 @@ func TestRequestRepresentationMultipartAggregateAndSkeletonBounds(t *testing.T) 
 		)
 	})
 
-	t.Run("ordinary invalid UTF8 expansion over D falls back to one bounded whole-body resource", func(t *testing.T) {
+	t.Run("ordinary invalid UTF8 expansion over D collapses that part", func(t *testing.T) {
 		const dumpLimit = 128 * 1024
 		withGlobalMaxContentLength(t, dumpLimit)
 
@@ -433,8 +433,8 @@ func TestRequestRepresentationMultipartAggregateAndSkeletonBounds(t *testing.T) 
 		require.NoError(t, err)
 		t.Cleanup(func() { removeLargeRequestSpillFiles(spill.HeaderFile, spill.BodyFile) })
 		require.True(t, spill.IsTooLarge)
-		require.True(t, IsFlatSpillRequestPacket(spill.StoredPacket))
-		require.False(t, IsMultipartSpillRequestPacket(spill.StoredPacket))
+		require.False(t, IsFlatSpillRequestPacket(spill.StoredPacket))
+		require.True(t, IsMultipartSpillRequestPacket(spill.StoredPacket))
 
 		fuzzable, err := BuildFuzzableHTTPFlowRequestPacket(spill.StoredPacket, spill.BodyFile)
 		require.NoError(t, err)

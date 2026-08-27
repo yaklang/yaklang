@@ -331,34 +331,19 @@ func spillLargeHTTPFlowRequestIfNeeded(packet []byte) (largeRequestSpillResult, 
 		return res, nil
 	}
 
-	// Multipart/form-data uploads carrying file parts are skeletonized: each
-	// file part spills to its own disk file and the in-DB body keeps only an
-	// editable skeleton with placeholders. Falls back to flat spill when the
-	// body is not multipart or carries no file part.
+	// Valid multipart uploads keep their boundary/header skeleton and collapse
+	// only the part bodies selected by spillMultipartFilesIfNeeded. A flat spill
+	// remains the lossless fallback for non-multipart or malformed bodies.
 	if isMultipart {
 		if mpRes, err := spillMultipartFilesIfNeeded(packet); err != nil {
 			log.Errorf("spill multipart request failed: %s, fall back to flat spill", err)
 		} else if mpRes.IsTooLarge {
-			// Decide with the exact public editor representation. The raw skeleton
-			// can be below D while an invalid UTF-8 ordinary part expands to nearly
-			// four times its size inside {{unquote}}. Build only the lightweight
-			// {{file}} shape here, then measure the remaining conversion without
-			// allocating the expanded text.
-			fuzzableSkeleton, buildErr := buildFuzzableMultipartRequestPacket(mpRes.StoredPacket, mpRes.BodyFile)
-			finalBodySize, _, measureErr := lowhttp.MeasureHTTPRequestFuzzTagBodySize(fuzzableSkeleton)
-			if buildErr == nil && measureErr == nil && finalBodySize <= GetMaxHTTPFlowRequestBodyInDBBytes() {
-				res.StoredPacket = mpRes.StoredPacket
-				res.IsTooLarge = true
-				res.HeaderFile = mpRes.HeaderFile
-				res.BodyFile = mpRes.BodyFile
-				res.OriginalBodyLen = mpRes.OriginalBodyLen
-				return res, nil
-			}
-			// A multipart body can exceed D because of a huge ordinary field or
-			// because an invalid ordinary field expands as {{unquote}}. Per-part
-			// spilling would still leave an over-limit editor/DB representation, so
-			// discard it and externalize the complete body below.
-			removeLargeRequestSpillFiles(mpRes.HeaderFile, mpRes.BodyFile)
+			res.StoredPacket = mpRes.StoredPacket
+			res.IsTooLarge = true
+			res.HeaderFile = mpRes.HeaderFile
+			res.BodyFile = mpRes.BodyFile
+			res.OriginalBodyLen = mpRes.OriginalBodyLen
+			return res, nil
 		}
 	}
 

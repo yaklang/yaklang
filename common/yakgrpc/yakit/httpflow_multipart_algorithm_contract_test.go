@@ -87,10 +87,9 @@ func parseMultipartAlgorithmParts(t *testing.T, packet []byte) []multipartAlgori
 }
 
 // TestMultipartRepresentationDecisionTable is the top-level executable
-// decision table for multipart History/MITM packets. Every public packet must
-// be bounded and UTF-8 safe, and rendering it must reproduce the original part
-// bytes. The cases deliberately select every terminal representation:
-// raw/unquote inline, per-file resources, and one whole-body resource.
+// decision table for multipart History/MITM packets. Every valid multipart
+// packet keeps its skeleton, and rendering it must reproduce the original part
+// bytes. Only malformed multipart falls back to one whole-body resource.
 func TestMultipartRepresentationDecisionTable(t *testing.T) {
 	const dumpLimit = 4 * 1024
 	tests := []struct {
@@ -137,18 +136,18 @@ func TestMultipartRepresentationDecisionTable(t *testing.T) {
 			wantFileTags: 1,
 		},
 		{
-			name: "text-only body over D uses one whole-body resource",
+			name: "text-only body over D collapses the ordinary part",
 			packet: func(t *testing.T) []byte {
 				return buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
 					{fieldName: "large-note", body: bytes.Repeat([]byte("T"), dumpLimit+512)},
 				})
 			},
 			wellFormed:   true,
-			wantMode:     "flat",
+			wantMode:     "multipart",
 			wantFileTags: 1,
 		},
 		{
-			name: "ordinary invalid part expansion over D uses one whole-body resource",
+			name: "ordinary invalid part expansion over D collapses that part",
 			packet: func(t *testing.T) []byte {
 				return buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
 					{fieldName: "binary-note", body: bytes.Repeat([]byte{0xff}, 1200)},
@@ -156,7 +155,7 @@ func TestMultipartRepresentationDecisionTable(t *testing.T) {
 				})
 			},
 			wellFormed:   true,
-			wantMode:     "flat",
+			wantMode:     "multipart",
 			wantFileTags: 1,
 		},
 		{
@@ -223,71 +222,32 @@ func TestMultipartRepresentationDecisionTable(t *testing.T) {
 	}
 }
 
-// The first threshold decides whether the original multipart packet needs an
-// alternate representation. The second threshold decides whether the final
-// skeleton (file tags plus converted ordinary parts) still fits D. Equality is
-// accepted; one byte less must fall back to a single whole-body resource.
-func TestMultipartFinalPublicRepresentationBoundary(t *testing.T) {
+// D is a collapse budget for part bodies, not a reason to destroy a valid
+// multipart skeleton. With D below even the structural skeleton, every part is
+// externalized and the skeleton is intentionally allowed to remain above D.
+func TestMultipartStructuralSkeletonAboveDRemainsMultipart(t *testing.T) {
 	parts := []multipartAlgorithmPart{
-		{fieldName: "binary-note", body: bytes.Repeat([]byte{0xff}, 1200)},
-		{fieldName: "upload", filename: "large.bin", contentType: "application/octet-stream", body: bytes.Repeat([]byte{0xfe}, 32*1024)},
+		{fieldName: "note", body: []byte("ordinary")},
+		{fieldName: "upload", filename: "small.bin", contentType: "application/octet-stream", body: []byte("file")},
 	}
 	packet := buildMultipartAlgorithmPacket(t, parts)
+	withGlobalMaxContentLength(t, 1)
+	spill, err := spillLargeHTTPFlowRequestIfNeeded(packet)
+	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(spill.HeaderFile, spill.BodyFile) })
+	require.True(t, spill.IsTooLarge)
+	require.True(t, IsMultipartSpillRequestPacket(spill.StoredPacket))
+	require.False(t, IsFlatSpillRequestPacket(spill.StoredPacket))
 
-	for _, tc := range []struct {
-		name          string
-		limitDelta    int
-		wantMultipart bool
-	}{
-		{name: "final representation exactly D keeps per-part resources", wantMultipart: true},
-		{name: "final representation D plus one falls back to whole-body resource", limitDelta: -1},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			// Derive the candidate size inside this subtest's YAKIT_HOME. The
-			// absolute engine path is part of {{file(path)}} and therefore part of
-			// the exact public size; measuring it in a different temp directory
-			// would make the boundary assertion depend on path length.
-			withGlobalMaxContentLength(t, 1)
-			candidate, err := spillMultipartFilesIfNeeded(packet)
-			require.NoError(t, err)
-			require.True(t, candidate.IsTooLarge)
-			candidatePacket, err := buildFuzzableMultipartRequestPacket(candidate.StoredPacket, candidate.BodyFile)
-			require.NoError(t, err)
-			finalBodySize, converted, err := lowhttp.MeasureHTTPRequestFuzzTagBodySize(candidatePacket)
-			require.NoError(t, err)
-			require.True(t, converted)
-			removeLargeRequestSpillFiles(candidate.HeaderFile, candidate.BodyFile)
-			limit := finalBodySize + tc.limitDelta
-			consts.SetGlobalMaxContentLength(uint64(limit))
-
-			spill, err := spillLargeHTTPFlowRequestIfNeeded(packet)
-			require.NoError(t, err)
-			t.Cleanup(func() { removeLargeRequestSpillFiles(spill.HeaderFile, spill.BodyFile) })
-			require.True(t, spill.IsTooLarge)
-			require.Equal(t, tc.wantMultipart, IsMultipartSpillRequestPacket(spill.StoredPacket))
-			require.Equal(t, !tc.wantMultipart, IsFlatSpillRequestPacket(spill.StoredPacket))
-
-			fuzzable, err := BuildFuzzableHTTPFlowRequestPacket(spill.StoredPacket, spill.BodyFile)
-			require.NoError(t, err)
-			_, displayBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(fuzzable)
-			require.LessOrEqual(t, len(displayBody), limit)
-			if tc.wantMultipart {
-				require.Equal(t, limit, len(displayBody), "equality at D must remain accepted")
-				require.Len(t, fileFuzzTagPaths(fuzzable), 1)
-			} else {
-				require.Equal(t, []string{spill.BodyFile}, fileFuzzTagPaths(fuzzable))
-				abandonedPartDirs, err := filepath.Glob(filepath.Join(
-					consts.GetDefaultYakitBaseTempDir(),
-					"large-request-body-*-parts",
-				))
-				require.NoError(t, err)
-				require.Empty(t, abandonedPartDirs, "flat fallback must remove its abandoned multipart sidecar")
-			}
-
-			rendered := renderRepresentationTestPacket(t, fuzzable)
-			require.Equal(t, parseMultipartAlgorithmParts(t, packet), parseMultipartAlgorithmParts(t, rendered))
-		})
-	}
+	manifest, err := loadMultipartManifest(filepath.Dir(spill.BodyFile))
+	require.NoError(t, err)
+	require.Len(t, manifest, 2)
+	fuzzable, err := BuildFuzzableHTTPFlowRequestPacket(spill.StoredPacket, spill.BodyFile)
+	require.NoError(t, err)
+	_, displayBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(fuzzable)
+	require.Greater(t, len(displayBody), 1)
+	require.Len(t, fileFuzzTagPaths(fuzzable), 2)
+	require.Equal(t, parseMultipartAlgorithmParts(t, packet), parseMultipartAlgorithmParts(t, renderRepresentationTestPacket(t, fuzzable)))
 }
 
 // A replacement index is the physical part position, not the ordinal among
@@ -295,7 +255,7 @@ func TestMultipartFinalPublicRepresentationBoundary(t *testing.T) {
 // test interleaves ordinary/file parts with the same name and replaces only the
 // file at physical index 3.
 func TestMultipartReplacementUsesPhysicalPartIndex(t *testing.T) {
-	withGlobalMaxContentLength(t, 8*1024)
+	withGlobalMaxContentLength(t, 4*1024)
 	parts := []multipartAlgorithmPart{
 		{fieldName: "upload", body: []byte("ordinary-before")},
 		{fieldName: "upload", filename: "first.bin", contentType: "application/octet-stream", body: bytes.Repeat([]byte("A"), 6*1024)},
@@ -399,7 +359,7 @@ func (w *multipartRejectPayloadWriter) Write(p []byte) (int, error) {
 // HTTP History because GetHTTPFlowById and GetHTTPFlowBodyById consume the same
 // manifest and part files that the editor representation references.
 func TestMultipartSplitReaderAndFailureContracts(t *testing.T) {
-	withGlobalMaxContentLength(t, 4*1024)
+	withGlobalMaxContentLength(t, 2*1024)
 	packet := buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
 		{fieldName: "note", body: []byte("ordinary")},
 		{fieldName: "upload", filename: "first.bin", contentType: "application/octet-stream", body: bytes.Repeat([]byte("A"), 3*1024)},
@@ -572,6 +532,192 @@ func TestSpillMultipartFilesIfNeededEarlyDecisions(t *testing.T) {
 	require.False(t, result.IsTooLarge)
 }
 
+// These cases cover the selection invariant and both-pass consistency checks
+// that protect the sidecar from containing a different multipart layout than
+// the request measured during the first pass.
+func TestMultipartSpillSelectionAndPassConsistencyContracts(t *testing.T) {
+	t.Run("zero parsed parts falls back", func(t *testing.T) {
+		withGlobalMaxContentLength(t, 1)
+		packet := buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
+			{fieldName: "note", body: []byte("data")},
+		})
+		ops := defaultMultipartSpillOps()
+		ops.newReader = func(io.Reader) multipartPartReader {
+			return multipartErrorPartReader{err: io.EOF}
+		}
+		result, err := spillMultipartFilesIfNeededWithOps(packet, ops)
+		require.NoError(t, err)
+		require.False(t, result.IsTooLarge)
+	})
+
+	t.Run("oversized epilogue with bounded parts falls back losslessly", func(t *testing.T) {
+		withGlobalMaxContentLength(t, 512)
+		packet := buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
+			{fieldName: "note", body: []byte("small")},
+		})
+		packet = append(packet, bytes.Repeat([]byte("E"), 1024)...)
+		result, err := spillMultipartFilesIfNeeded(packet)
+		require.NoError(t, err)
+		require.False(t, result.IsTooLarge)
+		require.Empty(t, result.MultipartDir)
+	})
+
+	t.Run("aggregate selection skips an already oversized part", func(t *testing.T) {
+		withGlobalMaxContentLength(t, 1024)
+		packet := buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
+			{fieldName: "already-large", body: bytes.Repeat([]byte("L"), 2*1024)},
+			{fieldName: "largest-remaining", body: bytes.Repeat([]byte("R"), 900)},
+		})
+		result, err := spillMultipartFilesIfNeeded(packet)
+		require.NoError(t, err)
+		t.Cleanup(func() { removeLargeRequestSpillFiles(result.HeaderFile, result.BodyFile) })
+		require.True(t, result.IsTooLarge)
+		require.Len(t, result.Manifest, 2)
+		require.Equal(t, []int{0, 1}, []int{result.Manifest[0].Index, result.Manifest[1].Index})
+	})
+
+	fullPacket := buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
+		{fieldName: "first", body: []byte("first")},
+		{fieldName: "second", body: []byte("second")},
+	})
+	onePartPacket := buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
+		{fieldName: "first", body: []byte("first")},
+	})
+	_, fullBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(fullPacket)
+	_, onePartBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(onePartPacket)
+
+	for _, tc := range []struct {
+		name             string
+		firstPassBody    []byte
+		secondPassBody   []byte
+		wantCreatedFiles int
+	}{
+		{name: "second pass has an extra part", firstPassBody: onePartBody, secondPassBody: fullBody, wantCreatedFiles: 1},
+		{name: "second pass loses a part", firstPassBody: fullBody, secondPassBody: onePartBody, wantCreatedFiles: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withGlobalMaxContentLength(t, 1)
+			ops := defaultMultipartSpillOps()
+			readerCall := 0
+			ops.newReader = func(io.Reader) multipartPartReader {
+				readerCall++
+				if readerCall == 1 {
+					return customMultipart.NewReader(bytes.NewReader(tc.firstPassBody))
+				}
+				return customMultipart.NewReader(bytes.NewReader(tc.secondPassBody))
+			}
+			createdFiles := 0
+			originalCreate := ops.create
+			ops.create = func(path string) (*os.File, error) {
+				createdFiles++
+				return originalCreate(path)
+			}
+			result, err := spillMultipartFilesIfNeededWithOps(fullPacket, ops)
+			require.NoError(t, err)
+			require.False(t, result.IsTooLarge)
+			require.Equal(t, tc.wantCreatedFiles, createdFiles)
+			require.NotEmpty(t, result.MultipartDir)
+			require.NoDirExists(t, result.MultipartDir)
+		})
+	}
+}
+
+func TestMultipartRepeatedPartHeadersSurviveSpillAndRebuild(t *testing.T) {
+	withGlobalMaxContentLength(t, 1)
+	require.Equal(t,
+		len("--boundary\r\n")+len("\r\n")+len("\r\n"),
+		multipartSkeletonPartOverhead("boundary", textproto.MIMEHeader{"X-Empty": nil}),
+	)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Disposition", `form-data; name="upload"; filename="repeated.bin"`)
+	header.Set("Content-Type", "application/octet-stream")
+	header.Add("X-Trace", "one")
+	header.Add("X-Trace", "two")
+	part, err := writer.CreatePart(header)
+	require.NoError(t, err)
+	partBody := []byte("payload")
+	_, err = part.Write(partBody)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	packet := buildRepresentationTestPacket(writer.FormDataContentType(), body.Bytes())
+
+	spill, err := spillMultipartFilesIfNeeded(packet)
+	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(spill.HeaderFile, spill.BodyFile) })
+	require.True(t, spill.IsTooLarge)
+	fuzzable, err := BuildFuzzableHTTPFlowRequestPacket(spill.StoredPacket, spill.BodyFile)
+	require.NoError(t, err)
+	require.True(t, IsMultipartSpillRequestPacket(fuzzable))
+	_, skeletonBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(spill.StoredPacket)
+	rebuilt := readAll(t, rebuildMultipartBodyToReader([]byte(skeletonBody), spill.MultipartDir))
+
+	reader := multipart.NewReader(bytes.NewReader(rebuilt), writer.Boundary())
+	rebuiltPart, err := reader.NextPart()
+	require.NoError(t, err)
+	require.Equal(t, []string{"one", "two"}, rebuiltPart.Header.Values("X-Trace"))
+	rebuiltPartBody, err := io.ReadAll(rebuiltPart)
+	require.NoError(t, err)
+	require.Equal(t, partBody, rebuiltPartBody)
+	_, err = reader.NextPart()
+	require.ErrorIs(t, err, io.EOF)
+}
+
+func TestBuildFuzzableMultipartRequestPacketFailureContracts(t *testing.T) {
+	markerPacket := func(partIndex string) []byte {
+		return []byte("POST / HTTP/1.1\r\nContent-Type: multipart/form-data; boundary=x\r\n\r\n" +
+			"--x\r\nContent-Disposition: form-data; name=\"x\"\r\n\r\n" +
+			multipartSkeletonMarker + ", part=" + partIndex + ", file=x, size=1]]\r\n--x--\r\n")
+	}
+
+	t.Run("empty body file", func(t *testing.T) {
+		_, err := buildFuzzableMultipartRequestPacket(markerPacket("0"), "")
+		require.ErrorContains(t, err, "body file is empty")
+	})
+
+	t.Run("manifest read error", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(dir, manifestFileName), 0o700))
+		_, err := buildFuzzableMultipartRequestPacket(markerPacket("0"), filepath.Join(dir, "part-0-data.txt"))
+		require.Error(t, err)
+	})
+
+	t.Run("marker missing", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, writeMultipartManifest(dir, nil))
+		_, err := buildFuzzableMultipartRequestPacket(
+			[]byte("POST / HTTP/1.1\r\nContent-Type: multipart/form-data; boundary=x\r\n\r\n--x--\r\n"),
+			filepath.Join(dir, "part-0-data.txt"),
+		)
+		require.ErrorContains(t, err, "marker is missing")
+	})
+
+	t.Run("part index overflow", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, writeMultipartManifest(dir, nil))
+		_, err := buildFuzzableMultipartRequestPacket(
+			markerPacket(string(bytes.Repeat([]byte("9"), 100))),
+			filepath.Join(dir, "part-0-data.txt"),
+		)
+		require.ErrorContains(t, err, "parse multipart spill part index")
+	})
+
+	t.Run("part absent from manifest", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, writeMultipartManifest(dir, nil))
+		_, err := buildFuzzableMultipartRequestPacket(markerPacket("0"), filepath.Join(dir, "part-0-data.txt"))
+		require.ErrorContains(t, err, "part 0 not found in manifest")
+	})
+
+	t.Run("unsafe manifest file path", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, writeMultipartManifest(dir, []multipartPartMeta{{Index: 0, File: "bad).txt"}}))
+		_, err := buildFuzzableMultipartRequestPacket(markerPacket("0"), filepath.Join(dir, "part-0-data.txt"))
+		require.ErrorContains(t, err, "unsupported delimiter")
+	})
+}
+
 type multipartErrorPartReader struct {
 	err error
 }
@@ -649,7 +795,7 @@ func TestSpillMultipartFilesIfNeededFailureCleanup(t *testing.T) {
 				originalCopy := ops.copy
 				ops.copy = func(dst io.Writer, src io.Reader) (int64, error) {
 					copyCall++
-					if copyCall == 2 {
+					if copyCall == 3 {
 						return 0, injectedErr
 					}
 					return originalCopy(dst, src)
@@ -664,7 +810,7 @@ func TestSpillMultipartFilesIfNeededFailureCleanup(t *testing.T) {
 				originalCopy := ops.copy
 				ops.copy = func(dst io.Writer, src io.Reader) (int64, error) {
 					copyCall++
-					if copyCall == 3 {
+					if copyCall == 4 {
 						return 0, injectedErr
 					}
 					return originalCopy(dst, src)
@@ -697,7 +843,7 @@ func TestSpillMultipartFilesIfNeededFailureCleanup(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			withGlobalMaxContentLength(t, 1)
+			withGlobalMaxContentLength(t, 1024)
 			ops := defaultMultipartSpillOps()
 			tc.configure(&ops)
 			result, err := spillMultipartFilesIfNeededWithOps(packet, ops)
@@ -733,6 +879,9 @@ func TestMultipartRebuildFailureContracts(t *testing.T) {
 	manifest, err := loadMultipartManifest(fileSidecar)
 	require.NoError(t, err)
 	require.Len(t, manifest, 1)
+	fileFuzzable, err := BuildFuzzableHTTPFlowRequestPacket(fileSpill.StoredPacket, fileSpill.BodyFile)
+	require.NoError(t, err)
+	_, fileFuzzableSkeleton := lowhttp.SplitHTTPHeadersAndBodyFromPacket(fileFuzzable)
 
 	ordinaryAndFilePacket := buildMultipartAlgorithmPacket(t, []multipartAlgorithmPart{
 		{fieldName: "note", body: []byte("ordinary-payload")},
@@ -774,6 +923,16 @@ func TestMultipartRebuildFailureContracts(t *testing.T) {
 		emptySidecar := t.TempDir()
 		require.NoError(t, writeMultipartManifest(emptySidecar, nil))
 		err := rebuildMultipartBodyToWriterWithReplacements(fileSkeleton, emptySidecar, nil, io.Discard)
+		require.ErrorContains(t, err, "not found in manifest")
+	})
+
+	t.Run("engine file resource absent from manifest", func(t *testing.T) {
+		manifestPath := filepath.Join(fileSidecar, manifestFileName)
+		originalManifest, err := os.ReadFile(manifestPath)
+		require.NoError(t, err)
+		defer func() { _ = os.WriteFile(manifestPath, originalManifest, 0o600) }()
+		require.NoError(t, writeMultipartManifest(fileSidecar, nil))
+		err = rebuildMultipartBodyToWriterWithReplacements(fileFuzzableSkeleton, fileSidecar, nil, io.Discard)
 		require.ErrorContains(t, err, "not found in manifest")
 	})
 
