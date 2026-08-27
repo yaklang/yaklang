@@ -194,6 +194,12 @@ func resolveAISessionStartParams(db *gorm.DB, sessionID string, request *ypb.AIS
 }
 
 func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
+	return s.startAIReActWithOptions(stream, true)
+}
+
+// startAIReActWithOptions keeps production behavior unchanged while allowing
+// lifecycle tests to replace external AI dependencies.
+func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, loadBuiltinTools bool, additionalOptions ...aicommon.ConfigOption) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
 		log.Errorf("recv re-act first config msg failed: %v", err)
@@ -352,13 +358,17 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}),
 		aicommon.WithEventInputChanx(inputEvent),
 		aicommon.WithContext(baseCtx),
-		aireact.WithBuiltinTools(),
+	}
+	if loadBuiltinTools {
+		configOptions = append(configOptions, aireact.WithBuiltinTools())
+	}
+	configOptions = append(configOptions,
 		aicommon.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 		aicommon.WithPersistentSessionId(persistentSession),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEnablePETaskAnalyze(true),
 		aicommon.WithEnableDispatchSubReactAgent(true), // 仅仅允许顶层 ReAct 分发子 ReAct Agent，子 Agent 仍然可以使用原始的 AI 回调。
-	}
+	)
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
 	// (Original, Quality, Speed) to the same frontend-selected model.
@@ -366,6 +376,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	if aiconfig.IsTieredAIConfig() {
 		configOptions = append(configOptions, aicommon.WithAutoTieredAICallback(defaultAI))
 	}
+	configOptions = append(configOptions, additionalOptions...)
 
 	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {

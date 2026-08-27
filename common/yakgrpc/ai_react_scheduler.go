@@ -23,9 +23,10 @@ import (
 )
 
 const (
-	aiReActSchedulePollInterval  = 30 * time.Second
-	aiReActScheduleMaxConcurrent = 3
-	legacyAIReActRunTable        = "ai_react_schedule_runs_v1"
+	aiReActSchedulePollInterval   = 30 * time.Second
+	aiReActScheduleMaxConcurrent  = 3
+	aiReActScheduleReleaseTimeout = 10 * time.Second
+	legacyAIReActRunTable         = "ai_react_schedule_runs_v1"
 
 	aiReActScheduleTriggerSchedule = "schedule"
 	aiReActScheduleTriggerManual   = "manual"
@@ -48,6 +49,7 @@ type scheduledReActJob struct {
 	cancel              context.CancelFunc
 	unregisterExecution func()
 	workerReserved      bool
+	done                chan struct{}
 }
 
 type scheduleEnqueueError struct {
@@ -70,6 +72,7 @@ type aiReActScheduler struct {
 	jobs             map[string]*scheduledReActJob
 	activeBySchedule map[string]string
 	activeBySession  map[string]string
+	startAIReAct     func(ypb.Yak_StartAIReActServer) error
 	wg               sync.WaitGroup
 }
 
@@ -85,6 +88,7 @@ func newAIReActScheduler(server *Server, db *gorm.DB) *aiReActScheduler {
 		jobs:             make(map[string]*scheduledReActJob),
 		activeBySchedule: make(map[string]string),
 		activeBySession:  make(map[string]string),
+		startAIReAct:     server.StartAIReAct,
 	}
 }
 
@@ -341,6 +345,7 @@ func (m *aiReActScheduler) enqueue(schedule *schema.AIReActSchedule, scheduledAt
 		trigger:      trigger,
 		ctx:          jobCtx,
 		cancel:       cancel,
+		done:         make(chan struct{}),
 	}
 	m.jobsMu.Lock()
 	if _, active := m.activeBySchedule[schedule.UUID]; active {
@@ -406,6 +411,9 @@ func (m *aiReActScheduler) unregisterJob(job *scheduledReActJob) {
 		}
 	}
 	m.jobsMu.Unlock()
+	if job.done != nil {
+		close(job.done)
+	}
 }
 
 func (m *aiReActScheduler) cancelSchedule(scheduleUUID string) {
@@ -426,6 +434,60 @@ func (m *aiReActScheduler) isSessionReserved(sessionID string) bool {
 	_, ok := m.activeBySession[strings.TrimSpace(sessionID)]
 	m.jobsMu.Unlock()
 	return ok
+}
+
+// cancelSessionExecutionsAndWait is used by DeleteAISession to make the
+// scheduler's active maps authoritative: session data is not removed until
+// every matching execution has cancelled and unregistered itself.
+func (m *aiReActScheduler) cancelSessionExecutionsAndWait(ctx context.Context, sessionIDs []string, all bool) error {
+	if m == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, aiReActScheduleReleaseTimeout)
+	defer cancel()
+
+	m.jobsMu.Lock()
+	jobs := make([]*scheduledReActJob, 0, len(sessionIDs))
+	seen := make(map[string]struct{})
+	if all {
+		for executionID, job := range m.jobs {
+			if job == nil {
+				continue
+			}
+			seen[executionID] = struct{}{}
+			jobs = append(jobs, job)
+		}
+	} else {
+		for _, sessionID := range sessionIDs {
+			executionID := m.activeBySession[strings.TrimSpace(sessionID)]
+			if executionID == "" {
+				continue
+			}
+			if _, exists := seen[executionID]; exists {
+				continue
+			}
+			if job := m.jobs[executionID]; job != nil {
+				seen[executionID] = struct{}{}
+				jobs = append(jobs, job)
+			}
+		}
+	}
+	m.jobsMu.Unlock()
+
+	for _, job := range jobs {
+		job.cancel()
+	}
+	for _, job := range jobs {
+		select {
+		case <-job.done:
+		case <-waitCtx.Done():
+			return utils.Errorf("wait for scheduled execution %s to release session %s failed: %v", job.executionID, job.sessionID, waitCtx.Err())
+		}
+	}
+	return nil
 }
 
 type scheduledReActOutcome struct {
@@ -711,15 +773,16 @@ func (m *aiReActScheduler) runReAct(
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		serverErrCh <- m.server.StartAIReAct(stream)
+		startAIReAct := m.startAIReAct
+		if startAIReAct == nil {
+			startAIReAct = m.server.StartAIReAct
+		}
+		serverErrCh <- startAIReAct(stream)
 	}()
 	select {
 	case outcome := <-outcomeCh:
 		stream.cancel()
-		select {
-		case <-serverErrCh:
-		case <-time.After(time.Second):
-		}
+		<-serverErrCh
 		return outcome
 	case err := <-serverErrCh:
 		stateMu.Lock()
@@ -731,6 +794,9 @@ func (m *aiReActScheduler) runReAct(
 		return state
 	case <-ctx.Done():
 		stream.cancel()
+		// Do not unregister the job while its in-process gRPC handler is alive.
+		// DeleteAISession may remove the session immediately after job.done.
+		<-serverErrCh
 		stateMu.Lock()
 		defer stateMu.Unlock()
 		return state

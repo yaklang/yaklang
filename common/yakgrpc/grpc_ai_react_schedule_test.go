@@ -377,6 +377,114 @@ func TestAIReActSchedulerCancelsActiveExecutionInMemory(t *testing.T) {
 	require.Empty(t, manager.activeBySession)
 }
 
+func TestDeleteRunningScheduleSessionReleasesBeforeRunNow(t *testing.T) {
+	server := newScheduleTestServer(t)
+	db := server.GetProjectDatabase()
+	require.NoError(t, db.AutoMigrate(
+		&schema.AIAgentRuntime{},
+		&schema.AiCheckpoint{},
+		&schema.AiOutputEvent{},
+		&schema.AiProcessAndAiEvent{},
+		&schema.AISessionPlanAndExec{},
+	).Error)
+
+	manager := newAIReActScheduler(server, db)
+	executionCancelled := make(chan struct{})
+	allowShutdown := make(chan struct{})
+	var cancellationReported atomic.Bool
+	var shutdownReleased atomic.Bool
+	releaseShutdown := func() {
+		if shutdownReleased.CompareAndSwap(false, true) {
+			close(allowShutdown)
+		}
+	}
+	defer releaseShutdown()
+	manager.startAIReAct = func(stream ypb.Yak_StartAIReActServer) error {
+		<-stream.Context().Done()
+		if cancellationReported.CompareAndSwap(false, true) {
+			close(executionCancelled)
+		}
+		<-allowShutdown
+		return nil
+	}
+	server.aiReActSchedulerMu.Lock()
+	server.aiReActScheduler = manager
+	server.aiReActSchedulerMu.Unlock()
+
+	created, err := server.CreateAIReActSchedule(context.Background(), validScheduleRequest(time.Now().Add(time.Hour)))
+	require.NoError(t, err)
+	_, err = server.RunAIReActScheduleNow(context.Background(), &ypb.RunAIReActScheduleNowRequest{UUID: created.GetUUID()})
+	require.NoError(t, err)
+
+	var firstJob *scheduledReActJob
+	require.Eventually(t, func() bool {
+		manager.jobsMu.Lock()
+		defer manager.jobsMu.Unlock()
+		executionID := manager.activeBySchedule[created.GetUUID()]
+		firstJob = manager.jobs[executionID]
+		return firstJob != nil
+	}, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		_, queryErr := yakit.GetAISessionMetaBySessionID(db, firstJob.sessionID)
+		return queryErr == nil
+	}, time.Second, 10*time.Millisecond)
+
+	deleteDone := make(chan error, 1)
+	go func() {
+		_, deleteErr := server.DeleteAISession(context.Background(), &ypb.DeleteAISessionRequest{
+			Filter: &ypb.DeleteAISessionFilter{SessionID: []string{firstJob.sessionID}},
+		})
+		deleteDone <- deleteErr
+	}()
+	select {
+	case <-executionCancelled:
+	case <-time.After(time.Second):
+		t.Fatal("deleting the session did not cancel its scheduled execution")
+	}
+	select {
+	case deleteErr := <-deleteDone:
+		t.Fatalf("DeleteAISession returned before the scheduler handler exited: %v", deleteErr)
+	default:
+	}
+
+	releaseShutdown()
+	select {
+	case err = <-deleteDone:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("DeleteAISession did not finish after scheduler shutdown")
+	}
+	select {
+	case <-firstJob.done:
+	default:
+		t.Fatal("DeleteAISession returned before the scheduler job unregistered")
+	}
+	manager.jobsMu.Lock()
+	require.NotContains(t, manager.jobs, firstJob.executionID)
+	require.NotContains(t, manager.activeBySchedule, created.GetUUID())
+	require.NotContains(t, manager.activeBySession, firstJob.sessionID)
+	manager.jobsMu.Unlock()
+
+	// Reproduce the UI sequence from the bug report: delete the running
+	// independent session and immediately run the same schedule again.
+	_, err = server.RunAIReActScheduleNow(context.Background(), &ypb.RunAIReActScheduleNowRequest{UUID: created.GetUUID()})
+	require.NoError(t, err)
+	var secondJob *scheduledReActJob
+	require.Eventually(t, func() bool {
+		manager.jobsMu.Lock()
+		defer manager.jobsMu.Unlock()
+		executionID := manager.activeBySchedule[created.GetUUID()]
+		secondJob = manager.jobs[executionID]
+		return secondJob != nil && secondJob.executionID != firstJob.executionID
+	}, time.Second, 10*time.Millisecond)
+	manager.cancelSchedule(created.GetUUID())
+	select {
+	case <-secondJob.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("replacement scheduled execution did not stop")
+	}
+}
+
 func TestScheduleAttentionWaitsForActualAIEscalation(t *testing.T) {
 	pending := make(map[string]struct{})
 	reviewRequest := &ypb.AIOutputEvent{
