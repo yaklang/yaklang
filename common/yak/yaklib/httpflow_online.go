@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 	"sync"
 )
 
@@ -214,4 +215,54 @@ func (s *OnlineClient) downloadOnlineHTTPFlows(token string, page int, limit int
 		return nil, nil, utils.Errorf("unmarshal httpflow response failed: %s", err.Error())
 	}
 	return _container.Data, _container.Pagemeta, nil
+}
+
+type setHTTPFlowTagsRequest struct {
+	Hash         string `json:"hash"`
+	IssueType    string `json:"issueType"`
+	Severity     string `json:"severity"`
+	Status       string `json:"status"`
+	StatusReason string `json:"statusReason"`
+}
+
+func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string, hashes []string, issueType, severity, status, statusReason string) error {
+	if token == "" {
+		return utils.Errorf("token is empty")
+	}
+	if len(hashes) == 0 {
+		return nil
+	}
+
+	raw, err := json.Marshal(setHTTPFlowTagsRequest{
+		Hash:         strings.Join(hashes, ","),
+		IssueType:    issueType,
+		Severity:     severity,
+		Status:       status,
+		StatusReason: statusReason,
+	})
+	if err != nil {
+		return utils.Errorf("marshal set httpflow tags request failed: %s", err)
+	}
+
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/set/httpflow/tags"),
+		poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, true),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
+	)
+	if err != nil {
+		return utils.Errorf("set httpflow tags to online failed: %s", err)
+	}
+
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
+	var responseData map[string]interface{}
+	if err := json.Unmarshal(rawResponse, &responseData); err != nil {
+		return utils.Errorf("unmarshal set httpflow tags response failed: %s", err)
+	}
+	if msg := utils.MapGetString(responseData, "message"); msg != "" {
+		return utils.Errorf("set httpflow tags to online error: %s %s", utils.MapGetString(responseData, "reason"), msg)
+	}
+	return nil
 }
