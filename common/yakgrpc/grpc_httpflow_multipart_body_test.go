@@ -1,9 +1,11 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"mime/multipart"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,7 +17,7 @@ import (
 )
 
 // buildBigMultipartRequest builds an oversized multipart/form-data request
-// carrying one text field and two file parts (so it triggers skeleton spill).
+// carrying one text field, one oversized file part, and one inline file part.
 func buildBigMultipartRequest(t *testing.T) ([]byte, []byte, []byte) {
 	t.Helper()
 	boundary := "----YakTestBoundary"
@@ -27,7 +29,7 @@ func buildBigMultipartRequest(t *testing.T) ([]byte, []byte, []byte) {
 	body.WriteString("hello-field" + "\r\n")
 
 	// file part 0 (oversized vs GlobalMaxContentLength to trigger spill)
-	f0 := []byte(strings.Repeat("F", 250 * 1024))
+	f0 := []byte(strings.Repeat("F", 250*1024))
 	body.WriteString("--" + boundary + "\r\n")
 	body.WriteString(`Content-Disposition: form-data; name="file0"; filename="big0.bin"` + "\r\n")
 	body.WriteString("Content-Type: application/octet-stream\r\n\r\n")
@@ -78,14 +80,14 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById_MultipartPartIndex(t *testing.T) {
 		})
 	}()
 
-	// Detail query should expose MultipartFiles so the frontend can render a
-	// dropdown.
+	// Detail query exposes only collapsed file parts. The small file remains
+	// inline in the multipart skeleton and is not a sidecar download entry.
 	detail, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{Id: int64(flow.ID)})
 	require.NoError(t, err)
 	require.True(t, detail.GetIsTooLargeRequest(), "should be marked too large")
 	require.NotEmpty(t, detail.GetTooLargeRequestBodyFile(), "body placeholder path should be set")
 	files := detail.GetMultipartFiles()
-	require.Len(t, files, 2, "should expose two file parts")
+	require.Len(t, files, 1, "should expose only the collapsed file part")
 	// Find the big0.bin part index.
 	var big0Idx int32 = -1
 	for _, f := range files {
@@ -94,6 +96,10 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById_MultipartPartIndex(t *testing.T) {
 		}
 	}
 	require.GreaterOrEqual(t, big0Idx, int32(0), "big0.bin part not found in manifest")
+	require.FileExists(t, files[0].GetFilePath())
+	localBig0, err := os.ReadFile(files[0].GetFilePath())
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(f0, localBig0), "manifest file path must contain the exact collapsed part bytes")
 
 	// Download that single part via PartIndex.
 	stream, err := client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
@@ -159,12 +165,15 @@ func TestGRPCMUSTPASS_GetHTTPFlowBodyById_MultipartPartIndex(t *testing.T) {
 	parts := map[string][]byte{}
 	for {
 		p, rerr := mr.NextPart()
-		if rerr != nil {
+		if rerr == io.EOF {
 			break
 		}
-		b, _ := io.ReadAll(p)
+		require.NoError(t, rerr, "rebuilt multipart body must have valid framing and a closing boundary")
+		b, rerr := io.ReadAll(p)
+		require.NoError(t, rerr)
 		parts[p.FormName()] = b
 	}
+	require.Len(t, parts, 3)
 	require.Equal(t, "hello-field", string(parts["desc"]))
 	require.Equal(t, f0, parts["file0"])
 	require.Equal(t, f1, parts["file1"])

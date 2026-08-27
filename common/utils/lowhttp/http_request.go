@@ -438,6 +438,17 @@ func bodyNeedsUnquote(body []byte) bool {
 	return !utf8.Valid(body)
 }
 
+// MeasureFuzzTagBodySize returns the editor-facing size of one HTTP body or
+// multipart part body. Invalid UTF-8 is represented by one forced unquote tag;
+// valid UTF-8 remains byte-for-byte inline, regardless of its declared MIME.
+func MeasureFuzzTagBodySize(body []byte) (int, bool) {
+	binary := bodyNeedsUnquote(body)
+	if !binary {
+		return len(body), false
+	}
+	return UnquoteFuzzTagSize(body, true), true
+}
+
 type fuzzTagBodyCountingWriter struct {
 	n int
 }
@@ -465,11 +476,8 @@ func MeasureHTTPRequestFuzzTagBodySize(i []byte) (int, bool, error) {
 	})
 
 	if boundary == "" {
-		binary := bodyNeedsUnquote(body)
-		if !binary {
-			return len(body), false, nil
-		}
-		return UnquoteFuzzTagSize(body, true), true, nil
+		size, binary := MeasureFuzzTagBodySize(body)
+		return size, binary, nil
 	}
 
 	reader := multipart.NewReader(bytes.NewReader(body))
@@ -494,13 +502,9 @@ func MeasureHTTPRequestFuzzTagBodySize(i []byte) (int, bool, error) {
 		if err != nil {
 			return 0, false, err
 		}
-		binary := bodyNeedsUnquote(partBody)
+		partSize, binary := MeasureFuzzTagBodySize(partBody)
 		converted = converted || binary
-		if binary {
-			counter.n += UnquoteFuzzTagSize(partBody, true)
-		} else {
-			counter.n += len(partBody)
-		}
+		counter.n += partSize
 	}
 	if err := writer.Close(); err != nil {
 		return 0, false, err
