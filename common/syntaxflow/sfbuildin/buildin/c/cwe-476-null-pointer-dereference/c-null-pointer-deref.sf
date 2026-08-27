@@ -38,11 +38,13 @@ $use #-> as $ptr
 $ptr<npd()> as $npd
 
 alert $npd for {
-	title: "Null Pointer Dereference"
-	title_zh: "空指针解引用"
-	level: "high"
-	risk: "空指针解引用"
-	desc: "指针可能为空时仍发生 *p 或 p->member 等解引用"
+	title: "Null Pointer Dereference",
+	title_zh: "空指针解引用",
+	level: "high",
+	risk: "空指针解引用",
+	desc: <<<DESC
+指针可能为空时仍发生 *p 或 p->member 等解引用
+DESC
 }
 
 desc(

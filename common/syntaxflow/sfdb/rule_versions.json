@@ -54,10 +54,22 @@
     "version": "20251230.0001"
   },
   {
+    "rule_id": "a3b8c1d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+    "rule_name": "C 语言 Use-After-Free / Double-Free 检测",
+    "hash": "5064a32b8fd14a5c0bba7719c2cc9ce586b397613db1d3707c937179f8853b8c",
+    "version": "20260827.0001"
+  },
+  {
     "rule_id": "f1e8d3b7-4c9a-4f2e-8b1d-6a5c9e2f7b4d",
     "rule_name": "检测C语言文件上传漏洞",
     "hash": "6a0bc4e15721337debe0f49a1e2842c154daee913b65bf98d67a977e39f9d242",
     "version": "20251230.0001"
+  },
+  {
+    "rule_id": "c5d0e3f6-7a8b-4c9d-0e1f-2a3b4c5d6e7f",
+    "rule_name": "C 语言空指针解引用检测",
+    "hash": "e846180386b0115ee42cdf0bae262e66a19985d5ebdffe2dd88a99e94134a5c9",
+    "version": "20260827.0001"
   },
   {
     "rule_id": "e9c7f2a4-1d8b-4e3f-9a6c-2b5e8d1f4a7c",
