@@ -923,24 +923,26 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 	if req.Token == "" {
 		return utils.Errorf("params empty")
 	}
+	logType := strings.TrimSpace(req.LogType)
+	if logType != "testerAssign" && logType != "tagsUpdate" {
+		return utils.Errorf("logType only supports testerAssign / tagsUpdate")
+	}
 
 	if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
 		return utils.Errorf("download failed: %s", err.Error())
 	}
 
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	ch := client.DownloadOnlineHTTPFlows(stream.Context(), req.Token)
-	if ch == nil {
-		return utils.Error("BUG: download stream error: empty")
+	ch, err := client.DownloadHTTPFlows(stream.Context(), req.Token, logType)
+	if err != nil {
+		return utils.Errorf("download  httpflow failed: %s", err)
 	}
 
 	var (
-		progress     float64
-		count        float64
-		updatedCount int64
-		skippedCount int64
-		batch        []*yaklib.OnlineHTTPFlowItem
-		batchSize    = 100
+		progress      float64
+		count         float64
+		updatedCount  int64
+		insertedCount int64
 	)
 
 	stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
@@ -950,40 +952,86 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 	defer func() {
 		stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
 			Progress: 1,
-			Log:      fmt.Sprintf("finished, updated: %d, skipped: %d", updatedCount, skippedCount),
+			Log:      fmt.Sprintf("finished, updated: %d, inserted: %d", updatedCount, insertedCount),
 		})
 	}()
 
 	db := s.GetProjectDatabase()
-	for item := range ch.Chan {
-		total := item.Total
+	for resultIns := range ch {
+		item := resultIns.Flow
+		total := resultIns.Total
 		if total > 0 {
 			progress = count / float64(total)
 		}
 		count++
 
-		batch = append(batch, item.Flow)
-		if len(batch) >= batchSize {
-			u, sk := s.doUpdateHTTPFlowIssueFields(stream.Context(), db, batch)
-			updatedCount += u
-			skippedCount += sk
-			batch = batch[:0]
-			_ = stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
-				Progress: progress,
-				Log:      fmt.Sprintf("processing: updated %d, skipped %d", updatedCount, skippedCount),
-			})
+		var existing schema.HTTPFlow
+		findResult := db.Model(&schema.HTTPFlow{}).Where("hash = ?", item.Hash).First(&existing)
+
+		if findResult.Error == nil && existing.ID > 0 {
+			// 本地已存在：只更新四个标识字段
+			if err := db.Model(&schema.HTTPFlow{}).Where("hash = ?", item.Hash).Update(map[string]interface{}{
+				"issue_type":    item.IssueType,
+				"severity":      item.Severity,
+				"status":        item.Status,
+				"status_reason": item.StatusReason,
+			}).Error; err != nil {
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("update [%s] issue fields failed: %s", item.Hash, err),
+				})
+			} else {
+				updatedCount++
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("update [%s] issue fields finished", item.Hash),
+				})
+			}
+		} else {
+			// 本地不存在：写入整条数据
+			flow := &schema.HTTPFlow{
+				Hash:          item.Hash,
+				Url:           item.URL,
+				Path:          item.Path,
+				Method:        item.Method,
+				IsHTTPS:       item.IsHTTPS,
+				StatusCode:    item.StatusCode,
+				ContentType:   item.ContentType,
+				SourceType:    item.SourceType,
+				BodyLength:    item.BodyLength,
+				IPAddress:     item.IPAddress,
+				RemoteAddr:    item.HostPort,
+				Tags:          item.Tags,
+				FromPlugin:    item.FromPlugin,
+				HiddenIndex:   item.HiddenIndex,
+				IsWebsocket:   item.IsWebsocket,
+				WebsocketHash: item.WebsocketHash,
+				Host:          item.Host,
+				IssueType:     item.IssueType,
+				Severity:      item.Severity,
+				Status:        item.Status,
+				StatusReason:  item.StatusReason,
+			}
+			flow.SetRequest(item.Request)
+			flow.SetResponse(item.Response)
+			if flow.Hash == "" {
+				flow.Hash = flow.CalcHash()
+			}
+			if err := yakit.CreateOrUpdateHTTPFlow(db, flow.Hash, flow); err != nil {
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("insert [%s] failed: %s", item.Hash, err),
+				})
+			} else {
+				insertedCount++
+				stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
+					Progress: progress,
+					Log:      fmt.Sprintf("insert [%s] finished", item.Hash),
+				})
+			}
 		}
 	}
-	if len(batch) > 0 {
-		u, sk := s.doUpdateHTTPFlowIssueFields(stream.Context(), db, batch)
-		updatedCount += u
-		skippedCount += sk
-	}
 
-	stream.Send(&ypb.HTTPFlowsFromOnlineProgress{
-		Progress: 1,
-		Log:      fmt.Sprintf("sync finished, updated: %d, skipped: %d", updatedCount, skippedCount),
-	})
 	return nil
 }
 
