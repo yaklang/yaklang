@@ -36,11 +36,13 @@ $free_arg #-> as $ptr
 $ptr<uaf()> as $uaf
 
 alert $uaf for {
-	title: "Use After Free"
-	title_zh: "释放后使用"
-	level: "high"
-	risk: "释放后使用"
-	desc: "指针在 free 之后仍被解引用，或对同一对象二次 free"
+	title: "Use After Free",
+	title_zh: "释放后使用",
+	level: "high",
+	risk: "释放后使用",
+	desc: <<<DESC
+指针在 free 之后仍被解引用，或对同一对象二次 free
+DESC
 }
 
 desc(
