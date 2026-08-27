@@ -7395,6 +7395,7 @@ message HTTPFlowsToOnlineBatchResponse {
 
 message HTTPFlowsFromOnlineRequest {
   string Token = 1;
+  string LogType = 2;
 }
 
 message HTTPFlowsFromOnlineProgress {

@@ -256,6 +256,13 @@ func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string
 		return utils.Errorf("set httpflow tags to online failed: %s", err)
 	}
 
+	if rsp.GetStatusCode() != 200 {
+		rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
+		var errData map[string]interface{}
+		_ = json.Unmarshal(rawResponse, &errData)
+		return utils.Errorf("set httpflow tags to online error: %s %s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
+	}
+
 	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 	var responseData map[string]interface{}
 	if err := json.Unmarshal(rawResponse, &responseData); err != nil {
@@ -265,4 +272,161 @@ func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string
 		return utils.Errorf("set httpflow tags to online error: %s %s", utils.MapGetString(responseData, "reason"), msg)
 	}
 	return nil
+}
+
+type downloadHTTPFlowRequest struct {
+	LogType string `json:"logType"`
+	Page    int64  `json:"page"`
+	Limit   int64  `json:"limit"`
+	Order   string `json:"order"`
+	OrderBy string `json:"order_by"`
+}
+
+type DownloadHTTPFlowItem struct {
+	Hash          string `json:"hash"`
+	URL           string `json:"url"`
+	Path          string `json:"path"`
+	Method        string `json:"method"`
+	IsHTTPS       bool   `json:"isHTTPS"`
+	StatusCode    int64  `json:"statusCode"`
+	ContentType   string `json:"contentType"`
+	SourceType    string `json:"sourceType"`
+	Request       string `json:"request"`
+	Response      string `json:"response"`
+	BodyLength    int64  `json:"bodyLength"`
+	HTMLTitle     string `json:"htmlTitle"`
+	IPAddress     string `json:"ipAddress"`
+	HostPort      string `json:"hostPort"`
+	Host          string `json:"host"`
+	Tags          string `json:"tags"`
+	FromPlugin    string `json:"fromPlugin"`
+	HiddenIndex   string `json:"hiddenIndex"`
+	IsWebsocket   bool   `json:"isWebsocket"`
+	WebsocketHash string `json:"websocketHash"`
+	ProjectName   string `json:"projectName"`
+	UserName      string `json:"userName"`
+	IssueType     string `json:"issueType"`
+	Severity      string `json:"severity"`
+	Status        string `json:"status"`
+	StatusReason  string `json:"statusReason"`
+}
+
+type downloadHTTPFlowResponse struct {
+	Pagemeta *OnlinePaging           `json:"pagemeta"`
+	Data     []*DownloadHTTPFlowItem `json:"data"`
+}
+
+// DownloadMyHTTPFlowStreamItem 流式下载的单条结果，携带当前条数据和总数（用于进度计算）。
+type DownloadHTTPFlowStreamItem struct {
+	Flow  *DownloadHTTPFlowItem
+	Total int64
+}
+
+func (s *OnlineClient) DownloadHTTPFlows(ctx context.Context, token, logType string) (chan *DownloadHTTPFlowStreamItem, error) {
+	if token == "" {
+		return nil, utils.Errorf("token is empty")
+	}
+	if logType != "testerAssign" && logType != "tagsUpdate" {
+		return nil, utils.Errorf("logType error")
+	}
+
+	ch := make(chan *DownloadHTTPFlowStreamItem, 10)
+	go func() {
+		defer close(ch)
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("recover download  httpflow failed: %s", err)
+			}
+		}()
+
+		const limit int64 = 30
+		var (
+			retry int
+			total int64
+			page  int64 = 1
+		)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+		RETRY:
+			items, paging, err := s.downloadHTTPFlowPage(token, logType, page, limit)
+			if err != nil {
+				retry++
+				if retry <= 5 {
+					log.Errorf("[RETRYING]: download  httpflow page %d failed: %s", page, err)
+					goto RETRY
+				} else {
+					log.Errorf("download  httpflow page %d failed after retries: %s", page, err)
+					return
+				}
+			} else {
+				retry = 0
+			}
+
+			if paging != nil && total <= 0 {
+				total = int64(paging.Total)
+			}
+
+			if len(items) > 0 {
+				for _, item := range items {
+					select {
+					case ch <- &DownloadHTTPFlowStreamItem{
+						Flow:  item,
+						Total: total,
+					}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+
+			if paging == nil || page >= int64(paging.TotalPage) {
+				return
+			}
+			page++
+		}
+	}()
+	return ch, nil
+}
+
+func (s *OnlineClient) downloadHTTPFlowPage(token, logType string, page, limit int64) ([]*DownloadHTTPFlowItem, *OnlinePaging, error) {
+	raw, err := json.Marshal(downloadHTTPFlowRequest{
+		LogType: logType,
+		Page:    page,
+		Limit:   limit,
+		Order:   "desc",
+		OrderBy: "updated_at",
+	})
+	if err != nil {
+		return nil, nil, utils.Errorf("marshal download httpflow request failed: %s", err)
+	}
+
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/httpflow/download"),
+		poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, true),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
+	)
+	if err != nil {
+		return nil, nil, utils.Errorf("download my httpflow failed: %s", err)
+	}
+
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
+	if rsp.GetStatusCode() != 200 {
+		var errData map[string]interface{}
+		_ = json.Unmarshal(rawResponse, &errData)
+		return nil, nil, utils.Errorf("download httpflow error: %s %s", utils.MapGetString(errData, "reason"), utils.MapGetString(errData, "message"))
+	}
+
+	var container downloadHTTPFlowResponse
+	if err := json.Unmarshal(rawResponse, &container); err != nil {
+		return nil, nil, utils.Errorf("unmarshal download httpflow response failed: %s", err)
+	}
+	return container.Data, container.Pagemeta, nil
 }
