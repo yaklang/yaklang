@@ -193,6 +193,9 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			return nil, ferr
 		}
 		root := sfpattern.NewRoot(files)
+		if config.program != nil {
+			root.SetProgramName(config.program.GetProgramName())
+		}
 		res, err = frame.Feed(sfvm.ValuesOf(root), config.opts...)
 	} else {
 		res, err = frame.Feed(value, config.opts...)

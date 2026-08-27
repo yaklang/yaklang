@@ -5,8 +5,8 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -67,7 +67,7 @@ func (t *SourceQueryTarget) SetLanguage(lang ssaconfig.Language) *SourceQueryTar
 
 func (t *SourceQueryTarget) IsIncrementalCompile() bool { return false }
 func (t *SourceQueryTarget) IsBaseProgram() bool        { return true }
-func (t *SourceQueryTarget) GetBaseProgramName() string  { return t.GetProgramName() }
+func (t *SourceQueryTarget) GetBaseProgramName() string { return t.GetProgramName() }
 func (t *SourceQueryTarget) Recompile(...ssaconfig.Option) error {
 	return nil
 }
@@ -92,6 +92,7 @@ func (t *SourceQueryTarget) syntaxFlow(opts []QueryOption, ruleOpt QueryOption) 
 		return nil, utils.Error("nil SourceQueryTarget")
 	}
 	root := sfpattern.NewRoot(t.files)
+	root.SetProgramName(t.name)
 	prog := NewTmpProgram(t.name)
 	all := make([]QueryOption, 0, len(opts)+3)
 	all = append(all, QueryWithValue(root), ruleOpt, QueryWithResultProgram(prog))

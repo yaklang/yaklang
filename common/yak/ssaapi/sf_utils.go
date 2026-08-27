@@ -95,12 +95,18 @@ func valueOperatorToSSAValue(value sfvm.ValueOperator) (*Value, bool) {
 	return nil, false
 }
 
-// simpleValueToSSAValue wraps an sfpattern hit as a const Value with a range
-// anchored on path + match text (no SSA IR required).
+// simpleValueToSSAValue wraps an sfpattern hit as a const Value.
+// When the hit carries a full-file editor (sfpattern regexp hits), the range
+// anchors to the real byte offsets inside the whole file so risks get the
+// actual file path / line numbers / code context — same behavior as SSA mode.
+// Otherwise it falls back to a snippet-only editor (match text only).
 func simpleValueToSSAValue(sv *sfvm.SimpleValue) *Value {
 	prog := NewTmpProgram("")
 	text := sv.String()
 	path := sv.Path()
+	if ed := sv.FileEditor(); ed != nil {
+		return prog.NewConstValue(text, ed.GetRangeOffset(sv.Start(), sv.End()))
+	}
 	ed := memedit.NewMemEditorWithFileUrl(text, path)
 	return prog.NewConstValue(text, ed.GetFullRange())
 }

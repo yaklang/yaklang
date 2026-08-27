@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
@@ -27,6 +28,33 @@ func init() {
 }
 
 var defaultMatcher sfvm.FileFilterFunc
+
+// hitEditorCache builds one full-file editor per file per match call so every
+// hit in the same file shares the editor (and its line/rune maps).
+type hitEditorCache struct {
+	files   map[string]string
+	editors map[string]*memedit.MemEditor
+}
+
+func newHitEditorCache(files map[string]string) *hitEditorCache {
+	return &hitEditorCache{files: files, editors: make(map[string]*memedit.MemEditor, 8)}
+}
+
+// editorFor returns a shared full-file editor for the hit path.
+// The editor content is the WHOLE file so hits anchor to real file offsets
+// (risks then carry file path / line ranges / context, same as SSA mode).
+func (c *hitEditorCache) editorFor(p string) *memedit.MemEditor {
+	if ed, ok := c.editors[p]; ok {
+		return ed
+	}
+	content, ok := c.files[p]
+	if !ok {
+		return nil
+	}
+	ed := memedit.NewMemEditorWithFileUrl(content, p)
+	c.editors[p] = ed
+	return ed
+}
 
 // MatchFileFilter is the sfvm.FileFilterFunc implementation for regexp (and
 // rejects unsupported match types so xpath/json stay on other backends).
@@ -55,10 +83,11 @@ func MatchRegexpWithNegatives(files map[string]string, pathPattern string, posit
 	if err != nil {
 		return nil, err
 	}
+	editors := newHitEditorCache(files)
 	if len(negatives) == 0 {
 		vals := make([]sfvm.ValueOperator, 0, len(hits))
 		for _, h := range hits {
-			vals = append(vals, sfvm.NewSimpleValue(h.Text, h.Path, h.Start, h.End))
+			vals = append(vals, sfvm.NewSimpleValueWithEditor(h.Text, h.Path, h.Start, h.End, editors.editorFor(h.Path)))
 		}
 		return sfvm.NewValues(vals), nil
 	}
@@ -113,7 +142,7 @@ func MatchRegexpWithNegatives(files map[string]string, pathPattern string, posit
 	}
 	vals := make([]sfvm.ValueOperator, 0, len(kept))
 	for _, h := range kept {
-		vals = append(vals, sfvm.NewSimpleValue(h.Text, h.Path, h.Start, h.End))
+		vals = append(vals, sfvm.NewSimpleValueWithEditor(h.Text, h.Path, h.Start, h.End, editors.editorFor(h.Path)))
 	}
 	return sfvm.NewValues(vals), nil
 }
@@ -148,9 +177,10 @@ func MatchRegexp(files map[string]string, pathPattern string, patterns []string)
 	if err != nil {
 		return nil, err
 	}
+	editors := newHitEditorCache(files)
 	vals := make([]sfvm.ValueOperator, 0, len(hits))
 	for _, h := range hits {
-		vals = append(vals, sfvm.NewSimpleValue(h.Text, h.Path, h.Start, h.End))
+		vals = append(vals, sfvm.NewSimpleValueWithEditor(h.Text, h.Path, h.Start, h.End, editors.editorFor(h.Path)))
 	}
 	return sfvm.NewValues(vals), nil
 }
