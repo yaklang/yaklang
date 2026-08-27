@@ -245,15 +245,11 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 	if enabled {
 		re := strings.TrimSpace(strings.ToLower(reasoningEffort))
 		switch re {
-		case "low", "medium", "high":
+		case "low", "medium", "high", "xhigh", "max":
+			// Pass through as-is. xhigh/max are only set when ProbedExtendedEfforts
+			// confirmed support (enforced in BuildOptionsFromConfig). Unknown or
+			// unsupported values are clamped to high before reaching here.
 			effort = re
-		case "xhigh", "max":
-			// Provider-specific extensions. Standard OpenAI models reject these.
-			// Clamp to high as a safety net. The frontend uses ProbeReasoningEffort
-			// to discover which models support xhigh/max and only exposes those
-			// options when supported. If a value still reaches here (e.g. probe
-			// not yet done, or config changed), clamping prevents a 400.
-			effort = "high"
 		default:
 			if re == "" {
 				effort = "medium"
@@ -275,16 +271,16 @@ func (openAICompatibleReasoningMatcher) Params(enabled bool, reasoningEffort str
 //
 // The frontend can expose all values including xhigh and max. This function
 // only handles the semantic mapping — it does NOT clamp provider-specific
-// extensions. Per-provider matchers are responsible for clamping unsupported
-// values (e.g. xhigh → high for standard OpenAI models).
+// extensions. Clamping of unsupported xhigh/max values is done in
+// BuildOptionsFromConfig based on ProbedExtendedEfforts.
 //
 //   - "" / "auto"  → (false, "")      — do not inject any thinking params
 //   - "off"        → (true, "none")   — explicitly disable thinking
 //   - "low"        → (true, "low")    — enable thinking with low effort
 //   - "medium"     → (true, "medium") — enable thinking with medium effort
 //   - "high"       → (true, "high")   — enable thinking with high effort
-//   - "xhigh"      → (true, "xhigh")  — extra-high (matcher clamps if unsupported)
-//   - "max"        → (true, "max")    — maximum (matcher clamps if unsupported)
+//   - "xhigh"      → (true, "xhigh")  — extra-high (clamped to high if not probed)
+//   - "max"        → (true, "max")    — maximum (clamped to high if not probed)
 //   - other        → (true, <raw>)    — passthrough (matcher clamps if unsupported)
 func MapReasoningEffortToThinkingConfig(effort string) (enableThinking bool, reasoningEffort string) {
 	switch strings.ToLower(strings.TrimSpace(effort)) {
