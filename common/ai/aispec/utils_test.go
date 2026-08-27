@@ -225,7 +225,99 @@ func TestBuildOptionsFromConfig_ReasoningEffortXhigh(t *testing.T) {
 	}
 	require.NotNil(t, resolved.EnableThinking)
 	assert.True(t, *resolved.EnableThinking)
-	assert.Equal(t, "xhigh", resolved.ReasoningEffort) // preserved, matcher will clamp
+	// Without ProbedExtendedEfforts, xhigh is clamped to high
+	assert.Equal(t, "high", resolved.ReasoningEffort)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedSupported(t *testing.T) {
+	effort := "xhigh"
+	config := &ypb.AIModelConfig{
+		ModelName:             "o3-mini",
+		ProbedExtendedEfforts: []string{"xhigh", "max"},
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
+	// With ProbedExtendedEfforts containing xhigh, it passes through
+	assert.Equal(t, "xhigh", resolved.ReasoningEffort)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortMax_ProbedSupported(t *testing.T) {
+	effort := "max"
+	config := &ypb.AIModelConfig{
+		ModelName:             "o3-mini",
+		ProbedExtendedEfforts: []string{"xhigh", "max"},
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "max", resolved.ReasoningEffort)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedNotSupported(t *testing.T) {
+	effort := "xhigh"
+	config := &ypb.AIModelConfig{
+		ModelName:             "gpt-4o",
+		ProbedExtendedEfforts: nil, // probed but not supported
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
+	// Probed but not supported → clamped to high
+	assert.Equal(t, "high", resolved.ReasoningEffort)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortMax_OnlyXhighProbed(t *testing.T) {
+	effort := "max"
+	config := &ypb.AIModelConfig{
+		ModelName:             "o3-mini",
+		ProbedExtendedEfforts: []string{"xhigh"}, // only xhigh, not max
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	require.NotNil(t, resolved.EnableThinking)
+	assert.True(t, *resolved.EnableThinking)
+	// max not in ProbedExtendedEfforts → clamped to high
+	assert.Equal(t, "high", resolved.ReasoningEffort)
 }
 
 func TestBuildOptionsFromConfig_LegacyEnableThinkingWithoutReasoningEffort(t *testing.T) {

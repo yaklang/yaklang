@@ -203,8 +203,9 @@ func (s *Server) ProbeReasoningEffort(ctx context.Context, req *ypb.ProbeReasoni
 		var errMsg string
 
 		opts := aispec.BuildOptionsFromConfig(&ypb.AIModelConfig{
-			Provider:  config,
-			ModelName: model,
+			Provider:               config,
+			ModelName:              model,
+			ProbedExtendedEfforts:  []string{effort}, // allow this effort to pass through for probing
 		})
 		opts = append(opts,
 			aispec.WithContext(ctx),

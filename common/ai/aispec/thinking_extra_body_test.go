@@ -120,17 +120,17 @@ func TestThinkingExtraBodyForProvider_OpenAIEffortLevels(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "none", inner["effort"])
 
-	// xhigh → clamped to high (standard OpenAI models don't accept xhigh)
+	// xhigh → passthrough (clamping is done in BuildOptionsFromConfig)
 	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "xhigh")
 	inner, ok = m["reasoning"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "high", inner["effort"])
+	assert.Equal(t, "xhigh", inner["effort"])
 
-	// max → clamped to high
+	// max → passthrough
 	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "max")
 	inner, ok = m["reasoning"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "high", inner["effort"])
+	assert.Equal(t, "max", inner["effort"])
 
 	// custom unknown level → clamped to high
 	m = ThinkingExtraBodyForProvider("openai", "o3-mini", "", "", true, "turbo")
