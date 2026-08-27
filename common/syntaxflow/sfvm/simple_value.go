@@ -14,17 +14,34 @@ import (
 
 // SimpleValue is a minimal ValueOperator for non-SSA pattern hits (sfpattern).
 // It only carries matched text / path / offsets — no SSA Program dependency.
+// When a full-file editor is attached (sfpattern regexp hits), the hit is
+// anchored inside the whole file so risks get real line numbers / context.
 type SimpleValue struct {
-	text  string
-	path  string
-	start int // rune or byte start (display)
-	end   int
-	empty bool
+	text   string
+	path   string
+	start  int // rune or byte start (display)
+	end    int
+	empty  bool
+	editor *memedit.MemEditor // optional full-file editor containing this hit
 }
 
 // NewSimpleValue builds a pattern hit value.
 func NewSimpleValue(text string, path string, start, end int) *SimpleValue {
 	return &SimpleValue{text: text, path: path, start: start, end: end}
+}
+
+// NewSimpleValueWithEditor builds a pattern hit value anchored inside a
+// full-file editor. start/end are byte offsets into that editor's content.
+func NewSimpleValueWithEditor(text string, path string, start, end int, editor *memedit.MemEditor) *SimpleValue {
+	return &SimpleValue{text: text, path: path, start: start, end: end, editor: editor}
+}
+
+// FileEditor returns the attached full-file editor (nil when absent).
+func (v *SimpleValue) FileEditor() *memedit.MemEditor {
+	if v == nil {
+		return nil
+	}
+	return v.editor
 }
 
 // NewSimpleConst builds a const-like simple value (no path).
@@ -157,8 +174,9 @@ func (v *SimpleValue) SetAnchorBitVector(*utils.BitVector)  {}
 // PatternRoot is the feed root for source-mode scans: holds files and responds to
 // FileFilter by delegating to a registered regexp matcher (set by sfpattern).
 type PatternRoot struct {
-	files   map[string]string
-	matcher FileFilterFunc
+	files       map[string]string
+	matcher     FileFilterFunc
+	programName string
 }
 
 // FileFilterFunc is injected by sfpattern to avoid sfvm→sfpattern import cycles
@@ -178,6 +196,22 @@ func (r *PatternRoot) SetFileFilterMatcher(fn FileFilterFunc) {
 	if r != nil {
 		r.matcher = fn
 	}
+}
+
+// SetProgramName records the owning program name so hit editors produce
+// program-scoped URLs and ir_source hashes (aligned with compiled programs).
+func (r *PatternRoot) SetProgramName(name string) {
+	if r != nil {
+		r.programName = name
+	}
+}
+
+// GetProgramName returns the recorded program name (may be empty).
+func (r *PatternRoot) GetProgramName() string {
+	if r == nil {
+		return ""
+	}
+	return r.programName
 }
 
 // Files returns the underlying path→content map.
@@ -232,7 +266,21 @@ func (r *PatternRoot) FileFilter(pathPattern, matchType string, paramMap map[str
 	if r.matcher == nil {
 		return nil, utils.Error("pattern root: file filter matcher not registered")
 	}
-	return r.matcher(r.files, pathPattern, matchType, paramMap, patterns)
+	vals, err := r.matcher(r.files, pathPattern, matchType, paramMap, patterns)
+	if err != nil {
+		return nil, err
+	}
+	// Propagate the program name into hit editors so file URLs / ir-source
+	// hashes match the convention of compiled programs (files get deduped
+	// against compile artifacts downstream).
+	if r.programName != "" {
+		for _, v := range vals {
+			if sv, ok := v.(*SimpleValue); ok && sv != nil && sv.editor != nil {
+				sv.editor.SetProgramName(r.programName)
+			}
+		}
+	}
+	return vals, nil
 }
 
 func (r *PatternRoot) CompareString(*StringComparator) (Values, []bool) {

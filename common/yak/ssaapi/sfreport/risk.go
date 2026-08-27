@@ -37,6 +37,8 @@ type Risk struct {
 
 	// rule
 	RuleName string `json:"rule_name"`
+	// 扫描模式: source (源码模式匹配/漏洞预检测) 或 ssa (SSA/深度静态分析)
+	ScanMode string `json:"scan_mode"`
 	// program
 	ProgramName string `json:"program_name"`
 	// 处置状态
@@ -75,6 +77,7 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) (*Risk,
 		Line:          ssarisk.Line,
 
 		ProgramName:          ssarisk.ProgramName,
+		ScanMode:             ssarisk.ScanMode,
 		LatestDisposalStatus: ssarisk.LatestDisposalStatus,
 		RiskFeatureHash:      ssarisk.RiskFeatureHash,
 	}
@@ -123,6 +126,7 @@ func (r *Risk) SaveToDB(db *gorm.DB) (string, error) {
 		Tags:                "",
 		FromRule:            r.RuleName,
 		ProgramName:         r.ProgramName,
+		ScanMode:            r.ScanMode,
 		CodeSourceUrl:       r.CodeSourceURL,
 		CodeRange:           r.CodeRange,
 		CodeFragment:        r.CodeFragment,

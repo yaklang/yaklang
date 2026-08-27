@@ -101,6 +101,7 @@ func buildSSARisk(
 		FromRule:    rule.RuleName,
 		IsPotential: false,
 		ProgramName: progName,
+		ScanMode:    string(schema.ValidRuleMode(rule.Mode)),
 		// result
 		Variable: variable,
 		Index:    int64(index),

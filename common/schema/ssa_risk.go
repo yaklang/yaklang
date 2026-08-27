@@ -41,6 +41,8 @@ type SSARisk struct {
 
 	// 来源于哪个规则
 	FromRule string `json:"from_rule"`
+	// 风险来源的扫描模式: source (源码模式匹配/漏洞预检测) 或 ssa (SSA/深度静态分析)
+	ScanMode string `json:"scan_mode" gorm:"index;default:'ssa'"`
 	// 来源于哪个项目
 	ProgramName string `json:"program_name" gorm:"index"`
 	// file url yakurl
@@ -134,6 +136,9 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
 	if s.RiskType == "" {
 		s.RiskType = "其他"
+	}
+	if s.ScanMode == "" {
+		s.ScanMode = "ssa"
 	}
 	s.Severity = ValidSeverityType(s.Severity)
 	s.Hash = s.CalcHash()
