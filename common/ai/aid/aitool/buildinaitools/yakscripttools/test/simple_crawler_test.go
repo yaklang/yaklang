@@ -161,3 +161,184 @@ func TestSimpleCrawler_HidesAndDoesNotRequestURLFragments(t *testing.T) {
 	assert.Assert(t, !strings.Contains(stdout, "404 Not Found"),
 		"fragment-only 404 should not be shown in crawler output; got:\n%s", stdout)
 }
+
+func TestSimpleCrawler_ClientRenderingClassificationFixtures(t *testing.T) {
+	type fixture struct {
+		name        string
+		contentType string
+		body        string
+		want        string
+	}
+	fixtures := []fixture{
+		{
+			name:        "react-webpack-shell",
+			contentType: "application/octet-stream",
+			body: `<!doctype html><html><head><title>Console</title></head><body>
+<div id="root"></div><script>window.webpackChunkconsole=[]</script>
+<script src="/assets/runtime.aa.js"></script><script src="/assets/app.bb.js"></script></body></html>`,
+			want: "likely client-rendered SPA / JavaScript-heavy page",
+		},
+		{
+			name:        "vue-vite-shell",
+			contentType: "text/html",
+			body:        `<!doctype html><html><body><div id="app" data-v-app></div><script type="module" src="/assets/index-a1b2.js"></script></body></html>`,
+			want:        "likely client-rendered SPA / JavaScript-heavy page",
+		},
+		{
+			name:        "angular-shell",
+			contentType: "text/html",
+			body: `<!doctype html><html><body><app-root ng-version="17"><router-outlet></router-outlet></app-root>
+<script src="/runtime.123.js"></script><script src="/main.456.js"></script></body></html>`,
+			want: "likely client-rendered SPA / JavaScript-heavy page",
+		},
+		{
+			name:        "next-shell",
+			contentType: "text/html",
+			body: `<!doctype html><html><body><div id="__next"></div><script id="__NEXT_DATA__" type="application/json">{}</script>
+<script src="/_next/static/chunks/main.js"></script></body></html>`,
+			want: "likely client-rendered SPA / JavaScript-heavy page",
+		},
+		{
+			name:        "nuxt-shell",
+			contentType: "text/html",
+			body: `<!doctype html><html><body><div id="__nuxt"></div><script>window.__NUXT__={}</script>
+<script type="module" src="/_nuxt/entry.js"></script></body></html>`,
+			want: "likely client-rendered SPA / JavaScript-heavy page",
+		},
+		{
+			name:        "sveltekit-shell",
+			contentType: "text/html",
+			body: `<!doctype html><html><body><div id="svelte" data-sveltekit-preload-data="hover"></div>
+<script type="module" src="/assets/index-cafe.js"></script></body></html>`,
+			want: "likely client-rendered SPA / JavaScript-heavy page",
+		},
+		{
+			name:        "generic-client-router-shell",
+			contentType: "text/html",
+			body: `<!doctype html><html><body><div id="app"></div><script type="module">
+history.pushState({}, "", "/dashboard"); fetch("/api/v1/me")</script></body></html>`,
+			want: "likely client-rendered SPA / JavaScript-heavy page",
+		},
+		{
+			name:        "hydrated-rich-ssr",
+			contentType: "text/html",
+			body: `<!doctype html><html><body><div id="__next"><main><h1>Rendered documentation</h1><p>` +
+				strings.Repeat("This response already contains meaningful server-rendered product and security documentation. ", 8) +
+				`</p><a href="/guide">Guide</a><form action="/search"><input name="q"></form></main></div>
+<script id="__NEXT_DATA__">{}</script><script src="/_next/static/chunks/main.js"></script></body></html>`,
+			want: "possible client-rendered page",
+		},
+		{
+			name:        "server-rendered-docs",
+			contentType: "text/html; charset=utf-8",
+			body: `<!doctype html><html><body><main><h1>Documentation</h1><p>Server-rendered content.</p>
+<a href="/guide">Guide</a><a href="/api">API</a><form action="/search"><input name="q"></form></main></body></html>`,
+			want: "no strong client-rendering dependency detected",
+		},
+		{
+			name:        "traditional-ssr-with-scripts",
+			contentType: "text/html",
+			body: `<!doctype html><html><body><article><h1>News</h1><p>` +
+				strings.Repeat("This article and its navigation are fully present in the original HTML response. ", 8) +
+				`</p><a href="/archive">Archive</a></article><script src="/jquery.js"></script>
+<script src="/analytics.js"></script><script src="/widgets.js"></script></body></html>`,
+			want: "no strong client-rendering dependency detected",
+		},
+	}
+
+	fixtureByPath := make(map[string]fixture, len(fixtures))
+	for _, tc := range fixtures {
+		fixtureByPath["/"+tc.name] = tc
+	}
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if tc, ok := fixtureByPath[r.URL.Path]; ok {
+			w.Header().Set("Content-Type", tc.contentType)
+			_, _ = w.Write([]byte(tc.body))
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, ".js") {
+			w.Header().Set("Content-Type", "application/javascript")
+			_, _ = w.Write([]byte(`console.log("fixture");`))
+			return
+		}
+		http.NotFound(w, r)
+	})
+	baseURL := "http://" + host + ":" + strconv.Itoa(port)
+	tool := getSimpleCrawlerTool(t)
+
+	for _, tc := range fixtures {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, _ := execCrawlerTool(t, tool, aitool.InvokeParams{
+				"urls":                   baseURL + "/" + tc.name,
+				"reqs-max":               8,
+				"max-depth":              1,
+				"timeout":                5,
+				"forbid-for-parent-path": "yes",
+			})
+			assert.Assert(t, strings.Contains(stdout, "=== Rendering Assessment ==="),
+				"crawler should emit a rendering assessment; got:\n%s", stdout)
+			assert.Assert(t, strings.Contains(stdout, tc.want),
+				"classification mismatch, want %q; got:\n%s", tc.want, stdout)
+		})
+	}
+}
+
+func TestSimpleCrawler_SPAAdviceStopsRepeatedCrawling(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<!doctype html><html><body><div id="root"></div>
+<script>window.webpackChunkapp=[]; history.pushState({}, "", "/dashboard")</script>
+<script type="module" src="/assets/index-deadbeef.js"></script></body></html>`))
+	})
+	baseURL := "http://" + host + ":" + strconv.Itoa(port)
+
+	stdout, _ := execCrawlerTool(t, getSimpleCrawlerTool(t), aitool.InvokeParams{
+		"urls":      baseURL,
+		"reqs-max":  20,
+		"max-depth": 3,
+		"timeout":   5,
+	})
+
+	for _, want := range []string{
+		"does not execute JavaScript",
+		"Stop mechanically deepening this crawl",
+		"`use_browser` (`op=open`)",
+		"referenced JavaScript assets",
+		"direct HTTP request",
+	} {
+		assert.Assert(t, strings.Contains(stdout, want), "SPA advice missing %q; got:\n%s", want, stdout)
+	}
+	assert.Assert(t, !strings.Contains(stdout, "[coverage hint]"),
+		"a SPA shell must not trigger advice to deepen the same crawler; got:\n%s", stdout)
+}
+
+func TestSimpleCrawler_BoundsRenderingAssessmentWork(t *testing.T) {
+	var landing strings.Builder
+	landing.WriteString(`<!doctype html><html><body>`)
+	for i := 0; i < 25; i++ {
+		landing.WriteString(`<a href="/page/` + strconv.Itoa(i) + `">page</a>`)
+	}
+	landing.WriteString(`</body></html>`)
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		if r.URL.Path == "/" {
+			_, _ = w.Write([]byte(landing.String()))
+			return
+		}
+		_, _ = w.Write([]byte(`<!doctype html><html><body><main>plain server page</main></body></html>`))
+	})
+	baseURL := "http://" + host + ":" + strconv.Itoa(port)
+
+	stdout, _ := execCrawlerTool(t, getSimpleCrawlerTool(t), aitool.InvokeParams{
+		"urls":      baseURL,
+		"reqs-max":  30,
+		"max-depth": 2,
+		"timeout":   5,
+	})
+
+	assert.Assert(t, strings.Contains(stdout, "Classification: no strong client-rendering dependency detected in 20 assessed HTML response(s)"),
+		"rendering assessment should stop after 20 HTML responses; got:\n%s", stdout)
+	assert.Assert(t, strings.Contains(stdout, "Assessment budget: sampled the first 20 of "),
+		"rendering assessment should report its stable work cap without depending on concurrent crawl completion order; got:\n%s", stdout)
+}

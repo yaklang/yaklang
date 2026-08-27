@@ -138,6 +138,35 @@ func TestBuiltinSkillsFS_AllMetaValid(t *testing.T) {
 	}
 }
 
+func TestBuiltinWebCrawlerSkillUsesBoundedEvidenceDrivenRouting(t *testing.T) {
+	content, err := GetBuiltinSkillsFS().ReadFile("skills/web-crawler/SKILL.md")
+	if err != nil {
+		t.Fatalf("read web-crawler skill: %v", err)
+	}
+	body := string(content)
+
+	for _, expected := range []string{
+		"URL 快速路径与调用预算",
+		"do_http_request",
+		"simple_crawler",
+		"各 1 次",
+		"use_browser",
+		"crawl_js_collector",
+		"js_static_extract_ai",
+		"普通爬虫不执行 JavaScript",
+	} {
+		if !strings.Contains(body, expected) {
+			t.Errorf("web-crawler skill missing bounded routing guidance %q", expected)
+		}
+	}
+	if strings.Contains(body, "URL 自动等于“必须爬取”") {
+		t.Error("web-crawler skill must not make crawling mandatory merely because input contains a URL")
+	}
+	if strings.Contains(body, "- [ ] 未认证爬取完成") {
+		t.Error("web-crawler checklist must not make unauthenticated crawling universally mandatory")
+	}
+}
+
 // TestExtractBuiltinSkills_WritesToBuiltinSubdir verifies that
 // ExtractBuiltinSkillsToDir places files under a "builtin/" subdirectory.
 func TestExtractBuiltinSkills_WritesToBuiltinSubdir(t *testing.T) {
