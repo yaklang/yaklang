@@ -18,8 +18,10 @@ func TestUnquoteFuzzTagSizeMatchesEncoding(t *testing.T) {
 		{name: "ordinary printable ASCII is one byte", body: []byte("A"), want: 16},
 		{name: "quote and slash are two bytes", body: []byte{'"', '\\'}, want: 19},
 		{name: "delimiter printable ASCII is four bytes", body: []byte("(){}"), want: 31},
+		{name: "Yak raw string terminator is four bytes", body: []byte("`"), want: 19},
 		{name: "non printable is four bytes", body: []byte{0x00, 0xff}, want: 23},
 	}
+	require.NotContains(t, ToUnquoteFuzzTagForce([]byte("before`after")), "`")
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			encoded := ToUnquoteFuzzTagForce(tc.body)

@@ -544,6 +544,11 @@ func toUnquoteFuzzTag(i []byte, force bool) string {
 				buf.WriteString(`\x7d`)
 			case '{':
 				buf.WriteString(`\x7b`)
+			case '`':
+				// History/exported tags are commonly embedded in a Yak raw
+				// string. A literal backtick would terminate that source
+				// string; unquote("\\x60") preserves the original byte.
+				buf.WriteString(`\x60`)
 			case '\\':
 				buf.WriteString(`\\`)
 			case '"':
@@ -571,7 +576,7 @@ func UnquoteFuzzTagSize(i []byte, force bool) int {
 		switch {
 		case b < printableMin || b > printableMax:
 			size += 4
-		case b == '(' || b == ')' || b == '{' || b == '}':
+		case b == '(' || b == ')' || b == '{' || b == '}' || b == '`':
 			size += 4
 		case b == '\\' || b == '"':
 			size += 2

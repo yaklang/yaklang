@@ -57,9 +57,13 @@ func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowReque
 			httpFlowsHash []string
 		)
 
-		db = yakit.QueryWebsocketFlowsByHTTPFlowHash(db, r)
-		db = db.Select([]string{"id", "websocket_hash", "hash"}) //  just select websocket_hash and hash
-		res := yakit.YieldHTTPFlows(db, ctx)
+		// Keep the project database handle pristine for the actual deletion and
+		// request-resource cleanup below. Reusing this Select query causes GORM v1
+		// to carry HTTPFlow-only columns into the BareRequest KV lookup, deleting
+		// the Flow row while silently leaving its original-request sidecar behind.
+		flowQuery := yakit.QueryWebsocketFlowsByHTTPFlowHash(db, r)
+		flowQuery = flowQuery.Select([]string{"id", "websocket_hash", "hash"}) //  just select websocket_hash and hash
+		res := yakit.YieldHTTPFlows(flowQuery, ctx)
 		for flow := range res {
 			if flow.WebsocketHash != "" {
 				websocketHash = append(websocketHash, flow.WebsocketHash)

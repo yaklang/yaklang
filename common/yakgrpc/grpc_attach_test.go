@@ -4,14 +4,19 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -116,4 +121,79 @@ func TestUploadToTemporaryFileGRPC(t *testing.T) {
 	got, err := os.ReadFile(rsp.GetFileName())
 	require.NoError(t, err)
 	require.Equal(t, []byte{0x25, 0x50, 0x44, 0x46, 0x00, 0xff}, got)
+}
+
+// This is the backend contract behind History/WebFuzzer replacement in remote
+// mode: GUI-local bytes are streamed to the engine, the returned engine path is
+// placed in {{file(path)}}, and HTTPFuzzer expands that path to the exact file
+// bytes on the target wire. A structurally valid ZIP catches text conversion,
+// truncation and parser-delimiter bugs that a repeated "aaaa" body cannot.
+func TestGRPCMUSTPASS_UploadToTemporaryFile_WebFuzzerReplaysExactZIP(t *testing.T) {
+	client := isolateMITMTestSideEffects(t)
+	want := readMITMBinaryRepositoryFixture(t, "common", "aireducer", "testdata", "demo.txt.zip")
+	requireRealZIPFixture(t, want)
+
+	uploadCtx, uploadCancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer uploadCancel()
+	upload, err := client.UploadToTemporaryFile(uploadCtx)
+	require.NoError(t, err)
+	for offset := 0; offset < len(want); offset += 997 {
+		end := offset + 997
+		if end > len(want) {
+			end = len(want)
+		}
+		require.NoError(t, upload.Send(&ypb.UploadToTemporaryFileRequest{Data: want[offset:end]}))
+	}
+	uploaded, err := upload.CloseAndRecv()
+	require.NoError(t, err)
+	require.Equal(t, int64(len(want)), uploaded.GetSize())
+	require.FileExists(t, uploaded.GetFileName())
+	t.Cleanup(func() { _ = os.Remove(uploaded.GetFileName()) })
+	stored, err := os.ReadFile(uploaded.GetFileName())
+	require.NoError(t, err)
+	require.Equal(t, want, stored)
+
+	token := "remote-upload-webfuzzer-" + utils.RandStringBytes(8)
+	registerHTTPFlowTokenCleanup(t, token)
+	mockCtx, mockCancel := context.WithCancel(context.Background())
+	t.Cleanup(mockCancel)
+	captured := make(chan []byte, 1)
+	host, port := utils.DebugMockHTTPHandlerFuncContext(mockCtx, func(writer http.ResponseWriter, request *http.Request) {
+		body, readErr := io.ReadAll(request.Body)
+		require.NoError(t, readErr)
+		select {
+		case captured <- bytes.Clone(body):
+		default:
+		}
+		_, writeErr := writer.Write([]byte("ok"))
+		require.NoError(t, writeErr)
+	})
+	target := utils.HostPort(host, port)
+	packet := []byte(fmt.Sprintf(
+		"POST /%s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/zip\r\nContent-Length: 1\r\nConnection: close\r\n\r\n{{file(%s)}}",
+		token,
+		target,
+		uploaded.GetFileName(),
+	))
+
+	fuzzerCtx, fuzzerCancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer fuzzerCancel()
+	stream, err := client.HTTPFuzzer(fuzzerCtx, &ypb.FuzzerRequest{
+		Request:   string(packet),
+		ForceFuzz: true,
+	})
+	require.NoError(t, err)
+	for {
+		if _, recvErr := stream.Recv(); recvErr != nil {
+			break
+		}
+	}
+
+	select {
+	case got := <-captured:
+		require.Equal(t, want, got)
+		require.NotEqual(t, []byte(lowhttp.ToUnquoteFuzzTagForce(want)), got)
+	case <-time.After(3 * time.Second):
+		t.Fatal("mock target did not receive the uploaded ZIP through HTTPFuzzer")
+	}
 }
