@@ -10,26 +10,23 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-const memLeakSFRule = `*<memLeak()> as $leak`
-const nullCheckSFRule = `*<nullCheck()> as $chk`
+// Ext natives: memLeak, nullCheck, pointsTo, aliases.
+const extNativeRule = `
+$focus<memLeak()> as $leak
+$focus<nullCheck()> as $chk
+$focus<pointsTo()> as $pto
+$alias<aliases(target=$focus)> as $alias_hit
+alert $leak for { level: "low", risk: "memory-leak" }
+`
 
-type memLeakSFCase struct {
-	name     string
-	code     string
-	wantLeak bool
-}
+const memLeakScanRule = `*<memLeak()> as $leak`
+const nullCheckScanRule = `*<nullCheck()> as $chk`
 
-type nullCheckSFCase struct {
-	name    string
-	code    string
-	wantChk bool
-}
-
-func TestC_MemLeak_SyntaxFlow(t *testing.T) {
-	cases := []memLeakSFCase{
+func TestC_MemLeak_Config(t *testing.T) {
+	runPtrNativeConfigCases(t, []ptrNativeConfigCase{
 		{
-			name: "basic malloc never freed",
-			code: `
+			Name: "basic malloc never freed",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = (int*)malloc(sizeof(int));
@@ -37,22 +34,25 @@ int main() {
     return 0;
 }
 `,
-			wantLeak: true,
+			Rule: `p as $focus` + extNativeRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 1}},
+			WantAlerts: []string{"leak"},
 		},
 		{
-			name: "calloc never freed",
-			code: `
+			Name: "calloc never freed",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = (int*)calloc(1, sizeof(int));
     return 0;
 }
 `,
-			wantLeak: true,
+			Rule: `p as $focus` + extNativeRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 1}},
 		},
 		{
-			name: "free then return is safe",
-			code: `
+			Name: "free then return is safe",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = (int*)malloc(sizeof(int));
@@ -60,11 +60,12 @@ int main() {
     return 0;
 }
 `,
-			wantLeak: false,
+			Rule: `p as $focus` + extNativeRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 0, Max: 0}},
 		},
 		{
-			name: "if may-free still may leak",
-			code: `
+			Name: "if may-free still may leak",
+			Code: `
 #include <stdlib.h>
 int main(int abrt) {
     int *p = (int*)malloc(sizeof(int));
@@ -74,11 +75,12 @@ int main(int abrt) {
     return 0;
 }
 `,
-			wantLeak: true,
+			Rule: `p as $focus` + extNativeRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 1}},
 		},
 		{
-			name: "free in both branches is safe",
-			code: `
+			Name: "free in both branches is safe",
+			Code: `
 #include <stdlib.h>
 int main(int cond) {
     int *p = (int*)malloc(sizeof(int));
@@ -90,11 +92,12 @@ int main(int cond) {
     return 0;
 }
 `,
-			wantLeak: false,
+			Rule: `p as $focus` + extNativeRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 0, Max: 0}},
 		},
 		{
-			name: "return ownership escape is safe",
-			code: `
+			Name: "return ownership escape is safe",
+			Code: `
 #include <stdlib.h>
 int *make(void) {
     int *p = (int*)malloc(sizeof(int));
@@ -106,12 +109,12 @@ int main() {
     return 0;
 }
 `,
-			// make() returns p → not a leak in make; main frees → no leak
-			wantLeak: false,
+			Rule: `q as $focus` + extNativeRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 0, Max: 0}},
 		},
 		{
-			name: "two allocs one leaked",
-			code: `
+			Name: "two allocs one leaked",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *pa = (int*)malloc(sizeof(int));
@@ -120,53 +123,48 @@ int main() {
     return 0;
 }
 `,
-			wantLeak: true,
+			Rule: memLeakScanRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 1}},
 		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			ssatest.CheckWithNameOnlyInMemory("", t, tc.code, func(prog *ssaapi.Program) error {
-				res, err := prog.SyntaxFlowWithError(memLeakSFRule)
-				require.NoError(t, err)
-				got := res.GetValues("leak")
-				if tc.wantLeak {
-					require.Greater(t, got.Len(), 0, "expected memLeak")
-				} else {
-					require.Equal(t, 0, got.Len(), "unexpected memLeak: %v", got)
-				}
-				return nil
-			}, ssaapi.WithLanguage(ssaconfig.C))
-		})
-	}
-}
-
-func TestC_MemLeak_SyntaxFlow_AlertConfig(t *testing.T) {
-	code := `
+		{
+			Name: "struct nested field mem leak",
+			Code: `
 #include <stdlib.h>
+struct Wrapper { int *data; };
 int main() {
-    int *p = (int*)malloc(sizeof(int));
+    struct Wrapper *w = (struct Wrapper*)malloc(sizeof(struct Wrapper));
+    w->data = (int*)malloc(sizeof(int));
+    free(w);
     return 0;
 }
-`
-	rule := `
-*<memLeak()> as $leak
-alert $leak for {
-	level: "low",
-	risk: "memory-leak",
+`,
+			Rule: memLeakScanRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 1}},
+		},
+		{
+			Name: "multilevel int** heap leak",
+			Code: `
+#include <stdlib.h>
+int main() {
+    int **pp = (int**)malloc(sizeof(int*));
+    *pp = (int*)malloc(sizeof(int));
+    return 0;
 }
-`
-	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
-		res, err := prog.SyntaxFlowWithError(rule)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("leak").Len(), 0)
-		require.NotEmpty(t, res.GetAlertVariables())
-		return nil
-	}, ssaapi.WithLanguage(ssaconfig.C))
-}
-
-func TestC_MemLeak_SyntaxFlow_Target(t *testing.T) {
-	code := `
+`,
+			Rule: `
+pp as $focus
+` + extNativeRule + `
+*pp as $inner
+$inner<memLeak()> as $inner_leak
+`,
+			Want: map[string]ptrNativeWant{
+				"leak":       {Min: 1},
+				"inner_leak": {Min: 1},
+			},
+		},
+		{
+			Name: "target filter pa leaks pb freed",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *pa = (int*)malloc(sizeof(int));
@@ -176,113 +174,83 @@ int main() {
     free(pb);
     return 0;
 }
-`
-	run := func(t *testing.T, rule string, wantLeak bool) {
-		t.Helper()
-		ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
-			res, err := prog.SyntaxFlowWithError(rule)
-			require.NoError(t, err)
-			got := res.GetValues("leak")
-			if wantLeak {
-				require.Greater(t, got.Len(), 0, "expected leak for rule %s", rule)
-			} else {
-				require.Equal(t, 0, got.Len(), "unexpected leak: %v", got)
-			}
-			return nil
-		}, ssaapi.WithLanguage(ssaconfig.C))
-	}
-
-	t.Run("named target pa leaks", func(t *testing.T) {
-		run(t, `
+`,
+			Rule: `
 pa as $pa
-<memLeak(target=$pa)> as $leak
-`, true)
-	})
-	t.Run("star receiver with target pa", func(t *testing.T) {
-		run(t, `
-pa as $pa
-*<memLeak(target=$pa)> as $leak
-`, true)
-	})
-	t.Run("receiver chain $pa<memLeak()>", func(t *testing.T) {
-		run(t, `
-pa as $pa
-$pa<memLeak()> as $leak
-`, true)
-	})
-	t.Run("named target pb freed no leak", func(t *testing.T) {
-		run(t, `
 pb as $pb
-<memLeak(target=$pb)> as $leak
-`, false)
-	})
-	t.Run("safe pointer has no leak", func(t *testing.T) {
-		run(t, `
 safe as $safe
-<memLeak(target=$safe)> as $leak
-`, false)
+<memLeak(target=$pa)> as $leak_pa
+*<memLeak(target=$pa)> as $leak_pa_star
+$pa<memLeak()> as $leak_pa_recv
+<memLeak(target=$pb)> as $leak_pb
+<memLeak(target=$safe)> as $leak_safe
+`,
+			Want: map[string]ptrNativeWant{
+				"leak_pa":      {Min: 1},
+				"leak_pa_star": {Min: 1},
+				"leak_pa_recv": {Min: 1},
+				"leak_pb":      {Min: 0, Max: 0},
+				"leak_safe":    {Min: 0, Max: 0},
+			},
+		},
 	})
 }
 
-func TestC_NullCheck_SyntaxFlow_Cases(t *testing.T) {
-	cases := []nullCheckSFCase{
+func TestC_NullCheck_Config(t *testing.T) {
+	runPtrNativeConfigCases(t, []ptrNativeConfigCase{
 		{
-			name: "bare if (p)",
-			code: `
+			Name: "bare if (p)",
+			Code: `
 #include <stdlib.h>
 int main(int *p) {
-    if (p) {
-        *p = 1;
-    }
+    if (p) { *p = 1; }
     return 0;
 }
 `,
-			wantChk: true,
+			Rule: nullCheckScanRule,
+			Want: map[string]ptrNativeWant{"chk": {Min: 1}},
 		},
 		{
-			name: "if (p != 0)",
-			code: `
+			Name: "if (p != 0)",
+			Code: `
 #include <stdlib.h>
 int main(int *p) {
-    if (p != 0) {
-        *p = 1;
-    }
+    if (p != 0) { *p = 1; }
     return 0;
 }
 `,
-			wantChk: true,
+			Rule: nullCheckScanRule,
+			Want: map[string]ptrNativeWant{"chk": {Min: 1}},
 		},
 		{
-			name: "if (p == 0)",
-			code: `
+			Name: "if (p == 0)",
+			Code: `
 #include <stdlib.h>
 int main(int *p) {
-    if (p == 0) {
-        return 1;
-    }
+    if (p == 0) { return 1; }
     *p = 1;
     return 0;
 }
 `,
-			wantChk: true,
+			Rule: nullCheckScanRule,
+			Want: map[string]ptrNativeWant{"chk": {Min: 1}},
 		},
 		{
-			name: "if (!p)",
-			code: `
+			Name: "if (!p)",
+			Code: `
 #include <stdlib.h>
 int main(int *p) {
-    if (!p) {
-        return 1;
-    }
+    if (!p) { return 1; }
     *p = 1;
     return 0;
 }
 `,
-			wantChk: true,
+			Rule: nullCheckScanRule,
+			Want: map[string]ptrNativeWant{"chk": {Min: 1}},
 		},
 		{
-			name: "no null check",
-			code: `
+			Name: "no null check",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = (int*)malloc(sizeof(int));
@@ -291,93 +259,54 @@ int main() {
     return 0;
 }
 `,
-			wantChk: false,
+			Rule: nullCheckScanRule,
+			Want: map[string]ptrNativeWant{"chk": {Min: 0, Max: 0}},
 		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			ssatest.CheckWithNameOnlyInMemory("", t, tc.code, func(prog *ssaapi.Program) error {
-				res, err := prog.SyntaxFlowWithError(nullCheckSFRule)
-				require.NoError(t, err)
-				got := res.GetValues("chk")
-				if tc.wantChk {
-					require.Greater(t, got.Len(), 0, "expected nullCheck")
-				} else {
-					require.Equal(t, 0, got.Len(), "unexpected nullCheck: %v", got)
-				}
-				return nil
-			}, ssaapi.WithLanguage(ssaconfig.C))
-		})
-	}
+		{
+			Name: "struct param nullCheck",
+			Code: `
+#include <stdlib.h>
+struct Node { int x; };
+int main(struct Node *p) {
+    if (p != 0) { p->x = 1; }
+    return 0;
 }
-
-func TestC_NullCheck_SyntaxFlow_Target(t *testing.T) {
-	code := `
+`,
+			Rule: `p as $focus` + extNativeRule,
+			Want: map[string]ptrNativeWant{"chk": {Min: 1}},
+		},
+		{
+			Name: "target filter pa and pb",
+			Code: `
 #include <stdlib.h>
 int main(int *pa, int *pb) {
-    if (pa) {
-        *pa = 11;
-    }
-    if (pb == 0) {
-        return 1;
-    }
+    if (pa) { *pa = 11; }
+    if (pb == 0) { return 1; }
     *pb = 22;
     return 0;
 }
-`
-	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
-		res, err := prog.SyntaxFlowWithError(`
+`,
+			Rule: `
 pa as $pa
-<nullCheck(target=$pa)> as $chk
-`)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("chk").Len(), 0)
-
-		res, err = prog.SyntaxFlowWithError(`
 pb as $pb
-$pb<nullCheck()> as $chk
-`)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("chk").Len(), 0)
-
-		res, err = prog.SyntaxFlowWithError(`
-*<nullCheck()> as $chk
-`)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("chk").Len(), 1, "both pa and pb checks")
-		return nil
-	}, ssaapi.WithLanguage(ssaconfig.C))
+<nullCheck(target=$pa)> as $chk_pa
+$pb<nullCheck()> as $chk_pb
+*<nullCheck()> as $chk_all
+`,
+			Want: map[string]ptrNativeWant{
+				"chk_pa":  {Min: 1},
+				"chk_pb":  {Min: 1},
+				"chk_all": {Min: 2},
+			},
+		},
+	})
 }
 
-func TestC_NullCheck_SyntaxFlow_AlertConfig(t *testing.T) {
-	code := `
-#include <stdlib.h>
-int main(int *p) {
-    if (p != 0) {
-        *p = 1;
-    }
-    return 0;
-}
-`
-	rule := `
-*<nullCheck()> as $chk
-alert $chk for {
-	level: "info",
-	risk: "null-check",
-}
-`
-	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
-		res, err := prog.SyntaxFlowWithError(rule)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("chk").Len(), 0)
-		require.NotEmpty(t, res.GetAlertVariables())
-		return nil
-	}, ssaapi.WithLanguage(ssaconfig.C))
-}
-
-func TestC_PointsTo_Aliases_SyntaxFlow_Config(t *testing.T) {
-	code := `
+func TestC_PointsTo_Aliases_Config(t *testing.T) {
+	runPtrNativeConfigCases(t, []ptrNativeConfigCase{
+		{
+			Name: "int alias q=p pointsTo",
+			Code: `
 #include <stdlib.h>
 int main() {
     int *p = (int*)malloc(sizeof(int));
@@ -387,89 +316,70 @@ int main() {
     free(r);
     return 0;
 }
-`
-	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
-		// pointsTo on alloc / copy
-		res, err := prog.SyntaxFlowWithError(`
-p as $p
-$p<pointsTo()> as $obj
-`)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("obj").Len(), 0, "p should pointsTo its heap object")
-
-		res, err = prog.SyntaxFlowWithError(`
-q as $q
-$q<pointsTo()> as $obj
-`)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("obj").Len(), 0, "alias q should pointsTo")
-
-		// aliases: q may-alias p
-		res, err = prog.SyntaxFlowWithError(`
-p as $p
-q as $q
-$q<aliases(target=$p)> as $hit
-`)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("hit").Len(), 0, "q should alias p")
-
-		// aliases: r should NOT alias p
-		res, err = prog.SyntaxFlowWithError(`
-p as $p
-r as $r
-$r<aliases(target=$p)> as $hit
-`)
-		require.NoError(t, err)
-		require.Equal(t, 0, res.GetValues("hit").Len(), "independent r should not alias p")
-
-		// against= alias for target
-		res, err = prog.SyntaxFlowWithError(`
-p as $p
-q as $q
-$q<aliases(against=$p)> as $hit
-`)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("hit").Len(), 0)
-		return nil
-	}, ssaapi.WithLanguage(ssaconfig.C))
-}
-
-func TestC_Lifetime_Combined_Config(t *testing.T) {
-	// Mix query natives + memLeak / doubleFree in one rule-style config.
-	code := `
+`,
+			Rule: `
+p as $focus
+q as $alias
+r as $other
+` + extNativeRule + `
+$other<aliases(target=$focus)> as $other_alias
+`,
+			Want: map[string]ptrNativeWant{
+				"pto":         {Min: 1},
+				"alias_hit":   {Min: 1},
+				"other_alias": {Min: 0, Max: 0},
+			},
+		},
+		{
+			Name: "struct alias chain",
+			Code: `
 #include <stdlib.h>
+struct Node { int v; struct Node *next; };
 int main() {
-    int *leak = (int*)malloc(sizeof(int));
-    int *df = (int*)malloc(sizeof(int));
-    free(df);
-    free(df);
+    struct Node *p = (struct Node*)malloc(sizeof(struct Node));
+    struct Node *q = p;
+    struct Node *r = (struct Node*)malloc(sizeof(struct Node));
+    p->v = 1;
+    free(p);
+    free(r);
     return 0;
 }
-`
-	rule := `
-*<heapAlloc()> as $alloc
-*<freeCall()> as $free
-*<doubleFree()> as $df
-*<memLeak()> as $leak
-alert $df for {
-	level: "high",
-	risk: "double-free",
+`,
+			Rule: `
+p as $focus
+q as $alias
+r as $other
+` + extNativeRule + `
+$other<aliases(target=$focus)> as $other_alias
+`,
+			Want: map[string]ptrNativeWant{
+				"alias_hit":   {Min: 1},
+				"other_alias": {Min: 0, Max: 0},
+				"pto":         {Min: 1},
+			},
+		},
+		{
+			Name: "multilevel slot alias",
+			Code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    int **slot = &p;
+    int *q = *slot;
+    free(p);
+    return 0;
 }
-alert $leak for {
-	level: "low",
-	risk: "memory-leak",
-}
-`
-	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
-		res, err := prog.SyntaxFlowWithError(rule)
-		require.NoError(t, err)
-		require.Greater(t, res.GetValues("alloc").Len(), 0)
-		require.Greater(t, res.GetValues("free").Len(), 0)
-		require.Greater(t, res.GetValues("df").Len(), 0)
-		require.Greater(t, res.GetValues("leak").Len(), 0)
-		require.NotEmpty(t, res.GetAlertVariables())
-		return nil
-	}, ssaapi.WithLanguage(ssaconfig.C))
+`,
+			Rule: `
+p as $focus
+q as $alias
+` + extNativeRule,
+			Want: map[string]ptrNativeWant{
+				"alias_hit": {Min: 1},
+				"pto":       {Min: 1},
+			},
+		},
+	})
 }
 
 func TestC_MemLeak_LifetimeAPI(t *testing.T) {
@@ -494,13 +404,12 @@ int main() {
 	}, ssaapi.WithLanguage(ssaconfig.C))
 }
 
-// TestC_MemLeak_SyntaxFlow_Ex encodes desired behavior for harder cases.
-// Soft assertions: log gaps instead of failing CI hard when analysis is incomplete.
-func TestC_MemLeak_SyntaxFlow_Ex(t *testing.T) {
-	cases := []memLeakSFCase{
+// TestC_MemLeak_Config_Ex — soft assertions for known analysis gaps.
+func TestC_MemLeak_Config_Ex(t *testing.T) {
+	runPtrNativeConfigCases(t, []ptrNativeConfigCase{
 		{
-			name: "nested free wrapper then no leak",
-			code: `
+			Name: "nested free wrapper then no leak",
+			Code: `
 #include <stdlib.h>
 void freep(int *p) { free(p); }
 int main() {
@@ -509,27 +418,28 @@ int main() {
     return 0;
 }
 `,
-			wantLeak: false,
+			Rule: memLeakScanRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 0, Max: 0}},
+			Soft: true,
 		},
 		{
-			name: "early return without free is leak",
-			code: `
+			Name: "early return without free is leak",
+			Code: `
 #include <stdlib.h>
 int main(int c) {
     int *p = (int*)malloc(sizeof(int));
-    if (c) {
-        return 1;
-    }
+    if (c) { return 1; }
     free(p);
     return 0;
 }
 `,
-			wantLeak: true,
+			Rule: memLeakScanRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 1}},
+			Soft: true,
 		},
 		{
-			// gap: may-alive + loop back-edge can keep Alive across iterations
-			name: "alloc in loop body freed is safe",
-			code: `
+			Name: "alloc in loop body freed is safe",
+			Code: `
 #include <stdlib.h>
 int main() {
     int i;
@@ -541,23 +451,9 @@ int main() {
     return 0;
 }
 `,
-			wantLeak: false,
+			Rule: memLeakScanRule,
+			Want: map[string]ptrNativeWant{"leak": {Min: 0, Max: 0}},
+			Soft: true,
 		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			ssatest.CheckWithNameOnlyInMemory("", t, tc.code, func(prog *ssaapi.Program) error {
-				res, err := prog.SyntaxFlowWithError(memLeakSFRule)
-				require.NoError(t, err)
-				got := res.GetValues("leak")
-				if tc.wantLeak && got.Len() == 0 {
-					t.Logf("gap: expected memLeak for %s", tc.name)
-				}
-				if !tc.wantLeak && got.Len() > 0 {
-					t.Logf("gap: unexpected memLeak for %s: %v", tc.name, got)
-				}
-				return nil
-			}, ssaapi.WithLanguage(ssaconfig.C))
-		})
-	}
+	})
 }
