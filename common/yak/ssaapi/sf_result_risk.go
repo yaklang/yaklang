@@ -207,7 +207,13 @@ func (r *SyntaxFlowResult) SaveRisk(
 	if save {
 		err := yakit.CreateSSARisk(consts.GetGormSSAProjectDataBase(), ssaRisk)
 		if err != nil {
+			// Keep the risk in memory so the streaming path (EmitSSAResult →
+			// ssa-stream → platform artifact import) and in-process results
+			// still deliver it even when the local SSA IR DB is stale or
+			// read-only (e.g. missing a newly added column). The platform
+			// stores its own copy from the stream.
 			log.Errorf("save risk failed: %s", err)
+			r.riskMap[ssaRiskName(variable, index)] = ssaRisk
 			return ""
 		}
 	}
