@@ -112,10 +112,10 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			log.Infof("modify_http_request action: target=%s, reason=%s, review=%v", modificationTarget, modificationReason, requireManualReview)
 
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeModifyRequest, fmt.Sprintf("修改请求: %s", modificationTarget))
-			reactloops.EmitStatus(loop, "修改请求中 / Modifying Request...")
+			reactloops.EmitStatusI18n(loop, "修改请求中", "Modifying Request...")
 			r.AddToTimeline("modify_http_request", fmt.Sprintf("Modified current HTTP request: %s\n%s", modificationTarget, buildFuzzTimelineSummary(feedback)))
 			feedbackMsg := buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeModifyRequest, "HTTP 请求已修改 / HTTP Request Modified", utils.ShrinkTextBlock(result.Diff, 2000))
 			operator.Feedback(feedbackMsg)
 		},

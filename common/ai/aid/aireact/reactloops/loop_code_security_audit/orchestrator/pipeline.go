@@ -28,7 +28,7 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 		userInput := task.GetUserInput()
 
 		if state.GetPhase() == model.AuditPhaseDone {
-			reactloops.EmitStatus(loop, "审计追问模式 / Audit follow-up mode")
+			reactloops.EmitStatusI18n(loop, "审计追问模式", "Audit follow-up mode")
 			r.AddToTimeline("[AUDIT_FOLLOWUP]", "审计已完成，进入追问模式。用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 			followLoop, err := followup.BuildLoop(r, state)
 			if err != nil {
@@ -43,7 +43,7 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 			return
 		}
 
-		reactloops.EmitStatus(loop, "代码安全审计启动 / Starting code security audit")
+		reactloops.EmitStatusI18n(loop, "代码安全审计启动", "Starting code security audit")
 		r.AddToTimeline("[AUDIT_START]", "代码安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
 		ws := reactloops.InitWorkspaceAttachedContext(r, loop, task, AttachedResourceKeyCodeAuditTargetPath)
@@ -84,7 +84,7 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 			reportPath = filepath.Join(auditDirPath, "security_audit_report.md")
 		}
 		finalReport := state.GetFinalReport()
-		reactloops.EmitStatus(loop, "审计完成 / Audit complete")
+		reactloops.EmitStatusI18n(loop, "审计完成", "Audit complete")
 		emit.PipelineDone(loop, reportPath, len(finalReport), state.GetStats())
 		r.AddToTimeline("[AUDIT_DONE]", "代码安全审计全部完成。报告预览:\n"+utils.ShrinkTextBlock(finalReport, 200))
 		log.Infof("[CodeAudit] All phases complete. Report length: %d bytes", len(finalReport))
@@ -133,7 +133,7 @@ func emitPhaseMarker(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, k
 
 func runPhase1(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string, ws *reactloops.WorkspaceAttachedContext, op *reactloops.InitTaskOperator) {
 	log.Infof("[CodeAudit] Starting Phase 1 (Recon via dir_explore)")
-	reactloops.EmitStatus(loop, "正在了解项目结构和关键入口 / Understanding the project structure and key entry points")
+	reactloops.EmitStatusI18n(loop, "正在了解项目结构和关键入口", "Understanding the project structure and key entry points")
 	r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：项目探索（使用 dir_explore loop）")
 	emitPhaseMarker(loop, task, "phase", "dir_explore", "Phase 1：项目探索", "")
 
@@ -201,13 +201,13 @@ func runPhase1(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 		log.Infof("[CodeAudit] Phase 1 complete. tech=%s recon_file=%s", state.TechStack, state.GetReconFilePath())
 		emit.ReconComplete(loop, state.ProjectPath, state.TechStack, state.GetReconFilePath(), false)
 	}
-	reactloops.EmitStatus(loop, "已经了解项目结构，正在深入排查 / The project structure is clear; starting the detailed review")
+	reactloops.EmitStatusI18n(loop, "已经了解项目结构，正在深入排查", "The project structure is clear; starting the detailed review")
 }
 
 func runPhase2(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string) {
 	log.Infof("[CodeAudit] Starting Phase 2")
 	reactloops.EmitActionLog(loop, util.ScanNodeID, "Phase 2：代码审计扫描 / Phase 2: Code audit scan")
-	reactloops.EmitStatus(loop, "正在排查潜在安全风险 / Checking for potential security risks")
+	reactloops.EmitStatusI18n(loop, "正在排查潜在安全风险", "Checking for potential security risks")
 	r.AddToTimeline("[PHASE2_START]", "开始 Phase 2：代码审计扫描")
 	emitPhaseMarker(loop, task, "phase", "code_audit_phase2_orchestrator", "Phase 2：代码审计扫描", task.GetId())
 
@@ -224,7 +224,7 @@ func runPhase2(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	if findingsFile != "" {
 		r.AddToTimeline("[PHASE2_PERSISTED]", fmt.Sprintf("Phase 2 扫描完成，共 %d 个 finding 已写入: %s", len(state.GetFindings()), findingsFile))
 	}
-	reactloops.EmitStatus(loop, "已经找到需要关注的位置，正在逐一确认 / Potential areas of concern were found; validating each one")
+	reactloops.EmitStatusI18n(loop, "已经找到需要关注的位置，正在逐一确认", "Potential areas of concern were found; validating each one")
 }
 
 func runPhase3(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string) {
@@ -258,14 +258,14 @@ func runPhase3(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 			r.AddToTimeline("[PHASE3_PERSISTED]", fmt.Sprintf("Phase 3 验证完成，共 %d 个结果: %s", len(state.GetVerifiedVulns()), verifiedFile))
 		}
 	}
-	reactloops.EmitStatus(loop, "风险确认已完成，正在汇总结论 / Validation is complete; consolidating the findings")
+	reactloops.EmitStatusI18n(loop, "风险确认已完成，正在汇总结论", "Validation is complete; consolidating the findings")
 	emit.VerifyComplete(loop, "", state.GetStats())
 }
 
 func runPhase4(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string) {
 	log.Infof("[CodeAudit] Starting Phase 4 (Report)")
 	reactloops.EmitActionLog(loop, util.ReportNodeID, "Phase 4：审计报告 / Phase 4: Audit report")
-	reactloops.EmitStatus(loop, "正在整理安全审计报告 / Preparing the security audit report")
+	reactloops.EmitStatusI18n(loop, "正在整理安全审计报告", "Preparing the security audit report")
 	r.AddToTimeline("[PHASE4_START]", "开始 Phase 4：报告生成")
 	emitPhaseMarker(loop, task, "phase", "code_audit_phase4_report", "Phase 4：审计报告", task.GetId())
 	reportLoop, err := phase4.BuildReportLoop(r, state)

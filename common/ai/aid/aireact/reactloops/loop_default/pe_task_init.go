@@ -20,7 +20,7 @@ func buildPETaskInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReAct
 			return
 		}
 
-		loop.LoadingStatus("深度意图识别 / Deep intent recognition")
+		loop.UserStatus("深度意图识别", "Deep intent recognition")
 		log.Infof("pe_task: invoking deep intent recognition directly")
 
 		capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), task.GetUserInput())

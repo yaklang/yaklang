@@ -609,10 +609,12 @@ func (r *loopHTTPFuzzThrottleEmitter) emitProgress(stats *loopHTTPFuzzOverviewSt
 	emit := func() {
 		emitLoopHTTPFuzzStatusEvent(r.loop, loopHTTPFuzzStatusWorking, r.fuzzID, r.runtimeID, r.actionName, r.reason, r.paramSummary, statusProgress)
 		if stats.TotalRequests > 0 && (force || stats.TotalRequests%50 == 0) {
-			reactloops.EmitStatus(r.loop, fmt.Sprintf(
-				"已执行 %d 次测试 / Executed %d Tests",
-				stats.TotalRequests, stats.TotalRequests,
-			))
+			reactloops.EmitStatusI18n(
+				r.loop,
+				fmt.Sprintf("已执行 %d 次测试", stats.TotalRequests),
+				fmt.Sprintf("Executed %d tests", stats.TotalRequests),
+			)
+
 		}
 	}
 	if force || r.throttle == nil {
@@ -973,7 +975,7 @@ func getFuzzRequest(loop *reactloops.ReActLoop) (*mutate.FuzzHTTPRequest, error)
 // 3. 在需要时只压缩 analysis 段，再把最终反馈送去满意度验证。
 func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string, paramSummary string, action *aicommon.Action) (string, *aicommon.VerifySatisfactionResult, error) {
 	reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeFuzz, buildLoopHTTPFuzzActionLogStartLine(actionName, paramSummary, action))
-	reactloops.EmitStatus(loop, "模糊测试中 / Fuzzing...")
+	reactloops.EmitStatusI18n(loop, "模糊测试中", "Fuzzing...")
 	isHttpsStr := loop.Get("is_https")
 	isHttps := isHttpsStr == "true"
 	task := loop.GetCurrentTask()
@@ -1037,7 +1039,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	if err != nil {
 		emitLoopHTTPFuzzStatusEvent(loop, loopHTTPFuzzStatusFinish, fuzzID, runtimeID, actionName, "", "", nil)
 		log.Errorf("[executeFuzzAndCompare] %s exec failed: %v", actionName, err)
-		reactloops.EmitStatus(loop, "模糊测试失败 / Fuzz Test Failed")
+		reactloops.EmitStatusI18n(loop, "模糊测试失败", "Fuzz Test Failed")
 		return "", nil, err
 	}
 
@@ -1102,16 +1104,16 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 
 	if len(strings.TrimSpace(analysisSection)) > loopHTTPFuzzCompressionThreshold && invoker != nil {
 		log.Infof("[executeFuzzAndCompare] %s report exceeds %d bytes, compressing", actionName, loopHTTPFuzzCompressionThreshold)
-		reactloops.EmitStatus(loop, "压缩测试报告中 / Compressing Test Report...")
+		reactloops.EmitStatusI18n(loop, "压缩测试报告中", "Compressing Test Report...")
 		compressionTarget := buildFuzzCompressionTarget(loop, actionName)
 		compressed, compressErr := invoker.CompressLongTextWithDestination(taskCtx, analysisSection, compressionTarget, loopHTTPFuzzCompressionTarget)
 		if compressErr != nil {
 			log.Warnf("[executeFuzzAndCompare] %s compression failed, using original report: %v", actionName, compressErr)
-			reactloops.EmitStatus(loop, "压缩失败，使用原始报告 / Compression Failed, Using Original")
+			reactloops.EmitStatusI18n(loop, "压缩失败，使用原始报告", "Compression Failed, Using Original")
 		} else {
 			analysisSection = buildCompressedAnalysisSection(compressed, representativeRequest, representativeResponse, representativeHiddenIndex)
 			loop.Set("diff_result_compressed", analysisSection)
-			reactloops.EmitStatus(loop, "验证测试目标中 / Verifying Test Goal...")
+			reactloops.EmitStatusI18n(loop, "验证测试目标中", "Verifying Test Goal...")
 		}
 	}
 
@@ -1140,7 +1142,11 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	if verificationSummary != "" {
 		finishLine += "; " + verificationSummary
 	}
-	reactloops.EmitStatus(loop, fmt.Sprintf("模糊测试完成 / Fuzz Test Complete (%d requests)", overview.TotalRequests))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("模糊测试完成，共发送 %d 个请求", overview.TotalRequests),
+		fmt.Sprintf("Fuzz test complete with %d requests", overview.TotalRequests),
+	)
 	reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeFuzz, finishLine, displaySummary)
 
 	loop.Set("diff_result", operatorFeedback)
@@ -1211,7 +1217,7 @@ func verifyFuzzCompletion(loop *reactloops.ReActLoop, taskCtx context.Context, a
 		return nil, "", nil
 	}
 
-	reactloops.EmitStatus(loop, "验证测试目标中 / Verifying Test Goal...")
+	reactloops.EmitStatusI18n(loop, "验证测试目标中", "Verifying Test Goal...")
 	verifyResult, err := invoker.VerifyUserSatisfaction(taskCtx, task.GetUserInput(), true, verificationPayload)
 	if err != nil {
 		log.Errorf("[verifyFuzzCompletion] %s verification failed: %v", actionName, err)
@@ -1230,9 +1236,9 @@ func verifyFuzzCompletion(loop *reactloops.ReActLoop, taskCtx context.Context, a
 	loop.Set("verification_result", verificationText)
 
 	if verifyResult.Satisfied {
-		reactloops.EmitStatus(loop, "已达到测试目标 / Test Goal Met")
+		reactloops.EmitStatusI18n(loop, "已达到测试目标", "Test Goal Met")
 	} else {
-		reactloops.EmitStatus(loop, "需继续测试 / Continue Testing")
+		reactloops.EmitStatusI18n(loop, "需继续测试", "Continue Testing")
 	}
 
 	return verifyResult, verificationText, nil

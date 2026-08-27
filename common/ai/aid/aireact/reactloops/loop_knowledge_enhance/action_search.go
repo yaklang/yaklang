@@ -40,7 +40,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 		desc, toolOpts,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			loop.Set("search_mode", mode)
-			loop.LoadingStatus("正在确认查找方向 / Confirming the search direction")
+			loop.UserStatus("正在确认查找方向", "Confirming the search direction")
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
 			if len(knowledgeBases) == 0 {
 				// 使用初始化阶段加载的知识库
@@ -84,7 +84,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				}
 			}
 
-			loop.LoadingStatus(fmt.Sprintf("执行搜索中 - search_knowledge:%s / executing search - mode:%s", mode, mode))
+			loop.UserStatus("正在搜索相关知识", "Searching relevant knowledge")
 
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
 			// 如果未提供 knowledge_bases，使用初始化阶段加载的知识库
@@ -122,7 +122,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			}
 
 			emitter := loop.GetEmitter()
-			loop.LoadingStatus(fmt.Sprintf("查询知识库中 - querying: %s", queryToUse))
+			loop.UserStatus("正在查询知识库", "Searching the knowledge base")
 
 			// 根据搜索模式确定 EnhancePlan
 			var enhancePlans []string
@@ -156,13 +156,13 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				return
 			}
 
-			loop.LoadingStatus("已获取结果，准备压缩 - result fetched, preparing to compress")
+			loop.UserStatus("已找到相关内容，正在提炼重点", "Relevant content found; extracting the key points")
 
 			// 压缩搜索结果
 			singleResult := fmt.Sprintf("=== 查询: %s ===\n%s", queryToUse, enhanceData)
 			_ = singleResult
 
-			loop.LoadingStatus("压缩搜索结果中 - compressing search result")
+			loop.UserStatus("正在提炼搜索结果", "Refining the search results")
 			log.Infof("query result size: %d bytes\n=====================\n%v\n=====================\n", len(enhanceData), enhanceData)
 			compressedResult, err := invoker.CompressLongTextWithDestination(ctx, enhanceData, queryToUse, 10*1024)
 			if err != nil {
@@ -184,7 +184,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				op.Continue()
 				return
 			}
-			loop.LoadingStatus("压缩完成 - compression done")
+			loop.UserStatus("搜索结果已整理完成", "The search results are ready")
 			log.Infof("query result size: %d bytes\n=====================\n%v\n=====================\n", len(compressedResult), compressedResult)
 
 			// 将新知识记录
@@ -253,7 +253,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			// loop.Set("all_compressed_results", allResults)
 
 			// 使用 LiteForge 评估下一步行动
-			loop.LoadingStatus("正在判断现有信息是否足够 / Checking whether the available information is sufficient")
+			loop.UserStatus("正在判断现有信息是否足够", "Checking whether the available information is sufficient")
 			evalResult := evaluateNextSearch(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
 			if evalResult.Finished {
 				// 知识收集已完成，保存总结并退出循环

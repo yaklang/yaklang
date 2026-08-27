@@ -4,13 +4,13 @@ Status 用来告诉用户助手正在做什么，不承担调试日志职责。�
 
 ## 兼容协议
 
-旧接口保持原样：
+旧接口仅保留给外部兼容调用：
 
 ```go
 emitter.EmitStatus(key, value)
 ```
 
-新代码优先使用：
+生产代码统一使用：
 
 ```go
 emitter.EmitStatusI18n(
@@ -88,3 +88,5 @@ emitter.EmitStatusI18n(
 - 批量工具只在准备和批次返回时更新状态，避免为每个子调用重复刷屏。
 - Status 不携带工具参数、提示词、原始响应和敏感错误信息。
 - `detail` 只补充“为什么做”或“接下来做什么”，不要复制标题。
+- 中英文必须作为独立参数传入，不要在中文参数中继续拼接 `中文 / English`。
+- `EmitStatus` 与 `LoadingStatus` 只是兼容层，`TestProductionStatusCallsUseI18n` 会防止生产代码重新使用旧入口或传入空翻译。

@@ -69,7 +69,7 @@ var grepReferenceAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 
 			startLog := fmt.Sprintf("检索参考: pattern='%s', file=%s", pattern, filePath)
 			reactloops.EmitActionLog(loop, grepReferenceNodeID, startLog)
-			reactloops.EmitStatus(loop, "正在查找报告所需的参考内容 / Finding reference material for the report")
+			reactloops.EmitStatusI18n(loop, "正在查找报告所需的参考内容", "Finding reference material for the report")
 
 			log.Infof("grep_reference: searching pattern '%s' in file %s (context=%d, case_insensitive=%v)",
 				pattern, filePath, contextLines, caseInsensitive)
@@ -196,7 +196,7 @@ var grepReferenceAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			op.Feedback(feedback)
 
 			finishLog := fmt.Sprintf("完成: %d 个匹配, pattern='%s'", len(results), pattern)
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, grepReferenceNodeID, finishLog, reference)
 
 			log.Infof("grep_reference: completed, %d matches added to collected references", len(results))

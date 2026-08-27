@@ -83,7 +83,11 @@ func buildFastContextAction(
 
 			log.Infof("[CodeAudit/Phase2/%s] fast_context registered %d new discovery candidates (total %d)",
 				category.ID, added, scan.DiscoveryCandidateCount())
-			reactloops.EmitStatus(loop, fmt.Sprintf("正在筛选 %d 个重点位置 / Reviewing %d priority locations", len(paths), len(paths)))
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("正在筛选 %d 个重点位置", len(paths)),
+				fmt.Sprintf("Reviewing %d priority locations", len(paths)),
+			)
 			emitPhase2FastContextResult(loop, category, paths, result.Markdown)
 
 			if result.Markdown != "" {
