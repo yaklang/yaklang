@@ -7412,6 +7412,7 @@ message BatchSetHTTPFlowIssueFieldsRequest {
   repeated int64 Ids = 6;
   // 按 Hash 批量更新
   repeated string Hashes = 7;
+  string Token = 8;
 }
 
 message BatchSetHTTPFlowIssueFieldsResponse {

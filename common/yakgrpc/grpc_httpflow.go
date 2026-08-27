@@ -1023,10 +1023,41 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 		// 全量更新
 	}
 
+	// 批量上限校验：与 online 端一致，超过 100 条直接拒绝。
+	const batchMaxLimit = 100
+	var count int64
+	if err := db.Count(&count).Error; err != nil {
+		return nil, utils.Errorf("count httpflow for batch limit failed: %s", err)
+	}
+	if count == 0 {
+		return nil, utils.Errorf("未匹配到任何 httpflow")
+	}
+	if count > batchMaxLimit {
+		return nil, utils.Errorf("匹配 %d 条，超过批量上限 %d，请缩小筛选条件", count, batchMaxLimit)
+	}
+
+	// 查出受影响的 hash 用于同步到 online
+	var syncHashes []string
+	if req.GetToken() != "" {
+		if err := db.Pluck("hash", &syncHashes).Error; err != nil {
+			return nil, utils.Errorf("pluck httpflow hashes for online sync failed: %s", err)
+		}
+	}
+
 	result := db.Updates(updates)
 	if result.Error != nil {
 		return nil, utils.Errorf("batch set httpflow issue fields failed: %s", result.Error)
 	}
+
+	// 更新本地数据后， 请求 online 同步更新 online 端会按 hash 匹配，能找到的就更新；找不到的忽略。
+	if req.GetToken() != "" && len(syncHashes) > 0 {
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		if err := client.SetHTTPFlowTagsToOnline(ctx, req.GetToken(), syncHashes,
+			req.IssueType, req.Severity, req.Status, req.StatusReason); err != nil {
+			return nil, utils.Errorf("sync httpflow tags to online failed: %s", err)
+		}
+	}
+
 	return &ypb.BatchSetHTTPFlowIssueFieldsResponse{
 		UpdatedCount: result.RowsAffected,
 	}, nil
