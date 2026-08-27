@@ -34,35 +34,37 @@ import (
 )
 
 type mitmV2RequestOutcomeCase struct {
-	name                      string
-	originalPayload           []byte
-	inlineEditedPayload       []byte
-	manualFuzzTagPayload      []byte
-	replacementPayload        []byte
-	localReplacementFilename  string
-	localReplacementType      string
-	sentPayload               []byte
-	contentType               string
-	multipart                 bool
-	uploadFilename            string
-	uploadContentType         string
-	forwardOriginal           bool
-	dropRequest               bool
-	hijackResponse            bool
-	wantHijackTag             string
-	wantHijackRaw             bool
-	wantResourceFlow          bool
-	wantCurrentRaw            bool
-	wantBareResource          bool
-	wantCurrentMultipartFiles int
-	wantBareFileTags          int
-	wantManualEditTag         bool
-	wantRenderedUserFuzzTag   bool
-	wantCurrentBinaryExports  bool
-	wantBareBinaryExports     bool
-	extraMultipartParts       []mitmV2OutcomeMultipartPart
-	replacementPartName       string
-	deleteAfterValidation     bool
+	name                     string
+	originalPayload          []byte
+	inlineEditedPayload      []byte
+	manualFuzzTagPayload     []byte
+	replacementPayload       []byte
+	localReplacementFilename string
+	localReplacementType     string
+	sentPayload              []byte
+	contentType              string
+	multipart                bool
+	uploadFilename           string
+	uploadContentType        string
+	forwardOriginal          bool
+	dropRequest              bool
+	hijackResponse           bool
+	wantHijackTag            string
+	wantHijackRaw            bool
+	wantResourceFlow         bool
+	wantCurrentRaw           bool
+	wantBareResource         bool
+	wantHijackFileFields     []string
+	wantCurrentFileFields    []string
+	wantBareFileFields       []string
+	wantBareFileTags         int
+	wantManualEditTag        bool
+	wantRenderedUserFuzzTag  bool
+	wantCurrentBinaryExports bool
+	wantBareBinaryExports    bool
+	extraMultipartParts      []mitmV2OutcomeMultipartPart
+	replacementPartName      string
+	deleteAfterValidation    bool
 }
 
 type mitmV2OutcomeMultipartPart struct {
@@ -143,6 +145,50 @@ func mitmV2FileTagPaths(packet []byte) []string {
 		paths = append(paths, string(match[1]))
 	}
 	return paths
+}
+
+type mitmV2MultipartFileTagPart struct {
+	physicalIndex int32
+	fieldName     string
+	path          string
+}
+
+func mitmV2MultipartFileTagParts(t *testing.T, packet []byte) []mitmV2MultipartFileTagPart {
+	t.Helper()
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	mediaType, params, err := mime.ParseMediaType(lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type"))
+	require.NoError(t, err)
+	require.Equal(t, "multipart/form-data", mediaType)
+	reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	var tagged []mitmV2MultipartFileTagPart
+	for physicalIndex := int32(0); ; physicalIndex++ {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		partBody, err := io.ReadAll(part)
+		require.NoError(t, err)
+		matches := mitmV2FileTagPattern.FindAllSubmatch(partBody, -1)
+		for _, match := range matches {
+			tagged = append(tagged, mitmV2MultipartFileTagPart{
+				physicalIndex: physicalIndex,
+				fieldName:     part.FormName(),
+				path:          string(match[1]),
+			})
+		}
+	}
+	return tagged
+}
+
+func mitmV2MultipartFileTagFields(t *testing.T, packet []byte) []string {
+	t.Helper()
+	parts := mitmV2MultipartFileTagParts(t, packet)
+	var fields []string
+	for _, part := range parts {
+		fields = append(fields, part.fieldName)
+	}
+	return fields
 }
 
 func mitmV2FileTagPartIndex(t *testing.T, packet []byte) int32 {
@@ -252,7 +298,11 @@ func requireMITMV2OutcomeMultipartParts(
 	}
 }
 
-func expectedMITMV2OutcomeFileParts(tc mitmV2RequestOutcomeCase, original bool) []mitmV2OutcomeMultipartPart {
+func expectedMITMV2OutcomeFileParts(
+	tc mitmV2RequestOutcomeCase,
+	original bool,
+	selectedFields []string,
+) []mitmV2OutcomeMultipartPart {
 	if !tc.multipart {
 		payload := tc.sentPayload
 		if original {
@@ -260,13 +310,51 @@ func expectedMITMV2OutcomeFileParts(tc mitmV2RequestOutcomeCase, original bool) 
 		}
 		return []mitmV2OutcomeMultipartPart{{originalPayload: tc.originalPayload, sentPayload: payload}}
 	}
+	selected := make(map[string]struct{}, len(selectedFields))
+	for _, fieldName := range selectedFields {
+		selected[fieldName] = struct{}{}
+	}
 	var files []mitmV2OutcomeMultipartPart
 	for _, part := range expectedMITMV2OutcomeMultipartParts(tc, original) {
-		if part.filename != "" {
+		if _, ok := selected[part.fieldName]; ok {
 			files = append(files, part)
 		}
 	}
 	return files
+}
+
+func requireMITMV2OutcomeMultipartFileTags(
+	t *testing.T,
+	packet []byte,
+	tc mitmV2RequestOutcomeCase,
+	original bool,
+	wantFields []string,
+	label string,
+) []mitmV2MultipartFileTagPart {
+	t.Helper()
+	tagged := mitmV2MultipartFileTagParts(t, packet)
+	require.Len(t, tagged, len(wantFields), "%s resource count", label)
+	expectedParts := expectedMITMV2OutcomeMultipartParts(tc, original)
+	for ordinal, wantField := range wantFields {
+		require.Equal(t, wantField, tagged[ordinal].fieldName, "%s resource field order", label)
+		expectedIndex := -1
+		for physicalIndex, expectedPart := range expectedParts {
+			if expectedPart.fieldName == wantField {
+				expectedIndex = physicalIndex
+				break
+			}
+		}
+		require.NotEqual(t, -1, expectedIndex, "%s unknown resource field %q", label, wantField)
+		if expectedIndex < 0 {
+			continue
+		}
+		require.Equal(t, int32(expectedIndex), tagged[ordinal].physicalIndex, "%s physical part index", label)
+		require.FileExists(t, tagged[ordinal].path)
+		storedPart, err := os.ReadFile(tagged[ordinal].path)
+		require.NoError(t, err)
+		require.Equal(t, expectedParts[expectedIndex].sentPayload, storedPart, "%s resource bytes for %q", label, wantField)
+	}
+	return tagged
 }
 
 func extractMITMV2OutcomePayload(t *testing.T, captured mitmV2CapturedRequest, multipartPayload bool) []byte {
@@ -467,21 +555,24 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		},
 		{
 			// Physical part indexes include ordinary fields. This packet is:
-			// 0=note, 1=ZIP, 2=description, 3=PDF. Only part 3 is replaced;
-			// both real files remain independently represented and replayable.
-			name:                      "multipart-two-real-files-replace-second",
-			originalPayload:           zipOriginal,
-			sentPayload:               zipOriginal,
-			multipart:                 true,
-			uploadFilename:            "archive.zip",
-			uploadContentType:         "application/zip",
-			replacementPayload:        pdfReplacement,
-			replacementPartName:       "attachment",
-			wantHijackTag:             "{{file(",
-			wantResourceFlow:          true,
-			wantCurrentMultipartFiles: 2,
-			wantBareFileTags:          2,
-			deleteAfterValidation:     true,
+			// 0=note, 1=ZIP, 2=description, 3=PDF. The PDF's editor form is
+			// over D, so only part 3 is externalized; the ZIP remains an inline
+			// unquote part. Only part 3 is replaced, and both files must remain
+			// independently represented and replayable across every layer.
+			name:                  "multipart-two-real-files-replace-second",
+			originalPayload:       zipOriginal,
+			sentPayload:           zipOriginal,
+			multipart:             true,
+			uploadFilename:        "archive.zip",
+			uploadContentType:     "application/zip",
+			replacementPayload:    pdfReplacement,
+			replacementPartName:   "attachment",
+			wantHijackTag:         "{{file(",
+			wantResourceFlow:      true,
+			wantHijackFileFields:  []string{"attachment"},
+			wantCurrentFileFields: []string{"attachment"},
+			wantBareFileFields:    []string{"attachment"},
+			deleteAfterValidation: true,
 			extraMultipartParts: []mitmV2OutcomeMultipartPart{
 				{fieldName: "description", originalPayload: []byte("keep-this-field")},
 				{
@@ -602,17 +693,18 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			wantResourceFlow: true,
 		},
 		{
-			name:                      "multipart-file-replace",
-			originalPayload:           pdfOriginal,
-			replacementPayload:        pdfReplacement,
-			sentPayload:               pdfReplacement,
-			multipart:                 true,
-			uploadFilename:            "report.pdf",
-			uploadContentType:         "application/pdf",
-			wantHijackTag:             "{{file(",
-			wantResourceFlow:          true,
-			wantCurrentMultipartFiles: 1,
-			wantBareFileTags:          1,
+			name:                  "multipart-file-replace",
+			originalPayload:       pdfOriginal,
+			replacementPayload:    pdfReplacement,
+			sentPayload:           pdfReplacement,
+			multipart:             true,
+			uploadFilename:        "report.pdf",
+			uploadContentType:     "application/pdf",
+			wantHijackTag:         "{{file(",
+			wantResourceFlow:      true,
+			wantHijackFileFields:  []string{"upload"},
+			wantCurrentFileFields: []string{"upload"},
+			wantBareFileFields:    []string{"upload"},
 		},
 		{
 			// This is the bounded CI analogue of a user intercepting a PDF below
@@ -633,7 +725,8 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			wantHijackTag:            "{{file(",
 			wantCurrentRaw:           true,
 			wantBareResource:         true,
-			wantBareFileTags:         1,
+			wantHijackFileFields:     []string{"upload"},
+			wantBareFileFields:       []string{"upload"},
 			wantManualEditTag:        true,
 		},
 	}
@@ -756,6 +849,22 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		if tc == nil {
 			return
 		}
+		if tc.multipart {
+			require.Equal(t, tc.wantHijackFileFields, mitmV2MultipartFileTagFields(t, task.GetRequest()),
+				"MITM editor must externalize exactly the selected multipart parts for %s", tc.name)
+			requireMITMV2OutcomeMultipartFileTags(
+				t, task.GetRequest(), *tc, true, tc.wantHijackFileFields, tc.name+" hijack request",
+			)
+			rendered, err := renderMITMSubmittedRequest(task.GetRequest())
+			require.NoError(t, err)
+			_, renderedBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rendered)
+			require.Equal(t, strconv.Itoa(len(renderedBody)), lowhttp.GetHTTPPacketHeader(rendered, "Content-Length"),
+				"rendered MITM request Content-Length for %s", tc.name)
+			requireMITMV2OutcomeMultipartParts(t, mitmV2CapturedRequest{
+				body:        renderedBody,
+				contentType: lowhttp.GetHTTPPacketHeader(rendered, "Content-Type"),
+			}, expectedMITMV2OutcomeMultipartParts(*tc, true), tc.name+" rendered hijack request")
+		}
 		if tc.wantHijackTag != "" {
 			require.Contains(t, string(task.GetRequest()), tc.wantHijackTag, "MITM editor representation for %s", tc.name)
 		}
@@ -774,14 +883,17 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			}
 		}
 		if strings.Contains(tc.wantHijackTag, "file") {
-			require.Less(t, len(task.GetRequest()), 8*1024, "resource-backed hijack packets must stay editor-safe")
+			require.True(t, utf8.Valid(task.GetRequest()), "resource-backed hijack packets must be editor-safe UTF-8")
+			_, editorBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(task.GetRequest())
+			require.LessOrEqual(t, len(editorBody), yakit.GetMaxHTTPFlowRequestBodyInDBBytes(),
+				"resource-backed hijack body must obey D when its multipart skeleton fits")
 		}
 		if strings.Contains(tc.wantHijackTag, "file") && tc.replacementPayload != nil {
 			// Frontend contract at the manual-hijack boundary: Monaco receives a
 			// bounded UTF-8 packet containing the standard file tag. Multipart
 			// headers retain the user-facing filename/type, while the part index
 			// used by the replacement RPC is derived from the multipart structure.
-			// Original file bytes never enter renderer text.
+			// Externalized part bytes never enter renderer text.
 			require.True(t, utf8.Valid(task.GetRequest()))
 			paths := mitmV2FileTagPaths(task.GetRequest())
 			require.NotEmpty(t, paths)
@@ -790,9 +902,6 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 				require.Contains(t, string(task.GetRequest()), `filename="`+tc.uploadFilename+`"`)
 				require.Contains(t, string(task.GetRequest()), "Content-Type: "+tc.uploadContentType)
 				require.False(t, bytes.Contains(task.GetRequest(), tc.originalPayload[:len("%PDF-1.7\n")]))
-				info, err := os.Stat(paths[0])
-				require.NoError(t, err)
-				require.Equal(t, int64(len(tc.originalPayload)), info.Size())
 			}
 			partIndex := int32(0)
 			if tc.multipart {
@@ -903,12 +1012,12 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		}
 		require.Equal(t, tc.wantResourceFlow, mitmV2FileTagPattern.Match(currentRequest))
 		require.Equal(t, tc.wantResourceFlow, flow.GetIsTooLargeRequest())
-		require.Len(t, flow.GetMultipartFiles(), tc.wantCurrentMultipartFiles,
+		require.Len(t, flow.GetMultipartFiles(), len(tc.wantCurrentFileFields),
 			"History list query must expose the multipart manifest contract for %s", tc.name)
 		if tc.multipart {
 			detail, err := client.GetHTTPFlowById(utils.TimeoutContextSeconds(5), &ypb.GetHTTPFlowByIdRequest{Id: int64(flow.GetId())})
 			require.NoError(t, err)
-			require.Len(t, detail.GetMultipartFiles(), tc.wantCurrentMultipartFiles,
+			require.Len(t, detail.GetMultipartFiles(), len(tc.wantCurrentFileFields),
 				"History detail query is the frontend's authoritative multipart metadata for %s", tc.name)
 			detailRequest := detail.GetRequest()
 			if detail.GetSafeHTTPRequest() != "" {
@@ -916,26 +1025,17 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			}
 			require.Equal(t, currentRequest, detailRequest,
 				"History list and detail queries must expose the same editor packet for %s", tc.name)
-			if tc.wantCurrentMultipartFiles > 0 {
-				expectedFiles := expectedMITMV2OutcomeFileParts(tc, false)
-				require.Len(t, expectedFiles, tc.wantCurrentMultipartFiles)
-				fileOrdinal := 0
-				for physicalIndex, expectedPart := range expectedMITMV2OutcomeMultipartParts(tc, false) {
-					if expectedPart.filename == "" {
-						continue
-					}
-					fileInfo := detail.GetMultipartFiles()[fileOrdinal]
-					fileOrdinal++
-					require.Equal(t, int32(physicalIndex), fileInfo.GetPartIndex())
-					require.Equal(t, expectedPart.filename, fileInfo.GetFilename())
-					require.Equal(t, expectedPart.contentType, fileInfo.GetContentType())
-					require.Equal(t, int64(len(expectedPart.sentPayload)), fileInfo.GetSize())
-					require.FileExists(t, fileInfo.GetFilePath())
-					storedPart, err := os.ReadFile(fileInfo.GetFilePath())
-					require.NoError(t, err)
-					require.Equal(t, expectedPart.sentPayload, storedPart, "frontend metadata must point at the actual wire part")
-					require.Contains(t, mitmV2FileTagPaths(currentRequest), fileInfo.GetFilePath())
-				}
+			taggedCurrent := requireMITMV2OutcomeMultipartFileTags(
+				t, currentRequest, tc, false, tc.wantCurrentFileFields, tc.name+" current History request",
+			)
+			for fileOrdinal, taggedPart := range taggedCurrent {
+				expectedPart := expectedMITMV2OutcomeMultipartParts(tc, false)[taggedPart.physicalIndex]
+				fileInfo := detail.GetMultipartFiles()[fileOrdinal]
+				require.Equal(t, taggedPart.physicalIndex, fileInfo.GetPartIndex())
+				require.Equal(t, expectedPart.filename, fileInfo.GetFilename())
+				require.Equal(t, expectedPart.contentType, fileInfo.GetContentType())
+				require.Equal(t, int64(len(expectedPart.sentPayload)), fileInfo.GetSize())
+				require.Equal(t, taggedPart.path, fileInfo.GetFilePath())
 			}
 		}
 		if tc.wantCurrentRaw {
@@ -994,17 +1094,31 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			receivedMu.Lock()
 			webFuzzerReplay := received[token+"/webfuzzer-replaced"]
 			receivedMu.Unlock()
-			require.Equal(t, webFuzzerReplacement, extractMITMV2OutcomePayload(t, webFuzzerReplay, tc.multipart))
+			wantWebFuzzerUpload := webFuzzerReplacement
+			if tc.multipart {
+				wantWebFuzzerUpload = tc.sentPayload
+				for _, fieldName := range tc.wantCurrentFileFields {
+					if fieldName == "upload" {
+						wantWebFuzzerUpload = webFuzzerReplacement
+						break
+					}
+				}
+			}
+			require.Equal(t, wantWebFuzzerUpload, extractMITMV2OutcomePayload(t, webFuzzerReplay, tc.multipart))
 			if len(tc.extraMultipartParts) > 0 {
 				parts := extractMITMV2OutcomeMultipartParts(t, webFuzzerReplay)
+				replacedFields := make(map[string]struct{}, len(tc.wantCurrentFileFields))
+				for _, fieldName := range tc.wantCurrentFileFields {
+					replacedFields[fieldName] = struct{}{}
+				}
 				for _, expectedPart := range expectedMITMV2OutcomeMultipartParts(tc, false) {
 					got := parts[expectedPart.fieldName]
-					if expectedPart.filename != "" {
+					if _, replaced := replacedFields[expectedPart.fieldName]; replaced {
 						require.Equal(t, webFuzzerReplacement, got.sentPayload,
-							"WebFuzzer path replacement must affect file part %q", expectedPart.fieldName)
+							"WebFuzzer path replacement must affect externalized part %q", expectedPart.fieldName)
 					} else {
 						require.Equal(t, expectedPart.sentPayload, got.sentPayload,
-							"WebFuzzer path replacement must preserve ordinary part %q", expectedPart.fieldName)
+							"WebFuzzer path replacement must preserve inline part %q", expectedPart.fieldName)
 					}
 				}
 			}
@@ -1032,9 +1146,18 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 					}
 				}
 			}
-			require.Len(t, barePaths, tc.wantBareFileTags,
-				"BareRequest must use the expected original multipart representation for %s", tc.name)
-			expectedBareFiles := expectedMITMV2OutcomeFileParts(tc, true)
+			wantBareFileTags := tc.wantBareFileTags
+			if tc.multipart {
+				wantBareFileTags = len(tc.wantBareFileFields)
+				require.Equal(t, tc.wantBareFileFields, mitmV2MultipartFileTagFields(t, bare.GetData()),
+					"BareRequest must externalize exactly the selected original multipart parts for %s", tc.name)
+				requireMITMV2OutcomeMultipartFileTags(
+					t, bare.GetData(), tc, true, tc.wantBareFileFields, tc.name+" original BareRequest",
+				)
+			}
+			require.Len(t, barePaths, wantBareFileTags,
+				"BareRequest must use the expected original representation for %s", tc.name)
+			expectedBareFiles := expectedMITMV2OutcomeFileParts(tc, true, tc.wantBareFileFields)
 			unmatchedBareFiles := append([]mitmV2OutcomeMultipartPart(nil), expectedBareFiles...)
 			for _, path := range barePaths {
 				require.FileExists(t, path)
@@ -1053,7 +1176,7 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 				}
 			}
 			if len(barePaths) > 0 {
-				require.Empty(t, unmatchedBareFiles, "every original file part must own exactly one BareRequest resource")
+				require.Empty(t, unmatchedBareFiles, "every externalized original part must own exactly one BareRequest resource")
 			}
 			if tc.wantBareBinaryExports {
 				requireMITMV2OutcomeBinaryExportContract(t, bare.GetData(), tc.originalPayload, tc.multipart, tc.name+" original request")
