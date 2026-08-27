@@ -53290,6 +53290,7 @@ type BatchSetHTTPFlowIssueFieldsRequest struct {
 	Ids []int64 `protobuf:"varint,6,rep,packed,name=Ids,proto3" json:"Ids,omitempty"`
 	// 按 Hash 批量更新
 	Hashes        []string `protobuf:"bytes,7,rep,name=Hashes,proto3" json:"Hashes,omitempty"`
+	Token         string   `protobuf:"bytes,8,opt,name=Token,proto3" json:"Token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53371,6 +53372,13 @@ func (x *BatchSetHTTPFlowIssueFieldsRequest) GetHashes() []string {
 		return x.Hashes
 	}
 	return nil
+}
+
+func (x *BatchSetHTTPFlowIssueFieldsRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
 }
 
 type BatchSetHTTPFlowIssueFieldsResponse struct {
@@ -83121,7 +83129,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\"K\n" +
 	"\x1bHTTPFlowsFromOnlineProgress\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x10\n" +
-	"\x03Log\x18\x02 \x01(\tR\x03Log\"\xf7\x01\n" +
+	"\x03Log\x18\x02 \x01(\tR\x03Log\"\x8d\x02\n" +
 	"\"BatchSetHTTPFlowIssueFieldsRequest\x121\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x19.ypb.QueryHTTPFlowRequestR\x06Filter\x12\x1c\n" +
 	"\tIssueType\x18\x02 \x01(\tR\tIssueType\x12\x1a\n" +
@@ -83129,7 +83137,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Status\x18\x04 \x01(\tR\x06Status\x12\"\n" +
 	"\fStatusReason\x18\x05 \x01(\tR\fStatusReason\x12\x10\n" +
 	"\x03Ids\x18\x06 \x03(\x03R\x03Ids\x12\x16\n" +
-	"\x06Hashes\x18\a \x03(\tR\x06Hashes\"I\n" +
+	"\x06Hashes\x18\a \x03(\tR\x06Hashes\x12\x14\n" +
+	"\x05Token\x18\b \x01(\tR\x05Token\"I\n" +
 	"#BatchSetHTTPFlowIssueFieldsResponse\x12\"\n" +
 	"\fUpdatedCount\x18\x01 \x01(\x03R\fUpdatedCount\"\x8f\x02\n" +
 	"\x16AnalyzeHTTPFlowRequest\x12\"\n" +
