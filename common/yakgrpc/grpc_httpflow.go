@@ -1004,7 +1004,6 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 	if len(updates) == 0 {
 		return nil, utils.Errorf("all issue fields are empty")
 	}
-	updates["upload_online"] = false
 
 	db := s.GetProjectDatabase().Model(&schema.HTTPFlow{})
 
