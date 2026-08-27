@@ -378,8 +378,26 @@ func (s *Server) UnIgnoreYakScript(ctx context.Context, req *ypb.DeleteYakScript
 func (s *Server) DeleteYakScript(ctx context.Context, req *ypb.DeleteYakScriptRequest) (*ypb.Empty, error) {
 	ids := append(req.GetIds(), req.GetId())
 	db := s.GetProfileDatabase()
-	db = db.Where("is_core_plugin = ?", false)
-	if err := yakit.DeleteYakScriptByIDs(db, ids...); err != nil {
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var scripts []*schema.YakScript
+		query := bizhelper.ExactQueryInt64ArrayOr(
+			tx.Model(&schema.YakScript{}).Where("is_core_plugin = ?", false),
+			"id",
+			ids,
+		)
+		if result := query.Find(&scripts); result.Error != nil {
+			return result.Error
+		}
+		pluginUUIDs := make([]string, 0, len(scripts))
+		for _, script := range scripts {
+			pluginUUIDs = append(pluginUUIDs, script.Uuid)
+		}
+		if err := yakit.DisableContextMenuBindingsByPluginUUIDs(tx, pluginUUIDs...); err != nil {
+			return err
+		}
+		return yakit.DeleteYakScriptByIDs(tx.Where("is_core_plugin = ?", false), ids...)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &ypb.Empty{}, nil

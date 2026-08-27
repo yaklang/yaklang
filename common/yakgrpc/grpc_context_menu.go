@@ -83,13 +83,27 @@ func (s *Server) QueryContextMenuActions(ctx context.Context, req *ypb.QueryCont
 	}
 	response.EnabledCustomPluginCount = int64(len(enabledCustomPlugins))
 	sort.SliceStable(response.Actions, func(i, j int) bool {
-		if response.Actions[i].Sort != response.Actions[j].Sort {
-			return response.Actions[i].Sort < response.Actions[j].Sort
+		left := response.Actions[i]
+		right := response.Actions[j]
+		// 管理页的“可添加插件”保留服务端顺序：刚创建或编辑的插件优先。
+		// 已启用 action 的顺序仍由 binding.Sort 决定。
+		if left.Enabled != right.Enabled {
+			return left.Enabled
 		}
-		if response.Actions[i].PluginName != response.Actions[j].PluginName {
-			return response.Actions[i].PluginName < response.Actions[j].PluginName
+		if !left.Enabled && !right.Enabled {
+			leftScript := scriptByUUID[left.PluginUUID]
+			rightScript := scriptByUUID[right.PluginUUID]
+			if leftScript != nil && rightScript != nil && !leftScript.UpdatedAt.Equal(rightScript.UpdatedAt) {
+				return leftScript.UpdatedAt.After(rightScript.UpdatedAt)
+			}
 		}
-		return response.Actions[i].ActionID < response.Actions[j].ActionID
+		if left.Sort != right.Sort {
+			return left.Sort < right.Sort
+		}
+		if left.PluginName != right.PluginName {
+			return left.PluginName < right.PluginName
+		}
+		return left.ActionID < right.ActionID
 	})
 	return response, nil
 }
@@ -142,7 +156,7 @@ func (s *Server) ExecuteContextMenuAction(req *ypb.ExecuteContextMenuActionReque
 		return utils.Errorf("plugin %s does not implement action %s", script.ScriptName, actionID)
 	}
 
-	binding, bindingErr := yakit.GetContextMenuBinding(s.GetProfileDatabase(), script.Uuid, actionID)
+	binding, bindingErr := yakit.GetEffectiveContextMenuBinding(s.GetProfileDatabase(), script.Uuid, actionID)
 	if !script.IsCorePlugin && (bindingErr != nil || !binding.Enabled) {
 		return utils.Errorf("context-menu action %s/%s is not enabled", script.Uuid, actionID)
 	}

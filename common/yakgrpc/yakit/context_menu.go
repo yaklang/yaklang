@@ -137,7 +137,124 @@ func QueryEffectiveContextMenuBindings(db *gorm.DB, scene string) ([]*schema.Con
 		bindings = append(bindings, binding)
 	}
 	sortContextMenuBindings(bindings)
-	return bindings, nil
+	return limitEffectiveContextMenuBindings(db, bindings)
+}
+
+// GetEffectiveContextMenuBinding returns the binding after applying scene quota
+// rules. An explicit Enabled=true row is not necessarily effective when stale
+// plugin state would otherwise make the scene exceed its hard limit.
+func GetEffectiveContextMenuBinding(db *gorm.DB, pluginUUID, actionID string) (*schema.ContextMenuBinding, error) {
+	scene, ok := contextmenu.SceneForAction(actionID)
+	if !ok {
+		return nil, utils.Errorf("unknown context-menu scene for action: %s", actionID)
+	}
+	bindings, err := QueryEffectiveContextMenuBindings(db, scene)
+	if err != nil {
+		return nil, err
+	}
+	key := contextMenuBindingKey(pluginUUID, actionID)
+	for _, binding := range bindings {
+		if contextMenuBindingKey(binding.PluginUUID, binding.ActionID) == key {
+			return binding, nil
+		}
+	}
+	return nil, utils.Errorf("effective context-menu binding not found: %s/%s", pluginUUID, actionID)
+}
+
+// DisableContextMenuBindingsByPluginUUIDs prevents a removed plugin from
+// silently returning to the menu when a later download recreates the same UUID.
+// Keep the rows as explicit disabled overrides so legacy CODEC defaults do not
+// automatically enable the plugin again.
+func DisableContextMenuBindingsByPluginUUIDs(db *gorm.DB, pluginUUIDs ...string) error {
+	seen := make(map[string]struct{}, len(pluginUUIDs))
+	uuids := make([]string, 0, len(pluginUUIDs))
+	for _, pluginUUID := range pluginUUIDs {
+		pluginUUID = strings.TrimSpace(pluginUUID)
+		if pluginUUID == "" {
+			continue
+		}
+		if _, exists := seen[pluginUUID]; exists {
+			continue
+		}
+		seen[pluginUUID] = struct{}{}
+		uuids = append(uuids, pluginUUID)
+	}
+	if len(uuids) == 0 {
+		return nil
+	}
+	result := db.Model(&schema.ContextMenuBinding{}).
+		Where("plugin_uuid IN (?)", uuids).
+		UpdateColumns(map[string]any{
+			"enabled":  false,
+			"shortcut": "",
+		})
+	if result.Error != nil {
+		return utils.Errorf("disable removed context-menu plugin bindings failed: %s", result.Error)
+	}
+	return nil
+}
+
+func limitEffectiveContextMenuBindings(db *gorm.DB, bindings []*schema.ContextMenuBinding) ([]*schema.ContextMenuBinding, error) {
+	pluginUUIDs := make([]string, 0, len(bindings))
+	seenUUIDs := make(map[string]struct{}, len(bindings))
+	for _, binding := range bindings {
+		if !binding.Enabled {
+			continue
+		}
+		pluginUUID := strings.TrimSpace(binding.PluginUUID)
+		if pluginUUID == "" {
+			continue
+		}
+		if _, exists := seenUUIDs[pluginUUID]; exists {
+			continue
+		}
+		seenUUIDs[pluginUUID] = struct{}{}
+		pluginUUIDs = append(pluginUUIDs, pluginUUID)
+	}
+
+	scriptByUUID := make(map[string]*schema.YakScript, len(pluginUUIDs))
+	if len(pluginUUIDs) > 0 {
+		var scripts []*schema.YakScript
+		if result := db.Model(&schema.YakScript{}).Where("uuid IN (?)", pluginUUIDs).Find(&scripts); result.Error != nil {
+			return nil, utils.Errorf("query context-menu plugins for scene limit failed: %s", result.Error)
+		}
+		for _, script := range scripts {
+			scriptByUUID[script.Uuid] = script
+		}
+	}
+
+	selectedByScene := make(map[string]map[string]struct{})
+	limited := make([]*schema.ContextMenuBinding, len(bindings))
+	copy(limited, bindings)
+	for index, binding := range bindings {
+		if !binding.Enabled {
+			continue
+		}
+		bindingScene, ok := contextmenu.SceneForAction(binding.ActionID)
+		if !ok {
+			continue
+		}
+		script := scriptByUUID[binding.PluginUUID]
+		if script == nil || script.IsCorePlugin || !isContextMenuManagedScript(script, binding.ActionID) {
+			continue
+		}
+		selected := selectedByScene[bindingScene]
+		if selected == nil {
+			selected = make(map[string]struct{})
+			selectedByScene[bindingScene] = selected
+		}
+		if _, exists := selected[binding.PluginUUID]; exists {
+			continue
+		}
+		if len(selected) >= contextmenu.MaxCustomPluginsPerScene {
+			overflow := *binding
+			overflow.Enabled = false
+			limited[index] = &overflow
+			continue
+		}
+		selected[binding.PluginUUID] = struct{}{}
+	}
+	return limited, nil
 }
 
 func queryDefaultLegacyContextMenuBindings(
