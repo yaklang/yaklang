@@ -37,6 +37,13 @@ func isolateMITMTestSideEffects(t *testing.T) ypb.YakClient {
 	if err != nil {
 		t.Fatalf("create isolated MITM test server: %v", err)
 	}
+	// Keep the isolated database equivalent to a migrated user project. Some
+	// deletion paths query columns (for example websocket_hash) that are not
+	// needed by the basic MITM insert path and can otherwise be absent here,
+	// silently skipping cache/WebSocket cleanup coverage.
+	if err := server.projectDatabase.AutoMigrate(&schema.HTTPFlow{}).Error; err != nil {
+		t.Fatalf("migrate isolated HTTPFlow schema: %v", err)
+	}
 	consts.BindProjectDatabaseWithReader(server.projectDatabase, server.projectReadDatabase, projectPath)
 
 	listener := bufconn.Listen(128 * 1024 * 1024)

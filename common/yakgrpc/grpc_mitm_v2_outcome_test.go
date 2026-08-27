@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"mime"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/textproto"
 	"os"
@@ -45,6 +47,7 @@ type mitmV2RequestOutcomeCase struct {
 	uploadFilename            string
 	uploadContentType         string
 	forwardOriginal           bool
+	dropRequest               bool
 	hijackResponse            bool
 	wantHijackTag             string
 	wantHijackRaw             bool
@@ -55,6 +58,19 @@ type mitmV2RequestOutcomeCase struct {
 	wantBareFileTags          int
 	wantManualEditTag         bool
 	wantRenderedUserFuzzTag   bool
+	wantCurrentBinaryExports  bool
+	wantBareBinaryExports     bool
+	extraMultipartParts       []mitmV2OutcomeMultipartPart
+	replacementPartName       string
+	deleteAfterValidation     bool
+}
+
+type mitmV2OutcomeMultipartPart struct {
+	fieldName       string
+	filename        string
+	contentType     string
+	originalPayload []byte
+	sentPayload     []byte
 }
 
 func buildMITMV2OutcomePacket(t *testing.T, target, token string, tc mitmV2RequestOutcomeCase) []byte {
@@ -80,6 +96,21 @@ func buildMITMV2OutcomePacket(t *testing.T, target, token string, tc mitmV2Reque
 		require.NoError(t, err)
 		_, err = part.Write(tc.originalPayload)
 		require.NoError(t, err)
+		for _, extra := range tc.extraMultipartParts {
+			header := make(textproto.MIMEHeader)
+			disposition := fmt.Sprintf(`form-data; name="%s"`, extra.fieldName)
+			if extra.filename != "" {
+				disposition += fmt.Sprintf(`; filename="%s"`, extra.filename)
+			}
+			header.Set("Content-Disposition", disposition)
+			if extra.contentType != "" {
+				header.Set("Content-Type", extra.contentType)
+			}
+			extraWriter, createErr := writer.CreatePart(header)
+			require.NoError(t, createErr)
+			_, writeErr := extraWriter.Write(extra.originalPayload)
+			require.NoError(t, writeErr)
+		}
 		require.NoError(t, writer.Close())
 		body = buf.Bytes()
 		contentType = writer.FormDataContentType()
@@ -115,6 +146,10 @@ func mitmV2FileTagPaths(packet []byte) []string {
 }
 
 func mitmV2FileTagPartIndex(t *testing.T, packet []byte) int32 {
+	return mitmV2FileTagPartIndexForField(t, packet, "")
+}
+
+func mitmV2FileTagPartIndexForField(t *testing.T, packet []byte, fieldName string) int32 {
 	t.Helper()
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 	_, params, err := mime.ParseMediaType(lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type"))
@@ -128,12 +163,110 @@ func mitmV2FileTagPartIndex(t *testing.T, packet []byte) int32 {
 		require.NoError(t, err)
 		partBody, err := io.ReadAll(part)
 		require.NoError(t, err)
-		if mitmV2FileTagPattern.Match(partBody) {
+		if mitmV2FileTagPattern.Match(partBody) && (fieldName == "" || part.FormName() == fieldName) {
 			return index
 		}
 	}
 	t.Fatal("multipart file tag part not found")
 	return -1
+}
+
+func extractMITMV2OutcomeMultipartParts(t *testing.T, captured mitmV2CapturedRequest) map[string]mitmV2OutcomeMultipartPart {
+	t.Helper()
+	mediaType, params, err := mime.ParseMediaType(captured.contentType)
+	require.NoError(t, err)
+	require.Equal(t, "multipart/form-data", mediaType)
+	reader := multipart.NewReader(bytes.NewReader(captured.body), params["boundary"])
+	parts := make(map[string]mitmV2OutcomeMultipartPart)
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		body, err := io.ReadAll(part)
+		require.NoError(t, err)
+		parts[part.FormName()] = mitmV2OutcomeMultipartPart{
+			fieldName:       part.FormName(),
+			filename:        part.FileName(),
+			contentType:     part.Header.Get("Content-Type"),
+			originalPayload: body,
+			sentPayload:     body,
+		}
+	}
+	return parts
+}
+
+func expectedMITMV2OutcomeMultipartParts(tc mitmV2RequestOutcomeCase, original bool) []mitmV2OutcomeMultipartPart {
+	if !tc.multipart {
+		return nil
+	}
+	filename := tc.uploadFilename
+	if filename == "" {
+		filename = "sample.bin"
+	}
+	contentType := tc.uploadContentType
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	parts := []mitmV2OutcomeMultipartPart{
+		{fieldName: "note", originalPayload: []byte("editable"), sentPayload: []byte("editable")},
+		{
+			fieldName:       "upload",
+			filename:        filename,
+			contentType:     contentType,
+			originalPayload: tc.originalPayload,
+			sentPayload:     tc.sentPayload,
+		},
+	}
+	for _, extra := range tc.extraMultipartParts {
+		copy := extra
+		if copy.sentPayload == nil {
+			copy.sentPayload = copy.originalPayload
+		}
+		parts = append(parts, copy)
+	}
+	if original {
+		for index := range parts {
+			parts[index].sentPayload = parts[index].originalPayload
+		}
+	}
+	return parts
+}
+
+func requireMITMV2OutcomeMultipartParts(
+	t *testing.T,
+	captured mitmV2CapturedRequest,
+	expected []mitmV2OutcomeMultipartPart,
+	label string,
+) {
+	t.Helper()
+	actual := extractMITMV2OutcomeMultipartParts(t, captured)
+	require.Len(t, actual, len(expected), "%s part count", label)
+	for _, want := range expected {
+		got, ok := actual[want.fieldName]
+		require.True(t, ok, "%s missing part %q", label, want.fieldName)
+		require.Equal(t, want.filename, got.filename, "%s filename for %q", label, want.fieldName)
+		require.Equal(t, want.contentType, got.contentType, "%s content type for %q", label, want.fieldName)
+		require.Equal(t, want.sentPayload, got.sentPayload, "%s bytes for %q", label, want.fieldName)
+	}
+}
+
+func expectedMITMV2OutcomeFileParts(tc mitmV2RequestOutcomeCase, original bool) []mitmV2OutcomeMultipartPart {
+	if !tc.multipart {
+		payload := tc.sentPayload
+		if original {
+			payload = tc.originalPayload
+		}
+		return []mitmV2OutcomeMultipartPart{{originalPayload: tc.originalPayload, sentPayload: payload}}
+	}
+	var files []mitmV2OutcomeMultipartPart
+	for _, part := range expectedMITMV2OutcomeMultipartParts(tc, original) {
+		if part.filename != "" {
+			files = append(files, part)
+		}
+	}
+	return files
 }
 
 func extractMITMV2OutcomePayload(t *testing.T, captured mitmV2CapturedRequest, multipartPayload bool) []byte {
@@ -186,8 +319,11 @@ func extractMITMV2OutcomeMultipartFileMetadata(t *testing.T, captured mitmV2Capt
 // and writes the edited bytes back as one {{unquote(...)}} part. Keeping this
 // transformation in the integration test is important: merely editing an HTTP
 // header does not prove that SendPacket expands the edited binary tag.
-func replaceMITMV2OutcomeInlineUpload(t *testing.T, packet, editedPayload []byte) []byte {
+func replaceMITMV2OutcomeInlinePayload(t *testing.T, packet, editedPayload []byte, multipartPacket bool) []byte {
 	t.Helper()
+	if !multipartPacket {
+		return lowhttp.ReplaceHTTPPacketBody(packet, []byte(lowhttp.ToUnquoteFuzzTagForce(editedPayload)), false)
+	}
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 	mediaType, params, err := mime.ParseMediaType(lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type"))
 	require.NoError(t, err)
@@ -221,6 +357,33 @@ func replaceMITMV2OutcomeInlineUpload(t *testing.T, packet, editedPayload []byte
 	return lowhttp.ReplaceHTTPPacketBody([]byte(header), rebuilt.Bytes(), false)
 }
 
+// requireMITMV2OutcomeBinaryExportContract models the data boundary used by
+// History's Binary chip. The packet exposed to the renderer must be UTF-8-safe
+// Fuzztag text, while rendering that text ("导出原始数据") must recover the
+// exact file bytes. Keeping literal backticks out also makes "导出带FuzzTag的
+// 数据" safe to embed in the common fuzz.Strings(`...`) workflow.
+func requireMITMV2OutcomeBinaryExportContract(
+	t *testing.T,
+	packet []byte,
+	wantPayload []byte,
+	multipartPacket bool,
+	label string,
+) {
+	t.Helper()
+	require.True(t, utf8.Valid(packet), "%s History packet must be safe editor text", label)
+	require.Contains(t, string(packet), "{{unquote(", "%s must expose a Binary chip", label)
+	require.NotContains(t, string(packet), "`", "%s Fuzztag export must be Yak raw-string safe", label)
+
+	rendered, err := renderMITMSubmittedRequest(packet)
+	require.NoError(t, err)
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rendered)
+	actual := extractMITMV2OutcomePayload(t, mitmV2CapturedRequest{
+		body:        body,
+		contentType: lowhttp.GetHTTPPacketHeader(rendered, "Content-Type"),
+	}, multipartPacket)
+	require.Equal(t, wantPayload, actual, "%s raw export must recover the exact source bytes", label)
+}
+
 func replayMITMV2OutcomeRequest(t *testing.T, client ypb.YakClient, request []byte, replayKind string) {
 	t.Helper()
 	request = lowhttp.ReplaceHTTPPacketHeader(request, "X-Outcome-Replay", replayKind)
@@ -249,22 +412,34 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 	consts.SetGlobalMaxContentLength(512 * 1024)
 	t.Cleanup(func() { consts.SetGlobalMaxContentLength(previousLimit) })
 
-	// Keep this at the same scale as the redis-poc ZIP that exposed the
-	// editor-save regression. A tiny tag would not catch size-dependent parser
-	// or submission behavior along the real MITMv2 stream.
-	zipOriginal := make([]byte, 47_213)
-	// A real ZIP is not a uniform high-byte blob: redis-poc-main.zip contains
-	// hundreds of printable (){} bytes. Those bytes are also Fuzztag parser
-	// delimiters and exposed the renderer/backend quoting mismatch that the old
-	// all-0xa5 fixture could never exercise. Cycle through every byte value so
-	// this end-to-end case permanently covers parser-sensitive binary content.
-	for i := range zipOriginal {
-		zipOriginal[i] = byte((i*37 + 11) & 0xff)
-	}
-	copy(zipOriginal, []byte{'P', 'K', 0x03, 0x04})
+	// These checked-in files are structurally valid user documents, not merely
+	// repeated bytes with a magic prefix. Reading and validating them here keeps
+	// the cross-layer test representative of the ZIP/PDF/JPEG uploads that found
+	// bugs missed by earlier all-"a" and all-0xa5 fixtures.
+	zipOriginal := readMITMBinaryRepositoryFixture(t, "common", "aireducer", "testdata", "demo.txt.zip")
+	requireRealZIPFixture(t, zipOriginal)
 	zipHexEdited := bytes.Clone(zipOriginal)
 	for i := 0; i < 29; i++ {
 		zipHexEdited[i] = 0x11
+	}
+	pdfOriginal := readMITMBinaryRepositoryFixture(t, "vtestdata", "demo.pdf")
+	requireRealPDFFixture(t, pdfOriginal)
+	require.Greater(t, len(pdfOriginal), 256*1024)
+	pdfInline := readMITMBinaryRepositoryFixture(t, "vtestdata", "demo1.pdf")
+	requireRealPDFFixture(t, pdfInline)
+	pdfInlineEdited := bytes.Clone(pdfInline)
+	for i := 0; i < 16; i++ {
+		pdfInlineEdited[i] = 0x11
+	}
+	pdfReplacement := readMITMBinaryRepositoryFixture(t, "vtestdata", "zwb.pdf")
+	requireRealPDFFixture(t, pdfReplacement)
+	require.Greater(t, len(pdfReplacement), 512*1024)
+	require.NotEmpty(t, embedJPEG)
+	_, err := jpeg.DecodeConfig(bytes.NewReader(embedJPEG))
+	require.NoError(t, err)
+	jpegHexEdited := bytes.Clone(embedJPEG)
+	for i := 0; i < 16; i++ {
+		jpegHexEdited[i] = 0x11
 	}
 	readableTextReplacement := []byte("b'<!DOCTYPE html>\n<html lang=\"en-GB\">\n<title>Vulnerability: SQL Injection (Blind)</title>\n</html>'")
 	cases := []mitmV2RequestOutcomeCase{
@@ -278,11 +453,45 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			wantCurrentRaw:  true,
 		},
 		{
-			name:            "small-binary-edit",
-			originalPayload: []byte{0xff, 0x00, 'A'},
-			sentPayload:     []byte{0xff, 0x00, 'A'},
-			contentType:     "application/octet-stream",
-			wantHijackTag:   "{{unquote(",
+			// Non-multipart Binary-chip edit: the intercepted payload is a real
+			// JPEG, and the submitted body is a distinct HEX-edited byte sequence.
+			// This prevents a header-only edit from masquerading as binary coverage.
+			name:                     "small-binary-edit",
+			originalPayload:          embedJPEG,
+			inlineEditedPayload:      jpegHexEdited,
+			sentPayload:              jpegHexEdited,
+			contentType:              "image/jpeg",
+			wantHijackTag:            "{{unquote(",
+			wantCurrentBinaryExports: true,
+			wantBareBinaryExports:    true,
+		},
+		{
+			// Physical part indexes include ordinary fields. This packet is:
+			// 0=note, 1=ZIP, 2=description, 3=PDF. Only part 3 is replaced;
+			// both real files remain independently represented and replayable.
+			name:                      "multipart-two-real-files-replace-second",
+			originalPayload:           zipOriginal,
+			sentPayload:               zipOriginal,
+			multipart:                 true,
+			uploadFilename:            "archive.zip",
+			uploadContentType:         "application/zip",
+			replacementPayload:        pdfReplacement,
+			replacementPartName:       "attachment",
+			wantHijackTag:             "{{file(",
+			wantResourceFlow:          true,
+			wantCurrentMultipartFiles: 2,
+			wantBareFileTags:          2,
+			deleteAfterValidation:     true,
+			extraMultipartParts: []mitmV2OutcomeMultipartPart{
+				{fieldName: "description", originalPayload: []byte("keep-this-field")},
+				{
+					fieldName:       "attachment",
+					filename:        "report.pdf",
+					contentType:     "application/pdf",
+					originalPayload: pdfOriginal,
+					sentPayload:     pdfReplacement,
+				},
+			},
 		},
 		{
 			// A Fuzztag typed by the user is a send-time template, not History
@@ -320,14 +529,31 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			// unquote chip; the user overwrites its first HEX row with 0x11.
 			// The target, HTTPFlow replay, and History representation must all
 			// preserve bytes 0x11, never the four ASCII bytes "\\x11".
-			name:                "multipart-inline-zip-hex-edit",
-			originalPayload:     zipOriginal,
-			inlineEditedPayload: zipHexEdited,
-			sentPayload:         zipHexEdited,
-			multipart:           true,
-			uploadFilename:      "sample.zip",
-			uploadContentType:   "application/zip",
-			wantHijackTag:       "{{unquote(",
+			name:                     "multipart-inline-zip-hex-edit",
+			originalPayload:          zipOriginal,
+			inlineEditedPayload:      zipHexEdited,
+			sentPayload:              zipHexEdited,
+			multipart:                true,
+			uploadFilename:           "sample.zip",
+			uploadContentType:        "application/zip",
+			wantHijackTag:            "{{unquote(",
+			wantCurrentBinaryExports: true,
+			wantBareBinaryExports:    true,
+		},
+		{
+			// The real PDF export regression: both the HEX-edited current file
+			// and the captured original file stay below D after unquote expansion.
+			// History must expose two independent Binary-chip export sources.
+			name:                     "multipart-inline-real-pdf-hex-edit",
+			originalPayload:          pdfInline,
+			inlineEditedPayload:      pdfInlineEdited,
+			sentPayload:              pdfInlineEdited,
+			multipart:                true,
+			uploadFilename:           "document.pdf",
+			uploadContentType:        "application/pdf",
+			wantHijackTag:            "{{unquote(",
+			wantCurrentBinaryExports: true,
+			wantBareBinaryExports:    true,
 		},
 		{
 			name:            "large-binary-mime-valid-utf8-below-D",
@@ -339,39 +565,50 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		},
 		{
 			name:               "large-binary-replace",
-			originalPayload:    bytes.Repeat([]byte{0xdd}, 300*1024),
-			replacementPayload: bytes.Repeat([]byte{0xee}, 300*1024+1),
-			sentPayload:        bytes.Repeat([]byte{0xee}, 300*1024+1),
-			contentType:        "application/octet-stream",
+			originalPayload:    pdfOriginal,
+			replacementPayload: pdfReplacement,
+			sentPayload:        pdfReplacement,
+			contentType:        "application/pdf",
 			wantHijackTag:      "{{file(",
 			wantResourceFlow:   true,
 			wantBareFileTags:   1,
 		},
 		{
 			name:               "large-binary-forward-discards-replacement",
-			originalPayload:    bytes.Repeat([]byte{0x87}, 300*1024),
-			replacementPayload: bytes.Repeat([]byte{0x88}, 300*1024+1),
-			sentPayload:        bytes.Repeat([]byte{0x87}, 300*1024),
-			contentType:        "application/octet-stream",
+			originalPayload:    pdfOriginal,
+			replacementPayload: pdfReplacement,
+			sentPayload:        pdfOriginal,
+			contentType:        "application/pdf",
 			forwardOriginal:    true,
 			wantHijackTag:      "{{file(",
 			wantResourceFlow:   true,
 		},
 		{
 			name:             "large-binary-view-response",
-			originalPayload:  bytes.Repeat([]byte{0x86}, 300*1024),
-			sentPayload:      bytes.Repeat([]byte{0x86}, 300*1024),
-			contentType:      "application/octet-stream",
+			originalPayload:  pdfOriginal,
+			sentPayload:      pdfOriginal,
+			contentType:      "application/pdf",
 			hijackResponse:   true,
 			wantHijackTag:    "{{file(",
 			wantResourceFlow: true,
 		},
 		{
+			name:             "large-binary-drop",
+			originalPayload:  pdfOriginal,
+			sentPayload:      pdfOriginal,
+			contentType:      "application/pdf",
+			dropRequest:      true,
+			wantHijackTag:    "{{file(",
+			wantResourceFlow: true,
+		},
+		{
 			name:                      "multipart-file-replace",
-			originalPayload:           bytes.Repeat([]byte{0xaa}, 300*1024),
-			replacementPayload:        bytes.Repeat([]byte{0xbb}, 300*1024+1),
-			sentPayload:               bytes.Repeat([]byte{0xbb}, 300*1024+1),
+			originalPayload:           pdfOriginal,
+			replacementPayload:        pdfReplacement,
+			sentPayload:               pdfReplacement,
 			multipart:                 true,
+			uploadFilename:            "report.pdf",
+			uploadContentType:         "application/pdf",
 			wantHijackTag:             "{{file(",
 			wantResourceFlow:          true,
 			wantCurrentMultipartFiles: 1,
@@ -384,11 +621,8 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			// while its exact unquote representation exceeds D.
 			// The current request must become inline, while GetHTTPFlowBare must
 			// retain a bounded {{file}} tag for the original PDF.
-			name: "multipart-pdf-replace-small",
-			originalPayload: append(
-				[]byte("%PDF-1.7\n"),
-				bytes.Repeat([]byte{0xa5}, 300*1024-len("%PDF-1.7\n"))...,
-			),
+			name:                     "multipart-pdf-replace-small",
+			originalPayload:          pdfOriginal,
 			replacementPayload:       readableTextReplacement,
 			localReplacementFilename: "replacement.txt",
 			localReplacementType:     "text/plain; charset=utf-8",
@@ -443,7 +677,8 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 	target := utils.HostPort(mockHost, mockPort)
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
-	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	proxyAddress := utils.HostPort("127.0.0.1", mitmPort)
+	proxy := "http://" + proxyAddress
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	t.Cleanup(cancel)
 
@@ -460,6 +695,20 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 	}, func(stream ypb.Yak_MITMV2Client) {
 		require.NoError(t, utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5))
 		for _, tc := range cases {
+			if tc.dropRequest {
+				conn, err := net.DialTimeout("tcp", proxyAddress, 3*time.Second)
+				require.NoError(t, err)
+				_, err = conn.Write(packetsByName[tc.name])
+				require.NoError(t, err)
+				require.NoError(t, conn.SetReadDeadline(time.Now().Add(3*time.Second)))
+				response := make([]byte, 1024)
+				// MITM may synthesize a local response to finish the browser-side
+				// connection. The authoritative drop assertion is that the target
+				// capture has no /wire entry, checked after History replay below.
+				_, _ = conn.Read(response)
+				require.NoError(t, conn.Close())
+				continue
+			}
 			response, err := lowhttp.HTTP(
 				lowhttp.WithPacketBytes(packetsByName[tc.name]),
 				lowhttp.WithProxy(proxy),
@@ -547,7 +796,11 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			}
 			partIndex := int32(0)
 			if tc.multipart {
-				partIndex = mitmV2FileTagPartIndex(t, task.GetRequest())
+				if tc.replacementPartName != "" {
+					partIndex = mitmV2FileTagPartIndexForField(t, task.GetRequest(), tc.replacementPartName)
+				} else {
+					partIndex = mitmV2FileTagPartIndex(t, task.GetRequest())
+				}
 			}
 			require.NoError(t, stream.Send(&ypb.MITMV2Request{
 				ManualHijackControl: true,
@@ -561,6 +814,13 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 					LargeRequestFileEOF:     true,
 				},
 			}))
+		}
+		if tc.dropRequest {
+			require.NoError(t, stream.Send(&ypb.MITMV2Request{
+				ManualHijackControl: true,
+				ManualHijackMessage: &ypb.SingleManualHijackControlMessage{TaskID: task.GetTaskID(), Drop: true},
+			}))
+			return
 		}
 		if tc.forwardOriginal {
 			require.NoError(t, stream.Send(&ypb.MITMV2Request{
@@ -580,7 +840,7 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		}
 		submitted := task.GetRequest()
 		if tc.inlineEditedPayload != nil {
-			submitted = replaceMITMV2OutcomeInlineUpload(t, submitted, tc.inlineEditedPayload)
+			submitted = replaceMITMV2OutcomeInlinePayload(t, submitted, tc.inlineEditedPayload, tc.multipart)
 		}
 		if tc.manualFuzzTagPayload != nil {
 			submitted = lowhttp.ReplaceHTTPPacketBody(submitted, tc.manualFuzzTagPayload, false)
@@ -614,6 +874,24 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		}
 		var persisted schema.HTTPFlow
 		require.NoError(t, consts.GetGormProjectDatabase().First(&persisted, flow.GetId()).Error)
+		var deleteResourcePaths []string
+		var deleteResourceDirs []string
+		if tc.deleteAfterValidation {
+			deleteResourcePaths = append(deleteResourcePaths, mitmV2FileTagPaths(currentRequest)...)
+			for _, path := range []string{persisted.TooLargeRequestHeaderFile, persisted.TooLargeRequestBodyFile} {
+				if path == "" {
+					continue
+				}
+				require.FileExists(t, path)
+				deleteResourcePaths = append(deleteResourcePaths, path)
+			}
+			if tc.multipart && persisted.TooLargeRequestBodyFile != "" {
+				dir := filepath.Dir(persisted.TooLargeRequestBodyFile)
+				require.DirExists(t, dir)
+				require.FileExists(t, filepath.Join(dir, "manifest.json"))
+				deleteResourceDirs = append(deleteResourceDirs, dir)
+			}
+		}
 		require.Equal(t, flow.GetIsTooLargeRequest(), persisted.IsTooLargeRequest)
 		persistedRequest := []byte(persisted.GetRequest())
 		if flow.GetSafeHTTPRequest() != "" {
@@ -639,30 +917,36 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			require.Equal(t, currentRequest, detailRequest,
 				"History list and detail queries must expose the same editor packet for %s", tc.name)
 			if tc.wantCurrentMultipartFiles > 0 {
-				fileInfo := detail.GetMultipartFiles()[0]
-				require.Equal(t, int32(1), fileInfo.GetPartIndex(), "the ordinary note field occupies physical part index 0")
-				expectedFilename := tc.uploadFilename
-				if expectedFilename == "" {
-					expectedFilename = "sample.bin"
+				expectedFiles := expectedMITMV2OutcomeFileParts(tc, false)
+				require.Len(t, expectedFiles, tc.wantCurrentMultipartFiles)
+				fileOrdinal := 0
+				for physicalIndex, expectedPart := range expectedMITMV2OutcomeMultipartParts(tc, false) {
+					if expectedPart.filename == "" {
+						continue
+					}
+					fileInfo := detail.GetMultipartFiles()[fileOrdinal]
+					fileOrdinal++
+					require.Equal(t, int32(physicalIndex), fileInfo.GetPartIndex())
+					require.Equal(t, expectedPart.filename, fileInfo.GetFilename())
+					require.Equal(t, expectedPart.contentType, fileInfo.GetContentType())
+					require.Equal(t, int64(len(expectedPart.sentPayload)), fileInfo.GetSize())
+					require.FileExists(t, fileInfo.GetFilePath())
+					storedPart, err := os.ReadFile(fileInfo.GetFilePath())
+					require.NoError(t, err)
+					require.Equal(t, expectedPart.sentPayload, storedPart, "frontend metadata must point at the actual wire part")
+					require.Contains(t, mitmV2FileTagPaths(currentRequest), fileInfo.GetFilePath())
 				}
-				expectedContentType := tc.uploadContentType
-				if expectedContentType == "" {
-					expectedContentType = "application/octet-stream"
-				}
-				require.Equal(t, expectedFilename, fileInfo.GetFilename())
-				require.Equal(t, expectedContentType, fileInfo.GetContentType())
-				require.Equal(t, int64(len(tc.sentPayload)), fileInfo.GetSize())
-				require.FileExists(t, fileInfo.GetFilePath())
-				storedPart, err := os.ReadFile(fileInfo.GetFilePath())
-				require.NoError(t, err)
-				require.Equal(t, tc.sentPayload, storedPart, "frontend metadata must point at the actual wire part")
-				require.Contains(t, mitmV2FileTagPaths(currentRequest), fileInfo.GetFilePath())
 			}
 		}
 		if tc.wantCurrentRaw {
 			require.Empty(t, flow.GetSafeHTTPRequest(), "valid UTF-8 current requests stay in Request for %s", tc.name)
 			require.NotContains(t, string(currentRequest), "{{unquote(")
 			require.False(t, mitmV2FileTagPattern.Match(currentRequest))
+		}
+		if tc.wantCurrentBinaryExports {
+			require.NotEmpty(t, flow.GetSafeHTTPRequest(),
+				"binary current request must reach the frontend through SafeHTTPRequest for %s", tc.name)
+			requireMITMV2OutcomeBinaryExportContract(t, currentRequest, tc.sentPayload, tc.multipart, tc.name+" current request")
 		}
 		if tc.wantManualEditTag {
 			// HTTP History derives all user-visible branching from these fields:
@@ -692,6 +976,9 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			require.Equal(t, "8", lowhttp.GetHTTPPacketHeader(currentRequest, "X-User-Fuzztag"))
 			require.NotContains(t, string(currentRequest), "{{int(", "HTTPFlow must store the concrete request sent on the wire")
 		}
+		if tc.dropRequest {
+			require.Contains(t, flow.GetTags(), yakit.HTTPFlowTagDiscarded)
+		}
 		replayMITMV2OutcomeRequest(t, client, currentRequest, "current")
 		if tc.wantResourceFlow {
 			webFuzzerReplacement := []byte("webfuzzer-replacement-" + tc.name)
@@ -708,9 +995,22 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			webFuzzerReplay := received[token+"/webfuzzer-replaced"]
 			receivedMu.Unlock()
 			require.Equal(t, webFuzzerReplacement, extractMITMV2OutcomePayload(t, webFuzzerReplay, tc.multipart))
+			if len(tc.extraMultipartParts) > 0 {
+				parts := extractMITMV2OutcomeMultipartParts(t, webFuzzerReplay)
+				for _, expectedPart := range expectedMITMV2OutcomeMultipartParts(tc, false) {
+					got := parts[expectedPart.fieldName]
+					if expectedPart.filename != "" {
+						require.Equal(t, webFuzzerReplacement, got.sentPayload,
+							"WebFuzzer path replacement must affect file part %q", expectedPart.fieldName)
+					} else {
+						require.Equal(t, expectedPart.sentPayload, got.sentPayload,
+							"WebFuzzer path replacement must preserve ordinary part %q", expectedPart.fieldName)
+					}
+				}
+			}
 		}
 
-		if !tc.forwardOriginal && !tc.hijackResponse {
+		if !tc.forwardOriginal && !tc.hijackResponse && !tc.dropRequest {
 			bare, err := client.GetHTTPFlowBare(utils.TimeoutContextSeconds(5), &ypb.HTTPFlowBareRequest{
 				Id: int64(flow.GetId()), BareType: "request",
 			})
@@ -724,16 +1024,43 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			require.Equal(t, bare.GetData(), []byte(storedBare),
 				"GetHTTPFlowBare must return the exact BareRequest KV persisted for %s", tc.name)
 			barePaths := mitmV2FileTagPaths(bare.GetData())
+			if tc.deleteAfterValidation {
+				deleteResourcePaths = append(deleteResourcePaths, barePaths...)
+				for _, path := range barePaths {
+					if strings.HasSuffix(filepath.Base(filepath.Dir(path)), "-parts") {
+						deleteResourceDirs = append(deleteResourceDirs, filepath.Dir(path))
+					}
+				}
+			}
 			require.Len(t, barePaths, tc.wantBareFileTags,
 				"BareRequest must use the expected original multipart representation for %s", tc.name)
+			expectedBareFiles := expectedMITMV2OutcomeFileParts(tc, true)
+			unmatchedBareFiles := append([]mitmV2OutcomeMultipartPart(nil), expectedBareFiles...)
 			for _, path := range barePaths {
 				require.FileExists(t, path)
-				info, err := os.Stat(path)
-				require.NoError(t, err)
-				require.Equal(t, int64(len(tc.originalPayload)), info.Size())
 				storedOriginal, err := os.ReadFile(path)
 				require.NoError(t, err)
-				require.Equal(t, tc.originalPayload, storedOriginal)
+				matched := -1
+				for index, expectedPart := range unmatchedBareFiles {
+					if bytes.Equal(expectedPart.originalPayload, storedOriginal) {
+						matched = index
+						break
+					}
+				}
+				require.NotEqual(t, -1, matched, "BareRequest resource %q must belong to the original multipart", path)
+				if matched >= 0 {
+					unmatchedBareFiles = append(unmatchedBareFiles[:matched], unmatchedBareFiles[matched+1:]...)
+				}
+			}
+			if len(barePaths) > 0 {
+				require.Empty(t, unmatchedBareFiles, "every original file part must own exactly one BareRequest resource")
+			}
+			if tc.wantBareBinaryExports {
+				requireMITMV2OutcomeBinaryExportContract(t, bare.GetData(), tc.originalPayload, tc.multipart, tc.name+" original request")
+				if tc.wantCurrentBinaryExports && !bytes.Equal(tc.originalPayload, tc.sentPayload) {
+					require.NotEqual(t, currentRequest, bare.GetData(),
+						"current and original History exports must not be swapped for %s", tc.name)
+				}
 			}
 			if tc.wantBareResource {
 				// GetHTTPFlowBare is passed directly to the original-request text
@@ -760,8 +1087,17 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		currentReplay := received[token+"/current"]
 		originalReplay := received[token+"/original"]
 		receivedMu.Unlock()
-		require.Equal(t, tc.sentPayload, extractMITMV2OutcomePayload(t, wirePacket, tc.multipart))
 		require.Equal(t, tc.sentPayload, extractMITMV2OutcomePayload(t, currentReplay, tc.multipart))
+		if !tc.dropRequest {
+			require.Equal(t, tc.sentPayload, extractMITMV2OutcomePayload(t, wirePacket, tc.multipart))
+		} else {
+			require.Empty(t, wirePacket.body, "the mock target must not receive a dropped request")
+		}
+		if len(tc.extraMultipartParts) > 0 {
+			requireMITMV2OutcomeMultipartParts(t, wirePacket, expectedMITMV2OutcomeMultipartParts(tc, false), tc.name+" wire")
+			requireMITMV2OutcomeMultipartParts(t, currentReplay, expectedMITMV2OutcomeMultipartParts(tc, false), tc.name+" current replay")
+			requireMITMV2OutcomeMultipartParts(t, originalReplay, expectedMITMV2OutcomeMultipartParts(tc, true), tc.name+" original replay")
+		}
 		if tc.localReplacementFilename != "" && tc.multipart {
 			wireFilename, wireContentType := extractMITMV2OutcomeMultipartFileMetadata(t, wirePacket)
 			require.Equal(t, tc.uploadFilename, wireFilename)
@@ -770,7 +1106,9 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			require.Equal(t, tc.uploadFilename, replayFilename)
 			require.Equal(t, tc.uploadContentType, replayContentType)
 		}
-		if tc.forwardOriginal || tc.hijackResponse {
+		if tc.dropRequest {
+			require.Empty(t, wirePacket.edited)
+		} else if tc.forwardOriginal || tc.hijackResponse {
 			require.Empty(t, wirePacket.edited)
 		} else {
 			require.Equal(t, "true", wirePacket.edited)
@@ -780,27 +1118,87 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			require.Equal(t, "8", wirePacket.userFuzzTag)
 			require.Equal(t, wirePacket.userFuzzTag, currentReplay.userFuzzTag)
 		}
+		if tc.deleteAfterValidation {
+			// This is the History delete button's complete backend contract. The
+			// gRPC handler must evict the Flow/cache, remove its BareRequest KV,
+			// and clean both the current and original engine-owned sidecars.
+			_, err := client.DeleteHTTPFlows(utils.TimeoutContextSeconds(5), &ypb.DeleteHTTPFlowRequest{
+				Id: []int64{int64(flow.GetId())},
+			})
+			require.NoError(t, err)
+			_, err = client.GetHTTPFlowById(utils.TimeoutContextSeconds(5), &ypb.GetHTTPFlowByIdRequest{Id: int64(flow.GetId())})
+			require.Error(t, err, "deleted Flow must not remain visible through History detail/cache")
+			_, err = client.GetHTTPFlowBare(utils.TimeoutContextSeconds(5), &ypb.HTTPFlowBareRequest{
+				Id: int64(flow.GetId()), BareType: "request",
+			})
+			require.Error(t, err, "deleted Flow must not retain its original-request KV")
+			_, err = QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
+				SearchURL:  token,
+				SourceType: "mitm",
+				Full:       true,
+				Pagination: &ypb.Paging{Page: 1, Limit: 10},
+			}, 0)
+			require.NoError(t, err, "deleted Flow must disappear from the History list")
+			for _, path := range deleteResourcePaths {
+				require.NoFileExists(t, path, "deleting the Flow must clean its engine-owned request resource")
+			}
+			for _, dir := range deleteResourceDirs {
+				require.NoDirExists(t, dir, "deleting the Flow must clean its multipart sidecar directory")
+			}
+		}
 	}
 }
 
-// Auto-forward has no editor action and therefore no bare/original snapshot,
-// but its persisted current request must use the same bounded representation
-// and remain exactly replayable from HTTP History/WebFuzzer.
+// Auto-forward has no editor action and therefore no bare/original snapshot.
+// Both an externalized large file and an inline invalid-UTF8 upload must reach
+// the target unchanged, persist in their expected History representation, and
+// remain exactly replayable through WebFuzzer.
 func TestGRPCMUSTPASS_MITMV2_AutoForwardResourceOutcome(t *testing.T) {
 	client := isolateMITMTestSideEffects(t)
 	previousLimit := consts.GetGlobalMaxContentLength()
 	consts.SetGlobalMaxContentLength(512 * 1024)
 	t.Cleanup(func() { consts.SetGlobalMaxContentLength(previousLimit) })
 
-	original := bytes.Repeat([]byte{0xcc}, 300*1024)
-	tc := mitmV2RequestOutcomeCase{
-		name:            "auto-forward-large-binary",
-		originalPayload: original,
-		sentPayload:     original,
-		contentType:     "application/octet-stream",
+	largePDF := readMITMBinaryRepositoryFixture(t, "vtestdata", "zwb.pdf")
+	requireRealPDFFixture(t, largePDF)
+	unsafeZIP := readMITMBinaryRepositoryFixture(t, "common", "aireducer", "testdata", "demo.txt.zip")
+	requireRealZIPFixture(t, unsafeZIP)
+
+	type autoForwardOutcomeCase struct {
+		token            string
+		request          mitmV2RequestOutcomeCase
+		wantFileResource bool
+		wantInlineBinary bool
 	}
-	token := "mitmv2-outcome-auto-" + utils.RandStringBytes(8)
-	registerHTTPFlowTokenCleanup(t, token)
+	cases := []autoForwardOutcomeCase{
+		{
+			token: "mitmv2-outcome-auto-large-" + utils.RandStringBytes(8),
+			request: mitmV2RequestOutcomeCase{
+				name:            "auto-forward-large-binary",
+				originalPayload: largePDF,
+				sentPayload:     largePDF,
+				contentType:     "application/pdf",
+			},
+			wantFileResource: true,
+		},
+		{
+			token: "mitmv2-outcome-auto-invalid-utf8-" + utils.RandStringBytes(8),
+			request: mitmV2RequestOutcomeCase{
+				name:              "auto-forward-invalid-utf8-multipart",
+				originalPayload:   unsafeZIP,
+				sentPayload:       unsafeZIP,
+				multipart:         true,
+				uploadFilename:    "archive.zip",
+				uploadContentType: "application/zip",
+			},
+			wantInlineBinary: true,
+		},
+	}
+	tokens := make([]string, 0, len(cases))
+	for _, tc := range cases {
+		tokens = append(tokens, tc.token)
+	}
+	registerHTTPFlowTokenCleanup(t, tokens...)
 
 	mockCtx, mockCancel := context.WithCancel(context.Background())
 	t.Cleanup(mockCancel)
@@ -813,8 +1211,9 @@ func TestGRPCMUSTPASS_MITMV2_AutoForwardResourceOutcome(t *testing.T) {
 		if kind == "" {
 			kind = "wire"
 		}
+		token := request.Header.Get("X-Outcome-Case")
 		receivedMu.Lock()
-		received[kind] = mitmV2CapturedRequest{
+		received[token+"/"+kind] = mitmV2CapturedRequest{
 			body:        bytes.Clone(body),
 			contentType: request.Header.Get("Content-Type"),
 		}
@@ -823,7 +1222,10 @@ func TestGRPCMUSTPASS_MITMV2_AutoForwardResourceOutcome(t *testing.T) {
 		require.NoError(t, err)
 	})
 	target := utils.HostPort(mockHost, mockPort)
-	packet := buildMITMV2OutcomePacket(t, target, token, tc)
+	packets := make([][]byte, 0, len(cases))
+	for _, tc := range cases {
+		packets = append(packets, buildMITMV2OutcomePacket(t, target, tc.token, tc.request))
+	}
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
@@ -837,14 +1239,16 @@ func TestGRPCMUSTPASS_MITMV2_AutoForwardResourceOutcome(t *testing.T) {
 	}, func(stream ypb.Yak_MITMV2Client) {
 		require.NoError(t, utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5))
 		time.Sleep(100 * time.Millisecond)
-		response, err := lowhttp.HTTP(
-			lowhttp.WithPacketBytes(packet),
-			lowhttp.WithProxy(proxy),
-			lowhttp.WithTimeout(15*time.Second),
-			lowhttp.WithSaveHTTPFlow(false),
-		)
-		require.NoError(t, err)
-		require.Contains(t, string(response.RawPacket), "200 OK")
+		for _, packet := range packets {
+			response, err := lowhttp.HTTP(
+				lowhttp.WithPacketBytes(packet),
+				lowhttp.WithProxy(proxy),
+				lowhttp.WithTimeout(15*time.Second),
+				lowhttp.WithSaveHTTPFlow(false),
+			)
+			require.NoError(t, err)
+			require.Contains(t, string(response.RawPacket), "200 OK")
+		}
 		time.Sleep(500 * time.Millisecond)
 		cancel()
 	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
@@ -861,31 +1265,69 @@ func TestGRPCMUSTPASS_MITMV2_AutoForwardResourceOutcome(t *testing.T) {
 	})
 	require.False(t, unexpectedlyHijacked.Load(), "auto-forward traffic must not enter the manual editor")
 
-	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(8), client, &ypb.QueryHTTPFlowRequest{
-		SearchURL:  token,
-		SourceType: "mitm",
-		Full:       true,
-		Pagination: &ypb.Paging{Page: 1, Limit: 10},
-	}, 1)
-	require.NoError(t, err)
-	flow := flows.GetData()[0]
-	current := flow.GetRequest()
-	if flow.GetSafeHTTPRequest() != "" {
-		current = []byte(flow.GetSafeHTTPRequest())
+	for _, tc := range cases {
+		flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(8), client, &ypb.QueryHTTPFlowRequest{
+			SearchURL:  tc.token,
+			SourceType: "mitm",
+			Full:       true,
+			Pagination: &ypb.Paging{Page: 1, Limit: 10},
+		}, 1)
+		require.NoError(t, err)
+		flow := flows.GetData()[0]
+		current := flow.GetRequest()
+		if flow.GetSafeHTTPRequest() != "" {
+			current = []byte(flow.GetSafeHTTPRequest())
+		}
+
+		var persisted schema.HTTPFlow
+		require.NoError(t, consts.GetGormProjectDatabase().First(&persisted, flow.GetId()).Error)
+		require.Equal(t, tc.wantFileResource, persisted.IsTooLargeRequest)
+		if tc.wantFileResource {
+			require.Contains(t, string(current), "{{file(")
+			require.Less(t, len(current), 8*1024)
+			require.FileExists(t, persisted.TooLargeRequestBodyFile)
+			storedBody, readErr := os.ReadFile(persisted.TooLargeRequestBodyFile)
+			require.NoError(t, readErr)
+			require.Equal(t, tc.request.originalPayload, storedBody,
+				"History sidecar must retain the exact automatically forwarded large file")
+			require.Contains(t, mitmV2FileTagPaths(current), persisted.TooLargeRequestBodyFile)
+		}
+		if tc.wantInlineBinary {
+			require.False(t, persisted.IsTooLargeRequest)
+			require.NotEmpty(t, flow.GetSafeHTTPRequest(),
+				"invalid UTF-8 must use the frontend-safe History field")
+			require.True(t, utf8.Valid(current))
+			require.Contains(t, string(current), "{{unquote(")
+			require.False(t, mitmV2FileTagPattern.Match(current))
+			persistedRequest := []byte(persisted.GetRequest())
+			require.False(t, utf8.Valid(persistedRequest),
+				"HTTPFlow DB must retain the concrete automatically forwarded bytes")
+			require.Equal(t, current, lowhttp.ConvertHTTPRequestToFuzzTag(persistedRequest),
+				"SafeHTTPRequest must be derived from the exact HTTPFlow DB request")
+			_, persistedBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(persistedRequest)
+			persistedUpload := extractMITMV2OutcomePayload(t, mitmV2CapturedRequest{
+				body:        persistedBody,
+				contentType: lowhttp.GetHTTPPacketHeader(persistedRequest, "Content-Type"),
+			}, true)
+			require.Equal(t, tc.request.originalPayload, persistedUpload)
+			requireMITMV2OutcomeBinaryExportContract(
+				t, current, tc.request.originalPayload, true, tc.request.name+" current request",
+			)
+		}
+
+		replayMITMV2OutcomeRequest(t, client, current, "current")
+		_, err = client.GetHTTPFlowBare(utils.TimeoutContextSeconds(3), &ypb.HTTPFlowBareRequest{
+			Id: int64(flow.GetId()), BareType: "request",
+		})
+		require.Error(t, err, "unmodified auto-forward traffic must not create an original-request duplicate")
+
+		receivedMu.Lock()
+		wire := received[tc.token+"/wire"]
+		replay := received[tc.token+"/current"]
+		receivedMu.Unlock()
+		require.Equal(t, tc.request.originalPayload, extractMITMV2OutcomePayload(t, wire, tc.request.multipart),
+			"target must receive the exact automatically forwarded bytes")
+		require.Equal(t, tc.request.originalPayload, extractMITMV2OutcomePayload(t, replay, tc.request.multipart),
+			"WebFuzzer must replay the exact History bytes")
 	}
-	require.Contains(t, string(current), "{{file(")
-	require.Less(t, len(current), 8*1024)
-	replayMITMV2OutcomeRequest(t, client, current, "current")
-
-	_, err = client.GetHTTPFlowBare(utils.TimeoutContextSeconds(3), &ypb.HTTPFlowBareRequest{
-		Id: int64(flow.GetId()), BareType: "request",
-	})
-	require.Error(t, err, "unmodified auto-forward traffic must not create an original-request duplicate")
-
-	receivedMu.Lock()
-	wire := received["wire"]
-	replay := received["current"]
-	receivedMu.Unlock()
-	require.Equal(t, original, wire.body)
-	require.Equal(t, original, replay.body)
 }
