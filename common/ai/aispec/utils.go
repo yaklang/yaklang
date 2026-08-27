@@ -238,10 +238,10 @@ func BuildOptionsFromConfig(config *ypb.AIModelConfig) []AIConfigOption {
 	if config == nil {
 		return nil
 	}
-	return buildOptionsFromProviderAndModel(config.GetProvider(), config.GetModelName(), config.GetExtraParams())
+	return buildOptionsFromProviderAndModel(config.GetProvider(), config.GetModelName(), config.GetExtraParams(), config.GetProbedExtendedEfforts(), config.GetEffortProbed())
 }
 
-func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, modelName string, modelExtra []*ypb.KVPair) []AIConfigOption {
+func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, modelName string, modelExtra []*ypb.KVPair, probedExtendedEfforts []string, effortProbed bool) []AIConfigOption {
 	var opts []AIConfigOption
 
 	if provider == nil {
@@ -302,6 +302,21 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 			if !enable && effort == "" {
 				// skip — let model/provider defaults apply
 			} else {
+				// Clamp xhigh/max: if the model hasn't been probed or doesn't support
+				// the requested extended effort, downgrade to high as a safety net.
+				// If probed and supported, pass through as-is.
+				if effort == "xhigh" || effort == "max" {
+					supported := false
+					for _, e := range probedExtendedEfforts {
+						if e == effort {
+							supported = true
+							break
+						}
+					}
+					if !supported {
+						effort = "high"
+					}
+				}
 				opts = append(opts, WithEnableThinking(enable))
 				if effort != "" {
 					opts = append(opts, WithReasoningEffort(effort))
