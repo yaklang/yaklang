@@ -60,14 +60,16 @@ type Risk struct {
 	// 潜在威胁：用于输出合规性质的漏洞内容
 	IsPotential bool `json:"is_potential"`
 
-	CVE                 string `json:"cve"`
-	IsRead              bool   `json:"is_read"`
-	Ignore              bool   `json:"ignore"`
-	UploadOnline        bool   `json:"upload_online"`
-	TaskName            string `json:"task_name"`
-	CveAccessVector     string `json:"cve_access_vector"`
-	CveAccessComplexity string `json:"cve_access_complexity"`
-	Tags                string `json:"tags"`
+	CVE                 string  `json:"cve"`
+	IsRead              bool    `json:"is_read"`
+	Ignore              bool    `json:"ignore"`
+	UploadOnline        bool    `json:"upload_online"`
+	TaskName            string  `json:"task_name"`
+	CveAccessVector     string  `json:"cve_access_vector"`
+	CveAccessComplexity string  `json:"cve_access_complexity"`
+	Tags                string  `json:"tags"`
+	TagsDescription     string  `json:"tags_description"`
+	SeverityScore       float64 `json:"severity_score"`
 
 	// SyntaxFlow
 	ResultID    uint   `json:"result_id"`

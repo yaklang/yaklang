@@ -988,7 +988,6 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 				})
 			}
 		} else {
-			// 本地不存在：写入整条数据
 			flow := &schema.HTTPFlow{
 				Hash:          item.Hash,
 				Url:           item.URL,
