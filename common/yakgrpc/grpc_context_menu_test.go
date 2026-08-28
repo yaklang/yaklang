@@ -126,7 +126,11 @@ func TestContextMenuQueryIncludesLegacyCodecCapabilities(t *testing.T) {
 	for _, action := range management.Actions {
 		require.Equal(t, contextmenu.LegacyPluginType, action.PluginType)
 		require.False(t, action.SupportsResultMode)
-		require.True(t, action.Enabled)
+		if action.ActionID == contextmenu.ActionLegacyPacketMutate {
+			require.False(t, action.Enabled, "legacy packet mutation must stay out of the context-menu defaults")
+		} else {
+			require.True(t, action.Enabled)
+		}
 		require.True(t, action.IsAIPlugin)
 		require.NotEmpty(t, action.Scene)
 		require.NotEmpty(t, action.ExecutionType)
@@ -154,11 +158,8 @@ func TestContextMenuQueryIncludesLegacyCodecCapabilities(t *testing.T) {
 		Scene: contextmenu.ActionHTTPPacket,
 	})
 	require.NoError(t, err)
-	require.Len(t, packetMenu.Actions, 2)
-	require.ElementsMatch(t, []string{
-		contextmenu.ActionLegacyPacketContext,
-		contextmenu.ActionLegacyPacketMutate,
-	}, []string{packetMenu.Actions[0].ActionID, packetMenu.Actions[1].ActionID})
+	require.Len(t, packetMenu.Actions, 1)
+	require.Equal(t, contextmenu.ActionLegacyPacketContext, packetMenu.Actions[0].ActionID)
 	require.EqualValues(t, 1, packetMenu.EnabledCustomPluginCount)
 
 	_, err = server.SetContextMenuActionBinding(context.Background(), &ypb.SetContextMenuActionBindingRequest{
