@@ -14,7 +14,7 @@ desc(
 分析基于 SSA 生命周期：跟踪 `malloc`/`calloc`/`realloc` 分配与 `free`，
 覆盖过程内别名拷贝，以及简单的 free-param 跨函数摘要。
 
-命中点为 UAF 使用点（含 double-free，视为 UAF 子类）。
+命中点为存在 UAF / double-free 风险的 `free` 调用（而非指针或后续使用点）。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -28,12 +28,8 @@ SOLUTION
 REFERENCE
 )
 
-// 1. 定位 free 调用
-free(* as $free_arg)
-// 2. 确定被释放的指针
-$free_arg #-> as $ptr
-// 3. 判断该指针是否存在 UAF / double-free
-$ptr<uaf()> as $uaf
+// 保留「实参指针存在 UAF / double-free」的 free 调用；命中点是 free 本身，不是指针或后续使用点。
+free?(* #-> <uaf()>) as $uaf
 
 alert $uaf for {
 	title: "Use After Free",
@@ -41,7 +37,7 @@ alert $uaf for {
 	level: "high",
 	risk: "释放后使用",
 	desc: <<<DESC
-指针在 free 之后仍被解引用，或对同一对象二次 free
+该 free 释放的指针之后仍被解引用，或对同一对象二次 free
 DESC
 }
 
