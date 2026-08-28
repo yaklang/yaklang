@@ -29,13 +29,8 @@ SOLUTION
 REFERENCE
 )
 
-// 1. 定位解引用点（成员访问 / 星号解引用）
-*.* as $use
-*?{opcode: undefined} as $use
-// 2. 确定被解引用的指针
-$use #-> as $ptr
-// 3. 判断该指针是否存在空指针解引用
-$ptr<npd()> as $npd
+// npd() 是空指针解引用 native：扫描 *p / p->field 等解引用点上的 Null/MaybeNull。
+*<npd()> as $npd
 
 alert $npd for {
 	title: "Null Pointer Dereference",
