@@ -131,21 +131,50 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
 	}
 
-	// Fold the node task log into debug/log before cache/analysis so live
-	// queries see SSA phase markers (compile/scan) while the run is in progress.
-	mergeTaskLogIntoDebugDir(dir)
+	// NOTE: the live path deliberately does not fold the task log into
+	// debug/log on every query any more. The analysis folds it in memory when
+	// phase detection needs it (enrichLogWithTaskLog), and finalizeDebugRun
+	// keeps merging incrementally for the zip. Merging per query made
+	// debug/log grow without bound and kept the analysis cache stale forever.
 
-	// Serve the cached analysis when it is newer than every pprof/log input,
-	// so repeated queries do not re-parse large profiles. Always overlay the
+	// Serve the cached analysis when it is newer than every pprof input, so
+	// repeated queries do not re-parse large profiles. Always overlay the
 	// Legion task status so a stale "failed" badge from log heuristics cannot
 	// stick while the attempt is still running.
 	if cached, ok := readCachedDebugAnalysis(dir); ok && cachedAnalysisHasPhases(cached) {
 		response.Found = true
-		response.Analysis = overlayDebugAnalysisStatus(cached, payload.TaskStatus)
+		response.Analysis = capLiveDebugAnalysis(overlayDebugAnalysisStatus(cached, payload.TaskStatus), debugLiveResponseMaxBytes)
 		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=true (cached) dir=%s", payload.JobID, payload.AttemptID, dir)
 		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
 	}
 
+	// A full analysis parses every pprof snapshot and can take minutes on
+	// long runs. Debounce + single-flight keep repeated console polls from
+	// piling up concurrent analyses, which OOM'd a node during an 18-hour
+	// debug run: after the first full pass, later polls are served from the
+	// (possibly slightly stale) cache until the cooldown elapses.
+	if last, ok := debugLiveAnalyzeFinished.Load(dir); ok {
+		if finished, _ := last.(time.Time); time.Since(finished) < debugLiveAnalysisMinInterval {
+			if stale, ok := readCachedDebugAnalysisAny(dir); ok {
+				response.Found = true
+				response.Analysis = capLiveDebugAnalysis(overlayDebugAnalysisStatus(stale, payload.TaskStatus), debugLiveResponseMaxBytes)
+			} else {
+				response.Reason = "debug analysis in progress"
+			}
+			return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+		}
+	}
+
+	debugLiveAnalyzeMu.Lock()
+	// Double-check: a query that waited on the lock can serve the cache the
+	// winner just refreshed instead of analyzing again.
+	if cached, ok := readCachedDebugAnalysis(dir); ok && cachedAnalysisHasPhases(cached) {
+		debugLiveAnalyzeMu.Unlock()
+		response.Found = true
+		response.Analysis = capLiveDebugAnalysis(overlayDebugAnalysisStatus(cached, payload.TaskStatus), debugLiveResponseMaxBytes)
+		log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=true (cached after wait) dir=%s", payload.JobID, payload.AttemptID, dir)
+		return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
+	}
 	analysis := AnalyzeDebugRunWithStatus(dir, payload.TaskStatus)
 	hasContent := len(analysis.Samples) > 0 || analysis.Summary != nil ||
 		analysis.StartedAt != nil || strings.TrimSpace(analysis.Status) != ""
@@ -154,14 +183,17 @@ func (b *legionJobBridge) handleSSADebugQuery(ctx context.Context, raw []byte) e
 	} else {
 		analysisJSON, err := json.Marshal(analysis)
 		if err != nil {
+			debugLiveAnalyzeMu.Unlock()
 			return fmt.Errorf("marshal ssa debug analysis: %w", err)
 		}
 		if err := writeCachedDebugAnalysis(dir, analysisJSON); err != nil {
 			log.Warnf("[debug] cache analysis json failed: %v", err)
 		}
 		response.Found = true
-		response.Analysis = analysisJSON
+		response.Analysis = capLiveDebugAnalysis(analysisJSON, debugLiveResponseMaxBytes)
 	}
+	debugLiveAnalyzeFinished.Store(dir, time.Now())
+	debugLiveAnalyzeMu.Unlock()
 	log.Infof("[debug] ssa.debug.query answered: job=%s attempt=%s found=%v samples=%d dir=%s",
 		payload.JobID, payload.AttemptID, response.Found, len(analysis.Samples), dir)
 	return b.publishDebugQueryResponse(ctx, payload.QueryID, response)
@@ -203,7 +235,7 @@ func writeCachedDebugAnalysis(dir string, analysisJSON []byte) error {
 }
 
 // readCachedDebugAnalysis returns the cached analysis JSON when it is at least
-// as new as every profile/log input file of the debug run.
+// as new as every profile input file of the debug run.
 func readCachedDebugAnalysis(dir string) (json.RawMessage, bool) {
 	cachePath := filepath.Join(dir, debugAnalysisCacheName)
 	cacheInfo, err := os.Stat(cachePath)
@@ -211,7 +243,12 @@ func readCachedDebugAnalysis(dir string) (json.RawMessage, bool) {
 		return nil, false
 	}
 	newestInput := time.Time{}
-	inputs := []string{"cpu-pprof", "memory-pprof", "goroutine-pprof", "log"}
+	// "log" is intentionally NOT an invalidation input: the engine keeps
+	// appending to the log for the whole run, which used to invalidate the
+	// cache on every query and forced a full re-parse of every profile per
+	// poll. New pprof snapshots (the meaningful new inputs) still invalidate
+	// it, and phase/status are refreshed via the task-status overlay.
+	inputs := []string{"cpu-pprof", "memory-pprof", "goroutine-pprof"}
 	for _, name := range inputs {
 		path := filepath.Join(dir, name)
 		info, err := os.Stat(path)
@@ -248,6 +285,17 @@ func readCachedDebugAnalysis(dir string) (json.RawMessage, bool) {
 	return json.RawMessage(data), true
 }
 
+// readCachedDebugAnalysisAny reads the cached analysis regardless of input
+// freshness. Used as the fallback while a fresh analysis is debounced or
+// still running in another query.
+func readCachedDebugAnalysisAny(dir string) (json.RawMessage, bool) {
+	data, err := os.ReadFile(filepath.Join(dir, debugAnalysisCacheName))
+	if err != nil || len(data) == 0 {
+		return nil, false
+	}
+	return json.RawMessage(data), true
+}
+
 func cachedAnalysisHasPhases(raw json.RawMessage) bool {
 	var payload struct {
 		Phases []struct {
@@ -273,6 +321,97 @@ func cachedAnalysisHasPhases(raw json.RawMessage) bool {
 		}
 	}
 	return false
+}
+
+const (
+	// debugLiveAnalysisMinInterval debounces full debug-directory analyses:
+	// new pprof snapshots land every ~5 minutes, so re-analyzing more often
+	// than this only burns CPU/memory on identical inputs.
+	debugLiveAnalysisMinInterval = 45 * time.Second
+)
+
+var (
+	// debugLiveAnalyzeMu serializes full debug-directory analyses node-wide.
+	debugLiveAnalyzeMu sync.Mutex
+	// debugLiveAnalyzeFinished tracks when the last full analysis finished,
+	// keyed by debug dir, so repeated queries are served from cache.
+	debugLiveAnalyzeFinished sync.Map
+)
+
+const (
+	// debugLiveResponseMaxBytes keeps the ssa.debug.query reply under the
+	// NATS max payload (~1MB). Long runs produce hundreds of samples with
+	// inline top lists and folded stacks (~30KB per sample); the full
+	// analysis stays in analysis.cache.json and is uploaded as an artifact
+	// at finalize.
+	debugLiveResponseMaxBytes = 900 * 1024
+
+	// liveAnalysisDetailedSamples keeps this many of the newest samples with
+	// their full inline details; older samples are reduced to light rows
+	// (and dropped entirely if the reply still does not fit).
+	liveAnalysisDetailedSamples = 24
+)
+
+// liveAnalysisHeavySampleFields are the per-sample inline fields that
+// dominate the analysis JSON size (folded stacks are ~2/3 of a sample).
+var liveAnalysisHeavySampleFields = []string{
+	"cpu_stacks", "cpu_stacks_yaklang", "heap_stacks", "heap_stacks_yaklang",
+	"cpu_top", "cpu_top_yaklang", "heap_top", "heap_top_yaklang",
+}
+
+// capLiveDebugAnalysis shrinks an analysis JSON to fit the live-query reply
+// budget without touching the on-disk cache. A 200+ sample run serializes to
+// several MB, which NATS drops (>1MB max payload), so the console never saw
+// more than the earliest samples. The full analysis remains available in
+// analysis.cache.json and in the finalized debug artifacts.
+func capLiveDebugAnalysis(raw json.RawMessage, maxBytes int) json.RawMessage {
+	if len(raw) <= maxBytes {
+		return raw
+	}
+	var payload struct {
+		Status     string           `json:"status,omitempty"`
+		StartedAt  *string          `json:"started_at,omitempty"`
+		FinishedAt *string          `json:"finished_at,omitempty"`
+		Duration   string           `json:"duration,omitempty"`
+		Phases     json.RawMessage  `json:"phases,omitempty"`
+		Samples    []map[string]any `json:"samples,omitempty"`
+		Summary    json.RawMessage  `json:"summary,omitempty"`
+		Errors     []string         `json:"errors,omitempty"`
+		Partial    bool             `json:"partial,omitempty"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return raw
+	}
+	marshal := func() []byte {
+		out, err := json.Marshal(payload)
+		if err != nil {
+			return nil
+		}
+		return out
+	}
+	// 1) Keep the newest samples detailed; strip heavy inline fields from
+	// older ones so the sample list itself survives.
+	if n := len(payload.Samples); n > liveAnalysisDetailedSamples {
+		for i := 0; i < n-liveAnalysisDetailedSamples; i++ {
+			for _, field := range liveAnalysisHeavySampleFields {
+				delete(payload.Samples[i], field)
+			}
+		}
+	}
+	if out := marshal(); out != nil && len(out) <= maxBytes {
+		return out
+	}
+	// 2) Drop the oldest sample rows until it fits (keep at least one).
+	for len(payload.Samples) > 1 {
+		payload.Samples = payload.Samples[1:]
+		if out := marshal(); out != nil && len(out) <= maxBytes {
+			return out
+		}
+	}
+	if out := marshal(); out != nil {
+		return out
+	}
+	return raw
 }
 
 func (b *legionJobBridge) publishDebugQueryResponse(ctx context.Context, queryID string, response ssaDebugQueryResponse) error {
