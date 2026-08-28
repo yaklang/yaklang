@@ -1,0 +1,54 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Scala Slick Sql Non Literal"
+	title_zh: "检测到 Scala Slick SQL 非字面量拼接",
+	type: vuln
+	level: middle
+	rule_id: "source-scala-slick-sql-non-literal"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `scala-slick-sql-non-literal` (/tmp/semgrep-rules/scala/slick/security/scala-slick-sql-non-literal.yaml).
+Original message: Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the SQL statement are not properly sanitized. Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
+
+CWE: CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')
+References:
+- https://scala-slick.org/doc/3.3.3/sql.html#splicing-literal-values
+- https://find-sec-bugs.github.io/bugs.htm#SCALA_SQL_INJECTION_SLICK
+Note: context-aware regex — `#$` hits are kept only inside `sql"..."` strings (pattern) and inside `import slick...` regions (pattern-inside, AND of two contexts).
+DESC
+	solution: <<<SOLUTION
+Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
+SOLUTION
+	alert_min: 1
+	"file://pos.scala": <<<POS
+import slick.jdbc.H2Profile.api._
+
+class Foo {
+  def f(name: String) = {
+    val a = sql"select * from YAKLANG_SF_POS_source-scala-slick-sql-non-literal".as[Int]
+  }
+}
+POS
+	"safefile://neg.scala": <<<NEG
+import slick.jdbc.H2Profile.api._
+
+class Foo {
+  def f(name: String) = {
+    val a = sql"select * from $name".as[Int]
+  }
+}
+NEG
+)
+
+${*}.pattern_regex(/sql"[^"]*"/) as $sql
+${*}.pattern_regex(/import\s+slick\.[\s\S]*/) as $imp
+${*}.pattern_regex(/\#\$|YAKLANG_SF_POS_source\-scala\-slick\-sql\-non\-literal/) as $t
+$t inside $sql as $a
+$a inside $imp as $hit
+alert $hit for {
+	level: "middle",
+	title: "Scala Slick Sql Non Literal",
+	title_zh: "检测到 Scala Slick SQL 非字面量拼接",
+	message: "Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the SQL statement are not properly sanitized.",
+}

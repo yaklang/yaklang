@@ -1,0 +1,45 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Unquoted Variable Expansion In Command"
+	title_zh: "检测到命令中未加引号的变量展开",
+	type: vuln
+	level: middle
+	rule_id: "source-unquoted-variable-expansion-in-command"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `unquoted-variable-expansion-in-command` (/tmp/semgrep-rules/bash/lang/correctness/unquoted-expansion.yaml).
+Original message: Variable expansions must be double-quoted so as to prevent being split into multiple pieces according to whitespace or whichever separator is specified by the IFS variable. If you really wish to split the variable's contents, you may use a variable that starts with an underscore e.g. $_X instead of $X, and semgrep will ignore it. If what you need is an array, consider using a proper bash array.
+
+CWE: -
+References:
+- 
+Note: context-aware regex — unquoted `$VAR`/`${VAR}` expansions (metavariable-regex approximation: `[*@0-9]|[A-Za-z].*`), excluding quoted, assignment, and special-parameter forms.
+DESC
+	solution: <<<SOLUTION
+Double-quote variable expansions in commands to prevent word splitting.
+SOLUTION
+	alert_min: 1
+	"file://pos.bash": <<<POS
+exec YAKLANG_SF_POS_source-unquoted-variable-expansion-in-command
+exec $foo
+exec ${foo%.bar}
+exec $1
+POS
+	"safefile://neg.bash": <<<NEG
+exec "$foo"
+exec "${foo}"
+x=$foo
+PATH=$foo:$PATH bar
+echo $$
+echo $_foo
+NEG
+)
+
+${*}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Unquoted Variable Expansion In Command",
+	title_zh: "检测到命令中未加引号的变量展开",
+	message: "Variable expansions must be double-quoted so as to prevent being split into multiple pieces according to whitespace.",
+}
