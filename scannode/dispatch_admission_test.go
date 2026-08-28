@@ -22,6 +22,7 @@ type recordingDispatchReporter struct {
 	failureDetail map[string]map[string]string
 	failStarted   bool
 	failSucceeded bool
+	failFailed    bool
 	cancelBlock   <-chan struct{}
 }
 
@@ -70,6 +71,9 @@ func (r *recordingDispatchReporter) PublishFailed(
 	}
 	r.failureCodes[ref.AttemptID] = code
 	r.failureDetail[ref.AttemptID] = detail
+	if r.failFailed {
+		return errors.New("failed unavailable")
+	}
 	return nil
 }
 
@@ -344,6 +348,135 @@ func TestFullDispatchNAKExpiresAtIssuedHeartbeatDeadline(t *testing.T) {
 		t.Fatalf("expired disposition=%+v err=%v", disposition, err)
 	}
 	close(releaseExecution)
+}
+
+// TestFullDispatchNAKExpiryPublishesCapacityFailure asserts the expired
+// full-capacity redelivery does not terminate silently: the node must report
+// node_capacity_exceeded so the platform records the real cause instead of
+// reclaiming the attempt later as attempt_missing_from_heartbeat.
+func TestFullDispatchNAKExpiryPublishesCapacityFailure(t *testing.T) {
+	releaseExecution := make(chan struct{})
+	bridge, reporter := newAdmissionTestBridge(1, func(task *Task, _ ScriptExecutionRequest) (*ScriptExecutionResult, error) {
+		select {
+		case <-releaseExecution:
+			return &ScriptExecutionResult{}, nil
+		case <-task.Ctx.Done():
+			return nil, &TaskCancelledError{}
+		}
+	})
+	bridge.agent.heartbeatInterval = 40 * time.Millisecond
+	first := admissionTestCommand("cmd-1", "job-1", "subtask-1", "attempt-1")
+	firstDisposition, err := bridge.handleDispatch(context.Background(), "session-a", marshalAdmissionCommand(t, first))
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstDisposition.afterAck()
+	waitForAdmission(t, func() bool { return bridge.agent.invokeLimiter.activeCount() == 1 }, "first slot was not occupied")
+	second := admissionTestCommand("cmd-2", "job-2", "subtask-2", "attempt-2")
+	raw := marshalAdmissionCommand(t, second)
+	if disposition, err := bridge.handleDispatch(context.Background(), "session-a", raw); err != nil || disposition.kind != messageNakDelayed {
+		t.Fatalf("full disposition=%+v err=%v", disposition, err)
+	}
+	if code, _ := reporter.failure("attempt-2"); code != "" {
+		t.Fatalf("failure published before deadline expiry: %s", code)
+	}
+	time.Sleep(60 * time.Millisecond)
+	if disposition, err := bridge.handleDispatch(context.Background(), "session-a", raw); err != nil || disposition.kind != messageTerm {
+		t.Fatalf("expired disposition=%+v err=%v", disposition, err)
+	}
+	code, detail := reporter.failure("attempt-2")
+	if code != dispatchCapacityFailureCode {
+		t.Fatalf("expired capacity drop code = %q, want %q", code, dispatchCapacityFailureCode)
+	}
+	if detail["script_release_id"] != "release-a" {
+		t.Fatalf("failure detail missing dispatch context: %#v", detail)
+	}
+	close(releaseExecution)
+}
+
+// TestFirstDispatchCapacityExpiryPublishesCapacityFailure covers the
+// first-delivery variant: the admission deadline is already expired when the
+// command arrives and the only execution slot is occupied, so the node must
+// publish the capacity failure instead of terminating quietly.
+func TestFirstDispatchCapacityExpiryPublishesCapacityFailure(t *testing.T) {
+	bridge, reporter := newAdmissionTestBridge(1, nil)
+	release, acquired := bridge.agent.invokeLimiter.TryAcquire()
+	if !acquired {
+		t.Fatal("pre-acquiring the only execution slot must succeed")
+	}
+	defer release()
+
+	command := admissionTestCommand("cmd-cap", "job-cap", "subtask-cap", "attempt-cap")
+	command.Metadata.IssuedAt = timestamppb.New(time.Now().Add(-time.Minute))
+	disposition, err := bridge.handleDispatch(
+		context.Background(),
+		"session-a",
+		marshalAdmissionCommand(t, command),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if disposition.kind != messageTerm {
+		t.Fatalf("disposition=%+v, want term after capacity expiry", disposition)
+	}
+	code, _ := reporter.failure("attempt-cap")
+	if code != dispatchCapacityFailureCode {
+		t.Fatalf("failure code = %q, want %q", code, dispatchCapacityFailureCode)
+	}
+	if count := reporter.count("failed", "attempt-cap"); count != 1 {
+		t.Fatalf("expected exactly one failure event, got %d", count)
+	}
+}
+
+// TestCapacityFailurePublishErrorNAKsForRetry keeps the report deliverable:
+// when publishing the capacity failure fails, the message must be NAKed and
+// the reservation must stay pending so the next redelivery retries the report
+// instead of acking it away as a terminal reservation.
+func TestCapacityFailurePublishErrorNAKsForRetry(t *testing.T) {
+	bridge, reporter := newAdmissionTestBridge(1, nil)
+	reporter.failFailed = true
+	release, acquired := bridge.agent.invokeLimiter.TryAcquire()
+	if !acquired {
+		t.Fatal("pre-acquiring the only execution slot must succeed")
+	}
+	defer release()
+
+	command := admissionTestCommand("cmd-cap", "job-cap", "subtask-cap", "attempt-cap")
+	command.Metadata.IssuedAt = timestamppb.New(time.Now().Add(-time.Minute))
+	disposition, err := bridge.handleDispatch(
+		context.Background(),
+		"session-a",
+		marshalAdmissionCommand(t, command),
+	)
+	if err == nil {
+		t.Fatal("expected the publish error to surface")
+	}
+	if disposition.kind != messageNak {
+		t.Fatalf("disposition=%+v, want NAK so redelivery retries the report", disposition)
+	}
+	state, _, _, _ := bridge.admissions().Snapshot(
+		bridge.admissions().byAttempt["attempt-cap"],
+	)
+	if state != dispatchAdmissionPending {
+		t.Fatalf("reservation state = %v, want pending so the report can be retried", state)
+	}
+
+	// The next redelivery must retry the report and terminate on success.
+	reporter.failFailed = false
+	disposition, err = bridge.handleDispatch(
+		context.Background(),
+		"session-a",
+		marshalAdmissionCommand(t, command),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if disposition.kind != messageTerm {
+		t.Fatalf("redelivery disposition=%+v, want term after report succeeds", disposition)
+	}
+	if code, _ := reporter.failure("attempt-cap"); code != dispatchCapacityFailureCode {
+		t.Fatalf("redelivery failure code = %q, want %q", code, dispatchCapacityFailureCode)
+	}
 }
 
 func TestLateFirstDispatchUsesFreeSlotDespiteAdmissionDeadline(t *testing.T) {

@@ -18,6 +18,13 @@ import (
 
 const dispatchCapacityNakDelay = time.Second
 
+// dispatchCapacityFailureCode is reported to Legion when a dispatch waited for
+// a free execution slot past its admission deadline and was dropped. Without
+// this report the platform only sees the attempt lease expire and reclaims it
+// as attempt_missing_from_heartbeat, which reads as "node lost contact" even
+// though the node was online and busy the whole time.
+const dispatchCapacityFailureCode = "node_capacity_exceeded"
+
 var (
 	dispatchEventRetryAttempts = 3
 	dispatchEventRetryDelay    = 100 * time.Millisecond
@@ -76,8 +83,7 @@ func (b *legionJobBridge) handleDispatch(
 			// A first delivery may legitimately arrive later because it waited in
 			// Legion's outbox or JetStream and must still run when a slot is free.
 			if b.admissions().CapacityRetryExpired(reservation, now) {
-				b.expirePendingReservation(reservation)
-				return termMessage(), nil
+				return b.publishCapacityExceeded(ctx, reservation, &command)
 			}
 			if preparing {
 				return nakDelayedMessage(dispatchCapacityNakDelay), nil
@@ -94,8 +100,7 @@ func (b *legionJobBridge) handleDispatch(
 	if !acquired {
 		b.admissions().PrepareFailed(reservation)
 		if b.admissions().CapacityRetryExpired(reservation, time.Now().UTC()) {
-			b.admissions().MarkExpired(reservation)
-			return termMessage(), nil
+			return b.publishCapacityExceeded(ctx, reservation, &command)
 		}
 		return nakDelayedMessage(dispatchCapacityNakDelay), nil
 	}
@@ -193,6 +198,31 @@ func (b *legionJobBridge) publishPendingCancellation(
 	b.admissions().MarkPendingCancelPublished(reservation)
 	b.admissions().CompactTerminal(reservation)
 	return ackSyncMessage(nil), nil
+}
+
+// publishCapacityExceeded reports a capacity drop to Legion instead of
+// terminating the message silently, so the platform records the real failure
+// cause rather than reclaiming the attempt later as
+// attempt_missing_from_heartbeat. The reservation is expired only after the
+// report succeeds; a publish failure NAKs while the reservation stays pending,
+// so the next redelivery retries the report instead of acking it away.
+func (b *legionJobBridge) publishCapacityExceeded(
+	ctx context.Context,
+	reservation *dispatchReservation,
+	command *jobv1.DispatchJobCommand,
+) (messageDisposition, error) {
+	err := b.dispatchReporter().PublishFailed(
+		ctx,
+		reservation.ref,
+		dispatchCapacityFailureCode,
+		"node execution slots are full and the dispatch admission deadline expired",
+		dispatchFailureDetail(command),
+	)
+	if err != nil {
+		return nakMessage(), err
+	}
+	b.expirePendingReservation(reservation)
+	return termMessage(), nil
 }
 
 func (b *legionJobBridge) rollbackPreparedReservation(reservation *dispatchReservation) {
