@@ -115,6 +115,10 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitRemoveRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.IntersectionRefFilterContext:
 		y.EmitIntersectionRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
+	case *sf.InsideRefFilterContext:
+		y.EmitInsideRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
+	case *sf.NotInsideRefFilterContext:
+		y.EmitNotInsideRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.VersionInFilterContext:
 		y.EmitAnchorScopeStart()
 		if versionIn := filter.VersionInExpression(); versionIn != nil {
