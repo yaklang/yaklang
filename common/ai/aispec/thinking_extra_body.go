@@ -5,239 +5,345 @@ import (
 	"sync"
 )
 
-// ThinkingBodyMatcher maps provider type / host / model hints to chat-completions extra JSON fields.
-// Built-in matchers run first in fixed order; RegisterThinkingBodyMatcher appends custom matchers.
-type ThinkingBodyMatcher interface {
-	// MatchType matches gateway / provider registration name (AIConfig.Type), e.g. tongyi、openai。
-	// 在基于域名/URL 的 MatchHost 之前优先执行。
-	MatchType(typeName string) bool
-	MatchHost(baseURL, domain string) bool
-	MatchModel(modelName string) bool
-	Params(enabled bool) map[string]any
+// ---------------------------------------------------------------------------
+// 思考强度参数构建：注册模式
+// ---------------------------------------------------------------------------
+//
+// 设计目标：
+//   - 这一层只做「格式构建」——把已确定好的 ThinkingLevel 放进正确的 JSON 字段。
+//   - 不做降级——降级由上层（utils.go 的探测逻辑）在调用前完成。
+//   - 可扩展——第三方通过 RegisterThinkingParamBuilder 注册自定义构建器。
+//
+// 调度顺序：
+//  1. MiniMax 模型名短路（百炼下 type=tongyi 但需 thinking.type 而非 enable_thinking）
+//  2. 按 typeName 匹配已注册的 builder
+//  3. 按 baseURL/domain 匹配已注册的 builder
+//  4. 按 modelName 匹配已注册的 builder
+//  5. 默认 fallback: {"thinking":{"type":"enabled"|"disabled"}}
+
+// ThinkingParamsContext 是传给 builder 的上下文。
+type ThinkingParamsContext struct {
+	// Level 是已归一化、已降级的思考等级：
+	// "none"/"low"/"medium"/"high"/"xhigh"/"max"。
+	// 空字符串表示 auto（不注入）。
+	Level string
+	// Model 是模型名（小写），如 "deepseek-v4-pro"、"kimi-k3"。
+	Model string
+	// APIType 是请求协议："responses" / "chat_completions" / ""（未知）。
+	APIType string
+}
+
+// ThinkingParamBuilder 将 ThinkingParamsContext 转换为请求体顶层 JSON 字段。
+// 返回 nil 表示不注入任何参数。
+type ThinkingParamBuilder func(ctx ThinkingParamsContext) map[string]any
+
+// thinkingBuilderEntry 描述一个 builder 的匹配条件。
+type thinkingBuilderEntry struct {
+	// builder 是实际构建函数
+	builder ThinkingParamBuilder
+	// typeNames 是该 builder 匹配的 AIConfig.Type 值（小写）
+	typeNames []string
+	// hostPatterns 是该 builder 匹配的 baseURL/domain 子串（小写）
+	hostPatterns []string
+	// modelTokens 是该 builder 匹配的 modelName 子串（小写）
+	modelTokens []string
 }
 
 var (
-	thinkingMatchersMu      sync.RWMutex
-	extraThinkingMatchers   []ThinkingBodyMatcher
-	builtinThinkingMatchers = []ThinkingBodyMatcher{
-		qwenThinkingMatcher{},
-		deepseekFamilyThinkingMatcher{},
-		openAICompatibleReasoningMatcher{},
-	}
+	thinkingBuildersMu sync.RWMutex
+	thinkingBuilders   []thinkingBuilderEntry
 )
 
-// RegisterThinkingBodyMatcher registers an extra matcher evaluated after built-ins.
-func RegisterThinkingBodyMatcher(m ThinkingBodyMatcher) {
-	if m == nil {
+// RegisterThinkingParamBuilder 注册一个思考参数构建器。
+// typeNames/hostPatterns/modelTokens 均为可选匹配条件，传空切片表示不按该维度匹配。
+// 后注册的 builder 优先级更高（插队到队列头部），便于覆盖内置实现。
+func RegisterThinkingParamBuilder(builder ThinkingParamBuilder, typeNames, hostPatterns, modelTokens []string) {
+	if builder == nil {
 		return
 	}
-	thinkingMatchersMu.Lock()
-	defer thinkingMatchersMu.Unlock()
-	extraThinkingMatchers = append(extraThinkingMatchers, m)
+	thinkingBuildersMu.Lock()
+	defer thinkingBuildersMu.Unlock()
+	thinkingBuilders = append([]thinkingBuilderEntry{{
+		builder:      builder,
+		typeNames:    typeNames,
+		hostPatterns: hostPatterns,
+		modelTokens:  modelTokens,
+	}}, thinkingBuilders...)
 }
 
-func allThinkingMatchers() []ThinkingBodyMatcher {
-	thinkingMatchersMu.RLock()
-	defer thinkingMatchersMu.RUnlock()
-	out := make([]ThinkingBodyMatcher, 0, len(builtinThinkingMatchers)+len(extraThinkingMatchers))
-	out = append(out, builtinThinkingMatchers...)
-	out = append(out, extraThinkingMatchers...)
-	return out
-}
-
-// ThinkingExtraBodyForProvider returns top-level JSON fields to merge into the request body
-// when the user has set EnableThinking (non-nil). Match order:
-//  1) every matcher’s MatchType(typeName)（厂商 / aispec 注册名）；
-//  2) every matcher’s MatchHost(baseURL, domain)；
-//  3) every matcher’s MatchModel(modelName)；
-// 若仍无命中，默认 {"thinking":{"type":"enabled"|"disabled"}}。
-func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain string, enabled bool) map[string]any {
-	// MiniMax 系模型（百炼直供 / 稀宇科技直供）忽略 enable_thinking，仅通过 thinking.type 控制思考。
-	// 由于 type=tongyi 会在 MatchType 阶段被 qwenThinkingMatcher 先命中（注入 enable_thinking），
-	// 基于模型名的判定无法走到 MatchModel 阶段，因此在此先行短路处理。
-	// 注意：MiniMax 仅允许 thinking.type 为 adaptive / disabled，不接受 enabled。
-	if strings.Contains(strings.ToLower(modelName), "minimax") {
-		return minimaxThinkingExtraBody(enabled)
+// ThinkingExtraBodyForProvider 根据 provider 类型/域名/模型名，返回请求体顶层的思考控制 JSON 字段。
+//
+// thinkingLevel 是已归一化的等级（"none"/"low"/"medium"/"high"/"xhigh"/"max"），
+// 空字符串表示 auto（不注入）。
+func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain, apiType, thinkingLevel string) map[string]any {
+	ctx := ThinkingParamsContext{
+		Level:   strings.ToLower(strings.TrimSpace(thinkingLevel)),
+		Model:   strings.ToLower(strings.TrimSpace(modelName)),
+		APIType: strings.ToLower(strings.TrimSpace(apiType)),
 	}
 
-	ms := allThinkingMatchers()
+	// MiniMax 短路：百炼下 type=tongyi 会被 Qwen builder 命中，
+	// 但 MiniMax 需要 thinking.type 而非 enable_thinking，因此先行判断。
+	if strings.Contains(ctx.Model, "minimax") {
+		return buildMiniMaxParams(ctx)
+	}
+
 	typ := strings.ToLower(strings.TrimSpace(typeName))
-	for _, m := range ms {
-		if m.MatchType(typ) {
-			return shallowCloneTopMap(m.Params(enabled))
-		}
-	}
 	bu := strings.ToLower(baseURL)
 	dm := strings.ToLower(domain)
-	for _, m := range ms {
-		if m.MatchHost(bu, dm) {
-			return shallowCloneTopMap(m.Params(enabled))
+
+	thinkingBuildersMu.RLock()
+	builders := make([]thinkingBuilderEntry, len(thinkingBuilders))
+	copy(builders, thinkingBuilders)
+	thinkingBuildersMu.RUnlock()
+
+	// Phase 1: 按 typeName 匹配
+	if typ != "" {
+		for _, e := range builders {
+			for _, tn := range e.typeNames {
+				if tn == typ {
+					return e.builder(ctx)
+				}
+			}
 		}
 	}
-	ml := strings.ToLower(modelName)
-	for _, m := range ms {
-		if m.MatchModel(ml) {
-			return shallowCloneTopMap(m.Params(enabled))
+
+	// Phase 2: 按 host 匹配
+	for _, e := range builders {
+		for _, h := range e.hostPatterns {
+			if strings.Contains(bu, h) || strings.Contains(dm, h) {
+				return e.builder(ctx)
+			}
 		}
 	}
-	return defaultThinkingExtraBody(enabled)
+
+	// Phase 3: 按 model 匹配
+	for _, e := range builders {
+		for _, tok := range e.modelTokens {
+			if strings.Contains(ctx.Model, tok) {
+				return e.builder(ctx)
+			}
+		}
+	}
+
+	// Phase 4: 默认 fallback
+	return buildDefaultParams(ctx)
 }
 
-// minimaxThinkingExtraBody 返回 MiniMax 系模型的思考控制字段。
-// 关闭思考使用 disabled；开启时使用 adaptive（MiniMax 不支持 enabled 取值）。
-func minimaxThinkingExtraBody(enabled bool) map[string]any {
-	t := "disabled"
-	if enabled {
-		t = "adaptive"
-	}
-	return map[string]any{
-		"thinking": map[string]any{"type": t},
-	}
-}
+// ---------------------------------------------------------------------------
+// 内置 builder
+// ---------------------------------------------------------------------------
 
-func defaultThinkingExtraBody(enabled bool) map[string]any {
-	t := "disabled"
-	if enabled {
-		t = "enabled"
-	}
-	return map[string]any{
-		"thinking": map[string]any{"type": t},
-	}
-}
-
-func shallowCloneTopMap(m map[string]any) map[string]any {
-	if m == nil {
+// buildOpenAIParams — OpenAI / Gemini / OpenRouter
+// Responses: {"reasoning":{"effort": level}}
+// Chat Completions: {"reasoning_effort": level}
+func buildOpenAIParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.Level == "" {
 		return nil
 	}
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		out[k] = v
+	if ctx.APIType == "responses" {
+		return map[string]any{"reasoning": map[string]any{"effort": ctx.Level}}
 	}
-	return out
+	return map[string]any{"reasoning_effort": ctx.Level}
 }
 
-type qwenThinkingMatcher struct{}
+// buildxAIParams — xAI / Grok
+// 与 OpenAI 格式一致，仅 typeName/modelToken 不同。
+func buildxAIParams(ctx ThinkingParamsContext) map[string]any {
+	return buildOpenAIParams(ctx)
+}
 
-func (qwenThinkingMatcher) MatchType(typeName string) bool {
-	if typeName == "" {
-		return false
+// buildDeepSeekParams — DeepSeek
+// Responses: {"reasoning":{"effort": level}}
+// Chat Completions: {"thinking":{"type":"enabled"},"reasoning_effort": level}
+func buildDeepSeekParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.Level == "" {
+		return nil
 	}
-	if typeName == "tongyi" {
-		return true
+	if ctx.APIType == "responses" {
+		return map[string]any{"reasoning": map[string]any{"effort": ctx.Level}}
 	}
-	if strings.Contains(typeName, "qwen") {
-		return true
+	if ctx.Level == "none" {
+		return map[string]any{"thinking": map[string]any{"type": "disabled"}}
 	}
-	switch typeName {
-	case "yaklang-writer", "yaklang-rag", "yaklang-com-search", "yakit-plugin-search":
-		return true
-	default:
-		return false
+	return map[string]any{
+		"thinking":         map[string]any{"type": "enabled"},
+		"reasoning_effort": ctx.Level,
 	}
 }
 
-func (qwenThinkingMatcher) MatchHost(baseURL, domain string) bool {
-	for _, h := range []string{
-		"dashscope.aliyuncs.com",
-		"dashscope-us.aliyuncs.com",
-		"dashscope-intl.aliyuncs.com",
-	} {
-		if strings.Contains(baseURL, h) || strings.Contains(domain, h) {
+// buildQwenParams — Qwen / 百炼
+// Responses: {"reasoning":{"effort": level}}
+// Chat Completions: {"enable_thinking": true/false, "reasoning_effort": level}
+func buildQwenParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.APIType == "responses" {
+		if ctx.Level == "" {
+			return nil
+		}
+		return map[string]any{"reasoning": map[string]any{"effort": ctx.Level}}
+	}
+	// Chat Completions
+	if ctx.Level == "" || ctx.Level == "none" {
+		return map[string]any{"enable_thinking": false}
+	}
+	return map[string]any{
+		"enable_thinking":  true,
+		"reasoning_effort": ctx.Level,
+	}
+}
+
+// buildKimiParams — Kimi / Moonshot
+// K3: {"reasoning_effort": level}
+// K2.x: {"thinking":{"type":"enabled","keep":"all"}} / {"thinking":{"type":"disabled"}}
+func buildKimiParams(ctx ThinkingParamsContext) map[string]any {
+	if strings.Contains(ctx.Model, "k3") {
+		// K3 用 reasoning_effort
+		if ctx.Level == "" {
+			return nil
+		}
+		return map[string]any{"reasoning_effort": ctx.Level}
+	}
+	// K2.x 用 thinking.type 开关
+	if ctx.Level == "" || ctx.Level == "none" {
+		return map[string]any{"thinking": map[string]any{"type": "disabled"}}
+	}
+	return map[string]any{"thinking": map[string]any{"type": "enabled", "keep": "all"}}
+}
+
+// buildAnthropicParams — Claude
+// Claude 4.7+/5.x: {"thinking":{"type":"adaptive","display":"summarized"}}
+// Claude ≤4.6: {"thinking":{"type":"enabled","budget_tokens": N, "display":"detailed"}}
+func buildAnthropicParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.Level == "" || ctx.Level == "none" {
+		return nil
+	}
+	if isClaudeAdaptiveOnly(ctx.Model) {
+		return map[string]any{"thinking": map[string]any{"type": "adaptive", "display": "summarized"}}
+	}
+	budgetMap := map[string]int64{
+		"low":    2048,
+		"medium": 8192,
+		"high":   16384,
+		"xhigh":  32768,
+		"max":    32768,
+	}
+	budget, ok := budgetMap[ctx.Level]
+	if !ok {
+		budget = 8192
+	}
+	return map[string]any{
+		"thinking": map[string]any{
+			"type":          "enabled",
+			"budget_tokens": budget,
+			"display":       "detailed",
+		},
+	}
+}
+
+// buildFamilyParams — volcengine / chatglm / siliconflow / doubao / glm
+// 通用 thinking.type 开关控制。
+func buildFamilyParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.Level == "" || ctx.Level == "none" {
+		return map[string]any{"thinking": map[string]any{"type": "disabled"}}
+	}
+	return map[string]any{"thinking": map[string]any{"type": "enabled"}}
+}
+
+// buildMiniMaxParams — MiniMax（稀宇科技直供）
+// {"thinking":{"type":"adaptive"}} 或 {"thinking":{"type":"disabled"}}
+func buildMiniMaxParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.Level == "none" {
+		return map[string]any{"thinking": map[string]any{"type": "disabled"}}
+	}
+	return map[string]any{"thinking": map[string]any{"type": "adaptive"}}
+}
+
+// buildDefaultParams — 未知 provider 的 fallback
+func buildDefaultParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.Level == "none" {
+		return map[string]any{"thinking": map[string]any{"type": "disabled"}}
+	}
+	if ctx.Level == "" {
+		return nil
+	}
+	return map[string]any{"thinking": map[string]any{"type": "enabled"}}
+}
+
+// ---------------------------------------------------------------------------
+// 辅助函数
+// ---------------------------------------------------------------------------
+
+// isClaudeAdaptiveOnly 通过模型名判断是否仅支持 adaptive 模式。
+// Claude 4.7+、Claude 5.x（opus-5/sonnet-5/haiku-5 等）不再支持手动 budget_tokens。
+func isClaudeAdaptiveOnly(model string) bool {
+	if strings.Contains(model, "4.7") || strings.Contains(model, "4.8") || strings.Contains(model, "4.9") {
+		return true
+	}
+	for _, tok := range []string{"opus-5", "sonnet-5", "haiku-5", "fable-5", "mythos-5", "claude-5"} {
+		if strings.Contains(model, tok) {
 			return true
 		}
 	}
 	return false
 }
 
-func (qwenThinkingMatcher) MatchModel(modelName string) bool {
-	return strings.Contains(modelName, "qwen")
+// MapReasoningEffortToThinkingConfig — legacy 兼容函数
+// 将用户输入的 effort 字符串归一化为 ThinkingLevel。
+func MapReasoningEffortToThinkingConfig(effort string) string {
+	return normalizeThinkingLevel(effort)
 }
 
-func (qwenThinkingMatcher) Params(enabled bool) map[string]any {
-	return map[string]any{"enable_thinking": enabled}
-}
+// ---------------------------------------------------------------------------
+// 内置 builder 注册（init 时自动执行）
+// ---------------------------------------------------------------------------
 
-type deepseekFamilyThinkingMatcher struct{}
+func init() {
+	// OpenAI / Gemini / OpenRouter
+	RegisterThinkingParamBuilder(buildOpenAIParams,
+		[]string{"openai", "gemini", "openrouter"},
+		[]string{"api.openai.com", "generativelanguage.googleapis.com"},
+		[]string{"gpt", "gemini"},
+	)
 
-func (deepseekFamilyThinkingMatcher) MatchType(typeName string) bool {
-	if typeName == "" {
-		return false
-	}
-	switch typeName {
-	case "deepseek", "moonshot", "volcengine", "chatglm", "siliconflow":
-		return true
-	default:
-		return false
-	}
-}
+	// xAI / Grok
+	RegisterThinkingParamBuilder(buildxAIParams,
+		[]string{"xai", "grok"},
+		[]string{"api.x.ai"},
+		[]string{"grok"},
+	)
 
-func (deepseekFamilyThinkingMatcher) MatchHost(baseURL, domain string) bool {
-	for _, h := range []string{
-		"api.deepseek.com",
-		"api.moonshot.ai",
-		"open.bigmodel.cn",
-		"ark.cn-beijing.volces.com",
-	} {
-		if strings.Contains(baseURL, h) || strings.Contains(domain, h) {
-			return true
-		}
-	}
-	return false
-}
+	// Anthropic / Claude
+	RegisterThinkingParamBuilder(buildAnthropicParams,
+		[]string{"anthropic", "claude"},
+		[]string{"api.anthropic.com"},
+		[]string{"claude"},
+	)
 
-func (deepseekFamilyThinkingMatcher) MatchModel(modelName string) bool {
-	for _, tok := range []string{"deepseek", "kimi", "glm", "doubao"} {
-		if strings.Contains(modelName, tok) {
-			return true
-		}
-	}
-	return false
-}
+	// Qwen / 百炼
+	RegisterThinkingParamBuilder(buildQwenParams,
+		[]string{"tongyi", "qwen", "yaklang-writer", "yaklang-rag", "yaklang-com-search", "yakit-plugin-search"},
+		[]string{"dashscope.aliyuncs.com", "dashscope-us.aliyuncs.com", "dashscope-intl.aliyuncs.com"},
+		[]string{"qwen"},
+	)
 
-func (deepseekFamilyThinkingMatcher) Params(enabled bool) map[string]any {
-	t := "disabled"
-	if enabled {
-		t = "enabled"
-	}
-	return map[string]any{"thinking": map[string]any{"type": t}}
-}
+	// DeepSeek
+	RegisterThinkingParamBuilder(buildDeepSeekParams,
+		[]string{"deepseek"},
+		[]string{"api.deepseek.com"},
+		[]string{"deepseek"},
+	)
 
-type openAICompatibleReasoningMatcher struct{}
+	// Kimi / Moonshot
+	RegisterThinkingParamBuilder(buildKimiParams,
+		[]string{"moonshot"},
+		[]string{"api.moonshot.ai"},
+		[]string{"kimi"},
+	)
 
-func (openAICompatibleReasoningMatcher) MatchType(typeName string) bool {
-	if typeName == "" {
-		return false
-	}
-	switch typeName {
-	case "openai", "gemini", "openrouter":
-		return true
-	default:
-		return false
-	}
-}
-
-func (openAICompatibleReasoningMatcher) MatchHost(baseURL, domain string) bool {
-	for _, h := range []string{"api.openai.com", "generativelanguage.googleapis.com"} {
-		if strings.Contains(baseURL, h) || strings.Contains(domain, h) {
-			return true
-		}
-	}
-	return false
-}
-
-func (openAICompatibleReasoningMatcher) MatchModel(modelName string) bool {
-	for _, tok := range []string{"gpt", "gemini"} {
-		if strings.Contains(modelName, tok) {
-			return true
-		}
-	}
-	return false
-}
-
-func (openAICompatibleReasoningMatcher) Params(enabled bool) map[string]any {
-	effort := "none"
-	if enabled {
-		effort = "medium"
-	}
-	return map[string]any{"reasoning": map[string]any{"effort": effort}}
+	// 通用 family: volcengine / chatglm / siliconflow / doubao / glm
+	RegisterThinkingParamBuilder(buildFamilyParams,
+		[]string{"volcengine", "chatglm", "siliconflow"},
+		[]string{"open.bigmodel.cn", "ark.cn-beijing.volces.com"},
+		[]string{"glm", "doubao"},
+	)
 }

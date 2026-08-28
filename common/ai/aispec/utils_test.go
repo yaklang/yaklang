@@ -44,15 +44,13 @@ func TestBuildOptionsFromConfig_AppliesEnableThinking(t *testing.T) {
 		},
 	}
 
-	// 仅应用 BuildOptionsFromConfig，避免 NewDefaultAIConfig 命中环境里的 tiered 配置并覆盖 thinking 相关字段。
 	resolved := &AIConfig{}
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
 	assert.Equal(t, "siliconflow", resolved.Type)
 	assert.Equal(t, "deepseek-ai/DeepSeek-V4-Flash", resolved.Model)
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *testing.T) {
@@ -60,18 +58,17 @@ func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *test
 	config := &ypb.AIModelConfig{
 		ModelName: "doubao-pro",
 		Provider: &ypb.ThirdPartyApplicationConfig{
-			Type:               "openai",
-			APIKey:             "test-key",
-			EnableThinking:     true,
-			EnableThinkingOpt:  &disabled,
+			Type:              "openai",
+			APIKey:            "test-key",
+			EnableThinking:    true,
+			EnableThinkingOpt: &disabled,
 		},
 	}
 	resolved := &AIConfig{}
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.False(t, *resolved.EnableThinking)
+	assert.Equal(t, "none", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_EnableThinkingOptTrue(t *testing.T) {
@@ -88,8 +85,7 @@ func TestBuildOptionsFromConfig_EnableThinkingOptTrue(t *testing.T) {
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
@@ -102,14 +98,14 @@ func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
 	config := &ypb.AIModelConfig{
 		ModelName: "gpt-4o",
 		Provider: &ypb.ThirdPartyApplicationConfig{
-			Type:               "openai",
-			APIKey:             "test-key",
-			MaxTokens:          &maxT,
-			Temperature:        &temp,
-			TopP:               &topP,
-			TopK:               &topK,
-			FrequencyPenalty:   &freq,
-			ReasoningEffort:    &reason,
+			Type:             "openai",
+			APIKey:           "test-key",
+			MaxTokens:        &maxT,
+			Temperature:      &temp,
+			TopP:             &topP,
+			TopK:             &topK,
+			FrequencyPenalty: &freq,
+			ReasoningEffort:  &reason,
 		},
 	}
 
@@ -124,7 +120,201 @@ func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
 	assert.Equal(t, int64(50), *resolved.TopK)
 	require.NotNil(t, resolved.FrequencyPenalty)
 	assert.InDelta(t, 0.0, *resolved.FrequencyPenalty, 1e-9)
-	assert.Equal(t, "high", resolved.ReasoningEffort)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortHigh(t *testing.T) {
+	effort := "high"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Equal(t, "high", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortOff(t *testing.T) {
+	effort := "off"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Equal(t, "none", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortAuto(t *testing.T) {
+	effort := "auto"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Empty(t, resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortOverridesEnableThinking(t *testing.T) {
+	// When ReasoningEffort is set, it takes priority over legacy EnableThinking field.
+	effort := "low"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			EnableThinking:  true, // legacy field, should be overridden
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Equal(t, "low", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortXhigh(t *testing.T) {
+	effort := "xhigh"
+	config := &ypb.AIModelConfig{
+		ModelName: "o3-mini",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	// Without ProbedExtendedEfforts, xhigh is clamped to high
+	assert.Equal(t, "high", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedSupported(t *testing.T) {
+	effort := "xhigh"
+	config := &ypb.AIModelConfig{
+		ModelName:             "o3-mini",
+		ProbedExtendedEfforts: []string{"xhigh", "max"},
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	// With ProbedExtendedEfforts containing xhigh, it passes through
+	assert.Equal(t, "xhigh", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortMax_ProbedSupported(t *testing.T) {
+	effort := "max"
+	config := &ypb.AIModelConfig{
+		ModelName:             "o3-mini",
+		ProbedExtendedEfforts: []string{"xhigh", "max"},
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Equal(t, "max", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedNotSupported(t *testing.T) {
+	effort := "xhigh"
+	config := &ypb.AIModelConfig{
+		ModelName:             "gpt-4o",
+		ProbedExtendedEfforts: nil, // probed but not supported
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	// Probed but not supported → clamped to high
+	assert.Equal(t, "high", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_ReasoningEffortMax_OnlyXhighProbed(t *testing.T) {
+	effort := "max"
+	config := &ypb.AIModelConfig{
+		ModelName:             "o3-mini",
+		ProbedExtendedEfforts: []string{"xhigh"}, // only xhigh, not max
+		EffortProbed:          true,
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:            "openai",
+			APIKey:          "test-key",
+			ReasoningEffort: &effort,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	// max not in ProbedExtendedEfforts → clamped to high
+	assert.Equal(t, "high", resolved.ThinkingLevel)
+}
+
+func TestBuildOptionsFromConfig_LegacyEnableThinkingWithoutReasoningEffort(t *testing.T) {
+	// When ReasoningEffort is NOT set, legacy EnableThinking/EnableThinkingOpt still work.
+	config := &ypb.AIModelConfig{
+		ModelName: "deepseek-chat",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:           "siliconflow",
+			APIKey:         "test-key",
+			EnableThinking: true,
+		},
+	}
+
+	resolved := &AIConfig{}
+	for _, opt := range BuildOptionsFromConfig(config) {
+		opt(resolved)
+	}
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestGetBaseURLFromConfig_UsesResponsesAPIType(t *testing.T) {

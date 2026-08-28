@@ -300,18 +300,29 @@ func mergeChatBaseExtraBody(c *ChatBaseContext, m map[string]any) {
 	}
 }
 
-// ChatBaseThinkingOptions merges ThinkingExtraBodyForProvider into ExtraBody when cfg.EnableThinking != nil.
+// ChatBaseThinkingOptions merges ThinkingExtraBodyForProvider into ExtraBody when cfg.ThinkingLevel is non-empty.
+// apiType 由实际请求 URL 动态推断（与 ChatBase 中的 URL 后缀检测逻辑一致），
+// 而非使用 cfg.APIType 静态配置值，避免两者不一致导致注入格式错误。
 func ChatBaseThinkingOptions(cfg *AIConfig, resolvedTargetURL string) ChatBaseOption {
 	return func(c *ChatBaseContext) {
-		if cfg == nil || cfg.EnableThinking == nil {
+		if cfg == nil || strings.TrimSpace(cfg.ThinkingLevel) == "" {
 			return
 		}
 		baseURL := cfg.BaseURL
 		if baseURL == "" {
 			baseURL = resolvedTargetURL
 		}
-		m := ThinkingExtraBodyForProvider(cfg.Type, cfg.Model, baseURL, cfg.Domain, *cfg.EnableThinking)
+		// 动态推断实际协议：URL 以 /responses 结尾则为 Responses，否则 Chat Completions。
+		// 与 ChatBase() 中的 interfaceType 检测逻辑保持一致。
+		apiType := string(c.InterfaceType)
+		if c.InterfaceType == ChatBaseInterfaceTypeChatCompletions &&
+			strings.HasSuffix(strings.TrimRight(strings.ToLower(resolvedTargetURL), "/"), "/responses") {
+			apiType = string(ChatBaseInterfaceTypeResponses)
+		}
+		m := ThinkingExtraBodyForProvider(cfg.Type, cfg.Model, baseURL, cfg.Domain, apiType, cfg.ThinkingLevel)
 		mergeChatBaseExtraBody(c, m)
+		// 防止 base.go 中直接注入路径（msgIns.ReasoningEffort / req["reasoning"]）重复注入。
+		c.ReasoningEffort = ""
 	}
 }
 
@@ -327,9 +338,6 @@ func WithChatBase_AISamplingFromConfig(cfg *AIConfig) ChatBaseOption {
 		c.TopP = cloneFloat64Ptr(cfg.TopP)
 		c.TopK = cloneInt64Ptr(cfg.TopK)
 		c.FrequencyPenalty = cloneFloat64Ptr(cfg.FrequencyPenalty)
-		if s := strings.TrimSpace(cfg.ReasoningEffort); s != "" {
-			c.ReasoningEffort = s
-		}
 		if cfg.DisableStream {
 			c.DisableStream = true
 		}

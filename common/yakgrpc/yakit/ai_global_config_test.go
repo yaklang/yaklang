@@ -495,3 +495,100 @@ func lookupExtraParam(cfg *ypb.AIModelConfig, key string) string {
 	}
 	return ""
 }
+
+func TestCloneAIModelConfigs_ProbedExtendedEfforts(t *testing.T) {
+	models := []*ypb.AIModelConfig{
+		{
+			ModelName:             "o3-mini",
+			ProbedExtendedEfforts: []string{"xhigh", "max"},
+			EffortProbed:          true,
+		},
+		{
+			ModelName:             "gpt-4o",
+			ProbedExtendedEfforts: nil,
+			EffortProbed:          true, // probed but not supported
+		},
+		{
+			ModelName:    "gpt-4o-mini",
+			EffortProbed: false, // never probed
+		},
+	}
+
+	cloned := cloneAIModelConfigs(models)
+	require.Len(t, cloned, 3)
+
+	// Model 0: xhigh + max supported
+	assert.Equal(t, []string{"xhigh", "max"}, cloned[0].GetProbedExtendedEfforts())
+	assert.True(t, cloned[0].GetEffortProbed())
+
+	// Model 1: probed but empty (not supported)
+	assert.Empty(t, cloned[1].GetProbedExtendedEfforts())
+	assert.True(t, cloned[1].GetEffortProbed())
+
+	// Model 2: never probed
+	assert.False(t, cloned[2].GetEffortProbed())
+}
+
+func TestApplyAIGlobalConfig_ProbedExtendedEfforts(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	defer db.Close()
+
+	cfg := &ypb.AIGlobalConfig{
+		Enabled:       true,
+		RoutingPolicy: "auto",
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName:             "o3-mini",
+				ProbedExtendedEfforts: []string{"xhigh", "max"},
+				EffortProbed:          true,
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "openai",
+					APIKey: "key-1",
+					Domain: "api.openai.com",
+				},
+			},
+		},
+	}
+
+	err := ApplyAIGlobalConfig(db, cfg)
+	require.NoError(t, err)
+
+	intelligent := consts.GetIntelligentAIConfigs()
+	require.Len(t, intelligent, 1)
+	assert.Equal(t, []string{"xhigh", "max"}, intelligent[0].GetProbedExtendedEfforts())
+	assert.True(t, intelligent[0].GetEffortProbed())
+}
+
+func TestSetGetAIGlobalConfig_ProbedExtendedEfforts(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	defer db.Close()
+
+	cfg := &ypb.AIGlobalConfig{
+		Enabled:       true,
+		RoutingPolicy: "auto",
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName:             "o3-mini",
+				ProbedExtendedEfforts: []string{"xhigh", "max"},
+				EffortProbed:          true,
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "openai",
+					APIKey: "key-1",
+					Domain: "api.openai.com",
+				},
+			},
+		},
+	}
+
+	saved, err := SetAIGlobalConfig(db, cfg)
+	require.NoError(t, err)
+	require.Len(t, saved.IntelligentModels, 1)
+	assert.Equal(t, []string{"xhigh", "max"}, saved.IntelligentModels[0].GetProbedExtendedEfforts())
+	assert.True(t, saved.IntelligentModels[0].GetEffortProbed())
+
+	loaded, err := GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Len(t, loaded.IntelligentModels, 1)
+	assert.Equal(t, []string{"xhigh", "max"}, loaded.IntelligentModels[0].GetProbedExtendedEfforts())
+	assert.True(t, loaded.IntelligentModels[0].GetEffortProbed())
+}

@@ -238,10 +238,10 @@ func BuildOptionsFromConfig(config *ypb.AIModelConfig) []AIConfigOption {
 	if config == nil {
 		return nil
 	}
-	return buildOptionsFromProviderAndModel(config.GetProvider(), config.GetModelName(), config.GetExtraParams())
+	return buildOptionsFromProviderAndModel(config.GetProvider(), config.GetModelName(), config.GetExtraParams(), config.GetProbedExtendedEfforts(), config.GetEffortProbed())
 }
 
-func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, modelName string, modelExtra []*ypb.KVPair) []AIConfigOption {
+func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, modelName string, modelExtra []*ypb.KVPair, probedExtendedEfforts []string, effortProbed bool) []AIConfigOption {
 	var opts []AIConfigOption
 
 	if provider == nil {
@@ -291,10 +291,37 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithAPIType(provider.APIType))
 	}
 
-	if provider.EnableThinkingOpt != nil {
-		opts = append(opts, WithEnableThinking(*provider.EnableThinkingOpt))
+	// ThinkingLevel 统一表达思考强度。ReasoningEffort（proto 层）优先，
+	// 回退到 EnableThinkingOpt / EnableThinking（legacy 布尔开关）。
+	if provider.ReasoningEffort != nil {
+		s := strings.TrimSpace(*provider.ReasoningEffort)
+		if s != "" {
+			level := normalizeThinkingLevel(s)
+			if level != "" {
+				// Clamp xhigh/max：未探测或探测结果不含此级别时降级为 high。
+				if level == "xhigh" || level == "max" {
+					supported := false
+					for _, e := range probedExtendedEfforts {
+						if e == level {
+							supported = true
+							break
+						}
+					}
+					if !supported {
+						level = "high"
+					}
+				}
+				opts = append(opts, WithThinkingLevel(level))
+			}
+		}
+	} else if provider.EnableThinkingOpt != nil {
+		if *provider.EnableThinkingOpt {
+			opts = append(opts, WithThinkingLevel("high"))
+		} else {
+			opts = append(opts, WithThinkingLevel("none"))
+		}
 	} else if provider.GetEnableThinking() {
-		opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
+		opts = append(opts, WithThinkingLevel("high"))
 	}
 
 	if provider.MaxTokens != nil {
@@ -311,11 +338,6 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	}
 	if provider.FrequencyPenalty != nil {
 		opts = append(opts, WithFrequencyPenalty(*provider.FrequencyPenalty))
-	}
-	if provider.ReasoningEffort != nil {
-		if s := strings.TrimSpace(*provider.ReasoningEffort); s != "" {
-			opts = append(opts, WithReasoningEffort(s))
-		}
 	}
 
 	if modelName != "" {
