@@ -99,7 +99,9 @@ filterItemFirst
 constSearchPrefix: ConstSearchModePrefixRegexp | ConstSearchModePrefixGlob | ConstSearchModePrefixExact;
 
 filterItem
-    : filterItemFirst                            # First
+    : Inside refVariable                         # InsideRefFilter
+    | NotInside refVariable                      # NotInsideRefFilter
+    | filterItemFirst                            # First
     | '...' lines? nameFilter                    # DeepChainFilter
     | Question? '(' lines? actualParam? ')'      # FunctionCallFilter
     | '[' sliceCallItem ']'                      # FieldIndexFilter
@@ -224,6 +226,8 @@ keywords
     | Else
     | Type
     | In
+    | Inside
+    | NotInside
     | Have
     | HaveAny
     | BoolLiteral
