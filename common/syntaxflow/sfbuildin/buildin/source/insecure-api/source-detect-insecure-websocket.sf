@@ -1,0 +1,47 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Detect Insecure Websocket"
+	title_zh: "检测到不安全的 WebSocket 连接",
+	type: vuln
+	level: middle
+	rule_id: "source-detect-insecure-websocket"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `detect-insecure-websocket` (/tmp/semgrep-rules/javascript/lang/security/detect-insecure-websocket.yaml).
+Original message: Insecure WebSocket Detected. WebSocket Secure (wss) should be used for all WebSocket connections.
+
+CWE: CWE-319: Cleartext Transmission of Sensitive Information
+References:
+- https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+Note: context-aware regex — ws:// hits are dropped when inside ws://localhost.* / ws://127.0.0.1.* regions (pattern-not-inside).
+DESC
+	solution: <<<SOLUTION
+Use wss:// (WebSocket Secure) for all WebSocket connections.
+SOLUTION
+	alert_min: 1
+	"file://pos.js": <<<POS
+var scheme = "ws://";
+var uri = scheme + window.document.location.host + "/";
+var ws = new WebSocket(uri);
+YAKLANG_SF_POS_source-detect-insecure-websocket
+ws://foo/bar
+POS
+	"safefile://neg.js": <<<NEG
+var secure_url = "wss://my/url";
+var localhost = "ws://localhost:27017/freecodecamp?directConnection=true";
+var local = "ws://127.0.0.1:3000"
+NEG
+)
+
+${*}.pattern_regex(/\bws:\/\//) as $t
+${*}.pattern_regex(/\bws:\/\/localhost.*/) as $j1
+${*}.pattern_regex(/\bws:\/\/127\.0\.0\.1.*/) as $j2
+$t not_inside $j1 as $a
+$a not_inside $j2 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Detect Insecure Websocket",
+	title_zh: "检测到不安全的 WebSocket 连接",
+	message: "Insecure WebSocket Detected. WebSocket Secure (wss) should be used for all WebSocket connections.",
+}

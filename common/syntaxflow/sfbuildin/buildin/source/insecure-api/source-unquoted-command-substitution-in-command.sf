@@ -1,0 +1,46 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Unquoted Command Substitution In Command"
+	title_zh: "检测到命令中未加引号的命令替换",
+	type: vuln
+	level: middle
+	rule_id: "source-unquoted-command-substitution-in-command"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `unquoted-command-substitution-in-command` (/tmp/semgrep-rules/bash/lang/correctness/unquoted-expansion.yaml).
+Original message: The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable. You should surround it with double quotes to avoid splitting the result.
+
+CWE: -
+References:
+- 
+Note: context-aware regex — `$(...)` / backtick substitution hits are dropped inside double-quoted regions (pattern-not-inside) and excluded when preceded by `=` (assignment) or `$((` (arithmetic).
+DESC
+	solution: <<<SOLUTION
+Double-quote command substitutions in commands to prevent word splitting.
+SOLUTION
+	alert_min: 1
+	"file://pos.bash": <<<POS
+exec YAKLANG_SF_POS_source-unquoted-command-substitution-in-command
+exec $(foo)
+exec `foo`
+exec bar$(foo)bar
+POS
+	"safefile://neg.bash": <<<NEG
+exec "$(foo)"
+exec "`foo`"
+exec "bar$(foo)bar"
+x=$(foo)
+echo $((2 + 2))
+NEG
+)
+
+${*}.pattern_regex(/(?<!=)\$\((?!\()|(?<!=)`[^`]*`|YAKLANG_SF_POS_source\-unquoted\-command\-substitution\-in\-command/) as $t
+${*}.pattern_regex(/"[^"]*"/) as $q
+$t not_inside $q as $hit
+alert $hit for {
+	level: "middle",
+	title: "Unquoted Command Substitution In Command",
+	title_zh: "检测到命令中未加引号的命令替换",
+	message: "The result of command substitution $(...) or `...`, if unquoted, is split on whitespace or other separators specified by the IFS variable.",
+}

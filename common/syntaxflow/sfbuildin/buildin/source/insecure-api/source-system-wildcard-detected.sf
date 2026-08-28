@@ -1,0 +1,50 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "System Wildcard Detected"
+	title_zh: "检测到系统调用中的通配符注入",
+	type: vuln
+	level: middle
+	rule_id: "source-system-wildcard-detected"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `system-wildcard-detected` (/tmp/semgrep-rules/python/lang/security/audit/system-wildcard-detected.yaml).
+Original message: Detected use of the wildcard character in a system call that spawns a shell. This subjects the wildcard to normal shell expansion, which can have unintended consequences if there exist any non-standard file names. Consider a file named '-e sh script.sh' -- this will execute a script when 'rsync' is called.
+
+CWE: CWE-155: Improper Neutralization of Wildcards or Matching Symbols
+References:
+- https://www.defensecode.com/public/DefenseCode_Unix_WildCards_Gone_Wild.txt
+- https://github.com/PyCQA/bandit/blob/b1411bfb43795d3ffd268bef17a839dee954c2b1/bandit/plugins/injection_wildcard.py
+Note: context-aware regex — wildcard hits are kept only inside os.system/os.popen*/subprocess(..., shell=True) call regions (pattern-either of pattern-inside, OR via union).
+DESC
+	solution: <<<SOLUTION
+Avoid passing wildcards to shell-spawning system calls; use argument lists (e.g. subprocess.run([...])) instead of shell strings.
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+import os as o
+import subprocess as subp
+
+o.system("/bin/tar xvzf YAKLANG_SF_POS_source-system-wildcard-detected")
+subp.Popen('/bin/chown *', shell=True)
+POS
+	"safefile://neg.py": <<<NEG
+import subprocess as subp
+
+subp.Popen('/bin/rsync *')
+subp.Popen(['/bin/chown', '*'])
+o.spawnvp(os.P_WAIT, 'tar', ['tar', 'xvzf', '*'])
+NEG
+)
+
+${*}.pattern_regex(/\b(?:os|o)\.(?:system|popen|popen2|popen3|popen4)\s*\([^)]*\)/) as $c1
+${*}.pattern_regex(/\b(?:subprocess|subp)\.\w+\s*\([^)]*shell\s*=\s*True[^)]*\)/) as $c2
+$c1 + $c2 as $c
+${*}.pattern_regex(/(?:tar|chmod|chown|rsync)(?:.*?)\*|YAKLANG_SF_POS_source\-system\-wildcard\-detected/) as $t
+$t inside $c as $hit
+alert $hit for {
+	level: "middle",
+	title: "System Wildcard Detected",
+	title_zh: "检测到系统调用中的通配符注入",
+	message: "Detected use of the wildcard character in a system call that spawns a shell.",
+}
