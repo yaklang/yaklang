@@ -193,9 +193,16 @@ func buildQwenParams(ctx ThinkingParamsContext) map[string]any {
 }
 
 // buildKimiParams — Kimi / Moonshot
-// K3: {"reasoning_effort": level}
-// K2.x: {"thinking":{"type":"enabled","keep":"all"}} / {"thinking":{"type":"disabled"}}
+// Responses: {"reasoning":{"effort": level}}
+// Chat Completions K3: {"reasoning_effort": level}
+// Chat Completions K2.x: {"thinking":{"type":"enabled","keep":"all"}} / {"thinking":{"type":"disabled"}}
 func buildKimiParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.APIType == "responses" {
+		if ctx.Level == "" {
+			return nil
+		}
+		return map[string]any{"reasoning": map[string]any{"effort": ctx.Level}}
+	}
 	if strings.Contains(ctx.Model, "k3") {
 		// K3 用 reasoning_effort
 		if ctx.Level == "" {
@@ -241,12 +248,23 @@ func buildAnthropicParams(ctx ThinkingParamsContext) map[string]any {
 }
 
 // buildFamilyParams — volcengine / chatglm / siliconflow / doubao / glm
-// 通用 thinking.type 开关控制。
+// Responses: {"reasoning":{"effort": level}}
+// Chat Completions: 通用 thinking.type 开关 + reasoning_effort 等级控制。
 func buildFamilyParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.APIType == "responses" {
+		if ctx.Level == "" || ctx.Level == "none" {
+			return nil
+		}
+		return map[string]any{"reasoning": map[string]any{"effort": ctx.Level}}
+	}
+	// Chat Completions
 	if ctx.Level == "" || ctx.Level == "none" {
 		return map[string]any{"thinking": map[string]any{"type": "disabled"}}
 	}
-	return map[string]any{"thinking": map[string]any{"type": "enabled"}}
+	return map[string]any{
+		"thinking":         map[string]any{"type": "enabled"},
+		"reasoning_effort": ctx.Level,
+	}
 }
 
 // buildMiniMaxParams — MiniMax（稀宇科技直供）
@@ -259,14 +277,25 @@ func buildMiniMaxParams(ctx ThinkingParamsContext) map[string]any {
 }
 
 // buildDefaultParams — 未知 provider 的 fallback
+// Responses: {"reasoning":{"effort": level}}
+// Chat Completions: thinking.type 开关 + reasoning_effort
 func buildDefaultParams(ctx ThinkingParamsContext) map[string]any {
+	if ctx.APIType == "responses" {
+		if ctx.Level == "" || ctx.Level == "none" {
+			return nil
+		}
+		return map[string]any{"reasoning": map[string]any{"effort": ctx.Level}}
+	}
 	if ctx.Level == "none" {
 		return map[string]any{"thinking": map[string]any{"type": "disabled"}}
 	}
 	if ctx.Level == "" {
 		return nil
 	}
-	return map[string]any{"thinking": map[string]any{"type": "enabled"}}
+	return map[string]any{
+		"thinking":         map[string]any{"type": "enabled"},
+		"reasoning_effort": ctx.Level,
+	}
 }
 
 // ---------------------------------------------------------------------------

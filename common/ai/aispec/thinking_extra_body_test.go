@@ -290,6 +290,36 @@ func TestThinkingExtraBodyForProvider_KimiK2Keep(t *testing.T) {
 	assert.Equal(t, "all", inner["keep"])
 }
 
+func TestThinkingExtraBodyForProvider_KimiResponses(t *testing.T) {
+	// K3 Responses: reasoning.effort
+	m := ThinkingExtraBodyForProvider("moonshot", "kimi-k3", "", "", "responses", "high")
+	inner, ok := m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "high", inner["effort"])
+	_, hasThinking := m["thinking"]
+	assert.False(t, hasThinking, "K3 Responses 不应注入 thinking 开关")
+	_, hasEffort := m["reasoning_effort"]
+	assert.False(t, hasEffort, "Responses 模式不应注入顶层 reasoning_effort")
+
+	// K2.x Responses: reasoning.effort（不使用 thinking.type 开关）
+	m = ThinkingExtraBodyForProvider("moonshot", "kimi-k2.6", "", "", "responses", "medium")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "medium", inner["effort"])
+	_, hasThinking = m["thinking"]
+	assert.False(t, hasThinking, "K2 Responses 不应注入 thinking 开关")
+
+	// Kimi Responses none
+	m = ThinkingExtraBodyForProvider("moonshot", "kimi-k3", "", "", "responses", "none")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "none", inner["effort"])
+
+	// Kimi Responses auto → 不注入
+	m = ThinkingExtraBodyForProvider("moonshot", "kimi-k3", "", "", "responses", "")
+	assert.Nil(t, m)
+}
+
 // ===========================================================================
 // MiniMax
 // ===========================================================================
@@ -310,6 +340,23 @@ func TestThinkingExtraBodyForProvider_MiniMaxUnderTongyi(t *testing.T) {
 	assert.Equal(t, "adaptive", innerOn["type"])
 }
 
+func TestThinkingExtraBodyForProvider_MiniMaxResponsesStaysUnique(t *testing.T) {
+	// MiniMax 在 Responses 模式下仍使用独特的 thinking.type，而非 reasoning.effort
+	m := ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "", "", "responses", "high")
+	inner, ok := m["thinking"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "adaptive", inner["type"])
+	_, hasReasoning := m["reasoning"]
+	assert.False(t, hasReasoning, "MiniMax Responses 不应注入 reasoning.effort")
+
+	m = ThinkingExtraBodyForProvider("tongyi", "MiniMax/MiniMax-M3", "", "", "responses", "none")
+	inner, ok = m["thinking"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "disabled", inner["type"])
+	_, hasReasoning = m["reasoning"]
+	assert.False(t, hasReasoning, "MiniMax Responses none 不应注入 reasoning.effort")
+}
+
 // ===========================================================================
 // 通用 / fallback
 // ===========================================================================
@@ -326,6 +373,31 @@ func TestThinkingExtraBodyForProvider_Default(t *testing.T) {
 	assert.Equal(t, "disabled", inner2["type"])
 }
 
+func TestThinkingExtraBodyForProvider_DefaultResponses(t *testing.T) {
+	// Default Responses: reasoning.effort
+	m := ThinkingExtraBodyForProvider("", "unknown-model-xyz", "https://unknown.example", "", "responses", "high")
+	inner, ok := m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "high", inner["effort"])
+	_, hasThinking := m["thinking"]
+	assert.False(t, hasThinking, "Default Responses 不应注入 thinking 开关")
+
+	// Default Responses none → 不注入
+	m = ThinkingExtraBodyForProvider("", "unknown-model-xyz", "https://unknown.example", "", "responses", "none")
+	assert.Nil(t, m, "Default Responses none 不应注入任何参数")
+
+	// Default Responses auto → 不注入
+	m = ThinkingExtraBodyForProvider("", "unknown-model-xyz", "https://unknown.example", "", "responses", "")
+	assert.Nil(t, m)
+
+	// Default Chat Completions 仍使用 thinking.type + reasoning_effort
+	m = ThinkingExtraBodyForProvider("", "unknown-model-xyz", "https://unknown.example", "", "chat_completions", "high")
+	inner, ok = m["thinking"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "enabled", inner["type"])
+	assert.Equal(t, "high", m["reasoning_effort"])
+}
+
 func TestThinkingExtraBodyForProvider_TypeBeforeHost(t *testing.T) {
 	// tongyi 厂商名优先：无 dashscope 域名也应走 Qwen 的 enable_thinking
 	m := ThinkingExtraBodyForProvider("tongyi", "foo", "https://proxy.example/v1", "", "", "low")
@@ -338,6 +410,39 @@ func TestThinkingExtraBodyForProvider_VolcengineTypeUsesThinkingMap(t *testing.T
 	inner, ok := m["thinking"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "enabled", inner["type"])
+}
+
+func TestThinkingExtraBodyForProvider_FamilyResponses(t *testing.T) {
+	// volcengine Responses: reasoning.effort
+	m := ThinkingExtraBodyForProvider("volcengine", "doubao-v2", "", "", "responses", "high")
+	inner, ok := m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "high", inner["effort"])
+	_, hasThinking := m["thinking"]
+	assert.False(t, hasThinking, "Family Responses 不应注入 thinking 开关")
+	_, hasEffort := m["reasoning_effort"]
+	assert.False(t, hasEffort, "Responses 模式不应注入顶层 reasoning_effort")
+
+	// chatglm Responses
+	m = ThinkingExtraBodyForProvider("chatglm", "glm-4", "", "", "responses", "medium")
+	inner, ok = m["reasoning"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "medium", inner["effort"])
+
+	// siliconflow Responses none
+	m = ThinkingExtraBodyForProvider("siliconflow", "glm-4", "", "", "responses", "none")
+	assert.Nil(t, m, "Family Responses none 不应注入任何参数")
+
+	// Family Responses auto → 不注入
+	m = ThinkingExtraBodyForProvider("volcengine", "doubao-v2", "", "", "responses", "")
+	assert.Nil(t, m)
+
+	// Family Chat Completions 仍使用 thinking.type + reasoning_effort
+	m = ThinkingExtraBodyForProvider("volcengine", "doubao-v2", "", "", "chat_completions", "high")
+	inner, ok = m["thinking"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "enabled", inner["type"])
+	assert.Equal(t, "high", m["reasoning_effort"])
 }
 
 func TestThinkingExtraBodyForProvider_OpenAITypeBeforeModel(t *testing.T) {
