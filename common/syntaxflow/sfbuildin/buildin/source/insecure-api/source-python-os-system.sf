@@ -1,0 +1,33 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "Detect Python os.system Usage"
+	title_zh: "检测 Python os.system 调用",
+	type: vuln
+	level: high
+	rule_id: "source-python-os-system"
+	risk: "Command Injection"
+	desc: <<<DESC
+Flags os.system(...) which invokes a shell and is dangerous with untrusted input.
+DESC
+	solution: <<<SOLUTION
+Use subprocess with argument lists and shell=False instead of os.system.
+SOLUTION
+	alert_min: 1
+	"file://sh.py": <<<POS
+import os
+os.system("ls " + user)
+POS
+	"safefile://sh-safe.py": <<<NEG
+import subprocess
+subprocess.run(["ls", user], check=False)
+NEG
+)
+
+${*.py}.pattern_regex(/\bos\.system\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Python os.system()",
+	title_zh: "Python os.system()",
+	message: "os.system() call detected",
+}

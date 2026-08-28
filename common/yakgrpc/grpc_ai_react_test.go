@@ -37,6 +37,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	syncPerceptionTrigger := rand.Intn(2) == 1
 	enableDetachedPlan := rand.Intn(2) == 1
 	goalMinIterations := int64(maxIter + 2)
+	maxSubAgents := int64(5)
 
 	start := &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: disallowRequire,
@@ -60,6 +61,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 			EnableMultiAgent:  true,
 			EnableGoalMode:    true,
 			GoalMinIterations: goalMinIterations,
+			MaxSubAgents:      maxSubAgents,
 		},
 		EnabledCapabilities: []*ypb.AIEnabledCapability{
 			{Name: "read_file", Type: "tool"},
@@ -96,6 +98,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.GetEnableDetachedPlan(), cfg.GetEnableDetachedPlan())
 	require.True(t, cfg.EnableDispatchSubReactAgents)
 	require.True(t, cfg.GetPreferDispatchSubReactAgents())
+	require.Equal(t, maxSubAgents, cfg.GetMaxSubAgents())
 	require.True(t, cfg.GetEnableGoalMode())
 	require.Equal(t, goalMinIterations, cfg.GetGoalMinIterations())
 	require.Equal(t, []aicommon.EnabledCapability{

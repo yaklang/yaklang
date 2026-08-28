@@ -11,7 +11,15 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 	t.Parallel()
 
 	got := normalizeScanNodeCapabilityKeys(nil)
-	want := []string{"yak.execute", "hids", capabilityKeySSARuleSyncExport}
+	want := []string{
+		"yak.execute",
+		"hids",
+		capabilityKeySSARuleSyncExport,
+		capabilityKeySSARuleSnapshotExecutionV2,
+		capabilityKeyAIBindEpochV1,
+		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAICodeWorkspaceV1,
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}
@@ -27,7 +35,16 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		"yak.execute",
 		"extra.capability",
 	})
-	want := []string{"yak.execute", "hids", capabilityKeySSARuleSyncExport, "extra.capability"}
+	want := []string{
+		"yak.execute",
+		"hids",
+		capabilityKeySSARuleSyncExport,
+		capabilityKeySSARuleSnapshotExecutionV2,
+		capabilityKeyAIBindEpochV1,
+		capabilityKeyAITurnLifecycleV1,
+		capabilityKeyAICodeWorkspaceV1,
+		"extra.capability",
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}

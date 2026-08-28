@@ -2,10 +2,9 @@ package aicommon
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"math/rand"
-	"strconv"
 	"strings"
 	"time"
 
@@ -111,112 +110,11 @@ func appendPresetPrompt(request *AIRequest, tagName, description, prompt string)
 	request.SetPrompt(request.GetPrompt() + preset)
 }
 
-// handle429RateLimit checks the AI response for a 429 status code, emits the
-// appropriate user-facing message, and waits for the correct duration using a
-// context-aware select so the wait can be interrupted by context cancellation.
-//
-// Returns:
-//   - is429:   true if a 429 was detected
-//   - ctxDone: true if the context was cancelled during the wait
-//
-// Three cases:
-//  1. AIBalance daily token quota exceeded (X-AIBalance-Limit-Kind: daily_token):
-//     show daily-quota friendly notification highlighting the Yi-unit usage and
-//     the daily 06:00 Asia/Shanghai refresh time, then wait random 5-15 seconds.
-//  2. AIBalance 429 (X-AIBalance-Info header present): parse queue count,
-//     show warm notification, wait queueCount*3 seconds.
-//  3. Generic 429: show generic rate-limit message, wait random 5-15 seconds.
-func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) {
-	if rsp == nil {
-		return false, false
-	}
-
-	if !rsp.WaitForHTTPHeaders(c.Ctx) {
-		return false, true
-	}
-
-	if rsp.GetHTTPStatusCode() != 429 {
-		return false, false
-	}
-
-	var waitDuration time.Duration
-
-	// 关键词: handle429RateLimit, daily_token_limit_exceeded, 日 Token 限额友好提示
-	// 优先识别日 Token 限额（X-AIBalance-Limit-Kind: daily_token），按"亿词元"展示
-	// 当日全球免费池消耗状态，并提示每日北京时间 06:00 刷新；行为对齐 generic 429，
-	// 等待 5-15 秒后由上层重试，避免改变现有重试循环语义。
-	limitKind := strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Limit-Kind"))
-	if limitKind == "daily_token" {
-		tokensUsed, _ := strconv.ParseInt(strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Token-Used")), 10, 64)
-		tokensLimit, _ := strconv.ParseInt(strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Token-Limit")), 10, 64)
-		const yiUnit = 100_000_000 // 1 亿 = 1e8 token
-		limitYi := float64(tokensLimit) / float64(yiUnit)
-		msg := fmt.Sprintf(
-			"今日免费词元额度 %.2f 亿 已经全部消耗完毕\n"+
-				"感谢大家踊跃使用，每日北京时间 06:00 准时刷新\n"+
-				"稍后将自动重试，您也可以稍候再来",
-			limitYi)
-		sleepSec := 5 + rand.Intn(11)
-		waitDuration = time.Duration(sleepSec) * time.Second
-		c.EmitDefaultSystemStreamEvent("daily-token-exceeded", strings.NewReader(msg), "")
-		c.EmitNotify("daily-token-exceeded", msg, waitDuration)
-		log.Infof("daily token quota exceeded (used=%d, limit=%d), retrying in %ds",
-			tokensUsed, tokensLimit, sleepSec)
-
-		select {
-		case <-c.Ctx.Done():
-			return true, true
-		case <-time.After(waitDuration):
-			return true, false
-		}
-	}
-
-	queueInfo := strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Info"))
-	if queueInfo != "" {
-		queueCount, parseErr := strconv.Atoi(queueInfo)
-		if parseErr == nil && queueCount > 0 {
-			waitSec := queueCount * 3
-			if waitSec < 5 {
-				waitSec = 5
-			}
-			msg := fmt.Sprintf(
-				"此刻有 %d 位用户正在与我深度对话中\n"+
-					"您的任务同样重要，我不想敷衍任何一位\n"+
-					"预计等待约 %d 秒，感谢您的耐心",
-				queueCount, waitSec)
-			waitDuration = time.Duration(waitSec) * time.Second
-			c.EmitNotify("rate-limit", msg, waitDuration)
-			c.EmitError("AIBalance 429 rate limit: %s", msg)
-			log.Infof("AIBalance 429: queue=%d, waiting %ds", queueCount, waitSec)
-		} else {
-			msg := "当前有大量用户正在与我深度对话中\n" +
-				"您的任务同样重要，我不想敷衍任何一位\n" +
-				"预计等待一段时间后自动请求，感谢您的耐心"
-			waitDuration = 15 * time.Second
-			c.EmitNotify("rate-limit", msg, waitDuration)
-			c.EmitError("AIBalance 429 rate limit: %s", msg)
-			log.Infof("AIBalance 429: queue info unparseable (%q), waiting 15s", queueInfo)
-		}
-	} else {
-		msg := "当前遇到 429 服务器访问人数过多，稍后自动重试\n" +
-			"Current request was rate-limited (HTTP 429), retrying shortly..."
-		sleepSec := 5 + rand.Intn(11)
-		waitDuration = time.Duration(sleepSec) * time.Second
-		c.EmitNotify("rate-limit", msg, waitDuration)
-		log.Infof("generic 429 rate limit, waiting %ds", sleepSec)
-	}
-
-	select {
-	case <-c.Ctx.Done():
-		return true, true
-	case <-time.After(waitDuration):
-		return true, false
-	}
-}
-
 func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
+		requestCtx, stopRequestCtx := combineAIRequestAndConfigContext(c.Ctx, request.GetContext())
+		defer stopRequestCtx()
 		// check if callback is nil before calling
 		if i == nil {
 			return nil, utils.Error("AI callback is not set, please configure AI service first")
@@ -261,19 +159,19 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			for _idx := 0; _idx < int(c.AiAutoRetry); {
 				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-				if is429, done := c.handle429RateLimit(rsp); is429 {
+				if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 					if done {
-						return nil, c.Ctx.Err()
+						return nil, requestCtx.Err()
+					}
+					if !shouldRetry {
+						_idx++
 					}
 					continue
 				}
 				if err != nil || rsp == nil {
 					_idx++
-					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
-					select {
-					case <-c.Ctx.Done():
-						return nil, c.Ctx.Err()
-					case <-time.After(500 * time.Millisecond):
+					if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, int(c.AiAutoRetry)); waitErr != nil {
+						return nil, waitErr
 					}
 					continue
 				}
@@ -282,8 +180,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				rsp = TeeAIResponse(config, rsp, nil, func() {
 					c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
 				})
-				if !waitOrigAIResponseCallback(c, origRsp) {
-					return nil, c.Ctx.Err()
+				if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
+					return nil, requestCtx.Err()
 				}
 				return rsp, err
 			}
@@ -337,19 +235,19 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); {
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if is429, done := c.handle429RateLimit(rsp); is429 {
+			if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
 				if done {
-					return nil, c.Ctx.Err()
+					return nil, requestCtx.Err()
+				}
+				if !shouldRetry {
+					_idx++
 				}
 				continue
 			}
 			if err != nil || rsp == nil {
 				_idx++
-				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
-				select {
-				case <-c.Ctx.Done():
-					return nil, c.Ctx.Err()
-				case <-time.After(500 * time.Millisecond):
+				if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, int(c.AiAutoRetry)); waitErr != nil {
+					return nil, waitErr
 				}
 				continue
 			}
@@ -495,8 +393,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					}
 				}
 			})
-			if !waitOrigAIResponseCallback(c, origRsp) {
-				return nil, c.Ctx.Err()
+			if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
+				return nil, requestCtx.Err()
 			}
 			if c.DebugPrompt {
 				rsp.Debug(true)
@@ -516,7 +414,37 @@ func waitOrigAIResponseCallback(c *Config, origRsp *AIResponse) bool {
 	if c == nil || origRsp == nil {
 		return true
 	}
-	return origRsp.WaitForCallbackDone(c.Ctx)
+	return waitOrigAIResponseCallbackContext(c.Ctx, origRsp)
+}
+
+func waitOrigAIResponseCallbackContext(ctx context.Context, origRsp *AIResponse) bool {
+	if origRsp == nil {
+		return true
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return origRsp.WaitForCallbackDone(ctx)
+}
+
+// combineAIRequestAndConfigContext preserves request-scoped values while
+// cancelling when either the child request or the long-lived config ends.
+func combineAIRequestAndConfigContext(configCtx, requestCtx context.Context) (context.Context, func()) {
+	if requestCtx == nil {
+		requestCtx = configCtx
+	}
+	if requestCtx == nil {
+		requestCtx = context.Background()
+	}
+	if configCtx == nil {
+		return requestCtx, func() {}
+	}
+	ctx, cancel := context.WithCancel(requestCtx)
+	stopConfigCancel := context.AfterFunc(configCtx, cancel)
+	return ctx, func() {
+		stopConfigCancel()
+		cancel()
+	}
 }
 
 type AIResponseSimple struct {

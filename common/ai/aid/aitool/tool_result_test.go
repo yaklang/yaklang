@@ -2,11 +2,14 @@ package aitool
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"golang.org/x/net/context"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 // TestToolExecutionResult 测试工具执行结果
@@ -161,6 +164,72 @@ func TestExecuteToolWithCapture(t *testing.T) {
 		if code, ok := resultData["code"]; !ok || code != 0 {
 			t.Errorf("结果代码不正确: %v", code)
 		}
+	}
+}
+
+func TestExecuteToolWithCapture_PreCancelledContextDoesNotStartCallback(t *testing.T) {
+	var callbackCalls atomic.Int32
+	tool, err := New(
+		"pre_cancelled",
+		WithDescription("must not run after cancellation"),
+		WithSimpleCallback(func(params InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			callbackCalls.Add(1)
+			return "unexpected", nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("create tool: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var cancelCalls atomic.Int32
+	config := &ToolInvokeConfig{
+		cancelCallback: func(result *ToolExecutionResult, cancelErr error) (*ToolExecutionResult, error) {
+			cancelCalls.Add(1)
+			if cancelErr != context.Canceled {
+				t.Fatalf("cancel callback error = %v, want %v", cancelErr, context.Canceled)
+			}
+			return result, cancelErr
+		},
+	}
+
+	result, err := tool.ExecuteToolWithCapture(ctx, nil, config)
+	if err != context.Canceled {
+		t.Fatalf("ExecuteToolWithCapture error = %v, want %v", err, context.Canceled)
+	}
+	if result == nil || result.Stdout != "" || result.Stderr != "" || result.CombinedOutput != "" {
+		t.Fatalf("cancelled result = %#v, want empty captured output", result)
+	}
+	if got := callbackCalls.Load(); got != 0 {
+		t.Fatalf("tool callback started %d times after pre-cancellation", got)
+	}
+	if got := cancelCalls.Load(); got != 1 {
+		t.Fatalf("cancel callback calls = %d, want 1", got)
+	}
+}
+
+func TestInvokeWithParams_CancelledContextIsProtocolFailure(t *testing.T) {
+	callbackStarted := false
+	tool, err := New("cancelled", WithCallback(func(context.Context, InvokeParams, *ToolRuntimeConfig, io.Writer, io.Writer) (any, error) {
+		callbackStarted = true
+		return "unexpected", nil
+	}))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result, invokeErr := tool.InvokeWithParams(InvokeParams{}, WithContext(ctx))
+	if !errors.Is(invokeErr, context.Canceled) {
+		t.Fatalf("InvokeWithParams error = %v, want %v", invokeErr, context.Canceled)
+	}
+	if result == nil || result.Success {
+		t.Fatalf("cancelled invocation result = %#v, want protocol failure", result)
+	}
+	if callbackStarted {
+		t.Fatal("callback started for a pre-cancelled invocation")
 	}
 }
 

@@ -1,0 +1,34 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "Detect Python eval Usage"
+	title_zh: "检测 Python eval 调用",
+	type: vuln
+	level: high
+	rule_id: "source-python-eval"
+	risk: "Code Injection"
+	desc: <<<DESC
+Flags eval(...) which can execute arbitrary code when given attacker-controlled strings.
+DESC
+	solution: <<<SOLUTION
+Avoid eval; use ast.literal_eval for literals or structured parsers.
+SOLUTION
+	alert_min: 1
+	"file://dyn.py": <<<POS
+def run(user_input):
+    return eval(user_input)
+POS
+	"safefile://dyn-safe.py": <<<NEG
+import ast
+def run(user_input):
+    return ast.literal_eval(user_input)
+NEG
+)
+
+${*.py}.pattern_regex(/(?m)(?<!literal_)(?<!ast\.)\beval\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Python eval()",
+	title_zh: "Python eval()",
+	message: "Dangerous eval() call detected",
+}

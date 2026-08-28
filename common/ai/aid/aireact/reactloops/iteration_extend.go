@@ -69,6 +69,14 @@ func (r *ReActLoop) requestIterationExtension(
 	if utils.IsNil(cfg) {
 		return false, 0, nil
 	}
+	// A Focus that explicitly disables user interaction is a bounded
+	// single-run workflow. Never emit a review checkpoint for iteration
+	// extension in that mode: there is no product surface allowed to answer it,
+	// so waiting would strand the Turn indefinitely.
+	if r.allowUserInteract != nil && !r.allowUserInteract() {
+		log.Infof("ReactLoop[%v] iteration extension skipped because user interaction is disabled", r.loopName)
+		return false, 0, nil
+	}
 
 	if cfg.GetConfigBool(aicommon.DisableIncreaseIteration) {
 		log.Infof("ReactLoop[%v] iteration extension disabled by config, fallback to soft interrupt", r.loopName)
@@ -190,9 +198,9 @@ func (r *ReActLoop) requestIterationExtension(
 	delta, ok := matchIterationExtensionOption(suggestion, maxIterations)
 	if !ok {
 		if invoker := r.GetInvoker(); invoker != nil {
-			invoker.AddToTimeline("iteration_extend", fmt.Sprintf(
-				"[%v] user declined iteration extension (suggestion=%q), will soft-interrupt",
-				loopName, suggestion))
+			invoker.AddToTimeline("execution_control", fmt.Sprintf(
+				"[%v] user declined additional host execution capacity; preserve unfinished work for a later continuation",
+				loopName))
 		}
 		return false, 0, nil
 	}
@@ -200,9 +208,9 @@ func (r *ReActLoop) requestIterationExtension(
 	// 记录扩充次数 + timeline 痕迹.
 	r.incrementIterationExtensionCount()
 	if invoker := r.GetInvoker(); invoker != nil {
-		invoker.AddToTimeline("iteration_extend", fmt.Sprintf(
-			"[%v] user agreed to extend max iterations by %d (new cap=%d, extension #%d/%d)",
-			loopName, delta, maxIterations+delta, r.getIterationExtensionCount(), maxIterationExtensionCount))
+		invoker.AddToTimeline("execution_control", fmt.Sprintf(
+			"[%v] user granted additional host execution capacity; continue from the existing evidence and TODO state without guessing the remaining budget",
+			loopName))
 	}
 	log.Infof("ReactLoop[%v] iteration extended by %d (new max=%d)",
 		r.loopName, delta, maxIterations+delta)

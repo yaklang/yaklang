@@ -1,0 +1,228 @@
+name: Build Portable Legion Node
+
+on:
+  workflow_call:
+    inputs:
+      source_mode:
+        description: "Source validation mode: alpha or release"
+        required: false
+        type: string
+        default: alpha
+      retention_days:
+        description: "GitHub Actions artifact retention"
+        required: false
+        type: number
+        default: 7
+      production_release:
+        description: "Whether the portable artifact belongs to a formal version tag"
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "legion-node-alpha-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legion-portable-node-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_SHA: ${{ github.sha }}
+  NODE_VERSION: ${{ github.ref_name }}
+  SOURCE_MODE: ${{ inputs.source_mode || 'alpha' }}
+  RETENTION_DAYS: ${{ inputs.retention_days || 7 }}
+  PRODUCTION_RELEASE: ${{ inputs.production_release || false }}
+
+jobs:
+  source-contract:
+    name: Validate tagged source
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out tagged source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+
+      - name: Validate tag and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == push ]]
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          [[ -z "$(git status --porcelain --untracked-files=all)" ]]
+          case "$SOURCE_MODE" in
+            alpha)
+              [[ "$GITHUB_REF" =~ ^refs/tags/legion-node-alpha-[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || {
+                echo "unexpected Legion Node alpha tag: $GITHUB_REF" >&2
+                exit 1
+              }
+              ;;
+            release)
+              [[ "$GITHUB_REF" =~ ^refs/tags/legion-node-v[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?$ ]] || {
+                echo "unexpected Legion Node release tag: $GITHUB_REF" >&2
+                exit 1
+              }
+              git fetch --no-tags origin main:refs/remotes/origin/main
+              git merge-base --is-ancestor "$SOURCE_SHA" refs/remotes/origin/main || {
+                echo "published portable Node source must already be reachable from origin/main" >&2
+                exit 1
+              }
+              ;;
+            *)
+              echo "unsupported source validation mode: $SOURCE_MODE" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Test Legion Node entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTOOLCHAIN=local
+          go test ./cmd/legion-smoke-node ./common/node ./scannode
+
+  build:
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }} Legion Node
+    needs: source-contract
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+            runner: macos-15-intel
+            file_fragment: Mach-O 64-bit executable x86_64
+          - goos: darwin
+            goarch: arm64
+            runner: macos-15
+            file_fragment: Mach-O 64-bit executable arm64
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-22.04
+            file_fragment: ELF 64-bit LSB executable, x86-64
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+            file_fragment: ELF 64-bit LSB executable, ARM aarch64
+    env:
+      TARGET_OS: ${{ matrix.goos }}
+      TARGET_ARCH: ${{ matrix.goarch }}
+      EXPECTED_FILE_FRAGMENT: ${{ matrix.file_fragment }}
+      BINARY_NAME: legion-smoke-node_${{ matrix.goos }}_${{ matrix.goarch }}
+    steps:
+      - name: Check out tagged source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build native portable Legion Node artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOTOOLCHAIN=local
+          mkdir -p dist/legion-node-portable
+          binary="dist/legion-node-portable/${BINARY_NAME}"
+          CGO_ENABLED=1 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" go build \
+            -trimpath \
+            -buildvcs=true \
+            -ldflags '-s -w -buildid=' \
+            -o "$binary" \
+            ./cmd/legion-smoke-node
+
+          file "$binary" | tee dist/legion-node-portable/FILE.txt
+          grep -Fq "$EXPECTED_FILE_FRAGMENT" dist/legion-node-portable/FILE.txt
+          go version -m "$binary" >dist/legion-node-portable/GO_VERSION.txt
+
+          if command -v sha256sum >/dev/null 2>&1; then
+            binary_sha="$(sha256sum "$binary" | awk '{print $1}')"
+          else
+            binary_sha="$(shasum -a 256 "$binary" | awk '{print $1}')"
+          fi
+          if stat -c %s "$binary" >/dev/null 2>&1; then
+            binary_size="$(stat -c %s "$binary")"
+          else
+            binary_size="$(stat -f %z "$binary")"
+          fi
+          printf '%s  %s\n' "$binary_sha" "$BINARY_NAME" \
+            >dist/legion-node-portable/SHA256SUMS
+
+          jq -n \
+            --arg version "$NODE_VERSION" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg go_version "$(go version)" \
+            --arg target_os "$TARGET_OS" \
+            --arg target_arch "$TARGET_ARCH" \
+            --arg binary_name "$BINARY_NAME" \
+            --arg binary_sha "$binary_sha" \
+            --argjson binary_size "$binary_size" \
+            --argjson retention_days "$RETENTION_DAYS" \
+            --argjson production_release "$PRODUCTION_RELEASE" \
+            --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+              {
+                schema_version: "1",
+                artifact_type: "legion-node-portable",
+                version: $version,
+                source: {
+                  repository: $repository,
+                  commit: $source_sha,
+                  dirty: false
+                },
+                recipe: {
+                  goos: $target_os,
+                  goarch: $target_arch,
+                  cgo_enabled: true,
+                  build_tags: "",
+                  go_version: $go_version
+                },
+                capabilities: ["ssa.rule_sync.export", "yak.execute"],
+                binary: {
+                  path: $binary_name,
+                  sha256: $binary_sha,
+                  size: $binary_size
+                },
+                distribution: {
+                  channel: "github-actions",
+                  retention_days: $retention_days,
+                  production_release: $production_release
+                },
+                built_at: $built_at
+              }
+            ' >dist/legion-node-portable/LEGION_NODE_MANIFEST.json
+
+      - name: Upload portable Legion Node artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ env.NODE_VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/legion-node-portable/*
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days || 7 }}
+
+      - name: Publish portable Node build summary
+        shell: bash
+        run: |
+          {
+            echo "## Portable Legion Node"
+            echo
+            echo "- Source: \`${SOURCE_SHA}\`"
+            echo "- Tag: \`${NODE_VERSION}\`"
+            echo "- Target: \`${TARGET_OS}/${TARGET_ARCH}\`"
+            echo "- Build tags: none (local integration node, not HIDS Product Node)"
+            echo "- Production release: \`${PRODUCTION_RELEASE}\`"
+            echo "- Retention: \`${RETENTION_DAYS} days\`"
+            echo "- Distribution: Actions artifact only; not published to OSS or a stable channel"
+          } >>"$GITHUB_STEP_SUMMARY"

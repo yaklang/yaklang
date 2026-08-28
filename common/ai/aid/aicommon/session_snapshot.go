@@ -46,17 +46,19 @@ type SessionSnapshotBackgroundProcess struct {
 }
 
 type SessionSnapshotExecution struct {
-	TaskName          string `json:"task_name"`
-	Status            string `json:"status"`
-	StartedAt         int64  `json:"started_at"`
-	EndedAt           int64  `json:"ended_at"`
-	ToolCallSuccess   int    `json:"tool_call_success"`
-	ToolCallFailed    int    `json:"tool_call_failed"`
-	ToolCallTotal     int    `json:"tool_call_total"`
-	ExecutionMinutes  int    `json:"execution_minutes"`
-	HTTPFlowCount     int    `json:"http_flow_count"`
-	RiskCount         int    `json:"risk_count"`
-	ModifiedFileCount int    `json:"modified_file_count"`
+	TaskName  string `json:"task_name"`
+	Status    string `json:"status"`
+	StartedAt int64  `json:"started_at"`
+	EndedAt   int64  `json:"ended_at"`
+	// Legacy wire names retained for frontend compatibility. These count
+	// protocol-completed and protocol-failed calls, not execution outcomes.
+	ToolCallSuccess   int `json:"tool_call_success"`
+	ToolCallFailed    int `json:"tool_call_failed"`
+	ToolCallTotal     int `json:"tool_call_total"`
+	ExecutionMinutes  int `json:"execution_minutes"`
+	HTTPFlowCount     int `json:"http_flow_count"`
+	RiskCount         int `json:"risk_count"`
+	ModifiedFileCount int `json:"modified_file_count"`
 }
 
 type SessionSnapshotPerception struct {
@@ -95,10 +97,11 @@ type sessionSnapshotPerceptionExtras struct {
 }
 
 type sessionExecutionTracker struct {
-	mu               sync.Mutex
-	stats            SessionSnapshotExecution
-	callToolIDs      map[string]struct{}
-	firstEmitPending bool
+	mu                  sync.Mutex
+	stats               SessionSnapshotExecution
+	callToolIDs         map[string]struct{}
+	recordedToolCallIDs map[string]struct{}
+	firstEmitPending    bool
 }
 
 func isSessionSnapshotExecutionTerminal(status string) bool {
@@ -135,7 +138,8 @@ func (c *Config) ensureSessionSnapshotState() *sessionSnapshotState {
 			legacySeparateEvents: true,
 			backgroundProcesses:  make(map[string]SessionSnapshotBackgroundProcess),
 			execution: sessionExecutionTracker{
-				callToolIDs: make(map[string]struct{}),
+				callToolIDs:         make(map[string]struct{}),
+				recordedToolCallIDs: make(map[string]struct{}),
 			},
 		}
 	}
@@ -378,6 +382,7 @@ func (c *Config) ResetSessionSnapshotExecution(taskName, status string, startedA
 	}
 	state.execution.firstEmitPending = true
 	state.execution.callToolIDs = make(map[string]struct{})
+	state.execution.recordedToolCallIDs = make(map[string]struct{})
 }
 
 func (c *Config) FinalizeSessionSnapshotExecution(status string, endedAt time.Time) {
@@ -401,16 +406,35 @@ func (c *Config) FinalizeSessionSnapshotExecution(status string, endedAt time.Ti
 }
 
 func (c *Config) RecordSessionSnapshotToolCall(result *aitool.ToolResult) {
+	c.recordSessionSnapshotToolCallOnce(result)
+}
+
+// recordSessionSnapshotToolCallOnce updates the execution counters only once
+// for a stable ToolCallID. This protects the in-memory snapshot from duplicate
+// notifications while checkpoint replay is independently suppressed by
+// ToolCaller (which also covers a freshly reconstructed Config).
+func (c *Config) recordSessionSnapshotToolCallOnce(result *aitool.ToolResult) bool {
 	if c == nil || result == nil {
-		return
+		return false
 	}
 	state := c.ensureSessionSnapshotState()
 	if state == nil {
-		return
+		return false
 	}
 
 	state.execution.mu.Lock()
 	defer state.execution.mu.Unlock()
+	callToolID := strings.TrimSpace(result.ToolCallID)
+	if callToolID != "" {
+		if state.execution.recordedToolCallIDs == nil {
+			state.execution.recordedToolCallIDs = make(map[string]struct{})
+		}
+		if _, duplicated := state.execution.recordedToolCallIDs[callToolID]; duplicated {
+			return false
+		}
+		state.execution.recordedToolCallIDs[callToolID] = struct{}{}
+		state.execution.callToolIDs[callToolID] = struct{}{}
+	}
 
 	if result.Success {
 		state.execution.stats.ToolCallSuccess++
@@ -419,12 +443,9 @@ func (c *Config) RecordSessionSnapshotToolCall(result *aitool.ToolResult) {
 	}
 	state.execution.stats.ToolCallTotal = state.execution.stats.ToolCallSuccess + state.execution.stats.ToolCallFailed
 
-	if callToolID := strings.TrimSpace(result.ToolCallID); callToolID != "" {
-		state.execution.callToolIDs[callToolID] = struct{}{}
-	}
-
 	c.refreshSessionSnapshotRuntimeCountsLocked(state)
 	c.refreshSessionSnapshotDurationLocked(state, false)
+	return true
 }
 
 func (c *Config) RecordSessionSnapshotFileWrite(path string) {
@@ -580,6 +601,10 @@ func (c *Config) syncExecutionToolCountsLocked(state *sessionSnapshotState, task
 		}
 		if callToolID := strings.TrimSpace(result.ToolCallID); callToolID != "" {
 			state.execution.callToolIDs[callToolID] = struct{}{}
+			if state.execution.recordedToolCallIDs == nil {
+				state.execution.recordedToolCallIDs = make(map[string]struct{})
+			}
+			state.execution.recordedToolCallIDs[callToolID] = struct{}{}
 		}
 	}
 	state.execution.stats.ToolCallSuccess = success
@@ -622,14 +647,20 @@ func ConfigFromAICaller(cfg AICallerConfigIf) *Config {
 	return nil
 }
 
-func NotifySessionSnapshotToolCall(cfg AICallerConfigIf, result *aitool.ToolResult) {
+func NotifySessionSnapshotToolCall(cfg AICallerConfigIf, result *aitool.ToolResult, source ...string) {
 	if c := ConfigFromAICaller(cfg); c != nil {
-		c.RecordSessionSnapshotToolCall(result)
+		if !c.recordSessionSnapshotToolCallOnce(result) {
+			return
+		}
 		c.NotifySessionSnapshotEmit()
 		// 命中统计: 任意一次工具调用 (成功/失败, 直接/申请) 都计一次 tool 命中.
 		// 这是「重要反馈点」, 供意图层与工具 inventory 做命中数排序.
 		if result != nil && result.Name != "" {
-			SubmitToolHit(c, result.Name, StatsSourceToolDirect)
+			statsSource := StatsSourceToolDirect
+			if len(source) > 0 {
+				statsSource = normalizeToolCallStatsSource(source[0])
+			}
+			SubmitToolHit(c, result.Name, statsSource)
 		}
 	}
 }

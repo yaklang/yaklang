@@ -2,10 +2,12 @@ package aicommon
 
 import (
 	"encoding/json"
+	"sync"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
 )
 
 func TestAIStatefulTaskBase_TaskBaseOptions(t *testing.T) {
@@ -83,4 +85,30 @@ func TestAIStatefulTaskBase_ForceSetStatusAllowsRecoveryFromFinishedState(t *tes
 
 	task.Finish(nil)
 	require.Equal(t, AITaskState_Completed, task.GetStatus(), "task should be able to finish after being forced back to processing")
+}
+
+func TestAIStatefulTaskBase_StatusConcurrentReadersAndTerminalWriter(t *testing.T) {
+	task := NewStatefulTaskBase("task-status-race", "input", nil, nil, true)
+	task.SetStatus(AITaskState_Processing)
+
+	const readerCount = 8
+	start := make(chan struct{})
+	var readers sync.WaitGroup
+	readers.Add(readerCount)
+	for i := 0; i < readerCount; i++ {
+		go func() {
+			defer readers.Done()
+			<-start
+			for j := 0; j < 1000; j++ {
+				_ = task.GetStatus()
+				_ = task.IsFinished()
+			}
+		}()
+	}
+	close(start)
+	task.SetStatus(AITaskState_Completed)
+	readers.Wait()
+
+	require.Equal(t, AITaskState_Completed, task.GetStatus())
+	require.True(t, task.IsFinished())
 }

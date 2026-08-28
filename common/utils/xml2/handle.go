@@ -6,6 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
+
+	"golang.org/x/text/encoding/charmap"
 )
 
 type XMLConfig struct {
@@ -63,6 +65,17 @@ func Handle(value string, opts ...XMLConfigHandler) {
 	}
 
 	decoder := xml.NewDecoder(strings.NewReader(value))
+	// Hadoop web.xml / resources declare iso-8859-1; without a CharsetReader
+	// the decoder errors and the XML is not analyzed. Provide a default that
+	// maps declared charsets to their Go encoding (iso-8859-1 -> charmap).
+	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		switch strings.ToLower(charset) {
+		case "iso-8859-1", "latin1":
+			return charmap.ISO8859_1.NewDecoder().Reader(input), nil
+		default:
+			return input, nil
+		}
+	}
 
 	doctype := false
 

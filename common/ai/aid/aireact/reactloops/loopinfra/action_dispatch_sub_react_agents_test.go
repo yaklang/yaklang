@@ -119,13 +119,36 @@ func TestVerifyDispatchSubReactAgents_AcceptsValidPayload(t *testing.T) {
 			map[string]any{"identifier": "scan_a", "goal": "scan service A"},
 			map[string]any{"identifier": "scan_b", "goal": "scan service B"},
 		),
-		"concurrency": 2,
 	})
 	err := verifyDispatchSubReactAgents(loop, action)
 	require.NoError(t, err)
-	assert.Contains(t, loop.Get(dispatchSubReactJobsLoopKey), "scan_a")
-	assert.Equal(t, 2, loop.GetInt(dispatchSubReactConcurrencyLoopKey))
 }
+
+func TestVerifyDispatchSubReactAgents_AcceptsMultipleJobs(t *testing.T) {
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithEnableMultiAgentMode(true),
+		aicommon.WithMaxSubAgents(1),
+		aicommon.WithDisableAutoSkills(true),
+	)
+	invoker := &configBackedDispatchInvoker{
+		dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(context.Background()),
+		cfg:                         cfg,
+	}
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	require.Equal(t, 1, loop.GetMaxSubAgents())
+
+	// MaxSubAgents controls concurrency, not the dispatches array size.
+	action := mustBuildDispatchSubReactAction(t, map[string]any{
+		"dispatches": dispatchSubReactJobs(
+			map[string]any{"identifier": "scan_a", "goal": "scan service A"},
+			map[string]any{"identifier": "scan_b", "goal": "scan service B"},
+		),
+	})
+	err := verifyDispatchSubReactAgents(loop, action)
+	require.NoError(t, err)
+}
+
 func TestNewReActLoop_InjectsDispatchSubReactAgents(t *testing.T) {
 	// Dispatch sub react agents is gated by EnableDispatchSubReactAgents on the
 	// real *aicommon.Config; NewReActLoop only injects the action when the flag is on.
@@ -191,9 +214,8 @@ func (c *configBackedDispatchInvoker) GetConfig() aicommon.AICallerConfigIf {
 }
 func TestDispatchSubReactAgents_StreamFieldsUseI18nNodeIDs(t *testing.T) {
 	require.NotNil(t, loopAction_DispatchSubReactAgents)
-	require.Len(t, loopAction_DispatchSubReactAgents.StreamFields, 2)
+	require.Len(t, loopAction_DispatchSubReactAgents.StreamFields, 1)
 	assert.Equal(t, loopInfraNodeDispatchSubReact, loopAction_DispatchSubReactAgents.StreamFields[0].AINodeId)
-	assert.Equal(t, loopInfraNodeDispatchConcurrency, loopAction_DispatchSubReactAgents.StreamFields[1].AINodeId)
 
 	zh := schema.NodeIdToI18n(loopInfraNodeDispatchSubReact, true)
 	require.NotNil(t, zh)

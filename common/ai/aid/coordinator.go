@@ -234,7 +234,16 @@ func (c *Coordinator) planLoadingStatus(status string) {
 		return
 	}
 	log.Infof("plan-executing loading status updated: %v", status)
-	c.EmitStatus(PlanExecutingLoadingStatusKey, status)
+	zh, en := aicommon.SplitLegacyStatusI18n(status)
+	_, _ = c.EmitStatusI18n(PlanExecutingLoadingStatusKey, zh, en)
+}
+
+func (c *Coordinator) planUserStatus(zh, en string, options ...aicommon.StatusOption) {
+	if c.Emitter == nil {
+		return
+	}
+	log.Infof("plan-executing user status updated: %v", zh)
+	_, _ = c.EmitStatusI18n(PlanExecutingLoadingStatusKey, zh, en, options...)
 }
 
 func (c *Coordinator) GetContextProvider() *PromptContextProvider {
@@ -399,8 +408,7 @@ func (c *Coordinator) Run() error {
 		coordinatorID = c.Config.Id
 	}
 	defer unregisterRunningCoordinator(coordinatorID)
-	c.planLoadingStatus("初始化 / Initializing...")
-	defer c.planLoadingStatus("任务规划执行结束 / Plan Execution Finished")
+	c.planUserStatus("正在准备任务", "Preparing the task", aicommon.WithStatusCode("plan.preparing"))
 
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()

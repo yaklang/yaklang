@@ -16,7 +16,7 @@ type ScopeIF ssautil.ScopedVersionedTableIF[Value]
 
 var _ ssautil.ScopedVersionedTableIF[Value] = (*ScopeInstance)(nil)
 
-var spinReplaceSkipExternLib = func(v Value) bool {
+func spinReplaceSkipExternLib(v Value) bool {
 	if utils.IsNil(v) {
 		return false
 	}

@@ -117,7 +117,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-rule-sample", "reason"))
 		}
 
-		reactloops.EmitStatus(loop, "开始分析用户需求... / Analyzing user requirements...")
+		reactloops.EmitStatusI18n(loop, "开始分析用户需求...", "Analyzing user requirements...")
 		step1Result, err := r.InvokeSpeedPriorityLiteForge(
 			task.GetContext(),
 			"analyze-requirement-and-search",
@@ -243,7 +243,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 
 		if docSearcher != nil && len(searchPatterns) > 0 {
 			log.Infof("init task step 2.1: grep searching rule samples with %d patterns", len(searchPatterns))
-			reactloops.EmitStatus(loop, "开始搜索相关规则样例... / Searching for relevant rule examples...")
+			reactloops.EmitStatusI18n(loop, "开始搜索相关规则样例...", "Searching for relevant rule examples...")
 
 			var grepResults strings.Builder
 			searchedCount := 0
@@ -275,10 +275,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				}
 
 				searchedCount++
-				reactloops.EmitStatus(loop, fmt.Sprintf(
-					"Grep 搜索 %d/%d / Grep search %d/%d",
-					searchedCount, patternTotal, searchedCount, patternTotal,
-				))
+				reactloops.EmitStatusI18n(
+					loop,
+					fmt.Sprintf("Grep 搜索 %d/%d", searchedCount, patternTotal),
+					fmt.Sprintf("Grep search %d/%d", searchedCount, patternTotal),
+				)
 
 				header := fmt.Sprintf("\n=== Grep Pattern: %s (Found %d matches) ===\n", pattern, len(results))
 				grepResults.WriteString(header)
@@ -335,10 +336,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 
 				log.Infof("semantic searching question %d/%d: %s", idx+1, len(semanticQuestions), question)
 				searchedQuestions++
-				reactloops.EmitStatus(loop, fmt.Sprintf(
-					"语义搜索 %d/%d / Semantic search %d/%d",
-					searchedQuestions, questionTotal, searchedQuestions, questionTotal,
-				))
+				reactloops.EmitStatusI18n(
+					loop,
+					fmt.Sprintf("语义搜索 %d/%d", searchedQuestions, questionTotal),
+					fmt.Sprintf("Semantic search %d/%d", searchedQuestions, questionTotal),
+				)
 
 				results, err := ragSearcher.QueryTopN(question, topN, scoreThreshold)
 				if err != nil {
@@ -461,9 +463,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			}
 
 			if initialSamples != "" {
-				reactloops.EmitStatus(loop, "压缩样例中 / Compressing samples...")
+				reactloops.EmitStatusI18n(loop, "压缩样例中", "Compressing samples...")
 				summary, reference := reactloops.SpillLongContent(loop, "init_rule_samples", initialSamples)
-				reactloops.EmitStatus(loop, "样例准备完成 / Samples ready")
+				reactloops.EmitStatusI18n(loop, "样例准备完成", "Samples ready")
 				reactloops.EmitActionLog(loop, "init-search-rule-sample",
 					fmt.Sprintf("初始化规则样例: %s", utils.ByteSize(uint64(len(initialSamples)))),
 					reference,

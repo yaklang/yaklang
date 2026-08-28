@@ -26,12 +26,17 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 		// 从 holder 读取(可能已被上面的自动安装回填)的最新搜索器
 		docSearcher := holder.getGrep()
 		ragSearcher := holder.getRAG()
-		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
-		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
+		reactloops.RunAttachedExtraResourcesInit(
+			r,
+			loop,
+			aicommon.FilterAttachedResourcesExcludeYaklangDelivery(attachedDatas),
+		)
+		userInput := task.GetUserInput()
+		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas, userInput)
 		if editorCtx == nil {
 			editorCtx = &aicommon.YaklangEditorContext{}
 		}
-		aicommon.EnrichYaklangEditorContextFromUserInput(editorCtx, task.GetUserInput())
+		aicommon.EnrichYaklangEditorContextFromUserInput(editorCtx, userInput)
 		if editorCtx.HasEditorFile() {
 			loop.Set("editor_file_path", editorCtx.EditorFile)
 		} else {
@@ -91,7 +96,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 				forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-code-sample", "reason"))
 			}
 
-			reactloops.EmitStatus(loop, "开始分析用户需求... / Analyzing user requirements...")
+			reactloops.EmitStatusI18n(loop, "开始分析用户需求...", "Analyzing user requirements...")
 			step1Result, err := r.InvokeSpeedPriorityLiteForge(
 				task.GetContext(),
 				"analyze-requirement-and-search",
@@ -125,9 +130,18 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 		if pinned := BuildPinnedAPISection(pinnedLibs); pinned != "" {
 			loop.Set("pinned_apis", pinned)
 			loop.Set("pinned_libraries", strings.Join(pinnedLibs, ","))
-			reactloops.EmitStatus(loop, fmt.Sprintf("已锁定核心库 API: %s / Pinned core library APIs: %s",
-				strings.Join(pinnedLibs, ", "), strings.Join(pinnedLibs, ", ")))
+			libraries := strings.Join(pinnedLibs, ", ")
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("已锁定核心库 API：%s", libraries),
+				fmt.Sprintf("Pinned core library APIs: %s", libraries),
+			)
+
 			log.Infof("pinned core library APIs for libs: %v (%d bytes)", pinnedLibs, len(pinned))
+		}
+		if dsl := BuildPinnedDSLSection(); dsl != "" {
+			loop.Set("pinned_dsl", dsl)
+			log.Infof("pinned yaklang DSL rules (%d bytes)", len(dsl))
 		}
 
 		userRequirements := utils.MustRenderTemplate(`<|USER_REQUIREMENTS_{{.nonce}}|>
@@ -152,7 +166,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 			// Step 2.1: Grep
 			if docSearcher != nil && len(searchPatterns) > 0 {
 				log.Infof("init task step 2.1: grep searching code samples with %d patterns", len(searchPatterns))
-				reactloops.EmitStatus(loop, "开始搜索相关代码样例... / Searching for relevant code examples...")
+				reactloops.EmitStatusI18n(loop, "开始搜索相关代码样例...", "Searching for relevant code examples...")
 
 				patternTotal := 0
 				for _, pattern := range searchPatterns {
@@ -170,7 +184,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 
 					grepOpts := []ziputil.GrepOption{
 						ziputil.WithGrepCaseSensitive(false),
-						ziputil.WithContext(15),
+						ziputil.WithContext(8),
 					}
 
 					results, err := docSearcher.GrepRegexp(pattern, grepOpts...)
@@ -183,79 +197,87 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 					}
 
 					searchedCount++
-					reactloops.EmitStatus(loop, fmt.Sprintf(
-						"Grep 搜索 %d/%d / Grep search %d/%d",
-						searchedCount, patternTotal, searchedCount, patternTotal,
-					))
+					reactloops.EmitStatusI18n(
+						loop,
+						fmt.Sprintf("Grep 搜索 %d/%d", searchedCount, patternTotal),
+						fmt.Sprintf("Grep search %d/%d", searchedCount, patternTotal),
+					)
 
 					hits := GrepResultsToSampleHits(pattern, results, grepMaxHitsPerPattern)
 					allHits = append(allHits, hits...)
 				}
 			}
 
-			// Step 2.2: RAG semantic search
+			// Step 2.2: RAG semantic search（Grep 已够用时跳过，减少双通道重复）
+			ranSemanticSearch := false
 			if ragSearcher != nil && len(semanticQuestions) > 0 {
-				log.Infof("init task step 2.2: semantic searching code samples with %d questions", len(semanticQuestions))
-				topN := 20
-				scoreThreshold := 0.4
-				type ResultKey struct {
-					DocID string
-				}
-				allResultsMap := make(map[ResultKey]rag.SearchResult)
-
-				questionTotal := 0
-				for _, question := range semanticQuestions {
-					if question != "" {
-						questionTotal++
+				if len(allHits) >= initGrepEnoughHits {
+					log.Infof("init task step 2.2: skip RAG, grep hits=%d >= %d", len(allHits), initGrepEnoughHits)
+				} else {
+					ranSemanticSearch = true
+					log.Infof("init task step 2.2: semantic searching code samples with %d questions (grep hits=%d)", len(semanticQuestions), len(allHits))
+					topN := 10
+					scoreThreshold := 0.4
+					type ResultKey struct {
+						DocID string
 					}
-				}
-				searchedQuestions := 0
+					allResultsMap := make(map[ResultKey]rag.SearchResult)
 
-				for idx, question := range semanticQuestions {
-					if question == "" {
-						continue
+					questionTotal := 0
+					for _, question := range semanticQuestions {
+						if question != "" {
+							questionTotal++
+						}
 					}
+					searchedQuestions := 0
 
-					log.Infof("semantic searching question %d/%d: %s", idx+1, len(semanticQuestions), question)
-					searchedQuestions++
-					reactloops.EmitStatus(loop, fmt.Sprintf(
-						"语义搜索 %d/%d / Semantic search %d/%d",
-						searchedQuestions, questionTotal, searchedQuestions, questionTotal,
-					))
-
-					results, err := ragSearcher.QueryTopN(question, topN, scoreThreshold)
-					if err != nil {
-						log.Errorf("semantic search failed for question '%s': %v", question, err)
-						continue
-					}
-
-					log.Infof("semantic search found %d results for question: %s", len(results), question)
-
-					for _, result := range results {
-						var docID string
-						if result.KnowledgeBaseEntry != nil {
-							docID = fmt.Sprintf("kb_%d_%s", result.KnowledgeBaseEntry.ID, result.KnowledgeBaseEntry.KnowledgeTitle)
-						} else if result.Document != nil {
-							docID = result.Document.ID
-						} else {
+					for idx, question := range semanticQuestions {
+						if question == "" {
 							continue
 						}
 
-						key := ResultKey{DocID: docID}
-						existing, exists := allResultsMap[key]
-						if !exists || result.Score > existing.Score {
-							allResultsMap[key] = *result
-						}
-					}
+						log.Infof("semantic searching question %d/%d: %s", idx+1, len(semanticQuestions), question)
+						searchedQuestions++
+						reactloops.EmitStatusI18n(
+							loop,
+							fmt.Sprintf("语义搜索 %d/%d", searchedQuestions, questionTotal),
+							fmt.Sprintf("Semantic search %d/%d", searchedQuestions, questionTotal),
+						)
 
-					questionHits := make([]rag.SearchResult, 0, len(results))
-					for _, result := range results {
-						questionHits = append(questionHits, *result)
+						results, err := ragSearcher.QueryTopN(question, topN, scoreThreshold)
+						if err != nil {
+							log.Errorf("semantic search failed for question '%s': %v", question, err)
+							continue
+						}
+
+						log.Infof("semantic search found %d results for question: %s", len(results), question)
+
+						for _, result := range results {
+							var docID string
+							if result.KnowledgeBaseEntry != nil {
+								docID = fmt.Sprintf("kb_%d_%s", result.KnowledgeBaseEntry.ID, result.KnowledgeBaseEntry.KnowledgeTitle)
+							} else if result.Document != nil {
+								docID = result.Document.ID
+							} else {
+								continue
+							}
+
+							key := ResultKey{DocID: docID}
+							existing, exists := allResultsMap[key]
+							if !exists || result.Score > existing.Score {
+								allResultsMap[key] = *result
+							}
+						}
+
+						questionHits := make([]rag.SearchResult, 0, len(results))
+						for _, result := range results {
+							questionHits = append(questionHits, *result)
+						}
+						sort.Slice(questionHits, func(i, j int) bool {
+							return questionHits[i].Score > questionHits[j].Score
+						})
+						allHits = append(allHits, RAGResultsToSampleHits(question, questionHits, ragMaxHits)...)
 					}
-					sort.Slice(questionHits, func(i, j int) bool {
-						return questionHits[i].Score > questionHits[j].Score
-					})
-					allHits = append(allHits, RAGResultsToSampleHits(question, questionHits, ragMaxHits)...)
 				}
 			}
 
@@ -269,24 +291,28 @@ func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCf
 					searchQueryBuilder.WriteString(strings.Join(searchPatterns, ", "))
 					searchQueryBuilder.WriteString("\n")
 				}
-				if len(semanticQuestions) > 0 {
+				if ranSemanticSearch && len(semanticQuestions) > 0 {
 					searchQueryBuilder.WriteString("Semantic Questions: ")
 					searchQueryBuilder.WriteString(strings.Join(semanticQuestions, ", "))
 				}
 				searchQuery := searchQueryBuilder.String()
 
 				ctx := task.GetContext()
-				reactloops.EmitStatus(loop, "压缩样例中 / Compressing samples...")
+				reactloops.EmitStatusI18n(loop, "压缩样例中", "Compressing samples...")
 				initialSamples = FinalizeSearchResults(ctx, allHits, searchQuery, r)
 				log.Infof("initial samples finalized, hit count: %d, final size: %d bytes", len(allHits), len(initialSamples))
 
 				if initialSamples != "" {
-					manifest := NewSearchManifest(searchPatterns, semanticQuestions)
+					manifestQuestions := semanticQuestions
+					if !ranSemanticSearch {
+						manifestQuestions = nil
+					}
+					manifest := NewSearchManifest(searchPatterns, manifestQuestions)
 					loop.Set("initial_code_samples", initialSamples)
 					loop.Set("init_search_manifest", manifest.JSON())
 					loop.Set("init_samples_ready", "true")
 
-					reactloops.EmitStatus(loop, "样例准备完成 / Samples ready")
+					reactloops.EmitStatusI18n(loop, "样例准备完成", "Samples ready")
 					summary, reference := reactloops.SpillLongContent(loop, "init_yaklang_samples", initialSamples)
 					reactloops.EmitActionLog(loop, "yaklang-init-search",
 						fmt.Sprintf("初始化代码样例: %s (%d 条命中) / Init code samples: %s (%d hits)",

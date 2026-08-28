@@ -136,10 +136,10 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 	}
 
 	backend := &AIMemoryHNSWBackend{
-		sessionID:  sessionID,
-		db:         db,
-		collection: &collection,
-		autoSave:   config.autoSave,
+		sessionID:   sessionID,
+		db:          db,
+		collection:  &collection,
+		autoSave:    config.autoSave,
 		midtermMode: config.midtermMode,
 	}
 
@@ -178,10 +178,14 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 
 // createNewGraph 创建新的HNSW Graph
 func (b *AIMemoryHNSWBackend) createNewGraph() *hnsw.Graph[string] {
-	return hnsw.NewGraph[string](
+	options := []hnsw.GraphOption[string]{
 		hnsw.WithHNSWParameters[string](b.collection.M, b.collection.Ml, b.collection.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc("cosine")),
-	)
+	}
+	if b.collection.EfConstruct > 0 {
+		options = append(options, hnsw.WithEfConstruction[string](b.collection.EfConstruct))
+	}
+	return hnsw.NewGraph[string](options...)
 }
 
 // loadGraphFromBinary 从二进制数据加载HNSW Graph
@@ -213,10 +217,14 @@ func (b *AIMemoryHNSWBackend) loadGraphFromBinary(graphBinary []byte) (*hnsw.Gra
 	}
 
 	// 加载graph
-	graph, err := hnsw.LoadGraphFromBinary(reader, loadNodeFunc,
+	options := []hnsw.GraphOption[string]{
 		hnsw.WithHNSWParameters[string](b.collection.M, b.collection.Ml, b.collection.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc("cosine")),
-	)
+	}
+	if b.collection.EfConstruct > 0 {
+		options = append(options, hnsw.WithEfConstruction[string](b.collection.EfConstruct))
+	}
+	graph, err := hnsw.LoadGraphFromBinary(reader, loadNodeFunc, options...)
 	if err != nil {
 		return nil, utils.Errorf("load graph from binary failed: %v", err)
 	}

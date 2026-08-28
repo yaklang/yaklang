@@ -181,6 +181,12 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	loop.SetCondition(func() ssa.Value {
 		var lefts []*ssa.Variable
 		var valueLeft *ssa.Variable
+		// A nil iterable (e.g. an expression that failed to compile or an
+		// undefined variable) must terminate the loop instead of panicking in
+		// NewNext. See ssa.NewNext nil guard.
+		if utils.IsNil(value) {
+			return y.EmitConstInst(false)
+		}
 		if i.ArrayDestructuring() != nil {
 			lefts = y.VisitArrayDestructuring(i.ArrayDestructuring())
 		} else if i.Assignable() != nil {

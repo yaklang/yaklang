@@ -17,11 +17,13 @@ import (
 )
 
 const (
-	sampleBudgetBytes     = 24 * 1024
-	sampleLLMFallbackRaw  = 50 * 1024
-	sampleMaxSnippetBytes = 1200
-	grepMaxHitsPerPattern = 15
-	ragMaxHits            = 20
+	sampleBudgetBytes     = 16 * 1024
+	sampleLLMFallbackRaw  = 40 * 1024
+	sampleMaxSnippetBytes = 900
+	grepMaxHitsPerPattern = 8
+	ragMaxHits            = 10
+	// initGrepEnoughHits: Init Grep 命中达到该数时跳过同轮 RAG，避免双通道重复注水。
+	initGrepEnoughHits = 8
 )
 
 const (
@@ -389,11 +391,7 @@ func GrepAlreadyCovered(loop interface{ Get(string) string }, pattern string) (b
 	normalized := normalizeGrepPattern(pattern)
 	for _, p := range manifest.GrepPatterns {
 		if normalizeGrepPattern(p) == normalized {
-			msg := fmt.Sprintf(`【Init 已覆盖】搜索模式 "%s" 已在初始化阶段预检索。
-
-请直接参考 reactive_data 中的「预检索代码样例（Init 已完成）」段落，禁止重复相同 grep。
-
-若需要不同角度，请修改 pattern 或使用 semantic_search_yaklang_samples。`, pattern)
+			msg := fmt.Sprintf(`【Init 已覆盖】"%s" 已预检索，见「预检索代码样例」。换 pattern 或用 semantic_search。`, pattern)
 			return true, msg
 		}
 	}
@@ -429,11 +427,7 @@ func SemanticAlreadyCovered(loop interface{ Get(string) string }, questions []st
 	if !allCovered {
 		return false, ""
 	}
-	msg := fmt.Sprintf(`【Init 已覆盖】语义问题已在初始化阶段预检索：
-
-%s
-
-请直接参考 reactive_data 中的「预检索代码样例（Init 已完成）」段落，禁止重复相同 semantic 搜索。`, strings.Join(questions, "\n"))
+	msg := fmt.Sprintf(`【Init 已覆盖】语义问题已预检索：%s。见「预检索代码样例」。`, strings.Join(questions, "; "))
 	return true, msg
 }
 

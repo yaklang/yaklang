@@ -130,6 +130,9 @@ var RagExports = map[string]interface{}{
 	"LocalEmbedding":  _localEmbedding,
 	"OnlineEmbedding": _onlineEmbedding,
 
+	// Collection2DPoints - 集合向量二维化（PCA），供绘图侧使用
+	"Collection2DPoints": _collection2DPoints,
+
 	// DBQuery - 数据库直接查询接口（快速，不使用语义搜索）
 	// 用于去重检查、快速验证等场景
 	"DBQueryKnowledge":             _dbQueryKnowledge,             // 查询知识库条目

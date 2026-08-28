@@ -60,6 +60,42 @@ var (
 
 const mitmRequestHijackAtTimingKey = "yakit_mitm_request_hijack_at_unix_ms"
 
+const storedMITMBareRequestTruncateNotice = "[[yakit: original request body truncated for storage, original=%s, limit=%s]]"
+
+// truncateMITMBareRequestForStorage bounds the original request snapshot that
+// is persisted to project KV after a request is modified. Large-request spill
+// sidecars protect the normal HTTPFlow request, but the bare/original request
+// is stored independently and must not bypass the same global body limit.
+func truncateMITMBareRequestForStorage(packet []byte) (stored []byte, truncated bool, originalBodyLen, limit int) {
+	limit = yakit.GetMaxHTTPFlowRequestBodyInDBBytes()
+	if len(packet) == 0 || limit <= 0 {
+		return packet, false, 0, limit
+	}
+
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
+	originalBodyLen = len(body)
+	if originalBodyLen <= limit {
+		return packet, false, originalBodyLen, limit
+	}
+
+	notice := []byte(fmt.Sprintf(
+		storedMITMBareRequestTruncateNotice,
+		utils.ByteSize(uint64(originalBodyLen)),
+		utils.ByteSize(uint64(limit)),
+	))
+	keep := limit - len(notice)
+	if keep < 0 {
+		// The UI currently configures this value in MiB, so the notice normally
+		// fits. Keep the hard storage bound even for an unusually tiny limit.
+		keep = 0
+		notice = notice[:limit]
+	}
+	bodyForStorage := make([]byte, keep+len(notice))
+	copy(bodyForStorage, body[:keep])
+	copy(bodyForStorage[keep:], notice)
+	return lowhttp.ReplaceHTTPPacketBody([]byte(header), bodyForStorage, false), true, originalBodyLen, limit
+}
+
 func cacheModifiedPlainResponseBytes(req *http.Request, plainResponse []byte) {
 	if len(plainResponse) == 0 || !httpctx.GetResponseIsModified(req) {
 		return
@@ -149,6 +185,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}()
 
 	var mServer *crep.MITMServer
+	var streamSendMu sync.Mutex
 
 	send := func(rsp *ypb.MITMV2Response) (sendError error) {
 		defer func() {
@@ -159,6 +196,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 
+		streamSendMu.Lock()
+		defer streamSendMu.Unlock()
 		sendError = stream.Send(safeUTF8MITMV2Resp(rsp))
 		return
 	}
@@ -207,13 +246,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		return utils.Errorf("recv first req failed: %s", err)
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
-
-	// 是否过滤打包/构建产物的静态 JS（默认 true：过滤）
-	// 这里用原子变量：需要支持前端在运行时切换开关后立即生效（无需重启 MITM）。
-	filterBundledStaticJS := utils.NewBool(true)
-	if filterData := firstReq.GetFilterData(); filterData != nil {
-		filterBundledStaticJS.SetTo(filterData.GetFilterBundledStaticJS())
-	}
 
 	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, map[string][]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
@@ -389,6 +421,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
+	pipelineTracker := newMITMPipelineTracker(ksuid.New().String())
 
 	log.Infof("start to create mitm server instance for %v", addr)
 
@@ -399,6 +432,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		filterManager       = GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
 		hijackFilterManager = GetMITMHijackFilterManager(s.GetProjectDatabase())
 	)
+	// 是否过滤打包/构建产物的静态 JS（默认 true：过滤）。
+	// 以持久化的过滤器为单一状态源，避免 GUI 和运行时行为不一致。
+	filterBundledStaticJS := utils.NewBool(filterManager.Data.GetFilterBundledStaticJS())
 
 	/*
 		设置内容替换模块，通过正则驱动
@@ -551,6 +587,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 			if reqInstance.GetResetFilter() {
 				filterManager.Recover()
+				filterBundledStaticJS.SetTo(filterManager.Data.GetFilterBundledStaticJS())
 				sendLogged(&ypb.MITMV2Response{
 					JustFilter: true,
 					FilterData: filterManager.Data,
@@ -880,6 +917,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) (hijackRsp []byte) {
+		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req))
 		pluginCtx := httpctx.GetPluginContext(req)
 		urlStr := httpctx.GetRequestURL(req)
 
@@ -991,7 +1029,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				return nil
 			}
 			httpctx.AppendMatchedRule(req, rules...)
-			if packetModified(rsp, rspHooked) {
+			// 规则在 FixHTTPResponse 规范化后的报文上匹配/替换, 因此判定基准是规范化报文
+			// 而非原始报文: 未命中时 Hook 返回的规范化报文与基准一致, 不会误判为规则修改。
+			ruleHookBaseline, _, err := lowhttp.FixHTTPResponse(rsp)
+			if err != nil {
+				ruleHookBaseline = rsp
+			}
+			if packetModified(ruleHookBaseline, rspHooked) {
 				httpctx.SetResponseModified(req, "yakit.rule.hook")
 				httpctx.SetHijackedResponseBytes(req, rspHooked)
 				rsp = rspHooked
@@ -1029,6 +1073,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
 
+		pipelineTracker.manualWaitStarted(req, true)
+		defer pipelineTracker.manualWaitFinished(req, true)
 		sendPacket := taskInfo.Response
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
@@ -1196,6 +1242,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) (hijackReq []byte) {
+		pipelineTracker.requestObserved(originReqIns)
+		defer func() {
+			if hijackReq == nil || httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+				pipelineTracker.requestDropped(originReqIns)
+				return
+			}
+			pipelineTracker.requestDispatched(originReqIns, httpctx.GetShouldMockResponse(originReqIns))
+		}()
 		if httpctx.GetContextAnyFromRequest(originReqIns, mitmRequestHijackAtTimingKey) == nil {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, mitmRequestHijackAtTimingKey, time.Now().UnixMilli())
 		}
@@ -1388,6 +1442,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		taskInfo := task.infoMessage
+		pipelineTracker.manualWaitStarted(originReqIns, false)
+		defer pipelineTracker.manualWaitFinished(originReqIns, false)
 
 		// Capture encoding from wire packet; UI shows plain (or truncated plain for oversized bodies).
 		if viewReq, st, ok := lowhttp.AutoUnzipPacketEncoding(wireReq); ok && st != nil {
@@ -1422,6 +1478,29 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 		sendPacket := taskInfo.Request
+		largeRequestReplacements := newManualLargeRequestReplacementStore()
+		defer largeRequestReplacements.close()
+		notifyLargeRequestReplacementError := func(err error) {
+			log.Errorf("MITM large request file replacement failed: %v", err)
+			sendLogged(&ypb.MITMV2Response{
+				HaveNotification:    true,
+				NotificationContent: []byte(fmt.Sprintf("替换超大请求文件失败：%v", err)),
+			})
+		}
+		rebuildMultipartRequest := func(packet []byte) ([]byte, error) {
+			return yakit.RebuildMultipartRequestPacket(
+				packet,
+				httpctx.GetRequestTooLargeBodyFile(originReqIns),
+				largeRequestReplacements.multipartPaths(),
+			)
+		}
+		rebuildFlatRequest := func(packet []byte) ([]byte, error) {
+			return yakit.RebuildFlatSpillRequestPacket(
+				packet,
+				httpctx.GetRequestTooLargeBodyFile(originReqIns),
+				largeRequestReplacements.bodyPath(),
+			)
+		}
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
@@ -1446,6 +1525,29 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if controlReq.GetUpdateTags() {
 					taskInfo.Tags = controlReq.GetTags()
 					httpctx.SetFlowTags(originReqIns, controlReq.GetTags())
+				}
+
+				if controlReq.GetIsLargeRequestFileChunk() {
+					replaceBody := controlReq.GetLargeRequestReplaceBody()
+					if replaceBody && !yakit.IsFlatSpillRequestPacket(sendPacket) {
+						notifyLargeRequestReplacementError(utils.Error("current request is not an oversized non-multipart body"))
+						continue
+					}
+					if !replaceBody && !yakit.IsMultipartSpillRequestPacket(sendPacket) {
+						notifyLargeRequestReplacementError(utils.Error("current request is not an oversized multipart skeleton"))
+						continue
+					}
+					if err := largeRequestReplacements.consume(
+						replaceBody,
+						int(controlReq.GetLargeRequestPartIndex()),
+						controlReq.GetLargeRequestFileData(),
+						controlReq.GetLargeRequestFileStart(),
+						controlReq.GetLargeRequestFileEOF(),
+						controlReq.GetLargeRequestFileCancel(),
+					); err != nil {
+						notifyLargeRequestReplacementError(err)
+					}
+					continue
 				}
 
 				if controlReq.GetDrop() {
@@ -1473,6 +1575,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						RequestHijackAtUnixMs: requestHijackAt,
 						FlowBuiltAtUnixMs:     time.Now().UnixMilli(),
 					}
+					pipelineTracker.flowBuilt()
+					pipelineTracker.persistEnqueued(flow)
+					persisted := false
 					for i := 0; i < 3; i++ {
 						startCreateFlow = time.Now()
 						// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
@@ -1483,16 +1588,52 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 							time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
 							continue
 						}
+						persisted = true
 						break
 					}
+					pipelineTracker.persistFinished(flow, persisted)
 					return nil
 				}
 
 				if controlReq.GetForward() {
+					if largeRequestReplacements.hasActive() {
+						notifyLargeRequestReplacementError(utils.Error("large request replacement upload is still in progress"))
+						continue
+					}
+					if largeRequestReplacements.hasCompleted() {
+						var (
+							current []byte
+							err     error
+						)
+						if yakit.IsMultipartSpillRequestPacket(sendPacket) {
+							current, err = rebuildMultipartRequest(sendPacket)
+						} else {
+							current, err = rebuildFlatRequest(sendPacket)
+						}
+						if err != nil {
+							notifyLargeRequestReplacementError(err)
+							continue
+						}
+						if _, err := yakit.RefreshPreparedLargeHTTPFlowRequest(originReqIns, current); err != nil {
+							notifyLargeRequestReplacementError(utils.Wrap(err, "refresh replaced request spill"))
+							continue
+						}
+						if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
+							if encoded, ok := lowhttp.AutoZipPacketEncoding(current, st); ok {
+								current = encoded
+							}
+						}
+						setModifiedRequest("user.large-request-file-replacement", current)
+						return current
+					}
 					return req
 				}
 
 				if controlReq.GetSendPacket() {
+					if largeRequestReplacements.hasActive() {
+						notifyLargeRequestReplacementError(utils.Error("large request replacement upload is still in progress"))
+						continue
+					}
 					// 这里是用户自定义的请求
 					current := controlReq.GetRequest()
 					taskInfo.Request = current // use for front ,should not render fuzztag
@@ -1504,9 +1645,37 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						}
 					}
 
-					// 没改动的话，保持 forward 行为（避免因重新压缩导致“被修改”误判）
-					if !packetModified(sendPacket, current) {
+					requestModified := packetModified(sendPacket, current)
+					// 没改动且没有替换文件时，保持 forward 行为（避免因重新压缩导致“被修改”误判）
+					if !requestModified && !largeRequestReplacements.hasCompleted() {
 						return req
+					}
+					largeRequestRebuilt := false
+					if yakit.IsMultipartSpillRequestPacket(current) {
+						rebuilt, err := rebuildMultipartRequest(current)
+						if err != nil {
+							notifyLargeRequestReplacementError(err)
+							continue
+						}
+						current = rebuilt
+						largeRequestRebuilt = true
+					} else if yakit.IsFlatSpillRequestPacket(current) {
+						rebuilt, err := rebuildFlatRequest(current)
+						if err != nil {
+							notifyLargeRequestReplacementError(err)
+							continue
+						}
+						current = rebuilt
+						largeRequestRebuilt = true
+					} else if largeRequestReplacements.hasCompleted() {
+						notifyLargeRequestReplacementError(utils.Error("large request replacement marker was removed from the edited request"))
+						continue
+					}
+					if largeRequestRebuilt {
+						if _, err := yakit.RefreshPreparedLargeHTTPFlowRequest(originReqIns, current); err != nil {
+							notifyLargeRequestReplacementError(utils.Wrap(err, "refresh edited request spill"))
+							continue
+						}
 					}
 
 					if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
@@ -1522,8 +1691,20 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 	}
 
+	streamRecorderFactory := minimartian.HTTPStreamRecorderFactory(func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte) (io.WriteCloser, error) {
+		if httpctx.IsFiltered(req) {
+			return nil, nil
+		}
+		return yakit.NewHTTPFlowStreamRecorder(s.GetProjectDatabase(), isHTTPS, req, rsp, headerBytes)
+	})
+
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
 		responseMirrorAtUnixMs := time.Now().UnixMilli()
+		// Filtered responses skip the response-hijack callback, so mirror is also
+		// the fallback terminal point for their upstream stage.
+		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req))
+		pipelineTracker.responseMirrored(req)
+		defer pipelineTracker.responseProcessingFinished(req)
 		addCounter()
 
 		// 不符合劫持条件就不劫持
@@ -1606,12 +1787,28 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		// 劫持过滤: 被过滤且未命中敏感信息的流量直接丢弃; 命中敏感信息的过滤流量继续走保存(以插件流量形式)。
 		if isFiltered && !tgSaveAsPlugin {
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				if err := recorder.Drop(); err != nil {
+					log.Warnf("drop filtered HTTP stream flow failed: %v", err)
+				}
+			}
 			return
 		}
 		saveBarePacketHandler := func(id uint) {
 			// 存储KV，将flow ID作为key，bare request和bare response作为value
 			if httpctx.GetRequestIsModified(req) {
 				bareReq := httpctx.GetBareRequestBytes(req)
+				bareReq, truncated, originalBodyLen, limit := truncateMITMBareRequestForStorage(bareReq)
+				if truncated {
+					sendLogged(&ypb.MITMV2Response{
+						HaveNotification: true,
+						NotificationContent: []byte(fmt.Sprintf(
+							"原始请求 Body 大小为 %s，超过全局转储数据包大小 %s，HTTP History 中的原始请求仅保存截断内容",
+							utils.ByteSize(uint64(originalBodyLen)),
+							utils.ByteSize(uint64(limit)),
+						)),
+					})
+				}
 				log.Debugf("[KV] save bare Request(%d)", id)
 
 				if len(bareReq) > 0 && id > 0 {
@@ -1672,6 +1869,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			FlowBuiltAtUnixMs:      time.Now().UnixMilli(),
 		}
 		flow.RuntimeTiming = runtimeTiming
+		pipelineTracker.flowBuilt()
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
 		// 额外，获取进程名
@@ -1715,7 +1913,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		hijackedFlowMutex := new(sync.Mutex)
 		isDroppedSaveFlow := utils.NewBool(false)
-		afterPersistCleanups := flow.AfterPersistCleanups
+		flow.AfterPersistCleanups = append(flow.AfterPersistCleanups, func(saved *schema.HTTPFlow) {
+			pipelineTracker.persistFinished(saved, saved != nil && saved.ID > 0)
+		})
+		afterPersistCleanups := append([]func(*schema.HTTPFlow){}, flow.AfterPersistCleanups...)
 
 		pluginCh := make(chan struct{})
 		hotPatchPipeline.HijackSaveHTTPFlowEx(
@@ -1806,6 +2007,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			// A hijackSaveHTTPFlow plugin may replace the public flow model. Keep
 			// process-local diagnostics owned by the engine and out of plugin data.
 			flow.RuntimeTiming = runtimeTiming
+			pipelineTracker.persistEnqueued(flow)
 			// 额外添加用户手动设置的标签，确保其优先级最高
 			userTags := httpctx.GetFlowTags(req)
 			if len(userTags) > 0 {
@@ -1814,10 +2016,19 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			// 内置高危凭证检测(TrafficGuard): 复用上面过滤前已扫描的 tgFindings, 标红并生成 Risk。
 			trafficguard.ApplyToFlow(s.GetProjectDatabase(), flow, tgFindings, plainRequest, plainResponse)
 			tags := flow.Tags
-			err := yakit.InsertHTTPFlowEx(flow, false, func() {
-				saveBarePacketHandler(flow.ID)
-			})
+			var err error
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				err = recorder.Finalize(flow)
+				if err == nil {
+					saveBarePacketHandler(flow.ID)
+				}
+			} else {
+				err = yakit.InsertHTTPFlowEx(flow, false, func() {
+					saveBarePacketHandler(flow.ID)
+				})
+			}
 			if err != nil {
+				yakit.ReleaseHTTPFlowPersistResources(flow)
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else {
 				if needUpdate {
@@ -1836,6 +2047,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		} else {
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				if err := recorder.Drop(); err != nil {
+					log.Warnf("drop HTTP stream flow rejected by save hook failed: %v", err)
+				}
+			}
 			yakit.ReleaseHTTPFlowPersistResources(flow)
 		}
 	}
@@ -1891,6 +2107,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_SetWebsocketRequestHijackRaw(handleHijackWsRequest),
 		crep.MITM_SetWebsocketResponseHijackRaw(handleHijackWsResponse),
 		crep.MITM_SetHTTPResponseMirror(handleMirrorResponse),
+		crep.MITM_SetHTTPStreamRecorderFactory(streamRecorderFactory),
 		crep.MITM_SetWebsocketHijackMode(true),
 		crep.MITM_SetHTTP2(firstReq.GetEnableHttp2()),
 		crep.MITM_MergeOptions(opts...),
@@ -1920,6 +2137,25 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	recoverFilterAndReplacerSend()
 	// 发送第二个来设置 replacer
 	recoverFilterAndReplacerSend()
+
+	sendPipelineStats := func() {
+		sendLogged(&ypb.MITMV2Response{
+			PipelineStats: pipelineTracker.snapshot(len(yakit.DBSaveAsyncChannel), cap(yakit.DBSaveAsyncChannel)),
+		})
+	}
+	sendPipelineStats()
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-streamCtx.Done():
+				return
+			case <-ticker.C:
+				sendPipelineStats()
+			}
+		}
+	}()
 
 	extraPorts := firstReq.GetExtraPorts()
 	if len(extraPorts) == 0 {

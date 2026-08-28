@@ -131,7 +131,11 @@ func Phase2ScanPlan(loop *reactloops.ReActLoop, categories []model.VulnCategory)
 		ids = append(ids, c.ID)
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, b.String())
-	reactloops.EmitStatus(loop, fmt.Sprintf("Phase 2：%d 个类别待扫描 / Phase 2: %d categories", len(categories), len(categories)))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("正在排查 %d 类潜在风险", len(categories)),
+		fmt.Sprintf("Reviewing %d potential risk categories", len(categories)),
+	)
 	Structured(loop, "code_audit_scan_plan", map[string]any{
 		"category_count": len(categories),
 		"category_ids":   ids,
@@ -158,7 +162,11 @@ func Phase2AuditVulnerabilityTypes(loop *reactloops.ReActLoop, categories []mode
 		b.WriteString(fmt.Sprintf("  ... 另有 %d 类\n", len(categories)-12))
 	}
 	reactloops.EmitActionLog(loop, util.ScanNodeID, b.String())
-	reactloops.EmitStatus(loop, fmt.Sprintf("已确定 %d 类审计漏洞类型 / %d vulnerability types confirmed", len(categories), len(categories)))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("已确定 %d 类审计漏洞类型", len(categories)),
+		fmt.Sprintf("%d vulnerability types confirmed", len(categories)),
+	)
 	Structured(loop, "code_audit_vulnerability_types", map[string]any{
 		"type_count": len(categories),
 		"type_ids":   ids,
@@ -198,7 +206,11 @@ func Phase2CategoryOutcome(
 		label, index, total, category.Name, category.ID, findingCount, findingCount,
 	))
 	if incomplete {
-		reactloops.EmitStatus(loop, fmt.Sprintf("[警告] 类别 %s 可能未完成 / Category %s may be incomplete", category.ID, category.ID))
+		reactloops.EmitStatusI18n(
+			loop,
+			fmt.Sprintf("类别 %s 可能尚未完成", category.ID),
+			fmt.Sprintf("Category %s may be incomplete", category.ID),
+		)
 	} else {
 		reactloops.EmitProgress(loop, index, total, "扫描进度", "Scan progress")
 	}
@@ -224,7 +236,11 @@ func Phase2FindingAdded(loop *reactloops.ReActLoop, category model.VulnCategory,
 		"Finding [%s] %s %s — %s:%d (%s) / %s",
 		category.Name, f.Severity, f.ID, shortFile, f.Line, utils.ShrinkString(f.Title, 80), f.Title,
 	))
-	reactloops.EmitStatus(loop, fmt.Sprintf("已发现 %d 个 finding / %d findings so far", totalFindings, totalFindings))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("已找到 %d 个需要进一步确认的位置", totalFindings),
+		fmt.Sprintf("Found %d areas that need further validation", totalFindings),
+	)
 }
 
 func Phase2CategoryScanComplete(loop *reactloops.ReActLoop, category model.VulnCategory, findingCount int, coveragePreview string) {
@@ -278,7 +294,11 @@ func Phase3VerifyStart(loop *reactloops.ReActLoop, total int) {
 	}
 	reactloops.EmitActionLog(loop, util.VerifyNodeID,
 		fmt.Sprintf("开始验证 %d 个 findings / Verifying %d findings", total, total))
-	reactloops.EmitStatus(loop, fmt.Sprintf("漏洞验证中 (%d) / Verifying findings (%d)", total, total))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("正在验证 %d 个潜在风险", total),
+		fmt.Sprintf("Verifying %d potential findings", total),
+	)
 }
 
 // Phase3VerifyScope emits the verification scope grouped by vulnerability type for the frontend.
@@ -302,7 +322,11 @@ func Phase3VerifyScope(loop *reactloops.ReActLoop, findings []*model.Finding, by
 		b.WriteString(fmt.Sprintf("  • %s: %s\n", cat, strings.Join(byCategory[cat], ", ")))
 	}
 	reactloops.EmitActionLog(loop, util.VerifyNodeID, b.String())
-	reactloops.EmitStatus(loop, fmt.Sprintf("已确定验证范围 (%d findings) / Verification scope confirmed", len(findings)))
+	reactloops.EmitStatusI18n(
+		loop,
+		fmt.Sprintf("已确定 %d 个重点位置，正在逐一确认", len(findings)),
+		fmt.Sprintf("Identified %d priority areas for validation", len(findings)),
+	)
 	Structured(loop, "code_audit_verify_scope", map[string]any{
 		"finding_count": len(findings),
 		"type_count":    len(byCategory),
@@ -362,7 +386,7 @@ func Phase4ReportComplete(loop *reactloops.ReActLoop, reportPath string, stats m
 		"报告已生成 / Report ready: %s\n高危 %d | 中危 %d | 低危 %d | 待复核 %d",
 		reportPath, stats.HighCount, stats.MediumCount, stats.LowCount, stats.UncertainCount,
 	))
-	reactloops.EmitStatus(loop, "报告生成完成 / Report generation complete")
+	reactloops.EmitStatusI18n(loop, "报告生成完成", "Report generation complete")
 	Structured(loop, "code_audit_report_done", map[string]any{
 		"report_path": reportPath,
 		"high":        stats.HighCount,

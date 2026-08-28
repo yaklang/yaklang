@@ -69,21 +69,5 @@ func GetCollection(db *gorm.DB, collectionName string, opts ...CollectionConfigF
 }
 
 func RemoveCollection(db *gorm.DB, collectionName string) error {
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		collection, err := yakit.QueryRAGCollectionByName(tx, collectionName)
-		if err != nil {
-			return err
-		}
-		if collection == nil {
-			return utils.Errorf("集合 %s 不存在", collectionName)
-		}
-
-		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
-			return err
-		}
-		return nil
-	})
+	return DeleteCollection(db, collectionName)
 }

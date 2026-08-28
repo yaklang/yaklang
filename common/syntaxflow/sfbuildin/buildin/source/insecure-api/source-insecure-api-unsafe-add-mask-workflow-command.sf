@@ -1,0 +1,42 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Unsafe Add Mask Workflow Command"
+	title_zh: "检测到Unsafe Add Mask Workflow Command",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-unsafe-add-mask-workflow-command"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `unsafe-add-mask-workflow-command` (/tmp/semgrep-rules/yaml/github-actions/security/audit/unsafe-add-mask-workflow-command.yaml).
+Original message: GitHub Actions provides the **'add-mask'** workflow command to mask sensitive data in the workflow logs. If **'add-mask'** is not used or if workflow commands have been stopped, sensitive data can leaked into the workflow logs. An attacker could simply copy the workflow to another branch and add the following payload `echo "::stop-commands::$stopMarker"` to stop workflow command processing ([described here](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#stopping-and-starting-workflow-commands)), which will cause the secret token to be exposed despite the **'add-mask'** usage. For more information, please refer to the [GitHub documentation](https://github.com/actions/toolkit/blob/main/docs/commands.md#register-a-secret).
+
+CWE: CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
+References:
+- https://github.blog/changelog/2020-10-01-github-actions-deprecating-set-env-and-add-path-commands/
+- https://github.com/actions/runner/issues/159
+- https://github.com/actions/runner/issues/475
+DESC
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION
+	alert_min: 1
+	"file://pos.yml": <<<POS
+::add-mask::
+
+POS
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG
+)
+
+${*.yml}.pattern_regex(/::add-mask::/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Unsafe Add Mask Workflow Command",
+	title_zh: "检测到Unsafe Add Mask Workflow Command",
+	message: "Unsafe Add Mask Workflow Command",
+}

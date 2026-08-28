@@ -743,6 +743,7 @@ func (a *anValue) GetVariable(name string) *Variable {
 			programName = prog.GetProgramName()
 		}
 		v := GetVariableFromDB(a.GetId(), name, programName)
+		RestoreVariableFinish(v)
 		a.AddVariable(v)
 		return v
 	}

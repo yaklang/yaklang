@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -708,4 +709,522 @@ func sessionReader() func(*http.Request) {
 		ssatest.CheckResultWithFS(t, vf, sessionsFilesystemStoreGetRule, assertStoreGetMatched,
 			ssaapi.WithLanguage(ssaconfig.GO))
 	})
+}
+
+func TestImport_GlobalVariableCrossPackage(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+
+go 1.20
+`)
+	vf.AddFile("src/main/go/A/a.go", `
+package A
+
+var GlobalA = 1
+`)
+	vf.AddFile("src/main/go/B/b.go", `
+package B
+
+import "fmt"
+
+func init() {
+	fmt.Println(GlobalA)
+}
+`)
+
+	// pkg_b does NOT import pkg_a, so GlobalA should be Undefined,
+	// not the value 1 from pkg_a.
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"Undefined-GlobalA"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestImport_GlobalVariableSamePackage(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+
+go 1.20
+`)
+	vf.AddFile("src/main/go/A/a.go", `
+package A
+
+var GlobalA = 1
+`)
+	vf.AddFile("src/main/go/A/b.go", `
+package A
+
+import "fmt"
+
+func init() {
+	fmt.Println(GlobalA)
+}
+`)
+
+	// Same package: GlobalA should resolve to 1
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"1"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+// ===== Global Variable Mechanism Comprehensive Tests =====
+// These tests document the current behavior of the GlobalVariablesBlueprint
+// mechanism for Go, covering all code paths that will be affected by the
+// global mechanism refactor.
+
+func TestGlobal_samePackage_globalVarWithInit(t *testing.T) {
+	// Global var declared in file A, assigned in init() in file A,
+	// referenced in function in file B (same package).
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Config string
+
+func init() {
+	Config = "production"
+}
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func runConfig() {
+	fmt.Println(Config)
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"\"production\""},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_globalVarInlineInit(t *testing.T) {
+	// Global var with inline initializer, referenced in another file.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Count = 42
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func showCount() {
+	fmt.Println(Count)
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"42"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_globalSliceIndex(t *testing.T) {
+	// Global slice, index access in another file.
+	// This tests the member call relationship (str[0]) that is currently
+	// stored in globalVarsContainer and restored by LoadGlobalVariable.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Items = []string{"alpha", "beta", "gamma"}
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func showFirst() {
+	fmt.Println(Items[0])
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* #-> as $target)
+	`, map[string][]string{
+		"target": {"\"alpha\""},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_globalMapKey(t *testing.T) {
+	// Global map, key access in another file.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var ConfigMap = map[string]int{
+	"timeout": 30,
+	"retries": 3,
+}
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func showTimeout() {
+	fmt.Println(ConfigMap["timeout"])
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* #-> as $target)
+	`, map[string][]string{
+		"target": {"30"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_globalUpdatedInInit(t *testing.T) {
+	// Global var declared with default value, updated in init(),
+	// referenced in another function. The value should be the
+	// updated value, not the default.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Mode int
+
+func init() {
+	Mode = 1
+}
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func showMode() {
+	fmt.Println(Mode)
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"1"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_multipleInit(t *testing.T) {
+	// Multiple init() functions update the same global. Sequential
+	// accumulation to 15 is not guaranteed under concurrent compile;
+	// Println must still see the global (10 from the first assignment
+	// and/or 15 if later inits were applied).
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Counter int
+
+func init() {
+	Counter = 10
+}
+
+func init() {
+	Counter = Counter + 5
+}
+`)
+	vf.AddFile("src/main/go/c.go", `
+package main
+
+import "fmt"
+
+func showCounter() {
+	fmt.Println(Counter)
+}
+`)
+	ssatest.CheckResultWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, func(sfr *ssaapi.SyntaxFlowResult) {
+		require.NotNil(t, sfr)
+		got := sfr.GetValues("target")
+		require.NotEmpty(t, got)
+		ok := false
+		for _, v := range got {
+			s := v.String()
+			if strings.Contains(s, "10") || strings.Contains(s, "15") {
+				ok = true
+				break
+			}
+		}
+		require.True(t, ok, "Println(Counter) should see init assignment 10 or accumulated 15, got %v", got)
+	}, ssaapi.WithLanguage(ssaconfig.GO), ssaconfig.WithCompileConcurrency(1))
+}
+
+func TestGlobal_samePackage_globalInClosure(t *testing.T) {
+	// Global variable referenced in a function that also creates a closure.
+	// SyntaxFlow does not traverse into closure bodies, so we verify the
+	// global variable is visible in the outer function.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Secret = "s3cr3t"
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func getSecretFunc() func() string {
+	fmt.Println(Secret)
+	return func() string {
+		return Secret
+	}
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"\"s3cr3t\""},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_crossPackage_importGlobal(t *testing.T) {
+	// Global var in package A, imported and used in package B.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/A/a.go", `
+package A
+
+var Version = "1.0.0"
+`)
+	vf.AddFile("src/main/go/B/b.go", `
+package B
+
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/A"
+)
+
+func showVersion() {
+	fmt.Println(A.Version)
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* #-> as $target)
+	`, map[string][]string{
+		"target": {"\"1.0.0\""},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_crossPackage_importGlobalChain(t *testing.T) {
+	// Global var in package C, imported by B, imported by A.
+	// Tests transitive import of global variables.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/C/c.go", `
+package C
+
+var Depth = 100
+`)
+	vf.AddFile("src/main/go/B/b.go", `
+package B
+
+import "github.com/yaklang/yaklang/C"
+
+var BDepth = C.Depth
+`)
+	vf.AddFile("src/main/go/A/a.go", `
+package A
+
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/B"
+)
+
+func showDepth() {
+	fmt.Println(B.BDepth)
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* #-> as $target)
+	`, map[string][]string{
+		"target": {"100"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_globalVarDefaultZero(t *testing.T) {
+	// Global var declared without initializer, no init() assigns it.
+	// Should have default zero value.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Uninitialized int
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func showUninit() {
+	fmt.Println(Uninitialized)
+}
+`)
+	// The value should be 0 (default int value)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"0"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_globalStructFieldAccess(t *testing.T) {
+	// Global struct variable, field access in another file.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+type Settings struct {
+	Host string
+	Port int
+}
+
+var Config = Settings{
+	Host: "localhost",
+	Port: 8080,
+}
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func showHost() {
+	fmt.Println(Config.Host)
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* #-> as $target)
+	`, map[string][]string{
+		"target": {"\"localhost\""},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_samePackage_globalVarReassigned(t *testing.T) {
+	// Global var assigned multiple times in init(), final value wins.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/a.go", `
+package main
+
+var Status string
+
+func init() {
+	Status = "starting"
+	Status = "running"
+}
+`)
+	vf.AddFile("src/main/go/b.go", `
+package main
+
+import "fmt"
+
+func showStatus() {
+	fmt.Println(Status)
+}
+`)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"\"running\""},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
+func TestGlobal_crossPackage_notVisibleWithoutImport(t *testing.T) {
+	// Global var in package A, NOT imported by package B.
+	// B should see Undefined, not the value from A.
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+go 1.20
+`)
+	vf.AddFile("src/main/go/A/a.go", `
+package A
+
+var Private = "secret"
+`)
+	vf.AddFile("src/main/go/B/b.go", `
+package B
+
+import "fmt"
+
+func showPrivate() {
+	fmt.Println(Private)
+}
+`)
+	// Private should be Undefined (not visible across packages without import)
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		fmt.Println(* as $target)
+	`, map[string][]string{
+		"target": {"Undefined-Private"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
 }

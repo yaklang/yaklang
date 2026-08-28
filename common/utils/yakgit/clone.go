@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -200,16 +201,7 @@ func Clone(u string, localPath string, opt ...Option) error {
 		}()
 	}
 
-	respos, err := git.PlainCloneContext(c.Context, localPath, false, &git.CloneOptions{
-		URL:               u,
-		Auth:              c.Auth,
-		Depth:             c.Depth,
-		RecurseSubmodules: c.ToRecursiveSubmodule(),
-		InsecureSkipTLS:   !c.VerifyTLS,
-		Progress:          os.Stdout,
-		ProxyOptions:      c.Proxy,
-		ReferenceName:     plumbing.ReferenceName(c.Branch),
-	})
+	respos, err := git.PlainCloneContext(c.Context, localPath, false, buildCloneOptions(u, c))
 	if err != nil {
 		return utils.Wrapf(err, "git clone: %v to %v failed", u, localPath)
 	}
@@ -221,4 +213,69 @@ func Clone(u string, localPath string, opt ...Option) error {
 		log.Infof("git clone: %v to %v success", u, localPath)
 	}
 	return nil
+}
+
+// buildCloneOptions maps yakgit config to go-git CloneOptions. Branch names
+// without a refs/ prefix are treated as local branch names (refs/heads/...).
+func buildCloneOptions(u string, c *config) *git.CloneOptions {
+	opts := &git.CloneOptions{
+		URL:               u,
+		Auth:              c.Auth,
+		Depth:             c.Depth,
+		RecurseSubmodules: c.ToRecursiveSubmodule(),
+		InsecureSkipTLS:   !c.VerifyTLS,
+		Progress:          os.Stdout,
+		ProxyOptions:      c.Proxy,
+		ReferenceName:     cloneReferenceName(c.Branch),
+		SingleBranch:      c.SingleBranch,
+		Tags:              cloneTagMode(c),
+	}
+	return opts
+}
+
+func cloneReferenceName(branch string) plumbing.ReferenceName {
+	trimmed := strings.TrimSpace(branch)
+	if trimmed == "" {
+		return ""
+	}
+	ref := plumbing.ReferenceName(trimmed)
+	if ref.IsBranch() || ref.IsTag() || ref.IsNote() || ref.IsRemote() {
+		return ref
+	}
+	return plumbing.NewBranchReferenceName(trimmed)
+}
+
+func cloneTagMode(c *config) git.TagMode {
+	if c.NoFetchTags {
+		return git.NoTags
+	}
+	if c.FetchAllTags {
+		return git.AllTags
+	}
+	return git.InvalidTagMode
+}
+
+// CloneSettings is a read-only view of clone options after applying Option
+// funcs. Used by callers/tests that need to assert SSA/default clone policy.
+type CloneSettings struct {
+	Depth              int
+	SingleBranch       bool
+	NoFetchTags        bool
+	Branch             string
+	RecursiveSubmodule bool
+}
+
+// InspectCloneSettings applies Option funcs and returns the resolved settings.
+func InspectCloneSettings(opts ...Option) CloneSettings {
+	c := &config{}
+	for _, opt := range opts {
+		_ = opt(c)
+	}
+	return CloneSettings{
+		Depth:              c.Depth,
+		SingleBranch:       c.SingleBranch,
+		NoFetchTags:        c.NoFetchTags,
+		Branch:             c.Branch,
+		RecursiveSubmodule: c.RecursiveSubmodule,
+	}
 }

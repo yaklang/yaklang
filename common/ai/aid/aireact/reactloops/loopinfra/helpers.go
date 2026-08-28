@@ -10,24 +10,23 @@ import (
 )
 
 const (
-	loopInfraNodeToolCompose         = "tool_compose_progress"
-	loopInfraNodeLoadCapability      = "load_capability"
-	loopInfraNodeLoadSkillResources  = "load_skill_resources_path"
-	loopInfraNodeSingleFileWrite     = "infra-file-write"
-	loopInfraNodeSingleFileModify    = "infra-file-modify"
-	loopInfraNodeSingleFileInsert    = "infra-file-insert"
-	loopInfraNodeSingleFileDelete    = "infra-file-delete"
-	loopInfraNodeCodeVerify          = "infra-code-verify"
-	loopInfraNodeQueryMCPServers     = "query_mcp_servers"
-	loopInfraNodeQueryMCPTools       = "query_mcp_tools"
-	loopInfraNodeDispatchSubReact    = "dispatch_sub_react_agents"
-	loopInfraNodeSubReactReport      = "sub_react_agents_report"
-	loopInfraNodeDispatchConcurrency = "dispatch_sub_react_concurrency"
-	loopInfraNodeSubReactGoal        = "sub_react_agent_goal"
+	loopInfraNodeToolCompose        = "tool_compose_progress"
+	loopInfraNodeLoadCapability     = "load_capability"
+	loopInfraNodeLoadSkillResources = "load_skill_resources_path"
+	loopInfraNodeSingleFileWrite    = "infra-file-write"
+	loopInfraNodeSingleFileModify   = "infra-file-modify"
+	loopInfraNodeSingleFileInsert   = "infra-file-insert"
+	loopInfraNodeSingleFileDelete   = "infra-file-delete"
+	loopInfraNodeCodeVerify         = "infra-code-verify"
+	loopInfraNodeQueryMCPServers    = "query_mcp_servers"
+	loopInfraNodeQueryMCPTools      = "query_mcp_tools"
+	loopInfraNodeDispatchSubReact   = "dispatch_sub_react_agents"
+	loopInfraNodeSubReactReport     = "sub_react_agents_report"
+	loopInfraNodeSubReactGoal       = "sub_react_agent_goal"
 )
 
-func loopInfraStatus(loop *reactloops.ReActLoop, message string) {
-	reactloops.EmitStatus(loop, message)
+func loopInfraStatus(loop *reactloops.ReActLoop, zh, en string) {
+	reactloops.EmitStatusI18n(loop, zh, en)
 }
 
 func loopInfraSystemLog(loop *reactloops.ReActLoop, nodeID, message string) {
@@ -45,9 +44,9 @@ func loopInfraSystemLog(loop *reactloops.ReActLoop, nodeID, message string) {
 	_, _ = emitter.EmitDefaultSystemStreamEvent(nodeID, strings.NewReader(message), taskID)
 }
 
-func loopInfraActionStart(loop *reactloops.ReActLoop, nodeID, line, status string) {
+func loopInfraActionStart(loop *reactloops.ReActLoop, nodeID, line, statusZh, statusEn string) {
 	reactloops.EmitActionLog(loop, nodeID, line)
-	loopInfraStatus(loop, status)
+	loopInfraStatus(loop, statusZh, statusEn)
 }
 
 func loopInfraActionFinish(loop *reactloops.ReActLoop, nodeID, line string, reference ...string) {

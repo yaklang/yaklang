@@ -343,6 +343,14 @@ func (r *Emitter) EmitStatus(key string, value any) (*schema.AiOutputEvent, erro
 	})
 }
 
+// EmitStatusI18n emits an extensible user-facing status while preserving the
+// legacy string value. Chinese is the default value when available; newer
+// clients may select value_i18n and render optional detail, progress, or tool
+// metadata, while older clients continue to read value unchanged.
+func (r *Emitter) EmitStatusI18n(key, zh, en string, options ...StatusOption) (*schema.AiOutputEvent, error) {
+	return r.EmitStructured("status", newStatusPayload(key, zh, en, options...))
+}
+
 func (r *Emitter) EmitThoughtStream(taskId string, fmtTpl string, item ...any) (*schema.AiOutputEvent, error) {
 	content := fmtTpl
 	if item != nil && len(item) > 0 {
@@ -557,6 +565,8 @@ func (r *Emitter) EmitToolCallProgressReview(callToolID string, payload ToolCall
 }
 
 func (r *Emitter) EmitToolCallDone(callToolId string, endTime time.Time, startTime time.Time, purePluginDuration time.Duration) (*schema.AiOutputEvent, error) {
+	// EVENT_TOOL_CALL_DONE is a lifecycle boundary only. Execution semantics are
+	// carried separately by EVENT_TOOL_CALL_RESULT.
 	if purePluginDuration < 0 {
 		purePluginDuration = 0
 	}

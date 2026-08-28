@@ -41,10 +41,16 @@ func handleToolCallResult(
 	err error,
 	operator *reactloops.LoopActionHandlerOperator,
 ) {
+	// A non-nil ToolResult is the objective boundary that proves the plugin
+	// callback settled. Count both completed and protocol-failed calls. Review-driven
+	// direct_answer/cancel is terminal user intent, not a tool execution.
+	if !directly && result != nil {
+		operator.MarkToolExecuted()
+	}
 	if err != nil {
-		errMsg := fmt.Sprintf("Tool '%s' execution failed: %v.", toolPayload, err)
-		invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
-		loopInfraStatus(loop, "工具调用失败 / Tool Call Failed")
+		errMsg := fmt.Sprintf("Tool '%s' invocation protocol failed: %v.", toolPayload, err)
+		invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)
+		emitToolResultStatus(loop, toolPayload, false)
 
 		resolved := loop.ResolveIdentifier(toolPayload)
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingError(err) {
@@ -75,19 +81,19 @@ func handleToolCallResult(
 	if result == nil {
 		msg := fmt.Sprintf("tool call [%v] returned nil result", toolPayload)
 		invoker.AddToTimeline("error", msg)
-		loopInfraStatus(loop, "工具无结果 / Tool Returned No Result")
+		emitToolResultStatus(loop, toolPayload, false)
 		operator.Continue()
 		return
 	}
 
 	if result.Success {
 		reactloops.MarkEditBeforeExecutionCompleted(loop, toolPayload)
-		loopInfraStatus(loop, "工具调用完成 / Tool Call Complete")
+		emitToolResultStatus(loop, toolPayload, true)
 	}
 
 	if result.Error != "" {
-		invoker.AddToTimeline("call["+toolPayload+"] error", result.Error)
-		loopInfraStatus(loop, "工具返回错误 / Tool Returned Error")
+		invoker.AddToTimeline("call["+toolPayload+"] protocol-error", result.Error)
+		emitToolResultStatus(loop, toolPayload, false)
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingMessage(result.Error) {
 			operator.Feedback(
 				"[MCP] Tool '" + toolPayload + "' is still initializing. " +

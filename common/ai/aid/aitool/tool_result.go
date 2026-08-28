@@ -28,14 +28,19 @@ func (c *combinedBuffer) String() string {
 	return c.buf.String()
 }
 
-// ToolExecutionResult 表示工具执行的完整结果
+// ToolExecutionResult is the completed tool-callback envelope.
+//
+// Result is the semantic execution result. Stdout, Stderr and CombinedOutput
+// are observations produced while the callback ran; their wording is not a
+// reliable success/failure signal. Keep every field present in JSON so callers
+// can distinguish an explicit null semantic result from a missing envelope.
 type ToolExecutionResult struct {
 	Stdout string `json:"stdout"`
-	Stderr string `json:"stderr,omitempty"`
+	Stderr string `json:"stderr"`
 	// CombinedOutput 是 stdout + stderr 的合并输出，按时间顺序交错。
 	// 截断保存时只针对 CombinedOutput 做一次，不再分别处理 stdout/stderr。
 	CombinedOutput string      `json:"combined_output"`
-	Result         interface{} `json:"result,omitempty"`
+	Result         interface{} `json:"result"`
 }
 
 // ToJSON 将执行结果转换为JSON字符串
@@ -52,22 +57,22 @@ func (r *ToolExecutionResult) GetJSONSchema() map[string]interface{} {
 	schema := map[string]interface{}{
 		"$schema":     "http://json-schema.org/draft-07/schema#",
 		"type":        "object",
-		"description": "工具执行的完整结果",
+		"description": "工具调用完成后的结果信封；result 是执行语义，stdout/stderr/combined_output 仅为观察日志",
 		"properties": map[string]interface{}{
 			"stdout": map[string]interface{}{
 				"type":        "string",
-				"description": "标准输出内容",
+				"description": "标准输出观察日志；内容本身不代表执行成功",
 			},
 			"stderr": map[string]interface{}{
 				"type":        "string",
-				"description": "标准错误输出内容",
+				"description": "标准错误观察日志；非空不等于执行失败",
 			},
 			"combined_output": map[string]interface{}{
 				"type":        "string",
-				"description": "stdout + stderr 合并输出",
+				"description": "stdout + stderr 按时间顺序合并的观察日志",
 			},
 			"result": map[string]interface{}{
-				"description": "工具执行的结果",
+				"description": "工具提供的结构化执行语义；调用方应据此判断命令退出码、HTTP 状态或任务效果",
 			},
 		},
 		"required": []string{"stdout", "stderr", "combined_output", "result"},
@@ -118,32 +123,60 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 			stderr = io.Discard
 		}
 	}
-	var res any
-	var err error
-	var finsh = make(chan struct{})
+	type callbackResult struct {
+		value any
+		err   error
+	}
+	// A tool callback is allowed to have external side effects. Do not start it
+	// when its context was already cancelled before invocation.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		execResult := &ToolExecutionResult{
+			Stdout:         "",
+			Stderr:         "",
+			CombinedOutput: "",
+		}
+		if cancelCallback != nil {
+			execResult, callbackErr := cancelCallback(execResult, ctxErr)
+			if callbackErr != nil {
+				return execResult, callbackErr
+			}
+		}
+		return execResult, ctxErr
+	}
+	finished := make(chan callbackResult, 1)
 	go func() {
-		res, err = t.Callback(ctx, params, runtimeConfig, stdout, stderr)
-		close(finsh)
+		res, err := t.Callback(ctx, params, runtimeConfig, stdout, stderr)
+		finished <- callbackResult{value: res, err: err}
 	}()
 
 	var execResult *ToolExecutionResult
+	var err error
 	select {
 	case <-ctx.Done():
+		// Do not read callback-owned buffers or result variables while a
+		// non-cooperative callback may still be unwinding. Context-aware tools
+		// return promptly; the buffered channel lets that goroutine exit even if
+		// this cancellation path has already returned.
 		execResult = &ToolExecutionResult{
-			Stdout:         stdoutBuf.String(),
-			Stderr:         stderrBuf.String(),
-			CombinedOutput: combinedBuf.String(),
-			Result:         res,
+			Stdout:         "",
+			Stderr:         "",
+			CombinedOutput: "",
 		}
+		err = ctx.Err()
 		if cancelCallback != nil {
-			execResult, err = cancelCallback(execResult, err)
+			var callbackErr error
+			execResult, callbackErr = cancelCallback(execResult, err)
+			if callbackErr != nil {
+				err = callbackErr
+			}
 		}
-	case <-finsh:
+	case callback := <-finished:
+		err = callback.err
 		execResult = &ToolExecutionResult{
 			Stdout:         stdoutBuf.String(),
 			Stderr:         stderrBuf.String(),
 			CombinedOutput: combinedBuf.String(),
-			Result:         res,
+			Result:         callback.value,
 		}
 	}
 	return execResult, err

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/urfavecli"
@@ -268,6 +267,21 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 		if res == nil || res.Program == nil {
 			return nil, utils.Errorf("compile result is empty")
 		}
+
+		// Path A (optional, default OFF): after compile + SaveToDatabase,
+		// close the DBWrite cache and reload a DBRead Program from the
+		// database. This releases ~14GB of compile-time SSA objects
+		// (instructions, types, variables, scopes, ANTLR tokens, source
+		// editors) before the SyntaxFlow scan starts, reducing peak RSS
+		// and GC pressure during the scan phase.
+		//
+		// Enabled via YAK_SSA_PATH_A_RELOAD=1. When disabled (default),
+		// the compiled DBWrite Program is used directly (Path B).
+		if ssaapi.PathAEnabled() {
+			prog := ssaapi.ReloadProgramFromDatabase(res.Program)
+			return []*ssaapi.Program{prog}, nil
+		}
+
 		return []*ssaapi.Program{res.Program}, nil
 	}
 
@@ -456,6 +470,9 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	if concurrency := cfg.GetCompileConcurrency(); concurrency > 0 {
 		opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
 	}
+	if scanConcurrency := cfg.GetScanConcurrency(); scanConcurrency > 0 {
+		opts = append(opts, ssaconfig.WithScanConcurrency(scanConcurrency))
+	}
 	return opts
 }
 
@@ -536,11 +553,8 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 
 // setupDebugDir creates a structured debug output directory and wires up all
 // the output paths. It:
-//  1. Creates the directory structure: <dir>/{cpu-pprof,memory-pprof,goroutine-pprof}
-//  2. Redirects --database to <dir>/ssadb.db
-//  3. Redirects --output to <dir>/report
-//  4. Saves the launch command to <dir>/cmd.txt
-//  5. Starts a pprof HTTP server and periodic pprof collector
+//  1. Saves the launch command to <dir>/cmd.txt (CLI-only)
+//  2. Reuses ssaapi.StartDebugOutput for MkdirAll / ssadb / log / pprof
 //
 // The returned cleanup function stops the pprof collector and should be deferred.
 func setupDebugDir(c *cli.Context, dir string) (func(), error) {
@@ -548,7 +562,8 @@ func setupDebugDir(c *cli.Context, dir string) (func(), error) {
 		return nil, utils.Errorf("create debug dir %s: %v", dir, err)
 	}
 
-	// Save the launch command
+	// Save the launch command (CLI-only artifact; shared StartDebugOutput
+	// does not know about os.Args / urfave command metadata).
 	cmdPath := filepath.Join(dir, "cmd.txt")
 	cmdContent := fmt.Sprintf("yak %s\n\nFull command:\n%s\n\nTimestamp: %s\n",
 		c.Command.Name,
@@ -559,33 +574,13 @@ func setupDebugDir(c *cli.Context, dir string) (func(), error) {
 		return nil, utils.Errorf("write cmd.txt: %v", err)
 	}
 
-	// Redirect SSA database to <dir>/ssadb.db
-	ssadbPath := filepath.Join(dir, "ssadb.db")
-	if err := consts.SetGormSSAProjectDatabaseByInfo(ssadbPath); err != nil {
-		return nil, utils.Errorf("set SSA database to %s: %v", ssadbPath, err)
-	}
-	log.Infof("[debug] SSA database: %s", ssadbPath)
-
-	// Redirect log output to <dir>/log (in addition to stdout)
-	logPath := filepath.Join(dir, "log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	// Standalone CLI scans redirect SSA DB into the debug dir.
+	cleanup, err := ssaapi.StartDebugOutput(dir, true)
 	if err != nil {
-		return nil, utils.Errorf("create log file %s: %v", logPath, err)
+		return nil, utils.Errorf("setup debug output: %v", err)
 	}
-	log.Infof("[debug] log output: %s", logPath)
-	log.SetOutput(io.MultiWriter(logFile, os.Stdout))
-
-	// Start pprof collector
-	cleanup, err := ssaapi.StartPprofCollector(dir)
-	if err != nil {
-		logFile.Close()
-		return nil, utils.Errorf("start pprof collector: %v", err)
+	if cleanup == nil {
+		cleanup = func() {}
 	}
-
-	originalCleanup := cleanup
-	combinedCleanup := func() {
-		originalCleanup()
-		logFile.Close()
-	}
-	return combinedCleanup, nil
+	return cleanup, nil
 }

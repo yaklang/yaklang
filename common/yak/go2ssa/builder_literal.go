@@ -80,6 +80,13 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 			handleFunctionType(b.Function)
 
 			b.SetGlobal = false
+			// Load global variables before compiling the closure body so
+			// that global variables are visible inside the closure. The
+			// old code used buildBlock(block, false) which skipped
+			// LoadGlobalVariable, causing globals to be invisible in
+			// closures (resolved as FreeValue wrappers that SyntaxFlow
+			// cannot follow to the actual value).
+			b.LoadGlobalVariable()
 			if block, ok := exp.Block().(*gol.BlockContext); ok {
 				b.buildBlock(block, false)
 			}

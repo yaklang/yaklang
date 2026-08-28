@@ -57,3 +57,20 @@ func TestTransferFixedResponsePacket(t *testing.T) {
 		}
 	})
 }
+
+func TestDoHTTPRequestDoesNotMarkMockResponseAsUpstreamRoundTrip(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	httpctx.SetShouldMockResponse(req, true)
+	httpctx.SetMockResponseBytes(req, []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"))
+
+	response, err := NewProxy().doHTTPRequest(nil, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response == nil || response.StatusCode != http.StatusOK {
+		t.Fatalf("mock response = %#v, want HTTP 200", response)
+	}
+	if httpctx.GetUpstreamRoundTripSucceeded(req) {
+		t.Fatal("locally generated mock response was marked as a successful upstream round trip")
+	}
+}

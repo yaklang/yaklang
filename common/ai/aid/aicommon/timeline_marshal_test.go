@@ -83,6 +83,28 @@ func TestTimelineMarshalUnmarshal(t *testing.T) {
 	t.Log("Timeline marshal/unmarshal test passed")
 }
 
+func TestTimelineMarshalPreservesPromptOnlyTextWithoutChangingDisplay(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.PushTextWithPromptProjection(
+		301,
+		"[model_thinking]:\ndisplay-only reasoning",
+		"[model_thinking]:\n<|TIMELINE_MODEL_THINKING_n1|>payload<|TIMELINE_MODEL_THINKING_END_n1|>",
+	)
+
+	serialized, err := MarshalTimeline(timeline)
+	require.NoError(t, err)
+	restored, err := UnmarshalTimeline(serialized)
+	require.NoError(t, err)
+
+	item, ok := restored.idToTimelineItem.Get(301)
+	require.True(t, ok)
+	require.Equal(t, "[model_thinking]:\ndisplay-only reasoning", item.String())
+	textItem, ok := item.GetValue().(*TextTimelineItem)
+	require.True(t, ok)
+	require.Contains(t, textItem.PromptText, "TIMELINE_MODEL_THINKING_n1")
+	require.NotContains(t, item.String(), "TIMELINE_MODEL_THINKING_n1")
+}
+
 // TestTimelineMarshalWithCompressedHead 测试 single compressed head 的往返一致性
 func TestTimelineMarshalWithCompressedHead(t *testing.T) {
 	originalTimeline := NewTimeline(nil, nil)

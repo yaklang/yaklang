@@ -38,17 +38,31 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 			return
 		}
 
-		if tryDeliverYaklangFinalizeViaAI(loop, invoker, task, reason) {
-			loop.Set(yaklangFinalizedFlagKey, "true")
-			ignoreYaklangMaxIterationError(operator, reason)
-			return
+		// 成功路径走 lite，避免多余一次 AI 调用；失败/不完整才用 AI 总结。
+		if shouldPreferLiteYaklangFinalize(loop) || !tryDeliverYaklangFinalizeViaAI(loop, invoker, task, reason) {
+			lite := generateYaklangFinalizeLiteSummary(loop, reason)
+			deliverYaklangFinalizeLiteSummary(loop, invoker, lite)
 		}
-
-		lite := generateYaklangFinalizeLiteSummary(loop, reason)
-		deliverYaklangFinalizeLiteSummary(loop, invoker, lite)
 		loop.Set(yaklangFinalizedFlagKey, "true")
 		ignoreYaklangMaxIterationError(operator, reason)
 	})
+}
+
+// shouldPreferLiteYaklangFinalize 为 true 时跳过 AI finalize：已有代码、无阻塞 lint、自测未失败。
+func shouldPreferLiteYaklangFinalize(loop *reactloops.ReActLoop) bool {
+	if loop == nil {
+		return true
+	}
+	if strings.TrimSpace(loop.Get("full_code")) == "" {
+		return false
+	}
+	if hasBlockingLintErrors(loop) {
+		return false
+	}
+	if hasFailedSelfTest(loop) {
+		return false
+	}
+	return true
 }
 
 func ignoreYaklangMaxIterationError(operator *reactloops.OnPostIterationOperator, reason any) {
@@ -186,7 +200,7 @@ func buildYaklangFinalizeQuery(loop *reactloops.ReActLoop, task aicommon.AIState
 	out.WriteString("是否通过语法检查必须与上面的【权威结论】一致。")
 	out.WriteString("不要标题、列表、编号或任何 markdown，纯短句。")
 	if reasonErr, ok := reason.(error); ok && reasonErr != nil && strings.Contains(reasonErr.Error(), "max iterations") {
-		out.WriteString(" 本轮因达到最大迭代次数退出，若代码可能不完整请提示用户。")
+		out.WriteString(" 宿主已暂停继续执行，若代码可能不完整请提示用户。")
 	}
 	if task != nil {
 		if userInput := strings.TrimSpace(task.GetUserInput()); userInput != "" {
@@ -227,7 +241,7 @@ func generateYaklangFinalizeLiteSummary(loop *reactloops.ReActLoop, reason any) 
 
 	summary := strings.TrimSpace(strings.Join(parts, "; "))
 	if reasonErr, ok := reason.(error); ok && reasonErr != nil && strings.Contains(reasonErr.Error(), "max iterations") {
-		summary = summary + " (因达到最大迭代次数退出)"
+		summary = summary + " (宿主已暂停继续执行)"
 	}
 	return summary
 }

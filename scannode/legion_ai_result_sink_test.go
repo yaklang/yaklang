@@ -43,6 +43,7 @@ type recordingAIFocusRiskPublisher struct {
 	lifecycleRef jobExecutionRef
 	reports      [][]byte
 	reportIDs    []string
+	reportKinds  []string
 	order        []string
 }
 
@@ -133,11 +134,12 @@ func (p *recordingAIFocusRiskPublisher) PublishReportWithEventID(
 	_ context.Context,
 	ref jobExecutionRef,
 	eventID string,
-	_ string,
+	reportKind string,
 	reportJSON []byte,
 ) error {
 	p.lifecycleRef = ref
 	p.reportIDs = append(p.reportIDs, eventID)
+	p.reportKinds = append(p.reportKinds, reportKind)
 	p.reports = append(p.reports, append([]byte(nil), reportJSON...))
 	p.order = append(p.order, "report")
 	return nil
@@ -402,6 +404,120 @@ func TestLegionAIFocusResultSinkRejectsOffOriginTargets(t *testing.T) {
 		Url:      "https://outside.test/api",
 	}); err == nil || !strings.Contains(err.Error(), "outside the authorized origin") {
 		t.Fatalf("expected off-origin risk rejection, got %v", err)
+	}
+	for _, candidate := range []string{
+		"ftp://focus.example.test/api",
+		"mailto:security@focus.example.test",
+	} {
+		if _, err := rawSink.SubmitRisk(context.Background(), &schema.Risk{
+			Title:    "Unsupported target",
+			RiskType: "test",
+			Url:      candidate,
+		}); err == nil {
+			t.Fatalf("expected non-HTTP(S) target rejection for %q", candidate)
+		}
+	}
+}
+
+func TestLegionAIFocusResultSinkNormalizesBareAuthorizedRiskTarget(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		authorized string
+		candidate  string
+		want       string
+	}{
+		{
+			name:       "ipv4",
+			authorized: "http://192.0.2.88/",
+			candidate:  "192.0.2.88",
+			want:       "http://192.0.2.88/",
+		},
+		{
+			name:       "ipv4 with port",
+			authorized: "http://192.0.2.88:8080/",
+			candidate:  "192.0.2.88:8080",
+			want:       "http://192.0.2.88:8080/",
+		},
+		{
+			name:       "bracketed ipv6 with port",
+			authorized: "http://[2001:db8::1]:8443/",
+			candidate:  "[2001:db8::1]:8443",
+			want:       "http://[2001:db8::1]:8443/",
+		},
+		{
+			name:       "unbracketed ipv6",
+			authorized: "http://[2001:db8::1]/",
+			candidate:  "2001:db8::1",
+			want:       "http://[2001:db8::1]/",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			resultContext := validAIFocusResultContext()
+			resultContext.TargetUrl = test.authorized
+			publisher := &recordingAIFocusRiskPublisher{}
+			sink, err := newLegionAIFocusResultSink(publisher, "bind-1", resultContext)
+			if err != nil {
+				t.Fatalf("new result sink: %v", err)
+			}
+			if _, err := sink.SubmitRisk(context.Background(), &schema.Risk{
+				Title:    "SQL injection",
+				RiskType: "sql_injection",
+				Url:      test.candidate,
+			}); err != nil {
+				t.Fatalf("submit bare authorized target: %v", err)
+			}
+			if len(publisher.risks) != 1 || publisher.risks[0].target != test.want {
+				t.Fatalf("unexpected published target: %#v", publisher.risks)
+			}
+		})
+	}
+}
+
+func TestLegionAIFocusResultSinkNormalizesBareDomainAndPortRiskTarget(t *testing.T) {
+	t.Parallel()
+
+	resultContext := validAIFocusResultContext()
+	resultContext.TargetUrl = "http://app.example.test:8080/"
+	publisher := &recordingAIFocusRiskPublisher{}
+	sink, err := newLegionAIFocusResultSink(publisher, "bind-1", resultContext)
+	if err != nil {
+		t.Fatalf("new result sink: %v", err)
+	}
+	if _, err := sink.SubmitRisk(context.Background(), &schema.Risk{
+		Title:    "SQL injection",
+		RiskType: "sql_injection",
+		Url:      "app.example.test:8080/audit?q=1",
+	}); err != nil {
+		t.Fatalf("submit bare authorized target: %v", err)
+	}
+	if len(publisher.risks) != 1 || publisher.risks[0].target != "http://app.example.test:8080/audit?q=1" {
+		t.Fatalf("unexpected published target: %#v", publisher.risks)
+	}
+}
+
+func TestLegionAIFocusResultSinkRejectsBareOffOriginTarget(t *testing.T) {
+	t.Parallel()
+
+	resultContext := validAIFocusResultContext()
+	resultContext.TargetUrl = "http://192.0.2.88/"
+	sink, err := newLegionAIFocusResultSink(
+		&recordingAIFocusRiskPublisher{},
+		"bind-1",
+		resultContext,
+	)
+	if err != nil {
+		t.Fatalf("new result sink: %v", err)
+	}
+	if _, err := sink.SubmitRisk(context.Background(), &schema.Risk{
+		Title:    "Outside risk",
+		RiskType: "test",
+		Url:      "192.0.2.89",
+	}); err == nil || !strings.Contains(err.Error(), "outside the authorized origin") {
+		t.Fatalf("expected bare off-origin risk rejection, got %v", err)
 	}
 }
 

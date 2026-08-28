@@ -23,7 +23,7 @@ func makeBigToolResultPayload(seed int, repeat int) string {
 }
 
 // TestFindCompressSplit_ByRecentKeepTokens_Even 100 个均匀 item，
-// keepTokens = currentSize/4，断言 splitIdx 落在 item 总数 75% 附近（容差 ±10%）。
+// keepTokens = currentSize/6，断言 splitIdx 落在 item 总数 ~83% 附近（容差 ±10%）。
 // 关键词: findCompressSplitByRecentKeepTokens 均匀
 func TestFindCompressSplit_ByRecentKeepTokens_Even(t *testing.T) {
 	tl := NewTimeline(nil, nil)
@@ -38,16 +38,16 @@ func TestFindCompressSplit_ByRecentKeepTokens_Even(t *testing.T) {
 	currentSize := tl.calculateActualContentSize()
 	require.Greater(t, currentSize, int64(0))
 
-	keepTokens := currentSize / 4
+	keepTokens := currentSize / 6
 	splitIdx := tl.findCompressSplitByRecentKeepTokens(keepTokens)
 	require.Greater(t, splitIdx, 0, "split must be > 0 for sufficiently large timeline")
 	require.Less(t, splitIdx, N, "split must be < N (something must remain in recent keep)")
 
-	// 期望切点在 75% 位置 ± 15% 容差（BPE 估算近似不严格线性）
-	expected := N * 3 / 4
-	tolerance := N * 15 / 100
+	// 期望切点在 ~83% 位置 ± 10% 容差（BPE 估算近似不严格线性）
+	expected := N * 5 / 6
+	tolerance := N * 10 / 100
 	require.InDelta(t, expected, splitIdx, float64(tolerance),
-		"splitIdx %d should be ~75%% of N=%d (within +-%d), currentSize=%d, keepTokens=%d",
+		"splitIdx %d should be ~83%% of N=%d (within +-%d), currentSize=%d, keepTokens=%d",
 		splitIdx, N, tolerance, currentSize, keepTokens)
 }
 
@@ -70,7 +70,7 @@ func TestFindCompressSplit_LargeNewest(t *testing.T) {
 	currentSize := tl.calculateActualContentSize()
 	require.Greater(t, currentSize, int64(0))
 
-	keepTokens := currentSize / 4
+	keepTokens := currentSize / 6
 	splitIdx := tl.findCompressSplitByRecentKeepTokens(keepTokens)
 
 	// 最新一条已大于 keepTokens，splitIdx 必须 == N-1（即只保留最后一条）
@@ -157,7 +157,7 @@ func TestRenderBatchCompressPrompt_ContainsBothSections(t *testing.T) {
 		recentKeep = append(recentKeep, item)
 	}
 
-	out := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "TESTNONCE")
+	out := tl.renderBatchCompressPrompt(toCompress, recentKeep, "TESTNONCE", 0, 0)
 	require.NotEmpty(t, out)
 	require.Contains(t, out, "<|RECENT_KEEP_TESTNONCE|>", "RECENT_KEEP open tag missing")
 	require.Contains(t, out, "<|RECENT_KEEP_END_TESTNONCE|>", "RECENT_KEEP close tag missing")
@@ -180,7 +180,7 @@ func TestRenderBatchCompressPrompt_NoRecentKept(t *testing.T) {
 		item, _ := tl.idToTimelineItem.Get(i)
 		toCompress = append(toCompress, item)
 	}
-	out := tl.renderBatchCompressPrompt(nil, toCompress, nil, "NOREC")
+	out := tl.renderBatchCompressPrompt(toCompress, nil, "NOREC", 0, 0)
 	require.NotEmpty(t, out)
 	require.Contains(t, out, "<|ITEMS_TO_COMPRESS_NOREC|>")
 	require.NotContains(t, out, "<|RECENT_KEEP_NOREC|>", "RECENT_KEEP block must be omitted when recent is empty")
@@ -254,7 +254,7 @@ func TestRenderBatchCompressPrompt_RecentBudgetRespectsToCompress(t *testing.T) 
 		recentKeep = append(recentKeep, item)
 	}
 
-	out := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "BUDGET")
+	out := tl.renderBatchCompressPrompt(toCompress, recentKeep, "BUDGET", 0, 0)
 	require.NotEmpty(t, out)
 	// toCompress 段必须可见
 	require.Contains(t, out, "old-keyword-XYZ", "toCompress must remain visible even when recent contends for budget")
@@ -284,7 +284,7 @@ func TestRenderBatchCompressPrompt_SingleHugeRecentDropped(t *testing.T) {
 	bigItem, _ := tl.idToTimelineItem.Get(int64(999))
 	recentKeep := []*TimelineItem{bigItem}
 
-	out := tl.renderBatchCompressPrompt(nil, toCompress, recentKeep, "HUGE")
+	out := tl.renderBatchCompressPrompt(toCompress, recentKeep, "HUGE", 0, 0)
 	require.NotEmpty(t, out)
 	require.Contains(t, out, "stay-visible", "toCompress must still render even if single recent item exceeds budget")
 	require.NotContains(t, out, "<|RECENT_KEEP_HUGE|>", "RECENT_KEEP must be dropped when no item fits in its budget")
@@ -294,6 +294,6 @@ func TestRenderBatchCompressPrompt_SingleHugeRecentDropped(t *testing.T) {
 // 关键词: renderBatchCompressPrompt 空 toCompress
 func TestRenderBatchCompressPrompt_EmptyToCompress(t *testing.T) {
 	tl := NewTimeline(nil, nil)
-	out := tl.renderBatchCompressPrompt(nil, nil, nil, "EMPTY")
+	out := tl.renderBatchCompressPrompt(nil, nil, "EMPTY", 0, 0)
 	require.Empty(t, out, "empty toCompress should produce empty prompt")
 }

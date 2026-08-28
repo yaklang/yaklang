@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -12,6 +13,85 @@ import (
 )
 
 const commandPollInterval = time.Second
+
+type messageDispositionKind uint8
+
+const (
+	messageAck messageDispositionKind = iota
+	messageAckSync
+	messageNak
+	messageNakDelayed
+	messageTerm
+)
+
+type messageDisposition struct {
+	kind       messageDispositionKind
+	delay      time.Duration
+	afterAck   func()
+	onAckError func()
+}
+
+func ackMessage() messageDisposition { return messageDisposition{kind: messageAck} }
+func ackSyncMessage(afterAck func()) messageDisposition {
+	return messageDisposition{kind: messageAckSync, afterAck: afterAck}
+}
+func ackSyncDispatchMessage(afterAck, onAckError func()) messageDisposition {
+	return messageDisposition{
+		kind:       messageAckSync,
+		afterAck:   afterAck,
+		onAckError: onAckError,
+	}
+}
+func nakMessage() messageDisposition { return messageDisposition{kind: messageNak} }
+func nakDelayedMessage(delay time.Duration) messageDisposition {
+	return messageDisposition{kind: messageNakDelayed, delay: delay}
+}
+func termMessage() messageDisposition { return messageDisposition{kind: messageTerm} }
+
+// errUnsupportedCommandSubject is returned for legion command subjects this
+// node binary does not implement (e.g. a newer platform than the node). It is
+// handled specially: the message is acked (not nak'd) so JetStream does not
+// redeliver it in a tight loop, and the warning is rate-limited per subject.
+var errUnsupportedCommandSubject = errors.New("unsupported legion command subject")
+
+type unsupportedCommandError struct {
+	subject string
+}
+
+func (e *unsupportedCommandError) Error() string {
+	return fmt.Sprintf("%s: %s", errUnsupportedCommandSubject, e.subject)
+}
+
+func (e *unsupportedCommandError) Unwrap() error { return errUnsupportedCommandSubject }
+
+// unsupportedCommandWarnState rate-limits warnings for unknown command
+// subjects. Without it, a single unsupported subject can flood the node log
+// at thousands of lines per second when the platform keeps delivering it.
+type unsupportedCommandWarnState struct {
+	mu       sync.Mutex
+	lastWarn map[string]time.Time
+}
+
+const unsupportedCommandWarnInterval = 5 * time.Minute
+
+func (s *unsupportedCommandWarnState) warn(subject string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.lastWarn == nil {
+		s.lastWarn = make(map[string]time.Time)
+	}
+	now := time.Now()
+	if last, ok := s.lastWarn[subject]; ok && now.Sub(last) < unsupportedCommandWarnInterval {
+		return
+	}
+	s.lastWarn[subject] = now
+	log.Warnf(
+		"%s: %s (acked to stop redelivery; further occurrences suppressed for %v)",
+		errUnsupportedCommandSubject,
+		subject,
+		unsupportedCommandWarnInterval,
+	)
+}
 
 type commandConsumer struct {
 	sessionID string
@@ -113,9 +193,14 @@ func (b *legionJobBridge) forwardCapabilityAlerts(ctx context.Context) {
 }
 
 func (b *legionJobBridge) syncConsumer(parent context.Context) {
+	if b.shuttingDown.Load() {
+		b.stopConsumer()
+		return
+	}
 	session, ok := b.agent.node.GetSessionState()
 	if !ok {
 		b.stopConsumer()
+		b.switchDispatchSession("")
 		b.resetCapabilityStatusSync()
 		return
 	}
@@ -128,6 +213,7 @@ func (b *legionJobBridge) syncConsumer(parent context.Context) {
 	}
 
 	b.stopConsumer()
+	b.switchDispatchSession(session.SessionID)
 	consumer, err := b.startConsumer(parent, session.NATSURL, session.SessionID, session.CommandSubject)
 	if err != nil {
 		log.Errorf("start legion command consumer failed: %v", err)
@@ -230,13 +316,38 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			continue
 		}
 		for _, message := range messages {
-			if err := b.handleMessage(ctx, message); err != nil {
+			disposition, err := b.handleMessageWithDisposition(ctx, consumer.sessionID, message)
+			if err != nil {
 				log.Errorf("handle legion command failed: %v", err)
-				_ = message.Nak()
-				continue
 			}
-			_ = message.Ack()
+			if err := applyMessageDisposition(message, disposition); err != nil {
+				log.Errorf("apply legion command disposition failed: %v", err)
+			}
 		}
+	}
+}
+
+func applyMessageDisposition(message *nats.Msg, disposition messageDisposition) error {
+	switch disposition.kind {
+	case messageAckSync:
+		if err := message.AckSync(); err != nil {
+			if disposition.onAckError != nil {
+				disposition.onAckError()
+			}
+			return err
+		}
+		if disposition.afterAck != nil {
+			disposition.afterAck()
+		}
+		return nil
+	case messageNak:
+		return message.Nak()
+	case messageNakDelayed:
+		return message.NakWithDelay(disposition.delay)
+	case messageTerm:
+		return message.Term()
+	default:
+		return message.Ack()
 	}
 }
 
@@ -249,17 +360,56 @@ func isCommandConsumerResetError(err error) bool {
 		errors.Is(err, nats.ErrSubscriptionClosed)
 }
 
-func (b *legionJobBridge) handleMessage(
+func (b *legionJobBridge) handleMessageWithDisposition(
 	ctx context.Context,
+	sessionID string,
+	message *nats.Msg,
+) (messageDisposition, error) {
+	if strings.HasSuffix(message.Subject, "."+legionCommandDispatch) {
+		return b.handleDispatch(ctx, sessionID, message.Data)
+	}
+	err := b.handleMessagePayload(ctx, sessionID, message)
+	if err == nil {
+		return ackMessage(), nil
+	}
+	var rejected *runtimeHostCommandRejectedError
+	if errors.As(err, &rejected) {
+		return termMessage(), err
+	}
+	var unsupported *unsupportedCommandError
+	if errors.As(err, &unsupported) {
+		// Ack instead of Nak: Nak causes JetStream to redeliver the message
+		// immediately, and each redelivery logs another error — an unsupported
+		// subject from a newer platform then becomes a multi-GB log flood.
+		b.unsupportedWarn.warn(unsupported.subject)
+		return ackMessage(), nil
+	}
+	return nakMessage(), err
+}
+
+// handleMessage remains the direct, non-consumer test/adapter entry. The
+// consume loop uses handleMessageWithDisposition so it can apply AckSync and
+// run dispatch only after the server confirms the acknowledgement.
+func (b *legionJobBridge) handleMessage(ctx context.Context, message *nats.Msg) error {
+	_, err := b.handleMessageWithDisposition(ctx, "", message)
+	return err
+}
+
+func (b *legionJobBridge) handleMessagePayload(
+	ctx context.Context,
+	sessionID string,
 	message *nats.Msg,
 ) error {
 	switch {
-	case strings.HasSuffix(message.Subject, "."+legionCommandDispatch):
-		return b.handleDispatch(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCancel):
-		return b.handleCancel(message.Data)
+		return b.handleCancelForSession(sessionID, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCapabilityApply):
 		return b.handleCapabilityApply(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeImageEnsure),
+		strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeContainerStart),
+		strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeContainerInspect),
+		strings.HasSuffix(message.Subject, "."+legionCommandAIRuntimeContainerStop):
+		return b.handleAIRuntimeHostCommand(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSDesiredSpecDryRun):
 		return b.handleHIDSDesiredSpecDryRun(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSCurrentStateCollect):
@@ -270,6 +420,18 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleHIDSResponseActionExecute(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
 		return b.handleSSARuleSyncExport(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandSSADebugQuery):
+		return b.handleSSADebugQuery(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandSSALogTail):
+		return b.handleSSALogTail(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandPluginGroupsList):
+		return b.handlePluginGroupsList(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSync):
+		return b.handlePluginStoreSync(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreSyncStatusQuery):
+		return b.handlePluginStoreSyncStatusQuery(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandPluginStoreImport):
+		return b.handlePluginStoreImport(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionBind):
 		return b.handleAISessionBind(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandAISessionInput):
@@ -401,7 +563,7 @@ func (b *legionJobBridge) handleMessage(
 	case strings.HasSuffix(message.Subject, "."+legionCommandAIRisksQuery):
 		return b.handleAIRisksQuery(ctx, message.Data)
 	default:
-		return fmt.Errorf("unsupported legion command subject: %s", message.Subject)
+		return &unsupportedCommandError{subject: message.Subject}
 	}
 }
 

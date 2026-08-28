@@ -62,6 +62,13 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		r.config.RunVerificationWatchdogToolBlockingStart()
 		defer r.config.RunVerificationWatchdogToolBlockingEnd()
 	}
+	statsSource := aicommon.StatsSourceToolRequested
+	if skipRequire {
+		statsSource = aicommon.StatsSourceToolDirect
+	}
+	// Runtime entry points own this classification. Append it last so a generic
+	// caller cannot accidentally relabel a require call as direct (or vice versa).
+	opt = append(opt, aicommon.WithToolCaller_StatsSource(statsSource))
 
 	return r.withTaskEmitterScope(func(currentTask aicommon.AIStatefulTask) (*aitool.ToolResult, bool, error) {
 		tool, err := r.resolveToolForCall(ctx, toolName)
@@ -221,13 +228,27 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
 			toolCaller.SetEmitter(toolCaller.GetEmitter().PopEventProcesser())
 		}),
-		aicommon.WithToolCaller_ReviewWrongTool(r._invokeToolCall_ReviewWrongTool),
-		aicommon.WithToolCaller_ReviewWrongParam(r._invokeToolCall_ReviewWrongParam),
+		aicommon.WithToolCaller_ReviewWrongTool(func(
+			ctx context.Context,
+			tool *aitool.Tool,
+			newToolName string,
+			keyword string,
+		) (*aitool.Tool, bool, error) {
+			return r._invokeToolCall_ReviewWrongToolForTask(ctx, currentTask, tool, newToolName, keyword)
+		}),
+		aicommon.WithToolCaller_ReviewWrongParam(func(
+			ctx context.Context,
+			tool *aitool.Tool,
+			oldParam aitool.InvokeParams,
+			suggestion string,
+		) (aitool.InvokeParams, error) {
+			return r._invokeToolCall_ReviewWrongParamForTask(ctx, currentTask, tool, oldParam, suggestion)
+		}),
 	)
 
 	// Add interval review handler if not disabled (enabled by default)
 	if !r.config.DisableIntervalReview {
-		intervalHandler := r.CreateIntervalReviewHandler()
+		intervalHandler := r.CreateIntervalReviewHandlerForTask(currentTask)
 		if intervalHandler != nil {
 			toolCallerOptions = append(toolCallerOptions,
 				aicommon.WithToolCaller_IntervalReviewHandler(intervalHandler),
@@ -243,7 +264,7 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 	if withParamGenBuilder {
 		toolCallerOptions = append(toolCallerOptions,
 			aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(func(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
-				return r.generateToolParamsPromptWithMeta(tool, toolName)
+				return r.generateToolParamsPromptWithMetaForTask(currentTask, tool, toolName)
 			}),
 		)
 	}
@@ -342,6 +363,7 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		toolName,
 		true,
 		aicommon.WithToolCaller_OmitResultParamsInTimeline(),
+		aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
 	)
 	if err != nil {
 		return nil, false, err
@@ -361,23 +383,17 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 	return r.finalizeToolCallResult(currentTask, result, directlyAnswer)
 }
 
-// generateToolParamsPrompt generates the prompt for tool parameter generation
-func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool, toolName string) (string, error) {
-	result, err := r.generateToolParamsPromptWithMeta(tool, toolName)
-	if err != nil {
-		return "", err
-	}
-	return result.Prompt, nil
-}
-
-// generateToolParamsPromptWithMeta generates the prompt for tool parameter generation with AITAG metadata
-func (r *ReAct) generateToolParamsPromptWithMeta(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
+func (r *ReAct) generateToolParamsPromptWithMetaForTask(
+	task aicommon.AIStatefulTask,
+	tool *aitool.Tool,
+	toolName string,
+) (*aicommon.ToolParamsPromptMeta, error) {
 	if tool == nil {
 		return nil, fmt.Errorf("tool '%s' not found", toolName)
 	}
 
 	// Use PromptManager to generate the prompt with metadata
-	promptResult, err := r.promptManager.GenerateToolParamsPromptWithMeta(tool)
+	promptResult, err := r.promptManager.GenerateToolParamsPromptWithMetaForTask(task, tool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tool params prompt: %w", err)
 	}

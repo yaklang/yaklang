@@ -10,12 +10,12 @@ func TestBuildYaklangAnalyzeRequirementPromptWithAttachedPath(t *testing.T) {
 	out := buildYaklangAnalyzeRequirementPrompt(yaklangAnalyzeRequirementOptions{
 		userInput:       "fix scan timeout",
 		hasAttachedPath: true,
-		attachedPath:    "/tmp/project/scan.yak",
-		workspacePath:   "/tmp/project",
+		attachedPath:    "testdata/project/scan.yak",
+		workspacePath:   "testdata/project",
 		hasGrepSearcher: true,
 	})
 	require.Contains(t, out, "已知编辑器上下文")
-	require.Contains(t, out, "/tmp/project/scan.yak")
+	require.Contains(t, out, "testdata/project/scan.yak")
 	require.NotContains(t, out, "判断文件操作类型")
 }
 
@@ -33,11 +33,11 @@ func TestBuildYaklangAnalyzeRequirementPromptCreateModeWithWorkspace(t *testing.
 	out := buildYaklangAnalyzeRequirementPrompt(yaklangAnalyzeRequirementOptions{
 		userInput:       "write port scan",
 		createMode:      true,
-		workspacePath:   "/tmp/project",
+		workspacePath:   "testdata/project",
 		hasGrepSearcher: true,
 	})
 	require.Contains(t, out, "新建文件模式")
-	require.Contains(t, out, "/tmp/project")
+	require.Contains(t, out, "testdata/project")
 	require.NotContains(t, out, "判断文件操作类型")
 }
 

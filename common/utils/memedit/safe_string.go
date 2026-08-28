@@ -2,6 +2,8 @@ package memedit
 
 import (
 	"bytes"
+	"sync"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -11,15 +13,21 @@ type SafeString struct {
 	utf8Valid bool
 	bytes     []byte
 
-	// 缓存，懒加载
-	runes        []rune
-	runeLen      int
-	asciiChecked bool
-	asciiOnly    bool
+	// 缓存，懒加载。SafeString 可能被多个扫描 goroutine 共享（同一个
+	// MemEditor 的 safeSourceCode），缓存写入必须并发安全，否则 -race 会报
+	// data race（旧实现 isASCII/Len 直接写字段）。
+	asciiState atomic.Int32           // 0=未检查, 1=ASCII, 2=非ASCII
+	runeLen    atomic.Int64           // -1=未计算
+	runes      atomic.Pointer[[]rune] // 非 ASCII 时惰性物化的 rune 切片
+	runesOnce  sync.Once
+
+	strOnce  sync.Once
+	strCache atomic.Pointer[string] // String() 的惰性缓存，消除每次 string(s.bytes) 的拷贝
 }
 
 func NewSafeString(i any) *SafeString {
-	ss := &SafeString{runeLen: -1}
+	ss := &SafeString{}
+	ss.runeLen.Store(-1)
 	raw := codec.AnyToBytes(i)
 
 	ss.bytes = raw
@@ -32,21 +40,23 @@ func (s *SafeString) isASCII() bool {
 	if !s.utf8Valid {
 		return false
 	}
-	if s.asciiChecked {
-		return s.asciiOnly
+	if st := s.asciiState.Load(); st != 0 {
+		return st == 1
 	}
-	s.asciiChecked = true
-	s.asciiOnly = true
+	only := true
 	for _, b := range s.bytes {
 		if b >= utf8.RuneSelf {
-			s.asciiOnly = false
+			only = false
 			break
 		}
 	}
-	if s.asciiOnly && s.runeLen < 0 {
-		s.runeLen = len(s.bytes)
+	st := int32(2)
+	if only {
+		st = 1
+		s.runeLen.CompareAndSwap(-1, int64(len(s.bytes)))
 	}
-	return s.asciiOnly
+	s.asciiState.Store(st)
+	return only
 }
 
 func (s *SafeString) runeIndexToByteOffset(idx int) int {
@@ -70,21 +80,29 @@ func (s *SafeString) runeIndexToByteOffset(idx int) int {
 
 // 懒加载 runes
 func (s *SafeString) ensureRunes() {
-	if s.runes == nil && s.utf8Valid {
-		if s.isASCII() {
-			return
-		}
+	if !s.utf8Valid || s.isASCII() {
+		return
+	}
+	s.runesOnce.Do(func() {
 		runeCount := s.Len()
-		s.runes = make([]rune, runeCount)
+		runes := make([]rune, runeCount)
 		i := 0
 		tempBytes := s.bytes
 		for len(tempBytes) > 0 {
 			r, size := utf8.DecodeRune(tempBytes)
-			s.runes[i] = r
+			runes[i] = r
 			i++
 			tempBytes = tempBytes[size:]
 		}
-	}
+		s.runes.Store(&runes)
+	})
+}
+
+func newSafeString(utf8Valid bool, bytes []byte, runeLen int, asciiState int32) *SafeString {
+	ss := &SafeString{utf8Valid: utf8Valid, bytes: bytes}
+	ss.runeLen.Store(int64(runeLen))
+	ss.asciiState.Store(asciiState)
+	return ss
 }
 
 // SafeSlice 切片操作，end为可选参数
@@ -100,35 +118,17 @@ func (s *SafeString) SafeSlice(start int, end ...int) *SafeString {
 
 	if s.utf8Valid {
 		if s.isASCII() {
-			return &SafeString{
-				utf8Valid:    true,
-				bytes:        s.bytes[start:endIdx],
-				runeLen:      endIdx - start,
-				asciiChecked: true,
-				asciiOnly:    true,
-			}
+			return newSafeString(true, s.bytes[start:endIdx], endIdx-start, 1)
 		}
 		if endIdx == 0 {
-			return &SafeString{
-				utf8Valid: true,
-				bytes:     []byte{},
-				runeLen:   0,
-			}
+			return newSafeString(true, []byte{}, 0, 0)
 		}
 		startByteIdx := s.runeIndexToByteOffset(start)
 		endByteIdx := s.runeIndexToByteOffset(endIdx)
 
-		return &SafeString{
-			utf8Valid: s.utf8Valid,
-			bytes:     s.bytes[startByteIdx:endByteIdx],
-			runeLen:   endIdx - start,
-		}
+		return newSafeString(s.utf8Valid, s.bytes[startByteIdx:endByteIdx], endIdx-start, 0)
 	}
-	return &SafeString{
-		utf8Valid: s.utf8Valid,
-		bytes:     s.bytes[start:endIdx],
-		runeLen:   -1,
-	}
+	return newSafeString(s.utf8Valid, s.bytes[start:endIdx], -1, 0)
 }
 
 // Slice 返回字符串切片，end为可选参数
@@ -176,7 +176,10 @@ func (s *SafeString) Slice1(idx int) rune {
 			return rune(s.bytes[idx])
 		}
 		s.ensureRunes()
-		return s.runes[idx]
+		if runes := s.runes.Load(); runes != nil {
+			return (*runes)[idx]
+		}
+		return 0
 	}
 	return rune(s.bytes[idx])
 }
@@ -187,7 +190,9 @@ func (s *SafeString) Runes() []rune {
 			return []rune(string(s.bytes))
 		}
 		s.ensureRunes()
-		return s.runes
+		if runes := s.runes.Load(); runes != nil {
+			return *runes
+		}
 	}
 	return []rune(string(s.bytes))
 }
@@ -199,20 +204,37 @@ func (s *SafeString) Bytes() []byte {
 	return s.bytes
 }
 
+// String returns the string content, memoized so repeated calls don't re-copy
+// the bytes (SafeString.String was a top allocator on large scans — ~23GB in
+// the hadoop window). The cache is lazily built once and safely shared across
+// goroutines via atomic.Pointer.
 func (s *SafeString) String() string {
+	if s == nil {
+		return ""
+	}
+	if cached := s.strCache.Load(); cached != nil {
+		return *cached
+	}
+	s.strOnce.Do(func() {
+		str := string(s.bytes)
+		s.strCache.Store(&str)
+	})
+	if cached := s.strCache.Load(); cached != nil {
+		return *cached
+	}
 	return string(s.bytes)
 }
 
 func (s *SafeString) Len() int {
 	if s.utf8Valid {
-		if s.runeLen >= 0 {
-			return s.runeLen
+		if n := s.runeLen.Load(); n >= 0 {
+			return int(n)
 		}
 		if s.isASCII() {
-			return s.runeLen
+			return int(s.runeLen.Load())
 		}
-		s.runeLen = utf8.RuneCount(s.bytes)
-		return s.runeLen
+		s.runeLen.CompareAndSwap(-1, int64(utf8.RuneCount(s.bytes)))
+		return int(s.runeLen.Load())
 	}
 	return len(s.bytes)
 }
@@ -267,7 +289,11 @@ func (s *SafeString) Index(what []rune) int {
 			return bytes.Index(s.bytes, buf)
 		}
 		s.ensureRunes()
-		if len(what) > len(s.runes) {
+		runes := s.runes.Load()
+		if runes == nil {
+			return -1
+		}
+		if len(what) > len(*runes) {
 			return -1
 		}
 
@@ -288,8 +314,8 @@ func (s *SafeString) Index(what []rune) int {
 
 		// 搜索
 		i, j = 0, 0
-		for i < len(s.runes) && j < len(what) {
-			if j == -1 || s.runes[i] == what[j] {
+		for i < len(*runes) && j < len(what) {
+			if j == -1 || (*runes)[i] == what[j] {
 				i++
 				j++
 			} else {

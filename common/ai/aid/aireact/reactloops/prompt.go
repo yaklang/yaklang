@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -25,7 +26,7 @@ func (r *ReActLoop) shouldRenderTodoSnapshot() bool {
 //go:embed prompts/todo_list.txt
 var todoListTemplate string
 
-func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
+func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) (string, error) {
 	// loop
 	// build in code
 	values := r.GetAllActions()
@@ -52,13 +53,13 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// 第一次工具调用前后 schema enum / desc 都不变, semi-dynamic 段 hash 跨 turn
 	// 一致, 让 dashscope prefix 缓存能持续命中.
 	//
-	// 安全兜底: 当 LLM 在没有 recent tools 时选 directly_call_tool, 该 action
-	// 的 ActionVerifier (loopinfra/action_directly_call_tool.go) 会通过
-	// IsRecentlyUsedTool 检查报错 "tool 'xxx' is not in the recently-used cache;
-	// use require_tool instead", 触发 aiTransaction 重试, 让 LLM 改选 require_tool,
-	// 行为与原 disable 路径等价.
+	// 行为兜底: 当 LLM 在没有 recent tools 时选 directly_call_tool, verifier
+	// 仍会从完整 ToolManager 解析工具并在 cache miss 时发 warning, 而不是仅因
+	// recent cache 未命中而拒绝. Action description 继续建议模型在看不到可靠
+	// Params Schema 时使用 require_tool; runtime 则允许名字与完整参数都正确的
+	// enabled tool 直调, 避免把 recent cache 误当成执行白名单.
 	//
-	// 关键词: P2.1, schema 字节稳定, HasRecentlyUsedTools 跳变消除, verifier 兜底
+	// 关键词: P2.1, schema 字节稳定, HasRecentlyUsedTools 跳变消除, cache miss warning
 	toolManager := r.config.GetAiToolManager()
 	if toolManager == nil {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
@@ -77,6 +78,14 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	if !r.initActionApplied && len(r.initActionDisabled) > 0 {
 		disableActionList = append(disableActionList, r.initActionDisabled...)
 		log.Infof("applied init action disabled list: %v", r.initActionDisabled)
+	}
+	var nextActionOperator *LoopActionHandlerOperator
+	if len(actionOperators) > 0 {
+		nextActionOperator = actionOperators[0]
+	}
+	if nextActionOperator != nil && len(nextActionOperator.GetNextActionDisabled()) > 0 {
+		disableActionList = append(disableActionList, nextActionOperator.GetNextActionDisabled()...)
+		log.Infof("applied next-iteration action disabled list: %v", nextActionOperator.GetNextActionDisabled())
 	}
 
 	filterFunc := func(action *LoopAction) bool {
@@ -118,13 +127,78 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		}
 	}
 
+	// Action handlers may narrow the immediately following model turn. This is
+	// evaluated after the normal action filters so it cannot re-enable a hidden,
+	// unsafe, or unavailable action.
+	if nextActionOperator != nil && len(nextActionOperator.GetNextActionMustUse()) > 0 {
+		var mustUseFiltered []*LoopAction
+		for _, v := range filteredValues {
+			if slices.Contains(nextActionOperator.GetNextActionMustUse(), v.ActionType) {
+				mustUseFiltered = append(mustUseFiltered, v)
+			}
+		}
+		if len(mustUseFiltered) > 0 {
+			log.Infof("applied next-iteration action must-use list: %v, filtered from %d to %d actions",
+				nextActionOperator.GetNextActionMustUse(), len(filteredValues), len(mustUseFiltered))
+			filteredValues = mustUseFiltered
+		} else {
+			log.Warnf("next-iteration action must-use list %v did not match any available actions, keeping all",
+				nextActionOperator.GetNextActionMustUse())
+		}
+	}
+
 	// Mark init constraints as applied after first schema generation
 	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
 		r.initActionApplied = true
 	}
 
-	schema := buildSchema(filteredValues...)
-	return schema, nil
+	schemaText := buildSchema(filteredValues...)
+	maxBatchCalls := aicommon.DefaultToolBatchMaxCalls
+	if concrete, ok := r.config.(*aicommon.Config); !ok || concrete.KeyValueConfig != nil {
+		maxBatchCalls = r.config.GetConfigInt(aicommon.ConfigKeyToolBatchMaxCalls, maxBatchCalls)
+	}
+	if maxBatchCalls < 2 {
+		maxBatchCalls = 2
+	}
+	if maxBatchCalls > aicommon.DefaultToolBatchMaxCalls {
+		maxBatchCalls = aicommon.DefaultToolBatchMaxCalls
+	}
+	return applyToolBatchSchemaMaxItems(schemaText, maxBatchCalls)
+}
+
+// applyToolBatchSchemaMaxItems keeps the model-visible JSON Schema aligned
+// with the runtime quota. The action definitions publish the protocol hard
+// cap (8); deployments may lower it per Config without teaching the model an
+// action that will inevitably be rejected by the verifier.
+func applyToolBatchSchemaMaxItems(schemaText string, maxCalls int) (string, error) {
+	if maxCalls >= aicommon.DefaultToolBatchMaxCalls {
+		return schemaText, nil
+	}
+	var root map[string]any
+	if err := json.Unmarshal([]byte(schemaText), &root); err != nil {
+		return "", utils.Wrap(err, "decode loop schema for tool batch limit")
+	}
+	properties, ok := root["properties"].(map[string]any)
+	if !ok {
+		return schemaText, nil
+	}
+	changed := false
+	for _, field := range []string{"directly_call_tool_calls", "tool_require_calls"} {
+		property, ok := properties[field].(map[string]any)
+		if !ok {
+			continue
+		}
+		property["maxItems"] = maxCalls
+		changed = true
+	}
+	if !changed {
+		return schemaText, nil
+	}
+	encoded, err := json.Marshal(root)
+	if err != nil {
+		return "", utils.Wrap(err, "encode loop schema with tool batch limit")
+	}
+	return string(encoded), nil
 }
 
 // generateLoopPrompt 生成 ReActLoop 一轮的完整 prompt。
@@ -163,7 +237,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		tools = r.toolsGetter()
 	}
 
-	schema, err := r.generateSchemaString(operator.disallowLoopExit)
+	schema, err := r.generateSchemaString(operator.disallowLoopExit, operator)
 	if err != nil {
 		return "", err
 	}
@@ -251,22 +325,23 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
-		Nonce:             nonce,
-		Lightweight:       r.useSpeedPriorityAI,
-		UserQuery:         userInput,
-		FrozenUserContext: frozenUserContext,
-		FrozenPartitions:  frozenPartitions,
-		TaskInstruction:   persistent,
-		OutputExample:     outputExample,
-		Schema:            schema,
-		SkillsContext:     skillsContext,
-		ForcedSkills:      forcedSkillsBlock,
-		AutoLoadedSkills:  autoSkillsBlock,
-		ExtraCapabilities: extraCapabilities,
-		TodoSnapshot:      todoSnapshot,
-		ReactiveData:      reactiveData,
-		InjectedMemory:    appendMidtermToMemory(memory, r.GetCurrentMidtermMemory()),
-		TodoCheckpoint:    todoCheckpoint,
+		Nonce:                    nonce,
+		IncludeLatestModelReplay: true,
+		Lightweight:              r.useSpeedPriorityAI,
+		UserQuery:                userInput,
+		FrozenUserContext:        frozenUserContext,
+		FrozenPartitions:         frozenPartitions,
+		TaskInstruction:          persistent,
+		OutputExample:            outputExample,
+		Schema:                   schema,
+		SkillsContext:            skillsContext,
+		ForcedSkills:             forcedSkillsBlock,
+		AutoLoadedSkills:         autoSkillsBlock,
+		ExtraCapabilities:        extraCapabilities,
+		TodoSnapshot:             todoSnapshot,
+		ReactiveData:             reactiveData,
+		InjectedMemory:           appendMidtermToMemory(memory, r.GetCurrentMidtermMemory()),
+		TodoCheckpoint:           todoCheckpoint,
 	})
 	if err != nil {
 		return "", utils.Wrap(err, "assemble loop prompt failed")

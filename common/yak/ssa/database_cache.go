@@ -32,7 +32,12 @@ type ProgramCache struct {
 	indexes      *indexStore
 
 	// Track last flush statistics for telemetry
-	lastReleasedEditors int
+	lastReleasedEditors   int
+	cleanedPersistedCount int64
+
+	// cleaned is set by CleanBaseline to indicate the cache has been
+	// fully released and no compilation state remains.
+	cleaned atomic.Bool
 }
 
 func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheKind, fileSize int) *ProgramCache {
@@ -100,6 +105,28 @@ func (c *ProgramCache) IsClosed() bool {
 		return false
 	}
 	return c.instructions.IsClosed()
+}
+
+// CloseWithoutSave releases all in-memory cache objects (instructions, types,
+// indexes, sources) without persisting to DB. Safe to call after SaveToDatabase
+// completed successfully. After this, the Program can still serve SyntaxFlow
+// queries via lazy DB reads (GetInstruction falls back to DB when the resident
+// cache is empty).
+func (c *ProgramCache) CloseWithoutSave() {
+	if c == nil {
+		return
+	}
+	// Close the instruction writer's cache (releases resident instruction map,
+	// marshal pipeline, saver goroutines). This is the largest memory consumer.
+	if c.instructions != nil {
+		c.instructions.CloseWithoutSave()
+	}
+	// Type/index/source stores don't have CloseWithoutSave, but nil-ing
+	// the references allows GC to reclaim the resident maps. This is safe
+	// because SaveToDatabase already persisted all data to the DB.
+	c.types = nil
+	c.indexes = nil
+	c.sources = nil
 }
 
 func (c *ProgramCache) SetInstruction(inst Instruction) {
@@ -173,55 +200,178 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 		progress = cb[0]
 	}
 
+	// heapSnapshot logs current heap usage. On large projects the instruction
+	// Close-flush can balloon memory because all resident instructions are
+	// marshaled into IrCode structs; periodic snapshots help correlate OOM with
+	// the exact phase.
+	heapSnapshot := func(label string) {
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		log.Infof("[ssa-ir-cache-save] %s: heapAlloc=%.1fMB heapSys=%.1fMB heapObjects=%d numGC=%d",
+			label, float64(ms.Alloc)/1024/1024, float64(ms.Sys)/1024/1024, ms.HeapObjects, ms.NumGC)
+	}
+
+	progName := ""
+	if c.program != nil {
+		progName = c.program.GetProgramName()
+	}
+	log.Infof("[ssa-ir-cache-save] program=%s SaveToDatabase started", progName)
+	// Final barrier enter log (v3 §A.5)
+	enterRemaining := int64(c.CountInstruction())
+	enterPersisted := int64(c.InstructionPersistedCount())
+	enterTotal := enterRemaining + enterPersisted
+	log.Infof("[ssa-persist-final-barrier] event=enter program=%s instructions_total=%d already_persisted=%d remaining_dirty=%d", progName, enterTotal, enterPersisted, enterRemaining)
+	heapSnapshot("SaveToDatabase.enter")
+
 	steps := []func() error{
+		// step0: flush the instruction async saver to ensure all pending
+		// instruction DB writes complete before types/indexes start writing.
+		// This prevents concurrent SQLite writes that caused "database disk
+		// image is malformed" corruption with synchronous=OFF under memory
+		// pressure (root cause of Hadoop scan failure, 2026-07-29).
+		func() error {
+			if c.instructions != nil {
+				log.Infof("[ssa-ir-cache-save] program=%s step0: flushing instruction saver before type store close", progName)
+				c.FlushInstructionSaver()
+				log.Infof("[ssa-ir-cache-save] program=%s step0: instruction saver flushed", progName)
+			}
+			return nil
+		},
 		func() error {
 			if c.types != nil {
+				log.Infof("[ssa-ir-cache-save] program=%s step1: closing type store", progName)
+				heapSnapshot("step1_types.close.enter")
+				start := time.Now()
 				if err := c.types.close(); err != nil {
 					return err
 				}
-				log.Infof("Type Cache closed")
+				log.Infof("[ssa-ir-cache-save] program=%s Type Cache closed, cost=%v", progName, time.Since(start))
+				heapSnapshot("step1_types.close.exit")
 			}
 			return nil
 		},
 		func() error {
 			if c.indexes != nil {
+				log.Infof("[ssa-ir-cache-save] program=%s step2: closing index/offset store", progName)
+				heapSnapshot("step2_indexes.close.enter")
+				start := time.Now()
 				if err := c.indexes.Close(); err != nil {
 					return err
 				}
+				log.Infof("[ssa-ir-cache-save] program=%s Index store closed, cost=%v", progName, time.Since(start))
+				heapSnapshot("step2_indexes.close.exit")
 			}
 			return nil
 		},
 		func() error {
 			if c.instructions != nil {
+				remaining := c.CountInstruction()
+				persisted := c.InstructionPersistedCount()
+				log.Infof("[ssa-ir-cache-save] program=%s step3: closing instruction store (resident=%d persisted=%d total=%d)",
+					progName, remaining, persisted, remaining+persisted)
+				heapSnapshot("step3_instructions.close.enter")
+				start := time.Now()
 				if err := c.instructions.Close(progress); err != nil {
+					log.Errorf("[ssa-ir-cache-save] program=%s Instruction cache close FAILED: %v (cost=%v)", progName, err, time.Since(start))
 					return err
 				}
-				log.Infof("Instruction cache closed")
+				log.Infof("[ssa-ir-cache-save] program=%s Instruction cache closed, cost=%v", progName, time.Since(start))
+				heapSnapshot("step3_instructions.close.exit")
 			}
 			return nil
 		},
 		func() error {
 			if c.sources != nil {
+				log.Infof("[ssa-ir-cache-save] program=%s step4: closing source store", progName)
+				heapSnapshot("step4_sources.close.enter")
+				start := time.Now()
 				if err := c.sources.Close(); err != nil {
 					return err
 				}
+				log.Infof("[ssa-ir-cache-save] program=%s Source store closed, cost=%v", progName, time.Since(start))
+				heapSnapshot("step4_sources.close.exit")
 			}
 			return nil
 		},
 		func() error {
 			if c.program != nil && c.instructions != nil {
-				stats := c.instructions.Stats()
-				log.Debugf("[ssa-ir-cache-saver] program=%s %s", c.program.GetProgramName(), stats)
+				persistStats := c.instructions.PersistenceStats()
+				progName := c.program.GetProgramName()
+				avgBatch := float64(0)
+				if persistStats.BatchCount > 0 {
+					avgBatch = float64(persistStats.WriteOperations) / float64(persistStats.BatchCount)
+				}
+				// Writer summary (v3 §A.3)
+				log.Infof("[ssa-persist-writer-summary] program=%s request=%d enqueued=%d completed=%d write_ops=%d unique_persisted=%d resident=%d pending=%d persisted_instructions=%d batch_count=%d avg_batch=%.2f queue_depth_current=%d pending_current=%d errors=0",
+					progName, persistStats.Requests, persistStats.Enqueued, persistStats.Completed,
+					persistStats.WriteOperations, persistStats.UniquePersisted, persistStats.Resident,
+					persistStats.Pending, persistStats.WriteOperations, persistStats.BatchCount, avgBatch,
+					persistStats.Resident, persistStats.Pending)
 			}
 			return nil
 		},
 	}
-	return c.diagnosticsTrackErr("ssa.ProgramCache.SaveToDatabase", steps...)
+	err := c.diagnosticsTrackErr("ssa.ProgramCache.SaveToDatabase", steps...)
+
+	// Final barrier log (v3 §A.5): mid_flush_coverage and final_pressure_reduction
+	finalStats := InstructionPersistStats{}
+	if c.instructions != nil {
+		finalStats = c.instructions.PersistenceStats()
+	}
+	finalRemaining := finalStats.RemainingDirty
+	finalPersisted := finalStats.UniquePersisted
+	total := finalRemaining + finalPersisted
+	var midFlushCoverage, finalPressureReduction float64
+	if total > 0 {
+		midFlushCoverage = float64(finalPersisted) / float64(total)
+		finalPressureReduction = 1.0 - float64(finalRemaining)/float64(total)
+	}
+	// Source/type/index remaining and saved
+	var sourceRemaining, sourceSaved int64
+	var typeRemaining, typeSaved int64
+	var indexRemaining, indexSaved int64
+	if c.sources != nil {
+		sourceSaved = int64(c.sources.PersistedCount())
+	}
+	// typeStore and indexStore don't expose persistedCount in a simple way;
+	// use 0 for remaining (they're flushed during SaveToDatabase steps)
+	log.Infof("[ssa-persist-final-barrier] event=done program=%s instructions_total=%d already_persisted=%d remaining_dirty=%d request=%d enqueued=%d completed=%d write_ops=%d unique_persisted=%d resident=%d pending=%d mid_flush_coverage=%.4f final_pressure_reduction=%.4f source_remaining=%d source_saved=%d type_remaining=%d type_saved=%d index_remaining=%d index_saved=%d err=%v",
+		progName, total, finalPersisted, finalRemaining, finalStats.Requests, finalStats.Enqueued,
+		finalStats.Completed, finalStats.WriteOperations,
+		finalStats.UniquePersisted, finalStats.Resident, finalStats.Pending,
+		midFlushCoverage, finalPressureReduction,
+		sourceRemaining, sourceSaved, typeRemaining, typeSaved, indexRemaining, indexSaved, err)
+	log.Infof("[ssa-ir-cache-save] program=%s SaveToDatabase finished, err=%v", progName, err)
+	return err
 }
 
 func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 	if c == nil || !c.HaveDatabaseBackend() {
 		return
+	}
+	unitSample := unitKey
+	if len(unitSample) > 80 {
+		unitSample = unitSample[:77] + "..."
+	}
+	residentBefore := c.CountInstruction()
+	persistedBefore := c.InstructionPersistedCount()
+	var onComplete func()
+	if instructionCacheDebugEnabled() {
+		onComplete = func() {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			pendingAfter := int64(0)
+			if c.instructions != nil {
+				pendingAfter = c.instructions.PersistenceStats().Pending
+			}
+			log.Debugf("[ssa-persist-flush] event=completed reason=unit unit_key=%s persisted_after=%d resident_after=%d heap_after=%.1fMB pending_after=%d",
+				unitSample, c.InstructionPersistedCount(), c.CountInstruction(),
+				float64(m.HeapInuse)/(1024*1024), pendingAfter)
+		}
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		log.Debugf("[ssa-persist-flush] event=request reason=unit unit_key=%s mode=%s heap_before=%.1fMB resident_before=%d persisted_before=%d",
+			unitSample, c.InstructionCacheMode(), float64(m.HeapInuse)/(1024*1024), residentBefore, persistedBefore)
 	}
 	// Per-batch flush bounds memory by spilling ORDINARY instructions to DB
 	// (flushCompileUnitWriter keeps BasicBlocks + Function/Parameter/FreeValue
@@ -231,38 +381,39 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 	// (SyntaxFlow `#->` over-resolves imported symbols — see TestImportClass).
 	// They stay resident and are persisted by the final SaveToDatabase flush.
 	//
-	// NOTE: FlushCompileUnit is currently NOT called from the batch loop in
-	// ssa_compile_fs.go because the per-batch instruction flush exposes two
-	// deeper bugs (dbcache async-save channel lifetime → FeedBlock panic on
-	// lazy reload; cross-unit store flush). It is retained here for re-enable
-	// once those are fixed; shouldKeepCompileUnitBoundaryResident already
-	// keeps BasicBlocks resident for that future path.
+	// The instruction saver is asynchronous: this method only enqueues the
+	// selected instructions. The completion callback above is the only place
+	// that reports post-persist residency and heap values.
 	c.diagnosticsTrack("ssa.ProgramCache.FlushCompileUnit",
 		func() error {
 			if c.instructions != nil {
-				c.instructions.Flush()
+				c.instructions.Flush(onComplete)
 			}
 			return nil
 		},
 	)
+	if instructionCacheDebugEnabled() && c.instructions != nil {
+		stats := c.instructions.PersistenceStats()
+		log.Debugf("[ssa-persist-flush] event=enqueued reason=unit unit_key=%s mode=%s persisted=%d resident=%d pending=%d",
+			unitSample, c.InstructionCacheMode(), c.InstructionPersistedCount(), c.CountInstruction(), stats.Pending)
+	}
 	c.lastReleasedEditors = 0
 
 	// Release program-level state for completed units (function bodies plus
 	// program caches the flush path no longer needs).
-	releasedFuncs := 0
 	if c.program != nil {
-		releasedFuncs = c.program.ReleaseCompletedUnitMemory(strings.Split(unitKey, ","))
+		c.program.ReleaseCompletedUnitMemory(strings.Split(unitKey, ","))
 	}
+}
 
-	// Single GC at unit-run end to reclaim the released resident memory.
-	runtime.GC()
-
-	if instructionCacheDebugEnabled() {
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s released_funcs=%d heap=%.1fMB resident=%d persisted=%d",
-			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), releasedFuncs, float64(m.HeapInuse)/(1024*1024), c.CountInstruction(), c.InstructionPersistedCount())
+// FlushInstructionSaver drains the instruction async saver's pending
+// writes without evicting new items. Call this before flushing other stores
+// (types, indexes) to prevent concurrent SQLite writes.
+func (c *ProgramCache) FlushInstructionSaver() {
+	if c == nil || c.instructions == nil {
+		return
 	}
+	c.instructions.FlushSaver()
 }
 
 func (c *ProgramCache) CountReleasedEditors() int {
@@ -434,4 +585,107 @@ func normalizeVariableName(name string) (normalized, member string) {
 		name = strings.TrimPrefix(name, "$")
 	}
 	return name, member
+}
+
+// FlushAccounting is a snapshot of the instruction persist accounting,
+// used for observability and test verification.
+type FlushAccounting struct {
+	InstructionsTotal      int64
+	AlreadyPersisted       int64
+	RemainingDirty         int64
+	RemainingPending       int64
+	WriteOperations        int64
+	UniquePersisted        int64
+	Resident               int64
+	Pending                int64
+	MidFlushCoverage       float64
+	FinalPressureReduction float64
+}
+
+// GetFlushAccounting returns flush accounting metrics after SaveToDatabase.
+// Returns the final accounting snapshot: total = already_persisted + remaining_dirty.
+// It reports unique persisted instruction IDs separately from write operations.
+func (c *ProgramCache) GetFlushAccounting() *FlushAccounting {
+	if c == nil {
+		return nil
+	}
+	persistStats := InstructionPersistStats{}
+	if c.instructions != nil {
+		persistStats = c.instructions.PersistenceStats()
+	}
+	remaining := persistStats.RemainingDirty
+	persisted := persistStats.UniquePersisted
+	total := remaining + persisted
+
+	var midFlushCoverage float64
+	var finalPressureReduction float64
+	if total > 0 {
+		midFlushCoverage = float64(persisted) / float64(total)
+		finalPressureReduction = 1.0 - float64(remaining)/float64(total)
+	}
+
+	return &FlushAccounting{
+		InstructionsTotal:      total,
+		AlreadyPersisted:       persisted,
+		RemainingDirty:         remaining,
+		RemainingPending:       persistStats.Pending,
+		WriteOperations:        persistStats.WriteOperations,
+		UniquePersisted:        persistStats.UniquePersisted,
+		Resident:               persistStats.Resident,
+		Pending:                persistStats.Pending,
+		MidFlushCoverage:       midFlushCoverage,
+		FinalPressureReduction: finalPressureReduction,
+	}
+}
+
+// CleanBaseline releases ALL compilation state after SaveToDatabase.
+// This is the v3 step E "clean baseline" — no compilation state retained.
+//
+// After CleanBaseline:
+// - All writers/pending channels are closed
+// - AST/token/parser, Function/BasicBlock/Value/Instruction graphs are nil'd
+// - Variable/Scope/VersionedTable, types/index/source resident maps are nil'd
+// - Diagnostics, recorder, callbacks, builders are nil'd
+// - The Program is removed from ssaapi.ProgramCache
+// - runtime.GC() is called to reclaim released memory
+//
+// The caller must call this only after SaveToDatabase has succeeded.
+// After CleanBaseline, the cache cannot be used for further writes.
+func (c *ProgramCache) CleanBaseline() {
+	if c == nil {
+		return
+	}
+
+	// Save persisted count before nil'ing (for post-cleanup verification)
+	if c.instructions != nil {
+		c.cleanedPersistedCount = int64(c.InstructionPersistedCount())
+	}
+
+	// Close instruction store if not already closed
+	if c.instructions != nil && !c.instructions.IsClosed() {
+		c.instructions.CloseWithoutSave()
+	}
+
+	// Nil out all stores — allows GC to reclaim resident maps
+	c.instructions = nil
+	c.types = nil
+	c.indexes = nil
+	c.sources = nil
+
+	// Nil program reference (breaks reference cycle)
+	c.program = nil
+
+	// Mark as cleaned
+	c.cleaned.Store(true)
+
+	// Force GC to reclaim released memory
+	runtime.GC()
+}
+
+// IsCleaned returns true if CleanBaseline has been called.
+func (c *ProgramCache) IsCleaned() bool {
+	if c == nil {
+		return false
+	}
+	return c.cleaned.Load()
 }

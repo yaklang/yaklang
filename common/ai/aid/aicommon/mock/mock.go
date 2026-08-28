@@ -97,10 +97,11 @@ func (m *MockedAIConfig) GetContextProviderManager() *aicommon.ContextProviderMa
 func (m *MockedAIConfig) AppendRelatedRuntimeID(string) {}
 
 func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
-	return ""
+	return m.TodoState.GetSessionEvidenceRendered()
 }
 
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
+	m.TodoState.ApplySessionEvidenceOps(ops)
 }
 
 func (m *MockedAIConfig) GetVerificationTodoRendered(scope aicommon.VerificationTodoScope) string {
@@ -495,6 +496,18 @@ func (m *MockInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onF
 }
 
 func (m *MockInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
+}
+
+func (m *MockInvoker) RequireAIForgeAndExecute(ctx context.Context, forgeName string) error {
+	return nil
+}
+
+func (m *MockInvoker) PlanAndExecute(ctx context.Context, planPayload string) error {
+	return nil
+}
+
+func (m *MockInvoker) RecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskID string, input *aicommon.ExecutePlanInput) error {
+	return nil
 }
 
 func (m *MockInvoker) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {

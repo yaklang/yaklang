@@ -73,6 +73,13 @@ func (e *EndpointManager) Feed(id string, params aitool.InvokeParams) {
 }
 
 func (e *EndpointManager) CreateEndpointWithEventType(typeName schema.EventType) *Endpoint {
+	return e.CreateEndpointWithEventTypeAndSeq(typeName, 0)
+}
+
+// CreateEndpointWithEventTypeAndSeq creates an endpoint at a caller-reserved
+// checkpoint sequence. A non-positive seq preserves the scalar API's existing
+// allocate-on-demand behavior.
+func (e *EndpointManager) CreateEndpointWithEventTypeAndSeq(typeName schema.EventType, seq int64) *Endpoint {
 	id := ksuid.New().String()
 	endpoint := &Endpoint{
 		id:              id,
@@ -84,7 +91,10 @@ func (e *EndpointManager) CreateEndpointWithEventType(typeName schema.EventType)
 	}
 	e.results.Store(id, endpoint)
 	if c := e.config; c != nil {
-		endpoint.seq = c.AcquireId()
+		if seq <= 0 {
+			seq = c.AcquireId()
+		}
+		endpoint.seq = seq
 		if ret, ok := yakit.GetReviewCheckpoint(c.GetDB(), c.GetRuntimeId(), endpoint.seq); ok {
 			endpoint.SetParams(aiddb.AiCheckPointGetResponseParams(ret))
 			endpoint.checkpoint = ret

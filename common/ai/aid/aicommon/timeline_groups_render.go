@@ -29,6 +29,9 @@ type TimelineIntervalBlock struct {
 	// initialTaskID 只服务于渲染：字节切桶时，子桶可能从 tool/user item 开始，
 	// 需要继承前一子桶的 task context。它不改变原始 TimelineItem，也不参与持久化。
 	initialTaskID string
+	// promptProjection is set only on ephemeral copies produced for prompt
+	// rendering. Raw Timeline dumps and UI-facing values remain byte-identical.
+	promptProjection bool
 }
 
 // TimelineIntervalBlocks 是按时间顺序排列的 block 切片
@@ -553,6 +556,10 @@ func stripTimelineTaskLabel(content, taskID string) string {
 // renderTimelineEntry 渲染一个 entry，并推进仅在当前 block 内使用的 task state。
 // 同 task 的逐条 [task:...] 标签从渲染结果中折叠；task 切换只输出一次边界。
 func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timelineTaskRenderState) string {
+	return renderTimelineEntryForPrompt(item, bucketStart, state, false)
+}
+
+func renderTimelineEntryForPrompt(item *TimelineItem, bucketStart time.Time, state *timelineTaskRenderState, promptProjection bool) string {
 	if item == nil || item.deleted {
 		return ""
 	}
@@ -584,6 +591,16 @@ func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timel
 		state.activeTaskID = taskID
 	}
 	content := selectShrunkContent(item)
+	// Timeline facts are untrusted prompt data: tool output, user input, and
+	// reviewed source can all contain AITAG-looking literals. Escape their open
+	// delimiter before wrapping the item in real Timeline control tags, otherwise
+	// a literal can corrupt downstream section parsing or impersonate an internal
+	// reasoning replay record. PromptText-backed model replay is the sole internal
+	// projection allowed to retain a raw control envelope; its JSON fields are
+	// emitted with encoding/json and therefore escape '<' inside payload values.
+	if promptProjection && !isModelThinkingReplayProjection(item) {
+		content = strings.ReplaceAll(content, "<|", "&lt;|")
+	}
 	if explicitTask && taskID != "" {
 		content = stripTimelineTaskLabel(content, taskID)
 	}
@@ -608,6 +625,19 @@ func renderTimelineEntry(item *TimelineItem, bucketStart time.Time, state *timel
 	return buf.String()
 }
 
+func isModelThinkingReplayProjection(item *TimelineItem) bool {
+	textItem, ok := timelineTextItem(item)
+	if !ok || normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) != "MODEL_THINKING" {
+		return false
+	}
+	promptText := strings.TrimSpace(textItem.PromptText)
+	if promptText == "" || strings.TrimSpace(textItem.Text) != promptText {
+		return false
+	}
+	return strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_V1_") ||
+		strings.Contains(promptText, "<|TIMELINE_MODEL_THINKING_")
+}
+
 func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
 	if block == nil || len(block.Items) == 0 {
 		return 0
@@ -616,7 +646,7 @@ func timelineIntervalBlockRenderedByteLen(block *TimelineIntervalBlock) int {
 	n := len(renderTimelineIntervalHeader(block.BucketStart, block.BucketEnd, block.IntervalMinutes, headerTaskID))
 	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
 	for _, item := range block.Items {
-		n += len(renderTimelineEntry(item, block.BucketStart, &state))
+		n += len(renderTimelineEntryForPrompt(item, block.BucketStart, &state, block.promptProjection))
 	}
 	return n
 }
@@ -658,7 +688,7 @@ func (b *TimelineIntervalBlock) Render() string {
 	buf.WriteString(renderTimelineIntervalHeader(b.BucketStart, b.BucketEnd, b.IntervalMinutes, headerTaskID))
 	state := timelineTaskRenderState{activeTaskID: headerTaskID, firstEntry: true}
 	for _, item := range b.Items {
-		buf.WriteString(renderTimelineEntry(item, b.BucketStart, &state))
+		buf.WriteString(renderTimelineEntryForPrompt(item, b.BucketStart, &state, b.promptProjection))
 	}
 	return strings.TrimRight(buf.String(), "\n")
 }
@@ -765,15 +795,13 @@ func renderItemTypeVerbose(item *TimelineItem) string {
 	}
 	switch v := item.value.(type) {
 	case *aitool.ToolResult:
-		status := "ok"
-		if !v.Success {
-			status = "fail"
-		}
 		name := strings.TrimSpace(v.Name)
 		if name == "" {
 			name = "unknown"
 		}
-		return fmt.Sprintf("tool/%s %s", name, status)
+		// ToolResult.Success is protocol completion, not execution outcome. Keep
+		// the header neutral; result/error details are rendered in the body.
+		return fmt.Sprintf("tool/%s", name)
 	case *UserInteraction:
 		stage := string(v.Stage)
 		if stage == "" {

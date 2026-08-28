@@ -52,13 +52,14 @@ type Config struct {
 }
 
 // RuleWorkBudget is a per-rule atomic counter+limit that bounds total fanout
-// work. cancel, if set, is invoked once when visited first exceeds Limit so the
-// rule ctx (config.ctx) gets cancelled and execRule / native loops bail via
-// their existing ctx.Done() checks. Created per Query in
-// syntaxflow_scan/runtime.go and threaded to the sfvm.Config via
-// QueryWithWorkBudget.
+// work. visited is a work-unit counter (not graph depth/level): EnterWork
+// increments it once per fanout native-call element. cancel, if set, is
+// invoked once when visited first exceeds Limit so the rule ctx (config.ctx)
+// gets cancelled and execRule / native loops bail via their existing
+// ctx.Done() checks. Created per Query in syntaxflow_scan/runtime.go and
+// threaded to the sfvm.Config via QueryWithWorkBudget.
 type RuleWorkBudget struct {
-	visited  int64
+	visited  int64 // cumulative fanout work units entered, not traversal depth
 	limit    int64
 	cancel   context.CancelFunc
 	exceeded int32 // set to 1 the first time visited > limit
@@ -97,6 +98,26 @@ func (b *RuleWorkBudget) Exceeded() bool {
 		return false
 	}
 	return atomic.LoadInt32(&b.exceeded) != 0
+}
+
+// Visited reports the number of fanout work units entered so far (a counter,
+// not a depth/level). The count can be slightly above Limit when several
+// fanout loops race to enter work at the boundary; that is intentional and
+// is useful in the rule-level diagnostic.
+func (b *RuleWorkBudget) Visited() int64 {
+	if b == nil {
+		return 0
+	}
+	return atomic.LoadInt64(&b.visited)
+}
+
+// Limit reports the configured per-rule work limit. A non-positive value means
+// that the budget is disabled.
+func (b *RuleWorkBudget) Limit() int64 {
+	if b == nil {
+		return 0
+	}
+	return atomic.LoadInt64(&b.limit)
 }
 
 // EnterWork records one unit of fanout work against the config's work budget and

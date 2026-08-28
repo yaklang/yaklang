@@ -1,0 +1,37 @@
+desc(
+	mode: "source"
+	language: "java"
+	title: "Detect Java MD5 MessageDigest"
+	title_zh: "检测 Java MD5 MessageDigest",
+	type: vuln
+	level: medium
+	rule_id: "source-java-md5"
+	risk: "Weak Cryptography"
+	desc: <<<DESC
+Flags MessageDigest.getInstance("MD5") which is cryptographically broken for security uses.
+DESC
+	solution: <<<SOLUTION
+Use SHA-256 or stronger algorithms; prefer password hashing APIs (bcrypt/argon2) for passwords.
+SOLUTION
+	alert_min: 1
+	"file://Hash.java": <<<POS
+import java.security.MessageDigest;
+class Hash {
+  MessageDigest md = MessageDigest.getInstance("MD5");
+}
+POS
+	"safefile://HashSafe.java": <<<NEG
+import java.security.MessageDigest;
+class HashSafe {
+  MessageDigest md = MessageDigest.getInstance("SHA-256");
+}
+NEG
+)
+
+${*.java}.pattern_regex(/MessageDigest\.getInstance\(\s*["']MD5["']\s*\)/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "Weak MD5 Digest",
+	title_zh: "弱哈希 MD5",
+	message: "MessageDigest MD5 detected",
+}

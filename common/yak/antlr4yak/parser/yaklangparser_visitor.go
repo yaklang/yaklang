@@ -155,6 +155,9 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#mapTypeLiteral.
 	VisitMapTypeLiteral(ctx *MapTypeLiteralContext) interface{}
 
+	// Visit a parse tree produced by YaklangParser#funcTypeRef.
+	VisitFuncTypeRef(ctx *FuncTypeRefContext) interface{}
+
 	// Visit a parse tree produced by YaklangParser#instanceCode.
 	VisitInstanceCode(ctx *InstanceCodeContext) interface{}
 
@@ -166,6 +169,12 @@ type YaklangParserVisitor interface {
 
 	// Visit a parse tree produced by YaklangParser#functionParamDecl.
 	VisitFunctionParamDecl(ctx *FunctionParamDeclContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#functionParam.
+	VisitFunctionParam(ctx *FunctionParamContext) interface{}
+
+	// Visit a parse tree produced by YaklangParser#functionResultType.
+	VisitFunctionResultType(ctx *FunctionResultTypeContext) interface{}
 
 	// Visit a parse tree produced by YaklangParser#functionCall.
 	VisitFunctionCall(ctx *FunctionCallContext) interface{}

@@ -13,9 +13,9 @@ This document describes how to build, validate, and operate the current Legion H
 
 | Build mode | Host OS | Advertised capability keys | HIDS apply behavior |
 | --- | --- | --- | --- |
-| default build | any | `yak.execute`, `ssa.rule_sync.export` | `ErrHIDSCapabilityNotCompiled` |
-| `-tags hids` | non-Linux | `yak.execute`, `hids`, `ssa.rule_sync.export` | `ErrHIDSCapabilityUnsupportedPlatform` |
-| `-tags hids` | Linux | `yak.execute`, `hids`, `ssa.rule_sync.export` | HIDS runtime starts if at least one collector comes up |
+| default build | any | `yak.execute`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | `ErrHIDSCapabilityNotCompiled` |
+| `-tags hids` | non-Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | `ErrHIDSCapabilityUnsupportedPlatform` |
+| `-tags hids` | Linux | `yak.execute`, `hids`, `ssa.rule_sync.export`, `ai.session.bind_epoch.v1`, `ai.session.turn_lifecycle.v1` | HIDS runtime starts if at least one collector comes up |
 
 Operational implication: a build that advertises `hids` must still be scheduled to Linux hosts only. Building with `-tags hids` on macOS or Windows advertises the capability key, but the runtime cannot start there.
 
@@ -37,16 +37,58 @@ go build -tags hids -o ./legion-smoke-node-hids ./cmd/legion-smoke-node
 GOOS=linux GOARCH=amd64 go build -tags hids -o ./legion-smoke-node-hids-linux-amd64 ./cmd/legion-smoke-node
 ```
 
-## CI Product Node Package
+## CI Node Artifacts
+
+### Trusted HIDS Product Node release
 
 `.github/workflows/build-legion-product-node.yml` produces the deployable
 Linux amd64 and arm64 product nodes from the repository's declared Go version.
 The trusted packaging workflow runs only for tags in the isolated
-`legion-node-v*` namespace, including alpha tags. Pull requests and ordinary
-branch pushes do not produce Product Node packages. This namespace does not
-trigger the repository's existing general `v*` release workflows.
+`legion-node-v*` namespace, including alpha tags. The `pull_request` event and
+ordinary branch pushes do not produce trusted Product Node packages. This
+namespace does not trigger the repository's existing general `v*` release
+workflows.
 
-The workflow emits separate `legion-product-node_linux_amd64` and
+The same formal tag also calls the portable Node workflow and emits native
+development nodes for macOS Intel, macOS Apple Silicon, Linux amd64, and Linux
+arm64. These four GitHub Actions artifacts use the default non-HIDS build and
+are retained for 14 days. The existing Linux HIDS Product Node artifacts and
+their immutable OSS release indexes remain unchanged for deployment consumers.
+
+### Short-lived native alpha nodes
+
+For short-lived testing of any tagged commit, including the current head of a
+pull request, a maintainer may create a `legion-node-alpha-*` tag such as
+`legion-node-alpha-0212`. The separate
+`.github/workflows/build-legion-node-alpha.yml` workflow builds native
+development nodes for macOS Intel, macOS Apple Silicon, Linux amd64, and Linux
+arm64. The tag does not carry or resolve a pull request number: the tagged
+commit is the complete source identity.
+
+Alpha packages are kept as GitHub Actions artifacts for seven days. They are
+not uploaded to OSS, do not update a stable channel, and are not accepted as
+trusted product-release inputs. They use the default build without the `hids`
+tag, so macOS testers can run them locally while exercising `yak.execute` and
+`ssa.rule_sync.export`. Use a new alpha tag for every candidate; never move or
+reuse an existing tag.
+
+Example:
+
+```bash
+git fetch origin pull/4872/head
+git tag legion-node-alpha-0212 FETCH_HEAD
+git push origin refs/tags/legion-node-alpha-0212
+```
+
+GitHub builds the exact commit referenced by the pushed tag. If the pull
+request receives another commit, create a new tag on that new SHA. The alpha
+workflow must exist in the tagged commit. After this workflow is first merged,
+rebase an older pull request onto the updated `main` before creating its first
+alpha tag.
+
+### Trusted HIDS Product Node outputs
+
+The trusted workflow emits separate `legion-product-node_linux_amd64` and
 `legion-product-node_linux_arm64` Actions artifacts. Each architecture package
 contains its executable, `PRODUCT_NODE_MANIFEST.json`, and `SHA256SUMS`. The
 outer release artifact also contains the package archive and its checksum.
@@ -83,6 +125,14 @@ source commit, target platform, producer manifest, archive, raw binary, and
 checksums. Cross-repository assembly consumes the architecture-appropriate OSS
 index URL and an independently approved index SHA-256 instead of a GitHub
 Actions run ID or repository token.
+
+For Console engine import, the same trusted tag build also emits one
+`yaklang-node-engine_<tag>_linux_<arch>.tar.gz` installation package. It
+contains exactly `manifest.json`, `release-index.json`,
+`release-index.json.sha256`, and `yaklang-node`. Administrators select this
+single package in Legion; they do not extract it or paste release metadata.
+Legion performs the package, compatibility, and digest checks server-side
+before adding the engine as a candidate version.
 
 Use `task legion_smoke_node_build_hids` for native debugging when your current host is already Linux. Use `task legion_smoke_node_build_hids_linux_amd64` when you need a deployable Linux artifact from any development host.
 

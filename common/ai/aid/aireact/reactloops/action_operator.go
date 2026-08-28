@@ -20,10 +20,23 @@ type LoopActionHandlerOperator struct {
 	failedError  error
 	isSilence    bool
 
+	// executedToolCallCount is not the number of tool calls declared by the
+	// model. It counts callbacks that actually settled with a ToolResult during
+	// this action (successful or failed). Admission failures, review
+	// direct-answer/cancel paths, and nil-result pre-invoke failures stay zero.
+	// The loop copies this value into the ActionRecord after the handler returns.
+	executedToolCallCount int
+
 	task aicommon.AIStatefulTask
 
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
+
+	// One-shot action constraints for the next model iteration. They are kept on
+	// the completed action operator, which is already passed into the next prompt
+	// build, and disappear when the following action gets a fresh operator.
+	nextActionMustUse  []string
+	nextActionDisabled []string
 }
 
 func (r *LoopActionHandlerOperator) GetContext() context.Context {
@@ -36,6 +49,8 @@ func newLoopActionHandlerOperator(task aicommon.AIStatefulTask) *LoopActionHandl
 		terminateOperateOnce: utils.NewOnce(),
 		disallowLoopExitOnce: utils.NewOnce(),
 		task:                 task,
+		nextActionMustUse:    []string{},
+		nextActionDisabled:   []string{},
 	}
 }
 
@@ -72,6 +87,30 @@ func (l *LoopActionHandlerOperator) IsTerminated() (bool, error) {
 
 func (l *LoopActionHandlerOperator) IsContinued() bool {
 	return l.isContinued
+}
+
+// MarkToolExecuted records callbacks that actually reached a settled
+// ToolResult. A failed ToolResult is still an execution; a nil result is not.
+// Batch handlers should pass the number of settled child results in one call.
+func (l *LoopActionHandlerOperator) MarkToolExecuted(count ...int) {
+	delta := 1
+	if len(count) > 0 {
+		delta = count[0]
+	}
+	if delta <= 0 {
+		return
+	}
+	l.executedToolCallCount += delta
+}
+
+// GetExecutedToolCallCount returns the actual settled callback count recorded
+// by the action handler. It deliberately differs from ActionRecord.ToolCallCount,
+// which preserves how many calls the model declared.
+func (l *LoopActionHandlerOperator) GetExecutedToolCallCount() int {
+	if l == nil {
+		return 0
+	}
+	return l.executedToolCallCount
 }
 
 func (l *LoopActionHandlerOperator) Fail(i any) {
@@ -112,6 +151,30 @@ func (l *LoopActionHandlerOperator) RequestAsyncMode() {
 // IsAsyncModeRequested returns whether the handler has dynamically requested async mode.
 func (l *LoopActionHandlerOperator) IsAsyncModeRequested() bool {
 	return l.requestedAsyncMode
+}
+
+// NextAction restricts the next model iteration to the named actions. The
+// constraint applies to one iteration only and is ignored if no named action
+// exists after the loop's normal security filters run.
+func (l *LoopActionHandlerOperator) NextAction(actions ...string) {
+	l.nextActionMustUse = append(l.nextActionMustUse, actions...)
+}
+
+// RemoveNextAction hides the named actions from the next model iteration.
+func (l *LoopActionHandlerOperator) RemoveNextAction(actions ...string) {
+	l.nextActionDisabled = append(l.nextActionDisabled, actions...)
+}
+
+func (l *LoopActionHandlerOperator) GetNextActionMustUse() []string {
+	return l.nextActionMustUse
+}
+
+func (l *LoopActionHandlerOperator) GetNextActionDisabled() []string {
+	return l.nextActionDisabled
+}
+
+func (l *LoopActionHandlerOperator) HasActionConstraints() bool {
+	return len(l.nextActionMustUse) > 0 || len(l.nextActionDisabled) > 0
 }
 
 // OnPostIterationOperator allows post-iteration callbacks to control loop behavior

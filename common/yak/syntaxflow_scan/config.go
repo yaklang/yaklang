@@ -2,7 +2,9 @@ package syntaxflow_scan
 
 import (
 	"io"
+	"path/filepath"
 
+	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -128,6 +130,35 @@ var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerf
 var withProgramsOption = ssaconfig.SetOption("syntaxflow-scan/programs", func(c *Config, progs ssaapi.Programs) {
 	c.ScanTaskCallback.Programs = progs
 })
+
+var withQueryTargetsOption = ssaconfig.SetOption("syntaxflow-scan/query-targets", func(c *Config, targets []ssaapi.SyntaxFlowQueryInstance) {
+	c.ScanTaskCallback.QueryTargets = append(c.ScanTaskCallback.QueryTargets, targets...)
+})
+
+// WithQueryTargets appends SyntaxFlowQueryInstance targets (Program or SourceQueryTarget).
+func WithQueryTargets(targets ...ssaapi.SyntaxFlowQueryInstance) ssaconfig.Option {
+	return withQueryTargetsOption(targets)
+}
+
+// WithSourceFiles runs mode=source rules against path→content without SSA compile.
+func WithSourceFiles(name string, files map[string]string) ssaconfig.Option {
+	return WithQueryTargets(ssaapi.NewSourceQueryTarget(name, files))
+}
+
+// WithSourceDir loads a local directory (filtered) as a no-SSA source scan target.
+// targetDir = code under scan; select rules via RuleFilter (e.g. Tag=source for builtin mode:source).
+func WithSourceDir(name, targetDir string) ssaconfig.Option {
+	return func(c *ssaconfig.Config) error {
+		files, err := sfpattern.LoadFilesFromDir(targetDir)
+		if err != nil {
+			return err
+		}
+		if name == "" {
+			name = filepath.Base(targetDir)
+		}
+		return WithSourceFiles(name, files)(c)
+	}
+}
 
 // withPrograms 指定本次扫描要覆盖的程序集合（导出名为 syntaxflow.withScanPrograms）
 // 作为 syntaxflow.StartScan 的可选项，限定扫描在指定的已编译程序上进行

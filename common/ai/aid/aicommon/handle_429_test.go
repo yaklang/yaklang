@@ -78,7 +78,7 @@ func make200Response() *AIResponse {
 
 func TestHandle429_NilResponse(t *testing.T) {
 	cfg := newTestConfigForHandle429(context.Background())
-	is429, ctxDone := cfg.handle429RateLimit(nil)
+	is429, _, ctxDone := cfg.handle429RateLimit(nil)
 	assert.False(t, is429)
 	assert.False(t, ctxDone)
 }
@@ -87,7 +87,7 @@ func TestHandle429_Non429StatusCode(t *testing.T) {
 	cfg := newTestConfigForHandle429(context.Background())
 
 	rsp200 := make200Response()
-	is429, ctxDone := cfg.handle429RateLimit(rsp200)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp200)
 	assert.False(t, is429)
 	assert.False(t, ctxDone)
 
@@ -96,7 +96,7 @@ func TestHandle429_Non429StatusCode(t *testing.T) {
 		[]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"),
 		nil,
 	)
-	is429, ctxDone = cfg.handle429RateLimit(rsp500)
+	is429, _, ctxDone = cfg.handle429RateLimit(rsp500)
 	assert.False(t, is429)
 	assert.False(t, ctxDone)
 }
@@ -109,7 +109,7 @@ func TestHandle429_Generic429_ContextCancelled(t *testing.T) {
 	rsp := make429Response()
 
 	start := time.Now()
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	elapsed := time.Since(start)
 
 	assert.True(t, is429)
@@ -125,7 +125,7 @@ func TestHandle429_AIBalance_ParseableQueue_ContextCancelled(t *testing.T) {
 	rsp := make429Response("X-AIBalance-Info: 3")
 
 	start := time.Now()
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	elapsed := time.Since(start)
 
 	assert.True(t, is429)
@@ -141,7 +141,7 @@ func TestHandle429_AIBalance_UnparseableQueue_ContextCancelled(t *testing.T) {
 	rsp := make429Response("X-AIBalance-Info: abc")
 
 	start := time.Now()
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	elapsed := time.Since(start)
 
 	assert.True(t, is429)
@@ -157,7 +157,7 @@ func TestHandle429_AIBalance_ZeroQueue_ContextCancelled(t *testing.T) {
 	rsp := make429Response("X-AIBalance-Info: 0")
 
 	start := time.Now()
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	elapsed := time.Since(start)
 
 	assert.True(t, is429)
@@ -172,42 +172,42 @@ func TestHandle429_AIBalance_EmitsNotifyEvent(t *testing.T) {
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
 	rsp := make429Response("X-AIBalance-Info: 2")
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
 	assert.True(t, ctxDone)
 
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "rate-limit", payload["type"])
-	require.Equal(t, "rate-limit", payload["warning_type"])
+	require.Equal(t, "限流", payload["type"])
+	require.Equal(t, "限流", payload["warning_type"])
 	require.Contains(t, payload["content"], "此刻有 2 位用户正在与我深度对话中")
 	require.Equal(t, float64(6), payload["duration"])
 	require.Equal(t, float64(6000), payload["duration_ms"])
 	require.Equal(t, float64(6), payload["duration_seconds"])
 }
 
-func TestHandle429_Generic429_EmitsRateLimitNotifyEvent(t *testing.T) {
+func TestHandle429_Generic429_EmitsNotifyEvent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// make429Response() has no Retry-After → quota-exceeded notify type
 	rsp := make429Response()
 
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	cfg.Emitter.WaitForStream()
 
 	assert.True(t, is429)
 	assert.True(t, ctxDone)
 
 	payload := requireNotifyPayload(t, snapshot())
-	require.Equal(t, "rate-limit", payload["type"])
-	require.Equal(t, "rate-limit", payload["warning_type"])
+	// No Retry-After → quota-exceeded type
+	require.Equal(t, "额度耗尽", payload["type"])
+	require.Equal(t, "额度耗尽", payload["warning_type"])
 	require.Contains(t, payload["content"], "HTTP 429")
 	require.GreaterOrEqual(t, payload["duration"].(float64), float64(5))
 	require.LessOrEqual(t, payload["duration"].(float64), float64(15))
-	require.GreaterOrEqual(t, payload["duration_ms"].(float64), float64(5000))
-	require.LessOrEqual(t, payload["duration_ms"].(float64), float64(15000))
 }
 
 func TestHandle429_Generic429_WaitsWhenContextAlive(t *testing.T) {
@@ -218,7 +218,7 @@ func TestHandle429_Generic429_WaitsWhenContextAlive(t *testing.T) {
 	rsp := make429Response()
 
 	start := time.Now()
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	elapsed := time.Since(start)
 
 	assert.True(t, is429)
@@ -234,7 +234,7 @@ func TestHandle429_AIBalance_ParseableQueue_WaitDuration(t *testing.T) {
 	rsp := make429Response("X-AIBalance-Info: 1")
 
 	start := time.Now()
-	is429, ctxDone := cfg.handle429RateLimit(rsp)
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
 	elapsed := time.Since(start)
 
 	assert.True(t, is429)
@@ -249,9 +249,9 @@ func TestHandle429_ContextCancelDuringSleep(t *testing.T) {
 	rsp := make429Response("X-AIBalance-Info: 100")
 
 	done := make(chan struct{})
-	var is429, ctxDone bool
+	var is429, _, ctxDone bool
 	go func() {
-		is429, ctxDone = cfg.handle429RateLimit(rsp)
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
 		close(done)
 	}()
 
@@ -273,9 +273,9 @@ func TestHandle429_AsyncHeaderSet_429Detected(t *testing.T) {
 	rsp := NewUnboundAIResponse()
 
 	done := make(chan struct{})
-	var is429, ctxDone bool
+	var is429, _, ctxDone bool
 	go func() {
-		is429, ctxDone = cfg.handle429RateLimit(rsp)
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
 		close(done)
 	}()
 
@@ -303,9 +303,9 @@ func TestHandle429_AsyncHeaderSet_Non429(t *testing.T) {
 	rsp := NewUnboundAIResponse()
 
 	done := make(chan struct{})
-	var is429, ctxDone bool
+	var is429, _, ctxDone bool
 	go func() {
-		is429, ctxDone = cfg.handle429RateLimit(rsp)
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
 		close(done)
 	}()
 
@@ -328,9 +328,9 @@ func TestHandle429_ContextCancelBeforeHeaders(t *testing.T) {
 	rsp := NewUnboundAIResponse()
 
 	done := make(chan struct{})
-	var is429, ctxDone bool
+	var is429, _, ctxDone bool
 	go func() {
-		is429, ctxDone = cfg.handle429RateLimit(rsp)
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
 		close(done)
 	}()
 

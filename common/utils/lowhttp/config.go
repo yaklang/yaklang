@@ -121,6 +121,9 @@ type LowhttpExecConfig struct {
 
 	// BodyStreamReaderHandler is a callback function to handle the body stream reader
 	BodyStreamReaderHandler func(responseHeader []byte, closer io.ReadCloser)
+	// bodyStreamReaderHandled coordinates the transport-specific stream handler
+	// with HTTPWithoutRedirect's fallback. It keeps the callback exactly-once.
+	bodyStreamReaderHandled *utils.AtomicBool
 	// AutoDetectSSE enables SSE auto-detection by response headers (Content-Type: text/event-stream)
 	// to automatically switch into stream/no-body-buffer mode even when request headers don't include
 	// Accept: text/event-stream.
@@ -1068,6 +1071,11 @@ func WithRandomChunkedHandler(handler ChunkedResultHandler) LowhttpOpt {
 
 func (o *LowhttpExecConfig) GetOrCreateChunkSender() (*RandomChunkedSender, error) {
 	if o.chunkedSender != nil {
+		// 复用缓存的 sender，但每次都把最新的 ctx / handler 同步进去。
+		// 连接池在重试（shouldRetryRequest）时会重排同一个 writeRequest，
+		// 如果不加刷新，缓存 sender 会沿用创建时固化的 handler，导致分块回调
+		// 被路由到旧的闭包，造成分块重复计数 / 归属错乱。
+		o.chunkedSender.refreshCallbacks(o.Ctx, o.ChunkedHandler)
 		return o.chunkedSender, nil
 	}
 	options := []randomChunkedHTTPOption{

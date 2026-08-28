@@ -10,6 +10,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
@@ -79,8 +80,13 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s error: %v", config.rule.RuleName, err)
 		}
 		if resave {
-			// save rule to db
-			sfdb.MigrateSyntaxFlow("", config.rule)
+			// Persist recompiled opcodes only for rules already stored in the
+			// profile DB. Task-local / ephemeral rules (ID==0) must not Create
+			// into syntax_flow_rules / syntax_flow_groups — that races on shared
+			// group names and floods scan logs with UNIQUE constraint errors.
+			if config.rule.ID > 0 {
+				sfdb.MigrateSyntaxFlow("", config.rule)
+			}
 		}
 		return frame, nil
 	}
@@ -181,7 +187,16 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 
 	// runtime
 	var res *sfvm.SFFrameResult
-	res, err = frame.Feed(value, config.opts...)
+	if sfvm.FrameIsSourceMode(frame) {
+		files, ferr := collectFilesForSourceMode(config)
+		if ferr != nil {
+			return nil, ferr
+		}
+		root := sfpattern.NewRoot(files)
+		res, err = frame.Feed(sfvm.ValuesOf(root), config.opts...)
+	} else {
+		res, err = frame.Feed(value, config.opts...)
+	}
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
 	}

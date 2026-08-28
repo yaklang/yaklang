@@ -2,9 +2,9 @@
 --- 当前任务 ---
 {{ .CurrentTaskUserInput }}
 
-任务次数执行信息：
-- 调用了{{ .ToolCallCount }} 次工具。
-- 决策继续执行了{{ .TaskContinueCount }} 次。（系统限制为{{ .TaskMaxContinue}}次）
+任务执行信息：
+- 已调用工具 {{ .ToolCallCount }} 次。
+- 只依据任务目标、TODO 与可验证证据决定继续或完成。
 
 {{ if .SingleLineStatusSummary }}任务状态：{{ .SingleLineStatusSummary }}{{end}}
 

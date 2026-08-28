@@ -3,11 +3,11 @@ package vectorstore
 import (
 	"bytes"
 	"context"
-	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -56,13 +56,14 @@ func TestMUSTPASS_ExportHNSW(t *testing.T) {
 	GraphWrapperManager.ClearCache()
 
 	//验证使用错误的 code 导入
-	_, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithEmbeddingClient(embedding))
+	_, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithTryRebuildHNSWIndex(false), WithEmbeddingClient(embedding))
 	require.Error(t, err)
 
 	// 验证使用Key作为code导入
 	store, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithKeyAsUID(true), WithEmbeddingClient(embedding))
 	assert.NoError(t, err)
 	assert.NotNil(t, store)
+	GraphWrapperManager.ClearCache()
 
 	// 测试尝试重建HNSW索引
 	store, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithTryRebuildHNSWIndex(true), WithEmbeddingClient(embedding))

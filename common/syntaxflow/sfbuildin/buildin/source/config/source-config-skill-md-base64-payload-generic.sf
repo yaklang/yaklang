@@ -1,0 +1,57 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Skill Md Base64 Payload Generic"
+	title_zh: "检测到Skill Md Base64 Payload Generic",
+	type: vuln
+	level: middle
+	rule_id: "source-config-skill-md-base64-payload-generic"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `skill-md-base64-payload-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-base64-payload/skill-md-base64-payload.yaml).
+Original message: SKILL.md or AGENT.md instructs the agent to decode and execute a base64 (or hex) blob, which is a common encoding-evasion pattern used to smuggle malicious instructions past human review. Document the content in plain text or remove the encoded payload, and audit the decoded value before reintroducing it.
+
+CWE: CWE-506: Embedded Malicious Code
+References:
+- https://github.com/Agent-Threat-Rule/agent-threat-rules
+- https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+DESC
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION
+	alert_min: 1
+	"file://posSKILL.md": <<<POS
+eval
+base64dGFm%S]V`07gxCdMAu175dgQkFvUhJQtBBg9ZrmN25oWJbk6uTwQoX4LWAJN5SnJJ3PwRkGW==
+
+POS
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG
+)
+
+${*SKILL.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p0
+${*SKILL.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p1
+${*SKILL.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p2
+${*SKILL.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p3
+${*AGENT.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p4
+${*AGENT.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p5
+${*AGENT.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p6
+${*AGENT.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p7
+${*AGENTS.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p8
+${*AGENTS.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p9
+${*AGENTS.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p10
+${*AGENTS.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p11
+${*skill.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p12
+${*skill.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p13
+${*skill.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p14
+${*skill.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p15
+$p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 + $p13 + $p14 + $p15 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Skill Md Base64 Payload Generic",
+	title_zh: "检测到Skill Md Base64 Payload Generic",
+	message: "Skill Md Base64 Payload Generic",
+}

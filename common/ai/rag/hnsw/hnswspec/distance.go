@@ -15,8 +15,11 @@ func CosineDistance[K cmp.Ordered](a, b LayerNode[K]) float64 {
 
 // PQAwareCosineDistance PQ感知的余弦距离计算函数
 func PQAwareCosineDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quantizer) float64 {
+	vecA, normA, pqA, readyA := cosineNodeState(a)
+	vecB, normB, pqB, readyB := cosineNodeState(b)
+
 	// 如果两个节点都启用PQ且有有效的PQ编码，使用PQ距离计算
-	if a.IsPQEnabled() && b.IsPQEnabled() {
+	if pqA && pqB {
 		codesA, okA := a.GetPQCodes()
 		codesB, okB := b.GetPQCodes()
 		if okA && okB {
@@ -28,17 +31,21 @@ func PQAwareCosineDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quant
 	}
 
 	// 如果只有一个节点启用PQ，使用非对称距离计算
-	if a.IsPQEnabled() && !b.IsPQEnabled() {
+	if pqA && !pqB {
 		// a是PQ节点，b是标准节点（通常是查询向量）
-		vecB := b.GetVector()()
+		if !readyB {
+			vecB = b.GetVector()()
+		}
 		if len(vecB) == 0 {
 			log.Warnf("node b has empty vector, returning max distance")
 			return 1.0
 		}
 		return PQAsymmetricCosineDistance(vecB, a, quantizer)
-	} else if !a.IsPQEnabled() && b.IsPQEnabled() {
+	} else if !pqA && pqB {
 		// a是标准节点（通常是查询向量），b是PQ节点
-		vecA := a.GetVector()()
+		if !readyA {
+			vecA = a.GetVector()()
+		}
 		if len(vecA) == 0 {
 			log.Warnf("node a has empty vector, returning max distance")
 			return 1.0
@@ -47,8 +54,14 @@ func PQAwareCosineDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quant
 	}
 
 	// 都是标准节点，使用原始向量进行精确计算
-	vecA := a.GetVector()()
-	vecB := b.GetVector()()
+	if !readyA {
+		vecA = a.GetVector()()
+		normA = vectorNorm(vecA, a)
+	}
+	if !readyB {
+		vecB = b.GetVector()()
+		normB = vectorNorm(vecB, b)
+	}
 	if len(vecA) == 0 || len(vecB) == 0 {
 		log.Warnf("one or both vectors are empty: len(a)=%d, len(b)=%d, returning max distance", len(vecA), len(vecB))
 		return 1.0
@@ -57,7 +70,136 @@ func PQAwareCosineDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quant
 		log.Warnf("vector dimension mismatch: len(a)=%d, len(b)=%d, returning max distance", len(vecA), len(vecB))
 		return 1.0
 	}
-	return cosineDistanceRaw(vecA, vecB)
+	return cosineDistanceWithNorms(vecA, vecB, normA, normB)
+}
+
+type vectorNormProvider interface {
+	GetVectorNorm() float64
+}
+
+type vectorAndNormProvider interface {
+	GetVectorAndNorm() ([]float32, float64)
+}
+
+type cosineVectorAndNormProvider interface {
+	GetCosineVectorAndNorm() ([]float32, float64, bool)
+}
+
+func cosineNodeState[K cmp.Ordered](node LayerNode[K]) ([]float32, float64, bool, bool) {
+	if provider, ok := node.(cosineVectorAndNormProvider); ok {
+		vector, norm, isPQ := provider.GetCosineVectorAndNorm()
+		return vector, norm, isPQ, true
+	}
+	return nil, 0, node.IsPQEnabled(), false
+}
+
+func cosineVectorAndNorm[K cmp.Ordered](node LayerNode[K]) ([]float32, float64, bool) {
+	if provider, ok := node.(cosineVectorAndNormProvider); ok {
+		return provider.GetCosineVectorAndNorm()
+	}
+	isPQ := node.IsPQEnabled()
+	if provider, ok := node.(vectorAndNormProvider); ok {
+		vector, norm := provider.GetVectorAndNorm()
+		return vector, norm, isPQ
+	}
+	vector := node.GetVector()()
+	return vector, vectorNorm(vector, node), isPQ
+}
+
+func cosineDistanceNodes[K cmp.Ordered](a, b LayerNode[K], vecA, vecB []float32) float64 {
+	return cosineDistanceWithNorms(vecA, vecB, vectorNorm(vecA, a), vectorNorm(vecB, b))
+}
+
+func cosineDistanceWithNorms(vecA, vecB []float32, normA, normB float64) float64 {
+	var dotProduct float64
+	if len(vecA) >= acceleratedDotMinDimensions {
+		dotProduct = dotFloat32Accelerated(vecA, vecB)
+	} else {
+		dotProduct = dotFloat32Go(vecA, vecB)
+	}
+
+	if normA == 0 || normB == 0 {
+		return 1
+	}
+
+	similarity := dotProduct / (normA * normB)
+	if similarity > 1 {
+		similarity = 1
+	} else if similarity < -1 {
+		similarity = -1
+	}
+	return 1 - similarity
+}
+
+// BatchCosineDistances evaluates one query against several graph nodes while
+// amortizing the CGO transition used by high-dimensional dot products. Scratch
+// slices are supplied by the caller so the search loop remains allocation-free.
+// It returns false when a PQ node or malformed vector requires the caller's
+// normal distance function.
+func BatchCosineDistances[K cmp.Ordered](
+	nodes []LayerNode[K],
+	target LayerNode[K],
+	vectorScratch [][]float32,
+	normScratch []float64,
+	distances []float64,
+) bool {
+	if len(nodes) == 0 {
+		return true
+	}
+	if len(vectorScratch) < len(nodes) || len(normScratch) < len(nodes) || len(distances) < len(nodes) {
+		return false
+	}
+	query, queryNorm, queryIsPQ := cosineVectorAndNorm(target)
+	if len(query) == 0 || queryIsPQ {
+		return false
+	}
+	if queryNorm == 0 {
+		for i := range nodes {
+			distances[i] = 1
+		}
+		return true
+	}
+	for i, node := range nodes {
+		vector, norm, isPQ := cosineVectorAndNorm(node)
+		if len(vector) != len(query) || isPQ {
+			return false
+		}
+		vectorScratch[i] = vector
+		normScratch[i] = norm
+	}
+	if len(query) >= acceleratedDotMinDimensions {
+		dotFloat32Batch(query, vectorScratch[:len(nodes)], distances[:len(nodes)])
+	} else {
+		for i := range nodes {
+			distances[i] = dotFloat32Go(query, vectorScratch[i])
+		}
+	}
+	for i := range nodes {
+		if normScratch[i] == 0 {
+			distances[i] = 1
+			continue
+		}
+		similarity := distances[i] / (queryNorm * normScratch[i])
+		if similarity > 1 {
+			similarity = 1
+		} else if similarity < -1 {
+			similarity = -1
+		}
+		distances[i] = 1 - similarity
+	}
+	return true
+}
+
+func vectorNorm[K cmp.Ordered](vector []float32, node LayerNode[K]) float64 {
+	if provider, ok := node.(vectorNormProvider); ok {
+		return provider.GetVectorNorm()
+	}
+	var sum float64
+	for _, value := range vector {
+		v := float64(value)
+		sum += v * v
+	}
+	return math.Sqrt(sum)
 }
 
 // EuclideanDistance 欧氏距离计算函数（基于节点接口，不支持PQ）

@@ -25,6 +25,10 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
 	for _, resource := range event.AttachedResourceInfo {
+		// Type=code is writable delivery — never register as @/reference AutoContext.
+		if resource.GetType() == aicommon.AttachedResourceTypeCode {
+			continue
+		}
 		if resource.GetType() == aicommon.CONTEXT_PROVIDER_TYPE_FILE &&
 			resource.GetKey() == aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH {
 			path := strings.TrimSpace(resource.GetValue())
@@ -61,12 +65,17 @@ func (r *ReAct) AddRuntimeTask(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReAct) setCurrentTask(task aicommon.AIStatefulTask) {
-	r.lastTask = r.currentTask
-
-	r.currentTask = task
-	if r.currentTask != nil {
-		r.currentTask.SetDB(r.config.GetDB())
+	if task != nil {
+		// Initialize the task before publishing it. Readers may start using the
+		// task as soon as GetCurrentTask returns, so SetDB belongs on the writer's
+		// private side of the ownership hand-off.
+		task.SetDB(r.config.GetDB())
 	}
+
+	r.currentTaskMu.Lock()
+	r.lastTask = r.currentTask
+	r.currentTask = task
+	r.currentTaskMu.Unlock()
 	if r.config.DebugEvent {
 		if task != nil {
 			log.Infof("Current task set to: %s", task.GetId())
@@ -75,27 +84,33 @@ func (r *ReAct) setCurrentTask(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReAct) IsProcessingReAct() bool {
-	return r.currentTask != nil
+	return r.GetCurrentTask() != nil
 }
 
 func (r *ReAct) GetLastTask() aicommon.AIStatefulTask {
-	if r.lastTask == nil {
+	r.currentTaskMu.RLock()
+	lastTask := r.lastTask
+	r.currentTaskMu.RUnlock()
+	if lastTask == nil {
 		return nil
 	}
 	if r.config.DebugEvent {
-		log.Infof("Last task retrieved: %s", r.lastTask.GetId())
+		log.Infof("Last task retrieved: %s", lastTask.GetId())
 	}
-	return r.lastTask
+	return lastTask
 }
 
 func (r *ReAct) GetCurrentTask() aicommon.AIStatefulTask {
-	if r.currentTask == nil {
+	r.currentTaskMu.RLock()
+	currentTask := r.currentTask
+	r.currentTaskMu.RUnlock()
+	if currentTask == nil {
 		return nil
 	}
 	if r.config.DebugEvent {
-		log.Infof("Current task retrieved: %s", r.currentTask.GetId())
+		log.Infof("Current task retrieved: %s", currentTask.GetId())
 	}
-	return r.currentTask
+	return currentTask
 }
 
 func (r *ReAct) GetCurrentTaskId() string {
@@ -189,8 +204,9 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 	if event == nil {
 		return nil
 	}
+	freeInput := event.FreeInput
 	// 创建基于aireact.Task的任务（初始状态为created）
-	sanitizedInput := sanitizeForTaskId(event.FreeInput)
+	sanitizedInput := sanitizeForTaskId(freeInput)
 	shortId := ksuid.New().String()
 	if len(shortId) > 8 {
 		shortId = shortId[:8]
@@ -198,7 +214,7 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 	taskId := fmt.Sprintf("react-%s-%s", sanitizedInput, shortId)
 	task := aicommon.NewStatefulTaskBase(
 		taskId,
-		event.FreeInput,
+		freeInput,
 		r.config.GetContext(),
 		r.Emitter)
 	if r.config.DebugEvent {

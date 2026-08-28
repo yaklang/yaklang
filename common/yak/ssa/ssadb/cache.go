@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"golang.org/x/sync/singleflight"
@@ -239,12 +239,19 @@ func PreloadIrCodesByIdsFast(db *gorm.DB, progName string, ids []int64) {
 	if len(missing) == 0 {
 		return
 	}
-	var irs []*IrCode
-	if err := db.Model(&IrCode{}).
-		Where("program_name = ?", progName).
-		Where("code_id in (?)", missing).
-		Find(&irs).Error; err != nil {
-		return
+	// O2: use the parameterized native-SQL batch read (skips GORM's heavy
+	// Scope.Fields/DB.clone/search.clone/buildScanPlan chain — ~38GB cum on
+	// hadoop). On any native error, fall back to the GORM Find path so a DB
+	// error is never mistaken for an empty result.
+	irs, err := nativeGetIrCodesByIds(db, progName, missing)
+	if err != nil {
+		irs = nil
+		if gerr := db.Model(&IrCode{}).
+			Where("program_name = ?", progName).
+			Where("code_id in (?)", missing).
+			Find(&irs).Error; gerr != nil {
+			return
+		}
 	}
 	for _, ir := range irs {
 		cache.Set(ir.CodeID, ir)

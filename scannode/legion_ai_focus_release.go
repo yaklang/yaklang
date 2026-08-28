@@ -19,6 +19,7 @@ const (
 	maxServerFocusSidekickBytes = 512 * 1024
 	maxServerFocusBundleBytes   = 1024 * 1024
 	maxServerFocusSidekicks     = 32
+	maxServerFocusContractBytes = 64 * 1024
 	focusReleaseSeparator       = "\x00"
 )
 
@@ -26,6 +27,7 @@ var (
 	serverFocusRuntimeNamePattern = regexp.MustCompile(`^legion_release_[a-z0-9_]+_[0-9a-f]{12}$`)
 	serverFocusRegistryMu         sync.Mutex
 	serverFocusRegistry           = map[string]string{}
+	serverFocusContractRegistry   = map[string]*legionFocusExecutionContract{}
 )
 
 func registerContextFocusRelease(release *aiv1.ContextFocusRelease) (string, error) {
@@ -42,6 +44,10 @@ func registerContextFocusRelease(release *aiv1.ContextFocusRelease) (string, err
 	if checksum, ok := serverFocusRegistry[validated.runtimeName]; ok {
 		if checksum != validated.sha256 {
 			return "", fmt.Errorf("server focus runtime %q is already registered with different content", validated.runtimeName)
+		}
+		registered := serverFocusContractRegistry[validated.runtimeName]
+		if (registered == nil) != (validated.executionContract == nil) {
+			return "", fmt.Errorf("server focus runtime %q is already registered with a different execution contract", validated.runtimeName)
 		}
 		return validated.runtimeName, nil
 	}
@@ -62,25 +68,29 @@ func registerContextFocusRelease(release *aiv1.ContextFocusRelease) (string, err
 		return "", fmt.Errorf("register server focus release %q: %w", validated.releaseID, err)
 	}
 	serverFocusRegistry[validated.runtimeName] = validated.sha256
+	serverFocusContractRegistry[validated.runtimeName] = cloneLegionFocusExecutionContract(validated.executionContract)
 	return validated.runtimeName, nil
 }
 
 type validatedFocusRelease struct {
-	releaseID   string
-	runtimeName string
-	entryFile   string
-	entryCode   string
-	sha256      string
-	sidekicks   []reactloops.FocusModeSidekick
+	releaseID             string
+	runtimeName           string
+	entryFile             string
+	entryCode             string
+	sha256                string
+	sidekicks             []reactloops.FocusModeSidekick
+	executionContract     *legionFocusExecutionContract
+	executionContractJSON string
 }
 
 func validateContextFocusRelease(release *aiv1.ContextFocusRelease) (validatedFocusRelease, error) {
 	validated := validatedFocusRelease{
-		releaseID:   strings.TrimSpace(release.GetReleaseId()),
-		runtimeName: strings.TrimSpace(release.GetRuntimeName()),
-		entryFile:   strings.TrimSpace(release.GetEntryFile()),
-		entryCode:   release.GetEntryCode(),
-		sha256:      strings.ToLower(strings.TrimSpace(release.GetSha256())),
+		releaseID:             strings.TrimSpace(release.GetReleaseId()),
+		runtimeName:           strings.TrimSpace(release.GetRuntimeName()),
+		entryFile:             strings.TrimSpace(release.GetEntryFile()),
+		entryCode:             release.GetEntryCode(),
+		sha256:                strings.ToLower(strings.TrimSpace(release.GetSha256())),
+		executionContractJSON: strings.TrimSpace(release.GetExecutionContractJson()),
 	}
 	focusName := strings.TrimSpace(release.GetFocusName())
 	version := strings.TrimSpace(release.GetVersion())
@@ -100,7 +110,15 @@ func validateContextFocusRelease(release *aiv1.ContextFocusRelease) (validatedFo
 		return validatedFocusRelease{}, fmt.Errorf("server focus sidekick count %d exceeds limit", len(release.GetSidekicks()))
 	}
 
-	totalBytes := len(validated.entryCode)
+	if len(validated.executionContractJSON) > maxServerFocusContractBytes {
+		return validatedFocusRelease{}, fmt.Errorf("server focus execution contract exceeds size limit")
+	}
+	executionContract, err := parseLegionFocusExecutionContract(validated.executionContractJSON)
+	if err != nil {
+		return validatedFocusRelease{}, err
+	}
+	validated.executionContract = executionContract
+	totalBytes := len(validated.entryCode) + len(validated.executionContractJSON)
 	seenPaths := make(map[string]struct{}, len(release.GetSidekicks()))
 	for _, sidekick := range release.GetSidekicks() {
 		if sidekick == nil {
@@ -138,16 +156,22 @@ func validateContextFocusRelease(release *aiv1.ContextFocusRelease) (validatedFo
 	if validated.releaseID != focusName+"@"+version+"+"+validated.sha256[:12] {
 		return validatedFocusRelease{}, fmt.Errorf("server focus release id does not match release checksum")
 	}
-	if actual := contextFocusReleaseChecksum(focusName, version, validated.entryFile, validated.entryCode, validated.sidekicks); actual != validated.sha256 {
+	if actual := contextFocusReleaseChecksum(focusName, version, validated.entryFile, validated.entryCode, validated.sidekicks, validated.executionContractJSON); actual != validated.sha256 {
 		return validatedFocusRelease{}, fmt.Errorf("server focus release checksum mismatch")
 	}
 	return validated, nil
 }
 
-func contextFocusReleaseChecksum(focusName, version, entryFile, entryCode string, sidekicks []reactloops.FocusModeSidekick) string {
+func contextFocusReleaseChecksum(focusName, version, entryFile, entryCode string, sidekicks []reactloops.FocusModeSidekick, executionContractJSON ...string) string {
 	hash := sha256.New()
 	for _, value := range []string{focusName, version, entryFile, entryCode} {
 		_, _ = hash.Write([]byte(value))
+		_, _ = hash.Write([]byte(focusReleaseSeparator))
+	}
+	if len(executionContractJSON) > 0 && strings.TrimSpace(executionContractJSON[0]) != "" {
+		_, _ = hash.Write([]byte("execution_contract"))
+		_, _ = hash.Write([]byte(focusReleaseSeparator))
+		_, _ = hash.Write([]byte(executionContractJSON[0]))
 		_, _ = hash.Write([]byte(focusReleaseSeparator))
 	}
 	for _, sidekick := range sidekicks {
@@ -159,8 +183,14 @@ func contextFocusReleaseChecksum(focusName, version, entryFile, entryCode string
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+func registeredLegionFocusExecutionContract(runtimeName string) *legionFocusExecutionContract {
+	serverFocusRegistryMu.Lock()
+	defer serverFocusRegistryMu.Unlock()
+	return cloneLegionFocusExecutionContract(serverFocusContractRegistry[strings.TrimSpace(runtimeName)])
+}
+
 func pinnedFocusReleaseID(runtimeOptions []byte) string {
-	options, err := decodeYakRuntimeOptions(runtimeOptions)
+	options, err := decodeYakRuntimeOptions(runtimeOptions, true)
 	if err != nil {
 		return ""
 	}

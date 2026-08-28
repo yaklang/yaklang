@@ -239,6 +239,9 @@ func measureAddPerformance(t *testing.T, initialNodeCount int, addNodeCount int,
 
 // TestHNSWPerformance1K 测试在1000个节点基础上添加单个节点的性能
 func TestHNSWPerformance1K(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance analysis in short mode")
+	}
 	if utils.InGithubActions() {
 		t.Skip("no performance test in ci")
 		return
@@ -272,6 +275,9 @@ func TestHNSWPerformance1K(t *testing.T) {
 
 // TestHNSWPerformance10K 测试在10000个节点基础上添加节点的性能
 func TestHNSWPerformance10K(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance analysis in short mode")
+	}
 	if utils.InGithubActions() {
 		t.Skip("no performance test in ci")
 		return
@@ -1377,6 +1383,9 @@ func TestHNSWMParameterImpact(t *testing.T) {
 
 // TestHNSWPerformancePrediction 基于已有数据预估大规模数据的Add性能
 func TestHNSWPerformancePrediction(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance analysis in short mode")
+	}
 	if utils.InGithubActions() {
 		t.Skip("no performance test in ci")
 		return
@@ -1557,6 +1566,9 @@ func TestHNSWPerformancePrediction(t *testing.T) {
 
 // TestHNSWDistanceCalculationAnalysis 分析HNSW中距离计算的分布和并行优化潜力
 func TestHNSWDistanceCalculationAnalysis(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping performance analysis in short mode")
+	}
 	if utils.InGithubActions() {
 		t.Skip("no performance test in ci")
 		return

@@ -69,7 +69,6 @@ func buildDefaultReactiveDataBuilder() reactloops.ReActLoopOption {
 		renderMap := map[string]any{
 			"Nonce":            nonce,
 			"FeedbackMessages": feedbacker.String(),
-			"IsLastIteration":  loop.GetCurrentIterationIndex()+1 >= loop.GetMaxIterations(),
 		}
 		return utils.RenderTemplate(reactiveDataTemplate, renderMap)
 	})

@@ -161,6 +161,12 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 }
 
 func (c *Config) parseProject() (progs Programs, err error) {
+	// Wire up debug/pprof output when debug_dir is set.
+	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) so the
+	// two-job compile -> scan flow can reuse the compiled program.
+	debugCleanup := SetupDebugDir(c.GetDebugDir(), false)
+	defer debugCleanup()
+
 	programName := c.GetProgramName()
 	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
 	isDiffCompile := isIncrementalCompile && c.GetBaseProgramName() != ""
@@ -197,6 +203,19 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			c.Processf(0, "recompile project, delete old data finish")
 		} else {
 			c.Processf(0, "recompile incremental project, keep base program...")
+		}
+	} else if !isIncrementalCompile && programName != "" {
+		// A non-incremental full compile of an already-existing program name
+		// must clear the program's old IR rows before re-inserting. The
+		// UNIQUE indexes on ir_codes/ir_offsets otherwise reject the
+		// re-inserted rows (e.g. recompiling the same program twice in the
+		// risk-disposal inheritance test). This mirrors the delete-then-insert
+		// contract documented in SaveIrOffsetBatch.
+		if _, err := ssadb.GetProgram(programName, ssadb.Application); err == nil {
+			c.Processf(0, "recompile project, delete old data for existing program...")
+			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
+			ProgramCache.Remove(programName)
+			c.Processf(0, "recompile project, delete old data for existing program finish")
 		}
 	}
 
@@ -467,6 +486,8 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 	return vfs, nil
 }
 
+var buildFileSystemFromProgramNameForIncremental = buildFileSystemFromProgramName
+
 func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	baseProgramName := c.GetBaseProgramName()
 	c.Processf(0.03, "loading base program from database: %s", baseProgramName)
@@ -511,26 +532,15 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		c.Processf(0.08, "base program is a diff program, created overlay with 2 layers")
 	} else {
 		var err error
-		baseFSForDiff, err = buildFileSystemFromProgramName(baseProgramName)
+		baseFSForDiff, err = buildFileSystemFromProgramNameForIncremental(baseProgramName)
 		if err == nil && baseFSForDiff != nil {
 			c.Processf(0.08, "base program is a full compilation program, rebuilt file system from program name")
 		} else {
-			baseConfig := baseProgram.GetConfig()
-			if baseConfig == nil {
-				if baseProgram.irProgram != nil && baseProgram.irProgram.ConfigInput != "" {
-					baseConfigRaw, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithConfigJson(baseProgram.irProgram.ConfigInput))
-					if err != nil {
-						return nil, utils.Wrapf(err, "failed to rebuild config from base program: %s", baseProgramName)
-					}
-					baseConfig = &Config{Config: baseConfigRaw}
-				} else {
-					return nil, utils.Errorf("base program %s has no config or files to rebuild file system", baseProgramName)
-				}
-			}
-			baseFSForDiff, err = baseConfig.parseFSFromInfo()
+			baseFSForDiff, cleanupBaseConfig, err := rebuildBaseFileSystemFromConfig(baseProgram)
 			if err != nil {
-				return nil, utils.Wrapf(err, "failed to rebuild file system from base program config: %s", baseProgramName)
+				return nil, utils.Wrapf(err, "failed to rebuild config from base program: %s", baseProgramName)
 			}
+			defer cleanupBaseConfig()
 			if baseFSForDiff == nil {
 				return nil, utils.Errorf("failed to rebuild file system from base program: %s", baseProgramName)
 			}
@@ -587,6 +597,56 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	c.Processf(1, "incremental compile finish, overlay created and saved")
 
 	return diffProgram, nil
+}
+
+func rebuildBaseFileSystemFromConfig(baseProgram *Program) (fi.FileSystem, func(), error) {
+	baseConfig, err := independentBaseProgramConfig(baseProgram)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanupOwned := true
+	defer func() {
+		if cleanupOwned {
+			baseConfig.Cleanup()
+		}
+	}()
+	// parseFSFromInfo can clone a Git-backed base program and registers
+	// ownership on baseConfig. Always use a private JSON reconstruction here:
+	// FromDatabase may return a ProgramCache entry shared by concurrent diff
+	// compiles, and registering cleanup on that cached Config would race and
+	// allow one compile to remove another compile's workspace.
+	baseFS, err := baseConfig.parseFSFromInfo()
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanupOwned = false
+	return baseFS, baseConfig.Cleanup, nil
+}
+
+func independentBaseProgramConfig(baseProgram *Program) (*Config, error) {
+	if baseProgram == nil {
+		return nil, utils.Error("base program is nil")
+	}
+
+	configInput := ""
+	if baseProgram.irProgram != nil {
+		configInput = baseProgram.irProgram.ConfigInput
+	}
+	if configInput == "" {
+		cachedConfig := baseProgram.GetConfig()
+		if cachedConfig != nil && cachedConfig.Config != nil {
+			configInput = cachedConfig.Config.JSON()
+		}
+	}
+	if configInput == "" {
+		return nil, utils.Error("base program has no persisted config")
+	}
+
+	config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithConfigJson(configInput))
+	if err != nil {
+		return nil, err
+	}
+	return &Config{Config: config}, nil
 }
 
 // parseProjectWithFirstIncrementalCompile full-compiles the first base layer and marks IsOverlay.

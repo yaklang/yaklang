@@ -99,7 +99,7 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			loop.SubmitRiskFeedback(riskIDs, riskFeedbackType, riskFeedbackSeverity)
 
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeGenerateRisk, fmt.Sprintf("生成 %d 个 Risk / Generated %d Risks", len(riskIDs), len(riskIDs)), summary)
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			r.AddToTimeline("generate_risk", summary)
 			operator.Feedback(summary)
 			operator.Continue()

@@ -147,3 +147,32 @@ func (s *Server) GetApiKeyByOnline(ctx context.Context, req *ypb.GetApiKeyByOnli
 
 	return &ypb.GetApiKeyByOnlineResponse{ApiKey: apiKey}, nil
 }
+
+func (s *Server) UpdateApiKey(ctx context.Context, req *ypb.UpdateApiKeyRequest) (*ypb.Empty, error) {
+	if req.ApiKey == "" {
+		return nil, utils.Errorf("params is empty")
+	}
+	cfg, err := s.GetAIGlobalConfig(ctx, &ypb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	if cfg != nil {
+		for _, models := range [][]*ypb.AIModelConfig{
+			cfg.IntelligentModels,
+			cfg.LightweightModels,
+			cfg.VisionModels,
+		} {
+			for _, model := range models {
+				if model.Provider == nil {
+					continue
+				}
+				model.Provider.APIKey = req.ApiKey
+			}
+		}
+		if _, err := s.SetAIGlobalConfig(ctx, cfg); err != nil {
+			return nil, utils.Errorf("UpdateApiKey failed: %v", err)
+		}
+	}
+
+	return &ypb.Empty{}, nil
+}

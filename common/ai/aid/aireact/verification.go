@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -216,8 +217,17 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel("verification"),
+		aicommon.WithAIRequest_Context(ctx),
 	)
 	if transErr != nil {
+		// Verification is an observation, not a completion gate. A task may
+		// legitimately finish while an asynchronous watchdog verification is in
+		// flight. Treat that lifecycle cancellation as a quiet shutdown instead
+		// of surfacing it as malformed model output after transaction retries.
+		if ctx.Err() != nil || errors.Is(transErr, context.Canceled) {
+			log.Infof("verification stopped because its task context was cancelled")
+			return nil, nil
+		}
 		log.Errorf("AI transaction failed during verification: %v", transErr)
 		// P1 兜底: 当所有 retry 都因 AI 流"假活"(无字节/字节间空闲)而失败时,
 		// 不再向上抛出 transErr 让调用方 Fail loop, 而是降级为

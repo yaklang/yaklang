@@ -13,11 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-const (
-	dispatchSubReactJobsLoopKey        = reactloops.DispatchSubReactJobsLoopKey
-	dispatchSubReactConcurrencyLoopKey = reactloops.DispatchSubReactConcurrencyLoopKey
-)
-
 func getSubAgentDepth(loop *reactloops.ReActLoop) int {
 	if loop == nil {
 		return 0
@@ -30,19 +25,8 @@ func verifyDispatchSubReactAgents(loop *reactloops.ReActLoop, action *aicommon.A
 		return utils.Error("dispatch_sub_react_agents is only available in top-level agent; sub agents cannot dispatch more sub agents")
 	}
 
-	jobs, err := reactloops.ParseDispatchJobs(action)
-	if err != nil {
-		return err
-	}
-
-	concurrency := reactloops.ParseConcurrency(action, len(jobs))
-	encoded, err := json.Marshal(jobs)
-	if err != nil {
-		return err
-	}
-	loop.Set(dispatchSubReactJobsLoopKey, string(encoded))
-	loop.Set(dispatchSubReactConcurrencyLoopKey, concurrency)
-	return nil
+	_, err := reactloops.ParseDispatchJobs(action)
+	return err
 }
 
 func handleDispatchSubReactAgents(
@@ -56,23 +40,15 @@ func handleDispatchSubReactAgents(
 		parentTask = loop.GetCurrentTask()
 	}
 
-	rawJobs := loop.Get(dispatchSubReactJobsLoopKey)
-	if strings.TrimSpace(rawJobs) == "" {
-		operator.Fail(utils.Error("dispatch_sub_react_agents verifier state missing; retry the action"))
-		return
-	}
-	var jobs []reactloops.SubAgentJob
-	if err := json.Unmarshal([]byte(rawJobs), &jobs); err != nil {
+	jobs, err := reactloops.ParseDispatchJobs(action)
+	if err != nil {
 		operator.Fail(err)
 		return
 	}
 
-	concurrency := loop.GetInt(dispatchSubReactConcurrencyLoopKey)
-	if concurrency <= 0 {
-		concurrency = reactloops.ParseConcurrency(action, len(jobs))
-	}
+	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(jobs))
 
-	loopInfraStatus(loop, "子 Agent 执行中/ Sub Agents Running...")
+	loopInfraStatus(loop, "子 Agent 正在执行", "Sub-agents are running…")
 
 	// Pause the verification watchdog while sub-agents are running. This is a
 	// double-insurance alongside the sub-agent progress bypass in
@@ -166,20 +142,11 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 				aitool.WithParam_Description(fmt.Sprintf("Target ReAct loop name. Defaults to %q.", schema.AI_REACT_LOOP_NAME_DEFAULT)),
 			),
 		),
-		aitool.WithIntegerParam(
-			"concurrency",
-			aitool.WithParam_Description(fmt.Sprintf("Parallelism for sub agent execution. Default min(len(dispatches), %d), max %d.", reactloops.DefaultDispatchConcurrency, reactloops.MaxDispatchConcurrency)),
-		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
 		{
 			FieldName: "goal",
 			AINodeId:  loopInfraNodeDispatchSubReact,
-		},
-		{
-			FieldName: "concurrency",
-			AINodeId:  loopInfraNodeDispatchConcurrency,
-			IsSystem:  true,
 		},
 	},
 	ActionVerifier: verifyDispatchSubReactAgents,

@@ -1133,6 +1133,7 @@ var Exports = map[string]any{
 	"ListModelByProviderType": ListModelByProviderType,
 
 	"thinking":                       aispec.WithEnableThinking,
+	"reasoningEffort":                aispec.WithReasoningEffort,
 	"timeout":                        aispec.WithTimeout,
 	"proxy":                          aispec.WithProxy,
 	"model":                          aispec.WithModel,

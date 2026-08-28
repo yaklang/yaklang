@@ -2,8 +2,66 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"testing"
 )
+
+func TestSmokeNodeMaxRunningJobsFlag(t *testing.T) {
+	flags := flag.NewFlagSet("test", flag.ContinueOnError)
+	maximum := smokeNodeMaxRunningJobsFlag(flags)
+	if err := flags.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	if *maximum != 1 {
+		t.Fatalf("default max-running-jobs = %d, want 1", *maximum)
+	}
+	if err := flags.Parse([]string{"--max-running-jobs", "0"}); err != nil {
+		t.Fatal(err)
+	}
+	if *maximum != 0 {
+		t.Fatalf("explicit max-running-jobs = %d, want unlimited 0", *maximum)
+	}
+}
+
+func TestSmokeNodeMaxRunningJobsRejectsOverflow(t *testing.T) {
+	if _, err := smokeNodeMaxRunningJobs(uint64(^uint32(0)) + 1); err == nil {
+		t.Fatal("expected uint32 overflow to be rejected")
+	}
+}
+
+func TestHostDockerEndpoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		kind     string
+		endpoint string
+		want     string
+	}{
+		{name: "host", kind: "host", endpoint: " tcp://runtime-host:2376 ", want: "tcp://runtime-host:2376"},
+		{name: "default host kind", endpoint: "unix:///var/run/docker.sock", want: "unix:///var/run/docker.sock"},
+		{name: "AI session cannot advertise host daemon", kind: " ai_session ", endpoint: "tcp://runtime-host:2376", want: ""},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := hostDockerEndpoint(tt.kind, tt.endpoint); got != tt.want {
+				t.Fatalf("hostDockerEndpoint(%q, %q) = %q, want %q", tt.kind, tt.endpoint, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHostEngineValue(t *testing.T) {
+	t.Parallel()
+	if got := hostEngineValue("host", " sha256-e2 "); got != "sha256-e2" {
+		t.Fatalf("host engine value = %q", got)
+	}
+	if got := hostEngineValue("ai_session", "sha256-e2"); got != "" {
+		t.Fatalf("AI session leaked host engine identity = %q", got)
+	}
+}
 
 func TestShouldRunDistYak(t *testing.T) {
 	t.Parallel()

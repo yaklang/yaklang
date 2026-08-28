@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,30 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+type intervalReviewOutputGuard struct {
+	prevStdout []byte
+	prevStderr []byte
+}
+
+func (g *intervalReviewOutputGuard) outputChanged(stdout, stderr []byte) bool {
+	if g == nil {
+		return false
+	}
+	if bytes.Equal(g.prevStdout, stdout) && bytes.Equal(g.prevStderr, stderr) {
+		return false
+	}
+	g.prevStdout = append([]byte(nil), stdout...)
+	g.prevStderr = append([]byte(nil), stderr...)
+	return true
+}
+
+func intervalReviewToolName(tool *aitool.Tool) string {
+	if tool == nil {
+		return ""
+	}
+	return tool.Name
+}
 
 func normalizeIntervalReviewFieldContent(reader io.Reader) (string, bool) {
 	raw, err := io.ReadAll(utils.UTF8Reader(reader))
@@ -54,6 +79,66 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	reviewCount int,
 	callExpectations string,
 ) (bool, error) {
+	return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
+		ctx,
+		r.GetCurrentTask(),
+		r.Emitter,
+		tool,
+		params,
+		stdoutSnapshot,
+		stderrSnapshot,
+		startTime,
+		reviewCount,
+		callExpectations,
+	)
+}
+
+func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTask(
+	ctx context.Context,
+	task aicommon.AIStatefulTask,
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	startTime time.Time,
+	reviewCount int,
+	callExpectations string,
+) (bool, error) {
+	return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
+		ctx,
+		task,
+		r.Emitter,
+		tool,
+		params,
+		stdoutSnapshot,
+		stderrSnapshot,
+		startTime,
+		reviewCount,
+		callExpectations,
+	)
+}
+
+// _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter binds both the
+// prompt context and every review stream event to the immutable owner of one
+// tool call. Scalar callers keep using r.Emitter through the wrappers above;
+// batch callers pass their associative child emitter so concurrent reviews do
+// not lose or borrow a sibling's CallToolID/ProcessesId metadata.
+func (r *ReAct) _invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(
+	ctx context.Context,
+	task aicommon.AIStatefulTask,
+	emitter *aicommon.Emitter,
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	startTime time.Time,
+	reviewCount int,
+	callExpectations string,
+) (bool, error) {
+	if emitter == nil {
+		// Preserve the historical scalar fallback for callers that do not own a
+		// more specific emitter.
+		emitter = r.Emitter
+	}
+
 	// Check context at the beginning
 	select {
 	case <-ctx.Done():
@@ -65,8 +150,8 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	log.Infof("toolcall interval review #%d triggered for tool [%s], elapsed: %v", reviewCount, tool.Name, elapsed)
 
 	// Generate a bounded speed-priority prompt from the newest Timeline facts.
-	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContext(
-		tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations,
+	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContextForTask(
+		task, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations,
 	)
 	if err != nil {
 		log.Errorf("failed to generate interval review prompt: %v", err)
@@ -79,10 +164,10 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 
 	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallSpeedPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
-			boundEmitter := rsp.BindEmitter(r.Emitter)
+			boundEmitter := rsp.BindEmitter(emitter)
 			action, err := aicommon.ExtractActionFromStream(
 				ctx,
-				rsp.GetOutputStreamReader("interval-review", true, r.Emitter),
+				rsp.GetOutputStreamReader("interval-review", true, emitter),
 				"interval-toolcall-review",
 				aicommon.WithActionFieldStreamHandler([]string{
 					"reason", "progress_summary", "estimated_remaining_time",
@@ -119,20 +204,21 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 			switch decision {
 			case "continue":
 				shouldContinue = true
-				if progressSummary != "" {
-					r.AddToTimeline("interval-review-continue", fmt.Sprintf(
-						"Tool [%s] execution continues. Progress: %s. Reason: %s",
-						tool.Name, progressSummary, reviewReason,
-					))
-				}
-				log.Infof("interval review: tool [%s] should continue. Reason: %s", tool.Name, reviewReason)
+				// Interval reviews are timing-dependent auxiliary observations. Do
+				// not write them to the coordinator Timeline: AddToTimeline allocates
+				// a replay ID, so merely changing review frequency would shift every
+				// later checkpoint. The streamed review event and this runtime log
+				// retain visibility without mutating replay state.
+				log.Infof(
+					"interval review: tool [%s] should continue. Progress: %s. Reason: %s",
+					tool.Name, progressSummary, reviewReason,
+				)
 			case "cancel":
 				shouldContinue = false
-				r.AddToTimeline("interval-review-cancel", fmt.Sprintf(
-					"Tool [%s] execution cancelled by interval review. Reason: %s",
-					tool.Name, reviewReason,
-				))
-				log.Warnf("interval review: tool [%s] should be cancelled. Reason: %s", tool.Name, reviewReason)
+				log.Warnf(
+					"interval review: tool [%s] should be cancelled. Progress: %s. Reason: %s",
+					tool.Name, progressSummary, reviewReason,
+				)
 			default:
 				// Unknown decision, continue by default
 				shouldContinue = true
@@ -141,6 +227,8 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 			return nil
 		},
 		aicommon.WithAIRequest_CallerLabel("toolcall-interval-review"),
+		aicommon.WithAIRequest_Context(ctx),
+		aicommon.WithAIRequest_DetachCheckpoint(),
 	)
 
 	if transErr != nil {
@@ -157,6 +245,21 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 // Returns nil if interval review is disabled.
 // The handler maintains its own state (start time and review count) in a closure.
 func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
+	return r.CreateIntervalReviewHandlerForTask(r.GetCurrentTask())
+}
+
+// CreateIntervalReviewHandlerForTask binds progress reviews to the task that
+// owns the ToolCaller. Batch workers use this form instead of consulting the
+// mutable ReAct.currentTask pointer when each interval fires.
+func (r *ReAct) CreateIntervalReviewHandlerForTask(task aicommon.AIStatefulTask) func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
+	return r.CreateIntervalReviewHandlerForTaskAndEmitter(task, r.Emitter)
+}
+
+// CreateIntervalReviewHandlerForTaskAndEmitter creates a handler whose prompt
+// and emitted streams belong to the same immutable tool-call child. Batch
+// workers use it with their associative emitter; scalar callers continue to use
+// CreateIntervalReviewHandlerForTask and retain the previous emitter behavior.
+func (r *ReAct) CreateIntervalReviewHandlerForTaskAndEmitter(task aicommon.AIStatefulTask, emitter *aicommon.Emitter) func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 	if r.config.DisableIntervalReview {
 		return nil
 	}
@@ -165,6 +268,7 @@ func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *ai
 	// context. Keep local fallbacks for direct handler callers and old tests.
 	fallbackStartTime := time.Now()
 	var fallbackReviewCount int
+	var outputGuard intervalReviewOutputGuard
 
 	return func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 		startTime := fallbackStartTime
@@ -177,7 +281,15 @@ func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *ai
 			reviewCount = fallbackReviewCount
 		}
 
-		return r._invokeToolCall_IntervalReviewWithContext(ctx, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)
+		if outputGuard.outputChanged(stdoutSnapshot, stderrSnapshot) {
+			log.Infof(
+				"interval review #%d: skip AI for tool [%s] (stdout/stderr still changing)",
+				reviewCount, intervalReviewToolName(tool),
+			)
+			return true, nil
+		}
+
+		return r._invokeToolCall_IntervalReviewWithContextForTaskAndEmitter(ctx, task, emitter, tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations)
 	}
 }
 

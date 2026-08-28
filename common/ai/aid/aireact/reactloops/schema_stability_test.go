@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"testing"
 
@@ -73,7 +74,8 @@ func makeSchemaStabilityTestLoop(cfg aicommon.AICallerConfigIf) *ReActLoop {
 // 加进 disableActionList, schema enum / desc 缩短; HasRecentlyUsedTools=true 时
 // 保留, schema enum / desc 增长. 这导致每会话首次调用工具时 semi-dynamic 段
 // hash 翻转, prefix cache 必然失效一次. P2.1 改成永远保留 directly_call_tool
-// 在 schema 中, 由 ActionVerifier 在 LLM 误选时报错触发 retry.
+// 在 schema 中. 未命中 recent cache 的 enabled tool 由 handler 从完整
+// ToolManager 解析并给出 warning；真正不存在或参数非法的工具仍由后续校验处理.
 //
 // 关键词: P2.1, schema 字节稳定, HasRecentlyUsedTools 跳变消除, byte-equal 断言
 func TestGenerateSchema_StableAcrossHasRecentlyUsedTools(t *testing.T) {
@@ -128,6 +130,38 @@ func TestGenerateSchema_DirectlyCallToolDisabledWhenNoToolManager(t *testing.T) 
 		"directly_call_tool MUST be disabled when toolManager is nil (NPE 兜底)")
 }
 
+func TestGenerateSchema_AppliesOneShotHandlerActionConstraints(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background())
+	loop := makeSchemaStabilityTestLoop(cfg)
+
+	mustUse := newLoopActionHandlerOperator(nil)
+	mustUse.NextAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+	constrained, err := loop.generateSchemaString(false, mustUse)
+	require.NoError(t, err)
+	var constrainedRoot map[string]any
+	require.NoError(t, json.Unmarshal([]byte(constrained), &constrainedRoot))
+	constrainedActions := constrainedRoot["properties"].(map[string]any)["@action"].(map[string]any)["enum"].([]any)
+	require.Equal(t, []any{schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL}, constrainedActions)
+
+	disabled := newLoopActionHandlerOperator(nil)
+	disabled.RemoveNextAction(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	withoutDirectCall, err := loop.generateSchemaString(false, disabled)
+	require.NoError(t, err)
+	var disabledRoot map[string]any
+	require.NoError(t, json.Unmarshal([]byte(withoutDirectCall), &disabledRoot))
+	disabledActions := disabledRoot["properties"].(map[string]any)["@action"].(map[string]any)["enum"].([]any)
+	require.Contains(t, disabledActions, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+	require.NotContains(t, disabledActions, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+
+	unconstrained, err := loop.generateSchemaString(false)
+	require.NoError(t, err)
+	var unconstrainedRoot map[string]any
+	require.NoError(t, json.Unmarshal([]byte(unconstrained), &unconstrainedRoot))
+	unconstrainedActions := unconstrainedRoot["properties"].(map[string]any)["@action"].(map[string]any)["enum"].([]any)
+	require.Contains(t, unconstrainedActions, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
+		"handler constraints must only affect the immediately following prompt")
+}
+
 // TestGenerateSchema_StableAcrossMultipleAdds 双重保险: 多次 AddRecentlyUsedTool
 // 后 schema 仍与初始空 schema 字节相等 (验证 LRU 增减不影响 schema 字节).
 //
@@ -155,6 +189,45 @@ func TestGenerateSchema_StableAcrossMultipleAdds(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, schema0, schemaN,
 		"adding multiple recent tools must not perturb schema bytes (P2.1 invariant)")
+}
+
+func TestGenerateSchema_ToolBatchMaxItemsMatchesRuntimeConfig(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithToolBatchMaxCalls(3))
+	loop := makeSchemaStabilityTestLoop(cfg)
+
+	direct, ok := loop.actions.Get(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	require.True(t, ok)
+	direct.Options = append(direct.Options, aitool.WithStructArrayParam(
+		"directly_call_tool_calls",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Raw("minItems", 2),
+			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
+		},
+		nil,
+		aitool.WithStringParam("tool_name"),
+	))
+	requireAction, ok := loop.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+	require.True(t, ok)
+	requireAction.Options = append(requireAction.Options, aitool.WithStructArrayParam(
+		"tool_require_calls",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Raw("minItems", 2),
+			aitool.WithParam_Raw("maxItems", aicommon.DefaultToolBatchMaxCalls),
+		},
+		nil,
+		aitool.WithStringParam("tool_name"),
+	))
+
+	raw, err := loop.generateSchemaString(false)
+	require.NoError(t, err)
+	var root map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &root))
+	properties := root["properties"].(map[string]any)
+	for _, field := range []string{"directly_call_tool_calls", "tool_require_calls"} {
+		property := properties[field].(map[string]any)
+		require.EqualValues(t, 3, property["maxItems"], field)
+		require.EqualValues(t, 2, property["minItems"], field)
+	}
 }
 
 // configWithNilToolManager wraps an AICallerConfigIf and forces GetAiToolManager

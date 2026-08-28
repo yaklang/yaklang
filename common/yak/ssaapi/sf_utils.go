@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -85,7 +86,23 @@ func valueOperatorToSSAValue(value sfvm.ValueOperator) (*Value, bool) {
 		}
 		return prog.NewConstValue(g.String(), nil), true
 	}
+	if sv, ok := value.(*sfvm.SimpleValue); ok {
+		if sv == nil || sv.IsEmpty() {
+			return nil, true
+		}
+		return simpleValueToSSAValue(sv), true
+	}
 	return nil, false
+}
+
+// simpleValueToSSAValue wraps an sfpattern hit as a const Value with a range
+// anchored on path + match text (no SSA IR required).
+func simpleValueToSSAValue(sv *sfvm.SimpleValue) *Value {
+	prog := NewTmpProgram("")
+	text := sv.String()
+	path := sv.Path()
+	ed := memedit.NewMemEditorWithFileUrl(text, path)
+	return prog.NewConstValue(text, ed.GetFullRange())
 }
 
 // IsCfgCtxURLDisplayString matches the stable text form of [CfgCtxValue.String] (used when bridging to const).

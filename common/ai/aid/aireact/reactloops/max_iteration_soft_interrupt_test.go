@@ -111,7 +111,8 @@ func TestMaxIterationSoftInterrupt_DefersActiveTodos(t *testing.T) {
 	assert.Contains(t, summary, "确认是否有明文 token 泄露")
 
 	// 单条软性中断 timeline 说明
-	assert.Contains(t, invoker.timelineString(), "iteration_limit_interrupt")
+	assert.Contains(t, invoker.timelineString(), "execution_paused")
+	assert.NotContains(t, invoker.timelineString(), "iteration limit")
 }
 
 // TestMaxIterationSoftInterrupt_NoActiveTodos 验证没有活跃 TODO 时也能安全走软性
@@ -125,7 +126,8 @@ func TestMaxIterationSoftInterrupt_NoActiveTodos(t *testing.T) {
 	require.Empty(t, closed)
 	require.True(t, loop.IsMaxIterationInterrupted())
 	assert.Empty(t, loop.GetMaxIterationInterruptSummary())
-	assert.Contains(t, invoker.timelineString(), "iteration_limit_interrupt")
+	assert.Contains(t, invoker.timelineString(), "execution_paused")
+	assert.NotContains(t, invoker.timelineString(), "iteration limit")
 }
 
 // TestClassifyLoopFinishEmission_SoftInterruptIsNaturalEnd 覆盖框架层全局收尾的核心

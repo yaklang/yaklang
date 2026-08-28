@@ -40,6 +40,13 @@ type Save[T any] struct {
 	// CompareAndSwap; subsequent errors are logged but not stored. Read by
 	// Close/Flush to report failures to the caller.
 	firstErr atomic.Pointer[error]
+
+	// failed is set to true after the first save error. It does not stop
+	// already-queued batches from reaching saveToDB: Cache.handleSaveBatch
+	// uses it to settle those requests without re-entering the save callback,
+	// so every pending persist still settles exactly once.
+	failed atomic.Bool
+	queued atomic.Int64
 }
 
 // SaveStats is a compact debug snapshot of the async saver state.
@@ -233,11 +240,12 @@ func (s *Save[T]) processBuffer() {
 			// call Save concurrently with Flush.
 			save(items)
 			items = make([]T, 0, saveSize)
-			for s.buffer.Len() > 0 {
+			for s.queued.Load() > 0 {
 				item, ok := <-s.buffer.OutputChannel()
 				if !ok {
 					break
 				}
+				s.queued.Add(-1)
 				items = append(items, item)
 				if len(items) >= currentSaveSize {
 					save(items)
@@ -257,6 +265,7 @@ func (s *Save[T]) processBuffer() {
 				save(items)
 				return
 			}
+			s.queued.Add(-1)
 
 			items = append(items, item)
 
@@ -293,9 +302,11 @@ func (s *Save[T]) Save(item T) {
 	if !utils.IsNil(item) {
 		queued := false
 		start := time.Now()
+		s.queued.Add(1)
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
+					s.queued.Add(-1)
 					utils.Errorf("Save item panic: %v", r)
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
@@ -393,6 +404,7 @@ func (s *Save[T]) runSave(ts []T) {
 	if err := s.saveToDB(ts); err != nil {
 		log.Errorf("dbcache batch save failed (%s): %v", s.config.name, err)
 		s.recordErr(err)
+		s.failed.Store(true) // Stop processing new batches after first error
 	}
 }
 

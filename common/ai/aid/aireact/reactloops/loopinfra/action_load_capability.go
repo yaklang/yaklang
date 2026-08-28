@@ -92,7 +92,7 @@ func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, 
 	hasSkillAlt := strings.Contains(altTypesStr, string(aicommon.ResolvedAs_Skill))
 	loopInfraActionStart(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("加载能力: %s (%s) / Load capability: %s (%s)", identifier, resolvedType, identifier, resolvedType),
-		"加载能力中 / Loading Capability...")
+		"正在加载能力", "Loading capability…")
 
 	switch resolvedType {
 	case aicommon.ResolvedAs_Tool:
@@ -175,7 +175,7 @@ func handleLoadForgeDisabled(
 			"You MUST use tools, skills, focus modes, or directly answer instead of starting a forge.",
 		identifier)
 	invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE_DISABLED]", rejectMsg)
-	loopInfraStatus(loop, "蓝图加载被禁用 / Blueprint Disabled")
+	loopInfraStatus(loop, "蓝图加载被禁用", "Blueprint Disabled")
 	loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("蓝图加载被禁用: %s / Blueprint Disabled: %s", identifier, identifier),
 		utils.ShrinkTextBlock(rejectMsg, 800))
@@ -202,7 +202,7 @@ func handleLoadForge(
 				"Wait for the current async task to complete, or take a different synchronous action.",
 			identifier)
 		invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE_REJECTED]", rejectMsg)
-		loopInfraStatus(loop, "蓝图加载被拒绝 / Blueprint Rejected")
+		loopInfraStatus(loop, "蓝图加载被拒绝", "Blueprint Rejected")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("蓝图加载被拒绝: %s / Blueprint Rejected: %s", identifier, identifier),
 			utils.ShrinkTextBlock(rejectMsg, 800))
@@ -213,20 +213,20 @@ func handleLoadForge(
 
 	log.Infof("load_capability: dispatching '%s' as blueprint/forge", identifier)
 	invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE]",
-		fmt.Sprintf("Starting AI Blueprint '%s' in async mode", identifier))
-	loopInfraStatus(loop, "蓝图已启动 / Blueprint Started")
+		fmt.Sprintf("Starting AI Blueprint '%s'", identifier))
+	loopInfraStatus(loop, "蓝图已启动", "Blueprint Started")
 	loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("蓝图已启动: %s / Blueprint Started: %s", identifier, identifier))
 	recommendCapabilitiesFromForgePrompts(loop, invoker, identifier, "AI Blueprint "+identifier)
 
-	op.RequestAsyncMode()
-
 	task = op.GetTask()
-	task.SetAsyncMode(true)
 	taskCtx := task.GetContext()
-	invoker.RequireAIForgeAndAsyncExecute(taskCtx, identifier, func(err error) {
+	if err := invoker.RequireAIForgeAndExecute(taskCtx, identifier); err != nil {
 		loop.FinishAsyncTask(task, err)
-	})
+		op.Fail(err)
+		return
+	}
+	op.Exit()
 }
 
 // handleLoadSkill loads a skill into the context window.
@@ -241,7 +241,7 @@ func handleLoadSkill(
 	mgr := loop.GetSkillsContextManager()
 	if mgr == nil {
 		invoker.AddToTimeline("[LOAD_CAPABILITY_SKILL_ERROR]", "skills context manager is not available")
-		loopInfraStatus(loop, "加载技能失败 / Load Skill Failed")
+		loopInfraStatus(loop, "加载技能失败", "Load Skill Failed")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("加载技能失败: %s / Load Skill Failed: %s", identifier, identifier),
 			"skills context manager is not available")
@@ -256,7 +256,7 @@ func handleLoadSkill(
 		viewSummary := mgr.GetSkillViewSummary(identifier)
 		invoker.AddToTimeline("skill_already_loaded",
 			fmt.Sprintf("Skill '%s' is already loaded", identifier))
-		loopInfraStatus(loop, "技能已加载 / Skill Already Loaded")
+		loopInfraStatus(loop, "技能已加载", "Skill Already Loaded")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("技能已加载: %s / Skill Already Loaded: %s", identifier, identifier),
 			utils.ShrinkTextBlock(viewSummary, 800))
@@ -273,7 +273,7 @@ func handleLoadSkill(
 		log.Warnf("load_capability: failed to load skill %q: %v", identifier, err)
 		errMsg := fmt.Sprintf("Failed to load skill '%s': %v", identifier, err)
 		invoker.AddToTimeline("[LOAD_CAPABILITY_SKILL_ERROR]", errMsg)
-		loopInfraStatus(loop, "加载技能失败 / Load Skill Failed")
+		loopInfraStatus(loop, "加载技能失败", "Load Skill Failed")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("加载技能失败: %s / Load Skill Failed: %s", identifier, identifier),
 			utils.ShrinkTextBlock(errMsg, 800))
@@ -292,7 +292,7 @@ func handleLoadSkill(
 	invoker.AddToTimeline("skill_loaded",
 		fmt.Sprintf("Successfully loaded skill '%s' into context. %s", identifier, viewSummary))
 	log.Infof("load_capability: skill %q loaded into context successfully", identifier)
-	loopInfraStatus(loop, "技能加载完成 / Skill Loaded")
+	loopInfraStatus(loop, "技能加载完成", "Skill Loaded")
 	loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("技能加载完成: %s / Skill Loaded: %s", identifier, identifier),
 		utils.ShrinkTextBlock(viewSummary, 800))
@@ -364,7 +364,7 @@ func handleLoadFocusMode(
 				"Proceed with a different approach using your current context and available tools.",
 			identifier, err)
 		invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_FAILED]", failMsg)
-		loopInfraStatus(loop, "专注模式执行失败 / Focus Mode Failed")
+		loopInfraStatus(loop, "专注模式执行失败", "Focus Mode Failed")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("专注模式执行失败: %s / Focus Mode Failed: %s", identifier, identifier),
 			utils.ShrinkTextBlock(failMsg, 800))
@@ -379,7 +379,7 @@ func handleLoadFocusMode(
 			"Its results are now part of your context. Proceed with your main task.",
 		identifier)
 	invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_DONE]", successMsg)
-	loopInfraStatus(loop, "专注模式完成 / Focus Mode Complete")
+	loopInfraStatus(loop, "专注模式完成", "Focus Mode Complete")
 	loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("专注模式完成: %s / Focus Mode Complete: %s", identifier, identifier))
 	op.Feedback(successMsg)
@@ -408,7 +408,7 @@ func handleLoadUnknown(
 				"or use a known tool/action directly. Repeating this call wastes iterations.",
 			identifier, identifier)
 		invoker.AddToTimeline("[LOAD_CAPABILITY_UNKNOWN_BLOCKED]", blockMsg)
-		loopInfraStatus(loop, "能力加载被阻止 / Capability Load Blocked")
+		loopInfraStatus(loop, "能力加载被阻止", "Capability Load Blocked")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("能力加载被阻止: %s / Capability Load Blocked: %s", identifier, identifier),
 			utils.ShrinkTextBlock(blockMsg, 800))
@@ -436,7 +436,7 @@ func handleLoadUnknown(
 				"Use search_capabilities with a descriptive query, or proceed with already-available tools.",
 			identifier, err, identifier)
 		invoker.AddToTimeline("[LOAD_CAPABILITY_SEARCH_FAILED]", failMsg)
-		loopInfraStatus(loop, "能力搜索失败 / Capability Search Failed")
+		loopInfraStatus(loop, "能力搜索失败", "Capability Search Failed")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("能力搜索失败: %s / Capability Search Failed: %s", identifier, identifier),
 			utils.ShrinkTextBlock(failMsg, 800))
@@ -452,7 +452,7 @@ func handleLoadUnknown(
 				"Do NOT retry. Use search_capabilities instead.",
 			identifier)
 		invoker.AddToTimeline("[LOAD_CAPABILITY_SEARCH_NIL]", failMsg)
-		loopInfraStatus(loop, "能力搜索无结果 / Capability Search Empty")
+		loopInfraStatus(loop, "能力搜索无结果", "Capability Search Empty")
 		loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 			fmt.Sprintf("能力搜索无结果: %s / Capability Search Empty: %s", identifier, identifier))
 		op.Feedback(failMsg)
@@ -504,7 +504,7 @@ func handleLoadUnknown(
 			reactloops.CompactCapabilityNames(matchedForgeNames, 2),
 			reactloops.CompactCapabilityNames(matchedSkillNames, 2),
 			identifier))
-	loopInfraStatus(loop, "能力候选已识别 / Capability Candidates Identified")
+	loopInfraStatus(loop, "能力候选已识别", "Capability Candidates Identified")
 	loopInfraActionFinish(loop, loopInfraNodeLoadCapability,
 		fmt.Sprintf("能力候选已识别: %s / Capability Candidates Identified: %s", identifier, identifier),
 		utils.ShrinkTextBlock(summary.String(), 800))

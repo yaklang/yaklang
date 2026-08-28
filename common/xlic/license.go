@@ -27,7 +27,7 @@ func initMachine() {
 
 		raw, err := certs.ReadFile("certs/pub.gzip")
 		if err != nil {
-			log.Debugf("read enc.gzip error: %v", err)
+			log.Debugf("read pub.gzip error: %v", err)
 		}
 		if len(raw) > 0 {
 			if raw, _ := utils.GzipDeCompress(raw); len(raw) > 0 {
@@ -47,6 +47,10 @@ func initMachine() {
 		}
 
 		if len(encBytes) <= 0 || len(decBytes) <= 0 {
+			// Local/CE builds have no official certs (initializer.go is CI-only).
+			// A random 2048-bit key makes GetLicense/CheckLicense incompatible
+			// with the official engine — never ship this path in release binaries.
+			log.Warn("xlic: official license certs not embedded; generating ephemeral RSA keys. Enterprise licenses will not work across engines. Run common/xlic/cmd/initializer.go before building a release.")
 			decBytes, encBytes, _ = tlsutils.GeneratePrivateAndPublicKeyPEM()
 		}
 

@@ -1304,6 +1304,9 @@ func GetTableCurrentId(db *gorm.DB, tableName string) (int64, error) {
 }
 
 func YakitPagingQuery(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm.DB) {
+	if p == nil {
+		p = &ypb.Paging{}
+	}
 	db = QueryOrder(db, p.OrderBy, p.Order)          // set order by
 	if p.GetBeforeId() <= 0 && p.GetAfterId() <= 0 { // if not set after_id and before_id, use page and limit
 		return NewPagination(&Param{

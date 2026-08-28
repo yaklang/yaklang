@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -14,6 +15,46 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// setMCPToolDescriptionI18n sets DescriptionI18n via unified schema.I18n → ypb.I18N.
+func setMCPToolDescriptionI18n(item *ypb.MCPClientToolConfig, zh, en string) {
+	if item == nil {
+		return
+	}
+	if i18n := schema.NewI18n(strings.TrimSpace(zh), strings.TrimSpace(en)); i18n != nil {
+		item.DescriptionI18N = i18n.I18nToYPB_I18n()
+	}
+}
+
+// hasMCPToolDescriptionI18n reports whether DescriptionI18n already carries UI text.
+func hasMCPToolDescriptionI18n(item *ypb.MCPClientToolConfig) bool {
+	if item == nil || item.GetDescriptionI18N() == nil {
+		return false
+	}
+	return strings.TrimSpace(item.GetDescriptionI18N().GetZh()) != "" ||
+		strings.TrimSpace(item.GetDescriptionI18N().GetEn()) != ""
+}
+
+// resolveMCPToolDescriptionI18nForExport builds DescriptionI18n for UI export by source.
+func resolveMCPToolDescriptionI18nForExport(source, toolName, description string) *schema.I18n {
+	switch source {
+	case schema.MCPClientToolSourceBuiltin:
+		return mcp.ResolveBuiltinToolDescriptionI18n(toolName, description)
+	default:
+		return schema.NewI18n("", description)
+	}
+}
+
+// ensureMCPToolDescriptionI18n fills DescriptionI18n when attachToolMeta did not set it
+// (bridge tools / DB-cached rows / old engine clients reading cached responses).
+func ensureMCPToolDescriptionI18n(item *ypb.MCPClientToolConfig) {
+	if item == nil || hasMCPToolDescriptionI18n(item) {
+		return
+	}
+	if i18n := resolveMCPToolDescriptionI18nForExport(item.GetSource(), item.GetToolName(), item.GetDescription()); i18n != nil {
+		item.DescriptionI18N = i18n.I18nToYPB_I18n()
+	}
+}
 
 // GetMCPToolList returns the merged list of builtin tools and bridge tools with
 // their per-tool enable/disable state. The result is paged and filterable.
@@ -28,6 +69,12 @@ import (
 //     with ForceSync=true whenever the user explicitly requests a refresh.
 //   - ForceSync=true: dial every enabled external MCP server, perform a full
 //     diff (insert new tools, refresh descriptions, delete removed tools).
+//
+// UI contract (Yakit「工具配置」):
+//   - Description: English, for AI / MCP protocol compatibility.
+//   - DescriptionI18n: bilingual UI text (Zh/En). Prefer a dedicated table column
+//     "描述" that renders DescriptionI18n by locale; do not bury it as a faint
+//     subtitle under ToolName. Fall back to Description when DescriptionI18n is empty.
 func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequest) (*ypb.GetMCPToolListResponse, error) {
 	db := s.GetProfileDatabase()
 
@@ -54,6 +101,7 @@ func (s *Server) GetMCPToolList(ctx context.Context, req *ypb.GetMCPToolListRequ
 		if cfg.Source == schema.MCPClientToolSourceBridge {
 			attachBridgeToolMeta(db, item)
 		}
+		ensureMCPToolDescriptionI18n(item)
 		tools = append(tools, item)
 	}
 
@@ -104,6 +152,7 @@ func (s *Server) GetMCPToolDetail(ctx context.Context, req *ypb.GetMCPToolDetail
 		}
 	}
 
+	ensureMCPToolDescriptionI18n(item)
 	return item, nil
 }
 
@@ -258,6 +307,9 @@ func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string, a
 			return
 		}
 		item.Description = t.Description
+		if i18n := resolveMCPToolDescriptionI18nForExport(source, toolName, t.Description); i18n != nil {
+			item.DescriptionI18N = i18n.I18nToYPB_I18n()
+		}
 		params, err := parseMCPToolInputSchema(&t.InputSchema)
 		if err != nil {
 			log.Warnf("attachToolMeta: parse legacy schema for %q: %v", toolName, err)
@@ -270,6 +322,9 @@ func attachToolMeta(item *ypb.MCPClientToolConfig, source, toolName, _ string, a
 			return
 		}
 		item.Description = at.Description
+		if i18n := resolveMCPToolDescriptionI18nForExport(source, toolName, at.Description); i18n != nil {
+			item.DescriptionI18N = i18n.I18nToYPB_I18n()
+		}
 		params, err := parseMCPToolInputSchema(&at.InputSchema)
 		if err != nil {
 			log.Warnf("attachToolMeta: parse aitool-framework schema for %q: %v", toolName, err)

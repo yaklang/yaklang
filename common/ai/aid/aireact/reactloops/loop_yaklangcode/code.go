@@ -143,7 +143,6 @@ var reactiveData string
 func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) map[string]any {
 	yakCode := loop.Get("full_code")
 	lineBase := loop.GetInt(loopinfra.LoopVarCodeLineBase)
-	codeWithLine := utils.PrefixLinesWithLineNumbersFrom(lineBase+1, yakCode)
 	editorFilePath := strings.TrimSpace(loop.Get("editor_file_path"))
 	hasCode := strings.TrimSpace(yakCode) != ""
 
@@ -151,6 +150,8 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 	if feedbacker != nil {
 		feedbacks = strings.TrimSpace(feedbacker.String())
 	}
+	lintFailed := hasBlockingLintErrors(loop)
+	codeWithLine := formatReactiveCurrentCode(yakCode, lineBase, feedbacks, lintFailed)
 	policy := ClassifyYakScriptRunPolicy(yakCode)
 	runFeedback := strings.TrimSpace(loop.Get(loopVarYakRunLastFeedback))
 	runOk := loop.Get(loopVarYakRunOK)
@@ -158,7 +159,7 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 	scriptKind := string(policy.Kind)
 	needsSelfTest := policy.BlockExitNoSelfTest
 
-	initialSamples := loop.Get("initial_code_samples")
+	initialSamples := shrinkReactiveSamplesAfterCodeExists(loop.Get("initial_code_samples"), hasCode)
 	hasInitialSamples := loop.Get("init_samples_ready") == "true" || strings.TrimSpace(initialSamples) != ""
 	aikbAvailable := loop.Get("aikb_available") != "false"
 
@@ -186,6 +187,11 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 		// PinnedAPIs: init 阶段为选定核心库 PIN 的权威函数签名(接口速查卡), 注入反应数据降低类型/猜名错误。
 		"PinnedAPIs":      loop.Get("pinned_apis"),
 		"PinnedLibraries": loop.Get("pinned_libraries"),
+		"PinnedDSL":       loop.Get("pinned_dsl"),
+		// NeedsLintResearch: lint 失败且尚未 grep/yakdoc，禁止直接 modify_code。
+		"NeedsLintResearch": needsYaklangLintResearchGate(loop),
+		// ForcePatchFallback: Apply Patch 连续应用失败后强制行号/old_snippet，打断空转。
+		"ForcePatchFallback": loopinfra.IsModifyCodePatchFallbackMode(loop),
 	}
 }
 
@@ -227,6 +233,8 @@ func init() {
 				autoInstall:   !config.GetConfigBool("aikb_auto_install_disabled", false),
 			}
 
+			loopBox := &yaklangLoopBox{}
+
 			// 创建单文件修改工厂
 			modSuite := loopinfra.NewSingleFileModificationSuiteFactory(
 				r,
@@ -245,7 +253,11 @@ func init() {
 					if loop != nil {
 						lineBase = loop.GetInt(loopinfra.LoopVarCodeLineBase)
 					}
-					return checkCodeAndFormatErrors(content, lineBase)
+					errMsg, blocking := checkCodeAndFormatErrors(content, lineBase)
+					if blocking {
+						markYaklangLintResearchNeeded(loop)
+					}
+					return errMsg, blocking
 				}),
 				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r, holder)),
 			)
@@ -254,7 +266,7 @@ func init() {
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
-				reactloops.WithInitTask(buildInitTask(r, holder, installCfg)),
+				reactloops.WithInitTask(wrapInitTaskBindLoopBox(loopBox, buildInitTask(r, holder, installCfg))),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				// write_yaklang_code 是"直接写代码"的 focus 模式, 标准工作流为
 				// 选库→搜样例→写代码→修语法→收尾, 本就没有"向用户提问"环节。
@@ -263,6 +275,8 @@ func init() {
 				// 最通用合理的默认直接产出可运行代码, 把可调项写进 __DESC__/cli 参数供用户事后切换,
 				// 而不是反复反问用户造成空转。API/签名不确定时用 grep/yakdoc 查, 同样不需要问用户。
 				reactloops.WithAllowUserInteract(false),
+				// lint/空代码门禁：限制 finish、未检索前的 mutate、early exit 等低效动作。
+				reactloops.WithActionFilter(newYaklangLoopActionFilter(loopBox)),
 				modSuite.GetAITagOption(),
 				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 					return utils.RenderTemplate(instruction, yaklangPromptRenderMap(loop, nil, nonce))

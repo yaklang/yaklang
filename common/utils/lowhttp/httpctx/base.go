@@ -381,6 +381,7 @@ const (
 	RESPONSE_CONTEXT_KEY_Timestamp                   = "timestamp_response"
 	REQUEST_CONTEXT_KEY_RequestIsModified            = "requestIsModified"
 	REQUEST_CONTEXT_KEY_UpstreamPortIsModified       = "upstreamPortIsModified"
+	REQUEST_CONTEXT_KEY_UpstreamRoundTripSucceeded   = "upstreamRoundTripSucceeded"
 	REQUEST_CONTEXT_KEY_ResponseIsModified           = "responseIsModified"
 	REQUEST_CONTEXT_KEY_RequestModifiedBy            = "requestIsModifiedBy"
 	REQUEST_CONTEXT_KEY_ResponseModifiedBy           = "responseIsModifiedBy"
@@ -421,6 +422,7 @@ const (
 	REQUEST_CONTEXT_KEY_MitmFrontendReadWriter       = "mitmFrontendReadWriter"
 	REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback     = "mitmSkipFrontendFeedback"
 	REQUEST_CONTEXT_KEY_ResponseFinishedCallback     = "responseFinishedCallback"
+	REQUEST_CONTEXT_KEY_ResponseStreamRecorder       = "responseStreamRecorder"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile   = "ResponseTooLargeHeaderFile"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile     = "ResponseTooLargeBodyFile"
 	REQUEST_CONTEXT_KEY_ResponseBodySize             = "ResponseBodySize"
@@ -445,6 +447,21 @@ func SetRequestMITMTaskID(req *http.Request, id string) {
 
 func GetRequestMITMTaskID(req *http.Request) string {
 	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_MITMTaskID)
+}
+
+// SetResponseStreamRecorder stores an optional stream recorder (e.g. for SSE
+// persistence) on the request context so the mirror stage can retrieve it.
+func SetResponseStreamRecorder(req *http.Request, recorder any) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder, recorder)
+}
+
+// GetResponseStreamRecorder returns the stream recorder previously stored via
+// SetResponseStreamRecorder, or nil.
+func GetResponseStreamRecorder(req *http.Request) any {
+	if req == nil {
+		return nil
+	}
+	return GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder)
 }
 
 func SetRequestProxyProtocol(req *http.Request, p string) {
@@ -737,6 +754,17 @@ func SetUpstreamPortModified(req *http.Request, modified bool) {
 
 func GetUpstreamPortIsModified(req *http.Request) bool {
 	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamPortIsModified)
+}
+
+// SetUpstreamRoundTripSucceeded records whether a real upstream round trip
+// completed successfully. Proxy-generated responses (for example a local 502)
+// must not be counted as upstream completions.
+func SetUpstreamRoundTripSucceeded(req *http.Request, succeeded bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamRoundTripSucceeded, succeeded)
+}
+
+func GetUpstreamRoundTripSucceeded(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamRoundTripSucceeded)
 }
 
 func SetResponseModified(req *http.Request, by ...string) {

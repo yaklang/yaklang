@@ -338,6 +338,11 @@ func TestPromptManager_GenerateToolParamsPromptWithMeta_UsesPromptSections(t *te
 	}
 
 	prompt := result.Prompt
+	for _, forbidden := range []string{"Current iteration:", "last iteration", "final iteration", "最后一次迭代", "最后一轮"} {
+		if strings.Contains(strings.ToLower(prompt), strings.ToLower(forbidden)) {
+			t.Fatalf("tool parameter prompt must hide host iteration limits, found %q", forbidden)
+		}
+	}
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic-1|>",
@@ -1038,6 +1043,21 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 	) {
 		t.Fatalf("verification prompt should be composed by prompt sections. Got:\n%s", prompt)
 	}
+	for _, forbidden := range []string{"当前子任务已执行", "last iteration", "final iteration", "最后一次迭代", "最后一轮"} {
+		if strings.Contains(strings.ToLower(prompt), strings.ToLower(forbidden)) {
+			t.Fatalf("verification prompt must hide host iteration limits, found %q", forbidden)
+		}
+	}
+	if !utils.MatchAllOfSubString(prompt,
+		"语义停滞判定",
+		"调用次数多、轮次增加或耗时变长本身都不是重复证据",
+		"同一工具用于不同目标、参数 / payload、对照、假设、观察通道或独立复核属于有效探索",
+	) {
+		t.Fatalf("verification prompt must judge stalled execution by semantic information gain. Got:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "当前子任务已多次经过相似执行路径") {
+		t.Fatal("verification prompt must not infer semantic repetition from a host-side counter")
+	}
 }
 
 func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testing.T) {
@@ -1179,6 +1199,7 @@ func TestGenerateIntervalReviewPrompt_UsesOnlyBoundedRecentTimeline(t *testing.T
 	)
 	require.NoError(t, err)
 	react.AddToTimeline("note", "ANCIENT_INTERVAL_CONTEXT "+strings.Repeat("old ", 12000))
+	react.AddToTimeline("[LOOP_STALL_DETECTED]", "main loop has not advanced; waiting on tool")
 	react.AddToTimeline("note", "RECENT_INTERVAL_FACT")
 
 	tool := aitool.NewWithoutCallback(
@@ -1199,6 +1220,7 @@ func TestGenerateIntervalReviewPrompt_UsesOnlyBoundedRecentTimeline(t *testing.T
 	require.Contains(t, prompt, "RECENT_INTERVAL_FACT")
 	require.NotContains(t, prompt, "ANCIENT_INTERVAL_CONTEXT")
 	require.NotContains(t, prompt, "Timeline Memory (Frozen)")
+	require.NotContains(t, prompt, "LOOP_STALL_DETECTED")
 	promptTokens := aicommon.MeasureTokens(prompt)
 	t.Logf("bounded interval-review prompt tokens: %d", promptTokens)
 	require.LessOrEqual(t, promptTokens, 9000)
@@ -1242,6 +1264,39 @@ func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
 	if extraPromptBlock.Body != extraPrompt {
 		t.Fatalf("interval review prompt should wrap extra prompt in EXTRA_PROMPT AITAG. Got:\n%s", prompt)
 	}
+}
+
+func TestGenerateIntervalReviewPrompt_GrepOmitsLongSearchHint(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "decision": "continue"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	tool := aitool.NewWithoutCallback(
+		"grep",
+		aitool.WithStringParam("pattern"),
+	)
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool,
+		aitool.InvokeParams{"pattern": "Runtime.exec", "path": "/repo"},
+		[]byte("=== Start Grep ==="),
+		nil,
+		time.Now().Add(-3*time.Minute),
+		2,
+		"",
+	)
+	if err != nil {
+		t.Fatalf("GenerateIntervalReviewPromptWithContext failed: %v", err)
+	}
+	require.NotContains(t, prompt, "LOOP_STALL_DETECTED")
+	require.NotContains(t, prompt, "start banner")
 }
 
 // TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法
@@ -1364,8 +1419,8 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 			t.Fatal("Generated prompt should contain cumulative summary")
 		}
 
-		if !utils.MatchAllOfSubString(prompt, "2/10") {
-			t.Fatal("Generated prompt should contain iteration information")
+		if utils.MatchAllOfSubString(prompt, "2/10") {
+			t.Fatal("Generated prompt must not expose host iteration information")
 		}
 
 		// 验证包含 AIForge 的信息

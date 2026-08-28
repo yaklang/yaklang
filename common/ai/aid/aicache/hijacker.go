@@ -124,16 +124,16 @@ func hijackHighStatic(msg string) *aispec.ChatBaseMirrorResult {
 	//   4. 2 段 (兼容退化): build2SegmentMessages
 	// 关键词: hijack 切分优先级, 5 段优先, 4 段 SEMI 单 cc, 3 段 frozen-only, 2 段兼容
 	if five := build5SegmentMessages(res, systemContent); five != nil {
-		return five
+		return expandReasoningReplayMessages(five)
 	}
 	if four := build4SegmentMessages(res, systemContent); four != nil {
-		return four
+		return expandReasoningReplayMessages(four)
 	}
 	if three := build3SegmentMessages(res, systemContent, timelineBlk); three != nil {
-		return three
+		return expandReasoningReplayMessages(three)
 	}
 
-	return build2SegmentMessages(res, systemContent)
+	return expandReasoningReplayMessages(build2SegmentMessages(res, systemContent))
 }
 
 // build2SegmentMessages 走"原始 2 段"兼容路径: 把所有非 high-static block

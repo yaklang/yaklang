@@ -191,12 +191,15 @@ type toolCallArtifactBundle struct {
 	resultPath   string
 	manifestPath string
 
-	combined *os.File
-	stdout   *os.File
-	stderr   *os.File
-	preview  *boundedHeadTailBuffer
-	prepare  error
-	closed   bool
+	combined  *os.File
+	stdout    *os.File
+	stderr    *os.File
+	preview   *boundedHeadTailBuffer
+	prepare   error
+	closed    bool
+	finalized bool
+	discarded bool
+	ownsDir   bool
 }
 
 func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, identifier string) *toolCallArtifactBundle {
@@ -219,7 +222,9 @@ func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, id
 		taskName = t.task.GetSemanticIdentifier()
 	}
 	callNumber := 1
-	if t.task != nil {
+	if t.artifactOrdinal > 0 {
+		callNumber = t.artifactOrdinal
+	} else if t.task != nil {
 		callNumber = len(t.task.GetAllToolCallResults()) + 1
 	}
 	name := sanitizeFilename(tool.Name)
@@ -235,6 +240,7 @@ func (t *ToolCaller) newToolCallArtifactBundle(tool *aitool.Tool, callToolID, id
 	if b.prepare != nil {
 		return b
 	}
+	b.ownsDir = true
 	b.reportPath = filepath.Join(b.dir, "report.md")
 	b.combinedPath = filepath.Join(b.dir, "combined_output.txt")
 	b.stdoutPath = filepath.Join(b.dir, "stdout.txt")
@@ -287,6 +293,13 @@ func (b *toolCallArtifactBundle) Writer(stream toolArtifactStream) io.Writer {
 func (b *toolCallArtifactBundle) writeStream(stream toolArtifactStream, p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	// A context cancellation can return from a non-cooperative plugin before its
+	// callback goroutine has fully unwound. Once the unfinished bundle has been
+	// discarded, accept and drop any late writes so that the callback cannot
+	// recreate a ghost artifact or turn cancellation into an unrelated pipe error.
+	if b.discarded {
+		return len(p), nil
+	}
 	_, _ = b.preview.Write(p)
 	if b.prepare != nil {
 		return len(p), nil
@@ -308,6 +321,12 @@ func (b *toolCallArtifactBundle) writeStream(stream toolArtifactStream, p []byte
 }
 
 func (b *toolCallArtifactBundle) closeStreams() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.closeStreamsLocked()
+}
+
+func (b *toolCallArtifactBundle) closeStreamsLocked() {
 	if b.closed {
 		return
 	}
@@ -318,6 +337,81 @@ func (b *toolCallArtifactBundle) closeStreams() {
 				b.prepare = err
 			}
 		}
+	}
+}
+
+// discardIfUnfinished rolls back an artifact bundle that never reached
+// finalize. The important case is context cancellation while plugin code is
+// running: invoke intentionally does not finalize or checkpoint a cancelled
+// result, so retaining an empty/partial directory would expose a ghost artifact
+// that is not represented in task state or Timeline.
+//
+// finalized bundles (including ordinary failed tool calls) are retained. A
+// callback that outlives cancellation may still hold the writers; discarded is
+// therefore set before closing/removing files and writeStream drops late bytes.
+func (b *toolCallArtifactBundle) discardIfUnfinished() error {
+	if b == nil {
+		return nil
+	}
+	b.mu.Lock()
+	if b.finalized {
+		b.mu.Unlock()
+		return nil
+	}
+	b.discarded = true
+	b.closeStreamsLocked()
+	dir := b.dir
+	ownsDir := b.ownsDir
+	b.mu.Unlock()
+	if ownsDir && dir != "" {
+		if err := os.RemoveAll(dir); err != nil {
+			log.Warnf("failed to discard unfinished tool artifact bundle %s: %v", dir, err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *toolCallArtifactBundle) markFinalized() {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.finalized = true
+	b.mu.Unlock()
+}
+
+// isCanonicalToolResultData recognizes only the framework envelope written by
+// applyNormalizedData. Current envelopes begin with RESULT or OBSERVATIONS;
+// COMBINED OUTPUT remains accepted for checkpoint compatibility. Requiring a
+// valid final ARTIFACT/HINT section avoids treating an arbitrary tool string
+// that merely starts with one of those labels as a replay envelope.
+func isCanonicalToolResultData(data string) bool {
+	if !strings.HasPrefix(data, "RESULT:\n") &&
+		!strings.HasPrefix(data, "OBSERVATIONS:\n") &&
+		!strings.HasPrefix(data, "COMBINED OUTPUT:\n") {
+		return false
+	}
+	artifactMarker := "\n\nARTIFACT:\n"
+	hintMarker := "\n\nHINT:\n"
+	artifactAt := strings.LastIndex(data, artifactMarker)
+	hintAt := strings.LastIndex(data, hintMarker)
+	switch {
+	case artifactAt > hintAt:
+		section := strings.TrimSpace(data[artifactAt+len(artifactMarker):])
+		lines := strings.Split(section, "\n")
+		if len(lines) != 2 {
+			return false
+		}
+		combinedPath := strings.TrimSpace(strings.TrimPrefix(lines[0], "- combined:"))
+		resultPath := strings.TrimSpace(strings.TrimPrefix(lines[1], "- result:"))
+		return strings.HasPrefix(lines[0], "- combined:") && combinedPath != "" &&
+			strings.HasPrefix(lines[1], "- result:") && resultPath != ""
+	case hintAt >= 0:
+		section := strings.TrimSpace(data[hintAt+len(hintMarker):])
+		return strings.HasPrefix(section, "artifact_persist_failed:")
+	default:
+		return false
 	}
 }
 
@@ -438,18 +532,19 @@ func normalizeToolResultData(toolResult *aitool.ToolResult, combined, resultText
 		combined = "(empty)"
 	}
 	if combined == resultText {
-		// duplicate: skip RESULT section entirely to save tokens
-		body := "COMBINED OUTPUT:\n" + combined
+		// Duplicate: one semantic RESULT section is enough. Do not lead with an
+		// observation label that could make log wording look authoritative.
+		body := "RESULT:\n" + resultText
 		applyNormalizedData(toolResult, body, hint)
 		return
 	}
 	if resultText == "" {
-		// empty result: skip RESULT section to avoid a two-line "(empty)" no-op
-		body := "COMBINED OUTPUT:\n" + combined
+		// No semantic result was supplied; label captured text as observations.
+		body := "OBSERVATIONS:\n" + combined
 		applyNormalizedData(toolResult, body, hint)
 		return
 	}
-	body := "COMBINED OUTPUT:\n" + combined + "\n\nRESULT:\n" + resultText
+	body := "RESULT:\n" + resultText + "\n\nOBSERVATIONS:\n" + combined
 	applyNormalizedData(toolResult, body, hint)
 }
 
@@ -528,18 +623,15 @@ func (b *toolCallArtifactBundle) finalize(
 	if toolResult == nil {
 		return nil
 	}
-	if data, ok := toolResult.Data.(string); ok && strings.Contains(data, "COMBINED OUTPUT:\n") && strings.Contains(data, "\n\nRESULT:\n") && (strings.Contains(data, "\n\nARTIFACT:\n") || strings.Contains(data, "\n\nHINT:\n")) {
+	if data, ok := toolResult.Data.(string); ok && isCanonicalToolResultData(data) {
 		// A current-format checkpoint already owns stable artifact paths. Do not
 		// wrap the preview again or rewrite its bytes during replay.
-		b.closeStreams()
-		for _, path := range []string{b.combinedPath, b.stdoutPath, b.stderrPath} {
-			if path != "" {
-				_ = os.Remove(path)
-			}
+		if err := b.discardIfUnfinished(); err != nil {
+			log.Warnf("failed to discard replay artifact staging directory: %v", err)
+			// Leave finalized=false so the caller's deferred rollback can retry.
+			return nil
 		}
-		if b.dir != "" {
-			_ = os.Remove(b.dir)
-		}
+		b.markFinalized()
 		return nil
 	}
 	b.closeStreams()
@@ -584,13 +676,13 @@ func (b *toolCallArtifactBundle) finalize(
 	normalizeToolResultData(toolResult, combined, resultText, hint)
 	rawTokens := ytoken.CalcTokenCount(combined) + ytoken.CalcTokenCount(resultText)
 	if persistErr != nil && rawTokens > ToolResultTokenLimit {
-		toolResult.Success = false
-		if toolResult.Error != "" {
-			toolResult.Error += "; "
-		}
-		toolResult.Error += "artifact_persist_failed: complete oversized output is unavailable"
+		// Artifact persistence is an observation-channel failure after the tool
+		// callback already produced its protocol result. Keep Success unchanged;
+		// the canonical HINT communicates that the oversized observation is not
+		// fully recoverable.
 		normalizeToolResultData(toolResult, combined, resultText, hint)
-		return persistErr
+		log.Warnf("tool artifact persistence failed for oversized result: %v", persistErr)
+		return nil
 	}
 	if persistErr != nil {
 		log.Warnf("tool artifact persistence failed for bounded result: %v", persistErr)
@@ -607,7 +699,7 @@ func (b *toolCallArtifactBundle) finalize(
 		Tool:       tool.Name,
 		CallToolID: callToolID,
 		Identifier: identifier,
-		Status:     map[bool]string{true: "success", false: "failed"}[toolResult.Success],
+		Status:     map[bool]string{true: "completed", false: "protocol_failed"}[toolResult.Success],
 		Success:    toolResult.Success,
 		Error:      toolResult.Error,
 		Params:     params,
@@ -619,13 +711,23 @@ func (b *toolCallArtifactBundle) finalize(
 		err = os.WriteFile(b.manifestPath, manifestData, 0o644)
 	}
 	if err != nil {
-		return err
+		// Deferred rollback will remove this incomplete bundle. Replace the
+		// already-rendered ARTIFACT paths before returning so Timeline never
+		// advertises files that no longer exist.
+		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
+		log.Warnf("tool artifact manifest persistence failed: %v", err)
+		return nil
 	}
 
 	report := b.renderReport(tool, identifier, params, toolResult, paramGenDuration, rawAIParamResponse)
 	if err := os.WriteFile(b.reportPath, []byte(report), 0o644); err != nil {
-		return err
+		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
+		log.Warnf("tool artifact report persistence failed: %v", err)
+		return nil
 	}
+	// Only a complete manifest/report bundle is durable. Any earlier error keeps
+	// finalized=false so ToolCaller's deferred rollback removes the partial tree.
+	b.markFinalized()
 	t.emitter.EmitToolCallLogDir(callToolID, b.reportPath)
 	t.emitter.EmitPinFilename(b.reportPath)
 	t.emitter.EmitPinFilename(b.dir)
@@ -746,11 +848,6 @@ func migrateLegacyTimelineToolResult(workdir string, toolResult *aitool.ToolResu
 	normalizeToolResultData(toolResult, combined, resultText, hint)
 	if persistErr != nil {
 		if ytoken.CalcTokenCount(combined)+ytoken.CalcTokenCount(resultText) > ToolResultTokenLimit {
-			toolResult.Success = false
-			if toolResult.Error != "" {
-				toolResult.Error += "; "
-			}
-			toolResult.Error += "artifact_persist_failed: historical oversized output is unavailable"
 			normalizeToolResultData(toolResult, combined, resultText, hint)
 		}
 		log.Warnf("failed to migrate legacy Timeline tool result %d: %v", toolResult.ID, persistErr)
@@ -761,7 +858,7 @@ func migrateLegacyTimelineToolResult(workdir string, toolResult *aitool.ToolResu
 		Tool:       toolResult.Name,
 		CallToolID: toolResult.ToolCallID,
 		Identifier: "legacy-timeline-migration",
-		Status:     map[bool]string{true: "success", false: "failed"}[toolResult.Success],
+		Status:     map[bool]string{true: "completed", false: "protocol_failed"}[toolResult.Success],
 		Success:    toolResult.Success,
 		Error:      toolResult.Error,
 		Params:     toolResult.Param,

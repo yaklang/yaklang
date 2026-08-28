@@ -1,0 +1,43 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Dml Native Statements"
+	title_zh: "检测到Dml Native Statements",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-dml-native-statements"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `dml-native-statements` (/tmp/semgrep-rules/apex/lang/security/ncino/dml/DmlNativeStatements.yaml).
+Original message: Native Salesforce DML operations execute in system context, ignoring the current user's permissions, field-level security, organization-wide defaults, position in the role hierarchy, and sharing rules. Be mindful when using native Salesforce DML operations.
+
+CWE: CWE-863: Incorrect Authorization
+References:
+- https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_dml_section.htm
+- https://cwe.mitre.org/data/definitions/863.html
+- https://owasp.org/Top10/A04_2021-Insecure_Design/
+DESC
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION
+	alert_min: 1
+	"file://pos.cls": <<<POS
+update
+
+POS
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG
+)
+
+${*.cls}.pattern_regex_not(/(insert|upsert|update|delete)[\s]/, /[\/\/].*(insert|upsert|update|delete).*/, /[\/\/].*(insert|upsert|update|delete)[\n]/, /.*[=].*(insert|upsert|update|delete).*[,;]/) as $p0
+${*.cls}.pattern_regex_not(/(insert|upsert|update|delete)[(]/, /[\/\/].*(insert|upsert|update|delete).*/, /[\/\/].*(insert|upsert|update|delete)[\n]/, /.*[=].*(insert|upsert|update|delete).*[,;]/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Dml Native Statements",
+	title_zh: "检测到Dml Native Statements",
+	message: "Dml Native Statements",
+}

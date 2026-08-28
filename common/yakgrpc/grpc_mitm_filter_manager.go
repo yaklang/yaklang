@@ -249,6 +249,50 @@ var defaultMITMFilterData = &ypb.MITMFilterData{
 		MatcherType: httptpl.MATCHER_TYPE_MIME,
 		Group:       defaultExcludeMIME,
 	}},
+	FilterBundledStaticJS: true,
+}
+
+const filterBundledStaticJSJSONField = "FilterBundledStaticJS"
+
+// unmarshalMITMFilterData keeps the historical default for static JS filtering.
+// Older persisted filter records do not contain FilterBundledStaticJS, so the
+// missing field must mean true rather than proto3's zero value (false).
+func unmarshalMITMFilterData(serializedFilter string) (*ypb.MITMFilterData, error) {
+	var filterData ypb.MITMFilterData
+	if err := json.Unmarshal([]byte(serializedFilter), &filterData); err != nil {
+		return nil, err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(serializedFilter), &fields); err != nil {
+		return nil, err
+	}
+	if _, ok := fields[filterBundledStaticJSJSONField]; !ok {
+		if _, ok = fields["filterBundledStaticJS"]; !ok {
+			filterData.FilterBundledStaticJS = true
+		}
+	}
+	return &filterData, nil
+}
+
+// marshalMITMFilterData always persists the boolean field, including false.
+// This lets future loads distinguish an explicit user choice from a legacy
+// record where the field was absent.
+func marshalMITMFilterData(data *ypb.MITMFilterData) ([]byte, error) {
+	if data == nil {
+		return json.Marshal(nil)
+	}
+
+	result, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(result, &fields); err != nil {
+		return nil, err
+	}
+	fields[filterBundledStaticJSJSONField] = data.GetFilterBundledStaticJS()
+	return json.Marshal(fields)
 }
 
 func getInitFilterManager(db *gorm.DB, key string) (*MITMFilter, error) {
@@ -262,8 +306,7 @@ func getInitFilterManager(db *gorm.DB, key string) (*MITMFilter, error) {
 		serializedFilter = yakit.GetKey(db, key)
 	}
 
-	var filterData ypb.MITMFilterData
-	err := json.Unmarshal([]byte(serializedFilter), &filterData)
+	filterData, err := unmarshalMITMFilterData(serializedFilter)
 	if err != nil {
 		// legacy
 		var manager MITMFilterManager
@@ -271,9 +314,11 @@ func getInitFilterManager(db *gorm.DB, key string) (*MITMFilter, error) {
 		if err != nil {
 			return nil, err
 		}
-		return NewMITMFilter(LegacyFilter2FilterMatcherData(&manager)), nil
+		data := LegacyFilter2FilterMatcherData(&manager)
+		data.FilterBundledStaticJS = true
+		return NewMITMFilter(data), nil
 	}
-	return NewMITMFilter(&filterData), nil
+	return NewMITMFilter(filterData), nil
 }
 
 func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
@@ -343,7 +388,7 @@ func (m *MITMFilter) SaveToDb(keys ...string) error {
 		return utils.Error("mitm filter not set db")
 	}
 
-	result, err := json.Marshal(m.Data)
+	result, err := marshalMITMFilterData(m.Data)
 	if err != nil {
 		return err
 	}

@@ -219,16 +219,52 @@ func (a *ToolCaller) invoke(
 	stdoutSnapshotBuffer, stderrSnapshotBuffer *toolOutputBuffer,
 	finalizeResults ...func(*aitool.ToolResult) error,
 ) (*aitool.ToolResult, error) {
+	// A ToolCaller can recursively enter invoke after a review override. Track
+	// replay for the current invocation only; the outer pipeline uses this bit to
+	// suppress session/stat notifications when no plugin callback ran.
+	a.checkpointReplayed = false
 	c := a.config
 	e := a.emitter
+	if err := toolCallerContextErr(a.ctx); err != nil {
+		return nil, err
+	}
 	var finalizeResult func(*aitool.ToolResult) error
 	if len(finalizeResults) > 0 {
 		finalizeResult = finalizeResults[0]
 	}
 
-	seq := c.AcquireId()
+	seq := a.checkpointSeq
+	if seq <= 0 {
+		seq = c.AcquireId()
+	}
 	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.GetRuntimeId(), seq); ok {
+		if a.batchID != "" {
+			stored := aiddb.AiCheckPointGetRequestParams(ret)
+			storedParam := stored.GetObject("param")
+			storedIndex, hasStoredIndex := stored["call_index"]
+			if stored.GetString("batch_id") != a.batchID ||
+				!hasStoredIndex ||
+				utils.InterfaceToInt(storedIndex) != a.batchIndex ||
+				stored.GetString("call_tool_id") != a.callToolId ||
+				stored.GetString("tool_name") != tool.Name ||
+				string(utils.Jsonify(storedParam)) != string(utils.Jsonify(params)) {
+				return nil, utils.Errorf(
+					"tool batch checkpoint identity mismatch: expected batch=%s index=%d call=%s tool=%s params=%s; stored batch=%s index=%d call=%s tool=%s params=%s",
+					a.batchID,
+					a.batchIndex,
+					a.callToolId,
+					tool.Name,
+					utils.Jsonify(params),
+					stored.GetString("batch_id"),
+					utils.InterfaceToInt(storedIndex),
+					stored.GetString("call_tool_id"),
+					stored.GetString("tool_name"),
+					utils.Jsonify(storedParam),
+				)
+			}
+		}
 		if ret.Finished {
+			a.checkpointReplayed = true
 			res := aiddb.AiCheckPointGetToolResult(ret)
 			if finalizeResult != nil && res != nil {
 				if err := finalizeResult(res); err != nil {
@@ -242,27 +278,37 @@ func (a *ToolCaller) invoke(
 		}
 	}
 	toolCheckpoint := c.CreateToolCallCheckpoint(seq)
-	err := c.SubmitCheckpointRequest(toolCheckpoint, map[string]any{
+	checkpointRequest := map[string]any{
 		"tool_name": tool.Name,
 		"param":     params,
-	})
+	}
+	if a.batchID != "" {
+		checkpointRequest["batch_id"] = a.batchID
+		checkpointRequest["call_index"] = a.batchIndex
+		checkpointRequest["call_tool_id"] = a.callToolId
+	}
+	err := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest)
 	if err != nil {
 		return nil, err
 	}
 
 	epm := c.GetEndpointManager()
-	ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
+	watcherCheckpointSeq := a.watcherCheckpointSeq
+	a.watcherCheckpointSeq = 0
+	ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_CALL_WATCHER, watcherCheckpointSeq)
 	e.EmitToolCallWatcher(a.callToolId, ep.GetId(), tool, params)
 
-	// Use task context if available (for proper cancellation), otherwise fall back to config context
-	var baseCtx context.Context
-	if a.task != nil {
+	// Prefer the caller-scoped context. Batch children derive it from both the
+	// action context and task context, so cancelling either one interrupts the
+	// plugin. Scalar callers also populate a.ctx and keep their old semantics.
+	var baseCtx = a.ctx
+	if baseCtx == nil && a.task != nil {
 		if statefulTask, ok := a.task.(AIStatefulTask); ok {
 			baseCtx = statefulTask.GetContext()
 		} else {
 			baseCtx = c.GetContext()
 		}
-	} else {
+	} else if baseCtx == nil {
 		baseCtx = c.GetContext()
 	}
 
@@ -289,14 +335,11 @@ func (a *ToolCaller) invoke(
 	toolCallErr := func(err error) (*aitool.ToolResult, error) {
 		reportError(err)
 		res := newToolCallRes()
-		res.Error = fmt.Sprintf("tool execution failed: %v", err)
+		res.Error = fmt.Sprintf("tool invocation protocol failed: %v", err)
 		return res, err
 	}
 
 	toolCallCancel := func(result *aitool.ToolExecutionResult, err error) (*aitool.ToolExecutionResult, error) {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return result, nil
-		}
 		return result, err
 	}
 
@@ -321,12 +364,17 @@ func (a *ToolCaller) invoke(
 	log.Infof("start to invoke tool[%s] with params: %v", tool.Name, params)
 
 	if !utils.IsNil(a.intervalReviewHandler) {
+		// InvokeWithParams performs small in-place normalizations while validating
+		// (notably temporarily removing runtime_id). Interval review runs in a
+		// parallel goroutine and renders params into its prompt, so it must observe
+		// an immutable deep snapshot instead of racing those tool-owned mutations.
+		intervalReviewParams := cloneEndpointParams(params)
 		intervalStart := make(chan struct{})
 		go func() {
 			close(intervalStart)
 			a.intervalReviewContext(
 				ctx, cancel,
-				tool, params,
+				tool, intervalReviewParams,
 				stdoutSnapshotBuffer.Snapshot,
 				stderrSnapshotBuffer.Snapshot,
 				userCancel,
@@ -416,6 +464,12 @@ func (a *ToolCaller) invoke(
 			return submitToolRiskToPlatformSink(resultRuntime, risk)
 		}
 	}
+	// Everything above prepares observers and runtime metadata. Cancellation can
+	// race any of those steps, so make the final callback boundary explicit: a
+	// cancelled child must never enter plugin code after being admitted earlier.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),
@@ -427,6 +481,23 @@ func (a *ToolCaller) invoke(
 		aitool.WithRuntimeConfig(runtimeCfg),
 		aitool.WithOutputCapture(false),
 	)
+	invokeCancelled := errors.Is(execErr, context.Canceled) ||
+		errors.Is(execErr, context.DeadlineExceeded) ||
+		ctx.Err() != nil
+	if invokeCancelled {
+		if execErr == nil {
+			execErr = ctx.Err()
+			if execErr == nil {
+				execErr = context.Canceled
+			}
+		}
+		if execResult != nil {
+			execResult.Success = false
+			if execResult.Error == "" {
+				execResult.Error = fmt.Sprintf("tool invocation cancelled: %v", execErr)
+			}
+		}
+	}
 	if execErr != nil {
 		// Preflight failures have no script callback, so without this line their
 		// artifact would misleadingly say COMBINED OUTPUT: (empty). Mirror the final
@@ -434,7 +505,7 @@ func (a *ToolCaller) invoke(
 		// artifacts useful even when the structured error event is unavailable.
 		_, _ = fmt.Fprintf(stderrWriter, "[error] %v\n", execErr)
 	}
-	if execResult != nil && finalizeResult != nil {
+	if execResult != nil && finalizeResult != nil && !invokeCancelled {
 		if finalizeErr := finalizeResult(execResult); finalizeErr != nil {
 			if execErr == nil {
 				execErr = finalizeErr
@@ -443,18 +514,17 @@ func (a *ToolCaller) invoke(
 			}
 		}
 	}
-	if execResult != nil {
+	if execResult != nil && !invokeCancelled {
 		if checkpointErr := c.SubmitCheckpointResponse(toolCheckpoint, execResult); checkpointErr != nil {
-			if execErr == nil {
-				execErr = checkpointErr
-			} else {
-				execErr = errors.Join(execErr, checkpointErr)
-			}
+			// The callback has already produced a result envelope. Checkpoint
+			// persistence is an infrastructure observation and must not rewrite
+			// protocol completion into a tool failure.
+			log.Warnf("failed to persist completed tool result checkpoint: %v", checkpointErr)
 		}
 	}
 
 	// Some failures happen outside the tool callback (for example JSON Schema
-	// validation, artifact finalization, or checkpoint persistence). Those paths can
+	// validation or cancellation). Those paths can
 	// return a ToolResult and an error without passing through WithErrorCallback.
 	// Always report the final aggregated error here so the UI receives tool_call_error
 	// instead of a silent done card. The caller's handler is guarded by sync.Once, so

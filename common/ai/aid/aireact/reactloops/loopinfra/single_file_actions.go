@@ -47,7 +47,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			invoker := loop.GetInvoker()
 			loopInfraActionStart(loop, loopInfraNodeSingleFileWrite,
 				fmt.Sprintf("写入文件: %s / Write file: %s", filename, filename),
-				"写入文件中 / Writing File...")
+				"正在写入文件", "Writing file…")
 
 			invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)
 			code := loop.Get(codeVar)
@@ -69,7 +69,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 					return
 				}
 				operator.Feedback(failMsg + "\n\nHINT: 你很可能【输出完 @action JSON 就停下了】, 没有紧接着输出代码块。@action JSON 与紧随其后的 `<|" + f.aiTagName + "_<nonce>|> ... <|" + f.aiTagName + "_END_<nonce>|>` 代码块是【同一次回复、不可分割的一体】——发完 JSON 不要结束, 必须在同一条消息里把代码块完整写完(含 END 结束标记)再停。\n如果你只是想先确认 API 签名或语法, 请改用查询动作 (yakdoc_function_details / grep_yaklang_samples / semantic_search_yaklang_samples), 不要发空的 write_code。")
-				loopInfraStatus(loop, "write_code 缺少代码, 已反馈纠正并继续 / write_code missing code, fed back and continue")
+				loopInfraStatus(loop, "write_code 缺少代码, 已反馈纠正并继续", "write_code missing code, fed back and continue")
 				return
 			}
 			// 成功提取到代码, 重置空写计数。
@@ -119,7 +119,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			log.Infof("write_code done: hasBlockingErrors=%v runBlocked=%v", blocking, runBlocked)
 			if !blocking && !runBlocked {
-				loopInfraStatus(loop, "文件写入完成 / File Write Complete")
+				loopInfraStatus(loop, "文件写入完成", "File Write Complete")
 				loopInfraActionFinish(loop, loopInfraNodeSingleFileWrite,
 					fmt.Sprintf("文件写入完成: %s (%d bytes) / File Written: %s (%d bytes)", filename, len(code), filename, len(code)),
 					msg)
@@ -144,7 +144,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		actionName,
 		`Modify existing code. Preferred mode:
-1) Patch (default): put a Cursor-style Apply Patch in the GEN_CODE / content tag
+1) Patch (default): put an Apply Patch block in the GEN_CODE / content tag
    (*** Begin Patch ... *** End Patch). System applies it to full_code then emits the merged full file (never raw patch) to the frontend.
 Legacy fallbacks when GEN_CODE is NOT a patch:
 2) Small snippet only: old_snippet + optional replace_all.
@@ -172,13 +172,17 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 			end := action.GetInt("modify_end_line")
 			// Patch mode: JSON may omit line range / old_snippet; GEN_CODE is validated after WaitStream.
 			if start == 0 && end == 0 {
-				loopInfraStatus(l, "准备以 Patch 修改文件 / Preparing Patch Modify")
+				loopInfraStatus(l, "准备以 Patch 修改文件", "Preparing Patch Modify")
 				return nil
 			}
 			if start <= 0 || end <= 0 || end < start {
 				return utils.Error("modify_code action must have a GEN_CODE patch (*** Begin Patch), valid 'modify_start_line'/'modify_end_line', or 'old_snippet'")
 			}
-			loopInfraStatus(l, fmt.Sprintf("准备修改文件行 %d-%d / Preparing File Modify Lines %d-%d", start, end, start, end))
+			loopInfraStatus(
+				l,
+				fmt.Sprintf("准备修改文件第 %d-%d 行", start, end),
+				fmt.Sprintf("Preparing to modify file lines %d-%d", start, end),
+			)
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -196,7 +200,9 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 
 			action.WaitStream(op.GetContext())
 
-			// Preferred path: Cursor-style patch inside GEN_CODE (ignores old_snippet / line range).
+			// Preferred path: Apply Patch inside GEN_CODE (ignores old_snippet / line range).
+			// When patch-fallback mode is on, still accept a correct patch (compatible), but
+			// prefer line-range / old_snippet after repeated apply failures.
 			if LooksLikeCodePatch(loop.Get(codeVar)) {
 				f.handleModifyByPatch(loop, action, op, actionName, filename, fullCodeVar, codeVar)
 				return
@@ -206,10 +212,11 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 			oldSnippet := strings.TrimSpace(action.GetString("old_snippet"))
 			modifyStartParam := action.GetInt("modify_start_line")
 			modifyEndParam := action.GetInt("modify_end_line")
-			if looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode, modifyStartParam, modifyEndParam) {
+			patchFallback := IsPatchFallbackMode(loop, actionName)
+			if !patchFallback && looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode, modifyStartParam, modifyEndParam) {
 				msg := fmt.Sprintf(`【modify_code 失败】检测到 GEN_CODE 是完整文件或大段源码，但缺少 *** Begin Patch。
 
-modify_code 必须输出 Cursor 风格 Patch；禁止直接输出完整 beforeRequest、runSelfTest、完整函数或整份脚本。
+modify_code 必须输出 Apply Patch；禁止直接输出完整 beforeRequest、runSelfTest、完整函数或整份脚本。
 请基于本轮 CURRENT_CODE 原样复制上下文和删除行，重新输出：
 *** Begin Patch
 *** Update File: current
@@ -225,6 +232,18 @@ GEN_CODE 预览：
 				op.Continue()
 				return
 			}
+			if patchFallback && looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode, modifyStartParam, modifyEndParam) &&
+				(modifyStartParam <= 0 || modifyEndParam <= 0 || modifyEndParam < modifyStartParam) && oldSnippet == "" {
+				msg := fmt.Sprintf(`【modify_code 失败】当前处于 Patch 降级模式：禁止再输出无定位信息的大段代码。
+
+请提供 modify_start_line/modify_end_line（对照 CURRENT_CODE 行号）或 old_snippet。
+GEN_CODE 预览：
+%s`, utils.ShrinkTextBlock(generatedCode, 300))
+				runtime.AddToTimeline("modify_fallback_needs_locator", msg)
+				op.Feedback(msg)
+				op.Continue()
+				return
+			}
 
 			if oldSnippet != "" {
 				f.handleModifyByOldSnippet(loop, action, op, actionName, filename, fullCodeVar, codeVar)
@@ -234,9 +253,19 @@ GEN_CODE 预览：
 			start := modifyStartParam
 			end := modifyEndParam
 			if start <= 0 || end <= 0 || end < start {
-				msg := fmt.Sprintf(`【modify_code 失败】GEN_CODE 不是 Patch（缺少 *** Begin Patch），且未提供 old_snippet / 有效行号。
+				var msg string
+				if IsPatchFallbackMode(loop, actionName) {
+					msg = fmt.Sprintf(`【modify_code 失败】Patch 降级模式：必须提供 old_snippet 或有效行号 modify_start_line/modify_end_line。
 
-请优先输出 Cursor 风格 Patch：
+示例：
+{"@action":"modify_code","modify_start_line":10,"modify_end_line":25,"modify_code_reason":"..."}
+<|%s_<nonce>|>
+...该行号范围内的新代码...
+<|%s_END_<nonce>|>`, f.aiTagName, f.aiTagName)
+				} else {
+					msg = fmt.Sprintf(`【modify_code 失败】GEN_CODE 不是 Patch（缺少 *** Begin Patch），且未提供 old_snippet / 有效行号。
+
+请优先输出 Apply Patch：
 {"@action":"modify_code","modify_code_reason":"..."}
 <|%s_<nonce>|>
 *** Begin Patch
@@ -248,6 +277,7 @@ GEN_CODE 预览：
 <|%s_END_<nonce>|>
 
 或回退：old_snippet / modify_start_line+modify_end_line。`, f.aiTagName, f.aiTagName)
+				}
 				runtime.AddToTimeline("modify_no_locator", msg)
 				op.Feedback(msg)
 				op.Continue()
@@ -268,7 +298,7 @@ GEN_CODE 预览：
 			reason := action.GetString("modify_code_reason")
 			loopInfraActionStart(loop, loopInfraNodeSingleFileModify,
 				fmt.Sprintf("修改文件行 %d-%d: %s / Modify file lines %d-%d: %s", modifyStartLine, modifyEndLine, filename, modifyStartLine, modifyEndLine, filename),
-				"修改文件中 / Modifying File...")
+				"正在修改文件", "Modifying file…")
 
 			// Prettify the code (extract line numbers if present)
 			start, end, codeSegment, fixedCode := f.PrettifyCode(partialCode)
@@ -321,6 +351,7 @@ GEN_CODE 解析行号：[%d-%d]
 				op.Fail(fmt.Sprintf("failed to write modified content to file: %v", writeErr))
 				return
 			}
+			resetPatchApplyFail(loop, actionName)
 			loop.Set(fullCodeVar, fullCode)
 
 			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
@@ -348,7 +379,7 @@ GEN_CODE 解析行号：[%d-%d]
 			runtime.AddToTimeline("code_modified", msg)
 			log.Infof("modify_code done: hasBlockingErrors=%v runBlocked=%v", hasBlockingErrors, runBlocked)
 			if !hasBlockingErrors && !runBlocked {
-				loopInfraStatus(loop, "文件修改完成 / File Modify Complete")
+				loopInfraStatus(loop, "文件修改完成", "File Modify Complete")
 				loopInfraActionFinish(loop, loopInfraNodeSingleFileModify,
 					fmt.Sprintf("文件修改完成: %s lines %d-%d / File Modified: %s lines %d-%d", filename, modifyStartLine, modifyEndLine, filename, modifyStartLine, modifyEndLine),
 					msg)
@@ -428,7 +459,11 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			if line <= 0 {
 				return utils.Error("insert_lines action must have valid 'insert_line' parameter")
 			}
-			loopInfraStatus(l, fmt.Sprintf("准备插入文件行 %d / Preparing File Insert Line %d", line, line))
+			loopInfraStatus(
+				l,
+				fmt.Sprintf("准备在文件第 %d 行插入内容", line),
+				fmt.Sprintf("Preparing to insert content at file line %d", line),
+			)
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -455,7 +490,7 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			invoker.AddToTimeline("insert_lines", msg)
 			loopInfraActionStart(loop, loopInfraNodeSingleFileInsert,
 				fmt.Sprintf("插入文件行 %d: %s / Insert file line %d: %s", insertLine, filename, insertLine, filename),
-				"插入文件内容 / Inserting File Content...")
+				"正在插入文件内容", "Inserting file content…")
 
 			// Prettify the code
 			start, end, codeSegment, fixedCode := f.PrettifyCode(partialCode)
@@ -506,7 +541,7 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			runtime.AddToTimeline("lines_inserted", msg)
 			log.Infof("insert_lines done: hasBlockingErrors=%v runBlocked=%v", hasBlockingErrors, runBlocked)
 			if !hasBlockingErrors && !runBlocked {
-				loopInfraStatus(loop, "文件插入完成 / File Insert Complete")
+				loopInfraStatus(loop, "文件插入完成", "File Insert Complete")
 				loopInfraActionFinish(loop, loopInfraNodeSingleFileInsert,
 					fmt.Sprintf("文件插入完成: %s line %d / File Inserted: %s line %d", filename, insertLine, filename, insertLine),
 					msg)
@@ -551,9 +586,17 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			}
 
 			if endLine > 0 {
-				loopInfraStatus(l, fmt.Sprintf("准备删除文件行 %d-%d / Preparing File Delete Lines %d-%d", startLine, endLine, startLine, endLine))
+				loopInfraStatus(
+					l,
+					fmt.Sprintf("准备删除文件第 %d-%d 行", startLine, endLine),
+					fmt.Sprintf("Preparing to delete file lines %d-%d", startLine, endLine),
+				)
 			} else {
-				loopInfraStatus(l, fmt.Sprintf("准备删除文件行 %d / Preparing File Delete Line %d", startLine, startLine))
+				loopInfraStatus(
+					l,
+					fmt.Sprintf("准备删除文件第 %d 行", startLine),
+					fmt.Sprintf("Preparing to delete file line %d", startLine),
+				)
 			}
 			return nil
 		},
@@ -597,7 +640,7 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			invoker.AddToTimeline("delete_lines", msg)
 			loopInfraActionStart(loop, loopInfraNodeSingleFileDelete,
 				fmt.Sprintf("删除文件行: %s / Delete file lines: %s", filename, filename),
-				"删除文件内容 / Deleting File Content...")
+				"正在删除文件内容", "Deleting file content…")
 
 			if err != nil {
 				runtime.AddToTimeline("delete_failed", "Failed to delete lines: "+err.Error())
@@ -652,7 +695,7 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			runtime.AddToTimeline("lines_deleted", msg)
 			log.Infof("delete_lines done: hasBlockingErrors=%v runBlocked=%v", hasBlockingErrors, runBlocked)
 			if !hasBlockingErrors && !runBlocked {
-				loopInfraStatus(loop, "文件删除完成 / File Delete Complete")
+				loopInfraStatus(loop, "文件删除完成", "File Delete Complete")
 				loopInfraActionFinish(loop, loopInfraNodeSingleFileDelete,
 					fmt.Sprintf("文件删除完成: %s / File Delete Complete: %s", filename, filename),
 					msg)

@@ -11,7 +11,7 @@ import (
 )
 
 var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
-	AsyncMode:   true,
+	AsyncMode:   false,
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT,
 	Description: `Require an AI Blueprint to accomplish complex tasks that need specialized AI capabilities.`,
 	Options: []aitool.ToolOption{
@@ -70,8 +70,10 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 		task := operator.GetTask()
 		recommendCapabilitiesFromForgePrompts(loop, invoker, forgeName, "AI Blueprint "+forgeName)
 
-		invoker.RequireAIForgeAndAsyncExecute(task.GetContext(), forgeName, func(err error) {
-			loop.FinishAsyncTask(task, err)
-		})
+		if err := invoker.RequireAIForgeAndExecute(task.GetContext(), forgeName); err != nil {
+			operator.Fail(err)
+			return
+		}
+		operator.Exit()
 	},
 }

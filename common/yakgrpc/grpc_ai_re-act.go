@@ -1,4 +1,4 @@
-package yakgrpc
+﻿package yakgrpc
 
 import (
 	"context"
@@ -44,7 +44,7 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	if i == nil {
 		return opts
 	}
-	enableMultiAgent, goalModeEnabled, goalMinIterations := resolveAIExecutionStrategy(i)
+	enableMultiAgent, goalModeEnabled, goalMinIterations, maxSubAgents := resolveAIExecutionStrategy(i)
 	if i.DisallowRequireForUserPrompt {
 		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))
 	} else {
@@ -86,7 +86,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aid.WithAiToolsSearchTool())
 	}
 	if enableMultiAgent {
-		opts = append(opts, aicommon.WithEnableMultiAgentMode(true))
+		opts = append(opts,
+			aicommon.WithEnableMultiAgentMode(true),
+			aicommon.WithMaxSubAgents(maxSubAgents),
+		)
 	}
 	if len(i.GetExcludeToolNames()) > 0 {
 		opts = append(opts, aicommon.WithDisableToolsName(i.GetExcludeToolNames()...))
@@ -151,14 +154,15 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	return opts
 }
 
-func resolveAIExecutionStrategy(i *ypb.AIStartParams) (enableMultiAgent bool, enableGoalMode bool, goalMinIterations int64) {
+func resolveAIExecutionStrategy(i *ypb.AIStartParams) (enableMultiAgent bool, enableGoalMode bool, goalMinIterations int64, maxSubAgents int64) {
 	if i == nil {
-		return false, false, aicommon.DefaultGoalMinIterations
+		return false, false, aicommon.DefaultGoalMinIterations, aicommon.DefaultMaxSubAgentConcurrency
 	}
 	if strategy := i.GetStrategy(); strategy != nil {
 		enableMultiAgent = strategy.GetEnableMultiAgent()
 		enableGoalMode = strategy.GetEnableGoalMode()
 		goalMinIterations = strategy.GetGoalMinIterations()
+		maxSubAgents = strategy.GetMaxSubAgents()
 	}
 	goalMinIterations = aicommon.NormalizeGoalMinIterations(goalMinIterations)
 	return

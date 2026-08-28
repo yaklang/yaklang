@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/format"
 )
 
 func TestQueryAllLibraryNames(t *testing.T) {
@@ -62,14 +63,14 @@ func TestSearchYakDocument_EmptyQuery(t *testing.T) {
 
 func TestEnrichExternFieldError_KnownCase(t *testing.T) {
 	msg := `ExternLib [poc] don't has [appendHeade], maybe you meant appendHeader ?`
-	enriched := EnrichExternFieldError(msg)
+	enriched := format.EnrichExternFieldError(msg)
 	require.Contains(t, enriched, "已自动附加 YakDocument")
 	require.Contains(t, enriched, "appendHeader")
 	require.Contains(t, enriched, "相近函数")
 }
 
 func TestEnrichExternFieldError_NonMatching(t *testing.T) {
-	require.Empty(t, EnrichExternFieldError("syntax error at line 1"))
+	require.Empty(t, format.EnrichExternFieldError("syntax error at line 1"))
 }
 
 func TestFormatLibraryDetails_Truncation(t *testing.T) {

@@ -67,15 +67,23 @@ type RuntimeStatusProvider interface {
 
 // BaseConfig defines how NodeBase connects to the platform.
 type BaseConfig struct {
-	NodeType             spec.NodeType
-	Kind                 string
-	NodeID               string
-	DisplayName          string
-	AgentInstallationID  string
-	BaseDir              string
-	EnrollmentToken      string
-	PlatformAPIBaseURL   string
-	Version              string
+	NodeType spec.NodeType
+	Kind     string
+	// DockerEndpoint is reported only by host Nodes. It must be reachable by
+	// Legion Session Manager and is never inferred from a client-controlled URL.
+	DockerEndpoint      string
+	NodeID              string
+	DisplayName         string
+	AgentInstallationID string
+	BaseDir             string
+	EnrollmentToken     string
+	PlatformAPIBaseURL  string
+	Version             string
+	// EngineReleaseID and EngineDigest are the immutable unified release
+	// identity currently installed on a host Node. They are omitted by
+	// ephemeral ai_session Nodes.
+	EngineReleaseID      string
+	EngineDigest         string
 	Labels               map[string]string
 	CapabilityKeys       []string
 	HeartbeatInterval    time.Duration

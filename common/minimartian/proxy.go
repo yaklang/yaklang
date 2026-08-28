@@ -75,6 +75,10 @@ type Proxy struct {
 	reqmod          RequestModifier
 	resmod          ResponseModifier
 
+	// streamRecorder creates optional best-effort recorders for streaming
+	// responses (e.g. SSE) to persist body chunks before EOF.
+	streamRecorder HTTPStreamRecorderFactory
+
 	// context cache
 	ctxCacheLock     *sync.Mutex
 	ctxCacheInitOnce *sync.Once
@@ -98,6 +102,8 @@ type Proxy struct {
 	maxReadWaitTime  time.Duration
 
 	h2Cache sync.Map
+	// h2ProbeInflight deduplicates background origin h2 probes (per host:port)
+	h2ProbeInflight sync.Map
 
 	forceDisableKeepAlive bool
 	disableSystemProxy    bool
@@ -561,4 +567,10 @@ func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
 	}
 
 	p.resmod = resmod
+}
+
+// SetHTTPStreamRecorderFactory configures an optional best-effort recorder for
+// streaming responses such as SSE. A nil factory disables stream recording.
+func (p *Proxy) SetHTTPStreamRecorderFactory(factory HTTPStreamRecorderFactory) {
+	p.streamRecorder = factory
 }

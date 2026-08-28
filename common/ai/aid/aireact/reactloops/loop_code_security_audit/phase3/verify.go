@@ -19,7 +19,7 @@ var phase3VerifyInstruction string
 var phase3OutputExample string
 
 // BuildVerifyLoop builds the Phase 3 orchestrator loop.
-// It forks one sub-agent per finding (concurrency=5) and merges verified_vulns.json at the end.
+// It forks one sub-agent per finding (engine concurrency from MaxSubAgents) and merges verified_vulns.json at the end.
 func BuildVerifyLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(math.MaxInt32),

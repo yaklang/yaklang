@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,11 +18,12 @@ import (
 )
 
 const (
-	yakRunOutputMaxBytes       = 8 * 1024
-	defaultYakRunSelfTestSec   = 30
+	yakRunOutputMaxBytes     = 8 * 1024
+	defaultYakRunSelfTestSec = 90 // subprocess cold-starts DB; 30s was too tight in practice
 
-	configYakRunSelfTestDisabled = "yaklang_auto_run_self_test_disabled"
-	configYakRunSelfTestTimeout  = "yaklang_run_self_test_timeout_sec"
+	configYakRunSelfTestDisabled   = "yaklang_auto_run_self_test_disabled"
+	configYakRunSelfTestTimeout    = "yaklang_run_self_test_timeout_sec"
+	configYakRunSelfTestSubprocess = "yaklang_run_self_test_subprocess" // default false: in-process
 
 	loopVarYakRunOK           = "yak_run_ok"
 	loopVarYakRunOutput       = "yak_run_output"
@@ -50,9 +50,10 @@ type YakRunResult struct {
 	Truncated bool
 }
 
-// RunYakSelfTest executes code with YAK_MAIN=true in an isolated yak subprocess (same as Yakit UI default).
-// Mock CLI flags are injected so cli.check() passes without killing the grpc parent process.
-func RunYakSelfTest(ctx context.Context, code, absPath string, timeoutSec int) (YakRunResult, error) {
+// RunYakSelfTest executes code with YAK_MAIN=true.
+// Default is in-process (reuses warm grpc DB). Set preferSubprocess / env
+// YAKLANG_RUN_SELF_TEST_SUBPROCESS=true for isolated yak.exe subprocess.
+func RunYakSelfTest(ctx context.Context, code, absPath string, timeoutSec int, preferSubprocess ...bool) (YakRunResult, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
 		return YakRunResult{}, utils.Error("yak self-test: code is empty")
@@ -70,10 +71,22 @@ func RunYakSelfTest(ctx context.Context, code, absPath string, timeoutSec int) (
 	mockArgs := buildSelfTestCLIArgs(code)
 	log.Infof("yaklang self-test mock cli args: %v", mockArgs)
 
-	if _, binErr := resolveYakEngineBinary(); binErr == nil {
-		return runYakSelfTestSubprocess(runCtx, code, absPath, mockArgs)
+	useSubprocess := forceYakSelfTestSubprocess()
+	if len(preferSubprocess) > 0 && preferSubprocess[0] {
+		useSubprocess = true
+	}
+	if useSubprocess {
+		if _, binErr := resolveYakEngineBinary(); binErr == nil {
+			return runYakSelfTestSubprocess(runCtx, code, absPath, mockArgs)
+		}
+		log.Warnf("yaklang self-test: subprocess requested but yak binary missing, falling back in-process")
 	}
 	return runYakSelfTestInProcess(runCtx, code, absPath, mockArgs)
+}
+
+func forceYakSelfTestSubprocess() bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv("YAKLANG_RUN_SELF_TEST_SUBPROCESS")))
+	return v == "1" || v == "true" || v == "yes"
 }
 
 func runYakSelfTestSubprocess(ctx context.Context, code, absPath string, mockArgs []string) (YakRunResult, error) {
@@ -177,13 +190,9 @@ func writeSelfTestScriptFile(code, absPath string) (scriptPath string, cleanup f
 		}
 	}
 
-	dir := os.TempDir()
-	if p := strings.TrimSpace(absPath); p != "" {
-		if d := filepath.Dir(p); d != "" && d != "." {
-			dir = d
-		}
-	}
-	f, err := os.CreateTemp(dir, "yaklang-selftest-*.yak")
+	// Always use TempDir: writing into the workspace dirties file monitors and walks.
+	_ = absPath
+	f, err := os.CreateTemp(os.TempDir(), "yaklang-selftest-*.yak")
 	if err != nil {
 		return "", func() {}, utils.Errorf("create self-test script temp file: %v", err)
 	}
@@ -203,11 +212,15 @@ func writeSelfTestScriptFile(code, absPath string) (scriptPath string, cleanup f
 // FormatRunFailureForAI builds AI-facing feedback when self-test fails.
 func FormatRunFailureForAI(result YakRunResult, err error) string {
 	var b strings.Builder
-	b.WriteString("YAK_MAIN 自测运行失败。请用 modify_code（Cursor Patch）修复；禁止 write_code 重置。不确定 API 时先 grep_yaklang_samples / yakdoc_*。\n\n")
+	b.WriteString("YAK_MAIN 自测运行失败。请用 modify_code（Apply Patch）修复；禁止 write_code 重置。不确定 API 时先 grep_yaklang_samples / yakdoc_*。\n\n")
 	if err != nil {
 		b.WriteString("--- runtime error ---\n")
-		b.WriteString(strings.TrimSpace(err.Error()))
+		errText := strings.TrimSpace(err.Error())
+		b.WriteString(errText)
 		b.WriteString("\n")
+		if strings.Contains(errText, "deadline exceeded") || strings.Contains(errText, "context deadline") {
+			b.WriteString("提示：自测超时常见于冷启动 DB 或真实网络。优先把 YAK_MAIN 改成本地 mock（tcp.MockServe / 不发外网），避免依赖 DNS。\n")
+		}
 	}
 	if strings.TrimSpace(result.Output) != "" {
 		b.WriteString("--- execution log ---\n")
@@ -255,6 +268,16 @@ func yakRunSelfTestDisabled(config aicommonGetter) bool {
 	return config.GetConfigBool(configYakRunSelfTestDisabled, false)
 }
 
+func yakRunSelfTestPreferSubprocess(config aicommonGetter) bool {
+	if forceYakSelfTestSubprocess() {
+		return true
+	}
+	if config == nil {
+		return false
+	}
+	return config.GetConfigBool(configYakRunSelfTestSubprocess, false)
+}
+
 // aicommonGetter is the minimal config surface for run tuning.
 type aicommonGetter interface {
 	GetConfigBool(key string, defaults ...bool) bool
@@ -281,10 +304,18 @@ func FormatMissingSelfTestFeedback(policy YakScriptRunPolicy) string {
 	return strings.TrimSpace(b.String())
 }
 
-// FormatRunSkippedStatus builds a short UI status when auto-run is intentionally skipped.
-func FormatRunSkippedStatus(policy YakScriptRunPolicy) string {
+// FormatRunSkippedStatusI18n builds localized UI statuses when auto-run is
+// intentionally skipped.
+func FormatRunSkippedStatusI18n(policy YakScriptRunPolicy) (zh, en string) {
 	if policy.SkipReason != "" {
-		return "跳过自测: " + policy.SkipReason + " / Skipped self-test"
+		return "跳过自测: " + policy.SkipReason, "Skipped self-test"
 	}
-	return "跳过自测（无 YAK_MAIN）/ Skipped self-test (no YAK_MAIN)"
+	return "跳过自测（无 YAK_MAIN）", "Skipped self-test (no YAK_MAIN)"
+}
+
+// FormatRunSkippedStatus preserves the historical bilingual string for logs
+// and callers that have not migrated to structured status events yet.
+func FormatRunSkippedStatus(policy YakScriptRunPolicy) string {
+	zh, en := FormatRunSkippedStatusI18n(policy)
+	return zh + " / " + en
 }

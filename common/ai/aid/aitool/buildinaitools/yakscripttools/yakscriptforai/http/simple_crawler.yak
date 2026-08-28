@@ -11,10 +11,10 @@ automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
 
 Output includes:
   1. Crawl summary (requests made, total URLs discovered, pending URLs)
-  2. Website forest: a tree structure showing the full site hierarchy,
-     including URLs discovered in responses but NOT yet requested.
-     This gives a broad view of the site structure even with limited requests.
-  3. Requested URL list with HTTP method and response status.
+  2. Requested URLs with HTTP method, response status, content type, body size,
+     and redirect location when available.
+  3. Found URLs discovered in responses but NOT yet requested.
+  4. Follow-up guidance for selecting Found URLs and tuning crawl limits.
 
 Required Parameters:
   urls            (string)  Start URL(s) for crawling. Multiple URLs can be provided
@@ -23,8 +23,7 @@ Required Parameters:
 Optional Parameters:
   reqs-max        (int)     Maximum number of outbound HTTP requests allowed.
                             Default: 300. The crawler discovers many more URLs than
-                            it requests; all discovered URLs appear in the website
-                            forest output even if not requested.
+                            it requests; unrequested discoveries appear under Found URLs.
   max-retry       (int)     Maximum retry count per request. Default: 1.
   forbid-for-parent-path (string)  Whether to forbid crawling parent paths.
                             Accepted values: "yes"/"no". Default: "no".
@@ -55,9 +54,9 @@ timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求
 httpsFallback := cli.Bool("https-fallback", cli.setHelp("HTTPS 失败时是否自动切回 HTTP"), cli.setDefault(true))
 cli.check()
 
-forest = webforest.New(50)
 discoveredUrls = sync.NewLock()
 discoveredUrlSet = {}
+discoveredUrlList = []
 requestedUrlSet = {}
 
 normalizeDisplayUrl = func(rawUrl) {
@@ -102,7 +101,7 @@ opts.Append(crawler.onUrlFound(func(urlStr) {
         return
     }
     discoveredUrlSet[urlStr] = true
-    try { forest.AddNode(urlStr) } catch {}
+    discoveredUrlList.Append(urlStr)
 }))
 
 targetCandidates = [startUrl]
@@ -136,16 +135,23 @@ for currentStartUrl in targetCandidates {
         requestedUrlSet[urlstr] = true
         if !(urlstr in discoveredUrlSet) {
             discoveredUrlSet[urlstr] = true
-            try { forest.AddNode(urlstr) } catch {}
+            discoveredUrlList.Append(urlstr)
         }
         discoveredUrls.Unlock()
 
         req, _ := http.dump(result.Request())
         method := poc.GetHTTPRequestMethod(req)
-        var rspdesc = ""
+        status = "unknown"
+        contentType = ""
+        bodySize = 0
+        redirectLocation = ""
         try {
             rsp, _ := http.dump(result.Response()[0])
-            rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
+            _, statusCode, statusText = poc.GetHTTPPacketFirstLine(rsp)
+            status = str.TrimSpace(sprintf("%v %v", statusCode, statusText))
+            contentType = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Content-Type"))
+            bodySize = len(poc.GetHTTPPacketBody(rsp))
+            redirectLocation = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Location"))
         } catch {}
 
         // A URL fragment is browser-only and must never be sent to the server.
@@ -153,10 +159,17 @@ for currentStartUrl in targetCandidates {
         // returns a misleading 404 for one; the crawler now strips fragments at
         // request construction time, so this is only a defensive compatibility
         // guard.
-        if rawUrlstr != urlstr && str.Contains(rspdesc, " 404 ") {
+        if rawUrlstr != urlstr && str.HasPrefix(status, "404") {
             continue
         }
-        requestLines.Append(sprintf("[%v] [%v] %v", method, rspdesc, urlstr))
+        responseInfo = [sprintf("bytes=%v", bodySize)]
+        if contentType != "" {
+            responseInfo.Append("type=" + contentType)
+        }
+        if redirectLocation != "" {
+            responseInfo.Append("location=" + redirectLocation)
+        }
+        requestLines.Append(sprintf("[%v] [%v] [%v] %v", method, status, str.Join(responseInfo, "; "), urlstr))
     }
 
     if currentResults > 0 {
@@ -180,34 +193,17 @@ if usedFallback {
 
 discoveredCount = len(discoveredUrlSet)
 requestedCount = len(requestedUrlSet)
+pendingCount = discoveredCount - requestedCount
 
-output = bufio.NewBuffer()
-
-output.WriteString("=== Crawl Summary ===\n")
-output.WriteString(sprintf("Requests sent:   %v\n", requestedCount))
-output.WriteString(sprintf("URLs discovered: %v (includes URLs found in responses but not yet requested)\n", discoveredCount))
-output.WriteString(sprintf("Pending:         %v\n", discoveredCount - requestedCount))
-
-output.WriteString("\n")
-output.WriteString(forest.Output())
-
-output.WriteString("\n=== Requested URLs ===\n")
-for line in requestLines {
-    output.WriteString(line)
-    output.WriteString("\n")
+foundUrlLines = []
+discoveredUrls.Lock()
+for u in discoveredUrlList {
+    if !(u in requestedUrlSet) {
+        foundUrlLines.Append(u)
+    }
 }
+discoveredUrls.Unlock()
 
-result = string(output.String())
-if len(result) <= 30000 {
-    yakit.Info(result)
-} else {
-    yakit.Info(result[:30000] + "... (truncated)")
-}
-
-// 覆盖度提示: 爬虫发现的往往是多个子站 / 大量路径, 实战里 AI 经常只盯住一个深挖而漏掉其余.
-// 这里不钉死具体清单(避免过拟合到某个形态), 只用"子站数 + pending 数"作为广度信号, 引导 AI
-// 在下一步用 adjust_todo 把待测面拆成多个 todo —— 多 todo 是保证执行深度和覆盖完整度的关键.
-// 关键词: simple_crawler 覆盖度提示, adjust_todo, 多 todo, 执行深度
 distinctSubdomains = {}
 for u, _ in discoveredUrlSet {
     lower = str.ToLower(u)
@@ -223,9 +219,46 @@ for u, _ in discoveredUrlSet {
     }
 }
 subdomainCount = len(distinctSubdomains)
-pendingCount = discoveredCount - requestedCount
+
+output = bufio.NewBuffer()
+
+output.WriteString("=== Crawl Summary ===\n")
+output.WriteString(sprintf("Requests sent:   %v\n", requestedCount))
+output.WriteString(sprintf("URLs discovered: %v (includes URLs found in responses but not yet requested)\n", discoveredCount))
+output.WriteString(sprintf("Pending:         %v\n", pendingCount))
+
+output.WriteString("\n=== Requested URLs ===\n")
+for line in requestLines {
+    output.WriteString(line)
+    output.WriteString("\n")
+}
+
+output.WriteString("\n=== Found URLs ===\n")
+output.WriteString("Discovered but not requested; treat these as follow-up candidates, not verified live endpoints.\n")
+if len(foundUrlLines) == 0 {
+    output.WriteString("(none)\n")
+} else {
+    for line in foundUrlLines {
+        output.WriteString(line)
+        output.WriteString("\n")
+    }
+}
+
+output.WriteString("\n=== Follow-up Guidance ===\n")
+output.WriteString("- Select high-value Found URLs and run `simple_crawler` again with them in `urls`; prioritize dynamic pages, APIs, auth/account, admin, and parameterized endpoints before static assets.\n")
+output.WriteString("- If Pending remains high, increase `reqs-max`, `urls-max`, or `max-depth` gradually to collect more of the discovered surface.\n")
+output.WriteString("- For a focused branch, lower `reqs-max`/`max-depth` or set `forbid-for-parent-path=yes`; this reduces noise and request cost.\n")
+output.WriteString("- Compare status, content type, body size, and redirect location in Requested URLs to prioritize unusual or dynamic responses.\n")
 if subdomainCount > 1 || pendingCount > 0 {
-    yakit.Info("[coverage hint] Crawler discovered %v distinct subdomain(s) and %v unrequested URL(s) (see the website forest + pending count above). A common failure mode is to fixate on ONE subdomain or ONE thread and skip the rest. In your NEXT iteration, use `adjust_todo` to break the remaining surface into MULTIPLE concrete todos (e.g. one per subdomain / per untested endpoint group, plus auth, IDOR, and parameter testing for each) before diving into any single one. More (and finer-grained) todos => better depth and coverage, and they prevent the loop from finishing before the surface is covered.", subdomainCount, pendingCount)
+    output.WriteString(sprintf("- [coverage hint] %v distinct subdomain(s) and %v Found URL(s) remain. In the NEXT iteration, use `adjust_todo` to split work by subdomain and endpoint group before deep-diving into one thread; do not claim full coverage while high-value Found URLs remain unrequested.\n", subdomainCount, pendingCount))
+}
+
+result = string(output.String())
+RESULT = result
+if len(result) <= 30000 {
+    yakit.Info(result)
+} else {
+    yakit.Info(result[:30000] + "... (truncated)")
 }
 
 try {

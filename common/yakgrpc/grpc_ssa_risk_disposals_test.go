@@ -611,21 +611,21 @@ alert $result for {
 }
 	`, risk)
 
-	// 执行两次独立的扫描，生成具有相同 RiskFeatureHash 的风险
+	// 执行两次独立的扫描，生成具有相同 RiskFeatureHash 的风险。
+	// Compile once: CI yak grpc caches FromDatabase for 10m, so a second
+	// ParseProjectWithFS (delete IR + rewrite) leaves that process scanning
+	// stale instruction IDs and persisting 0 risks for the new RuntimeID.
 	riskCount := 2
 	risks := make([]*schema.SSARisk, riskCount)
 	programName := "inheritance_test_" + uuid.NewString() // 使用相同的程序名，这样会有不同的批次号
 
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("test.yak", testCode)
+	programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName))
+	require.NoError(t, err)
+	require.NotEmpty(t, programs)
+
 	for i := 0; i < riskCount; i++ {
-
-		// 使用现有的扫描模式，创建程序并扫描
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("test.yak", testCode)
-
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName))
-		require.NoError(t, err)
-		require.NotEmpty(t, programs)
-
 		// 使用 gRPC 调用进行扫描，这样会自动产生扫描批次
 		stream, err := client.SyntaxFlowScan(context.Background())
 		require.NoError(t, err)
@@ -641,7 +641,7 @@ alert $result for {
 		})
 		require.NoError(t, err)
 
-		// 等待扫描完成
+		var taskID string
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
@@ -650,17 +650,41 @@ alert $result for {
 				}
 				require.NoError(t, err)
 			}
+			if taskID == "" {
+				taskID = resp.GetTaskID()
+			}
 			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
 				break
 			}
 		}
+		require.NotEmpty(t, taskID)
 
-		// 查询生成的 Risk
-		_, queryRisk, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
-			ProgramName: []string{programName},
-		}, nil)
-		require.NoError(t, err)
-		require.NotEmpty(t, queryRisk)
+		// 查询本次扫描生成的 Risk，不能因相同 ProgramName 复用上一次扫描的记录。
+		var queryRisk []*schema.SSARisk
+		var queryErr error
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			_, queryRisk, queryErr = yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+				ProgramName: []string{programName},
+				RuntimeID:   []string{taskID},
+			}, nil)
+			if queryErr == nil && len(queryRisk) == 1 {
+				break
+			}
+			if time.Now().After(deadline) {
+				_, allRisks, _ := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+					ProgramName: []string{programName},
+				}, nil)
+				runtimeIDs := make([]string, 0, len(allRisks))
+				for _, r := range allRisks {
+					runtimeIDs = append(runtimeIDs, r.RuntimeId)
+				}
+				require.Failf(t, "scan task did not persist exactly one risk",
+					"task=%s got=%d err=%v program_risks=%d runtime_ids=%v",
+					taskID, len(queryRisk), queryErr, len(allRisks), runtimeIDs)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
 		risks[i] = queryRisk[0]
 
 		// 添加延迟确保下次扫描的时间戳不同
@@ -680,6 +704,7 @@ alert $result for {
 	require.Equal(t, risks[0].RiskFeatureHash, risks[1].RiskFeatureHash, "RiskFeatureHash 应该相同")
 	require.NotEmpty(t, risks[0].RiskFeatureHash, "RiskFeatureHash 不应该为空")
 	require.NotEmpty(t, risks[1].RiskFeatureHash, "RiskFeatureHash 不应该为空")
+	require.NotEqual(t, risks[0].RuntimeId, risks[1].RuntimeId, "两次扫描必须使用不同的任务ID")
 
 	// 添加调试信息
 	t.Logf("Risk1: ID=%d, RiskFeatureHash=%s, RuntimeId=%s", risks[0].ID, risks[0].RiskFeatureHash, risks[0].RuntimeId)

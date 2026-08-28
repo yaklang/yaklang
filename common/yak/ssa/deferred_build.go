@@ -149,7 +149,27 @@ func (prog *Program) releaseDeferredBuildTasks() {
 
 // RunDeferredBuildsForUnits 只执行归属给定编译单元的延迟构建任务，执行后从队列移除。
 // 用于编译单元粒度流式编译：每个单元编译完即释放其体 AST，内存上界与项目总规模解耦。
+// RunDeferredBuildsForUnits executes all deferred-build tasks whose unitKey
+// matches any of the given unitKeys. afterEach is called after every task
+// with (completed, total). afterUnit is called after the LAST task of a
+// given unitKey completes — this is the true per-unit completion point.
+// Both callbacks may be nil. If either returns false, execution stops.
 func (prog *Program) RunDeferredBuildsForUnits(unitKeys []string, afterEach func(index int, total int) bool) bool {
+	return prog.RunDeferredBuildsForUnitsWithUnitCallback(unitKeys, afterEach, nil)
+}
+
+// RunDeferredBuildsForUnitsWithUnitCallback is like RunDeferredBuildsForUnits
+// but adds afterUnit: called when ALL deferred tasks for a specific unitKey
+// have completed. This enables per-unit FlushCompileUnit: the caller can
+// flush instructions belonging to a completed unit without waiting for the
+// entire batch to finish. Task execution order is unchanged (same as
+// RunDeferredBuildsForUnits). If tasks from different units interleave,
+// afterUnit fires only when that unit's remaining task count reaches zero.
+func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
+	unitKeys []string,
+	afterEach func(index int, total int) bool,
+	afterUnit func(unitKey string) bool,
+) bool {
 	if prog == nil || len(unitKeys) == 0 {
 		return true
 	}
@@ -170,8 +190,9 @@ func (prog *Program) RunDeferredBuildsForUnits(unitKeys []string, afterEach func
 		return true
 	}
 
-	// 先统计匹配单元的任务总数，供 afterEach 进度回调使用。
+	// Count tasks per unit and total, in a single pass over the keys.
 	total := 0
+	unitRemaining := make(map[string]int, len(units))
 	keys := app.deferredBuilds.Keys()
 	for _, id := range keys {
 		task, ok := app.deferredBuilds.Get(id)
@@ -180,6 +201,7 @@ func (prog *Program) RunDeferredBuildsForUnits(unitKeys []string, afterEach func
 		}
 		if _, match := units[task.unitKey]; match {
 			total++
+			unitRemaining[task.unitKey]++
 		}
 	}
 
@@ -205,6 +227,15 @@ func (prog *Program) RunDeferredBuildsForUnits(unitKeys []string, afterEach func
 		completed++
 		if afterEach != nil {
 			if !afterEach(completed, total) {
+				return false
+			}
+		}
+		// Per-unit completion: decrement this unit's remaining count.
+		// When it reaches zero, all tasks for this unit are done.
+		unitKey := task.unitKey
+		unitRemaining[unitKey]--
+		if unitRemaining[unitKey] <= 0 && afterUnit != nil {
+			if !afterUnit(unitKey) {
 				return false
 			}
 		}

@@ -18,7 +18,7 @@
 
 - [禁止] 臆造 API / 猜测函数名与参数。
 - [正确] 不确定就查：先看反应数据里的【已锁定接口签名】与【预检索样例】；不够再用 `grep_yaklang_samples` 找样例、`yakdoc_*` 查签名。
-- [正确] 修改已有代码必须用 `modify_code`，且 GEN_CODE 内必须是 **Cursor 风格 Patch**（`*** Begin Patch` … `*** End Patch`）；系统会把 patch 应用到 full_code，再把**拼接后的完整源码**同步给前端（前端永远收不到 patch 原文）。`old_snippet` / 行号仅是系统兼容旧调用的兜底，模型不得主动使用。尽量不要 `write_code` 重置已有代码。
+- [正确] 修改已有代码必须用 `modify_code`，且 GEN_CODE 内必须是 **Apply Patch**（`*** Begin Patch` … `*** End Patch`）；系统会把 patch 应用到 full_code，再把**拼接后的完整源码**同步给前端（前端永远收不到 patch 原文）。`old_snippet` / 行号仅是系统兼容旧调用的兜底，模型不得主动使用。尽量不要 `write_code` 重置已有代码。
 
 > 🔴 **三条"编译能过、运行必炸"的高频致命陷阱（语法检查查不出来，务必从一开始就避开，详见下文）**：
 > 1. **取 map 值禁止 Go 的 comma-ok**：`v, ok := m[key]` 会运行时报 `multi-assign failed: right value is not iterable`。改用 `v = m[key]; if v == nil {...}` 或 `if "key" in m {...}`。
@@ -51,7 +51,7 @@
 1. [必须] 输出完 JSON 那一行后**绝对不要停下**，必须在**同一次回复里紧接着**把 `<|GEN_CODE_CURRENT_NONCE|>` 代码块完整写完(含 `<|GEN_CODE_END_CURRENT_NONCE|>` 结束标记)再结束。把它们当成一个不可断开的整体来写。
 2. [必须] 代码必须写在 `<|GEN_CODE...|>` 标签内，**不能**放进 JSON 字段，**不能**用 markdown ```yak 代码块(系统不解析)。
 3. [禁止] 生成代码里**绝不能**带行号前缀(如 `18 | `)或 `|` 分隔符——下方显示代码带行号只是为了你定位，生成时只要纯净代码。
-4. [正确] **`modify_code` 必须在 GEN_CODE 里输出 Cursor 风格 Patch**（`*** Begin Patch` … `*** End Patch`）。系统应用后投递给前端的是**完整源码**，不是 patch。删重复/大段清理用带充足 context 的 `-` 删除 hunk，**禁止**用行号大段覆盖成一行注释。
+4. [正确] **`modify_code` 必须在 GEN_CODE 里输出 Apply Patch**（`*** Begin Patch` … `*** End Patch`）。系统应用后投递给前端的是**完整源码**，不是 patch。删重复/大段清理用带充足 context 的 `-` 删除 hunk，**禁止**用行号大段覆盖成一行注释。
 5. [禁止] `modify_code` 的 GEN_CODE 不得直接输出完整脚本、完整 `beforeRequest` / `runSelfTest` 函数或其他大段替换源码。扩充函数时仍应输出 Patch；每个 hunk 的 context / `-` 行必须从本轮 `CURRENT_CODE` **逐字符**复制，不能复用修改前或 rebase 前的旧内容。
 6. [禁止] Patch 里字符串字面量中的 `\n` / `\r\n`：**禁止展开成真实换行**，**禁止再加一层反斜杠**写成 `\\n` / `\\r\\n`。HTTP mock 等行必须与 CURRENT_CODE 中的转义序列完全一致。
 
@@ -116,8 +116,7 @@ cli.check()                        // cli 参数声明后必须调用
 
 ### 易错点（务必牢记）
 - 无需 import 任何库，所有标准库都是内置的。
-- **不支持类/面向对象**：没有 `type X struct {}`、没有 `interface{}`。用 `{"key": "value"}` 存数据。
-- 函数声明不写类型：`func(a, b, c) { ... }`；也支持箭头函数 `i => {...}`。
+- **不支持类/面向对象**：没有 `type X struct {}`。用 `{"key": "value"}` 存数据。
 - 变量声明：`x = 10` 或 `x := 10`，不要 `var x int`。
 - 列表 `l = []`，字典 `m = {}`；`for it in list {}`、`for k, v in map {}`。
 

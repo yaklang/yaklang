@@ -58,6 +58,10 @@ type scanManager struct {
 
 	// 扫描耗时（在 StartQuerySF 结束时记录，在 Stop 之后输出）
 	scanDuration time.Duration
+
+	// autoScaleLogged deduplicates the per-program auto-scale log line so a
+	// 269-rule scan does not repeat it hundreds of times.
+	autoScaleLogged sync.Map
 }
 
 // var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
@@ -271,7 +275,11 @@ func (m *scanManager) initByConfig() error {
 			}
 			config.Programs = append(config.Programs, prog)
 		}
+		existingTargets := config.QueryTargets
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+		if len(existingTargets) > 0 {
+			config.QueryTargets = append(existingTargets, config.QueryTargets...)
+		}
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
@@ -283,16 +291,23 @@ func (m *scanManager) initByConfig() error {
 			log.Errorf("SyntaxFlow Scan Init Program By ProjectId By %d Failed", config.GetProjectID())
 		}
 		config.Programs = append(config.Programs, prog)
+		existingTargets := config.QueryTargets
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
+		if len(existingTargets) > 0 {
+			config.QueryTargets = append(existingTargets, config.QueryTargets...)
+		}
 		// 同步更新 BaseInfo.ProgramNames，确保保存时 programs 字段不为空
 		if config.Config != nil {
 			config.Config.SetProgramName(name)
 		}
+	} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
+		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
 		db := consts.GetGormProfileDatabase()
 		db = yakit.FilterSyntaxFlowRule(db, filter)
+		db = yakit.ApplySyntaxFlowRuleModeFilter(db, config.GetRuleFilterMode())
 		// get all rule name
 		var ruleNames []string
 		err := db.Pluck("rule_name", &ruleNames).Error
@@ -306,7 +321,22 @@ func (m *scanManager) initByConfig() error {
 	}
 
 	// log.Errorf("config: %v", config.Config.GetRuleInput())
-	if input := config.GetRuleInput(); len(input) != 0 {
+	if config.IsTaskLocalRuleInput() {
+		parsedRules, libraries, err := loadTaskLocalSyntaxFlowRules(config.SyntaxFlowRule)
+		if err != nil {
+			return err
+		}
+		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, config.GetRuleFilterMode())
+		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
+		for _, rule := range parsedRules {
+			ruleCh <- rule
+		}
+		close(ruleCh)
+		m.ruleChan = ruleCh
+		m.rulesCount = int64(len(parsedRules))
+		m.kind = ruleInputResultKind(true)
+		m.ctx = ssaapi.WithTaskLocalSyntaxFlowRuleLibraries(m.ctx, libraries)
+	} else if input := config.GetRuleInput(); len(input) != 0 {
 		// start debug mode scan task (use provided rule inputs)
 		rules := make([]*schema.SyntaxFlowRule, 0, len(input))
 		for _, rinput := range input {
@@ -324,7 +354,7 @@ func (m *scanManager) initByConfig() error {
 		close(ruleCh)
 		m.ruleChan = ruleCh
 		m.rulesCount = int64(len(rules))
-		m.kind = schema.SFResultKindDebug
+		m.kind = ruleInputResultKind(false)
 	} else if config.GetRuleFilter() != nil {
 		if err := setRuleChan(config.GetRuleFilter()); err != nil {
 			return err
@@ -386,8 +416,7 @@ func (m *scanManager) ScanNewTask() error {
 	if m.Config == nil {
 		return utils.Errorf("Start SyntaxFlow Scan Failed:config is nil")
 	}
-	programs := m.Config.Programs
-	if len(programs) == 0 {
+	if len(m.Config.Programs) == 0 && len(m.Config.QueryTargets) == 0 {
 		return utils.Errorf("Start SyntaxFlow Scan Failed:programs is empty")
 	}
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING

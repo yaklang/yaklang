@@ -33,6 +33,12 @@ var (
 	systemEtcOnce   = sync.Once{}
 )
 
+// maxReconnectTimes caps how many times a single request may rebuild its
+// connection. Stale pooled connections need a retry or two; an origin that
+// tears down every connection on sight needs to surface as an error instead,
+// so the caller can fall back to another protocol.
+const maxReconnectTimes = 3
+
 func GetSystemHostByName(domain string) (string, bool) {
 	systemEtcOnce.Do(func() {
 		_systemEtcHosts = GetSystemEtcHosts()
@@ -114,7 +120,6 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	if redirectTimes > 0 {
 		lastPacket := raw
-		statusCode := GetStatusCodeFromResponse(lastPacket.Response)
 
 		for i := 0; i < redirectTimes; i++ {
 			target := GetRedirectFromHTTPResponse(lastPacket.Response, jsRedirect)
@@ -133,6 +138,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
 			// should not extract response cookie
+			statusCode := GetStatusCodeFromResponse(lastPacket.Response)
 			r, err = BuildRedirectRequest(targetUrl, r, lastPacket.IsHttps, statusCode)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
@@ -335,6 +341,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 	// 用于检查 BodyStreamReaderHandler 是否被正常调用
 	bodyStreamReaderHandled := utils.NewAtomicBool()
+	option.bodyStreamReaderHandled = bodyStreamReaderHandled
 	var streamBodyReaderCh chan io.ReadCloser
 	var streamHandlerDone chan struct{}
 	defer func() {
@@ -357,7 +364,15 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 	// ctx
 	if ctx == nil {
-		ctx = context.Background()
+		if reqIns != nil {
+			ctx = reqIns.Context()
+		}
+		if ctx == nil {
+			ctx = context.Background()
+		}
+	}
+	if reqIns != nil {
+		*reqIns = *reqIns.WithContext(ctx)
 	}
 	// fix some field
 	response.Source = source
@@ -777,6 +792,33 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRequestHTTPS(reqIns, https)
 	}
+
+	// canReconnect bounds the RECONNECT loop below, but only for the failure
+	// mode that can actually spin forever.
+	//
+	// A pooled connection dying between requests — the server closed an idle
+	// keep-alive connection, or a read failed mid-flight — says nothing about
+	// whether the origin is healthy, and a busy pool can hand out several stale
+	// connections in a row. Those retries stay unbounded, as they have always
+	// been; capping them makes ordinary traffic fail under load.
+	//
+	// What must be bounded is an origin that tears down the connection the
+	// moment it receives a request — h2 fingerprinting defenses do exactly
+	// this. Unbounded, the caller never receives an error, so it never gets to
+	// fall back to HTTP/1.1 and the request simply hangs.
+	reconnectTimes := 0
+	canReconnect := func(err error) bool {
+		var poolReadErr connPoolReadFromServerError
+		if errors.Is(err, errServerClosedIdle) || errors.As(err, &poolReadErr) {
+			return true
+		}
+		if reconnectTimes >= maxReconnectTimes {
+			log.Warnf("lowhttp: giving up after %d reconnects to %v: %v", reconnectTimes, cacheKey.addr, err)
+			return false
+		}
+		reconnectTimes++
+		return true
+	}
 RECONNECT:
 	if enableHttp3 {
 		http3Conn, err := getHTTP3Conn(ctx, originAddr, dialopts...)
@@ -789,9 +831,9 @@ RECONNECT:
 		response.RawPacket = responsePacket
 		return response, nil
 	} else if withConnPool {
-		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
+		conn, err = connPool.getIdleConn(ctx, cacheKey, dialopts...)
 	} else {
-		conn, err = netx.DialX(originAddr, dialopts...)
+		conn, err = dialXWithContext(ctx, originAddr, dialopts...)
 	}
 
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
@@ -802,6 +844,9 @@ RECONNECT:
 	oldVersionProxyChecking := false
 	var tryOldVersionProxy []string
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return response, ctxErr
+		}
 		errMsg := err.Error()
 		if strings.Contains(errMsg, `no proxy available`) {
 			noProxyDial := make([]netx.DialXOption, len(dialopts), len(dialopts)+1)
@@ -821,9 +866,9 @@ RECONNECT:
 				}
 				if withConnPool {
 					cacheKey.addr = utils.ExtractHostPort(basicProxy)
-					conn, err = connPool.getIdleConn(cacheKey, noProxyDial...)
+					conn, err = connPool.getIdleConn(ctx, cacheKey, noProxyDial...)
 				} else {
-					conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
+					conn, err = dialXWithContext(ctx, utils.ExtractHostPort(basicProxy), noProxyDial...)
 				}
 				if err != nil {
 					log.Debugf("try old version proxy failed: %s", err)
@@ -850,7 +895,8 @@ RECONNECT:
 		pc := conn.(*persistConn)
 		if pc.cacheKey.scheme != H2 { // http2 downgrade to http1.1
 			enableHttp2 = false
-			withConnPool = false // downgrade can not with conn pool
+			response.Http2 = false // reflect the actual wire protocol so callers can detect the downgrade
+			withConnPool = false   // downgrade can not with conn pool
 			method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
 			requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
 		} else {
@@ -862,40 +908,61 @@ RECONNECT:
 			h2Stream, err := h2Conn.newStream(reqIns, requestPacket, option)
 			if err != nil {
 				if err == CreateStreamAfterGoAwayErr {
+					// Close first, then decide: the connection is unusable
+					// either way, and running out of reconnects must not leave
+					// it in the pool.
 					pc.closeConn(err) // close old connection to avoid goroutine leak
-					goto RECONNECT
-				} else {
-					return nil, err
+					if canReconnect(err) {
+						goto RECONNECT
+					}
 				}
+				return nil, err
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				h2Stream.abort()
+				return nil, ctxErr
 			}
 
 			currentRPS.Add(1)
 			if err := h2Stream.doRequest(); err != nil {
+				h2Stream.abort()
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return nil, ctxErr
+				}
 				if err == CreateStreamAfterGoAwayErr {
 					pc.closeConn(err)
-					goto RECONNECT
+					if canReconnect(err) {
+						goto RECONNECT
+					}
+					return nil, err
 				}
 				if h2Stream.ID <= 1 { // first stream or ID not yet assigned
 					return nil, err
-				} else {
-					pc.closeConn(err) // close old connection to avoid goroutine leak
+				}
+				pc.closeConn(err) // close old connection to avoid goroutine leak
+				if canReconnect(err) {
 					goto RECONNECT
 				}
+				return nil, err
 			}
 			serverStart := time.Now()
 			h2Stream.SetReadFirstFrameCallback(func() {
 				traceInfo.ServerTime = time.Now().Sub(serverStart)
 			})
 
-			resp, responsePacket, err := h2Stream.waitResponse(timeout)
+			resp, responsePacket, err := h2Stream.waitResponse(ctx, timeout)
 			_ = resp
 			if err != nil {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return nil, ctxErr
+				}
 				if conn.(*persistConn).shouldRetryRequest(err) {
 					pc.closeConn(err) // close old connection to avoid goroutine leak
-					goto RECONNECT
-				} else {
-					return nil, err
+					if canReconnect(err) {
+						goto RECONNECT
+					}
 				}
+				return nil, err
 			}
 			httpctx.SetBareResponseBytes(reqIns, responsePacket)
 			response.RawPacket = responsePacket
@@ -941,7 +1008,9 @@ RECONNECT:
 			if re.err != nil && len(rawBytes) == 0 { // get some bytes but get error too
 				if pc.shouldRetryRequest(re.err) {
 					pc.closeConn(re.err) // close old connection to avoid goroutine leak
-					goto RECONNECT
+					if canReconnect(re.err) {
+						goto RECONNECT
+					}
 				}
 				return nil, re.err
 			}
@@ -954,11 +1023,20 @@ RECONNECT:
 			if option != nil && option.BodyStreamReaderHandler != nil {
 				bodyStreamReaderHandled.Set()
 			}
+		case <-ctx.Done():
+			// A pooled HTTP/1 connection has a dedicated read loop waiting for
+			// this response. Close that connection when the individual request is
+			// canceled so the read loop cannot outlive its caller.
+			pc.closeConn(ctx.Err())
+			return nil, ctx.Err()
 		case <-pc.ctx.Done(): // if persistConn closed before read response , check error can retry or not
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
 			if pc.closed == nil {
 				return nil, utils.Error("BUG: closeCh but closed is nil")
 			}
-			if pc.shouldRetryRequest(pc.closed) {
+			if pc.shouldRetryRequest(pc.closed) && canReconnect(pc.closed) {
 				goto RECONNECT
 			}
 			return nil, pc.closed
@@ -1237,20 +1315,16 @@ RECONNECT:
 		httpctx.SetBareResponseBytes(reqIns, rawBytes)
 	}
 
-	// 更新 cookiejar 中的 cookie
-	if session != "" && firstResponse != nil {
-		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
+	// Seed request cookies first. Leaving Domain and Path empty lets cookiejar
+	// apply host-only and RFC default-path rules instead of pinning a cookie
+	// from /login.php to that exact path.
+	if session != "" && reqIns != nil {
+		cookiejar.SetCookies(urlIns, reqIns.Cookies())
 	}
 
-	// 将请求中的cookie更新到cookiejar中
-	if session != "" && reqIns != nil {
-		reqCookies := reqIns.Cookies()
-		for _, cookie := range reqCookies {
-			// 限制domain为当前域, path为当前路径
-			cookie.Domain = urlIns.Hostname()
-			cookie.Path = urlIns.Path
-		}
-		cookiejar.SetCookies(urlIns, reqCookies)
+	// Apply Set-Cookie after request cookies so rotations and deletions win.
+	if session != "" && firstResponse != nil {
+		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
 	}
 
 	response.BareResponse = rawBytes

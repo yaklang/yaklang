@@ -134,6 +134,13 @@ type astbuilder struct {
 	memberKeys     map[string]ssa.Value // interned field-name consts for this file build
 	pkgNameCurrent string
 	SetGlobal      bool
+	// starAssignExtra registers the pointer-state convergence for *formal
+	// stores: when left (the EmitConstPointer wrapper that drives
+	// PointerSideEffect) is assigned, the same rhs must also be written to the
+	// Parameter's @pointer (extra) so UAF sees the store as a member-use of the
+	// formal. Registered per-lvalue in starPtrAccess, consumed once in
+	// assignToVar — callers never carry extra around.
+	starAssignExtra map[*ssa.Variable]*ssa.Variable
 }
 
 // emitMemberKey returns a reused ConstInst for struct/union member names.
@@ -312,7 +319,7 @@ var cSideEffect = map[string][]uint{
 	"malloc":   {uint(ssa.SideEffectOut)},    // size input, returns pointer
 	"calloc":   {uint(ssa.SideEffectOut), 0}, // num input, size input, returns pointer
 	"realloc":  {0, 0},                       // ptr input, size input, returns pointer (SideEffectOut for return value)
-	"free":     {0},                          // ptr input
+	"free":     {uint(ssa.SideEffectIn)},     // ptr input — lifetime kill (UAF)
 	"memalign": {uint(ssa.SideEffectOut), 0}, // alignment input, size input, returns pointer
 	"valloc":   {uint(ssa.SideEffectOut)},    // size input, returns pointer
 

@@ -21,16 +21,16 @@ func writeArtifactFile(t *testing.T, root string, rel string, body string, mod t
 	require.NoError(t, os.Chtimes(path, mod, mod))
 }
 
-func requireDumpSizeNearQuarter(t *testing.T, before string, after string, stage string) {
+func requireDumpSizeNearSixth(t *testing.T, before string, after string, stage string) {
 	t.Helper()
 	require.NotEmpty(t, before, "%s: before dump must not be empty", stage)
 	require.NotEmpty(t, after, "%s: after dump must not be empty", stage)
 	require.Less(t, len(after), len(before), "%s: after dump should be smaller than before dump", stage)
 
 	ratio := float64(len(after)) / float64(len(before))
-	// 目标是压缩后 timeline dump 接近原始 1/4；考虑头块/标签开销，容差放宽到 ±0.15。
-	require.InDelta(t, 0.25, ratio, 0.15,
-		"%s: dump size ratio should be close to 1/4 (before=%d after=%d ratio=%.4f)",
+	// 目标是压缩后 timeline dump 接近原始 1/6；考虑头块/标签开销，容差放宽到 ±0.15。
+	require.InDelta(t, 0.1667, ratio, 0.15,
+		"%s: dump size ratio should be close to 1/6 (before=%d after=%d ratio=%.4f)",
 		stage, len(before), len(after), ratio,
 	)
 }
@@ -177,7 +177,7 @@ func TestSessionArtifactsAreNotRenderedByPromptTemplates(t *testing.T) {
 	require.Contains(t, open, "# Workspace Context")
 }
 
-func TestPromptTimelineAfterCompression_KeepsQuarterAndSingleHead(t *testing.T) {
+func TestPromptTimelineAfterCompression_KeepsSixthAndSingleHead(t *testing.T) {
 	const (
 		totalItems     = 40
 		oldMarker      = "old-marker-should-be-compressed"
@@ -198,7 +198,7 @@ func TestPromptTimelineAfterCompression_KeepsQuarterAndSingleHead(t *testing.T) 
 			if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
 				seq := atomic.AddInt64(&compressCount, 1)
 				rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(
-					`{"@action":"timeline-reducer","reducer_memory":"compressed-summary-v%d"}`, seq,
+					`{"@action":"timeline-reducer","key_findings":["compressed-summary-v%d"]}`, seq,
 				)))
 			} else {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action":"timeline-shrink","persistent":"noop"}`))
@@ -228,7 +228,7 @@ func TestPromptTimelineAfterCompression_KeepsQuarterAndSingleHead(t *testing.T) 
 	require.Contains(t, dumpBefore, recentMarker)
 
 	beforeSize := timeline.calculateActualContentSize()
-	keepTokens := beforeSize / 4
+	keepTokens := beforeSize / 6
 	if keepTokens < 1 {
 		keepTokens = 1
 	}
@@ -255,7 +255,7 @@ func TestPromptTimelineAfterCompression_KeepsQuarterAndSingleHead(t *testing.T) 
 			strings.Contains(dumpAfter, recentMarker) &&
 			!strings.Contains(dumpAfter, oldMarker)
 	}, 8*time.Second, 50*time.Millisecond)
-	requireDumpSizeNearQuarter(t, dumpBefore, dumpAfter, "first compression")
+	requireDumpSizeNearSixth(t, dumpBefore, dumpAfter, "first compression")
 
 	frozenOpen := BuildPromptFrozenOpenMaterials(cfg, nonce)
 	materials := &PromptMaterials{
@@ -298,7 +298,7 @@ func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *
 			if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
 				seq := atomic.AddInt64(&compressCount, 1)
 				rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(
-					`{"@action":"timeline-reducer","reducer_memory":"compressed-summary-v%d"}`, seq,
+					`{"@action":"timeline-reducer","key_findings":["compressed-summary-v%d"]}`, seq,
 				)))
 			} else {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action":"timeline-shrink","persistent":"noop"}`))
@@ -315,7 +315,7 @@ func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *
 	}
 
 	beforeSize1 := timeline.calculateActualContentSize()
-	keepTokens1 := beforeSize1 / 4
+	keepTokens1 := beforeSize1 / 6
 	if keepTokens1 < 1 {
 		keepTokens1 = 1
 	}
@@ -346,7 +346,7 @@ func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *
 
 	activeBeforeSecond := len(timeline.getActiveTimelineItemIDs())
 	beforeSize2 := timeline.calculateActualContentSize()
-	keepTokens2 := beforeSize2 / 4
+	keepTokens2 := beforeSize2 / 6
 	if keepTokens2 < 1 {
 		keepTokens2 = 1
 	}
@@ -370,7 +370,7 @@ func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *
 			strings.Contains(dumpAfterSecond, secondMarker)
 	}, 8*time.Second, 50*time.Millisecond)
 	require.Equal(t, int64(2), atomic.LoadInt64(&compressCount))
-	requireDumpSizeNearQuarter(t, dumpBeforeSecond, dumpAfterSecond, "second compression")
+	requireDumpSizeNearSixth(t, dumpBeforeSecond, dumpAfterSecond, "second compression")
 
 	frozenOpen := BuildPromptFrozenOpenMaterials(cfg, nonce)
 	materials := &PromptMaterials{
@@ -388,6 +388,8 @@ func TestPromptTimelineAfterCompression_SecondCompressionRollsHeadAndHistory(t *
 	require.NoError(t, err)
 	require.Contains(t, prompt, "[compressed/head]")
 	require.Contains(t, prompt, "compressed-summary-v2")
-	require.NotContains(t, prompt, "compressed-summary-v1")
+	// old head text is now preserved in the new head (not re-compressed by AI),
+	// so compressed-summary-v1 still appears in the head text
+	require.Contains(t, prompt, "compressed-summary-v1")
 	require.Contains(t, prompt, secondMarker)
 }

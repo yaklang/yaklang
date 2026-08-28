@@ -10,7 +10,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
+// irSourceCache is a bounded LRU cache for source editors.
+// Capacity 2000 entries (~214MB for RuneOffsetMap) prevents all 11K+
+// source editors from being resident simultaneously on large projects.
+var irSourceCache = utils.NewLRUCache[*memedit.MemEditor](2000)
 
 type IrSource struct {
 	ProgramName    string `json:"program_name" gorm:"index"`

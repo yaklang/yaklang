@@ -1,4 +1,4 @@
-package aicommon
+﻿package aicommon
 
 import (
 	"context"
@@ -90,6 +90,27 @@ func TestConfig_ToolComposeConcurrencyPropagation(t *testing.T) {
 	require.Equal(t, 5, child.ToolComposeConcurrency)
 }
 
+func TestConfig_ToolBatchOptionsClampAndPropagateIndependently(t *testing.T) {
+	parent := NewConfig(
+		context.Background(),
+		WithToolBatchMaxCalls(99),
+		WithToolBatchParamConcurrency(0),
+		WithToolBatchInvokeConcurrency(6),
+	)
+	require.Equal(t, DefaultToolBatchMaxCalls, parent.GetConfigInt(ConfigKeyToolBatchMaxCalls))
+	require.Equal(t, 1, parent.GetConfigInt(ConfigKeyToolBatchParamConcurrency))
+	require.Equal(t, 6, parent.GetConfigInt(ConfigKeyToolBatchInvokeConcurrency))
+	require.Equal(t, 2, parent.ToolComposeConcurrency, "native batch options must not reuse tool_compose concurrency")
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.Equal(t, DefaultToolBatchMaxCalls, child.GetConfigInt(ConfigKeyToolBatchMaxCalls))
+	require.Equal(t, 1, child.GetConfigInt(ConfigKeyToolBatchParamConcurrency))
+	require.Equal(t, 6, child.GetConfigInt(ConfigKeyToolBatchInvokeConcurrency))
+
+	minimum := NewConfig(context.Background(), WithToolBatchMaxCalls(1))
+	require.Equal(t, 2, minimum.GetConfigInt(ConfigKeyToolBatchMaxCalls))
+}
+
 func TestConfig_DefaultPlanExecTaskConcurrency(t *testing.T) {
 	config := NewConfig(context.Background())
 	require.Equal(t, 1, config.PlanExecTaskConcurrency)
@@ -120,6 +141,22 @@ func TestConfig_EnableMultiAgentMode(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithEnableMultiAgentMode(true))
 	require.True(t, cfg.EnableDispatchSubReactAgents)
 	require.True(t, cfg.GetPreferDispatchSubReactAgents())
+	require.Equal(t, int64(DefaultMaxSubAgentConcurrency), cfg.GetMaxSubAgents())
+}
+
+func TestConfig_MaxSubAgentsNotPropagated(t *testing.T) {
+	parent := NewConfig(
+		context.Background(),
+		WithEnableMultiAgentMode(true),
+		WithMaxSubAgents(5),
+	)
+	require.True(t, parent.GetPreferDispatchSubReactAgents())
+	require.Equal(t, int64(5), parent.GetMaxSubAgents())
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.False(t, child.GetPreferDispatchSubReactAgents(),
+		"multi-agent preference must remain top-level only and must not propagate to forked child configs")
+	require.Equal(t, int64(DefaultMaxSubAgentConcurrency), child.GetMaxSubAgents())
 }
 
 func TestConfig_GoalModeNotPropagated(t *testing.T) {

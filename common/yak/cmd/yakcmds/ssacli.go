@@ -1389,7 +1389,7 @@ and exports structured report (sarif/irify).`,
 		cli.Int64Flag{
 			Name:  "rule-work-limit",
 			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 200000 (calibrated for javacms-core: 5-concurrent scan completes in ~15min within 24GB, vs hang/OOM at 4M); 0 disables (only --rule-timeout applies)",
-			Value: 200_000,
+			Value: ssaconfig.DefaultScanRuleWorkLimit,
 		},
 
 		cli.StringFlag{
@@ -1419,18 +1419,12 @@ and exports structured report (sarif/irify).`,
 		}()
 		ctx := context.Background()
 
-		var pprofCleanup func()
 		if debugDir := c.String("debug"); debugDir != "" {
 			cleanup, err := setupDebugDir(c, debugDir)
 			if err != nil {
 				return utils.Errorf("setup debug dir failed: %v", err)
 			}
-			pprofCleanup = cleanup
-			defer func() {
-				if pprofCleanup != nil {
-					pprofCleanup()
-				}
-			}()
+			defer cleanup()
 		}
 
 		if logLevel := c.String("log-level"); logLevel != "" {
@@ -1577,8 +1571,8 @@ and exports structured report (sarif/irify).`,
 		// fanout that the wall-clock budget only catches after the fact, so heavy
 		// rules bail at N operations (partial results) instead of doing tens of
 		// millions of per-element MergeAnchor(Clone)+AppendPredecessor ops that
-		// hang for hours. Default 4M (loose; tune via --rule-work-limit); 0
-		// disables (only --rule-timeout applies).
+		// hang for hours. Default 200k (tune via --rule-work-limit); 0 disables
+		// (only --rule-timeout applies).
 		scanOpt = append(scanOpt, ssaconfig.WithScanRuleWorkLimit(c.Int64("rule-work-limit")))
 
 		scanOpt = append(scanOpt,

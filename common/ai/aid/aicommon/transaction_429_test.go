@@ -20,10 +20,11 @@ type transactionTestConfig struct {
 	*KeyValueConfig
 	*BaseInteractiveHandler
 	*BaseCheckpointableStorage
-	ctx      context.Context
-	emitter  *Emitter
-	idSeq    int64
-	retryMax int64
+	ctx       context.Context
+	emitter   *Emitter
+	idSeq     int64
+	retryMax  int64
+	retryWait func(context.Context, time.Duration) error
 }
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)
@@ -62,6 +63,12 @@ func (t *transactionTestConfig) IsCtxDone() bool {
 func (t *transactionTestConfig) GetContext() context.Context           { return t.ctx }
 func (t *transactionTestConfig) CallAIResponseConsumptionCallback(int) {}
 func (t *transactionTestConfig) GetAITransactionAutoRetryCount() int64 { return t.retryMax }
+func (t *transactionTestConfig) waitBeforeAIRetry(ctx context.Context, delay time.Duration) error {
+	if t.retryWait != nil {
+		return t.retryWait(ctx, delay)
+	}
+	return nil
+}
 func (t *transactionTestConfig) GetToolComposeConcurrency() int        { return 2 }
 func (t *transactionTestConfig) GetPlanExecTaskConcurrency() int       { return 1 }
 func (t *transactionTestConfig) GetTimelineContentSizeLimit() int64    { return 1000 }
@@ -136,7 +143,10 @@ func TestCallAITransaction_429DoesNotCountRetry(t *testing.T) {
 	callAi := func(req *AIRequest) (*AIResponse, error) {
 		n := atomic.AddInt64(&callCount, 1)
 		if n <= num429Responses {
-			rsp := make429Response()
+			// Retryable 429: must have Retry-After header so the transaction
+			// layer classifies it as rate-limit (retryable) rather than
+			// quota-exceeded (not retryable).
+			rsp := make429Response("Retry-After: 1")
 			return rsp, utils.Errorf("429 rate limited")
 		}
 		rsp := NewUnboundAIResponse()
@@ -167,7 +177,8 @@ func TestCallAITransaction_429ContextCancel(t *testing.T) {
 		if n >= 3 {
 			cancel()
 		}
-		rsp := make429Response()
+		// Retryable 429 with Retry-After so it doesn't consume retry count
+		rsp := make429Response("Retry-After: 1")
 		return rsp, utils.Errorf("429 rate limited")
 	}
 
@@ -182,6 +193,109 @@ func TestCallAITransaction_429ContextCancel(t *testing.T) {
 	require.Error(t, err)
 	assert.Less(t, elapsed, 30*time.Second, "should exit promptly after context cancellation")
 	t.Logf("exited after %v with %d calls", elapsed, atomic.LoadInt64(&callCount))
+}
+
+func TestCallAITransaction_RequestContextCancelDoesNotRetryOrEmitError(t *testing.T) {
+	configCtx := context.Background()
+	cfg := newTransactionTestConfig(configCtx)
+	cfg.retryMax = 5
+
+	var captured []*schema.AiOutputEvent
+	cfg.emitter = NewEmitter("txn-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	started := make(chan context.Context, 1)
+	var callCount atomic.Int64
+	callAi := func(req *AIRequest) (*AIResponse, error) {
+		callCount.Add(1)
+		started <- req.GetContext()
+		<-req.GetContext().Done()
+		return nil, req.GetContext().Err()
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- CallAITransaction(
+			cfg,
+			"request-scoped cancellation",
+			callAi,
+			func(*AIResponse) error { return nil },
+			WithAIRequest_Context(requestCtx),
+		)
+	}()
+
+	select {
+	case actualRequestCtx := <-started:
+		require.NotNil(t, actualRequestCtx)
+		cancelRequest()
+	case <-time.After(3 * time.Second):
+		t.Fatal("AI request did not start")
+	}
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(3 * time.Second):
+		t.Fatal("transaction did not stop after request context cancellation")
+	}
+
+	require.Equal(t, int64(1), callCount.Load(), "context cancellation must not be retried")
+	for _, event := range captured {
+		if event == nil {
+			continue
+		}
+		content := string(event.Content)
+		require.NotContains(t, content, "call ai api error")
+		require.NotContains(t, content, "postHandler error")
+	}
+}
+
+func TestCallAITransaction_PostHandlerCancellationDoesNotRetryOrEmitError(t *testing.T) {
+	cfg := newTransactionTestConfig(context.Background())
+	cfg.retryMax = 5
+
+	var captured []*schema.AiOutputEvent
+	cfg.emitter = NewEmitter("txn-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	var callCount atomic.Int64
+	var postHandlerCount atomic.Int64
+	callAi := func(*AIRequest) (*AIResponse, error) {
+		callCount.Add(1)
+		rsp := NewUnboundAIResponse()
+		rsp.Close()
+		return rsp, nil
+	}
+	postHandler := func(*AIResponse) error {
+		postHandlerCount.Add(1)
+		cancelRequest()
+		return utils.Errorf("failed to parse action: %v", context.Canceled)
+	}
+
+	err := CallAITransaction(
+		cfg,
+		"post-handler cancellation",
+		callAi,
+		postHandler,
+		WithAIRequest_Context(requestCtx),
+	)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, int64(1), callCount.Load(), "post-handler cancellation must not call AI again")
+	require.Equal(t, int64(1), postHandlerCount.Load(), "post-handler cancellation must not be retried")
+	for _, event := range captured {
+		if event == nil {
+			continue
+		}
+		content := string(event.Content)
+		require.NotContains(t, content, "call ai api error")
+		require.NotContains(t, content, "postHandler error")
+	}
 }
 
 func TestCallAITransaction_Non429ErrorCountsRetry(t *testing.T) {

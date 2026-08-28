@@ -139,7 +139,7 @@ declareVariableOnly: Var Identifier (',' Identifier) *;
 declareAndAssignExpression: Var leftExpressionList ('=' | ':=') expressionList;
 
 leftExpressionList
-    : leftExpression (',' leftExpression) *
+    : leftExpression (ws* ',' ws* leftExpression) *
     ;
 
 /*
@@ -240,7 +240,7 @@ expression
     | expression '<-' expression
     ;
 
-parenExpression: '(' expression? ')' ;
+parenExpression: '(' ws* expression? ws* ')' ;
 
 // 定义 make 语法，有点特殊，因为涉及到类型声明
 makeExpression: 'make' '(' ws* typeLiteral (',' ws* expressionListMultiline )?')';
@@ -250,10 +250,13 @@ typeLiteral
     | sliceTypeLiteral
     | mapTypeLiteral
     | 'chan' typeLiteral
+    | InterfaceEmptyType      // Go interface{}（单一 token，避免 ASI 插入 ;）
     ;
 sliceTypeLiteral: '[' ']' typeLiteral;
 mapTypeLiteral: 'map' '[' typeLiteral ']' typeLiteral;
 
+// 仅用于函数形参/返回注解；含 Identifier（如 error）。不进 typeLiteral，避免与 f(x) 调用歧义。
+funcTypeRef: typeLiteral | Identifier;
 
 instanceCode: Func block;
 
@@ -262,14 +265,22 @@ instanceCode: Func block;
 fn(p1,p2,p3){}
 fn abc(p1,p2,p3){}
 fn abc(p1,p2,p3...){}
+兼容 Go 风格可选类型注解（运行时忽略）：
+fn(a string, b int) []byte {}
+fn() error {}
 */
 anonymousFunctionDecl
-    : Func functionNameDecl? '(' functionParamDecl? ')'  block
+    : Func functionNameDecl? '(' functionParamDecl? ')' ws* functionResultType? ws* block
     | ('('  functionParamDecl? ')' | Identifier ) '=>' (block | expression)
     ;
 
 functionNameDecl: Identifier;
-functionParamDecl: ws* Identifier (ws* ',' ws* Identifier)* '...'? ws* ','? ws*;
+functionParamDecl: ws* functionParam (ws* ',' ws* functionParam)* '...'? ws* ','? ws*;
+functionParam: Identifier (ws* funcTypeRef)?;
+functionResultType
+    : funcTypeRef
+    | '(' ws* funcTypeRef (ws* ',' ws* funcTypeRef)* ws* ')'
+    ;
 
 functionCall: '(' ordinaryArguments? ')' '~'?;
 ordinaryArguments: ws* expression (ws* ',' ws* expression)* '...'? ws* ','? ws*;
@@ -344,8 +355,9 @@ sliceLiteral: '[' ws* expressionListMultiline? ws* ']';
      : sliceTypeLiteral '{' ws* expressionListMultiline? ws* ';'?'}'
      ;
 
-// 表达式列表
-expressionList: expression (',' expression)* ','?;
+// 表达式列表（赋值/return 等）；允许逗号两侧换行，避免 `a, b = 1,\n2` 被截断成两句。
+// 尾部只用 LF* 承接可选逗号，勿用 ws*（会吞掉行尾 LINE_COMMENT，导致 formatter 丢注释）。
+expressionList: expression (ws* ',' ws* expression)* (LF* ',')?;
 expressionListMultiline: expression (',' ws* expression)* ','?;
 
 /* map literal */

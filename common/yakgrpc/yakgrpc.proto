@@ -765,8 +765,10 @@ service Yak {
   rpc UpsertAIProvider(UpsertAIProviderRequest) returns (UpsertAIProviderResponse);
   rpc DeleteAIProvider(DeleteAIProviderRequest) returns (Empty);
   rpc GetAIThirdPartyAppConfigTemplate(Empty) returns (GetThirdPartyAppConfigTemplateResponse);
-
+  // 废弃
   rpc GetApiKeyByOnline(GetApiKeyByOnlineRequest) returns (GetApiKeyByOnlineResponse);
+
+  rpc UpdateApiKey(UpdateApiKeyRequest) returns (Empty);
 
   // 指纹库
   rpc GetFingerprint(GetFingerprintRequest) returns (GetFingerprintResponse);
@@ -1424,8 +1426,9 @@ message MCPClientToolConfig {
   string Source = 3;
   string ServerName = 4;
   bool Enable = 5;
-  string Description = 6;
+  string Description = 6; // English; used by AI / MCP protocol
   repeated MCPServerToolParamInfo Params = 7;
+  I18n DescriptionI18n = 8; // UI bilingual description (Zh/En); Zh falls back to En when empty
 }
 
 message GetMCPToolListRequest {
@@ -2312,6 +2315,10 @@ message AIExecutionStrategy {
 
   // Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
   int64 GoalMinIterations = 3;
+
+  // Multi 模式下子 Agent 最大并发数（同时运行数量）。
+  // <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
+  int64 MaxSubAgents = 4;
 }
 
 message AITaskFilter {
@@ -7038,6 +7045,14 @@ message FuzzerResponse {
   string FixContentType = 60;
   bool IsSetContentTypeOptions = 61;
   repeated RandomChunkedResponse RandomChunkedData = 62;
+  // 与 http_flows / web_fuzzer_response 对齐的唯一键，下载 body 用它而不是 RuntimeID。
+  string HiddenIndex = 64;
+}
+
+enum ChunkedDataDirection {
+  CHUNKED_DATA_DIRECTION_UNSPECIFIED = 0;
+  CHUNKED_DATA_DIRECTION_REQUEST = 1;   // 请求分块：随机分块传输发送的请求 body 分块
+  CHUNKED_DATA_DIRECTION_RESPONSE = 2;  // 响应增量：如 SSE 流式响应的 body delta
 }
 
 message RandomChunkedResponse{
@@ -7047,6 +7062,12 @@ message RandomChunkedResponse{
   int64 CurrentChunkedDelayTime = 4; // 当前的 chunked 延迟时间
   int64 TotalDelayTime = 5; // 总的发送耗时
   bool IsFinal = 6; // 是否结束（结束标记事件；Data 可能为空）
+  // 数据方向，用于区分 Data 的语义：
+  //   REQUEST  = 请求分块（随机分块传输，Data 是请求 body 的一个分块）
+  //   RESPONSE = 响应增量（如 SSE，Data 是响应 body 的 delta）
+  // 前端应按方向分别渲染，避免把请求分块当成响应内容回显。
+  // 缺省值 UNSPECIFIED 兼容旧版本，按 RESPONSE 语义处理。
+  ChunkedDataDirection Direction = 7;
 }
 
 message RedirectHTTPFlow {
@@ -7089,6 +7110,8 @@ message GetHTTPFlowBodyByIdRequest {
   // 未设 = 返回完整 body（multipart 时现场流式重建完整 body）。
   // 用 optional 以区分「未设」与「part 0」。
   optional int32 PartIndex = 6;
+  // WebFuzzer 单条结果：按 HiddenIndex 定位 HTTPFlow，避免 RuntimeId 命中任务内其它 hop。
+  string HiddenIndex = 7;
 }
 
 message MITMExtractAggregateFlowFilterRow {
@@ -8016,6 +8039,10 @@ message GetApiKeyByOnlineRequest {
 }
 
 message GetApiKeyByOnlineResponse {
+  string ApiKey = 1;
+}
+
+message UpdateApiKeyRequest {
   string ApiKey = 1;
 }
 
@@ -9457,6 +9484,7 @@ message MITMV2Response {
 
   string ManualHijackListAction = 15; // add\delete\update\reload
   repeated SingleManualHijackInfoMessage ManualHijackList = 16; // top 20 hijack message
+  MITMPipelineStats PipelineStats = 17;
 }
 
 message SingleManualHijackControlMessage{
@@ -9478,6 +9506,19 @@ message SingleManualHijackControlMessage{
   bytes Request = 9;
   bytes Response = 10;
   bytes Payload = 11;
+
+  // Stream a local replacement file for an oversized request. Chunks are
+  // written to an engine-side temporary file and applied when the hijacked
+  // request is forwarded, so the renderer never loads the full file.
+  bool IsLargeRequestFileChunk = 12;
+  int32 LargeRequestPartIndex = 13;
+  string LargeRequestFilename = 14;
+  bytes LargeRequestFileData = 15;
+  bool LargeRequestFileStart = 16;
+  bool LargeRequestFileEOF = 17;
+  bool LargeRequestFileCancel = 18;
+  // Replace the complete request body instead of one multipart file part.
+  bool LargeRequestReplaceBody = 19;
 }
 
 message SingleManualHijackInfoMessage{
@@ -9958,4 +9999,40 @@ message UpdateAIReActRecommendedSkillRequest {
 
 message ResetAIReActRecommendedSkillRequest {
   string Name = 1;
+}
+
+// MITMPipelineStats is a one-second, session-scoped observation frame. Totals
+// are monotonic for the lifetime of one MITMV2 stream; clients derive rates
+// from consecutive frames instead of relying on reset-on-tick buckets.
+message MITMPipelineStats {
+  int32 Version = 1;
+  string SessionId = 2;
+  int64 SessionStartedAtUnixMs = 3;
+  int64 GeneratedAtUnixMs = 4;
+
+  uint64 RequestTotal = 5;
+  uint64 DispatchTotal = 6;
+  uint64 UpstreamCompletedTotal = 7;
+  uint64 ResponseMirroredTotal = 8;
+  uint64 DroppedTotal = 9;
+  uint64 FlowBuiltTotal = 10;
+  uint64 PersistEnqueuedTotal = 11;
+  uint64 PersistedTotal = 12;
+  uint64 PersistFailedTotal = 13;
+
+  int64 ActiveTotal = 14;
+  int64 PreDispatchActive = 15;
+  int64 ManualActive = 16;
+  int64 UpstreamActive = 17;
+  int64 ResponseProcessingActive = 18;
+  int64 PersistActive = 19;
+
+  int64 OldestPreDispatchAgeMs = 20;
+  int64 OldestManualAgeMs = 21;
+  int64 OldestUpstreamAgeMs = 22;
+  int64 OldestResponseProcessingAgeMs = 23;
+  int64 OldestPersistAgeMs = 24;
+
+  int64 DatabaseWriteQueueDepth = 25;
+  int64 DatabaseWriteQueueCapacity = 26;
 }

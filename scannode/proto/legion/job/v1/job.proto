@@ -27,6 +27,14 @@ message InlineScript {
   string content = 3;
 }
 
+message RuleSnapshotRef {
+  string snapshot_id = 1;
+  string content_sha256 = 2;
+  string schema_version = 3;
+  string bundle_format = 4;
+  repeated string asset_ids = 5;
+}
+
 message DispatchJobCommand {
   legion.node.v1.CommandMetadata metadata = 1;
   string target_node_id = 2;
@@ -36,6 +44,7 @@ message DispatchJobCommand {
   bytes input_json = 6;
   map<string, string> labels = 7;
   InlineScript script = 8;
+  RuleSnapshotRef rule_snapshot = 9;
 }
 
 message CancelJobCommand {
@@ -63,6 +72,18 @@ message JobProgressed {
   string message = 4;
   uint32 completed_units = 5;
   uint32 total_units = 6;
+}
+
+message JobRuleSnapshotPrepared {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  string snapshot_id = 3;
+  string content_sha256 = 4;
+  string schema_version = 5;
+  string bundle_format = 6;
+  uint32 rule_count = 7;
+  bool cache_hit = 8;
+  google.protobuf.Timestamp prepared_at = 9;
 }
 
 message JobAsset {

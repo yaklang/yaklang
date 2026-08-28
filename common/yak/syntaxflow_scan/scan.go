@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -15,6 +16,13 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 	if err != nil {
 		return err
 	}
+
+	// Wire up debug/pprof output when debug_dir is set.
+	// Keep the shared Postgres SSA IR DB (redirectSSADB=false) for platform
+	// two-job compile -> scan reuse; CLI --debug redirects SSADB separately.
+	debugCleanup := ssaapi.SetupDebugDir(config.GetDebugDir(), false)
+	defer debugCleanup()
+
 	var taskId string
 	var m *scanManager
 	var success bool

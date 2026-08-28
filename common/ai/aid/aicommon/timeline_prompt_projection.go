@@ -9,6 +9,10 @@ import (
 // Timeline item: UI, diff, persistence, fork and rollback continue to observe
 // the original event stream.
 func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
+	return projectTimelineItemForPromptWithModelReplay(item, false)
+}
+
+func projectTimelineItemForPromptWithModelReplay(item *TimelineItem, allowModelReplay bool) *TimelineItem {
 	if item == nil || item.deleted || item.value == nil {
 		return nil
 	}
@@ -23,8 +27,13 @@ func projectTimelineItemForPrompt(item *TimelineItem) *TimelineItem {
 	entryType := extractTextEntryType(textItem.Text)
 	category := normalizeTimelinePromptCategory(entryType)
 	switch category {
-	case "TODO_DELTA", "EVIDENCE_OPS", "MODEL_THINKING":
+	case "TODO_DELTA", "EVIDENCE_OPS":
 		return nil
+	case "MODEL_THINKING":
+		if !allowModelReplay || strings.TrimSpace(textItem.PromptText) == "" {
+			return nil
+		}
+		return cloneTextTimelineItemForPrompt(item, textItem, textItem.PromptText)
 	case "ITERATION":
 		return item
 	case "TODO_DELTA_ERROR":
@@ -83,9 +92,13 @@ func cloneTextTimelineItemForPrompt(item *TimelineItem, textItem *TextTimelineIt
 }
 
 func projectTimelineItemsForPrompt(items []*TimelineItem) []*TimelineItem {
+	return projectTimelineItemsForPromptWithModelReplay(items, false)
+}
+
+func projectTimelineItemsForPromptWithModelReplay(items []*TimelineItem, includeModelReplay bool) []*TimelineItem {
 	projected := make([]*TimelineItem, 0, len(items))
 	for _, item := range items {
-		if promptItem := projectTimelineItemForPrompt(item); promptItem != nil {
+		if promptItem := projectTimelineItemForPromptWithModelReplay(item, includeModelReplay); promptItem != nil {
 			projected = append(projected, promptItem)
 		}
 	}
@@ -96,6 +109,20 @@ func projectTimelineItemsForPrompt(items []*TimelineItem) []*TimelineItem {
 // and stable nonces. Empty projected interval blocks remain present so noise
 // filtering cannot move the Frozen/Open boundary.
 func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
+	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, false)
+}
+
+// projectTimelineRenderableBlocksForPromptWithLatestModelReplay preserves the
+// existing bucket topology while allowing every successful model replay still
+// present in the visible frozen/open interval blocks into the prompt. Reduced
+// or evicted items are never reconstructed; compressed heads remain ordinary
+// historical facts, with control-looking delimiters escaped only in their
+// ephemeral prompt copy.
+func projectTimelineRenderableBlocksForPromptWithLatestModelReplay(blocks TimelineRenderableBlocks) TimelineRenderableBlocks {
+	return projectTimelineRenderableBlocksForPromptWithModelReplay(blocks, true)
+}
+
+func projectTimelineRenderableBlocksForPromptWithModelReplay(blocks TimelineRenderableBlocks, includeModelReplay bool) TimelineRenderableBlocks {
 	projected := make(TimelineRenderableBlocks, 0, len(blocks))
 	for _, block := range blocks {
 		switch typed := block.(type) {
@@ -104,15 +131,30 @@ func projectTimelineRenderableBlocksForPrompt(blocks TimelineRenderableBlocks) T
 				continue
 			}
 			copyBlock := *typed
-			copyBlock.Items = projectTimelineItemsForPrompt(typed.Items)
+			copyBlock.Items = projectTimelineItemsForPromptWithModelReplay(typed.Items, includeModelReplay)
+			copyBlock.promptProjection = true
+			projected = append(projected, &copyBlock)
+		case *TimelineCompressedHeadBlock:
+			if typed == nil {
+				continue
+			}
+			copyBlock := *typed
+			copyBlock.Text = strings.ReplaceAll(copyBlock.Text, "<|", "&lt;|")
 			projected = append(projected, &copyBlock)
 		default:
-			// Existing compressed heads are historical facts. Rewriting them here
-			// would alter reducer semantics and is outside projection cleanup.
+			// Preserve unknown renderable types byte-for-byte.
 			if block != nil {
 				projected = append(projected, block)
 			}
 		}
 	}
 	return projected
+}
+
+func timelineTextItem(item *TimelineItem) (*TextTimelineItem, bool) {
+	if item == nil || item.deleted || item.value == nil {
+		return nil, false
+	}
+	textItem, ok := item.value.(*TextTimelineItem)
+	return textItem, ok && textItem != nil
 }

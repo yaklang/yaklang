@@ -627,7 +627,7 @@ func (m *Timeline) calculateActualContentSizeLocked() int64 {
 		}
 
 		buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
-		raw := item.String()
+		raw := selectShrunkContent(item)
 		for _, line := range utils.ParseStringToRawLines(raw) {
 			buf.WriteString(fmt.Sprintf("     %s\n", line))
 		}
@@ -801,10 +801,19 @@ func (m *Timeline) createEmergencySummary(item *TimelineItem, id int64) string {
 	var summary string
 	switch v := item.value.(type) {
 	case *aitool.ToolResult:
-		if v.Success {
-			summary = fmt.Sprintf("[%s] tool:%s success", timeStr, v.Name)
-		} else {
-			summary = fmt.Sprintf("[%s] tool:%s failed", timeStr, v.Name)
+		executionStatus, detail := v.GetExecutionStatus()
+		switch {
+		case !v.Success:
+			summary = fmt.Sprintf("[%s] tool:%s protocol-error", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusFailed:
+			summary = fmt.Sprintf("[%s] tool:%s execution-failed", timeStr, v.Name)
+		case executionStatus == aitool.ToolExecutionStatusSucceeded:
+			summary = fmt.Sprintf("[%s] tool:%s execution-succeeded", timeStr, v.Name)
+		default:
+			summary = fmt.Sprintf("[%s] tool:%s protocol-completed; execution-outcome-unknown", timeStr, v.Name)
+		}
+		if detail != "" {
+			summary += " (" + detail + ")"
 		}
 	case *UserInteraction:
 		summary = fmt.Sprintf("[%s] user-interaction stage:%v", timeStr, v.Stage)
@@ -944,6 +953,18 @@ func (m *Timeline) DumpForPrompt() string {
 // item exceeds the whole budget, only that item's head and tail are retained so
 // the helper prompt remains bounded.
 func (m *Timeline) DumpRecentForPrompt(tokenLimit int) string {
+	return m.dumpRecentForPrompt(tokenLimit, false)
+}
+
+// DumpRecentForPromptWithLatestModelReplay is the main ReAct counterpart of
+// DumpRecentForPrompt for speed-priority/lightweight decisions. It keeps the
+// same hard budget and recent-item ordering while allowing only the newest
+// successful decision replay into the projection.
+func (m *Timeline) DumpRecentForPromptWithLatestModelReplay(tokenLimit int) string {
+	return m.dumpRecentForPrompt(tokenLimit, true)
+}
+
+func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay bool) string {
 	if m == nil || tokenLimit <= 0 {
 		return ""
 	}
@@ -963,18 +984,36 @@ func (m *Timeline) DumpRecentForPrompt(tokenLimit int) string {
 	remaining := tokenLimit - baseTokens
 	selected := make([]string, 0)
 	omitted := false
+	var latestReplayID int64
+	if includeLatestModelReplay {
+		for i := m.tsToTimelineItem.Len() - 1; i >= 0; i-- {
+			item, ok := m.tsToTimelineItem.GetByIndex(i)
+			if !ok || item == nil || item.deleted {
+				continue
+			}
+			textItem, ok := timelineTextItem(item)
+			if ok && strings.TrimSpace(textItem.PromptText) != "" && normalizeTimelinePromptCategory(extractTextEntryType(textItem.Text)) == "MODEL_THINKING" {
+				latestReplayID = item.GetID()
+				break
+			}
+		}
+	}
 	for i := m.tsToTimelineItem.Len() - 1; i >= 0; i-- {
 		item, ok := m.tsToTimelineItem.GetByIndex(i)
 		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
-		projected := projectTimelineItemForPrompt(item)
+		allowReplay := latestReplayID > 0 && item.GetID() == latestReplayID
+		projected := projectTimelineItemForPromptWithModelReplay(item, allowReplay)
 		if projected == nil {
 			continue
 		}
 		content := strings.TrimSpace(projected.String())
 		if content == "" {
 			continue
+		}
+		if !isModelThinkingReplayProjection(projected) {
+			content = strings.ReplaceAll(content, "<|", "&lt;|")
 		}
 		cost := MeasureTokens(content)
 		if len(selected) > 0 {
@@ -1340,6 +1379,23 @@ func (m *Timeline) PromptForToolCallResultsForLastN(n int) string {
 }
 
 func (m *Timeline) PushText(id int64, fmtText string, items ...any) {
+	var result string
+	if len(items) > 0 {
+		result = fmt.Sprintf(fmtText, items...)
+	} else {
+		result = fmtText
+	}
+	m.pushTextWithPromptProjection(id, result, "")
+}
+
+// PushTextWithPromptProjection stores a normal user-facing timeline string and
+// an optional alternate representation used only while assembling prompts.
+// The alternate text is never returned by TimelineItem.String or UI projection.
+func (m *Timeline) PushTextWithPromptProjection(id int64, text, promptText string) {
+	m.pushTextWithPromptProjection(id, text, promptText)
+}
+
+func (m *Timeline) pushTextWithPromptProjection(id int64, text, promptText string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := time.Now()
@@ -1351,18 +1407,12 @@ func (m *Timeline) PushText(id int64, fmtText string, items ...any) {
 	}
 	m.idToTs.Set(id, ts)
 
-	var result string
-	if len(items) > 0 {
-		result = fmt.Sprintf(fmtText, items...)
-	} else {
-		result = fmtText
-	}
-
 	item := &TimelineItem{
 		createdAt: now,
 		value: &TextTimelineItem{
-			ID:   id,
-			Text: result,
+			ID:         id,
+			Text:       text,
+			PromptText: promptText,
 		},
 	}
 

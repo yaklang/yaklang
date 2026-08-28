@@ -25,6 +25,20 @@ import (
 
 var errH2ConnClosed = utils.Error("http2 client conn closed")
 
+// errH2ServerPrefaceTimeout marks a connection torn down because the server
+// never sent its SETTINGS frame. Unlike errH2ConnClosed it must NOT be
+// retried: reconnecting only rebuilds the same dead h2 conn against the same
+// origin. Callers should fall back to HTTP/1.1 instead.
+var errH2ServerPrefaceTimeout = utils.Error("http2 server preface timeout")
+
+// h2ServerPrefaceTimeout bounds how long an h2 connection may go without the
+// server's SETTINGS frame (its connection preface, RFC 7540 Section 3.5). A
+// healthy h2 server sends it immediately upon connection establishment, so this
+// only bites endpoints that negotiate h2 in ALPN but then stall (tarpit) or
+// kill the connection (fingerprinting WAF). On expiry the connection is closed
+// and the request falls back to HTTP/1.1.
+const h2ServerPrefaceTimeout = 3 * time.Second
+
 type http2ClientConn struct {
 	conn net.Conn
 	ctx  context.Context
@@ -65,6 +79,22 @@ type http2ClientConn struct {
 	clientPrefaceOk *utils.AtomicBool
 	closeCh         chan struct{}
 	closeOnce       sync.Once
+
+	// serverPrefaceCh is signalled when the server's first SETTINGS frame
+	// (its connection preface, RFC 7540 Section 3.5) arrives. Used to detect
+	// endpoints that negotiate h2 in ALPN but then never speak h2 (silent
+	// tarpit) or kill the connection (fingerprinting WAF): watchServerPreface
+	// closes such a connection and the request falls back to HTTP/1.1.
+	serverPrefaceCh chan struct{}
+
+	// serverPrefaceTimedOut records that watchServerPreface, not a peer or
+	// transport event, closed this connection. It turns the resulting stream
+	// failure into a non-retryable error, so the caller downgrades to
+	// HTTP/1.1 instead of rebuilding the same dead h2 conn.
+	//
+	// Plain int32 rather than *utils.AtomicBool: this struct is also built as
+	// a literal outside the pool, and a zero value must be safe to read there.
+	serverPrefaceTimedOut int32
 
 	// readLoopRunning is 1 while the readLoop goroutine is active, 0 after it exits.
 	// Accessed atomically; used by the debug printer to show goroutine liveness.
@@ -129,6 +159,7 @@ type http2ClientStream struct {
 	bodyStreamWriter    io.WriteCloser
 	bodyStreamOnce      sync.Once
 	bodyStreamCloseOnce sync.Once
+	bodyStreamDone      chan struct{}
 	headersHandled      bool
 	noBodyBuffer        bool
 }
@@ -161,8 +192,7 @@ func (s *http2ClientStream) handleHeadersDone() {
 
 	headerRaw := s.buildResponseHeaderRaw()
 	if s.option != nil && s.option.AutoDetectSSE {
-		headerLower := strings.ToLower(string(headerRaw))
-		if strings.Contains(headerLower, "content-type:") && strings.Contains(headerLower, "text/event-stream") {
+		if IsSSEContentTypeHeader(headerRaw) {
 			s.noBodyBuffer = true
 			if s.req != nil {
 				httpctx.SetNoBodyBuffer(s.req, true)
@@ -214,14 +244,24 @@ func (s *http2ClientStream) startBodyStreamHandler(headerRaw []byte) {
 	reader := s.bodyStreamReader
 	handler := s.option.BodyStreamReaderHandler
 	s.bodyStreamOnce.Do(func() {
-		go func() {
+		if s.option.bodyStreamReaderHandled != nil {
+			s.option.bodyStreamReaderHandled.Set()
+		}
+		// Capture the completion channel owned by this handler. The stream object
+		// can be returned to sync.Pool and reused if a slow handler outlives the
+		// bounded wait in waitBodyStreamHandler.
+		done := s.bodyStreamDone
+		go func(done chan struct{}) {
 			defer func() {
 				if r := recover(); r != nil {
 					log.Errorf("BodyStreamReaderHandler panic in http2: %v", r)
 				}
+				if done != nil {
+					close(done)
+				}
 			}()
 			handler(headerCopy, reader)
-		}()
+		}(done)
 	})
 }
 
@@ -231,6 +271,25 @@ func (s *http2ClientStream) closeBodyStreamWriter() {
 			_ = s.bodyStreamWriter.Close()
 		}
 	})
+}
+
+func (s *http2ClientStream) waitBodyStreamHandler() {
+	if s.bodyStreamDone == nil || s.option == nil || s.option.bodyStreamReaderHandled == nil || !s.option.bodyStreamReaderHandled.IsSet() {
+		return
+	}
+	select {
+	case <-s.bodyStreamDone:
+		return
+	case <-time.After(2 * time.Second):
+	}
+	if s.bodyStreamReader != nil {
+		_ = s.bodyStreamReader.Close()
+	}
+	select {
+	case <-s.bodyStreamDone:
+	case <-time.After(2 * time.Second):
+		log.Warn("stream handler wait timeout: http2 stream handler")
+	}
 }
 
 type http2ClientConnReadLoop struct {
@@ -345,6 +404,30 @@ func (h2Conn *http2ClientConn) setPreface() {
 	h2Conn.clientPrefaceOk.Set()
 }
 
+// watchServerPreface tears the connection down when the server never sends its
+// SETTINGS frame (its connection preface, RFC 7540 Section 3.5). Endpoints that
+// negotiate h2 in ALPN and then go silent — fingerprinting WAF tarpits — would
+// otherwise hold requests until the caller's full timeout.
+//
+// The check deliberately runs in the background instead of gating connection
+// setup: RFC 7540 Section 3.5 lets a client send requests immediately after its
+// own preface, and middleboxes exist that withhold the server preface until the
+// client's HEADERS arrive. Blocking setup on it would deadlock against those.
+// Closing the conn makes in-flight requests fail fast, and the caller falls back
+// to HTTP/1.1.
+func (h2Conn *http2ClientConn) watchServerPreface() {
+	go func() {
+		select {
+		case <-h2Conn.serverPrefaceCh:
+		case <-h2Conn.closeCh:
+		case <-time.After(h2ServerPrefaceTimeout):
+			atomic.StoreInt32(&h2Conn.serverPrefaceTimedOut, 1)
+			h2Conn.setCloseReason("server preface timeout")
+			h2Conn.setClose()
+		}
+	}()
+}
+
 var CreateStreamAfterGoAwayErr = utils.Errorf("h2 conn can not create new stream, because read go away flag")
 
 // newStream obtains an http2ClientStream from the pool and initialises it for
@@ -352,10 +435,25 @@ var CreateStreamAfterGoAwayErr = utils.Errorf("h2 conn can not create new stream
 // the call blocks until a slot becomes available or the connection is closed —
 // the same behaviour as Go's net/http H2 transport.
 func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, option *LowhttpExecConfig) (*http2ClientStream, error) {
+	requestCtx := context.Background()
+	if req != nil && req.Context() != nil {
+		requestCtx = req.Context()
+	}
+	stopCancelWake := context.AfterFunc(requestCtx, func() {
+		h2Conn.mu.Lock()
+		h2Conn.streamsCond.Broadcast()
+		h2Conn.mu.Unlock()
+	})
+	defer stopCancelWake()
+
 	// Wait for a concurrent-stream slot.  Access activeStreams and the
 	// connection-state flags under mu so that streamsCond.Wait() is race-free.
 	h2Conn.mu.Lock()
 	for h2Conn.activeStreams >= int(h2Conn.maxStreamsCount) {
+		if err := requestCtx.Err(); err != nil {
+			h2Conn.mu.Unlock()
+			return nil, err
+		}
 		if h2Conn.closed || h2Conn.readGoAway {
 			h2Conn.mu.Unlock()
 			return nil, CreateStreamAfterGoAwayErr
@@ -363,6 +461,10 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 		// Atomically releases mu and suspends goroutine.
 		// Woken by streamsCond.Broadcast() in waitResponse / setClose / processGoAway.
 		h2Conn.streamsCond.Wait()
+	}
+	if err := requestCtx.Err(); err != nil {
+		h2Conn.mu.Unlock()
+		return nil, err
 	}
 	if h2Conn.closed || h2Conn.readGoAway {
 		h2Conn.mu.Unlock()
@@ -401,6 +503,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 	cs.headersHandled = false
 	cs.bodyStreamOnce = sync.Once{}
 	cs.bodyStreamCloseOnce = sync.Once{}
+	cs.bodyStreamDone = nil
 	cs.bodyStreamReader = nil
 	cs.bodyStreamWriter = nil
 	cs.noBodyBuffer = false
@@ -410,6 +513,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 			reader, writer := utils.NewBufPipe(nil)
 			cs.bodyStreamReader = reader
 			cs.bodyStreamWriter = writer
+			cs.bodyStreamDone = make(chan struct{})
 		}
 	}
 
@@ -690,7 +794,7 @@ func (cs *http2ClientStream) doRequest() error {
 	return nil
 }
 
-func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte, error) {
+func (cs *http2ClientStream) waitResponse(ctx context.Context, timeout time.Duration) (http.Response, []byte, error) {
 	// Check if h2Conn is nil to prevent panic
 	if cs.h2Conn == nil {
 		return http.Response{}, nil, utils.Error("h2 connection is nil")
@@ -700,24 +804,53 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	}
 
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var err error
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case <-timer.C:
 		err = utils.Errorf("h2 stream-id %v wait response timeout : %s, maybe you can use HTTP/1.1 retry it", cs.ID, flow)
-		cs.setEndStream()
+		cs.resetStream(http2.ErrCodeCancel)
+	case <-ctx.Done():
+		err = ctx.Err()
+		cs.resetStream(http2.ErrCodeCancel)
 	case <-cs.readEndStreamSignal:
 	case <-cs.h2Conn.closeCh:
-		err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
+		if atomic.LoadInt32(&cs.h2Conn.serverPrefaceTimedOut) == 1 {
+			// Not a transport hiccup: this origin negotiated h2 and then never
+			// spoke it. Retrying rebuilds the same dead conn, so surface a
+			// non-retryable error and let the caller fall back to HTTP/1.1.
+			err = utils.Wrapf(errH2ServerPrefaceTimeout, "h2 stream-id %v never saw the server preface : %s", cs.ID, flow)
+		} else {
+			err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
+		}
 	}
+	cs.closeBodyStreamWriter()
+	cs.waitBodyStreamHandler()
 
-	// Cleanup: remove stream from map, decrement slot, restart idle timer if idle.
+	cs.releaseSlot()
+
+	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
+	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
+	resp := *cs.resp
+	responsePacket := cs.respPacket
+	cs.h2Conn.http2StreamPool.Put(cs) // gc
+	return resp, responsePacket, err
+}
+
+// releaseSlot removes a stream from the connection without affecting other
+// streams sharing the same HTTP/2 connection.
+func (cs *http2ClientStream) releaseSlot() {
 	cs.h2Conn.mu.Lock()
 	if cs.ID > 0 {
 		delete(cs.h2Conn.streams, cs.ID)
 	}
-	cs.h2Conn.activeStreams--
+	if cs.h2Conn.activeStreams > 0 {
+		cs.h2Conn.activeStreams--
+	}
 	idleNow := cs.h2Conn.activeStreams <= 0
 	cs.h2Conn.mu.Unlock()
 	// Broadcast wakes any goroutines blocked in newStream waiting for a free slot.
@@ -725,11 +858,30 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	if idleNow {
 		cs.h2Conn.idleTimer.Reset(cs.h2Conn.idleTimeout)
 	}
+}
 
-	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
-	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
-	cs.h2Conn.http2StreamPool.Put(cs) // gc
-	return *cs.resp, cs.respPacket, err
+func (cs *http2ClientStream) abort() {
+	if cs == nil || cs.h2Conn == nil {
+		return
+	}
+	cs.resetStream(http2.ErrCodeCancel)
+	cs.releaseSlot()
+	cs.h2Conn.http2StreamPool.Put(cs)
+}
+
+func (cs *http2ClientStream) resetStream(code http2.ErrCode) {
+	if cs == nil || cs.h2Conn == nil {
+		return
+	}
+	if cs.ID > 0 && !cs.readEndStream.Load() {
+		cs.h2Conn.frWriteMutex.Lock()
+		writeErr := cs.h2Conn.fr.WriteRSTStream(cs.ID, code)
+		cs.h2Conn.frWriteMutex.Unlock()
+		if writeErr != nil && !errors.Is(writeErr, net.ErrClosed) {
+			log.Debugf("h2 stream-id %v reset failed: %v", cs.ID, writeErr)
+		}
+	}
+	cs.setEndStream()
 }
 
 func (cs *http2ClientStream) setEndStream() {
@@ -890,6 +1042,13 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) {
 	if f.IsAck() {
 		return
+	}
+
+	// The server's first SETTINGS frame is its connection preface: signal
+	// conn setup that this h2 connection is actually alive.
+	select {
+	case rl.h2Conn.serverPrefaceCh <- struct{}{}:
+	default:
 	}
 
 	f.ForeachSetting(func(setting http2.Setting) error {

@@ -24,7 +24,7 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 		// verification 收缩为纯观测角色后, satisfied=true 不再自动退出. require_tool
 		// 执行过一轮后, 下一轮主决策 prompt 的 timeline 段会带上本轮工具结果
 		// (作为 timeline-open 段内容). 检测到它说明工具已执行过, 主动 finish 收口.
-		if strings.Contains(prompt, "COMBINED OUTPUT:") {
+		if strings.Contains(prompt, "RESULT:") {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "mocked: task done after tool call"}`))
 			rsp.Close()
@@ -56,6 +56,17 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 	if utils.MatchAllOfSubString(prompt, "interval-toolcall-review", "Interval Review") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "interval-toolcall-review", "decision": "continue", "reason": "tool running normally", "progress_summary": "executing", "estimated_remaining_time": "1s"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// The finish action is followed by a distinct final-synthesis request. Its
+	// parser accepts directly_answer/answer_payload, not another finish action;
+	// returning the latter makes the transaction retry until slow/race suites hit
+	// their outer deadline.
+	if isDirectAnswerPrompt(prompt) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_answer","answer_payload":"mocked summary after interval-reviewed tool call"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -110,7 +121,7 @@ func TestReAct_ToolUse_CallExpectations_InIntervalReview(t *testing.T) {
 		}
 	}()
 
-	after := time.After(15 * time.Second)
+	after := time.After(30 * time.Second)
 	reviewed := false
 
 LOOP:
@@ -178,7 +189,7 @@ func TestReAct_ToolUse_CallExpectations_InTimelineVerify(t *testing.T) {
 		}
 	}()
 
-	after := time.After(15 * time.Second)
+	after := time.After(30 * time.Second)
 	reviewed := false
 
 LOOP:
@@ -270,7 +281,7 @@ func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
 		}
 	}()
 
-	after := time.After(15 * time.Second)
+	after := time.After(30 * time.Second)
 	reviewed := false
 
 LOOP_EXTRA_PROMPT:

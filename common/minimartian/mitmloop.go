@@ -24,7 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/nosigpipe"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
@@ -412,56 +411,10 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 		s.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, true)
 		var serverUseH2 bool
 		if p.http2 {
-			// does remote server use h2?
-			var proxyStr string
-			if p.proxyURL != nil {
-				proxyStr = p.proxyURL.String()
-			}
-
-			// Check the cache first.
-			cacheKey := GetDialDetectionAddr(ctx, conn)
-			if cached, ok := p.h2Cache.Load(cacheKey); ok {
-				log.Infof("use cached h2 %v", cacheKey)
-				serverUseH2 = cached.(bool)
-			} else {
-				// TODO: should connect every connection?
-				basicOptions := []netx.DialXOption{
-					netx.DialX_WithTimeout(10 * time.Second),
-					netx.DialX_WithProxy(proxyStr),
-					netx.DialX_WithForceProxy(proxyStr != ""),
-					netx.DialX_WithEnableSystemProxyFromEnv(!p.disableSystemProxy),
-					netx.DialX_WithAppendTLSNextProto("h2"),
-					netx.DialX_WithTLS(true),
-					netx.DialX_WithDialer(p.dialer),
-				}
-
-				if ctx.GetSessionBoolValue("StrongHostMode") {
-					localAddrIP := ctx.GetSessionStringValue("StrongHostLocalAddr")
-					if localAddrIP != "" {
-						basicOptions = append(basicOptions, netx.DialX_WithStrongHostMode(localAddrIP))
-					}
-				}
-
-				netConn, _ := netx.DialX(
-					cacheKey, basicOptions...,
-				)
-				if netConn != nil {
-					switch ret := netConn.(type) {
-					case *tls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					case *gmtls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					}
-					netConn.Close()
-				}
-
-				// Store the result in the cache.
-				p.h2Cache.Store(cacheKey, serverUseH2)
-			}
+			// Decide the client-facing ALPN without blocking on the origin:
+			// a slow/bot-mitigated origin must never stall the client's TLS
+			// handshake. The origin h2 probe runs in the background.
+			serverUseH2 = p.offerH2ToClient(GetDialDetectionAddr(ctx, conn), strongHostLocalAddrFromCtx(ctx))
 		}
 		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2)
 		if err != nil {
@@ -586,56 +539,10 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 
 		var serverUseH2 bool
 		if p.http2 {
-			// does remote server use h2?
-			var proxyStr string
-			if p.proxyURL != nil {
-				proxyStr = p.proxyURL.String()
-			}
-
-			// Check the cache first.
-			cacheKey := GetDialDetectionAddr(ctx, conn)
-			if cached, ok := p.h2Cache.Load(cacheKey); ok {
-				log.Infof("use cached h2 %v", cacheKey)
-				serverUseH2 = cached.(bool)
-			} else {
-				// TODO: should connect every connection?
-				basicOptions := []netx.DialXOption{
-					netx.DialX_WithTimeout(10 * time.Second),
-					netx.DialX_WithProxy(proxyStr),
-					netx.DialX_WithForceProxy(proxyStr != ""),
-					netx.DialX_WithEnableSystemProxyFromEnv(!p.disableSystemProxy),
-					netx.DialX_WithAppendTLSNextProto("h2"),
-					netx.DialX_WithTLS(true),
-					netx.DialX_WithDialer(p.dialer),
-				}
-
-				if ctx.GetSessionBoolValue("StrongHostMode") {
-					localAddrIP := ctx.GetSessionStringValue("StrongHostLocalAddr")
-					if localAddrIP != "" {
-						basicOptions = append(basicOptions, netx.DialX_WithStrongHostMode(localAddrIP))
-					}
-				}
-				netConn, _ := netx.DialX(
-					cacheKey,
-					basicOptions...,
-				)
-				if netConn != nil {
-					switch ret := netConn.(type) {
-					case *tls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					case *gmtls.Conn:
-						if ret.ConnectionState().NegotiatedProtocol == "h2" {
-							serverUseH2 = true
-						}
-					}
-					netConn.Close()
-				}
-
-				// Store the result in the cache.
-				p.h2Cache.Store(cacheKey, serverUseH2)
-			}
+			// Decide the client-facing ALPN without blocking on the origin:
+			// a slow/bot-mitigated origin must never stall the client's TLS
+			// handshake. The origin h2 probe runs in the background.
+			serverUseH2 = p.offerH2ToClient(GetDialDetectionAddr(ctx, conn), strongHostLocalAddrFromCtx(ctx))
 		}
 
 		// fallback: 最普通的情况，没有任何 http2 支持
@@ -943,6 +850,8 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 		return nil
 	}
 
+	stopWatchingDownstream := bindHTTPRequestToDownstream(req, conn, brw.Reader)
+	defer stopWatchingDownstream()
 	res, err := p.doHTTPRequest(ctx, req)
 	if (err != nil && err != io.EOF) || res == nil {
 		if p.disableBuiltinPage {
@@ -1079,6 +988,104 @@ func isExpectedDownstreamWriteError(err error) bool {
 		}
 	}
 	return false
+}
+
+const downstreamDisconnectPollInterval = 100 * time.Millisecond
+
+// bindHTTPRequestToDownstream cancels the request context when the client
+// connection closes while the proxy is waiting for the upstream response.
+// Peek observes the connection without consuming a pipelined request byte.
+func bindHTTPRequestToDownstream(req *http.Request, conn net.Conn, reader *bufio.Reader) func() {
+	if req == nil || conn == nil || reader == nil {
+		return func() {}
+	}
+
+	requestCtx, cancelRequest := context.WithCancel(req.Context())
+	*req = *req.WithContext(requestCtx)
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	var deadlineMu sync.Mutex
+
+	go func() {
+		defer close(done)
+
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+
+			deadlineMu.Lock()
+			select {
+			case <-stop:
+				deadlineMu.Unlock()
+				return
+			default:
+			}
+			err := conn.SetReadDeadline(time.Now().Add(downstreamDisconnectPollInterval))
+			deadlineMu.Unlock()
+			if err != nil {
+				cancelRequest()
+				return
+			}
+
+			// Ask for one byte beyond the current buffer. This observes the
+			// underlying connection while preserving pipelined request bytes for
+			// the next proxy loop.
+			peekSize := reader.Buffered() + 1
+			if peekSize > reader.Size() {
+				<-stop
+				return
+			}
+			_, err = reader.Peek(peekSize)
+			if err == nil {
+				continue
+			}
+
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if timeoutErr, ok := err.(net.Error); ok && timeoutErr.Timeout() {
+				continue
+			}
+			if errors.Is(err, bufio.ErrBufferFull) {
+				<-stop
+				return
+			}
+
+			// EOF only means that the peer closed its request/write direction.
+			// A half-closing client may still be waiting for the response, so FIN
+			// alone is not evidence that the response has been abandoned. Hard
+			// read errors such as connection reset still cancel the upstream work.
+			if !errors.Is(err, io.EOF) {
+				cancelRequest()
+			}
+			return
+		}
+	}()
+
+	var stopOnce sync.Once
+	return func() {
+		stopOnce.Do(func() {
+			close(stop)
+
+			// Wake a blocked Peek. Read deadlines do not affect the response
+			// write, and the deadline is cleared before feedback begins.
+			deadlineMu.Lock()
+			_ = conn.SetReadDeadline(time.Now())
+			deadlineMu.Unlock()
+			<-done
+
+			deadlineMu.Lock()
+			_ = conn.SetReadDeadline(time.Time{})
+			deadlineMu.Unlock()
+			cancelRequest()
+		})
+	}
 }
 
 func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 bool) (net.Conn, bool, error) {

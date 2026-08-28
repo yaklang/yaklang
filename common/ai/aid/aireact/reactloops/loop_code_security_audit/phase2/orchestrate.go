@@ -14,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-const defaultCategoryScanConcurrency = 3
-
 type categoryScanJob struct {
 	category model.VulnCategory
 	index    int
@@ -60,14 +58,11 @@ func runAllCategoryScans(
 		}
 	}
 
-	concurrency := defaultCategoryScanConcurrency
-	if len(categories) < concurrency {
-		concurrency = len(categories)
-	}
+	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(categories))
 
 	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d)", len(categories), concurrency)
 	r.AddToTimeline("[PHASE2_START]",
-		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（并发 %d，timeline 分支隔离）。", len(categories), concurrency))
+		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（timeline 分支隔离）。", len(categories)))
 
 	artifacts := newCategoryArtifactStore(state)
 

@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-const maxMacroExpandDepth = 64
-
 // ExpandFunctionMacros expands function-like and object-like macros defined in src.
 // #include and conditional compilation directives are left unchanged.
 // Successfully parsed #define lines are removed from the output.
@@ -18,8 +16,7 @@ func ExpandFunctionMacros(src string) (string, error) {
 func ExpandFunctionMacrosWithTables(src string, base MacroTables) (string, error) {
 	collected := collectFunctionMacros(src, exportToMacroTables(base))
 	env := &macroEnv{
-		tables:   collected.tables,
-		maxDepth: maxMacroExpandDepth,
+		tables: collected.tables,
 	}
 	expanded := env.expandSource(collected.output)
 	expanded = collapsePreprocessorContinuations(expanded)
@@ -28,16 +25,13 @@ func ExpandFunctionMacrosWithTables(src string, base MacroTables) (string, error
 
 type macroEnv struct {
 	tables             macroTables
-	depth              int
-	maxDepth           int
 	objectBodyTokens   map[string][]macroToken // session cache: tokenize only
 	functionBodyTokens map[string][]macroToken
 }
 
 func newMacroEnvFromTables(tables MacroTables) *macroEnv {
 	return &macroEnv{
-		tables:   exportToMacroTables(tables),
-		maxDepth: maxMacroExpandDepth,
+		tables: exportToMacroTables(tables),
 	}
 }
 
@@ -45,6 +39,39 @@ func (e *macroEnv) setTables(tables macroTables) {
 	e.tables = tables
 	e.objectBodyTokens = nil
 	e.functionBodyTokens = nil
+}
+
+// cloneHideSet returns a shallow copy of h (or nil if h is empty).
+// Expansion of a given macro only adds names to its own branch's copy, so a
+// sibling expansion (e.g. the other side of a mutual recursion) is unaffected.
+func cloneHideSet(h map[string]struct{}) map[string]struct{} {
+	if len(h) == 0 {
+		return nil
+	}
+	out := make(map[string]struct{}, len(h)+1)
+	for k := range h {
+		out[k] = struct{}{}
+	}
+	return out
+}
+
+// withMacro returns a hide-set that additionally hides name.
+// A fresh map is allocated so the caller's set is not mutated.
+func withMacro(h map[string]struct{}, name string) map[string]struct{} {
+	if _, ok := h[name]; ok {
+		return h
+	}
+	out := make(map[string]struct{}, len(h)+1)
+	for k := range h {
+		out[k] = struct{}{}
+	}
+	out[name] = struct{}{}
+	return out
+}
+
+func isHidden(h map[string]struct{}, name string) bool {
+	_, ok := h[name]
+	return ok
 }
 
 func (e *macroEnv) getObjectBodyTokens(name, body string) []macroToken {
@@ -109,23 +136,23 @@ func (e *macroEnv) expandSource(src string) string {
 
 func (e *macroEnv) expandSourceWithState(src string, st *macroScanState) string {
 	tokens := tokenizeMacroSourceWithState(src, st)
-	expanded := e.expandTokens(tokens)
+	expanded := e.expandTokens(tokens, nil)
 	return tokensToString(expanded)
 }
 
-func (e *macroEnv) expandTokens(tokens []macroToken) []macroToken {
-	for {
-		next, changed := e.expandOnce(tokens)
-		tokens = next
-		if !changed {
-			return tokens
-		}
-	}
+// expandTokens scans tokens once, recursively expanding each macro's replacement
+// body. hidden is the set of macro names currently being expanded on this branch
+// (ISO C "hide-set" / "painted blue"): a name in hidden is not expanded again, which
+// terminates self-referential and mutually-recursive macros. A single recursive scan
+// is sufficient because each macro's replacement is fully expanded before being
+// emitted; re-scanning emitted tokens with the top-level (empty) hide-set would
+// re-expand self-referential macros forever.
+func (e *macroEnv) expandTokens(tokens []macroToken, hidden map[string]struct{}) []macroToken {
+	return e.expandOnce(tokens, hidden)
 }
 
-func (e *macroEnv) expandOnce(tokens []macroToken) ([]macroToken, bool) {
+func (e *macroEnv) expandOnce(tokens []macroToken, hidden map[string]struct{}) []macroToken {
 	var out []macroToken
-	changed := false
 	i := 0
 	for i < len(tokens) {
 		if tokens[i].kind == macroTokComment {
@@ -137,42 +164,34 @@ func (e *macroEnv) expandOnce(tokens []macroToken) ([]macroToken, bool) {
 			name := tokens[i].text
 			j := skipWhitespaceTokens(tokens, i+1)
 			if j < len(tokens) && tokens[j].text == "(" {
-				if fm, ok := e.tables.function[name]; ok {
+				if fm, ok := e.tables.function[name]; ok && !isHidden(hidden, name) {
 					args, end, err := parseMacroCallArgs(tokens, j+1)
 					if err == nil {
-						e.depth++
-						if e.depth > e.maxDepth {
-							e.depth--
-							out = append(out, tokens[i])
-							i++
-							continue
-						}
+						// Arguments are expanded with the caller's hide-set (not this
+						// macro's), so a macro name used as an argument is still expandable.
 						expandedArgs := make([][]macroToken, len(args))
 						for ai, arg := range args {
-							expandedArgs[ai] = e.expandTokens(arg)
+							expandedArgs[ai] = e.expandTokens(arg, hidden)
 						}
 						repl := e.substituteMacro(name, fm, expandedArgs)
-						repl = e.expandTokens(repl)
-						e.depth--
-						out = append(out, repl...)
+						// The replacement body is expanded with this macro hidden so a
+						// self-referential macro terminates after one expansion.
+						out = append(out, e.expandTokens(repl, withMacro(hidden, name))...)
 						i = end + 1
-						changed = true
 						continue
 					}
 				}
-			} else if body, ok := e.tables.object[name]; ok {
+			} else if body, ok := e.tables.object[name]; ok && !isHidden(hidden, name) {
 				repl := e.getObjectBodyTokens(name, body)
-				repl = e.expandTokens(repl)
-				out = append(out, repl...)
+				out = append(out, e.expandTokens(repl, withMacro(hidden, name))...)
 				i++
-				changed = true
 				continue
 			}
 		}
 		out = append(out, tokens[i])
 		i++
 	}
-	return out, changed
+	return out
 }
 
 func parseMacroCallArgs(tokens []macroToken, start int) ([][]macroToken, int, error) {

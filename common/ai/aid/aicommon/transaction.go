@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -26,7 +27,9 @@ func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
 	if rsp.GetTotalOutputBytes() != 0 {
 		return err
 	}
-	if strings.Contains(lower, "action type is empty") || strings.Contains(lower, "action @action not found or invalid") {
+	if strings.Contains(lower, "action type is empty") ||
+		strings.Contains(lower, "action @action not found or invalid") ||
+		strings.Contains(lower, `action resolution failed: requested="<missing>"`) {
 		provider := strings.TrimSpace(rsp.GetProviderName())
 		model := strings.TrimSpace(rsp.GetModelName())
 		if provider != "" || model != "" {
@@ -66,8 +69,19 @@ func callAITransaction(
 	failureExtra map[string]any,
 	requestOpts ...AIRequestOption,
 ) error {
-	var seq int64
+	// Honour a caller-reserved sequence. Batch parameter generation allocates
+	// sequences in model order before launching goroutines.
+	seedRequest := NewAIRequest("", requestOpts...)
+	transactionCtx, stopTransactionCtx := combineAIRequestAndConfigContext(c.GetContext(), seedRequest.GetContext())
+	defer stopTransactionCtx()
+	seq := seedRequest.GetSeqId()
 	var saver CheckpointCommitHandler
+	var transactionStateMu sync.Mutex
+	getSeq := func() int64 {
+		transactionStateMu.Lock()
+		defer transactionStateMu.Unlock()
+		return seq
+	}
 	var trcRetry int64 = 3
 	if c != nil {
 		trcRetry = c.GetAITransactionAutoRetryCount()
@@ -96,71 +110,84 @@ func callAITransaction(
 
 	requestOpts = append(requestOpts,
 		WithAIRequest_OnAcquireSeq(func(i int64) {
+			transactionStateMu.Lock()
+			defer transactionStateMu.Unlock()
 			seq = i
 		}),
 		WithAIRequest_SaveCheckpointCallback(func(handler CheckpointCommitHandler) {
+			transactionStateMu.Lock()
+			defer transactionStateMu.Unlock()
 			saver = handler
 		}),
 	)
 
 	for i := int64(0); i < trcRetry; {
+		if err := transactionCtx.Err(); err != nil {
+			return err
+		}
 		if c.IsCtxDone() {
-			return utils.Errorf("context is done, cannot continue transaction")
+			return c.GetContext().Err()
 		}
 		finalPrompt := c.RetryPromptBuilder(prompt, postHandlerErr)
 
 		utils.Debug(func() {
 			if i == 0 {
-				emitter.EmitInfo("[DEBUG] AI Transaction Prompt (seq=%d, attempt=%d):\n%s", seq, i+1, finalPrompt)
+				emitter.EmitInfo("[DEBUG] AI Transaction Prompt (seq=%d, attempt=%d):\n%s", getSeq(), i+1, finalPrompt)
 			} else {
-				emitter.EmitInfo("[DEBUG] AI Transaction Prompt Retry (seq=%d, attempt=%d):\n%s", seq, i+1, utils.ShrinkString(finalPrompt, 512))
+				emitter.EmitInfo("[DEBUG] AI Transaction Prompt Retry (seq=%d, attempt=%d):\n%s", getSeq(), i+1, utils.ShrinkString(finalPrompt, 512))
 			}
 		})
 
 		aiReq := NewAIRequest(
 			finalPrompt,
-			append(requestOpts, WithAIRequest_SeqId(seq))...,
+			append(requestOpts, WithAIRequest_SeqId(getSeq()))...,
 		)
 		lastReq = aiReq
 		rsp, err := callAi(aiReq)
+		// A request-scoped cancellation is a terminal control signal, not an AI
+		// failure. Check it before classifying callAi errors so a task finishing
+		// while the provider is in flight cannot emit a misleading model-error
+		// event or enter the retry loop.
+		if ctxErr := transactionCtx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		if err != nil {
 			lastErr = err
 			lastCallAiErr = err
 			lastRsp = rsp
 			rspEmitter := bindEmitter(rsp)
 
-			if is429Response(c.GetContext(), rsp) {
-				rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", seq)
-				attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
-				select {
-				case <-c.GetContext().Done():
-					return err
-				case <-time.After(5 * time.Second):
+			if is429Response(transactionCtx, rsp) {
+				if is429Retryable(transactionCtx, rsp) {
+					// 频率限流/过载类：可重试，不消耗重试次数。
+					rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())
+					attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
+					retryAfter := parseRetryAfterSeconds(rsp, 5)
+					waitSec := capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
+					if waitErr := waitBeforeAIRetry(transactionCtx, c, time.Duration(waitSec)*time.Second); waitErr != nil {
+						return waitErr
+					}
 					continue
 				}
+				// 额度耗尽类 429：不可重试，消耗重试次数让上层暴露错误。
+				rspEmitter.EmitWarning("429 quota exceeded in transaction layer (seq=%d), not retryable", getSeq())
 			}
 
 			i++
 			attemptHistory = append(attemptHistory, buildAttemptRecord(i, finalPrompt, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
-			select {
-			case <-c.GetContext().Done():
-				return err
-			case <-time.After(100 * time.Millisecond):
-				if len(attemptHistory) > 0 {
-					if failedOutput := attemptHistory[len(attemptHistory)-1].FailedAIOutput(); failedOutput != "" {
-						rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d, previous AI output: %s)", i, trcRetry, failedOutput)
-					} else {
-						rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
-					}
-				} else {
-					rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
+			if i < trcRetry {
+				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
+					return waitErr
 				}
-				continue
 			}
+			continue
+		}
+		if err := transactionCtx.Err(); err != nil {
+			return err
 		}
 		if c.IsCtxDone() {
-			return utils.Errorf("context is done, cannot continue transaction")
+			return c.GetContext().Err()
 		}
 		lastRsp = rsp
 		// The plain AI output / reason text is captured automatically by
@@ -168,10 +195,19 @@ func callAITransaction(
 		// reason-stream goroutine). We can read it directly via
 		// GetPlainOutput / GetPlainReason after postHandler finishes — no
 		// custom capture hooks needed.
-		if !rsp.WaitForCallbackDone(c.GetContext()) {
-			return c.GetContext().Err()
+		if !rsp.WaitForCallbackDone(transactionCtx) {
+			return transactionCtx.Err()
+		}
+		if ctxErr := transactionCtx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 		postHandlerErr = postHandler(rsp)
+		// The post-handler may consume a stream with the same request context.
+		// If that context was cancelled while parsing, do not reinterpret the
+		// cancellation as malformed model output and retry it.
+		if ctxErr := transactionCtx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		// 归一化空响应错误，再与 rsp 的回调错误（由 AIChatToAICallbackType 等设置）合并
 		postHandlerErr = normalizeTransactionPostHandlerError(rsp, postHandlerErr)
 		postHandlerErr = mergePostHandlerAndCallbackError(postHandlerErr, rsp.GetError())
@@ -183,24 +219,18 @@ func callAITransaction(
 			attemptHistory = append(attemptHistory, rec)
 			rspEmitter := bindEmitter(rsp)
 			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
-			select {
-			case <-c.GetContext().Done():
-				return postHandlerErr
-			case <-time.After(100 * time.Millisecond):
-				if len(attemptHistory) > 0 {
-					if failedOutput := attemptHistory[len(attemptHistory)-1].FailedAIOutput(); failedOutput != "" {
-						rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d, previous AI output: %s)", i, trcRetry, failedOutput)
-					} else {
-						rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
-					}
-				} else {
-					rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
+			if i < trcRetry {
+				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
+					return waitErr
 				}
-				continue
 			}
+			continue
 		}
-		if saver != nil {
-			cp, err := saver()
+		transactionStateMu.Lock()
+		checkpointSaver := saver
+		transactionStateMu.Unlock()
+		if checkpointSaver != nil {
+			cp, err := checkpointSaver()
 			if cp == nil {
 				emitter.EmitError("cannot save checkpoint")
 				return err
@@ -268,4 +298,26 @@ func callAITransaction(
 		return utils.Wrap(finalErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
 	}
 	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
+}
+
+func waitBeforeTransactionRetry(
+	ctx context.Context,
+	c AICallerConfigIf,
+	emitter *Emitter,
+	failedAttempt int64,
+	maxAttempts int64,
+	attemptHistory []transactionAttemptRecord,
+) error {
+	retryDelay := aiRetryBackoff(failedAttempt)
+	nextAttempt := failedAttempt + 1
+	if len(attemptHistory) > 0 {
+		if failedOutput := attemptHistory[len(attemptHistory)-1].FailedAIOutput(); failedOutput != "" {
+			emitter.EmitWarning("call ai transaction retry (next attempt %d/%d in %s, previous AI output: %s)", nextAttempt, maxAttempts, retryDelay, failedOutput)
+		} else {
+			emitter.EmitWarning("call ai transaction retry (next attempt %d/%d in %s)", nextAttempt, maxAttempts, retryDelay)
+		}
+	} else {
+		emitter.EmitWarning("call ai transaction retry (next attempt %d/%d in %s)", nextAttempt, maxAttempts, retryDelay)
+	}
+	return waitBeforeAIRetry(ctx, c, retryDelay)
 }

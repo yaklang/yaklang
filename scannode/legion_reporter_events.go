@@ -1,6 +1,7 @@
 package scannode
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -84,7 +85,22 @@ func (r *ScannerAgentReporter) flushSuccessfulJobProgress() error {
 	if r == nil {
 		return nil
 	}
-	return r.reportJobProgress(1.0)
+	// SSA scripts intentionally stop at ~0.99 and wait for platform risk/artifact
+	// import to publish 1.0. Do not force terminal 100% here or the UI jumps early.
+	if err := r.flushLatestJobProgress(); err != nil {
+		return err
+	}
+	r.progressCheckpoint.mu.Lock()
+	hasObserved := r.progressCheckpoint.hasObserved
+	last := r.progressCheckpoint.lastObservedProcess
+	r.progressCheckpoint.mu.Unlock()
+	if !hasObserved {
+		return r.reportJobProgress(0.99)
+	}
+	if last >= 0.99 {
+		return nil
+	}
+	return r.reportJobProgress(0.99)
 }
 
 func (c *attemptProgressCheckpoint) report(
@@ -171,7 +187,11 @@ func (r *ScannerAgentReporter) updateActiveAttemptProgress(process float64) {
 	if r == nil || r.agent == nil || r.agent.manager == nil || r.SubTaskId == "" {
 		return
 	}
-	task, err := r.agent.manager.GetTaskById(taskIDForSubtask(r.SubTaskId))
+	task, err := r.agent.manager.GetTaskByAttemptID(r.RuntimeId)
+	if err != nil {
+		// Non-Legion and legacy reporter callers may not carry an AttemptID.
+		task, err = r.agent.manager.GetTaskById(taskIDForSubtask(r.SubTaskId))
+	}
 	if err != nil {
 		return
 	}
@@ -389,5 +409,42 @@ func (r *ScannerAgentReporter) touchActiveAttempt() {
 	if r == nil || r.agent == nil || r.agent.manager == nil || r.SubTaskId == "" {
 		return
 	}
+	if r.RuntimeId != "" {
+		r.agent.manager.TouchAttempt(r.RuntimeId)
+		return
+	}
 	r.agent.manager.Touch(taskIDForSubtask(r.SubTaskId))
+}
+
+// PublishArtifactReady publishes a generic JobArtifactReady event for
+// debug artifacts (pprof, logs, timing). Unlike PublishSSAArtifactReady
+// which is specialized for SSA results, this accepts arbitrary artifact kinds.
+func (r *ScannerAgentReporter) PublishArtifactReady(
+	ctx context.Context,
+	artifactKind string,
+	artifactFormat string,
+	objectKey string,
+	codec string,
+	sha256 string,
+	rawSizeBytes uint64,
+	storedSizeBytes uint64,
+	metricsJSON []byte,
+) error {
+	publisher, ref, ok, err := r.legionPublisher()
+	if err != nil || !ok {
+		return err
+	}
+	r.touchActiveAttempt()
+	return publisher.PublishArtifactReady(
+		ctx,
+		*ref,
+		artifactKind,
+		artifactFormat,
+		objectKey,
+		codec,
+		sha256,
+		rawSizeBytes,
+		storedSizeBytes,
+		metricsJSON,
+	)
 }

@@ -204,7 +204,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 
 			nodeID := "semantic_search_yaklang_samples"
 			startLine := fmt.Sprintf("语义搜索: %d 个问题, top_n=%d, threshold=%.2f", len(questions), topN, scoreThreshold)
-			reactloops.EmitStatus(loop, "语义搜索中 / Semantic searching...")
+			reactloops.EmitStatusI18n(loop, "正在寻找最相关的代码样例", "Finding the most relevant code examples")
 
 			invoker.AddToTimeline("start_semantic_search_yaklang_samples", startLine)
 
@@ -314,6 +314,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 【后果警告】：不重新搜索将导致代码错误和调试失败！`, questionsStr)
 				log.Infof("no semantic search results found for questions: %s", questionsStr)
 				invoker.AddToTimeline("semantic_search_no_results_warning", noResultMsg)
+				markYaklangLintResearchDone(loop)
 				op.Continue()
 				return
 			}
@@ -447,13 +448,14 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			invoker.AddToTimeline(timelineKey, suggestionMsg)
 
 			log.Infof("semantic search completed: %d results found for %d questions", len(results), len(questions))
+			markYaklangLintResearchDone(loop)
 
 			// 检查是否有语法错误 - 参考 action_modify_code.go 的实现
 			fullcode := loop.Get("full_code")
 			if fullcode != "" {
 				errMsg, hasBlockingErrors := checkCodeAndFormatErrors(fullcode, loop.GetInt(loopinfra.LoopVarCodeLineBase))
 				if hasBlockingErrors {
-					reactloops.EmitStatus(loop, "检测到语法错误，修复中 / Syntax error detected, fixing...")
+					reactloops.EmitStatusI18n(loop, "检测到语法错误，修复中", "Syntax error detected, fixing...")
 					op.DisallowNextLoopExit()
 				}
 				if errMsg != "" {

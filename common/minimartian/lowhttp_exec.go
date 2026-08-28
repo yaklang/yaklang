@@ -1,9 +1,13 @@
 package minimartian
 
 import (
+	"context"
 	"io"
+	"mime"
 	"net"
 	"net/http"
+	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,6 +17,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+// isServerSentEventContentType reports whether value is a text/event-stream
+// media type, tolerating charset and other parameters.
+func isServerSentEventContentType(value string) bool {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(mediaType, "text/event-stream")
+}
 
 func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, error) {
 	// Check if mock response should be used (set by mockHTTPRequest)
@@ -52,14 +66,37 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-	return p.execLowhttp(ctx, req)
+	res, err := p.execLowhttp(ctx, req)
+	if err == nil && res != nil {
+		httpctx.SetUpstreamRoundTripSucceeded(req, true)
+	}
+	return res, err
 }
 
 func parseLowHTTPResponsePacket(packet []byte) (*http.Response, error) {
 	return utils.ReadHTTPResponseFromBytesWithBodyView(packet)
 }
 
+// forceHTTP11FirstLine rewrites a request packet's version marker to HTTP/1.1.
+//
+// A request parsed from an h2 client keeps its "HTTP/2" marker so the UI shows
+// the client-facing protocol faithfully, but lowhttp reads that same marker as
+// a force-h2 signal (see lowhttp.exec). Any hop that goes out over HTTP/1.1
+// must therefore rewrite the wire copy, or lowhttp overrides the caller's
+// choice of protocol.
+func forceHTTP11FirstLine(packet []byte) []byte {
+	method, uri, _ := lowhttp.GetHTTPPacketFirstLine(packet)
+	return lowhttp.ReplaceHTTPPacketFirstLine(packet, method+" "+uri+" HTTP/1.1")
+}
+
 func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, error) {
+	// A cancellable context for the upstream request. When the downstream
+	// client disconnects during a long-lived streaming response (e.g. SSE),
+	// cancelling this context tears down the upstream connection so the
+	// blocking body reader can return.
+	upstreamContext, cancelUpstream := context.WithCancel(req.Context())
+	defer cancelUpstream()
+
 	// PlainRequestBytes is the decoded representation used by the UI, history,
 	// and plugins. It must not replace the wire packet during transparent
 	// forwarding. Explicitly hijacked bytes still take precedence.
@@ -90,6 +127,23 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	if cached, ok := p.h2Cache.Load(cacheKey); ok {
 		isH2 = cached.(bool)
+	} else if p.http2 && isHttps {
+		// Origin h2 capability unknown: try h2 optimistically. Every failure
+		// mode below downgrades to HTTP/1.1 and negative-caches the origin:
+		//  - h1-only origin: ALPN does not negotiate h2 -> instant downgrade
+		//  - WAF kills the h2 conn (preface EOF/RST): closeCh -> downgrade
+		//  - WAF tarpit (no SETTINGS): bounded server-preface wait -> downgrade
+		//  - any other transport error: err fallback below
+		// so optimistic h2 never hangs the request. The probe still runs in
+		// the background to populate the cache for later requests.
+		isH2 = true
+		p.detectServerH2Async(cacheKey, "")
+	}
+
+	if !isH2 {
+		// The upstream protocol is decided by the origin h2 cache, not by the
+		// packet's version marker.
+		reqBytes = forceHTTP11FirstLine(reqBytes)
 	}
 
 	isGmTLS := p.gmTLS && isHttps
@@ -109,12 +163,14 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	opts := append(
 		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
+		lowhttp.WithContext(req.Context()),
 		lowhttp.WithHttp2(isH2),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithGmTLS(isGmTLS),
 		lowhttp.WithGmTLSOnly(p.gmTLSOnly),
 		lowhttp.WithGmTLSPrefer(p.gmPrefer),
 		lowhttp.WithExtendReadDeadline(true),
+		lowhttp.WithContext(upstreamContext),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
 		lowhttp.WithDiscardIntermediateResponseBody(true),
@@ -145,20 +201,21 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	if proxies := p.selectProxiesForHost(host); len(proxies) > 0 {
 		opts = append(opts, lowhttp.WithProxy(proxies...))
-	} else {
-		opts = append(opts, lowhttp.WithProxy())
 	}
 
-	//if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
-	//	portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
-	//	if !portValid {
-	//		// 修复host和port
-	//		if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
-	//			opts = append(opts, lowhttp.WithHost(host))
+	isStrongHostMode = httpctx.GetIsStrongHostMode(req)
+	upstreamPortModified = httpctx.GetUpstreamPortIsModified(req)
+
+	//	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
+	//		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
+	//		if !portValid {
+	//			// 修复host和port
+	//			if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
+	//				opts = append(opts, lowhttp.WithHost(host))
+	//			}
+	//			opts = append(opts, lowhttp.WithPort(connectedPort))
 	//		}
-	//		opts = append(opts, lowhttp.WithPort(connectedPort))
 	//	}
-	//}
 
 	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 	if isStrongHostMode || !upstreamPortModified {
@@ -204,69 +261,79 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	}
 
 	httpctx.SetResponseHeaderParsed(req, func(key string, value string) {
+		// Forwarding is decided once: the first header that signals a
+		// streaming response wins and registers the single shared
+		// callback. makeStreamResponseCallback inspects the fully-parsed
+		// response to choose the trigger timing (immediate vs buffered),
+		// so this site only decides *whether* to stream plus the few
+		// flags that must be set before the body is read.
+		if httpctx.GetResponseHeaderCallback(req) != nil {
+			return
+		}
 		bwr := httpctx.GetMITMFrontendReadWriter(req)
 		if bwr == nil {
 			return
 		}
 
-		// filter / forward to client conn via Content-Type
-		if key == "content-type" {
-			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
-				if ret(value) {
-					// filtered by content-type
-					httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-						httpctx.SetMITMSkipFrontendFeedback(req, true)
-						bwr.Write(headerBytes)
-						utils.FlushWriter(bwr)
-						httpctx.SetResponseFinishedCallback(req, func() {
-							utils.FlushWriter(bwr)
-						})
-						return io.TeeReader(bodyReader, bwr), nil
-					})
-					return
-				}
-			}
-		}
-
-		// content-length is too short
-		if key != "content-length" && key != "transfer-encoding" {
-			return
-		}
-
-		if key == "content-length" {
-			if contentLength := codec.Atoi(value); contentLength < int(MaxContentLength) {
+		switch key {
+		case "content-type":
+			// SSE: long-lived stream. NoBodyBuffer must be set here, before
+			// the builder reads it, so the infinite body is never buffered
+			// into memory. The trigger timing is decided inside the callback.
+			if isServerSentEventContentType(value) {
+				httpctx.SetNoBodyBuffer(req, true)
+				httpctx.SetResponseReadTooSlow(req, true)
+				httpctx.SetResponseHeaderCallback(req, p.makeStreamResponseCallback(isHttps, req, bwr, cancelUpstream))
 				return
 			}
+			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil && ret(value) {
+				httpctx.SetResponseHeaderCallback(req, p.makeStreamResponseCallback(isHttps, req, bwr, cancelUpstream))
+				return
+			}
+		case "content-length":
+			if contentLength := codec.Atoi(value); contentLength >= int(MaxContentLength) {
+				httpctx.SetResponseHeaderCallback(req, p.makeStreamResponseCallback(isHttps, req, bwr, cancelUpstream))
+			}
+		case "transfer-encoding":
+			if utils.IContains(value, "chunked") {
+				httpctx.SetResponseHeaderCallback(req, p.makeStreamResponseCallback(isHttps, req, bwr, cancelUpstream))
+			}
 		}
-
-		// set if chunked or content-length is too large
-		httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-			writerCloser := utils.NewTriggerWriterEx(uint64(MaxContentLength), p.maxReadWaitTime, func(buffer io.ReadCloser, triggerEvent string) {
-				httpctx.SetContextValueInfoFromRequest(req, triggerEvent, true)
-				httpctx.SetMITMSkipFrontendFeedback(req, true)
-				bwr.Write(headerBytes)
-				utils.FlushWriter(bwr)
-				go func() {
-					_, err := utils.IOCopy(utils.WriterAutoFlush(bwr), buffer, nil)
-					utils.FlushWriter(bwr)
-					if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-						log.Errorf("io.Copy error: %s", err)
-					}
-				}()
-			})
-			httpctx.SetResponseFinishedCallback(req, func() {
-				httpctx.SetResponseTooLargeSize(req, writerCloser.GetCount())
-				writerCloser.Close()
-			})
-			return io.TeeReader(bodyReader, writerCloser), nil
-		})
 	})
 
 	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)
+	if err != nil && isH2 && req.Context().Err() == nil {
+		// The origin advertised h2 during detection, but the h2 upstream
+		// attempt failed at transport level. Some endpoints (WAF/bot
+		// mitigation, e.g. fingerprinting-protected APIs) kill non-browser
+		// h2 clients right after the preface. Downgrade: remember h1 for
+		// this origin and retry over HTTP/1.1 — the same behavior as Burp.
+		//
+		// The context check above matters: a request abandoned by the client
+		// also surfaces as an error here, but says nothing about the origin's
+		// h2 support. Downgrading on it would poison the cache for the whole
+		// origin and burn a second, equally doomed round trip.
+		log.Warnf("h2 upstream to %v failed: %v, downgrading to HTTP/1.1", cacheKey, err)
+		p.h2Cache.Store(cacheKey, false)
+		// Rewrite the version marker as well: leaving "HTTP/2" on the wire copy
+		// makes lowhttp force h2 again and the retry rebuilds the very
+		// connection that just failed.
+		opts = append(opts, lowhttp.WithHttp2(false), lowhttp.WithRequest(forceHTTP11FirstLine(reqBytes)))
+		lowHttpResp, err = lowhttp.HTTPWithoutRedirect(opts...)
+	}
 	if err != nil {
 		req.RemoteAddr = ""
 		httpctx.SetRemoteAddr(req, "")
 		return nil, err
+	}
+
+	// If h2 was requested (the origin advertised it during detection) but the
+	// connection was silently downgraded to HTTP/1.1 — ALPN mismatch, preface
+	// failure, or a tarpit that never sent its SETTINGS frame — remember h1
+	// for this origin so later requests skip the h2 attempt entirely.
+	if isH2 && lowHttpResp != nil && !lowHttpResp.Http2 {
+		log.Infof("h2 upstream to %v was downgraded to HTTP/1.1, caching h1 for this origin", cacheKey)
+		p.h2Cache.Store(cacheKey, false)
 	}
 
 	// set trace info
@@ -287,6 +354,224 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
 	return rsp, err
+}
+
+// makeStreamResponseCallback builds a ResponseHeaderCallback that relays the
+// response body to the downstream client via a TriggerWriter + pipe + goroutine
+// IOCopy. This is the single forwarding primitive shared by all streaming
+// responses.
+//
+// Unlike the previous design where the caller picked the trigger timing by
+// passing an `immediate` flag, the callback now inspects the fully-parsed
+// response (available here as `rsp`) and decides the streaming kind itself:
+//
+//   - SSE (text/event-stream): immediate trigger; a downstream write failure
+//     cancels the upstream request so the blocking body reader can return.
+//   - content-type filtered:   immediate trigger; upstream is not cancelled.
+//   - chunked / large body:     buffered trigger (fires on MaxContentLength or
+//     maxReadWaitTime); upstream is not cancelled.
+//
+// immediate = NewTriggerWriterImmediate fires on the first body chunk so the
+// header is written and forwarding starts without delay — essential for SSE
+// where the body is long-lived. buffered = NewTriggerWriterEx waits until the
+// size or time threshold is exceeded.
+//
+// When p.streamRecorder is set, an optional best-effort recorder is created
+// to persist body chunks to a spill file for history/audit. The recorder is
+// only created for SSE responses (see the kind == streamKindSSE guard below):
+// SSE disables body buffering, so the spill file is the only way to persist
+// the long-lived body. Recorder write errors never break or delay forwarding.
+func (p *Proxy) makeStreamResponseCallback(
+	isHTTPS bool,
+	req *http.Request,
+	bwr io.ReadWriter,
+	cancelUpstream context.CancelFunc,
+) httpctx.ResponseHeaderCallbackType {
+	return func(rsp *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+		// Decide the streaming kind from the fully-parsed response. This
+		// keeps the "immediate vs buffered" trigger choice inside the
+		// forwarding mechanism instead of at every call site.
+		kind := p.classifyStreamResponse(req, rsp)
+		if kind == streamKindNone {
+			// Not actually a streaming response (e.g. the registered header
+			// was a false positive). Don't interfere with the body reader.
+			return bodyReader, nil
+		}
+		immediate := kind == streamKindSSE || kind == streamKindFiltered
+		// Only SSE cancels the upstream on downstream write failure; the
+		// filtered/chunked paths preserve the original no-cancel behavior.
+		var cancelOnWriteFail context.CancelFunc
+		if kind == streamKindSSE {
+			cancelOnWriteFail = cancelUpstream
+		}
+
+		// Create an optional best-effort recorder for incremental persistence.
+		// The recorder is set up before the trigger fires so the goroutine
+		// can tee body chunks into it.
+		//
+		// Only SSE responses need a recorder: SSE sets NoBodyBuffer so the
+		// response builder never buffers the long-lived body, and the only
+		// way to persist it for history/audit is the spill file the recorder
+		// writes incrementally. The recorder also marks the flow as
+		// read-too-slow so History/API reconstruct the response from the
+		// spill file instead of the (empty) DB body.
+		//
+		// Filtered and chunked/large responses do NOT set NoBodyBuffer, so
+		// the response builder still buffers the full body and the ordinary
+		// mirror path persists it. Creating a recorder for them would
+		// unconditionally mark the flow read-too-slow and attach spill files
+		// even when the body is smaller than MaxContentLength (e.g. a chunked
+		// 4 MB response under a 5 MB limit), which is incorrect. The
+		// too-large decision for those kinds stays with the response builder,
+		// which judges by the actual body size — matching the pre-SSE
+		// behavior.
+		var recorder io.WriteCloser
+		var closeOnce sync.Once
+		closeRecorder := func() {
+			closeOnce.Do(func() {
+				if recorder != nil {
+					if err := recorder.Close(); err != nil {
+						log.Warnf("mitm: finalize stream recorder failed: %v", err)
+					}
+				}
+			})
+		}
+		if kind == streamKindSSE && p.streamRecorder != nil {
+			recorderRsp, err := utils.ReadHTTPResponseFromBytes(headerBytes, nil)
+			if err != nil {
+				log.Warnf("mitm: parse response header for recorder failed: %v", err)
+			} else {
+				recorderRsp.Request = req
+				recorder, err = p.streamRecorder(isHTTPS, req, recorderRsp, headerBytes)
+				if err != nil {
+					log.Warnf("mitm: create stream recorder failed: %v", err)
+					recorder = nil
+				} else if recorder != nil {
+					httpctx.SetResponseStreamRecorder(req, recorder)
+				}
+			}
+		}
+
+		// Build the trigger callback: write header, flush, then start a
+		// goroutine that drains the pipe and forwards body chunks to the
+		// downstream client (and recorder).
+		triggerHandler := func(buffer io.ReadCloser, triggerEvent string) {
+			httpctx.SetContextValueInfoFromRequest(req, triggerEvent, true)
+			httpctx.SetMITMSkipFrontendFeedback(req, true)
+			if _, err := bwr.Write(headerBytes); err != nil {
+				if cancelOnWriteFail != nil {
+					cancelOnWriteFail()
+				}
+				return
+			}
+			utils.FlushWriter(bwr)
+			go func() {
+				writers := []io.Writer{utils.WriterAutoFlush(bwr)}
+				if recorder != nil {
+					// bestEffortStreamRecorder swallows recorder errors, so a
+					// non-EOF error from the MultiWriter can only come from
+					// the downstream writer — i.e. the client disconnected.
+					writers = append(writers, &bestEffortStreamRecorder{writer: recorder})
+				}
+				_, err := utils.IOCopy(io.MultiWriter(writers...), buffer, nil)
+				utils.FlushWriter(bwr)
+				if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+					log.Errorf("io.Copy error: %s", err)
+					// Downstream write failure (client gone): cancel the
+					// upstream request so the blocking body reader returns.
+					// Only SSE sets cancelOnWriteFail; other kinds leave it
+					// nil to preserve the original no-cancel behavior.
+					if cancelOnWriteFail != nil {
+						cancelOnWriteFail()
+					}
+				}
+			}()
+		}
+
+		// Choose the trigger based on the streaming kind.
+		MaxContentLength := int(consts.GetGlobalMaxContentLength())
+		if p.GetMaxContentLength() != 0 {
+			MaxContentLength = p.maxContentLength
+		}
+		var writerCloser *utils.TriggerWriter
+		if immediate {
+			writerCloser = utils.NewTriggerWriterImmediate(triggerHandler)
+		} else {
+			writerCloser = utils.NewTriggerWriterEx(uint64(MaxContentLength), p.maxReadWaitTime, triggerHandler)
+		}
+
+		httpctx.SetResponseFinishedCallback(req, func() {
+			httpctx.SetResponseTooLargeSize(req, writerCloser.GetCount())
+			utils.FlushWriter(bwr)
+			closeRecorder()
+			writerCloser.Close()
+		})
+		return io.TeeReader(bodyReader, writerCloser), nil
+	}
+}
+
+// streamKind classifies a streaming response for forwarding purposes.
+type streamKind int
+
+const (
+	streamKindNone streamKind = iota
+	// streamKindSSE is a text/event-stream response: immediate trigger,
+	// downstream disconnect cancels the upstream connection.
+	streamKindSSE
+	// streamKindFiltered is a content-type-filtered response: immediate
+	// trigger, upstream is not cancelled on downstream write failure.
+	streamKindFiltered
+	// streamKindChunkedLarge is a chunked or content-length-too-large
+	// response: buffered trigger (size/timeout), upstream not cancelled.
+	streamKindChunkedLarge
+)
+
+// classifyStreamResponse inspects the fully-parsed response and the request
+// context to determine which streaming forwarding kind applies. It is the
+// single place that decides trigger timing, so adding a new streaming type
+// (e.g. streaming JSON) only needs a new case here.
+func (p *Proxy) classifyStreamResponse(req *http.Request, rsp *http.Response) streamKind {
+	if rsp == nil {
+		return streamKindNone
+	}
+	ct := rsp.Header.Get("Content-Type")
+	if isServerSentEventContentType(ct) {
+		return streamKindSSE
+	}
+	if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil && ret(ct) {
+		return streamKindFiltered
+	}
+	// chunked transfer-encoding
+	for _, te := range rsp.TransferEncoding {
+		if utils.IContains(te, "chunked") {
+			return streamKindChunkedLarge
+		}
+	}
+	// content-length too large
+	MaxContentLength := int(consts.GetGlobalMaxContentLength())
+	if p.GetMaxContentLength() != 0 {
+		MaxContentLength = p.maxContentLength
+	}
+	if rsp.ContentLength >= int64(MaxContentLength) {
+		return streamKindChunkedLarge
+	}
+	return streamKindNone
+}
+
+// bestEffortStreamRecorder wraps an io.Writer and never returns an error,
+// ensuring that recorder failures do not break or delay response forwarding.
+type bestEffortStreamRecorder struct {
+	writer io.Writer
+}
+
+func (w *bestEffortStreamRecorder) Write(p []byte) (int, error) {
+	if w == nil || w.writer == nil {
+		return len(p), nil
+	}
+	if n, err := w.writer.Write(p); err != nil || n != len(p) {
+		log.Warnf("mitm: persist streaming response chunk failed: wrote=%d expected=%d error=%v", n, len(p), err)
+	}
+	return len(p), nil
 }
 
 func transferFixedResponsePacket(req *http.Request, response *lowhttp.LowhttpResponse) {

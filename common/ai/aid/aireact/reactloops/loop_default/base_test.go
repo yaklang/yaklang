@@ -29,8 +29,10 @@ func TestConfigExecutionPolicy(t *testing.T) {
 	)
 	text := cfg.GetExecutionPolicy()
 	require.Contains(t, text, "dispatch_sub_react_agents")
-	require.Contains(t, text, "do not use finish before iteration 6")
-	require.False(t, strings.Contains(text, "Current iteration"))
+	require.Contains(t, text, "host-side completion gate")
+	require.NotContains(t, text, "iteration 6")
+	require.NotContains(t, text, "Current iteration")
+	require.NotContains(t, text, "minimum iteration")
 }
 
 // TestConfigExecutionPolicy_MultiAgentDirective asserts the multi-agent
@@ -44,6 +46,7 @@ func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 	text := cfg.GetExecutionPolicy()
 	require.Contains(t, text, "MUST make dispatch_sub_react_agents your FIRST move")
 	require.Contains(t, text, "MUST NOT use it to offload")
+	require.NotContains(t, text, "MaxSubAgents")
 	require.NotContains(t, text, "Goal mode")
 }
 
@@ -59,7 +62,16 @@ func TestConfigExecutionPolicy_CombinedModes(t *testing.T) {
 	)
 	text := cfg.GetExecutionPolicy()
 	require.Contains(t, text, "Both modes are active")
-	require.Contains(t, text, "reach iteration 6 before finishing")
+	require.Contains(t, text, "completion gate opens")
+	require.NotContains(t, text, "iteration 6")
+	require.NotContains(t, text, "minimum iteration")
+}
+
+func TestReactiveDataDoesNotExposeIterationDeadline(t *testing.T) {
+	lower := strings.ToLower(reactiveDataTemplate)
+	for _, forbidden := range []string{"islastiteration", "last iteration", "final iteration", "最后一次迭代", "最后一轮"} {
+		require.NotContains(t, lower, strings.ToLower(forbidden))
+	}
 }
 
 func TestPostSummaryOnlyOffersNonBlockingFollowUps(t *testing.T) {

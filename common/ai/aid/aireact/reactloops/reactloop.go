@@ -45,8 +45,19 @@ type ActionRecord struct {
 	ActionParams   map[string]interface{} `json:"action_params"`
 	IterationIndex int                    `json:"iteration_index"`
 
-	// ToolName 是该 action 实际调用的工具名，供价值反馈和执行历史使用。
+	// ToolName 是该 action 声明的第一个工具名，供价值反馈和执行历史使用。
+	// 批量工具调用时保留第一项，兼容只识别单工具的旧消费者。它不表示
+	// callback 已经实际执行；实际执行事实见 ExecutedToolCallCount。
 	ToolName string `json:"tool_name,omitempty"`
+	// ToolNames 按模型输出顺序记录该 action 中的全部工具调用。
+	ToolNames []string `json:"tool_names,omitempty"`
+	// ToolCallCount 是本 action 实际声明的工具调用数。旧记录为 0 时按
+	// ToolName 是否存在回退到 0/1。
+	ToolCallCount int `json:"tool_call_count,omitempty"`
+	// ExecutedToolCallCount 是 handler 实际拿到 settled ToolResult 的 callback
+	// 数量。成功和工具自身返回失败都计数；审批 direct_answer/cancel、批量准入
+	// 失败以及其它 nil-result 的 pre-invoke 失败不计数。
+	ExecutedToolCallCount int `json:"executed_tool_call_count,omitempty"`
 }
 
 type ReActLoop struct {
@@ -175,6 +186,17 @@ type ReActLoop struct {
 	// 兜底观察而非抢断.
 	// 关键词: lastIterationTickAt, 主循环心跳, [LOOP_STALL_DETECTED]
 	lastIterationTickAt atomic.Int64
+
+	// lastActivityAt 记录最近一次"非 iteration 推进"的活动 (工具开始执行等).
+	// 与 lastIterationTickAt 分开: 长工具调用不会推进 iteration, 但必须算作
+	// 有进度, 否则 stall heartbeat 会把全仓 grep 误判成死锁并 hard abort.
+	// 关键词: lastActivityAt, 工具 in-flight, stall 旁路
+	lastActivityAt atomic.Int64
+
+	// toolActivityInflight 是正在执行的工具调用深度. >0 时 stall heartbeat
+	// 跳过报警和硬抢断 (工具还在跑 ≠ 主循环死锁).
+	// 关键词: toolActivityInflight, 长工具调用不误杀
+	toolActivityInflight atomic.Int32
 
 	// verificationInFlight 标记 verification AI 调用是否正在飞行中, 用于
 	// 让 watchdog 在不持锁的情况下感知 "上一次还没回来". 与 verificationMutex
@@ -561,6 +583,40 @@ func NewMinimalReActLoop(cfg aicommon.AICallerConfigIf, invoker aicommon.AIInvok
 	}
 }
 
+func registeredLoopActionResolutionError(actionType, enabledBy, reason string) error {
+	return utils.Errorf(
+		"loop action registration resolution failed: requested=%q; enabled_by=%q; registered_actions=%v; reason=%s",
+		actionType,
+		enabledBy,
+		GetRegisteredActionNames(),
+		reason,
+	)
+}
+
+func requireRegisteredLoopAction(actionType, enabledBy string) (*LoopAction, error) {
+	action, ok := GetLoopAction(actionType)
+	if !ok || action == nil {
+		return nil, registeredLoopActionResolutionError(actionType, enabledBy, "no action is registered under the requested key")
+	}
+	if action.ActionType != actionType {
+		return nil, registeredLoopActionResolutionError(
+			actionType,
+			enabledBy,
+			fmt.Sprintf("registry returned action type %q instead of the requested type", action.ActionType),
+		)
+	}
+	return action, nil
+}
+
+func optionalRegisteredLoopAction(actionType, enabledBy string) *LoopAction {
+	action, err := requireRegisteredLoopAction(actionType, enabledBy)
+	if err != nil {
+		log.Warnf("optional %v", err)
+		return nil
+	}
+	return action
+}
+
 func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReActLoopOption) (*ReActLoop, error) {
 	if utils.IsNil(invoker) {
 		return nil, utils.Error("invoker is nil in ReActLoop")
@@ -598,6 +654,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	for _, action := range []*LoopAction{
 		loopAction_DirectlyAnswer,
 		loopAction_Finish,
+		loopAction_SaveEvidence,
 	} {
 		r.actions.Set(action.ActionType, action)
 	}
@@ -666,60 +723,57 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 				LoadEnabledForges(realConfig, r, names)
 			}
 			if realConfig.EnableDispatchSubReactAgents {
-				if dispatchSubReactAgents, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS); ok {
-					r.actions.Set(dispatchSubReactAgents.ActionType, dispatchSubReactAgents)
+				dispatchSubReactAgents, err := requireRegisteredLoopAction(
+					schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS,
+					"EnableDispatchSubReactAgents=true",
+				)
+				if err != nil {
+					return nil, err
 				}
+				r.actions.Set(dispatchSubReactAgents.ActionType, dispatchSubReactAgents)
 			}
 		}
 	}
 
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL); !ok {
-		toolcall, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
-		if !ok {
-			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+		toolcall, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, "required default tool routing")
+		if err != nil {
+			return nil, err
 		}
 		r.actions.Set(toolcall.ActionType, toolcall)
 	}
 
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL); !ok {
-		if directCall, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL); ok {
+		if directCall := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, "optional direct tool routing"); directCall != nil {
 			r.actions.Set(directCall.ActionType, directCall)
 		}
 	}
 
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE); !ok {
-		if toolCompose, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE); !ok {
-			log.Warn("loop action 'tool_compose' not found")
-		} else {
+		if toolCompose := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE, "optional composed tool routing"); toolCompose != nil {
 			r.actions.Set(toolCompose.ActionType, toolCompose)
 		}
 	}
 
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); !ok {
-		if loadCap, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); ok {
+		if loadCap := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY, "optional capability discovery"); loadCap != nil {
 			r.actions.Set(loadCap.ActionType, loadCap)
-		}
-	}
-
-	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE); !ok {
-		if verifyNow, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE); ok {
-			r.actions.Set(verifyNow.ActionType, verifyNow)
 		}
 	}
 
 	if r.allowRAG == nil || r.allowRAG() {
 		// allow tool call, must have tools
-		ins, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE)
-		if !ok {
-			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+		ins, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE, "knowledge enhancement enabled")
+		if err != nil {
+			return nil, err
 		}
 		r.actions.Set(ins.ActionType, ins)
 	}
 
 	if r.allowAIForge == nil || r.allowAIForge() {
-		aiforge, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
-		if !ok {
-			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
+		aiforge, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT, "AI Forge enabled")
+		if err != nil {
+			return nil, err
 		}
 		r.actions.Set(aiforge.ActionType, aiforge)
 	}
@@ -729,17 +783,17 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		if r.planExecActionType != "" {
 			planActionType = r.planExecActionType
 		}
-		planAction, ok := GetLoopAction(planActionType)
-		if !ok {
-			return nil, utils.Errorf("loop action %s not found", planActionType)
+		planAction, err := requireRegisteredLoopAction(planActionType, "plan-and-execution enabled")
+		if err != nil {
+			return nil, err
 		}
 		r.actions.Set(planAction.ActionType, planAction)
 	}
 
 	if r.allowUserInteract == nil || r.allowUserInteract() {
-		ac, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
-		if !ok {
-			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
+		ac, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION, "user interaction enabled")
+		if err != nil {
+			return nil, err
 		}
 		r.actions.Set(ac.ActionType, ac)
 	}
@@ -747,30 +801,40 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Register skills actions conditionally
 	if r.skillsContextManager != nil {
 		if r.allowSkillLoading == nil || r.allowSkillLoading() {
-			if loadSkill, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS); ok {
-				r.actions.Set(loadSkill.ActionType, loadSkill)
+			loadSkill, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, "registered skills are available")
+			if err != nil {
+				return nil, err
 			}
-			if loadRes, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES); ok {
-				r.actions.Set(loadRes.ActionType, loadRes)
+			r.actions.Set(loadSkill.ActionType, loadSkill)
+			loadRes, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES, "registered skills are available")
+			if err != nil {
+				return nil, err
 			}
+			r.actions.Set(loadRes.ActionType, loadRes)
 		}
 		if r.allowSkillViewOffset == nil || r.allowSkillViewOffset() {
-			if changeOffset, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET); ok {
-				r.actions.Set(changeOffset.ActionType, changeOffset)
+			changeOffset, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET, "truncated skill views are available")
+			if err != nil {
+				return nil, err
 			}
+			r.actions.Set(changeOffset.ActionType, changeOffset)
 		}
 	}
 
 	if IsMCPServersAllowed(invoker) {
 		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS); !ok {
-			if queryMCPServers, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS); ok {
-				r.actions.Set(queryMCPServers.ActionType, queryMCPServers)
+			queryMCPServers, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS, "MCP servers enabled")
+			if err != nil {
+				return nil, err
 			}
+			r.actions.Set(queryMCPServers.ActionType, queryMCPServers)
 		}
 		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS); !ok {
-			if queryMCPTools, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS); ok {
-				r.actions.Set(queryMCPTools.ActionType, queryMCPTools)
+			queryMCPTools, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS, "MCP servers enabled")
+			if err != nil {
+				return nil, err
 			}
+			r.actions.Set(queryMCPTools.ActionType, queryMCPTools)
 		}
 	}
 

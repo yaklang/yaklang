@@ -59,6 +59,13 @@ func LoadHTTPFlowResponsePacket(flow *schema.HTTPFlow) ([]byte, error) {
 	if flow == nil {
 		return nil, utils.Error("flow is nil")
 	}
+	// Streaming responses (e.g. SSE) and too-large responses both persist
+	// headers and body in separate spill files. Prefer the spill files when
+	// available so History/API can reconstruct the actual response rather
+	// than only the header skeleton stored in the database.
+	if (flow.IsTooLargeResponse || flow.IsReadTooSlowResponse) && flow.TooLargeResponseHeaderFile != "" && flow.TooLargeResponseBodyFile != "" {
+		return readHTTPFlowSpillPacket(flow.TooLargeResponseHeaderFile, flow.TooLargeResponseBodyFile)
+	}
 	if flow.Response != "" {
 		respRaw, err := strconv.Unquote(flow.Response)
 		if err != nil {
@@ -67,9 +74,6 @@ func LoadHTTPFlowResponsePacket(flow *schema.HTTPFlow) ([]byte, error) {
 		if len(respRaw) > 0 {
 			return []byte(respRaw), nil
 		}
-	}
-	if flow.IsTooLargeResponse && flow.TooLargeResponseHeaderFile != "" && flow.TooLargeResponseBodyFile != "" {
-		return readHTTPFlowSpillPacket(flow.TooLargeResponseHeaderFile, flow.TooLargeResponseBodyFile)
 	}
 	return nil, nil
 }

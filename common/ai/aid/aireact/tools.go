@@ -1,6 +1,9 @@
 package aireact
 
 import (
+	"context"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 )
@@ -19,6 +22,9 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithDisableIncreaseIteration(true),
 	}
 	basicOption = append(basicOption, opts...)
+	// Keep the legacy transaction retry cadence for async test coordination,
+	// while avoiding production-scale exponential waits in nested test configs.
+	basicOption = append(basicOption, testAIRetryWaitOption())
 	ins, err := NewReAct(
 		basicOption...,
 	)
@@ -28,4 +34,17 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	ins.memoryTriage.SetInvoker(ins)
 	ins.config.SetConfig("test_yaklang_aikb_rag", true)
 	return ins, nil
+}
+
+func testAIRetryWaitOption() aicommon.ConfigOption {
+	return aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error {
+		timer := time.NewTimer(100 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return nil
+		}
+	})
 }

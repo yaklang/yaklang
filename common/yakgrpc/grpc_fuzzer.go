@@ -48,6 +48,16 @@ var (
 	fuzzerSessionPreFix  = "__FUZZER_SESSION__"
 )
 
+func ensureLowhttpHiddenIndex(r *lowhttp.LowhttpResponse) string {
+	if r == nil {
+		return uuid.NewString()
+	}
+	if strings.TrimSpace(r.HiddenIndex) == "" {
+		r.HiddenIndex = uuid.NewString()
+	}
+	return r.HiddenIndex
+}
+
 func Chardet(raw []byte) string {
 	res, err := chardet.NewTextDetector().DetectBest(raw)
 	if err != nil {
@@ -307,18 +317,23 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		return nil, utils.Error("cannot find redirect url")
 	}
 
-	isHttps := req.GetIsHttps()
+	originIsHttps := req.GetIsHttps()
+	isHttps := originIsHttps
 	if strings.HasPrefix(result, "https://") {
 		isHttps = true
 	}
 	if strings.HasPrefix(result, "http://") {
 		isHttps = false
 	}
-	_ = isHttps
-	newUrl := lowhttp.MergeUrlFromHTTPRequest([]byte(req.GetRequest()), result, isHttps)
-	resultRequest := lowhttp.UrlToGetRequestPacket(newUrl, []byte(req.GetRequest()), isHttps, lowhttp.ExtractCookieJarFromHTTPResponse([]byte(req.GetResponse()))...)
-	if resultRequest == nil {
-		return nil, utils.Errorf("cannot merge request packet. redirect url: %s", newUrl)
+	newUrl := lowhttp.MergeUrlFromHTTPRequest([]byte(req.GetRequest()), result, originIsHttps)
+	resultRequest, err := lowhttp.BuildRedirectRequestFromResponse(
+		newUrl,
+		[]byte(req.GetRequest()),
+		[]byte(req.GetResponse()),
+		originIsHttps,
+	)
+	if err != nil {
+		return nil, utils.Wrapf(err, "cannot build redirect request. redirect url: %s", newUrl)
 	}
 	start := time.Now()
 	host, port, _ := utils.ParseStringToHostPort(newUrl)
@@ -385,8 +400,9 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 	}
 
+	method := lowhttp.GetHTTPRequestMethod(resultRequest)
 	rsp := &ypb.FuzzerResponse{
-		Method:                "GET",
+		Method:                method,
 		ResponseRaw:           rspRaw,
 		GuessResponseEncoding: Chardet(rspRaw),
 		RequestRaw:            resultRequest,
@@ -1203,7 +1219,27 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_WithSimple(true)))
 		}
 		if req.GetFuzzTagSyncIndex() {
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_SyncTag(true)))
+			syncOpts := []mutate.FuzzConfigOpt{mutate.Fuzz_SyncTag(true)}
+			if len(mergedParams) > 0 {
+				// Request variables are already expanded by PreRenderVariables. Treat the
+				// selected scalar as dynamic here so a single-valued {{p(...)}} remains
+				// available for every row of a longer pitchfork payload group. Keep list
+				// values non-dynamic so their indexed pitchfork behavior is unchanged.
+				paramValues := func(name string) []string {
+					if value, ok := mergedParams[name]; ok {
+						return utils.InterfaceToStringSlice(value)
+					}
+					return []string{""}
+				}
+				syncOpts = append(syncOpts, mutate.Fuzz_WithExtraFuzzTag("params", &mutate.FuzzTagDescription{
+					TagName: "params",
+					Handler: paramValues,
+					IsDynFun: func(_, name string) bool {
+						return len(paramValues(name)) <= 1
+					},
+				}))
+			}
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(syncOpts...))
 		}
 		if !isPause {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExternSwitch(sw))
@@ -1301,6 +1337,12 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 						if chunkInfo == nil {
 							continue
 						}
+						// 仅统计响应方向的增量（SSE body delta）。请求分块
+						// （Direction=REQUEST）是请求 body 的发送记录，不应计入响应长度，
+						// 否则开启分块传输时会把请求 body 当作响应内容回显。
+						if chunkInfo.Direction == ypb.ChunkedDataDirection_CHUNKED_DATA_DIRECTION_REQUEST {
+							continue
+						}
 						deltaLen += int64(len(chunkInfo.Data))
 						if chunkInfo.IsFinal {
 							isFinal = true
@@ -1336,6 +1378,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					TaskId:      int64(taskID),
 					Payloads:    result.Payloads,
 					RuntimeID:   runtimeID,
+					HiddenIndex: ensureLowhttpHiddenIndex(result.LowhttpResponse),
 					BodyLength:  totalLen,
 					DurationMs:  result.DurationMs,
 				}
@@ -1382,7 +1425,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 
 			if result.Error != nil {
 				log.Errorf("http pool error: %s", result.Error)
-				hiddenIndex := ""
+				hiddenIndex := ensureLowhttpHiddenIndex(result.LowhttpResponse)
 				rsp := &ypb.FuzzerResponse{}
 				rsp.RequestRaw = result.RequestRaw
 				rsp.UUID = uuid.New().String()
@@ -1392,14 +1435,11 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				rsp.TaskId = int64(taskID)
 				rsp.Payloads = payloads
 				rsp.RuntimeID = runtimeID
+				rsp.HiddenIndex = hiddenIndex
 				rsp.ResponseRaw = result.ResponseRaw
 				if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
 					SetFuzzerRespTraceInfo(rsp, result.LowhttpResponse.TraceInfo)
 					rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
-					hiddenIndex = result.LowhttpResponse.HiddenIndex
-				}
-				if hiddenIndex == "" {
-					hiddenIndex = uuid.NewString()
 				}
 
 				task.HTTPFlowFailedCount++
@@ -1478,6 +1518,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			}
 
 			if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() && result.LowhttpResponse != nil {
+				ensureLowhttpHiddenIndex(result.LowhttpResponse)
 				yakit.SaveLowHTTPFlow(result.LowhttpResponse, false)
 			}
 
@@ -1525,6 +1566,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,
 				RuntimeID:                  runtimeID,
+				HiddenIndex:                ensureLowhttpHiddenIndex(result.LowhttpResponse),
 				IsAutoFixContentType:       isAutoFixContentType,
 				OriginalContentType:        originContentType,
 				FixContentType:             fixContentType,
@@ -1678,6 +1720,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					}
 
 					if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+						ensureLowhttpHiddenIndex(redirectRes)
 						yakit.SaveLowHTTPFlow(redirectRes, false)
 					}
 
@@ -1690,6 +1733,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 						Payloads:              payloads,
 						IsHTTPS:               redirectRes.Https,
 						RuntimeID:             runtimeID,
+						HiddenIndex:           ensureLowhttpHiddenIndex(redirectRes),
 					}
 					if redirectRes != nil && redirectRes.TraceInfo != nil {
 						SetFuzzerRespTraceInfo(redirectRsp, redirectRes.TraceInfo)
@@ -1746,9 +1790,9 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 							}
 						}
 					}
-					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.Uuid, redirectRsp)
-					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					redirectRsp.TaskId = int64(taskID)
+					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.Uuid, redirectRsp)
+					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRsp.HiddenIndex, redirectRsp)
 					err := feedbackResponse(redirectRsp, false, false)
 					if err != nil {
 						log.Errorf("send to client failed: %s", err)
@@ -1760,9 +1804,9 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
 			}
-			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.Uuid, rsp)
-			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
+			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.Uuid, rsp)
+			yakit.SaveWebFuzzerResponseEx(int(task.ID), rsp.HiddenIndex, rsp)
 			err := feedbackResponse(rsp, false, skipSendForSSEFinal)
 			if du := time.Now().Sub(feedbackNormalResponseStart); du > time.Second {
 				log.Warnf("feedbackNormalResponse cost too much time, try investigate it, cost: %v", du)

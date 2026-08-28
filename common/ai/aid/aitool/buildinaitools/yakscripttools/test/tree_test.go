@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -582,5 +583,40 @@ func TestTreeTool_LargeDir_PaginationCoversAll(t *testing.T) {
 	for i := range fullSorted {
 		assert.Equal(t, fullSorted[i], pagedSorted[i],
 			"sorted entry[%d] mismatch: want %q got %q", i, fullSorted[i], pagedSorted[i])
+	}
+}
+
+// TestTreeTool_SlashNormalizedPath_RespectsMaxDepth verifies that AI-style
+// forward-slash paths (and trailing slashes) do not inflate relative depth
+// past the default max-depth=6. On Windows filesys.Recursive yields native
+// backslash paths; TrimPrefix against C:/... used to fail and drop the tree.
+func TestTreeTool_SlashNormalizedPath_RespectsMaxDepth(t *testing.T) {
+	tool := getTreeTool(t)
+	root := buildTreeTestDir(t)
+	slashRoot := filepath.ToSlash(root)
+
+	run := func(label, path string) []string {
+		t.Helper()
+		out := execTreeTool(t, tool, aitool.InvokeParams{
+			"path":      path,
+			"max-lines": 0,
+			"exclude":   "",
+			"max-depth": 6,
+		})
+		t.Logf("%s path=%q\n%s", label, path, out)
+		lines := extractEntryLines(out)
+		assert.Equal(t, 13, len(lines),
+			"%s: expected 13 entries under max-depth=6, got %d: %v", label, len(lines), lines)
+		return lines
+	}
+
+	native := run("native", root)
+	slash := run("forward-slash", slashRoot)
+	trailing := run("forward-slash-trailing", slashRoot+"/")
+	assert.DeepEqual(t, native, slash)
+	assert.DeepEqual(t, native, trailing)
+
+	if runtime.GOOS == "windows" {
+		run("native-trailing-backslash", root+`\`)
 	}
 }

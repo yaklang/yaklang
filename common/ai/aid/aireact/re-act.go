@@ -31,6 +31,8 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 )
 
+const MainTaskQueueName = "react-main-queue"
+
 // 同步类型常量
 const (
 	SYNC_TYPE_QUEUE_INFO                = "queue_info"
@@ -79,7 +81,8 @@ type ReAct struct {
 	inputChanx *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// 任务队列相关
-	currentTask aicommon.AIStatefulTask // 当前正在处理的任务
+	currentTaskMu sync.RWMutex
+	currentTask   aicommon.AIStatefulTask // 当前正在处理的任务
 
 	lastTask aicommon.AIStatefulTask // 上一个完成的任务
 
@@ -87,11 +90,12 @@ type ReAct struct {
 	RuntimeTasks           []aicommon.AIStatefulTask
 	UpdateRuntimeTaskMutex sync.Mutex
 
-	currentPlanExecution aicommon.AIStatefulTask
-	taskQueue            *TaskQueue // 任务队列
-	queueProcessor       sync.Once  // 确保队列处理器只启动一次
-	mirrorMutex          sync.RWMutex
-	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
+	currentPlanExecutionMu sync.RWMutex
+	currentPlanExecution   aicommon.AIStatefulTask
+	taskQueue              *TaskQueue // 任务队列
+	queueProcessor         sync.Once  // 确保队列处理器只启动一次
+	mirrorMutex            sync.RWMutex
+	mirrorOfAIInputEvent   map[string]func(*ypb.AIInputEvent)
 
 	saveTimelineThrottle func(func())
 	artifacts            *filesys.RelLocalFs
@@ -160,17 +164,19 @@ func (r *ReAct) SetCurrentPlanExecutionTask(t aicommon.AIStatefulTask) {
 	if r == nil {
 		return
 	}
+	r.currentPlanExecutionMu.Lock()
 	r.currentPlanExecution = t
+	r.currentPlanExecutionMu.Unlock()
 }
 
 func (r *ReAct) GetCurrentPlanExecutionTask() aicommon.AIStatefulTask {
 	if r == nil {
 		return nil
 	}
-	if r.currentPlanExecution == nil {
-		return nil
-	}
-	return r.currentPlanExecution
+	r.currentPlanExecutionMu.RLock()
+	task := r.currentPlanExecution
+	r.currentPlanExecutionMu.RUnlock()
+	return task
 }
 
 func (r *ReAct) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {
@@ -227,7 +233,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	react := &ReAct{
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
-		taskQueue:            NewTaskQueue("react-main-queue"),
+		taskQueue:            NewTaskQueue(MainTaskQueueName),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            nil, // lazy: created in ensureWorkDirectory
@@ -493,29 +499,44 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) (ret error) {
 
 // AddToTimeline 添加条目到时间线
 func (r *ReAct) AddToTimeline(entryType, content string) {
-	msg := new(bytes.Buffer)
-	if entryType != "" {
-		msg.WriteString(fmt.Sprintf("[%s]", entryType))
-	} else {
-		msg.WriteString("[note]")
+	r.addToTimelineWithPromptProjection(entryType, content, "")
+}
+
+// AddToTimelineWithPromptProjection records a display-safe timeline entry and
+// an alternate prompt-only representation. It is intentionally not part of the
+// public AIInvokeRuntime contract; ReActLoop discovers it through a narrow
+// optional interface so existing runtimes and test doubles remain compatible.
+func (r *ReAct) AddToTimelineWithPromptProjection(entryType, content, promptContent string) {
+	r.addToTimelineWithPromptProjection(entryType, content, promptContent)
+}
+
+func (r *ReAct) addToTimelineWithPromptProjection(entryType, content, promptContent string) {
+	buildMessage := func(body string) string {
+		msg := new(bytes.Buffer)
+		if entryType != "" {
+			msg.WriteString(fmt.Sprintf("[%s]", entryType))
+		} else {
+			msg.WriteString("[note]")
+		}
+
+		t := r.GetCurrentTask()
+		if t != nil {
+			msg.WriteString(fmt.Sprintf(" [task:%s]:\n", t.GetId()))
+		} else {
+			msg.WriteString(":\n")
+		}
+		// Keep body text unindented; the timeline renderer already emits a
+		// per-item header and legacy readers safely tolerate the compact form.
+		msg.WriteString(body)
+		return msg.String()
 	}
 
-	t := r.GetCurrentTask()
-	taskId := ""
-	if t != nil {
-		taskId = t.GetId()
-		msg.WriteString(fmt.Sprintf(" [task:%s]:\n", taskId))
-	} else {
-		msg.WriteString(":\n")
+	displayText := buildMessage(content)
+	promptText := ""
+	if promptContent != "" {
+		promptText = buildMessage(promptContent)
 	}
-	// 旧实现给 body 整体加过 '  ' 缩进, 当时是为了让人类阅读 dump 时一眼区分
-	// 'header line' 与 'body lines'. timeline 渲染 (TimelineIntervalBlock.Render)
-	// 现在已经为每个 item 输出独立的 'HH:MM:SS [type/...]' 行头, 缩进对 LLM 不再
-	// 提供任何信息, 只消耗 token. 直接拼 body 即可, humanReadable parser 端的
-	// removeIndent 在新数据无前缀时是 no-op, 向后兼容历史持久化.
-	// 关键词: ReAct.AddToTimeline 去掉 body 缩进, prompt token 节省
-	msg.WriteString(content)
-	r.config.Timeline.PushText(r.config.AcquireId(), msg.String())
+	r.config.Timeline.PushTextWithPromptProjection(r.config.AcquireId(), displayText, promptText)
 	r.SaveTimeline()
 }
 
@@ -581,9 +602,11 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 		taskInfo := map[string]interface{}{
 			"id":         task.GetId(),
 			"user_input": task.GetUserInput(),
+			"user_input_uuid": task.GetUserInputUUID(),
 			"status":     task.GetStatus(),
 			"created_at": task.GetCreatedAt(),
 			"focus_mode": task.GetFocusMode(),
+			"is_recovery": task.GetTaskKind() == aicommon.AITaskKind_Recovery,
 		}
 
 		taskInfos = append(taskInfos, taskInfo)

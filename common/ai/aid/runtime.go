@@ -404,30 +404,33 @@ func (r *runtime) invokeTask(current *AiTask) error {
 	}
 
 	if current.GetStatus() == aicommon.AITaskState_Skipped {
-		r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 已跳过 / Task [%s] Skipped", current.Index, current.Index))
+		r.config.planUserStatus(fmt.Sprintf("已跳过「%s」，正在继续", current.Name), fmt.Sprintf("Skipped %q and continuing", current.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 		r.config.EmitInfo("subtask %s was skipped by user, moving to next task", current.Name)
 		return nil
 	}
 	if current.executed() {
-		r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 已完成 / Task [%s] Completed", current.Index, current.Index))
+		r.config.planUserStatus(fmt.Sprintf("「%s」已经完成，正在继续", current.Name), fmt.Sprintf("%q is complete; continuing", current.Name), aicommon.WithStatusCode("plan.task_completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
 		r.config.EmitInfo("subtask %s already completed, moving to next task", current.Name)
 		return nil
 	}
 	if r.config.IsCtxDone() {
-		r.config.planLoadingStatus("执行已取消 / Execution Cancelled")
+		r.config.planUserStatus("任务已经停止", "Task stopped", aicommon.WithStatusCode("plan.stopped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 		return utils.Errorf("coordinator context is done")
 	}
 	if current.IsCtxDone() {
 		if current.GetStatus() == aicommon.AITaskState_Skipped {
-			r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 已跳过 / Task [%s] Skipped", current.Index, current.Index))
+			r.config.planUserStatus(fmt.Sprintf("已跳过「%s」，正在继续", current.Name), fmt.Sprintf("Skipped %q and continuing", current.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 			r.config.EmitInfo("subtask %s context cancelled (skipped), moving to next task", current.Name)
 			return nil
 		}
 		return utils.Errorf("task context is done")
 	}
 
-	r.config.planLoadingStatus(fmt.Sprintf("准备执行任务 [%s]: %s / Preparing Task [%s]: %s",
-		current.Index, current.Name, current.Index, current.Name))
+	r.config.planUserStatus(
+		fmt.Sprintf("正在处理「%s」", current.Name),
+		fmt.Sprintf("Working on %q", current.Name),
+		aicommon.WithStatusCode("plan.task_running"),
+	)
 
 	r.config.EmitInfo("invoke subtask: %v", current.Name)
 	current.ForceSetStatus(aicommon.AITaskState_Processing) // recovery 时允许从终态强制回到执行中
@@ -450,10 +453,12 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 
 	r.setActiveStage(stageIdx, stageNodes)
 	representative := r.representativeTask()
-	r.config.planLoadingStatus(fmt.Sprintf(
-		"执行阶段 %d/%d（%d 个任务） / Executing Stage %d/%d (%d Tasks)",
-		stageIdx+1, totalStages, len(stageNodes), stageIdx+1, totalStages, len(stageNodes),
-	))
+	r.config.planUserStatus(
+		fmt.Sprintf("正在推进第 %d/%d 个阶段，共 %d 项任务", stageIdx+1, totalStages, len(stageNodes)),
+		fmt.Sprintf("Running stage %d/%d with %d tasks", stageIdx+1, totalStages, len(stageNodes)),
+		aicommon.WithStatusCode("plan.stage_running"),
+		aicommon.WithStatusProgress(int64(stageIdx+1), int64(totalStages), "stage"),
+	)
 	r.config.savePlanAndExecState(Phase_NotCompleted, representative)
 
 	concurrency := r.config.GetPlanExecTaskConcurrency()
@@ -496,11 +501,13 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 			if result.task != nil {
 				r.finishActiveTask(result.task.TaskId)
 			}
-			r.config.planLoadingStatus(fmt.Sprintf(
-				"执行进度: %d/%d - 当前阶段 %d/%d / Progress: %d/%d - Stage %d/%d",
-				r.currentProgressIndex(), totalTasks, stageIdx+1, totalStages,
-				r.currentProgressIndex(), totalTasks, stageIdx+1, totalStages,
-			))
+			completed := r.currentProgressIndex()
+			r.config.planUserStatus(
+				fmt.Sprintf("任务进度 %d/%d，正在继续推进", completed, totalTasks),
+				fmt.Sprintf("Task progress %d/%d; continuing", completed, totalTasks),
+				aicommon.WithStatusCode("plan.progress"),
+				aicommon.WithStatusProgress(int64(completed), int64(totalTasks), "task"),
+			)
 			r.config.savePlanAndExecState(Phase_NotCompleted, r.representativeTask())
 			if result.err != nil && firstErr == nil {
 				failedTask = result.task
@@ -563,11 +570,13 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 		if result.task != nil {
 			r.finishActiveTask(result.task.TaskId)
 		}
-		r.config.planLoadingStatus(fmt.Sprintf(
-			"执行进度: %d/%d - 当前阶段 %d/%d / Progress: %d/%d - Stage %d/%d",
-			r.currentProgressIndex(), totalTasks, stageIdx+1, totalStages,
-			r.currentProgressIndex(), totalTasks, stageIdx+1, totalStages,
-		))
+		completed := r.currentProgressIndex()
+		r.config.planUserStatus(
+			fmt.Sprintf("任务进度 %d/%d，正在继续推进", completed, totalTasks),
+			fmt.Sprintf("Task progress %d/%d; continuing", completed, totalTasks),
+			aicommon.WithStatusCode("plan.progress"),
+			aicommon.WithStatusProgress(int64(completed), int64(totalTasks), "task"),
+		)
 		r.config.savePlanAndExecState(Phase_NotCompleted, r.representativeTask())
 		if result.err != nil && firstErr == nil {
 			failedTask = result.task
@@ -683,7 +692,7 @@ func (r *runtime) Invoke(task *AiTask, startTaskID string) (retErr error) {
 
 		stageIdx, stageNodes, ok := r.nextPendingStage(graph)
 		if !ok {
-			r.config.planLoadingStatus("所有任务执行完成 / All Tasks Completed")
+			r.config.planUserStatus("所有任务都已经完成", "All tasks are complete", aicommon.WithStatusCode("plan.completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
 			phase = Phase_Completed
 			currentTask = nil
 			return nil
@@ -696,21 +705,21 @@ func (r *runtime) Invoke(task *AiTask, startTaskID string) (retErr error) {
 				isSkipped := failedTask.GetStatus() == aicommon.AITaskState_Skipped
 				isContextCanceled := strings.Contains(err.Error(), "context canceled") || strings.Contains(err.Error(), "context done")
 				if isSkipped || (isContextCanceled && failedTask.GetStatus() == aicommon.AITaskState_Skipped) {
-					r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 用户跳过,继续下一个 / Task [%s] User Skipped, Continuing", failedTask.Index, failedTask.Index))
+					r.config.planUserStatus(fmt.Sprintf("已跳过「%s」，正在继续下一项", failedTask.Name), fmt.Sprintf("Skipped %q and continuing", failedTask.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 					r.config.EmitInfo("task %s was skipped by user, continuing to next task", failedTask.Name)
 					continue
 				}
 			}
 			if r.config.IsCtxDone() {
-				r.config.planLoadingStatus("用户终止执行 / User Terminated Execution")
+				r.config.planUserStatus("任务已经停止", "Task stopped", aicommon.WithStatusCode("plan.stopped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 				r.config.EmitInfo("coordinator context cancelled, stopping execution")
 				return err
 			}
 			if failedTask != nil {
-				r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 执行失败 / Task [%s] Failed", failedTask.Index, failedTask.Index))
+				r.config.planUserStatus(fmt.Sprintf("处理「%s」时遇到问题", failedTask.Name), fmt.Sprintf("A problem occurred while working on %q", failedTask.Name), aicommon.WithStatusCode("plan.task_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 				r.config.EmitPlanExecFail("invoke task[%s] failed: %v", failedTask.Name, err)
 			} else {
-				r.config.planLoadingStatus("阶段执行失败 / Stage Execution Failed")
+				r.config.planUserStatus("推进当前阶段时遇到问题", "A problem occurred in the current stage", aicommon.WithStatusCode("plan.stage_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 				r.config.EmitPlanExecFail("invoke stage failed: %v", err)
 			}
 			r.config.EmitError("invoke subtask failed: %v", err)

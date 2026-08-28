@@ -8,28 +8,17 @@ import (
 )
 
 func TestCheckCodeAndFormatErrors_FunctionParameterTypes(t *testing.T) {
-	// Test the specific case from the error log
 	code := `
-// 结果处理
-found := false
-bruteTask.SetResultHandler(func(result map[string]interface{}) {
+handler = func(result map[string]interface{}) {
     if result["status"] == "success" {
-        found = true
-        yakit.StatusCard("爆破成功", "找到有效凭证", "brute-success", "success")
+        println("ok")
     }
-})
+}
+_ = handler
 `
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
-
-	// Should have blocking errors
-	assert.True(t, hasBlockingErrors, "Should have blocking errors for function parameter types")
-
-	// Should contain intelligent hint about function parameter types
-	assert.Contains(t, errorMsg, "AI助手提示:", "Should contain AI assistant hint")
-	assert.Contains(t, errorMsg, "Yaklang DSL 中函数参数不允许有类型声明", "Should contain specific hint about parameter types")
-	assert.Contains(t, errorMsg, "错误: func(result map[string]interface{})", "Should show incorrect syntax")
-	assert.Contains(t, errorMsg, "正确: func(result)", "Should show correct syntax")
+	assert.False(t, hasBlockingErrors, "typed func param should parse; blocking=%v msg=%s", hasBlockingErrors, errorMsg)
 }
 
 func TestCheckCodeAndFormatErrors_VariableTypeDeclarations(t *testing.T) {
@@ -140,31 +129,6 @@ _ = count
 	assert.Empty(t, errorMsg, "Valid code should not have error messages")
 }
 
-func TestGetIntelligentErrorHint_FunctionParameterTypes(t *testing.T) {
-	// This is a unit test for the helper function
-	// We can't easily test it directly since it's not exported,
-	// but the integration tests above cover the functionality
-
-	// Test that the main function works correctly
-	code := `bruteTask.SetResultHandler(func(result map[string]interface{}) {`
-
-	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
-
-	if hasBlockingErrors {
-		// Should contain the specific hint we're looking for
-		expectedHints := []string{
-			"AI助手提示:",
-			"函数参数不允许有类型声明",
-			"func(result map[string]interface{})",
-			"func(result)",
-		}
-
-		for _, hint := range expectedHints {
-			assert.Contains(t, errorMsg, hint, "Should contain hint: %s", hint)
-		}
-	}
-}
-
 func TestCheckCodeAndFormatErrors_EmptyCode(t *testing.T) {
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors("")
 
@@ -189,11 +153,10 @@ func test(param string) {
 		// Should contain AI hints
 		assert.Contains(t, errorMsg, "AI助手提示:", "Should contain AI assistant hints")
 
-		// May contain hints about package, import, or parameter types
+		// May contain hints about package / import / var types
 		// depending on which error is processed first
 		hasRelevantHint := strings.Contains(errorMsg, "package 声明") ||
 			strings.Contains(errorMsg, "import 语句") ||
-			strings.Contains(errorMsg, "函数参数") ||
 			strings.Contains(errorMsg, "变量声明")
 
 		assert.True(t, hasRelevantHint, "Should contain at least one relevant hint")
@@ -201,7 +164,7 @@ func test(param string) {
 }
 
 func TestCheckCodeAndFormatErrors_CodeLineBaseOffsetsDisplayedLines(t *testing.T) {
-	code := "func bad(x string) {\n}\n"
+	code := "import \"fmt\"\n"
 	baseMsg, blocking := checkCodeAndFormatErrors(code)
 	assert.True(t, blocking)
 	assert.NotEmpty(t, baseMsg)

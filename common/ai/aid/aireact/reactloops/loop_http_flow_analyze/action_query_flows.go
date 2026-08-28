@@ -48,7 +48,7 @@ var queryHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			reactloops.EmitActionLog(loop, "http-flow-query", line1)
 
 			// === 2. 发送瞬时状态 ===
-			reactloops.EmitStatus(loop, "查询流量中 / Querying Flows...")
+			reactloops.EmitStatusI18n(loop, "查询流量中", "Querying Flows...")
 
 			// === 3. 执行查询 ===
 			db := consts.GetGormProjectDatabase()
@@ -131,7 +131,11 @@ var queryHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			saveQueryResult(loop, queryResult)
 
 			// === 8. 发送完成状态 ===
-			reactloops.EmitStatus(loop, fmt.Sprintf("查询完成，找到 %d 条流量 / Query Complete, Found %d Flows", total, total))
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("查询完成，找到 %d 条流量", total),
+				fmt.Sprintf("Query complete; found %d flows", total),
+			)
 
 			// === 9. 构建第二行累积流（结果摘要）===
 			line2 := fmt.Sprintf("完成: 找到 %d 条流量",

@@ -32,7 +32,8 @@
 9. modify_http_request：当需要修改当前有效 HTTP 数据包，并把 merge 结果明确展示给用户时使用。修改后应保留前一个版本、当前版本、修改原因和审核结果。
 10. generate_and_send_packet：当需要 AI 直接生成完整原始 HTTP 数据包并立即发送测试时使用。必须通过 AITAG 输出完整原始包。
 11. generate_risk：当已有明确漏洞证据，或有可辩护的潜在风险需要落库时，生成一条或多条 Yakit Risk。单条可直接写顶层字段；多条必须使用 risks 数组。每条 risk 都要写清 target、title、risk_type、severity、description、details、payload 等核心字段。
-12. directly_answer：仅用于回答测试过程中的简短问题，例如当前发现、下一步计划、为什么怀疑某漏洞、为什么需要人工审核。不要把它用于替代 fuzz、改包、整包生成或 risk 落库。
+12. decrypt_data：当用户提供密文 + 密钥并要求解密时使用（典型场景：数据包里的加密参数、Cookie、Body 字段，用户给了 key）。这是一个离线非 fuzz 动作，不发送任何请求，只做本地解密计算。需明确 algorithm、key、data；iv/padding/data_encoding 按实际情况补充。
+13. directly_answer：仅用于回答测试过程中的简短问题，例如当前发现、下一步计划、为什么怀疑某漏洞、为什么需要人工审核。不要把它用于替代 fuzz、改包、整包生成、risk 落库或数据解密。
 
 ### 漏洞分析优先级
 
@@ -116,6 +117,17 @@
 5. `location=body.format` 仅与 `operation=transform` 搭配，可用于 JSON/XML/Form 的格式切换。
 6. `location=auth.basic` 用于改账号密码并自动重编 Base64；`location=auth.bearer.jwt` 用于在无签名校验假设下修改 JWT payload。
 7. 如果只是补一个字段，不要为了这点改动重新生成整包。
+
+### decrypt_data 的使用规则
+
+1. 当用户给出密文 + 密钥要求解密时，优先使用 decrypt_data，而不是 modify_http_request / generate_and_send_packet。解密是离线计算，不发送请求。
+2. 常用算法：aes-cbc、aes-ecb、aes-cfb、aes-ofb、aes-ctr、aes-gcm、des-cbc、des-ecb、3des-cbc、3des-ecb、rc4、sm4-cbc、sm4-ecb、rsa。不确定算法时先分析密文特征（长度、前缀、base64 结构、IV 是否存在），必要时先用 auto_decode / decode 工具排除纯编码。
+3. 数据包中常见的密文是 base64，默认 data_encoding=base64；如果是 hex 则显式指定。密钥默认 utf8，也可以是 hex/base64。
+4. CBC/CFB/OFB/CTR/GCM 模式通常需要 IV（GCM 里叫 nonce）；ECB/RC4/RSA 不需要。
+5. 块模式默认 padding=pkcs7；如果是零填充或不需要填充，显式指定 padding=zero / padding=none。
+6. 如果大段密文需要传入，使用 DECRYPT_DATA AITAG 块输出密文，data 参数可省略。
+7. 解密成功后，明文会写入 loop 状态（decrypt_data_result / decrypt_data_result_hex / decrypt_data_result_base64），后续如需把明文写回数据包再测，可继续用 patch_http_request 或直接基于明文做分析。
+8. 解密失败时，先检查 key 长度（AES-128/192/256 分别要求 16/24/32 字节，DES 8 字节，3DES 24 字节，SM4 16 字节）、IV 长度、padding 和编码是否正确，再调整参数重试。
 
 ### generate_risk 的使用规则
 

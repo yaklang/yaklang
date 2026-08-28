@@ -29,6 +29,29 @@ func suppressInvalidTodoDelta(r *ReActLoop, action *aicommon.Action, err error) 
 	action.DeleteParam("todo_delta")
 }
 
+// validateTodoDeltaBeforeActionVerifier normalizes and validates TODO state
+// before action-specific verification. This ordering is security- and
+// liveness-relevant: a syntactically present but semantically invalid delta
+// must not make directly_answer look like progress and bypass its duplicate
+// output guard. Invalid TODO maintenance remains subordinate to valid tool
+// actions and is suppressed for a later correction.
+func validateTodoDeltaBeforeActionVerifier(r *ReActLoop, action *aicommon.Action) {
+	if r == nil || action == nil || r.config == nil {
+		return
+	}
+	delta, err := aicommon.NormalizeTodoDelta(action)
+	if err != nil {
+		suppressInvalidTodoDelta(r, action, err)
+		return
+	}
+	if delta == nil {
+		return
+	}
+	if err := r.config.ValidateTodoDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), delta); err != nil {
+		suppressInvalidTodoDelta(r, action, err)
+	}
+}
+
 // applyTodoDeltaBottomLine applies the optional increment before the selected
 // action handler, so tool calls, directly_answer, and finish share one path.
 // It returns the parsed *TodoDelta (nil when absent/invalid) so the caller can

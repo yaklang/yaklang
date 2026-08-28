@@ -2,8 +2,10 @@ package aireact
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +25,174 @@ func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionOb
 	sections, ok := raw.([]*reactloops.PromptSectionObservation)
 	require.True(t, ok, "loop prompt sections should be []*reactloops.PromptSectionObservation")
 	return sections
+}
+
+func TestPromptManager_ModelReasoningReplayOnlyEntersMainDecisionPrompt(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	const replayMarker = `<|TIMELINE_MODEL_THINKING_V1_scope1|>
+{"v":1,"reasoning_content":"previous reasoning","content":"{\"@action\":\"object\"}"}
+<|TIMELINE_MODEL_THINKING_V1_END_scope1|>`
+	react.AddToTimelineWithPromptProjection("model_thinking", "previous reasoning", replayMarker)
+
+	baseInput := &reactloops.LoopPromptAssemblyInput{
+		Nonce:           "scope-main",
+		UserQuery:       "continue",
+		TaskInstruction: "decide the next action",
+		Schema:          `{"type":"object"}`,
+	}
+	helpResult, err := react.promptManager.AssembleLoopPrompt(nil, baseInput)
+	require.NoError(t, err)
+	require.NotContains(t, helpResult.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
+
+	mainInput := *baseInput
+	mainInput.IncludeLatestModelReplay = true
+	mainResult, err := react.promptManager.AssembleLoopPrompt(nil, &mainInput)
+	require.NoError(t, err)
+	require.Contains(t, mainResult.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
+
+	tool := aitool.NewWithoutCallback("scope-tool", aitool.WithDescription("scope test tool"))
+	toolParams, err := react.promptManager.GenerateToolParamsPromptWithMeta(tool)
+	require.NoError(t, err)
+	require.NotContains(t, toolParams.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
+
+	lightInput := mainInput
+	lightInput.Nonce = "scope-light"
+	lightInput.Lightweight = true
+	lightResult, err := react.promptManager.AssembleLoopPrompt(nil, &lightInput)
+	require.NoError(t, err)
+	require.Contains(t, lightResult.Prompt, "TIMELINE_MODEL_THINKING_V1_scope1")
+}
+
+func TestPromptManager_ModelReasoningReplayInterleavesTimelineFactsInFinalMessages(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"object"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	const firstReplay = `<|TIMELINE_MODEL_THINKING_V1_interleave1|>
+{"v":1,"reasoning_content":"reason-one","content":"{\"@action\":\"require_tool\"}"}
+<|TIMELINE_MODEL_THINKING_V1_END_interleave1|>`
+	const secondReplay = `<|TIMELINE_MODEL_THINKING_V1_interleave2|>
+{"v":1,"reasoning_content":"reason-two","content":"{\"@action\":\"directly_call_tool\"}"}
+<|TIMELINE_MODEL_THINKING_V1_END_interleave2|>`
+
+	timeline := aicommon.NewTimeline(nil, nil)
+	timeline.PushTextWithPromptProjection(1, "[model_thinking]:\nreason-one", "[model_thinking]:\n"+firstReplay)
+	timeline.PushToolResult(&aitool.ToolResult{ID: 2, Name: "read-first", Success: true, Data: "OBSERVATION_ONE"})
+	timeline.PushTextWithPromptProjection(3, "[model_thinking]:\nreason-two", "[model_thinking]:\n"+secondReplay)
+	timeline.PushToolResult(&aitool.ToolResult{ID: 4, Name: "read-second", Success: true, Data: "OBSERVATION_TWO"})
+
+	// Move the first reasoning/tool pair into an earlier interval so the real
+	// prompt path exercises both Timeline frozen and open sections.
+	serialized, err := aicommon.MarshalTimeline(timeline)
+	require.NoError(t, err)
+	var document map[string]any
+	require.NoError(t, json.Unmarshal([]byte(serialized), &document))
+	idItems := document["id_to_timeline_item"].(map[string]any)
+	idToTs := make(map[string]any, len(idItems))
+	tsToItem := make(map[string]any, len(idItems))
+	base := time.Date(2026, 8, 16, 9, 0, 0, 0, time.UTC)
+	itemTimes := map[string]time.Time{
+		"1": base,
+		"2": base.Add(time.Second),
+		"3": base.Add(4 * time.Minute),
+		"4": base.Add(4*time.Minute + time.Second),
+	}
+	for id, createdAt := range itemTimes {
+		item := idItems[id].(map[string]any)
+		item["created_at"] = createdAt.Format(time.RFC3339Nano)
+		ts := strconv.FormatInt(createdAt.UnixMilli(), 10)
+		idToTs[id] = createdAt.UnixMilli()
+		tsToItem[ts] = item
+	}
+	document["id_to_ts"] = idToTs
+	document["ts_to_timeline_item"] = tsToItem
+	rewritten, err := json.Marshal(document)
+	require.NoError(t, err)
+	react.config.Timeline, err = aicommon.UnmarshalTimeline(string(rewritten))
+	require.NoError(t, err)
+
+	assembled, err := react.promptManager.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{
+		Nonce:                    "interleave-main",
+		UserQuery:                "continue after both observations",
+		TaskInstruction:          "decide the next action",
+		Schema:                   `{"type":"object"}`,
+		IncludeLatestModelReplay: true,
+	})
+	require.NoError(t, err)
+	require.Contains(t, assembled.Prompt, "TIMELINE_MODEL_THINKING_V1_interleave1")
+	require.Contains(t, assembled.Prompt, "TIMELINE_MODEL_THINKING_V1_interleave2")
+
+	restoreThreshold := aicache.SetMinCachableUserSegmentBytesForTest(0)
+	defer restoreThreshold()
+	hijacked := aicache.Observe("memfit-standard-thinking-free", assembled.Prompt)
+	require.NotNil(t, hijacked)
+	require.True(t, hijacked.IsHijacked)
+
+	messageText := func(message aispec.ChatDetail) string {
+		switch content := message.Content.(type) {
+		case string:
+			return content
+		case []*aispec.ChatContent:
+			var text strings.Builder
+			for _, part := range content {
+				if part != nil {
+					text.WriteString(part.Text)
+				}
+			}
+			return text.String()
+		default:
+			return ""
+		}
+	}
+	firstReasoningIndex, secondReasoningIndex := -1, -1
+	for index, message := range hijacked.Messages {
+		require.NotContains(t, messageText(message), "TIMELINE_MODEL_THINKING")
+		switch message.ReasoningContent {
+		case "reason-one":
+			firstReasoningIndex = index
+			require.Contains(t, messageText(message), `"@action":"require_tool"`)
+		case "reason-two":
+			secondReasoningIndex = index
+			require.Contains(t, messageText(message), `"@action":"directly_call_tool"`)
+		}
+	}
+	require.Positive(t, firstReasoningIndex)
+	require.Greater(t, secondReasoningIndex, firstReasoningIndex)
+
+	betweenReasoning := ""
+	for _, message := range hijacked.Messages[firstReasoningIndex+1 : secondReasoningIndex] {
+		betweenReasoning += messageText(message)
+	}
+	require.Contains(t, betweenReasoning, "OBSERVATION_ONE")
+	require.NotContains(t, betweenReasoning, "OBSERVATION_TWO")
+
+	afterSecondReasoning := ""
+	for _, message := range hijacked.Messages[secondReasoningIndex+1:] {
+		afterSecondReasoning += messageText(message)
+	}
+	require.Contains(t, afterSecondReasoning, "OBSERVATION_TWO")
+
+	requestBody, err := json.Marshal(aispec.NewChatMessage("memfit-standard-thinking-free", hijacked.Messages))
+	require.NoError(t, err)
+	require.Equal(t, 2, bytes.Count(requestBody, []byte(`"reasoning_content"`)))
+	require.Less(t, bytes.Index(requestBody, []byte(`"reasoning_content":"reason-one"`)), bytes.Index(requestBody, []byte("OBSERVATION_ONE")))
+	require.Less(t, bytes.Index(requestBody, []byte("OBSERVATION_ONE")), bytes.Index(requestBody, []byte(`"reasoning_content":"reason-two"`)))
+	require.Less(t, bytes.Index(requestBody, []byte(`"reasoning_content":"reason-two"`)), bytes.Index(requestBody, []byte("OBSERVATION_TWO")))
 }
 
 func TestPromptManager_AssembleLoopPrompt_LightweightUsesBoundedRecentTimeline(t *testing.T) {

@@ -1,0 +1,99 @@
+desc(
+	title: "C Null Pointer Dereference"
+	type: audit
+	level: high
+	risk: "空指针解引用"
+	lang: c
+	rule_id: "c5d0e3f6-7a8b-4c9d-0e1f-2a3b4c5d6e7f"
+	title_zh: "C 语言空指针解引用检测"
+	desc: <<<DESC
+### 漏洞描述
+
+检测在指针可能为 NULL / 未初始化时发生的解引用路径（CWE-476）。
+
+分析基于 SSA 空性状态：跟踪 `NULL` / `0` 赋值、条件分支合并后的
+`MaybeNull` 状态，在 `*p`、`p->field` 等显式解引用点报警。
+
+不将「仅作为 call 实参传递」视为解引用；与 UAF 分析相互独立。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+
+1. 解引用前显式判空：`if (p != NULL) { ... }`。
+2. 初始化所有指针；避免未赋值即使用。
+3. 条件分支后若指针可能为空，仅在非空路径解引用，或提前 return。
+4. 结构体嵌套指针字段同样需在访问 `->field` / `*field` 前校验。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-476: NULL Pointer Dereference](https://cwe.mitre.org/data/definitions/476.html)
+REFERENCE
+)
+
+// 1. 定位解引用点（成员访问 / 星号解引用）
+*.* as $use
+*?{opcode: undefined} as $use
+// 2. 确定被解引用的指针
+$use #-> as $ptr
+// 3. 判断该指针是否存在空指针解引用
+$ptr<npd()> as $npd
+
+alert $npd for {
+	title: "Null Pointer Dereference",
+	title_zh: "空指针解引用",
+	level: "high",
+	risk: "空指针解引用",
+	desc: <<<DESC
+指针可能为空时仍发生 *p 或 p->member 等解引用
+DESC
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_npd_arrow.c': <<<UNSAFE
+#include <stdlib.h>
+struct Node { int x; };
+int main() {
+    struct Node *p = 0;
+    p->x = 1;
+    return 0;
+}
+UNSAFE
+	'file://unsafe_npd_maynull.c': <<<UNSAFE2
+#include <stdlib.h>
+struct Node { int x; };
+int main(int c) {
+    struct Node *p = (struct Node*)malloc(sizeof(struct Node));
+    if (c) {
+        p = 0;
+    }
+    p->x = 1;
+    return 0;
+}
+UNSAFE2
+	'file://unsafe_npd_multilevel.c': <<<UNSAFE3
+#include <stdlib.h>
+int main() {
+    int **pp = 0;
+    **pp = 1;
+    return 0;
+}
+UNSAFE3
+	'safefile://safe_null_no_deref.c': <<<SAFE
+#include <stdlib.h>
+int main() {
+    int *p = 0;
+    return 0;
+}
+SAFE
+	'safefile://safe_malloc_use.c': <<<SAFE2
+#include <stdlib.h>
+struct Node { int x; };
+int main() {
+    struct Node *p = (struct Node*)malloc(sizeof(struct Node));
+    p->x = 1;
+    free(p);
+    return 0;
+}
+SAFE2
+)

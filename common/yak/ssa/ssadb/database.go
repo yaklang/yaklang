@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/reportstore"
+	"strings"
 )
 
 var SSAProjectTables = []any{
@@ -121,10 +122,163 @@ func patchIrCodeIndex(db *gorm.DB) {
 			log.Warnf("failed to add index %s: %v", idx.name, err)
 		}
 	}
+
+	// Add UNIQUE constraint on (program_name, code_id) to prevent
+	// duplicate instruction INSERTs from race conditions in the async
+	// persist pipeline. This is a hard database invariant.
+	ensureUniqueIrCodesProgramCodeIndex(db)
+	ensureUniqueIrOffsetsIndex(db)
+}
+
+// deleteDuplicateIrCodes removes every row except the oldest (MIN id) per
+// (program_name, code_id) using a single window query, and returns the number
+// of removed rows. The oldest row is exactly what normal single-read paths
+// return, so existing databases keep behaving identically after the cleanup.
+func deleteDuplicateIrCodes(db *gorm.DB) (int64, error) {
+	res := db.Exec(`DELETE FROM ` + TableIrCodes + ` WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (PARTITION BY program_name, code_id ORDER BY id) AS rn
+			FROM ` + TableIrCodes + `
+		) WHERE rn > 1
+	)`)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
+// deleteDuplicateIrOffsets removes every row except the oldest (MIN id) per
+// composite key using a single window query, and returns the number of
+// removed rows.
+func deleteDuplicateIrOffsets(db *gorm.DB) (int64, error) {
+	res := db.Exec(`DELETE FROM ` + TableIrOffsets + ` WHERE id IN (
+		SELECT id FROM (
+			SELECT id, ROW_NUMBER() OVER (
+				PARTITION BY program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')
+				ORDER BY id
+			) AS rn
+			FROM ` + TableIrOffsets + `
+		) WHERE rn > 1
+	)`)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
+// ensureUniqueIrCodesProgramCodeIndex creates a UNIQUE INDEX on
+// (program_name, code_id) for the ir_codes table. If duplicate rows already
+// exist, the extras are removed (keeping MIN(id)) before the index is
+// created, so legacy databases upgrade cleanly.
+func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
+	if !db.HasTable(TableIrCodes) {
+		return
+	}
+
+	indexName := "ux_ir_codes_program_code"
+
+	// Check if the unique index already exists
+	var exists int64
+	db.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='ir_codes' AND name=?`, indexName).Row().Scan(&exists)
+	if exists > 0 {
+		return // already created
+	}
+
+	// Legacy async-persist runs can leave duplicate rows. Remove every row
+	// except the oldest (MIN id) per (program_name, code_id) in one window
+	// query, so the unique index can be created. This runs only once: after
+	// the index exists the function returns at the top.
+	removed, err := deleteDuplicateIrCodes(db)
+	if err != nil {
+		log.Warnf("[unique-constraint] failed to remove duplicate ir_codes rows: %v", err)
+		return
+	}
+	if removed > 0 {
+		log.Infof("[unique-constraint] removed %d duplicate ir_codes rows (kept MIN(id) per (program_name, code_id))", removed)
+	}
+
+	// No duplicates — safe to create the UNIQUE INDEX
+	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`
+	if err := db.Exec(query).Error; err != nil {
+		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
+	} else {
+		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_codes (program_name, code_id)", indexName)
+	}
+}
+
+// ensureUniqueIrOffsetsIndex creates a UNIQUE INDEX with COALESCE on
+// (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))
+// for the ir_offsets table. This prevents duplicate offset INSERTs.
+//
+// If an older non-COALESCE index with the same name exists, it is dropped and
+// recreated with COALESCE. If duplicate rows exist, the extras are removed
+// (keeping MIN(id)) before the index is created.
+func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
+	if !db.HasTable(TableIrOffsets) {
+		return
+	}
+
+	indexName := "ux_ir_offsets_program_value_file_range"
+
+	// Check if the index exists and whether its SQL uses COALESCE
+	type idxInfo struct {
+		Name string
+		SQL  string
+	}
+	var existing []idxInfo
+	rows, err := db.Raw(
+		`SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`,
+		indexName,
+	).Rows()
+	if err == nil {
+		for rows.Next() {
+			var info idxInfo
+			rows.Scan(&info.Name, &info.SQL)
+			existing = append(existing, info)
+		}
+		rows.Close()
+	}
+
+	// If the index exists with COALESCE, it's up to date — nothing to do
+	for _, info := range existing {
+		if strings.Contains(strings.ToUpper(info.SQL), "COALESCE") {
+			return // already the COALESCE version
+		}
+	}
+
+	// If the index exists WITHOUT COALESCE, drop it so we can recreate
+	if len(existing) > 0 {
+		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
+		if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
+			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
+			return
+		}
+	}
+
+	// Legacy async-persist runs can leave duplicate rows. Remove every row
+	// except the oldest (MIN id) per composite key in one window query, so
+	// the unique index can be created.
+	removed, err := deleteDuplicateIrOffsets(db)
+	if err != nil {
+		log.Warnf("[unique-constraint] failed to remove duplicate ir_offsets rows: %v", err)
+		return
+	}
+	if removed > 0 {
+		log.Infof("[unique-constraint] removed %d duplicate ir_offsets rows (kept MIN(id) per composite key)", removed)
+	}
+
+	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`
+	if err := db.Exec(query).Error; err != nil {
+		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
+	} else {
+		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_offsets (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))", indexName)
+	}
 }
 
 func GetDB() *gorm.DB {
-	return consts.GetGormSSAProjectDataBase()
+	db := consts.GetGormSSAProjectDataBase()
+	EnsureDBOpCallbacks(db)
+	return db
 }
 
 func SetDB(db *gorm.DB) {

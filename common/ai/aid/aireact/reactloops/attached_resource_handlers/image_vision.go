@@ -61,22 +61,32 @@ In cumulative_summary, besides an objective description of the image, explicitly
 
 	for i, imagePath := range imagePaths {
 		base := filepath.Base(imagePath)
-		loop.LoadingStatus(fmt.Sprintf("正在解析附件图片 (%d/%d): %s / Parsing attached image: %s", i+1, len(imagePaths), base, base))
+		loop.UserStatus(
+			fmt.Sprintf("正在理解第 %d/%d 张图片", i+1, len(imagePaths)),
+			fmt.Sprintf("Understanding image %d of %d", i+1, len(imagePaths)),
+			aicommon.WithStatusCode("attachment.image.analyzing"),
+			aicommon.WithStatusDetail(fmt.Sprintf("正在查看「%s」中的关键信息", base), fmt.Sprintf("Reviewing key details in %q", base)),
+			aicommon.WithStatusProgress(int64(i), int64(len(imagePaths)), "image"),
+		)
 
 		statusCb := func(id string, data interface{}, tags ...string) {
-			msg := fmt.Sprintf("图片解析进度 / Image analysis [%s]: %v", id, data)
-			if len(tags) > 0 {
-				msg = fmt.Sprintf("%s tags=%v", msg, tags)
-			}
-			loop.LoadingStatus(msg)
+			log.Debugf("attached image analysis status: id=%s data=%v tags=%v", id, data, tags)
 		}
 
 		log.Infof("attached extra resources: vision analyze attached image %q (%d/%d)", imagePath, i+1, len(imagePaths))
-		analysis, err := aiforge.AnalyzeImageFile(imagePath,
+		analysisOptions := []any{
 			aiforge.WithAnalyzeContext(runCtx),
 			aiforge.WithExtraPrompt(extra),
 			aiforge.WithAnalyzeStatusCard(statusCb),
-		)
+		}
+		if config, ok := loop.GetConfig().(interface {
+			GetVisionPriorityAICallback() aicommon.AICallbackType
+		}); ok {
+			if callback := config.GetVisionPriorityAICallback(); callback != nil {
+				analysisOptions = append(analysisOptions, aiforge.WithVisionAICallback(callback))
+			}
+		}
+		analysis, err := aiforge.AnalyzeImageFile(imagePath, analysisOptions...)
 
 		buf.WriteString(fmt.Sprintf("### %s\n\n", imagePath))
 		if err != nil {
@@ -105,7 +115,13 @@ In cumulative_summary, besides an objective description of the image, explicitly
 		}
 	}
 
-	loop.LoadingStatus("附件图片解析完成 / Finished parsing attached images")
+	loop.UserStatus(
+		"已经理解附件图片，正在结合任务继续处理",
+		"Finished reviewing the attached images and continuing with the task",
+		aicommon.WithStatusCode("attachment.image.ready"),
+		aicommon.WithStatusState(aicommon.StatusStateSuccess),
+		aicommon.WithStatusProgress(int64(len(imagePaths)), int64(len(imagePaths)), "image"),
+	)
 
 	payload := strings.TrimSpace(buf.String())
 	if payload == "" {

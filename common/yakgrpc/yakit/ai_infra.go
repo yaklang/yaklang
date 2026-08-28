@@ -161,6 +161,10 @@ func FilterAgentRuntime(db *gorm.DB, filter *ypb.AITaskFilter) *gorm.DB {
 }
 
 func QueryAgentRuntime(db *gorm.DB, filter *ypb.AITaskFilter, paging *ypb.Paging) (*bizhelper.Paginator, []schema.AIAgentRuntime, error) {
+	if paging == nil {
+		paging = &ypb.Paging{}
+	}
+
 	db = FilterAgentRuntime(db, filter)
 	db = bizhelper.OrderByPaging(db, paging)
 	var aiTasks []schema.AIAgentRuntime

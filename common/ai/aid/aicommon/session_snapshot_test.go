@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,15 +45,15 @@ func TestNotifySessionSnapshotEmit_Immediate(t *testing.T) {
 }
 
 func TestNotifySessionSnapshotEmit_Debounced(t *testing.T) {
-	emitted := 0
+	var emitted atomic.Int32
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	cfg.SetSessionSnapshotEmitHandler(func() {
-		emitted++
+		emitted.Add(1)
 	})
 	cfg.NotifySessionSnapshotEmit()
-	require.Equal(t, 0, emitted)
+	require.Equal(t, int32(0), emitted.Load())
 	time.Sleep(1100 * time.Millisecond)
-	require.Equal(t, 1, emitted)
+	require.Equal(t, int32(1), emitted.Load())
 }
 
 func TestNormalizeSessionSnapshot_FullPayload(t *testing.T) {

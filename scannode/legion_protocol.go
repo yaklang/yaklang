@@ -15,6 +15,12 @@ const (
 	legionCommandHIDSCurrentStateCollect              = "hids.current_state.collect"
 	legionCommandHIDSFileEvidenceCollect              = "hids.file_evidence.collect"
 	legionCommandSSARuleSyncExport                    = "ssa.rule_sync.export"
+	legionCommandSSADebugQuery                        = "ssa.debug.query"
+	legionCommandSSALogTail                           = "ssa.log.tail"
+	legionCommandPluginGroupsList                     = "plugin.groups.list"
+	legionCommandPluginStoreSync                      = "plugin.store.sync"
+	legionCommandPluginStoreSyncStatusQuery           = "plugin.store.sync.status"
+	legionCommandPluginStoreImport                    = "plugin.store.import"
 	legionCommandAISessionBind                        = "ai.session.bind"
 	legionCommandAISessionInput                       = "ai.session.input"
 	legionCommandAISessionAppend                      = "ai.session.context.append"
@@ -80,15 +86,20 @@ const (
 	legionCommandAIMemoryEntityTagsCount              = "ai.memory_entity_tags.count"
 	legionCommandAIHTTPFlowsQuery                     = "ai.http_flows.query"
 	legionCommandAIRisksQuery                         = "ai.risks.query"
+	legionCommandAIRuntimeImageEnsure                 = "ai.runtime.image.ensure"
+	legionCommandAIRuntimeContainerStart              = "ai.runtime.container.start"
+	legionCommandAIRuntimeContainerInspect            = "ai.runtime.container.inspect"
+	legionCommandAIRuntimeContainerStop               = "ai.runtime.container.stop"
 
 	legionEventClaimed                                    = "job.claimed"
 	legionEventStarted                                    = "job.started"
 	legionEventProgress                                   = "job.progressed"
+	legionEventRuleSnapshotPrepared                       = "job.rule_snapshot_prepared"
 	legionEventAsset                                      = "job.asset"
 	legionEventRisk                                       = "job.risk"
 	legionEventReport                                     = "job.report"
 	legionEventArtifactReady                              = "job.artifact_ready"
-	legionEventArtifactUploadFailed                        = "job.artifact_upload_failed"
+	legionEventArtifactUploadFailed                       = "job.artifact_upload_failed"
 	legionEventSucceeded                                  = "job.succeeded"
 	legionEventFailed                                     = "job.failed"
 	legionEventCancelled                                  = "job.cancelled"
@@ -105,6 +116,7 @@ const (
 	legionEventAISessionDone                              = "ai.session.done"
 	legionEventAISessionFailed                            = "ai.session.failed"
 	legionEventAISessionCancelled                         = "ai.session.cancelled"
+	legionEventAISessionClose                             = "ai.session.close"
 	legionEventAISessionTitleUpdated                      = "ai.session.title.updated"
 	legionEventAISessionTitleUpdateFailed                 = "ai.session.title.update.failed"
 	legionEventAISessionDeleteCompleted                   = "ai.session.delete.completed"
@@ -242,6 +254,10 @@ const (
 
 const legionRealtimeHIDSDesiredSpecDryRunResultPrefix = legionRealtimePrefix + ".hids.desired_spec_dry_run.result"
 
+const legionRealtimePluginGroupsResultPrefix = legionRealtimePrefix + ".plugin.groups.result"
+
+const legionRealtimePluginStoreSyncResultPrefix = legionRealtimePrefix + ".plugin.store.sync.result"
+
 func commandSubjectWildcard(base string) string {
 	return trimSubject(base) + ".>"
 }
@@ -267,6 +283,22 @@ func hidsDesiredSpecDryRunResultSubject(commandID string) string {
 		return legionRealtimeHIDSDesiredSpecDryRunResultPrefix
 	}
 	return legionRealtimeHIDSDesiredSpecDryRunResultPrefix + "." + commandID
+}
+
+func pluginGroupsResultSubject(commandID string) string {
+	commandID = strings.TrimSpace(commandID)
+	if commandID == "" {
+		return legionRealtimePluginGroupsResultPrefix
+	}
+	return legionRealtimePluginGroupsResultPrefix + "." + commandID
+}
+
+func pluginStoreSyncResultSubject(commandID string) string {
+	commandID = strings.TrimSpace(commandID)
+	if commandID == "" {
+		return legionRealtimePluginStoreSyncResultPrefix
+	}
+	return legionRealtimePluginStoreSyncResultPrefix + "." + commandID
 }
 
 func trimSubject(value string) string {

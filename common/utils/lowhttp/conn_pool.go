@@ -144,8 +144,11 @@ func addGetIdleConnFinishedCounter() {
 
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
-func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getIdleConn(ctx context.Context, key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
 	//addGetIdleConnRequiredCounter()
+	if err := requestContextError(ctx); err != nil {
+		return nil, err
+	}
 	if l.contextDone() {
 		return nil, utils.Error("lowhttp: context done")
 	}
@@ -154,26 +157,41 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 
 	// H2 connections are managed separately and do not consume the H1 semaphore.
 	if key.scheme == H2 {
-		return l.getOrCreateH2Conn(key, opts...)
+		return l.getOrCreateH2Conn(ctx, key, opts...)
 	}
 
 	// 尝试获取复用连接（H1）
 	if oldPc, ok := l.getFromConn(key); ok {
+		if err := requestContextError(ctx); err != nil {
+			oldPc.closeConn(err)
+			return nil, err
+		}
 		//addGetIdleConnFinishedCounter()
 		return oldPc, nil
 	}
 	// 没有复用连接则新建一个连接
-	if !l.acquireConnSlot() {
-		return nil, utils.Error("lowhttp: conn pool context done")
+	if err := l.acquireConnSlot(ctx); err != nil {
+		return nil, err
 	}
-	pConn, err := newPersistConn(key, l, opts...)
+	pConn, err := newPersistConn(ctx, key, l, opts...)
 	if err != nil {
 		l.releaseConnSlot()
+		if ctxErr := requestContextError(ctx); ctxErr != nil {
+			return nil, ctxErr
+		}
 		// try get idle conn
 		if oldPc, ok := l.getFromConn(key); ok {
+			if ctxErr := requestContextError(ctx); ctxErr != nil {
+				oldPc.closeConn(ctxErr)
+				return nil, ctxErr
+			}
 			//addGetIdleConnFinishedCounter()
 			return oldPc, nil
 		}
+		return nil, err
+	}
+	if err := requestContextError(ctx); err != nil {
+		pConn.closeConn(err)
 		return nil, err
 	}
 	//addGetIdleConnFinishedCounter()
@@ -188,7 +206,10 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 // Concurrent-stream throttling (SETTINGS_MAX_CONCURRENT_STREAMS) is handled
 // inside newStream via streamsCond.Wait() — this function only needs to check
 // whether the connection itself is still structurally usable.
-func (l *LowHttpConnPool) getOrCreateH2Conn(key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getOrCreateH2Conn(ctx context.Context, key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+	if err := requestContextError(ctx); err != nil {
+		return nil, err
+	}
 	hash := key.hash()
 
 	// connUsable returns true when the connection can accept new streams.
@@ -205,6 +226,9 @@ func (l *LowHttpConnPool) getOrCreateH2Conn(key *connectKey, opts ...netx.DialXO
 	if pc, ok := l.h2ConnMap[hash]; ok {
 		if connUsable(pc) {
 			l.h2Mu.Unlock()
+			if err := requestContextError(ctx); err != nil {
+				return nil, err
+			}
 			return pc, nil
 		}
 		// Existing connection is no longer usable; evict it.
@@ -213,13 +237,19 @@ func (l *LowHttpConnPool) getOrCreateH2Conn(key *connectKey, opts ...netx.DialXO
 	l.h2Mu.Unlock()
 
 	// Slow path: establish a new H2 connection (no semaphore consumed).
-	pConn, err := newPersistConn(key, l, opts...)
+	pConn, err := newPersistConn(ctx, key, l, opts...)
 	if err != nil {
+		if ctxErr := requestContextError(ctx); ctxErr != nil {
+			return nil, ctxErr
+		}
 		// Another goroutine may have concurrently established a usable connection.
 		l.h2Mu.Lock()
 		if pc, ok := l.h2ConnMap[hash]; ok {
 			if connUsable(pc) {
 				l.h2Mu.Unlock()
+				if ctxErr := requestContextError(ctx); ctxErr != nil {
+					return nil, ctxErr
+				}
 				return pc, nil
 			}
 		}
@@ -231,6 +261,10 @@ func (l *LowHttpConnPool) getOrCreateH2Conn(key *connectKey, opts ...netx.DialXO
 	// preface failure). Return the conn directly; exec.go detects the scheme
 	// change and switches to the non-pool H1 path.
 	if key.scheme != H2 {
+		if err := requestContextError(ctx); err != nil {
+			pConn.closeNetConn()
+			return nil, err
+		}
 		return pConn, nil
 	}
 
@@ -242,23 +276,43 @@ func (l *LowHttpConnPool) getOrCreateH2Conn(key *connectKey, opts ...netx.DialXO
 			// Prefer the already-stored connection; discard our duplicate.
 			l.h2Mu.Unlock()
 			pConn.closeNetConn()
+			if err := requestContextError(ctx); err != nil {
+				return nil, err
+			}
 			return existing, nil
 		}
+	}
+	if err := requestContextError(ctx); err != nil {
+		l.h2Mu.Unlock()
+		pConn.closeNetConn()
+		return nil, err
 	}
 	l.h2ConnMap[hash] = pConn
 	l.h2Mu.Unlock()
 	return pConn, nil
 }
 
-func (l *LowHttpConnPool) acquireConnSlot() bool {
+func requestContextError(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
+}
+
+func (l *LowHttpConnPool) acquireConnSlot(ctx context.Context) error {
 	if l == nil || l.connSem == nil {
-		return true
+		return requestContextError(ctx)
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	select {
 	case l.connSem <- struct{}{}:
-		return true
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	case <-l.ctx.Done():
-		return false
+		return utils.Error("lowhttp: conn pool context done")
 	}
 }
 
@@ -532,16 +586,60 @@ func (es *bodyEOFSignal) condfn(err error) error {
 	return err
 }
 
-func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
+type dialXResult struct {
+	conn net.Conn
+	err  error
+}
+
+// dialXWithContext lets an individual request stop waiting for connection
+// establishment even though DialX's legacy dialer interface has no context
+// parameter. A connection that completes after cancellation is closed instead
+// of being returned to the pool.
+func dialXWithContext(ctx context.Context, target string, opt ...netx.DialXOption) (net.Conn, error) {
+	if ctx == nil || ctx.Done() == nil {
+		return netx.DialX(target, opt...)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	resultCh := make(chan dialXResult)
+	go func() {
+		conn, err := netx.DialX(target, opt...)
+		result := dialXResult{conn: conn, err: err}
+		select {
+		case resultCh <- result:
+		case <-ctx.Done():
+			if conn != nil {
+				_ = conn.Close()
+			}
+		}
+	}()
+
+	select {
+	case result := <-resultCh:
+		if err := ctx.Err(); err != nil {
+			if result.conn != nil {
+				_ = result.conn.Close()
+			}
+			return nil, err
+		}
+		return result.conn, result.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
 	needProxy := len(key.proxy) > 0
 	opt = append(opt, netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
-	newConn, err := netx.DialX(key.addr, opt...)
+	newConn, err := dialXWithContext(requestCtx, key.addr, opt...)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	persistCtx, cancel := context.WithCancel(context.Background())
 	pc := &persistConn{
-		ctx:        ctx,
+		ctx:        persistCtx,
 		cancel:     cancel,
 		conn:       newConn,
 		mu:         sync.Mutex{},
@@ -580,18 +678,30 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 		pc.h2Conn()
 		if err = pc.alt.preface(); err == nil {
 			go pc.alt.readLoop()
+			// Watch for a server that negotiates h2 and then never sends its
+			// SETTINGS frame; see watchServerPreface for why this must not
+			// gate setup. Requests on such a conn fail fast and the caller
+			// falls back to HTTP/1.1.
+			pc.alt.watchServerPreface()
 			// H2 conn is registered in h2ConnMap by getOrCreateH2Conn after this call returns.
 			return pc, nil
-		} else { // preface fail downgrade
-			key.scheme = H1
-			newH1Conn, err := netx.DialX(key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
-			if err != nil {
-				return nil, err
-			}
-			pc.alt = nil
-			pc.conn = newH1Conn
-			return pc, nil
 		}
+		// client preface failure: tear down the broken h2 conn and
+		// downgrade to HTTP/1.1 (downgraded conns are not reused for h2)
+		key.scheme = H1
+		if pc.alt != nil {
+			pc.alt.setClose()
+		}
+		pc.alt = nil
+		if pc.conn != nil {
+			pc.conn.Close()
+		}
+		newH1Conn, err := dialXWithContext(requestCtx, key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
+		if err != nil {
+			return nil, err
+		}
+		pc.conn = newH1Conn
+		return pc, nil
 	}
 
 	pc.br = bufio.NewReader(pc)
@@ -625,6 +735,7 @@ func (pc *persistConn) h2Conn() {
 		clientPrefaceOk:   utils.NewAtomicBool(),
 		closeCh:           make(chan struct{}),
 		readLoopExited:    make(chan struct{}),
+		serverPrefaceCh:   make(chan struct{}, 1),
 		// pc back-reference: used by setClose() to evict this connection from
 		// the pool's h2ConnMap when it transitions to closed state.
 		pc: pc,
@@ -723,12 +834,45 @@ func (pc *persistConn) readLoop() {
 				_ = pc.conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
 			})
 		}
+
+		// Watch the per-request context (e.g. the MITM upstream context that
+		// is cancelled when the downstream client disconnects during a
+		// long-lived streaming response). When it is cancelled, close the
+		// upstream connection so the blocking conn.Read returns immediately.
+		// Closing (rather than setting a past read deadline) is required
+		// because deadlineExtendingReader resets the deadline to the future
+		// on every Read, which would defeat a past-deadline approach. Without
+		// this watcher, a streaming response (SSE) blocks forever:
+		// ExtendReadDeadline disables the hard timeout and pc.ctx is derived
+		// from context.Background(), not the request context.
+		var ctxWatcherStop chan struct{}
+		if rc.option != nil && rc.option.Ctx != nil {
+			ctxWatcherStop = make(chan struct{})
+			go func(seq uint64, stop chan struct{}) {
+				select {
+				case <-rc.option.Ctx.Done():
+					if atomic.LoadUint64(&pc.reqSeq) != seq {
+						return
+					}
+					_ = pc.conn.Close()
+				case <-stop:
+				}
+			}(seq, ctxWatcherStop)
+		}
+		stopCtxWatcher := func() {
+			if ctxWatcherStop != nil {
+				close(ctxWatcherStop)
+				ctxWatcherStop = nil
+			}
+		}
+
 		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
 		_, err := pc.br.Peek(1)
 		if err != nil {
 			if hardTimeoutTimer != nil {
 				hardTimeoutTimer.Stop()
 			}
+			stopCtxWatcher()
 			if errors.Is(err, io.EOF) {
 				pc.sawEOF = true
 				closeErr = errServerClosedIdle
@@ -926,6 +1070,11 @@ func (pc *persistConn) readLoop() {
 		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
 			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "conn pool stream handler")
 		}
+
+		// Stop the per-request context watcher before sending the response:
+		// the read is done, so a late cancel must not perturb the next
+		// iteration's deadline.
+		stopCtxWatcher()
 
 		//pc.mu.Lock()
 		////pc.numExpectedResponses-- // 减少预期响应数量

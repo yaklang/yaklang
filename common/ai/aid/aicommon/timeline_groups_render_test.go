@@ -225,10 +225,10 @@ func TestGroupByMinutes_TypeVerbose(t *testing.T) {
 	blocks := tl.GroupByMinutes(3).GetBlocks()
 	require.Len(t, blocks, 1)
 	rendered := blocks[0].Render()
-	require.Contains(t, rendered, "[tool/scanX ok]")
+	require.Contains(t, rendered, "[tool/scanX]")
 	require.Contains(t, rendered, "[user/review]")
 	require.Contains(t, rendered, "[text/note]")
-	require.Contains(t, rendered, "[tool/scanY fail]")
+	require.Contains(t, rendered, "[tool/scanY]")
 }
 
 func TestTimelineRender_TaskHeaderDeduplicatesSameTask(t *testing.T) {
@@ -283,7 +283,7 @@ func TestTimelineRender_LateTaskDoesNotRewriteBucketHeader(t *testing.T) {
 	rendered := tl.GroupByMinutesAndBytes(3, -1).GetBlocks()[0].Render()
 	require.NotContains(t, strings.Split(rendered, "\n")[0], "task=")
 	require.Equal(t, 1, strings.Count(rendered, "# task=task-a"))
-	require.Less(t, strings.Index(rendered, "[tool/setup ok]"), strings.Index(rendered, "# task=task-a"))
+	require.Less(t, strings.Index(rendered, "[tool/setup]"), strings.Index(rendered, "# task=task-a"))
 }
 
 // TestGroupByMinutes_TagWrapping 验证 aitag 兼容包裹格式
@@ -442,7 +442,7 @@ func TestGroupByMinutes_OutputFormat(t *testing.T) {
 	injectTimelineItem(tl, 1, ts, tr)
 
 	rendered := tl.GroupByMinutes(3).GetBlocks()[0].Render()
-	require.Contains(t, rendered, "10:01:30 [tool/scan ok]")
+	require.Contains(t, rendered, "10:01:30 [tool/scan]")
 	// content 行不应带前导空格（节省 token）
 	require.Contains(t, rendered, "\ncompact-result")
 	require.NotContains(t, rendered, "  compact-result")
