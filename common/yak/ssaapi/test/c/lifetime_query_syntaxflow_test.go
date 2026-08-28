@@ -654,3 +654,55 @@ int main() {
 	})
 }
 
+func requireAuditGraph(t *testing.T, vals ssaapi.Values, wantLabel string) {
+	t.Helper()
+	require.Greater(t, vals.Len(), 0, "expected hits to draw an audit graph")
+	found := false
+	for _, v := range vals {
+		preds := v.GetPredecessors()
+		require.NotEmpty(t, preds, "no predecessors on %s", v.String())
+		info := v.GetGraphInfo()
+		require.NotNil(t, info)
+		require.Greater(t, len(info.GraphInfo), 1, "audit graph should have more than the alert node for %s", v.String())
+		for _, p := range preds {
+			if p != nil && p.Info.Label == wantLabel {
+				found = true
+			}
+		}
+	}
+	require.True(t, found, "missing predecessor label %q on %s", wantLabel, vals.String())
+}
+
+// TestC_LifetimeNative_AuditGraph locks IRify "Syntax Flow 审计过程":
+// native-call results must hang predecessors, and func?() must copy the
+// condition chain onto the kept Call (OpFilter does not otherwise walk dataflow).
+func TestC_LifetimeNative_AuditGraph(t *testing.T) {
+	const code = `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    *p = 10;
+    free(p);
+    *p = 20;
+    return 0;
+}
+`
+	ssatest.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`*<uaf()> as $uaf`)
+		require.NoError(t, err)
+		requireAuditGraph(t, res.GetValues("uaf"), "uaf:free")
+
+		res, err = prog.SyntaxFlowWithError(`
+p as $p
+$p<heapAlloc()> as $alloc
+`)
+		require.NoError(t, err)
+		requireAuditGraph(t, res.GetValues("alloc"), "heapAlloc")
+
+		res, err = prog.SyntaxFlowWithError(`free?(* #-> <uaf()>) as $hit`)
+		require.NoError(t, err)
+		requireAuditGraph(t, res.GetValues("hit"), "filter")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.C))
+}
+
