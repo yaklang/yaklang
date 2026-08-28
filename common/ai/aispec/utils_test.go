@@ -44,15 +44,13 @@ func TestBuildOptionsFromConfig_AppliesEnableThinking(t *testing.T) {
 		},
 	}
 
-	// 仅应用 BuildOptionsFromConfig，避免 NewDefaultAIConfig 命中环境里的 tiered 配置并覆盖 thinking 相关字段。
 	resolved := &AIConfig{}
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
 	assert.Equal(t, "siliconflow", resolved.Type)
 	assert.Equal(t, "deepseek-ai/DeepSeek-V4-Flash", resolved.Model)
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *testing.T) {
@@ -60,18 +58,17 @@ func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *test
 	config := &ypb.AIModelConfig{
 		ModelName: "doubao-pro",
 		Provider: &ypb.ThirdPartyApplicationConfig{
-			Type:               "openai",
-			APIKey:             "test-key",
-			EnableThinking:     true,
-			EnableThinkingOpt:  &disabled,
+			Type:              "openai",
+			APIKey:            "test-key",
+			EnableThinking:    true,
+			EnableThinkingOpt: &disabled,
 		},
 	}
 	resolved := &AIConfig{}
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.False(t, *resolved.EnableThinking)
+	assert.Equal(t, "none", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_EnableThinkingOptTrue(t *testing.T) {
@@ -88,8 +85,7 @@ func TestBuildOptionsFromConfig_EnableThinkingOptTrue(t *testing.T) {
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
@@ -102,14 +98,14 @@ func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
 	config := &ypb.AIModelConfig{
 		ModelName: "gpt-4o",
 		Provider: &ypb.ThirdPartyApplicationConfig{
-			Type:               "openai",
-			APIKey:             "test-key",
-			MaxTokens:          &maxT,
-			Temperature:        &temp,
-			TopP:               &topP,
-			TopK:               &topK,
-			FrequencyPenalty:   &freq,
-			ReasoningEffort:    &reason,
+			Type:             "openai",
+			APIKey:           "test-key",
+			MaxTokens:        &maxT,
+			Temperature:      &temp,
+			TopP:             &topP,
+			TopK:             &topK,
+			FrequencyPenalty: &freq,
+			ReasoningEffort:  &reason,
 		},
 	}
 
@@ -124,7 +120,7 @@ func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
 	assert.Equal(t, int64(50), *resolved.TopK)
 	require.NotNil(t, resolved.FrequencyPenalty)
 	assert.InDelta(t, 0.0, *resolved.FrequencyPenalty, 1e-9)
-	assert.Equal(t, "high", resolved.ReasoningEffort)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortHigh(t *testing.T) {
@@ -142,9 +138,7 @@ func TestBuildOptionsFromConfig_ReasoningEffortHigh(t *testing.T) {
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
-	assert.Equal(t, "high", resolved.ReasoningEffort)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortOff(t *testing.T) {
@@ -162,9 +156,7 @@ func TestBuildOptionsFromConfig_ReasoningEffortOff(t *testing.T) {
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking) // off maps to enable=true + reasoning_effort=none
-	assert.Equal(t, "none", resolved.ReasoningEffort)
+	assert.Equal(t, "none", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortAuto(t *testing.T) {
@@ -182,8 +174,7 @@ func TestBuildOptionsFromConfig_ReasoningEffortAuto(t *testing.T) {
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	assert.Nil(t, resolved.EnableThinking) // auto → do not inject
-	assert.Empty(t, resolved.ReasoningEffort)
+	assert.Empty(t, resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortOverridesEnableThinking(t *testing.T) {
@@ -203,9 +194,7 @@ func TestBuildOptionsFromConfig_ReasoningEffortOverridesEnableThinking(t *testin
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
-	assert.Equal(t, "low", resolved.ReasoningEffort)
+	assert.Equal(t, "low", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortXhigh(t *testing.T) {
@@ -223,10 +212,8 @@ func TestBuildOptionsFromConfig_ReasoningEffortXhigh(t *testing.T) {
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
 	// Without ProbedExtendedEfforts, xhigh is clamped to high
-	assert.Equal(t, "high", resolved.ReasoningEffort)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedSupported(t *testing.T) {
@@ -246,10 +233,8 @@ func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedSupported(t *testing.
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
 	// With ProbedExtendedEfforts containing xhigh, it passes through
-	assert.Equal(t, "xhigh", resolved.ReasoningEffort)
+	assert.Equal(t, "xhigh", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortMax_ProbedSupported(t *testing.T) {
@@ -269,9 +254,7 @@ func TestBuildOptionsFromConfig_ReasoningEffortMax_ProbedSupported(t *testing.T)
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
-	assert.Equal(t, "max", resolved.ReasoningEffort)
+	assert.Equal(t, "max", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedNotSupported(t *testing.T) {
@@ -291,10 +274,8 @@ func TestBuildOptionsFromConfig_ReasoningEffortXhigh_ProbedNotSupported(t *testi
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
 	// Probed but not supported → clamped to high
-	assert.Equal(t, "high", resolved.ReasoningEffort)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_ReasoningEffortMax_OnlyXhighProbed(t *testing.T) {
@@ -314,10 +295,8 @@ func TestBuildOptionsFromConfig_ReasoningEffortMax_OnlyXhighProbed(t *testing.T)
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
 	// max not in ProbedExtendedEfforts → clamped to high
-	assert.Equal(t, "high", resolved.ReasoningEffort)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestBuildOptionsFromConfig_LegacyEnableThinkingWithoutReasoningEffort(t *testing.T) {
@@ -335,9 +314,7 @@ func TestBuildOptionsFromConfig_LegacyEnableThinkingWithoutReasoningEffort(t *te
 	for _, opt := range BuildOptionsFromConfig(config) {
 		opt(resolved)
 	}
-	require.NotNil(t, resolved.EnableThinking)
-	assert.True(t, *resolved.EnableThinking)
-	assert.Empty(t, resolved.ReasoningEffort)
+	assert.Equal(t, "high", resolved.ThinkingLevel)
 }
 
 func TestGetBaseURLFromConfig_UsesResponsesAPIType(t *testing.T) {

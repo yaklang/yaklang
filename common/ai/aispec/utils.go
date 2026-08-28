@@ -291,42 +291,37 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithAPIType(provider.APIType))
 	}
 
-	// ReasoningEffort now serves double duty: it can be a control value
-	// ("off"/"auto"/"") or an effort level ("low"/"medium"/"high"/"xhigh"/"max").
-	// When set, it takes priority and derives EnableThinking automatically.
+	// ThinkingLevel 统一表达思考强度。ReasoningEffort（proto 层）优先，
+	// 回退到 EnableThinkingOpt / EnableThinking（legacy 布尔开关）。
 	if provider.ReasoningEffort != nil {
 		s := strings.TrimSpace(*provider.ReasoningEffort)
 		if s != "" {
-			enable, effort := MapReasoningEffortToThinkingConfig(s)
-			// auto/default → (false, ""): do not inject any thinking params
-			if !enable && effort == "" {
-				// skip — let model/provider defaults apply
-			} else {
-				// Clamp xhigh/max: if the model hasn't been probed or doesn't support
-				// the requested extended effort, downgrade to high as a safety net.
-				// If probed and supported, pass through as-is.
-				if effort == "xhigh" || effort == "max" {
+			level := normalizeThinkingLevel(s)
+			if level != "" {
+				// Clamp xhigh/max：未探测或探测结果不含此级别时降级为 high。
+				if level == "xhigh" || level == "max" {
 					supported := false
 					for _, e := range probedExtendedEfforts {
-						if e == effort {
+						if e == level {
 							supported = true
 							break
 						}
 					}
 					if !supported {
-						effort = "high"
+						level = "high"
 					}
 				}
-				opts = append(opts, WithEnableThinking(enable))
-				if effort != "" {
-					opts = append(opts, WithReasoningEffort(effort))
-				}
+				opts = append(opts, WithThinkingLevel(level))
 			}
 		}
 	} else if provider.EnableThinkingOpt != nil {
-		opts = append(opts, WithEnableThinking(*provider.EnableThinkingOpt))
+		if *provider.EnableThinkingOpt {
+			opts = append(opts, WithThinkingLevel("high"))
+		} else {
+			opts = append(opts, WithThinkingLevel("none"))
+		}
 	} else if provider.GetEnableThinking() {
-		opts = append(opts, WithEnableThinking(provider.GetEnableThinking()))
+		opts = append(opts, WithThinkingLevel("high"))
 	}
 
 	if provider.MaxTokens != nil {
