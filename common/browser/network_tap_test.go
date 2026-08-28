@@ -2,6 +2,7 @@ package browser
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,9 @@ func TestClipNetworkBody(t *testing.T) {
 	long := stringsRepeat("a", networkTapBodyLimit+10)
 	clipped := clipNetworkBody(long)
 	require.Equal(t, networkTapBodyLimit, len(clipped))
+	clipped = clipNetworkBody(stringsRepeat("界", networkTapBodyLimit))
+	require.LessOrEqual(t, len(clipped), networkTapBodyLimit)
+	require.True(t, utf8.ValidString(clipped))
 }
 
 func TestSkipNetworkURL(t *testing.T) {
@@ -49,6 +53,51 @@ func TestNetworkTapDrainEmpty(t *testing.T) {
 	t.Parallel()
 	p := &BrowserPage{}
 	require.Empty(t, p.DrainNetworkTap())
+}
+
+func TestNetworkTapKeepsPendingUntilFinished(t *testing.T) {
+	t.Parallel()
+	tap := &networkTap{pending: map[proto.NetworkRequestID]*pendingNetworkReq{}}
+	id := proto.NetworkRequestID("pending")
+	tap.onRequest(&proto.NetworkRequestWillBeSent{
+		RequestID: id,
+		Type:      proto.NetworkResourceTypeFetch,
+		Request:   &proto.NetworkRequest{URL: "https://app.example/api", Method: "GET"},
+	})
+	require.Empty(t, tap.drain())
+	require.Contains(t, tap.pending, id)
+
+	tap.onFinished(nil, id)
+	got := tap.drain()
+	require.Len(t, got, 1)
+	require.Equal(t, "https://app.example/api", got[0]["url"])
+	require.NotContains(t, tap.pending, id)
+}
+
+func TestNetworkTapRemovesFailedRequest(t *testing.T) {
+	t.Parallel()
+	tap := &networkTap{pending: map[proto.NetworkRequestID]*pendingNetworkReq{}}
+	id := proto.NetworkRequestID("failed")
+	tap.onRequest(&proto.NetworkRequestWillBeSent{
+		RequestID: id,
+		Type:      proto.NetworkResourceTypeXHR,
+		Request:   &proto.NetworkRequest{URL: "https://app.example/api", Method: "POST"},
+	})
+	tap.onFailed(&proto.NetworkLoadingFailed{RequestID: id})
+	require.NotContains(t, tap.pending, id)
+	require.Len(t, tap.drain(), 1)
+}
+
+func TestNetworkHelpersRejectEmptyPage(t *testing.T) {
+	t.Parallel()
+	var nilPage *BrowserPage
+	require.Error(t, nilPage.StartNetworkTap())
+	require.Error(t, nilPage.EvalOnNewDocument("window.test = true"))
+	require.Empty(t, nilPage.DrainNetworkTap())
+
+	page := &BrowserPage{}
+	require.Error(t, page.StartNetworkTap())
+	require.Error(t, page.EvalOnNewDocument("window.test = true"))
 }
 
 func TestNetworkTapFlushRedirectKeepsOriginalPOST(t *testing.T) {

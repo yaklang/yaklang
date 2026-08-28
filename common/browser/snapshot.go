@@ -26,7 +26,6 @@ var interactiveRoles = map[string]bool{
 	"searchbox":        true,
 	"menuitemcheckbox": true,
 	"menuitemradio":    true,
-	"listitem":         true,
 }
 
 type SnapshotResult struct {
@@ -103,6 +102,9 @@ func takeSnapshot(page *rod.Page, refMap *RefMap) (*SnapshotResult, error) {
 // ListInteractive snapshots the page and returns interactive AX nodes as
 // {ref, role, name} maps. ref is the "@eN" form expected by page.Click / Fill.
 func (p *BrowserPage) ListInteractive() []map[string]any {
+	if p == nil || p.page == nil {
+		return []map[string]any{}
+	}
 	snap, err := p.Snapshot()
 	if err != nil {
 		log.Debugf("ListInteractive: %v", err)
