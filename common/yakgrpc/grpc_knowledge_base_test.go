@@ -9,10 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -105,21 +105,13 @@ func TestMUSTPASS_CreateKnowledgeBaseV2_DuplicateName(t *testing.T) {
 }
 
 func TestMUSTPASS_TestImportedFlag(t *testing.T) {
-	// 关键词: TestMUSTPASS_TestImportedFlag, vectorstore_mock_mode, AIBalance daily-token-quota
-	// 该用例需要写入 KB 条目并走向量索引，CI 上 AIBalance 免费 embedding 服务
-	// 可能日 token 已经被打爆且本地 embedding 模型 (Qwen3-Embedding-0.6B-Q4_K_M.gguf)
-	// 在 CI 容器内不可执行 (exec: no command)。这里把 vectorstore 切到 mock 模式，
-	// 让 FixEmbeddingClient 走 NewMockEmbedder 路径，避开外部依赖；测试结束后还原。
-	originalMockMode := vectorstore.IsMockMode
-	vectorstore.IsMockMode = true
-	defer func() { vectorstore.IsMockMode = originalMockMode }()
-
 	client, err := NewLocalClient()
 	require.NoError(t, err, "创建本地客户端失败")
 
 	ctx := context.Background()
-	originalKBName := "test_imported_flag_original"
-	importedKBName := "test_imported_flag_imported"
+	nameSuffix := utils.RandStringBytes(8)
+	originalKBName := "test_imported_flag_original_" + nameSuffix
+	importedKBName := "test_imported_flag_imported_" + nameSuffix
 	db := consts.GetGormProfileDatabase()
 
 	// 清理函数，确保测试结束后删除知识库和临时文件
@@ -139,13 +131,15 @@ func TestMUSTPASS_TestImportedFlag(t *testing.T) {
 	require.NotZero(t, createResponse.KnowledgeBase.ID)
 	originalKBId := createResponse.KnowledgeBase.ID
 
-	// 2. 增加一条测试数据
-	_, err = client.CreateKnowledgeBaseEntry(ctx, &ypb.CreateKnowledgeBaseEntryRequest{
+	// 2. 增加一条测试数据。该用例只验证导入标志，不需要生成向量索引。
+	// CI 中 NewLocalClient 连接独立的 yak grpc 进程，因此测试进程中的 mock
+	// 开关无法影响服务端；直接写入条目可避免测试依赖外部 embedding 服务。
+	err = yakit.CreateKnowledgeBaseEntry(db, &schema.KnowledgeBaseEntry{
 		KnowledgeBaseID:  originalKBId,
 		KnowledgeTitle:   "test entry",
 		KnowledgeType:    "text",
 		ImportanceScore:  5,
-		Keywords:         []string{"test", "entry"},
+		Keywords:         schema.StringArray{"test", "entry"},
 		KnowledgeDetails: "this is a test entry for imported flag testing",
 		Summary:          "test entry summary",
 	})
