@@ -17,6 +17,13 @@ type SyntaxFlowVisitor struct {
 	rule         *schema.SyntaxFlowRule
 	verifyFsInfo []*VerifyFsInfo
 	codes        []*SFI
+
+	// pendingFileFilterField remembers a FieldCallFilter whose name is a
+	// file-filter method (regexp/re/pattern_regex/...). If the next filterItem
+	// is a FunctionCallFilter, the pair becomes a chained context search
+	// ($a.regexp(/x/)); otherwise the field call is emitted as a plain member
+	// access at the end of the expression.
+	pendingFileFilterField sf.INameFilterContext
 }
 
 type VerifyFsInfo struct {

@@ -35,14 +35,49 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) error {
 	for _, raw := range i.AllFilterItem() {
 		y.VisitFilterItem(raw)
 	}
+	// A deferred file-filter field call not followed by a call is a plain
+	// member access (e.g. `$a.regexp` alone) — emit it now.
+	if y.pendingFileFilterField != nil {
+		if err := y.VisitNameFilter(true, y.pendingFileFilterField); err != nil {
+			return err
+		}
+		y.pendingFileFilterField = nil
+	}
 	return nil
 }
 
 func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
+	// Flush a deferred file-filter field call when the next item is not a
+	// FunctionCallFilter (e.g. `$a.regexp + $b` → member access on $a).
+	if _, isCall := raw.(*sf.FunctionCallFilterContext); !isCall && y.pendingFileFilterField != nil {
+		if err := y.VisitNameFilter(true, y.pendingFileFilterField); err != nil {
+			return err
+		}
+		y.pendingFileFilterField = nil
+	}
 	switch filter := raw.(type) {
 	case *sf.FirstContext:
 		y.VisitFilterItemFirst(filter.FilterItemFirst())
 	case *sf.FunctionCallFilterContext:
+		// Chained context search: $a.regexp(/x/) — the deferred field call is
+		// consumed here and emitted as a FileFilter op on the hit values.
+		if y.pendingFileFilterField != nil {
+			method := strings.ToLower(y.pendingFileFilterField.GetText())
+			y.pendingFileFilterField = nil
+			params, err := y.extractFileFilterParams(filter.ActualParam())
+			if err != nil {
+				return err
+			}
+			paramMap := make(map[string]string)
+			switch method {
+			case "pattern_regex_not", "pattern-regex-not", "patternregexnot":
+				paramMap["__sf_pattern_not_list"] = "1"
+			case "pattern_not_regex", "pattern-not-regex", "patternnotregex", "not_regexp", "not_re":
+				paramMap["__sf_pattern_not"] = "1"
+			}
+			y.EmitFileFilterReg("", paramMap, params)
+			return nil
+		}
 		//先拿到所有的call，然后再去拿callArgs
 		y.EmitGetCall()
 		if filter.Question() != nil {
@@ -132,6 +167,94 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 	return nil
 }
 
+// extractFileFilterParams collects regex sources from a FunctionCallFilter's
+// actualParam for the chained file-filter form ($a.regexp(/x/, /y/)). Each
+// singleParam must be a simple regex literal, quoted string, identifier, star,
+// or heredoc; anything else is a compile error.
+func (y *SyntaxFlowVisitor) extractFileFilterParams(actualParam sf.IActualParamContext) ([]string, error) {
+	var out []string
+	if actualParam == nil {
+		return out, nil
+	}
+	collect := func(sp sf.ISingleParamContext) error {
+		single, ok := sp.(*sf.SingleParamContext)
+		if !ok || single == nil {
+			return nil
+		}
+		if single.ConditionExpression() != nil {
+			return utils.Errorf("chained file filter: condition-expression params unsupported")
+		}
+		fs := single.FilterStatement()
+		if fs == nil {
+			return nil
+		}
+		var filterExpr sf.IFilterExprContext
+		switch st := fs.(type) {
+		case *sf.PureFilterExprContext:
+			filterExpr = st.FilterExpr()
+		case *sf.RefFilterExprContext:
+			return utils.Errorf("chained file filter: ref params unsupported")
+		default:
+			return utils.Errorf("chained file filter: unsupported param statement")
+		}
+		if filterExpr == nil {
+			return nil
+		}
+		first := filterExpr.FilterItemFirst()
+		if first == nil {
+			return nil
+		}
+		switch ff := first.(type) {
+		case *sf.NamedFilterContext:
+			nf := ff.NameFilter()
+			if nf == nil {
+				return nil
+			}
+			if nf.RegexpLiteral() != nil {
+				text := nf.RegexpLiteral().GetText()
+				out = append(out, text[1:len(text)-1])
+			} else if nf.Identifier() != nil {
+				out = append(out, yakunquote.TryUnquote(nf.Identifier().GetText()))
+			} else if nf.Star() != nil {
+				out = append(out, "*")
+			}
+		case *sf.ConstFilterContext:
+			if ff.QuotedStringLiteral() != nil {
+				out = append(out, yakunquote.TryUnquote(ff.QuotedStringLiteral().GetText()))
+			} else if ff.HereDoc() != nil {
+				out = append(out, y.VisitHereDoc(ff.HereDoc()))
+			}
+		default:
+			return utils.Errorf("chained file filter: unsupported param form")
+		}
+		return nil
+	}
+	switch ap := actualParam.(type) {
+	case *sf.AllParamContext:
+		if ap.SingleParam() != nil {
+			if err := collect(ap.SingleParam()); err != nil {
+				return nil, err
+			}
+		}
+	case *sf.EveryParamContext:
+		for _, p := range ap.AllActualParamFilter() {
+			if pf, ok := p.(*sf.ActualParamFilterContext); ok && pf.SingleParam() != nil {
+				if err := collect(pf.SingleParam()); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if ap.SingleParam() != nil {
+			if err := collect(ap.SingleParam()); err != nil {
+				return nil, err
+			}
+		}
+	default:
+		return nil, utils.Errorf("chained file filter: unsupported actualParam form")
+	}
+	return out, nil
+}
+
 func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext) error {
 
 	if y == nil || raw == nil {
@@ -176,6 +299,14 @@ func (y *SyntaxFlowVisitor) VisitFilterItemFirst(raw sf.IFilterItemFirstContext)
 	case *sf.NamedFilterContext:
 		return y.VisitNameFilter(false, i.NameFilter())
 	case *sf.FieldCallFilterContext:
+		// Chained context search: $a.regexp(/x/) — a field call whose name is a
+		// file-filter method is deferred; if the next filterItem is a
+		// FunctionCallFilter it becomes a chained FileFilter op, otherwise it
+		// falls back to a plain member access (flushed at expression end).
+		if isFileFilterMethod(i.NameFilter().GetText()) {
+			y.pendingFileFilterField = i.NameFilter()
+			return nil
+		}
 		return y.VisitNameFilter(true, i.NameFilter())
 	case *sf.NativeCallFilterContext:
 		var varname string

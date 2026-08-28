@@ -1283,7 +1283,10 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}
 		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
 		name := i.UnaryStr
-		if name == "" {
+		// Chained context search ($a.regexp(...)) has no path pattern; the
+		// SimpleValue hits carry their own file. Only reject empty names for
+		// non-hit values (e.g. PatternRoot).
+		if name == "" && !RegionAllSimpleHits(value) {
 			return true, utils.Errorf("file filter failed: file name is empty")
 		}
 		paramList := i.Values

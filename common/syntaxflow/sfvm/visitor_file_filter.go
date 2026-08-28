@@ -78,6 +78,19 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentInput(raw sf.IFileFilterConten
 	return "", utils.Error("file filter content input is not identifier or regexp literal")
 }
 
+// isFileFilterMethod reports whether a field-call name is a chained file-filter
+// method (regexp family). Only these are intercepted in $a.regexp(...) form;
+// xpath/jsonpath keep their member-access meaning.
+func isFileFilterMethod(name string) bool {
+	switch strings.ToLower(name) {
+	case "regexp", "re", "pattern_regex", "pattern-regex", "patternregex",
+		"pattern_regex_not", "pattern-regex-not", "patternregexnot",
+		"pattern_not_regex", "pattern-not-regex", "patternnotregex", "not_regexp", "not_re":
+		return true
+	}
+	return false
+}
+
 func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterContentMethodContext, fileInput string) error {
 	if y == nil || raw == nil {
 		return nil

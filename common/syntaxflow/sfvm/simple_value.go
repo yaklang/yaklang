@@ -5,9 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/fnv"
+	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -23,6 +26,10 @@ type SimpleValue struct {
 	end    int
 	empty  bool
 	editor *memedit.MemEditor // optional full-file editor containing this hit
+
+	// files backs chained context search ($a.regexp(...)): the path→content
+	// map the hit was produced from. Set by sfpattern when creating hits.
+	files map[string]string
 }
 
 // NewSimpleValue builds a pattern hit value.
@@ -42,6 +49,14 @@ func (v *SimpleValue) FileEditor() *memedit.MemEditor {
 		return nil
 	}
 	return v.editor
+}
+
+// SetFiles attaches the source path→content map so chained FileFilter calls
+// ($a.regexp(...)) can search within the hit's file. Nil-safe.
+func (v *SimpleValue) SetFiles(files map[string]string) {
+	if v != nil {
+		v.files = files
+	}
 }
 
 // NewSimpleConst builds a const-like simple value (no path).
@@ -136,9 +151,152 @@ func (v *SimpleValue) AppendPredecessor(ValueOperator, ...AnalysisContextOption)
 	return nil
 }
 
-// FileFilter on a simple hit is unsupported; pattern roots implement PatternRoot.
-func (v *SimpleValue) FileFilter(string, string, map[string]string, []string) (Values, error) {
-	return nil, utils.Error("simple value: FileFilter unsupported")
+// FileFilter on a simple hit runs a chained context search: the regex is
+// applied to the file the hit came from (default scope=file), or to the hit's
+// own range (scope=region). This powers `$a.regexp(...)` — searching around
+// prior hits. Only regexp match type is supported.
+func (v *SimpleValue) FileFilter(name, matchType string, paramMap map[string]string, patterns []string) (Values, error) {
+	if v == nil {
+		return nil, utils.Error("simple value: nil hit")
+	}
+	switch strings.ToLower(matchType) {
+	case "regexp", "re", "pattern_regex", "pattern-regex":
+	default:
+		return nil, utils.Errorf("simple value: unsupported chained match type %q (use regexp)", matchType)
+	}
+	if v.path == "" {
+		return nil, utils.Error("simple value: hit has no file path")
+	}
+	if v.files == nil {
+		return nil, utils.Error("simple value: no files backing for chained search")
+	}
+	content, ok := v.files[v.path]
+	if !ok {
+		return nil, utils.Errorf("simple value: file %q not in backing files", v.path)
+	}
+
+	// scope=region searches within the hit's own range; default scope=file
+	// searches the whole file the hit lives in.
+	searchFrom, searchTo := 0, len(content)
+	if paramMap != nil && strings.EqualFold(paramMap["scope"], "region") {
+		searchFrom, searchTo = v.start, v.end
+		if searchFrom < 0 || searchTo > len(content) || searchTo < searchFrom {
+			return nil, utils.Errorf("simple value: hit range [%d,%d) out of file bounds", v.start, v.end)
+		}
+	}
+
+	var cleaned []string
+	for _, s := range patterns {
+		if strings.TrimSpace(s) != "" {
+			cleaned = append(cleaned, s)
+		}
+	}
+	if len(cleaned) == 0 {
+		return nil, utils.Error("simple value: no content patterns")
+	}
+
+	// pattern_regex_not / pattern_not_regex in the CHAINED form: the hit itself
+	// is the positive; every param is a negative. Keep the hit only when no
+	// negative match overlaps it (Semgrep pattern-not-regex).
+	if paramMap != nil && (paramMap["__sf_pattern_not_list"] == "1" || paramMap["__sf_pattern_not"] == "1") {
+		if len(cleaned) == 0 {
+			return nil, utils.Error("simple value: negative filter requires at least one pattern")
+		}
+		for _, expr := range cleaned {
+			yak := regexp_utils.NewYakRegexpUtils(expr)
+			indexs, err := yak.FindAllSubmatchIndex(content[searchFrom:searchTo])
+			if err != nil {
+				log.Warnf("simple value negative regexp match error: %s", err)
+				continue
+			}
+			for _, index := range indexs {
+				if len(index) < 2 {
+					continue
+				}
+				negStart, negEnd := searchFrom+index[0], searchFrom+index[1]
+				if v.start < negEnd && negStart < v.end {
+					return NewEmptyValues(), nil // dropped
+				}
+			}
+		}
+		return ValuesOf(v), nil
+	}
+
+	var out []ValueOperator
+	for _, expr := range cleaned {
+		yak := regexp_utils.NewYakRegexpUtils(expr)
+		indexs, err := yak.FindAllSubmatchIndex(content[searchFrom:searchTo])
+		if err != nil {
+			log.Warnf("simple value chained regexp match error: %s", err)
+			continue
+		}
+		for _, index := range indexs {
+			if len(index) < 2 {
+				continue
+			}
+			start, end := searchFrom+index[0], searchFrom+index[1]
+			if start < 0 || end > len(content) || end < start {
+				continue
+			}
+			hit := NewSimpleValue(content[start:end], v.path, start, end)
+			hit.SetFiles(v.files)
+			out = append(out, hit)
+		}
+	}
+	return NewValues(out), nil
+}
+
+// chainedRegexpWithNegatives mirrors sfpattern.MatchRegexpWithNegatives for a
+// single hit's context: positive hits minus hits overlapping any negative match.
+func chainedRegexpWithNegatives(v *SimpleValue, content string, from, to int, positive string, negatives []string) (Values, error) {
+	yak := regexp_utils.NewYakRegexpUtils(positive)
+	indexs, err := yak.FindAllSubmatchIndex(content[from:to])
+	if err != nil {
+		return nil, err
+	}
+	type posHit struct {
+		start, end int
+	}
+	var pos []posHit
+	for _, index := range indexs {
+		if len(index) >= 2 {
+			pos = append(pos, posHit{start: from + index[0], end: from + index[1]})
+		}
+	}
+	if len(pos) == 0 {
+		return NewEmptyValues(), nil
+	}
+	var negRanges []posHit
+	for _, expr := range negatives {
+		yak := regexp_utils.NewYakRegexpUtils(expr)
+		indexs, err := yak.FindAllSubmatchIndex(content[from:to])
+		if err != nil {
+			log.Warnf("simple value negative regexp match error: %s", err)
+			continue
+		}
+		for _, index := range indexs {
+			if len(index) >= 2 {
+				negRanges = append(negRanges, posHit{start: from + index[0], end: from + index[1]})
+			}
+		}
+	}
+	var out []ValueOperator
+	for _, h := range pos {
+		overlap := false
+		for _, nr := range negRanges {
+			if h.start < nr.end && nr.start < h.end {
+				overlap = true
+				break
+			}
+		}
+		if overlap {
+			continue
+		}
+		hit := NewSimpleValue(content[h.start:h.end], v.path, h.start, h.end)
+		hit.SetFiles(v.files)
+		out = append(out, hit)
+	}
+	return NewValues(out), nil
 }
 
 func (v *SimpleValue) CompareString(items *StringComparator) (Values, []bool) {
