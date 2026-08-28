@@ -1,17 +1,31 @@
 * 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
+
+* `directly_answer` 必须且只能选择以下一种答案承载方式。下面两个示例是互斥的独立响应，禁止在同一次响应中拼接或同时输出：
+    * 短答案：使用非空 `answer_payload`；JSON 结束后立即停止，禁止再输出 `FINAL_ANSWER` AI Tag。
     * `{"@action": "directly_answer", "answer_payload": "...[your-answer not a markdown].."}`
 
 *. 简单直接回答时，默认不要输出 `human_readable_thought`
 
-* 在 directly_answer 的 Action 中，如果 answer_payload 的内容较大，设计到代码等多样化内容，请使用 AI Tag 回答
+* 长答案、Markdown 或代码：省略 `answer_payload` 或将其保持为空，仅使用 `FINAL_ANSWER` AI Tag；禁止同时提供非空 `answer_payload`。
 
 {"@action": "directly_answer"}
 <|FINAL_ANSWER_CURRENT_NONCE|>
 # markdown in mass
 <|FINAL_ANSWER_END_CURRENT_NONCE|>
 
-*. 如果你想要使用工具：
-    * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "先读取配置"}`
+* 再次强调：非空 `answer_payload` 与 `FINAL_ANSWER` AI Tag 严格互斥；任一响应只能出现其中一种答案内容。
+
+*. 所有 action 必须直接输出使用 Schema 原始英文键名的 JSON object；禁止 `<@action=...>` 标签、中文字段说明、YAML 或 JSON 外包装。
+*. 缺少任务所需的一手证据时，本轮工具 action 就是执行机会；立即选择工具，禁止回答“没有工具执行机会”或要求重发任务。
+
+*. 如果你想要使用工具，先枚举本轮可立即执行的真实调用：
+    * 选择门：1 个真实调用用标量；2-8 个独立真实调用用批次；存在数据依赖或写入冲突时只执行当前已就绪的一层。不要凑调用，也不要把已明确的独立调用留到下一轮。
+    * 有 2-8 个彼此独立的调用时，优先一次批量申请，运行时会分别生成参数并并发执行：
+      `{"@action":"require_tool","identifier":"parallel_inspection","human_readable_thought":"并发收集独立证据","tool_require_calls":[{"tool_name":"grep","identifier":"find_handlers","reason":"定位处理函数"},{"tool_name":"read_file","identifier":"read_config","reason":"读取独立配置"}]}`
+    * 若动态段已经展示真实工具参数 Schema 且全部参数明确，可改用一个 `directly_call_tool_calls` 批次直接执行；没有 Schema 时禁止猜参数。
+    * 只有本轮恰好一个调用或调用之间存在依赖/冲突时，才使用标量：`{"@action":"require_tool","tool_require_payload":"..[your-toolname]..","human_readable_thought":"先读取配置"}`
+    * 批次准入、Schema、参数或某个 child 失败，只否定本次载荷或假设，不否定并发策略。修正共同错误、保留成功结果，下一轮把仍独立的修复项或 2-4 个有区分力的候选方案继续组成批次；禁止原样重试。
+    * Timeline / 注入记忆中的旧失败是历史证据，不是永久单工具指令；“之前批量失败过”本身不是标量选择条件。
 
 *. `todo_delta` 使用案例（维护 TODO 工作集，与正常动作同轮携带）：
     * 任务一开始就需要拆成多个入口时，第一条动作同时建立初始 TODO 并指定 current：
@@ -23,9 +37,9 @@
 
 *. `save_evidence` 使用案例（确认关键事实后主动沉淀，不等任务结束）：
     * 确认一个安全风险后，先落证据再继续，同时把新发现的关联入口记为待探索：
-      `{"@action": "save_evidence", "verification_payload": "确认 /api/v2/token/refresh 存在重放漏洞：同一 refresh_token 重放两次均返回 200 且下发新的有效 access_token，未做一次性校验，响应字段 access_token 每次不同但均可正常鉴权", "todo_delta": {"add": [{"id": "check_logout_invalidate", "text": "待探索：验证退出登录后 refresh_token 是否失效，来源为本次重放漏洞的关联假设"}]}}`
+      `{"@action": "save_evidence", "evidence_id": "refresh-token-replay", "verification_payload": "确认 /api/v2/token/refresh 存在重放漏洞：同一 refresh_token 重放两次均返回 200 且下发新的有效 access_token，未做一次性校验，响应字段 access_token 每次不同但均可正常鉴权", "todo_delta": {"add": [{"id": "check_logout_invalidate", "text": "待探索：验证退出登录后 refresh_token 是否失效，来源为本次重放漏洞的关联假设"}]}}`
     * 排除一条路径时，写明实验条件和对照，而不是单次未命中就下结论：
-      `{"@action": "save_evidence", "verification_payload": "排除 /admin/ 路径存在未授权访问：对比携带有效 session 与清空 Cookie 两种请求，未登录时返回 302 跳转至登录页，与预期基线一致，字段和状态码均无差异"}`
+      `{"@action": "save_evidence", "evidence_id": "admin-anonymous-access", "verification_payload": "排除 /admin/ 路径存在未授权访问：对比携带有效 session 与清空 Cookie 两种请求，未登录时返回 302 跳转至登录页，与预期基线一致，字段和状态码均无差异"}`
 
 {{ if .AllowKnowledgeEnhanceAnswer }}*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:
     * `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "..[rewrite-user-query]..", "human_readable_thought": "先补充资料"}
@@ -38,7 +52,7 @@
 同时你必须遵循动作选择优先级：
 1. 复杂/不确定任务，或需要新建/修订 Plan：优先 `request_plan`
 2. 需要领域指导：优先加载技能（`loading_skills` / `load_skill_resources`）
-3. 仅在“已知多工具且存在明确依赖图”时使用 `tool_compose`
+3. 仅在后序参数依赖前序真实输出时使用 `tool_compose`；独立多调用使用 `tool_require_calls` / `directly_call_tool_calls` 批次
 4. AI Blueprint 必须使用 `require_ai_blueprint`，禁止通过 `tool_compose` 代替
 
 反例（禁止）：

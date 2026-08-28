@@ -51,16 +51,17 @@ func (t *AiTask) execute() error {
 	}
 
 	// Emit task execution start status
-	t.planLoadingStatus(fmt.Sprintf("执行子任务 [%s] / Executing Subtask [%s]: %s", t.Index, t.Index, t.Name))
+	t.planUserStatus(
+		fmt.Sprintf("正在处理「%s」", t.Name),
+		fmt.Sprintf("Working on %q", t.Name),
+		aicommon.WithStatusCode("plan.task_running"),
+	)
 
 	err := t.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,
 		t,
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
-
-			// Emit iteration status
-			t.planLoadingStatus(fmt.Sprintf("任务 [%s] 迭代 %d 完成 / Task [%s] Iteration %d Completed", t.Index, iteration, t.Index, iteration))
 
 			// Log current task status for debugging - similar to prompt context format
 			log.Infof("=== Post Iteration Task Status ===")
@@ -93,9 +94,8 @@ func (t *AiTask) execute() error {
 					// EVIDENCE 单写到 SessionPromptState (SESSION_EVIDENCE 段)。
 					// 历史曾把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext
 					// 跨子任务抖动并破坏多个 prompt cache 命中。现仅保留
-					// SESSION_EVIDENCE 单一渲染源, 其它 evidence 入口 (如
-					// output_evidence action) 写入的 task plan_evidence 不再被任何
-					// prompt 模板读取。
+					// SESSION_EVIDENCE 单一渲染源；基础 save_evidence 与 PE 兼容
+					// output_evidence action 也直接写入同一个 Session Evidence Store。
 					// 关键词: EVIDENCE 单写, ApplySessionEvidenceOps, PlanContext 抖动修复
 					log.Infof("task %s applying session evidence ops, count=%d", t.Index, len(allOps))
 					if incremental := aicommon.FormatEvidenceOpsLines(allOps, t.GetLanguage()); incremental != "" {
@@ -129,21 +129,25 @@ func (t *AiTask) execute() error {
 
 			if shouldComplete {
 				// Emit task completing status
-				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 正在总结 / Task [%s] Generating Summary...", t.Index, t.Index))
+				t.planUserStatus(
+					fmt.Sprintf("正在归纳「%s」的结果", t.Name),
+					fmt.Sprintf("Summarizing the results of %q", t.Name),
+					aicommon.WithStatusCode("plan.task_summarizing"),
+				)
 
 				err := t.generateTaskSummary(summary, nextSteps)
 				if err != nil {
 					log.Errorf("iteration task summary failed: %v", err)
-					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结失败 / Task [%s] Summary Failed", t.Index, t.Index))
+					t.planUserStatus(fmt.Sprintf("暂时没能归纳「%s」的结果", t.Name), fmt.Sprintf("Unable to summarize %q", t.Name), aicommon.WithStatusCode("plan.task_summary_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 				} else {
-					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 已完成 / Task [%s] Completed", t.Index, t.Index))
+					t.planUserStatus(fmt.Sprintf("「%s」已经完成", t.Name), fmt.Sprintf("%q is complete", t.Name), aicommon.WithStatusCode("plan.task_completed"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
 				}
 
 				// Signal the loop to end - this ensures the loop terminates after this iteration
 				operator.EndIteration("task completed via completed_task_index or isDone")
 			} else {
 				// Emit continuing status
-				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
+				t.planUserStatus(fmt.Sprintf("正在继续处理「%s」", t.Name), fmt.Sprintf("Continuing to work on %q", t.Name), aicommon.WithStatusCode("plan.task_continuing"))
 
 				// Combine summary (reasoning) and todo_delta as Processing status
 				// This ensures both are captured in StatusSummary to avoid context loss
@@ -151,8 +155,8 @@ func (t *AiTask) execute() error {
 
 				if t.Coordinator != nil && summary != "" {
 					timelineMsg := fmt.Sprintf(
-						"[task-verification] Task %s iteration %d verification: not yet complete. Reason: %s",
-						t.Index, iteration, summary,
+						"[task-verification] Task %s verification: not yet complete. Reason: %s",
+						t.Index, summary,
 					)
 					if nextSteps != "" {
 						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextSteps)
@@ -164,22 +168,11 @@ func (t *AiTask) execute() error {
 			}
 		}),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
-			currentIteration := loop.GetCurrentIterationIndex()
-
 			var lastVerificationInfo string
 			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
 				// 注: verification 收缩为纯观测角色后不再产出 TodoDelta,
 				// 这里只沉淀 satisfied + reasoning 作为观测信号.
 				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
-			}
-
-			var recentActionsSummary string
-			if recentActions := loop.GetLastNAction(3); len(recentActions) > 0 {
-				var parts []string
-				for _, a := range recentActions {
-					parts = append(parts, fmt.Sprintf("iter%d: %s(%s)", a.IterationIndex, a.ActionType, a.ActionName))
-				}
-				recentActionsSummary = strings.Join(parts, " -> ")
 			}
 
 			reactiveData := utils.MustRenderTemplate(`
@@ -194,24 +187,14 @@ func (t *AiTask) execute() error {
 
 <|PROGRESS_TASK_END_{{ .Nonce }}|>
 
---- TASK_ITERATION_INFO ---
-当前子任务迭代次数: {{ .CurrentIteration }}
+--- TASK_EXECUTION_INFO ---
 {{ if .StatusSummary }}当前状态分析: {{ .StatusSummary }}{{ end }}
 {{ if .LastVerificationInfo }}上次验证结果: {{ .LastVerificationInfo }}{{ end }}
 {{ if .FeedbackMessages }}
 最近反馈信息:
 {{ .FeedbackMessages }}
 {{ end }}
-{{ if .RecentActions }}最近执行动作: {{ .RecentActions }}{{ end }}
-{{ if gt .CurrentIteration 5 }}
-** 警告: 当前子任务已执行 {{ .CurrentIteration }} 次迭代，请认真评估：
-  1. 任务目标是否实际上已经完成？如果工具已返回足够结果，请允许任务完成。
-  2. 当前策略是否有效？如果反复失败，请更换工具或方法。
-  3. 不要重复执行相同的操作，这会浪费迭代次数。
-  4. 如果你当前执行的动作与 CURRENT_TASK 目标领域不相关（例如当前任务是 FTP 后门验证但你在做 Web 漏洞扫描），说明当前子任务实际已完成，应使用 directly_answer 输出任务总结并结束。
-  5. 安全测试中，"漏洞不存在"是有效的否定结论，不需要继续尝试——请直接总结结果并完成任务。**
-{{ end }}
---- TASK_ITERATION_INFO_END ---
+--- TASK_EXECUTION_INFO_END ---
 
 - 进度信息语义约定：
   1) 任务树状态约定
@@ -226,7 +209,7 @@ func (t *AiTask) execute() error {
   3) 行为准则（必须遵守）
      - 不要假设或回填未在进度信息中出现的状态。
      - 不要“预完成”尚未执行的步骤；只就“当前任务”进行计划、细化与必要的状态更新建议。
-     - 工具调用与继续决策次数受系统限制（见“任务次数执行信息”），你必须在该限制下规划行为，避免无效尝试。
+     - 持续以新证据驱动下一步；反复失败时更换工具、假设或验证方法。
      - 若需要外部信息或权限，先在输出中请求或声明前置条件，而非擅自推进其他任务。
   4) 只读规则（重要）
      - 进度信息对 AI 是只读的。框架会根据实际执行进度自动更新任务清单与状态。
@@ -240,11 +223,9 @@ func (t *AiTask) execute() error {
 				"Progress":             t.rootTask.Progress(),
 				"CurrentProgress":      t.Progress(),
 				"Nonce":                nonce,
-				"CurrentIteration":     currentIteration,
 				"FeedbackMessages":     feedback.String(),
 				"StatusSummary":        t.StatusSummary,
 				"LastVerificationInfo": lastVerificationInfo,
-				"RecentActions":        recentActionsSummary,
 			})
 
 			return reactiveData, nil
@@ -256,9 +237,18 @@ func (t *AiTask) execute() error {
 			t.SetStatus(aicommon.AITaskState_Aborted)
 		}
 		if t.GetStatus() == aicommon.AITaskState_Skipped {
+			// 用户通过 sync 事件跳过了任务（HandleSkipSubtaskInPlan），
+			// 取消确认消息已通过 asyncDeferCallback 延迟注册，
+			// 此处 loop 已退出，触发回调发送取消确认消息。
+			t.CallAsyncDeferCallback(nil)
 			return nil
 		}
 		return err
+	}
+	// 正常完成时，如果有用户取消标记（例如在 execute 完成后才收到取消），
+	// 也触发回调发送取消确认消息。
+	if t.IsUserCancelled() {
+		t.CallAsyncDeferCallback(nil)
 	}
 	return nil
 }
@@ -285,19 +275,19 @@ func (t *AiTask) executeTask() error {
 		if t.GetStatus() == aicommon.AITaskState_Processing {
 			t.SetStatus(aicommon.AITaskState_Aborted)
 		}
-		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 上下文已取消 / Task [%s] Context Cancelled", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("「%s」已经停止", t.Name), fmt.Sprintf("%q has stopped", t.Name), aicommon.WithStatusCode("plan.task_stopped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 		return utils.Errorf("context is done")
 	}
 
 	// Execute the task
 	if err := t.execute(); err != nil {
-		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 执行出错 / Task [%s] Execution Error", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("处理「%s」时遇到问题", t.Name), fmt.Sprintf("A problem occurred while working on %q", t.Name), aicommon.WithStatusCode("plan.task_failed"), aicommon.WithStatusState(aicommon.StatusStateError))
 		return err
 	}
 
 	if t.GetStatus() != aicommon.AITaskState_Skipped {
 		// Start to wait for user review
-		t.planLoadingStatus(fmt.Sprintf("等待用户审查任务 [%s] / Waiting User Review for Task [%s]", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("「%s」已经处理好，等你确认", t.Name), fmt.Sprintf("%q is ready for your review", t.Name), aicommon.WithStatusCode("plan.task_awaiting_review"), aicommon.WithStatusState(aicommon.StatusStateWaiting))
 		ep := t.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 		t.EmitInfo("start to wait for user review current task")
@@ -309,7 +299,7 @@ func (t *AiTask) executeTask() error {
 		t.DoWaitAgree(t.Ctx, ep)
 
 		// User review finished
-		t.planLoadingStatus(fmt.Sprintf("处理任务 [%s] 审查结果 / Processing Review for Task [%s]", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("正在根据你的意见调整「%s」", t.Name), fmt.Sprintf("Updating %q based on your feedback", t.Name), aicommon.WithStatusCode("plan.task_revising"))
 		reviewResult := ep.GetParams()
 		t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
 		t.EmitInfo("start to handle review task event: %v", ep.GetId())
@@ -321,7 +311,7 @@ func (t *AiTask) executeTask() error {
 			log.Warnf("error handling review result: %v", err)
 		}
 	} else {
-		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 已跳过 / Task [%s] Skipped", t.Index, t.Index))
+		t.planUserStatus(fmt.Sprintf("已跳过「%s」", t.Name), fmt.Sprintf("Skipped %q", t.Name), aicommon.WithStatusCode("plan.task_skipped"), aicommon.WithStatusState(aicommon.StatusStateWarning))
 		t.EmitInfo("task %s was skipped by user, skip review", t.Name)
 		log.Infof("task %s was skipped by user, skip review", t.Name)
 	}
@@ -330,7 +320,7 @@ func (t *AiTask) executeTask() error {
 }
 
 func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
-	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 生成总结提示 / Task [%s] Generating Summary Prompt...", t.Index, t.Index))
+	t.planUserStatus(fmt.Sprintf("正在整理「%s」的关键信息", t.Name), fmt.Sprintf("Organizing the key information from %q", t.Name), aicommon.WithStatusCode("plan.task_summary_preparing"))
 
 	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
 	if err != nil {
@@ -343,7 +333,7 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 	// reference material emission tracking (once per transaction, not per key)
 	var referenceEmittedOnce sync.Once
 
-	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 等待 AI 生成总结 / Task [%s] Waiting AI Summary...", t.Index, t.Index))
+	t.planUserStatus(fmt.Sprintf("正在归纳「%s」的结果", t.Name), fmt.Sprintf("Summarizing the results of %q", t.Name), aicommon.WithStatusCode("plan.task_summarizing"))
 	extractStart := time.Now()
 	err = t.CallAITransaction(summaryPromptWellFormed, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
 		boundEmitter := summaryReader.BindEmitter(t.GetEmitter())
@@ -359,7 +349,6 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 					}()
 
 					log.Debugf("summary stream handler started for field [%s]", key)
-					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 处理 %s / Task [%s] Processing %s", t.Index, key, t.Index, key))
 
 					nodeId := "summary-long"
 
@@ -472,7 +461,7 @@ func (t *AiTask) generateTaskSummary(summary, nextSteps string) error {
 		}
 	}
 
-	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))
+	t.planUserStatus(fmt.Sprintf("「%s」的结果已经整理完成", t.Name), fmt.Sprintf("The results of %q are ready", t.Name), aicommon.WithStatusCode("plan.task_summary_ready"), aicommon.WithStatusState(aicommon.StatusStateSuccess))
 
 	// Save timeline diff and result summary artifacts
 	if err := t.saveTaskArtifacts(summary, nextSteps, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
@@ -658,7 +647,7 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextSteps, statusSum
 			failCount++
 		}
 	}
-	contentBuilder.WriteString(fmt.Sprintf("Total Tool Calls: %d (Success: %d, Failed: %d)\n", len(toolCallResults), successCount, failCount))
+	contentBuilder.WriteString(fmt.Sprintf("Total Tool Calls: %d (Completed: %d, Protocol Failed: %d)\n", len(toolCallResults), successCount, failCount))
 
 	contentBuilder.WriteString("\n")
 

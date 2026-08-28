@@ -200,7 +200,7 @@ func buildYaklangFinalizeQuery(loop *reactloops.ReActLoop, task aicommon.AIState
 	out.WriteString("是否通过语法检查必须与上面的【权威结论】一致。")
 	out.WriteString("不要标题、列表、编号或任何 markdown，纯短句。")
 	if reasonErr, ok := reason.(error); ok && reasonErr != nil && strings.Contains(reasonErr.Error(), "max iterations") {
-		out.WriteString(" 本轮因达到最大迭代次数退出，若代码可能不完整请提示用户。")
+		out.WriteString(" 宿主已暂停继续执行，若代码可能不完整请提示用户。")
 	}
 	if task != nil {
 		if userInput := strings.TrimSpace(task.GetUserInput()); userInput != "" {
@@ -241,7 +241,7 @@ func generateYaklangFinalizeLiteSummary(loop *reactloops.ReActLoop, reason any) 
 
 	summary := strings.TrimSpace(strings.Join(parts, "; "))
 	if reasonErr, ok := reason.(error); ok && reasonErr != nil && strings.Contains(reasonErr.Error(), "max iterations") {
-		summary = summary + " (因达到最大迭代次数退出)"
+		summary = summary + " (宿主已暂停继续执行)"
 	}
 	return summary
 }

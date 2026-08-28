@@ -79,7 +79,7 @@ var decryptDataAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 			log.Infof("decrypt_data action: %s", paramSummary)
 
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeSetRequest, fmt.Sprintf("解密数据: %s", spec.Algorithm))
-			reactloops.EmitStatus(loop, "解密中 / Decrypting...")
+			reactloops.EmitStatusI18n(loop, "解密中", "Decrypting...")
 
 			plainBytes, err := decryptLoopHTTPFuzzData(spec)
 			if err != nil {
@@ -88,7 +88,7 @@ var decryptDataAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 				record := recordLoopHTTPFuzzMetaAction(loop, "decrypt_data", paramSummary, utils.ShrinkTextBlock(feedback, 240))
 				r.AddToTimeline("decrypt_data", fmt.Sprintf("Decrypt failed: %s\n%s", spec.Algorithm, err.Error()))
 				persistLoopHTTPFuzzSessionContext(loop, "decrypt_data_failed")
-				reactloops.EmitStatus(loop, "解密失败 / Decrypt Failed")
+				reactloops.EmitStatusI18n(loop, "解密失败", "Decrypt Failed")
 				operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback)
 				return
 			}
@@ -120,7 +120,7 @@ var decryptDataAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 			record := recordLoopHTTPFuzzMetaAction(loop, "decrypt_data", paramSummary, utils.ShrinkTextBlock(resultMarkdown, 240))
 			r.AddToTimeline("decrypt_data", fmt.Sprintf("Decrypted %s, output: %s", spec.Algorithm, utils.ShrinkTextBlock(outputText, 200)))
 			persistLoopHTTPFuzzSessionContext(loop, "decrypt_data")
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeSetRequest, "解密完成 / Decrypt Complete", utils.ShrinkTextBlock(outputText, 1200))
 			operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + resultMarkdown)
 		},

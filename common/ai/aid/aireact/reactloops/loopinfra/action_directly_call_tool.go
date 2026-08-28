@@ -406,7 +406,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 
 		toolName := loop.Get("directly_call_tool_name")
 		if toolName == "" {
-			loopInfraStatus(loop, "直接工具调用失败 / Direct Tool Call Failed")
+			loopInfraStatus(loop, "没有找到要使用的工具", "No suitable tool was found")
 			reportStatus(strings.TrimSpace(`
 Error: directly_call_tool_name is missing in loop state.
 Fast-path directly_call_tool failed before execution and cannot be recovered in-place because the target tool is unknown.
@@ -421,14 +421,14 @@ Few-shot example 2 (valid directly_call_tool):
 			operator.Feedback(utils.Error("directly_call_tool requires tool_name; switch to require_tool or provide directly_call_tool_name + directly_call_tool_params"))
 			return
 		}
-		loopInfraStatus(loop, "准备直接工具调用 / Preparing Direct Tool Call...")
+		emitToolsPreparingStatus(loop, []string{toolName})
 
 		// Pre-card unrecoverable branch: cached tool lookup failure cannot enter the
 		// "card already created" flow, so it stays here (before invoker.DirectlyCallTool).
 		_, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolName)
 		if lookupErr != nil {
 			reportStatus(fmt.Sprintf("cached tool lookup failed for '%s': %v", toolName, lookupErr))
-			loopInfraStatus(loop, "缓存工具不可用 / Cached Tool Unavailable")
+			loopInfraStatus(loop, "当前工具暂时不可用，正在换一种方式继续", "The current tool is unavailable; trying another approach")
 			msg := fmt.Sprintf("directly_call_tool cached tool lookup failed for '%s'; switch to @action=require_tool", toolName)
 			operator.Feedback(utils.Error(msg))
 			invoker.AddToTimeline("DIRECT_CALL_PARAMS", msg)
@@ -537,7 +537,13 @@ Few-shot example 2 (valid direct retry):
 `, toolName, validationSummary, toolName, toolName, toolName)))
 				finishProgress("[failed] params validation failed; falling back to require_tool")
 				reportStatus(fmt.Sprintf("auto fallback: switching '%s' from directly_call_tool to @action=require_tool because schema validation failed", toolName))
-				loopInfraStatus(loop, "参数校验失败，切换常规工具调用 / Params Invalid, Falling Back...")
+				reactloops.EmitStatusI18n(
+					loop,
+					"当前方式不太合适，正在调整调用方式",
+					"Adjusting the tool invocation approach",
+					aicommon.WithStatusCode("tool.adjusting"),
+					aicommon.WithStatusState(aicommon.StatusStateRecovering),
+				)
 				operator.Feedback(fmt.Sprintf("directly_call_tool params invalid for '%s': %s; automatically switching to @action=require_tool", toolName, validationSummary))
 				return nil, true, tool, nil
 			}
@@ -558,7 +564,14 @@ Few-shot example 2 (valid direct retry):
 			if ce := action.GetString("directly_call_expectations"); ce != "" {
 				params[aicommon.ReservedKeyCallExpectations] = ce
 			}
-			loopInfraStatus(loop, "直接工具调用参数已准备 / Direct Tool Params Ready")
+			tools := buildStatusTools(loop, []string{name}, aicommon.StatusStateRunning)
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("正在使用「%s」完成这一步", statusToolNames(tools, false)),
+				fmt.Sprintf("Using %s for this step", statusToolNames(tools, true)),
+				aicommon.WithStatusCode("tool.running"),
+				aicommon.WithStatusTools(tools...),
+			)
 			return params, false, tool, nil
 		}
 

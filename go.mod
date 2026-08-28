@@ -9,6 +9,9 @@ replace github.com/wenlng/go-captcha-assets v1.0.5 => github.com/wenlng/go-captc
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
 replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.1
 
+// Backport ALPS 17613 support without raising the project's Go version.
+replace github.com/refraction-networking/utls => ./common/third_party/utls
+
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.7.2
@@ -26,7 +29,7 @@ require (
 	github.com/bytedance/mockey v1.4.6
 	github.com/chzyer/readline v1.5.1
 	github.com/cilium/ebpf v0.17.3
-	github.com/cloudflare/circl v1.3.7
+	github.com/cloudflare/circl v1.5.0
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/corpix/uarand v0.2.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.4

@@ -660,6 +660,7 @@ const (
 	Yak_QueryContextMenuActions_FullMethodName                    = "/ypb.Yak/QueryContextMenuActions"
 	Yak_SetContextMenuActionBinding_FullMethodName                = "/ypb.Yak/SetContextMenuActionBinding"
 	Yak_ExecuteContextMenuAction_FullMethodName                   = "/ypb.Yak/ExecuteContextMenuAction"
+	Yak_UploadToTemporaryFile_FullMethodName                      = "/ypb.Yak/UploadToTemporaryFile"
 )
 
 // YakClient is the client API for Yak service.
@@ -1484,6 +1485,10 @@ type YakClient interface {
 	QueryContextMenuActions(ctx context.Context, in *QueryContextMenuActionsRequest, opts ...grpc.CallOption) (*QueryContextMenuActionsResponse, error)
 	SetContextMenuActionBinding(ctx context.Context, in *SetContextMenuActionBindingRequest, opts ...grpc.CallOption) (*ContextMenuAction, error)
 	ExecuteContextMenuAction(ctx context.Context, in *ExecuteContextMenuActionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContextMenuActionEvent], error)
+	// Upload GUI-local bytes into the currently connected engine's temporary
+	// filesystem. Returned paths are engine paths and can be used by file
+	// Fuzztags in both local and remote-engine modes.
+	UploadToTemporaryFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse], error)
 }
 
 type yakClient struct {
@@ -8864,6 +8869,19 @@ func (c *yakClient) ExecuteContextMenuAction(ctx context.Context, in *ExecuteCon
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExecuteContextMenuActionClient = grpc.ServerStreamingClient[ContextMenuActionEvent]
 
+func (c *yakClient) UploadToTemporaryFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[118], Yak_UploadToTemporaryFile_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_UploadToTemporaryFileClient = grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -9686,6 +9704,10 @@ type YakServer interface {
 	QueryContextMenuActions(context.Context, *QueryContextMenuActionsRequest) (*QueryContextMenuActionsResponse, error)
 	SetContextMenuActionBinding(context.Context, *SetContextMenuActionBindingRequest) (*ContextMenuAction, error)
 	ExecuteContextMenuAction(*ExecuteContextMenuActionRequest, grpc.ServerStreamingServer[ContextMenuActionEvent]) error
+	// Upload GUI-local bytes into the currently connected engine's temporary
+	// filesystem. Returned paths are engine paths and can be used by file
+	// Fuzztags in both local and remote-engine modes.
+	UploadToTemporaryFile(grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -11618,6 +11640,9 @@ func (UnimplementedYakServer) SetContextMenuActionBinding(context.Context, *SetC
 }
 func (UnimplementedYakServer) ExecuteContextMenuAction(*ExecuteContextMenuActionRequest, grpc.ServerStreamingServer[ContextMenuActionEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method ExecuteContextMenuAction not implemented")
+}
+func (UnimplementedYakServer) UploadToTemporaryFile(grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method UploadToTemporaryFile not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -22284,6 +22309,13 @@ func _Yak_ExecuteContextMenuAction_Handler(srv interface{}, stream grpc.ServerSt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExecuteContextMenuActionServer = grpc.ServerStreamingServer[ContextMenuActionEvent]
 
+func _Yak_UploadToTemporaryFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).UploadToTemporaryFile(&grpc.GenericServerStream[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_UploadToTemporaryFileServer = grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -24991,6 +25023,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "ExecuteContextMenuAction",
 			Handler:       _Yak_ExecuteContextMenuAction_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "UploadToTemporaryFile",
+			Handler:       _Yak_UploadToTemporaryFile_Handler,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "yakgrpc.proto",

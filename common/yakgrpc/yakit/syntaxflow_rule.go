@@ -170,6 +170,24 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 	return db
 }
 
+// ApplySyntaxFlowRuleModeFilter restricts rules by persisted execution mode
+// (source | ssa). Mode is stored on schema.SyntaxFlowRule, not in gRPC filter.
+func ApplySyntaxFlowRuleModeFilter(db *gorm.DB, modes []string) *gorm.DB {
+	if db == nil || len(modes) == 0 {
+		return db
+	}
+	normalized := make([]string, 0, len(modes))
+	for _, mode := range modes {
+		if trimmed := strings.TrimSpace(mode); trimmed != "" {
+			normalized = append(normalized, string(schema.ValidRuleMode(trimmed)))
+		}
+	}
+	if len(normalized) == 0 {
+		return db
+	}
+	return bizhelper.ExactOrQueryStringArrayOr(db, "mode", normalized)
+}
+
 func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowRule, error) {
 	if params == nil {
 		params = &ypb.QuerySyntaxFlowRuleRequest{}

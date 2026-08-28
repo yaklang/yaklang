@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,21 +18,21 @@ import (
 type DebugRunAnalysis struct {
 	// RunDir is intentionally NOT returned to the frontend (security).
 	// It is kept for internal use but not serialized.
-	RunDir     string             `json:"-"`
-	Status     string             `json:"status"` // running | completed | failed | unknown
-	StartedAt  *time.Time         `json:"started_at,omitempty"`
-	FinishedAt *time.Time         `json:"finished_at,omitempty"`
-	Duration   string             `json:"duration,omitempty"`
-	Phases     []PhaseAnalysis    `json:"phases,omitempty"`
-	Samples    []SampleSummary    `json:"samples,omitempty"`
-	Summary    *RunSummary         `json:"summary,omitempty"`
-	Errors     []string            `json:"errors,omitempty"`
-	Partial    bool               `json:"partial,omitempty"`
+	RunDir     string          `json:"-"`
+	Status     string          `json:"status"` // running | completed | failed | unknown
+	StartedAt  *time.Time      `json:"started_at,omitempty"`
+	FinishedAt *time.Time      `json:"finished_at,omitempty"`
+	Duration   string          `json:"duration,omitempty"`
+	Phases     []PhaseAnalysis `json:"phases,omitempty"`
+	Samples    []SampleSummary `json:"samples,omitempty"`
+	Summary    *RunSummary     `json:"summary,omitempty"`
+	Errors     []string        `json:"errors,omitempty"`
+	Partial    bool            `json:"partial,omitempty"`
 }
 
 // PhaseAnalysis is a per-phase summary.
 type PhaseAnalysis struct {
-	Phase      string     `json:"phase"` // compile | scan | unknown
+	Phase      string     `json:"phase"`  // compile | scan | unknown
 	Source     string     `json:"source"` // log_inferred | status_card | unknown
 	StartedAt  *time.Time `json:"started_at,omitempty"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
@@ -43,43 +44,95 @@ type PhaseAnalysis struct {
 // Detail fields are populated inline so the frontend can expand a row
 // without a second request.
 type SampleSummary struct {
-	Sequence   int        `json:"sequence"`
-	Label      string     `json:"label"` // e.g. "20260805-120030-initial"
-	Timestamp  *time.Time `json:"timestamp,omitempty"`
-	Phase      string     `json:"phase,omitempty"`
-	PhaseSource string    `json:"phase_source,omitempty"` // explicit | boundary_inferred | log_inferred | unknown
-	HasCPU     bool       `json:"has_cpu"`
-	HasHeap    bool       `json:"has_heap"`
-	HasGoroutine bool     `json:"has_goroutine"`
+	Sequence     int        `json:"sequence"`
+	Label        string     `json:"label"` // e.g. "20260805-120030-initial"
+	Timestamp    *time.Time `json:"timestamp,omitempty"`
+	EndedAt      *time.Time `json:"ended_at,omitempty"`
+	DurationMS   int64      `json:"duration_ms,omitempty"`
+	Phase        string     `json:"phase,omitempty"`
+	PhaseSource  string     `json:"phase_source,omitempty"` // explicit | boundary_inferred | log_inferred | unknown
+	HasCPU       bool       `json:"has_cpu"`
+	HasHeap      bool       `json:"has_heap"`
+	HasGoroutine bool       `json:"has_goroutine"`
 	// File paths are internal only, not serialized to JSON
 	CPUFile       string `json:"-"`
 	HeapFile      string `json:"-"`
 	GoroutineFile string `json:"-"`
 	// Inline detail (limited to avoid oversized analysis JSON)
-	CPUTop     []PprofTopFunction `json:"cpu_top,omitempty"`
-	HeapTop    []PprofTopFunction `json:"heap_top,omitempty"`
-	Goroutines int                `json:"goroutines,omitempty"`
-	LogExcerpt string             `json:"log_excerpt,omitempty"`
-	Status     string             `json:"status,omitempty"` // available | partial | error | pending
+	CPUTop            []PprofTopFunction `json:"cpu_top,omitempty"`
+	CPUTopYaklang     []PprofTopFunction `json:"cpu_top_yaklang,omitempty"`
+	CPUStacks         []PprofStackPath   `json:"cpu_stacks,omitempty"`
+	CPUStacksYaklang  []PprofStackPath   `json:"cpu_stacks_yaklang,omitempty"`
+	HeapTop           []PprofTopFunction `json:"heap_top,omitempty"`
+	HeapTopYaklang    []PprofTopFunction `json:"heap_top_yaklang,omitempty"`
+	HeapStacks        []PprofStackPath   `json:"heap_stacks,omitempty"`
+	HeapStacksYaklang []PprofStackPath   `json:"heap_stacks_yaklang,omitempty"`
+	Goroutines        int                `json:"goroutines,omitempty"`
+	LogExcerpt        string             `json:"log_excerpt,omitempty"`
+	Status            string             `json:"status,omitempty"` // available | partial | error | pending
+	DBStats           *DBOpStatsSummary  `json:"db_stats,omitempty"`
+	Runtime           *RuntimeStatsSummary `json:"runtime,omitempty"`
+}
+
+// RuntimeStatsSummary mirrors runtime-stats/*.runtime.json written by the
+// scan-task pprof collector (host vs this process CPU/memory).
+type RuntimeStatsSummary struct {
+	Timestamp             string  `json:"timestamp,omitempty"`
+	NumCPU                int     `json:"num_cpu,omitempty"`
+	Load1                 float64 `json:"load1,omitempty"`
+	HostCPUPercent        float64 `json:"host_cpu_percent"`
+	ProcessCPUPercent     float64 `json:"process_cpu_percent"`
+	HostMemTotalBytes     uint64  `json:"host_mem_total_bytes"`
+	HostMemUsedBytes      uint64  `json:"host_mem_used_bytes"`
+	HostMemAvailableBytes uint64  `json:"host_mem_available_bytes"`
+	ProcessRSSBytes       uint64  `json:"process_rss_bytes"`
+	ProcessHeapAllocBytes uint64  `json:"process_heap_alloc_bytes"`
+	ProcessHeapSysBytes   uint64  `json:"process_heap_sys_bytes"`
+	Goroutines            int     `json:"goroutines,omitempty"`
+}
+
+// DBOpStatsSummary mirrors ssadb.DBOpStats JSON written to db-stats/*.db.json.
+type DBOpStatsSummary struct {
+	Dialect    string                       `json:"dialect,omitempty"`
+	Ops        map[string]DBOpBucketSummary `json:"ops,omitempty"`
+	TotalCount int64                        `json:"total_count"`
+	TotalMs    int64                        `json:"total_ms"`
+	WindowMs   int64                        `json:"window_ms,omitempty"`
+	ErrorCount int64                        `json:"error_count,omitempty"`
+}
+
+// DBOpBucketSummary mirrors ssadb.DBOpBucket JSON.
+type DBOpBucketSummary struct {
+	Count      int64 `json:"count"`
+	TotalMs    int64 `json:"total_ms"`
+	MinMs      int64 `json:"min_ms,omitempty"`
+	MaxMs      int64 `json:"max_ms,omitempty"`
+	AvgMs      int64 `json:"avg_ms,omitempty"`
+	ErrorCount int64 `json:"error_count,omitempty"`
 }
 
 // SampleDetail is the detailed view of a single 5-minute sample.
 type SampleDetail struct {
 	SampleSummary
-	CPUProfile   *PprofTopAnalysis `json:"cpu_profile,omitempty"`
-	HeapProfile  *PprofTopAnalysis  `json:"heap_profile,omitempty"`
-	Goroutines   int                `json:"goroutines,omitempty"`
-	LogExcerpt   string             `json:"log_excerpt,omitempty"`
+	CPUProfile  *PprofTopAnalysis `json:"cpu_profile,omitempty"`
+	HeapProfile *PprofTopAnalysis `json:"heap_profile,omitempty"`
+	Goroutines  int               `json:"goroutines,omitempty"`
+	LogExcerpt  string            `json:"log_excerpt,omitempty"`
 }
 
 // PprofTopAnalysis contains top functions from a pprof profile.
 type PprofTopAnalysis struct {
-	Kind         string             `json:"kind"`
-	TopFunctions []PprofTopFunction  `json:"top_functions,omitempty"`
-	SampleCount  int64              `json:"sample_count"`
-	TotalValue   int64              `json:"total_value"`
-	SampleUnit   string             `json:"sample_unit,omitempty"`
-	ParseError   string             `json:"parse_error,omitempty"`
+	Kind          string             `json:"kind"`
+	TopFunctions  []PprofTopFunction `json:"top_functions,omitempty"`
+	YaklangTop    []PprofTopFunction `json:"yaklang_top,omitempty"`
+	TopStacks     []PprofStackPath   `json:"top_stacks,omitempty"`
+	YaklangStacks []PprofStackPath   `json:"yaklang_stacks,omitempty"`
+	SampleCount   int64              `json:"sample_count"`
+	TotalValue    int64              `json:"total_value"`
+	SampleUnit    string             `json:"sample_unit,omitempty"`
+	ParseError    string             `json:"parse_error,omitempty"`
+	TimeNanos     int64              `json:"time_nanos,omitempty"`
+	DurationNanos int64              `json:"duration_nanos,omitempty"`
 }
 
 // PprofTopFunction is a single function entry.
@@ -91,18 +144,26 @@ type PprofTopFunction struct {
 	FlatPct   string `json:"flat_pct"`
 }
 
+// PprofStackPath is one folded call path (root → leaf) with its sample share.
+type PprofStackPath struct {
+	Frames []string `json:"frames"`
+	Value  int64    `json:"value"`
+	Pct    string   `json:"pct"`
+}
+
 // RunSummary is the overall run summary.
 type RunSummary struct {
-	TotalDurationMS  int64  `json:"total_duration_ms"`
-	CPUProfileFiles  int    `json:"cpu_profile_files"`
-	HeapProfileFiles int    `json:"heap_profile_files"`
-	GoroutineFiles   int    `json:"goroutine_files"`
-	HasLog           bool   `json:"has_log"`
-	HasReport        bool   `json:"has_report"`
-	HasSSADB         bool   `json:"has_ssadb"`
-	HasCmd           bool   `json:"has_cmd"`
-	CompilePhaseFound bool  `json:"compile_phase_found"`
-	ScanPhaseFound    bool  `json:"scan_phase_found"`
+	TotalDurationMS   int64             `json:"total_duration_ms"`
+	CPUProfileFiles   int               `json:"cpu_profile_files"`
+	HeapProfileFiles  int               `json:"heap_profile_files"`
+	GoroutineFiles    int               `json:"goroutine_files"`
+	HasLog            bool              `json:"has_log"`
+	HasReport         bool              `json:"has_report"`
+	HasSSADB          bool              `json:"has_ssadb"`
+	HasCmd            bool              `json:"has_cmd"`
+	CompilePhaseFound bool              `json:"compile_phase_found"`
+	ScanPhaseFound    bool              `json:"scan_phase_found"`
+	DBStatsTotal      *DBOpStatsSummary `json:"db_stats_total,omitempty"`
 }
 
 // AnalyzeDebugRun parses a debug run directory and returns structured analysis.
@@ -111,9 +172,10 @@ func AnalyzeDebugRun(dir string) DebugRunAnalysis {
 	return AnalyzeDebugRunWithStatus(dir, "")
 }
 
-// AnalyzeDebugRunWithStatus analyzes a debug run directory. When taskStatus
-// is non-empty (e.g. "succeeded"/"failed"), it takes precedence over the
-// log-derived status because the log may not contain a completion marker.
+// AnalyzeDebugRunWithStatus analyzes a debug run directory.
+// Status always comes from the Legion task/attempt status when provided.
+// Logs are never used to invent failed/completed — rule comments contain
+// words like "panic" and previously false-triggered "失败".
 func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 	result := DebugRunAnalysis{
 		RunDir: dir,
@@ -151,27 +213,52 @@ func AnalyzeDebugRunWithStatus(dir string, taskStatus string) DebugRunAnalysis {
 	if strings.TrimSpace(logContent) != "" {
 		result.setTimesFromLog(logContent)
 		result.setPhasesFromLog(logContent)
-		if taskStatus == "" {
-			result.Status = result.determineStatus(logContent)
-		}
 	}
-	if taskStatus != "" {
-		result.Status = normalizeTaskStatus(taskStatus)
+
+	// Child collector logs often only contain ERROR/pprof lines and miss the
+	// SSA phase markers that live in the node task log. Fold that log in when
+	// phase detection came up empty so live/cancel analysis still shows compile.
+	if !hasRecognizedDebugPhases(result.Phases) {
+		if enriched := enrichLogWithTaskLog(dir, logContent); enriched != logContent && strings.TrimSpace(enriched) != "" {
+			logContent = enriched
+			result.setTimesFromLog(logContent)
+			result.setPhasesFromLog(logContent)
+		}
 	}
 
 	// Parse pprof samples
-	cpuDir := filepath.Join(dir, "cpu-pprof")
-	memDir := filepath.Join(dir, "memory-pprof")
-	goroutineDir := filepath.Join(dir, "goroutine-pprof")
-
-	samples := result.collectSamples(cpuDir, memDir, goroutineDir, logContent)
+	samples := result.collectSamples(dir, logContent)
 	result.Samples = samples
 
 	// Build summary
 	result.Summary = result.buildSummary(dir, samples)
 	result.Partial = len(result.Errors) > 0
 
+	result.Status = resolveDebugAnalysisStatus(taskStatus, logContent, len(samples))
 	return result
+}
+
+// resolveDebugAnalysisStatus maps the Legion attempt/job status onto the
+// debug analysis badge. Never infer failure from log text.
+func resolveDebugAnalysisStatus(taskStatus, logContent string, sampleCount int) string {
+	if normalized := normalizeTaskStatus(taskStatus); normalized != "" {
+		switch normalized {
+		case "succeeded", "completed", "ok":
+			return "completed"
+		case "failed", "error":
+			return "failed"
+		case "cancelled", "canceled", "timed_out", "lost":
+			return normalized
+		case "running", "claimed", "dispatched", "queued", "created":
+			return "running"
+		default:
+			return normalized
+		}
+	}
+	if sampleCount > 0 || strings.TrimSpace(logContent) != "" {
+		return "running"
+	}
+	return "unknown"
 }
 
 // AnalyzeSample returns detailed analysis for a single pprof sample.
@@ -197,11 +284,27 @@ func AnalyzeSample(dir string, label string) (SampleDetail, error) {
 	// Parse CPU profile
 	if cpuFile != "" {
 		detail.CPUProfile = parsePprofFile(cpuFile, "cpu")
+		if detail.CPUProfile != nil {
+			detail.CPUTop = limitTopFunctions(detail.CPUProfile.TopFunctions, 10)
+			detail.CPUTopYaklang = limitTopFunctions(detail.CPUProfile.YaklangTop, 10)
+			detail.CPUStacks = limitStackPaths(detail.CPUProfile.TopStacks, 10)
+			detail.CPUStacksYaklang = limitStackPaths(detail.CPUProfile.YaklangStacks, 10)
+			ts := parseLabelTimestamp(label)
+			detail.Label = label
+			detail.Timestamp = ts
+			applySampleWindow(&detail.SampleSummary, detail.CPUProfile)
+		}
 	}
 
 	// Parse heap profile
 	if heapFile != "" {
 		detail.HeapProfile = parsePprofFile(heapFile, "heap")
+		if detail.HeapProfile != nil {
+			detail.HeapTop = limitTopFunctions(detail.HeapProfile.TopFunctions, 10)
+			detail.HeapTopYaklang = limitTopFunctions(detail.HeapProfile.YaklangTop, 10)
+			detail.HeapStacks = limitStackPaths(detail.HeapProfile.TopStacks, 10)
+			detail.HeapStacksYaklang = limitStackPaths(detail.HeapProfile.YaklangStacks, 10)
+		}
 	}
 
 	// Count goroutines from goroutine profile
@@ -214,6 +317,8 @@ func AnalyzeSample(dir string, label string) (SampleDetail, error) {
 	if logData, err := os.ReadFile(logPath); err == nil {
 		detail.LogExcerpt = extractLogExcerpt(string(logData), label, 4096)
 	}
+
+	detail.DBStats = loadSampleDBStats(dir, label)
 
 	return detail, nil
 }
@@ -280,27 +385,33 @@ func (r *DebugRunAnalysis) setPhasesFromLog(logContent string) {
 	compileStart, scanStart := findPhaseTransitionsInLog(logContent)
 
 	if compileStart != nil {
-		finished := r.FinishedAt
+		var finished *time.Time
+		phaseStatus := "completed"
 		if scanStart != nil {
 			finished = scanStart
+		} else if isActiveDebugStatus(r.Status) {
+			// Still compiling: leave the window open so later samples map here.
+			phaseStatus = "running"
+		} else {
+			finished = r.FinishedAt
 		}
 		phases = append(phases, PhaseAnalysis{
-			Phase:     "compile",
-			Source:    "log_inferred",
-			StartedAt: compileStart,
+			Phase:      "compile",
+			Source:     "log_inferred",
+			StartedAt:  compileStart,
 			FinishedAt: finished,
-			Duration:  durationStr(compileStart, finished),
-			Status:    "completed",
+			Duration:   durationStr(compileStart, finished),
+			Status:     phaseStatus,
 		})
 	}
 	if scanStart != nil {
 		phases = append(phases, PhaseAnalysis{
-			Phase:     "scan",
-			Source:    "log_inferred",
-			StartedAt: scanStart,
+			Phase:      "scan",
+			Source:     "log_inferred",
+			StartedAt:  scanStart,
 			FinishedAt: r.FinishedAt,
-			Duration:  durationStr(scanStart, r.FinishedAt),
-			Status:    r.Status,
+			Duration:   durationStr(scanStart, r.FinishedAt),
+			Status:     r.Status,
 		})
 	}
 
@@ -315,32 +426,69 @@ func (r *DebugRunAnalysis) setPhasesFromLog(logContent string) {
 	r.Phases = phases
 }
 
-func (r *DebugRunAnalysis) determineStatus(logContent string) string {
-	lower := strings.ToLower(logContent)
-	if strings.Contains(lower, "code scan done") {
-		return "completed"
+func isActiveDebugStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running", "partial", "cancel_requested", "unknown", "":
+		return true
+	default:
+		return false
 	}
-	if strings.Contains(lower, "code scan failed") || strings.Contains(lower, "panic") {
-		return "failed"
-	}
-	// If log is still being written (file exists but no completion marker)
-	if len(logContent) > 0 {
-		return "running"
-	}
-	return "unknown"
 }
 
-func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logContent string) []SampleSummary {
+func hasRecognizedDebugPhases(phases []PhaseAnalysis) bool {
+	for _, phase := range phases {
+		name := strings.ToLower(strings.TrimSpace(phase.Phase))
+		if name != "" && name != "unknown" {
+			return true
+		}
+	}
+	return false
+}
+
+func enrichLogWithTaskLog(debugDir, logContent string) string {
+	taskLog := resolveTaskLogByDebugDir(debugDir)
+	if taskLog == "" {
+		return logContent
+	}
+	data, err := os.ReadFile(taskLog)
+	if err != nil || len(data) == 0 {
+		return logContent
+	}
+	taskText := string(data)
+	if strings.TrimSpace(logContent) == "" {
+		return taskText
+	}
+	if strings.Contains(logContent, taskText) {
+		return logContent
+	}
+	return logContent + "\n--- node task log ---\n" + taskText
+}
+
+func (r *DebugRunAnalysis) determineStatus(logContent string) string {
+	// Deprecated: status must come from the Legion task/attempt, not log text.
+	// Kept as a thin wrapper for older call sites/tests.
+	return resolveDebugAnalysisStatus("", logContent, 0)
+}
+
+func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummary {
 	type fileEntry struct {
 		dir      string
 		suffix   string
 		fileType string
 	}
 
+	cpuDir := filepath.Join(dir, "cpu-pprof")
+	memDir := filepath.Join(dir, "memory-pprof")
+	goroutineDir := filepath.Join(dir, "goroutine-pprof")
+	dbStatsDir := filepath.Join(dir, "db-stats")
+	runtimeStatsDir := filepath.Join(dir, "runtime-stats")
+
 	entries := []fileEntry{
 		{cpuDir, ".cpu.prof", "cpu"},
 		{memDir, ".mem.prof", "heap"},
 		{goroutineDir, ".goroutine.prof", "goroutine"},
+		{dbStatsDir, ".db.json", "db_stats"},
+		{runtimeStatsDir, ".runtime.json", "runtime"},
 	}
 
 	// Collect all sample labels
@@ -383,6 +531,10 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 			case "goroutine":
 				s.HasGoroutine = true
 				s.GoroutineFile = filepath.Join(entry.dir, name)
+			case "db_stats":
+				s.DBStats = loadDBStatsFile(filepath.Join(entry.dir, name))
+			case "runtime":
+				s.Runtime = loadRuntimeStatsFile(filepath.Join(entry.dir, name))
 			}
 		}
 	}
@@ -394,7 +546,7 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 		}
 	}
 
-	// Populate inline details for each sample (limited to top 5 functions)
+	// Populate inline details for each sample (limited top lists for UI)
 	for _, s := range labelMap {
 		s.Status = "available"
 		if s.CPUFile != "" {
@@ -403,6 +555,10 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 					s.Status = "partial"
 				}
 				s.CPUTop = limitTopFunctions(p.TopFunctions, 10)
+				s.CPUTopYaklang = limitTopFunctions(p.YaklangTop, 10)
+				s.CPUStacks = limitStackPaths(p.TopStacks, 10)
+				s.CPUStacksYaklang = limitStackPaths(p.YaklangStacks, 10)
+				applySampleWindow(s, p)
 			}
 		}
 		if s.HeapFile != "" {
@@ -411,6 +567,10 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 					s.Status = "partial"
 				}
 				s.HeapTop = limitTopFunctions(p.TopFunctions, 10)
+				s.HeapTopYaklang = limitTopFunctions(p.YaklangTop, 10)
+				s.HeapStacks = limitStackPaths(p.TopStacks, 10)
+				s.HeapStacksYaklang = limitStackPaths(p.YaklangStacks, 10)
+				// Heap snapshots are instantaneous; only fill window from CPU.
 			}
 		}
 		if s.GoroutineFile != "" {
@@ -420,22 +580,14 @@ func (r *DebugRunAnalysis) collectSamples(cpuDir, memDir, goroutineDir, logConte
 				s.Goroutines = count
 			}
 		}
+		if s.DBStats == nil {
+			s.DBStats = loadSampleDBStats(dir, s.Label)
+		}
 		// Log excerpt limited to 500 chars
 		if s.Label != "" {
-			firstFile := s.CPUFile
-			if firstFile == "" {
-				firstFile = s.HeapFile
-			}
-			if firstFile == "" {
-				firstFile = s.GoroutineFile
-			}
-			if firstFile == "" {
-				continue
-			}
-			logPath := filepath.Join(filepath.Dir(filepath.Dir(firstFile)), "log")
-			if logData, err := os.ReadFile(logPath); err == nil {
+			if logData, err := os.ReadFile(filepath.Join(dir, "log")); err == nil {
 				s.LogExcerpt = extractLogExcerpt(string(logData), s.Label, 500)
-			} else if taskLog := resolveNodeTaskLogFallback(firstFile); taskLog != "" {
+			} else if taskLog := resolveTaskLogByDebugDir(dir); taskLog != "" {
 				if logData, err := os.ReadFile(taskLog); err == nil {
 					s.LogExcerpt = extractLogExcerpt(string(logData), s.Label, 500)
 				}
@@ -496,7 +648,82 @@ func (r *DebugRunAnalysis) buildSummary(dir string, samples []SampleSummary) *Ru
 		}
 	}
 
+	summary.DBStatsTotal = aggregateDBStats(samples)
+
 	return summary
+}
+
+func loadSampleDBStats(dir, label string) *DBOpStatsSummary {
+	if dir == "" || label == "" {
+		return nil
+	}
+	return loadDBStatsFile(filepath.Join(dir, "db-stats", label+".db.json"))
+}
+
+func loadDBStatsFile(path string) *DBOpStatsSummary {
+	raw, err := os.ReadFile(path)
+	if err != nil || len(raw) == 0 {
+		return nil
+	}
+	var stats DBOpStatsSummary
+	if err := json.Unmarshal(raw, &stats); err != nil {
+		return nil
+	}
+	return &stats
+}
+
+func loadRuntimeStatsFile(path string) *RuntimeStatsSummary {
+	raw, err := os.ReadFile(path)
+	if err != nil || len(raw) == 0 {
+		return nil
+	}
+	var stats RuntimeStatsSummary
+	if err := json.Unmarshal(raw, &stats); err != nil {
+		return nil
+	}
+	return &stats
+}
+
+func aggregateDBStats(samples []SampleSummary) *DBOpStatsSummary {
+	ops := make(map[string]DBOpBucketSummary)
+	total := DBOpStatsSummary{Ops: ops}
+	any := false
+	for _, s := range samples {
+		if s.DBStats == nil {
+			continue
+		}
+		any = true
+		if total.Dialect == "" {
+			total.Dialect = s.DBStats.Dialect
+		}
+		total.TotalCount += s.DBStats.TotalCount
+		total.TotalMs += s.DBStats.TotalMs
+		total.ErrorCount += s.DBStats.ErrorCount
+		for kind, bucket := range s.DBStats.Ops {
+			cur := ops[kind]
+			cur.Count += bucket.Count
+			cur.TotalMs += bucket.TotalMs
+			cur.ErrorCount += bucket.ErrorCount
+			if bucket.MaxMs > cur.MaxMs {
+				cur.MaxMs = bucket.MaxMs
+			}
+			if bucket.MinMs > 0 && (cur.MinMs == 0 || bucket.MinMs < cur.MinMs) {
+				cur.MinMs = bucket.MinMs
+			}
+			ops[kind] = cur
+		}
+	}
+	if !any {
+		return nil
+	}
+	for kind, bucket := range ops {
+		if bucket.Count > 0 {
+			bucket.AvgMs = bucket.TotalMs / bucket.Count
+		}
+		ops[kind] = bucket
+	}
+	total.Ops = ops
+	return &total
 }
 
 func parsePprofFile(path string, kind string) *PprofTopAnalysis {
@@ -521,6 +748,9 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		return result
 	}
 
+	result.TimeNanos = p.TimeNanos
+	result.DurationNanos = p.DurationNanos
+
 	sampleTypeIdx := 0
 	for i, st := range p.SampleType {
 		if st.Type == "samples" || st.Type == "cpu" || st.Type == "alloc_space" || st.Type == "inuse_space" || st.Type == "alloc_objects" || st.Type == "inuse_objects" {
@@ -529,12 +759,8 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		}
 	}
 
-	type funcStats struct {
-		name string
-		flat int64
-		cum  int64
-	}
-	funcMap := make(map[string]*funcStats)
+	funcMap := make(map[string]*pprofFuncStats)
+	stackMap := make(map[string]*pprofStackStats)
 	var totalValue int64
 
 	for _, sample := range p.Sample {
@@ -551,7 +777,7 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 					name := line.Function.Name
 					fs, ok := funcMap[name]
 					if !ok {
-						fs = &funcStats{name: name}
+						fs = &pprofFuncStats{name: name}
 						funcMap[name] = fs
 					}
 					fs.flat += value
@@ -568,7 +794,7 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 						seen[name] = true
 						fs, ok := funcMap[name]
 						if !ok {
-							fs = &funcStats{name: name}
+							fs = &pprofFuncStats{name: name}
 							funcMap[name] = fs
 						}
 						fs.cum += value
@@ -576,9 +802,21 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 				}
 			}
 		}
+
+		frames := stackFramesRootToLeaf(sample)
+		if len(frames) == 0 {
+			continue
+		}
+		key := strings.Join(frames, "\x00")
+		ss, ok := stackMap[key]
+		if !ok {
+			ss = &pprofStackStats{frames: frames}
+			stackMap[key] = ss
+		}
+		ss.value += value
 	}
 
-	var stats []*funcStats
+	var stats []*pprofFuncStats
 	for _, fs := range funcMap {
 		stats = append(stats, fs)
 	}
@@ -589,28 +827,213 @@ func buildPprofTopAnalysis(p *profile.Profile, kind string) *PprofTopAnalysis {
 		return stats[i].name < stats[j].name
 	})
 
-	const topN = 20
-	if len(stats) > topN {
-		stats = stats[:topN]
+	var stacks []*pprofStackStats
+	for _, ss := range stackMap {
+		stacks = append(stacks, ss)
 	}
-
-	for _, fs := range stats {
-		var cumPct, flatPct string
-		if totalValue > 0 {
-			cumPct = fmt.Sprintf("%.2f%%", float64(fs.cum)*100/float64(totalValue))
-			flatPct = fmt.Sprintf("%.2f%%", float64(fs.flat)*100/float64(totalValue))
+	sort.Slice(stacks, func(i, j int) bool {
+		if stacks[i].value != stacks[j].value {
+			return stacks[i].value > stacks[j].value
 		}
-		result.TopFunctions = append(result.TopFunctions, PprofTopFunction{
-			Name: fs.name, CumValue: fs.cum, CumPct: cumPct, FlatValue: fs.flat, FlatPct: flatPct,
-		})
-	}
+		return strings.Join(stacks[i].frames, "/") < strings.Join(stacks[j].frames, "/")
+	})
 
+	result.TopFunctions = pprofTopFromStats(stats, totalValue, 20, nil)
+	result.YaklangTop = pprofTopFromStats(stats, totalValue, 20, isYaklangPprofFunc)
+	result.TopStacks = pprofStacksFromStats(stacks, totalValue, 20, false)
+	result.YaklangStacks = pprofStacksFromStats(stacks, totalValue, 20, true)
 	result.SampleCount = int64(len(p.Sample))
 	result.TotalValue = totalValue
 	if len(p.SampleType) > sampleTypeIdx {
 		result.SampleUnit = p.SampleType[sampleTypeIdx].Unit
 	}
 	return result
+}
+
+type pprofFuncStats struct {
+	name string
+	flat int64
+	cum  int64
+}
+
+type pprofStackStats struct {
+	frames []string
+	value  int64
+}
+
+const pprofStackMaxFrames = 8
+
+// stackFramesRootToLeaf returns the call path outer→inner. Go profiles keep
+// the leaf at location[0]; reverse so the UI reads top-down like a call tree.
+func stackFramesRootToLeaf(sample *profile.Sample) []string {
+	if sample == nil || len(sample.Location) == 0 {
+		return nil
+	}
+	raw := make([]string, 0, len(sample.Location))
+	for i := len(sample.Location) - 1; i >= 0; i-- {
+		loc := sample.Location[i]
+		if loc == nil || len(loc.Line) == 0 {
+			continue
+		}
+		// Prefer the last line on the location (outermost inline frame).
+		line := loc.Line[len(loc.Line)-1]
+		if line.Function == nil || strings.TrimSpace(line.Function.Name) == "" {
+			continue
+		}
+		name := line.Function.Name
+		if len(raw) > 0 && raw[len(raw)-1] == name {
+			continue
+		}
+		raw = append(raw, name)
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	if len(raw) <= pprofStackMaxFrames {
+		return raw
+	}
+	// Keep the deepest frames (closest to the leaf where time is spent).
+	trimmed := make([]string, 0, pprofStackMaxFrames+1)
+	trimmed = append(trimmed, "…")
+	trimmed = append(trimmed, raw[len(raw)-pprofStackMaxFrames:]...)
+	return trimmed
+}
+
+func pprofStacksFromStats(
+	stacks []*pprofStackStats,
+	totalValue int64,
+	n int,
+	yaklangOnly bool,
+) []PprofStackPath {
+	selected := stacks
+	if yaklangOnly {
+		merged := make(map[string]*pprofStackStats)
+		for _, ss := range stacks {
+			focused := focusYaklangStackFrames(ss.frames)
+			if len(focused) == 0 {
+				continue
+			}
+			key := strings.Join(focused, "\x00")
+			cur, ok := merged[key]
+			if !ok {
+				cur = &pprofStackStats{frames: focused}
+				merged[key] = cur
+			}
+			cur.value += ss.value
+		}
+		selected = make([]*pprofStackStats, 0, len(merged))
+		for _, ss := range merged {
+			selected = append(selected, ss)
+		}
+		sort.Slice(selected, func(i, j int) bool {
+			if selected[i].value != selected[j].value {
+				return selected[i].value > selected[j].value
+			}
+			return strings.Join(selected[i].frames, "/") < strings.Join(selected[j].frames, "/")
+		})
+	}
+
+	out := make([]PprofStackPath, 0, n)
+	for _, ss := range selected {
+		var pct string
+		if totalValue > 0 {
+			pct = fmt.Sprintf("%.2f%%", float64(ss.value)*100/float64(totalValue))
+		}
+		out = append(out, PprofStackPath{
+			Frames: append([]string(nil), ss.frames...),
+			Value:  ss.value,
+			Pct:    pct,
+		})
+		if len(out) >= n {
+			break
+		}
+	}
+	return out
+}
+
+// focusYaklangStackFrames keeps one parent context plus yaklang frames through
+// the leaf so the path stays readable without runtime noise.
+func focusYaklangStackFrames(frames []string) []string {
+	first := -1
+	for i, name := range frames {
+		if isYaklangPprofFunc(name) {
+			first = i
+			break
+		}
+	}
+	if first < 0 {
+		return nil
+	}
+	start := first
+	if start > 0 {
+		start--
+	}
+	out := append([]string(nil), frames[start:]...)
+	if len(out) <= pprofStackMaxFrames {
+		return out
+	}
+	trimmed := make([]string, 0, pprofStackMaxFrames+1)
+	trimmed = append(trimmed, "…")
+	trimmed = append(trimmed, out[len(out)-pprofStackMaxFrames:]...)
+	return trimmed
+}
+
+func limitStackPaths(paths []PprofStackPath, n int) []PprofStackPath {
+	if n <= 0 || len(paths) <= n {
+		return paths
+	}
+	return paths[:n]
+}
+
+func pprofTopFromStats(
+	stats []*pprofFuncStats,
+	totalValue int64,
+	n int,
+	pred func(string) bool,
+) []PprofTopFunction {
+	out := make([]PprofTopFunction, 0, n)
+	for _, fs := range stats {
+		if pred != nil && !pred(fs.name) {
+			continue
+		}
+		var cumPct, flatPct string
+		if totalValue > 0 {
+			cumPct = fmt.Sprintf("%.2f%%", float64(fs.cum)*100/float64(totalValue))
+			flatPct = fmt.Sprintf("%.2f%%", float64(fs.flat)*100/float64(totalValue))
+		}
+		out = append(out, PprofTopFunction{
+			Name: fs.name, CumValue: fs.cum, CumPct: cumPct, FlatValue: fs.flat, FlatPct: flatPct,
+		})
+		if len(out) >= n {
+			break
+		}
+	}
+	return out
+}
+
+const yaklangPprofPrefix = "github.com/yaklang/yaklang"
+
+func isYaklangPprofFunc(name string) bool {
+	return strings.Contains(name, yaklangPprofPrefix)
+}
+
+// applySampleWindow sets EndedAt / DurationMS from the CPU profile duration.
+func applySampleWindow(s *SampleSummary, p *PprofTopAnalysis) {
+	if s == nil || p == nil || p.DurationNanos <= 0 {
+		return
+	}
+	s.DurationMS = p.DurationNanos / int64(time.Millisecond)
+	var start time.Time
+	if s.Timestamp != nil {
+		start = *s.Timestamp
+	} else if p.TimeNanos > 0 {
+		start = time.Unix(0, p.TimeNanos).UTC()
+		s.Timestamp = &start
+	} else {
+		return
+	}
+	end := start.Add(time.Duration(p.DurationNanos))
+	s.EndedAt = &end
 }
 
 func countGoroutines(path string) int {
@@ -701,14 +1124,12 @@ func findPhaseTransitionsInLog(logContent string) (compileStart, scanStart *time
 		ts := parseLogTimestamp(line)
 
 		if compileStart == nil && ts != nil {
-			if (strings.Contains(lower, "compile") || strings.Contains(lower, "load-program")) &&
-				(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+			if looksLikeCompilePhaseLine(lower) {
 				compileStart = ts
 			}
 		}
 		if scanStart == nil && ts != nil {
-			if (strings.Contains(lower, "scan") || strings.Contains(lower, "ingest")) &&
-				(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+			if looksLikeScanPhaseLine(lower) {
 				scanStart = ts
 			}
 		}
@@ -725,6 +1146,38 @@ func findPhaseTransitionsInLog(logContent string) (compileStart, scanStart *time
 		}
 	}
 	return
+}
+
+func looksLikeCompilePhaseLine(lower string) bool {
+	if strings.Contains(lower, `"id":"ssa-phase"`) && strings.Contains(lower, `"data":"compile"`) {
+		return true
+	}
+	if strings.Contains(lower, "ssa 任务阶段: compile") || strings.Contains(lower, "ssa 任务阶段：compile") {
+		return true
+	}
+	if (strings.Contains(lower, "compile") || strings.Contains(lower, "load-program")) &&
+		(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+		return true
+	}
+	return false
+}
+
+func looksLikeScanPhaseLine(lower string) bool {
+	if strings.Contains(lower, `"id":"ssa-phase"`) && strings.Contains(lower, `"data":"scan"`) {
+		return true
+	}
+	if strings.Contains(lower, "ssa 任务阶段: scan") || strings.Contains(lower, "ssa 任务阶段：scan") {
+		return true
+	}
+	if (strings.Contains(lower, "scan") || strings.Contains(lower, "ingest")) &&
+		(strings.Contains(lower, "phase") || strings.Contains(lower, "\u9636\u6bb5")) {
+		// Avoid treating compile-phase lines that also mention scan tooling.
+		if strings.Contains(lower, "compile") && !strings.Contains(lower, `"data":"scan"`) {
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func assignPhase(ts *time.Time, phases []PhaseAnalysis) (string, string) {

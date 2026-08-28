@@ -2,12 +2,133 @@ package aitool
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+func TestToolExecutionResultJSONKeepsAllSemanticChannels(t *testing.T) {
+	raw, err := json.Marshal(&ToolExecutionResult{})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"stdout":"","stderr":"","combined_output":"","result":null}`, string(raw))
+}
+
+func TestToolResultDumpAndTimelineUseNeutralProtocolSemantics(t *testing.T) {
+	tr := &ToolResult{
+		Name:    "bash",
+		Success: true,
+		Data: &ToolExecutionResult{
+			Stdout:         "SUCCESS from stdout",
+			Stderr:         "ERROR from stderr",
+			CombinedOutput: "SUCCESS from stdout\nERROR from stderr",
+			Result: map[string]any{
+				"exit_code":          7,
+				"exit_code_accepted": false,
+			},
+		},
+	}
+
+	dump := tr.Dump()
+	require.Contains(t, dump, `"protocol_completed":true`)
+	require.Contains(t, dump, `"execution_status":"failed"`)
+	require.NotContains(t, dump, `"success"`)
+	require.Contains(t, dump, `"exit_code":7`)
+
+	timeline := tr.String()
+	require.Contains(t, timeline, "execution_status: failed")
+	require.Less(t, strings.Index(timeline, "execution_result:"), strings.Index(timeline, "observations:"))
+	require.NotContains(t, timeline, "success: true")
+	require.NotContains(t, timeline, "tool/bash ok")
+
+	failed := (&ToolResult{Name: "bash", Success: false, Error: "validation failed"}).String()
+	require.Contains(t, failed, "protocol_error: validation failed")
+	require.NotContains(t, failed, "execution failed")
+}
+
+func TestToolResultGetExecutionStatusUsesOnlyExplicitSignals(t *testing.T) {
+	tests := []struct {
+		name       string
+		result     any
+		wantStatus ToolExecutionStatus
+		wantDetail string
+	}{
+		{
+			name:       "accepted zero exit",
+			result:     map[string]any{"exit_code": 0, "exit_code_accepted": true, "timed_out": false},
+			wantStatus: ToolExecutionStatusSucceeded,
+			wantDetail: "exit_code_accepted=true",
+		},
+		{
+			name:       "rejected nonzero exit",
+			result:     map[string]any{"exit_code": 7, "exit_code_accepted": false, "process_error": "exit status 7"},
+			wantStatus: ToolExecutionStatusFailed,
+			wantDetail: "exit_code=7",
+		},
+		{
+			name:       "accepted nonzero exit remains success",
+			result:     map[string]any{"exit_code": 7, "exit_code_accepted": true, "process_error": "exit status 7"},
+			wantStatus: ToolExecutionStatusSucceeded,
+			wantDetail: "exit_code_accepted=true",
+		},
+		{
+			name:       "timeout overrides exit acceptance",
+			result:     map[string]any{"exit_code": 0, "exit_code_accepted": true, "timed_out": true},
+			wantStatus: ToolExecutionStatusFailed,
+			wantDetail: "timed_out=true",
+		},
+		{
+			name:       "transport error",
+			result:     map[string]any{"transport_error": "connection refused", "response_received": false},
+			wantStatus: ToolExecutionStatusFailed,
+			wantDetail: "transport_error=connection refused",
+		},
+		{
+			name:       "http error response is task dependent",
+			result:     map[string]any{"status_code": 500, "response_received": true, "transport_error": ""},
+			wantStatus: ToolExecutionStatusUnknown,
+		},
+		{
+			name:       "arbitrary domain result is task dependent",
+			result:     map[string]any{"matches": 3},
+			wantStatus: ToolExecutionStatusUnknown,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			toolResult := &ToolResult{
+				Name:    "test-tool",
+				Success: true,
+				Data:    &ToolExecutionResult{Result: test.result},
+			}
+			status, detail := toolResult.GetExecutionStatus()
+			require.Equal(t, test.wantStatus, status)
+			if test.wantDetail != "" {
+				require.Contains(t, detail, test.wantDetail)
+			}
+		})
+	}
+}
+
+func TestToolResultShrinkCannotHideExplicitExecutionFailure(t *testing.T) {
+	toolResult := &ToolResult{
+		Name:         "bash",
+		Success:      true,
+		ShrinkResult: "The command was processed.",
+		Data: &ToolExecutionResult{Result: map[string]any{
+			"exit_code":          9,
+			"exit_code_accepted": false,
+		}},
+	}
+
+	timeline := toolResult.String()
+	require.Contains(t, timeline, "execution_status: failed")
+	require.Contains(t, timeline, "The command was processed.")
+	require.Less(t, strings.Index(timeline, "execution_status: failed"), strings.Index(timeline, "The command was processed."))
+}
 
 func TestToolResult_DumpTimelineItem_ParamsOption(t *testing.T) {
 	tr := &ToolResult{

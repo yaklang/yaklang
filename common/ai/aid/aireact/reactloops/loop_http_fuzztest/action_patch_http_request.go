@@ -67,7 +67,7 @@ var patchHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			log.Infof("patch_http_request action: %s", paramSummary)
 
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeModifyRequest, fmt.Sprintf("修补请求: %s", summarizeHTTPRequestPatchSpec(spec)))
-			reactloops.EmitStatus(loop, "修补请求中 / Patching Request...")
+			reactloops.EmitStatusI18n(loop, "修补请求中", "Patching Request...")
 
 			result, err := applyLoopHTTPFuzzRequestChange(loop, r, &loopHTTPFuzzRequestChange{
 				RawRequest:         string(patchedPacket),
@@ -95,7 +95,7 @@ var patchHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			)
 			r.AddToTimeline("patch_http_request", fmt.Sprintf("Patched current HTTP request: %s\n%s", summarizeHTTPRequestPatchSpec(spec), buildFuzzTimelineSummary(result.Diff)))
 			feedbackMsg := buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeModifyRequest, "HTTP 请求已修补 / HTTP Request Patched", utils.ShrinkTextBlock(result.Diff, 2000))
 			operator.Feedback(feedbackMsg)
 		},

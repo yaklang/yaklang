@@ -1,11 +1,17 @@
 package scannode
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -21,8 +27,17 @@ type runtimeHostDockerStub struct {
 	pingErr    error
 	images     map[string]string
 	containers map[string]runtimeHostContainer
+	loadImages map[string]string
+	loadErr    error
+	loads      int
 	creates    int
 	stops      int
+}
+
+type runtimeHostRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (function runtimeHostRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return function(request)
 }
 
 func (d *runtimeHostDockerStub) Ping(context.Context) error { return d.pingErr }
@@ -30,7 +45,19 @@ func (d *runtimeHostDockerStub) ResolveImageID(_ context.Context, selector strin
 	image, ok := d.images[selector]
 	return image, ok, nil
 }
-func (d *runtimeHostDockerStub) LoadImage(context.Context, io.Reader) error { return nil }
+func (d *runtimeHostDockerStub) LoadImage(context.Context, io.Reader) error {
+	d.loads++
+	if d.loadErr != nil {
+		return d.loadErr
+	}
+	if d.images == nil {
+		d.images = make(map[string]string)
+	}
+	for selector, imageID := range d.loadImages {
+		d.images[selector] = imageID
+	}
+	return nil
+}
 func (d *runtimeHostDockerStub) FindContainer(_ context.Context, cleanupKey string) (runtimeHostContainer, bool, error) {
 	container, ok := d.containers[cleanupKey]
 	return container, ok, nil
@@ -65,12 +92,20 @@ func (d *runtimeHostDockerStub) StopAndRemove(_ context.Context, containerID str
 func (d *runtimeHostDockerStub) Close() error { return nil }
 
 func newRuntimeHostTestExecutor(t *testing.T, docker *runtimeHostDockerStub, baseDir string) *runtimeHostExecutor {
+	return newRuntimeHostTestExecutorAt(t, docker, baseDir, "http://platform.invalid")
+}
+
+func newRuntimeHostTestExecutorAt(t *testing.T, docker *runtimeHostDockerStub, baseDir, platformAPIBaseURL string) *runtimeHostExecutor {
+	return newRuntimeHostTestExecutorWithClient(t, docker, baseDir, platformAPIBaseURL, nil)
+}
+
+func newRuntimeHostTestExecutorWithClient(t *testing.T, docker *runtimeHostDockerStub, baseDir, platformAPIBaseURL string, httpClient *http.Client) *runtimeHostExecutor {
 	t.Helper()
 	executor, err := newRuntimeHostExecutor(RuntimeHostConfig{
-		Enabled: true, BaseDir: baseDir, PlatformAPIBaseURL: "http://platform.invalid",
+		Enabled: true, BaseDir: baseDir, PlatformAPIBaseURL: platformAPIBaseURL,
 		EnrollmentToken: "enrollment-ticket", AgentInstallationID: "host-installation-1",
 		EngineReleaseID: "sha256-" + strings.Repeat("d", 64), EngineDigest: strings.Repeat("a", 64),
-		Network: "bridge", docker: docker, NodeIDProvider: func() string { return "node-1" },
+		Network: "bridge", HTTPClient: httpClient, docker: docker, NodeIDProvider: func() string { return "node-1" },
 		SessionProvider: func() (node.SessionState, bool) {
 			return node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}, true
 		},
@@ -79,6 +114,51 @@ func newRuntimeHostTestExecutor(t *testing.T, docker *runtimeHostDockerStub, bas
 		t.Fatalf("newRuntimeHostExecutor() error = %v", err)
 	}
 	return executor
+}
+
+func runtimeHostTestImageArchive(t *testing.T, tags []string, imageCount int) ([]byte, string) {
+	t.Helper()
+	config := []byte(`{"architecture":"amd64","config":{"Labels":{"org.opencontainers.image.revision":"fixture"}}}`)
+	digest := sha256.Sum256(config)
+	producerImageID := "sha256:" + hex.EncodeToString(digest[:])
+	configPath := "blobs/sha256/" + strings.TrimPrefix(producerImageID, "sha256:")
+	type manifestEntry struct {
+		Config   string   `json:"Config"`
+		RepoTags []string `json:"RepoTags"`
+		Layers   []string `json:"Layers"`
+	}
+	manifest := make([]manifestEntry, imageCount)
+	for index := range manifest {
+		manifest[index] = manifestEntry{Config: configPath, RepoTags: tags, Layers: []string{}}
+	}
+	manifestJSON, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buffer bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buffer)
+	tarWriter := tar.NewWriter(gzipWriter)
+	for _, file := range []struct {
+		name string
+		data []byte
+	}{
+		{name: "manifest.json", data: manifestJSON},
+		{name: configPath, data: config},
+	} {
+		if err := tarWriter.WriteHeader(&tar.Header{Name: file.name, Mode: 0o600, Size: int64(len(file.data))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tarWriter.Write(file.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes(), producerImageID
 }
 
 func runtimeHostTestCommand(t *testing.T) *nodev1.AIRuntimeCommand {
@@ -150,6 +230,31 @@ func TestRuntimeHostCommandAuthenticationRejectsTampering(t *testing.T) {
 	}
 }
 
+func TestRuntimeHostAcceptsPinnedContainerAPIOriginDistinctFromHostBootstrap(t *testing.T) {
+	command := runtimeHostTestCommand(t)
+	const runtimeAPIURL = "http://host.docker.internal:8080"
+	command.Container.Environment["LEGION_API_URL"] = runtimeAPIURL
+	command.Container.Arguments[1] = runtimeAPIURL
+	runtimeHostSignTestCommand(t, command)
+	executor := &runtimeHostExecutor{
+		enrollmentToken: "enrollment-ticket", network: "bridge",
+		platformAPIBaseURL: "http://127.0.0.1:8080", runtimePlatformAPIBaseURL: runtimeAPIURL,
+		engineReleaseID: command.Release.ReleaseId, engineDigest: command.Release.EngineDigest,
+		nodeIDProvider: func() string { return "node-1" },
+	}
+	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
+	if err := executor.validateCommand(command, session); err != nil {
+		t.Fatalf("validateCommand() rejected the pinned container API origin: %v", err)
+	}
+
+	command.Container.Environment["LEGION_API_URL"] = "http://another.invalid"
+	command.Container.Arguments[1] = "http://another.invalid"
+	runtimeHostSignTestCommand(t, command)
+	if err := executor.validateCommand(command, session); err == nil {
+		t.Fatal("validateCommand() accepted a container API origin outside the pinned startup contract")
+	}
+}
+
 func TestRuntimeHostCommandRejectionIsTerminallyTyped(t *testing.T) {
 	cause := errors.New("targets another node session")
 	err := rejectRuntimeHostCommand(cause)
@@ -169,6 +274,22 @@ func TestRuntimeHostCannotEnableWithoutAuthenticatedNodeIdentity(t *testing.T) {
 		},
 	})
 	if err == nil || !strings.Contains(err.Error(), "authenticated node identity") {
+		t.Fatalf("newRuntimeHostExecutor() error = %v", err)
+	}
+}
+
+func TestRuntimeHostRejectsInvalidRuntimePlatformAPIURL(t *testing.T) {
+	_, err := newRuntimeHostExecutor(RuntimeHostConfig{
+		Enabled: true, BaseDir: t.TempDir(), PlatformAPIBaseURL: "http://platform.invalid",
+		RuntimePlatformAPIBaseURL: "file:///tmp/platform.sock",
+		EnrollmentToken:           "enrollment-ticket", AgentInstallationID: "host-installation-1",
+		EngineReleaseID: "sha256-" + strings.Repeat("d", 64), EngineDigest: strings.Repeat("a", 64),
+		Network: "bridge", docker: &runtimeHostDockerStub{}, NodeIDProvider: func() string { return "node-1" },
+		SessionProvider: func() (node.SessionState, bool) {
+			return node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}, true
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "platform API URLs") {
 		t.Fatalf("newRuntimeHostExecutor() error = %v", err)
 	}
 }
@@ -213,8 +334,17 @@ func TestRuntimeHostRejectsReleaseDifferentFromInstalledNode(t *testing.T) {
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
 	command.Release.EngineDigest = strings.Repeat("e", 64)
 	runtimeHostSignTestCommand(t, command)
-	if err := executor.validateCommand(command, session); err == nil {
+	err := executor.validateCommand(command, session)
+	if !errors.Is(err, errRuntimeHostReleaseMismatch) {
 		t.Fatal("validateCommand() accepted a release different from the installed node")
+	}
+	result := runtimeHostRejectedResult(command, session, "release_mismatch", err)
+	if result.Success || result.ErrorCode != "release_mismatch" || result.ErrorMessage != err.Error() ||
+		result.CommandId != command.Metadata.CommandId || result.Metadata.Node.NodeSessionId != session.SessionID {
+		t.Fatalf("release mismatch result lost its command binding: %+v", result)
+	}
+	if signErr := signRuntimeHostResult(result, executor.enrollmentToken, session.SessionID); signErr != nil || len(result.AuthTag) == 0 {
+		t.Fatalf("release mismatch result was not signed: tag=%x err=%v", result.AuthTag, signErr)
 	}
 }
 
@@ -269,5 +399,109 @@ func TestResilienceRuntimeHostReplayRestartAndStopDoNotDuplicateContainer(t *tes
 	replayedStart := afterStopRestart.execute(context.Background(), command, session)
 	if replayedStart.Success || docker.creates != 1 {
 		t.Fatalf("stopped generation was recreated: result=%+v creates=%d", replayedStart, docker.creates)
+	}
+}
+
+func TestRuntimeHostEnsureImageAcceptsAndPersistsTargetLocalIdentity(t *testing.T) {
+	tag := "local.invalid/yaklang/legion-ai-session-runtime:legion-node-v0.3.3-amd64"
+	archive, producerImageID := runtimeHostTestImageArchive(t, []string{tag}, 1)
+	archiveDigest := sha256.Sum256(archive)
+	httpClient := &http.Client{Transport: runtimeHostRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path != "/v1/node-engine-control/runtime" ||
+			request.Header.Get("Authorization") != "Enrollment enrollment-ticket" {
+			return &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader("unexpected request"))}, nil
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(archive))}, nil
+	})}
+
+	localImageID := "sha256:" + strings.Repeat("e", 64)
+	docker := &runtimeHostDockerStub{
+		images: make(map[string]string), containers: make(map[string]runtimeHostContainer),
+		loadImages: map[string]string{tag: localImageID},
+	}
+	baseDir := t.TempDir()
+	executor := newRuntimeHostTestExecutorWithClient(t, docker, baseDir, "http://platform.invalid", httpClient)
+	command := runtimeHostTestCommand(t)
+	command.Release.ImageId = producerImageID
+	command.Release.ArchiveSha256 = hex.EncodeToString(archiveDigest[:])
+	command.Release.ArchiveSize = int64(len(archive))
+
+	resolved, err := executor.ensureImage(context.Background(), command.Release)
+	if err != nil || resolved != localImageID || docker.loads != 1 {
+		t.Fatalf("ensureImage() = %q, %v; loads=%d", resolved, err, docker.loads)
+	}
+
+	restarted := newRuntimeHostTestExecutorWithClient(t, docker, baseDir, "http://platform.invalid", httpClient)
+	result := restarted.execute(context.Background(), command, node.SessionState{
+		NodeID: "node-1", SessionID: "node-session-1",
+	})
+	if !result.Success || result.ContainerId == "" || docker.creates != 1 {
+		t.Fatalf("start after restart = %+v; creates=%d", result, docker.creates)
+	}
+	container := docker.containers[command.CleanupKey]
+	if container.ImageID != localImageID {
+		t.Fatalf("container image = %q, want target-local %q", container.ImageID, localImageID)
+	}
+}
+
+func TestRuntimeHostEnsureImageKeepsProducerIdentityWhenLocallyAddressable(t *testing.T) {
+	command := runtimeHostTestCommand(t)
+	docker := &runtimeHostDockerStub{
+		images:     map[string]string{command.Release.ImageId: command.Release.ImageId},
+		containers: make(map[string]runtimeHostContainer),
+	}
+	executor := newRuntimeHostTestExecutor(t, docker, t.TempDir())
+	resolved, err := executor.ensureImage(context.Background(), command.Release)
+	if err != nil || resolved != command.Release.ImageId || docker.loads != 0 {
+		t.Fatalf("ensureImage() = %q, %v; loads=%d", resolved, err, docker.loads)
+	}
+}
+
+func TestRuntimeHostArchiveIdentityValidationRejectsUnsafeArchives(t *testing.T) {
+	validTag := "local.invalid/yaklang/legion-ai-session-runtime:legion-node-v0.3.3-amd64"
+	tests := []struct {
+		name       string
+		tags       []string
+		imageCount int
+		wrongImage bool
+	}{
+		{name: "multiple images", tags: []string{validTag}, imageCount: 2},
+		{name: "multiple tags", tags: []string{validTag, validTag + "-other"}, imageCount: 1},
+		{name: "pullable tag", tags: []string{"registry.example/runtime:latest"}, imageCount: 1},
+		{name: "wrong config digest", tags: []string{validTag}, imageCount: 1, wrongImage: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			archive, producerImageID := runtimeHostTestImageArchive(t, test.tags, test.imageCount)
+			if test.wrongImage {
+				producerImageID = "sha256:" + strings.Repeat("f", 64)
+			}
+			release := &nodev1.AIRuntimeRelease{ImageId: producerImageID}
+			if _, err := inspectRuntimeImageArchive(bytes.NewReader(archive), release); err == nil {
+				t.Fatal("inspectRuntimeImageArchive() accepted an unsafe archive")
+			}
+		})
+	}
+}
+
+func TestRuntimeHostStartDoesNotAdoptRetaggedLocalImage(t *testing.T) {
+	command := runtimeHostTestCommand(t)
+	tag := "local.invalid/yaklang/legion-ai-session-runtime:legion-node-v0.3.3-amd64"
+	expectedLocalImageID := "sha256:" + strings.Repeat("e", 64)
+	docker := &runtimeHostDockerStub{
+		images:     map[string]string{tag: "sha256:" + strings.Repeat("f", 64)},
+		containers: make(map[string]runtimeHostContainer),
+	}
+	executor := newRuntimeHostTestExecutor(t, docker, t.TempDir())
+	executor.images[command.Release.ReleaseId] = runtimeHostImageRecord{
+		ReleaseID: command.Release.ReleaseId, EngineDigest: command.Release.EngineDigest,
+		ProducerImageID: command.Release.ImageId, ArchiveSHA256: command.Release.ArchiveSha256,
+		ArchiveSize: command.Release.ArchiveSize, ImageTag: tag, LocalImageID: expectedLocalImageID,
+	}
+	result := executor.execute(context.Background(), command, node.SessionState{
+		NodeID: "node-1", SessionID: "node-session-1",
+	})
+	if result.Success || docker.creates != 0 || !strings.Contains(result.ErrorMessage, "not ready") {
+		t.Fatalf("retagged start result = %+v; creates=%d", result, docker.creates)
 	}
 }

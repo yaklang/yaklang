@@ -118,7 +118,7 @@ var loopAction_LoadSkillResources = &reactloops.LoopAction{
 			}
 			loopInfraActionStart(loop, loopInfraNodeLoadSkillResources,
 				fmt.Sprintf("搜索技能资源: pattern=%q scope=%s / Search skill resources: pattern=%q scope=%s", pattern, scope, pattern, scope),
-				"搜索技能资源 / Searching Skill Resources...")
+				"正在搜索技能资源", "Searching skill resources…")
 			handleGrepResource(mgr, invoker, loop, op)
 			return
 		}
@@ -134,7 +134,7 @@ var loopAction_LoadSkillResources = &reactloops.LoopAction{
 		}
 		loopInfraActionStart(loop, loopInfraNodeLoadSkillResources,
 			fmt.Sprintf("加载技能资源: %s / Load skill resource: %s", rawPath, rawPath),
-			"加载技能资源 / Loading Skill Resource...")
+			"正在加载技能资源", "Loading skill resource…")
 
 		if resourceType == "script" {
 			handleScriptResource(loop, mgr, invoker, skillName, filePath, rawPath, op)
@@ -156,7 +156,7 @@ func handleDocumentResource(
 		log.Warnf("failed to load skill resource %q: %v", rawPath, err)
 		errMsg := fmt.Sprintf("Failed to load resource '%s': %v", rawPath, err)
 		invoker.AddToTimeline("skill_resource_load_failed", errMsg)
-		loopInfraStatus(loop, "技能资源加载失败 / Skill Resource Load Failed")
+		loopInfraStatus(loop, "技能资源加载失败", "Skill Resource Load Failed")
 		loopInfraActionFinish(loop, loopInfraNodeLoadSkillResources,
 			fmt.Sprintf("技能资源加载失败: %s / Skill Resource Load Failed: %s", rawPath, rawPath),
 			utils.ShrinkTextBlock(errMsg, 800))
@@ -175,7 +175,7 @@ func handleDocumentResource(
 		rawPath, summary, float64(result.ContentSize)/1024,
 	)
 	invoker.AddToTimeline("skill_resource_loaded", timelineMsg)
-	loopInfraStatus(loop, "技能资源加载完成 / Skill Resource Loaded")
+	loopInfraStatus(loop, "技能资源加载完成", "Skill Resource Loaded")
 	loopInfraActionFinish(loop, loopInfraNodeLoadSkillResources,
 		fmt.Sprintf("技能资源已加载: %s / Skill Resource Loaded: %s", rawPath, rawPath),
 		utils.ShrinkTextBlock(summary, 800))
@@ -209,7 +209,7 @@ func handleScriptResource(
 		log.Warnf("failed to load script resource %q: %v", rawPath, err)
 		errMsg := fmt.Sprintf("Failed to load script resource '%s': %v", rawPath, err)
 		invoker.AddToTimeline("skill_script_resource_load_failed", errMsg)
-		loopInfraStatus(loop, "脚本资源加载失败 / Script Resource Load Failed")
+		loopInfraStatus(loop, "脚本资源加载失败", "Script Resource Load Failed")
 		loopInfraActionFinish(loop, loopInfraNodeLoadSkillResources,
 			fmt.Sprintf("脚本资源加载失败: %s / Script Resource Load Failed: %s", rawPath, rawPath),
 			utils.ShrinkTextBlock(errMsg, 800))
@@ -230,7 +230,7 @@ func handleScriptResource(
 	}
 	timelineMsg += " Use this path directly in shell commands."
 	invoker.AddToTimeline("skill_script_resource_loaded", timelineMsg)
-	loopInfraStatus(loop, "脚本资源加载完成 / Script Resource Loaded")
+	loopInfraStatus(loop, "脚本资源加载完成", "Script Resource Loaded")
 	loopInfraActionFinish(loop, loopInfraNodeLoadSkillResources,
 		fmt.Sprintf("脚本资源已加载: %s / Script Resource Loaded: %s", rawPath, rawPath),
 		fmt.Sprintf("Absolute path: %s\n%s", result.AbsolutePath, utils.ShrinkTextBlock(summary, 800)))
@@ -275,7 +275,7 @@ func handleGrepResource(
 		log.Warnf("grep skill resources failed: %v", err)
 		errMsg := fmt.Sprintf("Grep failed for pattern %q: %v", pattern, err)
 		invoker.AddToTimeline("skill_grep_failed", errMsg)
-		loopInfraStatus(loop, "技能资源搜索失败 / Skill Resource Search Failed")
+		loopInfraStatus(loop, "技能资源搜索失败", "Skill Resource Search Failed")
 		loopInfraActionFinish(loop, loopInfraNodeLoadSkillResources,
 			fmt.Sprintf("技能资源搜索失败: %s / Skill Resource Search Failed: %s", pattern, pattern),
 			utils.ShrinkTextBlock(errMsg, 800))
@@ -288,7 +288,7 @@ func handleGrepResource(
 	log.Infof("skill grep completed: %s", summary)
 
 	invoker.AddToTimeline("skill_grep_completed", summary)
-	loopInfraStatus(loop, "技能资源搜索完成 / Skill Resource Search Complete")
+	loopInfraStatus(loop, "技能资源搜索完成", "Skill Resource Search Complete")
 	loopInfraActionFinish(loop, loopInfraNodeLoadSkillResources,
 		fmt.Sprintf("技能资源搜索完成: %s / Skill Resource Search Complete: %s", pattern, pattern),
 		utils.ShrinkTextBlock(summary, 800))

@@ -69,7 +69,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			ctx = t.GetContext()
 		}
 
-		loopInfraStatus(loop, "准备工具调用 / Preparing Tool Call...")
+		emitToolsPreparingStatus(loop, []string{toolPayload})
 		toolLoadMessage := fmt.Sprintf("loading tool: %s...", toolPayload)
 		if toolIns, err := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload); err != nil {
 			toolLoadMessage += fmt.Sprintf(" Error: %v", err)

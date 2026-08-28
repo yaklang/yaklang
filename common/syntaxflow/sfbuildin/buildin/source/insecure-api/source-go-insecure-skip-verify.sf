@@ -1,0 +1,35 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "Detect Go TLS InsecureSkipVerify"
+	title_zh: "检测 Go TLS InsecureSkipVerify",
+	type: vuln
+	level: high
+	rule_id: "source-go-insecure-skip-verify"
+	risk: "Improper Certificate Validation"
+	desc: <<<DESC
+Flags InsecureSkipVerify: true which disables TLS certificate verification.
+DESC
+	solution: <<<SOLUTION
+Keep certificate verification enabled; pin or load trusted CAs instead of skipping verify.
+SOLUTION
+	alert_min: 1
+	"file://client.go": <<<POS
+package main
+import "crypto/tls"
+var cfg = &tls.Config{InsecureSkipVerify: true}
+POS
+	"safefile://client-safe.go": <<<NEG
+package main
+import "crypto/tls"
+var cfg = &tls.Config{MinVersion: tls.VersionTLS12}
+NEG
+)
+
+${*.go}.pattern_regex(/InsecureSkipVerify\s*:\s*true/) as $hit
+alert $hit for {
+	level: "high",
+	title: "TLS InsecureSkipVerify",
+	title_zh: "TLS InsecureSkipVerify",
+	message: "TLS certificate verification disabled",
+}

@@ -37,7 +37,7 @@ func makeFinalAnswerAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			loop.LoadingStatus("preparing final answer")
+			loop.UserStatus("正在组织回答", "Preparing the answer")
 
 			answer := strings.TrimSpace(action.GetString("answer"))
 			if answer == "" {

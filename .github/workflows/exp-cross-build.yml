@@ -6,6 +6,7 @@ name: Cross-Build-Yak
 # ------------------------------------------------------------------------------------------------
 # 标准版本              gzip_embed             yak_                   yak_linux_amd64 / yak_windows_arm64.exe
 # yak-slim（并行构建）  gzip_embed,irify_exclude  yak-slim_             yak-slim_linux_amd64
+# slim 必须 ee=true：与完整引擎嵌入同一套 license 证书，否则企业版无法跨引擎切换
 #
 # Windows ARM64: windows-11-arm 原生 runner + llvm-mingw (CC=aarch64-w64-mingw32-clang)
 # 标准 MinGW 无法处理 runtime/cgo 的 ARM64 汇编；参考 agentsview/nginx-ui/llvm-mingw
@@ -371,7 +372,14 @@ jobs:
           gzip-embed -cache --source ./common/aiforge/buildinforge --gz ./common/aiforge/buildinforge.tar.gz --root-path --no-embed
 
       - name: Initialize License Machine
-        run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run common/xlic/cmd/initializer.go --ak "${{ secrets.OSS_KEY_ID }}" --sk "${{ secrets.OSS_KEY_SECRET }}"
+          if [ ! -s common/xlic/certs/pub.gzip ] || [ ! -s common/xlic/certs/pri.gzip ]; then
+            echo "::error::License certs missing after initializer; refusing to embed random license keys"
+            exit 1
+          fi
 
       - name: Build for Windows
         if: contains(matrix.os, 'windows')
@@ -588,7 +596,10 @@ jobs:
     with:
       os: ${{ matrix.os }}
       build_type: yakslim
-      ee: false
+      # Slim is a Yakit engine drop-in. It must embed the same official license
+      # certs as the full engine; otherwise GetLicense/CheckLicense use a random
+      # 2048-bit key and enterprise licenses cannot be shared across engines.
+      ee: true
       sign: ${{ matrix.os == 'windows' || matrix.os == 'windows-arm64' }}
     secrets: inherit
 

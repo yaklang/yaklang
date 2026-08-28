@@ -20,10 +20,11 @@ type transactionTestConfig struct {
 	*KeyValueConfig
 	*BaseInteractiveHandler
 	*BaseCheckpointableStorage
-	ctx      context.Context
-	emitter  *Emitter
-	idSeq    int64
-	retryMax int64
+	ctx       context.Context
+	emitter   *Emitter
+	idSeq     int64
+	retryMax  int64
+	retryWait func(context.Context, time.Duration) error
 }
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)
@@ -62,6 +63,12 @@ func (t *transactionTestConfig) IsCtxDone() bool {
 func (t *transactionTestConfig) GetContext() context.Context           { return t.ctx }
 func (t *transactionTestConfig) CallAIResponseConsumptionCallback(int) {}
 func (t *transactionTestConfig) GetAITransactionAutoRetryCount() int64 { return t.retryMax }
+func (t *transactionTestConfig) waitBeforeAIRetry(ctx context.Context, delay time.Duration) error {
+	if t.retryWait != nil {
+		return t.retryWait(ctx, delay)
+	}
+	return nil
+}
 func (t *transactionTestConfig) GetToolComposeConcurrency() int        { return 2 }
 func (t *transactionTestConfig) GetPlanExecTaskConcurrency() int       { return 1 }
 func (t *transactionTestConfig) GetTimelineContentSizeLimit() int64    { return 1000 }
@@ -136,7 +143,10 @@ func TestCallAITransaction_429DoesNotCountRetry(t *testing.T) {
 	callAi := func(req *AIRequest) (*AIResponse, error) {
 		n := atomic.AddInt64(&callCount, 1)
 		if n <= num429Responses {
-			rsp := make429Response()
+			// Retryable 429: must have Retry-After header so the transaction
+			// layer classifies it as rate-limit (retryable) rather than
+			// quota-exceeded (not retryable).
+			rsp := make429Response("Retry-After: 1")
 			return rsp, utils.Errorf("429 rate limited")
 		}
 		rsp := NewUnboundAIResponse()
@@ -167,7 +177,8 @@ func TestCallAITransaction_429ContextCancel(t *testing.T) {
 		if n >= 3 {
 			cancel()
 		}
-		rsp := make429Response()
+		// Retryable 429 with Retry-After so it doesn't consume retry count
+		rsp := make429Response("Retry-After: 1")
 		return rsp, utils.Errorf("429 rate limited")
 	}
 

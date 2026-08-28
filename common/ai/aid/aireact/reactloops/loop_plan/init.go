@@ -16,7 +16,7 @@ func buildPlanInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLo
 		config := r.GetConfig()
 
 		if !config.GetConfigBool("DisableIntentRecognition") {
-			reactloops.EmitStatus(loop, "深度意图识别中 / Deep intent recognition...")
+			reactloops.EmitStatusI18n(loop, "深度意图识别中", "Deep intent recognition...")
 			log.Infof("plan: invoking deep intent recognition directly")
 
 			capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), task.GetUserInput())
@@ -125,6 +125,9 @@ func init() {
 					currentIter := loop.GetCurrentIterationIndex()
 					maxIter := loop.GetMaxIterations()
 					isLastIteration := currentIter+1 >= maxIter
+					// The host may constrain the final planning window, but never exposes
+					// its counters or deadline to the model. Countdown language makes the
+					// model optimize for premature closure instead of plan quality.
 					if isLastIteration && isDeepPlanMode(loop) {
 						for _, name := range infoGatheringActions {
 							loop.RemoveAction(name)
@@ -136,16 +139,15 @@ func init() {
 						log.Infof("plan loop: last iteration (%d/%d) in simple mode, forcing generate_direct_plan", currentIter+1, maxIter)
 					}
 					renderMap := map[string]any{
-						"Help":            help,
-						"Nonce":           nonce,
-						"Enhance":         enhance,
-						"FileResults":     fileResults,
-						"WebResults":      webResults,
-						"ReconResults":    reconResults,
-						"Facts":           loop.Get(PLAN_FACTS_KEY),
-						"IsLastIteration": isLastIteration,
-						"PlanMode":        loop.Get(PLAN_MODE_KEY),
-						"PlanModeReason":  loop.Get(PLAN_MODE_REASON_KEY),
+						"Help":           help,
+						"Nonce":          nonce,
+						"Enhance":        enhance,
+						"FileResults":    fileResults,
+						"WebResults":     webResults,
+						"ReconResults":   reconResults,
+						"Facts":          loop.Get(PLAN_FACTS_KEY),
+						"PlanMode":       loop.Get(PLAN_MODE_KEY),
+						"PlanModeReason": loop.Get(PLAN_MODE_REASON_KEY),
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),

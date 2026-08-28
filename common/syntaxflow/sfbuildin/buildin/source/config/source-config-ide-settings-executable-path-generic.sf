@@ -1,0 +1,41 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "IDe Settings Executable PATh Generic"
+	title_zh: "检测到IDe Settings Executable PATh Generic",
+	type: vuln
+	level: middle
+	rule_id: "source-config-ide-settings-executable-path-generic"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `ide-settings-executable-path-generic` (/tmp/semgrep-rules/ai/ai-best-practices/ide-settings-executable-path/ide-settings-executable-path.yaml).
+Original message: Executable path override detected in VS Code settings pointing to a project-relative path. A malicious repository can override interpreter or tool paths in workspace settings to execute arbitrary code when the project is opened. Use absolute system paths instead of relative paths for executable settings, and review .vscode/settings.json in untrusted repos.
+
+CWE: CWE-94: Improper Control of Generation of Code
+References:
+- https://blog.vipyrsec.com/posts/idesaster/
+DESC
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION
+	alert_min: 1
+	"file://pos/settings.json": <<<POS
+"KO8p*terminal.integrated.shell.Ka6aaaar":	 "./
+
+POS
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG
+)
+
+${/.*\/settings\.json/}.pattern_regex(/"[^"]*(?:executablePath|ExecutablePath|defaultInterpreterPath|pythonPath|terminal\.integrated\.shell\.\w+)"\s*:\s*"\.\.?\//) as $p0
+${/.*\/[^\/]*\.settings\.json/}.pattern_regex(/"[^"]*(?:executablePath|ExecutablePath|defaultInterpreterPath|pythonPath|terminal\.integrated\.shell\.\w+)"\s*:\s*"\.\.?\//) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "IDe Settings Executable PATh Generic",
+	title_zh: "检测到IDe Settings Executable PATh Generic",
+	message: "IDe Settings Executable PATh Generic",
+}

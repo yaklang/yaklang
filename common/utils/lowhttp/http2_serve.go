@@ -87,6 +87,10 @@ func (w *h2RequestState) emitRequestHeader(req *http.Request, pairs []*ypb.KVPai
 	buf.WriteString(req.Method)
 	buf.WriteByte(' ')
 	buf.WriteString(req.RequestURI)
+	// Keep the "HTTP/2" marker here: the parsed request carries it for display
+	// fidelity (the UI shows the client-facing protocol). The upstream wire
+	// protocol is NOT decided by this marker — minimartian.execLowhttp picks
+	// it from the origin h2 cache and rewrites the wire copy when using h1.
 	buf.WriteString(" HTTP/2\r\n")
 	buf.WriteString("Host: ")
 	buf.WriteString(req.Host)

@@ -103,6 +103,8 @@ func TestCurrentTaskInfo_PeTaskPrompt_EndToEnd_WithEvidence(t *testing.T) {
 	require.Contains(t, stable, "如果当前上下文中还有共享执行证据")
 	require.Contains(t, dynamic, peTaskMarkerSharedEvidence)
 	require.NotContains(t, dynamic, peTaskMarkerPrecondition)
+	require.NotContains(t, dynamic, "决策继续执行了")
+	require.NotContains(t, dynamic, "系统限制为")
 	idx := strings.Index(out, peTaskMarkerSharedEvidence)
 	pre := strings.Index(out, peTaskMarkerPrecondition)
 	require.Greater(t, pre, idx)

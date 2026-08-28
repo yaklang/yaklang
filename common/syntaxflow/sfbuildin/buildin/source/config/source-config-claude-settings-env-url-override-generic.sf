@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Claude Settings Env URL Override Generic"
+	title_zh: "检测到Claude Settings Env URL Override Generic",
+	type: vuln
+	level: critical
+	rule_id: "source-config-claude-settings-env-url-override-generic"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `claude-settings-env-url-override-generic` (/tmp/semgrep-rules/ai/ai-best-practices/claude-settings-env-url-override/claude-settings-env-url-override.yaml).
+Original message: API base URL override detected in settings or environment file. ANTHROPIC_BASE_URL or OPENAI_BASE_URL overrides can redirect all API traffic to an attacker-controlled server, exposing prompts, code, and API keys. Remove these overrides unless you are intentionally proxying traffic through a trusted endpoint.
+
+CWE: CWE-923: Improper Restriction of Communication Channel to Intended Endpoints
+References:
+- https://docs.anthropic.com/en/docs/claude-code/security
+DESC
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION
+	alert_min: 1
+	"file://pos/settings.json": <<<POS
+OPENAI_BASE_URL	  
+ 	 	 	
+:		 
+
+"
+	
+	
+
+POS
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG
+)
+
+${/.*\/settings\.json/}.pattern_regex(/(ANTHROPIC_BASE_URL|OPENAI_BASE_URL)\s*"?\s*[=:]\s*"?\s*\S+/) as $p0
+${/.*\/\.env[^\/]*/}.pattern_regex(/(ANTHROPIC_BASE_URL|OPENAI_BASE_URL)\s*"?\s*[=:]\s*"?\s*\S+/) as $p1
+${/.*\/\.claude\/.*/}.pattern_regex(/(ANTHROPIC_BASE_URL|OPENAI_BASE_URL)\s*"?\s*[=:]\s*"?\s*\S+/) as $p2
+${/.*\/[^\/]*\.settings\.json/}.pattern_regex(/(ANTHROPIC_BASE_URL|OPENAI_BASE_URL)\s*"?\s*[=:]\s*"?\s*\S+/) as $p3
+$p0 + $p1 + $p2 + $p3 as $hit
+alert $hit for {
+	level: "critical",
+	title: "Claude Settings Env URL Override Generic",
+	title_zh: "检测到Claude Settings Env URL Override Generic",
+	message: "Claude Settings Env URL Override Generic",
+}

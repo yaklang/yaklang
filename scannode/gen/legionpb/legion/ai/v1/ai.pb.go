@@ -498,7 +498,7 @@ type ContextPackage struct {
 	UserInput                  string                 `protobuf:"bytes,6,opt,name=user_input,json=userInput,proto3" json:"user_input,omitempty"`                                                        // this turn's user input text
 	ProviderPolicySnapshotJson []byte                 `protobuf:"bytes,7,opt,name=provider_policy_snapshot_json,json=providerPolicySnapshotJson,proto3" json:"provider_policy_snapshot_json,omitempty"` // model provider config (API key, base URL, headers)
 	RuntimeOptionSnapshotJson  []byte                 `protobuf:"bytes,8,opt,name=runtime_option_snapshot_json,json=runtimeOptionSnapshotJson,proto3" json:"runtime_option_snapshot_json,omitempty"`    // temperature, max_tokens, etc.
-	FocusRelease               *ContextFocusRelease   `protobuf:"bytes,9,opt,name=focus_release,json=focusRelease,proto3" json:"focus_release,omitempty"`                                               // immutable server-published Yak Focus release pinned to the session
+	FocusRelease               *ContextFocusRelease   `protobuf:"bytes,9,opt,name=focus_release,json=focusRelease,proto3" json:"focus_release,omitempty"`                                               // immutable server-published Yak Focus release selected for this Turn
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -19033,17 +19033,18 @@ func (x *ContextFocusSidekick) GetContent() string {
 // server. Scan Node verifies sha256 before registering runtime_name; it never
 // resolves the client-facing focus_name directly.
 type ContextFocusRelease struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	ReleaseId     string                  `protobuf:"bytes,1,opt,name=release_id,json=releaseId,proto3" json:"release_id,omitempty"`
-	FocusName     string                  `protobuf:"bytes,2,opt,name=focus_name,json=focusName,proto3" json:"focus_name,omitempty"`
-	RuntimeName   string                  `protobuf:"bytes,3,opt,name=runtime_name,json=runtimeName,proto3" json:"runtime_name,omitempty"`
-	Version       string                  `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
-	EntryFile     string                  `protobuf:"bytes,5,opt,name=entry_file,json=entryFile,proto3" json:"entry_file,omitempty"`
-	EntryCode     string                  `protobuf:"bytes,6,opt,name=entry_code,json=entryCode,proto3" json:"entry_code,omitempty"`
-	Sidekicks     []*ContextFocusSidekick `protobuf:"bytes,7,rep,name=sidekicks,proto3" json:"sidekicks,omitempty"`
-	Sha256        string                  `protobuf:"bytes,8,opt,name=sha256,proto3" json:"sha256,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState  `protogen:"open.v1"`
+	ReleaseId             string                  `protobuf:"bytes,1,opt,name=release_id,json=releaseId,proto3" json:"release_id,omitempty"`
+	FocusName             string                  `protobuf:"bytes,2,opt,name=focus_name,json=focusName,proto3" json:"focus_name,omitempty"`
+	RuntimeName           string                  `protobuf:"bytes,3,opt,name=runtime_name,json=runtimeName,proto3" json:"runtime_name,omitempty"`
+	Version               string                  `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
+	EntryFile             string                  `protobuf:"bytes,5,opt,name=entry_file,json=entryFile,proto3" json:"entry_file,omitempty"`
+	EntryCode             string                  `protobuf:"bytes,6,opt,name=entry_code,json=entryCode,proto3" json:"entry_code,omitempty"`
+	Sidekicks             []*ContextFocusSidekick `protobuf:"bytes,7,rep,name=sidekicks,proto3" json:"sidekicks,omitempty"`
+	Sha256                string                  `protobuf:"bytes,8,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	ExecutionContractJson string                  `protobuf:"bytes,9,opt,name=execution_contract_json,json=executionContractJson,proto3" json:"execution_contract_json,omitempty"` // checksummed engine capability/stage/result contract
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *ContextFocusRelease) Reset() {
@@ -19128,6 +19129,13 @@ func (x *ContextFocusRelease) GetSidekicks() []*ContextFocusSidekick {
 func (x *ContextFocusRelease) GetSha256() string {
 	if x != nil {
 		return x.Sha256
+	}
+	return ""
+}
+
+func (x *ContextFocusRelease) GetExecutionContractJson() string {
+	if x != nil {
+		return x.ExecutionContractJson
 	}
 	return ""
 }
@@ -20923,7 +20931,7 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\x10focus_release_id\x18\a \x01(\tR\x0efocusReleaseId\"D\n" +
 	"\x14ContextFocusSidekick\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\"\xa8\x02\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\xe0\x02\n" +
 	"\x13ContextFocusRelease\x12\x1d\n" +
 	"\n" +
 	"release_id\x18\x01 \x01(\tR\treleaseId\x12\x1d\n" +
@@ -20936,7 +20944,8 @@ const file_legion_ai_v1_ai_proto_rawDesc = "" +
 	"\n" +
 	"entry_code\x18\x06 \x01(\tR\tentryCode\x12@\n" +
 	"\tsidekicks\x18\a \x03(\v2\".legion.ai.v1.ContextFocusSidekickR\tsidekicks\x12\x16\n" +
-	"\x06sha256\x18\b \x01(\tR\x06sha256B$Z\"legion/gen/proto/legion/ai/v1;aiv1b\x06proto3"
+	"\x06sha256\x18\b \x01(\tR\x06sha256\x126\n" +
+	"\x17execution_contract_json\x18\t \x01(\tR\x15executionContractJsonB$Z\"legion/gen/proto/legion/ai/v1;aiv1b\x06proto3"
 
 var (
 	file_legion_ai_v1_ai_proto_rawDescOnce sync.Once

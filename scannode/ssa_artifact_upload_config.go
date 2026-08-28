@@ -2,10 +2,13 @@ package scannode
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const scannodeInternalParamPrefix = "_scannode_"
@@ -15,9 +18,13 @@ const scannodeInternalParamPrefix = "_scannode_"
 // injects these into the script input JSON; scannode extracts them and
 // forwards as env vars to the distyak child process.
 const (
-	scannodeSSADatabaseRawParamKey = "_scannode_ssa_database_raw"
-	scannodeSSASkipMigrateParamKey = "_scannode_ssa_skip_migrate"
+	scannodeSSADatabaseRawParamKey     = "_scannode_ssa_database_raw"
+	scannodeSSASkipMigrateParamKey     = "_scannode_ssa_skip_migrate"
+	scannodeSSADatabaseBackendParamKey = "_scannode_ssa_database_backend"
+	scannodeSSASqliteKeyParamKey       = "_scannode_ssa_sqlite_key"
 )
+
+const ssaIRSQLiteDirName = "ssa-ir-sqlite"
 
 // extractSSADatabaseEnv reads the shared SSA IR DB DSN and skip_migrate flag
 // from the scheduler-injected hidden params and returns them as "KEY=VALUE"
@@ -38,6 +45,64 @@ func extractSSADatabaseEnv(params map[string]interface{}) []string {
 		env = append(env, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
 	}
 	return env
+}
+
+func isSQLiteSSABackend(params map[string]interface{}) bool {
+	b := strings.ToLower(strings.TrimSpace(toString(params[scannodeSSADatabaseBackendParamKey])))
+	return b == "sqlite" || b == "sqlite3"
+}
+
+func scanNodeIRBaseDir(s *ScanNode) string {
+	if s != nil && s.node != nil {
+		if base := strings.TrimSpace(s.node.BaseDir()); base != "" {
+			return base
+		}
+	}
+	return filepath.Join(os.TempDir(), "legion-node")
+}
+
+// resolveSSADatabaseEnv chooses the child SSA_DATABASE_RAW env.
+// Postgres (default): hidden DSN param, same as extractSSADatabaseEnv.
+// SQLite: live file at {nodeBase}/ssa-ir-sqlite/{key}/ssadb.db so compile and
+// scan jobs that share a key reuse the same IR database. debugDir is not the
+// live path; finalize copies the file into the debug zip.
+func resolveSSADatabaseEnv(s *ScanNode, params map[string]interface{}, debugDir, runtimeID string) (env []string, sqlitePath string) {
+	return resolveSSADatabaseEnvWithBase(scanNodeIRBaseDir(s), params, debugDir, runtimeID)
+}
+
+func resolveSSADatabaseEnvWithBase(nodeBase string, params map[string]interface{}, debugDir, runtimeID string) (env []string, sqlitePath string) {
+	if !isSQLiteSSABackend(params) {
+		return extractSSADatabaseEnv(params), ""
+	}
+	key := strings.TrimSpace(toString(params[scannodeSSASqliteKeyParamKey]))
+	if key == "" {
+		key = strings.TrimSpace(runtimeID)
+	}
+	if key == "" {
+		log.Warnf("[ssadb] sqlite backend requested but sqlite key and runtime id are empty; falling back to DSN env")
+		return extractSSADatabaseEnv(params), ""
+	}
+	key = sanitizeLogName(key)
+	nodeBase = strings.TrimSpace(nodeBase)
+	if nodeBase == "" {
+		nodeBase = filepath.Join(os.TempDir(), "legion-node")
+	}
+	sqlitePath = filepath.Join(nodeBase, ssaIRSQLiteDirName, key, "ssadb.db")
+	if err := os.MkdirAll(filepath.Dir(sqlitePath), 0o755); err != nil {
+		log.Warnf("[ssadb] mkdir sqlite IR dir failed: %v", err)
+		return extractSSADatabaseEnv(params), ""
+	}
+	log.Infof("[ssadb] using sqlite IR database: path=%s", sqlitePath)
+	if debugDir != "" {
+		log.Infof("[ssadb] debug zip will include a copy of sqlite IR from %s", sqlitePath)
+	}
+	env = []string{
+		fmt.Sprintf("%s=%s", consts.ENV_SSA_DATABASE_RAW, sqlitePath),
+	}
+	if toBool(params[scannodeSSASkipMigrateParamKey]) {
+		env = append(env, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
+	}
+	return env, sqlitePath
 }
 
 func extractSSAArtifactUploadConfig(params map[string]interface{}) *SSAArtifactUploadConfig {

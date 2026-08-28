@@ -1,11 +1,15 @@
 package aicommon
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var sessionEvidenceIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
 type EvidenceItem struct {
 	ID          string `json:"id"`
@@ -20,6 +24,28 @@ type EvidenceStore struct {
 
 func NewEvidenceStore() *EvidenceStore {
 	return &EvidenceStore{Items: make([]EvidenceItem, 0)}
+}
+
+// BuildSessionEvidenceUpsert creates an idempotent evidence operation. Callers
+// may provide a stable semantic ID so later saves update the same finding. When
+// the ID is omitted, the normalized content determines a stable fallback ID,
+// making action retries safe without forcing the model to invent identifiers.
+func BuildSessionEvidenceUpsert(id, content string) (EvidenceOperation, error) {
+	content = NormalizeConcreteEvidenceMarkdown(content)
+	if content == "" {
+		return EvidenceOperation{}, fmt.Errorf("session evidence content is required")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		digest := sha256.Sum256([]byte(content))
+		id = fmt.Sprintf("saved_%x", digest[:8])
+	}
+	if !sessionEvidenceIDPattern.MatchString(id) {
+		return EvidenceOperation{}, fmt.Errorf("invalid session evidence id %q: expected 1-128 characters matching %s", id, sessionEvidenceIDPattern.String())
+	}
+
+	return EvidenceOperation{ID: id, Op: "add", Content: content}, nil
 }
 
 func (s *EvidenceStore) IsEmpty() bool {

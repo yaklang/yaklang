@@ -166,6 +166,13 @@ func buildSubAgentRuntime(
 	parentInvoker.AddRuntimeTask(subTask)
 	childInvoker.SetCurrentTask(subTask)
 
+	// 子 Agent 本质是异步任务：它由 DispatchSubAgents 在 worker goroutine 中
+	// 并发执行，但相对于父 loop 和 sync 事件系统而言是独立运行的。设为 async
+	// 模式使 CancelTask 走 asyncDeferCallback 路径：Cancel 取消 context 后，
+	// 不立即发送取消确认消息，而是在 finalizeSubAgents 中等子 Agent loop 退出
+	// 后统一触发 CallAsyncDeferCallback 发送，实现"取消完成再发返回消息"。
+	subTask.SetAsyncMode(true)
+
 	if handle.Mode() == SubAgentTimelineFork {
 		branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 		handle.branch.PushText(parentCfg.AcquireId(), branchMarker)
@@ -363,6 +370,13 @@ func PrepareForkedSubAgent(
 
 	parentInvoker.AddRuntimeTask(subTask)
 	childInvoker.SetCurrentTask(subTask)
+
+	// 子 Agent 本质是异步任务：它由 DispatchSubAgents 在 worker goroutine 中
+	// 并发执行，但相对于父 loop 和 sync 事件系统而言是独立运行的。设为 async
+	// 模式使 CancelTask 走 asyncDeferCallback 路径：Cancel 取消 context 后，
+	// 不立即发送取消确认消息，而是在 finalizeSubAgents 中等子 Agent loop 退出
+	// 后统一触发 CallAsyncDeferCallback 发送，实现"取消完成再发返回消息"。
+	subTask.SetAsyncMode(true)
 
 	// Emit explicit sub-agent lifecycle metadata for viz trajectory reconstruction.
 	// The event carries the sub-task id, its human-readable name, the loop it will

@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 
 	"github.com/yaklang/yaklang/common/schema"
-	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	sfvm "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -125,8 +125,8 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 }
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
-	// 语言匹配检查
-	if !m.Config.GetScanIgnoreLanguage() {
+	// 语言匹配检查（source 模式规则按文件 glob 过滤，不强制语言对齐）
+	if !m.Config.GetScanIgnoreLanguage() && !sfvm.RuleIsSourceMode(rule, nil) {
 		if rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
 			m.markRuleSkipped()
 			return
@@ -176,9 +176,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 				targetName, baseWorkLimit, workLimit, totalLines)
 		}
 	}
-	var workBudget *sf.RuleWorkBudget
+	var workBudget *sfvm.RuleWorkBudget
 	if workLimit > 0 {
-		workBudget = sf.NewRuleWorkBudget(workLimit, ruleCancel)
+		workBudget = sfvm.NewRuleWorkBudget(workLimit, ruleCancel)
 	}
 
 	// 将查询逻辑包装到函数中

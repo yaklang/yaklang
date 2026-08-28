@@ -422,6 +422,7 @@ const (
 	REQUEST_CONTEXT_KEY_MitmFrontendReadWriter       = "mitmFrontendReadWriter"
 	REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback     = "mitmSkipFrontendFeedback"
 	REQUEST_CONTEXT_KEY_ResponseFinishedCallback     = "responseFinishedCallback"
+	REQUEST_CONTEXT_KEY_ResponseStreamRecorder       = "responseStreamRecorder"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile   = "ResponseTooLargeHeaderFile"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile     = "ResponseTooLargeBodyFile"
 	REQUEST_CONTEXT_KEY_ResponseBodySize             = "ResponseBodySize"
@@ -446,6 +447,21 @@ func SetRequestMITMTaskID(req *http.Request, id string) {
 
 func GetRequestMITMTaskID(req *http.Request) string {
 	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_MITMTaskID)
+}
+
+// SetResponseStreamRecorder stores an optional stream recorder (e.g. for SSE
+// persistence) on the request context so the mirror stage can retrieve it.
+func SetResponseStreamRecorder(req *http.Request, recorder any) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder, recorder)
+}
+
+// GetResponseStreamRecorder returns the stream recorder previously stored via
+// SetResponseStreamRecorder, or nil.
+func GetResponseStreamRecorder(req *http.Request) any {
+	if req == nil {
+		return nil
+	}
+	return GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseStreamRecorder)
 }
 
 func SetRequestProxyProtocol(req *http.Request, p string) {

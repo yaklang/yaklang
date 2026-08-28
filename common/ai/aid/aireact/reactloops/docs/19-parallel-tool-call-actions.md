@@ -856,7 +856,7 @@ type ToolBatchCall struct {
 ```text
 阶段 1：验证 runtime、task、context、批量数量
 阶段 2：按数组 index 预留稳定 ID、checkpoint seq、result ID、artifact ordinal
-阶段 3：解析工具；direct 做整批 guard / mutator / params validation
+阶段 3：解析工具；direct 逐项做 guard / mutator / params validation
 阶段 4：创建独立的参数生成 gate、审批有序 gate、最终 barrier、invoke gate
 阶段 5：每个 child 建立自己的 ToolCaller、context、emitter、call ID
 阶段 6：require 参数生成可并发；状态型 mutator 和人工审批按 index 有序
@@ -866,7 +866,7 @@ type ToolBatchCall struct {
 
 下面逐个解释“为什么”。
 
-### 6.4 direct 为什么先做“整批 admission”
+### 6.4 direct 为什么先做逐项 admission
 
 Direct 模式下，参数已经由模型提供，因此 runtime 能在任何卡片、pipe、artifact 或插件 callback 之前检查整批：
 
@@ -888,17 +888,15 @@ resolve tool
 }
 ```
 
-第二项缺少 `path`。如果边校验边执行，第一项可能已经写盘，随后第二项才失败。当前语义是：
+第二项缺少 `path`。两项在任何 callback 开始前都先完成 admission，但由于 batch 成员声明为彼此独立，当前语义是：
 
 ```text
-child 0 -> cancelled: tool batch admission failed before execution
+child 0 -> done（回调已结束；另看 execution_status / result）
 child 1 -> validation_failed: missing path
-真实 write_file callback 总数 -> 0
+真实 write_file callback 总数 -> 1
 ```
 
-这叫“整批零执行保证”。代码位于 `ExecuteToolBatch` 的 direct preflight；测试 `TestExecuteToolBatch_DirectAdmissionFailureStartsNothing` 会直接统计 callback 数，确保不是只看返回值“像没执行”。
-
-需要准确理解：这个原子性只覆盖 **真实插件开始之前的 admission**。一旦全部通过并进入真实并发调用，普通 child 失败采用 all-settled；系统不承诺对已经成功的外部副作用做跨工具事务回滚。
+这叫“逐项拒绝、有效兄弟保留”。代码位于 `ExecuteToolBatch` 的 direct preflight；测试 `TestExecuteToolBatch_DirectAdmissionFailureSkipsOnlyRejectedChild` 会直接统计 callback 数。需要整批原子性的业务不应使用 independent batch，而应通过单一事务工具或补偿机制实现。
 
 ### 6.5 require 的参数生成为什么可以并发
 
@@ -1021,11 +1019,11 @@ result.Outcomes[i]
 
 | Stage | 人话含义 | 是否可能有真实插件副作用 |
 |-------|----------|--------------------------|
-| `validation_failed` | 协议之后的 runtime guard 或参数校验没有通过 | direct admission 下不会 |
+| `validation_failed` | 协议之后的 runtime guard 或参数校验没有通过 | 当前 child 不会；有效兄弟仍可执行 |
 | `prepare_failed` | 找工具、生成参数、修复参数、创建 ToolCaller 等准备过程失败 | 当前 child 未开始真实 callback |
 | `invoke_failed` | 已进入真实工具路径，但返回错误、失败结果或空结果 | **可能有**；外部系统是否部分写入由工具自身决定 |
 | `cancelled` | 外部 context、任务、batch direct-answer 或 sibling 终止导致取消 | 若在运行中取消，工具可能已经开始；若在 barrier 前则没有 |
-| `done` | 工具返回成功结果 | 有预期副作用或读取结果 |
+| `done` | 工具 callback 已结束并返回 protocol-complete 结果；不是语义成功 | 可能有；必须继续看 `execution_status` / `result` |
 
 `queued/preparing/reviewing/running` 是生命周期状态词；当前 `ToolBatchResult` 返回的是 settled 结果，通常不会把这些中间值作为最终 stage。
 
@@ -1042,10 +1040,7 @@ batch 顶层                  -> 正常结算，进入下一轮
 
 下一轮 AI 会同时看到成功和失败，可以决定只补救失败项。测试 `TestExecuteToolBatch_RequireParamFailureIsAllSettled` 故意让一项参数生成失败，并断言两个 sibling 仍实际执行。
 
-Direct 的“全批 admission 失败零执行”与这里并不矛盾：
-
-- admission 阶段发现确定性的无效输入：整批不启动；
-- 通过 admission 后，真实执行期间发生普通错误：all-settled。
+Direct 与 require 均采用逐项 all-settled：admission 阶段的确定性无效输入只拒绝对应 child；通过 admission 后的普通执行错误也只结算对应 child。
 
 ### 7.3 `direct_answer` 是批次级终止
 
@@ -1305,6 +1300,8 @@ Batch 的稳定 ID 可以作为工具构造幂等键的材料，但当前框架�
 
 这里的“优先 batch”是选择规则，不是为了凑数量制造调用：只有当前轮已经存在 2–8 个真实、互不依赖、互不干扰的调用才合批。渗透测试中的多 URL、多文件、多目标和多个只读探测是典型场景；“正在探索”本身不应把这些已经明确的独立探测强制拆成多轮。只有本轮恰好一个调用、后续动作必须读取前一结果、调用可能互相干扰或动作不可逆时，才选择 scalar。
 
+批次准入、Schema、参数校验或单个 child 的失败只否定本次载荷或假设，不否定 batch 这一选择策略。下一轮应根据错误修正共同参数、保留成功 child 的结果，并把仍独立的修复项或 2–4 个有区分力的低成本候选方案重新组成批次；禁止原样重复无效载荷，也禁止因为 Timeline / 注入记忆记录过旧失败就永久降级为 scalar。
+
 这部分相对稳定，适合放在高缓存命中区。
 
 ### 9.3 位置二：`semi-dynamic-2` Schema 教“逐字怎么写”
@@ -1519,7 +1516,7 @@ manager 中存在但 recent cache 未命中 -> warning，runtime 仍解析并调
 成功完成 -> 记录为 recently used
 ```
 
-Batch 结果 handler 会把每个成功 `FinalTool` 更新回 recent cache。人工 `wrong_tool` 后记录的是实际成功工具，而不是只记录模型最初名字。
+Batch 结果 handler 会把每个 protocol-complete 的 `FinalTool` 更新回 recent cache（表示工具可用，不表示任务成功）。人工 `wrong_tool` 后记录的是实际调用工具，而不是只记录模型最初名字。
 
 ### 11.4 MCP 工具仍走统一解析逻辑
 
@@ -1578,6 +1575,7 @@ Provider tool_calls[] -> 直接 ExecuteToolBatch
       "requested_tool": "read_file",
       "final_tool": "read_file",
       "stage": "done",
+      "execution_status": "unknown",
       "result": {"name": "read_file", "success": true}
     },
     {
@@ -1594,6 +1592,7 @@ Provider tool_calls[] -> 直接 ExecuteToolBatch
       "requested_tool": "stat",
       "final_tool": "stat",
       "stage": "done",
+      "execution_status": "unknown",
       "result": {"name": "stat", "success": true}
     }
   ]
@@ -1607,17 +1606,17 @@ Provider tool_calls[] -> 直接 ExecuteToolBatch
 ActionHandler 会生成稳定的人类可读摘要：
 
 ```text
-Tool batch finished: 3 calls
-1. read_file: done
+Tool batch settled: 3 calls; execution_succeeded=0; execution_failed=0; execution_unknown=2; protocol_failed=1; not_run=0
+1. read_file: protocol-completed; execution-outcome-unknown; inspect execution_result
 2. grep: invoke_failed: permission denied
-3. stat: done
+3. stat: protocol-completed; execution-outcome-unknown; inspect execution_result
 ```
 
 它同时：
 
 - 写入 Timeline `[TOOL_BATCH_RESULT]`；
 - 通过 `operator.Feedback(summary)` 成为下一轮观察；
-- 对成功工具更新 recent cache；
+- 对 protocol-complete 的可用工具更新 recent cache（不作为语义成功证据）；
 - 若至少一个 child 真正返回了 settled `ToolResult`，统一触发一次 satisfaction verification；
 - 最后只调用一次 `operator.Continue()`。
 
@@ -1673,10 +1672,10 @@ Handler 不再生成普通 batch summary，而是调用：
 - `ToolName`：第一项，供旧消费者继续工作；
 - `ToolNames`：所有 child，按模型数组顺序；
 - `ToolCallCount`：**模型声明数**，不能再把整个 batch 永远算成 1 次工具调用；它说明模型计划了多少项，不证明插件 callback 已发生；
-- `ExecutedToolCallCount`：handler 实际拿到 settled `ToolResult` 的 callback 数。成功结果和“插件确实运行但返回失败”都计数；admission/prepare/review/cancel 等得到 nil result 的 pre-invoke 结算不计数；
+- `ExecutedToolCallCount`：handler 实际拿到 settled `ToolResult` 的 callback 数。语义成功和“插件确实运行但执行失败”都计数；admission/prepare/review/cancel 等得到 nil result 的 pre-invoke 结算不计数；
 - `ActionParams`：深拷贝 canonical 嵌套数组，后续 mutator 不会改写历史。
 
-例如模型声明 3 项，但第一项参数校验失败导致 direct 全批零执行时，`ToolCallCount=3`、`ExecutedToolCallCount=0`。两者不能合并：前者用于审计模型决策和工具预算，后者才是“这一轮真的发生过插件执行”的事实源。
+例如模型声明 3 项且三项都在 admission 被拒绝时，`ToolCallCount=3`、`ExecutedToolCallCount=0`。若仅第一项被拒绝、两个有效兄弟执行，则后者为 2。两者不能合并：前者用于审计模型决策和工具预算，后者才是“这一轮真的发生过插件执行”的事实源。
 
 ### 12.6 Value Feedback 与 Subagent 统计
 
@@ -1898,10 +1897,9 @@ func ExecuteToolBatch(ctx, task, request) (*ToolBatchResult, error) {
     // 在任何 goroutine 前固定恢复布局。
     works := reserveStableIdentityAndSequences(request)
 
-    // direct 可以整批提前验证；失败则 0 callback。
-    if directAdmissionFailed := preflightAllDirectCalls(works); directAdmissionFailed {
-        return settledAdmissionFailure(works), nil
-    }
+    // 所有 child 先逐项 admission；无效 child 保留失败 outcome，
+    // 有效且独立的兄弟仍进入后续调度。
+    preflightEachCall(works, outcomes)
 
     paramGate := semaphore(paramConcurrency)
     reviewOrder := orderedStage(len(works))
@@ -1998,7 +1996,7 @@ func ExecuteToolBatch(ctx, task, request) (*ToolBatchResult, error) {
 | `TestExecuteToolBatch_RejectsScalarRequest` | runtime 被直接传入 1 项 | 拒绝；单项必须走原协议 |
 | `TestExecuteToolBatch_DirectBoundedConcurrencyAndOrderedCommit` | 故意让后项先完成 | active 不超过上限；outcomes 与 Task commit 仍按 index；Timeline 摘要的排序是 handler 中另一处显式实现 |
 | `TestExecuteToolBatch_SameToolLiveOutputEventsStayBoundToTheirChild` | 两个 child 并发调用同名工具并交错写 stdout/stderr | 相同 NodeId 下每个 writer 的 start/delta/finish 仍按 CallToolID/ProcessesId/RecoveryIndexID 归属，且早于各自 result |
-| `TestExecuteToolBatch_DirectAdmissionFailureStartsNothing` | 一项 direct 参数非法 | 所有真实 callback 计数为 0 |
+| `TestExecuteToolBatch_DirectAdmissionFailureSkipsOnlyRejectedChild` | 一项 direct 参数非法、一项有效 | 无效项不执行，有效兄弟 callback 计数为 1 |
 | `TestExecuteToolBatch_FreshRequestReplaysStableCheckpointIdentity` | 新 request/新 runtime 从相同起始序号恢复 | 已完成工具不再调用，稳定 ID 命中 |
 | `TestExecuteToolBatch_ReviewCardsFollowModelArrayOrder` | 参数准备完成顺序打乱 | 审批卡仍按 0,1,... 展示 |
 | `TestExecuteToolBatch_ReviewCheckpointIdentityMismatchIsRejected` | seq 一样但 tool/params/identity 不同 | 拒绝错误 checkpoint，不静默套用 |
@@ -2142,11 +2140,11 @@ git diff --check
 
 ### 16.4 如何只跑一个业务承诺
 
-例如只验证“direct admission 失败时零 callback”：
+例如只验证“direct admission 失败只跳过对应 child”：
 
 ```bash
 go test ./common/ai/aid/aireact \
-  -run '^TestExecuteToolBatch_DirectAdmissionFailureStartsNothing$' \
+  -run '^TestExecuteToolBatch_DirectAdmissionFailureSkipsOnlyRejectedChild$' \
   -count=1 -v
 ```
 
@@ -2361,8 +2359,8 @@ CI 会让 object 形式的 scalar exact 示例经过 Schema、parser、verifier�
 | 出现 `[TOOL_BATCH_COMPAT]` | Runtime 未实现 `ToolBatchInvokeRuntime` | 功能仍正确但串行；要并发需实现可选接口并保证 task/emitter 安全 |
 | 审批卡看起来仍串行 | 设计如此 | 参数生成/插件调用可并发，人工 pending review 固定为 1 |
 | 日志显示 child 2 先结束 | 正常完成交错 | 看最终 `[TOOL_BATCH_RESULT]` 是否仍按 index；用 call ID 分组实时事件 |
-| 一项失败但兄弟继续 | 普通 all-settled 语义 | 只有 admission failure、direct-answer、外部取消会批次级阻止 |
-| direct admission 失败后一项显示 cancelled | 另一项触发全批零执行 | 查看真正的 `validation_failed` child 原因 |
+| 一项失败但兄弟继续 | 普通 all-settled 语义 | 预期行为；只重试失败分支 |
+| direct admission 失败但有效兄弟仍执行 | 逐项 admission + independent batch | 查看对应 `validation_failed` child 原因；不要把兄弟的成功当成它的成功 |
 | 审批 direct-answer 后没有工具结果 | 正常 | barrier 保证零 callback，系统转为直接回答并退出 Action |
 | checkpoint identity mismatch | seq 命中但 batch/call/tool/params 不同 | 不要强行忽略；检查 runtime ID、起始 seq、数组顺序和 request 是否变化 |
 | 恢复后又弹审批卡 | review response 未正确保存或身份不匹配 | 检查 review checkpoint materials/response 与 batch metadata |
@@ -2439,11 +2437,11 @@ Require 的职责就是让运行时基于任务上下文和工具 Schema 生成�
 
 ### Q8：一项失败为什么不取消全部？
 
-因为同批定义为彼此独立。普通失败应该让成功信息保留下来；只有 direct admission 的确定性无效输入、明确 direct-answer 和外部取消是批次级终止。
+因为同批定义为彼此独立。admission 或执行失败都只结算对应 child，让有效兄弟的信息保留下来；明确 direct-answer 和外部取消仍可批次级终止。
 
 ### Q9：这是不是保证整批原子性？
 
-不是数据库事务。它保证 direct admission 失败和 barrier 前 direct-answer 时零真实 callback；不保证真实并发调用开始后跨外部系统回滚。
+不是数据库事务。它只保证所有 child 完成 admission/review 并到达 barrier 后才开始 callback，以及 barrier 前 direct-answer 时零真实 callback；不保证 admission 失败时整批零执行，也不保证跨外部系统回滚。
 
 ### Q10：提高 invoke concurrency 是否一定更快？
 
@@ -2518,7 +2516,7 @@ Require 的职责就是让运行时基于任务上下文和工具 Schema 生成�
 
 ### 21.3 Runtime 验收
 
-- [ ] direct 全批 admission 失败时 callback 数为 0；
+- [ ] direct admission 失败只拒绝对应 child，有效兄弟仍执行；
 - [ ] 参数生成与真实 invoke 使用独立并发上限；
 - [ ] review 按 index 且最多一个 pending；
 - [ ] 所有 child 到 barrier 前无真实 callback；

@@ -2,6 +2,8 @@ package scannode
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -138,12 +140,35 @@ func downloadManagedSourcePayload(
 	session node.SessionState,
 	payloadID string,
 ) (localFile string, err error) {
+	localFile, _, err = downloadManagedSourcePayloadBounded(
+		ctx,
+		client,
+		platformAPIBaseURL,
+		session.SessionID,
+		session.SessionToken,
+		payloadID,
+		0,
+		"",
+	)
+	return localFile, err
+}
+
+func downloadManagedSourcePayloadBounded(
+	ctx context.Context,
+	client *http.Client,
+	platformAPIBaseURL string,
+	nodeSessionID string,
+	nodeSessionToken string,
+	payloadID string,
+	maxBytes int64,
+	expectedSHA256 string,
+) (localFile string, actualSHA256 string, err error) {
 	payloadID = strings.TrimSpace(payloadID)
 	if !managedSourcePayloadIDPattern.MatchString(payloadID) {
-		return "", utils.Errorf("invalid managed source payload id")
+		return "", "", utils.Errorf("invalid managed source payload id")
 	}
-	if strings.TrimSpace(session.SessionID) == "" || strings.TrimSpace(session.SessionToken) == "" {
-		return "", utils.Errorf("node session credentials are unavailable for source payload download")
+	if strings.TrimSpace(nodeSessionID) == "" || strings.TrimSpace(nodeSessionToken) == "" {
+		return "", "", utils.Errorf("node session credentials are unavailable for source payload download")
 	}
 
 	baseURL, err := url.Parse(strings.TrimSpace(platformAPIBaseURL))
@@ -154,19 +179,19 @@ func downloadManagedSourcePayload(
 		baseURL.User != nil ||
 		baseURL.RawQuery != "" ||
 		baseURL.Fragment != "" {
-		return "", utils.Errorf("invalid platform API base URL for source payload download")
+		return "", "", utils.Errorf("invalid platform API base URL for source payload download")
 	}
 	baseURL.Path = strings.TrimRight(baseURL.Path, "/") + sourcePayloadDownloadPathPrefix + url.PathEscape(payloadID) + "/download"
 	baseURL.RawPath = ""
 	query := baseURL.Query()
-	query.Set("node_session_id", strings.TrimSpace(session.SessionID))
+	query.Set("node_session_id", strings.TrimSpace(nodeSessionID))
 	baseURL.RawQuery = query.Encode()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL.String(), nil)
 	if err != nil {
-		return "", utils.Errorf("build source payload download request: %v", err)
+		return "", "", utils.Errorf("build source payload download request: %v", err)
 	}
-	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(session.SessionToken))
+	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(nodeSessionToken))
 
 	httpClient := client
 	if httpClient == nil {
@@ -184,16 +209,23 @@ func downloadManagedSourcePayload(
 	}
 	response, err := requestClient.Do(request)
 	if err != nil {
-		return "", utils.Errorf("download managed source payload: %v", err)
+		return "", "", utils.Errorf("download managed source payload: %v", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return "", utils.Errorf("download managed source payload failed: status=%d", response.StatusCode)
+		return "", "", utils.Errorf("download managed source payload failed: status=%d", response.StatusCode)
+	}
+	if maxBytes > 0 && response.ContentLength > maxBytes {
+		return "", "", utils.Errorf(
+			"download managed source payload exceeds max bytes: content_length=%d max_bytes=%d",
+			response.ContentLength,
+			maxBytes,
+		)
 	}
 
 	tempFile, err := os.CreateTemp("", "yaklang-node-source-payload-*.zip")
 	if err != nil {
-		return "", utils.Errorf("create source payload temp file: %v", err)
+		return "", "", utils.Errorf("create source payload temp file: %v", err)
 	}
 	tempPath := tempFile.Name()
 	defer func() {
@@ -205,11 +237,28 @@ func downloadManagedSourcePayload(
 			_ = os.Remove(tempPath)
 		}
 	}()
-	if _, err = io.Copy(tempFile, response.Body); err != nil {
-		return "", utils.Errorf("write source payload temp file: %v", err)
+	hash := sha256.New()
+	reader := io.Reader(response.Body)
+	if maxBytes > 0 {
+		reader = io.LimitReader(response.Body, maxBytes+1)
+	}
+	written, copyErr := io.Copy(io.MultiWriter(tempFile, hash), reader)
+	if copyErr != nil {
+		return "", "", utils.Errorf("write source payload temp file: %v", copyErr)
+	}
+	if maxBytes > 0 && written > maxBytes {
+		return "", "", utils.Errorf("download managed source payload exceeds max bytes: max_bytes=%d", maxBytes)
 	}
 	if err = tempFile.Sync(); err != nil {
-		return "", utils.Errorf("sync source payload temp file: %v", err)
+		return "", "", utils.Errorf("sync source payload temp file: %v", err)
 	}
-	return tempPath, nil
+	actualSHA256 = hex.EncodeToString(hash.Sum(nil))
+	if expected := strings.ToLower(strings.TrimSpace(expectedSHA256)); expected != "" && expected != actualSHA256 {
+		return "", "", utils.Errorf(
+			"download managed source payload sha256 mismatch: expected=%s actual=%s",
+			expected,
+			actualSHA256,
+		)
+	}
+	return tempPath, actualSHA256, nil
 }

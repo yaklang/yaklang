@@ -63,7 +63,7 @@ func mockedMaxIterationLoopForever(i aicommon.AICallerConfigIf, req *aicommon.AI
 //  1. 客户端表现为"自然结束": 收到 success_react_task 终止事件, 任务状态 completed;
 //  2. 不出现错误: 全程不出现 fail_react_task 事件;
 //  3. TODO 都被留痕关闭: 撞上限时把开放 TODO 批量标为 deferred 并记录 reason;
-//  4. 退出原因入 timeline: timeline 记录 iteration_limit_interrupt (退出=超出最大迭代).
+//  4. 退出原因入 timeline: timeline 使用不暴露预算的 execution_paused 语义.
 //
 // 关键词: max iteration 自然结束, 无 fail, 待办 deferred, timeline 退出原因
 func TestReAct_MaxIteration_NaturalEnd(t *testing.T) {
@@ -181,9 +181,12 @@ LOOP:
 	}
 
 	tl := ins.DumpTimeline()
-	// 要点4: 退出原因入 timeline (退出 = 超出最大迭代限制).
-	if !strings.Contains(tl, "iteration_limit_interrupt") {
-		t.Fatalf("timeline must record the iteration-limit interrupt exit reason, got:\n%s", tl)
+	// 要点4: timeline 保留执行暂停语义，但不向 Agent 暴露迭代预算。
+	if !strings.Contains(tl, "execution_paused") {
+		t.Fatalf("timeline must record the execution pause reason, got:\n%s", tl)
+	}
+	if strings.Contains(tl, "iteration limit") {
+		t.Fatalf("timeline must not expose the host iteration budget, got:\n%s", tl)
 	}
 	// 要点3: 活跃 TODO 被 deferred 留痕关闭.
 	if !strings.Contains(tl, "deferred") {

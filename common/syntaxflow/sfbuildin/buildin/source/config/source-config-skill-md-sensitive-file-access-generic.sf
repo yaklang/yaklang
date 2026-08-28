@@ -1,0 +1,60 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Skill Md Sensitive File Access Generic"
+	title_zh: "检测到Skill Md Sensitive File Access Generic",
+	type: vuln
+	level: critical
+	rule_id: "source-config-skill-md-sensitive-file-access-generic"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `skill-md-sensitive-file-access-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-sensitive-file-access/skill-md-sensitive-file-access.yaml).
+Original message: SKILL.md or AGENT.md instructs the agent to read sensitive credential files such as ~/.ssh/id_rsa, ~/.aws/credentials, /etc/shadow, .env, or browser cookie stores. Agents that load this skill will treat the directive as authoritative and may exfiltrate the contents. Remove the file-access directive or scope it to user-supplied paths.
+
+CWE: CWE-538: Insertion of Sensitive Information into Externally-Accessible File or Directory
+References:
+- https://github.com/Agent-Threat-Rule/agent-threat-rules
+- https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
+DESC
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION
+	alert_min: 1
+	"file://posSKILL.md": <<<POS
+access 	
+
+	
+ the	
+	/etc/shadow
+
+POS
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG
+)
+
+${*SKILL.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+)?(?:~\/\.ssh\/id_(?:rsa|ed25519|ecdsa|dsa)\b|~\/\.ssh\/known_hosts|~\/\.aws\/credentials|~\/\.config\/gcloud\/[^\s]*credential|\/etc\/shadow|\/etc\/passwd)/) as $p0
+${*SKILL.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+contents?\s+of\s+)?(?:~\/\.npmrc|~\/\.pypirc|~\/\.docker\/config\.json|~\/\.kube\/config|~\/\.netrc)/) as $p1
+${*SKILL.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch|grep)\s+(?:the\s+)?\.env(?:\.\w+)?\s+(?:file|and)/) as $p2
+${*SKILL.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:browser\s+)?cookies?\s+(?:from|in)\s+(?:Chrome|Firefox|Safari|Edge|~\/Library\/Application Support\/(?:Google\/Chrome|Firefox))/) as $p3
+${*AGENT.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+)?(?:~\/\.ssh\/id_(?:rsa|ed25519|ecdsa|dsa)\b|~\/\.ssh\/known_hosts|~\/\.aws\/credentials|~\/\.config\/gcloud\/[^\s]*credential|\/etc\/shadow|\/etc\/passwd)/) as $p4
+${*AGENT.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+contents?\s+of\s+)?(?:~\/\.npmrc|~\/\.pypirc|~\/\.docker\/config\.json|~\/\.kube\/config|~\/\.netrc)/) as $p5
+${*AGENT.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch|grep)\s+(?:the\s+)?\.env(?:\.\w+)?\s+(?:file|and)/) as $p6
+${*AGENT.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:browser\s+)?cookies?\s+(?:from|in)\s+(?:Chrome|Firefox|Safari|Edge|~\/Library\/Application Support\/(?:Google\/Chrome|Firefox))/) as $p7
+${*AGENTS.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+)?(?:~\/\.ssh\/id_(?:rsa|ed25519|ecdsa|dsa)\b|~\/\.ssh\/known_hosts|~\/\.aws\/credentials|~\/\.config\/gcloud\/[^\s]*credential|\/etc\/shadow|\/etc\/passwd)/) as $p8
+${*AGENTS.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+contents?\s+of\s+)?(?:~\/\.npmrc|~\/\.pypirc|~\/\.docker\/config\.json|~\/\.kube\/config|~\/\.netrc)/) as $p9
+${*AGENTS.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch|grep)\s+(?:the\s+)?\.env(?:\.\w+)?\s+(?:file|and)/) as $p10
+${*AGENTS.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:browser\s+)?cookies?\s+(?:from|in)\s+(?:Chrome|Firefox|Safari|Edge|~\/Library\/Application Support\/(?:Google\/Chrome|Firefox))/) as $p11
+${*skill.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+)?(?:~\/\.ssh\/id_(?:rsa|ed25519|ecdsa|dsa)\b|~\/\.ssh\/known_hosts|~\/\.aws\/credentials|~\/\.config\/gcloud\/[^\s]*credential|\/etc\/shadow|\/etc\/passwd)/) as $p12
+${*skill.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:the\s+contents?\s+of\s+)?(?:~\/\.npmrc|~\/\.pypirc|~\/\.docker\/config\.json|~\/\.kube\/config|~\/\.netrc)/) as $p13
+${*skill.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch|grep)\s+(?:the\s+)?\.env(?:\.\w+)?\s+(?:file|and)/) as $p14
+${*skill.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:browser\s+)?cookies?\s+(?:from|in)\s+(?:Chrome|Firefox|Safari|Edge|~\/Library\/Application Support\/(?:Google\/Chrome|Firefox))/) as $p15
+$p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 + $p13 + $p14 + $p15 as $hit
+alert $hit for {
+	level: "critical",
+	title: "Skill Md Sensitive File Access Generic",
+	title_zh: "检测到Skill Md Sensitive File Access Generic",
+	message: "Skill Md Sensitive File Access Generic",
+}

@@ -1,4 +1,4 @@
-__DESC__ = "不使用浏览器的基本简易爬虫，开销低，速度快，可控性好，适合初步探查使用"
+__DESC__ = "不执行 JavaScript 的轻量级爬虫，用于有界发现服务端可见 URL。单 URL 状态、响应头或正文优先直接 HTTP 请求；需要站点覆盖时再使用本工具。输出会识别疑似 SPA/重型 JS 页面并给出浏览器或 JS 资产分析建议，避免机械加深爬取。"
 __VERBOSE_NAME__ = "Crawler"
 __VERBOSE_NAME_ZH__ = "爬虫"
 __KEYWORDS__ = "爬虫,网络抓取,网页采集,http请求,http响应,无头爬虫,数据抓取,轻量级爬虫"
@@ -8,13 +8,18 @@ Simple Crawler Tool - Parameter Description for JSON Tool Calls
 
 This crawler is tuned to get results quickly: it minimizes retries and can
 automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
+It does NOT execute JavaScript. Use it for bounded multi-page discovery from
+server-visible HTML, not merely because the user supplied a URL. For one known
+URL's status, headers, body, or redirect, use one direct HTTP request first.
 
 Output includes:
   1. Crawl summary (requests made, total URLs discovered, pending URLs)
   2. Requested URLs with HTTP method, response status, content type, body size,
      and redirect location when available.
   3. Found URLs discovered in responses but NOT yet requested.
-  4. Follow-up guidance for selecting Found URLs and tuning crawl limits.
+  4. A bounded rendering assessment for likely SPA / JavaScript-heavy shells.
+  5. Follow-up guidance that either deepens useful server-visible coverage or
+     switches to rendered DOM / JavaScript analysis.
 
 Required Parameters:
   urls            (string)  Start URL(s) for crawling. Multiple URLs can be provided
@@ -37,6 +42,10 @@ Optional Parameters:
                             no results. Default: true.
 
 Scenario Guidance:
+  - One known URL, exact response: use one direct HTTP request; do not crawl
+  - One known URL, map the site: use this crawler with bounded limits
+  - Exact response + site map: run one HTTP request and one bounded crawl; do
+    not repeat either observation unless its result creates a new question
   - Standard web app scan: use defaults (max-depth=5, reqs-max=300)
   - Deep crawl large site:  set reqs-max=1000, max-depth=8
   - Quick surface check:    set reqs-max=50, max-depth=2
@@ -116,6 +125,118 @@ requestLines = []
 totalResults = 0
 lastErr = ""
 usedFallback = false
+htmlResponseCount = 0
+assessedHTMLResponseCount = 0
+likelyClientRenderedCount = 0
+possibleClientRenderedCount = 0
+renderingEvidenceLines = []
+
+// Keep SPA detection cheap even on large sites and oversized HTML responses.
+maxRenderingAssessments = 20
+maxRenderingBodyBytes = 512 * 1024
+
+analyzeClientRendering = func(body) {
+    if len(body) > maxRenderingBodyBytes {
+        body = body[:maxRenderingBodyBytes]
+    }
+    lowerBody = str.ToLower(string(body))
+    scriptCount = str.Count(lowerBody, "<script")
+    moduleScriptCount = str.Count(lowerBody, `type="module"`) + str.Count(lowerBody, `type='module'`)
+    anchorCount = str.Count(lowerBody, "<a ")
+    formCount = str.Count(lowerBody, "<form")
+
+    appShellMarkers = 0
+    for marker in [
+        `id="root"`, `id='root'`, `id="app"`, `id='app'`,
+        `id="__next"`, `id='__next'`, `id="__nuxt"`, `id='__nuxt'`,
+        `<app-root`, `<router-outlet`, `id="q-app"`, `id='q-app'`,
+        `id="svelte"`, `id='svelte'`,
+    ] {
+        if str.Contains(lowerBody, marker) {
+            appShellMarkers++
+        }
+    }
+
+    frameworkMarkers = 0
+    for marker in [
+        `__next_data__`, `/_next/static/`, `__nuxt__`, `/_nuxt/`,
+        `data-reactroot`, `data-v-app`, `ng-version=`, `webpackchunk`,
+        `vite/client`, `data-sveltekit`, `__sveltekit`, `__remixcontext`,
+    ] {
+        if str.Contains(lowerBody, marker) {
+            frameworkMarkers++
+        }
+    }
+
+    clientRoutingMarkers = 0
+    for marker in [
+        `history.pushstate`, `history.replacestate`, `react-router`,
+        `vue-router`, `createwebhistory`, `createrouter`, `router-outlet`,
+    ] {
+        if str.Contains(lowerBody, marker) {
+            clientRoutingMarkers++
+        }
+    }
+
+    bundleMarkers = 0
+    for marker in [
+        `/assets/index-`, `/static/js/main.`, `/static/js/chunk.`,
+        `runtime.`, `vendor.`, `chunk-`, `.bundle.js`,
+    ] {
+        if str.Contains(lowerBody, marker) {
+            bundleMarkers++
+        }
+    }
+
+    visibleText = re.ReplaceAll(string(body), `(?is)<script[^>]*>.*?</script>`, " ")
+    visibleText = re.ReplaceAll(visibleText, `(?is)<style[^>]*>.*?</style>`, " ")
+    visibleText = re.ReplaceAll(visibleText, `(?is)<noscript[^>]*>.*?</noscript>`, " ")
+    visibleText = re.ReplaceAll(visibleText, `(?is)<[^>]+>`, " ")
+    visibleText = str.TrimSpace(re.ReplaceAll(visibleText, `\s+`, " "))
+    visibleTextSize = len(visibleText)
+
+    score = 0
+    if appShellMarkers > 0 {
+        score += 2
+    }
+    if frameworkMarkers > 0 {
+        score += 2
+    }
+    if clientRoutingMarkers > 0 {
+        score += 2
+    }
+    if moduleScriptCount > 0 || scriptCount >= 3 || bundleMarkers >= 2 {
+        score++
+    }
+    if scriptCount > 0 && visibleTextSize <= 200 {
+        score += 2
+    }
+    if scriptCount > 0 && anchorCount == 0 && formCount == 0 {
+        score++
+    }
+
+    classification = "server-visible"
+    if score >= 5 && (visibleTextSize <= 400 || anchorCount + formCount == 0) {
+        classification = "likely-client-rendered"
+    } else if score >= 2 {
+        classification = "possible-client-rendered"
+    }
+
+    return {
+        "classification": classification,
+        "score": score,
+        "script_count": scriptCount,
+        "module_script_count": moduleScriptCount,
+        "visible_text_size": visibleTextSize,
+        "anchor_count": anchorCount,
+        "form_count": formCount,
+        "app_shell_markers": appShellMarkers,
+        "framework_markers": frameworkMarkers,
+        "client_routing_markers": clientRoutingMarkers,
+        "bundle_markers": bundleMarkers,
+    }
+}
+
 for currentStartUrl in targetCandidates {
     reqCh, err := crawler.Start(currentStartUrl, opts...)
     if err != nil {
@@ -150,8 +271,44 @@ for currentStartUrl in targetCandidates {
             _, statusCode, statusText = poc.GetHTTPPacketFirstLine(rsp)
             status = str.TrimSpace(sprintf("%v %v", statusCode, statusText))
             contentType = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Content-Type"))
-            bodySize = len(poc.GetHTTPPacketBody(rsp))
+            rspBody = poc.GetHTTPPacketBody(rsp)
+            bodySize = len(rspBody)
             redirectLocation = str.TrimSpace(poc.GetHTTPPacketHeader(rsp, "Location"))
+
+            bodyPrefix = str.ToLower(str.TrimSpace(string(rspBody)))
+            looksLikeHTML = str.Contains(str.ToLower(contentType), "html") ||
+                str.HasPrefix(bodyPrefix, "<!doctype html") ||
+                str.HasPrefix(bodyPrefix, "<html")
+            if looksLikeHTML {
+                htmlResponseCount++
+                if assessedHTMLResponseCount < maxRenderingAssessments {
+                    assessedHTMLResponseCount++
+                    rendering = analyzeClientRendering(rspBody)
+                    classification = rendering["classification"]
+                    if classification == "likely-client-rendered" {
+                        likelyClientRenderedCount++
+                    } else if classification == "possible-client-rendered" {
+                        possibleClientRenderedCount++
+                    }
+                    if classification != "server-visible" && len(renderingEvidenceLines) < 5 {
+                        renderingEvidenceLines.Append(sprintf(
+                            "[%v] %v (score=%v; scripts/modules=%v/%v, visible-text=%v chars, anchors/forms=%v/%v, shell/framework/router/bundle=%v/%v/%v/%v)",
+                            classification,
+                            urlstr,
+                            rendering["score"],
+                            rendering["script_count"],
+                            rendering["module_script_count"],
+                            rendering["visible_text_size"],
+                            rendering["anchor_count"],
+                            rendering["form_count"],
+                            rendering["app_shell_markers"],
+                            rendering["framework_markers"],
+                            rendering["client_routing_markers"],
+                            rendering["bundle_markers"],
+                        ))
+                    }
+                }
+            }
         } catch {}
 
         // A URL fragment is browser-only and must never be sent to the server.
@@ -244,16 +401,47 @@ if len(foundUrlLines) == 0 {
     }
 }
 
+output.WriteString("\n=== Rendering Assessment ===\n")
+if likelyClientRenderedCount > 0 {
+    output.WriteString(sprintf("Classification: likely client-rendered SPA / JavaScript-heavy page (%v of %v assessed HTML response(s))\n", likelyClientRenderedCount, assessedHTMLResponseCount))
+} else if possibleClientRenderedCount > 0 {
+    output.WriteString(sprintf("Classification: possible client-rendered page (%v of %v assessed HTML response(s)); compare raw and rendered content only if the raw result is insufficient\n", possibleClientRenderedCount, assessedHTMLResponseCount))
+} else if htmlResponseCount > 0 {
+    output.WriteString(sprintf("Classification: no strong client-rendering dependency detected in %v assessed HTML response(s)\n", assessedHTMLResponseCount))
+} else {
+    output.WriteString("Classification: not assessed (no HTML response was available)\n")
+}
+if htmlResponseCount > assessedHTMLResponseCount {
+    output.WriteString(sprintf("Assessment budget: sampled the first %v of %v HTML response(s).\n", assessedHTMLResponseCount, htmlResponseCount))
+}
+output.WriteString("Assessment is heuristic, not proof. This crawler does not execute JavaScript, click controls, or observe browser-created DOM/API activity.\n")
+for line in renderingEvidenceLines {
+    output.WriteString("- ")
+    output.WriteString(line)
+    output.WriteString("\n")
+}
+
 output.WriteString("\n=== Follow-up Guidance ===\n")
-output.WriteString("- Select high-value Found URLs and run `simple_crawler` again with them in `urls`; prioritize dynamic pages, APIs, auth/account, admin, and parameterized endpoints before static assets.\n")
-output.WriteString("- If Pending remains high, increase `reqs-max`, `urls-max`, or `max-depth` gradually to collect more of the discovered surface.\n")
+if likelyClientRenderedCount > 0 {
+    output.WriteString("- [decision] Stop mechanically deepening this crawl: an application shell can return few useful links regardless of `reqs-max` or `max-depth`. Missing URLs here do not prove that the SPA has no routes or APIs.\n")
+    output.WriteString("- [recommended next action] Open the original URL once with `use_browser` (`op=open`) to inspect rendered DOM, forms, links, scripts, and visible text. Interact only when the task requires it.\n")
+    output.WriteString("- For routes/APIs, inspect referenced JavaScript assets and validate extracted candidates with one direct HTTP request each. In `infosec_recon`, use `crawl_js_collector` -> `js_static_extract_ai` for this path.\n")
+    output.WriteString("- Keep raw-response questions on an HTTP request tool: rendered DOM is not the raw HTTP status, headers, or body.\n")
+} else {
+    output.WriteString("- Select high-value Found URLs and run `simple_crawler` again with them in `urls` only when the task needs broader server-visible coverage; prioritize dynamic pages, APIs, auth/account, admin, and parameterized endpoints before static assets.\n")
+    output.WriteString("- If Pending remains high and those URLs matter to the task, increase `reqs-max`, `urls-max`, or `max-depth` gradually. Do not expand limits merely to maximize counts.\n")
+    if possibleClientRenderedCount > 0 {
+        output.WriteString("- If the raw HTML and discovered URLs are insufficient, compare them with one `use_browser` `op=open` result before spending more crawl budget.\n")
+    }
+}
 output.WriteString("- For a focused branch, lower `reqs-max`/`max-depth` or set `forbid-for-parent-path=yes`; this reduces noise and request cost.\n")
 output.WriteString("- Compare status, content type, body size, and redirect location in Requested URLs to prioritize unusual or dynamic responses.\n")
-if subdomainCount > 1 || pendingCount > 0 {
+if likelyClientRenderedCount == 0 && (subdomainCount > 1 || pendingCount > 0) {
     output.WriteString(sprintf("- [coverage hint] %v distinct subdomain(s) and %v Found URL(s) remain. In the NEXT iteration, use `adjust_todo` to split work by subdomain and endpoint group before deep-diving into one thread; do not claim full coverage while high-value Found URLs remain unrequested.\n", subdomainCount, pendingCount))
 }
 
 result = string(output.String())
+RESULT = result
 if len(result) <= 30000 {
     yakit.Info(result)
 } else {

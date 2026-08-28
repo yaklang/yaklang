@@ -57,13 +57,21 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	}
 
 	db := s.GetProfileDatabase()
-	proj, err := model.GetProjectById(db, req.GetId())
-	if err != nil {
-		err := yakit.InitializingProjectDatabase()
-		if err != nil {
-			log.Errorf("init db failed: %s", err)
+	var proj *schema.Project
+	err := utils.AttemptWithDelay(5, 100*time.Millisecond, func() error {
+		got, getErr := model.GetProjectById(db, req.GetId())
+		if getErr != nil {
+			return getErr
 		}
-		return &ypb.Empty{}, nil
+		proj = got
+		return nil
+	})
+	if err != nil {
+		initErr := yakit.InitializingProjectDatabase()
+		if initErr != nil {
+			log.Errorf("init db failed: %s", initErr)
+		}
+		return nil, utils.Errorf("cannot fetch project: %s", err)
 	}
 	if proj.Type != req.GetType() {
 		return nil, utils.Errorf("type not match %s vs want[%s]", proj.Type, req.GetType())
@@ -599,28 +607,48 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 	//  get delete target programs
 	db := s.GetProfileDatabase()
 	db = db.Where(" id = ? or folder_id = ? or child_folder_id = ? ", req.GetId(), req.GetId(), req.GetId())
-	projects := yakit.YieldProject(db, ctx)
-	if projects == nil {
+	projectCh := yakit.YieldProject(db, ctx)
+	if projectCh == nil {
+		return nil, utils.Error("project is not exist")
+	}
+	var projects []*schema.Project
+	for proj := range projectCh {
+		if proj != nil {
+			projects = append(projects, proj)
+		}
+	}
+	if len(projects) == 0 {
 		return nil, utils.Error("project is not exist")
 	}
 
-	// close current program
-	switch req.GetType() {
-	case yakit.TypeProject:
-		consts.GetGormProjectDatabase().Close()
-	case yakit.TypeSSAProject:
-		consts.GetGormSSAProjectDataBase().Close()
+	deletingCurrent := false
+	if current, err := yakit.GetCurrentProject(s.GetProfileDatabase(), req.GetType()); err == nil && current != nil {
+		for _, proj := range projects {
+			if int64(proj.ID) == int64(current.ID) {
+				deletingCurrent = true
+				break
+			}
+		}
 	}
 
-	// set default to current
-	defaultProg, err := s.GetDefaultProjectEx(ctx, &ypb.GetDefaultProjectExRequest{Type: req.GetType()})
-	if err != nil {
-		return nil, utils.Errorf("get default project err: %v", err)
+	// only close/switch when the current project itself is being deleted
+	if deletingCurrent {
+		switch req.GetType() {
+		case yakit.TypeProject:
+			consts.GetGormProjectDatabase().Close()
+		case yakit.TypeSSAProject:
+			consts.GetGormSSAProjectDataBase().Close()
+		}
+
+		defaultProg, err := s.GetDefaultProjectEx(ctx, &ypb.GetDefaultProjectExRequest{Type: req.GetType()})
+		if err != nil {
+			return nil, utils.Errorf("get default project err: %v", err)
+		}
+		_, _ = s.SetCurrentProject(ctx, &ypb.SetCurrentProjectRequest{Id: defaultProg.Id, Type: req.GetType()})
 	}
-	s.SetCurrentProject(ctx, &ypb.SetCurrentProjectRequest{Id: defaultProg.Id, Type: req.GetType()})
 
 	// delete selected projects
-	for k := range projects {
+	for _, k := range projects {
 		if CheckDefault(k.ProjectName, k.Type, k.FolderID, k.ChildFolderID) {
 			log.Info("[default] cannot be deleted")
 			break
@@ -632,7 +660,7 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 			}
 		}
 
-		err = yakit.DeleteProjectById(s.GetProfileDatabase(), int64(k.ID))
+		err := yakit.DeleteProjectById(s.GetProfileDatabase(), int64(k.ID))
 		if err != nil {
 			log.Errorf("delete project error: %v", err)
 		}

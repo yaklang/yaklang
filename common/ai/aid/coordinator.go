@@ -234,7 +234,16 @@ func (c *Coordinator) planLoadingStatus(status string) {
 		return
 	}
 	log.Infof("plan-executing loading status updated: %v", status)
-	c.EmitStatus(PlanExecutingLoadingStatusKey, status)
+	zh, en := aicommon.SplitLegacyStatusI18n(status)
+	_, _ = c.EmitStatusI18n(PlanExecutingLoadingStatusKey, zh, en)
+}
+
+func (c *Coordinator) planUserStatus(zh, en string, options ...aicommon.StatusOption) {
+	if c.Emitter == nil {
+		return
+	}
+	log.Infof("plan-executing user status updated: %v", zh)
+	_, _ = c.EmitStatusI18n(PlanExecutingLoadingStatusKey, zh, en, options...)
 }
 
 func (c *Coordinator) GetContextProvider() *PromptContextProvider {
@@ -399,8 +408,7 @@ func (c *Coordinator) Run() error {
 		coordinatorID = c.Config.Id
 	}
 	defer unregisterRunningCoordinator(coordinatorID)
-	c.planLoadingStatus("初始化 / Initializing...")
-	defer c.planLoadingStatus("任务规划执行结束 / Plan Execution Finished")
+	c.planUserStatus("正在准备任务", "Preparing the task", aicommon.WithStatusCode("plan.preparing"))
 
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
@@ -703,16 +711,6 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
-	// 标记为用户主动取消，阻止 abort 覆盖为 Aborted
-	task.SetUserCancelled()
-	// 取消任务并设置为 Skipped 状态（区别于 Aborted，Skipped 专门表示用户主动跳过）
-	task.SetStatus(aicommon.AITaskState_Skipped)
-	if userReason != "" {
-		task.Cancel("user skipped subtask: " + userReason + "; do NOT re-dispatch or retry this cancelled sub agent")
-	} else {
-		task.Cancel("user skipped subtask; do NOT re-dispatch or retry this cancelled sub agent")
-	}
-
 	// 构建 timeline 消息
 	baseMessage := "用户主动跳过了当前子任务，可能是用户觉得当前任务意义不重要，或者当前信息已经足够作出决定了，请你不要质疑，直接开始执行下一个子任务"
 	timelineMessage := baseMessage
@@ -720,19 +718,37 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 		timelineMessage = baseMessage + "。用户给出的理由: " + userReason
 	}
 
+	// 延迟发送取消确认消息：注册 asyncDeferCallback，等子任务 loop 退出后
+	// 由 execute() 中的 CallAsyncDeferCallback 触发发送，实现"取消完成再发返回消息"。
+	//
+	// SetStatus(Skipped) 立即调用（而非在 callback 中），因为
+	// ExecuteWithExistedTask 的 defer complete(nil) 会在 loop 退出时
+	// 先于 callback 执行，需要 Skipped 状态阻止 complete 设为 Completed。
+	syncID := event.SyncID
+	task.SetAsyncDeferCallback(func(err error) {
+		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skip_subtask_in_plan", map[string]any{
+			"success":       true,
+			"subtask_index": task.Index,
+			"subtask_id":    task.TaskId,
+			"subtask_name":  task.Name,
+			"reason":        userReason,
+			"message":       timelineMessage,
+		}, syncID)
+	})
+
+	// 标记为用户主动取消，阻止 abort 覆盖为 Aborted
+	task.SetUserCancelled()
+	// 立即设置 Skipped 状态，阻止 loop 的 complete 设为 Completed
+	task.SetStatus(aicommon.AITaskState_Skipped)
+	if userReason != "" {
+		task.Cancel("user skipped subtask: " + userReason + "; do NOT re-dispatch or retry this cancelled sub agent")
+	} else {
+		task.Cancel("user skipped subtask; do NOT re-dispatch or retry this cancelled sub agent")
+	}
+
 	c.Timeline.PushText(c.AcquireId(), "[user-skiped-subtask] 任务 %s (%s) 被用户主动跳过: %s", task.Index, task.Name, timelineMessage)
 
 	c.EmitInfo("subtask %s (%s) skipped by user", task.Index, task.Name)
-
-	// 发送同步响应
-	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skip_subtask_in_plan", map[string]any{
-		"success":       true,
-		"subtask_index": task.Index,
-		"subtask_id":    task.TaskId,
-		"subtask_name":  task.Name,
-		"reason":        userReason,
-		"message":       timelineMessage,
-	}, event.SyncID)
 
 	return nil
 }

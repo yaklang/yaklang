@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/node"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
 	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 )
@@ -82,6 +85,41 @@ func (p *jobEventPublisher) PublishProgress(
 		CompletedUnits: completedUnits,
 		TotalUnits:     totalUnits,
 	})
+}
+
+func (p *jobEventPublisher) PublishRuleSnapshotPrepared(
+	ctx context.Context,
+	ref jobExecutionRef,
+	receipt RuleSnapshotPreparationReceipt,
+) error {
+	preparedAt := receipt.PreparedAt
+	if preparedAt.IsZero() {
+		preparedAt = time.Now().UTC()
+	}
+	receipt.PreparedAt = preparedAt
+	return p.publish(
+		ctx,
+		legionEventRuleSnapshotPrepared,
+		ref,
+		ref.AttemptID+":rule-snapshot-prepared:"+receipt.ContentSHA256,
+		buildRuleSnapshotPreparedEvent(p.jobRef(ref), receipt),
+	)
+}
+
+func buildRuleSnapshotPreparedEvent(
+	job *jobv1.JobRef,
+	receipt RuleSnapshotPreparationReceipt,
+) *jobv1.JobRuleSnapshotPrepared {
+	return &jobv1.JobRuleSnapshotPrepared{
+		Job:           job,
+		SnapshotId:    receipt.SnapshotID,
+		ContentSha256: receipt.ContentSHA256,
+		SchemaVersion: receipt.SchemaVersion,
+		BundleFormat:  receipt.BundleFormat,
+		RuleCount:     uint32(receipt.AssetCount),
+		CacheHit:      receipt.CacheHit,
+		PreparedAt:    timestamppb.New(receipt.PreparedAt),
+	}
 }
 
 func (p *jobEventPublisher) PublishAsset(
@@ -274,6 +312,10 @@ func (p *jobEventPublisher) PublishFailed(
 	detail map[string]string,
 ) error {
 	now := time.Now().UTC()
+	// Node diagnostics (git output, subprocess stderr) can carry invalid
+	// UTF-8; proto3 string fields reject it, so sanitize at the source.
+	errorMessage = sanitizeUTF8String(errorMessage)
+	detail = sanitizeUTF8Map(detail)
 	raw, err := json.Marshal(detail)
 	if err != nil {
 		return fmt.Errorf("marshal job failure detail: %w", err)
@@ -333,6 +375,14 @@ func (p *jobEventPublisher) publish(
 
 	raw, err := proto.Marshal(message)
 	if err != nil {
+		// proto3 string fields must contain valid UTF-8, but node diagnostics
+		// (git output, subprocess stderr) can carry arbitrary bytes. Sanitize
+		// the whole message and retry so a terminal event is never dropped — a
+		// dropped failure event turns a real failure into a "lost" attempt.
+		sanitizeJobEventUTF8(message)
+		raw, err = proto.Marshal(message)
+	}
+	if err != nil {
 		return fmt.Errorf("marshal job event: %w", err)
 	}
 	msg := nats.NewMsg(subject)
@@ -349,6 +399,64 @@ func (p *jobEventPublisher) publish(
 	}
 	log.Infof("published legion job event: type=%s attempt_id=%s", eventType, ref.AttemptID)
 	return nil
+}
+
+// sanitizeUTF8String replaces invalid UTF-8 bytes in a diagnostic string with
+// \\xNN escapes so it can be stored in a proto3 string field (proto3 requires
+// valid UTF-8) while keeping the raw bytes visible for debugging.
+func sanitizeUTF8String(value string) string {
+	if utf8.ValidString(value) {
+		return value
+	}
+	return codec.UTF8SafeEscape(value)
+}
+
+// sanitizeUTF8Map applies sanitizeUTF8String to every key and value of a
+// diagnostic map.
+func sanitizeUTF8Map(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return input
+	}
+	output := make(map[string]string, len(input))
+	for key, value := range input {
+		output[sanitizeUTF8String(key)] = sanitizeUTF8String(value)
+	}
+	return output
+}
+
+// sanitizeJobEventUTF8 scrubs invalid UTF-8 from every exported string field
+// of a job event message. Only settable (exported) fields are touched — proto
+// messages carry unexported internal state that must never be written through
+// reflection, which is also why codec.SanitizeUTF8 cannot be used here.
+func sanitizeJobEventUTF8(message proto.Message) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			log.Warnf("[job-event] utf8 sanitize aborted: %v", recovered)
+		}
+	}()
+	var cleanValue func(v reflect.Value)
+	cleanValue = func(v reflect.Value) {
+		switch v.Kind() {
+		case reflect.Ptr, reflect.Interface:
+			if !v.IsNil() {
+				cleanValue(v.Elem())
+			}
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Field(i)
+				if !field.CanSet() {
+					// Unexported proto runtime state: never touch.
+					continue
+				}
+				cleanValue(field)
+			}
+		case reflect.String:
+			if !utf8.ValidString(v.String()) {
+				v.SetString(sanitizeUTF8String(v.String()))
+			}
+		}
+	}
+	cleanValue(reflect.ValueOf(message))
 }
 
 func (p *jobEventPublisher) ensureJetStream(natsURL string) error {
@@ -399,6 +507,8 @@ func attachEventMetadata(message proto.Message, metadata *nodev1.EventMetadata) 
 	case *jobv1.JobStarted:
 		value.Metadata = metadata
 	case *jobv1.JobProgressed:
+		value.Metadata = metadata
+	case *jobv1.JobRuleSnapshotPrepared:
 		value.Metadata = metadata
 	case *jobv1.JobAsset:
 		value.Metadata = metadata

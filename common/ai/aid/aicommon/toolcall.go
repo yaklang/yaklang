@@ -537,8 +537,8 @@ func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, ta
 }
 
 // buildRecentToolCallSummary returns a short markdown summary of the most
-// recent N tool-call results from the task, oldest first. Each entry is a
-// one-line bullet: "- tool_name: success/failed (brief error if any)".
+// recent N tool-call results from the task, oldest first. Status describes the
+// invocation protocol only; execution semantics remain in the tool result.
 // Returns "" when no prior results exist.
 func buildRecentToolCallSummary(task AITask, maxItems int) string {
 	if task == nil {
@@ -555,10 +555,10 @@ func buildRecentToolCallSummary(task AITask, maxItems int) string {
 	}
 	var sb strings.Builder
 	for _, r := range results[start:] {
-		status := "success"
+		status := "completed"
 		extra := ""
 		if !r.Success {
-			status = "failed"
+			status = "protocol-error"
 			if r.Error != "" {
 				errMsg := r.Error
 				if len(errMsg) > 80 {

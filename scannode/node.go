@@ -23,6 +23,7 @@ type ScanNode struct {
 	httpClient        *http.Client
 	invokeLimiter     *invokeLimiter
 	maxRunningJobs    uint32
+	heartbeatInterval time.Duration
 	bridge            *legionJobBridge
 	ssaGitOwnerScope  string
 	ssaGitScopeLock   *ssagitworkdir.OwnerScopeLock
@@ -34,7 +35,8 @@ var scanNodeTaskDrainTimeout = 30 * time.Second
 type ScanNodeOption func(*scanNodeOptions)
 
 type scanNodeOptions struct {
-	runtimeHost RuntimeHostConfig
+	runtimeHost          RuntimeHostConfig
+	ruleSnapshotCacheDir string
 }
 
 func WithRuntimeHost(cfg RuntimeHostConfig) ScanNodeOption {
@@ -43,7 +45,23 @@ func WithRuntimeHost(cfg RuntimeHostConfig) ScanNodeOption {
 	}
 }
 
+// WithRuleSnapshotCacheDir isolates the immutable snapshot bundle cache for a
+// node installation. An empty value keeps the legacy user-home default.
+func WithRuleSnapshotCacheDir(cacheDir string) ScanNodeOption {
+	return func(options *scanNodeOptions) {
+		options.ruleSnapshotCacheDir = strings.TrimSpace(cacheDir)
+	}
+}
+
 func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, error) {
+	if cfg.HeartbeatInterval <= 0 {
+		cfg.HeartbeatInterval = node.DefaultHeartbeatInterval
+	}
+	maxRunningJobs, err := effectiveMaxRunningJobs(cfg.MaxRunningJobs)
+	if err != nil {
+		return nil, err
+	}
+	cfg.MaxRunningJobs = maxRunningJobs
 	var resolvedOptions scanNodeOptions
 	for _, option := range options {
 		if option != nil {
@@ -54,8 +72,9 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		cfg.CapabilityKeys = append(cfg.CapabilityKeys, AIRuntimeHostCapabilityKey)
 	}
 	agent := &ScanNode{
-		manager:        newTaskManager(),
-		maxRunningJobs: cfg.MaxRunningJobs,
+		manager:           newTaskManager(),
+		maxRunningJobs:    cfg.MaxRunningJobs,
+		heartbeatInterval: cfg.HeartbeatInterval,
 	}
 	if cfg.NodeType == "" {
 		cfg.NodeType = spec.NodeType_Scanner
@@ -74,6 +93,7 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 	agent.ruleSyncClient = NewRuleSyncClient(&RuleSyncConfig{
 		ServerURL:   cfg.PlatformAPIBaseURL,
 		SyncEnabled: true,
+		CacheDir:    resolvedOptions.ruleSnapshotCacheDir,
 		Client:      cfg.HTTPClient,
 	})
 	existingHook := cfg.PostBootstrapHook
@@ -116,7 +136,7 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 		)
 	}
 	agent.httpClient = cfg.HTTPClient
-	agent.initInvokeLimiter()
+	agent.initInvokeLimiter(cfg.MaxRunningJobs)
 	agent.bridge = newLegionJobBridge(agent)
 	return agent, nil
 }
@@ -168,6 +188,9 @@ func (s *ScanNode) Shutdown() {
 	if s == nil || s.node == nil {
 		return
 	}
+	if s.bridge != nil {
+		s.bridge.BeginShutdown()
+	}
 	s.manager.BeginShutdown()
 	if s.capabilityManager != nil {
 		if err := s.capabilityManager.Close(); err != nil {
@@ -202,7 +225,7 @@ func (s *ScanNode) releaseSSAGitScopeLockAfterTasks() {
 func (s *ScanNode) Snapshot() node.RuntimeStatus {
 	return node.RuntimeStatus{
 		LifecycleState: node.DefaultLifecycleState,
-		RunningJobs:    uint32(s.manager.Count()),
+		RunningJobs:    s.invokeLimiter.activeCount(),
 		MaxRunningJobs: s.maxRunningJobs,
 		ActiveAttempts: s.manager.ActiveAttemptHeartbeats(time.Now().UTC()),
 	}

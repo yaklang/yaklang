@@ -31,6 +31,12 @@ type LoopActionHandlerOperator struct {
 
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
+
+	// One-shot action constraints for the next model iteration. They are kept on
+	// the completed action operator, which is already passed into the next prompt
+	// build, and disappear when the following action gets a fresh operator.
+	nextActionMustUse  []string
+	nextActionDisabled []string
 }
 
 func (r *LoopActionHandlerOperator) GetContext() context.Context {
@@ -43,6 +49,8 @@ func newLoopActionHandlerOperator(task aicommon.AIStatefulTask) *LoopActionHandl
 		terminateOperateOnce: utils.NewOnce(),
 		disallowLoopExitOnce: utils.NewOnce(),
 		task:                 task,
+		nextActionMustUse:    []string{},
+		nextActionDisabled:   []string{},
 	}
 }
 
@@ -143,6 +151,30 @@ func (l *LoopActionHandlerOperator) RequestAsyncMode() {
 // IsAsyncModeRequested returns whether the handler has dynamically requested async mode.
 func (l *LoopActionHandlerOperator) IsAsyncModeRequested() bool {
 	return l.requestedAsyncMode
+}
+
+// NextAction restricts the next model iteration to the named actions. The
+// constraint applies to one iteration only and is ignored if no named action
+// exists after the loop's normal security filters run.
+func (l *LoopActionHandlerOperator) NextAction(actions ...string) {
+	l.nextActionMustUse = append(l.nextActionMustUse, actions...)
+}
+
+// RemoveNextAction hides the named actions from the next model iteration.
+func (l *LoopActionHandlerOperator) RemoveNextAction(actions ...string) {
+	l.nextActionDisabled = append(l.nextActionDisabled, actions...)
+}
+
+func (l *LoopActionHandlerOperator) GetNextActionMustUse() []string {
+	return l.nextActionMustUse
+}
+
+func (l *LoopActionHandlerOperator) GetNextActionDisabled() []string {
+	return l.nextActionDisabled
+}
+
+func (l *LoopActionHandlerOperator) HasActionConstraints() bool {
+	return len(l.nextActionMustUse) > 0 || len(l.nextActionDisabled) > 0
 }
 
 // OnPostIterationOperator allows post-iteration callbacks to control loop behavior

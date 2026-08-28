@@ -31,6 +31,9 @@ func TestSetupDebugDirCreatesLogAndDirs(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(target, "cpu-pprof"))
 	require.NoError(t, err)
+
+	_, err = os.Stat(filepath.Join(target, "db.log"))
+	require.NoError(t, err)
 }
 
 func TestSetupDebugDirPanicDoesNotEscape(t *testing.T) {

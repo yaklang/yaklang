@@ -63,7 +63,66 @@ func (r *ReActLoop) recordIterationTick() {
 	if r == nil {
 		return
 	}
-	r.lastIterationTickAt.Store(time.Now().UnixNano())
+	now := time.Now().UnixNano()
+	r.lastIterationTickAt.Store(now)
+	r.lastActivityAt.Store(now)
+}
+
+// recordActivityTick 记录一次非 iteration 活动 (工具开始执行等).
+// 不推进 lastIterationTickAt, 因此 LOOP_STALL_DETECTED 仍能观察
+// "主循环多久没进入下一轮"; 但 LastActivityAt / in-flight 旁路会把它
+// 当成有进度, 避免 hard abort 误杀长工具调用.
+// 关键词: recordActivityTick, 工具活动心跳
+func (r *ReActLoop) recordActivityTick() {
+	if r == nil {
+		return
+	}
+	r.lastActivityAt.Store(time.Now().UnixNano())
+}
+
+// BeginToolActivity 标记一次工具调用开始. 必须与 EndToolActivity 成对.
+// 关键词: BeginToolActivity, 工具 in-flight
+func (r *ReActLoop) BeginToolActivity() {
+	if r == nil {
+		return
+	}
+	r.toolActivityInflight.Add(1)
+	r.recordActivityTick()
+}
+
+// EndToolActivity 标记一次工具调用结束. 超额 End 被忽略, 避免计数变负.
+// 关键词: EndToolActivity, 工具 in-flight
+func (r *ReActLoop) EndToolActivity() {
+	if r == nil {
+		return
+	}
+	for {
+		cur := r.toolActivityInflight.Load()
+		if cur <= 0 {
+			return
+		}
+		if r.toolActivityInflight.CompareAndSwap(cur, cur-1) {
+			return
+		}
+	}
+}
+
+// HasInflightToolActivity 返回当前是否有尚未结束的工具调用.
+func (r *ReActLoop) HasInflightToolActivity() bool {
+	return r != nil && r.toolActivityInflight.Load() > 0
+}
+
+// lastObservedActivityNano 返回 iteration tick 与工具活动中较新的时间戳.
+func (r *ReActLoop) lastObservedActivityNano() int64 {
+	if r == nil {
+		return 0
+	}
+	tick := r.lastIterationTickAt.Load()
+	act := r.lastActivityAt.Load()
+	if act > tick {
+		return act
+	}
+	return tick
 }
 
 // startStallHeartbeat 启动主循环 stall 监控 goroutine. 返回一个 stop func,
@@ -136,9 +195,17 @@ func (r *ReActLoop) startStallHeartbeatWithClock(
 				if gap < threshold {
 					continue
 				}
+				// 本 loop 正在执行工具 (如全仓 grep): iteration 不会前进, 但
+				// 这不是死锁. 跳过 stall 报警和硬抢断, 避免误杀 Phase2 /
+				// fast_context 子 Agent.
+				// 关键词: stall heartbeat tool in-flight 旁路
+				if r.HasInflightToolActivity() {
+					continue
+				}
 				// 子 Agent 进度旁路: 如果主循环因等待 dispatch_sub_react_agents
 				// 而不推进, 但 registry 中有活跃子 Agent 仍在工作 (LastActivityAt
-				// 距今 < threshold), 则视为有进度, 跳过 stall 报警和硬抢断.
+				// 距今 < threshold, 含子 Agent 的 in-flight 工具), 则视为有进度,
+				// 跳过 stall 报警和硬抢断.
 				// 关键词: stall heartbeat sub-agent 旁路, dispatch 等待不误报
 				if registry := r.GetSubAgentProgressRegistry(); registry != nil && registry.IsAnyActive() {
 					subActivity := registry.AggregateLastActivityAt()

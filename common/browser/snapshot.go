@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var interactiveRoles = map[string]bool{
@@ -96,6 +97,37 @@ func takeSnapshot(page *rod.Page, refMap *RefMap) (*SnapshotResult, error) {
 		RefMap:    refMap,
 		NodeCount: len(result.Nodes),
 	}, nil
+}
+
+// ListInteractive snapshots the page and returns interactive AX nodes as
+// {ref, role, name} maps. ref is the "@eN" form expected by page.Click / Fill.
+func (p *BrowserPage) ListInteractive() []map[string]any {
+	if p == nil || p.page == nil {
+		return []map[string]any{}
+	}
+	snap, err := p.Snapshot()
+	if err != nil {
+		log.Debugf("ListInteractive: %v", err)
+		return []map[string]any{}
+	}
+	if snap == nil || snap.RefMap == nil {
+		return []map[string]any{}
+	}
+	n := snap.RefMap.Count()
+	out := make([]map[string]any, 0, n)
+	for i := 1; i <= n; i++ {
+		key := fmt.Sprintf("e%d", i)
+		entry, ok := snap.RefMap.Get(key)
+		if !ok || entry == nil {
+			continue
+		}
+		out = append(out, map[string]any{
+			"ref":  "@" + key,
+			"role": entry.Role,
+			"name": entry.Name,
+		})
+	}
+	return out
 }
 
 func buildSnapshotTree(node *proto.AccessibilityAXNode, nodeMap map[string]*proto.AccessibilityAXNode) *snapshotNode {

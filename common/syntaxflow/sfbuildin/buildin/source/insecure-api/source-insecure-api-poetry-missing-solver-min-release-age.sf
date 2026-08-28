@@ -1,0 +1,50 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Poetry Missing Solver Min Release Age"
+	title_zh: "检测到Poetry Missing Solver Min Release Age",
+	type: vuln
+	level: middle
+	rule_id: "source-insecure-api-poetry-missing-solver-min-release-age"
+	risk: "Security"
+	desc: <<<DESC
+Migrated from Semgrep rule `poetry-missing-solver-min-release-age` (/tmp/semgrep-rules/package_managers/poetry/poetry-missing-solver-min-release-age.yaml).
+Original message: This poetry.toml does not set a dependency cooldown via `solver.min-release-age`. Without a cooldown, Poetry may resolve newly published package versions that have not yet been vetted by the community. Supply chain attacks frequently involve publishing a malicious version of a popular package and waiting for it to be pulled in — most are detected and removed within days. Set `min-release-age = 7` under `[solver]` to require that package versions are at least 7 days old before they are considered during dependency resolution. Added in: v2.4.0
+
+CWE: CWE-829: Inclusion of Functionality from Untrusted Control Sphere
+References:
+- https://python-poetry.org/docs/configuration/#solvermin-release-age
+DESC
+	solution: <<<SOLUTION
+Review the flagged code and follow the framework's secure coding guidance: use safe APIs, escape output, and avoid hardcoded credentials.
+SOLUTION
+	alert_min: 1
+	"file://pos/poetry.toml": <<<POS
+[solver]
+1
+Q=2@L D
+Vk[X[Be- g"CNVZ
+ L6um,A5;+(P&$"b V(
+(
+ kKc
+---
+
+POS
+	"safefile://neg.sample": <<<NEG
+# safe sample
+no secrets here
+just regular code
+NEG
+)
+
+${/.*\/poetry\.toml/}.pattern_regex(/(?m)^\[solver\]\n(?:^(?!min-release-age|\[|---).*\n)*(?=^\[|^---|\z)/) as $p0
+${/.*\/poetry\.toml/}.pattern_regex(/(?ms)^\[solver\](?:[^\[]*?)min-release-age\s*=\s*(?P<TARGET>"[^"]*"|[0-6](?:\s|#|$)|false)/) as $p1
+${/.*\/config\.toml/}.pattern_regex(/(?m)^\[solver\]\n(?:^(?!min-release-age|\[|---).*\n)*(?=^\[|^---|\z)/) as $p2
+${/.*\/config\.toml/}.pattern_regex(/(?ms)^\[solver\](?:[^\[]*?)min-release-age\s*=\s*(?P<TARGET>"[^"]*"|[0-6](?:\s|#|$)|false)/) as $p3
+$p0 + $p1 + $p2 + $p3 as $hit
+alert $hit for {
+	level: "middle",
+	title: "Poetry Missing Solver Min Release Age",
+	title_zh: "检测到Poetry Missing Solver Min Release Age",
+	message: "Poetry Missing Solver Min Release Age",
+}

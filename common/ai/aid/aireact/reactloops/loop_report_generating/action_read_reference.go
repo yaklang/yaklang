@@ -49,7 +49,7 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				startLog = fmt.Sprintf("读取参考文件: %s (lines %d-%d)", filePath, startLine, endLine)
 			}
 			reactloops.EmitActionLog(loop, readReferenceNodeID, startLog)
-			reactloops.EmitStatus(loop, "读取参考文件中 / Reading reference file...")
+			reactloops.EmitStatusI18n(loop, "读取参考文件中", "Reading reference file...")
 
 			log.Infof("read_reference_file: reading file %s (lines %d-%d)", filePath, startLine, endLine)
 
@@ -113,7 +113,7 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				filePath, len(resultContent), len(lines), summary)
 			op.Feedback(feedback)
 
-			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitStatusI18n(loop, "完成", "Complete")
 
 			log.Infof("read_reference_file: completed, added to collected references")
 		},

@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/minimartian/h2"
 	"github.com/yaklang/yaklang/common/minimartian/mitm"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -73,7 +74,26 @@ func MITM_EnableWebsocketCompression(b bool) MITMConfig {
 
 func MITM_RandomJA3(b bool) MITMConfig {
 	return func(server *MITMServer) error {
-		server.randomJA3 = b
+		if b {
+			server.tlsFingerprint = netx.DefaultTLSFingerprint
+		} else {
+			server.tlsFingerprint = ""
+		}
+		return nil
+	}
+}
+
+// MITM_TLSFingerprint selects the TLS fingerprint used for ordinary upstream
+// TLS connections. An empty name explicitly restores the native Go/GMTLS
+// ClientHello.
+func MITM_TLSFingerprint(name string) MITMConfig {
+	return func(server *MITMServer) error {
+		if name != "" {
+			if _, err := netx.GetClientHelloProfile(name); err != nil {
+				return err
+			}
+		}
+		server.tlsFingerprint = name
 		return nil
 	}
 }
@@ -827,6 +847,16 @@ func MITM_SetExtraIncomingConnectionChannelLegacy(ch chan net.Conn) MITMConfig {
 			}
 		}()
 		server.extraIncomingConnChans = append(server.extraIncomingConnChans, wrappedChan)
+		return nil
+	}
+}
+
+// MITM_SetHTTPStreamRecorderFactory configures incremental persistence for
+// long-lived streaming responses (e.g. SSE) before the ordinary response
+// mirror runs. A nil factory disables stream recording.
+func MITM_SetHTTPStreamRecorderFactory(f minimartian.HTTPStreamRecorderFactory) MITMConfig {
+	return func(server *MITMServer) error {
+		server.streamRecorderFactory = f
 		return nil
 	}
 }

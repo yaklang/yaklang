@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
-	"os"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -318,9 +317,7 @@ func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp
 const (
 	// Responses dominate project-DB bloat; cap above fuzzer/MITM limits (~4–5MB) but below huge scan bodies.
 	maxStoredHTTPFlowResponseBodyBytes = 5 * 1024 * 1024
-	// Requests can be large uploads (MITM/fuzzer); keep a higher cap so history stays usable.
-	maxStoredHTTPFlowRequestBodyBytes = 16 * 1024 * 1024
-	storedHTTPFlowTruncateNotice      = "[[yakit: body truncated for storage]]"
+	storedHTTPFlowTruncateNotice       = "[[yakit: body truncated for storage]]"
 )
 
 // truncateHTTPPacketBodyForStorage caps HTTP body stored in project DB to slow index/bloat growth.
@@ -381,11 +378,6 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	reqRaw, isTooLargeRequest, tooLargeReqHeaderFile, tooLargeReqBodyFile, requestBodyLen, err := applyPreparedLargeRequestSpill(reqIns, reqRaw)
 	if err != nil {
 		return nil, utils.Errorf("spill large request failed: %s", err)
-	}
-
-	if !isTooLargeRequest {
-		reqRaw = truncateHTTPPacketBodyForStorage(reqRaw, maxStoredHTTPFlowRequestBodyBytes)
-		requestBodyLen = requestBodyLengthFromPacket(reqRaw)
 	}
 
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketViewEx(reqRaw, func(m string, r string, proto string) error {
@@ -1046,15 +1038,31 @@ func InsertHTTPFlowEx(i *schema.HTTPFlow, forceSync bool, finishHandler ...func(
 		i.RuntimeTiming.ProjectGeneration = binding.Generation
 	}
 	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() || forceSync {
-		return InsertHTTPFlow(binding.Database, i)
+		err := InsertHTTPFlow(binding.Database, i)
+		if err != nil {
+			cleanupDiscardedHTTPFlowRequestResources(i)
+			return err
+		}
+		for _, h := range finishHandler {
+			h()
+		}
+		return nil
 	} else {
-		return enqueueDBSaveTo(binding.Database, func(db *gorm.DB) error {
+		err := enqueueDBSaveTo(binding.Database, func(db *gorm.DB) error {
 			err := InsertHTTPFlow(db, i)
+			if err != nil {
+				cleanupDiscardedHTTPFlowRequestResources(i)
+				return err
+			}
 			for _, h := range finishHandler {
 				h()
 			}
-			return err
+			return nil
 		})
+		if err != nil {
+			cleanupDiscardedHTTPFlowRequestResources(i)
+		}
+		return err
 	}
 }
 
@@ -1176,77 +1184,144 @@ func GetHTTPFlowByHiddenIndex(db *gorm.DB, index string) (*schema.HTTPFlow, erro
 }
 
 func DeleteHTTPFlowByID(db *gorm.DB, id int64) error {
-	// Clean up multipart sidecar parts derived from the spilled body file
-	// before the row is removed, since the body/header file paths live only
-	// on the flow record. (Flat spill file cleanup is a separate concern.)
-	if flow, err := GetHTTPFlow(db, id); err == nil && flow != nil {
-		cleanupMultipartSidecar(flow.TooLargeRequestBodyFile)
-		if flow.TooLargeRequestHeaderFile != "" {
-			_ = os.Remove(flow.TooLargeRequestHeaderFile)
-		}
-	}
+	flow, _ := GetHTTPFlow(db, id)
 	if db := db.Model(&schema.HTTPFlow{}).Where(
 		"id = ?", id,
 	).Unscoped().Delete(&schema.HTTPFlow{}); db.Error != nil {
 		return db.Error
 	}
+	cleanupHTTPFlowRequestResources(db, flow)
 	return nil
 }
 
 func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 	if req.GetDeleteAll() {
+		var flows []*schema.HTTPFlow
+		query := db.Model(&schema.HTTPFlow{}).Select(
+			"id, too_large_request_header_file, too_large_request_body_file",
+		).Find(&flows)
+		if query.Error != nil {
+			return query.Error
+		}
 		if err := schema.DropRecreateTable(db, &schema.HTTPFlow{}); err != nil {
 			log.Errorf("drop recreate http_flows failed: %s", err)
 			return err
 		}
+		for _, flow := range flows {
+			cleanupHTTPFlowRequestResources(db, flow)
+		}
+		cleanupAllBareRequestResources(db)
 		DeleteProjectKeyBareRequestAndResponse(db)
 		return nil
 	}
 
 	if len(req.GetId()) > 0 {
-		db = db.Or("false")
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetId())
-		// for _, id := range req.GetId() {
-		// 	db = db.Or("id = ?", id)
-		// }
-		db.Unscoped().Delete(&schema.HTTPFlow{})
-		return nil
+		query := db.Model(&schema.HTTPFlow{}).Or("false")
+		query = bizhelper.ExactQueryInt64ArrayOr(query, "id", req.GetId())
+		return deleteHTTPFlowsWithRequestResourceCleanup(db, query)
 	}
 
 	if req.GetFilter() != nil {
-		db = FilterHTTPFlow(db, req.GetFilter())
-		db.Unscoped().Delete(&schema.HTTPFlow{})
-		return nil
+		query := FilterHTTPFlow(db.Model(&schema.HTTPFlow{}), req.GetFilter())
+		return deleteHTTPFlowsWithRequestResourceCleanup(db, query)
 	}
 
 	if req.GetURLPrefix() != "" {
-		db = db.Model(&schema.HTTPFlow{})
-		db = bizhelper.FuzzQueryLike(db, "url", req.GetURLPrefix()).Unscoped().Delete(&schema.HTTPFlow{})
-		if db.Error != nil {
-			return nil
-		}
-		return nil
+		query := bizhelper.FuzzQueryLike(db.Model(&schema.HTTPFlow{}), "url", req.GetURLPrefix())
+		return deleteHTTPFlowsWithRequestResourceCleanup(db, query)
 	}
 
 	if req.GetItemHash() != nil {
-		db = db.Model(&schema.HTTPFlow{})
-		db = bizhelper.ExactQueryStringArrayOr(db, "hash", req.GetItemHash())
-		if db := db.Where("true").Unscoped().Delete(&schema.HTTPFlow{}); db.Error != nil {
-			return db.Error
-		}
-		return nil
+		query := bizhelper.ExactQueryStringArrayOr(db.Model(&schema.HTTPFlow{}), "hash", req.GetItemHash()).Where("true")
+		return deleteHTTPFlowsWithRequestResourceCleanup(db, query)
 	}
 
 	if len(req.GetURLPrefixBatch()) > 0 {
-		db = db.Model(&schema.HTTPFlow{})
-		db = bizhelper.FuzzQueryStringArrayOrLike(db, "url", req.GetURLPrefixBatch())
-		db = db.Unscoped().Delete(&schema.HTTPFlow{})
-		if db.Error != nil {
-			return db.Error
-		}
-		return nil
+		query := bizhelper.FuzzQueryStringArrayOrLike(db.Model(&schema.HTTPFlow{}), "url", req.GetURLPrefixBatch())
+		return deleteHTTPFlowsWithRequestResourceCleanup(db, query)
 	}
 	return nil
+}
+
+func cleanupHTTPFlowRequestResources(db *gorm.DB, flow *schema.HTTPFlow) {
+	if flow == nil {
+		return
+	}
+	removeLargeRequestSpillFiles(flow.TooLargeRequestHeaderFile, flow.TooLargeRequestBodyFile)
+
+	requestKey := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
+	if bareRequest, err := GetProjectKeyWithError(db, requestKey); err == nil {
+		CleanupFuzzableHTTPRequestResources([]byte(bareRequest))
+	}
+	keys := []string{
+		strconv.Quote(requestKey),
+		strconv.Quote(strconv.FormatUint(uint64(flow.ID), 10) + "_response"),
+	}
+	_ = db.Where("key IN (?)", keys).Unscoped().Delete(&schema.ProjectGeneralStorage{}).Error
+}
+
+// cleanupDiscardedHTTPFlowRequestResources releases sidecars owned by a Flow
+// that definitively will not be persisted. Unlike deletion cleanup it does not
+// touch bare-request KV rows because a discarded Flow has no stable database
+// identity.
+func cleanupDiscardedHTTPFlowRequestResources(flow *schema.HTTPFlow) {
+	if flow == nil {
+		return
+	}
+	removeLargeRequestSpillFiles(flow.TooLargeRequestHeaderFile, flow.TooLargeRequestBodyFile)
+	flow.TooLargeRequestHeaderFile = ""
+	flow.TooLargeRequestBodyFile = ""
+}
+
+func cleanupAllBareRequestResources(db *gorm.DB) {
+	var rows []*schema.ProjectGeneralStorage
+	if query := db.Model(&schema.ProjectGeneralStorage{}).Where("\"group\" = ?", BARE_REQUEST_GROUP).Find(&rows); query.Error != nil {
+		return
+	}
+	for _, row := range rows {
+		value, err := strconv.Unquote(row.Value)
+		if err == nil {
+			CleanupFuzzableHTTPRequestResources([]byte(value))
+		}
+	}
+}
+
+func deleteHTTPFlowsWithRequestResourceCleanup(db, query *gorm.DB) error {
+	var flows []*schema.HTTPFlow
+	if result := query.Select(
+		"id, too_large_request_header_file, too_large_request_body_file",
+	).Find(&flows); result.Error != nil {
+		return result.Error
+	}
+	if len(flows) == 0 {
+		return nil
+	}
+	ids := make([]uint, 0, len(flows))
+	for _, flow := range flows {
+		ids = append(ids, flow.ID)
+	}
+	if result := db.Where("id IN (?)", ids).Unscoped().Delete(&schema.HTTPFlow{}); result.Error != nil {
+		return result.Error
+	}
+	for _, flow := range flows {
+		cleanupHTTPFlowRequestResources(db, flow)
+	}
+	return nil
+}
+
+// FinalizeHTTPFlowTableRecreation rotates the logical project generation and
+// clears process-local live-flow state after the HTTP flow table has been
+// dropped and recreated. Callers must pass the binding captured for the
+// database on which the recreation succeeded.
+func FinalizeHTTPFlowTableRecreation(binding consts.ProjectDatabaseBinding) {
+	if binding.Generation == 0 {
+		return
+	}
+	_, _ = consts.AdvanceProjectDatabaseGeneration(binding.Generation)
+	ResetHTTPFlowRuntimeState(
+		HTTPFlowDatabaseIdentity(binding.Path),
+		binding.Generation,
+	)
 }
 
 func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {

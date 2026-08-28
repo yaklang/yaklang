@@ -1,0 +1,89 @@
+desc(
+	title: "C Use After Free and Double Free"
+	type: audit
+	level: high
+	risk: "释放后使用"
+	lang: c
+	rule_id: "a3b8c1d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+	title_zh: "C 语言 Use-After-Free / Double-Free 检测"
+	desc: <<<DESC
+### 漏洞描述
+
+检测堆对象在 `free` / 等价释放之后仍被解引用或再次释放的路径（CWE-416）。
+
+分析基于 SSA 生命周期：跟踪 `malloc`/`calloc`/`realloc` 分配与 `free`，
+覆盖过程内别名拷贝，以及简单的 free-param 跨函数摘要。
+
+命中点为 UAF 使用点（含 double-free，视为 UAF 子类）。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+
+1. `free(p)` 之后立即将 `p = NULL`，并保证所有别名同步失效。
+2. 统一所有权：同一对象只在一处释放，避免多路径重复 free。
+3. 释放后禁止再读写成员 / 解引用；必要时先拷贝所需数据再释放。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-416: Use After Free](https://cwe.mitre.org/data/definitions/416.html)
+REFERENCE
+)
+
+// 1. 定位 free 调用
+free(* as $free_arg)
+// 2. 确定被释放的指针
+$free_arg #-> as $ptr
+// 3. 判断该指针是否存在 UAF / double-free
+$ptr<uaf()> as $uaf
+
+alert $uaf for {
+	title: "Use After Free",
+	title_zh: "释放后使用",
+	level: "high",
+	risk: "释放后使用",
+	desc: <<<DESC
+指针在 free 之后仍被解引用，或对同一对象二次 free
+DESC
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_uaf.c': <<<UNSAFE
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    *p = 10;
+    free(p);
+    *p = 20;
+    return 0;
+}
+UNSAFE
+	'file://unsafe_double_free.c': <<<UNSAFE2
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    free(p);
+    free(p);
+    return 0;
+}
+UNSAFE2
+	'file://unsafe_struct_uaf.c': <<<UNSAFE3
+#include <stdlib.h>
+struct Node { int x; };
+int main() {
+    struct Node *p = (struct Node*)malloc(sizeof(struct Node));
+    free(p);
+    p->x = 1;
+    return 0;
+}
+UNSAFE3
+	'safefile://safe_free.c': <<<SAFE
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    *p = 10;
+    free(p);
+    return 0;
+}
+SAFE
+)

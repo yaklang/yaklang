@@ -1,6 +1,13 @@
 package ssaapi
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -37,6 +44,86 @@ func GetSFIncludeCache() *utils.Cache[Values] {
 
 var includeCache = createIncludeCache()
 
+type taskLocalSyntaxFlowRuleLibrariesKey struct{}
+
+type taskLocalSyntaxFlowRuleLibraries struct {
+	rules map[string]*schema.SyntaxFlowRule
+	scope string
+}
+
+// WithTaskLocalSyntaxFlowRuleLibraries binds immutable library rules to one
+// scan context. Native <include(...)> calls in that context never fall back to
+// the shared profile database, including when the requested library is absent.
+func WithTaskLocalSyntaxFlowRuleLibraries(
+	ctx context.Context,
+	rules map[string]*schema.SyntaxFlowRule,
+) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cloned := make(map[string]*schema.SyntaxFlowRule, len(rules))
+	for name, rule := range rules {
+		trimmed := strings.TrimSpace(name)
+		if trimmed != "" && rule != nil {
+			cloned[trimmed] = rule
+		}
+	}
+	names := make([]string, 0, len(cloned))
+	for name := range cloned {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	hasher := sha256.New()
+	for _, name := range names {
+		_, _ = hasher.Write([]byte(name))
+		_, _ = hasher.Write([]byte{0})
+		_, _ = hasher.Write([]byte(taskLocalSyntaxFlowRuleCacheHash(cloned[name])))
+		_, _ = hasher.Write([]byte{0})
+	}
+	return context.WithValue(ctx, taskLocalSyntaxFlowRuleLibrariesKey{}, taskLocalSyntaxFlowRuleLibraries{
+		rules: cloned,
+		scope: hex.EncodeToString(hasher.Sum(nil)),
+	})
+}
+
+func resolveSyntaxFlowIncludeRule(
+	ctx context.Context,
+	ruleName string,
+) (*schema.SyntaxFlowRule, bool, error) {
+	if ctx != nil {
+		if binding, ok := ctx.Value(taskLocalSyntaxFlowRuleLibrariesKey{}).(taskLocalSyntaxFlowRuleLibraries); ok {
+			rule, exists := binding.rules[strings.TrimSpace(ruleName)]
+			if !exists || rule == nil {
+				return nil, true, fmt.Errorf(
+					"task-local syntaxflow library %q is not present in the prepared rule snapshot",
+					ruleName,
+				)
+			}
+			return rule, true, nil
+		}
+	}
+	rule, err := sfdb.GetLibrary(ruleName)
+	return rule, false, err
+}
+
+func taskLocalSyntaxFlowRuleScope(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	binding, _ := ctx.Value(taskLocalSyntaxFlowRuleLibrariesKey{}).(taskLocalSyntaxFlowRuleLibraries)
+	return binding.scope
+}
+
+func taskLocalSyntaxFlowRuleCacheHash(rule *schema.SyntaxFlowRule) string {
+	if rule == nil {
+		return ""
+	}
+	// SyntaxFlowRule.CalcHash mutates rule.Hash. Task-local rules preserve the
+	// published content_hash as execution metadata, so cache identity must be
+	// calculated without overwriting that value.
+	return utils.CalcSha256(rule.RuleId, rule.RuleName, rule.Content, rule.Tag)
+}
+
 func createIncludeCache() *utils.Cache[Values] {
 	return utils.NewTTLCache[Values]()
 }
@@ -66,15 +153,18 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 		return false, nil, utils.Error("no rule name found")
 	}
 
-	hash, ret, shouldCache := GetIncludeCacheValue(parent, ruleName, inputs)
-	if ret != nil {
-		return true, ret, nil
-	}
-
-	rule, err := sfdb.GetLibrary(ruleName)
+	rule, taskLocal, err := resolveSyntaxFlowIncludeRule(frame.GetConfig().GetContext(), ruleName)
 	if err != nil {
 		log.Warnf("get syntaxflow rule library %v error: %v", ruleName, err)
 		return false, nil, err
+	}
+	cacheKey := ruleName
+	if taskLocal {
+		cacheKey = taskLocalSyntaxFlowRuleScope(frame.GetConfig().GetContext()) + ":" + ruleName + ":" + taskLocalSyntaxFlowRuleCacheHash(rule)
+	}
+	hash, ret, shouldCache := GetIncludeCacheValue(parent, cacheKey, inputs)
+	if ret != nil {
+		return true, ret, nil
 	}
 	var queryValue sfvm.Values
 	if len(inputs) == 0 {

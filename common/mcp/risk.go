@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -38,7 +39,7 @@ func init() {
 				mcp.WithDescription("Page vulnerability/risk records from scans, plugins, MITM, or OOB. Returns title, severity, riskType, reverseToken, request/response, programName for SSA findings"),
 			}, filterRisksToolOptions...)...,
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QueryRisksRequest) (any, error) {
-			return s.grpcClient.QueryRisks(ctx, req)
+			return queryRisks(ctx, s, req)
 		}, "failed to query risks")),
 
 		WithTool(mcp.NewTool("query_risk",
@@ -87,4 +88,23 @@ func init() {
 			return "set tag for risk success", nil
 		}, "failed to set tag for risk")),
 	)
+}
+
+func queryRisks(ctx context.Context, s *MCPServer, req *ypb.QueryRisksRequest) (*ypb.QueryRisksResponse, error) {
+	db := s.getProjectDatabase()
+	if db == nil {
+		return s.grpcClient.QueryRisks(ctx, req)
+	}
+	p, data, err := yakit.QueryRisks(db, req)
+	if err != nil {
+		return nil, err
+	}
+	rsp := &ypb.QueryRisksResponse{
+		Pagination: req.Pagination,
+		Total:      int64(p.TotalRecord),
+	}
+	for _, r := range data {
+		rsp.Data = append(rsp.Data, r.ToGRPCModel())
+	}
+	return rsp, nil
 }

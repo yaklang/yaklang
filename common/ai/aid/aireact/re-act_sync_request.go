@@ -334,7 +334,11 @@ func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent
 
 func (r *ReAct) HandleSyncTypeReactCancelCurrentTaskEvent(event *ypb.AIInputEvent) error {
 	// 中断当前正在执行的任务
-	currentTask := r.GetCurrentTask()
+	currentTask := r.getProcessingRuntimeTask()
+	if currentTask == nil {
+		// Pure-invoker callers and legacy tests may not populate RuntimeTasks.
+		currentTask = r.GetCurrentTask()
+	}
 	if currentTask == nil {
 		r.EmitError("no current task to cancel")
 		return nil

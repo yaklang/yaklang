@@ -75,6 +75,7 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+
 	triage := &AIMemoryTriage{
 		ctx:                ctx,
 		cancel:             cancel,

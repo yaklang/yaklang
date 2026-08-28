@@ -330,7 +330,6 @@ func initYaklangLib() {
 
 	// sca
 	yaklang.Import("sca", sca.Exports)
-
 	// git
 	yaklang.Import("git", yakgit.Exports)
 

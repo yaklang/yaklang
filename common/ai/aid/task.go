@@ -290,6 +290,8 @@ func (t *AiTask) GetSummary() string {
 }
 
 func (t *AiTask) GetSuccessCallCount() int {
+	// Legacy API name: Success means the tool-call protocol completed. It does
+	// not measure command/HTTP/task outcome.
 	count := 0
 	for _, v := range t.GetAllToolCallResults() {
 		if v.Success {
@@ -300,6 +302,7 @@ func (t *AiTask) GetSuccessCallCount() int {
 }
 
 func (t *AiTask) GetFailCallCount() int {
+	// Legacy API name: failure means the invocation protocol did not complete.
 	count := 0
 	for _, v := range t.GetAllToolCallResults() {
 		if !v.Success {

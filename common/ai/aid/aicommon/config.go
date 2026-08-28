@@ -40,6 +40,7 @@ import (
 const DefaultPeriodicVerificationInterval = 20
 const DefaultGoalMinIterations = 6
 const GoalModeIterationBuffer = 2
+
 // DefaultMaxSubAgentConcurrency 是子 Agent 默认最大并发数（同时运行数量）。
 const DefaultMaxSubAgentConcurrency = 5
 
@@ -214,6 +215,7 @@ type Config struct {
 	AiCallTokenLimit       int64
 	AiAutoRetry            int64
 	AiTransactionAutoRetry int64
+	aiRetryWaitFunc        func(context.Context, time.Duration) error
 	PromptHook             func(string) string
 
 	/*
@@ -244,10 +246,10 @@ type Config struct {
 	DisableToolUse               bool
 	AiToolManagerOption          []buildinaitools.ToolManagerOption
 	EnableAISearch               bool
-	DisableWebSearch             bool // disable enhanced web search tool, default false (enabled)
-	DisallowMCPServers           bool // 禁用 MCP Servers，默认为 false（即默认启用）
-	EnableDispatchSubReactAgents bool // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
-	PreferDispatchSubReactAgents bool // Bias the top-level loop toward dispatch_sub_react_agents for parallelizable work.
+	DisableWebSearch             bool  // disable enhanced web search tool, default false (enabled)
+	DisallowMCPServers           bool  // 禁用 MCP Servers，默认为 false（即默认启用）
+	EnableDispatchSubReactAgents bool  // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
+	PreferDispatchSubReactAgents bool  // Bias the top-level loop toward dispatch_sub_react_agents for parallelizable work.
 	MaxSubAgents                 int64 // Max simultaneous sub-agent concurrency (multi-agent mode).
 
 	// ExtraMCPServers 会话级显式挂载的 MCP server（不读 profile DB、不进全局列表）。
@@ -440,8 +442,10 @@ type AICallbacks struct {
 	Original           AICallbackType
 	QualityPriorityRaw AICallbackType
 	SpeedPriorityRaw   AICallbackType
+	VisionPriorityRaw  AICallbackType
 	QualityPriority    AICallbackType
 	SpeedPriority      AICallbackType
+	VisionPriority     AICallbackType
 }
 
 func (callbacks *AICallbacks) RawClone() *AICallbacks {
@@ -452,6 +456,7 @@ func (callbacks *AICallbacks) RawClone() *AICallbacks {
 		Original:           callbacks.Original,
 		QualityPriorityRaw: callbacks.QualityPriorityRaw,
 		SpeedPriorityRaw:   callbacks.SpeedPriorityRaw,
+		VisionPriorityRaw:  callbacks.VisionPriorityRaw,
 	}
 }
 
@@ -479,13 +484,21 @@ func (c *Config) setSpeedPriorityAICallbackLocked(cb AICallbackType) {
 	callbacks.SpeedPriority = c.wrapper(cb, consts.TierLightweight)
 }
 
+func (c *Config) setVisionPriorityAICallbackLocked(cb AICallbackType) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.VisionPriorityRaw = cb
+	callbacks.VisionPriority = c.wrapper(cb, consts.TierVision)
+}
+
 func (c *Config) setFastAICallbackLocked(cb AICallbackType) {
 	callbacks := c.ensureAICallbacks()
 	callbacks.Original = cb
 	callbacks.QualityPriorityRaw = nil
 	callbacks.SpeedPriorityRaw = nil
+	callbacks.VisionPriorityRaw = nil
 	callbacks.QualityPriority = nil
 	callbacks.SpeedPriority = nil
+	callbacks.VisionPriority = nil
 }
 
 func (c *Config) setAICallbacksLocked(callbacks *AICallbacks) {
@@ -496,6 +509,7 @@ func (c *Config) setAICallbacksLocked(callbacks *AICallbacks) {
 	c.setOriginalAICallbackLocked(callbacks.Original)
 	c.setQualityPriorityAICallbackLocked(callbacks.QualityPriorityRaw)
 	c.setSpeedPriorityAICallbackLocked(callbacks.SpeedPriorityRaw)
+	c.setVisionPriorityAICallbackLocked(callbacks.VisionPriorityRaw)
 }
 
 func (c *Config) GetRawAICallbacks() *AICallbacks {
@@ -529,6 +543,14 @@ func (c *Config) GetSpeedPriorityAICallback() AICallbackType {
 	return callbacks.SpeedPriority
 }
 
+func (c *Config) GetVisionPriorityAICallback() AICallbackType {
+	if c == nil {
+		return nil
+	}
+	callbacks := c.ensureAICallbacks()
+	return callbacks.VisionPriority
+}
+
 func (c *Config) GetQualityPriorityRawAICallback() AICallbackType {
 	if c == nil {
 		return nil
@@ -543,6 +565,14 @@ func (c *Config) GetSpeedPriorityRawAICallback() AICallbackType {
 	}
 	callbacks := c.ensureAICallbacks()
 	return callbacks.SpeedPriorityRaw
+}
+
+func (c *Config) GetVisionPriorityRawAICallback() AICallbackType {
+	if c == nil {
+		return nil
+	}
+	callbacks := c.ensureAICallbacks()
+	return callbacks.VisionPriorityRaw
 }
 
 // NewConfig creates a new Config with options
@@ -679,6 +709,7 @@ func newConfig(ctx context.Context) *Config {
 		m:                                  new(sync.Mutex),
 		InitStatus:                         initStatus,
 		AiCallTokenLimit:                   40 * 1024, // Default to 40 k
+		aiRetryWaitFunc:                    aiRetryWaitFuncFromContext(ctx),
 		SessionPromptState:                 NewSessionPromptState(),
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
@@ -834,6 +865,7 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 		c.setOriginalAICallbackLocked(oCb)
 		c.setQualityPriorityAICallbackLocked(cb)
 		c.setSpeedPriorityAICallbackLocked(cb)
+		c.setVisionPriorityAICallbackLocked(cb)
 		c.m.Unlock()
 		return nil
 	}
@@ -874,7 +906,7 @@ func WithInheritTieredAICallback(parent *Config, force bool) ConfigOption {
 		if raw == nil {
 			return nil
 		}
-		if raw.QualityPriorityRaw == nil && raw.SpeedPriorityRaw == nil && !force {
+		if raw.QualityPriorityRaw == nil && raw.SpeedPriorityRaw == nil && raw.VisionPriorityRaw == nil && !force {
 			return nil
 		}
 		if c.m == nil {
@@ -949,8 +981,21 @@ func WithSpeedPriorityAICallback(cb AICallbackType) ConfigOption {
 	}
 }
 
-// WithTieredAICallback configures both quality and speed priority callbacks using tiered AI configuration
-// This automatically uses intelligent model for quality priority and lightweight model for speed priority
+// WithVisionPriorityAICallback sets the session-scoped callback for image understanding.
+func WithVisionPriorityAICallback(cb AICallbackType) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.setVisionPriorityAICallbackLocked(cb)
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithTieredAICallback configures quality, speed, and vision callbacks using tiered AI configuration.
+// It maps intelligent models to quality, lightweight models to speed, and vision models to image understanding.
 func WithTieredAICallback() ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -991,6 +1036,16 @@ func WithTieredAICallback() ConfigOption {
 			log.Debugf("Configured speed priority callback from lightweight model")
 		} else {
 			log.Warnf("Failed to load lightweight model callback: %v", err)
+		}
+
+		visionCB, err := GetVisionAIModelCallback()
+		if err == nil {
+			c.m.Lock()
+			c.setVisionPriorityAICallbackLocked(visionCB)
+			c.m.Unlock()
+			log.Debugf("Configured vision priority callback from vision model")
+		} else {
+			log.Warnf("Failed to load vision model callback: %v", err)
 		}
 
 		return nil
@@ -1110,6 +1165,7 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 			c.setOriginalAICallbackLocked(defaultCallback)
 			c.setQualityPriorityAICallbackLocked(defaultCallback)
 			c.setSpeedPriorityAICallbackLocked(defaultCallback)
+			c.setVisionPriorityAICallbackLocked(defaultCallback)
 			c.m.Unlock()
 		}
 		return nil
@@ -1130,6 +1186,31 @@ func WithAITransactionAutoRetry(n int64) ConfigOption {
 		c.m.Unlock()
 		return nil
 	}
+}
+
+// WithAIRetryWaitFunc overrides how retry delays are waited. It is primarily
+// useful for deterministic tests that need to observe retries without sleeping
+// for the production backoff duration. A nil function restores the default,
+// context-aware timer.
+func WithAIRetryWaitFunc(wait func(context.Context, time.Duration) error) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.aiRetryWaitFunc = wait
+		c.Ctx = withAIRetryWaitFuncContext(c.Ctx, wait)
+		return nil
+	}
+}
+
+// GetAIRetryWaitFunc returns the configured retry waiter for child runtimes.
+func (c *Config) GetAIRetryWaitFunc() func(context.Context, time.Duration) error {
+	if c == nil {
+		return nil
+	}
+	return c.aiRetryWaitFunc
 }
 
 func WithAiCallTokenLimit(limit int64) ConfigOption {
@@ -4042,6 +4123,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.AiAutoRetry > 0 {
 		opts = append(opts, WithAIAutoRetry(i.AiAutoRetry))
+	}
+	if i.aiRetryWaitFunc != nil {
+		opts = append(opts, WithAIRetryWaitFunc(i.aiRetryWaitFunc))
 	}
 	if i.AiCallTokenLimit > 0 {
 		opts = append(opts, WithAiCallTokenLimit(i.AiCallTokenLimit))

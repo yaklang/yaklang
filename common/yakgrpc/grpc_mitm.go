@@ -3,12 +3,12 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -32,7 +32,7 @@ import (
 	"github.com/yaklang/yaklang/common/crep/trafficguard"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -145,23 +145,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	})
 	feedbackToUser := feedbackFactory(s.GetProjectDatabase(), execFeedback, false, "")
 
-	getPlainRequestBytes := func(req *http.Request) []byte {
-		if req != nil && httpctx.GetRequestTooLarge(req) {
-			if cached := httpctx.GetRequestDisplayPacket(req); len(cached) > 0 {
-				return cached
-			}
-		}
-		var plainRequest []byte
-		if httpctx.GetRequestIsModified(req) {
-			plainRequest = httpctx.GetHijackedRequestBytes(req)
-		} else {
-			plainRequest = httpctx.GetPlainRequestBytes(req)
-			if len(plainRequest) <= 0 {
-				plainRequest = decodeAndCachePlainRequestBytesIfStorable(req, httpctx.GetBareRequestBytes(req))
-			}
-		}
-		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
-	}
+	getPlainRequestBytes := getMITMDisplayRequestBytes
 	getPlainResponseBytes := func(req *http.Request) []byte {
 		var plainResponse []byte
 		if httpctx.GetResponseIsModified(req) {
@@ -840,13 +824,28 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetPlainResponseBytes(req, plainResponse)
 			rsp = plainResponse
 		}
+		plainResponseHash := codec.Sha256(plainResponse)
 
 		// use handled request
 		plainRequest := getPlainRequestBytes(req)
 
-		plainResponseHash := codec.Sha256(plainResponse)
+		// 插件 Hook 的判定基准: 插件收到的是原始 plainResponse, 原样返回时不应被误判为修改。
 		handleResponseModified := func(r []byte) bool {
 			if codec.Sha256(r) != plainResponseHash {
+				return true
+			}
+			return false
+		}
+		// 规则 Hook 的判定基准: 规则在 FixHTTPResponse 规范化后的报文上匹配/替换,
+		// 因此"是否被规则修改"应比较 规范化报文 vs 规则处理结果, 而不是原始报文 vs 结果;
+		// 否则未命中规则时, 规范化造成的字节差异(如 Content-Type 重组)会被误判为规则修改。
+		ruleHookBaseline, _, err := lowhttp.FixHTTPResponse(plainResponse)
+		if err != nil {
+			ruleHookBaseline = plainResponse
+		}
+		ruleHookBaselineHash := codec.Sha256(ruleHookBaseline)
+		handleRuleResponseModified := func(r []byte) bool {
+			if codec.Sha256(r) != ruleHookBaselineHash {
 				return true
 			}
 			return false
@@ -934,7 +933,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					return nil
 				}
 				httpctx.AppendMatchedRule(req, rules...)
-				if handleResponseModified(rspHooked) {
+				if handleRuleResponseModified(rspHooked) {
 					httpctx.SetResponseModified(req, "yakit.rule.hook")
 					httpctx.SetHijackedResponseBytes(req, rspHooked)
 				}
@@ -973,7 +972,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 			return nil
 		}
-		if handleResponseModified(rsp1) {
+		if handleRuleResponseModified(rsp1) {
 			rsp = rsp1
 		}
 		httpctx.AppendMatchedRule(req, rules...)
@@ -991,7 +990,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return rsp
 		}
 
-		rsp, _, err := lowhttp.FixHTTPResponse(rsp)
+		rsp, _, err = lowhttp.FixHTTPResponse(rsp)
 		if err != nil {
 			log.Errorf("fix http response packet failed: %s", err)
 			return originRspRaw
@@ -1057,7 +1056,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			response := reqInstance.GetResponse()
-			if handleResponseModified(response) {
+			if handleRuleResponseModified(response) {
 				httpctx.SetResponseModified(req, "manual")
 				httpctx.SetHijackedResponseBytes(req, response)
 			}
@@ -1561,13 +1560,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					return originReqRaw
 				}
 
-				current := reqInstance.GetRequest()
-				if bytes.Contains(current, []byte{'{', '{'}) || bytes.Contains(current, []byte{'}', '}'}) {
-					// 在这可能包含 fuzztag
-					result := mutate.MutateQuick(current)
-					if len(result) > 0 {
-						current = []byte(result[0])
-					}
+				current, renderErr := renderMITMSubmittedRequest(reqInstance.GetRequest())
+				if renderErr != nil {
+					log.Errorf("render manually submitted MITM request failed: %v", renderErr)
+					mitmSendRespLogged(&ypb.MITMResponse{
+						HaveNotification:    true,
+						NotificationContent: []byte(fmt.Sprintf("渲染请求中的 Fuzztag 失败：%v", renderErr)),
+					})
+					goto RECV
 				}
 				if handleRequestModified(current) {
 					setModifiedRequest("user", current)
@@ -1576,6 +1576,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 	}
+
+	streamRecorderFactory := minimartian.HTTPStreamRecorderFactory(func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte) (io.WriteCloser, error) {
+		if httpctx.IsFiltered(req) {
+			return nil, nil
+		}
+		return yakit.NewHTTPFlowStreamRecorder(s.GetProjectDatabase(), isHTTPS, req, rsp, headerBytes)
+	})
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
 		addCounter()
@@ -1590,7 +1597,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 		isModified := isRequestModified || isResponseModified
 
-		plainRequest := getPlainRequestBytes(req)
+		plainRequest := getMITMPlainRequestBytes(req)
 		plainResponse := getPlainResponseBytes(req)
 		responseOverSize := false
 		if len(plainResponse) > packetLimit {
@@ -1654,6 +1661,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}()
 		// 劫持过滤: 被过滤且未命中敏感信息的流量直接丢弃; 命中敏感信息的过滤流量继续走保存(以插件流量形式)。
 		if isFiltered && !tgSaveAsPlugin {
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				if err := recorder.Drop(); err != nil {
+					log.Warnf("drop filtered HTTP stream flow failed: %v", err)
+				}
+			}
+			yakit.CleanupPreparedLargeHTTPFlowRequest(req)
 			return
 		}
 		saveBarePacketHandler := func(id uint) {
@@ -1848,9 +1861,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// tgFindings(命中即把流量标红并生成"高危/中危" Risk), 避免二次扫描。
 			trafficguard.ApplyToFlow(s.GetProjectDatabase(), flow, tgFindings, plainRequest, plainResponse)
 			tags := flow.Tags
-			err := yakit.InsertHTTPFlowEx(flow, false, func() {
-				saveBarePacketHandler(flow.ID)
-			})
+			var err error
+			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+				err = recorder.Finalize(flow)
+				if err == nil {
+					saveBarePacketHandler(flow.ID)
+				}
+			} else {
+				err = yakit.InsertHTTPFlowEx(flow, false, func() {
+					saveBarePacketHandler(flow.ID)
+				})
+			}
 			if err != nil {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
 			} else {
@@ -1869,6 +1890,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
+		} else if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
+			if err := recorder.Drop(); err != nil {
+				log.Warnf("drop HTTP stream flow rejected by save hook failed: %v", err)
+			}
 		}
 	}
 	// 核心 MITM 服务器
@@ -1876,10 +1901,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	for _, cert := range firstReq.GetCertificates() {
 		opts = append(opts, crep.MITM_MutualTLSClient(cert.CrtPem, cert.KeyPem, cert.GetCaCertificates()...))
 	}
+	if randomJA3 {
+		opts = append(opts, crep.MITM_RandomJA3(true))
+	}
 	opts = append(opts,
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
-		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
@@ -1888,6 +1915,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetWebsocketRequestHijackRaw(handleHijackWsRequest),
 		crep.MITM_SetWebsocketResponseHijackRaw(handleHijackWsResponse),
 		crep.MITM_SetHTTPResponseMirror(handleMirrorResponse),
+		crep.MITM_SetHTTPStreamRecorderFactory(streamRecorderFactory),
 		crep.MITM_SetWebsocketHijackMode(true),
 		crep.MITM_SetHTTP2(firstReq.GetEnableHttp2()),
 		crep.MITM_MergeOptions(opts...),

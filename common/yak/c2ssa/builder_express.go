@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/lifetime"
 )
 
 func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
@@ -15,6 +16,229 @@ func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
 		return b.EmitConstInst(0)
 	}
 	return v
+}
+
+// emitHeapAllocFromArgs builds a heap allocation wrapped as PointerKind and
+// registers it for lifetime / UAF analysis.
+func (b *astbuilder) emitHeapAllocFromArgs(name string, args ssa.Values) ssa.Value {
+	var typ ssa.Type
+	switch name {
+	case "calloc":
+		// calloc(n, size) — approximate as byte slice when size is const
+		if len(args) >= 2 {
+			if c, ok := ssa.ToConstInst(args[1]); ok {
+				index, _ := strconv.Atoi(c.String())
+				st := ssa.NewSliceType(ssa.CreateByteType())
+				st.Len = index
+				typ = st
+			}
+		}
+	case "realloc":
+		if len(args) >= 2 {
+			if tv, ok := ssa.ToTypeValue(args[1]); ok {
+				typ = tv.GetType()
+			} else if c, ok := ssa.ToConstInst(args[1]); ok {
+				index, _ := strconv.Atoi(c.String())
+				st := ssa.NewSliceType(ssa.CreateByteType())
+				st.Len = index
+				typ = st
+			}
+		}
+	default: // malloc, valloc, memalign
+		if len(args) > 0 {
+			if tv, ok := ssa.ToTypeValue(args[0]); ok {
+				typ = tv.GetType()
+			} else if c, ok := ssa.ToConstInst(args[0]); ok {
+				index, _ := strconv.Atoi(c.String())
+				st := ssa.NewSliceType(ssa.CreateByteType())
+				st.Len = index
+				typ = st
+			} else if len(args) >= 2 {
+				// memalign(align, size)
+				if c, ok := ssa.ToConstInst(args[1]); ok {
+					index, _ := strconv.Atoi(c.String())
+					st := ssa.NewSliceType(ssa.CreateByteType())
+					st.Len = index
+					typ = st
+				}
+			}
+		}
+	}
+	if typ == nil {
+		typ = ssa.NewSliceType(ssa.CreateByteType())
+	}
+	return b.emitHeapPointer(typ)
+}
+
+// emitHeapPointer creates Make payload + Pointer wrapper and registers alloc.
+func (b *astbuilder) emitHeapPointer(typ ssa.Type) ssa.Value {
+	obj := b.EmitMakeBuildWithType(typ, nil, nil)
+	if utils.IsNil(obj) {
+		return b.EmitConstInst(0)
+	}
+	tmpName := fmt.Sprintf("$heap_%d", obj.GetId())
+	tmp := b.CreateLocalVariable(tmpName)
+	b.AssignVariable(tmp, obj)
+	ptr := b.EmitConstPointer(tmp)
+	if !utils.IsNil(ptr) {
+		lifetime.RegisterAlloc(ptr)
+	}
+	return ptr
+}
+
+// ensurePointerValue wraps a scalar/null as a PointerKind object so *p / p->x
+// go through the origin-pointer / member-use path. Does not RegisterAlloc.
+func (b *astbuilder) ensurePointerValue(v ssa.Value) ssa.Value {
+	if !utils.IsNil(v) && v.GetType() != nil && v.GetType().GetTypeKind() == ssa.PointerKind {
+		return v
+	}
+	if utils.IsNil(v) {
+		v = b.EmitConstInst(0)
+	}
+	tmpName := fmt.Sprintf("$pval_%d", v.GetId())
+	tmp := b.CreateLocalVariable(tmpName)
+	b.AssignVariable(tmp, v)
+	ptr := b.EmitConstPointer(tmp)
+	if utils.IsNil(ptr) {
+		return v
+	}
+	// InterfaceAddFieldBuild may infer a non-pointer type from the payload;
+	// force PointerKind so later *p / p->x take the pointer paths.
+	t := ssa.NewPointerType()
+	t.SetName("Pointer")
+	ptr.SetType(t)
+	return ptr
+}
+
+func cIsNullishConst(v ssa.Value) bool {
+	if utils.IsNil(v) {
+		return true
+	}
+	c, ok := ssa.ToConstInst(v)
+	if !ok || c == nil {
+		return false
+	}
+	s := strings.ToLower(strings.TrimSpace(c.String()))
+	return s == "0" || s == "null" || s == "nil" || s == "<nil>" || s == "nullptr"
+}
+
+// assignToVar is the single assignment channel for lvalue stores. After
+// writing left it consults the builder's starAssignExtra registry and, if left
+// was registered by starPtrAccess as a *formal store, writes the same rhs to
+// the Parameter's @pointer so UAF sees it as a member-use of the formal.
+// Callers never carry the extra lvalue — pointer-state convergence is
+// registered per-lvalue and resolved here.
+func (b *astbuilder) assignToVar(left *ssa.Variable, right ssa.Value) {
+	if left == nil || utils.IsNil(right) {
+		return
+	}
+	if b.wantPointerAssign(left) && cIsNullishConst(right) {
+		right = b.ensurePointerValue(right)
+	}
+	b.AssignVariable(left, right)
+	if extra, ok := b.starAssignExtra[left]; ok && extra != nil {
+		b.AssignVariable(extra, right)
+		delete(b.starAssignExtra, left)
+	}
+}
+
+// wantPointerAssign is true when the LHS is (or is typed as) a pointer.
+func (b *astbuilder) wantPointerAssign(left *ssa.Variable) bool {
+	if left == nil {
+		return false
+	}
+	if cur := b.PeekValue(left.GetName()); cur != nil && cur.GetType() != nil &&
+		cur.GetType().GetTypeKind() == ssa.PointerKind {
+		return true
+	}
+	if left.IsMemberCall() {
+		obj, key := left.GetMemberCall()
+		if obj != nil && key != nil {
+			if ot, ok := ssa.ToObjectType(obj.GetType()); ok && ot != nil {
+				if ft := ot.GetField(key); ft != nil && ft.GetTypeKind() == ssa.PointerKind {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// materializeStarLoad records an explicit *ptr rvalue use for NPD/UAF.
+// Stack aliases must load the live origin (GetOriginValue). Heap slots
+// (*int** after *slot = p) keep the stored @value payload.
+func (b *astbuilder) materializeStarLoad(ptr ssa.Value) ssa.Value {
+	if utils.IsNil(ptr) {
+		return b.EmitConstInst(0)
+	}
+	origin := b.GetOriginValue(ptr)
+	stored := b.ReadMemberCallValue(ptr, b.EmitConstInstPlaceholder("@value"))
+	loaded := origin
+	if starLoadPreferStored(origin) && !utils.IsNil(stored) {
+		loaded = stored
+	}
+	if utils.IsNil(loaded) {
+		loaded = stored
+	}
+	b.registerStarDeref(ptr)
+	if utils.IsNil(loaded) {
+		return b.EmitConstInst(0)
+	}
+	return loaded
+}
+
+func starLoadPreferStored(origin ssa.Value) bool {
+	if utils.IsNil(origin) || origin.GetType() == nil {
+		return true
+	}
+	switch origin.GetType().GetTypeKind() {
+	case ssa.PointerKind, ssa.SliceTypeKind, ssa.ObjectTypeKind, ssa.MapTypeKind, ssa.StructTypeKind:
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *astbuilder) registerStarDeref(ptr ssa.Value) {
+	if utils.IsNil(ptr) {
+		return
+	}
+	site := b.EmitUndefined(fmt.Sprintf("*%d", ptr.GetId()))
+	lifetime.RegisterDeref(site, ptr)
+}
+
+// starPtrAccess implements *ptr.
+// For *formal stores, two lvalues are needed: left (EmitConstPointer wrapper
+// so PointerSideEffect writes back to the caller) and the formal's @pointer
+// (so UAF sees the store as a member-use of the formal). Rather than threading
+// the second lvalue back through every caller, starPtrAccess registers
+// (left -> @pointer) in the builder's starAssignExtra map; the unified
+// assignToVar channel picks it up and writes both with the same rhs.
+func (b *astbuilder) starPtrAccess(ptr ssa.Value, ptrVar *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
+	if utils.IsNil(ptr) || ptr.GetType() == nil || ptr.GetType().GetTypeKind() != ssa.PointerKind {
+		return ptr, ptrVar
+	}
+	if isLeft {
+		if p, ok := ssa.ToParameter(ptr); ok {
+			b.ReferenceParameter(ptr.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+			if !p.IsFreeValue && ptrVar != nil {
+				extra := b.GetAndCreateOriginPointer(ptr)
+				obj := b.EmitConstPointer(ptrVar)
+				left := b.GetAndCreateOriginPointer(obj)
+				if b.starAssignExtra == nil {
+					b.starAssignExtra = make(map[*ssa.Variable]*ssa.Variable)
+				}
+				b.starAssignExtra[left] = extra
+				return b.GetOriginValue(obj), left
+			}
+		}
+		left := b.GetAndCreateOriginPointer(ptr)
+		return b.GetOriginValue(ptr), left
+	}
+	if p, ok := ssa.ToParameter(ptr); ok {
+		b.ReferenceParameter(ptr.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+	}
+	return b.materializeStarLoad(ptr), ptrVar
 }
 
 // hasBinaryExpr is cheaper than len(ast.AllExpression()) >= 2 (avoids child slice alloc).
@@ -99,7 +323,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 				return b.EmitUnOp(ssa.OpBitwiseNot, right), nil
 			case "*":
 				if right.GetType().GetTypeKind() == ssa.PointerKind {
-					return b.GetOriginValue(right), left
+					return b.materializeStarLoad(right), left
 				} else {
 					return right, left
 				}
@@ -269,12 +493,6 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 		return b.buildStatementsExpression(s.(*cparser.StatementsExpressionContext)), nil
 	}
 
-	// 12. 声明表达式: declarationSpecifier
-	if d := ast.DeclarationSpecifier(); d != nil {
-		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
-		return ssa.NewTypeValue(ssatype), nil
-	}
-
 	return b.EmitConstInst(0), b.CreateVariable("")
 }
 
@@ -329,18 +547,7 @@ func (b *astbuilder) buildCoreExpression(ast *cparser.CoreExpressionContext) ssa
 
 func (b *astbuilder) leftFromStarCast(castCtx *cparser.CastExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
 	right, innerLeft := b.buildCastExpression(castCtx, false)
-	left := innerLeft
-	if right != nil && right.GetType() != nil && right.GetType().GetTypeKind() == ssa.PointerKind {
-		if p, ok := ssa.ToParameter(right); ok {
-			b.ReferenceParameter(right.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-			return right, left
-		}
-		if isLeft {
-			left = b.GetAndCreateOriginPointer(right)
-		}
-		right = b.GetOriginValue(right)
-	}
-	return right, left
+	return b.starPtrAccess(right, innerLeft, isLeft)
 }
 
 func (b *astbuilder) derefCastLvalue(castCtx *cparser.CastExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
@@ -377,8 +584,8 @@ func (b *astbuilder) applyAssignmentFromStarCast(
 
 	right = b.applyAssignmentOp(op.GetText(), right, newRight)
 	if left != nil {
-		b.AssignVariable(left, right)
-		right.SetType(newRight.GetType())
+		// Do not SetType from RHS — that clobbers PointerKind / member types.
+		b.assignToVar(left, right)
 	}
 
 	if utils.IsNil(right) {
@@ -514,8 +721,7 @@ func (b *astbuilder) applyAssignmentFromCast(
 
 	right = b.applyAssignmentOp(op.GetText(), right, newRight)
 	if left != nil {
-		b.AssignVariable(left, right)
-		right.SetType(newRight.GetType())
+		b.assignToVar(left, right)
 	}
 
 	if utils.IsNil(right) {
@@ -555,8 +761,7 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 				op := a.(*cparser.AssignmentOperatorContext).GetText()
 				right = b.applyAssignmentOp(op, right, newRight)
 				if left != nil {
-					b.AssignVariable(left, right)
-					right.SetType(newRight.GetType())
+					b.assignToVar(left, right)
 				}
 			}
 		}
@@ -588,7 +793,7 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 				} else if ast.MinusMinus() != nil {
 					right = b.EmitBinOp(ssa.OpSub, right, b.EmitConstInst(1))
 				}
-				b.AssignVariable(left, right)
+				b.assignToVar(left, right)
 			}
 			return right, left
 		}
@@ -608,19 +813,7 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 	if len(ast.AllStar()) > 0 {
 		if u := ast.UnaryExpression(); u != nil {
 			right, left = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
-			if right != nil {
-				if right.GetType().GetTypeKind() == ssa.PointerKind {
-					if param, ok := ssa.ToParameter(right); ok && !param.IsFreeValue {
-						b.ReferenceParameter(right.GetName(), param.FormalParameterIndex, ssa.PointerSideEffect)
-						left = b.GetAndCreateOriginPointer(b.EmitConstPointer(left))
-					} else {
-						if isLeft {
-							left = b.GetAndCreateOriginPointer(right)
-						}
-						right = b.GetOriginValue(right)
-					}
-				}
-			}
+			right, left = b.starPtrAccess(right, left, isLeft)
 		}
 	}
 
@@ -719,18 +912,28 @@ func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right
 			args = b.buildArgumentExpressionList(a.(*cparser.ArgumentExpressionListContext))
 		}
 
-		if right != nil && right.GetName() == "malloc" {
-			if len(args) > 0 {
-				if tv, ok := ssa.ToTypeValue(args[0]); ok {
-					right = b.EmitMakeBuildWithType(tv.GetType(), nil, nil)
-				} else if c, ok := ssa.ToConstInst(args[0]); ok {
-					index, _ := strconv.Atoi(c.String())
-					newtype := ssa.NewSliceType(ssa.CreateByteType())
-					newtype.Len = index
-					right = b.EmitMakeBuildWithType(newtype, nil, nil)
+		if right != nil {
+			switch right.GetName() {
+			case "malloc", "calloc", "valloc", "memalign":
+				right = b.emitHeapAllocFromArgs(right.GetName(), args)
+				return right, left
+			case "realloc":
+				// realloc moves/frees the old pointer; emit a kill call then a fresh alloc.
+				if len(args) > 0 {
+					killCall := b.EmitCall(b.NewCall(right, args))
+					if killCall != nil {
+						lifetime.RegisterKill(killCall, args[0])
+					}
 				}
+				right = b.emitHeapAllocFromArgs("realloc", args)
+				return right, left
+			case "free":
+				call := b.EmitCall(b.NewCall(right, args))
+				if call != nil && len(args) > 0 {
+					lifetime.RegisterKill(call, args[0])
+				}
+				return call, left
 			}
-			return right, left
 		}
 		right = b.EmitCall(b.NewCall(right, args))
 		return right, left
@@ -915,17 +1118,7 @@ func (b *astbuilder) buildLeftExpression(ast *cparser.LeftExpressionContext, isL
 	if ast.Star() != nil {
 		if u := ast.UnaryExpression(); u != nil {
 			right, left := b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
-			if right != nil && right.GetType().GetTypeKind() == ssa.PointerKind {
-				if p, ok := ssa.ToParameter(right); ok {
-					b.ReferenceParameter(right.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-				} else {
-					if isLeft {
-						left = b.GetAndCreateOriginPointer(right)
-					}
-					right = b.GetOriginValue(right)
-				}
-			}
-			return right, left
+			return b.starPtrAccess(right, left, isLeft)
 		}
 		if c := ast.CastExpression(); c != nil {
 			return b.derefCastLvalue(c.(*cparser.CastExpressionContext), isLeft)

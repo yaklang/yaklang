@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,11 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 func withGlobalMaxContentLength(t *testing.T, limit uint64) {
 	t.Helper()
+	// Sidecars belong to this test sandbox even if the process is interrupted
+	// before Go can run registered cleanup callbacks.
+	t.Setenv("YAKIT_HOME", t.TempDir())
 	prev := consts.GetGlobalMaxContentLength()
 	consts.SetGlobalMaxContentLength(limit)
 	t.Cleanup(func() {
@@ -25,8 +30,8 @@ func withGlobalMaxContentLength(t *testing.T, limit uint64) {
 
 func TestGetMaxHTTPFlowRequestBodyInDBBytes_FollowsGlobal(t *testing.T) {
 	t.Run("follows_global", func(t *testing.T) {
-		withGlobalMaxContentLength(t, 10*1024*1024)
-		require.Equal(t, 10*1024*1024, GetMaxHTTPFlowRequestBodyInDBBytes())
+		withGlobalMaxContentLength(t, 50*1024*1024)
+		require.Equal(t, 50*1024*1024, GetMaxHTTPFlowRequestBodyInDBBytes())
 	})
 	t.Run("fallback_when_unset", func(t *testing.T) {
 		withGlobalMaxContentLength(t, 0)
@@ -55,11 +60,10 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_Large(t *testing.T) {
 	packet := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
 	res, err := spillLargeHTTPFlowRequestIfNeeded(packet)
 	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(res.HeaderFile, res.BodyFile) })
 	require.True(t, res.IsTooLarge)
 	require.NotEmpty(t, res.HeaderFile)
 	require.NotEmpty(t, res.BodyFile)
-	defer os.Remove(res.HeaderFile)
-	defer os.Remove(res.BodyFile)
 
 	require.Less(t, len(res.StoredPacket), len(packet))
 	require.Contains(t, string(res.StoredPacket), "request too large")
@@ -70,15 +74,51 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_Large(t *testing.T) {
 	require.Equal(t, body, string(rawBody))
 }
 
+func TestRebuildFlatSpillRequestPacket(t *testing.T) {
+	const limit = 64 * 1024
+	withGlobalMaxContentLength(t, limit)
+	body := strings.Repeat("A", limit+1024)
+	packet := []byte("PUT /upload HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/octet-stream\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\nX-Edit: before\r\n\r\n" + body)
+	spill, err := spillLargeHTTPFlowRequestIfNeeded(packet)
+	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(spill.HeaderFile, spill.BodyFile) })
+	require.True(t, spill.IsTooLarge)
+	require.True(t, IsFlatSpillRequestPacket(spill.StoredPacket))
+	require.False(t, IsFlatSpillRequestPacket([]byte("prefix [[request too large(1MB), truncated]]")))
+	replacement := []byte("replacement raw body")
+	replacementPath := filepath.Join(t.TempDir(), "replacement.bin")
+	require.NoError(t, os.WriteFile(replacementPath, replacement, 0o644))
+	edited := []byte(strings.Replace(string(spill.StoredPacket), "X-Edit: before", "X-Edit: after", 1))
+	rebuilt, err := RebuildFlatSpillRequestPacket(edited, spill.BodyFile, replacementPath)
+	require.NoError(t, err)
+	require.False(t, IsFlatSpillRequestPacket(rebuilt))
+	require.Equal(t, "after", lowhttp.GetHTTPPacketHeader(rebuilt, "X-Edit"))
+	_, rebuiltBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rebuilt)
+	require.Equal(t, replacement, rebuiltBody)
+	require.Equal(t, strconv.Itoa(len(replacement)), lowhttp.GetHTTPPacketHeader(rebuilt, "Content-Length"))
+
+	restored, err := RebuildFlatSpillRequestPacket(edited, spill.BodyFile, "")
+	require.NoError(t, err)
+	_, restoredBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(restored)
+	require.Equal(t, body, string(restoredBody))
+
+	emptyPath := filepath.Join(t.TempDir(), "empty.bin")
+	require.NoError(t, os.WriteFile(emptyPath, nil, 0o644))
+	empty, err := RebuildFlatSpillRequestPacket(edited, spill.BodyFile, emptyPath)
+	require.NoError(t, err)
+	_, emptyBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(empty)
+	require.Empty(t, emptyBody)
+	require.Equal(t, "0", lowhttp.GetHTTPPacketHeader(empty, "Content-Length"))
+}
+
 func TestSpillLargeHTTPFlowRequestIfNeeded_RespectsGlobalMaxContentLength(t *testing.T) {
 	withGlobalMaxContentLength(t, 64*1024)
 	body := strings.Repeat("D", 100*1024)
 	packet := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
 	res, err := spillLargeHTTPFlowRequestIfNeeded(packet)
 	require.NoError(t, err)
+	t.Cleanup(func() { removeLargeRequestSpillFiles(res.HeaderFile, res.BodyFile) })
 	require.True(t, res.IsTooLarge)
-	defer os.Remove(res.HeaderFile)
-	defer os.Remove(res.BodyFile)
 }
 
 func TestSpillLargeHTTPFlowRequestIfNeeded_UnderGlobalNotSpilled(t *testing.T) {
@@ -100,15 +140,14 @@ func TestPrepareLargeHTTPFlowRequest_Idempotent(t *testing.T) {
 	require.NoError(t, err)
 
 	first := PrepareLargeHTTPFlowRequest(req, packet)
+	t.Cleanup(func() { CleanupPreparedLargeHTTPFlowRequest(req) })
 	second := PrepareLargeHTTPFlowRequest(req, first)
 	require.Equal(t, first, second)
 	require.True(t, httpctx.GetRequestTooLarge(req))
 	require.NotEmpty(t, httpctx.GetRequestTooLargeBodyFile(req))
-	require.Contains(t, string(first), "request too large")
+	require.Contains(t, string(first), "{{file(")
+	require.NotContains(t, string(first), "request too large")
 	require.Empty(t, httpctx.GetPlainRequestBytes(req), "plain request must not hold truncated display bytes for wire forwarding")
-	defer os.Remove(httpctx.GetRequestTooLargeHeaderFile(req))
-	defer os.Remove(httpctx.GetRequestTooLargeBodyFile(req))
-
 	flow, err := CreateHTTPFlow(
 		CreateHTTPFlowWithURL("http://example.com/upload"),
 		CreateHTTPFlowWithRequestRaw(packet),
@@ -118,6 +157,30 @@ func TestPrepareLargeHTTPFlowRequest_Idempotent(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, flow.IsTooLargeRequest)
 	require.Equal(t, httpctx.GetRequestTooLargeBodyFile(req), flow.TooLargeRequestBodyFile)
+}
+
+func TestCleanupPreparedLargeHTTPFlowRequestIsIdempotent(t *testing.T) {
+	withGlobalMaxContentLength(t, 64*1024)
+	body := strings.Repeat("Z", 64*1024+1)
+	packet := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
+	req, err := http.NewRequest("POST", "http://example.com/upload", nil)
+	require.NoError(t, err)
+
+	PrepareLargeHTTPFlowRequest(req, packet)
+	headerFile := httpctx.GetRequestTooLargeHeaderFile(req)
+	bodyFile := httpctx.GetRequestTooLargeBodyFile(req)
+	require.FileExists(t, headerFile)
+	require.FileExists(t, bodyFile)
+	t.Cleanup(func() { CleanupPreparedLargeHTTPFlowRequest(req) })
+
+	CleanupPreparedLargeHTTPFlowRequest(req)
+	CleanupPreparedLargeHTTPFlowRequest(req)
+	require.NoFileExists(t, headerFile)
+	require.NoFileExists(t, bodyFile)
+	require.False(t, httpctx.GetRequestTooLarge(req))
+	require.Empty(t, httpctx.GetRequestTooLargeHeaderFile(req))
+	require.Empty(t, httpctx.GetRequestTooLargeBodyFile(req))
+	require.Empty(t, httpctx.GetRequestDisplayPacket(req))
 }
 
 func TestSyncLargeHTTPFlowFlagsFromStoredPacket(t *testing.T) {

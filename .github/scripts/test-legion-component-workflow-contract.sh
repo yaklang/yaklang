@@ -49,6 +49,17 @@ if ! grep -Fq 'archive_dir="${RUNNER_TEMP}/runtime-archive-${RUNTIME_GOARCH}"' "
   exit 1
 fi
 # shellcheck disable=SC2016 # Match literal GitHub Actions expression syntax.
+if ! grep -Fq 'RUNTIME_IMAGE_TAG: ${{ steps.inspect.outputs.image_tag }}' "$runtime_workflow" ||
+   ! grep -Fq 'docker save "$RUNTIME_IMAGE_TAG"' "$runtime_workflow"; then
+  echo "$runtime_workflow must export a tagged Runtime image for containerd-backed Docker hosts" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal workflow shell syntax.
+if grep -Fq 'docker save "$RUNTIME_IMAGE_ID"' "$runtime_workflow"; then
+  echo "$runtime_workflow must not export the Runtime by bare image ID" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # Match literal GitHub Actions expression syntax.
 if ! grep -Fq 'RUNTIME_IMAGE_ARCHIVE: ${{ steps.runtime-archive.outputs.path }}' "$runtime_workflow"; then
   echo "$runtime_workflow must pass the runner-temp archive into provenance generation" >&2
   exit 1

@@ -35,7 +35,10 @@ func (tu *tuProcessor) run(src string) string {
 }
 
 func (ctx *tuExpandCtx) syncExpandEnv() {
-	// Rebuild internal tables once per define/undef; maps stay shared on MacroTables side.
+	// Rebuild the expander's internal tables from the (possibly mutated) local
+	// exported tables. exportToMacroTables produces a fresh internal map pair, so
+	// expandEnv.tables and localTables hold independent map instances after this
+	// call; subsequent #define/#undef must update localTables and call this again.
 	ctx.expandEnv.setTables(exportToMacroTables(ctx.localTables))
 }
 
@@ -60,7 +63,7 @@ func (ctx *tuExpandCtx) expandSource(src, filePath string) []string {
 		switch DirectiveName(line) {
 		case "define":
 			if ApplyDefineLine(line, &ctx.localTables, true) {
-				// localTables mutated in place; env.tables aliases the same maps.
+				// localTables mutated; resync the expander's internal tables.
 				ctx.syncExpandEnv()
 				continue
 			}

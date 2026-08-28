@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -40,14 +41,31 @@ const (
 )
 
 func httpPoolIsSSERequest(reqRaw []byte) bool {
-	accept := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(reqRaw, "Accept")))
-	return strings.Contains(accept, "text/event-stream")
+	accept := lowhttp.GetHTTPPacketHeader(reqRaw, "Accept")
+	for _, item := range strings.Split(accept, ",") {
+		mediaType, params, err := mime.ParseMediaType(strings.TrimSpace(item))
+		if err != nil || !strings.EqualFold(mediaType, "text/event-stream") {
+			continue
+		}
+		if rawQ, ok := params["q"]; ok {
+			q, err := strconv.ParseFloat(rawQ, 64)
+			if err != nil || q <= 0 {
+				continue
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func httpPoolIsSSEResponseHeader(respHeaderRaw []byte) (isSSE bool, isChunked bool) {
-	headerLower := strings.ToLower(string(respHeaderRaw))
-	isSSE = strings.Contains(headerLower, "content-type:") && strings.Contains(headerLower, "text/event-stream")
-	isChunked = strings.Contains(headerLower, "transfer-encoding:") && strings.Contains(headerLower, "chunked")
+	isSSE = lowhttp.IsSSEContentTypeHeader(respHeaderRaw)
+	for _, coding := range strings.Split(lowhttp.GetHTTPPacketHeader(respHeaderRaw, "Transfer-Encoding"), ",") {
+		if strings.EqualFold(strings.TrimSpace(coding), "chunked") {
+			isChunked = true
+			break
+		}
+	}
 	return
 }
 
@@ -124,17 +142,32 @@ func httpPoolChunkedStreamDecode(ctx context.Context, r io.Reader, onData func([
 			}
 		}
 
-		buf := make([]byte, int(size))
-		_, err = io.ReadFull(br, buf)
-		if err != nil {
-			return err
+		// A peer controls the advertised chunk size. Read it in bounded blocks
+		// instead of allocating the whole chunk at once.
+		for remaining := size; remaining > 0; {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			blockSize := int64(32 * 1024)
+			if remaining < blockSize {
+				blockSize = remaining
+			}
+			buf := make([]byte, int(blockSize))
+			_, err = io.ReadFull(br, buf)
+			if err != nil {
+				return err
+			}
+			onData(buf)
+			remaining -= blockSize
 		}
-		onData(buf)
 
 		crlf := make([]byte, 2)
 		_, err = io.ReadFull(br, crlf)
 		if err != nil {
 			return err
+		}
+		if !bytes.Equal(crlf, []byte("\r\n")) {
+			return fmt.Errorf("invalid chunk terminator %q", crlf)
 		}
 	}
 }
@@ -1393,12 +1426,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						}
 
 						if needSSEStream {
-							if httpPoolIsSSERequest(targetRequest) {
-								lowhttpOptions = append(lowhttpOptions, lowhttp.WithNoBodyBuffer(true))
-							}
-							if config.AutoDetectSSE {
-								lowhttpOptions = append(lowhttpOptions, lowhttp.WithAutoDetectSSE(true))
-							}
+							// Accept: text/event-stream only says that the client can consume SSE.
+							// Streamable HTTP endpoints (including MCP) may still return a normal
+							// application/json response, so defer NoBodyBuffer to lowhttp's
+							// response Content-Type detection instead of discarding the body here.
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithAutoDetectSSE(true))
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithBodyStreamReaderHandler(func(respHeaderRaw []byte, bodyReader io.ReadCloser) {
 								defer bodyReader.Close()
 
@@ -1428,16 +1460,14 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								sseStateMu.Unlock()
 
 								dataCh := make(chan []byte, 64)
-								doneCh := make(chan struct{})
 
 								go func() {
-									defer close(doneCh)
+									defer close(dataCh)
 									onData := func(b []byte) {
 										select {
 										case <-streamCtx.Done():
 											return
 										case dataCh <- b:
-										default:
 										}
 									}
 									var err error
@@ -1447,7 +1477,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 										err = httpPoolRawStreamRead(streamCtx, bodyReader, onData)
 									}
 									_ = err
-									close(dataCh)
 								}()
 
 								window := 250 * time.Millisecond
@@ -1609,13 +1638,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 										flush()
 										emitFinalMarker()
 										return
-									case <-doneCh:
-										flush()
-										emitFinalMarker()
-										return
 									case b, ok := <-dataCh:
 										if !ok {
-											continue
+											flush()
+											emitFinalMarker()
+											return
 										}
 										if len(b) == 0 {
 											continue

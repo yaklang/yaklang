@@ -49,6 +49,34 @@ func TestExecuteScriptCleansChildSSAGitWorkspaceAfterCancellation(t *testing.T) 
 	require.Empty(t, mustReadDir(t, root))
 }
 
+func TestExecuteScriptExtraEnvironmentOverridesParentYakitHome(t *testing.T) {
+	parentHome := t.TempDir()
+	taskHome := t.TempDir()
+	resultPath := filepath.Join(t.TempDir(), "yakit-home.txt")
+	helper := filepath.Join(t.TempDir(), "helper.sh")
+	require.NoError(t, os.WriteFile(
+		helper,
+		[]byte("#!/bin/sh\nset -eu\nprintf '%s' \"$YAKIT_HOME\" > \"$YAKIT_HOME_RESULT\"\n"),
+		0o700,
+	))
+	t.Setenv("YAKIT_HOME", parentHome)
+
+	var node *ScanNode
+	err := node.executeScript(
+		context.Background(),
+		helper,
+		"fixture.yak",
+		nil,
+		"runtime",
+		[]string{"YAKIT_HOME=" + taskHome, "YAKIT_HOME_RESULT=" + resultPath},
+		nil,
+	)
+	require.NoError(t, err)
+	raw, err := os.ReadFile(resultPath)
+	require.NoError(t, err)
+	require.Equal(t, taskHome, string(raw))
+}
+
 func writeSSAGitWorkspaceHelper(t *testing.T, block bool) string {
 	t.Helper()
 	body := "#!/bin/sh\nset -eu\nmkdir -p \"$YAK_SSA_GIT_WORKDIR/yakgit-$YAK_SSA_GIT_WORKSPACE_OWNER-fixture\"\n"

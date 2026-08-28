@@ -35,7 +35,7 @@ const directlyCallToolScalarOutputExampleJSON = `{
   "identifier": "read_project_config",
   "human_readable_thought": "读取单个项目配置",
   "directly_call_tool_name": "read_file",
-  "directly_call_tool_params": {"path": "/workspace/go.mod"},
+  "directly_call_tool_params": {"file": "/workspace/go.mod"},
   "directly_call_identifier": "read_go_mod",
   "directly_call_expectations": "~1s",
   "directly_call_reason": "读取模块定义"
@@ -48,14 +48,14 @@ const directlyCallToolBatchOutputExampleJSON = `{
   "directly_call_tool_calls": [
     {
       "tool_name": "read_file",
-      "params": {"path": "/workspace/go.mod"},
+      "params": {"file": "/workspace/go.mod"},
       "identifier": "read_go_mod",
       "expectations": "~1s",
       "reason": "读取模块定义"
     },
     {
       "tool_name": "read_file",
-      "params": {"path": "/workspace/README.md"},
+      "params": {"file": "/workspace/README.md"},
       "identifier": "read_readme",
       "expectations": "~1s",
       "reason": "读取项目说明"
@@ -517,7 +517,11 @@ func executeVerifiedToolBatch(
 		ctx = task.GetContext()
 	}
 
-	loopInfraStatus(loop, fmt.Sprintf("准备并发工具调用（%d 项） / Preparing Parallel Tool Calls...", len(request.Calls)))
+	toolNames := make([]string, 0, len(request.Calls))
+	for _, call := range request.Calls {
+		toolNames = append(toolNames, call.ToolName)
+	}
+	emitToolsPreparingStatus(loop, toolNames)
 	batchRuntime, supported := invoker.(aicommon.ToolBatchInvokeRuntime)
 	var (
 		result *aicommon.ToolBatchResult
@@ -606,10 +610,17 @@ func executeToolBatchSerialFallback(
 			stage = aicommon.ToolCallStageInvokeFailed
 		}
 		result.Outcomes[index] = aicommon.ToolCallOutcome{
-			Index:          call.Index,
-			RequestedTool:  call.ToolName,
-			FinalTool:      call.ToolName,
-			Stage:          stage,
+			Index:         call.Index,
+			RequestedTool: call.ToolName,
+			FinalTool:     call.ToolName,
+			Stage:         stage,
+			ExecutionStatus: func() aitool.ToolExecutionStatus {
+				if toolResult == nil {
+					return ""
+				}
+				status, _ := toolResult.GetExecutionStatus()
+				return status
+			}(),
 			Result:         toolResult,
 			Err:            err,
 			DirectlyAnswer: directlyAnswer,
@@ -662,7 +673,33 @@ func handleToolBatchActionResult(
 
 	outcomes := append([]aicommon.ToolCallOutcome(nil), result.Outcomes...)
 	sort.SliceStable(outcomes, func(i, j int) bool { return outcomes[i].Index < outcomes[j].Index })
-	lines := []string{fmt.Sprintf("Tool batch finished: %d calls", len(request.Calls))}
+	var executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun int
+	for i := range outcomes {
+		outcome := &outcomes[i]
+		if outcome.Result == nil {
+			notRun++
+			continue
+		}
+		if !outcome.Result.Success || outcome.Stage == aicommon.ToolCallStageInvokeFailed {
+			protocolFailed++
+			continue
+		}
+		if outcome.ExecutionStatus == "" {
+			outcome.ExecutionStatus, _ = outcome.Result.GetExecutionStatus()
+		}
+		switch outcome.ExecutionStatus {
+		case aitool.ToolExecutionStatusSucceeded:
+			executionSucceeded++
+		case aitool.ToolExecutionStatusFailed:
+			executionFailed++
+		default:
+			executionUnknown++
+		}
+	}
+	lines := []string{fmt.Sprintf(
+		"Tool batch settled: %d calls; execution_succeeded=%d; execution_failed=%d; execution_unknown=%d; protocol_failed=%d; not_run=%d",
+		len(request.Calls), executionSucceeded, executionFailed, executionUnknown, protocolFailed, notRun,
+	)}
 	executedToolCallCount := 0
 	for _, outcome := range outcomes {
 		// Result is assigned only after the ToolCaller returns from the plugin
@@ -682,6 +719,29 @@ func handleToolBatchActionResult(
 		status := string(outcome.Stage)
 		if status == "" {
 			status = "unknown"
+		} else if outcome.Stage == aicommon.ToolCallStageDone {
+			executionStatus := outcome.ExecutionStatus
+			detail := ""
+			if outcome.Result != nil {
+				if executionStatus == "" {
+					executionStatus, detail = outcome.Result.GetExecutionStatus()
+				} else {
+					_, detail = outcome.Result.GetExecutionStatus()
+				}
+			}
+			switch executionStatus {
+			case aitool.ToolExecutionStatusSucceeded:
+				status = "protocol-completed; execution-succeeded"
+			case aitool.ToolExecutionStatusFailed:
+				status = "protocol-completed; execution-failed"
+			default:
+				status = "protocol-completed; execution-outcome-unknown; inspect execution_result"
+			}
+			if detail != "" {
+				status += " (" + detail + ")"
+			}
+		} else if outcome.Stage == aicommon.ToolCallStageInvokeFailed {
+			status = "protocol-error"
 		}
 		if outcome.Err != nil {
 			status += ": " + outcome.Err.Error()
@@ -704,6 +764,11 @@ func handleToolBatchActionResult(
 	summary := strings.Join(lines, "\n")
 	invoker.AddToTimeline("[TOOL_BATCH_RESULT]", summary)
 	operator.Feedback(summary)
+	emitToolBatchResultStatus(loop, request, outcomes)
+	toolNames := make([]string, 0, len(request.Calls))
+	for _, call := range request.Calls {
+		toolNames = append(toolNames, call.ToolName)
+	}
 	justExecutedTool := executedToolCallCount > 0
 	if justExecutedTool {
 		operator.MarkToolExecuted(executedToolCallCount)
@@ -716,10 +781,6 @@ func handleToolBatchActionResult(
 	if task == nil || !justExecutedTool {
 		operator.Continue()
 		return
-	}
-	toolNames := make([]string, 0, len(request.Calls))
-	for _, call := range request.Calls {
-		toolNames = append(toolNames, call.ToolName)
 	}
 	verifyResult, triggered, verifyErr := loop.MaybeVerifyUserSatisfaction(ctx, task.GetUserInput(), true, strings.Join(toolNames, ","))
 	if verifyErr != nil {

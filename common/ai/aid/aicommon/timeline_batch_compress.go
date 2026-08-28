@@ -275,7 +275,10 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 
 	// 生成压缩提示（双段：RECENT_KEEP + ITEMS_TO_COMPRESS + token 预算）
 	nonceStr := utils.RandStringBytes(4)
-	prompt := m.renderBatchCompressPrompt(m.compressedHead, toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget)
+	// The existing head is retained deterministically by the host below. Do not
+	// send it back to the reducer: asking the model to copy it and then prepending
+	// it again duplicates history and consumes an ever-growing prompt budget.
+	prompt := m.renderBatchCompressPrompt(toCompress, recentKeep, nonceStr, inputTokenEstimate, outputTokenBudget)
 	if prompt == "" {
 		// If prompt is empty, fall back to emergency compress
 		log.Warnf("batch compress: prompt is empty, falling back to emergency compress")
@@ -300,7 +303,7 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 		// 为每个结构化字段注册 stream handler，实时 emit 到 UI
 		fieldHandlers := []string{
 			"key_findings", "active_config", "completed_work",
-			"failed_and_resolved", "discarded", "user_directives",
+			"open_failures", "failed_and_resolved", "discarded", "user_directives",
 		}
 		streamHandlers := make([]ActionMakerOption, 0, len(fieldHandlers)+2)
 		streamHandlers = append(streamHandlers,
@@ -425,7 +428,7 @@ var timelineBatchCompress string
 //	ITEMS_TO_COMPRESS <= MaxBatchCompressPromptSize - actualRecentSize（再填，按时间顺序最旧到次新）
 //
 // 关键词: renderBatchCompressPrompt, RECENT_KEEP, ITEMS_TO_COMPRESS, prompt 预算分配
-func (m *Timeline) renderBatchCompressPrompt(currentHead *TimelineCompressedHead, toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string, inputTokenEstimate int64, outputTokenBudget int64) string {
+func (m *Timeline) renderBatchCompressPrompt(toCompress []*TimelineItem, recentKeep []*TimelineItem, nonceStr string, inputTokenEstimate int64, outputTokenBudget int64) string {
 	if len(toCompress) == 0 {
 		return ""
 	}
@@ -482,20 +485,15 @@ func (m *Timeline) renderBatchCompressPrompt(currentHead *TimelineCompressedHead
 	}
 
 	err = ins.Execute(&buf, map[string]any{
-		"ExtraMetaInfo":        m.ExtraMetaInfo(),
-		"RecentKept":           recentStr,
-		"RecentKeptCount":      recentCount,
-		"HasRecentKept":        recentCount > 0,
-		"ItemsToCompress":      itemsStr,
-		"ItemCount":            actualItemCount,
-		"HasCompressedHead":    currentHead != nil && strings.TrimSpace(currentHead.Text) != "",
-		"CompressedHeadText":   compressedHeadText(currentHead),
-		"CompressedHeadID":     compressedHeadCoveredID(currentHead),
-		"CompressedHeadAtMs":   compressedHeadCoveredAtMs(currentHead),
-		"CompressedHeadVer":    compressedHeadVersion(currentHead),
-		"InputTokenEstimate":   inputTokenEstimate,
-		"OutputTokenBudget":    outputTokenBudget,
-		"NONCE":                nonce,
+		"ExtraMetaInfo":      m.ExtraMetaInfo(),
+		"RecentKept":         recentStr,
+		"RecentKeptCount":    recentCount,
+		"HasRecentKept":      recentCount > 0,
+		"ItemsToCompress":    itemsStr,
+		"ItemCount":          actualItemCount,
+		"InputTokenEstimate": inputTokenEstimate,
+		"OutputTokenBudget":  outputTokenBudget,
+		"NONCE":              nonce,
 	})
 	if err != nil {
 		log.Errorf("BUG: batch compress prompt execution failed: %v", err)
@@ -518,34 +516,6 @@ func (m *Timeline) getActiveTimelineItemIDs() []int64 {
 		out = append(out, id)
 	}
 	return out
-}
-
-func compressedHeadText(head *TimelineCompressedHead) string {
-	if head == nil {
-		return ""
-	}
-	return strings.TrimSpace(head.Text)
-}
-
-func compressedHeadCoveredID(head *TimelineCompressedHead) int64 {
-	if head == nil {
-		return 0
-	}
-	return head.CoveredEndItemID
-}
-
-func compressedHeadCoveredAtMs(head *TimelineCompressedHead) int64 {
-	if head == nil {
-		return 0
-	}
-	return head.CoveredEndAtMs
-}
-
-func compressedHeadVersion(head *TimelineCompressedHead) int64 {
-	if head == nil {
-		return 0
-	}
-	return head.Version
 }
 
 // buildRecentKeptString 从最新向旧填充 recentKeep 段，受 budget 字节上限约束
@@ -647,7 +617,7 @@ func buildItemsToCompressString(items []*TimelineItem, budget int) (string, int,
 // buildStructuredCompressedMemory 从 AI action 中提取结构化字段，
 // 拼成有固定段落标记的分段文本，存入 compressedHead.Text。
 //
-// 字段优先级: key_findings > active_config > user_directives > completed_work > failed_and_resolved > discarded
+// 字段优先级: key_findings/open_failures > active_config > user_directives > completed_work > failed_and_resolved > discarded
 // 关键词: buildStructuredCompressedMemory, 结构化压缩输出, 分段文本
 func buildStructuredCompressedMemory(action *Action) string {
 	if action == nil {
@@ -696,6 +666,15 @@ func buildStructuredCompressedMemory(action *Action) string {
 		}{"User Directives", s})
 	}
 
+	// open_failures: unresolved execution failures, blockers and pending work are
+	// control-critical state. They must never be folded into completed work.
+	if s := strings.TrimSpace(action.GetString("open_failures")); s != "" {
+		sections = append(sections, struct {
+			title string
+			body  string
+		}{"Open Failures", s})
+	}
+
 	// completed_work
 	if s := strings.TrimSpace(action.GetString("completed_work")); s != "" {
 		sections = append(sections, struct {
@@ -738,8 +717,9 @@ func buildStructuredCompressedMemory(action *Action) string {
 }
 
 // enforceOutputTokenBudget 当 AI 输出超过 token 预算时，按优先级截断低价值字段。
-// 截断顺序: discarded -> failed_and_resolved -> completed_work -> user_directives -> active_config -> key_findings
-// key_findings 永远不截断。
+// 截断顺序: discarded -> failed_and_resolved -> completed_work -> user_directives -> active_config.
+// key_findings and open_failures are control-critical and are never selected
+// for section deletion.
 // 关键词: enforceOutputTokenBudget, post-check, 规则截断
 func enforceOutputTokenBudget(text string, budget int64) string {
 	if budget <= 0 {
@@ -837,7 +817,8 @@ func joinCompressedHeadSections(sections []compressedHeadSection) string {
 }
 
 // refineCompressedHeadLocked 当 head 累积超过预算时，调用 AI 对 head 自身做精简。
-// 只精简 completed_work/discarded/failed_and_resolved，保留 key_findings/active_config/user_directives。
+// 只精简 completed_work/discarded/failed_and_resolved，保留
+// key_findings/open_failures/active_config/user_directives。
 // 关键词: refineCompressedHead, head-only 精简, head 累积控制
 func (m *Timeline) refineCompressedHeadLocked(headText string, budget int64, nonceStr string) string {
 	if m.ai == nil || headText == "" || budget <= 0 {
@@ -866,7 +847,7 @@ func (m *Timeline) refineCompressedHeadLocked(headText string, budget int64, non
 
 		fieldHandlers := []string{
 			"key_findings", "active_config", "completed_work",
-			"failed_and_resolved", "discarded", "user_directives",
+			"open_failures", "failed_and_resolved", "discarded", "user_directives",
 		}
 		streamHandlers := make([]ActionMakerOption, 0, len(fieldHandlers)+1)
 		streamHandlers = append(streamHandlers, WithActionNonce(nonceStr))
@@ -921,12 +902,13 @@ func buildRefineHeadPrompt(headText string, budget int64, nonceStr string) strin
 
 ## 精简规则
 
-1. **key_findings 和 active_config 不得丢失或删减**：这些是最高价值信息，必须原样保留。
+1. **key_findings、open_failures 和 active_config 不得丢失或删减**：这些是最高价值和控制关键状态，必须原样保留。
 2. **user_directives 不得丢失**：用户指令必须原样保留。
 3. **可以精简 completed_work**：合并相似条目，去除冗余描述，但保留工作阶段和关键结论。
 4. **可以精简或删除 failed_and_resolved**：如果内容过长，保留最重要的转折性结论，删减细节。
 5. **可以删除 discarded**：如果需要进一步缩减，优先删除此字段。
-6. 保持原有的 6 字段结构化输出格式。
+6. **不得将未解决失败移入 completed_work 或 failed_and_resolved**；只有后续独立成功证据才能改变其状态。
+7. 保持原有的 7 字段结构化输出格式。
 
 ## 输出 token 预算
 总输出 ≤ {{ .OutputTokenBudget }} tokens
@@ -938,12 +920,13 @@ func buildRefineHeadPrompt(headText string, budget int64, nonceStr string) strin
 ` + "```schema" + `
 {
   "type": "object",
-  "required": ["@action", "key_findings"],
+  "required": ["@action", "key_findings", "open_failures"],
   "properties": {
     "@action": { "const": "timeline-reducer" },
     "key_findings": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
     "active_config": { "type": "string" },
     "completed_work": { "type": "string" },
+    "open_failures": { "type": "string" },
     "failed_and_resolved": { "type": "string" },
     "discarded": { "type": "string" },
     "user_directives": { "type": "string" }
@@ -965,9 +948,9 @@ func buildRefineHeadPrompt(headText string, budget int64, nonceStr string) strin
 
 	var buf bytes.Buffer
 	err = ins.Execute(&buf, map[string]any{
-		"HeadText":         headText,
+		"HeadText":          headText,
 		"OutputTokenBudget": budget,
-		"NONCE":            nonce,
+		"NONCE":             nonce,
 	})
 	if err != nil {
 		log.Errorf("BUG: head refine prompt execution failed: %v", err)

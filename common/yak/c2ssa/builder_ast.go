@@ -2,6 +2,7 @@ package c2ssa
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -552,6 +553,10 @@ func (b *astbuilder) buildDeclarator(ast *cparser.DeclaratorContext, kinds ...Co
 	}
 
 	if p := ast.Pointer(); p != nil {
+		// Do not assign an Undefined PointerKind placeholder. Undefined is not
+		// a pointer object, so later *p hits ObjectError (@pointer on type {})
+		// and never writes through to the origin. Uninitialized `int *p;`
+		// stays valueless; `p = &x` then supplies a real pointer object.
 		b.applyPointerModifiers(p.(*cparser.PointerContext), value)
 	}
 
@@ -831,9 +836,18 @@ func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext, ssa
 	defer recoverRange()
 
 	if d := ast.Declarator(); d != nil {
-		left, right, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), VARIABLE_KIND)
+		decl := d.(*cparser.DeclaratorContext)
+		left, right, _ := b.buildDeclarator(decl, VARIABLE_KIND)
+		// Only the declarator may contain '*'. Do NOT scan ast.GetText():
+		// `int x = *p` would otherwise be treated as a pointer init.
+		isPtr := decl.Pointer() != nil || strings.Contains(decl.GetText(), "*")
 		if e := ast.Initializer(); e != nil {
 			initial := b.buildInitializer(e.(*cparser.InitializerContext), ssatype...)
+			// Only wrap NULL/0. Wrapping strings, functions, or aggregates
+			// as PointerKind breaks char*, function pointers, and int *arr[].
+			if isPtr && cIsNullishConst(initial) {
+				initial = b.ensurePointerValue(initial)
+			}
 			b.AssignVariable(left, initial)
 			return left, -1
 		}
@@ -1155,9 +1169,22 @@ func (b *astbuilder) buildStructDeclaration(ast *cparser.StructDeclarationContex
 	if sq := ast.SpecifierQualifierList(); sq != nil {
 		ssatype := b.buildSpecifierQualifierList(sq.(*cparser.SpecifierQualifierListContext))
 		if sd := ast.StructDeclaratorList(); sd != nil {
-			lefts := b.buildStructDeclaratorList(sd.(*cparser.StructDeclaratorListContext))
-			for _, l := range lefts {
-				structTyp.AddField(b.EmitConstInst(l.GetName()), ssatype)
+			for _, s := range sd.AllStructDeclarator() {
+				sc := s.(*cparser.StructDeclaratorContext)
+				l := b.buildStructDeclarator(sc)
+				if utils.IsNil(l) {
+					continue
+				}
+				fieldType := ssatype
+				if d := sc.Declarator(); d != nil {
+					if decl := d.(*cparser.DeclaratorContext); decl.Pointer() != nil {
+						pt := ssa.NewPointerType()
+						pt.SetName("Pointer")
+						pt.FieldType = ssatype
+						fieldType = pt
+					}
+				}
+				structTyp.AddField(b.EmitConstInst(l.GetName()), fieldType)
 			}
 		}
 	} else if sa := ast.StaticAssertDeclaration(); sa != nil {
@@ -1252,10 +1279,11 @@ func (b *astbuilder) buildBlockItem(ast *cparser.BlockItemContext) {
 	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	if s := ast.Statement(); s != nil {
-		b.buildStatement(s.(*cparser.StatementContext))
-	} else if d := ast.Declaration(); d != nil {
+	// Prefer declaration (matches CParser blockItem order after grammar fix).
+	if d := ast.Declaration(); d != nil {
 		b.buildDeclaration(d.(*cparser.DeclarationContext))
+	} else if s := ast.Statement(); s != nil {
+		b.buildStatement(s.(*cparser.StatementContext))
 	}
 }
 

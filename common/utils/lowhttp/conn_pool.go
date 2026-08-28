@@ -678,18 +678,30 @@ func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpCo
 		pc.h2Conn()
 		if err = pc.alt.preface(); err == nil {
 			go pc.alt.readLoop()
+			// Watch for a server that negotiates h2 and then never sends its
+			// SETTINGS frame; see watchServerPreface for why this must not
+			// gate setup. Requests on such a conn fail fast and the caller
+			// falls back to HTTP/1.1.
+			pc.alt.watchServerPreface()
 			// H2 conn is registered in h2ConnMap by getOrCreateH2Conn after this call returns.
 			return pc, nil
-		} else { // preface fail downgrade
-			key.scheme = H1
-			newH1Conn, err := dialXWithContext(requestCtx, key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
-			if err != nil {
-				return nil, err
-			}
-			pc.alt = nil
-			pc.conn = newH1Conn
-			return pc, nil
 		}
+		// client preface failure: tear down the broken h2 conn and
+		// downgrade to HTTP/1.1 (downgraded conns are not reused for h2)
+		key.scheme = H1
+		if pc.alt != nil {
+			pc.alt.setClose()
+		}
+		pc.alt = nil
+		if pc.conn != nil {
+			pc.conn.Close()
+		}
+		newH1Conn, err := dialXWithContext(requestCtx, key.addr, append(opt, netx.DialX_WithTLSNextProto(H1))...)
+		if err != nil {
+			return nil, err
+		}
+		pc.conn = newH1Conn
+		return pc, nil
 	}
 
 	pc.br = bufio.NewReader(pc)
@@ -723,6 +735,7 @@ func (pc *persistConn) h2Conn() {
 		clientPrefaceOk:   utils.NewAtomicBool(),
 		closeCh:           make(chan struct{}),
 		readLoopExited:    make(chan struct{}),
+		serverPrefaceCh:   make(chan struct{}, 1),
 		// pc back-reference: used by setClose() to evict this connection from
 		// the pool's h2ConnMap when it transitions to closed state.
 		pc: pc,
@@ -821,12 +834,45 @@ func (pc *persistConn) readLoop() {
 				_ = pc.conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
 			})
 		}
+
+		// Watch the per-request context (e.g. the MITM upstream context that
+		// is cancelled when the downstream client disconnects during a
+		// long-lived streaming response). When it is cancelled, close the
+		// upstream connection so the blocking conn.Read returns immediately.
+		// Closing (rather than setting a past read deadline) is required
+		// because deadlineExtendingReader resets the deadline to the future
+		// on every Read, which would defeat a past-deadline approach. Without
+		// this watcher, a streaming response (SSE) blocks forever:
+		// ExtendReadDeadline disables the hard timeout and pc.ctx is derived
+		// from context.Background(), not the request context.
+		var ctxWatcherStop chan struct{}
+		if rc.option != nil && rc.option.Ctx != nil {
+			ctxWatcherStop = make(chan struct{})
+			go func(seq uint64, stop chan struct{}) {
+				select {
+				case <-rc.option.Ctx.Done():
+					if atomic.LoadUint64(&pc.reqSeq) != seq {
+						return
+					}
+					_ = pc.conn.Close()
+				case <-stop:
+				}
+			}(seq, ctxWatcherStop)
+		}
+		stopCtxWatcher := func() {
+			if ctxWatcherStop != nil {
+				close(ctxWatcherStop)
+				ctxWatcherStop = nil
+			}
+		}
+
 		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
 		_, err := pc.br.Peek(1)
 		if err != nil {
 			if hardTimeoutTimer != nil {
 				hardTimeoutTimer.Stop()
 			}
+			stopCtxWatcher()
 			if errors.Is(err, io.EOF) {
 				pc.sawEOF = true
 				closeErr = errServerClosedIdle
@@ -1024,6 +1070,11 @@ func (pc *persistConn) readLoop() {
 		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
 			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "conn pool stream handler")
 		}
+
+		// Stop the per-request context watcher before sending the response:
+		// the read is done, so a late cancel must not perturb the next
+		// iteration's deadline.
+		stopCtxWatcher()
 
 		//pc.mu.Lock()
 		////pc.numExpectedResponses-- // 减少预期响应数量
@@ -1274,12 +1325,13 @@ type connectKey struct {
 	https           bool
 	gmTls           bool
 	clientHelloSpec *utls.ClientHelloSpec
+	tlsFingerprint  string
 	sni             string
 	strongHost      string
 }
 
 func (c *connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni, c.strongHost)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.tlsFingerprint, c.sni, c.strongHost)
 }
 
 type connLRU struct {

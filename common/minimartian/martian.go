@@ -16,7 +16,10 @@
 // request and response modifiers.
 package minimartian
 
-import "net/http"
+import (
+	"io"
+	"net/http"
+)
 
 // RequestModifier is an interface that defines a request modifier that can be
 // used by a proxy.
@@ -31,6 +34,12 @@ type ResponseModifier interface {
 	// ModifyResponse modifies the response.
 	ModifyResponse(res *http.Response) error
 }
+
+// HTTPStreamRecorderFactory creates an optional best-effort recorder for
+// streaming responses (e.g. SSE). The recorder receives body chunks as they
+// are relayed to the downstream client. Recorder failures must not affect
+// forwarding; a nil return disables recording for this response.
+type HTTPStreamRecorderFactory func(isHTTPS bool, req *http.Request, rsp *http.Response, headerBytes []byte) (io.WriteCloser, error)
 
 // RequestResponseModifier is an interface that is both a ResponseModifier and
 // a RequestModifier.

@@ -191,3 +191,79 @@ const char* s = HTTP_1_0 "extra";
 	require.Contains(t, out, `"HTTP/1.0 "`)
 	require.Contains(t, out, `"extra"`)
 }
+
+// Self-referential and mutually-recursive macros must terminate (ISO C "hide-set"):
+// a macro is not re-expanded within its own expansion chain. These previously
+// caused fatal stack overflow (object macros) or infinite loops (function macros).
+
+func TestExpandFunctionMacros_ObjectSelfReference(t *testing.T) {
+	src := `
+#define x x
+int v = x;
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	require.NotContains(t, out, "#define x")
+	// x expands once to x, then is hidden -> left as x.
+	require.Contains(t, out, "int v = x;")
+}
+
+func TestExpandFunctionMacros_ObjectMutualRecursion(t *testing.T) {
+	src := `
+#define A B
+#define B A
+int v = A;
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	// A -> B (A hidden) -> A (B hidden) -> A stays.
+	require.Contains(t, out, "int v = A;")
+}
+
+func TestExpandFunctionMacros_FunctionSelfReference(t *testing.T) {
+	src := `
+#define F(x) F(x)
+int v = F(1);
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	// F(1) expands once to F(1), then F is hidden -> left as F(1).
+	require.Contains(t, out, "int v = F(1);")
+}
+
+func TestExpandFunctionMacros_FunctionMutualRecursion(t *testing.T) {
+	src := `
+#define A(x) B(x)
+#define B(x) A(x)
+int v = A(1);
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	// A(1) -> B(1) (A hidden) -> A(1) (B hidden) -> A(1) stays.
+	require.Contains(t, out, "int v = A(1);")
+}
+
+func TestExpandFunctionMacros_ObjectMacroUsedByFunction(t *testing.T) {
+	src := `
+#define X X
+#define F(x) (X)
+int v = F(1);
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	// F(1) -> (X) with F hidden; X expands once to X then hidden -> (X).
+	require.Contains(t, out, "int v = (X);")
+}
+
+func TestExpandFunctionMacros_NestedStillExpands(t *testing.T) {
+	// Regression guard: hide-set must not suppress legitimate nested expansion
+	// where the outer and inner macro names differ.
+	src := `
+#define SQUARE(x) ((x) * (x))
+#define CUBE(x) (SQUARE(x) * (x))
+int result = CUBE(num);
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	require.Contains(t, out, "((num) * (num))")
+}

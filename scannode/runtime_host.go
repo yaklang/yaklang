@@ -39,36 +39,40 @@ const (
 var runtimeHostIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{0,191}$`)
 var runtimeHostSHA256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var runtimeHostReleaseIDPattern = regexp.MustCompile(`^sha256-[a-f0-9]{64}$`)
+var errRuntimeHostReleaseMismatch = errors.New("runtime release does not match the installed node release")
 
 type RuntimeHostConfig struct {
-	Enabled             bool
-	BaseDir             string
-	PlatformAPIBaseURL  string
-	EnrollmentToken     string
-	AgentInstallationID string
-	EngineReleaseID     string
-	EngineDigest        string
-	Network             string
-	HTTPClient          *http.Client
-	NodeIDProvider      func() string
-	SessionProvider     func() (node.SessionState, bool)
-	docker              runtimeHostDocker
+	Enabled                   bool
+	BaseDir                   string
+	PlatformAPIBaseURL        string
+	RuntimePlatformAPIBaseURL string
+	EnrollmentToken           string
+	AgentInstallationID       string
+	EngineReleaseID           string
+	EngineDigest              string
+	Network                   string
+	HTTPClient                *http.Client
+	NodeIDProvider            func() string
+	SessionProvider           func() (node.SessionState, bool)
+	docker                    runtimeHostDocker
 }
 
 type runtimeHostExecutor struct {
-	docker              runtimeHostDocker
-	baseDir             string
-	platformAPIBaseURL  string
-	enrollmentToken     string
-	agentInstallationID string
-	engineReleaseID     string
-	engineDigest        string
-	network             string
-	httpClient          *http.Client
-	nodeIDProvider      func() string
-	sessionProvider     func() (node.SessionState, bool)
-	operations          map[string]runtimeHostOperationRecord
-	mu                  sync.Mutex
+	docker                    runtimeHostDocker
+	baseDir                   string
+	platformAPIBaseURL        string
+	runtimePlatformAPIBaseURL string
+	enrollmentToken           string
+	agentInstallationID       string
+	engineReleaseID           string
+	engineDigest              string
+	network                   string
+	httpClient                *http.Client
+	nodeIDProvider            func() string
+	sessionProvider           func() (node.SessionState, bool)
+	operations                map[string]runtimeHostOperationRecord
+	images                    map[string]runtimeHostImageRecord
+	mu                        sync.Mutex
 }
 
 type runtimeHostStatusDetail struct {
@@ -105,21 +109,31 @@ func newRuntimeHostExecutor(cfg RuntimeHostConfig) (*runtimeHostExecutor, error)
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Minute}
 	}
+	platformAPIBaseURL := strings.TrimRight(strings.TrimSpace(cfg.PlatformAPIBaseURL), "/")
+	runtimePlatformAPIBaseURL := strings.TrimRight(strings.TrimSpace(cfg.RuntimePlatformAPIBaseURL), "/")
+	if runtimePlatformAPIBaseURL == "" {
+		runtimePlatformAPIBaseURL = platformAPIBaseURL
+	}
 	executor := &runtimeHostExecutor{
-		docker:              dockerClient,
-		baseDir:             strings.TrimSpace(cfg.BaseDir),
-		platformAPIBaseURL:  strings.TrimRight(strings.TrimSpace(cfg.PlatformAPIBaseURL), "/"),
-		enrollmentToken:     strings.TrimSpace(cfg.EnrollmentToken),
-		agentInstallationID: strings.TrimSpace(cfg.AgentInstallationID),
-		engineReleaseID:     strings.TrimSpace(cfg.EngineReleaseID),
-		engineDigest:        strings.ToLower(strings.TrimSpace(cfg.EngineDigest)),
-		network:             network,
-		httpClient:          client,
-		nodeIDProvider:      cfg.NodeIDProvider,
-		sessionProvider:     cfg.SessionProvider,
+		docker:                    dockerClient,
+		baseDir:                   strings.TrimSpace(cfg.BaseDir),
+		platformAPIBaseURL:        platformAPIBaseURL,
+		runtimePlatformAPIBaseURL: runtimePlatformAPIBaseURL,
+		enrollmentToken:           strings.TrimSpace(cfg.EnrollmentToken),
+		agentInstallationID:       strings.TrimSpace(cfg.AgentInstallationID),
+		engineReleaseID:           strings.TrimSpace(cfg.EngineReleaseID),
+		engineDigest:              strings.ToLower(strings.TrimSpace(cfg.EngineDigest)),
+		network:                   network,
+		httpClient:                client,
+		nodeIDProvider:            cfg.NodeIDProvider,
+		sessionProvider:           cfg.SessionProvider,
 	}
 	if executor.baseDir == "" {
 		return nil, fmt.Errorf("runtime host base directory is required")
+	}
+	if !runtimeHostURLHasScheme(executor.platformAPIBaseURL, "http", "https") ||
+		!runtimeHostURLHasScheme(executor.runtimePlatformAPIBaseURL, "http", "https") {
+		return nil, fmt.Errorf("runtime host platform API URLs must use http or https")
 	}
 	if executor.enrollmentToken == "" || executor.agentInstallationID == "" ||
 		executor.nodeIDProvider == nil || executor.sessionProvider == nil {
@@ -200,12 +214,25 @@ func (b *legionJobBridge) handleAIRuntimeHostCommand(ctx context.Context, payloa
 		return rejectRuntimeHostCommand(fmt.Errorf("node session is unavailable"))
 	}
 	if err := b.agent.runtimeHost.validateCommand(command, session); err != nil {
+		if errors.Is(err, errRuntimeHostReleaseMismatch) {
+			// The command was authenticated for this live Node session, but it
+			// belongs to a container pinned to an older release. Return a signed
+			// terminal result so Session Manager can release its cleanup claim and
+			// continue reconciling new sessions instead of waiting forever.
+			return b.publishRuntimeHostResult(
+				runtimeHostRejectedResult(command, session, "release_mismatch", err),
+				session,
+			)
+		}
 		// Authentication, expiry, target-session and fixed-spec failures cannot
 		// become valid on redelivery. Mark them terminal so an old node-session
 		// message cannot occupy the durable consumer after a restart.
 		return rejectRuntimeHostCommand(err)
 	}
-	result := b.agent.runtimeHost.execute(ctx, command, session)
+	return b.publishRuntimeHostResult(b.agent.runtimeHost.execute(ctx, command, session), session)
+}
+
+func (b *legionJobBridge) publishRuntimeHostResult(result *nodev1.AIRuntimeResult, session node.SessionState) error {
 	if err := signRuntimeHostResult(result, b.agent.runtimeHost.enrollmentToken, session.SessionID); err != nil {
 		return err
 	}
@@ -219,7 +246,7 @@ func (b *legionJobBridge) handleAIRuntimeHostCommand(ctx context.Context, payloa
 	if consumer == nil || consumer.conn == nil {
 		return fmt.Errorf("runtime host reply transport is unavailable")
 	}
-	return consumer.conn.Publish(command.ReplySubject, encoded)
+	return consumer.conn.Publish(runtimeHostReplyPrefix+result.CommandId, encoded)
 }
 
 func (e *runtimeHostExecutor) validateCommand(command *nodev1.AIRuntimeCommand, session node.SessionState) error {
@@ -257,7 +284,7 @@ func (e *runtimeHostExecutor) validateCommand(command *nodev1.AIRuntimeCommand, 
 	}
 	if command.Release.ReleaseId != e.engineReleaseID ||
 		!strings.EqualFold(command.Release.EngineDigest, e.engineDigest) {
-		return fmt.Errorf("runtime release does not match the installed node release")
+		return errRuntimeHostReleaseMismatch
 	}
 	if command.Operation == nodev1.AIRuntimeOperation_AI_RUNTIME_OPERATION_START {
 		return e.validateContainerSpec(command.Container, command.AiSessionId)
@@ -315,7 +342,11 @@ func (e *runtimeHostExecutor) validateContainerSpec(spec *nodev1.AIRuntimeContai
 	if spec.Environment["LEGION_AI_SESSION_ID"] != sessionID || strings.TrimSpace(spec.Environment["LEGION_ENROLLMENT_TOKEN"]) == "" {
 		return fmt.Errorf("runtime container startup credential is missing")
 	}
-	if strings.TrimRight(spec.Environment["LEGION_API_URL"], "/") != e.platformAPIBaseURL ||
+	runtimePlatformAPIBaseURL := e.runtimePlatformAPIBaseURL
+	if runtimePlatformAPIBaseURL == "" {
+		runtimePlatformAPIBaseURL = e.platformAPIBaseURL
+	}
+	if strings.TrimRight(spec.Environment["LEGION_API_URL"], "/") != runtimePlatformAPIBaseURL ||
 		spec.Environment["LEGION_AI_RUNTIME"] != "stateless" ||
 		!runtimeHostURLHasScheme(spec.Environment["LEGION_SESSIONMGR_URL"], "http", "https") ||
 		!runtimeHostURLHasScheme(spec.Environment["LEGION_NATS_URL"], "nats") {
@@ -371,15 +402,7 @@ func runtimeHostArgumentsMatch(arguments []string, flag, expected string) bool {
 }
 
 func (e *runtimeHostExecutor) execute(ctx context.Context, command *nodev1.AIRuntimeCommand, session node.SessionState) *nodev1.AIRuntimeResult {
-	result := &nodev1.AIRuntimeResult{
-		Metadata: &nodev1.EventMetadata{
-			EventId: uuid.NewString(), EventType: "ai.runtime.result", CausationId: command.Metadata.CommandId,
-			CorrelationId: command.AiSessionId, EmittedAt: timestamppb.Now(),
-			Node: &nodev1.NodeRef{NodeId: command.Target.NodeId, NodeSessionId: session.SessionID},
-		},
-		CommandId: command.Metadata.CommandId, Operation: command.Operation,
-		AiSessionId: command.AiSessionId, CleanupKey: command.CleanupKey, LeaseToken: command.LeaseToken,
-	}
+	result := newRuntimeHostResult(command, session)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	var err error
@@ -403,8 +426,29 @@ func (e *runtimeHostExecutor) execute(ctx context.Context, command *nodev1.AIRun
 	return result
 }
 
+func newRuntimeHostResult(command *nodev1.AIRuntimeCommand, session node.SessionState) *nodev1.AIRuntimeResult {
+	return &nodev1.AIRuntimeResult{
+		Metadata: &nodev1.EventMetadata{
+			EventId: uuid.NewString(), EventType: "ai.runtime.result", CausationId: command.Metadata.CommandId,
+			CorrelationId: command.AiSessionId, EmittedAt: timestamppb.Now(),
+			Node: &nodev1.NodeRef{NodeId: command.Target.NodeId, NodeSessionId: session.SessionID},
+		},
+		CommandId: command.Metadata.CommandId, Operation: command.Operation,
+		AiSessionId: command.AiSessionId, CleanupKey: command.CleanupKey, LeaseToken: command.LeaseToken,
+	}
+}
+
+func runtimeHostRejectedResult(command *nodev1.AIRuntimeCommand, session node.SessionState, code string, err error) *nodev1.AIRuntimeResult {
+	result := newRuntimeHostResult(command, session)
+	result.ErrorCode = strings.TrimSpace(code)
+	if err != nil {
+		result.ErrorMessage = err.Error()
+	}
+	return result
+}
+
 func (e *runtimeHostExecutor) ensureImage(ctx context.Context, release *nodev1.AIRuntimeRelease) (string, error) {
-	if imageID, exists, err := e.docker.ResolveImageID(ctx, release.ImageId); err != nil || exists {
+	if imageID, exists, err := e.resolveRuntimeImage(ctx, release); err != nil || exists {
 		return imageID, err
 	}
 	archive, cleanup, err := e.downloadRuntimeArchive(ctx, release)
@@ -412,15 +456,25 @@ func (e *runtimeHostExecutor) ensureImage(ctx context.Context, release *nodev1.A
 		return "", err
 	}
 	defer cleanup()
-	if err := e.docker.LoadImage(ctx, archive); err != nil {
-		return "", fmt.Errorf("load verified Runtime image: %w", err)
-	}
-	imageID, exists, err := e.docker.ResolveImageID(ctx, release.ImageId)
+	imageTag, err := inspectRuntimeImageArchive(archive, release)
 	if err != nil {
 		return "", err
 	}
-	if !exists || imageID != release.ImageId {
-		return "", fmt.Errorf("loaded Runtime image does not match the pinned identity")
+	if _, err := archive.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	if err := e.docker.LoadImage(ctx, archive); err != nil {
+		return "", fmt.Errorf("load verified Runtime image: %w", err)
+	}
+	imageID, exists, err := e.docker.ResolveImageID(ctx, imageTag)
+	if err != nil {
+		return "", err
+	}
+	if !exists || !runtimeHostImageIDPattern.MatchString(strings.ToLower(strings.TrimSpace(imageID))) {
+		return "", fmt.Errorf("loaded Runtime image has no target-local identity")
+	}
+	if err := e.recordRuntimeImage(release, imageTag, imageID); err != nil {
+		return "", fmt.Errorf("persist target-local Runtime image identity: %w", err)
 	}
 	return imageID, nil
 }
@@ -482,11 +536,11 @@ func (e *runtimeHostExecutor) start(ctx context.Context, command *nodev1.AIRunti
 			return "", false, fmt.Errorf("runtime container ownership does not match the active generation")
 		}
 	}
-	imageID, exists, err := e.docker.ResolveImageID(ctx, command.Release.ImageId)
+	imageID, exists, err := e.resolveRuntimeImage(ctx, command.Release)
 	if err != nil {
 		return "", false, err
 	}
-	if !exists || imageID != command.Release.ImageId {
+	if !exists {
 		return "", false, fmt.Errorf("pinned Runtime image is not ready")
 	}
 	if existing, found, err := e.docker.FindContainer(ctx, command.CleanupKey); err != nil {

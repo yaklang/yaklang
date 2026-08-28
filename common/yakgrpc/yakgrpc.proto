@@ -1095,6 +1095,11 @@ service Yak {
   rpc QueryContextMenuActions(QueryContextMenuActionsRequest) returns (QueryContextMenuActionsResponse);
   rpc SetContextMenuActionBinding(SetContextMenuActionBindingRequest) returns (ContextMenuAction);
   rpc ExecuteContextMenuAction(ExecuteContextMenuActionRequest) returns (stream ContextMenuActionEvent);
+
+  // Upload GUI-local bytes into the currently connected engine's temporary
+  // filesystem. Returned paths are engine paths and can be used by file
+  // Fuzztags in both local and remote-engine modes.
+  rpc UploadToTemporaryFile(stream UploadToTemporaryFileRequest) returns (UploadToTemporaryFileResponse);
 }
 
 // IMBotConfig 描述一个 IM 平台 bot 的配置凭证。
@@ -7050,6 +7055,8 @@ message FuzzerResponse {
   string FixContentType = 60;
   bool IsSetContentTypeOptions = 61;
   repeated RandomChunkedResponse RandomChunkedData = 62;
+  // 与 http_flows / web_fuzzer_response 对齐的唯一键，下载 body 用它而不是 RuntimeID。
+  string HiddenIndex = 64;
 }
 
 enum ChunkedDataDirection {
@@ -7113,6 +7120,8 @@ message GetHTTPFlowBodyByIdRequest {
   // 未设 = 返回完整 body（multipart 时现场流式重建完整 body）。
   // 用 optional 以区分「未设」与「part 0」。
   optional int32 PartIndex = 6;
+  // WebFuzzer 单条结果：按 HiddenIndex 定位 HTTPFlow，避免 RuntimeId 命中任务内其它 hop。
+  string HiddenIndex = 7;
 }
 
 message MITMExtractAggregateFlowFilterRow {
@@ -9507,6 +9516,22 @@ message SingleManualHijackControlMessage{
   bytes Request = 9;
   bytes Response = 10;
   bytes Payload = 11;
+
+  // Stream a local replacement file for an oversized request. Chunks are
+  // written to an engine-side temporary file and applied when the hijacked
+  // request is forwarded, so the renderer never loads the full file.
+  bool IsLargeRequestFileChunk = 12;
+  int32 LargeRequestPartIndex = 13;
+  // Field 14 previously carried the GUI-local replacement filename. File
+  // replacement changes bytes only; multipart filename/MIME remain those of
+  // the intercepted request, so this field must not be reused.
+  reserved 14;
+  bytes LargeRequestFileData = 15;
+  bool LargeRequestFileStart = 16;
+  bool LargeRequestFileEOF = 17;
+  bool LargeRequestFileCancel = 18;
+  // Replace the complete request body instead of one multipart file part.
+  bool LargeRequestReplaceBody = 19;
 }
 
 message SingleManualHijackInfoMessage{
@@ -10105,4 +10130,13 @@ message ContextMenuActionEvent {
   string PluginName = 5;
   ExecResult Result = 6;
   ContextMenuPacketActionResult PacketResult = 7;
+}
+
+message UploadToTemporaryFileRequest {
+  bytes Data = 1;
+}
+
+message UploadToTemporaryFileResponse {
+  string FileName = 1;
+  int64 Size = 2;
 }

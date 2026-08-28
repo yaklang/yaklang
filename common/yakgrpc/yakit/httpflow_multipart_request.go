@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,9 +24,9 @@ import (
 )
 
 // multipartSkeletonMarker is the prefix of the single-line placeholder that
-// replaces a spilled file part inside the in-DB skeleton body. It carries the
-// part index, original filename and size so the skeleton stays human-readable
-// and the part can be located in the sidecar directory on rebuild.
+// replaces a spilled part body inside the internal skeleton. The historical
+// "file spilled" wording is retained for serialized-flow compatibility even
+// though ordinary form fields may now be spilled too.
 //
 // Example:
 //
@@ -34,27 +35,25 @@ const multipartSkeletonMarker = "[[yakit: multipart file spilled"
 
 // multipartSpillMarkerPattern matches the placeholder line produced by
 // spillMultipartFilesIfNeeded. Kept for callers that want to parse part
-// index/filename/size out of a skeleton (e.g. a future single-part download).
+// index/filename/size out of a skeleton.
 var multipartSpillMarkerPattern = regexp.MustCompile(
-	`(?m)^\[\[yakit: multipart file spilled, part=(\d+), file=(.*?), size=(\d+)\]\]$`,
+	`(?m)^\[\[yakit: multipart file spilled, part=(\d+), file=(.*?), size=(\d+)\]\]\r?$`,
 )
 
 // multipartSpillResult is the multipart-aware counterpart of
 // largeRequestSpillResult. When IsTooLarge is true the request was a
-// multipart/form-data body carrying at least one file part, and:
+// multipart body carrying at least one collapsed part, and:
 //   - StoredPacket is the in-DB skeleton (header + skeleton body with
 //     placeholders) — small and editable.
 //   - HeaderFile holds the request headers (same contract as flat spill).
-//   - BodyFile is a 0-byte placeholder: the real file contents live in the
-//     sidecar part files (MultipartDir). The complete multipart body is
-//     rebuilt on demand by GetHTTPFlowBodyById via io.Pipe streaming. The
-//     placeholder name anchors the sidecar directory derivation
-//     (multipartSidecarDirFromBodyFile) so cleanup/locating parts work from
-//     the persisted TooLargeRequestBodyFile path alone.
+//   - BodyFile points to the first real spilled part file inside MultipartDir.
+//     Its parent directory anchors cleanup and manifest lookup from the
+//     persisted TooLargeRequestBodyFile path alone. The complete multipart
+//     body is rebuilt on demand by GetHTTPFlowBodyById via io.Pipe streaming.
 //   - MultipartDir is the sidecar directory containing the per-part files
 //     and manifest.json.
-//   - Manifest lists every file part; also persisted to manifest.json in
-//     MultipartDir for downstream readers.
+//   - Manifest lists every collapsed part; it is also persisted to
+//     manifest.json in MultipartDir for downstream readers.
 type multipartSpillResult struct {
 	StoredPacket    []byte
 	IsTooLarge      bool
@@ -65,25 +64,72 @@ type multipartSpillResult struct {
 	Manifest        []multipartPartMeta
 }
 
-// multipartPartMeta records metadata about one spilled file part.
+// multipartPartMeta records metadata about one spilled part. Filename is empty
+// for an ordinary form field.
 type multipartPartMeta struct {
 	Index       int
 	FieldName   string
 	Filename    string
 	ContentType string
 	Size        int64
-	File        string // disk filename inside MultipartDir (part-N-<sanitized>)
+	File        string // disk filename inside MultipartDir (part-N-data.txt)
 }
 
-// spillMultipartFilesIfNeeded inspects an oversized request packet and, when
-// it is a multipart/form-data body carrying at least one file part, spills each
-// file part to a sidecar file, writes manifest.json, leaves a 0-byte body
-// placeholder, and returns a skeleton packet safe to store in the DB. The
-// complete multipart body is rebuilt on demand by GetHTTPFlowBodyById.
+type multipartPartSpillPlan struct {
+	FieldName        string
+	Filename         string
+	ContentType      string
+	EditorSize       int
+	SkeletonOverhead int
+	Spill            bool
+}
+
+type multipartPartReader interface {
+	NextPart() (*customMultipart.Part, error)
+}
+
+// multipartSpillOps keeps filesystem and streaming failures deterministic in
+// tests. The production wrapper below always supplies the real os/io helpers;
+// no mutable package-level hook is shared by concurrent MITM requests.
+type multipartSpillOps struct {
+	newReader     func(io.Reader) multipartPartReader
+	mkdirAll      func(string, os.FileMode) error
+	create        func(string) (*os.File, error)
+	copy          func(io.Writer, io.Reader) (int64, error)
+	writeHeaders  func(io.Writer, textproto.MIMEHeader) error
+	openTempFile  func(string) (*os.File, error)
+	writeManifest func(string, []multipartPartMeta) error
+}
+
+func defaultMultipartSpillOps() multipartSpillOps {
+	return multipartSpillOps{
+		newReader: func(reader io.Reader) multipartPartReader {
+			return customMultipart.NewReader(reader)
+		},
+		mkdirAll:      os.MkdirAll,
+		create:        os.Create,
+		copy:          io.Copy,
+		writeHeaders:  writePartHeaders,
+		openTempFile:  utils.OpenTempFile,
+		writeManifest: writeMultipartManifest,
+	}
+}
+
+// spillMultipartFilesIfNeeded inspects an oversized multipart request and
+// collapses only as many part bodies as necessary. A part whose exact editor
+// representation exceeds D is selected immediately; while the remaining
+// multipart skeleton still exceeds D, the largest remaining part is selected.
+// Boundaries and part headers always stay in the skeleton. If every body is
+// selected and the structural skeleton still exceeds D, it is intentionally
+// kept instead of flattening a valid multipart request.
 //
-// When the packet is not multipart or carries no file part, IsTooLarge is false
-// and the caller falls back to the flat large-request spill path.
+// When the packet is not parseable multipart, IsTooLarge is false and the
+// caller falls back to the flat large-request spill path.
 func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
+	return spillMultipartFilesIfNeededWithOps(packet, defaultMultipartSpillOps())
+}
+
+func spillMultipartFilesIfNeededWithOps(packet []byte, ops multipartSpillOps) (multipartSpillResult, error) {
 	var res multipartSpillResult
 	if len(packet) == 0 {
 		return res, nil
@@ -91,9 +137,13 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
 	res.OriginalBodyLen = len(body)
-	// Only engage for oversized bodies; small multiparts take the normal path.
+	// Keep the original multipart body inline when its exact editor-facing
+	// representation (including unquote expansion) remains within D.
 	if len(body) <= GetMaxHTTPFlowRequestBodyInDBBytes() {
-		return res, nil
+		inlineBodySize, _, measureErr := lowhttp.MeasureHTTPRequestFuzzTagBodySize(packet)
+		if measureErr == nil && inlineBodySize <= GetMaxHTTPFlowRequestBodyInDBBytes() {
+			return res, nil
+		}
 	}
 
 	ct := lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type")
@@ -106,13 +156,14 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 		return res, nil
 	}
 
-	// First pass: enumerate parts using the boundary-tolerant reader and
-	// decide whether this is worth skeletonizing (>=1 file part).
-	mr := customMultipart.NewReader(bytes.NewReader(body))
-	var partInfos []struct {
-		header textproto.MIMEHeader
-		isFile bool
-	}
+	limit := GetMaxHTTPFlowRequestBodyInDBBytes()
+
+	// First pass: enumerate and measure every part using the same UTF-8 rule as
+	// ConvertHTTPRequestToFuzzTag. The reader is boundary-tolerant, while the
+	// temporary buffer keeps failure injection deterministic and is released
+	// after each part.
+	mr := ops.newReader(bytes.NewReader(body))
+	plans := make([]multipartPartSpillPlan, 0)
 	for {
 		p, err := mr.NextPart()
 		if err != nil {
@@ -122,25 +173,63 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 			// Malformed multipart: bail out to flat spill so we never lose data.
 			return res, nil
 		}
-		isFile := p.FileName() != ""
-		partInfos = append(partInfos, struct {
-			header textproto.MIMEHeader
-			isFile bool
-		}{header: copyMIMEHeader(p.Header), isFile: isFile})
+		var partBody bytes.Buffer
+		_, copyErr := ops.copy(&partBody, p)
+		if copyErr != nil {
+			return res, nil
+		}
+		editorSize, _ := lowhttp.MeasureFuzzTagBodySize(partBody.Bytes())
+		filename := p.FileName()
+		contentType := p.GetHeader("Content-Type")
+		if contentType == "" && filename != "" {
+			contentType = "application/octet-stream"
+		}
+		plans = append(plans, multipartPartSpillPlan{
+			FieldName:        p.FormName(),
+			Filename:         filename,
+			ContentType:      contentType,
+			EditorSize:       editorSize,
+			SkeletonOverhead: multipartSkeletonPartOverhead(boundary, p.Header),
+			Spill:            editorSize > limit,
+		})
 	}
-	if len(partInfos) == 0 {
+	if len(plans) == 0 {
 		return res, nil
 	}
-	hasFilePart := false
-	for _, pi := range partInfos {
-		if pi.isFile {
-			hasFilePart = true
-			break
+
+	// file tags are deliberately ignored by the selection heuristic: they are
+	// tiny compared with D. They remain part of the actual generated skeleton,
+	// but a structural skeleton above D is preferable to destroying multipart
+	// shape via a whole-body fallback.
+	skeletonSize := len("--" + boundary + "--\r\n")
+	selected := 0
+	for i := range plans {
+		skeletonSize += plans[i].SkeletonOverhead
+		if plans[i].Spill {
+			selected++
+		} else {
+			skeletonSize += plans[i].EditorSize
 		}
 	}
-	if !hasFilePart {
-		// Oversized multipart with only text fields: keep flat path, no
-		// benefit in skeletonizing tiny editable fields.
+	for skeletonSize > limit && selected < len(plans) {
+		largest := -1
+		for i := range plans {
+			if plans[i].Spill {
+				continue
+			}
+			if largest < 0 || plans[i].EditorSize > plans[largest].EditorSize {
+				largest = i
+			}
+		}
+		// selected < len(plans) guarantees that at least one plan is not
+		// spilled, so largest is always set by the loop above.
+		plans[largest].Spill = true
+		selected++
+		skeletonSize -= plans[largest].EditorSize
+	}
+	if selected == 0 {
+		// The oversized bytes were outside parseable part bodies (for example a
+		// large preamble). Rebuilding a skeleton would not be lossless.
 		return res, nil
 	}
 
@@ -151,16 +240,16 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	suffix := fmt.Sprintf("%v_%v", time.Now().Format(utils.DatetimePretty()), uid)
 	tempDir := consts.GetDefaultYakitBaseTempDir()
 	dir := filepath.Join(tempDir, fmt.Sprintf("large-request-body-%v-parts", suffix))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := ops.mkdirAll(dir, 0o755); err != nil {
 		return res, err
 	}
 	res.MultipartDir = dir
 
-	// Second pass: spill file parts to disk and build the skeleton body.
+	// Second pass: spill selected part bodies and build the skeleton body.
 	// We write the multipart framing manually into skeletonBuf so the
 	// skeleton keeps the original boundary and part headers verbatim (the
 	// standard multipart.Writer would normalize them).
-	mr = customMultipart.NewReader(bytes.NewReader(body))
+	mr = ops.newReader(bytes.NewReader(body))
 	skeletonBuf := new(bytes.Buffer)
 
 	partIndex := 0
@@ -174,31 +263,31 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 			return res, nil
 		}
 
-		isFile := p.FileName() != ""
+		if partIndex >= len(plans) {
+			_ = os.RemoveAll(dir)
+			return res, nil
+		}
+		plan := plans[partIndex]
 		// Opening boundary line for this part.
 		skeletonBuf.WriteString("--" + boundary + "\r\n")
-		if err := writePartHeaders(skeletonBuf, p.Header); err != nil {
+		if err := ops.writeHeaders(skeletonBuf, p.Header); err != nil {
 			_ = os.RemoveAll(dir)
 			return res, err
 		}
 		skeletonBuf.WriteString("\r\n")
 
-		if isFile {
-			fieldName := p.FormName()
-			filename := p.FileName()
-			contentType := p.GetHeader("Content-Type")
-			if contentType == "" {
-				contentType = "application/octet-stream"
-			}
-
-			partFileName := fmt.Sprintf("part-%d-%s.txt", partIndex, sanitizeFilename(filename))
+		if plan.Spill {
+			// The original filename remains in Content-Disposition and the
+			// manifest. Do not place it in the sidecar path: characters such as
+			// ')', '|', or '{{' are valid filename text but delimit {{file(...)}}.
+			partFileName := fmt.Sprintf("part-%d-data.txt", partIndex)
 			partPath := filepath.Join(dir, partFileName)
-			f, err := os.Create(partPath)
+			f, err := ops.create(partPath)
 			if err != nil {
 				_ = os.RemoveAll(dir)
 				return res, err
 			}
-			n, copyErr := io.Copy(f, p)
+			n, copyErr := ops.copy(f, p)
 			f.Close()
 			if copyErr != nil {
 				_ = os.RemoveAll(dir)
@@ -207,20 +296,20 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 
 			res.Manifest = append(res.Manifest, multipartPartMeta{
 				Index:       partIndex,
-				FieldName:   fieldName,
-				Filename:    filename,
-				ContentType: contentType,
+				FieldName:   plan.FieldName,
+				Filename:    plan.Filename,
+				ContentType: plan.ContentType,
 				Size:        n,
 				File:        partFileName,
 			})
 
-			// Skeleton placeholder line replaces the file content; the
+			// Skeleton placeholder line replaces the selected part body; the
 			// trailing CRLF terminates the part body.
 			fmt.Fprintf(skeletonBuf, "%s, part=%d, file=%s, size=%d]]\r\n",
-				multipartSkeletonMarker, partIndex, filename, n)
+				multipartSkeletonMarker, partIndex, plan.Filename, n)
 		} else {
-			// Text field: preserve value verbatim in the skeleton.
-			if _, err := io.Copy(skeletonBuf, p); err != nil {
+			// Unselected fields and files remain editable inline.
+			if _, err := ops.copy(skeletonBuf, p); err != nil {
 				_ = os.RemoveAll(dir)
 				return res, err
 			}
@@ -228,11 +317,15 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 		}
 		partIndex++
 	}
+	if partIndex != len(plans) || len(res.Manifest) == 0 {
+		_ = os.RemoveAll(dir)
+		return res, nil
+	}
 	// Closing boundary.
 	skeletonBuf.WriteString("--" + boundary + "--\r\n")
 
 	// Write the header file (same contract as flat spill).
-	headerFP, err := utils.OpenTempFile(fmt.Sprintf("large-request-header-%v.txt", suffix))
+	headerFP, err := ops.openTempFile(fmt.Sprintf("large-request-header-%v.txt", suffix))
 	if err != nil {
 		_ = os.RemoveAll(dir)
 		return res, err
@@ -246,9 +339,9 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	headerFP.Close()
 
 	// Write manifest.json into the sidecar directory so downstream readers
-	// (toHTTPFlowGRPCModel, GetHTTPFlowBodyById) can enumerate file parts
+	// (toHTTPFlowGRPCModel, GetHTTPFlowBodyById) can enumerate spilled parts
 	// without re-parsing the skeleton.
-	if err := writeMultipartManifest(dir, res.Manifest); err != nil {
+	if err := ops.writeManifest(dir, res.Manifest); err != nil {
 		_ = os.RemoveAll(dir)
 		_ = os.Remove(headerPath)
 		return res, err
@@ -270,6 +363,20 @@ func spillMultipartFilesIfNeeded(packet []byte) (multipartSpillResult, error) {
 	return res, nil
 }
 
+func multipartSkeletonPartOverhead(boundary string, header textproto.MIMEHeader) int {
+	// --boundary\r\n + headers + blank line + trailing body CRLF.
+	size := len(boundary) + len("--\r\n") + len("\r\n") + len("\r\n")
+	for key, values := range header {
+		if len(values) == 0 {
+			continue
+		}
+		for _, value := range values {
+			size += len(key) + len(": \r\n") + len(value)
+		}
+	}
+	return size
+}
+
 // writePartHeaders writes the given part headers in a stable, verbatim style
 // (key: value\r\n) into w. It preserves the original header casing stored by
 // the custom multipart reader.
@@ -281,36 +388,68 @@ func writePartHeaders(w io.Writer, header textproto.MIMEHeader) error {
 	for k := range header {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	// Put Content-Disposition first for readability of the skeleton.
-	if cd, ok := header["Content-Disposition"]; ok && len(cd) > 0 {
-		if _, err := fmt.Fprintf(w, "Content-Disposition: %s\r\n", cd[0]); err != nil {
-			return err
+	if values := header["Content-Disposition"]; len(values) > 0 {
+		for _, value := range values {
+			if _, err := fmt.Fprintf(w, "Content-Disposition: %s\r\n", value); err != nil {
+				return err
+			}
 		}
 	}
 	for _, k := range keys {
 		if k == "Content-Disposition" {
 			continue
 		}
-		vals := header[k]
-		if len(vals) == 0 {
+		values := header[k]
+		if len(values) == 0 {
 			continue
 		}
-		if _, err := fmt.Fprintf(w, "%s: %s\r\n", k, vals[0]); err != nil {
-			return err
+		for _, value := range values {
+			if _, err := fmt.Fprintf(w, "%s: %s\r\n", k, value); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 // rebuildMultipartBodyToWriter parses a skeleton multipart body and writes the
-// complete body to dst, streaming each spilled file part from sidecarDir.
-// Text fields are copied verbatim from the skeleton; file parts are replaced
-// by the contents of the corresponding part-N-<filename> file on disk.
+// complete body to dst, streaming each spilled part from sidecarDir. Parts not
+// present in the manifest are copied verbatim from the editable skeleton.
 func rebuildMultipartBodyToWriter(skeletonBody []byte, sidecarDir string, dst io.Writer) error {
+	return rebuildMultipartBodyToWriterWithReplacements(skeletonBody, sidecarDir, nil, dst)
+}
+
+// rebuildMultipartBodyToWriterWithReplacements rebuilds a multipart skeleton
+// while replacing selected spilled parts with engine-local temporary files.
+// Spilled parts not present in replacements stream from the original sidecar.
+func rebuildMultipartBodyToWriterWithReplacements(
+	skeletonBody []byte,
+	sidecarDir string,
+	replacements map[int]string,
+	dst io.Writer,
+) error {
 	// Detect boundary from the skeleton's first boundary line.
 	boundary, err := detectBoundary(skeletonBody)
 	if err != nil {
 		return err
+	}
+	manifest, err := loadMultipartManifest(sidecarDir)
+	if err != nil {
+		return err
+	}
+	manifestByIndex := make(map[int]multipartPartMeta, len(manifest))
+	for _, meta := range manifest {
+		manifestByIndex[meta.Index] = meta
+	}
+	for partIndex, replacementPath := range replacements {
+		if _, ok := manifestByIndex[partIndex]; !ok {
+			return utils.Errorf("multipart replacement part %d not found in manifest", partIndex)
+		}
+		if replacementPath == "" {
+			return utils.Errorf("multipart replacement part %d has an empty file path", partIndex)
+		}
 	}
 
 	mr := customMultipart.NewReader(bytes.NewReader(skeletonBody))
@@ -327,10 +466,12 @@ func rebuildMultipartBodyToWriter(skeletonBody []byte, sidecarDir string, dst io
 			}
 			return err
 		}
-		isFile := p.FileName() != ""
-		if isFile {
-			partFileName := fmt.Sprintf("part-%d-%s.txt", partIndex, sanitizeFilename(p.FileName()))
-			partPath := filepath.Join(sidecarDir, partFileName)
+		meta, spilled := manifestByIndex[partIndex]
+		if spilled {
+			partPath := replacements[partIndex]
+			if partPath == "" {
+				partPath = filepath.Join(sidecarDir, meta.File)
+			}
 			f, ferr := os.Open(partPath)
 			if ferr != nil {
 				return utils.Wrapf(ferr, "open spilled part file %q failed", partPath)
@@ -346,19 +487,76 @@ func rebuildMultipartBodyToWriter(skeletonBody []byte, sidecarDir string, dst io
 			}
 			f.Close()
 		} else {
-			// Text field: write the value verbatim from the skeleton into the
-			// part body returned by CreatePart.
+			// Inline ordinary and file parts stay editable in the skeleton. A
+			// backend-owned marker/resource without a matching manifest entry is
+			// corruption, not an inline user value; fail closed instead of
+			// streaming the placeholder as request bytes.
+			// The custom multipart reader materializes every Part into an in-memory
+			// bytes.Buffer before returning it, so reading the part cannot fail.
+			inlineBody, _ := io.ReadAll(p)
+			if multipartSpillMarkerPattern.Match(inlineBody) {
+				return utils.Errorf("multipart part %d not found in manifest", partIndex)
+			}
+			for _, path := range fileFuzzTagPaths(inlineBody) {
+				if filepath.Clean(filepath.Dir(path)) == filepath.Clean(sidecarDir) && isEngineOwnedLargeRequestPath(path) {
+					return utils.Errorf("multipart part %d not found in manifest", partIndex)
+				}
+			}
 			partWriter, werr := mw.CreatePart(p.Header)
 			if werr != nil {
 				return werr
 			}
-			if _, cerr := io.Copy(partWriter, p); cerr != nil {
+			if _, cerr := partWriter.Write(inlineBody); cerr != nil {
 				return cerr
 			}
 		}
 		partIndex++
 	}
 	return mw.Close()
+}
+
+// IsMultipartSpillRequestPacket reports whether packet is the editable
+// skeleton representation of an oversized multipart request.
+func IsMultipartSpillRequestPacket(packet []byte) bool {
+	if containsMultipartSpillMarker(packet) {
+		return true
+	}
+	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketView(packet)
+	contentType := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader([]byte(header), "Content-Type")))
+	if !strings.HasPrefix(contentType, "multipart/") {
+		return false
+	}
+	for _, path := range fileFuzzTagPaths(body) {
+		dirBase := filepath.Base(filepath.Dir(path))
+		if isEngineOwnedLargeRequestPath(path) && strings.HasSuffix(dirBase, "-parts") {
+			return true
+		}
+	}
+	return false
+}
+
+// RebuildMultipartRequestPacket reconstructs a complete request packet from
+// an editable multipart skeleton. replacements maps multipart part indexes to
+// engine-local files uploaded by the frontend. Unmapped parts use their
+// original spilled sidecar files.
+func RebuildMultipartRequestPacket(packet []byte, bodyFile string, replacements map[int]string) ([]byte, error) {
+	if !IsMultipartSpillRequestPacket(packet) {
+		return nil, utils.Error("request packet is not a multipart spill skeleton")
+	}
+	if bodyFile == "" {
+		return nil, utils.Error("multipart spill body file is empty")
+	}
+	header, skeletonBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	var rebuiltBody bytes.Buffer
+	if err := rebuildMultipartBodyToWriterWithReplacements(
+		skeletonBody,
+		multipartSidecarDirFromBodyFile(bodyFile),
+		replacements,
+		&rebuiltBody,
+	); err != nil {
+		return nil, err
+	}
+	return lowhttp.ReplaceHTTPPacketBody([]byte(header), rebuiltBody.Bytes(), false), nil
 }
 
 // detectBoundary extracts the boundary string from a multipart skeleton body
@@ -385,17 +583,17 @@ func detectBoundary(body []byte) (string, error) {
 // multipart skeleton placeholder. Used to detect legacy/serialized flows that
 // were skeletonized.
 func containsMultipartSpillMarker(packet []byte) bool {
-	return bytes.Contains(packet, []byte(multipartSkeletonMarker))
+	return multipartSpillMarkerPattern.Match(packet)
 }
 
 // FlowIsMultipartSpill reports whether a stored HTTPFlow's request was
-// skeletonized as a multipart spill: the request is marked too-large and the
-// in-DB skeleton carries the multipart placeholder.
+// skeletonized as a multipart spill. Internal packets carry markers; persisted
+// editor packets carry engine-owned file tags rooted in the parts sidecar.
 func FlowIsMultipartSpill(flow *schema.HTTPFlow) bool {
 	if flow == nil || !flow.IsTooLargeRequest || flow.TooLargeRequestBodyFile == "" {
 		return false
 	}
-	return containsMultipartSpillMarker([]byte(flow.GetRequest()))
+	return IsMultipartSpillRequestPacket([]byte(flow.GetRequest()))
 }
 
 // FlowMultipartSidecarDir returns the sidecar directory path for a flow's
@@ -453,40 +651,13 @@ func OpenFlowMultipartPart(flow *schema.HTTPFlow, partIndex int) (*os.File, stri
 }
 
 // RebuildFlowMultipartBody returns a reader streaming the complete rebuilt
-// multipart body for a flow (skeleton text fields + spilled file parts from
-// disk), via io.Pipe so large parts never load fully into memory.
+// multipart body for a flow (inline parts + spilled parts from disk), via
+// io.Pipe so large parts never load fully into memory.
 func RebuildFlowMultipartBody(flow *schema.HTTPFlow) (io.Reader, error) {
 	if !FlowIsMultipartSpill(flow) {
 		return nil, utils.Error("flow is not a multipart spill")
 	}
 	return rebuildMultipartBodyToReader(FlowMultipartSkeletonBody(flow), FlowMultipartSidecarDir(flow)), nil
-}
-
-// sanitizeFilename strips path separators and other filesystem-unsafe chars
-// from a part filename so it can be used as a disk filename inside the
-// sidecar directory.
-func sanitizeFilename(name string) string {
-	if name == "" {
-		return "unnamed"
-	}
-	base := filepath.Base(name)
-	if base == "" || base == "." || base == string(os.PathSeparator) {
-		base = "unnamed"
-	}
-	// Replace any remaining separators inside the base just in case.
-	base = strings.ReplaceAll(base, string(os.PathSeparator), "_")
-	base = strings.ReplaceAll(base, "/", "_")
-	return base
-}
-
-func copyMIMEHeader(h textproto.MIMEHeader) textproto.MIMEHeader {
-	out := make(textproto.MIMEHeader, len(h))
-	for k, vs := range h {
-		cp := make([]string, len(vs))
-		copy(cp, vs)
-		out[k] = cp
-	}
-	return out
 }
 
 // multipartSidecarDirFromBodyFile derives the per-part sidecar directory path
@@ -501,26 +672,21 @@ func multipartSidecarDirFromBodyFile(bodyFile string) string {
 }
 
 // cleanupMultipartSidecar removes the per-part sidecar directory holding the
-// spilled file parts (and manifest.json) for a multipart flow. The body file
+// spilled parts (and manifest.json) for a multipart flow. The body file
 // for a multipart spill is the first part file, so the sidecar is its parent
 // directory. To avoid nuking the shared temp root for flat (non-multipart)
 // spills — whose body file also lives in the temp root — only a directory
 // whose base name ends with "-parts" is removed. Safe to call for any flow.
 func cleanupMultipartSidecar(bodyFile string) {
-	dir := multipartSidecarDirFromBodyFile(bodyFile)
-	if dir == "" {
+	_, multipart, ok := engineOwnedLargeRequestBodySuffix(bodyFile)
+	if !ok || !multipart {
 		return
 	}
-	if !strings.HasSuffix(filepath.Base(dir), "-parts") {
-		return
-	}
-	if info, err := os.Stat(dir); err == nil && info.IsDir() {
-		_ = os.RemoveAll(dir)
-	}
+	_ = os.RemoveAll(multipartSidecarDirFromBodyFile(bodyFile))
 }
 
 // manifestFileName is the sidecar file recording the per-part metadata so
-// downstream readers can enumerate file parts without re-parsing the skeleton.
+// downstream readers can enumerate spilled parts without re-parsing the skeleton.
 const manifestFileName = "manifest.json"
 
 // writeMultipartManifest persists the manifest entries as JSON into sidecarDir.
@@ -528,10 +694,7 @@ func writeMultipartManifest(sidecarDir string, manifest []multipartPartMeta) err
 	if sidecarDir == "" {
 		return utils.Error("empty sidecar dir")
 	}
-	data, err := jsonMarshalManifest(manifest)
-	if err != nil {
-		return err
-	}
+	data := jsonMarshalManifest(manifest)
 	return os.WriteFile(filepath.Join(sidecarDir, manifestFileName), data, 0o644)
 }
 
@@ -562,15 +725,15 @@ func openMultipartPart(sidecarDir string, meta multipartPartMeta) (*os.File, err
 // manifestJSONEntry is the on-disk JSON representation of a part meta. Field
 // names are stable and lowerCamel to match the gRPC MultipartFileInfo shape.
 type manifestJSONEntry struct {
-	PartIndex    int    `json:"partIndex"`
-	FieldName    string `json:"fieldName"`
-	Filename     string `json:"filename"`
-	ContentType  string `json:"contentType"`
-	Size         int64  `json:"size"`
-	File         string `json:"file"`
+	PartIndex   int    `json:"partIndex"`
+	FieldName   string `json:"fieldName"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"contentType"`
+	Size        int64  `json:"size"`
+	File        string `json:"file"`
 }
 
-func jsonMarshalManifest(manifest []multipartPartMeta) ([]byte, error) {
+func jsonMarshalManifest(manifest []multipartPartMeta) []byte {
 	entries := make([]manifestJSONEntry, len(manifest))
 	for i, m := range manifest {
 		entries[i] = manifestJSONEntry{
@@ -582,7 +745,11 @@ func jsonMarshalManifest(manifest []multipartPartMeta) ([]byte, error) {
 			File:        m.File,
 		}
 	}
-	return json.MarshalIndent(entries, "", "  ")
+	// manifestJSONEntry contains only JSON-native scalar fields, therefore this
+	// marshal cannot fail. Keeping an impossible error branch would obscure the
+	// real filesystem failures that callers must handle.
+	data, _ := json.MarshalIndent(entries, "", "  ")
+	return data
 }
 
 func jsonUnmarshalManifest(data []byte) ([]multipartPartMeta, error) {
@@ -605,10 +772,9 @@ func jsonUnmarshalManifest(data []byte) ([]multipartPartMeta, error) {
 }
 
 // rebuildMultipartBodyToReader returns a reader that streams the complete
-// multipart body rebuilt from the skeleton (text fields verbatim) plus the
-// spilled file parts (streamed from disk). It uses an io.Pipe so large file
-// parts never need to be fully loaded into memory: a goroutine writes into the
-// pipe while the caller reads from the returned reader.
+// multipart body rebuilt from the skeleton plus collapsed parts streamed from
+// disk. It uses an io.Pipe so large parts never need to be fully loaded into
+// memory: a goroutine writes into the pipe while the caller reads from it.
 //
 // If the rebuild fails, the goroutine closes the pipe with the error and the
 // caller's Read will surface it.

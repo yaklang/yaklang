@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -254,6 +254,73 @@ func TestDeleteHTTPFlowUsesBoundProjectDatabase(t *testing.T) {
 
 	_, err = yakit.GetHTTPFlow(db, int64(flow.ID))
 	require.Error(t, err)
+}
+
+func TestDeleteAllHTTPFlowsOnCurrentProjectResetsLiveFlowState(t *testing.T) {
+	originalBinding := consts.CaptureProjectDatabaseBinding()
+	projectPath := t.TempDir() + "/project.db"
+	projectDB, err := consts.CreateProjectDatabase(projectPath)
+	require.NoError(t, err)
+	consts.BindProjectDatabaseWithReader(projectDB, nil, projectPath)
+	projectBinding := consts.CaptureProjectDatabaseBinding()
+	databaseIdentity := yakit.HTTPFlowDatabaseIdentity(projectBinding.Path)
+	t.Cleanup(func() {
+		currentBinding := consts.CaptureProjectDatabaseBinding()
+		yakit.ResetHTTPFlowRuntimeState(databaseIdentity, projectBinding.Generation)
+		yakit.ResetHTTPFlowRuntimeState(databaseIdentity, currentBinding.Generation)
+		consts.BindProjectDatabaseWithReader(
+			originalBinding.Database,
+			originalBinding.ReadDatabase,
+			originalBinding.Path,
+		)
+		_ = projectDB.Close()
+	})
+
+	flow, err := insertHTTPFlowForMCPTest(projectDB, "https://delete-all.example", time.Now())
+	require.NoError(t, err)
+	flow.RuntimeTiming = &schema.HTTPFlowRuntimeTiming{
+		DatabaseIdentity:  databaseIdentity,
+		ProjectGeneration: projectBinding.Generation,
+		PersistedAtUnixMs: time.Now().UnixMilli(),
+	}
+	yakit.RecordHTTPFlowPersisted(flow)
+	_, published := yakit.PublishHTTPFlowLiveCommitted(flow)
+	require.True(t, published)
+	require.Equal(
+		t,
+		uint64(flow.ID),
+		yakit.SnapshotHTTPFlowPipelineHighWater(databaseIdentity, projectBinding.Generation).LatestPersistedID,
+	)
+
+	client := &recordingHTTPFlowClient{}
+	srv, err := mcp.NewMCPServer(
+		mcp.WithEnableHTTPFlowToolSet(),
+		mcp.WithGRPCClient(client),
+		mcp.WithDatabaseProvider(nil, consts.GetGormProjectDatabase),
+	)
+	require.NoError(t, err)
+
+	_, err = mcp.CallBuiltinTool(srv, context.Background(), "delete_http_flow", map[string]any{
+		"deleteAll": true,
+	})
+	require.NoError(t, err)
+	require.Zero(t, client.deletes, "current project DB should be deleted directly")
+
+	currentBinding := consts.CaptureProjectDatabaseBinding()
+	require.Greater(t, currentBinding.Generation, projectBinding.Generation)
+	require.Zero(
+		t,
+		yakit.SnapshotHTTPFlowPipelineHighWater(databaseIdentity, projectBinding.Generation).LatestPersistedID,
+	)
+	require.Equal(
+		t,
+		yakit.HTTPFlowLiveState{OldestAvailableSequence: 1},
+		yakit.SnapshotHTTPFlowLive(databaseIdentity, projectBinding.Generation),
+	)
+
+	newFlow, err := insertHTTPFlowForMCPTest(projectDB, "https://after-delete-all.example", time.Now())
+	require.NoError(t, err)
+	require.Equal(t, uint(1), newFlow.ID, "recreated table should restart SQLite IDs")
 }
 
 func insertHTTPFlowForMCPTest(db *gorm.DB, url string, ts time.Time, sourceType ...string) (*schema.HTTPFlow, error) {

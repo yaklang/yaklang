@@ -44,6 +44,23 @@ workflow, target platform, Dockerfile, immutable base images, embedded binary
 digest, image archive digest and size, immutable image ID, and the
 `ai.session.runtime` plus `yak.execute` capabilities.
 
+The Docker archive is exported through the verified build tag rather than a
+bare image ID. Its `manifest.json` must retain that non-pullable tag, and the
+referenced config blob must hash to the immutable image ID recorded by the
+Runtime manifest. This makes `docker load` register an addressable image on
+both the classic Docker image store and containerd-backed Docker engines;
+archives with `RepoTags=null` are rejected before publication.
+
+The Runtime Host does not require the image ID reported by the target Docker
+engine after `docker load` to equal the producer's config digest. Some
+containerd-backed Docker versions assign a different target-local descriptor
+while importing the same verified archive. Before loading, the host still
+requires exactly one fixed non-pullable tag and proves that the referenced
+config blob hashes to the producer image ID. It then persists the exact release,
+archive, tag, and target-local image ID mapping and re-resolves that mapping
+before starting a session container. A missing, retagged, or mismatched local
+image is never adopted without re-validating and re-loading the pinned archive.
+
 The unified bundle builder rejects a Node and Runtime pair when their version,
 source commit, operating system, architecture, workflow identity, capability
 set, manifest digest, or image-archive digest differs. The Runtime archive is

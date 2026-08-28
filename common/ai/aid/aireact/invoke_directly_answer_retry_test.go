@@ -3,14 +3,75 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func TestReAct_DirectlyAnswerBindsProviderRequestToCallerContext(t *testing.T) {
+	requestStarted := make(chan context.Context, 1)
+	release := make(chan struct{})
+	defer close(release)
+
+	ins, err := NewTestReAct(
+		aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAICallback(func(_ aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			requestCtx := req.GetContext()
+			requestStarted <- requestCtx
+			if requestCtx == nil {
+				<-release
+				return nil, utils.Error("provider request context is nil")
+			}
+			select {
+			case <-requestCtx.Done():
+				return nil, requestCtx.Err()
+			case <-release:
+				return nil, utils.Error("test released provider request")
+			}
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	callerCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, directErr := ins.DirectlyAnswer(callerCtx, "cancel this provider request", nil)
+		done <- directErr
+	}()
+
+	var requestCtx context.Context
+	select {
+	case requestCtx = <-requestStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("provider request did not start")
+	}
+	if requestCtx == nil {
+		t.Fatal("provider request did not inherit the directly-answer caller context")
+	}
+
+	cancel()
+	select {
+	case <-requestCtx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("provider request context was not cancelled")
+	}
+	select {
+	case directErr := <-done:
+		if !errors.Is(directErr, context.Canceled) {
+			t.Fatalf("DirectlyAnswer error = %v, want context canceled", directErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("DirectlyAnswer did not return after caller cancellation")
+	}
+}
 
 func TestReAct_DirectlyAnswer_RetryIncludesLastErrorAndAITAGHint(t *testing.T) {
 	var prompts []string

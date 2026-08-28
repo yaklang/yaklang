@@ -119,7 +119,7 @@ For simple single-condition matching, use match_flows_simple instead.`,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			// === 1. 获取流量来源 (使用 fallback 逻辑) ===
 			nodeId := "http-flow-match"
-			reactloops.EmitStatus(loop, "准备匹配流量 / Preparing to Match Flows...")
+			reactloops.EmitStatusI18n(loop, "准备匹配流量", "Preparing to Match Flows...")
 
 			db := consts.GetGormProjectDatabase()
 			if db == nil {
@@ -193,7 +193,7 @@ For simple single-condition matching, use match_flows_simple instead.`,
 			reactloops.EmitActionLog(loop, nodeId, line1)
 
 			// === 4. 执行匹配（流式处理）===
-			reactloops.EmitStatus(loop, "匹配流量中 / Matching Flows...")
+			reactloops.EmitStatusI18n(loop, "匹配流量中", "Matching Flows...")
 
 			var matchedFlows []*schema.HTTPFlow
 			var totalCount int
@@ -331,7 +331,11 @@ For simple single-condition matching, use match_flows_simple instead.`,
 			saveMatchResult(loop, matchResult)
 
 			// === 6. 发送完成状态 ===
-			reactloops.EmitStatus(loop, fmt.Sprintf("匹配完成，找到 %d 条 / Match Complete, Found %d Flows", len(matchedFlows), len(matchedFlows)))
+			reactloops.EmitStatusI18n(
+				loop,
+				fmt.Sprintf("匹配完成，找到 %d 条流量", len(matchedFlows)),
+				fmt.Sprintf("Match complete; found %d flows", len(matchedFlows)),
+			)
 
 			// === 7. 构建并发送第2行累积流（结果摘要）===
 			line2 := fmt.Sprintf("完成: 匹配 %d/%d 条流量",

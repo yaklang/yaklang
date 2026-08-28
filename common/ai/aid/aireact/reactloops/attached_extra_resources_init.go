@@ -40,10 +40,10 @@ func RunAttachedExtraResourcesInit(
 		if data == nil {
 			continue
 		}
-		loop.LoadingStatus(fmt.Sprintf(
-			"正在加载附加资源 (%d) / Loading attached resource (%d)",
-			idx+1, idx+1,
-		))
+		loop.UserStatus(
+			fmt.Sprintf("正在加载第 %d 个附加资源", idx+1),
+			fmt.Sprintf("Loading attached resource %d", idx+1),
+		)
 
 		resource, err := aicommon.ParseAttachedResourceData(data)
 		if err != nil {
@@ -76,7 +76,7 @@ func RunAttachedExtraResourcesInit(
 	}
 
 	if len(sectionsByType) > 0 {
-		loop.LoadingStatus("附加资源处理完成 / Finished loading attached resources")
+		loop.UserStatus("附加资源处理完成", "Finished loading attached resources")
 	}
 	return resources
 }

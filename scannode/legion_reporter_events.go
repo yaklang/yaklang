@@ -85,7 +85,22 @@ func (r *ScannerAgentReporter) flushSuccessfulJobProgress() error {
 	if r == nil {
 		return nil
 	}
-	return r.reportJobProgress(1.0)
+	// SSA scripts intentionally stop at ~0.99 and wait for platform risk/artifact
+	// import to publish 1.0. Do not force terminal 100% here or the UI jumps early.
+	if err := r.flushLatestJobProgress(); err != nil {
+		return err
+	}
+	r.progressCheckpoint.mu.Lock()
+	hasObserved := r.progressCheckpoint.hasObserved
+	last := r.progressCheckpoint.lastObservedProcess
+	r.progressCheckpoint.mu.Unlock()
+	if !hasObserved {
+		return r.reportJobProgress(0.99)
+	}
+	if last >= 0.99 {
+		return nil
+	}
+	return r.reportJobProgress(0.99)
 }
 
 func (c *attemptProgressCheckpoint) report(
@@ -172,7 +187,11 @@ func (r *ScannerAgentReporter) updateActiveAttemptProgress(process float64) {
 	if r == nil || r.agent == nil || r.agent.manager == nil || r.SubTaskId == "" {
 		return
 	}
-	task, err := r.agent.manager.GetTaskById(taskIDForSubtask(r.SubTaskId))
+	task, err := r.agent.manager.GetTaskByAttemptID(r.RuntimeId)
+	if err != nil {
+		// Non-Legion and legacy reporter callers may not carry an AttemptID.
+		task, err = r.agent.manager.GetTaskById(taskIDForSubtask(r.SubTaskId))
+	}
 	if err != nil {
 		return
 	}
@@ -388,6 +407,10 @@ func ssaSizeToUint64(value int64) uint64 {
 
 func (r *ScannerAgentReporter) touchActiveAttempt() {
 	if r == nil || r.agent == nil || r.agent.manager == nil || r.SubTaskId == "" {
+		return
+	}
+	if r.RuntimeId != "" {
+		r.agent.manager.TouchAttempt(r.RuntimeId)
 		return
 	}
 	r.agent.manager.Touch(taskIDForSubtask(r.SubTaskId))

@@ -70,6 +70,7 @@ func recoverPlan(t *testing.T, uuid string) {
 	ord, err := aid.NewFastRecoverCoordinatorContext(
 		recoverCtx,
 		uuid,
+		testAIRetryWaitOption(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(safeTestEventHandler(outputChan, stopEvents)),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -161,6 +162,7 @@ func TestCoordinator_RecoverCase(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"test",
+		testAIRetryWaitOption(),
 		aicommon.WithContext(ctx),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(safeTestEventHandler(outputChan, stopEvents)),

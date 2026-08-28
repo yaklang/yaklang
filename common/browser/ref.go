@@ -13,6 +13,8 @@ type RefEntry struct {
 	Nth           int
 	Selector      string
 	FrameID       string
+	CoordX        float64
+	CoordY        float64
 }
 
 type RefMap struct {

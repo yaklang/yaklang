@@ -382,12 +382,14 @@ func (b *toolCallArtifactBundle) markFinalized() {
 }
 
 // isCanonicalToolResultData recognizes only the framework envelope written by
-// applyNormalizedData. RESULT is optional by design: it is omitted when the
-// structured result is empty or byte-identical to combined output. Requiring a
+// applyNormalizedData. Current envelopes begin with RESULT or OBSERVATIONS;
+// COMBINED OUTPUT remains accepted for checkpoint compatibility. Requiring a
 // valid final ARTIFACT/HINT section avoids treating an arbitrary tool string
-// that merely starts with "COMBINED OUTPUT:" as a checkpoint replay envelope.
+// that merely starts with one of those labels as a replay envelope.
 func isCanonicalToolResultData(data string) bool {
-	if !strings.HasPrefix(data, "COMBINED OUTPUT:\n") {
+	if !strings.HasPrefix(data, "RESULT:\n") &&
+		!strings.HasPrefix(data, "OBSERVATIONS:\n") &&
+		!strings.HasPrefix(data, "COMBINED OUTPUT:\n") {
 		return false
 	}
 	artifactMarker := "\n\nARTIFACT:\n"
@@ -530,18 +532,19 @@ func normalizeToolResultData(toolResult *aitool.ToolResult, combined, resultText
 		combined = "(empty)"
 	}
 	if combined == resultText {
-		// duplicate: skip RESULT section entirely to save tokens
-		body := "COMBINED OUTPUT:\n" + combined
+		// Duplicate: one semantic RESULT section is enough. Do not lead with an
+		// observation label that could make log wording look authoritative.
+		body := "RESULT:\n" + resultText
 		applyNormalizedData(toolResult, body, hint)
 		return
 	}
 	if resultText == "" {
-		// empty result: skip RESULT section to avoid a two-line "(empty)" no-op
-		body := "COMBINED OUTPUT:\n" + combined
+		// No semantic result was supplied; label captured text as observations.
+		body := "OBSERVATIONS:\n" + combined
 		applyNormalizedData(toolResult, body, hint)
 		return
 	}
-	body := "COMBINED OUTPUT:\n" + combined + "\n\nRESULT:\n" + resultText
+	body := "RESULT:\n" + resultText + "\n\nOBSERVATIONS:\n" + combined
 	applyNormalizedData(toolResult, body, hint)
 }
 
@@ -622,11 +625,11 @@ func (b *toolCallArtifactBundle) finalize(
 	}
 	if data, ok := toolResult.Data.(string); ok && isCanonicalToolResultData(data) {
 		// A current-format checkpoint already owns stable artifact paths. Do not
-		// wrap the preview again or rewrite its bytes during replay. RESULT is
-		// intentionally optional: canonical compact data omits that section when
-		// result is empty or byte-identical to COMBINED OUTPUT.
+		// wrap the preview again or rewrite its bytes during replay.
 		if err := b.discardIfUnfinished(); err != nil {
-			return err
+			log.Warnf("failed to discard replay artifact staging directory: %v", err)
+			// Leave finalized=false so the caller's deferred rollback can retry.
+			return nil
 		}
 		b.markFinalized()
 		return nil
@@ -673,13 +676,13 @@ func (b *toolCallArtifactBundle) finalize(
 	normalizeToolResultData(toolResult, combined, resultText, hint)
 	rawTokens := ytoken.CalcTokenCount(combined) + ytoken.CalcTokenCount(resultText)
 	if persistErr != nil && rawTokens > ToolResultTokenLimit {
-		toolResult.Success = false
-		if toolResult.Error != "" {
-			toolResult.Error += "; "
-		}
-		toolResult.Error += "artifact_persist_failed: complete oversized output is unavailable"
+		// Artifact persistence is an observation-channel failure after the tool
+		// callback already produced its protocol result. Keep Success unchanged;
+		// the canonical HINT communicates that the oversized observation is not
+		// fully recoverable.
 		normalizeToolResultData(toolResult, combined, resultText, hint)
-		return persistErr
+		log.Warnf("tool artifact persistence failed for oversized result: %v", persistErr)
+		return nil
 	}
 	if persistErr != nil {
 		log.Warnf("tool artifact persistence failed for bounded result: %v", persistErr)
@@ -696,7 +699,7 @@ func (b *toolCallArtifactBundle) finalize(
 		Tool:       tool.Name,
 		CallToolID: callToolID,
 		Identifier: identifier,
-		Status:     map[bool]string{true: "success", false: "failed"}[toolResult.Success],
+		Status:     map[bool]string{true: "completed", false: "protocol_failed"}[toolResult.Success],
 		Success:    toolResult.Success,
 		Error:      toolResult.Error,
 		Params:     params,
@@ -712,13 +715,15 @@ func (b *toolCallArtifactBundle) finalize(
 		// already-rendered ARTIFACT paths before returning so Timeline never
 		// advertises files that no longer exist.
 		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
-		return err
+		log.Warnf("tool artifact manifest persistence failed: %v", err)
+		return nil
 	}
 
 	report := b.renderReport(tool, identifier, params, toolResult, paramGenDuration, rawAIParamResponse)
 	if err := os.WriteFile(b.reportPath, []byte(report), 0o644); err != nil {
 		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
-		return err
+		log.Warnf("tool artifact report persistence failed: %v", err)
+		return nil
 	}
 	// Only a complete manifest/report bundle is durable. Any earlier error keeps
 	// finalized=false so ToolCaller's deferred rollback removes the partial tree.
@@ -843,11 +848,6 @@ func migrateLegacyTimelineToolResult(workdir string, toolResult *aitool.ToolResu
 	normalizeToolResultData(toolResult, combined, resultText, hint)
 	if persistErr != nil {
 		if ytoken.CalcTokenCount(combined)+ytoken.CalcTokenCount(resultText) > ToolResultTokenLimit {
-			toolResult.Success = false
-			if toolResult.Error != "" {
-				toolResult.Error += "; "
-			}
-			toolResult.Error += "artifact_persist_failed: historical oversized output is unavailable"
 			normalizeToolResultData(toolResult, combined, resultText, hint)
 		}
 		log.Warnf("failed to migrate legacy Timeline tool result %d: %v", toolResult.ID, persistErr)
@@ -858,7 +858,7 @@ func migrateLegacyTimelineToolResult(workdir string, toolResult *aitool.ToolResu
 		Tool:       toolResult.Name,
 		CallToolID: toolResult.ToolCallID,
 		Identifier: "legacy-timeline-migration",
-		Status:     map[bool]string{true: "success", false: "failed"}[toolResult.Success],
+		Status:     map[bool]string{true: "completed", false: "protocol_failed"}[toolResult.Success],
 		Success:    toolResult.Success,
 		Error:      toolResult.Error,
 		Params:     toolResult.Param,
