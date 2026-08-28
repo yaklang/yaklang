@@ -478,3 +478,179 @@ int main() {
 		},
 	})
 }
+
+// TestC_LifetimeNative_FilterAnchorBits locks ?{} / func?(...) usage of
+// lifetime natives: results must carry per-receiver anchor bits so OpFilter
+// can map derived values back to the call/value list (missing bits is CriticalError).
+func TestC_LifetimeNative_FilterAnchorBits(t *testing.T) {
+	const sinkPrefix = `
+#include <stdlib.h>
+void sink(int *p) {}
+`
+	runPtrNativeConfigCases(t, []ptrNativeConfigCase{
+		{
+			Name: "heapAlloc filter keeps only heap-arg call",
+			Code: sinkPrefix + `
+int main() {
+    int *heap = (int*)malloc(sizeof(int));
+    int stack = 0;
+    int *sp = &stack;
+    sink(heap);
+    sink(sp);
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <heapAlloc()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "freeCall filter keeps only later-freed pointer's call",
+			Code: sinkPrefix + `
+int main() {
+    int *pa = (int*)malloc(sizeof(int));
+    int *pb = (int*)malloc(sizeof(int));
+    *pb = 0;
+    free(pa);
+    sink(pa);
+    sink(pb);
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <freeCall()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "doubleFree filter keeps only double-freed pointer's free",
+			Code: sinkPrefix + `
+int main() {
+    int *pa = (int*)malloc(sizeof(int));
+    int *pb = (int*)malloc(sizeof(int));
+    *pb = 0;
+    free(pa);
+    free(pa);
+    free(pb);
+    return 0;
+}
+`,
+			Rule: `free?(* #-> <doubleFree()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 2}},
+		},
+		{
+			Name: "npd filter keeps only null-deref pointer's call",
+			Code: `
+#include <stdlib.h>
+struct Node { int x; };
+void sink(struct Node *p) {}
+int main() {
+    struct Node *pa = 0;
+    struct Node *pb = (struct Node*)malloc(sizeof(struct Node));
+    pb->x = 0;
+    sink(pa);
+    sink(pb);
+    pa->x = 11;
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <npd()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "memLeak filter keeps only leaked pointer's call",
+			Code: sinkPrefix + `
+int main() {
+    int *leak = (int*)malloc(sizeof(int));
+    int *ok = (int*)malloc(sizeof(int));
+    *ok = 0;
+    free(ok);
+    sink(leak);
+    sink(ok);
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <memLeak()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "nullCheck filter keeps only checked pointer's call",
+			Code: sinkPrefix + `
+int main() {
+    int *pa = (int*)malloc(sizeof(int));
+    int *pb = (int*)malloc(sizeof(int));
+    *pb = 0;
+    if (pa) { *pa = 1; }
+    sink(pa);
+    sink(pb);
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <nullCheck()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "pointsTo filter keeps only heap-arg call",
+			Code: sinkPrefix + `
+int main() {
+    int *heap = (int*)malloc(sizeof(int));
+    int stack = 0;
+    int *sp = &stack;
+    sink(heap);
+    sink(sp);
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <pointsTo()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "aliases filter keeps only aliasing pointer",
+			Code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    int *q = p;
+    int *r = (int*)malloc(sizeof(int));
+    *r = 0;
+    return 0;
+}
+`,
+			Rule: `
+p as $p
+q as $q
+r as $r
+$p + $r as $both
+$both ?{ <aliases(target=$q)> } as $hit
+`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "derefSite filter keeps only deref'd pointer's call",
+			Code: sinkPrefix + `
+int main() {
+    int *pa = (int*)malloc(sizeof(int));
+    int *pb = (int*)malloc(sizeof(int));
+    *pb = 0;
+    int x = *pa;
+    sink(pa);
+    sink(pb);
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <derefSite()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 1, Max: 1}},
+		},
+		{
+			Name: "safe heapAlloc filter is empty not CriticalError",
+			Code: sinkPrefix + `
+int main() {
+    int stack = 0;
+    int *sp = &stack;
+    sink(sp);
+    return 0;
+}
+`,
+			Rule: `sink?(* #-> <heapAlloc()>) as $hit`,
+			Want: map[string]ptrNativeWant{"hit": {Min: 0, Max: 0}},
+		},
+	})
+}
+

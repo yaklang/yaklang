@@ -83,31 +83,18 @@ func runLifetimeQueryNativeCall(
 	}
 
 	var vals []ssa.Value
-	if !targetSpecified && (receiverIsProgramOnly(vs) || len(seeds) == 0) {
+	fullScan := !targetSpecified && (receiverIsProgramOnly(vs) || len(seeds) == 0)
+	if fullScan {
 		vals = listAll(prog.Program)
 	} else {
 		vals = listRelated(prog.Program, seeds)
 	}
 
-	results := make([]sfvm.ValueOperator, 0, len(vals))
-	seen := make(map[int64]struct{})
-	for _, iv := range vals {
-		if iv == nil || iv.GetId() <= 0 {
-			continue
-		}
-		id := iv.GetId()
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		val, err := prog.NewValue(iv)
-		if err != nil || val == nil {
-			continue
-		}
-		results = append(results, val)
+	id2val, results := ssaValuesToSFVM(prog, vals)
+	if !targetSpecified && !fullScan {
+		propagateRelatedSSAAnchors(vs, func(inner ssa.Value) []ssa.Value {
+			return listRelated(prog.Program, []ssa.Value{inner})
+		}, id2val)
 	}
-	if len(results) == 0 {
-		return false, sfvm.NewEmptyValues(), nil
-	}
-	return true, sfvm.NewValues(results), nil
+	return finishLifetimeSFVM(results)
 }

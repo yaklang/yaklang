@@ -16,6 +16,7 @@ import (
 //   - $ptr<uaf()> as $uaf                   // findings related to $ptr
 //   - <uaf(target=$ptr)> as $uaf            // same, named target (receiver may be *)
 //   - <uaf(kind="double-free")>             // optional kind filter
+//   - free?(* #-> <uaf()>) as $free         // keep free() calls whose pointer has UAF
 const NativeCall_UAF = "uaf"
 
 func nativeCallUAF(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
@@ -86,6 +87,74 @@ func resolveLifetimeTargetSeeds(frame *sfvm.SFFrame, params *sfvm.NativeCallActu
 
 type lifetimeFindFn func(prog *ssa.Program, seeds []ssa.Value, fullScan bool) []*lifetime.Finding
 
+func forEachReceiverValue(vs sfvm.Values, fn func(op sfvm.ValueOperator, inner ssa.Value)) {
+	if vs == nil || fn == nil {
+		return
+	}
+	_ = vs.Recursive(func(operator sfvm.ValueOperator) error {
+		v, ok := operator.(*Value)
+		if !ok || v == nil {
+			return nil
+		}
+		inner := v.getValue()
+		if inner == nil {
+			return nil
+		}
+		fn(operator, inner)
+		return nil
+	})
+}
+
+func ssaValuesToSFVM(prog *Program, vals []ssa.Value) (map[int64]*Value, []sfvm.ValueOperator) {
+	id2val := make(map[int64]*Value, len(vals))
+	results := make([]sfvm.ValueOperator, 0, len(vals))
+	if prog == nil {
+		return id2val, results
+	}
+	for _, iv := range vals {
+		if iv == nil || iv.GetId() <= 0 {
+			continue
+		}
+		id := iv.GetId()
+		if _, ok := id2val[id]; ok {
+			continue
+		}
+		val, err := prog.NewValue(iv)
+		if err != nil || val == nil {
+			continue
+		}
+		id2val[id] = val
+		results = append(results, val)
+	}
+	return id2val, results
+}
+
+func finishLifetimeSFVM(results []sfvm.ValueOperator) (bool, sfvm.Values, error) {
+	if len(results) == 0 {
+		return false, sfvm.NewEmptyValues(), nil
+	}
+	return true, sfvm.NewValues(results), nil
+}
+
+// propagateRelatedSSAAnchors copies each receiver's anchor bits onto result
+// values related to that receiver. Required so NewValue-based natives can be
+// used in ?{} / func?(...) filters (OpFilter maps via bits).
+func propagateRelatedSSAAnchors(vs sfvm.Values, related func(inner ssa.Value) []ssa.Value, id2val map[int64]*Value) {
+	if related == nil || len(id2val) == 0 {
+		return
+	}
+	forEachReceiverValue(vs, func(op sfvm.ValueOperator, inner ssa.Value) {
+		for _, iv := range related(inner) {
+			if iv == nil {
+				continue
+			}
+			if val, ok := id2val[iv.GetId()]; ok && val != nil {
+				sfvm.MergeAnchor(op, val)
+			}
+		}
+	})
+}
+
 func runLifetimeNativeCall(
 	vs sfvm.Values,
 	frame *sfvm.SFFrame,
@@ -114,7 +183,7 @@ func runLifetimeNativeCall(
 	}
 
 	results := make([]sfvm.ValueOperator, 0, len(findings))
-	seen := make(map[int64]struct{})
+	id2val := make(map[int64]*Value, len(findings))
 	for _, f := range findings {
 		if f == nil || f.Use == nil {
 			continue
@@ -128,10 +197,9 @@ func runLifetimeNativeCall(
 			continue
 		}
 		id := f.Use.GetId()
-		if _, ok := seen[id]; ok {
+		if _, ok := id2val[id]; ok {
 			continue
 		}
-		seen[id] = struct{}{}
 		val, err := prog.NewValue(f.Use)
 		if err != nil || val == nil {
 			continue
@@ -141,10 +209,25 @@ func runLifetimeNativeCall(
 				val.AppendPredecessor(fc, frame.WithPredecessorContext(opName+":free"))
 			}
 		}
+		id2val[id] = val
 		results = append(results, val)
 	}
 	if len(results) == 0 {
 		return false, sfvm.NewEmptyValues(), nil
 	}
-	return true, sfvm.NewValues(results), nil
+	// Per-receiver bits so <uaf()> can be used in ?{} / func?(...) filters:
+	// mask[i] is true iff a finding related to that slot carries its anchor bits.
+	// Skip full-scan / target=$x: results are not derived from the receiver list.
+	if !targetSpecified && !fullScan {
+		propagateRelatedSSAAnchors(vs, func(inner ssa.Value) []ssa.Value {
+			var out []ssa.Value
+			for _, f := range find(prog.Program, []ssa.Value{inner}, false) {
+				if f != nil && f.Use != nil {
+					out = append(out, f.Use)
+				}
+			}
+			return out
+		}, id2val)
+	}
+	return finishLifetimeSFVM(results)
 }
