@@ -89,6 +89,24 @@ int flags = FLAGS;
 	require.Contains(t, out, "0x02")
 }
 
+func TestExpandFunctionMacros_AssertVoidCastObjectMacro(t *testing.T) {
+	// glibc assert.h: space before '(' makes this object-like, not CAST(void).
+	src := `
+#define __ASSERT_VOID_CAST (void)
+#define __ASSERT_FUNCTION ((const char *) 0)
+#define assert(expr) ((expr) ? __ASSERT_VOID_CAST (0) : __assert_fail (#expr, __FILE__, __LINE__, __ASSERT_FUNCTION))
+int main() {
+    assert(stack_var[0] == 0xcafebabe);
+    return 0;
+}
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	require.Contains(t, out, "(void)")
+	require.Contains(t, out, "(0)")
+	require.NotRegexp(t, `\?\s*:`, out)
+}
+
 func TestExpandFunctionMacros_PreservesInclude(t *testing.T) {
 	src := `
 #include <stdio.h>

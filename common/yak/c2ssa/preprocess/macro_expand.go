@@ -181,7 +181,11 @@ func (e *macroEnv) expandOnce(tokens []macroToken, hidden map[string]struct{}) [
 						continue
 					}
 				}
-			} else if body, ok := e.tables.object[name]; ok && !isHidden(hidden, name) {
+			}
+			// Object-like macros expand even when the next token is '('.
+			// glibc `#define __ASSERT_VOID_CAST (void)` used as `__ASSERT_VOID_CAST (0)`
+			// must become `(void) (0)`, not be left unexpanded or eaten as a call.
+			if body, ok := e.tables.object[name]; ok && !isHidden(hidden, name) {
 				repl := e.getObjectBodyTokens(name, body)
 				out = append(out, e.expandTokens(repl, withMacro(hidden, name))...)
 				i++
