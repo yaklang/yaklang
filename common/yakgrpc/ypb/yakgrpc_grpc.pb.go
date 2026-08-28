@@ -658,6 +658,9 @@ const (
 	Yak_GetAIReActRecommendedSkills_FullMethodName                = "/ypb.Yak/GetAIReActRecommendedSkills"
 	Yak_UpdateAIReActRecommendedSkill_FullMethodName              = "/ypb.Yak/UpdateAIReActRecommendedSkill"
 	Yak_ResetAIReActRecommendedSkill_FullMethodName               = "/ypb.Yak/ResetAIReActRecommendedSkill"
+	Yak_QueryContextMenuActions_FullMethodName                    = "/ypb.Yak/QueryContextMenuActions"
+	Yak_SetContextMenuActionBinding_FullMethodName                = "/ypb.Yak/SetContextMenuActionBinding"
+	Yak_ExecuteContextMenuAction_FullMethodName                   = "/ypb.Yak/ExecuteContextMenuAction"
 	Yak_UploadToTemporaryFile_FullMethodName                      = "/ypb.Yak/UploadToTemporaryFile"
 )
 
@@ -1480,6 +1483,10 @@ type YakClient interface {
 	UpdateAIReActRecommendedSkill(ctx context.Context, in *UpdateAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error)
 	// 将推荐技能完整恢复为随当前版本发布的内置默认内容。
 	ResetAIReActRecommendedSkill(ctx context.Context, in *ResetAIReActRecommendedSkillRequest, opts ...grpc.CallOption) (*AIReActRecommendedSkill, error)
+	// Context-menu plugins are discovered statically and executed on demand.
+	QueryContextMenuActions(ctx context.Context, in *QueryContextMenuActionsRequest, opts ...grpc.CallOption) (*QueryContextMenuActionsResponse, error)
+	SetContextMenuActionBinding(ctx context.Context, in *SetContextMenuActionBindingRequest, opts ...grpc.CallOption) (*ContextMenuAction, error)
+	ExecuteContextMenuAction(ctx context.Context, in *ExecuteContextMenuActionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContextMenuActionEvent], error)
 	// Upload GUI-local bytes into the currently connected engine's temporary
 	// filesystem. Returned paths are engine paths and can be used by file
 	// Fuzztags in both local and remote-engine modes.
@@ -8835,9 +8842,48 @@ func (c *yakClient) ResetAIReActRecommendedSkill(ctx context.Context, in *ResetA
 	return out, nil
 }
 
+func (c *yakClient) QueryContextMenuActions(ctx context.Context, in *QueryContextMenuActionsRequest, opts ...grpc.CallOption) (*QueryContextMenuActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryContextMenuActionsResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryContextMenuActions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SetContextMenuActionBinding(ctx context.Context, in *SetContextMenuActionBindingRequest, opts ...grpc.CallOption) (*ContextMenuAction, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ContextMenuAction)
+	err := c.cc.Invoke(ctx, Yak_SetContextMenuActionBinding_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ExecuteContextMenuAction(ctx context.Context, in *ExecuteContextMenuActionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ContextMenuActionEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[117], Yak_ExecuteContextMenuAction_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExecuteContextMenuActionRequest, ContextMenuActionEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExecuteContextMenuActionClient = grpc.ServerStreamingClient[ContextMenuActionEvent]
+
 func (c *yakClient) UploadToTemporaryFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[117], Yak_UploadToTemporaryFile_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[118], Yak_UploadToTemporaryFile_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -9667,6 +9713,10 @@ type YakServer interface {
 	UpdateAIReActRecommendedSkill(context.Context, *UpdateAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error)
 	// 将推荐技能完整恢复为随当前版本发布的内置默认内容。
 	ResetAIReActRecommendedSkill(context.Context, *ResetAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error)
+	// Context-menu plugins are discovered statically and executed on demand.
+	QueryContextMenuActions(context.Context, *QueryContextMenuActionsRequest) (*QueryContextMenuActionsResponse, error)
+	SetContextMenuActionBinding(context.Context, *SetContextMenuActionBindingRequest) (*ContextMenuAction, error)
+	ExecuteContextMenuAction(*ExecuteContextMenuActionRequest, grpc.ServerStreamingServer[ContextMenuActionEvent]) error
 	// Upload GUI-local bytes into the currently connected engine's temporary
 	// filesystem. Returned paths are engine paths and can be used by file
 	// Fuzztags in both local and remote-engine modes.
@@ -11597,6 +11647,15 @@ func (UnimplementedYakServer) UpdateAIReActRecommendedSkill(context.Context, *Up
 }
 func (UnimplementedYakServer) ResetAIReActRecommendedSkill(context.Context, *ResetAIReActRecommendedSkillRequest) (*AIReActRecommendedSkill, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetAIReActRecommendedSkill not implemented")
+}
+func (UnimplementedYakServer) QueryContextMenuActions(context.Context, *QueryContextMenuActionsRequest) (*QueryContextMenuActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryContextMenuActions not implemented")
+}
+func (UnimplementedYakServer) SetContextMenuActionBinding(context.Context, *SetContextMenuActionBindingRequest) (*ContextMenuAction, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetContextMenuActionBinding not implemented")
+}
+func (UnimplementedYakServer) ExecuteContextMenuAction(*ExecuteContextMenuActionRequest, grpc.ServerStreamingServer[ContextMenuActionEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method ExecuteContextMenuAction not implemented")
 }
 func (UnimplementedYakServer) UploadToTemporaryFile(grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method UploadToTemporaryFile not implemented")
@@ -22237,6 +22296,53 @@ func _Yak_ResetAIReActRecommendedSkill_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QueryContextMenuActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryContextMenuActionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryContextMenuActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryContextMenuActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryContextMenuActions(ctx, req.(*QueryContextMenuActionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SetContextMenuActionBinding_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetContextMenuActionBindingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetContextMenuActionBinding(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SetContextMenuActionBinding_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetContextMenuActionBinding(ctx, req.(*SetContextMenuActionBindingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ExecuteContextMenuAction_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExecuteContextMenuActionRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ExecuteContextMenuAction(m, &grpc.GenericServerStream[ExecuteContextMenuActionRequest, ContextMenuActionEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExecuteContextMenuActionServer = grpc.ServerStreamingServer[ContextMenuActionEvent]
+
 func _Yak_UploadToTemporaryFile_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).UploadToTemporaryFile(&grpc.GenericServerStream[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]{ServerStream: stream})
 }
@@ -24339,6 +24445,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "ResetAIReActRecommendedSkill",
 			Handler:    _Yak_ResetAIReActRecommendedSkill_Handler,
 		},
+		{
+			MethodName: "QueryContextMenuActions",
+			Handler:    _Yak_QueryContextMenuActions_Handler,
+		},
+		{
+			MethodName: "SetContextMenuActionBinding",
+			Handler:    _Yak_SetContextMenuActionBinding_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -24941,6 +25055,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "SubscribeHTTPFlows",
 			Handler:       _Yak_SubscribeHTTPFlows_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExecuteContextMenuAction",
+			Handler:       _Yak_ExecuteContextMenuAction_Handler,
 			ServerStreams: true,
 		},
 		{

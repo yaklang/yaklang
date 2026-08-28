@@ -1092,6 +1092,11 @@ service Yak {
   // 将推荐技能完整恢复为随当前版本发布的内置默认内容。
   rpc ResetAIReActRecommendedSkill(ResetAIReActRecommendedSkillRequest) returns (AIReActRecommendedSkill);
 
+  // Context-menu plugins are discovered statically and executed on demand.
+  rpc QueryContextMenuActions(QueryContextMenuActionsRequest) returns (QueryContextMenuActionsResponse);
+  rpc SetContextMenuActionBinding(SetContextMenuActionBindingRequest) returns (ContextMenuAction);
+  rpc ExecuteContextMenuAction(ExecuteContextMenuActionRequest) returns (stream ContextMenuActionEvent);
+
   // Upload GUI-local bytes into the currently connected engine's temporary
   // filesystem. Returned paths are engine paths and can be used by file
   // Fuzztags in both local and remote-engine modes.
@@ -10062,6 +10067,88 @@ message MITMPipelineStats {
 
   int64 DatabaseWriteQueueDepth = 25;
   int64 DatabaseWriteQueueCapacity = 26;
+}
+
+message QueryContextMenuActionsRequest {
+  // Empty means all scenes. Otherwise use history-single, history-multi or http-packet.
+  string Scene = 1;
+  bool IncludeDisabled = 2;
+}
+
+message QueryContextMenuActionsResponse {
+  repeated ContextMenuAction Actions = 1;
+  // Enabled non-core plugin UUIDs in the requested Scene; zero when Scene is empty.
+  int64 EnabledCustomPluginCount = 2;
+  // Per-Scene custom plugin limit.
+  int64 MaxCustomPluginCount = 3;
+}
+
+message ContextMenuAction {
+  string PluginUUID = 1;
+  string PluginName = 2;
+  string ActionID = 3;
+  string HookName = 4;
+  bool Enabled = 5;
+  bool Locked = 6;
+  int64 Sort = 7;
+  string Shortcut = 8;
+  string ResultMode = 9;
+  bool AskBeforeRun = 10;
+  repeated YakScriptParam Params = 11;
+  bool IsCorePlugin = 12;
+  // Scene is one of history-single, history-multi or http-packet. ActionID may
+  // be a first-class hook or a legacy CODEC capability identifier.
+  string Scene = 13;
+  string PluginType = 14;
+  string ExecutionType = 15;
+  string Help = 16;
+  string HeadImg = 17;
+  bool SupportsResultMode = 18;
+  bool IsAIPlugin = 19;
+}
+
+message SetContextMenuActionBindingRequest {
+  string PluginUUID = 1;
+  string ActionID = 2;
+  bool Enabled = 3;
+  int64 Sort = 4;
+  string Shortcut = 5;
+  string ResultMode = 6;
+  bool AskBeforeRun = 7;
+}
+
+message ExecuteContextMenuActionRequest {
+  string PluginUUID = 1;
+  string ActionID = 2;
+  string Source = 3;
+  string Trigger = 4;
+  string HttpsState = 5;
+  repeated int64 HTTPFlowIDs = 6;
+  bytes Request = 7;
+  bytes Response = 8;
+  bool HasRequest = 9;
+  bool HasResponse = 10;
+  repeated ExecParamItem Params = 11;
+  string PacketRevision = 12;
+}
+
+message ContextMenuPacketActionResult {
+  bytes Request = 1;
+  bytes Response = 2;
+  bool ReplaceRequest = 3;
+  bool ReplaceResponse = 4;
+  bool RequireConfirmation = 5;
+  string PacketRevision = 6;
+}
+
+message ContextMenuActionEvent {
+  string RuntimeID = 1;
+  string Status = 2;
+  string Reason = 3;
+  string ResultMode = 4;
+  string PluginName = 5;
+  ExecResult Result = 6;
+  ContextMenuPacketActionResult PacketResult = 7;
 }
 
 message UploadToTemporaryFileRequest {

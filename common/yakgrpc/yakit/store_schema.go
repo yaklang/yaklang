@@ -18,8 +18,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/yaklang/gorm"
 	"github.com/pkg/errors"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"gopkg.in/yaml.v2"
@@ -68,6 +68,8 @@ func GetDefaultScriptFileNameByType(t string) (string, error) {
 		return "nuclei.yaml", nil
 	case "codec":
 		return "codec.yak", nil
+	case "context-menu":
+		return "context_menu.yak", nil
 	case "port-scan":
 		return "handle.yak", nil
 	case "mitm":
@@ -550,6 +552,8 @@ func YakScriptLocalType(dirName string) string {
 		typeStr = "yak"
 	case "yak_codec":
 		typeStr = "codec"
+	case "yak_context_menu":
+		typeStr = "context-menu"
 	case "yak_portscan":
 		typeStr = "port-scan"
 	default:
