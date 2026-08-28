@@ -309,11 +309,13 @@ func queryDefaultLegacyContextMenuBindings(
 		}
 	}
 
+	// Legacy packet mutation stays on the original CODEC execution path. Do not
+	// enable it as a context-menu default or let it consume the HTTP-packet scene
+	// quota; the frontend intentionally filters it out.
 	actionIDs := []string{
 		contextmenu.ActionLegacyHistorySingle,
 		contextmenu.ActionLegacyHistoryMulti,
 		contextmenu.ActionLegacyPacketContext,
-		contextmenu.ActionLegacyPacketMutate,
 	}
 	bindings := make([]*schema.ContextMenuBinding, 0, len(actionIDs)*contextmenu.LegacyDefaultPluginLimit)
 	for _, actionID := range actionIDs {
