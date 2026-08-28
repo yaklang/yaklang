@@ -197,17 +197,21 @@ func (s *Server) ProbeReasoningEffort(ctx context.Context, req *ypb.ProbeReasoni
 
 	probeOne := func(effort string) (bool, string) {
 		config := cloneThirdPartyApplicationConfig(req.Config)
-		config.ReasoningEffort = &effort
+		config.ReasoningEffort = nil // probe path controls ThinkingLevel directly, bypassing clamp
 
 		var statusCode int32
 		var errMsg string
 
 		opts := aispec.BuildOptionsFromConfig(&ypb.AIModelConfig{
-			Provider:               config,
-			ModelName:              model,
-			ProbedExtendedEfforts:  []string{effort}, // allow this effort to pass through for probing
+			Provider:    config,
+			ModelName:   model,
 		})
 		opts = append(opts,
+			// Override ThinkingLevel directly with the effort under probe.
+			// This decouples the probe path from the normal-use clamp mechanism
+			// in buildOptionsFromProviderAndModel, so that xhigh/max is always
+			// sent as-is to the API regardless of ProbedExtendedEfforts.
+			aispec.WithThinkingLevel(effort),
 			aispec.WithContext(ctx),
 			aispec.WithDisableProviderFallback(true),
 			aispec.WithDisableStream(true),
