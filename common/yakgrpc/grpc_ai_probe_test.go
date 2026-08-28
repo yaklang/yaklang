@@ -120,7 +120,7 @@ func TestProbeReasoningEffort_OnlyXhighSupported(t *testing.T) {
 	mockey.PatchConvey("only xhigh supported, max returns 400", t, func() {
 		mockey.Mock(ai.Chat).To(func(msg string, opts ...aispec.AIConfigOption) (string, error) {
 			cfg := aispec.NewDefaultAIConfig(opts...)
-			effort := cfg.ReasoningEffort
+			effort := cfg.ThinkingLevel
 			if cfg.RawHTTPRequestResponseCallback != nil {
 				if effort == "xhigh" {
 					cfg.RawHTTPRequestResponseCallback(
