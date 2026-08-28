@@ -599,25 +599,38 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 	taskInfos := make([]map[string]interface{}, 0, len(queueingTasks))
 
 	for _, task := range queueingTasks {
-		taskInfo := map[string]interface{}{
-			"id":         task.GetId(),
-			"user_input": task.GetUserInput(),
-			"user_input_uuid": task.GetUserInputUUID(),
-			"status":     task.GetStatus(),
-			"created_at": task.GetCreatedAt(),
-			"focus_mode": task.GetFocusMode(),
-			"is_recovery": task.GetTaskKind() == aicommon.AITaskKind_Recovery,
-		}
+		taskInfos = append(taskInfos, buildQueueTaskInfo(task))
+	}
 
-		taskInfos = append(taskInfos, taskInfo)
+	var currentTaskInfo map[string]interface{}
+	if currentTask := r.GetCurrentTask(); currentTask != nil {
+		currentTaskInfo = buildQueueTaskInfo(currentTask)
 	}
 
 	return map[string]interface{}{
 		"queue_name":    r.taskQueue.GetQueueName(),
 		"total_tasks":   r.taskQueue.GetQueueingCount(),
 		"is_processing": r.IsProcessingReAct(),
+		"current_task":  currentTaskInfo,
 		"tasks":         taskInfos,
 		"queue_empty":   r.taskQueue.IsEmpty(),
+	}
+}
+
+func buildQueueTaskInfo(task aicommon.AIStatefulTask) map[string]interface{} {
+	return map[string]interface{}{
+		"id":               task.GetId(),
+		"user_input":       task.GetUserInput(),
+		"user_input_uuid":  task.GetUserInputUUID(),
+		"status":           task.GetStatus(),
+		"created_at":       task.GetCreatedAt(),
+		"focus_mode":       task.GetFocusMode(),
+		"input_source":     task.GetInputSource(),
+		"schedule_uuid":    task.GetScheduleUUID(),
+		"schedule_name":    task.GetScheduleName(),
+		"scheduled_at":     task.GetScheduledAt(),
+		"schedule_trigger": task.GetScheduleTrigger(),
+		"is_recovery":      task.GetTaskKind() == aicommon.AITaskKind_Recovery,
 	}
 }
 

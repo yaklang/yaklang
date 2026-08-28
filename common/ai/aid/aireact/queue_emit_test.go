@@ -125,3 +125,34 @@ func TestGetQueueInfoIncludesUserInputUUID(t *testing.T) {
 	require.Len(t, tasks, 1)
 	require.Equal(t, "ui-uuid-queue-info-789", tasks[0]["user_input_uuid"])
 }
+
+func TestGetQueueInfoIncludesCurrentTask(t *testing.T) {
+	currentTask := aicommon.NewStatefulTaskBase("task-current", "scheduled prompt", nil, nil, true)
+	currentTask.SetStatus(aicommon.AITaskState_Processing)
+	currentTask.SetInputSource(aicommon.USER_INPUT_SOURCE_SCHEDULE)
+	currentTask.SetScheduleUUID("schedule-uuid")
+	currentTask.SetScheduleName("daily check")
+
+	react := &ReAct{
+		taskQueue:   NewTaskQueue("test"),
+		currentTask: currentTask,
+		config:      &aicommon.Config{},
+	}
+	info := react.GetQueueInfo()
+	current, ok := info["current_task"].(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, "task-current", current["id"])
+	require.Equal(t, aicommon.AITaskState_Processing, current["status"])
+	require.Equal(t, aicommon.USER_INPUT_SOURCE_SCHEDULE, current["input_source"])
+	require.Equal(t, "schedule-uuid", current["schedule_uuid"])
+	require.Equal(t, "daily check", current["schedule_name"])
+}
+
+func TestGetQueueInfoCurrentTaskIsNilWhenIdle(t *testing.T) {
+	react := &ReAct{taskQueue: NewTaskQueue("test")}
+	info := react.GetQueueInfo()
+
+	current, exists := info["current_task"]
+	require.True(t, exists)
+	require.Nil(t, current)
+}
