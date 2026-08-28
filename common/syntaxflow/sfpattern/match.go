@@ -142,7 +142,9 @@ func MatchRegexpWithNegatives(files map[string]string, pathPattern string, posit
 	}
 	vals := make([]sfvm.ValueOperator, 0, len(kept))
 	for _, h := range kept {
-		vals = append(vals, sfvm.NewSimpleValueWithEditor(h.Text, h.Path, h.Start, h.End, editors.editorFor(h.Path)))
+		sv := sfvm.NewSimpleValueWithEditor(h.Text, h.Path, h.Start, h.End, editors.editorFor(h.Path))
+		sv.SetFiles(files)
+		vals = append(vals, sv)
 	}
 	return sfvm.NewValues(vals), nil
 }
@@ -180,7 +182,9 @@ func MatchRegexp(files map[string]string, pathPattern string, patterns []string)
 	editors := newHitEditorCache(files)
 	vals := make([]sfvm.ValueOperator, 0, len(hits))
 	for _, h := range hits {
-		vals = append(vals, sfvm.NewSimpleValueWithEditor(h.Text, h.Path, h.Start, h.End, editors.editorFor(h.Path)))
+		sv := sfvm.NewSimpleValueWithEditor(h.Text, h.Path, h.Start, h.End, editors.editorFor(h.Path))
+		sv.SetFiles(files)
+		vals = append(vals, sv)
 	}
 	return sfvm.NewValues(vals), nil
 }
