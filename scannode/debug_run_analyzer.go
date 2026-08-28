@@ -583,17 +583,29 @@ func (r *DebugRunAnalysis) collectSamples(dir, logContent string) []SampleSummar
 		if s.DBStats == nil {
 			s.DBStats = loadSampleDBStats(dir, s.Label)
 		}
-		// Log excerpt limited to 500 chars
-		if s.Label != "" {
-			if logData, err := os.ReadFile(filepath.Join(dir, "log")); err == nil {
-				s.LogExcerpt = extractLogExcerpt(string(logData), s.Label, 500)
-			} else if taskLog := resolveTaskLogByDebugDir(dir); taskLog != "" {
-				if logData, err := os.ReadFile(taskLog); err == nil {
-					s.LogExcerpt = extractLogExcerpt(string(logData), s.Label, 500)
-				}
+	}
+
+	// Convert to a stable slice for excerpt extraction and sorting.
+	summaries := make([]*SampleSummary, 0, len(labelMap))
+	for _, s := range labelMap {
+		summaries = append(summaries, s)
+	}
+
+	// Log excerpts: one shared pass over the log content (which can be
+	// hundreds of MB on long runs). Reading and re-splitting the log per
+	// sample allocated O(samples × log size) and OOM'd nodes on multi-hour
+	// debug runs.
+	excerptSource := logContent
+	if strings.TrimSpace(excerptSource) == "" {
+		if logData, err := os.ReadFile(filepath.Join(dir, "log")); err == nil {
+			excerptSource = string(logData)
+		} else if taskLog := resolveTaskLogByDebugDir(dir); taskLog != "" {
+			if logData, err := os.ReadFile(taskLog); err == nil {
+				excerptSource = string(logData)
 			}
 		}
 	}
+	sampleLogExcerpts(excerptSource, summaries, 500)
 
 	// Convert to sorted slice
 	result := make([]SampleSummary, 0, len(labelMap))
@@ -1243,6 +1255,80 @@ func extractLogExcerpt(logContent string, label string, maxLen int) string {
 	return excerpt
 }
 
+// sampleLogExcerpts extracts a bounded excerpt around each sample's
+// timestamp using a single pass over the log content. Sample labels and log
+// lines are both chronological, so one ascending scan replaces the previous
+// per-sample full read + strings.Split, which allocated O(samples × log size)
+// and OOM'd nodes on multi-hour debug runs.
+func sampleLogExcerpts(logContent string, summaries []*SampleSummary, maxLen int) {
+	if logContent == "" || len(summaries) == 0 || maxLen <= 0 {
+		return
+	}
+	type pendingExcerpt struct {
+		summary *SampleSummary
+		target  string
+	}
+	pending := make([]*pendingExcerpt, 0, len(summaries))
+	headOnly := make([]*SampleSummary, 0)
+	for _, s := range summaries {
+		ts := parseLabelTimestamp(s.Label)
+		if ts == nil || s.Timestamp == nil {
+			headOnly = append(headOnly, s)
+			continue
+		}
+		pending = append(pending, &pendingExcerpt{summary: s, target: ts.Format("2006/01/02 15:04:05")})
+	}
+	sort.Slice(pending, func(i, j int) bool {
+		return pending[i].summary.Timestamp.Before(*pending[j].summary.Timestamp)
+	})
+
+	// strings.Split shares the underlying bytes, so this is cheap relative to
+	// the content size.
+	lines := strings.Split(logContent, "\n")
+	searchFrom := 0
+	pi := 0
+	for pi < len(pending) {
+		startIdx := -1
+		for i := searchFrom; i < len(lines); i++ {
+			if strings.Contains(lines[i], pending[pi].target) {
+				startIdx = i
+				break
+			}
+		}
+		if startIdx < 0 {
+			// The log ends before this sample's timestamp; remaining samples
+			// are chronologically later and cannot match either.
+			break
+		}
+		start := startIdx - 5
+		if start < 0 {
+			start = 0
+		}
+		end := startIdx + 15
+		if end > len(lines) {
+			end = len(lines)
+		}
+		pending[pi].summary.LogExcerpt = truncateString(strings.Join(lines[start:end], "\n"), maxLen)
+		searchFrom = startIdx + 1
+		pi++
+	}
+	// Samples whose timestamp was not found in the log fall back to the head
+	// of the log (matches the previous extractLogExcerpt behavior).
+	for ; pi < len(pending); pi++ {
+		pending[pi].summary.LogExcerpt = truncateString(logContent, maxLen)
+	}
+	for _, s := range headOnly {
+		s.LogExcerpt = truncateString(logContent, maxLen)
+	}
+}
+
+func truncateString(s string, maxLen int) string {
+	if len(s) > maxLen {
+		return s[:maxLen]
+	}
+	return s
+}
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
@@ -1367,10 +1453,22 @@ func resolveNodeTaskLogFallback(firstFile string) string {
 	return ""
 }
 
+// taskLogMergeMarkerName tracks how much of the node task log has already
+// been folded into debugDir/log so repeated merges (live queries, finalize,
+// shutdown) append only new bytes instead of re-appending the whole log.
+const taskLogMergeMarkerName = "task.log.merge.json"
+
+type taskLogMergeState struct {
+	Offset int64 `json:"offset"`
+}
+
 // mergeTaskLogIntoDebugDir copies the node-side per-task log into
-// debugDir/log when that file is empty or absent, so the debug zip and
-// analysis contain the scan stdout/stderr even if the child profiler did
-// not redirect logs.
+// debugDir/log, appending incrementally, so the debug zip and analysis
+// contain the scan stdout/stderr even if the child profiler did not redirect
+// logs. The previous implementation re-read and re-appended the FULL task
+// log on every call: a console polling ssa.debug.query every few seconds
+// made debug/log grow without bound and kept the analysis cache
+// permanently stale.
 func mergeTaskLogIntoDebugDir(debugDir string) {
 	if debugDir == "" {
 		return
@@ -1379,19 +1477,61 @@ func mergeTaskLogIntoDebugDir(debugDir string) {
 	if taskLog == "" {
 		return
 	}
-	data, err := os.ReadFile(taskLog)
-	if err != nil || len(data) == 0 {
+	info, err := os.Stat(taskLog)
+	if err != nil || info.Size() <= 0 {
 		return
 	}
+	offset := int64(0)
+	if raw, err := os.ReadFile(filepath.Join(debugDir, taskLogMergeMarkerName)); err == nil {
+		var state taskLogMergeState
+		if json.Unmarshal(raw, &state) == nil && state.Offset > 0 {
+			offset = state.Offset
+		}
+	}
+	if offset > info.Size() {
+		// Task log was truncated or recreated since the last merge; start over.
+		offset = 0
+	}
+	if offset == info.Size() {
+		return // nothing new to fold in
+	}
+
+	file, err := os.Open(taskLog)
+	if err != nil {
+		return
+	}
+	if _, err := file.Seek(offset, io.SeekStart); err != nil {
+		file.Close()
+		return
+	}
+	newData, err := io.ReadAll(file)
+	file.Close()
+	if err != nil || len(newData) == 0 {
+		return
+	}
+
 	debugLog := filepath.Join(debugDir, "log")
-	if existing, err := os.ReadFile(debugLog); err == nil && len(existing) > 0 {
-		// Keep child collector content and append task log after a separator.
-		out := append(append(existing, '\n'), []byte("--- node task log ---\n")...)
-		out = append(out, data...)
-		_ = os.WriteFile(debugLog, out, 0o644)
+	out, err := os.OpenFile(debugLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
 		return
 	}
-	_ = os.WriteFile(debugLog, data, 0o644)
+	if offset == 0 {
+		if existing, err := out.Stat(); err == nil && existing.Size() > 0 {
+			// Keep child collector content and separate the task log.
+			if _, err := out.Write([]byte("\n--- node task log ---\n")); err != nil {
+				out.Close()
+				return
+			}
+		}
+	}
+	if _, err := out.Write(newData); err != nil {
+		out.Close()
+		return
+	}
+	out.Close()
+	if raw, err := json.Marshal(taskLogMergeState{Offset: info.Size()}); err == nil {
+		_ = os.WriteFile(filepath.Join(debugDir, taskLogMergeMarkerName), raw, 0o644)
+	}
 }
 
 // resolveTaskLogByDebugDir derives the node task log path from a debug run

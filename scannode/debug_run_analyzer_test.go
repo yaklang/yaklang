@@ -359,3 +359,80 @@ func TestAnalyzeDebugRun_EnrichesPhasesFromTaskLog(t *testing.T) {
 	assert.Equal(t, "compile", result.Samples[0].Phase)
 	assert.Equal(t, "log_inferred", result.Samples[0].PhaseSource)
 }
+
+func TestSampleLogExcerpts_SinglePass(t *testing.T) {
+	logContent := "2026/08/05 12:00:00 boot\n" +
+		"2026/08/05 12:00:29 warmup\n" +
+		"2026/08/05 12:00:30 sample-one context\n" +
+		"2026/08/05 12:05:00 middle\n" +
+		"2026/08/05 12:10:00 sample-two context\n" +
+		"2026/08/05 12:11:00 tail\n"
+
+	mk := func(label string) *SampleSummary {
+		return &SampleSummary{Label: label, Timestamp: parseLabelTimestamp(label)}
+	}
+	summaries := []*SampleSummary{
+		mk("20260805-121000-121000"), // 12:10:00
+		mk("20260805-120030-initial"), // 12:00:30 (deliberately out of order)
+		mk("not-a-timestamp"),         // unparseable → head fallback
+		mk("20260805-235900-late"),    // not in log → head fallback
+	}
+
+	sampleLogExcerpts(logContent, summaries, 500)
+
+	// Newest label first: the two-pointer scan must not let the later label
+	// steal the earlier one's match.
+	assert.Contains(t, summaries[1].LogExcerpt, "sample-one context")
+	assert.Contains(t, summaries[0].LogExcerpt, "sample-two context")
+	for _, s := range summaries {
+		assert.LessOrEqual(t, len(s.LogExcerpt), 500)
+		assert.NotEmpty(t, s.LogExcerpt)
+	}
+}
+
+func TestMergeTaskLogIntoDebugDir_IncrementalIdempotent(t *testing.T) {
+	root := t.TempDir()
+	debugDir := filepath.Join(root, "debug-runs", "debug", "task-abc_1234")
+	require.NoError(t, os.MkdirAll(debugDir, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "logs"), 0o755))
+
+	taskLog := filepath.Join(root, "logs", "task-abc_1234.log")
+	require.NoError(t, os.WriteFile(taskLog, []byte("line1\nline2\n"), 0o644))
+
+	// 1) first merge seeds the log with the task log
+	mergeTaskLogIntoDebugDir(debugDir)
+	first, err := os.ReadFile(filepath.Join(debugDir, "log"))
+	require.NoError(t, err)
+	assert.Equal(t, "line1\nline2\n", string(first))
+
+	// 2) merge again with no new task-log bytes: no change, no duplication
+	mergeTaskLogIntoDebugDir(debugDir)
+	same, err := os.ReadFile(filepath.Join(debugDir, "log"))
+	require.NoError(t, err)
+	assert.Equal(t, "line1\nline2\n", string(same))
+
+	// 3) task log grows: merge appends only the new tail
+	require.NoError(t, os.WriteFile(taskLog, []byte("line1\nline2\nline3\n"), 0o644))
+	mergeTaskLogIntoDebugDir(debugDir)
+	grown, err := os.ReadFile(filepath.Join(debugDir, "log"))
+	require.NoError(t, err)
+	assert.Equal(t, "line1\nline2\nline3\n", string(grown))
+
+	// 4) existing collector content gets the separator on the first merge
+	root2 := t.TempDir()
+	debugDir2 := filepath.Join(root2, "debug-runs", "debug", "task-def_5678")
+	require.NoError(t, os.MkdirAll(debugDir2, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root2, "logs"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(debugDir2, "log"), []byte("collector out\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(root2, "logs", "task-def_5678.log"), []byte("task log\n"), 0o644))
+	mergeTaskLogIntoDebugDir(debugDir2)
+	merged, err := os.ReadFile(filepath.Join(debugDir2, "log"))
+	require.NoError(t, err)
+	assert.Equal(t, "collector out\n\n--- node task log ---\ntask log\n", string(merged))
+
+	// 5) repeated finalize merges must not re-append the task log
+	mergeTaskLogIntoDebugDir(debugDir2)
+	mergedAgain, err := os.ReadFile(filepath.Join(debugDir2, "log"))
+	require.NoError(t, err)
+	assert.Equal(t, "collector out\n\n--- node task log ---\ntask log\n", string(mergedAgain))
+}
