@@ -530,6 +530,12 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		jpegHexEdited[i] = 0x11
 	}
 	readableTextReplacement := []byte("b'<!DOCTYPE html>\n<html lang=\"en-GB\">\n<title>Vulnerability: SQL Injection (Blind)</title>\n</html>'")
+	// Keep the same ratio as the field report (10 MiB dump limit and a
+	// 100 MiB browser form upload) without making every CI run move 100 MiB
+	// through each replay layer. If manual hijack ever converts these concrete
+	// bytes to {{unquote}} before spilling the part, the editor-body assertion
+	// below sees the multi-megabyte expansion instead of a bounded file tag.
+	largeInvalidMultipart := bytes.Repeat([]byte{0x00, 0xff, 0x10, 0x80}, 5*1024*1024/4)
 	cases := []mitmV2RequestOutcomeCase{
 		{
 			name:            "small-text-forward",
@@ -614,6 +620,20 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 			forwardOriginal:   true,
 			wantHijackRaw:     true,
 			wantCurrentRaw:    true,
+		},
+		{
+			name:                  "multipart-browser-upload-ten-times-D",
+			originalPayload:       largeInvalidMultipart,
+			sentPayload:           largeInvalidMultipart,
+			multipart:             true,
+			uploadFilename:        "large-upload.bin",
+			uploadContentType:     "application/octet-stream",
+			hijackResponse:        true,
+			wantHijackTag:         "{{file(",
+			wantResourceFlow:      true,
+			wantHijackFileFields:  []string{"upload"},
+			wantCurrentFileFields: []string{"upload"},
+			deleteAfterValidation: true,
 		},
 		{
 			// Exact GUI contract: a small ZIP is represented by an inline
@@ -821,6 +841,13 @@ func TestGRPCMUSTPASS_MITMV2_RequestOutcomeMatrix(t *testing.T) {
 		if task.GetStatus() == Hijack_Status_Response {
 			if msg.GetManualHijackListAction() != Hijack_List_Update {
 				return
+			}
+			if bytes.Contains(task.GetRequest(), []byte("/outcome/multipart-browser-upload-ten-times-D/")) {
+				require.True(t, utf8.Valid(task.GetRequest()), "response-stage task must retain the bounded request editor packet")
+				require.Contains(t, string(task.GetRequest()), "{{file(")
+				_, editorBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(task.GetRequest())
+				require.LessOrEqual(t, len(editorBody), yakit.GetMaxHTTPFlowRequestBodyInDBBytes(),
+					"response-stage task must not restore and expand the concrete large request")
 			}
 			if _, loaded := handledResponses.LoadOrStore(task.GetTaskID(), struct{}{}); loaded {
 				return
