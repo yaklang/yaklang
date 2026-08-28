@@ -2,9 +2,10 @@ package browser
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"sync"
-	"time"
+	"unicode/utf8"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
@@ -15,26 +16,27 @@ import (
 const networkTapBodyLimit = 2048
 
 type pendingNetworkReq struct {
-	url          string
-	method       string
-	body         string
-	headers      map[string]string
-	status       int
-	resourceType proto.NetworkResourceType
+	url     string
+	method  string
+	body    string
+	headers map[string]string
+	status  int
 }
 
 type networkTap struct {
 	mu      sync.Mutex
 	pending map[proto.NetworkRequestID]*pendingNetworkReq
 	done    []map[string]any
-	started bool
 }
 
 // EvalOnNewDocument injects JavaScript that runs before every new document.
 func (p *BrowserPage) EvalOnNewDocument(js string) error {
+	if p == nil {
+		return fmt.Errorf("eval on new document: empty page")
+	}
 	sess := p.rootRod()
 	if sess == nil {
-		sess = p.page
+		return fmt.Errorf("eval on new document: empty page")
 	}
 	_, err := sess.EvalOnNewDocument(js)
 	if err != nil {
@@ -46,24 +48,25 @@ func (p *BrowserPage) EvalOnNewDocument(js string) error {
 // StartNetworkTap enables CDP Network events and records finished HTTP exchanges.
 // Call this before Navigate so load-time XHR/fetch is captured.
 func (p *BrowserPage) StartNetworkTap() error {
+	if p == nil {
+		return fmt.Errorf("start network tap: empty page")
+	}
 	p.tapMu.Lock()
-	if p.tap != nil && p.tap.started {
-		p.tapMu.Unlock()
+	defer p.tapMu.Unlock()
+	if p.tap != nil {
 		return nil
+	}
+	sess := p.rootRod()
+	if sess == nil {
+		return fmt.Errorf("start network tap: empty page")
 	}
 	tap := &networkTap{
 		pending: map[proto.NetworkRequestID]*pendingNetworkReq{},
 	}
-	p.tap = tap
-	p.tapMu.Unlock()
 
 	maxPost := 8192
 	maxRes := 1024 * 1024
 	maxTot := 10 * 1024 * 1024
-	sess := p.rootRod()
-	if sess == nil {
-		sess = p.page
-	}
 	err := proto.NetworkEnable{
 		MaxPostDataSize:       &maxPost,
 		MaxResourceBufferSize: &maxRes,
@@ -84,17 +87,20 @@ func (p *BrowserPage) StartNetworkTap() error {
 		func(e *proto.NetworkLoadingFinished) {
 			go tap.onFinished(page, e.RequestID)
 		},
+		func(e *proto.NetworkLoadingFailed) {
+			tap.onFailed(e)
+		},
 	)
+	p.tap = tap
 	go wait()
-	time.Sleep(100 * time.Millisecond)
-	tap.mu.Lock()
-	tap.started = true
-	tap.mu.Unlock()
 	return nil
 }
 
 // DrainNetworkTap returns captured exchanges since the last drain and clears them.
 func (p *BrowserPage) DrainNetworkTap() []map[string]any {
+	if p == nil {
+		return []map[string]any{}
+	}
 	p.tapMu.Lock()
 	tap := p.tap
 	p.tapMu.Unlock()
@@ -124,26 +130,22 @@ func (t *networkTap) onRequest(e *proto.NetworkRequestWillBeSent) {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.pending == nil {
+		t.pending = make(map[proto.NetworkRequestID]*pendingNetworkReq)
+	}
 	if prev, ok := t.pending[e.RequestID]; ok && prev != nil {
 		status := prev.status
 		if e.RedirectResponse != nil {
 			status = e.RedirectResponse.Status
 		}
-		t.done = append(t.done, map[string]any{
-			"url":      prev.url,
-			"method":   prev.method,
-			"body":     prev.body,
-			"status":   status,
-			"headers":  prev.headers,
-			"response": "",
-		})
+		prev.status = status
+		t.done = append(t.done, networkTapRecord(prev, ""))
 	}
 	t.pending[e.RequestID] = &pendingNetworkReq{
-		url:          e.Request.URL,
-		method:       e.Request.Method,
-		body:         clipNetworkBody(body),
-		headers:      headers,
-		resourceType: e.Type,
+		url:     e.Request.URL,
+		method:  e.Request.Method,
+		body:    clipNetworkBody(body),
+		headers: headers,
 	}
 }
 
@@ -154,28 +156,36 @@ func (t *networkTap) onResponse(e *proto.NetworkResponseReceived) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	pending, ok := t.pending[e.RequestID]
-	if !ok {
+	if !ok || pending == nil {
 		return
 	}
 	pending.status = e.Response.Status
 }
 
+func (t *networkTap) onFailed(e *proto.NetworkLoadingFailed) {
+	if e == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	pending, ok := t.pending[e.RequestID]
+	if !ok || pending == nil {
+		return
+	}
+	delete(t.pending, e.RequestID)
+	t.done = append(t.done, networkTapRecord(pending, ""))
+}
+
 func (t *networkTap) onFinished(page *rod.Page, id proto.NetworkRequestID) {
 	t.mu.Lock()
 	pending, ok := t.pending[id]
-	if !ok {
+	if !ok || pending == nil {
+		delete(t.pending, id)
 		t.mu.Unlock()
 		return
 	}
 	delete(t.pending, id)
-	rec := map[string]any{
-		"url":      pending.url,
-		"method":   pending.method,
-		"body":     pending.body,
-		"status":   pending.status,
-		"headers":  pending.headers,
-		"response": "",
-	}
+	rec := networkTapRecord(pending, "")
 	t.mu.Unlock()
 
 	respBody := ""
@@ -204,31 +214,32 @@ func (t *networkTap) drain() []map[string]any {
 	defer t.mu.Unlock()
 	out := t.done
 	t.done = nil
-	for id, pending := range t.pending {
-		if pending == nil {
-			continue
-		}
-		out = append(out, map[string]any{
-			"url":      pending.url,
-			"method":   pending.method,
-			"body":     pending.body,
-			"status":   pending.status,
-			"headers":  pending.headers,
-			"response": "",
-		})
-		delete(t.pending, id)
-	}
 	if out == nil {
 		return []map[string]any{}
 	}
 	return out
 }
 
+func networkTapRecord(pending *pendingNetworkReq, response string) map[string]any {
+	return map[string]any{
+		"url":      pending.url,
+		"method":   pending.method,
+		"body":     pending.body,
+		"status":   pending.status,
+		"headers":  pending.headers,
+		"response": response,
+	}
+}
+
 func clipNetworkBody(s string) string {
 	if len(s) <= networkTapBodyLimit {
 		return s
 	}
-	return s[:networkTapBodyLimit]
+	end := networkTapBodyLimit
+	for end > 0 && end < len(s) && !utf8.RuneStart(s[end]) {
+		end--
+	}
+	return s[:end]
 }
 
 func skipNetworkURL(raw string) bool {

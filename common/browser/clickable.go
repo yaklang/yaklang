@@ -3,18 +3,24 @@ package browser
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/log"
 )
 
 const markClickableJS = `(function(){
-  document.querySelectorAll("[data-legion-clickable]").forEach(function(el){ el.removeAttribute("data-legion-clickable"); });
+  var marker = "data-yaklang-clickable-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
   function visible(el) {
-    var st = window.getComputedStyle(el);
-    if (!st || st.display === "none" || st.visibility === "hidden" || st.pointerEvents === "none") {
-      return false;
-    }
+	var st = window.getComputedStyle(el);
+	if (!st || st.display === "none" || st.visibility === "hidden" || st.pointerEvents === "none") {
+	  return false;
+	}
+	if (el.disabled || (el.getAttribute("aria-disabled") || "").toLowerCase() === "true") {
+	  return false;
+	}
     var box = el.getBoundingClientRect();
     return box.width >= 4 && box.height >= 4;
   }
@@ -72,19 +78,20 @@ const markClickableJS = `(function(){
     return t;
   }
   var ranked = [];
+  var candidateSelector = "a,button,[role=button],[role=menuitem],[role=tab],[role=treeitem],[role=option],[onclick],li,div,span,td,input,select,[contenteditable=true],[contenteditable='']";
   function walk(root, inShadow) {
     if (!root) {
       return;
     }
-    var all;
-    try {
-      all = root.querySelectorAll("a,button,[role=button],[role=menuitem],[role=tab],[role=treeitem],[role=option],[onclick],li,div,span,td,input,select,[contenteditable=true],[contenteditable='']");
+	var all;
+	try {
+	  all = root.querySelectorAll("*");
     } catch (e) {
       return;
     }
-    for (var i = 0; i < all.length; i++) {
-      var el = all[i];
-      if (visible(el) && isClickable(el)) {
+	for (var i = 0; i < all.length; i++) {
+	  var el = all[i];
+	  if (el.matches(candidateSelector) && visible(el) && isClickable(el)) {
         ranked.push({el: el, shadow: inShadow});
       }
       try {
@@ -98,35 +105,46 @@ const markClickableJS = `(function(){
   ranked.sort(function(a, b) { return intentScore(b.el) - intentScore(a.el); });
   var n = 0;
   var extras = [];
+  var shadowElements = [];
   for (var j = 0; j < ranked.length && n < 40; j++) {
     var item = ranked[j];
     if (item.shadow) {
       var box = item.el.getBoundingClientRect();
-      extras.push({
-        name: nodeName(item.el),
-        role: ((item.el.getAttribute("role") || item.el.tagName || "clickable") + "").toLowerCase(),
-        x: box.left + box.width / 2,
-        y: box.top + box.height / 2,
-        shadow: true
+		extras.push({
+		  name: nodeName(item.el),
+		  role: ((item.el.getAttribute("role") || item.el.tagName || "clickable") + "").toLowerCase(),
+		  x: box.left + box.width / 2,
+		  y: box.top + box.height / 2,
+		  index: shadowElements.push(item.el) - 1,
+		  shadow: true
       });
       n++;
       continue;
     }
-    item.el.setAttribute("data-legion-clickable", String(n));
-    n++;
+	item.el.setAttribute(marker, String(n));
+	n++;
   }
-  return JSON.stringify({n: n, extras: extras});
+  window[marker] = shadowElements;
+  return JSON.stringify({marker: marker, n: n, extras: extras});
 })()`
+
+const clickableMarkerPrefix = "data-yaklang-clickable-"
 
 type markClickableExtra struct {
 	Name   string  `json:"name"`
 	Role   string  `json:"role"`
 	X      float64 `json:"x"`
 	Y      float64 `json:"y"`
+	Index  int     `json:"index"`
 	Shadow bool    `json:"shadow"`
 }
 
-func parseMarkClickableExtras(raw any) []markClickableExtra {
+type markClickableResult struct {
+	Marker string               `json:"marker"`
+	Extras []markClickableExtra `json:"extras"`
+}
+
+func parseMarkClickableResult(raw any) markClickableResult {
 	s := ""
 	switch v := raw.(type) {
 	case string:
@@ -134,18 +152,57 @@ func parseMarkClickableExtras(raw any) []markClickableExtra {
 	case []byte:
 		s = string(v)
 	default:
-		return nil
+		return markClickableResult{}
 	}
 	if strings.TrimSpace(s) == "" {
-		return nil
+		return markClickableResult{}
 	}
-	var parsed struct {
-		Extras []markClickableExtra `json:"extras"`
-	}
+	var parsed markClickableResult
 	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
-		return nil
+		return markClickableResult{}
 	}
-	return parsed.Extras
+	if !validClickableMarker(parsed.Marker) {
+		parsed.Marker = ""
+	}
+	return parsed
+}
+
+func validClickableMarker(marker string) bool {
+	if !strings.HasPrefix(marker, clickableMarkerPrefix) || len(marker) == len(clickableMarkerPrefix) {
+		return false
+	}
+	for _, r := range marker {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+type markedClickable struct {
+	element *rod.Element
+	rank    int
+}
+
+func clickableMarkerCleanupJS(marker string) string {
+	quoted, _ := json.Marshal(marker)
+	return fmt.Sprintf(`(function(){var a=%s;document.querySelectorAll("["+a+"]").forEach(function(el){el.removeAttribute(a);});delete window[a];return 0;})()`, quoted)
+}
+
+func (p *BrowserPage) resolveShadowClickable(marker string, extra markClickableExtra) int {
+	if p == nil || p.page == nil || !extra.Shadow || extra.Index < 0 {
+		return 0
+	}
+	el, err := p.page.ElementByJS(rod.Eval(`(key, index) => window[key] && window[key][index]`, marker, extra.Index))
+	if err != nil || el == nil {
+		return 0
+	}
+	node, err := el.Describe(0, false)
+	if err != nil || node == nil {
+		return 0
+	}
+	return int(node.BackendNodeID)
 }
 
 // ListClickable snapshots interactive AX nodes then adds pointer/click DOM
@@ -171,12 +228,35 @@ func (p *BrowserPage) ListClickable() []map[string]any {
 		log.Debugf("ListClickable mark: %v", err)
 		return items
 	}
-	els, err := p.page.Elements("[data-legion-clickable]")
+	marked := parseMarkClickableResult(raw)
+	if marked.Marker == "" {
+		log.Debugf("ListClickable mark returned an invalid marker")
+		return items
+	}
+	defer func() {
+		_, _ = p.Evaluate(clickableMarkerCleanupJS(marked.Marker))
+	}()
+	els, err := p.page.Elements("[" + marked.Marker + "]")
 	if err != nil {
 		log.Debugf("ListClickable query: %v", err)
 		return items
 	}
+	ranked := make([]markedClickable, 0, len(els))
 	for _, el := range els {
+		if el == nil {
+			continue
+		}
+		rank := len(ranked)
+		if attr, attrErr := el.Attribute(marked.Marker); attrErr == nil && attr != nil {
+			if n, convErr := strconv.Atoi(*attr); convErr == nil {
+				rank = n
+			}
+		}
+		ranked = append(ranked, markedClickable{element: el, rank: rank})
+	}
+	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].rank < ranked[j].rank })
+	for _, candidate := range ranked {
+		el := candidate.element
 		if el == nil {
 			continue
 		}
@@ -191,9 +271,7 @@ func (p *BrowserPage) ListClickable() []map[string]any {
 		name := ""
 		if text, textErr := el.Text(); textErr == nil {
 			name = strings.Join(strings.Fields(text), " ")
-			if len(name) > 40 {
-				name = name[:40]
-			}
+			name = clipRunes(name, 40)
 		}
 		role := "clickable"
 		if p.refMap == nil {
@@ -215,7 +293,14 @@ func (p *BrowserPage) ListClickable() []map[string]any {
 		}
 	}
 	if len(items) < 60 {
-		for _, extra := range parseMarkClickableExtras(raw) {
+		for _, extra := range marked.Extras {
+			backendID := p.resolveShadowClickable(marked.Marker, extra)
+			if backendID > 0 {
+				if _, ok := seen[backendID]; ok {
+					continue
+				}
+				seen[backendID] = struct{}{}
+			}
 			if p.refMap == nil {
 				p.refMap = NewRefMap()
 			}
@@ -224,10 +309,11 @@ func (p *BrowserPage) ListClickable() []map[string]any {
 				role = "clickable"
 			}
 			ref := p.refMap.Assign(&RefEntry{
-				Role:   role,
-				Name:   extra.Name,
-				CoordX: extra.X,
-				CoordY: extra.Y,
+				BackendNodeID: backendID,
+				Role:          role,
+				Name:          extra.Name,
+				CoordX:        extra.X,
+				CoordY:        extra.Y,
 			})
 			items = append(items, map[string]any{
 				"ref":  "@" + ref,
@@ -239,6 +325,5 @@ func (p *BrowserPage) ListClickable() []map[string]any {
 			}
 		}
 	}
-	_, _ = p.Evaluate(`(function(){document.querySelectorAll("[data-legion-clickable]").forEach(function(el){el.removeAttribute("data-legion-clickable");}); return 0;})()`)
 	return items
 }

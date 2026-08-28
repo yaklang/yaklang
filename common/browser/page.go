@@ -366,13 +366,16 @@ func cookieRequestURL(raw string) string {
 // SetCookie sets one cookie via CDP using scalar args so Yak callers do not
 // have to pass []*proto.NetworkCookieParam (maps become []interface{} and fail).
 func (p *BrowserPage) SetCookie(name, value, rawURL string) error {
+	if p == nil {
+		return fmt.Errorf("set cookie: empty page")
+	}
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return fmt.Errorf("set cookie: empty name")
 	}
 	sess := p.rootRod()
 	if sess == nil {
-		sess = p.page
+		return fmt.Errorf("set cookie: empty page")
 	}
 	u := cookieRequestURL(rawURL)
 	if u == "" && sess != nil {
@@ -391,7 +394,11 @@ func (p *BrowserPage) SetCookie(name, value, rawURL string) error {
 }
 
 func (p *BrowserPage) Close() error {
-	return p.page.Close()
+	root := p.rootRod()
+	if root == nil {
+		return fmt.Errorf("close page: empty page")
+	}
+	return root.Close()
 }
 
 func (p *BrowserPage) clickBySelector(selector string) error {

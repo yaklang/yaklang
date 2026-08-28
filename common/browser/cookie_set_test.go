@@ -1,6 +1,10 @@
 package browser
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestCookieRequestURL(t *testing.T) {
 	t.Parallel()
@@ -13,4 +17,11 @@ func TestCookieRequestURL(t *testing.T) {
 	if cookieRequestURL("  ") != "" {
 		t.Fatal("empty should stay empty")
 	}
+}
+
+func TestSetCookieWithoutPage(t *testing.T) {
+	t.Parallel()
+	var nilPage *BrowserPage
+	require.Error(t, nilPage.SetCookie("sid", "1", "https://app.example"))
+	require.Error(t, (&BrowserPage{}).SetCookie("sid", "1", "https://app.example"))
 }

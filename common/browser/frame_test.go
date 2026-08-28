@@ -26,6 +26,10 @@ func TestParseFrameArgIndexAndURL(t *testing.T) {
 	require.True(t, hasIdx)
 	require.Equal(t, 1, idx)
 
+	idx, _, hasIdx = parseFrameArg(1.5)
+	require.True(t, hasIdx)
+	require.Equal(t, -1, idx)
+
 	idx, src, hasIdx = parseFrameArg("https://app.example/frame/list")
 	require.False(t, hasIdx)
 	require.Equal(t, "https://app.example/frame/list", src)
@@ -53,18 +57,31 @@ func TestPickFrameSameOriginLargestAndRefuseCross(t *testing.T) {
 	got, ok = pickFrame(frames, "/list")
 	require.True(t, ok)
 	require.Equal(t, "https://app.example/list", got.Src)
+
+	_, ok = pickFrame(frames, 1.5)
+	require.False(t, ok)
+	_, ok = pickFrame(frames, "/list/missing")
+	require.False(t, ok)
 }
 
 func TestParseFrameListJSON(t *testing.T) {
 	t.Parallel()
-	raw := `[{"index":0,"src":"http://app/x","url":"http://app/x","host":"app","same_origin":true,"visible":true,"area":12}]`
+	raw := `[{"index":0,"element_index":2,"src":"http://app/x","url":"http://app/x","host":"app","same_origin":true,"visible":true,"area":12}]`
 	got := parseFrameList(raw)
 	require.Len(t, got, 1)
 	require.True(t, got[0].SameOrigin)
 	require.Equal(t, "http://app/x", got[0].Src)
+	require.Equal(t, 2, got[0].ElementIndex)
 
 	arr := []any{map[string]any{"index": 0, "src": "http://app/y", "url": "http://app/y", "host": "app", "same_origin": true, "visible": true, "area": 9}}
 	got = parseFrameList(arr)
 	require.Len(t, got, 1)
 	require.Equal(t, "http://app/y", got[0].Src)
+}
+
+func TestOriginOfNormalizesDefaultPorts(t *testing.T) {
+	t.Parallel()
+	require.Equal(t, originOf("https://APP.example/path"), originOf("https://app.example:443/other"))
+	require.Equal(t, originOf("http://app.example/path"), originOf("http://app.example:80/other"))
+	require.NotEqual(t, originOf("http://app.example"), originOf("https://app.example"))
 }

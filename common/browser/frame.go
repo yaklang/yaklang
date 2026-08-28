@@ -3,6 +3,7 @@ package browser
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -39,6 +40,7 @@ const listFramesJS = `(function(){
     } catch (e2) {}
     frames.push({
       index: frames.length,
+      element_index: i,
       src: abs,
       url: abs,
       host: host,
@@ -51,13 +53,38 @@ const listFramesJS = `(function(){
 })()`
 
 type frameInfo struct {
-	Index      int     `json:"index"`
-	Src        string  `json:"src"`
-	URL        string  `json:"url"`
-	Host       string  `json:"host"`
-	SameOrigin bool    `json:"same_origin"`
-	Visible    bool    `json:"visible"`
-	Area       float64 `json:"area"`
+	Index        int     `json:"index"`
+	ElementIndex int     `json:"element_index"`
+	Src          string  `json:"src"`
+	URL          string  `json:"url"`
+	Host         string  `json:"host"`
+	SameOrigin   bool    `json:"same_origin"`
+	Visible      bool    `json:"visible"`
+	Area         float64 `json:"area"`
+}
+
+func signedFrameIndex(n int64) (int, bool) {
+	maxInt := int64(^uint(0) >> 1)
+	minInt := -maxInt - 1
+	if n < minInt || n > maxInt {
+		return -1, false
+	}
+	return int(n), true
+}
+
+func unsignedFrameIndex(n uint64) (int, bool) {
+	if n > uint64(^uint(0)>>1) {
+		return -1, false
+	}
+	return int(n), true
+}
+
+func floatFrameIndex(n float64) (int, bool) {
+	limit := math.Ldexp(1, strconv.IntSize-1)
+	if math.IsNaN(n) || math.IsInf(n, 0) || math.Trunc(n) != n || n < -limit || n >= limit {
+		return -1, false
+	}
+	return int(n), true
 }
 
 func parseFrameArg(v any) (idx int, src string, hasIdx bool) {
@@ -73,27 +100,55 @@ func parseFrameArg(v any) (idx int, src string, hasIdx bool) {
 	case int32:
 		return int(t), "", true
 	case int64:
-		return int(t), "", true
+		idx, ok := signedFrameIndex(t)
+		if !ok {
+			return -1, "", true
+		}
+		return idx, "", true
 	case uint:
-		return int(t), "", true
+		idx, ok := unsignedFrameIndex(uint64(t))
+		if !ok {
+			return -1, "", true
+		}
+		return idx, "", true
 	case uint8:
 		return int(t), "", true
 	case uint16:
 		return int(t), "", true
 	case uint32:
-		return int(t), "", true
+		idx, ok := unsignedFrameIndex(uint64(t))
+		if !ok {
+			return -1, "", true
+		}
+		return idx, "", true
 	case uint64:
-		return int(t), "", true
+		idx, ok := unsignedFrameIndex(t)
+		if !ok {
+			return -1, "", true
+		}
+		return idx, "", true
 	case float32:
-		return int(t), "", true
+		idx, ok := floatFrameIndex(float64(t))
+		if !ok {
+			return -1, "", true
+		}
+		return idx, "", true
 	case float64:
-		return int(t), "", true
+		idx, ok := floatFrameIndex(t)
+		if !ok {
+			return -1, "", true
+		}
+		return idx, "", true
 	case json.Number:
 		n, err := t.Int64()
 		if err == nil {
-			return int(n), "", true
+			idx, ok := signedFrameIndex(n)
+			if !ok {
+				return -1, "", true
+			}
+			return idx, "", true
 		}
-		return 0, t.String(), false
+		return -1, "", true
 	case string:
 		s := strings.TrimSpace(t)
 		if s == "" {
@@ -164,10 +219,25 @@ func parseFrameList(raw any) []frameInfo {
 }
 
 func truncateRunes(s string, n int) string {
-	if n <= 0 || len(s) <= n {
+	if n <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n] + "..."
+	return string(runes[:n]) + "..."
+}
+
+func clipRunes(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n])
 }
 
 func frameToMap(f frameInfo) map[string]any {
@@ -196,7 +266,16 @@ func originOf(raw string) string {
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return ""
 	}
-	return u.Scheme + "://" + u.Host
+	scheme := strings.ToLower(u.Scheme)
+	host := strings.ToLower(u.Hostname())
+	port := u.Port()
+	if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
+		port = ""
+	}
+	if port != "" {
+		host += ":" + port
+	}
+	return scheme + "://" + host
 }
 
 func urlsMatchFrame(want, got string) bool {
@@ -208,7 +287,7 @@ func urlsMatchFrame(want, got string) bool {
 	if want == got {
 		return true
 	}
-	return strings.Contains(got, want) || strings.Contains(want, got)
+	return strings.Contains(got, want)
 }
 
 func pickFrame(frames []frameInfo, urlOrIndex any) (frameInfo, bool) {
@@ -309,7 +388,7 @@ func collectFrames(root *rod.Page, timeout time.Duration, rootURL string) []fram
 	}
 	rootOrigin := originOf(rootURL)
 	var frames []frameInfo
-	for _, el := range els {
+	for elementIndex, el := range els {
 		if el == nil {
 			continue
 		}
@@ -336,13 +415,14 @@ func collectFrames(root *rod.Page, timeout time.Duration, rootURL string) []fram
 			same = originOf(src) != "" && originOf(src) == rootOrigin
 		}
 		frames = append(frames, frameInfo{
-			Index:      len(frames),
-			Src:        src,
-			URL:        src,
-			Host:       host,
-			SameOrigin: same,
-			Visible:    vis,
-			Area:       elementArea(el),
+			Index:        len(frames),
+			ElementIndex: elementIndex,
+			Src:          src,
+			URL:          src,
+			Host:         host,
+			SameOrigin:   same,
+			Visible:      vis,
+			Area:         elementArea(el),
 		})
 	}
 	return frames
@@ -411,18 +491,17 @@ func (p *BrowserPage) UseFrame(urlOrIndex any) error {
 		if el == nil {
 			continue
 		}
-		src, srcErr := el.Property("src")
-		if srcErr != nil {
-			continue
-		}
-		got := strings.TrimSpace(src.String())
-		if urlsMatchFrame(chosen.Src, got) || urlsMatchFrame(chosen.URL, got) {
+		got := elementSrc(el)
+		if got == chosen.Src || got == chosen.URL {
 			target = el
 			break
 		}
 	}
-	if target == nil && chosen.Index >= 0 && chosen.Index < len(els) {
-		target = els[chosen.Index]
+	if target == nil && chosen.ElementIndex >= 0 && chosen.ElementIndex < len(els) {
+		candidate := els[chosen.ElementIndex]
+		if got := elementSrc(candidate); got == "" || got == chosen.Src || got == chosen.URL {
+			target = candidate
+		}
 	}
 	if target == nil {
 		return fmt.Errorf("iframe element not found for %s", chosen.Src)
@@ -436,8 +515,8 @@ func (p *BrowserPage) UseFrame(urlOrIndex any) error {
 		rootOrigin = originOf(info.URL)
 	}
 	frameURL := ""
-	if info, infoErr := framePage.Info(); infoErr == nil && info != nil {
-		frameURL = info.URL
+	if result, evalErr := framePage.Eval(`() => location.href`); evalErr == nil && result != nil {
+		frameURL = strings.TrimSpace(result.Value.Str())
 	}
 	if rootOrigin != "" && frameURL != "" && originOf(frameURL) != "" && originOf(frameURL) != rootOrigin {
 		return fmt.Errorf("refuse cross-origin frame host=%s", chosen.Host)
