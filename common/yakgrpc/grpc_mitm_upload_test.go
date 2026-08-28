@@ -12,15 +12,19 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/multipart"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -231,6 +235,101 @@ func TestGRPCMUSTPASS_MITM_ManualRequestRendersFileAndUserFuzzTag(t *testing.T) 
 	case <-time.After(2 * time.Second):
 		t.Fatal("target server did not receive the rendered MITMv1 request")
 	}
+}
+
+func TestGRPCMUSTPASS_MITM_ManualLargeMultipartUploadIsBounded(t *testing.T) {
+	client := isolateMITMTestSideEffects(t)
+	previousLimit := consts.GetGlobalMaxContentLength()
+	consts.SetGlobalMaxContentLength(512 * 1024)
+	t.Cleanup(func() { consts.SetGlobalMaxContentLength(previousLimit) })
+
+	payload := bytes.Repeat([]byte{0x00, 0xff, 0x10, 0x80}, 5*1024*1024/4)
+	token := "mitm-v1-large-multipart-" + utils.RandStringBytes(8)
+	registerHTTPFlowTokenCleanup(t, token)
+
+	captured := make(chan []byte, 1)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		select {
+		case captured <- bytes.Clone(req):
+		default:
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+	})
+	target := utils.HostPort(host, port)
+	packet := buildMITMV2OutcomePacket(t, target, token, mitmV2RequestOutcomeCase{
+		name:              "legacy-browser-upload-ten-times-D",
+		originalPayload:   payload,
+		multipart:         true,
+		uploadFilename:    "large-upload.bin",
+		uploadContentType: "application/octet-stream",
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	requestDone := make(chan error, 1)
+	var forwarded atomic.Bool
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		require.NoError(t, stream.Send(&ypb.MITMRequest{Host: "127.0.0.1", Port: uint32(mitmPort)}))
+		require.NoError(t, stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false}))
+	}, func(stream ypb.Yak_MITMClient) {
+		time.Sleep(200 * time.Millisecond)
+		response, err := lowhttp.HTTP(
+			lowhttp.WithPacketBytes(packet),
+			lowhttp.WithProxy("http://127.0.0.1:"+fmt.Sprint(mitmPort)),
+			lowhttp.WithTimeout(15*time.Second),
+			lowhttp.WithSaveHTTPFlow(false),
+		)
+		if err == nil {
+			require.Contains(t, string(response.RawPacket), "200 OK")
+		}
+		requestDone <- err
+		cancel()
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+		if !bytes.Contains(msg.GetRequest(), []byte(token)) || forwarded.Swap(true) {
+			return
+		}
+		require.True(t, utf8.Valid(msg.GetRequest()))
+		require.Contains(t, string(msg.GetRequest()), "{{file(")
+		_, editorBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(msg.GetRequest())
+		require.LessOrEqual(t, len(editorBody), yakit.GetMaxHTTPFlowRequestBodyInDBBytes())
+		require.NoError(t, stream.Send(&ypb.MITMRequest{Id: msg.GetId(), Forward: true}))
+	})
+
+	select {
+	case err := <-requestDone:
+		require.NoError(t, err)
+	case <-time.After(20 * time.Second):
+		t.Fatal("timed out waiting for legacy MITM large multipart request")
+	}
+	select {
+	case request := <-captured:
+		require.Equal(t, payload, extractMITMV2OutcomePayload(t, mitmV2CapturedRequest{
+			body:        lowhttp.GetHTTPPacketBody(request),
+			contentType: lowhttp.GetHTTPPacketHeader(request, "Content-Type"),
+		}, true))
+	case <-time.After(2 * time.Second):
+		t.Fatal("target server did not receive the legacy MITM upload")
+	}
+
+	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(8), client, &ypb.QueryHTTPFlowRequest{
+		SearchURL: token, SourceType: "mitm", Full: true,
+		Pagination: &ypb.Paging{Page: 1, Limit: 10},
+	}, 1)
+	require.NoError(t, err)
+	require.Len(t, flows.GetData(), 1)
+	flow := flows.GetData()[0]
+	require.True(t, flow.GetIsTooLargeRequest())
+	var persisted schema.HTTPFlow
+	require.NoError(t, consts.GetGormProjectDatabase().First(&persisted, flow.GetId()).Error)
+	require.FileExists(t, persisted.TooLargeRequestBodyFile)
+	rebuilt, err := yakit.LoadHTTPFlowRequestPacket(&persisted)
+	require.NoError(t, err)
+	require.Equal(t, payload, extractMITMV2OutcomePayload(t, mitmV2CapturedRequest{
+		body:        lowhttp.GetHTTPPacketBody(rebuilt),
+		contentType: lowhttp.GetHTTPPacketHeader(rebuilt, "Content-Type"),
+	}, true))
 }
 
 func TestMITM_InvalidUTF8Request(t *testing.T) {

@@ -1015,10 +1015,23 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		taskInfo.Status = Hijack_Status_Response
-		taskInfo.Request = httpctx.GetRequestBytes(req)
+		// Keep the same bounded editor representation when the task moves from
+		// request hijacking to response hijacking. Restoring RequestBytes here
+		// reintroduced the complete upload; hijackListFeedback would then turn
+		// invalid UTF-8 into a multi-times-larger {{unquote}} packet and could
+		// exceed the gRPC send limit.
+		displayReq := getMITMDisplayRequestBytes(req)
+		if len(displayReq) == 0 {
+			displayReq = yakit.PrepareLargeHTTPFlowRequest(req, lowhttp.DeletePacketEncoding(httpctx.GetRequestBytes(req)))
+		}
+		taskInfo.Request = displayReq
 		taskInfo.Response = rsp
 		if viewReq, _, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok {
-			taskInfo.Request = viewReq
+			if httpctx.GetRequestTooLarge(req) && len(displayReq) > 0 {
+				taskInfo.Request = displayReq
+			} else {
+				taskInfo.Request = viewReq
+			}
 		}
 		if viewRsp, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Response); ok && st != nil {
 			taskInfo.Response = viewRsp
