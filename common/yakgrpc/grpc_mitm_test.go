@@ -6,20 +6,18 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/crep"
 
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/vulinbox"
-
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1079,113 +1077,96 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 
 func TestGRPCMUSTPASS_MITM_DnsAndHosts(t *testing.T) {
 	client, err := NewLocalClient(true) // 新建一个 yakit client
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	port1 := utils.GetRandomAvailableTCPPort()
-	fmt.Println(port1)
-	// mock http server
-	go func() {
-		err = facades.Serve("127.0.0.1", port1, facades.SetHttpResource("/ok", []byte("")))
-		if err != nil {
-			t.Fatal(err)
+	testCtx, cancelTest := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancelTest()
+	// .invalid is reserved for tests and cannot be resolved by the system DNS.
+	// That guarantees the configured MITM DNS server is the resolver under test.
+	dnsRoot := strings.ToLower(utils.RandStringBytes(10)) + ".invalid"
+	var dnsTargetCount atomic.Int32
+	var hostsTargetCount atomic.Int32
+	_, targetPort := utils.DebugMockHTTPHandlerFuncContext(testCtx, func(writer http.ResponseWriter, request *http.Request) {
+		host, _, _ := utils.ParseStringToHostPort(request.Host)
+		switch {
+		case host == dnsRoot:
+			dnsTargetCount.Add(1)
+		case strings.HasPrefix(host, "hosts-"):
+			hostsTargetCount.Add(1)
 		}
-	}()
-	err = utils.WaitConnect(fmt.Sprintf("127.0.0.1:%d", port1), 5)
-	if err != nil {
-		t.Fatal(err)
-	}
+		_, _ = writer.Write([]byte("dns-and-hosts-ok"))
+	})
 
-	hostForDns := utils.RandStringBytes(10) + ".com"
-	hostForHost := utils.RandStringBytes(10) + ".com"
-	dnsRecordCount := 0
-	// mock dns server
-	dnsServer := facades.MockDNSServerDefault(hostForDns, func(record string, domain string) string {
-		dnsRecordCount++
+	var dnsRecordCount atomic.Int32
+	var unexpectedHostsDNSCount atomic.Int32
+	dnsServer := facades.MockDNSServer(testCtx, dnsRoot, utils.GetRandomAvailableTCPPort(), func(record string, domain string) string {
+		if record == "A" {
+			if strings.HasPrefix(domain, "hosts-") {
+				unexpectedHostsDNSCount.Add(1)
+			} else if strings.TrimSuffix(domain, ".") == dnsRoot {
+				dnsRecordCount.Add(1)
+			}
+		}
 		return "127.0.0.1"
 	})
-	defer func() {
-		if dnsRecordCount != 1 {
-			t.Fatal("dns server should be called")
-		}
-	}()
+	require.NotEmpty(t, dnsServer)
 
-	for _, mitmConfig := range []func(request *ypb.MITMRequest){
-		func(request *ypb.MITMRequest) {},
-		func(request *ypb.MITMRequest) {
+	mitmConfigs := []struct {
+		name      string
+		configure func(request *ypb.MITMRequest)
+	}{
+		{name: "default", configure: func(request *ypb.MITMRequest) {}},
+		{name: "gmtls", configure: func(request *ypb.MITMRequest) {
 			request.EnableGMTLS = true
-		},
-		func(request *ypb.MITMRequest) {
+		}},
+		{name: "http2", configure: func(request *ypb.MITMRequest) {
 			request.EnableHttp2 = true
-		},
-		func(request *ypb.MITMRequest) {
+		}},
+		{name: "prefer-gmtls", configure: func(request *ypb.MITMRequest) {
 			request.EnableHttp2 = true
 			request.EnableGMTLS = true
 			request.PreferGMTLS = true
-		},
-		func(request *ypb.MITMRequest) {
+		}},
+		{name: "only-gmtls", configure: func(request *ypb.MITMRequest) {
 			request.EnableHttp2 = true
 			request.EnableGMTLS = true
 			request.OnlyEnableGMTLS = true
-		},
-	} {
-		// start mitm server
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		stream, err := client.MITM(ctx)
-		if err != nil {
-			t.Fatalf("start mitm stream failed: %s", err)
-		}
-		port := utils.GetRandomAvailableTCPPort()
-		mitmAddr := fmt.Sprintf("127.0.0.1:%d", port)
-		request := &ypb.MITMRequest{
-			Host:       "127.0.0.1",
-			Port:       uint32(port),
-			DnsServers: []string{dnsServer},
-			Hosts: []*ypb.KVPair{
-				{
-					Key:   hostForHost,
-					Value: "127.0.0.1",
-				},
-			},
-		}
-		mitmConfig(request)
-		err = stream.Send(request)
-		if err != nil {
-			t.Fatalf("send mitm request failed: %s", err)
-		}
-		// wait mitm server started
-		//err = utils.WaitConnect(mitmAddr, 5)
-		//if err != nil {
-		//	t.Fatal(err)
-		//}
-
-		for {
-			msg, err := stream.Recv()
-			if err != nil {
-				break
-			}
-			msgStr := string(msg.GetMessage().GetMessage())
-			if strings.Contains(msgStr, `starting mitm server`) {
-				for _, host := range []string{hostForDns, hostForHost} {
-					urlForDns := "http://" + fmt.Sprintf("%s:%d/ok", host, port1)
-					_, err := yak.Execute(
-						`rsp, req := poc.Get(urlForDns, poc.proxy(proxy))~; println(string(rsp.RawPacket))`,
-						map[string]interface{}{
-							"urlForDns": urlForDns,
-							"proxy":     "http://" + mitmAddr,
-						},
-					)
-					if err != nil {
-						t.Fatalf("get url `%v` failed: %s", urlForDns, err)
-					}
-				}
-				cancel()
-			}
-		}
+		}},
 	}
+
+	for index, mitmConfig := range mitmConfigs {
+		t.Run(mitmConfig.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(testCtx, 15*time.Second)
+			defer cancel()
+			mitmPort := utils.GetRandomAvailableTCPPort()
+			mitmAddr := utils.HostPort("127.0.0.1", mitmPort)
+			dnsHost := dnsRoot
+			hostsHost := fmt.Sprintf("hosts-%d.%s", index, dnsRoot)
+			request := &ypb.MITMRequest{
+				Host:       "127.0.0.1",
+				Port:       uint32(mitmPort),
+				DnsServers: []string{dnsServer},
+				Hosts: []*ypb.KVPair{{
+					Key:   hostsHost,
+					Value: "127.0.0.1",
+				}},
+			}
+			mitmConfig.configure(request)
+
+			RunMITMTestServer(client, ctx, request, func(stream ypb.Yak_MITMClient) {
+				defer cancel()
+				for _, host := range []string{hostsHost, dnsHost} {
+					targetURL := fmt.Sprintf("http://%s:%d/ok", host, targetPort)
+					_, _, err := poc.DoGET(targetURL, poc.WithProxy("http://"+mitmAddr), poc.WithTimeout(5))
+					require.NoErrorf(t, err, "get URL %s through MITM", targetURL)
+				}
+			})
+		})
+	}
+	require.GreaterOrEqual(t, dnsRecordCount.Load(), int32(len(mitmConfigs)), "every MITM configuration must use the configured DNS server")
+	require.Zero(t, unexpectedHostsDNSCount.Load(), "hosts mappings must be applied without querying DNS")
+	require.Equal(t, int32(len(mitmConfigs)), dnsTargetCount.Load(), "every MITM configuration must reach the target through custom DNS")
+	require.Equal(t, int32(len(mitmConfigs)), hostsTargetCount.Load(), "every MITM configuration must reach the target through hosts mapping")
 }
 
 //func TestMitmDropWithHijackResp(t *testing.T) {
@@ -2432,11 +2413,17 @@ Host: %s:%d
 
 func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(120))
+	defer cancel()
 
-	vulinboxTarget, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
-	require.NoError(t, err)
-
-	addr := strings.Trim(vulinboxTarget, "http://")
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		for i := 0; i < 15; i++ {
+			_, _ = fmt.Fprintf(writer, "slow chunk %d\n", i)
+			utils.FlushWriter(writer)
+			time.Sleep(200 * time.Millisecond)
+		}
+	})
+	addr := utils.HostPort(mockHost, mockPort)
 
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -2448,7 +2435,7 @@ func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
 		stream.Send(&ypb.MITMRequest{
 			Host:            mitmHost,
 			Port:            uint32(mitmPort),
-			MaxReadWaitTime: 10,
+			MaxReadWaitTime: 1,
 		})
 	}, func(stream ypb.Yak_MITMClient) {
 
@@ -2461,32 +2448,26 @@ func TestGRPCMUSTPASS_MITM_Longtime_chunk(t *testing.T) {
 Host: %s
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
 Accept-Encoding: gzip, deflate
+Connection: close
 Content-length: 0
 
 `, token, addr))))
 		require.NoError(t, err)
 
 		buffer := make([]byte, 128)
-		conn.SetReadDeadline(time.Now().Add(time.Second * 15)) // check start forwarding
-		_, err = conn.Read(buffer)
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second)) // check start forwarding
+		n, err := conn.Read(buffer)
 		require.NoError(t, err)
-		fmt.Println("read buffer---------------------")
-		spew.Dump(buffer)
 
-		for i := 0; i < 10; i++ { // check is forwarding stable?
-			buffer := make([]byte, 128)
-			conn.SetReadDeadline(time.Now().Add(time.Second * 2))
-			_, err = conn.Read(buffer)
+		var forwarded bytes.Buffer
+		_, _ = forwarded.Write(buffer[:n])
+		for !bytes.Contains(forwarded.Bytes(), []byte("slow chunk 14")) {
+			conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+			n, err = conn.Read(buffer)
 			require.NoError(t, err)
-			fmt.Println("read buffer---------------------")
-			spew.Dump(buffer)
+			_, _ = forwarded.Write(buffer[:n])
 		}
-
-		conn.SetReadDeadline(time.Time{})
-		all, err := io.ReadAll(conn)
-		require.NoError(t, err)
-		fmt.Println("read all------------------")
-		spew.Dump(all)
+		require.Contains(t, forwarded.String(), "slow chunk 0")
 
 		flows, err := QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{Keyword: token}, 1)
 		require.NoError(t, err)

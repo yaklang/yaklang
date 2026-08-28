@@ -107,14 +107,17 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 
 func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.T) {
 	// 下游代理地址中凭据含 @ 等特殊字符，验证能正确解析并启动
-	var downstreamPassed bool
+	var (
+		networkPassed    atomic.Bool
+		downstreamPassed atomic.Bool
+	)
 	token := utils.RandNumberStringBytes(10)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	_, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
-			downstreamPassed = true
+			networkPassed.Store(true)
 		}
 		writer.Write([]byte("ok"))
 	})
@@ -123,7 +126,7 @@ func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
 		if req.URL.Query().Get("u") == token {
-			downstreamPassed = true
+			downstreamPassed.Store(true)
 		}
 		return req
 	}))
@@ -141,11 +144,11 @@ func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.
 	require.NoError(t, err)
 	// 密码含 @，未手动编码
 	downstreamWithSpecialChars := "http://user:pass@word@" + utils.HostPort("127.0.0.1", port)
-	stream.Send(&ypb.MITMV2Request{
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{
 		Host:            "127.0.0.1",
 		Port:            uint32(mitmPort),
 		DownstreamProxy: downstreamWithSpecialChars,
-	})
+	}))
 	started := false
 	for {
 		data, err := stream.Recv()
@@ -156,13 +159,15 @@ func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.
 			msg := string(data.GetMessage().GetMessage())
 			if strings.Contains(msg, "starting mitm server") {
 				started = true
-				_, _ = yak.Execute(
+				_, executeErr := yak.Execute(
 					`poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 					map[string]any{
 						"mockUrl":   mockUrl,
 						"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
 						"token":     token,
 					})
+				require.NoError(t, executeErr)
+				cancel()
 			}
 			if strings.Contains(msg, "ERROR") && strings.Contains(msg, "downstream") {
 				t.Fatalf("MITM should not fail with downstream parse error when credentials have @: %s", msg)
@@ -170,12 +175,13 @@ func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.
 		}
 	}
 	require.True(t, started, "MITM should start")
-	require.True(t, downstreamPassed, "request should pass through downstream proxy")
+	require.True(t, downstreamPassed.Load(), "request should pass through downstream proxy")
+	require.True(t, networkPassed.Load(), "request should reach the target server")
 }
 
 func TestGRPCMUSTPASS_MITMV2_S5Proxy(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
@@ -184,7 +190,7 @@ func TestGRPCMUSTPASS_MITMV2_S5Proxy(t *testing.T) {
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		writer.Write([]byte(rspToken))
 	})
@@ -224,18 +230,19 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }
 
 func TestGRPCMUSTPASS_MITMV2_S5Proxy_https(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
@@ -244,7 +251,7 @@ func TestGRPCMUSTPASS_MITMV2_S5Proxy_https(t *testing.T) {
 
 	mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
 		if lowhttp.GetHTTPRequestQueryParam(req, "u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		return []byte("HTTP/1.1 200 OK\r\nContent-length: 10\r\n\r\n" + rspToken)
 	})
@@ -284,11 +291,12 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }

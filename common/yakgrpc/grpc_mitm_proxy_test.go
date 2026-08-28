@@ -289,7 +289,7 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 
 func TestGRPCMUSTPASS_MITM_S5Proxy(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
@@ -298,7 +298,7 @@ func TestGRPCMUSTPASS_MITM_S5Proxy(t *testing.T) {
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		writer.Write([]byte(rspToken))
 	})
@@ -338,18 +338,19 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }
 
 func TestGRPCMUSTPASS_MITM_S5Proxy_https(t *testing.T) {
 	var (
-		networkIsPassed bool
+		networkIsPassed atomic.Bool
 		token           = utils.RandNumberStringBytes(10)
 		rspToken        = utils.RandStringBytes(10)
 	)
@@ -358,7 +359,7 @@ func TestGRPCMUSTPASS_MITM_S5Proxy_https(t *testing.T) {
 
 	mockHost, mockPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
 		if lowhttp.GetHTTPRequestQueryParam(req, "u") == token {
-			networkIsPassed = true
+			networkIsPassed.Store(true)
 		}
 		return []byte("HTTP/1.1 200 OK\r\nContent-length: 10\r\n\r\n" + rspToken)
 	})
@@ -398,11 +399,12 @@ assert str.Contains(rsp.RawPacket,rspToken)`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
 			}
 		}
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }

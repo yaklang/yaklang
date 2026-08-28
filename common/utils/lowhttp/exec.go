@@ -756,6 +756,12 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 				})
 			}),
 			netx.WithDNSServers(dnsServers...),
+			// An explicitly configured resolver must be authoritative. Falling
+			// back to the system resolver or a result cached by another resolver
+			// makes this option ineffective on networks that synthesize an address
+			// for every hostname.
+			netx.WithDNSDisableSystemResolver(len(dnsServers) > 0),
+			netx.WithDNSNoCache(len(dnsServers) > 0),
 			netx.WithTemporaryHosts(dnsHosts),
 		),
 		netx.DialX_WithDialTraceInfo(dialTraceInfo),

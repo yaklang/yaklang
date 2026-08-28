@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -495,18 +496,18 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 }
 
 func TestGRPCMUSTPASS_MITMV2_Filter_Plugin(t *testing.T) {
-	var shouldFilter bool
-	var notFilter bool
+	var shouldFilter atomic.Bool
+	var notFilter atomic.Bool
 
 	shouldFilterToken := utils.RandStringBytes(10)
 	notFilterToken := utils.RandStringBytes(10)
 	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 		if token == shouldFilterToken {
-			shouldFilter = true
+			shouldFilter.Store(true)
 		}
 		if token == notFilterToken {
-			notFilter = true
+			notFilter.Store(true)
 		}
 		return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 	})
@@ -566,11 +567,12 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 		defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 		_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 		require.NoError(t, err)
-		time.Sleep(3 * time.Second)
+		require.Eventually(t, notFilter.Load, 3*time.Second, 20*time.Millisecond)
+		require.Never(t, shouldFilter.Load, 500*time.Millisecond, 20*time.Millisecond)
 		cancel()
 	})
-	require.False(t, shouldFilter)
-	require.True(t, notFilter)
+	require.False(t, shouldFilter.Load())
+	require.True(t, notFilter.Load())
 }
 
 func TestGRPCMUSTPASS_MITMV2_Static_Filter(t *testing.T) {
@@ -579,16 +581,16 @@ func TestGRPCMUSTPASS_MITMV2_Static_Filter(t *testing.T) {
 	notFilterToken2 := utils.RandStringBytes(10)
 
 	t.Run("url", func(t *testing.T) {
-		var shouldFilter bool
-		var notFilter bool
+		var shouldFilter atomic.Bool
+		var notFilter atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == shouldFilterToken {
-				shouldFilter = true
+				shouldFilter.Store(true)
 			}
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -630,23 +632,24 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, notFilter.Load, 3*time.Second, 20*time.Millisecond)
+			require.Never(t, shouldFilter.Load, 500*time.Millisecond, 20*time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.False(t, shouldFilter)
+		require.True(t, notFilter.Load())
+		require.False(t, shouldFilter.Load())
 	})
 
 	t.Run("url extend", func(t *testing.T) {
-		var notFilter, notFilter2 bool
+		var notFilter, notFilter2 atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			if token == notFilterToken2 {
-				notFilter2 = true
+				notFilter2.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -688,24 +691,26 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, func() bool {
+				return notFilter.Load() && notFilter2.Load()
+			}, 3*time.Second, 20*time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.True(t, notFilter2)
+		require.True(t, notFilter.Load())
+		require.True(t, notFilter2.Load())
 	})
 
 	t.Run("content-type", func(t *testing.T) {
-		var shouldFilter bool
-		var notFilter bool
+		var shouldFilter atomic.Bool
+		var notFilter atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == shouldFilterToken {
-				shouldFilter = true
+				shouldFilter.Store(true)
 			}
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -750,23 +755,24 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, notFilter.Load, 3*time.Second, 20*time.Millisecond)
+			require.Never(t, shouldFilter.Load, 500*time.Millisecond, 20*time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.False(t, shouldFilter)
+		require.True(t, notFilter.Load())
+		require.False(t, shouldFilter.Load())
 	})
 
 	t.Run("content-type and accept", func(t *testing.T) {
-		var notFilter, notFilter2 bool
+		var notFilter, notFilter2 atomic.Bool
 
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == notFilterToken {
-				notFilter = true
+				notFilter.Store(true)
 			}
 			if token == notFilterToken2 {
-				notFilter2 = true
+				notFilter2.Store(true)
 			}
 			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
 		})
@@ -811,11 +817,13 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
 			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
 			require.NoError(t, err)
-			time.Sleep(3 * time.Second)
+			require.Eventually(t, func() bool {
+				return notFilter.Load() && notFilter2.Load()
+			}, 3*time.Second, 20*time.Millisecond)
 			cancel()
 		})
-		require.True(t, notFilter)
-		require.True(t, notFilter2)
+		require.True(t, notFilter.Load())
+		require.True(t, notFilter2.Load())
 	})
 }
 
