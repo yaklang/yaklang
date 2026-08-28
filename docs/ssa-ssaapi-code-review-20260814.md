@@ -373,15 +373,14 @@
 
 - `go test -race -run 'Test_FunctionType_String' ./common/yak/ssa` 通过；完整 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
 
-
 ## 更新记录（2026-08-19 第八轮，@ 9155d75f）
 
 - **B3 完成（本批文件）**：`lazy_builder.go` / `deferred_build.go` 的中英混杂注释统一为英文；项目其余历史中文注释保留（大规模统一需单独 PR，避免噪音 diff）。
 - **B5 完成（本批）**：instruction-store Close 的 `maxPasses=16` 改为命名常量 `closeFlushMaxPasses`；`fullTypeName` 截断不再是静默丢失——`fullTypeNameAdd`/`fullTypeNameSet` 截断时增加原子计数，新增 `TestFullTypeNameTruncationObservable`。
 
 ### 验证（第八轮）
-- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第九轮，@ d2b6b1b8）
 
@@ -389,16 +388,16 @@
 - **A6 剩余**：`appendBlueprintMember` 只对最后一个值去重导致交替赋值时 StaticMember slice 无界增长，需要限制历史长度/去重策略（涉及 `GetStaticMembers` 消费者语义，保留）。
 
 ### 验证（第九轮）
-- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；改动文件 gofmt 干净。
 
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第十轮，@ 26678bdf）
 
 - **A6 完成**：`RegisterStaticMember` 增加每名历史上限 `maxStaticMemberHistory = 16`（保留最近值，`GetStaticMember` 始终读最新），交替赋值不再无界增长；新增 `TestStaticMemberHistoryBounded`。叠加上一轮的 local 遮蔽修复，A6 两个子问题（遮蔽污染、无界增长）均已处理。
 
 ### 验证（第十轮）
-- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第十一轮，@ cfa60e19f）
 
@@ -406,8 +405,8 @@
 - **B5（剩余魔数）**：`databasex.go` 的 close 轮数 `8` 命名化为 `closeFlushMaxPasses`；`pprof_collector.go` 的 `5*time.Minute+2s` 改为基于 `pprofCPUDurationHigh` 的表达式。
 
 ### 验证（第十一轮）
-- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第十二轮，@ 234ccd834）
 
@@ -417,8 +416,8 @@
 - 新增 `TestGetProgramUpdatedAtLightQuery`（存在/不存在两种路径）。
 
 ### 验证（第十二轮）
-- `TestJarRecompile` 单独与全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 均通过；`go build` 通过；改动文件 gofmt 干净。
 
+- `TestJarRecompile` 单独与全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 均通过；`go build` 通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第十三轮，@ d3dfae305）
 
@@ -426,8 +425,8 @@
 - **B2 补充**：`flush_observability_test.go` 里“FlushStats 尚不存在/RED”的过时注释更新为当前实现描述。
 
 ### 验证（第十三轮）
-- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
+- 隔离 `YAKIT_HOME` 下 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 全部通过；`go build` 通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第十四轮，@ d08fdb57e）
 
@@ -438,17 +437,17 @@
   - `defaultLargeProjectMemLimit` 同时尊重 `YAK_SSA_COMPILE_MEM_LIMIT`（opt-in adaptive GC 策略），避免两条路径互相覆盖；测试补充该分支
 
 ### 验证（第十四轮）
+
 - Linux 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过。
 - Darwin/Windows 交叉编译被仓库既有 cgo 依赖（go-pcre2-lite、yaklang/pcap 无对应原生绑定）阻塞，与本改动无关；Darwin 分支 API 与 `golang.org/x/sys v0.30.0` 的 `unix.SysctlUint64` 匹配。
-
 
 ## 更新记录（2026-08-19 第十五轮，@ d883858b3）
 
 - **B3（memedit/editor.go）**：评审文档点名的 `memedit/editor.go` 全部 106 处中英混杂注释统一为英文（含并发安全说明、路径拼接语义、编辑 API 描述），无行为变更。
 
 ### 验证（第十五轮）
-- `memedit`/`ssa`（含 ssadb）/`ssaapi` 通过；改动文件 gofmt 干净。
 
+- `memedit`/`ssa`（含 ssadb）/`ssaapi` 通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第十六轮，@ 09aff33f9）
 
@@ -459,12 +458,19 @@
   - 原 `TestFromDatabaseReloadsWhenIrUpdatedAtChanges` 改为 `TestFromDatabaseReloadsWhenCompileGenerationChanges`：元数据-only 的 updated_at 变化不再丢 IR 缓存，generation bump 才丢。
 
 ### 验证（第十六轮）
-- 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
 
+- 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
 
 ## 更新记录（2026-08-19 第十七轮，@ c0a864e8a）
 
 - **A10 完成**：唯一索引修复/创建抽成独立的 `migrateUniqueIrCodeIndexes(db)`，与常规性能索引路径分离，代码结构上即为“一次性迁移”：两个 helper 都先做 dialect-aware 目录检查，索引已存在直接返回，只有缺少索引的 legacy 库才触发重复扫描/去重/建索引。原有全部唯一索引测试继续通过。
 
 ### 验证（第十七轮）
+
 - 全量 `dbcache`/`ssa`（含 ssadb）/`ssaapi`/`ssatest` 通过；`go build` 通过；改动文件 gofmt 干净。
+
+## 终态（2026-08-19，@ ca234f8b9）
+
+- 评审 A1–A17、B1–B8 的全部机械安全项已实现并验证（见各轮记录）；A10/A11/A12/A16 按“部分修复 + 明确理由”或完整修复收尾。
+- 唯一剩余决策项：**B9 默认并发**（scan/compile 默认 `GOMAXPROCS-1`）。当前实现为统一的 `DefaultCPUConcurrency()`，并保留 `WithScanConcurrency` / `WithCompileConcurrency` 显式覆盖；维持现状或回退到 5 需要作者确认，属语义/回归决策，不在无授权下改动。
+- 可选风格项：B3 全仓中文注释统一（约 170 文件、2400 行），建议单独 PR。
