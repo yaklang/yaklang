@@ -90,6 +90,8 @@ Opcode: 'opcode';
 Have: 'have';
 HaveAny: 'any';
 Not: 'not';
+Inside: 'inside';
+NotInside: 'not_inside';
 For: 'for';
 VersionIn: 'version_in';
 

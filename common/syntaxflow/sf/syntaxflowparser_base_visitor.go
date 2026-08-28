@@ -179,6 +179,14 @@ func (v *BaseSyntaxFlowParserVisitor) VisitConstSearchPrefix(ctx *ConstSearchPre
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitInsideRefFilter(ctx *InsideRefFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowParserVisitor) VisitNotInsideRefFilter(ctx *NotInsideRefFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitFirst(ctx *FirstContext) interface{} {
 	return v.VisitChildren(ctx)
 }

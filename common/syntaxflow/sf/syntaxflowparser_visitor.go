@@ -136,6 +136,12 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#constSearchPrefix.
 	VisitConstSearchPrefix(ctx *ConstSearchPrefixContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#InsideRefFilter.
+	VisitInsideRefFilter(ctx *InsideRefFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#NotInsideRefFilter.
+	VisitNotInsideRefFilter(ctx *NotInsideRefFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#First.
 	VisitFirst(ctx *FirstContext) interface{}
 
