@@ -63,7 +63,10 @@ func buildInvalidUTF8MITMRequest(token, target string) []byte {
 
 func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {
 	client := isolateMITMTestSideEffects(t)
-	token := "mitm-invalid-utf8-" + utils.RandSecret(32)
+	// This value is embedded directly in the raw request-target and is also
+	// used verbatim by SearchURL. RandSecret includes URL delimiters such as
+	// '#', '&', '%' and '?', which can be normalized or split before storage.
+	token := "mitm-invalid-utf8-" + utils.RandStringBytes(32)
 	registerHTTPFlowTokenCleanup(t, token)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
 	t.Cleanup(cancel)
@@ -73,10 +76,12 @@ func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {
 	}
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
-	stream.Send(&ypb.MITMRequest{
+	if err := stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(token))
@@ -91,6 +96,9 @@ func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {
 		msg := string(rsp.GetMessage().GetMessage())
 		fmt.Println(msg)
 		if strings.Contains(msg, `starting mitm server`) {
+			if err := utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5); err != nil {
+				t.Fatal(err)
+			}
 			packet := buildInvalidUTF8MITMRequest(token, utils.HostPort(host, port))
 			_, err := lowhttp.HTTP(
 				lowhttp.WithPacketBytes(packet),
@@ -98,6 +106,7 @@ func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {
 				lowhttp.WithHost("127.0.0.1"),
 				lowhttp.WithPort(mitmPort),
 				lowhttp.WithSaveHTTPFlow(false),
+				lowhttp.WithTimeout(10*time.Second),
 			)
 			if err != nil {
 				spew.Dump(err)
@@ -120,7 +129,7 @@ func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {
 
 func TestGRPCMUSTPASS_MITMV2_InvalidUTF8RequestDetail(t *testing.T) {
 	client := isolateMITMTestSideEffects(t)
-	token := "mitm-invalid-utf8-" + utils.RandSecret(32)
+	token := "mitm-invalid-utf8-" + utils.RandStringBytes(32)
 	registerHTTPFlowTokenCleanup(t, token)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
 	t.Cleanup(cancel)
@@ -130,10 +139,12 @@ func TestGRPCMUSTPASS_MITMV2_InvalidUTF8RequestDetail(t *testing.T) {
 	}
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
-	stream.Send(&ypb.MITMV2Request{
+	if err := stream.Send(&ypb.MITMV2Request{
 		Host: "127.0.0.1",
 		Port: uint32(mitmPort),
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(token))
@@ -148,6 +159,9 @@ func TestGRPCMUSTPASS_MITMV2_InvalidUTF8RequestDetail(t *testing.T) {
 		msg := string(rsp.GetMessage().GetMessage())
 		fmt.Println(msg)
 		if strings.Contains(msg, `starting mitm server`) {
+			if err := utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5); err != nil {
+				t.Fatal(err)
+			}
 			packet := buildInvalidUTF8MITMRequest(token, utils.HostPort(host, port))
 			_, err := lowhttp.HTTP(
 				lowhttp.WithPacketBytes(packet),
@@ -155,6 +169,7 @@ func TestGRPCMUSTPASS_MITMV2_InvalidUTF8RequestDetail(t *testing.T) {
 				lowhttp.WithHost("127.0.0.1"),
 				lowhttp.WithPort(mitmPort),
 				lowhttp.WithSaveHTTPFlow(false),
+				lowhttp.WithTimeout(10*time.Second),
 			)
 			if err != nil {
 				spew.Dump(err)
