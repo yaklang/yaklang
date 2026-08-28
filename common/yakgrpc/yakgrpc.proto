@@ -478,6 +478,9 @@ service Yak {
   // 误报反馈
   rpc RiskFeedbackToOnline(UploadRiskToOnlineRequest) returns (Empty);
 
+  rpc RisksFromOnline(RisksFromOnlineRequest) returns (stream RisksFromOnlineProgress);
+  rpc BatchSetRiskTags(BatchSetRiskTagsRequest) returns (BatchSetRiskTagsResponse);
+
   // Report
   rpc QueryReports(QueryReportsRequest) returns(QueryReportsResponse);
   rpc QueryReport(QueryReportRequest) returns (Report);
@@ -5533,6 +5536,32 @@ message SetTagForRiskRequest {
   int64 Id = 1;
   string Hash = 2;
   repeated string Tags = 3;
+}
+
+message RisksFromOnlineRequest {
+  string Token = 1;
+  string LogType = 2;
+}
+
+message RisksFromOnlineProgress {
+  double Progress = 1;
+  string Log = 2;
+}
+
+message BatchSetRiskTagsRequest {
+  QueryRisksRequest Filter = 1;
+  string Tags = 2;
+  string TagsDescription = 3;
+  repeated int64 Ids = 4;
+  repeated string Hashes = 5;
+  string Token = 6;
+  string RiskTypeVerbose = 7;
+  string Severity = 8;
+  double SeverityScore = 9;
+}
+
+message BatchSetRiskTagsResponse {
+  int64 UpdatedCount = 1;
 }
 
 
