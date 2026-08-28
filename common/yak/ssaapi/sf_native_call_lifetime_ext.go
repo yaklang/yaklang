@@ -68,7 +68,7 @@ func nativeCallPointsTo(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 	if !targetSpecified {
 		propagateRelatedSSAAnchors(vs, func(inner ssa.Value) []ssa.Value {
 			return lifetime.PointsToRelated(prog.Program, []ssa.Value{inner})
-		}, id2val)
+		}, id2val, frame, NativeCall_PointsTo)
 	}
 	return finishLifetimeSFVM(results)
 }
@@ -104,6 +104,21 @@ func nativeCallAliases(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeC
 	// (MayAlias of that single receiver vs against).
 	propagateRelatedSSAAnchors(vs, func(inner ssa.Value) []ssa.Value {
 		return lifetime.AliasesOf(prog.Program, []ssa.Value{inner}, against)
-	}, id2val)
+	}, id2val, frame, NativeCall_Aliases)
+	if frame != nil {
+		for _, a := range against {
+			av := newSSAPredecessor(prog, a)
+			if av == nil {
+				continue
+			}
+			for _, r := range results {
+				rv, ok := r.(*Value)
+				if !ok || rv == nil {
+					continue
+				}
+				appendLifetimePredecessor(rv, av, frame, NativeCall_Aliases+":target")
+			}
+		}
+	}
 	return finishLifetimeSFVM(results)
 }

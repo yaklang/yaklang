@@ -94,7 +94,12 @@ func runLifetimeQueryNativeCall(
 	if !targetSpecified && !fullScan {
 		propagateRelatedSSAAnchors(vs, func(inner ssa.Value) []ssa.Value {
 			return listRelated(prog.Program, []ssa.Value{inner})
-		}, id2val)
+		}, id2val, frame, opName)
+	}
+	for _, r := range results {
+		if rv, ok := r.(*Value); ok {
+			attachFallbackCallPredecessor(prog, frame, opName, rv)
+		}
 	}
 	return finishLifetimeSFVM(results)
 }
