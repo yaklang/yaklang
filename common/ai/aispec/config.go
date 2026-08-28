@@ -69,15 +69,22 @@ type AIConfig struct {
 	// 关键词: AIConfig.Videos, 视频输入承载
 	Videos []*VideoDescription
 
-	Headers        []*ypb.KVPair
-	EnableThinking *bool
+	Headers []*ypb.KVPair
+	// ThinkingLevel 统一表达思考强度：
+	//   ""       — 不注入思考参数（auto，走模型默认）
+	//   "none"   — 显式关闭思考
+	//   "low"    — 低强度
+	//   "medium" — 中强度
+	//   "high"   — 高强度
+	//   "xhigh"  — 超高强度（需探测支持）
+	//   "max"    — 最大强度（需探测支持）
+	ThinkingLevel string `json:"thinking_level,omitempty"`
 	// 以下为可选模型采样/推理参数（与 ypb.ThirdPartyApplicationConfig 对齐）；nil 或空串表示不写入上游请求
 	MaxTokens        *int64   `json:"max_tokens,omitempty"`
 	Temperature      *float64 `json:"temperature,omitempty"`
 	TopP             *float64 `json:"top_p,omitempty"`
 	TopK             *int64   `json:"top_k,omitempty"`
 	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
-	ReasoningEffort  string   `json:"reasoning_effort,omitempty"`
 
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
@@ -207,36 +214,8 @@ func ExtraHeadersToMap(headers []*ypb.KVPair) map[string]string {
 	return result
 }
 
-// WithEnableThinking 设置是否启用思考链相关请求体字段；仅写入 EnableThinking（*bool）。
-// nil 表示不在请求体中注入思考参数（由网关默认值等单独处理）；非 nil 时 true 为开启，false 为关闭。
-//
-// 参数：
-// - t(any): 思维链配置
-//
-// 返回值：
-// - r1(AIConfigOption): AI 配置选项
-//
-// Example:
-// ```go
-// // 示例 1: 基础用法 - 启用思维模式
-// println("=== 示例 1: 基础思维模式 ===")
-// response, err = ai.Chat(
-//
-//	"请分析 SQL 注入漏洞的原理和常见的防御方法",
-//	ai.type("volcengine"),
-//	ai.apiKey("你的API密钥"),  // 请替换为实际的 API Key
-//	ai.model("doubao-lite-4k"),  // 或使用其他豆包模型
-//	ai.thinking(true),  // 启用思维模式
-//
-// )
-//
-//	if err != nil {
-//	   die(err)
-//	}
-//
-// println("回答:", response)
-// println()
-// ```
+// WithEnableThinking 是兼容 wrapper：true → ThinkingLevel="high"，false → ThinkingLevel="none"。
+// 新代码应直接使用 WithThinkingLevel。
 func WithEnableThinking(t any) AIConfigOption {
 	return func(config *AIConfig) {
 		if utils.IsNil(t) {
@@ -247,16 +226,24 @@ func WithEnableThinking(t any) AIConfigOption {
 			if v == nil {
 				return
 			}
-			copied := *v
-			config.EnableThinking = &copied
-			return
+			if *v {
+				config.ThinkingLevel = "high"
+			} else {
+				config.ThinkingLevel = "none"
+			}
 		case bool:
-			b := v
-			config.EnableThinking = &b
-			return
+			if v {
+				config.ThinkingLevel = "high"
+			} else {
+				config.ThinkingLevel = "none"
+			}
 		default:
 			b := parseThinkingToggleFromAny(t)
-			config.EnableThinking = &b
+			if b {
+				config.ThinkingLevel = "high"
+			} else {
+				config.ThinkingLevel = "none"
+			}
 		}
 	}
 }
@@ -267,6 +254,19 @@ func parseThinkingToggleFromAny(t any) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// normalizeThinkingLevel 将用户输入的 effort 字符串归一化为 ThinkingLevel。
+// "off"/"none"/"disabled" → "none"，"auto"/"default"/"" → ""，其他原样返回（小写）。
+func normalizeThinkingLevel(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "auto", "default":
+		return ""
+	case "off", "none", "disabled":
+		return "none"
+	default:
+		return strings.ToLower(strings.TrimSpace(s))
 	}
 }
 
@@ -305,9 +305,20 @@ func WithFrequencyPenalty(v float64) AIConfigOption {
 	}
 }
 
+// WithReasoningEffort 是兼容 wrapper：将 effort 字符串统一写入 ThinkingLevel。
+// "off"/"none"/"disabled" → "none"，"auto"/"default"/"" → ""（不注入）。
+// 新代码应直接使用 WithThinkingLevel。
 func WithReasoningEffort(s string) AIConfigOption {
 	return func(c *AIConfig) {
-		c.ReasoningEffort = strings.TrimSpace(s)
+		c.ThinkingLevel = normalizeThinkingLevel(strings.TrimSpace(s))
+	}
+}
+
+// WithThinkingLevel 设置统一思考强度等级。
+// 合法值：""/"none"/"low"/"medium"/"high"/"xhigh"/"max"。其他值原样保留，由注入层 matcher 负责降级。
+func WithThinkingLevel(level string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ThinkingLevel = strings.ToLower(strings.TrimSpace(level))
 	}
 }
 
@@ -355,13 +366,12 @@ func hasExplicitConfigBeyondType(c *AIConfig) bool {
 		c.EnableEndpoint ||
 		strings.TrimSpace(c.APIType) != "" ||
 		len(c.Headers) > 0 ||
-		c.EnableThinking != nil ||
+		strings.TrimSpace(c.ThinkingLevel) != "" ||
 		c.MaxTokens != nil ||
 		c.Temperature != nil ||
 		c.TopP != nil ||
 		c.TopK != nil ||
 		c.FrequencyPenalty != nil ||
-		strings.TrimSpace(c.ReasoningEffort) != "" ||
 		c.PreferredTier != "" ||
 		c.DisableProviderFallback ||
 		c.Context != nil ||
