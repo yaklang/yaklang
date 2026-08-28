@@ -55,7 +55,7 @@ if str.TrimSpace(output) != "" {
     }
     f = file.OpenFile(outPath, file.O_CREATE|file.O_RDWR|file.O_TRUNC, 0o644)~
     defer f.Close()
-    report.SetWriter(f)~
+    report.SetWriter(f.GetOsFile())~
     yakit.Info("report output = %s (format=%s)", outPath, format)
 } else {
     yakit.Info("output not set; report will not be written to a file")
@@ -69,7 +69,7 @@ if progName == "" || progName == "/" || progName == "." {
 opts = [
     syntaxflow.withScanSourceDir(progName, target),
     syntaxflow.withScanConcurrency(concurrency),
-    syntaxflow.withRuleFilterTag("source"),
+    syntaxflow.withRuleFilterMode("source"),
     syntaxflow.withRuleFilterLibRuleKind("noLib"),
     syntaxflow.withReporter(report),
 ]
