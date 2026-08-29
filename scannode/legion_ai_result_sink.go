@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -25,10 +26,16 @@ const (
 	legionAIFocusResultSchemaV1         = "legion.focus-result.v1"
 	legionAIConversationAuditResultMode = "conversation_audit"
 	legionAIConversationExecutionMode   = "multi_turn"
+	legionAIRiskJudgementResultSchemaV1 = "result.risk_judgement.v1"
+	legionAIRiskJudgementReportKindV1   = "ai_risk_judgement_v1"
 	maxInlineFocusRiskFieldBytes        = 64 * 1024
 	maxInlineFocusAssetBytes            = 64 * 1024
 	maxInlineCodeAuditReportBytes       = 512 * 1024
 	maxInlineCodeAuditSummaryBytes      = 64 * 1024
+	maxAIRiskJudgementScopeRisks        = 4096
+	maxAIRiskJudgementEvidenceRefs      = 64
+	maxAIRiskJudgementIdentifierBytes   = 512
+	maxAIRiskJudgementScopeBytes        = 64 * 1024
 )
 
 var legionCodeFindingCWEPattern = regexp.MustCompile(`^CWE-[1-9][0-9]*$`)
@@ -80,6 +87,59 @@ type aiFocusCodeAuditReport struct {
 	StructuredSummary json.RawMessage `json:"structured_summary"`
 }
 
+type aiFocusRiskJudgementEvidenceRef struct {
+	Type       string `json:"type"`
+	DataflowID string `json:"dataflow_id,omitempty"`
+	File       string `json:"file,omitempty"`
+	StartLine  int    `json:"start_line,omitempty"`
+	EndLine    int    `json:"end_line,omitempty"`
+	RuleID     string `json:"rule_id,omitempty"`
+}
+
+type aiFocusRiskJudgement struct {
+	SchemaVersion        string                            `json:"schema_version"`
+	FocusRunID           string                            `json:"focus_run_id"`
+	FocusReleaseID       string                            `json:"focus_release_id"`
+	OwnerUserID          string                            `json:"owner_user_id"`
+	ProductKey           string                            `json:"product_key"`
+	ProjectID            string                            `json:"project_id"`
+	SourceSnapshotID     string                            `json:"source_snapshot_id"`
+	SourceSHA256         string                            `json:"source_sha256"`
+	AllowedRiskIDs       []string                          `json:"allowed_risk_ids"`
+	AllowedRiskIDsSHA256 string                            `json:"allowed_risk_ids_sha256"`
+	RequiredResultCount  uint32                            `json:"required_result_count"`
+	TaskRunID            string                            `json:"task_run_id"`
+	TaskRunItemID        string                            `json:"task_run_item_id"`
+	SessionID            string                            `json:"session_id"`
+	TurnID               string                            `json:"turn_id"`
+	ScopeSHA256          string                            `json:"scope_sha256"`
+	RiskID               string                            `json:"risk_id"`
+	Verdict              string                            `json:"verdict"`
+	Confidence           float64                           `json:"confidence"`
+	Reason               string                            `json:"reason"`
+	FixSuggestion        string                            `json:"fix_suggestion"`
+	EvidenceRefs         []aiFocusRiskJudgementEvidenceRef `json:"evidence_refs"`
+	DedupeKey            string                            `json:"dedupe_key"`
+	confidenceSet        bool
+}
+
+type legionAIRiskJudgementScope struct {
+	OwnerUserID          string
+	ProductKey           string
+	ProjectID            string
+	SourceSnapshotID     string
+	SourceSHA256         string
+	AllowedRiskIDs       []string
+	AllowedRiskIDsSHA256 string
+	RequiredResultCount  uint32
+	TaskRunID            string
+	TaskRunItemID        string
+	SessionID            string
+	TurnID               string
+	ScopeSHA256          string
+	allowedRiskIDSet     map[string]struct{}
+}
+
 type aiFocusResultSink interface {
 	SubmitRisk(context.Context, *schema.Risk) (aiFocusResultReceipt, error)
 }
@@ -93,6 +153,11 @@ type aiFocusCodeResultSink interface {
 	aiFocusAssetResultSink
 	SubmitCodeFinding(context.Context, string, aiFocusCodeFinding) (aiFocusResultReceipt, error)
 	SubmitCodeAuditReport(context.Context, string, aiFocusCodeAuditReport) (aiFocusResultReceipt, error)
+}
+
+type aiFocusRiskJudgementResultSink interface {
+	aiFocusResultSink
+	SubmitRiskJudgement(context.Context, string, aiFocusRiskJudgement) (aiFocusResultReceipt, error)
 }
 
 type aiFocusExecutionContractBinder interface {
@@ -146,6 +211,10 @@ type legionAIFocusResultSink struct {
 	publishedResultKinds   map[string]struct{}
 	codeWorkspaceLockedRev string
 	codeWorkspaceSHA256    string
+	riskJudgementScope     *legionAIRiskJudgementScope
+	riskJudgementKind      string
+	riskJudgementIDs       map[string]struct{}
+	judgedRiskIDs          map[string]struct{}
 }
 
 func newLegionAIFocusResultSink(
@@ -163,6 +232,10 @@ func newLegionAIFocusResultSink(
 	if err != nil {
 		return nil, err
 	}
+	riskJudgementScope, err := normalizeLegionAIRiskJudgementScope(resultContext.GetRiskJudgementScope())
+	if err != nil {
+		return nil, fmt.Errorf("ai focus risk_judgement_scope: %w", err)
+	}
 	return &legionAIFocusResultSink{
 		publisher:            publisher,
 		ref:                  ref,
@@ -175,6 +248,9 @@ func newLegionAIFocusResultSink(
 		targets:              make(map[string]struct{}),
 		requiredResultKinds:  make(map[string]struct{}),
 		publishedResultKinds: make(map[string]struct{}),
+		riskJudgementScope:   riskJudgementScope,
+		riskJudgementIDs:     make(map[string]struct{}),
+		judgedRiskIDs:        make(map[string]struct{}),
 	}, nil
 }
 
@@ -275,6 +351,23 @@ func (p *aiSessionResultSinkProxy) SubmitCodeAuditReport(
 		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink does not accept code audit reports")
 	}
 	return sink.SubmitCodeAuditReport(ctx, kind, report)
+}
+
+func (p *aiSessionResultSinkProxy) SubmitRiskJudgement(
+	ctx context.Context,
+	kind string,
+	judgement aiFocusRiskJudgement,
+) (aiFocusResultReceipt, error) {
+	if p == nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink is unavailable")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	sink, ok := p.sink.(aiFocusRiskJudgementResultSink)
+	if !ok {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai session result sink does not accept risk judgements")
+	}
+	return sink.SubmitRiskJudgement(ctx, kind, judgement)
 }
 
 func (p *aiSessionResultSinkProxy) bindFocusExecutionContract(contract *legionFocusExecutionContract) error {
@@ -392,6 +485,155 @@ func validateLegionAIFocusResultContext(
 	default:
 		return ref, nil
 	}
+}
+
+func normalizeLegionAIRiskJudgementScope(
+	raw *aiv1.AIFocusRiskJudgementScope,
+) (*legionAIRiskJudgementScope, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	scope := &legionAIRiskJudgementScope{
+		OwnerUserID:          strings.TrimSpace(raw.GetOwnerUserId()),
+		ProductKey:           strings.TrimSpace(raw.GetProductKey()),
+		ProjectID:            strings.TrimSpace(raw.GetProjectId()),
+		SourceSnapshotID:     strings.TrimSpace(raw.GetSourceSnapshotId()),
+		SourceSHA256:         strings.ToLower(strings.TrimSpace(raw.GetSourceSha256())),
+		AllowedRiskIDsSHA256: strings.ToLower(strings.TrimSpace(raw.GetAllowedRiskIdsSha256())),
+		RequiredResultCount:  raw.GetRequiredResultCount(),
+		TaskRunID:            strings.TrimSpace(raw.GetTaskRunId()),
+		TaskRunItemID:        strings.TrimSpace(raw.GetTaskRunItemId()),
+		SessionID:            strings.TrimSpace(raw.GetSessionId()),
+		TurnID:               strings.TrimSpace(raw.GetTurnId()),
+	}
+	for name, value := range map[string]string{
+		"owner_user_id":      scope.OwnerUserID,
+		"product_key":        scope.ProductKey,
+		"project_id":         scope.ProjectID,
+		"source_snapshot_id": scope.SourceSnapshotID,
+		"task_run_id":        scope.TaskRunID,
+		"task_run_item_id":   scope.TaskRunItemID,
+		"session_id":         scope.SessionID,
+		"turn_id":            scope.TurnID,
+	} {
+		if err := validateAIRiskJudgementIdentifier(name, value); err != nil {
+			return nil, err
+		}
+	}
+	if len(scope.SourceSHA256) != sha256.Size*2 || !isLowerHex(scope.SourceSHA256) {
+		return nil, fmt.Errorf("source_sha256 must be 64 lowercase hexadecimal characters")
+	}
+	allowedRiskIDs, allowedRiskIDsSHA256, err := canonicalLegionAIRiskJudgementRiskIDs(raw.GetAllowedRiskIds())
+	if err != nil {
+		return nil, err
+	}
+	if len(scope.AllowedRiskIDsSHA256) != sha256.Size*2 || !isLowerHex(scope.AllowedRiskIDsSHA256) {
+		return nil, fmt.Errorf("allowed_risk_ids_sha256 must be 64 lowercase hexadecimal characters")
+	}
+	if scope.AllowedRiskIDsSHA256 != allowedRiskIDsSHA256 {
+		return nil, fmt.Errorf(
+			"allowed_risk_ids_sha256 mismatch: expected %s",
+			allowedRiskIDsSHA256,
+		)
+	}
+	if int(scope.RequiredResultCount) != len(allowedRiskIDs) {
+		return nil, fmt.Errorf(
+			"required_result_count must equal the %d canonical allowed risks",
+			len(allowedRiskIDs),
+		)
+	}
+	scope.AllowedRiskIDs = allowedRiskIDs
+	scope.allowedRiskIDSet = make(map[string]struct{}, len(allowedRiskIDs))
+	for _, riskID := range allowedRiskIDs {
+		scope.allowedRiskIDSet[riskID] = struct{}{}
+	}
+	scope.ScopeSHA256, err = legionAIRiskJudgementScopeSHA256(scope)
+	if err != nil {
+		return nil, err
+	}
+	return scope, nil
+}
+
+func canonicalLegionAIRiskJudgementRiskIDs(values []string) ([]string, string, error) {
+	if len(values) == 0 || len(values) > maxAIRiskJudgementScopeRisks {
+		return nil, "", fmt.Errorf(
+			"allowed_risk_ids must contain between 1 and %d entries",
+			maxAIRiskJudgementScopeRisks,
+		)
+	}
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if err := validateAIRiskJudgementIdentifier("allowed_risk_ids entry", value); err != nil {
+			return nil, "", err
+		}
+		set[value] = struct{}{}
+	}
+	canonical := make([]string, 0, len(set))
+	for value := range set {
+		canonical = append(canonical, value)
+	}
+	sort.Strings(canonical)
+	raw, err := json.Marshal(canonical)
+	if err != nil {
+		return nil, "", fmt.Errorf("canonicalize allowed_risk_ids: %w", err)
+	}
+	if len(raw) > maxAIRiskJudgementScopeBytes {
+		return nil, "", fmt.Errorf(
+			"canonical allowed_risk_ids exceeds %d bytes",
+			maxAIRiskJudgementScopeBytes,
+		)
+	}
+	sum := sha256.Sum256(raw)
+	return canonical, hex.EncodeToString(sum[:]), nil
+}
+
+func legionAIRiskJudgementScopeSHA256(scope *legionAIRiskJudgementScope) (string, error) {
+	if scope == nil {
+		return "", fmt.Errorf("risk judgement scope is required")
+	}
+	raw, err := json.Marshal(struct {
+		OwnerUserID          string   `json:"owner_user_id"`
+		ProductKey           string   `json:"product_key"`
+		ProjectID            string   `json:"project_id"`
+		SourceSnapshotID     string   `json:"source_snapshot_id"`
+		SourceSHA256         string   `json:"source_sha256"`
+		AllowedRiskIDs       []string `json:"allowed_risk_ids"`
+		AllowedRiskIDsSHA256 string   `json:"allowed_risk_ids_sha256"`
+		RequiredResultCount  uint32   `json:"required_result_count"`
+		TaskRunID            string   `json:"task_run_id"`
+		TaskRunItemID        string   `json:"task_run_item_id"`
+		SessionID            string   `json:"session_id"`
+		TurnID               string   `json:"turn_id"`
+	}{
+		OwnerUserID:          scope.OwnerUserID,
+		ProductKey:           scope.ProductKey,
+		ProjectID:            scope.ProjectID,
+		SourceSnapshotID:     scope.SourceSnapshotID,
+		SourceSHA256:         scope.SourceSHA256,
+		AllowedRiskIDs:       scope.AllowedRiskIDs,
+		AllowedRiskIDsSHA256: scope.AllowedRiskIDsSHA256,
+		RequiredResultCount:  scope.RequiredResultCount,
+		TaskRunID:            scope.TaskRunID,
+		TaskRunItemID:        scope.TaskRunItemID,
+		SessionID:            scope.SessionID,
+		TurnID:               scope.TurnID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("canonicalize risk judgement scope: %w", err)
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func validateAIRiskJudgementIdentifier(name, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s is required", name)
+	}
+	if len(value) > maxAIRiskJudgementIdentifierBytes || strings.IndexFunc(value, unicode.IsControl) >= 0 {
+		return fmt.Errorf("%s is invalid", name)
+	}
+	return nil
 }
 
 func (s *legionAIFocusResultSink) SubmitCodeFinding(
@@ -587,6 +829,162 @@ func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 	return aiFocusResultReceipt{ResultID: eventID, DedupeKey: kind, BackendID: s.ref.JobID}, nil
 }
 
+func (s *legionAIFocusResultSink) SubmitRiskJudgement(
+	ctx context.Context,
+	kind string,
+	judgement aiFocusRiskJudgement,
+) (aiFocusResultReceipt, error) {
+	if s == nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai risk judgement result sink is unavailable")
+	}
+	s.mu.Lock()
+	scope := s.riskJudgementScope
+	boundKind := s.riskJudgementKind
+	s.mu.Unlock()
+	if scope == nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai risk judgement scope is required")
+	}
+	kind = strings.TrimSpace(kind)
+	if kind == "" || boundKind == "" || kind != boundKind {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai risk judgement result kind is not bound")
+	}
+
+	judgement.RiskID = strings.TrimSpace(judgement.RiskID)
+	judgement.Verdict = strings.ToLower(strings.TrimSpace(judgement.Verdict))
+	judgement.Reason = strings.TrimSpace(judgement.Reason)
+	judgement.FixSuggestion = strings.TrimSpace(judgement.FixSuggestion)
+	if err := validateAIRiskJudgementIdentifier("risk_id", judgement.RiskID); err != nil {
+		return aiFocusResultReceipt{}, err
+	}
+	if _, allowed := scope.allowedRiskIDSet[judgement.RiskID]; !allowed {
+		return aiFocusResultReceipt{}, fmt.Errorf(
+			"ai risk judgement risk_id %q is outside the allowed risk scope",
+			judgement.RiskID,
+		)
+	}
+	switch judgement.Verdict {
+	case "confirmed_vuln", "likely_false_positive", "needs_review":
+	default:
+		return aiFocusResultReceipt{}, fmt.Errorf(
+			"ai risk judgement verdict %q is unsupported",
+			judgement.Verdict,
+		)
+	}
+	if !judgement.confidenceSet {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai risk judgement confidence is required")
+	}
+	if math.IsNaN(judgement.Confidence) || math.IsInf(judgement.Confidence, 0) ||
+		judgement.Confidence < 0 || judgement.Confidence > 1 {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai risk judgement confidence must be between 0 and 1")
+	}
+	if judgement.Reason == "" {
+		return aiFocusResultReceipt{}, fmt.Errorf("ai risk judgement reason is required")
+	}
+	if len(judgement.Reason) > maxInlineFocusRiskFieldBytes || len(judgement.FixSuggestion) > maxInlineFocusRiskFieldBytes {
+		return aiFocusResultReceipt{}, fmt.Errorf(
+			"ai risk judgement reason and fix_suggestion must not exceed %d bytes",
+			maxInlineFocusRiskFieldBytes,
+		)
+	}
+	evidenceRefs, err := normalizeAIRiskJudgementEvidenceRefs(judgement.EvidenceRefs)
+	if err != nil {
+		return aiFocusResultReceipt{}, err
+	}
+
+	judgement.SchemaVersion = legionAIRiskJudgementResultSchemaV1
+	judgement.FocusRunID = s.focusRunID
+	judgement.FocusReleaseID = s.focusReleaseID
+	judgement.OwnerUserID = scope.OwnerUserID
+	judgement.ProductKey = scope.ProductKey
+	judgement.ProjectID = scope.ProjectID
+	judgement.SourceSnapshotID = scope.SourceSnapshotID
+	judgement.SourceSHA256 = scope.SourceSHA256
+	judgement.AllowedRiskIDs = append([]string(nil), scope.AllowedRiskIDs...)
+	judgement.AllowedRiskIDsSHA256 = scope.AllowedRiskIDsSHA256
+	judgement.RequiredResultCount = scope.RequiredResultCount
+	judgement.TaskRunID = scope.TaskRunID
+	judgement.TaskRunItemID = scope.TaskRunItemID
+	judgement.SessionID = scope.SessionID
+	judgement.TurnID = scope.TurnID
+	judgement.ScopeSHA256 = scope.ScopeSHA256
+	judgement.EvidenceRefs = evidenceRefs
+	judgement.DedupeKey = legionAIRiskJudgementDedupeKey(scope.ScopeSHA256, judgement.RiskID)
+	raw, err := json.Marshal(judgement)
+	if err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("marshal ai risk judgement: %w", err)
+	}
+	eventID := focusRiskJudgementEventID(s.ref.JobID, kind, scope.ScopeSHA256, judgement.RiskID)
+	if err := s.publisher.PublishReportWithEventID(ctx, s.ref, eventID, kind, raw); err != nil {
+		return aiFocusResultReceipt{}, fmt.Errorf("publish ai risk judgement: %w", err)
+	}
+	s.recordRiskJudgement(eventID, judgement.RiskID, kind)
+	return aiFocusResultReceipt{
+		ResultID:  eventID,
+		DedupeKey: judgement.DedupeKey,
+		BackendID: s.ref.JobID,
+	}, nil
+}
+
+func normalizeAIRiskJudgementEvidenceRefs(
+	values []aiFocusRiskJudgementEvidenceRef,
+) ([]aiFocusRiskJudgementEvidenceRef, error) {
+	if len(values) == 0 || len(values) > maxAIRiskJudgementEvidenceRefs {
+		return nil, fmt.Errorf(
+			"ai risk judgement evidence_refs must contain between 1 and %d entries",
+			maxAIRiskJudgementEvidenceRefs,
+		)
+	}
+	deduplicated := make(map[string]aiFocusRiskJudgementEvidenceRef, len(values))
+	for _, value := range values {
+		value.Type = strings.ToLower(strings.TrimSpace(value.Type))
+		value.DataflowID = strings.TrimSpace(value.DataflowID)
+		value.File = strings.TrimSpace(value.File)
+		value.RuleID = strings.TrimSpace(value.RuleID)
+		switch value.Type {
+		case "dataflow":
+			if err := validateAIRiskJudgementIdentifier("dataflow_id", value.DataflowID); err != nil {
+				return nil, err
+			}
+			if value.File != "" || value.StartLine != 0 || value.EndLine != 0 || value.RuleID != "" {
+				return nil, fmt.Errorf("ai risk judgement dataflow evidence contains unrelated fields")
+			}
+		case "file_line":
+			cleaned, err := cleanLegionCodeRelativePath(value.File, false)
+			if err != nil || value.StartLine <= 0 || value.EndLine < value.StartLine {
+				return nil, fmt.Errorf("ai risk judgement file_line evidence is invalid")
+			}
+			if value.DataflowID != "" || value.RuleID != "" {
+				return nil, fmt.Errorf("ai risk judgement file_line evidence contains unrelated fields")
+			}
+			value.File = cleaned
+		case "rule":
+			if err := validateAIRiskJudgementIdentifier("rule_id", value.RuleID); err != nil {
+				return nil, err
+			}
+			if value.DataflowID != "" || value.File != "" || value.StartLine != 0 || value.EndLine != 0 {
+				return nil, fmt.Errorf("ai risk judgement rule evidence contains unrelated fields")
+			}
+		default:
+			return nil, fmt.Errorf("ai risk judgement evidence type %q is unsupported", value.Type)
+		}
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return nil, fmt.Errorf("canonicalize ai risk judgement evidence: %w", err)
+		}
+		deduplicated[string(raw)] = value
+	}
+	keys := make([]string, 0, len(deduplicated))
+	for key := range deduplicated {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := make([]aiFocusRiskJudgementEvidenceRef, 0, len(keys))
+	for _, key := range keys {
+		result = append(result, deduplicated[key])
+	}
+	return result, nil
+}
+
 func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFocusExecutionContract) error {
 	if s == nil || contract == nil {
 		return fmt.Errorf("Focus execution contract is required")
@@ -597,15 +995,36 @@ func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFoc
 			required[result.Kind] = struct{}{}
 		}
 	}
+	riskJudgementResult, hasRiskJudgement := contract.resultForCapability(serverFocusCapabilitySubmitRiskJudgementV1)
+	if hasRiskJudgement {
+		if s.riskJudgementScope == nil {
+			return fmt.Errorf("ai risk judgement scope is required by the Focus execution contract")
+		}
+		if riskJudgementResult.Kind != legionAIRiskJudgementReportKindV1 {
+			return fmt.Errorf(
+				"ai risk judgement result kind must be %q",
+				legionAIRiskJudgementReportKindV1,
+			)
+		}
+		if !riskJudgementResult.Required {
+			return fmt.Errorf("ai risk judgement result must be required by the Focus execution contract")
+		}
+	} else if s.riskJudgementScope != nil {
+		return fmt.Errorf("ai risk judgement scope requires result.risk_judgement.v1 in the Focus execution contract")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.requiredResultKinds) > 0 {
-		if !sameStringSet(s.requiredResultKinds, required) {
+		if !sameStringSet(s.requiredResultKinds, required) ||
+			(hasRiskJudgement && s.riskJudgementKind != riskJudgementResult.Kind) {
 			return fmt.Errorf("Focus execution result contract is already bound")
 		}
 		return nil
 	}
 	s.requiredResultKinds = required
+	if hasRiskJudgement {
+		s.riskJudgementKind = riskJudgementResult.Kind
+	}
 	return nil
 }
 
@@ -737,10 +1156,22 @@ func (s *legionAIFocusResultSink) Succeed(
 			missingRequired = append(missingRequired, kind)
 		}
 	}
+	judgedRiskCount := len(s.judgedRiskIDs)
+	var requiredJudgementCount uint32
+	if s.riskJudgementScope != nil {
+		requiredJudgementCount = s.riskJudgementScope.RequiredResultCount
+	}
 	s.mu.Unlock()
 	if len(missingRequired) > 0 {
 		sort.Strings(missingRequired)
 		return fmt.Errorf("Focus execution cannot complete without required results: %s", strings.Join(missingRequired, ", "))
+	}
+	if judgedRiskCount < int(requiredJudgementCount) {
+		return fmt.Errorf(
+			"Focus execution cannot complete with only %d of %d required risk judgements",
+			judgedRiskCount,
+			requiredJudgementCount,
+		)
 	}
 	result := make(map[string]any)
 	if len(resultJSON) > 0 {
@@ -754,6 +1185,7 @@ func (s *legionAIFocusResultSink) Succeed(
 		}
 	}
 	assetIDs, riskIDs, targets := s.resultSummarySnapshot()
+	riskJudgementIDs, riskJudgementScopeSHA256 := s.riskJudgementSummarySnapshot()
 	result["schema_version"] = "legion.focus-run-result.v1"
 	result["focus_run_id"] = s.focusRunID
 	result["focus_mode"] = s.focusMode
@@ -765,6 +1197,11 @@ func (s *legionAIFocusResultSink) Succeed(
 	result["asset_result_ids"] = assetIDs
 	result["risk_result_ids"] = riskIDs
 	result["targets"] = targets
+	result["risk_judgement_count"] = len(riskJudgementIDs)
+	result["risk_judgement_result_ids"] = riskJudgementIDs
+	if riskJudgementScopeSHA256 != "" {
+		result["risk_judgement_scope_sha256"] = riskJudgementScopeSHA256
+	}
 	reportJSON, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("marshal ai focus summary report: %w", err)
@@ -797,6 +1234,24 @@ func (s *legionAIFocusResultSink) recordRisk(eventID string, target string) {
 	if target = strings.TrimSpace(target); target != "" {
 		s.targets[target] = struct{}{}
 	}
+}
+
+func (s *legionAIFocusResultSink) recordRiskJudgement(eventID, riskID, kind string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.riskJudgementIDs[strings.TrimSpace(eventID)] = struct{}{}
+	s.judgedRiskIDs[strings.TrimSpace(riskID)] = struct{}{}
+	s.publishedResultKinds[strings.TrimSpace(kind)] = struct{}{}
+}
+
+func (s *legionAIFocusResultSink) riskJudgementSummarySnapshot() ([]string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ids := sortedFocusResultKeys(s.riskJudgementIDs)
+	if s.riskJudgementScope == nil {
+		return ids, ""
+	}
+	return ids, s.riskJudgementScope.ScopeSHA256
 }
 
 func (s *legionAIFocusResultSink) resultSummarySnapshot() ([]string, []string, []string) {
@@ -900,6 +1355,15 @@ func legionCodeFindingDedupeKey(finding aiFocusCodeFinding) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func legionAIRiskJudgementDedupeKey(scopeSHA256, riskID string) string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{
+		legionAIRiskJudgementResultSchemaV1,
+		strings.TrimSpace(scopeSHA256),
+		strings.TrimSpace(riskID),
+	}, "\x00")))
+	return hex.EncodeToString(sum[:])
+}
+
 func normalizeLegionCodeFindingIdentityText(value string) string {
 	return strings.ToLower(strings.Join(strings.Fields(value), " "))
 }
@@ -922,6 +1386,16 @@ func focusRiskEventID(jobID string, dedupeKey string) string {
 		strings.TrimSpace(jobID),
 		"risk",
 		strings.TrimSpace(dedupeKey),
+	}, "\x00")
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
+}
+
+func focusRiskJudgementEventID(jobID, kind, scopeSHA256, riskID string) string {
+	name := strings.Join([]string{
+		strings.TrimSpace(jobID),
+		strings.TrimSpace(kind),
+		strings.TrimSpace(scopeSHA256),
+		strings.TrimSpace(riskID),
 	}, "\x00")
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(name)).String()
 }

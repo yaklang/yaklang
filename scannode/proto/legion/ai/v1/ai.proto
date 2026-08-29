@@ -2041,6 +2041,26 @@ message AIFocusResultContext {
   string execution_mode = 5;
   string target_url = 6;
   string focus_release_id = 7;
+  AIFocusRiskJudgementScope risk_judgement_scope = 8;
+}
+
+// AIFocusRiskJudgementScope binds a professional Focus Run to the exact SSA
+// risks and source snapshot authorized by Legion. Scan Node independently
+// canonicalizes allowed_risk_ids (trim, deduplicate, bytewise sort, JSON
+// encode) and verifies its SHA-256 before accepting judgement results.
+message AIFocusRiskJudgementScope {
+  string owner_user_id = 1;
+  string product_key = 2;
+  string project_id = 3;
+  string source_snapshot_id = 4;
+  string source_sha256 = 5;
+  repeated string allowed_risk_ids = 6;
+  string allowed_risk_ids_sha256 = 7;
+  uint32 required_result_count = 8;
+  string task_run_id = 9;
+  string task_run_item_id = 10;
+  string session_id = 11;
+  string turn_id = 12;
 }
 
 message ContextFocusSidekick {
