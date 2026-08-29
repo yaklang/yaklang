@@ -146,7 +146,11 @@ func prepareLegionCodeWorkspace(
 		return nil, nil, fmt.Errorf("decode code workspace runtime options: %w", err)
 	}
 	if runtimeOptions.SourceWorkspace == nil {
-		return nil, cloneBytes(runtimeOptionSnapshotJSON), nil
+		publicOptions, err := stripYakRiskJudgementScopeRuntimeOption(runtimeOptionSnapshotJSON)
+		if err != nil {
+			return nil, nil, fmt.Errorf("sanitize public runtime options: %w", err)
+		}
+		return nil, publicOptions, nil
 	}
 	spec := *runtimeOptions.SourceWorkspace
 	if spec.Auth != nil {
@@ -169,6 +173,7 @@ func prepareLegionCodeWorkspace(
 	publicSpec.Auth = nil
 	publicSpec.Proxy = nil
 	runtimeOptions.SourceWorkspace = &publicSpec
+	runtimeOptions.RiskJudgementScope = nil
 	sanitized, err := json.Marshal(runtimeOptions)
 	if err != nil {
 		_ = workspace.Cleanup()
@@ -1079,6 +1084,10 @@ func validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw []byte) error {
 	contextOptions, err := decodeYakRuntimeOptions(contextRaw, true)
 	if err != nil {
 		return fmt.Errorf("decode context source_workspace pin: %w", err)
+	}
+	if hasYakRuntimeJSONValue(bindOptions.RiskJudgementScope) ||
+		hasYakRuntimeJSONValue(contextOptions.RiskJudgementScope) {
+		return fmt.Errorf("context risk_judgement_scope is private bind-only data")
 	}
 	bound := bindOptions.SourceWorkspace
 	received := contextOptions.SourceWorkspace
