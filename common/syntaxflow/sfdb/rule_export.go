@@ -6,12 +6,13 @@ import (
 	"io"
 	"os"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
 	"github.com/tidwall/sjson"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // =============================================================================
@@ -103,6 +104,7 @@ func ExportRulesToZip(ctx context.Context, db *gorm.DB, targetPath string, opts 
 			"group_names": groupNames,
 		}
 	})
+	metadata["rule_group_taxonomy"] = ssaconfig.GetRuleGroupTaxonomy()
 
 	// 获取规则数量
 	var ruleCount int

@@ -2,7 +2,8 @@
 # 定义预设策略及其对应的规则组映射关系
 
 version: "1.0"
-updated_at: "2026-02-02"
+rule_group_taxonomy_version: "1.0"
+updated_at: "2026-08-29"
 
 # 策略列表
 policies:
@@ -88,12 +89,13 @@ categories:
     name: "自定义"
     policies: ["custom"]
 
-# 自定义规则组分类（用于自定义策略的规则选择器）
-# 前端通过 API 获取此配置动态渲染规则组选择器
+# 标准规则组 taxonomy，同时为自定义策略选择器提供分类数据。
+# 规则导出会把这里的稳定 ID、展示名和 canonical name 写入 meta.json。
 custom_rule_groups:
   # 合规规则（基于行业标准）
   compliance_rules:
-    - category: "OWASP Top 10 (2021)"
+    - id: "owasp"
+      category: "OWASP Top 10 (2021)"
       groups:
         - name: "OWASP 2021 A01:Broken Access Control"
           display_name: "A01: 失效的访问控制"
@@ -116,29 +118,57 @@ custom_rule_groups:
         - name: "OWASP 2021 A10:Server-Side Request Forgery"
           display_name: "A10: 服务器端请求伪造"
     
-    - category: "CWE"
+    - id: "cwe"
+      category: "CWE"
       groups:
         - name: "CWE Top 25 (2023)"
           display_name: "CWE Top 25 (2023)"
   
   # 技术栈规则（语言、框架、组件）
   tech_stack_rules:
-    - category: "语言"
+    - id: "language"
+      category: "语言"
       groups:
         - name: "java"
           display_name: "Java"
+          canonical_name: "java"
         - name: "go"
           display_name: "Golang"
+          canonical_name: "go"
         - name: "php"
           display_name: "PHP"
+          canonical_name: "php"
         - name: "javascript"
           display_name: "JavaScript"
+          canonical_name: "javascript"
         - name: "python"
           display_name: "Python"
+          canonical_name: "python"
         - name: "c"
           display_name: "C"
+          canonical_name: "c"
+
+    - id: "language-library"
+      category: "语言库"
+      groups:
+        - name: "Language Library - Golang"
+          display_name: "Golang"
+          canonical_name: "go"
+        - name: "Language Library - Java"
+          display_name: "Java"
+          canonical_name: "java"
+        - name: "Language Library - PHP"
+          display_name: "PHP"
+          canonical_name: "php"
+        - name: "Language Library - Python"
+          display_name: "Python"
+          canonical_name: "python"
+        - name: "Language Library - JavaScript"
+          display_name: "JavaScript"
+          canonical_name: "javascript"
     
-    - category: "框架/组件"
+    - id: "framework"
+      category: "框架/组件"
       groups:
         - name: "Framework - Spring"
           display_name: "Spring"
@@ -147,14 +177,22 @@ custom_rule_groups:
         - name: "Framework - ThinkPHP"
           display_name: "ThinkPHP"
     
-    - category: "组件扫描"
+    - id: "sca"
+      category: "组件扫描"
       groups:
         - name: "SCA - Dependency Check"
           display_name: "依赖组件检查"
+
+    - id: "code-quality"
+      category: "代码质量"
+      groups:
+        - name: "Code Style"
+          display_name: "代码规范"
   
   # 特殊规则（严重性、用途等）
   special_rules:
-    - category: "严重性"
+    - id: "severity"
+      category: "严重性"
       groups:
         - name: "critical"
           display_name: "严重"
@@ -164,8 +202,11 @@ custom_rule_groups:
           display_name: "中危"
         - name: "low"
           display_name: "低危"
+        - name: "info"
+          display_name: "信息"
     
-    - category: "检测目的"
+    - id: "purpose"
+      category: "检测目的"
       groups:
         - name: "audit"
           display_name: "审计"
