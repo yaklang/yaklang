@@ -584,6 +584,9 @@ func TestBuildYakAIEngineOptionsMapsPlanStrategyCapabilitiesAndSessionMCP(t *tes
 	if len(engineConfig.ExtraMCPServers) != 1 || !engineConfig.RestrictToSessionMCP {
 		t.Fatalf("session mcp contract was not applied: %#v", engineConfig.ExtraMCPServers)
 	}
+	if got := engineConfig.ExtraMCPServers[0].Server.Name; got != "irify" {
+		t.Fatalf("session mcp server name was not preserved: %q", got)
+	}
 	config := aicommon.NewConfig(context.Background(), engineConfig.ExtOptions...)
 	if !config.GetEnablePlanAndExec() || !config.GetEnableDetachedPlan() {
 		t.Fatal("plan and detached plan must both be enabled")

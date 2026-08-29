@@ -886,6 +886,7 @@ func buildYakSessionMCPServers(options yakRuntimeOptions) ([]*aicommon.ExtraMCPS
 		}
 		servers = append(servers, &aicommon.ExtraMCPServer{
 			Server: &schema.MCPServer{
+				Name: name,
 				Type: "sse",
 				URL:  url,
 			},
