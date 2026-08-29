@@ -823,7 +823,7 @@ func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) {
 		}
 		tools, err := aitool.LoadAIToolsFromMCPServer(r.config.Ctx, s.Server, s.AllowedTools)
 		if err != nil {
-			log.Errorf("load session-scoped mcp server %s failed: %v", s.Server.Name, err)
+			log.Error(redactedSessionMCPMountFailure(s.Server.Name, err))
 			continue
 		}
 		if len(tools) > 0 {
@@ -841,6 +841,18 @@ func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) {
 		mng.RestrictToTools(mountedNames...)
 		log.Infof("session tools restricted to %d session-scoped mcp tool(s): %v", len(mountedNames), mountedNames)
 	}
+}
+
+// redactedSessionMCPMountFailure intentionally discards the nested transport
+// error. MCP clients may include URLs and authentication material in that
+// error chain; emitting it would turn a connection failure into a credential
+// disclosure. The quoted server name remains enough to correlate the bounded
+// Session capability without enabling log injection.
+func redactedSessionMCPMountFailure(serverName string, _ error) string {
+	return fmt.Sprintf(
+		"load session-scoped mcp server %q failed: connection details redacted",
+		strings.TrimSpace(serverName),
+	)
 }
 
 // cycle import issue

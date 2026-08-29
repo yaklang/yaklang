@@ -573,7 +573,7 @@ func TestBuildYakAIEngineOptionsMapsPlanStrategyCapabilitiesAndSessionMCP(t *tes
 			"forge_params":[{"key":"target","value":"https://example.test"}],
 			"enabled_capabilities":[{"name":"httpx","type":"tool"}],
 			"strategy":{"enable_multi_agent":true,"enable_goal_mode":true,"goal_min_iterations":8},
-			"session_mcp_servers":[{"name":"irify","url":"http://legion.test/mcp/sse","allowed_tools":["get_risk"]}]
+			"session_mcp_servers":[{"name":"ssa_risk_ai_judgement","url":"http://legion.test/v1/ai/ssa-evidence-mcp/sse","headers":{"Authorization":"Bearer signed-test-token"},"allowed_tools":["get_risk"]}]
 		}`),
 	}, noopAISessionRuntimeEmitter{})
 	if err != nil {
@@ -584,8 +584,14 @@ func TestBuildYakAIEngineOptionsMapsPlanStrategyCapabilitiesAndSessionMCP(t *tes
 	if len(engineConfig.ExtraMCPServers) != 1 || !engineConfig.RestrictToSessionMCP {
 		t.Fatalf("session mcp contract was not applied: %#v", engineConfig.ExtraMCPServers)
 	}
-	if got := engineConfig.ExtraMCPServers[0].Server.Name; got != "irify" {
+	if got := engineConfig.ExtraMCPServers[0].Server.Name; got != "ssa_risk_ai_judgement" {
 		t.Fatalf("session mcp server name was not preserved: %q", got)
+	}
+	if got := engineConfig.ExtraMCPServers[0].Server.Headers["Authorization"]; got != "Bearer signed-test-token" {
+		t.Fatalf("session mcp Authorization header was not preserved: %#v", engineConfig.ExtraMCPServers[0].Server.Headers)
+	}
+	if strings.Contains(engineConfig.ExtraMCPServers[0].Server.URL, "signed-test-token") {
+		t.Fatal("session MCP credential leaked into its URL")
 	}
 	config := aicommon.NewConfig(context.Background(), engineConfig.ExtOptions...)
 	if !config.GetEnablePlanAndExec() || !config.GetEnableDetachedPlan() {

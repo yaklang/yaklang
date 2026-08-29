@@ -658,9 +658,10 @@ type yakAIStrategy struct {
 }
 
 type sessionMCPServer struct {
-	Name         string   `json:"name"`
-	URL          string   `json:"url"`
-	AllowedTools []string `json:"allowed_tools"`
+	Name         string            `json:"name"`
+	URL          string            `json:"url"`
+	Headers      map[string]string `json:"headers"`
+	AllowedTools []string          `json:"allowed_tools"`
 }
 
 func buildYakAIEngineOptions(
@@ -881,14 +882,19 @@ func buildYakSessionMCPServers(options yakRuntimeOptions) ([]*aicommon.ExtraMCPS
 		name := strings.TrimSpace(server.Name)
 		url := strings.TrimSpace(server.URL)
 		if name == "" || url == "" {
-			log.Warnf("skip session-scoped mcp server with empty name or url: name=%q url=%q", name, url)
+			log.Warnf("skip session-scoped mcp server with incomplete identity: has_name=%t has_url=%t", name != "", url != "")
 			continue
+		}
+		headers := make(schema.MapStringAny, len(server.Headers))
+		for key, value := range server.Headers {
+			headers[key] = value
 		}
 		servers = append(servers, &aicommon.ExtraMCPServer{
 			Server: &schema.MCPServer{
-				Name: name,
-				Type: "sse",
-				URL:  url,
+				Name:    name,
+				Type:    "sse",
+				URL:     url,
+				Headers: headers,
 			},
 			AllowedTools: append([]string(nil), server.AllowedTools...),
 		})
