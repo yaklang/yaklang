@@ -1443,6 +1443,12 @@ func validateAISessionBindCommand(nodeID string, command *aiv1.BindAISessionComm
 	if err != nil {
 		return fmt.Errorf("invalid ai session runtime options: %w", err)
 	}
+	if err := validateYakRiskJudgementScopePin(
+		runtimeOptions.RiskJudgementScope,
+		command.GetResultContext(),
+	); err != nil {
+		return fmt.Errorf("invalid ai session risk judgement scope: %w", err)
+	}
 	if runtimeOptions.SourceWorkspace != nil {
 		spec := *runtimeOptions.SourceWorkspace
 		if err := normalizeLegionCodeWorkspaceSpec(&spec); err != nil {

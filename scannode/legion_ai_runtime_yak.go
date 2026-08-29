@@ -609,6 +609,10 @@ type yakRuntimeOptions struct {
 	Language                       string                    `json:"language"`
 	SessionMCPServers              []sessionMCPServer        `json:"session_mcp_servers"`
 	SourceWorkspace                *legionCodeWorkspaceSpec  `json:"source_workspace,omitempty"`
+	// RiskJudgementScope is a private bind-only recovery pin. The node checks
+	// it against the protobuf ResultContext, then strips it before runtime or
+	// model configuration is constructed.
+	RiskJudgementScope json.RawMessage `json:"risk_judgement_scope,omitempty"`
 }
 
 type yakProviderModelOptions struct {
@@ -1641,6 +1645,9 @@ func buildYakAIHotpatchEvent(input aiSessionInput) (*ypb.AIInputEvent, error) {
 }
 
 func validateYakAIHotpatch(hotpatchType string, params yakRuntimeOptions) error {
+	if hasYakRuntimeJSONValue(params.RiskJudgementScope) {
+		return fmt.Errorf("ai session hotpatch cannot change risk_judgement_scope")
+	}
 	required := func(ok bool, field string) error {
 		if ok {
 			return nil
