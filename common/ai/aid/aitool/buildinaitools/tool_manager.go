@@ -55,6 +55,7 @@ type AiToolManager struct {
 	noCacheTools          bool // 是否不缓存工具
 	enableAllTools        bool // 是否开启所有工具
 	disallowMCPServers    bool // when true, hide MCP tools from search/list/lookup paths
+	restrictToTools       bool // when true, disabled names must not fall back to profile DB/plugin lookup
 
 	recentToolsCache []*RecentToolEntry
 	recentToolsMu    sync.Mutex
@@ -319,6 +320,13 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 			return tool, nil
 		}
 	}
+	// A restricted Session must fail closed here. Falling through to the profile
+	// DB, YakScript plugin, or cached MCP lookups would bypass toolEnabled and
+	// let a model invoke a local builtin such as read_file by name even though
+	// the prompt inventory correctly exposed only the injected Session MCP set.
+	if m.restrictToTools {
+		return nil, fmt.Errorf("tool [%v] is outside the restricted tool set", name)
+	}
 
 	db := consts.GetGormProfileDatabase()
 
@@ -425,6 +433,7 @@ func (m *AiToolManager) RestrictToTools(names ...string) {
 	m.enableAllTools = false
 	m.enableSearchTool = false
 	m.enableForgeSearchTool = false
+	m.restrictToTools = true
 	enabled := make(map[string]bool, len(names))
 	for _, name := range names {
 		enabled[name] = true

@@ -35,6 +35,13 @@ func TestRestrictToTools(t *testing.T) {
 	assert.False(t, mgr.enableAllTools)
 	assert.False(t, mgr.enableSearchTool, "search tool must be disabled under restriction")
 	assert.False(t, mgr.enableForgeSearchTool, "forge search must be disabled under restriction")
+
+	resolved, err := mgr.GetToolByName("mcp_session_only")
+	require.NoError(t, err)
+	assert.Equal(t, "mcp_session_only", resolved.Name)
+	_, err = mgr.GetToolByName("builtin_a")
+	require.ErrorContains(t, err, "outside the restricted tool set",
+		"disabled names must not bypass the restriction through profile/plugin fallback")
 }
 
 // RestrictToTools with no names must deny all (fail-closed), not fall back to
