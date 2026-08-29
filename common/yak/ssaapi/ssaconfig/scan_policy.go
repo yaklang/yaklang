@@ -27,10 +27,11 @@ type PolicyDefinition struct {
 
 // ScanPoliciesConfig 策略配置文件结构
 type ScanPoliciesConfig struct {
-	Version          string                      `yaml:"version"`
-	Policies         map[string]PolicyDefinition `yaml:"policies"`
-	Categories       []PolicyCategory            `yaml:"categories"`
-	CustomRuleGroups CustomRuleGroupsConfig      `yaml:"custom_rule_groups"`
+	Version                  string                      `yaml:"version"`
+	RuleGroupTaxonomyVersion string                      `yaml:"rule_group_taxonomy_version"`
+	Policies                 map[string]PolicyDefinition `yaml:"policies"`
+	Categories               []PolicyCategory            `yaml:"categories"`
+	CustomRuleGroups         CustomRuleGroupsConfig      `yaml:"custom_rule_groups"`
 }
 
 // PolicyCategory 策略分类
@@ -49,19 +50,46 @@ type CustomRuleGroupsConfig struct {
 
 // RuleGroupCategory 规则组分类
 type RuleGroupCategory struct {
+	ID       string      `yaml:"id" json:"id"`
 	Category string      `yaml:"category" json:"category"`
 	Groups   []RuleGroup `yaml:"groups" json:"groups"`
 }
 
 // RuleGroup 规则组
 type RuleGroup struct {
-	Name        string `yaml:"name" json:"name"`
-	DisplayName string `yaml:"display_name" json:"display_name"`
+	Name          string `yaml:"name" json:"name"`
+	DisplayName   string `yaml:"display_name" json:"display_name"`
+	CanonicalName string `yaml:"canonical_name,omitempty" json:"canonical_name,omitempty"`
+}
+
+const RuleGroupTaxonomySchemaVersion = "yaklang_rule_group_taxonomy.v1"
+
+// RuleGroupTaxonomy is the versioned, transport-safe taxonomy embedded in
+// exported SyntaxFlow rule archives. Its definitions come only from
+// scan_policies.yaml; consumers must not infer categories from group names.
+type RuleGroupTaxonomy struct {
+	SchemaVersion string                      `json:"schema_version"`
+	Version       string                      `json:"version"`
+	Categories    []RuleGroupTaxonomyCategory `json:"categories"`
+}
+
+type RuleGroupTaxonomyCategory struct {
+	ID          string                  `json:"id"`
+	DisplayName string                  `json:"display_name"`
+	Order       int                     `json:"order"`
+	Groups      []RuleGroupTaxonomyItem `json:"groups"`
+}
+
+type RuleGroupTaxonomyItem struct {
+	Name          string `json:"name"`
+	DisplayName   string `json:"display_name"`
+	CanonicalName string `json:"canonical_name,omitempty"`
+	Order         int    `json:"order"`
 }
 
 // ScanPolicyConfig 扫描策略配置
 type ScanPolicyConfig struct {
-	PolicyType  string            `json:"policy_type"`  // 策略类型: owasp-web, critical-high, fullstack, custom
+	PolicyType  string             `json:"policy_type"`  // 策略类型: owasp-web, critical-high, fullstack, custom
 	CustomRules *CustomRulesConfig `json:"custom_rules"` // 自定义规则组（当 PolicyType 为 custom 时使用）
 }
 
@@ -109,39 +137,54 @@ func GetScanPoliciesConfig() *ScanPoliciesConfig {
 
 // GetAllStandardGroupNames 获取所有标准规则组名称
 func GetAllStandardGroupNames() []string {
+	taxonomy := GetRuleGroupTaxonomy()
+	groupNames := make([]string, 0)
+	for _, category := range taxonomy.Categories {
+		for _, group := range category.Groups {
+			groupNames = append(groupNames, group.Name)
+		}
+	}
+	return groupNames
+}
+
+// GetRuleGroupTaxonomy returns a detached taxonomy value so callers cannot
+// mutate the cached scan-policy configuration.
+func GetRuleGroupTaxonomy() RuleGroupTaxonomy {
 	config := GetScanPoliciesConfig()
 	if config == nil {
-		return nil
+		return RuleGroupTaxonomy{}
 	}
-	
-	var groupNames []string
-	
-	// 从 custom_rule_groups 中提取所有组名
-	if config.CustomRuleGroups.ComplianceRules != nil {
-		for _, category := range config.CustomRuleGroups.ComplianceRules {
-			for _, group := range category.Groups {
-				groupNames = append(groupNames, group.Name)
+
+	taxonomy := RuleGroupTaxonomy{
+		SchemaVersion: RuleGroupTaxonomySchemaVersion,
+		Version:       config.RuleGroupTaxonomyVersion,
+	}
+	categoryOrder := 1
+	appendCategories := func(categories []RuleGroupCategory) {
+		for _, category := range categories {
+			items := make([]RuleGroupTaxonomyItem, 0, len(category.Groups))
+			for groupOrder, group := range category.Groups {
+				items = append(items, RuleGroupTaxonomyItem{
+					Name:          group.Name,
+					DisplayName:   group.DisplayName,
+					CanonicalName: group.CanonicalName,
+					Order:         groupOrder + 1,
+				})
 			}
+			taxonomy.Categories = append(taxonomy.Categories, RuleGroupTaxonomyCategory{
+				ID:          category.ID,
+				DisplayName: category.Category,
+				Order:       categoryOrder,
+				Groups:      items,
+			})
+			categoryOrder++
 		}
 	}
-	
-	if config.CustomRuleGroups.TechStackRules != nil {
-		for _, category := range config.CustomRuleGroups.TechStackRules {
-			for _, group := range category.Groups {
-				groupNames = append(groupNames, group.Name)
-			}
-		}
-	}
-	
-	if config.CustomRuleGroups.SpecialRules != nil {
-		for _, category := range config.CustomRuleGroups.SpecialRules {
-			for _, group := range category.Groups {
-				groupNames = append(groupNames, group.Name)
-			}
-		}
-	}
-	
-	return groupNames
+
+	appendCategories(config.CustomRuleGroups.ComplianceRules)
+	appendCategories(config.CustomRuleGroups.TechStackRules)
+	appendCategories(config.CustomRuleGroups.SpecialRules)
+	return taxonomy
 }
 
 var (

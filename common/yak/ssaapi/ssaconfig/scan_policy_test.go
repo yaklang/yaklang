@@ -6,6 +6,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRuleGroupTaxonomyIsVersionedAndComplete(t *testing.T) {
+	taxonomy := GetRuleGroupTaxonomy()
+	require.Equal(t, RuleGroupTaxonomySchemaVersion, taxonomy.SchemaVersion)
+	require.Equal(t, "1.0", taxonomy.Version)
+	require.NotEmpty(t, taxonomy.Categories)
+
+	groups := make(map[string]RuleGroupTaxonomyItem)
+	categories := make(map[string]RuleGroupTaxonomyCategory)
+	for _, category := range taxonomy.Categories {
+		require.NotEmpty(t, category.ID)
+		require.NotEmpty(t, category.DisplayName)
+		_, duplicateCategory := categories[category.ID]
+		require.False(t, duplicateCategory, "duplicate taxonomy category %q", category.ID)
+		categories[category.ID] = category
+		for _, group := range category.Groups {
+			require.NotEmpty(t, group.Name)
+			require.NotEmpty(t, group.DisplayName)
+			_, duplicateGroup := groups[group.Name]
+			require.False(t, duplicateGroup, "duplicate taxonomy group %q", group.Name)
+			groups[group.Name] = group
+		}
+	}
+
+	require.Len(t, groups, 36)
+	require.Equal(t, "java", groups["Language Library - Java"].CanonicalName)
+	require.Equal(t, 3, categories["language"].Order)
+	require.Equal(t, 1, groups["java"].Order)
+	require.Equal(t, "信息", groups["info"].DisplayName)
+	require.Contains(t, categories, "code-quality")
+	require.ElementsMatch(t, GetAllStandardGroupNames(), mapKeys(groups))
+	for policyName, policy := range GetScanPoliciesConfig().Policies {
+		for _, groupName := range policy.RuleGroups {
+			require.Contains(t, groups, groupName, "policy %q references a non-standard group", policyName)
+		}
+	}
+}
+
+func mapKeys[K comparable, V any](values map[K]V) []K {
+	keys := make([]K, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
 func TestGetScanPolicy(t *testing.T) {
 	cfg, err := New(ModeAll)
 	require.NoError(t, err)
