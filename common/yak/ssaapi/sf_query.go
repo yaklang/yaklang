@@ -196,7 +196,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		if config.program != nil {
 			root.SetProgramName(config.program.GetProgramName())
 		}
-		res, err = frame.Feed(sfvm.ValuesOf(root), config.opts...)
+		res, err = executeSourceFrameBatches(frame, root, config.opts...)
 	} else {
 		res, err = frame.Feed(value, config.opts...)
 	}
@@ -230,6 +230,31 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}
 
 	return ret, nil
+}
+
+func executeSourceFrameBatches(
+	frame *sfvm.SFFrame,
+	root *sfvm.PatternRoot,
+	opts ...sfvm.Option,
+) (*sfvm.SFFrameResult, error) {
+	batchSize := sfpattern.DefaultSourceHitBatchSize
+	var accumulated *sfvm.SFFrameResult
+	for offset := 0; ; offset += batchSize {
+		root.SetSourceHitBatch(offset, batchSize)
+		batchResult, err := frame.Feed(sfvm.ValuesOf(root), opts...)
+		if err != nil {
+			return nil, err
+		}
+		if accumulated == nil {
+			accumulated = sfvm.NewSFFrameResultAccumulator(batchResult)
+		} else {
+			accumulated.MergeByResult(batchResult)
+		}
+		_, _, total := root.SourceHitBatch()
+		if total == 0 || offset+batchSize >= total {
+			return accumulated, nil
+		}
+	}
 }
 
 type QueryOption func(*queryConfig)
