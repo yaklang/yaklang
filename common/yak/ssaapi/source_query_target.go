@@ -84,6 +84,16 @@ func (t *SourceQueryTarget) SyntaxFlowWithError(i string, opts ...QueryOption) (
 }
 
 func (t *SourceQueryTarget) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	if t == nil {
+		return nil, utils.Error("nil SourceQueryTarget")
+	}
+	if rule != nil && !sfvm.RuleIsSourceMode(rule, nil) {
+		return nil, utils.Errorf(
+			"source target cannot execute non-source rule %s (mode=%s)",
+			rule.RuleName,
+			schema.ValidRuleMode(rule.Mode),
+		)
+	}
 	return t.syntaxFlow(opts, QueryWithRule(rule))
 }
 
