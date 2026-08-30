@@ -190,6 +190,53 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 	return manager
 }
 
+// ForkForSession copies registry policy and recent-tool state for a private
+// session without writing changes back to the caller's manager. As with the
+// other registry methods, callers must serialize registry changes while forking;
+// the independently synchronized recent-tool cache is copied under its lock.
+// Tool definitions and dynamic source/searcher functions remain shared inputs.
+func (m *AiToolManager) ForkForSession() *AiToolManager {
+	if m == nil {
+		return nil
+	}
+	getter := m.toolsGetter
+	fork := &AiToolManager{
+		toolsGetter: func() []*aitool.Tool {
+			if getter == nil {
+				return nil
+			}
+			// Registry appends must not reuse the source getter's backing array.
+			return append([]*aitool.Tool(nil), getter()...)
+		},
+		toolEnabled:           make(map[string]bool, len(m.toolEnabled)),
+		enableSearchTool:      m.enableSearchTool,
+		enableForgeSearchTool: m.enableForgeSearchTool,
+		aiToolsSearcher:       m.aiToolsSearcher,
+		aiForgeSearcher:       m.aiForgeSearcher,
+		disableTools:          make(map[string]struct{}, len(m.disableTools)),
+		noCacheTools:          m.noCacheTools,
+		enableAllTools:        m.enableAllTools,
+		disallowMCPServers:    m.disallowMCPServers,
+		restrictToTools:       m.restrictToTools,
+		maxCacheTokens:        m.maxCacheTokens,
+	}
+	for name, enabled := range m.toolEnabled {
+		fork.toolEnabled[name] = enabled
+	}
+	for name := range m.disableTools {
+		fork.disableTools[name] = struct{}{}
+	}
+	// Do not copy searchTool/forgeSearchTool: their cached callbacks can capture
+	// this manager's getters and policy. Rebuild them against the fork instead.
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	for _, entry := range m.recentToolsCache {
+		copy := *entry
+		fork.recentToolsCache = append(fork.recentToolsCache, &copy)
+	}
+	return fork
+}
+
 // SetDisallowMCPServers updates MCP visibility policy and invalidates cached search tools.
 func (m *AiToolManager) SetDisallowMCPServers(disallow bool) {
 	if m == nil {

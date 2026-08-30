@@ -242,13 +242,24 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	}
 
 	cfg.SetBrowserSessionTracker(react)
+	var rollbackExtraMCPServers func()
+	constructed := false
+	defer func() {
+		// Until construction succeeds, no caller owns the mounted clients.
+		// Roll back on every failure, including errors after the MCP mount.
+		if !constructed && rollbackExtraMCPServers != nil {
+			rollbackExtraMCPServers()
+		}
+	}()
 
 	// Session-scoped MCP capabilities are part of the immutable execution
 	// contract. Mount them before any ReAct goroutine or persistent runtime
 	// record is started so a restricted Session can fail closed without
 	// leaking a half-started runtime when its evidence plane is unavailable.
 	if len(react.config.ExtraMCPServers) > 0 {
-		if err := react.loadExtraMCPServers(react.config.ExtraMCPServers); err != nil {
+		var err error
+		rollbackExtraMCPServers, err = react.loadExtraMCPServers(react.config.ExtraMCPServers)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -476,6 +487,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		react.loadMCPServers()
 	}
 
+	constructed = true
 	return react, nil
 }
 
@@ -604,13 +616,13 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 
 	for _, task := range queueingTasks {
 		taskInfo := map[string]interface{}{
-			"id":         task.GetId(),
-			"user_input": task.GetUserInput(),
+			"id":              task.GetId(),
+			"user_input":      task.GetUserInput(),
 			"user_input_uuid": task.GetUserInputUUID(),
-			"status":     task.GetStatus(),
-			"created_at": task.GetCreatedAt(),
-			"focus_mode": task.GetFocusMode(),
-			"is_recovery": task.GetTaskKind() == aicommon.AITaskKind_Recovery,
+			"status":          task.GetStatus(),
+			"created_at":      task.GetCreatedAt(),
+			"focus_mode":      task.GetFocusMode(),
+			"is_recovery":     task.GetTaskKind() == aicommon.AITaskKind_Recovery,
 		}
 
 		taskInfos = append(taskInfos, taskInfo)
@@ -814,10 +826,19 @@ func (r *ReAct) preloadMCPStubsFromDB() {
 // loadExtraMCPServers mounts session-scoped MCP servers at construction time.
 // 每个 server 经 aitool.LoadAIToolsFromMCPServer 取工具（不查 profile DB），
 // 并按 AllowedTools 在 client 侧做白名单过滤后 AppendTools。
-func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) error {
+// The returned rollback closes only clients opened by this mount, including
+// clients whose tool names were already present in the caller's tool manager.
+func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) (func(), error) {
+	var clients []aitool.MCPClientCloser
+	seenClients := make(map[aitool.MCPClientCloser]struct{})
+	rollback := func() {
+		for _, client := range clients {
+			_ = client.Close()
+		}
+	}
 	mng := r.config.GetAiToolManager()
 	if mng == nil {
-		return utils.Errorf("cannot mount session-scoped MCP servers: tool manager is unavailable")
+		return rollback, utils.Errorf("cannot mount session-scoped MCP servers: tool manager is unavailable")
 	}
 	var mountedNames []string
 	var failureClasses []string
@@ -833,10 +854,16 @@ func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) error {
 			continue
 		}
 		if len(tools) > 0 {
-			mng.AppendTools(tools...)
 			for _, tool := range tools {
+				if client := tool.BridgeMCPClient; client != nil {
+					if _, seen := seenClients[client]; !seen {
+						seenClients[client] = struct{}{}
+						clients = append(clients, client)
+					}
+				}
 				mountedNames = append(mountedNames, tool.Name)
 			}
+			mng.AppendTools(tools...)
 			log.Infof("session-scoped mcp server %s mounted %d tool(s)", s.Server.Name, len(tools))
 		}
 	}
@@ -850,13 +877,13 @@ func (r *ReAct) loadExtraMCPServers(servers []*aicommon.ExtraMCPServer) error {
 			if len(failureClasses) == 0 {
 				failureClasses = append(failureClasses, "no_tools")
 			}
-			return utils.Errorf(
+			return rollback, utils.Errorf(
 				"required session-scoped MCP capabilities are unavailable: %s",
 				strings.Join(failureClasses, ","),
 			)
 		}
 	}
-	return nil
+	return rollback, nil
 }
 
 // redactedSessionMCPMountFailure intentionally discards the nested transport
