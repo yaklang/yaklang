@@ -566,13 +566,32 @@ func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*Sy
 }
 
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	if p != nil && sfvm.RuleIsSourceMode(rule, nil) {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
 	opts = append(opts, QueryWithProgram(p), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
 }
 
 func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	if sfvm.RuleIsSourceMode(rule, nil) {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
 	opts = append(opts, QueryWithPrograms(ps), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
+}
+
+func ruleGetRuleName(rule *schema.SyntaxFlowRule) string {
+	if rule == nil {
+		return ""
+	}
+	return rule.RuleName
 }
 
 func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {

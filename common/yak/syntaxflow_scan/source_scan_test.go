@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -34,6 +35,41 @@ func writeTaskLocalRuleInputFile(
 	require.NoError(t, os.WriteFile(path, payload, 0o600))
 	sum := sha256.Sum256(payload)
 	return path, hex.EncodeToString(sum[:])
+}
+
+func TestSourceAndSSATargetsRejectMismatchedRuleModes(t *testing.T) {
+	files := map[string]string{
+		"leak.env": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n",
+	}
+	sourceTarget := ssaapi.NewSourceQueryTarget("source-only", files)
+	prog, err := ssaapi.Parse("a = 1")
+	require.NoError(t, err)
+
+	sourceRule := &schema.SyntaxFlowRule{
+		RuleName: "source-rule",
+		Mode:     schema.SFR_MODE_SOURCE,
+		Language: ssaconfig.General,
+		Content:  `${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit`,
+	}
+	ssaRule := &schema.SyntaxFlowRule{
+		RuleName: "ssa-rule",
+		Mode:     schema.SFR_MODE_SSA,
+		Language: ssaconfig.General,
+		Content:  "${a}.len()\n",
+	}
+
+	_, err = sourceTarget.SyntaxFlowRule(ssaRule)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "source target cannot execute non-source rule")
+
+	_, err = prog.SyntaxFlowRule(sourceRule)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "SSA program target cannot execute source rule")
+
+	_, err = sourceTarget.SyntaxFlowRule(sourceRule)
+	require.NoError(t, err)
+	_, err = prog.SyntaxFlowRule(ssaRule)
+	require.NoError(t, err)
 }
 
 func TestStartScan_SourceMode_NoSSACompile(t *testing.T) {
