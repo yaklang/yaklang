@@ -11,7 +11,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func Scan(ctx context.Context, option ...ssaconfig.Option) error {
+func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("syntaxflow scan panic: %v", e)
+			utils.PrintCurrentGoroutineRuntimeStack()
+			retErr = utils.Errorf("syntaxflow scan panic: %v", e)
+		}
+	}()
+
 	config, err := NewConfig(option...)
 	if err != nil {
 		return err
@@ -29,10 +37,15 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 
 	runningID := uuid.NewString()
 	defer func() {
-		if success && m != nil && m.status != schema.SYNTAXFLOWSCAN_PAUSED {
+		if m == nil {
+			return
+		}
+		if success && m.status != schema.SYNTAXFLOWSCAN_PAUSED {
 			m.SetFinishedQuery(m.GetTotalQuery())
 		}
-		m.SaveTask()
+		if err := m.SaveTask(); err != nil {
+			log.Errorf("save syntaxflow task failed: %v", err)
+		}
 		m.StatusTask()
 		m.Stop(runningID)
 		// 在 Stop() 之后保存报告，确保所有结果都已被处理
