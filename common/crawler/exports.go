@@ -12,8 +12,10 @@ var Exports = map[string]interface{}{
 	"httpsToHttpFallback": WithHTTPSFallback,
 	"domainExclude":       WithDomainBlackList,
 	"domainInclude":       WithDomainWhiteList,
+	"domainIncludeExact":  WithDomainWhiteListExactPattern,
 	"cookie":              WithFixedCookie,
 	"forbiddenFromParent": WithForbiddenFromParent,
+	"exactOrigins":        WithExactOrigins,
 	"disallowSuffix":      WithDisallowSuffix,
 	"header":              WithHeader,
 	"urlExtractor":        WithUrlExtractor,
@@ -31,6 +33,9 @@ var Exports = map[string]interface{}{
 	"autoLogin":           WithAutoLogin,
 	"jsParser":            WithJSParser,
 	"onUrlFound":          WithOnUrlFound,
+	"onAIJSRequestFound":  WithOnAIJSRequestFound,
+	"redactURLForDisplay": RedactURLForDisplay,
+	"safeDisplayText":     SanitizeTextForDisplay,
 	"RequestsFromFlow":    HandleRequestResult,
 
 	// AI assisted JS / HTML path extraction

@@ -18,6 +18,19 @@ type AIJSAsset struct {
 	Body        string
 }
 
+// AIJSRequestFinding preserves the request shape recovered from static asset
+// evidence. It is discovery metadata, not an instruction to replay the
+// request. In particular, non-GET methods and requests that depend on headers
+// or a body are reported to callers but are never reduced to a plain URL and
+// automatically scheduled by the extraction layer.
+type AIJSRequestFinding struct {
+	URL       string
+	Method    string
+	Headers   map[string]string
+	Body      string
+	SourceURL string
+}
+
 // AIJSExtractEvent describes one local trigger decision. It deliberately
 // contains metadata only; source text and request credentials are never copied
 // into observers.
@@ -70,6 +83,42 @@ type aiJSCallBudget struct {
 	used atomic.Int64
 }
 
+// aiJSContentDedupe is shared by shallow config copies. Its caller keys the
+// exact canonical source URL and body digest. It intentionally does not merge
+// schemes, ports, www aliases, paths, queries, or subdomains because identical
+// source can depend on its own import.meta.url/currentScript identity.
+type aiJSContentDedupe struct {
+	mu   sync.Mutex
+	seen map[string]struct{}
+}
+
+func newAIJSContentDedupe() *aiJSContentDedupe {
+	return &aiJSContentDedupe{seen: make(map[string]struct{})}
+}
+
+func (d *aiJSContentDedupe) claim(key string) bool {
+	if d == nil || key == "" {
+		return true
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if _, ok := d.seen[key]; ok {
+		return false
+	}
+	d.seen[key] = struct{}{}
+	return true
+}
+
+type aiJSFindingState struct {
+	mu    sync.Mutex
+	count int
+	seen  map[string]struct{}
+}
+
+func newAIJSFindingState() *aiJSFindingState {
+	return &aiJSFindingState{seen: make(map[string]struct{})}
+}
+
 func newAIJSCallBudget(max int) *aiJSCallBudget {
 	return &aiJSCallBudget{max: int64(max)}
 }
@@ -114,6 +163,21 @@ var aiJSTriggerPatternSpecs = []aiJSPatternSpec{
 		name:  "request-sink-worker",
 		expr:  `(?<![A-Za-z0-9_$])(?:serviceWorker\s*\.\s*register|importScripts)(?![A-Za-z0-9_$])\s*\(`,
 		gates: []string{"serviceWorker", "importScripts"},
+	},
+	{
+		name:  "request-alias",
+		expr:  `(?<![A-Za-z0-9_$])[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*(?:fetch|\$fetch|axios(?:\s*\.\s*[A-Za-z_$][A-Za-z0-9_$]*)?|ky(?:\s*\.\s*[A-Za-z_$][A-Za-z0-9_$]*)?|got|request)(?![A-Za-z0-9_$])`,
+		gates: []string{"fetch", "$fetch", "axios", "ky", "got", "request"},
+	},
+	{
+		name:  "request-shape-field",
+		expr:  `(?<![A-Za-z0-9_$])(?:method|headers|body|credentials)(?![A-Za-z0-9_$])\s*[:=]`,
+		gates: []string{"method", "headers", "body", "credentials"},
+	},
+	{
+		name:  "request-nonget-helper",
+		expr:  `\.\s*(?:post|put|patch|delete|head|options)(?![A-Za-z0-9_$])\s*\(`,
+		gates: []string{"post", "put", "patch", "delete", "head", "options"},
 	},
 	{
 		name:  "dynamic-request-call",
@@ -375,31 +439,40 @@ func parseAIJSQuotedString(code string, start int) (string, int, bool, bool) {
 			i++
 			continue
 		}
-		if value, width, ok := decodeAIJSHexEscape(code[i:]); ok {
+		if value, width, ok := decodeBoundedAIJSStringEscape(code[i:]); ok {
 			decoded.WriteString(value)
 			encoded = true
 			i += width
 			continue
 		}
-		if i+1 >= len(code) {
-			decoded.WriteByte(code[i])
-			i++
-			continue
-		}
-		escaped := code[i+1]
-		switch escaped {
-		case 'n':
-			decoded.WriteByte('\n')
-		case 'r':
-			decoded.WriteByte('\r')
-		case 't':
-			decoded.WriteByte('\t')
-		default:
-			decoded.WriteByte(escaped)
-		}
-		i += 2
+		decoded.WriteByte(code[i])
+		i++
 	}
 	return decoded.String(), len(code), encoded, templateAssembly
+}
+
+// aiJSLineContinuationWidthAt returns the byte width of a backslash followed
+// immediately by one ECMAScript LineTerminatorSequence. CRLF is one sequence;
+// U+2028 and U+2029 are represented by their fixed UTF-8 encodings here.
+func aiJSLineContinuationWidthAt(code string, index int) int {
+	if index < 0 || index+1 >= len(code) || code[index] != '\\' {
+		return 0
+	}
+	switch code[index+1] {
+	case '\n':
+		return 2
+	case '\r':
+		if index+2 < len(code) && code[index+2] == '\n' {
+			return 3
+		}
+		return 2
+	case 0xe2:
+		if index+3 < len(code) && code[index+2] == 0x80 &&
+			(code[index+3] == 0xa8 || code[index+3] == 0xa9) {
+			return 4
+		}
+	}
+	return 0
 }
 
 func decodeAIJSHexEscape(code string) (string, int, bool) {
@@ -408,12 +481,79 @@ func decodeAIJSHexEscape(code string) (string, int, bool) {
 			return string(rune(value)), 4, true
 		}
 	}
+	if len(code) >= 4 && code[0] == '\\' && (code[1] == 'u' || code[1] == 'U') && code[2] == '{' {
+		value := 0
+		digits := 0
+		for index := 3; index < len(code) && digits < 7; index++ {
+			if code[index] == '}' {
+				if digits == 0 || value > 0x10ffff {
+					return "", 0, false
+				}
+				return string(rune(value)), index + 1, true
+			}
+			digit, ok := fromHex(code[index])
+			if !ok {
+				return "", 0, false
+			}
+			value = value<<4 | int(digit)
+			digits++
+		}
+		return "", 0, false
+	}
 	if len(code) >= 6 && code[0] == '\\' && (code[1] == 'u' || code[1] == 'U') {
 		if value, ok := parseAIJSHex(code[2:6]); ok {
 			return string(rune(value)), 6, true
 		}
 	}
 	return "", 0, false
+}
+
+// decodeBoundedAIJSStringEscape decodes one bounded ECMAScript string escape.
+// It intentionally covers only semantics needed by request evidence: fixed
+// hex/unicode, ES6 code-point unicode, legacy octal, LineContinuation removal,
+// standard single-character escapes, and identity escapes. It never executes
+// JavaScript and consumes at most one local escape sequence.
+func decodeBoundedAIJSStringEscape(code string) (string, int, bool) {
+	if len(code) < 2 || code[0] != '\\' {
+		return "", 0, false
+	}
+	if width := aiJSLineContinuationWidthAt(code, 0); width > 0 {
+		return "", width, true
+	}
+	if decoded, width, ok := decodeAIJSHexEscape(code); ok {
+		return decoded, width, true
+	}
+	if code[1] >= '0' && code[1] <= '7' {
+		maxDigits := 3
+		if code[1] > '3' {
+			maxDigits = 2
+		}
+		value := 0
+		width := 1
+		for width <= maxDigits && width < len(code) && code[width] >= '0' && code[width] <= '7' {
+			value = value<<3 | int(code[width]-'0')
+			width++
+		}
+		return string(rune(value)), width, true
+	}
+	switch code[1] {
+	case 'b':
+		return "\b", 2, true
+	case 'f':
+		return "\f", 2, true
+	case 'n':
+		return "\n", 2, true
+	case 'r':
+		return "\r", 2, true
+	case 't':
+		return "\t", 2, true
+	case 'v':
+		return "\v", 2, true
+	default:
+		// Quotes, slash, backslash, query markers, and non-reserved legacy
+		// identity escapes all evaluate to the escaped character itself.
+		return string(code[1]), 2, true
+	}
 }
 
 func parseAIJSHex(code string) (int, bool) {
@@ -459,7 +599,13 @@ func assessAIJSTrigger(code, sourceURL, contentType string) aiJSTriggerAssessmen
 		return aiJSTriggerAssessment{}
 	}
 
-	lexical := normalizeAIJSTriggerCode(code)
+	// Trigger scoring does not depend on source offsets, so optional chaining
+	// can be canonicalised before lexical masking. Candidate extraction keeps
+	// the original bytes and uses optional-aware PCRE rules below.
+	triggerCode := strings.ReplaceAll(code, "?.(", "(")
+	triggerCode = strings.ReplaceAll(triggerCode, "?.[", "[")
+	triggerCode = strings.ReplaceAll(triggerCode, "?.", ".")
+	lexical := normalizeAIJSTriggerCode(triggerCode)
 	normalized := lexical.code
 	normalizedBytes := []byte(normalized)
 	triggerPatterns := getAIJSTriggerPatterns()
@@ -484,6 +630,15 @@ func assessAIJSTrigger(code, sourceURL, contentType string) aiJSTriggerAssessmen
 	if matched["request-sink-call"] || matched["request-sink-open"] ||
 		matched["request-sink-channel"] || matched["request-sink-worker"] {
 		add("request-sink", 1)
+	}
+	if matched["request-alias"] {
+		add("request-alias", 3)
+	}
+	if matched["request-shape-field"] && (matched["request-sink-call"] || matched["request-sink-open"] || matched["request-alias"]) {
+		add("request-shape", 2)
+	}
+	if matched["request-nonget-helper"] {
+		add("request-nonget-helper", 2)
 	}
 	if matched["dynamic-request-call"] || matched["dynamic-request-open"] ||
 		matched["dynamic-request-channel"] {
@@ -587,6 +742,9 @@ func RunAIJSExtractAssets(ctx context.Context, assets []AIJSAsset, cfg *AIJSExtr
 	if base.runtimeBudget == nil {
 		base.runtimeBudget = newAIJSCallBudget(base.MaxAIRequests)
 	}
+	if base.runtimeContent == nil {
+		base.runtimeContent = newAIJSContentDedupe()
+	}
 	for _, asset := range assets {
 		if strings.TrimSpace(asset.Body) == "" {
 			continue
@@ -594,6 +752,7 @@ func RunAIJSExtractAssets(ctx context.Context, assets []AIJSAsset, cfg *AIJSExtr
 		assetCfg := base
 		assetCfg.assetSourceURL = asset.SourceURL
 		assetCfg.assetContentType = asset.ContentType
+		assetCfg.findingState = newAIJSFindingState()
 		if err := runAIJSExtract(ctx, asset.Body, &assetCfg, onPath); err != nil {
 			return err
 		}
@@ -606,5 +765,14 @@ func RunAIJSExtractAssets(ctx context.Context, assets []AIJSAsset, cfg *AIJSExtr
 func withAIJSInvoker(invoker AIJSInvoker) AIJSExtractOption {
 	return func(cfg *AIJSExtractConfig) {
 		cfg.invoker = invoker
+	}
+}
+
+// withAIJSRequestFindingSink wires the extraction-only finding channel to the
+// crawler's public callback. It stays package-private so Yak callers use the
+// crawler Config API rather than mutating the AI runtime contract directly.
+func withAIJSRequestFindingSink(sink func(AIJSRequestFinding)) AIJSExtractOption {
+	return func(cfg *AIJSExtractConfig) {
+		cfg.findingSink = sink
 	}
 }
