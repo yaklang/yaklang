@@ -1,6 +1,7 @@
 package sfpattern
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -98,6 +99,16 @@ func TestNewRootFromFS(t *testing.T) {
 	vals, err := root.FileFilter("*", "regexp", nil, []string{`(?i)password\s*=\s*["'][^"']+["']`})
 	require.NoError(t, err)
 	require.Greater(t, sfvm.ValuesLen(vals), 0)
+}
+
+func TestMatchRegexpRejectsUnboundedHitCounts(t *testing.T) {
+	files := map[string]string{
+		"many.txt": "key\n" + strings.Repeat("key\n", 5000),
+	}
+	_, err := MatchRegexp(files, "many.txt", []string{`key`})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "matches too many locations")
+	require.Contains(t, err.Error(), "max 4096")
 }
 
 func TestMatchRegexpWithNegatives(t *testing.T) {

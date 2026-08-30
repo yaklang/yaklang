@@ -153,10 +153,24 @@ type Hit struct {
 }
 
 // MatchRegexp scans files whose path matches pathPattern with content regexes.
+// defaultMaxMaterializedHits bounds one FileFilter call. Source rules can match
+// tens of thousands of locations in large repositories; materializing every hit
+// at once builds millions of values/goroutines and exhausts memory before a
+// customer sees any result. The cap is intentionally large enough for normal
+// rules while forcing high-volume rules through bounded batches.
+const defaultMaxMaterializedHits = 4096
+
 func MatchRegexp(files map[string]string, pathPattern string, patterns []string) (sfvm.Values, error) {
 	hits, err := MatchRegexpHits(files, pathPattern, patterns)
 	if err != nil {
 		return nil, err
+	}
+	if len(hits) > defaultMaxMaterializedHits {
+		return nil, utils.Errorf(
+			"sfpattern: rule matches too many locations (%d; max %d); narrow the file filter or pattern",
+			len(hits),
+			defaultMaxMaterializedHits,
+		)
 	}
 	editors := newHitEditorCache(files)
 	vals := make([]sfvm.ValueOperator, 0, len(hits))
