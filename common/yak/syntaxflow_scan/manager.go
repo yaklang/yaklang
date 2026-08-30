@@ -356,6 +356,7 @@ func (m *scanManager) initByConfig() error {
 			}
 		}
 		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, modeFilter)
+		parsedRules = filterTaskLocalSyntaxFlowRulesByNames(parsedRules, config.SyntaxFlowRule)
 		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
 		for _, rule := range parsedRules {
 			ruleCh <- rule
