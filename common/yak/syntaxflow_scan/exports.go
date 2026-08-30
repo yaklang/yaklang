@@ -8,6 +8,7 @@ var Exports = map[string]any{
 	"GetScanStatus": GetScanStatus,
 	// 进度
 	"withScanProcessCallback":      WithProcessCallback,
+	"withProcessRuleDetail":        WithProcessRuleDetail,
 	"withScanResultCallback":       WithScanResultCallback,
 	"withScanPrograms":             withPrograms,
 	"withScanSourceFiles":          WithSourceFiles,
