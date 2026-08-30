@@ -17,8 +17,10 @@ const (
 
 // DefaultScanRuleWorkLimit is the CLI default for the per-rule structural
 // work budget. Keep the default in one place so API documentation and the CLI
-// do not drift apart.
-const DefaultScanRuleWorkLimit int64 = 200_000
+// do not drift apart. 50k was validated on dotCMS/core (188 SSA rules): it
+// finishes in ~2m at default concurrency with ~4GB peak RSS, while the legacy
+// 200k default still reached the node's 24GiB guard on that project.
+const DefaultScanRuleWorkLimit int64 = 50_000
 
 type SyntaxFlowConfig struct {
 	Memory          bool                  `json:"memory"`
@@ -57,7 +59,7 @@ type SyntaxFlowScanConfig struct {
 	// MergeAnchor(Clone)+AppendPredecessor ops that hang for hours. This bounds
 	// the within-opcode fanout that RuleTimeout (a wall-clock backstop) only
 	// catches after the fact. 0 means no work budget (legacy: only RuleTimeout).
-	// Default in `yak code-scan` is 200k; tune via --rule-work-limit.
+	// Default in `yak code-scan` is 50k; tune via --rule-work-limit.
 	RuleWorkLimit int64 `json:"rule_work_limit"`
 }
 
@@ -277,7 +279,7 @@ func WithScanRuleTimeout(timeout time.Duration) Option {
 //
 // Example:
 // ```
-// opt = syntaxflow.withScanRuleWorkLimit(200_000)
+// opt = syntaxflow.withScanRuleWorkLimit(50_000)
 // println(opt)
 // ```
 func WithScanRuleWorkLimit(limit int64) Option {
