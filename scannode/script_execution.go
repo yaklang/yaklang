@@ -106,6 +106,19 @@ func (s *ScanNode) executeScriptTask(
 	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {
 		defer reporter.ssaCollector.Cleanup()
+		if reporter.ssaUploadCfg != nil &&
+			strings.TrimSpace(input.ScriptLabels["chain.next_compile"]) == "true" {
+			provider := s.buildSSAArtifactUploadConfigProvider(taskCtx, reporter, reporter.ssaUploadCfg)
+			if err := reporter.ssaCollector.EnableContinuousUploadWithFlushInterval(
+				normalizeArtifactCodec(reporter.ssaUploadCfg.Codec),
+				provider,
+				2*time.Second,
+			); err != nil {
+				log.Warnf("enable continuous source artifact upload failed: %v", err)
+			} else {
+				log.Infof("continuous source artifact upload enabled task=%s flush=2s", input.TaskID)
+			}
+		}
 	}
 	result := &ScriptExecutionResult{}
 	if preparedSnapshot != nil {
@@ -200,6 +213,7 @@ func (s *ScanNode) executeScriptTask(
 
 	if err := s.executeScript(task, scanNodePath, scriptFile, params, input.RuntimeID, scriptEnv, taskLogWriter); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
+		s.preserveFailedSSAArtifactUpload(taskCtx, reporter, result)
 		// Finalize debug before returning the failure. Cancel / shutdown leaves
 		// taskCtx cancelled; finalize must still upload and write local cache.
 		if debugDir != "" {
@@ -1201,6 +1215,26 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 		event.FlowCount,
 	)
 	return nil
+}
+
+// preserveFailedSSAArtifactUpload publishes a finalized continuous-upload
+// manifest after a source precheck failure. The source stage is customer-visible
+// even when a later rule is cancelled or killed, so rules that already emitted
+// ssa-stream payloads must not be discarded with the local spool.
+func (s *ScanNode) preserveFailedSSAArtifactUpload(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	result *ScriptExecutionResult,
+) {
+	if reporter == nil || reporter.ssaCollector == nil || !reporter.ssaCollector.HasData() {
+		return
+	}
+	preserveCtx := context.WithoutCancel(ctx)
+	preserveCtx, cancel := context.WithTimeout(preserveCtx, 45*time.Second)
+	defer cancel()
+	if err := s.finalizeSSAArtifactUpload(preserveCtx, reporter, result); err != nil {
+		log.Warnf("preserve partial SSA artifact after script failure failed: %v", err)
+	}
 }
 
 // emitSSAArtifactUploadFailed constructs and publishes an upload-failed event

@@ -90,15 +90,16 @@ type SSAArtifactCollector struct {
 	hasData bool
 	initErr error
 
-	continuousEnabled  bool
-	continuousCodec    string
-	continuousProvider ssaUploadConfigProvider
-	continuousStarted  bool
-	continuousInput    chan []byte
-	continuousDone     chan struct{}
-	continuousClosed   bool
-	continuousErr      error
-	continuousBuild    *SSAArtifactBuildResult
+	continuousEnabled       bool
+	continuousCodec         string
+	continuousProvider      ssaUploadConfigProvider
+	continuousStarted       bool
+	continuousInput         chan []byte
+	continuousDone          chan struct{}
+	continuousClosed        bool
+	continuousErr           error
+	continuousBuild         *SSAArtifactBuildResult
+	continuousFlushInterval time.Duration
 
 	uploadMetrics ssaUploadMetrics
 }
@@ -119,6 +120,14 @@ func normalizeArtifactCodec(codec string) string {
 }
 
 func (c *SSAArtifactCollector) EnableContinuousUpload(codec string, provider ssaUploadConfigProvider) error {
+	return c.EnableContinuousUploadWithFlushInterval(codec, provider, 0)
+}
+
+func (c *SSAArtifactCollector) EnableContinuousUploadWithFlushInterval(
+	codec string,
+	provider ssaUploadConfigProvider,
+	flushInterval time.Duration,
+) error {
 	if c == nil {
 		return utils.Errorf("collector is nil")
 	}
@@ -130,6 +139,7 @@ func (c *SSAArtifactCollector) EnableContinuousUpload(codec string, provider ssa
 	c.continuousEnabled = true
 	c.continuousCodec = normalizeArtifactCodec(codec)
 	c.continuousProvider = provider
+	c.continuousFlushInterval = flushInterval
 	return nil
 }
 
@@ -159,7 +169,7 @@ func (c *SSAArtifactCollector) startContinuousUploadIfNeeded() error {
 	c.mu.Unlock()
 
 	go func() {
-		build, err := runContinuousSegmentedUpload(codec, provider, taskID, programName, reportType, input, func(uploadMs int64) {
+		build, err := runContinuousSegmentedUpload(codec, c.continuousFlushInterval, provider, taskID, programName, reportType, input, func(uploadMs int64) {
 			c.recordUploadMs(uploadMs)
 			c.recordSegment()
 		})
@@ -500,7 +510,7 @@ func readSSASegmentFlushInterval() time.Duration {
 	return time.Duration(sec) * time.Second
 }
 
-func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte, onSegment func(uploadMs int64)) (*SSAArtifactBuildResult, error) {
+func runContinuousSegmentedUpload(codec string, customFlushInterval time.Duration, provider ssaUploadConfigProvider, taskID string, programName string, reportType string, input <-chan []byte, onSegment func(uploadMs int64)) (*SSAArtifactBuildResult, error) {
 	if provider == nil {
 		return nil, utils.Errorf("empty upload config provider")
 	}
@@ -516,7 +526,10 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 	if segmentMaxBytes <= 0 {
 		segmentMaxBytes = defaultSSASegmentMaxBytes
 	}
-	flushInterval := readSSASegmentFlushInterval()
+	flushInterval := customFlushInterval
+	if flushInterval <= 0 {
+		flushInterval = readSSASegmentFlushInterval()
+	}
 	if flushInterval <= 0 {
 		flushInterval = time.Duration(defaultSSASegmentFlushSec) * time.Second
 	}
