@@ -3,7 +3,7 @@
 
 version: "1.0"
 rule_group_taxonomy_version: "1.0"
-updated_at: "2026-08-29"
+updated_at: "2026-08-30"
 
 # 策略列表
 policies:
@@ -147,6 +147,23 @@ custom_rule_groups:
         - name: "c"
           display_name: "C"
           canonical_name: "c"
+        # Exact engine language names; retain the policy aliases above.
+        # Appending keeps existing display order and policy selection intact.
+        - name: "golang"
+          display_name: "Golang"
+          canonical_name: "go"
+        - name: "js"
+          display_name: "JavaScript"
+          canonical_name: "javascript"
+        - name: "general"
+          display_name: "通用规则"
+          canonical_name: "general"
+        - name: "yak"
+          display_name: "Yak"
+          canonical_name: "yak"
+        - name: "ts"
+          display_name: "TypeScript"
+          canonical_name: "typescript"
 
     - id: "language-library"
       category: "语言库"

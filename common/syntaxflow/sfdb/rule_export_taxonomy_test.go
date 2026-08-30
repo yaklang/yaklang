@@ -26,9 +26,13 @@ func TestRuleExportEmbedsTaxonomyAndRemainsImportCompatible(t *testing.T) {
 		Content:  `desc(title: "taxonomy") alert $result`,
 	}
 	require.NoError(t, db.Create(rule).Error)
-	group := &schema.SyntaxFlowGroup{GroupName: "java"}
-	require.NoError(t, db.Create(group).Error)
-	require.NoError(t, db.Model(rule).Association("Groups").Append(group).Error)
+	standardGroups := append(ssaconfig.GetAllSupportedLanguages(), ssaconfig.General.String(), "go", "javascript")
+	rawGroups := append(append([]string(nil), standardGroups...), "user-defined-group")
+	for _, name := range rawGroups {
+		group := &schema.SyntaxFlowGroup{GroupName: name}
+		require.NoError(t, db.Create(group).Error)
+		require.NoError(t, db.Model(rule).Association("Groups").Append(group).Error)
+	}
 
 	archive, result, err := ExportRulesToBytes(context.Background(), db)
 	require.NoError(t, err)
@@ -37,13 +41,18 @@ func TestRuleExportEmbedsTaxonomyAndRemainsImportCompatible(t *testing.T) {
 	metadata := readRuleExportMetadata(t, archive)
 	require.Equal(t, ssaconfig.RuleGroupTaxonomySchemaVersion, metadata.RuleGroupTaxonomy.SchemaVersion)
 	require.NotEmpty(t, metadata.RuleGroupTaxonomy.Categories)
-	taxonomyGroupCount := 0
+	taxonomyNames := make(map[string]bool)
 	for _, category := range metadata.RuleGroupTaxonomy.Categories {
-		taxonomyGroupCount += len(category.Groups)
+		for _, group := range category.Groups {
+			taxonomyNames[group.Name] = true
+		}
 	}
-	require.Equal(t, 36, taxonomyGroupCount)
+	for _, name := range standardGroups {
+		require.True(t, taxonomyNames[name], "exported raw group %q must have exact taxonomy metadata", name)
+	}
+	require.False(t, taxonomyNames["user-defined-group"], "custom groups must not become standard taxonomy")
 	require.Equal(t, "taxonomy-rule-id", metadata.Relationship[0].RuleID)
-	require.Equal(t, []string{"java"}, metadata.Relationship[0].GroupNames)
+	require.ElementsMatch(t, rawGroups, metadata.Relationship[0].GroupNames)
 
 	importDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
@@ -54,8 +63,11 @@ func TestRuleExportEmbedsTaxonomyAndRemainsImportCompatible(t *testing.T) {
 
 	var imported schema.SyntaxFlowRule
 	require.NoError(t, importDB.Preload("Groups").Where("rule_id = ?", rule.RuleId).First(&imported).Error)
-	require.Len(t, imported.Groups, 1)
-	require.Equal(t, "java", imported.Groups[0].GroupName)
+	var importedGroupNames []string
+	for _, group := range imported.Groups {
+		importedGroupNames = append(importedGroupNames, group.GroupName)
+	}
+	require.ElementsMatch(t, rawGroups, importedGroupNames)
 }
 
 type ruleExportMetadata struct {
