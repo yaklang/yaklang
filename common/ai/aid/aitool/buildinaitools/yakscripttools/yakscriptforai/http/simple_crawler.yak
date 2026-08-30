@@ -1,4 +1,4 @@
-__DESC__ = "不执行 JavaScript 的轻量级爬虫，用于有界发现服务端可见 URL。单 URL 状态、响应头或正文优先直接 HTTP 请求；需要站点覆盖时再使用本工具。输出会识别疑似 SPA/重型 JS 页面并给出浏览器或 JS 资产分析建议，避免机械加深爬取。"
+__DESC__ = "不执行站点 JavaScript、无需浏览器的轻量级爬虫，用于有界发现服务端可见 URL 与前端请求面。默认 ai-js=auto：下载站点引用的 JavaScript，先以本地证据决定是否需要 AI，再对命中的有限代码窗口做静态分析；不会运行站点脚本、点击控件或观察浏览器运行时流量。单 URL 状态、响应头或正文优先直接 HTTP 请求；需要站点覆盖时再使用本工具。"
 __VERBOSE_NAME__ = "Crawler"
 __VERBOSE_NAME_ZH__ = "爬虫"
 __KEYWORDS__ = "爬虫,网络抓取,网页采集,http请求,http响应,无头爬虫,数据抓取,轻量级爬虫"
@@ -8,9 +8,14 @@ Simple Crawler Tool - Parameter Description for JSON Tool Calls
 
 This crawler is tuned to get results quickly: it minimizes retries and can
 automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
-It does NOT execute JavaScript. Use it for bounded multi-page discovery from
-server-visible HTML, not merely because the user supplied a URL. For one known
-URL's status, headers, body, or redirect, use one direct HTTP request first.
+It does NOT execute site JavaScript and does not launch a browser. By default,
+ai-js=auto downloads referenced JavaScript and uses bounded, browser-independent
+static analysis: local evidence decides whether a small set of code windows needs
+AI assistance. This can discover request candidates, but it cannot observe a
+rendered DOM, clicks, XHR/fetch traffic, or other browser runtime behavior.
+Use it for bounded multi-page discovery, not merely because the user supplied a
+URL. For one known URL's status, headers, body, or redirect, use one direct HTTP
+request first.
 
 Output includes:
   1. Crawl summary (requests made, total URLs discovered, pending URLs)
@@ -18,8 +23,10 @@ Output includes:
      and redirect location when available.
   3. Found URLs discovered in responses but NOT yet requested.
   4. A bounded rendering assessment for likely SPA / JavaScript-heavy shells.
-  5. Follow-up guidance that either deepens useful server-visible coverage or
-     switches to rendered DOM / JavaScript analysis.
+  5. Browser-independent, adaptive static analysis of referenced JavaScript when
+     ai-js is enabled. Extracted URLs remain candidates until requested.
+  6. Follow-up guidance that either deepens useful server-visible coverage or
+     switches to rendered DOM / a complete auditable JavaScript artifact workflow.
 
 Required Parameters:
   urls            (string)  Start URL(s) for crawling. Multiple URLs can be provided
@@ -40,6 +47,10 @@ Optional Parameters:
   timeout         (int)     Per-request timeout in seconds. Default: 10.
   https-fallback  (bool)    Whether to retry with HTTP when an HTTPS crawl yields
                             no results. Default: true.
+  ai-js           (string)  Browser-independent JavaScript static-analysis mode.
+                            Accepted values: "auto"/"yes"/"no". Default: "auto".
+                            "auto" and "yes" both use the same bounded adaptive
+                            trigger; "no" disables JavaScript downloading/analysis.
 
 Scenario Guidance:
   - One known URL, exact response: use one direct HTTP request; do not crawl
@@ -50,6 +61,8 @@ Scenario Guidance:
   - Deep crawl large site:  set reqs-max=1000, max-depth=8
   - Quick surface check:    set reqs-max=50, max-depth=2
   - Single directory only:  set forbid-for-parent-path=yes
+  - Server-visible only:    set ai-js=no
+  - SPA/API request surface: keep ai-js=auto; browser execution is not required
 USAGE_BLOCK
 
 startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))
@@ -61,7 +74,17 @@ maxUrls = cli.Int("urls-max", cli.setHelp("最多访问多少URL？"))
 maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(5))
 timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求的秒数)"), cli.setDefault(10))
 httpsFallback := cli.Bool("https-fallback", cli.setHelp("HTTPS 失败时是否自动切回 HTTP"), cli.setDefault(true))
+aiJSModeRaw := cli.String("ai-js", cli.setHelp("浏览器无关的 JavaScript 静态分析模式: auto/yes/no"), cli.setDefault("auto"))
 cli.check()
+
+aiJSMode = str.ToLower(str.TrimSpace(aiJSModeRaw))
+if aiJSMode == "" {
+    aiJSMode = "auto"
+}
+if !(aiJSMode in ["auto", "yes", "y", "true", "on", "no", "n", "false", "off"]) {
+    die("invalid ai-js mode: expected auto/yes/no")
+}
+enableAdaptiveAIJS = aiJSMode in ["auto", "yes", "y", "true", "on"]
 
 discoveredUrls = sync.NewLock()
 discoveredUrlSet = {}
@@ -76,7 +99,17 @@ normalizeDisplayUrl = func(rawUrl) {
     return rawUrl
 }
 
-opts = []
+// AI-backed Yak tools receive their parent context through injected params.
+// Reading it with getParam keeps direct/non-AID execution compatible while
+// allowing cancellation, deadlines, and context-scoped AI mocks to propagate
+// through crawler.context.
+crawlerCtx = context.Background()
+injectedCtx = getParam("CTX")
+if injectedCtx != nil && injectedCtx != undefined && injectedCtx != "" {
+    crawlerCtx = injectedCtx
+}
+
+opts = [crawler.context(crawlerCtx)]
 if reqsLimit > 0 {
     opts.Append(crawler.maxRequest(reqsLimit))
 }
@@ -97,6 +130,24 @@ if maxDepth > 0 {
 }
 if timeoutSecond > 0 {
     opts.Append(crawler.connectTimeout(timeoutSecond))
+}
+if enableAdaptiveAIJS {
+    // This is deliberately bounded and browser-independent. The crawler may
+    // download referenced scripts and inspect evidence windows, but never runs
+    // site JavaScript. A single crawler run shares the AI request budget.
+    opts.Append(crawler.aiJSExtract(
+        crawler.aiJSAdaptive(true),
+        crawler.aiJSTriggerThreshold(3),
+        crawler.aiJSMaxRequests(3),
+        crawler.aiJSMaxCandidates(96),
+        crawler.aiJSMaxCandidateBytes(192 * 1024),
+        crawler.aiJSTimeoutSeconds(2),
+        crawler.aiJSConcurrency(1),
+        crawler.aiJSMaxTokens(12 * 1024),
+        crawler.aiJSChunkBytes(48 * 1024),
+        crawler.aiJSSmallInputBytes(0),
+        crawler.aiJSSmallInputTokens(0),
+    ))
 }
 
 opts.Append(crawler.onUrlFound(func(urlStr) {
@@ -383,6 +434,11 @@ output.WriteString("=== Crawl Summary ===\n")
 output.WriteString(sprintf("Requests sent:   %v\n", requestedCount))
 output.WriteString(sprintf("URLs discovered: %v (includes URLs found in responses but not yet requested)\n", discoveredCount))
 output.WriteString(sprintf("Pending:         %v\n", pendingCount))
+if enableAdaptiveAIJS {
+    output.WriteString("JavaScript:      adaptive bounded static analysis (browser-independent; site code was not executed)\n")
+} else {
+    output.WriteString("JavaScript:      disabled (server-visible crawl only)\n")
+}
 
 output.WriteString("\n=== Requested URLs ===\n")
 for line in requestLines {
@@ -414,7 +470,7 @@ if likelyClientRenderedCount > 0 {
 if htmlResponseCount > assessedHTMLResponseCount {
     output.WriteString(sprintf("Assessment budget: sampled the first %v of %v HTML response(s).\n", assessedHTMLResponseCount, htmlResponseCount))
 }
-output.WriteString("Assessment is heuristic, not proof. This crawler does not execute JavaScript, click controls, or observe browser-created DOM/API activity.\n")
+output.WriteString("Assessment is heuristic, not proof. This crawler does not execute JavaScript, click controls, or observe browser-created DOM/API activity; ai-js only performs browser-independent static analysis of downloaded assets.\n")
 for line in renderingEvidenceLines {
     output.WriteString("- ")
     output.WriteString(line)
@@ -425,7 +481,7 @@ output.WriteString("\n=== Follow-up Guidance ===\n")
 if likelyClientRenderedCount > 0 {
     output.WriteString("- [decision] Stop mechanically deepening this crawl: an application shell can return few useful links regardless of `reqs-max` or `max-depth`. Missing URLs here do not prove that the SPA has no routes or APIs.\n")
     output.WriteString("- [recommended next action] Open the original URL once with `use_browser` (`op=open`) to inspect rendered DOM, forms, links, scripts, and visible text. Interact only when the task requires it.\n")
-    output.WriteString("- For routes/APIs, inspect referenced JavaScript assets and validate extracted candidates with one direct HTTP request each. In `infosec_recon`, use `crawl_js_collector` -> `js_static_extract_ai` for this path.\n")
+    output.WriteString("- For routes/APIs, ai-js=auto performs bounded static analysis of referenced JavaScript assets without executing them; validate extracted candidates with one direct HTTP request each. For complete, persisted, auditable JS coverage in `infosec_recon`, use `crawl_js_collector` -> `js_static_extract_ai`.\n")
     output.WriteString("- Keep raw-response questions on an HTTP request tool: rendered DOM is not the raw HTTP status, headers, or body.\n")
 } else {
     output.WriteString("- Select high-value Found URLs and run `simple_crawler` again with them in `urls` only when the task needs broader server-visible coverage; prioritize dynamic pages, APIs, auth/account, admin, and parameterized endpoints before static assets.\n")

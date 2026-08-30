@@ -43,9 +43,8 @@ type Crawler struct {
 	finished *utils.AtomicBool
 	starting *utils.AtomicBool
 
-	requestCounter         int64
-	linkCounter            int64
-	handlingRequestCounter int
+	requestCounter int64
+	linkCounter    int64
 
 	requestedHash *sync.Map
 	foundUrls     *sync.Map
@@ -542,12 +541,12 @@ func (c *Crawler) run() {
 			}
 
 			c.requestCounter++
-			c.handlingRequestCounter++
+			overRequestLimit := c.requestCounter > int64(config.maxCountOfRequest)
 			c.preRequestLock.Unlock()
 
-			// 请求最大值限制
-			// 判断请求最大值限制
-			if c.requestCounter > int64(config.maxCountOfRequest) {
+			// Keep the limit decision under preRequestLock: direct JavaScript
+			// asset workers reserve from the same counter.
+			if overRequestLimit {
 				c.scheduler.Done()
 				continue
 			}
@@ -592,7 +591,6 @@ func (c *Crawler) run() {
 				// 发送结束了
 				c.afterRequestLock.Lock()
 				c.handleReqResult(r)
-				c.handlingRequestCounter--
 				c.afterRequestLock.Unlock()
 			}(r)
 		}
@@ -724,6 +722,13 @@ func (c *Crawler) handleReqResult(r *Req) {
 		lowhttp.GetHTTPPacketContentType([]byte(r.responseHeader)),
 		string(r.responseBody),
 		WithFetcher_JavaScript(func(content *JavaScriptContent) {
+			// Adaptive AI analysis needs compiled/minified and oversized assets.
+			// Preserve every asset here; legacy SSA-only behavior keeps its old
+			// filters below.
+			if config.enableAIJSExtract && config.aiJSExtractConfig != nil && config.aiJSExtractConfig.AdaptiveTrigger {
+				jsContents = append(jsContents, content)
+				return
+			}
 			// skip min.js
 			if strings.HasSuffix(content.UrlPath, ".min.js") {
 				return
@@ -774,44 +779,92 @@ func (c *Crawler) handleReqResult(r *Req) {
 	// so users can opt-in to either or both. Each emitted path goes through
 	// the same submit() pipeline so deduplication / domain filters apply.
 	if config.enableAIJSExtract {
-		var combined bytes.Buffer
-		if len(r.responseBody) > 0 {
-			combined.Write(r.responseBody)
-			// Block-end markers must NOT start with "//" or look like a path,
-			// otherwise both the regex pre-filter and the AI step will mis-read
-			// them as protocol-relative URLs (regression: leaked as
-			// "http://---html-end---/" downstream).
-			combined.WriteString("\n/* yak-html-end */\n")
-		}
-		for _, j := range jsContents {
-			if j.IsCodeText && j.Code != "" {
-				combined.WriteString(j.Code)
-				combined.WriteString("\n/* yak-js-end */\n")
-			}
-		}
-		if combined.Len() > 0 {
-			// Build a per-request shallow copy so that RequestRaw / IsHTTPS do
-			// not leak across concurrent crawler requests sharing the shared
-			// config.aiJSExtractConfig template.
+		// Adaptive mode keeps source boundaries and analyzes each response/asset
+		// independently under one crawler-wide AI budget. Legacy callers retain
+		// the previous concatenated behavior below.
+		if config.aiJSExtractConfig.AdaptiveTrigger {
 			extractCfg := *config.aiJSExtractConfig
 			extractCfg.IsHTTPS = r.IsHttps()
 			extractCfg.RequestRaw = r.requestRaw
 
-			extractCtx, extractCancel := context.WithTimeout(c.ctx, 5*time.Minute)
-			err := RunAIJSExtract(extractCtx, combined.String(), &extractCfg, func(p string) {
+			contentType := lowhttp.GetHTTPPacketContentType([]byte(r.responseHeader))
+			assets := []AIJSAsset{{
+				SourceURL:   r.Url(),
+				ContentType: contentType,
+				Body:        string(r.responseBody),
+			}}
+			for _, jsContent := range jsContents {
+				// Inline code is already present in the owning HTML response. A direct
+				// JavaScript response is likewise represented by r.responseBody.
+				if !jsContent.IsCodeText || jsContent.Code == "" || jsContent.UrlPath == "" {
+					continue
+				}
+				assets = append(assets, AIJSAsset{
+					SourceURL:   r.AbsoluteURL(jsContent.UrlPath),
+					ContentType: "application/javascript",
+					Body:        jsContent.Code,
+				})
+			}
+
+			err := RunAIJSExtractAssets(c.ctx, assets, &extractCfg, func(p string) {
 				if c.contextDone() {
 					return
 				}
-				httpsR, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, p)
+				httpsR, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, p)
 				if err != nil {
 					log.Debugf("ai js extract: build http request failed for %q: %v", p, err)
 					return
 				}
+				candidateURL, err := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, httpsR)
+				if err != nil || candidateURL == nil || !config.CheckShouldBeHandledURL(candidateURL) {
+					log.Debugf("ai js extract: drop out-of-scope candidate %q", p)
+					return
+				}
 				submit(httpsR, reqBytes)
 			})
-			extractCancel()
 			if err != nil {
-				log.Warnf("ai js extract: pipeline error: %v", err)
+				log.Warnf("ai js extract: adaptive pipeline error: %v", err)
+			}
+		} else {
+			var combined bytes.Buffer
+			if len(r.responseBody) > 0 {
+				combined.Write(r.responseBody)
+				// Block-end markers must NOT start with "//" or look like a path,
+				// otherwise both the regex pre-filter and the AI step will mis-read
+				// them as protocol-relative URLs (regression: leaked as
+				// "http://---html-end---/" downstream).
+				combined.WriteString("\n/* yak-html-end */\n")
+			}
+			for _, j := range jsContents {
+				if j.IsCodeText && j.Code != "" {
+					combined.WriteString(j.Code)
+					combined.WriteString("\n/* yak-js-end */\n")
+				}
+			}
+			if combined.Len() > 0 {
+				// Build a per-request shallow copy so that RequestRaw / IsHTTPS do
+				// not leak across concurrent crawler requests sharing the shared
+				// config.aiJSExtractConfig template.
+				extractCfg := *config.aiJSExtractConfig
+				extractCfg.IsHTTPS = r.IsHttps()
+				extractCfg.RequestRaw = r.requestRaw
+
+				extractCtx, extractCancel := context.WithTimeout(c.ctx, 5*time.Minute)
+				err := RunAIJSExtract(extractCtx, combined.String(), &extractCfg, func(p string) {
+					if c.contextDone() {
+						return
+					}
+					httpsR, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, p)
+					if err != nil {
+						log.Debugf("ai js extract: build http request failed for %q: %v", p, err)
+						return
+					}
+					submit(httpsR, reqBytes)
+				})
+				extractCancel()
+				if err != nil {
+					log.Warnf("ai js extract: pipeline error: %v", err)
+				}
 			}
 		}
 	}
@@ -824,6 +877,11 @@ func (c *Crawler) handleReqResult(r *Req) {
 
 	for _, i := range jsContents {
 		if !i.IsCodeText {
+			continue
+		}
+		// Keep the historical SSA input policy even when adaptive AI retained a
+		// broader asset set above.
+		if strings.HasSuffix(i.UrlPath, ".min.js") || isPopularJSLibrary(i.UrlPath) || len(i.Code) > twoMB {
 			continue
 		}
 		fullJSCode.WriteString(i.Code)
@@ -884,22 +942,48 @@ FETCH_LOOP:
 				return
 			}
 			urlIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, reqHttps)
-			if urlIns != nil {
-				log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
-				// External JS <script src=...> is intentionally skipped by the
-				// HtmlTag-based submit pipeline (see handleResponse), so its URL
-				// would otherwise never reach onUrlFound. Report it here to keep
-				// the discovery channel complete.
-				if config.onUrlFound != nil {
-					config.onUrlFound(urlIns.String())
-				}
+			if urlIns == nil {
+				return
 			}
+			// External JS <script src=...> is intentionally skipped by the
+			// HtmlTag-based submit pipeline (see handleResponse), so its URL
+			// would otherwise never reach onUrlFound. Discovery and fetching
+			// are deliberately separate: report the asset, then enforce scope,
+			// deduplication, and the crawler-wide request budget before I/O.
+			if config.onUrlFound != nil {
+				config.onUrlFound(urlIns.String())
+			}
+			if !config.CheckShouldBeHandledURL(urlIns) {
+				log.Debugf("skip out-of-scope JavaScript asset: %v", urlIns)
+				return
+			}
+			if !c.reserveDirectJSAssetRequest(urlIns) {
+				log.Debugf("skip duplicate or over-budget JavaScript asset: %v", urlIns)
+				return
+			}
+			log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
 			rsp, _, err := config.DoHTTPRequest(reqHttps, c.config.runtimeID, lowhttp.WithRequest(reqBytes))
 			if err != nil {
 				return
 			}
 
-			if !utils.IContains(lowhttp.GetHTTPPacketContentType(rsp.RawPacket), "javascript") {
+			responseContentType := lowhttp.GetHTTPPacketContentType(rsp.RawPacket)
+			assetPath := strings.ToLower(content.UrlPath)
+			looksLikeJavaScriptPath := strings.HasSuffix(assetPath, ".js") ||
+				strings.HasSuffix(assetPath, ".mjs") ||
+				strings.HasSuffix(assetPath, ".cjs") ||
+				strings.Contains(assetPath, ".js?") ||
+				strings.Contains(assetPath, ".mjs?") ||
+				strings.Contains(assetPath, ".cjs?")
+			// The path-suffix fallback is intentionally adaptive-only. Historical
+			// SSA and legacy AI callers required a JavaScript MIME type; widening
+			// that policy for every jsParser caller could make an HTML error page
+			// named *.js enter the legacy parser.
+			adaptivePathFallback := config.enableAIJSExtract &&
+				config.aiJSExtractConfig != nil &&
+				config.aiJSExtractConfig.AdaptiveTrigger &&
+				looksLikeJavaScriptPath
+			if !utils.IContains(responseContentType, "javascript") && !adaptivePathFallback {
 				return
 			}
 
@@ -909,6 +993,32 @@ FETCH_LOOP:
 		}()
 	}
 	wg.Wait()
+}
+
+// reserveDirectJSAssetRequest brings the historical direct <script src>
+// downloader under the same crawler-run request cap as scheduled requests.
+// LoadOrStore is also an in-flight reservation, so duplicate tags cannot race
+// into multiple downloads.
+func (c *Crawler) reserveDirectJSAssetRequest(assetURL *url.URL) bool {
+	if c == nil || c.config == nil || assetURL == nil || c.requestedHash == nil {
+		return false
+	}
+	hash := utils.CalcSha1(assetURL.String(), http.MethodGet)
+	if _, loaded := c.requestedHash.LoadOrStore(hash, struct{}{}); loaded {
+		return false
+	}
+
+	c.preRequestLock.Lock()
+	defer c.preRequestLock.Unlock()
+	limit := int64(c.config.maxCountOfRequest)
+	if limit <= 0 || c.requestCounter >= limit {
+		// The crawler-wide budget cannot grow later in the run. Keep the
+		// reservation so repeated tags do not repeatedly retry a permanently
+		// over-budget asset.
+		return false
+	}
+	c.requestCounter++
+	return true
 }
 
 func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(string) bool, extractionRulesHandler func(*Req) []interface{}) {
