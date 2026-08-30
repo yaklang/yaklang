@@ -23,6 +23,82 @@ import (
 
 func boolPointer(value bool) *bool { return &value }
 
+func TestStatefulDriverTaskFocusInput(t *testing.T) {
+	for _, test := range taskFocusInputCases() {
+		t.Run(test.name, func(t *testing.T) {
+			engine := newTaskFocusCaptureEngine(t)
+			handle := &yakAIEngineRuntimeHandle{
+				engine: engine, emitter: noopEmitter{}, messageQueue: make(chan yakAIQueuedMessage, 1),
+			}
+			input := aiSessionInput{
+				Ref:       aiSessionCommandRef{CommandID: "task-focus-command", SessionID: "task-focus-session", RunID: "task-focus-run", BindEpoch: 3},
+				InputType: "message", PayloadJSON: test.payload,
+			}
+			beforePayload, beforeRef := string(input.PayloadJSON), input.Ref
+			err := handle.SendInput(context.Background(), input)
+			if string(input.PayloadJSON) != beforePayload || input.Ref != beforeRef {
+				t.Fatal("focus projection changed durable payload or command identity")
+			}
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Errorf("invalid focus was not explicitly rejected (%s): %v", test.wantErr, err)
+				}
+				if err != nil && strings.Contains(err.Error(), "DO_NOT_LOG_USER_VALUE") {
+					t.Error("focus validation disclosed the rejected value")
+				}
+				if len(handle.messageQueue) != 0 {
+					t.Error("invalid focus was enqueued")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			queued := <-handle.messageQueue
+			if queued.turnID != input.Ref.CommandID {
+				t.Fatal("focus projection changed the queued turn identity")
+			}
+			done := make(chan struct{})
+			go func() { defer close(done); handle.sendMessage(queued) }()
+			message := receiveTaskFocusMessage(t, engine)
+			assertTaskFocusMessage(t, message.content, "PAYLOAD_USER_INPUT", test)
+			assertTaskFocusAttachmentOption(t, message.options)
+			close(engine.release)
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("stateful task did not finish after engine release")
+			}
+		})
+	}
+}
+
+func TestStatefulDriverTaskFocusControlInputUnchanged(t *testing.T) {
+	for _, input := range taskFocusControlInputs() {
+		t.Run(input.InputType, func(t *testing.T) {
+			engine := newTaskFocusCaptureEngine(t)
+			handle := &yakAIEngineRuntimeHandle{
+				engine: engine, emitter: noopEmitter{}, messageQueue: make(chan yakAIQueuedMessage, 1),
+			}
+			before := string(input.PayloadJSON)
+			if err := handle.SendInput(context.Background(), input); err != nil {
+				t.Fatalf("control input was treated as a task focus message: %v", err)
+			}
+			if len(handle.messageQueue) != 0 || len(engine.messages) != 0 || string(input.PayloadJSON) != before {
+				t.Fatal("control input was rewritten or enqueued as a user message")
+			}
+			event := <-engine.events
+			if input.InputType == "interactive_response" {
+				if !event.GetIsInteractiveMessage() || event.GetInteractiveId() != "review-task-focus" || event.GetInteractiveJSONInput() != before {
+					t.Fatal("interactive response changed")
+				}
+			} else if !event.GetIsSyncMessage() || event.GetSyncID() != "sync-task-focus" || event.GetSyncJsonInput() != "{}" {
+				t.Fatal("sync input changed")
+			}
+		})
+	}
+}
+
 func testAttachmentTaskBinding(t *testing.T, body string) aiSessionBinding {
 	t.Helper()
 	command := testAttachmentTaskBindCommand(t)

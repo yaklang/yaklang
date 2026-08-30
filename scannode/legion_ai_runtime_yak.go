@@ -132,6 +132,10 @@ func (h *yakAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessio
 		return h.sendControlInput(event, "sync event")
 	}
 
+	content, err = appendAITaskFocusInput(content, input.PayloadJSON)
+	if err != nil {
+		return err
+	}
 	return h.enqueueMessage(ctx, input.Ref.CommandID, content, options...)
 }
 
