@@ -344,7 +344,18 @@ func (m *scanManager) initByConfig() error {
 		if err != nil {
 			return err
 		}
-		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, config.GetRuleFilterMode())
+		modeFilter := config.GetRuleFilterMode()
+		if len(modeFilter) == 0 {
+			// Source/SSA query targets must never execute mixed-mode rules:
+			// a snapshot can contain both backends, and an SSA rule against
+			// a raw PatternRoot can allocate unbounded result objects.
+			if len(config.QueryTargets) > 0 && len(config.Programs) == 0 {
+				modeFilter = []string{string(schema.SFR_MODE_SOURCE)}
+			} else if len(config.Programs) > 0 && len(config.QueryTargets) == 0 {
+				modeFilter = []string{string(schema.SFR_MODE_SSA)}
+			}
+		}
+		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, modeFilter)
 		ruleCh := make(chan *schema.SyntaxFlowRule, len(parsedRules))
 		for _, rule := range parsedRules {
 			ruleCh <- rule

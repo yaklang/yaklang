@@ -87,6 +87,56 @@ alert $hit
 	require.NotEmpty(t, res.GetAlertVariables())
 }
 
+func TestInitByConfig_SourceTargetDefaultsToSourceMode(t *testing.T) {
+	const sourceRuleName = "source-rule.sf"
+	const ssaRuleName = "ssa-rule.sf"
+	inputPath, inputSHA := writeTaskLocalRuleInputFile(t,
+		[]*ypb.SyntaxFlowRuleInput{
+			{
+				RuleName: sourceRuleName,
+				Content: `desc(mode: "source", language: general, title: src)
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			},
+			{
+				RuleName: ssaRuleName,
+				Content: `desc(mode: "ssa", language: general, title: ssa)
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			},
+		},
+		map[string]ssaconfig.TaskLocalRuleMetadata{
+			sourceRuleName: {AssetID: "asset-source"},
+			ssaRuleName:    {AssetID: "asset-ssa"},
+		},
+	)
+
+	configJSON, err := json.Marshal(map[string]any{
+		"Mode": int(ssaconfig.ModeSyntaxFlowScan),
+		"SyntaxFlowRule": map[string]any{
+			"task_local":              true,
+			"task_local_input_file":   inputPath,
+			"task_local_input_sha256": inputSHA,
+			"task_local_input_count":  2,
+		},
+	})
+	require.NoError(t, err)
+
+	cfg, err := NewConfig(
+		ssaconfig.WithJsonRawConfig(configJSON),
+		WithSourceFiles("source-only", map[string]string{
+			"leak.env": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n",
+		}),
+	)
+	require.NoError(t, err)
+	require.Empty(t, cfg.GetRuleFilterMode())
+
+	task, err := createSyntaxflowTaskById(context.Background(), "", uuid.NewString(), cfg)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), task.GetTotalQuery(),
+		"a source target must default task-local rules to source mode")
+}
+
 func TestInitByConfig_TaskLocalRulesApplyModeFilter(t *testing.T) {
 	const sourceRuleName = "source-rule.sf"
 	const ssaRuleName = "ssa-rule.sf"
