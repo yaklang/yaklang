@@ -304,6 +304,24 @@ func (m *scanManager) initByConfig() error {
 		config.Programs, config.QueryTargets = ssaapi.PrepareSyntaxFlowQueryTargets(config.Programs)
 	}
 
+	// Source query targets never populate BaseInfo.ProgramNames, but task
+	// persistence and progress reporting use program names. Keep them aligned
+	// so SaveTask does not record an empty program for a completed source scan.
+	if len(config.QueryTargets) > 0 && len(config.GetProgramNames()) == 0 {
+		names := make([]string, 0, len(config.QueryTargets))
+		for _, target := range config.QueryTargets {
+			if target == nil {
+				continue
+			}
+			if name := target.GetProgramName(); name != "" {
+				names = append(names, name)
+			}
+		}
+		if len(names) > 0 && config.Config != nil {
+			config.Config.SetProgramName(names[0])
+		}
+	}
+
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
 		db := consts.GetGormProfileDatabase()
 		db = yakit.FilterSyntaxFlowRule(db, filter)

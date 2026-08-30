@@ -105,7 +105,10 @@ opts = append(opts, syntaxflow.withScanResultCallback((sr) => {
 
 yakit.Info("start source-mode scan: target=%s tag=source", target)
 err = syntaxflow.StartScan(context.Background(), opts...)
-die(err)
+if err != nil {
+    println("SOURCE SCAN ERROR:", err)
+    die(err)
+}
 
 yakit.Info("======== SOURCE SCAN DONE ========")
 yakit.Info("alertTotal=%d", alertTotal)
