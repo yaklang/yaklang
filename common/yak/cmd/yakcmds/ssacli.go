@@ -1388,7 +1388,7 @@ and exports structured report (sarif/irify).`,
 
 		cli.Int64Flag{
 			Name:  "rule-work-limit",
-			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 200000 (calibrated for javacms-core: 5-concurrent scan completes in ~15min within 24GB, vs hang/OOM at 4M); 0 disables (only --rule-timeout applies)",
+			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 50000 (validated on dotCMS/core: default-concurrency scan finishes in ~2m with ~4GB peak RSS); 0 disables (only --rule-timeout applies)",
 			Value: ssaconfig.DefaultScanRuleWorkLimit,
 		},
 
