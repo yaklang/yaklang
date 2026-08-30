@@ -2,6 +2,7 @@ package syntaxflow_scan
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -35,4 +36,21 @@ func TestScan_ManagerNotConstructed_ReturnsErrorWithoutPanic(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no such file or directory")
 	})
+}
+
+func TestScan_JsonRawConfigDoesNotClearRuleFilterMode(t *testing.T) {
+	configJSON, err := json.Marshal(map[string]any{
+		"Mode": int(ssaconfig.ModeSyntaxFlowScan),
+		"SyntaxFlowRule": map[string]any{
+			"task_local": true,
+		},
+	})
+	require.NoError(t, err)
+
+	cfg, err := NewConfig(
+		ssaconfig.WithJsonRawConfig(configJSON),
+		ssaconfig.WithRuleFilterMode("source"),
+	)
+	require.NoError(t, err)
+	require.Equal(t, []string{"source"}, cfg.GetRuleFilterMode())
 }
