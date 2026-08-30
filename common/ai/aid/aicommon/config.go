@@ -4398,7 +4398,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	if i.ContextProviderManager != nil {
-		opts = append(opts, WithContextProvider(i.ContextProviderManager))
+		opts = append(opts, WithContextProvider(i.ContextProviderManager.snapshotForChild()))
 	}
 
 	// Dynamic planning propagation
