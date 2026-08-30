@@ -283,6 +283,44 @@ func filterTaskLocalSyntaxFlowRulesByMode(
 	return filtered
 }
 
+// filterTaskLocalSyntaxFlowRulesByNames applies the launch-frozen rule-name
+// subset to an immutable task-local snapshot. Empty name filters keep the whole
+// snapshot (subject to the mode filter).
+func filterTaskLocalSyntaxFlowRulesByNames(
+	rules []*schema.SyntaxFlowRule,
+	config *ssaconfig.SyntaxFlowRuleConfig,
+) []*schema.SyntaxFlowRule {
+	if config == nil {
+		return rules
+	}
+	names := config.RuleFilter.GetRuleNames()
+	if len(names) == 0 {
+		names = config.RuleNames
+	}
+	if len(names) == 0 {
+		return rules
+	}
+	selected := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if name = strings.TrimSpace(name); name != "" {
+			selected[name] = struct{}{}
+		}
+	}
+	if len(selected) == 0 {
+		return rules
+	}
+	filtered := make([]*schema.SyntaxFlowRule, 0, len(rules))
+	for _, rule := range rules {
+		if rule == nil {
+			continue
+		}
+		if _, ok := selected[rule.RuleName]; ok {
+			filtered = append(filtered, rule)
+		}
+	}
+	return filtered
+}
+
 func ruleInputResultKind(taskLocal bool) schema.SyntaxflowResultKind {
 	if taskLocal {
 		return schema.SFResultKindScan

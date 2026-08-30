@@ -138,6 +138,57 @@ alert $hit`,
 		"source-tagged snapshot metadata must restore source execution mode")
 }
 
+func TestInitByConfig_TaskLocalRulesApplyLaunchNameSubset(t *testing.T) {
+	const selectedRuleName = "selected-source-rule.sf"
+	const otherRuleName = "other-source-rule.sf"
+	inputPath, inputSHA := writeTaskLocalRuleInputFile(t,
+		[]*ypb.SyntaxFlowRuleInput{
+			{
+				RuleName: selectedRuleName,
+				Content: `desc(mode: "source", language: general, title: selected)
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			},
+			{
+				RuleName: otherRuleName,
+				Content: `desc(mode: "source", language: general, title: other)
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit`,
+			},
+		},
+		map[string]ssaconfig.TaskLocalRuleMetadata{
+			selectedRuleName: {AssetID: "asset-selected", Tag: "source|secrets"},
+			otherRuleName:    {AssetID: "asset-other", Tag: "source|secrets"},
+		},
+	)
+
+	configJSON, err := json.Marshal(map[string]any{
+		"Mode": int(ssaconfig.ModeSyntaxFlowScan),
+		"SyntaxFlowRule": map[string]any{
+			"task_local":              true,
+			"task_local_input_file":   inputPath,
+			"task_local_input_sha256": inputSHA,
+			"task_local_input_count":  2,
+			"rule_names":              []string{selectedRuleName},
+			"rule_filter":             map[string]any{"RuleNames": []string{selectedRuleName}},
+		},
+	})
+	require.NoError(t, err)
+
+	cfg, err := NewConfig(
+		ssaconfig.WithJsonRawConfig(configJSON),
+		WithSourceFiles("source-only", map[string]string{
+			"leak.env": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n",
+		}),
+	)
+	require.NoError(t, err)
+
+	task, err := createSyntaxflowTaskById(context.Background(), "", uuid.NewString(), cfg)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), task.GetTotalQuery(),
+		"task-local snapshot must apply the launch-frozen rule-name subset")
+}
+
 func TestInitByConfig_SourceTargetDefaultsToSourceMode(t *testing.T) {
 	const sourceRuleName = "source-rule.sf"
 	const ssaRuleName = "ssa-rule.sf"

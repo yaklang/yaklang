@@ -703,10 +703,9 @@ func injectPreparedRuleSnapshot(params map[string]any, bundle RuleSnapshotBundle
 			ruleConfig = typed
 		}
 	}
-	delete(ruleConfig, "rule_names")
-	delete(ruleConfig, "RuleNames")
-	delete(ruleConfig, "rule_filter")
-	delete(ruleConfig, "RuleFilter")
+	// Keep rule_names / rule_filter in the config: the snapshot bundle remains
+	// complete and immutable, while these fields freeze the execution subset
+	// selected by the platform launch request.
 
 	ruleInputs := make([]*ypb.SyntaxFlowRuleInput, 0, len(bundle.Items))
 	ruleMetadata := make(map[string]ssaconfig.TaskLocalRuleMetadata, len(bundle.Items))
