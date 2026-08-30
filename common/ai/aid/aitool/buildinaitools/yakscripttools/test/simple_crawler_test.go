@@ -8,9 +8,11 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -39,12 +41,182 @@ func getSimpleCrawlerTool(t *testing.T) *aitool.Tool {
 
 func execCrawlerTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) (stdout, stderr string) {
 	t.Helper()
+	// ai-js defaults to auto. Keep every existing EmbedFS test hermetic by
+	// installing a per-call no-op invoker; focused tests below replace it with
+	// deterministic behavior. This must not use a process-global LiteForge hook.
+	ctx := crawler.WithAIJSInvokerContext(context.Background(), func(
+		ctx context.Context,
+		cfg *crawler.AIJSExtractConfig,
+		payload string,
+		onPath func(string),
+	) error {
+		return nil
+	})
+	stdout, stderr, _ = execCrawlerToolWithContext(t, ctx, tool, params)
+	return stdout, stderr
+}
+
+func execCrawlerToolWithContext(t *testing.T, ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams) (stdout, stderr string, err error) {
+	t.Helper()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	_, err := tool.Callback(context.Background(), params, nil, w1, w2)
+	_, err = tool.Callback(ctx, params, nil, w1, w2)
 	if err != nil {
 		t.Logf("crawler tool execution error (may be expected): %v", err)
 	}
-	return w1.String(), w2.String()
+	return w1.String(), w2.String(), err
+}
+
+func TestSimpleCrawler_DefaultAutoUsesContextScopedAIInvoker(t *testing.T) {
+	var aiCalls atomic.Int64
+	var hiddenRequests atomic.Int64
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte(`<!doctype html><html><body><div id="app"></div><script src="/assets/app.chunk.js"></script></body></html>`))
+		case "/assets/app.chunk.js":
+			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+			// A dynamic request expression plus encoded/config evidence crosses the
+			// adaptive trigger threshold. The URL itself is deliberately absent.
+			_, _ = w.Write([]byte(`const runtimeConfig={apiBase:atob("L2FwaQ==")};fetch(runtimeConfig.apiBase+window.__tenant);`))
+		case "/api/context-mock-only":
+			hiddenRequests.Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	baseURL := "http://" + host + ":" + strconv.Itoa(port)
+
+	ctx := crawler.WithAIJSInvokerContext(context.Background(), func(
+		ctx context.Context,
+		cfg *crawler.AIJSExtractConfig,
+		payload string,
+		onPath func(string),
+	) error {
+		aiCalls.Add(1)
+		assert.Assert(t, strings.Contains(payload, "runtimeConfig"), "mock should receive the bounded trigger evidence")
+		assert.Assert(t, len(payload) < 256*1024, "adaptive payload must stay bounded, got %d bytes", len(payload))
+		onPath(baseURL + "/api/context-mock-only")
+		return nil
+	})
+
+	stdout, stderr, err := execCrawlerToolWithContext(t, ctx, getSimpleCrawlerTool(t), aitool.InvokeParams{
+		"urls":      baseURL,
+		"reqs-max":  12,
+		"max-depth": 3,
+		"timeout":   3,
+		// Deliberately omit ai-js: this verifies the declared default is auto.
+	})
+	assert.NilError(t, err, "stderr=%s", stderr)
+	assert.Assert(t, aiCalls.Load() >= 1, "the context-scoped mock should handle adaptive AI calls")
+	assert.Assert(t, aiCalls.Load() <= 3, "the script-level shared AI budget must cap calls, got %d", aiCalls.Load())
+	assert.Equal(t, hiddenRequests.Load(), int64(1), "the mock-only request candidate should be crawled once")
+	assert.Assert(t, strings.Contains(stdout, baseURL+"/api/context-mock-only"), "mock candidate missing from crawler output:\n%s", stdout)
+	assert.Assert(t, strings.Contains(stdout, "adaptive bounded static analysis"), "default auto mode should be reported:\n%s", stdout)
+
+	for _, section := range []string{
+		"=== Crawl Summary ===",
+		"=== Requested URLs ===",
+		"=== Found URLs ===",
+		"=== Rendering Assessment ===",
+		"=== Follow-up Guidance ===",
+	} {
+		assert.Assert(t, strings.Contains(stdout, section), "legacy output section missing: %s", section)
+	}
+}
+
+func TestSimpleCrawler_AIJSNoDisablesAdaptiveInvoker(t *testing.T) {
+	var aiCalls atomic.Int64
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte(`<!doctype html><html><body><script src="/assets/disabled.chunk.js"></script></body></html>`))
+		case "/assets/disabled.chunk.js":
+			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+			_, _ = w.Write([]byte(`const runtimeConfig={apiBase:atob("L2FwaQ==")};fetch(runtimeConfig.apiBase+window.__tenant);`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	baseURL := "http://" + host + ":" + strconv.Itoa(port)
+	ctx := crawler.WithAIJSInvokerContext(context.Background(), func(
+		ctx context.Context,
+		cfg *crawler.AIJSExtractConfig,
+		payload string,
+		onPath func(string),
+	) error {
+		aiCalls.Add(1)
+		return nil
+	})
+
+	stdout, stderr, err := execCrawlerToolWithContext(t, ctx, getSimpleCrawlerTool(t), aitool.InvokeParams{
+		"urls":      baseURL,
+		"reqs-max":  4,
+		"max-depth": 1,
+		"timeout":   3,
+		"ai-js":     "no",
+	})
+	assert.NilError(t, err, "stderr=%s", stderr)
+	assert.Equal(t, aiCalls.Load(), int64(0), "ai-js=no must not invoke AI")
+	assert.Assert(t, strings.Contains(stdout, "JavaScript:      disabled"), "disabled mode should be reported:\n%s", stdout)
+}
+
+func TestSimpleCrawler_ParentDeadlineCancelsContextScopedAIInvoker(t *testing.T) {
+	var aiCalls atomic.Int64
+	var observedCancellation atomic.Bool
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte(`<!doctype html><html><body><div id="app"></div><script src="/assets/cancel.chunk.js"></script></body></html>`))
+		case "/assets/cancel.chunk.js":
+			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+			_, _ = w.Write([]byte(`const runtimeConfig={apiBase:atob("L2FwaQ==")};fetch(runtimeConfig.apiBase+window.__tenant);`))
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	baseURL := "http://" + host + ":" + strconv.Itoa(port)
+	tool := getSimpleCrawlerTool(t)
+
+	// Cancel only after the invoker is reached. A wall-clock deadline started
+	// before Yak compilation makes this test depend on cold CI startup time and
+	// can expire before the crawler has exercised the propagation path at all.
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx := crawler.WithAIJSInvokerContext(parent, func(
+		ctx context.Context,
+		cfg *crawler.AIJSExtractConfig,
+		payload string,
+		onPath func(string),
+	) error {
+		aiCalls.Add(1)
+		cancel()
+		<-ctx.Done()
+		observedCancellation.Store(true)
+		return ctx.Err()
+	})
+
+	started := time.Now()
+	_, _, _ = execCrawlerToolWithContext(t, ctx, tool, aitool.InvokeParams{
+		"urls":      baseURL,
+		"reqs-max":  6,
+		"max-depth": 1,
+		"timeout":   3,
+	})
+	elapsed := time.Since(started)
+
+	assert.Equal(t, aiCalls.Load(), int64(1), "adaptive analysis should reach the context-scoped mock")
+	assert.Assert(t, observedCancellation.Load(), "parent deadline should reach the AI invoker")
+	assert.Assert(t, elapsed < 3*time.Second, "deadline propagation took too long: %s", elapsed)
 }
 
 // TestSimpleCrawler_CoverageHint nudges the AI toward broad coverage via
