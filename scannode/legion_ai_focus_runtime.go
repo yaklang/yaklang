@@ -67,13 +67,14 @@ var serverFocusAPIReferencePattern = regexp.MustCompile(
 // knows nothing about a particular Focus name or stage order; Legion-delivered
 // Yak code owns that orchestration.
 type legionServerFocusRuntime struct {
-	ctx        context.Context
-	authorized *url.URL
-	client     *http.Client
-	sink       aiFocusAssetResultSink
-	workspace  *legionCodeWorkspaceRuntime
-	emitEvent  func(string, []byte)
-	// A source workspace belongs to one server-authorized Focus Run. The
+	ctx                  context.Context
+	authorized           *url.URL
+	client               *http.Client
+	sink                 aiFocusAssetResultSink
+	workspace            *legionCodeWorkspaceRuntime
+	emitEvent            func(string, []byte)
+	attachmentResourceID string
+	// Source and attachment resources belong to one server-authorized Focus Run. The
 	// capability surface is dormant between Turns and is activated only while
 	// the matching immutable Focus Release executes.
 	authorizedFocusReleaseID string
@@ -108,6 +109,16 @@ func newLegionServerFocusRuntime(
 	if err != nil {
 		return nil, fmt.Errorf("server focus runtime target: %w", err)
 	}
+	var attachmentResourceID string
+	if isLegionAttachmentTarget(authorizedTarget) {
+		if workspace != nil {
+			return nil, fmt.Errorf("attachment task cannot bind a source workspace")
+		}
+		attachmentResourceID, err = legionAttachmentResourceID(authorizedTarget)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -120,8 +131,9 @@ func newLegionServerFocusRuntime(
 				return http.ErrUseLastResponse
 			},
 		},
-		sink:      assetSink,
-		workspace: workspace,
+		sink:                 assetSink,
+		workspace:            workspace,
+		attachmentResourceID: attachmentResourceID,
 	}, nil
 }
 
@@ -144,14 +156,17 @@ func (r *legionServerFocusRuntime) Execute(
 	}
 	requestedCapability := strings.TrimSpace(capability)
 	capability = normalizeLegionFocusCapability(requestedCapability)
-	if r.workspace != nil {
+	if r.attachmentResourceID != "" && capability != serverFocusCapabilityTaskStage && capability != serverFocusCapabilitySubmitReportV1 {
+		return nil, fmt.Errorf("server focus capability %q is disabled for attachment tasks", requestedCapability)
+	}
+	if r.workspace != nil || r.attachmentResourceID != "" {
 		r.mu.Lock()
 		active := strings.TrimSpace(r.activeFocusReleaseID)
 		authorized := strings.TrimSpace(r.authorizedFocusReleaseID)
 		contract := cloneLegionFocusExecutionContract(r.activeExecutionContract)
 		r.mu.Unlock()
 		if active == "" || authorized == "" || active != authorized {
-			return nil, fmt.Errorf("source workspace capabilities are available only during the authorized Focus Turn")
+			return nil, fmt.Errorf("server resource capabilities are available only during the authorized Focus Turn")
 		}
 		if contract == nil || !contract.allowsCapability(capability) {
 			return nil, fmt.Errorf("server focus capability %q is not allowed by the immutable Focus execution contract", requestedCapability)
@@ -220,24 +235,29 @@ func (r *legionServerFocusRuntime) activateFocusTurn(releaseID string, contracts
 		contract = cloneLegionFocusExecutionContract(contracts[0])
 	}
 	_, hasRiskJudgement := contract.resultForCapability(serverFocusCapabilitySubmitRiskJudgementV1)
-	if r.workspace == nil && !hasRiskJudgement {
+	if r.workspace == nil && r.attachmentResourceID == "" && !hasRiskJudgement {
 		return nil
 	}
 	releaseID = strings.TrimSpace(releaseID)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if releaseID == "" || releaseID != strings.TrimSpace(r.authorizedFocusReleaseID) {
-		return fmt.Errorf("focus release is not authorized for the bound source workspace")
+		return fmt.Errorf("focus release is not authorized for the bound server resource")
 	}
 	if r.activeFocusReleaseID != "" {
-		return fmt.Errorf("a source workspace Focus Turn is already active")
+		return fmt.Errorf("a server resource Focus Turn is already active")
 	}
-	if contract == nil && r.workspace != nil {
-		return fmt.Errorf("source workspace Focus Turn requires an immutable execution contract")
+	if contract == nil && (r.workspace != nil || r.attachmentResourceID != "") {
+		return fmt.Errorf("server resource Focus Turn requires an immutable execution contract")
+	}
+	if r.attachmentResourceID != "" {
+		if err := validateAttachmentFocusExecutionContract(contract); err != nil {
+			return err
+		}
 	}
 	if contract != nil {
 		binder, ok := r.sink.(aiFocusExecutionContractBinder)
-		if !ok && hasRiskJudgement {
+		if !ok && (hasRiskJudgement || r.attachmentResourceID != "") {
 			return fmt.Errorf("server focus result sink does not accept an immutable execution contract")
 		}
 		if ok {
@@ -248,6 +268,23 @@ func (r *legionServerFocusRuntime) activateFocusTurn(releaseID string, contracts
 	}
 	r.activeFocusReleaseID = releaseID
 	r.activeExecutionContract = contract
+	return nil
+}
+
+func validateAttachmentFocusExecutionContract(contract *legionFocusExecutionContract) error {
+	if contract == nil {
+		return fmt.Errorf("attachment task requires an immutable Focus execution contract")
+	}
+	for _, capability := range contract.Capabilities {
+		if capability != serverFocusCapabilityTaskStage && capability != serverFocusCapabilitySubmitReportV1 {
+			return fmt.Errorf("capability %q is disabled for attachment tasks", capability)
+		}
+	}
+	for _, result := range contract.Results {
+		if result.Capability != serverFocusCapabilitySubmitReportV1 {
+			return fmt.Errorf("attachment task result contract may only declare result.report.v1")
+		}
+	}
 	return nil
 }
 
@@ -269,8 +306,8 @@ func (r *legionServerFocusRuntime) deactivateFocusTurn(releaseID string) {
 }
 
 func (r *legionServerFocusRuntime) publishTaskStage(params map[string]any) (map[string]any, error) {
-	if r.workspace == nil {
-		return nil, fmt.Errorf("task.stage requires a source workspace")
+	if r.workspace == nil && r.attachmentResourceID == "" {
+		return nil, fmt.Errorf("task.stage requires a server resource")
 	}
 	if r.emitEvent == nil {
 		return nil, fmt.Errorf("task.stage event publisher is unavailable")
@@ -289,9 +326,13 @@ func (r *legionServerFocusRuntime) publishTaskStage(params map[string]any) (map[
 		return nil, fmt.Errorf("task.stage status %q is unsupported", status)
 	}
 	payload := map[string]any{
-		"workspace_id": r.workspace.spec.WorkspaceID,
-		"phase":        phase,
-		"status":       status,
+		"phase":  phase,
+		"status": status,
+	}
+	if r.workspace != nil {
+		payload["workspace_id"] = r.workspace.spec.WorkspaceID
+	} else {
+		payload["resource_id"] = r.attachmentResourceID
 	}
 	if message := focusRuntimeRawString(params, "message"); message != "" {
 		if len(message) > 2048 {
@@ -383,8 +424,8 @@ func (r *legionServerFocusRuntime) submitFindingV1(capability string, params map
 }
 
 func (r *legionServerFocusRuntime) submitReportV1(capability string, params map[string]any) (map[string]any, error) {
-	if r.workspace == nil {
-		return nil, fmt.Errorf("result.report.v1 requires a source workspace")
+	if r.workspace == nil && r.attachmentResourceID == "" {
+		return nil, fmt.Errorf("result.report.v1 requires a server resource")
 	}
 	r.mu.Lock()
 	contract := cloneLegionFocusExecutionContract(r.activeExecutionContract)
@@ -405,12 +446,17 @@ func (r *legionServerFocusRuntime) submitReportV1(capability string, params map[
 	if err != nil {
 		return nil, fmt.Errorf("result.report.v1 structured_summary: %w", err)
 	}
-	receipt, err := sink.SubmitCodeAuditReport(r.ctx, resultContract.Kind, aiFocusCodeAuditReport{
-		WorkspaceID:       r.workspace.spec.WorkspaceID,
+	report := aiFocusCodeAuditReport{
 		Title:             focusRuntimeRawString(params, "title"),
 		Markdown:          focusRuntimeRawString(params, "markdown"),
 		StructuredSummary: summary,
-	})
+	}
+	if r.workspace != nil {
+		report.WorkspaceID = r.workspace.spec.WorkspaceID
+	} else {
+		report.ResourceID = r.attachmentResourceID
+	}
+	receipt, err := sink.SubmitCodeAuditReport(r.ctx, resultContract.Kind, report)
 	if err != nil {
 		return nil, err
 	}

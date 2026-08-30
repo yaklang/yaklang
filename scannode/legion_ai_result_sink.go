@@ -81,7 +81,8 @@ type aiFocusCodeFinding struct {
 }
 
 type aiFocusCodeAuditReport struct {
-	WorkspaceID       string          `json:"workspace_id"`
+	WorkspaceID       string          `json:"workspace_id,omitempty"`
+	ResourceID        string          `json:"resource_id,omitempty"`
 	Title             string          `json:"title"`
 	Markdown          string          `json:"markdown"`
 	StructuredSummary json.RawMessage `json:"structured_summary"`
@@ -197,24 +198,27 @@ type aiFocusResultEventPublisher interface {
 }
 
 type legionAIFocusResultSink struct {
-	publisher              aiFocusResultEventPublisher
-	ref                    jobExecutionRef
-	focusRunID             string
-	focusMode              string
-	focusReleaseID         string
-	targetURL              string
-	mu                     sync.Mutex
-	assetIDs               map[string]struct{}
-	riskIDs                map[string]struct{}
-	targets                map[string]struct{}
-	requiredResultKinds    map[string]struct{}
-	publishedResultKinds   map[string]struct{}
-	codeWorkspaceLockedRev string
-	codeWorkspaceSHA256    string
-	riskJudgementScope     *legionAIRiskJudgementScope
-	riskJudgementKind      string
-	riskJudgementIDs       map[string]struct{}
-	judgedRiskIDs          map[string]struct{}
+	publisher               aiFocusResultEventPublisher
+	ref                     jobExecutionRef
+	focusRunID              string
+	focusMode               string
+	focusReleaseID          string
+	targetURL               string
+	mu                      sync.Mutex
+	assetIDs                map[string]struct{}
+	riskIDs                 map[string]struct{}
+	targets                 map[string]struct{}
+	requiredResultKinds     map[string]struct{}
+	publishedResultKinds    map[string]struct{}
+	codeWorkspaceLockedRev  string
+	codeWorkspaceSHA256     string
+	riskJudgementScope      *legionAIRiskJudgementScope
+	riskJudgementKind       string
+	riskJudgementIDs        map[string]struct{}
+	judgedRiskIDs           map[string]struct{}
+	attachmentResourceID    string
+	attachmentReportKind    string
+	attachmentContractBound bool
 }
 
 func newLegionAIFocusResultSink(
@@ -236,6 +240,13 @@ func newLegionAIFocusResultSink(
 	if err != nil {
 		return nil, fmt.Errorf("ai focus risk_judgement_scope: %w", err)
 	}
+	var attachmentResourceID string
+	if isLegionAttachmentTarget(resultContext.GetTargetUrl()) {
+		attachmentResourceID, err = legionAttachmentResourceID(resultContext.GetTargetUrl())
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &legionAIFocusResultSink{
 		publisher:            publisher,
 		ref:                  ref,
@@ -251,6 +262,7 @@ func newLegionAIFocusResultSink(
 		riskJudgementScope:   riskJudgementScope,
 		riskJudgementIDs:     make(map[string]struct{}),
 		judgedRiskIDs:        make(map[string]struct{}),
+		attachmentResourceID: attachmentResourceID,
 	}, nil
 }
 
@@ -482,6 +494,20 @@ func validateLegionAIFocusResultContext(
 		return jobExecutionRef{}, fmt.Errorf("ai focus result target_url: %w", targetErr)
 	case strings.TrimSpace(resultContext.GetFocusMode()) == legionAIConversationAuditResultMode && isWorkspaceSentinel:
 		return jobExecutionRef{}, fmt.Errorf("workspace.invalid sentinel is reserved for server-managed Professional Tasks")
+	case isLegionAttachmentTarget(targetURL):
+		if strings.TrimSpace(resultContext.GetFocusMode()) == legionAIConversationAuditResultMode {
+			return jobExecutionRef{}, fmt.Errorf("attachments.invalid sentinel is reserved for server-managed Professional Tasks")
+		}
+		if _, err := legionAttachmentResourceID(targetURL); err != nil {
+			return jobExecutionRef{}, err
+		}
+		if !strings.HasPrefix(strings.TrimSpace(resultContext.GetFocusReleaseId()), strings.TrimSpace(resultContext.GetFocusMode())+"@") {
+			return jobExecutionRef{}, fmt.Errorf("attachment task focus_release_id must match focus_mode")
+		}
+		if resultContext.GetRiskJudgementScope() != nil {
+			return jobExecutionRef{}, fmt.Errorf("attachment task cannot bind a risk judgement scope")
+		}
+		return ref, nil
 	default:
 		return ref, nil
 	}
@@ -641,6 +667,9 @@ func (s *legionAIFocusResultSink) SubmitCodeFinding(
 	kind string,
 	finding aiFocusCodeFinding,
 ) (aiFocusResultReceipt, error) {
+	if s.attachmentResourceID != "" {
+		return aiFocusResultReceipt{}, fmt.Errorf("source findings are disabled for attachment tasks")
+	}
 	kind = strings.TrimSpace(kind)
 	finding.WorkspaceID = strings.TrimSpace(finding.WorkspaceID)
 	finding.LockedRevision = ""
@@ -775,15 +804,31 @@ func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 ) (aiFocusResultReceipt, error) {
 	kind = strings.TrimSpace(kind)
 	report.WorkspaceID = strings.TrimSpace(report.WorkspaceID)
+	report.ResourceID = strings.TrimSpace(report.ResourceID)
 	report.Title = strings.TrimSpace(report.Title)
 	if report.Title == "" {
 		report.Title = "代码安全审计报告"
+		if s.attachmentResourceID != "" {
+			report.Title = "附件分析报告"
+		}
 	}
 	report.Markdown = strings.TrimSpace(report.Markdown)
 	if kind == "" {
 		return aiFocusResultReceipt{}, fmt.Errorf("report result kind is required")
 	}
-	if report.WorkspaceID == "" || report.Markdown == "" {
+	if s.attachmentResourceID != "" {
+		s.mu.Lock()
+		boundKind := s.attachmentReportKind
+		s.mu.Unlock()
+		if boundKind == "" || kind != boundKind {
+			return aiFocusResultReceipt{}, fmt.Errorf("attachment report kind is not bound by the immutable Focus execution contract")
+		}
+		if report.WorkspaceID != "" || report.ResourceID != s.attachmentResourceID || report.Markdown == "" {
+			return aiFocusResultReceipt{}, fmt.Errorf("attachment report requires the authorized resource_id and markdown, without workspace_id")
+		}
+	} else if report.ResourceID != "" {
+		return aiFocusResultReceipt{}, fmt.Errorf("source report cannot use an attachment resource_id")
+	} else if report.WorkspaceID == "" || report.Markdown == "" {
 		return aiFocusResultReceipt{}, fmt.Errorf("ai code audit report workspace_id and markdown are required")
 	}
 	if len(report.Title) > 256 {
@@ -807,7 +852,12 @@ func (s *legionAIFocusResultSink) SubmitCodeAuditReport(
 		return aiFocusResultReceipt{}, fmt.Errorf("canonicalize ai code audit report structured_summary: %w", err)
 	}
 	report.StructuredSummary = canonicalSummary
-	expectedTarget, err := legionCodeWorkspaceSentinel(report.WorkspaceID)
+	var expectedTarget string
+	if s.attachmentResourceID != "" {
+		expectedTarget, err = legionAttachmentSentinel(report.ResourceID)
+	} else {
+		expectedTarget, err = legionCodeWorkspaceSentinel(report.WorkspaceID)
+	}
 	if err != nil {
 		return aiFocusResultReceipt{}, err
 	}
@@ -989,6 +1039,12 @@ func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFoc
 	if s == nil || contract == nil {
 		return fmt.Errorf("Focus execution contract is required")
 	}
+	attachmentReport, _ := contract.resultForCapability(serverFocusCapabilitySubmitReportV1)
+	if s.attachmentResourceID != "" {
+		if err := validateAttachmentFocusExecutionContract(contract); err != nil {
+			return err
+		}
+	}
 	required := make(map[string]struct{})
 	for _, result := range contract.Results {
 		if result.Required {
@@ -1014,6 +1070,9 @@ func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFoc
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.attachmentContractBound && (s.attachmentReportKind != attachmentReport.Kind || !sameStringSet(s.requiredResultKinds, required)) {
+		return fmt.Errorf("attachment Focus execution result contract is already bound")
+	}
 	if len(s.requiredResultKinds) > 0 {
 		if !sameStringSet(s.requiredResultKinds, required) ||
 			(hasRiskJudgement && s.riskJudgementKind != riskJudgementResult.Kind) {
@@ -1022,6 +1081,10 @@ func (s *legionAIFocusResultSink) bindFocusExecutionContract(contract *legionFoc
 		return nil
 	}
 	s.requiredResultKinds = required
+	if s.attachmentResourceID != "" {
+		s.attachmentReportKind = attachmentReport.Kind
+		s.attachmentContractBound = true
+	}
 	if hasRiskJudgement {
 		s.riskJudgementKind = riskJudgementResult.Kind
 	}
@@ -1032,6 +1095,9 @@ func (s *legionAIFocusResultSink) SubmitRisk(
 	ctx context.Context,
 	risk *schema.Risk,
 ) (aiFocusResultReceipt, error) {
+	if s.attachmentResourceID != "" {
+		return aiFocusResultReceipt{}, fmt.Errorf("risk results are disabled for attachment tasks")
+	}
 	if risk == nil {
 		return aiFocusResultReceipt{}, fmt.Errorf("ai focus risk is required")
 	}
@@ -1095,6 +1161,9 @@ func (s *legionAIFocusResultSink) SubmitAsset(
 	ctx context.Context,
 	asset aiFocusAssetResult,
 ) (aiFocusResultReceipt, error) {
+	if s.attachmentResourceID != "" {
+		return aiFocusResultReceipt{}, fmt.Errorf("asset results are disabled for attachment tasks")
+	}
 	asset.Kind = strings.TrimSpace(asset.Kind)
 	asset.Title = strings.TrimSpace(asset.Title)
 	asset.Target = strings.TrimSpace(asset.Target)
@@ -1150,6 +1219,10 @@ func (s *legionAIFocusResultSink) Succeed(
 	resultJSON []byte,
 ) error {
 	s.mu.Lock()
+	if s.attachmentResourceID != "" && !s.attachmentContractBound {
+		s.mu.Unlock()
+		return fmt.Errorf("attachment task cannot complete before its immutable Focus execution contract is bound")
+	}
 	missingRequired := make([]string, 0)
 	for kind := range s.requiredResultKinds {
 		if _, published := s.publishedResultKinds[kind]; !published {
@@ -1437,6 +1510,34 @@ func legionCodeWorkspaceSentinel(workspaceID string) (string, error) {
 		return "", fmt.Errorf("source_workspace workspace_id is invalid")
 	}
 	return (&url.URL{Scheme: "https", Host: "workspace.invalid", Path: "/" + workspaceID + "/"}).String(), nil
+}
+
+// Attachment targets are server resource identities, never network targets or
+// source workspaces. Keep their canonical shape closed before granting any
+// Professional Task capability.
+func isLegionAttachmentTarget(raw string) bool {
+	target, err := url.Parse(strings.TrimSpace(raw))
+	return err == nil && strings.EqualFold(target.Hostname(), "attachments.invalid")
+}
+
+func legionAttachmentSentinel(resourceID string) (string, error) {
+	if !legionCodeWorkspaceIDPattern.MatchString(resourceID) {
+		return "", fmt.Errorf("attachment task resource_id is invalid")
+	}
+	return "https://attachments.invalid/" + resourceID + "/", nil
+}
+
+func legionAttachmentResourceID(raw string) (string, error) {
+	target, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || target == nil {
+		return "", fmt.Errorf("attachment task target is invalid")
+	}
+	resourceID := strings.Trim(target.Path, "/")
+	expected, err := legionAttachmentSentinel(resourceID)
+	if err != nil || target.String() != expected {
+		return "", fmt.Errorf("attachment task target must be a canonical https://attachments.invalid/<aicw_id>/ sentinel")
+	}
+	return resourceID, nil
 }
 
 func legionCodeFindingTarget(authorizedTarget, workspaceID, filename string) (string, error) {
