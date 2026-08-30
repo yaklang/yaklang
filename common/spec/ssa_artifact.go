@@ -41,12 +41,13 @@ type SSAArtifactManifestV1 struct {
 // artifact to object storage. Server should consume this as a control-plane
 // notification and run async import from object storage.
 type SSAArtifactReadyEvent struct {
-	ObjectKey        string `json:"object_key"`
-	Codec            string `json:"codec"` // "zstd" | "gzip" | "identity"
-	ArtifactFormat   string `json:"artifact_format,omitempty"`
-	CompressedSize   int64  `json:"compressed_size"`
-	UncompressedSize int64  `json:"uncompressed_size"`
-	SHA256           string `json:"sha256"`
+	SourceStatistics json.RawMessage `json:"source_statistics,omitempty"`
+	ObjectKey        string          `json:"object_key"`
+	Codec            string          `json:"codec"` // "zstd" | "gzip" | "identity"
+	ArtifactFormat   string          `json:"artifact_format,omitempty"`
+	CompressedSize   int64           `json:"compressed_size"`
+	UncompressedSize int64           `json:"uncompressed_size"`
+	SHA256           string          `json:"sha256"`
 
 	ProgramName string `json:"program_name,omitempty"`
 	ReportType  string `json:"report_type,omitempty"`

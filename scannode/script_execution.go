@@ -1160,6 +1160,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	if event == nil {
 		return nil
 	}
+	event.SourceStatistics = meta.SourceStatistics
 	if err := reporter.PublishSSAArtifactReady(event); err != nil {
 		return err
 	}
@@ -1273,9 +1274,10 @@ func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
 }
 
 type ssaResultMeta struct {
-	ProgramName string
-	TotalLines  int64
-	RiskCount   int64
+	SourceStatistics json.RawMessage
+	ProgramName      string
+	TotalLines       int64
+	RiskCount        int64
 }
 
 func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
@@ -1289,6 +1291,9 @@ func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
 		return meta
 	}
 
+	if statistics := dataMap["source_statistics"]; statistics != nil {
+		meta.SourceStatistics, _ = json.Marshal(statistics)
+	}
 	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(
 		utils.MapGetFirstRaw(dataMap, "program_name", "programName", "ProgramName"),
 	))
@@ -1311,6 +1316,9 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 		_ = json.Unmarshal(event.Metrics, &merged)
 	}
 	// Add risk/file/flow counts
+	if len(event.SourceStatistics) > 0 && json.Valid(event.SourceStatistics) {
+		merged["source_statistics"] = event.SourceStatistics
+	}
 	merged["risk_count"] = event.RiskCount
 	merged["file_count"] = event.FileCount
 	merged["dataflow_count"] = event.FlowCount
