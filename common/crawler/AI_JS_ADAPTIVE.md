@@ -15,14 +15,42 @@ HTML / text / config / JavaScript asset
   -> Go PCRE Lite precise matching
   -> bounded, source-attributed evidence windows
   -> optional AI analysis
-  -> URL validation and seed-host scope check
-  -> normal crawler deduplication and scheduling
+  -> structured request validation and credential redaction
+  -> request-surface reporting
+  -> local request-shape conflict veto
+  -> shape-free GET URL scope check, deduplication, and scheduling
 ```
 
 Every AI round is bounded by a crawler-wide call budget and deadline; empty or
-duplicate model output is not scheduled. Model output is never treated as
-authority: malformed, non-HTTP, out-of-scope, fragment-only, and non-path
-values are dropped before scheduling.
+duplicate model output is not scheduled. Model output is untrusted extraction
+input and must pass the same URL, scope, request-shape, credential, and quota
+policy as deterministic findings. A validated shape-free GET may enter the
+compatibility scheduler; malformed, non-HTTP, out-of-scope, fragment-only, and
+non-path values are dropped. In adaptive mode, explicit local source evidence
+takes precedence over model output: when an owning call for the same canonical
+host and decoded path carries a non-GET method, headers, body, or opaque request
+options, a model-reported GET is retained as a finding but cannot authorize a
+request. Query differences and equivalent default-port, IP, or IDNA host forms
+do not bypass this veto. An unowned endpoint/API-like literal remains
+report-only because its sink may be an alias elsewhere in the source. The only
+unowned scheduling exception is a narrow static/config asset class (JavaScript,
+source maps, WASM, CSS, config/web-manifest files, route registries, and
+resource-semantic JSON names), for which a model-correlated shape-free GET may
+establish a recursive asset edge. Arbitrary `/api/*.json` names are not in that
+exception.
+
+The structured finding contract preserves URL, method, headers, bounded body,
+and source asset. A non-GET request, HEAD request, credential-bearing query, or
+request that depends on any header/body is reported as a request surface but is
+not automatically replayed. This prevents a required-header GET or POST from
+being silently degraded into a misleading plain GET. Sensitive headers are
+removed, sensitive query and JSON fields are redacted, and an oversized body is
+represented only by omission metadata. Target and provenance URLs have hard
+length caps; target URL userinfo is rejected and provenance userinfo is
+removed; provenance fragments are discarded because they are never sent in an
+HTTP request. Harmless query bytes are preserved exactly, while control bytes in
+displayable headers, bodies, provenance, and bounded Content-Type metadata are
+escaped so findings cannot forge output sections or terminal control sequences.
 
 Assets remain separate. Each model payload identifies its source URL and byte
 offsets; the crawler never concatenates a 5 MiB bundle with every other page
@@ -77,23 +105,67 @@ array joins, and Webpack-style chunk runtimes. Comments, documentation strings,
 `prefetch`, and identifiers such as `myfetch` are negative controls and must
 remain below the trigger threshold.
 
+Raw URL candidates also receive a bounded JavaScript-escape pass for
+`\uNNNN`, `\xNN`, and `\/`. Unresolved templates and scheme-less host-shaped
+pseudo paths are rejected. A decoded extensionless endpoint is not replayed as
+GET because its method/headers/body may only be recoverable through structured
+analysis. A decoded file-like value remains eligible for call-site evaluation,
+but its suffix alone never authorizes deterministic crawling.
+Before any raw candidate enters the GET-only compatibility scheduler, its own
+call site must positively prove a one-argument default-GET helper such as
+`fetch(...)` / `axios.get(...)`, or an explicit asset loader such as
+`import(...)` / `new Worker(...)`. A bare constant is never assumed to be GET,
+even when it ends in `.json` or `.js`: it may be consumed by a distant
+POST/DELETE outside any bounded local window. Explicit methods, headers,
+bodies, opaque request options, aliases, and unknown/custom request helpers are
+therefore deferred to structured analysis. The deferred candidate itself
+raises the adaptive score to the analysis threshold so this conservative
+safety gate cannot become a coverage loss.
+
+GET proof uses a finite known-root list rather than method-name suffixes.
+Standard `fetch` globals and explicit Axios/Ky/Got/request/jQuery GET entry
+points are recognized; an arbitrary `api.get(...)`, `api.getJSON(...)`, or
+`api.fetch(...)` remains untrusted and is deferred even when it has one
+argument.
+
 ## Budgets and privacy
 
 Adaptive defaults in the Go API cap one crawler run at eight AI calls, 256
 candidate windows, 512 KiB of evidence per asset, and four seconds per call.
+Adaptive mode also raises the default local half-window from the legacy 120
+bytes to 512 bytes, enough to retain compact method/header/body definitions a
+few hundred bytes from their request sink; an explicit context setting still
+wins. Total evidence and token caps do not increase.
 The AID `simple_crawler` uses a smaller low-cost profile: three calls, 96
-windows, 192 KiB evidence, two seconds per call, and no whole-small-file fast
-path.
+windows, 192 KiB evidence, and no whole-small-file fast path. It inherits the
+caller's context/deadline instead of imposing an additional two-second model
+cutoff.
 
 The request body is never included in model context. Sensitive query values,
 the request line, Referer/Origin URLs, asset URLs, and credential-like headers
-are redacted. JavaScript, comments, and configuration text are explicitly
-treated as untrusted data rather than model instructions.
+are redacted. Obsolete folded header continuation lines are conservatively
+redacted in full rather than associated with a possibly misparsed header name.
+Within JavaScript evidence, quoted values assigned to recognized credential
+properties and credential fields inside quoted `headers`/`body` blocks are also
+redacted while harmless sibling fields remain available for request-shape
+analysis.
+JavaScript, comments, and configuration text are explicitly treated as
+untrusted data rather than model instructions.
 
 Tests inject an `AIJSInvoker` with `WithAIJSInvokerContext`; production falls
 back to LiteForge. The context-scoped seam avoids process-global mock mutation
 and carries parent cancellation and deadlines through AID's
-`crawler.context(CTX)` option.
+`crawler.context(CTX)` option. A Go-only mock reports production-equivalent
+structured output through `AIJSExtractConfig.ReportRequestFinding`, which uses
+the same sanitizer and safe-scheduling gate as LiteForge output. The legacy
+URL-only callback is also gated: credential-query candidates are reported in
+redacted form but are never scheduled as altered GET requests.
+
+Repeated semantic analysis is deduplicated only for the exact canonical source
+URL and SHA-256 content fingerprint. Scheme, port, `www` alias, path, query, and
+subdomain boundaries are deliberately preserved because identical bytes can
+depend on relative resolution, `import.meta.url`, or `currentScript`. Both the
+source identity and body are hashed in the runtime key.
 
 ## Hermetic acceptance test
 
@@ -106,8 +178,8 @@ Run the essential contract with:
 
 ```bash
 go test ./common/crawler \
-  -run '^(TestMUSTPASS_AIJSLayeredSite|TestMUSTPASS_AIJSPCREPrefilter)$' \
-  -count=1 -timeout=20s
+  -run '^(TestMUSTPASS_JSHandle|TestMUSTPASS_AIJSLayeredSite|TestMUSTPASS_AIJSPCREPrefilter|TestMUSTPASS_AIJSExternalAssetBudget|TestAIJSContract|TestCoreAsset|TestCoreURL|TestRedactURLForDisplay|TestSanitizeTextForDisplay|TestDomainBlackList|TestDomainWhiteListExactPattern|TestExactOriginSeedMatcher)' \
+  -count=1 -timeout=40s
 ```
 
 The test itself uses a nine-second deadline and requires functional crawl time
@@ -119,7 +191,16 @@ below ten seconds. It also proves that:
 - all expected internal request surfaces are recovered;
 - the different-host script is reported but not downloaded;
 - source assets are not downloaded twice;
-- credentials do not appear in model payloads.
+- seed/request-context credentials, recognized credential-like URL-query
+  values, and obvious quoted credential/header/body property values do not
+  appear in model payloads. Other JavaScript source is intentionally supplied
+  as bounded evidence and may itself contain secrets; callers must select an
+  appropriate model/provider for that data boundary.
+- structured methods, headers, bounded bodies, and source provenance survive;
+- covered source-backed non-GET and header/body-dependent requests, including
+  bounded `const`/`let`/`var` URL aliases, are not downgraded to GET;
+- an exact duplicate of the same source URL and content does not spend another
+  AI call, while same-directory filenames and query variants remain distinct.
 
 The PCRE contract additionally proves mixed-case and no-space calls,
 identifier boundaries (`fetch` versus `prefetch` / `fetcher`), paired quote
@@ -129,11 +210,11 @@ dynamic trigger produces at least one bounded source-evidence window.
 
 ## Known boundary
 
-The compatibility callback is still `func(string)`, so AI findings are fed back
-as URL candidates and scheduled as GET requests. Method, headers, and body shape
-can be observed in the fixture ground truth, but are not yet preserved by this
-legacy callback. Browser-only state, rendered DOM, post-click traffic, and
-runtime-only XHR remain outside this static analyzer. External script downloads
-also still use the historical direct fetch path, but they now reserve a
-crawler-wide request-budget slot before I/O and share an in-flight dedup key
-with scheduled requests.
+Browser-only state, rendered DOM, post-click traffic, and values created only by
+runtime-only XHR remain outside this static analyzer. The analyzer exposes
+source-backed request shapes; it does not execute non-GET operations or guess
+missing credentials/state. The compatibility `func(string)` path remains for
+safe, shape-free GET candidates, while structured findings travel through the
+separate request-surface callback. A model finding remains a bounded candidate,
+not absolute proof of the source method: it is still constrained by local
+conflict veto, scope, redaction, request budget, and scheduler deduplication.

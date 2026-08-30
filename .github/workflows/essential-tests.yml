@@ -504,9 +504,9 @@ jobs:
               [
                 {"package": "./common/yak/httptpl", "timeout": "1m"},
                 {"package": "./common/crawlerx/...", "timeout": "5m"},
-                {"package": "./common/crawler", "timeout": "20s", "run": "^(TestMUSTPASS_JSHandle|TestMUSTPASS_AIJSLayeredSite|TestMUSTPASS_AIJSPCREPrefilter|TestMUSTPASS_AIJSExternalAssetBudget)$"},
+                {"package": "./common/crawler", "timeout": "40s", "run": "^(TestMUSTPASS_JSHandle|TestMUSTPASS_AIJSLayeredSite|TestMUSTPASS_AIJSPCREPrefilter|TestMUSTPASS_AIJSExternalAssetBudget|TestAIJSContract|TestCoreAsset|TestCoreURL|TestRedactURLForDisplay|TestSanitizeTextForDisplay|TestDomainBlackList|TestDomainWhiteListExactPattern|TestExactOriginSeedMatcher)"},
                 {"package": "./common/crawler/crawlertest", "timeout": "20s", "run": "^TestLayeredSiteGroundTruth$"},
-                {"package": "./common/ai/aid/aitool/buildinaitools/yakscripttools/test", "timeout": "30s", "run": "^(TestSimpleCrawler_DefaultAutoUsesContextScopedAIInvoker|TestSimpleCrawler_AIJSNoDisablesAdaptiveInvoker|TestSimpleCrawler_ParentDeadlineCancelsContextScopedAIInvoker)$"}
+                {"package": "./common/ai/aid/aitool/buildinaitools/yakscripttools/test", "timeout": "40s", "run": "^TestSimpleCrawler_"}
               ]
 
           - name: "Test MustPass - full yak scripts"
