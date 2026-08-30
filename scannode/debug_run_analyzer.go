@@ -59,18 +59,18 @@ type SampleSummary struct {
 	HeapFile      string `json:"-"`
 	GoroutineFile string `json:"-"`
 	// Inline detail (limited to avoid oversized analysis JSON)
-	CPUTop            []PprofTopFunction `json:"cpu_top,omitempty"`
-	CPUTopYaklang     []PprofTopFunction `json:"cpu_top_yaklang,omitempty"`
-	CPUStacks         []PprofStackPath   `json:"cpu_stacks,omitempty"`
-	CPUStacksYaklang  []PprofStackPath   `json:"cpu_stacks_yaklang,omitempty"`
-	HeapTop           []PprofTopFunction `json:"heap_top,omitempty"`
-	HeapTopYaklang    []PprofTopFunction `json:"heap_top_yaklang,omitempty"`
-	HeapStacks        []PprofStackPath   `json:"heap_stacks,omitempty"`
-	HeapStacksYaklang []PprofStackPath   `json:"heap_stacks_yaklang,omitempty"`
-	Goroutines        int                `json:"goroutines,omitempty"`
-	LogExcerpt        string             `json:"log_excerpt,omitempty"`
-	Status            string             `json:"status,omitempty"` // available | partial | error | pending
-	DBStats           *DBOpStatsSummary  `json:"db_stats,omitempty"`
+	CPUTop            []PprofTopFunction   `json:"cpu_top,omitempty"`
+	CPUTopYaklang     []PprofTopFunction   `json:"cpu_top_yaklang,omitempty"`
+	CPUStacks         []PprofStackPath     `json:"cpu_stacks,omitempty"`
+	CPUStacksYaklang  []PprofStackPath     `json:"cpu_stacks_yaklang,omitempty"`
+	HeapTop           []PprofTopFunction   `json:"heap_top,omitempty"`
+	HeapTopYaklang    []PprofTopFunction   `json:"heap_top_yaklang,omitempty"`
+	HeapStacks        []PprofStackPath     `json:"heap_stacks,omitempty"`
+	HeapStacksYaklang []PprofStackPath     `json:"heap_stacks_yaklang,omitempty"`
+	Goroutines        int                  `json:"goroutines,omitempty"`
+	LogExcerpt        string               `json:"log_excerpt,omitempty"`
+	Status            string               `json:"status,omitempty"` // available | partial | error | pending
+	DBStats           *DBOpStatsSummary    `json:"db_stats,omitempty"`
 	Runtime           *RuntimeStatsSummary `json:"runtime,omitempty"`
 }
 
@@ -382,7 +382,29 @@ func (r *DebugRunAnalysis) setTimesFromLog(logContent string) {
 
 func (r *DebugRunAnalysis) setPhasesFromLog(logContent string) {
 	var phases []PhaseAnalysis
+	sourceStart, sourceFinish := findSourceScanPhaseInLog(logContent)
 	compileStart, scanStart := findPhaseTransitionsInLog(logContent)
+
+	if sourceStart != nil {
+		finished := sourceFinish
+		phaseStatus := r.Status
+		if finished == nil && compileStart != nil {
+			finished = compileStart
+		}
+		if finished != nil {
+			phaseStatus = "completed"
+		} else if isActiveDebugStatus(r.Status) {
+			phaseStatus = "running"
+		}
+		phases = append(phases, PhaseAnalysis{
+			Phase:      "source-scan",
+			Source:     "log_inferred",
+			StartedAt:  sourceStart,
+			FinishedAt: finished,
+			Duration:   durationStr(sourceStart, finished),
+			Status:     phaseStatus,
+		})
+	}
 
 	if compileStart != nil {
 		var finished *time.Time
@@ -1155,6 +1177,27 @@ func findPhaseTransitionsInLog(logContent string) (compileStart, scanStart *time
 			if t := parseLogTimestamp(line); t != nil {
 				compileStart = t
 			}
+		}
+	}
+	return
+}
+
+func findSourceScanPhaseInLog(logContent string) (start, finish *time.Time) {
+	lines := strings.Split(logContent, "\n")
+	for _, line := range lines {
+		lower := strings.ToLower(line)
+		if !strings.Contains(lower, "[source-scan]") {
+			continue
+		}
+		ts := parseLogTimestamp(line)
+		if ts == nil {
+			continue
+		}
+		if start == nil {
+			start = ts
+		}
+		if finish == nil && strings.Contains(lower, "[source-scan] 完成") {
+			finish = ts
 		}
 	}
 	return
