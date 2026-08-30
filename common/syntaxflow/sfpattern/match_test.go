@@ -101,14 +101,31 @@ func TestNewRootFromFS(t *testing.T) {
 	require.Greater(t, sfvm.ValuesLen(vals), 0)
 }
 
-func TestMatchRegexpRejectsUnboundedHitCounts(t *testing.T) {
+func TestPatternRootMaterializesBoundedHitWindows(t *testing.T) {
 	files := map[string]string{
 		"many.txt": "key\n" + strings.Repeat("key\n", 5000),
 	}
-	_, err := MatchRegexp(files, "many.txt", []string{`key`})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "matches too many locations")
-	require.Contains(t, err.Error(), "max 4096")
+	root := NewRoot(files)
+	all, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, 5001, sfvm.ValuesLen(all))
+
+	root.SetSourceHitBatch(0, DefaultSourceHitBatchSize)
+	first, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, DefaultSourceHitBatchSize, sfvm.ValuesLen(first))
+
+	root.SetSourceHitBatch(DefaultSourceHitBatchSize, DefaultSourceHitBatchSize)
+	second, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, DefaultSourceHitBatchSize, sfvm.ValuesLen(second))
+
+	root.SetSourceHitBatch(5000, DefaultSourceHitBatchSize)
+	last, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, 1, sfvm.ValuesLen(last))
+	_, _, total := root.SourceHitBatch()
+	require.Equal(t, 5001, total)
 }
 
 func TestMatchRegexpWithNegatives(t *testing.T) {

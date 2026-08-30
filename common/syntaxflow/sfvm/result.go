@@ -42,6 +42,23 @@ func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
 	}
 }
 
+// NewSFFrameResultAccumulator creates an independent merge target from seed.
+// Source-mode execution runs one rule in bounded hit batches against the same
+// frame; the frame flushes between batches, so the seed cannot be retained as
+// the accumulator directly.
+func NewSFFrameResultAccumulator(seed *SFFrameResult) *SFFrameResult {
+	if seed == nil {
+		return nil
+	}
+	accumulated := NewSFResult(seed.rule, seed.config)
+	seed.Description.ForEach(func(key string, value string) bool {
+		accumulated.Description.Set(key, value)
+		return true
+	})
+	accumulated.MergeByResult(seed)
+	return accumulated
+}
+
 func (s *SFFrameResult) GetAlertInfo(name string) (*schema.SyntaxFlowDescInfo, bool) {
 	return s.rule.GetAlertInfo(name)
 }
@@ -66,7 +83,11 @@ func (s *SFFrameResult) MergeByResultLocked(result *SFFrameResult) {
 		return true
 	})
 	result.AlertSymbolTable.ForEach(func(key string, value Values) bool {
-		s.AlertSymbolTable.Set(key, value)
+		if existing, ok := s.AlertSymbolTable.Get(key); ok {
+			s.AlertSymbolTable.Set(key, MergeValues(existing, value))
+		} else {
+			s.AlertSymbolTable.Set(key, value)
+		}
 		return true
 	})
 	//for k, v := range result.AlertDesc {

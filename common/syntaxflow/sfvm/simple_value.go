@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -332,14 +333,29 @@ func (v *SimpleValue) SetAnchorBitVector(*utils.BitVector)  {}
 // PatternRoot is the feed root for source-mode scans: holds files and responds to
 // FileFilter by delegating to a registered regexp matcher (set by sfpattern).
 type PatternRoot struct {
-	files       map[string]string
-	matcher     FileFilterFunc
-	programName string
+	files           map[string]string
+	matcher         FileFilterFunc
+	programName     string
+	sourceMu        sync.RWMutex
+	sourceHitOffset int
+	sourceHitLimit  int
+	sourceHitTotal  int
+	sourceHitKey    string
+	sourceHitCache  []SourceHit
+	sourceEditors   map[string]*memedit.MemEditor
+}
+
+// SourceHit is a raw source match before it is wrapped as a ValueOperator.
+type SourceHit struct {
+	Path  string
+	Text  string
+	Start int
+	End   int
 }
 
 // FileFilterFunc is injected by sfpattern to avoid sfvm→sfpattern import cycles
 // when wiring is done from the opcode side (sfvm calls sfpattern package).
-type FileFilterFunc func(files map[string]string, pathPattern string, matchType string, paramMap map[string]string, patterns []string) (Values, error)
+type FileFilterFunc func(root *PatternRoot, files map[string]string, pathPattern string, matchType string, paramMap map[string]string, patterns []string) (Values, error)
 
 // NewPatternRoot builds a source-scan root from path→content.
 func NewPatternRoot(files map[string]string) *PatternRoot {
@@ -362,6 +378,79 @@ func (r *PatternRoot) SetProgramName(name string) {
 	if r != nil {
 		r.programName = name
 	}
+}
+
+// SetSourceHitBatch selects one bounded raw-hit window. Cache and editor state
+// are intentionally preserved between windows of the same query.
+func (r *PatternRoot) SetSourceHitBatch(offset, limit int) {
+	if r == nil {
+		return
+	}
+	r.sourceMu.Lock()
+	defer r.sourceMu.Unlock()
+	r.sourceHitOffset = max(0, offset)
+	r.sourceHitLimit = max(0, limit)
+}
+
+// SourceHitBatch returns the current raw-hit window and its total.
+func (r *PatternRoot) SourceHitBatch() (offset int, limit int, total int) {
+	if r == nil {
+		return 0, 0, 0
+	}
+	r.sourceMu.RLock()
+	defer r.sourceMu.RUnlock()
+	return r.sourceHitOffset, r.sourceHitLimit, r.sourceHitTotal
+}
+
+// SetSourceHits caches raw hits for repeated bounded executions of one filter.
+func (r *PatternRoot) SetSourceHits(key string, hits []SourceHit) {
+	if r == nil {
+		return
+	}
+	r.sourceMu.Lock()
+	defer r.sourceMu.Unlock()
+	if key != r.sourceHitKey {
+		r.sourceHitKey = key
+		r.sourceHitCache = append([]SourceHit(nil), hits...)
+		r.sourceEditors = make(map[string]*memedit.MemEditor)
+	}
+	r.sourceHitTotal = len(r.sourceHitCache)
+}
+
+// SourceHits returns cached raw hits when the filter key matches.
+func (r *PatternRoot) SourceHits(key string) ([]SourceHit, bool) {
+	if r == nil {
+		return nil, false
+	}
+	r.sourceMu.RLock()
+	defer r.sourceMu.RUnlock()
+	if key != r.sourceHitKey {
+		return nil, false
+	}
+	return r.sourceHitCache, true
+}
+
+// SourceHitEditor returns one editor per file across all batches. Reusing the
+// editor prevents each batch from retaining duplicate line/rune maps.
+func (r *PatternRoot) SourceHitEditor(path string) *memedit.MemEditor {
+	if r == nil {
+		return nil
+	}
+	r.sourceMu.Lock()
+	defer r.sourceMu.Unlock()
+	if r.sourceEditors == nil {
+		r.sourceEditors = make(map[string]*memedit.MemEditor)
+	}
+	if editor, ok := r.sourceEditors[path]; ok {
+		return editor
+	}
+	content, ok := r.files[path]
+	if !ok {
+		return nil
+	}
+	editor := memedit.NewMemEditorWithFileUrl(content, path)
+	r.sourceEditors[path] = editor
+	return editor
 }
 
 // GetProgramName returns the recorded program name (may be empty).
@@ -424,7 +513,7 @@ func (r *PatternRoot) FileFilter(pathPattern, matchType string, paramMap map[str
 	if r.matcher == nil {
 		return nil, utils.Error("pattern root: file filter matcher not registered")
 	}
-	vals, err := r.matcher(r.files, pathPattern, matchType, paramMap, patterns)
+	vals, err := r.matcher(r, r.files, pathPattern, matchType, paramMap, patterns)
 	if err != nil {
 		return nil, err
 	}
