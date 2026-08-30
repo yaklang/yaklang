@@ -1,15 +1,164 @@
 package aicommon
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
+
+func TestNewContextProviderInlineContentIsCompleteAndReadOnly(t *testing.T) {
+	// Observe only this test process's isolated AI temp directory. Inline data
+	// must not be rematerialized on every context refresh.
+	tempDir := consts.GetDefaultAISpaceDir()
+	before, err := os.ReadDir(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := "Filename: synthetic.log\n" + strings.Repeat("INFO synthetic event\n", 100) + "TAIL_INLINE_ANOMALY"
+	provider := NewContextProvider(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_CONTENT, content, "analyze attached data")
+	for refresh := 0; refresh < 3; refresh++ {
+		rendered, err := provider(nil, nil, "inline-fixture")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(rendered, content) {
+			t.Errorf("refresh %d lost inline content beyond the path-provider limit", refresh)
+		}
+		if strings.Contains(rendered, "content truncated") {
+			t.Errorf("refresh %d incorrectly applied the file-path preview limit", refresh)
+		}
+	}
+	after, err := os.ReadDir(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != len(before) {
+		t.Errorf("inline provider created temporary files: before=%d after=%d", len(before), len(after))
+	}
+}
+
+func TestNewContextProviderFilePathRetainsPreviewLimit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "reference.txt")
+	content := strings.Repeat("x", MaxFileContentSize) + "PATH_TAIL_NOT_IN_PREVIEW"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rendered, err := NewContextProvider(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, path)(nil, nil, "path-fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rendered, "content truncated") || strings.Contains(rendered, "PATH_TAIL_NOT_IN_PREVIEW") {
+		t.Fatal("file-path preview behavior changed")
+	}
+}
+
+func TestContextProviderManager_TaskSnapshotOrdinarySharing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	manager := NewContextProviderManager()
+	parent := &Config{Ctx: ctx, ContextProviderManager: manager}
+	child := &Config{}
+	for _, option := range ConvertConfigToOptions(parent) {
+		if err := option(child); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if child.ContextProviderManager != manager {
+		t.Fatal("ordinary config inheritance changed manager pointer sharing")
+	}
+	cleanup := manager.BeginTaskContext("task-inline", FileContentContextProvider("CURRENT_TASK_INLINE"))
+	defer cleanup()
+	direct := &Config{}
+	if err := WithContextProvider(manager)(direct); err != nil {
+		t.Fatal(err)
+	}
+	if direct.ContextProviderManager != manager {
+		t.Fatal("explicit WithContextProvider no longer shares the supplied manager")
+	}
+	if !strings.Contains(direct.ContextProviderManager.Execute(nil, nil), "CURRENT_TASK_INLINE") {
+		t.Fatal("direct option unexpectedly froze or filtered the supplied manager")
+	}
+}
+
+func TestContextProviderManager_TaskSnapshotCleanupOwnership(t *testing.T) {
+	manager := NewContextProviderManager()
+	manager.Register("shared-name", FileContentContextProvider("ORDINARY_SAME_NAME"))
+	cleanup := manager.BeginTaskContext("shared-name", FileContentContextProvider("ORIGINAL_TASK_INLINE"))
+	duplicateCleanup := manager.BeginTaskContext("shared-name", FileContentContextProvider("DUPLICATE_TASK_INLINE"))
+	duplicateCleanup()
+	duplicateCleanup()
+	child := manager.snapshotForChild()
+	cleanup()
+	cleanup()
+	if manager.taskScopes != 0 || manager.snapshotForChild() != manager {
+		t.Fatal("task cleanup was not idempotent or left the ordinary manager scoped")
+	}
+	if rendered := manager.Execute(nil, nil); !strings.Contains(rendered, "ORDINARY_SAME_NAME") || strings.Contains(rendered, "ORIGINAL_TASK_INLINE") {
+		t.Fatal("cleanup removed an ordinary provider or retained task input")
+	}
+	if rendered := child.Execute(nil, nil); !strings.Contains(rendered, "ORDINARY_SAME_NAME") || !strings.Contains(rendered, "ORIGINAL_TASK_INLINE") || strings.Contains(rendered, "DUPLICATE_TASK_INLINE") {
+		t.Fatal("duplicate scope cleanup removed or replaced another scope's inline provider")
+	}
+	childCleanup := child.BeginTaskContext("shared-name", FileContentContextProvider("CHILD_DUPLICATE_INLINE"))
+	childCleanup()
+	grandchild := child.snapshotForChild()
+	if rendered := grandchild.Execute(nil, nil); !strings.Contains(rendered, "ORIGINAL_TASK_INLINE") || strings.Contains(rendered, "CHILD_DUPLICATE_INLINE") {
+		t.Fatal("child cleanup removed the inherited inline snapshot")
+	}
+}
+
+func TestContextProviderManager_TaskSnapshotConcurrentAccess(t *testing.T) {
+	manager := NewContextProviderManager()
+	var dynamic atomic.Value
+	dynamic.Store("DYNAMIC_INITIAL")
+	manager.Register("dynamic", func(AICallerConfigIf, *Emitter, string) (string, error) {
+		return dynamic.Load().(string), nil
+	})
+	cleanup := manager.BeginTaskContext("task-a", FileContentContextProvider("PINNED_TASK_A"))
+	child := manager.snapshotForChild()
+	cleanup()
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 30; i++ {
+			finish := manager.BeginTaskContext("task-b", FileContentContextProvider("NEXT_TASK_B"))
+			_ = manager.Execute(nil, nil)
+			finish()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 30; i++ {
+			dynamic.Store(fmt.Sprintf("DYNAMIC_%d", i))
+			child.Register("ordinary-mutation", FileContentContextProvider("LIVE_ORDINARY"))
+			manager.Unregister("ordinary-mutation")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 30; i++ {
+			grandchild := child.snapshotForChild()
+			for _, view := range []*ContextProviderManager{child, grandchild} {
+				rendered := view.Execute(nil, nil)
+				if !strings.Contains(rendered, "PINNED_TASK_A") || strings.Contains(rendered, "NEXT_TASK_B") {
+					t.Error("concurrent parent scope mutation changed a derived inline snapshot")
+				}
+			}
+		}
+	}()
+	wg.Wait()
+}
 
 func TestContextProviderManager_BasicRegistration(t *testing.T) {
 	cpm := NewContextProviderManager()
