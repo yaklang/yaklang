@@ -2,8 +2,11 @@ package scannode
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -19,6 +22,106 @@ import (
 )
 
 func boolPointer(value bool) *bool { return &value }
+
+func testAttachmentTaskBinding(t *testing.T, body string) aiSessionBinding {
+	t.Helper()
+	command := testAttachmentTaskBindCommand(t)
+	runtime, _, _ := newTestAttachmentFocusRuntime(t)
+	return aiSessionBinding{
+		Ref:                       aiSessionRefFromBindCommand(command),
+		RuntimeOptionSnapshotJSON: command.RuntimeOptionSnapshotJson,
+		Attachments:               cloneAISessionAttachmentRefs(command.Attachments),
+		ExecutionMode:             "single_run", AuthorizedFocusReleaseID: command.ResultContext.FocusReleaseId,
+		AuthorizedTargetURL: testAttachmentTaskTarget, LegionResultRuntime: runtime,
+		PlatformBearerToken: "synthetic-node-token",
+		HTTPClient: &http.Client{Transport: runtimeHostRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+			if request.URL.String() != "https://download.invalid/attachment-log-1" || request.Method != http.MethodGet {
+				return nil, fmt.Errorf("unexpected synthetic attachment request: %s %s", request.Method, request.URL)
+			}
+			if request.Header.Get("Authorization") != "Bearer synthetic-node-token" {
+				return nil, errors.New("missing synthetic node authorization")
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header)}, nil
+		})},
+	}
+}
+
+func TestDownloadAISessionAttachmentVerifiesTaskPins(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		mutate  func(*aiSessionAttachmentRef)
+		wantErr string
+	}{
+		{name: "matching", body: testAttachmentTaskContent},
+		{name: "size_mismatch", body: testAttachmentTaskContent, mutate: func(a *aiSessionAttachmentRef) { a.SizeBytes++ }, wantErr: "size"},
+		{name: "digest_mismatch", body: testAttachmentTaskContent, mutate: func(a *aiSessionAttachmentRef) { a.SHA256 = strings.Repeat("0", 64) }, wantErr: "sha256"},
+		{name: "over_limit_is_not_truncated", body: strings.Repeat("x", maxAISessionAttachmentBytes+1), wantErr: "limit"},
+		{name: "invalid_utf8", body: "\xff", mutate: func(a *aiSessionAttachmentRef) {
+			a.SizeBytes = 1
+			a.SHA256 = fmt.Sprintf("%x", sha256.Sum256([]byte("\xff")))
+		}, wantErr: "utf-8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			binding := testAttachmentTaskBinding(t, tt.body)
+			attachment := binding.Attachments[0]
+			if tt.mutate != nil {
+				tt.mutate(&attachment)
+			}
+			content, err := downloadAISessionAttachment(context.Background(), binding, attachment)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(strings.ToLower(err.Error()), tt.wantErr) {
+					t.Fatalf("expected %s rejection, got %v", tt.wantErr, err)
+				}
+				if content != "" {
+					t.Fatal("rejected attachment leaked content to the model")
+				}
+				return
+			}
+			if err != nil || !strings.Contains(content, testAttachmentTaskContent) {
+				t.Fatalf("verified attachment not available to the model: %v", err)
+			}
+		})
+	}
+}
+
+func TestBuildYakAIEngineOptionsAttachmentTaskRejectsExtraMCP(t *testing.T) {
+	for _, source := range []string{"runtime", "provider_snapshot"} {
+		t.Run(source, func(t *testing.T) {
+			binding := testAttachmentTaskBinding(t, testAttachmentTaskContent)
+			mcp := []sessionMCPServer{{Name: "forbidden", URL: "https://mcp.invalid/sse"}}
+			if source == "runtime" {
+				options, err := decodeYakRuntimeOptions(binding.RuntimeOptionSnapshotJSON, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				options.SessionMCPServers = mcp
+				binding.RuntimeOptionSnapshotJSON, err = json.Marshal(options)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				raw, err := json.Marshal(yakRuntimeOptions{SessionMCPServers: mcp})
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding.ProviderPolicySnapshotJSON = raw
+			}
+			if _, err := buildYakAIEngineOptions(context.Background(), binding, noopAISessionRuntimeEmitter{}); err == nil || !strings.Contains(err.Error(), "MCP") {
+				t.Fatalf("attachment task accepted ExtraMCP from %s: %v", source, err)
+			}
+		})
+	}
+	options, err := buildYakAIEngineOptions(context.Background(), testAttachmentTaskBinding(t, testAttachmentTaskContent), noopAISessionRuntimeEmitter{})
+	if err != nil {
+		t.Fatalf("valid attachment task rejected: %v", err)
+	}
+	config := aiengine.NewAIEngineConfig(options...)
+	if config.Focus != "" || len(config.AttachedResources) != 1 || !strings.Contains(config.AttachedResources[0].Value, testAttachmentTaskContent) {
+		t.Fatal("attachment task lost pinned content or bypassed context release activation")
+	}
+}
 
 func TestStatefulDriverKeepsConversationRuntimeAfterTurnFailure(t *testing.T) {
 	engine := newFakeStatelessTurnEngine()

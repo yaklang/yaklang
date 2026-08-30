@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,6 +37,7 @@ const (
 	aiSessionRuntimeEventToolCall           = "ai.session.tool_call"
 	aiSessionRuntimeEventToolResult         = "ai.session.tool_result"
 	maxAISessionAttachmentBytes             = 64 << 10
+	maxAISessionAttachmentTotalBytes        = 256 << 10
 )
 
 type yakAIEngineRuntimeDriver struct{}
@@ -681,6 +683,28 @@ func buildYakAIEngineOptions(
 	if err != nil {
 		return nil, fmt.Errorf("decode runtime options: %w", err)
 	}
+	attachmentTask := isLegionAttachmentTarget(binding.AuthorizedTargetURL) || isLegionAttachmentTarget(options.FocusTargetURL)
+	if attachmentTask {
+		if binding.ProjectID != "" || binding.ExecutionMode != "single_run" || binding.LegionResultRuntime == nil || binding.LegionResultRuntime.AuthorizedTarget() != binding.AuthorizedTargetURL {
+			return nil, fmt.Errorf("attachment task requires a projectless single-run server resource binding")
+		}
+		focusMode, _, _ := strings.Cut(binding.AuthorizedFocusReleaseID, "@")
+		if err := validateAttachmentTaskRuntimeOptions(options, binding.AuthorizedTargetURL, focusMode, binding.AuthorizedFocusReleaseID); err != nil {
+			return nil, err
+		}
+		if err := validateAttachmentTaskPins(binding.Attachments); err != nil {
+			return nil, err
+		}
+		// Immutable attachment Focus code owns stage/report execution. Do not
+		// expose the ordinary engine's tools, filesystem, search, or ambient MCP
+		// surfaces through merged provider/session configuration.
+		enabled, disabled := true, false
+		options.DisableToolUse = &enabled
+		options.EnableSystemFileSystemOperator = &disabled
+		options.EnableAISearchTool = &disabled
+		options.EnableAISearchInternet = &disabled
+		options.EnabledCapabilities = nil
+	}
 
 	config := []aiengine.AIEngineConfigOption{
 		aiengine.WithContext(ctx),
@@ -721,6 +745,9 @@ func buildYakAIEngineOptions(
 		return nil, err
 	}
 	extOptions := buildYakAICommonExtOptions(options)
+	if attachmentTask {
+		extOptions = append(extOptions, aicommon.WithDisallowMCPServers(true))
+	}
 	if callbacks.Vision != nil {
 		extOptions = append(extOptions, aicommon.WithVisionPriorityAICallback(callbacks.Vision))
 	}
@@ -1207,6 +1234,18 @@ func downloadAISessionAttachment(
 		return "", fmt.Errorf("read body: %w", err)
 	}
 	truncated := len(raw) > maxAISessionAttachmentBytes
+	if isLegionAttachmentTarget(binding.AuthorizedTargetURL) {
+		if truncated {
+			return "", fmt.Errorf("attachment task content exceeds the attachment size limit")
+		}
+		if uint64(len(raw)) != attachment.SizeBytes {
+			return "", fmt.Errorf("attachment task content size does not match the pinned size")
+		}
+		checksum := fmt.Sprintf("%x", sha256.Sum256(raw))
+		if checksum != attachment.SHA256 {
+			return "", fmt.Errorf("attachment task content sha256 does not match the pinned sha256")
+		}
+	}
 	if truncated {
 		raw = raw[:maxAISessionAttachmentBytes]
 		for trim := 0; trim < utf8.UTFMax && trim <= len(raw); trim++ {
