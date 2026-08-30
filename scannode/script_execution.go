@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -197,7 +198,7 @@ func (s *ScanNode) executeScriptTask(
 	// console can filter (Info/Warn/Error remain available).
 	scriptEnv := scriptEnvWithDebugLogLevel(ssaDBEnv, input.DebugEnabled)
 
-	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, scriptEnv, taskLogWriter); err != nil {
+	if err := s.executeScript(task, scanNodePath, scriptFile, params, input.RuntimeID, scriptEnv, taskLogWriter); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
 		// Finalize debug before returning the failure. Cancel / shutdown leaves
 		// taskCtx cancelled; finalize must still upload and write local cache.
@@ -279,8 +280,14 @@ func (s *ScanNode) handleScriptFailure(
 	if err == nil {
 		return nil
 	}
-	if reason := s.cancelReasonForAttempt(attemptID); reason != "" {
-		return &TaskCancelledError{Reason: reason}
+	if s != nil {
+		if reason := s.cancelReasonForAttempt(attemptID); reason != "" {
+			return &TaskCancelledError{Reason: reason}
+		}
+	}
+	var memoryErr *ScriptMemoryLimitError
+	if errors.As(err, &memoryErr) && memoryErr != nil {
+		return &TaskCancelledError{Reason: memoryErr.Error()}
 	}
 	if errors.Is(err, context.Canceled) {
 		return &TaskCancelledError{}
@@ -930,7 +937,7 @@ func (e *scriptExecError) Error() string {
 }
 
 func (s *ScanNode) executeScript(
-	ctx context.Context,
+	task *Task,
 	scanNodePath string,
 	scriptFile string,
 	params []string,
@@ -938,6 +945,7 @@ func (s *ScanNode) executeScript(
 	extraEnv []string,
 	taskLogWriter io.Writer,
 ) error {
+	ctx := task.Ctx
 	baseCmd := []string{"distyak", scriptFile}
 	log.Infof("yak %v %v", scriptFile, params)
 
@@ -972,6 +980,20 @@ func (s *ScanNode) executeScript(
 		return err
 	}
 	childPID := cmd.Process.Pid
+	memoryGuardCancel := func() {}
+	var memoryLimitExceeded atomic.Pointer[ScriptMemoryLimitError]
+	if strings.TrimSpace(os.Getenv("LEGION_SCRIPT_MEMORY_GUARD")) != "0" {
+		guardCancel := func() {
+			contextCancel(task)
+		}
+		stopGuard, guardErr := startScriptMemoryGuard(guardCancel, childPID, &memoryLimitExceeded)
+		if guardErr == nil {
+			memoryGuardCancel = stopGuard
+		} else {
+			log.Warnf("start script memory guard failed: %v", guardErr)
+		}
+	}
+	defer memoryGuardCancel()
 	waitErr := cmd.Wait()
 	if waitErr != nil {
 		// Preserve the latest-main diagnostics while still waiting before the
@@ -991,6 +1013,9 @@ func (s *ScanNode) executeScript(
 			return utils.Errorf("cleanup SSA Git workspaces for child process %d: %v", childPID, cleanupErr)
 		}
 		log.Errorf("cleanup SSA Git workspaces for failed child process %d: %v", childPID, cleanupErr)
+	}
+	if limitErr := memoryLimitExceeded.Load(); waitErr != nil && limitErr != nil {
+		return limitErr
 	}
 	return waitErr
 }
@@ -1381,6 +1406,10 @@ func debugStatusForScriptError(s *ScanNode, attemptID string, err error) string 
 		return "cancelled"
 	}
 	if err != nil && errors.Is(err, context.Canceled) {
+		return "cancelled"
+	}
+	var memoryErr *ScriptMemoryLimitError
+	if errors.As(err, &memoryErr) && memoryErr != nil {
 		return "cancelled"
 	}
 	return "failed"
