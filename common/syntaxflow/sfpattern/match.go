@@ -92,25 +92,7 @@ func MatchRegexpWithNegatives(files map[string]string, pathPattern string, posit
 		return sfvm.NewValues(vals), nil
 	}
 
-	negMatchers := make([]func(string) []byteIndex, 0, len(negatives))
-	for _, expr := range negatives {
-		expr := expr
-		yak := regexp_utils.NewYakRegexpUtils(expr)
-		negMatchers = append(negMatchers, func(data string) []byteIndex {
-			indexs, err := yak.FindAllSubmatchIndex(data)
-			if err != nil {
-				log.Warnf("sfpattern negative regexp match error: %s", err)
-				return nil
-			}
-			out := make([]byteIndex, 0, len(indexs))
-			for _, index := range indexs {
-				if len(index) >= 2 {
-					out = append(out, byteIndex{Start: index[0], End: index[1]})
-				}
-			}
-			return out
-		})
-	}
+	negativeMatcher := compileContentMatchers(negatives)
 
 	byFile := make(map[string][]Hit)
 	for _, h := range hits {
@@ -120,10 +102,7 @@ func MatchRegexpWithNegatives(files map[string]string, pathPattern string, posit
 	var kept []Hit
 	for filePath, fileHits := range byFile {
 		content := files[filePath]
-		var negRanges []byteIndex
-		for _, m := range negMatchers {
-			negRanges = append(negRanges, m(content)...)
-		}
+		negRanges := negativeMatcher(content)
 		for _, h := range fileHits {
 			overlap := false
 			for _, nr := range negRanges {
