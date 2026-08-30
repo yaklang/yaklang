@@ -29,7 +29,17 @@ func TestRuleGroupTaxonomyIsVersionedAndComplete(t *testing.T) {
 		}
 	}
 
-	require.Len(t, groups, 36)
+	// A matching count does not prove coverage: the exported raw names come
+	// from engine language values, not policy aliases such as go/javascript.
+	for _, language := range append(GetAllSupportedLanguages(), General.String()) {
+		require.Contains(t, groups, language, "engine language group must have exact taxonomy metadata")
+	}
+	for rawName, canonical := range map[string]string{
+		"go": "go", "golang": "go", "javascript": "javascript", "js": "javascript",
+		"general": "general", "yak": "yak", "ts": "typescript",
+	} {
+		require.Equal(t, canonical, groups[rawName].CanonicalName, "raw group %q", rawName)
+	}
 	require.Equal(t, "java", groups["Language Library - Java"].CanonicalName)
 	require.Equal(t, 3, categories["language"].Order)
 	require.Equal(t, 1, groups["java"].Order)
@@ -41,6 +51,13 @@ func TestRuleGroupTaxonomyIsVersionedAndComplete(t *testing.T) {
 			require.Contains(t, groups, groupName, "policy %q references a non-standard group", policyName)
 		}
 	}
+}
+
+func TestTaxonomyDoesNotChangeExistingPolicyGroupSelection(t *testing.T) {
+	require.Equal(t, []string{
+		"critical", "high", "middle", "java", "go", "php", "javascript", "python",
+		"Framework - Spring", "Framework - Apache Shiro", "Framework - ThinkPHP", "SCA - Dependency Check",
+	}, (&ScanPolicyConfig{PolicyType: PolicyTypeFullStack}).MapToGroups())
 }
 
 func mapKeys[K comparable, V any](values map[K]V) []K {
