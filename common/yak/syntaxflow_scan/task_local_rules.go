@@ -149,6 +149,18 @@ func parseTaskLocalSyntaxFlowRulesWithMetadata(
 		}
 		rule.Hash = strings.TrimSpace(item.ContentHash)
 		rule.NeedUpdate = false
+		// Metadata is authoritative for snapshot-derived dispatch: a synced tag
+		// such as `source|secrets` must restore source mode even if an older
+		// compiler produced an empty Mode/Tag on the parsed rule object.
+		if itemTag := strings.TrimSpace(item.Tag); itemTag != "" {
+			rule.Tag = itemTag
+			for _, part := range strings.Split(itemTag, "|") {
+				switch strings.ToLower(strings.TrimSpace(part)) {
+				case "source", "pattern", "sfpattern":
+					rule.Mode = schema.SFR_MODE_SOURCE
+				}
+			}
+		}
 		// AlertDesc is a derived projection of the canonical rule content. Keep
 		// the parser-produced value when an older/minimal bundle omits it;
 		// otherwise a matching `alert` still executes but cannot materialize a
