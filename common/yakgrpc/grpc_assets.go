@@ -1064,9 +1064,6 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 		return utils.Errorf("params empty")
 	}
 	logType := strings.TrimSpace(req.LogType)
-	if logType != "testerAssign" && logType != "tagsUpdate" {
-		return utils.Errorf("logType only supports testerAssign / tagsUpdate")
-	}
 
 	if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
 		return utils.Errorf("download failed: %s", err.Error())

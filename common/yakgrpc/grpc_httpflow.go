@@ -1096,7 +1096,6 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 		return nil, utils.Errorf("batch set httpflow issue fields failed: %s", result.Error)
 	}
 
-	// 更新本地数据后， 请求 online 同步更新 online 端会按 hash 匹配，能找到的就更新；找不到的忽略。
 	if req.GetToken() != "" && len(syncHashes) > 0 {
 		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 		if err := client.SetHTTPFlowTagsToOnline(ctx, req.GetToken(), syncHashes,
