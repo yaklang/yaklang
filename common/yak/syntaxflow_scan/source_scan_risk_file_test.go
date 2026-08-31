@@ -3,7 +3,9 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -110,4 +112,50 @@ alert $hit for {
 	riskPart := lastParts.Risks[0]
 	require.NotEmpty(t, riskPart.FileHashes, "risk must reference its file hash")
 	require.Contains(t, riskPart.FileHashes, file.IrSourceHash)
+}
+
+func TestStartScan_SourceMode_StreamsBoundedResultBatches(t *testing.T) {
+	files := make(map[string]string, 1200)
+	for i := 0; i < 1200; i++ {
+		files[fmt.Sprintf("src/leak-%04d.env", i)] = fmt.Sprintf("AWS_ACCESS_KEY_ID=AKIA%016X\n", i)
+	}
+
+	ruleContent := `
+desc(
+	mode: "source",
+	language: "general",
+	title: "aws akia batch test",
+	alert_min: 1,
+)
+${*}.pattern_regex(/AKIA[0-9A-Z]{16}/) as $hit
+alert $hit for { level: "critical", title: "AWS key" }
+`
+
+	var mu sync.Mutex
+	batchSizes := make([]int, 0, 8)
+	riskCount := 0
+	err := StartScan(context.Background(),
+		WithSourceFiles("src-batch", files),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			Content:  ruleContent,
+			Language: string(ssaconfig.General),
+		}),
+		WithScanResultCallback(func(r *ScanResult) {
+			if r == nil || r.Result == nil {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			batchSizes = append(batchSizes, r.Result.RiskCount())
+			riskCount += r.Result.RiskCount()
+		}),
+		ssaconfig.WithScanIgnoreLanguage(true),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 1200, riskCount)
+	require.Greater(t, len(batchSizes), 1, "1200 hits must be streamed as multiple bounded batches")
+	require.LessOrEqual(t, len(batchSizes), 3, "source callback batches must not be unbounded")
+	for _, size := range batchSizes {
+		require.LessOrEqual(t, size, 512)
+	}
 }

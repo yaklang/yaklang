@@ -191,6 +191,11 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
 				m.processMonitor.UpdateRuleStatus(targetName, rule.RuleName, f, info)
 			}),
+			ssaapi.QueryWithSourceResultCallback(func(batch *ssaapi.SyntaxFlowResult) {
+				if batch != nil {
+					m.notifyResult(batch)
+				}
+			}),
 			ssaapi.QueryWithSave(m.kind),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)

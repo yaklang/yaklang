@@ -48,6 +48,11 @@ type queryConfig struct {
 	vm    *sfvm.SyntaxFlowVirtualMachine
 	frame *sfvm.SFFrame
 
+	// sourceResultCallback lets source-mode bounded hit batches stream to a
+	// consumer immediately. The fallback aggregate path is retained for callers
+	// that do not provide a result callback.
+	sourceResultCallback func(*SyntaxFlowResult)
+
 	// runtime config
 	opts []sfvm.Option // config
 	// config       *sfvm.Config
@@ -196,12 +201,15 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		if config.program != nil {
 			root.SetProgramName(config.program.GetProgramName())
 		}
-		res, err = executeSourceFrameBatches(frame, root, config.opts...)
+		res, err = executeSourceFrameBatches(frame, root, config)
 	} else {
 		res, err = frame.Feed(value, config.opts...)
 	}
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
+	}
+	if config.sourceResultCallback != nil && sfvm.FrameIsSourceMode(frame) {
+		return nil, nil
 	}
 
 	var ret *SyntaxFlowResult
@@ -235,15 +243,27 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 func executeSourceFrameBatches(
 	frame *sfvm.SFFrame,
 	root *sfvm.PatternRoot,
-	opts ...sfvm.Option,
+	config *queryConfig,
 ) (*sfvm.SFFrameResult, error) {
 	batchSize := sfpattern.DefaultSourceHitBatchSize
 	var accumulated *sfvm.SFFrameResult
 	for offset := 0; ; offset += batchSize {
 		root.SetSourceHitBatch(offset, batchSize)
-		batchResult, err := frame.Feed(sfvm.ValuesOf(root), opts...)
+		batchResult, err := frame.Feed(sfvm.ValuesOf(root), config.opts...)
 		if err != nil {
 			return nil, err
+		}
+		if config.sourceResultCallback != nil {
+			result := CreateResultFromQuery(batchResult, config.Config)
+			result.program = config.program
+			result.TaskID = config.taskID
+			_ = result.CreateRisk()
+			config.sourceResultCallback(result)
+			_, _, total := root.SourceHitBatch()
+			if total == 0 || offset+batchSize >= total {
+				return nil, nil
+			}
+			continue
 		}
 		if accumulated == nil {
 			accumulated = sfvm.NewSFFrameResultAccumulator(batchResult)
@@ -451,6 +471,12 @@ func QueryWithWorkBudget(b *sfvm.RuleWorkBudget) QueryOption {
 func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 	return func(c *queryConfig) {
 		c.SetSyntaxFlowProcessCallback(cb)
+	}
+}
+
+func QueryWithSourceResultCallback(callback func(*SyntaxFlowResult)) QueryOption {
+	return func(c *queryConfig) {
+		c.sourceResultCallback = callback
 	}
 }
 
