@@ -177,7 +177,7 @@ func (c *SSAArtifactCollector) startContinuousUploadIfNeeded() error {
 		c.continuousBuild = build
 		c.continuousErr = err
 		if build != nil {
-			c.setUploadBytes(uint64(build.UncompressedSize), uint64(build.CompressedSize))
+			c.setUploadBytesLocked(uint64(build.UncompressedSize), uint64(build.CompressedSize))
 		}
 		close(done)
 		c.mu.Unlock()
@@ -273,9 +273,16 @@ func (c *SSAArtifactCollector) setUploadBytes(raw, compressed uint64) {
 		return
 	}
 	c.mu.Lock()
+	c.setUploadBytesLocked(raw, compressed)
+	c.mu.Unlock()
+}
+
+func (c *SSAArtifactCollector) setUploadBytesLocked(raw, compressed uint64) {
+	if c == nil {
+		return
+	}
 	c.uploadMetrics.RawBytes = raw
 	c.uploadMetrics.CompressedBytes = compressed
-	c.mu.Unlock()
 }
 
 func (c *SSAArtifactCollector) snapshotUploadMetrics() ssaUploadMetrics {
