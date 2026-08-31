@@ -14,13 +14,18 @@ func TestComputeRiskHash_Deterministic(t *testing.T) {
 	require.Len(t, h1, 32) // 16 bytes hex = 32 chars
 }
 
-func TestComputeRiskHash_TargetNormalization(t *testing.T) {
+func TestComputeRiskHash_NoNormalization(t *testing.T) {
+	// ComputeRiskHash does NOT normalize. Different surface forms of the
+	// same logical target produce different hashes. It is the caller's
+	// responsibility (e.g. cybersecurity-risk.yak) to normalize inputs
+	// before passing them in.
 	h1 := ComputeRiskHash("https://example.com/login", "", 0, "sqli", "username")
 	h2 := ComputeRiskHash("https://example.com:443/login/", "", 0, "sqli", "username")
-	require.Equal(t, h1, h2, "scheme/default-port/trailing-slash should normalize to same hash")
+	require.NotEqual(t, h1, h2, "un-normalized targets should produce different hashes")
 
-	h3 := ComputeRiskHash("http://example.com:80/login", "", 0, "sqli", "username")
-	require.Equal(t, h1, h3, "http + default port should normalize to same hash")
+	// But the same string always produces the same hash.
+	h3 := ComputeRiskHash("https://example.com:443/login/", "", 0, "sqli", "username")
+	require.Equal(t, h2, h3)
 }
 
 func TestComputeRiskHash_DifferentFields(t *testing.T) {
@@ -44,10 +49,10 @@ func TestComputeRiskHash_HostPortFallback(t *testing.T) {
 	h2 := ComputeRiskHash("", "192.168.1.10", 22, "weak-pass", "password")
 	require.Equal(t, h1, h2)
 
-	// Default port stripped
-	h3 := ComputeRiskHash("", "example.com", 443, "info", "")
+	// url takes priority over host:port
+	h3 := ComputeRiskHash("https://example.com/", "example.com", 443, "info", "")
 	h4 := ComputeRiskHash("https://example.com/", "", 0, "info", "")
-	require.Equal(t, h3, h4, "host:443 should normalize same as https://host/")
+	require.Equal(t, h3, h4, "url should take priority over host:port")
 }
 
 func TestCreateRisk_DeterministicHash(t *testing.T) {
@@ -100,11 +105,31 @@ func TestSchemaRisk_BeforeSave_DeterministicHash(t *testing.T) {
 
 	// Same fields → same hash
 	r2 := &schema.Risk{
-		Url:       "https://example.com:443/login/",
+		Url:       "https://example.com/login",
 		RiskType:  "sqli",
 		Parameter: "username",
 	}
 	err = r2.BeforeSave()
 	require.NoError(t, err)
-	require.Equal(t, r.Hash, r2.Hash, "normalized targets should produce same hash in BeforeSave")
+	require.Equal(t, r.Hash, r2.Hash, "same fields should produce same hash in BeforeSave")
+}
+
+func TestSchemaRisk_BeforeSave_NoNormalization(t *testing.T) {
+	// BeforeSave does NOT normalize. Different surface forms produce
+	// different hashes.
+	r1 := &schema.Risk{
+		Url:       "https://example.com/login",
+		RiskType:  "sqli",
+		Parameter: "username",
+	}
+	r1.BeforeSave()
+
+	r2 := &schema.Risk{
+		Url:       "https://example.com:443/login/",
+		RiskType:  "sqli",
+		Parameter: "username",
+	}
+	r2.BeforeSave()
+
+	require.NotEqual(t, r1.Hash, r2.Hash, "un-normalized targets should produce different hashes")
 }
