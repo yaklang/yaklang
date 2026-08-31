@@ -2,8 +2,10 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/bytedance/mockey"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -254,4 +257,179 @@ func TestQueryRisksWithRuntimeIds(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(randInt)*2, res.Total)
+}
+
+func TestBatchSetRiskTags(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := utils.RandStringBytes(5)
+
+	risk := &schema.Risk{
+		Title:    "test-risk-" + token,
+		Severity: "high",
+		RiskType: "ssrf",
+	}
+	require.NoError(t, yakit.SaveRisk(risk))
+	defer yakit.DeleteRiskByID(db, int64(risk.ID))
+
+	mockey.PatchConvey("skip online sync, test local batch update", t, func() {
+		mockClient := new(yaklib.OnlineClient)
+
+		mockey.Mock((*yaklib.OnlineClient).SetRiskTagsToOnline).
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, token string, hashes []string, tags, tagsDescription, riskTypeVerbose, severity string, severityScore float64) error {
+				assert.NotEmpty(t, hashes)
+				assert.Equal(t, "confirmed|verified", tags)
+				assert.Equal(t, `{"verifier":"admin"}`, tagsDescription)
+				assert.Equal(t, "ssrf-patched", riskTypeVerbose)
+				assert.Equal(t, "critical", severity)
+				assert.Equal(t, 9.5, severityScore)
+				return nil
+			}).Build()
+
+		mockey.Mock(yaklib.NewOnlineClient).
+			To(func(baseUrl string) *yaklib.OnlineClient {
+				return mockClient
+			}).Build()
+
+		server := &TestServerWrapper{
+			Server:       &Server{},
+			onlineClient: yaklib.OnlineClient{},
+		}
+
+		req := &ypb.BatchSetRiskTagsRequest{
+			Hashes:          []string{risk.Hash},
+			Tags:            "confirmed|verified",
+			TagsDescription: `{"verifier":"admin"}`,
+			RiskTypeVerbose: "ssrf-patched",
+			Severity:        "critical",
+			SeverityScore:   9.5,
+			Token:           "test-token",
+		}
+
+		resp, err := server.BatchSetRiskTags(context.Background(), req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Greater(t, resp.UpdatedCount, int64(0))
+
+		updated, err := yakit.GetRiskByIDOrHash(db, 0, risk.Hash)
+		require.NoError(t, err)
+		assert.Equal(t, "confirmed|verified", updated.Tags)
+		assert.Equal(t, `{"verifier":"admin"}`, updated.TagsDescription)
+		assert.Equal(t, "ssrf-patched", updated.RiskTypeVerbose)
+		assert.Equal(t, "critical", updated.Severity)
+		assert.Equal(t, 9.5, updated.SeverityScore)
+	})
+}
+
+func TestRisksFromOnline(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := utils.RandStringBytes(5)
+
+	existingRisk := &schema.Risk{
+		Title:    "existing-risk-" + token,
+		Severity: "high",
+		Tags:     "old-tag",
+	}
+	require.NoError(t, yakit.SaveRisk(existingRisk))
+	defer yakit.DeleteRiskByID(db, int64(existingRisk.ID))
+
+	newHash := "new-download-" + token
+	mockItems := []*yaklib.DownloadRiskStreamItem{
+		{
+			Risk: &yaklib.DownloadRiskItem{
+				Hash:            existingRisk.Hash,
+				Title:           existingRisk.Title,
+				Tags:            "new-tag",
+				TagsDescription: `{"verifier":"admin"}`,
+				Severity:        "critical",
+				RiskTypeVerbose: "ssrf-confirmed",
+				SeverityScore:   8.5,
+			},
+			Total: 2,
+		},
+		{
+			Risk: &yaklib.DownloadRiskItem{
+				Hash:          newHash,
+				Title:         "downloaded-risk-" + token,
+				Severity:      "medium",
+				Tags:          "downloaded",
+				SeverityScore: 5.0,
+			},
+			Total: 2,
+		},
+	}
+
+	mockey.PatchConvey("mock download from online", t, func() {
+		mockClient := new(yaklib.OnlineClient)
+
+		mockey.Mock((*yaklib.OnlineClient).DownloadRisks).
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, tk, logType string) (chan *yaklib.DownloadRiskStreamItem, error) {
+				ch := make(chan *yaklib.DownloadRiskStreamItem, len(mockItems))
+				for _, item := range mockItems {
+					ch <- item
+				}
+				close(ch)
+				return ch, nil
+			}).Build()
+
+		mockey.Mock(yaklib.NewOnlineClient).
+			To(func(baseUrl string) *yaklib.OnlineClient {
+				return mockClient
+			}).Build()
+
+		mockey.Mock(yaklib.DownloadOnlineAuthProxy).
+			To(func(baseUrl string) error {
+				return nil
+			}).Build()
+
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+
+		stream, err := client.RisksFromOnline(context.Background(), &ypb.RisksFromOnlineRequest{
+			Token:   "test-token",
+			LogType: "tagsUpdate",
+		})
+		require.NoError(t, err)
+
+		var progressLogs []string
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			progressLogs = append(progressLogs, msg.Log)
+		}
+
+		foundUpdate := false
+		foundInsert := false
+		for _, logMsg := range progressLogs {
+			if logMsg == "update ["+existingRisk.Hash+"] finished" {
+				foundUpdate = true
+			}
+			if logMsg == "insert ["+newHash+"] finished" {
+				foundInsert = true
+			}
+		}
+		assert.True(t, foundUpdate, "should have updated existing risk")
+		assert.True(t, foundInsert, "should have inserted new risk")
+
+		// 验证已存在的 risk 字段已更新
+		updated, err := yakit.GetRiskByIDOrHash(db, 0, existingRisk.Hash)
+		require.NoError(t, err)
+		assert.Equal(t, "new-tag", updated.Tags)
+		assert.Equal(t, `{"verifier":"admin"}`, updated.TagsDescription)
+		assert.Equal(t, "critical", updated.Severity)
+		assert.Equal(t, "ssrf-confirmed", updated.RiskTypeVerbose)
+		assert.Equal(t, 8.5, updated.SeverityScore)
+
+		// 验证新 risk 已写入
+		newRisk, err := yakit.GetRiskByIDOrHash(db, 0, newHash)
+		require.NoError(t, err)
+		assert.Equal(t, "downloaded-risk-"+token, newRisk.Title)
+		assert.Equal(t, "medium", newRisk.Severity)
+		assert.Equal(t, "downloaded", newRisk.Tags)
+		assert.Equal(t, 5.0, newRisk.SeverityScore)
+
+		// 清理新建的 risk
+		yakit.DeleteRiskByID(db, int64(newRisk.ID))
+	})
 }
