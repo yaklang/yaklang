@@ -364,7 +364,7 @@ func DefaultLoadOptions() LoadOptions {
 	for _, d := range []string{
 		".git", ".svn", ".hg", "node_modules", "vendor", "dist", "build",
 		"target", ".idea", ".vscode", "__pycache__", ".tox", "coverage",
-		"bower_components", ".gradle", ".mvn", "out", "bin", "obj",
+		"bower_components", ".gradle", ".mvn", "out", "obj",
 	} {
 		skip[d] = struct{}{}
 	}

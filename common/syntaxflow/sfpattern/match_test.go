@@ -101,6 +101,17 @@ func TestNewRootFromFS(t *testing.T) {
 	require.Greater(t, sfvm.ValuesLen(vals), 0)
 }
 
+func TestLoadFilesFromFSWithOptions_KeepsSourceScriptsInBin(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("bin/run.sh", `exec $foo`)
+	vfs.AddFile("build/generated.go", `package generated`)
+
+	files, err := LoadFilesFromFSWithOptions(vfs, DefaultLoadOptions())
+	require.NoError(t, err)
+	require.Contains(t, files, "bin/run.sh")
+	require.NotContains(t, files, "build/generated.go")
+}
+
 func TestPatternRootMaterializesBoundedHitWindows(t *testing.T) {
 	files := map[string]string{
 		"many.txt": "key\n" + strings.Repeat("key\n", 5000),
