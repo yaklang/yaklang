@@ -681,16 +681,22 @@ func WithRiskParam_Tags(i string) RiskParamsOpt {
 // risk.Save(r) // 保存到数据库; 也可用 risk.NewRisk(target, ...) 一步创建并保存
 // ```
 // ComputeRiskHash returns a deterministic hash for a risk record based on
-// the dedup key: normalized target + risk type + parameter. Two risks with
-// the same target, type, and parameter yield the same hash, enabling
+// the dedup key: target + risk type + parameter. Two risks with the same
+// target, type, and parameter yield the same hash, enabling
 // CreateOrUpdateRisk's FirstOrCreate to find and update existing records
 // instead of always creating new ones.
 //
-// Target normalization: strip scheme, strip default ports (80/443),
-// strip trailing slash, lowercase. When URL is empty, fall back to
-// host:port.
-func ComputeRiskHash(rawURL, host string, port int, riskType, parameter string) string {
-	target := normalizeRiskTargetForHash(rawURL, host, port)
+// No normalization is performed here. Callers (e.g. cybersecurity-risk.yak)
+// are responsible for normalizing inputs before passing them to risk.NewRisk.
+// This keeps the hash computation transparent and predictable.
+func ComputeRiskHash(url, host string, port int, riskType, parameter string) string {
+	target := url
+	if target == "" {
+		target = host
+		if port > 0 {
+			target = fmt.Sprintf("%s:%d", host, port)
+		}
+	}
 	key := strings.Join([]string{
 		strings.ToLower(strings.TrimSpace(target)),
 		strings.ToLower(strings.TrimSpace(riskType)),
@@ -698,35 +704,6 @@ func ComputeRiskHash(rawURL, host string, port int, riskType, parameter string) 
 	}, "|")
 	h := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(h[:16]) // 32-char hex, sufficient for dedup
-}
-
-// normalizeRiskTargetForHash strips scheme, default ports, and trailing
-// slash from a URL, or falls back to host:port. The result is a compact,
-// normalized target string used for deterministic hash computation.
-func normalizeRiskTargetForHash(rawURL, host string, port int) string {
-	s := strings.TrimSpace(rawURL)
-	if s != "" {
-		// Strip scheme.
-		s = strings.TrimPrefix(s, "https://")
-		s = strings.TrimPrefix(s, "http://")
-		// Strip default ports.
-		s = strings.Replace(s, ":443/", "/", 1)
-		s = strings.Replace(s, ":80/", "/", 1)
-		// Strip trailing slash (but keep root "/").
-		if len(s) > 1 {
-			s = strings.TrimSuffix(s, "/")
-		}
-		return s
-	}
-	// Fallback to host:port.
-	h := strings.TrimSpace(host)
-	if h == "" {
-		return ""
-	}
-	if port > 0 && port != 80 && port != 443 {
-		return fmt.Sprintf("%s:%d", h, port)
-	}
-	return h
 }
 
 func CreateRisk(u string, opts ...RiskParamsOpt) *schema.Risk {

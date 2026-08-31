@@ -261,13 +261,18 @@ func (p *Risk) BeforeSave() error {
 }
 
 // ComputeRiskHashForSchema returns a deterministic hash for a Risk based on
-// the dedup key: normalized target + risk type + parameter. This is the
-// schema-layer fallback used in BeforeSave when the caller did not set a
-// Hash explicitly. The primary computation lives in yakgrpc/yakit/risk_exports.go
-// (ComputeRiskHash), but to avoid a circular import (schema cannot import
-// yakgrpc), we duplicate the minimal logic here.
+// the dedup key: target + risk type + parameter. This is the schema-layer
+// fallback used in BeforeSave when the caller did not set a Hash explicitly.
+// No normalization is performed; callers are responsible for normalizing
+// inputs before saving.
 func ComputeRiskHashForSchema(r *Risk) string {
-	target := normalizeRiskTargetForSchemaHash(r.Url, r.Host, r.Port)
+	target := r.Url
+	if target == "" {
+		target = r.Host
+		if r.Port > 0 {
+			target = fmt.Sprintf("%s:%d", r.Host, r.Port)
+		}
+	}
 	key := strings.Join([]string{
 		strings.ToLower(strings.TrimSpace(target)),
 		strings.ToLower(strings.TrimSpace(r.RiskType)),
@@ -275,28 +280,6 @@ func ComputeRiskHashForSchema(r *Risk) string {
 	}, "|")
 	h := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(h[:16])
-}
-
-func normalizeRiskTargetForSchemaHash(rawURL, host string, port int) string {
-	s := strings.TrimSpace(rawURL)
-	if s != "" {
-		s = strings.TrimPrefix(s, "https://")
-		s = strings.TrimPrefix(s, "http://")
-		s = strings.Replace(s, ":443/", "/", 1)
-		s = strings.Replace(s, ":80/", "/", 1)
-		if len(s) > 1 {
-			s = strings.TrimSuffix(s, "/")
-		}
-		return s
-	}
-	h := strings.TrimSpace(host)
-	if h == "" {
-		return ""
-	}
-	if port > 0 && port != 80 && port != 443 {
-		return fmt.Sprintf("%s:%d", h, port)
-	}
-	return h
 }
 
 func (r *Risk) AfterCreate(tx *gorm.DB) (err error) {
