@@ -1,9 +1,11 @@
 package yakit
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -132,4 +134,65 @@ func TestSchemaRisk_BeforeSave_NoNormalization(t *testing.T) {
 	r2.BeforeSave()
 
 	require.NotEqual(t, r1.Hash, r2.Hash, "un-normalized targets should produce different hashes")
+}
+
+func TestCreateOrUpdateRisk_UpdatePathRefreshesRecord(t *testing.T) {
+	db, _ := consts.CreateProjectDatabase(filepath.Join(t.TempDir(), "probe.db"))
+	require.NoError(t, db.AutoMigrate(&schema.Risk{}).Error)
+
+	// First report: create.
+	r1 := &schema.Risk{
+		Hash: "probe-upsert-hash", Url: "http://x.example/1", Host: "x.example", Port: 80,
+		RuntimeId: "runtime-A", RiskType: "info", Severity: "low", Title: "t1", Description: "d1",
+	}
+	require.NoError(t, CreateOrUpdateRisk(db, r1.Hash, r1))
+
+	risk, err := GetRiskByHash(db, "probe-upsert-hash")
+	require.NoError(t, err)
+	require.Equal(t, "runtime-A", risk.RuntimeId)
+	require.Equal(t, "t1", risk.Title)
+
+	// Same dedup key reported again (e.g. another runtime re-discovers the
+	// same target/type/parameter): the existing record must be updated with
+	// the latest reporter's values instead of being a silent no-op.
+	r2 := &schema.Risk{
+		Hash: "probe-upsert-hash", Url: "http://x.example/1", Host: "x.example", Port: 80,
+		RuntimeId: "runtime-B", RiskType: "info", Severity: "high", Title: "t2", Description: "d2",
+	}
+	require.NoError(t, CreateOrUpdateRisk(db, r2.Hash, r2))
+
+	risk, err = GetRiskByHash(db, "probe-upsert-hash")
+	require.NoError(t, err)
+	require.Equal(t, "runtime-B", risk.RuntimeId, "deduplicated upsert must refresh runtime_id")
+	require.Equal(t, "t2", risk.Title, "deduplicated upsert must refresh title")
+	require.Equal(t, "high", risk.Severity, "deduplicated upsert must refresh severity")
+
+	// The caller's struct must not be clobbered by the found DB record.
+	require.Equal(t, "runtime-B", r2.RuntimeId)
+	require.Equal(t, "t2", r2.Title)
+
+	// Only ONE record exists for the dedup key.
+	var count int
+	require.NoError(t, db.Model(&schema.Risk{}).Where("hash = ?", "probe-upsert-hash").Count(&count).Error)
+	require.Equal(t, 1, count, "deduplicated reports must collapse into a single record")
+}
+
+func TestCreateOrUpdateRisk_CreatePathKeepsAllFields(t *testing.T) {
+	db, _ := consts.CreateProjectDatabase(filepath.Join(t.TempDir(), "probe-create.db"))
+	require.NoError(t, db.AutoMigrate(&schema.Risk{}).Error)
+
+	r3 := &schema.Risk{
+		Hash: "probe-create-hash", Url: "http://y.example/3", Host: "y.example", Port: 443,
+		RuntimeId: "runtime-C", RiskType: "sqli", Severity: "high", Title: "t3", Description: "d3",
+	}
+	require.NoError(t, CreateOrUpdateRisk(db, r3.Hash, r3))
+
+	risk, err := GetRiskByHash(db, "probe-create-hash")
+	require.NoError(t, err)
+	require.Equal(t, "runtime-C", risk.RuntimeId)
+	require.Equal(t, "t3", risk.Title)
+	require.Equal(t, "high", risk.Severity)
+	require.Equal(t, "http://y.example/3", risk.Url)
+	require.Equal(t, "y.example", risk.Host)
+	require.Equal(t, 443, risk.Port)
 }
