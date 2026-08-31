@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -75,6 +76,16 @@ func buildSingleFindingVerifyLoop(
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
+	}
+	preset = append(preset, auditopts.LoopAuxiliaryOpts()...)
+	preset = append(preset,
+		reactloops.WithFrozenBlockPartitions(aicommon.FrozenBlockPartition{
+			ID:    "code-audit-phase3-path-rules",
+			Title: "Code Audit Phase3 Path Rules",
+			Content: "路径规则：所有工具路径必须使用项目绝对路径；read_file 用 file；grep 用 path。" +
+				"Finding.file 多为相对路径，调用前需拼接项目根目录。",
+			Order: 210,
+		}),
 
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			return utils.RenderTemplate(phase3VerifyInstruction, map[string]any{
@@ -130,7 +141,7 @@ func buildSingleFindingVerifyLoop(
 		registerPhase3NoteFilterAction(r),
 		registerPhase3ConcludeFindingAction(r, state, verify, &concluded),
 		registerPhase3ReadReconNotesAction(r, state),
-	}
+	)
 
 	loopName := fmt.Sprintf("code_audit_verify_%s", finding.ID)
 	return reactloops.NewReActLoop(loopName, r, preset...)

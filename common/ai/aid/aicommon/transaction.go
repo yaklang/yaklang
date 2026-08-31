@@ -40,6 +40,34 @@ func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
 	return err
 }
 
+// isActionFormatError reports postHandler failures caused by malformed / missing
+// @action output (as opposed to transport errors). Used to apply a tighter
+// format-retry budget than the general transaction retry count.
+func isActionFormatError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "action resolution failed") ||
+		strings.Contains(lower, "failed to parse action") ||
+		strings.Contains(lower, "action type is empty") ||
+		strings.Contains(lower, "action @action not found")
+}
+
+func resolveAIFormatAutoRetryCount(c AICallerConfigIf, transactionRetry int64) int64 {
+	if c != nil {
+		if getter, ok := c.(interface{ GetAIFormatAutoRetryCount() int64 }); ok {
+			if n := getter.GetAIFormatAutoRetryCount(); n > 0 {
+				return n
+			}
+		}
+	}
+	if transactionRetry > 0 && transactionRetry < 3 {
+		return transactionRetry
+	}
+	return 3
+}
+
 func CallAITransaction(
 	c AICallerConfigIf,
 	prompt string,
@@ -89,6 +117,8 @@ func callAITransaction(
 	if trcRetry <= 0 {
 		trcRetry = 3
 	}
+	formatRetryCap := resolveAIFormatAutoRetryCount(c, trcRetry)
+	var formatAttempts int64
 	var postHandlerErr error
 	var lastErr error
 	var lastCallAiErr error // 保留 API 调用错误，防止被 postHandler 错误覆盖
@@ -214,11 +244,20 @@ func callAITransaction(
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++
+			if isActionFormatError(postHandlerErr) {
+				formatAttempts++
+			}
 			rec := buildAttemptRecord(i, finalPrompt, nil, rsp)
 			rec.PostHandlerErr = postHandlerErr
 			attemptHistory = append(attemptHistory, rec)
 			rspEmitter := bindEmitter(rsp)
 			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			// Format failures get a tighter budget so think-only / missing @action
+			// outputs do not burn the full network retry window.
+			if isActionFormatError(postHandlerErr) && formatAttempts >= formatRetryCap {
+				rspEmitter.EmitWarning("ai format retry budget exhausted (%d/%d); stopping early", formatAttempts, formatRetryCap)
+				break
+			}
 			if i < trcRetry {
 				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
 					return waitErr

@@ -5,9 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
 	"math"
 	"os"
 	"strings"
@@ -15,6 +12,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -295,35 +296,21 @@ func (s *ScanState) AllDone() bool {
 // Reactive data 模板
 // ─────────────────────────────────────────────────────────────────────
 
-const phase2ReactiveDataTpl = `## 当前扫描任务
-<|SCAN_TASK_{{ .Nonce }}|>
+const phase2ReactiveDataTpl = `## 当前扫描进度
+<|SCAN_PROGRESS_{{ .Nonce }}|>
 **漏洞类别**: {{ .CategoryName }} ({{ .CategoryID }})
-**技术栈**: {{ .TechStack }}
-**入口点摘要**: {{ .EntryPoints }}
+> 稳定上下文（类别侧重点 / Sink 提示 / 路径规则）已在 frozen-block；此处仅保留随轮次变化的进度。
 
-{{ if .LanguageFocus }}
-### 语言画像与本类侧重点
-{{ .LanguageFocus }}
-{{ end }}
-
-{{ if .HasSelectionFocus }}
-**[优先] 用户选中片段**（必须先覆盖文件 {{ .FocusFilePath }}）:
-{{ .Selection }}
-{{ else if .HasOpenFileFocus }}
-**[优先] 前端打开文件**: {{ .FocusFilePath }}
-{{ end }}
-
-> [路径规则] 所有文件路径参数必须使用用户指定的项目绝对路径，禁止使用相对路径。
-{{ if .ReconOutline }}
-**项目背景报告章节大纲**（包含路由列表、数据访问模式、认证机制等）:
-{{ .ReconOutline }}
-{{ else if .ReconFileHint }}
-**项目背景报告**（包含路由列表、数据访问模式、认证机制等）: {{ .ReconFileHint }}（调用 read_recon_notes 读取全文）
-{{ end }}
 {{ if .PrevFindingsSummary }}
----
 ### 前序类别已发现的 Findings（仅供参考，避免重复提交）
 {{ .PrevFindingsSummary }}
+{{ end }}
+
+{{ if .ReconOutline }}
+**项目背景报告章节大纲**:
+{{ .ReconOutline }}
+{{ else if .ReconFileHint }}
+**项目背景报告**: {{ .ReconFileHint }}（调用 read_recon_notes 读取全文）
 {{ end }}
 
 ---
@@ -331,26 +318,26 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 
 {{ if .IsSearchPhase }}
 ### 阶段A：关键词搜索
-目标：根据 **Sink 语义提示** 发现候选文件。
+目标：根据 frozen-block 中的 Sink 语义提示发现候选文件。
 
-**阶段A read_file 限制**：仅抽查，必须 offset + lines（≤80）；禁止全文件读。违反时运行时会自动截断。
+**阶段A read_file 限制**：仅抽查，必须 offset + lines（≤80）；禁止全文件读。
 
-**首选 fast_context**：子 loop 内并行 grep；参考材料为**可选目录**（子 loop 内按需 require_tool + read_file 打开 recon_report）。若发现质量偏弱，父 loop 应先 **read_recon_notes 深度调研** 再重写 query 重试 fast_context。
+**首选 fast_context**：子 loop 内并行 grep。若发现质量偏弱，先 **read_recon_notes** 再重写 query 重试。
 
 {{ if .DiscoveryQualityWarning }}
 **发现质量提醒**: {{ .DiscoveryQualityWarning }}
 {{ end }}
 
-**阶段A推荐循环（广度优先）**：fast_context →（可选 read 抽查）→ lock_target_files 批量纳入 → 可继续 fast_context 扩搜 → done=true 进阶段B。
+**阶段A推荐循环**：fast_context →（可选 read 抽查）→ lock_target_files → 可继续扩搜 → done=true 进阶段B。
 
 {{ if ge .PhaseASpotReads 1 }}
 **阶段A 已抽查 read_file**: {{ .PhaseASpotReads }} 次（自上次 lock 起）
 {{ end }}
 {{ if ge .PhaseASpotReads 2 }}
-**请尽快 lock**：已连续抽查 {{ .PhaseASpotReads }} 次 read_file 仍未 lock。下一 action 应是 lock_target_files(done=false) 纳入已读候选，不要连读多个文件不 lock。
+**请尽快 lock**：已连续抽查 {{ .PhaseASpotReads }} 次 read_file 仍未 lock。
 {{ end }}
 {{ if .PendingDiscoveryList }}
-**fast_context 候选处理进度**（建议全部纳入；done=true 可自动纳入剩余）:
+**fast_context 候选处理进度**:
 {{ .PendingDiscoveryList }}
 {{ end }}
 {{ if .DiscoveryGateWarning }}
@@ -362,47 +349,77 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 **已纳入目标文件列表**:
 {{ .CollectedFilesList }}
 {{ else if eq .CollectedFileCount 0 }}
-（尚未 lock 任何文件；fast_context/grep 候选需经 read_file 判断后调用 lock_target_files 写入）
+（尚未 lock 任何文件）
 {{ end }}
 
-**Sink 语义提示**（根据实际技术栈自主选择合适的 grep 关键词，示例仅供参考）:
-{{ .SinkHints }}
 {{ else }}
 ### 阶段B：逐文件审计
-目标：对**已 lock 的目标文件**逐文件审计。**一次只处理一个文件**：read_file →（可选 trace grep）→ **可疑则 add_finding** → **mark_file_done(disposition=...)**。
-
-**文件归属（代码强制）**：每个 lock 的文件必须有且仅有一种归属：
-- finding：已 add_finding → mark_file_done(disposition="finding")
-- not_vul：本类别无漏洞 → mark_file_done(disposition="not_vul", audit_summary="...")
-- complete_scan 会校验全部目标文件均已归属，否则拒绝并列出待处理文件
-
-**阶段B 允许 trace grep（content 模式）**：在目标文件、其父目录或项目根内搜索符号/调用链，用于 data_flow 上溯；**禁止** files_with_matches / find_file / tree / fast_context。
-
-**审计进度**: {{ .AuditDone }} / {{ .AuditTotal }} 个目标文件已完成 mark_file_done
-
-**待审计文件**（须全部 mark_file_done 后才能 complete_scan）:
-{{ .RemainingFilesList }}
+进度：{{ .AuditDone }}/{{ .AuditTotal }}（剩余 {{ .AuditRemaining }}）
 {{ if .PhaseBReadWarning }}
-**阶段B read 提醒**: {{ .PhaseBReadWarning }}
+**警告**: {{ .PhaseBReadWarning }}
 {{ end }}
 {{ if .PhaseBGrepWarning }}
-**阶段B trace grep 提醒**: {{ .PhaseBGrepWarning }}
+**警告**: {{ .PhaseBGrepWarning }}
 {{ end }}
-{{ if eq .AuditRemaining 1 }}
-**仅剩 1 个文件**：read 后**立即** mark_file_done，然后 complete_scan。
-{{ end }}
+**待审计文件**:
+{{ .RemainingFilesList }}
 {{ end }}
 
 {{ if .FeedbackMessages }}
 ---
-### 上步操作反馈
+### 系统反馈
 {{ .FeedbackMessages }}
 {{ end }}
-<|SCAN_TASK_END_{{ .Nonce }}|>
 
-**当前 Finding 数**: {{ .FindingsCount }}
+**全局 findings 数**: {{ .FindingsCount }}
+<|SCAN_PROGRESS_END_{{ .Nonce }}|>
+`
 
-{{ if not .IsSearchPhase }}[终止规则] complete_scan 仅在**全部**目标文件均已 mark_file_done 后才会被接受。每个文件：read_file → mark_file_done；不可用 todo_delta 跳过 mark。{{ end }}`
+// buildPhase2FrozenPartition hoists category-stable context into frozen-block so
+// the per-turn reactive/dynamic section stays smaller (aicache friendly).
+func buildPhase2FrozenPartition(state *model.AuditState, category model.VulnCategory) aicommon.FrozenBlockPartition {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("## Phase2 类别稳定上下文\n**类别**: %s (%s)\n", category.Name, category.ID))
+	if state != nil && state.TechStack != "" {
+		b.WriteString(fmt.Sprintf("**技术栈**: %s\n", state.TechStack))
+	}
+	if state != nil && state.EntryPoints != "" {
+		b.WriteString(fmt.Sprintf("**入口点摘要**: %s\n", state.EntryPoints))
+	}
+	techStack := ""
+	if state != nil {
+		techStack = state.TechStack
+	}
+	if focus := model.LanguageFocusForCategory(techStack, category.ID); focus != "" {
+		b.WriteString("\n### 语言画像与本类侧重点\n")
+		b.WriteString(focus)
+		b.WriteString("\n")
+	}
+	if hints := category.RenderSinkHints(); hints != "" {
+		b.WriteString("\n### Sink 语义提示\n")
+		b.WriteString(hints)
+		b.WriteString("\n")
+	}
+	b.WriteString("\n### 路径规则\n所有文件路径必须使用绝对路径：grep 用 path，read_file 用 file，find_file 用 dir。\n")
+	if state != nil {
+		vars := reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection())
+		if v, ok := vars["HasSelectionFocus"].(bool); ok && v {
+			b.WriteString("\n### 优先：用户选中片段\n")
+			if sel, ok := vars["Selection"].(string); ok {
+				b.WriteString(sel)
+				b.WriteString("\n")
+			}
+		} else if v, ok := vars["HasOpenFileFocus"].(bool); ok && v {
+			b.WriteString(fmt.Sprintf("\n### 优先：打开文件\n%s\n", vars["FocusFilePath"]))
+		}
+	}
+	return aicommon.FrozenBlockPartition{
+		ID:      "code-audit-phase2-" + category.ID,
+		Title:   "Code Audit Phase2 Category Context",
+		Content: b.String(),
+		Order:   200,
+	}
+}
 
 // buildSingleCategoryScanLoop 构建针对单一漏洞类别的扫描 Loop（两阶段：discovery → 逐文件审计）。
 //
@@ -431,6 +448,10 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 			return action.ActionType != "load_capability"
 		}),
+	}
+	preset = append(preset, auditopts.LoopAuxiliaryOpts()...)
+	preset = append(preset,
+		reactloops.WithFrozenBlockPartitions(buildPhase2FrozenPartition(state, category)),
 
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			vars := map[string]any{
@@ -919,7 +940,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				op.Exit()
 			},
 		),
-	}
+	)
 
 	preset = append(preset, buildPhase2WhitelistFSToolOptions(r)...)
 

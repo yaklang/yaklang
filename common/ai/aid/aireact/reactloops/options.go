@@ -577,6 +577,27 @@ func WithDisablePeriodicVerification(disable ...bool) ReActLoopOption {
 	}
 }
 
+// WithDisableValueFeedback disables automatic value-feedback submission for this loop.
+func WithDisableValueFeedback(disable ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(disable) > 0 && !disable[0] {
+			return
+		}
+		r.disableValueFeedback = true
+	}
+}
+
+// WithFrozenBlockPartitions appends stable prompt partitions into the loop's
+// frozen-block (hoisted out of the per-turn dynamic section).
+func WithFrozenBlockPartitions(partitions ...aicommon.FrozenBlockPartition) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if r == nil || len(partitions) == 0 {
+			return
+		}
+		r.extraFrozenPartitions = append(r.extraFrozenPartitions, partitions...)
+	}
+}
+
 // WithPeriodicVerificationInterval sets the  iteration interval used by
 // loop-level periodic checkpoint behaviors
 // auto-verification.
