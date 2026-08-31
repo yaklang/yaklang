@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Go语言直接反射型XSS漏洞"
 	type: vuln
 	level: mid
-	risk: "跨站脚本（XSS）"
+	risk: "xss"
 	desc: <<<DESC
 # 检测Go语言直接反射型XSS漏洞
 
@@ -72,7 +72,7 @@ alert $mid for {
 	title: "Direct Reflected Cross-Site Scripting (XSS) via User Input",
 	title_zh: "通过用户输入的反射型跨站脚本攻击",
 	level: "mid",
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 	type: "vuln",
 	message: "用户输入未经安全处理，存在XSS风险",
 	solution: <<<SOLUTION

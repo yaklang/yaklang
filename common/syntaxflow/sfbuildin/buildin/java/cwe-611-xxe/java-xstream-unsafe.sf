@@ -2,7 +2,7 @@ desc(
 	title: "Check Java XStream Unsafe Deserialization"
 	title_zh: "检测 Java XStream 不安全反序列化"
 	type: vuln
-	risk: XXE
+	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -196,7 +196,7 @@ xstream.allowTypes(new Class[]{YourExpectedObject.class});
 #### 4. 避免反序列化来自不受信任来源的数据
 如果可能，避免反序列化任何来自外部、不可信源的序列化数据。
 SOLUTION
-	risk: "XML外部实体（XXE）",
+	risk: "xxe",
 	name: "vuln",
 }
 

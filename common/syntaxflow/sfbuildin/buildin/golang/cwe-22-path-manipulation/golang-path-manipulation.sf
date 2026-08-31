@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang路径操作漏洞"
 	type: audit
 	level: low
-	risk: "路径穿越"
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -77,7 +77,7 @@ alert $low for {
 	title: "Golang Path Manipulation Vulnerability Was Detected",
 	title_zh: "检测到Golang路径操纵漏洞",
 	level: "low",
-	risk: "路径操纵",
+	risk: "path-manipulation",
 	message: "检测到Golang路径操纵漏洞，但路径已包含过滤机制，通常无需处理",
 	solution: <<<SOLUTION
 ### 修复建议

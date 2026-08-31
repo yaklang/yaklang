@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-dml-native-statements"
-	risk: "Security"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 Migrated from Semgrep rule `dml-native-statements` (/tmp/semgrep-rules/apex/lang/security/ncino/dml/DmlNativeStatements.yaml).
 Original message: Native Salesforce DML operations execute in system context, ignoring the current user's permissions, field-level security, organization-wide defaults, position in the role hierarchy, and sharing rules. Be mindful when using native Salesforce DML operations.

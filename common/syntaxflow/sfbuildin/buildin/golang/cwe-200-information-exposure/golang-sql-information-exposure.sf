@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang SQL Information Exposure"
 	type: audit
 	level: low
-	risk: "信息泄露（Information Exposure）"
+	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -184,7 +184,7 @@ fmt.Println("Server version:", version)
 SOLUTION
 	name: "low",
 	message: "检测到Golang应用程序中存在SQL信息泄露风险，查询结果可能暴露敏感系统信息。",
-	risk: "信息泄露",
+	risk: "information-exposure",
 }
 
 desc(

@@ -143,7 +143,7 @@ DESC
 	title: "Unvalidated Command Execution",
 	name: "output",
 	message: "检测到Java代码中存在未验证的命令执行漏洞，用户输入直接传递到ProcessBuilder中。",
-	risk: "命令注入",
+	risk: "command-injection",
 }
 
 

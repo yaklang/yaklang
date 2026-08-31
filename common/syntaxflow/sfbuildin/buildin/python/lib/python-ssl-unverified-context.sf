@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-ssl-unverified-context"
-	risk: "中间人攻击"
+	risk: "man-in-the-middle"
 	desc: <<<DESC
 标记 ssl._create_unverified_context 等跳过证书校验的用法，攻击者可实施中间人攻击，窃听或篡改 TLS 流量。
 DESC
@@ -24,7 +24,7 @@ alert $output for {
 	title_zh: "未校验证书的 SSL 上下文",
 	level: "info",
 	type: "audit",
-	risk: "中间人攻击",
+	risk: "man-in-the-middle",
 	message: "检测到未校验证书的 SSL 上下文，存在被中间人攻击的风险。",
 	name: "output",
 }

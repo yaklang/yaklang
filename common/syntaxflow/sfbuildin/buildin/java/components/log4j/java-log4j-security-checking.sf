@@ -1,4 +1,5 @@
 desc(
+	risk: "remote-code-execution"
 	title: "Detect Java Log4j Remote Code Execution Vulnerability"
 	title_zh: "检测Java Log4j远程代码执行漏洞"
 	type: vuln
@@ -175,7 +176,7 @@ return "Processed";
 DESC
 	level: "high",
 	message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
-	risk: "远程代码执行",
+	risk: "remote-code-execution",
 	title: "Detect Java Log4j Remote Code Execution Vulnerability",
 	title_zh: "检测Java Log4j远程代码执行漏洞",
 	name: "high",
@@ -218,7 +219,7 @@ return "Processed";
 DESC
 	level: "low",
 	message: "发现Java代码中可能存在Log4j远程代码执行漏洞。",
-	risk: "远程代码执行",
+	risk: "remote-code-execution",
 	title: "Detect Java Log4j Remote Code Execution Vulnerability",
 	title_zh: "检测Java Log4j远程代码执行漏洞",
 	solution: <<<SOLUTION

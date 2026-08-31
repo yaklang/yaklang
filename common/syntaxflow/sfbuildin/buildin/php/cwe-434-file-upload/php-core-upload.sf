@@ -1,4 +1,5 @@
 desc(
+	risk: "file-upload"
 	title: "Detect PHP Unsafe File Upload"
 	title_zh: "检测PHP不安全的文件上传漏洞"
 	type: vul
@@ -222,7 +223,7 @@ DESC
 	title: "Unsafe File Upload Without Validation",
 	name: "high",
 	message: "检测到PHP代码中存在未经验证的高危文件上传漏洞，从数据源（source）到污染汇聚点（sink）间未发现任何过滤函数信息。",
-	risk: "文件上传漏洞",
+	risk: "file-upload",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -245,7 +246,7 @@ DESC
 	level: "mid",
 	name: "mid",
 	message: "检测到PHP代码中文件类型检测存在安全隐患，虽然可能存在部分防护机制，但仍需进一步审计确认。",
-	risk: "文件上传漏洞",
+	risk: "file-upload",
 }
 $sink - $high - $mid as $low
 
@@ -261,7 +262,7 @@ alert $low for {
 - 使用随机化文件名以减少文件覆盖或路径操纵的风险。
 DESC
 	level: "low",
-	risk: "文件上传漏洞",
+	risk: "file-upload",
 	name: "low",
 	message: "检测到PHP代码中文件存储路径配置可能存在潜在风险，需进一步审计确认。",
 }

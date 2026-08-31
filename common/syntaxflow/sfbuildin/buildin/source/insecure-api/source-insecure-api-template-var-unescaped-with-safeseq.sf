@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-template-var-unescaped-with-safeseq"
-	risk: "Security"
+	risk: "xss"
 	desc: <<<DESC
 Migrated from Semgrep rule `template-var-unescaped-with-safeseq` (/tmp/semgrep-rules/python/django/security/audit/xss/template-var-unescaped-with-safeseq.yaml).
 Original message: Detected a template variable where autoescaping is explicitly disabled with '| safeseq' filter. This allows rendering of raw HTML in this segment. Ensure no user data is rendered here, otherwise this is a cross-site scripting (XSS) vulnerability. If you must do this, use `mark_safe` in your Python code.

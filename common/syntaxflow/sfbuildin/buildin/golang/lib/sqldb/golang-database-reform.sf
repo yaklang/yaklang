@@ -114,7 +114,7 @@ sqlDB.SetMaxIdleConns(5)
 reformDB := reform.NewDB(sqlDB, reform.NewDialect("sqlite"))
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

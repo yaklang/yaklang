@@ -423,7 +423,7 @@ $file_ops?{* #{ until: `* & $user_input`}-> } as $mid
 
 alert $mid for {
 	level: "mid",
-	risk: "文件上传",
+	risk: "file-upload",
 	type: "vuln",
 	title: "C File Upload Vulnerability Was Detected",
 	title_zh: "检测到C语言文件上传漏洞",

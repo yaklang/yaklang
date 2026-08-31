@@ -183,7 +183,7 @@ _, err := l.Search(searchRequest)
 ```
 **注意:** 上述安全示例中的 `ldap.EscapeFilter` 是一个通用转义的伪代码表示，实际应用中应查找所使用的 LDAP 库是否提供官方的转义或参数化接口，或者参考 RFC 4515 标准自行实现完整的 LDAP 过滤器转义逻辑。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则描述
 1. **规则目的**

@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-detect-insecure-websocket"
-	risk: "Security"
+	risk: "cleartext-transmission"
 	desc: <<<DESC
 Migrated from Semgrep rule `detect-insecure-websocket` (/tmp/semgrep-rules/javascript/lang/security/detect-insecure-websocket.yaml).
 Original message: Insecure WebSocket Detected. WebSocket Secure (wss) should be used for all WebSocket connections.

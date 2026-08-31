@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-google-maps-apikeyleak"
-	risk: "Security"
+	risk: "hardcoded-credentials"
 	desc: <<<DESC
 Migrated from Semgrep rule `google-maps-apikeyleak` (/tmp/semgrep-rules/generic/secrets/security/google-maps-apikeyleak.yaml).
 Original message: Detects potential Google Maps API keys in code

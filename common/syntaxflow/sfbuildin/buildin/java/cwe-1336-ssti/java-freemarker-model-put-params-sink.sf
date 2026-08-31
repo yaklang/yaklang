@@ -1,4 +1,5 @@
 desc(
+	risk: "ssti"
 	title: "Check Java Freemarker SSTI Vulnerability"
 	type: audit
 	level: warning
@@ -90,7 +91,7 @@ template.process(templateData, out); // 如果data包含恶意freemarker语法�
 DESC
 	level: "high",
 	message: "检测到Java Freemarker模板注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "服务器端模板注入（SSTI）",
+	risk: "ssti",
 	name: "sink",
 }
 

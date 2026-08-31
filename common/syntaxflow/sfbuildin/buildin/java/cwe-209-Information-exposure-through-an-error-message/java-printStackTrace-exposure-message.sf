@@ -1,4 +1,5 @@
 desc(
+	risk: "information-exposure"
 	title: "Check Java Information Exposure Through PrintStackTrace"
 	title_zh: "检查Java通过PrintStackTrace泄露信息"
 	type:security
@@ -71,7 +72,7 @@ check $sink then "发现PrintStackTrace打印异常堆栈信息"
 alert $sink for {
 	level: "low",
 	message: "通过PrintStackTrace泄露信息",
-	risk: "信息泄露",
+	risk: "information-exposure",
 	title: "Check Java Information Exposure Through PrintStackTrace",
 	title_zh: "检查Java通过PrintStackTrace泄露信息",
 	desc: <<<DESC

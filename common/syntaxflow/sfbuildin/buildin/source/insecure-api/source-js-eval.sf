@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-js-eval"
-	risk: "Code Injection"
+	risk: "code-injection"
 	desc: <<<DESC
 Flags eval(...) in JS/TS sources which enables code injection.
 DESC

@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-hooks-dns-exfiltration-generic"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
 Migrated from Semgrep rule `hooks-dns-exfiltration-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-dns-exfiltration/hooks-dns-exfiltration.yaml).
 Original message: DNS lookup command uses a variable in the hostname, which could exfiltrate sensitive data via DNS queries. In Claude Code and Cursor hooks, this pattern can leak secrets or environment data to attacker-controlled domains. Use static hostnames only in DNS commands.

@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-skill-md-sensitive-file-access-generic"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
 Migrated from Semgrep rule `skill-md-sensitive-file-access-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-sensitive-file-access/skill-md-sensitive-file-access.yaml).
 Original message: SKILL.md or AGENT.md instructs the agent to read sensitive credential files such as ~/.ssh/id_rsa, ~/.aws/credentials, /etc/shadow, .env, or browser cookie stores. Agents that load this skill will treat the directive as authoritative and may exfiltrate the contents. Remove the file-access directive or scope it to user-supplied paths.

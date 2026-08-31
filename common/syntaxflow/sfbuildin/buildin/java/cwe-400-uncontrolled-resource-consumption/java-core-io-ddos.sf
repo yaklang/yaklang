@@ -2,7 +2,7 @@ desc(
 	title: "Detect Java Core IO Denial of Service Vulnerability"
 	title_zh: "检测Java IO库拒绝服务漏洞"
 	type:vuln
-	risk:DDOS
+	risk:"denial-of-service"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -141,7 +141,7 @@ private static void processLine(String line) {
 #### 3. 使用更安全的库或框架
 考虑使用提供了内置安全控制的库或框架来处理文件上传、网络通信等，它们通常包含了对大小、类型的校验和限制。
 SOLUTION
-	risk: "DDOS",
+	risk: "denial-of-service",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

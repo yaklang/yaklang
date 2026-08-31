@@ -1,5 +1,5 @@
-// Package sfrisk owns display taxonomy for SyntaxFlow risk types.
-// It never rewrites persisted risk values, rule contents, or finding identities.
+// Package sfrisk owns canonical built-in risk types and legacy display aliases.
+// It never implicitly rewrites persisted findings or custom rule values.
 package sfrisk
 
 import (
@@ -28,7 +28,7 @@ type Category struct {
 	RiskTypes   []Type `json:"risk_types"`
 }
 
-// Name is a stable display-bucket identifier, not a replacement for raw RiskType.
+// Name is the canonical key required for new built-in risk metadata.
 // Aliases are explicit, reviewed legacy spellings; no substring/CWE inference is used.
 type Type struct {
 	Name           string   `json:"name"`
@@ -93,6 +93,13 @@ func GetTaxonomy() Taxonomy {
 func Lookup(raw string) (Definition, bool) {
 	definition, ok := definitions[strings.TrimSpace(raw)]
 	return definition, ok
+}
+
+// IsCanonical accepts only an active authoring key, not a legacy alias or review
+// placeholder. Keep Lookup permissive for historical/custom rule consumers.
+func IsCanonical(raw string) bool {
+	definition, ok := definitions[raw]
+	return ok && definition.CanonicalName == raw && !definition.ReviewRequired
 }
 
 func ParseTaxonomy(data []byte) (Taxonomy, error) {

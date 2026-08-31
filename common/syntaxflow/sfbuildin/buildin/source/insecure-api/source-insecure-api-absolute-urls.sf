@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-absolute-urls"
-	risk: "Best-Practice"
+	risk: "best-practice"
 	desc: <<<DESC
 Migrated from Semgrep rule `absolute-urls` (/tmp/semgrep-rules/apex/lang/best-practice/ncino/urls/AbsoluteUrls.yaml).
 Original message: Using absolute URLs to Salesforce Pages is bug prone. Different sandboxes and production environments will have different instance names (like "na10", "na15" etc.). Code using absolute URLs will only work when it runs in the corresponding salesforce instances. It will break as soon as it is deployed in another one. Thus only relative URLs, i.e. without the domain and subdomain names, should be used when pointing to a salesforce page.

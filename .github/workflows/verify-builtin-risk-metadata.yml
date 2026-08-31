@@ -1,0 +1,44 @@
+name: Verify built-in risk types
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'common/syntaxflow/**'
+      - 'common/schema/ssa_risk.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/verify-builtin-risk-metadata.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: builtin-risk-types-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Use an isolated Yakit home
+        run: echo "YAKIT_HOME=$RUNNER_TEMP/yak-risk-types" >> "$GITHUB_ENV"
+      - name: Validate default embedded rules and negative fixtures
+        run: go test -mod=readonly ./common/syntaxflow/sfrisk ./common/syntaxflow/sfbuildin -run 'TestRiskType|TestBuiltinRisk' -count=1 -v
+      - name: Generate gzip resources from this checkout
+        run: |
+          go build -mod=readonly -o "$RUNNER_TEMP/gzip-embed" ./common/utils/gzip_embed/gzip-embed
+          "$RUNNER_TEMP/gzip-embed" --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
+          "$RUNNER_TEMP/gzip-embed" --source ./common/ai/aid/aireact/skills --gz ./common/ai/aid/aireact/skills.tar.gz --root-path --no-embed
+          "$RUNNER_TEMP/gzip-embed" --source ./common/yso/resources/static --gz ./common/yso/resources/static.tar.gz --root-path --no-embed
+          "$RUNNER_TEMP/gzip-embed" --source ./common/coreplugin/base-yak-plugin --gz ./common/coreplugin/base-yak-plugin.tar.gz --root-path --no-embed
+          "$RUNNER_TEMP/gzip-embed" --source ./common/syntaxflow/sfbuildin/buildin --gz ./common/syntaxflow/sfbuildin/buildin.tar.gz --root-path --no-embed
+          "$RUNNER_TEMP/gzip-embed" --source ./common/aiforge/buildinforge --gz ./common/aiforge/buildinforge.tar.gz --root-path --no-embed
+      - name: Validate the gzip distribution
+        run: go test -mod=readonly -tags gzip_embed ./common/syntaxflow/sfbuildin -run 'TestBuiltinRisk' -count=1 -v
