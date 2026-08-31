@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-hooks-wget-pipe-bash-generic"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 Migrated from Semgrep rule `hooks-wget-pipe-bash-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-wget-pipe-bash/hooks-wget-pipe-bash.yaml).
 Original message: Remote script is fetched and piped directly to a shell interpreter. In Claude Code and Cursor hooks, this enables remote code execution from untrusted sources. Download the script first, inspect it, then execute it separately.

@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Unsafe Process WaitFor"
 	title_zh: "检测Java不安全Process WaitFor使用"
 	type:vuln
-	risk: DDOS
+	risk: "denial-of-service"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -264,7 +264,7 @@ process.destroyForcibly(); // 确保进程终止
 #### 3. 避免执行用户提供的完整命令
 如果可能，应避免直接执行用户输入的完整命令字符串。考虑使用白名单机制，仅允许执行预定义的、安全的命令，并对参数进行严格校验和过滤。
 SOLUTION
-	risk: "DDOS",
+	risk: "denial-of-service",
 }
 
 desc(

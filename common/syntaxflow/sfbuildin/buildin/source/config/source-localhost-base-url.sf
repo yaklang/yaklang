@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-localhost-base-url"
-	risk: "Best-Practice"
+	risk: "best-practice"
 	desc: <<<DESC
 Migrated from Semgrep rule `localhost-base-url` (/tmp/semgrep-rules/generic/hugo/best-practice/localhost-base-url.yaml).
 Original message: The 'baseURL' is set to localhost. This may cause links to not work if deployed.

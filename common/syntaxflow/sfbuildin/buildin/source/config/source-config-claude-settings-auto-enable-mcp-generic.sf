@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-config-claude-settings-auto-enable-mcp-generic"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 Migrated from Semgrep rule `claude-settings-auto-enable-mcp-generic` (/tmp/semgrep-rules/ai/ai-best-practices/claude-settings-auto-enable-mcp/claude-settings-auto-enable-mcp.yaml).
 Original message: "enableAllProjectMcpServers" is set to true in settings. This automatically enables all MCP servers defined in project configuration without user confirmation, allowing malicious repositories to register arbitrary MCP servers that execute code on your machine. Remove this setting or set it to false so that MCP servers require explicit approval.

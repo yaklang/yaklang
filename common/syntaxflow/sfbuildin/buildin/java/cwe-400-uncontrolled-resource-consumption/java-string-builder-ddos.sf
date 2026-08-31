@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java StringBuilder 拒绝服务漏洞"
 	title: "Check Java StringBuilder Denial of Service Vulnerability"
-	risk:DDOS
+	risk:"denial-of-service"
 	reference: <<<REFERENCE
 [URL](https://docs.oracle.com/javase/8/docs/api/java/lang/StringBuilder.html)
 [CWE-400](https://cwe.mitre.org/data/definitions/400.html)
@@ -108,7 +108,7 @@ resp.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Input too large
 4. **监控资源使用**
 部署资源监控（如CPU、内存）机制，及时发现异常的资源消耗情况，以便快速响应和定位问题。
 SOLUTION
-	risk: "DDOS",
+	risk: "denial-of-service",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

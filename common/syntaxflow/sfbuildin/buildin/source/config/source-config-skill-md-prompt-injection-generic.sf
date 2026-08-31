@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-skill-md-prompt-injection-generic"
-	risk: "Security"
+	risk: "prompt-injection"
 	desc: <<<DESC
 Migrated from Semgrep rule `skill-md-prompt-injection-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-prompt-injection/skill-md-prompt-injection.yaml).
 Original message: SKILL.md or AGENT.md frontmatter description contains prompt-injection markers that may override agent behavior. Phrases like "ignore previous instructions", "system: you are", or "<IMPORTANT>" inside a skill description are read as authoritative instructions by agents that load the skill, bypassing the user's intent. Remove the override directive from the description, or move authoritative system text out of the shared skill manifest.

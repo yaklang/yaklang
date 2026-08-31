@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-mcp-tool-poisoning-generic"
-	risk: "Security"
+	risk: "tool-poisoning"
 	desc: <<<DESC
 Migrated from Semgrep rule `mcp-tool-poisoning-generic` (/tmp/semgrep-rules/ai/ai-best-practices/mcp-tool-poisoning/mcp-tool-poisoning.yaml).
 Original message: MCP tool docstring contains suspicious directives that may indicate tool poisoning. Attackers can embed hidden instructions in tool descriptions to manipulate LLM behavior, exfiltrate data, or access sensitive files. Review the tool description for hidden instructions or social engineering.

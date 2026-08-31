@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP路径遍历漏洞"
 	type: vul
 	level: low
-	risk:"路径穿越"
+	risk:"path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -155,7 +155,7 @@ DESC
 	level: "high",
 	type: "vuln",
 	message: "检测到PHP文件操作存在未过滤的路径拼接漏洞，且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "路径遍历",
+	risk: "path-traversal",
 	name: "high",
 }
 $sink<dataflow(include=<<<CODE
@@ -231,7 +231,7 @@ echo "文件不存在或不允许访问";
 SOLUTION
 	name: "middle",
 	message: "检测到PHP文件操作可能存在过滤不足的情况，需进一步审计确认是否有绕过风险。",
-	risk: "路径遍历",
+	risk: "path-traversal",
 }
 $sink - $high - $middle as $low
 
@@ -253,7 +253,7 @@ DESC
 	title_zh: "PHP文件操作，存在过滤机制",
 	name: "low",
 	message: "检测到PHP文件操作已包含过滤机制，但仍需排查过滤函数是否存在潜在缺陷。",
-	risk: "路径遍历",
+	risk: "path-traversal",
 }
 desc(
 	lang: php

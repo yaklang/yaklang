@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-poetry-missing-solver-min-release-age"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 Migrated from Semgrep rule `poetry-missing-solver-min-release-age` (/tmp/semgrep-rules/package_managers/poetry/poetry-missing-solver-min-release-age.yaml).
 Original message: This poetry.toml does not set a dependency cooldown via `solver.min-release-age`. Without a cooldown, Poetry may resolve newly published package versions that have not yet been vetted by the community. Supply chain attacks frequently involve publishing a malicious version of a popular package and waiting for it to be pulled in — most are detected and removed within days. Set `min-release-age = 7` under `[solver]` to require that package versions are at least 7 days old before they are considered during dependency resolution. Added in: v2.4.0

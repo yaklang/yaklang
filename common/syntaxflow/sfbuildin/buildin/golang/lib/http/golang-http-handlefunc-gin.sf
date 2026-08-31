@@ -128,7 +128,7 @@ router.Use(cors.Default())
 ```
 通过以上措施，可以有效降低因不当处理用户输入而导致的安全风险。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

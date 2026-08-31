@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-template-and-attributes"
-	risk: "Security"
+	risk: "xss"
 	desc: <<<DESC
 Migrated from Semgrep rule `template-and-attributes` (/tmp/semgrep-rules/javascript/express/security/audit/xss/pug/and-attributes.yaml).
 Original message: Detected a unescaped variables using '&attributes'. If external data can reach these locations, your application is exposed to a cross-site scripting (XSS) vulnerability. If you must do this, ensure no external data can reach this location.

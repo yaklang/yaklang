@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-no-bidi-characters"
-	risk: "Security"
+	risk: "unicode-direction-control"
 	desc: <<<DESC
 Migrated from Semgrep rule `no-bidi-characters` (/tmp/semgrep-rules/solidity/security/no-bidi-characters.yaml).
 Original message: The code must not contain any of Unicode Direction Control Characters

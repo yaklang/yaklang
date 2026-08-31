@@ -1,7 +1,7 @@
 desc(
 	title: "Detect PHP Code Execution Vulnerability"
 	title_zh: "检测PHP代码执行漏洞"
-	risk: "远程代码执行（RCE）"
+	risk: "code-execution"
 	type: vul
 	desc: <<<DESC
 ### 漏洞描述
@@ -164,7 +164,7 @@ echo $func(10);
 SOLUTION
 	name: "evalFunction",
 	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
-	risk: "代码执行",
+	risk: "code-execution",
 }
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
@@ -256,7 +256,7 @@ DESC
 	level: "high",
 	title: "Unvalidated parameter injection",
 	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
-	risk: "代码执行",
+	risk: "code-execution",
 	name: "high",
 }
 
@@ -344,7 +344,7 @@ assert($_GET['code']);
 DESC
 	level: "mid",
 	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
-	risk: "代码执行",
+	risk: "code-execution",
 	name: "mid",
 }
 
@@ -427,7 +427,7 @@ DESC
 	title: "Potential code execution risk",
 	name: "low",
 	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
-	risk: "代码执行",
+	risk: "code-execution",
 }
 desc(
 	lang: "php"

@@ -152,7 +152,7 @@ http.ListenAndServe(":8080", nil)
 #### 3. 配合数据流分析工具
 使用静态分析工具跟踪用户输入流向，定位潜在的风险点，并加以修复。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 规则描述
 1. **规则原理**

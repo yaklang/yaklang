@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-skill-md-data-exfiltration-generic"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
 Migrated from Semgrep rule `skill-md-data-exfiltration-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-data-exfiltration/skill-md-data-exfiltration.yaml).
 Original message: SKILL.md or AGENT.md content instructs the agent to exfiltrate data to an attacker-controlled endpoint. Patterns like "send the result to http://...", "POST credentials to ...", or "include the contents in a request to ..." inside a skill body are read as authoritative instructions by agents that load the skill. Remove the exfiltration directive or audit the skill source.

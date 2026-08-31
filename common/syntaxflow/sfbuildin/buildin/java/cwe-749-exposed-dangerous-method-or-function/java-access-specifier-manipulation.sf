@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java反射setAccessible函数滥用漏洞"
 	type: Vulnerability
 	severity: High
-	risk: "反序列化漏洞"
+	risk: "reflection-abuse"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -97,6 +97,7 @@ $set_accessible_true?{<getCallee()><fullTypeName()>?{have: "java.lang.reflect"} 
 
 // alert 
 alert $target for {
+	risk: "reflection-abuse",
 	title: "Detect Java Reflection setAccessible Vulnerability",
 	title_zh: "检测Java反射setAccessible函数滥用漏洞",
 	level: "high",

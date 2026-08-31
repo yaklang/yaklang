@@ -4,7 +4,7 @@ desc(
 	type: audit
 	level: info
 	lib: "python-weak-hash"
-	risk: "弱完整性 / 易碰撞"
+	risk: "weak-integrity"
 	desc: <<<DESC
 标记 hashlib.md5、hashlib.sha1、hashlib.new 等调用。MD5/SHA1 不适合口令存储与现代完整性保证；算法名或数据若来自用户输入风险更高。
 DESC
@@ -26,7 +26,7 @@ alert $output for {
 	title_zh: "弱哈希调用",
 	level: "info",
 	type: "audit",
-	risk: "弱完整性 / 易碰撞",
+	risk: "weak-integrity",
 	message: "检测到 MD5、SHA1 或 hashlib.new；请确认用途非安全敏感场景或升级为更强算法。",
 	name: "output",
 }

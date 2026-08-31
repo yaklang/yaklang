@@ -72,3 +72,19 @@ func TestRiskTypeTaxonomyIsDetached(t *testing.T) {
 		t.Fatal("caller mutated producer taxonomy")
 	}
 }
+
+func TestRiskTypeCanonicalAuthoring(t *testing.T) {
+	for _, key := range []string{"sql-injection", "information", "reflection-abuse", "prompt-injection", "encoded-payload-execution"} {
+		if !IsCanonical(key) {
+			t.Errorf("active canonical key rejected: %q", key)
+		}
+	}
+	for _, raw := range []string{"", "SQL注入", " sql-injection ", "Moderate", "misplaced-severity", "Security", "security-check", "customer-risk"} {
+		if IsCanonical(raw) {
+			t.Errorf("invalid built-in authoring type accepted: %q", raw)
+		}
+	}
+	if _, ok := Lookup("Security"); !ok {
+		t.Fatal("legacy consumers must still resolve Security")
+	}
+}

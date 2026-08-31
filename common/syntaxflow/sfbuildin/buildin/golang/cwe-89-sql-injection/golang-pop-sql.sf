@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Pop SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -32,7 +32,7 @@ log.Fatal(err)
 DESC
 	rule_id: "56f41530-4175-41ec-96ac-198315171c10"
 	title_zh: "检测Golang SQL注入漏洞(Pop)"
-	risk: "SQL注入"
+	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用Pop库的参数化查询方式
@@ -116,7 +116,7 @@ $func?(* #{
 
 alert $high for {
 	type: "vuln",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	title: "Golang Pop SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang Pop SQL注入漏洞",
 	solution: <<<SOLUTION

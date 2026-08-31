@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang FTP Information Exposure"
 	type: audit
 	level: low
-	risk: "信息泄露（Information Exposure）"
+	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -161,7 +161,7 @@ DESC
 	type: "vuln",
 	title: "Golang FTP Information Exposure Vulnerability Was Detected",
 	message: "检测到Golang FTP信息泄露，可能存在目录结构暴露、当前工作路径泄露以及服务器系统类型识别的风险。",
-	risk: "信息泄露",
+	risk: "information-exposure",
 	name: "low",
 }
 

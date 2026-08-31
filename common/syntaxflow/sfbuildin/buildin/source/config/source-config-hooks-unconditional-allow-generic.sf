@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-hooks-unconditional-allow-generic"
-	risk: "Security"
+	risk: "authorization-bypass"
 	desc: <<<DESC
 Migrated from Semgrep rule `hooks-unconditional-allow-generic` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-unconditional-allow/hooks-unconditional-allow.yaml).
 Original message: Hook unconditionally allows tool execution by outputting a permissionDecision of "allow" without any conditional check. This bypasses the entire permission system. Add a conditional check to validate the tool or command before allowing.

@@ -1,7 +1,7 @@
 desc(
 	title: "Check PHP FTP Information Exposure Vulnerability"
 	title_zh: "检测PHP FTP信息泄露漏洞"
-	risk: "信息泄露（Information Exposure）"
+	risk: "information-exposure"
 	type: vul
 	level: "low"
 	desc: <<<DESC
@@ -140,7 +140,7 @@ if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
 #### 4. 对所有输出内容进行严格过滤和验证
 即使在需要向特定用户（如管理员）展示FTP相关信息时，也应对这些输出内容进行严格的过滤、转义和验证。确保不包含任何可能被利用于跨站脚本（XSS）或其他注入攻击的恶意字符或格式。例如，对于文件路径，应只展示文件名而不暴露完整的服务器文件系统路径。对于目录列表，应限制展示的深度和敏感性。
 SOLUTION
-	risk: "信息泄露",
+	risk: "information-exposure",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

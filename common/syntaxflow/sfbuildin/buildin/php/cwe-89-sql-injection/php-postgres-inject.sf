@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP PostgreSQL注入漏洞"
 	type: audit
 	level: low
-	risk: "sqli-inject"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -204,7 +204,7 @@ DESC
 	title: "Unvalidated PostgreSQL Parameter Injection",
 	name: "high",
 	message: "检测到PHP PostgreSQL未验证参数注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "SQL注入",
+	risk: "sql-injection",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -292,7 +292,7 @@ $result = pg_query($conn, "INSERT INTO comments (text) VALUES (" . $safe_comment
 为数据库用户分配最小必需的权限，限制其只能执行应用程序需要的操作。即使发生注入攻击，也能限制攻击者能造成的损害。
 SOLUTION
 	message: "检测到PHP PostgreSQL参数过滤不充分漏洞，可能存在中危风险，需进一步审计确认。",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	name: "mid",
 }
 
@@ -321,7 +321,7 @@ DESC
 2. **强制实施最小权限原则**：确保数据库账户仅拥有完成必要功能所需的最低权限，避免滥用信任机制。
 3. **结合其他规则共同审计**：本规则属于基础检测库，需与其他规则（如用户输入跟踪规则）配合使用，才能全面评估访问控制的有效性。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 }
 
 desc(

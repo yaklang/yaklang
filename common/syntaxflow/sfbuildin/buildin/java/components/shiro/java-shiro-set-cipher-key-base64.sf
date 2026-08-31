@@ -1,4 +1,5 @@
 desc(
+	risk: "hardcoded-key"
 	title: "Detect Java Shiro Hardcoded Encryption Key"
 	title_zh: "检测Java Shiro硬编码加密密钥"
 	type: audit
@@ -147,7 +148,7 @@ return cookieRememberMeManager;
 4. **禁用 RememberMe 功能 (如果不需要)**
 如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
 SOLUTION
-	risk: "硬编码密钥",
+	risk: "hardcoded-key",
 	name: "base64EncodedKey",
 	message: "检测到Java Shiro硬编码加密密钥，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
@@ -224,7 +225,7 @@ DESC
 	level: "mid",
 	name: "sink",
 	message: "检测到Java Shiro硬编码加密密钥，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
-	risk: "硬编码密钥",
+	risk: "hardcoded-key",
 }
 
 

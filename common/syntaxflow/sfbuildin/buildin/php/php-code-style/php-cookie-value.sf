@@ -1,4 +1,5 @@
 desc(
+	risk: "cookie-security"
 	title:"Predictable Cookie Value (Pseudo-Random)"
 	title_zh:"可预测的Cookie值（伪随机）", 
 	reference: <<<REFERENCE
@@ -22,7 +23,7 @@ alert $high for {
 	title: "Predictable Cookie Value (Pseudo-Random)",
 	title_zh: "可预测的Cookie值（伪随机）",
 	level: "high",
-	risk: "cookie security",
+	risk: "cookie-security",
 	solution: <<<SOLUTION
 SOLUTION
     desc:<<<DESC
@@ -56,7 +57,7 @@ alert $mid for {
 	title: "Predictable Cookie Value (Pseudo-Random)",
 	title_zh: "可预测的Cookie值（伪随机）",
 	level: "mid",
-	risk: "cookie security",
+	risk: "cookie-security",
 	solution: <<<SOLUTION
 确保用于会话管理或其他敏感目的的Cookie值是不可预测且高熵的。
 强烈建议使用加密安全的伪随机数生成器（CSPRNG）来生成Cookie值。

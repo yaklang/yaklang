@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java泛型异常捕获"
 	type: "Code Vulnerability"
 	severity: "low"
-	risk: "错误处理（Error Handling）"
+	risk: "error-handling"
 	cwe: "CWE-396"
 	desc: <<<DESC
 ### 漏洞描述
@@ -126,7 +126,7 @@ logger.error("IO or Database error", e);
 }
 ```
 SOLUTION
-	risk: "异常处理",
+	risk: "exception-handling",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

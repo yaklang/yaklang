@@ -1,7 +1,7 @@
 desc(
 	title_zh: "审计Java J2EE 标准使用线程规则"
 	title: "Audit Java J2EE Usage of Threads"
-	risk:"代码风格",
+	risk:"code-style"
 	level: info
 	reference: <<<REFERENCE
 [Java™ Platform, Standard v8 API Specification - Class Thread](https://docs.oracle.com/javase/8/docs/api/java/lang/Thread.html)
@@ -121,7 +121,7 @@ System.out.println("Executing task in ManagedExecutorService thread");
 #### 3. 避免使用 ThreadLocal
 在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
 SOLUTION
-	risk: "代码风格",
+	risk: "code-style",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -192,7 +192,7 @@ System.out.println("Executing task in ManagedExecutorService thread");
 #### 3. 避免使用 ThreadLocal
 在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
 SOLUTION
-	risk: "代码风格",
+	risk: "code-style",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -265,7 +265,7 @@ System.out.println("Executing task in ManagedExecutorService thread");
 #### 3. 避免使用 ThreadLocal
 在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
 SOLUTION
-	risk: "代码风格",
+	risk: "code-style",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -290,7 +290,7 @@ DESC
 run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run
 alert $run for {
 	message: "检测到Java项目中使用了Runnable接口并且实现了run方法",
-	risk: "代码风格",
+	risk: "code-style",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

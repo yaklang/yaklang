@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: medium
 	rule_id: "source-java-runtime-exec"
-	risk: "Command Injection"
+	risk: "command-injection"
 	desc: <<<DESC
 Flags Runtime.getRuntime().exec(...) which often leads to command injection when fed with untrusted input.
 DESC

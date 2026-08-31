@@ -152,7 +152,7 @@ $id = input('get.id');
 $user = Db::table('users')->where('id', $id)->find();
 ```
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 1. 规则目的
 该规则用于审计 ThinkPHP 框架中 `param` 方法的使用情况，特别是用于获取外部用户输入（如 `GET`、`POST`、`COOKIE`、`REQUEST` 等）的场景。目的是识别潜在的未经过滤或验证的用户输入，这些输入如果不加处理地直接用于数据库操作或页面输出，可能导致 SQL 注入、XSS 跨站脚本攻击等安全漏洞。

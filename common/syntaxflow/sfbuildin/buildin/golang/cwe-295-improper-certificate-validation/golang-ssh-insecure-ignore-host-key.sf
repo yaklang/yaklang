@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang使用ssh.InsecureIgnoreHostKey"
 	type: vuln
 	level: high
-	risk: "身份认证缺陷"
+	risk: "improper-authentication"
 	desc: <<<DESC
 该规则用于检测 `golang.org/x/crypto/ssh` 中 `ssh.InsecureIgnoreHostKey()` 的使用。
 该函数会跳过 SSH 主机密钥校验，导致客户端无法验证服务端身份，容易受到中间人攻击（MITM）。
@@ -29,7 +29,7 @@ alert $high for {
 	title: "Golang SSH InsecureIgnoreHostKey Detected",
 	title_zh: "检测到Golang使用不安全的SSH主机校验",
 	message: "检测到使用 ssh.InsecureIgnoreHostKey()，这会禁用SSH主机身份验证，存在中间人攻击风险。",
-	risk: "身份认证缺陷",
+	risk: "improper-authentication",
 	desc: <<<DESC
 使用 `ssh.InsecureIgnoreHostKey()` 会无条件信任任意主机密钥。
 攻击者可伪造服务端主机并窃听或篡改 SSH 会话流量。

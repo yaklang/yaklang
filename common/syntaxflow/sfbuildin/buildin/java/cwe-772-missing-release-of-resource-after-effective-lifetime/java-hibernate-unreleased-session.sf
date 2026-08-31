@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java Hibernate Session 数据库资源未释放"
 	title: "Check Java Hibernate Session Unreleased Resource"
-	risk:"资源泄漏",
+	risk:"resource-leak"
 	level:high
 	reference: <<<REFERENCE
 [Hibernate Session API 文档 (Hibernate 2.x)](https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/Session.html)
@@ -215,7 +215,7 @@ DESC
 	message: "检测到Hibernate Session 未释放资源",
 	title: "Check Java Hibernate Session Unreleased Resource",
 	title_zh: "检测Java Hibernate Session 数据库资源未释放",
-	risk: "资源泄漏",
+	risk: "resource-leak",
 	name: "weak",
 }
 

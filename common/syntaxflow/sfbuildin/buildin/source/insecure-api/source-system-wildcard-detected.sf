@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-system-wildcard-detected"
-	risk: "Security"
+	risk: "unsafe-shell-expansion"
 	desc: <<<DESC
 Migrated from Semgrep rule `system-wildcard-detected` (/tmp/semgrep-rules/python/lang/security/audit/system-wildcard-detected.yaml).
 Original message: Detected use of the wildcard character in a system call that spawns a shell. This subjects the wildcard to normal shell expansion, which can have unintended consequences if there exist any non-standard file names. Consider a file named '-e sh script.sh' -- this will execute a script when 'rsync' is called.
@@ -43,6 +43,7 @@ $c1 + $c2 as $c
 ${*.py}.pattern_regex(/(?:tar|chmod|chown|rsync)(?:.*?)\*|YAKLANG_SF_POS_source\-system\-wildcard\-detected/) as $t
 $t inside $c as $hit
 alert $hit for {
+	risk: "unsafe-shell-expansion",
 	level: "middle",
 	title: "System Wildcard Detected",
 	title_zh: "检测到系统调用中的通配符注入",

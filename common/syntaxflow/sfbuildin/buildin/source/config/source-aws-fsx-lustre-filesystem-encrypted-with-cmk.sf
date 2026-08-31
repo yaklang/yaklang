@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-aws-fsx-lustre-filesystem-encrypted-with-cmk"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 Migrated from Semgrep rule `aws-fsx-lustre-filesystem-encrypted-with-cmk` (/tmp/semgrep-rules/terraform/aws/security/aws-fsx-lustre-files-ystem.yaml).
 Original message: Ensure FSX Lustre file system is encrypted at rest using KMS CMKs. CMKs gives you control over the encryption key in terms of access and rotation.

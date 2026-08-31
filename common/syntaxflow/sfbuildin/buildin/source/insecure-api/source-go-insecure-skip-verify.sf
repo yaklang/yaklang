@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-go-insecure-skip-verify"
-	risk: "Improper Certificate Validation"
+	risk: "certificate-validation"
 	desc: <<<DESC
 Flags InsecureSkipVerify: true which disables TLS certificate verification.
 DESC

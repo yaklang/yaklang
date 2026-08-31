@@ -2,7 +2,7 @@ desc(
 	title: "C Use After Free and Double Free"
 	type: audit
 	level: high
-	risk: "释放后使用"
+	risk: "use-after-free"
 	lang: c
 	rule_id: "a3b8c1d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
 	title_zh: "C 语言 Use-After-Free / Double-Free 检测"
@@ -35,7 +35,7 @@ alert $uaf for {
 	title: "Use After Free",
 	title_zh: "释放后使用",
 	level: "high",
-	risk: "释放后使用",
+	risk: "use-after-free",
 	desc: <<<DESC
 该 free 释放的指针之后仍被解引用，或对同一对象二次 free
 DESC

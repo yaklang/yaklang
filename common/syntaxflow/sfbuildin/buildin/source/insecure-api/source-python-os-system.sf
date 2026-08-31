@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-python-os-system"
-	risk: "Command Injection"
+	risk: "command-injection"
 	desc: <<<DESC
 Flags os.system(...) which invokes a shell and is dangerous with untrusted input.
 DESC

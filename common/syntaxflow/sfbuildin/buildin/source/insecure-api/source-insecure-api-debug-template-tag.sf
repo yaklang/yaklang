@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-debug-template-tag"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
 Migrated from Semgrep rule `debug-template-tag` (/tmp/semgrep-rules/python/django/security/audit/templates/debug-template-tag.yaml).
 Original message: Detected a debug template tag in a Django template. This dumps debugging information to the page when debug mode is enabled. Showing debug information to users is dangerous because it may reveal information about your environment that malicious actors can use to gain access to the system. Remove the debug tag.
@@ -34,6 +34,7 @@ NEG
 ${*.html}.pattern_regex(/({% debug %})/) as $p0
 $p0 as $hit
 alert $hit for {
+	risk: "information-exposure",
 	level: "middle",
 	title: "Debug Template Tag",
 	title_zh: "检测到Debug Template Tag",

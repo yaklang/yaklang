@@ -1,6 +1,6 @@
 {
   "schema_version": "yaklang_risk_type_taxonomy.v1",
-  "version": "2026.08.31",
+  "version": "2026.08.31.2",
   "categories": [
     {
       "id": "injection",
@@ -28,7 +28,10 @@
         {"name":"log-forging","display_name":"日志伪造","aliases":["日志伪造"],"order":19},
         {"name":"format-string","display_name":"格式化字符串漏洞","aliases":["格式化字符串漏洞"],"order":20},
         {"name":"deserialization","display_name":"不安全反序列化","aliases":["Insecure Deserialization","不安全反序列化","反序列化","反序列化漏洞","反序列化（Unserialize）"],"order":21},
-        {"name":"variable-overwrite","display_name":"变量覆盖","aliases":["变量覆盖","变量覆盖（Variable Coverage）"],"order":22}
+        {"name":"variable-overwrite","display_name":"变量覆盖","aliases":["变量覆盖","变量覆盖（Variable Coverage）"],"order":22},
+        {"name":"reflection-abuse","display_name":"不安全反射","order":23},
+        {"name":"prompt-injection","display_name":"提示词注入","order":24},
+        {"name":"tool-poisoning","display_name":"工具描述投毒","order":25}
       ]
     },
     {
@@ -46,7 +49,8 @@
         {"name":"open-redirect","display_name":"开放重定向","aliases":["开放重定向","开放重定向（Open Redirect）","URL重定向","url-redirect"],"order":8},
         {"name":"cors","display_name":"跨域资源共享（CORS）","aliases":["CORS","跨域资源共享（CORS）"],"order":9},
         {"name":"clickjacking","display_name":"点击劫持","aliases":["点击劫持"],"order":10},
-        {"name":"insecure-content-loading","display_name":"不安全内容加载","aliases":["不安全内容加载"],"order":11}
+        {"name":"insecure-content-loading","display_name":"不安全内容加载","aliases":["不安全内容加载"],"order":11},
+        {"name":"csp-misconfiguration","display_name":"内容安全策略配置不当","order":12}
       ]
     },
     {
@@ -171,7 +175,9 @@
         {"name":"error-handling","display_name":"错误处理不当","aliases":["错误处理","错误处理不当","错误处理（Error Handling）"],"order":5},
         {"name":"exception-handling","display_name":"异常处理","aliases":["异常处理"],"order":6},
         {"name":"input-validation","display_name":"输入校验不当","aliases":["输入校验不当"],"order":7},
-        {"name":"data-integrity","display_name":"数据完整性","aliases":["数据完整性"],"order":8}
+        {"name":"data-integrity","display_name":"数据完整性","aliases":["数据完整性"],"order":8},
+        {"name":"unicode-direction-control","display_name":"Unicode 方向控制符","order":9},
+        {"name":"unsafe-shell-expansion","display_name":"不安全 Shell 展开","order":10}
       ]
     },
     {
@@ -179,11 +185,12 @@
       "display_name": "审计与辅助分析",
       "order": 12,
       "risk_types": [
-        {"name":"security-check","display_name":"安全检查","aliases":["Security"],"order":1},
+        {"name":"security-check","display_name":"安全检查","aliases":["Security"],"order":1,"review_required":true},
         {"name":"audit-check","display_name":"审计检查","aliases":["审计（Audit）"],"order":2},
         {"name":"information","display_name":"信息提示","aliases":["信息"],"order":3},
         {"name":"archive-operation","display_name":"压缩文件操作","aliases":["zip operator"],"order":4},
-        {"name":"deserialization-flow","display_name":"不安全反序列化链路","aliases":["不安全反序列化链路"],"order":5}
+        {"name":"deserialization-flow","display_name":"不安全反序列化链路","aliases":["不安全反序列化链路"],"order":5},
+        {"name":"encoded-payload-execution","display_name":"编码载荷执行","order":6}
       ]
     },
     {

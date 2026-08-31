@@ -218,7 +218,7 @@ DESC
 	type: "vuln",
 	title: "Unvalidated File Upload Path in Golang",
 	title_zh: "检测到Golang文件上传路径未验证风险",
-	risk: "文件上传",
+	risk: "file-upload",
 	name: "low",
 	message: "检测到Golang文件上传路径未验证风险，并且从数据源（source）到污染汇聚点（sink）间，可能存在过滤函数，需进一步审计进行确认。",
 }

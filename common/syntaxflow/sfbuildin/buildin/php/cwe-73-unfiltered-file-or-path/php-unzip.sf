@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP文件解压漏洞"
 	type: vul
 	level: low
-	risk: "zip operator"
+	risk: "archive-operation"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -143,7 +143,7 @@ $zip->close();
 - **拒绝服务：** 攻击者可能解压大量小文件或超大文件，消耗服务器资源导致服务不可用。
 DESC
 	message: "检测到PHP未验证文件解压漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "目录穿越",
+	risk: "path-traversal",
 	name: "high",
 }
 $sink<dataflow(include=<<<CODE
@@ -194,7 +194,7 @@ $zip->close();
 3. **使用安全的解压函数或库**
 - 检查使用的解压函数或库是否内置了防止路径穿越的机制。优先使用支持文件名 sanitization 的库。
 SOLUTION
-	risk: "目录穿越",
+	risk: "path-traversal",
 	name: "mid",
 }
 $sink - $high - $mid as $low
@@ -240,7 +240,7 @@ $zip->close();
 3. **使用安全的解压函数或库**
 - 检查使用的解压函数或库是否内置了防止路径穿越的机制。优先使用支持文件名 sanitization 的库。
 SOLUTION
-	risk: "目录穿越",
+	risk: "path-traversal",
 	name: "low",
 }
 desc(

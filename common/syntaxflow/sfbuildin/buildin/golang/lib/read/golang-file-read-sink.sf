@@ -193,7 +193,7 @@ logFileAccess(absPath)
 ```
 以上方法可以有效防止路径遍历漏洞和敏感文件非法访问，同时提升系统的安全性。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

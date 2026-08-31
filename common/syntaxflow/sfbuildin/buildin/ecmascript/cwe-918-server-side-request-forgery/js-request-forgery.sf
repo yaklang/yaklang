@@ -3,7 +3,7 @@ desc(
 	title_zh: "服务端请求伪造（SSRF）"
 	type: vuln
 	level: high
-	risk: "服务端请求伪造（SSRF）"
+	risk: "ssrf"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -238,7 +238,7 @@ alert $ssrf for {
 	title: "Server-Side Request Forgery",
 	title_zh: "服务端请求伪造（SSRF）",
 	message: "检测到用户可控输入直接流入 HTTP 请求的 URL 参数，可能导致 SSRF 攻击。攻击者可利用此漏洞将服务器作为代理访问内网资源、云元数据服务或其他非预期目标。请使用白名单校验请求目标，禁止将用户输入直接拼入 URL。",
-	risk: "服务端请求伪造（SSRF）",
+	risk: "ssrf",
 	name: "ssrfSink",
 }
 

@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Reflected XSS in Template Engine"
 	type: audit
 	level: mid
-	risk: "跨站脚本（XSS）"
+	risk: "xss"
 	desc: <<<DESC
 该规则旨在识别Go语言应用程序中，当使用`text/template`或`html/template`包渲染用户输入数据时，若未进行适当的上下文感知转义处理，可能导致反射型跨站脚本（XSS）漏洞。具体场景包括：直接从HTTP请求参数、Cookie或Header获取数据后，未经过滤或调用`html.EscapeString()`等安全函数，直接传递给模板的`Execute`或`ExecuteTemplate`方法；或者错误地使用了`template.HTML`类型来绕过Go模板引擎默认的自动转义机制。攻击者可以利用此漏洞注入恶意JavaScript代码，当受害者的浏览器解析并执行这些代码时，可能窃取用户的会话令牌（Session Cookie）、重定向用户到钓鱼网站、篡改页面内容或执行其他恶意操作，严重威胁系统的完整性和用户的隐私安全。
 DESC
@@ -45,7 +45,7 @@ DESC
 	title_zh: "Go模板渲染中的反射型跨站脚本（XSS）漏洞",
 	name: "mid",
 	message: "用户输入未经过滤直接用于模板渲染，存在跨站脚本攻击风险。",
-	risk: "跨站脚本（XSS）",
+	risk: "xss",
 }
 
 desc(

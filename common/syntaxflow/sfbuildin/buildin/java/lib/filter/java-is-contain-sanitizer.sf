@@ -40,7 +40,7 @@ alert $output for {
 	solution: <<<SOLUTION
 无明确修复方式，但建议审计人员对匹配到的代码进行深入分析，确保其使用场景符合安全需求。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	desc: <<<DESC
 ### 1. 规则目的
 该规则用于查找Java代码中是否存在包含"contain"关键字的方法调用。此规则期望输入参数的操作码为`call`，如果该调用名称包含"contain"，则返回调用的原始值。该规则常用于确认数据流分析中是否涉及白名单校验、字符串校验等操作。
