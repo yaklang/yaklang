@@ -1,0 +1,137 @@
+__DESC__ = "返回异常行为狩猎分析剧本与报告约束，覆盖大文件外发、远程控制工具异常、网盘邮箱外泄等场景。适用于异常行为狩猎、外发日志分析、DLP狩猎报告。"
+__VERBOSE_NAME__ = "数字猎手"
+__KEYWORDS__ = "异常行为狩猎,大文件外发,DLP,远控,网盘外泄,行为分析,终端外发"
+
+target = cli.String("target", cli.setVerboseName("狩猎场景"), cli.setHelp("大文件外发/远程控制工具异常/网盘邮箱外泄，可空"), cli.setDefault("大文件外发"))
+standaloneTool = cli.Bool("standalone-tool", cli.setDefault(false), cli.setHelp("作为 AI 工具直接执行"))
+cli.check()
+
+// BEGIN GENERATED HUNT CATALOG
+embeddedCatalogJSON = `{"playbooks":[{"场景":"大文件外发","适用信号":"文件外发日志、DLP外发、大文件传输、终端外发途径","关键字段":["文件名称","文件大小","账号","姓名","IP","设备名称","终端外发途径","外发结果","操作时间"],"分析维度":["总量与时间范围","外发结果分布（放行/阻断）","外发途径 TOP","账号/设备 TOP","大文件阈值（如≥50MB、≥100MB）","高风险途径（远程控制、网盘、邮箱、共享）","可疑样本明细"],"高风险途径关键词":["Sunlogin","ToDesk","TeamViewer","网盘","邮箱","微信文件传输","共享","ftp","scp"],"关注点":["远程运维工具外发大文件","个人网盘/邮箱外发","单账号高频外发","镜像/压缩包/数据库类文件名","阻断极少而放行占绝对多数时的策略缺口"]},{"场景":"远程控制工具异常","适用信号":"向日葵、ToDesk、TeamViewer、远程桌面外发或远控行为","关键字段":["账号","IP","设备名称","终端外发途径","文件名称","文件大小","操作时间"],"分析维度":["远控工具占比","涉及账号与设备","外发文件类型","时间集中度"],"高风险途径关键词":["Sunlogin","ToDesk","TeamViewer","Remote"],"关注点":["非运维人员使用远控外发","非工作时间远控外发","超大文件经远控通道离开终端"]},{"场景":"网盘邮箱外泄","适用信号":"百度网盘、邮箱、微信文件传输助手、公有云盘","关键字段":["账号","文件名称","文件大小","终端外发途径","外发结果","操作时间"],"分析维度":["外泄通道分布","账号 TOP","敏感扩展名/命名","放行占比"],"高风险途径关键词":["网盘","邮箱","文件传输助手","网易","QQ"],"关注点":["批量图片/压缩包外发","同一账号多通道外发","策略几乎全放行"]}],"supported_scenarios":["大文件外发","远程控制工具异常","网盘邮箱外泄"],"default_scenario":"大文件外发","size_thresholds_mb":{"关注":50,"重点":100},"status_enum":["放行","阻断","未知"],"generation_contract":{"required_sections":["狩猎范围","数据概况","异常发现","重点对象","可疑明细","狩猎结论与建议","数据缺口"],"max_detail_rows":20,"must_keep_full_ip":true,"forbid_invented_stats":true}}`
+// END GENERATED HUNT CATALOG
+
+expectedScenes = [
+    "大文件外发",
+    "远程控制工具异常",
+    "网盘邮箱外泄",
+]
+
+resolveParam = func(params, key, fallback) {
+    if params == nil {
+        return fallback
+    }
+    try {
+        value = params[key]
+        if value != nil && str.TrimSpace(string(value)) != "" {
+            return str.TrimSpace(string(value))
+        }
+        alias = str.ReplaceAll(key, "-", "_")
+        value = params[alias]
+        if value != nil && str.TrimSpace(string(value)) != "" {
+            return str.TrimSpace(string(value))
+        }
+    } catch err {
+        return fallback
+    }
+    return fallback
+}
+
+normalizeScene = func(raw) {
+    value = str.TrimSpace(string(raw))
+    for _, scene = range expectedScenes {
+        if value == scene {
+            return value
+        }
+    }
+    if value == "" {
+        return "大文件外发"
+    }
+    // 简单兼容
+    if value == "外发" || value == "dlp" || value == "DLP" {
+        return "大文件外发"
+    }
+    if value == "远控" {
+        return "远程控制工具异常"
+    }
+    if value == "网盘" || value == "邮箱" {
+        return "网盘邮箱外泄"
+    }
+    return "大文件外发"
+}
+
+loadEmbeddedCatalog = func() {
+    if str.TrimSpace(embeddedCatalogJSON) == "" {
+        return nil, error("内置狩猎剧本为空")
+    }
+    try {
+        catalog = json.loads(embeddedCatalogJSON)
+        if catalog["playbooks"] == nil {
+            return nil, error("内置狩猎剧本缺少 playbooks")
+        }
+        return catalog, nil
+    } catch parseError {
+        return nil, error("内置狩猎剧本解析失败: " + sprint(parseError))
+    }
+}
+
+selectPlaybook = func(catalog, scene) {
+    selected = nil
+    for _, pb = range catalog["playbooks"] {
+        if pb["场景"] == scene {
+            selected = pb
+            break
+        }
+    }
+    if selected == nil {
+        return nil, error("不支持的狩猎场景: " + scene)
+    }
+    return {
+        "status": "completed",
+        "scene": scene,
+        "supported_scenarios": expectedScenes,
+        "playbook": selected,
+        "size_thresholds_mb": catalog["size_thresholds_mb"],
+        "generation_contract": catalog["generation_contract"],
+    }, nil
+}
+
+emitFinalResult = func(content) {
+    result = str.TrimSpace(string(content))
+    if result == "" {
+        return error("最终结果不能为空")
+    }
+    yakit.AIOutput("%s", result)
+    return nil
+}
+
+forgeHandle = func(params, opts...) {
+    scene = normalizeScene(resolveParam(params, "scene", resolveParam(params, "target", target)))
+    catalog, err = loadEmbeddedCatalog()
+    if err != nil {
+        message = "狩猎剧本查询失败: " + sprint(err)
+        yakit.Error("%s", message)
+        emitFinalResult(message)
+        return message
+    }
+    result, selErr = selectPlaybook(catalog, scene)
+    if selErr != nil {
+        message = "狩猎剧本查询失败: " + sprint(selErr)
+        yakit.Error("%s", message)
+        emitFinalResult(message)
+        return message
+    }
+    resultBytes, marshalError = json.Marshal(result)
+    if marshalError != nil {
+        message = "狩猎剧本序列化失败: " + sprint(marshalError)
+        yakit.Error("%s", message)
+        emitFinalResult(message)
+        return message
+    }
+    resultText = string(resultBytes)
+    emitFinalResult(resultText)
+    return resultText
+}
+
+if standaloneTool {
+    println(forgeHandle({}))
+}

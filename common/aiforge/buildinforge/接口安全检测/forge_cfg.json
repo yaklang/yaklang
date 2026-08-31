@@ -1,0 +1,13 @@
+{
+  "name": "接口安全检测",
+  "verbose_name": "接口安全检测助手",
+  "description": "根据输入的接口地址整理检测任务要素，输出鉴权、参数、越权等检查项和结果整理框架。",
+  "tags": "接口安全,API检测,越权检查,鉴权分析,演示",
+  "tools": "",
+  "params": "",
+  "init_prompt": "你是接口安全检测助手。根据输入的接口地址整理检查项和结果整理框架，不执行真实请求，不虚构结果。",
+  "persistent_prompt": "保持输出结构稳定，仅根据输入内容整理结果，不执行真实操作，不虚构数据。",
+  "plan_prompt": "{\"@action\":\"plan\",\"query\":\"-\",\"main_task\":\"接口安全检测\",\"main_task_goal\":\"整理接口检查项和结果框架\",\"tasks\":[{\"subtask_name\":\"整理检查项\",\"subtask_goal\":\"根据输入整理鉴权和越权检查项，不执行真实请求\"}]}",
+  "result_prompt": "输出简体中文 Markdown 报告，包含输入摘要、检查项整理和风险说明，不描述内部执行过程。",
+  "forge_content": "cli.Text(\"base-url\", cli.setVerboseName(\"接口地址\"), cli.setHelp(\"演示参数，仅用于展示，不执行真实请求\"))\ncli.check()"
+}

@@ -1,0 +1,1 @@
+{"@action":"plan","query":"-","main_task":"生成异常行为狩猎报告","main_task_goal":"读取行为日志并调用一次狩猎剧本，输出统计、异常发现与核查建议。","tasks":[{"subtask_name":"分析日志并输出狩猎报告","subtask_goal":"先完整解析 log-text 或读取 log-file，再调用一次 abnormal_behavior_hunt_playbook，传入 standalone-tool=true 和 target；完成总量/途径/账号/大文件/高风险通道统计；输出不超过20条可疑明细与建议；禁止编造，禁止省略IP与账号。"}]}

@@ -1,0 +1,13 @@
+{
+  "name": "流量包分析",
+  "verbose_name": "流量包分析助手",
+  "description": "根据输入的流量包文件路径整理分析框架，输出协议分布、可疑会话和取证要点建议。",
+  "tags": "流量分析,协议解析,会话分析,取证,演示",
+  "tools": "",
+  "params": "",
+  "init_prompt": "你是流量包分析助手。根据输入的流量包文件路径整理分析框架和取证要点，不解析真实文件，不虚构会话。",
+  "persistent_prompt": "保持输出结构稳定，仅根据输入内容整理结果，不执行真实操作，不虚构数据。",
+  "plan_prompt": "{\"@action\":\"plan\",\"query\":\"-\",\"main_task\":\"流量包分析\",\"main_task_goal\":\"整理分析框架和取证要点\",\"tasks\":[{\"subtask_name\":\"整理分析任务\",\"subtask_goal\":\"根据输入整理流量分析框架，不解析真实文件\"}]}",
+  "result_prompt": "输出简体中文 Markdown 报告，包含输入摘要、分析框架和取证建议，不描述内部执行过程。",
+  "forge_content": "cli.File(\"pcap-file\", cli.setVerboseName(\"流量包文件\"), cli.setHelp(\"演示参数，仅用于展示，不解析真实文件\"))\ncli.check()"
+}

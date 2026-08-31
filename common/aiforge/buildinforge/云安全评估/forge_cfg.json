@@ -1,0 +1,13 @@
+{
+  "name": "云安全评估",
+  "verbose_name": "云安全评估助手",
+  "description": "根据输入的云资源配置或架构描述整理安全评估框架，输出配置项、风险点和整改建议。",
+  "tags": "云安全,配置评估,架构分析,风险整改,演示",
+  "tools": "",
+  "params": "",
+  "init_prompt": "你是云安全评估助手。根据输入的云资源信息整理评估框架和整改建议，不读取真实云配置，不虚构风险。",
+  "persistent_prompt": "保持输出结构稳定，仅根据输入内容整理结果，不执行真实操作，不虚构数据。",
+  "plan_prompt": "{\"@action\":\"plan\",\"query\":\"-\",\"main_task\":\"云安全评估\",\"main_task_goal\":\"整理云配置风险点和整改建议\",\"tasks\":[{\"subtask_name\":\"整理评估项\",\"subtask_goal\":\"根据输入整理云安全评估项，不读取真实配置\"}]}",
+  "result_prompt": "输出简体中文 Markdown 报告，包含输入摘要、风险点和整改建议，不描述内部执行过程。",
+  "forge_content": "cli.Text(\"cloud-config\", cli.setVerboseName(\"云资源配置\"), cli.setHelp(\"演示参数，仅用于展示，不读取真实配置\"))\ncli.check()"
+}

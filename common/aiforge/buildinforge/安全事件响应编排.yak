@@ -1,0 +1,27 @@
+alert_file = cli.File("alert-file", cli.setVerboseName("事件文件"), cli.setHelp("上传事件Excel或告警导出文件，可空"))
+incident_type = cli.StringSlice(
+    "incident-type",
+    cli.setVerboseName("事件类型"),
+    cli.setHelp("九类之一；也可留空由模型根据文件内容判断"),
+    cli.setSelectOption("探测扫描", "探测扫描"),
+    cli.setSelectOption("恶意软件感染", "恶意软件感染"),
+    cli.setSelectOption("勒索软件", "勒索软件"),
+    cli.setSelectOption("账号失陷", "账号失陷"),
+    cli.setSelectOption("数据泄露", "数据泄露"),
+    cli.setSelectOption("Web应用入侵", "Web应用入侵"),
+    cli.setSelectOption("横向移动", "横向移动"),
+    cli.setSelectOption("钓鱼成功", "钓鱼成功"),
+    cli.setSelectOption("DDoS攻击", "DDoS攻击"),
+)
+alert_text = cli.Text("alert-text", cli.setVerboseName("事件描述"), cli.setDefault(""), cli.setHelp("也可直接粘贴告警/事件内容"))
+current_phase = cli.StringSlice(
+    "current-phase",
+    cli.setVerboseName("当前阶段"),
+    cli.setHelp("可空；空则输出全阶段编排"),
+    cli.setSelectOption("检测与研判", "检测与研判"),
+    cli.setSelectOption("遏制", "遏制"),
+    cli.setSelectOption("根除", "根除"),
+    cli.setSelectOption("恢复", "恢复"),
+    cli.setSelectOption("复盘改进", "复盘改进"),
+)
+cli.check()

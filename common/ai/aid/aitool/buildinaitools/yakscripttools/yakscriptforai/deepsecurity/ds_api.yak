@@ -1,0 +1,509 @@
+__DESC__ = "亚信安全云主机深度安全防护系统（服务器安全狗/云眼 Safedog / Deep Security）开放接口统一查询工具。通过 action 区分操作，覆盖入侵威胁（病毒木马/网页后门/反弹shell/异常账号/异常登录/异常进程/命令篡改/日志删除/本地提权）、漏洞风险（系统漏洞/弱口令/高危账号/配置缺陷/应急漏洞）、资产盘点（服务器/账号）、威胁监测告警（进程/内存/蜜罐/登录/文件/账号/操作审计/反弹shell/威胁情报/后门/文件蜜罐/异常外联）。工具内部固定使用 HmacSHA256 签名认证 + GET 请求，地址、appId、secret、参数转换与分页全部内置，AI 只传查询条件即可。仅查询，不执行任何写操作。"
+__VERBOSE_NAME__ = "Deep Security OpenAPI Query Tool"
+__VERBOSE_NAME_ZH__ = "主机安全(Deep Security)开放接口查询工具"
+__KEYWORDS__ = "deepsecurity,主机安全,云主机,入侵威胁,病毒木马,webshell,反弹shell,弱口令,漏洞,异常登录,safedog,云眼,query"
+__USAGE__ = <<<USAGE_BLOCK
+亚信安全云主机深度安全防护系统开放接口统一查询工具。仅查询，不执行任何写操作。
+
+## 认证
+公共参数放 header（appId / signMethod=HmacSHA256 / signVersion=3.0 / signNonce / time / version / sign）。
+签名串 = 公共参数+业务参数 按 key 字典序排序，value 用 JSON 序列化（字符串带双引号，GET 单值按数组 ["x"] 参与），
+拼 key=value&... 末尾拼 key=<secret>，整体 HmacSHA256 输出小写 hex。工具内部已实现，AI 无需关心。
+请求限额：每接口每分钟 100 次。返回统一 {requestId, returnCode(1=成功), returnMsg, data{totalData,totalPage,xxxList}}。
+
+## 通用参数
+- `ds-base-url`：平台地址，默认 demo mock，通常无需修改
+- `ds-app-id`：API 账户 appId（后台 API 账户管理申请）
+- `ds-secret`：API 账户 secret（与 appId 配对）
+- `page-no`：页码，默认 1，max-pages>1 时作为起始页
+- `page-size`：每页条数，默认 10，最大 100
+- `max-pages`：自动翻页页数，默认 1 不翻页；传 N（1-10）时工具自动从 page-no 起连续拉 N 页并
+  合并结果；返回的 data 中额外带 totalData（全量总数）、pages_fetched、items_fetched、has_more。
+  研判查询建议传 page-size=100、max-pages=5~10
+- `user-name`：用户名（服务器拥有者），可留空
+- `mac-code`：机器码（服务器唯一标识），路径参数或筛选条件
+- `is-processed`：false 待处理 / true 已处理，可留空
+- `state`：处理状态（0未处理 1隔离 2信任 3删除，101/201/301进行中，-1/-2/-3失败），可留空
+- `server-ip` / `server-local-ip`：按 IP 筛选，可留空
+
+## 操作（按 action 路由，均为 GET）
+
+### 入侵威胁（invade）—— 失陷取证，最高优先级
+- `action=query_virus_count`：GET /invade/virus/server-count/list，各服务器病毒木马数量分布
+- `action=query_virus_info`：GET /invade/virus/info/list，全网病毒木马信息列表（type/path/hash/time/state/recentlyTime/count）
+- `action=query_virus_affect`：GET /invade/virus/influence/{virus-hash}/server/list，某病毒影响的服务器（需 virus-hash）
+- `action=query_virus_server_detail`：GET /invade/virus/server/{mac-code}/detail/list，某服务器病毒木马详情（需 mac-code）
+- `action=query_virus_detail`：GET /invade/virus/detail/{mac-code}/{risk-id}，某条病毒木马详情（需 mac-code + risk-id）
+- 网页后门：`query_webshell_count` / `query_webshell_info` / `query_webshell_affect`(需 webshell-hash) / `query_webshell_server_detail`(需 mac-code) / `query_webshell_detail`(需 mac-code + risk-id)，路径把 virus 换成 webshell
+- 反弹shell：`query_reboundshell_count` / `query_reboundshell_server_detail`(需 mac-code) / `query_reboundshell_detail`(需 mac-code + risk-id)
+- 异常账号：`query_abnormal_account_count` / `query_abnormal_account_server_detail`(需 mac-code) / `query_abnormal_account_detail`(需 mac-code + risk-id)
+- 异常登录：`query_abnormal_login_count` / `query_abnormal_login_server_detail`(需 mac-code) / `query_abnormal_login_detail`(需 mac-code + risk-id)
+- 异常进程：`query_abnormal_process_count` / `query_abnormal_process_server_detail`(需 mac-code) / `query_abnormal_process_detail`(需 mac-code + risk-id)
+- 日志删除：`query_log_delete_count` / `query_log_delete_server_detail`(需 mac-code) / `query_log_delete_detail`(需 mac-code + risk-id)
+- 命令篡改：`query_system_cmd_count` / `query_system_cmd_info` / `query_system_cmd_detail`(需 mac-code + risk-id)
+- 本地提权：`query_local_permission_count` / `query_local_permission_info` / `query_local_permission_detail`(需 risk-id)
+
+### 漏洞风险（risk）—— 暴露面
+- `action=query_system_vuln_distributed`：GET /risk/system/server-distributed/list，各服务器系统漏洞分布
+- `action=query_system_vuln_info`：GET /risk/system/info/list，全网系统漏洞信息列表
+- `action=query_system_vuln_influence`：GET /risk/system/influence/{vuln-name}/server/list，某漏洞影响的服务器（需 vuln-name）
+- `action=query_system_vuln_server_detail`：GET /risk/system/server/{mac-code}/detail/list，某服务器系统漏洞（需 mac-code）
+- `action=query_system_vuln_detail`：GET /risk/system/detail/{mac-code}/{risk-id}，某条系统漏洞详情（需 mac-code + risk-id）
+- 弱口令：`query_weakpwd_distributed` / `query_weakpwd_server_detail`(需 mac-code) / `query_weakpwd_detail`(需 mac-code + risk-id) / `query_weakpwd_by_time`(需 day)
+- 高危账号：`query_danger_account_distributed` / `query_danger_account_server_detail`(需 mac-code) / `query_danger_account_detail`(需 mac-code + risk-id)
+- 配置缺陷：`query_config_defect_distributed` / `query_config_defect_server_detail`(需 mac-code) / `query_config_defect_detail`(需 mac-code + risk-id)
+- 应急漏洞：`action=query_contingency`：GET /risk/contingency/pageByServerId，需 server-id
+
+### 资产盘点（asset）
+- `action=query_server_list`：GET /asset/server/list，服务器列表（hostName/serverIp/serverLocalIp/macCode/online/score/groupId）
+- `action=query_server_hardware`：GET /asset/server-hardware/list，服务器硬件信息
+- `action=query_server_asset`：GET /asset/server-asset/list，服务器资产统计（端口/数据库/网站/容器/账号/进程数）
+- `action=query_account_list`：GET /asset/account/list，服务器账号列表
+- `action=get_agent_authorization`：GET /agent/authorizationInfo，云眼授权额度
+
+### 威胁监测告警（monitor）—— 实时行为
+- `action=query_monitor`：按 monitor-type 路由到对应告警接口，monitor-type 取值：
+  process(进程) / ram(内存) / honey(蜜罐) / login(登录) / file(文件) / account(账号) /
+  operationAudit(操作审计) / reboundShell(反弹shell) / threatIntelligence(威胁情报) /
+  backdoor(后门) / fileHoney(文件蜜罐) / outreach(异常外联)
+
+## 路径参数
+- `virus-hash`、`webshell-hash`：病毒/webshell 哈希（affect 类接口路径参数）
+- `vuln-name`：漏洞名称（系统漏洞 influence 接口路径参数）
+- `risk-id`：入侵项 id（detail 类接口路径参数）
+- `server-id`：服务器 id（应急漏洞接口）
+
+## 输出
+工具返回 JSON：{ok, action, code, message, data}，data 内含 totalData/totalPage 与 xxxList 数组。
+接口失败时返回 {ok:false, code, message}，不得把错误字段当作数据。
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+// --- 参数 ---
+action = cli.String("action", cli.setVerboseName("操作"), cli.setDefault("query_server_list"), cli.setHelp("按 USAGE 的 action 路由，如 query_server_list / query_virus_info / query_system_vuln_info / query_monitor 等"))
+// ============ 环境配置（DEMO 默认值，替换真实环境时只改这三个 setDefault）============
+// demo: 指向本地 deepsecurity-mock 服务（python3 mock_server.py 8688）
+// 真实环境: https://<平台IP> + 后台「API账户管理」申请的 appId/secret（允许IP填 -1）
+dsBaseUrl = cli.String("ds-base-url", cli.setVerboseName("平台地址"), cli.setDefault("http://127.0.0.1:8688"), cli.setHelp("协议、IP 和端口；demo 默认指向本地 mock（8688），生产替换为真实平台地址"))
+dsAppId = cli.String("ds-app-id", cli.setVerboseName("API appId"), cli.setDefault("demo-appid"), cli.setHelp("API 账户 appId；demo 使用 mock 值，生产替换为后台 API 账户管理申请的真实值"))
+dsSecret = cli.String("ds-secret", cli.setVerboseName("API secret"), cli.setDefault("demo-secret"), cli.setHelp("API 账户 secret，与 appId 配对；demo 使用 mock 值，生产替换为真实值"))
+// ============================== 环境配置结束 ==============================
+pageNo = cli.Int("page-no", cli.setVerboseName("页码"), cli.setDefault(1), cli.setHelp("从 1 开始，默认 1，max-pages>1 时作为起始页"))
+pageSize = cli.Int("page-size", cli.setVerboseName("每页条数"), cli.setDefault(10), cli.setHelp("默认 10，最大 100"))
+maxPages = cli.Int("max-pages", cli.setVerboseName("自动翻页页数"), cli.setDefault(1), cli.setHelp("默认 1 不翻页；传 N 时工具自动从 page-no 开始连续拉 N 页并合并结果（1-10），返回中带 totalData/pages_fetched/items_fetched/has_more"))
+userName = cli.String("user-name", cli.setVerboseName("用户名"), cli.setDefault(""), cli.setHelp("服务器拥有者用户名，可留空"))
+macCode = cli.String("mac-code", cli.setVerboseName("机器码"), cli.setDefault(""), cli.setHelp("服务器机器码，路径参数或筛选条件"))
+isProcessed = cli.String("is-processed", cli.setVerboseName("是否已处理"), cli.setDefault(""), cli.setHelp("false 待处理 / true 已处理，可留空"))
+state = cli.String("state", cli.setVerboseName("处理状态"), cli.setDefault(""), cli.setHelp("0未处理 1隔离 2信任 3删除，可留空"))
+serverIp = cli.String("server-ip", cli.setVerboseName("服务器IP"), cli.setDefault(""), cli.setHelp("按服务器外网IP筛选，可留空"))
+serverLocalIp = cli.String("server-local-ip", cli.setVerboseName("服务器内网IP"), cli.setDefault(""), cli.setHelp("按服务器内网IP筛选，可留空"))
+virusHash = cli.String("virus-hash", cli.setVerboseName("病毒哈希"), cli.setDefault(""), cli.setHelp("病毒木马哈希，affect 接口路径参数"))
+webshellHash = cli.String("webshell-hash", cli.setVerboseName("webshell哈希"), cli.setDefault(""), cli.setHelp("网页后门哈希，affect 接口路径参数"))
+vulnName = cli.String("vuln-name", cli.setVerboseName("漏洞名称"), cli.setDefault(""), cli.setHelp("系统漏洞名称，influence 接口路径参数"))
+riskId = cli.String("risk-id", cli.setVerboseName("入侵项ID"), cli.setDefault(""), cli.setHelp("入侵项 id，detail 接口路径参数"))
+serverId = cli.String("server-id", cli.setVerboseName("服务器ID"), cli.setDefault(""), cli.setHelp("服务器 id，应急漏洞接口参数"))
+day = cli.String("day", cli.setVerboseName("日期"), cli.setDefault(""), cli.setHelp("弱口令按天查询，格式如 2024-01-01"))
+monitorType = cli.String("monitor-type", cli.setVerboseName("监测类型"), cli.setDefault(""), cli.setHelp("process/ram/honey/login/file/account/operationAudit/reboundShell/threatIntelligence/backdoor/fileHoney/outreach"))
+
+cli.check()
+
+if dsAppId == "" || dsSecret == "" {
+    yakit.Error("缺少 ds-app-id 或 ds-secret 参数（后台 API 账户管理申请）")
+    return
+}
+if pageNo <= 0 { pageNo = 1 }
+if pageSize <= 0 { pageSize = 10 }
+if pageSize > 100 { pageSize = 100 }
+if maxPages <= 0 { maxPages = 1 }
+if maxPages > 10 { maxPages = 10 }
+
+// --- 工具函数 ---
+
+// 紧凑 JSON 序列化（yak 的 json.dumps 是美化多行输出，fastjson 是紧凑单行，签名必须用紧凑格式）
+// 签名串 value 序列化（与官方 ThirdSignUtil/fastjson 一致）：
+// - 数组（GET 业务参数 List<String>）→ ["v1","v2"] 紧凑格式
+// - 数字/布尔直接转字符串
+// - 字符串（公共参数等 String 类型）→ "v" 带引号
+jsonQuote = func(s) {
+    // 简单字符串 JSON 转义（引号/反斜杠）
+    escaped = str.ReplaceAll(s, "\\", "\\\\")
+    escaped = str.ReplaceAll(escaped, "\"", "\\\"")
+    return sprintf("\"%v\"", escaped)
+}
+signValue = func(v) {
+    if v == nil { return "null" }
+    ts = sprintf("%T", v)
+    // yak 的 slice 类型名形如 []string / []interface {}，以 "[]" 开头
+    if str.HasPrefix(ts, "[]") || str.Contains(ts, "slice") || str.Contains(ts, "array") {
+        items = []
+        for _, item := range v {
+            items.Push(jsonQuote(sprintf("%v", item)))
+        }
+        return "[" + str.Join(items, ",") + "]"
+    }
+    if str.Contains(ts, "map") {
+        return json.dumps(v)
+    }
+    if ts == "bool" || str.Contains(ts, "int") || str.Contains(ts, "float") {
+        return sprintf("%v", v)
+    }
+    return jsonQuote(sprintf("%v", v))
+}
+
+// 生成签名：公共参数+业务参数按 key 字典序排序，value JSON 序列化拼接，末尾拼 key=secret，HmacSHA256 输出小写 hex
+buildSign = func(params, timeMs, nonce) {
+    // 必须用空 map（map[string]interface{}）：字面量 {"appId": "x"} 会被推断成 map[string]string，
+    // 塞入 int 型 pageNo/pageSize 会触发 "cannot convert int to string" panic
+    signParams = {}
+    for k, v := range params {
+        // GET 业务参数按官方 demo 一律 List<String> 参与签名
+        signParams[k] = [sprintf("%v", v)]
+    }
+    signParams["appId"] = dsAppId
+    signParams["signMethod"] = "HmacSHA256"
+    signParams["signVersion"] = "3.0"
+    signParams["signNonce"] = nonce
+    signParams["time"] = timeMs
+    signParams["version"] = "3.0"
+    keys = x.Keys(signParams)
+    // x.Sort 对字符串切片不生效，这里手写冒泡排序保证字典序
+    for i := 0; i < len(keys); i++ {
+        for j := i + 1; j < len(keys); j++ {
+            if keys[j] < keys[i] {
+                tmp = keys[i]; keys[i] = keys[j]; keys[j] = tmp
+            }
+        }
+    }
+    parts = []
+    for _, k := range keys {
+        parts.Push(sprintf("%v=%v", k, signValue(signParams[k])))
+    }
+    strA = str.Join(parts, "&") + "&key=" + dsSecret
+    mac = codec.HmacSha256(dsSecret, strA)
+    return codec.EncodeToHex(mac)
+}
+
+// 发送签名 GET 请求
+doGet = func(path, params) {
+    timeMs = sprint(int(time.Now().Unix()) * 1000)
+    nonce = str.RandStr(10)
+    sign = buildSign(params, timeMs, nonce)
+    base = str.TrimRight(dsBaseUrl, "/")
+    url = sprintf("%v%v", base, path)
+    qs = []
+    for k, v := range params {
+        qs.Push(sprintf("%v=%v", k, codec.EscapeQueryUrl(sprintf("%v", v))))
+    }
+    if len(qs) > 0 {
+        url = url + "?" + str.Join(qs, "&")
+    }
+    opts = [
+        poc.timeout(30),
+        poc.header("appId", dsAppId),
+        poc.header("signMethod", "HmacSHA256"),
+        poc.header("signVersion", "3.0"),
+        poc.header("signNonce", nonce),
+        poc.header("time", timeMs),
+        poc.header("version", "3.0"),
+        poc.header("sign", sign),
+        poc.header("Content-Type", "application/json"),
+    ]
+    rspIns, _, err := poc.Do("GET", url, opts...)
+    if err != nil {
+        return {"err": sprintf("请求失败: %v", err)}
+    }
+    status = poc.GetStatusCodeFromResponse(rspIns.RawPacket)
+    body = poc.GetHTTPPacketBody(rspIns.RawPacket)
+    parsed = {}
+    try {
+        parsed = json.loads(string(body))
+    } catch e {
+        return {"err": sprintf("响应非 JSON (status %v): %v", status, e)}
+    }
+    parsed["_http_status"] = status
+    return parsed
+}
+
+// 组装通用查询参数（只加非空筛选）
+// GET 业务参数按官方 demo 一律用字符串（签名时按 List<String> 序列化为 ["v"]）
+// pg 为本次页码（自动翻页时变化）
+buildParams = func(pg) {
+    p = {}
+    p["pageNo"] = sprint(pg)
+    p["pageSize"] = sprint(pageSize)
+    if userName != "" { p["userName"] = userName }
+    if macCode != "" { p["macCode"] = macCode }
+    if isProcessed != "" { p["isProcessed"] = isProcessed }
+    if state != "" { p["state"] = state }
+    if serverIp != "" { p["serverIp"] = serverIp }
+    if serverLocalIp != "" { p["serverLocalIp"] = serverLocalIp }
+    return p
+}
+
+// 路径参数校验
+needMac = func(name) {
+    if macCode == "" {
+        yakit.Error("%v 需要 mac-code 参数", name)
+        return false
+    }
+    return true
+}
+needRisk = func(name) {
+    if riskId == "" {
+        yakit.Error("%v 需要 risk-id 参数", name)
+        return false
+    }
+    return true
+}
+
+// 统一执行 + 输出（自动翻页：从 page-no 开始连续拉 max-pages 页，合并列表字段并附加分页元数据）
+// pathBuilder(pg) 返回该页的完整请求路径（含路径参数），paramBuilder(pg) 返回该页的查询参数
+// listKey 为响应 data 中的列表字段名；若为空则不合并（单对象响应）
+doRun = func(actionName, pathBuilder, paramBuilder) {
+    items = []
+    total = -1
+    totalPage = -1
+    pagesFetched = 0
+    lastResp = {}
+    lastListKey = ""
+    for i := 0; i < maxPages; i++ {
+        pg = pageNo + i
+        path = pathBuilder(pg)
+        params = paramBuilder(pg)
+        resp = doGet(path, params)
+        if resp["err"] != nil {
+            yakit.Error("%v 失败（第 %v 页）: %v", actionName, pg, resp["err"])
+            return
+        }
+        pagesFetched = pagesFetched + 1
+        lastResp = resp
+        inner = resp["data"]
+        if inner == nil { inner = {} }
+        if inner["totalData"] != nil {
+            total = int(inner["totalData"])
+        }
+        if inner["totalPage"] != nil {
+            totalPage = int(inner["totalPage"])
+        }
+        // 找到列表字段（xxxList）
+        lst = nil
+        for k, v := range inner {
+            if str.Contains(k, "List") && str.HasPrefix(k, "total") == false {
+                ts = sprintf("%T", v)
+                if str.HasPrefix(ts, "[]") {
+                    lst = v
+                    lastListKey = k
+                }
+            }
+        }
+        if lst != nil {
+            for _, item := range lst {
+                items.Push(item)
+            }
+            if len(lst) == 0 { break }
+        } else {
+            // 非列表响应（如授权信息），直接返回单页
+            break
+        }
+        // 拉满或到达最后一页则停止
+        if total >= 0 && len(items) >= total { break }
+        if totalPage > 0 && pg >= totalPage { break }
+    }
+    hasMore = false
+    if total >= 0 && len(items) < total {
+        hasMore = true
+    }
+    // 构造合并响应
+    out = {}
+    for k, v := range lastResp {
+        out[k] = v
+    }
+    if out["data"] == nil { out["data"] = {} }
+    if lastListKey != "" {
+        out["data"][lastListKey] = items
+    }
+    out["data"]["totalData"] = total
+    out["data"]["pages_fetched"] = pagesFetched
+    out["data"]["items_fetched"] = len(items)
+    out["data"]["has_more"] = hasMore
+    out["data"]["page_from"] = pageNo
+    out["data"]["page_to"] = pageNo + pagesFetched - 1
+    yakit.Info("DS_RESULT %v", json.dumps({"ok": true, "action": actionName, "data": out}))
+}
+
+// --- 主流程：按 action 路由 ---
+actionLower = str.ToLower(str.TrimSpace(action))
+P = "/sdapi/cloudeyes"
+
+// ===================== 资产盘点 =====================
+if actionLower == "query_server_list" { doRun(action, func(pg) { return P+"/asset/server/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_server_hardware" { doRun(action, func(pg) { return P+"/asset/server-hardware/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_server_asset" { doRun(action, func(pg) { return P+"/asset/server-asset/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_account_list" { doRun(action, func(pg) { return P+"/asset/account/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "get_agent_authorization" { doRun(action, func(pg) { return P+"/agent/authorizationInfo" }, func(pg) { return {} }); return }
+
+// ===================== 入侵威胁 =====================
+// 病毒木马
+if actionLower == "query_virus_count" { doRun(action, func(pg) { return P+"/invade/virus/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_virus_info" { doRun(action, func(pg) { return P+"/invade/virus/info/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_virus_affect" {
+    if virusHash == "" { yakit.Error("query_virus_affect 需要 virus-hash 参数"); return }
+    doRun(action, func(pg) { return sprintf("%v/invade/virus/influence/%v/server/list", P, virusHash) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_virus_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/virus/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_virus_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/virus/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 网页后门
+if actionLower == "query_webshell_count" { doRun(action, func(pg) { return P+"/invade/webshell/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_webshell_info" { doRun(action, func(pg) { return P+"/invade/webshell/info/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_webshell_affect" {
+    if webshellHash == "" { yakit.Error("query_webshell_affect 需要 webshell-hash 参数"); return }
+    doRun(action, func(pg) { return sprintf("%v/invade/webshell/influence/%v/server/list", P, webshellHash) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_webshell_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/webshell/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_webshell_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/webshell/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 反弹shell
+if actionLower == "query_reboundshell_count" { doRun(action, func(pg) { return P+"/invade/reboundshell/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_reboundshell_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/reboundshell/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_reboundshell_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/reboundshell/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 异常账号
+if actionLower == "query_abnormal_account_count" { doRun(action, func(pg) { return P+"/invade/abnormal-account/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_abnormal_account_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/abnormal-account/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_abnormal_account_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/abnormal-account/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 异常登录
+if actionLower == "query_abnormal_login_count" { doRun(action, func(pg) { return P+"/invade/abnormal-login/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_abnormal_login_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/abnormal-login/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_abnormal_login_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/abnormal-login/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 异常进程
+if actionLower == "query_abnormal_process_count" { doRun(action, func(pg) { return P+"/invade/abnormal-process/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_abnormal_process_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/abnormal-process/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_abnormal_process_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/abnormal-process/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 日志删除
+if actionLower == "query_log_delete_count" { doRun(action, func(pg) { return P+"/invade/log-delete/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_log_delete_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/log-delete/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_log_delete_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/log-delete/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 命令篡改
+if actionLower == "query_system_cmd_count" { doRun(action, func(pg) { return P+"/invade/system-cmd/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_system_cmd_info" { doRun(action, func(pg) { return P+"/invade/system-cmd/detail/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_system_cmd_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/system-cmd/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 本地提权
+if actionLower == "query_local_permission_count" { doRun(action, func(pg) { return P+"/invade/local-permission/server-count/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_local_permission_info" { doRun(action, func(pg) { return P+"/invade/local-permission/detail/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_local_permission_detail" {
+    if !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/invade/local-permission/detail/%v", P, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+
+// ===================== 漏洞风险 =====================
+// 系统漏洞
+if actionLower == "query_system_vuln_distributed" { doRun(action, func(pg) { return P+"/risk/system/server-distributed/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_system_vuln_info" { doRun(action, func(pg) { return P+"/risk/system/info/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_system_vuln_influence" {
+    if vulnName == "" { yakit.Error("query_system_vuln_influence 需要 vuln-name 参数"); return }
+    doRun(action, func(pg) { return sprintf("%v/risk/system/influence/%v/server/list", P, codec.EscapeQueryUrl(vulnName)) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_system_vuln_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/system/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_system_vuln_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/system/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 弱口令
+if actionLower == "query_weakpwd_distributed" { doRun(action, func(pg) { return P+"/risk/weak/server-distributed/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_weakpwd_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/weak/server/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_weakpwd_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/weak/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_weakpwd_by_time" {
+    if day == "" { yakit.Error("query_weakpwd_by_time 需要 day 参数"); return }
+    doRun(action, func(pg) { return P+"/risk/weak/pageByTime" }, func(pg) { p = buildParams(pg); p["day"] = day; return p }); return
+}
+// 高危账号
+if actionLower == "query_danger_account_distributed" { doRun(action, func(pg) { return P+"/risk/danger-account/server-distributed/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_danger_account_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/danger-account/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_danger_account_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/danger-account/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 配置缺陷
+if actionLower == "query_config_defect_distributed" { doRun(action, func(pg) { return P+"/risk/config-defect/server-distributed/list" }, func(pg) { return buildParams(pg) }); return }
+if actionLower == "query_config_defect_server_detail" {
+    if !needMac(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/config-defect/%v/detail/list", P, macCode) }, func(pg) { return buildParams(pg) }); return
+}
+if actionLower == "query_config_defect_detail" {
+    if !needMac(action) || !needRisk(action) { return }
+    doRun(action, func(pg) { return sprintf("%v/risk/config-defect/detail/%v/%v", P, macCode, riskId) }, func(pg) { return buildParams(pg) }); return
+}
+// 应急漏洞
+if actionLower == "query_contingency" {
+    if serverId == "" { yakit.Error("query_contingency 需要 server-id 参数"); return }
+    doRun(action, func(pg) { return P+"/risk/contingency/pageByServerId" }, func(pg) { p = buildParams(pg); p["serverId"] = serverId; return p }); return
+}
+
+// ===================== 威胁监测告警 =====================
+if actionLower == "query_monitor" {
+    mt = str.TrimSpace(monitorType)
+    if mt == "" { yakit.Error("query_monitor 需要 monitor-type 参数"); return }
+    valid = ["process","ram","honey","login","file","account","operationAudit","reboundShell","threatIntelligence","backdoor","fileHoney","outreach"]
+    ok = false
+    for _, v := range valid { if v == mt { ok = true } }
+    if !ok { yakit.Error("不支持的 monitor-type: %v", mt); return }
+    doRun(action, func(pg) { return sprintf("%v/%v-monitor/record/list", P, mt) }, func(pg) { return buildParams(pg) }); return
+}
+
+yakit.Error("不支持的操作: %v，详见 USAGE", action)

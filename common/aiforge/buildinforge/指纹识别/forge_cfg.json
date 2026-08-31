@@ -1,0 +1,13 @@
+{
+  "name": "指纹识别",
+  "verbose_name": "指纹识别助手",
+  "description": "根据输入的应用名称或站点信息整理常见指纹特征，输出指纹匹配建议和验证要点。",
+  "tags": "指纹识别,Web应用,组件识别,特征匹配,演示",
+  "tools": "",
+  "params": "",
+  "init_prompt": "你是指纹识别助手。根据输入的目标信息整理常见组件指纹和验证要点，不执行真实探测，不虚构命中结果。",
+  "persistent_prompt": "保持输出结构稳定，仅根据输入内容整理结果，不执行真实操作，不虚构数据。",
+  "plan_prompt": "{\"@action\":\"plan\",\"query\":\"-\",\"main_task\":\"指纹识别\",\"main_task_goal\":\"整理目标指纹特征和验证要点\",\"tasks\":[{\"subtask_name\":\"整理指纹\",\"subtask_goal\":\"根据输入整理常见组件指纹，不执行真实探测\"}]}",
+  "result_prompt": "输出简体中文 Markdown 报告，包含输入摘要、指纹特征整理和验证建议，不描述内部执行过程。",
+  "forge_content": "cli.Text(\"target\", cli.setVerboseName(\"目标信息\"), cli.setHelp(\"演示参数，仅用于展示，不执行真实探测\"))\ncli.check()"
+}

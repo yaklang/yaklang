@@ -1,0 +1,378 @@
+__DESC__ = "TrustOne 开放接口统一查询工具。通过 action 区分不同操作，支持终端列表查询、服务器信息、漏洞查询、弱口令查询、扫描任务查询、遏制状态查询等。工具内部固定使用 GET/POST 请求 TrustOne 开放接口，地址、鉴权头、参数转换与分页全部内置，AI 只传查询条件即可。"
+__VERBOSE_NAME__ = "TrustOne OpenAPI Query Tool"
+__VERBOSE_NAME_ZH__ = "TrustOne 开放接口查询工具"
+__KEYWORDS__ = "trustone,终端,漏洞,弱口令,扫描,遏制,edr,安全运营,api,query"
+__USAGE__ = <<<USAGE_BLOCK
+TrustOne 开放接口统一查询工具。仅查询，不执行任何写操作。
+
+## 操作
+- `action=get_host_info`：GET /hostInfo，获取 TrustOne 服务器信息（IP、在线数、CPU、内存等）
+- `action=query_terminal_list`：GET /open_api/client/v2/client_list，查询终端列表
+- `action=query_isolation_status`：GET /uap/isolation_result，查询遏制状态
+- `action=query_vuln_hosts`：GET /hrm/openapi/v1/vuln/all_host_results，查询全部存在漏洞的终端
+- `action=query_vuln_list`：GET /hrm/openapi/v1/vuln/all_vuln_results，查询所有存在的漏洞
+- `action=query_host_vulns`：GET /hrm/openapi/v1/vuln/host_vuln_results，查询单个终端的漏洞
+- `action=query_vuln_detail`：GET /hrm/openapi/v1/vuln/vuln_detail，查询单个漏洞详情
+- `action=query_vuln_affected_hosts`：GET /hrm/openapi/v1/vuln/vuln_host_results，查询单个漏洞影响的终端
+- `action=query_weakpwd`：GET /hrm/openapi/v1/weakpwd/all_result，获取所有弱口令结果
+- `action=query_host_weakpwd`：GET /hrm/openapi/v1/weakpwd/host_result，查询单个终端的弱口令
+- `action=query_scan_task`：GET /open_api/overall_scan/task_detail，查询扫描任务详情
+- `action=query_triage_report`：GET /v1/triagereport?ticketid=xxx，按 ticketid 查询验伤结果（勒索/木马/恶意代码/僵尸网络/钓鱼/渗透工具/挖矿等威胁检测报告）
+- `action=query_hostip`：GET /v1/hostip，获取终端名与 IP 简表
+
+## 通用参数
+- `trustone-base-url`：平台地址，默认 https://10.21.17.218:8443，通常无需修改
+- `trustone-api-key`：API Key，默认空，需用户配置
+- `trustone-deploy-mode`：部署模式，linkone 或 standalone，默认 standalone
+- `page-size`：每页条数，默认 10
+- `page-number`：页码，默认 1
+
+## query_terminal_list 额外参数
+- `device-id`、`ip`、`mac`、`group-id`、`status`：筛选条件，可留空
+- `with-group`、`with-policy-info`、`with-license-info`、`with-assets-info`：0/1，控制返回字段
+
+## query_host_vulns 额外参数
+- `device-id`：必填，终端设备ID
+
+## query_vuln_detail 额外参数
+- `cve-no`：必填，漏洞编号
+
+## query_vuln_affected_hosts 额外参数
+- `cve-no`：必填，漏洞编号
+
+## query_host_weakpwd 额外参数
+- `device-id`：必填，终端设备ID
+
+## query_triage_report 额外参数
+- `ticket-id`：必填，验伤请求返回的 ticketid
+
+## query_scan_task 额外参数
+- `task-id`：必填，扫描任务ID
+
+## 输出
+工具返回 JSON：{ok, action, code, message, data}。
+接口失败时返回 {ok:false, code, message}，不得把错误字段当作数据。
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+// --- 参数 ---
+action = cli.String("action", cli.setVerboseName("操作"), cli.setDefault("query_terminal_list"), cli.setHelp("操作类型：get_host_info / query_terminal_list / query_isolation_status / query_vuln_hosts / query_vuln_list / query_host_vulns / query_vuln_detail / query_vuln_affected_hosts / query_weakpwd / query_host_weakpwd / query_scan_task / query_triage_report / query_hostip"))
+// ============ 环境配置（DEMO 默认值，替换真实环境时只改这两个 setDefault）============
+// demo: 指向本地 trustone-mock 服务（/Users/ws/Downloads/产品接口文档/trustone-mock，python3 mock_server.py 8686）
+// 真实环境: https://10.21.17.218:8443 + 管理台「密钥管理」申请的 API Key
+trustoneBaseUrl = cli.String("trustone-base-url", cli.setVerboseName("TrustOne 平台地址"), cli.setDefault("http://127.0.0.1:8686"), cli.setHelp("协议、IP 和端口；demo 默认指向本地 mock（8686），生产替换为 https://10.21.17.218:8443"))
+trustoneApiKey = cli.String("trustone-api-key", cli.setVerboseName("API Key"), cli.setDefault("demo-api-key"), cli.setHelp("TrustOne API Key；demo 使用 mock 值（任意非空），生产替换为管理台密钥管理的真实值"))
+// ============================== 环境配置结束 ==============================
+trustoneDeployMode = cli.String("trustone-deploy-mode", cli.setVerboseName("部署模式"), cli.setDefault("standalone"), cli.setHelp("linkone 或 standalone，默认 standalone"))
+pageSize = cli.Int("page-size", cli.setVerboseName("每页条数"), cli.setDefault(10), cli.setHelp("默认 10"))
+pageNumber = cli.Int("page-number", cli.setVerboseName("页码"), cli.setDefault(1), cli.setHelp("从 1 开始，默认 1"))
+
+// query_terminal_list 参数
+deviceId = cli.String("device-id", cli.setVerboseName("终端ID"), cli.setDefault(""), cli.setHelp("终端设备ID，多个逗号分隔"))
+terminalIp = cli.String("ip", cli.setVerboseName("终端IP"), cli.setDefault(""), cli.setHelp("终端IP精确查询"))
+terminalMac = cli.String("mac", cli.setVerboseName("终端MAC"), cli.setDefault(""), cli.setHelp("终端MAC精确查询"))
+groupId = cli.Int("group-id", cli.setVerboseName("分组ID"), cli.setDefault(0), cli.setHelp("终端分组ID，0表示所有"))
+terminalStatus = cli.Int("status", cli.setVerboseName("在线状态"), cli.setDefault(-1), cli.setHelp("0离线 1在线，-1不筛选"))
+withGroup = cli.Int("with-group", cli.setVerboseName("返回分组"), cli.setDefault(1), cli.setHelp("1返回终端列表，0返回带组结构"))
+withPolicyInfo = cli.Int("with-policy-info", cli.setVerboseName("返回策略信息"), cli.setDefault(0), cli.setHelp("1返回终端策略信息"))
+withLicenseInfo = cli.Int("with-license-info", cli.setVerboseName("返回授权信息"), cli.setDefault(0), cli.setHelp("1返回终端授权信息"))
+withAssetsInfo = cli.Int("with-assets-info", cli.setVerboseName("返回资产信息"), cli.setDefault(0), cli.setHelp("1返回终端资产登记信息"))
+
+// query_host_vulns / query_vuln_detail / query_vuln_affected_hosts 参数
+cveNo = cli.String("cve-no", cli.setVerboseName("漏洞编号"), cli.setDefault(""), cli.setHelp("CVE 编号，如 CVE-2017-0001"))
+
+// query_scan_task 参数
+taskId = cli.String("task-id", cli.setVerboseName("扫描任务ID"), cli.setDefault(""), cli.setHelp("扫描任务ID"))
+
+// query_triage_report 参数
+ticketId = cli.String("ticket-id", cli.setVerboseName("验伤票据ID"), cli.setDefault(""), cli.setHelp("验伤请求返回的 ticketid，用于查询验伤结果"))
+
+cli.check()
+
+// --- 工具函数 ---
+
+// 根据部署模式确定认证头名称
+getAuthHeaderName = func() {
+    if str.ToLower(str.TrimSpace(trustoneDeployMode)) == "linkone" {
+        return "X-UAP-APIKEY"
+    }
+    return "X-CTDI-APIKEY"
+}
+
+// 构建请求 URL，linkone 模式加前缀
+buildURL = func(path) {
+    base = str.TrimRight(trustoneBaseUrl, "/")
+    if str.ToLower(str.TrimSpace(trustoneDeployMode)) == "linkone" {
+        return sprintf("%v/linkone-openapi/trustone%v", base, path)
+    }
+    return sprintf("%v%v", base, path)
+}
+
+// GET 请求
+doGet = func(url, params) {
+    opts = [
+        poc.timeout(30),
+        poc.header(getAuthHeaderName(), trustoneApiKey),
+        poc.header("Content-Type", "application/json"),
+    ]
+    if len(params) > 0 {
+        qs = []
+        for k, v := range params {
+            vv = sprint(v)
+            if vv == "" || vv == "0" || vv == "-1" || vv == "false" {
+                continue
+            }
+            qs.Push(sprintf("%v=%v", k, codec.EscapeQueryUrl(vv)))
+        }
+        if len(qs) > 0 {
+            url = sprintf("%v?%v", url, str.Join(qs, "&"))
+        }
+    }
+    rspIns, _, err := poc.Do("GET", url, opts...)
+    if err != nil {
+        return {"err": sprintf("请求失败: %v", err)}
+    }
+    status = poc.GetStatusCodeFromResponse(rspIns.RawPacket)
+    body = poc.GetHTTPPacketBody(rspIns.RawPacket)
+    if status != 200 {
+        return {"err": sprintf("HTTP %v: %v", status, string(body))}
+    }
+    parsed = {}
+    try {
+        parsed = json.loads(string(body))
+    } catch e {
+        return {"err": sprintf("响应非 JSON (status %v): %v", status, e)}
+    }
+    parsed["_http_status"] = status
+    return parsed
+}
+
+// --- 主流程: 按 action 路由 ---
+
+actionLower = str.ToLower(str.TrimSpace(action))
+
+if actionLower == "get_host_info" {
+    url = buildURL("/hostInfo")
+    resp = doGet(url, {})
+    if resp["err"] != nil {
+        yakit.Error("get_host_info 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_HOST_INFO %v", json.dumps({"ok": true, "action": "get_host_info", "data": resp}))
+    return
+}
+
+if actionLower == "query_terminal_list" {
+    url = buildURL("/open_api/client/v2/client_list")
+    params = {
+        "page": sprint(pageNumber),
+        "page_size": sprint(pageSize),
+        "with_group": sprint(withGroup),
+        "with_policy_info": sprint(withPolicyInfo),
+        "with_license_info": sprint(withLicenseInfo),
+        "with_assets_info": sprint(withAssetsInfo),
+    }
+    if deviceId != "" {
+        params["device_id"] = deviceId
+    }
+    if terminalIp != "" {
+        params["ip"] = terminalIp
+    }
+    if terminalMac != "" {
+        params["mac"] = terminalMac
+    }
+    if groupId > 0 {
+        params["group_id"] = sprint(groupId)
+    }
+    if terminalStatus >= 0 {
+        params["status"] = sprint(terminalStatus)
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_terminal_list 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_TERMINAL_LIST %v", json.dumps({"ok": true, "action": "query_terminal_list", "data": resp}))
+    return
+}
+
+if actionLower == "query_isolation_status" {
+    url = buildURL("/uap/isolation_result")
+    resp = doGet(url, {})
+    if resp["err"] != nil {
+        yakit.Error("query_isolation_status 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_ISOLATION_STATUS %v", json.dumps({"ok": true, "action": "query_isolation_status", "data": resp}))
+    return
+}
+
+if actionLower == "query_vuln_hosts" {
+    url = buildURL("/hrm/openapi/v1/vuln/all_host_results")
+    params = {
+        "page_size": sprint(pageSize),
+        "page_number": sprint(pageNumber),
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_vuln_hosts 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_VULN_HOSTS %v", json.dumps({"ok": true, "action": "query_vuln_hosts", "data": resp}))
+    return
+}
+
+if actionLower == "query_vuln_list" {
+    url = buildURL("/hrm/openapi/v1/vuln/all_vuln_results")
+    params = {
+        "page_size": sprint(pageSize),
+        "page_number": sprint(pageNumber),
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_vuln_list 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_VULN_LIST %v", json.dumps({"ok": true, "action": "query_vuln_list", "data": resp}))
+    return
+}
+
+if actionLower == "query_host_vulns" {
+    if deviceId == "" {
+        yakit.Error("query_host_vulns 需要 device-id 参数")
+        return
+    }
+    url = buildURL("/hrm/openapi/v1/vuln/host_vuln_results")
+    params = {
+        "device_id": deviceId,
+        "page_size": sprint(pageSize),
+        "page_number": sprint(pageNumber),
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_host_vulns 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_HOST_VULNS %v", json.dumps({"ok": true, "action": "query_host_vulns", "device_id": deviceId, "data": resp}))
+    return
+}
+
+if actionLower == "query_vuln_detail" {
+    if cveNo == "" {
+        yakit.Error("query_vuln_detail 需要 cve-no 参数")
+        return
+    }
+    url = buildURL("/hrm/openapi/v1/vuln/vuln_detail")
+    params = {
+        "cve_no": cveNo,
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_vuln_detail 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_VULN_DETAIL %v", json.dumps({"ok": true, "action": "query_vuln_detail", "cve_no": cveNo, "data": resp}))
+    return
+}
+
+if actionLower == "query_vuln_affected_hosts" {
+    if cveNo == "" {
+        yakit.Error("query_vuln_affected_hosts 需要 cve-no 参数")
+        return
+    }
+    url = buildURL("/hrm/openapi/v1/vuln/vuln_host_results")
+    params = {
+        "cve_no": cveNo,
+        "page_size": sprint(pageSize),
+        "page_number": sprint(pageNumber),
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_vuln_affected_hosts 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_VULN_AFFECTED_HOSTS %v", json.dumps({"ok": true, "action": "query_vuln_affected_hosts", "cve_no": cveNo, "data": resp}))
+    return
+}
+
+if actionLower == "query_weakpwd" {
+    url = buildURL("/hrm/openapi/v1/weakpwd/all_result")
+    params = {
+        "page_size": sprint(pageSize),
+        "page_number": sprint(pageNumber),
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_weakpwd 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_WEAKPWD %v", json.dumps({"ok": true, "action": "query_weakpwd", "data": resp}))
+    return
+}
+
+if actionLower == "query_host_weakpwd" {
+    if deviceId == "" {
+        yakit.Error("query_host_weakpwd 需要 device-id 参数")
+        return
+    }
+    url = buildURL("/hrm/openapi/v1/weakpwd/host_result")
+    params = {
+        "device_id": deviceId,
+        "page_size": sprint(pageSize),
+        "page_number": sprint(pageNumber),
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_host_weakpwd 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_HOST_WEAKPWD %v", json.dumps({"ok": true, "action": "query_host_weakpwd", "device_id": deviceId, "data": resp}))
+    return
+}
+
+if actionLower == "query_triage_report" {
+    if ticketId == "" {
+        yakit.Error("query_triage_report 需要 ticket-id 参数（验伤请求返回的 ticketid）")
+        return
+    }
+    url = buildURL(sprintf("/v1/triagereport?ticketid=%v", codec.EscapeQueryUrl(ticketId)))
+    resp = doGet(url, {})
+    if resp["err"] != nil {
+        yakit.Error("query_triage_report 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_TRIAGE_REPORT %v", json.dumps({"ok": true, "action": "query_triage_report", "ticket_id": ticketId, "data": resp}))
+    return
+}
+
+if actionLower == "query_hostip" {
+    url = buildURL("/v1/hostip")
+    resp = doGet(url, {})
+    if resp["err"] != nil {
+        yakit.Error("query_hostip 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_HOSTIP %v", json.dumps({"ok": true, "action": "query_hostip", "data": resp}))
+    return
+}
+
+if actionLower == "query_scan_task" {
+    if taskId == "" {
+        yakit.Error("query_scan_task 需要 task-id 参数")
+        return
+    }
+    url = buildURL("/open_api/overall_scan/task_detail")
+    params = {
+        "taskId": taskId,
+    }
+    resp = doGet(url, params)
+    if resp["err"] != nil {
+        yakit.Error("query_scan_task 失败: %v", resp["err"])
+        return
+    }
+    yakit.Info("TRUSTONE_SCAN_TASK %v", json.dumps({"ok": true, "action": "query_scan_task", "task_id": taskId, "data": resp}))
+    return
+}
+
+yakit.Error("不支持的操作: %v，支持的操作: get_host_info, query_terminal_list, query_isolation_status, query_vuln_hosts, query_vuln_list, query_host_vulns, query_vuln_detail, query_vuln_affected_hosts, query_weakpwd, query_scan_task", action)
