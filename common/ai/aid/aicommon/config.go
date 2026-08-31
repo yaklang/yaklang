@@ -3748,6 +3748,40 @@ func (c *Config) SetBrowserSessionTracker(tracker BrowserSessionTracker) {
 	c.browserSessionTracker = tracker
 }
 
+// AppendReportedRisk adds a compact summary of the given risk to the
+// session-level reported-risks store, deduplicating by target + type +
+// parameter. Called from the toolcall_invoke.go FeedBacker callback.
+func (c *Config) AppendReportedRisk(risk *schema.Risk) bool {
+	if c == nil {
+		return false
+	}
+	return c.GetSessionPromptState().AppendReportedRisk(risk)
+}
+
+// GetReportedRisksRendered returns the markdown block for prompt injection.
+func (c *Config) GetReportedRisksRendered() string {
+	if c == nil {
+		return ""
+	}
+	return c.GetSessionPromptState().GetReportedRisksRendered()
+}
+
+// GetReportedRisks returns the raw JSON for DB persistence.
+func (c *Config) GetReportedRisks() string {
+	if c == nil {
+		return ""
+	}
+	return c.GetSessionPromptState().GetReportedRisks()
+}
+
+// SetReportedRisks restores the reported-risks state from DB-persisted JSON.
+func (c *Config) SetReportedRisks(json string) {
+	if c == nil {
+		return
+	}
+	c.GetSessionPromptState().SetReportedRisks(json)
+}
+
 func (c *Config) CallAIResponseConsumptionCallback(i int) {
 	state := c.ensureConsumptionState()
 	if state == nil {

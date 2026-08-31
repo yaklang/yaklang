@@ -40,6 +40,20 @@ type SessionPromptState struct {
 	// sessionEvidenceState keeps the frozen evidence snapshot used to render
 	// frozen/open evidence blocks under a timeline frozen cutoff.
 	sessionEvidenceState *SessionEvidenceRenderState
+
+	// reportedRisksJSON stores the serialized ReportedRiskStore JSON for the
+	// session-level "已报告漏洞清单" accumulator. Each time a risk is emitted
+	// via cybersecurity-risk (or any risk-emitting tool), the FeedBacker
+	// callback calls AppendReportedRisk to append a compact summary. The
+	// rendered block is injected into the timeline-open prompt section
+	// (after PlanContext) so the model sees a machine-readable list of
+	// already-reported vulnerabilities and avoids duplicate calls to
+	// cybersecurity-risk.
+	//
+	// Persisted to DB alongside evidenceJSON / todoJSON.
+	//
+	// 关键词: reportedRisksJSON, ReportedRiskStore, 已报告漏洞清单, 去重
+	reportedRisksJSON string
 }
 
 func NewSessionPromptState() *SessionPromptState {
@@ -70,6 +84,9 @@ func (s *SessionPromptState) ForkForSubAgent() *SessionPromptState {
 	}
 
 	forked.evidenceJSON = s.evidenceJSON
+	// Sub agents inherit the reported-risks list: they need to know what the
+	// parent has already reported to avoid duplicate cybersecurity-risk calls.
+	forked.reportedRisksJSON = s.reportedRisksJSON
 	// todoJSON intentionally left empty: sub agents do not inherit the
 	// parent's global TODO list.
 
@@ -402,4 +419,61 @@ func (s *SessionPromptState) ActiveVerificationTodoItemsByScope(scope Verificati
 	defer s.m.RUnlock()
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
 	return store.ActiveTodoItemsByScope(scope)
+}
+
+// GetReportedRisks returns the raw serialized ReportedRiskStore JSON (no
+// quoting). Suitable for DB persistence callers.
+func (s *SessionPromptState) GetReportedRisks() string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return s.reportedRisksJSON
+}
+
+// SetReportedRisks replaces the in-memory reported-risks state with the given
+// JSON payload. Used during session restore from DB.
+func (s *SessionPromptState) SetReportedRisks(json string) {
+	if s == nil {
+		return
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.reportedRisksJSON = json
+}
+
+// AppendReportedRisk extracts a compact summary from the given risk and
+// appends it to the reported-risks store if it is not a duplicate (same
+// target + type + parameter). The store is re-serialized to JSON in place.
+// Returns true if a new entry was added.
+//
+// Called from toolcall_invoke.go FeedBacker callback whenever a json-risk
+// message is emitted by a tool (e.g. cybersecurity-risk).
+func (s *SessionPromptState) AppendReportedRisk(risk *schema.Risk) bool {
+	if s == nil || risk == nil {
+		return false
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+	store := UnmarshalReportedRiskStore(s.reportedRisksJSON)
+	added := store.AppendFromRisk(risk)
+	if added {
+		s.reportedRisksJSON = store.Marshal()
+	}
+	return added
+}
+
+// GetReportedRisksRendered returns the markdown block ready for prompt
+// injection into the timeline-open section. Returns empty string when no
+// risks have been reported yet, so the prompt template naturally skips the
+// block.
+func (s *SessionPromptState) GetReportedRisksRendered() string {
+	if s == nil {
+		return ""
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+	store := UnmarshalReportedRiskStore(s.reportedRisksJSON)
+	return store.Render()
 }
