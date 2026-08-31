@@ -37,10 +37,10 @@ o.spawnvp(os.P_WAIT, 'tar', ['tar', 'xvzf', '*'])
 NEG
 )
 
-${*}.pattern_regex(/\b(?:os|o)\.(?:system|popen|popen2|popen3|popen4)\s*\([^)]*\)/) as $c1
-${*}.pattern_regex(/\b(?:subprocess|subp)\.\w+\s*\([^)]*shell\s*=\s*True[^)]*\)/) as $c2
+${*.py}.pattern_regex(/\b(?:os|o)\.(?:system|popen|popen2|popen3|popen4)\s*\([^)]*\)/) as $c1
+${*.py}.pattern_regex(/\b(?:subprocess|subp)\.\w+\s*\([^)]*shell\s*=\s*True[^)]*\)/) as $c2
 $c1 + $c2 as $c
-${*}.pattern_regex(/(?:tar|chmod|chown|rsync)(?:.*?)\*|YAKLANG_SF_POS_source\-system\-wildcard\-detected/) as $t
+${*.py}.pattern_regex(/(?:tar|chmod|chown|rsync)(?:.*?)\*|YAKLANG_SF_POS_source\-system\-wildcard\-detected/) as $t
 $t inside $c as $hit
 alert $hit for {
 	level: "middle",

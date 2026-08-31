@@ -40,8 +40,8 @@ resource "aws_fsx_lustre_file_system" "pass" {
 NEG
 )
 
-${*}.pattern_regex(/resource\s+"aws_fsx_lustre_file_system"\s+"[^"]*"\s*\{[\s\S]*?\}/) as $b
-${*}.pattern_regex(/resource\s+"aws_fsx_lustre_file_system"\s+"[^"]*"\s*\{[\s\S]*?kms_key_id\s*=[\s\S]*?\}/) as $k
+${*.tf}.pattern_regex(/resource\s+"aws_fsx_lustre_file_system"\s+"[^"]*"\s*\{[\s\S]*?\}/) as $b
+${*.tf}.pattern_regex(/resource\s+"aws_fsx_lustre_file_system"\s+"[^"]*"\s*\{[\s\S]*?kms_key_id\s*=[\s\S]*?\}/) as $k
 $b - $k as $hit
 alert $hit for {
 	level: "middle",

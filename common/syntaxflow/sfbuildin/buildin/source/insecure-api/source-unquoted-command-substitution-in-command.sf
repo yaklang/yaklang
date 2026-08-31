@@ -35,8 +35,12 @@ echo $((2 + 2))
 NEG
 )
 
-${*}.pattern_regex(/(?<!=)\$\((?!\()|(?<!=)`[^`]*`|YAKLANG_SF_POS_source\-unquoted\-command\-substitution\-in\-command/) as $t
-${*}.pattern_regex(/"[^"]*"/) as $q
+${*.sh}.pattern_regex(/(?<!=)\$\((?!\()|(?<!=)`[^`]*`|YAKLANG_SF_POS_source\-unquoted\-command\-substitution\-in\-command/) as $t_sh
+${*.bash}.pattern_regex(/(?<!=)\$\((?!\()|(?<!=)`[^`]*`|YAKLANG_SF_POS_source\-unquoted\-command\-substitution\-in\-command/) as $t_bash
+$t_sh + $t_bash as $t
+${*.sh}.pattern_regex(/"[^"]*"/) as $q_sh
+${*.bash}.pattern_regex(/"[^"]*"/) as $q_bash
+$q_sh + $q_bash as $q
 $t not_inside $q as $hit
 alert $hit for {
 	level: "middle",

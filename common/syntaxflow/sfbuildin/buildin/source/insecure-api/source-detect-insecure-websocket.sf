@@ -34,9 +34,9 @@ var local = "ws://127.0.0.1:3000"
 NEG
 )
 
-${*}.pattern_regex(/\bws:\/\//) as $t
-${*}.pattern_regex(/\bws:\/\/localhost.*/) as $j1
-${*}.pattern_regex(/\bws:\/\/127\.0\.0\.1.*/) as $j2
+${/\.(js|jsx|ts|tsx)$/}.pattern_regex(/\bws:\/\//) as $t
+${/\.(js|jsx|ts|tsx)$/}.pattern_regex(/\bws:\/\/localhost.*/) as $j1
+${/\.(js|jsx|ts|tsx)$/}.pattern_regex(/\bws:\/\/127\.0\.0\.1.*/) as $j2
 $t not_inside $j1 as $a
 $a not_inside $j2 as $hit
 alert $hit for {
