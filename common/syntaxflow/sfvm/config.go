@@ -49,6 +49,9 @@ type Config struct {
 	// ctx is cancelled (cancel) so the existing ctx-bail path surfaces partial
 	// results instead of a hard failure. nil = no budget (legacy behavior).
 	workBudget *RuleWorkBudget
+	// nativeCallGuard is a query-local authority boundary. It is inherited by
+	// nested queries; nil preserves the unrestricted engine behavior.
+	nativeCallGuard func(string) error
 }
 
 // RuleWorkBudget is a per-rule atomic counter+limit that bounds total fanout
@@ -212,6 +215,14 @@ func WithWorkBudget(b *RuleWorkBudget) Option {
 	}
 }
 
+// WithNativeCallGuard restricts native calls for one query and its children.
+// It never changes the process-wide native-call registry.
+func WithNativeCallGuard(guard func(string) error) Option {
+	return func(config *Config) {
+		config.nativeCallGuard = guard
+	}
+}
+
 func WithEnableDebug(b ...bool) Option {
 	return func(config *Config) {
 		if len(b) <= 0 {
@@ -260,6 +271,7 @@ func WithConfig(other *Config) Option {
 		self.diagnosticsEnabled = other.diagnosticsEnabled
 		self.diagnosticsRecorder = other.diagnosticsRecorder
 		self.workBudget = other.workBudget
+		self.nativeCallGuard = other.nativeCallGuard
 	}
 }
 
@@ -274,6 +286,7 @@ func (c *Config) Copy() *Config {
 		processCallback:           c.processCallback,
 		diagnosticsEnabled:        c.diagnosticsEnabled,
 		workBudget:                c.workBudget,
+		nativeCallGuard:           c.nativeCallGuard,
 		// diagnosticsRecorder:       c.diagnosticsRecorder,
 	}
 	if ret.diagnosticsEnabled {

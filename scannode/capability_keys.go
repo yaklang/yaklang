@@ -11,6 +11,7 @@ const (
 	capabilityKeyAIBindEpochV1              = "ai.session.bind_epoch.v1"
 	capabilityKeyAITurnLifecycleV1          = "ai.session.turn_lifecycle.v1"
 	capabilityKeyAICodeWorkspaceV1          = "ai.code_workspace.v1"
+	capabilityKeyAISyntaxFlowRuleV1         = "ai.syntaxflow_rule.v1"
 )
 
 func normalizeScanNodeCapabilityKeys(input []string) []string {
@@ -27,7 +28,10 @@ func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode strin
 		if trimmed == "" {
 			return
 		}
-		if trimmed == capabilityKeyAICodeWorkspaceV1 && runtimeMode == aiSessionRuntimeModeStateful {
+		if (trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAISyntaxFlowRuleV1) && runtimeMode == aiSessionRuntimeModeStateful {
+			return
+		}
+		if trimmed == capabilityKeyAISyntaxFlowRuleV1 && !legionSyntaxFlowRuntimeAvailable() {
 			return
 		}
 		if _, exists := seen[trimmed]; exists {

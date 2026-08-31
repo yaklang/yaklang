@@ -30,6 +30,7 @@ import (
 const (
 	legionCodeWorkspaceKindGit             = "git"
 	legionCodeWorkspaceKindUploadedArchive = "uploaded_archive"
+	legionCodeWorkspaceKindInlineSources   = "inline_sources"
 	legionCodeWorkspaceArchiveLocator      = "managed-source"
 
 	legionCodeArchiveMaxFiles         = 20_000
@@ -78,6 +79,9 @@ type legionCodeWorkspaceSpec struct {
 	MaxSearchResults int                       `json:"max_search_results"`
 	Auth             *legionCodeWorkspaceAuth  `json:"auth,omitempty"`
 	Proxy            *legionCodeWorkspaceProxy `json:"proxy,omitempty"`
+	// InlineFiles is bound by Legion, never supplied by the model or replay
+	// context. On Git/archive workspaces it contains optional user samples only.
+	InlineFiles map[string]string `json:"inline_files,omitempty"`
 }
 
 type legionCodeWorkspaceMaterializeOptions struct {
@@ -97,6 +101,7 @@ type legionCodeWorkspaceRuntime struct {
 	cleanup        func() error
 	cleanupOnce    sync.Once
 	cleanupErr     error
+	inlineFiles    map[string]string
 }
 
 type legionCodeWorkspaceRuntimeHandle struct {
@@ -149,6 +154,7 @@ func prepareLegionCodeWorkspace(
 		return nil, cloneBytes(runtimeOptionSnapshotJSON), nil
 	}
 	spec := *runtimeOptions.SourceWorkspace
+	spec.InlineFiles = cloneLegionInlineFiles(spec.InlineFiles)
 	if spec.Auth != nil {
 		auth := *spec.Auth
 		spec.Auth = &auth
@@ -165,9 +171,7 @@ func prepareLegionCodeWorkspace(
 	if err != nil {
 		return nil, nil, err
 	}
-	publicSpec := spec
-	publicSpec.Auth = nil
-	publicSpec.Proxy = nil
+	publicSpec := publicLegionCodeWorkspaceSpec(spec)
 	runtimeOptions.SourceWorkspace = &publicSpec
 	sanitized, err := json.Marshal(runtimeOptions)
 	if err != nil {
@@ -194,9 +198,9 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 		return fmt.Errorf("source_workspace workspace_id is required")
 	case !legionCodeWorkspaceIDPattern.MatchString(spec.WorkspaceID):
 		return fmt.Errorf("source_workspace workspace_id is invalid")
-	case spec.Kind != legionCodeWorkspaceKindGit && spec.Kind != legionCodeWorkspaceKindUploadedArchive:
+	case spec.Kind != legionCodeWorkspaceKindGit && spec.Kind != legionCodeWorkspaceKindUploadedArchive && spec.Kind != legionCodeWorkspaceKindInlineSources:
 		return fmt.Errorf("source_workspace kind %q is unsupported", spec.Kind)
-	case spec.Locator == "":
+	case spec.Locator == "" && spec.Kind != legionCodeWorkspaceKindInlineSources:
 		return fmt.Errorf("source_workspace locator is required")
 	case !spec.ReadOnly:
 		return fmt.Errorf("source_workspace must be read_only")
@@ -207,6 +211,21 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 	}
 	if err := normalizeLegionCodeWorkspaceLocator(spec); err != nil {
 		return err
+	}
+	if err := validateLegionInlineFiles(spec.InlineFiles, true); err != nil {
+		return fmt.Errorf("source_workspace inline_files: %w", err)
+	}
+	if spec.Kind == legionCodeWorkspaceKindInlineSources {
+		if spec.Branch != "" || spec.Subpath != "" || spec.PayloadID != "" || spec.Auth != nil || spec.Proxy != nil || spec.SizeBytes != 0 {
+			return fmt.Errorf("source_workspace inline_sources must not contain another source target or credentials")
+		}
+		digest := legionInlineSourceDigest(spec.InlineFiles)
+		if spec.ExpectedSHA256 != "" && spec.ExpectedSHA256 != digest {
+			return fmt.Errorf("source_workspace inline_sources sha256 mismatch")
+		}
+		if spec.ExpectedRevision != "" && spec.ExpectedRevision != digest {
+			return fmt.Errorf("source_workspace inline_sources revision mismatch")
+		}
 	}
 	if spec.Subpath != "" {
 		if _, err := cleanLegionCodeRelativePath(spec.Subpath, false); err != nil {
@@ -227,6 +246,11 @@ func normalizeLegionCodeWorkspaceLocator(spec *legionCodeWorkspaceSpec) error {
 		return fmt.Errorf("source_workspace is required")
 	}
 	switch spec.Kind {
+	case legionCodeWorkspaceKindInlineSources:
+		if spec.Locator != "" {
+			return fmt.Errorf("source_workspace inline_sources locator must be empty")
+		}
+		return nil
 	case legionCodeWorkspaceKindGit:
 		locator, err := normalizeLegionCodeGitLocator(spec.Locator)
 		if err != nil {
@@ -311,6 +335,8 @@ func materializeLegionCodeWorkspace(
 	options legionCodeWorkspaceMaterializeOptions,
 ) (*legionCodeWorkspaceRuntime, error) {
 	switch spec.Kind {
+	case legionCodeWorkspaceKindInlineSources:
+		return materializeLegionInlineWorkspace(ctx, spec)
 	case legionCodeWorkspaceKindGit:
 		return materializeLegionCodeGitWorkspace(ctx, spec)
 	case legionCodeWorkspaceKindUploadedArchive:
@@ -342,6 +368,10 @@ func materializeLegionCodeGitWorkspace(
 	opts := []yakgit.Option{
 		yakgit.WithContext(ctx),
 		yakgit.WithRecuriveSubmodule(false),
+		yakgit.WithVerifyTLS(true),
+		yakgit.WithDepth(1),
+		yakgit.WithSingleBranch(true),
+		yakgit.WithNoFetchTags(true),
 	}
 	if spec.Branch != "" {
 		opts = append(opts, yakgit.WithBranch(spec.Branch))
@@ -389,6 +419,11 @@ func materializeLegionCodeGitWorkspace(
 	if err := cloneLegionCodeGitWorkspace(spec.Locator, local, opts...); err != nil {
 		return nil, ssagitworkdir.WrapCloneError(ctx, local, err)
 	}
+	if spec.ExpectedRevision != "" {
+		if err := restoreLegionCodeGitRevision(ctx, local, spec.ExpectedRevision, opts...); err != nil {
+			return nil, err
+		}
+	}
 	lockedRevision := strings.ToLower(strings.TrimSpace(yakgit.GetHeadHash(local)))
 	if lockedRevision == "" {
 		return nil, fmt.Errorf("source_workspace git clone has no HEAD revision")
@@ -413,6 +448,7 @@ func materializeLegionCodeGitWorkspace(
 	}
 	return &legionCodeWorkspaceRuntime{
 		spec:           publicLegionCodeWorkspaceSpec(spec),
+		inlineFiles:    cloneLegionInlineFiles(spec.InlineFiles),
 		root:           root,
 		lockedRevision: lockedRevision,
 		sha256:         digest,
@@ -468,6 +504,7 @@ func materializeLegionCodeArchiveWorkspace(
 	}
 	return &legionCodeWorkspaceRuntime{
 		spec:           publicLegionCodeWorkspaceSpec(spec),
+		inlineFiles:    cloneLegionInlineFiles(spec.InlineFiles),
 		root:           root,
 		lockedRevision: strings.TrimSpace(spec.ExpectedRevision),
 		sha256:         archiveSHA256,
@@ -1068,6 +1105,7 @@ func validateLegionCodeProxyURL(raw string) error {
 func publicLegionCodeWorkspaceSpec(spec legionCodeWorkspaceSpec) legionCodeWorkspaceSpec {
 	spec.Auth = nil
 	spec.Proxy = nil
+	spec.InlineFiles = nil
 	return spec
 }
 
@@ -1089,8 +1127,8 @@ func validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw []byte) error {
 		return fmt.Errorf("context source_workspace was not present at bind")
 	case received == nil:
 		return fmt.Errorf("context source_workspace pin is missing")
-	case received.Auth != nil || received.Proxy != nil:
-		return fmt.Errorf("context source_workspace must not contain auth or proxy")
+	case received.Auth != nil || received.Proxy != nil || received.InlineFiles != nil:
+		return fmt.Errorf("context source_workspace must not contain auth, proxy, or inline_files")
 	}
 	boundLocator := *bound
 	boundLocator.Kind = strings.ToLower(strings.TrimSpace(boundLocator.Kind))
