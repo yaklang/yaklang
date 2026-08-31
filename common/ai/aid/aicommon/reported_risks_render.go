@@ -241,9 +241,9 @@ func normalizeRiskTargetForSummary(url, host string, port int) string {
 		if len(s) > 1 {
 			s = strings.TrimSuffix(s, "/")
 		}
-		// Truncate to 60 chars.
-		if len(s) > 60 {
-			s = s[:60] + "..."
+		// Truncate to 60 runes.
+		if len([]rune(s)) > 60 {
+			s = string([]rune(s)[:60]) + "..."
 		}
 		return s
 	}
