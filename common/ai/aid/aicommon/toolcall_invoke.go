@@ -439,6 +439,10 @@ func (a *ToolCaller) invoke(
 				boundRisksMu.Lock()
 				boundRisks = append(boundRisks, risk)
 				boundRisksMu.Unlock()
+				// Append a compact summary to the session-level reported-risks
+				// store so the model sees a "已报告漏洞清单" in every subsequent
+				// prompt and avoids duplicate cybersecurity-risk calls.
+				a.config.AppendReportedRisk(risk)
 			}
 			httpFlow, _ := handleHTTPFlowMessage(result)
 			if httpFlow != nil {
@@ -694,7 +698,10 @@ func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
 				RuntimeId       string `json:"RuntimeId"`
 				Severity        string `json:"Severity"`
 				Title           string `json:"Title"`
+				TitleVerbose    string `json:"TitleVerbose"`
 				Url             string `json:"Url"`
+				Parameter       string `json:"Parameter"`
+				Payload         string `json:"Payload"`
 			}
 
 			var riskData riskJSON
@@ -716,6 +723,8 @@ func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
 				RiskTypeVerbose: riskData.RiskTypeVerbose,
 				RuntimeId:       riskData.RuntimeId,
 				Severity:        riskData.Severity,
+				Parameter:       riskData.Parameter,
+				Payload:         riskData.Payload,
 			}
 			risk.ID = riskData.Id
 			risk.CreatedAt = time.Unix(riskData.CreatedAt, 0)

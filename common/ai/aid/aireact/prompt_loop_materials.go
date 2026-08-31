@@ -240,6 +240,12 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	}
 	lightBase := *base
 	lightBase.PromptFrozenOpenMaterials = aicommon.PromptFrozenOpenMaterials{}
+	// Preserve ReportedRisks in lightweight mode: the dedup list is critical
+	// for preventing duplicate vulnerability reports even on speed-priority
+	// models. Budget-limited via the render function's internal token cap.
+	if pm != nil && pm.react != nil && pm.react.config != nil {
+		lightBase.PromptFrozenOpenMaterials.ReportedRisks = pm.react.config.GetReportedRisksRendered()
+	}
 	if pm != nil && pm.react != nil && pm.react.config != nil && pm.react.config.GetTimeline() != nil {
 		if input.IncludeLatestModelReplay {
 			lightBase.TimelineOpen = pm.react.config.GetTimeline().DumpRecentForPromptWithLatestModelReplay(lightweightLoopRecentTimelineTokens)
