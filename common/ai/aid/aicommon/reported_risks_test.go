@@ -374,7 +374,7 @@ func TestSessionPromptState_ReportedRisksPersistence(t *testing.T) {
 // SessionPromptState: ForkForSubAgent inherits reported risks
 // ---------------------------------------------------------------------------
 
-func TestSessionPromptState_ForkForSubAgent_InheritsReportedRisks(t *testing.T) {
+func TestSessionPromptState_ForkForSubAgent_SharesReportedRisks(t *testing.T) {
 	parent := NewSessionPromptState()
 	parent.AppendReportedRisk(&schema.Risk{
 		Url:       "https://example.com/login",
@@ -385,11 +385,13 @@ func TestSessionPromptState_ForkForSubAgent_InheritsReportedRisks(t *testing.T) 
 	})
 
 	child := parent.ForkForSubAgent()
+
+	// Child sees parent's risk.
 	rendered := child.GetReportedRisksRendered()
 	require.Contains(t, rendered, "sqli")
 	require.Contains(t, rendered, "example.com/login")
 
-	// Child can add its own risks.
+	// Child adds its own risk.
 	added := child.AppendReportedRisk(&schema.Risk{
 		Url:       "https://example.com/search",
 		RiskType:  "xss",
@@ -399,16 +401,16 @@ func TestSessionPromptState_ForkForSubAgent_InheritsReportedRisks(t *testing.T) 
 	})
 	require.True(t, added)
 
-	// Parent does not see the child's new risk.
+	// Parent immediately sees the child's new risk — shared store, not copy.
 	parentRendered := parent.GetReportedRisksRendered()
-	require.NotContains(t, parentRendered, "xss")
+	require.Contains(t, parentRendered, "xss", "parent should see child's risk (shared store)")
 
-	// Child sees both inherited and new.
+	// Child still sees both.
 	childRendered := child.GetReportedRisksRendered()
 	require.Contains(t, childRendered, "sqli")
 	require.Contains(t, childRendered, "xss")
 
-	// Child still deduplicates against inherited parent risks.
+	// Child deduplicates against parent's risks.
 	dup := child.AppendReportedRisk(&schema.Risk{
 		Url:       "https://example.com/login",
 		RiskType:  "sqli",
@@ -416,7 +418,18 @@ func TestSessionPromptState_ForkForSubAgent_InheritsReportedRisks(t *testing.T) 
 		Title:     "SQL 注入 (child retry)",
 		Severity:  "high",
 	})
-	require.False(t, dup, "child should dedup against inherited parent risks")
+	require.False(t, dup, "child should dedup against shared parent risks")
+
+	// Parent adding a risk is also visible to child.
+	parent.AppendReportedRisk(&schema.Risk{
+		Url:       "https://example.com/admin",
+		RiskType:  "rce",
+		Parameter: "cmd",
+		Title:     "RCE",
+		Severity:  "high",
+	})
+	childRendered2 := child.GetReportedRisksRendered()
+	require.Contains(t, childRendered2, "rce", "child should see parent's new risk (shared store)")
 }
 
 // ---------------------------------------------------------------------------
