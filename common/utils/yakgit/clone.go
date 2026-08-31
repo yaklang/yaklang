@@ -33,7 +33,7 @@ const defaultCloneTimeout = 30 * time.Minute
 // init / SetProxy / applyProxyTransport / installDefaultProxyTransport.
 // go-git's gitClient.InstallProtocol mutates a global registry, so concurrent
 // clones that swap transports would race without this lock.
-var protocolMu sync.Mutex
+var protocolMu sync.RWMutex
 
 func init() {
 	installDefaultProxyTransport()
@@ -76,12 +76,9 @@ func installDefaultProxyTransport() {
 // applyProxyTransport re-registers the global go-git https/http transports
 // with an HTTP client whose custom DialContext dials through the given proxy.
 //
-// Why this is needed: go-git's built-in ProxyOptions support relies on
-// http.Transport.Proxy, but yakgit's init() installs a transport with a
-// custom DialContext (netx.DialContext). When DialContext is set, http.Transport
-// bypasses the Proxy CONNECT path and dials directly, so go-git's ProxyOptions
-// is silently ignored. To make per-clone proxy actually work, we must re-register
-// a transport whose DialContext itself dials through the proxy.
+// The configured proxy is applied once, at the netx dial layer. Callers must
+// not also set go-git's ProxyOptions: that adds http.Transport.Proxy and makes
+// the proxy dialer tunnel to the proxy itself instead of the repository.
 //
 // The registry is process-global (gitClient.Protocols), so while a proxied
 // clone is in flight every other clone in the process observes this transport.
@@ -169,37 +166,14 @@ func Clone(u string, localPath string, opt ...Option) error {
 		}
 	}
 
-	// If a per-clone proxy is configured, re-register the global go-git
-	// transport with a DialContext that dials through that proxy. go-git's
-	// own ProxyOptions is silently ignored because yakgit's custom DialContext
-	// bypasses http.Transport.Proxy, so we must swap the transport ourselves.
-	//
-	// Hold protocolMu for the ENTIRE clone, not just the swap: gitClient.Protocols
-	// is a process-global map, and PlainCloneContext reads it at clone time, so
-	// releasing the lock before the clone finishes would let a concurrent clone
-	// (or SetProxy) overwrite the transport mid-flight, silently routing this
-	// clone's requests through the wrong proxy. Proxied clones are rare
-	// (scan-time, one per target) so serializing them is acceptable; no-proxy
-	// clones never touch the registry and stay fully concurrent.
-	//
-	// Restore the PREVIOUS transport (snapshotted before the swap) on exit,
-	// NOT the no-proxy default — a caller may have set a global proxy via
-	// SetProxy that should remain in effect after this per-clone proxy clone
-	// returns. Unconditionally calling installDefaultProxyTransport() here
-	// would silently wipe that global setting.
-	if c.Proxy.URL != "" {
-		full, err := c.Proxy.FullURL()
-		if err != nil {
-			return utils.Wrapf(err, "git clone: %v to %v failed: invalid proxy url", u, localPath)
-		}
-		protocolMu.Lock()
-		prevHTTPS, prevHTTP := snapshotProtocolTransports()
-		applyProxyTransport(full.String())
-		defer func() {
-			restoreProtocolTransports(prevHTTPS, prevHTTP)
-			protocolMu.Unlock()
-		}()
+	// Ordinary clones share a read lock; a per-operation proxy owns the write
+	// lock until the previous transport has been restored. Reads must also
+	// participate so another task's proxy cannot be observed mid-clone.
+	releaseTransport, err := lockGitProtocolTransport(c.Context, c.Proxy)
+	if err != nil {
+		return err
 	}
+	defer releaseTransport()
 
 	respos, err := git.PlainCloneContext(c.Context, localPath, false, buildCloneOptions(u, c))
 	if err != nil {
@@ -225,7 +199,6 @@ func buildCloneOptions(u string, c *config) *git.CloneOptions {
 		RecurseSubmodules: c.ToRecursiveSubmodule(),
 		InsecureSkipTLS:   !c.VerifyTLS,
 		Progress:          os.Stdout,
-		ProxyOptions:      c.Proxy,
 		ReferenceName:     cloneReferenceName(c.Branch),
 		SingleBranch:      c.SingleBranch,
 		Tags:              cloneTagMode(c),
