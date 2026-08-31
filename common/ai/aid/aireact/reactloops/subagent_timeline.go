@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -122,6 +124,10 @@ func buildSubAgentRuntime(
 	}
 
 	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
+	if timeout := resolveSubAgentJobTimeout(job, opts); timeout > 0 {
+		jobCtx, jobCancel = context.WithTimeout(parentTask.GetContext(), timeout)
+		log.Infof("[SubAgent] job %q wall-clock timeout=%s", job.Identifier, timeout)
+	}
 
 	userInput := strings.TrimSpace(job.UserInput)
 	if userInput == "" {
@@ -157,7 +163,7 @@ func buildSubAgentRuntime(
 	}
 	subTask.SetEmitter(taskEmitter)
 
-	childInvoker, err := buildSubAgentInvoker(parentCfg, handle, subTask.GetContext(), taskEmitter)
+	childInvoker, err := buildSubAgentInvoker(parentCfg, handle, subTask.GetContext(), taskEmitter, opts)
 	if err != nil {
 		jobCancel()
 		return nil, nil, nil, utils.Wrap(err, "create sub react invoker failed")
@@ -186,6 +192,18 @@ func buildSubAgentRuntime(
 	return childInvoker, subTask, release, nil
 }
 
+// resolveSubAgentJobTimeout returns the effective wall-clock budget for a job.
+// Job.Timeout wins; otherwise DefaultJobTimeout; <=0 means unlimited.
+func resolveSubAgentJobTimeout(job SubAgentJob, opts SubAgentOptions) time.Duration {
+	if job.Timeout > 0 {
+		return job.Timeout
+	}
+	if opts.DefaultJobTimeout > 0 {
+		return opts.DefaultJobTimeout
+	}
+	return 0
+}
+
 // buildSubAgentInvoker 根据子 timeline 容器和父 config 构建子 invoker。
 // timeline 来源由 TimelineHandle 决定（Fork.Branch 或 Clean 新建）。
 func buildSubAgentInvoker(
@@ -193,6 +211,7 @@ func buildSubAgentInvoker(
 	handle *TimelineHandle,
 	taskCtx context.Context,
 	taskEmitter *aicommon.Emitter,
+	opts SubAgentOptions,
 ) (aicommon.AITaskInvokeRuntime, error) {
 	baseOpts := aicommon.ConvertConfigToOptions(parentCfg)
 	baseOpts = append(baseOpts,
@@ -208,6 +227,9 @@ func buildSubAgentInvoker(
 	// / increase iteration，使子 Agent 契约自文档化，且在 ConvertConfigToOptions
 	// 传播逻辑变化时不会静默回退。
 	baseOpts = append(baseOpts, buildSubAgentStrategyOptions()...)
+	if len(opts.ExtraConfigOpts) > 0 {
+		baseOpts = append(baseOpts, opts.ExtraConfigOpts...)
+	}
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(taskCtx, baseOpts...)
 	if err != nil {
@@ -362,7 +384,7 @@ func PrepareForkedSubAgent(
 	taskEmitter := BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
 	subTask.SetEmitter(taskEmitter)
 
-	childInvoker, err := buildSubAgentInvoker(parentCfg, &TimelineHandle{mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}, subTask.GetContext(), taskEmitter)
+	childInvoker, err := buildSubAgentInvoker(parentCfg, &TimelineHandle{mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}, subTask.GetContext(), taskEmitter, SubAgentOptions{})
 	if err != nil {
 		jobCancel()
 		return nil, nil, nil, nil, err

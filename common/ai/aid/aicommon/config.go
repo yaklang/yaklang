@@ -215,8 +215,13 @@ type Config struct {
 	AiCallTokenLimit       int64
 	AiAutoRetry            int64
 	AiTransactionAutoRetry int64
-	aiRetryWaitFunc        func(context.Context, time.Duration) error
-	PromptHook             func(string) string
+	// AiFormatAutoRetry caps retries for action-format / parse failures inside
+	// CallAITransaction. When <=0, format retries share AiTransactionAutoRetry.
+	AiFormatAutoRetry int64
+	// SkipToolCallReasonGeneration skips liteforge tool-call-reason generation.
+	SkipToolCallReasonGeneration bool
+	aiRetryWaitFunc              func(context.Context, time.Duration) error
+	PromptHook                   func(string) string
 
 	/*
 		Prompt Manager
@@ -1192,6 +1197,39 @@ func WithAITransactionAutoRetry(n int64) ConfigOption {
 		}
 		c.m.Lock()
 		c.AiTransactionAutoRetry = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithAIFormatAutoRetry sets the max retries for action-format / parse failures
+// inside CallAITransaction. Use a lower value than WithAITransactionAutoRetry so
+// malformed @action outputs fail fast without burning full network retry budgets.
+func WithAIFormatAutoRetry(n int64) ConfigOption {
+	return func(c *Config) error {
+		if n < 0 {
+			return utils.Error("ai format auto retry must be >= 0")
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.AiFormatAutoRetry = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithSkipToolCallReasonGeneration disables liteforge generation of tool-call
+// reasons. Useful for high-volume loops (e.g. code audit) where reason AI calls
+// amplify latency under slow networks.
+func WithSkipToolCallReasonGeneration(skip bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.SkipToolCallReasonGeneration = skip
 		c.m.Unlock()
 		return nil
 	}
@@ -3841,6 +3879,14 @@ func (c *Config) GetAITransactionAutoRetryCount() int64 {
 	return c.AiTransactionAutoRetry
 }
 
+func (c *Config) GetAIFormatAutoRetryCount() int64 {
+	return c.AiFormatAutoRetry
+}
+
+func (c *Config) ShouldSkipToolCallReasonGeneration() bool {
+	return c.SkipToolCallReasonGeneration
+}
+
 func (c *Config) GetToolComposeConcurrency() int {
 	if c.ToolComposeConcurrency <= 0 {
 		return 2
@@ -4197,6 +4243,12 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Retry / limits
 	if i.AiTransactionAutoRetry > 0 {
 		opts = append(opts, WithAITransactionRetry(i.AiTransactionAutoRetry))
+	}
+	if i.AiFormatAutoRetry > 0 {
+		opts = append(opts, WithAIFormatAutoRetry(i.AiFormatAutoRetry))
+	}
+	if i.SkipToolCallReasonGeneration {
+		opts = append(opts, WithSkipToolCallReasonGeneration(true))
 	}
 	if i.AiAutoRetry > 0 {
 		opts = append(opts, WithAIAutoRetry(i.AiAutoRetry))

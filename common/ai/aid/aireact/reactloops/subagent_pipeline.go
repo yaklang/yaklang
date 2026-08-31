@@ -836,6 +836,14 @@ type SubAgentOptions struct {
 	// verification watchdog 能观察子 Agent 活动。可为 nil（跳过注册，但会
 	// 丧失 stall heartbeat 旁路保护）。
 	ParentLoop *ReActLoop
+
+	// DefaultJobTimeout 是每个子 Agent 的默认 wall-clock 预算。当 job.Timeout
+	// 未设置时生效；<=0 表示不限制（仅受父 context 约束）。
+	DefaultJobTimeout time.Duration
+
+	// ExtraConfigOpts 追加到子 invoker 的 config（在 ConvertConfigToOptions 之后）。
+	// 用于审计等场景收紧重试、关闭 tool-call-reason 等。
+	ExtraConfigOpts []aicommon.ConfigOption
 }
 
 // LoopBuilder 构建子 Agent 的 ReActLoop。默认实现按 job.LoopName 查注册表
@@ -928,6 +936,10 @@ type SubAgentJob struct {
 	// LoopName 是已注册的 ReAct loop factory 名称。为空时在 dispatch / nested
 	// 路径中默认取 schema.AI_REACT_LOOP_NAME_DEFAULT。
 	LoopName string `json:"loop_name"`
+	// Timeout 是该子 Agent 的 wall-clock 预算。>0 时用 context.WithTimeout
+	// 包裹 jobCtx；超时后 cancel，释放并发槽。0 表示使用
+	// SubAgentOptions.DefaultJobTimeout（若也未设置则不限时）。
+	Timeout time.Duration `json:"timeout,omitempty"`
 }
 
 // SubAgentResult 是子 Agent 运行的统一结果。它内嵌 SubAgentJob，使身份字段

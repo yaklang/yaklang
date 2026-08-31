@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/auditopts"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
@@ -50,6 +51,7 @@ func runAllCategoryScans(
 			TaskName:   goal,
 			Goal:       goal,
 			LoopName:   schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT,
+			Timeout:    auditopts.DefaultCategoryScanTimeout,
 		})
 		catalog[category.ID] = categoryScanJob{
 			category: category,
@@ -60,9 +62,11 @@ func runAllCategoryScans(
 
 	concurrency := reactloops.ResolveSubAgentConcurrency(loop.GetMaxSubAgents(), len(categories))
 
-	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d)", len(categories), concurrency)
+	log.Infof("[CodeAudit/Phase2] Starting forked sub-agent scan of %d categories (concurrency=%d, per-category timeout=%s)",
+		len(categories), concurrency, auditopts.DefaultCategoryScanTimeout)
 	r.AddToTimeline("[PHASE2_START]",
-		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（timeline 分支隔离）。", len(categories)))
+		fmt.Sprintf("Phase 2 开始：fork 子 Agent 扫描 %d 个漏洞类别（timeline 分支隔离，每类超时 %s）。",
+			len(categories), auditopts.DefaultCategoryScanTimeout))
 
 	artifacts := newCategoryArtifactStore(state)
 
@@ -72,6 +76,8 @@ func runAllCategoryScans(
 		ParentLoop:         loop,
 		TimelineMode:       reactloops.SubAgentTimelineFork,
 		ExecuteConcurrency: concurrency,
+		DefaultJobTimeout:  auditopts.DefaultCategoryScanTimeout,
+		ExtraConfigOpts:    auditopts.SubAgentConfigOpts(),
 		LoopBuilder: phase2CategoryLoopBuilder{
 			state: state, catalog: catalog, artifacts: artifacts, scanStates: &scanStates,
 		},
@@ -200,10 +206,13 @@ func tryResumeCategoryScanPhaseB(
 		Identifier: category.ID + "-resume",
 		TaskName:   resumeGoal,
 		Goal:       resumeGoal,
+		Timeout:    auditopts.DefaultCategoryScanTimeout,
 	}
 	resumeResults := reactloops.DispatchSubAgents(r, task, []reactloops.SubAgentJob{resumeJob}, reactloops.SubAgentOptions{
-		ParentLoop:   loop,
-		TimelineMode: reactloops.SubAgentTimelineFork,
+		ParentLoop:        loop,
+		TimelineMode:      reactloops.SubAgentTimelineFork,
+		DefaultJobTimeout: auditopts.DefaultCategoryScanTimeout,
+		ExtraConfigOpts:   auditopts.SubAgentConfigOpts(),
 		LoopBuilder: phase2CategoryResumeLoopBuilder{
 			state: state, category: category, catJob: catJob, scanState: scanState,
 			artifacts: artifacts, scanStates: scanStates,

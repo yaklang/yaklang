@@ -15,5 +15,5 @@ func BuildSubAgentInvokerForTest(
 	taskEmitter *aicommon.Emitter,
 ) (aicommon.AITaskInvokeRuntime, error) {
 	handle := &TimelineHandle{mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}
-	return buildSubAgentInvoker(parentCfg, handle, taskCtx, taskEmitter)
+	return buildSubAgentInvoker(parentCfg, handle, taskCtx, taskEmitter, SubAgentOptions{})
 }
