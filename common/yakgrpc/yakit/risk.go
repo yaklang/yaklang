@@ -24,7 +24,12 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 		if ret.FromYakScript == "" {
 			ret.FromYakScript = consts.GetCurrentYakitPluginID()
 		}
-		risk = ret
+		// Important: do NOT alias `ret` into `risk`. FirstOrCreate scans the found
+		// record INTO `risk`, then runs the update from the Assign attributes.
+		// Alias the same pointer would overwrite ret's new values with the stale
+		// DB row, silently turning every deduplicated upsert into a no-op
+		// (e.g. runtime_id / title never refreshed on duplicate reports).
+		risk = &schema.Risk{}
 	case schema.Risk:
 		token = ret.ReverseToken
 		if ret.FromYakScript == "" {

@@ -1199,7 +1199,7 @@ func TestDebugPluginRiskCount(t *testing.T) {
 		}
 		code := `
 for i in 10 {
-	a = risk.NewRisk("127.0.0.1")
+	a = risk.NewRisk(sprintf("http://127.0.0.1/%d", i))
 }
 `
 		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
