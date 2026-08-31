@@ -148,6 +148,9 @@ message JobFailed {
   legion.node.v1.EventMetadata metadata = 1;
   JobRef job = 2;
   google.protobuf.Timestamp finished_at = 3;
+  // Canonical failure code. Known node-reported codes and retry policies live in
+  // scannode/job_failure_codes.go (ResolveJobFailureCode). Unknown codes are
+  // bucketed as node_reported_failure_unknown with raw_error_code in detail.
   string error_code = 4;
   string error_message = 5;
   bytes error_detail_json = 6;
