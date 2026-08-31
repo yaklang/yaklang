@@ -36,7 +36,9 @@ echo $_foo
 NEG
 )
 
-${*}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit
+${*.sh}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_sh
+${*.bash}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_bash
+$hit_sh + $hit_bash as $hit
 alert $hit for {
 	level: "middle",
 	title: "Unquoted Variable Expansion In Command",
