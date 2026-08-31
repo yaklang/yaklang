@@ -140,7 +140,7 @@ runtime_go -> common/yak/ssaapi -> common/utils/yakgit -> github.com/go-git/go-g
 runtime_go -> common/yak/ssaapi -> common/utils/yakgit -> github.com/go-git/go-git/v5 -> github.com/ProtonMail/go-crypto/openpgp
 runtime_go -> common/utils/lowhttp -> github.com/andybalholm/brotli
 runtime_go -> common/utils/lowhttp -> github.com/refraction-networking/utls -> github.com/cloudflare/circl/pki
-runtime_go -> common/yak/yaklib -> github.com/dop251/goja
+runtime_go -> common/yak/yaklib -> github.com/yaklang/goja
 runtime_go -> common/yak/yaklib -> common/fp
 runtime_go -> common/yak/yaklib -> common/fuzzx
 ```

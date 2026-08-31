@@ -3,7 +3,7 @@ package javascript
 import (
 	"fmt"
 
-	"github.com/dop251/goja/ast"
+	"github.com/yaklang/goja/ast"
 	"github.com/yaklang/yaklang/common/log"
 )
 

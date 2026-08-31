@@ -42,8 +42,6 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
-	github.com/dop251/goja_nodejs v0.0.0-20240221231712-27eeffc9c235
 	github.com/elastic/go-libaudit v0.4.0
 	github.com/elastic/go-libaudit/v2 v2.6.2
 	github.com/emersion/go-message v0.18.0
@@ -64,7 +62,7 @@ require (
 	github.com/google/btree v1.0.0
 	github.com/google/go-containerregistry v0.15.2
 	github.com/google/go-dap v0.10.0
-	github.com/google/pprof v0.0.0-20230926050212-f7f687d19a98
+	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/google/uuid v1.6.0
 	github.com/gopacket/gopacket v1.3.1
 	github.com/gorilla/mux v1.7.4
@@ -131,6 +129,8 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33
+	// Yaklang's maintained hard fork combines goja and goja_nodejs in one Go 1.22 module.
+	github.com/yaklang/goja v0.1.0
 	github.com/yaklang/gorm v1.9.17-0.20260811094634-87ab480108b6
 	github.com/yaklang/javajive v0.1.2
 	github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80
@@ -161,7 +161,6 @@ require (
 )
 
 require (
-	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/elastic/go-licenser v0.4.1 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
@@ -170,7 +169,7 @@ require (
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
-	github.com/VillanCh/go-pcre2-lite v0.1.2
+	github.com/VillanCh/go-pcre2-lite v0.1.6
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -192,7 +191,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-pg/zerochecker v0.2.0 // indirect
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
+	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/gogo/protobuf v1.3.2
@@ -273,7 +272,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/mock v0.5.0 // indirect
-	golang.org/x/arch v0.11.0 // indirect
+	golang.org/x/arch v0.11.0
 	golang.org/x/tools v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dop251/goja/parser"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/goja/parser"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -161,4 +161,67 @@ add(a) {return this.d+a},
 	v, err := add(1)
 	require.NoError(t, err)
 	require.Equal(t, int64(4), v.ToInteger())
+}
+
+func TestMUSTPASS_GojaModernJavaScriptCompatibility(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{
+			name: "bigint",
+			code: `(9007199254740993n + 7n).toString()`,
+			want: "9007199254741000",
+		},
+		{
+			name: "logical assignment",
+			code: `let value = 0; value ||= 42; value.toString()`,
+			want: "42",
+		},
+		{
+			name: "es2023 non-mutating array sort",
+			code: `const source = [3, 1, 2]; source.toSorted().join("") + ":" + source.join("")`,
+			want: "123:312",
+		},
+		{
+			name: "regexp dotall",
+			code: `new RegExp("a.b", "s").test("a\nb").toString()`,
+			want: "true",
+		},
+		{
+			name: "regexp named group",
+			code: `/^(?<scheme>https?):/.exec("https://yaklang.com").groups.scheme`,
+			want: "https",
+		},
+		{
+			name: "regexp lookbehind capture direction",
+			code: `const match = /(?<=(\w){3})def/.exec("abcdef"); match[0] + ":" + match[1]`,
+			want: "def:a",
+		},
+		{
+			name: "regexp lookbehind forward backreference",
+			code: `const match = /(?<=\1(\w))d/i.exec("abcCd"); match[0] + ":" + match[1]`,
+			want: "d:C",
+		},
+		{
+			name: "regexp lookbehind outer backtracking",
+			code: `/^faaao?(?<=^f[oa]+(?=o))/.exec("faaao")[0]`,
+			want: "faaa",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, value, err := _run(test.code)
+			require.NoError(t, err)
+			require.Equal(t, test.want, value.String())
+		})
+	}
+}
+
+func TestMUSTPASS_GojaNodeJSBufferConcatCompatibility(t *testing.T) {
+	_, value, err := _run(`Buffer.concat([Buffer.from("yak"), Buffer.from("lang")]).toString("utf8")`)
+	require.NoError(t, err)
+	require.Equal(t, "yaklang", value.String())
 }
