@@ -250,6 +250,20 @@ func TestUploadMetricsConcurrency(t *testing.T) {
 	}
 }
 
+func TestSSAArtifactCollector_SetUploadBytesUnderCollectorLock(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+	defer c.Cleanup()
+
+	c.mu.Lock()
+	c.setUploadBytesLocked(102400, 32000)
+	c.mu.Unlock()
+
+	metrics := c.snapshotUploadMetrics()
+	if metrics.RawBytes != 102400 || metrics.CompressedBytes != 32000 {
+		t.Fatalf("unexpected upload byte metrics: %+v", metrics)
+	}
+}
+
 func TestBuildReadyEventPopulatesMetrics(t *testing.T) {
 	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
 	c.recordUploadMs(1500)
