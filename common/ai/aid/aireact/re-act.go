@@ -602,15 +602,20 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 		taskInfos = append(taskInfos, buildQueueTaskInfo(task))
 	}
 
+	// currentTask is an internal execution cursor and may temporarily point to
+	// an intent task or another nested execution unit. Queue consumers need the
+	// stable, queue-owned root task so that queue_info agrees with dequeue_task
+	// and can be used to restore the frontend's stop target after attaching.
+	currentRootTask := r.getProcessingRuntimeTask()
 	var currentTaskInfo map[string]interface{}
-	if currentTask := r.GetCurrentTask(); currentTask != nil {
-		currentTaskInfo = buildQueueTaskInfo(currentTask)
+	if currentRootTask != nil {
+		currentTaskInfo = buildQueueTaskInfo(currentRootTask)
 	}
 
 	return map[string]interface{}{
 		"queue_name":    r.taskQueue.GetQueueName(),
 		"total_tasks":   r.taskQueue.GetQueueingCount(),
-		"is_processing": r.IsProcessingReAct(),
+		"is_processing": currentRootTask != nil,
 		"current_task":  currentTaskInfo,
 		"tasks":         taskInfos,
 		"queue_empty":   r.taskQueue.IsEmpty(),

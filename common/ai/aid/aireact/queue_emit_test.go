@@ -127,25 +127,65 @@ func TestGetQueueInfoIncludesUserInputUUID(t *testing.T) {
 }
 
 func TestGetQueueInfoIncludesCurrentTask(t *testing.T) {
-	currentTask := aicommon.NewStatefulTaskBase("task-current", "scheduled prompt", nil, nil, true)
-	currentTask.SetStatus(aicommon.AITaskState_Processing)
-	currentTask.SetInputSource(aicommon.USER_INPUT_SOURCE_SCHEDULE)
-	currentTask.SetScheduleUUID("schedule-uuid")
-	currentTask.SetScheduleName("daily check")
+	rootTask := aicommon.NewStatefulTaskBase("task-current", "scheduled prompt", nil, nil, true)
+	rootTask.SetStatus(aicommon.AITaskState_Processing)
+	rootTask.SetInputSource(aicommon.USER_INPUT_SOURCE_SCHEDULE)
+	rootTask.SetScheduleUUID("schedule-uuid")
+	rootTask.SetScheduleName("daily check")
 
 	react := &ReAct{
 		taskQueue:   NewTaskQueue("test"),
-		currentTask: currentTask,
-		config:      &aicommon.Config{},
+		currentTask: rootTask,
+		RuntimeTasks: []aicommon.AIStatefulTask{
+			rootTask,
+		},
+		config: &aicommon.Config{},
 	}
 	info := react.GetQueueInfo()
 	current, ok := info["current_task"].(map[string]interface{})
 	require.True(t, ok)
+	require.True(t, info["is_processing"].(bool))
 	require.Equal(t, "task-current", current["id"])
 	require.Equal(t, aicommon.AITaskState_Processing, current["status"])
 	require.Equal(t, aicommon.USER_INPUT_SOURCE_SCHEDULE, current["input_source"])
 	require.Equal(t, "schedule-uuid", current["schedule_uuid"])
 	require.Equal(t, "daily check", current["schedule_name"])
+}
+
+func TestGetQueueInfoCurrentTaskRemainsQueueRootDuringNestedExecution(t *testing.T) {
+	rootTask := aicommon.NewStatefulTaskBase("queue-root", "scheduled prompt", nil, nil, true)
+	rootTask.SetStatus(aicommon.AITaskState_Processing)
+	rootTask.SetInputSource(aicommon.USER_INPUT_SOURCE_SCHEDULE)
+
+	// Intent tasks are internal execution units. They can become current even
+	// while still in Created state, but must never replace the frontend's root
+	// task identity or make the session appear idle.
+	intentTask := aicommon.NewStatefulTaskBase("queue-root_intent", "intent", nil, nil, true)
+	processingSubAgent := aicommon.NewSubTaskBaseWithOptions(
+		rootTask,
+		"queue-root_sub-agent",
+		"sub agent",
+		aicommon.WithStatefulTaskBaseSubAgent(),
+	)
+	processingSubAgent.SetStatus(aicommon.AITaskState_Processing)
+
+	react := &ReAct{
+		taskQueue:   NewTaskQueue("test"),
+		currentTask: intentTask,
+		RuntimeTasks: []aicommon.AIStatefulTask{
+			rootTask,
+			processingSubAgent,
+		},
+		config: &aicommon.Config{},
+	}
+
+	info := react.GetQueueInfo()
+	current, ok := info["current_task"].(map[string]interface{})
+	require.True(t, ok)
+	require.True(t, info["is_processing"].(bool))
+	require.Equal(t, "queue-root", current["id"])
+	require.Equal(t, aicommon.AITaskState_Processing, current["status"])
+	require.Equal(t, aicommon.USER_INPUT_SOURCE_SCHEDULE, current["input_source"])
 }
 
 func TestGetQueueInfoCurrentTaskIsNilWhenIdle(t *testing.T) {
