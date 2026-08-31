@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfrisk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -24,6 +25,10 @@ func TestRuleExportEmbedsTaxonomyAndRemainsImportCompatible(t *testing.T) {
 		RuleId:   "taxonomy-rule-id",
 		RuleName: "taxonomy-rule",
 		Content:  `desc(title: "taxonomy") alert $result`,
+		RiskType: "sqli",
+		AlertDesc: schema.MapEx[string, *schema.SyntaxFlowDescInfo]{
+			"result": {RiskType: "SQL注入", TitleZh: "SQL 注入"},
+		},
 	}
 	require.NoError(t, db.Create(rule).Error)
 	standardGroups := append(ssaconfig.GetAllSupportedLanguages(), ssaconfig.General.String(), "go", "javascript")
@@ -39,6 +44,7 @@ func TestRuleExportEmbedsTaxonomyAndRemainsImportCompatible(t *testing.T) {
 	require.Equal(t, 1, result.Count)
 
 	metadata := readRuleExportMetadata(t, archive)
+	require.Equal(t, sfrisk.GetTaxonomy(), metadata.RiskTypeTaxonomy)
 	require.Equal(t, ssaconfig.RuleGroupTaxonomySchemaVersion, metadata.RuleGroupTaxonomy.SchemaVersion)
 	require.NotEmpty(t, metadata.RuleGroupTaxonomy.Categories)
 	taxonomyNames := make(map[string]bool)
@@ -60,9 +66,15 @@ func TestRuleExportEmbedsTaxonomyAndRemainsImportCompatible(t *testing.T) {
 	importedMetadata, err := ImportRulesFromBytes(context.Background(), importDB, archive)
 	require.NoError(t, err)
 	require.Contains(t, importedMetadata, "rule_group_taxonomy")
+	require.Contains(t, importedMetadata, "risk_type_taxonomy")
 
 	var imported schema.SyntaxFlowRule
 	require.NoError(t, importDB.Preload("Groups").Where("rule_id = ?", rule.RuleId).First(&imported).Error)
+	require.Equal(t, rule.RuleId, imported.RuleId)
+	require.Equal(t, rule.Content, imported.Content)
+	require.Equal(t, rule.Hash, imported.Hash)
+	require.Equal(t, "sqli", imported.RiskType)
+	require.Equal(t, rule.AlertDesc, imported.AlertDesc)
 	var importedGroupNames []string
 	for _, group := range imported.Groups {
 		importedGroupNames = append(importedGroupNames, group.GroupName)
@@ -72,6 +84,7 @@ func TestRuleExportEmbedsTaxonomyAndRemainsImportCompatible(t *testing.T) {
 
 type ruleExportMetadata struct {
 	RuleGroupTaxonomy ssaconfig.RuleGroupTaxonomy `json:"rule_group_taxonomy"`
+	RiskTypeTaxonomy  sfrisk.Taxonomy             `json:"risk_type_taxonomy"`
 	Relationship      []struct {
 		RuleID     string   `json:"rule_id"`
 		GroupNames []string `json:"group_names"`
