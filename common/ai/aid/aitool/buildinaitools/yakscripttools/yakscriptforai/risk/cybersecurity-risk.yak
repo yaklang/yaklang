@@ -29,6 +29,11 @@ small set of inputs that still makes the saved record actionable.
      result file) so nothing is lost if the session is interrupted.
    - A confirmed risk that is neither saved here nor written to an output file
      counts as NOT delivered.
+   - DO NOT report the same vulnerability twice. The same target + same type +
+     same parameter = the same vulnerability. If you have new evidence (e.g. a
+     different payload confirming the same issue), attach it via evidence
+     instead of creating a new risk record. Check the "已报告漏洞清单" in the
+     prompt context before calling this tool.
 
 1. Never create a title-only risk.
    `summary` is mandatory. It must explain:
