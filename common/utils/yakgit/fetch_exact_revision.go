@@ -47,7 +47,15 @@ func FetchExactRevision(ctx context.Context, local, revision string, opts ...Opt
 	if err != nil {
 		return err
 	}
-	releaseTransport, err := lockGitProtocolTransport(ctx, c.Proxy)
+	origin, err := repository.Remote("origin")
+	if err != nil {
+		return err
+	}
+	if len(origin.Config().URLs) == 0 {
+		return fmt.Errorf("git exact fetch requires a configured origin")
+	}
+	dialProxy, endpointProxy := gitProxyOptionsForEndpoint(origin.Config().URLs[0], c.Proxy)
+	releaseTransport, err := lockGitProtocolTransport(ctx, dialProxy)
 	if err != nil {
 		return err
 	}
@@ -58,8 +66,20 @@ func FetchExactRevision(ctx context.Context, local, revision string, opts ...Opt
 		Depth:           1,
 		Tags:            git.NoTags,
 		Auth:            c.Auth,
+		ProxyOptions:    endpointProxy,
 		InsecureSkipTLS: !c.VerifyTLS,
 	})
+}
+
+// HTTP(S) uses yakgit's netx dial transport; SSH/SCP must retain go-git's
+// endpoint proxy instead. Applying both doubles the HTTP proxy hop, while
+// dropping both silently bypasses an explicitly configured SSH proxy.
+func gitProxyOptionsForEndpoint(locator string, configured transport.ProxyOptions) (dial, endpoint transport.ProxyOptions) {
+	parsed, err := transport.NewEndpoint(locator)
+	if err == nil && (parsed.Protocol == "http" || parsed.Protocol == "https") {
+		return configured, transport.ProxyOptions{}
+	}
+	return transport.ProxyOptions{}, configured
 }
 
 // lockGitProtocolTransport protects the full transport lifetime, including

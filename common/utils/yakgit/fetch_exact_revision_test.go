@@ -3,9 +3,12 @@ package yakgit
 import (
 	"context"
 	"crypto/x509"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -17,9 +20,12 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	gitHTTP "github.com/go-git/go-git/v5/plumbing/transport/http"
+	gitSSH "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netx"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 const exactFetchTestRevision = "0123456789abcdef0123456789abcdef01234567"
@@ -322,4 +328,164 @@ func TestCloneCannotUseAnotherFetchProxy(t *testing.T) {
 	require.Error(t, err)
 	require.EqualValues(t, 1, originRequests.Load(), "after restoration an ordinary clone must contact only its own origin")
 	require.EqualValues(t, 1, proxyRequests.Load())
+}
+
+// go-git consults known_hosts even with a HostKeyCallback when algorithms are
+// empty. Set them in the synthetic auth so this fixture never reads user SSH
+// files. The five-second dial timeout also bounds go-git's pre-session dial,
+// which does not yet inherit the operation's context.
+type exactFetchSSHPassword struct{ gitSSH.Password }
+
+func (a *exactFetchSSHPassword) ClientConfig() (*gossh.ClientConfig, error) {
+	cfg, err := a.Password.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	cfg.HostKeyAlgorithms = []string{gossh.KeyAlgoED25519}
+	cfg.Timeout = 5 * time.Second
+	return cfg, nil
+}
+
+type exactFetchSOCKSObservation struct {
+	host              string
+	port              uint16
+	registryUntouched bool
+	sharedLockHeld    bool
+	err               error
+}
+
+func readExactFetchSOCKSRequest(conn net.Conn, beforeHTTPS, beforeHTTP transport.Transport) (result exactFetchSOCKSObservation) {
+	if result.err = conn.SetDeadline(time.Now().Add(5 * time.Second)); result.err != nil {
+		return
+	}
+	var greeting [2]byte
+	if _, result.err = io.ReadFull(conn, greeting[:]); result.err != nil {
+		return
+	}
+	if greeting[0] != 5 || greeting[1] == 0 {
+		result.err = fmt.Errorf("expected SOCKS5 method negotiation")
+		return
+	}
+	methods := make([]byte, int(greeting[1]))
+	if _, result.err = io.ReadFull(conn, methods); result.err != nil {
+		return
+	}
+	if _, result.err = conn.Write([]byte{5, 0}); result.err != nil {
+		return
+	}
+	var request [5]byte
+	if _, result.err = io.ReadFull(conn, request[:]); result.err != nil {
+		return
+	}
+	if request[0] != 5 || request[1] != 1 || request[2] != 0 || request[3] != 3 || request[4] == 0 {
+		result.err = fmt.Errorf("expected SOCKS5 CONNECT with a domain target")
+		return
+	}
+	target := make([]byte, int(request[4])+2)
+	if _, result.err = io.ReadFull(conn, target); result.err != nil {
+		return
+	}
+	result.host = string(target[:len(target)-2])
+	result.port = binary.BigEndian.Uint16(target[len(target)-2:])
+	if protocolMu.TryRLock() {
+		duringHTTPS, duringHTTP := snapshotProtocolTransports()
+		result.registryUntouched = beforeHTTPS == duringHTTPS && beforeHTTP == duringHTTP
+		protocolMu.RUnlock()
+		if protocolMu.TryLock() {
+			protocolMu.Unlock()
+		} else {
+			result.sharedLockHeld = true
+		}
+	}
+	return
+}
+
+func newExactFetchSOCKSFixture(t *testing.T, beforeHTTPS, beforeHTTP transport.Transport) (string, <-chan exactFetchSOCKSObservation) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	observed := make(chan exactFetchSOCKSObservation, 1)
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		conn, err := listener.Accept()
+		if err != nil {
+			observed <- exactFetchSOCKSObservation{err: err}
+			return
+		}
+		defer conn.Close()
+		result := readExactFetchSOCKSRequest(conn, beforeHTTPS, beforeHTTP)
+		observed <- result
+		if result.err == nil {
+			// SOCKS5 "connection not allowed". Never dial or forward the target.
+			_, _ = conn.Write([]byte{5, 2, 0, 1, 0, 0, 0, 0, 0, 0})
+		}
+	}()
+	t.Cleanup(func() {
+		_ = listener.Close()
+		<-closed
+	})
+	return "socks5://" + listener.Addr().String(), observed
+}
+
+func TestFetchExactRevisionSSHAndSCPUseExplicitSOCKSProxy(t *testing.T) {
+	isolateExactFetchTransports(t)
+	previousSSHConfig := gitSSH.DefaultSSHConfig
+	gitSSH.DefaultSSHConfig = nil
+	t.Cleanup(func() { gitSSH.DefaultSSHConfig = previousSSHConfig })
+	// A regression that drops ProxyOptions must fail without external DNS or
+	// environment-proxy traffic, and it must not count as a successful test.
+	previousResolver := net.DefaultResolver
+	net.DefaultResolver = &net.Resolver{PreferGo: true, Dial: func(context.Context, string, string) (net.Conn, error) {
+		return nil, errors.New("external DNS is disabled by the SOCKS fixture")
+	}}
+	t.Cleanup(func() { net.DefaultResolver = previousResolver })
+	for _, name := range []string{"ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"} {
+		t.Setenv(name, "")
+	}
+	for _, locator := range []struct{ name, value string }{
+		{name: "ssh_url", value: "ssh://git@syntaxflow-fetch-origin.invalid/repo"},
+		{name: "scp", value: "git@syntaxflow-fetch-origin.invalid:repo"},
+	} {
+		for _, operation := range []string{"fetch", "clone"} {
+			t.Run(operation+"_"+locator.name, func(t *testing.T) {
+				protocolMu.RLock()
+				beforeHTTPS, beforeHTTP := snapshotProtocolTransports()
+				protocolMu.RUnlock()
+				proxyURL, observed := newExactFetchSOCKSFixture(t, beforeHTTPS, beforeHTTP)
+				auth := &exactFetchSSHPassword{Password: gitSSH.Password{
+					User: "git", Password: "fixture-password",
+					HostKeyCallbackHelper: gitSSH.HostKeyCallbackHelper{HostKeyCallback: gossh.InsecureIgnoreHostKey()},
+				}}
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				opts := []Option{WithContext(ctx), WithProxy(proxyURL, "", ""), func(c *config) error {
+					c.Auth = auth
+					return nil
+				}}
+				var err error
+				if operation == "fetch" {
+					err = FetchExactRevision(ctx, newExactFetchRepository(t, locator.value), exactFetchTestRevision, opts...)
+				} else {
+					err = Clone(locator.value, filepath.Join(t.TempDir(), "clone"), opts...)
+				}
+				require.Error(t, err, "the fixture always rejects CONNECT")
+				select {
+				case request := <-observed:
+					require.NoError(t, request.err)
+					require.Equal(t, "syntaxflow-fetch-origin.invalid", request.host)
+					require.EqualValues(t, 22, request.port)
+					require.True(t, request.registryUntouched, "SSH must not swap the HTTP(S) registry")
+					require.True(t, request.sharedLockHeld, "SSH must share the transport read lock while dialing")
+				default:
+					t.Fatalf("the SOCKS5 fixture received no request; a direct-connect error is not proxy evidence: %v", err)
+				}
+				protocolMu.RLock()
+				afterHTTPS, afterHTTP := snapshotProtocolTransports()
+				protocolMu.RUnlock()
+				require.Same(t, beforeHTTPS, afterHTTPS)
+				require.Same(t, beforeHTTP, afterHTTP)
+			})
+		}
+	}
 }

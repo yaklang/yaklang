@@ -169,7 +169,8 @@ func Clone(u string, localPath string, opt ...Option) error {
 	// Ordinary clones share a read lock; a per-operation proxy owns the write
 	// lock until the previous transport has been restored. Reads must also
 	// participate so another task's proxy cannot be observed mid-clone.
-	releaseTransport, err := lockGitProtocolTransport(c.Context, c.Proxy)
+	dialProxy, _ := gitProxyOptionsForEndpoint(u, c.Proxy)
+	releaseTransport, err := lockGitProtocolTransport(c.Context, dialProxy)
 	if err != nil {
 		return err
 	}
@@ -192,6 +193,7 @@ func Clone(u string, localPath string, opt ...Option) error {
 // buildCloneOptions maps yakgit config to go-git CloneOptions. Branch names
 // without a refs/ prefix are treated as local branch names (refs/heads/...).
 func buildCloneOptions(u string, c *config) *git.CloneOptions {
+	_, endpointProxy := gitProxyOptionsForEndpoint(u, c.Proxy)
 	opts := &git.CloneOptions{
 		URL:               u,
 		Auth:              c.Auth,
@@ -199,6 +201,7 @@ func buildCloneOptions(u string, c *config) *git.CloneOptions {
 		RecurseSubmodules: c.ToRecursiveSubmodule(),
 		InsecureSkipTLS:   !c.VerifyTLS,
 		Progress:          os.Stdout,
+		ProxyOptions:      endpointProxy,
 		ReferenceName:     cloneReferenceName(c.Branch),
 		SingleBranch:      c.SingleBranch,
 		Tags:              cloneTagMode(c),
