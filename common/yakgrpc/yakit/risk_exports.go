@@ -3,6 +3,8 @@ package yakit
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -15,7 +17,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
@@ -679,14 +680,61 @@ func WithRiskParam_Tags(i string) RiskParamsOpt {
 // assert r.Severity == "high", "severity should be set"
 // risk.Save(r) // 保存到数据库; 也可用 risk.NewRisk(target, ...) 一步创建并保存
 // ```
+// ComputeRiskHash returns a deterministic hash for a risk record based on
+// the dedup key: normalized target + risk type + parameter. Two risks with
+// the same target, type, and parameter yield the same hash, enabling
+// CreateOrUpdateRisk's FirstOrCreate to find and update existing records
+// instead of always creating new ones.
+//
+// Target normalization: strip scheme, strip default ports (80/443),
+// strip trailing slash, lowercase. When URL is empty, fall back to
+// host:port.
+func ComputeRiskHash(rawURL, host string, port int, riskType, parameter string) string {
+	target := normalizeRiskTargetForHash(rawURL, host, port)
+	key := strings.Join([]string{
+		strings.ToLower(strings.TrimSpace(target)),
+		strings.ToLower(strings.TrimSpace(riskType)),
+		strings.TrimSpace(parameter),
+	}, "|")
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:16]) // 32-char hex, sufficient for dedup
+}
+
+// normalizeRiskTargetForHash strips scheme, default ports, and trailing
+// slash from a URL, or falls back to host:port. The result is a compact,
+// normalized target string used for deterministic hash computation.
+func normalizeRiskTargetForHash(rawURL, host string, port int) string {
+	s := strings.TrimSpace(rawURL)
+	if s != "" {
+		// Strip scheme.
+		s = strings.TrimPrefix(s, "https://")
+		s = strings.TrimPrefix(s, "http://")
+		// Strip default ports.
+		s = strings.Replace(s, ":443/", "/", 1)
+		s = strings.Replace(s, ":80/", "/", 1)
+		// Strip trailing slash (but keep root "/").
+		if len(s) > 1 {
+			s = strings.TrimSuffix(s, "/")
+		}
+		return s
+	}
+	// Fallback to host:port.
+	h := strings.TrimSpace(host)
+	if h == "" {
+		return ""
+	}
+	if port > 0 && port != 80 && port != 443 {
+		return fmt.Sprintf("%s:%d", h, port)
+	}
+	return h
+}
+
 func CreateRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 	return _createRisk(u, opts...)
 }
 
 func _createRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
-	r := &schema.Risk{
-		Hash: uuid.New().String(),
-	}
+	r := &schema.Risk{}
 
 	if utils.IsIPv4(u) {
 		r.IP = u
@@ -733,6 +781,14 @@ func _createRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 	}
 	if r.Severity == "" {
 		r.Severity = "low"
+	}
+
+	// Compute a deterministic hash based on the dedup key:
+	// normalized target + risk type + parameter. This allows
+	// CreateOrUpdateRisk's FirstOrCreate to actually find and update
+	// existing records instead of always creating new ones.
+	if r.Hash == "" {
+		r.Hash = ComputeRiskHash(r.Url, r.Host, r.Port, r.RiskType, r.Parameter)
 	}
 	return r
 }
