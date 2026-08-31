@@ -385,8 +385,8 @@ func TestFullDispatchNAKExpiryPublishesCapacityFailure(t *testing.T) {
 		t.Fatalf("expired disposition=%+v err=%v", disposition, err)
 	}
 	code, detail := reporter.failure("attempt-2")
-	if code != dispatchCapacityFailureCode {
-		t.Fatalf("expired capacity drop code = %q, want %q", code, dispatchCapacityFailureCode)
+	if code != JobFailureCodeNodeCapacityExceeded {
+		t.Fatalf("expired capacity drop code = %q, want %q", code, JobFailureCodeNodeCapacityExceeded)
 	}
 	if detail["script_release_id"] != "release-a" {
 		t.Fatalf("failure detail missing dispatch context: %#v", detail)
@@ -420,8 +420,8 @@ func TestFirstDispatchCapacityExpiryPublishesCapacityFailure(t *testing.T) {
 		t.Fatalf("disposition=%+v, want term after capacity expiry", disposition)
 	}
 	code, _ := reporter.failure("attempt-cap")
-	if code != dispatchCapacityFailureCode {
-		t.Fatalf("failure code = %q, want %q", code, dispatchCapacityFailureCode)
+	if code != JobFailureCodeNodeCapacityExceeded {
+		t.Fatalf("failure code = %q, want %q", code, JobFailureCodeNodeCapacityExceeded)
 	}
 	if count := reporter.count("failed", "attempt-cap"); count != 1 {
 		t.Fatalf("expected exactly one failure event, got %d", count)
@@ -474,8 +474,8 @@ func TestCapacityFailurePublishErrorNAKsForRetry(t *testing.T) {
 	if disposition.kind != messageTerm {
 		t.Fatalf("redelivery disposition=%+v, want term after report succeeds", disposition)
 	}
-	if code, _ := reporter.failure("attempt-cap"); code != dispatchCapacityFailureCode {
-		t.Fatalf("redelivery failure code = %q, want %q", code, dispatchCapacityFailureCode)
+	if code, _ := reporter.failure("attempt-cap"); code != JobFailureCodeNodeCapacityExceeded {
+		t.Fatalf("redelivery failure code = %q, want %q", code, JobFailureCodeNodeCapacityExceeded)
 	}
 }
 
@@ -748,8 +748,8 @@ func TestDispatchFailurePanicCancelAndShutdownReleaseSlot(t *testing.T) {
 			t.Fatal("rule snapshot preparation failure leaked slot")
 		}
 		code, detail := reporter.failure("attempt-rs")
-		if code != "rule_snapshot_prepare_failed" {
-			t.Fatalf("failure code = %q, want rule_snapshot_prepare_failed", code)
+		if code != JobFailureCodeRuleSnapshotPrepareFailed {
+			t.Fatalf("failure code = %q, want %s", code, JobFailureCodeRuleSnapshotPrepareFailed)
 		}
 		if detail["rule_snapshot_id"] != "snapshot-a" || detail["rule_snapshot_content_sha256"] != "sha256-a" {
 			t.Fatalf("failure detail = %#v, want snapshot identity", detail)

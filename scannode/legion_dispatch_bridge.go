@@ -18,13 +18,6 @@ import (
 
 const dispatchCapacityNakDelay = time.Second
 
-// dispatchCapacityFailureCode is reported to Legion when a dispatch waited for
-// a free execution slot past its admission deadline and was dropped. Without
-// this report the platform only sees the attempt lease expire and reclaims it
-// as attempt_missing_from_heartbeat, which reads as "node lost contact" even
-// though the node was online and busy the whole time.
-const dispatchCapacityFailureCode = "node_capacity_exceeded"
-
 var (
 	dispatchEventRetryAttempts = 3
 	dispatchEventRetryDelay    = 100 * time.Millisecond
@@ -45,7 +38,7 @@ func (b *legionJobBridge) handleDispatch(
 		return termMessage(), b.publishDispatchFailure(
 			ctx,
 			ref,
-			"invalid_dispatch_command",
+			JobFailureCodeInvalidDispatchCommand,
 			err.Error(),
 			&command,
 		)
@@ -214,7 +207,7 @@ func (b *legionJobBridge) publishCapacityExceeded(
 	err := b.dispatchReporter().PublishFailed(
 		ctx,
 		reservation.ref,
-		dispatchCapacityFailureCode,
+		JobFailureCodeNodeCapacityExceeded,
 		"node execution slots are full and the dispatch admission deadline expired",
 		dispatchFailureDetail(command),
 	)
@@ -270,7 +263,7 @@ func (b *legionJobBridge) startDispatch(
 				return b.dispatchReporter().PublishFailed(
 					ctx,
 					reservation.ref,
-					"started_event_publish_failed",
+					JobFailureCodeStartedEventPublishFailed,
 					err.Error(),
 					dispatchFailureDetail(command),
 				)
@@ -293,7 +286,7 @@ func (b *legionJobBridge) executeDispatch(
 				return b.dispatchReporter().PublishFailed(
 					ctx,
 					reservation.ref,
-					"script_execution_panic",
+					JobFailureCodeScriptExecutionPanic,
 					fmt.Sprintf("panic: %v", recovered),
 					map[string]string{"stack": string(debug.Stack())},
 				)
@@ -346,11 +339,11 @@ func (b *legionJobBridge) executeDispatch(
 		return
 	}
 	finished = true
-	failureCode := "script_execution_failed"
+	failureCode := JobFailureCodeScriptExecutionFailed
 	failureDetail := dispatchFailureDetail(command)
 	var preparationErr *ruleSnapshotPreparationError
 	if errors.As(err, &preparationErr) {
-		failureCode = "rule_snapshot_prepare_failed"
+		failureCode = JobFailureCodeRuleSnapshotPrepareFailed
 		if preparationErr.Expectation.SnapshotID != "" {
 			failureDetail["rule_snapshot_id"] = preparationErr.Expectation.SnapshotID
 		}

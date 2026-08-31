@@ -312,6 +312,7 @@ func (p *jobEventPublisher) PublishFailed(
 	detail map[string]string,
 ) error {
 	now := time.Now().UTC()
+	errorCode, detail = prepareJobFailureForPublish(errorCode, detail)
 	// Node diagnostics (git output, subprocess stderr) can carry invalid
 	// UTF-8; proto3 string fields reject it, so sanitize at the source.
 	errorMessage = sanitizeUTF8String(errorMessage)
