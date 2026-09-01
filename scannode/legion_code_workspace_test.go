@@ -108,12 +108,16 @@ func TestLegionCodeWorkspaceValidatesSyntaxFlowMode(t *testing.T) {
 	for _, mode := range []string{"", "create", "improve"} {
 		spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
 		spec.SyntaxFlowMode = mode
+		if mode != "" {
+			spec.SyntaxFlowLanguage = "java"
+		}
 		if err := normalizeLegionCodeWorkspaceSpec(&spec); err != nil {
 			t.Fatalf("valid syntaxflow_mode %q rejected: %v", mode, err)
 		}
 	}
 	spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
 	spec.SyntaxFlowMode = "publish"
+	spec.SyntaxFlowLanguage = "java"
 	if err := normalizeLegionCodeWorkspaceSpec(&spec); err == nil || !strings.Contains(err.Error(), "syntaxflow_mode is invalid") {
 		t.Fatalf("invalid syntaxflow_mode accepted: %v", err)
 	}
@@ -125,6 +129,10 @@ func TestLegionCodeWorkspaceValidatesTrustedSyntaxFlowOriginalRule(t *testing.T)
 	spec.SyntaxFlowMode = "improve"
 	spec.SyntaxFlowOriginalRule = original
 	spec.SyntaxFlowOriginalRuleSHA256 = legionRuleHash(original)
+	spec.SyntaxFlowLanguage = "java"
+	spec.SyntaxFlowOriginalSamplePath = "negative/Sample.java"
+	spec.InlineFiles = map[string]string{spec.SyntaxFlowOriginalSamplePath: "class Negative {}"}
+	spec.SyntaxFlowOriginalSampleSHA256 = legionInlineSourceDigest(spec.InlineFiles)
 	spec.SyntaxFlowRequireOriginalReproduction = true
 	if err := normalizeLegionCodeWorkspaceSpec(&spec); err != nil {
 		t.Fatalf("valid original rule pin rejected: %v", err)
@@ -134,6 +142,14 @@ func TestLegionCodeWorkspaceValidatesTrustedSyntaxFlowOriginalRule(t *testing.T)
 		"invalid hash":       func(value *legionCodeWorkspaceSpec) { value.SyntaxFlowOriginalRuleSHA256 = strings.Repeat("z", 64) },
 		"hash mismatch":      func(value *legionCodeWorkspaceSpec) { value.SyntaxFlowOriginalRuleSHA256 = strings.Repeat("a", 64) },
 		"missing rule bytes": func(value *legionCodeWorkspaceSpec) { value.SyntaxFlowOriginalRule = "" },
+		"invalid sample hash": func(value *legionCodeWorkspaceSpec) {
+			value.SyntaxFlowOriginalSampleSHA256 = strings.Repeat("z", 64)
+		},
+		"missing sample hash": func(value *legionCodeWorkspaceSpec) { value.SyntaxFlowOriginalSampleSHA256 = "" },
+		"missing sample path": func(value *legionCodeWorkspaceSpec) { value.SyntaxFlowOriginalSamplePath = "" },
+		"sample digest mismatch": func(value *legionCodeWorkspaceSpec) {
+			value.SyntaxFlowOriginalSampleSHA256 = strings.Repeat("a", 64)
+		},
 		"oversized rule": func(value *legionCodeWorkspaceSpec) {
 			value.SyntaxFlowOriginalRule = strings.Repeat("a", legionSyntaxFlowMaxRuleBytes+1)
 		},
@@ -420,6 +436,10 @@ func TestPrepareLegionCodeWorkspaceSanitizesBackendAuthAndProxy(t *testing.T) {
 	spec.SyntaxFlowMode = "improve"
 	spec.SyntaxFlowOriginalRule = "exec(,* as $arg,)\nalert $arg"
 	spec.SyntaxFlowOriginalRuleSHA256 = legionRuleHash(spec.SyntaxFlowOriginalRule)
+	spec.SyntaxFlowLanguage = "java"
+	spec.SyntaxFlowOriginalSamplePath = "negative/Sample.java"
+	spec.InlineFiles = map[string]string{spec.SyntaxFlowOriginalSamplePath: "class Negative {}"}
+	spec.SyntaxFlowOriginalSampleSHA256 = legionInlineSourceDigest(spec.InlineFiles)
 	spec.SyntaxFlowRequireOriginalReproduction = true
 	spec.Auth = &legionCodeWorkspaceAuth{
 		Kind: "token", UserName: "backend-user", Password: "backend-token",
@@ -452,12 +472,16 @@ func TestPrepareLegionCodeWorkspaceSanitizesBackendAuthAndProxy(t *testing.T) {
 	}
 	if publicOptions.SourceWorkspace.WorkspaceID != spec.WorkspaceID || publicOptions.SourceWorkspace.ExpectedRevision != revision || publicOptions.SourceWorkspace.SyntaxFlowMode != "improve" ||
 		publicOptions.SourceWorkspace.SyntaxFlowOriginalRule != "" || publicOptions.SourceWorkspace.SyntaxFlowOriginalRuleSHA256 != spec.SyntaxFlowOriginalRuleSHA256 ||
+		publicOptions.SourceWorkspace.SyntaxFlowLanguage != "java" || publicOptions.SourceWorkspace.SyntaxFlowOriginalSamplePath != spec.SyntaxFlowOriginalSamplePath ||
+		publicOptions.SourceWorkspace.SyntaxFlowOriginalSampleSHA256 != spec.SyntaxFlowOriginalSampleSHA256 ||
 		!publicOptions.SourceWorkspace.SyntaxFlowRequireOriginalReproduction {
 		t.Fatalf("public source workspace lost its pin: %#v", publicOptions.SourceWorkspace)
 	}
 	info := workspace.info()["source_workspace"].(map[string]any)
 	if info["syntaxflow_mode"] != "improve" || info["syntaxflow_original_rule"] != spec.SyntaxFlowOriginalRule ||
-		info["syntaxflow_original_rule_sha256"] != spec.SyntaxFlowOriginalRuleSHA256 || info["syntaxflow_require_original_reproduction"] != true {
+		info["syntaxflow_original_rule_sha256"] != spec.SyntaxFlowOriginalRuleSHA256 || info["syntaxflow_language"] != "java" ||
+		info["syntaxflow_original_sample_path"] != spec.SyntaxFlowOriginalSamplePath || info["syntaxflow_original_sample_sha256"] != spec.SyntaxFlowOriginalSampleSHA256 ||
+		info["syntaxflow_require_original_reproduction"] != true {
 		t.Fatalf("trusted source workspace info lost SyntaxFlow mode: %#v", info)
 	}
 }
@@ -774,6 +798,9 @@ func TestStatelessCodeWorkspacePinRejectsMismatchAndPrivateFields(t *testing.T) 
 	bound.SyntaxFlowMode = "improve"
 	bound.SyntaxFlowOriginalRule = "exec(,* as $arg,)\nalert $arg"
 	bound.SyntaxFlowOriginalRuleSHA256 = legionRuleHash(bound.SyntaxFlowOriginalRule)
+	bound.SyntaxFlowLanguage = "java"
+	bound.SyntaxFlowOriginalSamplePath = "negative/Sample.java"
+	bound.SyntaxFlowOriginalSampleSHA256 = strings.Repeat("b", 64)
 	bound.SyntaxFlowRequireOriginalReproduction = true
 	bindRaw, _ := json.Marshal(yakRuntimeOptions{SourceWorkspace: &bound})
 	public := publicLegionCodeWorkspaceSpec(bound)
@@ -797,6 +824,24 @@ func TestStatelessCodeWorkspacePinRejectsMismatchAndPrivateFields(t *testing.T) 
 	contextRaw, _ = json.Marshal(yakRuntimeOptions{SourceWorkspace: &public})
 	if err := validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw); err == nil || !strings.Contains(err.Error(), "does not match") {
 		t.Fatalf("expected original reproduction pin mismatch, got %v", err)
+	}
+	public = publicLegionCodeWorkspaceSpec(bound)
+	public.SyntaxFlowLanguage = "python"
+	contextRaw, _ = json.Marshal(yakRuntimeOptions{SourceWorkspace: &public})
+	if err := validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("expected SyntaxFlow language pin mismatch, got %v", err)
+	}
+	public = publicLegionCodeWorkspaceSpec(bound)
+	public.SyntaxFlowOriginalSampleSHA256 = strings.Repeat("c", 64)
+	contextRaw, _ = json.Marshal(yakRuntimeOptions{SourceWorkspace: &public})
+	if err := validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("expected original sample pin mismatch, got %v", err)
+	}
+	public = publicLegionCodeWorkspaceSpec(bound)
+	public.SyntaxFlowOriginalSamplePath = "negative/Other.java"
+	contextRaw, _ = json.Marshal(yakRuntimeOptions{SourceWorkspace: &public})
+	if err := validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("expected original sample path pin mismatch, got %v", err)
 	}
 	public = publicLegionCodeWorkspaceSpec(bound)
 	public.SyntaxFlowOriginalRule = bound.SyntaxFlowOriginalRule
