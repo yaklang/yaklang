@@ -47,6 +47,12 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 			log.Errorf("save syntaxflow task failed: %v", err)
 		}
 		m.StatusTask()
+		// 任务真正结束后，结果回调必须收到一次终态 done，否则调用方只能
+		// 看到执行过程中的 executing/paused。放在 Stop() 之前，确保
+		// processMonitor 关闭前完成状态已经落定。
+		if success && m.status == schema.SYNTAXFLOWSCAN_DONE {
+			m.notifyDone()
+		}
 		m.Stop(runningID)
 		// 在 Stop() 之后保存报告，确保所有结果都已被处理
 		// Stop() 会调用 processMonitor.Close()，等待后台 goroutine 完成
