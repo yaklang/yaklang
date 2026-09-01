@@ -68,13 +68,12 @@ func (p Prober) Probe(ctx context.Context, target core.Target, cred core.Credent
 	if err := stream.finishPacket(); err != nil {
 		return readFailure(ctx, err, transport)
 	}
-	pktType, payload, err := stream.readPacket()
+	_, payload, err := stream.readPacket()
 	if err != nil {
 		return readFailure(ctx, err, transport)
 	}
-	if pktType != packPreLogin {
-		return core.Result{Outcome: core.OutcomeProtocolMismatch, Transport: transport, Err: core.ErrProtocolParse, ErrDetail: "unexpected prelogin response packet type"}
-	}
+	// 注意：真实 SQL Server 的 PRELOGIN 响应使用 REPLY(0x04) 包类型
+	// （与 go-mssqldb 一致，不校验包类型，直接解析字段）。
 	fields, err := parsePrelogin(payload)
 	if err != nil {
 		return core.Result{Outcome: core.OutcomeProtocolMismatch, Transport: transport, Err: core.ErrProtocolParse, ErrDetail: sanitize(err)}

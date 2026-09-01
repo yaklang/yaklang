@@ -435,6 +435,11 @@ func parseTokens(payload []byte) (srvErr *serverError, loginAck bool, err error)
 	pos := 0
 	for pos < len(payload) {
 		token := payload[pos]
+		if token == 0x00 {
+			// 登录响应包的尾部可能出现 NUL 填充
+			// （与 go-mssqldb 一致：读到 DONE 即认为登录结果完整，忽略尾部）
+			break
+		}
 		pos++
 		switch token {
 		case tokenError:
@@ -454,7 +459,7 @@ func parseTokens(payload []byte) (srvErr *serverError, loginAck bool, err error)
 				srvErr = e
 			}
 			pos += length
-		case tokenInfo, tokenEnvChange, tokenFeatureExtAck:
+		case tokenInfo, tokenEnvChange:
 			if pos+2 > len(payload) {
 				return nil, false, errTDS
 			}
@@ -468,12 +473,29 @@ func parseTokens(payload []byte) (srvErr *serverError, loginAck bool, err error)
 			length := int(binary.LittleEndian.Uint16(payload[pos : pos+2]))
 			pos += 2 + length
 		case tokenDone, 0xFE, 0xFF:
-			// DONE/DONEPROC/DONEINPROC：长度 2(+4 with COUNT if status&0x20? 简化为 2 字节长度)
-			if pos+2 > len(payload) {
+			// DONE/DONEPROC/DONEINPROC（[MS-TDS] 2.2.7.6）：
+			// Status(2) + CurCmd(2) + ByteCount(2) + [RowCount(8) 当 Status&COUNTPRESENT(0x20)]
+			if pos+6 > len(payload) {
 				return nil, false, errTDS
 			}
-			length := int(binary.LittleEndian.Uint16(payload[pos : pos+2]))
-			pos += 2 + length
+			status := binary.LittleEndian.Uint16(payload[pos : pos+2])
+			pos += 6
+			if status&0x20 != 0 {
+				pos += 8
+			}
+		case 0x79: // RETURNSTATUS: 4 字节值，无长度
+			pos += 4
+		case tokenFeatureExtAck:
+			// FEATUREEXTACK: featureid(1)+length(1)+data... 直到 0xFF 终止符
+			for pos < len(payload) && payload[pos] != 0xFF {
+				pos++ // feature id
+				if pos >= len(payload) {
+					return nil, false, errTDS
+				}
+				n := int(payload[pos])
+				pos += 1 + n
+			}
+			pos++ // 0xFF 终止符
 		case tokenSSPI:
 			return nil, false, fmt.Errorf("tds: server requires SSPI (Windows integrated auth)")
 		default:
@@ -505,10 +527,10 @@ func parseErrorToken(b []byte) (*serverError, error) {
 	}
 	e.Message = ucs2ToString(b[pos : pos+msgLen])
 	pos += msgLen
-	// ServerName / ProcName: B_VARCHAR（uint8 长度 + 字节）
+	// ServerName / ProcName：1 字节长度 + UCS2 字节（与 go-mssqldb parseError72 一致）
 	for i := 0; i < 2 && pos < len(b); i++ {
 		n := int(b[pos])
-		pos += 1 + n
+		pos += 1 + n*2
 	}
 	// LineNo (uint16) 忽略
 	return e, nil
