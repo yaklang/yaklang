@@ -43,12 +43,17 @@ func TestSentinelPasswordNeverLeaks(t *testing.T) {
 		}
 	}
 
+	// 协议并行扫描：CI 对本包有 15s 超时，串行 30 协议的拨号超时会超限；
+	// 并行后总耗时 = 最慢单协议，泄漏判定互不影响。
+	var wg sync.WaitGroup
 	for _, typ := range types {
-		handler, err := bruteutils.GetBruteFuncByType(typ)
-		if err != nil {
-			continue
-		}
-		func() {
+		wg.Add(1)
+		go func(typ string) {
+			defer wg.Done()
+			handler, err := bruteutils.GetBruteFuncByType(typ)
+			if err != nil {
+				return
+			}
 			defer func() {
 				if r := recover(); r != nil {
 					check(typ+"-panic", fmt.Sprintf("%v", r))
@@ -69,8 +74,9 @@ func TestSentinelPasswordNeverLeaks(t *testing.T) {
 			check(typ+"-result-fmt", fmt.Sprintf("%+v", res))
 			check(typ+"-extra", string(res.ExtraInfo))
 			check(typ+"-item-string", item.String())
-		}()
+		}(typ)
 	}
+	wg.Wait()
 
 	time.Sleep(200 * time.Millisecond) // 等待异步日志落盘
 	check("global-log", logBuf.String())
