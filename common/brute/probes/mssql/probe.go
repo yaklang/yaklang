@@ -51,6 +51,24 @@ func (p Prober) Probe(ctx context.Context, target core.Target, cred core.Credent
 	timeout := timeoutOf(opts)
 	addr := withDefaultPort(target, 1433)
 
+	// SQL Server 密码最大长度为 128 字符：超长密码必然无效，
+	// 服务器收到超长 LOGIN7 会直接断开连接（实测），
+	// 客户端预判归类为认证失败而非目标不可用。
+	if ucs2Count(cred.Password) > 128 {
+		return core.Result{
+			Outcome:   core.OutcomeAuthFailed,
+			Err:       core.ErrAuthRejected,
+			ErrDetail: "password exceeds SQL Server maximum length (128)",
+		}
+	}
+	if ucs2Count(cred.Username) > 128 {
+		return core.Result{
+			Outcome:   core.OutcomeAuthFailed,
+			Err:       core.ErrAuthRejected,
+			ErrDetail: "username exceeds SQL Server maximum length (128)",
+		}
+	}
+
 	conn, transport, err := core.Dialer(ctx, addr, core.PlaintextAllowed, timeout)
 	if err != nil {
 		return dialFailure(ctx, err, transport)
