@@ -125,6 +125,8 @@ O5LOGON/PBKDF2 verifier 涉及多版本密码学交互，任务明确要求
 ## 稳定性
 
 - 探针模拟器套件 `-count=5`（5 轮重复）全绿；`-race -count=3` 全绿。
+- 真实 mysql8 大字典（5000 密码）中途取消：1.5s 完整退出（= 取消信号延迟），
+  goroutine 净增 0。
 - `TestGRPCMUSTPASS_Brute`（grpc→yak 脚本→调度器全链路）连过 5+ 次。
 - 已知无关项：yakvm 日志引擎存在既有数据竞态（main 分支同样复现 6 处），
   非本 PR 引入；CI 对该包不启用 -race。
