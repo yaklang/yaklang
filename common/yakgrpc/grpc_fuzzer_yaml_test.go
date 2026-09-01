@@ -65,8 +65,8 @@ func CompareNucleiYaml(yaml1, yaml2 string) error {
 		return errors.New("requests length not equal")
 	}
 	for i := 0; i < len(requests1); i++ {
-		req1 := requests1[i].(map[any]any)
-		req2 := requests2[i].(map[any]any)
+		req1 := requests1[i].(map[string]interface{})
+		req2 := requests2[i].(map[string]interface{})
 		if len(req1) != len(req2) {
 			return errors.New(fmt.Sprintf("request %d field length not equal", i+1))
 		}
