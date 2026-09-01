@@ -2198,8 +2198,8 @@
   {
     "rule_id": "source-aws-fsx-lustre-filesystem-encrypted-with-cmk",
     "rule_name": "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
-    "hash": "46b9d366403a7c5f35a491a7f2ffac26c1c42ec1b7f911dcf5ffc59c9b63a578",
-    "version": "20260828.0001"
+    "hash": "18498954a58282033c9be166b3d8ebfbbeb2638af9e2d408534b004e5464edc0",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-config-claude-settings-auto-enable-mcp-generic",
@@ -2300,20 +2300,20 @@
   {
     "rule_id": "source-gha-workflow-env-secret",
     "rule_name": "检测到 GitHub Actions 工作流级 env 暴露 Secret",
-    "hash": "10ab87e0c3d44dc70f9d483f163ea7e128544027e785bfb3f0cbcf2a8cb8b36f",
-    "version": "20260828.0001"
+    "hash": "99ebe0eac0db5ce388dc8f5190b820c55842c6c9c57cb71a3a3d520a049f5cd7",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-localhost-base-url",
     "rule_name": "检测到 baseURL 配置为 localhost",
-    "hash": "2d0d9c1cad5667ca5e9dd200139cc35551270a564637dad637464cf912ac8e80",
-    "version": "20260828.0001"
+    "hash": "82d5258bf5448fa6ad6283b68f54d30f39bf19fedc3ad0e50b1b63e6932f7643",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-detect-insecure-websocket",
     "rule_name": "检测到不安全的 WebSocket 连接",
-    "hash": "e77260574561c245ceaea8482f0d523e6dc1b2aad69826fcb282e98ea7f98f10",
-    "version": "20260828.0001"
+    "hash": "3c4f14c2df283143314ec85e4f9b1938c67d23ecdb7fb7b0a8b48b4b91b43da9",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-go-insecure-skip-verify",
@@ -2480,26 +2480,26 @@
   {
     "rule_id": "source-scala-slick-sql-non-literal",
     "rule_name": "检测到 Scala Slick SQL 非字面量拼接",
-    "hash": "8968e323cb3d9523e3192a81ecffd77d0447203353ea7f1afe02e22fcb87c9d8",
-    "version": "20260828.0001"
+    "hash": "25a2ba0d91a195333a1194adfba7b2057eedfcf03443c8d0e7598941cc33d649",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-system-wildcard-detected",
     "rule_name": "检测到系统调用中的通配符注入",
-    "hash": "048920f766e2f27edf8740a28a284f6e0743edd9a956e7111925aada143b700a",
-    "version": "20260828.0001"
+    "hash": "c04ea240899cdab4b95486233c194c90ac0c91da2ac36f97b44c80c21cf52938",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-unquoted-command-substitution-in-command",
     "rule_name": "检测到命令中未加引号的命令替换",
-    "hash": "912e647079005c427228fcfb0389a4d54aa222cc09be6aec143358fa15ed8ea8",
-    "version": "20260828.0001"
+    "hash": "bdd7e62295201bfabb6f9f7f2fd34bb7d5411f17c0747a0aee022e9434c2c783",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-unquoted-variable-expansion-in-command",
     "rule_name": "检测到命令中未加引号的变量展开",
-    "hash": "4fe4c015fda5c06ca64721197da0613753b474162279ed373fa32cc3dfb5717c",
-    "version": "20260828.0001"
+    "hash": "83fe19b55a2e1c1fd7735040484d0520973710370528ce43b8c5f641d3b899f8",
+    "version": "20260901.0001"
   },
   {
     "rule_id": "source-detected-artifactory-password",
