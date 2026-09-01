@@ -2,7 +2,8 @@ package core
 
 import (
 	"context"
-	"math/rand"
+	crand "crypto/rand"
+	"encoding/binary"
 	"sync"
 	"time"
 )
@@ -16,11 +17,26 @@ type rateLimiter struct {
 	tokens   float64
 	last     time.Time
 	jitter   time.Duration // 每次取令牌后的随机抖动上限
-	rng      *rand.Rand
+	// rngMu 保护 crypto 随机源的便捷读取（抖动对性能不敏感）
+	rngMu sync.Mutex
+}
+
+// randInt63n 返回 [0,n) 的随机数（crypto/rand 源）。
+func (rl *rateLimiter) randInt63n(n int64) int64 {
+	if n <= 1 {
+		return 0
+	}
+	rl.rngMu.Lock()
+	defer rl.rngMu.Unlock()
+	var buf [8]byte
+	if _, err := crand.Read(buf[:]); err != nil {
+		return time.Now().UnixNano() % n
+	}
+	return int64(binary.BigEndian.Uint64(buf[:]) % uint64(n))
 }
 
 func newRateLimiter(perSecond float64, jitter time.Duration) *rateLimiter {
-	rl := &rateLimiter{jitter: jitter, rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
+	rl := &rateLimiter{jitter: jitter}
 	if perSecond > 0 {
 		rl.interval = time.Duration(float64(time.Second) / perSecond)
 		rl.burst = 1
@@ -35,7 +51,7 @@ func (rl *rateLimiter) Take(ctx context.Context) error {
 	if rl.interval <= 0 {
 		// 仅抖动
 		if rl.jitter > 0 {
-			return sleepCtx(ctx, time.Duration(rl.rng.Int63n(int64(rl.jitter))))
+			return sleepCtx(ctx, time.Duration(rl.randInt63n(int64(rl.jitter))))
 		}
 		return ctx.Err()
 	}
@@ -52,7 +68,7 @@ func (rl *rateLimiter) Take(ctx context.Context) error {
 			rl.tokens--
 			jitter := time.Duration(0)
 			if rl.jitter > 0 {
-				jitter = time.Duration(rl.rng.Int63n(int64(rl.jitter)))
+				jitter = time.Duration(rl.randInt63n(int64(rl.jitter)))
 			}
 			rl.mu.Unlock()
 			if jitter > 0 {

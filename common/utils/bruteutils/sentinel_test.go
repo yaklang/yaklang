@@ -21,6 +21,9 @@ import (
 //   - 错误链文本
 //   - 全局日志输出（log.SetOutput 捕获）
 func TestSentinelPasswordNeverLeaks(t *testing.T) {
+	if testing.Short() {
+		t.Skip("short mode: 跳过 30 协议全量扫描")
+	}
 	sentinel := "SENTINEL-P@ss!中文🔐$(echo)"
 
 	// 捕获日志

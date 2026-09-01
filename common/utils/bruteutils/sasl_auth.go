@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"crypto/hmac"
 	"crypto/md5"
+	cryptorand "crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,10 +12,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/sasl"
 	"hash"
-	"math/rand"
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/xdg-go/scram"
@@ -285,10 +286,21 @@ func (m *DigestMD5Mechanism) start() ([]byte, error) {
 	return m.Step(nil)
 }
 
+// randSeq 生成 DIGEST-MD5 的 cnonce。nonce 必须不可预测，
+// 使用 crypto/rand（修复旧实现使用 math/rand 的可预测 nonce 缺陷）。
 func (m *DigestMD5Mechanism) randSeq(n int) string {
 	b := make([]rune, n)
+	buf := make([]byte, n)
+	if _, err := cryptorand.Read(buf); err != nil {
+		// crypto 源不可用时退化为时间戳混合（尽力而为）
+		now := time.Now().UnixNano()
+		for i := range b {
+			b[i] = letters[byte(now>>uint(i*8))%byte(len(letters))]
+		}
+		return string(b)
+	}
 	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+		b[i] = letters[buf[i]%byte(len(letters))]
 	}
 	return string(b)
 }
