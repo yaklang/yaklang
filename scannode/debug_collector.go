@@ -49,7 +49,7 @@ type debugTimingSummary struct {
 	AttemptID  string `json:"attempt_id"`
 	StartedAt  string `json:"started_at"`
 	FinishedAt string `json:"finished_at"`
-	DurationMS int64 `json:"duration_ms"`
+	DurationMS int64  `json:"duration_ms"`
 	Phase      string `json:"phase,omitempty"`
 }
 
@@ -147,13 +147,13 @@ func (dc *DebugCollector) WriteTimingSummary(phase string) error {
 		return nil
 	}
 	summary := debugTimingSummary{
-		TaskID:      dc.taskID,
-		SubTaskID:   dc.subTaskID,
-		AttemptID:   dc.runtimeID,
-		StartedAt:   dc.startedAt.UTC().Format(time.RFC3339Nano),
-		FinishedAt:  dc.finishedAt.UTC().Format(time.RFC3339Nano),
-		DurationMS:  dc.finishedAt.Sub(dc.startedAt).Milliseconds(),
-		Phase:       strings.TrimSpace(phase),
+		TaskID:     dc.taskID,
+		SubTaskID:  dc.subTaskID,
+		AttemptID:  dc.runtimeID,
+		StartedAt:  dc.startedAt.UTC().Format(time.RFC3339Nano),
+		FinishedAt: dc.finishedAt.UTC().Format(time.RFC3339Nano),
+		DurationMS: dc.finishedAt.Sub(dc.startedAt).Milliseconds(),
+		Phase:      strings.TrimSpace(phase),
 	}
 	data, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -281,7 +281,7 @@ func (s *ScanNode) uploadDebugArtifacts(
 		}
 
 		provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
-		if err := uploadDebugArtifactFile(art.FilePath, size, objKey, provider); err != nil {
+		if err := uploadDebugArtifactFile(ctx, art.FilePath, size, objKey, provider); err != nil {
 			log.Warnf("[debug] upload %s failed: %v", art.FileName, err)
 			continue
 		}
@@ -302,18 +302,22 @@ func (s *ScanNode) buildDebugUploadConfigProvider(
 	baseCfg *SSAArtifactUploadConfig,
 	objKey string,
 ) ssaUploadConfigProvider {
-	current := *baseCfg
+	baseProvider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, baseCfg)
 	return func(force bool) (*SSAArtifactUploadConfig, error) {
-		cp := current
+		cfg, err := baseProvider(force)
+		if err != nil {
+			return nil, err
+		}
+		cp := *cfg
 		cp.ObjectKey = objKey
 		return &cp, nil
 	}
 }
 
-// uploadDebugArtifactFile uploads a file to MinIO with a specific object key.
-func uploadDebugArtifactFile(path string, size int64, objKey string, provider ssaUploadConfigProvider) error {
+// uploadDebugArtifactFile uploads a file with a specific object key.
+func uploadDebugArtifactFile(ctx context.Context, path string, size int64, objKey string, provider ssaUploadConfigProvider) error {
 	tmp := &SSAArtifactCollector{}
-	return tmp.UploadBySTSWithProvider(path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
+	return tmp.UploadBySTSWithProvider(ctx, path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
 		cfg, err := provider(force)
 		if err != nil {
 			return nil, err
@@ -333,14 +337,15 @@ func resolveDebugDir(labels map[string]string) string {
 	}
 	return strings.TrimSpace(labels["debug_dir"])
 }
+
 // computeSHA256FromBytes computes the SHA-256 hash of a byte slice.
 func computeSHA256FromBytes(data []byte) (string, error) {
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:]), nil
 }
 
-// uploadDebugArtifactBytes uploads a byte slice to MinIO with a specific object key.
-func uploadDebugArtifactBytes(payload []byte, objKey string, provider ssaUploadConfigProvider) error {
+// uploadDebugArtifactBytes uploads a byte slice with a specific object key.
+func uploadDebugArtifactBytes(ctx context.Context, payload []byte, objKey string, provider ssaUploadConfigProvider) error {
 	tmpFile, err := os.CreateTemp("", "debug-analysis-*.json")
 	if err != nil {
 		return err
@@ -354,5 +359,5 @@ func uploadDebugArtifactBytes(payload []byte, objKey string, provider ssaUploadC
 	if err := tmpFile.Close(); err != nil {
 		return err
 	}
-	return uploadDebugArtifactFile(path, int64(len(payload)), objKey, provider)
+	return uploadDebugArtifactFile(ctx, path, int64(len(payload)), objKey, provider)
 }

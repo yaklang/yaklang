@@ -103,7 +103,7 @@ func (s *ScanNode) executeScriptTask(
 	}
 	defer cleanupSourcePayload()
 	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
-	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
+	reporter.ssaCollector = NewSSAArtifactCollectorWithContext(taskCtx, input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {
 		defer reporter.ssaCollector.Cleanup()
 		if reporter.ssaUploadCfg != nil &&
@@ -1160,6 +1160,31 @@ func classifyUploadError(errMsg string) string {
 	return "put_failed"
 }
 
+func classifySSAUploadError(err error) string {
+	if code := classifyObjectStoreError(err); code != "put_failed" {
+		return code
+	}
+	// Non-object-store errors (ticket fetch, compression, filesystem) retain the
+	// legacy fallback classification. S3 protocol decisions never use strings.
+	return classifyUploadError(err.Error())
+}
+
+func redactSSAUploadErrorMessage(err error, cfg *SSAArtifactUploadConfig) string {
+	if err == nil {
+		return ""
+	}
+	message := err.Error()
+	if cfg == nil {
+		return message
+	}
+	for _, secret := range []secretValue{cfg.STSAccessKey, cfg.STSSecretKey, cfg.STSSessionToken} {
+		if raw := secret.raw(); raw != "" {
+			message = strings.ReplaceAll(message, raw, "[REDACTED]")
+		}
+	}
+	return message
+}
+
 func (s *ScanNode) finalizeSSAArtifactUpload(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
@@ -1180,6 +1205,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 
 	provider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, cfg)
 	build, err := reporter.ssaCollector.FinalizeUploadWithProvider(
+		ctx,
 		normalizeArtifactCodec(cfg.Codec),
 		provider,
 	)
@@ -1248,11 +1274,12 @@ func (s *ScanNode) emitSSAArtifactUploadFailed(
 	if reporter == nil || reporter.ssaCollector == nil || uploadErr == nil {
 		return
 	}
-	errorCode := classifyUploadError(uploadErr.Error())
+	errorCode := classifySSAUploadError(uploadErr)
+	errorMessage := redactSSAUploadErrorMessage(uploadErr, reporter.ssaUploadCfg)
 	metrics := reporter.ssaCollector.snapshotUploadMetrics()
 	failedEvent := reporter.ssaCollector.BuildUploadFailedEvent(
 		errorCode,
-		uploadErr.Error(),
+		errorMessage,
 		metrics.CompressedBytes,
 	)
 	if failedEvent == nil {
@@ -1266,7 +1293,7 @@ func (s *ScanNode) emitSSAArtifactUploadFailed(
 	}
 	log.Infof(
 		"ssa artifact upload failed task=%s error_code=%s error=%s uploaded_bytes=%d",
-		reporter.TaskId, errorCode, uploadErr.Error(), metrics.CompressedBytes,
+		reporter.TaskId, errorCode, errorMessage, metrics.CompressedBytes,
 	)
 }
 
@@ -1487,7 +1514,7 @@ func (s *ScanNode) publishDebugAnalysis(
 	objKey := fmt.Sprintf("debug_analysis/%s/%s/analysis.json", taskID, attemptID)
 
 	provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
-	if err := uploadDebugArtifactBytes(analysisJSON, objKey, provider); err != nil {
+	if err := uploadDebugArtifactBytes(ctx, analysisJSON, objKey, provider); err != nil {
 		log.Warnf("[debug] upload analysis failed: %v", err)
 		return
 	}
@@ -1530,7 +1557,7 @@ func (s *ScanNode) publishDebugZip(
 
 	provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
 	zipSize := fileSize(zipPath)
-	if err := uploadDebugArtifactFile(zipPath, zipSize, objKey, provider); err != nil {
+	if err := uploadDebugArtifactFile(ctx, zipPath, zipSize, objKey, provider); err != nil {
 		log.Warnf("[debug] upload zip failed: %v", err)
 		return
 	}
