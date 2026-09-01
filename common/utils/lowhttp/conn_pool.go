@@ -47,6 +47,7 @@ func NewHttpConnPool(ctx context.Context, idleCount int, perHostCount int) *LowH
 		h2Tombstones:       newTombstoneQueue(defaultTombstoneQueueSize),
 		keepAliveTimeout:   30 * time.Second,
 		ctx:                ctx,
+		debugNotify:        make(chan struct{}, 1),
 	}
 	if idleCount > 0 {
 		pool.connSem = make(chan struct{}, idleCount)
@@ -73,8 +74,9 @@ type LowHttpConnPool struct {
 	h2Tombstones *tombstoneQueue         // bounded ring-buffer of recent close events (protected by h2Mu)
 
 	// debug: 每 5s 打印连接池状态；通过 EnableConnPoolDebug(true) 开启。
-	debugEnabled int32     // atomic bool (1 = on). controls the printer goroutine.
-	debugOnce    sync.Once // ensures the printer goroutine is started only once.
+	debugEnabled int32         // atomic bool (1 = on). controls the printer goroutine.
+	debugRunning int32         // atomic bool (1 = running). permits restart after disable.
+	debugNotify  chan struct{} // wakes the printer immediately on enable/disable.
 }
 
 func (l *LowHttpConnPool) HostConnFull(key *connectKey) bool {
