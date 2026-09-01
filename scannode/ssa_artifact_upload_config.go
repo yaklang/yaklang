@@ -110,16 +110,20 @@ func extractSSAArtifactUploadConfig(params map[string]interface{}) *SSAArtifactU
 		return nil
 	}
 	cfg := &SSAArtifactUploadConfig{
-		ObjectKey: strings.TrimSpace(toString(params["_scannode_ssa_object_key"])),
-		Codec:     strings.TrimSpace(toString(params["_scannode_ssa_codec"])),
-		Endpoint:  strings.TrimSpace(toString(params["_scannode_ssa_endpoint"])),
-		Bucket:    strings.TrimSpace(toString(params["_scannode_ssa_bucket"])),
-		Region:    strings.TrimSpace(toString(params["_scannode_ssa_region"])),
-		UseSSL:    toBool(params["_scannode_ssa_use_ssl"]),
+		ObjectKey:        strings.TrimSpace(toString(params["_scannode_ssa_object_key"])),
+		Codec:            strings.TrimSpace(toString(params["_scannode_ssa_codec"])),
+		Endpoint:         strings.TrimSpace(toString(params["_scannode_ssa_endpoint"])),
+		Bucket:           strings.TrimSpace(toString(params["_scannode_ssa_bucket"])),
+		Region:           strings.TrimSpace(toString(params["_scannode_ssa_region"])),
+		UseSSL:           toBool(params["_scannode_ssa_use_ssl"]),
+		TLSVerify:        toBool(params["_scannode_ssa_tls_verify"]),
+		TLSCAFile:        strings.TrimSpace(toString(params["_scannode_ssa_tls_ca_file"])),
+		AllowHTTP:        toBool(params["_scannode_ssa_allow_http"]),
+		VirtualHostStyle: toBool(params["_scannode_ssa_virtual_host_style"]),
 
-		STSAccessKey:    strings.TrimSpace(toString(params["_scannode_ssa_sts_access_key"])),
-		STSSecretKey:    strings.TrimSpace(toString(params["_scannode_ssa_sts_secret_key"])),
-		STSSessionToken: strings.TrimSpace(toString(params["_scannode_ssa_sts_session_token"])),
+		STSAccessKey:    newSecretValue(toString(params["_scannode_ssa_sts_access_key"])),
+		STSSecretKey:    newSecretValue(toString(params["_scannode_ssa_sts_secret_key"])),
+		STSSessionToken: newSecretValue(toString(params["_scannode_ssa_sts_session_token"])),
 		STSExpiresAt:    toInt64(params["_scannode_ssa_sts_expires_at"]),
 	}
 	if cfg.Codec == "" {
@@ -135,7 +139,7 @@ func (cfg *SSAArtifactUploadConfig) NeedSTSRefresh(renewBeforeSec int64) bool {
 	if cfg == nil {
 		return true
 	}
-	if strings.TrimSpace(cfg.STSAccessKey) == "" || strings.TrimSpace(cfg.STSSecretKey) == "" {
+	if cfg.STSAccessKey.raw() == "" || cfg.STSSecretKey.raw() == "" {
 		return true
 	}
 	if renewBeforeSec <= 0 {
