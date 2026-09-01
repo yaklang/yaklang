@@ -3400,8 +3400,8 @@ func extractContentLength(headerBytes []byte) int64 {
 	return size
 }
 
-// RemoveSession 清除指定的 session，删除其关联的 cookiejar
-// 这在完成一系列请求后清理资源时很有用
+// RemoveSession 清除指定的 session，删除其关联的 cookiejar。
+// session 池本身有容量上限，但主动清理可以更早释放 cookie 数据。
 // 参数:
 //   - session: 要清除的 session 标识符
 //
