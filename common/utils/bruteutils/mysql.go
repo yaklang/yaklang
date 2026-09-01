@@ -2,64 +2,34 @@ package bruteutils
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"net"
-	"net/url"
-	"strings"
-	"sync"
 
+	"github.com/yaklang/yaklang/common/brute/core"
+	"github.com/yaklang/yaklang/common/brute/probes/mysql"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-
-	"github.com/go-sql-driver/mysql"
 )
 
-var registerDialContextOnce sync.Once
-
+// MYSQLAuth 使用最小 MySQL 探针执行认证探测。
+// 旧实现依赖 go-sql-driver/mysql 完整驱动；现在只做协议级认证握手，
+// 依赖闭包不再进入主程序（差分验证见 legacydrivers）。
 func MYSQLAuth(target, username, password string, needAuth bool) (ok, finished bool, err error) {
-	registerDialContextOnce.Do(func() {
-		mysql.RegisterDialContext("tcp", func(ctx context.Context, addr string) (net.Conn, error) {
-			return defaultDialer.DialContext(ctx, "tcp", addr)
-		})
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 
-	dsn := fmt.Sprintf("tcp(%v)/mysql", target)
-	if needAuth {
-		dsn = fmt.Sprintf("%v:%v@%v", url.PathEscape(username), url.PathEscape(password), dsn)
+	if !needAuth {
+		username, password = "", ""
 	}
+	res := probeMySQL(ctx, target, username, password)
+	return res.Outcome == core.OutcomeAuthSuccess, res.Outcome.IsFinalForTarget(), legacyError(res)
+}
 
-	db, err := sql.Open("mysql", dsn)
+func probeMySQL(ctx context.Context, target, username, password string) core.Result {
+	ptarget, err := core.ParseTarget(appendDefaultPort(target, 3306))
 	if err != nil {
-		return false, false, err
+		return core.Result{Outcome: core.OutcomeProtocolMismatch, Err: core.ErrProtocolParse}
 	}
-	_, err = db.Exec("select 1")
-	if err != nil {
-		errStr := err.Error()
-		switch true {
-		case strings.Contains(errStr, "timeout"):
-			fallthrough
-		case strings.Contains(errStr, "i/o timeout"):
-			fallthrough
-		case strings.Contains(errStr, "dial tcp"):
-			fallthrough
-		case strings.Contains(errStr, "bad connection"):
-			fallthrough
-		case strings.Contains(errStr, "EOF"):
-			fallthrough
-		case strings.Contains(errStr, "is not allowed to connect to"):
-			fallthrough
-		case strings.Contains(errStr, "connect: connection refused"):
-			return false, true, err
-		case strings.Contains(errStr, "Error 1045:"):
-			return false, false, utils.Wrapf(err, "auth failed: %s/%v", username, password)
-		case strings.Contains(errStr, "Error 1044:") || strings.Contains(errStr, "1044:"):
-			return true, false, nil
-		}
-
-		return false, false, utils.Wrapf(err, "exec 'select 1' to mysql failed: %v, (%v:%v)", err, username, password)
-	}
-	return true, false, nil
+	var prober mysql.Prober
+	return prober.Probe(ctx, ptarget, core.Credential{Username: username, Password: password},
+		core.Options{Timeout: defaultTimeout, TLSPolicy: core.TLSOpportunistic})
 }
 
 var mysqlAuth = &DefaultServiceAuthInfo{
@@ -69,28 +39,44 @@ var mysqlAuth = &DefaultServiceAuthInfo{
 	DefaultPasswords: append(CommonPasswords, ""),
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 3306)
-		res := i.Result()
-
-		ok, finished, err := MYSQLAuth(i.Target, "", "", false)
-		if err != nil {
-			log.Errorf("mysql unauth verify failed: %v", err)
-		}
-		res.Ok = ok
-		res.Finished = finished
-
-		return i.Result()
+		res := probeMySQL(itemCtx(i), i.Target, "", "")
+		return legacyFromCore(i, res)
 	},
 	BrutePass: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 3306)
-		res := i.Result()
-
-		ok, finished, err := MYSQLAuth(i.Target, i.Username, i.Password, true)
-		if err != nil {
-			log.Errorf("mysql brute pass failed: %v", err)
-		}
-		res.Ok = ok
-		res.Finished = finished
-
-		return res
+		res := probeMySQL(itemCtx(i), i.Target, i.Username, i.Password)
+		return legacyFromCore(i, res)
 	},
+}
+
+// legacyError 把结构化结果转成旧签名错误（nil 表示无错误）。
+func legacyError(res core.Result) error {
+	if res.Outcome == core.OutcomeAuthSuccess || res.ErrDetail == "" {
+		return nil
+	}
+	return &probeResultError{res: res}
+}
+
+// probeResultError 承载结构化结果的旧式错误（Error 文本脱敏）。
+type probeResultError struct{ res core.Result }
+
+func (e *probeResultError) Error() string {
+	msg := e.res.ErrDetail
+	if msg == "" {
+		return e.res.Outcome.String()
+	}
+	return msg
+}
+
+// legacyFromCore 把核心结果转旧 BruteItemResult。
+func legacyFromCore(i *BruteItem, res core.Result) *BruteItemResult {
+	out := i.Result()
+	out.Ok = res.Outcome == core.OutcomeAuthSuccess
+	out.Finished = res.Outcome.IsFinalForTarget()
+	out.UserEliminated = res.UserEliminated
+	out.ExtraInfo = res.Extra
+	if res.Outcome == core.OutcomeAuthSuccess && res.Extra != nil {
+		log.Debugf("mysql auth success: %s", string(res.Extra))
+	}
+	return out
 }

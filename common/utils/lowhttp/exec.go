@@ -739,7 +739,9 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// 初次连接需要的
 	// retry use DialX
 	dnsStart := time.Now()
-	dnsEnd := time.Now()
+	// dnsEnd 由异步 DNS 回调写入、主流程读取，必须原子化（修复数据竞态）
+	var dnsEndNano atomic.Int64
+	dnsEndNano.Store(time.Now().UnixNano())
 	var dnsEndOnce sync.Once
 	dialTraceInfo := netx.NewDialXTraceInfo()
 	dialopts = append(
@@ -752,7 +754,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		netx.DialX_WithDNSOptions(
 			netx.WithDNSOnFinished(func() {
 				dnsEndOnce.Do(func() {
-					dnsEnd = time.Now()
+					dnsEndNano.Store(time.Now().UnixNano())
 				})
 			}),
 			netx.WithDNSServers(dnsServers...),
@@ -842,7 +844,7 @@ RECONNECT:
 		conn, err = dialXWithContext(ctx, originAddr, dialopts...)
 	}
 
-	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
+	traceInfo.DNSTime = time.Unix(0, dnsEndNano.Load()).Sub(dnsStart) // 原子读（修复竞态）
 	traceInfo.ParseDialXTraceInfo(dialTraceInfo)
 	response.Https = https
 

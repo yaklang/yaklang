@@ -187,7 +187,8 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 	receiver := func(result *FuzzResult) {
 		receiverLock.Lock()
 		defer receiverLock.Unlock()
-		f.config.logger.Debugf("tag %s generate data: %s", f.data.String(), string(result.GetData()))
+		// 安全：生成的数据可能包含敏感值（如密码字典），绝不落日志
+		f.config.logger.Debugf("tag %s generated data (%d bytes)", f.data.String(), len(result.GetData()))
 		if execEnd {
 			return
 		}
