@@ -311,6 +311,19 @@ func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	}
 }
 
+// notifyDone 在任务真正结束后补发一次终态结果回调。source 流式批处理会在
+// 规则完成计数之前同步触发 notifyResult，导致调用方只能看到 executing；
+// 这里在 Stop() 之前显式补发 done，保证结果回调一定能收到终态。
+func (m *scanManager) notifyDone() {
+	if m == nil || m.Config == nil || m.Config.resultCallback == nil {
+		return
+	}
+	m.Config.resultCallback(&ScanResult{
+		TaskID: m.taskID,
+		Status: m.status,
+	})
+}
+
 func (m *scanManager) saveReport() {
 	if m == nil || m.Config == nil || m.Config.Reporter == nil {
 		return
