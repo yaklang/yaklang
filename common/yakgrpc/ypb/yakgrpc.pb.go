@@ -38464,7 +38464,6 @@ func (x *SetTagForRiskRequest) GetTags() []string {
 type RisksFromOnlineRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         string                 `protobuf:"bytes,1,opt,name=Token,proto3" json:"Token,omitempty"`
-	LogType       string                 `protobuf:"bytes,2,opt,name=LogType,proto3" json:"LogType,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -38502,13 +38501,6 @@ func (*RisksFromOnlineRequest) Descriptor() ([]byte, []int) {
 func (x *RisksFromOnlineRequest) GetToken() string {
 	if x != nil {
 		return x.Token
-	}
-	return ""
-}
-
-func (x *RisksFromOnlineRequest) GetLogType() string {
-	if x != nil {
-		return x.LogType
 	}
 	return ""
 }
@@ -53442,7 +53434,6 @@ func (x *HTTPFlowsToOnlineBatchResponse) GetFailedCount() int64 {
 type HTTPFlowsFromOnlineRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         string                 `protobuf:"bytes,1,opt,name=Token,proto3" json:"Token,omitempty"`
-	LogType       string                 `protobuf:"bytes,2,opt,name=LogType,proto3" json:"LogType,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53480,13 +53471,6 @@ func (*HTTPFlowsFromOnlineRequest) Descriptor() ([]byte, []int) {
 func (x *HTTPFlowsFromOnlineRequest) GetToken() string {
 	if x != nil {
 		return x.Token
-	}
-	return ""
-}
-
-func (x *HTTPFlowsFromOnlineRequest) GetLogType() string {
-	if x != nil {
-		return x.LogType
 	}
 	return ""
 }
@@ -82048,10 +82032,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14SetTagForRiskRequest\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x12\n" +
 	"\x04Hash\x18\x02 \x01(\tR\x04Hash\x12\x12\n" +
-	"\x04Tags\x18\x03 \x03(\tR\x04Tags\"H\n" +
+	"\x04Tags\x18\x03 \x03(\tR\x04Tags\".\n" +
 	"\x16RisksFromOnlineRequest\x12\x14\n" +
-	"\x05Token\x18\x01 \x01(\tR\x05Token\x12\x18\n" +
-	"\aLogType\x18\x02 \x01(\tR\aLogType\"G\n" +
+	"\x05Token\x18\x01 \x01(\tR\x05Token\"G\n" +
 	"\x17RisksFromOnlineProgress\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x10\n" +
 	"\x03Log\x18\x02 \x01(\tR\x03Log\"\xb3\x02\n" +
@@ -83406,10 +83389,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14UploadHTTPFlowsWhere\x18\x02 \x01(\v2\x19.ypb.QueryHTTPFlowRequestR\x14UploadHTTPFlowsWhere\"f\n" +
 	"\x1eHTTPFlowsToOnlineBatchResponse\x12\"\n" +
 	"\fSuccessCount\x18\x01 \x01(\x03R\fSuccessCount\x12 \n" +
-	"\vFailedCount\x18\x02 \x01(\x03R\vFailedCount\"L\n" +
+	"\vFailedCount\x18\x02 \x01(\x03R\vFailedCount\"2\n" +
 	"\x1aHTTPFlowsFromOnlineRequest\x12\x14\n" +
-	"\x05Token\x18\x01 \x01(\tR\x05Token\x12\x18\n" +
-	"\aLogType\x18\x02 \x01(\tR\aLogType\"K\n" +
+	"\x05Token\x18\x01 \x01(\tR\x05Token\"K\n" +
 	"\x1bHTTPFlowsFromOnlineProgress\x12\x1a\n" +
 	"\bProgress\x18\x01 \x01(\x01R\bProgress\x12\x10\n" +
 	"\x03Log\x18\x02 \x01(\tR\x03Log\"\x8d\x02\n" +

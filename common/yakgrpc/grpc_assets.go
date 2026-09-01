@@ -1063,14 +1063,13 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 	if req.Token == "" {
 		return utils.Errorf("params empty")
 	}
-	logType := strings.TrimSpace(req.LogType)
 
 	if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
 		return utils.Errorf("download failed: %s", err.Error())
 	}
 
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	ch, err := client.DownloadRisks(stream.Context(), req.Token, logType)
+	ch, err := client.DownloadRisks(stream.Context(), req.Token)
 	if err != nil {
 		return utils.Errorf("download risks failed: %s", err)
 	}

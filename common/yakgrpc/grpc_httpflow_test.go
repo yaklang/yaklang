@@ -2310,7 +2310,7 @@ func TestHTTPFlowsFromOnline(t *testing.T) {
 		mockClient := new(yaklib.OnlineClient)
 
 		mockey.Mock((*yaklib.OnlineClient).DownloadHTTPFlows).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, tk string, logType string) (chan *yaklib.DownloadHTTPFlowStreamItem, error) {
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, tk string) (chan *yaklib.DownloadHTTPFlowStreamItem, error) {
 				ch := make(chan *yaklib.DownloadHTTPFlowStreamItem, len(mockItems))
 				for _, item := range mockItems {
 					ch <- item
@@ -2333,8 +2333,7 @@ func TestHTTPFlowsFromOnline(t *testing.T) {
 		require.NoError(t, err)
 
 		stream, err := client.HTTPFlowsFromOnline(context.Background(), &ypb.HTTPFlowsFromOnlineRequest{
-			Token:   "test-token",
-			LogType: "tagsUpdate",
+			Token: "test-token",
 		})
 		require.NoError(t, err)
 

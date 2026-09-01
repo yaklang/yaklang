@@ -362,7 +362,7 @@ func TestRisksFromOnline(t *testing.T) {
 		mockClient := new(yaklib.OnlineClient)
 
 		mockey.Mock((*yaklib.OnlineClient).DownloadRisks).
-			To(func(_ *yaklib.OnlineClient, ctx context.Context, tk, logType string) (chan *yaklib.DownloadRiskStreamItem, error) {
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, tk string) (chan *yaklib.DownloadRiskStreamItem, error) {
 				ch := make(chan *yaklib.DownloadRiskStreamItem, len(mockItems))
 				for _, item := range mockItems {
 					ch <- item
@@ -385,8 +385,7 @@ func TestRisksFromOnline(t *testing.T) {
 		require.NoError(t, err)
 
 		stream, err := client.RisksFromOnline(context.Background(), &ypb.RisksFromOnlineRequest{
-			Token:   "test-token",
-			LogType: "tagsUpdate",
+			Token: "test-token",
 		})
 		require.NoError(t, err)
 
