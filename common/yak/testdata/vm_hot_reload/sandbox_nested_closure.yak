@@ -1,0 +1,19 @@
+box := sandbox.Create()
+
+for seed := 0; seed < 32; seed++ {
+	runtimeID = "sandbox-runtime-%d" % seed
+    ok = box.ExecuteAsBoolean(`
+(() => {
+    outer = (base) => {
+        inner = (delta) => {
+			line = runtime.GetInfo("line")~
+			id = runtime.GetInfo("runtimeId")~
+			return base + delta == seed + 3 && line > 0 && id == expectedRuntimeID
+        }
+		return inner(3)
+    }
+	return outer(seed)
+})()
+`, {"seed": seed, "runtimeId": runtimeID, "expectedRuntimeID": runtimeID})~
+    assert ok, "sandbox nested closure failed for seed %d" % seed
+}

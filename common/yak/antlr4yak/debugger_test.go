@@ -2,9 +2,11 @@ package antlr4yak
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +29,102 @@ func RunTestDebugger(code string, debuggerInit, debuggerCallBack func(g *yakvm.D
 	engine.SetDebugCallback(debuggerCallBack)
 	engine.SetSourceFilePath("/xxx/test.yak")
 	engine.Eval(context.Background(), code)
+}
+
+func TestDebugger_CancelBeforeFirstOpcodeFinishesLifecycle(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	engine := New()
+	engine.SetDebugMode(true)
+	engine.SetSourceFilePath("/xxx/cancel-before-first-opcode.yak")
+
+	var debugger *yakvm.Debugger
+	var finishedCallbacks atomic.Int32
+	engine.SetDebugInit(func(g *yakvm.Debugger) {
+		debugger = g
+		// Debug init runs after the root frame is installed but before Frame.Exec.
+		// This deterministically exercises cancellation before ShouldCallback.
+		cancel()
+	})
+	engine.SetDebugCallback(func(g *yakvm.Debugger) {
+		if g.Finished() {
+			finishedCallbacks.Add(1)
+		}
+	})
+
+	err := engine.EvalWithoutCache(ctx, "a = 1")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	if debugger == nil {
+		t.Fatal("debugger init callback was not called")
+	}
+
+	started := make(chan struct{})
+	go func() {
+		debugger.StartWGWait()
+		close(started)
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("debugger start waiter was not released by terminal callback")
+	}
+
+	if !debugger.Finished() {
+		t.Fatal("debugger was not marked finished")
+	}
+	if got := finishedCallbacks.Load(); got != 1 {
+		t.Fatalf("expected exactly one finished callback, got %d", got)
+	}
+}
+
+func TestDebugger_EmptySourceFinishesLifecycle(t *testing.T) {
+	for name, source := range map[string]string{
+		"empty":        "",
+		"comment-only": "// no executable opcode",
+	} {
+		t.Run(name, func(t *testing.T) {
+			engine := New()
+			engine.SetDebugMode(true)
+			engine.SetSourceFilePath("/xxx/" + name + ".yak")
+			engine.SetDebugInit(func(*yakvm.Debugger) {})
+
+			var finishedCallbacks atomic.Int32
+			engine.SetDebugCallback(func(g *yakvm.Debugger) {
+				if g.Finished() {
+					finishedCallbacks.Add(1)
+				}
+			})
+
+			if err := engine.EvalWithoutCache(context.Background(), source); err != nil {
+				t.Fatalf("empty debug execution failed: %v", err)
+			}
+			debugger := engine.GetVM().GetDebugger()
+			if debugger == nil {
+				t.Fatal("debugger was not initialized")
+			}
+
+			started := make(chan struct{})
+			go func() {
+				debugger.StartWGWait()
+				close(started)
+			}()
+			select {
+			case <-started:
+			case <-time.After(time.Second):
+				t.Fatal("empty source left debugger start waiter blocked")
+			}
+
+			if !debugger.Finished() {
+				t.Fatal("empty source debugger was not marked finished")
+			}
+			if got := finishedCallbacks.Load(); got != 1 {
+				t.Fatalf("expected exactly one finished callback, got %d", got)
+			}
+		})
+	}
 }
 
 func TestDebugger_1(t *testing.T) {
@@ -552,6 +650,47 @@ c = 3`
 	}
 }
 
+func TestDebugger_StepInVariadicCall(t *testing.T) {
+	code := `result = 0
+func collect(a, b, c) {
+result = a + b + c
+}
+args = [1, 2, 3]
+collect(args...)
+assert result == 6`
+	requestedStepIn := false
+	enteredFunction := false
+	init := func(g *yakvm.Debugger) {
+		_, err := g.SetNormalBreakPoint(6)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	callback := func(g *yakvm.Debugger) {
+		if g.Finished() {
+			return
+		}
+		if !requestedStepIn {
+			requestedStepIn = true
+			if err := g.StepIn(); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		if g.StateName() == "collect" {
+			enteredFunction = true
+		}
+	}
+
+	RunTestDebugger(code, init, callback)
+	if !requestedStepIn {
+		t.Fatal("variadic call breakpoint was not reached")
+	}
+	if !enteredFunction {
+		t.Fatal("step-in treated an expanded argument as the callable")
+	}
+}
+
 func TestDebugger_StepOut(t *testing.T) {
 	code := `a = 0
 func test() {
@@ -637,9 +776,9 @@ a = 3`
 
 func TestDebugger_StackTrace(t *testing.T) {
 	code := `go fn {
-	for {
+	for i := 0; i < 1; i++ {
 		x = 1	
-		test_debugger_sleep(3)
+		test_debugger_sleep(2)
 	}
 }
 
@@ -657,6 +796,7 @@ x = v
 a = 1
 b = 2
 c(a+b)
+waitAllAsyncCallFinish()
 `
 	init := func(g *yakvm.Debugger) {
 		_, err := g.SetNormalBreakPoint(16)
@@ -671,8 +811,19 @@ c(a+b)
 		}
 		in = true
 		sts := g.GetStackTraces()
-		if len(sts) < 2 {
-			t.Fatal("goroutine 1 stack trace not found")
+		// The background goroutine is running rather than paused, so the
+		// debugger's visibility contract reports only the stopped root thread.
+		// Synchronous c -> d frames must retain that root thread ID instead of
+		// drifting to the last allocated async ID.
+		trace, ok := sts[g.CurrentThreadID()]
+		if !ok {
+			t.Fatal("current root thread stack trace not found")
+		}
+		if len(sts) != 1 {
+			t.Fatalf("unexpected visible thread count: %d", len(sts))
+		}
+		if len(trace.StackTraces) < 3 {
+			t.Fatalf("nested c -> d stack trace too short: %d", len(trace.StackTraces))
 		}
 	}
 

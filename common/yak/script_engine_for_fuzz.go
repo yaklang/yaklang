@@ -139,9 +139,9 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 				var resultRequest any
 				var err error
 				if legacyBeforeRequest {
-					resultRequest, err = engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{req})
+					resultRequest, err = engine.CallYakFunction(ctx, "beforeRequest", []interface{}{req})
 				} else {
-					resultRequest, err = engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{https, originReq, req})
+					resultRequest, err = engine.CallYakFunction(ctx, "beforeRequest", []interface{}{https, originReq, req})
 				}
 				if err != nil {
 					log.Infof("eval beforeRequest hook failed: %s", err)
@@ -170,9 +170,9 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 				var resultResponse any
 				var err error
 				if legacyAfterRequest {
-					resultResponse, err = engine.CallYakFunction(context.Background(), "afterRequest", []interface{}{rsp})
+					resultResponse, err = engine.CallYakFunction(ctx, "afterRequest", []interface{}{rsp})
 				} else {
-					resultResponse, err = engine.CallYakFunction(context.Background(), "afterRequest", []interface{}{https, originReq, req, originRsp, rsp})
+					resultResponse, err = engine.CallYakFunction(ctx, "afterRequest", []interface{}{https, originReq, req, originRsp, rsp})
 				}
 				if err != nil {
 					log.Infof("eval afterRequest hook failed: %s", err)
@@ -203,9 +203,10 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 				if mirrorHTTPFlowNumIn > 2 {
 					params = []any{req, rsp, existed}
 				}
-				mirrorResult, err := engine.CallYakFunction(context.Background(), "mirrorHTTPFlow", params)
+				mirrorResult, err := engine.CallYakFunction(ctx, "mirrorHTTPFlow", params)
 				if err != nil {
-					log.Infof("eval afterRequest hook failed: %s", err)
+					log.Infof("eval mirrorHTTPFlow hook failed: %s", err)
+					return result
 				}
 				if ret := utils.InterfaceToMap(mirrorResult); ret != nil {
 					for k, v := range ret {
@@ -231,7 +232,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 				} else if retryHandlerInstanceNumIn == 3 {
 					params = []any{req, rsp, retryFunc}
 				}
-				_, err := engine.CallYakFunction(context.Background(), "retryHandler", params)
+				_, err := engine.CallYakFunction(ctx, "retryHandler", params)
 				if err != nil {
 					log.Infof("eval retryHandler hook failed: %s", err)
 				}
@@ -253,7 +254,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 				} else if customFailureCheckerInstanceNumIn == 2 {
 					params = []any{rsp, fail}
 				}
-				_, err := engine.CallYakFunction(context.Background(), "customFailureChecker", params)
+				_, err := engine.CallYakFunction(ctx, "customFailureChecker", params)
 				if err != nil {
 					log.Infof("eval customFailureChecker hook failed: %s", err)
 				}
@@ -275,7 +276,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 				} else if mockHTTPRequestInstanceNumIn == 2 {
 					params = []any{req, mockResponse}
 				}
-				_, err := engine.CallYakFunction(context.Background(), "mockHTTPRequest", params)
+				_, err := engine.CallYakFunction(ctx, "mockHTTPRequest", params)
 				if err != nil {
 					log.Infof("eval mockHTTPRequest hook failed: %s", err)
 				}

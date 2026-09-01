@@ -1,0 +1,70 @@
+workerCount = 48
+
+starts = make(chan bool)
+results = make(chan string, workerCount)
+
+// Both function literals below are static bytecode templates shared by every
+// concurrent call to factory. captured exercises a closure with free values;
+// pure exercises the no-free-value function path.
+factory = func(base) {
+    captured = func(delta) {
+        return base + delta
+    }
+    pure = func() {
+        return 7
+    }
+    return sprintf("worker-%d-%d-%d", base, captured(3), pure())
+}
+
+shared = func() {
+    return 11
+}
+
+worker = func(id) {
+    <-starts
+    // Aliasing a published function must not rewrite its diagnostic name or
+    // any other metadata while sibling workers use the same Value.
+    alias = shared
+    for round := 0; round < 32; round++ {
+        base = id * 1000 + round
+        expected = sprintf("worker-%d-%d-7", base, base + 3)
+        actual = factory(base)
+        assert actual == expected, "static closure scope crossed: got %s want %s" % [actual, expected]
+    }
+    results <- sprintf("worker-%d-%d-7-%d", id, id + 3, alias())
+}
+
+for i := 0; i < workerCount; i++ {
+    go worker(i)
+}
+for i := 0; i < workerCount; i++ {
+    starts <- true
+}
+
+seen = make(map[string]bool)
+for i := 0; i < workerCount; i++ {
+    value = <-results
+    seen[value] = true
+}
+waitAllAsyncCallFinish()
+
+assert len(seen) == workerCount, "static closure results crossed frames: %v" % seen
+for i := 0; i < workerCount; i++ {
+    expected = sprintf("worker-%d-%d-7-11", i, i + 3)
+    assert seen[expected], "missing static closure result %s" % expected
+}
+
+// A later alias must not rename the already-published function. The function
+// name appears in argument-count diagnostics and is useful to hot-patch users.
+nameProbe = func(required) {
+    return required
+}
+probeAlias = nameProbe
+try {
+    nameProbe()
+    assert false, "expected name probe to reject a missing argument"
+} catch err {
+    message = sprintf("%v", err)
+    assert str.Contains(message, "nameProbe"), "first function binding was lost: %s" % message
+    assert !str.Contains(message, "probeAlias params"), "alias renamed shared function: %s" % message
+}

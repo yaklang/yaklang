@@ -53,3 +53,26 @@ func (v *Frame) popArgN(n int) []*Value {
 	}
 	return v.popReverseN(n)
 }
+
+func (v *Frame) setPendingCallArgCount(code *Code, count int) {
+	v.pendingCallCode = code
+	v.pendingCallArgCount = count
+}
+
+func (v *Frame) effectiveCallArgCount(code *Code) int {
+	if v.pendingCallCode == code {
+		return v.pendingCallArgCount
+	}
+	return code.Unary
+}
+
+func (v *Frame) consumeCallArgCount(code *Code) int {
+	count := v.effectiveCallArgCount(code)
+	v.clearPendingCallArgCount()
+	return count
+}
+
+func (v *Frame) clearPendingCallArgCount() {
+	v.pendingCallCode = nil
+	v.pendingCallArgCount = 0
+}

@@ -1322,39 +1322,45 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 					args = callArgHook(funcName, numIn, args)
 				}
 
-				errCh := make(chan error)
-				valueCh := make(chan any)
+				type callResult struct {
+					value any
+					err   error
+				}
+				// The caller may return as soon as subCtx is canceled. Keep one
+				// buffered result slot so the VM goroutine can still publish its
+				// terminal state and exit instead of leaking forever on a channel send.
+				resultCh := make(chan callResult, 1)
 				go func() {
+					result := callResult{}
 					defer func() {
+						printStack := false
 						if err := recover(); err != nil {
 							fmtErr := utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
 							y.Err = fmtErr
-							//log.Error(fmtErr)
-							//fmt.Println()
-							errCh <- fmtErr
-							if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
-								utils.PrintCurrentGoroutineRuntimeStack()
-							}
+							result.err = fmtErr
+							printStack = os.Getenv("YAK_IN_TERMINAL_MODE") == ""
 						}
-						close(errCh)
+						resultCh <- result
+						// Publish the terminal result before potentially expensive
+						// diagnostics so cancellation and timeout callers are never
+						// held up by stack formatting.
+						if printStack {
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
 					}()
-					value, err := nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
-					if err != nil {
-						errCh <- err
-					} else {
-						valueCh <- value
-					}
+					result.value, result.err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
 				}()
 
 				select {
-				case value := <-valueCh:
-					return value
-				case err := <-errCh:
+				case result := <-resultCh:
 					//if err != nil && !errors.Is(err, context.Canceled) {
 					//	log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 					//}
-					// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
-					panic(err)
+					if result.err != nil {
+						// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
+						panic(result.err)
+					}
+					return result.value
 				case <-subCtx.Done():
 					err := subCtx.Err()
 					if errors.Is(err, context.DeadlineExceeded) {
