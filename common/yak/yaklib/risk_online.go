@@ -49,7 +49,6 @@ func (s *OnlineClient) UploadToOnline(ctx context.Context,
 }
 
 type downloadRiskRequest struct {
-	LogType string `json:"logType"`
 	Page    int64  `json:"page"`
 	Limit   int64  `json:"limit"`
 	Order   string `json:"order"`
@@ -91,12 +90,9 @@ type DownloadRiskStreamItem struct {
 	Total int64
 }
 
-func (s *OnlineClient) DownloadRisks(ctx context.Context, token, logType string) (chan *DownloadRiskStreamItem, error) {
+func (s *OnlineClient) DownloadRisks(ctx context.Context, token string) (chan *DownloadRiskStreamItem, error) {
 	if token == "" {
 		return nil, utils.Errorf("token is empty")
-	}
-	if logType != "testerAssign" && logType != "tagsUpdate" {
-		return nil, utils.Errorf("logType only supports testerAssign / tagsUpdate")
 	}
 
 	ch := make(chan *DownloadRiskStreamItem, 10)
@@ -120,7 +116,7 @@ func (s *OnlineClient) DownloadRisks(ctx context.Context, token, logType string)
 			}
 
 		RETRY:
-			items, paging, err := s.downloadRiskPage(token, logType, page, limit)
+			items, paging, err := s.downloadRiskPage(token, page, limit)
 			if err != nil {
 				retry++
 				if retry <= 5 {
@@ -160,9 +156,8 @@ func (s *OnlineClient) DownloadRisks(ctx context.Context, token, logType string)
 	return ch, nil
 }
 
-func (s *OnlineClient) downloadRiskPage(token, logType string, page, limit int64) ([]*DownloadRiskItem, *OnlinePaging, error) {
+func (s *OnlineClient) downloadRiskPage(token string, page, limit int64) ([]*DownloadRiskItem, *OnlinePaging, error) {
 	raw, err := json.Marshal(downloadRiskRequest{
-		LogType: logType,
 		Page:    page,
 		Limit:   limit,
 		Order:   "desc",

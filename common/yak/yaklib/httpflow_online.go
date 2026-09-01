@@ -275,7 +275,6 @@ func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string
 }
 
 type downloadHTTPFlowRequest struct {
-	LogType string `json:"logType"`
 	Page    int64  `json:"page"`
 	Limit   int64  `json:"limit"`
 	Order   string `json:"order"`
@@ -322,14 +321,10 @@ type DownloadHTTPFlowStreamItem struct {
 	Total int64
 }
 
-func (s *OnlineClient) DownloadHTTPFlows(ctx context.Context, token, logType string) (chan *DownloadHTTPFlowStreamItem, error) {
+func (s *OnlineClient) DownloadHTTPFlows(ctx context.Context, token string) (chan *DownloadHTTPFlowStreamItem, error) {
 	if token == "" {
 		return nil, utils.Errorf("token is empty")
 	}
-	if logType != "testerAssign" && logType != "tagsUpdate" {
-		return nil, utils.Errorf("logType error")
-	}
-
 	ch := make(chan *DownloadHTTPFlowStreamItem, 10)
 	go func() {
 		defer close(ch)
@@ -353,7 +348,7 @@ func (s *OnlineClient) DownloadHTTPFlows(ctx context.Context, token, logType str
 			}
 
 		RETRY:
-			items, paging, err := s.downloadHTTPFlowPage(token, logType, page, limit)
+			items, paging, err := s.downloadHTTPFlowPage(token, page, limit)
 			if err != nil {
 				retry++
 				if retry <= 5 {
@@ -393,9 +388,8 @@ func (s *OnlineClient) DownloadHTTPFlows(ctx context.Context, token, logType str
 	return ch, nil
 }
 
-func (s *OnlineClient) downloadHTTPFlowPage(token, logType string, page, limit int64) ([]*DownloadHTTPFlowItem, *OnlinePaging, error) {
+func (s *OnlineClient) downloadHTTPFlowPage(token string, page, limit int64) ([]*DownloadHTTPFlowItem, *OnlinePaging, error) {
 	raw, err := json.Marshal(downloadHTTPFlowRequest{
-		LogType: logType,
 		Page:    page,
 		Limit:   limit,
 		Order:   "desc",
