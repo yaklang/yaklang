@@ -50,8 +50,9 @@ func TestRealMSSQLServers(t *testing.T) {
 			if correct.Outcome != core.OutcomeAuthSuccess {
 				t.Errorf("correct creds: want success got %v (%s)", correct.Outcome, correct.ErrDetail)
 			}
-			if correct.Transport != core.TransportTLS {
-				t.Errorf("SQL Server 2022 requires TLS, transport=%v", correct.Transport)
+			// 传输方式跟随服务器 PRELOGIN 声明：要求加密则 TLS，不支持则明文。
+			if correct.Transport != core.TransportTLS && correct.Transport != core.TransportPlainTCP {
+				t.Errorf("transport not recorded: %v", correct.Transport)
 			}
 			if res := probeOnce("sa", "wrong-password"); res.Outcome != core.OutcomeAuthFailed {
 				t.Errorf("wrong password: want auth-failed got %v (%s)", res.Outcome, res.ErrDetail)
