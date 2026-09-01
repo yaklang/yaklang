@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"fmt"
@@ -61,6 +62,8 @@ type targetState struct {
 	gate   *chanGate
 	ctx    context.Context
 	cancel context.CancelFunc
+	// checked 原子标记 PreCheck 已执行（无锁 fast path）
+	checked atomic.Bool
 
 	mu               sync.Mutex
 	eliminatedUsers  map[string]struct{}
@@ -70,7 +73,6 @@ type targetState struct {
 	lockoutCount     int
 	backoffUntil     time.Time
 	stopped          bool
-	checked          bool // PreCheck 已执行
 }
 
 func (t *targetState) shouldSkip(user, password string) (skip bool, markPassword bool) {
@@ -269,11 +271,8 @@ func (s *Scheduler) Run(ctx context.Context, source CombinationSource) (*Stats, 
 		}
 
 		// 目标预检（每个目标一次，失败则短路该目标）。
-		if !t.checked {
-			t.mu.Lock()
-			t.checked = true
-			t.mu.Unlock()
-			if s.PreCheck != nil && !s.PreCheck(comb.Target) {
+		if s.PreCheck != nil && !t.checked.Load() && t.checked.CompareAndSwap(false, true) {
+			if !s.PreCheck(comb.Target) {
 				stopTarget(t, "pre-check failed")
 				continue
 			}
