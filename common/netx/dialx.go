@@ -224,10 +224,13 @@ RETRY:
 					addTimeoutRetry()
 					goto RETRY
 				}
+				// 代理 connection refused：该代理明确不可用，直接跳到
+				// 池中下一个代理。历史上此处 goto RETRY 从头重试同一
+				// 坏代理——仅因重试超限错误曾被包装成非 OpError 字符串
+				// 而碰巧落入 continue 分支；错误携带 cause 后该缺陷即
+				// 显现（MITM 下游代理池永远回退不到健康代理）。
 				if strings.Contains(opError.Error(), "refused") {
-					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
 					addRefuseErrorRetry()
-					goto RETRY
 				}
 			}
 			errs = utils.JoinErrors(errs, err)
