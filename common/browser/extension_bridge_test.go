@@ -53,6 +53,30 @@ func TestExtensionBridgeResponseIsBoundToTargetConnection(t *testing.T) {
 	require.Equal(t, message, <-response)
 }
 
+func TestExtensionBridgeClientRequestIDsAreScopedToConnections(t *testing.T) {
+	firstConnection := &websocket.Conn{}
+	secondConnection := &websocket.Conn{}
+	firstContext, cancelFirst := context.WithCancel(context.Background())
+	secondContext, cancelSecond := context.WithCancel(context.Background())
+	t.Cleanup(cancelFirst)
+	t.Cleanup(cancelSecond)
+
+	server := &ExtensionBridgeServer{clientRequests: map[extensionBridgeClientRequestKey]*extensionBridgeClientRequest{
+		{connection: firstConnection, id: "shared-request-id"}:  {cancel: cancelFirst},
+		{connection: secondConnection, id: "shared-request-id"}: {cancel: cancelSecond},
+	}}
+	server.cancelClientRequest(secondConnection, "shared-request-id")
+	require.Eventually(t, func() bool {
+		return secondContext.Err() == context.Canceled
+	}, time.Second, time.Millisecond)
+	require.NoError(t, firstContext.Err())
+
+	server.cancelClientRequestsFor(firstConnection)
+	require.Eventually(t, func() bool {
+		return firstContext.Err() == context.Canceled
+	}, time.Second, time.Millisecond)
+}
+
 func TestExtensionBridgeRejectsWebOrigin(t *testing.T) {
 	server, err := newLegacyExtensionBridgeServer(0, "test-token")
 	require.NoError(t, err)
