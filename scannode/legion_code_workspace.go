@@ -81,7 +81,8 @@ type legionCodeWorkspaceSpec struct {
 	Proxy            *legionCodeWorkspaceProxy `json:"proxy,omitempty"`
 	// InlineFiles is bound by Legion, never supplied by the model or replay
 	// context. On Git/archive workspaces it contains optional user samples only.
-	InlineFiles map[string]string `json:"inline_files,omitempty"`
+	InlineFiles    map[string]string `json:"inline_files,omitempty"`
+	SyntaxFlowMode string            `json:"syntaxflow_mode,omitempty"`
 }
 
 type legionCodeWorkspaceMaterializeOptions struct {
@@ -191,6 +192,7 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 	spec.Branch = strings.TrimSpace(spec.Branch)
 	spec.Subpath = strings.TrimSpace(spec.Subpath)
 	spec.PayloadID = strings.TrimSpace(spec.PayloadID)
+	spec.SyntaxFlowMode = strings.TrimSpace(spec.SyntaxFlowMode)
 	spec.ExpectedRevision = strings.TrimSpace(spec.ExpectedRevision)
 	spec.ExpectedSHA256 = strings.ToLower(strings.TrimSpace(spec.ExpectedSHA256))
 	switch {
@@ -208,6 +210,8 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 		return fmt.Errorf("source_workspace expected_sha256 is invalid")
 	case spec.Kind == legionCodeWorkspaceKindUploadedArchive && !managedSourcePayloadIDPattern.MatchString(spec.PayloadID):
 		return fmt.Errorf("source_workspace payload_id is invalid")
+	case spec.SyntaxFlowMode != "" && spec.SyntaxFlowMode != "create" && spec.SyntaxFlowMode != "improve":
+		return fmt.Errorf("source_workspace syntaxflow_mode is invalid")
 	}
 	if err := normalizeLegionCodeWorkspaceLocator(spec); err != nil {
 		return err
@@ -674,6 +678,7 @@ func (w *legionCodeWorkspaceRuntime) info() map[string]any {
 			"read_only":          true,
 			"max_read_bytes":     w.spec.MaxReadBytes,
 			"max_search_results": w.spec.MaxSearchResults,
+			"syntaxflow_mode":    w.spec.SyntaxFlowMode,
 		},
 		"locked_revision": w.lockedRevision,
 		"sha256":          w.sha256,
@@ -1145,7 +1150,8 @@ func validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw []byte) error {
 	if strings.TrimSpace(bound.WorkspaceID) != strings.TrimSpace(received.WorkspaceID) ||
 		strings.ToLower(strings.TrimSpace(bound.Kind)) != strings.ToLower(strings.TrimSpace(received.Kind)) ||
 		strings.TrimSpace(bound.ExpectedRevision) != strings.TrimSpace(received.ExpectedRevision) ||
-		strings.ToLower(strings.TrimSpace(bound.ExpectedSHA256)) != strings.ToLower(strings.TrimSpace(received.ExpectedSHA256)) {
+		strings.ToLower(strings.TrimSpace(bound.ExpectedSHA256)) != strings.ToLower(strings.TrimSpace(received.ExpectedSHA256)) ||
+		strings.TrimSpace(bound.SyntaxFlowMode) != strings.TrimSpace(received.SyntaxFlowMode) {
 		return fmt.Errorf("context source_workspace pin does not match bind snapshot")
 	}
 	return nil

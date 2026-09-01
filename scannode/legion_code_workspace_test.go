@@ -104,6 +104,21 @@ func TestLegionCodeWorkspaceIDRequiresFrozenFormat(t *testing.T) {
 	}
 }
 
+func TestLegionCodeWorkspaceValidatesSyntaxFlowMode(t *testing.T) {
+	for _, mode := range []string{"", "create", "improve"} {
+		spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
+		spec.SyntaxFlowMode = mode
+		if err := normalizeLegionCodeWorkspaceSpec(&spec); err != nil {
+			t.Fatalf("valid syntaxflow_mode %q rejected: %v", mode, err)
+		}
+	}
+	spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
+	spec.SyntaxFlowMode = "publish"
+	if err := normalizeLegionCodeWorkspaceSpec(&spec); err == nil || !strings.Contains(err.Error(), "syntaxflow_mode is invalid") {
+		t.Fatalf("invalid syntaxflow_mode accepted: %v", err)
+	}
+}
+
 func TestLegionCodeWorkspaceLocatorRejectsPublicCredentialLeaks(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -372,6 +387,7 @@ func TestPrepareLegionCodeWorkspaceSanitizesBackendAuthAndProxy(t *testing.T) {
 	spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
 	spec.Locator = "https://source.invalid/repository.git"
 	spec.ExpectedRevision = revision
+	spec.SyntaxFlowMode = "improve"
 	spec.Auth = &legionCodeWorkspaceAuth{
 		Kind: "token", UserName: "backend-user", Password: "backend-token",
 	}
@@ -401,8 +417,12 @@ func TestPrepareLegionCodeWorkspaceSanitizesBackendAuthAndProxy(t *testing.T) {
 	if publicOptions.SourceWorkspace == nil || publicOptions.SourceWorkspace.Auth != nil || publicOptions.SourceWorkspace.Proxy != nil {
 		t.Fatalf("public source workspace retained credentials: %s", publicRaw)
 	}
-	if publicOptions.SourceWorkspace.WorkspaceID != spec.WorkspaceID || publicOptions.SourceWorkspace.ExpectedRevision != revision {
+	if publicOptions.SourceWorkspace.WorkspaceID != spec.WorkspaceID || publicOptions.SourceWorkspace.ExpectedRevision != revision || publicOptions.SourceWorkspace.SyntaxFlowMode != "improve" {
 		t.Fatalf("public source workspace lost its pin: %#v", publicOptions.SourceWorkspace)
+	}
+	info := workspace.info()["source_workspace"].(map[string]any)
+	if info["syntaxflow_mode"] != "improve" {
+		t.Fatalf("trusted source workspace info lost SyntaxFlow mode: %#v", info)
 	}
 }
 
@@ -715,12 +735,19 @@ func TestStatelessCodeWorkspacePinRejectsMismatchAndPrivateFields(t *testing.T) 
 	bound := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
 	bound.ExpectedRevision = strings.Repeat("a", 40)
 	bound.ExpectedSHA256 = strings.Repeat("b", 64)
+	bound.SyntaxFlowMode = "improve"
 	bindRaw, _ := json.Marshal(yakRuntimeOptions{SourceWorkspace: &bound})
 	public := bound
 	contextRaw, _ := json.Marshal(yakRuntimeOptions{SourceWorkspace: &public})
 	if err := validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw); err != nil {
 		t.Fatalf("matching pin rejected: %v", err)
 	}
+	public.SyntaxFlowMode = "create"
+	contextRaw, _ = json.Marshal(yakRuntimeOptions{SourceWorkspace: &public})
+	if err := validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("expected SyntaxFlow mode pin mismatch, got %v", err)
+	}
+	public = bound
 	public.ExpectedRevision = strings.Repeat("c", 40)
 	contextRaw, _ = json.Marshal(yakRuntimeOptions{SourceWorkspace: &public})
 	if err := validateLegionCodeWorkspaceContextPin(bindRaw, contextRaw); err == nil || !strings.Contains(err.Error(), "does not match") {
