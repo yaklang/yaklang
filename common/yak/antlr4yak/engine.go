@@ -407,14 +407,26 @@ func (n *Engine) HaveEvaluatedCode() bool {
 }
 
 func (n *Engine) Eval(ctx context.Context, code string) error {
-	return n.EvalWithInline(ctx, code, false)
+	return n.evalWithInline(ctx, code, false, true)
 }
 
 func (n *Engine) EvalInline(ctx context.Context, code string) error {
-	return n.EvalWithInline(ctx, code, true)
+	return n.evalWithInline(ctx, code, true, true)
 }
 
 func (n *Engine) EvalWithInline(ctx context.Context, code string, inline bool) error {
+	return n.evalWithInline(ctx, code, inline, true)
+}
+
+// EvalWithoutCache compiles and executes source without reading or persisting a
+// yakc artifact. It is intended for rapidly changing hot patches where every
+// source revision is normally unique and cache serialization becomes pure
+// overhead.
+func (n *Engine) EvalWithoutCache(ctx context.Context, code string) error {
+	return n.evalWithInline(ctx, code, false, false)
+}
+
+func (n *Engine) evalWithInline(ctx context.Context, code string, inline bool, cache bool) error {
 	flag := yakvm.None
 	if inline {
 		flag = yakvm.Inline
@@ -429,16 +441,18 @@ func (n *Engine) EvalWithInline(ctx context.Context, code string, inline bool) e
 	n.vm.SetCallFuncCallback(n.callFuncCallback)
 	// yakc缓存
 	codes, symtbl := compiler.GetOpcodes(), compiler.GetRootSymbolTable()
-	defer func() {
-		if len(code) <= YAKC_CACHE_MAX_LENGTH {
-			return
-		}
-		yc, err := n._marshal(symtbl, codes, nil)
-		if err != nil {
-			return
-		}
-		SaveYakcCache(code, yc)
-	}()
+	if cache {
+		defer func() {
+			if len(code) <= YAKC_CACHE_MAX_LENGTH {
+				return
+			}
+			yc, err := n._marshal(symtbl, codes, nil)
+			if err != nil {
+				return
+			}
+			SaveYakcCache(code, yc)
+		}()
+	}
 
 	err = n.vm.ExecYakCode(ctx, code, codes, flag)
 	if err != nil {
@@ -455,6 +469,16 @@ func (n *Engine) SafeEval(ctx context.Context, code string) (err error) {
 		}
 	}()
 	err = n.Eval(ctx, code)
+	return
+}
+
+func (n *Engine) SafeEvalWithoutCache(ctx context.Context, code string) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Error(fmt.Sprint(e))
+		}
+	}()
+	err = n.EvalWithoutCache(ctx, code)
 	return
 }
 

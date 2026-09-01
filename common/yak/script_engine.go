@@ -586,13 +586,11 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	defer func() {
 		t.isRunning.UnSet()
 		t.isFinished.Set()
-
-		go func() {
-			select {
-			case <-time.After(3 * time.Second):
-				e.tasks.Delete(id)
-			}
-		}()
+		// Do not retain one sleeping goroutine per short-lived hot reload. The
+		// timer service invokes this callback after the task's observation window.
+		time.AfterFunc(3*time.Second, func() {
+			e.tasks.Delete(id)
+		})
 	}()
 
 	// log.Infof("recv code: %v", code)
@@ -758,7 +756,10 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 			return engine, engine.SafeExecYakcWithCode(ctx, yakcBytes, e.cryptoKey, code)
 		}
 	}
-	return engine, engine.SafeEval(ctx, code)
+	if cache {
+		return engine, engine.SafeEval(ctx, code)
+	}
+	return engine, engine.SafeEvalWithoutCache(ctx, code)
 }
 
 func (e *ScriptEngine) ExecuteWithTaskID(taskId, code string) error {
@@ -784,6 +785,14 @@ func (e *ScriptEngine) ExecuteWithoutCache(code string, params map[string]interf
 		runtimeId = uuid.New().String()
 	}
 	return e.exec(context.Background(), runtimeId, code, params, false)
+}
+
+func (e *ScriptEngine) ExecuteWithoutCacheWithContext(ctx context.Context, code string, params map[string]interface{}) (*antlr4yak.Engine, error) {
+	runtimeId := utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
+	if runtimeId == "" {
+		runtimeId = uuid.New().String()
+	}
+	return e.exec(ctx, runtimeId, code, params, false)
 }
 
 func (e *ScriptEngine) ExecuteEx(code string, params map[string]interface{}) (*antlr4yak.Engine, error) {

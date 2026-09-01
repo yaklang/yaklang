@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
@@ -172,6 +173,20 @@ beforeRequest = func(isHttps, originReq, req) {
 		expected := fmt.Sprintf("req%d-done", i)
 		assert.Equal(t, expected, res, "result[%d] wrong", i)
 	}
+}
+
+func TestMutateHookCallerDoesNotPersistHotReloadCache(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
+	code := `
+beforeRequest = func(isHttps, originReq, req) {
+    return req
+}
+// ` + strings.Repeat("hot-reload-revision-", 20)
+
+	hookBefore, _, _, _, _, _ := MutateHookCaller(context.Background(), code, nil)
+	require.NotNil(t, hookBefore)
+	_, cached := antlr4yak.HaveYakcCache(code)
+	require.False(t, cached, "web fuzzer hot reload must not persist unique source revisions")
 }
 
 // 并发调用多层嵌套子函数(A→B→C)，验证context逐层传递正确

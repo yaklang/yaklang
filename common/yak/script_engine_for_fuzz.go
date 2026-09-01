@@ -69,7 +69,10 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 		return nil
 	})
 
-	engine, err = scriptEngine.ExecuteEx(raw, make(map[string]interface{}))
+	// Web Fuzzer hot patches change on nearly every reload. Avoid serializing
+	// and persisting a yakc file for revisions that will not be reused, and let
+	// cancellation stop top-level initialization work.
+	engine, err = scriptEngine.ExecuteWithoutCacheWithContext(ctx, raw, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("eval hookCode failed: %s", err)
 		return nil, nil, nil, nil, nil, nil

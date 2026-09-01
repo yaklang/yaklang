@@ -56,6 +56,11 @@ type Frame struct {
 	contextData                 map[string]interface{} // 用于引擎执行时函数栈之间的数据传递
 
 	coroutine *Coroutine
+
+	// ownerGoroutineID is resolved once for a top-level execution and reused by
+	// its synchronous subframes. It keeps goroutine-local frame isolation while
+	// avoiding runtime.Stack on every nested function entry and frame pop.
+	ownerGoroutineID int64
 }
 
 type Coroutine struct {
@@ -169,7 +174,11 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		}
 	}
 
-	frame.GlobalVariables = vm.runtimeGlobalVar.SetPred(vm.globalVar)
+	// VM initialization and ImportLibs link runtimeGlobalVar to the immutable
+	// global library chain.
+	// Re-linking that shared SafeMap for every call races under concurrent hooks
+	// and is redundant after engine initialization.
+	frame.GlobalVariables = vm.runtimeGlobalVar
 	vm.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
 		return true

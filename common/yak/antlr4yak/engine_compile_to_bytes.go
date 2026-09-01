@@ -33,7 +33,12 @@ func IsYakc(b []byte) bool {
 	return IsNormalYakc(b) || IsCryptoYakc(b)
 }
 
-var yakcCache = utils.NewTTLCache[[]byte](10 * time.Minute)
+const yakcMemoryCacheCapacity = 256
+
+var yakcCache = utils.NewCacheEx[[]byte](
+	utils.WithCacheCapacity(yakcMemoryCacheCapacity),
+	utils.WithCacheTTL(10*time.Minute),
+)
 
 func HaveYakcCache(code string) ([]byte, bool) {
 	return HaveYakcCacheWithKey(code, nil)

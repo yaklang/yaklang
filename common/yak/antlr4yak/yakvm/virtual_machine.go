@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"runtime"
-	"strconv"
-	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils/limitedmap"
 
@@ -44,6 +43,7 @@ type (
 
 		frameStacksMu sync.RWMutex
 		frameStacks   map[int64]*vmstack.Stack
+		activeFrames  atomic.Int64
 		rootScope     *Scope
 
 		// asyncWaitGroup
@@ -154,6 +154,10 @@ func NewWithSymbolTable(table *SymbolTable) *VirtualMachine {
 		// debug
 		ThreadIDCount: 1, // 初始是1
 	}
+	// Establish the immutable-library parent before the VM can be shared. This
+	// keeps even a bare VM from lazily mutating the parent link on its first
+	// concurrent GetVar call; ImportLibs refreshes it when libraries are added.
+	v.runtimeGlobalVar.SetPred(v.globalVar)
 	return v
 }
 
@@ -262,7 +266,9 @@ func (v *VirtualMachine) execYakFunctionWithParentFrame(ctx context.Context, par
 	}
 	err := v.exec(ctx, parentFrame, func(frame *Frame) {
 		if v.sandboxMode && f.defineFrame != nil {
+			ownerGoroutineID := frame.ownerGoroutineID
 			frame = NewSubFrame(f.defineFrame)
+			frame.ownerGoroutineID = ownerGoroutineID
 		}
 		name := f.GetActualName()
 		frame.SetVerbose(fmt.Sprintf("function: %s", name))
@@ -324,7 +330,7 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, parentFrame *
 	go func() {
 		v.pushCurrentFrame(frame)
 		defer func() {
-			v.popCurrentFrame()
+			v.popCurrentFrame(frame)
 			v.AsyncEnd()
 			if err := frame.recover(); err != nil {
 				log.Errorf("yakvm async function panic: %v", err)
@@ -376,6 +382,11 @@ func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(fr
 			return utils.Error("BUG: current frame is empty(Sub)")
 		}
 		frame = NewSubFrame(parentFrame)
+		// Synchronous Yak function calls stay on the parent's goroutine. Reuse
+		// its already-resolved ID instead of calling runtime.Stack for every
+		// nested frame. Async calls do not go through this path and resolve their
+		// owner after the goroutine starts.
+		frame.ownerGoroutineID = parentFrame.ownerGoroutineID
 	} else if flag&Inline == Inline {
 		topFrame := v.peekCurrentFrame()
 
@@ -388,14 +399,13 @@ func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(fr
 		codes := frame.codes
 		p := frame.codePointer
 
-		frame.GlobalVariables = v.runtimeGlobalVar.SetPred(v.globalVar)
+		frame.GlobalVariables = v.runtimeGlobalVar
 		defer func() {
 			frame.codes = codes
 			frame.codePointer = p
 		}()
 	} else {
 		frame = NewFrame(v)
-		frame.GlobalVariables = v.runtimeGlobalVar.SetPred(v.globalVar)
 	}
 
 	if flag&Asnyc == Asnyc {
@@ -407,7 +417,7 @@ func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(fr
 	v.pushCurrentFrame(frame)
 	shouldPop := flag&Trace != Trace
 	if shouldPop {
-		defer v.popCurrentFrame()
+		defer v.popCurrentFrame(frame)
 	}
 
 	frame.debug = v.debug
@@ -439,44 +449,52 @@ func (v *VirtualMachine) CurrentFM() *Frame {
 }
 
 func currentGoroutineID() int64 {
-	buf := make([]byte, 64)
-	n := runtime.Stack(buf, false)
-	if n <= 0 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	const prefix = "goroutine "
+	if n <= len(prefix) {
 		return 0
 	}
-	fields := strings.Fields(string(buf[:n]))
-	if len(fields) < 2 {
-		return 0
+
+	var id int64
+	foundDigit := false
+	for i := len(prefix); i < n; i++ {
+		c := buf[i]
+		if c < '0' || c > '9' {
+			break
+		}
+		foundDigit = true
+		id = id*10 + int64(c-'0')
 	}
-	id, err := strconv.ParseInt(fields[1], 10, 64)
-	if err != nil {
+	if !foundDigit {
 		return 0
 	}
 	return id
 }
 
-func (v *VirtualMachine) getGoroutineFrameStack(gid int64, create bool) *vmstack.Stack {
-	v.frameStacksMu.Lock()
-	defer v.frameStacksMu.Unlock()
-
-	stack, ok := v.frameStacks[gid]
-	if ok || !create {
-		return stack
+func (v *VirtualMachine) pushCurrentFrame(frame *Frame) {
+	gid := frame.ownerGoroutineID
+	if gid == 0 {
+		gid = currentGoroutineID()
+		frame.ownerGoroutineID = gid
 	}
 
-	stack = vmstack.New()
-	v.frameStacks[gid] = stack
-	return stack
-}
-
-func (v *VirtualMachine) pushCurrentFrame(frame *Frame) {
-	gid := currentGoroutineID()
-	stack := v.getGoroutineFrameStack(gid, true)
+	v.frameStacksMu.Lock()
+	defer v.frameStacksMu.Unlock()
+	stack, ok := v.frameStacks[gid]
+	if !ok {
+		stack = vmstack.New()
+		v.frameStacks[gid] = stack
+	}
 	stack.Push(frame)
+	v.activeFrames.Add(1)
 }
 
-func (v *VirtualMachine) popCurrentFrame() *Frame {
-	gid := currentGoroutineID()
+func (v *VirtualMachine) popCurrentFrame(expected *Frame) *Frame {
+	gid := expected.ownerGoroutineID
+	if gid == 0 {
+		gid = currentGoroutineID()
+	}
 
 	v.frameStacksMu.Lock()
 	defer v.frameStacksMu.Unlock()
@@ -486,6 +504,9 @@ func (v *VirtualMachine) popCurrentFrame() *Frame {
 		return nil
 	}
 	frame, _ := stack.Pop().(*Frame)
+	if frame != nil {
+		v.activeFrames.Add(-1)
+	}
 	if stack.Len() == 0 {
 		delete(v.frameStacks, gid)
 	}
@@ -493,6 +514,12 @@ func (v *VirtualMachine) popCurrentFrame() *Frame {
 }
 
 func (v *VirtualMachine) peekCurrentFrame() *Frame {
+	// Most external GetVar calls happen after compilation has finished, when
+	// there cannot be a current frame. Avoid runtime.Stack entirely in that
+	// common hot-load path.
+	if v.activeFrames.Load() == 0 {
+		return nil
+	}
 	gid := currentGoroutineID()
 
 	v.frameStacksMu.RLock()
