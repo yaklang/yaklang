@@ -1245,7 +1245,7 @@ const UserPresetPromptMaxLength = 4000
 
 func WithUserPresetPrompt(prompt string) ConfigOption {
 	return func(c *Config) error {
-		if MeasureTokens(prompt) > UserPresetPromptMaxLength {
+		if TokenCountExceeds(prompt, UserPresetPromptMaxLength) {
 			prompt = ShrinkByTokens(prompt, UserPresetPromptMaxLength)
 		}
 		c.UserPresetPrompt = prompt

@@ -2,10 +2,13 @@ package ytoken
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -75,6 +78,253 @@ func TestCalcOrdinaryTokenCount(t *testing.T) {
 	if got != 18 {
 		t.Errorf("CalcOrdinaryTokenCount = %d, want 18", got)
 	}
+}
+
+func TestCalcTokenCountUpTo(t *testing.T) {
+	text := "<|im_start|>user\n请分析 this code<|im_end|>"
+	want := CalcTokenCount(text)
+
+	if got, exceeded := CalcTokenCountUpTo(text, want); got != want || exceeded {
+		t.Fatalf("limit at exact count: got=(%d, %v), want=(%d, false)", got, exceeded, want)
+	}
+	if got, exceeded := CalcTokenCountUpTo(text, want-1); got <= want-1 || !exceeded {
+		t.Fatalf("limit below count: got=(%d, %v), want count > %d", got, exceeded, want-1)
+	}
+	if TokenCountExceeds(text, want) {
+		t.Fatalf("TokenCountExceeds returned true at exact count %d", want)
+	}
+	if !TokenCountExceeds(text, want-1) {
+		t.Fatalf("TokenCountExceeds returned false below exact count %d", want)
+	}
+	if TokenCountExceeds("short", len("short")) {
+		t.Fatal("byte-length upper bound rejected a text that cannot exceed the limit")
+	}
+	for _, candidate := range []string{"valid 世界", string([]byte{0xff, 'a', 0xfe})} {
+		exact := CalcTokenCount(candidate)
+		for limit := 0; limit <= exact+1; limit++ {
+			if got, want := TokenCountExceeds(candidate, limit), exact > limit; got != want {
+				t.Fatalf("TokenCountExceeds(%q, %d) = %v, want %v", candidate, limit, got, want)
+			}
+		}
+	}
+}
+
+func TestOptimizedBPEMatchesReference(t *testing.T) {
+	ensureInit()
+	pieces := []string{
+		"a",
+		"hello world",
+		strings.Repeat("a", 256),
+		strings.Repeat("天地玄黄", 40),
+		strings.Repeat(" := function_name(value_123) ", 12),
+	}
+	rng := rand.New(rand.NewSource(0x59544f4b454e))
+	for i := 0; i < 300; i++ {
+		raw := make([]byte, 1+rng.Intn(180))
+		if _, err := rng.Read(raw); err != nil {
+			t.Fatal(err)
+		}
+		pieces = append(pieces, string(raw))
+	}
+
+	for i, piece := range pieces {
+		sink := tokenSink{collect: true}
+		if !bpeEncodePiece(piece, &sink) {
+			t.Fatalf("piece %d unexpectedly stopped", i)
+		}
+		want := referenceBPEEncode(piece)
+		if !reflect.DeepEqual(sink.tokens, want) {
+			t.Fatalf("piece %d mismatch\ngot:  %v\nwant: %v", i, sink.tokens, want)
+		}
+	}
+}
+
+func TestPureGoPreTokenizerMatchesPCRE(t *testing.T) {
+	ensureInit()
+	texts := []string{
+		"hello world",
+		"Hello's I'M we'd they'll I'VE",
+		"你好，世界！１２٣四五",
+		"a  b   c    ",
+		"a\n b\r\n  c\n\n",
+		" \n \n  next",
+		"!@#$%^&*() -- symbols\r\n",
+		"emoji 👨‍👩‍👧‍👦 flags 🇨🇳 combining e\u0301",
+		string([]byte{'a', 0xff, 'b', 0xfe, '\n'}),
+	}
+	alphabet := []rune("abcXYZ' 0129\t\n\r,.-_:/中文界１２٣🙂\u00a0\u0085\u2028\u2029\u0301")
+	rng := rand.New(rand.NewSource(0x505245544f4b454e))
+	for i := 0; i < 500; i++ {
+		var b strings.Builder
+		for j, n := 0, rng.Intn(180); j < n; j++ {
+			b.WriteRune(alphabet[rng.Intn(len(alphabet))])
+		}
+		texts = append(texts, b.String())
+	}
+	for i := 0; i < 200; i++ {
+		var b strings.Builder
+		for j := 0; j < 60; j++ {
+			r := rune(rng.Intn(utf8.MaxRune + 1))
+			if r >= 0xd800 && r <= 0xdfff {
+				j--
+				continue
+			}
+			b.WriteRune(r)
+		}
+		texts = append(texts, b.String())
+	}
+
+	unsafeUnicode := 0
+	for i, text := range texts {
+		if !canUsePureGoPreTokenizer(text) {
+			unsafeUnicode++
+			continue
+		}
+		got := pureGoPatternPieces(text)
+		want := pcrePatternPieces(text)
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("text %d pre-tokenization mismatch for %q\ngot:  %#v\nwant: %#v", i, text, got, want)
+		}
+	}
+	if unsafeUnicode == 0 {
+		t.Fatal("full-Unicode corpus did not exercise the PCRE compatibility fallback")
+	}
+}
+
+func pureGoPatternPieces(text string) []string {
+	if !utf8.ValidString(text) {
+		text = string([]rune(text))
+	}
+	var pieces []string
+	for start := 0; start < len(text); {
+		end := nextPieceEnd(text, start)
+		if end <= start {
+			_, size := utf8.DecodeRuneInString(text[start:])
+			end = start + size
+		}
+		pieces = append(pieces, text[start:end])
+		start = end
+	}
+	return pieces
+}
+
+func pcrePatternPieces(text string) []string {
+	ensurePCRE()
+	var pieces []string
+	match, err := compiledPattern.FindStringMatch(text)
+	for err == nil && match != nil {
+		pieces = append(pieces, match.String())
+		match, err = compiledPattern.FindNextMatch(match)
+	}
+	return pieces
+}
+
+type referenceBPENode struct {
+	data string
+	rank int
+}
+
+// referenceBPEEncode intentionally retains the former allocation-heavy merge
+// algorithm so the optimized implementation can be checked against its exact
+// token semantics on a bounded deterministic corpus.
+func referenceBPEEncode(piece string) []int {
+	nodes := make([]referenceBPENode, len(piece))
+	for i := 0; i < len(piece); i++ {
+		rank, ok := mergeableRanks[piece[i:i+1]]
+		if !ok {
+			rank = math.MaxInt
+		}
+		nodes[i] = referenceBPENode{data: piece[i : i+1], rank: rank}
+	}
+	for len(nodes) >= 2 {
+		bestRank := math.MaxInt
+		bestPair := ""
+		for i := 0; i < len(nodes)-1; i++ {
+			pair := nodes[i].data + nodes[i+1].data
+			if rank, ok := mergeableRanks[pair]; ok && rank < bestRank {
+				bestRank, bestPair = rank, pair
+			}
+		}
+		if bestRank == math.MaxInt {
+			break
+		}
+
+		out := make([]referenceBPENode, 0, len(nodes))
+		for i := 0; i < len(nodes); {
+			if i+1 < len(nodes) && nodes[i].data+nodes[i+1].data == bestPair {
+				out = append(out, referenceBPENode{data: bestPair, rank: bestRank})
+				i += 2
+				continue
+			}
+			out = append(out, nodes[i])
+			i++
+		}
+		nodes = out
+	}
+
+	result := make([]int, len(nodes))
+	for i := range nodes {
+		result[i] = nodes[i].rank
+	}
+	return result
+}
+
+func TestSpecialScannerMatchesLegacySplitting(t *testing.T) {
+	tests := []string{
+		"plain text",
+		"<|im_start|>user<|im_end|>",
+		"a<|bad<|im_start|>b",
+		"<|extra_1|><|extra_10|><|extra_204|>",
+		"x<|extra_020|>y<|im_end|>z",
+		"missing <|im_start| and trailing <|bad|>",
+	}
+	for _, text := range tests {
+		got := Encode(text)
+		want := referenceEncodeWithLegacySpecialSplit(text)
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("special split mismatch for %q\ngot:  %v\nwant: %v", text, got, want)
+		}
+	}
+}
+
+func referenceEncodeWithLegacySpecialSplit(text string) []int {
+	keys := []string{endOfText, imStart, imEnd}
+	for i := 0; i < 205; i++ {
+		keys = append(keys, "<|extra_"+strconv.Itoa(i)+"|>")
+	}
+	chunks := []string{text}
+	for _, sep := range keys {
+		var next []string
+		for _, chunk := range chunks {
+			from := 0
+			for {
+				rel := strings.Index(chunk[from:], sep)
+				if rel < 0 {
+					break
+				}
+				pos := from + rel
+				if pos > from {
+					next = append(next, chunk[from:pos])
+				}
+				next = append(next, sep)
+				from = pos + len(sep)
+			}
+			if from < len(chunk) {
+				next = append(next, chunk[from:])
+			}
+		}
+		chunks = next
+	}
+
+	sink := tokenSink{collect: true}
+	for _, chunk := range chunks {
+		if id, ok := specialTokens[chunk]; ok {
+			sink.addToken(id)
+		} else {
+			encodeOrdinary(chunk, &sink)
+		}
+	}
+	return sink.tokens
 }
 
 func TestEncode_EmptyString(t *testing.T) {
@@ -737,6 +987,21 @@ func BenchmarkCalcTokenCount_LargeCode(b *testing.B) {
 	fmt.Fprintf(w, "received %d bytes", len(body))
 }
 `, 20)
+	ensureInit()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		CalcTokenCount(text)
+	}
+}
+
+func BenchmarkCalcTokenCount_RealBasePrompt(b *testing.B) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	projectRoot := filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
+	data, err := os.ReadFile(filepath.Join(projectRoot, "common/ai/aid/aireact/prompts/base/base.txt"))
+	if err != nil {
+		b.Skipf("base prompt not available: %v", err)
+	}
+	text := string(data)
 	ensureInit()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

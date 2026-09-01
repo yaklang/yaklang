@@ -436,7 +436,7 @@ func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) C
 			}
 
 			content := detailBuilder.String()
-			if MeasureTokens(content) > maxInlineKnowledgeBaseTokens {
+			if TokenCountExceeds(content, maxInlineKnowledgeBaseTokens) {
 				filePath := consts.TempAIFileFast("knowledge-bases-*.txt", content)
 				if emitter != nil && filePath != "" {
 					emitter.EmitPinFilename(filePath)
@@ -663,7 +663,7 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 	})
 
 	result := buf.String()
-	if MeasureTokens(result) > r.maxTokens {
+	if TokenCountExceeds(result, r.maxTokens) {
 		shrinkSize := int(float64(r.maxTokens) * 0.8)
 		result = ShrinkTextBlockByTokens(result, shrinkSize)
 		log.Warnf("context provider result exceeded maxTokens (%d), shrunk to %d tokens", r.maxTokens, shrinkSize)

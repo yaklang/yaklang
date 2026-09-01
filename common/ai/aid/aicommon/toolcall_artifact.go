@@ -525,7 +525,7 @@ func normalizeToolResultData(toolResult *aitool.ToolResult, combined, resultText
 	// shrink fields must not bypass it during Timeline rendering.
 	toolResult.ShrinkResult = ""
 	toolResult.ShrinkSimilarResult = ""
-	if ytoken.CalcTokenCount(toolResult.CallExpectations) > toolResultHintReserve/2 {
+	if ytoken.TokenCountExceeds(toolResult.CallExpectations, toolResultHintReserve/2) {
 		toolResult.CallExpectations = ShrinkTextBlockByTokens(toolResult.CallExpectations, toolResultHintReserve/2)
 	}
 	if combined == "" {
@@ -561,11 +561,11 @@ func applyNormalizedData(toolResult *aitool.ToolResult, body, hint string) {
 	}
 
 	// An enormous error cannot be allowed to consume the whole Timeline item.
-	if ytoken.CalcTokenCount(toolResult.Error) > toolResultHintReserve {
+	if ytoken.TokenCountExceeds(toolResult.Error, toolResultHintReserve) {
 		toolResult.Error = ShrinkTextBlockByTokens(toolResult.Error, toolResultHintReserve)
 	}
 	toolResult.Data = shrinkBodyWithStats(body, bodyBudget) + "\n\n" + hint
-	if ytoken.CalcTokenCount(toolResult.Data.(string)) > ToolResultTokenLimit {
+	if ytoken.TokenCountExceeds(toolResult.Data.(string), ToolResultTokenLimit) {
 		toolResult.Data = shrinkBodyWithStats(body, ToolResultTokenLimit-staticTokens) + "\n\n" + hint
 	}
 
@@ -579,18 +579,25 @@ func enforceCanonicalToolResultLimit(toolResult *aitool.ToolResult) {
 	if toolResult == nil {
 		return
 	}
-	if ytoken.CalcTokenCount(toolResult.Error) > toolResultHintReserve {
+	if ytoken.TokenCountExceeds(toolResult.Error, toolResultHintReserve) {
 		toolResult.Error = ShrinkTextBlockByTokens(toolResult.Error, toolResultHintReserve)
 	}
 	// Params remain on ToolResult for audit/checkpoint use, but an exceptionally
 	// large param block is omitted from Timeline rendering to preserve the same
 	// 16K hard ceiling as Data.
-	for attempts := 0; attempts < 8 && ytoken.CalcTokenCount(toolResult.String()) > ToolResultTokenLimit; attempts++ {
+	for attempts := 0; attempts < 8; attempts++ {
 		if !toolResult.OmitParamsInTimeline {
+			if !ytoken.TokenCountExceeds(toolResult.String(), ToolResultTokenLimit) {
+				break
+			}
 			toolResult.OmitParamsInTimeline = true
 			continue
 		}
-		over := ytoken.CalcTokenCount(toolResult.String()) - ToolResultTokenLimit
+		currentTokens := ytoken.CalcTokenCount(toolResult.String())
+		if currentTokens <= ToolResultTokenLimit {
+			break
+		}
+		over := currentTokens - ToolResultTokenLimit
 		data, ok := toolResult.Data.(string)
 		if !ok || data == "" {
 			break
@@ -674,8 +681,7 @@ func (b *toolCallArtifactBundle) finalize(
 
 	hint := toolArtifactHint(b, persistErr)
 	normalizeToolResultData(toolResult, combined, resultText, hint)
-	rawTokens := ytoken.CalcTokenCount(combined) + ytoken.CalcTokenCount(resultText)
-	if persistErr != nil && rawTokens > ToolResultTokenLimit {
+	if persistErr != nil && tokenCountSumExceeds(ToolResultTokenLimit, combined, resultText) {
 		// Artifact persistence is an observation-channel failure after the tool
 		// callback already produced its protocol result. Keep Success unchanged;
 		// the canonical HINT communicates that the oversized observation is not
@@ -733,6 +739,18 @@ func (b *toolCallArtifactBundle) finalize(
 	t.emitter.EmitPinFilename(b.dir)
 	log.Infof("saved tool call artifact bundle to: %s", b.dir)
 	return nil
+}
+
+func tokenCountSumExceeds(limit int, texts ...string) bool {
+	remaining := limit
+	for _, text := range texts {
+		count, exceeded := ytoken.CalcTokenCountUpTo(text, remaining)
+		if exceeded {
+			return true
+		}
+		remaining -= count
+	}
+	return false
 }
 
 func (b *toolCallArtifactBundle) renderReport(tool *aitool.Tool, identifier string, params aitool.InvokeParams, toolResult *aitool.ToolResult, paramGenDuration time.Duration, rawAIParamResponse string) string {
@@ -847,7 +865,7 @@ func migrateLegacyTimelineToolResult(workdir string, toolResult *aitool.ToolResu
 	hint := toolArtifactHint(b, persistErr)
 	normalizeToolResultData(toolResult, combined, resultText, hint)
 	if persistErr != nil {
-		if ytoken.CalcTokenCount(combined)+ytoken.CalcTokenCount(resultText) > ToolResultTokenLimit {
+		if tokenCountSumExceeds(ToolResultTokenLimit, combined, resultText) {
 			normalizeToolResultData(toolResult, combined, resultText, hint)
 		}
 		log.Warnf("failed to migrate legacy Timeline tool result %d: %v", toolResult.ID, persistErr)

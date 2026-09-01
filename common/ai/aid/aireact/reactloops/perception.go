@@ -184,7 +184,7 @@ func (p *PerceptionState) FormatForContext() string {
 		buf.WriteString(fmt.Sprintf("Keywords: %s\n", strings.Join(p.Keywords, ", ")))
 	}
 	result := buf.String()
-	if aicommon.MeasureTokens(result) > perceptionMaxContextTokens {
+	if aicommon.TokenCountExceeds(result, perceptionMaxContextTokens) {
 		result = aicommon.ShrinkTextBlockByTokens(result, perceptionMaxContextTokens)
 	}
 	return result
@@ -628,7 +628,7 @@ func formatPerceptionKnowledgeContext(query string, knowledgeBases []string, con
 	buf.WriteString(content)
 
 	result := buf.String()
-	if aicommon.MeasureTokens(result) > perceptionKnowledgeMaxContextTokens {
+	if aicommon.TokenCountExceeds(result, perceptionKnowledgeMaxContextTokens) {
 		result = aicommon.ShrinkTextBlockByTokens(result, perceptionKnowledgeMaxContextTokens)
 	}
 	return strings.TrimSpace(result)
