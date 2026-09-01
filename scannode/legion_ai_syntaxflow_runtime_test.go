@@ -208,6 +208,29 @@ func TestLegionSyntaxFlowRealDebugAndCanonicalCandidate(t *testing.T) {
 	}
 }
 
+func TestLegionSyntaxFlowJavaCallArgumentOpcodeFilter(t *testing.T) {
+	files := map[string]string{
+		"positive/Sample.java": `class Positive { void run(String command) throws Exception { Runtime.getRuntime().exec(command); } }`,
+		"negative/Sample.java": `class Negative { void run() throws Exception { Runtime.getRuntime().exec("echo safe"); } }`,
+	}
+	runtime, _ := testLegionRuleRuntime(t, context.Background(), files)
+	const rule = "exec(,*?{!opcode: const} as $cmd,)\nalert $cmd"
+	positive := testLegionRuleDebug(t, runtime, map[string]any{
+		"rule": rule, "language": "java", "source_kind": "workspace",
+		"paths": []string{"positive/Sample.java"}, "expected": "match", "label": "positive dynamic command",
+	})
+	negative := testLegionRuleDebug(t, runtime, map[string]any{
+		"rule": rule, "language": "java", "source_kind": "workspace",
+		"paths": []string{"negative/Sample.java"}, "expected": "no_match", "label": "negative literal command",
+	})
+	if positive.Status != "completed" || positive.MatchCount == 0 {
+		t.Fatalf("non-constant Java call argument was not matched: %#v", positive)
+	}
+	if negative.Status != "completed" || negative.MatchCount != 0 {
+		t.Fatalf("constant Java call argument was not excluded: %#v", negative)
+	}
+}
+
 func TestLegionSyntaxFlowCannotReuseTurnOrRuleEvidence(t *testing.T) {
 	runtime, publisher := testLegionRuleRuntime(t, context.Background(), nil)
 	input := map[string]any{

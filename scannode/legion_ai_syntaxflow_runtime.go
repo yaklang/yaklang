@@ -33,7 +33,9 @@ const (
 	legionSyntaxFlowDebugSchema        = "legion.syntaxflow-debug/v1"
 	legionSyntaxFlowCandidateSchema    = "legion.syntaxflow-rule-candidate/v1"
 	legionSyntaxFlowMaxRuleBytes       = 32 * 1024
-	legionSyntaxFlowMaxCalls           = 24
+	// Matches the immutable Focus ceiling: 12 syntax checks, 16 candidate
+	// debug runs, and 2 trusted original-rule reproduction runs.
+	legionSyntaxFlowMaxCalls           = 30
 	legionSyntaxFlowMaxPaths           = 32
 	legionSyntaxFlowMaxMatches         = 32
 	legionSyntaxFlowMaxSnippetBytes    = 512

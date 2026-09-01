@@ -158,7 +158,7 @@ func materializeLegionInlineWorkspace(ctx context.Context, spec legionCodeWorksp
 	}
 	digest := legionInlineSourceDigest(spec.InlineFiles)
 	return &legionCodeWorkspaceRuntime{
-		spec: publicLegionCodeWorkspaceSpec(spec), root: root,
+		spec: publicLegionCodeWorkspaceSpec(spec), root: root, originalRule: spec.SyntaxFlowOriginalRule,
 		inlineFiles:    cloneLegionInlineFiles(spec.InlineFiles),
 		lockedRevision: digest, sha256: digest,
 		files: len(spec.InlineFiles), bytes: total, cleanup: cleanup,
