@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -29,7 +30,7 @@ func TestSentinelPasswordNeverLeaks(t *testing.T) {
 	// 捕获日志
 	var logBuf syncBuffer
 	log.SetOutput(&logBuf)
-	defer log.SetOutput(nil)
+	defer log.SetOutput(os.Stderr)
 
 	types := bruteutils.GetBuildinAvailableBruteType()
 	var mu sync.Mutex
@@ -93,7 +94,7 @@ func TestSentinelPasswordNeverLeaksInStream(t *testing.T) {
 
 	var logBuf syncBuffer
 	log.SetOutput(&logBuf)
-	defer log.SetOutput(nil)
+	defer log.SetOutput(os.Stderr)
 
 	util, err := bruteutils.NewMultiTargetBruteUtilEx(
 		bruteutils.WithBruteCallback(func(item *bruteutils.BruteItem) *bruteutils.BruteItemResult {

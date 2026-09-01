@@ -394,12 +394,14 @@ func readTelnetLine(r *bufio.Reader) string {
 	for {
 		b, err := r.ReadByte()
 		if err != nil {
-			return sb.String()
+			return strings.TrimSpace(sb.String())
 		}
-		if b == '\n' || b == '\r' {
-			if sb.Len() > 0 {
-				return strings.TrimSpace(sb.String())
-			}
+		if b == '\n' {
+			// 行结束即返回；空行返回空串（真实设备把单独的回车
+			// 当作"继续"按键，例如敲回车后才显示登录提示）。
+			return strings.TrimSpace(sb.String())
+		}
+		if b == '\r' {
 			continue
 		}
 		sb.WriteByte(b)

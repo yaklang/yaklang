@@ -148,6 +148,9 @@ func coreResultFromLegacy(ctx context.Context, item *BruteItem, legacy *BruteIte
 	switch {
 	case legacy.Ok:
 		outcome = core.OutcomeAuthSuccess
+	case legacy.AccountLocked:
+		// 协议层识别的锁定特征：调度器按锁定预算短路该目标。
+		outcome = core.OutcomeAccountLocked
 	case legacy.Finished:
 		// 旧 Finished 语义：目标级终止（网络错误/协议不符等）。
 		outcome = core.OutcomeTargetUnavailable

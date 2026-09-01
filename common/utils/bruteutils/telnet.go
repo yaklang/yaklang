@@ -36,15 +36,18 @@ var telnetAuth = &DefaultServiceAuthInfo{
 		}
 		defer conn.Close()
 
-		raw := telnetReadStable(conn, defaultTimeout, 1024)
+		raw := telnetReadUntil(conn, defaultTimeout)
 		if raw == nil {
 			res := i.Result()
 			res.Finished = true
 			return res
 		}
+		if res := classifyTelnetRefusal(i.Result(), raw); res != nil {
+			return res
+		}
 
 		conn.Write([]byte("?\n"))
-		raw = telnetReadStable(conn, defaultTimeout, 4096)
+		raw = append(raw, telnetReadUntil(conn, defaultTimeout)...)
 		if raw == nil {
 			return i.Result()
 		}
@@ -111,7 +114,15 @@ var telnetAuth = &DefaultServiceAuthInfo{
 				conn.Write([]byte(i.Password + "\n"))
 				bruteResult := telnetReadUntil(conn, defaultTimeout,
 					`(?i)invalid`, `(?i)incorrect`, `(?i)fail`,
-					`(?i)correct`, `(?i)logged`, `(?i)succe`)
+					`(?i)correct`, `(?i)logged`, `(?i)succe`,
+					`(?i)lockout`, `(?i)locked`)
+				// 连续失败当场触发锁定（真实设备行为）：置锁定信号，
+				// 调度器按锁定预算短路该目标。
+				if utils.MatchAnyOfRegexp(string(bruteResult), `(?i)lockout`, `(?i)locked`) {
+					result.AccountLocked = true
+					result.ExtraInfo = bruteResult
+					return result
+				}
 				if utils.MatchAnyOfRegexp(string(bruteResult), `(?i)invalid`, `(?i)incorrect`, `(?i)fail`) {
 					return result
 				}
@@ -125,7 +136,13 @@ var telnetAuth = &DefaultServiceAuthInfo{
 			return result
 		}
 
-		bannerAndFinished := telnetReadUntil(conn, defaultTimeout, `(?i)login`, `(?i)user`, `(?i)password`)
+		// 提示符与拒绝特征（锁定/限流）一并等待，读到即返回。
+		bannerWait := []string{`(?i)login`, `(?i)user`, `(?i)password`, `(?i)lockout`, `(?i)locked`,
+			`(?i)exceed`, `(?i)no more connections`, `(?i)disabled`, `(?i)not enabled`, `(?i)expired`}
+		bannerAndFinished := telnetReadUntil(conn, defaultTimeout, bannerWait...)
+		if res := classifyTelnetRefusal(result, bannerAndFinished); res != nil {
+			return res
+		}
 		u := strings.TrimSpace(string(bannerAndFinished))
 		if !utils.MatchAnyOfRegexp(u, `(?i)login`, `(?i)user`) {
 			// 没有匹配到 login 或者 user，看是不是匹配到 password
@@ -134,7 +151,23 @@ var telnetAuth = &DefaultServiceAuthInfo{
 				finalResult.OnlyNeedPassword = true
 				return finalResult
 			}
-			return result
+			// 部分真实设备（Shodan 语料：Telnet Server 2.00 等）banner
+			// 后不出提示符，需要客户端先敲一次回车。
+			conn.Write([]byte("\n"))
+			second := telnetReadUntil(conn, defaultTimeout, bannerWait...)
+			if res := classifyTelnetRefusal(result, second); res != nil {
+				return res
+			}
+			bannerAndFinished = append(bannerAndFinished, second...)
+			u = strings.TrimSpace(string(bannerAndFinished))
+			if !utils.MatchAnyOfRegexp(u, `(?i)login`, `(?i)user`) {
+				if utils.MatchAnyOfRegexp(u, `(?i)password`) {
+					finalResult := doPassword()
+					finalResult.OnlyNeedPassword = true
+					return finalResult
+				}
+				return result
+			}
 		}
 
 		conn.Write([]byte(i.Username + "\n"))
@@ -142,61 +175,72 @@ var telnetAuth = &DefaultServiceAuthInfo{
 	},
 }
 
-// telnetReadUntil 流式读取并在内容匹配任一模式时立即返回。
-// 旧实现用 StableReaderEx 读完整阶段（提示符不带换行，只能等超时
-// 稳定 + 异步 goroutine 退出，单阶段 ~10s，三次交互近 30s/凭证，
-// 大字典不可用）；提示符/判定词即协议边界，读到即返回。
+// telnetReadUntil 流式读取，双出口：
+//  1. 内容匹配任一模式（提示符/判定词/拒绝特征）→ 立即返回；
+//  2. 已读到数据且连续两个静默窗口（共 ~600ms）无新增 → banner 已
+//     发完且无等待词，返回已读内容（旧实现等满超时，真实无提示符
+//     设备单阶段 ~10s）。
+//
+// EOF/错误/总超时同样返回已读内容。
 func telnetReadUntil(conn net.Conn, timeout time.Duration, patterns ...string) []byte {
-	var buf bytes.Buffer
-	ddl := time.Now().Add(timeout)
-	_ = conn.SetReadDeadline(ddl)
-	defer conn.SetReadDeadline(time.Time{})
-	ch := make([]byte, 1)
-	for time.Now().Before(ddl) {
-		n, err := conn.Read(ch)
-		if n > 0 {
-			buf.Write(ch[:n])
-			content := buf.String()
-			if utils.MatchAnyOfRegexp(content, patterns...) {
-				return buf.Bytes()
-			}
-		}
-		if err != nil {
-			return buf.Bytes() // EOF / 超时：返回已读内容
-		}
-	}
-	return buf.Bytes()
-}
-
-// telnetReadStable 读取直到静默稳定（连续两个静默窗口无新数据）或 EOF。
-// 用于未授权探测的 banner 检查；替代 StableReaderEx（其内部 goroutine
-// 需等满外层超时才退出，单次读取 ~10s）。
-func telnetReadStable(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	var buf bytes.Buffer
 	ddl := time.Now().Add(timeout)
 	ch := make([]byte, 1)
 	quiet := 0
-	for time.Now().Before(ddl) && buf.Len() < maxSize {
+	for time.Now().Before(ddl) {
 		_ = conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
 		n, err := conn.Read(ch)
 		if n > 0 {
 			buf.Write(ch[:n])
 			quiet = 0
+			content := buf.String()
+			if utils.MatchAnyOfRegexp(content, patterns...) {
+				break
+			}
 			continue
 		}
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Timeout() {
-				if buf.Len() > 0 {
-					quiet++
-					if quiet >= 2 {
-						break // 已读数据 + 600ms 静默 → 稳定
-					}
+				quiet++
+				if buf.Len() > 0 && quiet >= 2 {
+					break // 数据已读完且无匹配词：稳定
+				}
+				if buf.Len() == 0 && quiet >= 4 {
+					break // 1.2s 无任何字节：哑连接，快速放弃
 				}
 				continue
 			}
-			break // EOF / 连接错误：返回已读内容
+			break // EOF / 连接错误
 		}
 	}
 	_ = conn.SetReadDeadline(time.Time{})
 	return buf.Bytes()
+}
+
+// classifyTelnetRefusal 识别真实 telnet 设备的明确拒绝特征
+// （Shodan 100 样本语料，37% 无标准提示符）：
+//   - 爆破锁定：Protection of brute force attack!! Lockout remaining:
+//     TELNET[ppp0] N seconds（华为系等）→ AccountLocked，调度器短路目标
+//   - 连接资源受限：connections exceed 5 / maximum number of telnet
+//     sessions / no more connections → Finished，目标暂不可用
+//
+// 命中返回已标记的 result，未命中返回 nil（继续正常流程）。
+func classifyTelnetRefusal(result *BruteItemResult, raw []byte) *BruteItemResult {
+	s := string(raw)
+	if utils.MatchAnyOfRegexp(s,
+		`(?i)lockout remaining`, `(?i)protection of brute force`,
+		`(?i)locked out`, `(?i)account.{0,10}locked`, `(?i)too many.{0,20}(fail|attempt|login)`) {
+		result.AccountLocked = true
+		result.ExtraInfo = raw
+		return result
+	}
+	if utils.MatchAnyOfRegexp(s,
+		`(?i)connections? exceed`, `(?i)maximum number of.{0,30}session`,
+		`(?i)no more connections`, `(?i)too many (connections|users|sessions)`,
+		`(?i)telnet.*(disabled|not enabled)`) {
+		result.Finished = true
+		result.ExtraInfo = raw
+		return result
+	}
+	return nil
 }

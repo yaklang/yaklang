@@ -126,6 +126,12 @@ type BruteItemResult struct {
 
 	// 爆破结果的 banner 依据，额外信息
 	ExtraInfo []byte
+
+	// 账户锁定信号：协议层识别到"因连续失败被锁定"的明确特征时置位，
+	// 调度器将按锁定预算短路该目标，避免持续撞击延长锁定期。
+	// （真实 telnet 设备语料：Protection of brute force attack!!
+	// Lockout remaining: TELNET[ppp0] N seconds）
+	AccountLocked bool
 }
 
 // String 返回脱敏表示：密码只保留不可逆摘要，绝不输出明文。
