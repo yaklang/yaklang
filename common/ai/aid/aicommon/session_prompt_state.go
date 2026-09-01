@@ -217,7 +217,7 @@ func (s *SessionPromptState) GetSessionEvidenceFrozenOpenBlocks(frozenTimeUnix i
 
 	blocks := RenderSessionEvidenceFrozenOpen(s.sessionEvidenceState, store, frozenTimeUnix)
 	rendered := renderSessionEvidencePromptBlocks(blocks, openNonce)
-	for MeasureTokens(joinSessionEvidencePromptBlocks(rendered)) > sessionEvidenceTokenBudget && len(store.Items) > 1 {
+	for len(store.Items) > 1 && TokenCountExceeds(joinSessionEvidencePromptBlocks(rendered), sessionEvidenceTokenBudget) {
 		trimmed := store.Items[0]
 		store.Items = store.Items[1:]
 		pruneSessionEvidenceFrozenItem(s.sessionEvidenceState, trimmed.ID)
@@ -234,7 +234,7 @@ func shrinkEvidenceStoreWithStateToTokenBudget(store *EvidenceStore, state *Sess
 	}
 	for len(store.Items) > 1 {
 		rendered := store.Render()
-		if MeasureTokens(rendered) <= budget {
+		if !TokenCountExceeds(rendered, budget) {
 			return
 		}
 		trimmed := store.Items[0]

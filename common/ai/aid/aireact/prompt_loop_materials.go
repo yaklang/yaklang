@@ -277,7 +277,7 @@ func boundedLightweightPromptBlock(content string, tokenLimit int, label string)
 	if strings.TrimSpace(content) == "" {
 		return ""
 	}
-	if aicommon.MeasureTokens(content) <= tokenLimit {
+	if !aicommon.TokenCountExceeds(content, tokenLimit) {
 		return content
 	}
 	// These inputs often already contain AITAG wrappers. Cutting through them

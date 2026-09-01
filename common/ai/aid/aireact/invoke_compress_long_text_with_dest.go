@@ -89,7 +89,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 		return "", utils.Error("cannot compress empty text")
 	}
 
-	if int64(ytoken.CalcTokenCount(rawText)) < (targetTokenSize / 2) {
+	if !aicommon.TokenCountExceeds64(rawText, targetTokenSize/2-1) {
 		return rawText, nil
 	}
 
