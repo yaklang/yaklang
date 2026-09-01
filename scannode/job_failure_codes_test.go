@@ -19,6 +19,14 @@ func TestResolveJobFailureCodeKnownCodes(t *testing.T) {
 		{JobFailureCodeScriptExecutionPanic, JobFailureRetryPolicyTransient},
 		{JobFailureCodeStartedEventPublishFailed, JobFailureRetryPolicyTransient},
 		{JobFailureCodeAttemptMissingFromHeartbeat, JobFailureRetryPolicyReschedule},
+		// Script-reported codes from Legion-owned yak scripts must resolve as
+		// known so prepareJobFailureForPublish forwards them verbatim.
+		{JobFailureCodeGitCloneError, JobFailureRetryPolicyTransient},
+		{JobFailureCodeNotFoundFileCanCompile, JobFailureRetryPolicyNone},
+		{JobFailureCodeSourceConfigInvalid, JobFailureRetryPolicyNone},
+		{JobFailureCodeSourceWorkspaceFailed, JobFailureRetryPolicyNone},
+		{JobFailureCodeSourceExtractFailed, JobFailureRetryPolicyNone},
+		{JobFailureCodeScanFailed, JobFailureRetryPolicyNone},
 	}
 
 	for _, tc := range tests {
@@ -84,6 +92,27 @@ func TestPrepareJobFailureForPublishKnownCode(t *testing.T) {
 	}
 	if detail["script_release_id"] != "release-a" {
 		t.Fatalf("lost dispatch detail: %#v", detail)
+	}
+}
+
+func TestPrepareJobFailureForPublishScriptCodePassesThrough(t *testing.T) {
+	t.Parallel()
+
+	// A Legion yak script supplies ReturnData.error_code; the dispatch bridge
+	// forwards it and publish normalization must keep it intact instead of
+	// bucketing it into node_reported_failure_unknown.
+	code, detail := prepareJobFailureForPublish(JobFailureCodeGitCloneError, nil)
+	if code != JobFailureCodeGitCloneError {
+		t.Fatalf("code = %q", code)
+	}
+	if detail[jobFailureDetailCodeKnown] != "true" {
+		t.Fatalf("detail = %#v", detail)
+	}
+	if detail[jobFailureDetailRetryPolicy] != string(JobFailureRetryPolicyTransient) {
+		t.Fatalf("retry policy = %q", detail[jobFailureDetailRetryPolicy])
+	}
+	if _, exists := detail[jobFailureDetailRawCode]; exists {
+		t.Fatalf("raw code must not appear for known codes: %#v", detail)
 	}
 }
 
