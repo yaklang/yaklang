@@ -317,7 +317,7 @@ func (s *ScanNode) buildDebugUploadConfigProvider(
 // uploadDebugArtifactFile uploads a file with a specific object key.
 func uploadDebugArtifactFile(ctx context.Context, path string, size int64, objKey string, provider ssaUploadConfigProvider) error {
 	tmp := &SSAArtifactCollector{}
-	return tmp.UploadBySTSWithProvider(ctx, path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
+	return tmp.UploadBySTSWithProviderContext(ctx, path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
 		cfg, err := provider(force)
 		if err != nil {
 			return nil, err
