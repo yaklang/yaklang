@@ -20,13 +20,13 @@ const reportedRisksTokenBudget = 4000
 // It carries only the fields needed for AI dedup: target, type, parameter,
 // title, severity. The full risk record remains in the risk database.
 type ReportedRiskItem struct {
-	ID        string `json:"id"`         // stable hash for dedup / eviction
-	Severity  string `json:"severity"`   // high / middle / low / info / debug
-	RiskType  string `json:"risk_type"`  // sqli / xss / rce / ...
-	Target    string `json:"target"`     // normalized URL or host:port
-	Parameter string `json:"parameter"`  // triggering param, or ""
-	Title     string `json:"title"`      // one-line title (titleVerbose preferred)
-	CreatedUnix int64 `json:"created_unix"`
+	ID          string `json:"id"`        // stable hash for dedup / eviction
+	Severity    string `json:"severity"`  // high / middle / low / info / debug
+	RiskType    string `json:"risk_type"` // sqli / xss / rce / ...
+	Target      string `json:"target"`    // normalized URL or host:port
+	Parameter   string `json:"parameter"` // triggering param, or ""
+	Title       string `json:"title"`     // one-line title (titleVerbose preferred)
+	CreatedUnix int64  `json:"created_unix"`
 }
 
 // ReportedRiskStore is the session-level accumulator for reported risk

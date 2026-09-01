@@ -146,6 +146,8 @@ func TestCreateOrUpdateRisk_UpdatePathRefreshesRecord(t *testing.T) {
 		RuntimeId: "runtime-A", RiskType: "info", Severity: "low", Title: "t1", Description: "d1",
 	}
 	require.NoError(t, CreateOrUpdateRisk(db, r1.Hash, r1))
+	require.NotZero(t, r1.ID, "create path must return the persisted model ID")
+	require.False(t, r1.CreatedAt.IsZero(), "create path must return persistence timestamps")
 
 	risk, err := GetRiskByHash(db, "probe-upsert-hash")
 	require.NoError(t, err)
@@ -160,6 +162,8 @@ func TestCreateOrUpdateRisk_UpdatePathRefreshesRecord(t *testing.T) {
 		RuntimeId: "runtime-B", RiskType: "info", Severity: "high", Title: "t2", Description: "d2",
 	}
 	require.NoError(t, CreateOrUpdateRisk(db, r2.Hash, r2))
+	require.Equal(t, r1.ID, r2.ID, "update path must return the deduplicated row ID")
+	require.False(t, r2.UpdatedAt.IsZero(), "update path must return persistence timestamps")
 
 	risk, err = GetRiskByHash(db, "probe-upsert-hash")
 	require.NoError(t, err)
