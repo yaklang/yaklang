@@ -406,7 +406,22 @@ func (d *ServerCoreData) ScType() Message {
 	return SC_CORE
 }
 func (d *ServerCoreData) Unpack(r io.Reader) error {
-	return struc.Unpack(r, d)
+	// [MS-RDPBCGR] 2.2.1.4.1：EarlyCapabilityFlags 为可选字段，
+	// xrdp 等实现只发送 8 字节（版本 + ClientRequestedProtocol）。
+	// struc 固定解 3 字段遇到 8 字节块会 EOF，进而中断整个 GCC
+	// 响应解析（丢失 SC_SECURITY 等），改为容错逐字段读取。
+	var err error
+	var v uint32
+	if v, err = core.ReadUInt32LE(r); err != nil {
+		return err
+	}
+	d.RdpVersion = VERSION(v)
+	if d.ClientRequestedProtocol, err = core.ReadUInt32LE(r); err != nil {
+		return err
+	}
+	// 可选字段：读不满不算错误
+	d.EarlyCapabilityFlags, _ = core.ReadUInt32LE(r)
+	return nil
 }
 
 type ServerNetworkData struct {
@@ -557,8 +572,10 @@ func ReadConferenceCreateResponse(data []byte) []interface{} {
 			r := bytes.NewReader(dataBytes)
 			err := d.Unpack(r)
 			if err != nil {
+				// 单个 block 解析失败只跳过该 block，不能中断整个
+				// GCC 响应（否则 SC_SECURITY 等后续 block 全部丢失）。
 				glog.Error("Unpack:", err)
-				return ret
+				continue
 			}
 			ret = append(ret, d)
 		}

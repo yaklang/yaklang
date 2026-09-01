@@ -322,6 +322,14 @@ func (c *Client) recvPDU(s []byte) {
 		if p.ShareCtrlHeader.PDUType == PDUTYPE_DEACTIVATEALLPDU {
 			c.transport.On("data", c.recvDemandActivePDU)
 		}
+		// 认证结果判定：Save Session Info 携带 logon 成功/失败。
+		// INFO_LOGON/INFO_LOGON_LONG = 登录成功；EXTENDED_INFO + logonErrors
+		// 为凭证错误。供上层（爆破）等待真实认证结果而非仅连接就绪。
+		if dpdu, ok := p.Message.(*DataPDU); ok && dpdu.Header.PDUType2 == PDUTYPE2_SAVE_SESSION_INFO {
+			if si, ok2 := dpdu.Data.(*SaveSessionInfo); ok2 {
+				c.Emit("logon", si)
+			}
+		}
 	}
 }
 
