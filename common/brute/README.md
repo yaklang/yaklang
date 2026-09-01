@@ -108,6 +108,35 @@ O5LOGON/PBKDF2 verifier 涉及多版本密码学交互，任务明确要求
 4. **既有数据竞态**：`DelayWaiter.nextDelay` 并发读写、lowhttp `dnsEnd`
    异步回调竞态（均已修复，`go test -race` 全绿）。
 
+## 版本兼容矩阵（真实服务器，YAK_BRUTE_REAL=1 + 可达性自动跳过）
+
+| 协议 | 已验证版本 |
+|---|---|
+| MySQL | 8.0 / 8.4 / 5.7 / MariaDB 11 / MariaDB 10.11 |
+| PostgreSQL | 12 / 13 / 14 / 15 / 16(TLS+SCRAM) / 17 |
+| MongoDB | 4.4 / 5.0 / 6.0 / 7.0 |
+| SQL Server | 2019 / 2022（Rosetta amd64 模拟） |
+
+每版本 7 个正反案例（正确/错误密码、未知用户、空密码、Unicode、
+256 字符长密码、传输方式记录）+ MySQL 边界 8 例
+（过期密码→AuthSuccess、账户锁定 3118→AuthFailed、Unicode 凭证正反、
+200 字符密码正反）。
+
+## 稳定性
+
+- 探针模拟器套件 `-count=5`（5 轮重复）全绿；`-race -count=3` 全绿。
+- `TestGRPCMUSTPASS_Brute`（grpc→yak 脚本→调度器全链路）连过 5+ 次。
+- 已知无关项：yakvm 日志引擎存在既有数据竞态（main 分支同样复现 6 处），
+  非本 PR 引入；CI 对该包不启用 -race。
+
+## 兼容层修复的调度缺陷（本地全链路测试发现）
+
+1. delayer 限速换算把 time.Duration（纳秒）当秒 → 令牌间隔 158 年，
+   第二个目标等到 ctx 超时（多目标场景全部饿死）。
+2. 调度器 allStopped 在"后续目标状态机未创建"时误判全部完成 →
+   OkToStop 命中即取消整个运行。
+3. 旧 defaultDialer TLS-first 污染明文服务（见上文"旧实现的缺陷"）。
+
 ## 差分验证（删除旧驱动的前置条件）
 
 `legacydrivers/differential_test.go`（`YAK_BRUTE_REAL=1` 启用）在真实
