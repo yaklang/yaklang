@@ -42,11 +42,11 @@ func PlainAuth(identity, username, password, host string) smtp.Auth {
 	var userprep, pwdprep string
 	var err error
 	if userprep, err = stringprep.SASLprep.Prepare(username); err != nil {
-		log.Errorf("Error SASLprepping username '%s': %v", username, err)
+		log.Errorf("Error SASLprepping username: %v", err)
 		return &plainAuth{identity, username, password, host}
 	}
 	if pwdprep, err = stringprep.SASLprep.Prepare(password); err != nil {
-		log.Errorf("Error SASLprepping password '%s': %v", password, err)
+		log.Errorf("Error SASLprepping password: %v", err)
 		return &plainAuth{identity, username, password, host}
 	}
 	if username == identity {
@@ -184,11 +184,11 @@ func NewCramClient(mech, username, secret string) sasl.Client {
 	var userprep, secretprep string
 	var err error
 	if userprep, err = stringprep.SASLprep.Prepare(username); err != nil {
-		log.Errorf("Error SASLprepping username '%s': %v", username, err)
+		log.Errorf("Error SASLprepping username: %v", err)
 		return nil
 	}
 	if secretprep, err = stringprep.SASLprep.Prepare(secret); err != nil {
-		log.Errorf("Error SASLprepping password '%s': %v", secret, err)
+		log.Errorf("Error SASLprepping password: %v", err)
 		return nil
 	}
 	return &cramSASLClient{userprep, secretprep, mech, hashFunc}
@@ -267,11 +267,11 @@ func NewDigestMD5Mechanism(service string, username string, password string) *Di
 	var userprep, passprep string
 	var err error
 	if userprep, err = stringprep.SASLprep.Prepare(username); err != nil {
-		log.Errorf("Error SASLprepping username '%s': %v", username, err)
+		log.Errorf("Error SASLprepping username: %v", err)
 		return nil
 	}
 	if passprep, err = stringprep.SASLprep.Prepare(password); err != nil {
-		log.Errorf("Error SASLprepping password '%s': %v", password, err)
+		log.Errorf("Error SASLprepping password: %v", err)
 		return nil
 	}
 	return &DigestMD5Mechanism{

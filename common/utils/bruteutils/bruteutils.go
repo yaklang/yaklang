@@ -40,8 +40,9 @@ func (b *BruteItem) Result() *BruteItemResult {
 	}
 }
 
+// String 返回脱敏表示：密码只保留不可逆摘要，绝不输出明文。
 func (b *BruteItem) String() string {
-	return fmt.Sprintf("%s:%s@%v", b.Username, b.Password, b.Target)
+	return fmt.Sprintf("%s:%s@%v", b.Username, RedactPassword(b.Password), b.Target)
 }
 
 type targetProcessing struct {
@@ -63,6 +64,9 @@ func (t *targetProcessing) Finish() {
 type BruteUtil struct {
 	processes            sync.Map
 	TargetTaskConcurrent int
+	// targetsConcurrent 记录 WithTargetsConcurrent / NewMultiTargetBruteUtil
+	// 设置的目标级并发上限（供流式调度器映射全局并发）。
+	targetsConcurrent int
 
 	targetsSwg *utils.SizedWaitGroup
 
@@ -124,14 +128,13 @@ type BruteItemResult struct {
 	ExtraInfo []byte
 }
 
+// String 返回脱敏表示：密码只保留不可逆摘要，绝不输出明文。
 func (r *BruteItemResult) String() string {
 	result := "FAIL"
 	if r.Ok {
 		result = "OK"
-	} else {
-		result = "FAIL"
 	}
-	return fmt.Sprintf("[%v]: %v://%v:%v@%v", result, r.Type, r.Username, r.Password, r.Target)
+	return fmt.Sprintf("[%v]: %v://%v:%s@%v", result, r.Type, r.Username, RedactPassword(r.Password), r.Target)
 }
 
 func (r *BruteItemResult) Show() {
@@ -152,6 +155,7 @@ func NewMultiTargetBruteUtil(targetsConcurrent, minDelay, maxDelay int, callback
 	delayer.Wait()
 	return &BruteUtil{
 		TargetTaskConcurrent: 1,
+		targetsConcurrent:    targetsConcurrent,
 		targetList:           list.New(),
 		targetsSwg:           utils.NewSizedWaitGroup(targetsConcurrent),
 		callback:             callback,
@@ -211,7 +215,7 @@ func (b *BruteUtil) run(ctx context.Context) error {
 	for {
 		target, err := b.popFirstTarget()
 		if err != nil {
-			log.Error("finished poping target from target list")
+			log.Info("finished popping target from target list")
 			break
 		}
 
@@ -414,6 +418,7 @@ type OptionsAction func(util *BruteUtil)
 func WithTargetsConcurrent(targetsConcurrent int) OptionsAction {
 	return func(util *BruteUtil) {
 		util.targetsSwg = utils.NewSizedWaitGroup(targetsConcurrent)
+		util.targetsConcurrent = targetsConcurrent
 	}
 }
 
@@ -485,6 +490,7 @@ func NewMultiTargetBruteUtilEx(options ...OptionsAction) (*BruteUtil, error) {
 
 	bu := &BruteUtil{
 		TargetTaskConcurrent: 1,
+		targetsConcurrent:    200,
 		targetsSwg:           utils.NewSizedWaitGroup(200),
 		OkToStop:             false,
 		FinishingThreshold:   0,
@@ -579,26 +585,6 @@ func FileToDictList(fileName string) []string {
 		lines = append(lines, line)
 	}
 	return lines
-}
-
-func (b *BruteUtil) StreamBruteContext(
-	ctx context.Context, typeStr string, target, users, pass []string,
-	resultCallback BruteItemResultCallback,
-) error {
-	ch, err := BruteItemStreamWithContext(ctx, typeStr, target, users, pass)
-	if err != nil {
-		return err
-	}
-	b.SetResultCallback(resultCallback)
-	log.Infof("brute task with target[%v] user[%v] password[%v]", len(target), len(users), len(pass))
-	for item := range ch {
-		b.Feed(item)
-	}
-	err = b.RunWithContext(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func autoSetFinishedByConnectionError(err error, result *BruteItemResult) *BruteItemResult {
