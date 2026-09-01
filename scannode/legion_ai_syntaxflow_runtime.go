@@ -25,14 +25,15 @@ import (
 )
 
 const (
-	serverFocusCapabilityRuleCheck     = "syntaxflow.rule.check"
-	serverFocusCapabilityRuleDebug     = "syntaxflow.rule.debug"
-	serverFocusCapabilityRuleCandidate = "result.rule_candidate.v1"
-	legionSyntaxFlowRuleCandidateKind  = "ai_syntaxflow_rule_v1"
-	legionSyntaxFlowCheckSchema        = "legion.syntaxflow-check/v1"
-	legionSyntaxFlowDebugSchema        = "legion.syntaxflow-debug/v1"
-	legionSyntaxFlowCandidateSchema    = "legion.syntaxflow-rule-candidate/v1"
-	legionSyntaxFlowMaxRuleBytes       = 32 * 1024
+	serverFocusCapabilityOriginalSampleRead = "syntaxflow.original_sample.read"
+	serverFocusCapabilityRuleCheck          = "syntaxflow.rule.check"
+	serverFocusCapabilityRuleDebug          = "syntaxflow.rule.debug"
+	serverFocusCapabilityRuleCandidate      = "result.rule_candidate.v1"
+	legionSyntaxFlowRuleCandidateKind       = "ai_syntaxflow_rule_v1"
+	legionSyntaxFlowCheckSchema             = "legion.syntaxflow-check/v1"
+	legionSyntaxFlowDebugSchema             = "legion.syntaxflow-debug/v1"
+	legionSyntaxFlowCandidateSchema         = "legion.syntaxflow-rule-candidate/v1"
+	legionSyntaxFlowMaxRuleBytes            = 32 * 1024
 	// Matches the immutable Focus ceiling: 12 syntax checks, 16 candidate
 	// debug runs, and 2 trusted original-rule reproduction runs.
 	legionSyntaxFlowMaxCalls           = 30
@@ -95,6 +96,51 @@ func normalizeLegionSyntaxFlowLanguage(raw string) (ssaconfig.Language, error) {
 func legionRuleHash(rule string) string {
 	digest := sha256.Sum256([]byte(rule))
 	return hex.EncodeToString(digest[:])
+}
+
+// readSyntaxFlowOriginalSample exposes only the exact private inline sample
+// pinned by the server for an improve task. It deliberately ignores the
+// materialized project tree, where a Git/archive workspace may contain a file
+// with the same relative path but different bytes.
+func (r *legionServerFocusRuntime) readSyntaxFlowOriginalSample(params map[string]any) (map[string]any, error) {
+	if len(params) != 0 {
+		return nil, fmt.Errorf("SyntaxFlow original sample read does not accept model parameters")
+	}
+	if r == nil || r.workspace == nil {
+		return nil, fmt.Errorf("source workspace is unavailable")
+	}
+	spec := r.workspace.spec
+	if !spec.SyntaxFlowRequireOriginalReproduction || spec.SyntaxFlowMode != "improve" {
+		return nil, fmt.Errorf("SyntaxFlow original sample is unavailable for this task")
+	}
+	path := spec.SyntaxFlowOriginalSamplePath
+	cleaned, err := cleanLegionRuleSourcePath(path)
+	if err != nil || cleaned != path || spec.SyntaxFlowOriginalSampleSHA256 == "" {
+		return nil, fmt.Errorf("SyntaxFlow original sample pin is invalid")
+	}
+	content, exists := r.workspace.inlineFiles[path]
+	if !exists {
+		return nil, fmt.Errorf("SyntaxFlow original sample bytes are unavailable")
+	}
+	files := map[string]string{path: content}
+	if err := validateLegionInlineFiles(files, false); err != nil {
+		return nil, fmt.Errorf("SyntaxFlow original sample bytes are invalid: %w", err)
+	}
+	digest := legionInlineSourceDigest(files)
+	if digest != spec.SyntaxFlowOriginalSampleSHA256 {
+		return nil, fmt.Errorf("SyntaxFlow original sample no longer matches its server pin")
+	}
+	return map[string]any{
+		"path":          path,
+		"offset":        0,
+		"content":       content,
+		"read_bytes":    len(content),
+		"file_size":     len(content),
+		"truncated":     false,
+		"source_kind":   "inline_sample",
+		"sample_origin": "user_supplied",
+		"source_sha256": digest,
+	}, nil
 }
 
 func legionRuleString(params map[string]any, key string, limit int, required bool) (string, error) {

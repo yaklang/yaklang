@@ -207,6 +207,8 @@ func (r *legionServerFocusRuntime) Execute(
 			return nil, fmt.Errorf("source workspace is unavailable")
 		}
 		return r.workspace.search(params)
+	case serverFocusCapabilityOriginalSampleRead:
+		return r.readSyntaxFlowOriginalSample(params)
 	case serverFocusCapabilitySubmitFindingV1:
 		return r.submitFindingV1(capability, params)
 	case serverFocusCapabilitySubmitReportV1:

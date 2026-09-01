@@ -26,7 +26,7 @@ func testLegionRuleContract(t *testing.T) *legionFocusExecutionContract {
 		SchemaVersion: legionFocusExecutionContractSchemaV1,
 		Stages:        []legionFocusExecutionStage{{Key: "generate"}, {Key: "debug"}, {Key: "report"}},
 		Capabilities: []string{
-			serverFocusCapabilityRuleCheck, serverFocusCapabilityRuleDebug, serverFocusCapabilityRuleCandidate,
+			serverFocusCapabilityOriginalSampleRead, serverFocusCapabilityRuleCheck, serverFocusCapabilityRuleDebug, serverFocusCapabilityRuleCandidate,
 			serverFocusCapabilitySourceWorkspaceInfo, serverFocusCapabilitySourceList, serverFocusCapabilitySourceRead,
 			serverFocusCapabilitySourceSearch, serverFocusCapabilityTaskStage,
 		},
@@ -88,6 +88,70 @@ func testLegionRuleCandidateParams() map[string]any {
 	return map[string]any{
 		"title": "SyntaxFlow 规则候选", "rule_name": "bounded-print.sf", "language": "yak",
 		"rule": testLegionRule, "explanation": "检查 println 的参数。",
+	}
+}
+
+func TestLegionSyntaxFlowOriginalSampleReadUsesPrivateBoundBytes(t *testing.T) {
+	root := t.TempDir()
+	path := "negative/Sample.java"
+	if err := os.MkdirAll(filepath.Join(root, "negative"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	projectContent := `class ProjectCollision {}`
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(path)), []byte(projectContent), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	trustedContent := `class Negative { void run() throws Exception { Runtime.getRuntime().exec("echo safe"); } }`
+	spec := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindGit)
+	spec.InlineFiles = map[string]string{path: trustedContent}
+	spec.SyntaxFlowMode = "improve"
+	spec.SyntaxFlowLanguage = "java"
+	spec.SyntaxFlowOriginalRule = "exec(,* as $cmd,)\nalert $cmd"
+	spec.SyntaxFlowOriginalRuleSHA256 = legionRuleHash(spec.SyntaxFlowOriginalRule)
+	spec.SyntaxFlowOriginalSamplePath = path
+	spec.SyntaxFlowOriginalSampleSHA256 = legionInlineSourceDigest(spec.InlineFiles)
+	spec.SyntaxFlowRequireOriginalReproduction = true
+	if err := normalizeLegionCodeWorkspaceSpec(&spec); err != nil {
+		t.Fatal(err)
+	}
+	workspace := &legionCodeWorkspaceRuntime{
+		spec:           publicLegionCodeWorkspaceSpec(spec),
+		root:           root,
+		lockedRevision: strings.Repeat("a", 40),
+		sha256:         strings.Repeat("b", 64),
+		inlineFiles:    cloneLegionInlineFiles(spec.InlineFiles),
+		originalRule:   spec.SyntaxFlowOriginalRule,
+	}
+	target, err := legionCodeWorkspaceSentinel(spec.WorkspaceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := newLegionServerFocusRuntime(context.Background(), target, &recordingServerFocusSink{}, workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := value.(*legionServerFocusRuntime)
+	runtime.authorizedFocusReleaseID = "syntaxflow_rule@1.0.0+abcdef123456"
+	if err := runtime.activateFocusTurn(runtime.authorizedFocusReleaseID, testLegionRuleContract(t)); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runtime.deactivateFocusTurn(runtime.authorizedFocusReleaseID) })
+
+	read, err := runtime.Execute(serverFocusCapabilityOriginalSampleRead, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read["path"] != path || read["content"] != trustedContent || read["content"] == projectContent ||
+		read["offset"] != 0 || read["read_bytes"] != len(trustedContent) || read["file_size"] != len(trustedContent) || read["truncated"] != false ||
+		read["source_kind"] != "inline_sample" || read["sample_origin"] != "user_supplied" || read["source_sha256"] != spec.SyntaxFlowOriginalSampleSHA256 {
+		t.Fatalf("private original sample read lost its exact pin: %#v", read)
+	}
+	if _, err := runtime.Execute(serverFocusCapabilityOriginalSampleRead, map[string]any{"path": path}); err == nil {
+		t.Fatal("model-controlled original sample path was accepted")
+	}
+	workspace.inlineFiles[path] = `class Tampered {}`
+	if _, err := runtime.Execute(serverFocusCapabilityOriginalSampleRead, map[string]any{}); err == nil || !strings.Contains(err.Error(), "server pin") {
+		t.Fatalf("mutated private original sample failed open: %v", err)
 	}
 }
 
