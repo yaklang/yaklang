@@ -97,12 +97,7 @@ func (s *ExtensionBridgeFileIdentityStore) Save(state *extensionBridgeIdentitySt
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return fmt.Errorf("create browser extension identity directory: %w", err)
 	}
-	temporary := s.path + ".tmp"
-	if err := os.WriteFile(temporary, data, 0o600); err != nil {
-		return fmt.Errorf("write browser extension identity: %w", err)
-	}
-	if err := os.Rename(temporary, s.path); err != nil {
-		_ = os.Remove(temporary)
+	if err := writeExtensionBridgeIdentityFileAtomically(s.path, data); err != nil {
 		return fmt.Errorf("replace browser extension identity: %w", err)
 	}
 	return nil

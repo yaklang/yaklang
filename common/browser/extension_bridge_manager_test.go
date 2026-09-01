@@ -9,7 +9,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -264,6 +266,27 @@ func TestManagedExtensionBridgeIdentityPersists(t *testing.T) {
 	secondID, secondKey := second.EngineIdentity()
 	require.Equal(t, firstID, secondID)
 	require.Equal(t, firstKey, secondKey)
+}
+
+func TestExtensionBridgeFileIdentityStoreReplacesExistingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "identity.json")
+	store := NewExtensionBridgeFileIdentityStore(path)
+	first := &extensionBridgeIdentityState{Version: 1, EngineIdentityID: "first"}
+	second := &extensionBridgeIdentityState{Version: 1, EngineIdentityID: "second"}
+
+	require.NoError(t, store.Save(first))
+	require.NoError(t, store.Save(second))
+	loaded, err := store.Load()
+	require.NoError(t, err)
+	require.Equal(t, second, loaded)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	if runtime.GOOS != "windows" {
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+	matches, err := filepath.Glob(filepath.Join(filepath.Dir(path), ".identity.json.tmp-*"))
+	require.NoError(t, err)
+	require.Empty(t, matches)
 }
 
 func TestPairingVerificationCodeSharedVector(t *testing.T) {
