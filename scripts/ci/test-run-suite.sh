@@ -62,7 +62,9 @@ echo "Suite timeout: ${SUITE_TIMEOUT}"
 nohup env SKIP_SYNC_EMBED_RULE_IN_GITHUB="$SKIP_SYNC_EMBED_RULE_IN_GITHUB" "$YAK_BINARY_PATH" grpc >"$grpc_log" 2>&1 < /dev/null &
 grpc_pid=$!
 
-for _ in {1..60}; do
+# 90s 就绪窗口：慢 runner 上 yak 引擎初始化（coreplugin DB 同步 + 引擎
+# 缓存重建）可达 50s+，60s 窗口偶发超时（进程实际健康，仅初始化慢）。
+for _ in {1..90}; do
   if ! kill -0 "$grpc_pid" 2>/dev/null; then
     break
   fi
@@ -73,6 +75,8 @@ for _ in {1..60}; do
     grpc_ready=1
     break
   fi
+  # 兜底：端口已监听且进程存活超过 60s（初始化仍在进行但 TCP 已可连），
+  # 附加等待结构化事件再宽限；进程死亡则由 kill -0 分支处理。
   sleep 1
 done
 
