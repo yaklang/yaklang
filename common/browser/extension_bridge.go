@@ -94,8 +94,12 @@ type extensionBridgeChunkAssembly struct {
 }
 
 type extensionBridgeClientRequest struct {
+	cancel context.CancelFunc
+}
+
+type extensionBridgeClientRequestKey struct {
 	connection *websocket.Conn
-	cancel     context.CancelFunc
+	id         string
 }
 
 type extensionBridgePendingCall struct {
@@ -159,7 +163,7 @@ type ExtensionBridgeServer struct {
 	events    chan ExtensionBridgeEnvelope
 
 	clientRequestMu sync.Mutex
-	clientRequests  map[string]extensionBridgeClientRequest
+	clientRequests  map[extensionBridgeClientRequestKey]*extensionBridgeClientRequest
 }
 
 // newLegacyExtensionBridgeServer exists only for the protocol-v2 test suite.
@@ -207,7 +211,7 @@ func newExtensionBridgeServer(port int, token string, manager *ExtensionBridgeMa
 		manager:            manager,
 		pending:            make(map[string]extensionBridgePendingCall),
 		events:             make(chan ExtensionBridgeEnvelope, extensionBridgeEventBuffer),
-		clientRequests:     make(map[string]extensionBridgeClientRequest),
+		clientRequests:     make(map[extensionBridgeClientRequestKey]*extensionBridgeClientRequest),
 		managedClients:     make(map[string]*extensionBridgeConnectedClient),
 		managedSessions:    make(map[string]string),
 		capabilityCatalogs: make(map[string]*ExtensionBridgeCapabilityCatalog),
@@ -825,23 +829,22 @@ func (s *ExtensionBridgeServer) startClientRequest(connection *websocket.Conn, d
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	key := extensionBridgeClientRequestKey{connection: connection, id: message.ID}
+	request := &extensionBridgeClientRequest{cancel: cancel}
 	s.clientRequestMu.Lock()
-	if active, exists := s.clientRequests[message.ID]; exists {
-		if active.connection == connection {
-			s.clientRequestMu.Unlock()
-			cancel()
-			_ = s.writeConnectionJSON(connection, ExtensionBridgeEnvelope{ID: message.ID, Type: "response", Error: &ExtensionBridgeError{Code: "duplicate_request_id", Message: "extension request id is already active"}})
-			return
-		}
-		active.cancel()
+	if _, exists := s.clientRequests[key]; exists {
+		s.clientRequestMu.Unlock()
+		cancel()
+		_ = s.writeConnectionJSON(connection, ExtensionBridgeEnvelope{ID: message.ID, Type: "response", Error: &ExtensionBridgeError{Code: "duplicate_request_id", Message: "extension request id is already active"}})
+		return
 	}
-	s.clientRequests[message.ID] = extensionBridgeClientRequest{connection: connection, cancel: cancel}
+	s.clientRequests[key] = request
 	s.clientRequestMu.Unlock()
 	go func() {
 		defer func() {
 			s.clientRequestMu.Lock()
-			if active, exists := s.clientRequests[message.ID]; exists && active.connection == connection {
-				delete(s.clientRequests, message.ID)
+			if active, exists := s.clientRequests[key]; exists && active == request {
+				delete(s.clientRequests, key)
 			}
 			s.clientRequestMu.Unlock()
 			cancel()
@@ -867,10 +870,11 @@ func (s *ExtensionBridgeServer) startClientRequest(connection *websocket.Conn, d
 }
 
 func (s *ExtensionBridgeServer) cancelClientRequest(connection *websocket.Conn, id string) {
+	key := extensionBridgeClientRequestKey{connection: connection, id: id}
 	s.clientRequestMu.Lock()
-	request, exists := s.clientRequests[id]
+	request, exists := s.clientRequests[key]
 	s.clientRequestMu.Unlock()
-	if exists && request.connection == connection {
+	if exists {
 		request.cancel()
 	}
 }
@@ -878,11 +882,11 @@ func (s *ExtensionBridgeServer) cancelClientRequest(connection *websocket.Conn, 
 func (s *ExtensionBridgeServer) cancelClientRequestsFor(connection *websocket.Conn) {
 	s.clientRequestMu.Lock()
 	requests := make([]context.CancelFunc, 0)
-	for id, request := range s.clientRequests {
-		if request.connection != connection {
+	for key, request := range s.clientRequests {
+		if key.connection != connection {
 			continue
 		}
-		delete(s.clientRequests, id)
+		delete(s.clientRequests, key)
 		requests = append(requests, request.cancel)
 	}
 	s.clientRequestMu.Unlock()
@@ -894,7 +898,7 @@ func (s *ExtensionBridgeServer) cancelClientRequestsFor(connection *websocket.Co
 func (s *ExtensionBridgeServer) cancelClientRequests() {
 	s.clientRequestMu.Lock()
 	requests := s.clientRequests
-	s.clientRequests = make(map[string]extensionBridgeClientRequest)
+	s.clientRequests = make(map[extensionBridgeClientRequestKey]*extensionBridgeClientRequest)
 	s.clientRequestMu.Unlock()
 	for _, request := range requests {
 		request.cancel()

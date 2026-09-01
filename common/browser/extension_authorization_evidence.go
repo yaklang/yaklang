@@ -1122,9 +1122,9 @@ func (m *ExtensionBridgeManager) ValidateExtensionAuthorizationEvidence(
 			changed = true
 		}
 		workspace.Execution = execution
-		m.authorizationMu.Lock()
-		m.authorization[workspace.ID] = workspace
-		m.authorizationMu.Unlock()
+		if err := m.updateExtensionAuthorizationWorkspace(workspace); err != nil {
+			return ExtensionAuthorizationEvidenceValidation{}, err
+		}
 	}
 	reason := "所选路径没有同时满足“双方正常值不同且交叉值精确等于目标身份”的条件"
 	if len(evidence) > 0 {
