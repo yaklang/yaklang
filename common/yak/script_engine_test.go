@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"testing"
 	"time"
@@ -74,4 +75,17 @@ func TestScriptEngine_YakScript_callback(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	require.True(t, nativeOk)
+}
+
+func TestExecuteWithoutCacheWithContextRecoversEngineHookPanic(t *testing.T) {
+	engine := NewScriptEngine(1)
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		panic("hot reload hook panic")
+	})
+
+	var err error
+	require.NotPanics(t, func() {
+		_, err = engine.ExecuteWithoutCacheWithContext(context.Background(), "value = 1", map[string]any{})
+	})
+	require.ErrorContains(t, err, "hot reload hook panic")
 }

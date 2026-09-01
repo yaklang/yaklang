@@ -53,7 +53,7 @@ type (
 		debugMode     bool // 外部debugger
 		debugger      *Debugger
 		BreakPoint    []BreakPointFactoryFun
-		ThreadIDCount uint64
+		ThreadIDCount uint64 // atomically allocated VM execution thread IDs
 		config        *VirtualMachineConfig
 		// map[sha1(caller, callee)]func(any)any
 		hijackMapMemberCallHandlers sync.Map
@@ -151,14 +151,20 @@ func NewWithSymbolTable(table *SymbolTable) *VirtualMachine {
 		config:           NewVMConfig(),
 		// asyncWaitGroup
 		asyncWaitGroup: new(sync.WaitGroup),
-		// debug
-		ThreadIDCount: 1, // 初始是1
+		// Thread IDs start at one. ThreadIDCount stores the last allocated ID,
+		// so its zero value lets nextThreadID preserve that public convention.
+		ThreadIDCount: 0,
 	}
 	// Establish the immutable-library parent before the VM can be shared. This
 	// keeps even a bare VM from lazily mutating the parent link on its first
 	// concurrent GetVar call; ImportLibs refreshes it when libraries are added.
 	v.runtimeGlobalVar.SetPred(v.globalVar)
+	v.runtimeGlobalVar.Store("runtime", newRuntimeLib(v))
 	return v
+}
+
+func (v *VirtualMachine) nextThreadID() int {
+	return int(atomic.AddUint64(&v.ThreadIDCount, 1))
 }
 
 func New() *VirtualMachine {
@@ -264,12 +270,38 @@ func (v *VirtualMachine) execYakFunctionWithParentFrame(ctx context.Context, par
 	if len(flags) > 0 {
 		finalFlags = flags
 	}
-	err := v.exec(ctx, parentFrame, func(frame *Frame) {
-		if v.sandboxMode && f.defineFrame != nil {
-			ownerGoroutineID := frame.ownerGoroutineID
-			frame = NewSubFrame(f.defineFrame)
-			frame.ownerGoroutineID = ownerGoroutineID
+	var frameFactory func(*Frame) *Frame
+	if v.sandboxMode && f.defineFrame != nil {
+		// Sandbox functions execute against the frame in which they were
+		// defined. Select that frame before registering the execution with the
+		// VM so CurrentFM, runtime.GetInfo and engine-backed logging all observe
+		// the frame that is actually running, rather than the temporary Sub
+		// frame created by exec.
+		frameFactory = func(defaultFrame *Frame) *Frame {
+			frame := NewSubFrame(f.defineFrame)
+			// The definition frame supplies lexical scope, globals and VM
+			// capabilities, but its coroutine belongs to the execution that
+			// originally created the closure. Reusing it makes concurrent
+			// sandboxes race on lastPanic and can leak a panic across callers.
+			// Keep panic propagation within the current caller's chain instead.
+			frame.coroutine = defaultFrame.coroutine
+			frame.ownerGoroutineID = defaultFrame.ownerGoroutineID
+			if frame.vm == defaultFrame.vm {
+				// A same-VM sandbox call is still a synchronous nested call and
+				// therefore belongs to the caller's debugger thread.
+				frame.ThreadID = defaultFrame.ThreadID
+				frame.ownsThreadID = defaultFrame.ownsThreadID
+			} else {
+				// The definition VM owns this frame, its globals and its debugger.
+				// Give independent cross-VM calls distinct IDs in that VM so
+				// concurrent callers cannot share debugger stack state.
+				frame.ThreadID = frame.vm.nextThreadID()
+				frame.ownsThreadID = true
+			}
+			return frame
 		}
+	}
+	err := v.execWithFrameFactory(ctx, parentFrame, frameFactory, func(frame *Frame) {
 		name := f.GetActualName()
 		frame.SetVerbose(fmt.Sprintf("function: %s", name))
 		frame.SetFunction(f)
@@ -314,6 +346,18 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, parentFrame *
 	} else {
 		frame = NewSubFrame(parentFrame)
 	}
+	executionVM := frame.vm
+	if executionVM == nil {
+		executionVM = v
+	}
+	// Allocate the VM thread ID before the goroutine starts. Loading the shared
+	// counter inside Frame.Exec lets delayed siblings observe the same final ID
+	// and also makes synchronous subframes change IDs when another async call is
+	// spawned. A sandbox can invoke a function defined by another VM; in that
+	// case the frame keeps the definition VM's globals, operators and debugger,
+	// so its thread ID and current-frame registration must live there as well.
+	frame.ThreadID = executionVM.nextThreadID()
+	frame.ownsThreadID = true
 	frame.coroutine = NewCoroutine()
 
 	name := f.GetActualName()
@@ -327,10 +371,13 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, parentFrame *
 
 	frame.ctx = ctx
 
+	// Register only once the async frame is fully constructed. Early context or
+	// validation failures must not leave an unmatched WaitGroup increment.
+	v.AsyncStart()
 	go func() {
-		v.pushCurrentFrame(frame)
+		executionVM.pushCurrentFrame(frame)
 		defer func() {
-			v.popCurrentFrame(frame)
+			executionVM.popCurrentFrame(frame)
 			v.AsyncEnd()
 			if err := frame.recover(); err != nil {
 				log.Errorf("yakvm async function panic: %v", err)
@@ -366,6 +413,10 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 }
 
 func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(frame *Frame), flags ...ExecFlag) error {
+	return v.execWithFrameFactory(ctx, parentFrame, nil, f, flags...)
+}
+
+func (v *VirtualMachine) execWithFrameFactory(ctx context.Context, parentFrame *Frame, frameFactory func(*Frame) *Frame, f func(frame *Frame), flags ...ExecFlag) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -407,6 +458,27 @@ func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(fr
 	} else {
 		frame = NewFrame(v)
 	}
+	// Resolve the execution ID before a sandbox factory chooses the VM that
+	// will own the actual frame. Synchronous subframes inherit a non-zero ID;
+	// independent roots receive a fresh one.
+	if frame.ThreadID == 0 {
+		threadVM := frame.vm
+		if threadVM == nil {
+			threadVM = v
+		}
+		frame.ThreadID = threadVM.nextThreadID()
+		frame.ownsThreadID = true
+	}
+	if frameFactory != nil {
+		frame = frameFactory(frame)
+		if frame == nil {
+			return utils.Error("BUG: frame factory returned nil")
+		}
+	}
+	executionVM := frame.vm
+	if executionVM == nil {
+		executionVM = v
+	}
 
 	if flag&Asnyc == Asnyc {
 		frame.coroutine = NewCoroutine()
@@ -414,15 +486,20 @@ func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(fr
 
 	frame.ctx = ctx
 
-	v.pushCurrentFrame(frame)
-	shouldPop := flag&Trace != Trace
-	if shouldPop {
-		defer v.popCurrentFrame(frame)
-	}
+	executionVM.pushCurrentFrame(frame)
+	traceCompleted := false
+	defer func() {
+		// Trace deliberately retains a successfully initialized frame for later
+		// Inline execution. A panic or cancellation is not a usable trace and
+		// must not pin its scope, bytecode, or goroutine stack forever.
+		if flag&Trace != Trace || !traceCompleted {
+			executionVM.popCurrentFrame(frame)
+		}
+	}()
 
-	frame.debug = v.debug
-	if v.debugMode && v.debugger != nil && v.debugger.initFunc != nil {
-		v.debugger.InitCallBack()
+	frame.debug = executionVM.debug
+	if executionVM.debugMode && executionVM.debugger != nil && executionVM.debugger.initFunc != nil {
+		executionVM.debugger.InitCallBack()
 	}
 
 	f(frame)
@@ -441,6 +518,7 @@ func (v *VirtualMachine) exec(ctx context.Context, parentFrame *Frame, f func(fr
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	traceCompleted = true
 	return nil
 }
 
@@ -500,7 +578,11 @@ func (v *VirtualMachine) popCurrentFrame(expected *Frame) *Frame {
 	defer v.frameStacksMu.Unlock()
 
 	stack, ok := v.frameStacks[gid]
-	if !ok || stack == nil {
+	if !ok || stack == nil || stack.Len() == 0 {
+		return nil
+	}
+	if stack.Peek() != expected {
+		log.Errorf("yakvm frame stack mismatch: refusing to pop a non-current frame")
 		return nil
 	}
 	frame, _ := stack.Pop().(*Frame)

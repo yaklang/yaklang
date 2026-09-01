@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,6 +20,7 @@ const YAKC_CACHE_MAX_LENGTH = 300
 type Engine struct {
 	rootSymbol            *yakvm.SymbolTable
 	vm                    *yakvm.VirtualMachine
+	compileMu             sync.Mutex
 	strictMode            bool
 	sourceFilePathPointer *string
 	// debug
@@ -40,6 +42,23 @@ func (e *Engine) RuntimeInfo(infoType string, params ...any) (res any, err error
 	frame := e.GetVM().CurrentFM()
 	if frame == nil {
 		return nil, fmt.Errorf("not found runtime.GetInfo")
+	}
+	// These are the runtime library's built-in queries. Resolve them directly
+	// from the goroutine-local frame already found above, avoiding another
+	// runtime.Stack lookup in the logging hot path.
+	switch infoType {
+	case "line":
+		code := frame.CurrentCode()
+		if code == nil {
+			return nil, fmt.Errorf("current code is empty")
+		}
+		return code.StartLineNumber, nil
+	case "runtimeId":
+		result, ok := frame.GlobalVariables.Load("runtimeId")
+		if !ok {
+			return "", nil
+		}
+		return result, nil
 	}
 	runtimeLib, ok := frame.GlobalVariables.Load("runtime")
 	if !ok || runtimeLib == nil {
@@ -373,6 +392,13 @@ func (n *Engine) MustCompile(code string) []*yakvm.Code {
 }
 
 func (n *Engine) _compile(code string, symbolTable *yakvm.SymbolTable) (*yakast.YakCompiler, error) {
+	// Dynamic eval compiles against the live scope's symbol table. Serialize
+	// compiler mutations per engine so concurrent hook invocations cannot both
+	// redefine a name between lookup and insertion and emit bytecode for each
+	// other's symbol IDs. Execution itself remains concurrent.
+	n.compileMu.Lock()
+	defer n.compileMu.Unlock()
+
 	compiler := yakast.NewYakCompilerWithSymbolTable(symbolTable)
 	compiler.SetStrictMode(n.strictMode)
 	if n.strictMode {

@@ -45,6 +45,7 @@ type Frame struct {
 	debug          bool
 	indebuggerEval bool // 在debugger中执行代码
 	ThreadID       int  // 当前线程的ID
+	ownsThreadID   bool // this frame owns cleanup for an independently allocated ID
 	// panic
 	//panics   []*VMPanic
 	tryStack *vmstack.Stack
@@ -54,6 +55,11 @@ type Frame struct {
 	hijackMapMemberCallHandlers sync.Map
 	ctx                         context.Context
 	contextData                 map[string]interface{} // 用于引擎执行时函数栈之间的数据传递
+	runeCache                   map[*Value][]rune      // bounded frame-local cache for immutable string values
+	runeCacheBytes              int
+	pendingCallCode             *Code // the call immediately following an ellipsis expansion
+	pendingCallArgCount         int
+	executionDepth              int // recursive Exec depth for this exact frame
 
 	coroutine *Coroutine
 
@@ -86,6 +92,9 @@ func (v *Frame) GetFunction() *Function {
 }
 
 func (v *Frame) CurrentCode() *Code {
+	if v == nil || v.codePointer < 0 || v.codePointer >= len(v.codes) {
+		return nil
+	}
 	return v.codes[v.codePointer]
 }
 func (v *Frame) GetVerbose() string {
@@ -138,6 +147,7 @@ func NewSubFrame(parent *Frame) *Frame {
 		ctx:           parent.ctx,
 		contextData:   parent.contextData,
 		coroutine:     parent.coroutine,
+		ThreadID:      parent.ThreadID,
 	}
 	parent.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
@@ -162,6 +172,7 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		exitCode:      NoneExit,
 		contextData:   make(map[string]interface{}),
 		coroutine:     NewCoroutine(),
+		ownsThreadID:  true,
 	}
 	if v1, ok := buildinBinaryOperatorHandler[vm.config.vmMode]; ok {
 		for k, v := range v1 {
@@ -188,6 +199,5 @@ func NewFrame(vm *VirtualMachine) *Frame {
 	if vm.debugMode && vm.debugger != nil {
 		vm.debugger.AddScopeRef(vm.rootScope)
 	}
-	ImportRuntimeLib(frame)
 	return frame
 }
