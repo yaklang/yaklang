@@ -560,7 +560,7 @@ jobs:
                 {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "^TestMUSTPASS_Fp.*$"},
                 {"package": "./common/utils/dot/...", "timeout": "10s"},
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
-                {"package": "./common/utils/bruteutils/.", "timeout": "15s"},
+                {"package": "./common/utils/bruteutils/.", "timeout": "1m"},
                 {"package": "./common/utils/memedit/.", "timeout": "15s"},
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},

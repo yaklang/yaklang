@@ -10,7 +10,8 @@ import (
 
 // MYSQLAuth 使用最小 MySQL 探针执行认证探测。
 // 旧实现依赖 go-sql-driver/mysql 完整驱动；现在只做协议级认证握手，
-// 依赖闭包不再进入主程序（差分验证见 legacydrivers）。
+// 数据库驱动不再进入爆破依赖闭包（旧驱动已删除，真实服务器上的
+// 差分验证结论记录于 common/brute/README.md）。
 func MYSQLAuth(target, username, password string, needAuth bool) (ok, finished bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
