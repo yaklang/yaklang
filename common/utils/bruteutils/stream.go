@@ -32,12 +32,15 @@ func (b *BruteUtil) StreamBruteContext(
 
 	// 兼容旧 delayer 语义（每次尝试后随机等待 [min,max] 秒）：
 	// 限速间隔取 max（最保守），抖动取 max-min。
+	// 注意 GetDelayRange 返回 time.Duration（纳秒），
+	// 换算每秒次数必须先转 float64 秒（曾因直接除 Duration 导致
+	// interval 被算成 158 年，多目标全部饿死）。
 	maxPerSecond := 0.0
 	jitter := time.Duration(0)
 	if b.delayer != nil {
 		minDelay, maxDelay := b.delayer.GetDelayRange()
 		if maxDelay > 0 {
-			maxPerSecond = 1.0 / float64(maxDelay)
+			maxPerSecond = 1.0 / maxDelay.Seconds()
 		}
 		if d := maxDelay - minDelay; d > 0 {
 			jitter = d
@@ -62,10 +65,19 @@ func (b *BruteUtil) StreamBruteContext(
 			OnlyNeedPassword: res.OnlyNeedPassword,
 			Target:           res.TargetID,
 		}
-		if cred, ok := credHandoff.LoadAndDelete(res.RawCredentialIndex); ok {
-			c := cred.(core.Credential)
-			legacy.Username = c.Username
-			legacy.Password = c.Password
+		// 未授权命中（Attempts==1）：handler 已清空凭证，保持未授权语义不回填
+		if res.Attempts != 1 {
+			if cred, ok := credHandoff.LoadAndDelete(res.RawCredentialIndex); ok {
+				c := cred.(core.Credential)
+				legacy.Username = c.Username
+				legacy.Password = c.Password
+			}
+		}
+		// 未授权访问成功的判定契约（grpc_brute.yak 依赖）：结果 Ok 且
+		// Username/Password 均为空 → "未授权访问"风险；否则 → "弱口令"。
+		// 部分协议（redis 等）在未授权成功时把 Username 设为 "-"，归一化为空。
+		if legacy.Ok && legacy.Username == "-" {
+			legacy.Username = ""
 		}
 		legacy.ExtraInfo = res.Extra
 		if b.resultCallback != nil {
@@ -150,5 +162,17 @@ func coreResultFromLegacy(ctx context.Context, item *BruteItem, legacy *BruteIte
 		CredID:   core.Credential{Username: legacy.Username, Password: legacy.Password}.ID(),
 		Extra:    legacy.ExtraInfo,
 		Err:      core.ErrAuthRejected,
+		// RawCredentialIndex 由调度器回填；这里用 Attempts=1 标记未授权命中
+		// （handler 在未授权成功时清空 Username/Password）。
+		Attempts: unauthAttemptMark(legacy),
 	}
+}
+
+// unauthAttemptMark：handler 未授权命中时返回 1（Ok 且凭证为空），否则 0。
+// sink 以 Attempts==1 && Ok 判定未授权命中，跳过凭证回填。
+func unauthAttemptMark(legacy *BruteItemResult) int {
+	if legacy.Ok && legacy.Username == "" && legacy.Password == "" {
+		return 1
+	}
+	return 0
 }

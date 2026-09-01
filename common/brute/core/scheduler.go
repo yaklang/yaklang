@@ -2,11 +2,12 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -146,6 +147,7 @@ func (s *Scheduler) Run(ctx context.Context, source CombinationSource) (*Stats, 
 		active    int64 // 未停止的目标数
 		wg        sync.WaitGroup
 		statsMu   sync.Mutex
+		genDone   atomic.Bool // 生成器已耗尽（不会再有新目标）
 	)
 
 	getTarget := func(id string) *targetState {
@@ -181,10 +183,15 @@ func (s *Scheduler) Run(ctx context.Context, source CombinationSource) (*Stats, 
 		log.Infof("brute target[%s] protocol[%s] stopped: %s", t.id, s.Protocol, reason)
 	}
 
+	// allStopped 判定"全部已知目标已停止且不会再有新目标"。
+	// 生成器是否已耗尽（queue 已关闭）必须参与判断：
+	// 否则首个目标 OkToStop 时，后续目标的状态机尚未创建（组合还在队列），
+	// len(targets)==1 && active==0 会误判为全部完成并取消整个运行
+	//（实测：多目标 + OkToStop + 限速下第二个目标被整体饿死）。
 	allStopped := func() bool {
 		targetsMu.Lock()
 		defer targetsMu.Unlock()
-		return len(targets) > 0 && active == 0
+		return genDone.Load() && len(targets) > 0 && active == 0
 	}
 
 	queue := make(chan Combination, s.QueueSize)
@@ -195,6 +202,7 @@ func (s *Scheduler) Run(ctx context.Context, source CombinationSource) (*Stats, 
 	go func() {
 		defer wg.Done()
 		defer close(queue)
+		defer genDone.Store(true)
 		for {
 			comb, ok := source.Next(runCtx)
 			if !ok {
@@ -458,7 +466,7 @@ func (s *Scheduler) probeWithRecover(ctx context.Context, comb Combination) (res
 func (s *Scheduler) safeSink(res *Result) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("brute result sink panic (protocol=%s): %v", s.Protocol, r)
+			log.Errorf("brute result sink panic (protocol=%s): %v\nstack:\n%v", s.Protocol, r, debug.Stack())
 		}
 	}()
 	s.Sink(*res)
