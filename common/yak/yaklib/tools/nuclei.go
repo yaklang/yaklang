@@ -25,7 +25,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	gitClient "github.com/go-git/go-git/v5/plumbing/transport/client"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type templateDesc struct {

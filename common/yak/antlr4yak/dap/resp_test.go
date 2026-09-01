@@ -1,5 +1,7 @@
 package dap
 
+// This file contains response assertions for the test-only DAP client.
+
 import (
 	"reflect"
 	"regexp"

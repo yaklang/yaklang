@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -113,7 +114,7 @@ func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.
 			rsp.Close()
 			return rsp, nil
 		}
-		nonce := aicommon.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
+		nonce := aicommon_testutil.ExtractPromptNonce(prompt, "CACHE_TOOL_CALL")
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "run_script", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"timeout": 20} },

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -248,7 +249,7 @@ func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 			if utils.MatchAllOfSubString(prompt, "Interval Review") {
-				nonce := aicommon.ExtractPromptNonce(prompt, "EXTRA_PROMPT")
+				nonce := aicommon_testutil.ExtractPromptNonce(prompt, "EXTRA_PROMPT")
 				if nonce != "" {
 					startMarker := "<|EXTRA_PROMPT_" + nonce + "|>"
 					endMarker := "<|EXTRA_PROMPT_END_" + nonce + "|>"

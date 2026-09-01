@@ -6,7 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	_ "github.com/yaklang/yaklang/common/yak"
 )

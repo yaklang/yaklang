@@ -3,7 +3,7 @@ package spec
 import (
 	"fmt"
 	"github.com/dave/jennifer/jen"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"strings"
 )
 

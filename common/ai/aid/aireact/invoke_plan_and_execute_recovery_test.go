@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
@@ -28,7 +29,7 @@ func extractCurrentTaskContentFromPrompt(t *testing.T, prompt string) string {
 			return strings.TrimSpace(rest[:end])
 		}
 	}
-	block := aicommon.MustExtractAITagBlock(t, prompt, "CURRENT_TASK")
+	block := aicommon_testutil.MustExtractAITagBlock(t, prompt, "CURRENT_TASK")
 	return strings.TrimSpace(block.Body)
 }
 
