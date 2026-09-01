@@ -5540,7 +5540,6 @@ message SetTagForRiskRequest {
 
 message RisksFromOnlineRequest {
   string Token = 1;
-  string LogType = 2;
 }
 
 message RisksFromOnlineProgress {
@@ -7424,7 +7423,6 @@ message HTTPFlowsToOnlineBatchResponse {
 
 message HTTPFlowsFromOnlineRequest {
   string Token = 1;
-  string LogType = 2;
 }
 
 message HTTPFlowsFromOnlineProgress {

@@ -923,17 +923,13 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 	if req.Token == "" {
 		return utils.Errorf("params empty")
 	}
-	logType := strings.TrimSpace(req.LogType)
-	if logType != "testerAssign" && logType != "tagsUpdate" {
-		return utils.Errorf("logType only supports testerAssign / tagsUpdate")
-	}
 
 	if err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl()); err != nil {
 		return utils.Errorf("download failed: %s", err.Error())
 	}
 
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	ch, err := client.DownloadHTTPFlows(stream.Context(), req.Token, logType)
+	ch, err := client.DownloadHTTPFlows(stream.Context(), req.Token)
 	if err != nil {
 		return utils.Errorf("download  httpflow failed: %s", err)
 	}
