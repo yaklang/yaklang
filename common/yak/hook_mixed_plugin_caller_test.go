@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -308,6 +310,7 @@ aaa`)
 }
 
 func TestMixCaller_LoadHotPatch(t *testing.T) {
+	t.Setenv("YAKIT_HOME", t.TempDir())
 	caller, err := NewMixPluginCaller()
 	require.NoError(t, err)
 	caller.SetLoadPluginTimeout(1)
@@ -318,7 +321,7 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 	s = "%s"
 }
-`, ksuid.New().String(), ksuid.New().String())
+`, ksuid.New().String(), ksuid.New().String()) + "\n// " + strings.Repeat("hot-reload-revision-", 20)
 	checkCallerLoads := func(funcName string, wantLength int, hashes ...string) {
 		res, ok := caller.callers.table.Load(funcName)
 		require.True(t, ok)
@@ -333,6 +336,8 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 	// load hot patch
 	err = caller.LoadHotPatch(utils.TimeoutContextSeconds(2), []*ypb.ExecParamItem{}, code)
 	require.NoError(t, err)
+	_, cached := antlr4yak.HaveYakcCache(code)
+	require.False(t, cached, "MITM hot reload must not persist unique source revisions")
 	checkCallerLoads(HOOK_HijackHTTPRequest, 1, utils.CalcSha1(code, HOOK_HijackHTTPRequest, HotPatchScriptName))
 	checkCallerLoads(HOOK_MirrorHTTPFlow, 1, utils.CalcSha1(code, HOOK_MirrorHTTPFlow, HotPatchScriptName))
 

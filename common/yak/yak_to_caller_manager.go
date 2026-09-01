@@ -219,6 +219,7 @@ type fetchFuncFromSrcCodeConfig struct {
 	engineHook        func(e *antlr4yak.Engine) error
 	callArgumentHooks map[string]callArgumentHookFunc
 	functionNames     []string
+	disableCache      bool
 }
 
 type fetchFuncFromSrcCodeOptions func(*fetchFuncFromSrcCodeConfig)
@@ -762,7 +763,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 		args = append(args, "--"+key, fmt.Sprintf("%s", value))
 	}
 	app := GetHookCliApp(args)
-	cTable, err := y.fetchFunctionFromSourceCode(y.getYakitPluginContext(ctx).WithCliApp(app),
+	fetchOptions := []fetchFuncFromSrcCodeOptions{
 		WithFetchScript(script),
 		WithFetchCode(code),
 		WithFetchEngineHook(func(e *antlr4yak.Engine) error {
@@ -780,7 +781,14 @@ func (y *YakToCallerManager) Add(ctx context.Context, script *schema.YakScript, 
 			return nil
 		}),
 		WithFetchFunctionNames(funcName...),
-	)
+	}
+	// The MITM hot patch is replaced for every editor revision. Persisting each
+	// unique source as yakc increases reload latency and leaves unbounded cache
+	// files without providing useful hits.
+	if id == HotPatchScriptName {
+		fetchOptions = append(fetchOptions, WithFetchCacheDisabled())
+	}
+	cTable, err := y.fetchFunctionFromSourceCode(y.getYakitPluginContext(ctx).WithCliApp(app), fetchOptions...)
 
 	if err != nil {
 		return err
@@ -1272,10 +1280,17 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 
 	loadCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.loadTimeout)
 	defer cancel()
-	ins, err := engine.ExecuteExWithContext(loadCtx, code, map[string]interface{}{
+	executeParams := map[string]interface{}{
 		"ROOT_CONTEXT": loadCtx,
 		"YAK_FILENAME": scriptName,
-	})
+	}
+	var ins *antlr4yak.Engine
+	var err error
+	if cfg.disableCache {
+		ins, err = engine.ExecuteWithoutCacheWithContext(loadCtx, code, executeParams)
+	} else {
+		ins, err = engine.ExecuteExWithContext(loadCtx, code, executeParams)
+	}
 	if err != nil {
 		log.Errorf("init execute plugin finished: %s", err)
 		return nil, utils.Errorf("load plugin failed: %s", err)
@@ -2378,12 +2393,18 @@ func WithFetchFunctionNames(names ...string) fetchFuncFromSrcCodeOptions {
 	}
 }
 
+func WithFetchCacheDisabled() fetchFuncFromSrcCodeOptions {
+	return func(c *fetchFuncFromSrcCodeConfig) {
+		c.disableCache = true
+	}
+}
+
 func buildHotpatchHandler(ctx context.Context, code string) func(s string, yield func(s string)) (err error) {
 	if strings.TrimSpace(code) == "" {
 		return nil
 	}
 	engine := NewScriptEngine(1)
-	codeEnv, err := engine.ExecuteExWithContext(ctx, code, make(map[string]interface{}))
+	codeEnv, err := engine.ExecuteWithoutCacheWithContext(ctx, code, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("load hotPatch code error: %s", err)
 		return nil
