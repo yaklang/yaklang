@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -149,7 +149,7 @@ type (
 func NewMultiTargetBruteUtil(targetsConcurrent, minDelay, maxDelay int, callback BruteCallback) (*BruteUtil, error) {
 	delayer, err := utils.NewDelayWaiter(int32(minDelay), int32(maxDelay))
 	if err != nil {
-		return nil, errors.Errorf("create delayer failed: %s", err)
+		return nil, fmt.Errorf("create delayer failed: %s", err)
 	}
 	// first is 0 delay
 	delayer.Wait()
@@ -266,7 +266,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 
 	process, err := b.GetProcessingByTarget(target)
 	if err != nil {
-		return errors.Errorf("start processing target failed: %s", err)
+		return fmt.Errorf("start processing target failed: %s", err)
 	}
 	defer func() {
 		process.Swg.Wait()
@@ -287,7 +287,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 	//    2. 检查目标指纹
 	if b.beforeBruteCallback != nil {
 		if !b.beforeBruteCallback(target) {
-			return errors.Errorf("pre-checking target[%s] failed", target)
+			return fmt.Errorf("pre-checking target[%s] failed", target)
 		}
 	}
 
@@ -433,7 +433,7 @@ func WithTargetTasksConcurrent(targetTasksConcurrent int) OptionsAction {
 func WithDelayerWaiter(minDelay, maxDelay int) (OptionsAction, error) {
 	dlr, err := utils.NewDelayWaiter(int32(minDelay), int32(maxDelay))
 	if err != nil {
-		return nil, errors.Errorf("delay waiter build failed: %s", err)
+		return nil, fmt.Errorf("delay waiter build failed: %s", err)
 	}
 	return func(util *BruteUtil) {
 		util.delayer = dlr
@@ -485,7 +485,7 @@ func WithBeforeBruteCallback(c func(string) bool) OptionsAction {
 func NewMultiTargetBruteUtilEx(options ...OptionsAction) (*BruteUtil, error) {
 	delayer, err := utils.NewDelayWaiter(0, 0)
 	if err != nil {
-		return nil, errors.Errorf("init delay waiter failed: %s", err)
+		return nil, fmt.Errorf("init delay waiter failed: %s", err)
 	}
 
 	bu := &BruteUtil{

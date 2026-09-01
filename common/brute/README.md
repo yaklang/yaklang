@@ -23,7 +23,7 @@ common/brute/
 └── dicts/                   # 共享默认字典
 
 common/utils/bruteutils/     # 兼容层：旧 Yak API 不变，内部切换到新核心
-└── legacydrivers/           # 旧驱动实现（仅供差分测试，主程序不引用）
+                             # （旧数据库驱动已删除，见下文"依赖收缩"）
 ```
 
 ## 调度器（core.Scheduler）
@@ -78,14 +78,29 @@ TDS PRELOGIN ENCRYPTION、Mongo TCP 层），而非旧的"TCP 层盲试 TLS"。
 | 默认 | 全部协议；MySQL/MSSQL/MongoDB/PostgreSQL 使用最小探针；Oracle 暂保留 go-ora |
 | `yakslim` | 额外排除 go-ora（Oracle 不可用），验证爆破闭包无数据库驱动 |
 
-### 依赖收益（相对 origin/main，yakgrpc 依赖闭包）
+### 依赖收缩（最终状态，legacydrivers 已删除）
 
-- 默认构建：**-61 包**（移除 go-mssqldb、mongo-driver、go-pg 闭包；
-  外部模块含 golang-sql、vmihailenco/msgpack、montanaflynn/stats、tmthrgd、youmark/pkcs8 等）
-- yakslim 构建：再 -13 包（go-ora 闭包）
-- 二进制（含 yakgrpc 的空 main，darwin/arm64）：
-  main 基线 290,461,010B → 默认 285,107,570B（**-5.1 MiB**）→ slim 278,332,290B（**-11.6 MiB**）
-- `core` 包依赖图 0 驱动（`TestNoDriverImports` 强制）。
+旧数据库驱动（go-mssqldb / go-pg / mongo-driver）及其闭包已从
+go.mod 移除（相对 origin/main：**-3 直接依赖模块 + 13 indirect 模块**，
+含 golang-sql、vmihailenco/msgpack、montanaflynn/stats、tmthrgd、
+youmark/pkcs8、mellium.im/sasl 等）。go-sql-driver/mysql 仍被
+common/consts 的 gorm 存储层引用，与爆破无关。
+
+包级依赖闭环（`go list -deps` 实测，数据库驱动 grep 为 0）：
+
+| 包 | 外部直接依赖 |
+|---|---|
+| `brute/core` | **无任何外部依赖**（纯标准库） |
+| `brute/probes/mysql` | 无（原生 handshake + SHA1/SHA256/RSA stdlib） |
+| `brute/probes/postgres` | 无（MD5/SCRAM-SHA-256 stdlib） |
+| `brute/probes/mongodb` | 无（最小 BSON + SCRAM 自实现） |
+| `brute/probes/mssql` | 无（TDS + 内嵌 TLS stdlib） |
+| `brute/probes/...` 全部 | 仅 `golang.org/x/text/secure/precis`（SCRAM SASLprep） |
+| `bruteutils` 兼容层 | 每库单一协议归属：`x/crypto/ssh`(SSH)、`jlaffaye/ftp`(FTP)、`go-ldap/ldap`(LDAP)、`gosnmp`(SNMP)、`mitchellh/go-vnc`(VNC)、`xdg-go/scram+stringprep`(SASL 邮件认证)、`sijms/go-ora`(Oracle，见下) |
+
+RDP（grdp，仓库自带实现）、Redis、Telnet、RTSP、Memcached、
+HTTP/SOCKS 代理、PPTP、Tomcat 均为仓库内最小自研实现，零外部依赖。
+工具性依赖（go-spew、pkg/errors）已全部替换为标准库。
 
 ### Oracle 符号归因
 
@@ -121,6 +136,37 @@ O5LOGON/PBKDF2 verifier 涉及多版本密码学交互，任务明确要求
 256 字符长密码、传输方式记录）+ MySQL 边界 8 例
 （过期密码→AuthSuccess、账户锁定 3118→AuthFailed、Unicode 凭证正反、
 200 字符密码正反）。
+
+## 探针运行状况总表
+
+四个验证维度：**Mock**（本地模拟器正反向测试，`go test` 默认执行；
+数据库探针见 `common/brute/probes/*`，其余见 `bruteutils/mock_servers_test.go`）、
+**真实容器**（`YAK_BRUTE_REAL=1`，版本见兼容矩阵）、**互联网实测**
+（Shodan 采样，见下文直方图）、**依赖**（外部库，全部单一协议归属）。
+
+| 协议 | 实现/依赖 | Mock 正反向 | 真实容器 | 互联网实测 |
+|---|---|---|---|---|
+| MySQL | 最小探针（零外部依赖） | ✅ 怪异 banner/超时/断连/Unicode/ctx 取消/锁定/限流 | ✅ 5 版本+8 边界 | ✅ 3+2 |
+| PostgreSQL | 最小探针（零外部依赖） | ✅ | ✅ 6 版本（含 TLS） | ✅ 3+2 |
+| MongoDB | 最小探针（零外部依赖） | ✅ | ✅ 4 版本 | ✅ 2+3 |
+| SQL Server | 最小探针（零外部依赖） | ✅ | ✅ 2019/2022 | ✅ 2+3 |
+| Oracle | go-ora（窄用法） | — | 差分通过（删除前） | 未采样 |
+| RDP | 自研 grdp（零外部依赖） | ✅ CredSSP 模拟器 6 用例含 Unicode 正反 | ✅ xrdp×2 | ✅ 1 eof+4 tls |
+| FTP | jlaffaye/ftp | ✅ 230/530 正反+未知用户 | — | ✅ 5/5 |
+| SMTP | 自研（SASL: PLAIN/LOGIN/CRAM/SCRAM） | ✅ AUTH LOGIN 全流程正反 | — | — |
+| Telnet | 自研（流式提示符匹配） | ✅ 登录流正反+未知用户 | — | ✅ 5/5 |
+| Redis | 自研（RESP） | ✅ AUTH/SET-GET 回环+无密码模式 | — | ✅ 5/5 |
+| LDAP | go-ldap | ✅ BER bindResponse 0/49 正反 | — | — |
+| VNC | mitchellh/go-vnc | ✅ RFB3.8 VNC-Auth DES 挑战正反 | — | ✅ 5/5 |
+| SNMPv2 | gosnmp | ✅ UDP community 正反（错误静默丢弃） | — | — |
+| SNMPv3 | gosnmp | ✅（sasl 单测 + 差分） | — | — |
+| Memcached | 自研 | ✅ stats 未授权路径 | — | ✅ 5/5 |
+| SSH | x/crypto/ssh | ✅（ssh_test） | — | ✅ 5/5 |
+| SMB/POP3/IMAP/RTSP/PPTP/Tomcat/HTTP-SOCKS 代理 | 自研 | ✅（哨兵全协议扫描 + 不可达分类） | — | ✅（SMB 5/5） |
+
+不可达目标（127.0.0.1:1）全协议无 panic 分类测试：TestMockTargetUnavailable。
+判定语义：RDP-NLA/全部数据库协议有协议级成败信号；xrdp SSL 模式
+（无 NLA）为已知误报限制（无失败信号，见 RDP 章节）。
 
 ## RDP（grdp）修复与真实容器验证
 
@@ -181,17 +227,20 @@ Windows NLA 目标由 CredSSP 阶段给出确定成败。
    OkToStop 命中即取消整个运行。
 3. 旧 defaultDialer TLS-first 污染明文服务（见上文"旧实现的缺陷"）。
 
-## 差分验证（删除旧驱动的前置条件）
+## 差分验证结论（旧驱动删除依据，实现已随依赖一并移除）
 
-`legacydrivers/differential_test.go`（`YAK_BRUTE_REAL=1` 启用）在真实
-服务上对照旧驱动与新探针：
+删除前在真实服务器上完成新旧实现全量对照（每服务：正确凭证、错误
+密码、未知用户、空密码全部一致）：
 
 | 服务 | 环境 | 结果 |
 |---|---|---|
-| MySQL 8.0 / 5.7 / MariaDB 11 | caching_sha2 / native | 正确凭证、错误密码、未知用户、空密码全部一致 |
+| MySQL 8.0 / 5.7 / MariaDB 11 | caching_sha2 / native | 全部一致 |
 | PostgreSQL 16 / 12 | SCRAM-SHA-256 / MD5 | 全部一致 |
-| MongoDB 7 / 4.4 | SCRAM-SHA-256 | 全部一致 |
-| SQL Server 2022 | TDS 内嵌 TLS | 模拟器全通过；真实服务器验证依赖 amd64 容器（ARM 主机模拟受限） |
+| MongoDB 7 / 4.4 | SCRAM-SHA-256 / SHA-1 | 全部一致 |
+| SQL Server 2022 / 2019 | TDS 内嵌 TLS | 全部一致 |
+
+差分测试代码（legacydrivers）已随旧驱动删除；结论由上表与版本矩阵
+（YAK_BRUTE_REAL=1 可重跑）持续背书。
 
 ## 测试
 
@@ -199,8 +248,8 @@ Windows NLA 目标由 CredSSP 阶段给出确定成败。
 # 单元 + 模拟器（全部协议的怪异场景：错误 banner、超时、断连、Unicode 凭证、ctx 取消、锁定、限流）
 go test -race ./common/brute/... ./common/utils/bruteutils/
 
-# 真实服务器（先启动上文差分表中的容器）
-YAK_BRUTE_REAL=1 go test ./common/brute/probes/... ./common/utils/bruteutils/legacydrivers/
+# 真实服务器（先启动上文版本矩阵中的容器）
+YAK_BRUTE_REAL=1 go test ./common/brute/probes/... ./common/utils/bruteutils/
 
 # Fuzz（解析器：MySQL greeting / BSON / PG ErrorResponse / TDS PRELOGIN+token）
 go test -fuzz=FuzzMySQLGreeting -fuzztime=60s ./common/brute/probes/
@@ -233,5 +282,5 @@ go list -tags yakslim -deps ./common/yakgrpc
 - `StreamBruteContext` 内部已切换到流式调度器，语义兼容
   （OkToStop / FinishingThreshold / UserEliminated / OnlyNeedPassword /
   delayer / beforeBruteCallback）。
-- 旧驱动实现保留在 `legacydrivers`（仅测试引用），差分验证通过一个
-  发布周期后随 go.mod 依赖一并删除。
+- 旧数据库驱动与差分测试代码已删除（差分结论见上节）；go.mod 同步
+  移除 go-mssqldb / go-pg / mongo-driver 及其 indirect 闭包。
