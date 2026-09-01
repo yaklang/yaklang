@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -452,8 +451,7 @@ func LoadYakitThirdpartySourceScripts(
 	// client := utils.NewDefaultHTTPClient()
 	// Create a custom http(s) client with your config
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Proxy:           http.ProxyFromEnvironment,
+		Proxy: http.ProxyFromEnvironment,
 	}
 	if len(proxy) > 0 {
 		u, err := url.Parse(proxy[0])
