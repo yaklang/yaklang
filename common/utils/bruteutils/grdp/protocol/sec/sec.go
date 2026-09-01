@@ -171,7 +171,10 @@ type RDPInfo struct {
 func NewRDPInfo() *RDPInfo {
 	info := &RDPInfo{
 		//Flag: INFO_MOUSE | INFO_UNICODE | INFO_LOGONNOTIFY | INFO_LOGONERRORS | INFO_DISABLECTRLALTDEL | INFO_ENABLEWINDOWSKEY | INFO_FORCE_ENCRYPTED_CS_PDU,
-		Flag:           INFO_MOUSE | INFO_UNICODE | INFO_LOGONNOTIFY | INFO_LOGONERRORS | INFO_DISABLECTRLALTDEL | INFO_ENABLEWINDOWSKEY | INFO_AUTOLOGON,
+		// INFO_MAXIMIZESHELL 必须置位：xrdp 等服务端按 [MS-RDPBCGR] 校验
+		// flags&RDP_LOGON_NORMAL(0x33)==0x33（MOUSE|DISABLECTRLALTDEL|UNICODE|
+		// MAXIMIZESHELL），缺失即被判 "wrong flags" 断连。
+		Flag:           INFO_MOUSE | INFO_UNICODE | INFO_LOGONNOTIFY | INFO_LOGONERRORS | INFO_DISABLECTRLALTDEL | INFO_ENABLEWINDOWSKEY | INFO_AUTOLOGON | INFO_MAXIMIZESHELL,
 		Domain:         []byte{0, 0},
 		UserName:       []byte{0, 0},
 		Password:       []byte{0, 0},
@@ -733,14 +736,36 @@ func (c *Client) sendClientNewLicenseRequest(data []byte) {
 	struc.Unpack(bytes.NewReader(data), &req)
 
 	var sc gcc.ServerCertificate
-	if c.ServerSecurityData().ServerCertificate.DwVersion != 0 {
-		sc = c.ServerSecurityData().ServerCertificate
+	// GCC 响应可能缺少 SC_SECURITY block（此时 ServerSecurityData() 为
+	// nil），必须判空，避免 nil deref panic 中断 license 流程。
+	if ssd := c.ServerSecurityData(); ssd != nil && ssd.ServerCertificate.DwVersion != 0 {
+		sc = ssd.ServerCertificate
 	} else {
 		rd := bytes.NewReader(req.ServerCertificate.BlobData)
-		//err := sc.Unpack(rd)
-		err := struc.Unpack(rd, &req)
-		if err != nil {
-			glog.Error(err)
+		// 与 ServerSecurityData.Unpack 相同的解析方式：dwVersion 决定
+		// 证书类型；使用 CertData 手写解析（struc 对嵌套 sizeof 会 EOF）。
+		var err error
+		if sc.DwVersion, err = core.ReadUInt32LE(rd); err != nil {
+			glog.Error("license cert read version:", err)
+			return
+		}
+		switch gcc.CertificateType(sc.DwVersion & 0x7fffffff) {
+		case gcc.CERT_CHAIN_VERSION_1:
+			cd := &gcc.ProprietaryServerCertificate{}
+			if err = cd.Unpack(rd); err != nil {
+				glog.Error("license cert unpack:", err)
+				return
+			}
+			sc.CertData = cd
+		case gcc.CERT_CHAIN_VERSION_2:
+			cd := &gcc.X509CertificateChain{}
+			if err = cd.Unpack(rd); err != nil {
+				glog.Error("license cert unpack:", err)
+				return
+			}
+			sc.CertData = cd
+		default:
+			glog.Error("unsupported license certificate version:", sc.DwVersion)
 			return
 		}
 	}
@@ -791,7 +816,9 @@ func (c *Client) sendClientNewLicenseRequest(data []byte) {
 	buff.Reset()
 	struc.Pack(buff, message)
 
-	c.sendFlagged(LICENSE_PKT, b.Bytes())
+	// 必须发送序列化后的 license request（历史上误发 b.Bytes()——
+	// RSA 模数，导致服务端无法解析、客户端超时）。
+	c.sendFlagged(LICENSE_PKT, buff.Bytes())
 
 }
 

@@ -2,12 +2,21 @@ package core
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 )
 
 type ReadBytesComplete func(result []byte, err error)
 
+var errBadReadLength = errors.New("protocol error: unreasonable read length (non-TPKT peer?)")
+
+// StartReadBytes 异步读取 len 字节。len 可能源自对端可控的协议字段，
+// 越界（负数/超大）时必须报错而不是 makeslice panic。
 func StartReadBytes(len int, r io.Reader, cb ReadBytesComplete) {
+	if len < 0 || len > 1<<20 {
+		cb(nil, errBadReadLength)
+		return
+	}
 	b := make([]byte, len)
 	go func() {
 		_, err := io.ReadFull(r, b)

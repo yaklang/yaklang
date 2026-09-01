@@ -76,6 +76,12 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 RETRY:
 	if timeoutRetryCount > retryMax || refuseErrorRetryCount > retryMax {
 		if retryMax > 0 {
+			// 保留底层错误（connection refused / no route 等）：
+			// 上层（如爆破的目标不可达判定）依赖错误字符串分类，
+			// 丢弃 cause 会导致 refused 被误判为普通失败。
+			if lastError != nil {
+				return nil, fmt.Errorf("timeout retry(%v) or refuse retry(%v) > max(%v): %w", timeoutRetryCount, refuseErrorRetryCount, retryMax, lastError)
+			}
 			return nil, fmt.Errorf("timeout retry(%v) or refuse retry(%v) > max(%v)", timeoutRetryCount, refuseErrorRetryCount, retryMax)
 		}
 		if lastError != nil {

@@ -3,6 +3,7 @@ package tpkt
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
@@ -10,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
 )
+
+var errNonRDPPeer = errors.New("protocol error: peer does not speak RDP/TPKT")
 
 // take idea from https://github.com/Madnikulin50/gordp
 
@@ -179,6 +182,12 @@ func (t *TPKT) recvHeader(s []byte, err error) {
 		if t.lastShortLength&0x80 != 0 {
 			core.StartReadBytes(1, t.Conn, t.recvExtendedFastPathHeader)
 		} else {
+			// fastpath 长度来自对端首字节；<2 说明对端不是 RDP（畸形
+			// banner），按协议错误处理而非 makeslice panic。
+			if t.lastShortLength < 2 {
+				t.Emit("error", errNonRDPPeer)
+				return
+			}
 			core.StartReadBytes(t.lastShortLength-2, t.Conn, t.recvFastPath)
 		}
 	}
@@ -192,6 +201,10 @@ func (t *TPKT) recvExtendedHeader(s []byte, err error) {
 	r := bytes.NewReader(s)
 	size, _ := core.ReadUint16BE(r)
 	glog.Debug("tpkt wait recvData:", size)
+	if size < 4 {
+		t.Emit("error", errNonRDPPeer)
+		return
+	}
 	core.StartReadBytes(int(size-4), t.Conn, t.recvData)
 }
 
