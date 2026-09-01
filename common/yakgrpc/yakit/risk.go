@@ -15,11 +15,13 @@ import (
 
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 	risk := &schema.Risk{}
+	var callerRisk *schema.Risk
 	db = db.Model(&schema.Risk{})
 
 	var token string
 	switch ret := i.(type) {
 	case *schema.Risk:
+		callerRisk = ret
 		token = ret.ReverseToken
 		if ret.FromYakScript == "" {
 			ret.FromYakScript = consts.GetCurrentYakitPluginID()
@@ -56,8 +58,17 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 		}
 	}
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(risk); db.Error != nil {
-		return utils.Errorf("create/update Risk failed: %s", db.Error)
+	result := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(risk)
+	if result.Error != nil {
+		return utils.Errorf("create/update Risk failed: %s", result.Error)
+	}
+
+	// FirstOrCreate must scan into a separate object so an existing row cannot
+	// overwrite the Assign input before the update. Once persistence succeeds,
+	// copy the resulting row back so callers of NewRisk receive its ID and
+	// timestamps on both the create and deduplicated-update paths.
+	if callerRisk != nil {
+		*callerRisk = *risk
 	}
 
 	return nil
