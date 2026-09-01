@@ -2,6 +2,7 @@ package legacydrivers_test
 
 import (
 	"context"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -53,6 +54,11 @@ func TestDifferentialOldVsNewProbes(t *testing.T) {
 
 	for _, srv := range servers {
 		t.Run(srv.name, func(t *testing.T) {
+			// 可达性探测：容器未启动时跳过（差分依赖真实服务）
+			if !hostReachable(srv.addr) {
+				t.Skipf("server %s at %s not reachable (start the container first)", srv.name, srv.addr)
+			}
+
 			// 新实现：bruteutils（已切换到最小探针）
 			newProbe := func(user, pass string) (ok bool) {
 				switch srv.proto {
@@ -113,6 +119,16 @@ func TestDifferentialOldVsNewProbes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// hostReachable 探测目标端口是否可连接。
+func hostReachable(addr string) bool {
+	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 // postgresHandler 返回 postgres 的 BrutePass 处理器。
