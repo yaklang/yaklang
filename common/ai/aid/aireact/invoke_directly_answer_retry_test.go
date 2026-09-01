@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -93,7 +94,7 @@ func TestReAct_DirectlyAnswer_RetryIncludesLastErrorAndAITAGHint(t *testing.T) {
 			case 1, 2:
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_answer"}`))
 			case 3:
-				nonce := aicommon.MustExtractPromptNonce(t, req.GetPrompt(), "FINAL_ANSWER")
+				nonce := aicommon_testutil.MustExtractPromptNonce(t, req.GetPrompt(), "FINAL_ANSWER")
 				rsp.EmitOutputStream(bytes.NewBufferString(
 					`{"@action":"directly_answer"}` + "\n" +
 						"<|FINAL_ANSWER_" + nonce + "|>third time lucky<|FINAL_ANSWER_END_" + nonce + "|>",

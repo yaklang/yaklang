@@ -9,8 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/common/log"
+	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"gopkg.in/yaml.v2"
 	"testing"
 )
 

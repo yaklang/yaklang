@@ -1,7 +1,9 @@
 package yaklib
 
 import (
-	"gopkg.in/yaml.v2"
+	"bytes"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Marshal 将一个对象序列化为 YAML 格式的字节切片
@@ -69,7 +71,9 @@ func yamlUnmarshal(b []byte) (interface{}, error) {
 // ```
 func yamlUnmarshalStrict(b []byte) (interface{}, error) {
 	var i interface{}
-	err := yaml.UnmarshalStrict(b, &i)
+	decoder := yaml.NewDecoder(bytes.NewReader(b))
+	decoder.KnownFields(true)
+	err := decoder.Decode(&i)
 	if err != nil {
 		return nil, err
 	}

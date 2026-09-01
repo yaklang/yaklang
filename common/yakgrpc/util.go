@@ -8,27 +8,24 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 
 	"github.com/pkg/errors"
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/gorm"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -283,55 +280,6 @@ func NewLocalClientForceNew() (ypb.YakClient, error) {
 		YakClient: ypb.NewYakClient(conn),
 		server:    s,
 	}, err
-}
-
-func NewLocalClientAndServerWithTempDatabase(t *testing.T) (ypb.YakClient, *Server, error) {
-	netx.UnsetProxyFromEnv()
-
-	lis, addr, err := newLocalGRPCListener()
-	if err != nil {
-		return nil, nil, err
-	}
-	grpcTrans := grpc.NewServer(
-		grpc.MaxRecvMsgSize(100*1024*1024),
-		grpc.MaxSendMsgSize(100*1024*1024),
-	)
-	profileDatabasePath := path.Join(os.TempDir(), fmt.Sprintf("%s.db", ksuid.New().String()))
-	projectDatabasePath := path.Join(os.TempDir(), fmt.Sprintf("%s.db", ksuid.New().String()))
-	s, err := newServerEx(WithInitFacadeServer(true), WithProfileDatabasePath(profileDatabasePath), WithProjectDatabasePath(projectDatabasePath))
-	if err != nil {
-		_ = lis.Close()
-		log.Errorf("build yakit server failed: %s", err)
-		return nil, nil, err
-	}
-	ypb.RegisterYakServer(grpcTrans, s)
-	t.Cleanup(func() {
-		os.Remove(profileDatabasePath)
-		os.Remove(projectDatabasePath)
-	})
-	go func() {
-		if serveErr := grpcTrans.Serve(lis); serveErr != nil {
-			log.Error(serveErr)
-		}
-	}()
-	time.Sleep(1 * time.Second)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-		grpc.MaxCallRecvMsgSize(100*1024*1045),
-	))
-	client := &Client{
-		YakClient: ypb.NewYakClient(conn),
-		server:    s,
-	}
-	return client, s, err
-}
-
-func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
-	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
 }
 
 func newLocalClientEx(local bool) (ypb.YakClient, error) {
