@@ -379,15 +379,7 @@ func (c *CliApp) SetRequired(t bool) SetCliExtraParam {
 }
 
 func (c *CliApp) _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtraParams {
-	optName, optShortName := name, ""
-	if strings.Contains(name, ",") {
-		optName, optShortName, _ = strings.Cut(name, ",")
-	} else if strings.Contains(name, " ") {
-		optName, optShortName, _ = strings.Cut(name, " ")
-	}
-	if optShortName != "" && len(optShortName) > len(optName) {
-		optName, optShortName = optShortName, optName
-	}
+	optName, optShortName := splitParamName(name)
 	param := &cliExtraParams{
 		optName:      optName,
 		optShortName: optShortName,
@@ -402,6 +394,19 @@ func (c *CliApp) _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtr
 	c.extraParams = append(c.extraParams, param)
 	param.params = _getAvailableParams(param.optName, param.optShortName)
 	return param
+}
+
+func splitParamName(name string) (optName, optShortName string) {
+	optName = name
+	if strings.Contains(name, ",") {
+		optName, optShortName, _ = strings.Cut(name, ",")
+	} else if strings.Contains(name, " ") {
+		optName, optShortName, _ = strings.Cut(name, " ")
+	}
+	if optShortName != "" && len(optShortName) > len(optName) {
+		optName, optShortName = optShortName, optName
+	}
+	return optName, optShortName
 }
 
 // ------------------------------------------------
@@ -1102,6 +1107,27 @@ func (c *CliApp) StringSlice(name string, options ...SetCliExtraParam) []string 
 	}
 
 	return utils.PrettifyListFromStringSplited(rawStr, ",")
+}
+
+// PeekStringSlice reads a comma-separated argument without registering CLI
+// metadata. It is intended for infrastructure code that needs to honor a
+// process-level flag on a hot path; script-facing parameter declarations must
+// continue to use StringSlice so they remain visible in Help and UI metadata.
+func (c *CliApp) PeekStringSlice(name string) []string {
+	optName, optShortName := splitParamName(name)
+	param := &cliExtraParams{
+		optName:      optName,
+		optShortName: optShortName,
+		params:       _getAvailableParams(optName, optShortName),
+		cliApp:       c,
+	}
+	index := param.foundArgsIndex()
+	args := c.GetArgs()
+	if index < 0 || index+1 >= len(args) {
+		return []string{}
+	}
+
+	return utils.PrettifyListFromStringSplited(args[index+1], ",")
 }
 
 // IntSlice 获取对应名称的命令行参数，将其字符串根据","切割并尝试转换为 int 类型返回 []int 类型

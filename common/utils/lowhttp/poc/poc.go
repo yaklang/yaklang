@@ -2422,8 +2422,10 @@ func fixPacketByConfig(packet []byte, config *PocConfig) []byte {
 }
 
 func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, error) {
-	// poc 模块收 proxy 影响
-	proxy := cli.DefaultCliApp.StringSlice("proxy")
+	// Honor the process-level proxy without declaring a new script parameter on
+	// every request. StringSlice registers metadata and made this hot path retain
+	// one cliExtraParams object per call (and race with concurrent Help reads).
+	proxy := cli.DefaultCliApp.PeekStringSlice("proxy")
 	config := NewDefaultPoCConfig()
 	config.Proxy = proxy
 	for _, opt := range opts {
@@ -2504,8 +2506,9 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 		return nil, nil, utils.Errorf("cannot support: %s", reflect.TypeOf(i))
 	}
 
-	// poc 模块收 proxy 影响
-	proxy := cli.DefaultCliApp.StringSlice("proxy")
+	// Keep raw-packet requests on the same non-registering proxy lookup as URL
+	// requests; both entry points are request hot paths.
+	proxy := cli.DefaultCliApp.PeekStringSlice("proxy")
 	config := NewDefaultPoCConfig()
 	config.Proxy = proxy
 	for _, opt := range opts {
