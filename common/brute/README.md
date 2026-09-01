@@ -196,6 +196,30 @@ Unicode 正反、空密码）全通过——NTLMv2 客户端实现首次获得�
 xrdp SSL 模式的误报限制已在 `rdp_real_test.go` 注明；互联网主流的
 Windows NLA 目标由 CredSSP 阶段给出确定成败。
 
+## Telnet 真实设备语料与判定增强（Shodan 100 样本）
+
+互联网 telnet 协议形态高度不标准。Shodan 采样 100 例 banner 分析：
+49% 标准 login 提示、13% 仅 user、1% 仅 password、**37% 无标准提示符**——
+其中 ~14% 为爆破锁定提示（华为系 `Protection of brute force attack!!
+Lockout remaining: TELNET[ppp0] N seconds`，多带 IAC 协商字节前缀）、
+~4% 连接资源受限（`connections exceed 5` / `maximum number of telnet
+sessions` / `no more connections`）、其余为 banner 后等待按键才出提示
+（`Telnet Server 2.00` 类）。
+
+判定增强（`telnet_corpus_test.go` 用真实 banner 回放回归）：
+- **锁定识别**：`AccountLocked` 信号贯通 `coreResultFromLegacy` →
+  `OutcomeAccountLocked`，调度器按 LockoutBudget 短路目标，不再撞击
+  延长锁定期（30 目标实测 4 例正确识别，含 IAC 前缀原始流）；
+- **资源受限/禁用**：标记 Finished（TargetUnavailable），~1s 内退出；
+- **无提示符重触发**：banner 无提示词时先敲一次回车再读（覆盖
+  "等待按键"类设备）；
+- **读取双出口**：匹配词即返回；数据读完 600ms 静默或 1.2s 无任何
+  字节（哑连接）即返回——单凭证实测最慢从 30.4s 降至 6.1s。
+
+实测（30 个互联网目标）：4 account-locked / 4 unavailable / 22
+auth-rejected，0 意外成功、0 panic。已知限制：IAC 协商字节未应答
+（正则判定容忍二进制前缀，不影响分类）。
+
 ## 互联网真实目标分类实测（Shodan）
 
 `shodan_real_test.go`（`YAK_BRUTE_SHODAN=1 + SHODAN_API_KEY`）：每协议
