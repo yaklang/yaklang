@@ -182,8 +182,12 @@ func IsUserInstruction(i Instruction) bool {
 func CreateInstruction(op Opcode) Instruction {
 	switch op {
 	case SSAOpcodeFunction:
+		// FreeValues must be non-nil: instructions rebuilt from DB
+		// (CreateInstruction via LazyInstruction) can still get free-value
+		// writes (BuildFreeValue), which would panic on a nil map.
 		return &Function{
-			anValue: NewValue(),
+			anValue:    NewValue(),
+			FreeValues: make(map[*Variable]int64),
 		}
 	case SSAOpcodeBasicBlock:
 		return &BasicBlock{
@@ -231,8 +235,14 @@ func CreateInstruction(op Opcode) Instruction {
 			anValue: NewValue(),
 		}
 	case SSAOpcodeCall:
+		// Binding/SideEffectValue must be non-nil: instructions rebuilt from
+		// DB (CreateInstruction via LazyInstruction) can still get writes from
+		// ReplaceValue trees (handleCalleeFunction/handleSideEffect), which
+		// would panic on nil maps.
 		return &Call{
-			anValue: NewValue(),
+			anValue:         NewValue(),
+			Binding:         make(map[string]int64),
+			SideEffectValue: make(map[string]int64),
 		}
 	case SSAOpcodeSideEffect:
 		return &SideEffect{
