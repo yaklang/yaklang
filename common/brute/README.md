@@ -122,6 +122,48 @@ O5LOGON/PBKDF2 verifier 涉及多版本密码学交互，任务明确要求
 （过期密码→AuthSuccess、账户锁定 3118→AuthFailed、Unicode 凭证正反、
 200 字符密码正反）。
 
+## RDP（grdp）修复与真实容器验证
+
+xrdp 真实容器（0.9.17 / 0.9.24，`testdata/rdp/Dockerfile.nla`）测试
+发现并修复五处致瘫缺陷——修复前 RDP 探测对 xrdp 部署 100% 失败：
+
+1. Info PDU 缺 `INFO_MAXIMIZESHELL(0x20)`：xrdp 按 `RDP_LOGON_NORMAL(0x33)`
+   校验即断连（"wrong flags"）。
+2. `sendClientNewLicenseRequest` 解包目标误写 `&req`（应为 ServerCertificate），
+   且误发 RSA 模数而非序列化后的 license request → 客户端必 15s 超时。
+3. GCC `ServerCoreData` 用 struc 固定解 3 字段，xrdp 只发 8 字节（可选
+   EarlyCapabilityFlags）→ EOF 中断整个响应解析，SC_SECURITY 丢失。
+4. `readCapability` 对空 capability（len=4）返回 `(nil,nil)`，nil 接口
+   方法调用 panic。
+5. TPKT/`StartReadBytes` 不校验对端可控长度：RDP 探测打到非 RDP 端口
+   （如 MySQL banner）`makeslice` panic。
+
+其他：Context 贯通（取消亚毫秒级中断连接）、netx 重试错误保留底层
+cause（恢复 connection refused 分类）、NTLM 明文密码日志清除
+（Shodan 真实目标测试捕获）、Login 事件竞态治理（doneOnce）。
+
+**NLA/CredSSP 判定**：xrdp 主线不支持服务端 NLA（源码注明 "We don't
+yet support CredSSP"），SSL 模式下认证失败只显示图形登录框（无协议级
+信号、不断连）。因此 `rdp_nla_test.go` 实现最小 CredSSP 模拟服务器，
+服务端按 [MS-NLMP] 验证 NTProofStr：6 用例（正确/错误密码、未知用户、
+Unicode 正反、空密码）全通过——NTLMv2 客户端实现首次获得确定性验证。
+xrdp SSL 模式的误报限制已在 `rdp_real_test.go` 注明；互联网主流的
+Windows NLA 目标由 CredSSP 阶段给出确定成败。
+
+## 互联网真实目标分类实测（Shodan）
+
+`shodan_real_test.go`（`YAK_BRUTE_SHODAN=1 + SHODAN_API_KEY`）：每协议
+≤6 目标、每目标 1 次无效凭证尝试、尝试间隔 1s，输出错误分类直方图。
+
+2026-09 实测（12 协议 × 5 目标 = 60 次）：**0 次意外成功、0 次 panic**。
+
+| 协议 | 分类分布 |
+|---|---|
+| ftp / ssh / redis / telnet / memcached / smb / vnc | 5/5 auth-rejected |
+| mysql / postgres | 3 auth-rejected + 2 target-unreachable |
+| mongodb / mssql | 2 auth-rejected + 3 target-unreachable |
+| rdp | 1 eof + 4 tls（真实 NLA 目标 TLS 拒绝正确分类，3s 内退出） |
+
 ## 稳定性
 
 - 探针模拟器套件 `-count=5`（5 轮重复）全绿；`-race -count=3` 全绿。
