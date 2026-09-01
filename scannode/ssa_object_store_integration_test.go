@@ -39,9 +39,9 @@ func TestS3ObjectStoreIntegration(t *testing.T) {
 		AllowHTTP:        strings.HasPrefix(endpoint, "http://"),
 		TLSVerify:        strings.EqualFold(os.Getenv("SCANNODE_S3_INTEGRATION_TLS_VERIFY"), "true"),
 		VirtualHostStyle: strings.EqualFold(os.Getenv("SCANNODE_S3_INTEGRATION_VIRTUAL_HOST"), "true"),
-		STSAccessKey:     newSecretValue(accessKey),
-		STSSecretKey:     newSecretValue(secretKey),
-		STSSessionToken:  newSecretValue(os.Getenv("SCANNODE_S3_INTEGRATION_SESSION_TOKEN")),
+		STSAccessKey:     accessKey,
+		STSSecretKey:     secretKey,
+		STSSessionToken:  os.Getenv("SCANNODE_S3_INTEGRATION_SESSION_TOKEN"),
 	}
 	client, err := newS3ObjectStoreClient(cfg)
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func BenchmarkS3ObjectStoreIntegration64MiB(b *testing.B) {
 	cfg := &SSAArtifactUploadConfig{
 		Endpoint: endpoint, Bucket: fmt.Sprintf("scannode-s3-bench-%d", time.Now().UnixNano()), ObjectKey: "benchmark/payload.bin",
 		Region: normalizedSSARegion(os.Getenv("SCANNODE_S3_INTEGRATION_REGION")), UseSSL: strings.HasPrefix(endpoint, "https://"), AllowHTTP: strings.HasPrefix(endpoint, "http://"),
-		STSAccessKey: newSecretValue(accessKey), STSSecretKey: newSecretValue(secretKey), STSSessionToken: newSecretValue(os.Getenv("SCANNODE_S3_INTEGRATION_SESSION_TOKEN")),
+		STSAccessKey: accessKey, STSSecretKey: secretKey, STSSessionToken: os.Getenv("SCANNODE_S3_INTEGRATION_SESSION_TOKEN"),
 	}
 	client, err := newS3ObjectStoreClient(cfg)
 	require.NoError(b, err)

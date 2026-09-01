@@ -59,9 +59,9 @@ func TestSecretValueRedactsFormattingAndJSON(t *testing.T) {
 	const secretKey = "SECRET_SHOULD_NOT_LEAK"
 	const token = "TOKEN_SHOULD_NOT_LEAK"
 	cfg := &SSAArtifactUploadConfig{
-		STSAccessKey: newSecretValue(accessKey), STSSecretKey: newSecretValue(secretKey), STSSessionToken: newSecretValue(token),
+		STSAccessKey: accessKey, STSSecretKey: secretKey, STSSessionToken: token,
 	}
-	formatted := fmt.Sprintf("%+v %#v %s", cfg, cfg, cfg.STSSecretKey)
+	formatted := fmt.Sprintf("%+v %#v", cfg, cfg)
 	encoded, err := json.Marshal(cfg)
 	require.NoError(t, err)
 	for _, value := range []string{accessKey, secretKey, token} {
@@ -92,32 +92,34 @@ func TestValidateSSAUploadConfig_RequiresExplicitHTTPAndBoundsPartSize(t *testin
 	require.Equal(t, 1, readSSAMultipartConcurrency())
 }
 
-func TestSSATLS_DefaultSkipVerifyAndExplicitPrivateCA(t *testing.T) {
+func TestSSATLS_ObjectStoreStrictByDefaultAndExplicitPrivateCA(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
 
 	t.Setenv("SCANNODE_SSA_TICKET_TLS_VERIFY", "")
+	t.Setenv("SCANNODE_SSA_TICKET_ALLOW_INSECURE_TLS", "")
 	t.Setenv("SCANNODE_SSA_TICKET_TLS_CA_FILE", "")
 	client, err := newSSATicketHTTPClient()
+	require.NoError(t, err)
+	_, err = client.Get(server.URL)
+	require.Error(t, err)
+	client.CloseIdleConnections()
+
+	t.Setenv("SCANNODE_SSA_TICKET_ALLOW_INSECURE_TLS", "true")
+	client, err = newSSATicketHTTPClient()
 	require.NoError(t, err)
 	resp, err := client.Get(server.URL)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
 	client.CloseIdleConnections()
 
-	t.Setenv("SCANNODE_SSA_TICKET_TLS_VERIFY", "true")
-	client, err = newSSATicketHTTPClient()
-	require.NoError(t, err)
-	_, err = client.Get(server.URL)
-	require.Error(t, err)
-	client.CloseIdleConnections()
-
 	certificatePEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.TLS.Certificates[0].Certificate[0]})
 	caPath := t.TempDir() + "/private-ca.pem"
 	require.NoError(t, os.WriteFile(caPath, certificatePEM, 0o600))
 	t.Setenv("SCANNODE_SSA_TICKET_TLS_CA_FILE", caPath)
+	t.Setenv("SCANNODE_SSA_TICKET_ALLOW_INSECURE_TLS", "")
 	client, err = newSSATicketHTTPClient()
 	require.NoError(t, err)
 	resp, err = client.Get(server.URL)
@@ -125,8 +127,8 @@ func TestSSATLS_DefaultSkipVerifyAndExplicitPrivateCA(t *testing.T) {
 	_ = resp.Body.Close()
 	client.CloseIdleConnections()
 
-	// Object-store TLS follows the same compatibility default requested for
-	// private ScanNode deployments, while still allowing strict verification.
+	// Object-store TLS preserves the old minio-go security property: certificates
+	// are verified by default, including when TLSVerify is left at its zero value.
 	t.Setenv("SCANNODE_SSA_TLS_CA_FILE", "")
 	cfg := testSSAUploadConfig(server.URL)
 	store, err := newS3ObjectStoreClient(cfg)
@@ -134,18 +136,19 @@ func TestSSATLS_DefaultSkipVerifyAndExplicitPrivateCA(t *testing.T) {
 	_, err = store.Put(context.Background(), PutRequest{
 		Bucket: cfg.Bucket, ObjectKey: cfg.ObjectKey, Body: bytes.NewReader([]byte("tls")), Size: 3, PayloadSHA256: sha256Hex([]byte("tls")),
 	})
-	require.NoError(t, err)
+	require.Error(t, err)
 	store.Close()
 
-	cfg.TLSVerify = true
+	cfg.AllowInsecureTLS = true
 	store, err = newS3ObjectStoreClient(cfg)
 	require.NoError(t, err)
 	_, err = store.Put(context.Background(), PutRequest{
 		Bucket: cfg.Bucket, ObjectKey: cfg.ObjectKey, Body: bytes.NewReader([]byte("tls")), Size: 3, PayloadSHA256: sha256Hex([]byte("tls")),
 	})
-	require.Error(t, err)
+	require.NoError(t, err)
 	store.Close()
 
+	cfg.AllowInsecureTLS = false
 	cfg.TLSCAFile = caPath
 	store, err = newS3ObjectStoreClient(cfg)
 	require.NoError(t, err)
@@ -154,6 +157,61 @@ func TestSSATLS_DefaultSkipVerifyAndExplicitPrivateCA(t *testing.T) {
 	})
 	require.NoError(t, err)
 	store.Close()
+}
+
+func TestS3ObjectStore_CreateMultipartDoesNotRetryAmbiguousFailure(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = io.WriteString(w, `<Error><Code>SlowDown</Code></Error>`)
+	}))
+	defer server.Close()
+
+	store, err := newS3ObjectStoreClient(testSSAUploadConfig(server.URL))
+	require.NoError(t, err)
+	store.retryLimit = 3
+	defer store.Close()
+
+	_, _, err = store.CreateMultipart(context.Background(), CreateRequest{
+		Bucket: "test-bucket", ObjectKey: "object.bin", ContentType: "application/octet-stream",
+	})
+	require.Error(t, err)
+	require.EqualValues(t, 1, requests.Load())
+}
+
+func TestS3ObjectStore_CompleteMultipartRejectsInvalidSuccessBody(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "empty"},
+		{name: "malformed", body: `<CompleteMultipartUploadResult>`},
+		{name: "wrong root", body: `<html><ETag>unexpected</ETag></html>`},
+		{name: "missing etag", body: `<CompleteMultipartUploadResult></CompleteMultipartUploadResult>`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("x-amz-request-id", "complete-invalid")
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer server.Close()
+
+			store, err := newS3ObjectStoreClient(testSSAUploadConfig(server.URL))
+			require.NoError(t, err)
+			defer store.Close()
+			_, err = store.CompleteMultipart(context.Background(), CompleteRequest{
+				Bucket: "test-bucket", ObjectKey: "object.bin", UploadID: "upload-1",
+				Parts: []CompletePart{{PartNumber: 1, ETag: "part-1"}},
+			})
+			require.Error(t, err)
+			var storeErr *ObjectStoreError
+			require.ErrorAs(t, err, &storeErr)
+			require.Equal(t, "InvalidResponse", storeErr.Code)
+			require.Equal(t, "complete-invalid", storeErr.RequestID)
+		})
+	}
 }
 
 func TestS3ObjectStore_PutMultipartRetryAndEncoding(t *testing.T) {
@@ -277,7 +335,7 @@ func TestObjectStoreSession_RefreshesOnlyExpiredCredentials(t *testing.T) {
 				cp := *cfg
 				if force {
 					refreshes.Add(1)
-					cp.STSAccessKey = newSecretValue("fresh-access")
+					cp.STSAccessKey = "fresh-access"
 				}
 				return &cp, nil
 			}
@@ -395,7 +453,7 @@ func testSSAUploadConfig(endpoint string) *SSAArtifactUploadConfig {
 	return &SSAArtifactUploadConfig{
 		Endpoint: endpoint, Bucket: "test-bucket", ObjectKey: "object.bin", Region: "us-east-1",
 		UseSSL: strings.HasPrefix(endpoint, "https://"), AllowHTTP: strings.HasPrefix(endpoint, "http://"),
-		STSAccessKey: newSecretValue("test-access"), STSSecretKey: newSecretValue("test-secret"), STSSessionToken: newSecretValue("test-token"),
+		STSAccessKey: "test-access", STSSecretKey: "test-secret", STSSessionToken: "test-token",
 	}
 }
 

@@ -31,19 +31,61 @@ type SSAArtifactUploadConfig struct {
 	Bucket   string
 	Region   string
 	UseSSL   bool
-	// TLSVerify defaults to false for compatibility with private ScanNode
-	// deployments that use self-signed certificates. Set it explicitly when
-	// the endpoint must be verified against the system or configured CA pool.
+	// TLSVerify is retained for input compatibility. Object-store TLS is
+	// verified by default; use AllowInsecureTLS only for an explicitly trusted
+	// development endpoint, or configure TLSCAFile for a private CA.
 	TLSVerify        bool
+	AllowInsecureTLS bool
 	TLSCAFile        string
 	AllowHTTP        bool
 	VirtualHostStyle bool
 
-	STSAccessKey    secretValue
-	STSSecretKey    secretValue
-	STSSessionToken secretValue
+	// These exported string fields preserve the pre-existing Go API for callers
+	// that build or inspect configs with dynamic strings. String, GoString, and
+	// JSON formatting on the containing config redact them; request signing
+	// converts them to the internal redacting value.
+	STSAccessKey    string `json:"-"`
+	STSSecretKey    string `json:"-"`
+	STSSessionToken string `json:"-"`
 	STSExpiresAt    int64
 }
+
+func (cfg *SSAArtifactUploadConfig) accessKeySecret() secretValue {
+	if cfg == nil {
+		return ""
+	}
+	return newSecretValue(cfg.STSAccessKey)
+}
+
+func (cfg *SSAArtifactUploadConfig) secretKeySecret() secretValue {
+	if cfg == nil {
+		return ""
+	}
+	return newSecretValue(cfg.STSSecretKey)
+}
+
+func (cfg *SSAArtifactUploadConfig) sessionTokenSecret() secretValue {
+	if cfg == nil {
+		return ""
+	}
+	return newSecretValue(cfg.STSSessionToken)
+}
+
+func (cfg *SSAArtifactUploadConfig) setSTSCredentials(accessKey, secretKey, sessionToken string) {
+	if cfg == nil {
+		return
+	}
+	cfg.STSAccessKey = accessKey
+	cfg.STSSecretKey = secretKey
+	cfg.STSSessionToken = sessionToken
+}
+
+func (cfg SSAArtifactUploadConfig) String() string {
+	return fmt.Sprintf("SSAArtifactUploadConfig{ObjectKey:%q Codec:%q Endpoint:%q Bucket:%q Region:%q UseSSL:%t TLSVerify:%t AllowInsecureTLS:%t TLSCAFile:%q AllowHTTP:%t VirtualHostStyle:%t STSAccessKey:[REDACTED] STSSecretKey:[REDACTED] STSSessionToken:[REDACTED] STSExpiresAt:%d}",
+		cfg.ObjectKey, cfg.Codec, cfg.Endpoint, cfg.Bucket, cfg.Region, cfg.UseSSL, cfg.TLSVerify, cfg.AllowInsecureTLS, cfg.TLSCAFile, cfg.AllowHTTP, cfg.VirtualHostStyle, cfg.STSExpiresAt)
+}
+
+func (cfg SSAArtifactUploadConfig) GoString() string { return cfg.String() }
 
 // ssaUploadMetrics accumulates upload-phase observability data across the
 // collector's lifetime. All fields are accessed under the collector's mutex.
@@ -422,7 +464,11 @@ func (c *SSAArtifactCollector) HasData() bool {
 	return c.hasData
 }
 
-func (c *SSAArtifactCollector) FinalizeUploadWithProvider(ctx context.Context, codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
+func (c *SSAArtifactCollector) FinalizeUploadWithProvider(codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
+	return c.FinalizeUploadWithProviderContext(context.Background(), codec, provider)
+}
+
+func (c *SSAArtifactCollector) FinalizeUploadWithProviderContext(ctx context.Context, codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
 	if c == nil {
 		return nil, utils.Errorf("collector is nil")
 	}
@@ -479,7 +525,7 @@ func (c *SSAArtifactCollector) FinalizeUploadWithProvider(ctx context.Context, c
 			_ = c.partsFile.Sync()
 		}
 		c.mu.Unlock()
-		return c.BuildAndUploadCompressedArtifactWithProvider(ctx, codec, provider)
+		return c.BuildAndUploadCompressedArtifactWithProviderContext(ctx, codec, provider)
 	}
 
 	if continuousEnabled && started && done != nil {
@@ -522,7 +568,7 @@ func (c *SSAArtifactCollector) FinalizeUploadWithProvider(ctx context.Context, c
 		return result, nil
 	}
 
-	return c.BuildAndUploadCompressedArtifactWithProvider(ctx, codec, provider)
+	return c.BuildAndUploadCompressedArtifactWithProviderContext(ctx, codec, provider)
 }
 
 const (
@@ -816,7 +862,7 @@ func compressSSAArtifactFile(rawPath, compressedPath, codec string) (int64, stri
 
 func uploadSSAArtifactFileWithObjectKey(ctx context.Context, path string, size int64, objectKey string, provider ssaUploadConfigProvider) error {
 	tmp := &SSAArtifactCollector{}
-	return tmp.UploadBySTSWithProvider(ctx, path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
+	return tmp.UploadBySTSWithProviderContext(ctx, path, size, func(force bool) (*SSAArtifactUploadConfig, error) {
 		cfg, err := provider(force)
 		if err != nil {
 			return nil, err
@@ -948,7 +994,11 @@ func (c *SSAArtifactCollector) BuildCompressedArtifact(codec string) (*SSAArtifa
 	}, nil
 }
 
-func (c *SSAArtifactCollector) BuildAndUploadCompressedArtifactWithProvider(ctx context.Context, codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
+func (c *SSAArtifactCollector) BuildAndUploadCompressedArtifactWithProvider(codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
+	return c.BuildAndUploadCompressedArtifactWithProviderContext(context.Background(), codec, provider)
+}
+
+func (c *SSAArtifactCollector) BuildAndUploadCompressedArtifactWithProviderContext(ctx context.Context, codec string, provider ssaUploadConfigProvider) (*SSAArtifactBuildResult, error) {
 	if provider == nil {
 		return nil, utils.Errorf("empty upload config provider")
 	}
@@ -1113,14 +1163,25 @@ func readSSAMultipartConcurrency() int {
 	return concurrency
 }
 
-func (c *SSAArtifactCollector) UploadBySTS(ctx context.Context, cfg *SSAArtifactUploadConfig, artifactPath string, size int64) error {
-	return c.UploadBySTSWithProvider(ctx, artifactPath, size, func(force bool) (*SSAArtifactUploadConfig, error) {
+func (c *SSAArtifactCollector) UploadBySTS(cfg *SSAArtifactUploadConfig, artifactPath string, size int64) error {
+	return c.UploadBySTSContext(context.Background(), cfg, artifactPath, size)
+}
+
+func (c *SSAArtifactCollector) UploadBySTSContext(ctx context.Context, cfg *SSAArtifactUploadConfig, artifactPath string, size int64) error {
+	return c.UploadBySTSWithProviderContext(ctx, artifactPath, size, func(force bool) (*SSAArtifactUploadConfig, error) {
 		_ = force
 		return cfg, nil
 	})
 }
 
-func (c *SSAArtifactCollector) UploadBySTSWithProvider(ctx context.Context, artifactPath string, size int64, provider ssaUploadConfigProvider) error {
+func (c *SSAArtifactCollector) UploadBySTSWithProvider(artifactPath string, size int64, provider ssaUploadConfigProvider) error {
+	return c.UploadBySTSWithProviderContext(context.Background(), artifactPath, size, provider)
+}
+
+func (c *SSAArtifactCollector) UploadBySTSWithProviderContext(ctx context.Context, artifactPath string, size int64, provider ssaUploadConfigProvider) error {
+	if provider == nil {
+		return utils.Errorf("empty upload config provider")
+	}
 	if ctx == nil {
 		ctx = c.uploadContext()
 	}

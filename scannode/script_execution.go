@@ -1177,7 +1177,7 @@ func redactSSAUploadErrorMessage(err error, cfg *SSAArtifactUploadConfig) string
 	if cfg == nil {
 		return message
 	}
-	for _, secret := range []secretValue{cfg.STSAccessKey, cfg.STSSecretKey, cfg.STSSessionToken} {
+	for _, secret := range []secretValue{cfg.accessKeySecret(), cfg.secretKeySecret(), cfg.sessionTokenSecret()} {
 		if raw := secret.raw(); raw != "" {
 			message = strings.ReplaceAll(message, raw, "[REDACTED]")
 		}
@@ -1204,7 +1204,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	}
 
 	provider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, cfg)
-	build, err := reporter.ssaCollector.FinalizeUploadWithProvider(
+	build, err := reporter.ssaCollector.FinalizeUploadWithProviderContext(
 		ctx,
 		normalizeArtifactCodec(cfg.Codec),
 		provider,

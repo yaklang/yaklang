@@ -280,9 +280,9 @@ func credentialsFromSSAConfig(cfg *SSAArtifactUploadConfig) objectStoreCredentia
 		return objectStoreCredentials{}
 	}
 	return objectStoreCredentials{
-		AccessKey:    cfg.STSAccessKey,
-		SecretKey:    cfg.STSSecretKey,
-		SessionToken: cfg.STSSessionToken,
+		AccessKey:    cfg.accessKeySecret(),
+		SecretKey:    cfg.secretKeySecret(),
+		SessionToken: cfg.sessionTokenSecret(),
 	}
 }
 
@@ -301,7 +301,7 @@ func (c *s3ObjectStoreClient) currentCredentials() objectStoreCredentials {
 func buildSSAObjectStoreTLSConfig(cfg *SSAArtifactUploadConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: cfg == nil || !cfg.TLSVerify,
+		InsecureSkipVerify: cfg != nil && cfg.AllowInsecureTLS,
 	}
 	caFile := ""
 	if cfg != nil {
@@ -336,7 +336,10 @@ func (c *s3ObjectStoreClient) Put(ctx context.Context, req PutRequest) (ObjectSt
 }
 
 func (c *s3ObjectStoreClient) CreateMultipart(ctx context.Context, req CreateRequest) (string, ObjectStoreResult, error) {
-	result, body, err := c.executeXML(ctx, "create_multipart", http.MethodPost, req.Bucket, req.ObjectKey, []queryValue{{Key: "uploads"}}, req.ContentType, emptySHA256Hex, nil, 0)
+	// CreateMultipartUpload is not idempotent: if the service creates an upload
+	// but its response is lost, retrying creates an orphan upload ID that the
+	// caller can never abort. Leave any retry decision to a higher-level flow.
+	result, body, err := c.executeXMLWithRetryLimit(ctx, "create_multipart", http.MethodPost, req.Bucket, req.ObjectKey, []queryValue{{Key: "uploads"}}, req.ContentType, emptySHA256Hex, nil, 0, 1)
 	if err != nil {
 		return "", result, err
 	}
@@ -410,11 +413,16 @@ func (c *s3ObjectStoreClient) CompleteMultipart(ctx context.Context, req Complet
 			return result, embeddedErr
 		}
 		var response struct {
-			ETag string `xml:"ETag"`
+			XMLName xml.Name `xml:"CompleteMultipartUploadResult"`
+			ETag    string   `xml:"ETag"`
 		}
-		if xml.Unmarshal(responseBody, &response) == nil && response.ETag != "" {
-			result.ETag = unquoteETag(response.ETag)
+		if unmarshalErr := xml.Unmarshal(responseBody, &response); unmarshalErr != nil || strings.TrimSpace(response.ETag) == "" {
+			return result, &ObjectStoreError{
+				Operation: "complete_multipart", Code: "InvalidResponse", Message: "invalid completion response",
+				StatusCode: http.StatusOK, RequestID: result.RequestID, Cause: unmarshalErr,
+			}
 		}
+		result.ETag = unquoteETag(response.ETag)
 		return result, nil
 	}
 	return ObjectStoreResult{}, &ObjectStoreError{Operation: "complete_multipart", Code: "RetryLimitExceeded"}
@@ -459,6 +467,10 @@ func (c *s3ObjectStoreClient) execute(ctx context.Context, operation, method, bu
 }
 
 func (c *s3ObjectStoreClient) executeXML(ctx context.Context, operation, method, bucket, objectKey string, query []queryValue, contentType, payloadHash string, body io.ReadSeeker, size int64) (ObjectStoreResult, []byte, error) {
+	return c.executeXMLWithRetryLimit(ctx, operation, method, bucket, objectKey, query, contentType, payloadHash, body, size, c.retryLimit)
+}
+
+func (c *s3ObjectStoreClient) executeXMLWithRetryLimit(ctx context.Context, operation, method, bucket, objectKey string, query []queryValue, contentType, payloadHash string, body io.ReadSeeker, size int64, retryLimit int) (ObjectStoreResult, []byte, error) {
 	if c == nil || c.httpClient == nil || c.endpoint == nil {
 		return ObjectStoreResult{}, nil, &ObjectStoreError{Operation: operation, Code: "ClientUnavailable"}
 	}
@@ -480,7 +492,7 @@ func (c *s3ObjectStoreClient) executeXML(ctx context.Context, operation, method,
 			return ObjectStoreResult{}, nil, &ObjectStoreError{Operation: operation, Code: "InvalidArgument", Message: "request body must be seekable", Cause: err}
 		}
 	}
-	limit := c.retryLimit
+	limit := retryLimit
 	if limit < 1 {
 		limit = 1
 	}
@@ -819,7 +831,7 @@ func validateSSAUploadConfig(cfg *SSAArtifactUploadConfig) (*url.URL, error) {
 			return nil, fmt.Errorf("invalid object store region")
 		}
 	}
-	if cfg.STSAccessKey.raw() == "" || cfg.STSSecretKey.raw() == "" {
+	if cfg.accessKeySecret().raw() == "" || cfg.secretKeySecret().raw() == "" {
 		return nil, fmt.Errorf("STS credentials missing")
 	}
 	endpointRaw := strings.TrimSpace(cfg.Endpoint)

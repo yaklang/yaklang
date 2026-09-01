@@ -31,6 +31,8 @@ type ssaArtifactTicketResponse struct {
 	Endpoint         string      `json:"endpoint"`
 	UseSSL           bool        `json:"use_ssl"`
 	TLSVerify        bool        `json:"tls_verify"`
+	AllowInsecureTLS bool        `json:"allow_insecure_tls"`
+	TLSCAFile        string      `json:"tls_ca_file"`
 	AllowHTTP        bool        `json:"allow_http"`
 	VirtualHostStyle bool        `json:"virtual_host_style"`
 	STSAccessKey     secretValue `json:"sts_access_key"`
@@ -121,36 +123,42 @@ func (s *ScanNode) fetchSSAArtifactUploadTicket(ctx context.Context, taskID, obj
 			}
 		}
 	}
+	ticketEndpoint := strings.TrimSpace(ticket.Endpoint)
+	legacySchemeLessHTTP := ticketEndpoint != "" && !ticket.UseSSL && !strings.Contains(ticketEndpoint, "://")
 	cfg = &SSAArtifactUploadConfig{
 		ObjectKey:        strings.TrimSpace(ticket.ObjectKey),
 		Codec:            strings.TrimSpace(ticket.Codec),
-		Endpoint:         strings.TrimSpace(ticket.Endpoint),
+		Endpoint:         ticketEndpoint,
 		Bucket:           strings.TrimSpace(ticket.Bucket),
 		Region:           strings.TrimSpace(ticket.Region),
 		UseSSL:           ticket.UseSSL,
 		TLSVerify:        ticket.TLSVerify,
-		AllowHTTP:        ticket.AllowHTTP || ssaExplicitHTTPAllowed(),
+		AllowInsecureTLS: ticket.AllowInsecureTLS,
+		TLSCAFile:        strings.TrimSpace(ticket.TLSCAFile),
+		AllowHTTP:        ticket.AllowHTTP || legacySchemeLessHTTP || ssaExplicitHTTPAllowed(),
 		VirtualHostStyle: ticket.VirtualHostStyle,
-		STSAccessKey:     newSecretValue(ticket.STSAccessKey.raw()),
-		STSSecretKey:     newSecretValue(ticket.STSSecretKey.raw()),
-		STSSessionToken:  newSecretValue(ticket.STSSessionToken.raw()),
 		STSExpiresAt:     ticket.STSExpiresAt,
 	}
+	cfg.setSTSCredentials(ticket.STSAccessKey.raw(), ticket.STSSecretKey.raw(), ticket.STSSessionToken.raw())
 	if cfg.Codec == "" {
 		cfg.Codec = "zstd"
 	}
 	if cfg.ObjectKey == "" {
 		cfg.ObjectKey = strings.TrimSpace(objectKey)
 	}
-	if cfg.STSAccessKey.raw() == "" || cfg.STSSecretKey.raw() == "" {
+	if cfg.accessKeySecret().raw() == "" || cfg.secretKeySecret().raw() == "" {
 		return nil, utils.Errorf("invalid upload ticket: missing sts credentials")
 	}
 	return cfg, nil
 }
 
 func newSSATicketHTTPClient() (*http.Client, error) {
-	verifyTLS := strings.EqualFold(strings.TrimSpace(os.Getenv("SCANNODE_SSA_TICKET_TLS_VERIFY")), "true")
-	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: !verifyTLS}
+	allowInsecureTLS := false
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("SCANNODE_SSA_TICKET_ALLOW_INSECURE_TLS"))) {
+	case "1", "true", "yes", "on":
+		allowInsecureTLS = true
+	}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: allowInsecureTLS}
 	caFile := strings.TrimSpace(os.Getenv("SCANNODE_SSA_TICKET_TLS_CA_FILE"))
 	if caFile == "" {
 		caFile = strings.TrimSpace(os.Getenv("SCANNODE_SSA_TLS_CA_FILE"))
