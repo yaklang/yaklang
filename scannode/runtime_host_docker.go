@@ -14,19 +14,25 @@ import (
 const runtimeHostDockerSocket = "unix:///var/run/docker.sock"
 
 type runtimeHostContainer struct {
-	ID      string
-	ImageID string
-	Running bool
-	Labels  map[string]string
+	ID              string
+	ImageID         string
+	Running         bool
+	Labels          map[string]string
+	CPUMillicores   uint64
+	MemoryBytes     uint64
+	MemorySwapBytes uint64
 }
 
 type runtimeHostContainerInput struct {
-	Name    string
-	Image   string
-	Network string
-	Args    []string
-	Env     []string
-	Labels  map[string]string
+	Name            string
+	Image           string
+	Network         string
+	Args            []string
+	Env             []string
+	Labels          map[string]string
+	CPUMillicores   uint64
+	MemoryBytes     uint64
+	MemorySwapBytes uint64
 }
 
 type runtimeHostDocker interface {
@@ -110,6 +116,11 @@ func (d *localRuntimeHostDocker) CreateAndStart(ctx context.Context, input runti
 	}, &container.HostConfig{
 		NetworkMode:   container.NetworkMode(input.Network),
 		RestartPolicy: container.RestartPolicy{Name: container.RestartPolicyUnlessStopped},
+		Resources: container.Resources{
+			NanoCPUs:   int64(input.CPUMillicores * 1_000_000),
+			Memory:     int64(input.MemoryBytes),
+			MemorySwap: int64(input.MemorySwapBytes),
+		},
 	}, nil, nil, input.Name)
 	if err != nil {
 		return runtimeHostContainer{}, err
@@ -136,12 +147,24 @@ func (d *localRuntimeHostDocker) Inspect(ctx context.Context, containerID string
 		}
 		return runtimeHostContainer{}, false, err
 	}
-	return runtimeHostContainer{
+	result := runtimeHostContainer{
 		ID:      info.ID,
 		ImageID: strings.TrimSpace(info.Image),
 		Running: info.State != nil && info.State.Running,
 		Labels:  cloneStringMapValue(info.Config.Labels),
-	}, true, nil
+	}
+	if info.HostConfig != nil {
+		if info.HostConfig.NanoCPUs > 0 {
+			result.CPUMillicores = uint64(info.HostConfig.NanoCPUs) / 1_000_000
+		}
+		if info.HostConfig.Memory > 0 {
+			result.MemoryBytes = uint64(info.HostConfig.Memory)
+		}
+		if info.HostConfig.MemorySwap > 0 {
+			result.MemorySwapBytes = uint64(info.HostConfig.MemorySwap)
+		}
+	}
+	return result, true, nil
 }
 
 func (d *localRuntimeHostDocker) StopAndRemove(ctx context.Context, containerID string) error {

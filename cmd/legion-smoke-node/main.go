@@ -25,6 +25,11 @@ import (
 	"github.com/yaklang/yaklang/scannode"
 )
 
+const (
+	defaultRuntimeHostSystemReservedCPUMillicores = 500
+	defaultRuntimeHostSystemReservedMemoryBytes   = 512 * 1024 * 1024
+)
+
 type staticHostIdentityProvider struct {
 	identity node.HostIdentity
 }
@@ -68,6 +73,16 @@ func runNode(args []string) error {
 	dockerEndpoint := flags.String("docker-endpoint", strings.TrimSpace(os.Getenv("LEGION_DOCKER_ENDPOINT")), "Session-Manager-reachable Docker endpoint advertised by a host node")
 	runtimeHost := flags.Bool("runtime-host", environmentBool("LEGION_RUNTIME_HOST"), "Allow this node to run AI session containers using its local Docker Engine")
 	runtimeNetwork := flags.String("runtime-network", environmentValue("LEGION_RUNTIME_NETWORK", "bridge"), "Fixed local Docker network for AI session containers")
+	runtimeSystemReservedCPU := flags.Uint64(
+		"runtime-system-reserved-cpu-millicores",
+		defaultRuntimeHostSystemReservedCPUMillicores,
+		"CPU reserved for the host OS, Docker and Yaklang Node before Runtime scheduling",
+	)
+	runtimeSystemReservedMemory := flags.Uint64(
+		"runtime-system-reserved-memory-bytes",
+		defaultRuntimeHostSystemReservedMemoryBytes,
+		"Memory reserved for the host OS, Docker and Yaklang Node before Runtime scheduling",
+	)
 	baseDir := flags.String("base-dir", "", "Node local state base directory")
 	ruleSnapshotCacheDir := flags.String(
 		"rule-snapshot-cache-dir",
@@ -189,6 +204,8 @@ func runNode(args []string) error {
 			Enabled: true, PlatformAPIBaseURL: *apiURL, RuntimePlatformAPIBaseURL: *runtimeAPIURL, EnrollmentToken: *enrollmentToken,
 			AgentInstallationID: *agentInstallationID, Network: *runtimeNetwork,
 			EngineReleaseID: *engineReleaseID, EngineDigest: *engineDigest,
+			SystemReservedCPUMillicores: *runtimeSystemReservedCPU,
+			SystemReservedMemoryBytes:   *runtimeSystemReservedMemory,
 		}))
 	}
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{

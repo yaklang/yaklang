@@ -27,6 +27,13 @@ message AIRuntimeRelease {
   int64 archive_size = 5;
 }
 
+// AIRuntimeResourceEnvelope is both the Legion reservation charge and the
+// Docker hard limit for one AI Runtime container.
+message AIRuntimeResourceEnvelope {
+  uint64 cpu_millicores = 1;
+  uint64 memory_bytes = 2;
+}
+
 // AIRuntimeContainerSpec contains only the values a Runtime Host is allowed to
 // vary per AI Session. Image source, mounts and the executable are derived from
 // the trusted release and the node's local configuration.
@@ -35,6 +42,7 @@ message AIRuntimeContainerSpec {
   string network = 2;
   repeated string arguments = 3;
   map<string, string> environment = 4;
+  AIRuntimeResourceEnvelope resources = 5;
 }
 
 // AIRuntimeCommand is authenticated for one active host Node session. The
