@@ -27,6 +27,32 @@ func (r *ReActLoop) shouldRenderTodoSnapshot() bool {
 var todoListTemplate string
 
 func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) (string, error) {
+	filteredValues := r.getFilteredActions(disallowExit, actionOperators...)
+
+	// Mark init constraints as applied after first schema generation
+	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
+		r.initActionApplied = true
+	}
+
+	schemaText := buildSchema(filteredValues...)
+	maxBatchCalls := aicommon.DefaultToolBatchMaxCalls
+	if concrete, ok := r.config.(*aicommon.Config); !ok || concrete.KeyValueConfig != nil {
+		maxBatchCalls = r.config.GetConfigInt(aicommon.ConfigKeyToolBatchMaxCalls, maxBatchCalls)
+	}
+	if maxBatchCalls < 2 {
+		maxBatchCalls = 2
+	}
+	if maxBatchCalls > aicommon.DefaultToolBatchMaxCalls {
+		maxBatchCalls = aicommon.DefaultToolBatchMaxCalls
+	}
+	return applyToolBatchSchemaMaxItems(schemaText, maxBatchCalls)
+}
+
+// getFilteredActions returns the list of LoopActions that should be visible
+// to the model in this iteration, after applying all disable/must-use filters.
+// Shared by generateSchemaString (text mode) and buildFunctionCallTools
+// (functioncall mode) so both modes see the same action set.
+func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) []*LoopAction {
 	// loop
 	// build in code
 	values := r.GetAllActions()
@@ -147,23 +173,7 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*
 		}
 	}
 
-	// Mark init constraints as applied after first schema generation
-	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
-		r.initActionApplied = true
-	}
-
-	schemaText := buildSchema(filteredValues...)
-	maxBatchCalls := aicommon.DefaultToolBatchMaxCalls
-	if concrete, ok := r.config.(*aicommon.Config); !ok || concrete.KeyValueConfig != nil {
-		maxBatchCalls = r.config.GetConfigInt(aicommon.ConfigKeyToolBatchMaxCalls, maxBatchCalls)
-	}
-	if maxBatchCalls < 2 {
-		maxBatchCalls = 2
-	}
-	if maxBatchCalls > aicommon.DefaultToolBatchMaxCalls {
-		maxBatchCalls = aicommon.DefaultToolBatchMaxCalls
-	}
-	return applyToolBatchSchemaMaxItems(schemaText, maxBatchCalls)
+	return filteredValues
 }
 
 // applyToolBatchSchemaMaxItems keeps the model-visible JSON Schema aligned

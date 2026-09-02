@@ -258,6 +258,15 @@ type ReActLoop struct {
 	// 变更; registry 内部并发安全 (自带 mutex).
 	// 关键词: subAgentProgressRegistry, 子 Agent 进度追踪, stall heartbeat 旁路
 	subAgentProgressRegistry *ProgressRegistry
+
+	// functionCallMode enables native functioncall (tool_calls) instead of
+	// the text-based @action JSON contract. When true, each LoopAction is
+	// converted to an aispec.Tool and injected via aispec.WithTools; the model
+	// responds with tool_calls deltas which are accumulated and converted back
+	// to aicommon.Action after the stream completes. This lets the model service
+	// set stop_reason="tool_calls" and naturally reduce thinking on subsequent
+	// calls.
+	functionCallMode bool
 }
 
 // GetScenarioToolWhitelist 返回当前 loop 声明的 scenario 工具拉回名单.
@@ -522,6 +531,14 @@ func (r *ReActLoop) GetSubAgentProgressRegistry() *ProgressRegistry {
 	return r.subAgentProgressRegistry
 }
 
+// FunctionCallModeEnabled reports whether native functioncall mode is enabled.
+func (r *ReActLoop) FunctionCallModeEnabled() bool {
+	if r == nil {
+		return false
+	}
+	return r.functionCallMode
+}
+
 // SetSubAgentProgressRegistry sets the sub-agent progress registry.
 func (r *ReActLoop) SetSubAgentProgressRegistry(reg *ProgressRegistry) {
 	if r == nil || reg == nil {
@@ -681,6 +698,11 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// Config-level perception disable (e.g. test environments via WithDisablePerception)
 	if config.GetConfigBool("DisablePerception") {
 		r.perception = nil
+	}
+
+	// Config-level functioncall mode enable (e.g. production via WithEnableFunctionCallMode)
+	if config.GetConfigBool("EnableFunctionCallMode") {
+		r.functionCallMode = true
 	}
 
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)
