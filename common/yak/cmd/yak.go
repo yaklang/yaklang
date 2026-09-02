@@ -1393,6 +1393,7 @@ func main() {
 	app.Commands = append(app.Commands, cliGroup("RAG Server", yakcmds.RAGServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("AI Viz Server", yakcmds.VizServerCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("Hot Patch Validators", yakcmds.HotPatchValidatorCommands...)...)
+	app.Commands = append(app.Commands, *yakcmds.MemfitWorkerCommand)
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
