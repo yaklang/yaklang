@@ -464,7 +464,7 @@ func getHash(hashFunc string) hash.Hash {
 // { Name = "kdfMode", Type = "select", DefaultValue = "Openssl", Options = ["Openssl", "PBKDF2"], Required = true ,Label = "密钥派生算法-KDF"},
 // { Name = "hashFunc", Type = "select",DefaultValue = "MD5", Options = ["MD5","SHA-1", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希"},
 // { Name = "noSalt", Type = "checkbox", Required = true , Label = "不加盐值"},
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "base64", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
@@ -510,7 +510,7 @@ func (flow *CodecExecFlow) AESEncryptKDF(password string, kdfMode string, hashFu
 // { Name = "password", Type = "input", Required = true,Label = "密码" },
 // { Name = "kdfMode", Type = "select", DefaultValue = "Openssl", Options = ["Openssl", "PBKDF2"], Required = true ,Label = "密钥派生算法-KDF"},
 // { Name = "hashFunc", Type = "select",DefaultValue = "MD5", Options = ["MD5","SHA-1", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希"},
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "base64", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
@@ -554,7 +554,7 @@ func (flow *CodecExecFlow) AESDecryptKDF(password string, kdfMode string, hashFu
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
@@ -585,7 +585,7 @@ func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
