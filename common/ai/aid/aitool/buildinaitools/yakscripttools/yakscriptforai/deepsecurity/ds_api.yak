@@ -66,6 +66,8 @@ __USAGE__ = <<<USAGE_BLOCK
   process(进程) / ram(内存) / honey(蜜罐) / login(登录) / file(文件) / account(账号) /
   operationAudit(操作审计) / reboundShell(反弹shell) / threatIntelligence(威胁情报) /
   backdoor(后门) / fileHoney(文件蜜罐) / outreach(异常外联)
+- **必填 `mac-code`**：监测告警按主机查询，官方接口要求 macCode 必填，缺参返回 500 参数错误。
+  须先 `query_server_list` 取得各主机 macCode，再逐台查询（或传指定主机的 mac-code）。
 
 ## 路径参数
 - `virus-hash`、`webshell-hash`：病毒/webshell 哈希（affect 类接口路径参数）
@@ -286,15 +288,16 @@ doRun = func(actionName, pathBuilder, paramBuilder) {
         if inner["totalPage"] != nil {
             totalPage = int(inner["totalPage"])
         }
-        // 找到列表字段（xxxList）
+        // 找到列表字段：优先 xxxList 命名，监测告警接口的列表字段名为 data（数组）
         lst = nil
         for k, v := range inner {
-            if str.Contains(k, "List") && str.HasPrefix(k, "total") == false {
-                ts = sprintf("%T", v)
-                if str.HasPrefix(ts, "[]") {
-                    lst = v
-                    lastListKey = k
-                }
+            ts = sprintf("%T", v)
+            if !str.HasPrefix(ts, "[]") { continue }
+            isListName = str.Contains(k, "List")
+            if isListName || k == "data" {
+                lst = v
+                lastListKey = k
+                if isListName { break }
             }
         }
         if lst != nil {
@@ -503,6 +506,8 @@ if actionLower == "query_monitor" {
     ok = false
     for _, v := range valid { if v == mt { ok = true } }
     if !ok { yakit.Error("不支持的 monitor-type: %v", mt); return }
+    // 监测告警按主机查询，macCode 为必填参数（官方接口文档「是否可空=否」），缺参会返回 500 参数错误
+    if macCode == "" { yakit.Error("query_monitor 需要 mac-code 参数（监测告警按主机查询，请先 query_server_list 获取 macCode）"); return }
     doRun(action, func(pg) { return sprintf("%v/%v-monitor/record/list", P, mt) }, func(pg) { return buildParams(pg) }); return
 }
 
