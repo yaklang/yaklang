@@ -223,10 +223,16 @@ func (s *ScanNode) releaseSSAGitScopeLockAfterTasks() {
 }
 
 func (s *ScanNode) Snapshot() node.RuntimeStatus {
-	return node.RuntimeStatus{
+	status := node.RuntimeStatus{
 		LifecycleState: node.DefaultLifecycleState,
 		RunningJobs:    s.invokeLimiter.activeCount(),
 		MaxRunningJobs: s.maxRunningJobs,
 		ActiveAttempts: s.manager.ActiveAttemptHeartbeats(time.Now().UTC()),
 	}
+	if s.runtimeHost != nil {
+		if capacity, ok := s.runtimeHost.ResourceCapacity(); ok {
+			status.RuntimeHostCapacity = &capacity
+		}
+	}
+	return status
 }
