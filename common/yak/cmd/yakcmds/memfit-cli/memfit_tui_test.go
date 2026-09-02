@@ -53,13 +53,27 @@ func TestMemfitKeyBindings(t *testing.T) {
 		{"\x1b[3~", memfitKeyDelete},
 		{"\x1b\r", memfitKeyNewline},
 		{"\x03", memfitKeyInterrupt},
+		{"\x0f", memfitKeyToggleProcess},
 		{"\x17", memfitKeyDeleteWord},
+		{"\x1b[12;7R", memfitKeyCursorPosition},
+		{"\x1b[<0;4;9M", memfitKeyMouse},
 	}
 	for _, test := range tests {
 		key, err := readMemfitKey(bufio.NewReader(strings.NewReader(test.input)))
 		require.NoError(t, err)
 		require.Equal(t, test.kind, key.kind, "input %q", test.input)
 	}
+	cursor, err := readMemfitKey(bufio.NewReader(strings.NewReader("\x1b[12;7R")))
+	require.NoError(t, err)
+	require.Equal(t, 12, cursor.row)
+	require.Equal(t, 7, cursor.column)
+
+	mouse, err := readMemfitKey(bufio.NewReader(strings.NewReader("\x1b[<0;4;9M")))
+	require.NoError(t, err)
+	require.True(t, mouse.pressed)
+	require.Equal(t, 0, mouse.button)
+	require.Equal(t, 4, mouse.column)
+	require.Equal(t, 9, mouse.row)
 }
 
 func TestMemfitReadableContentExtraction(t *testing.T) {
@@ -103,6 +117,106 @@ func TestMemfitStreamClassification(t *testing.T) {
 	thought := memfitWorkerEvent{Type: string(schema.EVENT_TYPE_STREAM), NodeID: "re-act-loop-thought", VizSource: "human_readable_thought"}
 	require.False(t, isMemfitAnswerStream(thought))
 	require.True(t, isMemfitThoughtStream(thought))
+}
+
+func TestMemfitProcessEventHumanization(t *testing.T) {
+	ui := &memfitTUI{width: 72, height: 24}
+	require.True(t, ui.recordProcessEvent("intent-1", memfitWorkerEvent{
+		Type: string(schema.EVENT_TYPE_INTENT_RECOGNITION),
+		Content: `{"intent":"inspect repository","matched_tool_names":["read_file","bash"],` +
+			`"recommended_tools":{"description":"must stay hidden"}}`,
+	}))
+	require.Len(t, ui.processItems, 1)
+	require.Equal(t, "Intent", ui.processItems[0].kind)
+	require.Contains(t, ui.processItems[0].detail, "inspect repository")
+	require.Contains(t, ui.processItems[0].detail, "read_file, bash")
+	require.NotContains(t, ui.processItems[0].detail, "description")
+
+	require.True(t, ui.recordProcessEvent("tool-event", memfitWorkerEvent{
+		Type:       string(schema.EVENT_TOOL_CALL_START),
+		CallToolID: "tool-1",
+		Content:    `{"tool":{"verbose_name_i18n":{"Zh":"文件读取"}},"params":{"file_path":"README.md"}}`,
+	}))
+	require.True(t, ui.recordProcessEvent("tool-done", memfitWorkerEvent{
+		Type:       string(schema.EVENT_TOOL_CALL_PARAM),
+		CallToolID: "tool-1",
+		Content:    `{"call_tool_id":"tool-1","params":{"file_path":"README.md"}}`,
+	}))
+	require.True(t, ui.recordProcessEvent("tool-done", memfitWorkerEvent{
+		Type:       string(schema.EVENT_TOOL_CALL_RESULT),
+		CallToolID: "tool-1",
+		Content:    `{"call_tool_id":"tool-1","result":"first line\n+added line\n-removed line"}`,
+	}))
+	require.Len(t, ui.processItems, 2, "tool lifecycle events must update one row")
+	require.Equal(t, "Read", ui.processItems[1].kind)
+	require.Equal(t, memfitProcessDone, ui.processItems[1].state)
+	require.Contains(t, ui.processItems[1].detail, "Result:\nfirst line")
+	require.Contains(t, ui.processItems[1].detail, "Input:\nREADME.md")
+	require.NotContains(t, ui.processItems[1].detail, "call_tool_id")
+}
+
+func TestMemfitProcessTimelineClassifiesCoreStreamsAndHidesDetailsByDefault(t *testing.T) {
+	ui := &memfitTUI{width: 72, height: 24, busy: true}
+	ui.appendProcessThought("thought-1", "先判断意图，再读取必要信息。")
+	collapsed := joinMemfitLiveLines(ui.processPanelLines())
+	require.Contains(t, collapsed, "Thinking ▸")
+	require.NotContains(t, collapsed, "先判断意图")
+	ui.toggleProcessItem("thought:thought-1")
+	require.Contains(t, joinMemfitLiveLines(ui.processPanelLines()), "先判断意图")
+
+	streams := []struct {
+		typeName schema.EventType
+		content  string
+		kind     string
+	}{
+		{schema.EVENT_TYPE_INTENT_RECOGNITION, `{"intent":"inspect repository"}`, "Intent"},
+		{schema.EVENT_TYPE_PERCEPTION, `{"summary":"repository context understood"}`, "Understanding"},
+		{schema.EVENT_TYPE_ACTION, `{"action":"read the README","action_type":"tool"}`, "Action"},
+		{schema.EVENT_TYPE_OBSERVATION, `{"observation":"project purpose found","source":"README.md"}`, "Observation"},
+		{schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, `{"message":"prepare a minimal plan"}`, "Plan"},
+		{schema.EVENT_TYPE_MEMORY_SEARCH_QUICKLY, `{}`, "Memory"},
+	}
+	for index, stream := range streams {
+		require.True(t, ui.recordProcessEvent(string(rune('a'+index)), memfitWorkerEvent{
+			Type:    string(stream.typeName),
+			Content: stream.content,
+		}))
+		require.Equal(t, stream.kind, ui.processItems[len(ui.processItems)-1].kind)
+	}
+}
+
+func TestMemfitStructuredTimelineKeepsSemanticsAndDropsBreadcrumbs(t *testing.T) {
+	kind, group, detail, state, ok := classifyMemfitTimelineItem(`{
+		"type":"text",
+		"raw_text":"[intent_analysis] [task:main]:\n意图识别：检查仓库结构",
+		"content":"意图识别：检查仓库结构"
+	}`)
+	require.True(t, ok)
+	require.Equal(t, "Intent", kind)
+	require.Equal(t, "intent", group)
+	require.Equal(t, "意图识别：检查仓库结构", detail)
+	require.Equal(t, memfitProcessDone, state)
+
+	_, _, _, _, ok = classifyMemfitTimelineItem(`{
+		"type":"text",
+		"raw_text":"[current task user input]:\nread README",
+		"content":"read README"
+	}`)
+	require.False(t, ok, "the visible user transcript must not be duplicated as an activity")
+
+	_, _, _, _, ok = classifyMemfitTimelineItem(`{
+		"type":"tool_result",
+		"content":"large duplicate tool output"
+	}`)
+	require.False(t, ok, "native tool lifecycle events own tool result rendering")
+}
+
+func joinMemfitLiveLines(lines []memfitLiveLine) string {
+	values := make([]string, 0, len(lines))
+	for _, line := range lines {
+		values = append(values, line.text)
+	}
+	return strings.Join(values, "\n")
 }
 
 func TestMemfitAnswerStreamsSelectLatestWriter(t *testing.T) {

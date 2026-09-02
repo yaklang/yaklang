@@ -9,12 +9,12 @@ Queued #1
   第二个问题 queued while busy
 
 Session
-  State   Thinking · <elapsed>
+  State   Thinking
   Worker  PID 4242
   Model   test-model
   Review  YOLO
   Queue   1 waiting
   Project /workspace/yaklang
 
-◆ Thinking · 1 waiting · <elapsed>
+◆ Thinking · 1 waiting
 queue ❯
