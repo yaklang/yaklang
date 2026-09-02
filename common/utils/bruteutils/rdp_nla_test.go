@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/binary"
+	"errors"
 	"math/big"
 	"net"
 	"sync"
@@ -41,6 +42,10 @@ type nlaTestServer struct {
 	lastResult *nlaVerifyRecord
 	conns      int
 	knownUsers map[string]string // user -> password（小写 user 匹配）
+
+	// credsspVersion is the version advertised in server TSRequests.
+	// 0 means v2 (legacy mock). 6 enables errorCode on auth failure.
+	credsspVersion int
 }
 
 type nlaVerifyRecord struct {
@@ -52,6 +57,10 @@ type nlaVerifyRecord struct {
 }
 
 func startNLATestServer(t *testing.T, users map[string]string) *nlaTestServer {
+	return startNLATestServerVer(t, users, 0)
+}
+
+func startNLATestServerVer(t *testing.T, users map[string]string, ver int) *nlaTestServer {
 	t.Helper()
 	// 自签证书
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -74,13 +83,28 @@ func startNLATestServer(t *testing.T, users map[string]string) *nlaTestServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := &nlaTestServer{listener: ln, tlsCert: cert, knownUsers: users}
+	srv := &nlaTestServer{listener: ln, tlsCert: cert, knownUsers: users, credsspVersion: ver}
 	go srv.serve()
 	t.Cleanup(func() { ln.Close() })
 	return srv
 }
 
 func (s *nlaTestServer) addr() string { return s.listener.Addr().String() }
+
+func (s *nlaTestServer) protoVersion() int {
+	if s.credsspVersion == 0 {
+		return nla.CredSSPVersion2
+	}
+	return s.credsspVersion
+}
+
+func (s *nlaTestServer) rejectAuth(conn *tls.Conn) error {
+	// Windows 10/2016+ (CredSSP v6) sends NTSTATUS instead of just dropping TLS.
+	if s.credsspVersion >= nla.CredSSPVersion6 {
+		_, _ = conn.Write(nla.EncodeTSRequestError(s.protoVersion(), 0xC000006D))
+	}
+	return errAuthFail
+}
 
 func (s *nlaTestServer) record(r *nlaVerifyRecord) {
 	s.mu.Lock()
@@ -183,7 +207,7 @@ func (s *nlaTestServer) credssp(conn *tls.Conn, rec *nlaVerifyRecord) error {
 	serverChallenge := make([]byte, 8)
 	_, _ = rand.Read(serverChallenge)
 	challengeMsg := buildNTLMChallenge(serverChallenge)
-	if _, err := conn.Write(nla.EncodeDERTRequest([]nla.Message{challengeMsg}, nil, nil)); err != nil {
+	if _, err := conn.Write(nla.EncodeDERTRequest(s.protoVersion(), []nla.Message{challengeMsg}, nil, nil, nil)); err != nil {
 		return err
 	}
 	// 3c. 收 TSRequest(Authenticate)
@@ -204,15 +228,15 @@ func (s *nlaTestServer) credssp(conn *tls.Conn, rec *nlaVerifyRecord) error {
 	// 3d. 服务端验证 NTProofStr
 	password, known := s.knownUsers[user]
 	if !known {
-		return errAuthFail // 未知用户：真实服务器也拒绝
+		return s.rejectAuth(conn)
 	}
 	if !verifyNTLMv2(password, user, domain, serverChallenge, ntResp) {
-		return errAuthFail
+		return s.rejectAuth(conn)
 	}
 	rec.Verified = true
 
 	// 3e. 发 PubKeyAuth（客户端不校验内容）→ 收最终 AuthInfo
-	if _, err := conn.Write(nla.EncodeDERTRequest(nil, nil, []byte("pubkey-placeholder"))); err != nil {
+	if _, err := conn.Write(nla.EncodeDERTRequest(s.protoVersion(), nil, nil, []byte("pubkey-placeholder"), nil)); err != nil {
 		return err
 	}
 	final, err := readTSRequest(conn)
@@ -424,10 +448,6 @@ func TestRDPNLAAuthentication(t *testing.T) {
 			}
 			ok, err := rdpLoginContext(context.Background(), host, host, c.user, c.pass, port)
 			gotErr := err != nil
-			if c.wantVerify && ok {
-				// 客户端到达 ready/success（模拟器在 AuthInfo 后断开，
-				// 客户端通常在后续 MCS 阶段报错——两种都接受）
-			}
 			res := srv.result()
 			if res == nil {
 				t.Fatalf("no connection reached NLA stage (err=%v)", err)
@@ -439,11 +459,94 @@ func TestRDPNLAAuthentication(t *testing.T) {
 			if res.GotAuthInfo != c.wantAuthInfo {
 				t.Errorf("client AuthInfo=%v want %v", res.GotAuthInfo, c.wantAuthInfo)
 			}
-			if c.wantVerify == false && !gotErr && ok {
-				t.Errorf("client reported success for failed NLA auth")
+			if c.wantVerify {
+				if !ok || gotErr {
+					t.Errorf("correct NLA creds must report brute success (ok=%v err=%v)", ok, err)
+				}
+			} else if ok || !gotErr {
+				t.Errorf("client reported success for failed NLA auth (ok=%v err=%v)", ok, err)
 			}
 			t.Logf("case=%s server: verified=%v gotAuth=%v gotAuthInfo=%v user=%q domain=%q; client: ok=%v err=%v",
 				c.name, res.Verified, res.GotAuth, res.GotAuthInfo, res.User, res.Domain, ok, err)
 		})
+	}
+}
+
+// TestRDPNLAv6LogonFailure 覆盖 Windows 10/2016+ 的 CredSSP v6 失败信号：
+// 服务端在 NTLM 失败后发 TSRequest.errorCode=STATUS_LOGON_FAILURE，
+// 客户端必须在数秒内返回 CredSSPError 而不是 15s 超时或 tls 误分类。
+func TestRDPNLAv6LogonFailure(t *testing.T) {
+	users := map[string]string{"rdpuser": "RdpPass123!"}
+	srv := startNLATestServerVer(t, users, nla.CredSSPVersion6)
+
+	host, portStr, _ := splitHostPort(srv.addr())
+	port := atoiDefault(portStr, 0)
+
+	ok, err := rdpLoginContext(context.Background(), host, host, "rdpuser", "WRONG", port)
+	if ok {
+		t.Fatal("wrong password must not succeed")
+	}
+	if err == nil {
+		t.Fatal("wrong password must return an error")
+	}
+	var cssp *nla.CredSSPError
+	if !errors.As(err, &cssp) {
+		t.Fatalf("want CredSSPError, got %v", err)
+	}
+	if !cssp.AuthFailed() {
+		t.Fatalf("want AuthFailed, got %v", err)
+	}
+
+	// 正确凭证：NLA 完成即爆破成功，不必再开 MCS。
+	ok, err = rdpLoginContext(context.Background(), host, host, "rdpuser", "RdpPass123!", port)
+	res := srv.result()
+	if res == nil || !res.Verified {
+		t.Fatalf("correct creds: server verify=%v client ok=%v err=%v", res, ok, err)
+	}
+	if !ok || err != nil {
+		t.Fatalf("correct NLA creds must report brute success, ok=%v err=%v", ok, err)
+	}
+}
+
+// TestRDPBrutePassClassification 走 BrutePass 兼容层：正确凭证 Ok+Finished，
+// 错误凭证不得 Finished（调度器要继续字典），不可达必须 Finished。
+func TestRDPBrutePassClassification(t *testing.T) {
+	users := map[string]string{"rdpuser": "RdpPass123!"}
+	srv := startNLATestServerVer(t, users, nla.CredSSPVersion6)
+
+	hit := func(user, pass string) *BruteItemResult {
+		return rdpAuth.BrutePass(&BruteItem{
+			Type:     "rdp",
+			Target:   srv.addr(),
+			Username: user,
+			Password: pass,
+			Context:  context.Background(),
+		})
+	}
+
+	okRes := hit("rdpuser", "RdpPass123!")
+	if !okRes.Ok || !okRes.Finished {
+		t.Errorf("correct creds: want ok+finished, got ok=%v finished=%v", okRes.Ok, okRes.Finished)
+	}
+
+	bad := hit("rdpuser", "WRONG")
+	if bad.Ok {
+		t.Errorf("wrong password must not be ok")
+	}
+	if bad.Finished {
+		t.Errorf("wrong password must not mark target finished (scheduler would skip the rest of the dict)")
+	}
+
+	unknown := hit("no-such-user", "x")
+	if unknown.Ok || unknown.Finished {
+		t.Errorf("unknown user: want !ok !finished, got ok=%v finished=%v", unknown.Ok, unknown.Finished)
+	}
+
+	dead := rdpAuth.BrutePass(&BruteItem{
+		Type: "rdp", Target: "127.0.0.1:1", Username: "a", Password: "b",
+		Context: context.Background(),
+	})
+	if dead.Ok || !dead.Finished {
+		t.Errorf("unreachable: want finished+!ok, got ok=%v finished=%v", dead.Ok, dead.Finished)
 	}
 }

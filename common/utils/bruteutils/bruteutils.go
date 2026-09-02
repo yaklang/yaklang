@@ -609,6 +609,10 @@ func autoSetFinishedByConnectionError(err error, result *BruteItemResult) *Brute
 		fallthrough
 	case utils.IContains(err.Error(), "protocol error"):
 		fallthrough
+	case utils.IContains(err.Error(), "rdp tls handshake"):
+		fallthrough
+	case utils.IContains(err.Error(), "rdp x224"):
+		fallthrough
 	case utils.IContains(err.Error(), "i/o timeout"):
 		result.Finished = true
 		return result

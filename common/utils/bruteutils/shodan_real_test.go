@@ -114,6 +114,8 @@ func classifyNetError(err error) string {
 		return "eof"
 	case strings.Contains(s, "no route"), strings.Contains(s, "network unreachable"), strings.Contains(s, "unreachable"):
 		return "no-route"
+	case strings.Contains(s, "rdp nla"), strings.Contains(s, "credssp"), strings.Contains(s, "ntstatus"), strings.Contains(s, "logon_failure"):
+		return "auth-rejected"
 	case strings.Contains(s, "tls"), strings.Contains(s, "handshake"):
 		return "tls"
 	case strings.Contains(s, "protocol"):
@@ -144,20 +146,25 @@ func shodanProbeLegacy(t *testing.T, proto, target string) (ok, finished bool, c
 		Context:  context.Background(),
 	}
 	start := time.Now()
+	if proto == "rdp" {
+		host, portStr, ok2 := splitHostPort(target)
+		if !ok2 {
+			t.Fatalf("bad rdp target %s", target)
+		}
+		okLogin, err := rdpLoginContext(item.Context, host, host, item.Username, item.Password, atoiDefault(portStr, 3389))
+		elapsed = time.Since(start)
+		if err != nil {
+			class = classifyNetError(err)
+			t.Logf("rdp detail %s: %v", target, err)
+			return false, false, class, elapsed
+		}
+		if okLogin {
+			return true, true, "auth-ok", elapsed
+		}
+		return false, false, "auth-rejected", elapsed
+	}
 	res := handler.BrutePass(item)
 	elapsed = time.Since(start)
-
-	if proto == "rdp" {
-		if host, portStr, ok2 := splitHostPort(target); ok2 {
-			_, err := rdpLoginContext(item.Context, host, host, item.Username, item.Password, atoiDefault(portStr, 3389))
-			if err != nil {
-				class = classifyNetError(err)
-				return res.Ok, res.Finished, class, elapsed
-			}
-		}
-		class = "nil"
-		return res.Ok, res.Finished, class, elapsed
-	}
 	if res.Ok {
 		class = "auth-ok"
 	} else if res.Finished {
@@ -206,7 +213,7 @@ func TestShodanRealWorldBrute(t *testing.T) {
 		name  string
 		query string
 	}{
-		{name: "rdp", query: "port:3389"},
+		{name: "rdp", query: `port:3389 "Remote Desktop Protocol"`},
 		{name: "mysql", query: "port:3306"},
 		{name: "postgres", query: "port:5432"},
 		{name: "mssql", query: "port:1433"},
@@ -272,5 +279,86 @@ func TestShodanRealWorldBrute(t *testing.T) {
 			t.Logf("%-10s (%d attempts): %s", proto, n, strings.Join(parts, ", "))
 		}
 		t.Logf("total attempts=%d, unexpected ok=%d", totalAttempts, totalOK)
+	})
+}
+
+// TestShodanRDPWindowsMatrix 按 Windows 版本采样真实 RDP，验证 NLA/CredSSP
+// 在 Win7 / 2012R2 / 2016 / 2019 / 2022 / Win10 / Win11 上都能走到认证失败
+// 而不是卡在 TLS 或 15s 超时。每版本最多 8 个目标、每目标 1 次无效凭证。
+func TestShodanRDPWindowsMatrix(t *testing.T) {
+	if os.Getenv("YAK_BRUTE_SHODAN") != "1" {
+		t.Skip("set YAK_BRUTE_SHODAN=1 + SHODAN_API_KEY")
+	}
+	key := os.Getenv("SHODAN_API_KEY")
+	if key == "" {
+		t.Fatal("SHODAN_API_KEY is empty")
+	}
+	limit := 8
+	if v := os.Getenv("YAK_BRUTE_SHODAN_TARGETS"); v != "" {
+		limit = atoiDefault(v, 8)
+	}
+
+	versions := []struct {
+		name  string
+		query string
+	}{
+		{"win7-2008r2", `port:3389 "6.1.7601"`},
+		{"win2012r2", `port:3389 "6.3.9600"`},
+		{"win2016-1607", `port:3389 "10.0.14393"`},
+		{"win2019-1809", `port:3389 "10.0.17763"`},
+		{"win10-21h2", `port:3389 "10.0.19041"`},
+		{"win2022", `port:3389 "10.0.20348"`},
+		{"win11-22h2", `port:3389 "10.0.22621"`},
+		{"win11-24h2", `port:3389 "10.0.26100"`},
+		{"xrdp", `port:3389 xrdp`},
+	}
+
+	histogram := map[string]map[string]int{}
+	var totalOK int
+	for _, ver := range versions {
+		t.Run(ver.name, func(t *testing.T) {
+			targets := shodanSearch(t, key, ver.query, limit)
+			if len(targets) == 0 {
+				t.Skip("no tcp targets")
+			}
+			histogram[ver.name] = map[string]int{}
+			for _, tgt := range targets {
+				ok, finished, class, elapsed := shodanProbeLegacy(t, "rdp", tgt)
+				key := fmt.Sprintf("ok=%v,finished=%v,err=%s", ok, finished, class)
+				histogram[ver.name][key]++
+				if ok {
+					totalOK++
+				}
+				t.Logf("%-14s %-22s ok=%-5v finished=%-5v errclass=%-16s %v",
+					ver.name, tgt, ok, finished, class, elapsed.Round(100*time.Millisecond))
+				time.Sleep(shodanAttemptInterval)
+			}
+		})
+	}
+
+	t.Run("report", func(t *testing.T) {
+		t.Log("==== RDP Windows 版本矩阵 ====")
+		names := make([]string, 0, len(histogram))
+		for k := range histogram {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			classes := make([]string, 0)
+			for c := range histogram[name] {
+				classes = append(classes, c)
+			}
+			sort.Strings(classes)
+			var parts []string
+			n := 0
+			for _, c := range classes {
+				parts = append(parts, fmt.Sprintf("%s×%d", c, histogram[name][c]))
+				n += histogram[name][c]
+			}
+			t.Logf("%-14s (%d): %s", name, n, strings.Join(parts, ", "))
+		}
+		if totalOK != 0 {
+			t.Errorf("unexpected auth success: %d", totalOK)
+		}
 	})
 }

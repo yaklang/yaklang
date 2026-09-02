@@ -2,9 +2,12 @@ package tpkt
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/emission"
@@ -54,82 +57,128 @@ func (t *TPKT) StartTLS() error {
 	return t.Conn.StartTLS()
 }
 
+func isNLAAuthDrop(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "tls: access denied") ||
+		strings.Contains(s, "tls: internal error") ||
+		strings.Contains(s, "connection reset") ||
+		strings.Contains(s, "broken pipe")
+}
+
+func generateCredSSPNonce() ([]byte, error) {
+	nonce := make([]byte, 32)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("rdp nla: generate nonce: %w", err)
+	}
+	return nonce, nil
+}
+
 func (t *TPKT) StartNLA() error {
 	err := t.StartTLS()
 	if err != nil {
 		glog.Info("start tls failed", err)
+		return fmt.Errorf("rdp tls handshake: %w", err)
+	}
+
+	nonce, err := generateCredSSPNonce()
+	if err != nil {
 		return err
 	}
-	req := nla.EncodeDERTRequest([]nla.Message{t.ntlm.GetNegotiateMessage()}, nil, nil)
+
+	// Advertise v6 from the first TSRequest (Windows 10/2016+ require v5+
+	// after the CVE-2018-0886 Encryption Oracle Remediation policy).
+	req := nla.EncodeDERTRequest(nla.DefaultCredSSPVersion,
+		[]nla.Message{t.ntlm.GetNegotiateMessage()}, nil, nil, nonce)
 	_, err = t.Conn.Write(req)
 	if err != nil {
 		glog.Info("send NegotiateMessage", err)
-		return err
+		return fmt.Errorf("rdp nla: send negotiate: %w", err)
 	}
 
-	resp := make([]byte, 1024)
-	n, err := t.Conn.Read(resp)
+	tsreq, err := nla.ReadTSRequest(t.Conn)
 	if err != nil {
-		return fmt.Errorf("read %s", err)
-	} else {
-		glog.Debug("StartNLA Read success")
+		return fmt.Errorf("rdp nla: read challenge: %w", err)
 	}
-	return t.recvChallenge(resp[:n])
+	glog.Debug("StartNLA Read success")
+	return t.recvChallenge(tsreq, nonce)
 }
 
-func (t *TPKT) recvChallenge(data []byte) error {
-	glog.Debug("recvChallenge", hex.EncodeToString(data))
-	tsreq, err := nla.DecodeDERTRequest(data)
-	if err != nil {
-		glog.Info("DecodeDERTRequest", err)
+func (t *TPKT) recvChallenge(tsreq *nla.TSRequest, nonce []byte) error {
+	glog.Debugf("tsreq:%+v", tsreq)
+	if err := tsreq.AuthError(); err != nil {
 		return err
 	}
-	glog.Debugf("tsreq:%+v", tsreq)
-	// get pubkey
+	if len(tsreq.NegoTokens) == 0 {
+		return fmt.Errorf("rdp nla: no NegoTokens in challenge (server version %d)", tsreq.Version)
+	}
+
 	pubkey, err := t.Conn.TlsPubKey()
+	if err != nil {
+		return fmt.Errorf("rdp nla: tls public key: %w", err)
+	}
 	glog.Debugf("pubkey=%+v", pubkey)
 
+	effective := nla.EffectiveVersion(nla.DefaultCredSSPVersion, tsreq.Version)
+	glog.Debugf("CredSSP version client=%d server=%d effective=%d",
+		nla.DefaultCredSSPVersion, tsreq.Version, effective)
+
 	authMsg, ntlmSec := t.ntlm.GetAuthenticateMessage(tsreq.NegoTokens[0].Data)
+	if authMsg == nil || ntlmSec == nil {
+		return fmt.Errorf("rdp nla: failed to build NTLM Authenticate")
+	}
 	t.ntlmSec = ntlmSec
 
-	encryptPubkey := ntlmSec.GssEncrypt(pubkey)
-	req := nla.EncodeDERTRequest([]nla.Message{authMsg}, nil, encryptPubkey)
+	var pubValue []byte
+	var sendNonce []byte
+	if effective >= nla.CredSSPVersion5 {
+		pubValue = nla.ComputePubKeyHash(true, nonce, pubkey)
+		sendNonce = nonce
+	} else {
+		pubValue = pubkey
+	}
+	encrypted := ntlmSec.GssEncrypt(pubValue)
+	req := nla.EncodeDERTRequest(effective, []nla.Message{authMsg}, nil, encrypted, sendNonce)
 	_, err = t.Conn.Write(req)
 	if err != nil {
 		glog.Info("send AuthenticateMessage", err)
-		return err
+		return fmt.Errorf("rdp nla: send authenticate: %w", err)
 	}
-	resp := make([]byte, 1024)
-	n, err := t.Conn.Read(resp)
+
+	next, err := nla.ReadTSRequest(t.Conn)
 	if err != nil {
+		// Windows 7/2008 and some 2012 boxes just drop the TLS session
+		// on a failed NTLM Authenticate instead of sending errorCode.
+		if isNLAAuthDrop(err) {
+			return fmt.Errorf("rdp nla: authentication failed: %w", err)
+		}
 		glog.Error("Read:", err)
-		return fmt.Errorf("read %s", err)
-	} else {
-		glog.Debug("recvChallenge Read success")
+		return fmt.Errorf("rdp nla: read pubkey: %w", err)
 	}
-	return t.recvPubKeyInc(resp[:n])
+	glog.Debug("recvChallenge Read success")
+	return t.recvPubKeyInc(next, effective)
 }
 
-func (t *TPKT) recvPubKeyInc(data []byte) error {
-	glog.Debug("recvPubKeyInc", hex.EncodeToString(data))
-	tsreq, err := nla.DecodeDERTRequest(data)
-	if err != nil {
-		glog.Info("DecodeDERTRequest", err)
+func (t *TPKT) recvPubKeyInc(tsreq *nla.TSRequest, effective int) error {
+	if err := tsreq.AuthError(); err != nil {
 		return err
 	}
 	glog.Debug("PubKeyAuth:", tsreq.PubKeyAuth)
-	//ignore
-	//pubkey := t.ntlmSec.GssDecrypt([]byte(tsreq.PubKeyAuth))
+
 	domain, username, password := t.ntlm.GetEncodedCredentials()
 	credentials := nla.EncodeDERTCredentials(domain, username, password)
 	authInfo := t.ntlmSec.GssEncrypt(credentials)
-	req := nla.EncodeDERTRequest(nil, authInfo, nil)
-	_, err = t.Conn.Write(req)
+	req := nla.EncodeDERTRequest(effective, nil, authInfo, nil, nil)
+	_, err := t.Conn.Write(req)
 	if err != nil {
 		glog.Info("send AuthenticateMessage", err)
-		return err
+		return fmt.Errorf("rdp nla: send authInfo: %w", err)
 	}
-
 	return nil
 }
 
