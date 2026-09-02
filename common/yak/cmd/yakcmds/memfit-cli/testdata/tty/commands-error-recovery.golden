@@ -1,0 +1,18 @@
+◆ memfit  local isolated agent
+test-model · YOLO · /workspace/yaklang
+Enter send · Alt+Enter newline · Ctrl+C stop · /help
+worker pid: 4242
+model: configured Yaklang tiers/test-model
+review: yolo
+workdir: /workspace/yaklang
+│ worker warning: retry is available
+│ erase-attempt stayed plain text
+You › error
+error: deterministic provider failure
+Memfit commands
+  /status       process, model, mode, workdir
+  /mode MODE    set yolo, ai, or manual
+  /logs         filtered worker logs
+  /clear        clear view; keep scrollback
+  /exit         end session
+❯

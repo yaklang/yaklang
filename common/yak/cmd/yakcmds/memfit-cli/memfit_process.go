@@ -1,4 +1,4 @@
-package yakcmds
+package memfitcli
 
 import (
 	"context"
@@ -30,6 +30,21 @@ type memfitProcessClient struct {
 	logMu   sync.Mutex
 	logTail []string
 	secret  string
+}
+
+// memfitClient is the local side of the worker transport. Keeping the TUI on
+// this narrow interface makes the complete terminal interaction testable with
+// a deterministic worker while production still uses a real child process.
+type memfitClient interface {
+	send(typ, id string, payload any) error
+	Events() <-chan memfitEnvelope
+	Logs() <-chan string
+	Done() <-chan struct{}
+	WaitError() error
+	LogTail() []string
+	formattedLogTail() string
+	PID() int
+	Close()
 }
 
 func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*memfitProcessClient, error) {
@@ -174,6 +189,19 @@ func (c *memfitProcessClient) LogTail() []string {
 	c.logMu.Lock()
 	defer c.logMu.Unlock()
 	return append([]string(nil), c.logTail...)
+}
+
+func (c *memfitProcessClient) Events() <-chan memfitEnvelope { return c.events }
+
+func (c *memfitProcessClient) Logs() <-chan string { return c.logs }
+
+func (c *memfitProcessClient) Done() <-chan struct{} { return c.done }
+
+func (c *memfitProcessClient) PID() int {
+	if c.cmd == nil || c.cmd.Process == nil {
+		return 0
+	}
+	return c.cmd.Process.Pid
 }
 
 func (c *memfitProcessClient) formattedLogTail() string {

@@ -1,6 +1,6 @@
 //go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
 
-package yakcmds
+package memfitcli
 
 import (
 	"os/exec"

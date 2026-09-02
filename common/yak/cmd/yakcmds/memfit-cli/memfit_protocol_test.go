@@ -1,4 +1,4 @@
-package yakcmds
+package memfitcli
 
 import (
 	"bytes"
