@@ -5,6 +5,8 @@ __KEYWORDS__ = "deepsecurity,主机安全,云主机,入侵威胁,病毒木马,we
 __USAGE__ = <<<USAGE_BLOCK
 亚信安全云主机深度安全防护系统开放接口统一查询工具。仅查询，不执行任何写操作。
 
+**action 名是固定枚举，只支持本 USAGE 里列出的名字；严禁自行拼接或猜测变体（如 query_weak_pwd_info / query_config_list 等均不存在，会报"不支持的操作"）。某接口返回错误时先看错误信息，不要换名字重试。**
+
 ## 认证
 公共参数放 header（appId / signMethod=HmacSHA256 / signVersion=3.0 / signNonce / time / version / sign）。
 签名串 = 公共参数+业务参数 按 key 字典序排序，value 用 JSON 序列化（字符串带双引号，GET 单值按数组 ["x"] 参与），
