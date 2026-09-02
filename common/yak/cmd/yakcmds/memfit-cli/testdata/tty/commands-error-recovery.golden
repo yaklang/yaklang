@@ -1,7 +1,3 @@
-  Review  YOLO
-  Queue   empty
-  Project /workspace/yaklang
-
 Worker diagnostics · 3
   WARN    provider:42 · worker retry is available
   EVENT   structured retry detail
@@ -14,6 +10,10 @@ Error
   deterministic provider failure
 
 Commands
+  Click an activity to open its details
+  Ctrl+O        toggle the current activity
+  /process      toggle current activity
+  /process all  show earlier activities
   /status       session and worker status
   /queue        show queued messages
   /queue clear  discard queued messages

@@ -55,11 +55,12 @@ func TestMemfitTTYWidePasteAndAnswerSnapshot(t *testing.T) {
 	h.Write("\r")
 	h.WaitFor("echo: 你好，Memfit / 第二行 🌏")
 	h.WaitFor("Completed")
+	h.WaitFor("○ Ready\n❯")
 	h.AssertSnapshot("wide-answer")
 	raw := h.Raw()
 	require.Contains(t, raw, "\x1b[?2004h", "bracketed paste must be enabled")
+	require.Contains(t, raw, "\x1b[?1000h", "activity rows must accept mouse clicks")
 	require.NotContains(t, raw, "\x1b[?1049", "Memfit must preserve native scrollback")
-	require.NotContains(t, raw, "\x1b[?1000", "Memfit must not capture terminal mouse input")
 }
 
 func TestMemfitTTYManualReviewAndCancellationSnapshot(t *testing.T) {
@@ -77,6 +78,7 @@ func TestMemfitTTYManualReviewAndCancellationSnapshot(t *testing.T) {
 	h.Write("approve\r")
 	h.WaitFor("approved: approve")
 	h.WaitFor("Completed")
+	h.WaitFor("○ Ready\n❯")
 	h.Write("slow\r")
 	h.WaitFor("queue ❯")
 	h.Write("\x03")
@@ -92,6 +94,7 @@ func TestMemfitTTYCompactResizeAndHistorySnapshot(t *testing.T) {
 	h.WaitFor("memfit · YOLO")
 	h.Write("first prompt\r")
 	h.WaitFor("Completed")
+	h.WaitFor("○ Ready\n❯")
 	h.Write("/clear\r")
 	time.Sleep(100 * time.Millisecond)
 	h.Write("\x1b[A")
@@ -201,12 +204,12 @@ func TestMemfitTTYHidesToolJSONAndYOLOPromptsSnapshot(t *testing.T) {
 
 	h.WaitFor("❯")
 	h.Write("tool-noise\r")
-	h.WaitFor("Using 文件读取 · README.md")
-	h.WaitFor("Plan · 读取 README.md")
+	h.WaitFor("Reading 文件读取 · README.md")
+	h.WaitFor("Review · 读取 README.md")
 	h.WaitFor("Tool issue")
 	h.WaitFor("最终答案，只展示一次")
 	h.WaitFor("Completed")
-	snapshot := h.WaitFor("○ Ready")
+	snapshot := h.WaitFor("○ Ready\n❯")
 	require.NotContains(t, snapshot, `"description"`)
 	require.NotContains(t, snapshot, "Memfit update")
 	require.NotContains(t, snapshot, "reply ❯")
@@ -216,6 +219,39 @@ func TestMemfitTTYHidesToolJSONAndYOLOPromptsSnapshot(t *testing.T) {
 	require.NotContains(t, raw, "reply ❯")
 	require.NotContains(t, raw, "Memfit update")
 	h.AssertSnapshot("low-noise-tool-flow")
+}
+
+func TestMemfitTTYActivityTimelineExpandsIndividualStreams(t *testing.T) {
+	h := newMemfitTTYHarness(t, 82, 26)
+	defer h.Close()
+
+	h.WaitFor("❯")
+	h.Write("activity-flow\r")
+	h.WaitFor("activity flow complete")
+	h.WaitFor("Completed")
+	collapsed := h.WaitFor("○ Ready\n❯")
+	require.Contains(t, collapsed, "✓ Thinking ▸")
+	require.NotContains(t, collapsed, "先识别用户意图，再选择最小范围的工具。")
+	require.Contains(t, collapsed, "✓ Intent ▸ · inspect repository")
+	require.Contains(t, collapsed, "✓ Read ▸ · 文件读取 · README.md")
+
+	h.ClickText("Thinking")
+	h.WaitFor("先识别用户意图，再选择最小范围的工具。")
+	h.AssertSnapshot("activity-thinking-open")
+
+	h.ClickText("Read")
+	readOpen := h.WaitFor("Yaklang is a security-oriented language")
+	require.NotContains(t, readOpen, `"description"`)
+	require.NotContains(t, readOpen, `"call_tool_id"`)
+	h.AssertSnapshot("activity-read-open")
+
+	h.Resize(30, 14)
+	narrow := h.WaitFor("Result:")
+	for _, line := range strings.Split(narrow, "\n") {
+		require.LessOrEqual(t, runewidth.StringWidth(line), 30)
+	}
+	require.Contains(t, narrow, "❯")
+	h.AssertSnapshot("activity-narrow-open")
 }
 
 func TestMemfitTTYPreservesDraftWhileResponseUpdatesSnapshot(t *testing.T) {
@@ -280,6 +316,8 @@ func (c *scriptedMemfitClient) send(typ, id string, payload any) error {
 			}()
 		case "tool-noise":
 			go c.completeNoisyToolFlow()
+		case "activity-flow":
+			go c.completeActivityFlow()
 		case "stream-while-type":
 			go c.completeSlowStream()
 		case "error":
@@ -358,7 +396,8 @@ func (c *scriptedMemfitClient) completeNoisyToolFlow() {
 	})
 	time.Sleep(20 * time.Millisecond)
 	c.emit("event", "tool-1", memfitWorkerEvent{
-		Type: string(schema.EVENT_TOOL_CALL_START),
+		Type:       string(schema.EVENT_TOOL_CALL_START),
+		CallToolID: "tool-1",
 		Content: `{"tool":{"description":"A very long internal schema that users should never see",` +
 			`"name":"read_file","verbose_name":"File Reader","verbose_name_i18n":{"Zh":"文件读取"}},` +
 			`"params":{"file_path":"README.md"}}`,
@@ -370,8 +409,9 @@ func (c *scriptedMemfitClient) completeNoisyToolFlow() {
 	})
 	time.Sleep(20 * time.Millisecond)
 	c.emit("event", "tool-error", memfitWorkerEvent{
-		Type:    string(schema.EVENT_TOOL_CALL_ERROR),
-		Content: `{"error":"missing required command; Memfit corrected the tool input and retried"}`,
+		Type:       string(schema.EVENT_TOOL_CALL_ERROR),
+		CallToolID: "tool-1",
+		Content:    `{"error":"missing required command; Memfit corrected the tool input and retried"}`,
 	})
 	time.Sleep(20 * time.Millisecond)
 	c.emit("event", "answer-early", memfitWorkerEvent{
@@ -389,6 +429,60 @@ func (c *scriptedMemfitClient) completeNoisyToolFlow() {
 		AIModel:     "test-model",
 	})
 	time.Sleep(20 * time.Millisecond)
+	c.emit("turn_done", "", memfitStatus{TaskID: "test-task", Status: "completed"})
+}
+
+func (c *scriptedMemfitClient) completeActivityFlow() {
+	time.Sleep(25 * time.Millisecond)
+	c.emit("event", "thought-activity", memfitWorkerEvent{
+		Type:        string(schema.EVENT_TYPE_STREAM),
+		NodeID:      "re-act-loop-thought",
+		IsStream:    true,
+		IsReason:    true,
+		StreamDelta: "先识别用户意图，再选择最小范围的工具。",
+	})
+	time.Sleep(15 * time.Millisecond)
+	c.emit("event", "intent-activity", memfitWorkerEvent{
+		Type:    string(schema.EVENT_TYPE_INTENT_RECOGNITION),
+		Content: `{"intent":"inspect repository","matched_tool_names":["read_file"],"description":"hidden schema"}`,
+	})
+	time.Sleep(15 * time.Millisecond)
+	c.emit("event", "perception-activity", memfitWorkerEvent{
+		Type:    string(schema.EVENT_TYPE_PERCEPTION),
+		Content: `{"summary":"README contains project context","confidence":0.94}`,
+	})
+	time.Sleep(15 * time.Millisecond)
+	c.emit("event", "tool-start-activity", memfitWorkerEvent{
+		Type:       string(schema.EVENT_TOOL_CALL_START),
+		CallToolID: "activity-tool-1",
+		Content:    `{"tool":{"name":"read_file","verbose_name_i18n":{"Zh":"文件读取"},"description":"hidden schema"},"params":{"file_path":"README.md"}}`,
+	})
+	time.Sleep(15 * time.Millisecond)
+	c.emit("event", "tool-reason-activity", memfitWorkerEvent{
+		Type:       string(schema.EVENT_TOOL_CALL_REASON),
+		CallToolID: "activity-tool-1",
+		Content:    `{"reason":"Read the project overview before answering"}`,
+	})
+	time.Sleep(15 * time.Millisecond)
+	c.emit("event", "tool-result-activity", memfitWorkerEvent{
+		Type:       string(schema.EVENT_TOOL_CALL_RESULT),
+		CallToolID: "activity-tool-1",
+		Content:    `{"call_tool_id":"activity-tool-1","result":"# Yaklang\nYaklang is a security-oriented language."}`,
+	})
+	time.Sleep(15 * time.Millisecond)
+	c.emit("event", "observation-activity", memfitWorkerEvent{
+		Type:    string(schema.EVENT_TYPE_OBSERVATION),
+		Content: `{"observation":"Project purpose confirmed","source":"README.md"}`,
+	})
+	time.Sleep(15 * time.Millisecond)
+	c.emit("event", "activity-answer", memfitWorkerEvent{
+		Type:        string(schema.EVENT_TYPE_STREAM),
+		NodeID:      "re-act-loop-answer-payload",
+		IsStream:    true,
+		StreamDelta: "activity flow complete",
+		AIModel:     "test-model",
+	})
+	time.Sleep(15 * time.Millisecond)
 	c.emit("turn_done", "", memfitStatus{TaskID: "test-task", Status: "completed"})
 }
 
@@ -491,6 +585,32 @@ func (h *memfitTTYHarness) Write(input string) {
 	h.t.Helper()
 	_, err := io.WriteString(h.pty, input)
 	require.NoError(h.t, err)
+}
+
+func (h *memfitTTYHarness) ClickText(text string) {
+	h.t.Helper()
+	h.mu.Lock()
+	targetRow, targetColumn := -1, -1
+	for row, cells := range h.screen.cells {
+		var line strings.Builder
+		for _, cell := range cells {
+			if cell != "\x00" {
+				line.WriteString(cell)
+			}
+		}
+		if byteIndex := strings.Index(line.String(), text); byteIndex >= 0 {
+			targetRow = row + 1
+			targetColumn = runewidth.StringWidth(line.String()[:byteIndex]) + 1
+			break
+		}
+	}
+	cursorRow, cursorColumn := h.screen.row+1, h.screen.col+1
+	h.mu.Unlock()
+	require.Positive(h.t, targetRow, "could not find clickable text %q", text)
+	require.Positive(h.t, targetColumn)
+	h.Write(fmt.Sprintf("\x1b[<0;%d;%dM", targetColumn, targetRow))
+	time.Sleep(20 * time.Millisecond)
+	h.Write(fmt.Sprintf("\x1b[%d;%dR", cursorRow, cursorColumn))
 }
 
 func (h *memfitTTYHarness) Resize(width, height int) {

@@ -2,6 +2,7 @@
 Enter send · ^C stop
 
 Commands
+  click / ^O details
   /status /queue /mode
   /logs /clear /exit
   Enter queues while
