@@ -908,17 +908,21 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 					return
 				}
 
-				scanCompleted = true
-				coverageSummary := action.GetString("coverage_summary")
-				coverageSpill, _ := reactloops.SpillLongContent(loop, "scan_coverage_"+category.ID, coverageSummary)
+			scanCompleted = true
+			coverageSummary := action.GetString("coverage_summary")
+			coverageSpill, _ := reactloops.SpillLongContent(loop, "scan_coverage_"+category.ID, coverageSummary)
 
-				obs := &model.ScanObservation{
-					CategoryID:      category.ID,
-					CategoryName:    category.Name,
-					StopReason:      "files_all_audited",
-					CoverageSummary: coverageSummary,
-				}
-				state.AddScanObservation(obs)
+			auditedFiles, targetFiles := scan.Progress()
+			obs := &model.ScanObservation{
+				CategoryID:      category.ID,
+				CategoryName:    category.Name,
+				StopReason:      "files_all_audited",
+				CoverageSummary: coverageSummary,
+				Status:          model.ScanStatusCompleted,
+				AuditedFiles:    auditedFiles,
+				TargetFiles:     targetFiles,
+			}
+			state.AddScanObservation(obs)
 
 				catFindingCount := 0
 				for _, finding := range state.GetFindings() {

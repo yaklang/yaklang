@@ -370,6 +370,8 @@ type Config struct {
 	SyncPerceptionTrigger              bool // 感知调度处同步调用 TriggerPerception（否则 goroutine 异步）
 	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	EnableFunctionCallMode             bool // 启用原生 functioncall (tool_calls) 模式
+	DisableValueFeedback               bool // 禁用价值评估提交（汇聚点门控，见 value_feedback.go SubmitValueFeedback）
+	DisablePeriodicVerification        bool // 禁用周期验证（config 级，传播到所有子 loop，含 fast_context）
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -2691,6 +2693,40 @@ func WithEnableFunctionCallMode(enable bool) ConfigOption {
 	}
 }
 
+// WithDisableValueFeedbackSubmission disables all value-feedback submissions from
+// this config: the converge-point gate in SubmitValueFeedback blocks every path
+// (loop hooks, verification signals, tool/plan/task/aiforge review, risk), so
+// workloads like code audit stop paying the auxiliary AI overhead entirely.
+func WithDisableValueFeedbackSubmission(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableValueFeedback = disable
+		c.m.Unlock()
+		c.SetConfig("DisableValueFeedback", disable)
+		return nil
+	}
+}
+
+// WithDisablePeriodicVerification disables periodic verification checkpoints in
+// every loop built from this config. Unlike the per-loop reactloops option, this
+// config entry propagates through ConvertConfigToOptions, so sub-loops created
+// without explicit options (e.g. fast_context loops in code audit) inherit it.
+func WithDisablePeriodicVerification(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisablePeriodicVerification = disable
+		c.m.Unlock()
+		c.SetConfig("DisablePeriodicVerification", disable)
+		return nil
+	}
+}
+
 // WithDisableSessionTitleGeneration disables the automatic session title generation in ReAct
 func WithDisableSessionTitleGeneration(disable bool) ConfigOption {
 	return func(c *Config) error {
@@ -4433,6 +4469,18 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Propagate functioncall mode flag so sub-loops inherit the setting.
 	if i.EnableFunctionCallMode {
 		opts = append(opts, WithEnableFunctionCallMode(true))
+	}
+
+	// Propagate value-feedback disable flag so every child invoker (any depth)
+	// blocks value-feedback submission at the converge point.
+	if i.DisableValueFeedback {
+		opts = append(opts, WithDisableValueFeedbackSubmission(true))
+	}
+
+	// Propagate periodic-verification disable flag so sub-loops (e.g. fast_context)
+	// built without explicit loop options inherit the setting.
+	if i.DisablePeriodicVerification {
+		opts = append(opts, WithDisablePeriodicVerification(true))
 	}
 
 	// once init config flag

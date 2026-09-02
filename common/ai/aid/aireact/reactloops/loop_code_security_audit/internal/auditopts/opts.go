@@ -36,6 +36,13 @@ func SubAgentConfigOpts() []aicommon.ConfigOption {
 		aicommon.WithAIFormatAutoRetry(DefaultAuditFormatRetry),
 		aicommon.WithSkipToolCallReasonGeneration(true),
 		aicommon.WithDisablePerception(true),
+		// Config-level switches propagate to every child invoker at any depth
+		// (category loops, verify loops, fast_context sub-loops): the value
+		// feedback gate blocks all submission paths (incl. tool review), and
+		// the periodic verification entry disables the watchdog even in loops
+		// built without explicit per-loop options.
+		aicommon.WithDisableValueFeedbackSubmission(true),
+		aicommon.WithDisablePeriodicVerification(true),
 	}
 }
 

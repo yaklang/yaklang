@@ -43,7 +43,22 @@ type ScanObservation struct {
 	ConfirmedCount  int              `json:"confirmed_count"`
 	UncertainCount  int              `json:"uncertain_count"`
 	SafeCount       int              `json:"safe_count"`
+
+	// Status 是类别扫描覆盖状态（completed / partial / not_run），由写入方
+	// 结构化填充：complete_scan → completed；编排器兜底 → partial/not_run。
+	// Phase4 报告据此在 Go 层强制披露未完成类别（不依赖 AI 自觉）。
+	Status string `json:"status,omitempty"`
+	// AuditedFiles / TargetFiles 是已审文件数与目标文件总数（Status 的量化口径）。
+	AuditedFiles int `json:"audited_files,omitempty"`
+	TargetFiles  int `json:"target_files,omitempty"`
 }
+
+// ScanStatus_* 是 ScanObservation.Status 的取值。
+const (
+	ScanStatusCompleted = "completed" // 全部目标文件审完（complete_scan 或 all-marked 收尾）
+	ScanStatusPartial   = "partial"   // 中断后兜底 auto-finalize（剩余文件系统标为 not_vul）
+	ScanStatusNotRun    = "not_run"   // 从未真正扫描（排队即死 / 无 scanState）
+)
 
 // UncertainLead 表示一个证据不足但值得关注的潜在漏洞线索
 type UncertainLead struct {

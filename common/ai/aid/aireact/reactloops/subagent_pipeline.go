@@ -20,14 +20,21 @@ import (
 // PreparedSubAgent 是阶段 1（准备构建）的产物：一个已装配好、随时可执行的子
 // Agent 运行体。它持有子 invoker / 子 task / timeline 容器 / progress handle，
 // 调用方在阶段 2 启动 loop，在阶段 3 释放资源。
+//
+// 子 invoker / 子 task 延迟到阶段 2 worker 拿到并发槽之后再构建（见
+// executeSubAgents 内的 buildSubAgentRuntime 调用），使 job 的 wall-clock
+// timeout 从"上槽"而非"prepare"起算——排队等待不烧预算。
 type PreparedSubAgent struct {
 	Job       SubAgentJob
 	Invoker   aicommon.AITaskInvokeRuntime
 	Task      aicommon.AIStatefulTask
 	Timeline  *TimelineHandle
 	Handle    *SubAgentHandle // 已注册到 ProgressRegistry；nil 表示跳过注册
-	Release   func()          // 取消 jobCtx（幂等）
+	Release   func()          // 取消 jobCtx（幂等）；无 runtime 时为 no-op
 	StartedAt time.Time
+	// runtimeErr 记录 prepare 期 timeline 构建失败的原因；此时 Invoker/Task
+	// 为 nil，阶段 2 直接按失败兜底，不再尝试构建 runtime。
+	runtimeErr error
 }
 
 // ExecutedSubAgent 是阶段 2（执行任务）的产物：一个已执行（或执行失败）的子
@@ -66,7 +73,7 @@ func DispatchSubAgents(
 	prepared := prepareSubAgents(parentInvoker, parentTask, jobs, opts)
 
 	// ── 阶段 2：执行任务 ──
-	executed := executeSubAgents(prepared, opts)
+	executed := executeSubAgents(prepared, opts, parentInvoker, parentTask)
 
 	// ── 阶段 3：结果统一 ──
 	results := finalizeSubAgents(executed, opts)
@@ -78,8 +85,9 @@ func DispatchSubAgents(
 // 阶段 1：准备构建 (Prepare)
 // ─────────────────────────────────────────────────────────────────────
 
-// prepareSubAgents 为每个 job 构建 PreparedSubAgent：timeline 容器、子 invoker、
-// 子 task、progress handle。不做任何 LLM 调用，不启动 loop。
+// prepareSubAgents 为每个 job 构建 PreparedSubAgent。此阶段只创建 timeline 容器；
+// 子 invoker / 子 task / progress handle 延迟到阶段 2 worker 上槽后构建，使 job
+// timeout 从上槽起算，排队等待不烧预算。不做任何 LLM 调用，不启动 loop。
 func prepareSubAgents(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -93,13 +101,6 @@ func prepareSubAgents(
 	}
 	parentTimeline := parentCfg.GetTimeline()
 
-	// ensure ProgressRegistry on parent loop（若提供），使 stall heartbeat /
-	// verification watchdog 能观察子 Agent 活动。
-	var registry *ProgressRegistry
-	if opts.ParentLoop != nil {
-		registry = ensureSubAgentProgressRegistry(opts.ParentLoop)
-	}
-
 	prepared := make([]*PreparedSubAgent, 0, len(jobs))
 	for _, job := range jobs {
 		startedAt := time.Now()
@@ -109,43 +110,66 @@ func prepareSubAgents(
 			opts.TimelineMode,
 		)
 		if err != nil {
-			// timeline 容器构建失败：构造一个失败的 prepared，让阶段 2/3 兜底。
+			// timeline 容器构建失败：记录 runtimeErr，让阶段 2/3 兜底。
 			log.Warnf("subagent: build timeline handle for %q failed: %v", job.Identifier, err)
 			prepared = append(prepared, &PreparedSubAgent{
 				Job: job, StartedAt: startedAt,
-				Release: func() {},
+				Release:    func() {},
+				runtimeErr: utils.Wrap(err, "build timeline handle"),
 			})
 			continue
-		}
-
-		invoker, task, release, err := buildSubAgentRuntime(parentInvoker, parentTask, job, handle, opts)
-		if err != nil {
-			log.Warnf("subagent: build runtime for %q failed: %v", job.Identifier, err)
-			handle.Release()
-			prepared = append(prepared, &PreparedSubAgent{
-				Job: job, Timeline: handle, StartedAt: startedAt,
-				Release: func() {},
-			})
-			continue
-		}
-
-		// 注册 progress handle，使父 loop 的 stall heartbeat / watchdog 旁路生效。
-		var progHandle *SubAgentHandle
-		if registry != nil {
-			progHandle = registerHandle(registry, task.GetId(), job.Identifier, task, startedAt)
 		}
 
 		prepared = append(prepared, &PreparedSubAgent{
 			Job:       job,
-			Invoker:   invoker,
-			Task:      task,
 			Timeline:  handle,
-			Handle:    progHandle,
-			Release:   release,
+			Release:   func() {},
 			StartedAt: startedAt,
 		})
 	}
 	return prepared
+}
+
+// armPreparedSubAgentRuntime 在 worker 拿到并发槽之后构建子运行体（invoker/task）
+// 并注册 progress handle。返回 error 时调用方按失败兜底。
+//
+// 延迟到上槽构建的原因：buildSubAgentRuntime 内的 context.WithTimeout 从此刻
+// 起算（上槽起算），排队等待不再消耗预算；同时 progress handle 也从上槽注册，
+// 排队中的 job 不会被父 loop 的 stall heartbeat 误判为卡死。
+func armPreparedSubAgentRuntime(
+	p *PreparedSubAgent,
+	parentInvoker aicommon.AIInvokeRuntime,
+	parentTask aicommon.AIStatefulTask,
+	opts SubAgentOptions,
+	registry *ProgressRegistry,
+) error {
+	if p.Invoker != nil && p.Task != nil {
+		return nil // 已构建（测试直接注入 runtime 的场景）。
+	}
+	if p.runtimeErr != nil {
+		return p.runtimeErr
+	}
+	if p.Timeline == nil {
+		return utils.Errorf("timeline handle is nil: %s", p.Job.Identifier)
+	}
+
+	invoker, task, release, err := buildSubAgentRuntime(parentInvoker, parentTask, p.Job, p.Timeline, opts)
+	if err != nil {
+		p.Timeline.Release()
+		p.runtimeErr = utils.Wrap(err, "build sub agent runtime")
+		return p.runtimeErr
+	}
+
+	var progHandle *SubAgentHandle
+	if registry != nil {
+		progHandle = registerHandle(registry, task.GetId(), p.Job.Identifier, task, p.StartedAt)
+	}
+
+	p.Invoker = invoker
+	p.Task = task
+	p.Handle = progHandle
+	p.Release = release
+	return nil
 }
 
 // subAgentTaskName 从 job 推导子 task 的展示名。
@@ -167,22 +191,42 @@ func subAgentTaskName(job SubAgentJob) string {
 // ─────────────────────────────────────────────────────────────────────
 
 // executeSubAgents 通过 worker 池并发执行 prepared 子 Agent。每个 worker 内
-// 串行完成 [可选润色 → 构建 loop → 执行 loop]。
-func executeSubAgents(prepared []*PreparedSubAgent, opts SubAgentOptions) []*ExecutedSubAgent {
+// 串行完成 [上槽构建 runtime → 可选润色 → 构建 loop → 执行 loop]。
+//
+// runtime 构建放在拿到并发槽之后：job 的 wall-clock timeout 从上槽起算，
+// 排队等待不烧预算（修复"排到队尾的任务上槽即死"）。
+func executeSubAgents(
+	prepared []*PreparedSubAgent,
+	opts SubAgentOptions,
+	parentInvoker aicommon.AIInvokeRuntime,
+	parentTask aicommon.AIStatefulTask,
+) []*ExecutedSubAgent {
 	if len(prepared) == 0 {
 		return nil
 	}
 	concurrency := normalizeSubAgentConcurrency(opts.ExecuteConcurrency, len(prepared))
 
+	// 排队等槽期间父任务取消 → 排队 job 立即失败返回，而非继续傻等。
 	ctx := context.Background()
-	// 复用 prepared 自身没有 ctx；用 background，executeSubAgent 内部从 task 取 ctx。
+	if parentTask != nil && parentTask.GetContext() != nil {
+		ctx = parentTask.GetContext()
+	}
+
+	// ensure ProgressRegistry on parent loop（若提供），使 stall heartbeat /
+	// verification watchdog 能观察子 Agent 活动。与 runtime 一起从上槽注册。
+	var registry *ProgressRegistry
+	if opts.ParentLoop != nil {
+		registry = ensureSubAgentProgressRegistry(opts.ParentLoop)
+	}
+
 	runSingle := func(p *PreparedSubAgent) *ExecutedSubAgent {
+		if armErr := armPreparedSubAgentRuntime(p, parentInvoker, parentTask, opts, registry); armErr != nil {
+			log.Warnf("subagent: build runtime for %q failed: %v", p.Job.Identifier, armErr)
+			return failedExecuted(p, "failed", armErr)
+		}
 		return runExecuteSingleWithRecover(p, opts)
 	}
 
-	// runJobsConcurrently 接受 []*SubAgentResult 以内嵌 SubAgentJob 携带身份；
-	// 这里临时把 prepared 包装成 executed（零值 SubLoop），执行后回填。
-	// 为复用现有 worker 池，直接用一个本地 worker 池实现。
 	executed := make([]*ExecutedSubAgent, 0, len(prepared))
 	if concurrency <= 1 {
 		for _, p := range prepared {
@@ -234,11 +278,15 @@ func runExecuteSingleWithRecover(p *PreparedSubAgent, opts SubAgentOptions) (res
 
 // executeSubAgent 执行单个子 Agent：可选润色 → 构建 loop → 执行 loop。
 // 润色与子 loop 共享同一 worker 槽位、同一并发度，不在单独的集中批次中执行。
+// 调用前 runtime 必须已上槽构建（见 armPreparedSubAgentRuntime）。
 func executeSubAgent(prepared *PreparedSubAgent, opts SubAgentOptions) *ExecutedSubAgent {
-	// timeline/invoker 构建失败时 prepared.Invoker 为 nil，直接返回失败。
+	// runtime 构建失败（或父任务在构建前已取消）时 Invoker 为 nil，直接返回失败。
 	if prepared.Invoker == nil || prepared.Task == nil {
-		return failedExecuted(prepared, "failed",
-			utils.Errorf("subagent runtime not built: %s", prepared.Job.Identifier))
+		err := prepared.runtimeErr
+		if err == nil {
+			err = utils.Errorf("subagent runtime not built: %s", prepared.Job.Identifier)
+		}
+		return failedExecuted(prepared, "failed", err)
 	}
 
 	// 在润色与 loop 执行之前就把子任务标记为 Processing，使 UI 在润色 LLM
@@ -280,6 +328,13 @@ func executeSubAgent(prepared *PreparedSubAgent, opts SubAgentOptions) *Executed
 	// 2c. 执行 loop。
 	if opts.ConfigureLoop != nil {
 		opts.ConfigureLoop(loop)
+	}
+	// 调用方追加的 loop 选项（如 fast_context 的 tool pool 限制）在执行前应用，
+	// 与 ConfigureLoop 同时机。此前该参数从未被应用（静默失效）。
+	for _, opt := range opts.ExtraLoopOpts {
+		if opt != nil {
+			opt(loop)
+		}
 	}
 	execErr := loop.ExecuteWithExistedTask(prepared.Task)
 

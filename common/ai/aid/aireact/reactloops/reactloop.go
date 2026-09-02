@@ -715,6 +715,14 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		r.functionCallMode = true
 	}
 
+	// Config-level periodic verification disable (mirrors DisablePerception above):
+	// a config entry set via aicommon.WithDisablePeriodicVerification propagates to
+	// every loop built from this config — including sub-loops that don't take
+	// per-loop options (e.g. fast_context loops forked by code-audit category scans).
+	if config.GetConfigBool("DisablePeriodicVerification") {
+		r.DisablePeriodicVerification = true
+	}
+
 	// Auto-register perception context provider (nil-safe, skips if perception disabled)
 	r.RegisterPerceptionContextProvider()
 
