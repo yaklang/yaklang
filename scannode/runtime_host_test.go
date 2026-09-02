@@ -32,6 +32,7 @@ type runtimeHostDockerStub struct {
 	loads      int
 	creates    int
 	stops      int
+	lastInput  runtimeHostContainerInput
 }
 
 type runtimeHostRoundTripFunc func(*http.Request) (*http.Response, error)
@@ -64,9 +65,12 @@ func (d *runtimeHostDockerStub) FindContainer(_ context.Context, cleanupKey stri
 }
 func (d *runtimeHostDockerStub) CreateAndStart(_ context.Context, input runtimeHostContainerInput) (runtimeHostContainer, error) {
 	d.creates++
+	d.lastInput = input
 	container := runtimeHostContainer{
 		ID: "container-" + input.Labels[runtimeHostSessionLabel], ImageID: input.Image,
 		Running: true, Labels: cloneStringMapValue(input.Labels),
+		CPUMillicores: input.CPUMillicores, MemoryBytes: input.MemoryBytes,
+		MemorySwapBytes: input.MemorySwapBytes,
 	}
 	d.containers[input.Labels[runtimeHostCleanupLabel]] = container
 	return container, nil
@@ -93,6 +97,17 @@ func (d *runtimeHostDockerStub) Close() error { return nil }
 
 func newRuntimeHostTestExecutor(t *testing.T, docker *runtimeHostDockerStub, baseDir string) *runtimeHostExecutor {
 	return newRuntimeHostTestExecutorAt(t, docker, baseDir, "http://platform.invalid")
+}
+
+func runtimeHostTestResourceCollector(t *testing.T) *runtimeHostResourceCollector {
+	t.Helper()
+	collector, err := newRuntimeHostResourceCollector(
+		runtimeHostResourceSourceStub{cpus: 8, total: 16 << 30, available: 12 << 30}, 0, 0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return collector
 }
 
 func newRuntimeHostTestExecutorAt(t *testing.T, docker *runtimeHostDockerStub, baseDir, platformAPIBaseURL string) *runtimeHostExecutor {
@@ -191,6 +206,10 @@ func runtimeHostTestCommand(t *testing.T) *nodev1.AIRuntimeCommand {
 				"LEGION_ENROLLMENT_TOKEN": "short-lived-token", "LEGION_SESSIONMGR_URL": "http://manager.invalid",
 				"LEGION_AI_SESSION_ID": "session-1", "LEGION_AI_RUNTIME": "stateless",
 			},
+			Resources: &nodev1.AIRuntimeResourceEnvelope{
+				CpuMillicores: 1000,
+				MemoryBytes:   2 << 30,
+			},
 		},
 	}
 	runtimeHostSignTestCommand(t, command)
@@ -219,6 +238,7 @@ func TestRuntimeHostCommandAuthenticationRejectsTampering(t *testing.T) {
 		enrollmentToken: "enrollment-ticket", network: "bridge", platformAPIBaseURL: "http://platform.invalid",
 		engineReleaseID: command.Release.ReleaseId, engineDigest: command.Release.EngineDigest,
 		nodeIDProvider: func() string { return "node-1" },
+		resources:      runtimeHostTestResourceCollector(t),
 	}
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
 	if err := executor.validateCommand(command, session); err != nil {
@@ -241,6 +261,7 @@ func TestRuntimeHostAcceptsPinnedContainerAPIOriginDistinctFromHostBootstrap(t *
 		platformAPIBaseURL: "http://127.0.0.1:8080", runtimePlatformAPIBaseURL: runtimeAPIURL,
 		engineReleaseID: command.Release.ReleaseId, engineDigest: command.Release.EngineDigest,
 		nodeIDProvider: func() string { return "node-1" },
+		resources:      runtimeHostTestResourceCollector(t),
 	}
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
 	if err := executor.validateCommand(command, session); err != nil {
@@ -300,6 +321,7 @@ func TestRuntimeHostRejectsChangedFixedContainerIdentity(t *testing.T) {
 		enrollmentToken: "enrollment-ticket", network: "bridge", platformAPIBaseURL: "http://platform.invalid",
 		engineReleaseID: command.Release.ReleaseId, engineDigest: command.Release.EngineDigest,
 		nodeIDProvider: func() string { return "node-1" },
+		resources:      runtimeHostTestResourceCollector(t),
 	}
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
 	command.Container.Arguments[7] = "ai-session-another-session"
@@ -309,12 +331,47 @@ func TestRuntimeHostRejectsChangedFixedContainerIdentity(t *testing.T) {
 	}
 }
 
+func TestRuntimeHostRejectsMissingResourceEnvelope(t *testing.T) {
+	command := runtimeHostTestCommand(t)
+	command.Container.Resources = nil
+	runtimeHostSignTestCommand(t, command)
+	executor := newRuntimeHostTestExecutor(t, &runtimeHostDockerStub{
+		images:     map[string]string{},
+		containers: map[string]runtimeHostContainer{},
+	}, t.TempDir())
+	if err := executor.validateCommand(command, node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}); err == nil ||
+		!strings.Contains(err.Error(), "resource envelope") {
+		t.Fatalf("validateCommand() error = %v", err)
+	}
+}
+
+func TestRuntimeHostStartAppliesSignedResourceEnvelope(t *testing.T) {
+	command := runtimeHostTestCommand(t)
+	docker := &runtimeHostDockerStub{
+		images:     map[string]string{command.Release.ImageId: command.Release.ImageId},
+		containers: map[string]runtimeHostContainer{},
+	}
+	executor := newRuntimeHostTestExecutor(t, docker, t.TempDir())
+	result := executor.execute(
+		context.Background(),
+		command,
+		node.SessionState{NodeID: "node-1", SessionID: "node-session-1"},
+	)
+	if !result.Success {
+		t.Fatalf("execute() = %+v", result)
+	}
+	if docker.lastInput.CPUMillicores != 1000 || docker.lastInput.MemoryBytes != 2<<30 || docker.lastInput.MemorySwapBytes != 2<<30 {
+		t.Fatalf("Docker resource input = %+v", docker.lastInput)
+	}
+}
+
 func TestRuntimeHostRejectsReplySubjectOutsideCommandIdentity(t *testing.T) {
 	command := runtimeHostTestCommand(t)
 	executor := &runtimeHostExecutor{
 		enrollmentToken: "enrollment-ticket", network: "bridge", platformAPIBaseURL: "http://platform.invalid",
 		engineReleaseID: command.Release.ReleaseId, engineDigest: command.Release.EngineDigest,
 		nodeIDProvider: func() string { return "node-1" },
+		resources:      runtimeHostTestResourceCollector(t),
 	}
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
 	command.ReplySubject = runtimeHostReplyPrefix + uuid.NewString()
@@ -330,6 +387,7 @@ func TestRuntimeHostRejectsReleaseDifferentFromInstalledNode(t *testing.T) {
 		enrollmentToken: "enrollment-ticket", network: "bridge", platformAPIBaseURL: "http://platform.invalid",
 		engineReleaseID: command.Release.ReleaseId, engineDigest: command.Release.EngineDigest,
 		nodeIDProvider: func() string { return "node-1" },
+		resources:      runtimeHostTestResourceCollector(t),
 	}
 	session := node.SessionState{NodeID: "node-1", SessionID: "node-session-1"}
 	command.Release.EngineDigest = strings.Repeat("e", 64)
@@ -350,7 +408,7 @@ func TestRuntimeHostRejectsReleaseDifferentFromInstalledNode(t *testing.T) {
 
 func TestRuntimeHostStatusUsesSafeDockerReason(t *testing.T) {
 	docker := &runtimeHostDockerStub{pingErr: errors.New("permission denied")}
-	executor := &runtimeHostExecutor{docker: docker}
+	executor := &runtimeHostExecutor{docker: docker, resources: runtimeHostTestResourceCollector(t)}
 	status, ok := executor.CurrentStatus()
 	if !ok || status.Status != "unavailable" || !strings.Contains(string(status.DetailJSON), "docker_permission_denied") {
 		t.Fatalf("CurrentStatus() = %+v, %v", status, ok)

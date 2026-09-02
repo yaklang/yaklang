@@ -29,7 +29,8 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 				"nats_url":"nats://127.0.0.1:4222",
 				"command_subject":"legion.node.cmd.node-1",
 				"event_subject_prefix":"legion.node.event",
-				"expires_at":"2026-03-27T10:00:00Z"
+				"expires_at":"2026-03-27T10:00:00Z",
+				"runtime_host_capacity_accepted":true
 			}`,
 		},
 		{
@@ -123,6 +124,9 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 			}
 			if session.SessionToken != "token-1" {
 				t.Fatalf("unexpected session_token: %s", session.SessionToken)
+			}
+			if !session.RuntimeHostCapacityAccepted {
+				t.Fatal("bootstrap did not negotiate Runtime Host capacity reporting")
 			}
 		})
 	}
