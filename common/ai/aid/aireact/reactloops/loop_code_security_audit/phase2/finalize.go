@@ -3,7 +3,6 @@ package phase2
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
@@ -60,27 +59,15 @@ func finalizeCategoryScanOnLoopEnd(
 		return
 	}
 
-	var autoMarked []string
-	for _, filePath := range remaining {
-		scan.MarkFileDoneWithDisposition(filePath, FileDispositionNotVul)
-		scan.ClearPhaseBReads(filePath)
-		scan.ClearPhaseBGreps(filePath)
-		autoMarked = append(autoMarked, filePath)
-	}
-
-	summary := fmt.Sprintf(
-		"类别循环结束前自动收尾：%d 个文件未显式 mark_file_done，已由系统代为标记。\n"+
-			"原因：%s\n未 mark 文件：\n%s",
-		len(autoMarked),
-		reasonText,
-		strings.Join(autoMarked, "\n"),
-	)
-	log.Warnf("[CodeAudit/Phase2] Category '%s' auto-finalized %d remaining files: %v",
-		category.ID, len(autoMarked), autoMarked)
-	r.AddToTimeline("[SCAN_AUTO_FINALIZE]", fmt.Sprintf("[Phase2/%s] %s", category.ID, summary))
-	emit.Phase2ScanWarning(loop, category, "auto_finalize", summary)
-
-	recordAutoFinalizedScanObservation(r, state, scan, category, summary, "auto_finalized_on_loop_end", artifacts)
+	// 阶段B中断但仍有剩余目标文件：不做 auto-mark、不写 observation（auto-mark
+	// 会销毁可恢复性，并让编排器误判"已完成"）。只发 resumable 警告，把恢复
+	// 与兜底的决定权交给编排器（见 orchestrate.go 的 resume + fallback 流程）。
+	msg := fmt.Sprintf(
+		"[Phase2/%s] 类别循环在阶段B中断：%d/%d 文件已审计，剩余 %d 个未 mark；编排器将尝试恢复续扫。",
+		category.ID, done, total, len(remaining))
+	log.Warnf("[CodeAudit/Phase2] %s", msg)
+	r.AddToTimeline("[SCAN_INCOMPLETE]", msg)
+	emit.Phase2ScanWarning(loop, category, "stuck_phase_b_resumable", msg)
 }
 
 func recordAutoFinalizedScanObservation(
@@ -98,6 +85,9 @@ func recordAutoFinalizedScanObservation(
 		CategoryName:    category.Name,
 		StopReason:      stopReason,
 		CoverageSummary: coverageSummary,
+		Status:          model.ScanStatusCompleted,
+		AuditedFiles:    done,
+		TargetFiles:     total,
 	}
 	state.AddScanObservation(obs)
 

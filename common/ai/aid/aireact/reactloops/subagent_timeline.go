@@ -125,8 +125,10 @@ func buildSubAgentRuntime(
 
 	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
 	if timeout := resolveSubAgentJobTimeout(job, opts); timeout > 0 {
+		// 释放上一层的 cancel 句柄再覆盖，避免 cancel 泄漏（go vet lostcancel）。
+		jobCancel()
 		jobCtx, jobCancel = context.WithTimeout(parentTask.GetContext(), timeout)
-		log.Infof("[SubAgent] job %q wall-clock timeout=%s", job.Identifier, timeout)
+		log.Infof("[SubAgent] job %q wall-clock timeout=%s (armed on slot acquisition)", job.Identifier, timeout)
 	}
 
 	userInput := strings.TrimSpace(job.UserInput)
