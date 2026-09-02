@@ -151,7 +151,7 @@ O5LOGON/PBKDF2 verifier 涉及多版本密码学交互，任务明确要求
 | MongoDB | 最小探针（零外部依赖） | ✅ | ✅ 4 版本 | ✅ 2+3 |
 | SQL Server | 最小探针（零外部依赖） | ✅ | ✅ 2019/2022 | ✅ 2+3 |
 | Oracle | go-ora（窄用法） | — | 差分通过（删除前） | 未采样 |
-| RDP | 自研 grdp（零外部依赖） | ✅ CredSSP 模拟器 6 用例含 Unicode 正反 | ✅ xrdp×2 | ✅ 1 eof+4 tls |
+| RDP | 自研 grdp（零外部依赖） | ✅ CredSSP 模拟器 6 用例含 Unicode 正反 + v6 errorCode | ✅ xrdp×2 | ✅ Win7/2012R2/2016/2019/2022/Win10/Win11 矩阵 |
 | FTP | jlaffaye/ftp | ✅ 230/530 正反+未知用户 | — | ✅ 5/5 |
 | SMTP | 自研（SASL: PLAIN/LOGIN/CRAM/SCRAM） | ✅ AUTH LOGIN 全流程正反 | — | — |
 | Telnet | 自研（流式提示符匹配） | ✅ 登录流正反+未知用户 | — | ✅ 5/5 |
@@ -193,8 +193,50 @@ yet support CredSSP"），SSL 模式下认证失败只显示图形登录框（�
 信号、不断连）。因此 `rdp_nla_test.go` 实现最小 CredSSP 模拟服务器，
 服务端按 [MS-NLMP] 验证 NTProofStr：6 用例（正确/错误密码、未知用户、
 Unicode 正反、空密码）全通过——NTLMv2 客户端实现首次获得确定性验证。
-xrdp SSL 模式的误报限制已在 `rdp_real_test.go` 注明；互联网主流的
-Windows NLA 目标由 CredSSP 阶段给出确定成败。
+另有 CredSSP v6 用例：错误密码返回 `STATUS_LOGON_FAILURE`（0xC000006D），
+爆破路径据此记 AuthFailed 而非 TLS/超时。xrdp SSL 模式的误报限制已在
+`rdp_real_test.go` 注明；互联网主流的 Windows NLA 目标由 CredSSP 阶段
+给出确定成败。
+
+### CredSSP v5/v6 与真实 Windows（爆破关键路径）
+
+修复前客户端只发 CredSSP v2、单次 `Read(1024)` 截断 TSRequest、TLS 1.3
+导致 pubKeyAuth 静默失败、ECDSA 证书 panic。Shodan 5 个 NLA 目标全部
+被误分为 `tls`，无法进入认证判定。修复：
+
+1. **CredSSP v6**：首包即广告 version=6 + 32 字节 clientNonce；与服务端
+   取 `min(client, server)`。v5+ 用
+   `SHA256("CredSSP Client-To-Server Binding Hash\\0" || nonce || SubjectPublicKey)`
+   替代加密原始公钥（CVE-2018-0886）。
+2. **完整 DER 帧读取**：按 TLV 长度读完整 TSRequest，覆盖 Windows NTLM
+   Challenge 跨 TLS record / >1024 字节的情况。
+3. **errorCode**：解析 v6 `TSRequest.errorCode`，映射
+   `STATUS_LOGON_FAILURE` / `STATUS_ACCOUNT_LOCKED_OUT` 等 NTSTATUS。
+   旧版 Win7/2008 在 NTLM 失败后直接掐 TLS（`tls: access denied` /
+   `tls: internal error`），同样归为认证失败、不 Finished。
+4. **TLS 上限 1.2**：Windows CredSSP 在 TLS 1.3 上握手成功但校验公钥失败；
+   下限仍为 TLS 1.0（Win7/2008）。
+5. **公钥提取**：RSA 用 PKCS#1，ECDSA 用未压缩点，不再对非 RSA 证书 panic。
+6. **X.224 失败上抛**：StartNLA/StartTLS/NEG_FAILURE 立即 Emit error，
+   Login 不再空等到 15s。
+7. **NLA 完成即爆破成功**：CredSSP 走完（服务端 PubKeyAuth + 客户端
+   AuthInfo）后立即返回 Ok，不再等待 MCS/图形会话。错误密码返回
+   `STATUS_LOGON_FAILURE` 且 **不 Finished**，调度器继续字典。
+
+**Shodan 真实 Windows 矩阵**（2026-09，每版本 5 目标 × 1 次无效凭证，
+`TestShodanRDPWindowsMatrix`）：**0 意外成功、0 panic**。
+
+| 版本 | 采样 | 分类 |
+|---|---|---|
+| Windows 7 / Server 2008 R2 (6.1.7601) | 5 | 3 auth-rejected + 2 eof（对端在 NLA 前断连） |
+| Server 2012 R2 (6.3.9600) | 5 | 5/5 auth-rejected（`STATUS_LOGON_FAILURE`，最快 200ms） |
+| Server 2016 / Win10 1607 (10.0.14393) | 5 | 5/5 auth-rejected |
+| Server 2019 / Win10 1809 (10.0.17763) | 5 | 5/5 auth-rejected |
+| Windows 10 21H2 (10.0.19041) | 5 | 5/5 auth-rejected |
+| Server 2022 (10.0.20348) | 5 | 5/5 auth-rejected（最快 100ms） |
+| Windows 11 22H2 (10.0.22621) | 5 | 5/5 auth-rejected |
+| Windows 11 24H2 (10.0.26100) | 5 | 5/5 auth-rejected |
+| xrdp（Shodan 命中 1） | 1 | auth-rejected |
 
 ## Telnet 真实设备语料与判定增强（Shodan 100 样本）
 
@@ -232,7 +274,7 @@ auth-rejected，0 意外成功、0 panic。已知限制：IAC 协商字节未应
 | ftp / ssh / redis / telnet / memcached / smb / vnc | 5/5 auth-rejected |
 | mysql / postgres | 3 auth-rejected + 2 target-unreachable |
 | mongodb / mssql | 2 auth-rejected + 3 target-unreachable |
-| rdp | 1 eof + 4 tls（真实 NLA 目标 TLS 拒绝正确分类，3s 内退出） |
+| rdp | 见上文 Windows 版本矩阵：现代 NLA 目标 `STATUS_LOGON_FAILURE`（通常 <3s）；Win7 失败后掐 TLS 亦归认证失败 |
 
 ## 稳定性
 

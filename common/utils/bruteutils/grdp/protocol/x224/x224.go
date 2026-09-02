@@ -209,16 +209,23 @@ func (x *X224) recvConnectionConfirm(s []byte) {
 	message := &ServerConnectionConfirm{}
 	if err := struc.Unpack(bytes.NewReader(s), message); err != nil {
 		glog.Error("ReadServerConnectionConfirm err", err)
+		x.Emit("error", fmt.Errorf("rdp x224: unpack connection confirm: %w", err))
+		return
+	}
+	if message.ProtocolNeg == nil {
+		x.Emit("error", errors.New("rdp x224: missing protocol negotiation"))
 		return
 	}
 	glog.Debugf("message: %+v", *message.ProtocolNeg)
 	if message.ProtocolNeg.Type == TYPE_RDP_NEG_FAILURE {
-		glog.Error(fmt.Sprintf("NODE_RDP_PROTOCOL_X224_NEG_FAILURE with code: %d,see https://msdn.microsoft.com/en-us/library/cc240507.aspx",
-			message.ProtocolNeg.Result))
+		err := fmt.Errorf("rdp x224: negotiation failure code %d, see https://msdn.microsoft.com/en-us/library/cc240507.aspx",
+			message.ProtocolNeg.Result)
+		glog.Error(err.Error())
 		//only use Standard RDP Security mechanisms
 		if message.ProtocolNeg.Result == 2 {
 			glog.Info("Only use Standard RDP Security mechanisms, Reconnect with Standard RDP")
 		}
+		x.Emit("error", err)
 		x.Close()
 		return
 	}
@@ -229,7 +236,9 @@ func (x *X224) recvConnectionConfirm(s []byte) {
 	}
 
 	if x.selectedProtocol == PROTOCOL_HYBRID_EX {
-		glog.Error("NODE_RDP_PROTOCOL_HYBRID_EX_NOT_SUPPORTED")
+		err := errors.New("rdp x224: PROTOCOL_HYBRID_EX not supported")
+		glog.Error(err.Error())
+		x.Emit("error", err)
 		return
 	}
 
@@ -246,6 +255,7 @@ func (x *X224) recvConnectionConfirm(s []byte) {
 		err := x.transport.(*tpkt.TPKT).StartTLS()
 		if err != nil {
 			glog.Error("start tls failed:", err)
+			x.Emit("error", fmt.Errorf("rdp tls handshake: %w", err))
 			return
 		}
 		x.Emit("connect", x.selectedProtocol)
@@ -257,11 +267,17 @@ func (x *X224) recvConnectionConfirm(s []byte) {
 		err := x.transport.(*tpkt.TPKT).StartNLA()
 		if err != nil {
 			glog.Error("start NLA failed:", err)
+			x.Emit("error", err)
 			return
 		}
-		x.Emit("connect", x.selectedProtocol)
+		// 爆破只需要认证结果：CredSSP 走完（服务端发了 PubKeyAuth、
+		// 客户端交出 AuthInfo）即密码正确。不必再开 MCS/图形会话，
+		// 否则模拟器或只做 NLA 的目标会在后续 PDU 阶段把成功误判失败。
+		glog.Info("*** NLA authentication succeeded ***")
+		x.Emit("nla-ok")
 		return
 	}
+	x.Emit("error", fmt.Errorf("rdp x224: unknown selected protocol %d", x.selectedProtocol))
 }
 
 func (x *X224) recvData(s []byte) {

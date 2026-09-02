@@ -97,6 +97,13 @@ var rdpAuth = &DefaultServiceAuthInfo{
 		}
 
 		if err != nil {
+			var cssp *nla.CredSSPError
+			if errors.As(err, &cssp) {
+				if cssp.AccountLocked() {
+					result.Finished = true
+				}
+				return result
+			}
 			autoSetFinishedByConnectionError(err, result)
 			return result
 		}
@@ -236,13 +243,8 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	g.sec.SetFastPathListener(g.pdu)
 	g.pdu.SetFastPathSender(g.tpkt)
 
-	err = g.x224.Connect()
-	if err != nil {
-		return fmt.Errorf("[x224 connect err] %v", err)
-	}
-	glog.Info("wait connect ok")
 	wg := &sync.WaitGroup{}
-	// 竞态治理：第一个到达的事件（error/close/success/ready/ctx 超时）
+	// 竞态治理：第一个到达的事件（error/close/success/ready/nla-ok/ctx 超时）
 	// 通过 doneOnce 唯一写入 finalErr 并完成 wg；后续事件成为 no-op，
 	// 消除旧实现中多 handler 并发写共享 err 的 data race。
 	var doneOnce sync.Once
@@ -250,6 +252,15 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	wg.Add(1)
 	finish := func(e error) { doneOnce.Do(func() { finalErr = e; wg.Done() }) }
 
+	// 必须在 Connect 之前注册：NLA 在 localhost 上可能快于后续 On()。
+	g.x224.On("error", func(e error) {
+		log.Errorf("rdp error: %v", e)
+		finish(e)
+	})
+	g.x224.On("nla-ok", func() {
+		log.Info("rdp nla authentication succeeded")
+		finish(nil)
+	})
 	g.pdu.On("error", func(e error) {
 		log.Errorf("rdp error: %v", e)
 		finish(e)
@@ -268,6 +279,12 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	g.pdu.On("update", func(rectangles []pdu.BitmapData) {
 		_ = rectangles
 	})
+
+	err = g.x224.Connect()
+	if err != nil {
+		return fmt.Errorf("[x224 connect err] %v", err)
+	}
+	glog.Info("wait connect ok")
 
 	// ctx 截止后仍无事件：协议不对或对端无响应；Login 返回后 goroutine 立即退出。
 	loginDone := make(chan struct{})
