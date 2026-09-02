@@ -293,7 +293,8 @@ type Config struct {
 	TimelineTotalContentLimit int // in tokens
 
 	// triage
-	MemoryTriage MemoryTriage
+	MemoryTriage        MemoryTriage
+	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认为 false（即默认启用）
 
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
@@ -2305,6 +2306,23 @@ func WithMemoryTriage(mt MemoryTriage) ConfigOption {
 
 func WithNoOpMemoryTriage() ConfigOption {
 	return WithMemoryTriage(NewNoOpMemoryTriage())
+}
+
+// WithDisableMemoryTriage disables the built-in memory triage (intelligent memory
+// processing). When enabled, a no-op MemoryTriage is installed instead of the
+// default AIMemory instance, so no embedding/DB/AI calls are made for memory.
+// This is useful for lightweight or stateless sessions where memory overhead
+// is undesired.
+func WithDisableMemoryTriage(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableMemoryTriage = disable
+		c.m.Unlock()
+		return nil
+	}
 }
 
 func WithMemoryPoolSize(sz int64) ConfigOption {
