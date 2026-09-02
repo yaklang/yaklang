@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"gopkg.in/yaml.v3"
 )
 
@@ -690,6 +691,62 @@ func WithToolCaller_GenerateToolParamsBuilder(
 	}
 }
 
+// buildNativeToolForParamGen constructs an aispec.Tool for R2 (parameter
+// generation) in functioncall mode. The tool's parameters schema mirrors the
+// call-tool action protocol: {"@action":"call-tool","tool":"<name>",
+// "identifier":"...","params":{<InputSchema>},"call_expectations":"..."}.
+// The model outputs the complete action JSON as tool_call arguments, which
+// flows through the same ExtractValidActionFromStream("call-tool") pipeline
+// as text mode — no parsing changes needed.
+func buildNativeToolForParamGen(tool *aitool.Tool) aispec.Tool {
+	props := map[string]any{
+		"@action": map[string]any{
+			"const":       "call-tool",
+			"description": "Action type identifier",
+		},
+		"tool": map[string]any{
+			"type":        "string",
+			"description": "The tool to call",
+			"const":       tool.Name,
+		},
+		"identifier": map[string]any{
+			"type":        "string",
+			"description": "Short snake_case identifier for this tool call",
+		},
+	}
+	if tool.InputSchema.Properties != nil && tool.InputSchema.Properties.Len() > 0 {
+		props["params"] = map[string]any{
+			"type":        "object",
+			"description": "Tool parameters",
+			"properties":  tool.InputSchema.Properties,
+			"required":    tool.InputSchema.Required,
+		}
+	}
+	props["call_expectations"] = map[string]any{
+		"type":        "string",
+			"description": "Expected duration, success criteria, and exception handling",
+	}
+
+	params := map[string]any{
+		"type":                 "object",
+		"properties":           props,
+		"required":             []string{"@action", "tool", "params"},
+		"additionalProperties": false,
+	}
+	description := tool.Description
+	if description == "" {
+		description = tool.GetName()
+	}
+	return aispec.Tool{
+		Type: "function",
+		Function: aispec.ToolFunction{
+			Name:        tool.Name,
+			Description: description,
+			Parameters:  params,
+		},
+	}
+}
+
 // ToolParamsPromptMeta contains the generated prompt and metadata for AITAG parsing
 type ToolParamsPromptMeta struct {
 	Prompt     string
@@ -1014,6 +1071,33 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	// instead of replaying the outer transaction checkpoint.
 	paramTransactionSeq := t.paramTransactionSeq
 	t.paramTransactionSeq = 0
+
+	// Check if functioncall mode is enabled. In functioncall mode, R2 injects
+	// a native tool whose parameters schema mirrors the call-tool action
+	// protocol (same as ToJSONSchema: {@action, tool, params, identifier,
+	// call_expectations}). The model outputs the complete action JSON as
+	// tool_call arguments, which flow through the same
+	// ExtractValidActionFromStream("call-tool") pipeline as text mode — no
+	// parsing changes needed. The native tool uses the tool's real name (not
+	// R1's execute_action), so R2 never sees R1's big tool.
+	functionCallMode := t.config.GetConfigBool("EnableFunctionCallMode")
+	var requestOpts []AIRequestOption
+	if functionCallMode {
+		nativeTool := buildNativeToolForParamGen(tool)
+		requestOpts = append(requestOpts,
+			WithAIRequest_ExtraSpecOpts(
+				aispec.WithTools([]aispec.Tool{nativeTool}),
+				aispec.WithToolChoice("auto"),
+				aispec.WithToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+					for _, tc := range toolCalls {
+						log.Debugf("functioncall R2: tool_call delta: %s", tc.Function.Name)
+					}
+				}),
+			),
+			WithAIRequest_EnableToolCallArgumentsStream(),
+		)
+	}
+
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
@@ -1159,7 +1243,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		}
 
 		return nil
-	}, WithAIRequest_CallerLabel("toolcall-params"), WithAIRequest_Context(t.ctx), WithAIRequest_SeqId(paramTransactionSeq))
+	}, append(requestOpts, WithAIRequest_CallerLabel("toolcall-params"), WithAIRequest_Context(t.ctx), WithAIRequest_SeqId(paramTransactionSeq))...)
 	releaseParamGeneration()
 	if err != nil {
 		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
