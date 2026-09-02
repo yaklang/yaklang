@@ -412,6 +412,15 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 							if len(toolCalls) > 0 {
 								toolCallCallback(toolCalls)
 							}
+							// Stream the complete arguments into
+							// toolCallArgumentsWriter so downstream action parsers
+							// can consume them as a unified text stream, identical
+							// to the streaming SSE path and text-mode @action JSON path.
+							for _, tc := range toolCalls {
+								if tc.Function.Arguments != "" && toolCallArgumentsWriter != nil {
+									toolCallArgumentsWriter.Write([]byte(tc.Function.Arguments))
+								}
+							}
 						} else {
 							// Original behavior: convert to <|TOOL_CALL...|> format
 							for _, toolcall := range toolcallList {
