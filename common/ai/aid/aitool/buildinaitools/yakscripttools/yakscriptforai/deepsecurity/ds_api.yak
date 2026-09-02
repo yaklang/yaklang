@@ -513,4 +513,20 @@ if actionLower == "query_monitor" {
     doRun(action, func(pg) { return sprintf("%v/%v-monitor/record/list", P, mt) }, func(pg) { return buildParams(pg) }); return
 }
 
-yakit.Error("不支持的操作: %v，详见 USAGE", action)
+// 报错时直接给出完整 action 清单（模型常在弱口令/高危账号上拼错名字，给全量枚举可自愈）
+validActions = "query_server_list, query_server_hardware, query_server_asset, query_account_list, get_agent_authorization, " +
+    "query_virus_count, query_virus_info, query_virus_affect, query_virus_server_detail, query_virus_detail, " +
+    "query_webshell_count, query_webshell_info, query_webshell_affect, query_webshell_server_detail, query_webshell_detail, " +
+    "query_reboundshell_count, query_reboundshell_server_detail, query_reboundshell_detail, " +
+    "query_abnormal_account_count, query_abnormal_account_server_detail, query_abnormal_account_detail, " +
+    "query_abnormal_login_count, query_abnormal_login_server_detail, query_abnormal_login_detail, " +
+    "query_abnormal_process_count, query_abnormal_process_server_detail, query_abnormal_process_detail, " +
+    "query_log_delete_count, query_log_delete_server_detail, query_log_delete_detail, " +
+    "query_system_cmd_count, query_system_cmd_info, query_system_cmd_detail, " +
+    "query_local_permission_count, query_local_permission_info, query_local_permission_detail, " +
+    "query_system_vuln_distributed, query_system_vuln_info, query_system_vuln_influence, query_system_vuln_server_detail, query_system_vuln_detail, " +
+    "query_weakpwd_distributed, query_weakpwd_server_detail, query_weakpwd_detail, query_weakpwd_by_time, " +
+    "query_danger_account_distributed, query_danger_account_server_detail, query_danger_account_detail, " +
+    "query_config_defect_distributed, query_config_defect_server_detail, query_config_defect_detail, " +
+    "query_contingency, query_monitor"
+yakit.Error("不支持的操作: %v。action 名是固定枚举，禁止猜测变体。完整 action 列表: %v", action, validActions)
