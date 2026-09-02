@@ -244,7 +244,7 @@ func normalizeUsageMap(usage map[string]any) map[string]any {
 // SSE/body payload (Qwen Omni stream_options.include_usage=true). It is
 // called with nil when no usage block was observed.
 // 关键词: processAIResponse, SSE usage 抽取, 视频 token 用量解析
-func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
 	// lastUsage 始终持有响应里最后一次出现的 usage 字段；对于 dashscope omni
 	// 等 SSE 接口，真实 token 数通常出现在末帧，前面的 chunk usage 多为 null。
 	// 关键词: lastUsage, SSE 末帧 usage
@@ -269,6 +269,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	defer func() {
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
+		utils.CallGeneralClose(toolCallArgumentsWriter)
 	}()
 
 	if rawResponseHeaderCallback != nil {
@@ -368,13 +369,13 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 					if key != "message" {
 						return
 					}
-				result := utils.InterfaceToGeneralMap(data)
-				reasonContent := utils.InterfaceToString(utils.MapGetString(result, "reasoning_content"))
-				if reasonContent == "" {
-					reasonContent = utils.InterfaceToString(utils.MapGetString(result, "reasoning"))
-				}
-				content := utils.InterfaceToString(utils.MapGetString(result, "content"))
-				reasonWriter.Write([]byte(reasonContent))
+					result := utils.InterfaceToGeneralMap(data)
+					reasonContent := utils.InterfaceToString(utils.MapGetString(result, "reasoning_content"))
+					if reasonContent == "" {
+						reasonContent = utils.InterfaceToString(utils.MapGetString(result, "reasoning"))
+					}
+					content := utils.InterfaceToString(utils.MapGetString(result, "content"))
+					reasonWriter.Write([]byte(reasonContent))
 					outWriter.Write([]byte(content))
 					if toolcallRaw, ok := result["tool_calls"]; ok {
 						toolcallList := utils.InterfaceToSliceInterface(toolcallRaw)
@@ -540,6 +541,15 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 						if len(toolCalls) > 0 {
 							toolCallCallback(toolCalls)
 						}
+						// Stream the incremental arguments fragments into
+						// toolCallArgumentsWriter so downstream action parsers
+						// can consume them as a unified text stream, identical
+						// to the text-mode \@action JSON path.
+						for _, tc := range toolCalls {
+							if tc.Function.Arguments != "" && toolCallArgumentsWriter != nil {
+								toolCallArgumentsWriter.Write([]byte(tc.Function.Arguments))
+							}
+						}
 					} else {
 						// Legacy mode: convert to <|TOOL_CALL...|> format for complete tool calls,
 						// or accumulate incremental arguments to output
@@ -608,18 +618,20 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	}
 }
 
-func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
+func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
+	toolCallArgsReader, toolCallArgsWriter := utils.NewBufPipe(nil)
 	streamErrBox := &streamReadErrBox{}
 
 	cancelFunc := func() {
 		outWriter.Close()
 		reasonWriter.Close()
+		toolCallArgsWriter.Close()
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		if err := processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
+		if err := processAIResponse(r, closer, outWriter, reasonWriter, toolCallArgsWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
 			streamErrBox.set(err)
 		}
 	}))
@@ -633,17 +645,19 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 		)
 	}
 
-	return outReader, reasonReader, opts, cancelFunc, streamErrBox.get
+	return outReader, reasonReader, toolCallArgsReader, opts, cancelFunc, streamErrBox.get
 }
 
-func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
+func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
+	toolCallArgsReader, toolCallArgsWriter := utils.NewBufPipe(nil)
 	streamErrBox := &streamReadErrBox{}
 
 	cancelFunc := func() {
 		outWriter.Close()
 		reasonWriter.Close()
+		toolCallArgsWriter.Close()
 	}
 
 	opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"))
@@ -656,15 +670,15 @@ func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfig
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		if err := processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
+		if err := processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallArgsWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
 			streamErrBox.set(err)
 		}
 	}))
 
-	return outReader, reasonReader, opts, cancelFunc, streamErrBox.get
+	return outReader, reasonReader, toolCallArgsReader, opts, cancelFunc, streamErrBox.get
 }
 
-func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
+func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
 	// /responses 接口的 usage 目前仍以兜底扫描原始 payload 为主，
 	// 保持与 chat_completions 路径一致的系统态回调签名。
 	// 关键词: responses 接口 usage 兜底提取
@@ -690,6 +704,7 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 		utils.CallGeneralClose(closer)
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
+		utils.CallGeneralClose(toolCallArgumentsWriter)
 	}()
 
 	if rawResponseHeaderCallback != nil {
@@ -736,7 +751,7 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	contentType := strings.ToLower(lowhttp.GetHTTPPacketHeader(r, "content-type"))
 	bufferedReader := bufio.NewReader(reader)
 	if strings.Contains(contentType, "text/event-stream") {
-		return handleResponsesSSEStream(bufferedReader, outWriter, reasonWriter, toolCallCallback)
+		return handleResponsesSSEStream(bufferedReader, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
 	}
 
 	prefix, firstNonSpace, err := readResponsesPrefix(bufferedReader)
@@ -759,20 +774,20 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 		if len(bodyTrim) == 0 {
 			return nil
 		}
-		if handleResponsesJSONPayload(bodyTrim, outWriter, reasonWriter, toolCallCallback) {
+		if handleResponsesJSONPayload(bodyTrim, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback) {
 			return nil
 		}
-		return handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallCallback)
+		return handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
 	}
 
-	return handleResponsesSSEStream(fullReader, outWriter, reasonWriter, toolCallCallback)
+	return handleResponsesSSEStream(fullReader, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
 }
 
 type responsesToolCallState struct {
 	byItemID          map[string]*ToolCall
 	streamedMessageID map[string]struct{}
-	anyTextStreamed    bool
-	anyReasonStreamed  bool
+	anyTextStreamed   bool
+	anyReasonStreamed bool
 	// streamedArgsIDs records function_call item ids whose arguments were
 	// already delivered incrementally via response.function_call_arguments.delta.
 	// response.output_item.done for such items must NOT re-emit the full
@@ -820,7 +835,7 @@ func (s *responsesToolCallState) hasMessageStreamed(itemID string, index int) bo
 	return ok
 }
 
-func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) bool {
+func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall)) bool {
 	var payload any
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return false
@@ -829,15 +844,15 @@ func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter i
 	if len(obj) == 0 {
 		return false
 	}
-	extractResponsesOutputFromObject(obj, outWriter, reasonWriter, toolCallCallback, nil)
+	extractResponsesOutputFromObject(obj, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback, nil)
 	return true
 }
 
-func handleResponsesSSEPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
-	handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallCallback)
+func handleResponsesSSEPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+	handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback)
 }
 
-func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) error {
+func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall)) error {
 	lineReader := bufio.NewReader(reader)
 	toolState := newResponsesToolCallState()
 
@@ -872,7 +887,7 @@ func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWrite
 			if err := json.Unmarshal([]byte(j), &eventMap); err != nil {
 				continue
 			}
-			handleResponsesSSEEvent(eventMap, outWriter, reasonWriter, toolCallCallback, toolState)
+			handleResponsesSSEEvent(eventMap, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback, toolState)
 		}
 	}
 }
@@ -894,7 +909,7 @@ func readResponsesPrefix(reader *bufio.Reader) ([]byte, byte, error) {
 	}
 }
 
-func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
+func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
 	eventType := utils.MapGetString(event, "type")
 	switch eventType {
 	case "response.output_text.delta":
@@ -965,6 +980,13 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 			inc := tc.Clone()
 			inc.Function.Arguments = delta
 			toolCallCallback([]*ToolCall{inc})
+			// Also stream the incremental arguments into
+			// toolCallArgumentsWriter so downstream action parsers can
+			// consume them as a unified text stream, identical to the
+			// chat-completions tool_calls path and text-mode @action JSON.
+			if toolCallArgumentsWriter != nil {
+				toolCallArgumentsWriter.Write([]byte(delta))
+			}
 		} else {
 			outWriter.Write([]byte(delta))
 		}
@@ -974,12 +996,12 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 			return
 		}
 		outputIndex := utils.InterfaceToInt(event["output_index"])
-		handleResponsesOutputItem(item, outputIndex, eventType, outWriter, reasonWriter, toolCallCallback, toolState)
+		handleResponsesOutputItem(item, outputIndex, eventType, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback, toolState)
 	case "response.completed":
 		if !toolState.anyTextStreamed {
 			resp := utils.MapGetMapRaw(event, "response")
 			if len(resp) > 0 {
-				extractResponsesOutputFromObject(resp, outWriter, reasonWriter, toolCallCallback, toolState)
+				extractResponsesOutputFromObject(resp, outWriter, reasonWriter, toolCallArgumentsWriter, toolCallCallback, toolState)
 			}
 		}
 	default:
@@ -995,7 +1017,7 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 	}
 }
 
-func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType string, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
+func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType string, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
 	itemType := utils.MapGetString(item, "type")
 	switch itemType {
 	case "message":
@@ -1054,7 +1076,7 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 	}
 }
 
-func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
+func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallArgumentsWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
 	if nested := utils.MapGetMapRaw(obj, "response"); len(nested) > 0 {
 		obj = nested
 	}

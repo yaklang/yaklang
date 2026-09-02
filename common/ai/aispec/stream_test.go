@@ -20,7 +20,7 @@ func TestProcessNonStreamResponse(t *testing.T) {
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected stream read error: %v", err)
 	}
@@ -53,7 +53,7 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected stream read error: %v", err)
 	}
@@ -64,7 +64,7 @@ data: [DONE]`
 
 func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	// 测试流式和非流式选项创建
-	outReader, reasonReader, opts, cancel, _ := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil, nil, nil, nil)
+	outReader, reasonReader, _, opts, cancel, _ := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil, nil, nil, nil)
 	defer cancel()
 
 	if outReader == nil || reasonReader == nil {
@@ -76,7 +76,7 @@ func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	}
 
 	// 测试非流式
-	outReader2, reasonReader2, opts2, cancel2, _ := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil, nil, nil, nil)
+	outReader2, reasonReader2, _, opts2, cancel2, _ := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil, nil, nil, nil)
 	defer cancel2()
 
 	if outReader2 == nil || reasonReader2 == nil {
@@ -106,7 +106,7 @@ data: [DONE]`
 	reasonBuffer := &bytes.Buffer{}
 
 	var captured *ChatUsage
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, func(u *ChatUsage) {
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, func(u *ChatUsage) {
 		captured = u
 	})
 
@@ -142,7 +142,7 @@ data: [DONE]`
 
 	called := false
 	var captured *ChatUsage
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, func(u *ChatUsage) {
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, func(u *ChatUsage) {
 		called = true
 		captured = u
 	})
@@ -167,7 +167,7 @@ func TestProcessAIResponse_HeaderCallbackBeforeBodyRead(t *testing.T) {
 
 	go func() {
 		defer close(done)
-		processAIResponse(mockResponse, pr, outBuffer, reasonBuffer, nil, func(header []byte) {
+		processAIResponse(mockResponse, pr, outBuffer, reasonBuffer, nil, nil, func(header []byte) {
 			headerCh <- append([]byte(nil), header...)
 		}, nil, nil)
 	}()
@@ -215,7 +215,7 @@ func TestProcessAIResponse_StreamReadErrorReturned(t *testing.T) {
 
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
-	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected stream read error")
 	}
@@ -263,7 +263,7 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestProcessAIResponse_OllamaReasoningField_NonStream(t *testing.T) {
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,7 +313,7 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -339,7 +339,7 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -366,14 +366,14 @@ func TestHandleResponsesSSEEvent_CompletedFallback(t *testing.T) {
 		"item": map[string]any{"type": "message", "id": "msg_1", "role": "assistant",
 			"content": []any{map[string]any{"type": "output_text", "text": ""}}},
 		"output_index": 0,
-	}, outBuf, reasonBuf, nil, state)
+	}, outBuf, reasonBuf, nil, nil, state)
 
 	handleResponsesSSEEvent(map[string]any{
 		"type": "response.output_item.done",
 		"item": map[string]any{"type": "message", "id": "msg_1", "role": "assistant",
 			"content": []any{map[string]any{"type": "output_text", "text": ""}}},
 		"output_index": 0,
-	}, outBuf, reasonBuf, nil, state)
+	}, outBuf, reasonBuf, nil, nil, state)
 
 	if outBuf.Len() != 0 {
 		t.Fatalf("expected empty output before completed, got %q", outBuf.String())
@@ -388,7 +388,7 @@ func TestHandleResponsesSSEEvent_CompletedFallback(t *testing.T) {
 				"content": []any{map[string]any{"type": "output_text", "text": "PONG"}},
 			}},
 		},
-	}, outBuf, reasonBuf, nil, state)
+	}, outBuf, reasonBuf, nil, nil, state)
 
 	if outBuf.String() != "PONG" {
 		t.Errorf("expected output %q from completed fallback, got %q", "PONG", outBuf.String())
@@ -408,7 +408,7 @@ func TestHandleResponsesSSEEvent_DeltaSuppressCompleted(t *testing.T) {
 		"delta":        "Hello",
 		"output_index": 0,
 		"item_id":      "msg_1",
-	}, outBuf, reasonBuf, nil, state)
+	}, outBuf, reasonBuf, nil, nil, state)
 
 	handleResponsesSSEEvent(map[string]any{
 		"type": "response.completed",
@@ -419,7 +419,7 @@ func TestHandleResponsesSSEEvent_DeltaSuppressCompleted(t *testing.T) {
 				"content": []any{map[string]any{"type": "output_text", "text": "Hello"}},
 			}},
 		},
-	}, outBuf, reasonBuf, nil, state)
+	}, outBuf, reasonBuf, nil, nil, state)
 
 	if outBuf.String() != "Hello" {
 		t.Errorf("expected exactly one %q, got %q", "Hello", outBuf.String())
@@ -437,7 +437,7 @@ func TestHandleResponsesSSEEvent_OutputTextDone(t *testing.T) {
 	handleResponsesSSEEvent(map[string]any{
 		"type": "response.output_text.done",
 		"text": "done-text",
-	}, outBuf, reasonBuf, nil, state)
+	}, outBuf, reasonBuf, nil, nil, state)
 
 	if outBuf.String() != "done-text" {
 		t.Errorf("expected %q, got %q", "done-text", outBuf.String())
@@ -458,7 +458,7 @@ func TestHandleResponsesSSEEvent_ReasoningTextDone(t *testing.T) {
 	handleResponsesSSEEvent(map[string]any{
 		"type": "response.reasoning_text.done",
 		"text": "reason-done",
-	}, outBuf, reasonBuf, nil, state)
+	}, outBuf, reasonBuf, nil, nil, state)
 
 	if reasonBuf.String() != "reason-done" {
 		t.Errorf("expected %q, got %q", "reason-done", reasonBuf.String())
@@ -494,7 +494,7 @@ func TestHandleResponsesSSEEvent_CompletedWithToolCalls(t *testing.T) {
 				},
 			},
 		},
-	}, outBuf, reasonBuf, tcCallback, state)
+	}, outBuf, reasonBuf, nil, tcCallback, state)
 
 	if len(receivedCalls) == 0 {
 		t.Fatal("expected tool call from completed event, got none")
@@ -535,7 +535,7 @@ func TestHandleResponsesSSEEvent_FunctionCallArgumentsDeltaIncremental(t *testin
 			"item_id":       "fc_1",
 			"call_id":        "call_abc",
 			"name":          "get_weather",
-		}, outBuf, reasonBuf, tcCallback, state)
+		}, outBuf, reasonBuf, nil, tcCallback, state)
 	}
 
 	// Each callback invocation must carry ONLY that frame's delta fragment,
@@ -580,7 +580,7 @@ func TestHandleResponsesSSEEvent_DeltaThenDoneNoDuplicate(t *testing.T) {
 			"item_id":       "fc_1",
 			"call_id":        "call_abc",
 			"name":          "get_weather",
-		}, outBuf, reasonBuf, tcCallback, state)
+		}, outBuf, reasonBuf, nil, tcCallback, state)
 	}
 	// 2) output_item.done carries the full function_call item
 	handleResponsesSSEEvent(map[string]any{
@@ -593,7 +593,7 @@ func TestHandleResponsesSSEEvent_DeltaThenDoneNoDuplicate(t *testing.T) {
 			"name":      "get_weather",
 			"arguments": `{"city":"Tokyo"}`,
 		},
-	}, outBuf, reasonBuf, tcCallback, state)
+	}, outBuf, reasonBuf, nil, tcCallback, state)
 	// 3) response.completed with the same function_call in output
 	handleResponsesSSEEvent(map[string]any{
 		"type": "response.completed",
@@ -607,7 +607,7 @@ func TestHandleResponsesSSEEvent_DeltaThenDoneNoDuplicate(t *testing.T) {
 				"arguments": `{"city":"Tokyo"}`,
 			}},
 		},
-	}, outBuf, reasonBuf, tcCallback, state)
+	}, outBuf, reasonBuf, nil, tcCallback, state)
 
 	// Concatenating all received arguments must yield exactly one JSON object,
 	// NOT two or three copies.
