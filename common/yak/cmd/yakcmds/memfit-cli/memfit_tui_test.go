@@ -1,9 +1,13 @@
-package yakcmds
+package memfitcli
 
 import (
 	"bufio"
+	"context"
+	"io"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/stretchr/testify/require"
@@ -15,6 +19,7 @@ func TestMemfitSanitizeTerminalText(t *testing.T) {
 	result := sanitizeMemfitTerminalText(input)
 	require.Equal(t, "safe redOVER\n下一行", result)
 	require.NotContains(t, result, "\x1b")
+	require.Equal(t, "one\r\ntwo", sanitizeMemfitTTYText("one\ntwo"))
 }
 
 func TestMemfitInputViewportPreservesWideAndMultilineInput(t *testing.T) {
@@ -22,6 +27,7 @@ func TestMemfitInputViewportPreservesWideAndMultilineInput(t *testing.T) {
 	text, cursor := memfitInputViewport(buffer, len(buffer), 12)
 	require.LessOrEqual(t, runewidth.StringWidth(text), 12)
 	require.Contains(t, text, "tail")
+	require.GreaterOrEqual(t, runewidth.StringWidth(text), 10)
 	require.GreaterOrEqual(t, cursor, 0)
 	require.LessOrEqual(t, cursor, runewidth.StringWidth(text))
 
@@ -70,4 +76,38 @@ func TestMemfitStreamClassification(t *testing.T) {
 	thought := memfitWorkerEvent{Type: string(schema.EVENT_TYPE_STREAM), NodeID: "re-act-loop-thought", VizSource: "human_readable_thought"}
 	require.False(t, isMemfitAnswerStream(thought))
 	require.True(t, isMemfitThoughtStream(thought))
+}
+
+func TestMemfitAnswerStreamsSelectLatestWriter(t *testing.T) {
+	var streams memfitAnswerStreams
+	streams.Append("writer-1", "first")
+	streams.Append("writer-2", "final ")
+	streams.Append("writer-2", "answer")
+	require.Equal(t, "writer-1", streams.FirstID())
+	require.Equal(t, "first", streams.First())
+	require.Equal(t, "final answer", streams.Last())
+	streams.Reset()
+	require.Empty(t, streams.Last())
+}
+
+func TestMemfitPlainEmitsReplayedAnswerOnce(t *testing.T) {
+	client := newScriptedMemfitClient()
+	defer client.Close()
+	readSide, writeSide, err := os.Pipe()
+	require.NoError(t, err)
+	defer readSide.Close()
+	defer writeSide.Close()
+	oldStdout := os.Stdout
+	os.Stdout = writeSide
+	defer func() { os.Stdout = oldStdout }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	require.NoError(t, runMemfitPlain(ctx, client, memfitStartConfig{}, "once"))
+	require.NoError(t, writeSide.Close())
+	os.Stdout = oldStdout
+	output, err := io.ReadAll(readSide)
+	require.NoError(t, err)
+	require.NoError(t, readSide.Close())
+	require.Equal(t, "echo: once\n", string(output))
 }

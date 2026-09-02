@@ -1,4 +1,4 @@
-package yakcmds
+package memfitcli
 
 import (
 	"bufio"
@@ -35,16 +35,16 @@ func memfitCanUseTUI() bool {
 		strings.ToLower(os.Getenv("TERM")) != "dumb"
 }
 
-func runMemfitPlain(ctx context.Context, client *memfitProcessClient, config memfitStartConfig, query string) error {
+func runMemfitPlain(ctx context.Context, client memfitClient, config memfitStartConfig, query string) error {
 	id := fmt.Sprintf("input-%d", memfitNowMillis())
 	if err := client.send("input", id, memfitInput{Text: query}); err != nil {
 		return err
 	}
-	printed := false
+	var answers memfitAnswerStreams
 	var fallbackResult string
 	for {
 		select {
-		case envelope := <-client.events:
+		case envelope := <-client.Events():
 			switch envelope.Type {
 			case "event":
 				event, err := decodeMemfitPayload[memfitWorkerEvent](envelope)
@@ -52,8 +52,7 @@ func runMemfitPlain(ctx context.Context, client *memfitProcessClient, config mem
 					return err
 				}
 				if isMemfitAnswerStream(event) && event.StreamDelta != "" {
-					_, _ = io.WriteString(os.Stdout, sanitizeMemfitTerminalText(event.StreamDelta))
-					printed = true
+					answers.Append(envelope.ID, event.StreamDelta)
 				}
 				if event.Type == string(schema.EVENT_TYPE_RESULT) && event.Content != "" {
 					fallbackResult = extractMemfitReadableContent(event.Content)
@@ -67,10 +66,12 @@ func runMemfitPlain(ctx context.Context, client *memfitProcessClient, config mem
 				status, _ := decodeMemfitPayload[memfitStatus](envelope)
 				return utils.Error(status.Message)
 			case "turn_done":
-				if !printed && fallbackResult != "" {
-					fmt.Fprint(os.Stdout, sanitizeMemfitTerminalText(fallbackResult))
+				result := answers.Last()
+				if result == "" {
+					result = fallbackResult
 				}
-				if printed || fallbackResult != "" {
+				if result != "" {
+					fmt.Fprint(os.Stdout, sanitizeMemfitTerminalText(result))
 					fmt.Fprintln(os.Stdout)
 				}
 				status, _ := decodeMemfitPayload[memfitStatus](envelope)
@@ -79,11 +80,11 @@ func runMemfitPlain(ctx context.Context, client *memfitProcessClient, config mem
 				}
 				return nil
 			}
-		case line := <-client.logs:
+		case line := <-client.Logs():
 			if config.Debug {
 				fmt.Fprintf(os.Stderr, "[worker] %s\n", sanitizeMemfitTerminalText(line))
 			}
-		case <-client.done:
+		case <-client.Done():
 			if err := client.WaitError(); err != nil {
 				return utils.Errorf("memfit worker exited: %v%s", err, client.formattedLogTail())
 			}
@@ -92,6 +93,53 @@ func runMemfitPlain(ctx context.Context, client *memfitProcessClient, config mem
 			return ctx.Err()
 		}
 	}
+}
+
+type memfitAnswerStreams struct {
+	order []string
+	text  map[string]*strings.Builder
+}
+
+func (s *memfitAnswerStreams) Append(writerID, delta string) {
+	if writerID == "" {
+		writerID = "default"
+	}
+	if s.text == nil {
+		s.text = make(map[string]*strings.Builder)
+	}
+	stream, ok := s.text[writerID]
+	if !ok {
+		stream = &strings.Builder{}
+		s.text[writerID] = stream
+		s.order = append(s.order, writerID)
+	}
+	stream.WriteString(delta)
+}
+
+func (s *memfitAnswerStreams) FirstID() string {
+	if len(s.order) == 0 {
+		return ""
+	}
+	return s.order[0]
+}
+
+func (s *memfitAnswerStreams) First() string {
+	if len(s.order) == 0 {
+		return ""
+	}
+	return s.text[s.order[0]].String()
+}
+
+func (s *memfitAnswerStreams) Last() string {
+	if len(s.order) == 0 {
+		return ""
+	}
+	return s.text[s.order[len(s.order)-1]].String()
+}
+
+func (s *memfitAnswerStreams) Reset() {
+	s.order = nil
+	s.text = nil
 }
 
 type memfitKeyKind int
@@ -122,7 +170,7 @@ type memfitKey struct {
 }
 
 type memfitTUI struct {
-	client *memfitProcessClient
+	client memfitClient
 	config memfitStartConfig
 	color  bool
 	width  int
@@ -141,12 +189,13 @@ type memfitTUI struct {
 	streamID      string
 	streamKind    string
 	answerSeen    bool
+	answers       memfitAnswerStreams
 	turnStarted   time.Time
 	lastModel     string
 	lastCtrlC     time.Time
 }
 
-func runMemfitTUI(ctx context.Context, client *memfitProcessClient, config memfitStartConfig, initialQuery string) error {
+func runMemfitTUI(ctx context.Context, client memfitClient, config memfitStartConfig, initialQuery string) error {
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		return utils.Wrap(err, "enable memfit terminal input")
@@ -191,11 +240,11 @@ func runMemfitTUI(ctx context.Context, client *memfitProcessClient, config memfi
 			if exit {
 				return nil
 			}
-		case envelope := <-client.events:
+		case envelope := <-client.Events():
 			if err := ui.handleEnvelope(envelope); err != nil {
 				return err
 			}
-		case line := <-client.logs:
+		case line := <-client.Logs():
 			if config.Debug {
 				ui.printNotice("worker", line, memfitColorDim)
 			}
@@ -207,7 +256,7 @@ func runMemfitTUI(ctx context.Context, client *memfitProcessClient, config memfi
 					ui.renderComposer()
 				}
 			}
-		case <-client.done:
+		case <-client.Done():
 			ui.finishOutput()
 			if err := client.WaitError(); err != nil {
 				return utils.Errorf("memfit worker exited: %v%s", err, client.formattedLogTail())
@@ -228,13 +277,27 @@ func (ui *memfitTUI) printHeader() {
 	}
 	if ui.width < 48 {
 		fmt.Fprintf(os.Stdout, "%s memfit · %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆"), strings.ToUpper(ui.config.ReviewPolicy))
-		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, "Enter send · Ctrl+C stop · /help"))
+		hint := "Enter send · Ctrl+C stop · /help"
+		if ui.width < 34 {
+			hint = "Enter send · ^C stop"
+		}
+		if ui.width < 24 {
+			hint = "Enter send · ^C"
+		}
+		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, hint))
 		return
 	}
 	fmt.Fprintf(os.Stdout, "%s  %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆ memfit"), ui.paint(memfitColorDim, "local isolated agent"))
 	detail := fmt.Sprintf("%s · %s · %s", model, strings.ToUpper(ui.config.ReviewPolicy), compactMemfitPath(ui.config.Workdir, maxInt(18, ui.width/3)))
-	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, truncateMemfitCells(detail, ui.width)))
-	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, "Enter send · Alt/Shift+Enter newline · ↑↓ history · Ctrl+C stop · /help"))
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, truncateMemfitCells(detail, ui.width-1)))
+	hint := "Enter send · Ctrl+C stop · /help"
+	if ui.width >= 64 {
+		hint = "Enter send · Alt+Enter newline · Ctrl+C stop · /help"
+	}
+	if ui.width >= 82 {
+		hint = "Enter send · Alt/Shift+Enter newline · ↑↓ history · Ctrl+C stop · /help"
+	}
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, hint))
 }
 
 func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
@@ -349,12 +412,20 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 	case "/exit", "/quit", "/q":
 		return true, true, nil
 	case "/help", "/?":
-		fmt.Fprintln(os.Stdout, ui.paint(memfitColorBold, "Memfit commands"))
-		fmt.Fprintln(os.Stdout, "  /status          show process, model source, mode, and workdir")
-		fmt.Fprintln(os.Stdout, "  /mode MODE       switch yolo, ai, or manual review")
-		fmt.Fprintln(os.Stdout, "  /logs            show the filtered worker log tail")
-		fmt.Fprintln(os.Stdout, "  /clear           clear the visible viewport (scrollback is preserved)")
-		fmt.Fprintln(os.Stdout, "  /exit            end the session")
+		ui.printLine(ui.paint(memfitColorBold, "Memfit commands"))
+		if ui.width < 48 {
+			ui.printLine("  /status  process info")
+			ui.printLine("  /mode    review mode")
+			ui.printLine("  /logs    worker logs")
+			ui.printLine("  /clear   clear view")
+			ui.printLine("  /exit    quit")
+		} else {
+			ui.printLine("  /status       process, model, mode, workdir")
+			ui.printLine("  /mode MODE    set yolo, ai, or manual")
+			ui.printLine("  /logs         filtered worker logs")
+			ui.printLine("  /clear        clear view; keep scrollback")
+			ui.printLine("  /exit         end session")
+		}
 		return true, false, nil
 	case "/status", "/config":
 		model := "configured Yaklang tiers"
@@ -364,19 +435,19 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		if ui.config.Model != "" {
 			model += "/" + ui.config.Model
 		}
-		fmt.Fprintf(os.Stdout, "worker pid: %d\r\nmodel: %s\r\nreview: %s\r\nworkdir: %s\r\n", ui.client.cmd.Process.Pid, model, ui.config.ReviewPolicy, ui.config.Workdir)
+		fmt.Fprintf(os.Stdout, "worker pid: %d\r\nmodel: %s\r\nreview: %s\r\nworkdir: %s\r\n", ui.client.PID(), model, ui.config.ReviewPolicy, ui.config.Workdir)
 		return true, false, nil
 	case "/logs":
 		logs := ui.client.LogTail()
 		if len(logs) == 0 {
-			fmt.Fprintln(os.Stdout, ui.paint(memfitColorDim, "worker log is empty"))
+			ui.printLine(ui.paint(memfitColorDim, "worker log is empty"))
 			return true, false, nil
 		}
 		if len(logs) > 20 {
 			logs = logs[len(logs)-20:]
 		}
 		for _, line := range logs {
-			fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorDim, "│"), sanitizeMemfitTerminalText(line))
+			fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorDim, "│"), sanitizeMemfitTTYText(line))
 		}
 		return true, false, nil
 	case "/clear":
@@ -385,12 +456,12 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		return true, false, nil
 	case "/mode", "/review":
 		if len(parts) != 2 {
-			fmt.Fprintln(os.Stdout, ui.paint(memfitColorYellow, "usage: /mode yolo|ai|manual"))
+			ui.printLine(ui.paint(memfitColorYellow, "usage: /mode yolo|ai|manual"))
 			return true, false, nil
 		}
 		policy := strings.ToLower(parts[1])
 		if err := validateMemfitReviewPolicy(policy); err != nil {
-			fmt.Fprintln(os.Stdout, ui.paint(memfitColorYellow, err.Error()))
+			ui.printLine(ui.paint(memfitColorYellow, err.Error()))
 			return true, false, nil
 		}
 		ui.config.ReviewPolicy = policy
@@ -416,6 +487,7 @@ func (ui *memfitTUI) submit(text string) error {
 	ui.streamID = ""
 	ui.streamKind = ""
 	ui.answerSeen = false
+	ui.answers.Reset()
 	ui.showBusyStatus("thinking")
 	return ui.client.send("input", fmt.Sprintf("input-%d", memfitNowMillis()), memfitInput{Text: text})
 }
@@ -439,7 +511,7 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 		status, _ := decodeMemfitPayload[memfitStatus](envelope)
 		ui.finishOutput()
 		ui.clearStatusLine()
-		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorRed, "error:"), sanitizeMemfitTerminalText(status.Message))
+		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorRed, "error:"), sanitizeMemfitTTYText(status.Message))
 		ui.busy = false
 		ui.awaitingInput = false
 		ui.renderComposer()
@@ -452,6 +524,7 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 		ui.handleWorkerEvent(envelope.ID, event)
 	case "turn_done":
 		status, _ := decodeMemfitPayload[memfitStatus](envelope)
+		ui.flushBufferedAnswer()
 		ui.finishOutput()
 		ui.clearStatusLine()
 		elapsed := time.Since(ui.turnStarted).Round(100 * time.Millisecond)
@@ -479,6 +552,17 @@ func (ui *memfitTUI) handleWorkerEvent(envelopeID string, event memfitWorkerEven
 		ui.lastModel = event.AIModel
 	}
 	if isMemfitAnswerStream(event) && event.StreamDelta != "" {
+		writerID := envelopeID
+		if writerID == "" {
+			writerID = "default"
+		}
+		primaryWriter := ui.answers.FirstID()
+		ui.answers.Append(writerID, event.StreamDelta)
+		if primaryWriter != "" && primaryWriter != writerID {
+			// Later answer writers are buffered until turn completion. The engine
+			// can replay the final answer while confirming task completion.
+			return
+		}
 		ui.clearStatusLine()
 		if !ui.streamOpen || ui.streamKind != "answer" || (event.NodeID != "" && ui.streamID != "" && event.NodeID != ui.streamID) {
 			ui.finishOutput()
@@ -487,7 +571,7 @@ func (ui *memfitTUI) handleWorkerEvent(envelopeID string, event memfitWorkerEven
 			ui.streamID = event.NodeID
 			ui.streamKind = "answer"
 		}
-		fmt.Fprint(os.Stdout, sanitizeMemfitTerminalText(event.StreamDelta))
+		fmt.Fprint(os.Stdout, sanitizeMemfitTTYText(event.StreamDelta))
 		ui.answerSeen = true
 		return
 	}
@@ -501,7 +585,7 @@ func (ui *memfitTUI) handleWorkerEvent(envelopeID string, event memfitWorkerEven
 			ui.streamID = event.NodeID
 			ui.streamKind = "thought"
 		}
-		fmt.Fprint(os.Stdout, ui.paint(memfitColorDim, sanitizeMemfitTerminalText(event.StreamDelta)))
+		fmt.Fprint(os.Stdout, ui.paint(memfitColorDim, sanitizeMemfitTTYText(event.StreamDelta)))
 		return
 	}
 
@@ -512,7 +596,7 @@ func (ui *memfitTUI) handleWorkerEvent(envelopeID string, event memfitWorkerEven
 		if question == "" {
 			question = "Memfit needs your input"
 		}
-		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorYellow+memfitColorBold, "?"), sanitizeMemfitTerminalText(question))
+		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorYellow+memfitColorBold, "?"), sanitizeMemfitTTYText(question))
 		ui.awaitingInput = true
 		ui.interactiveID = extractMemfitInteractiveID(envelopeID, event.Content)
 		ui.renderComposer()
@@ -522,9 +606,26 @@ func (ui *memfitTUI) handleWorkerEvent(envelopeID string, event memfitWorkerEven
 	if description := describeMemfitEvent(event); description != "" {
 		ui.finishOutput()
 		ui.clearStatusLine()
-		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorDim, "↳"), sanitizeMemfitTerminalText(description))
+		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorDim, "↳"), sanitizeMemfitTTYText(description))
 		ui.showBusyStatus("working")
 	}
+}
+
+func (ui *memfitTUI) flushBufferedAnswer() {
+	first, last := ui.answers.First(), ui.answers.Last()
+	if first == "" || last == "" || first == last {
+		return
+	}
+	if strings.HasPrefix(last, first) {
+		fmt.Fprint(os.Stdout, sanitizeMemfitTTYText(strings.TrimPrefix(last, first)))
+		return
+	}
+	ui.finishOutput()
+	fmt.Fprint(os.Stdout, ui.paint(memfitColorBold+memfitColorCyan, "Memfit update › "))
+	fmt.Fprint(os.Stdout, sanitizeMemfitTTYText(last))
+	ui.streamOpen = true
+	ui.streamID = ui.answers.order[len(ui.answers.order)-1]
+	ui.streamKind = "answer"
 }
 
 func (ui *memfitTUI) renderComposer() {
@@ -586,12 +687,16 @@ func (ui *memfitTUI) printUserInput(text string) {
 func (ui *memfitTUI) printNotice(label, message, color string) {
 	ui.finishOutput()
 	ui.clearStatusLine()
-	fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(color, "["+label+"]"), sanitizeMemfitTerminalText(message))
+	fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(color, "["+label+"]"), sanitizeMemfitTTYText(message))
 	if ui.busy && !ui.awaitingInput {
 		ui.showBusyStatus("working")
 	} else {
 		ui.renderComposer()
 	}
+}
+
+func (ui *memfitTUI) printLine(text string) {
+	fmt.Fprintf(os.Stdout, "%s\r\n", text)
 }
 
 func (ui *memfitTUI) paint(code, text string) string {
@@ -835,7 +940,9 @@ func memfitInputViewport(buffer []rune, cursor, maxCells int) (string, int) {
 		widthBeforeCursor += widths[i]
 	}
 	if widthBeforeCursor > maxCells-3 {
-		budget := maxCells / 2
+		// Keep the cursor visible while using the full available width. The old
+		// half-width budget wasted space on compact terminals at the end of input.
+		budget := maxCells - 1 // reserve the leading ellipsis
 		used := 0
 		start = cursor
 		for start > 0 && used+widths[start-1] <= budget {
@@ -932,6 +1039,10 @@ func sanitizeMemfitTerminalText(input string) string {
 		}
 	}
 	return output.String()
+}
+
+func sanitizeMemfitTTYText(input string) string {
+	return strings.ReplaceAll(sanitizeMemfitTerminalText(input), "\n", "\r\n")
 }
 
 func describeMemfitEvent(event memfitWorkerEvent) string {

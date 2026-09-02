@@ -1,6 +1,6 @@
-//go:build windows
+//go:build !darwin && !dragonfly && !freebsd && !linux && !netbsd && !openbsd && !solaris && !windows
 
-package yakcmds
+package memfitcli
 
 import "os/exec"
 
