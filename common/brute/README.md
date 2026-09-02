@@ -238,6 +238,18 @@ Unicode 正反、空密码）全通过——NTLMv2 客户端实现首次获得�
 | Windows 11 24H2 (10.0.26100) | 5 | 5/5 auth-rejected |
 | xrdp（Shodan 命中 1） | 1 | auth-rejected |
 
+**可控 Windows 11 Pro ARM（QEMU / OrbStack，`WIN-0GR4G6GOD7U`）正反实测**：
+
+| 凭证 | 结果 |
+|---|---|
+| `rdpuser` / `RdpPass123!` | **Ok=true Finished=true**，NLA 1.2s / 二次 0.5s |
+| `rdpuser` / `WrongPass!` | Ok=false Finished=false，`STATUS_LOGON_FAILURE` 300–400ms |
+| `no-such-user` / `x` | Ok=false，`STATUS_LOGON_FAILURE` 200–300ms |
+
+`YAK_BRUTE_RDP_ADDR=host:port go test ./common/utils/bruteutils/ -run TestRDPWindowsLive -v`
+
+UnAuthVerify 不再 sleep 3s、不再用 `administrator:""` 当未授权探测（NLA 无未授权访问）。
+
 ## Telnet 真实设备语料与判定增强（Shodan 100 样本）
 
 互联网 telnet 协议形态高度不标准。Shodan 采样 100 例 banner 分析：

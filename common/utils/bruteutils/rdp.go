@@ -33,43 +33,15 @@ var rdpAuth = &DefaultServiceAuthInfo{
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 3389)
 		result := i.Result()
-
+		// NLA 没有“未授权访问”：空密码也是一次认证失败。
+		// 这里只做 TCP 可达性，避免 3s sleep + administrator:"" 误伤爆破节奏。
 		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
 			res := i.Result()
 			res.Finished = true
 			return res
 		}
-		conn.Close()
-
-		time.Sleep(3 * time.Second)
-
-		host, port, err := utils.ParseStringToHostPort(i.Target)
-		if err != nil {
-			log.Errorf("parse target[%v] failed: %s", i.Target, err)
-			result.Finished = true
-			return result
-		}
-
-		var r bool
-		if utils.IsIPv4(host) {
-			r, err = rdpLoginContext(i.Context, host, host, "administrator", "", port)
-		} else {
-			ip := netx.LookupFirst(host, netx.WithTimeout(5*time.Second))
-			r, err = rdpLoginContext(i.Context, ip, host, "administrator", "", port)
-		}
-
-		if err != nil {
-			// 192.3.138.219/24
-			autoSetFinishedByConnectionError(err, result)
-			return result
-		}
-		if r {
-			result.Finished = true
-			result.Ok = true
-			return result
-		}
-
+		_ = conn.Close()
 		return result
 	},
 	BrutePass: func(i *BruteItem) (result *BruteItemResult) {
@@ -227,8 +199,6 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	if d, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(d)
 	}
-	glog.Info(conn.LocalAddr().String())
-
 	g.tpkt = tpkt.New(core.NewSocketLayer(conn), nla.NewNTLMv2(domain, user, pwd))
 	g.x224 = x224.New(g.tpkt)
 	g.mcs = t125.NewMCSClient(g.x224)
@@ -250,21 +220,23 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	var doneOnce sync.Once
 	var finalErr error
 	wg.Add(1)
-	finish := func(e error) { doneOnce.Do(func() { finalErr = e; wg.Done() }) }
+	finish := func(e error) {
+		doneOnce.Do(func() {
+			if e != nil {
+				log.Errorf("rdp error: %v", e)
+			}
+			finalErr = e
+			wg.Done()
+		})
+	}
 
 	// 必须在 Connect 之前注册：NLA 在 localhost 上可能快于后续 On()。
-	g.x224.On("error", func(e error) {
-		log.Errorf("rdp error: %v", e)
-		finish(e)
-	})
+	g.x224.On("error", func(e error) { finish(e) })
 	g.x224.On("nla-ok", func() {
 		log.Info("rdp nla authentication succeeded")
 		finish(nil)
 	})
-	g.pdu.On("error", func(e error) {
-		log.Errorf("rdp error: %v", e)
-		finish(e)
-	})
+	g.pdu.On("error", func(e error) { finish(e) })
 	g.pdu.On("close", func() {
 		finish(errors.New("close"))
 	})
