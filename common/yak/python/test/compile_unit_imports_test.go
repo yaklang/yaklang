@@ -159,3 +159,127 @@ func TestPythonCompileUnit_EdgeStability(t *testing.T) {
 		require.Equal(t, sorted[i].To, edges[i].To)
 	}
 }
+// pyEdgeKeys renders the edge set as "from->to" keys.
+func pyEdgeKeys(edges []ssa.UnitRef) map[string]bool {
+	keys := map[string]bool{}
+	for _, e := range edges {
+		keys[edgeKey(e)] = true
+	}
+	return keys
+}
+
+// pyEdgeRaws collects the Raw fields of all edges.
+func pyEdgeRaws(edges []ssa.UnitRef) map[string]bool {
+	raws := map[string]bool{}
+	for _, e := range edges {
+		raws[e.Raw] = true
+	}
+	return raws
+}
+
+func TestPythonCompileUnit_ParenthesizedMultilineImportEdges(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("pkg/__init__.py", "")
+	vf.AddFile("pkg/moda.py", "def f():\n    return 1\n")
+	vf.AddFile("pkg/modb.py", "def g():\n    return 2\n")
+	vf.AddFile("pkg/user.py", "from . import (\n    moda,\n    modb,\n)\nfrom .moda import (\n    f as helper,\n)\n")
+
+	edges := requirePyUnitEdges(t, vf)
+	got := pyEdgeKeys(edges)
+	// "from . import (moda, modb)" resolves each imported name as a submodule
+	// of the importing package — but the units here are directories, so both
+	// moda and modb live in the same pkg unit as user.py: no cross-unit edge.
+	// "from .moda import f" also stays inside the pkg unit.
+	require.Empty(t, filterEdgesNotWithin(edges, "dir:pkg"), "unexpected cross-unit edges: %v", edges)
+
+	// With a second package importing via parentheses, the edge must appear.
+	vf.AddFile("other/__init__.py", "")
+	vf.AddFile("other/__init2__.py", "")
+	vf.AddFile("other/user2.py", "from pkg import (\n    moda,\n)\n")
+	edges = requirePyUnitEdges(t, vf)
+	got = pyEdgeKeys(edges)
+	require.Contains(t, got, "dir:other->dir:pkg", "edges: %v", edges)
+}
+
+// filterEdgesNotWithin returns edges whose From unit differs from the given unit.
+func filterEdgesNotWithin(edges []ssa.UnitRef, unitKey string) []ssa.UnitRef {
+	var out []ssa.UnitRef
+	for _, e := range edges {
+		if e.From != unitKey {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func TestPythonCompileUnit_CommentAndStringImportsProduceNoEdge(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("app/__init__.py", "")
+	vf.AddFile("app/mod.py", "def f():\n    return 1\n")
+	// The only import-like text lives in a comment, a plain string, and a
+	// docstring — none may produce an edge. With the old regex scanner the
+	// comment and string lines both matched.
+	vf.AddFile("app/main.py", `# from .mod import f
+s = "from .mod import f"
+
+def f():
+	"""from .mod import f"""
+	return s
+
+# import app.mod
+t = 'import app.mod'
+`)
+
+	edges := requirePyUnitEdges(t, vf)
+	require.Empty(t, edges, "imports in comments/strings must not produce edges: %v", edges)
+}
+
+func TestPythonCompileUnit_SemicolonSameLineImportEdges(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("bdir/__init__.py", "")
+	vf.AddFile("bdir/b.py", "def f():\n    return 1\n")
+	vf.AddFile("a.py", "import os; from bdir import b\n")
+
+	edges := requirePyUnitEdges(t, vf)
+	got := pyEdgeKeys(edges)
+	require.Contains(t, got, "dir:.->dir:bdir", "edges: %v", edges)
+	// "os" does not exist in the project: no edge for it.
+	require.NotContains(t, got, "dir:.->dir:.", "edges: %v", edges)
+}
+
+func TestPythonCompileUnit_SyntaxErrorFallsBackToRegex(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("bdir/__init__.py", "")
+	vf.AddFile("bdir/b.py", "def f():\n    return 1\n")
+	// Unbalanced parenthesis: the file fails to parse, so the legacy regex
+	// fallback must still produce the edge.
+	vf.AddFile("a.py", "def broken(:\n    pass\nfrom bdir import b\n")
+
+	edges := requirePyUnitEdges(t, vf)
+	got := pyEdgeKeys(edges)
+	require.Contains(t, got, "dir:.->dir:bdir", "syntax-error file must keep its edges via the regex fallback: %v", edges)
+}
+
+func TestPythonCompileUnit_DynamicImportExcludesNonLiteral(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("db/__init__.py", "")
+	vf.AddFile("db/engine.py", "")
+	vf.AddFile("main.py", `
+import importlib
+from importlib import import_module
+
+name = "db.engine"
+mod1 = importlib.import_module(name)   # non-literal: no edge
+mod2 = import_module(f"db.engine")     # f-string: no edge
+mod3 = myobj.import_module("db.engine")  # wrong receiver: no edge
+mod4 = __import__("db.engine")         # literal: edge
+`)
+
+	edges := requirePyUnitEdges(t, vf)
+	raws := pyEdgeRaws(edges)
+	require.Contains(t, raws, "db.engine", "edges: %v", edges)
+	// All forms collapse onto the single dir:db unit; only one edge remains.
+	got := pyEdgeKeys(edges)
+	require.Contains(t, got, "dir:.->dir:db", "edges: %v", edges)
+	require.Equal(t, 1, len(edges), "only the literal __import__ may produce an edge: %v", edges)
+}
