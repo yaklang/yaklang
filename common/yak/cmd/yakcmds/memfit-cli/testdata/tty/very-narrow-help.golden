@@ -1,9 +1,11 @@
 ◆ memfit · YOLO
 Enter send · ^C stop
-Memfit commands
-  /status  process info
-  /mode    review mode
-  /logs    worker logs
-  /clear   clear view
-  /exit    quit
+
+Commands
+  /status /queue /mode
+  /logs /clear /exit
+  Enter queues while
+  busy.
+
+○ Ready
 ❯

@@ -66,6 +66,33 @@ func TestMemfitReadableContentExtraction(t *testing.T) {
 	require.Equal(t, "Need approval", extractMemfitReadableContent(`{"question":"Need approval"}`))
 	require.Equal(t, "plain text", extractMemfitReadableContent("plain text"))
 	require.Equal(t, "id-1", extractMemfitInteractiveID("fallback", `{"id":"id-1"}`))
+	require.Equal(t, "nested message", humanizeMemfitMessage(`"{\"message\":\"nested message\"}"`))
+	require.Contains(t, humanizeMemfitMessage(`{"opaque":{"value":1}}`), "Structured details hidden")
+}
+
+func TestMemfitToolSummaryAvoidsSchemaJSON(t *testing.T) {
+	content := `{"tool":{"description":"long internal schema","name":"read_file",` +
+		`"verbose_name":"File Reader","verbose_name_i18n":{"Zh":"文件读取"}},` +
+		`"params":{"file_path":"README.md"}}`
+	name, detail := extractMemfitToolSummary(content)
+	require.Equal(t, "文件读取", name)
+	require.Equal(t, "README.md", detail)
+	require.Equal(t, "Using 文件读取 · README.md", describeMemfitEvent(memfitWorkerEvent{
+		Type:    string(schema.EVENT_TOOL_CALL_START),
+		Content: content,
+	}))
+}
+
+func TestMemfitWrapCellsPreservesWideRunesAndLineBreaks(t *testing.T) {
+	lines := wrapMemfitCells("abcdef\n你好世界", 5)
+	require.Equal(t, []string{"abcde", "f", "你好", "世界"}, lines)
+	for _, line := range lines {
+		require.LessOrEqual(t, runewidth.StringWidth(line), 5)
+	}
+	require.Equal(t,
+		[]string{"Use a tool", "to read", "README.md"},
+		wrapMemfitCells("Use a tool to read README.md", 12),
+	)
 }
 
 func TestMemfitStreamClassification(t *testing.T) {

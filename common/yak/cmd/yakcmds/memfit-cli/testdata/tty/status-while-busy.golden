@@ -1,0 +1,20 @@
+◆ memfit  local isolated agent
+test-model · YOLO · /workspace/yaklang
+Enter send · Alt+Enter newline · Ctrl+C stop · /help
+
+You
+  queue-first
+
+Queued #1
+  第二个问题 queued while busy
+
+Session
+  State   Thinking · <elapsed>
+  Worker  PID 4242
+  Model   test-model
+  Review  YOLO
+  Queue   1 waiting
+  Project /workspace/yaklang
+
+◆ Thinking · 1 waiting · <elapsed>
+queue ❯
