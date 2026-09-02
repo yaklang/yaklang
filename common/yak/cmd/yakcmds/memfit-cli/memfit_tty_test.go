@@ -54,7 +54,7 @@ func TestMemfitTTYWidePasteAndAnswerSnapshot(t *testing.T) {
 
 	h.Write("\r")
 	h.WaitFor("echo: 你好，Memfit / 第二行 🌏")
-	h.WaitFor("completed")
+	h.WaitFor("Completed")
 	h.AssertSnapshot("wide-answer")
 	raw := h.Raw()
 	require.Contains(t, raw, "\x1b[?2004h", "bracketed paste must be enabled")
@@ -68,7 +68,7 @@ func TestMemfitTTYManualReviewAndCancellationSnapshot(t *testing.T) {
 
 	h.WaitFor("❯")
 	h.Write("/mode manual\r")
-	h.WaitFor("review policy: MANUAL")
+	h.WaitFor("Review policy changed to MANUAL")
 	h.Write("needs-review\r")
 	h.WaitFor("Allow the deterministic test action?")
 	h.WaitFor("reply ❯")
@@ -76,13 +76,13 @@ func TestMemfitTTYManualReviewAndCancellationSnapshot(t *testing.T) {
 
 	h.Write("approve\r")
 	h.WaitFor("approved: approve")
-	h.WaitFor("completed")
+	h.WaitFor("Completed")
 	h.Write("slow\r")
-	h.WaitFor("thinking")
+	h.WaitFor("queue ❯")
 	h.Write("\x03")
-	h.WaitFor("cancelling")
+	h.WaitFor("Cancelling")
 	h.AssertSnapshot("cancelling")
-	h.WaitFor("cancelled")
+	h.WaitFor("Cancelled")
 }
 
 func TestMemfitTTYCompactResizeAndHistorySnapshot(t *testing.T) {
@@ -91,7 +91,9 @@ func TestMemfitTTYCompactResizeAndHistorySnapshot(t *testing.T) {
 
 	h.WaitFor("memfit · YOLO")
 	h.Write("first prompt\r")
-	h.WaitFor("completed")
+	h.WaitFor("Completed")
+	h.Write("/clear\r")
+	time.Sleep(100 * time.Millisecond)
 	h.Write("\x1b[A")
 	h.WaitFor("first prompt")
 	h.Resize(24, 10)
@@ -106,19 +108,37 @@ func TestMemfitTTYVeryNarrowHelpSnapshot(t *testing.T) {
 
 	h.WaitFor("Enter send · ^C stop")
 	h.Write("/help\r")
-	h.WaitFor("/exit    quit")
+	h.WaitFor("/logs /clear /exit")
 	h.AssertSnapshot("very-narrow-help")
 }
 
+func TestMemfitTTYVeryNarrowQueueStatusSnapshot(t *testing.T) {
+	h := newMemfitTTYHarness(t, 24, 18)
+	defer h.Close()
+
+	h.WaitFor("❯")
+	h.Write("queue-first\r")
+	h.WaitFor("queue ❯")
+	h.Write("next\r")
+	h.WaitFor("Q1")
+	h.Write("/status\r")
+	h.WaitFor("PID 4242")
+	h.AssertSnapshot("very-narrow-queue-status")
+}
+
 func TestMemfitTTYCommandsAndErrorRecoverySnapshot(t *testing.T) {
-	h := newMemfitTTYHarness(t, 68, 20)
+	h := newMemfitTTYHarness(t, 68, 28)
 	defer h.Close()
 
 	h.WaitFor("❯")
 	h.Write("/status\r")
-	h.WaitFor("worker pid: 4242")
+	h.WaitFor("PID 4242")
+	h.AssertSnapshot("status-panel")
 	h.Write("/logs\r")
 	h.WaitFor("erase-attempt")
+	logsSnapshot := h.WaitFor("structured retry detail")
+	require.NotContains(t, logsSnapshot, `{"message"`)
+	h.AssertSnapshot("logs-panel")
 	h.Write("error\r")
 	h.WaitFor("deterministic provider failure")
 	h.WaitFor("❯")
@@ -133,8 +153,84 @@ func TestMemfitTTYMultilineStreamReturnsToColumnZero(t *testing.T) {
 
 	h.WaitFor("❯")
 	h.Write("multiline\r")
+	h.WaitFor("Completed")
 	snapshot := h.WaitFor("第二行")
-	require.Contains(t, snapshot, "Memfit › first line\n第二行")
+	require.Contains(t, snapshot, "Memfit\n  first line\n  第二行")
+}
+
+func TestMemfitTTYQueuesInputWhileBusySnapshot(t *testing.T) {
+	h := newMemfitTTYHarness(t, 72, 22)
+	defer h.Close()
+
+	h.WaitFor("❯")
+	h.Write("queue-first\r")
+	h.WaitFor("queue ❯")
+	h.Write("第二个问题 queued while busy\r")
+	h.WaitFor("1 waiting")
+	h.AssertSnapshot("queued-while-busy")
+	h.Write("/status\r")
+	h.WaitFor("PID 4242")
+	h.AssertSnapshot("status-while-busy")
+
+	h.WaitFor("echo: queue-first")
+	h.WaitFor("echo: 第二个问题 queued while busy")
+	h.Write("/queue\r")
+	h.WaitFor("No messages waiting")
+}
+
+func TestMemfitTTYPauseAndResumeQueueAfterErrorSnapshot(t *testing.T) {
+	h := newMemfitTTYHarness(t, 72, 22)
+	defer h.Close()
+
+	h.WaitFor("❯")
+	h.Write("error-with-queue\r")
+	h.WaitFor("queue ❯")
+	h.Write("continue after error\r")
+	h.WaitFor("Queued #1")
+	h.WaitFor("Queue paused")
+	h.AssertSnapshot("queue-paused-after-error")
+
+	h.Write("/queue resume\r")
+	h.WaitFor("echo: continue after error")
+	h.WaitFor("Completed")
+}
+
+func TestMemfitTTYHidesToolJSONAndYOLOPromptsSnapshot(t *testing.T) {
+	h := newMemfitTTYHarness(t, 76, 22)
+	defer h.Close()
+
+	h.WaitFor("❯")
+	h.Write("tool-noise\r")
+	h.WaitFor("Using 文件读取 · README.md")
+	h.WaitFor("Plan · 读取 README.md")
+	h.WaitFor("Tool issue")
+	h.WaitFor("最终答案，只展示一次")
+	h.WaitFor("Completed")
+	snapshot := h.WaitFor("○ Ready")
+	require.NotContains(t, snapshot, `"description"`)
+	require.NotContains(t, snapshot, "Memfit update")
+	require.NotContains(t, snapshot, "reply ❯")
+	require.NotContains(t, snapshot, "中间答案")
+	raw := h.Raw()
+	require.NotContains(t, raw, `"description"`)
+	require.NotContains(t, raw, "reply ❯")
+	require.NotContains(t, raw, "Memfit update")
+	h.AssertSnapshot("low-noise-tool-flow")
+}
+
+func TestMemfitTTYPreservesDraftWhileResponseUpdatesSnapshot(t *testing.T) {
+	h := newMemfitTTYHarness(t, 72, 22)
+	defer h.Close()
+
+	h.WaitFor("❯")
+	h.Write("stream-while-type\r")
+	h.WaitFor("Memfit › answer starts")
+	h.Write("draft 中文 stays")
+	h.WaitFor("Memfit › answer starts and continues")
+	h.WaitFor("Completed")
+	snapshot := h.WaitFor("❯ draft 中文 stays")
+	require.Contains(t, snapshot, "answer starts and continues while typing")
+	h.AssertSnapshot("typing-during-response")
 }
 
 type scriptedMemfitClient struct {
@@ -151,7 +247,8 @@ func newScriptedMemfitClient() *scriptedMemfitClient {
 		logs:   make(chan string, 8),
 		done:   make(chan struct{}),
 		logTail: []string{
-			"worker warning: retry is available",
+			"[WARN] 2026-09-02 15:08:01 [provider:42] worker retry is available",
+			`{"message":"structured retry detail","attempt":2}`,
 			"\x1b[2Jerase-attempt stayed plain text",
 		},
 	}
@@ -176,9 +273,23 @@ func (c *scriptedMemfitClient) send(typ, id string, payload any) error {
 			}()
 		case "slow":
 			// The task remains active until the test sends Ctrl+C.
+		case "queue-first":
+			go func() {
+				time.Sleep(900 * time.Millisecond)
+				c.completeEcho(input.Text)
+			}()
+		case "tool-noise":
+			go c.completeNoisyToolFlow()
+		case "stream-while-type":
+			go c.completeSlowStream()
 		case "error":
 			go func() {
 				time.Sleep(25 * time.Millisecond)
+				c.emit("error", id, memfitStatus{Message: "deterministic provider failure"})
+			}()
+		case "error-with-queue":
+			go func() {
+				time.Sleep(350 * time.Millisecond)
 				c.emit("error", id, memfitStatus{Message: "deterministic provider failure"})
 			}()
 		case "multiline":
@@ -233,6 +344,67 @@ func (c *scriptedMemfitClient) completeAnswer(answer string) {
 	time.Sleep(20 * time.Millisecond)
 	c.emit("event", "answer-2", answerEvent)
 	time.Sleep(20 * time.Millisecond)
+	c.emit("turn_done", "", memfitStatus{TaskID: "test-task", Status: "completed"})
+}
+
+func (c *scriptedMemfitClient) completeNoisyToolFlow() {
+	time.Sleep(25 * time.Millisecond)
+	c.emit("event", "thought", memfitWorkerEvent{
+		Type:        string(schema.EVENT_TYPE_STREAM),
+		NodeID:      "re-act-loop-thought",
+		IsStream:    true,
+		IsReason:    true,
+		StreamDelta: "读取 README 了解项目定位",
+	})
+	time.Sleep(20 * time.Millisecond)
+	c.emit("event", "tool-1", memfitWorkerEvent{
+		Type: string(schema.EVENT_TOOL_CALL_START),
+		Content: `{"tool":{"description":"A very long internal schema that users should never see",` +
+			`"name":"read_file","verbose_name":"File Reader","verbose_name_i18n":{"Zh":"文件读取"}},` +
+			`"params":{"file_path":"README.md"}}`,
+	})
+	time.Sleep(20 * time.Millisecond)
+	c.emit("event", "plan-1", memfitWorkerEvent{
+		Type:    string(schema.EVENT_TYPE_PERMISSION_REQUIRE),
+		Content: `{"question":"读取 README.md 获取项目介绍"}`,
+	})
+	time.Sleep(20 * time.Millisecond)
+	c.emit("event", "tool-error", memfitWorkerEvent{
+		Type:    string(schema.EVENT_TOOL_CALL_ERROR),
+		Content: `{"error":"missing required command; Memfit corrected the tool input and retried"}`,
+	})
+	time.Sleep(20 * time.Millisecond)
+	c.emit("event", "answer-early", memfitWorkerEvent{
+		Type:        string(schema.EVENT_TYPE_STREAM),
+		NodeID:      "re-act-loop-answer-payload",
+		IsStream:    true,
+		StreamDelta: "中间答案",
+	})
+	time.Sleep(20 * time.Millisecond)
+	c.emit("event", "answer-final", memfitWorkerEvent{
+		Type:        string(schema.EVENT_TYPE_STREAM),
+		NodeID:      "re-act-loop-answer-payload",
+		IsStream:    true,
+		StreamDelta: "最终答案，只展示一次。",
+		AIModel:     "test-model",
+	})
+	time.Sleep(20 * time.Millisecond)
+	c.emit("turn_done", "", memfitStatus{TaskID: "test-task", Status: "completed"})
+}
+
+func (c *scriptedMemfitClient) completeSlowStream() {
+	time.Sleep(30 * time.Millisecond)
+	parts := []string{"answer starts", " and continues", " while typing"}
+	for _, part := range parts {
+		c.emit("event", "answer-stream", memfitWorkerEvent{
+			Type:        string(schema.EVENT_TYPE_STREAM),
+			NodeID:      "re-act-loop-answer-payload",
+			IsStream:    true,
+			StreamDelta: part,
+			AIModel:     "test-model",
+		})
+		time.Sleep(140 * time.Millisecond)
+	}
 	c.emit("turn_done", "", memfitStatus{TaskID: "test-task", Status: "completed"})
 }
 
@@ -557,6 +729,12 @@ func (s *memfitTestScreen) consumeEscape(input []byte) (int, bool) {
 
 func (s *memfitTestScreen) applyCSI(params string, final byte) {
 	switch final {
+	case 'A':
+		amount := parseMemfitCSIAmount(params, 1)
+		s.row -= amount
+		if s.row < 0 {
+			s.row = 0
+		}
 	case 'D':
 		amount := parseMemfitCSIAmount(params, 1)
 		s.col -= amount

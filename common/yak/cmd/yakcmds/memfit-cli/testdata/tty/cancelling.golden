@@ -1,13 +1,20 @@
-◆ memfit  local isolated agent
-test-model · YOLO · /workspace/yaklang
-Enter send · Alt+Enter newline · Ctrl+C stop · /help
-✓ review policy: MANUAL
-You › needs-review
-? Allow the deterministic test action?
-You › approve
-Thinking › checking…
-Memfit › approved: approve
-✓ completed · <elapsed> · test-model
-You › slow
-■ cancellation requested; press Ctrl+C again to exit
-◆ cancelling…
+
+Action required
+  Allow the deterministic test action?
+
+Reply
+  approve
+
+Memfit
+  approved: approve
+
+✓ Completed · <elapsed> · test-model
+
+You
+  slow
+
+Cancel
+  Cancellation requested; press Ctrl+C again to exit
+
+◆ Cancelling · <elapsed>
+queue ❯

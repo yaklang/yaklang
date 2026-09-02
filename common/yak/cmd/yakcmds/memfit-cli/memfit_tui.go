@@ -20,13 +20,14 @@ import (
 )
 
 const (
-	memfitColorReset  = "\x1b[0m"
-	memfitColorBold   = "\x1b[1m"
-	memfitColorDim    = "\x1b[2m"
-	memfitColorCyan   = "\x1b[36m"
-	memfitColorGreen  = "\x1b[32m"
-	memfitColorYellow = "\x1b[33m"
-	memfitColorRed    = "\x1b[31m"
+	memfitColorReset      = "\x1b[0m"
+	memfitColorBold       = "\x1b[1m"
+	memfitColorDim        = "\x1b[2m"
+	memfitColorCyan       = "\x1b[36m"
+	memfitColorGreen      = "\x1b[32m"
+	memfitColorYellow     = "\x1b[33m"
+	memfitColorRed        = "\x1b[31m"
+	memfitMaxQueuedInputs = 100
 )
 
 func memfitCanUseTUI() bool {
@@ -169,6 +170,16 @@ type memfitKey struct {
 	text string
 }
 
+type memfitQueuedInput struct {
+	text     string
+	queuedAt time.Time
+}
+
+type memfitInfoRow struct {
+	label string
+	value string
+}
+
 type memfitTUI struct {
 	client memfitClient
 	config memfitStartConfig
@@ -181,18 +192,25 @@ type memfitTUI struct {
 	historyIndex int
 	historyDraft []rune
 
-	busy          bool
-	awaitingInput bool
-	interactiveID string
-	statusLine    bool
-	streamOpen    bool
-	streamID      string
-	streamKind    string
-	answerSeen    bool
-	answers       memfitAnswerStreams
-	turnStarted   time.Time
-	lastModel     string
-	lastCtrlC     time.Time
+	busy             bool
+	awaitingInput    bool
+	interactiveID    string
+	queued           []memfitQueuedInput
+	queuePaused      bool
+	liveRows         int
+	activity         string
+	streamKind       string
+	streamWriter     string
+	streamPreview    string
+	answerSeen       bool
+	answers          memfitAnswerStreams
+	fallbackResult   string
+	turnStarted      time.Time
+	lastStatusTick   int64
+	lastModel        string
+	lastCtrlC        time.Time
+	savedDraft       []rune
+	savedDraftCursor int
 }
 
 func runMemfitTUI(ctx context.Context, client memfitClient, config memfitStartConfig, initialQuery string) error {
@@ -200,14 +218,18 @@ func runMemfitTUI(ctx context.Context, client memfitClient, config memfitStartCo
 	if err != nil {
 		return utils.Wrap(err, "enable memfit terminal input")
 	}
+	var ui *memfitTUI
 	defer func() {
-		fmt.Fprint(os.Stdout, "\r\x1b[2K\x1b[?2004l")
+		if ui != nil {
+			ui.clearLiveFrame()
+		}
+		fmt.Fprint(os.Stdout, "\x1b[?2004l")
 		_ = term.Restore(int(os.Stdin.Fd()), oldState)
 		fmt.Fprintln(os.Stdout)
 	}()
 
 	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
-	ui := &memfitTUI{
+	ui = &memfitTUI{
 		client:       client,
 		config:       config,
 		color:        os.Getenv("NO_COLOR") == "",
@@ -250,14 +272,17 @@ func runMemfitTUI(ctx context.Context, client memfitClient, config memfitStartCo
 			}
 		case <-resizeTicker.C:
 			width, _, sizeErr := term.GetSize(int(os.Stdout.Fd()))
-			if sizeErr == nil && normalizeMemfitWidth(width) != ui.width {
+			resized := sizeErr == nil && normalizeMemfitWidth(width) != ui.width
+			if resized {
 				ui.width = normalizeMemfitWidth(width)
-				if !ui.busy || ui.awaitingInput {
-					ui.renderComposer()
-				}
+			}
+			statusTick := time.Now().Unix()
+			if resized || (ui.busy && statusTick != ui.lastStatusTick) {
+				ui.lastStatusTick = statusTick
+				ui.renderComposer()
 			}
 		case <-client.Done():
-			ui.finishOutput()
+			ui.clearLiveFrame()
 			if err := client.WaitError(); err != nil {
 				return utils.Errorf("memfit worker exited: %v%s", err, client.formattedLogTail())
 			}
@@ -285,6 +310,7 @@ func (ui *memfitTUI) printHeader() {
 			hint = "Enter send · ^C"
 		}
 		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, hint))
+		fmt.Fprint(os.Stdout, "\r\n")
 		return
 	}
 	fmt.Fprintf(os.Stdout, "%s  %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆ memfit"), ui.paint(memfitColorDim, "local isolated agent"))
@@ -297,33 +323,10 @@ func (ui *memfitTUI) printHeader() {
 	if ui.width >= 82 {
 		hint = "Enter send · Alt/Shift+Enter newline · ↑↓ history · Ctrl+C stop · /help"
 	}
-	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, hint))
+	fmt.Fprintf(os.Stdout, "%s\r\n\r\n", ui.paint(memfitColorDim, hint))
 }
 
 func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
-	if ui.busy && !ui.awaitingInput {
-		switch key.kind {
-		case memfitKeyInterrupt:
-			if time.Since(ui.lastCtrlC) < time.Second {
-				return true, nil
-			}
-			ui.lastCtrlC = time.Now()
-			ui.clearStatusLine()
-			ui.finishOutput()
-			fmt.Fprintf(os.Stdout, "%s cancellation requested; press Ctrl+C again to exit\r\n", ui.paint(memfitColorYellow, "■"))
-			ui.showBusyStatus("cancelling")
-			return false, ui.client.send("cancel", fmt.Sprintf("cancel-%d", memfitNowMillis()), nil)
-		case memfitKeyRedraw:
-			ui.clearStatusLine()
-			fmt.Fprint(os.Stdout, "\x1b[2J\x1b[H")
-			ui.printHeader()
-			ui.showBusyStatus("working")
-		case memfitKeyEOF:
-			return true, nil
-		}
-		return false, nil
-	}
-
 	switch key.kind {
 	case memfitKeyInsert:
 		ui.insert(key.text)
@@ -362,7 +365,7 @@ func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
 	case memfitKeyClearRight:
 		ui.buffer = append([]rune(nil), ui.buffer[:ui.cursor]...)
 	case memfitKeyRedraw:
-		ui.clearComposer()
+		ui.clearLiveFrame()
 		fmt.Fprint(os.Stdout, "\x1b[2J\x1b[H")
 		ui.printHeader()
 	case memfitKeyInterrupt:
@@ -370,6 +373,17 @@ func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
 			ui.buffer = nil
 			ui.cursor = 0
 			ui.historyIndex = -1
+		} else if ui.busy {
+			if time.Since(ui.lastCtrlC) < time.Second {
+				return true, nil
+			}
+			ui.lastCtrlC = time.Now()
+			ui.activity = "Cancelling"
+			ui.streamKind = ""
+			ui.streamWriter = ""
+			ui.streamPreview = ""
+			ui.printNotice("cancel", "Cancellation requested; press Ctrl+C again to exit", memfitColorYellow)
+			return false, ui.client.send("cancel", fmt.Sprintf("cancel-%d", memfitNowMillis()), nil)
 		} else {
 			return true, nil
 		}
@@ -395,6 +409,14 @@ func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
 			}
 			return exit, err
 		}
+		if ui.busy || len(ui.queued) > 0 {
+			ui.enqueue(text)
+			if !ui.busy && !ui.queuePaused {
+				return false, ui.startNextQueued()
+			}
+			ui.renderComposer()
+			return false, nil
+		}
 		return false, ui.submit(text)
 	}
 	ui.renderComposer()
@@ -407,25 +429,41 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 	}
 	parts := strings.Fields(input)
 	command := strings.ToLower(parts[0])
-	ui.clearComposer()
+	ui.clearLiveFrame()
 	switch command {
 	case "/exit", "/quit", "/q":
 		return true, true, nil
 	case "/help", "/?":
-		ui.printLine(ui.paint(memfitColorBold, "Memfit commands"))
-		if ui.width < 48 {
-			ui.printLine("  /status  process info")
-			ui.printLine("  /mode    review mode")
-			ui.printLine("  /logs    worker logs")
-			ui.printLine("  /clear   clear view")
-			ui.printLine("  /exit    quit")
-		} else {
-			ui.printLine("  /status       process, model, mode, workdir")
-			ui.printLine("  /mode MODE    set yolo, ai, or manual")
-			ui.printLine("  /logs         filtered worker logs")
-			ui.printLine("  /clear        clear view; keep scrollback")
-			ui.printLine("  /exit         end session")
+		lines := []string{
+			"/status       session and worker status",
+			"/queue        show queued messages",
+			"/queue clear  discard queued messages",
+			"/queue resume continue a paused queue",
+			"/mode MODE    set yolo, ai, or manual",
+			"/logs         recent worker diagnostics",
+			"/clear        clear the view",
+			"/exit         end the session",
+			"Enter queues your message while Memfit is working.",
 		}
+		if ui.width < 48 {
+			lines = []string{
+				"/status  session info",
+				"/queue   queued messages",
+				"/mode    review mode",
+				"/logs    worker diagnostics",
+				"/clear   clear view",
+				"/exit    quit",
+				"Enter queues while busy.",
+			}
+		}
+		if ui.width < 32 {
+			lines = []string{
+				"/status /queue /mode",
+				"/logs /clear /exit",
+				"Enter queues while busy.",
+			}
+		}
+		ui.printTextSection("Commands", lines)
 		return true, false, nil
 	case "/status", "/config":
 		model := "configured Yaklang tiers"
@@ -433,22 +471,49 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 			model = ui.config.AIType
 		}
 		if ui.config.Model != "" {
-			model += "/" + ui.config.Model
+			model = ui.config.Model
+			if ui.config.AIType != "" {
+				model = ui.config.AIType + "/" + model
+			}
 		}
-		fmt.Fprintf(os.Stdout, "worker pid: %d\r\nmodel: %s\r\nreview: %s\r\nworkdir: %s\r\n", ui.client.PID(), model, ui.config.ReviewPolicy, ui.config.Workdir)
+		rows := []memfitInfoRow{
+			{label: "State", value: ui.statusSummary()},
+			{label: "Worker", value: fmt.Sprintf("PID %d", ui.client.PID())},
+			{label: "Model", value: model},
+			{label: "Review", value: strings.ToUpper(ui.config.ReviewPolicy)},
+			{label: "Queue", value: ui.queueSummary()},
+			{label: "Project", value: ui.config.Workdir},
+		}
+		if ui.width < 48 {
+			ui.printTextSection("Session", []string{
+				ui.statusSummary() + " · " + strings.ToUpper(ui.config.ReviewPolicy),
+				fmt.Sprintf("PID %d · %s", ui.client.PID(), ui.compactQueueSummary()),
+				model,
+				compactMemfitPath(ui.config.Workdir, maxInt(8, ui.width-3)),
+			})
+		} else {
+			ui.printInfoSection("Session", rows)
+		}
 		return true, false, nil
 	case "/logs":
-		logs := ui.client.LogTail()
-		if len(logs) == 0 {
-			ui.printLine(ui.paint(memfitColorDim, "worker log is empty"))
+		ui.printWorkerLogs(ui.client.LogTail())
+		return true, false, nil
+	case "/queue":
+		if len(parts) == 2 && strings.EqualFold(parts[1], "clear") {
+			count := len(ui.queued)
+			ui.queued = nil
+			ui.queuePaused = false
+			ui.printNotice("queue", fmt.Sprintf("Cleared %d queued message(s)", count), memfitColorYellow)
 			return true, false, nil
 		}
-		if len(logs) > 20 {
-			logs = logs[len(logs)-20:]
+		if len(parts) == 2 && strings.EqualFold(parts[1], "resume") {
+			ui.queuePaused = false
+			if !ui.busy {
+				return true, false, ui.startNextQueued()
+			}
+			return true, false, nil
 		}
-		for _, line := range logs {
-			fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorDim, "│"), sanitizeMemfitTTYText(line))
-		}
+		ui.printQueue()
 		return true, false, nil
 	case "/clear":
 		fmt.Fprint(os.Stdout, "\x1b[2J\x1b[H")
@@ -456,51 +521,92 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		return true, false, nil
 	case "/mode", "/review":
 		if len(parts) != 2 {
-			ui.printLine(ui.paint(memfitColorYellow, "usage: /mode yolo|ai|manual"))
+			ui.printNotice("mode", "Usage: /mode yolo|ai|manual", memfitColorYellow)
 			return true, false, nil
 		}
 		policy := strings.ToLower(parts[1])
 		if err := validateMemfitReviewPolicy(policy); err != nil {
-			ui.printLine(ui.paint(memfitColorYellow, err.Error()))
+			ui.printNotice("mode", err.Error(), memfitColorYellow)
 			return true, false, nil
 		}
 		ui.config.ReviewPolicy = policy
 		err = ui.client.send("review", fmt.Sprintf("review-%d", memfitNowMillis()), memfitReviewUpdate{Policy: policy})
 		if err == nil {
-			fmt.Fprintf(os.Stdout, "%s review policy: %s\r\n", ui.paint(memfitColorGreen, "✓"), strings.ToUpper(policy))
+			ui.printNotice("mode", "Review policy changed to "+strings.ToUpper(policy), memfitColorGreen)
 		}
 		return true, false, err
 	default:
-		fmt.Fprintf(os.Stdout, "%s unknown command %s; use /help\r\n", ui.paint(memfitColorYellow, "!"), command)
+		ui.printNotice("command", "Unknown command "+command+"; use /help", memfitColorYellow)
 		return true, false, nil
 	}
 }
 
 func (ui *memfitTUI) submit(text string) error {
-	ui.clearComposer()
 	ui.rememberHistory(text)
-	ui.printUserInput(text)
+	return ui.startTurn(text)
+}
+
+func (ui *memfitTUI) startTurn(text string) error {
+	ui.clearLiveFrame()
+	ui.printInputBlock("You", text, memfitColorGreen)
 	ui.busy = true
+	ui.queuePaused = false
 	ui.awaitingInput = false
+	ui.interactiveID = ""
 	ui.turnStarted = time.Now()
-	ui.streamOpen = false
-	ui.streamID = ""
+	ui.lastStatusTick = time.Now().Unix()
+	ui.activity = "Thinking"
 	ui.streamKind = ""
+	ui.streamWriter = ""
+	ui.streamPreview = ""
 	ui.answerSeen = false
 	ui.answers.Reset()
-	ui.showBusyStatus("thinking")
-	return ui.client.send("input", fmt.Sprintf("input-%d", memfitNowMillis()), memfitInput{Text: text})
+	ui.fallbackResult = ""
+	if err := ui.client.send("input", fmt.Sprintf("input-%d", memfitNowMillis()), memfitInput{Text: text}); err != nil {
+		return err
+	}
+	ui.renderComposer()
+	return nil
+}
+
+func (ui *memfitTUI) enqueue(text string) {
+	ui.rememberHistory(text)
+	if len(ui.queued) >= memfitMaxQueuedInputs {
+		ui.printNotice("queue", fmt.Sprintf("Queue is full (%d messages); use /queue clear first", memfitMaxQueuedInputs), memfitColorYellow)
+		return
+	}
+	ui.queued = append(ui.queued, memfitQueuedInput{text: text, queuedAt: time.Now()})
+	ui.clearLiveFrame()
+	ui.printInputBlock(fmt.Sprintf("Queued #%d", len(ui.queued)), text, memfitColorYellow)
+}
+
+func (ui *memfitTUI) startNextQueued() error {
+	if ui.busy || len(ui.queued) == 0 {
+		ui.renderComposer()
+		return nil
+	}
+	next := ui.queued[0]
+	ui.queued = append([]memfitQueuedInput(nil), ui.queued[1:]...)
+	return ui.startTurn(next.text)
 }
 
 func (ui *memfitTUI) submitInteractive(text string) error {
-	ui.clearComposer()
+	ui.clearLiveFrame()
 	ui.rememberHistory(text)
-	ui.printUserInput(text)
+	ui.printInputBlock("Reply", text, memfitColorYellow)
 	id := ui.interactiveID
 	ui.awaitingInput = false
 	ui.interactiveID = ""
-	ui.showBusyStatus("continuing")
-	return ui.client.send("interactive", id, memfitInput{Text: text})
+	ui.activity = "Continuing"
+	ui.streamKind = ""
+	ui.streamWriter = ""
+	ui.streamPreview = ""
+	if err := ui.client.send("interactive", id, memfitInput{Text: text}); err != nil {
+		return err
+	}
+	ui.restoreSavedDraft()
+	ui.renderComposer()
+	return nil
 }
 
 func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
@@ -509,11 +615,16 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 		return nil
 	case "error":
 		status, _ := decodeMemfitPayload[memfitStatus](envelope)
-		ui.finishOutput()
-		ui.clearStatusLine()
-		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorRed, "error:"), sanitizeMemfitTTYText(status.Message))
+		ui.clearLiveFrame()
+		ui.printTextSection("Error", []string{humanizeMemfitMessage(status.Message)}, memfitColorRed)
 		ui.busy = false
 		ui.awaitingInput = false
+		ui.activity = "Ready"
+		ui.streamKind = ""
+		ui.streamWriter = ""
+		ui.streamPreview = ""
+		ui.queuePaused = len(ui.queued) > 0
+		ui.restoreSavedDraft()
 		ui.renderComposer()
 		return nil
 	case "event":
@@ -524,22 +635,37 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 		ui.handleWorkerEvent(envelope.ID, event)
 	case "turn_done":
 		status, _ := decodeMemfitPayload[memfitStatus](envelope)
-		ui.flushBufferedAnswer()
-		ui.finishOutput()
-		ui.clearStatusLine()
+		result := ui.answers.Last()
+		if result == "" {
+			result = ui.fallbackResult
+		}
+		ui.clearLiveFrame()
+		if result != "" {
+			ui.printAnswerBlock(result)
+		}
 		elapsed := time.Since(ui.turnStarted).Round(100 * time.Millisecond)
 		marker, color := "✓", memfitColorGreen
 		if status.Status != "completed" && status.Status != "skipped" {
 			marker, color = "■", memfitColorYellow
 		}
-		detail := fmt.Sprintf("%s · %s", status.Status, elapsed)
+		detail := fmt.Sprintf("%s · %s", titleMemfitStatus(status.Status), elapsed)
 		if ui.lastModel != "" && ui.width >= 58 {
 			detail += " · " + ui.lastModel
 		}
-		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(color, marker), ui.paint(memfitColorDim, detail))
+		fmt.Fprintf(os.Stdout, "%s %s\r\n\r\n", ui.paint(color, marker), ui.paint(memfitColorDim, detail))
 		ui.busy = false
 		ui.awaitingInput = false
 		ui.interactiveID = ""
+		ui.activity = "Ready"
+		ui.streamKind = ""
+		ui.streamWriter = ""
+		ui.streamPreview = ""
+		ui.answers.Reset()
+		ui.fallbackResult = ""
+		ui.restoreSavedDraft()
+		if len(ui.queued) > 0 {
+			return ui.startNextQueued()
+		}
 		ui.renderComposer()
 	}
 	return nil
@@ -556,147 +682,333 @@ func (ui *memfitTUI) handleWorkerEvent(envelopeID string, event memfitWorkerEven
 		if writerID == "" {
 			writerID = "default"
 		}
-		primaryWriter := ui.answers.FirstID()
 		ui.answers.Append(writerID, event.StreamDelta)
-		if primaryWriter != "" && primaryWriter != writerID {
-			// Later answer writers are buffered until turn completion. The engine
-			// can replay the final answer while confirming task completion.
-			return
+		ui.activity = "Responding"
+		if ui.streamWriter != writerID {
+			ui.streamPreview = ""
+			ui.streamWriter = writerID
 		}
-		ui.clearStatusLine()
-		if !ui.streamOpen || ui.streamKind != "answer" || (event.NodeID != "" && ui.streamID != "" && event.NodeID != ui.streamID) {
-			ui.finishOutput()
-			fmt.Fprint(os.Stdout, ui.paint(memfitColorBold+memfitColorCyan, "Memfit › "))
-			ui.streamOpen = true
-			ui.streamID = event.NodeID
-			ui.streamKind = "answer"
-		}
-		fmt.Fprint(os.Stdout, sanitizeMemfitTTYText(event.StreamDelta))
+		ui.streamKind = "answer"
+		ui.streamPreview = lastMemfitPreviewLine(ui.streamPreview + event.StreamDelta)
 		ui.answerSeen = true
+		ui.renderComposer()
 		return
 	}
 
 	if isMemfitThoughtStream(event) && event.StreamDelta != "" && !ui.answerSeen {
-		ui.clearStatusLine()
-		if !ui.streamOpen || ui.streamKind != "thought" || (event.NodeID != "" && ui.streamID != "" && event.NodeID != ui.streamID) {
-			ui.finishOutput()
-			fmt.Fprint(os.Stdout, ui.paint(memfitColorDim, "Thinking › "))
-			ui.streamOpen = true
-			ui.streamID = event.NodeID
-			ui.streamKind = "thought"
+		ui.activity = "Thinking"
+		if ui.streamKind != "thought" {
+			ui.streamPreview = ""
 		}
-		fmt.Fprint(os.Stdout, ui.paint(memfitColorDim, sanitizeMemfitTTYText(event.StreamDelta)))
+		ui.streamKind = "thought"
+		ui.streamPreview = lastMemfitPreviewLine(ui.streamPreview + event.StreamDelta)
+		ui.renderComposer()
+		return
+	}
+
+	if event.Type == string(schema.EVENT_TYPE_RESULT) && event.Content != "" {
+		ui.fallbackResult = extractMemfitReadableContent(event.Content)
+	}
+
+	if event.Type == string(schema.EVENT_TOOL_CALL_ERROR) {
+		message := extractMemfitJSONField(event.Content, "error", "message", "reason")
+		if message == "" {
+			message = "The tool could not run; Memfit may retry with corrected input."
+		}
+		ui.activity = "Recovering from tool issue"
+		ui.streamKind = ""
+		ui.streamWriter = ""
+		ui.streamPreview = ""
+		ui.clearLiveFrame()
+		ui.printTextSection("Tool issue", []string{compactMemfitMessage(message, ui.width*3)}, memfitColorYellow)
+		ui.renderComposer()
+		return
+	}
+
+	if event.Type == string(schema.EVENT_TYPE_API_REQUEST_FAILED) {
+		message := extractMemfitReadableContent(event.Content)
+		if message == "" {
+			message = "The AI request failed."
+		}
+		ui.activity = "AI request failed"
+		ui.streamKind = ""
+		ui.streamWriter = ""
+		ui.streamPreview = ""
+		ui.clearLiveFrame()
+		ui.printTextSection("Request issue", []string{compactMemfitMessage(message, ui.width*3)}, memfitColorRed)
+		ui.renderComposer()
 		return
 	}
 
 	if isMemfitInteractiveEvent(event.Type) {
-		ui.finishOutput()
-		ui.clearStatusLine()
-		question := extractMemfitReadableContent(event.Content)
+		question := humanizeMemfitMessage(extractMemfitReadableContent(event.Content))
 		if question == "" {
 			question = "Memfit needs your input"
 		}
-		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorYellow+memfitColorBold, "?"), sanitizeMemfitTTYText(question))
+		if ui.config.ReviewPolicy == "yolo" {
+			ui.activity = singleLineMemfitText("Plan · " + question)
+			ui.streamKind = ""
+			ui.streamWriter = ""
+			ui.streamPreview = ""
+			ui.renderComposer()
+			return
+		}
+		ui.clearLiveFrame()
+		if len(ui.buffer) > 0 {
+			ui.savedDraft = append([]rune(nil), ui.buffer...)
+			ui.savedDraftCursor = ui.cursor
+			ui.buffer = nil
+			ui.cursor = 0
+		}
+		ui.printTextSection("Action required", []string{question}, memfitColorYellow)
 		ui.awaitingInput = true
 		ui.interactiveID = extractMemfitInteractiveID(envelopeID, event.Content)
+		ui.activity = "Waiting for your reply"
 		ui.renderComposer()
 		return
 	}
 
 	if description := describeMemfitEvent(event); description != "" {
-		ui.finishOutput()
-		ui.clearStatusLine()
-		fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(memfitColorDim, "↳"), sanitizeMemfitTTYText(description))
-		ui.showBusyStatus("working")
-	}
-}
-
-func (ui *memfitTUI) flushBufferedAnswer() {
-	first, last := ui.answers.First(), ui.answers.Last()
-	if first == "" || last == "" || first == last {
-		return
-	}
-	if strings.HasPrefix(last, first) {
-		fmt.Fprint(os.Stdout, sanitizeMemfitTTYText(strings.TrimPrefix(last, first)))
-		return
-	}
-	ui.finishOutput()
-	fmt.Fprint(os.Stdout, ui.paint(memfitColorBold+memfitColorCyan, "Memfit update › "))
-	fmt.Fprint(os.Stdout, sanitizeMemfitTTYText(last))
-	ui.streamOpen = true
-	ui.streamID = ui.answers.order[len(ui.answers.order)-1]
-	ui.streamKind = "answer"
-}
-
-func (ui *memfitTUI) renderComposer() {
-	if ui.busy && !ui.awaitingInput {
-		return
-	}
-	prefix := "❯ "
-	if ui.awaitingInput {
-		prefix = "reply ❯ "
-	}
-	available := maxInt(8, ui.width-runewidth.StringWidth(prefix)-1)
-	text, cursorCells := memfitInputViewport(ui.buffer, ui.cursor, available)
-	fmt.Fprint(os.Stdout, "\r\x1b[2K")
-	fmt.Fprint(os.Stdout, ui.paint(memfitColorBold+memfitColorCyan, prefix))
-	fmt.Fprint(os.Stdout, text)
-	endCells := runewidth.StringWidth(text)
-	if move := endCells - cursorCells; move > 0 {
-		fmt.Fprintf(os.Stdout, "\x1b[%dD", move)
-	}
-}
-
-func (ui *memfitTUI) clearComposer() {
-	fmt.Fprint(os.Stdout, "\r\x1b[2K")
-}
-
-func (ui *memfitTUI) showBusyStatus(status string) {
-	ui.clearStatusLine()
-	fmt.Fprintf(os.Stdout, "%s %s…", ui.paint(memfitColorCyan, "◆"), ui.paint(memfitColorDim, status))
-	ui.statusLine = true
-}
-
-func (ui *memfitTUI) clearStatusLine() {
-	if ui.statusLine {
-		fmt.Fprint(os.Stdout, "\r\x1b[2K")
-		ui.statusLine = false
-	}
-}
-
-func (ui *memfitTUI) finishOutput() {
-	if ui.streamOpen {
-		fmt.Fprint(os.Stdout, "\r\n")
-		ui.streamOpen = false
-		ui.streamID = ""
+		ui.activity = singleLineMemfitText(description)
 		ui.streamKind = ""
-	}
-}
-
-func (ui *memfitTUI) printUserInput(text string) {
-	lines := strings.Split(sanitizeMemfitTerminalText(text), "\n")
-	for index, line := range lines {
-		prefix := "  "
-		if index == 0 {
-			prefix = ui.paint(memfitColorBold+memfitColorGreen, "You › ")
-		}
-		fmt.Fprintf(os.Stdout, "%s%s\r\n", prefix, line)
-	}
-}
-
-func (ui *memfitTUI) printNotice(label, message, color string) {
-	ui.finishOutput()
-	ui.clearStatusLine()
-	fmt.Fprintf(os.Stdout, "%s %s\r\n", ui.paint(color, "["+label+"]"), sanitizeMemfitTTYText(message))
-	if ui.busy && !ui.awaitingInput {
-		ui.showBusyStatus("working")
-	} else {
+		ui.streamWriter = ""
+		ui.streamPreview = ""
 		ui.renderComposer()
 	}
 }
 
-func (ui *memfitTUI) printLine(text string) {
-	fmt.Fprintf(os.Stdout, "%s\r\n", text)
+func (ui *memfitTUI) renderComposer() {
+	ui.clearLiveFrame()
+	rows := 0
+	if ui.streamPreview != "" {
+		label, color := "Thinking › ", memfitColorDim
+		if ui.streamKind == "answer" {
+			label, color = "Memfit › ", memfitColorCyan
+		}
+		preview := singleLineMemfitText(ui.streamPreview)
+		line := label + preview
+		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(color, truncateMemfitCells(line, ui.width-1)))
+		rows++
+	}
+	statusMarker, statusColor := "○", memfitColorDim
+	if ui.busy {
+		statusMarker, statusColor = "◆", memfitColorCyan
+	}
+	if ui.awaitingInput {
+		statusMarker, statusColor = "?", memfitColorYellow
+	}
+	status := statusMarker + " " + ui.liveStatusSummary()
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(statusColor, truncateMemfitCells(status, ui.width-1)))
+	rows++
+	prefix := "❯ "
+	if ui.awaitingInput {
+		prefix = "reply ❯ "
+	} else if ui.busy {
+		prefix = "queue ❯ "
+	}
+	available := maxInt(8, ui.width-runewidth.StringWidth(prefix)-1)
+	text, cursorCells := memfitInputViewport(ui.buffer, ui.cursor, available)
+	fmt.Fprint(os.Stdout, ui.paint(memfitColorBold+memfitColorCyan, prefix))
+	fmt.Fprint(os.Stdout, text)
+	rows++
+	endCells := runewidth.StringWidth(text)
+	if move := endCells - cursorCells; move > 0 {
+		fmt.Fprintf(os.Stdout, "\x1b[%dD", move)
+	}
+	ui.liveRows = rows
+}
+
+func (ui *memfitTUI) clearLiveFrame() {
+	if ui.liveRows == 0 {
+		return
+	}
+	fmt.Fprint(os.Stdout, "\r\x1b[2K")
+	for row := 1; row < ui.liveRows; row++ {
+		fmt.Fprint(os.Stdout, "\x1b[1A\r\x1b[2K")
+	}
+	ui.liveRows = 0
+}
+
+func (ui *memfitTUI) printNotice(label, message, color string) {
+	ui.clearLiveFrame()
+	ui.printTextSection(strings.ToUpper(label[:1])+label[1:], []string{humanizeMemfitMessage(message)}, color)
+	ui.renderComposer()
+}
+
+func (ui *memfitTUI) printInputBlock(label, text, color string) {
+	ui.clearLiveFrame()
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorBold+color, label))
+	ui.printWrappedText(text, "  ")
+	fmt.Fprint(os.Stdout, "\r\n")
+}
+
+func (ui *memfitTUI) printAnswerBlock(text string) {
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "Memfit"))
+	ui.printWrappedText(text, "  ")
+	fmt.Fprint(os.Stdout, "\r\n")
+}
+
+func (ui *memfitTUI) printTextSection(title string, lines []string, colors ...string) {
+	color := memfitColorBold
+	if len(colors) > 0 {
+		color = memfitColorBold + colors[0]
+	}
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(color, title))
+	for _, line := range lines {
+		ui.printWrappedText(line, "  ")
+	}
+	fmt.Fprint(os.Stdout, "\r\n")
+}
+
+func (ui *memfitTUI) printInfoSection(title string, rows []memfitInfoRow) {
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorBold, title))
+	for _, row := range rows {
+		label := fmt.Sprintf("  %-8s", row.label)
+		ui.printWrappedWithPrefix(label, "            ", row.value)
+	}
+	fmt.Fprint(os.Stdout, "\r\n")
+}
+
+func (ui *memfitTUI) printQueue() {
+	if len(ui.queued) == 0 {
+		ui.printTextSection("Queue", []string{"No messages waiting."})
+		return
+	}
+	lines := make([]string, 0, len(ui.queued)*2)
+	for index, queued := range ui.queued {
+		age := time.Since(queued.queuedAt).Round(time.Second)
+		lines = append(lines, fmt.Sprintf("#%d · waiting %s", index+1, age), "  "+singleLineMemfitText(queued.text))
+	}
+	ui.printTextSection(fmt.Sprintf("Queue · %d waiting", len(ui.queued)), lines)
+}
+
+func (ui *memfitTUI) printWorkerLogs(logs []string) {
+	if len(logs) == 0 {
+		ui.printTextSection("Worker diagnostics", []string{"No recent diagnostics."})
+		return
+	}
+	if len(logs) > 8 {
+		logs = logs[len(logs)-8:]
+	}
+	rows := make([]memfitInfoRow, 0, len(logs))
+	for _, line := range logs {
+		label, message := formatMemfitLogLine(line)
+		if message == "" {
+			continue
+		}
+		rows = append(rows, memfitInfoRow{label: label, value: message})
+	}
+	if len(rows) == 0 {
+		ui.printTextSection("Worker diagnostics", []string{"No user-relevant diagnostics."})
+		return
+	}
+	ui.printInfoSection(fmt.Sprintf("Worker diagnostics · %d", len(rows)), rows)
+}
+
+func (ui *memfitTUI) printWrappedText(text, indent string) {
+	ui.printWrappedWithPrefix(indent, indent, text)
+}
+
+func (ui *memfitTUI) printWrappedWithPrefix(firstPrefix, nextPrefix, text string) {
+	width := maxInt(8, ui.width-runewidth.StringWidth(firstPrefix)-1)
+	lines := wrapMemfitCells(sanitizeMemfitTerminalText(text), width)
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+	for index, line := range lines {
+		prefix := nextPrefix
+		if index == 0 {
+			prefix = firstPrefix
+		}
+		fmt.Fprintf(os.Stdout, "%s%s\r\n", prefix, line)
+	}
+
+}
+
+func (ui *memfitTUI) statusSummary() string {
+	if ui.awaitingInput {
+		return "Waiting for your reply"
+	}
+	if !ui.busy {
+		if ui.queuePaused && len(ui.queued) > 0 {
+			return "Ready · queue paused"
+		}
+		return "Ready"
+	}
+	activity := ui.activity
+	if activity == "" {
+		activity = "Working"
+	}
+	elapsed := time.Since(ui.turnStarted).Round(100 * time.Millisecond)
+	return fmt.Sprintf("%s · %s", activity, elapsed)
+}
+
+func (ui *memfitTUI) liveStatusSummary() string {
+	if ui.awaitingInput {
+		if len(ui.queued) > 0 {
+			if ui.width < 40 {
+				return fmt.Sprintf("Reply needed · Q%d", len(ui.queued))
+			}
+			return "Waiting for your reply · " + ui.queueSummary()
+		}
+		return "Waiting for your reply"
+	}
+	if !ui.busy {
+		if ui.queuePaused && len(ui.queued) > 0 {
+			if ui.width < 40 {
+				return fmt.Sprintf("Queue paused · Q%d", len(ui.queued))
+			}
+			return fmt.Sprintf("Queue paused · %d waiting", len(ui.queued))
+		}
+		return "Ready"
+	}
+	activity := ui.activity
+	if activity == "" {
+		activity = "Working"
+	}
+	elapsed := time.Since(ui.turnStarted).Round(100 * time.Millisecond)
+	if len(ui.queued) > 0 {
+		if ui.width < 40 {
+			return fmt.Sprintf("%s · Q%d", activity, len(ui.queued))
+		}
+		return fmt.Sprintf("%s · %s · %s", activity, ui.queueSummary(), elapsed)
+	}
+	return fmt.Sprintf("%s · %s", activity, elapsed)
+}
+
+func (ui *memfitTUI) queueSummary() string {
+	if len(ui.queued) == 0 {
+		return "empty"
+	}
+	label := fmt.Sprintf("%d waiting", len(ui.queued))
+	if ui.queuePaused {
+		label += " (paused)"
+	}
+	return label
+}
+
+func (ui *memfitTUI) compactQueueSummary() string {
+	if len(ui.queued) == 0 {
+		return "queue empty"
+	}
+	label := fmt.Sprintf("Q%d", len(ui.queued))
+	if ui.queuePaused {
+		label += " paused"
+	}
+	return label
+}
+
+func (ui *memfitTUI) restoreSavedDraft() {
+	if ui.savedDraft == nil {
+		return
+	}
+	ui.buffer = append([]rune(nil), ui.savedDraft...)
+	ui.cursor = ui.savedDraftCursor
+	if ui.cursor > len(ui.buffer) {
+		ui.cursor = len(ui.buffer)
+	}
+	ui.savedDraft = nil
+	ui.savedDraftCursor = 0
 }
 
 func (ui *memfitTUI) paint(code, text string) string {
@@ -1045,28 +1357,273 @@ func sanitizeMemfitTTYText(input string) string {
 	return strings.ReplaceAll(sanitizeMemfitTerminalText(input), "\n", "\r\n")
 }
 
+func singleLineMemfitText(input string) string {
+	return strings.Join(strings.Fields(sanitizeMemfitTerminalText(input)), " ")
+}
+
+func lastMemfitPreviewLine(input string) string {
+	lines := strings.Split(sanitizeMemfitTerminalText(input), "\n")
+	for index := len(lines) - 1; index >= 0; index-- {
+		if line := singleLineMemfitText(lines[index]); line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+func titleMemfitStatus(status string) string {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return "Finished"
+	}
+	runes := []rune(status)
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
+}
+
+func humanizeMemfitMessage(input string) string {
+	input = strings.TrimSpace(sanitizeMemfitTerminalText(input))
+	for depth := 0; depth < 3 && input != ""; depth++ {
+		var value any
+		if json.Unmarshal([]byte(input), &value) != nil {
+			break
+		}
+		readable := findMemfitReadableValue(value)
+		if readable == "" || readable == input {
+			return "Structured details hidden; use --debug if you need the raw event."
+		}
+		input = strings.TrimSpace(readable)
+	}
+	return input
+}
+
+func compactMemfitMessage(input string, maxCells int) string {
+	message := singleLineMemfitText(humanizeMemfitMessage(input))
+	if message == "" {
+		return "No readable details were provided."
+	}
+	return truncateMemfitCells(message, maxInt(16, maxCells))
+}
+
+func wrapMemfitCells(input string, maxCells int) []string {
+	if maxCells < 1 {
+		maxCells = 1
+	}
+	input = strings.ReplaceAll(input, "\t", "    ")
+	paragraphs := strings.Split(input, "\n")
+	lines := make([]string, 0, len(paragraphs))
+	for _, paragraph := range paragraphs {
+		if paragraph == "" {
+			lines = append(lines, "")
+			continue
+		}
+		remaining := []rune(paragraph)
+		preferWords := !strings.HasPrefix(strings.TrimSpace(paragraph), "|") &&
+			!strings.HasPrefix(paragraph, "    ")
+		for len(remaining) > 0 {
+			used, cut, lastSpace := 0, 0, -1
+			for index, r := range remaining {
+				width := maxInt(1, runewidth.RuneWidth(r))
+				if used > 0 && used+width > maxCells {
+					break
+				}
+				used += width
+				cut = index + 1
+				if preferWords && unicode.IsSpace(r) {
+					lastSpace = cut
+				}
+			}
+			if cut >= len(remaining) {
+				lines = append(lines, string(remaining))
+				break
+			}
+			if lastSpace > 0 {
+				line := strings.TrimRightFunc(string(remaining[:lastSpace]), unicode.IsSpace)
+				if line != "" {
+					lines = append(lines, line)
+				}
+				remaining = remaining[lastSpace:]
+				for len(remaining) > 0 && unicode.IsSpace(remaining[0]) {
+					remaining = remaining[1:]
+				}
+				continue
+			}
+			lines = append(lines, string(remaining[:cut]))
+			remaining = remaining[cut:]
+		}
+	}
+	return lines
+}
+
+func formatMemfitLogLine(input string) (string, string) {
+	line := singleLineMemfitText(input)
+	if line == "" {
+		return "", ""
+	}
+	if json.Valid([]byte(line)) {
+		message := humanizeMemfitMessage(line)
+		if strings.HasPrefix(message, "Structured details hidden") {
+			return "EVENT", message
+		}
+		return "EVENT", singleLineMemfitText(message)
+	}
+	level := "WORKER"
+	if strings.HasPrefix(line, "[") {
+		if end := strings.IndexByte(line, ']'); end > 1 {
+			level = strings.ToUpper(strings.TrimSpace(line[1:end]))
+			line = strings.TrimSpace(line[end+1:])
+		}
+	}
+	fields := strings.Fields(line)
+	if len(fields) >= 2 && looksLikeMemfitDate(fields[0]) && strings.Contains(fields[1], ":") {
+		line = strings.TrimSpace(strings.TrimPrefix(line, fields[0]+" "+fields[1]))
+	}
+	source := ""
+	if strings.HasPrefix(line, "[") {
+		if end := strings.IndexByte(line, ']'); end > 1 {
+			source = strings.TrimSpace(line[1:end])
+			line = strings.TrimSpace(line[end+1:])
+		}
+	}
+	line = humanizeMemfitMessage(line)
+	if source != "" {
+		line = source + " · " + line
+	}
+	return truncateMemfitCells(level, 8), singleLineMemfitText(line)
+}
+
+func looksLikeMemfitDate(value string) bool {
+	return len(value) >= 10 && value[4] == '-' && value[7] == '-'
+}
+
+func extractMemfitToolSummary(content string) (string, string) {
+	var value any
+	if json.Unmarshal([]byte(content), &value) != nil {
+		return "Tool", ""
+	}
+	tool := findMemfitToolObject(value)
+	if tool == nil {
+		return "Tool", ""
+	}
+	name := scalarMemfitMapString(tool, "verbose_name", "tool_name", "name")
+	if localized, ok := tool["verbose_name_i18n"].(map[string]any); ok {
+		if zh := scalarMemfitMapString(localized, "Zh", "zh", "ZH"); zh != "" {
+			name = zh
+		}
+	}
+	if name == "" {
+		name = "Tool"
+	}
+	detail := findMemfitToolDetail(value)
+	return humanizeMemfitToolName(name), detail
+}
+
+func findMemfitToolObject(value any) map[string]any {
+	switch typed := value.(type) {
+	case map[string]any:
+		if scalarMemfitMapString(typed, "verbose_name", "tool_name", "name") != "" {
+			return typed
+		}
+		for _, key := range []string{"tool", "function", "metadata", "data"} {
+			if child, ok := typed[key]; ok {
+				if result := findMemfitToolObject(child); result != nil {
+					return result
+				}
+			}
+		}
+		for _, child := range typed {
+			if result := findMemfitToolObject(child); result != nil {
+				return result
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if result := findMemfitToolObject(child); result != nil {
+				return result
+			}
+		}
+	}
+	return nil
+}
+
+func scalarMemfitMapString(value map[string]any, keys ...string) string {
+	for _, key := range keys {
+		switch typed := value[key].(type) {
+		case string:
+			if strings.TrimSpace(typed) != "" {
+				return strings.TrimSpace(typed)
+			}
+		case json.Number:
+			return typed.String()
+		case float64:
+			return fmt.Sprintf("%v", typed)
+		}
+	}
+	return ""
+}
+
+func findMemfitToolDetail(value any) string {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, key := range []string{"path", "file_path", "filename", "command", "query", "url", "target"} {
+			if detail := scalarMemfitMapString(typed, key); detail != "" {
+				return singleLineMemfitText(detail)
+			}
+		}
+		for _, key := range []string{"params", "arguments", "input", "data"} {
+			if child, ok := typed[key]; ok {
+				if result := findMemfitToolDetail(child); result != "" {
+					return result
+				}
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if result := findMemfitToolDetail(child); result != "" {
+				return result
+			}
+		}
+	}
+	return ""
+}
+
+func humanizeMemfitToolName(name string) string {
+	name = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(name, "_", " "), "-", " "))
+	if name == "" {
+		return "Tool"
+	}
+	words := strings.Fields(name)
+	for index, word := range words {
+		if word == "bash" || word == "HTTP" || word == "URL" {
+			continue
+		}
+		words[index] = titleMemfitStatus(word)
+	}
+	return strings.Join(words, " ")
+}
+
 func describeMemfitEvent(event memfitWorkerEvent) string {
 	switch event.Type {
 	case string(schema.EVENT_TOOL_CALL_START):
-		name := extractMemfitJSONField(event.Content, "tool_name", "name", "tool")
-		if name == "" {
-			name = "tool"
+		name, detail := extractMemfitToolSummary(event.Content)
+		if detail != "" {
+			return "Using " + name + " · " + detail
 		}
-		return "running " + name
+		return "Using " + name
 	case string(schema.EVENT_TOOL_CALL_ERROR):
 		message := extractMemfitJSONField(event.Content, "error", "message", "reason")
 		if message == "" {
 			message = "tool failed"
 		}
-		return message
+		return "Tool failed · " + humanizeMemfitMessage(message)
 	case string(schema.EVENT_TYPE_API_REQUEST_FAILED):
 		message := extractMemfitReadableContent(event.Content)
 		if message == "" {
 			message = "AI request failed"
 		}
-		return message
+		return "AI request failed · " + humanizeMemfitMessage(message)
 	case string(schema.EVENT_TYPE_NOTIFY):
-		return extractMemfitReadableContent(event.Content)
+		return humanizeMemfitMessage(extractMemfitReadableContent(event.Content))
 	}
 	return ""
 }
@@ -1125,12 +1682,7 @@ func extractMemfitJSONField(content string, keys ...string) string {
 	if json.Unmarshal([]byte(content), &value) != nil {
 		return ""
 	}
-	for _, key := range keys {
-		if result := utils.InterfaceToString(value[key]); result != "" {
-			return result
-		}
-	}
-	return ""
+	return scalarMemfitMapString(value, keys...)
 }
 
 func isMemfitInteractiveEvent(eventType string) bool {
