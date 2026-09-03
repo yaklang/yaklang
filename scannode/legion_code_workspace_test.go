@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -74,6 +76,8 @@ func validLegionCodeWorkspaceSpec(kind string) legionCodeWorkspaceSpec {
 	locator := legionCodeWorkspaceArchiveLocator
 	if kind == legionCodeWorkspaceKindGit {
 		locator = "https://source.invalid/repository.git"
+	} else if kind == legionCodeWorkspaceKindAttachments {
+		locator = legionCodeWorkspaceAttachmentLocator
 	}
 	return legionCodeWorkspaceSpec{
 		WorkspaceID:      testLegionCodeWorkspaceID,
@@ -82,6 +86,270 @@ func validLegionCodeWorkspaceSpec(kind string) legionCodeWorkspaceSpec {
 		ReadOnly:         true,
 		MaxReadBytes:     64 * 1024,
 		MaxSearchResults: 20,
+	}
+}
+
+func TestMaterializeLegionAttachmentWorkspaceStreamsLargeLogsAndCleansUp(t *testing.T) {
+	t.Parallel()
+
+	content := strings.Repeat("ordinary event\n", 80_000) + "needle-after-inline-limits\n"
+	digest := sha256.Sum256([]byte(content))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/ai/attachments/aiatt_large/download" ||
+			r.URL.Query().Get("node_session_id") != "node-session-log" {
+			t.Fatalf("unexpected attachment request: %s", r.URL.String())
+		}
+		if authorization := r.Header.Get("Authorization"); authorization != "Bearer node-session-token" {
+			t.Fatalf("unexpected authorization: %q", authorization)
+		}
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(content)))
+		_, _ = io.WriteString(w, content)
+	}))
+	defer server.Close()
+
+	workspace, err := materializeLegionAttachmentWorkspace(
+		context.Background(),
+		validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindAttachments),
+		legionCodeWorkspaceMaterializeOptions{
+			HTTPClient:          server.Client(),
+			PlatformAPIBaseURL:  server.URL,
+			NodeSessionID:       "node-session-log",
+			PlatformBearerToken: "node-session-token",
+			Attachments: []aiSessionAttachmentRef{{
+				AttachmentID: "aiatt_large",
+				Filename:     "../../events.log",
+				SizeBytes:    uint64(len(content)),
+				SHA256:       hex.EncodeToString(digest[:]),
+			}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("materialize attachment workspace: %v", err)
+	}
+	root := workspace.root
+	if workspace.bytes != int64(len(content)) || workspace.files != 1 || len(workspace.sha256) != sha256.Size*2 {
+		t.Fatalf("unexpected workspace identity: %#v", workspace.info())
+	}
+	if _, err := os.Stat(filepath.Join(root, "01-events.log")); err != nil {
+		t.Fatalf("sanitized workspace file missing: %v", err)
+	}
+	result, err := workspace.search(context.Background(), map[string]any{"query": "needle-after-inline-limits", "limit": 5})
+	if err != nil || result["count"] != 1 {
+		t.Fatalf("search materialized large log: result=%#v err=%v", result, err)
+	}
+	if err := workspace.Cleanup(); err != nil {
+		t.Fatalf("cleanup attachment workspace: %v", err)
+	}
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Fatalf("attachment workspace survived cleanup: %v", err)
+	}
+}
+
+func TestMaterializeLegionAttachmentWorkspaceCancellationStopsDownloadAndCleansUp(t *testing.T) {
+	tempRoot := t.TempDir()
+	t.Setenv("TMPDIR", tempRoot)
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", 1<<30))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("x"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		close(started)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := materializeLegionAttachmentWorkspace(
+			ctx,
+			validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindAttachments),
+			legionCodeWorkspaceMaterializeOptions{
+				HTTPClient:          server.Client(),
+				PlatformAPIBaseURL:  server.URL,
+				NodeSessionID:       "node-session-log",
+				PlatformBearerToken: "node-session-token",
+				Attachments: []aiSessionAttachmentRef{{
+					AttachmentID: "aiatt_stalled",
+					Filename:     "stalled.log",
+					SizeBytes:    1 << 30,
+					SHA256:       strings.Repeat("a", sha256.Size*2),
+				}},
+			},
+		)
+		done <- err
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("attachment download did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "context canceled") {
+			t.Fatalf("cancelled attachment download error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("attachment download did not stop promptly after cancellation")
+	}
+	entries, err := os.ReadDir(tempRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("cancelled attachment workspace left residue: %#v", entries)
+	}
+}
+
+func TestLegionCodeWorkspaceSearchStreamsAnOversizedSingleLine(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	prefix := strings.Repeat("x", 128*1024-3)
+	content := prefix + "NEE" + "DLE" + strings.Repeat("y", 128*1024)
+	if err := os.WriteFile(filepath.Join(root, "single-line.jsonl"), []byte(content), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	workspace := &legionCodeWorkspaceRuntime{
+		spec: legionCodeWorkspaceSpec{
+			WorkspaceID:      testLegionCodeWorkspaceID,
+			Kind:             legionCodeWorkspaceKindAttachments,
+			Locator:          legionCodeWorkspaceAttachmentLocator,
+			ReadOnly:         true,
+			MaxReadBytes:     64 * 1024,
+			MaxSearchResults: 5,
+		},
+		root: root,
+	}
+	result, err := workspace.search(context.Background(), map[string]any{"query": "needle", "limit": 5})
+	if err != nil {
+		t.Fatalf("search oversized single line: %v", err)
+	}
+	if result["count"] != 1 || result["scanned_bytes"] != int64(len(content)) {
+		t.Fatalf("unexpected oversized-line search result: %#v", result)
+	}
+	match := result["results"].([]map[string]any)[0]
+	if match["line"] != 1 || match["column"] != len(prefix)+1 || match["byte_offset"] != int64(len(prefix)) ||
+		!strings.Contains(strings.ToLower(match["preview"].(string)), "needle") {
+		t.Fatalf("oversized-line match lost boundary context: %#v", match)
+	}
+}
+
+func TestLegionCodeWorkspaceReadKeepsValidUTF8AtSliceBoundary(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	content := strings.Repeat("x", 63) + "中" + "tail"
+	if err := os.WriteFile(filepath.Join(root, "utf8.log"), []byte(content), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	workspace := &legionCodeWorkspaceRuntime{
+		spec: legionCodeWorkspaceSpec{
+			WorkspaceID:      testLegionCodeWorkspaceID,
+			Kind:             legionCodeWorkspaceKindAttachments,
+			Locator:          legionCodeWorkspaceAttachmentLocator,
+			ReadOnly:         true,
+			MaxReadBytes:     64,
+			MaxSearchResults: 5,
+		},
+		root: root,
+	}
+	result, err := workspace.read(context.Background(), map[string]any{"path": "utf8.log", "offset": 0, "max_bytes": 64})
+	if err != nil {
+		t.Fatalf("read valid UTF-8 boundary: %v", err)
+	}
+	if result["content"] != strings.Repeat("x", 63) || result["read_bytes"] != 63 || result["truncated"] != true {
+		t.Fatalf("UTF-8 boundary was not trimmed safely: %#v", result)
+	}
+
+	result, err = workspace.read(context.Background(), map[string]any{"path": "utf8.log", "offset": 64, "max_bytes": 64})
+	if err != nil {
+		t.Fatalf("read from inside UTF-8 rune: %v", err)
+	}
+	if result["requested_offset"] != int64(64) || result["offset"] != int64(66) || result["content"] != "tail" {
+		t.Fatalf("UTF-8 start boundary was not aligned safely: %#v", result)
+	}
+}
+
+func TestLegionCodeWorkspaceSearchPreservesUnicodeByteOffset(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	const content = "prefix Ⱥ suffix\n"
+	if err := os.WriteFile(filepath.Join(root, "unicode.log"), []byte(content), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	workspace := &legionCodeWorkspaceRuntime{
+		spec: legionCodeWorkspaceSpec{
+			WorkspaceID:      testLegionCodeWorkspaceID,
+			Kind:             legionCodeWorkspaceKindAttachments,
+			Locator:          legionCodeWorkspaceAttachmentLocator,
+			ReadOnly:         true,
+			MaxReadBytes:     64,
+			MaxSearchResults: 5,
+		},
+		root: root,
+	}
+	result, err := workspace.search(context.Background(), map[string]any{"path": "unicode.log", "query": "ⱥ"})
+	if err != nil {
+		t.Fatalf("case-folded Unicode search: %v", err)
+	}
+	matches := result["results"].([]map[string]any)
+	if len(matches) != 1 || matches[0]["byte_offset"] != int64(len("prefix ")) || matches[0]["column"] != len("prefix ")+1 {
+		t.Fatalf("Unicode search lost original byte coordinates: %#v", result)
+	}
+	caseSensitive, err := workspace.search(context.Background(), map[string]any{"path": "unicode.log", "query": "ⱥ", "case_sensitive": true})
+	if err != nil || caseSensitive["count"] != 0 {
+		t.Fatalf("case-sensitive Unicode search matched a different rune: result=%#v err=%v", caseSensitive, err)
+	}
+}
+
+func TestLegionCodeWorkspaceSearchResumesLargeFileByByteOffset(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	prefix := strings.Repeat("x", 4096)
+	if err := os.WriteFile(filepath.Join(root, "large.log"), []byte(prefix+"needle-after-cursor\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	workspace := &legionCodeWorkspaceRuntime{
+		spec: legionCodeWorkspaceSpec{
+			WorkspaceID:      testLegionCodeWorkspaceID,
+			Kind:             legionCodeWorkspaceKindAttachments,
+			Locator:          legionCodeWorkspaceAttachmentLocator,
+			ReadOnly:         true,
+			MaxReadBytes:     64,
+			MaxSearchResults: 5,
+		},
+		root: root,
+	}
+	first, err := workspace.search(context.Background(), map[string]any{
+		"path": "large.log", "query": "needle-after-cursor", "max_scan_bytes": 1024,
+	})
+	if err != nil {
+		t.Fatalf("first bounded search: %v", err)
+	}
+	if first["complete"] != false || first["truncated"] != true || first["count"] != 0 ||
+		first["next_path"] != "large.log" {
+		t.Fatalf("first search did not return a continuation cursor: %#v", first)
+	}
+	nextOffset, ok := first["next_offset"].(int64)
+	if !ok || nextOffset <= 0 || nextOffset >= 1024 {
+		t.Fatalf("invalid continuation offset: %#v", first)
+	}
+	second, err := workspace.search(context.Background(), map[string]any{
+		"path": "large.log", "offset": nextOffset, "query": "needle-after-cursor", "max_scan_bytes": 8192,
+	})
+	if err != nil {
+		t.Fatalf("continued bounded search: %v", err)
+	}
+	matches := second["results"].([]map[string]any)
+	if second["complete"] != true || len(matches) != 1 || matches[0]["byte_offset"] != int64(len(prefix)) {
+		t.Fatalf("continued search did not find the original byte offset: %#v", second)
 	}
 }
 
@@ -350,11 +618,11 @@ func TestLegionCodeWorkspaceGitDoesNotRejectLargeProjectFiles(t *testing.T) {
 	if err != nil || listed["count"] != 2 {
 		t.Fatalf("large source was not listed: result=%#v err=%v", listed, err)
 	}
-	read, err := workspace.read(map[string]any{"path": "large.js", "max_bytes": 512})
+	read, err := workspace.read(context.Background(), map[string]any{"path": "large.js", "max_bytes": 512})
 	if err != nil || read["truncated"] != true || read["file_size"].(int64) != int64(len(largeContent)) {
 		t.Fatalf("large source did not support bounded reads: result=%#v err=%v", read, err)
 	}
-	search, err := workspace.search(map[string]any{"path": "large.js", "query": "AI_AUDIT_LARGE_FILE"})
+	search, err := workspace.search(context.Background(), map[string]any{"path": "large.js", "query": "AI_AUDIT_LARGE_FILE"})
 	if err != nil || search["count"] != 1 {
 		t.Fatalf("large source did not support bounded search: result=%#v err=%v", search, err)
 	}
@@ -1034,6 +1302,46 @@ func TestValidateAISessionBindPairsWorkspaceWithSentinelTarget(t *testing.T) {
 	ordinaryCommand.Session.RunId = ordinary.FocusRunId
 	if err := validateAISessionBindCommand("node-ai", ordinaryCommand); err == nil || !strings.Contains(err.Error(), "requires source_workspace") {
 		t.Fatalf("expected sentinel without workspace rejection, got %v", err)
+	}
+
+	attachmentOnly := validAIFocusResultContext()
+	attachmentOnly.FocusMode = "log_analysis"
+	attachmentOnly.FocusReleaseId = "log_analysis@1.0.0+abcdef123456"
+	attachmentOnly.ExecutionMode = "single_run"
+	attachmentOnly.TargetUrl = "https://workspace.invalid/" + testLegionCodeWorkspaceID + "/"
+	attachmentCommand := validAISessionBindCommand()
+	attachmentCommand.ProjectId = ""
+	attachmentCommand.ResultContext = attachmentOnly
+	attachmentCommand.Session.RunId = attachmentOnly.FocusRunId
+	attachmentCommand.Attachments = []*aiv1.AISessionAttachmentRef{{
+		AttachmentId: "aiatt_log",
+		Filename:     "events.log",
+		SizeBytes:    160123,
+		Sha256:       strings.Repeat("a", 64),
+	}}
+	attachmentWorkspace := validLegionCodeWorkspaceSpec(legionCodeWorkspaceKindAttachments)
+	releaseSHA256 := "abcdef123456" + strings.Repeat("a", 52)
+	attachmentCommand.RuntimeOptionSnapshotJson, _ = json.Marshal(yakRuntimeOptions{
+		SourceWorkspace:          &attachmentWorkspace,
+		FocusModeLoop:            legionLogAnalysisFocusName,
+		FocusReleaseID:           attachmentOnly.FocusReleaseId,
+		FocusReleaseSHA256:       releaseSHA256,
+		FocusRuntimeName:         "legion_release_log_analysis_1_0_0_abcdef123456",
+		FocusTargetURL:           attachmentOnly.TargetUrl,
+		AITaskRunID:              "aitr_0123456789abcdef0123456789abcdef",
+		AITaskKey:                legionLogAnalysisFocusName,
+		AITaskVersion:            "1.2.0",
+		AITaskDefinitionChecksum: strings.Repeat("b", sha256.Size*2),
+		AITaskSessionRole:        legionAITaskExecutionRole,
+	})
+	if err := validateAISessionBindCommand("node-ai", attachmentCommand); err != nil {
+		t.Fatalf("valid attachment workspace Professional Task bind rejected: %v", err)
+	}
+
+	attachmentCommand.ProjectId = "project-1"
+	if err := validateAISessionBindCommand("node-ai", attachmentCommand); err == nil ||
+		!strings.Contains(err.Error(), "restricted to projectless log_analysis Professional Task") {
+		t.Fatalf("forged ordinary Chat attachment workspace was accepted: %v", err)
 	}
 
 	code := validCodeAuditResultContext()

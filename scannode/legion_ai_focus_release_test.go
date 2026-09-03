@@ -39,6 +39,10 @@ func TestRegisterContextFocusReleaseRegistersImmutableYakBundle(t *testing.T) {
 	if _, ok := reactloops.GetLoopFactory(runtimeName); !ok {
 		t.Fatalf("runtime %q was not registered", runtimeName)
 	}
+	bundle, ok := reactloops.GetYakFocusModeBundle(runtimeName)
+	if !ok || bundle.CallTimeout != serverFocusHookCallTimeout || bundle.CallTimeout <= 4*serverFocusSourceCallTimeout {
+		t.Fatalf("runtime %q does not bound source calls before the hook timeout: %#v", runtimeName, bundle)
+	}
 	second, err := registerContextFocusRelease(release)
 	if err != nil || second != runtimeName {
 		t.Fatalf("idempotent register = %q, %v", second, err)
