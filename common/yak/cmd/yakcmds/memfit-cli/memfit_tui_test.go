@@ -185,6 +185,33 @@ func TestMemfitProcessTimelineClassifiesCoreStreamsAndHidesDetailsByDefault(t *t
 	}
 }
 
+func TestMemfitFooterSegmentsAdaptToTerminalWidth(t *testing.T) {
+	ui := &memfitTUI{
+		config: memfitStartConfig{Model: "test-model", ReviewPolicy: "yolo"},
+		width:  88,
+	}
+	left, right := ui.footerSegments("○")
+	require.Equal(t, "○ Ready", left)
+	require.Equal(t, "test-model · YOLO · click/Ctrl+O details · /help", right)
+
+	ui.width = 30
+	left, right = ui.footerSegments("○")
+	require.Equal(t, "○ Ready", left)
+	require.Equal(t, "test-model · YOLO", right)
+
+	ui.width = 24
+	left, right = ui.footerSegments("○")
+	require.Equal(t, "○ Ready", left)
+	require.Equal(t, "YOLO", right)
+
+	ui.busy = true
+	ui.activity = "Thinking"
+	ui.queued = []memfitQueuedInput{{text: "next"}}
+	left, right = ui.footerSegments("◆")
+	require.Equal(t, "◆ Thinking · Q1", left)
+	require.Equal(t, "YOLO", right)
+}
+
 func TestMemfitStructuredTimelineKeepsSemanticsAndDropsBreadcrumbs(t *testing.T) {
 	kind, group, detail, state, ok := classifyMemfitTimelineItem(`{
 		"type":"text",

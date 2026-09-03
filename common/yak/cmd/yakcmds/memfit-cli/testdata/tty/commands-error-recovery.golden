@@ -1,4 +1,3 @@
-Worker diagnostics · 3
   WARN    provider:42 · worker retry is available
   EVENT   structured retry detail
   WORKER  erase-attempt stayed plain text
@@ -24,5 +23,6 @@ Commands
   /exit         end the session
   Enter queues your message while Memfit is working.
 
-○ Ready
 ❯
+───────────────────────────────────────────────────────────────────
+○ Ready            test-model · YOLO · click/Ctrl+O details · /help

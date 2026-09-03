@@ -1,6 +1,5 @@
 ◆ memfit  local isolated agent
 test-model · YOLO · /workspace
-Enter send · Alt+Enter newline
   ◇ 4 more
 › ✓ Read ▾ · 文件读取 · READ…
       Why: Read the project
@@ -8,5 +7,6 @@ Enter send · Alt+Enter newline
       Result:
       # Yaklang
       … more hidden
-○ Ready
 ❯
+─────────────────────────────
+○ Ready     test-model · YOLO

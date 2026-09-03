@@ -237,25 +237,26 @@ type memfitTUI struct {
 	historyIndex int
 	historyDraft []rune
 
-	busy             bool
-	awaitingInput    bool
-	interactiveID    string
-	queued           []memfitQueuedInput
-	queuePaused      bool
-	liveRows         int
-	activity         string
-	streamKind       string
-	streamWriter     string
-	streamPreview    string
-	answerSeen       bool
-	answers          memfitAnswerStreams
-	fallbackResult   string
-	turnStarted      time.Time
-	lastStatusTick   int64
-	lastModel        string
-	lastCtrlC        time.Time
-	savedDraft       []rune
-	savedDraftCursor int
+	busy                bool
+	awaitingInput       bool
+	interactiveID       string
+	queued              []memfitQueuedInput
+	queuePaused         bool
+	liveRows            int
+	liveRowsBelowCursor int
+	activity            string
+	streamKind          string
+	streamWriter        string
+	streamPreview       string
+	answerSeen          bool
+	answers             memfitAnswerStreams
+	fallbackResult      string
+	turnStarted         time.Time
+	lastStatusTick      int64
+	lastModel           string
+	lastCtrlC           time.Time
+	savedDraft          []rune
+	savedDraftCursor    int
 
 	processItems       []memfitProcessItem
 	processShowAll     bool
@@ -1408,7 +1409,7 @@ func (ui *memfitTUI) processPanelLines() []memfitLiveLine {
 
 	budget := ui.height / 2
 	if ui.processShowAll {
-		budget = ui.height - 5
+		budget = ui.height - 7
 	}
 	if budget < 4 {
 		budget = 4
@@ -1654,16 +1655,6 @@ func (ui *memfitTUI) renderComposer() {
 		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(color, truncateMemfitCells(line, ui.width-1)))
 		rows++
 	}
-	statusMarker, statusColor := "○", memfitColorDim
-	if ui.busy {
-		statusMarker, statusColor = "◆", memfitColorCyan
-	}
-	if ui.awaitingInput {
-		statusMarker, statusColor = "?", memfitColorYellow
-	}
-	status := statusMarker + " " + ui.liveStatusSummary()
-	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(statusColor, truncateMemfitCells(status, ui.width-1)))
-	rows++
 	prefix := "❯ "
 	if ui.awaitingInput {
 		prefix = "reply ❯ "
@@ -1674,27 +1665,96 @@ func (ui *memfitTUI) renderComposer() {
 	text, cursorCells := memfitInputViewport(ui.buffer, ui.cursor, available)
 	fmt.Fprint(os.Stdout, ui.paint(memfitColorBold+memfitColorCyan, prefix))
 	fmt.Fprint(os.Stdout, text)
+	fmt.Fprint(os.Stdout, "\r\n")
+	composerRow := rows
 	rows++
-	endCells := runewidth.StringWidth(text)
-	if move := endCells - cursorCells; move > 0 {
-		fmt.Fprintf(os.Stdout, "\x1b[%dD", move)
+
+	dividerWidth := maxInt(1, ui.width-1)
+	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, strings.Repeat("─", dividerWidth)))
+	rows++
+
+	statusMarker, statusColor := "○", memfitColorDim
+	if ui.busy {
+		statusMarker, statusColor = "◆", memfitColorCyan
+	}
+	if ui.awaitingInput {
+		statusMarker, statusColor = "?", memfitColorYellow
+	}
+	ui.renderFooter(statusMarker, statusColor)
+	rows++
+
+	// Keep the editing cursor in the composer while retaining two persistent
+	// footer rows beneath it. clearLiveFrame knows how to descend to the footer
+	// before erasing the complete live frame on the next update.
+	fmt.Fprint(os.Stdout, "\r\x1b[2A")
+	if column := runewidth.StringWidth(prefix) + cursorCells; column > 0 {
+		fmt.Fprintf(os.Stdout, "\x1b[%dC", column)
 	}
 	ui.liveRows = rows
+	ui.liveRowsBelowCursor = 2
 	for _, hit := range pendingHits {
-		hit.offset = rows - 1 - hit.row
+		hit.offset = composerRow - hit.row
 		ui.processHits = append(ui.processHits, hit.memfitProcessHit)
 	}
+}
+
+func (ui *memfitTUI) renderFooter(marker, color string) {
+	left, right := ui.footerSegments(marker)
+	maxWidth := maxInt(1, ui.width-1)
+	if right == "" {
+		fmt.Fprint(os.Stdout, ui.paint(color, truncateMemfitCells(left, maxWidth)))
+		return
+	}
+	gap := maxWidth - runewidth.StringWidth(left) - runewidth.StringWidth(right)
+	if gap < 1 {
+		fmt.Fprint(os.Stdout, ui.paint(color, truncateMemfitCells(left, maxWidth)))
+		return
+	}
+	fmt.Fprint(os.Stdout, ui.paint(color, left))
+	fmt.Fprint(os.Stdout, strings.Repeat(" ", gap))
+	fmt.Fprint(os.Stdout, ui.paint(memfitColorDim, right))
+}
+
+func (ui *memfitTUI) footerSegments(marker string) (string, string) {
+	maxWidth := maxInt(1, ui.width-1)
+	left := truncateMemfitCells(marker+" "+ui.liveStatusSummary(), maxWidth)
+	model := ui.config.Model
+	if model == "" {
+		model = ui.config.AIType
+	}
+	if model == "" {
+		model = "configured model"
+	}
+	mode := strings.ToUpper(ui.config.ReviewPolicy)
+	candidates := []string{
+		model + " · " + mode + " · click/Ctrl+O details · /help",
+		model + " · " + mode + " · ^O details",
+		model + " · " + mode,
+		mode + " · ^O details",
+		mode,
+	}
+	for _, right := range candidates {
+		if runewidth.StringWidth(left)+3+runewidth.StringWidth(right) <= maxWidth {
+			return left, right
+		}
+	}
+	return left, ""
 }
 
 func (ui *memfitTUI) clearLiveFrame() {
 	if ui.liveRows == 0 {
 		return
 	}
-	fmt.Fprint(os.Stdout, "\r\x1b[2K")
+	fmt.Fprint(os.Stdout, "\r")
+	if ui.liveRowsBelowCursor > 0 {
+		fmt.Fprintf(os.Stdout, "\x1b[%dB", ui.liveRowsBelowCursor)
+	}
+	fmt.Fprint(os.Stdout, "\x1b[2K")
 	for row := 1; row < ui.liveRows; row++ {
 		fmt.Fprint(os.Stdout, "\x1b[1A\r\x1b[2K")
 	}
 	ui.liveRows = 0
+	ui.liveRowsBelowCursor = 0
 }
 
 func (ui *memfitTUI) printNotice(label, message, color string) {

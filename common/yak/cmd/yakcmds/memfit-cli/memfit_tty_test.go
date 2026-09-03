@@ -55,7 +55,8 @@ func TestMemfitTTYWidePasteAndAnswerSnapshot(t *testing.T) {
 	h.Write("\r")
 	h.WaitFor("echo: 你好，Memfit / 第二行 🌏")
 	h.WaitFor("Completed")
-	h.WaitFor("○ Ready\n❯")
+	snapshot := h.WaitFor("────────────────\n○ Ready")
+	require.Contains(t, snapshot, "❯\n────────────────")
 	h.AssertSnapshot("wide-answer")
 	raw := h.Raw()
 	require.Contains(t, raw, "\x1b[?2004h", "bracketed paste must be enabled")
@@ -78,7 +79,7 @@ func TestMemfitTTYManualReviewAndCancellationSnapshot(t *testing.T) {
 	h.Write("approve\r")
 	h.WaitFor("approved: approve")
 	h.WaitFor("Completed")
-	h.WaitFor("○ Ready\n❯")
+	h.WaitFor("────────────────\n○ Ready")
 	h.Write("slow\r")
 	h.WaitFor("queue ❯")
 	h.Write("\x03")
@@ -94,14 +95,14 @@ func TestMemfitTTYCompactResizeAndHistorySnapshot(t *testing.T) {
 	h.WaitFor("memfit · YOLO")
 	h.Write("first prompt\r")
 	h.WaitFor("Completed")
-	h.WaitFor("○ Ready\n❯")
+	h.WaitFor("────────────────\n○ Ready")
 	h.Write("/clear\r")
 	time.Sleep(100 * time.Millisecond)
 	h.Write("\x1b[A")
-	h.WaitFor("first prompt")
+	h.WaitForScreen("❯ first prompt")
 	h.Resize(24, 10)
 	h.Write(" with a long 中文 suffix")
-	h.WaitFor("suffix")
+	h.WaitForScreen("suffix")
 	h.AssertSnapshot("compact-resize-history")
 }
 
@@ -209,7 +210,7 @@ func TestMemfitTTYHidesToolJSONAndYOLOPromptsSnapshot(t *testing.T) {
 	h.WaitFor("Tool issue")
 	h.WaitFor("最终答案，只展示一次")
 	h.WaitFor("Completed")
-	snapshot := h.WaitFor("○ Ready\n❯")
+	snapshot := h.WaitFor("────────────────\n○ Ready")
 	require.NotContains(t, snapshot, `"description"`)
 	require.NotContains(t, snapshot, "Memfit update")
 	require.NotContains(t, snapshot, "reply ❯")
@@ -229,7 +230,7 @@ func TestMemfitTTYActivityTimelineExpandsIndividualStreams(t *testing.T) {
 	h.Write("activity-flow\r")
 	h.WaitFor("activity flow complete")
 	h.WaitFor("Completed")
-	collapsed := h.WaitFor("○ Ready\n❯")
+	collapsed := h.WaitFor("────────────────\n○ Ready")
 	require.Contains(t, collapsed, "✓ Thinking ▸")
 	require.NotContains(t, collapsed, "先识别用户意图，再选择最小范围的工具。")
 	require.Contains(t, collapsed, "✓ Intent ▸ · inspect repository")
@@ -615,10 +616,12 @@ func (h *memfitTTYHarness) ClickText(text string) {
 
 func (h *memfitTTYHarness) Resize(width, height int) {
 	h.t.Helper()
-	require.NoError(h.t, h.pty.Resize(width, height))
+	// Resize the screen model first so bytes emitted immediately after the PTY
+	// resize are interpreted with the same geometry as the real terminal.
 	h.mu.Lock()
 	h.screen.Resize(width, height)
 	h.mu.Unlock()
+	require.NoError(h.t, h.pty.Resize(width, height))
 	// Memfit polls terminal size rather than owning SIGWINCH handlers.
 	time.Sleep(350 * time.Millisecond)
 }
@@ -646,6 +649,32 @@ func (h *memfitTTYHarness) WaitFor(want string) string {
 	raw := h.raw.String()
 	h.mu.Unlock()
 	h.t.Fatalf("timed out waiting for %q\nscreen:\n%s\nraw output:\n%s", want, snapshot, visibleMemfitControlBytes(raw))
+	return ""
+}
+
+func (h *memfitTTYHarness) WaitForScreen(want string) string {
+	h.t.Helper()
+	deadline := time.Now().Add(4 * time.Second)
+	for time.Now().Before(deadline) {
+		h.mu.Lock()
+		snapshot := h.screen.Snapshot()
+		raw := h.raw.String()
+		h.mu.Unlock()
+		if strings.Contains(snapshot, want) {
+			return snapshot
+		}
+		select {
+		case err := <-h.done:
+			h.t.Fatalf("TTY helper exited while waiting for %q on screen: %v\nraw output:\n%s", want, err, visibleMemfitControlBytes(raw))
+		default:
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	h.mu.Lock()
+	snapshot := h.screen.Snapshot()
+	raw := h.raw.String()
+	h.mu.Unlock()
+	h.t.Fatalf("timed out waiting for %q on screen\nscreen:\n%s\nraw output:\n%s", want, snapshot, visibleMemfitControlBytes(raw))
 	return ""
 }
 
@@ -854,6 +883,18 @@ func (s *memfitTestScreen) applyCSI(params string, final byte) {
 		s.row -= amount
 		if s.row < 0 {
 			s.row = 0
+		}
+	case 'B':
+		amount := parseMemfitCSIAmount(params, 1)
+		s.row += amount
+		if s.row >= s.height {
+			s.row = s.height - 1
+		}
+	case 'C':
+		amount := parseMemfitCSIAmount(params, 1)
+		s.col += amount
+		if s.col >= s.width {
+			s.col = s.width - 1
 		}
 	case 'D':
 		amount := parseMemfitCSIAmount(params, 1)
