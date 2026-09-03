@@ -70,6 +70,12 @@ type http2ClientConn struct {
 	activeStreams int
 	streamsCond   *sync.Cond // based on mu
 
+	// http2Profile, when set, makes this connection write Chrome-like framing
+	// (SETTINGS, connection WINDOW_UPDATE, pseudo-header order, HEADERS
+	// priority and END_STREAM placement). nil means the default framing, which
+	// stays compatible with non-conforming servers.
+	http2Profile *http2Profile
+
 	maxFrameSize           uint32
 	initialWindowSize      uint32
 	maxStreamsCount        uint32
@@ -352,18 +358,29 @@ func (h2Conn *http2ClientConn) preface() error {
 	if _, err := prefaceWriter.Write([]byte(http2.ClientPreface)); err != nil {
 		return err
 	}
-	err := h2Conn.fr.WriteSettings(
-		http2.Setting{ID: http2.SettingEnablePush, Val: 0},
-		http2.Setting{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
-		http2.Setting{ID: http2.SettingMaxFrameSize, Val: defaultMaxFrameSize},
-		http2.Setting{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
-		http2.Setting{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
-	)
+	settings := []http2.Setting{
+		{ID: http2.SettingEnablePush, Val: 0},
+		{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
+		{ID: http2.SettingMaxFrameSize, Val: defaultMaxFrameSize},
+		{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
+		{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
+	}
+	// Increase connection-level flow control window from default 65535 to our desired size.
+	// RFC 7540 Section 6.9.2: SETTINGS only affects stream-level windows.
+	// Connection window must be increased via WINDOW_UPDATE.
+	connWindowIncrease := int64(defaultStreamReceiveWindowSize) - 65535
+	if profile := h2Conn.http2Profile; profile != nil {
+		settings = profile.settings
+		connWindowIncrease = int64(profile.connWindowUpdate)
+	}
+	err := h2Conn.fr.WriteSettings(settings...)
 	if err != nil {
 		return err
 	}
-	if err = h2Conn.fr.WriteWindowUpdate(0, defaultStreamReceiveWindowSize-65535); err != nil {
-		return err
+	if connWindowIncrease > 0 {
+		if err = h2Conn.fr.WriteWindowUpdate(0, uint32(connWindowIncrease)); err != nil {
+			return err
+		}
 	}
 	if err := h2Conn.flushFrames(); err != nil {
 		return err
@@ -734,6 +751,10 @@ func (cs *http2ClientStream) doRequest() error {
 			}
 		}
 	})
+	profile := cs.h2Conn.http2Profile
+	if profile != nil {
+		requestHeaders = profile.reorderPseudoHeaders(requestHeaders)
+	}
 
 	h2HeaderWriter := func(frame *http2.Framer, streamID uint32, endStream bool, maxFrameSize uint32, hdrs []byte) error {
 		first := true // first frame written (HEADERS is first, then CONTINUATION)
@@ -745,13 +766,20 @@ func (cs *http2ClientStream) doRequest() error {
 			hdrs = hdrs[len(chunk):]
 			endHeaders := len(hdrs) == 0
 			if first {
-				//endStream = endStream && endHeaders
-				err := frame.WriteHeaders(http2.HeadersFrameParam{ // some server not accept endStream flag in headers frame
+				// Default framing omits END_STREAM here: some servers do not
+				// accept it on HEADERS. A profile opts back into it, and RFC
+				// 7540 6.2 keeps the flag on HEADERS even when CONTINUATION
+				// frames follow.
+				param := http2.HeadersFrameParam{
 					StreamID:      streamID,
 					BlockFragment: chunk,
-					//EndStream:     endStream,
-					EndHeaders: endHeaders,
-				})
+					EndStream:     endStream,
+					EndHeaders:    endHeaders,
+				}
+				if profile != nil && !profile.headersPriority.IsZero() {
+					param.Priority = profile.headersPriority
+				}
+				err := frame.WriteHeaders(param)
 				first = false
 				if err != nil {
 					return err
@@ -821,9 +849,10 @@ func (cs *http2ClientStream) doRequest() error {
 	cs.h2Conn.full = cs.ID == (1<<31)-1
 	cs.h2Conn.mu.Unlock()
 	// activeStreams was already incremented in newStream when the slot was reserved.
+	endStreamOnHeaders := profile != nil && profile.endStreamOnHeaders && len(body) == 0
 	c.writeCtx = cs.requestCtx
-	err := h2HeaderWriter(fr, cs.ID, false, maxFrameSize, c.hEncBuf.Bytes())
-	if err == nil && len(body) == 0 {
+	err := h2HeaderWriter(fr, cs.ID, endStreamOnHeaders, maxFrameSize, c.hEncBuf.Bytes())
+	if err == nil && len(body) == 0 && !endStreamOnHeaders {
 		err = fr.WriteData(cs.ID, true, nil)
 		cs.sentEndStream = err == nil
 	}
