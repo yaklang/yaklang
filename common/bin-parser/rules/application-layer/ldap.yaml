@@ -1,4 +1,51 @@
+endian: big
 Package:
+  LDAPMessage:
+    operator: |
+      this.ProcessSubNode("Identifier")
+      if getNodeResult("Identifier").Value != 0x30 {
+        panic("ldap: expected SEQUENCE")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l >= 0x80 {
+        panic("ldap: long-form BER length not in this rule")
+      }
+      if l > 0 {
+        this.GetSubNode("Body").SetMaxLength(l)
+        this.ProcessSubNode("Body")
+      }
+    Identifier: uint8
+    Length: uint8
+    Body:
+      operator: |
+        this.ProcessSubNode("MessageID Tag")
+        if getNodeResult("MessageID Tag").Value != 0x02 {
+          panic("ldap: expected INTEGER messageID")
+        }
+        this.ProcessSubNode("MessageID Length")
+        ml = getNodeResult("MessageID Length").Value
+        if ml > 0 {
+          this.GetSubNode("MessageID").SetMaxLength(ml)
+          this.ProcessSubNode("MessageID")
+        }
+        this.ProcessSubNode("ProtocolOp Tag")
+        tag = getNodeResult("ProtocolOp Tag").Value
+        if tag != 0x60 && tag != 0x61 && tag != 0x63 && tag != 0x64 && tag != 0x65 && tag != 0x42 && tag != 0x66 && tag != 0x67 && tag != 0x68 && tag != 0x69 && tag != 0x4a && tag != 0x6b && tag != 0x50 && tag != 0x6c && tag != 0x6d && tag != 0x6e && tag != 0x6f && tag != 0x73 && tag != 0x78 && tag != 0x79 {
+          panic("ldap: unexpected protocolOp tag")
+        }
+        this.ProcessSubNode("ProtocolOp Length")
+        pl = getNodeResult("ProtocolOp Length").Value
+        if pl > 0 {
+          this.GetSubNode("ProtocolOp").SetMaxLength(pl)
+          this.ProcessSubNode("ProtocolOp")
+        }
+      MessageID Tag: uint8
+      MessageID Length: uint8
+      MessageID: raw
+      ProtocolOp Tag: uint8
+      ProtocolOp Length: uint8
+      ProtocolOp: raw
   Message: BER
   LDAP:
     parser: |

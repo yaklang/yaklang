@@ -36,11 +36,11 @@ Package:
                 dst = getNodeResult("@TCP/Destination Port").Value
                 typeNameList = ["TLS", "HTTP", "SSH", "Redis", "MQTT", "FTP", "SMTP"]
                 if src == 22 || dst == 22 {
-                  typeNameList = ["SSH"]
+                  typeNameList = ["SSHPacket", "SSH"]
                 } else if src == 21 || dst == 21 {
-                  typeNameList = ["FTP"]
+                  typeNameList = ["FTP", "FTPCommand"]
                 } else if src == 25 || dst == 25 || src == 587 || dst == 587 {
-                  typeNameList = ["SMTP"]
+                  typeNameList = ["SMTP", "SMTPCommand"]
                 } else if src == 6379 || dst == 6379 {
                   typeNameList = ["Redis"]
                 } else if src == 1883 || dst == 1883 || src == 8883 || dst == 8883 {
@@ -71,6 +71,8 @@ Package:
                   typeNameList = ["JavaSer"]
                 } else if src == 3389 || dst == 3389 {
                   typeNameList = ["TPKT"]
+                } else if src == 389 || dst == 389 {
+                  typeNameList = ["LDAPMessage"]
                 }
                 for typeName in typeNameList{
                     res,op = this.TryProcessByType(typeName)
@@ -109,8 +111,11 @@ Option:
 TLS: "import:application-layer/tls.yaml;node:Transport Layer Security"
 HTTP: "import:application-layer/http.yaml;node:HTTP"
 SSH: "import:application-layer/ssh.yaml;node:SSH"
+SSHPacket: "import:application-layer/ssh.yaml;node:SSHPacket"
 FTP: "import:application-layer/ftp.yaml;node:FTP"
+FTPCommand: "import:application-layer/ftp.yaml;node:FTPCommand"
 SMTP: "import:application-layer/smtp.yaml;node:SMTP"
+SMTPCommand: "import:application-layer/smtp.yaml;node:SMTPCommand"
 Redis: "import:application-layer/redis.yaml;node:RESP"
 MQTT: "import:application-layer/mqtt.yaml;node:MQTT"
 SMB2: "import:application-layer/smb2.yaml;node:SMB2"
@@ -133,3 +138,4 @@ DCERPC: "import:application-layer/dcerpc.yaml;node:DCERPC"
 JavaSer: "import:application-layer/java_ser.yaml;node:JavaSer"
 SMB3Transform: "import:application-layer/smb3.yaml;node:SMB3Transform"
 TPKT: "import:application-layer/msrdp.yaml;node:TPKT"
+LDAPMessage: "import:application-layer/ldap.yaml;node:LDAPMessage"

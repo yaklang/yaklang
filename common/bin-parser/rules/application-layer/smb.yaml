@@ -23,8 +23,20 @@ Package:
         this.ProcessByType("Negotiate")
         return
       }
-      if cmd == 0x73 || cmd == 0x75 || cmd == 0xa2 || cmd == 0x2f || cmd == 0x2e {
+      if cmd == 0x73 || cmd == 0x75 || cmd == 0xa2 || cmd == 0x2f || cmd == 0x2e || cmd == 0x74 {
         this.ProcessByType("AndX")
+        return
+      }
+      if cmd == 0x04 {
+        this.ProcessByType("Close")
+        return
+      }
+      if cmd == 0x71 {
+        this.ProcessByType("TreeDisconnect")
+        return
+      }
+      if cmd == 0x25 || cmd == 0x32 {
+        this.ProcessByType("Transaction")
         return
       }
     ProtocolId: uint32
@@ -79,5 +91,86 @@ AndX:
   AndXCommand: uint8
   AndXReserved: uint8
   AndXOffset: uint16
+  ByteCount: uint16
+  Buffer: raw
+Close:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    if getNodeResult("WordCount").Value != 3 {
+      panic("smb: CLOSE WordCount must be 3")
+    }
+    this.ProcessSubNode("FID")
+    this.ProcessSubNode("LastWrite")
+    this.ProcessSubNode("ByteCount")
+  WordCount: uint8
+  FID: uint16
+  LastWrite: uint32
+  ByteCount: uint16
+TreeDisconnect:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    this.ProcessSubNode("ByteCount")
+  WordCount: uint8
+  ByteCount: uint16
+Transaction:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    wc = getNodeResult("WordCount").Value
+    if wc < 14 {
+      panic("smb: TRANSACTION WordCount < 14")
+    }
+    this.ProcessSubNode("Total Parameter Count")
+    this.ProcessSubNode("Total Data Count")
+    this.ProcessSubNode("Max Parameter Count")
+    this.ProcessSubNode("Max Data Count")
+    this.ProcessSubNode("Max Setup Count")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Timeout")
+    this.ProcessSubNode("Reserved2")
+    this.ProcessSubNode("Parameter Count")
+    this.ProcessSubNode("Parameter Offset")
+    this.ProcessSubNode("Data Count")
+    this.ProcessSubNode("Data Offset")
+    this.ProcessSubNode("Setup Count")
+    this.ProcessSubNode("Reserved3")
+    setup = getNodeResult("Setup Count").Value
+    if setup > 32 {
+      panic("smb: TRANSACTION SetupCount too large")
+    }
+    extra = wc - 14
+    if extra != setup {
+      panic("smb: TRANSACTION WordCount/SetupCount mismatch")
+    }
+    if setup > 0 {
+      this.GetSubNode("Setup").SetMaxLength(setup * 2)
+      this.ProcessSubNode("Setup")
+    }
+    this.ProcessSubNode("ByteCount")
+    bc = getNodeResult("ByteCount").Value
+    if bc > 0 {
+      if bc > 0x10000 {
+        panic("smb: TRANSACTION ByteCount too large")
+      }
+      this.GetSubNode("Buffer").SetMaxLength(bc)
+      this.ProcessSubNode("Buffer")
+    }
+  WordCount: uint8
+  Total Parameter Count: uint16
+  Total Data Count: uint16
+  Max Parameter Count: uint16
+  Max Data Count: uint16
+  Max Setup Count: uint8
+  Reserved: uint8
+  Flags: uint16
+  Timeout: uint32
+  Reserved2: uint16
+  Parameter Count: uint16
+  Parameter Offset: uint16
+  Data Count: uint16
+  Data Offset: uint16
+  Setup Count: uint8
+  Reserved3: uint8
+  Setup: raw
   ByteCount: uint16
   Buffer: raw

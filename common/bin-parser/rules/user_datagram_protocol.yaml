@@ -28,6 +28,8 @@ Package:
                 typeNameList = ["RADIUS"]
               } else if src == 443 || dst == 443 {
                 typeNameList = ["QUIC"]
+              } else if src == 389 || dst == 389 {
+                typeNameList = ["LDAPMessage"]
               }
               for typeName in typeNameList{
                   res,op = this.TryProcessByType(typeName)
@@ -54,3 +56,4 @@ NBNS: "import:application-layer/nbns.yaml;node:NBNS"
 LLMNR: "import:application-layer/nbns.yaml;node:LLMNR"
 RADIUS: "import:application-layer/radius.yaml;node:RADIUS"
 QUIC: "import:application-layer/quic.yaml;node:QUIC"
+LDAPMessage: "import:application-layer/ldap.yaml;node:LDAPMessage"

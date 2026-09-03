@@ -98,9 +98,18 @@ Package:
           this.ProcessSubNode("Alloc Hint")
           this.ProcessSubNode("Context ID")
           this.ProcessSubNode("OpNum")
+          if this.GetSubNode("Stub").GetRemainingSpace() != 0 {
+            rem = this.GetSubNode("Stub").GetRemainingSpace()
+            if rem > 0x100000 {
+              panic("dcerpc: stub too large")
+            }
+            this.GetSubNode("Stub").SetMaxLength(rem)
+            this.ProcessSubNode("Stub")
+          }
         Alloc Hint: uint32
         Context ID: uint16
         OpNum: uint16
+        Stub: raw
       Response:
         operator: |
           this.ProcessSubNode("Alloc Hint")
