@@ -24,6 +24,56 @@ func TestProtocolCatalogRuleFilesExist(t *testing.T) {
 	}
 }
 
+func TestProtocolRoadmapIntegrity(t *testing.T) {
+	seen := map[string]string{}
+	var dupes []string
+	for _, item := range ProtocolRoadmap {
+		require.NotEmpty(t, item.Name)
+		require.NotEmpty(t, item.Family)
+		require.NotEmpty(t, item.Status)
+		require.NotEmpty(t, item.Priority)
+		require.NotEmpty(t, item.Sources)
+		if prev, ok := seen[item.Name]; ok {
+			dupes = append(dupes, item.Name+" also in "+prev+" and "+item.Family)
+		}
+		seen[item.Name] = item.Family
+	}
+	require.Empty(t, dupes, "duplicate roadmap names: %v", dupes)
+
+	for _, item := range ProtocolCatalog {
+		_, ok := seen[item.Name]
+		if !ok {
+			// catalog uses a few aliases (Ethernet vs Ethernet II, MSRdp vs RDP)
+			switch item.Name {
+			case "Ethernet", "MSRdp", "IIOP":
+				continue
+			}
+			t.Errorf("catalog protocol %q missing from ProtocolRoadmap", item.Name)
+		}
+	}
+
+	total, done, partial, todo := RoadmapStats()
+	family := map[string]int{}
+	priority := map[string]int{}
+	source := map[string]int{}
+	for _, item := range ProtocolRoadmap {
+		family[item.Family]++
+		priority[item.Priority]++
+		for _, s := range item.Sources {
+			source[s]++
+		}
+	}
+	t.Logf("protocol roadmap: total=%d done=%d partial=%d todo=%d", total, done, partial, todo)
+	t.Logf("by source: %#v", source)
+	t.Logf("by priority: %#v", priority)
+	t.Logf("by family: %#v", family)
+	require.Greater(t, total, 400)
+	require.Greater(t, todo, 300)
+	require.Greater(t, done+partial, 10)
+	require.Greater(t, source[srcColasoft], 200)
+	require.Greater(t, source[srcPrivate], 150)
+}
+
 func parseRule(t *testing.T, data []byte, rule string, keys ...string) *base.NodeValue {
 	t.Helper()
 	node, err := parser.ParseBinary(bytes.NewReader(data), rule, keys...)
