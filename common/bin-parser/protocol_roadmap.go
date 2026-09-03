@@ -164,7 +164,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "NetBIOS", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
 	{Name: "NBT NS", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
 	{Name: "NBT DG", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP1},
-	{Name: "NBT SS", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
+	{Name: "NBT SS", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP0, Notes: "session message + SMB/SMB2 payload"},
 
 	// --- 名称 / 配置 ---
 	{Name: "DNS", Family: "name-config", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0},
@@ -227,10 +227,10 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "RPC", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP1},
 	{Name: "Portmap/Rpcbind", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
 	{Name: "Mount", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
-	{Name: "SMB", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
-	{Name: "SMB2", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
-	{Name: "SMB3", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP0},
-	{Name: "CIFS", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
+	{Name: "SMB", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP0, Notes: "header + NEGOTIATE"},
+	{Name: "SMB2", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP0, Notes: "header + NEGOTIATE + SESSION_SETUP"},
+	{Name: "SMB3", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP0, Notes: "uses SMB2 header; transform \xfdSMB not yet"},
+	{Name: "CIFS", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP0, Notes: "see SMB"},
 	{Name: "SMB-Direct", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "AFP", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
 	{Name: "NCP", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},

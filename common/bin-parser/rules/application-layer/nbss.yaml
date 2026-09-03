@@ -1,0 +1,41 @@
+endian: big
+Package:
+  NBSS:
+    operator: |
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ != 0x00 && typ != 0x81 && typ != 0x82 && typ != 0x83 && typ != 0x84 && typ != 0x85 {
+        panic("nbss: unexpected type")
+      }
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Length")
+      flags = getNodeResult("Flags").Value
+      length = getNodeResult("Length").Value
+      if (flags & 0x1) != 0 {
+        length = length + 0x10000
+      }
+      this.GetSubNode("Payload").SetMaxLength(length)
+      this.ProcessSubNode("Payload")
+    Type: uint8
+    Flags: uint8
+    Length: uint16
+    Payload:
+      unpack: true
+      operator: |
+        typeNameList = ["SMB2", "SMB"]
+        for typeName in typeNameList {
+          res,op = this.TryProcessByType(typeName)
+          if op.OK {
+            err = op.Save()
+            if err != nil {
+              panic(err)
+            }
+            return
+          }
+          err = op.Recovery()
+          if err != nil {
+            panic(err)
+          }
+        }
+SMB2: "import:application-layer/smb2.yaml;node:SMB2"
+SMB: "import:application-layer/smb.yaml;node:SMB"
