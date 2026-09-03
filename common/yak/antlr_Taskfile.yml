@@ -69,6 +69,28 @@ tasks:
         ../antlr4util/antlr4 -Dlanguage=Go -package phpparser ./PHPLexer.g4 ./PHPParser.g4 -o parser -no-listener -visitor
     generates:
       - parser
+  csharp:
+    dir: csharp
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        ../antlr4util/antlr4 -Dlanguage=Go -package csharpparser ./CSharpLexer.g4 ./CSharpParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
+  csharp_asp:
+    dir: csharp/asp
+    ignore_errors: true
+    silent: true
+    cmds:
+      - |
+        rm ./parser/*.tokens
+        rm ./parser/*.interp
+        ../../antlr4util/antlr4 -Dlanguage=Go -package aspparser ./ASPLexer.g4 ./ASPParser.g4 -o parser -no-listener -visitor
+    generates:
+      - parser
   go:
     dir: antlr4go
     ignore_errors: true

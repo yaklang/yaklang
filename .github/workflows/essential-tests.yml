@@ -588,7 +588,7 @@ jobs:
                 {"package": "./common/yak/ssaapi/ssaconfig", "timeout": "20s"}
               ]
 
-          - name: "Test SSA Frontend Java / JS(TS|ES) / Yak / Python / Golang / C"
+          - name: "Test SSA Frontend Java / JS(TS|ES) / Yak / Python / Golang / C / CSharp"
             compile_workers: "3"
             go_test_p: "1"
             test_configs: |
@@ -607,7 +607,8 @@ jobs:
                 {"package": "./common/yak/ssaapi/test/golang/...", "timeout": "3m"},
                 {"package": "./common/yak/c2ssa/...", "timeout": "30s"},
                 {"package": "./common/yak/antlr4c/...", "timeout": "30s"},
-                {"package": "./common/yak/ssaapi/test/c/...", "timeout": "2m"}
+                {"package": "./common/yak/ssaapi/test/c/...", "timeout": "2m"},
+                {"package": "./common/yak/csharp/...", "timeout": "4m"}
               ]
 
           - name: "Test SSA / SSAAPI Core / SyntaxFlow / StaticAnalyze / SFDB / SFVM"
