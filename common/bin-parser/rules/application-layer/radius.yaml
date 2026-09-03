@@ -26,17 +26,31 @@ Package:
     Length: uint16
     Authenticator: raw,16
     Attributes:
+      list: true
+      Attribute: RADIUSAttribute
       operator: |
-        this.ProcessSubNode("Type")
-        this.ProcessSubNode("Length")
-        al = getNodeResult("Length").Value
-        if al < 2 {
-          panic("radius: attribute length smaller than 2")
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          ele.Process()
         }
-        if al > 2 {
-          this.GetSubNode("Value").SetMaxLength(al - 2)
-          this.ProcessSubNode("Value")
-        }
-      Type: uint8
-      Length: uint8
-      Value: raw
+RADIUSAttribute:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    al = getNodeResult("Length").Value
+    if al < 2 {
+      panic("radius: attribute length smaller than 2")
+    }
+    if al > 2 {
+      this.GetSubNode("Value").SetMaxLength(al - 2)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint8
+  Length: uint8
+  Value: raw

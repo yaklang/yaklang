@@ -70,14 +70,25 @@ Package:
     R: uint8,1bit
     Stream Identifier: uint32,31bit
     Settings:
+      list: true
+      Setting: HTTP2Setting
       operator: |
-        this.ProcessSubNode("Identifier")
-        this.ProcessSubNode("Value")
-      Identifier: uint16
-      Value: uint32
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          ele.Process()
+        }
     Ping: raw,8
     Last Stream ID: uint32
     Error Code: uint32
     Debug Data: raw
     Window Size Increment: uint32
     Payload: raw
+HTTP2Setting:
+  Identifier: uint16
+  Value: uint32

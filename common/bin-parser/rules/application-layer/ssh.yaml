@@ -34,6 +34,13 @@ Package:
     Payload:
       operator: |
         this.ProcessSubNode("Message Number")
+        if this.GetMaxLength() != 0 && this.Length() < this.GetMaxLength() {
+          rem = this.GetMaxLength() - this.Length()
+          if rem > 0 && rem < 0x100000 {
+            this.GetSubNode("Data").SetMaxLength(rem)
+            this.ProcessSubNode("Data")
+          }
+        }
       Message Number: uint8
       Data: raw
     Padding: raw
