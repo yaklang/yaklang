@@ -53,6 +53,14 @@ Package:
           this.ProcessSubNode("Capability High")
           this.ProcessSubNode("Auth Plugin Data Len")
           this.ProcessSubNode("Reserved")
+          n = getNodeResult("Auth Plugin Data Len").Value
+          if n > 8 {
+            this.GetSubNode("Auth Plugin Data 2").SetMaxLength(n - 8)
+            this.ProcessSubNode("Auth Plugin Data 2")
+          }
+          if this.GetMaxLength() != 0 && this.Length() < this.GetMaxLength() {
+            this.ProcessSubNode("Auth Plugin Name")
+          }
         Server Version: "del:\0;type:string"
         Connection ID: uint32
         Auth Plugin Data 1: raw,8
@@ -63,6 +71,8 @@ Package:
         Capability High: uint16
         Auth Plugin Data Len: uint8
         Reserved: raw,10
+        Auth Plugin Data 2: raw
+        Auth Plugin Name: "del:\0;type:string"
       OK:
         Rest: raw
       ERR:

@@ -189,11 +189,11 @@ var ProtocolRoadmap = []RoadmapItem{
 
 	// --- Web / TLS ---
 	{Name: "HTTP", Family: "web", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "request/response + CONNECT + WPAD"},
-	{Name: "HTTP/2", Family: "web", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "preface + DATA/SETTINGS/PING/GOAWAY/WINDOW_UPDATE"},
+	{Name: "HTTP/2", Family: "web", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "preface + DATA/SETTINGS list/PING/GOAWAY/WINDOW_UPDATE"},
 	{Name: "HTTP/3", Family: "web", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
 	{Name: "WebSocket", Family: "web", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "RFC 6455 frame"},
 	{Name: "SPDY", Family: "web", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
-	{Name: "TLS", Family: "web", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "record 20-24 + ClientHello; app-data Payload"},
+	{Name: "TLS", Family: "web", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "record 20-24 + ClientHello extensions; app-data Payload"},
 	{Name: "SSL", Family: "web", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP1},
 	{Name: "DTLS", Family: "web", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
 	{Name: "JA3/JA4", Family: "web", Sources: src(srcPrivate), Status: stDone, Priority: priP0, Notes: "ClientHello cipher suites"},
@@ -248,7 +248,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "NTLMSSP", Family: "auth", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "type 1/2/3 fields + SMB2/SPNEGO hook"},
 	{Name: "SPNEGO", Family: "auth", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "GSS-API 0x60 + OID + NegToken"},
 	{Name: "GSS-API", Family: "auth", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
-	{Name: "RADIUS", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "RFC 2865 header + attributes blob"},
+	{Name: "RADIUS", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "RFC 2865 header + attribute list"},
 	{Name: "TACACS+", Family: "auth", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
 	{Name: "Diameter", Family: "auth", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "OAuth/OIDC wire", Family: "auth", Sources: src(srcPrivate), Status: stTodo, Priority: priP2},
@@ -277,7 +277,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "PsExec/SMB-svcctl", Family: "remote", Sources: src(srcPrivate), Status: stDone, Priority: priP0, Notes: "SVCCTL OpenSCManagerW opnum 15"},
 
 	// --- 数据库 ---
-	{Name: "MySQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "HandshakeV10/OK/ERR/EOF/COM_QUERY"},
+	{Name: "MySQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "HandshakeV10 plugin data/name + OK/ERR/EOF/COM_QUERY"},
 	{Name: "MariaDB", Family: "database", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
 	{Name: "PostgreSQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "startup/SSL/query/auth/error/ready"},
 	{Name: "MSSQL TDS", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "header + PRELOGIN tokens/LOGIN7/BATCH"},
@@ -300,7 +300,7 @@ var ProtocolRoadmap = []RoadmapItem{
 
 	// --- 消息队列 / RPC ---
 	{Name: "AMQP", Family: "mq-rpc", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
-	{Name: "MQTT", Family: "mq-rpc", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "CONNECT/CONNACK/PUBLISH/SUBSCRIBE/PING"},
+	{Name: "MQTT", Family: "mq-rpc", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "CONNECT/CONNACK/PUBLISH/SUBSCRIBE + 1/2-byte remaining length"},
 	{Name: "MQTT-SN", Family: "mq-rpc", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "Kafka", Family: "mq-rpc", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
 	{Name: "RocketMQ", Family: "mq-rpc", Sources: src(srcPrivate), Status: stTodo, Priority: priP3},

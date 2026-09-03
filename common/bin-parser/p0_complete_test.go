@@ -131,8 +131,13 @@ func TestHTTP2SettingsPingGoaway(t *testing.T) {
 	binary.BigEndian.PutUint32(st[17:], 0)
 	n := parseRule(t, st, "application-layer.http2", "HTTP2")
 	require.Equal(t, uint64(4), uintVal(t, n.Child("Type")))
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Settings", "Identifier")))
-	require.Equal(t, uint64(4096), uintVal(t, mustChild(t, n, "Settings", "Value")))
+	settings := n.Child("Settings")
+	require.True(t, settings.IsList())
+	require.Len(t, settings.Children(), 2)
+	require.Equal(t, uint64(1), uintVal(t, settings.Children()[0].Child("Identifier")))
+	require.Equal(t, uint64(4096), uintVal(t, settings.Children()[0].Child("Value")))
+	require.Equal(t, uint64(2), uintVal(t, settings.Children()[1].Child("Identifier")))
+	require.Equal(t, uint64(0), uintVal(t, settings.Children()[1].Child("Value")))
 
 	ping := make([]byte, 9+8)
 	ping[2] = 8

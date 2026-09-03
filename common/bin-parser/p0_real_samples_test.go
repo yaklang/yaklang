@@ -50,17 +50,32 @@ func TestRADIUSAccessRequestFromCapture(t *testing.T) {
 	r := mustChild(t, eth, "IP", "UDP", "RADIUS")
 	require.Equal(t, uint64(1), uintVal(t, r.Child("Code")))
 	require.Equal(t, uint64(0x8d), uintVal(t, r.Child("Identifier")))
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, r, "Attributes", "Type")))
-	require.Equal(t, []byte("Admin"), bytesVal(t, mustChild(t, r, "Attributes", "Value")))
+	attrs := r.Child("Attributes")
+	require.True(t, attrs.IsList())
+	require.Len(t, attrs.Children(), 5)
+	require.Equal(t, uint64(1), uintVal(t, attrs.Children()[0].Child("Type")))
+	require.Equal(t, []byte("Admin"), bytesVal(t, attrs.Children()[0].Child("Value")))
+	require.Equal(t, uint64(2), uintVal(t, attrs.Children()[1].Child("Type"))) // User-Password
+	require.Equal(t, uint64(4), uintVal(t, attrs.Children()[2].Child("Type"))) // NAS-IP-Address
+	require.Equal(t, []byte{0x7f, 0x00, 0x01, 0x01}, bytesVal(t, attrs.Children()[2].Child("Value")))
+	require.Equal(t, uint64(5), uintVal(t, attrs.Children()[3].Child("Type"))) // NAS-Port
+	require.Equal(t, uint64(80), uintVal(t, attrs.Children()[4].Child("Type"))) // Message-Authenticator
 }
 
 func TestTLSClientHelloFromCapture(t *testing.T) {
 	eth := parseEthernet(t, tlsClientHelloFrame)
 	rec := mustChild(t, eth, "IP", "TCP", "TLS", "Record Layer")
 	require.Equal(t, uint64(22), uintVal(t, rec.Child("ContentType")))
-	suites := bytesVal(t, mustChild(t, rec, "TLSClientHello", "ClientHello", "Cipher Suites"))
+	ch := mustChild(t, rec, "TLSClientHello", "ClientHello")
+	suites := bytesVal(t, ch.Child("Cipher Suites"))
 	require.True(t, len(suites) >= 4)
 	require.Equal(t, []byte{0xc0, 0x14}, suites[:2])
+	exts := ch.Child("Extensions")
+	require.True(t, exts.IsList())
+	require.GreaterOrEqual(t, len(exts.Children()), 1)
+	// Handshake length 0xcd stops before the trailing SNI; first extension is
+	// ec_point_formats (type 0x000b) from the scapy-ssl_tls capture.
+	require.Equal(t, uint64(0x000b), uintVal(t, exts.Children()[0].Child("Type")))
 }
 
 func TestSNMPRFC1157GetRequestOID(t *testing.T) {
@@ -86,4 +101,90 @@ func TestRDPTPKTFromProtocolImplCapture(t *testing.T) {
 	n := parseRule(t, raw, "application-layer.msrdp", "TPKT")
 	require.Equal(t, uint64(3), uintVal(t, n.Child("Version")))
 	require.Equal(t, raw[4:], bytesVal(t, n.Child("TPDU")))
+}
+
+// Ethernet+IPv4+UDP+RADIUS Access-Accept from gopacket layers/radius_test.go
+// (second packet of Wireshark radtest.pcap).
+var radiusAccessAcceptFrame = []byte{
+	0x02, 0x42, 0x06, 0x4d, 0xad, 0xbf, 0x02, 0x42, 0xac, 0x14, 0x00, 0x02, 0x08, 0x00, 0x45, 0x00,
+	0x00, 0x30, 0xee, 0xfd, 0x00, 0x00, 0x40, 0x11, 0x33, 0x94, 0xac, 0x14, 0x00, 0x02, 0xac, 0x14,
+	0x00, 0x01, 0x07, 0x14, 0xd8, 0x29, 0x00, 0x1c, 0x58, 0x59, 0x02, 0x8d, 0x00, 0x14, 0x86, 0xa8,
+	0xd5, 0xcd, 0x69, 0x3c, 0x07, 0x5e, 0x9e, 0x18, 0xa2, 0x2d, 0xdd, 0x5f, 0x2b, 0xff,
+}
+
+func TestRADIUSAccessAcceptFromCapture(t *testing.T) {
+	eth := parseEthernet(t, radiusAccessAcceptFrame)
+	r := mustChild(t, eth, "IP", "UDP", "RADIUS")
+	require.Equal(t, uint64(2), uintVal(t, r.Child("Code")))
+	require.Equal(t, uint64(0x8d), uintVal(t, r.Child("Identifier")))
+	require.Equal(t, uint64(0x14), uintVal(t, r.Child("Length")))
+	if attrs := r.Child("Attributes"); attrs != nil {
+		require.Len(t, attrs.Children(), 0)
+	}
+}
+
+func TestDNSQueryFromExistingEthernetFixture(t *testing.T) {
+	// Ethernet DNS A query for copilot-telemetry.githubusercontent.com from parse_test.go.
+	raw, err := codec.DecodeHex("3066d026811bf84d8991af52080045000055edc10000401134dec0a80316771d1d1dfa0d003500417b4514520100000100000000000011636f70696c6f742d74656c656d657472791167697468756275736572636f6e74656e7403636f6d0000010001")
+	require.NoError(t, err)
+	eth := parseEthernet(t, raw)
+	dns := mustChild(t, eth, "IP", "UDP", "DNS")
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, dns, "Header", "Questions")))
+}
+
+func TestSOCKS5ConnectGoogleFromFixture(t *testing.T) {
+	// SOCKS5 CONNECT www.google.com:80 from parse_test.go.
+	raw, err := codec.DecodeHex("050100030e7777772e676f6f676c652e636f6d0050")
+	require.NoError(t, err)
+	n := parseRule(t, raw, "application-layer.socks5", "Request")
+	require.Equal(t, uint64(5), uintVal(t, n.Child("Version")))
+	require.Equal(t, uint64(1), uintVal(t, n.Child("Command")))
+	require.Equal(t, uint64(3), uintVal(t, n.Child("AddressType")))
+	require.Equal(t, "www.google.com", strVal(t, mustChild(t, n, "DstAddress", "Domain", "DomainName")))
+	require.Equal(t, uint64(80), uintVal(t, n.Child("DstPort")))
+}
+
+func TestWebSocketRFC6455UnmaskedHello(t *testing.T) {
+	// RFC 6455 §5.7 unmasked "Hello" text frame.
+	raw := []byte{0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f}
+	w := parseRule(t, raw, "application-layer.websocket", "WebSocket")
+	require.Equal(t, uint64(1), uintVal(t, w.Child("FIN")))
+	require.Equal(t, uint64(1), uintVal(t, w.Child("Opcode")))
+	require.Equal(t, []byte("Hello"), bytesVal(t, w.Child("Payload")))
+}
+
+func TestHTTP2RFC9113SettingsTwoParams(t *testing.T) {
+	// RFC 9113 SETTINGS frame: HEADER_TABLE_SIZE=4096, ENABLE_PUSH=0.
+	st := []byte{
+		0x00, 0x00, 0x0c, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x01, 0x00, 0x00, 0x10, 0x00,
+		0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+	}
+	n := parseRule(t, st, "application-layer.http2", "HTTP2")
+	settings := n.Child("Settings")
+	require.True(t, settings.IsList())
+	require.Len(t, settings.Children(), 2)
+	require.Equal(t, uint64(1), uintVal(t, settings.Children()[0].Child("Identifier")))
+	require.Equal(t, uint64(4096), uintVal(t, settings.Children()[0].Child("Value")))
+	require.Equal(t, uint64(2), uintVal(t, settings.Children()[1].Child("Identifier")))
+	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, st))
+	wired := mustChild(t, eth, "IP", "TCP", "HTTP2", "Settings")
+	require.True(t, wired.IsList())
+	require.Len(t, wired.Children(), 2)
+}
+
+func TestMQTTConnectTwoByteRemainingLength(t *testing.T) {
+	// MQTT 3.1.1 CONNECT with remaining length 128 (encoded 0x80 0x01).
+	id := make([]byte, 116)
+	for i := range id {
+		id[i] = 'a'
+	}
+	payload := []byte{0x00, 0x04, 'M', 'Q', 'T', 'T', 0x04, 0x02, 0x00, 0x3c, 0x00, byte(len(id))}
+	payload = append(payload, id...)
+	require.Equal(t, 128, len(payload))
+	raw := append([]byte{0x10, 0x80, 0x01}, payload...)
+	mqtt := parseRule(t, raw, "application-layer.mqtt", "MQTT")
+	require.Equal(t, uint64(1), uintVal(t, mqtt.Child("Packet Type")))
+	require.Equal(t, "MQTT", strVal(t, mustChild(t, mqtt, "Payload", "Connect", "Protocol Name")))
+	require.Equal(t, string(id), strVal(t, mustChild(t, mqtt, "Payload", "Connect", "Client ID")))
 }
