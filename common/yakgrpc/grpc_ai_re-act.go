@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/browsertools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -67,6 +68,14 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 		return utils.Error("AI ReAct session runtime is not configured")
 	}
 	extraOptions := append([]aicommon.ConfigOption{}, additionalOptions...)
+	if startParams.GetSource() == "ai" && s.browserBridge != nil {
+		browserTools, toolErr := browsertools.BuildDynamicCapabilityTools(serverBrowserExtensionBridge{server: s})
+		if toolErr != nil {
+			log.Warnf("build AI Agent browser capability tools failed: %v", toolErr)
+		} else {
+			extraOptions = append(extraOptions, aicommon.WithTools(browserTools...))
+		}
+	}
 	if forgeName := strings.TrimSpace(startParams.GetForgeName()); forgeName != "" {
 		preparation, handled, prepareErr := s.prepareRuntimeForgeReAct(
 			forgeName,

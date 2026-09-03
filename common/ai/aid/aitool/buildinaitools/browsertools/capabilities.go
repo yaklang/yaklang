@@ -21,6 +21,9 @@ func browserCapabilityCatalog(
 	query = strings.ToLower(strings.TrimSpace(query))
 	result := make([]browser.ExtensionBridgeCapabilityDescriptor, 0, len(catalog.Capabilities))
 	for _, descriptor := range catalog.Capabilities {
+		if descriptor.Method == "browser.thumbnail" {
+			continue
+		}
 		if domain != "" && domain != "all" && descriptor.Domain != domain {
 			continue
 		}
@@ -55,6 +58,9 @@ func browserCapabilityDescriptors(
 		}
 		if _, duplicate := descriptors[method]; duplicate {
 			return nil, nil, fmt.Errorf("browser extension capability catalog contains duplicate method %q", method)
+		}
+		if method == "browser.thumbnail" {
+			continue
 		}
 		descriptors[method] = descriptor
 		methods = append(methods, method)
@@ -153,7 +159,7 @@ func RegisterCapabilityTools(
 				"schemaVersion": catalog.Version,
 				"schemaHash":    catalog.Hash,
 				"schemaDialect": catalog.SchemaDialect,
-				"reviewPolicy":  "Each capability.call enters the current AI session's manual, ai, or yolo Review flow and remains constrained by the extension grant scope",
+				"reviewPolicy":  "Pairing grants instance-level access to HTTP(S) tabs. Each capability.call enters the current AI session's manual, ai, or yolo Review flow and remains constrained by browser and enterprise policy.",
 				"capabilities": browserCapabilityCatalog(
 					catalog,
 					params.GetString("domain"),
@@ -167,8 +173,8 @@ func RegisterCapabilityTools(
 
 	return factory.RegisterTool(
 		"browser.capability.call",
-		aitool.WithDescription("Call any capability declared by the connected browser extension. Parameters are checked against that extension version's signed schema before dispatch. The extension grant, target, origin, document, and scope remain the final authority."),
-		aitool.WithUsage("Use browser.capability.catalog first and construct params from the selected descriptor's paramsSchema. This tool can inspect or create browser identity-isolation contexts, interact with pages, read authorized Cookie or context data, capture traffic, control recording and Deep Capture, run invoke or eval, manage callables and Profiles, or switch proxies."),
+		aitool.WithDescription("Call any Agent-facing capability declared by the connected browser extension. Parameters are checked against that extension version's signed schema before dispatch. The paired instance, target, browser restrictions, enterprise policy, and AI review policy remain authoritative."),
+		aitool.WithUsage("Use browser.capability.catalog first and construct params from the selected descriptor's paramsSchema. This tool can open or inspect tabs, create browser identity-isolation contexts, interact with pages, read Cookie or context data, capture traffic, control recording and Deep Capture, run invoke or eval, manage callables and Profiles, or switch proxies."),
 		aitool.WithKeywords([]string{"browser", "identity isolation", "page interaction", "network", "debugging", "eval", "proxy", "浏览器", "身份隔离", "页面操作", "网络", "调试", "代理"}),
 		aitool.WithStringParam(
 			"method",
