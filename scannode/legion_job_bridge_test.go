@@ -30,6 +30,19 @@ func TestValidateDispatchCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "valid resource request",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.ResourceRequest = &jobv1.ResourceRequest{CpuMillicores: 1000, MemoryBytes: 2 << 30}
+			},
+		},
+		{
+			name: "partial resource request",
+			mutate: func(command *jobv1.DispatchJobCommand) {
+				command.ResourceRequest = &jobv1.ResourceRequest{CpuMillicores: 1000}
+			},
+			wantErr: "dispatch resource_request requires positive cpu_millicores and memory_bytes",
+		},
+		{
 			name: "missing metadata",
 			mutate: func(command *jobv1.DispatchJobCommand) {
 				command.Metadata = nil

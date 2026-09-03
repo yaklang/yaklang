@@ -25,11 +25,6 @@ import (
 	"github.com/yaklang/yaklang/scannode"
 )
 
-const (
-	defaultRuntimeHostSystemReservedCPUMillicores = 500
-	defaultRuntimeHostSystemReservedMemoryBytes   = 512 * 1024 * 1024
-)
-
 type staticHostIdentityProvider struct {
 	identity node.HostIdentity
 }
@@ -75,13 +70,13 @@ func runNode(args []string) error {
 	runtimeNetwork := flags.String("runtime-network", environmentValue("LEGION_RUNTIME_NETWORK", "bridge"), "Fixed local Docker network for AI session containers")
 	runtimeSystemReservedCPU := flags.Uint64(
 		"runtime-system-reserved-cpu-millicores",
-		defaultRuntimeHostSystemReservedCPUMillicores,
-		"CPU reserved for the host OS, Docker and Yaklang Node before Runtime scheduling",
+		scannode.DefaultHostSystemReservedCPUMillicores,
+		"CPU reserved for the host OS, Docker and Yaklang Node before scan/Runtime scheduling",
 	)
 	runtimeSystemReservedMemory := flags.Uint64(
 		"runtime-system-reserved-memory-bytes",
-		defaultRuntimeHostSystemReservedMemoryBytes,
-		"Memory reserved for the host OS, Docker and Yaklang Node before Runtime scheduling",
+		scannode.DefaultHostSystemReservedMemoryBytes,
+		"Memory reserved for the host OS, Docker and Yaklang Node before scan/Runtime scheduling",
 	)
 	baseDir := flags.String("base-dir", "", "Node local state base directory")
 	ruleSnapshotCacheDir := flags.String(
@@ -199,9 +194,9 @@ func runNode(args []string) error {
 	scanNodeOptions := []scannode.ScanNodeOption{
 		scannode.WithRuleSnapshotCacheDir(*ruleSnapshotCacheDir),
 	}
-	if *runtimeHost && strings.TrimSpace(*kind) != "ai_session" {
+	if strings.TrimSpace(*kind) != "ai_session" {
 		scanNodeOptions = append(scanNodeOptions, scannode.WithRuntimeHost(scannode.RuntimeHostConfig{
-			Enabled: true, PlatformAPIBaseURL: *apiURL, RuntimePlatformAPIBaseURL: *runtimeAPIURL, EnrollmentToken: *enrollmentToken,
+			Enabled: *runtimeHost, PlatformAPIBaseURL: *apiURL, RuntimePlatformAPIBaseURL: *runtimeAPIURL, EnrollmentToken: *enrollmentToken,
 			AgentInstallationID: *agentInstallationID, Network: *runtimeNetwork,
 			EngineReleaseID: *engineReleaseID, EngineDigest: *engineDigest,
 			SystemReservedCPUMillicores: *runtimeSystemReservedCPU,
