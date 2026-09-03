@@ -65,6 +65,12 @@ type http2ClientConn struct {
 	activeStreams int
 	streamsCond   *sync.Cond // based on mu
 
+	// http2Profile, when set, makes this connection write Chrome-like framing
+	// (SETTINGS, connection WINDOW_UPDATE, pseudo-header order, HEADERS
+	// priority and END_STREAM placement). nil means the default framing, which
+	// stays compatible with non-conforming servers.
+	http2Profile *http2Profile
+
 	maxFrameSize      uint32
 	initialWindowSize uint32
 	maxStreamsCount   uint32
@@ -312,21 +318,27 @@ func (h2Conn *http2ClientConn) preface() error {
 	if err != nil {
 		return utils.Wrapf(err, "write h2 preface failed")
 	}
-	h2Conn.frWriteMutex.Lock()
-	err = h2Conn.fr.WriteSettings([]http2.Setting{
+	settings := []http2.Setting{
 		{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
 		{ID: http2.SettingMaxFrameSize, Val: defaultMaxFrameSize},
 		{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
 		{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
-	}...)
-	if err != nil {
-		h2Conn.frWriteMutex.Unlock()
-		return utils.Wrapf(err, "write h2 setting failed")
 	}
 	// Increase connection-level flow control window from default 65535 to our desired size.
 	// RFC 7540 Section 6.9.2: SETTINGS only affects stream-level windows.
 	// Connection window must be increased via WINDOW_UPDATE.
-	connWindowIncrease := defaultStreamReceiveWindowSize - 65535
+	connWindowIncrease := int64(defaultStreamReceiveWindowSize) - 65535
+	if profile := h2Conn.http2Profile; profile != nil {
+		settings = profile.settings
+		connWindowIncrease = int64(profile.connWindowUpdate)
+	}
+
+	h2Conn.frWriteMutex.Lock()
+	err = h2Conn.fr.WriteSettings(settings...)
+	if err != nil {
+		h2Conn.frWriteMutex.Unlock()
+		return utils.Wrapf(err, "write h2 setting failed")
+	}
 	if connWindowIncrease > 0 {
 		err = h2Conn.fr.WriteWindowUpdate(0, uint32(connWindowIncrease))
 	}
@@ -691,6 +703,10 @@ func (cs *http2ClientStream) doRequest() error {
 			}
 		}
 	})
+	profile := cs.h2Conn.http2Profile
+	if profile != nil {
+		requestHeaders = profile.reorderPseudoHeaders(requestHeaders)
+	}
 	for _, h := range requestHeaders {
 		hPackEnc.WriteField(h)
 	}
@@ -705,13 +721,20 @@ func (cs *http2ClientStream) doRequest() error {
 			hdrs = hdrs[len(chunk):]
 			endHeaders := len(hdrs) == 0
 			if first {
-				//endStream = endStream && endHeaders
-				err := frame.WriteHeaders(http2.HeadersFrameParam{ // some server not accept endStream flag in headers frame
+				// Default framing omits END_STREAM here: some servers do not
+				// accept it on HEADERS. A profile opts back into it, and RFC
+				// 7540 6.2 keeps the flag on HEADERS even when CONTINUATION
+				// frames follow.
+				param := http2.HeadersFrameParam{
 					StreamID:      streamID,
 					BlockFragment: chunk,
-					//EndStream:     endStream,
-					EndHeaders: endHeaders,
-				})
+					EndStream:     endStream,
+					EndHeaders:    endHeaders,
+				}
+				if profile != nil && !profile.headersPriority.IsZero() {
+					param.Priority = profile.headersPriority
+				}
+				err := frame.WriteHeaders(param)
 				first = false
 				if err != nil {
 					return err
@@ -753,7 +776,8 @@ func (cs *http2ClientStream) doRequest() error {
 		cs.h2Conn.full = true
 	}
 	// activeStreams was already incremented in newStream when the slot was reserved.
-	err := h2HeaderWriter(fr, cs.ID, false, maxFrameSize, hPackBuf.Bytes())
+	endStreamOnHeaders := profile != nil && profile.endStreamOnHeaders && len(body) == 0
+	err := h2HeaderWriter(fr, cs.ID, endStreamOnHeaders, maxFrameSize, hPackBuf.Bytes())
 	cs.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
 		// Check if error is due to closed connection, which should trigger retry
@@ -784,7 +808,7 @@ func (cs *http2ClientStream) doRequest() error {
 				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
 			}
 		}
-	} else {
+	} else if !endStreamOnHeaders {
 		//if !cs.sentEndStream {
 		cs.h2Conn.frWriteMutex.Lock()
 		dataFrameErr := fr.WriteData(cs.ID, true, []byte{})

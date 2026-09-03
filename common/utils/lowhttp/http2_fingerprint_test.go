@@ -127,7 +127,7 @@ func writeH2FingerprintResponse(framer *http2.Framer, streamID uint32) {
 	})
 }
 
-func requestH2Fingerprint(t *testing.T, tlsFingerprint bool) *h2ClientProfile {
+func requestH2Fingerprint(t *testing.T, tlsFingerprint bool, extra ...LowhttpOpt) *h2ClientProfile {
 	t.Helper()
 	address, profileChannel := serveH2Fingerprint(t)
 	host, port, err := net.SplitHostPort(address)
@@ -146,6 +146,7 @@ func requestH2Fingerprint(t *testing.T, tlsFingerprint bool) *h2ClientProfile {
 	if tlsFingerprint {
 		options = append(options, WithTLSFingerprint("chrome-151"))
 	}
+	options = append(options, extra...)
 	go func() {
 		_, _ = HTTPWithoutRedirect(options...)
 	}()
@@ -186,12 +187,11 @@ func TestDefaultH2CompatibilityBehavior(t *testing.T) {
 	}
 }
 
-func TestChromeH2FingerprintTODO(t *testing.T) {
-	// TODO(H2): Enable only after Chrome H2 framing is compatible with the
-	// non-conforming servers supported by the existing lowhttp implementation.
-	t.Skip("TODO(H2): Chrome SETTINGS, pseudo-header order, priority, and END_STREAM behavior are intentionally not enabled")
-
-	profile := requestH2Fingerprint(t, true)
+func TestChromeH2Fingerprint(t *testing.T) {
+	// Chrome framing is opt-in via WithHTTP2Fingerprint, so servers that reject
+	// browser-style HEADERS keep the default framing untouched. See
+	// TestDefaultH2CompatibilityBehavior for that guarantee.
+	profile := requestH2Fingerprint(t, true, WithHTTP2Fingerprint(HTTP2FingerprintChrome151))
 	if got := profile.akamai(); got != chromeAkamaiFingerprint {
 		t.Fatalf("Akamai fingerprint mismatch\n want %s\n  got %s", chromeAkamaiFingerprint, got)
 	}
@@ -200,5 +200,27 @@ func TestChromeH2FingerprintTODO(t *testing.T) {
 	}
 	if !profile.headersPriority.Exclusive || profile.headersPriority.StreamDep != 0 || profile.headersPriority.Weight != 255 {
 		t.Errorf("HEADERS priority = %+v", profile.headersPriority)
+	}
+}
+
+func TestHTTP2FingerprintIsolatesConnectionPool(t *testing.T) {
+	base := &connectKey{scheme: "https", addr: "example.com:443", https: true}
+	withProfile := *base
+	withProfile.http2Fingerprint = HTTP2FingerprintChrome151
+
+	if base.hash() == withProfile.hash() {
+		t.Fatal("connectKey.hash() ignores http2Fingerprint: connections with different HTTP/2 framing would be reused for each other")
+	}
+}
+
+func TestUnknownHTTP2FingerprintIsRejected(t *testing.T) {
+	if err := ValidateHTTP2Profile(""); err != nil {
+		t.Errorf("empty profile name must mean default framing, got %v", err)
+	}
+	if err := ValidateHTTP2Profile(HTTP2FingerprintChrome151); err != nil {
+		t.Errorf("built-in profile must validate, got %v", err)
+	}
+	if err := ValidateHTTP2Profile("chrome-999"); err == nil {
+		t.Error("unknown profile name must be rejected")
 	}
 }

@@ -98,6 +98,20 @@ func MITM_TLSFingerprint(name string) MITMConfig {
 	}
 }
 
+// MITM_HTTP2Fingerprint selects the HTTP/2 framing fingerprint used for
+// ordinary upstream h2 connections. It defaults to empty, which keeps the
+// framing that tolerates servers rejecting browser-style HEADERS; enabling a
+// profile is an explicit opt-in and is independent of MITM_TLSFingerprint.
+func MITM_HTTP2Fingerprint(name string) MITMConfig {
+	return func(server *MITMServer) error {
+		if err := lowhttp.ValidateHTTP2Profile(name); err != nil {
+			return err
+		}
+		server.http2Fingerprint = name
+		return nil
+	}
+}
+
 // MITM_SetSNI 设置 SNI (Server Name Indication) 配置
 // 支持三种模式：
 // 1. 自动模式（默认）：不调用此函数，或 overwrite=false
