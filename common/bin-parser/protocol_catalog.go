@@ -58,4 +58,5 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "SMB2", Layer: "L7", RuleFile: "application-layer/smb2.yaml", Status: statusNew, Notes: "header + NEGOTIATE + SESSION_SETUP", SampleFrom: "[MS-SMB2] 2.2.1/2.2.3/2.2.4/2.2.5"},
 	{Name: "SMB", Layer: "L7", RuleFile: "application-layer/smb.yaml", Status: statusNew, Notes: "header + NEGOTIATE dialects", SampleFrom: "[MS-CIFS] 2.2.3.1/2.2.4.52"},
 	{Name: "NBT SS", Layer: "L4", RuleFile: "application-layer/nbss.yaml", Status: statusNew, Notes: "session message wrapping SMB/SMB2", SampleFrom: "RFC 1002"},
+	{Name: "MySQL", Layer: "L7", RuleFile: "application-layer/mysql.yaml", Status: statusNew, Notes: "packet header + HandshakeV10/OK/ERR/COM", SampleFrom: "MySQL HandshakeV10 internals doc"},
 }
