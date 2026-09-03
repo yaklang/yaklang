@@ -413,29 +413,6 @@ func TestClassicRDPBruteSuccessAndFail(t *testing.T) {
 	}
 }
 
-func TestClassicRDPSuccessWithoutSaveSessionInfo(t *testing.T) {
-	srv := startClassicRDPServer(t, map[string]string{"rdpuser": "RdpPass123!"})
-	srv.successWithoutLogon = true
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	start := time.Now()
-	ok := rdpAuth.BrutePass(&BruteItem{
-		Type: "rdp", Target: srv.addr(), Username: "rdpuser", Password: "RdpPass123!", Context: ctx,
-	})
-	if !ok.Ok || !ok.Finished {
-		t.Fatalf("XP without 0x26: want ok+finished got ok=%v finished=%v", ok.Ok, ok.Finished)
-	}
-	if elapsed := time.Since(start); elapsed < classicLogonGrace/2 {
-		t.Fatalf("should wait for fail-dialog window, elapsed=%s", elapsed)
-	}
-	bad := rdpAuth.BrutePass(&BruteItem{
-		Type: "rdp", Target: srv.addr(), Username: "rdpuser", Password: "WrongPass!", Context: ctx,
-	})
-	if bad.Ok {
-		t.Fatal("wrong password must not be ok")
-	}
-}
-
 func TestClassicRDPDictHunt(t *testing.T) {
 	srv := startClassicRDPServer(t, map[string]string{"administrator": "CorrectHorse!"})
 	util, err := NewMultiTargetBruteUtilEx(

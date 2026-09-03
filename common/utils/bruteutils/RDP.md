@@ -46,7 +46,7 @@ Synchronize / Cooperate / Granted / FontMap → 仅正确密码发 0x26。
 | Win7 `127.0.0.1:13390` `rdpuser` / `RdpPass123!` | NLA CredSSP | **通过** Ok+Finished ~0.2–1.5s | **通过** TLS `access denied`，非 Ok，不 Finished ~100ms |
 | Win11 `127.0.0.1:13389` `rdpuser` / `RdpPass123!` | NLA CredSSP | **通过** Ok+Finished ~0.3–1.3s | **通过** `STATUS_LOGON_FAILURE`，非 Ok，不 Finished ~200ms |
 | xrdp SSL 容器 | PROTOCOL_SSL | 正确账密可达会话 | 错密码无协议级失败信号（已知限制，见 `rdp_real_test.go`） |
-| XP SP3 x86 KVM `192.168.3.218:13391` `rdpuser` / `RdpPass123!` | PROTOCOL_RDP 5.1 RC4 | **通过** Ok+Finished ~2s（FontMap 后无失败对话框）。原始 PDU 扫过：没有 `17 00 … 26` 的 SAVE_SESSION_INFO。 | **通过** ~0.5s `rdp logon failed: xp logon dialog`，不 Finished |
+| XP SP3 x86 KVM `192.168.3.218:13391` `rdpuser` / `RdpPass123!` | PROTOCOL_RDP 5.1 RC4 | **通过** Ok+Finished ~1s（FontMap 后无失败对话框）。原始 PDU 扫过：没有 `17 00 … 26` 的 SAVE_SESSION_INFO。 | **通过** ~0.5s `rdp logon failed: xp logon dialog`，不 Finished |
 
 XP 真机说明：
 
@@ -54,7 +54,7 @@ XP 真机说明：
 - **0x26 不是唯一依据，这台 XP 成功路径根本不发。** 已对解密后的 Share PDU 按 `TotalLength` 走了一遍，type2 只有 `0x02` UPDATE 和 `0x1b` POINTER，没有 `FOUND 0x26`。
 - 成败都会先推同一批墙纸位图（`01004300` 2818 字节等），所以**大位图不能当成功**。
 - 失败：ncrack `FAILED_XP` 绘图订单，约 0.5s。
-- 成功：FontMap 后 2s 窗口内没有失败对话框（`classicLogonGrace`）。若对端发 0x26 仍立即成功。
+- 成功：FontMap 后 1s 窗口内没有失败对话框（`classicLogonGrace`）。若对端发 0x26 仍立即成功。
 - 已关 `INFO_LOGONERRORS` / fast-path；Domain 空；`INFO_AUTOLOGON|INFO_LOGONNOTIFY`。LOGONNOTIFY 没让这台 XP 发出 0x26。
 
 跑真机：
