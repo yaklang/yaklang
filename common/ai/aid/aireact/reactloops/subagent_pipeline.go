@@ -469,7 +469,9 @@ func BuildSubAgentResult(executed *ExecutedSubAgent, opts SubAgentOptions) *SubA
 		record.TracePreview = preview
 		branchDiffBytes = bytes
 	}
-	record.ProcessStats = CollectProcessStats(subLoop, executed.Timeline.Fork(), branchDiffBytes)
+	// Fork 句柄仅取一次，stats 与结果共用（Fork() 是 nil-safe getter）。
+	timelineFork := executed.Timeline.Fork()
+	record.ProcessStats = CollectProcessStats(subLoop, timelineFork, branchDiffBytes)
 
 	feedback := fmt.Sprintf("[%d] %s (%s): %s", job.Order, job.Identifier, record.Status, utils.ShrinkString(record.Result, 240))
 	if record.Error != "" {
@@ -481,7 +483,7 @@ func BuildSubAgentResult(executed *ExecutedSubAgent, opts SubAgentOptions) *SubA
 		SubTaskID:   record.SubAgentID,
 		SubTask:     subTask,
 		SubLoop:     subLoop,
-		Fork:        executed.Timeline.Fork(),
+		Fork:        timelineFork,
 		ExecErr:     execErr,
 		Duration:    duration,
 		Record:      record,

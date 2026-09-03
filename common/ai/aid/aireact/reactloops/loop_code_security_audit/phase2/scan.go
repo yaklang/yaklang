@@ -54,6 +54,10 @@ type ScanState struct {
 	TargetFileSet map[string]bool // 去重用
 	AuditedFiles  map[string]bool // 已完成审计的文件
 
+	// auditedCount 是 TargetFiles 中已 mark 的文件数（与 AuditedFiles 同步维护，
+	// 仅统计目标文件），使 Progress/AllDone 免于 O(T) 重扫。
+	auditedCount int
+
 	// PhaseASpotReadsSinceLock 阶段A 自上次 lock 以来的 read_file 抽查次数（用于提示及时 lock）
 	PhaseASpotReadsSinceLock int
 
@@ -166,6 +170,25 @@ func (s *ScanState) PhaseBGrepCount(file string) int {
 	return s.PhaseBGrepCounts[file]
 }
 
+// PhaseBReadAndGrepCount 一次读锁同时返回目标文件的 read / trace grep 计数
+// （reactive builder 逐文件展示用，替代每文件两次独立加锁）。
+func (s *ScanState) PhaseBReadAndGrepCount(file string) (read int, grep int) {
+	if file == "" {
+		return 0, 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.PhaseBReadCounts[file], s.PhaseBGrepCounts[file]
+}
+
+// PhaseBReadGuardSnapshot 一次读锁返回 read_file 防打转 guard 所需的全部状态
+// （phase / 是否目标文件 / 是否已 mark / phase-B read 计数），替代 4 次独立加锁。
+func (s *ScanState) PhaseBReadGuardSnapshot(file string) (phase ScanPhase, isTarget bool, audited bool, readCount int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Phase, s.TargetFileSet[file], s.AuditedFiles[file], s.PhaseBReadCounts[file]
+}
+
 // ClearPhaseBGreps clears phase-B trace grep counter for a file (call after mark_file_done).
 func (s *ScanState) ClearPhaseBGreps(file string) {
 	if file == "" {
@@ -185,6 +208,10 @@ func (s *ScanState) AddTargetFiles(files []string) (added int, total int) {
 			s.TargetFileSet[f] = true
 			s.TargetFiles = append(s.TargetFiles, f)
 			added++
+			if s.AuditedFiles[f] {
+				// 先 mark 后纳入的顺序同样计入（保持 auditedCount 精确）。
+				s.auditedCount++
+			}
 		}
 	}
 	return added, len(s.TargetFiles)
@@ -216,31 +243,11 @@ func (s *ScanState) CollectedTargetFiles() []string {
 	return result
 }
 
-// MarkFileDone marks a file audited without recording disposition (internal/tests/auto-finalize only).
-func (s *ScanState) MarkFileDone(filePath string) int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.AuditedFiles[filePath] = true
-	remaining := 0
-	for _, f := range s.TargetFiles {
-		if !s.AuditedFiles[f] {
-			remaining++
-		}
-	}
-	return remaining
-}
-
 // Progress 返回（已完成数，总数），仅统计 TargetFiles 中已 mark 的文件
 func (s *ScanState) Progress() (int, int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	done := 0
-	for _, f := range s.TargetFiles {
-		if s.AuditedFiles[f] {
-			done++
-		}
-	}
-	return done, len(s.TargetFiles)
+	return s.auditedCount, len(s.TargetFiles)
 }
 
 // CurrentPhase returns the active scan phase.
@@ -281,15 +288,7 @@ func (s *ScanState) RemainingFiles() []string {
 func (s *ScanState) AllDone() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.TargetFiles) == 0 {
-		return false
-	}
-	for _, f := range s.TargetFiles {
-		if !s.AuditedFiles[f] {
-			return false
-		}
-	}
-	return true
+	return len(s.TargetFiles) > 0 && s.auditedCount >= len(s.TargetFiles)
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -480,17 +479,13 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				phaseLabel = "阶段B：逐文件审计"
 			}
 
-			// SinkHints（阶段A显示，替代硬编码关键词列表）
-			sinkHintsText := category.RenderSinkHints()
-
 			// 待审计 / 已纳入文件列表
 			auditDone, auditTotal := scan.Progress()
 			remaining := scan.RemainingFiles()
 			var remainingFilesSB strings.Builder
 			for i, f := range remaining {
 				attrib := formatRemainingFileAttributionHint(scan, state, category.ID, f, state.ProjectPath)
-				readCnt := scan.PhaseBReadCount(f)
-				grepCnt := scan.PhaseBGrepCount(f)
+				readCnt, grepCnt := scan.PhaseBReadAndGrepCount(f)
 				switch {
 				case readCnt > 0 && grepCnt > 0:
 					remainingFilesSB.WriteString(fmt.Sprintf("  %d. %s（已 read %d 次、trace grep %d 次，须 mark）%s\n", i+1, f, readCnt, grepCnt, attrib))
@@ -509,12 +504,13 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			phaseBGrepWarning := ""
 			if !isSearchPhase && len(remaining) > 0 {
 				first := remaining[0]
-				if cnt := scan.PhaseBReadCount(first); cnt >= 1 {
-					phaseBReadWarning = fmt.Sprintf("%q 已 read %d 次，下一 action 必须是 mark_file_done（不可继续 read）", first, cnt)
+				firstRead, firstGrep := scan.PhaseBReadAndGrepCount(first)
+				if firstRead >= 1 {
+					phaseBReadWarning = fmt.Sprintf("%q 已 read %d 次，下一 action 必须是 mark_file_done（不可继续 read）", first, firstRead)
 				}
-				if cnt := scan.PhaseBGrepCount(first); cnt >= 3 {
+				if firstGrep >= 3 {
 					phaseBGrepWarning = fmt.Sprintf("%q 已 trace grep %d 次（上限 %d），请尽快完成 data_flow 并 mark_file_done",
-						first, cnt, phase2MaxPhaseBTraceGrepsPerFile)
+						first, firstGrep, phase2MaxPhaseBTraceGrepsPerFile)
 				}
 			}
 			auditRemaining := 0
@@ -535,19 +531,15 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			}
 			pendingDiscoveryList, discoveryGateWarning := formatPendingDiscoveryForReactive(scan)
 			discoveryQualityWarning := FormatDiscoveryQualityWarningForReactive(category, scan)
-			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, mergePhase2ReactiveVars(map[string]any{
+			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, map[string]any{
 				"Nonce":                   nonce,
 				"CategoryID":              category.ID,
 				"CategoryName":            category.Name,
-				"TechStack":               state.TechStack,
-				"LanguageFocus":           model.LanguageFocusForCategory(state.TechStack, category.ID),
-				"EntryPoints":             state.EntryPoints,
 				"ReconOutline":            state.GetReconOutline(),
 				"ReconFileHint":           reconFileHint,
 				"PrevFindingsSummary":     buildPrevFindingsSummary(state, category.ID),
 				"PhaseLabel":              phaseLabel,
 				"IsSearchPhase":           isSearchPhase,
-				"SinkHints":               sinkHintsText,
 				"CollectedFileCount":      scan.TargetFileCount(),
 				"CollectedFilesList":      collectedFilesSB.String(),
 				"PendingDiscoveryList":    pendingDiscoveryList,
@@ -560,9 +552,9 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				"PhaseBGrepWarning":       phaseBGrepWarning,
 				"AuditRemaining":          auditRemaining,
 				"FeedbackMessages":        feedbacker.String(),
-				"FindingsCount":           len(state.GetFindings()),
+				"FindingsCount":           state.GetFindingCount(),
 				"PhaseASpotReads":         scan.PhaseASpotReadCount(),
-			}, state))
+			})
 			return reactivePrompt, err
 		}),
 
@@ -849,9 +841,9 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 
 				loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, "code_audit_finding", map[string]any{
 					"finding": f,
-					"total":   len(state.GetFindings()),
+					"total":   state.GetFindingCount(),
 				})
-				emit.Phase2FindingAdded(loop, category, f, len(state.GetFindings()))
+				emit.Phase2FindingAdded(loop, category, f, state.GetFindingCount())
 
 				log.Infof("[CodeAudit/Phase2] Finding added: %s - %s (%s:%d)", f.ID, f.Category, f.File, f.Line)
 
@@ -1173,11 +1165,4 @@ func buildPrevFindingsSummary(state *model.AuditState, currentCategoryID string)
 			f.Severity, f.ID, f.Category, f.File, f.Line, f.Title))
 	}
 	return sb.String()
-}
-
-func mergePhase2ReactiveVars(base map[string]any, state *model.AuditState) map[string]any {
-	for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
-		base[k] = v
-	}
-	return base
 }

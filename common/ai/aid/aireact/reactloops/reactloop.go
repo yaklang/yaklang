@@ -231,10 +231,6 @@ type ReActLoop struct {
 	// TodoSnapshot 数据块 (plan / intent 等轻量子循环使用).
 	disableTodoSnapshot bool
 
-	// disableValueFeedback 为 true 时不自动注入价值评估埋点（code audit 等
-	// 高流量 loop 在慢网下旁路 AI 收益为负）。
-	disableValueFeedback bool
-
 	// extraFrozenPartitions 由 WithFrozenBlockPartitions 注入，在每轮
 	// generateLoopPrompt 并入 frozen-block，用于把稳定指令 hoist 出 dynamic 区。
 	extraFrozenPartitions []aicommon.FrozenBlockPartition
@@ -700,10 +696,10 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	// 自动注入价值评估埋点 (默认开启). 该钩子在每轮结束
 	// (iteration_end) 与整循环结束 (loop_end) 组装 ValueFeedbackRecord 并经
 	// aicommon 注册缝交给 aive; 全程非阻塞 + recover, 不影响主循环.
+	// 禁用走 config 级开关 (cfg.DisableValueFeedback, 经 SubmitValueFeedback
+	// 汇聚点门控并自动传播到任意深度子 invoker), 不再提供 loop 级开关.
 	// 关键词: 价值评估埋点注入, onPostIteration, SubmitValueFeedback
-	if !r.disableValueFeedback {
-		r.onPostIteration = append(r.onPostIteration, buildValueFeedbackPostIteration())
-	}
+	r.onPostIteration = append(r.onPostIteration, buildValueFeedbackPostIteration())
 
 	// Config-level perception disable (e.g. test environments via WithDisablePerception)
 	if config.GetConfigBool("DisablePerception") {

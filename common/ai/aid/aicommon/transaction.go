@@ -207,7 +207,7 @@ func callAITransaction(
 			attemptHistory = append(attemptHistory, buildAttemptRecord(i, finalPrompt, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
 			if i < trcRetry {
-				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
+				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory, false); waitErr != nil {
 					return waitErr
 				}
 			}
@@ -239,27 +239,37 @@ func callAITransaction(
 			return ctxErr
 		}
 		// 归一化空响应错误，再与 rsp 的回调错误（由 AIChatToAICallbackType 等设置）合并
+		callbackErr := rsp.GetError()
 		postHandlerErr = normalizeTransactionPostHandlerError(rsp, postHandlerErr)
-		postHandlerErr = mergePostHandlerAndCallbackError(postHandlerErr, rsp.GetError())
+		postHandlerErr = mergePostHandlerAndCallbackError(postHandlerErr, callbackErr)
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++
-			if isActionFormatError(postHandlerErr) {
+			// 传输归因：零输出且异步回调携带基础设施错误（TLS/拨号/超时）时，
+			// 空流的 action 解析失败只是症状——按网络类失败处理，不消耗 format 预算。
+			transportCaused := isTransportCausedEmptyResponse(callbackErr, rsp)
+			formatErr := isActionFormatError(postHandlerErr) && !transportCaused
+			if formatErr {
 				formatAttempts++
 			}
 			rec := buildAttemptRecord(i, finalPrompt, nil, rsp)
 			rec.PostHandlerErr = postHandlerErr
 			attemptHistory = append(attemptHistory, rec)
 			rspEmitter := bindEmitter(rsp)
-			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			if transportCaused {
+				rspEmitter.EmitError("ai transaction transport error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			} else {
+				rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			}
 			// Format failures get a tighter budget so think-only / missing @action
-			// outputs do not burn the full network retry window.
-			if isActionFormatError(postHandlerErr) && formatAttempts >= formatRetryCap {
+			// outputs do not burn the full network retry window; transport-caused
+			// failures keep the full network budget instead.
+			if formatErr && formatAttempts >= formatRetryCap {
 				rspEmitter.EmitWarning("ai format retry budget exhausted (%d/%d); stopping early", formatAttempts, formatRetryCap)
 				break
 			}
 			if i < trcRetry {
-				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
+				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory, transportCaused); waitErr != nil {
 					return waitErr
 				}
 			}
@@ -346,8 +356,12 @@ func waitBeforeTransactionRetry(
 	failedAttempt int64,
 	maxAttempts int64,
 	attemptHistory []transactionAttemptRecord,
+	transportFailure bool,
 ) error {
 	retryDelay := aiRetryBackoff(failedAttempt)
+	if transportFailure {
+		retryDelay = aiTransportRetryBackoff(failedAttempt)
+	}
 	nextAttempt := failedAttempt + 1
 	if len(attemptHistory) > 0 {
 		if failedOutput := attemptHistory[len(attemptHistory)-1].FailedAIOutput(); failedOutput != "" {

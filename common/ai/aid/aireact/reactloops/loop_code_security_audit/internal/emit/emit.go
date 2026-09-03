@@ -265,11 +265,10 @@ func Phase2ScanWarning(loop *reactloops.ReActLoop, category model.VulnCategory, 
 	if loop == nil {
 		return
 	}
+	// 可恢复中断（resumable）提示为 [信息]，其余（如 stuck_phase_a）按 [警告]。
 	prefix := "[警告]"
 	switch kind {
-	case "stuck_phase_a", "auto_finalize", "incomplete":
-		prefix = "[警告]"
-	default:
+	case "stuck_phase_a_resumable", "stuck_phase_b_resumable":
 		prefix = "[信息]"
 	}
 	catLabel := category.ID

@@ -302,15 +302,6 @@ func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulT
 	return r.ExecuteLoopTask(taskTypeName, task, loopOptions...)
 }
 
-// loopTerminalStreamFlushTimeout bounds how long the loop's finish emission
-// waits for pending async stream events before emitting the terminal
-// success/fail event. The finalize summary (and any other late stream content)
-// is flushed by async copy goroutines that a synchronous terminal emission can
-// otherwise overtake, so consumers stopping at the terminal event would miss
-// it. The wait is bounded so a stuck stream cannot block the terminal event
-// forever (same liveness posture as exec.go's bounded action.WaitStream).
-const loopTerminalStreamFlushTimeout = 5 * time.Second
-
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
 	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("react", r.config.TimelineDiffer, nil)
 	defer memoryFlushBuffer.Close()
@@ -345,17 +336,8 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 				case reactloops.LoopFinishSilent:
 					return
 				case reactloops.LoopFinishFail:
-					// 终态事件不得超越仍在异步排空的流内容 (例如 finalize 总结的
-					// re-act-loop-answer-payload 增量): 先有界等待 emitter 的流
-					// 排空, 再发终态, 保证客户端在收到终态时内容流已完整送达.
-					if !r.Emitter.WaitForStreamWithTimeout(loopTerminalStreamFlushTimeout) {
-						log.Warnf("loop finish emission: pending stream events still flushing after %v, emitting terminal event anyway", loopTerminalStreamFlushTimeout)
-					}
 					r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
 				default:
-					if !r.Emitter.WaitForStreamWithTimeout(loopTerminalStreamFlushTimeout) {
-						log.Warnf("loop finish emission: pending stream events still flushing after %v, emitting terminal event anyway", loopTerminalStreamFlushTimeout)
-					}
 					r.Emitter.EmitReActSuccess("ReAct task execution success")
 				}
 			})

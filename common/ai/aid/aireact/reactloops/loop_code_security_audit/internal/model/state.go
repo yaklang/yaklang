@@ -31,18 +31,11 @@ type Finding struct {
 // --------- ScanObservation（Phase2 扫描观察，包含 uncertain 线索）---------
 
 // ScanObservation 记录 Phase2 某类别扫描的完整观察记录
-// 包含 uncertain 假设（值得人工跟进的线索）和覆盖总结
 type ScanObservation struct {
-	CategoryID      string           `json:"category_id"`
-	CategoryName    string           `json:"category_name"`
-	StopReason      string           `json:"stop_reason"`
-	CoverageSummary string           `json:"coverage_summary"`
-	FindingsSummary string           `json:"findings_summary,omitempty"`
-	UncertainLeads  []*UncertainLead `json:"uncertain_leads,omitempty"`
-	SafeHypotheses  []string         `json:"safe_hypotheses,omitempty"` // 已排除的，简要列举
-	ConfirmedCount  int              `json:"confirmed_count"`
-	UncertainCount  int              `json:"uncertain_count"`
-	SafeCount       int              `json:"safe_count"`
+	CategoryID      string `json:"category_id"`
+	CategoryName    string `json:"category_name"`
+	StopReason      string `json:"stop_reason"`
+	CoverageSummary string `json:"coverage_summary"`
 
 	// Status 是类别扫描覆盖状态（completed / partial / not_run），由写入方
 	// 结构化填充：complete_scan → completed；编排器兜底 → partial/not_run。
@@ -59,16 +52,6 @@ const (
 	ScanStatusPartial   = "partial"   // 中断后兜底 auto-finalize（剩余文件系统标为 not_vul）
 	ScanStatusNotRun    = "not_run"   // 从未真正扫描（排队即死 / 无 scanState）
 )
-
-// UncertainLead 表示一个证据不足但值得关注的潜在漏洞线索
-type UncertainLead struct {
-	HypothesisID string `json:"hypothesis_id"`
-	Title        string `json:"title"`
-	SinkHint     string `json:"sink_hint"`
-	SourceHint   string `json:"source_hint,omitempty"`
-	Reason       string `json:"reason"`                 // 为什么标记为 uncertain
-	EvidenceLog  string `json:"evidence_log,omitempty"` // 收集到的证据摘要
-}
 
 // --------- VerifyResult（验证阶段产出）---------
 
@@ -156,6 +139,11 @@ type AuditState struct {
 	// Phase 4 产出：最终报告
 	FinalReport     string `json:"final_report,omitempty"`
 	FinalReportPath string `json:"final_report_path,omitempty"`
+
+	// verifiedByID 是 VerifiedVulns 的 finding-ID 索引（与列表同锁维护），
+	// 使 GetVerifiedFindingByID / 覆盖检查从 O(V) 线性扫描降为 O(1)。
+	// 不序列化；零值 AuditState 的写路径会惰性初始化。
+	verifiedByID map[string]*VerifiedFinding `json:"-"`
 }
 
 func NewAuditState() *AuditState {
@@ -164,6 +152,7 @@ func NewAuditState() *AuditState {
 		Findings:       make([]*Finding, 0),
 		VerifiedVulns:  make([]*VerifiedFinding, 0),
 		ReconNoteFiles: make([]string, 0),
+		verifiedByID:   make(map[string]*VerifiedFinding),
 	}
 }
 
@@ -328,6 +317,13 @@ func (s *AuditState) GetFindings() []*Finding {
 	return result
 }
 
+// GetFindingCount 返回 findings 总数（零拷贝，替代仅为取长度做的 GetFindings 全量副本）
+func (s *AuditState) GetFindingCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.Findings)
+}
+
 // GetFindingByID 按 ID 获取 Finding
 func (s *AuditState) GetFindingByID(id string) *Finding {
 	s.mu.RLock()
@@ -344,9 +340,16 @@ func (s *AuditState) GetFindingByID(id string) *Finding {
 
 // AddVerifiedFinding 添加验证结果
 func (s *AuditState) AddVerifiedFinding(vf *VerifiedFinding) {
+	if vf == nil || vf.Finding == nil || vf.Finding.ID == "" {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.VerifiedVulns = append(s.VerifiedVulns, vf)
+	if s.verifiedByID == nil {
+		s.verifiedByID = make(map[string]*VerifiedFinding)
+	}
+	s.verifiedByID[vf.Finding.ID] = vf
 }
 
 // GetVerifiedVulns 返回已验证的漏洞（只读副本）
@@ -356,6 +359,13 @@ func (s *AuditState) GetVerifiedVulns() []*VerifiedFinding {
 	result := make([]*VerifiedFinding, len(s.VerifiedVulns))
 	copy(result, s.VerifiedVulns)
 	return result
+}
+
+// GetVerifiedVulnCount 返回已验证漏洞总数（零拷贝，替代仅为取长度做的 GetVerifiedVulns 全量副本）
+func (s *AuditState) GetVerifiedVulnCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.VerifiedVulns)
 }
 
 // GetConfirmedVulns 只返回 confirmed 状态的漏洞
