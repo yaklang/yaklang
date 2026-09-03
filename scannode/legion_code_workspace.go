@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -30,13 +31,21 @@ import (
 const (
 	legionCodeWorkspaceKindGit             = "git"
 	legionCodeWorkspaceKindUploadedArchive = "uploaded_archive"
+	legionCodeWorkspaceKindAttachments     = "attachments"
 	legionCodeWorkspaceArchiveLocator      = "managed-source"
+	legionCodeWorkspaceAttachmentLocator   = "managed-attachments"
 
 	legionCodeArchiveMaxFiles         = 20_000
 	legionCodeArchiveMaxTotalBytes    = int64(256 * 1024 * 1024)
 	legionCodeWorkspaceMaxReadBytes   = int64(256 * 1024)
 	legionCodeWorkspaceMaxSearchItems = 200
+	legionCodeWorkspaceSearchBytes    = int64(64 * 1024 * 1024)
+	legionCodeWorkspaceMaxSearchBytes = int64(256 * 1024 * 1024)
 	legionCodeWorkspaceMaxPathDepth   = 32
+	legionCodeWorkspaceMaxAttachments = 5
+	legionLogAnalysisFocusName        = "log_analysis"
+	legionLogAnalysisFocusVersion     = "1.0.0"
+	legionAITaskExecutionRole         = "execution"
 )
 
 type legionCodeWorkspaceAuth struct {
@@ -85,6 +94,7 @@ type legionCodeWorkspaceMaterializeOptions struct {
 	PlatformAPIBaseURL  string
 	NodeSessionID       string
 	PlatformBearerToken string
+	Attachments         []aiSessionAttachmentRef
 }
 
 type legionCodeWorkspaceRuntime struct {
@@ -134,6 +144,8 @@ var (
 	cloneLegionCodeGitWorkspace     = yakgit.Clone
 	legionCodeWorkspaceIDPattern    = regexp.MustCompile(`^aicw_[0-9a-f]{32}$`)
 	legionCodeGitSCPUsernamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+	legionAITaskRunIDPattern        = regexp.MustCompile(`^aitr_[0-9a-f]{32}$`)
+	legionAITaskVersionPattern      = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 )
 
 func prepareLegionCodeWorkspace(
@@ -199,7 +211,7 @@ func normalizeLegionCodeWorkspaceSpec(spec *legionCodeWorkspaceSpec) error {
 		return fmt.Errorf("source_workspace workspace_id is required")
 	case !legionCodeWorkspaceIDPattern.MatchString(spec.WorkspaceID):
 		return fmt.Errorf("source_workspace workspace_id is invalid")
-	case spec.Kind != legionCodeWorkspaceKindGit && spec.Kind != legionCodeWorkspaceKindUploadedArchive:
+	case spec.Kind != legionCodeWorkspaceKindGit && spec.Kind != legionCodeWorkspaceKindUploadedArchive && spec.Kind != legionCodeWorkspaceKindAttachments:
 		return fmt.Errorf("source_workspace kind %q is unsupported", spec.Kind)
 	case spec.Locator == "":
 		return fmt.Errorf("source_workspace locator is required")
@@ -242,6 +254,15 @@ func normalizeLegionCodeWorkspaceLocator(spec *legionCodeWorkspaceSpec) error {
 	case legionCodeWorkspaceKindUploadedArchive:
 		if spec.Locator != legionCodeWorkspaceArchiveLocator {
 			return fmt.Errorf("source_workspace uploaded_archive locator must be %q", legionCodeWorkspaceArchiveLocator)
+		}
+		return nil
+	case legionCodeWorkspaceKindAttachments:
+		if spec.Locator != legionCodeWorkspaceAttachmentLocator {
+			return fmt.Errorf("source_workspace attachments locator must be %q", legionCodeWorkspaceAttachmentLocator)
+		}
+		if spec.Subpath != "" || spec.PayloadID != "" || spec.Branch != "" || spec.Auth != nil || spec.Proxy != nil ||
+			spec.ExpectedRevision != "" || spec.ExpectedSHA256 != "" {
+			return fmt.Errorf("source_workspace attachments cannot set source locator extensions")
 		}
 		return nil
 	default:
@@ -320,6 +341,8 @@ func materializeLegionCodeWorkspace(
 		return materializeLegionCodeGitWorkspace(ctx, spec)
 	case legionCodeWorkspaceKindUploadedArchive:
 		return materializeLegionCodeArchiveWorkspace(ctx, spec, options)
+	case legionCodeWorkspaceKindAttachments:
+		return materializeLegionAttachmentWorkspace(ctx, spec, options)
 	default:
 		return nil, fmt.Errorf("source_workspace kind %q is unsupported", spec.Kind)
 	}
@@ -480,6 +503,173 @@ func materializeLegionCodeArchiveWorkspace(
 		bytes:          bytesCount,
 		cleanup:        cleanup,
 	}, nil
+}
+
+func materializeLegionAttachmentWorkspace(
+	ctx context.Context,
+	spec legionCodeWorkspaceSpec,
+	options legionCodeWorkspaceMaterializeOptions,
+) (_ *legionCodeWorkspaceRuntime, finalErr error) {
+	attachments := options.Attachments
+	if len(attachments) < 1 || len(attachments) > legionCodeWorkspaceMaxAttachments {
+		return nil, fmt.Errorf("source_workspace attachments requires between 1 and %d files", legionCodeWorkspaceMaxAttachments)
+	}
+	if strings.TrimSpace(options.PlatformBearerToken) == "" || strings.TrimSpace(options.NodeSessionID) == "" {
+		return nil, fmt.Errorf("source_workspace attachments requires an authorized node session")
+	}
+
+	workspaceRoot, err := os.MkdirTemp("", "legion-attachment-workspace-*")
+	if err != nil {
+		return nil, fmt.Errorf("create source_workspace attachments directory: %w", err)
+	}
+	cleanup := func() error { return os.RemoveAll(workspaceRoot) }
+	defer func() {
+		if finalErr != nil {
+			finalErr = errors.Join(finalErr, cleanup())
+		}
+	}()
+
+	workspaceHash := sha256.New()
+	seenIDs := make(map[string]struct{}, len(attachments))
+	var totalBytes int64
+	for index, attachment := range attachments {
+		attachmentID := strings.TrimSpace(attachment.AttachmentID)
+		filename := strings.TrimSpace(attachment.Filename)
+		expectedSHA256 := strings.ToLower(strings.TrimSpace(attachment.SHA256))
+		if attachmentID == "" || filename == "" || attachment.SizeBytes >= math.MaxInt64 ||
+			len(expectedSHA256) != sha256.Size*2 || !isLowerHex(expectedSHA256) {
+			return nil, fmt.Errorf("source_workspace attachment %d immutable identity is invalid", index)
+		}
+		if _, duplicate := seenIDs[attachmentID]; duplicate {
+			return nil, fmt.Errorf("source_workspace attachment %d identity is duplicated", index)
+		}
+		seenIDs[attachmentID] = struct{}{}
+
+		rel := legionAttachmentWorkspaceFilename(index, filename)
+		target := filepath.Join(workspaceRoot, filepath.FromSlash(rel))
+		_, _ = io.WriteString(workspaceHash, rel+"\x00")
+		written, err := downloadLegionAttachmentToFile(ctx, target, attachment, options, workspaceHash)
+		if err != nil {
+			return nil, fmt.Errorf("materialize source_workspace attachment %s: %w", attachmentID, err)
+		}
+		_, _ = io.WriteString(workspaceHash, "\x00")
+		if written > math.MaxInt64-totalBytes {
+			return nil, fmt.Errorf("source_workspace attachment byte count overflows")
+		}
+		totalBytes += written
+	}
+
+	return &legionCodeWorkspaceRuntime{
+		spec:    publicLegionCodeWorkspaceSpec(spec),
+		root:    workspaceRoot,
+		sha256:  hex.EncodeToString(workspaceHash.Sum(nil)),
+		files:   len(attachments),
+		bytes:   totalBytes,
+		cleanup: cleanup,
+	}, nil
+}
+
+func legionAttachmentWorkspaceFilename(index int, raw string) string {
+	base := path.Base(strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/"))
+	if base == "." || base == "/" || base == "" {
+		base = "attachment.log"
+	}
+	var cleaned strings.Builder
+	for _, char := range base {
+		if char < 0x20 || char == 0x7f || char == '/' || char == '\\' {
+			cleaned.WriteByte('_')
+			continue
+		}
+		cleaned.WriteRune(char)
+		if cleaned.Len() >= 180 {
+			break
+		}
+	}
+	base = strings.TrimSpace(cleaned.String())
+	if base == "" || base == "." || base == ".." {
+		base = "attachment.log"
+	}
+	return fmt.Sprintf("%02d-%s", index+1, base)
+}
+
+func downloadLegionAttachmentToFile(
+	ctx context.Context,
+	target string,
+	attachment aiSessionAttachmentRef,
+	options legionCodeWorkspaceMaterializeOptions,
+	workspaceHash io.Writer,
+) (written int64, finalErr error) {
+	downloadURL, err := managedAISessionAttachmentDownloadURL(aiSessionBinding{
+		PlatformAPIBaseURL:  options.PlatformAPIBaseURL,
+		NodeSessionID:       options.NodeSessionID,
+		PlatformBearerToken: options.PlatformBearerToken,
+	}, attachment)
+	if err != nil {
+		return 0, err
+	}
+	client := options.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	requestClient := *client
+	// A multi-GB transfer is bounded by the pinned Content-Length and the
+	// Session context, not an arbitrary wall-clock timeout. Cancellation of
+	// the bind request still stops the transfer immediately.
+	requestClient.Timeout = 0
+	requestClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("build request: %w", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(options.PlatformBearerToken))
+	response, err := requestClient.Do(request)
+	if err != nil {
+		return 0, fmt.Errorf("send request: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(io.LimitReader(response.Body, 2048))
+		if readErr != nil {
+			return 0, fmt.Errorf("status=%d read_body=%v", response.StatusCode, readErr)
+		}
+		return 0, fmt.Errorf("status=%d body=%s", response.StatusCode, strings.TrimSpace(string(body)))
+	}
+	expectedSize := int64(attachment.SizeBytes)
+	if response.ContentLength >= 0 && response.ContentLength != expectedSize {
+		return 0, fmt.Errorf("content length mismatch: expected=%d actual=%d", expectedSize, response.ContentLength)
+	}
+
+	output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return 0, fmt.Errorf("create workspace file: %w", err)
+	}
+	defer func() {
+		if closeErr := output.Close(); closeErr != nil {
+			finalErr = errors.Join(finalErr, closeErr)
+		}
+		if finalErr != nil {
+			finalErr = errors.Join(finalErr, os.Remove(target))
+		}
+	}()
+
+	fileHash := sha256.New()
+	written, err = io.Copy(
+		io.MultiWriter(output, fileHash, workspaceHash),
+		io.LimitReader(response.Body, expectedSize+1),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("stream body: %w", err)
+	}
+	if written != expectedSize {
+		return 0, fmt.Errorf("size mismatch: expected=%d actual=%d", expectedSize, written)
+	}
+	actualSHA256 := hex.EncodeToString(fileHash.Sum(nil))
+	if actualSHA256 != strings.ToLower(strings.TrimSpace(attachment.SHA256)) {
+		return 0, fmt.Errorf("sha256 mismatch: expected=%s actual=%s", strings.ToLower(strings.TrimSpace(attachment.SHA256)), actualSHA256)
+	}
+	return written, nil
 }
 
 type legionCodeArchiveLimits struct {
@@ -748,7 +938,10 @@ func (w *legionCodeWorkspaceRuntime) appendListEntry(
 	return nil
 }
 
-func (w *legionCodeWorkspaceRuntime) read(params map[string]any) (map[string]any, error) {
+func (w *legionCodeWorkspaceRuntime) read(ctx context.Context, params map[string]any) (map[string]any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	resolved, rel, err := w.resolve(focusRuntimeString(params, "path"))
 	if err != nil {
 		return nil, err
@@ -764,8 +957,8 @@ func (w *legionCodeWorkspaceRuntime) read(params map[string]any) (map[string]any
 	if binary {
 		return nil, fmt.Errorf("source.read file %q is binary", rel)
 	}
-	offset := int64(utils.InterfaceToInt(params["offset"]))
-	if offset < 0 || offset > info.Size() {
+	requestedOffset := int64(utils.InterfaceToInt(params["offset"]))
+	if requestedOffset < 0 || requestedOffset > info.Size() {
 		return nil, fmt.Errorf("source.read offset is out of range")
 	}
 	limit := int64(utils.InterfaceToInt(params["max_bytes"]))
@@ -777,6 +970,10 @@ func (w *legionCodeWorkspaceRuntime) read(params map[string]any) (map[string]any
 		return nil, err
 	}
 	defer input.Close()
+	offset, err := alignLegionCodeUTF8ReadOffset(input, requestedOffset, info.Size())
+	if err != nil {
+		return nil, fmt.Errorf("source.read align UTF-8 offset for %q: %w", rel, err)
+	}
 	if _, err := input.Seek(offset, io.SeekStart); err != nil {
 		return nil, err
 	}
@@ -784,26 +981,106 @@ func (w *legionCodeWorkspaceRuntime) read(params map[string]any) (map[string]any
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	truncated := len(content) > int(limit)
 	if truncated {
 		content = content[:limit]
 	}
 	if !utf8.Valid(content) {
-		return nil, fmt.Errorf("source.read file %q is not UTF-8 text", rel)
+		trimmedBoundary := false
+		for trim := 1; trim < utf8.UTFMax && trim <= len(content); trim++ {
+			candidate := content[:len(content)-trim]
+			if utf8.Valid(candidate) {
+				content = candidate
+				trimmedBoundary = true
+				break
+			}
+		}
+		if !trimmedBoundary {
+			return nil, fmt.Errorf("source.read file %q is not UTF-8 text", rel)
+		}
 	}
 	sum := sha256.Sum256(content)
 	return map[string]any{
-		"path":       rel,
-		"offset":     offset,
-		"content":    string(content),
-		"read_bytes": len(content),
-		"file_size":  info.Size(),
-		"sha256":     hex.EncodeToString(sum[:]),
-		"truncated":  truncated || offset+int64(len(content)) < info.Size(),
+		"path":             rel,
+		"requested_offset": requestedOffset,
+		"offset":           offset,
+		"content":          string(content),
+		"read_bytes":       len(content),
+		"file_size":        info.Size(),
+		"sha256":           hex.EncodeToString(sum[:]),
+		"truncated":        truncated || offset+int64(len(content)) < info.Size(),
 	}, nil
 }
 
-func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]any, error) {
+func alignLegionCodeUTF8ReadOffset(input *os.File, requestedOffset, fileSize int64) (int64, error) {
+	if requestedOffset == 0 || requestedOffset == fileSize {
+		return requestedOffset, nil
+	}
+	probeSize := int64(utf8.UTFMax)
+	if remaining := fileSize - requestedOffset; remaining < probeSize {
+		probeSize = remaining
+	}
+	probe := make([]byte, probeSize)
+	readBytes, err := input.ReadAt(probe, requestedOffset)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return 0, err
+	}
+	for skip := 0; skip < readBytes; skip++ {
+		if probe[skip]&0xc0 != 0x80 {
+			return requestedOffset + int64(skip), nil
+		}
+	}
+	return requestedOffset + int64(readBytes), nil
+}
+
+func compileLegionCodeSearchMatcher(needle string, caseSensitive bool) (func(string) int, error) {
+	if caseSensitive {
+		return func(haystack string) int { return strings.Index(haystack, needle) }, nil
+	}
+	matcher, err := regexp.Compile("(?i:" + regexp.QuoteMeta(needle) + ")")
+	if err != nil {
+		return nil, fmt.Errorf("compile source.search query: %w", err)
+	}
+	return func(haystack string) int {
+		match := matcher.FindStringIndex(haystack)
+		if match == nil {
+			return -1
+		}
+		return match[0]
+	}, nil
+}
+
+func legionCodeSearchTail(input string, keep int) string {
+	if keep <= 0 || input == "" {
+		return ""
+	}
+	if keep >= len(input) {
+		return input
+	}
+	start := len(input) - keep
+	for start < len(input) && input[start]&0xc0 == 0x80 {
+		start++
+	}
+	return input[start:]
+}
+
+func legionCodeSearchOverlap(query string, caseSensitive bool) int {
+	if caseSensitive {
+		return len(query) - 1
+	}
+	// Unicode simple-fold equivalents can use a different number of UTF-8
+	// bytes. Retain the maximum encoded width per query rune so a match split
+	// across chunks or continuation calls is not missed.
+	return utf8.RuneCountInString(query)*utf8.UTFMax + utf8.UTFMax
+}
+
+func (w *legionCodeWorkspaceRuntime) search(ctx context.Context, params map[string]any) (map[string]any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	query := focusRuntimeRawString(params, "query")
 	if query == "" || len(query) > 1024 || strings.ContainsRune(query, '\x00') {
 		return nil, fmt.Errorf("source.search query must contain between 1 and 1024 safe bytes")
@@ -817,14 +1094,67 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 		limit = w.spec.MaxSearchResults
 	}
 	caseSensitive := utils.InterfaceToBoolean(params["case_sensitive"])
-	needle := query
-	if !caseSensitive {
-		needle = strings.ToLower(needle)
+	matchIndex, err := compileLegionCodeSearchMatcher(query, caseSensitive)
+	if err != nil {
+		return nil, err
+	}
+	requestedOffset := int64(utils.InterfaceToInt(params["offset"]))
+	if requestedOffset < 0 {
+		return nil, fmt.Errorf("source.search offset must be non-negative")
+	}
+	rootInfo, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("source.search inspect path %q: %w", rel, err)
+	}
+	if requestedOffset > 0 && !rootInfo.Mode().IsRegular() {
+		return nil, fmt.Errorf("source.search offset requires an exact regular file path")
+	}
+	if rootInfo.Mode().IsRegular() && requestedOffset > rootInfo.Size() {
+		return nil, fmt.Errorf("source.search offset is out of range")
+	}
+	maxScanBytes := int64(utils.InterfaceToInt(params["max_scan_bytes"]))
+	if maxScanBytes <= 0 {
+		maxScanBytes = legionCodeWorkspaceSearchBytes
+	}
+	if maxScanBytes > legionCodeWorkspaceMaxSearchBytes {
+		maxScanBytes = legionCodeWorkspaceMaxSearchBytes
+	}
+	overlapBytes := legionCodeSearchOverlap(query, caseSensitive)
+	if maxScanBytes <= int64(overlapBytes) {
+		maxScanBytes = int64(overlapBytes + 1)
 	}
 	results := make([]map[string]any, 0, limit)
 	var scannedBytes int64
 	truncated := false
+	complete := true
+	nextPath := ""
+	var nextOffset int64
+	interrupted := ""
+	setContinuation := func(path string, offset, floor int64) {
+		complete = false
+		truncated = true
+		nextPath = path
+		nextOffset = offset - int64(overlapBytes)
+		if nextOffset < floor {
+			nextOffset = floor
+		}
+	}
 	err = filepath.WalkDir(root, func(current string, entry os.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				complete = false
+				truncated = true
+				if entry != nil && !entry.IsDir() {
+					childRel, relErr := filepath.Rel(w.root, current)
+					if relErr == nil {
+						setContinuation(filepath.ToSlash(childRel), 0, 0)
+					}
+				}
+				interrupted = err.Error()
+				return filepath.SkipAll
+			}
+			return err
+		}
 		if walkErr != nil {
 			return walkErr
 		}
@@ -838,6 +1168,10 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 		}
 		if entry.IsDir() {
 			return nil
+		}
+		if scannedBytes >= maxScanBytes {
+			setContinuation(childRel, 0, 0)
+			return filepath.SkipAll
 		}
 		if len(results) >= limit {
 			truncated = true
@@ -859,43 +1193,119 @@ func (w *legionCodeWorkspaceRuntime) search(params map[string]any) (map[string]a
 		if err != nil {
 			return nil
 		}
-		reader := bufio.NewReader(input)
-		lineNumber := 0
-		for {
-			line, readErr := reader.ReadString('\n')
-			scannedBytes += int64(len(line))
-			lineNumber++
-			haystack := line
-			if !caseSensitive {
-				haystack = strings.ToLower(haystack)
+		startOffset := int64(0)
+		if rootInfo.Mode().IsRegular() {
+			startOffset, err = alignLegionCodeUTF8ReadOffset(input, requestedOffset, info.Size())
+			if err != nil {
+				_ = input.Close()
+				return fmt.Errorf("align source.search UTF-8 offset for %q: %w", childRel, err)
 			}
-			if column := strings.Index(haystack, needle); column >= 0 {
-				preview := strings.TrimRight(strings.ToValidUTF8(line, "�"), "\r\n")
-				if len(preview) > 512 {
-					preview = preview[:512]
+			if _, err := input.Seek(startOffset, io.SeekStart); err != nil {
+				_ = input.Close()
+				return err
+			}
+		}
+		remainingBudget := maxScanBytes - scannedBytes
+		reader := bufio.NewReaderSize(io.LimitReader(input, remainingBudget), 64*1024)
+		lineNumber := 1
+		lineOffset := 0
+		fileOffset := startOffset
+		tail := ""
+		matchedLine := false
+		for {
+			if err := ctx.Err(); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					setContinuation(childRel, fileOffset, startOffset)
+					interrupted = err.Error()
+					break
 				}
-				results = append(results, map[string]any{
-					"path": childRel, "line": lineNumber, "column": column + 1, "preview": preview,
-				})
+				_ = input.Close()
+				return err
+			}
+			fragment, readErr := reader.ReadSlice('\n')
+			scannedBytes += int64(len(fragment))
+			fragmentStart := fileOffset
+			fileOffset += int64(len(fragment))
+			fragmentText := string(fragment)
+			combined := tail + fragmentText
+			if column := matchIndex(combined); !matchedLine && column >= 0 {
+				previewStart := column - 128
+				if previewStart < 0 {
+					previewStart = 0
+				}
+				if previewStart > len(combined) {
+					previewStart = len(combined)
+				}
+				previewEnd := previewStart + 512
+				if previewEnd > len(combined) {
+					previewEnd = len(combined)
+				}
+				preview := strings.TrimRight(strings.ToValidUTF8(combined[previewStart:previewEnd], "�"), "\r\n")
+				absoluteColumn := lineOffset - len(tail) + column + 1
+				if absoluteColumn < 1 {
+					absoluteColumn = 1
+				}
+				match := map[string]any{
+					"path": childRel, "byte_offset": fragmentStart - int64(len(tail)) + int64(column), "preview": preview,
+				}
+				if startOffset == 0 {
+					match["line"] = lineNumber
+					match["column"] = absoluteColumn
+				}
+				results = append(results, match)
+				matchedLine = true
 				if len(results) >= limit {
-					truncated = true
+					setContinuation(childRel, fileOffset, startOffset)
 					break
 				}
 			}
-			if readErr != nil {
+			if errors.Is(readErr, bufio.ErrBufferFull) {
+				lineOffset += len(fragment)
+				if !matchedLine {
+					tail = legionCodeSearchTail(combined, overlapBytes)
+				} else {
+					tail = ""
+				}
+				continue
+			}
+			if readErr != nil && !errors.Is(readErr, io.EOF) {
+				_ = input.Close()
+				return fmt.Errorf("search source_workspace file %q: %w", childRel, readErr)
+			}
+			if errors.Is(readErr, io.EOF) {
+				if fileOffset < info.Size() {
+					setContinuation(childRel, fileOffset, startOffset)
+				}
 				break
 			}
+			lineNumber++
+			lineOffset = 0
+			tail = ""
+			matchedLine = false
 		}
 		_ = input.Close()
+		if !complete {
+			return filepath.SkipAll
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("source.search: %w", err)
 	}
-	return map[string]any{
+	response := map[string]any{
 		"path": rel, "query": query, "results": results, "count": len(results),
-		"scanned_bytes": scannedBytes, "max_search_results": limit, "truncated": truncated,
-	}, nil
+		"scan_start_offset": requestedOffset, "scanned_bytes": scannedBytes,
+		"max_scan_bytes": maxScanBytes, "max_search_results": limit,
+		"complete": complete, "truncated": truncated,
+	}
+	if !complete && nextPath != "" {
+		response["next_path"] = nextPath
+		response["next_offset"] = nextOffset
+	}
+	if interrupted != "" {
+		response["interrupted"] = interrupted
+	}
+	return response, nil
 }
 
 func (w *legionCodeWorkspaceRuntime) resolve(raw string) (string, string, error) {

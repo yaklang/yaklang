@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	aiv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ai/v1"
@@ -20,6 +21,7 @@ const (
 	maxServerFocusBundleBytes   = 1024 * 1024
 	maxServerFocusSidekicks     = 32
 	maxServerFocusContractBytes = 64 * 1024
+	serverFocusHookCallTimeout  = 2 * time.Minute
 	focusReleaseSeparator       = "\x00"
 )
 
@@ -53,10 +55,11 @@ func registerContextFocusRelease(release *aiv1.ContextFocusRelease) (string, err
 	}
 
 	bundle := &reactloops.FocusModeBundle{
-		Name:      validated.runtimeName,
-		FixedName: true,
-		EntryFile: validated.entryFile,
-		EntryCode: validated.entryCode,
+		Name:        validated.runtimeName,
+		FixedName:   true,
+		EntryFile:   validated.entryFile,
+		EntryCode:   validated.entryCode,
+		CallTimeout: serverFocusHookCallTimeout,
 	}
 	for _, sidekick := range validated.sidekicks {
 		bundle.Sidekicks = append(bundle.Sidekicks, reactloops.FocusModeSidekick{
