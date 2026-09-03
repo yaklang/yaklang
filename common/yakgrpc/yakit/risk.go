@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/yaklang/gorm"
@@ -90,12 +91,97 @@ func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*schema.Risk, error) 
 	return r, nil
 }
 
-func CountRiskByRuntimeId(db *gorm.DB, runtimeId string) (int, error) {
-	var count int
-	if db := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId).Count(&count); db.Error != nil {
-		return 0, utils.Errorf("get Risks count failed: %s", db.Error)
+// RiskLevelCount 按照风险等级(severity)分别统计的结果
+type RiskLevelCount struct {
+	Critical int64 `json:"critical"` // 严重
+	High     int64 `json:"high"`     // 高危
+	Warning  int64 `json:"warning"`  // 中危(warning/middle/medium/warn)
+	Low      int64 `json:"low"`      // 低危
+	Info     int64 `json:"info"`     // 信息(info/debug/fingerprint/空值等)
+	Other    int64 `json:"other"`    // 无法归类的等级，保证 Total 不丢失数据
+	Total    int64 `json:"total"`    // 以上所有等级之和
+}
+
+// rawSeverityCount 用于接收 `GROUP BY severity` 的原始查询结果
+type rawSeverityCount struct {
+	Severity string `json:"severity"`
+	Count    int64  `json:"count"`
+}
+
+// NormalizeRiskSeverity 将历史上各种写法的风险等级归一化为
+// critical/high/warning/low/info 五个标准等级，无法识别的返回 "other"。
+// 与 WithRiskParam_Severity 的映射保持一致，同时兼容未走该选项写入的脏数据。
+func NormalizeRiskSeverity(severity string) string {
+	switch strings.TrimSpace(strings.ToLower(severity)) {
+	case "critical", "panic", "fatal":
+		return "critical"
+	case "high":
+		return "high"
+	case "warning", "warn", "middle", "medium":
+		return "warning"
+	case "low", "default":
+		return "low"
+	case "", "info", "debug", "trace", "fingerprint", "note", "fp":
+		return "info"
+	default:
+		return "other"
 	}
-	return count, nil
+}
+
+// CountRiskByRuntimeIds 统计一个或多个 runtimeId 产生的风险，并按风险等级分别计数。
+// 返回值为所有传入 runtimeId 的汇总统计；若未传入任何有效 runtimeId 则返回错误。
+func CountRiskByRuntimeIds(db *gorm.DB, runtimeIds ...string) (*RiskLevelCount, error) {
+	var ids []string
+	for _, id := range runtimeIds {
+		if id = strings.TrimSpace(id); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	ids = utils.RemoveRepeatStringSlice(ids)
+	if len(ids) == 0 {
+		return nil, utils.Errorf("count Risks failed: empty runtime ids")
+	}
+
+	var results []*rawSeverityCount
+	if db := db.Model(&schema.Risk{}).
+		Select("severity, COUNT(*) as count").
+		Where("runtime_id IN (?)", ids).
+		Group("severity").
+		Scan(&results); db.Error != nil {
+		return nil, utils.Errorf("get Risks count failed: %s", db.Error)
+	}
+
+	stat := &RiskLevelCount{}
+	for _, r := range results {
+		if r == nil {
+			continue
+		}
+		switch NormalizeRiskSeverity(r.Severity) {
+		case "critical":
+			stat.Critical += r.Count
+		case "high":
+			stat.High += r.Count
+		case "warning":
+			stat.Warning += r.Count
+		case "low":
+			stat.Low += r.Count
+		case "info":
+			stat.Info += r.Count
+		default:
+			stat.Other += r.Count
+		}
+		stat.Total += r.Count
+	}
+	return stat, nil
+}
+
+// CountRiskByRuntimeId 统计单个 runtimeId 产生的风险总数。
+func CountRiskByRuntimeId(db *gorm.DB, runtimeId string) (int, error) {
+	stat, err := CountRiskByRuntimeIds(db, runtimeId)
+	if err != nil {
+		return 0, err
+	}
+	return int(stat.Total), nil
 }
 
 func GetRiskByHash(db *gorm.DB, hash string) (*schema.Risk, error) {
