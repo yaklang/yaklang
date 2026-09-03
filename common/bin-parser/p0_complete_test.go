@@ -408,3 +408,143 @@ func TestTNSConnectSNMPVarbindX224AndDCERPCStub(t *testing.T) {
 	require.Equal(t, stub, bytesVal(t, mustChild(t, r, "PDU", "Request", "Stub")))
 }
 
+func TestTLSRecordGatesAndClientHello(t *testing.T) {
+	app := make([]byte, 5+8)
+	app[0] = 23
+	binary.BigEndian.PutUint16(app[1:], 0x0303)
+	binary.BigEndian.PutUint16(app[3:], 8)
+	copy(app[5:], []byte("abcdefgh"))
+	tls := parseRule(t, app, "application-layer.tls", "Transport Layer Security")
+	rec := mustChild(t, tls, "Record Layer")
+	require.Equal(t, uint64(23), uintVal(t, rec.Child("ContentType")))
+	require.Equal(t, uint64(0x0303), uintVal(t, rec.Child("Version")))
+	require.NotEmpty(t, bytesVal(t, rec.Child("Payload")))
+
+	hello := make([]byte, 0, 64)
+	hello = append(hello, 0x03, 0x03)
+	hello = append(hello, make([]byte, 32)...)
+	hello = append(hello, 0)
+	hello = append(hello, 0x00, 0x04, 0x00, 0x2f, 0x00, 0x35)
+	hello = append(hello, 0x01, 0x00)
+	hs := []byte{0x01, 0x00, 0x00, byte(len(hello))}
+	hs = append(hs, hello...)
+	recHello := []byte{0x16, 0x03, 0x03, 0x00, byte(len(hs))}
+	recHello = append(recHello, hs...)
+	h := parseRule(t, recHello, "application-layer.tls", "Transport Layer Security")
+	require.Equal(t, uint64(22), uintVal(t, mustChild(t, h, "Record Layer", "ContentType")))
+	require.NotEmpty(t, bytesVal(t, mustChild(t, h, "Record Layer", "Payload")))
+	ch := parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello")
+	require.Equal(t, uint64(1), uintVal(t, ch.Child("Handshake Type")))
+	require.Equal(t, []byte{0x00, 0x2f, 0x00, 0x35}, bytesVal(t, mustChild(t, ch, "ClientHello", "Cipher Suites")))
+
+	ethH := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, recHello))
+	require.Equal(t, uint64(22), uintVal(t, mustChild(t, ethH, "IP", "TCP", "TLS", "Record Layer", "ContentType")))
+
+	get := []byte("GET / HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n")
+	parseMustFail(t, get, "application-layer.tls", "Transport Layer Security")
+	ethG := parseEthernet(t, ipv4TCPFrame(t, 50000, 14093, get))
+	require.Equal(t, "GET", strVal(t, mustChild(t, ethG, "IP", "TCP", "HTTP", "HTTP Request", "Method")))
+
+	parseMustFail(t, []byte{0x16, 0x03, 0x03, 0x00, 0x10}, "application-layer.tls", "Transport Layer Security")
+	parseMustFail(t, []byte{0x47, 0x45, 0x54, 0x20, 0x2f}, "application-layer.tls", "Transport Layer Security")
+	parseMustFail(t, []byte{0x16, 0x03}, "application-layer.tls", "Transport Layer Security")
+}
+
+func TestRDPX224CookieNegotiationAndTPKTABI(t *testing.T) {
+	tpkt := []byte{0x03, 0x00, 0x00, 0x08, 0x02, 0xe0, 0x00, 0x00}
+	n := parseRule(t, tpkt, "application-layer.msrdp", "TPKT")
+	require.Equal(t, uint64(3), uintVal(t, n.Child("Version")))
+	require.Equal(t, []byte{0x02, 0xe0, 0x00, 0x00}, bytesVal(t, n.Child("TPDU")))
+	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 3389, tpkt))
+	require.Equal(t, uint64(3), uintVal(t, mustChild(t, eth, "IP", "TCP", "TPKT", "Version")))
+	require.Equal(t, []byte{0x02, 0xe0, 0x00, 0x00}, bytesVal(t, mustChild(t, eth, "IP", "TCP", "TPKT", "TPDU")))
+
+	cookie := []byte("Cookie: mstshash=user\r\n")
+	neg := []byte{0x01, 0x00, 0x08, 0x00, 0x03, 0x00, 0x00, 0x00}
+	x224Len := 6 + len(cookie) + len(neg)
+	pkt := make([]byte, 4+1+x224Len)
+	pkt[0] = 3
+	binary.BigEndian.PutUint16(pkt[2:], uint16(len(pkt)))
+	pkt[4] = byte(x224Len)
+	pkt[5] = 0xe0
+	copy(pkt[11:], cookie)
+	copy(pkt[11+len(cookie):], neg)
+	rdp := parseRule(t, pkt, "application-layer.msrdp", "RDP")
+	require.Equal(t, uint64(3), uintVal(t, rdp.Child("Version")))
+	require.Equal(t, uint64(0xe0), uintVal(t, mustChild(t, rdp, "X224", "Flag")))
+	require.Equal(t, "Cookie: mstshash=user", strVal(t, mustChild(t, rdp, "X224", "VariableData", "RDPCookie", "Line")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, rdp, "X224", "VariableData", "RDPNegotiation", "Type")))
+	require.Equal(t, uint64(3), uintVal(t, mustChild(t, rdp, "X224", "VariableData", "RDPNegotiation", "Protocol")))
+
+	cc := []byte{0x03, 0x00, 0x00, 0x0b, 0x06, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}
+	require.Equal(t, uint64(0xd0), uintVal(t, mustChild(t, parseRule(t, cc, "application-layer.msrdp", "RDP"), "X224", "Flag")))
+
+	parseMustFail(t, []byte{0x03, 0x00, 0x00, 0x08, 0x02, 0xe0, 0x00, 0x00}, "application-layer.msrdp", "RDP")
+	parseMustFail(t, []byte{0x02, 0x00, 0x00, 0x0b, 0x06, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00}, "application-layer.msrdp", "RDP")
+	parseMustFail(t, []byte{0x03, 0x00, 0x00, 0x0b, 0x06, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00}, "application-layer.msrdp", "RDP")
+	badNeg := []byte{0x01, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00}
+	parseMustFail(t, badNeg, "application-layer.msrdp", "RDPNegotiation")
+}
+
+func dcerpcBindUUID(uuid []byte) []byte {
+	ndr := []byte{0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00, 0x2b, 0x10, 0x48, 0x60}
+	body := make([]byte, 12+44)
+	binary.LittleEndian.PutUint16(body[0:], 5840)
+	binary.LittleEndian.PutUint16(body[2:], 5840)
+	body[8] = 1
+	body[12] = 1
+	copy(body[16:32], uuid)
+	binary.LittleEndian.PutUint32(body[32:], 3)
+	copy(body[36:52], ndr)
+	binary.LittleEndian.PutUint32(body[52:], 2)
+	return append(dcerpcHeader(11, uint16(16+len(body)), 1), body...)
+}
+
+func dcerpcRequestOp(opnum uint16, stub []byte) []byte {
+	body := make([]byte, 8+len(stub))
+	binary.LittleEndian.PutUint16(body[6:], opnum)
+	copy(body[8:], stub)
+	return append(dcerpcHeader(0, uint16(16+len(body)), 2), body...)
+}
+
+func TestMSRPCInterfaceUUIDsAndPsExecOpnums(t *testing.T) {
+	ifaces := []struct {
+		name  string
+		uuid  []byte
+		opnum uint16
+	}{
+		{"EPM", []byte{0x08, 0x83, 0xaf, 0xe1, 0x1f, 0x5d, 0xc9, 0x11, 0x91, 0xa4, 0x08, 0x00, 0x2b, 0x14, 0xa0, 0xfa}, 3},
+		{"SAMR", []byte{0x78, 0x57, 0x34, 0x12, 0x34, 0x12, 0xcd, 0xab, 0xef, 0x00, 0x01, 0x23, 0x45, 0x67, 0x89, 0xac}, 64},
+		{"LSARPC", []byte{0x78, 0x57, 0x34, 0x12, 0x34, 0x12, 0xcd, 0xab, 0xef, 0x00, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab}, 6},
+		{"NETLOGON", []byte{0x78, 0x56, 0x34, 0x12, 0x34, 0x12, 0xcd, 0xab, 0xef, 0x00, 0x01, 0x23, 0x45, 0x67, 0xcf, 0xfb}, 26},
+		{"DRSUAPI", []byte{0x35, 0x42, 0x51, 0xe3, 0x06, 0x4b, 0xd1, 0x11, 0xab, 0x04, 0x00, 0xc0, 0x4f, 0xc2, 0xdc, 0xd2}, 0},
+		{"SRVSVC", []byte{0xc8, 0x4f, 0x32, 0x4b, 0x70, 0x16, 0xd3, 0x01, 0x12, 0x78, 0x5a, 0x47, 0xbf, 0x6e, 0xe1, 0x88}, 15},
+		{"SVCCTL", []byte{0x81, 0xbb, 0x7a, 0x36, 0x44, 0x98, 0xf1, 0x35, 0xad, 0x32, 0x98, 0xf0, 0x38, 0x00, 0x10, 0x03}, 15},
+		{"WINREG", []byte{0x01, 0xd0, 0x8c, 0x33, 0x44, 0x22, 0xf1, 0x31, 0xaa, 0xaa, 0x90, 0x00, 0x38, 0x00, 0x10, 0x03}, 2},
+		{"WMI", []byte{0x18, 0xad, 0x09, 0xf3, 0x6a, 0xd8, 0xd0, 0x11, 0xa0, 0x75, 0x00, 0xc0, 0x4f, 0xb6, 0x88, 0x20}, 6},
+		{"DCOM", []byte{0xc4, 0xfe, 0xfc, 0x99, 0x60, 0x52, 0x1b, 0x10, 0xbb, 0xcb, 0x00, 0xaa, 0x00, 0x21, 0x34, 0x7a}, 5},
+	}
+	for _, tc := range ifaces {
+		t.Run(tc.name, func(t *testing.T) {
+			bind := dcerpcBindUUID(tc.uuid)
+			n := parseRule(t, bind, "application-layer.dcerpc", "DCERPC")
+			ctx := mustChild(t, n, "PDU", "Bind", "Contexts")
+			require.True(t, ctx.IsList())
+			require.Equal(t, tc.uuid, bytesVal(t, ctx.Children()[0].Child("Abstract Syntax")))
+			req := dcerpcRequestOp(tc.opnum, []byte{1, 2, 3, 4})
+			r := parseRule(t, req, "application-layer.dcerpc", "DCERPC")
+			require.Equal(t, uint64(tc.opnum), uintVal(t, mustChild(t, r, "PDU", "Request", "OpNum")))
+			require.Equal(t, []byte{1, 2, 3, 4}, bytesVal(t, mustChild(t, r, "PDU", "Request", "Stub")))
+		})
+	}
+
+	psexec := dcerpcRequestOp(15, []byte{0, 0, 0, 0})
+	require.Equal(t, uint64(15), uintVal(t, mustChild(t, parseRule(t, psexec, "application-layer.dcerpc", "DCERPC"), "PDU", "Request", "OpNum")))
+	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 135, dcerpcBindUUID(ifaces[6].uuid)))
+	require.Equal(t, ifaces[6].uuid, bytesVal(t, mustChild(t, eth, "IP", "TCP", "DCERPC", "PDU", "Bind", "Contexts").Children()[0].Child("Abstract Syntax")))
+
+	parseMustFail(t, dcerpcHeader(30, 16, 1), "application-layer.dcerpc", "DCERPC")
+	parseMustFail(t, dcerpcHeader(0, 10, 1), "application-layer.dcerpc", "DCERPC")
+	parseMustFail(t, []byte{5, 0, 0}, "application-layer.dcerpc", "DCERPC")
+}
+

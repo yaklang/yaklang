@@ -24,6 +24,99 @@ Package:
     Protocol: uint32
   Challenge: Challenge
   Authentication: Authentication
+  RDP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 3 {
+        panic("rdp: TPKT version must be 3")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("PacketLength")
+      l = getNodeResult("PacketLength").Value
+      if l < 11 {
+        panic("rdp: TPKT too short for X224 CR")
+      }
+      this.GetSubNode("X224").SetMaxLength(l - 4)
+      this.ProcessSubNode("X224")
+    Version: uint8
+    Reserved: uint8
+    PacketLength: uint16
+    X224:
+      operator: |
+        this.ProcessSubNode("Length")
+        this.ProcessSubNode("Flag")
+        code = getNodeResult("Flag").Value & 0xf0
+        if code != 0xe0 && code != 0xd0 && code != 0xf0 && code != 0x80 {
+          panic("rdp: unexpected X224 TPDU code")
+        }
+        this.ProcessSubNode("Destination")
+        this.ProcessSubNode("Source")
+        this.ProcessSubNode("Class")
+        if this.GetSubNode("VariableData").GetRemainingSpace() != 0 {
+          rem = this.GetSubNode("VariableData").GetRemainingSpace()
+          if rem > 0x10000 {
+            panic("rdp: X224 variable data too large")
+          }
+          this.GetSubNode("VariableData").SetMaxLength(rem)
+          this.ProcessSubNode("VariableData")
+        }
+      Length: uint8
+      Flag: uint8
+      Destination: uint16
+      Source: uint16
+      Class: uint8
+      VariableData:
+        operator: |
+          res,op = this.TryProcessByType("RDPCookie")
+          if op.OK {
+            err = op.Save()
+            if err != nil {
+              panic(err)
+            }
+          } else {
+            err = op.Recovery()
+            if err != nil {
+              panic(err)
+            }
+          }
+          res,op = this.TryProcessByType("RDPNegotiation")
+          if op.OK {
+            err = op.Save()
+            if err != nil {
+              panic(err)
+            }
+          } else {
+            err = op.Recovery()
+            if err != nil {
+              panic(err)
+            }
+          }
+RDPCookie:
+  operator: |
+    this.ProcessSubNode("Line")
+    line = string(getNodeResult("Line").Value)
+    if !line.HasPrefix("Cookie:") {
+      panic("rdp: expected Cookie: mstshash")
+    }
+  Line: "del:\r\n;type:string"
+RDPNegotiation:
+  endian: little
+  operator: |
+    this.ProcessSubNode("Type")
+    t = getNodeResult("Type").Value
+    if t < 1 || t > 3 {
+      panic("rdp: negotiation type must be 1-3")
+    }
+    this.ProcessSubNode("Flag")
+    this.ProcessSubNode("Length")
+    if getNodeResult("Length").Value != 8 {
+      panic("rdp: negotiation length must be 8")
+    }
+    this.ProcessSubNode("Protocol")
+  Type: uint8
+  Flag: uint8
+  Length: uint16
+  Protocol: uint32
 
 Challenge: "import:application-layer/ntlm.yaml;node:ChallengeMessage"
 Authentication: "import:application-layer/ntlm.yaml;node:AuthenticationMessage"
