@@ -225,10 +225,10 @@ func AESDecFactory(paddingFunc func([]byte, int) []byte, unpaddingFunc func([]by
 	}
 }
 
-// IsAESStreamMode 判断 AES 模式是否为流模式
+// IsStreamMode 判断对称加密模式是否为流模式
 // 流模式（CTR、CFB、OFB）不需要 padding，明文长度等于密文长度
 // 块模式（CBC、ECB）需要 padding，要求数据长度对齐到块大小
-func IsAESStreamMode(mode string) bool {
+func IsStreamMode(mode string) bool {
 	return mode == CTR || mode == CFB || mode == OFB
 }
 
@@ -258,7 +258,7 @@ func IsAESStreamMode(mode string) bool {
 // ```
 func AESEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	// 只对块模式（CBC、ECB）进行 padding，流模式（CTR、CFB、OFB）不需要 padding
-	if !IsAESStreamMode(mode) {
+	if !IsStreamMode(mode) {
 		data = ZeroPadding(data, aes.BlockSize)
 	}
 

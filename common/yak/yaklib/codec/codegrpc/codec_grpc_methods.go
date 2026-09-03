@@ -474,7 +474,7 @@ func getHash(hashFunc string) hash.Hash {
 func (flow *CodecExecFlow) AESEncryptKDF(password string, kdfMode string, hashFunc string, noSalt bool, mode string, output outputType, paddingType string) error {
 	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
 	inData := flow.Text
-	if !codec.IsAESStreamMode(mode) {
+	if !codec.IsStreamMode(mode) {
 		var err error
 		inData, err = padding(paddingType, flow.Text, 16)
 		if err != nil {
@@ -544,7 +544,7 @@ func (flow *CodecExecFlow) AESDecryptKDF(password string, kdfMode string, hashFu
 		return err
 	}
 	// 流模式（CFB、OFB、CTR）不需要 unpadding
-	if !codec.IsAESStreamMode(mode) {
+	if !codec.IsStreamMode(mode) {
 		cipherText, err = unPadding(paddingType, cipherText)
 		if err != nil {
 			return err
@@ -572,7 +572,7 @@ func (flow *CodecExecFlow) AESDecryptKDF(password string, kdfMode string, hashFu
 func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
 	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
 	inData := flow.Text
-	if !codec.IsAESStreamMode(mode) {
+	if !codec.IsStreamMode(mode) {
 		var err error
 		inData, err = padding(paddingType, flow.Text, 16)
 		if err != nil {
@@ -608,7 +608,7 @@ func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivT
 func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
 	// 流模式（CFB、OFB、CTR）不需要 unpadding
-	needUnpadding := !codec.IsAESStreamMode(mode)
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 16, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.AESDec(decodeKey, text, decodeIV, mode)
 	}, paddingType, needUnpadding)
@@ -708,7 +708,7 @@ func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce strin
 func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
 	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
 	inData := flow.Text
-	if !codec.IsAESStreamMode(mode) {
+	if !codec.IsStreamMode(mode) {
 		var err error
 		inData, err = padding(paddingType, flow.Text, 16)
 		if err != nil {
@@ -740,7 +740,7 @@ func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivT
 func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
 	// 流模式（CFB、OFB、CTR）不需要 unpadding
-	needUnpadding := !codec.IsAESStreamMode(mode)
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 16, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.SM4Dec(decodeKey, text, decodeIV, mode)
 	}, paddingType, needUnpadding)
@@ -764,7 +764,7 @@ func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivT
 func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
 	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
 	inData := flow.Text
-	if !codec.IsAESStreamMode(mode) {
+	if !codec.IsStreamMode(mode) {
 		var err error
 		inData, err = padding(paddingType, flow.Text, 8)
 		if err != nil {
@@ -796,7 +796,7 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
 	// 流模式（CFB、OFB、CTR）不需要 unpadding
-	needUnpadding := !codec.IsAESStreamMode(mode)
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.DESDec(decodeKey, text, decodeIV, mode)
 	}, paddingType, needUnpadding)
@@ -820,7 +820,7 @@ func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivT
 func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
 	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
 	inData := flow.Text
-	if !codec.IsAESStreamMode(mode) {
+	if !codec.IsStreamMode(mode) {
 		var err error
 		inData, err = padding(paddingType, flow.Text, 8)
 		if err != nil {
@@ -852,7 +852,7 @@ func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV strin
 func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
 	// 流模式（CFB、OFB、CTR）不需要 unpadding
-	needUnpadding := !codec.IsAESStreamMode(mode)
+	needUnpadding := !codec.IsStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.TripleDesDec(decodeKey, text, decodeIV, mode)
 	}, paddingType, needUnpadding)
