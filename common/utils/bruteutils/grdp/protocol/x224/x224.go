@@ -2,6 +2,7 @@ package x224
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -12,6 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/emission"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/tpkt"
+)
+
+const (
+	// [MS-RDPBCGR] 2.2.1.2.2 RDP_NEG_FAILURE failureCode
+	sslNotAllowedByServer uint32 = 0x00000002
 )
 
 // take idea from https://github.com/Madnikulin50/gordp
@@ -190,6 +196,10 @@ func (x *X224) SetRequestedProtocol(p uint32) {
 	x.requestedProtocol = p
 }
 
+func (x *X224) SelectedProtocol() uint32 {
+	return x.selectedProtocol
+}
+
 func (x *X224) Connect() error {
 	if x.transport == nil {
 		return errors.New("no transport")
@@ -206,34 +216,13 @@ func (x *X224) Connect() error {
 
 func (x *X224) recvConnectionConfirm(s []byte) {
 	glog.Debug("x224 recvConnectionConfirm ", hex.EncodeToString(s))
-	message := &ServerConnectionConfirm{}
-	if err := struc.Unpack(bytes.NewReader(s), message); err != nil {
+	selected, err := parseConnectionConfirm(s)
+	if err != nil {
 		glog.Error("ReadServerConnectionConfirm err", err)
-		x.Emit("error", fmt.Errorf("rdp x224: unpack connection confirm: %w", err))
-		return
-	}
-	if message.ProtocolNeg == nil {
-		x.Emit("error", errors.New("rdp x224: missing protocol negotiation"))
-		return
-	}
-	glog.Debugf("message: %+v", *message.ProtocolNeg)
-	if message.ProtocolNeg.Type == TYPE_RDP_NEG_FAILURE {
-		err := fmt.Errorf("rdp x224: negotiation failure code %d, see https://msdn.microsoft.com/en-us/library/cc240507.aspx",
-			message.ProtocolNeg.Result)
-		glog.Error(err.Error())
-		//only use Standard RDP Security mechanisms
-		if message.ProtocolNeg.Result == 2 {
-			glog.Info("Only use Standard RDP Security mechanisms, Reconnect with Standard RDP")
-		}
 		x.Emit("error", err)
-		x.Close()
 		return
 	}
-
-	if message.ProtocolNeg.Type == TYPE_RDP_NEG_RSP {
-		glog.Info("TYPE_RDP_NEG_RSP")
-		x.selectedProtocol = message.ProtocolNeg.Result
-	}
+	x.selectedProtocol = selected
 
 	if x.selectedProtocol == PROTOCOL_HYBRID_EX {
 		err := errors.New("rdp x224: PROTOCOL_HYBRID_EX not supported")
@@ -278,6 +267,41 @@ func (x *X224) recvConnectionConfirm(s []byte) {
 		return
 	}
 	x.Emit("error", fmt.Errorf("rdp x224: unknown selected protocol %d", x.selectedProtocol))
+}
+
+// parseConnectionConfirm 解析 X.224 CC。XP / 早期 RDP 经常不带 rdpNegData，
+// 也有服务器对 SSL/NLA 回 NEG_FAILURE(SSL_NOT_ALLOWED_BY_SERVER=2)；
+// 这两种都按 PROTOCOL_RDP（标准 RDP 加密）继续，而不是当成协议错误。
+func parseConnectionConfirm(s []byte) (uint32, error) {
+	if len(s) < 7 {
+		return 0, fmt.Errorf("rdp x224: connection confirm too short (%d)", len(s))
+	}
+	if MessageType(s[1]) != TPDU_CONNECTION_CONFIRM {
+		return 0, fmt.Errorf("rdp x224: expected connection confirm, got 0x%02x", s[1])
+	}
+	rest := s[7:]
+	if len(rest) == 0 {
+		glog.Info("x224 CC without negotiation, using standard RDP security")
+		return PROTOCOL_RDP, nil
+	}
+	if len(rest) < 8 {
+		return 0, fmt.Errorf("rdp x224: truncated protocol negotiation (%d)", len(rest))
+	}
+	negType := NegotiationType(rest[0])
+	result := binary.LittleEndian.Uint32(rest[4:8])
+	switch negType {
+	case TYPE_RDP_NEG_RSP:
+		glog.Info("TYPE_RDP_NEG_RSP")
+		return result, nil
+	case TYPE_RDP_NEG_FAILURE:
+		if result == sslNotAllowedByServer {
+			glog.Info("SSL_NOT_ALLOWED_BY_SERVER, using standard RDP security")
+			return PROTOCOL_RDP, nil
+		}
+		return 0, fmt.Errorf("rdp x224: negotiation failure code %d, see https://msdn.microsoft.com/en-us/library/cc240507.aspx", result)
+	default:
+		return 0, fmt.Errorf("rdp x224: unexpected negotiation type %d", negType)
+	}
 }
 
 func (x *X224) recvData(s []byte) {

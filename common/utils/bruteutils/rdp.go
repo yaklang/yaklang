@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	stdlog "log"
+	"os"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	stdlog "log"
-	"os"
-	"sync"
-	"time"
 
 	//"github.com/shadow1ng/fscan/common"
 
@@ -61,14 +65,20 @@ var rdpAuth = &DefaultServiceAuthInfo{
 		}
 
 		var r bool
+		// 本地帐号爆破必须空域：Client Info 的 Domain 填 IP 时 XP 不会按
+		// Administrator 自动登录，后续也收不到 Save Session Info。
 		if utils.IsIPv4(host) {
-			r, err = rdpLoginContext(i.Context, host, host, i.Username, i.Password, port)
+			r, err = rdpLoginContext(i.Context, host, "", i.Username, i.Password, port)
 		} else {
 			ip := netx.LookupFirst(host, netx.WithTimeout(defaultTimeout))
-			r, err = rdpLoginContext(i.Context, ip, host, i.Username, i.Password, port)
+			r, err = rdpLoginContext(i.Context, ip, "", i.Username, i.Password, port)
 		}
 
 		if err != nil {
+			var auth *rdpAuthError
+			if errors.As(err, &auth) {
+				return result
+			}
 			var cssp *nla.CredSSPError
 			if errors.As(err, &cssp) {
 				if cssp.AccountLocked() {
@@ -165,6 +175,11 @@ func rdpLogin(ip, domain, user, password string, port int) (_ bool, err error) {
 
 var RDPLogin = rdpLogin
 
+// rdpAuthError 是协议已连通、但帐密被拒绝。调度器应继续字典，不得 Finished。
+type rdpAuthError struct{ msg string }
+
+func (e *rdpAuthError) Error() string { return e.msg }
+
 type rdpClient struct {
 	Host string // ip:port
 	tpkt *tpkt.TPKT
@@ -176,6 +191,11 @@ type rdpClient struct {
 }
 
 func newRDPClient(host string, logLevel glog.LEVEL) *rdpClient {
+	if os.Getenv("YAK_RDP_GLOG") == "debug" {
+		logLevel = glog.DEBUG
+	} else if os.Getenv("YAK_RDP_GLOG") != "" {
+		logLevel = glog.INFO
+	}
 	glog.SetLevel(logLevel)
 	logger := stdlog.New(os.Stdout, "", 0)
 	glog.SetLogger(logger)
@@ -219,6 +239,7 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	// 消除旧实现中多 handler 并发写共享 err 的 data race。
 	var doneOnce sync.Once
 	var finalErr error
+	var sessionReady atomic.Bool
 	wg.Add(1)
 	finish := func(e error) {
 		doneOnce.Do(func() {
@@ -231,22 +252,49 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	}
 
 	// 必须在 Connect 之前注册：NLA 在 localhost 上可能快于后续 On()。
-	g.x224.On("error", func(e error) { finish(e) })
+	g.x224.On("error", func(e error) { finish(classicDropOr(e, &sessionReady, g)) })
 	g.x224.On("nla-ok", func() {
 		log.Info("rdp nla authentication succeeded")
 		finish(nil)
 	})
-	g.pdu.On("error", func(e error) { finish(e) })
+	g.pdu.On("error", func(e error) {
+		if e != nil && strings.Contains(e.Error(), "rdp logon failed") {
+			finish(&rdpAuthError{msg: e.Error()})
+			return
+		}
+		finish(classicDropOr(e, &sessionReady, g))
+	})
 	g.pdu.On("close", func() {
-		finish(errors.New("close"))
+		finish(classicDropOr(errors.New("close"), &sessionReady, g))
 	})
 	g.pdu.On("success", func() {
 		log.Info("rdp login success")
 		finish(nil)
 	})
 	g.pdu.On("ready", func() {
+		// 标准 RDP 加密（XP 等）在 FontMap 时就会 ready，此时尚未校验帐密。
+		// 爆破必须再等 Save Session Info；SSL/xrdp 通常没有后续 logon PDU。
+		if g.x224.SelectedProtocol() == x224.PROTOCOL_RDP {
+			log.Info("rdp session ready, waiting for logon")
+			sessionReady.Store(true)
+			return
+		}
 		log.Info("rdp session ready")
 		finish(nil)
+	})
+	g.pdu.On("logon", func(si *pdu.SaveSessionInfo) {
+		if si != nil && si.AuthOK() {
+			log.Info("rdp logon succeeded")
+			finish(nil)
+			return
+		}
+		infoType := uint32(0)
+		fields := uint32(0)
+		if si != nil {
+			infoType = si.InfoType
+			fields = si.FieldsPresent
+		}
+		finish(&rdpAuthError{msg: fmt.Sprintf("rdp logon failed: infotype=%d fields=%d", infoType, fields)})
 	})
 	g.pdu.On("update", func(rectangles []pdu.BitmapData) {
 		_ = rectangles
@@ -263,7 +311,13 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	go func() {
 		select {
 		case <-ctx.Done():
-			g.pdu.Emit("error", utils.Errorf("protocol error or no response: %v", ctx.Err()))
+			if sessionReady.Load() {
+				// 已建会话但没有 SAVE_SESSION_INFO：AUTOLOGON 未成功（错密码
+				// 或 XP 停在登录界面）。这是认证失败，不是目标不可达。
+				g.pdu.Emit("error", &rdpAuthError{msg: "rdp logon failed: no save-session-info"})
+			} else {
+				g.pdu.Emit("error", utils.Errorf("protocol error or no response: %v", ctx.Err()))
+			}
 		case <-loginDone:
 		}
 	}()
@@ -271,4 +325,27 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	wg.Wait()
 	close(loginDone)
 	return finalErr
+}
+
+// classicDropOr：XP/2003 标准 RDP 在 FontMap 之后才会 ready，此时帐密尚未
+// 被协议确认。对端随后 EOF/复位/关连接（停在登录界面、拒绝 AUTOLOGON）
+// 是认证失败，不能当成目标不可达。
+func classicDropOr(err error, ready *atomic.Bool, g *rdpClient) error {
+	if err == nil || ready == nil || g == nil || g.x224 == nil {
+		return err
+	}
+	if !ready.Load() || g.x224.SelectedProtocol() != x224.PROTOCOL_RDP {
+		return err
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return &rdpAuthError{msg: "rdp logon failed: session dropped without save-session-info"}
+	}
+	msg := strings.ToLower(err.Error())
+	if msg == "close" || strings.Contains(msg, "eof") ||
+		strings.Contains(msg, "broken pipe") || strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "use of closed") || strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "deadline exceeded") {
+		return &rdpAuthError{msg: "rdp logon failed: session dropped without save-session-info"}
+	}
+	return err
 }

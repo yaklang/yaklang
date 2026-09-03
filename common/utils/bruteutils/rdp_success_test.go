@@ -53,6 +53,22 @@ func TestRDPBruteSuccessCases(t *testing.T) {
 		}
 	})
 
+	t.Run("classic-xp-mock", func(t *testing.T) {
+		srv := startClassicRDPServer(t, map[string]string{"administrator": "RdpPass123!"})
+		res := rdpAuth.BrutePass(&BruteItem{
+			Type: "rdp", Target: srv.addr(), Username: "Administrator", Password: "RdpPass123!",
+			Context: context.Background(),
+		})
+		report(hit{"classic-xp", srv.addr(), "Administrator", "RdpPass123!"}, res.Ok, res.Finished, "save-session-info")
+		bad := rdpAuth.BrutePass(&BruteItem{
+			Type: "rdp", Target: srv.addr(), Username: "Administrator", Password: "wrong",
+			Context: context.Background(),
+		})
+		if bad.Ok || bad.Finished {
+			t.Fatalf("classic XP wrong password must be fail-and-continue, got ok=%v finished=%v", bad.Ok, bad.Finished)
+		}
+	})
+
 	t.Run("credssp-v6-ascii", func(t *testing.T) {
 		srv := startNLATestServerVer(t, map[string]string{"rdpuser": "RdpPass123!"}, 6)
 		res := rdpAuth.BrutePass(&BruteItem{

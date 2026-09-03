@@ -461,7 +461,14 @@ func (c *Client) connect(clientData []interface{}, serverData []interface{}, use
 			break
 		}
 	}
-	c.enableEncryption = c.ClientCoreData().ServerSelectedProtocol == 0
+	// PROTOCOL_RDP 默认开 RC4；但 SC_SECURITY.EncryptionMethod=0
+	// （ENCRYPTION_METHOD_NONE）时按规范不加密，便于 XP 风格 mock。
+	c.enableEncryption = false
+	if c.ClientCoreData().ServerSelectedProtocol == 0 {
+		if ssd := c.ServerSecurityData(); ssd == nil || ssd.EncryptionMethod != 0 {
+			c.enableEncryption = true
+		}
+	}
 
 	c.sendInfoPkt()
 	c.transport.Once("global", c.recvLicenceInfo)
@@ -682,7 +689,24 @@ func (c *Client) sendInfoPkt() {
 	}
 
 	glog.Debug("RdpVersion:", c.ClientCoreData().RdpVersion, ":", gcc.RDP_VERSION_5_PLUS)
-	c.sendFlagged(secFlag, c.info.Serialize(c.ClientCoreData().RdpVersion == gcc.RDP_VERSION_5_PLUS))
+	// PROTOCOL_RDP（XP/2003）：ncrack 用 RDP_LOGON_AUTO|NORMAL(0x3B) 并带
+	// TS_EXTENDED_INFO（RDP 5.x）。INFO_LOGONERRORS / ENABLEWINDOWSKEY 是 6+
+	// 标志，5.1 会把后续字段吃偏，AUTOLOGON 失效。LOGONNOTIFY 必须留着才有 0x26。
+	legacyRDP := c.ClientCoreData().ServerSelectedProtocol == 0
+	hasExtended := true
+	if legacyRDP {
+		c.info.Flag = INFO_MOUSE | INFO_DISABLECTRLALTDEL | INFO_AUTOLOGON |
+			INFO_UNICODE | INFO_MAXIMIZESHELL | INFO_LOGONNOTIFY
+		if c.info.ExtendedInfo != nil {
+			ip := append(core.UnicodeEncode("127.0.0.1"), 0, 0)
+			dll := append(core.UnicodeEncode(`C:\WINNT\System32\mstscax.dll`), 0, 0)
+			c.info.ExtendedInfo.ClientAddress = ip
+			c.info.ExtendedInfo.ClientDir = dll
+		}
+		// RDP 4.0 才没有 ExtendedInfo；XP 5.1 走 ncrack 的 rdp_version!=4 分支。
+		hasExtended = c.ClientCoreData().RdpVersion != gcc.RDP_VERSION_4
+	}
+	c.sendFlagged(secFlag, c.info.Serialize(hasExtended))
 }
 
 func (c *Client) recvLicenceInfo(s []byte) {
@@ -869,13 +893,21 @@ func (c *Client) recvData(s []byte) {
 	}
 
 	r := bytes.NewReader(s)
-	securityFlag, _ := core.ReadUint16LE(r)
+	securityFlag, err := core.ReadUint16LE(r)
+	if err != nil {
+		c.Emit("data", s)
+		return
+	}
 	_, _ = core.ReadUint16LE(r) //securityFlagHi
 	s1, _ := core.ReadBytes(r.Len(), r)
 	if securityFlag&ENCRYPT != 0 {
 		data := c.readEncryptedPayload(s1, securityFlag&SECURE_CHECKSUM != 0)
 		c.Emit("data", data)
+		return
 	}
+	// 加密通道上仍可能出现未置 ENCRYPT 的慢路径 PDU（Save Session Info /
+	// Set Error Info）。丢掉就会让 XP 经典 RDP 永远等不到 logon。
+	c.Emit("data", s1)
 }
 func (c *Client) SetFastPathListener(f core.FastPathListener) {
 	c.fastPathListener = f
