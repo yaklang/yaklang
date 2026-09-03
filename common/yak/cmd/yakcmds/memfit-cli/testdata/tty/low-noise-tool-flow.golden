@@ -1,6 +1,6 @@
 ◆ memfit  local isolated agent
 test-model · YOLO · /workspace/yaklang
-Enter send · Alt+Enter newline · Ctrl+C stop · /help
+Enter send · Alt+Enter newline · @ files · / commands · PgUp history
 
 You
   tool-noise
@@ -15,6 +15,7 @@ Memfit
 
   ✓ Thinking ▸
 › × Read ▸ · 文件读取 · README.md
-❯
-───────────────────────────────────────────────────────────────────────────
+╭─ Message ────────────────────────────────────────────────────────────────
+│ ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────────────
 ○ Ready                    test-model · YOLO · click/Ctrl+O details · /help

@@ -1,6 +1,6 @@
 ◆ memfit  local isolated agent
 test-model · YOLO · /workspace/yaklang
-Enter send · Alt+Enter newline · Ctrl+C stop · /help
+Enter send · Alt+Enter newline · @ files · / commands · PgUp history
 
 You
   stream-while-type
@@ -10,6 +10,7 @@ Memfit
 
 ✓ Completed · <elapsed> · test-model
 
-❯ draft 中文 stays
-───────────────────────────────────────────────────────────────────────
+╭─ Message ────────────────────────────────────────────────────────────
+│ ❯ draft 中文 stays
+╰──────────────────────────────────────────────────────────────────────
 ○ Ready                test-model · YOLO · click/Ctrl+O details · /help

@@ -3,8 +3,10 @@ package memfitcli
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -51,7 +53,10 @@ func TestMemfitKeyBindings(t *testing.T) {
 		{"\x1b[A", memfitKeyUp},
 		{"\x1b[B", memfitKeyDown},
 		{"\x1b[3~", memfitKeyDelete},
+		{"\x1b[5~", memfitKeyPageUp},
+		{"\x1b[6~", memfitKeyPageDown},
 		{"\x1b\r", memfitKeyNewline},
+		{"\t", memfitKeyComplete},
 		{"\x03", memfitKeyInterrupt},
 		{"\x0f", memfitKeyToggleProcess},
 		{"\x17", memfitKeyDeleteWord},
@@ -74,6 +79,103 @@ func TestMemfitKeyBindings(t *testing.T) {
 	require.Equal(t, 0, mouse.button)
 	require.Equal(t, 4, mouse.column)
 	require.Equal(t, 9, mouse.row)
+}
+
+func TestMemfitCompletionContexts(t *testing.T) {
+	kind, query, start, ok := memfitCompletionContext([]rune("/mo"), 3)
+	require.True(t, ok)
+	require.Equal(t, memfitCompletionCommand, kind)
+	require.Equal(t, "/mo", query)
+	require.Zero(t, start)
+
+	input := []rune(`inspect @docs/My\ File`)
+	kind, query, start, ok = memfitCompletionContext(input, len(input))
+	require.True(t, ok)
+	require.Equal(t, memfitCompletionFile, kind)
+	require.Equal(t, "docs/My File", query)
+	require.Equal(t, strings.Index(string(input), "@"), start)
+
+	_, _, _, ok = memfitCompletionContext([]rune("first\n/help"), len([]rune("first\n/help")))
+	require.False(t, ok, "slash commands only complete at the start of a message")
+}
+
+func TestMemfitFileCompletionsAndAcceptance(t *testing.T) {
+	workdir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(workdir, "alpha dir"), 0o755))
+	require.NoError(t, os.Mkdir(filepath.Join(workdir, "vendor"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(workdir, "README.md"), []byte("fixture"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(workdir, "alpha.txt"), []byte("fixture"), 0o644))
+
+	completions := memfitMentionCompletions(workdir, "")
+	require.NotEmpty(t, completions)
+	require.Equal(t, "@alpha\\ dir/", completions[0].value, "directories sort before files")
+	require.NotContains(t, fmt.Sprint(completions), "vendor")
+
+	ui := &memfitTUI{config: memfitStartConfig{Workdir: workdir}, buffer: []rune("@REA"), cursor: 4}
+	ui.refreshCompletions()
+	require.Len(t, ui.completions, 1)
+	kind, accepted := ui.acceptCompletion()
+	require.True(t, accepted)
+	require.Equal(t, memfitCompletionFile, kind)
+	require.Equal(t, "@README.md ", string(ui.buffer))
+
+	ui.buffer = []rune("/mode y")
+	ui.cursor = len(ui.buffer)
+	ui.completionSignature = 0
+	ui.refreshCompletions()
+	require.Len(t, ui.completions, 1)
+	kind, accepted = ui.acceptCompletion()
+	require.True(t, accepted)
+	require.Equal(t, memfitCompletionCommand, kind)
+	require.Equal(t, "/mode yolo", string(ui.buffer))
+}
+
+func TestMemfitMultilineEditorAndTranscriptViewport(t *testing.T) {
+	layout := layoutMemfitEditor([]rune("你好\nworld"), len([]rune("你好\nworld")), 20, 4)
+	require.Equal(t, []string{"你好", "world"}, layout.lines)
+	require.Equal(t, 1, layout.cursorRow)
+	require.Equal(t, 5, layout.cursorColumn)
+
+	ui := &memfitTUI{width: 32, height: 12, buffer: []rune("你好\nworld"), cursor: len([]rune("你好\nworld"))}
+	editor, cursorRow, cursorColumn := ui.editorLines()
+	require.Contains(t, joinMemfitLiveLines(editor), "│ ❯ 你好\n│   world")
+	require.Equal(t, 2, cursorRow)
+	require.Equal(t, 9, cursorColumn)
+
+	cursor, moved := memfitMoveCursorLine([]rune("first\nxy"), len([]rune("first\nxy")), -1)
+	require.True(t, moved)
+	require.Equal(t, 2, cursor)
+	require.Equal(t, 6, memfitLineBoundary([]rune("first\nxy"), len([]rune("first\nxy")), false))
+
+	ui.recordTranscript("You", []string{"first question"}, memfitColorGreen)
+	ui.recordTranscript("Memfit", []string{"first answer"}, memfitColorCyan)
+	ui.width = 60
+	ui.scrollTranscript(3)
+	require.Positive(t, ui.transcriptScroll)
+	panel := joinMemfitLiveLines(ui.transcriptPanelLines(7))
+	require.Contains(t, panel, "History")
+	require.Contains(t, panel, "PgDn latest")
+	ui.scrollTranscript(-100)
+	require.Zero(t, ui.transcriptScroll)
+}
+
+func TestMemfitTranscriptRetainsThinkingIntentAndToolDetails(t *testing.T) {
+	ui := &memfitTUI{
+		width:  72,
+		height: 22,
+		processItems: []memfitProcessItem{
+			{kind: "Thinking", detail: "inspect the repository before answering", state: memfitProcessDone},
+			{kind: "Intent", detail: "understand project scope", state: memfitProcessDone},
+			{kind: "Read", detail: "README.md\nWhy: establish context\nResult: Yaklang project", state: memfitProcessDone},
+		},
+	}
+	ui.recordProcessTranscript()
+	transcript := joinMemfitLiveLines(ui.flattenedTranscriptLines())
+	require.Contains(t, transcript, "✓ Thinking\n  inspect the repository before answering")
+	require.Contains(t, transcript, "✓ Intent · understand project scope")
+	require.Contains(t, transcript, "✓ Read · README.md")
+	require.Contains(t, transcript, "Why: establish context")
+	require.Contains(t, transcript, "Result: Yaklang project")
 }
 
 func TestMemfitReadableContentExtraction(t *testing.T) {

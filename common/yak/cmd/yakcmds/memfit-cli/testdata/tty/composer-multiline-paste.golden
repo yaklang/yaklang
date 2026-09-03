@@ -1,17 +1,9 @@
 ◆ memfit  local isolated agent
-test-model · YOLO · /workspace/yaklang
+test-model · YOLO · …/001
 Enter send · Alt+Enter newline · @ files · / commands · PgUp history
 
-You
-  error-with-queue
-
-Queued #1
-  continue after error
-
-Error
-  deterministic provider failure
-
 ╭─ Message ────────────────────────────────────────────────────────────
-│ ❯ Type a message · @ files · / commands
+│ ❯ first line
+│   第二行 🌏
 ╰──────────────────────────────────────────────────────────────────────
-○ Queue paused · 1 waiting               test-model · YOLO · ^O details
+○ Ready                test-model · YOLO · click/Ctrl+O details · /help

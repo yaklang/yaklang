@@ -1,4 +1,3 @@
-Action required
   Allow the deterministic test action?
 
 Reply
@@ -15,6 +14,7 @@ You
 Cancel
   Cancellation requested; press Ctrl+C again to exit
 
-queue ❯
-───────────────────────────────────────────────────────────────────────
+╭─ Queued message ─────────────────────────────────────────────────────
+│ queue ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────────
 ◆ Cancelling         test-model · MANUAL · click/Ctrl+O details · /help
