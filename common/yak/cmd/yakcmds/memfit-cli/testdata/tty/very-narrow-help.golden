@@ -1,12 +1,12 @@
-Enter send · ^C stop
-
-Commands
+  @ files · / commands
+  Tab · PgUp/PgDn
   click / ^O details
   /status /queue /mode
   /logs /clear /exit
   Enter queues while
   busy.
 
-❯
-───────────────────────
+╭─ Message ────────────
+│ ❯ Type a message · @…
+╰──────────────────────
 ○ Ready            YOLO

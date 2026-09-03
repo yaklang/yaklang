@@ -1,6 +1,6 @@
 ◆ memfit  local isolated agent
 test-model · YOLO · /workspace/yaklang
-Enter send · Alt+Enter newline · Ctrl+C stop · /help
+Enter send · Alt+Enter newline · @ files · / commands · PgUp history
 
 You
   queue-first
@@ -8,6 +8,7 @@ You
 Queued #1
   第二个问题 queued while busy
 
-queue ❯
-───────────────────────────────────────────────────────────────────────
+╭─ Queued message ─────────────────────────────────────────────────────
+│ queue ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────────
 ◆ Thinking · 1 waiting                   test-model · YOLO · ^O details

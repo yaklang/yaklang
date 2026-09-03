@@ -23,7 +23,10 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-const memfitTTYHelperEnvironment = "YAK_MEMFIT_TTY_TEST_HELPER"
+const (
+	memfitTTYHelperEnvironment  = "YAK_MEMFIT_TTY_TEST_HELPER"
+	memfitTTYWorkdirEnvironment = "YAK_MEMFIT_TTY_TEST_WORKDIR"
+)
 
 // TestMemfitTTYHelper runs inside a child test process attached to a real PTY.
 // The outer tests below drive this process exactly like a user drives Memfit.
@@ -40,6 +43,9 @@ func TestMemfitTTYHelper(t *testing.T) {
 		ReviewPolicy:  "yolo",
 		MaxIterations: 50,
 	}
+	if workdir := os.Getenv(memfitTTYWorkdirEnvironment); workdir != "" {
+		config.Workdir = workdir
+	}
 	require.NoError(t, runMemfitTUI(context.Background(), client, config, ""))
 }
 
@@ -49,14 +55,14 @@ func TestMemfitTTYWidePasteAndAnswerSnapshot(t *testing.T) {
 
 	h.WaitFor("❯")
 	h.Write("\x1b[200~你好，Memfit\n第二行 🌏\x1b[201~")
-	h.WaitFor("你好，Memfit↵第二行 🌏")
+	h.WaitForScreen("│ ❯ 你好，Memfit\n│   第二行 🌏")
 	h.AssertSnapshot("wide-paste")
 
 	h.Write("\r")
 	h.WaitFor("echo: 你好，Memfit / 第二行 🌏")
 	h.WaitFor("Completed")
 	snapshot := h.WaitFor("────────────────\n○ Ready")
-	require.Contains(t, snapshot, "❯\n────────────────")
+	require.Contains(t, snapshot, "│ ❯ Type a message")
 	h.AssertSnapshot("wide-answer")
 	raw := h.Raw()
 	require.Contains(t, raw, "\x1b[?2004h", "bracketed paste must be enabled")
@@ -268,6 +274,44 @@ func TestMemfitTTYPreservesDraftWhileResponseUpdatesSnapshot(t *testing.T) {
 	snapshot := h.WaitFor("❯ draft 中文 stays")
 	require.Contains(t, snapshot, "answer starts and continues while typing")
 	h.AssertSnapshot("typing-during-response")
+}
+
+func TestMemfitTTYComposerCompletionPasteAndHistorySnapshot(t *testing.T) {
+	workdir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(workdir, "README.md"), []byte("fixture"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(workdir, "common"), 0o755))
+	h := newMemfitTTYHarnessWithWorkdir(t, 72, 22, workdir)
+	defer h.Close()
+
+	h.WaitFor("❯")
+	h.Write("/mo")
+	h.WaitForScreen("Commands · ↑↓ choose · Tab insert")
+	h.WaitForScreen("/mode yolo")
+	h.AssertSnapshot("composer-slash-completion")
+	h.Write("\t")
+	h.WaitForScreen("│ ❯ /mode yolo")
+
+	h.Write("\x15@REA")
+	h.WaitForScreen("Files · ↑↓ choose · Tab insert")
+	h.WaitForScreen("@README.md")
+	h.AssertSnapshot("composer-file-completion")
+	h.Write("\t")
+	h.WaitForScreen("│ ❯ @README.md")
+
+	h.Write("\x15\x1b[200~first line\n第二行 🌏\x1b[201~")
+	h.WaitForScreen("│ ❯ first line\n│   第二行 🌏")
+	h.AssertSnapshot("composer-multiline-paste")
+	h.Write("\r")
+	h.WaitFor("Completed")
+	h.WaitForScreen("○ Ready")
+
+	h.Write("\x1b[5~")
+	h.WaitForScreen("╭─ History")
+	h.WaitForScreen("PgDn latest")
+	h.AssertSnapshot("conversation-history")
+	h.Write("\x1b[6~")
+	time.Sleep(50 * time.Millisecond)
+	require.NotContains(t, h.WaitForScreen("○ Ready"), "History")
 }
 
 type scriptedMemfitClient struct {
@@ -538,6 +582,10 @@ type memfitTTYHarness struct {
 }
 
 func newMemfitTTYHarness(t *testing.T, width, height int) *memfitTTYHarness {
+	return newMemfitTTYHarnessWithWorkdir(t, width, height, "")
+}
+
+func newMemfitTTYHarnessWithWorkdir(t *testing.T, width, height int, workdir string) *memfitTTYHarness {
 	t.Helper()
 	terminal, err := gopty.New()
 	require.NoError(t, err)
@@ -552,6 +600,9 @@ func newMemfitTTYHarness(t *testing.T, width, height int) *memfitTTYHarness {
 		"NO_COLOR=1",
 		"LOG_LEVEL=warn",
 	)
+	if workdir != "" {
+		cmd.Env = append(cmd.Env, memfitTTYWorkdirEnvironment+"="+workdir)
+	}
 	require.NoError(t, cmd.Start())
 
 	h := &memfitTTYHarness{

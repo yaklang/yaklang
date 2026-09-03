@@ -167,6 +167,9 @@ const (
 	memfitKeyEOF
 	memfitKeyRedraw
 	memfitKeyToggleProcess
+	memfitKeyComplete
+	memfitKeyPageUp
+	memfitKeyPageDown
 	memfitKeyMouse
 	memfitKeyCursorPosition
 )
@@ -236,6 +239,14 @@ type memfitTUI struct {
 	history      [][]rune
 	historyIndex int
 	historyDraft []rune
+
+	completions         []memfitCompletion
+	completionIndex     int
+	completionStart     int
+	completionEnd       int
+	completionSignature uint64
+	transcript          []memfitTranscriptBlock
+	transcriptScroll    int
 
 	busy                bool
 	awaitingInput       bool
@@ -360,12 +371,12 @@ func (ui *memfitTUI) printHeader() {
 	}
 	if ui.width < 48 {
 		fmt.Fprintf(os.Stdout, "%s memfit · %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆"), strings.ToUpper(ui.config.ReviewPolicy))
-		hint := "Enter send · Ctrl+C stop · /help"
+		hint := "Enter send · @ files · / commands"
 		if ui.width < 34 {
 			hint = "Enter send · ^C stop"
 		}
 		if ui.width < 24 {
-			hint = "Enter send · ^C"
+			hint = "Enter send · /"
 		}
 		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, hint))
 		fmt.Fprint(os.Stdout, "\r\n")
@@ -374,17 +385,40 @@ func (ui *memfitTUI) printHeader() {
 	fmt.Fprintf(os.Stdout, "%s  %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆ memfit"), ui.paint(memfitColorDim, "local isolated agent"))
 	detail := fmt.Sprintf("%s · %s · %s", model, strings.ToUpper(ui.config.ReviewPolicy), compactMemfitPath(ui.config.Workdir, maxInt(18, ui.width/3)))
 	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, truncateMemfitCells(detail, ui.width-1)))
-	hint := "Enter send · Ctrl+C stop · /help"
+	hint := "Enter send · @ files · / commands · Ctrl+C stop"
 	if ui.width >= 64 {
-		hint = "Enter send · Alt+Enter newline · Ctrl+C stop · /help"
+		hint = "Enter send · Alt+Enter newline · @ files · / commands · PgUp history"
 	}
 	if ui.width >= 82 {
-		hint = "Enter send · Alt+Enter newline · click/^O details · Ctrl+C stop · /help"
+		hint = "Enter send · Alt+Enter newline · @ files · / commands · PgUp history · ^O details"
 	}
 	fmt.Fprintf(os.Stdout, "%s\r\n\r\n", ui.paint(memfitColorDim, hint))
 }
 
 func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
+	ui.refreshCompletions()
+	if len(ui.completions) > 0 {
+		switch key.kind {
+		case memfitKeyUp:
+			ui.selectCompletion(-1)
+			ui.renderComposer()
+			return false, nil
+		case memfitKeyDown:
+			ui.selectCompletion(1)
+			ui.renderComposer()
+			return false, nil
+		case memfitKeyComplete:
+			ui.acceptCompletion()
+			ui.renderComposer()
+			return false, nil
+		case memfitKeySubmit:
+			kind, accepted := ui.acceptCompletion()
+			if accepted && kind != memfitCompletionCommand {
+				ui.renderComposer()
+				return false, nil
+			}
+		}
+	}
 	switch key.kind {
 	case memfitKeyInsert:
 		ui.insert(key.text)
@@ -399,13 +433,28 @@ func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
 			ui.cursor++
 		}
 	case memfitKeyHome:
-		ui.cursor = 0
+		ui.cursor = memfitLineBoundary(ui.buffer, ui.cursor, false)
 	case memfitKeyEnd:
-		ui.cursor = len(ui.buffer)
+		ui.cursor = memfitLineBoundary(ui.buffer, ui.cursor, true)
 	case memfitKeyUp:
-		ui.moveHistory(-1)
+		if cursor, moved := memfitMoveCursorLine(ui.buffer, ui.cursor, -1); moved {
+			ui.cursor = cursor
+		} else {
+			ui.moveHistory(-1)
+		}
 	case memfitKeyDown:
-		ui.moveHistory(1)
+		if cursor, moved := memfitMoveCursorLine(ui.buffer, ui.cursor, 1); moved {
+			ui.cursor = cursor
+		} else {
+			ui.moveHistory(1)
+		}
+	case memfitKeyComplete:
+		// Tab only accepts a visible completion; otherwise it is intentionally
+		// ignored so a literal tab cannot distort the message layout.
+	case memfitKeyPageUp:
+		ui.scrollTranscript(maxInt(3, ui.height/2))
+	case memfitKeyPageDown:
+		ui.scrollTranscript(-maxInt(3, ui.height/2))
 	case memfitKeyBackspace:
 		if ui.cursor > 0 {
 			ui.buffer = append(ui.buffer[:ui.cursor-1], ui.buffer[ui.cursor:]...)
@@ -430,6 +479,15 @@ func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
 		ui.toggleSelectedProcessItem()
 		return false, nil
 	case memfitKeyMouse:
+		if key.pressed && key.button&64 != 0 {
+			if key.button&3 == 0 {
+				ui.scrollTranscript(3)
+			} else if key.button&3 == 1 {
+				ui.scrollTranscript(-3)
+			}
+			ui.renderComposer()
+			return false, nil
+		}
 		if key.pressed && key.button&64 == 0 && key.button&3 == 0 && len(ui.processHits) > 0 {
 			pending := key
 			ui.pendingMouse = &pending
@@ -491,6 +549,9 @@ func (ui *memfitTUI) handleKey(key memfitKey) (bool, error) {
 		ui.buffer = nil
 		ui.cursor = 0
 		ui.historyIndex = -1
+		ui.completions = nil
+		ui.completionSignature = 0
+		ui.transcriptScroll = 0
 		if ui.awaitingInput {
 			return false, ui.submitInteractive(text)
 		}
@@ -526,10 +587,17 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		return true, true, nil
 	case "/help", "/?":
 		lines := []string{
+			"@path         mention a project file",
+			"/              browse commands and settings",
+			"Tab            accept the selected completion",
+			"PgUp / PgDn    browse conversation history",
+			"Paste          supports multiline terminal paste",
+			"Shift-drag     select terminal output to copy",
 			"Click an activity to open its details",
 			"Ctrl+O        toggle the current activity",
 			"/process      toggle current activity",
 			"/process all  show earlier activities",
+			"/history      browse conversation history",
 			"/status       session and worker status",
 			"/queue        show queued messages",
 			"/queue clear  discard queued messages",
@@ -542,8 +610,12 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		}
 		if ui.width < 48 {
 			lines = []string{
+				"@path / slash completions",
+				"Tab accept · PgUp/PgDn history",
+				"Paste multiline · Shift-drag copy",
 				"click / ^O  activity details",
 				"/process all  earlier activity",
+				"/history history viewport",
 				"/status  session info",
 				"/queue   queued messages",
 				"/mode    review mode",
@@ -555,6 +627,8 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		}
 		if ui.width < 32 {
 			lines = []string{
+				"@ files · / commands",
+				"Tab · PgUp/PgDn",
 				"click / ^O details",
 				"/status /queue /mode",
 				"/logs /clear /exit",
@@ -579,6 +653,21 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		} else {
 			ui.toggleSelectedProcessItem()
 		}
+		return true, false, nil
+	case "/history":
+		if len(parts) == 2 && strings.EqualFold(parts[1], "latest") {
+			ui.transcriptScroll = 0
+			return true, false, nil
+		}
+		if len(parts) != 1 {
+			ui.printNotice("history", "Usage: /history [latest]", memfitColorYellow)
+			return true, false, nil
+		}
+		if len(ui.transcript) == 0 {
+			ui.printNotice("history", "No conversation history yet", memfitColorDim)
+			return true, false, nil
+		}
+		ui.scrollTranscript(maxInt(3, ui.height/2))
 		return true, false, nil
 	case "/thinking", "/think":
 		key := ui.latestProcessKindKey("Thinking")
@@ -659,6 +748,8 @@ func (ui *memfitTUI) handleLocalCommand(input string) (handled, exit bool, err e
 		ui.processItems = nil
 		ui.processShowAll = false
 		ui.processSelectedKey = ""
+		ui.transcript = nil
+		ui.transcriptScroll = 0
 		fmt.Fprint(os.Stdout, "\x1b[2J\x1b[H")
 		ui.printHeader()
 		return true, false, nil
@@ -691,6 +782,7 @@ func (ui *memfitTUI) submit(text string) error {
 
 func (ui *memfitTUI) startTurn(text string) error {
 	ui.clearLiveFrame()
+	ui.transcriptScroll = 0
 	ui.printInputBlock("You", text, memfitColorGreen)
 	ui.busy = true
 	ui.queuePaused = false
@@ -722,6 +814,7 @@ func (ui *memfitTUI) enqueue(text string) {
 		return
 	}
 	ui.queued = append(ui.queued, memfitQueuedInput{text: text, queuedAt: time.Now()})
+	ui.transcriptScroll = 0
 	ui.clearLiveFrame()
 	ui.printInputBlock(fmt.Sprintf("Queued #%d", len(ui.queued)), text, memfitColorYellow)
 }
@@ -738,6 +831,7 @@ func (ui *memfitTUI) startNextQueued() error {
 
 func (ui *memfitTUI) submitInteractive(text string) error {
 	ui.clearLiveFrame()
+	ui.transcriptScroll = 0
 	ui.rememberHistory(text)
 	ui.printInputBlock("Reply", text, memfitColorYellow)
 	id := ui.interactiveID
@@ -762,6 +856,7 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 	case "error":
 		status, _ := decodeMemfitPayload[memfitStatus](envelope)
 		ui.finishProcessItems(memfitProcessError)
+		ui.recordProcessTranscript()
 		ui.clearLiveFrame()
 		ui.printTextSection("Error", []string{humanizeMemfitMessage(status.Message)}, memfitColorRed)
 		ui.busy = false
@@ -783,6 +878,7 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 	case "turn_done":
 		status, _ := decodeMemfitPayload[memfitStatus](envelope)
 		ui.finishProcessItems(memfitProcessDone)
+		ui.recordProcessTranscript()
 		result := ui.answers.Last()
 		if result == "" {
 			result = ui.fallbackResult
@@ -801,6 +897,7 @@ func (ui *memfitTUI) handleEnvelope(envelope memfitEnvelope) error {
 			detail += " · " + ui.lastModel
 		}
 		fmt.Fprintf(os.Stdout, "%s %s\r\n\r\n", ui.paint(color, marker), ui.paint(memfitColorDim, detail))
+		ui.recordTranscript(marker+" "+detail, nil, color)
 		ui.busy = false
 		ui.awaitingInput = false
 		ui.interactiveID = ""
@@ -1623,6 +1720,31 @@ func memfitProcessStateStyle(state memfitProcessState) (string, string) {
 
 func (ui *memfitTUI) renderComposer() {
 	ui.clearLiveFrame()
+	ui.refreshCompletions()
+	editorLines, editorCursorRow, editorCursorColumn := ui.editorLines()
+	completionLines := ui.completionPanelLines()
+	completionBudget := maxInt(0, ui.height-len(editorLines)-1)
+	completionLines = limitMemfitCompletionLines(completionLines, completionBudget)
+
+	preludeBudget := maxInt(0, ui.height-len(editorLines)-len(completionLines)-1)
+	var prelude []memfitLiveLine
+	if ui.transcriptScroll > 0 {
+		prelude = ui.transcriptPanelLines(preludeBudget)
+	} else {
+		prelude = ui.processPanelLines()
+		if ui.streamPreview != "" {
+			label, color := "Thinking › ", memfitColorDim
+			if ui.streamKind == "answer" {
+				label, color = "Memfit › ", memfitColorCyan
+			}
+			prelude = append(prelude, memfitLiveLine{
+				text:  label + singleLineMemfitText(ui.streamPreview),
+				color: color,
+			})
+		}
+		prelude = limitMemfitLiveLines(prelude, preludeBudget)
+	}
+
 	rows := 0
 	type pendingHit struct {
 		row int
@@ -1630,7 +1752,7 @@ func (ui *memfitTUI) renderComposer() {
 	}
 	pendingHits := make([]pendingHit, 0, 8)
 	ui.processHits = nil
-	for _, line := range ui.processPanelLines() {
+	printLine := func(line memfitLiveLine) {
 		plain := truncateMemfitCells(line.text, ui.width-1)
 		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(line.color, plain))
 		if line.processKey != "" || line.showMore {
@@ -1645,33 +1767,17 @@ func (ui *memfitTUI) renderComposer() {
 		}
 		rows++
 	}
-	if ui.streamPreview != "" {
-		label, color := "Thinking › ", memfitColorDim
-		if ui.streamKind == "answer" {
-			label, color = "Memfit › ", memfitColorCyan
-		}
-		preview := singleLineMemfitText(ui.streamPreview)
-		line := label + preview
-		fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(color, truncateMemfitCells(line, ui.width-1)))
-		rows++
+	for _, line := range prelude {
+		printLine(line)
 	}
-	prefix := "❯ "
-	if ui.awaitingInput {
-		prefix = "reply ❯ "
-	} else if ui.busy {
-		prefix = "queue ❯ "
+	for _, line := range completionLines {
+		printLine(line)
 	}
-	available := maxInt(8, ui.width-runewidth.StringWidth(prefix)-1)
-	text, cursorCells := memfitInputViewport(ui.buffer, ui.cursor, available)
-	fmt.Fprint(os.Stdout, ui.paint(memfitColorBold+memfitColorCyan, prefix))
-	fmt.Fprint(os.Stdout, text)
-	fmt.Fprint(os.Stdout, "\r\n")
-	composerRow := rows
-	rows++
-
-	dividerWidth := maxInt(1, ui.width-1)
-	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, strings.Repeat("─", dividerWidth)))
-	rows++
+	editorStartRow := rows
+	for _, line := range editorLines {
+		printLine(line)
+	}
+	composerRow := editorStartRow + editorCursorRow
 
 	statusMarker, statusColor := "○", memfitColorDim
 	if ui.busy {
@@ -1683,19 +1789,63 @@ func (ui *memfitTUI) renderComposer() {
 	ui.renderFooter(statusMarker, statusColor)
 	rows++
 
-	// Keep the editing cursor in the composer while retaining two persistent
-	// footer rows beneath it. clearLiveFrame knows how to descend to the footer
-	// before erasing the complete live frame on the next update.
-	fmt.Fprint(os.Stdout, "\r\x1b[2A")
-	if column := runewidth.StringWidth(prefix) + cursorCells; column > 0 {
-		fmt.Fprintf(os.Stdout, "\x1b[%dC", column)
+	// Keep the editing cursor inside the editor while retaining its lower border
+	// and status row beneath it. clearLiveFrame descends before erasing the frame.
+	rowsBelowCursor := rows - 1 - composerRow
+	fmt.Fprint(os.Stdout, "\r")
+	if rowsBelowCursor > 0 {
+		fmt.Fprintf(os.Stdout, "\x1b[%dA", rowsBelowCursor)
+	}
+	if editorCursorColumn > 0 {
+		fmt.Fprintf(os.Stdout, "\x1b[%dC", editorCursorColumn)
 	}
 	ui.liveRows = rows
-	ui.liveRowsBelowCursor = 2
+	ui.liveRowsBelowCursor = rowsBelowCursor
 	for _, hit := range pendingHits {
 		hit.offset = composerRow - hit.row
 		ui.processHits = append(ui.processHits, hit.memfitProcessHit)
 	}
+}
+
+func limitMemfitLiveLines(lines []memfitLiveLine, maximum int) []memfitLiveLine {
+	if maximum <= 0 {
+		return nil
+	}
+	if len(lines) <= maximum {
+		return lines
+	}
+	if maximum == 1 {
+		return append([]memfitLiveLine(nil), lines[len(lines)-1])
+	}
+	result := []memfitLiveLine{{
+		text:  fmt.Sprintf("  ◇ %d activity lines hidden", len(lines)-maximum+1),
+		color: memfitColorDim,
+	}}
+	return append(result, lines[len(lines)-maximum+1:]...)
+}
+
+func limitMemfitCompletionLines(lines []memfitLiveLine, maximum int) []memfitLiveLine {
+	if maximum <= 0 || len(lines) == 0 {
+		return nil
+	}
+	if len(lines) <= maximum {
+		return lines
+	}
+	selected := lines[minMemfitInt(1, len(lines)-1)]
+	for _, line := range lines {
+		if strings.Contains(line.text, "│ › ") {
+			selected = line
+			break
+		}
+	}
+	if maximum == 1 {
+		return []memfitLiveLine{selected}
+	}
+	result := []memfitLiveLine{lines[0], selected}
+	if maximum >= 3 {
+		result = append(result, lines[len(lines)-1])
+	}
+	return result
 }
 
 func (ui *memfitTUI) renderFooter(marker, color string) {
@@ -1717,6 +1867,15 @@ func (ui *memfitTUI) renderFooter(marker, color string) {
 
 func (ui *memfitTUI) footerSegments(marker string) (string, string) {
 	maxWidth := maxInt(1, ui.width-1)
+	if ui.transcriptScroll > 0 {
+		left := truncateMemfitCells("↑ History · "+memfitHistoryOffsetLabel(ui.transcriptScroll), maxWidth)
+		for _, right := range []string{"PgDn latest · " + strings.ToUpper(ui.config.ReviewPolicy), "PgDn latest", strings.ToUpper(ui.config.ReviewPolicy)} {
+			if runewidth.StringWidth(left)+3+runewidth.StringWidth(right) <= maxWidth {
+				return left, right
+			}
+		}
+		return left, ""
+	}
 	left := truncateMemfitCells(marker+" "+ui.liveStatusSummary(), maxWidth)
 	model := ui.config.Model
 	if model == "" {
@@ -1765,12 +1924,14 @@ func (ui *memfitTUI) printNotice(label, message, color string) {
 
 func (ui *memfitTUI) printInputBlock(label, text, color string) {
 	ui.clearLiveFrame()
+	ui.recordTranscript(label, strings.Split(text, "\n"), color)
 	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorBold+color, label))
 	ui.printWrappedText(text, "  ")
 	fmt.Fprint(os.Stdout, "\r\n")
 }
 
 func (ui *memfitTUI) printAnswerBlock(text string) {
+	ui.recordTranscript("Memfit", strings.Split(text, "\n"), memfitColorCyan)
 	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "Memfit"))
 	ui.printWrappedText(text, "  ")
 	fmt.Fprint(os.Stdout, "\r\n")
@@ -1778,9 +1939,12 @@ func (ui *memfitTUI) printAnswerBlock(text string) {
 
 func (ui *memfitTUI) printTextSection(title string, lines []string, colors ...string) {
 	color := memfitColorBold
+	recordColor := ""
 	if len(colors) > 0 {
 		color = memfitColorBold + colors[0]
+		recordColor = colors[0]
 	}
+	ui.recordTranscript(title, lines, recordColor)
 	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(color, title))
 	for _, line := range lines {
 		ui.printWrappedText(line, "  ")
@@ -1789,6 +1953,11 @@ func (ui *memfitTUI) printTextSection(title string, lines []string, colors ...st
 }
 
 func (ui *memfitTUI) printInfoSection(title string, rows []memfitInfoRow) {
+	body := make([]string, 0, len(rows))
+	for _, row := range rows {
+		body = append(body, row.label+": "+row.value)
+	}
+	ui.recordTranscript(title, body, "")
 	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorBold, title))
 	for _, row := range rows {
 		label := fmt.Sprintf("  %-8s", row.label)
@@ -2068,7 +2237,7 @@ func readMemfitKey(r *bufio.Reader) (memfitKey, error) {
 	case 0x7f, 0x08:
 		return memfitKey{kind: memfitKeyBackspace}, nil
 	case '\t':
-		return memfitKey{kind: memfitKeyInsert, text: "\t"}, nil
+		return memfitKey{kind: memfitKeyComplete}, nil
 	case 0x1b:
 		return readMemfitEscapeKey(r)
 	}
@@ -2143,6 +2312,10 @@ func readMemfitEscapeKey(r *bufio.Reader) (memfitKey, error) {
 		return memfitKey{kind: memfitKeyEnd}, nil
 	case "3~":
 		return memfitKey{kind: memfitKeyDelete}, nil
+	case "5~":
+		return memfitKey{kind: memfitKeyPageUp}, nil
+	case "6~":
+		return memfitKey{kind: memfitKeyPageDown}, nil
 	case "13;2u", "13;3u", "27;2;13~":
 		return memfitKey{kind: memfitKeyNewline}, nil
 	case "200~":
