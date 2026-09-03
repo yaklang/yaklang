@@ -428,17 +428,29 @@ func TestTLSRecordGatesAndClientHello(t *testing.T) {
 	hello = append(hello, 0x01, 0x00)
 	hs := []byte{0x01, 0x00, 0x00, byte(len(hello))}
 	hs = append(hs, hello...)
-	recHello := []byte{0x16, 0x03, 0x03, 0x00, byte(len(hs))}
-	recHello = append(recHello, hs...)
+	recHello := make([]byte, 5+len(hs))
+	recHello[0] = 0x16
+	binary.BigEndian.PutUint16(recHello[1:], 0x0303)
+	binary.BigEndian.PutUint16(recHello[3:], uint16(5+len(hs)))
+	copy(recHello[5:], hs)
 	h := parseRule(t, recHello, "application-layer.tls", "Transport Layer Security")
 	require.Equal(t, uint64(22), uintVal(t, mustChild(t, h, "Record Layer", "ContentType")))
-	require.NotEmpty(t, bytesVal(t, mustChild(t, h, "Record Layer", "Payload")))
+	require.Equal(t, []byte{0x00, 0x2f, 0x00, 0x35}, bytesVal(t, mustChild(t, h, "Record Layer", "TLSClientHello", "ClientHello", "Cipher Suites")))
 	ch := parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello")
 	require.Equal(t, uint64(1), uintVal(t, ch.Child("Handshake Type")))
-	require.Equal(t, []byte{0x00, 0x2f, 0x00, 0x35}, bytesVal(t, mustChild(t, ch, "ClientHello", "Cipher Suites")))
 
 	ethH := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, recHello))
 	require.Equal(t, uint64(22), uintVal(t, mustChild(t, ethH, "IP", "TCP", "TLS", "Record Layer", "ContentType")))
+	require.Equal(t, []byte{0x00, 0x2f, 0x00, 0x35}, bytesVal(t, mustChild(t, ethH, "IP", "TCP", "TLS", "Record Layer", "TLSClientHello", "ClientHello", "Cipher Suites")))
+
+	sh := make([]byte, 5+4)
+	sh[0] = 0x16
+	binary.BigEndian.PutUint16(sh[1:], 0x0303)
+	binary.BigEndian.PutUint16(sh[3:], 9)
+	copy(sh[5:], []byte{0x02, 0x00, 0x00, 0x00})
+	srv := parseRule(t, sh, "application-layer.tls", "Transport Layer Security")
+	require.Equal(t, uint64(22), uintVal(t, mustChild(t, srv, "Record Layer", "ContentType")))
+	require.NotNil(t, mustChild(t, srv, "Record Layer", "Payload"))
 
 	get := []byte("GET / HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n")
 	parseMustFail(t, get, "application-layer.tls", "Transport Layer Security")
