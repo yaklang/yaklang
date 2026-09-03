@@ -1,13 +1,12 @@
 endian: big
 Package:
-  Ethernet:
-    Destination: raw,6
-    Source: raw,6
+  IEEE 802.1Q:
+    TCI: uint16
     Type: uint16
     Payload:
       unpack: true
       operator: |
-        type = getNodeResult("@Ethernet/Type").Value
+        type = getNodeResult("@IEEE 802.1Q/Type").Value
         switch type {
           case 0x0800:
             this.ProcessByType("IP")
@@ -15,8 +14,6 @@ Package:
             this.ProcessByType("IPv6")
           case 0x0806:
             this.ProcessByType("ARP")
-          case 0x8100:
-            this.ProcessByType("VLAN")
           case 0x888e:
             this.ProcessByType("EAPOL")
           default:
@@ -25,6 +22,5 @@ Package:
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
-VLAN: "import:ieee_802_1q.yaml;node:IEEE 802.1Q"
 EAPOL: "import:eapol.yaml;node:EAPOL"
 Unknown: raw

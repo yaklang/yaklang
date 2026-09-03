@@ -1,0 +1,61 @@
+endian: big
+Package:
+  MQTT:
+    operator: |
+      this.ProcessSubNode("Packet Type")
+      this.ProcessSubNode("Flags")
+      ptype = getNodeResult("Packet Type").Value
+      if ptype < 1 || ptype > 14 {
+        panic("mqtt: invalid packet type")
+      }
+      this.ProcessSubNode("Remaining Length")
+      rem = getNodeResult("Remaining Length").Value
+      avail = this.GetSubNode("Payload").GetRemainingSpace()
+      if rem > avail {
+        panic("mqtt: remaining length exceeds payload")
+      }
+      this.GetSubNode("Payload").SetMaxLength(rem)
+      this.ProcessSubNode("Payload")
+    Packet Type: uint8,4bit
+    Flags: uint8,4bit
+    Remaining Length: uint8
+    Payload:
+      operator: |
+        ptype = getNodeResult("../Packet Type").Value
+        if ptype == 1 {
+          this.ProcessSubNode("Connect")
+          return
+        }
+        if ptype == 2 {
+          this.ProcessSubNode("Connack")
+          return
+        }
+        this.ProcessSubNode("Data")
+      Connect:
+        Protocol Name Length: uint16
+        Protocol Name:
+          type: string
+          length-from-field: ../Protocol Name Length
+        Protocol Level: uint8
+        Connect Flags: uint8
+        Keep Alive: uint16
+        Client ID Length: uint16
+        Client ID:
+          type: string
+          length-from-field: ../Client ID Length
+        operator: |
+          this.ProcessSubNode("Protocol Name Length")
+          this.ProcessSubNode("Protocol Name")
+          name = string(getNodeResult("Protocol Name").Value)
+          if name != "MQTT" && name != "MQIsdp" {
+            panic("mqtt: unknown protocol name")
+          }
+          this.ProcessSubNode("Protocol Level")
+          this.ProcessSubNode("Connect Flags")
+          this.ProcessSubNode("Keep Alive")
+          this.ProcessSubNode("Client ID Length")
+          this.ProcessSubNode("Client ID")
+      Connack:
+        Flags: uint8
+        Return Code: uint8
+      Data: raw

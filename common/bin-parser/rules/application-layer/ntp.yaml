@@ -1,0 +1,16 @@
+endian: big
+Package:
+  NTP:
+    Leap Indicator: uint8,2bit
+    Version: uint8,3bit
+    Mode: uint8,3bit
+    Stratum: uint8
+    Poll: int8
+    Precision: int8
+    Root Delay: uint32
+    Root Dispersion: uint32
+    Reference ID: raw,4
+    Reference Timestamp: raw,8
+    Origin Timestamp: raw,8
+    Receive Timestamp: raw,8
+    Transmit Timestamp: raw,8
