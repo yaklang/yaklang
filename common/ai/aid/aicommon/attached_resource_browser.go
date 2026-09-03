@@ -15,6 +15,7 @@ const (
 
 	attachedBrowserCatalogToolName = "browser.capability.catalog"
 	attachedBrowserCallToolName    = "browser.capability.call"
+	attachedBrowserHandoffToolName = "browser.handoff.request"
 	attachedBrowserRodToolName     = "use_browser"
 )
 
@@ -60,13 +61,13 @@ func (d *AttachedBrowserResourceData) BindLoopData(loop ReActLoopIF) error {
 	d.routingChecked = true
 	d.routingMissing = nil
 	if loop == nil || loop.GetConfig() == nil || loop.GetConfig().GetAiToolManager() == nil {
-		d.routingMissing = []string{attachedBrowserCatalogToolName, attachedBrowserCallToolName}
+		d.routingMissing = []string{attachedBrowserCatalogToolName, attachedBrowserCallToolName, attachedBrowserHandoffToolName}
 		return nil
 	}
 
 	config := loop.GetConfig()
 	manager := config.GetAiToolManager()
-	for _, name := range []string{attachedBrowserCatalogToolName, attachedBrowserCallToolName} {
+	for _, name := range []string{attachedBrowserCatalogToolName, attachedBrowserCallToolName, attachedBrowserHandoffToolName} {
 		// An explicit @browser attachment is an explicit per-turn tool choice.
 		manager.EnableTool(name)
 		tool, err := manager.GetToolByName(name)
@@ -76,7 +77,7 @@ func (d *AttachedBrowserResourceData) BindLoopData(loop ReActLoopIF) error {
 		}
 
 		// Attached browser tools are not merely general inventory candidates: the
-		// user selected this concrete device for the current turn. Promote both
+		// user selected this concrete device for the current turn. Promote all
 		// bridge tools into the direct-call prompt so the model does not fall back
 		// to the similarly named Rod/use_browser session tool.
 		if concreteConfig, ok := config.(*Config); ok {
@@ -106,9 +107,10 @@ func (d *AttachedBrowserResourceData) ToAttachData(ReActLoopIF) string {
 - Reference: %q
 - Device ID: %q
 - Resource semantics: this is an already-open external browser connected through the Yakit browser extension. It is not a Rod-managed browser session.
-- Mandatory routing: for every operation on this reference, use only browser.capability.catalog and browser.capability.call. When more than one browser is attached, pass this exact Reference as browser_ref; the runtime securely maps it to the attached Device ID. Never generate or pass device_id yourself.
+- Mandatory routing: for every operation on this reference, use only browser.capability.catalog, browser.capability.call, and browser.handoff.request. When more than one browser is attached, pass this exact Reference as browser_ref; the runtime securely maps it to the attached Device ID. Never generate or pass device_id yourself.
 - Current-page inspection: first query browser.capability.catalog for tabs, then call method browser.tabs with params {} through browser.capability.call. Prefer the returned tab with active=true, and use its tab/frame/document target to call browser.context with includeDom=true. Refreshes, navigations, and newly opened HTTP(S) tabs remain part of this paired browser instance; fetch a new page context when a document changes.
 - Open a website: call browser.capability.call with method browser.tab.open and params {"url":"https://..."}. This opens a foreground tab inside this exact attached instance; never use use_browser or Eval merely to navigate.
+- Login and human verification: when the user asks to scan a QR code, log in, complete MFA/CAPTCHA, or confirm a device, make the relevant page UI visible and then MUST call browser.handoff.request. The tool renders the local handoff card and waits. Never finish the task by merely telling the user to scan or operate in the browser.
 - Prohibited fallback: do not use use_browser, generic browser automation, a browser session parameter, op=open, or create a replacement browser. Only do that if the user explicitly asks for a separate automation browser instead of this attached instance.
 - Routing status: %s
 - Authority: pairing grants this exact browser instance access to its HTTP(S) tabs. The signed capability catalog, browser/enterprise restrictions, and the AI review policy remain authoritative for every operation.`, name, d.Reference, d.DeviceID, routingStatus)
@@ -175,7 +177,7 @@ func attachedBrowserDeviceID(task AITask, browserRef string) (string, bool, erro
 
 func isAttachedBrowserBridgeTool(toolName string) bool {
 	toolName = strings.TrimSpace(toolName)
-	return toolName == attachedBrowserCatalogToolName || toolName == attachedBrowserCallToolName
+	return toolName == attachedBrowserCatalogToolName || toolName == attachedBrowserCallToolName || toolName == attachedBrowserHandoffToolName
 }
 
 // CheckAttachedBrowserToolRoute keeps the extension bridge and Rod as separate
@@ -196,11 +198,12 @@ func CheckAttachedBrowserToolRoute(task AITask, toolName string) (bool, string) 
 			references = append(references, resource.Reference)
 		}
 		return false, fmt.Sprintf(
-			"tool %q is blocked for this turn because the user attached browser-extension instance(s) %q; use %s and %s instead. Do not call op=open or create a replacement Rod browser. Remove the browser attachment if a separate automation browser is actually intended.",
+			"tool %q is blocked for this turn because the user attached browser-extension instance(s) %q; use %s, %s, and %s instead. Do not call op=open or create a replacement Rod browser. Remove the browser attachment if a separate automation browser is actually intended.",
 			attachedBrowserRodToolName,
 			references,
 			attachedBrowserCatalogToolName,
 			attachedBrowserCallToolName,
+			attachedBrowserHandoffToolName,
 		)
 	}
 	if isAttachedBrowserBridgeTool(toolName) && !attached {

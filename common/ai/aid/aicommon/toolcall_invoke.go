@@ -432,6 +432,10 @@ func (a *ToolCaller) invoke(
 		RuntimeID:             a.callToolId,
 		ProjectDatabase:       a.config.GetDB(),
 		BrowserSessionTracker: browserTracker,
+		EmitUIEvent: func(eventType schema.EventType, nodeID string, payload any) error {
+			_, err := e.EmitJSON(eventType, nodeID, payload)
+			return err
+		},
 		FeedBacker: func(result *ypb.ExecResult) error {
 			// 处理 risk 消息
 			risk, _ := handleRiskMessage(result)
