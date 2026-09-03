@@ -580,10 +580,7 @@ func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivT
 		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) {
-		decodeIV = decodeKey // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	data, err := codec.AESEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
@@ -716,10 +713,7 @@ func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivT
 		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) {
-		decodeIV = decodeKey // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 16)
 	data, err := codec.SM4Enc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
@@ -772,10 +766,7 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) {
-		decodeIV = decodeKey // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	data, err := codec.DESEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
@@ -828,10 +819,7 @@ func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV strin
 		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
-	decodeIV := decodeData([]byte(IV), ivType)
-	if funk.IsEmpty(decodeIV) && len(decodeKey) == 24 {
-		decodeIV = decodeKey[:8] // if IV is empty, use key as IV
-	}
+	decodeIV := codec.FixIV(decodeData([]byte(IV), ivType), decodeKey, 8)
 	data, err := codec.TripleDesEnc(decodeKey, inData, decodeIV, mode)
 	if err == nil {
 		flow.Text = encodeData(data, output)
