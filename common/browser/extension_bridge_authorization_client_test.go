@@ -48,3 +48,23 @@ func TestExtensionAuthorizationClientWorkspaceIgnoresCallerDeviceSelection(t *te
 	)
 	require.ErrorContains(t, err, "unknown field")
 }
+
+func TestDecodeExtensionAuthorizationYakitOpen(t *testing.T) {
+	prepared, err := decodeExtensionAuthorizationYakitOpen(
+		json.RawMessage(`{"tabId":11,"mode":"vertical"}`),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 11, prepared.TabID)
+	require.Equal(t, "vertical", prepared.Mode)
+
+	existing, err := decodeExtensionAuthorizationYakitOpen(
+		json.RawMessage(`{"workspaceId":"workspace-a"}`),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "workspace-a", existing.WorkspaceID)
+
+	_, err = decodeExtensionAuthorizationYakitOpen(
+		json.RawMessage(`{"workspaceId":"workspace-a","tabId":11}`),
+	)
+	require.ErrorContains(t, err, "cannot be combined")
+}

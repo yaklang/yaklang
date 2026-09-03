@@ -31,6 +31,37 @@ type extensionAuthorizationClientWorkspaceInput struct {
 	Right extensionAuthorizationClientIdentityInput `json:"right"`
 }
 
+type extensionAuthorizationYakitOpenInput struct {
+	WorkspaceID string `json:"workspaceId,omitempty"`
+	TabID       int    `json:"tabId,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+}
+
+func decodeExtensionAuthorizationYakitOpen(raw json.RawMessage) (extensionAuthorizationYakitOpenInput, error) {
+	var input extensionAuthorizationYakitOpenInput
+	if err := decodeExtensionAuthorizationClientJSON(raw, &input); err != nil {
+		return input, err
+	}
+	input.WorkspaceID = strings.TrimSpace(input.WorkspaceID)
+	input.Mode = strings.ToLower(strings.TrimSpace(input.Mode))
+	if input.WorkspaceID != "" {
+		if input.TabID != 0 || input.Mode != "" {
+			return input, errors.New("workspaceId cannot be combined with tabId or mode")
+		}
+		return input, nil
+	}
+	if input.TabID <= 0 {
+		return input, errors.New("workspaceId or tabId is required")
+	}
+	if input.Mode == "" {
+		input.Mode = "horizontal"
+	}
+	if input.Mode != "horizontal" && input.Mode != "vertical" {
+		return input, errors.New("mode must be horizontal or vertical")
+	}
+	return input, nil
+}
+
 func decodeExtensionAuthorizationClientJSON(raw json.RawMessage, output interface{}) error {
 	if len(raw) == 0 {
 		return errors.New("JSON payload is required")
@@ -331,32 +362,36 @@ func (s *ExtensionBridgeServer) openExtensionAuthorizationWorkspaceInYakit(
 	deviceID string,
 	params json.RawMessage,
 ) (interface{}, *ExtensionBridgeError) {
-	var input struct {
-		WorkspaceID string `json:"workspaceId"`
-	}
-	if err := decodeExtensionAuthorizationClientJSON(params, &input); err != nil {
+	input, err := decodeExtensionAuthorizationYakitOpen(params)
+	if err != nil {
 		return nil, &ExtensionBridgeError{
 			Code:    "invalid_params",
 			Message: "invalid authorization workspace handoff: " + err.Error(),
 		}
 	}
-	workspace, err := s.extensionAuthorizationWorkspaceForDevice(
-		ctx,
-		deviceID,
-		input.WorkspaceID,
-		false,
-	)
-	if err != nil {
-		return nil, extensionAuthorizationClientError(err)
+	handoff := map[string]interface{}{
+		"event":    "authorization.workspace.open",
+		"deviceId": deviceID,
 	}
-	yakit.BroadcastData(yakit.ServerPushType_BrowserExtension, map[string]interface{}{
-		"event":       "authorization.workspace.open",
-		"workspaceId": workspace.ID,
-		"deviceId":    deviceID,
-		"mode":        workspace.Mode,
-	})
-	return map[string]interface{}{
-		"workspaceId": workspace.ID,
-		"opened":      true,
-	}, nil
+	result := map[string]interface{}{"opened": true}
+	if input.WorkspaceID != "" {
+		workspace, workspaceErr := s.extensionAuthorizationWorkspaceForDevice(
+			ctx,
+			deviceID,
+			input.WorkspaceID,
+			false,
+		)
+		if workspaceErr != nil {
+			return nil, extensionAuthorizationClientError(workspaceErr)
+		}
+		handoff["workspaceId"] = workspace.ID
+		handoff["mode"] = workspace.Mode
+		result["workspaceId"] = workspace.ID
+	} else {
+		handoff["tabId"] = input.TabID
+		handoff["mode"] = input.Mode
+		result["tabId"] = input.TabID
+	}
+	yakit.BroadcastData(yakit.ServerPushType_BrowserExtension, handoff)
+	return result, nil
 }
