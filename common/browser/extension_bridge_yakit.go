@@ -60,6 +60,8 @@ func (s *ExtensionBridgeServer) handleExtensionClientRequest(ctx context.Context
 		return prepareCapturedRequestAnalysis(params)
 	case "yakit.browser_authorization.task":
 		return s.handleExtensionAuthorizationClientTask(ctx, deviceID, params)
+	case "yakit.browser_authorization.instances":
+		return s.listExtensionAuthorizationInstances(deviceID)
 	case "yakit.browser_authorization.open":
 		return s.openExtensionAuthorizationWorkspaceInYakit(ctx, deviceID, params)
 	default:

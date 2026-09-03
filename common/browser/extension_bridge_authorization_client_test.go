@@ -51,11 +51,12 @@ func TestExtensionAuthorizationClientWorkspaceIgnoresCallerDeviceSelection(t *te
 
 func TestDecodeExtensionAuthorizationYakitOpen(t *testing.T) {
 	prepared, err := decodeExtensionAuthorizationYakitOpen(
-		json.RawMessage(`{"tabId":11,"mode":"vertical"}`),
+		json.RawMessage(`{"tabId":11,"mode":"vertical","targetDeviceId":"device-b"}`),
 	)
 	require.NoError(t, err)
 	require.Equal(t, 11, prepared.TabID)
 	require.Equal(t, "vertical", prepared.Mode)
+	require.Equal(t, "device-b", prepared.TargetDeviceID)
 
 	existing, err := decodeExtensionAuthorizationYakitOpen(
 		json.RawMessage(`{"workspaceId":"workspace-a"}`),
@@ -67,4 +68,16 @@ func TestDecodeExtensionAuthorizationYakitOpen(t *testing.T) {
 		json.RawMessage(`{"workspaceId":"workspace-a","tabId":11}`),
 	)
 	require.ErrorContains(t, err, "cannot be combined")
+}
+
+func TestExtensionAuthorizationInstances(t *testing.T) {
+	connections := []ExtensionBridgeConnection{
+		{DeviceID: "device-a", ManagedInstance: &ExtensionBridgeManagedInstance{Manager: "ytray", Badge: "A"}},
+		{DeviceID: "device-b", ManagedInstance: &ExtensionBridgeManagedInstance{Manager: "ytray", Badge: "B"}},
+		{DeviceID: "device-other"},
+	}
+	require.Equal(t, []extensionAuthorizationInstance{
+		{DeviceID: "device-a", Badge: "A", Current: true},
+		{DeviceID: "device-b", Badge: "B", Current: false},
+	}, extensionAuthorizationInstances(connections, "device-a"))
 }
