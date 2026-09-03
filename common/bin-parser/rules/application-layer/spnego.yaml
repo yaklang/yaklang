@@ -35,4 +35,18 @@ Package:
     OID Tag: uint8
     OID Length: uint8
     OID: raw
-    Token: raw
+    Token:
+      operator: |
+        this.ProcessSubNode("NegTag")
+        this.ProcessSubNode("NegLength")
+        nl = getNodeResult("NegLength").Value
+        if nl >= 0x80 {
+          panic("spnego: long-form inner length not in this rule")
+        }
+        if nl > 0 {
+          this.GetSubNode("NegToken").SetMaxLength(nl)
+          this.ProcessSubNode("NegToken")
+        }
+      NegTag: uint8
+      NegLength: uint8
+      NegToken: raw

@@ -14,8 +14,10 @@ Package:
       if rem > avail {
         panic("mqtt: remaining length exceeds payload")
       }
-      this.GetSubNode("Payload").SetMaxLength(rem)
-      this.ProcessSubNode("Payload")
+      if rem > 0 {
+        this.GetSubNode("Payload").SetMaxLength(rem)
+        this.ProcessSubNode("Payload")
+      }
     Packet Type: uint8,4bit
     Flags: uint8,4bit
     Remaining Length: uint8
@@ -30,7 +32,18 @@ Package:
           this.ProcessSubNode("Connack")
           return
         }
-        this.ProcessSubNode("Data")
+        if ptype == 3 {
+          this.ProcessSubNode("Publish")
+          return
+        }
+        if ptype == 8 {
+          this.ProcessSubNode("Subscribe")
+          return
+        }
+        if ptype == 4 || ptype == 5 || ptype == 6 || ptype == 7 || ptype == 9 || ptype == 10 || ptype == 11 {
+          this.ProcessSubNode("Packet ID")
+          return
+        }
       Connect:
         Protocol Name Length: uint16
         Protocol Name:
@@ -58,4 +71,15 @@ Package:
       Connack:
         Flags: uint8
         Return Code: uint8
+      Publish:
+        operator: |
+          this.ProcessSubNode("Topic Length")
+          this.ProcessSubNode("Topic")
+        Topic Length: uint16
+        Topic:
+          type: string
+          length-from-field: ../Topic Length
+      Subscribe:
+        Packet ID: uint16
+      Packet ID: uint16
       Data: raw

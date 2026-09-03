@@ -26,6 +26,40 @@ Package:
       this.ProcessSubNode("Flags")
       this.ProcessSubNode("R")
       this.ProcessSubNode("Stream Identifier")
+      if typ == 4 && l > 0 {
+        if l % 6 != 0 {
+          panic("http2: SETTINGS payload not multiple of 6")
+        }
+        this.GetSubNode("Settings").SetMaxLength(l)
+        this.ProcessSubNode("Settings")
+        return
+      }
+      if typ == 6 {
+        if l != 8 {
+          panic("http2: PING payload must be 8")
+        }
+        this.ProcessSubNode("Ping")
+        return
+      }
+      if typ == 7 {
+        if l < 8 {
+          panic("http2: GOAWAY too small")
+        }
+        this.ProcessSubNode("Last Stream ID")
+        this.ProcessSubNode("Error Code")
+        if l > 8 {
+          this.GetSubNode("Debug Data").SetMaxLength(l - 8)
+          this.ProcessSubNode("Debug Data")
+        }
+        return
+      }
+      if typ == 8 {
+        if l != 4 {
+          panic("http2: WINDOW_UPDATE payload must be 4")
+        }
+        this.ProcessSubNode("Window Size Increment")
+        return
+      }
       if l > 0 {
         this.GetSubNode("Payload").SetMaxLength(l)
         this.ProcessSubNode("Payload")
@@ -35,4 +69,10 @@ Package:
     Flags: uint8
     R: uint8,1bit
     Stream Identifier: uint32,31bit
+    Settings: raw
+    Ping: raw,8
+    Last Stream ID: uint32
+    Error Code: uint32
+    Debug Data: raw
+    Window Size Increment: uint32
     Payload: raw

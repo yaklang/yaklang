@@ -41,8 +41,24 @@ Package:
           this.ProcessSubNode("Bind")
           return
         }
-        if ptype == 0 || ptype == 2 {
+        if ptype == 12 {
+          this.ProcessSubNode("BindAck")
+          return
+        }
+        if ptype == 13 {
+          this.ProcessSubNode("BindNak")
+          return
+        }
+        if ptype == 0 {
           this.ProcessSubNode("Request")
+          return
+        }
+        if ptype == 2 {
+          this.ProcessSubNode("Response")
+          return
+        }
+        if ptype == 3 {
+          this.ProcessSubNode("Fault")
           return
         }
       Bind:
@@ -85,3 +101,48 @@ Package:
         Alloc Hint: uint32
         Context ID: uint16
         OpNum: uint16
+      Response:
+        operator: |
+          this.ProcessSubNode("Alloc Hint")
+          this.ProcessSubNode("Context ID")
+          this.ProcessSubNode("Cancel Count")
+          this.ProcessSubNode("Reserved")
+        Alloc Hint: uint32
+        Context ID: uint16
+        Cancel Count: uint8
+        Reserved: uint8
+      Fault:
+        operator: |
+          this.ProcessSubNode("Alloc Hint")
+          this.ProcessSubNode("Context ID")
+          this.ProcessSubNode("Cancel Count")
+          this.ProcessSubNode("Reserved")
+          this.ProcessSubNode("Status")
+        Alloc Hint: uint32
+        Context ID: uint16
+        Cancel Count: uint8
+        Reserved: uint8
+        Status: uint32
+      BindAck:
+        operator: |
+          this.ProcessSubNode("Max Xmit Frag")
+          this.ProcessSubNode("Max Recv Frag")
+          this.ProcessSubNode("Assoc Group")
+          this.ProcessSubNode("Sec Addr Len")
+          sl = getNodeResult("Sec Addr Len").Value
+          if sl > 0 {
+            if sl > 256 {
+              panic("dcerpc: secondary address too long")
+            }
+            this.GetSubNode("Sec Addr").SetMaxLength(sl)
+            this.ProcessSubNode("Sec Addr")
+          }
+        Max Xmit Frag: uint16
+        Max Recv Frag: uint16
+        Assoc Group: uint32
+        Sec Addr Len: uint16
+        Sec Addr: raw
+      BindNak:
+        operator: |
+          this.ProcessSubNode("Reject Reason")
+        Reject Reason: uint16
