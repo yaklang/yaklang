@@ -8,6 +8,21 @@ Package:
         this.ProcessSubNode("ContentType")
         version = this.ProcessSubNode("Version").Value
         this.ProcessSubNode("Length")
+        ct = getNodeResult("ContentType").Value
+        if ct == 22 {
+          res,op = this.TryProcessByType("TLSClientHello")
+          if op.OK {
+            err = op.Save()
+            if err != nil {
+              panic(err)
+            }
+            return
+          }
+          err = op.Recovery()
+          if err != nil {
+            panic(err)
+          }
+        }
         switch version{
           default:
             this.ProcessByType("Payload")
@@ -17,6 +32,7 @@ Package:
       Length: uint16
 
 Payload: raw
+TLSClientHello: "import:application-layer/tls_hello.yaml;node:TLSClientHello"
 Handshake Protocol:
   Handshake Type: uint8
   Length: uint32,12bit
