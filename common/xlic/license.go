@@ -59,7 +59,10 @@ func initMachine() {
 	})
 }
 
-func init() {
+// EnsureInitialized lazily builds the license machine on first actual license use.
+// yaklang runtime paths do not need licenses, so nothing is initialized (and no
+// ephemeral-key warning is emitted) unless a license API is called.
+func EnsureInitialized() {
 	initMachine()
 }
 
