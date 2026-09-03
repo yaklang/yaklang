@@ -178,7 +178,8 @@ var RDPLogin = rdpLogin
 // classicLogonGrace 是 PROTOCOL_RDP 在 FontMap 之后等待失败对话框的窗口。
 // 真机 XP SP3 成功路径不发 SAVE_SESSION_INFO（0x26）；错密码 ~0.5s 画 FAILED_XP。
 // 窗口内没有失败信号则视为 AUTOLOGON 成功。0x26 仍是立即成功。
-const classicLogonGrace = 2 * time.Second
+// CI 里 bruteutils 套件只有 1m，这个值必须短；0.5s 失败对话框仍盖得住。
+const classicLogonGrace = time.Second
 
 // rdpAuthError 是协议已连通、但帐密被拒绝。调度器应继续字典，不得 Finished。
 type rdpAuthError struct{ msg string }
