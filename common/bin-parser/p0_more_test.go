@@ -11,11 +11,22 @@ import (
 func TestP0RoadmapCovered(t *testing.T) {
 	var leftover []string
 	for _, item := range ProtocolRoadmap {
-		if item.Priority == priP0 && item.Status == stTodo {
-			leftover = append(leftover, item.Name)
+		if item.Priority == priP0 && (item.Status == stTodo || item.Status == stPartial) {
+			leftover = append(leftover, item.Name+"="+item.Status)
 		}
 	}
-	require.Empty(t, leftover, "P0 protocols still todo: %v", leftover)
+	require.Empty(t, leftover, "P0 protocols still todo/partial: %v", leftover)
+
+	for _, item := range ProtocolCatalog {
+		if item.Status != statusPartial {
+			continue
+		}
+		for _, r := range ProtocolRoadmap {
+			if r.Name == item.Name && r.Priority == priP0 {
+				t.Errorf("P0 catalog protocol %q is still partial", item.Name)
+			}
+		}
+	}
 }
 
 func TestSPNEGOAndEdges(t *testing.T) {
