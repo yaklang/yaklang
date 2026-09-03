@@ -757,14 +757,19 @@ func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true , Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
-	inData, err := padding(paddingType, flow.Text, 8)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
+	inData := flow.Text
+	if !codec.IsAESStreamMode(mode) {
+		var err error
+		inData, err = padding(paddingType, flow.Text, 8)
+		if err != nil {
+			return err
+		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
 	decodeIV := decodeData([]byte(IV), ivType)
@@ -784,15 +789,17 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true , Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
+	// 流模式（CFB、OFB、CTR）不需要 unpadding
+	needUnpadding := !codec.IsAESStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.DESDec(decodeKey, text, decodeIV, mode)
-	}, paddingType, true)
+	}, paddingType, needUnpadding)
 	if err != nil {
 		return err
 	}
@@ -806,14 +813,19 @@ func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivT
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true ,Label = "输出格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType, paddingType string) error {
-	inData, err := padding(paddingType, flow.Text, 8)
-	if err != nil {
-		return err
+	// 流模式（CFB、OFB、CTR）不需要 padding，明文长度等于密文长度
+	inData := flow.Text
+	if !codec.IsAESStreamMode(mode) {
+		var err error
+		inData, err = padding(paddingType, flow.Text, 8)
+		if err != nil {
+			return err
+		}
 	}
 	decodeKey := decodeData([]byte(key), keyType)
 	decodeIV := decodeData([]byte(IV), ivType)
@@ -833,15 +845,17 @@ func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV strin
 // Params = [
 // { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
 // { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", Connector ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
-// { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB", "CTR", "CFB", "OFB"], Required = true , Label = "Mode"},
 // { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"},
 // { Name = "paddingType", Type = "select", DefaultValue = "pkcs", Options = ["pkcs", "zeroPadding"], Required = true,Label = "填充方式"}
 // ]
 func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType, paddingType string) error {
 	inputText := decodeData(flow.Text, input)
+	// 流模式（CFB、OFB、CTR）不需要 unpadding
+	needUnpadding := !codec.IsAESStreamMode(mode)
 	dec, err := trySymmetricDecrypt(key, keyType, IV, ivType, 8, inputText, func(decodeKey, text, decodeIV []byte) ([]byte, error) {
 		return codec.TripleDesDec(decodeKey, text, decodeIV, mode)
-	}, paddingType, true)
+	}, paddingType, needUnpadding)
 	if err != nil {
 		return err
 	}
