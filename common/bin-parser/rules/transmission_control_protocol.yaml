@@ -69,6 +69,8 @@ Package:
                   typeNameList = ["DCERPC"]
                 } else if src == 1099 || dst == 1099 {
                   typeNameList = ["JavaSer"]
+                } else if src == 3389 || dst == 3389 {
+                  typeNameList = ["TPKT"]
                 }
                 for typeName in typeNameList{
                     res,op = this.TryProcessByType(typeName)
@@ -130,3 +132,4 @@ TNS: "import:application-layer/tns.yaml;node:TNS"
 DCERPC: "import:application-layer/dcerpc.yaml;node:DCERPC"
 JavaSer: "import:application-layer/java_ser.yaml;node:JavaSer"
 SMB3Transform: "import:application-layer/smb3.yaml;node:SMB3Transform"
+TPKT: "import:application-layer/msrdp.yaml;node:TPKT"
