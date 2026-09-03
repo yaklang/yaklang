@@ -277,7 +277,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "PsExec/SMB-svcctl", Family: "remote", Sources: src(srcPrivate), Status: stTodo, Priority: priP0},
 
 	// --- 数据库 ---
-	{Name: "MySQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
+	{Name: "MySQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP0, Notes: "packet + HandshakeV10/ERR/COM"},
 	{Name: "MariaDB", Family: "database", Sources: src(srcWireshark), Status: stTodo, Priority: priP1},
 	{Name: "PostgreSQL", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
 	{Name: "MSSQL TDS", Family: "database", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP0},
