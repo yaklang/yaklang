@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: embed-fs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   generate-commit:
     runs-on: ubuntu-22.04
@@ -20,61 +24,156 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.ref  }}
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || github.token }}
-      - name: Check last commit message is bot message
+
+      - name: Configure git
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          
-          COMMIT_MESSAGE=$(git log -1 --pretty=format:%s)
-          echo "Commit Message: $COMMIT_MESSAGE"
-          
-          if [[ "$COMMIT_MESSAGE" == *"[bot commit]"* ]]; then
-            echo "Commit from bot detected. Stopping CI."
-            echo "SKIP_CI=true" >> $GITHUB_ENV
-          else
-            echo "Commit from human. Continuing workflow."
-          fi
-      - name: Set up Go
-        if: ${{env.SKIP_CI != 'true'}}
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: "./go.mod"
-          cache: false
 
-      # - name: Cache Go modules
-      #   if: ${{env.SKIP_CI != 'true'}}
-      #   uses: actions/cache@v3
-      #   id: cache-go-modules
-      #   with:
-      #     path: ~/go/pkg/mod
-      #     key: go-modules-${{ runner.os }}-1.21-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       go-modules-${{ runner.os }}-1.21-${{ hashFiles('**/go.sum') }}
-
-      - name: Try Auto Merge
-        if: ${{env.SKIP_CI != 'true'}}
+      - name: Rebase onto main
         run: |
           git fetch origin main
           git rebase origin/main || true
           CONFLICTS=$(git diff --name-only --diff-filter=U)
           if [[ -n "$CONFLICTS" ]]; then
-          echo "Conflicts detected. Stopping CI."
-          exit 1
+            echo "Conflicts detected. Stopping CI."
+            exit 1
           else
-          echo "No conflicts. Continuing workflow."
+            echo "No conflicts. Continuing workflow."
           fi
-      - name: Execute commands
-        if: ${{env.SKIP_CI != 'true'}}
+
+      - name: Check bot commit and resource changes
+        id: check
         run: |
-          go run common/yak/cmd/yak.go syntaxflow-format ./common/syntaxflow/sfbuildin/buildin
-          go run common/yak/cmd/yak.go sync-rule -o common/syntaxflow/sfdb/rule_versions.json
-          go run common/yak/cmd/yak.go embed-fs-hash --override --all
+          RESOURCE_DIRS=(
+            "common/coreplugin/base-yak-plugin"
+            "common/syntaxflow/sfbuildin/buildin"
+            "common/aiforge/buildinforge"
+            "common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai"
+          )
+
+          BOT_COMMIT=""
+          for c in $(git rev-list --reverse origin/main..HEAD); do
+            if git log -1 --pretty=%s "$c" | grep -q "\[bot commit\]"; then
+              BOT_COMMIT="$c"
+            fi
+          done
+
+          if [ -n "$BOT_COMMIT" ]; then
+            echo "Found bot commit: $BOT_COMMIT"
+            CHANGED_AFTER=$(git diff --name-only "$BOT_COMMIT"..HEAD -- "${RESOURCE_DIRS[@]}")
+            if [ -z "$CHANGED_AFTER" ]; then
+              echo "No resource changes after bot commit. Skipping."
+              echo "SKIP_CI=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Resource changes after bot commit. Dropping bot commit and regenerating."
+            BRANCH=$(git branch --show-current)
+            git rebase --onto "$BOT_COMMIT^" "$BOT_COMMIT" "$BRANCH"
+          else
+            echo "No bot commit found. Continuing."
+          fi
+
+      - name: Download Yak Binary
+        if: ${{ env.SKIP_CI != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          YAK_OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com"
+          INSTALL_DIR="${RUNNER_TEMP:-$HOME/.local/bin}"
+          mkdir -p "$INSTALL_DIR"
+
+          VERSIONS_TO_TRY=("latest")
+          if SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --quiet 2>/dev/null); then
+            if [ -n "$SELECTED_VERSION" ]; then
+              VERSIONS_TO_TRY+=("$SELECTED_VERSION")
+            fi
+          fi
+
+          for VERSION in "${VERSIONS_TO_TRY[@]}"; do
+            DOWNLOAD_URL="${YAK_OSS_BASE}/yak/${VERSION}/yak_linux_amd64"
+            echo "Trying to download from: $DOWNLOAD_URL"
+            HTTP_CODE=$(curl -w "%{http_code}" -sS -L "$DOWNLOAD_URL" -o yak_dl) || true
+            if [ "$HTTP_CODE" != "200" ] || [ ! -s yak_dl ]; then
+              echo "Download failed (http=$HTTP_CODE)"
+              rm -f yak_dl
+              continue
+            fi
+            FILE_SIZE=$(stat -c%s yak_dl 2>/dev/null || echo "0")
+            if [ "$FILE_SIZE" -lt 1048576 ]; then
+              echo "Downloaded file is too small: ${FILE_SIZE} bytes"
+              rm -f yak_dl
+              continue
+            fi
+            DEST="$INSTALL_DIR/yak"
+            mv -f yak_dl "$DEST"
+            chmod +x "$DEST"
+            if ! "$DEST" version >/dev/null 2>&1; then
+              echo "Downloaded binary failed version check"
+              rm -f "$DEST"
+              continue
+            fi
+            echo "YAK=$DEST" >> "$GITHUB_ENV"
+            echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+            echo "Successfully downloaded yak from version: $VERSION"
+            exit 0
+          done
+
+          echo "::error::Failed to download yak_linux_amd64 from OSS"
+          exit 1
+
+      - name: Verify Yak binary supports new embed-fs-hash flags
+        if: ${{ env.SKIP_CI != 'true' }}
+        run: |
+          if ! "$YAK" embed-fs-hash --help 2>&1 | grep -q "coreplugin-dir"; then
+            echo "::error::Downloaded yak binary does not support embed-fs-hash --coreplugin-dir. Merge the CLI changes to main and publish a new binary to OSS first."
+            exit 1
+          fi
+          if ! "$YAK" syntaxflow-format --help 2>&1 | grep -q "rule-version-output"; then
+            echo "::error::Downloaded yak binary does not support syntaxflow-format --rule-version-output. Merge the CLI changes to main and publish a new binary to OSS first."
+            exit 1
+          fi
+
+      - name: Detect changed resource dirs
+        if: ${{ env.SKIP_CI != 'true' }}
+        id: changed
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+          echo "$CHANGED" | grep -q "^common/coreplugin/base-yak-plugin/" && echo "CORE_PLUGIN_CHANGED=true" >> "$GITHUB_ENV" || true
+          echo "$CHANGED" | grep -q "^common/syntaxflow/sfbuildin/buildin/" && echo "SYNTAXFLOW_CHANGED=true" >> "$GITHUB_ENV" || true
+          echo "$CHANGED" | grep -q "^common/aiforge/buildinforge/" && echo "FORGE_CHANGED=true" >> "$GITHUB_ENV" || true
+          echo "$CHANGED" | grep -q "^common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai/" && echo "AITOOL_CHANGED=true" >> "$GITHUB_ENV" || true
+
+      - name: Format SyntaxFlow rules and generate rule versions
+        if: ${{ env.SKIP_CI != 'true' && env.SYNTAXFLOW_CHANGED == 'true' }}
+        run: |
+          "$YAK" syntaxflow-format ./common/syntaxflow/sfbuildin/buildin --rule-version-output ./common/syntaxflow/sfdb/rule_versions.json
+
+      - name: Generate core plugin hash
+        if: ${{ env.SKIP_CI != 'true' && env.CORE_PLUGIN_CHANGED == 'true' }}
+        run: |
+          "$YAK" embed-fs-hash --coreplugin-dir ./common/coreplugin/base-yak-plugin --output-file ./common/consts/coreplugin-hash.go
+
+      - name: Generate syntaxflow hash
+        if: ${{ env.SKIP_CI != 'true' && env.SYNTAXFLOW_CHANGED == 'true' }}
+        run: |
+          "$YAK" embed-fs-hash --syntaxflow-dir ./common/syntaxflow/sfbuildin/buildin --output-file ./common/consts/syntaxflow-hash.go
+
+      - name: Generate forge hash
+        if: ${{ env.SKIP_CI != 'true' && env.FORGE_CHANGED == 'true' }}
+        run: |
+          "$YAK" embed-fs-hash --forge-dir ./common/aiforge/buildinforge --output-file ./common/consts/forge-hash.go
+
+      - name: Generate aitool hash
+        if: ${{ env.SKIP_CI != 'true' && env.AITOOL_CHANGED == 'true' }}
+        run: |
+          "$YAK" embed-fs-hash --aitool-dir ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --output-file ./common/consts/aitool-hash.go
 
       - name: Commit changes
-        if: ${{success() && env.SKIP_CI != 'true'}}
+        if: ${{ success() && env.SKIP_CI != 'true' }}
         run: |
           git add .
           git diff --quiet && git diff --staged --quiet || git commit -m "chore: auto-update embed files [bot commit]"
