@@ -1,0 +1,23 @@
+endian: big
+Package:
+  AJP:
+    operator: |
+      this.ProcessSubNode("Magic")
+      magic = getNodeResult("Magic").Value
+      if magic != 0x1234 && magic != 0x4142 {
+        panic("ajp: magic must be 0x1234 or 'AB'")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 1 {
+        panic("ajp: empty body")
+      }
+      this.ProcessSubNode("Code")
+      if l > 1 {
+        this.GetSubNode("Body").SetMaxLength(l - 1)
+        this.ProcessSubNode("Body")
+      }
+    Magic: uint16
+    Length: uint16
+    Code: uint8
+    Body: raw

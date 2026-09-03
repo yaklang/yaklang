@@ -18,6 +18,16 @@ Package:
                 typeNameList = ["NTP"]
               } else if src == 161 || dst == 161 || src == 162 || dst == 162 {
                 typeNameList = ["SNMP"]
+              } else if src == 88 || dst == 88 {
+                typeNameList = ["Kerberos"]
+              } else if src == 137 || dst == 137 {
+                typeNameList = ["NBNS"]
+              } else if src == 5355 || dst == 5355 {
+                typeNameList = ["LLMNR"]
+              } else if src == 1812 || dst == 1812 || src == 1813 || dst == 1813 || src == 1645 || dst == 1645 {
+                typeNameList = ["RADIUS"]
+              } else if src == 443 || dst == 443 {
+                typeNameList = ["QUIC"]
               }
               for typeName in typeNameList{
                   res,op = this.TryProcessByType(typeName)
@@ -39,3 +49,8 @@ DNS: "import:application-layer/dns.yaml;node:DNS"
 DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
 NTP: "import:application-layer/ntp.yaml;node:NTP"
 SNMP: "import:application-layer/snmp.yaml;node:SNMP"
+Kerberos: "import:application-layer/kerberos.yaml;node:Kerberos"
+NBNS: "import:application-layer/nbns.yaml;node:NBNS"
+LLMNR: "import:application-layer/nbns.yaml;node:LLMNR"
+RADIUS: "import:application-layer/radius.yaml;node:RADIUS"
+QUIC: "import:application-layer/quic.yaml;node:QUIC"

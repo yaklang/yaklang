@@ -1,0 +1,29 @@
+endian: big
+Package:
+  TDS:
+    operator: |
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ != 1 && typ != 2 && typ != 3 && typ != 4 && typ != 6 && typ != 7 && typ != 8 && typ != 14 && typ != 16 && typ != 17 && typ != 18 {
+        panic("tds: unknown packet type")
+      }
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 8 {
+        panic("tds: length smaller than header")
+      }
+      this.ProcessSubNode("SPID")
+      this.ProcessSubNode("PacketID")
+      this.ProcessSubNode("Window")
+      if l > 8 {
+        this.GetSubNode("Payload").SetMaxLength(l - 8)
+        this.ProcessSubNode("Payload")
+      }
+    Type: uint8
+    Status: uint8
+    Length: uint16
+    SPID: uint16
+    PacketID: uint8
+    Window: uint8
+    Payload: raw
