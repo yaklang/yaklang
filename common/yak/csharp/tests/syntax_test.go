@@ -18,6 +18,13 @@ const savedCSharpFixtureMaxParseDuration = 30 * time.Second
 //go:embed all:code
 var codeFs embed.FS
 
+func mustReadCodeFixture(t *testing.T, codePath string) string {
+	t.Helper()
+	raw, err := codeFs.ReadFile(codePath)
+	require.NoError(t, err)
+	return string(raw)
+}
+
 func validateSource(t *testing.T, filename string, src string, caches ...*ssa.AntlrCache) {
 	t.Helper()
 	name := strings.ReplaceAll(strings.TrimSpace(filename), "\\", "/")
