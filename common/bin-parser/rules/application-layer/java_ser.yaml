@@ -10,5 +10,25 @@ Package:
       if getNodeResult("Version").Value != 5 {
         panic("java-ser: stream version must be 5")
       }
+      res,op = this.TryProcessByType("JavaContent")
+      if op.OK {
+        err = op.Save()
+        if err != nil {
+          panic(err)
+        }
+      } else {
+        err = op.Recovery()
+        if err != nil {
+          panic(err)
+        }
+      }
     Magic: uint16
     Version: uint16
+JavaContent:
+  operator: |
+    this.ProcessSubNode("Content Type")
+    tc = getNodeResult("Content Type").Value
+    if tc != 0x70 && tc != 0x71 && tc != 0x72 && tc != 0x73 && tc != 0x74 && tc != 0x75 && tc != 0x76 && tc != 0x77 && tc != 0x78 && tc != 0x79 && tc != 0x7a && tc != 0x7b && tc != 0x7c && tc != 0x7d && tc != 0x7e {
+      panic("java-ser: unknown TC content type")
+    }
+  Content Type: uint8
