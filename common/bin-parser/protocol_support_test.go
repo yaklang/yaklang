@@ -325,6 +325,8 @@ func TestSNMPGetRequest(t *testing.T) {
 	require.Equal(t, []byte("public"), bytesVal(t, snmp.Child("Community")))
 	require.Equal(t, uint64(0xa0), uintVal(t, snmp.Child("PDU Tag")))
 	require.Equal(t, []byte{1}, bytesVal(t, mustChild(t, snmp, "PDU Body", "Request ID")))
+	require.Equal(t, []byte{0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}, bytesVal(t, mustChild(t, snmp, "PDU Body", "Variable Bindings", "Bindings", "OID")))
+	require.Equal(t, uint64(0x05), uintVal(t, mustChild(t, snmp, "PDU Body", "Variable Bindings", "Bindings", "Value Tag")))
 
 	frame := ipv4UDPFrame(t, 40000, 161, gopacket.Payload(raw))
 	eth := parseEthernet(t, frame)

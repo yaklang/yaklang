@@ -69,7 +69,12 @@ Package:
     Flags: uint8
     R: uint8,1bit
     Stream Identifier: uint32,31bit
-    Settings: raw
+    Settings:
+      operator: |
+        this.ProcessSubNode("Identifier")
+        this.ProcessSubNode("Value")
+      Identifier: uint16
+      Value: uint32
     Ping: raw,8
     Last Stream ID: uint32
     Error Code: uint32

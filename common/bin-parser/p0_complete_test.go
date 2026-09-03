@@ -131,7 +131,8 @@ func TestHTTP2SettingsPingGoaway(t *testing.T) {
 	binary.BigEndian.PutUint32(st[17:], 0)
 	n := parseRule(t, st, "application-layer.http2", "HTTP2")
 	require.Equal(t, uint64(4), uintVal(t, n.Child("Type")))
-	require.Equal(t, st[9:], bytesVal(t, n.Child("Settings")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "Settings", "Identifier")))
+	require.Equal(t, uint64(4096), uintVal(t, mustChild(t, n, "Settings", "Value")))
 
 	ping := make([]byte, 9+8)
 	ping[2] = 8
@@ -339,6 +340,7 @@ func TestSMB1CloseTransactionLDAPJavaQUIC(t *testing.T) {
 	require.Equal(t, uint64(0x30), uintVal(t, ldap.Child("Identifier")))
 	require.Equal(t, uint64(0x60), uintVal(t, mustChild(t, ldap, "Body", "ProtocolOp Tag")))
 	require.Equal(t, []byte{1}, bytesVal(t, mustChild(t, ldap, "Body", "MessageID")))
+	require.Equal(t, []byte{3}, bytesVal(t, mustChild(t, ldap, "Body", "ProtocolOp", "BindRequest", "Version")))
 
 	unbind := []byte{0x30, 0x05, 0x02, 0x01, 0x01, 0x42, 0x00}
 	require.Equal(t, uint64(0x42), uintVal(t, mustChild(t, parseRule(t, unbind, "application-layer.ldap", "LDAPMessage"), "Body", "ProtocolOp Tag")))
@@ -418,7 +420,7 @@ func TestTLSRecordGatesAndClientHello(t *testing.T) {
 	rec := mustChild(t, tls, "Record Layer")
 	require.Equal(t, uint64(23), uintVal(t, rec.Child("ContentType")))
 	require.Equal(t, uint64(0x0303), uintVal(t, rec.Child("Version")))
-	require.NotEmpty(t, bytesVal(t, rec.Child("Payload")))
+	require.Equal(t, []byte("abcdefgh"), bytesVal(t, rec.Child("Payload")))
 
 	hello := make([]byte, 0, 64)
 	hello = append(hello, 0x03, 0x03)
@@ -431,7 +433,7 @@ func TestTLSRecordGatesAndClientHello(t *testing.T) {
 	recHello := make([]byte, 5+len(hs))
 	recHello[0] = 0x16
 	binary.BigEndian.PutUint16(recHello[1:], 0x0303)
-	binary.BigEndian.PutUint16(recHello[3:], uint16(5+len(hs)))
+	binary.BigEndian.PutUint16(recHello[3:], uint16(len(hs)))
 	copy(recHello[5:], hs)
 	h := parseRule(t, recHello, "application-layer.tls", "Transport Layer Security")
 	require.Equal(t, uint64(22), uintVal(t, mustChild(t, h, "Record Layer", "ContentType")))
@@ -446,7 +448,7 @@ func TestTLSRecordGatesAndClientHello(t *testing.T) {
 	sh := make([]byte, 5+4)
 	sh[0] = 0x16
 	binary.BigEndian.PutUint16(sh[1:], 0x0303)
-	binary.BigEndian.PutUint16(sh[3:], 9)
+	binary.BigEndian.PutUint16(sh[3:], 4)
 	copy(sh[5:], []byte{0x02, 0x00, 0x00, 0x00})
 	srv := parseRule(t, sh, "application-layer.tls", "Transport Layer Security")
 	require.Equal(t, uint64(22), uintVal(t, mustChild(t, srv, "Record Layer", "ContentType")))

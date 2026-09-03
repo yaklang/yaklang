@@ -77,4 +77,35 @@ Package:
           }
         Sequence Tag: uint8
         Sequence Length: uint8
-        Bindings: raw
+        Bindings:
+          operator: |
+            this.ProcessSubNode("Varbind Tag")
+            if getNodeResult("Varbind Tag").Value != 0x30 {
+              panic("snmp: expected SEQUENCE varbind")
+            }
+            this.ProcessSubNode("Varbind Length")
+            this.ProcessSubNode("OID Tag")
+            if getNodeResult("OID Tag").Value != 0x06 {
+              panic("snmp: expected OBJECT IDENTIFIER")
+            }
+            this.ProcessSubNode("OID Length")
+            ol = getNodeResult("OID Length").Value
+            if ol > 0 {
+              this.GetSubNode("OID").SetMaxLength(ol)
+              this.ProcessSubNode("OID")
+            }
+            this.ProcessSubNode("Value Tag")
+            this.ProcessSubNode("Value Length")
+            vl = getNodeResult("Value Length").Value
+            if vl > 0 {
+              this.GetSubNode("Value").SetMaxLength(vl)
+              this.ProcessSubNode("Value")
+            }
+          Varbind Tag: uint8
+          Varbind Length: uint8
+          OID Tag: uint8
+          OID Length: uint8
+          OID: raw
+          Value Tag: uint8
+          Value Length: uint8
+          Value: raw
