@@ -45,6 +45,8 @@ Package:
                   typeNameList = ["Redis"]
                 } else if src == 1883 || dst == 1883 || src == 8883 || dst == 8883 {
                   typeNameList = ["MQTT"]
+                } else if src == 3306 || dst == 3306 {
+                  typeNameList = ["MySQL"]
                 } else if src == 445 || dst == 445 {
                   typeNameList = ["SMB2", "SMB", "NBSS"]
                 } else if src == 139 || dst == 139 {
@@ -98,3 +100,4 @@ MQTT: "import:application-layer/mqtt.yaml;node:MQTT"
 SMB2: "import:application-layer/smb2.yaml;node:SMB2"
 SMB: "import:application-layer/smb.yaml;node:SMB"
 NBSS: "import:application-layer/nbss.yaml;node:NBSS"
+MySQL: "import:application-layer/mysql.yaml;node:MySQLPacket"

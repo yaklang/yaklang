@@ -1,0 +1,56 @@
+endian: little
+Package:
+  MySQLPacket:
+    operator: |
+      this.ProcessSubNode("Payload Length")
+      this.ProcessSubNode("Sequence ID")
+      l = getNodeResult("Payload Length").Value
+      this.GetSubNode("Payload").SetMaxLength(l)
+      this.ProcessSubNode("Payload")
+    Payload Length: uint32,24bit
+    Sequence ID: uint8
+    Payload:
+      operator: |
+        first = this.ProcessSubNode("First").Value
+        if first == 0x0a {
+          this.ProcessSubNode("Handshake")
+          return
+        }
+        if first == 0x00 {
+          this.ProcessSubNode("OK")
+          return
+        }
+        if first == 0xff {
+          this.ProcessSubNode("ERR")
+          return
+        }
+        this.ProcessSubNode("Rest")
+      First: uint8
+      Handshake:
+        operator: |
+          this.ProcessSubNode("Server Version")
+          this.ProcessSubNode("Connection ID")
+          this.ProcessSubNode("Auth Plugin Data 1")
+          this.ProcessSubNode("Filler")
+          this.ProcessSubNode("Capability Low")
+          this.ProcessSubNode("Character Set")
+          this.ProcessSubNode("Status Flags")
+          this.ProcessSubNode("Capability High")
+          this.ProcessSubNode("Auth Plugin Data Len")
+          this.ProcessSubNode("Reserved")
+        Server Version: "del:\0;type:string"
+        Connection ID: uint32
+        Auth Plugin Data 1: raw,8
+        Filler: uint8
+        Capability Low: uint16
+        Character Set: uint8
+        Status Flags: uint16
+        Capability High: uint16
+        Auth Plugin Data Len: uint8
+        Reserved: raw,10
+      OK:
+        Rest: raw
+      ERR:
+        Error Code: uint16
+        Rest: raw
+      Rest: raw
