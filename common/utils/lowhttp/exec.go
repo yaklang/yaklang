@@ -309,6 +309,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		randomJA3FingerPrint    = option.RandomJA3FingerPrint
 		clientHelloSpec         = option.ClientHelloSpec
 		tlsFingerprint          = option.TLSFingerprint
+		http2Fingerprint        = option.HTTP2Fingerprint
 		dialer                  = option.Dialer
 		fixQueryEscape          = option.FixQueryEscape
 	)
@@ -320,6 +321,14 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	if tlsFingerprint != "" {
 		_, err := netx.GetClientHelloProfile(tlsFingerprint)
 		if err != nil {
+			return response, err
+		}
+	}
+	// HTTP/2 framing is opt-in on its own: selecting a TLS fingerprint must not
+	// change it, because the default framing deliberately accommodates servers
+	// that reject browser-style HEADERS.
+	if http2Fingerprint != "" {
+		if _, err := getHTTP2Profile(http2Fingerprint); err != nil {
 			return response, err
 		}
 	}
@@ -782,13 +791,14 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	}
 
 	cacheKey := &connectKey{
-		proxy:           proxy,
-		scheme:          reqSchema,
-		addr:            originAddr,
-		https:           option.Https,
-		gmTls:           option.GmTLS,
-		clientHelloSpec: clientHelloSpec,
-		tlsFingerprint:  tlsFingerprint,
+		proxy:            proxy,
+		scheme:           reqSchema,
+		addr:             originAddr,
+		https:            option.Https,
+		gmTls:            option.GmTLS,
+		clientHelloSpec:  clientHelloSpec,
+		tlsFingerprint:   tlsFingerprint,
+		http2Fingerprint: http2Fingerprint,
 	}
 	if sni != nil {
 		cacheKey.sni = *sni

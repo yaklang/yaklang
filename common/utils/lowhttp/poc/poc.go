@@ -105,9 +105,10 @@ type PocConfig struct {
 	BodyStreamHandler func([]byte, io.ReadCloser)
 	NoBodyBuffer      *bool // 禁用响应体缓冲，用于下载大文件避免内存占用
 
-	ClientHelloSpec *utls.ClientHelloSpec
-	RandomJA3       bool
-	TLSFingerprint  string
+	ClientHelloSpec  *utls.ClientHelloSpec
+	RandomJA3        bool
+	TLSFingerprint   string
+	HTTP2Fingerprint string
 
 	GmTLS                  bool
 	GmTLSOnly              bool
@@ -260,6 +261,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	if c.TLSFingerprint != "" {
 		opts = append(opts, lowhttp.WithTLSFingerprint(c.TLSFingerprint))
+	}
+	if c.HTTP2Fingerprint != "" {
+		opts = append(opts, lowhttp.WithHTTP2Fingerprint(c.HTTP2Fingerprint))
 	}
 	if c.GmTLSOnly {
 		opts = append(opts, lowhttp.WithGmTLSOnly(c.GmTLSOnly))
@@ -971,6 +975,19 @@ func WithTLSFingerprint(name string) PocConfigOption {
 
 func TLSFingerprintProfiles() []string {
 	return netx.AvailableClientHelloProfiles()
+}
+
+// WithHTTP2Fingerprint selects a built-in HTTP/2 framing fingerprint profile.
+// Available profiles can be queried with HTTP2FingerprintProfiles. It is
+// independent of WithTLSFingerprint and only takes effect on h2 connections.
+func WithHTTP2Fingerprint(name string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.HTTP2Fingerprint = name
+	}
+}
+
+func HTTP2FingerprintProfiles() []string {
+	return lowhttp.AvailableHTTP2Profiles()
 }
 
 // not export
@@ -3644,6 +3661,8 @@ var PoCExports = map[string]interface{}{
 	"randomJA3":              WithRandomJA3,
 	"tlsFingerprint":         WithTLSFingerprint,
 	"tlsFingerprintProfiles": TLSFingerprintProfiles,
+	"http2Fingerprint":         WithHTTP2Fingerprint,
+	"http2FingerprintProfiles": HTTP2FingerprintProfiles,
 	"gmTls":                  WithGmTls,
 	"gmTlsOnly":              WithGmTlsOnly,
 	"gmTLSPrefer":            WithGmTLSPrefer,
