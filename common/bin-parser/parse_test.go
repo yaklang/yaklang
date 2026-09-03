@@ -426,7 +426,10 @@ var icmpV6Expect = `Ethernet:
       Type: 135
       Code: 0
       Checksum: 3154
-      Payload: 00000000fe8000000000000014ae6f6a11a35b780101f84d8991af52
+      Neighbor Solicitation:
+        Reserved: "00000000"
+        Target Address: fe8000000000000014ae6f6a11a35b78
+        Options: 0101f84d8991af52
 `
 var dnsResponseExpect = `Ethernet:
   Destination: f84d8991af52

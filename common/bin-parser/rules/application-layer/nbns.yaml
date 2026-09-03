@@ -10,6 +10,13 @@ Package:
       if qd > 0 {
         this.ProcessSubNode("Questions")
       }
+      an = getNodeResult("Header/Answer RRs").Value
+      if an > 16 {
+        panic("nbns: too many answers")
+      }
+      if an > 0 {
+        this.ProcessSubNode("Answers")
+      }
     Header:
       ID: uint16
       Flags: uint16
@@ -24,6 +31,16 @@ Package:
         Name: NBName
         Type: uint16
         Class: uint16
+    Answers:
+      list: true
+      list-length-from-field: "../Header/Answer RRs"
+      Answer:
+        Name: NBName
+        Type: uint16
+        Class: uint16
+        TTL: uint32
+        RDLength: uint16
+        RData: "type:raw;length-from-field:../RDLength"
   LLMNR:
     operator: |
       this.ProcessSubNode("Header")
@@ -34,6 +51,13 @@ Package:
       if qd > 0 {
         this.ProcessSubNode("Questions")
       }
+      an = getNodeResult("Header/Answer RRs").Value
+      if an > 16 {
+        panic("llmnr: too many answers")
+      }
+      if an > 0 {
+        this.ProcessSubNode("Answers")
+      }
     Header:
       ID: uint16
       Flags: uint16
@@ -48,6 +72,16 @@ Package:
         Name: NBName
         Type: uint16
         Class: uint16
+    Answers:
+      list: true
+      list-length-from-field: "../Header/Answer RRs"
+      Answer:
+        Name: NBName
+        Type: uint16
+        Class: uint16
+        TTL: uint32
+        RDLength: uint16
+        RData: "type:raw;length-from-field:../RDLength"
 NBName:
   list: true
   Label:
