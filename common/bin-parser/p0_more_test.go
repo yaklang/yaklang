@@ -202,8 +202,11 @@ func TestRADIUSAndEdges(t *testing.T) {
 	r := parseRule(t, pkt, "application-layer.radius", "RADIUS")
 	require.Equal(t, uint64(1), uintVal(t, r.Child("Code")))
 	require.Equal(t, uint64(7), uintVal(t, r.Child("Identifier")))
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, r, "Attributes", "Type")))
-	require.Equal(t, user, bytesVal(t, mustChild(t, r, "Attributes", "Value")))
+	attrs := r.Child("Attributes")
+	require.True(t, attrs.IsList())
+	require.GreaterOrEqual(t, len(attrs.Children()), 1)
+	require.Equal(t, uint64(1), uintVal(t, attrs.Children()[0].Child("Type")))
+	require.Equal(t, user, bytesVal(t, attrs.Children()[0].Child("Value")))
 
 	accept := make([]byte, 20)
 	accept[0] = 2

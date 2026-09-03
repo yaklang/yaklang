@@ -50,6 +50,8 @@ func TestMySQLHandshakeV10(t *testing.T) {
 	require.Equal(t, uint64(11), uintVal(t, hs.Child("Connection ID")))
 	require.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8}, bytesVal(t, hs.Child("Auth Plugin Data 1")))
 	require.Equal(t, uint64(33), uintVal(t, hs.Child("Character Set")))
+	require.Equal(t, []byte{9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0}, bytesVal(t, hs.Child("Auth Plugin Data 2")))
+	require.Equal(t, "mysql_native_password", strVal(t, hs.Child("Auth Plugin Name")))
 
 	eth := parseEthernet(t, ipv4TCPFrame(t, 3306, 50000, raw))
 	wired := mustChild(t, eth, "IP", "TCP", "MySQL")

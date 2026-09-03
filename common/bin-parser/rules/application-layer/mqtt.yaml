@@ -8,8 +8,17 @@ Package:
       if ptype < 1 || ptype > 14 {
         panic("mqtt: invalid packet type")
       }
-      this.ProcessSubNode("Remaining Length")
-      rem = getNodeResult("Remaining Length").Value
+      this.ProcessSubNode("RL0")
+      b0 = getNodeResult("RL0").Value
+      rem = b0 & 127
+      if (b0 & 128) != 0 {
+        this.ProcessSubNode("RL1")
+        b1 = getNodeResult("RL1").Value
+        rem = rem + (b1 & 127) * 128
+        if (b1 & 128) != 0 {
+          panic("mqtt: remaining length longer than 2 bytes")
+        }
+      }
       avail = this.GetSubNode("Payload").GetRemainingSpace()
       if rem > avail {
         panic("mqtt: remaining length exceeds payload")
@@ -20,7 +29,8 @@ Package:
       }
     Packet Type: uint8,4bit
     Flags: uint8,4bit
-    Remaining Length: uint8
+    RL0: uint8
+    RL1: uint8
     Payload:
       operator: |
         ptype = getNodeResult("../Packet Type").Value

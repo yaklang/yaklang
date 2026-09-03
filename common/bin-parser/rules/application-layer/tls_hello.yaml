@@ -43,6 +43,18 @@ Package:
           this.GetSubNode("Compression Methods").SetMaxLength(cpl)
           this.ProcessSubNode("Compression Methods")
         }
+        if this.GetMaxLength() != 0 && this.Length() < this.GetMaxLength() {
+          this.ProcessSubNode("Extensions Length")
+          el = getNodeResult("Extensions Length").Value
+          avail = this.GetMaxLength() - this.Length()
+          if el > avail {
+            el = avail
+          }
+          if el > 0 {
+            this.GetSubNode("Extensions").SetMaxLength(el)
+            this.ProcessSubNode("Extensions")
+          }
+        }
       Legacy Version: uint16
       Random: raw,32
       Session ID Length: uint8
@@ -51,3 +63,31 @@ Package:
       Cipher Suites: raw
       Compression Length: uint8
       Compression Methods: raw
+      Extensions Length: uint16
+      Extensions:
+        list: true
+        Extension: TLSExtension
+        operator: |
+          for {
+            ele = this.NewElement()
+            if ele.GetMaxLength() < 4 {
+              break
+            }
+            ele.Process()
+          }
+TLSExtension:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    el = getNodeResult("Length").Value
+    avail = this.GetMaxLength() - this.Length()
+    if el > avail {
+      el = avail
+    }
+    if el > 0 {
+      this.GetSubNode("Data").SetMaxLength(el)
+      this.ProcessSubNode("Data")
+    }
+  Type: uint16
+  Length: uint16
+  Data: raw
