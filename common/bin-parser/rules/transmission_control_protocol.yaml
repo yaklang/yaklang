@@ -45,6 +45,10 @@ Package:
                   typeNameList = ["Redis"]
                 } else if src == 1883 || dst == 1883 || src == 8883 || dst == 8883 {
                   typeNameList = ["MQTT"]
+                } else if src == 445 || dst == 445 {
+                  typeNameList = ["SMB2", "SMB", "NBSS"]
+                } else if src == 139 || dst == 139 {
+                  typeNameList = ["NBSS", "SMB2", "SMB"]
                 } else if src == 443 || dst == 443 {
                   typeNameList = ["TLS", "HTTP"]
                 } else if src == 80 || dst == 80 || src == 8080 || dst == 8080 {
@@ -91,3 +95,6 @@ FTP: "import:application-layer/ftp.yaml;node:FTP"
 SMTP: "import:application-layer/smtp.yaml;node:SMTP"
 Redis: "import:application-layer/redis.yaml;node:RESP"
 MQTT: "import:application-layer/mqtt.yaml;node:MQTT"
+SMB2: "import:application-layer/smb2.yaml;node:SMB2"
+SMB: "import:application-layer/smb.yaml;node:SMB"
+NBSS: "import:application-layer/nbss.yaml;node:NBSS"

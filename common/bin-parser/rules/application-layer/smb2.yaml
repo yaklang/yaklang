@@ -1,0 +1,155 @@
+endian: little
+Package:
+  SMB2:
+    operator: |
+      this.ProcessSubNode("ProtocolId")
+      magic = getNodeResult("ProtocolId").Value
+      if magic != 0x424d53fe {
+        panic("smb2: ProtocolId must be \\xfeSMB")
+      }
+      this.ProcessSubNode("StructureSize")
+      if getNodeResult("StructureSize").Value != 64 {
+        panic("smb2: header StructureSize must be 64")
+      }
+      this.ProcessSubNode("CreditCharge")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Credit")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("NextCommand")
+      this.ProcessSubNode("MessageId")
+      this.ProcessSubNode("ProcessId")
+      this.ProcessSubNode("TreeId")
+      this.ProcessSubNode("SessionId")
+      this.ProcessSubNode("Signature")
+      cmd = getNodeResult("Command").Value
+      flags = getNodeResult("Flags").Value
+      isResp = (flags & 0x1) != 0
+      if cmd == 0 {
+        if isResp {
+          this.ProcessByType("Negotiate Response")
+        } else {
+          this.ProcessByType("Negotiate Request")
+        }
+        return
+      }
+      if cmd == 1 {
+        if isResp {
+          this.ProcessByType("Session Setup Response")
+        } else {
+          this.ProcessByType("Session Setup Request")
+        }
+        return
+      }
+      this.ProcessSubNode("Body")
+    ProtocolId: uint32
+    StructureSize: uint16
+    CreditCharge: uint16
+    Status: uint32
+    Command: uint16
+    Credit: uint16
+    Flags: uint32
+    NextCommand: uint32
+    MessageId: uint64
+    ProcessId: uint32
+    TreeId: uint32
+    SessionId: uint64
+    Signature: raw,16
+    Body: raw
+Negotiate Request:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("DialectCount")
+    this.ProcessSubNode("SecurityMode")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Capabilities")
+    this.ProcessSubNode("ClientGuid")
+    this.ProcessSubNode("ClientStartTime")
+    this.ProcessSubNode("Dialects")
+  StructureSize: uint16
+  DialectCount: uint16
+  SecurityMode: uint16
+  Reserved: uint16
+  Capabilities: uint32
+  ClientGuid: raw,16
+  ClientStartTime: raw,8
+  Dialects:
+    list: true
+    list-length-from-field: ../DialectCount
+    Dialect: uint16
+Negotiate Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("SecurityMode")
+    this.ProcessSubNode("DialectRevision")
+    this.ProcessSubNode("NegotiateContextCount")
+    this.ProcessSubNode("ServerGuid")
+    this.ProcessSubNode("Capabilities")
+    this.ProcessSubNode("MaxTransactSize")
+    this.ProcessSubNode("MaxReadSize")
+    this.ProcessSubNode("MaxWriteSize")
+    this.ProcessSubNode("SystemTime")
+    this.ProcessSubNode("ServerStartTime")
+    this.ProcessSubNode("SecurityBufferOffset")
+    this.ProcessSubNode("SecurityBufferLength")
+    this.ProcessSubNode("NegotiateContextOffset")
+    l = getNodeResult("SecurityBufferLength").Value
+    if l > 0 {
+      this.GetSubNode("SecurityBuffer").SetMaxLength(l)
+      this.ProcessSubNode("SecurityBuffer")
+    }
+  StructureSize: uint16
+  SecurityMode: uint16
+  DialectRevision: uint16
+  NegotiateContextCount: uint16
+  ServerGuid: raw,16
+  Capabilities: uint32
+  MaxTransactSize: uint32
+  MaxReadSize: uint32
+  MaxWriteSize: uint32
+  SystemTime: raw,8
+  ServerStartTime: raw,8
+  SecurityBufferOffset: uint16
+  SecurityBufferLength: uint16
+  NegotiateContextOffset: uint32
+  SecurityBuffer: raw
+Session Setup Request:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("SecurityMode")
+    this.ProcessSubNode("Capabilities")
+    this.ProcessSubNode("Channel")
+    this.ProcessSubNode("SecurityBufferOffset")
+    this.ProcessSubNode("SecurityBufferLength")
+    this.ProcessSubNode("PreviousSessionId")
+    l = getNodeResult("SecurityBufferLength").Value
+    if l > 0 {
+      this.GetSubNode("SecurityBuffer").SetMaxLength(l)
+      this.ProcessSubNode("SecurityBuffer")
+    }
+  StructureSize: uint16
+  Flags: uint8
+  SecurityMode: uint8
+  Capabilities: uint32
+  Channel: uint32
+  SecurityBufferOffset: uint16
+  SecurityBufferLength: uint16
+  PreviousSessionId: uint64
+  SecurityBuffer: raw
+Session Setup Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("SessionFlags")
+    this.ProcessSubNode("SecurityBufferOffset")
+    this.ProcessSubNode("SecurityBufferLength")
+    l = getNodeResult("SecurityBufferLength").Value
+    if l > 0 {
+      this.GetSubNode("SecurityBuffer").SetMaxLength(l)
+      this.ProcessSubNode("SecurityBuffer")
+    }
+  StructureSize: uint16
+  SessionFlags: uint16
+  SecurityBufferOffset: uint16
+  SecurityBufferLength: uint16
+  SecurityBuffer: raw
