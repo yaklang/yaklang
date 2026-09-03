@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-use-assert-class"
-	risk: "Best-Practice"
+	risk: "best-practice"
 	desc: <<<DESC
 Migrated from Semgrep rule `use-assert-class` (/tmp/semgrep-rules/apex/lang/best-practice/ncino/tests/UseAssertClass.yaml).
 Original message: Assert methods in the System class have been replaced with the Assert class: https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_class_System_Assert.htm

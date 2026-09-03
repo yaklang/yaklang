@@ -181,6 +181,56 @@ alert $uaf for { level: "high", risk: "Use After Free" }
 			Want: map[string]ptrNativeWant{"uaf": {Min: 1}},
 			WantAlerts: []string{"uaf"},
 		},
+		{
+			Name: "free? filter outputs the free call not the use site",
+			Code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    *p = 10;
+    free(p);
+    *p = 20;
+    return 0;
+}
+`,
+			Rule: `free?(* #-> <uaf()>) as $uaf`,
+			Want: map[string]ptrNativeWant{"uaf": {Min: 1}},
+			Contain: map[string][]string{"uaf": {"free"}},
+			Absent:  map[string][]string{"uaf": {"20"}},
+		},
+		{
+			Name: "free? filter keeps only the free whose pointer has UAF",
+			Code: `
+#include <stdlib.h>
+int main() {
+    int *pa = (int*)malloc(sizeof(int));
+    int *pb = (int*)malloc(sizeof(int));
+    *pb = 0;
+    free(pa);
+    *pa = 11;
+    free(pb);
+    return 0;
+}
+`,
+			Rule: `free?(* #-> <uaf()>) as $uaf`,
+			Want: map[string]ptrNativeWant{"uaf": {Min: 1, Max: 1}},
+			Contain: map[string][]string{"uaf": {"free"}},
+			Absent:  map[string][]string{"uaf": {"11"}},
+		},
+		{
+			Name: "free? filter empty when no UAF",
+			Code: `
+#include <stdlib.h>
+int main() {
+    int *p = (int*)malloc(sizeof(int));
+    *p = 10;
+    free(p);
+    return 0;
+}
+`,
+			Rule: `free?(* #-> <uaf()>) as $uaf`,
+			Want: map[string]ptrNativeWant{"uaf": {Min: 0, Max: 0}},
+		},
 	}, uafCoreCases()...))
 }
 

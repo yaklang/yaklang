@@ -1,8 +1,8 @@
 package javascript
 
 import (
-	"github.com/dop251/goja/ast"
-	"github.com/dop251/goja/parser"
+	"github.com/yaklang/goja/ast"
+	"github.com/yaklang/goja/parser"
 	"github.com/yaklang/yaklang/common/log"
 )
 

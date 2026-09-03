@@ -83,6 +83,10 @@ func (t *transactionTestConfig) RetryPromptBuilder(prompt string, err error) str
 }
 func (t *transactionTestConfig) GetEmitter() *Emitter                            { return t.emitter }
 func (t *transactionTestConfig) GetBrowserSessionTracker() BrowserSessionTracker { return nil }
+func (t *transactionTestConfig) AppendReportedRisk(risk *schema.Risk) bool       { return false }
+func (t *transactionTestConfig) GetReportedRisksRendered() string                { return "" }
+func (t *transactionTestConfig) GetReportedRisks() string                        { return "" }
+func (t *transactionTestConfig) SetReportedRisks(string)                         {}
 func (t *transactionTestConfig) NewAIResponse() *AIResponse                      { return NewAIResponse(t) }
 func (t *transactionTestConfig) CallAIResponseOutputFinishedCallback(string)     {}
 func (t *transactionTestConfig) GetAiToolManager() *buildinaitools.AiToolManager { return nil }

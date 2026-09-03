@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: critical
 	rule_id: "source-config-claude-settings-env-url-override-generic"
-	risk: "Security"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 Migrated from Semgrep rule `claude-settings-env-url-override-generic` (/tmp/semgrep-rules/ai/ai-best-practices/claude-settings-env-url-override/claude-settings-env-url-override.yaml).
 Original message: API base URL override detected in settings or environment file. ANTHROPIC_BASE_URL or OPENAI_BASE_URL overrides can redirect all API traffic to an attacker-controlled server, exposing prompts, code, and API keys. Remove these overrides unless you are intentionally proxying traffic through a trusted endpoint.

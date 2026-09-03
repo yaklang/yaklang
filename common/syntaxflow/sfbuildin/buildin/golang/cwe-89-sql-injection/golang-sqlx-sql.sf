@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Sqlx SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "SQL注入"
+	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -26,7 +26,7 @@ err = db.Select(&users, query) // 存在SQL注入风险
 DESC
 	rule_id: "cdc66b17-36b4-4436-813e-9d121964224b"
 	title_zh: "检测Golang Sqlx SQL注入漏洞"
-	risk: "SQL注入"
+	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用参数化查询
@@ -164,7 +164,7 @@ DESC
 	title: "Golang Sqlx SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang Sqlx SQL注入漏洞",
 	message: "检测到Go语言中Sqlx SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "SQL注入",
+	risk: "sql-injection",
 	name: "high",
 }
 

@@ -1,7 +1,7 @@
 desc(
 	title_zh: "审计Java 使用System.out输出流"
 	title: "Audit Java Usage of System.out Output Stream"
-	risk:"代码风格",
+	risk:"code-style"
 	reference: <<<REFERENCE
 https://docs.oracle.com/javase/8/docs/api/java/io/PrintStream.html
 REFERENCE
@@ -54,7 +54,7 @@ logger.debug("This is a debug message");
 }
 ```
 SOLUTION
-	risk: "代码风格",
+	risk: "code-style",
 	desc: <<<DESC
 ### 规则目的
 该规则用于检测Java项目中是否使用了System.out输出流。System.out是Java中的标准输出流，通常用于打印调试信息或日志。

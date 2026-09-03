@@ -48,6 +48,11 @@ type queryConfig struct {
 	vm    *sfvm.SyntaxFlowVirtualMachine
 	frame *sfvm.SFFrame
 
+	// sourceResultCallback lets source-mode bounded hit batches stream to a
+	// consumer immediately. The fallback aggregate path is retained for callers
+	// that do not provide a result callback.
+	sourceResultCallback func(*SyntaxFlowResult)
+
 	// runtime config
 	opts []sfvm.Option // config
 	// config       *sfvm.Config
@@ -196,12 +201,15 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		if config.program != nil {
 			root.SetProgramName(config.program.GetProgramName())
 		}
-		res, err = frame.Feed(sfvm.ValuesOf(root), config.opts...)
+		res, err = executeSourceFrameBatches(frame, root, config)
 	} else {
 		res, err = frame.Feed(value, config.opts...)
 	}
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
+	}
+	if config.sourceResultCallback != nil && sfvm.FrameIsSourceMode(frame) {
+		return nil, nil
 	}
 
 	var ret *SyntaxFlowResult
@@ -230,6 +238,43 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}
 
 	return ret, nil
+}
+
+func executeSourceFrameBatches(
+	frame *sfvm.SFFrame,
+	root *sfvm.PatternRoot,
+	config *queryConfig,
+) (*sfvm.SFFrameResult, error) {
+	batchSize := sfpattern.DefaultSourceHitBatchSize
+	var accumulated *sfvm.SFFrameResult
+	for offset := 0; ; offset += batchSize {
+		root.SetSourceHitBatch(offset, batchSize)
+		batchResult, err := frame.Feed(sfvm.ValuesOf(root), config.opts...)
+		if err != nil {
+			return nil, err
+		}
+		if config.sourceResultCallback != nil {
+			result := CreateResultFromQuery(batchResult, config.Config)
+			result.program = config.program
+			result.TaskID = config.taskID
+			_ = result.CreateRisk()
+			config.sourceResultCallback(result)
+			_, _, total := root.SourceHitBatch()
+			if total == 0 || offset+batchSize >= total {
+				return nil, nil
+			}
+			continue
+		}
+		if accumulated == nil {
+			accumulated = sfvm.NewSFFrameResultAccumulator(batchResult)
+		} else {
+			accumulated.MergeByResult(batchResult)
+		}
+		_, _, total := root.SourceHitBatch()
+		if total == 0 || offset+batchSize >= total {
+			return accumulated, nil
+		}
+	}
 }
 
 type QueryOption func(*queryConfig)
@@ -429,6 +474,12 @@ func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 	}
 }
 
+func QueryWithSourceResultCallback(callback func(*SyntaxFlowResult)) QueryOption {
+	return func(c *queryConfig) {
+		c.sourceResultCallback = callback
+	}
+}
+
 func QueryWithSSAConfig(c *ssaconfig.Config) QueryOption {
 	return func(q *queryConfig) {
 		q.Config = c
@@ -566,13 +617,32 @@ func (ps Programs) SyntaxFlowRuleName(ruleName string, opts ...QueryOption) (*Sy
 }
 
 func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	if p != nil && sfvm.RuleIsSourceMode(rule, nil) {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
 	opts = append(opts, QueryWithProgram(p), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
 }
 
 func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	if sfvm.RuleIsSourceMode(rule, nil) {
+		return nil, utils.Errorf(
+			"SSA program target cannot execute source rule %s; source rules require a raw source target",
+			ruleGetRuleName(rule),
+		)
+	}
 	opts = append(opts, QueryWithPrograms(ps), QueryWithRule(rule))
 	return QuerySyntaxflow(opts...)
+}
+
+func ruleGetRuleName(rule *schema.SyntaxFlowRule) string {
+	if rule == nil {
+		return ""
+	}
+	return rule.RuleName
 }
 
 func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {

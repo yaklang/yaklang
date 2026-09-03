@@ -1,0 +1,20 @@
+  Allow the deterministic test action?
+
+Reply
+  approve
+
+Memfit
+  approved: approve
+
+✓ Completed · <elapsed> · test-model
+
+You
+  slow
+
+Cancel
+  Cancellation requested; press Ctrl+C again to exit
+
+╭─ Queued message ─────────────────────────────────────────────────────
+│ queue ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────────
+◆ Cancelling         test-model · MANUAL · click/Ctrl+O details · /help

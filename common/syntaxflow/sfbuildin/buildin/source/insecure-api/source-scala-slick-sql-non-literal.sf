@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-scala-slick-sql-non-literal"
-	risk: "Security"
+	risk: "sql-injection"
 	desc: <<<DESC
 Migrated from Semgrep rule `scala-slick-sql-non-literal` (/tmp/semgrep-rules/scala/slick/security/scala-slick-sql-non-literal.yaml).
 Original message: Detected a formatted string in a SQL statement. This could lead to SQL injection if variables in the SQL statement are not properly sanitized. Avoid using `#$variable` and use `$variable` in `sql"..."` strings instead.
@@ -41,9 +41,9 @@ class Foo {
 NEG
 )
 
-${*}.pattern_regex(/sql"[^"]*"/) as $sql
-${*}.pattern_regex(/import\s+slick\.[\s\S]*/) as $imp
-${*}.pattern_regex(/\#\$|YAKLANG_SF_POS_source\-scala\-slick\-sql\-non\-literal/) as $t
+${*.scala}.pattern_regex(/sql"[^"]*"/) as $sql
+${*.scala}.pattern_regex(/import\s+slick\.[\s\S]*/) as $imp
+${*.scala}.pattern_regex(/\#\$|YAKLANG_SF_POS_source\-scala\-slick\-sql\-non\-literal/) as $t
 $t inside $sql as $a
 $a inside $imp as $hit
 alert $hit for {

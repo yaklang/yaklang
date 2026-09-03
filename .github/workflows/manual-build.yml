@@ -22,6 +22,8 @@ jobs:
     uses: ./.github/workflows/reuse-build.yml
     with:
       os: ${{ matrix.os }}
-      ee: false
+      # Customer builds must embed the official license certs; without ee=true
+      # the engine ships ephemeral random RSA keys and licenses won't verify.
+      ee: true
       sign: ${{ inputs.sign && contains(matrix.os, 'windows') }}
     secrets: inherit 

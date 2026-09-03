@@ -1,9 +1,10 @@
 package dap
 
+// This file contains the test-only DAP protocol client fixture.
+
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"path/filepath"
@@ -208,14 +209,6 @@ func (c *Client) ExpectInvisibleErrorResponse(t *testing.T) *dap.ErrorResponse {
 		t.Errorf("\ngot %#v\nwant ShowUser=false", er)
 	}
 	return er
-}
-
-func pretty(v interface{}) string {
-	s, err := json.MarshalIndent(v, "", "\t")
-	if err != nil {
-		return fmt.Sprintf("%#v", s)
-	}
-	return string(s)
 }
 
 func toRawMessage(in interface{}) json.RawMessage {

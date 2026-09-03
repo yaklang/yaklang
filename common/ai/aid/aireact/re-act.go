@@ -256,7 +256,11 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	}
 
 	memoryLoadStart := time.Now()
-	if cfg.MemoryTriage != nil {
+	if cfg.DisableMemoryTriage {
+		react.memoryTriage = aicommon.NewNoOpMemoryTriage()
+		react.config.MemoryTriage = react.memoryTriage
+		log.Infof("memory triage disabled (no-op) for ReAct instance: %s", react.config.Id)
+	} else if cfg.MemoryTriage != nil {
 		react.memoryTriage = cfg.MemoryTriage
 	} else {
 		memoryTriageId := cfg.MemoryTriageId

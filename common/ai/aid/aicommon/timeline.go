@@ -1046,18 +1046,25 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 	result := header + body + footer
 	// Tokenizers can merge differently across concatenation boundaries. Keep a
 	// final guard so the public contract remains a hard upper bound.
-	if MeasureTokens(result) > tokenLimit {
+	if resultTokens := MeasureTokens(result); resultTokens > tokenLimit {
+		originalBody := body
 		bodyBudget := tokenLimit - baseTokens
-		for bodyBudget > 0 && MeasureTokens(result) > tokenLimit {
-			bodyBudget--
-			body = strings.TrimSpace(ShrinkTextBlockByTokens(body, bodyBudget))
+		for bodyBudget > 0 && resultTokens > tokenLimit {
+			// Remove the measured overflow in one step. The previous one-token
+			// decrement re-encoded the complete body once per excess token.
+			bodyBudget -= max(1, resultTokens-tokenLimit)
+			if bodyBudget <= 0 {
+				return ""
+			}
+			body = strings.TrimSpace(ShrinkTextBlockByTokens(originalBody, bodyBudget))
 			if body == "" {
 				return ""
 			}
 			result = header + body + footer
+			resultTokens = MeasureTokens(result)
 		}
 	}
-	if MeasureTokens(result) > tokenLimit {
+	if ytoken.TokenCountExceeds(result, tokenLimit) {
 		return ""
 	}
 	return result

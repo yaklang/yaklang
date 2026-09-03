@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-template-autoescape-off"
-	risk: "Security"
+	risk: "xss"
 	desc: <<<DESC
 Migrated from Semgrep rule `template-autoescape-off` (/tmp/semgrep-rules/python/django/security/audit/xss/template-autoescape-off.yaml).
 Original message: Detected a template block where autoescaping is explicitly disabled with '{% autoescape off %}'. This allows rendering of raw HTML in this segment. Turn autoescaping on to prevent cross-site scripting (XSS). If you must do this, consider instead, using `mark_safe` in Python code.

@@ -293,7 +293,8 @@ type Config struct {
 	TimelineTotalContentLimit int // in tokens
 
 	// triage
-	MemoryTriage MemoryTriage
+	MemoryTriage        MemoryTriage
+	DisableMemoryTriage bool // 禁用 Memory Triage（智能记忆处理），默认为 false（即默认启用）
 
 	TimelineArchiveStore TimelineArchiveStore
 	MemoryPoolSize       int64
@@ -1245,7 +1246,7 @@ const UserPresetPromptMaxLength = 4000
 
 func WithUserPresetPrompt(prompt string) ConfigOption {
 	return func(c *Config) error {
-		if MeasureTokens(prompt) > UserPresetPromptMaxLength {
+		if TokenCountExceeds(prompt, UserPresetPromptMaxLength) {
 			prompt = ShrinkByTokens(prompt, UserPresetPromptMaxLength)
 		}
 		c.UserPresetPrompt = prompt
@@ -2305,6 +2306,23 @@ func WithMemoryTriage(mt MemoryTriage) ConfigOption {
 
 func WithNoOpMemoryTriage() ConfigOption {
 	return WithMemoryTriage(NewNoOpMemoryTriage())
+}
+
+// WithDisableMemoryTriage disables the built-in memory triage (intelligent memory
+// processing). When enabled, a no-op MemoryTriage is installed instead of the
+// default AIMemory instance, so no embedding/DB/AI calls are made for memory.
+// This is useful for lightweight or stateless sessions where memory overhead
+// is undesired.
+func WithDisableMemoryTriage(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableMemoryTriage = disable
+		c.m.Unlock()
+		return nil
+	}
 }
 
 func WithMemoryPoolSize(sz int64) ConfigOption {
@@ -3746,6 +3764,40 @@ func (c *Config) SetBrowserSessionTracker(tracker BrowserSessionTracker) {
 		return
 	}
 	c.browserSessionTracker = tracker
+}
+
+// AppendReportedRisk adds a compact summary of the given risk to the
+// session-level reported-risks store, deduplicating by target + type +
+// parameter. Called from the toolcall_invoke.go FeedBacker callback.
+func (c *Config) AppendReportedRisk(risk *schema.Risk) bool {
+	if c == nil {
+		return false
+	}
+	return c.GetSessionPromptState().AppendReportedRisk(risk)
+}
+
+// GetReportedRisksRendered returns the markdown block for prompt injection.
+func (c *Config) GetReportedRisksRendered() string {
+	if c == nil {
+		return ""
+	}
+	return c.GetSessionPromptState().GetReportedRisksRendered()
+}
+
+// GetReportedRisks returns the raw JSON for DB persistence.
+func (c *Config) GetReportedRisks() string {
+	if c == nil {
+		return ""
+	}
+	return c.GetSessionPromptState().GetReportedRisks()
+}
+
+// SetReportedRisks restores the reported-risks state from DB-persisted JSON.
+func (c *Config) SetReportedRisks(json string) {
+	if c == nil {
+		return
+	}
+	c.GetSessionPromptState().SetReportedRisks(json)
 }
 
 func (c *Config) CallAIResponseConsumptionCallback(i int) {

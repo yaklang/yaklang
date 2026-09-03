@@ -45,7 +45,7 @@ func BenchCompressLongText(
 	}
 
 	targetTokenSize := opts.TargetTokenSize
-	if int64(ytoken.CalcTokenCount(rawText)) < (targetTokenSize / 2) {
+	if !aicommon.TokenCountExceeds64(rawText, targetTokenSize/2-1) {
 		return rawText, 0, nil
 	}
 

@@ -281,6 +281,37 @@ func buildFilterMask(scope anchorScopeState, cond Values) ([]bool, error) {
 	return mask, nil
 }
 
+func (s *SFFrame) attachFilterConditionPredecessors(scope anchorScopeState, source, cond Values, mask []bool) {
+	if s == nil || source.IsEmpty() || cond.IsEmpty() || len(mask) == 0 {
+		return
+	}
+	width := len(mask)
+	if len(source) < width {
+		width = len(source)
+	}
+	opts := s.WithPredecessorContext("filter")
+	for idx := 0; idx < width; idx++ {
+		if !mask[idx] {
+			continue
+		}
+		src := source[idx]
+		if utils.IsNil(src) || src.IsEmpty() {
+			continue
+		}
+		slot := scope.anchorBase + idx
+		for _, cv := range cond {
+			if utils.IsNil(cv) || cv.IsEmpty() || src == cv {
+				continue
+			}
+			bits := cv.GetAnchorBitVector()
+			if bits == nil || bits.IsEmpty() || !bits.Has(slot) {
+				continue
+			}
+			_ = src.AppendPredecessor(cv, opts)
+		}
+	}
+}
+
 func (s *SFFrame) pushFilterCondition(cond Values) error {
 	scope, ok := s.activeAnchorScope()
 	if !ok {
@@ -293,5 +324,10 @@ func (s *SFFrame) pushFilterCondition(cond Values) error {
 	if err != nil {
 		return err
 	}
+	source := scope.source
+	if source.IsEmpty() {
+		source = s.stack.Peek()
+	}
+	s.attachFilterConditionPredecessors(scope, source, cond, mask)
 	return s.pushCondition(mask, cond, false)
 }

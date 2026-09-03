@@ -131,7 +131,7 @@ public String uploadFile(@RequestParam("file") MultipartFile file) {
 #### 4. 日志记录与监控
 对文件上传行为进行日志记录，并实时监控异常事件（如大文件上传、频繁上传等），以便快速响应潜在威胁。
 SOLUTION
-	risk: "任意文件上传",
+	risk: "file-upload",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

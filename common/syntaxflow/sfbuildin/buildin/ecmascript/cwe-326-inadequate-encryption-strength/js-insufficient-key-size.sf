@@ -3,7 +3,7 @@ desc(
 	title_zh: "使用密钥长度不足的加密密钥"
 	type: vuln
 	level: low
-	risk: "密钥长度不足"
+	risk: "insufficient-key-size"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -169,7 +169,7 @@ alert $weakModLen for {
 	title: "Insufficient RSA/DSA key size: modulusLength is below 2048 bits",
 	title_zh: "RSA/DSA 密钥长度不足：modulusLength 低于 2048 位",
 	message: "检测到 RSA 或 DSA 密钥生成时使用了低于 2048 位的模数长度。根据 NIST SP 800-131A，2048 位是 RSA/DSA 密钥的当前最低安全要求。低于此长度的密钥可在合理时间内被现代硬件破解。请将 modulusLength 设置为至少 2048（推荐 3072 或 4096）。",
-	risk: "密钥长度不足",
+	risk: "insufficient-key-size",
 	name: "weakModLen",
 }
 
@@ -179,7 +179,7 @@ alert $weakEcCurve for {
 	title: "Weak elliptic curve: named curve provides insufficient security",
 	title_zh: "弱椭圆曲线：所选曲线安全位数不足",
 	message: "检测到椭圆曲线密钥生成或 ECDH 使用了安全级别低于 112 位的弱曲线（如 P-192、secp160r1 等）。NIST 要求椭圆曲线至少提供 112 位安全性。请改用 P-256（secp256r1）、P-384、X25519 或 Ed25519 等强曲线。",
-	risk: "密钥长度不足",
+	risk: "insufficient-key-size",
 	name: "weakEcCurve",
 }
 
@@ -189,7 +189,7 @@ alert $weakDhLen for {
 	title: "Insufficient DH prime length: below 2048 bits",
 	title_zh: "DH 素数长度不足：低于 2048 位",
 	message: "检测到 Diffie-Hellman 密钥交换使用了低于 2048 位的素数长度。根据 NIST SP 800-131A，DH 素数长度至少需要 2048 位才能保证安全性。强烈建议改用 X25519（通过 crypto.generateKeyPair('x25519')）以获得更好的安全性和性能。",
-	risk: "密钥长度不足",
+	risk: "insufficient-key-size",
 	name: "weakDhLen",
 }
 

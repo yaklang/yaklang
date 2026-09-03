@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -34,43 +33,15 @@ var rdpAuth = &DefaultServiceAuthInfo{
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 3389)
 		result := i.Result()
-
+		// NLA 没有“未授权访问”：空密码也是一次认证失败。
+		// 这里只做 TCP 可达性，避免 3s sleep + administrator:"" 误伤爆破节奏。
 		conn, err := defaultDialer.DialContext(utils.TimeoutContext(defaultTimeout), "tcp", i.Target)
 		if err != nil {
 			res := i.Result()
 			res.Finished = true
 			return res
 		}
-		conn.Close()
-
-		time.Sleep(3 * time.Second)
-
-		host, port, err := utils.ParseStringToHostPort(i.Target)
-		if err != nil {
-			log.Errorf("parse target[%v] failed: %s", i.Target, err)
-			result.Finished = true
-			return result
-		}
-
-		var r bool
-		if utils.IsIPv4(host) {
-			r, err = rdpLogin(host, host, "administrator", "", port)
-		} else {
-			ip := netx.LookupFirst(host, netx.WithTimeout(5*time.Second))
-			r, err = rdpLogin(ip, host, "administrator", "", port)
-		}
-
-		if err != nil {
-			// 192.3.138.219/24
-			autoSetFinishedByConnectionError(err, result)
-			return result
-		}
-		if r {
-			result.Finished = true
-			result.Ok = true
-			return result
-		}
-
+		_ = conn.Close()
 		return result
 	},
 	BrutePass: func(i *BruteItem) (result *BruteItemResult) {
@@ -91,13 +62,20 @@ var rdpAuth = &DefaultServiceAuthInfo{
 
 		var r bool
 		if utils.IsIPv4(host) {
-			r, err = rdpLogin(host, host, i.Username, i.Password, port)
+			r, err = rdpLoginContext(i.Context, host, host, i.Username, i.Password, port)
 		} else {
 			ip := netx.LookupFirst(host, netx.WithTimeout(defaultTimeout))
-			r, err = rdpLogin(ip, host, i.Username, i.Password, port)
+			r, err = rdpLoginContext(i.Context, ip, host, i.Username, i.Password, port)
 		}
 
 		if err != nil {
+			var cssp *nla.CredSSPError
+			if errors.As(err, &cssp) {
+				if cssp.AccountLocked() {
+					result.Finished = true
+				}
+				return result
+			}
 			autoSetFinishedByConnectionError(err, result)
 			return result
 		}
@@ -159,19 +137,30 @@ var rdpAuth = &DefaultServiceAuthInfo{
 // ok, err = rdp.Login("192.168.1.1", "", "administrator", "123456", 3389)
 // println(ok)
 // ```
-func rdpLogin(ip, domain, user, password string, port int) (_ bool, err error) {
+// rdpLoginContext 在给定 ctx 内尝试 RDP 登录；ctx 取消/超时会立即中断
+// 拨号与连接上的阻塞读写（deadline 贯通到 TLS/CredSSP 层）。
+func rdpLoginContext(ctx context.Context, ip, domain, user, password string, port int) (_ bool, err error) {
 	defer func() {
 		if err1 := recover(); err1 != nil {
 			err = utils.Errorf("recover rdp login from panic: %s", err1)
 		}
 	}()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Second*15)
+	defer cancel()
 	target := fmt.Sprintf("%s:%d", ip, port)
 	g := newRDPClient(target, glog.NONE)
-	err = g.Login(domain, user, password)
+	err = g.Login(ctx, domain, user, password)
 	if err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func rdpLogin(ip, domain, user, password string, port int) (_ bool, err error) {
+	return rdpLoginContext(context.Background(), ip, domain, user, password, port)
 }
 
 var RDPLogin = rdpLogin
@@ -195,17 +184,21 @@ func newRDPClient(host string, logLevel glog.LEVEL) *rdpClient {
 	}
 }
 
-func (g *rdpClient) Login(domain, user, pwd string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
-	defer cancel()
+func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
-	conn, err := defaultDialer.DialTCPContext(utils.TimeoutContext(defaultTimeout), "tcp", g.Host)
+	conn, err := defaultDialer.DialTCPContext(ctx, "tcp", g.Host)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}
 	defer conn.Close()
-	glog.Info(conn.LocalAddr().String())
-
+	// deadline 贯通：ctx 的截止时间作用于连接上所有读写（含 TLS 与 CredSSP 阶段），
+	// 取消时 defer Close 会强制中断仍在阻塞的读写。
+	if d, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(d)
+	}
 	g.tpkt = tpkt.New(core.NewSocketLayer(conn), nla.NewNTLMv2(domain, user, pwd))
 	g.x224 = x224.New(g.tpkt)
 	g.mcs = t125.NewMCSClient(g.x224)
@@ -220,51 +213,62 @@ func (g *rdpClient) Login(domain, user, pwd string) error {
 	g.sec.SetFastPathListener(g.pdu)
 	g.pdu.SetFastPathSender(g.tpkt)
 
+	wg := &sync.WaitGroup{}
+	// 竞态治理：第一个到达的事件（error/close/success/ready/nla-ok/ctx 超时）
+	// 通过 doneOnce 唯一写入 finalErr 并完成 wg；后续事件成为 no-op，
+	// 消除旧实现中多 handler 并发写共享 err 的 data race。
+	var doneOnce sync.Once
+	var finalErr error
+	wg.Add(1)
+	finish := func(e error) {
+		doneOnce.Do(func() {
+			if e != nil {
+				log.Errorf("rdp error: %v", e)
+			}
+			finalErr = e
+			wg.Done()
+		})
+	}
+
+	// 必须在 Connect 之前注册：NLA 在 localhost 上可能快于后续 On()。
+	g.x224.On("error", func(e error) { finish(e) })
+	g.x224.On("nla-ok", func() {
+		log.Info("rdp nla authentication succeeded")
+		finish(nil)
+	})
+	g.pdu.On("error", func(e error) { finish(e) })
+	g.pdu.On("close", func() {
+		finish(errors.New("close"))
+	})
+	g.pdu.On("success", func() {
+		log.Info("rdp login success")
+		finish(nil)
+	})
+	g.pdu.On("ready", func() {
+		log.Info("rdp session ready")
+		finish(nil)
+	})
+	g.pdu.On("update", func(rectangles []pdu.BitmapData) {
+		_ = rectangles
+	})
+
 	err = g.x224.Connect()
 	if err != nil {
 		return fmt.Errorf("[x224 connect err] %v", err)
 	}
 	glog.Info("wait connect ok")
-	wg := &sync.WaitGroup{}
-	var doneOnce sync.Once
-	wg.Add(1)
 
-	g.pdu.On("error", func(e error) {
-		err = e
-		log.Errorf("error: %v", e)
-		g.pdu.Emit("done")
-	})
-	g.pdu.On("close", func() {
-		err = errors.New("close")
-		log.Errorf("closed: %v", err)
-		g.pdu.Emit("done")
-	})
-	g.pdu.On("success", func() {
-		err = nil
-		log.Info("on success")
-		g.pdu.Emit("done")
-	})
-	g.pdu.On("ready", func() {
-		log.Info("on ready")
-		g.pdu.Emit("done")
-	})
-	g.pdu.On("update", func(rectangles []pdu.BitmapData) {
-		log.Infof("on update: %v", spew.Sdump(rectangles))
-	})
-	g.pdu.On("done", func() {
-		doneOnce.Do(func() {
-			wg.Done()
-		})
-	})
-
+	// ctx 截止后仍无事件：协议不对或对端无响应；Login 返回后 goroutine 立即退出。
+	loginDone := make(chan struct{})
 	go func() {
 		select {
 		case <-ctx.Done():
-			// 如果在超时时间内没有收到任何事件，说明可能协议不对
-			g.pdu.Emit("error", errors.New("protocol error"))
+			g.pdu.Emit("error", utils.Errorf("protocol error or no response: %v", ctx.Err()))
+		case <-loginDone:
 		}
 	}()
 
 	wg.Wait()
-	return err
+	close(loginDone)
+	return finalErr
 }

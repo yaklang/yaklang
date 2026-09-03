@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: medium
 	rule_id: "source-java-md5"
-	risk: "Weak Cryptography"
+	risk: "weak-cryptography"
 	desc: <<<DESC
 Flags MessageDigest.getInstance("MD5") which is cryptographically broken for security uses.
 DESC

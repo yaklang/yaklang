@@ -721,7 +721,11 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		cfg.SetBrowserSessionTracker(invoker)
 	}
 
-	if cfg.MemoryTriage != nil {
+	if cfg.DisableMemoryTriage {
+		invoker.memoryTriage = aicommon.NewNoOpMemoryTriage()
+		invoker.config.MemoryTriage = invoker.memoryTriage
+		log.Infof("memory triage disabled (no-op) for invoker instance")
+	} else if cfg.MemoryTriage != nil {
 		invoker.memoryTriage = cfg.MemoryTriage
 	} else {
 		memoryTriageId := cfg.MemoryTriageId

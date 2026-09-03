@@ -2,7 +2,7 @@ desc(
 	title: "Sensitive Data Read from GET Request"
 	title_zh: "GET 请求中读取敏感数据"
 	type: vuln
-	risk: "敏感信息GET泄露"
+	risk: "sensitive-query-exposure"
 	level: low
 	desc: <<<DESC
 ### 漏洞描述
@@ -113,7 +113,7 @@ alert $sensitiveGetParam for {
 	title: "Sensitive Data Read from GET Request",
 	title_zh: "GET 请求中读取敏感数据",
 	message: "检测到通过 GET 请求的查询字符串读取敏感数据（如密码、令牌、密钥等）。这些敏感信息会以明文形式出现在 URL 中，可能被记录到服务器日志、浏览器历史或通过 Referer 头泄露给第三方。建议改用 POST 请求，将敏感数据放在请求体中传输。",
-	risk: "敏感数据通过 GET 请求泄露",
+	risk: "sensitive-query-exposure",
 	name: "sensitiveGetParam",
 }
 

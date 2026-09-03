@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java Zip GetInputStream资源未释放"
 	title: "Check Java Zip GetInputStream Unreleased Resource"
-	risk:"资源泄漏",
+	risk:"resource-leak"
 	level:high
 	reference: <<<REFERENCE
 [Effective Java, Third Edition - Item 9: Prefer try-with-resources to try-finally](https://livebook.manning.com/book/effective-java-third-edition/chapter-2/9)
@@ -259,7 +259,7 @@ public class SafeZipReadWithApacheCommons {
 }
 ```
 SOLUTION
-	risk: "资源泄漏",
+	risk: "resource-leak",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

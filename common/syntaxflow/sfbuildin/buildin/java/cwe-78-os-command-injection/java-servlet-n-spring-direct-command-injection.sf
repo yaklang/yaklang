@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Command Injection from Servlet and SpringMVC"
 	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞"
 	type: vuln
-	risk:"命令注入",
+	risk:"command-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -113,7 +113,7 @@ alert $high_source_site for {
 	title_zh: "检测到Java命令注入漏洞",
 	level: "high",
 	message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
-	risk: "命令注入",
+	risk: "command-injection",
 	name: "high_source_site",
 }
 
@@ -126,7 +126,7 @@ alert $normal_source_side for {
 	title_zh: "检测到Java命令注入漏洞",
 	level: "mid",
 	name: "normal_source_side",
-	risk: "命令注入",
+	risk: "command-injection",
 }
 
 
@@ -139,7 +139,7 @@ alert $low_risk_sink for {
 	level: "low",
 	message: "发现Java代码中可能存在命令注入，但并没有发现参数可控。",
 	title: "Check Java Command Injection from Servlet and SpringMVC",
-	risk: "命令注入",
+	risk: "command-injection",
 	name: "low_risk_sink",
 }
 

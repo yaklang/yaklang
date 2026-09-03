@@ -1,4 +1,5 @@
 desc(
+	risk: "information"
 	title: "Check Java Lang Unchecked Return Value"
 	title_zh: "检测Java Lang库未检查返回值的API"
 	type:security
@@ -68,7 +69,7 @@ alert $weak for {
 	title: "Check Java Lang Unchecked Return Value",
 	title_zh: "检测Java Lang库未检查返回值的API",
 	level: "info",
-	risk: "信息",
+	risk: "information",
 	message: "发现Java Lang库未检查返回值的API，可能存在资源泄露或操作失败的风险。",
 	solution: <<<SOLUTION
 ### 修复建议

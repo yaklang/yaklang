@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-config-hooks-sensitive-file-access-bash"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
 Migrated from Semgrep rule `hooks-sensitive-file-access-bash` (/tmp/semgrep-rules/ai/ai-best-practices/hooks-sensitive-file-access/hooks-sensitive-file-access-bash.yaml).
 Original message: Hook input from jq flows into a file operation without checking for sensitive files. Claude Code and Cursor hooks receive JSON input that may reference sensitive files such as ~/.ssh/*, ~/.aws/credentials, or .env files. Filter or block access to sensitive paths using realpath and a validation check before performing file operations.

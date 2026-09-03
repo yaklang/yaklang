@@ -89,7 +89,7 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 
 			// 限制内容大小，避免过大
 			const maxContentTokens = 50 * 1024
-			if ytoken.CalcTokenCount(resultContent) > maxContentTokens {
+			if ytoken.TokenCountExceeds(resultContent, maxContentTokens) {
 				resultContent = resultContent[:maxContentTokens] + "\n\n[... content truncated, file too large ...]"
 				log.Warnf("read_reference_file: content truncated to %d tokens", maxContentTokens)
 			}

@@ -165,6 +165,22 @@ func (m *MockedAIConfig) GetBrowserSessionTracker() aicommon.BrowserSessionTrack
 	return nil
 }
 
+func (m *MockedAIConfig) AppendReportedRisk(risk *schema.Risk) bool {
+	return false
+}
+
+func (m *MockedAIConfig) GetReportedRisksRendered() string {
+	return ""
+}
+
+func (m *MockedAIConfig) GetReportedRisks() string {
+	return ""
+}
+
+func (m *MockedAIConfig) SetReportedRisks(json string) {
+	// no-op
+}
+
 func (m *MockedAIConfig) CallAIResponseConsumptionCallback(current int) {
 	// Mock implementation - do nothing
 }

@@ -109,19 +109,32 @@ func extractSSAArtifactUploadConfig(params map[string]interface{}) *SSAArtifactU
 	if len(params) == 0 {
 		return nil
 	}
+	endpoint := strings.TrimSpace(toString(params["_scannode_ssa_endpoint"]))
+	useSSL := toBool(params["_scannode_ssa_use_ssl"])
+	// Legion historically sends a scheme-less endpoint together with
+	// use_ssl=false. Preserve that trusted scheduler contract while continuing
+	// to reject an arbitrary explicit http:// endpoint unless it is allowed.
+	legacySchemeLessHTTP := endpoint != "" && !useSSL && !strings.Contains(endpoint, "://")
 	cfg := &SSAArtifactUploadConfig{
-		ObjectKey: strings.TrimSpace(toString(params["_scannode_ssa_object_key"])),
-		Codec:     strings.TrimSpace(toString(params["_scannode_ssa_codec"])),
-		Endpoint:  strings.TrimSpace(toString(params["_scannode_ssa_endpoint"])),
-		Bucket:    strings.TrimSpace(toString(params["_scannode_ssa_bucket"])),
-		Region:    strings.TrimSpace(toString(params["_scannode_ssa_region"])),
-		UseSSL:    toBool(params["_scannode_ssa_use_ssl"]),
+		ObjectKey:        strings.TrimSpace(toString(params["_scannode_ssa_object_key"])),
+		Codec:            strings.TrimSpace(toString(params["_scannode_ssa_codec"])),
+		Endpoint:         endpoint,
+		Bucket:           strings.TrimSpace(toString(params["_scannode_ssa_bucket"])),
+		Region:           strings.TrimSpace(toString(params["_scannode_ssa_region"])),
+		UseSSL:           useSSL,
+		TLSVerify:        toBool(params["_scannode_ssa_tls_verify"]),
+		AllowInsecureTLS: toBool(params["_scannode_ssa_allow_insecure_tls"]),
+		TLSCAFile:        strings.TrimSpace(toString(params["_scannode_ssa_tls_ca_file"])),
+		AllowHTTP:        toBool(params["_scannode_ssa_allow_http"]) || legacySchemeLessHTTP,
+		VirtualHostStyle: toBool(params["_scannode_ssa_virtual_host_style"]),
 
-		STSAccessKey:    strings.TrimSpace(toString(params["_scannode_ssa_sts_access_key"])),
-		STSSecretKey:    strings.TrimSpace(toString(params["_scannode_ssa_sts_secret_key"])),
-		STSSessionToken: strings.TrimSpace(toString(params["_scannode_ssa_sts_session_token"])),
-		STSExpiresAt:    toInt64(params["_scannode_ssa_sts_expires_at"]),
+		STSExpiresAt: toInt64(params["_scannode_ssa_sts_expires_at"]),
 	}
+	cfg.setSTSCredentials(
+		toString(params["_scannode_ssa_sts_access_key"]),
+		toString(params["_scannode_ssa_sts_secret_key"]),
+		toString(params["_scannode_ssa_sts_session_token"]),
+	)
 	if cfg.Codec == "" {
 		cfg.Codec = "zstd"
 	}
@@ -135,7 +148,7 @@ func (cfg *SSAArtifactUploadConfig) NeedSTSRefresh(renewBeforeSec int64) bool {
 	if cfg == nil {
 		return true
 	}
-	if strings.TrimSpace(cfg.STSAccessKey) == "" || strings.TrimSpace(cfg.STSSecretKey) == "" {
+	if cfg.accessKeySecret().raw() == "" || cfg.secretKeySecret().raw() == "" {
 		return true
 	}
 	if renewBeforeSec <= 0 {

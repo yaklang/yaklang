@@ -223,7 +223,7 @@ func RenderSessionArtifactGroups(workDir string, groups []SessionArtifactTaskGro
 		sb.WriteString("\n")
 	}
 	result := sb.String()
-	if MeasureTokens(result) > ArtifactsContextMaxTokens {
+	if TokenCountExceeds(result, ArtifactsContextMaxTokens) {
 		result = ShrinkTextBlockByTokens(result, ArtifactsContextMaxTokens)
 	}
 	return result
@@ -482,7 +482,7 @@ func renderSessionArtifactPromptGroups(
 	}
 
 	result := sb.String()
-	if MeasureTokens(result) > ArtifactsContextMaxTokens {
+	if TokenCountExceeds(result, ArtifactsContextMaxTokens) {
 		result = ShrinkTextBlockByTokens(result, ArtifactsContextMaxTokens)
 	}
 	return result

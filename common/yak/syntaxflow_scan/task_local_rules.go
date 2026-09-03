@@ -149,6 +149,18 @@ func parseTaskLocalSyntaxFlowRulesWithMetadata(
 		}
 		rule.Hash = strings.TrimSpace(item.ContentHash)
 		rule.NeedUpdate = false
+		// Metadata is authoritative for snapshot-derived dispatch: a synced tag
+		// such as `source|secrets` must restore source mode even if an older
+		// compiler produced an empty Mode/Tag on the parsed rule object.
+		if itemTag := strings.TrimSpace(item.Tag); itemTag != "" {
+			rule.Tag = itemTag
+			for _, part := range strings.Split(itemTag, "|") {
+				switch strings.ToLower(strings.TrimSpace(part)) {
+				case "source", "pattern", "sfpattern":
+					rule.Mode = schema.SFR_MODE_SOURCE
+				}
+			}
+		}
 		// AlertDesc is a derived projection of the canonical rule content. Keep
 		// the parser-produced value when an older/minimal bundle omits it;
 		// otherwise a matching `alert` still executes but cannot materialize a
@@ -265,6 +277,44 @@ func filterTaskLocalSyntaxFlowRulesByMode(
 		}
 		rule.NormalizeMode()
 		if slices.Contains(normalized, string(rule.Mode)) {
+			filtered = append(filtered, rule)
+		}
+	}
+	return filtered
+}
+
+// filterTaskLocalSyntaxFlowRulesByNames applies the launch-frozen rule-name
+// subset to an immutable task-local snapshot. Empty name filters keep the whole
+// snapshot (subject to the mode filter).
+func filterTaskLocalSyntaxFlowRulesByNames(
+	rules []*schema.SyntaxFlowRule,
+	config *ssaconfig.SyntaxFlowRuleConfig,
+) []*schema.SyntaxFlowRule {
+	if config == nil {
+		return rules
+	}
+	names := config.RuleFilter.GetRuleNames()
+	if len(names) == 0 {
+		names = config.RuleNames
+	}
+	if len(names) == 0 {
+		return rules
+	}
+	selected := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if name = strings.TrimSpace(name); name != "" {
+			selected[name] = struct{}{}
+		}
+	}
+	if len(selected) == 0 {
+		return rules
+	}
+	filtered := make([]*schema.SyntaxFlowRule, 0, len(rules))
+	for _, rule := range rules {
+		if rule == nil {
+			continue
+		}
+		if _, ok := selected[rule.RuleName]; ok {
 			filtered = append(filtered, rule)
 		}
 	}

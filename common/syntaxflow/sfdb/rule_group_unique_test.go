@@ -13,6 +13,10 @@ import (
 func TestCreateGroupConcurrentSameNameIsIdempotent(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	// Match production SQLite's single-writer pool while keeping callers concurrent.
+	db.DB().SetMaxOpenConns(1)
+	db.DB().SetMaxIdleConns(1)
 	require.NoError(t, db.AutoMigrate(&schema.SyntaxFlowGroup{}, &schema.SyntaxFlowRule{}).Error)
 
 	name := "concurrent-" + uuid.NewString()

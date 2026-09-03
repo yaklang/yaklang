@@ -157,7 +157,7 @@ echo "无效的文件名";
 #### 7. 备份机制
 - 建立完善的数据备份和恢复机制，即使发生意外删除，也能及时恢复数据。
 SOLUTION
-	risk: "信息",
+	risk: "information",
 	name: "output",
 }
 

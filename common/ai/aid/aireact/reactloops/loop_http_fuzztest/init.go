@@ -383,7 +383,7 @@ func searchByKeywords(db *gorm.DB, keywords []string) string {
 
 				results.WriteString(fmt.Sprintf("[%d] %s\n", i+1, entry.KnowledgeTitle))
 				content := entry.KnowledgeDetails
-				if ytoken.CalcTokenCount(content) > 500 {
+				if ytoken.TokenCountExceeds(content, 500) {
 					content = content[:500] + "..."
 				}
 				results.WriteString(content + "\n\n")
@@ -475,7 +475,7 @@ func searchBySemantic(db *gorm.DB, collectionName string, questions []string) st
 			content = result.Document.Content
 		}
 
-		if ytoken.CalcTokenCount(content) > 800 {
+		if ytoken.TokenCountExceeds(content, 800) {
 			content = content[:800] + "\n[... content truncated ...]"
 		}
 

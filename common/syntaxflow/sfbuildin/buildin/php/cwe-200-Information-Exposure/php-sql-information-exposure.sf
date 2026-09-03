@@ -119,7 +119,7 @@ DESC
 	title: "Detect PHP MySQL Information Exposure Risk",
 	name: "mysql_sink",
 	message: "检测到PHP MySQL数据库信息泄露风险，敏感函数如mysql_error()的输出未经过滤直接暴露给客户端。",
-	risk: "信息泄露",
+	risk: "information-exposure",
 }
 $param?{<self> #{include: <<<CODE
 * & $pg_information
@@ -177,7 +177,7 @@ DESC
 	level: "low",
 	name: "pg_sink",
 	message: "检测到PHP PostgreSQL数据库信息泄露风险，敏感函数如pg_last_error()的输出未经过滤直接暴露给客户端。",
-	risk: "信息泄露",
+	risk: "information-exposure",
 }
 desc(
 	lang: "php"

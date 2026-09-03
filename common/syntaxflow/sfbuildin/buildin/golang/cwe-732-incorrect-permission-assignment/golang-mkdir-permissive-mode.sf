@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang创建目录权限过宽"
 	type: vuln
 	level: mid
-	risk: "安全配置错误"
+	risk: "security-misconfiguration"
 	desc: <<<DESC
 该规则检测 `os.Mkdir`/`os.MkdirAll` 使用过宽权限（如 0777、0775）。
 目录权限过宽会放大未授权读取、写入与横向移动风险。
@@ -29,7 +29,7 @@ alert $mid for {
 	title: "Golang Directory Permission Too Broad",
 	title_zh: "检测到目录权限配置过宽",
 	message: "检测到使用过宽目录权限（如 0777/0775），可能导致未授权访问。",
-	risk: "安全配置错误",
+	risk: "security-misconfiguration",
 	desc: <<<DESC
 目录权限过宽会让非预期主体访问或修改目录内容，增加数据泄露与篡改风险。
 DESC

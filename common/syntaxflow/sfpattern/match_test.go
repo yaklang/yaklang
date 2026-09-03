@@ -1,6 +1,7 @@
 package sfpattern
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -98,6 +99,44 @@ func TestNewRootFromFS(t *testing.T) {
 	vals, err := root.FileFilter("*", "regexp", nil, []string{`(?i)password\s*=\s*["'][^"']+["']`})
 	require.NoError(t, err)
 	require.Greater(t, sfvm.ValuesLen(vals), 0)
+}
+
+func TestLoadFilesFromFSWithOptions_KeepsSourceScriptsInBin(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("bin/run.sh", `exec $foo`)
+	vfs.AddFile("build/generated.go", `package generated`)
+
+	files, err := LoadFilesFromFSWithOptions(vfs, DefaultLoadOptions())
+	require.NoError(t, err)
+	require.Contains(t, files, "bin/run.sh")
+	require.NotContains(t, files, "build/generated.go")
+}
+
+func TestPatternRootMaterializesBoundedHitWindows(t *testing.T) {
+	files := map[string]string{
+		"many.txt": "key\n" + strings.Repeat("key\n", 5000),
+	}
+	root := NewRoot(files)
+	all, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, 5001, sfvm.ValuesLen(all))
+
+	root.SetSourceHitBatch(0, DefaultSourceHitBatchSize)
+	first, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, DefaultSourceHitBatchSize, sfvm.ValuesLen(first))
+
+	root.SetSourceHitBatch(DefaultSourceHitBatchSize, DefaultSourceHitBatchSize)
+	second, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, DefaultSourceHitBatchSize, sfvm.ValuesLen(second))
+
+	root.SetSourceHitBatch(5000, DefaultSourceHitBatchSize)
+	last, err := root.FileFilter("many.txt", "regexp", nil, []string{`key`})
+	require.NoError(t, err)
+	require.Equal(t, 1, sfvm.ValuesLen(last))
+	_, _, total := root.SourceHitBatch()
+	require.Equal(t, 5001, total)
 }
 
 func TestMatchRegexpWithNegatives(t *testing.T) {

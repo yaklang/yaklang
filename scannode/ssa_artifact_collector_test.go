@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
@@ -90,6 +91,17 @@ func TestSSAArtifactCollector_PersistNDJSONParts(t *testing.T) {
 	require.Len(t, decoded[0].Risks, 1)
 	require.Len(t, decoded[0].Files, 1)
 	require.Len(t, decoded[0].Dataflows, 1)
+}
+
+func TestSSAArtifactCollector_ContinuousUploadUsesSourceFlushInterval(t *testing.T) {
+	c := NewSSAArtifactCollector("source-task", "source-runtime", "source-subtask")
+	defer c.Cleanup()
+	provider := func(bool) (*SSAArtifactUploadConfig, error) {
+		return &SSAArtifactUploadConfig{ObjectKey: "ssa/source-task/result"}, nil
+	}
+	require.NoError(t, c.EnableContinuousUploadWithFlushInterval("identity", provider, 2*time.Second))
+	require.Equal(t, 2*time.Second, c.continuousFlushInterval)
+	require.True(t, c.continuousEnabled)
 }
 
 func TestSSAArtifactCollector_Codec_Zstd(t *testing.T) {
@@ -235,6 +247,20 @@ func TestUploadMetricsConcurrency(t *testing.T) {
 	}
 	if m.Retries != 100 {
 		t.Errorf("retries = %d, want 100", m.Retries)
+	}
+}
+
+func TestSSAArtifactCollector_SetUploadBytesUnderCollectorLock(t *testing.T) {
+	c := NewSSAArtifactCollector("task-1", "runtime-1", "sub-1")
+	defer c.Cleanup()
+
+	c.mu.Lock()
+	c.setUploadBytesLocked(102400, 32000)
+	c.mu.Unlock()
+
+	metrics := c.snapshotUploadMetrics()
+	if metrics.RawBytes != 102400 || metrics.CompressedBytes != 32000 {
+		t.Fatalf("unexpected upload byte metrics: %+v", metrics)
 	}
 }
 

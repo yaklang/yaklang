@@ -5,8 +5,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/utils"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mutate"
 )
@@ -29,9 +27,10 @@ func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
 	return func(item *BruteItem) (finalResult *BruteItemResult) {
 		defer func() {
 			if err := recover(); err != nil {
+				// panic 栈只进日志，不进入结果
 				result := item.Result()
 				result.Ok = false
-				result.ExtraInfo = []byte(fmt.Sprintf("brute item failed: %s\nstack:\n%v", err, utils.ErrorStack(err)))
+				result.ExtraInfo = []byte(fmt.Sprintf("brute item failed: %v", sanitizePanicMessage(err)))
 				finalResult = result
 			}
 		}()

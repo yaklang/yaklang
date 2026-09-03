@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-localhost-base-url"
-	risk: "Best-Practice"
+	risk: "best-practice"
 	desc: <<<DESC
 Migrated from Semgrep rule `localhost-base-url` (/tmp/semgrep-rules/generic/hugo/best-practice/localhost-base-url.yaml).
 Original message: The 'baseURL' is set to localhost. This may cause links to not work if deployed.
@@ -20,20 +20,20 @@ DESC
 Set baseURL to the production domain instead of localhost.
 SOLUTION
 	alert_min: 1
-	"file://pos.toml": <<<POS
+	"file://hugo.toml": <<<POS
 baseURL = "YAKLANG_SF_POS_source-localhost-base-url"
 languageCode = "en-us"
 title = "Example"
 POS
-	"safefile://neg.toml": <<<NEG
+	"safefile://config.toml": <<<NEG
 baseURL = "example.com"
 languageCode = "en-us"
 title = "Example"
 NEG
 )
 
-${*}.pattern_regex(/baseURL\s*=\s*"[^"]*"/) as $c
-${*}.pattern_regex(/.*(localhost|127\.0\.0\.1).*|YAKLANG_SF_POS_source\-localhost\-base\-url/) as $t
+${/(^|\/)(config|hugo)\.(toml|yaml|yml|json)$/}.pattern_regex(/baseURL\s*=\s*"[^"]*"/) as $c
+${/(^|\/)(config|hugo)\.(toml|yaml|yml|json)$/}.pattern_regex(/.*(localhost|127\.0\.0\.1).*|YAKLANG_SF_POS_source\-localhost\-base\-url/) as $t
 $t inside $c as $hit
 alert $hit for {
 	level: "middle",

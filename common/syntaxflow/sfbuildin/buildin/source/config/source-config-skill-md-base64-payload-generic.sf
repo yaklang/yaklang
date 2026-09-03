@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-config-skill-md-base64-payload-generic"
-	risk: "Security"
+	risk: "encoded-payload-execution"
 	desc: <<<DESC
 Migrated from Semgrep rule `skill-md-base64-payload-generic` (/tmp/semgrep-rules/ai/ai-best-practices/skill-md-base64-payload/skill-md-base64-payload.yaml).
 Original message: SKILL.md or AGENT.md instructs the agent to decode and execute a base64 (or hex) blob, which is a common encoding-evasion pattern used to smuggle malicious instructions past human review. Document the content in plain text or remove the encoded payload, and audit the decoded value before reintroducing it.
@@ -50,6 +50,7 @@ ${*skill.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\
 ${*skill.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p15
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 + $p13 + $p14 + $p15 as $hit
 alert $hit for {
+	risk: "encoded-payload-execution",
 	level: "middle",
 	title: "Skill Md Base64 Payload Generic",
 	title_zh: "检测到Skill Md Base64 Payload Generic",

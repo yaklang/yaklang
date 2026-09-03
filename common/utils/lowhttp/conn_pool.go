@@ -47,6 +47,7 @@ func NewHttpConnPool(ctx context.Context, idleCount int, perHostCount int) *LowH
 		h2Tombstones:       newTombstoneQueue(defaultTombstoneQueueSize),
 		keepAliveTimeout:   30 * time.Second,
 		ctx:                ctx,
+		debugNotify:        make(chan struct{}, 1),
 	}
 	if idleCount > 0 {
 		pool.connSem = make(chan struct{}, idleCount)
@@ -67,13 +68,15 @@ type LowHttpConnPool struct {
 	connSem          chan struct{}
 
 	// H2 连接独立管理：多路复用特性使得单连接承载所有并发 stream，
+	// TODO(httpflow): h2ConnMap has no global cap and is not LRU. Follow-up should bound idle H2 connections.
 	h2Mu         sync.Mutex
 	h2ConnMap    map[string]*persistConn // per-host 缓存单个 H2 persistConn
 	h2Tombstones *tombstoneQueue         // bounded ring-buffer of recent close events (protected by h2Mu)
 
 	// debug: 每 5s 打印连接池状态；通过 EnableConnPoolDebug(true) 开启。
-	debugEnabled int32     // atomic bool (1 = on). controls the printer goroutine.
-	debugOnce    sync.Once // ensures the printer goroutine is started only once.
+	debugEnabled int32         // atomic bool (1 = on). controls the printer goroutine.
+	debugRunning int32         // atomic bool (1 = running). permits restart after disable.
+	debugNotify  chan struct{} // wakes the printer immediately on enable/disable.
 }
 
 func (l *LowHttpConnPool) HostConnFull(key *connectKey) bool {
@@ -714,6 +717,13 @@ func newPersistConn(requestCtx context.Context, key *connectKey, pool *LowHttpCo
 }
 
 func (pc *persistConn) h2Conn() {
+	fr := http2.NewFramer(pc.conn, bufio.NewReader(pc.conn))
+	// Keep the parser limit in sync with SETTINGS_MAX_FRAME_SIZE sent in
+	// preface. NewFramer defaults to the HTTP/2 protocol maximum (16 MiB - 1),
+	// which lets a non-compliant peer pin a multi-megabyte read buffer on every
+	// cached H2 connection.
+	fr.SetMaxReadFrameSize(defaultMaxFrameSize)
+
 	newH2Conn := &http2ClientConn{
 		conn:              pc.conn,
 		ctx:               pc.p.ctx,
@@ -729,7 +739,7 @@ func (pc *persistConn) h2Conn() {
 		headerListMaxSize: defaultHeaderTableSize,
 		connWindowControl: newControl(defaultStreamReceiveWindowSize),
 		maxStreamsCount:   defaultMaxConcurrentStreamSize,
-		fr:                http2.NewFramer(pc.conn, bufio.NewReader(pc.conn)),
+		fr:                fr,
 		frWriteMutex:      new(sync.Mutex),
 		hDec:              hpack.NewDecoder(defaultHeaderTableSize, nil),
 		clientPrefaceOk:   utils.NewAtomicBool(),

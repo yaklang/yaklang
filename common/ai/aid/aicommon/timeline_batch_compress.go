@@ -373,7 +373,7 @@ func (m *Timeline) batchCompressOldestWithRecent(toCompress []*TimelineItem, rec
 	}
 
 	// 如果拼接后 head 超预算，触发 head-only 精简
-	if int64(MeasureTokens(finalText)) > outputTokenBudget {
+	if TokenCountExceeds64(finalText, outputTokenBudget) {
 		finalText = m.refineCompressedHeadLocked(finalText, outputTokenBudget, nonceStr)
 	}
 
@@ -826,7 +826,7 @@ func (m *Timeline) refineCompressedHeadLocked(headText string, budget int64, non
 	}
 
 	// 如果 AI 不可用或精简 prompt 构建失败，用规则截断兜底
-	if MeasureTokens(headText) <= int(budget) {
+	if !TokenCountExceeds64(headText, budget) {
 		return headText
 	}
 
@@ -883,7 +883,7 @@ func (m *Timeline) refineCompressedHeadLocked(headText string, budget int64, non
 	}
 
 	// 确保 refined 不超过预算
-	if int64(MeasureTokens(refined)) > budget {
+	if TokenCountExceeds64(refined, budget) {
 		refined = enforceOutputTokenBudget(refined, budget)
 	}
 	return refined

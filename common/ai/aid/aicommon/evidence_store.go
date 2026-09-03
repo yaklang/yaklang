@@ -119,7 +119,7 @@ func (s *EvidenceStore) Render() string {
 func (s *EvidenceStore) ShrinkToTokenBudget(budget int) {
 	for len(s.Items) > 1 {
 		rendered := s.Render()
-		if MeasureTokens(rendered) <= budget {
+		if !TokenCountExceeds(rendered, budget) {
 			return
 		}
 		s.Items = s.Items[1:]

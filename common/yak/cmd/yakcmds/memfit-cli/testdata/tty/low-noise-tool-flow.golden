@@ -1,0 +1,21 @@
+◆ memfit  local isolated agent
+test-model · YOLO · /workspace/yaklang
+Enter send · Alt+Enter newline · @ files · / commands · PgUp history
+
+You
+  tool-noise
+
+Tool issue
+  missing required command; Memfit corrected the tool input and retried
+
+Memfit
+  最终答案，只展示一次。
+
+✓ Completed · <elapsed> · test-model
+
+  ✓ Thinking ▸
+› × Read ▸ · 文件读取 · README.md
+╭─ Message ────────────────────────────────────────────────────────────────
+│ ❯ Type a message · @ files · / commands
+╰──────────────────────────────────────────────────────────────────────────
+○ Ready                    test-model · YOLO · click/Ctrl+O details · /help

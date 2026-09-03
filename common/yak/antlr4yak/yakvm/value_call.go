@@ -17,11 +17,9 @@ func (v *Value) NativeCall(vm *Frame, wavy bool, vs ...*Value) interface{} {
 	return v.nativeCall(false, wavy, vm, vs...)
 }
 
-
 func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interface{} {
 	rets := reflect.ValueOf(v.Value)
 	funcType := rets.Type()
-	funcName := v.GetLiteral()
 	// 这儿很不完善，需要做大量兼容性处理
 	numin := funcType.NumIn()
 	if funcType.IsVariadic() {
@@ -58,7 +56,7 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 			err := vm.AutoConvertReflectValueByType(&argVal, targetType)
 			if err != nil {
 				msg := fmt.Sprintf(
-					"native func `%s` calling failed: auto convert failed, cannot convert %v(passed) to %v(need)", funcName,
+					"native func `%s` calling failed: auto convert failed, cannot convert %v(passed) to %v(need)", v.GetLiteral(),
 					args[i].Type(), funcType.In(i),
 				)
 				panic(msg)
@@ -68,7 +66,7 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 	} else {
 		// 不可变参数的话，输入的函数参数列表长度和需要的参数列表长度应该是相等的
 		if vm.vm.GetConfig().GetFunctionNumberCheck() && funcType.NumIn() != len(vs) {
-			msg := fmt.Sprintf("native func `%s` need [%v] params, actually got [%v] params", funcName, funcType.NumIn(), len(vs))
+			msg := fmt.Sprintf("native func `%s` need [%v] params, actually got [%v] params", v.GetLiteral(), funcType.NumIn(), len(vs))
 			panic(msg)
 		}
 		for i := 0; i < funcType.NumIn(); i++ {
@@ -76,7 +74,7 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 			err := vm.AutoConvertReflectValueByType(&argVal, funcType.In(i))
 			if err != nil {
 				msg := fmt.Sprintf(
-					"native func `%s` calling failed: auto convert failed, cannot convert %v(passed) to %v(need)", funcName,
+					"native func `%s` calling failed: auto convert failed, cannot convert %v(passed) to %v(need)", v.GetLiteral(),
 					args[i].Type(), funcType.In(i),
 				)
 				panic(msg)
@@ -91,6 +89,9 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 	//	println(a.Type().String())
 	//}
 	if asyncCall {
+		// Register only after argument validation has succeeded. A panic before a
+		// goroutine is created must not leave AsyncWait blocked forever.
+		vm.vm.AsyncStart()
 		go func() {
 			defer vm.vm.AsyncEnd()
 			rets.Call(args)
@@ -132,7 +133,7 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 		if err, ok := lastValue.(error); ok || lastValue == nil {
 			vals = vals[:len(vals)-1]
 			if err != nil {
-				panic(utils.Errorf("native func `%s` call error: %v", funcName, err))
+				panic(utils.Errorf("native func `%s` call error: %v", v.GetLiteral(), err))
 			}
 		}
 	}

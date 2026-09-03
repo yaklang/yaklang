@@ -3,7 +3,7 @@ desc(
 	title: "Check Java java.security use of broken or risky hash algorithm"
 	type: security
 	level: low
-	risk : '不安全加密算法',
+	risk : "weak-cryptographic-algorithm"
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 REFERENCE
@@ -104,7 +104,7 @@ MessageDigest sha512 = MessageDigest.getInstance("SHA-512");
 4. **对于密码存储，使用加盐（Salting）和迭代（Hashing Iterations）**
 即使使用了安全的哈希算法，对于密码存储，也应该结合随机的盐值（Salting）和足够的迭代次数（Hashing Iterations），进一步增强安全性，抵御彩虹表攻击和暴力破解。
 SOLUTION
-	risk: "不安全加密算法",
+	risk: "weak-cryptographic-algorithm",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

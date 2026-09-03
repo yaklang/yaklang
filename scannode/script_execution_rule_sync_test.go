@@ -78,11 +78,13 @@ func TestPrepareRuleSnapshotForExecutionInjectsTaskLocalRules(t *testing.T) {
 	if taskLocal, _ := ruleConfig["task_local"].(bool); !taskLocal {
 		t.Fatalf("task_local marker missing: %#v", ruleConfig)
 	}
-	if _, exists := ruleConfig["rule_names"]; exists {
-		t.Fatalf("shared rule_names survived injection: %#v", ruleConfig)
+	if names, _ := ruleConfig["rule_names"].([]any); len(names) != 1 || names[0] != "shared" {
+		t.Fatalf("launch rule_names subset was not preserved: %#v", ruleConfig)
 	}
-	if _, exists := ruleConfig["rule_filter"]; exists {
-		t.Fatalf("shared rule_filter survived injection: %#v", ruleConfig)
+	filter, _ := ruleConfig["rule_filter"].(map[string]any)
+	filterNames, _ := filter["RuleNames"].([]any)
+	if len(filterNames) != 1 || filterNames[0] != "shared" {
+		t.Fatalf("launch rule_filter subset was not preserved: %#v", ruleConfig)
 	}
 	if _, exists := ruleConfig["rule_input"]; exists {
 		t.Fatalf("snapshot rule content must not be inlined in process arguments: %#v", ruleConfig["rule_input"])

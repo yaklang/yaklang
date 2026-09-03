@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -102,9 +103,22 @@ func (s *ScanNode) executeScriptTask(
 	}
 	defer cleanupSourcePayload()
 	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
-	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
+	reporter.ssaCollector = NewSSAArtifactCollectorWithContext(taskCtx, input.TaskID, input.RuntimeID, input.SubTaskID)
 	if reporter.ssaCollector != nil {
 		defer reporter.ssaCollector.Cleanup()
+		if reporter.ssaUploadCfg != nil &&
+			strings.TrimSpace(input.ScriptLabels["chain.next_compile"]) == "true" {
+			provider := s.buildSSAArtifactUploadConfigProvider(taskCtx, reporter, reporter.ssaUploadCfg)
+			if err := reporter.ssaCollector.EnableContinuousUploadWithFlushInterval(
+				normalizeArtifactCodec(reporter.ssaUploadCfg.Codec),
+				provider,
+				2*time.Second,
+			); err != nil {
+				log.Warnf("enable continuous source artifact upload failed: %v", err)
+			} else {
+				log.Infof("continuous source artifact upload enabled task=%s flush=2s", input.TaskID)
+			}
+		}
 	}
 	result := &ScriptExecutionResult{}
 	if preparedSnapshot != nil {
@@ -197,8 +211,9 @@ func (s *ScanNode) executeScriptTask(
 	// console can filter (Info/Warn/Error remain available).
 	scriptEnv := scriptEnvWithDebugLogLevel(ssaDBEnv, input.DebugEnabled)
 
-	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, scriptEnv, taskLogWriter); err != nil {
+	if err := s.executeScript(task, scanNodePath, scriptFile, params, input.RuntimeID, scriptEnv, taskLogWriter); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
+		s.preserveFailedSSAArtifactUpload(taskCtx, reporter, result)
 		// Finalize debug before returning the failure. Cancel / shutdown leaves
 		// taskCtx cancelled; finalize must still upload and write local cache.
 		if debugDir != "" {
@@ -279,8 +294,14 @@ func (s *ScanNode) handleScriptFailure(
 	if err == nil {
 		return nil
 	}
-	if reason := s.cancelReasonForAttempt(attemptID); reason != "" {
-		return &TaskCancelledError{Reason: reason}
+	if s != nil {
+		if reason := s.cancelReasonForAttempt(attemptID); reason != "" {
+			return &TaskCancelledError{Reason: reason}
+		}
+	}
+	var memoryErr *ScriptMemoryLimitError
+	if errors.As(err, &memoryErr) && memoryErr != nil {
+		return &TaskCancelledError{Reason: memoryErr.Error()}
 	}
 	if errors.Is(err, context.Canceled) {
 		return &TaskCancelledError{}
@@ -703,10 +724,9 @@ func injectPreparedRuleSnapshot(params map[string]any, bundle RuleSnapshotBundle
 			ruleConfig = typed
 		}
 	}
-	delete(ruleConfig, "rule_names")
-	delete(ruleConfig, "RuleNames")
-	delete(ruleConfig, "rule_filter")
-	delete(ruleConfig, "RuleFilter")
+	// Keep rule_names / rule_filter in the config: the snapshot bundle remains
+	// complete and immutable, while these fields freeze the execution subset
+	// selected by the platform launch request.
 
 	ruleInputs := make([]*ypb.SyntaxFlowRuleInput, 0, len(bundle.Items))
 	ruleMetadata := make(map[string]ssaconfig.TaskLocalRuleMetadata, len(bundle.Items))
@@ -931,7 +951,7 @@ func (e *scriptExecError) Error() string {
 }
 
 func (s *ScanNode) executeScript(
-	ctx context.Context,
+	task *Task,
 	scanNodePath string,
 	scriptFile string,
 	params []string,
@@ -939,6 +959,7 @@ func (s *ScanNode) executeScript(
 	extraEnv []string,
 	taskLogWriter io.Writer,
 ) error {
+	ctx := task.Ctx
 	baseCmd := []string{"distyak", scriptFile}
 	log.Infof("yak %v %v", scriptFile, params)
 
@@ -973,6 +994,20 @@ func (s *ScanNode) executeScript(
 		return err
 	}
 	childPID := cmd.Process.Pid
+	memoryGuardCancel := func() {}
+	var memoryLimitExceeded atomic.Pointer[ScriptMemoryLimitError]
+	if strings.TrimSpace(os.Getenv("LEGION_SCRIPT_MEMORY_GUARD")) != "0" {
+		guardCancel := func() {
+			contextCancel(task)
+		}
+		stopGuard, guardErr := startScriptMemoryGuard(guardCancel, childPID, &memoryLimitExceeded)
+		if guardErr == nil {
+			memoryGuardCancel = stopGuard
+		} else {
+			log.Warnf("start script memory guard failed: %v", guardErr)
+		}
+	}
+	defer memoryGuardCancel()
 	waitErr := cmd.Wait()
 	if waitErr != nil {
 		// Preserve the latest-main diagnostics while still waiting before the
@@ -992,6 +1027,9 @@ func (s *ScanNode) executeScript(
 			return utils.Errorf("cleanup SSA Git workspaces for child process %d: %v", childPID, cleanupErr)
 		}
 		log.Errorf("cleanup SSA Git workspaces for failed child process %d: %v", childPID, cleanupErr)
+	}
+	if limitErr := memoryLimitExceeded.Load(); waitErr != nil && limitErr != nil {
+		return limitErr
 	}
 	return waitErr
 }
@@ -1122,6 +1160,31 @@ func classifyUploadError(errMsg string) string {
 	return "put_failed"
 }
 
+func classifySSAUploadError(err error) string {
+	if code := classifyObjectStoreError(err); code != "put_failed" {
+		return code
+	}
+	// Non-object-store errors (ticket fetch, compression, filesystem) retain the
+	// legacy fallback classification. S3 protocol decisions never use strings.
+	return classifyUploadError(err.Error())
+}
+
+func redactSSAUploadErrorMessage(err error, cfg *SSAArtifactUploadConfig) string {
+	if err == nil {
+		return ""
+	}
+	message := err.Error()
+	if cfg == nil {
+		return message
+	}
+	for _, secret := range []secretValue{cfg.accessKeySecret(), cfg.secretKeySecret(), cfg.sessionTokenSecret()} {
+		if raw := secret.raw(); raw != "" {
+			message = strings.ReplaceAll(message, raw, "[REDACTED]")
+		}
+	}
+	return message
+}
+
 func (s *ScanNode) finalizeSSAArtifactUpload(
 	ctx context.Context,
 	reporter *ScannerAgentReporter,
@@ -1141,7 +1204,8 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	}
 
 	provider := s.buildSSAArtifactUploadConfigProvider(ctx, reporter, cfg)
-	build, err := reporter.ssaCollector.FinalizeUploadWithProvider(
+	build, err := reporter.ssaCollector.FinalizeUploadWithProviderContext(
+		ctx,
 		normalizeArtifactCodec(cfg.Codec),
 		provider,
 	)
@@ -1160,6 +1224,7 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	if event == nil {
 		return nil
 	}
+	event.SourceStatistics = meta.SourceStatistics
 	if err := reporter.PublishSSAArtifactReady(event); err != nil {
 		return err
 	}
@@ -1178,6 +1243,26 @@ func (s *ScanNode) finalizeSSAArtifactUpload(
 	return nil
 }
 
+// preserveFailedSSAArtifactUpload publishes a finalized continuous-upload
+// manifest after a source precheck failure. The source stage is customer-visible
+// even when a later rule is cancelled or killed, so rules that already emitted
+// ssa-stream payloads must not be discarded with the local spool.
+func (s *ScanNode) preserveFailedSSAArtifactUpload(
+	ctx context.Context,
+	reporter *ScannerAgentReporter,
+	result *ScriptExecutionResult,
+) {
+	if reporter == nil || reporter.ssaCollector == nil || !reporter.ssaCollector.HasData() {
+		return
+	}
+	preserveCtx := context.WithoutCancel(ctx)
+	preserveCtx, cancel := context.WithTimeout(preserveCtx, 45*time.Second)
+	defer cancel()
+	if err := s.finalizeSSAArtifactUpload(preserveCtx, reporter, result); err != nil {
+		log.Warnf("preserve partial SSA artifact after script failure failed: %v", err)
+	}
+}
+
 // emitSSAArtifactUploadFailed constructs and publishes an upload-failed event
 // from the collector's accumulated metrics. The objectKey is the intended
 // object key (may be empty if the failure happened before the key was known).
@@ -1189,11 +1274,12 @@ func (s *ScanNode) emitSSAArtifactUploadFailed(
 	if reporter == nil || reporter.ssaCollector == nil || uploadErr == nil {
 		return
 	}
-	errorCode := classifyUploadError(uploadErr.Error())
+	errorCode := classifySSAUploadError(uploadErr)
+	errorMessage := redactSSAUploadErrorMessage(uploadErr, reporter.ssaUploadCfg)
 	metrics := reporter.ssaCollector.snapshotUploadMetrics()
 	failedEvent := reporter.ssaCollector.BuildUploadFailedEvent(
 		errorCode,
-		uploadErr.Error(),
+		errorMessage,
 		metrics.CompressedBytes,
 	)
 	if failedEvent == nil {
@@ -1207,7 +1293,7 @@ func (s *ScanNode) emitSSAArtifactUploadFailed(
 	}
 	log.Infof(
 		"ssa artifact upload failed task=%s error_code=%s error=%s uploaded_bytes=%d",
-		reporter.TaskId, errorCode, uploadErr.Error(), metrics.CompressedBytes,
+		reporter.TaskId, errorCode, errorMessage, metrics.CompressedBytes,
 	)
 }
 
@@ -1273,9 +1359,10 @@ func (s *ScanNode) buildSSAArtifactUploadConfigProvider(
 }
 
 type ssaResultMeta struct {
-	ProgramName string
-	TotalLines  int64
-	RiskCount   int64
+	SourceStatistics json.RawMessage
+	ProgramName      string
+	TotalLines       int64
+	RiskCount        int64
 }
 
 func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
@@ -1289,6 +1376,9 @@ func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
 		return meta
 	}
 
+	if statistics := dataMap["source_statistics"]; statistics != nil {
+		meta.SourceStatistics, _ = json.Marshal(statistics)
+	}
 	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(
 		utils.MapGetFirstRaw(dataMap, "program_name", "programName", "ProgramName"),
 	))
@@ -1311,6 +1401,9 @@ func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error
 		_ = json.Unmarshal(event.Metrics, &merged)
 	}
 	// Add risk/file/flow counts
+	if len(event.SourceStatistics) > 0 && json.Valid(event.SourceStatistics) {
+		merged["source_statistics"] = event.SourceStatistics
+	}
 	merged["risk_count"] = event.RiskCount
 	merged["file_count"] = event.FileCount
 	merged["dataflow_count"] = event.FlowCount
@@ -1376,6 +1469,10 @@ func debugStatusForScriptError(s *ScanNode, attemptID string, err error) string 
 	if err != nil && errors.Is(err, context.Canceled) {
 		return "cancelled"
 	}
+	var memoryErr *ScriptMemoryLimitError
+	if errors.As(err, &memoryErr) && memoryErr != nil {
+		return "cancelled"
+	}
 	return "failed"
 }
 
@@ -1417,7 +1514,7 @@ func (s *ScanNode) publishDebugAnalysis(
 	objKey := fmt.Sprintf("debug_analysis/%s/%s/analysis.json", taskID, attemptID)
 
 	provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
-	if err := uploadDebugArtifactBytes(analysisJSON, objKey, provider); err != nil {
+	if err := uploadDebugArtifactBytes(ctx, analysisJSON, objKey, provider); err != nil {
 		log.Warnf("[debug] upload analysis failed: %v", err)
 		return
 	}
@@ -1460,7 +1557,7 @@ func (s *ScanNode) publishDebugZip(
 
 	provider := s.buildDebugUploadConfigProvider(ctx, reporter, cfg, objKey)
 	zipSize := fileSize(zipPath)
-	if err := uploadDebugArtifactFile(zipPath, zipSize, objKey, provider); err != nil {
+	if err := uploadDebugArtifactFile(ctx, zipPath, zipSize, objKey, provider); err != nil {
 		log.Warnf("[debug] upload zip failed: %v", err)
 		return
 	}

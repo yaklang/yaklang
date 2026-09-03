@@ -104,6 +104,7 @@ func (f *Function) Copy(s *Scope) *Function {
 		uuid:                      f.uuid,
 		paramSymbols:              f.paramSymbols,
 		isVariableParameter:       f.isVariableParameter,
+		FreeValue:                 f.FreeValue,
 		defineFrame:               f.defineFrame,
 
 		// only this:
@@ -246,6 +247,13 @@ func LuaVMValuesToFunctionMap(f *Function, vs []*Value) map[int]*Value {
 }
 
 func (vm *Frame) CallYakFunction(asyncCall bool, f *Function, vs []*Value) interface{} {
+	if !asyncCall && vm.vm.debugMode && vm.vm.debugger != nil {
+		// ShouldCallback records this exact caller at OpCall. Pair the pop at
+		// the synchronous call boundary so recursive Exec for Yak defer blocks
+		// cannot consume additional debugger frames. Register before argument
+		// validation so a parameter-count panic is paired as well.
+		defer vm.vm.debugger.StackTracePopExpected(vm)
+	}
 	params := YakVMValuesToFunctionMap(f, vs, vm.vm.config.GetFunctionNumberCheck())
 
 	if asyncCall {
@@ -258,6 +266,9 @@ func (vm *Frame) CallYakFunction(asyncCall bool, f *Function, vs []*Value) inter
 }
 
 func (vm *Frame) CallLuaFunction(asyncCall bool, f *Function, vs []*Value) interface{} {
+	if vm.vm.debugMode && vm.vm.debugger != nil {
+		defer vm.vm.debugger.StackTracePopExpected(vm)
+	}
 	params := LuaVMValuesToFunctionMap(f, vs)
 
 	// TODO: 目前lua暂不支持coroutine

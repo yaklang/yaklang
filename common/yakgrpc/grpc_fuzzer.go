@@ -270,7 +270,7 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 	if !enabled {
 		globalCode = ""
 	}
-	opts := yak.Fuzz_WithAllHotPatchChained(rootCtx, yak.HotPatchChain{
+	opts := yak.Fuzz_WithAllHotPatchChained(ctx, yak.HotPatchChain{
 		GlobalCode: globalCode,
 		ModuleCode: req.GetHotPatchCode(),
 	})

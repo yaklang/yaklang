@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"gopkg.in/yaml.v2"
+	yaml "github.com/yaklang/yaklang/common/utils/orderedyaml"
 	"strconv"
 	"strings"
 	"unicode"

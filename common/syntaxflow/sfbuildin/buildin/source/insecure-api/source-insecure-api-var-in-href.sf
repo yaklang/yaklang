@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-var-in-href"
-	risk: "Security"
+	risk: "xss"
 	desc: <<<DESC
 Migrated from Semgrep rule `var-in-href` (/tmp/semgrep-rules/javascript/express/security/audit/xss/ejs/var-in-href.yaml).
 Original message: Detected a template variable used in an anchor tag with the 'href' attribute. This allows a malicious actor to input the 'javascript:' URI and is subject to cross- site scripting (XSS) attacks. If using a relative URL, start with a literal forward slash and concatenate the URL, like this: href='/<%= link %>'. You may also consider setting the Content Security Policy (CSP) header.

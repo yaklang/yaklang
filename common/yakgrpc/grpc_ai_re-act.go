@@ -151,6 +151,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithEnabledCapabilities(caps...))
 	}
 
+	if i.GetDisableMemoryTriage() {
+		opts = append(opts, aicommon.WithDisableMemoryTriage(true))
+	}
+
 	return opts
 }
 

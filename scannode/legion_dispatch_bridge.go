@@ -38,7 +38,7 @@ func (b *legionJobBridge) handleDispatch(
 		return termMessage(), b.publishDispatchFailure(
 			ctx,
 			ref,
-			"invalid_dispatch_command",
+			JobFailureCodeInvalidDispatchCommand,
 			err.Error(),
 			&command,
 		)
@@ -76,8 +76,7 @@ func (b *legionJobBridge) handleDispatch(
 			// A first delivery may legitimately arrive later because it waited in
 			// Legion's outbox or JetStream and must still run when a slot is free.
 			if b.admissions().CapacityRetryExpired(reservation, now) {
-				b.expirePendingReservation(reservation)
-				return termMessage(), nil
+				return b.publishCapacityExceeded(ctx, reservation, &command)
 			}
 			if preparing {
 				return nakDelayedMessage(dispatchCapacityNakDelay), nil
@@ -94,8 +93,7 @@ func (b *legionJobBridge) handleDispatch(
 	if !acquired {
 		b.admissions().PrepareFailed(reservation)
 		if b.admissions().CapacityRetryExpired(reservation, time.Now().UTC()) {
-			b.admissions().MarkExpired(reservation)
-			return termMessage(), nil
+			return b.publishCapacityExceeded(ctx, reservation, &command)
 		}
 		return nakDelayedMessage(dispatchCapacityNakDelay), nil
 	}
@@ -195,6 +193,31 @@ func (b *legionJobBridge) publishPendingCancellation(
 	return ackSyncMessage(nil), nil
 }
 
+// publishCapacityExceeded reports a capacity drop to Legion instead of
+// terminating the message silently, so the platform records the real failure
+// cause rather than reclaiming the attempt later as
+// attempt_missing_from_heartbeat. The reservation is expired only after the
+// report succeeds; a publish failure NAKs while the reservation stays pending,
+// so the next redelivery retries the report instead of acking it away.
+func (b *legionJobBridge) publishCapacityExceeded(
+	ctx context.Context,
+	reservation *dispatchReservation,
+	command *jobv1.DispatchJobCommand,
+) (messageDisposition, error) {
+	err := b.dispatchReporter().PublishFailed(
+		ctx,
+		reservation.ref,
+		JobFailureCodeNodeCapacityExceeded,
+		"node execution slots are full and the dispatch admission deadline expired",
+		dispatchFailureDetail(command),
+	)
+	if err != nil {
+		return nakMessage(), err
+	}
+	b.expirePendingReservation(reservation)
+	return termMessage(), nil
+}
+
 func (b *legionJobBridge) rollbackPreparedReservation(reservation *dispatchReservation) {
 	task, release, detached := b.admissions().DetachPrepared(reservation)
 	if !detached {
@@ -240,7 +263,7 @@ func (b *legionJobBridge) startDispatch(
 				return b.dispatchReporter().PublishFailed(
 					ctx,
 					reservation.ref,
-					"started_event_publish_failed",
+					JobFailureCodeStartedEventPublishFailed,
 					err.Error(),
 					dispatchFailureDetail(command),
 				)
@@ -263,7 +286,7 @@ func (b *legionJobBridge) executeDispatch(
 				return b.dispatchReporter().PublishFailed(
 					ctx,
 					reservation.ref,
-					"script_execution_panic",
+					JobFailureCodeScriptExecutionPanic,
 					fmt.Sprintf("panic: %v", recovered),
 					map[string]string{"stack": string(debug.Stack())},
 				)
@@ -316,11 +339,11 @@ func (b *legionJobBridge) executeDispatch(
 		return
 	}
 	finished = true
-	failureCode := "script_execution_failed"
+	failureCode := JobFailureCodeScriptExecutionFailed
 	failureDetail := dispatchFailureDetail(command)
 	var preparationErr *ruleSnapshotPreparationError
 	if errors.As(err, &preparationErr) {
-		failureCode = "rule_snapshot_prepare_failed"
+		failureCode = JobFailureCodeRuleSnapshotPrepareFailed
 		if preparationErr.Expectation.SnapshotID != "" {
 			failureDetail["rule_snapshot_id"] = preparationErr.Expectation.SnapshotID
 		}

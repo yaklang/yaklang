@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
@@ -1092,7 +1093,7 @@ func TestPromptManager_GenerateIntervalReviewPrompt_UsesPromptSections(t *testin
 		t.Fatalf("GenerateIntervalReviewPromptWithContext failed: %v", err)
 	}
 
-	nonce := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	nonce := aicommon_testutil.MustExtractDynamicSectionNonce(t, prompt)
 	if !utils.MatchAllOfSubString(prompt,
 		"<|AI_CACHE_SYSTEM_high-static|>",
 		"<|PROMPT_SECTION_semi-dynamic-2|>",
@@ -1260,7 +1261,7 @@ func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
 		t.Fatalf("Failed to generate interval review prompt: %v", err)
 	}
 
-	extraPromptBlock := aicommon.MustExtractAITagBlock(t, prompt, "EXTRA_PROMPT")
+	extraPromptBlock := aicommon_testutil.MustExtractAITagBlock(t, prompt, "EXTRA_PROMPT")
 	if extraPromptBlock.Body != extraPrompt {
 		t.Fatalf("interval review prompt should wrap extra prompt in EXTRA_PROMPT AITAG. Got:\n%s", prompt)
 	}

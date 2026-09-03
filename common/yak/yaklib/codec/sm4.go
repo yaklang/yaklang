@@ -743,7 +743,10 @@ func SM4DecFactory(unpaddingFunc func([]byte) []byte, mode string) SymmetricCryp
 }
 
 func SM4Enc(key, data, iv []byte, mode string) ([]byte, error) {
-	data = ZeroPadding(data, sm4.BlockSize)
+	// 只对块模式（CBC、ECB）进行 padding，流模式（CTR、CFB、OFB）不需要 padding
+	if !IsStreamMode(mode) {
+		data = ZeroPadding(data, sm4.BlockSize)
+	}
 	c, err := sm4.NewCipher(key)
 	if err != nil {
 		return nil, err

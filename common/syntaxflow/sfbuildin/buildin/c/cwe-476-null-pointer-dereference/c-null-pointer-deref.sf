@@ -2,7 +2,7 @@ desc(
 	title: "C Null Pointer Dereference"
 	type: audit
 	level: high
-	risk: "空指针解引用"
+	risk: "null-dereference"
 	lang: c
 	rule_id: "c5d0e3f6-7a8b-4c9d-0e1f-2a3b4c5d6e7f"
 	title_zh: "C 语言空指针解引用检测"
@@ -29,19 +29,14 @@ SOLUTION
 REFERENCE
 )
 
-// 1. 定位解引用点（成员访问 / 星号解引用）
-*.* as $use
-*?{opcode: undefined} as $use
-// 2. 确定被解引用的指针
-$use #-> as $ptr
-// 3. 判断该指针是否存在空指针解引用
-$ptr<npd()> as $npd
+// npd() 是空指针解引用 native：扫描 *p / p->field 等解引用点上的 Null/MaybeNull。
+*<npd()> as $npd
 
 alert $npd for {
 	title: "Null Pointer Dereference",
 	title_zh: "空指针解引用",
 	level: "high",
-	risk: "空指针解引用",
+	risk: "null-dereference",
 	desc: <<<DESC
 指针可能为空时仍发生 *p 或 p->member 等解引用
 DESC

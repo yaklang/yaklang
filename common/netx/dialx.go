@@ -76,6 +76,12 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.
 RETRY:
 	if timeoutRetryCount > retryMax || refuseErrorRetryCount > retryMax {
 		if retryMax > 0 {
+			// 保留底层错误（connection refused / no route 等）：
+			// 上层（如爆破的目标不可达判定）依赖错误字符串分类，
+			// 丢弃 cause 会导致 refused 被误判为普通失败。
+			if lastError != nil {
+				return nil, fmt.Errorf("timeout retry(%v) or refuse retry(%v) > max(%v): %w", timeoutRetryCount, refuseErrorRetryCount, retryMax, lastError)
+			}
 			return nil, fmt.Errorf("timeout retry(%v) or refuse retry(%v) > max(%v)", timeoutRetryCount, refuseErrorRetryCount, retryMax)
 		}
 		if lastError != nil {
@@ -218,10 +224,13 @@ RETRY:
 					addTimeoutRetry()
 					goto RETRY
 				}
+				// 代理 connection refused：该代理明确不可用，直接跳到
+				// 池中下一个代理。历史上此处 goto RETRY 从头重试同一
+				// 坏代理——仅因重试超限错误曾被包装成非 OpError 字符串
+				// 而碰巧落入 continue 分支；错误携带 cause 后该缺陷即
+				// 显现（MITM 下游代理池永远回退不到健康代理）。
 				if strings.Contains(opError.Error(), "refused") {
-					time.Sleep(utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1)))
 					addRefuseErrorRetry()
-					goto RETRY
 				}
 			}
 			errs = utils.JoinErrors(errs, err)

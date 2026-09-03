@@ -64,7 +64,13 @@ func nativeCallPointsTo(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 		return false, sfvm.NewEmptyValues(), nil
 	}
 	vals := lifetime.PointsToRelated(prog.Program, seeds)
-	return valuesToSFVM(prog, vals)
+	id2val, results := ssaValuesToSFVM(prog, vals)
+	if !targetSpecified {
+		propagateRelatedSSAAnchors(vs, func(inner ssa.Value) []ssa.Value {
+			return lifetime.PointsToRelated(prog.Program, []ssa.Value{inner})
+		}, id2val, frame, NativeCall_PointsTo)
+	}
+	return finishLifetimeSFVM(results)
 }
 
 func nativeCallAliases(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
@@ -93,29 +99,26 @@ func nativeCallAliases(vs sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeC
 		return false, sfvm.NewEmptyValues(), nil
 	}
 	vals := lifetime.AliasesOf(prog.Program, seeds, against)
-	return valuesToSFVM(prog, vals)
-}
-
-func valuesToSFVM(prog *Program, vals []ssa.Value) (bool, sfvm.Values, error) {
-	results := make([]sfvm.ValueOperator, 0, len(vals))
-	seen := make(map[int64]struct{})
-	for _, iv := range vals {
-		if iv == nil || iv.GetId() <= 0 {
-			continue
+	id2val, results := ssaValuesToSFVM(prog, vals)
+	// Results are a subset of the receiver seeds; copy bits by relatedness
+	// (MayAlias of that single receiver vs against).
+	propagateRelatedSSAAnchors(vs, func(inner ssa.Value) []ssa.Value {
+		return lifetime.AliasesOf(prog.Program, []ssa.Value{inner}, against)
+	}, id2val, frame, NativeCall_Aliases)
+	if frame != nil {
+		for _, a := range against {
+			av := newSSAPredecessor(prog, a)
+			if av == nil {
+				continue
+			}
+			for _, r := range results {
+				rv, ok := r.(*Value)
+				if !ok || rv == nil {
+					continue
+				}
+				appendLifetimePredecessor(rv, av, frame, NativeCall_Aliases+":target")
+			}
 		}
-		id := iv.GetId()
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		val, err := prog.NewValue(iv)
-		if err != nil || val == nil {
-			continue
-		}
-		results = append(results, val)
 	}
-	if len(results) == 0 {
-		return false, sfvm.NewEmptyValues(), nil
-	}
-	return true, sfvm.NewValues(results), nil
+	return finishLifetimeSFVM(results)
 }

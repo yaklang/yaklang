@@ -29,6 +29,11 @@ small set of inputs that still makes the saved record actionable.
      result file) so nothing is lost if the session is interrupted.
    - A confirmed risk that is neither saved here nor written to an output file
      counts as NOT delivered.
+   - DO NOT report the same vulnerability twice. The same target + same type +
+     same parameter = the same vulnerability. If you have new evidence (e.g. a
+     different payload confirming the same issue), attach it via evidence
+     instead of creating a new risk record. Check the "已报告漏洞清单" in the
+     prompt context before calling this tool.
 
 1. Never create a title-only risk.
    `summary` is mandatory. It must explain:
@@ -325,6 +330,43 @@ USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
+# normalizeTarget strips scheme, default ports (80/443), and trailing
+# slash from a URL so that the same logical target always produces the
+# same risk hash. For non-URL inputs (IP, host:port) the value is returned
+# as-is after trimming whitespace.
+normalizeTarget = func(raw) {
+    s = str.TrimSpace(raw)
+    if s == "" {
+        return s
+    }
+    # strip scheme
+    if str.HasPrefix(s, "https://") {
+        s = s[len("https://"):]
+    } elif str.HasPrefix(s, "http://") {
+        s = s[len("http://"):]
+    }
+    # strip default ports
+    s = str.Replace(s, ":443/", "/", 1)
+    s = str.Replace(s, ":80/", "/", 1)
+    # strip trailing slash (keep root)
+    if len(s) > 1 {
+        s = str.TrimSuffix(s, "/")
+    }
+    return s
+}
+
+# normalizeType lowercases and trims the risk type so that "SQLI" and
+# "sqli" produce the same hash.
+normalizeType = func(raw) {
+    return str.ToLower(str.TrimSpace(raw))
+}
+
+# normalizeParameter trims the parameter name so that " username " and
+# "username" produce the same hash.
+normalizeParameter = func(raw) {
+    return str.TrimSpace(raw)
+}
+
 normalizeTitle = func(rawTitle) {
     normalized = str.TrimSpace(rawTitle)
     title = normalized
@@ -506,6 +548,12 @@ if responseRaw != "" {
     }
     opts.Push(risk.response(rsp))
 }
+
+// Normalize inputs before passing to risk.NewRisk so that the same
+// logical vulnerability always produces the same deterministic hash.
+target = normalizeTarget(target)
+riskType = normalizeType(riskType)
+parameter = normalizeParameter(parameter)
 
 // @ssa-ignore
 risk.NewRisk(target, opts...)

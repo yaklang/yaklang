@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: high
 	rule_id: "source-python-pickle-load"
-	risk: "Insecure Deserialization"
+	risk: "deserialization"
 	desc: <<<DESC
 Flags pickle.load / loads which can execute code when deserializing untrusted data.
 DESC

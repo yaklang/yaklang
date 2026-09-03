@@ -1,4 +1,5 @@
 desc(
+	risk: "cleartext-transmission"
 	title: "Detect Golang HTTP Server Using Plaintext Communication"
 	title_zh: "检测Golang HTTP服务器使用明文通信"
 	type: vuln
@@ -155,7 +156,7 @@ server := &http.Server{
 }
 ```
 SOLUTION
-	risk: "明文传输",
+	risk: "cleartext-transmission",
 	desc: <<<DESC
 ### 漏洞描述
 

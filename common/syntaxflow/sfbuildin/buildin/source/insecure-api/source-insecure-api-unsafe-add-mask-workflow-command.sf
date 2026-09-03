@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: middle
 	rule_id: "source-insecure-api-unsafe-add-mask-workflow-command"
-	risk: "Security"
+	risk: "information-exposure"
 	desc: <<<DESC
 Migrated from Semgrep rule `unsafe-add-mask-workflow-command` (/tmp/semgrep-rules/yaml/github-actions/security/audit/unsafe-add-mask-workflow-command.yaml).
 Original message: GitHub Actions provides the **'add-mask'** workflow command to mask sensitive data in the workflow logs. If **'add-mask'** is not used or if workflow commands have been stopped, sensitive data can leaked into the workflow logs. An attacker could simply copy the workflow to another branch and add the following payload `echo "::stop-commands::$stopMarker"` to stop workflow command processing ([described here](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#stopping-and-starting-workflow-commands)), which will cause the secret token to be exposed despite the **'add-mask'** usage. For more information, please refer to the [GitHub documentation](https://github.com/actions/toolkit/blob/main/docs/commands.md#register-a-secret).
