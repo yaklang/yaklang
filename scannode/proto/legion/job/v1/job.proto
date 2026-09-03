@@ -35,6 +35,12 @@ message RuleSnapshotRef {
   repeated string asset_ids = 5;
 }
 
+// ResourceRequest is an admission charge, not a hard process limit.
+message ResourceRequest {
+  uint64 cpu_millicores = 1;
+  uint64 memory_bytes = 2;
+}
+
 message DispatchJobCommand {
   legion.node.v1.CommandMetadata metadata = 1;
   string target_node_id = 2;
@@ -45,6 +51,7 @@ message DispatchJobCommand {
   map<string, string> labels = 7;
   InlineScript script = 8;
   RuleSnapshotRef rule_snapshot = 9;
+  ResourceRequest resource_request = 10;
 }
 
 message CancelJobCommand {

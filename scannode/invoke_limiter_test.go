@@ -3,6 +3,7 @@ package scannode
 import (
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/node"
@@ -44,6 +45,61 @@ func TestInvokeLimiterMaxZeroIsUnlimitedAndStillCountsRunningJobs(t *testing.T) 
 	second()
 	if limiter.activeCount() != 0 {
 		t.Fatalf("active count after releases = %d, want 0", limiter.activeCount())
+	}
+}
+
+func TestInvokeLimiterResourceAdmissionIsAtomicAndReleaseIsIdempotent(t *testing.T) {
+	limiter := newInvokeLimiter(4)
+	limiter.SetResourceCapacity(2000, 4<<30)
+
+	first, acquired := limiter.TryAcquireResources(1500, 3<<30)
+	if !acquired {
+		t.Fatal("first resource request was not acquired")
+	}
+	if _, acquired := limiter.TryAcquireResources(1000, 2<<30); acquired {
+		t.Fatal("resource-overcommitting request was acquired")
+	}
+	first()
+	first()
+	second, acquired := limiter.TryAcquireResources(1000, 2<<30)
+	if !acquired {
+		t.Fatal("resource request was not admitted after idempotent release")
+	}
+	second()
+}
+
+func TestInvokeLimiterConcurrentResourceAdmissionDoesNotOvercommit(t *testing.T) {
+	limiter := newInvokeLimiter(4)
+	limiter.SetResourceCapacity(1000, 1<<30)
+	start := make(chan struct{})
+	type result struct {
+		release  func()
+		acquired bool
+	}
+	results := make(chan result, 2)
+	var wait sync.WaitGroup
+	for range 2 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			release, acquired := limiter.TryAcquireResources(1000, 1<<30)
+			results <- result{release: release, acquired: acquired}
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(results)
+	acquired := 0
+	for item := range results {
+		if !item.acquired {
+			continue
+		}
+		acquired++
+		item.release()
+	}
+	if acquired != 1 {
+		t.Fatalf("concurrent resource admissions = %d, want exactly 1", acquired)
 	}
 }
 
@@ -149,5 +205,33 @@ func TestScanNodeSnapshotUsesSlotCountAndEffectiveMaximum(t *testing.T) {
 	snapshot := node.Snapshot()
 	if snapshot.RunningJobs != 1 || snapshot.MaxRunningJobs != 4 {
 		t.Fatalf("snapshot = %+v", snapshot)
+	}
+}
+
+func TestScanNodeSnapshotReportsHostCapacityWithoutAIRuntimeHost(t *testing.T) {
+	collector, err := newRuntimeHostResourceCollector(
+		runtimeHostResourceSourceStub{cpus: 8, total: 16 << 30, available: 12 << 30},
+		500,
+		1<<30,
+	)
+	if err != nil {
+		t.Fatalf("new resource collector: %v", err)
+	}
+	limiter := newInvokeLimiter(4)
+	node := &ScanNode{
+		manager:        newTaskManager(),
+		invokeLimiter:  limiter,
+		maxRunningJobs: 4,
+		hostResources:  collector,
+	}
+
+	snapshot := node.Snapshot()
+	capacity := snapshot.RuntimeHostCapacity
+	if capacity == nil || capacity.CPUAllocatableMillicores != 7500 ||
+		capacity.MemoryAllocatableBytes != 15<<30 || capacity.SampleSequence != 1 {
+		t.Fatalf("unexpected host capacity: %#v", capacity)
+	}
+	if _, acquired := limiter.TryAcquireResources(8000, 2<<30); acquired {
+		t.Fatal("local limiter ignored the reported allocatable CPU")
 	}
 }
