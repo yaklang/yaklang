@@ -175,6 +175,11 @@ func rdpLogin(ip, domain, user, password string, port int) (_ bool, err error) {
 
 var RDPLogin = rdpLogin
 
+// classicLogonGrace 是 PROTOCOL_RDP 在 FontMap 之后等待失败对话框的窗口。
+// 真机 XP SP3 成功路径不发 SAVE_SESSION_INFO（0x26）；错密码 ~0.5s 画 FAILED_XP。
+// 窗口内没有失败信号则视为 AUTOLOGON 成功。0x26 仍是立即成功。
+const classicLogonGrace = 2 * time.Second
+
 // rdpAuthError 是协议已连通、但帐密被拒绝。调度器应继续字典，不得 Finished。
 type rdpAuthError struct{ msg string }
 
@@ -240,6 +245,7 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	var doneOnce sync.Once
 	var finalErr error
 	var sessionReady atomic.Bool
+	loginDone := make(chan struct{})
 	wg.Add(1)
 	finish := func(e error) {
 		doneOnce.Do(func() {
@@ -273,10 +279,27 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	})
 	g.pdu.On("ready", func() {
 		// 标准 RDP 加密（XP 等）在 FontMap 时就会 ready，此时尚未校验帐密。
-		// 爆破必须再等 Save Session Info；SSL/xrdp 通常没有后续 logon PDU。
+		// SSL/xrdp 通常没有后续 logon PDU，FontMap 即结束。
 		if g.x224.SelectedProtocol() == x224.PROTOCOL_RDP {
 			log.Info("rdp session ready, waiting for logon")
 			sessionReady.Store(true)
+			// 真机 XP SP3（x86 KVM）AUTOLOGON 成功后不发 0x26，只推桌面位图；
+			// 错密码会在 ~0.5s 画 FAILED_XP 对话框。0x26 若出现仍立刻成功。
+			// 大位图不能当成功：成败两条路径都会先画同一批墙纸。
+			go func() {
+				timer := time.NewTimer(classicLogonGrace)
+				defer timer.Stop()
+				select {
+				case <-timer.C:
+					log.Info("rdp classic: no logon failure after FontMap, treating as success")
+					finish(nil)
+				case <-loginDone:
+				case <-ctx.Done():
+					if sessionReady.Load() {
+						finish(nil)
+					}
+				}
+			}()
 			return
 		}
 		log.Info("rdp session ready")
@@ -307,15 +330,11 @@ func (g *rdpClient) Login(ctx context.Context, domain, user, pwd string) error {
 	glog.Info("wait connect ok")
 
 	// ctx 截止后仍无事件：协议不对或对端无响应；Login 返回后 goroutine 立即退出。
-	loginDone := make(chan struct{})
+	// 经典 RDP 在 FontMap 之后由 classicLogonGrace 决定成败，这里只处理尚未 ready 的超时。
 	go func() {
 		select {
 		case <-ctx.Done():
-			if sessionReady.Load() {
-				// 已建会话但没有 SAVE_SESSION_INFO：AUTOLOGON 未成功（错密码
-				// 或 XP 停在登录界面）。这是认证失败，不是目标不可达。
-				g.pdu.Emit("error", &rdpAuthError{msg: "rdp logon failed: no save-session-info"})
-			} else {
+			if !sessionReady.Load() {
 				g.pdu.Emit("error", utils.Errorf("protocol error or no response: %v", ctx.Err()))
 			}
 		case <-loginDone:

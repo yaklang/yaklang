@@ -61,4 +61,11 @@ func TestRDPMockMatrixFromLive(t *testing.T) {
 		assertFailContinue(t, hitRDP(t, srv.addr(), "Administrator", "WrongPass!"), "xp wrong")
 		assertFailContinue(t, hitRDP(t, srv.addr(), "no-such-user", "x"), "xp unknown")
 	})
+
+	t.Run("xp-classic-no-0x26", func(t *testing.T) {
+		srv := startClassicRDPServer(t, map[string]string{"rdpuser": "RdpPass123!"})
+		srv.successWithoutLogon = true
+		assertOk(t, hitRDP(t, srv.addr(), "rdpuser", "RdpPass123!"), "xp no-0x26 correct")
+		assertFailContinue(t, hitRDP(t, srv.addr(), "rdpuser", "WrongPass!"), "xp no-0x26 wrong")
+	})
 }

@@ -1,6 +1,12 @@
 package pdu
 
-import "bytes"
+import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
+
+	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
+)
 
 // ncrack 从 XP/2003 登录对话框的绘图订单里抠出来的固定字节串
 // （modules/ncrack_rdp.cc LOGON_MESSAGE_*）。
@@ -39,4 +45,42 @@ func xpLogonHint(raw []byte) xpHint {
 		return xpHintSuccess
 	}
 	return xpHintNone
+}
+
+// xpDesktopBitmap reports the live XP wallpaper tiles we captured.
+// Do NOT treat this as success: the wrong-password path paints the same
+// 2818-byte UPDATETYPE_BITMAP tiles before the fail dialog.
+
+func dumpSharePDUs(s []byte) {
+	off := 0
+	for off+6 <= len(s) {
+		total := int(binary.LittleEndian.Uint16(s[off:]))
+		pduType := binary.LittleEndian.Uint16(s[off+2:]) & 0x000f
+		t2 := byte(0xff)
+		if off+15 <= len(s) {
+			t2 = s[off+14]
+		}
+		glog.Infof("share off=%d total=%d ctrl=%d type2=0x%02x", off, total, pduType, t2)
+		if total < 6 {
+			glog.Infof("share stop: bad total at %d", off)
+			break
+		}
+		if off+total > len(s) {
+			glog.Infof("share truncated: need %d have %d", off+total, len(s))
+			break
+		}
+		off += total
+	}
+	if off < len(s) {
+		n := len(s) - off
+		if n > 16 {
+			n = 16
+		}
+		glog.Infof("share unused %d %s", len(s)-off, hex.EncodeToString(s[off:off+n]))
+	}
+	for i := 0; i+15 <= len(s); i++ {
+		if s[i+2] == 0x17 && s[i+3] == 0x00 && s[i+14] == 0x26 {
+			glog.Infof("FOUND 0x26 SAVE_SESSION_INFO at offset %d", i)
+		}
+	}
 }
