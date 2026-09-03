@@ -105,19 +105,6 @@ func TestAIReActScheduleSupportsBothSessionTargets(t *testing.T) {
 	require.Equal(t, "ai-schedule-"+runUUID, scheduleExecutionSessionID(&schema.AIReActSchedule{
 		TargetMode: schema.AIReActScheduleTargetNewSession,
 	}, runUUID))
-
-	legacy, err := scheduleToGRPC(&schema.AIReActSchedule{
-		UUID:            "legacy-schedule",
-		Name:            "legacy",
-		Status:          schema.AIReActScheduleStatusActive,
-		TargetMode:      schema.AIReActScheduleTargetContinueSession,
-		TargetSessionID: "busy-user-session",
-		StartParams:     `{"ReviewPolicy":"ai"}`,
-	})
-	require.NoError(t, err)
-	require.Equal(t, schema.AIReActScheduleTargetContinueSession, legacy.GetTargetMode())
-	require.Equal(t, "busy-user-session", legacy.GetTargetSessionID())
-	require.Equal(t, "yolo", legacy.GetPayload().GetStartParams().GetReviewPolicy())
 }
 
 func TestPrepareIsolatedScheduleSessionIsImmediatelyQueryable(t *testing.T) {
@@ -280,27 +267,6 @@ func TestAIReActScheduleFiltersAndSessionLifecycle(t *testing.T) {
 	require.Equal(t, schema.AIReActScheduleTargetNewSession, remaining.TargetMode)
 }
 
-func TestCleanupOrphanedAttachedAIReActSchedules(t *testing.T) {
-	server := newScheduleTestServer(t)
-	db := server.GetProjectDatabase()
-	attached := &schema.AIReActSchedule{
-		UUID: "orphan-attached", Name: "orphan", Status: schema.AIReActScheduleStatusActive,
-		TargetMode: schema.AIReActScheduleTargetContinueSession, TargetSessionID: "missing-session", Prompt: "work",
-	}
-	isolated := &schema.AIReActSchedule{
-		UUID: "orphan-isolated", Name: "isolated", Status: schema.AIReActScheduleStatusActive,
-		TargetMode: schema.AIReActScheduleTargetNewSession, CreatedFromSessionID: "missing-session", Prompt: "work",
-	}
-	require.NoError(t, db.Create(attached).Error)
-	require.NoError(t, db.Create(isolated).Error)
-
-	cleanupOrphanedAttachedAIReActSchedules(db)
-	_, err := getAIReActScheduleRecord(db, attached.UUID)
-	require.Error(t, err)
-	_, err = getAIReActScheduleRecord(db, isolated.UUID)
-	require.NoError(t, err, "isolated schedules do not depend on their creation chat")
-}
-
 func TestAIReActSchedulerSkipsAtTriggerBoundary(t *testing.T) {
 	server := newScheduleTestServer(t)
 	manager := newAIReActScheduler(server, server.GetProjectDatabase())
@@ -340,15 +306,6 @@ func TestAIReActSchedulerUsesBoundedParallelCapacity(t *testing.T) {
 	var skip *scheduleEnqueueError
 	require.ErrorAs(t, err, &skip)
 	require.Equal(t, "scheduler_capacity", skip.reason)
-}
-
-func TestDropLegacyAIReActScheduleRuns(t *testing.T) {
-	server := newScheduleTestServer(t)
-	db := server.GetProjectDatabase()
-	require.NoError(t, db.Exec(`CREATE TABLE ai_react_schedule_runs_v1 (id INTEGER PRIMARY KEY, status TEXT)`).Error)
-	require.True(t, db.HasTable(legacyAIReActRunTable))
-	dropLegacyAIReActScheduleRuns(db)
-	require.False(t, db.HasTable(legacyAIReActRunTable))
 }
 
 func TestAIReActSchedulerCancelsActiveExecutionInMemory(t *testing.T) {

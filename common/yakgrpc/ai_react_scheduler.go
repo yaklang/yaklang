@@ -26,7 +26,6 @@ const (
 	aiReActSchedulePollInterval   = 30 * time.Second
 	aiReActScheduleMaxConcurrent  = 3
 	aiReActScheduleReleaseTimeout = 10 * time.Second
-	legacyAIReActRunTable         = "ai_react_schedule_runs_v1"
 
 	aiReActScheduleTriggerSchedule = "schedule"
 	aiReActScheduleTriggerManual   = "manual"
@@ -92,47 +91,6 @@ func newAIReActScheduler(server *Server, db *gorm.DB) *aiReActScheduler {
 	}
 }
 
-func dropLegacyAIReActScheduleRuns(db *gorm.DB) {
-	if db == nil {
-		return
-	}
-	if !db.HasTable(legacyAIReActRunTable) {
-		return
-	}
-	if err := db.DropTableIfExists(legacyAIReActRunTable).Error; err != nil {
-		log.Warnf("drop legacy AI ReAct schedule run history failed: %v", err)
-	}
-}
-
-func backfillAIReActScheduleProvenance(db *gorm.DB) {
-	if db == nil || !db.HasTable((&schema.AIReActSchedule{}).TableName()) {
-		return
-	}
-	if err := db.Exec(`UPDATE ai_react_schedules_v1 SET original_request = prompt WHERE original_request IS NULL OR TRIM(original_request) = ''`).Error; err != nil {
-		log.Warnf("backfill AI ReAct schedule original request failed: %v", err)
-	}
-	if err := db.Exec(`UPDATE ai_react_schedules_v1 SET created_from_session_id = target_session_id WHERE target_mode = ? AND (created_from_session_id IS NULL OR TRIM(created_from_session_id) = '')`, schema.AIReActScheduleTargetContinueSession).Error; err != nil {
-		log.Warnf("backfill AI ReAct schedule source session failed: %v", err)
-	}
-}
-
-func cleanupOrphanedAttachedAIReActSchedules(db *gorm.DB) {
-	if db == nil || !db.HasTable((&schema.AIReActSchedule{}).TableName()) || !db.HasTable((&schema.AISession{}).TableName()) {
-		return
-	}
-	result := db.Where(
-		`target_mode = ? AND (TRIM(target_session_id) = '' OR NOT EXISTS (`+
-			`SELECT 1 FROM ai_sessions_v1 AS session_owner `+
-			`WHERE session_owner.deleted_at IS NULL AND session_owner.session_id = ai_react_schedules_v1.target_session_id))`,
-		schema.AIReActScheduleTargetContinueSession,
-	).Delete(&schema.AIReActSchedule{})
-	if result.Error != nil {
-		log.Warnf("cleanup orphaned attached AI ReAct schedules failed: %v", result.Error)
-	} else if result.RowsAffected > 0 {
-		log.Infof("removed %d orphaned attached AI ReAct schedules", result.RowsAffected)
-	}
-}
-
 // StartAIReActScheduler starts the project-scoped scheduler. Task definitions
 // are durable, while active execution state intentionally remains in memory.
 // It is safe to call more than once and is independent of UI streams.
@@ -150,12 +108,15 @@ func (s *Server) ensureAIReActScheduler() {
 		return
 	}
 	manager := newAIReActScheduler(s, s.GetProjectDatabase())
-	dropLegacyAIReActScheduleRuns(manager.db)
-	backfillAIReActScheduleProvenance(manager.db)
-	cleanupOrphanedAttachedAIReActSchedules(manager.db)
 	s.aiReActScheduler = manager
 	manager.wg.Add(1)
 	go manager.loop()
+}
+
+// StopAIReActScheduler stops the project-scoped scheduler and waits for its
+// in-memory executions to release their resources.
+func (s *Server) StopAIReActScheduler() {
+	s.stopAIReActScheduler()
 }
 
 func (s *Server) stopAIReActScheduler() {

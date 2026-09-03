@@ -653,7 +653,6 @@ var startGRPCServerCommand = cli.Command{
 			return err
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
-		s.StartAIReActScheduler()
 
 		// 确定监听地址和端口
 		var host string
@@ -732,6 +731,8 @@ var startGRPCServerCommand = cli.Command{
 				return err
 			}
 		}
+		s.StartAIReActScheduler()
+		defer s.StopAIReActScheduler()
 
 		actualAddress := lis.Addr().String()
 		log.Infof("yak grpc listener ready on: %s", actualAddress)
