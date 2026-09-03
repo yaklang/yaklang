@@ -66,13 +66,20 @@ var MCPCommand = &cli.Command{
 		cli.BoolFlag{Name: "enable-bridge-external-mcp", Usage: "bridge external MCP servers already enabled in AI Agent"},
 	},
 	Action: func(c *cli.Context) error {
+		transport := c.String("transport")
+		if transport == "stdio" {
+			// Re-apply at the action boundary as a defense for embedded callers
+			// that invoke MCPCommand without Yak's normal os.Args layout.
+			log.EnableMCPStdioLogging()
+			log.SetLevel(log.FatalLevel)
+		}
+
 		yakit.CallPostInitDatabase()
 		if err := syncCommandLineMCPProjectDatabase(); err != nil {
 			return err
 		}
 
 		var err error
-		transport := c.String("transport")
 		host := c.String("host")
 		port := c.Int("port")
 		tool, disableTool := c.String("tool"), c.String("disable-tool")
@@ -156,7 +163,6 @@ var MCPCommand = &cli.Command{
 		}
 		switch transport {
 		case "stdio":
-			log.SetLevel(log.FatalLevel)
 			err = s.ServeStdio()
 		case "sse":
 			if port == 0 {
