@@ -23,7 +23,31 @@ Package:
       panic("postgresql: use Startup or SSLRequest for untyped client packets")
     First: uint8
     Length: uint32
-    Payload: raw
+    Payload:
+      operator: |
+        first = getNodeResult("../First").Value
+        if first == 0x52 {
+          this.ProcessSubNode("AuthType")
+          return
+        }
+        if first == 0x51 {
+          this.ProcessSubNode("Query")
+          return
+        }
+        if first == 0x45 {
+          this.ProcessSubNode("Error")
+          return
+        }
+        if first == 0x5a {
+          this.ProcessSubNode("Ready")
+          return
+        }
+        this.ProcessSubNode("Data")
+      AuthType: uint32
+      Query: raw
+      Error: raw
+      Ready: uint8
+      Data: raw
   Startup:
     operator: |
       this.ProcessSubNode("Length")

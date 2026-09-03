@@ -18,6 +18,10 @@ Package:
       this.ProcessSubNode("Window")
       if l > 8 {
         this.GetSubNode("Payload").SetMaxLength(l - 8)
+        if typ == 18 {
+          this.ProcessSubNode("Prelogin")
+          return
+        }
         this.ProcessSubNode("Payload")
       }
     Type: uint8
@@ -26,4 +30,30 @@ Package:
     SPID: uint16
     PacketID: uint8
     Window: uint8
+    Prelogin:
+      list: true
+      exception-plan: stopList
+      Token: Token
+      operator: |
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          ele.Process()
+          if ele.GetSubNode("Type").Result().Value == 0xff {
+            break
+          }
+        }
     Payload: raw
+Token:
+  operator: |
+    this.ProcessSubNode("Type")
+    if getNodeResult("Type").Value == 0xff {
+      return
+    }
+    this.ProcessSubNode("Offset")
+    this.ProcessSubNode("Length")
+  Type: uint8
+  Offset: uint16
+  Length: uint16

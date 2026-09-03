@@ -61,7 +61,7 @@ func TestMySQLQueryCommand(t *testing.T) {
 	pkt := parseRule(t, raw, "application-layer.mysql", "MySQLPacket")
 	payload := mustChild(t, pkt, "Payload")
 	require.Equal(t, uint64(0x03), uintVal(t, payload.Child("First")))
-	require.Equal(t, []byte("SELECT 1"), bytesVal(t, payload.Child("Rest")))
+	require.Equal(t, []byte("SELECT 1"), bytesVal(t, payload.Child("Query")))
 }
 
 func TestMySQLERRPacket(t *testing.T) {
