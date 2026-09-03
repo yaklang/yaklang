@@ -1,0 +1,59 @@
+endian: little
+Package:
+  SMB:
+    operator: |
+      this.ProcessSubNode("ProtocolId")
+      magic = getNodeResult("ProtocolId").Value
+      if magic != 0x424d53ff {
+        panic("smb: ProtocolId must be \\xffSMB")
+      }
+      this.ProcessSubNode("Command")
+      this.ProcessSubNode("Status")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Flags2")
+      this.ProcessSubNode("PIDHigh")
+      this.ProcessSubNode("SecurityFeatures")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("TID")
+      this.ProcessSubNode("PID")
+      this.ProcessSubNode("UID")
+      this.ProcessSubNode("MID")
+      cmd = getNodeResult("Command").Value
+      if cmd == 0x72 {
+        this.ProcessByType("Negotiate")
+        return
+      }
+      this.ProcessSubNode("Body")
+    ProtocolId: uint32
+    Command: uint8
+    Status: uint32
+    Flags: uint8
+    Flags2: uint16
+    PIDHigh: uint16
+    SecurityFeatures: raw,8
+    Reserved: uint16
+    TID: uint16
+    PID: uint16
+    UID: uint16
+    MID: uint16
+    Body: raw
+Negotiate:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    this.ProcessSubNode("ByteCount")
+    this.GetSubNode("Dialects").SetMaxLength(getNodeResult("ByteCount").Value)
+    this.ProcessSubNode("Dialects")
+  WordCount: uint8
+  ByteCount: uint16
+  Dialects:
+    list: true
+    exception-plan: stopList
+    Dialect:
+      operator: |
+        fmt = this.ProcessSubNode("BufferFormat").Value
+        if fmt != 0x02 {
+          panic("smb: dialect BufferFormat must be 0x02")
+        }
+        this.ProcessSubNode("Name")
+      BufferFormat: uint8
+      Name: "del:\0;type:string"
