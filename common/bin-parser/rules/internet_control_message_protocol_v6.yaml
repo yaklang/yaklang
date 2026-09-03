@@ -3,7 +3,26 @@ Package:
     Type: uint8
     Code: uint8
     Checksum: uint16
-    Payload: raw
+    Payload:
+      unpack: true
+      operator: |
+        type = getNodeResult("@ICMPV6/Type").Value
+        switch type {
+          case 128:
+            this.ProcessByType("Echo Request")
+          case 129:
+            this.ProcessByType("Echo Reply")
+          case 133:
+            this.ProcessByType("Router Solicitation")
+          case 134:
+            this.ProcessByType("Router Advertisement")
+          case 135:
+            this.ProcessByType("Neighbor Solicitation")
+          case 136:
+            this.ProcessByType("Neighbor Advertisement")
+          default:
+            return
+        }
 Echo Request:
     Identifier: uint16
     Sequence Number: uint16
@@ -12,6 +31,24 @@ Echo Reply:
     Identifier: uint16
     Sequence Number: uint16
     Data: raw
+Router Solicitation:
+    Reserved: raw,4
+    Options: raw
+Router Advertisement:
+    Hop Limit: uint8
+    Flags: uint8
+    Router Lifetime: uint16
+    Reachable Time: uint32
+    Retrans Timer: uint32
+    Options: raw
+Neighbor Solicitation:
+    Reserved: raw,4
+    Target Address: raw,16
+    Options: raw
+Neighbor Advertisement:
+    Flags: uint32
+    Target Address: raw,16
+    Options: raw
 Destination Unreachable:
     Code: uint8
     Checksum: uint16

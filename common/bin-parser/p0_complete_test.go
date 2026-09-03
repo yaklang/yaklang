@@ -216,3 +216,62 @@ func TestDCERPCBindAckFaultAndSMB1AndX(t *testing.T) {
 	require.Equal(t, uint64(0x75), uintVal(t, smb.Child("Command")))
 	require.Equal(t, uint64(4), uintVal(t, mustChild(t, smb, "AndX", "WordCount")))
 }
+
+func TestICMPTimestampRedirectAndNBNSAnswer(t *testing.T) {
+	ts := make([]byte, 20)
+	ts[0] = 13
+	binary.BigEndian.PutUint16(ts[4:], 7)
+	binary.BigEndian.PutUint16(ts[6:], 1)
+	binary.BigEndian.PutUint32(ts[8:], 100)
+	n := parseRule(t, ts, "internet_control_message_protocol", "ICMP")
+	require.Equal(t, uint64(13), uintVal(t, n.Child("Type")))
+	require.Equal(t, uint64(7), uintVal(t, mustChild(t, n, "ICMP Timestamp", "Identifier")))
+	require.Equal(t, uint64(100), uintVal(t, mustChild(t, n, "ICMP Timestamp", "Originate")))
+
+	redir := make([]byte, 8)
+	redir[0] = 5
+	copy(redir[4:], []byte{10, 0, 0, 1})
+	r := parseRule(t, redir, "internet_control_message_protocol", "ICMP")
+	require.Equal(t, []byte{10, 0, 0, 1}, bytesVal(t, mustChild(t, r, "ICMP Redirect", "Gateway")))
+
+	parseMustFail(t, ts[:6], "internet_control_message_protocol", "ICMP")
+
+	q := dnsLikeQuery("TEST")
+	// turn into a response with one A answer
+	ans := make([]byte, len(q)+20)
+	copy(ans, q)
+	binary.BigEndian.PutUint16(ans[2:], 0x8400)
+	binary.BigEndian.PutUint16(ans[6:], 1)
+	off := len(q)
+	ans[off] = 4
+	copy(ans[off+1:], []byte("TEST"))
+	ans[off+5] = 0
+	binary.BigEndian.PutUint16(ans[off+6:], 1)
+	binary.BigEndian.PutUint16(ans[off+8:], 1)
+	binary.BigEndian.PutUint32(ans[off+10:], 60)
+	binary.BigEndian.PutUint16(ans[off+14:], 4)
+	copy(ans[off+16:], []byte{10, 0, 0, 9})
+	nb := parseRule(t, ans, "application-layer.nbns", "NBNS")
+	answers := nb.Child("Answers")
+	require.True(t, answers.IsList())
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, nb, "Header", "Answer RRs")))
+	require.Equal(t, []byte{10, 0, 0, 9}, bytesVal(t, answers.Children()[0].Child("RData")))
+
+	ll := parseRule(t, ans, "application-layer.nbns", "LLMNR")
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, ll, "Header", "Answer RRs")))
+}
+
+func TestRDPTPKTOn3389(t *testing.T) {
+	// TPKT version 3, length 8, dummy X224 4 bytes
+	tpkt := []byte{0x03, 0x00, 0x00, 0x08, 0x02, 0xe0, 0x00, 0x00}
+	n := parseRule(t, tpkt, "application-layer.msrdp", "TPKT")
+	require.Equal(t, uint64(3), uintVal(t, n.Child("Version")))
+	require.Equal(t, uint64(8), uintVal(t, n.Child("PacketLength")))
+	require.Equal(t, []byte{0x02, 0xe0, 0x00, 0x00}, bytesVal(t, n.Child("TPDU")))
+
+	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 3389, tpkt))
+	require.Equal(t, uint64(3), uintVal(t, mustChild(t, eth, "IP", "TCP", "TPKT", "Version")))
+
+	parseMustFail(t, []byte{0x03, 0x00}, "application-layer.msrdp", "TPKT")
+}
+

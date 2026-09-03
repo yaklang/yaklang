@@ -16,6 +16,12 @@ Package:
             this.ProcessByType("ICMP Destination Unreachable")
           case 11:
             this.ProcessByType("ICMP Time Exceeded")
+          case 5:
+            this.ProcessByType("ICMP Redirect")
+          case 13:
+            this.ProcessByType("ICMP Timestamp")
+          case 14:
+            this.ProcessByType("ICMP Timestamp Reply")
           default:
             return
         }
@@ -33,3 +39,20 @@ ICMP Destination Unreachable:
 ICMP Time Exceeded:
   Unused: raw,4
   Data: raw
+ICMP Redirect:
+  operator: |
+    this.ProcessSubNode("Gateway")
+  Gateway: raw,4
+  Data: raw
+ICMP Timestamp:
+  Identifier: uint16
+  Sequence Number: uint16
+  Originate: uint32
+  Receive: uint32
+  Transmit: uint32
+ICMP Timestamp Reply:
+  Identifier: uint16
+  Sequence Number: uint16
+  Originate: uint32
+  Receive: uint32
+  Transmit: uint32
