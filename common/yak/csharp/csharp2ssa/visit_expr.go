@@ -547,6 +547,7 @@ func (b *singleFileBuilder) VisitObjectCreation(raw csharpparser.IObject_creatio
 		bp.SetKind(ssa.BlueprintClass)
 	}
 	if bp != nil {
+		b.ensureBlueprintConstructorSlot(bp)
 		self := b.EmitUndefined(bp.Name)
 		self.SetType(bp)
 		callArgs := append([]ssa.Value{self}, args...)

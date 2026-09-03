@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -62,5 +63,26 @@ namespace Demo {
 	progs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.CSHARP), ssaapi.WithMemory())
 	require.NoError(t, err)
 	require.NotEmpty(t, progs)
-	require.NotNil(t, progs[0])
+	requireCSharpCompileErrorFree(t, progs[0])
+	got := lo.Map(
+		progs[0].Ref("println").GetUsers().Flat(func(v *ssaapi.Value) ssaapi.Values {
+			return ssaapi.Values{v.GetOperand(1)}
+		}),
+		func(v *ssaapi.Value, _ int) string { return v.String() },
+	)
+	require.Equal(t, []string{"1"}, got)
+}
+
+func TestCSharp_ClassMainStaticMain_NoObjectError(t *testing.T) {
+	src := `public class Main { public static void Main(string[] args) { int a = 1; println(a); } }`
+	prog, err := ssaapi.Parse(src, ssaapi.WithLanguage("csharp"))
+	require.NoError(t, err)
+	requireCSharpCompileErrorFree(t, prog)
+	got := lo.Map(
+		prog.Ref("println").GetUsers().Flat(func(v *ssaapi.Value) ssaapi.Values {
+			return ssaapi.Values{v.GetOperand(1)}
+		}),
+		func(v *ssaapi.Value, _ int) string { return v.String() },
+	)
+	require.Equal(t, []string{"1"}, got)
 }

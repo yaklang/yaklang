@@ -5,9 +5,38 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils"
 	csharpparser "github.com/yaklang/yaklang/common/yak/csharp/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
+
+// ensureBlueprintMemberSlot pre-declares a class member so later storeField
+// (RegisterStaticMethod / RegisterNormalMethod / constructor magic method)
+// does not emit ObjectError for a missing member. C# methods may share the
+// type name (class Main { static void Main() } / constructors).
+func (b *singleFileBuilder) ensureBlueprintMemberSlot(blueprint *ssa.Blueprint, name string, static bool) {
+	if b == nil || blueprint == nil || name == "" {
+		return
+	}
+	placeholder := b.EmitUndefined(name)
+	if static {
+		if utils.IsNil(blueprint.GetStaticMember(name)) {
+			blueprint.RegisterStaticMember(name, placeholder, false)
+		}
+		return
+	}
+	if utils.IsNil(blueprint.GetNormalMember(name)) {
+		blueprint.RegisterNormalMember(name, placeholder, false)
+	}
+}
+
+func (b *singleFileBuilder) ensureBlueprintConstructorSlot(blueprint *ssa.Blueprint) {
+	if blueprint == nil || blueprint.Name == "" {
+		return
+	}
+	b.ensureBlueprintMemberSlot(blueprint, blueprint.Name, false)
+	b.ensureBlueprintMemberSlot(blueprint, blueprint.Name, true)
+}
 
 func (b *singleFileBuilder) VisitClassDeclaration(raw csharpparser.IClass_declarationContext, out *ssa.Blueprint) ssa.Value {
 	if b == nil || raw == nil || b.IsStop() {
@@ -26,6 +55,7 @@ func (b *singleFileBuilder) VisitClassDeclaration(raw csharpparser.IClass_declar
 	blueprint := b.CreateBlueprint(name, i.Identifier())
 	blueprint.SetKind(ssa.BlueprintClass)
 	b.GetProgram().SetExportType(name, blueprint)
+	b.ensureBlueprintConstructorSlot(blueprint)
 
 	if cb := i.Class_base(); cb != nil {
 		base, _ := cb.(*csharpparser.Class_baseContext)
@@ -98,6 +128,7 @@ func (b *singleFileBuilder) VisitStructDeclaration(raw csharpparser.IStruct_decl
 	blueprint := b.CreateBlueprint(name, i.Identifier())
 	blueprint.SetKind(ssa.BlueprintClass)
 	b.GetProgram().SetExportType(name, blueprint)
+	b.ensureBlueprintConstructorSlot(blueprint)
 	b.PushBlueprint(blueprint)
 	defer b.PopBlueprint()
 	if body := i.Struct_body(); body != nil {
@@ -125,6 +156,7 @@ func (b *singleFileBuilder) VisitInterfaceDeclaration(raw csharpparser.IInterfac
 	blueprint := b.CreateBlueprint(name, i.Identifier())
 	blueprint.SetKind(ssa.BlueprintInterface)
 	b.GetProgram().SetExportType(name, blueprint)
+	b.ensureBlueprintConstructorSlot(blueprint)
 	b.PushBlueprint(blueprint)
 	defer b.PopBlueprint()
 	if body := i.Interface_body(); body != nil {
@@ -324,6 +356,7 @@ func (b *singleFileBuilder) VisitMethodDeclaration(raw csharpparser.IMethod_decl
 	newFunc := b.NewFunc(funcName)
 	newFunc.SetMethodName(key)
 	isStatic := methodIsStatic(i.Method_modifiers())
+	b.ensureBlueprintMemberSlot(class, key, isStatic)
 	if isStatic {
 		class.RegisterStaticMethod(key, newFunc)
 	} else {
@@ -375,7 +408,8 @@ func (b *singleFileBuilder) VisitConstructorDeclaration(raw csharpparser.IConstr
 	funcName := fmt.Sprintf("%s_ctor_%s", class.Name, uuid.NewString()[:4])
 	newFunc := b.NewFunc(funcName)
 	newFunc.SetMethodName(key)
-	class.RegisterNormalMethod(key, newFunc)
+	b.ensureBlueprintConstructorSlot(class)
+	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	params := ssa.DetachAST(decl.Parameter_list())
 	body := ssa.DetachAST(i.Constructor_body())
 	store := b.StoreFunctionBuilder()
@@ -472,6 +506,7 @@ func (b *singleFileBuilder) VisitType(raw csharpparser.IType_Context) ssa.Type {
 		return bp
 	}
 	bp := b.CreateBlueprint(text, raw)
+	b.ensureBlueprintConstructorSlot(bp)
 	return bp
 }
 
