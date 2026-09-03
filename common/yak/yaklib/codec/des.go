@@ -458,7 +458,7 @@ func TripleDESDecFactory(unpaddingFunc func([]byte) []byte, mode string) Symmetr
 
 func DESEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	// 只对块模式（CBC、ECB）进行 padding，流模式（CTR、CFB、OFB）不需要 padding
-	if !IsAESStreamMode(mode) {
+	if !IsStreamMode(mode) {
 		data = ZeroPadding(data, 8)
 	}
 	c, err := des.NewCipher(key)
@@ -504,7 +504,7 @@ func DESDec(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 
 func TripleDesEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
 	// 只对块模式（CBC、ECB）进行 padding，流模式（CTR、CFB、OFB）不需要 padding
-	if !IsAESStreamMode(mode) {
+	if !IsStreamMode(mode) {
 		data = ZeroPadding(data, 8)
 	}
 	c, err := des.NewTripleDESCipher(key)
