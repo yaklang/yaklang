@@ -9,6 +9,12 @@ func TestXPLogonHintNcrackPatterns(t *testing.T) {
 	if xpLogonHint(xpLogonCurrentUserXP) != xpHintSuccess {
 		t.Fatal("current user XP dialog is valid creds")
 	}
+	if xpLogonHint(xpLogonNotInRDPGroup) != xpHintSuccess {
+		t.Fatal("not in remote desktop group is still valid creds")
+	}
+	if !classicShareRestart(0x1) || !classicShareRestart(0x6) || classicShareRestart(0x7) {
+		t.Fatal("share restart is Demand Active(1) or Deactivate All(6) only")
+	}
 	if xpLogonHint([]byte{0x02, 0x00, 0x01, 0x00}) != xpHintNone {
 		t.Fatal("ordinary update is not a logon hint")
 	}
