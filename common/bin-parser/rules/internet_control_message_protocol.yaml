@@ -12,6 +12,10 @@ Package:
             this.ProcessByType("ICMP Echo")
           case 0:
             this.ProcessByType("ICMP Echo Reply")
+          case 3:
+            this.ProcessByType("ICMP Destination Unreachable")
+          case 11:
+            this.ProcessByType("ICMP Time Exceeded")
           default:
             return
         }
@@ -22,4 +26,10 @@ ICMP Echo:
 ICMP Echo Reply:
   Identifier: uint16
   Sequence Number: uint16
+  Data: raw
+ICMP Destination Unreachable:
+  Unused: raw,4
+  Data: raw
+ICMP Time Exceeded:
+  Unused: raw,4
   Data: raw

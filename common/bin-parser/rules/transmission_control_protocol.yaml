@@ -32,7 +32,24 @@ Package:
         Payload:
             unpack: true
             operator: |
-                typeNameList = ["TLS", "HTTP"]
+                src = getNodeResult("@TCP/Source Port").Value
+                dst = getNodeResult("@TCP/Destination Port").Value
+                typeNameList = ["TLS", "HTTP", "SSH", "Redis", "MQTT", "FTP", "SMTP"]
+                if src == 22 || dst == 22 {
+                  typeNameList = ["SSH"]
+                } else if src == 21 || dst == 21 {
+                  typeNameList = ["FTP"]
+                } else if src == 25 || dst == 25 || src == 587 || dst == 587 {
+                  typeNameList = ["SMTP"]
+                } else if src == 6379 || dst == 6379 {
+                  typeNameList = ["Redis"]
+                } else if src == 1883 || dst == 1883 || src == 8883 || dst == 8883 {
+                  typeNameList = ["MQTT"]
+                } else if src == 443 || dst == 443 {
+                  typeNameList = ["TLS", "HTTP"]
+                } else if src == 80 || dst == 80 || src == 8080 || dst == 8080 {
+                  typeNameList = ["HTTP", "TLS"]
+                }
                 for typeName in typeNameList{
                     res,op = this.TryProcessByType(typeName)
                     if op.OK {
@@ -49,7 +66,6 @@ Package:
                         debug("parse node %s failed: %v", typeName, op.Message)
                     }
                 }
-                # this.NewUnknownNode().Process()
 Option:
     operator: |
         n = this.ProcessSubNode("Kind").Value
@@ -70,3 +86,8 @@ Option:
     Data: raw
 TLS: "import:application-layer/tls.yaml;node:Transport Layer Security"
 HTTP: "import:application-layer/http.yaml;node:HTTP"
+SSH: "import:application-layer/ssh.yaml;node:SSH"
+FTP: "import:application-layer/ftp.yaml;node:FTP"
+SMTP: "import:application-layer/smtp.yaml;node:SMTP"
+Redis: "import:application-layer/redis.yaml;node:RESP"
+MQTT: "import:application-layer/mqtt.yaml;node:MQTT"

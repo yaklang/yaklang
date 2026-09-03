@@ -1,0 +1,72 @@
+endian: big
+Package:
+  DHCP:
+    operator: |
+      this.ProcessSubNode("Operation")
+      op = getNodeResult("Operation").Value
+      if op != 1 && op != 2 {
+        panic("dhcp: invalid operation")
+      }
+      this.ProcessSubNode("Hardware Type")
+      this.ProcessSubNode("Hardware Length")
+      this.ProcessSubNode("Hops")
+      this.ProcessSubNode("Xid")
+      this.ProcessSubNode("Seconds")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("Client IP")
+      this.ProcessSubNode("Your IP")
+      this.ProcessSubNode("Server IP")
+      this.ProcessSubNode("Gateway IP")
+      this.ProcessSubNode("Client MAC")
+      this.ProcessSubNode("Client Hardware Padding")
+      this.ProcessSubNode("Server Host Name")
+      this.ProcessSubNode("Boot File")
+      this.ProcessSubNode("Magic Cookie")
+      cookie = getNodeResult("Magic Cookie").Value
+      if cookie != 0x63825363 {
+        panic("dhcp: invalid magic cookie")
+      }
+      this.ProcessSubNode("Options")
+    Operation: uint8
+    Hardware Type: uint8
+    Hardware Length: uint8
+    Hops: uint8
+    Xid: uint32
+    Seconds: uint16
+    Flags: uint16
+    Client IP: raw,4
+    Your IP: raw,4
+    Server IP: raw,4
+    Gateway IP: raw,4
+    Client MAC: raw,6
+    Client Hardware Padding: raw,10
+    Server Host Name: raw,64
+    Boot File: raw,128
+    Magic Cookie: uint32
+    Options:
+      list: true
+      Option: Option
+      operator: |
+        for {
+          if this.GetRemainingSpace() == 0 {
+            break
+          }
+          ele = this.NewElement()
+          ele.Process()
+          if ele.GetSubNode("Code").Result().Value == 255 {
+            break
+          }
+        }
+Option:
+  operator: |
+    code = this.ProcessSubNode("Code").Value
+    if code == 0 || code == 255 {
+      return
+    }
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    this.GetSubNode("Data").SetMaxLength(l)
+    this.ProcessSubNode("Data")
+  Code: uint8
+  Length: uint8
+  Data: raw

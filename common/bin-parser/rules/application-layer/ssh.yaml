@@ -1,0 +1,9 @@
+Package:
+  SSH:
+    operator: |
+      ident = this.ProcessSubNode("Identification").Value
+      s = string(ident)
+      if !s.HasPrefix("SSH-") {
+        panic("ssh: identification must start with SSH-")
+      }
+    Identification: "del:\r\n;type:string"

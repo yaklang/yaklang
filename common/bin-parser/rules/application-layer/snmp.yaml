@@ -1,0 +1,66 @@
+endian: big
+Package:
+  SNMP:
+    operator: |
+      ident = this.ProcessSubNode("Identifier").Value
+      if ident != 0x30 {
+        panic("snmp: expected SEQUENCE")
+      }
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Version Tag")
+      if getNodeResult("Version Tag").Value != 0x02 {
+        panic("snmp: expected INTEGER version")
+      }
+      this.ProcessSubNode("Version Length")
+      this.GetSubNode("Version").SetMaxLength(getNodeResult("Version Length").Value)
+      this.ProcessSubNode("Version")
+      this.ProcessSubNode("Community Tag")
+      if getNodeResult("Community Tag").Value != 0x04 {
+        panic("snmp: expected OCTET STRING community")
+      }
+      this.ProcessSubNode("Community Length")
+      this.GetSubNode("Community").SetMaxLength(getNodeResult("Community Length").Value)
+      this.ProcessSubNode("Community")
+      this.ProcessSubNode("PDU Tag")
+      pdu = getNodeResult("PDU Tag").Value
+      if pdu < 0xa0 || pdu > 0xa7 {
+        panic("snmp: unexpected PDU tag")
+      }
+      this.ProcessSubNode("PDU Length")
+      this.GetSubNode("PDU Body").SetMaxLength(getNodeResult("PDU Length").Value)
+      this.ProcessSubNode("PDU Body")
+    Identifier: uint8
+    Length: uint8
+    Version Tag: uint8
+    Version Length: uint8
+    Version: raw
+    Community Tag: uint8
+    Community Length: uint8
+    Community: raw
+    PDU Tag: uint8
+    PDU Length: uint8
+    PDU Body:
+      operator: |
+        this.ProcessSubNode("Request ID Tag")
+        this.ProcessSubNode("Request ID Length")
+        this.GetSubNode("Request ID").SetMaxLength(getNodeResult("Request ID Length").Value)
+        this.ProcessSubNode("Request ID")
+        this.ProcessSubNode("Error Status Tag")
+        this.ProcessSubNode("Error Status Length")
+        this.GetSubNode("Error Status").SetMaxLength(getNodeResult("Error Status Length").Value)
+        this.ProcessSubNode("Error Status")
+        this.ProcessSubNode("Error Index Tag")
+        this.ProcessSubNode("Error Index Length")
+        this.GetSubNode("Error Index").SetMaxLength(getNodeResult("Error Index Length").Value)
+        this.ProcessSubNode("Error Index")
+        this.ProcessSubNode("Variable Bindings")
+      Request ID Tag: uint8
+      Request ID Length: uint8
+      Request ID: raw
+      Error Status Tag: uint8
+      Error Status Length: uint8
+      Error Status: raw
+      Error Index Tag: uint8
+      Error Index Length: uint8
+      Error Index: raw
+      Variable Bindings: raw
