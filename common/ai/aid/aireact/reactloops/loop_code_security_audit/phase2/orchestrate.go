@@ -291,7 +291,7 @@ func fallbackFinalizeCategoryScan(
 		}
 	}
 
-	stopReason := model.ScanStatusPartial
+	stopReason := "auto_finalized_on_timeout"
 	obsStatus := model.ScanStatusPartial
 	summary := fmt.Sprintf("类别 '%s' 扫描被中断且无法恢复续扫（execErr=%v），已由系统兜底收尾。", category.ID, execErr)
 	if scanState == nil || total == 0 {

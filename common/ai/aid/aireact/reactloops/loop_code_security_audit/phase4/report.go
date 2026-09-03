@@ -122,7 +122,7 @@ func BuildReportLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 						r.AddToTimeline("[PHASE4_REPORT_REPAIR]",
 							fmt.Sprintf("报告正文遗漏 %d 个 verified finding，已自动补录附录: %s",
 								len(missingIDs), strings.Join(missingIDs, ", ")))
-						log.Warnf("[CodeAudit/Phase4] Repaired report with %d missing findings: %v", reportPath, missingIDs)
+						log.Warnf("[CodeAudit/Phase4] Repaired report %s with %d missing findings: %v", reportPath, len(missingIDs), missingIDs)
 					}
 				}
 				// 覆盖状态兜底披露：存在未完成类别时强制追加机器准确的覆盖附录
