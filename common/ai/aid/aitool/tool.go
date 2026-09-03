@@ -25,6 +25,9 @@ type ToolRuntimeConfig struct {
 	// RiskSaveHandler replaces the process-local SQLite write for a risk when
 	// the current AI runtime is bound to a platform-owned result sink.
 	RiskSaveHandler func(context.Context, *schema.Risk) error
+	// EmitUIEvent emits structured metadata for a local UI surface. Tool callbacks
+	// must never place binary or base64 content in this channel.
+	EmitUIEvent func(schema.EventType, string, any) error
 	// BrowserSessionTracker is set for AI ReAct tool runs to hook browser.Open/Close ids.
 	BrowserSessionTracker interface {
 		TrackBrowserSession(id string)

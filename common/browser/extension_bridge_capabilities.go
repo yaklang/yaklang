@@ -33,12 +33,17 @@ type ExtensionBridgeCapabilityDescriptor struct {
 	Method            string                                    `json:"method"`
 	Domain            string                                    `json:"domain"`
 	Access            string                                    `json:"access"`
+	AgentVisible      *bool                                     `json:"agentVisible,omitempty"`
 	Summary           string                                    `json:"summary"`
 	Scopes            []string                                  `json:"scopes"`
 	ConditionalScopes []ExtensionBridgeCapabilityScopeCondition `json:"conditionalScopes,omitempty"`
 	TargetMode        string                                    `json:"targetMode"`
 	DefaultTimeoutMS  int                                       `json:"defaultTimeoutMs"`
 	ParamsSchema      json.RawMessage                           `json:"paramsSchema"`
+}
+
+func (d ExtensionBridgeCapabilityDescriptor) VisibleToAgent() bool {
+	return d.AgentVisible == nil || *d.AgentVisible
 }
 
 type ExtensionBridgeCapabilityCatalog struct {
@@ -59,6 +64,10 @@ func cloneExtensionBridgeCapabilityCatalog(
 	clone.Capabilities = make([]ExtensionBridgeCapabilityDescriptor, len(catalog.Capabilities))
 	for index, descriptor := range catalog.Capabilities {
 		clone.Capabilities[index] = descriptor
+		if descriptor.AgentVisible != nil {
+			visible := *descriptor.AgentVisible
+			clone.Capabilities[index].AgentVisible = &visible
+		}
 		clone.Capabilities[index].Scopes = append([]string(nil), descriptor.Scopes...)
 		clone.Capabilities[index].ConditionalScopes = append(
 			[]ExtensionBridgeCapabilityScopeCondition(nil),

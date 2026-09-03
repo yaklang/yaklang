@@ -21,7 +21,7 @@ func browserCapabilityCatalog(
 	query = strings.ToLower(strings.TrimSpace(query))
 	result := make([]browser.ExtensionBridgeCapabilityDescriptor, 0, len(catalog.Capabilities))
 	for _, descriptor := range catalog.Capabilities {
-		if descriptor.Method == "browser.thumbnail" {
+		if !descriptor.VisibleToAgent() {
 			continue
 		}
 		if domain != "" && domain != "all" && descriptor.Domain != domain {
@@ -59,7 +59,7 @@ func browserCapabilityDescriptors(
 		if _, duplicate := descriptors[method]; duplicate {
 			return nil, nil, fmt.Errorf("browser extension capability catalog contains duplicate method %q", method)
 		}
-		if method == "browser.thumbnail" {
+		if !descriptor.VisibleToAgent() {
 			continue
 		}
 		descriptors[method] = descriptor
@@ -174,7 +174,7 @@ func RegisterCapabilityTools(
 	return factory.RegisterTool(
 		"browser.capability.call",
 		aitool.WithDescription("Call any Agent-facing capability declared by the connected browser extension. Parameters are checked against that extension version's signed schema before dispatch. The paired instance, target, browser restrictions, enterprise policy, and AI review policy remain authoritative."),
-		aitool.WithUsage("Use browser.capability.catalog first and construct params from the selected descriptor's paramsSchema. This tool can open or inspect tabs, create browser identity-isolation contexts, interact with pages, read Cookie or context data, capture traffic, control recording and Deep Capture, run invoke or eval, manage callables and Profiles, or switch proxies."),
+		aitool.WithUsage("Use browser.capability.catalog first and construct params from the selected descriptor's paramsSchema. This tool can open or inspect tabs, create browser identity-isolation contexts, interact with pages, read Cookie or context data, capture traffic, control recording and Deep Capture, run invoke or eval, manage callables and Profiles, or switch proxies. When login requires a QR code, MFA, CAPTCHA, or device confirmation, call browser.handoff.request and wait; Yakit presents that interaction locally, so never extract or display its pixels through the Agent."),
 		aitool.WithKeywords([]string{"browser", "identity isolation", "page interaction", "network", "debugging", "eval", "proxy", "浏览器", "身份隔离", "页面操作", "网络", "调试", "代理"}),
 		aitool.WithStringParam(
 			"method",
@@ -190,9 +190,10 @@ func RegisterCapabilityTools(
 				"description":          "Parameters for the selected method; use the exact paramsSchema returned by browser.capability.catalog",
 			},
 		),
-		aitool.WithNoRuntimeCallback(func(
+		aitool.WithCallback(func(
 			ctx context.Context,
 			params aitool.InvokeParams,
+			runtimeConfig *aitool.ToolRuntimeConfig,
 			_ io.Writer,
 			_ io.Writer,
 		) (interface{}, error) {
@@ -209,7 +210,7 @@ func RegisterCapabilityTools(
 			); err != nil {
 				return nil, err
 			}
-			return CallCapability(
+			return callAgentCapability(
 				ctx,
 				caller,
 				deviceID,
@@ -218,6 +219,7 @@ func RegisterCapabilityTools(
 				callParams,
 				browserCapabilityTimeout(descriptor),
 				false,
+				runtimeConfig,
 			)
 		}),
 	)

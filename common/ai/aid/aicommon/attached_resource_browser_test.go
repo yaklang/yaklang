@@ -36,18 +36,26 @@ func TestAttachedBrowserResourcePromotesBridgeTools(t *testing.T) {
 		aitool.WithDescription("call"),
 		aitool.WithStringParam("device_id"),
 	)
-	cfg := NewConfig(context.Background(), WithTools(catalogTool, callTool))
+	handoffTool := aitool.NewWithoutCallback(
+		attachedBrowserHandoffToolName,
+		aitool.WithDescription("handoff"),
+		aitool.WithStringParam("device_id"),
+	)
+	cfg := NewConfig(context.Background(), WithTools(catalogTool, callTool, handoffTool))
 	cfg.GetAiToolManager().DisableTool(attachedBrowserCatalogToolName)
 	cfg.GetAiToolManager().DisableTool(attachedBrowserCallToolName)
+	cfg.GetAiToolManager().DisableTool(attachedBrowserHandoffToolName)
 	loop := &attachedBrowserTestLoop{config: cfg}
 	resource := &AttachedBrowserResourceData{DeviceID: "device-1", Name: "Chrome Browser"}
 
 	require.NoError(t, resource.BindLoopData(loop))
 	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserCatalogToolName))
 	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserCallToolName))
+	require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(attachedBrowserHandoffToolName))
 	promptMaterials := BuildPromptFrozenOpenMaterials(cfg)
 	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCatalogToolName)
 	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserCallToolName)
+	require.Contains(t, promptMaterials.PromotedTimelineOpen, "## Tool: "+attachedBrowserHandoffToolName)
 	require.Contains(t, resource.ToAttachData(loop), "tools are available and have been promoted")
 }
 
@@ -76,6 +84,7 @@ func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {
 	require.False(t, allow)
 	require.Contains(t, feedback, attachedBrowserCatalogToolName)
 	require.Contains(t, feedback, attachedBrowserCallToolName)
+	require.Contains(t, feedback, attachedBrowserHandoffToolName)
 	require.Contains(t, feedback, "Do not call op=open")
 
 	allow, feedback = CheckAttachedBrowserToolRoute(task, attachedBrowserCatalogToolName)
@@ -89,6 +98,14 @@ func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "device-1", params.GetString("device_id"))
+
+	params, err = BindAttachedBrowserToolParams(task, attachedBrowserHandoffToolName, aitool.InvokeParams{
+		"browser_ref": "device-1",
+		"reason":      "qr_code",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "device-1", params.GetString("device_id"))
+	require.NotContains(t, params, "browser_ref")
 
 	task.SetAttachedDatas(nil)
 	allow, feedback = CheckAttachedBrowserToolRoute(task, attachedBrowserRodToolName)

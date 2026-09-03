@@ -144,3 +144,20 @@ func TestCapabilityToolsUseAdvertisedMethodsReviewAndTargetRules(t *testing.T) {
 	require.False(t, result.Success)
 	require.Equal(t, previousCalls, caller.calls)
 }
+
+func TestCapabilityToolsExcludeUIOnlyMethods(t *testing.T) {
+	hidden := false
+	catalog := testCapabilityCatalog()
+	catalog.Capabilities = append(catalog.Capabilities, browser.ExtensionBridgeCapabilityDescriptor{
+		Method: "browser.handoff.presentation.get", Domain: "handoff", Access: "sensitive-read",
+		AgentVisible: &hidden, Summary: "Local UI presentation", Scopes: []string{"browser.human.takeover"},
+		TargetMode: "none", DefaultTimeoutMS: 20_000,
+		ParamsSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`),
+	})
+
+	descriptors, methods, err := browserCapabilityDescriptors(catalog)
+	require.NoError(t, err)
+	require.NotContains(t, descriptors, "browser.handoff.presentation.get")
+	require.NotContains(t, methods, "browser.handoff.presentation.get")
+	require.NotContains(t, browserCapabilityCatalog(catalog, "all", ""), catalog.Capabilities[2])
+}
