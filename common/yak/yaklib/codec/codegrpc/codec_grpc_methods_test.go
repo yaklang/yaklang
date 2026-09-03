@@ -330,3 +330,111 @@ func TestHTTPRequestMutate_PostToGetWithLeadingBlankLinesInBody(t *testing.T) {
 	require.Equal(t, map[string][]string{"sql": {"1"}}, lowhttp.GetFullHTTPRequestQueryParams(flow.Text))
 	require.Empty(t, strings.TrimSpace(string(lowhttp.GetHTTPPacketBody(flow.Text))))
 }
+
+// TestCodecSymmetricStreamModesNoPadding 验证 AES/DES/TripleDES 的流模式（CFB/OFB/CTR）
+// 在 Codec 层不产生 padding，密文长度等于明文长度；块模式（CBC/ECB）仍保留 padding。
+func TestCodecSymmetricStreamModesNoPadding(t *testing.T) {
+	plaintext := []byte("Hello Yak! This is a CFB/OFB test message.") // 42 bytes
+
+	cases := []struct {
+		name string
+		key  string
+		iv   string
+		enc  func(*CodecExecFlow, string, string, string, string, string) error
+		dec  func(*CodecExecFlow, string, string, string, string, string) error
+	}{
+		{
+			"AES", "1234567890123456", "abcdefghijklmnop",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.AESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.AESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
+			"DES", "12345678", "abcdefgh",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
+			"TripleDES", "123456789012345678901234", "abcdefgh",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.TripleDESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.TripleDESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+	}
+
+	streamModes := []string{"CFB", "OFB", "CTR"}
+	blockModes := []string{"CBC", "ECB"}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// 流模式：密文长度 = 明文长度，round-trip 一致
+			for _, mode := range streamModes {
+				for _, pad := range []string{"pkcs", "zeroPadding"} {
+					ef := NewCodecExecFlow(plaintext, nil)
+					require.NoError(t, c.enc(ef, c.key, c.iv, mode, "raw", pad), "%s/%s encrypt", mode, pad)
+					ct := make([]byte, len(ef.Text))
+					copy(ct, ef.Text)
+					require.Equal(t, len(plaintext), len(ct), "%s/%s stream mode should not pad", mode, pad)
+
+					df := NewCodecExecFlow(ct, nil)
+					require.NoError(t, c.dec(df, c.key, c.iv, mode, "raw", pad), "%s/%s decrypt", mode, pad)
+					require.Equal(t, plaintext, df.Text, "%s/%s round-trip", mode, pad)
+				}
+			}
+			// 块模式：密文长度 = 明文长度向上取整到块大小，round-trip 一致
+			for _, mode := range blockModes {
+				for _, pad := range []string{"pkcs", "zeroPadding"} {
+					ef := NewCodecExecFlow(plaintext, nil)
+					require.NoError(t, c.enc(ef, c.key, c.iv, mode, "raw", pad), "%s/%s encrypt", mode, pad)
+					ct := make([]byte, len(ef.Text))
+					copy(ct, ef.Text)
+					require.Greater(t, len(ct), len(plaintext), "%s/%s block mode should pad", mode, pad)
+
+					df := NewCodecExecFlow(ct, nil)
+					require.NoError(t, c.dec(df, c.key, c.iv, mode, "raw", pad), "%s/%s decrypt", mode, pad)
+					require.Equal(t, plaintext, df.Text, "%s/%s round-trip", mode, pad)
+				}
+			}
+		})
+	}
+}
+
+// TestCodecDESIVTruncation 验证 DES/TripleDES 加密时超长 IV 会被截断到块大小（8 字节），
+// 与解密走 FixIV 的行为保持一致，加解密 round-trip 一致。
+func TestCodecDESIVTruncation(t *testing.T) {
+	plaintext := []byte("Hello Yak! DES stream test message.")
+	// 16 字节 IV，DES/TripleDES 块大小为 8，应截断到前 8 字节
+	iv16 := "abcdefghijklmnop"
+
+	cases := []struct {
+		name string
+		key  string
+		enc  func(*CodecExecFlow, string, string, string, string, string) error
+		dec  func(*CodecExecFlow, string, string, string, string, string) error
+	}{
+		{
+			"DES", "12345678",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
+			"TripleDES", "123456789012345678901234",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.TripleDESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.TripleDESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			for _, mode := range []string{"CFB", "OFB", "CTR", "CBC"} {
+				ef := NewCodecExecFlow(plaintext, nil)
+				require.NoError(t, c.enc(ef, c.key, iv16, mode, "raw", "pkcs"), "%s encrypt", mode)
+				ct := make([]byte, len(ef.Text))
+				copy(ct, ef.Text)
+
+				df := NewCodecExecFlow(ct, nil)
+				require.NoError(t, c.dec(df, c.key, iv16, mode, "raw", "pkcs"), "%s decrypt", mode)
+				require.Equal(t, plaintext, df.Text, "%s round-trip with truncated IV", mode)
+			}
+		})
+	}
+}
+
