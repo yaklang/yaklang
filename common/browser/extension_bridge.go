@@ -50,6 +50,12 @@ type ExtensionBridgeError struct {
 	Data    json.RawMessage `json:"data,omitempty"`
 }
 
+type ExtensionBridgeManagedInstance struct {
+	Manager    string `json:"manager"`
+	InstanceID string `json:"instanceId"`
+	Badge      string `json:"badge"`
+}
+
 type ExtensionBridgeEnvelope struct {
 	ID                string                            `json:"id,omitempty"`
 	Type              string                            `json:"type"`
@@ -67,6 +73,7 @@ type ExtensionBridgeEnvelope struct {
 	TaskID            string                            `json:"taskId,omitempty"`
 	GrantID           string                            `json:"grantId,omitempty"`
 	InstallationID    string                            `json:"installationId,omitempty"`
+	ManagedInstance   *ExtensionBridgeManagedInstance   `json:"managedInstance,omitempty"`
 	EngineInstanceID  string                            `json:"engineInstanceId,omitempty"`
 	ConnectionID      string                            `json:"connectionId,omitempty"`
 	ResumeSessionID   string                            `json:"resumeSessionId,omitempty"`
@@ -110,6 +117,7 @@ type extensionBridgePendingCall struct {
 type ExtensionBridgeConnection struct {
 	DeviceID          string                            `json:"deviceId"`
 	InstallationID    string                            `json:"installationId"`
+	ManagedInstance   *ExtensionBridgeManagedInstance   `json:"managedInstance,omitempty"`
 	Client            string                            `json:"client"`
 	ClientVersion     string                            `json:"clientVersion"`
 	Capabilities      []string                          `json:"capabilities"`
@@ -293,6 +301,10 @@ func (s *ExtensionBridgeServer) connectionsLocked() []ExtensionBridgeConnection 
 	connections := make([]ExtensionBridgeConnection, 0, len(s.managedClients))
 	for _, client := range s.managedClients {
 		connection := client.status
+		if connection.ManagedInstance != nil {
+			managed := *connection.ManagedInstance
+			connection.ManagedInstance = &managed
+		}
 		connection.Capabilities = append([]string(nil), connection.Capabilities...)
 		connection.CapabilityCatalog = cloneExtensionBridgeCapabilityCatalog(connection.CapabilityCatalog)
 		connections = append(connections, connection)
@@ -539,7 +551,8 @@ func (s *ExtensionBridgeServer) handleWebSocket(writer http.ResponseWriter, requ
 			connection: connection,
 			status: ExtensionBridgeConnection{
 				DeviceID: deviceID, InstallationID: hello.InstallationID, Client: hello.Client,
-				ClientVersion: hello.Version, Capabilities: append([]string(nil), hello.Capabilities...),
+				ManagedInstance: hello.ManagedInstance,
+				ClientVersion:   hello.Version, Capabilities: append([]string(nil), hello.Capabilities...),
 				CapabilityCatalog: hello.CapabilityCatalog,
 				SessionID:         sessionID, ConnectionID: connectionID, TaskID: hello.TaskID,
 				GrantID: hello.GrantID, ConnectedAt: now.UnixMilli(),
@@ -723,6 +736,9 @@ func (s *ExtensionBridgeServer) authenticateManagedConnection(connection *websoc
 	if hello.Type != "auth" || hello.ProtocolVersion != managedExtensionBridgeProtocolVersion || hello.Challenge != challenge || strings.TrimSpace(hello.InstallationID) == "" {
 		return empty, nil, errors.New("invalid managed extension bridge handshake")
 	}
+	if err := validateExtensionBridgeManagedInstance(hello.ManagedInstance); err != nil {
+		return empty, nil, err
+	}
 	payload := managedClientAuthPayload(origin, engineIdentityID, s.engineInstanceID, challenge, hello)
 	device, err := s.manager.authenticateDevice(hello.InstallationID, origin, payload, hello.Signature)
 	if err != nil {
@@ -735,21 +751,49 @@ func (s *ExtensionBridgeServer) authenticateManagedConnection(connection *websoc
 	return hello, device, nil
 }
 
+func validateExtensionBridgeManagedInstance(instance *ExtensionBridgeManagedInstance) error {
+	if instance == nil {
+		return nil
+	}
+	if instance.Manager != "ytray" && instance.Manager != "yakit" {
+		return errors.New("invalid managed browser manager")
+	}
+	if len(instance.InstanceID) < 1 || len(instance.InstanceID) > 160 {
+		return errors.New("invalid managed browser instance id")
+	}
+	for _, char := range instance.InstanceID {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') || char == '-') {
+			return errors.New("invalid managed browser instance id")
+		}
+	}
+	if len(instance.Badge) < 1 || len(instance.Badge) > 2 {
+		return errors.New("invalid managed browser badge")
+	}
+	for _, char := range instance.Badge {
+		if char < 'A' || char > 'Z' {
+			return errors.New("invalid managed browser badge")
+		}
+	}
+	return nil
+}
+
 type extensionBridgePairingEnvelope struct {
-	Type             string              `json:"type"`
-	ProtocolVersion  int                 `json:"protocolVersion,omitempty"`
-	RequestID        string              `json:"requestId,omitempty"`
-	InstallationID   string              `json:"installationId,omitempty"`
-	Client           string              `json:"client,omitempty"`
-	Version          string              `json:"version,omitempty"`
-	Nonce            string              `json:"nonce,omitempty"`
-	ServerNonce      string              `json:"serverNonce,omitempty"`
-	PublicKey        *ExtensionBridgeJWK `json:"publicKey,omitempty"`
-	EngineIdentityID string              `json:"engineIdentityId,omitempty"`
-	Code             string              `json:"code,omitempty"`
-	ExpiresAt        int64               `json:"expiresAt,omitempty"`
-	DeviceID         string              `json:"deviceId,omitempty"`
-	Message          string              `json:"message,omitempty"`
+	Type             string                          `json:"type"`
+	ProtocolVersion  int                             `json:"protocolVersion,omitempty"`
+	RequestID        string                          `json:"requestId,omitempty"`
+	InstallationID   string                          `json:"installationId,omitempty"`
+	ManagedInstance  *ExtensionBridgeManagedInstance `json:"managedInstance,omitempty"`
+	Client           string                          `json:"client,omitempty"`
+	Version          string                          `json:"version,omitempty"`
+	Nonce            string                          `json:"nonce,omitempty"`
+	ServerNonce      string                          `json:"serverNonce,omitempty"`
+	PublicKey        *ExtensionBridgeJWK             `json:"publicKey,omitempty"`
+	EngineIdentityID string                          `json:"engineIdentityId,omitempty"`
+	Code             string                          `json:"code,omitempty"`
+	ExpiresAt        int64                           `json:"expiresAt,omitempty"`
+	DeviceID         string                          `json:"deviceId,omitempty"`
+	Message          string                          `json:"message,omitempty"`
 }
 
 func (s *ExtensionBridgeServer) handlePairingWebSocket(writer http.ResponseWriter, request *http.Request) {
@@ -782,11 +826,12 @@ func (s *ExtensionBridgeServer) handlePairingWebSocket(writer http.ResponseWrite
 		return
 	}
 	pending, err := s.manager.beginPairing(origin, extensionBridgePairingInput{
-		InstallationID: message.InstallationID,
-		Client:         message.Client,
-		ClientVersion:  message.Version,
-		Nonce:          message.Nonce,
-		PublicKey:      *message.PublicKey,
+		InstallationID:  message.InstallationID,
+		ManagedInstance: message.ManagedInstance,
+		Client:          message.Client,
+		ClientVersion:   message.Version,
+		Nonce:           message.Nonce,
+		PublicKey:       *message.PublicKey,
 	})
 	if err != nil {
 		_ = connection.WriteJSON(extensionBridgePairingEnvelope{Type: "pair_error", Message: err.Error()})

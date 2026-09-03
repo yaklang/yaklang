@@ -104,23 +104,25 @@ func (s *ExtensionBridgeFileIdentityStore) Save(state *extensionBridgeIdentitySt
 }
 
 type ExtensionBridgePairingRequest struct {
-	ID             string `json:"id"`
-	InstallationID string `json:"installationId"`
-	ExtensionID    string `json:"extensionId"`
-	Client         string `json:"client"`
-	ClientVersion  string `json:"clientVersion"`
-	Origin         string `json:"origin"`
-	Code           string `json:"code"`
-	CreatedAt      int64  `json:"createdAt"`
-	ExpiresAt      int64  `json:"expiresAt"`
+	ID              string                          `json:"id"`
+	InstallationID  string                          `json:"installationId"`
+	ManagedInstance *ExtensionBridgeManagedInstance `json:"managedInstance,omitempty"`
+	ExtensionID     string                          `json:"extensionId"`
+	Client          string                          `json:"client"`
+	ClientVersion   string                          `json:"clientVersion"`
+	Origin          string                          `json:"origin"`
+	Code            string                          `json:"code"`
+	CreatedAt       int64                           `json:"createdAt"`
+	ExpiresAt       int64                           `json:"expiresAt"`
 }
 
 type extensionBridgePairingInput struct {
-	InstallationID string             `json:"installationId"`
-	Client         string             `json:"client"`
-	ClientVersion  string             `json:"clientVersion"`
-	Nonce          string             `json:"nonce"`
-	PublicKey      ExtensionBridgeJWK `json:"publicKey"`
+	InstallationID  string                          `json:"installationId"`
+	ManagedInstance *ExtensionBridgeManagedInstance `json:"managedInstance,omitempty"`
+	Client          string                          `json:"client"`
+	ClientVersion   string                          `json:"clientVersion"`
+	Nonce           string                          `json:"nonce"`
+	PublicKey       ExtensionBridgeJWK              `json:"publicKey"`
 }
 
 type extensionBridgePairingDecision struct {
@@ -369,6 +371,9 @@ func (m *ExtensionBridgeManager) beginPairing(origin string, input extensionBrid
 	if input.InstallationID == "" || len(input.InstallationID) > 160 || input.Client == "" || len(input.Client) > 120 {
 		return nil, errors.New("invalid browser extension pairing identity")
 	}
+	if err := validateExtensionBridgeManagedInstance(input.ManagedInstance); err != nil {
+		return nil, err
+	}
 	if _, err := parseExtensionBridgePublicKey(input.PublicKey); err != nil {
 		return nil, err
 	}
@@ -404,7 +409,7 @@ func (m *ExtensionBridgeManager) beginPairing(origin string, input extensionBrid
 	serverNonce := base64.RawURLEncoding.EncodeToString(serverNonceBytes)
 	extensionID := strings.TrimPrefix(strings.TrimPrefix(origin, "chrome-extension://"), "moz-extension://")
 	request := ExtensionBridgePairingRequest{
-		ID: requestID, InstallationID: input.InstallationID, ExtensionID: extensionID,
+		ID: requestID, InstallationID: input.InstallationID, ManagedInstance: input.ManagedInstance, ExtensionID: extensionID,
 		Client: input.Client, ClientVersion: input.ClientVersion, Origin: origin,
 		Code:      pairingVerificationCode(m.identity.EngineIdentityID, requestID, origin, input, serverNonce),
 		CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(extensionPairingTTL).UnixMilli(),
@@ -736,6 +741,9 @@ func pairingVerificationCode(engineIdentityID, requestID, origin string, input e
 		"yak-browser-pairing-v1", engineIdentityID, requestID, origin, input.InstallationID,
 		input.Nonce, serverNonce, input.PublicKey.KTY, input.PublicKey.CRV, input.PublicKey.X, input.PublicKey.Y,
 	}
+	if input.ManagedInstance != nil {
+		parts = append(parts, input.ManagedInstance.Manager, input.ManagedInstance.InstanceID, input.ManagedInstance.Badge)
+	}
 	hash := sha256.Sum256([]byte(strings.Join(parts, "\n")))
 	return fmt.Sprintf("%06d", binary.BigEndian.Uint64(hash[:8])%1_000_000)
 }
@@ -756,12 +764,20 @@ func managedClientAuthPayload(origin, engineIdentityID, engineInstanceID, challe
 		capabilityCatalogVersion = strconv.Itoa(hello.CapabilityCatalog.Version)
 		capabilityCatalogHash = hello.CapabilityCatalog.Hash
 	}
-	return strings.Join([]string{
+	fields := []string{
 		"yak-browser-bridge-v3", "client-auth", origin, engineIdentityID, engineInstanceID,
 		challenge, hello.InstallationID, hello.Client, hello.Version, strings.Join(capabilities, ","),
 		capabilityCatalogVersion, capabilityCatalogHash,
 		hello.TaskID, hello.GrantID, hello.ResumeSessionID,
-	}, "\n")
+	}
+	if hello.ManagedInstance != nil {
+		fields = append(fields,
+			hello.ManagedInstance.Manager,
+			hello.ManagedInstance.InstanceID,
+			hello.ManagedInstance.Badge,
+		)
+	}
+	return strings.Join(fields, "\n")
 }
 
 var activeExtensionBridgeManager struct {

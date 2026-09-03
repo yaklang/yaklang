@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactloops_yak"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/browsertools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -321,6 +322,14 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEnablePETaskAnalyze(true),
 		aicommon.WithEnableDispatchSubReactAgent(true), // 仅仅允许顶层 ReAct 分发子 ReAct Agent，子 Agent 仍然可以使用原始的 AI 回调。
+	}
+	if startParams.GetSource() == "ai" && s.browserBridge != nil {
+		browserTools, toolErr := browsertools.BuildDynamicCapabilityTools(serverBrowserExtensionBridge{server: s})
+		if toolErr != nil {
+			log.Warnf("build AI Agent browser capability tools failed: %v", toolErr)
+		} else {
+			configOptions = append(configOptions, aicommon.WithTools(browserTools...))
+		}
 	}
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks

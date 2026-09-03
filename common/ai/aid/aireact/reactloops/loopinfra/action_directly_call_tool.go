@@ -258,7 +258,11 @@ func looksLikeWrappedDirectlyCallPayload(params aitool.InvokeParams) bool {
 	if params.GetString("type") == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
 		return true
 	}
-	if len(params.GetObject("params")) > 0 || len(params.GetObject("tool")) > 0 || len(params.GetObject("next_action")) > 0 {
+	// A tool may legitimately define a business parameter named "params"
+	// (browser.capability.call does). It is a wrapper only when accompanied by
+	// protocol metadata such as tool/@action/type; otherwise keep the complete
+	// object so sibling fields are not discarded.
+	if len(params.GetObject("tool")) > 0 || len(params.GetObject("next_action")) > 0 {
 		return true
 	}
 	return false

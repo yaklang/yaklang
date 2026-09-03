@@ -51,6 +51,20 @@ func TestManagedClientAuthPayloadMatchesBrowserTranscript(t *testing.T) {
 	)
 }
 
+func TestManagedClientAuthPayloadBindsBrowserInstanceIdentity(t *testing.T) {
+	hello := ExtensionBridgeEnvelope{
+		Type: "auth", InstallationID: "install-1", Client: "client-1", Version: "1.0.0",
+		ManagedInstance: &ExtensionBridgeManagedInstance{
+			Manager: "ytray", InstanceID: "instance-1", Badge: "B",
+		},
+	}
+	require.Equal(
+		t,
+		"yak-browser-bridge-v3\nclient-auth\nchrome-extension://abc\nidentity-1\nengine-1\nnonce-1\ninstall-1\nclient-1\n1.0.0\n\n\n\n\n\n\nytray\ninstance-1\nB",
+		managedClientAuthPayload("chrome-extension://abc", "identity-1", "engine-1", "nonce-1", hello),
+	)
+}
+
 func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) {
 	store := NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json"))
 	manager, err := NewExtensionBridgeManager(store, nil)
@@ -83,7 +97,8 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.NoError(t, pairingConnection.WriteJSON(extensionBridgePairingEnvelope{
 		Type: "pair_request", ProtocolVersion: managedExtensionBridgeProtocolVersion,
 		InstallationID: "managed-installation", Client: "managed-test", Version: "1.0.0",
-		Nonce: base64.RawURLEncoding.EncodeToString(clientNonce), PublicKey: ptrExtensionBridgeJWK(publicKeyToJWK(&clientKey.PublicKey)),
+		ManagedInstance: &ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-a", Badge: "A"},
+		Nonce:           base64.RawURLEncoding.EncodeToString(clientNonce), PublicKey: ptrExtensionBridgeJWK(publicKeyToJWK(&clientKey.PublicKey)),
 	}))
 	var pending extensionBridgePairingEnvelope
 	require.NoError(t, pairingConnection.ReadJSON(&pending))
@@ -91,6 +106,7 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.Regexp(t, `^\d{6}$`, pending.Code)
 	require.NotEmpty(t, pending.RequestID)
 	require.NotNil(t, pending.PublicKey)
+	require.Equal(t, "A", manager.Snapshot().Pending[0].ManagedInstance.Badge)
 
 	device, err := manager.ApprovePairing(pending.RequestID, "Test Chrome", "")
 	require.NoError(t, err)
@@ -117,6 +133,9 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 		Type: "auth", ProtocolVersion: managedExtensionBridgeProtocolVersion,
 		Challenge: challenge.Challenge, InstallationID: "managed-installation",
 		Client: "managed-test", Version: "1.0.0",
+		ManagedInstance: &ExtensionBridgeManagedInstance{
+			Manager: "ytray", InstanceID: "instance-a", Badge: "A",
+		},
 		Capabilities:      []string{"browser.context", "browser.tabs"},
 		CapabilityCatalog: testExtensionBridgeCapabilityCatalog(t, "browser.context", "browser.tabs"),
 	}
@@ -133,6 +152,7 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.Equal(t, managedExtensionBridgeProtocolVersion, manager.Snapshot().ProtocolVersion)
 	require.Len(t, manager.Snapshot().Connections, 1)
 	require.Equal(t, device.ID, manager.Snapshot().Connections[0].DeviceID)
+	require.Equal(t, auth.ManagedInstance, manager.Snapshot().Connections[0].ManagedInstance)
 	require.Equal(t, auth.CapabilityCatalog.Hash, manager.Snapshot().Connections[0].CapabilityCatalog.Hash)
 	require.Equal(t, managedExtensionBridgeProtocolVersion, manager.currentServer().Status()["protocolVersion"])
 	responseDone := make(chan error, 1)
@@ -297,5 +317,16 @@ func TestPairingVerificationCodeSharedVector(t *testing.T) {
 			PublicKey: ExtensionBridgeJWK{KTY: "EC", CRV: "P-256", X: "x-coordinate", Y: "y-coordinate"},
 		},
 		"server-nonce-value",
+	))
+}
+
+func TestPairingVerificationCodeBindsManagedInstance(t *testing.T) {
+	input := extensionBridgePairingInput{
+		InstallationID: "install-1", Nonce: "client-nonce-value",
+		PublicKey:       ExtensionBridgeJWK{KTY: "EC", CRV: "P-256", X: "x-coordinate", Y: "y-coordinate"},
+		ManagedInstance: &ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-1", Badge: "B"},
+	}
+	require.Equal(t, "005427", pairingVerificationCode(
+		"engine-id", "request-1", "chrome-extension://abc", input, "server-nonce-value",
 	))
 }
