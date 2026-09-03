@@ -110,6 +110,22 @@ func TestNormalizeDirectlyCallToolParams_NestedWrapperObject(t *testing.T) {
 	assert.Contains(t, strings.Join(notes, "\n"), "unwrapped next_action wrapper")
 }
 
+func TestNormalizeDirectlyCallToolParams_PreservesBusinessParamsField(t *testing.T) {
+	params, notes := normalizeDirectlyCallToolParams("", aitool.InvokeParams{
+		"device_id": "device-1",
+		"method":    "browser.eval",
+		"params": aitool.InvokeParams{
+			"mode": "expression",
+			"code": "document.title",
+		},
+	})
+
+	require.Equal(t, "device-1", params.GetString("device_id"))
+	require.Equal(t, "browser.eval", params.GetString("method"))
+	require.Equal(t, "expression", params.GetObject("params").GetString("mode"))
+	assert.Contains(t, strings.Join(notes, "\n"), "using directly_call_tool_params object as-is")
+}
+
 func TestDirectlyCallTool_Handler_NormalizesWrappedParamsAndStreamsProgress(t *testing.T) {
 	ctx := context.Background()
 	testTool := mustNewTool(
