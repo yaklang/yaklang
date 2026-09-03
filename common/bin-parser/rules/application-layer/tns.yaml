@@ -15,6 +15,11 @@ Package:
       }
       this.ProcessSubNode("Reserved")
       this.ProcessSubNode("Header Checksum")
+      if typ == 1 && l >= 34 {
+        this.GetSubNode("Connect").SetMaxLength(l - 8)
+        this.ProcessSubNode("Connect")
+        return
+      }
       if l > 8 {
         this.GetSubNode("Data").SetMaxLength(l - 8)
         this.ProcessSubNode("Data")
@@ -25,3 +30,40 @@ Package:
     Reserved: uint8
     Header Checksum: uint16
     Data: raw
+    Connect:
+      operator: |
+        this.ProcessSubNode("Version")
+        this.ProcessSubNode("Compat")
+        this.ProcessSubNode("Service Options")
+        this.ProcessSubNode("SDU")
+        this.ProcessSubNode("TDU")
+        this.ProcessSubNode("NT Proto")
+        this.ProcessSubNode("Line Turnaround")
+        this.ProcessSubNode("One")
+        this.ProcessSubNode("Connect Data Length")
+        this.ProcessSubNode("Connect Data Offset")
+        this.ProcessSubNode("Max Connect Data")
+        this.ProcessSubNode("Flags0")
+        this.ProcessSubNode("Flags1")
+        cdl = getNodeResult("Connect Data Length").Value
+        if cdl > 0 {
+          if cdl > 0x10000 {
+            panic("tns: connect data too large")
+          }
+          this.GetSubNode("Connect Data").SetMaxLength(cdl)
+          this.ProcessSubNode("Connect Data")
+        }
+      Version: uint16
+      Compat: uint16
+      Service Options: uint16
+      SDU: uint16
+      TDU: uint16
+      NT Proto: uint16
+      Line Turnaround: uint16
+      One: uint16
+      Connect Data Length: uint16
+      Connect Data Offset: uint16
+      Max Connect Data: uint32
+      Flags0: uint8
+      Flags1: uint8
+      Connect Data: raw

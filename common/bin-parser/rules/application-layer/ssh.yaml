@@ -1,3 +1,4 @@
+endian: big
 Package:
   SSH:
     operator: |
@@ -7,3 +8,32 @@ Package:
         panic("ssh: identification must start with SSH-")
       }
     Identification: "del:\r\n;type:string"
+  SSHPacket:
+    operator: |
+      this.ProcessSubNode("Packet Length")
+      plen = getNodeResult("Packet Length").Value
+      if plen < 5 || plen > 35000 {
+        panic("ssh: invalid packet length")
+      }
+      this.ProcessSubNode("Padding Length")
+      pad = getNodeResult("Padding Length").Value
+      if pad > plen - 1 {
+        panic("ssh: padding longer than packet")
+      }
+      pay = plen - pad - 1
+      if pay > 0 {
+        this.GetSubNode("Payload").SetMaxLength(pay)
+        this.ProcessSubNode("Payload")
+      }
+      if pad > 0 {
+        this.GetSubNode("Padding").SetMaxLength(pad)
+        this.ProcessSubNode("Padding")
+      }
+    Packet Length: uint32
+    Padding Length: uint8
+    Payload:
+      operator: |
+        this.ProcessSubNode("Message Number")
+      Message Number: uint8
+      Data: raw
+    Padding: raw

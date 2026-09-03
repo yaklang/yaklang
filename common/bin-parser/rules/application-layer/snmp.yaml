@@ -63,4 +63,18 @@ Package:
       Error Index Tag: uint8
       Error Index Length: uint8
       Error Index: raw
-      Variable Bindings: raw
+      Variable Bindings:
+        operator: |
+          this.ProcessSubNode("Sequence Tag")
+          if getNodeResult("Sequence Tag").Value != 0x30 {
+            panic("snmp: expected SEQUENCE variable-bindings")
+          }
+          this.ProcessSubNode("Sequence Length")
+          sl = getNodeResult("Sequence Length").Value
+          if sl > 0 {
+            this.GetSubNode("Bindings").SetMaxLength(sl)
+            this.ProcessSubNode("Bindings")
+          }
+        Sequence Tag: uint8
+        Sequence Length: uint8
+        Bindings: raw

@@ -15,3 +15,11 @@ Package:
     Code: string,3
     Separator: uint8
     Message: "del:\r\n;type:string"
+  SMTPCommand:
+    operator: |
+      this.ProcessSubNode("Line")
+      line = string(getNodeResult("Line").Value)
+      if !(line.HasPrefix("HELO") || line.HasPrefix("EHLO") || line.HasPrefix("MAIL") || line.HasPrefix("RCPT") || line.HasPrefix("DATA") || line.HasPrefix("RSET") || line.HasPrefix("NOOP") || line.HasPrefix("QUIT") || line.HasPrefix("VRFY") || line.HasPrefix("EXPN") || line.HasPrefix("HELP") || line.HasPrefix("AUTH") || line.HasPrefix("STARTTLS") || line.HasPrefix("LHLO")) {
+        panic("smtp: unknown command")
+      }
+    Line: "del:\r\n;type:string"

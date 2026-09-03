@@ -275,3 +275,136 @@ func TestRDPTPKTOn3389(t *testing.T) {
 	parseMustFail(t, []byte{0x03, 0x00}, "application-layer.msrdp", "TPKT")
 }
 
+func TestSSHPacketAndFTPSMTPCommands(t *testing.T) {
+	ident := []byte("SSH-2.0-OpenSSH_8.9\r\n")
+	require.Equal(t, "SSH-2.0-OpenSSH_8.9", strVal(t, parseRule(t, ident, "application-layer.ssh", "SSH").Child("Identification")))
+
+	pkt := make([]byte, 28)
+	binary.BigEndian.PutUint32(pkt[0:], 24)
+	pkt[4] = 6
+	pkt[5] = 20 // SSH_MSG_KEXINIT
+	p := parseRule(t, pkt, "application-layer.ssh", "SSHPacket")
+	require.Equal(t, uint64(24), uintVal(t, p.Child("Packet Length")))
+	require.Equal(t, uint64(20), uintVal(t, mustChild(t, p, "Payload", "Message Number")))
+
+	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, pkt))
+	require.Equal(t, uint64(20), uintVal(t, mustChild(t, eth, "IP", "TCP", "SSHPacket", "Payload", "Message Number")))
+
+	parseMustFail(t, []byte{0x00, 0x00, 0x88, 0xb9, 0x04}, "application-layer.ssh", "SSHPacket")
+	parseMustFail(t, []byte{0x00, 0x00, 0x00, 0x05, 0x06}, "application-layer.ssh", "SSHPacket")
+
+	user := []byte("USER anonymous\r\n")
+	f := parseRule(t, user, "application-layer.ftp", "FTPCommand")
+	require.Equal(t, "USER anonymous", strVal(t, f.Child("Line")))
+	ethF := parseEthernet(t, ipv4TCPFrame(t, 50000, 21, user))
+	require.Equal(t, "USER anonymous", strVal(t, mustChild(t, ethF, "IP", "TCP", "FTPCommand", "Line")))
+	parseMustFail(t, []byte("GET / HTTP/1.1\r\n"), "application-layer.ftp", "FTPCommand")
+	parseMustFail(t, []byte("USER"), "application-layer.ftp", "FTPCommand")
+
+	ehlo := []byte("EHLO mail.example.com\r\n")
+	s := parseRule(t, ehlo, "application-layer.smtp", "SMTPCommand")
+	require.Equal(t, "EHLO mail.example.com", strVal(t, s.Child("Line")))
+	ethS := parseEthernet(t, ipv4TCPFrame(t, 50000, 25, ehlo))
+	require.Equal(t, "EHLO mail.example.com", strVal(t, mustChild(t, ethS, "IP", "TCP", "SMTPCommand", "Line")))
+	parseMustFail(t, []byte("FOO bar\r\n"), "application-layer.smtp", "SMTPCommand")
+}
+
+func TestSMB1CloseTransactionLDAPJavaQUIC(t *testing.T) {
+	closeBody := []byte{3, 0x00, 0x40, 0xff, 0xff, 0xff, 0xff, 0, 0}
+	raw := append(smb1Header(0x04, 0x18, 0xc807, 3), closeBody...)
+	cl := parseRule(t, raw, "application-layer.smb", "SMB")
+	require.Equal(t, uint64(0x04), uintVal(t, cl.Child("Command")))
+	require.Equal(t, uint64(0x4000), uintVal(t, mustChild(t, cl, "Close", "FID")))
+
+	td := append(smb1Header(0x71, 0x18, 0xc807, 4), 0, 0, 0)
+	require.Equal(t, uint64(0x71), uintVal(t, parseRule(t, td, "application-layer.smb", "SMB").Child("Command")))
+
+	tx := make([]byte, 1+28+2+1)
+	tx[0] = 14
+	binary.LittleEndian.PutUint16(tx[1+28:], 1)
+	raw = append(smb1Header(0x25, 0x18, 0xc807, 5), tx...)
+	tr := parseRule(t, raw, "application-layer.smb", "SMB")
+	require.Equal(t, uint64(14), uintVal(t, mustChild(t, tr, "Transaction", "WordCount")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, tr, "Transaction", "ByteCount")))
+
+	raw = append(smb1Header(0x32, 0x18, 0xc807, 6), tx...)
+	require.Equal(t, uint64(0x32), uintVal(t, parseRule(t, raw, "application-layer.smb", "SMB").Child("Command")))
+
+	badClose := append(smb1Header(0x04, 0x18, 0xc807, 7), 2, 0, 0, 0, 0, 0, 0, 0)
+	parseMustFail(t, badClose, "application-layer.smb", "SMB")
+	parseMustFail(t, append(smb1Header(0x25, 0x18, 0xc807, 8), 4), "application-layer.smb", "SMB")
+
+	bind := []byte{0x30, 0x0c, 0x02, 0x01, 0x01, 0x60, 0x07, 0x02, 0x01, 0x03, 0x04, 0x00, 0x80, 0x00}
+	ldap := parseRule(t, bind, "application-layer.ldap", "LDAPMessage")
+	require.Equal(t, uint64(0x30), uintVal(t, ldap.Child("Identifier")))
+	require.Equal(t, uint64(0x60), uintVal(t, mustChild(t, ldap, "Body", "ProtocolOp Tag")))
+	require.Equal(t, []byte{1}, bytesVal(t, mustChild(t, ldap, "Body", "MessageID")))
+
+	unbind := []byte{0x30, 0x05, 0x02, 0x01, 0x01, 0x42, 0x00}
+	require.Equal(t, uint64(0x42), uintVal(t, mustChild(t, parseRule(t, unbind, "application-layer.ldap", "LDAPMessage"), "Body", "ProtocolOp Tag")))
+
+	ethL := parseEthernet(t, ipv4TCPFrame(t, 50000, 389, bind))
+	require.Equal(t, uint64(0x60), uintVal(t, mustChild(t, ethL, "IP", "TCP", "LDAPMessage", "Body", "ProtocolOp Tag")))
+
+	parseMustFail(t, []byte{0x31, 0x03, 0x02, 0x01, 0x01}, "application-layer.ldap", "LDAPMessage")
+	parseMustFail(t, []byte{0x30, 0x05, 0x02, 0x01, 0x01, 0x01, 0x00}, "application-layer.ldap", "LDAPMessage")
+
+	js := []byte{0xac, 0xed, 0x00, 0x05, 0x70}
+	j := parseRule(t, js, "application-layer.java_ser", "JavaSer")
+	require.Equal(t, uint64(0x70), uintVal(t, mustChild(t, j, "JavaContent", "Content Type")))
+	parseMustFail(t, []byte{0x00}, "application-layer.java_ser", "JavaContent")
+
+	tok := []byte{0xc0, 0x00, 0x00, 0x00, 0x01, 0, 0, 3, 1, 2, 3}
+	q := parseRule(t, tok, "application-layer.quic", "QUIC")
+	require.Equal(t, uint64(3), uintVal(t, mustChild(t, q, "QUICToken", "Token Length")))
+	require.Equal(t, []byte{1, 2, 3}, bytesVal(t, mustChild(t, q, "QUICToken", "Token")))
+}
+
+func TestTNSConnectSNMPVarbindX224AndDCERPCStub(t *testing.T) {
+	cdata := []byte("(DESCRIPTION=)")
+	pkt := make([]byte, 8+26+len(cdata))
+	binary.BigEndian.PutUint16(pkt[0:], uint16(len(pkt)))
+	pkt[4] = 1
+	binary.BigEndian.PutUint16(pkt[8:], 0x0134)
+	binary.BigEndian.PutUint16(pkt[10:], 0x0134)
+	binary.BigEndian.PutUint16(pkt[24:], uint16(len(cdata)))
+	binary.BigEndian.PutUint16(pkt[26:], 34)
+	copy(pkt[34:], cdata)
+	n := parseRule(t, pkt, "application-layer.tns", "TNS")
+	require.Equal(t, uint64(1), uintVal(t, n.Child("Packet Type")))
+	require.Equal(t, uint64(len(cdata)), uintVal(t, mustChild(t, n, "Connect", "Connect Data Length")))
+	require.Equal(t, cdata, bytesVal(t, mustChild(t, n, "Connect", "Connect Data")))
+	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1521, pkt))
+	require.Equal(t, cdata, bytesVal(t, mustChild(t, eth, "IP", "TCP", "TNS", "Connect", "Connect Data")))
+
+	shortConnect := make([]byte, 34)
+	binary.BigEndian.PutUint16(shortConnect[0:], 48)
+	shortConnect[4] = 1
+	binary.BigEndian.PutUint16(shortConnect[24:], 14)
+	parseMustFail(t, shortConnect, "application-layer.tns", "TNS")
+
+	snmpRaw := []byte{0x30, 0x26, 0x02, 0x01, 0x00, 0x04, 0x06, 'p', 'u', 'b', 'l', 'i', 'c', 0xa0, 0x19, 0x02, 0x01, 0x01, 0x02, 0x01, 0x00, 0x02, 0x01, 0x00, 0x30, 0x0e, 0x30, 0x0c, 0x06, 0x08, 0x2b, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00, 0x05, 0x00}
+	s := parseRule(t, snmpRaw, "application-layer.snmp", "SNMP")
+	require.Equal(t, uint64(0x30), uintVal(t, mustChild(t, s, "PDU Body", "Variable Bindings", "Sequence Tag")))
+	require.Equal(t, uint64(0x0e), uintVal(t, mustChild(t, s, "PDU Body", "Variable Bindings", "Sequence Length")))
+
+	x224 := []byte{0x06, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00}
+	x := parseRule(t, x224, "application-layer.msrdp", "X224")
+	require.Equal(t, uint64(6), uintVal(t, x.Child("Length")))
+	require.Equal(t, uint64(0xe0), uintVal(t, x.Child("Flag")))
+
+	neg := []byte{0x01, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00}
+	ng := parseRule(t, neg, "application-layer.msrdp", "Negotiation")
+	require.Equal(t, uint64(1), uintVal(t, ng.Child("Type")))
+	require.Equal(t, uint64(8), uintVal(t, ng.Child("Length")))
+
+	stub := []byte{9, 8, 7, 6}
+	reqBody := make([]byte, 8+len(stub))
+	binary.LittleEndian.PutUint16(reqBody[6:], 3)
+	copy(reqBody[8:], stub)
+	req := append(dcerpcHeader(0, uint16(16+len(reqBody)), 2), reqBody...)
+	r := parseRule(t, req, "application-layer.dcerpc", "DCERPC")
+	require.Equal(t, uint64(3), uintVal(t, mustChild(t, r, "PDU", "Request", "OpNum")))
+	require.Equal(t, stub, bytesVal(t, mustChild(t, r, "PDU", "Request", "Stub")))
+}
+
