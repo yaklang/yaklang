@@ -47,14 +47,28 @@ Package:
                   typeNameList = ["MQTT"]
                 } else if src == 3306 || dst == 3306 {
                   typeNameList = ["MySQL"]
+                } else if src == 5432 || dst == 5432 {
+                  typeNameList = ["PostgreSQL", "PGSSLRequest", "PGCancel", "PGStartup"]
+                } else if src == 1433 || dst == 1433 {
+                  typeNameList = ["TDS"]
+                } else if src == 8009 || dst == 8009 {
+                  typeNameList = ["AJP"]
+                } else if src == 88 || dst == 88 {
+                  typeNameList = ["KerberosTCP", "Kerberos"]
                 } else if src == 445 || dst == 445 {
-                  typeNameList = ["SMB2", "SMB", "NBSS"]
+                  typeNameList = ["SMB3Transform", "SMB2", "SMB", "NBSS"]
                 } else if src == 139 || dst == 139 {
                   typeNameList = ["NBSS", "SMB2", "SMB"]
                 } else if src == 443 || dst == 443 {
-                  typeNameList = ["TLS", "HTTP"]
+                  typeNameList = ["TLS", "HTTP2Preface", "HTTP2", "HTTP"]
                 } else if src == 80 || dst == 80 || src == 8080 || dst == 8080 {
-                  typeNameList = ["HTTP", "TLS"]
+                  typeNameList = ["HTTP2Preface", "HTTP2", "WebSocket", "HTTP", "TLS"]
+                } else if src == 1521 || dst == 1521 {
+                  typeNameList = ["TNS"]
+                } else if src == 135 || dst == 135 {
+                  typeNameList = ["DCERPC"]
+                } else if src == 1099 || dst == 1099 {
+                  typeNameList = ["JavaSer"]
                 }
                 for typeName in typeNameList{
                     res,op = this.TryProcessByType(typeName)
@@ -101,3 +115,18 @@ SMB2: "import:application-layer/smb2.yaml;node:SMB2"
 SMB: "import:application-layer/smb.yaml;node:SMB"
 NBSS: "import:application-layer/nbss.yaml;node:NBSS"
 MySQL: "import:application-layer/mysql.yaml;node:MySQLPacket"
+Kerberos: "import:application-layer/kerberos.yaml;node:Kerberos"
+KerberosTCP: "import:application-layer/kerberos.yaml;node:KerberosTCP"
+PostgreSQL: "import:application-layer/postgresql.yaml;node:PostgreSQL"
+PGStartup: "import:application-layer/postgresql.yaml;node:Startup"
+PGSSLRequest: "import:application-layer/postgresql.yaml;node:SSLRequest"
+PGCancel: "import:application-layer/postgresql.yaml;node:CancelRequest"
+TDS: "import:application-layer/tds.yaml;node:TDS"
+AJP: "import:application-layer/ajp.yaml;node:AJP"
+HTTP2Preface: "import:application-layer/http2.yaml;node:HTTP2Preface"
+HTTP2: "import:application-layer/http2.yaml;node:HTTP2"
+WebSocket: "import:application-layer/websocket.yaml;node:WebSocket"
+TNS: "import:application-layer/tns.yaml;node:TNS"
+DCERPC: "import:application-layer/dcerpc.yaml;node:DCERPC"
+JavaSer: "import:application-layer/java_ser.yaml;node:JavaSer"
+SMB3Transform: "import:application-layer/smb3.yaml;node:SMB3Transform"

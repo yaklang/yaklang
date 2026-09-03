@@ -1,0 +1,14 @@
+endian: big
+Package:
+  JavaSer:
+    operator: |
+      this.ProcessSubNode("Magic")
+      if getNodeResult("Magic").Value != 0xaced {
+        panic("java-ser: magic must be 0xACED")
+      }
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 5 {
+        panic("java-ser: stream version must be 5")
+      }
+    Magic: uint16
+    Version: uint16

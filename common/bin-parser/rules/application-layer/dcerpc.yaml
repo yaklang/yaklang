@@ -1,0 +1,87 @@
+endian: little
+Package:
+  DCERPC:
+    operator: |
+      this.ProcessSubNode("RPC Vers")
+      if getNodeResult("RPC Vers").Value != 5 {
+        panic("dcerpc: RPC vers must be 5")
+      }
+      this.ProcessSubNode("RPC Vers Minor")
+      this.ProcessSubNode("PType")
+      ptype = getNodeResult("PType").Value
+      if ptype > 19 {
+        panic("dcerpc: unknown ptype")
+      }
+      this.ProcessSubNode("PFC Flags")
+      this.ProcessSubNode("Packed Drep")
+      this.ProcessSubNode("Frag Length")
+      fl = getNodeResult("Frag Length").Value
+      if fl < 16 {
+        panic("dcerpc: frag length smaller than header")
+      }
+      if fl > 0x100000 {
+        panic("dcerpc: frag length too large")
+      }
+      this.ProcessSubNode("Auth Length")
+      this.ProcessSubNode("Call ID")
+      this.GetSubNode("PDU").SetMaxLength(fl - 16)
+      this.ProcessSubNode("PDU")
+    RPC Vers: uint8
+    RPC Vers Minor: uint8
+    PType: uint8
+    PFC Flags: uint8
+    Packed Drep: raw,4
+    Frag Length: uint16
+    Auth Length: uint16
+    Call ID: uint32
+    PDU:
+      operator: |
+        ptype = getNodeResult("../PType").Value
+        if ptype == 11 || ptype == 14 {
+          this.ProcessSubNode("Bind")
+          return
+        }
+        if ptype == 0 || ptype == 2 {
+          this.ProcessSubNode("Request")
+          return
+        }
+      Bind:
+        operator: |
+          this.ProcessSubNode("Max Xmit Frag")
+          this.ProcessSubNode("Max Recv Frag")
+          this.ProcessSubNode("Assoc Group")
+          this.ProcessSubNode("Num Ctx Items")
+          n = getNodeResult("Num Ctx Items").Value
+          if n > 20 {
+            panic("dcerpc: too many presentation contexts")
+          }
+          this.ProcessSubNode("Reserved")
+          this.ProcessSubNode("Reserved2")
+          if n > 0 {
+            this.ProcessSubNode("Contexts")
+          }
+        Max Xmit Frag: uint16
+        Max Recv Frag: uint16
+        Assoc Group: uint32
+        Num Ctx Items: uint8
+        Reserved: uint8
+        Reserved2: uint16
+        Contexts:
+          list: true
+          list-length-from-field: ../Num Ctx Items
+          Context:
+            Context ID: uint16
+            Num Trans Items: uint8
+            Reserved: uint8
+            Abstract Syntax: raw,16
+            Abstract Version: uint32
+            Transfer Syntax: raw,16
+            Transfer Version: uint32
+      Request:
+        operator: |
+          this.ProcessSubNode("Alloc Hint")
+          this.ProcessSubNode("Context ID")
+          this.ProcessSubNode("OpNum")
+        Alloc Hint: uint32
+        Context ID: uint16
+        OpNum: uint16

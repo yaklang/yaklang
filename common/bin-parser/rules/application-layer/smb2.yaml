@@ -125,6 +125,30 @@ Session Setup Request:
     this.ProcessSubNode("PreviousSessionId")
     l = getNodeResult("SecurityBufferLength").Value
     if l > 0 {
+      res,op = this.TryProcessByType("SPNEGO")
+      if op.OK {
+        err = op.Save()
+        if err != nil {
+          panic(err)
+        }
+        return
+      }
+      err = op.Recovery()
+      if err != nil {
+        panic(err)
+      }
+      res,op = this.TryProcessByType("NTLMSSP")
+      if op.OK {
+        err = op.Save()
+        if err != nil {
+          panic(err)
+        }
+        return
+      }
+      err = op.Recovery()
+      if err != nil {
+        panic(err)
+      }
       this.GetSubNode("SecurityBuffer").SetMaxLength(l)
       this.ProcessSubNode("SecurityBuffer")
     }
@@ -145,6 +169,30 @@ Session Setup Response:
     this.ProcessSubNode("SecurityBufferLength")
     l = getNodeResult("SecurityBufferLength").Value
     if l > 0 {
+      res,op = this.TryProcessByType("SPNEGO")
+      if op.OK {
+        err = op.Save()
+        if err != nil {
+          panic(err)
+        }
+        return
+      }
+      err = op.Recovery()
+      if err != nil {
+        panic(err)
+      }
+      res,op = this.TryProcessByType("NTLMSSP")
+      if op.OK {
+        err = op.Save()
+        if err != nil {
+          panic(err)
+        }
+        return
+      }
+      err = op.Recovery()
+      if err != nil {
+        panic(err)
+      }
       this.GetSubNode("SecurityBuffer").SetMaxLength(l)
       this.ProcessSubNode("SecurityBuffer")
     }
@@ -153,3 +201,5 @@ Session Setup Response:
   SecurityBufferOffset: uint16
   SecurityBufferLength: uint16
   SecurityBuffer: raw
+NTLMSSP: "import:application-layer/ntlm.yaml;node:NTLMSSP"
+SPNEGO: "import:application-layer/spnego.yaml;node:SPNEGO"

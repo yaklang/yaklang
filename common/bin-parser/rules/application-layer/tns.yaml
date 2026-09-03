@@ -1,0 +1,27 @@
+endian: big
+Package:
+  TNS:
+    operator: |
+      this.ProcessSubNode("Packet Length")
+      l = getNodeResult("Packet Length").Value
+      if l < 8 {
+        panic("tns: packet shorter than header")
+      }
+      this.ProcessSubNode("Packet Checksum")
+      this.ProcessSubNode("Packet Type")
+      typ = getNodeResult("Packet Type").Value
+      if typ < 1 || typ > 15 {
+        panic("tns: unknown packet type")
+      }
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Header Checksum")
+      if l > 8 {
+        this.GetSubNode("Data").SetMaxLength(l - 8)
+        this.ProcessSubNode("Data")
+      }
+    Packet Length: uint16
+    Packet Checksum: uint16
+    Packet Type: uint8
+    Reserved: uint8
+    Header Checksum: uint16
+    Data: raw
