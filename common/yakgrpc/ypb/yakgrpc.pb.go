@@ -10979,9 +10979,12 @@ type AIStartParams struct {
 	// 需配合 EnablePlan=true 才会暴露 request_plan 动作。
 	EnableDetachedPlan bool `protobuf:"varint,47,opt,name=EnableDetachedPlan,proto3" json:"EnableDetachedPlan,omitempty"`
 	// 执行策略集合。用于承载 multi-agent / goal mode 等顶层运行策略。
-	Strategy      *AIExecutionStrategy `protobuf:"bytes,48,opt,name=Strategy,proto3" json:"Strategy,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Strategy *AIExecutionStrategy `protobuf:"bytes,48,opt,name=Strategy,proto3" json:"Strategy,omitempty"`
+	// 为 true 时禁用 Memory Triage（智能记忆处理），不创建 AIMemory 实例，
+	// 跳过 embedding/DB/AI 调用。适用于轻量级或无状态会话。
+	DisableMemoryTriage bool `protobuf:"varint,49,opt,name=DisableMemoryTriage,proto3" json:"DisableMemoryTriage,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -11327,6 +11330,13 @@ func (x *AIStartParams) GetStrategy() *AIExecutionStrategy {
 		return x.Strategy
 	}
 	return nil
+}
+
+func (x *AIStartParams) GetDisableMemoryTriage() bool {
+	if x != nil {
+		return x.DisableMemoryTriage
+	}
+	return false
 }
 
 type AIExecutionStrategy struct {
@@ -77073,7 +77083,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\x8b\x11\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xbd\x11\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -77124,7 +77134,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x17PlanExecTaskConcurrency\x18- \x01(\x03R\x17PlanExecTaskConcurrency\x12\x16\n" +
 	"\x06Attach\x18. \x01(\bR\x06Attach\x12.\n" +
 	"\x12EnableDetachedPlan\x18/ \x01(\bR\x12EnableDetachedPlan\x124\n" +
-	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\"\xbb\x01\n" +
+	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\x120\n" +
+	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\"\xbb\x01\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +
 	"\x0eEnableGoalMode\x18\x02 \x01(\bR\x0eEnableGoalMode\x12,\n" +
