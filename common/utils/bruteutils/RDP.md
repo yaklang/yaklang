@@ -12,7 +12,7 @@
 |---|---|---|
 | **NLA / CredSSP**（Win7+） | CredSSP 走完（服务端 PubKeyAuth + 客户端 AuthInfo）即 `nla-ok` | `errorCode` / TLS `access denied` / 认证阶段掉线 → `CredSSPError` |
 | **SSL**（xrdp 等无 NLA） | FontMap `ready`（无后续 logon PDU） | 目标不可达才 Finished；xrdp 错密码往往只停在图形登录框 |
-| **经典 PROTOCOL_RDP**（XP/2003） | `SAVE_SESSION_INFO` 且 `AuthOK()`（INFOTYPE_LOGON / LONG / PLAINNOTIFY） | FontMap `ready` **不是**成功。无 0x26、随后 EOF/超时/复位/登录失败对话框 = 认证失败 |
+| **经典 PROTOCOL_RDP**（XP/2003） | `SAVE_SESSION_INFO`（0x26）且 `AuthOK()`，**或** FontMap 后短窗口内没有失败对话框 | FontMap **不是**成功。FAILED_XP 绘图订单 / EOF / 复位 = 认证失败。大位图也不是成功（成败都会先画墙纸） |
 
 FontMap 只表示连接序列完成。XP 在 AUTOLOGON 失败时同样会画登录界面。
 
@@ -31,6 +31,7 @@ NLA 在 CredSSP 完成后短路，不再开 MCS 图形会话。
 | `win11-credssp-v6-errorcode` | Win11：`STATUS_LOGON_FAILURE` | **通过** | **通过** errorCode，不 Finished |
 | `credssp-ber-long-form` | 边缘：TSRequest 长度 `82 00 xx`（BER 合法、DER 非法） | **通过** | **通过** errorCode |
 | `xp-classic-save-session-info` | XP：0x26 = 成功；失败对话框订单 = 失败 | **通过** 0x26 | **通过** FAILED_XP 绘图订单，不 Finished |
+| `xp-classic-no-0x26` | 真机 XP：成功不发 0x26，FontMap 后窗口内无失败对话框 | **通过** | **通过** FAILED_XP |
 
 另有 CredSSP v2/v6 Unicode、字典命中、BER 单测 `TestPadBERLongFormRoundTrip` / `TestReadTSRequestBERLeadingZeros`。
 
@@ -45,14 +46,16 @@ Synchronize / Cooperate / Granted / FontMap → 仅正确密码发 0x26。
 | Win7 `127.0.0.1:13390` `rdpuser` / `RdpPass123!` | NLA CredSSP | **通过** Ok+Finished ~0.2–1.5s | **通过** TLS `access denied`，非 Ok，不 Finished ~100ms |
 | Win11 `127.0.0.1:13389` `rdpuser` / `RdpPass123!` | NLA CredSSP | **通过** Ok+Finished ~0.3–1.3s | **通过** `STATUS_LOGON_FAILURE`，非 Ok，不 Finished ~200ms |
 | xrdp SSL 容器 | PROTOCOL_SSL | 正确账密可达会话 | 错密码无协议级失败信号（已知限制，见 `rdp_real_test.go`） |
-| XP SP3 `127.0.0.1:13391` `Administrator` / `RdpPass123!` | PROTOCOL_RDP 5.1 RC4 | 握手完整（RC4、License VALID_CLIENT、FontMap）。**正确账密本镜像不发 0x26**（只推位图），不把 FontMap 当成功。协议成功路径以 mock 的 0x26 为准。 | **未知用户会画登录失败对话框** → `rdp logon failed: xp logon dialog`，不 Finished。错密码同样不 Finished。 |
+| XP SP3 x86 KVM `192.168.3.218:13391` `rdpuser` / `RdpPass123!` | PROTOCOL_RDP 5.1 RC4 | **通过** Ok+Finished ~2s（FontMap 后无失败对话框）。原始 PDU 扫过：没有 `17 00 … 26` 的 SAVE_SESSION_INFO。 | **通过** ~0.5s `rdp logon failed: xp logon dialog`，不 Finished |
 
-XP 真机说明（未写成通过）：
+XP 真机说明：
 
-- X.224 CC 无协商、SC_SECURITY `EncryptionMethod=2`、Client Info 走 RC4，连接序列完整。
-- 已关 `INFO_LOGONERRORS` / fast-path（RDP 5.1 不理解这些，会导致 AUTOLOGON 失效）。
-- 已设空 Domain、`INFO_AUTOLOGON|INFO_LOGONNOTIFY`。
-- 判定保持「必须 0x26」：宁可超时失败，也不把 FontMap 当成功（早期假阳性）。
+- X.224 CC 无协商、License `STATUS_VALID_CLIENT`、FontMap 后进入图形。
+- **0x26 不是唯一依据，这台 XP 成功路径根本不发。** 已对解密后的 Share PDU 按 `TotalLength` 走了一遍，type2 只有 `0x02` UPDATE 和 `0x1b` POINTER，没有 `FOUND 0x26`。
+- 成败都会先推同一批墙纸位图（`01004300` 2818 字节等），所以**大位图不能当成功**。
+- 失败：ncrack `FAILED_XP` 绘图订单，约 0.5s。
+- 成功：FontMap 后 2s 窗口内没有失败对话框（`classicLogonGrace`）。若对端发 0x26 仍立即成功。
+- 已关 `INFO_LOGONERRORS` / fast-path；Domain 空；`INFO_AUTOLOGON|INFO_LOGONNOTIFY`。LOGONNOTIFY 没让这台 XP 发出 0x26。
 
 跑真机：
 
@@ -69,6 +72,7 @@ YAK_BRUTE_RDP_ADDR=127.0.0.1:13390 YAK_BRUTE_RDP_USER=rdpuser YAK_BRUTE_RDP_PASS
 2. **经典 RDP**：无 `rdpNegData` 或 `SSL_NOT_ALLOWED_BY_SERVER` 都回落到 `PROTOCOL_RDP`。
 3. **PDU 成帧**：按 Share Control Header `TotalLength` 切 PDU；慢路径 0x02/0x1b 跳过该 PDU 而不是整段流。
 4. **本地账户**：Domain 必须空；填 IP 时 XP 不会按用户名 AUTOLOGON。
+5. **经典成功判定**：0x26 是充分条件，不是必要条件。ncrack 也靠绘图订单识别 XP 失败（「Windows 不会显式发认证失败状态」）。
 
 ## 测试入口
 

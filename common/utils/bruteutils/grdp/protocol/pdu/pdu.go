@@ -319,11 +319,22 @@ func (c *Client) recvServerFontMapPDU(s []byte) {
 
 func (c *Client) recvPDU(s []byte) {
 	glog.Debug("PDU recvPDU", hex.EncodeToString(s))
+	if os.Getenv("YAK_RDP_XP_DUMP") != "" {
+		dumpSharePDUs(s)
+	}
 	r := bytes.NewReader(s)
 	for r.Len() > 0 {
+		left := r.Len()
 		p, err := readPDU(r)
 		if err != nil {
 			glog.Error(err)
+			if os.Getenv("YAK_RDP_XP_DUMP") != "" {
+				n := left
+				if n > 24 {
+					n = 24
+				}
+				glog.Infof("readPDU EOF leftover=%d %s", left, hex.EncodeToString(s[len(s)-left:len(s)-left+n]))
+			}
 			return
 		}
 		if p.ShareCtrlHeader.PDUType == PDUTYPE_DEACTIVATEALLPDU {

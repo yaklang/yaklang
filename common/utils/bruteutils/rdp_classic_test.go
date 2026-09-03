@@ -28,12 +28,13 @@ import (
 // X.224 无协商 → MCS（无 RC4）→ Client Info AUTOLOGON → FontMap →
 // 密码正确发 SAVE_SESSION_INFO，错误则保持会话但不发 logon。
 type classicRDPServer struct {
-	listener   net.Listener
-	mu         sync.Mutex
-	known      map[string]string
-	lastUser   string
-	lastPass   string
-	lastAuthed bool
+	listener            net.Listener
+	mu                  sync.Mutex
+	known               map[string]string
+	lastUser            string
+	lastPass            string
+	lastAuthed          bool
+	successWithoutLogon bool // 真机 XP：成功不发 0x26，只维持会话
 }
 
 func startClassicRDPServer(t *testing.T, users map[string]string) *classicRDPServer {
@@ -229,6 +230,12 @@ func (s *classicRDPServer) sendServerFinalize(conn net.Conn, authed bool) error 
 		fail := []byte{0x17, 0x00, 0x18, 0x06, 0x10, 0x06, 0x1a, 0x09, 0x1b, 0x05, 0x1a, 0x06, 0x1c, 0x05, 0x10, 0x04, 0x1d, 0x06}
 		return writeMCSGlobal(conn, encodeDataPDU(0x02, fail, 1002, 0x103EA))
 	}
+	if s.successWithoutLogon {
+		// 真机 XP 成功路径：FontMap 后只推位图，没有 0x26。
+		bmp := make([]byte, 32)
+		bmp[0], bmp[1] = 0x01, 0x00
+		return writeMCSGlobal(conn, encodeDataPDU(0x02, bmp, 1002, 0x103EA))
+	}
 	logon := encodeLogonV1("Administrator", "", 1)
 	return writeMCSGlobal(conn, encodeDataPDU(0x26, logon, 1002, 0x103EA))
 }
@@ -403,6 +410,29 @@ func TestClassicRDPBruteSuccessAndFail(t *testing.T) {
 	}
 	if unk.Finished {
 		t.Fatal("unknown user must not finish the target")
+	}
+}
+
+func TestClassicRDPSuccessWithoutSaveSessionInfo(t *testing.T) {
+	srv := startClassicRDPServer(t, map[string]string{"rdpuser": "RdpPass123!"})
+	srv.successWithoutLogon = true
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	start := time.Now()
+	ok := rdpAuth.BrutePass(&BruteItem{
+		Type: "rdp", Target: srv.addr(), Username: "rdpuser", Password: "RdpPass123!", Context: ctx,
+	})
+	if !ok.Ok || !ok.Finished {
+		t.Fatalf("XP without 0x26: want ok+finished got ok=%v finished=%v", ok.Ok, ok.Finished)
+	}
+	if elapsed := time.Since(start); elapsed < classicLogonGrace/2 {
+		t.Fatalf("should wait for fail-dialog window, elapsed=%s", elapsed)
+	}
+	bad := rdpAuth.BrutePass(&BruteItem{
+		Type: "rdp", Target: srv.addr(), Username: "rdpuser", Password: "WrongPass!", Context: ctx,
+	})
+	if bad.Ok {
+		t.Fatal("wrong password must not be ok")
 	}
 }
 
