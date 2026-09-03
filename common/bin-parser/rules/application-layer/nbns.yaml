@@ -1,0 +1,66 @@
+endian: big
+Package:
+  NBNS:
+    operator: |
+      this.ProcessSubNode("Header")
+      qd = getNodeResult("Header/Questions").Value
+      if qd > 16 {
+        panic("nbns: too many questions")
+      }
+      if qd > 0 {
+        this.ProcessSubNode("Questions")
+      }
+    Header:
+      ID: uint16
+      Flags: uint16
+      Questions: uint16
+      Answer RRs: uint16
+      Authority RRs: uint16
+      Additional RRs: uint16
+    Questions:
+      list: true
+      list-length-from-field: "../Header/Questions"
+      Question:
+        Name: NBName
+        Type: uint16
+        Class: uint16
+  LLMNR:
+    operator: |
+      this.ProcessSubNode("Header")
+      qd = getNodeResult("Header/Questions").Value
+      if qd > 16 {
+        panic("llmnr: too many questions")
+      }
+      if qd > 0 {
+        this.ProcessSubNode("Questions")
+      }
+    Header:
+      ID: uint16
+      Flags: uint16
+      Questions: uint16
+      Answer RRs: uint16
+      Authority RRs: uint16
+      Additional RRs: uint16
+    Questions:
+      list: true
+      list-length-from-field: "../Header/Questions"
+      Question:
+        Name: NBName
+        Type: uint16
+        Class: uint16
+NBName:
+  list: true
+  Label:
+    operator: |
+      count = this.ProcessSubNode("Count").Value
+      if count == 0 {
+        setCtx("inList",false)
+        return
+      }
+      if count > 63 {
+        panic("nbns: label too long")
+      }
+      this.GetSubNode("Data").SetMaxLength(count)
+      this.ProcessSubNode("Data")
+    Count: uint8
+    Data: string

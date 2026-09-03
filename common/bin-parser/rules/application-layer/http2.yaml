@@ -1,0 +1,38 @@
+endian: big
+Package:
+  HTTP2Preface:
+    operator: |
+      this.ProcessSubNode("Magic")
+      m = getNodeResult("Magic").Value
+      if len(m) != 24 || m[0] != 0x50 || m[1] != 0x52 || m[2] != 0x49 || m[3] != 0x20 || m[4] != 0x2a || m[5] != 0x20 {
+        panic("http2: preface must start with 'PRI * '")
+      }
+      if m[6] != 0x48 || m[7] != 0x54 || m[8] != 0x54 || m[9] != 0x50 || m[10] != 0x2f || m[11] != 0x32 {
+        panic("http2: preface must contain HTTP/2")
+      }
+    Magic: raw,24
+  HTTP2:
+    operator: |
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0x400000 {
+        panic("http2: frame longer than 4MiB")
+      }
+      this.ProcessSubNode("Type")
+      typ = getNodeResult("Type").Value
+      if typ > 0x0c {
+        panic("http2: unknown frame type")
+      }
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("R")
+      this.ProcessSubNode("Stream Identifier")
+      if l > 0 {
+        this.GetSubNode("Payload").SetMaxLength(l)
+        this.ProcessSubNode("Payload")
+      }
+    Length: uint32,24bit
+    Type: uint8
+    Flags: uint8
+    R: uint8,1bit
+    Stream Identifier: uint32,31bit
+    Payload: raw

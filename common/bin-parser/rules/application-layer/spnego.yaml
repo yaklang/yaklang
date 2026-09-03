@@ -1,0 +1,38 @@
+endian: big
+Package:
+  SPNEGO:
+    operator: |
+      tag = this.ProcessSubNode("Tag").Value
+      if tag != 0x60 {
+        panic("spnego: expected GSS-API 0x60")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l >= 0x80 {
+        panic("spnego: long-form BER length not in this rule")
+      }
+      if l < 2 {
+        panic("spnego: token too small")
+      }
+      this.ProcessSubNode("OID Tag")
+      if getNodeResult("OID Tag").Value != 0x06 {
+        panic("spnego: expected OID tag 0x06")
+      }
+      this.ProcessSubNode("OID Length")
+      ol = getNodeResult("OID Length").Value
+      if ol == 0 || ol > 32 {
+        panic("spnego: bad OID length")
+      }
+      this.GetSubNode("OID").SetMaxLength(ol)
+      this.ProcessSubNode("OID")
+      rest = l - 2 - ol
+      if rest > 0 {
+        this.GetSubNode("Token").SetMaxLength(rest)
+        this.ProcessSubNode("Token")
+      }
+    Tag: uint8
+    Length: uint8
+    OID Tag: uint8
+    OID Length: uint8
+    OID: raw
+    Token: raw

@@ -1,0 +1,53 @@
+endian: big
+Package:
+  TLSClientHello:
+    operator: |
+      this.ProcessSubNode("Handshake Type")
+      if getNodeResult("Handshake Type").Value != 1 {
+        panic("tls: not ClientHello")
+      }
+      this.ProcessSubNode("Length")
+      hl = getNodeResult("Length").Value
+      this.GetSubNode("ClientHello").SetMaxLength(hl)
+      this.ProcessSubNode("ClientHello")
+    Handshake Type: uint8
+    Length: uint32,24bit
+    ClientHello:
+      operator: |
+        this.ProcessSubNode("Legacy Version")
+        this.ProcessSubNode("Random")
+        this.ProcessSubNode("Session ID Length")
+        sid = getNodeResult("Session ID Length").Value
+        if sid > 32 {
+          panic("tls: session id too long")
+        }
+        if sid > 0 {
+          this.GetSubNode("Session ID").SetMaxLength(sid)
+          this.ProcessSubNode("Session ID")
+        }
+        this.ProcessSubNode("Cipher Suites Length")
+        cl = getNodeResult("Cipher Suites Length").Value
+        if cl > 512 {
+          panic("tls: cipher list too long")
+        }
+        if cl > 0 {
+          this.GetSubNode("Cipher Suites").SetMaxLength(cl)
+          this.ProcessSubNode("Cipher Suites")
+        }
+        this.ProcessSubNode("Compression Length")
+        cpl = getNodeResult("Compression Length").Value
+        if cpl > 16 {
+          panic("tls: compression list too long")
+        }
+        if cpl > 0 {
+          this.GetSubNode("Compression Methods").SetMaxLength(cpl)
+          this.ProcessSubNode("Compression Methods")
+        }
+      Legacy Version: uint16
+      Random: raw,32
+      Session ID Length: uint8
+      Session ID: raw
+      Cipher Suites Length: uint16
+      Cipher Suites: raw
+      Compression Length: uint8
+      Compression Methods: raw

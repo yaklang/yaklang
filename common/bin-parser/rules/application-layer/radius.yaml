@@ -1,0 +1,28 @@
+endian: big
+Package:
+  RADIUS:
+    operator: |
+      this.ProcessSubNode("Code")
+      code = getNodeResult("Code").Value
+      if code < 1 || (code > 5 && code != 11 && code != 12 && code != 13 && code != 40 && code != 41 && code != 44 && code != 45) {
+        panic("radius: unknown code")
+      }
+      this.ProcessSubNode("Identifier")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 20 {
+        panic("radius: length smaller than header")
+      }
+      if l > 4096 {
+        panic("radius: length exceeds 4096")
+      }
+      this.ProcessSubNode("Authenticator")
+      if l > 20 {
+        this.GetSubNode("Attributes").SetMaxLength(l - 20)
+        this.ProcessSubNode("Attributes")
+      }
+    Code: uint8
+    Identifier: uint8
+    Length: uint16
+    Authenticator: raw,16
+    Attributes: raw

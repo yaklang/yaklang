@@ -1,0 +1,21 @@
+endian: little
+Package:
+  SMB3Transform:
+    operator: |
+      this.ProcessSubNode("ProtocolId")
+      if getNodeResult("ProtocolId").Value != 0x424d53fd {
+        panic("smb3: ProtocolId must be \\xfdSMB")
+      }
+      this.ProcessSubNode("Signature")
+      this.ProcessSubNode("Nonce")
+      this.ProcessSubNode("OriginalMessageSize")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Flags")
+      this.ProcessSubNode("SessionId")
+    ProtocolId: uint32
+    Signature: raw,16
+    Nonce: raw,16
+    OriginalMessageSize: uint32
+    Reserved: uint16
+    Flags: uint16
+    SessionId: uint64

@@ -1,0 +1,70 @@
+endian: big
+Package:
+  Kerberos:
+    operator: |
+      tag = this.ProcessSubNode("Application Tag").Value
+      if tag != 0x6a && tag != 0x6b && tag != 0x6c && tag != 0x6d && tag != 0x6e && tag != 0x6f && tag != 0x7e {
+        panic("kerberos: unexpected application tag")
+      }
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l >= 0x80 {
+        panic("kerberos: long-form BER length not in this rule")
+      }
+      if l > 0 {
+        this.GetSubNode("Body").SetMaxLength(l)
+        this.ProcessSubNode("Body")
+      }
+    Application Tag: uint8
+    Length: uint8
+    Body: raw
+  KerberosTCP:
+    operator: |
+      this.ProcessSubNode("Record Length")
+      rl = getNodeResult("Record Length").Value
+      if rl < 2 || rl > 0x100000 {
+        panic("kerberos-tcp: record too small or too large")
+      }
+      this.GetSubNode("Record").SetMaxLength(rl)
+      this.ProcessSubNode("Record")
+    Record Length: uint32
+    Record:
+      operator: |
+        tag = this.ProcessSubNode("Application Tag").Value
+        if tag != 0x6a && tag != 0x6b && tag != 0x6c && tag != 0x6d && tag != 0x6e && tag != 0x6f && tag != 0x7e {
+          panic("kerberos: unexpected application tag")
+        }
+        this.ProcessSubNode("Length")
+        l = getNodeResult("Length").Value
+        if l >= 0x80 {
+          panic("kerberos: long-form BER length not in this rule")
+        }
+        if l > 0 {
+          this.GetSubNode("Body").SetMaxLength(l)
+          this.ProcessSubNode("Body")
+        }
+      Application Tag: uint8
+      Length: uint8
+      Body: raw
+  PAC:
+    endian: little
+    operator: |
+      this.ProcessSubNode("CBuffers")
+      n = getNodeResult("CBuffers").Value
+      if n > 64 {
+        panic("pac: too many buffers")
+      }
+      this.ProcessSubNode("Version")
+      if n > 0 {
+        this.ProcessSubNode("Buffers")
+      }
+    CBuffers: uint32
+    Version: uint32
+    Buffers:
+      list: true
+      list-length-from-field: ../CBuffers
+      Buffer:
+        UlType: uint32
+        CbBufferSize: uint32
+        Offset: uint32
+
