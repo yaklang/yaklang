@@ -504,6 +504,23 @@ func (s *ServerSecurityData) Unpack(r io.Reader) error {
 	return nil
 }
 
+func MakeConferenceCreateResponse(userData []byte) []byte {
+	buff := &bytes.Buffer{}
+	per.WriteChoice(0, buff)
+	per.WriteObjectIdentifier(t124_02_98_oid, buff)
+	per.WriteLength(len(userData)+14, buff)
+	per.WriteChoice(0, buff)
+	per.WriteInteger16(0x14, buff)
+	per.WriteInteger(0, buff)
+	core.WriteUInt8(0, buff)
+	per.WriteNumberOfSet(1, buff)
+	per.WriteChoice(0, buff)
+	per.WriteOctetStream(h221_sc_key, 4, buff)
+	per.WriteLength(len(userData), buff)
+	buff.Write(userData)
+	return buff.Bytes()
+}
+
 func MakeConferenceCreateRequest(userData []byte) []byte {
 	buff := &bytes.Buffer{}
 	per.WriteChoice(0, buff)                        // 00

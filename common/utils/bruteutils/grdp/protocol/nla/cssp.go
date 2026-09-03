@@ -196,11 +196,98 @@ func EncodeDERTRequest(version int, msgs []Message, authInfo, pubKeyAuth, client
 func DecodeDERTRequest(s []byte) (*TSRequest, error) {
 	treq := &TSRequest{}
 	_, err := asn1.Unmarshal(s, treq)
+	if err == nil {
+		return treq, nil
+	}
+	// 边缘情况：部分服务端 TSRequest 用 BER 长形式长度（带前导 0），
+	// Go encoding/asn1 只收 DER。规范化后再解一次。
+	canon, cerr := canonicalizeBERToDER(s)
+	if cerr != nil {
+		return nil, err
+	}
+	treq = &TSRequest{}
+	_, err = asn1.Unmarshal(canon, treq)
 	return treq, err
 }
 
 // EncodeTSRequestError builds a TSRequest that carries only version + errorCode
 // (the v6 NLA failure signal used by Windows 10/2016+).
+// PadBERLongForm 把 DER TSRequest 改写成 BER 长形式（长度一律 0x82 +
+// 两字节，可含前导零）。这是边缘实现；Windows 真实栈 DER/BER 都收，
+// encoding/asn1 只收 DER，解码前必须 canonicalizeBERToDER。
+func PadBERLongForm(b []byte) ([]byte, error) {
+	out, rest, err := padBERTLV(b)
+	if err != nil {
+		return nil, err
+	}
+	_ = rest
+	return out, nil
+}
+
+func padBERLen(n int) []byte {
+	return []byte{0x82, byte(n >> 8), byte(n)}
+}
+
+func padBERTLV(b []byte) (out, rest []byte, err error) {
+	if len(b) < 2 {
+		return nil, nil, fmt.Errorf("rdp nla: truncated BER TLV")
+	}
+	off := 0
+	tag := b[0]
+	off++
+	if tag&0x1f == 0x1f {
+		for off < len(b) {
+			t := b[off]
+			off++
+			if t&0x80 == 0 {
+				break
+			}
+		}
+	}
+	tagBytes := b[:off]
+	if off >= len(b) {
+		return nil, nil, fmt.Errorf("rdp nla: truncated BER length")
+	}
+	lb := b[off]
+	off++
+	var n int
+	if lb < 0x80 {
+		n = int(lb)
+	} else if lb == 0x80 {
+		return nil, nil, fmt.Errorf("rdp nla: indefinite BER length")
+	} else {
+		nb := int(lb & 0x7f)
+		if nb == 0 || nb > 4 || off+nb > len(b) {
+			return nil, nil, fmt.Errorf("rdp nla: bad BER length")
+		}
+		for i := 0; i < nb; i++ {
+			n = (n << 8) | int(b[off])
+			off++
+		}
+	}
+	if n < 0 || off+n > len(b) {
+		return nil, nil, fmt.Errorf("rdp nla: BER value truncated")
+	}
+	value := b[off : off+n]
+	rest = b[off+n:]
+	if tag&0x20 != 0 && len(value) > 0 {
+		var inner []byte
+		left := value
+		for len(left) > 0 {
+			part, more, e := padBERTLV(left)
+			if e != nil {
+				return nil, nil, e
+			}
+			inner = append(inner, part...)
+			left = more
+		}
+		value = inner
+	}
+	out = append(append([]byte{}, tagBytes...), padBERLen(len(value))...)
+	out = append(out, value...)
+	return out, rest, nil
+}
+
 func EncodeTSRequestError(version int, code uint32) []byte {
 	if version == 0 {
 		version = DefaultCredSSPVersion
@@ -264,6 +351,91 @@ func readDERFrame(r io.Reader) ([]byte, error) {
 	out = append(out, header...)
 	out = append(out, value...)
 	return out, nil
+}
+
+func encodeASN1Length(n int) []byte {
+	if n < 0x80 {
+		return []byte{byte(n)}
+	}
+	if n <= 0xff {
+		return []byte{0x81, byte(n)}
+	}
+	if n <= 0xffff {
+		return []byte{0x82, byte(n >> 8), byte(n)}
+	}
+	return []byte{0x83, byte(n >> 16), byte(n >> 8), byte(n)}
+}
+
+func canonicalizeBERToDER(b []byte) ([]byte, error) {
+	out, rest, err := canonicalizeTLV(b)
+	if err != nil {
+		return nil, err
+	}
+	if len(rest) != 0 {
+		// 尾随填充在 CredSSP 里不该出现；保留已解析部分。
+		_ = rest
+	}
+	return out, nil
+}
+
+func canonicalizeTLV(b []byte) (out, rest []byte, err error) {
+	if len(b) < 2 {
+		return nil, nil, fmt.Errorf("rdp nla: truncated BER TLV")
+	}
+	off := 0
+	tag := b[0]
+	off++
+	if tag&0x1f == 0x1f {
+		for off < len(b) {
+			t := b[off]
+			off++
+			if t&0x80 == 0 {
+				break
+			}
+		}
+	}
+	tagBytes := b[:off]
+	if off >= len(b) {
+		return nil, nil, fmt.Errorf("rdp nla: truncated BER length")
+	}
+	lb := b[off]
+	off++
+	var n int
+	if lb < 0x80 {
+		n = int(lb)
+	} else if lb == 0x80 {
+		return nil, nil, fmt.Errorf("rdp nla: indefinite BER length")
+	} else {
+		nb := int(lb & 0x7f)
+		if nb == 0 || nb > 4 || off+nb > len(b) {
+			return nil, nil, fmt.Errorf("rdp nla: bad BER length")
+		}
+		for i := 0; i < nb; i++ {
+			n = (n << 8) | int(b[off])
+			off++
+		}
+	}
+	if n < 0 || off+n > len(b) {
+		return nil, nil, fmt.Errorf("rdp nla: BER value truncated")
+	}
+	value := b[off : off+n]
+	rest = b[off+n:]
+	if tag&0x20 != 0 && len(value) > 0 {
+		var inner []byte
+		left := value
+		for len(left) > 0 {
+			part, more, e := canonicalizeTLV(left)
+			if e != nil {
+				return nil, nil, e
+			}
+			inner = append(inner, part...)
+			left = more
+		}
+		value = inner
+	}
+	out = append(append([]byte{}, tagBytes...), encodeASN1Length(len(value))...)
+	out = append(out, value...)
+	return out, rest, nil
 }
 
 func EncodeDERTCredentials(domain, username, password []byte) []byte {

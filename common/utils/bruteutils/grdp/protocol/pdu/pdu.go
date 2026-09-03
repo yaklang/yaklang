@@ -3,6 +3,8 @@ package pdu
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
+	"os"
 
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/emission"
@@ -169,9 +171,13 @@ func (c *Client) sendConfirmActivePDU() {
 	generalCapa := c.clientCapabilities[CAPSTYPE_GENERAL].(*GeneralCapability)
 	generalCapa.OSMajorType = OSMAJORTYPE_WINDOWS
 	generalCapa.OSMinorType = OSMINORTYPE_WINDOWS_NT
-	generalCapa.ExtraFlags = LONG_CREDENTIALS_SUPPORTED | NO_BITMAP_COMPRESSION_HDR | ENC_SALTED_CHECKSUM
-	//if not self._fastPathSender is None:
-	generalCapa.ExtraFlags |= FASTPATH_OUTPUT_SUPPORTED
+	generalCapa.ExtraFlags = NO_BITMAP_COMPRESSION_HDR
+	// XP/2003（PROTOCOL_RDP）不支持 LONG_CREDENTIALS / salted checksum /
+	// fast-path 输出。广告这些会让服务端走 fast-path 图形，SAVE_SESSION_INFO
+	// 仍走慢路径，但 5.1 自动登录更稳妥的是关掉。
+	if c.clientCoreData != nil && c.clientCoreData.ServerSelectedProtocol != 0 {
+		generalCapa.ExtraFlags |= LONG_CREDENTIALS_SUPPORTED | ENC_SALTED_CHECKSUM | FASTPATH_OUTPUT_SUPPORTED
+	}
 
 	bitmapCapa := c.clientCapabilities[CAPSTYPE_BITMAP].(*BitmapCapability)
 	bitmapCapa.PreferredBitsPerPixel = c.clientCoreData.HighColorDepth
@@ -304,6 +310,7 @@ func (c *Client) recvServerFontMapPDU(s []byte) {
 		} else {
 			glog.Error("recvServerFontMapPDU ignore message type", pdu.ShareCtrlHeader.PDUType)
 		}
+		c.transport.Once("data", c.recvServerFontMapPDU)
 		return
 	}
 	c.transport.On("data", c.recvPDU)
@@ -313,7 +320,7 @@ func (c *Client) recvServerFontMapPDU(s []byte) {
 func (c *Client) recvPDU(s []byte) {
 	glog.Debug("PDU recvPDU", hex.EncodeToString(s))
 	r := bytes.NewReader(s)
-	if r.Len() > 0 {
+	for r.Len() > 0 {
 		p, err := readPDU(r)
 		if err != nil {
 			glog.Error(err)
@@ -322,12 +329,37 @@ func (c *Client) recvPDU(s []byte) {
 		if p.ShareCtrlHeader.PDUType == PDUTYPE_DEACTIVATEALLPDU {
 			c.transport.On("data", c.recvDemandActivePDU)
 		}
-		// 认证结果判定：Save Session Info 携带 logon 成功/失败。
-		// INFO_LOGON/INFO_LOGON_LONG = 登录成功；EXTENDED_INFO + logonErrors
-		// 为凭证错误。供上层（爆破）等待真实认证结果而非仅连接就绪。
-		if dpdu, ok := p.Message.(*DataPDU); ok && dpdu.Header.PDUType2 == PDUTYPE2_SAVE_SESSION_INFO {
+		dpdu, ok := p.Message.(*DataPDU)
+		if !ok {
+			continue
+		}
+		glog.Debugf("pdu type2=0x%02x", dpdu.Header.PDUType2)
+		switch dpdu.Header.PDUType2 {
+		case PDUTYPE2_SAVE_SESSION_INFO:
 			if si, ok2 := dpdu.Data.(*SaveSessionInfo); ok2 {
+				glog.Infof("save session info type=%d fields=%d", si.InfoType, si.FieldsPresent)
 				c.Emit("logon", si)
+			}
+		case PDUTYPE2_SET_ERROR_INFO_PDU:
+			if ei, ok2 := dpdu.Data.(*ErrorInfoDataPDU); ok2 && ei.IsLogonFailure() {
+				c.Emit("error", fmt.Errorf("rdp logon failed: error info 0x%x", ei.ErrorInfo))
+			}
+		case PDUTYPE2_UPDATE:
+			// ncrack：XP 失败/占用会话走绘图订单，不一定发 0x26。
+			if sk, ok2 := dpdu.Data.(*skippedDataPDU); ok2 {
+				if os.Getenv("YAK_RDP_XP_DUMP") != "" && len(sk.raw) > 0 {
+					n := len(sk.raw)
+					if n > 48 {
+						n = 48
+					}
+					glog.Infof("xp update len=%d %s", len(sk.raw), hex.EncodeToString(sk.raw[:n]))
+				}
+				switch xpLogonHint(sk.raw) {
+				case xpHintFail:
+					c.Emit("error", fmt.Errorf("rdp logon failed: xp logon dialog"))
+				case xpHintSuccess:
+					c.Emit("logon", &SaveSessionInfo{InfoType: INFOTYPE_LOGON})
+				}
 			}
 		}
 	}

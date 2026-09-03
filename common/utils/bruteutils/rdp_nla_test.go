@@ -46,6 +46,10 @@ type nlaTestServer struct {
 	// credsspVersion is the version advertised in server TSRequests.
 	// 0 means v2 (legacy mock). 6 enables errorCode on auth failure.
 	credsspVersion int
+	// berLongForm：边缘 BER 长度（82 00 xx）。Win7 风格 tlsDropOnFail
+	// 不发 errorCode，直接拆 TLS。
+	berLongForm    bool
+	tlsDropOnFail  bool
 }
 
 type nlaVerifyRecord struct {
@@ -58,6 +62,18 @@ type nlaVerifyRecord struct {
 
 func startNLATestServer(t *testing.T, users map[string]string) *nlaTestServer {
 	return startNLATestServerVer(t, users, 0)
+}
+
+func startNLATestServerBERLong(t *testing.T, users map[string]string) *nlaTestServer {
+	s := startNLATestServerVer(t, users, 6)
+	s.berLongForm = true
+	return s
+}
+
+func startNLATestServerWin7(t *testing.T, users map[string]string) *nlaTestServer {
+	s := startNLATestServerVer(t, users, 2)
+	s.tlsDropOnFail = true
+	return s
 }
 
 func startNLATestServerVer(t *testing.T, users map[string]string, ver int) *nlaTestServer {
@@ -99,8 +115,8 @@ func (s *nlaTestServer) protoVersion() int {
 }
 
 func (s *nlaTestServer) rejectAuth(conn *tls.Conn) error {
-	// Windows 10/2016+ (CredSSP v6) sends NTSTATUS instead of just dropping TLS.
-	if s.credsspVersion >= nla.CredSSPVersion6 {
+	// Win7：Authenticate 之后直接 TLS alert/拆连接。Win10+：errorCode。
+	if !s.tlsDropOnFail && s.credsspVersion >= nla.CredSSPVersion6 {
 		_, _ = conn.Write(nla.EncodeTSRequestError(s.protoVersion(), 0xC000006D))
 	}
 	return errAuthFail
@@ -117,6 +133,19 @@ func (s *nlaTestServer) result() *nlaVerifyRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.lastResult
+}
+
+func (s *nlaTestServer) waitResult(t *testing.T, wantVerify bool) *nlaVerifyRecord {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		res := s.result()
+		if res != nil && res.GotAuth && res.Verified == wantVerify {
+			return res
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return s.result()
 }
 
 func (s *nlaTestServer) serve() {
@@ -207,7 +236,13 @@ func (s *nlaTestServer) credssp(conn *tls.Conn, rec *nlaVerifyRecord) error {
 	serverChallenge := make([]byte, 8)
 	_, _ = rand.Read(serverChallenge)
 	challengeMsg := buildNTLMChallenge(serverChallenge)
-	if _, err := conn.Write(nla.EncodeDERTRequest(s.protoVersion(), []nla.Message{challengeMsg}, nil, nil, nil)); err != nil {
+	ch := nla.EncodeDERTRequest(s.protoVersion(), []nla.Message{challengeMsg}, nil, nil, nil)
+	if s.berLongForm {
+		if padded, err := nla.PadBERLongForm(ch); err == nil {
+			ch = padded
+		}
+	}
+	if _, err := conn.Write(ch); err != nil {
 		return err
 	}
 	// 3c. 收 TSRequest(Authenticate)
@@ -448,7 +483,7 @@ func TestRDPNLAAuthentication(t *testing.T) {
 			}
 			ok, err := rdpLoginContext(context.Background(), host, host, c.user, c.pass, port)
 			gotErr := err != nil
-			res := srv.result()
+			res := srv.waitResult(t, c.wantVerify)
 			if res == nil {
 				t.Fatalf("no connection reached NLA stage (err=%v)", err)
 			}
@@ -499,7 +534,7 @@ func TestRDPNLAv6LogonFailure(t *testing.T) {
 
 	// 正确凭证：NLA 完成即爆破成功，不必再开 MCS。
 	ok, err = rdpLoginContext(context.Background(), host, host, "rdpuser", "RdpPass123!", port)
-	res := srv.result()
+	res := srv.waitResult(t, true)
 	if res == nil || !res.Verified {
 		t.Fatalf("correct creds: server verify=%v client ok=%v err=%v", res, ok, err)
 	}
