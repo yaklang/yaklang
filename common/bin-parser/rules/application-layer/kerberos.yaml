@@ -17,7 +17,21 @@ Package:
       }
     Application Tag: uint8
     Length: uint8
-    Body: raw
+    Body:
+      operator: |
+        this.ProcessSubNode("Seq Tag")
+        if getNodeResult("Seq Tag").Value != 0x30 {
+          panic("kerberos: expected SEQUENCE body")
+        }
+        this.ProcessSubNode("Seq Length")
+        sl = getNodeResult("Seq Length").Value
+        if sl > 0 {
+          this.GetSubNode("Content").SetMaxLength(sl)
+          this.ProcessSubNode("Content")
+        }
+      Seq Tag: uint8
+      Seq Length: uint8
+      Content: raw
   KerberosTCP:
     operator: |
       this.ProcessSubNode("Record Length")
@@ -45,7 +59,21 @@ Package:
         }
       Application Tag: uint8
       Length: uint8
-      Body: raw
+      Body:
+        operator: |
+          this.ProcessSubNode("Seq Tag")
+          if getNodeResult("Seq Tag").Value != 0x30 {
+            panic("kerberos: expected SEQUENCE body")
+          }
+          this.ProcessSubNode("Seq Length")
+          sl = getNodeResult("Seq Length").Value
+          if sl > 0 {
+            this.GetSubNode("Content").SetMaxLength(sl)
+            this.ProcessSubNode("Content")
+          }
+        Seq Tag: uint8
+        Seq Length: uint8
+        Content: raw
   PAC:
     endian: little
     operator: |

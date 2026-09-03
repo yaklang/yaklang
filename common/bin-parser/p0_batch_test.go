@@ -129,7 +129,8 @@ func TestKerberosTagsAndEdges(t *testing.T) {
 			k := parseRule(t, raw, "application-layer.kerberos", "Kerberos")
 			require.Equal(t, uint64(tc.tag), uintVal(t, k.Child("Application Tag")))
 			require.Equal(t, uint64(len(body)), uintVal(t, k.Child("Length")))
-			require.Equal(t, body, bytesVal(t, k.Child("Body")))
+			require.Equal(t, uint64(0x30), uintVal(t, mustChild(t, k, "Body", "Seq Tag")))
+			require.Equal(t, []byte{0x02, 0x01, 0x05}, bytesVal(t, mustChild(t, k, "Body", "Content")))
 		})
 	}
 
