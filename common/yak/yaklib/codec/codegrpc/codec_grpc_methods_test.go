@@ -349,6 +349,11 @@ func TestCodecSymmetricStreamModesNoPadding(t *testing.T) {
 			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.AESDecrypt(k, "raw", iv, "raw", m, o, p) },
 		},
 		{
+			"SM4", "1234567890123456", "abcdefghijklmnop",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.SM4Encrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.SM4Decrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
 			"DES", "12345678", "abcdefgh",
 			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESEncrypt(k, "raw", iv, "raw", m, o, p) },
 			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESDecrypt(k, "raw", iv, "raw", m, o, p) },
@@ -397,12 +402,60 @@ func TestCodecSymmetricStreamModesNoPadding(t *testing.T) {
 	}
 }
 
-// TestCodecDESIVTruncation 验证 DES/TripleDES 加密时超长 IV 会被截断到块大小（8 字节），
+// TestCodecSymmetricIVTruncation 验证对称加密加密时超长 IV 会被截断到块大小，
 // 与解密走 FixIV 的行为保持一致，加解密 round-trip 一致。
-func TestCodecDESIVTruncation(t *testing.T) {
+func TestCodecSymmetricIVTruncation(t *testing.T) {
 	plaintext := []byte("Hello Yak! DES stream test message.")
-	// 16 字节 IV，DES/TripleDES 块大小为 8，应截断到前 8 字节
-	iv16 := "abcdefghijklmnop"
+
+	cases := []struct {
+		name string
+		key  string
+		iv   string
+		enc  func(*CodecExecFlow, string, string, string, string, string) error
+		dec  func(*CodecExecFlow, string, string, string, string, string) error
+	}{
+		{
+			"AES", "1234567890123456", "abcdefghijklmnopqrstuvwxyz012345",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.AESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.AESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
+			"SM4", "1234567890123456", "abcdefghijklmnopqrstuvwxyz012345",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.SM4Encrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.SM4Decrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
+			"DES", "12345678", "abcdefghijklmnop",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
+			"TripleDES", "123456789012345678901234", "abcdefghijklmnop",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.TripleDESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.TripleDESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			for _, mode := range []string{"CFB", "OFB", "CTR", "CBC"} {
+				ef := NewCodecExecFlow(plaintext, nil)
+				require.NoError(t, c.enc(ef, c.key, c.iv, mode, "raw", "pkcs"), "%s encrypt", mode)
+				ct := make([]byte, len(ef.Text))
+				copy(ct, ef.Text)
+
+				df := NewCodecExecFlow(ct, nil)
+				require.NoError(t, c.dec(df, c.key, c.iv, mode, "raw", "pkcs"), "%s decrypt", mode)
+				require.Equal(t, plaintext, df.Text, "%s round-trip with truncated IV", mode)
+			}
+		})
+	}
+}
+
+// TestCodecSymmetricEmptyRawIV 验证 IV 为空且 ivType 为 raw 时，
+// 加密/解密都回退到 key 作为 IV（FixIV 对空切片的处理），round-trip 一致。
+func TestCodecSymmetricEmptyRawIV(t *testing.T) {
+	plaintext := []byte("Hello Yak! empty raw IV test message.")
 
 	cases := []struct {
 		name string
@@ -410,6 +463,16 @@ func TestCodecDESIVTruncation(t *testing.T) {
 		enc  func(*CodecExecFlow, string, string, string, string, string) error
 		dec  func(*CodecExecFlow, string, string, string, string, string) error
 	}{
+		{
+			"AES", "1234567890123456",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.AESEncrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.AESDecrypt(k, "raw", iv, "raw", m, o, p) },
+		},
+		{
+			"SM4", "1234567890123456",
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.SM4Encrypt(k, "raw", iv, "raw", m, o, p) },
+			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.SM4Decrypt(k, "raw", iv, "raw", m, o, p) },
+		},
 		{
 			"DES", "12345678",
 			func(f *CodecExecFlow, k, iv, m, o, p string) error { return f.DESEncrypt(k, "raw", iv, "raw", m, o, p) },
@@ -426,15 +489,14 @@ func TestCodecDESIVTruncation(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			for _, mode := range []string{"CFB", "OFB", "CTR", "CBC"} {
 				ef := NewCodecExecFlow(plaintext, nil)
-				require.NoError(t, c.enc(ef, c.key, iv16, mode, "raw", "pkcs"), "%s encrypt", mode)
+				require.NoError(t, c.enc(ef, c.key, "", mode, "raw", "pkcs"), "%s encrypt", mode)
 				ct := make([]byte, len(ef.Text))
 				copy(ct, ef.Text)
 
 				df := NewCodecExecFlow(ct, nil)
-				require.NoError(t, c.dec(df, c.key, iv16, mode, "raw", "pkcs"), "%s decrypt", mode)
-				require.Equal(t, plaintext, df.Text, "%s round-trip with truncated IV", mode)
+				require.NoError(t, c.dec(df, c.key, "", mode, "raw", "pkcs"), "%s decrypt", mode)
+				require.Equal(t, plaintext, df.Text, "%s round-trip with empty raw IV", mode)
 			}
 		})
 	}
 }
-
