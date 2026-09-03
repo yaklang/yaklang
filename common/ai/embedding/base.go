@@ -75,8 +75,122 @@ type embeddingRequest struct {
 	Model          string `json:"model,omitempty"`
 }
 
-type embeddingRawItem struct {
-	Embedding json.RawMessage `json:"embedding"`
+type embeddingItem struct {
+	Embedding embeddingValue `json:"embedding"`
+}
+
+// embeddingValue decodes the vector while the enclosing item is being
+// decoded. This avoids retaining a copy of the complete vector as a
+// json.RawMessage and unmarshalling that copy in a second step.
+type embeddingValue struct {
+	vector  []float32
+	vectors [][]float32
+	multi   bool
+}
+
+func (value *embeddingValue) UnmarshalJSON(raw []byte) error {
+	*value = embeddingValue{}
+	raw = bytes.TrimSpace(raw)
+	if len(raw) < 2 || raw[0] != '[' {
+		return nil
+	}
+	inner := bytes.TrimSpace(raw[1:])
+	if len(inner) > 0 && inner[0] == '[' {
+		value.multi = true
+		value.vectors = make([][]float32, 0, countTopLevelJSONElements(raw))
+		return json.Unmarshal(raw, &value.vectors)
+	}
+	value.vector = make([]float32, 0, countFlatJSONElements(raw))
+	return json.Unmarshal(raw, &value.vector)
+}
+
+// countFlatJSONElements counts numeric array elements without fully parsing
+// them. Strings and nested values are rejected by []float32 unmarshalling, so
+// they deliberately disable preallocation rather than using their commas.
+func countFlatJSONElements(raw []byte) int {
+	if len(raw) < 2 || raw[0] != '[' {
+		return 0
+	}
+	index := 1
+	for index < len(raw) && isJSONSpace(raw[index]) {
+		index++
+	}
+	if index >= len(raw) || raw[index] == ']' {
+		return 0
+	}
+
+	count := 1
+	for ; index < len(raw); index++ {
+		switch raw[index] {
+		case ',':
+			count++
+		case '"', '[', '{':
+			return 0
+		case ']':
+			// A valid JSON array needs at least one byte per value and one
+			// separator between values. Avoid amplifying malformed input.
+			if count > (len(raw)-1)/2 {
+				return 0
+			}
+			return count
+		}
+	}
+	return 0
+}
+
+// countTopLevelJSONElements returns the number of top-level array elements without
+// interpreting commas inside strings or nested JSON values. Supplying the
+// capacity to encoding/json avoids the repeated slice growth that otherwise
+// dominates allocations for large embedding vectors.
+func countTopLevelJSONElements(raw []byte) int {
+	if len(raw) < 2 || raw[0] != '[' {
+		return 0
+	}
+	index := 1
+	for index < len(raw) && isJSONSpace(raw[index]) {
+		index++
+	}
+	if index >= len(raw) || raw[index] == ']' {
+		return 0
+	}
+
+	count, depth := 1, 1
+	inString, escaped := false, false
+	for ; index < len(raw); index++ {
+		character := raw[index]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if character == '\\' {
+				escaped = true
+			} else if character == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch character {
+		case '"':
+			inString = true
+		case '[', '{':
+			depth++
+		case ']', '}':
+			depth--
+			if depth == 0 {
+				return count
+			}
+		case ',':
+			if depth == 1 {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func isJSONSpace(character byte) bool {
+	return character == ' ' || character == '\t' || character == '\r' || character == '\n'
 }
 
 // 错误响应结构体
@@ -339,19 +453,19 @@ func decodeEmbeddingItems(decoder *json.Decoder, arrayAlreadyOpen, firstItemOnly
 			itemIndex++
 			continue
 		}
-		var item embeddingRawItem
+		var item embeddingItem
 		if err := decoder.Decode(&item); err != nil {
 			return nil, err
 		}
-		itemVectors, multi, err := decodeRawEmbedding(item.Embedding)
-		if err != nil {
-			return nil, err
-		}
 		if itemIndex == 0 {
-			isMultiVector = multi
-			vectors = append(vectors, itemVectors...)
-		} else if len(itemVectors) > 0 {
-			vectors = append(vectors, itemVectors[0])
+			isMultiVector = item.Embedding.multi
+			if isMultiVector {
+				vectors = append(vectors, item.Embedding.vectors...)
+			} else if len(item.Embedding.vector) > 0 {
+				vectors = append(vectors, item.Embedding.vector)
+			}
+		} else if vector, ok := item.Embedding.firstVector(); ok {
+			vectors = append(vectors, vector)
 		}
 		itemIndex++
 	}
@@ -361,27 +475,17 @@ func decodeEmbeddingItems(decoder *json.Decoder, arrayAlreadyOpen, firstItemOnly
 	return vectors, nil
 }
 
-func decodeRawEmbedding(raw json.RawMessage) ([][]float32, bool, error) {
-	raw = bytes.TrimSpace(raw)
-	if len(raw) < 2 || raw[0] != '[' {
-		return nil, false, nil
-	}
-	inner := bytes.TrimSpace(raw[1:])
-	if len(inner) > 0 && inner[0] == '[' {
-		var vectors [][]float32
-		if err := json.Unmarshal(raw, &vectors); err != nil {
-			return nil, true, err
+func (value *embeddingValue) firstVector() ([]float32, bool) {
+	if value.multi {
+		if len(value.vectors) == 0 {
+			return nil, false
 		}
-		return vectors, true, nil
+		return value.vectors[0], true
 	}
-	var vector []float32
-	if err := json.Unmarshal(raw, &vector); err != nil {
-		return nil, false, err
+	if len(value.vector) == 0 {
+		return nil, false
 	}
-	if len(vector) == 0 {
-		return nil, false, nil
-	}
-	return [][]float32{vector}, false, nil
+	return value.vector, true
 }
 
 func skipJSONValue(decoder *json.Decoder) error {
