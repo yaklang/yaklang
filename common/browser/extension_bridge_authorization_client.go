@@ -32,9 +32,16 @@ type extensionAuthorizationClientWorkspaceInput struct {
 }
 
 type extensionAuthorizationYakitOpenInput struct {
-	WorkspaceID string `json:"workspaceId,omitempty"`
-	TabID       int    `json:"tabId,omitempty"`
-	Mode        string `json:"mode,omitempty"`
+	WorkspaceID    string `json:"workspaceId,omitempty"`
+	TabID          int    `json:"tabId,omitempty"`
+	Mode           string `json:"mode,omitempty"`
+	TargetDeviceID string `json:"targetDeviceId,omitempty"`
+}
+
+type extensionAuthorizationInstance struct {
+	DeviceID string `json:"deviceId"`
+	Badge    string `json:"badge"`
+	Current  bool   `json:"current"`
 }
 
 func decodeExtensionAuthorizationYakitOpen(raw json.RawMessage) (extensionAuthorizationYakitOpenInput, error) {
@@ -44,9 +51,10 @@ func decodeExtensionAuthorizationYakitOpen(raw json.RawMessage) (extensionAuthor
 	}
 	input.WorkspaceID = strings.TrimSpace(input.WorkspaceID)
 	input.Mode = strings.ToLower(strings.TrimSpace(input.Mode))
+	input.TargetDeviceID = strings.TrimSpace(input.TargetDeviceID)
 	if input.WorkspaceID != "" {
-		if input.TabID != 0 || input.Mode != "" {
-			return input, errors.New("workspaceId cannot be combined with tabId or mode")
+		if input.TabID != 0 || input.Mode != "" || input.TargetDeviceID != "" {
+			return input, errors.New("workspaceId cannot be combined with tabId, mode or targetDeviceId")
 		}
 		return input, nil
 	}
@@ -59,7 +67,34 @@ func decodeExtensionAuthorizationYakitOpen(raw json.RawMessage) (extensionAuthor
 	if input.Mode != "horizontal" && input.Mode != "vertical" {
 		return input, errors.New("mode must be horizontal or vertical")
 	}
+	if len(input.TargetDeviceID) > 160 {
+		return input, errors.New("targetDeviceId is too long")
+	}
 	return input, nil
+}
+
+func extensionAuthorizationInstances(connections []ExtensionBridgeConnection, currentDeviceID string) []extensionAuthorizationInstance {
+	instances := make([]extensionAuthorizationInstance, 0, len(connections))
+	for _, connection := range connections {
+		if connection.ManagedInstance == nil || connection.ManagedInstance.Manager != "ytray" {
+			continue
+		}
+		instances = append(instances, extensionAuthorizationInstance{
+			DeviceID: connection.DeviceID,
+			Badge:    connection.ManagedInstance.Badge,
+			Current:  connection.DeviceID == currentDeviceID,
+		})
+	}
+	return instances
+}
+
+func (s *ExtensionBridgeServer) listExtensionAuthorizationInstances(deviceID string) (interface{}, *ExtensionBridgeError) {
+	if s.manager == nil {
+		return nil, &ExtensionBridgeError{Code: "unavailable", Message: "browser extension bridge manager is not available"}
+	}
+	return map[string]interface{}{
+		"instances": extensionAuthorizationInstances(s.Connections(), deviceID),
+	}, nil
 }
 
 func decodeExtensionAuthorizationClientJSON(raw json.RawMessage, output interface{}) error {
@@ -388,6 +423,22 @@ func (s *ExtensionBridgeServer) openExtensionAuthorizationWorkspaceInYakit(
 		handoff["mode"] = workspace.Mode
 		result["workspaceId"] = workspace.ID
 	} else {
+		if input.TargetDeviceID != "" {
+			if input.TargetDeviceID == deviceID {
+				return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "target browser must differ from the current browser"}
+			}
+			targetOnline := false
+			for _, connection := range s.Connections() {
+				if connection.DeviceID == input.TargetDeviceID {
+					targetOnline = true
+					break
+				}
+			}
+			if !targetOnline {
+				return nil, &ExtensionBridgeError{Code: "invalid_params", Message: "target browser is not online"}
+			}
+			handoff["targetDeviceId"] = input.TargetDeviceID
+		}
 		handoff["tabId"] = input.TabID
 		handoff["mode"] = input.Mode
 		result["tabId"] = input.TabID
