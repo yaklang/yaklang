@@ -51,6 +51,10 @@ const (
 	maxServerFocusReferences     = 64
 	maxServerFocusHeaderValueLen = 256
 	serverFocusRequestTimeout    = 5 * time.Second
+	// One log search action can issue at most four sequential source calls.
+	// Keep their worst-case total below the immutable Focus hook timeout; each
+	// search returns a continuation cursor when this per-call window expires.
+	serverFocusSourceCallTimeout = 20 * time.Second
 )
 
 var serverFocusRequestHeaderAllowlist = map[string]struct{}{
@@ -216,12 +220,16 @@ func (r *legionServerFocusRuntime) Execute(
 		if r.workspace == nil {
 			return nil, fmt.Errorf("source workspace is unavailable")
 		}
-		return r.workspace.read(params)
+		operationCtx, cancel := context.WithTimeout(r.ctx, serverFocusSourceCallTimeout)
+		defer cancel()
+		return r.workspace.read(operationCtx, params)
 	case serverFocusCapabilitySourceSearch:
 		if r.workspace == nil {
 			return nil, fmt.Errorf("source workspace is unavailable")
 		}
-		return r.workspace.search(params)
+		operationCtx, cancel := context.WithTimeout(r.ctx, serverFocusSourceCallTimeout)
+		defer cancel()
+		return r.workspace.search(operationCtx, params)
 	case serverFocusCapabilitySubmitFindingV1:
 		return r.submitFindingV1(capability, params)
 	case serverFocusCapabilitySubmitReportV1:

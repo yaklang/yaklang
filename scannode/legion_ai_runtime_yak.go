@@ -619,6 +619,11 @@ type yakRuntimeOptions struct {
 	FocusRuntimeName               string                    `json:"focus_runtime_name"`
 	FocusTargetURL                 string                    `json:"focus_target_url"`
 	ConversationResultTargetURL    string                    `json:"conversation_result_target_url"`
+	AITaskRunID                    string                    `json:"ai_task_run_id"`
+	AITaskKey                      string                    `json:"ai_task_key"`
+	AITaskVersion                  string                    `json:"ai_task_version"`
+	AITaskDefinitionChecksum       string                    `json:"ai_task_definition_checksum"`
+	AITaskSessionRole              string                    `json:"ai_task_session_role"`
 	Workdir                        string                    `json:"workdir"`
 	Language                       string                    `json:"language"`
 	SessionMCPServers              []sessionMCPServer        `json:"session_mcp_servers"`
@@ -791,7 +796,7 @@ func buildYakAIEngineOptions(
 	if strings.TrimSpace(options.Language) != "" {
 		config = append(config, aiengine.WithLanguage(strings.TrimSpace(options.Language)))
 	}
-	config, err = appendYakAttachmentOptions(ctx, config, binding)
+	config, err = appendYakAttachmentOptions(ctx, config, binding, options.SourceWorkspace)
 	if err != nil {
 		return nil, err
 	}
@@ -1162,8 +1167,15 @@ func appendYakAttachmentOptions(
 	ctx context.Context,
 	config []aiengine.AIEngineConfigOption,
 	binding aiSessionBinding,
+	workspace *legionCodeWorkspaceSpec,
 ) ([]aiengine.AIEngineConfigOption, error) {
 	if len(binding.Attachments) == 0 {
+		return config, nil
+	}
+	if workspace != nil && strings.EqualFold(strings.TrimSpace(workspace.Kind), legionCodeWorkspaceKindAttachments) {
+		// Professional Task logs are materialized into the run-scoped read-only
+		// workspace before the engine is bound. Their bytes must never be copied
+		// into prompt attachments.
 		return config, nil
 	}
 	for _, attachment := range binding.Attachments {
@@ -1323,7 +1335,7 @@ func renderAttachmentContent(
 	builder.WriteString("\n--- Begin Attachment Content ---\n")
 	builder.WriteString(content)
 	if truncated {
-		builder.WriteString("\n\n[attachment content truncated to 65536 bytes]")
+		builder.WriteString(fmt.Sprintf("\n\n[attachment content truncated to %d bytes]", maxAISessionAttachmentBytes))
 	}
 	builder.WriteString("\n--- End Attachment Content ---\n")
 	return builder.String()
