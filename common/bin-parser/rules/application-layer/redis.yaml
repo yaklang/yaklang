@@ -1,0 +1,55 @@
+Package:
+  Redis:
+    unpack: true
+    operator: |
+      this.ProcessByType("RESP")
+RESP:
+  operator: |
+    p = this.ProcessSubNode("Prefix").Value
+    switch p {
+      case 0x2a:
+        this.ProcessSubNode("Array")
+      case 0x24:
+        this.ProcessSubNode("Bulk")
+      case 0x2b:
+        this.ProcessSubNode("Simple")
+      case 0x2d:
+        this.ProcessSubNode("Error")
+      case 0x3a:
+        this.ProcessSubNode("Integer")
+      default:
+        panic("redis: invalid RESP prefix")
+    }
+  Prefix: uint8
+  Array:
+    operator: |
+      nstr = this.ProcessSubNode("Count").Value
+      n = int(nstr)
+      if n < 0 {
+        return
+      }
+      this.GetSubNode("Elements").SetCfg("list-length", n)
+      this.ProcessSubNode("Elements")
+    Count: "del:\r\n;type:string"
+    Elements:
+      list: true
+      Element: RESP
+  Bulk:
+    operator: |
+      nstr = this.ProcessSubNode("Len").Value
+      n = int(nstr)
+      if n < 0 {
+        return
+      }
+      this.GetSubNode("Data").SetMaxLength(n)
+      this.ProcessSubNode("Data")
+      this.ProcessSubNode("CRLF")
+    Len: "del:\r\n;type:string"
+    Data: raw
+    CRLF: raw,2
+  Simple:
+    Message: "del:\r\n;type:string"
+  Error:
+    Message: "del:\r\n;type:string"
+  Integer:
+    Message: "del:\r\n;type:string"

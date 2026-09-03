@@ -1,0 +1,17 @@
+Package:
+  SMTP:
+    operator: |
+      this.ProcessSubNode("Code")
+      code = string(getNodeResult("Code").Value)
+      if len(code) != 3 {
+        panic("smtp: invalid reply code")
+      }
+      this.ProcessSubNode("Separator")
+      sep = getNodeResult("Separator").Value
+      if sep != 0x20 && sep != 0x2d {
+        panic("smtp: expected space or hyphen after reply code")
+      }
+      this.ProcessSubNode("Message")
+    Code: string,3
+    Separator: uint8
+    Message: "del:\r\n;type:string"

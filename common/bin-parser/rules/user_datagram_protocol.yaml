@@ -7,7 +7,18 @@ Package:
         Payload:
             unpack: true
             operator: |
+              src = getNodeResult("@UDP/Source Port").Value
+              dst = getNodeResult("@UDP/Destination Port").Value
               typeNameList = ["DNS", "DHCP", "NTP", "SNMP"]
+              if src == 53 || dst == 53 {
+                typeNameList = ["DNS"]
+              } else if src == 67 || dst == 67 || src == 68 || dst == 68 {
+                typeNameList = ["DHCP"]
+              } else if src == 123 || dst == 123 {
+                typeNameList = ["NTP"]
+              } else if src == 161 || dst == 161 || src == 162 || dst == 162 {
+                typeNameList = ["SNMP"]
+              }
               for typeName in typeNameList{
                   res,op = this.TryProcessByType(typeName)
                   if op.OK {
@@ -24,7 +35,6 @@ Package:
                       }
                   }
               }
-              # this.NewUnknownNode().Process()
 DNS: "import:application-layer/dns.yaml;node:DNS"
 DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
 NTP: "import:application-layer/ntp.yaml;node:NTP"
