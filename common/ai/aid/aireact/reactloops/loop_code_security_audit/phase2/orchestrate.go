@@ -28,7 +28,6 @@ type categoryScanOutcome struct {
 	total        int
 	incomplete   bool
 	findingCount int
-	execErr      error
 }
 
 // pendingResume 是一个被中断、等待批量恢复续扫的类别条目。
@@ -135,7 +134,7 @@ func runAllCategoryScans(
 			// 直接兜底，保证该类别在 Phase2 结束时有 observation 供 Phase3/4 消费。
 			fallbackFinalizeCategoryScan(r, state, scanState, category, forkResult.ExecErr, artifacts)
 		}
-		outcomes = append(outcomes, buildCategoryScanOutcome(state, catJob, forkResult.ExecErr))
+		outcomes = append(outcomes, buildCategoryScanOutcome(state, catJob))
 	}
 
 	if len(resumables) > 0 {
@@ -143,7 +142,7 @@ func runAllCategoryScans(
 		resumeCatalog := make(map[string]pendingResume, len(resumables))
 		for _, p := range resumables {
 			resumeGoal := fmt.Sprintf("Phase 2 category scan resume: %s", p.catJob.category.Name)
-			identifier := p.catJob.category.ID + "-resume"
+			identifier := resumeJobIdentifier(p.catJob.category.ID)
 			resumeJobs = append(resumeJobs, reactloops.SubAgentJob{
 				Order:      p.catJob.index,
 				Identifier: identifier,
@@ -158,7 +157,7 @@ func runAllCategoryScans(
 		r.AddToTimeline("[PHASE2_RESUME_BATCH]",
 			fmt.Sprintf("[Phase2] 恢复 %d 个被中断的类别扫描（并行，每类预算 %s）。", len(resumables), auditopts.DefaultCategoryScanTimeout))
 
-		_ = reactloops.DispatchSubAgents(r, task, resumeJobs, reactloops.SubAgentOptions{
+		resumeResults := reactloops.DispatchSubAgents(r, task, resumeJobs, reactloops.SubAgentOptions{
 			ParentLoop:         loop,
 			TimelineMode:       reactloops.SubAgentTimelineFork,
 			ExecuteConcurrency: concurrency,
@@ -168,14 +167,27 @@ func runAllCategoryScans(
 				state: state, resumeCatalog: resumeCatalog, artifacts: artifacts, scanStates: &scanStates,
 			},
 		})
+		resumeExecErrs := make(map[string]error, len(resumeResults))
+		for _, result := range resumeResults {
+			if result == nil {
+				continue
+			}
+			resumeExecErrs[result.Identifier] = result.ExecErr
+		}
 
 		// resume 批结束后逐类复查：仍无 observation → 兜底 auto-finalize。
 		for _, p := range resumables {
 			category := p.catJob.category
 			if countScanObservationsForCategory(state, category.ID) == 0 {
-				fallbackFinalizeCategoryScan(r, state, p.scanState, category, nil, artifacts)
+				resumeErr := resumeExecErrs[resumeJobIdentifier(category.ID)]
+				if resumeErr == nil {
+					// resume 轮自身未报执行错误但也没产出 observation（如循环正常
+					// 结束却没走到 complete_scan）——显式记录而非 execErr=<nil>。
+					resumeErr = fmt.Errorf("resume round finished without producing any scan observation")
+				}
+				fallbackFinalizeCategoryScan(r, state, p.scanState, category, resumeErr, artifacts)
 			}
-			outcomes = append(outcomes, buildCategoryScanOutcome(state, p.catJob, nil))
+			outcomes = append(outcomes, buildCategoryScanOutcome(state, p.catJob))
 		}
 	}
 
@@ -184,7 +196,7 @@ func runAllCategoryScans(
 	for _, outcome := range outcomes {
 		emit.Phase2CategoryOutcome(loop, outcome.index, outcome.total, outcome.category, outcome.findingCount, outcome.incomplete)
 		log.Infof("[CodeAudit/Phase2] [%d/%d] Category '%s' complete. Total findings so far: %d",
-			outcome.index, outcome.total, outcome.category.ID, len(state.GetFindings()))
+			outcome.index, outcome.total, outcome.category.ID, state.GetFindingCount())
 	}
 
 	auditDirPath := util.AuditDir(state)
@@ -193,6 +205,11 @@ func runAllCategoryScans(
 	}
 
 	return outcomes
+}
+
+// resumeJobIdentifier 构造批量恢复 job 的 identifier（派发与复查共用同一来源）。
+func resumeJobIdentifier(categoryID string) string {
+	return categoryID + "-resume"
 }
 
 // prepareCategoryResume 判定一个被中断的类别是否可恢复续扫，并做必要的预处理。
@@ -249,7 +266,7 @@ func shouldResumeCategoryScanFromPhaseB(scanState *ScanState) bool {
 }
 
 // buildCategoryScanOutcome 从 state 汇总单个类别的收尾结果。
-func buildCategoryScanOutcome(state *model.AuditState, catJob categoryScanJob, execErr error) categoryScanOutcome {
+func buildCategoryScanOutcome(state *model.AuditState, catJob categoryScanJob) categoryScanOutcome {
 	category := catJob.category
 	findingCount := 0
 	for _, f := range state.GetFindings() {
@@ -263,14 +280,14 @@ func buildCategoryScanOutcome(state *model.AuditState, catJob categoryScanJob, e
 		total:        catJob.total,
 		incomplete:   countScanObservationsForCategory(state, category.ID) == 0,
 		findingCount: findingCount,
-		execErr:      execErr,
 	}
 }
 
 // fallbackFinalizeCategoryScan 是不可恢复类别（或 resume 后仍未完成）的兜底：
-// 把剩余目标文件 mark 为 not_vul 并写入 observation，保证 Phase2 结束时每个
-// 类别都有 observation 供 Phase3/4 消费（原 finalize.go auto-finalize 的职责
-// 移到这里，只在恢复无望时执行，不再销毁可恢复性）。
+// 把剩余目标文件 mark 为 not_audited（区别于模型亲自审计的 not_vul）并写入
+// observation，保证 Phase2 结束时每个类别都有 observation 供 Phase3/4 消费
+// （原 finalize.go auto-finalize 的职责移到这里，只在恢复无望时执行，不再
+// 销毁可恢复性）。
 func fallbackFinalizeCategoryScan(
 	r aicommon.AIInvokeRuntime,
 	state *model.AuditState,
@@ -285,7 +302,7 @@ func fallbackFinalizeCategoryScan(
 		remaining = scanState.RemainingFiles()
 		done, total = scanState.Progress()
 		for _, filePath := range remaining {
-			scanState.MarkFileDoneWithDisposition(filePath, FileDispositionNotVul)
+			scanState.MarkFileDoneWithDisposition(filePath, FileDispositionNotAudited)
 			scanState.ClearPhaseBReads(filePath)
 			scanState.ClearPhaseBGreps(filePath)
 		}
@@ -301,7 +318,7 @@ func fallbackFinalizeCategoryScan(
 		summary = fmt.Sprintf("类别 '%s' 扫描未真正开始即被中断（execErr=%v）。", category.ID, execErr)
 	} else {
 		summary = fmt.Sprintf(
-			"类别 '%s' 扫描被中断且无法恢复续扫：%d/%d 文件已审计，剩余 %d 个已由系统兜底标记为 not_vul（execErr=%v）。",
+			"类别 '%s' 扫描被中断且无法恢复续扫：%d/%d 文件已审计，剩余 %d 个已由系统兜底标记为 not_audited（未经审计，区别于 not_vul）（execErr=%v）。",
 			category.ID, done, total, len(remaining), execErr)
 	}
 

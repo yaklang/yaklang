@@ -14,7 +14,10 @@ import (
 )
 
 // finalizeCategoryScanOnLoopEnd runs when a category loop ends without complete_scan.
-// It auto-marks remaining target files and records a model.ScanObservation so Phase 3/4 can proceed.
+// 中断只发警告（阶段A: stuck_phase_a[_resumable]；阶段B: stuck_phase_b_resumable），
+// 不做 auto-mark / 不写 observation——可恢复性与兜底决定权都交给编排器
+// （见 orchestrate.go 的 resume 批量与 fallbackFinalizeCategoryScan）。
+// 仅在"全部文件已 mark 却没调 complete_scan"时补记 completed observation。
 func finalizeCategoryScanOnLoopEnd(
 	loop *reactloops.ReActLoop,
 	r aicommon.AIInvokeRuntime,

@@ -17,6 +17,11 @@ const (
 	FileDispositionFinding = "finding"
 	// FileDispositionNotVul means the file was audited and has no vulnerability in this category.
 	FileDispositionNotVul = "not_vul"
+	// FileDispositionNotAudited means the file was never actually audited: the
+	// category was force-finalized by the system fallback after an unrecoverable
+	// interruption. Only written by fallbackFinalizeCategoryScan — models cannot
+	// self-report this disposition (normalizeFileDisposition rejects it).
+	FileDispositionNotAudited = "not_audited"
 )
 
 // NoteFinding records that a target file has an add_finding for the current category scan.
@@ -55,14 +60,13 @@ func (s *ScanState) MarkFileDoneWithDisposition(filePath, disposition string) in
 		s.FileDisposition = make(map[string]string)
 	}
 	s.FileDisposition[filePath] = disposition
-	s.AuditedFiles[filePath] = true
-	remaining := 0
-	for _, f := range s.TargetFiles {
-		if !s.AuditedFiles[f] {
-			remaining++
+	if !s.AuditedFiles[filePath] {
+		s.AuditedFiles[filePath] = true
+		if s.TargetFileSet[filePath] {
+			s.auditedCount++
 		}
 	}
-	return remaining
+	return len(s.TargetFiles) - s.auditedCount
 }
 
 func normalizeFileDisposition(raw string) string {
@@ -192,6 +196,9 @@ func validateAllTargetsAttributed(scan *ScanState, state *model.AuditState, cate
 			if fileHasCategoryFinding(state, scan, categoryID, f, projectRoot) {
 				issues = append(issues, fmt.Sprintf("  - %s → disposition=not_vul 但与 add_finding 冲突", f))
 			}
+		case FileDispositionNotAudited:
+			// 系统兜底归属（未真正审计，仅 fallbackFinalizeCategoryScan 写入）：
+			// 视为已归属，不参与 add_finding 冲突检查。
 		default:
 			issues = append(issues, fmt.Sprintf("  - %s → 已 mark 但缺少归属 disposition", f))
 		}

@@ -32,7 +32,10 @@ var (
 )
 
 var (
-	DefaultLowHttpConnPool = NewHttpConnPool(context.Background(), 100, 2)
+	// Per-host idle cap raised from 2 to 8: AI audit workloads run 5+ concurrent
+	// streams against a single gateway host, and a cap of 2 forced the pool to
+	// close and re-dial (full TLS handshake) most connections after every burst.
+	DefaultLowHttpConnPool = NewHttpConnPool(context.Background(), 100, 8)
 	errServerClosedIdle    = errors.New("conn pool: server closed idle connection")
 )
 

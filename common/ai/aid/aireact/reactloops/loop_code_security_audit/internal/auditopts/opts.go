@@ -47,11 +47,12 @@ func SubAgentConfigOpts() []aicommon.ConfigOption {
 }
 
 // LoopAuxiliaryOpts disables expensive auxiliary AI paths that amplify request
-// volume under slow networks (perception, periodic verification, value feedback).
+// volume under slow networks (perception, periodic verification). Value feedback
+// is covered by the config-level gate in SubAgentConfigOpts, which propagates
+// to all child invokers; no per-loop option is needed.
 func LoopAuxiliaryOpts() []reactloops.ReActLoopOption {
 	return []reactloops.ReActLoopOption{
 		reactloops.WithDisableLoopPerception(true),
 		reactloops.WithDisablePeriodicVerification(true),
-		reactloops.WithDisableValueFeedback(true),
 	}
 }

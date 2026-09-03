@@ -20,10 +20,8 @@ type findingVerifyJob struct {
 }
 
 type findingVerifyOutcome struct {
-	findingID  string
 	index      int
 	incomplete bool
-	execErr    error
 }
 
 // runAllFindingVerifications executes Phase3 finding verification via forked sub-agents.
@@ -107,7 +105,7 @@ func runAllFindingVerifications(
 		outcomes = append(outcomes, outcome)
 
 		if vf := state.GetVerifiedFindingByID(verifyJob.finding.ID); vf != nil {
-			verifiedCount := len(state.GetVerifiedVulns())
+			verifiedCount := state.GetVerifiedVulnCount()
 			emit.Phase3ConcludeFinding(loop, verifyJob.finding.ID, vf.Status, verifiedCount, len(findings), verifyJob.finding.Title)
 		}
 		log.Infof("[CodeAudit/Phase3] [%d/%d] Finding %s verify done (incomplete=%v)",
@@ -150,10 +148,8 @@ func finalizeFindingVerifyAfterFork(
 	}
 
 	return findingVerifyOutcome{
-		findingID:  finding.ID,
 		index:      job.index,
 		incomplete: incomplete,
-		execErr:    forkResult.ExecErr,
 	}
 }
 

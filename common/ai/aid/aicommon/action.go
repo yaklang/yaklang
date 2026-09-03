@@ -569,12 +569,6 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		streamFinish:    streamCtx,
 	}
 
-	// Drop provider-injected <think>...</think> so @action JSON is visible to
-	// the extractor (models often emit reason-only first and fail format checks).
-	if reader != nil {
-		reader = NewStripThinkTagsReader(reader)
-	}
-
 	actionNames := []string{m.actionName}
 	actionNames = append(actionNames, m.alias...)
 

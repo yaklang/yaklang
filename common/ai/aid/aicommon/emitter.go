@@ -219,38 +219,6 @@ func (i *Emitter) WaitForStream() {
 	i.streamWG.Wait()
 }
 
-// WaitForStreamWithTimeout waits for all pending async stream copy goroutines
-// (registered by emitStreamEvent) to finish emitting their delta events, and
-// returns false if the timeout elapses first.
-//
-// Stream delta events are flushed asynchronously from copy goroutines, so a
-// synchronous terminal emission (e.g. success/fail of a loop) can overtake
-// content that is still being flushed — a consumer that stops listening once
-// it sees the terminal event would silently miss the trailing stream content
-// (e.g. the finalize summary answer payload). Terminal emitters should drain
-// pending streams through this bounded wait first; the timeout keeps a stuck
-// stream from blocking the terminal event forever.
-func (i *Emitter) WaitForStreamWithTimeout(timeout time.Duration) bool {
-	if i == nil || i.streamWG == nil {
-		return true
-	}
-	if timeout <= 0 {
-		i.streamWG.Wait()
-		return true
-	}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		i.streamWG.Wait()
-	}()
-	select {
-	case <-done:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
-}
-
 func (r *Emitter) SetInteractiveEventSaver(saver func(string, *schema.AiOutputEvent)) {
 	r.interactiveEventSaver = saver
 }

@@ -20,7 +20,7 @@ func newPhaseBInterruptedScanState(t *testing.T) *ScanState {
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/abs/app/a.php", "/abs/app/b.php", "/abs/app/c.php"})
 	scan.CommitToAudit()
-	scan.MarkFileDone("/abs/app/a.php")
+	markFileDoneForTest(scan, "/abs/app/a.php")
 	return scan
 }
 
@@ -46,7 +46,7 @@ func TestShouldResumeCategoryScanFromPhaseB_AllDone(t *testing.T) {
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/abs/app/a.php"})
 	scan.CommitToAudit()
-	scan.MarkFileDone("/abs/app/a.php")
+	markFileDoneForTest(scan, "/abs/app/a.php")
 	require.False(t, shouldResumeCategoryScanFromPhaseB(scan), "fully marked categories are not resumable")
 }
 
@@ -85,7 +85,7 @@ func TestPrepareCategoryResume_PhaseBAllDoneNotResumable(t *testing.T) {
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/abs/app/a.php"})
 	scan.CommitToAudit()
-	scan.MarkFileDone("/abs/app/a.php")
+	markFileDoneForTest(scan, "/abs/app/a.php")
 	require.False(t, prepareCategoryResume(scan, "sql-injection"))
 }
 
@@ -116,7 +116,7 @@ func TestFinalizeCategoryScanOnLoopEnd_PhaseBAllMarkedStillRecords(t *testing.T)
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/abs/app/a.php"})
 	scan.CommitToAudit()
-	scan.MarkFileDone("/abs/app/a.php")
+	markFileDoneForTest(scan, "/abs/app/a.php")
 	state := model.NewAuditState()
 	r := mock.NewMockInvoker(context.Background())
 	category := model.VulnCategory{ID: "sql-injection", Name: "SQL注入"}
@@ -139,10 +139,10 @@ func TestFallbackFinalizeCategoryScan_PartialMarksRemainingAndRecords(t *testing
 
 	fallbackFinalizeCategoryScan(r, state, scan, category, errors.New("budget exhausted"), nil)
 
-	// 兜底把剩余文件标记为 not_vul，并写入 observation。
+	// 兜底把剩余文件标记为 not_audited（未审计，区别于 not_vul），并写入 observation。
 	require.True(t, scan.AllDone())
-	require.Equal(t, FileDispositionNotVul, scan.GetFileDisposition("/abs/app/b.php"))
-	require.Equal(t, FileDispositionNotVul, scan.GetFileDisposition("/abs/app/c.php"))
+	require.Equal(t, FileDispositionNotAudited, scan.GetFileDisposition("/abs/app/b.php"))
+	require.Equal(t, FileDispositionNotAudited, scan.GetFileDisposition("/abs/app/c.php"))
 	require.Equal(t, 0, scan.PhaseBReadCount("/abs/app/b.php"))
 	require.Len(t, state.GetScanObservations(), 1)
 	obs := state.GetScanObservations()[0]
@@ -179,13 +179,13 @@ func TestBuildCategoryScanOutcome_TotalAndIncomplete(t *testing.T) {
 	}
 
 	// 无 observation → incomplete。
-	outcome := buildCategoryScanOutcome(state, catJob, nil)
+	outcome := buildCategoryScanOutcome(state, catJob)
 	require.True(t, outcome.incomplete)
 	require.Equal(t, 3, outcome.index)
 	require.Equal(t, 12, outcome.total)
 
 	// 有 observation → complete。
 	state.AddScanObservation(&model.ScanObservation{CategoryID: "sql-injection"})
-	outcome = buildCategoryScanOutcome(state, catJob, nil)
+	outcome = buildCategoryScanOutcome(state, catJob)
 	require.False(t, outcome.incomplete)
 }
