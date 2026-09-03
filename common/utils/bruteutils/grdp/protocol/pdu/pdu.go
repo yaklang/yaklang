@@ -121,6 +121,9 @@ type Client struct {
 	clientCoreData *gcc.ClientCoreData
 	remoteAppMode  bool
 	enableCliprdr  bool
+	// afterFontMap：第一条连接序列已走完。此后再出现 Demand Active /
+	// Deactivate All 是 AUTOLOGON 成功后的会话切换（真机 XP 不发 0x26）。
+	afterFontMap bool
 }
 
 func NewClient(t core.Transport) *Client {
@@ -314,6 +317,7 @@ func (c *Client) recvServerFontMapPDU(s []byte) {
 		return
 	}
 	c.transport.On("data", c.recvPDU)
+	c.afterFontMap = true
 	c.Emit("ready")
 }
 
@@ -325,10 +329,15 @@ func (c *Client) recvPDU(s []byte) {
 	r := bytes.NewReader(s)
 	for r.Len() > 0 {
 		left := r.Len()
+		if c.afterFontMap && classicShareRestart(remainingShareType(s, left)) {
+			glog.Info("classic share restart after FontMap (AUTOLOGON)")
+			c.Emit("logon", &SaveSessionInfo{InfoType: INFOTYPE_LOGON_PLAINNOTIFY})
+			return
+		}
 		p, err := readPDU(r)
 		if err != nil {
 			glog.Error(err)
-			if os.Getenv("YAK_RDP_XP_DUMP") != "" {
+			if os.Getenv("YAK_RDP_XP_DUMP") != "" && left <= len(s) {
 				n := left
 				if n > 24 {
 					n = 24
@@ -337,7 +346,7 @@ func (c *Client) recvPDU(s []byte) {
 			}
 			return
 		}
-		if p.ShareCtrlHeader.PDUType == PDUTYPE_DEACTIVATEALLPDU {
+		if !c.afterFontMap && p.ShareCtrlHeader.PDUType == PDUTYPE_DEACTIVATEALLPDU {
 			c.transport.On("data", c.recvDemandActivePDU)
 		}
 		dpdu, ok := p.Message.(*DataPDU)

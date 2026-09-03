@@ -231,10 +231,12 @@ func (s *classicRDPServer) sendServerFinalize(conn net.Conn, authed bool) error 
 		return writeMCSGlobal(conn, encodeDataPDU(0x02, fail, 1002, 0x103EA))
 	}
 	if s.successWithoutLogon {
-		// 真机 XP 成功路径：FontMap 后只推位图，没有 0x26。
-		bmp := make([]byte, 32)
-		bmp[0], bmp[1] = 0x01, 0x00
-		return writeMCSGlobal(conn, encodeDataPDU(0x02, bmp, 1002, 0x103EA))
+		// 真机 XP 成功：FontMap 后 Deactivate All / 二次 Demand Active，不发 0x26。
+		inner := &bytes.Buffer{}
+		core.WriteUInt32LE(0x103EA, inner)
+		core.WriteUInt16LE(1, inner)
+		inner.WriteByte(0)
+		return writeMCSGlobal(conn, encodeSharePDU(0x16, 1002, inner.Bytes()))
 	}
 	logon := encodeLogonV1("Administrator", "", 1)
 	return writeMCSGlobal(conn, encodeDataPDU(0x26, logon, 1002, 0x103EA))
