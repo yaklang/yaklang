@@ -181,11 +181,12 @@ func TestPostgreSQLStartupSSLQueryAndEdges(t *testing.T) {
 	q := pgTyped('Q', append([]byte("SELECT 1"), 0))
 	msg := parseRule(t, q, "application-layer.postgresql", "PostgreSQL")
 	require.Equal(t, uint64('Q'), uintVal(t, msg.Child("First")))
-	require.Equal(t, append([]byte("SELECT 1"), 0), bytesVal(t, msg.Child("Payload")))
+	require.Equal(t, append([]byte("SELECT 1"), 0), bytesVal(t, mustChild(t, msg, "Payload", "Query")))
 
 	authOK := pgTyped('R', []byte{0, 0, 0, 0})
 	r := parseRule(t, authOK, "application-layer.postgresql", "PostgreSQL")
 	require.Equal(t, uint64('R'), uintVal(t, r.Child("First")))
+	require.Equal(t, uint64(0), uintVal(t, mustChild(t, r, "Payload", "AuthType")))
 
 	errp := pgTyped('E', []byte("SERROR\x00C42601\x00Msyntax\x00\x00"))
 	e := parseRule(t, errp, "application-layer.postgresql", "PostgreSQL")
@@ -227,7 +228,7 @@ func TestPostgreSQLStartupSSLQueryAndEdges(t *testing.T) {
 	pwd := pgTyped('p', append([]byte("secret"), 0))
 	pp := parseRule(t, pwd, "application-layer.postgresql", "PostgreSQL")
 	require.Equal(t, uint64('p'), uintVal(t, pp.Child("First")))
-	require.Equal(t, append([]byte("secret"), 0), bytesVal(t, pp.Child("Payload")))
+	require.Equal(t, append([]byte("secret"), 0), bytesVal(t, mustChild(t, pp, "Payload", "Data")))
 
 	copyData := pgTyped('d', []byte{1, 2, 3})
 	d := parseRule(t, copyData, "application-layer.postgresql", "PostgreSQL")
@@ -254,7 +255,11 @@ func TestTDSPreloginLoginBatchAndEdges(t *testing.T) {
 	require.Equal(t, uint64(18), uintVal(t, p.Child("Type")))
 	require.Equal(t, uint64(1), uintVal(t, p.Child("Status")))
 	require.Equal(t, uint64(len(pre)), uintVal(t, p.Child("Length")))
-	require.Equal(t, []byte{0x00, 0x00, 0x1a, 0x00, 0x06, 0xff}, bytesVal(t, p.Child("Payload")))
+	preTokens := p.Child("Prelogin")
+	require.True(t, preTokens.IsList())
+	require.GreaterOrEqual(t, len(preTokens.Children()), 2)
+	require.Equal(t, uint64(0), uintVal(t, preTokens.Children()[0].Child("Type")))
+	require.Equal(t, uint64(0xff), uintVal(t, preTokens.Children()[len(preTokens.Children())-1].Child("Type")))
 
 	login := tdsPacket(16, 1, make([]byte, 32))
 	l := parseRule(t, login, "application-layer.tds", "TDS")

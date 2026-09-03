@@ -24,6 +24,21 @@ Package:
           this.ProcessSubNode("ERR")
           return
         }
+        if first == 0xfe {
+          this.ProcessSubNode("EOF")
+          return
+        }
+        if first == 0x01 {
+          return
+        }
+        if first == 0x03 {
+          this.ProcessSubNode("Query")
+          return
+        }
+        if first == 0x02 {
+          this.ProcessSubNode("Schema")
+          return
+        }
         this.ProcessSubNode("Rest")
       First: uint8
       Handshake:
@@ -53,4 +68,9 @@ Package:
       ERR:
         Error Code: uint16
         Rest: raw
+      EOF:
+        Warnings: uint16
+        Status Flags: uint16
+      Query: raw
+      Schema: raw
       Rest: raw

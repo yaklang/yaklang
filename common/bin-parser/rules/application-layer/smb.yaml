@@ -23,7 +23,10 @@ Package:
         this.ProcessByType("Negotiate")
         return
       }
-      this.ProcessSubNode("Body")
+      if cmd == 0x73 || cmd == 0x75 || cmd == 0xa2 || cmd == 0x2f || cmd == 0x2e {
+        this.ProcessByType("AndX")
+        return
+      }
     ProtocolId: uint32
     Command: uint8
     Status: uint32
@@ -57,3 +60,24 @@ Negotiate:
         this.ProcessSubNode("Name")
       BufferFormat: uint8
       Name: "del:\0;type:string"
+AndX:
+  operator: |
+    this.ProcessSubNode("WordCount")
+    this.ProcessSubNode("AndXCommand")
+    this.ProcessSubNode("AndXReserved")
+    this.ProcessSubNode("AndXOffset")
+    this.ProcessSubNode("ByteCount")
+    bc = getNodeResult("ByteCount").Value
+    if bc > 0 {
+      if bc > 0x10000 {
+        panic("smb: ByteCount too large")
+      }
+      this.GetSubNode("Buffer").SetMaxLength(bc)
+      this.ProcessSubNode("Buffer")
+    }
+  WordCount: uint8
+  AndXCommand: uint8
+  AndXReserved: uint8
+  AndXOffset: uint16
+  ByteCount: uint16
+  Buffer: raw

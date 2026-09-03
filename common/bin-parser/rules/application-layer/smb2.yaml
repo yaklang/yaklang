@@ -41,7 +41,54 @@ Package:
         }
         return
       }
-      this.ProcessSubNode("Body")
+      if cmd == 2 {
+        this.ProcessByType("Logoff")
+        return
+      }
+      if cmd == 3 {
+        if isResp {
+          this.ProcessByType("Tree Connect Response")
+        } else {
+          this.ProcessByType("Tree Connect Request")
+        }
+        return
+      }
+      if cmd == 4 {
+        this.ProcessByType("Tree Disconnect")
+        return
+      }
+      if cmd == 5 {
+        if isResp {
+          this.ProcessByType("Create Response")
+        } else {
+          this.ProcessByType("Create Request")
+        }
+        return
+      }
+      if cmd == 6 {
+        this.ProcessByType("Close")
+        return
+      }
+      if cmd == 8 {
+        if isResp {
+          this.ProcessByType("Read Response")
+        } else {
+          this.ProcessByType("Read Request")
+        }
+        return
+      }
+      if cmd == 9 {
+        this.ProcessByType("Write Request")
+        return
+      }
+      if cmd == 11 {
+        this.ProcessByType("IOCTL")
+        return
+      }
+      if cmd == 13 {
+        this.ProcessByType("Echo")
+        return
+      }
     ProtocolId: uint32
     StructureSize: uint16
     CreditCharge: uint16
@@ -201,5 +248,243 @@ Session Setup Response:
   SecurityBufferOffset: uint16
   SecurityBufferLength: uint16
   SecurityBuffer: raw
+Logoff:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Reserved")
+  StructureSize: uint16
+  Reserved: uint16
+Tree Connect Request:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("PathOffset")
+    this.ProcessSubNode("PathLength")
+    pl = getNodeResult("PathLength").Value
+    if pl > 0 {
+      if pl > 0x1000 {
+        panic("smb2: tree connect path too long")
+      }
+      this.GetSubNode("Path").SetMaxLength(pl)
+      this.ProcessSubNode("Path")
+    }
+  StructureSize: uint16
+  Reserved: uint16
+  PathOffset: uint16
+  PathLength: uint16
+  Path: raw
+Tree Connect Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("ShareType")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("ShareFlags")
+    this.ProcessSubNode("Capabilities")
+    this.ProcessSubNode("MaximalAccess")
+  StructureSize: uint16
+  ShareType: uint8
+  Reserved: uint8
+  ShareFlags: uint32
+  Capabilities: uint32
+  MaximalAccess: uint32
+Tree Disconnect:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Reserved")
+  StructureSize: uint16
+  Reserved: uint16
+Create Request:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("SecurityFlags")
+    this.ProcessSubNode("RequestedOplockLevel")
+    this.ProcessSubNode("ImpersonationLevel")
+    this.ProcessSubNode("SmbCreateFlags")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("DesiredAccess")
+    this.ProcessSubNode("FileAttributes")
+    this.ProcessSubNode("ShareAccess")
+    this.ProcessSubNode("CreateDisposition")
+    this.ProcessSubNode("CreateOptions")
+    this.ProcessSubNode("NameOffset")
+    this.ProcessSubNode("NameLength")
+    this.ProcessSubNode("CreateContextsOffset")
+    this.ProcessSubNode("CreateContextsLength")
+    nl = getNodeResult("NameLength").Value
+    if nl > 0 {
+      if nl > 0x1000 {
+        panic("smb2: create name too long")
+      }
+      this.GetSubNode("Name").SetMaxLength(nl)
+      this.ProcessSubNode("Name")
+    }
+  StructureSize: uint16
+  SecurityFlags: uint8
+  RequestedOplockLevel: uint8
+  ImpersonationLevel: uint32
+  SmbCreateFlags: uint64
+  Reserved: uint64
+  DesiredAccess: uint32
+  FileAttributes: uint32
+  ShareAccess: uint32
+  CreateDisposition: uint32
+  CreateOptions: uint32
+  NameOffset: uint16
+  NameLength: uint16
+  CreateContextsOffset: uint32
+  CreateContextsLength: uint32
+  Name: raw
+Create Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("OplockLevel")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("CreateAction")
+    this.ProcessSubNode("CreationTime")
+    this.ProcessSubNode("LastAccessTime")
+    this.ProcessSubNode("LastWriteTime")
+    this.ProcessSubNode("ChangeTime")
+    this.ProcessSubNode("AllocationSize")
+    this.ProcessSubNode("EndofFile")
+    this.ProcessSubNode("FileAttributes")
+    this.ProcessSubNode("Reserved2")
+    this.ProcessSubNode("FileId")
+    this.ProcessSubNode("CreateContextsOffset")
+    this.ProcessSubNode("CreateContextsLength")
+  StructureSize: uint16
+  OplockLevel: uint8
+  Flags: uint8
+  CreateAction: uint32
+  CreationTime: raw,8
+  LastAccessTime: raw,8
+  LastWriteTime: raw,8
+  ChangeTime: raw,8
+  AllocationSize: uint64
+  EndofFile: uint64
+  FileAttributes: uint32
+  Reserved2: uint32
+  FileId: raw,16
+  CreateContextsOffset: uint32
+  CreateContextsLength: uint32
+Close:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("FileId")
+  StructureSize: uint16
+  Flags: uint16
+  Reserved: uint32
+  FileId: raw,16
+Read Request:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Padding")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Length")
+    this.ProcessSubNode("Offset")
+    this.ProcessSubNode("FileId")
+    this.ProcessSubNode("MinimumCount")
+    this.ProcessSubNode("Channel")
+    this.ProcessSubNode("RemainingBytes")
+    this.ProcessSubNode("ReadChannelInfoOffset")
+    this.ProcessSubNode("ReadChannelInfoLength")
+  StructureSize: uint16
+  Padding: uint8
+  Flags: uint8
+  Length: uint32
+  Offset: uint64
+  FileId: raw,16
+  MinimumCount: uint32
+  Channel: uint32
+  RemainingBytes: uint32
+  ReadChannelInfoOffset: uint16
+  ReadChannelInfoLength: uint16
+Read Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("DataOffset")
+    this.ProcessSubNode("Reserved0")
+    this.ProcessSubNode("DataLength")
+    this.ProcessSubNode("DataRemaining")
+    this.ProcessSubNode("Reserved")
+    dl = getNodeResult("DataLength").Value
+    if dl > 0 {
+      if dl > 0x100000 {
+        panic("smb2: read data too large")
+      }
+      this.GetSubNode("Data").SetMaxLength(dl)
+      this.ProcessSubNode("Data")
+    }
+  StructureSize: uint16
+  DataOffset: uint8
+  Reserved0: uint8
+  DataLength: uint32
+  DataRemaining: uint32
+  Reserved: uint32
+  Data: raw
+Write Request:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("DataOffset")
+    this.ProcessSubNode("Length")
+    this.ProcessSubNode("Offset")
+    this.ProcessSubNode("FileId")
+    this.ProcessSubNode("Channel")
+    this.ProcessSubNode("RemainingBytes")
+    this.ProcessSubNode("WriteChannelInfoOffset")
+    this.ProcessSubNode("WriteChannelInfoLength")
+    this.ProcessSubNode("Flags")
+    wl = getNodeResult("Length").Value
+    if wl > 0 {
+      if wl > 0x100000 {
+        panic("smb2: write data too large")
+      }
+      this.GetSubNode("Data").SetMaxLength(wl)
+      this.ProcessSubNode("Data")
+    }
+  StructureSize: uint16
+  DataOffset: uint16
+  Length: uint32
+  Offset: uint64
+  FileId: raw,16
+  Channel: uint32
+  RemainingBytes: uint32
+  WriteChannelInfoOffset: uint16
+  WriteChannelInfoLength: uint16
+  Flags: uint32
+  Data: raw
+IOCTL:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("CtlCode")
+    this.ProcessSubNode("FileId")
+    this.ProcessSubNode("InputOffset")
+    this.ProcessSubNode("InputCount")
+    this.ProcessSubNode("MaxInputResponse")
+    this.ProcessSubNode("OutputOffset")
+    this.ProcessSubNode("OutputCount")
+    this.ProcessSubNode("MaxOutputResponse")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Reserved2")
+  StructureSize: uint16
+  Reserved: uint16
+  CtlCode: uint32
+  FileId: raw,16
+  InputOffset: uint32
+  InputCount: uint32
+  MaxInputResponse: uint32
+  OutputOffset: uint32
+  OutputCount: uint32
+  MaxOutputResponse: uint32
+  Flags: uint32
+  Reserved2: uint32
+Echo:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Reserved")
+  StructureSize: uint16
+  Reserved: uint16
 NTLMSSP: "import:application-layer/ntlm.yaml;node:NTLMSSP"
 SPNEGO: "import:application-layer/spnego.yaml;node:SPNEGO"
