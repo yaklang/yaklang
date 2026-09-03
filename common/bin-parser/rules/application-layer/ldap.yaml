@@ -45,7 +45,45 @@ Package:
       MessageID: raw
       ProtocolOp Tag: uint8
       ProtocolOp Length: uint8
-      ProtocolOp: raw
+      ProtocolOp:
+        operator: |
+          tag = getNodeResult("../ProtocolOp Tag").Value
+          if tag == 0x60 {
+            this.ProcessSubNode("BindRequest")
+            return
+          }
+        BindRequest:
+          operator: |
+            this.ProcessSubNode("Version Tag")
+            this.ProcessSubNode("Version Length")
+            vl = getNodeResult("Version Length").Value
+            if vl > 0 {
+              this.GetSubNode("Version").SetMaxLength(vl)
+              this.ProcessSubNode("Version")
+            }
+            this.ProcessSubNode("Name Tag")
+            this.ProcessSubNode("Name Length")
+            nl = getNodeResult("Name Length").Value
+            if nl > 0 {
+              this.GetSubNode("Name").SetMaxLength(nl)
+              this.ProcessSubNode("Name")
+            }
+            this.ProcessSubNode("Auth Tag")
+            this.ProcessSubNode("Auth Length")
+            al = getNodeResult("Auth Length").Value
+            if al > 0 {
+              this.GetSubNode("Auth").SetMaxLength(al)
+              this.ProcessSubNode("Auth")
+            }
+          Version Tag: uint8
+          Version Length: uint8
+          Version: raw
+          Name Tag: uint8
+          Name Length: uint8
+          Name: raw
+          Auth Tag: uint8
+          Auth Length: uint8
+          Auth: raw
   Message: BER
   LDAP:
     parser: |

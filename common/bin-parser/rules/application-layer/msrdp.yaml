@@ -52,11 +52,8 @@ Package:
         this.ProcessSubNode("Destination")
         this.ProcessSubNode("Source")
         this.ProcessSubNode("Class")
-        if this.GetSubNode("VariableData").GetRemainingSpace() != 0 {
-          rem = this.GetSubNode("VariableData").GetRemainingSpace()
-          if rem > 0x10000 {
-            panic("rdp: X224 variable data too large")
-          }
+        rem = this.GetSubNode("VariableData").GetRemainingSpace()
+        if rem > 0 && rem <= 0x10000 {
           this.GetSubNode("VariableData").SetMaxLength(rem)
           this.ProcessSubNode("VariableData")
         }
@@ -66,13 +63,17 @@ Package:
       Source: uint16
       Class: uint8
       VariableData:
+        Rest: raw
         operator: |
+          gotCookie = false
+          gotNeg = false
           res,op = this.TryProcessByType("RDPCookie")
           if op.OK {
             err = op.Save()
             if err != nil {
               panic(err)
             }
+            gotCookie = true
           } else {
             err = op.Recovery()
             if err != nil {
@@ -85,10 +86,18 @@ Package:
             if err != nil {
               panic(err)
             }
+            gotNeg = true
           } else {
             err = op.Recovery()
             if err != nil {
               panic(err)
+            }
+          }
+          if !gotCookie && !gotNeg {
+            leftover = this.GetSubNode("Rest").GetRemainingSpace()
+            if leftover > 0 && leftover <= 0x10000 {
+              this.GetSubNode("Rest").SetMaxLength(leftover)
+              this.ProcessSubNode("Rest")
             }
           }
 RDPCookie:

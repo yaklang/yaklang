@@ -202,7 +202,8 @@ func TestRADIUSAndEdges(t *testing.T) {
 	r := parseRule(t, pkt, "application-layer.radius", "RADIUS")
 	require.Equal(t, uint64(1), uintVal(t, r.Child("Code")))
 	require.Equal(t, uint64(7), uintVal(t, r.Child("Identifier")))
-	require.Equal(t, attr, bytesVal(t, r.Child("Attributes")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, r, "Attributes", "Type")))
+	require.Equal(t, user, bytesVal(t, mustChild(t, r, "Attributes", "Value")))
 
 	accept := make([]byte, 20)
 	accept[0] = 2
@@ -221,9 +222,7 @@ func TestRADIUSAndEdges(t *testing.T) {
 	short[0] = 1
 	binary.BigEndian.PutUint16(short[2:], 19)
 	parseMustFail(t, short, "application-layer.radius", "RADIUS")
-	trunc := append([]byte{}, pkt...)
-	binary.BigEndian.PutUint16(trunc[2:], uint16(len(trunc)+8))
-	parseMustFail(t, trunc, "application-layer.radius", "RADIUS")
+	parseMustFail(t, pkt[:22], "application-layer.radius", "RADIUS")
 
 	eth := parseEthernet(t, ipv4UDPFrame(t, 50000, 1812, gopacket.Payload(pkt)))
 	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "RADIUS", "Code")))
