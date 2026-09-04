@@ -60,7 +60,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("L2TP", "l2tp.yaml", 25, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 2661 SCCRQ Message Type AVP Ethernet+UDP/1701; TestP1FailPaths l2tp", ""),
 	p1card("PPTP", "application-layer/pptp.yaml", 20, 25, 20, 20, 10, "L2",
-		"pptp/icc RFC 2637 §2.11 PeerCallId 1 ConnectSpeed 64000 Framing Async; pptp/icrp RecvWindow 64 TCP/1723; TestP1FailPaths trunc-icc", ""),
+		"pptp/ccrq RFC 2637 §2.12 CallId 1; pptp/icc PeerCallId 1 ConnectSpeed 64000 TCP/1723; TestP1FailPaths trunc-ccrq", ""),
 	p1card("OpenVPN", "openvpn.yaml", 25, 25, 20, 20, 10, "L2",
 		"openvpn/hard-reset P_CONTROL_HARD_RESET_CLIENT_V2 Opcode 7 Packet ID 1; openvpn/data-v2 P_DATA_V2 Peer ID 1 UDP/1194; TestP1FailPaths openvpn", "Payload"),
 	p1card("WireGuard", "wireguard.yaml", 20, 25, 20, 20, 10, "L2",
