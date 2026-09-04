@@ -32,11 +32,27 @@ FirstWorld: "del: ;type:string"
 SIPBody:
   operator: |
     l = getCtx("body_length")
-    if l > 0 {
-      this.GetSubNode("Data").SetMaxLength(l)
-      this.ProcessSubNode("Data")
+    ct = getCtx("content_type")
+    if l > 0 && l < 1048576 {
+      sdp = false
+      if ct != nil {
+        if string(ct).Contains("application/sdp") {
+          sdp = true
+        }
+      }
+      if sdp {
+        this.GetSubNode("SDP").SetMaxLength(l)
+        this.ProcessSubNode("SDP")
+        return
+      }
+      this.GetSubNode("Octets").SetMaxLength(l)
+      this.ProcessSubNode("Octets")
     }
-  Data: raw
+  SDP:
+    unpack: true
+    operator: |
+      this.ProcessByType("SDPSession")
+  Octets: string
 SIPHeaders:
   operator: |
     for {
@@ -48,6 +64,10 @@ SIPHeaders:
       if s.HasPrefix("Content-Length: ") {
         setCtx("body_length", int(s[len("Content-Length: "):]))
       }
+      if s.HasPrefix("Content-Type: ") {
+        setCtx("content_type", s[len("Content-Type: "):])
+      }
     }
   list: true
   Item: "del:\r\n;type:string"
+SDPSession: "import:sdp.yaml;node:SDP"
