@@ -119,6 +119,9 @@ func (h *statelessAIEngineRuntimeHandle) activeTurnID() string {
 }
 
 func (h *statelessAIEngineRuntimeHandle) SendInput(ctx context.Context, input aiSessionInput) error {
+	if err := validateInputWorkspaceTurn(h.binding, input); err != nil {
+		return err
+	}
 	if strings.EqualFold(strings.TrimSpace(input.InputType), "hotpatch") {
 		return h.sendHotpatchInput(ctx, input)
 	}
