@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Application debug enabled in .env"
+	type: config
+	level: medium
+	rule_id: "php.dotenv.debug"
+	alert_min: 1
+)
+
+${*}.pattern_regex(/(?im)^[ \t]*APP_DEBUG[ \t]*=[ \t]*["']?(?:true|1)["']?[ \t]*(?:#.*)?$/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "Application debug enabled in .env",
+	message: "APP_DEBUG is enabled",
+}

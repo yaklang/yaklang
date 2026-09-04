@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "yaml.load without a safe Loader"
+	type: vuln
+	level: medium
+	rule_id: "py.yaml.unsafe_load"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?i)\byaml\.(?:unsafe_load\s*\(|load\s*\((?![^\n)]*[Ll]oader[ \t]*=))/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "yaml.load without a safe Loader",
+	message: "yaml.load is called without an explicit safe Loader argument",
+}

@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "TLS certificate verification disabled"
+	type: vuln
+	level: high
+	rule_id: "go.tls.insecure_skip_verify"
+	alert_min: 1
+)
+
+${*.go}.pattern_regex(/(?i)\bInsecureSkipVerify\b[ \t]*[:=][ \t]*true\b/) as $hit
+alert $hit for {
+	level: "high",
+	title: "TLS certificate verification disabled",
+	message: "tls.Config sets InsecureSkipVerify to true",
+}

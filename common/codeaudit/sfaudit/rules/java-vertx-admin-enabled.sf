@@ -1,0 +1,20 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Vert.x admin endpoint enabled"
+	type: config
+	level: medium
+	rule_id: "java.vertx.admin.enabled"
+	alert_min: 1
+)
+
+${*.conf}.pattern_regex(/(?im)^[ \t]*vertx\.admin\.enabled[ \t]*[=:][ \t]*["']?true/) as $conf
+${*.properties}.pattern_regex(/(?im)^[ \t]*vertx\.admin\.enabled[ \t]*[=:][ \t]*["']?true/) as $props
+${*.yml}.pattern_regex(/(?im)^[ \t]*vertx\.admin\.enabled[ \t]*[=:][ \t]*["']?true/) as $yml
+${*.yaml}.pattern_regex(/(?im)^[ \t]*vertx\.admin\.enabled[ \t]*[=:][ \t]*["']?true/) as $yaml
+$conf + $props + $yml + $yaml as $hit
+alert $hit for {
+	level: "medium",
+	title: "Vert.x admin endpoint enabled",
+	message: "vertx.admin.enabled is set to true",
+}

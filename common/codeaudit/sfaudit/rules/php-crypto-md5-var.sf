@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "MD5 used over variables"
+	type: vuln
+	level: medium
+	rule_id: "php.crypto.md5_var"
+	alert_min: 1
+)
+
+${*.php}.pattern_regex(/(?i)\bmd5\s*\(\s*\$/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "MD5 used over variables",
+	message: "md5() hashes variable data instead of password_hash()/SHA-256",
+}

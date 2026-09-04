@@ -14,7 +14,7 @@ func TestScanSecrets_SpringBootSample(t *testing.T) {
 	}
 
 	// The spring_boot_sample has:
-	// - application.yml with password: SuperSecret123 (config.password.property)
+	// - application.yml with password: SuperSecret123 (secret.config_sensitive_value)
 	// - pom.xml (no secrets)
 	// We expect at least 1 finding
 	if len(report.Findings) < 1 {

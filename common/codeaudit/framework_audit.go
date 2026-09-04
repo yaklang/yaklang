@@ -18,10 +18,11 @@ func RunFrameworkAudit(target string, framework string, opts ...ProbeOption) *Re
 	idx := BuildFSIndex(root, o)
 
 	// Find the framework signal
+	catalogForLang := catalog.FrameworkCatalog(o.Language)
 	var sig *catalog.FrameworkSignal
-	for i := range catalog.JavaFrameworkCatalog {
-		if catalog.JavaFrameworkCatalog[i].Name == framework {
-			sig = &catalog.JavaFrameworkCatalog[i]
+	for i := range catalogForLang {
+		if catalogForLang[i].Name == framework {
+			sig = &catalogForLang[i]
 			break
 		}
 	}
@@ -34,7 +35,7 @@ func RunFrameworkAudit(target string, framework string, opts ...ProbeOption) *Re
 
 	if sig != nil {
 		// Find entry points based on framework
-		entryPoints = findEntryPoints(idx, framework)
+		entryPoints = findEntryPoints(idx, framework, o.Language)
 
 		// Find config files
 		for _, marker := range sig.FileMarkers {
@@ -46,7 +47,7 @@ func RunFrameworkAudit(target string, framework string, opts ...ProbeOption) *Re
 		// Module structure
 		modules := detectModules(idx)
 		moduleInfo = map[string]any{
-			"build_system":  detectBuildSystem(idx),
+			"build_system":  detectBuildSystem(idx, o),
 			"modules":       modules,
 			"config_files":   configFiles,
 			"entry_points":   entryPoints,
@@ -67,56 +68,84 @@ func RunFrameworkAudit(target string, framework string, opts ...ProbeOption) *Re
 	return report.Finish(start, idx.FilesScanned, o)
 }
 
-// findEntryPoints finds Java entry point classes for a given framework.
-func findEntryPoints(idx *FSIndex, framework string) []string {
+// findEntryPoints finds entry point files for a given framework. Java keeps
+// its historical per-framework logic; other languages use conventional
+// entry file names.
+func findEntryPoints(idx *FSIndex, framework, language string) []string {
 	var out []string
 
-	switch framework {
-	case "spring_boot":
-		// Look for @SpringBootApplication annotated classes
-		for _, fp := range idx.FindByExtension(".java") {
-			content, ok := ReadFileLimited(fp, 100000)
-			if !ok {
-				continue
+	if language == "java" || language == "" {
+		switch framework {
+		case "spring_boot":
+			// Look for @SpringBootApplication annotated classes
+			for _, fp := range idx.FindByExtension(".java") {
+				content, ok := ReadFileLimited(fp, 100000)
+				if !ok {
+					continue
+				}
+				if strings.Contains(content, "@SpringBootApplication") {
+					out = append(out, fp)
+				}
 			}
-			if strings.Contains(content, "@SpringBootApplication") {
+		case "servlet":
+			// Look for web.xml servlet definitions
+			for _, fp := range idx.FindByExactName("web.xml") {
 				out = append(out, fp)
 			}
-		}
-	case "servlet":
-		// Look for web.xml servlet definitions
-		for _, fp := range idx.FindByExactName("web.xml") {
-			out = append(out, fp)
-		}
-	case "struts2":
-		// Look for struts.xml
-		for _, fp := range idx.FindByExactName("struts.xml") {
-			out = append(out, fp)
-		}
-	case "jfinal":
-		// Look for JFinalConfig or extends JFinal
-		for _, fp := range idx.FindByExtension(".java") {
-			content, ok := ReadFileLimited(fp, 100000)
-			if !ok {
-				continue
-			}
-			if strings.Contains(content, "JFinalConfig") || strings.Contains(content, "extends JFinal") {
+		case "struts2":
+			// Look for struts.xml
+			for _, fp := range idx.FindByExactName("struts.xml") {
 				out = append(out, fp)
 			}
-		}
-	case "play":
-		// Look for routes file
-		for _, fp := range idx.FindByExactName("routes") {
-			out = append(out, fp)
-		}
-	default:
-		// Generic: look for Application-like classes
-		for _, fp := range idx.FindByExtension(".java") {
-			base := filepath.Base(fp)
-			if strings.Contains(base, "Application") || strings.Contains(base, "Main") {
+		case "jfinal":
+			// Look for JFinalConfig or extends JFinal
+			for _, fp := range idx.FindByExtension(".java") {
+				content, ok := ReadFileLimited(fp, 100000)
+				if !ok {
+					continue
+				}
+				if strings.Contains(content, "JFinalConfig") || strings.Contains(content, "extends JFinal") {
+					out = append(out, fp)
+				}
+			}
+		case "play":
+			// Look for routes file
+			for _, fp := range idx.FindByExactName("routes") {
 				out = append(out, fp)
 			}
+		default:
+			// Generic: look for Application-like classes
+			for _, fp := range idx.FindByExtension(".java") {
+				base := filepath.Base(fp)
+				if strings.Contains(base, "Application") || strings.Contains(base, "Main") {
+					out = append(out, fp)
+				}
+			}
 		}
+		// Limit to reasonable number
+		if len(out) > 20 {
+			out = out[:20]
+		}
+		return out
+	}
+
+	switch language {
+	case "python":
+		out = append(out, idx.FindByExactName("manage.py")...)
+		out = append(out, idx.FindByExactName("app.py")...)
+		out = append(out, idx.FindByExactName("main.py")...)
+		out = append(out, idx.FindByExactName("wsgi.py")...)
+		out = append(out, idx.FindByExactName("asgi.py")...)
+	case "go":
+		out = append(out, idx.FindByExactName("main.go")...)
+	case "php":
+		out = append(out, idx.FindByExactName("artisan")...)
+		out = append(out, idx.FindByExactName("index.php")...)
+	case "node":
+		out = append(out, idx.FindByExactName("app.js")...)
+		out = append(out, idx.FindByExactName("server.js")...)
+		out = append(out, idx.FindByExactName("index.js")...)
+		out = append(out, idx.FindByExactName("main.ts")...)
 	}
 
 	// Limit to reasonable number

@@ -1,0 +1,20 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Hardcoded Shiro rememberMe cipher key"
+	type: config
+	level: critical
+	rule_id: "java.shiro.remember_me.cipher_key"
+	alert_min: 1
+)
+
+${*.ini}.pattern_regex(/(?im)^[ \t]*(?:securityManager\.)?rememberMeManager\.cipherKey[ \t]*[=:][ \t]*\S+/) as $ini
+${*.properties}.pattern_regex(/(?im)^[ \t]*(?:securityManager\.)?rememberMeManager\.cipherKey[ \t]*[=:][ \t]*\S+/) as $props
+${*.yml}.pattern_regex(/(?im)^[ \t]*(?:securityManager\.)?rememberMeManager\.cipherKey[ \t]*[=:][ \t]*\S+/) as $yml
+${*.yaml}.pattern_regex(/(?im)^[ \t]*(?:securityManager\.)?rememberMeManager\.cipherKey[ \t]*[=:][ \t]*\S+/) as $yaml
+$ini + $props + $yml + $yaml as $hit
+alert $hit for {
+	level: "critical",
+	title: "Hardcoded Shiro rememberMe cipher key",
+	message: "rememberMeManager.cipherKey is hardcoded",
+}

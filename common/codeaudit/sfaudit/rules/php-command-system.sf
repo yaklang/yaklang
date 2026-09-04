@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "OS command execution function used"
+	type: vuln
+	level: medium
+	rule_id: "php.command.system"
+	alert_min: 1
+)
+
+${*.php}.pattern_regex(/(?i)\b(?:system|exec|shell_exec|passthru|popen|proc_open)\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "OS command execution function used",
+	message: "PHP command execution function invoked",
+}

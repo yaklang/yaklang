@@ -19,15 +19,15 @@ func TestAuditCmsProduct_RuoYiMini(t *testing.T) {
 		t.Errorf("expected at least 1 finding from ruoyi CMS audit, got %d: %+v", len(report.Findings), report.Findings)
 	}
 
-	// Check for ruoyi.password.plain finding
+	// Check for java.ruoyi.password.plain finding
 	foundRuoYiPassword := false
 	for _, f := range report.Findings {
-		if f.ID == "ruoyi.password.plain" {
+		if f.ID == "java.ruoyi.password.plain" {
 			foundRuoYiPassword = true
 		}
 	}
 	if !foundRuoYiPassword {
-		t.Errorf("expected to find ruoyi.password.plain finding, got: %+v", report.Findings)
+		t.Errorf("expected to find java.ruoyi.password.plain finding, got: %+v", report.Findings)
 	}
 }
 

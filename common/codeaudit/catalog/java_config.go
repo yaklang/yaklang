@@ -20,7 +20,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Spring Boot ===
 	{
 		Framework:      "spring_boot",
-		ID:             "spring.actuator.exposed",
+		ID:             "java.spring.actuator.exposed",
 		Severity:       "high",
 		Title:          "Actuator endpoints overly exposed",
 		Recommendation: "restrict management endpoints and protect with authentication",
@@ -28,7 +28,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "spring_boot",
-		ID:             "spring.error.stacktrace",
+		ID:             "java.spring.error.stacktrace",
 		Severity:       "medium",
 		Title:          "Stack trace disclosure enabled",
 		Recommendation: "set server.error.include-stacktrace to never or on_trace_param",
@@ -36,7 +36,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "spring_boot",
-		ID:             "spring.datasource.password.plain",
+		ID:             "java.spring.datasource.password.plain",
 		Severity:       "high",
 		Title:          "Plain-text database password in configuration",
 		Recommendation: "move database credentials to environment variables or a secret manager",
@@ -45,7 +45,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "spring_boot",
-		ID:             "spring.cors.wildcard",
+		ID:             "java.spring.cors.wildcard",
 		Severity:       "medium",
 		Title:          "CORS allows all origins",
 		Recommendation: "restrict allowed origins to specific trusted domains",
@@ -53,7 +53,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "spring_boot",
-		ID:             "spring.devtools.secret",
+		ID:             "java.spring.devtools.secret",
 		Severity:       "high",
 		Title:          "Spring DevTools remote secret exposed",
 		Recommendation: "remove remote DevTools or use a strong, rotated secret",
@@ -64,7 +64,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Shiro ===
 	{
 		Framework:      "shiro",
-		ID:             "shiro.anon.url",
+		ID:             "java.shiro.anon.url",
 		Severity:       "high",
 		Title:          "Unauthenticated URL pattern in Shiro configuration",
 		Recommendation: "remove overly broad anon patterns or restrict to specific public paths",
@@ -72,7 +72,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "shiro",
-		ID:             "shiro.rememberme.cipherKey",
+		ID:             "java.shiro.remember_me.cipher_key",
 		Severity:       "critical",
 		Title:          "Hardcoded Shiro rememberMe cipher key",
 		Recommendation: "generate a unique random key; rotate any compromised keys",
@@ -82,7 +82,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Struts2 ===
 	{
 		Framework:      "struts2",
-		ID:             "struts2.devmode",
+		ID:             "java.struts2.dev_mode",
 		Severity:       "high",
 		Title:          "Struts2 devMode enabled in production",
 		Recommendation: "set struts.devMode to false in production",
@@ -90,7 +90,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "struts2",
-		ID:             "struts2.dmi",
+		ID:             "java.struts2.dynamic_method_invocation",
 		Severity:       "high",
 		Title:          "Struts2 dynamic method invocation enabled",
 		Recommendation: "disable DMI to prevent method invocation attacks",
@@ -100,7 +100,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Servlet ===
 	{
 		Framework:        "servlet",
-		ID:               "servlet.missing_security_headers",
+		ID:               "java.servlet.missing_security_headers",
 		Severity:         "low",
 		Title:            "Missing security headers in web.xml",
 		Recommendation:   "add security headers such as X-Content-Type-Options, X-Frame-Options",
@@ -111,7 +111,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Spring Security ===
 	{
 		Framework:      "spring_security",
-		ID:             "spring_security.csrf_disabled",
+		ID:             "java.spring_security.csrf_disabled",
 		Severity:       "medium",
 		Title:          "CSRF protection disabled",
 		Recommendation: "enable CSRF protection unless the API is stateless and token-based",
@@ -119,7 +119,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "spring_security",
-		ID:             "spring_security.permit_all",
+		ID:             "java.spring_security.permit_all",
 		Severity:       "high",
 		Title:          "Spring Security permits all requests",
 		Recommendation: "restrict permitAll to specific public endpoints only",
@@ -129,7 +129,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === MyBatis ===
 	{
 		Framework:      "mybatis",
-		ID:             "mybatis.dollar_placeholder",
+		ID:             "java.mybatis.dollar_placeholder",
 		Severity:       "high",
 		Title:          "MyBatis uses ${} placeholder (SQL injection risk)",
 		Recommendation: "use #{} instead of ${} to prevent SQL injection",
@@ -139,7 +139,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === JPA/Hibernate ===
 	{
 		Framework:      "jpa",
-		ID:             "jpa.show_sql",
+		ID:             "java.jpa.show_sql",
 		Severity:       "low",
 		Title:          "JPA/Hibernate SQL logging enabled",
 		Recommendation: "disable show-sql in production to prevent information leakage",
@@ -147,7 +147,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 	{
 		Framework:      "jpa",
-		ID:             "jpa.password.inline",
+		ID:             "java.jpa.password.inline",
 		Severity:       "high",
 		Title:          "JPA/Hibernate password in configuration",
 		Recommendation: "move database passwords to environment variables",
@@ -158,7 +158,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Dubbo ===
 	{
 		Framework:      "dubbo",
-		ID:             "dubbo.token.inline",
+		ID:             "java.dubbo.token.inline",
 		Severity:       "medium",
 		Title:          "Dubbo token configured inline",
 		Recommendation: "move token to external configuration or secret manager",
@@ -169,7 +169,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Spring Cloud ===
 	{
 		Framework:      "spring_cloud",
-		ID:             "spring_cloud.secret.inline",
+		ID:             "java.spring_cloud.secret.inline",
 		Severity:       "high",
 		Title:          "Spring Cloud sensitive secret in config",
 		Recommendation: "use Vault or encrypted config server instead of inline secrets",
@@ -180,7 +180,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === JFinal ===
 	{
 		Framework:      "jfinal",
-		ID:             "jfinal.password.inline",
+		ID:             "java.jfinal.password.inline",
 		Severity:       "high",
 		Title:          "JFinal database password in config",
 		Recommendation: "use environment variables for database credentials",
@@ -191,7 +191,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Vert.x ===
 	{
 		Framework:      "vertx",
-		ID:             "vertx.admin.enabled",
+		ID:             "java.vertx.admin.enabled",
 		Severity:       "medium",
 		Title:          "Vert.x admin endpoint enabled",
 		Recommendation: "disable admin endpoints in production or restrict access",
@@ -201,7 +201,7 @@ var JavaConfigRules = []ConfigCheckRule{
 	// === Play ===
 	{
 		Framework:      "play",
-		ID:             "play.crypto.secret",
+		ID:             "java.play.crypto.secret",
 		Severity:       "critical",
 		Title:          "Play Framework crypto secret in config",
 		Recommendation: "use environment variable APPLICATION_SECRET; rotate exposed keys",
@@ -210,34 +210,3 @@ var JavaConfigRules = []ConfigCheckRule{
 	},
 }
 
-// GetConfigRules returns config rules filtered by language and framework.
-func GetConfigRules(language, framework string) []ConfigCheckRule {
-	var out []ConfigCheckRule
-	for _, r := range JavaConfigRules {
-		if r.Framework == framework {
-			out = append(out, r)
-		}
-	}
-	return out
-}
-
-// GetCmsConfigRules returns config rules for CMS-specific checks.
-// These are rules that apply regardless of framework when a CMS is detected.
-func GetCmsConfigRules(cmsID string) []ConfigCheckRule {
-	switch cmsID {
-	case "ruoyi", "ruoyi-cloud":
-		return []ConfigCheckRule{
-			{
-				Framework:      "ruoyi",
-				ID:             "ruoyi.password.plain",
-				Severity:       "high",
-				Title:          "RuoYi database password in plain text",
-				Recommendation: "move database password to environment variable or encrypted config",
-				FilePatterns:   []string{"application*.yml", "application*.yaml", "application*.properties"},
-				MaskValue:      true,
-			},
-		}
-	default:
-		return nil
-	}
-}

@@ -1,0 +1,19 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Actuator endpoints overly exposed"
+	type: config
+	level: high
+	rule_id: "java.spring.actuator.exposed"
+	alert_min: 1
+)
+
+${*.properties}.pattern_regex(/(?im)^[ \t]*management\.endpoints\.web\.exposure\.include[ \t]*=[ \t]*["']?[^"'\n]*\*/) as $props
+${*.yml}.pattern_regex(/(?is)management:\s*\n[ \t]+endpoints:\s*\n[ \t]+web:\s*\n[ \t]+exposure:\s*\n[ \t]+include:\s*\K["']?\*/) as $yml
+${*.yaml}.pattern_regex(/(?is)management:\s*\n[ \t]+endpoints:\s*\n[ \t]+web:\s*\n[ \t]+exposure:\s*\n[ \t]+include:\s*\K["']?\*/) as $yaml
+$props + $yml + $yaml as $hit
+alert $hit for {
+	level: "high",
+	title: "Actuator endpoints overly exposed",
+	message: "management.endpoints.web.exposure.include contains a wildcard",
+}

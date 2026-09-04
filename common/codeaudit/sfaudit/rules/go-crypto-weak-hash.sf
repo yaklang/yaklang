@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Weak hash algorithm (MD5/SHA-1)"
+	type: vuln
+	level: medium
+	rule_id: "go.crypto.weak_hash"
+	alert_min: 1
+)
+
+${*.go}.pattern_regex(/(?i)\b(?:md5|sha1)\.(?:New|Sum)\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "Weak hash algorithm (MD5/SHA-1)",
+	message: "MD5/SHA-1 is used where a stronger hash is expected",
+}

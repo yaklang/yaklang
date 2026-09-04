@@ -32,6 +32,16 @@ var DefaultSecretRules = []SecretRule{
 		Note:     "JDBC URL contains inline username/password",
 	},
 	{
+		ID:       "secret.db_url_credential",
+		Severity: "high",
+		Note:     "database/service URL contains inline username/password",
+	},
+	{
+		ID:       "secret.dotenv_credential",
+		Severity: "high",
+		Note:     "credential committed in dotenv-style KEY=value file",
+	},
+	{
 		ID:       "secret.aws_access_key",
 		Severity: "critical",
 		Note:     "possible AWS access key id",
@@ -52,7 +62,7 @@ var DefaultSecretRules = []SecretRule{
 		Note:     "static final secret constant",
 	},
 	{
-		ID:             "config.password.property",
+		ID:             "secret.config_sensitive_value",
 		Severity:       "high",
 		Note:           "sensitive value in configuration file",
 		FileExtensions: []string{".properties", ".yml", ".yaml", ".xml", ".ini"},

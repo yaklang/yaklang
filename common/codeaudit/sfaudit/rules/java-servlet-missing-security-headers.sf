@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Missing security headers in web.xml"
+	type: config
+	level: low
+	rule_id: "java.servlet.missing_security_headers"
+	alert_min: 1
+)
+
+${*.xml}.pattern_regex(/<security-constraint/) as $present
+alert $present for {
+	level: "low",
+	title: "web.xml declares security-constraint",
+	message: "web.xml declares a security-constraint",
+}

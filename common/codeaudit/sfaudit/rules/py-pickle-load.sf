@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "pickle deserialization of untrusted data"
+	type: vuln
+	level: medium
+	rule_id: "py.pickle.load"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?i)\bpickle\.loads?\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "pickle deserialization of untrusted data",
+	message: "pickle.load/loads can execute arbitrary code when fed untrusted input",
+}

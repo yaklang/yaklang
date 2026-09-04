@@ -60,7 +60,7 @@ func TestScanSecrets_PlaceholderFilter(t *testing.T) {
 
 	// The value "changeme" should be filtered as a placeholder
 	for _, f := range report.Findings {
-		if f.ID == "config.password.property" || f.ID == "secret.password_assignment" {
+		if f.ID == "secret.config_sensitive_value" || f.ID == "secret.password_assignment" {
 			t.Errorf("expected placeholder 'changeme' to be filtered, but found: %s", f.ID)
 		}
 	}

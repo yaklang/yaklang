@@ -34,6 +34,7 @@ var allBuiltinSkills = []struct {
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
+	{"code-audit", "skills/code-audit/SKILL.md", []string{"project_probe", "language", "framework_config_audit", "django", "wordpress", "rejectUnauthorized"}},
 }
 
 func useTempBuiltinSkillReleaseDB(t *testing.T) {

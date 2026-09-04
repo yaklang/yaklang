@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "unserialize() on potentially untrusted data"
+	type: vuln
+	level: medium
+	rule_id: "php.unserialize"
+	alert_min: 1
+)
+
+${*.php}.pattern_regex(/(?i)\bunserialize\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "unserialize() on potentially untrusted data",
+	message: "unserialize() can instantiate arbitrary objects (POP chains)",
+}

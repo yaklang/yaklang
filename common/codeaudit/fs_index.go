@@ -13,6 +13,12 @@ var excludedDirs = map[string]bool{
 	".idea": true, ".vscode": true,
 	"target": true, "build": true, ".gradle": true,
 	"out": true, "dist": true,
+	// python environments and caches
+	"venv": true, ".venv": true, "virtualenv": true,
+	"site-packages": true, ".tox": true,
+	".pytest_cache": true, ".mypy_cache": true, "__pypackages__": true,
+	// vendored / third-party trees
+	"vendor": true, "__tests__": true,
 }
 
 // excludedTestPathFragments are path fragments that indicate test directories.
@@ -20,6 +26,7 @@ var excludedTestPathFragments = []string{
 	"/src/test/", "/src/tests/",
 	"/test/java/", "/tests/java/",
 	"/test-fixtures/", "/testfixtures/",
+	"_test.go",
 }
 
 // FSIndex is a project file system index.

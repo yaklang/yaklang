@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Flask app bound to all interfaces"
+	type: config
+	level: low
+	rule_id: "py.flask.host_all_interfaces"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?i)\.run\([^\n)]*host[ \t]*=[ \t]*['"]0\.0\.0\.0['"]/) as $hit
+alert $hit for {
+	level: "low",
+	title: "Flask app bound to all interfaces",
+	message: "app.run(...) binds to 0.0.0.0",
+}

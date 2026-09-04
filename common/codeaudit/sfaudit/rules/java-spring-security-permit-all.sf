@@ -1,0 +1,20 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Spring Security permits all requests"
+	type: config
+	level: high
+	rule_id: "java.spring_security.permit_all"
+	alert_min: 1
+)
+
+${*.java}.pattern_regex(/permitAll\(\)/) as $java
+${*.yml}.pattern_regex(/permitAll\(\)/) as $yml
+${*.yaml}.pattern_regex(/permitAll\(\)/) as $yaml
+${*.xml}.pattern_regex(/permitAll\(\)/) as $xml
+$java + $yml + $yaml + $xml as $hit
+alert $hit for {
+	level: "high",
+	title: "Spring Security permits all requests",
+	message: "permitAll() found in security configuration",
+}

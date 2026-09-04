@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "MyBatis uses ${} placeholder (SQL injection risk)"
+	type: config
+	level: high
+	rule_id: "java.mybatis.dollar_placeholder"
+	alert_min: 1
+)
+
+${*.xml}.pattern_regex(/\$\{/) as $hit
+alert $hit for {
+	level: "high",
+	title: "MyBatis uses ${} placeholder (SQL injection risk)",
+	message: "${} string substitution found in MyBatis mapper XML",
+}

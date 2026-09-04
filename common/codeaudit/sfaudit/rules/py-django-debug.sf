@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Django DEBUG enabled"
+	type: config
+	level: high
+	rule_id: "py.django.debug"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?im)^[ \t]*DEBUG[ \t]*=[ \t]*True\b/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Django DEBUG enabled",
+	message: "DEBUG = True leaks stack traces and settings in production",
+}

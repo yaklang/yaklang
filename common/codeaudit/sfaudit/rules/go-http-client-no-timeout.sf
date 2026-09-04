@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "http.Client constructed without a Timeout"
+	type: config
+	level: medium
+	rule_id: "go.http.client_no_timeout"
+	alert_min: 1
+)
+
+${*.go}.pattern_regex(/(?i)\bhttp\.Client[ \t]*\{(?![^}]{0,800}Timeout[ \t]*:)[^}]{0,800}\}/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "http.Client constructed without a Timeout",
+	message: "http.Client literal has no Timeout field",
+}

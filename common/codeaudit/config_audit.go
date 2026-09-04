@@ -21,8 +21,8 @@ func AuditConfig(target string, framework string, opts ...ProbeOption) *Report {
 
 	rules := catalog.GetConfigRules(o.Language, framework)
 	if o.ConfigScope == "all" {
-		// Get all rules regardless of framework
-		rules = catalog.JavaConfigRules
+		// Get all rules of the language regardless of framework
+		rules = catalog.AllConfigRules(o.Language)
 	}
 
 	report := NewReport("codeaudit/config_audit", root, framework)
@@ -51,7 +51,7 @@ func AuditCmsProduct(target string, opts ...ProbeOption) *Report {
 	report := NewReport("codeaudit/cms_audit", root, o.Language)
 
 	for _, cms := range cmsProducts {
-		rules := catalog.GetCmsConfigRules(cms.ID)
+		rules := catalog.GetCmsConfigRules(o.Language, cms.ID)
 		runConfigRules(context.Background(), report, rules, idx, o)
 	}
 
@@ -165,10 +165,18 @@ func matchGlobInIndex(idx *FSIndex, pattern string) []string {
 	return out
 }
 
-// maskValueInSnippet masks the value part (after the first = or :) of a
-// single-line evidence snippet, mirroring the previous behavior of reporting
-// masked credential values.
+// maskValueInSnippet masks the value part of a single-line evidence snippet
+// (after the first "=>", "=" or ":"), mirroring the previous behavior of
+// reporting masked credential values.
 func maskValueInSnippet(line string) string {
+	if arrow := strings.Index(line, "=>"); arrow >= 0 {
+		key := line[:arrow+2]
+		value := strings.TrimSpace(line[arrow+2:])
+		if value == "" {
+			return line
+		}
+		return key + " " + maskSecretValue(value)
+	}
 	idx := strings.IndexAny(line, "=:")
 	if idx < 0 {
 		return line

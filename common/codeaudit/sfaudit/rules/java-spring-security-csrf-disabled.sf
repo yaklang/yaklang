@@ -1,0 +1,21 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "CSRF protection disabled"
+	type: config
+	level: medium
+	rule_id: "java.spring_security.csrf_disabled"
+	alert_min: 1
+)
+
+${*.properties}.pattern_regex(/(?im)^[ \t]*spring\.security\.csrf\.enabled[ \t]*=[ \t]*["']?false/) as $props
+${*.yml}.pattern_regex(/(?i)csrf[^\n]*disabled/) as $yml
+${*.yaml}.pattern_regex(/(?i)csrf[^\n]*disabled/) as $yaml
+${*.xml}.pattern_regex(/(?i)csrf[^\n]*disabled/) as $xml
+${*.java}.pattern_regex(/(?i)csrf[^\n]*disabled/) as $java
+$props + $yml + $yaml + $xml + $java as $hit
+alert $hit for {
+	level: "medium",
+	title: "CSRF protection disabled",
+	message: "CSRF protection appears to be disabled",
+}

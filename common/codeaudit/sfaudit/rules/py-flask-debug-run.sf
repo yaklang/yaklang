@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Flask app started with debug enabled"
+	type: config
+	level: medium
+	rule_id: "py.flask.debug_run"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?i)\.run\([^\n)]*debug[ \t]*=[ \t]*True\b/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "Flask app started with debug enabled",
+	message: "app.run(...) is called with debug=True",
+}

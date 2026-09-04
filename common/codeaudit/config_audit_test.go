@@ -21,18 +21,18 @@ func TestConfigAudit_SpringBoot(t *testing.T) {
 	foundActuator := false
 	foundPassword := false
 	for _, f := range report.Findings {
-		if f.ID == "spring.actuator.exposed" {
+		if f.ID == "java.spring.actuator.exposed" {
 			foundActuator = true
 		}
-		if f.ID == "spring.datasource.password.plain" {
+		if f.ID == "java.spring.datasource.password.plain" {
 			foundPassword = true
 		}
 	}
 	if !foundActuator {
-		t.Errorf("expected to find spring.actuator.exposed finding")
+		t.Errorf("expected to find java.spring.actuator.exposed finding")
 	}
 	if !foundPassword {
-		t.Errorf("expected to find spring.datasource.password.plain finding")
+		t.Errorf("expected to find java.spring.datasource.password.plain finding")
 	}
 }
 
@@ -66,7 +66,7 @@ func TestConfigAudit_Shiro(t *testing.T) {
 	foundAnonURL := false
 	foundCipherKey := false
 	for _, f := range report.Findings {
-		if f.ID == "shiro.anon.url" {
+		if f.ID == "java.shiro.anon.url" {
 			foundAnonURL = true
 		}
 		if f.ID == "shiro.rememberme.cipherKey" {
@@ -74,7 +74,7 @@ func TestConfigAudit_Shiro(t *testing.T) {
 		}
 	}
 	if !foundAnonURL {
-		t.Errorf("expected to find shiro.anon.url finding")
+		t.Errorf("expected to find java.shiro.anon.url finding")
 	}
 	if !foundCipherKey {
 		t.Errorf("expected to find shiro.rememberme.cipherKey finding")

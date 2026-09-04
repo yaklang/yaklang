@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "requests TLS verification disabled"
+	type: vuln
+	level: medium
+	rule_id: "py.requests.verify_false"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?i)\brequests\.(?:get|post|put|patch|delete|head|options|request)\s*\([^\n)]*verify[ \t]*=[ \t]*False\b/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "requests TLS verification disabled",
+	message: "requests call passes verify=False",
+}

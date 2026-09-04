@@ -1,0 +1,18 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Django CORS allows all origins"
+	type: config
+	level: medium
+	rule_id: "py.django.cors_allow_all"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?im)^[ \t]*CORS_ALLOW_ALL_ORIGINS[ \t]*=[ \t]*True\b/) as $all
+${*.py}.pattern_regex(/(?im)^[ \t]*CORS_ALLOWED_ORIGINS[ \t]*=[ \t]*\[[^\]\n]*['"]\*['"][^\]\n]*\]/) as $list
+$all + $list as $hit
+alert $hit for {
+	level: "medium",
+	title: "Django CORS allows all origins",
+	message: "CORS configuration accepts every origin",
+}

@@ -101,6 +101,10 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	// Add code audit tools from codeaudittools package (Java static security audit)
 	tools = append(tools, codeaudittools.CreateCodeAuditTools()...)
 
+	// Add language-generic code audit tools (project_probe etc., with required
+	// `language` param dispatching java/python/go/php/node content packs)
+	tools = append(tools, codeaudittools.CreateGenericCodeAuditTools()...)
+
 	// Add IM notify tools (send_im_message / configure_im_credentials) from notifytools package
 	tools = append(tools, notifytools.CreateNotifySendTools()...)
 

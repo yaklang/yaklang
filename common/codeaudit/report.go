@@ -19,7 +19,7 @@ type Report struct {
 
 // Finding represents a single audit finding.
 type Finding struct {
-	ID             string     `json:"id"`              // rule ID, e.g. "spring.actuator.exposed"
+	ID             string     `json:"id"`              // rule ID, e.g. "java.spring.actuator.exposed"
 	Severity       string     `json:"severity"`        // critical/high/medium/low
 	Title          string     `json:"title"`
 	Recommendation string     `json:"recommendation"`

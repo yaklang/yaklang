@@ -17,7 +17,7 @@ func ProbeProject(target string, opts ...ProbeOption) *Report {
 	root := resolveScanRoot(target, o)
 	idx := BuildFSIndex(root, o)
 
-	buildSystem := detectBuildSystem(idx)
+	buildSystem := detectBuildSystem(idx, o)
 	frameworks := detectFrameworks(idx, o)
 	cmsProducts := detectCmsProducts(idx, o)
 	recommended := recommendTools(frameworks, cmsProducts, o)
@@ -89,19 +89,24 @@ func resolveScanRoot(target string, opts *ProbeOptions) string {
 	return abs
 }
 
-// detectBuildSystem detects the build system from file presence.
-func detectBuildSystem(idx *FSIndex) string {
-	hasPom := len(idx.FindByExactName("pom.xml")) > 0
-	hasGradle := len(idx.FindByExactName("build.gradle")) > 0 || len(idx.FindByExactName("build.gradle.kts")) > 0
-	switch {
-	case hasPom && hasGradle:
-		return "mixed"
-	case hasPom:
-		return "maven"
-	case hasGradle:
-		return "gradle"
-	default:
+// detectBuildSystem detects the build system from marker files, following
+// the language profile. Multiple distinct build systems mean "mixed".
+func detectBuildSystem(idx *FSIndex, o *ProbeOptions) string {
+	names := map[string]bool{}
+	var ordered []string
+	for _, rule := range catalog.LanguageProfileFor(o.Language).BuildSystems {
+		if len(idx.FindByExactName(rule.Marker)) > 0 && !names[rule.Name] {
+			names[rule.Name] = true
+			ordered = append(ordered, rule.Name)
+		}
+	}
+	switch len(ordered) {
+	case 0:
 		return "unknown"
+	case 1:
+		return ordered[0]
+	default:
+		return "mixed"
 	}
 }
 
@@ -125,7 +130,7 @@ func detectFrameworks(idx *FSIndex, o *ProbeOptions) []FrameworkDetection {
 	}
 
 	var out []FrameworkDetection
-	for _, sig := range catalog.JavaFrameworkCatalog {
+	for _, sig := range catalog.FrameworkCatalog(o.Language) {
 		if excludeSet[sig.Name] {
 			continue
 		}
@@ -146,7 +151,7 @@ func detectFrameworks(idx *FSIndex, o *ProbeOptions) []FrameworkDetection {
 		// Check content markers in relevant files
 		contentHit := false
 		strongHit := false
-		filesToCheck := getFilesForContentCheck(idx, sig)
+		filesToCheck := getFilesForContentCheck(idx, sig, o.Language)
 		for _, fp := range filesToCheck {
 			content, ok := ReadFileLimited(fp, 1000000)
 			if !ok {
@@ -192,16 +197,16 @@ func detectFrameworks(idx *FSIndex, o *ProbeOptions) []FrameworkDetection {
 }
 
 // getFilesForContentCheck returns files relevant to content marker checking.
-func getFilesForContentCheck(idx *FSIndex, sig catalog.FrameworkSignal) []string {
-	// Look at pom.xml, build.gradle, and config files
+func getFilesForContentCheck(idx *FSIndex, sig catalog.FrameworkSignal, language string) []string {
+	// Look at the signal's own marker files first
 	var files []string
 	for _, marker := range sig.FileMarkers {
 		files = append(files, idx.FindByName(marker)...)
 	}
-	// Also check Java source files (limited)
+	// Otherwise fall back to a bounded sample of the language's source files
 	if len(files) == 0 {
-		files = append(files, idx.FindByExtension(".java")...)
-		// Limit to first 20 java files for performance
+		files = append(files, idx.FindByExtension(catalog.LanguageProfileFor(language).SourceExt)...)
+		// Limit to first 20 files for performance
 		if len(files) > 20 {
 			files = files[:20]
 		}
@@ -224,7 +229,7 @@ func detectCmsProducts(idx *FSIndex, o *ProbeOptions) []CmsDetection {
 	}
 
 	var out []CmsDetection
-	for _, fp := range catalog.JavaCmsCatalog {
+	for _, fp := range catalog.CmsCatalog(o.Language) {
 		if len(forcedSet) > 0 && !forcedSet[fp.ID] {
 			// Only check forced products if any are specified
 			continue
@@ -246,12 +251,16 @@ func detectCmsProducts(idx *FSIndex, o *ProbeOptions) []CmsDetection {
 			confidence += 0.35
 		}
 
-		// Check content markers (regex)
-		// Scan pom.xml, build.gradle, and known config files
+		// Check content markers (regex) in the language's fingerprint files
 		checkFiles := []string{}
-		checkFiles = append(checkFiles, idx.FindByExactName("pom.xml")...)
-		checkFiles = append(checkFiles, idx.FindByExactName("build.gradle")...)
-		checkFiles = append(checkFiles, idx.FindByName("application")...)
+		for _, name := range catalog.LanguageProfileFor(o.Language).CMSContentFiles {
+			if name == "application" {
+				// historical Java behavior: prefix match for spring config files
+				checkFiles = append(checkFiles, idx.FindByName(name)...)
+			} else {
+				checkFiles = append(checkFiles, idx.FindByExactName(name)...)
+			}
+		}
 		contentHit := false
 		for _, cf := range checkFiles {
 			content, ok := ReadFileLimited(cf, 1000000)
@@ -300,21 +309,32 @@ func detectCmsProducts(idx *FSIndex, o *ProbeOptions) []CmsDetection {
 }
 
 // recommendTools generates a list of recommended tools based on detected frameworks and CMS.
+// Java keeps its historical java_* tool names; other languages recommend the
+// language-generic tools.
 func recommendTools(frameworks []FrameworkDetection, cmsProducts []CmsDetection, o *ProbeOptions) []string {
-	tools := []string{
-		"java_maven_gradle_dependencies",
-		"java_hardcoded_secrets_scan",
-	}
-
-	// Add CMS audit tool if CMS detected
-	if len(cmsProducts) > 0 {
-		tools = append(tools, "java_cms_product_audit")
+	var tools []string
+	if o.Language == "java" {
+		tools = []string{
+			"java_maven_gradle_dependencies",
+			"java_hardcoded_secrets_scan",
+		}
+		if len(cmsProducts) > 0 {
+			tools = append(tools, "java_cms_product_audit")
+		}
+	} else {
+		tools = []string{
+			"dependencies_scan",
+			"secrets_scan",
+		}
+		if len(cmsProducts) > 0 {
+			tools = append(tools, "cms_product_audit")
+		}
 	}
 
 	// Add framework-specific tools
 	seen := map[string]bool{}
 	for _, fw := range frameworks {
-		for _, sig := range catalog.JavaFrameworkCatalog {
+		for _, sig := range catalog.FrameworkCatalog(o.Language) {
 			if sig.Name == fw.Name {
 				if sig.ArchTool != "" && !seen[sig.ArchTool] {
 					tools = append(tools, sig.ArchTool)

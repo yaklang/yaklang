@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "subprocess launched with shell=True"
+	type: vuln
+	level: medium
+	rule_id: "py.subprocess.shell_true"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?i)\bsubprocess\.(?:run|call|check_call|check_output|Popen)\s*\([^\n)]*shell[ \t]*=[ \t]*True\b/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "subprocess launched with shell=True",
+	message: "subprocess call passes shell=True",
+}

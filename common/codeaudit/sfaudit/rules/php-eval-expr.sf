@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "eval() used in PHP code"
+	type: vuln
+	level: medium
+	rule_id: "php.eval.expr"
+	alert_min: 1
+)
+
+${*.php}.pattern_regex(/(?i)\beval\s*\(/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "eval() used in PHP code",
+	message: "eval() executes arbitrary code strings",
+}

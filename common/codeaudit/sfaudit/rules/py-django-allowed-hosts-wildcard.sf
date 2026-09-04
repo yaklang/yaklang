@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Django ALLOWED_HOSTS accepts any host"
+	type: config
+	level: medium
+	rule_id: "py.django.allowed_hosts_wildcard"
+	alert_min: 1
+)
+
+${*.py}.pattern_regex(/(?im)^[ \t]*ALLOWED_HOSTS[ \t]*=[ \t]*\[[^\]\n]*['"]\*['"][^\]\n]*\]/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "Django ALLOWED_HOSTS accepts any host",
+	message: "ALLOWED_HOSTS contains a '*' wildcard entry",
+}

@@ -1,0 +1,20 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "child_process command execution"
+	type: vuln
+	level: medium
+	rule_id: "node.child_process.exec"
+	alert_min: 1
+)
+
+${*.js}.pattern_regex(/(?im)(?:^|[^.\w\r\n])(?:exec|execSync)[ \t]*\(/) as $js
+${*.ts}.pattern_regex(/(?im)(?:^|[^.\w\r\n])(?:exec|execSync)[ \t]*\(/) as $ts
+${*.mjs}.pattern_regex(/(?im)(?:^|[^.\w\r\n])(?:exec|execSync)[ \t]*\(/) as $mjs
+${*.cjs}.pattern_regex(/(?im)(?:^|[^.\w\r\n])(?:exec|execSync)[ \t]*\(/) as $cjs
+$js + $ts + $mjs + $cjs as $hit
+alert $hit for {
+	level: "medium",
+	title: "child_process command execution",
+	message: "child_process exec/execSync runs a command through a shell",
+}

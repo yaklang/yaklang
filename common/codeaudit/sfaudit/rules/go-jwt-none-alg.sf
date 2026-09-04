@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "JWT signed with the none algorithm"
+	type: vuln
+	level: medium
+	rule_id: "go.jwt.none_alg"
+	alert_min: 1
+)
+
+${*.go}.pattern_regex(/(?i)\bSigningMethodNone\b|["']alg["'][ \t]*:[ \t]*["']none["']/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "JWT signed with the none algorithm",
+	message: "JWT code references the none signing method",
+}

@@ -1,0 +1,20 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Node.js TLS verification disabled"
+	type: vuln
+	level: high
+	rule_id: "node.tls.reject_unauthorized"
+	alert_min: 1
+)
+
+${*.js}.pattern_regex(/(?i)rejectUnauthorized[ \t]*:[ \t]*false\b|NODE_TLS_REJECT_UNAUTHORIZED[ \t]*=[ \t]*["']?0["']?/) as $js
+${*.ts}.pattern_regex(/(?i)rejectUnauthorized[ \t]*:[ \t]*false\b|NODE_TLS_REJECT_UNAUTHORIZED[ \t]*=[ \t]*["']?0["']?/) as $ts
+${*.mjs}.pattern_regex(/(?i)rejectUnauthorized[ \t]*:[ \t]*false\b|NODE_TLS_REJECT_UNAUTHORIZED[ \t]*=[ \t]*["']?0["']?/) as $mjs
+${*.cjs}.pattern_regex(/(?i)rejectUnauthorized[ \t]*:[ \t]*false\b|NODE_TLS_REJECT_UNAUTHORIZED[ \t]*=[ \t]*["']?0["']?/) as $cjs
+$js + $ts + $mjs + $cjs as $hit
+alert $hit for {
+	level: "high",
+	title: "Node.js TLS verification disabled",
+	message: "rejectUnauthorized is false or NODE_TLS_REJECT_UNAUTHORIZED=0",
+}

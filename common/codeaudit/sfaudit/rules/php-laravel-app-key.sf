@@ -1,0 +1,16 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "Laravel APP_KEY committed to the repository"
+	type: config
+	level: high
+	rule_id: "php.laravel.app_key"
+	alert_min: 1
+)
+
+${*}.pattern_regex(/(?im)^[ \t]*APP_KEY[ \t]*=[ \t]*["']?(?!(?:changeme?|change[-_]me|xxx*|placeholder|example|your[-_][a-z-]*|SomeRandomString|base64:xxx*|#|\$\{))[^\s"'\n]{8,}/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Laravel APP_KEY committed to the repository",
+	message: ".env style file carries a literal APP_KEY value",
+}
