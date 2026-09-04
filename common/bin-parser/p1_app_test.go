@@ -90,6 +90,12 @@ func TestP1UDPApplications(t *testing.T) {
 	eth = parseEthernet(t, ipv4UDPBytes(t, 5005, 5005, rtcp))
 	require.Equal(t, uint64(200), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTCP").Child("Packet Type")))
 
+	sr := mustHex(t, "80c80006123456781112141822242628333435364445464755565758")
+	srs := parseRule(t, sr, "rtp", "RTCP")
+	require.Equal(t, uint64(0x44454647), uintVal(t, mustChild(t, srs, "RTCPSR").Child("Packet Count")))
+	eth = parseEthernet(t, ipv4UDPBytes(t, 5005, 5005, sr))
+	require.Equal(t, uint64(0x55565758), uintVal(t, mustChild(t, eth, "IP", "UDP", "RTCP", "RTCPSR").Child("Octet Count")))
+
 	// RFC 2661 data 0202 0014 0001 0002 … : T=0 L=0 S=0 O=1 Ver=2.
 	// Length-present layout would steal 0x0014 as Length and report Tunnel=1.
 	l2tp := mustHex(t, "02020014000100020000ff03002d")

@@ -186,6 +186,17 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, parseRule(t, []byte{0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0xaa}, "rtp", "RTP").Child("Sequence")))
 	})
 
+	t.Run("rtcp/sr", func(t *testing.T) {
+		sr := mustChild(t, parseRule(t, mustHex(t, "80c80006123456781112141822242628333435364445464755565758"), "rtp", "RTCP"), "RTCPSR")
+		require.Equal(t, uint64(0x44454647), uintVal(t, sr.Child("Packet Count")))
+		require.Equal(t, uint64(0x11121418), uintVal(t, sr.Child("NTP MSW")))
+	})
+	t.Run("rtcp/rr", func(t *testing.T) {
+		n := parseRule(t, mustHex(t, "80c9000112345678"), "rtp", "RTCP")
+		require.Equal(t, uint64(201), uintVal(t, n.Child("Packet Type")))
+		require.Nil(t, n.Child("RTCPSR"))
+	})
+
 	t.Run("websocket/text", func(t *testing.T) {
 		n := parseRule(t, []byte{0x81, 0x05, 'H', 'e', 'l', 'l', 'o'}, "application-layer.websocket", "WebSocket")
 		require.Equal(t, "Hello", strVal(t, n.Child("Text")))

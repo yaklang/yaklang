@@ -75,16 +75,33 @@ Package:
         panic("rtcp: unexpected packet type")
       }
       this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      total = (l + 1) * 4
+      if total < 8 {
+        panic("rtcp: length too small")
+      }
+      if total >= 1048576 {
+        panic("rtcp: packet too large")
+      }
+      this.SetMaxLength(total)
       this.ProcessSubNode("SSRC")
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Body").SetMaxLength(rest)
-          this.ProcessSubNode("Body")
+      if pt == 200 {
+        rest = 0
+        if this.GetMaxLength() > this.Length() {
+          rest = this.GetMaxLength() - this.Length()
         }
+        if rest >= 20 && rest < 1048576 {
+          this.ProcessByType("RTCPSR")
+        }
+        return
       }
     VersionPCount: uint8
     Packet Type: uint8
     Length: uint16
     SSRC: uint32
-    Body: raw
+RTCPSR:
+  NTP MSW: uint32
+  NTP LSW: uint32
+  RTP Timestamp: uint32
+  Packet Count: uint32
+  Octet Count: uint32
