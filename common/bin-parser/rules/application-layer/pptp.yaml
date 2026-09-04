@@ -55,6 +55,14 @@ Package:
           this.ProcessByType("Outgoing Call Reply")
           return
         }
+        if type == 5 {
+          this.ProcessByType("Echo Request")
+          return
+        }
+        if type == 15 {
+          this.ProcessByType("Set Link Info")
+          return
+        }
       ProtocolVersion: uint16
       Reserved2: uint16
       FramingCapabilities: uint32
@@ -109,6 +117,9 @@ Outgoing Call Reply:
     RecvWindowSize: uint16
     ProcessingDelay: uint16
     PhysicalChannelId: uint32
+
+Echo Request:
+    Identifier: uint32
 
 Set Link Info:
     PeerCallId: uint16
