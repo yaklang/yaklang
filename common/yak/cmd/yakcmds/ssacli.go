@@ -638,7 +638,16 @@ var syntaxflowFormat = &cli.Command{
 	Name:    "syntaxflow-format",
 	Aliases: []string{"sf-format", "sf-fmt"},
 	Usage:   "format SyntaxFlow rule",
-	Flags:   []cli.Flag{},
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "rule-version-output,o",
+			Usage: "generate rule_versions.json from formatted rules to this file",
+		},
+		cli.StringFlag{
+			Name:  "rule-version-baseline",
+			Usage: "existing rule_versions.json used as the version baseline (defaults to --rule-version-output)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		if len(c.Args()) == 0 {
 			log.Errorf("syntaxflow-format: no file provided")
@@ -692,6 +701,44 @@ var syntaxflowFormat = &cli.Command{
 				}))
 			} else {
 				log.Errorf("syntaxflow-format: file %s not found", path)
+			}
+		}
+
+		if output := c.String("rule-version-output"); output != "" && errors == nil {
+			var dirs []string
+			for _, path := range c.Args() {
+				if utils.IsDir(path) {
+					dirs = append(dirs, path)
+				}
+			}
+			if len(dirs) == 0 {
+				return utils.Error("--rule-version-output requires at least one directory argument")
+			}
+			// The baseline carries the previous rule versions. Without it every rule
+			// looks "new" and gets re-versioned to today, rewriting the whole table
+			// for no reason, so refuse instead of silently bumping everything.
+			baseline := c.String("rule-version-baseline")
+			if baseline == "" {
+				baseline = output
+			}
+			if !utils.IsFile(baseline) {
+				return utils.Errorf("rule version baseline not found: %s (pass --rule-version-baseline to point at the existing rule_versions.json)", baseline)
+			}
+			ruleInfos, err := sfbuildin.GenerateRuleVersionsFromLocalFS(dirs, baseline)
+			if err != nil {
+				return err
+			}
+			jsonData, err := json.MarshalIndent(ruleInfos, "", "  ")
+			if err != nil {
+				return err
+			}
+			if old, err := os.ReadFile(output); err == nil && bytes.Equal(old, jsonData) {
+				log.Infof("syntaxflow-format: rule versions unchanged, skip writing %s", output)
+			} else {
+				if err := os.WriteFile(output, jsonData, 0o666); err != nil {
+					return err
+				}
+				log.Infof("syntaxflow-format: rule versions written to %s", output)
 			}
 		}
 		return errors
