@@ -297,6 +297,16 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("pop3/err", func(t *testing.T) {
 		require.Equal(t, "-ERR", strVal(t, parseRule(t, []byte("-ERR no\r\n"), "pop3", "POP3").Child("Status")))
 	})
+	t.Run("pop3/stat", func(t *testing.T) {
+		st := mustChild(t, parseRule(t, []byte("+OK 2 320\r\n"), "pop3", "POP3"), "POP3Stat")
+		require.Equal(t, "2", strVal(t, st.Child("Messages")))
+		require.Equal(t, "320", strVal(t, st.Child("Octets")))
+	})
+	t.Run("pop3/list", func(t *testing.T) {
+		scan := parseRule(t, []byte("+OK 2 messages (320 octets)\r\n1 120\r\n2 200\r\n.\r\n"), "pop3", "POP3").Child("POP3Extra").Children()
+		require.Equal(t, "1", strVal(t, scan[0].Child("Number")))
+		require.Equal(t, "120", strVal(t, scan[0].Child("Size")))
+	})
 
 	t.Run("imap/untagged", func(t *testing.T) {
 		require.Equal(t, "OK", strVal(t, parseRule(t, []byte("* OK IMAP4rev1 ready\r\n"), "imap", "IMAP").Child("Command")))

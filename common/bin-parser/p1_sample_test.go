@@ -636,6 +636,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		capa := []byte("+OK Capability list follows\r\nUSER\r\nUIDL\r\n.\r\n")
 		po := parseRule(t, capa, "pop3", "POP3")
 		require.Equal(t, "+OK", strVal(t, po.Child("Status")))
+		require.Equal(t, "Capability list follows", strVal(t, po.Child("Arg")))
 		lines := mustChild(t, po, "POP3Extra").Children()
 		require.GreaterOrEqual(t, len(lines), 3)
 		require.Equal(t, "USER", strVal(t, lines[0].Child("Text")))
@@ -644,6 +645,39 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 110, 110, capa))
 		el := mustChild(t, eth, "IP", "TCP", "POP3", "POP3Extra").Children()
 		require.Equal(t, "USER", strVal(t, el[0].Child("Text")))
+	})
+
+	t.Run("pop3/stat", func(t *testing.T) {
+		// RFC 1939 STAT: +OK nn mm (messages, octets). Wireshark pop.response.
+		raw := []byte("+OK 2 320\r\n")
+		po := parseRule(t, raw, "pop3", "POP3")
+		require.Equal(t, "+OK", strVal(t, po.Child("Status")))
+		st := mustChild(t, po, "POP3Stat")
+		require.Equal(t, "2", strVal(t, st.Child("Messages")))
+		require.Equal(t, "320", strVal(t, st.Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 110, 110, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "POP3", "POP3Stat")
+		require.Equal(t, "2", strVal(t, wired.Child("Messages")))
+		require.Equal(t, "320", strVal(t, wired.Child("Octets")))
+	})
+
+	t.Run("pop3/list", func(t *testing.T) {
+		// RFC 1939 LIST scan listing: msg-number octets, terminated by ".".
+		raw := []byte("+OK 2 messages (320 octets)\r\n1 120\r\n2 200\r\n.\r\n")
+		po := parseRule(t, raw, "pop3", "POP3")
+		require.Equal(t, "+OK", strVal(t, po.Child("Status")))
+		require.Equal(t, "2 messages (320 octets)", strVal(t, po.Child("Arg")))
+		lines := mustChild(t, po, "POP3Extra").Children()
+		require.GreaterOrEqual(t, len(lines), 3)
+		require.Equal(t, "1", strVal(t, lines[0].Child("Number")))
+		require.Equal(t, "120", strVal(t, lines[0].Child("Size")))
+		require.Equal(t, "2", strVal(t, lines[1].Child("Number")))
+		require.Equal(t, "200", strVal(t, lines[1].Child("Size")))
+		require.Equal(t, ".", strVal(t, lines[2].Child("Text")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 110, 110, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "POP3", "POP3Extra").Children()
+		require.Equal(t, "1", strVal(t, wired[0].Child("Number")))
+		require.Equal(t, "120", strVal(t, wired[0].Child("Size")))
 	})
 
 	t.Run("imap/rfc3501", func(t *testing.T) {
