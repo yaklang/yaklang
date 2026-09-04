@@ -43,6 +43,27 @@ Package:
           list: true
           list-length-from-field: "../Header/Answer RRs"
           Answer:
+            operator: |
+              this.ProcessSubNode("Name")
+              this.ProcessSubNode("Type")
+              this.ProcessSubNode("Class")
+              this.ProcessSubNode("TTL")
+              this.ProcessSubNode("RDLength")
+              t = getNodeResult("Type").Value
+              l = getNodeResult("RDLength").Value
+              if t == 1 && l == 4 {
+                this.ProcessByType("DNSA")
+                return
+              }
+              if t == 12 && l > 0 && l < 1048576 {
+                this.ProcessByType("DNSPTR")
+                return
+              }
+              if l > 0 && l < 1048576 {
+                this.GetSubNode("RData").SetMaxLength(l)
+                this.ProcessSubNode("RData")
+              }
+              return
             Name:
               operator: |
                   res,op = this.TryProcessSubNode("PointerFlag")
@@ -53,14 +74,14 @@ Package:
                           this.ProcessSubNode("Pointer")
                       }else{
                           op.Recovery()
-                          this.ProcessSubNode("Data")
+                          this.ProcessSubNode("Labels")
                       }
                   }else{
                       panic(op.Message)
                   }
               PointerFlag: uint8,2bit
               Pointer: uint16,14bit
-              Data: String
+              Labels: String
             Type: uint16
             Class: uint16
             TTL: uint32
@@ -75,7 +96,11 @@ String:
         setCtx("inList",false)
         return
       }
-      this.GetSubNode("Data").SetMaxLength(count)
-      this.ProcessSubNode("Data")
+      this.GetSubNode("Text").SetMaxLength(count)
+      this.ProcessSubNode("Text")
     Count: uint8
-    Data: string
+    Text: string
+DNSA:
+  Address: raw,4
+DNSPTR:
+  Name: String

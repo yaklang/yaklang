@@ -1444,4 +1444,39 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 3389, 50000, raw))
 		require.Equal(t, uint64(0xd0), uintVal(t, mustChild(t, eth, "IP", "TCP", "RDP", "X224").Child("Flag")))
 	})
+
+	t.Run("mdns/ptr", func(t *testing.T) {
+		// RFC 6763 DNS-SD PTR query _http._tcp.local. Wireshark dns.qry.name.
+		raw := []byte{
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x05, '_', 'h', 't', 't', 'p', 0x04, '_', 't', 'c', 'p', 0x05, 'l', 'o', 'c', 'a', 'l', 0x00,
+			0x00, 0x0c, 0x00, 0x01,
+		}
+		n := parseRule(t, raw, "application-layer.dns", "DNS")
+		q := n.Child("Questions").Children()[0]
+		require.Equal(t, uint64(12), uintVal(t, q.Child("Type")))
+		labels := q.Child("Name").Children()
+		require.GreaterOrEqual(t, len(labels), 3)
+		require.Equal(t, "_http", strVal(t, labels[0].Child("Text")))
+		require.Equal(t, "_tcp", strVal(t, labels[1].Child("Text")))
+		require.Equal(t, "local", strVal(t, labels[2].Child("Text")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5353, 5353, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "MDNS")
+		require.Equal(t, "_http", strVal(t, wired.Child("Questions").Children()[0].Child("Name").Children()[0].Child("Text")))
+		require.Equal(t, uint64(12), uintVal(t, wired.Child("Questions").Children()[0].Child("Type")))
+	})
+
+	t.Run("mdns/a", func(t *testing.T) {
+		// Existing ethernet DNS A response for cloudconfig.jetbrains.com (parse_test.go fixture).
+		// Wireshark dns.a 52.18.236.21. Replay on UDP/5353 as mDNS.
+		raw := mustHex(t, "bc35818000010002000000000b636c6f7564636f6e666967096a6574627261696e7303636f6d0000010001c00c000100010000001300043412ec15c00c00010001000000130004364dbb13")
+		n := parseRule(t, raw, "application-layer.dns", "DNS")
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, n, "Header").Child("Answer RRs")))
+		ans := n.Child("Answers").Children()[0]
+		require.Equal(t, uint64(1), uintVal(t, ans.Child("Type")))
+		require.Equal(t, []byte{0x34, 0x12, 0xec, 0x15}, bytesVal(t, mustChild(t, ans, "DNSA").Child("Address")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 5353, 5353, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "MDNS", "Answers").Children()[0]
+		require.Equal(t, []byte{0x34, 0x12, 0xec, 0x15}, bytesVal(t, mustChild(t, wired, "DNSA").Child("Address")))
+	})
 }
