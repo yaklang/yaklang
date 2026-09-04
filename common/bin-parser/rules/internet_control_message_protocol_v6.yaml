@@ -9,6 +9,10 @@ Package:
       operator: |
         type = getNodeResult("@ICMPV6/Type").Value
         switch type {
+          case 1:
+            this.ProcessByType("Destination Unreachable")
+          case 2:
+            this.ProcessByType("Packet Too Big")
           case 128:
             this.ProcessByType("Echo Request")
           case 129:
@@ -222,24 +226,28 @@ NDPOption:
   Prefix: raw,16
   Octets: string
 Destination Unreachable:
-    Code: uint8
-    Checksum: uint16
-    Unused: uint32
-    Payload:
-      unpack: true
-      operator: |
-        code = getNodeResult("@Destination Unreachable/Code").Value
-        switch code {
-          case 1:
-            this.ProcessByType("No Route to Destination")
-          case 2:
-            this.ProcessByType("Communication with Destination Administratively Prohibited")
-          case 3:
-            this.ProcessByType("Beyond Scope of Source Address")
-          case 4:
-            this.ProcessByType("Address Unreachable")
-          case 5:
-            this.ProcessByType("Port Unreachable")
-          default:
-            return
-        }
+  operator: |
+    this.ProcessSubNode("Unused")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  Unused: uint32
+  Original Datagram: string
+Packet Too Big:
+  operator: |
+    this.ProcessSubNode("MTU")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Original Datagram").SetMaxLength(rest)
+      this.ProcessSubNode("Original Datagram")
+    }
+  MTU: uint32
+  Original Datagram: string
