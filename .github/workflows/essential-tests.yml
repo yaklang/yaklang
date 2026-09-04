@@ -211,7 +211,15 @@ jobs:
         env:
           SHOULD_RUN: ${{ env.SHOULD_RUN }}
 
+  # Go build/module caches (GOCACHE + GOMODCACHE) are shared through actions/cache
+  # instead of a per-run 656MB artifact:
+  #   - prepare-yak restores, builds the yak binary, then saves both caches;
+  #   - every compiling job restores the same run key first, then falls back to the
+  #     newest cache for the current go.sum, then to any previous essential-go cache.
+  # The yak binary itself is still shipped as the essential-tests-yak artifact,
+  # because it must always match the tested commit exactly.
   prepare-yak:
+
     needs: check-wip
     if: needs.check-wip.outputs.should_run_tests == 'true' && needs.check-wip.outputs.test_scope == 'full'
     runs-on: ubuntu-22.04
