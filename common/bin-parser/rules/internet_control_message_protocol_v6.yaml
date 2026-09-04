@@ -1,3 +1,4 @@
+endian: big
 Package:
   ICMPV6:
     Type: uint8
@@ -24,31 +25,202 @@ Package:
             return
         }
 Echo Request:
-    Identifier: uint16
-    Sequence Number: uint16
-    Data: raw
+  operator: |
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Sequence Number")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Echo Data").SetMaxLength(rest)
+      this.ProcessSubNode("Echo Data")
+    }
+  Identifier: uint16
+  Sequence Number: uint16
+  Echo Data: string
 Echo Reply:
-    Identifier: uint16
-    Sequence Number: uint16
-    Data: raw
+  operator: |
+    this.ProcessSubNode("Identifier")
+    this.ProcessSubNode("Sequence Number")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest > 0 && rest < 1048576 {
+      this.GetSubNode("Echo Data").SetMaxLength(rest)
+      this.ProcessSubNode("Echo Data")
+    }
+  Identifier: uint16
+  Sequence Number: uint16
+  Echo Data: string
 Router Solicitation:
-    Reserved: raw,4
-    Options: raw
+  operator: |
+    this.ProcessSubNode("Reserved")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Reserved: raw,4
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
 Router Advertisement:
-    Hop Limit: uint8
-    Flags: uint8
-    Router Lifetime: uint16
-    Reachable Time: uint32
-    Retrans Timer: uint32
-    Options: raw
+  operator: |
+    this.ProcessSubNode("Hop Limit")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Router Lifetime")
+    this.ProcessSubNode("Reachable Time")
+    this.ProcessSubNode("Retrans Timer")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Hop Limit: uint8
+  Flags: uint8
+  Router Lifetime: uint16
+  Reachable Time: uint32
+  Retrans Timer: uint32
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
 Neighbor Solicitation:
-    Reserved: raw,4
-    Target Address: raw,16
-    Options: raw
+  operator: |
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Target Address")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Reserved: raw,4
+  Target Address: raw,16
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
 Neighbor Advertisement:
-    Flags: uint32
-    Target Address: raw,16
-    Options: raw
+  operator: |
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Target Address")
+    rest = 0
+    if this.GetMaxLength() > this.Length() {
+      rest = this.GetMaxLength() - this.Length()
+    }
+    if rest >= 2 && rest < 1048576 {
+      this.GetSubNode("Options").SetMaxLength(rest)
+      this.ProcessSubNode("Options")
+    }
+  Flags: uint32
+  Target Address: raw,16
+  Options:
+    list: true
+    Option: NDPOption
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 || ele.GetMaxLength() > 1048576 {
+          break
+        }
+        prev = this.Length()
+        ele.Process()
+        if this.Length() <= prev {
+          break
+        }
+      }
+NDPOption:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    n = getNodeResult("Length").Value
+    t = getNodeResult("Type").Value
+    if n < 1 {
+      panic("ndp: option length smaller than 1")
+    }
+    body = n * 8 - 2
+    if t == 1 || t == 2 {
+      if body > 0 && body < 1048576 {
+        this.GetSubNode("Link Layer").SetMaxLength(body)
+        this.ProcessSubNode("Link Layer")
+      }
+      return
+    }
+    if t == 5 {
+      this.ProcessSubNode("MTU Reserved")
+      this.ProcessSubNode("MTU")
+      return
+    }
+    if t == 3 {
+      this.ProcessSubNode("Prefix Length")
+      this.ProcessSubNode("Prefix Flags")
+      this.ProcessSubNode("Valid Lifetime")
+      this.ProcessSubNode("Preferred Lifetime")
+      this.ProcessSubNode("Prefix Reserved")
+      this.ProcessSubNode("Prefix")
+      return
+    }
+    if body > 0 && body < 1048576 {
+      this.GetSubNode("Octets").SetMaxLength(body)
+      this.ProcessSubNode("Octets")
+    }
+  Type: uint8
+  Length: uint8
+  Link Layer: raw,6
+  MTU Reserved: uint16
+  MTU: uint32
+  Prefix Length: uint8
+  Prefix Flags: uint8
+  Valid Lifetime: uint32
+  Preferred Lifetime: uint32
+  Prefix Reserved: uint32
+  Prefix: raw,16
+  Octets: string
 Destination Unreachable:
     Code: uint8
     Checksum: uint16
