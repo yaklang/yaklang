@@ -13,7 +13,10 @@
 - In scope: bounded asynchronous Bind dispatch, broker acknowledgement renewal,
   cancel/close/rebind delivery during preparation, consumer-loss cleanup,
   ordinary managed-attachment origin/redirect/UTF-8 compatibility, and relevant
-  generic file-read/search edge cases found in the previous branch.
+  generic file-read/search edge cases found in the previous branch. The real
+  final-source run additionally exposed a dropped LiteForge child deadline;
+  preserve that deadline through inherited Provider callbacks. Its paired
+  Legion fix atomically fails idle Professional Tasks and queues runtime cancel.
 - Out of scope: restoring log task/version hardcodes, unrestricted URLs or
   tools, changing attachment quotas, new tasks, deployment, merge or release.
 - Publication: update the two existing Draft PRs under the user's existing
@@ -35,6 +38,7 @@
 | F-05 | Generic read/search retain valid text, original byte offsets and bounded memory | Unicode/page regression before failure and after success; existing bounded streaming tests | pass |
 | F-06 | Cross-owner task creation and correctly formed input download are denied | Real isolated API sessions/node grants; persisted state unchanged | pending |
 | F-07 | Main log and same-name input workflows remain correct on final sources | Existing source-impact audit plus affected final-source runtime checks | pending |
+| F-08 | Optional LiteForge initialization obeys its child context while the parent remains alive | Both cancellation and deadline fail before the fix and pass after | pass |
 
 ## Evidence handling
 
@@ -52,3 +56,9 @@ invocation passed. Earlier artifact-harness compilation/cleanup/acknowledgement
 assertion corrections remain recorded in the evidence history. A one-line
 duplicate `sync` import from the refreshed upstream `common/yakgrpc/server.go`
 was removed because it prevented the relevant packages from compiling.
+
+The run on 8c924b817 prepared the 1 GiB workspace but failed from inactivity
+while optional initialization was waiting on the Provider. Its subsequent
+runtime access and manual cancellation/cleanup are retained as failure evidence.
+The paired Legion runtime-timeout contract owns F-09 and terminal projection;
+F-07 must be rerun only after these affected source changes are frozen.
