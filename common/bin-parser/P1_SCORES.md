@@ -12,9 +12,9 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 
 | 协议 | 等级 | 总分 | Schema | 流量 | 测试 | 分支 | 栈 | 样本 | 规则 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ethernet 802.2 | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `llc.yaml` |
-| Ethernet 802.3 | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `llc.yaml` |
-| Ethernet SNAP | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `llc.yaml` |
+| Ethernet 802.2 | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `llc.yaml` |
+| Ethernet 802.3 | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `llc.yaml` |
+| Ethernet SNAP | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `llc.yaml` |
 | IEEE 802.1ad QinQ | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `ieee_802_1ad.yaml` |
 | PPP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `ppp.yaml` |
 | PPPoE Discovery | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `pppoe.yaml` |

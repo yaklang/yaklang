@@ -674,6 +674,26 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(0x4c), uintVal(t, n.Child("Protocol")))
 		require.Equal(t, uint64(0xaced), uintVal(t, mustChild(t, n, "Message").Child("Ser Magic")))
 	})
+	t.Run("llc/stp", func(t *testing.T) {
+		n := parseRule(t, []byte{0x42, 0x42, 0x03, 0x00, 0x00, 0x00, 0x80}, "llc", "LLC")
+		require.Equal(t, uint64(0x42), uintVal(t, n.Child("DSAP")))
+		require.Equal(t, uint64(0x80), uintVal(t, mustChild(t, n, "STP").Child("BPDU Type")))
+	})
+	t.Run("llc/snap", func(t *testing.T) {
+		arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
+		raw := append([]byte{0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00, 0x08, 0x06}, arp...)
+		n := parseRule(t, raw, "llc", "LLC")
+		require.Equal(t, uint64(0x0806), uintVal(t, mustChild(t, n, "SNAP").Child("Type")))
+	})
+	t.Run("llc/xid", func(t *testing.T) {
+		n := parseRule(t, []byte{0x00, 0x00, 0xaf, 0x81, 0x01, 0x7f}, "llc", "LLC")
+		require.Equal(t, uint64(0x81), uintVal(t, n.Child("XID Format")))
+	})
+	t.Run("llc/iframe", func(t *testing.T) {
+		n := parseRule(t, []byte{0x7e, 0x7e, 0x00, 0x01}, "llc", "LLC")
+		require.Equal(t, uint64(0x00), uintVal(t, n.Child("Control")))
+		require.Equal(t, uint64(0x01), uintVal(t, n.Child("Control Extended")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))

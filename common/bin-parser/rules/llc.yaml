@@ -6,6 +6,10 @@ Package:
       this.ProcessSubNode("SSAP")
       this.ProcessSubNode("Control")
       dsap = getNodeResult("DSAP").Value
+      ctrl = getNodeResult("Control").Value
+      if (ctrl & 0x03) != 0x03 {
+        this.ProcessSubNode("Control Extended")
+      }
       if dsap == 0x42 {
         this.ProcessByType("STP")
         return
@@ -14,9 +18,23 @@ Package:
         this.ProcessByType("SNAP")
         return
       }
+      if ctrl == 0xaf || ctrl == 0xbf {
+        this.ProcessSubNode("XID Format")
+        if getNodeResult("XID Format").Value != 0x81 {
+          panic("llc: XID format identifier must be 0x81")
+        }
+        this.ProcessSubNode("XID Types")
+        this.ProcessSubNode("XID Window")
+        return
+      }
+      return
     DSAP: uint8
     SSAP: uint8
     Control: uint8
+    Control Extended: uint8
+    XID Format: uint8
+    XID Types: uint8
+    XID Window: uint8
 SNAP:
   operator: |
     this.ProcessSubNode("OUI")
@@ -26,12 +44,18 @@ SNAP:
       this.ProcessByType("IP")
       return
     }
+    if typ == 0x0806 {
+      this.ProcessByType("ARP")
+      return
+    }
     if typ == 0x2000 {
       this.ProcessByType("CDP")
       return
     }
+    return
   OUI: raw,3
   Type: uint16
 STP: "import:stp.yaml;node:STP"
 CDP: "import:cdp.yaml;node:CDP"
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
+ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
