@@ -51,7 +51,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "LDAP", Layer: "L7", RuleFile: "application-layer/ldap.yaml", Status: statusNew, Notes: "SEQUENCE + bind/unbind/search"},
 	{Name: "NTLM", Layer: "L7", RuleFile: "application-layer/ntlm.yaml", Status: statusNew, Notes: "see NTLMSSP type 1/2/3"},
 	{Name: "MSRdp", Layer: "L7", RuleFile: "application-layer/msrdp.yaml", Status: statusNew, Notes: "TPKT + X224 CR/CC + Cookie/Negotiation"},
-	{Name: "IIOP", Layer: "L7", RuleFile: "application-layer/iiop.yaml", Status: statusNew, SampleFrom: "GIOP LocateRequest"},
+	{Name: "IIOP", Layer: "L7", RuleFile: "application-layer/iiop.yaml", Status: statusNew, SampleFrom: "GIOP 1.2 LocateRequest NameService"},
 	{Name: "T3", Layer: "L7", RuleFile: "application-layer/t3.yaml", Status: statusNew, SampleFrom: "WebLogic T3 header"},
 	{Name: "PPTP", Layer: "L7", RuleFile: "application-layer/pptp.yaml", Status: statusNew, SampleFrom: "RFC 2637 SCCRQ"},
 	{Name: "BER", Layer: "L7", RuleFile: "application-layer/ber.yaml", Status: statusNew, SampleFrom: "X.690 INTEGER"},

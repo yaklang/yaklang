@@ -1,131 +1,86 @@
-GIOP:
-  operator: |
-    this.ProcessSubNode("Magic")
-    mag = getNodeResult("Magic").Value
-    if mag[0] != 0x47 || mag[1] != 0x49 || mag[2] != 0x4f || mag[3] != 0x50 {
-      panic("giop: magic must be GIOP")
-    }
-    this.ProcessSubNode("Major")
-    this.ProcessSubNode("Minor")
-    this.ProcessSubNode("Flags")
-    this.ProcessSubNode("Message Type")
-    mt = getNodeResult("Message Type").Value
-    if mt > 7 {
-      panic("giop: unknown message type")
-    }
-    this.ProcessSubNode("Message Size")
-    l = getNodeResult("Message Size").Value
-    if l > 0 {
-      this.GetSubNode("Body").SetMaxLength(l)
-      this.ProcessSubNode("Body")
-    }
-  Magic: raw,4
-  Major: uint8
-  Minor: uint8
-  Flags: uint8
-  Message Type: uint8
-  Message Size: uint32
-  Body: raw
+endian: big
 Package:
-  Header:
+  GIOP:
     operator: |
-      this.ForEachChild((node)=>{
-        node.Process()
-      })
-      typeId = this.GetSubNode("MessageType").Result().Value
-      setCtx("typeId",typeId)
-      messageSize = this.GetSubNode("MessageSize").Result().Value
-      setCtx("messageSize",messageSize)
-    Magic: raw,4
-    Version:
-      Major: uint8
-      Minor: uint8 # 0: object_key 1: target (仅支持2)
-    MessageFlags: uint8
-    MessageType: uint8
-    MessageSize: uint32
-  Request:
-    operator: |
-      typeId = getCtx("typeId")
-      messageSize = getCtx("messageSize")
-      this.SetCfg("length",messageSize*8)
-      switch typeId {
-      case 0: // Request
-        this.GetSubNode("RequestId").Process()
-        this.GetSubNode("ResponseFlags").Process()
-        this.GetSubNode("Reserved1").Process()
-        this.GetSubNode("Target").Process()
-        this.GetSubNode("ObjectKey").Process()
-        this.GetSubNode("Operation").Process()
-        this.GetSubNode("ServiceContextList").Process()
-        this.GetSubNode("Reserved2").Process()
-        this.GetSubNode("StubData").Process()
-      case 1: // Reply
-        this.GetSubNode("RequestId").Process()
-        this.GetSubNode("ReplyStatus").Process()
-        this.GetSubNode("ServiceContextList").Process()
-        this.GetSubNode("Other").Process()
-      case 2: // CancelRequest
-      case 3: // LocateRequest
-        this.GetSubNode("RequestId").Process()
-        // if Minor == 0 || Minor == 1 { object_key.Process() }
-        // if Minor == 2 :
-        this.GetSubNode("Target").Process()
-        this.GetSubNode("ObjectKey").Process()
-      case 4: // LocateReply
-        this.GetSubNode("RequestId").Process()
-        this.GetSubNode("LocateStatus").Process()
-        this.GetSubNode("IOR").Process()
-      case 5: // CloseConnection
-      default:
-        panic("invalid message type")
+      this.ProcessSubNode("Magic")
+      mag = getNodeResult("Magic").Value
+      if mag[0] != 0x47 || mag[1] != 0x49 || mag[2] != 0x4f || mag[3] != 0x50 {
+        panic("giop: magic must be GIOP")
       }
-
-    # LocateRequest、LocateReply
-    RequestId: uint32
-    Target: uint32
-    ObjectKey: LengthString
-    LocateStatus: uint32 # 2|3: IOR、4: SystemException、5: short int
-    IOR: raw
-    ReplyStatus: uint32
-    ResponseFlags: uint8 # 0: response_expected、1: response_unexpected
-    Reserved1: raw,3
-    Operation: String
-    ServiceContextList:
-      ListLength: uint32
-      ServiceContexts:
-        list: true
-        list-length-from-field: "@Request.ServiceContextList.ListLength"
-        exception-plan: stopList # stopList, throw
-        ServiceContext:
-          operator: |
-            this.GetSubNode("Id").Process()
-            n = this.GetSubNode("DataLength").Process().Value
-            this.GetSubNode("Endian").Process()
-            this.GetSubNode("Data").SetCfg("length",(n-1)*8)
-            this.GetSubNode("Data").Process()
-          Id: uint32
-          DataLength: uint32
-          Endian: uint8
-          Data: raw
-    Reserved2: raw,4
-    StubData:
-      Length: uint32
-      WNames:
-        list: true
-        list-length-from-field: "@Request.StubData.Length"
-        WName: LengthString
-      Others: raw
-    Other: raw
-IOR:
-  RepositoryId: uint32
-  Length: uint32
-  Profiles:
-    Flag: uint
-#    IopProfile:
-LengthString:
-    Length: uint32
-    Data: "type:raw;length-from-field:Length;length-from-field-multiply:8"
-String:
-  OperationLength: uint32
-  RequestOperation: "type:raw;length-from-field:OperationLength;length-from-field-multiply:8"
-  Octet: raw,1
+      this.ProcessSubNode("Major")
+      this.ProcessSubNode("Minor")
+      this.ProcessSubNode("Flags")
+      if (getNodeResult("Flags").Value & 1) == 1 {
+        panic("giop: little-endian GIOP")
+      }
+      this.ProcessSubNode("Message Type")
+      mt = getNodeResult("Message Type").Value
+      if mt > 7 {
+        panic("giop: unknown message type")
+      }
+      this.ProcessSubNode("Message Size")
+      l = getNodeResult("Message Size").Value
+      if l >= 1048576 {
+        panic("giop: message too large")
+      }
+      if l > 0 {
+        this.SetMaxLength(this.Length()+l)
+      }
+      if mt == 3 && l >= 8 {
+        this.ProcessByType("LocateRequest")
+        return
+      }
+      if mt == 0 && l >= 8 {
+        this.ProcessByType("GIOPRequest")
+        return
+      }
+    Magic: raw,4
+    Major: uint8
+    Minor: uint8
+    Flags: uint8
+    Message Type: uint8
+    Message Size: uint32
+LocateRequest:
+  operator: |
+    this.ProcessSubNode("Request ID")
+    this.ProcessSubNode("Addr Disc")
+    this.ProcessSubNode("Addr Pad")
+    this.ProcessSubNode("Key Len")
+    n = getNodeResult("Key Len").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Object Key").SetMaxLength(n)
+      this.ProcessSubNode("Object Key")
+    }
+  Request ID: uint32
+  Addr Disc: uint16
+  Addr Pad: raw,2
+  Key Len: uint32
+  Object Key: string
+GIOPRequest:
+  operator: |
+    this.ProcessSubNode("Request ID")
+    this.ProcessSubNode("Response Flags")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Addr Disc")
+    this.ProcessSubNode("Addr Pad")
+    this.ProcessSubNode("Key Len")
+    n = getNodeResult("Key Len").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Object Key").SetMaxLength(n)
+      this.ProcessSubNode("Object Key")
+    }
+    this.ProcessSubNode("Op Len")
+    ol = getNodeResult("Op Len").Value
+    if ol > 0 && ol < 512 {
+      this.GetSubNode("Operation").SetMaxLength(ol)
+      this.ProcessSubNode("Operation")
+    }
+  Request ID: uint32
+  Response Flags: uint8
+  Reserved: raw,3
+  Addr Disc: uint16
+  Addr Pad: raw,2
+  Key Len: uint32
+  Object Key: string
+  Op Len: uint32
+  Operation: string

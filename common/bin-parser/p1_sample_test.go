@@ -161,6 +161,36 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "testing", strVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0].Child("Str")))
 	})
 
+	t.Run("iiop/locate", func(t *testing.T) {
+		// CORBA 3.1 Part 2 §9.4.5 LocateRequestHeader_1_2 KeyAddr; Wireshark packet-giop.c giop.objektkey.
+		// In-tree WebLogic CosNaming LocateRequest, object_key "NameService".
+		giop := mustHex(t, "47494f50010200030000001700000002000000000000000b4e616d6553657276696365")
+		n := parseRule(t, giop, "application-layer.iiop", "GIOP")
+		require.Equal(t, uint64(3), uintVal(t, n.Child("Message Type")))
+		require.Equal(t, uint64(23), uintVal(t, n.Child("Message Size")))
+		lr := mustChild(t, n, "LocateRequest")
+		require.Equal(t, uint64(2), uintVal(t, lr.Child("Request ID")))
+		require.Equal(t, uint64(0), uintVal(t, lr.Child("Addr Disc")))
+		require.Equal(t, uint64(11), uintVal(t, lr.Child("Key Len")))
+		require.Equal(t, "NameService", strVal(t, lr.Child("Object Key")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 2809, 2809, giop))
+		require.Equal(t, "NameService", strVal(t, mustChild(t, eth, "IP", "TCP", "GIOP", "LocateRequest").Child("Object Key")))
+	})
+
+	t.Run("iiop/request", func(t *testing.T) {
+		// CORBA 3.1 RequestHeader_1_2: KeyAddr, operation "_is_a" (NUL-terminated CDR string).
+		giop := mustHex(t, "47494f50010200000000001a00000001030000000000000000000000000000065f69735f6100")
+		n := parseRule(t, giop, "application-layer.iiop", "GIOP")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Message Type")))
+		req := mustChild(t, n, "GIOPRequest")
+		require.Equal(t, uint64(1), uintVal(t, req.Child("Request ID")))
+		require.Equal(t, uint64(3), uintVal(t, req.Child("Response Flags")))
+		require.Equal(t, uint64(6), uintVal(t, req.Child("Op Len")))
+		require.Equal(t, "_is_a", strings.TrimRight(strVal(t, req.Child("Operation")), "\x00"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 2809, 2809, giop))
+		require.Equal(t, "_is_a", strings.TrimRight(strVal(t, mustChild(t, eth, "IP", "TCP", "GIOP", "GIOPRequest").Child("Operation")), "\x00"))
+	})
+
 	t.Run("sip/invite", func(t *testing.T) {
 		// RFC 3261 Figure 1 INVITE + SDP (Content-Type application/sdp).
 		sdp := "v=0\r\no=alice 2890844526 2890844526 IN IP4 pc33.atlanta.example.com\r\n"
