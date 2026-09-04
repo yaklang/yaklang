@@ -58,46 +58,7 @@ Package:
       Version Minor: uint8
       Properties:
         operator: |
-          this.ProcessSubNode("Table Size")
-          n = getNodeResult("Table Size").Value
-          if n > 0 && n < 1048576 {
-            this.GetSubNode("Entries").SetMaxLength(n)
-            this.ProcessSubNode("Entries")
-          }
-        Table Size: uint32
-        Entries:
-          list: true
-          Entry:
-            operator: |
-              this.ProcessSubNode("Name Len")
-              n = getNodeResult("Name Len").Value
-              if n > 0 && n < 256 {
-                this.GetSubNode("Name").SetMaxLength(n)
-                this.ProcessSubNode("Name")
-              }
-              this.ProcessSubNode("Kind")
-              k = getNodeResult("Kind").Value
-              if k == 0x53 {
-                this.ProcessSubNode("Str Len")
-                sl = getNodeResult("Str Len").Value
-                if sl > 0 && sl < 1048576 {
-                  this.GetSubNode("Str").SetMaxLength(sl)
-                  this.ProcessSubNode("Str")
-                }
-              }
-            Name Len: uint8
-            Name: string
-            Kind: uint8
-            Str Len: uint32
-            Str: string
-          operator: |
-            for {
-              ele = this.NewElement()
-              if ele.GetMaxLength() < 2 {
-                break
-              }
-              ele.Process()
-            }
+          this.ProcessByType("AMQPTable")
       Mechanisms:
         operator: |
           this.ProcessSubNode("Len")
@@ -119,3 +80,98 @@ Package:
         Len: uint32
         Value: string
     Frame End: uint8
+AMQPTable:
+  operator: |
+    this.ProcessSubNode("Table Size")
+    n = getNodeResult("Table Size").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Entries").SetMaxLength(n)
+      this.ProcessSubNode("Entries")
+    }
+  Table Size: uint32
+  Entries:
+    list: true
+    Entry:
+      operator: |
+        this.ProcessSubNode("Name Len")
+        n = getNodeResult("Name Len").Value
+        if n > 0 && n < 256 {
+          this.GetSubNode("Name").SetMaxLength(n)
+          this.ProcessSubNode("Name")
+        }
+        this.ProcessSubNode("Kind")
+        k = getNodeResult("Kind").Value
+        if k == 0x53 {
+          this.ProcessSubNode("Str Len")
+          sl = getNodeResult("Str Len").Value
+          if sl > 0 && sl < 1048576 {
+            this.GetSubNode("Str").SetMaxLength(sl)
+            this.ProcessSubNode("Str")
+          }
+          return
+        }
+        if k == 0x74 {
+          this.ProcessSubNode("Bool")
+          return
+        }
+        if k == 0x46 {
+          this.ProcessByType("AMQPTable")
+          return
+        }
+        if k == 0x41 {
+          this.ProcessByType("AMQPArray")
+          return
+        }
+      Name Len: uint8
+      Name: string
+      Kind: uint8
+      Str Len: uint32
+      Str: string
+      Bool: uint8
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 2 {
+          break
+        }
+        ele.Process()
+      }
+AMQPArray:
+  operator: |
+    this.ProcessSubNode("Array Size")
+    n = getNodeResult("Array Size").Value
+    if n > 0 && n < 1048576 {
+      this.GetSubNode("Values").SetMaxLength(n)
+      this.ProcessSubNode("Values")
+    }
+  Array Size: uint32
+  Values:
+    list: true
+    Item:
+      operator: |
+        this.ProcessSubNode("Kind")
+        k = getNodeResult("Kind").Value
+        if k == 0x53 {
+          this.ProcessSubNode("Str Len")
+          sl = getNodeResult("Str Len").Value
+          if sl > 0 && sl < 1048576 {
+            this.GetSubNode("Str").SetMaxLength(sl)
+            this.ProcessSubNode("Str")
+          }
+          return
+        }
+        if k == 0x74 {
+          this.ProcessSubNode("Bool")
+        }
+      Kind: uint8
+      Str Len: uint32
+      Str: string
+      Bool: uint8
+    operator: |
+      for {
+        ele = this.NewElement()
+        if ele.GetMaxLength() < 1 {
+          break
+        }
+        ele.Process()
+      }
