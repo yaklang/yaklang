@@ -3,9 +3,14 @@ Package:
   LinuxSLL:
     operator: |
       this.ProcessSubNode("Packet Type")
+      pt = getNodeResult("Packet Type").Value
+      if pt > 7 {
+        panic("linux_sll: unknown packet type")
+      }
       this.ProcessSubNode("ARPHRD")
-      this.ProcessSubNode("Link-layer Address Length")
-      this.ProcessSubNode("Link-layer Address")
+      this.ProcessSubNode("Address Length")
+      this.ProcessSubNode("Source MAC")
+      this.ProcessSubNode("Unused")
       this.ProcessSubNode("Protocol")
       p = getNodeResult("Protocol").Value
       if p == 0x0800 {
@@ -20,11 +25,18 @@ Package:
         this.ProcessByType("ARP")
         return
       }
+      if p == 0x0004 {
+        this.ProcessByType("LLC")
+        return
+      }
+      return
     Packet Type: uint16
     ARPHRD: uint16
-    Link-layer Address Length: uint16
-    Link-layer Address: raw,8
+    Address Length: uint16
+    Source MAC: raw,6
+    Unused: raw,2
     Protocol: uint16
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+LLC: "import:llc.yaml;node:LLC"
