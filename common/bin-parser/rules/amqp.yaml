@@ -21,9 +21,12 @@ Package:
       if typ == 1 && l >= 4 {
         this.ProcessSubNode("Class ID")
         this.ProcessSubNode("Method ID")
-        if l >= 6 {
-          this.ProcessSubNode("Version Major")
-          this.ProcessSubNode("Version Minor")
+        rest = l - 4
+        cid = getNodeResult("Class ID").Value
+        mid = getNodeResult("Method ID").Value
+        if cid == 10 && mid == 10 && rest >= 2 && rest < 1048576 {
+          this.GetSubNode("Arguments").SetMaxLength(rest)
+          this.ProcessSubNode("Arguments")
         }
       }
       this.ProcessSubNode("Frame End")
@@ -43,6 +46,76 @@ Package:
     Length: uint32
     Class ID: uint16
     Method ID: uint16
-    Version Major: uint8
-    Version Minor: uint8
+    Arguments:
+      unpack: true
+      operator: |
+        this.ProcessSubNode("Version Major")
+        this.ProcessSubNode("Version Minor")
+        this.ProcessSubNode("Properties")
+        this.ProcessSubNode("Mechanisms")
+        this.ProcessSubNode("Locales")
+      Version Major: uint8
+      Version Minor: uint8
+      Properties:
+        operator: |
+          this.ProcessSubNode("Table Size")
+          n = getNodeResult("Table Size").Value
+          if n > 0 && n < 1048576 {
+            this.GetSubNode("Entries").SetMaxLength(n)
+            this.ProcessSubNode("Entries")
+          }
+        Table Size: uint32
+        Entries:
+          list: true
+          Entry:
+            operator: |
+              this.ProcessSubNode("Name Len")
+              n = getNodeResult("Name Len").Value
+              if n > 0 && n < 256 {
+                this.GetSubNode("Name").SetMaxLength(n)
+                this.ProcessSubNode("Name")
+              }
+              this.ProcessSubNode("Kind")
+              k = getNodeResult("Kind").Value
+              if k == 0x53 {
+                this.ProcessSubNode("Str Len")
+                sl = getNodeResult("Str Len").Value
+                if sl > 0 && sl < 1048576 {
+                  this.GetSubNode("Str").SetMaxLength(sl)
+                  this.ProcessSubNode("Str")
+                }
+              }
+            Name Len: uint8
+            Name: string
+            Kind: uint8
+            Str Len: uint32
+            Str: string
+          operator: |
+            for {
+              ele = this.NewElement()
+              if ele.GetMaxLength() < 2 {
+                break
+              }
+              ele.Process()
+            }
+      Mechanisms:
+        operator: |
+          this.ProcessSubNode("Len")
+          n = getNodeResult("Len").Value
+          if n > 0 && n < 1048576 {
+            this.GetSubNode("Value").SetMaxLength(n)
+            this.ProcessSubNode("Value")
+          }
+        Len: uint32
+        Value: string
+      Locales:
+        operator: |
+          this.ProcessSubNode("Len")
+          n = getNodeResult("Len").Value
+          if n > 0 && n < 1048576 {
+            this.GetSubNode("Value").SetMaxLength(n)
+            this.ProcessSubNode("Value")
+          }
+        Len: uint32
+        Value: string
     Frame End: uint8
