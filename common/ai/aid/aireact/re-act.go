@@ -111,6 +111,9 @@ type ReAct struct {
 
 	browserSessionsMu sync.Mutex
 	browserSessionIDs map[string]struct{}
+
+	attachedBrowsersMu sync.Mutex
+	attachedBrowsers   []*aicommon.AttachedResource
 }
 
 func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {

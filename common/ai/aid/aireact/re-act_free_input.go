@@ -222,15 +222,32 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 	}
 
 	var attachedDatas []*aicommon.AttachedResource
+	var attachedBrowsers []*aicommon.AttachedResource
 	if len(event.AttachedResourceInfo) > 0 {
 		for _, resource := range event.AttachedResourceInfo {
 			if resource.GetType() == aicommon.USER_FREE_INPUT_UUID {
 				task.SetUserInputUUID(resource.GetValue())
 				continue
 			}
-			attachedDatas = append(attachedDatas, aicommon.NewAttachedResource(resource.GetType(), resource.GetKey(), resource.GetValue()))
+			attached := aicommon.NewAttachedResource(resource.GetType(), resource.GetKey(), resource.GetValue())
+			attachedDatas = append(attachedDatas, attached)
+			if attached.HasType(aicommon.AttachedResourceTypeBrowser) {
+				attachedBrowsers = append(attachedBrowsers, attached)
+			}
 		}
 	}
+
+	// Browser instances are conversation resources: a follow-up such as
+	// "read my profile" must keep using the explicitly selected @A instance.
+	// A later turn with browser mentions replaces the selection (and can select
+	// several instances); other attachment types remain per-turn.
+	r.attachedBrowsersMu.Lock()
+	if len(attachedBrowsers) > 0 {
+		r.attachedBrowsers = append([]*aicommon.AttachedResource(nil), attachedBrowsers...)
+	} else {
+		attachedDatas = append(attachedDatas, r.attachedBrowsers...)
+	}
+	r.attachedBrowsersMu.Unlock()
 	task.SetAttachedDatas(attachedDatas)
 	return task
 }
