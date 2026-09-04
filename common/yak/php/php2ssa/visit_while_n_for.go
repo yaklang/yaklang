@@ -171,8 +171,8 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	var value ssa.Value
 	if i.Expression() != nil {
 		value = y.VisitExpression(i.Expression())
-	} else {
-		value = y.VisitChain(i.Chain(0))
+	} else if i.Chain() != nil {
+		value = y.VisitChain(i.Chain())
 	}
 	staticKey, staticField := y.foreachSingleStaticPair(value)
 	loop.SetFirst(func() []ssa.Value {
@@ -181,6 +181,7 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	loop.SetCondition(func() ssa.Value {
 		var lefts []*ssa.Variable
 		var valueLeft *ssa.Variable
+		var valueDestructuring []*ssa.Variable
 		// A nil iterable (e.g. an expression that failed to compile or an
 		// undefined variable) must terminate the loop instead of panicking in
 		// NewNext. See ssa.NewNext nil guard.
@@ -194,8 +195,13 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 		} else if i.AssignmentList() != nil {
 			//todo:
 		}
-		if i.Chain(1) != nil {
-			valueLeft = y.VisitChainLeft(i.Chain(1))
+		// keyed foreach tail: "as $k => $v" or "as $k => [$a, $b]"
+		if fv := i.ForeachValue(); fv != nil {
+			if fv.ArrayDestructuring() != nil {
+				valueDestructuring = y.VisitArrayDestructuring(fv.ArrayDestructuring())
+			} else if fv.Chain() != nil {
+				valueLeft = y.VisitChainLeft(fv.Chain())
+			}
 		}
 		//todo: more variable
 		key, field, ok := y.EmitNext(value, false)
@@ -204,12 +210,18 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 			field = staticField
 		}
 		if len(lefts) > 0 {
-			if valueLeft == nil {
+			if valueLeft == nil && len(valueDestructuring) == 0 {
 				y.AssignVariable(lefts[0], field)
 				ssa.DeleteInst(key)
 			} else {
 				y.AssignVariable(lefts[0], key)
-				y.AssignVariable(valueLeft, field)
+				if valueLeft != nil {
+					y.AssignVariable(valueLeft, field)
+				} else if len(valueDestructuring) > 0 {
+					// approximate "=> [$a, $b]" like the unkeyed destructuring
+					// form: the current element lands in the first variable.
+					y.AssignVariable(valueDestructuring[0], field)
+				}
 			}
 		}
 		if utils.IsNil(ok) {

@@ -56,7 +56,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
-	if raw.GetText() == "" {
+	// O(1) emptiness probe: GetText() would rebuild the full subtree text and
+	// turn deep expression nesting into quadratic work. A context with no
+	// children is the only way GetText() can be empty.
+	if raw.GetChildCount() == 0 {
 		return y.EmitUndefined("")
 	}
 
