@@ -193,8 +193,10 @@ func TestP1STP8023AndPPPFamily(t *testing.T) {
 
 	pap := parseRule(t, []byte{0x01, 0x00, 0x00, 0x0e, 0x04, 0x69, 0x78, 0x69, 0x61, 0x04, 0x69, 0x78, 0x69, 0x61}, "password_authentication_protocol", "PAP")
 	require.Equal(t, uint64(1), uintVal(t, pap.Child("Code")))
+	require.Equal(t, "ixia", strVal(t, mustChild(t, pap, "Request").Child("Peer ID")))
 	ethPAP := parseEthernet(t, ipv4ProtoFrame(t, 0x2f, append([]byte{0x30, 0x81, 0x88, 0x0b, 0x00, 0x12, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0xc0, 0x23}, []byte{0x01, 0x00, 0x00, 0x0e, 0x04, 0x69, 0x78, 0x69, 0x61, 0x04, 0x69, 0x78, 0x69, 0x61}...)))
 	require.Equal(t, uint64(0xc023), uintVal(t, mustChild(t, ethPAP, "IP", "GRE", "Payload", "PPP").Child("Protocol")))
+	require.Equal(t, "ixia", strVal(t, mustChild(t, ethPAP, "IP", "GRE", "Payload", "PPP", "PAP", "Request").Child("Peer ID")))
 
 	chap := mustHex(t, "01030022105c36e2c2ee83c339e9799344e9ec85d348695065722e6174742e6e6574")
 	ch := parseRule(t, chap, "challenge_handshake_authentication_protocol", "CHAP")

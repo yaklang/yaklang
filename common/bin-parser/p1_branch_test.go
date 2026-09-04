@@ -29,6 +29,14 @@ func TestP1BranchRows(t *testing.T) {
 		p := parseRule(t, []byte{0xff, 0x03, 0xc0, 0x21, 0x01, 0x01, 0x00, 0x0e, 0x03, 0x04, 0xc0, 0x23, 0x05, 0x06, 0x0f, 0x3f, 0x11, 0x7c}, "ppp", "PPP")
 		require.Equal(t, uint64(0xc021), uintVal(t, p.Child("Protocol")))
 	})
+	t.Run("password_authentication_protocol/request", func(t *testing.T) {
+		n := parseRule(t, []byte{0x01, 0x00, 0x00, 0x0e, 0x04, 'i', 'x', 'i', 'a', 0x04, 'i', 'x', 'i', 'a'}, "password_authentication_protocol", "PAP")
+		require.Equal(t, "ixia", strVal(t, mustChild(t, n, "Request").Child("Peer ID")))
+	})
+	t.Run("password_authentication_protocol/ack", func(t *testing.T) {
+		n := parseRule(t, []byte{0x02, 0x00, 0x00, 0x07, 0x02, 'O', 'K'}, "password_authentication_protocol", "PAP")
+		require.Equal(t, "OK", strVal(t, mustChild(t, n, "Response").Child("Message")))
+	})
 	t.Run("ppp/pap", func(t *testing.T) {
 		pap := []byte{0xff, 0x03, 0xc0, 0x23, 0x01, 0x00, 0x00, 0x0e, 0x04, 0x69, 0x78, 0x69, 0x61, 0x04, 0x69, 0x78, 0x69, 0x61}
 		p := parseRule(t, pap, "ppp", "PPP")
