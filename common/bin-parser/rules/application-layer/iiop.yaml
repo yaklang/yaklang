@@ -1,3 +1,31 @@
+GIOP:
+  operator: |
+    this.ProcessSubNode("Magic")
+    mag = getNodeResult("Magic").Value
+    if mag[0] != 0x47 || mag[1] != 0x49 || mag[2] != 0x4f || mag[3] != 0x50 {
+      panic("giop: magic must be GIOP")
+    }
+    this.ProcessSubNode("Major")
+    this.ProcessSubNode("Minor")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Message Type")
+    mt = getNodeResult("Message Type").Value
+    if mt > 7 {
+      panic("giop: unknown message type")
+    }
+    this.ProcessSubNode("Message Size")
+    l = getNodeResult("Message Size").Value
+    if l > 0 {
+      this.GetSubNode("Body").SetMaxLength(l)
+      this.ProcessSubNode("Body")
+    }
+  Magic: raw,4
+  Major: uint8
+  Minor: uint8
+  Flags: uint8
+  Message Type: uint8
+  Message Size: uint32
+  Body: raw
 Package:
   Header:
     operator: |

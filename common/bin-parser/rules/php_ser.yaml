@@ -1,0 +1,19 @@
+Package:
+  PHPSer:
+    operator: |
+      this.ProcessSubNode("Kind")
+      k = getNodeResult("Kind").Value
+      if k != 0x61 && k != 0x4f && k != 0x73 && k != 0x69 && k != 0x62 && k != 0x4e && k != 0x64 && k != 0x43 {
+        panic("php_ser: unknown type")
+      }
+      this.ProcessSubNode("Colon")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Body").SetMaxLength(rest)
+          this.ProcessSubNode("Body")
+        }
+      }
+    Kind: uint8
+    Colon: uint8
+    Body: raw

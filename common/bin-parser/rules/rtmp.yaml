@@ -1,0 +1,17 @@
+endian: big
+Package:
+  RTMP:
+    operator: |
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 3 {
+        panic("rtmp: version must be 3")
+      }
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Handshake").SetMaxLength(rest)
+          this.ProcessSubNode("Handshake")
+        }
+      }
+    Version: uint8
+    Handshake: raw

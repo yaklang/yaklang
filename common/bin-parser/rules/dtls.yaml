@@ -1,0 +1,28 @@
+endian: big
+Package:
+  DTLS:
+    operator: |
+      this.ProcessSubNode("Content Type")
+      ct = getNodeResult("Content Type").Value
+      if ct < 20 || ct > 24 {
+        panic("dtls: content type must be 20-24")
+      }
+      this.ProcessSubNode("Version")
+      ver = getNodeResult("Version").Value
+      if ver != 0xfeff && ver != 0xfefd && ver != 0xfefc {
+        panic("dtls: unexpected version")
+      }
+      this.ProcessSubNode("Epoch")
+      this.ProcessSubNode("Sequence")
+      this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l > 0 {
+        this.GetSubNode("Fragment").SetMaxLength(l)
+        this.ProcessSubNode("Fragment")
+      }
+    Content Type: uint8
+    Version: uint16
+    Epoch: uint16
+    Sequence: raw,6
+    Length: uint16
+    Fragment: raw

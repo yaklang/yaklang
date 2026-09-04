@@ -1,0 +1,17 @@
+endian: big
+Package:
+  Loopback:
+    operator: |
+      this.ProcessSubNode("Protocol")
+      p = getNodeResult("Protocol").Value
+      if p == 0x0800 {
+        this.ProcessByType("IP")
+        return
+      }
+      if p == 0x86dd {
+        this.ProcessByType("IPv6")
+        return
+      }
+    Protocol: uint16
+IP: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"

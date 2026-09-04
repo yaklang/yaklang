@@ -1,0 +1,9 @@
+Package:
+  JSONRPC:
+    operator: |
+      this.ProcessSubNode("Body")
+      s = string(getNodeResult("Body").Value)
+      if !(s.HasPrefix("{\"jsonrpc") || s.HasPrefix("{\"method")) {
+        panic("jsonrpc: expected jsonrpc object")
+      }
+    Body: "del:\n;type:string"

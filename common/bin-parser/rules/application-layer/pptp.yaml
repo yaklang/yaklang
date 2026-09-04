@@ -1,8 +1,23 @@
+endian: big
 Package:
   PPTP:
     Length: uint16
     length-from-field: Length
     length-from-field-multiply: 8
+    operator: |
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("MessageType")
+      mt = getNodeResult("MessageType").Value
+      if mt != 1 {
+        panic("pptp: message type must be 1 (control)")
+      }
+      this.ProcessSubNode("MagicCookie")
+      if getNodeResult("MagicCookie").Value != 0x1a2b3c4d {
+        panic("pptp: magic cookie mismatch")
+      }
+      this.ProcessSubNode("ControlMessageType")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Message")
     MessageType: uint16
     MagicCookie: uint32
     ControlMessageType: uint16

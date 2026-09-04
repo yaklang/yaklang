@@ -1,0 +1,17 @@
+Package:
+  IMAP:
+    operator: |
+      this.ProcessSubNode("Tag")
+      tag = string(getNodeResult("Tag").Value)
+      if len(tag) == 0 {
+        panic("imap: empty tag")
+      }
+      this.ProcessSubNode("Command")
+      cmd = string(getNodeResult("Command").Value)
+      if !(cmd.HasPrefix("OK") || cmd.HasPrefix("NO") || cmd.HasPrefix("BAD") || cmd.HasPrefix("BYE") || cmd.HasPrefix("PREAUTH") || cmd.HasPrefix("CAPABILITY") || cmd.HasPrefix("LOGIN") || cmd.HasPrefix("LOGOUT") || cmd.HasPrefix("SELECT") || cmd.HasPrefix("EXAMINE") || cmd.HasPrefix("CREATE") || cmd.HasPrefix("DELETE") || cmd.HasPrefix("RENAME") || cmd.HasPrefix("SUBSCRIBE") || cmd.HasPrefix("UNSUBSCRIBE") || cmd.HasPrefix("LIST") || cmd.HasPrefix("LSUB") || cmd.HasPrefix("STATUS") || cmd.HasPrefix("APPEND") || cmd.HasPrefix("CHECK") || cmd.HasPrefix("CLOSE") || cmd.HasPrefix("EXPUNGE") || cmd.HasPrefix("SEARCH") || cmd.HasPrefix("FETCH") || cmd.HasPrefix("STORE") || cmd.HasPrefix("COPY") || cmd.HasPrefix("UID") || cmd.HasPrefix("NOOP") || cmd.HasPrefix("STARTTLS") || cmd.HasPrefix("AUTHENTICATE") || cmd.HasPrefix("IDLE") || cmd.HasPrefix("FLAGS") || cmd.HasPrefix("EXISTS") || cmd.HasPrefix("RECENT")) {
+        panic("imap: unknown command")
+      }
+      this.ProcessSubNode("Rest")
+    Tag: "del: ;type:string"
+    Command: "del: ;type:string"
+    Rest: "del:\r\n;type:string"

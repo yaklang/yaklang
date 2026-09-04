@@ -1,0 +1,49 @@
+endian: big
+Package:
+  STUN:
+    operator: |
+      this.ProcessSubNode("Message Type")
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Magic Cookie")
+      if getNodeResult("Magic Cookie").Value != 0x2112a442 {
+        panic("stun: magic cookie mismatch")
+      }
+      this.ProcessSubNode("Transaction ID")
+      l = getNodeResult("Length").Value
+      if l > 0 {
+        this.GetSubNode("Attributes").SetMaxLength(l)
+        this.ProcessSubNode("Attributes")
+      }
+    Message Type: uint16
+    Length: uint16
+    Magic Cookie: uint32
+    Transaction ID: raw,12
+    Attributes:
+      list: true
+      Attribute: STUNAttr
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+        }
+STUNAttr:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l > 0 {
+      this.GetSubNode("Value").SetMaxLength(l)
+      this.ProcessSubNode("Value")
+    }
+    pad = (4 - (l % 4)) % 4
+    if pad > 0 && this.GetRemainingSpace() >= pad {
+      this.GetSubNode("Padding").SetMaxLength(pad)
+      this.ProcessSubNode("Padding")
+    }
+  Type: uint16
+  Length: uint16
+  Value: raw
+  Padding: raw

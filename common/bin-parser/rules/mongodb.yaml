@@ -1,0 +1,22 @@
+endian: little
+Package:
+  MongoDB:
+    operator: |
+      this.ProcessSubNode("Message Length")
+      l = getNodeResult("Message Length").Value
+      if l < 16 {
+        panic("mongodb: message length smaller than 16")
+      }
+      this.ProcessSubNode("Request ID")
+      this.ProcessSubNode("Response To")
+      this.ProcessSubNode("Op Code")
+      rest = l - 16
+      if rest > 0 {
+        this.GetSubNode("Body").SetMaxLength(rest)
+        this.ProcessSubNode("Body")
+      }
+    Message Length: uint32
+    Request ID: uint32
+    Response To: uint32
+    Op Code: uint32
+    Body: raw

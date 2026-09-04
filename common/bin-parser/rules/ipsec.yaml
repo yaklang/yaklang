@@ -1,0 +1,38 @@
+endian: big
+Package:
+  AH:
+    operator: |
+      this.ProcessSubNode("Next Header")
+      this.ProcessSubNode("Payload Len")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("SPI")
+      this.ProcessSubNode("Sequence")
+      plen = getNodeResult("Payload Len").Value
+      icv = (plen + 2) * 4 - 12
+      if icv < 0 {
+        panic("ah: invalid payload len")
+      }
+      if icv > 0 {
+        this.GetSubNode("ICV").SetMaxLength(icv)
+        this.ProcessSubNode("ICV")
+      }
+    Next Header: uint8
+    Payload Len: uint8
+    Reserved: uint16
+    SPI: uint32
+    Sequence: uint32
+    ICV: raw
+  ESP:
+    operator: |
+      this.ProcessSubNode("SPI")
+      this.ProcessSubNode("Sequence")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Ciphertext").SetMaxLength(rest)
+          this.ProcessSubNode("Ciphertext")
+        }
+      }
+    SPI: uint32
+    Sequence: uint32
+    Ciphertext: raw

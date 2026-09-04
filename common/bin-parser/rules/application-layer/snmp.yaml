@@ -1,5 +1,36 @@
 endian: big
 Package:
+  SNMPv3:
+    operator: |
+      ident = this.ProcessSubNode("Identifier").Value
+      if ident != 0x30 {
+        panic("snmpv3: expected SEQUENCE")
+      }
+      this.ProcessSubNode("Length")
+      this.ProcessSubNode("Version Tag")
+      if getNodeResult("Version Tag").Value != 0x02 {
+        panic("snmpv3: expected INTEGER version")
+      }
+      this.ProcessSubNode("Version Length")
+      this.GetSubNode("Version").SetMaxLength(getNodeResult("Version Length").Value)
+      this.ProcessSubNode("Version")
+      vb = getNodeResult("Version").Value
+      if vb[0] != 3 {
+        panic("snmpv3: version must be 3")
+      }
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("MsgGlobal").SetMaxLength(rest)
+          this.ProcessSubNode("MsgGlobal")
+        }
+      }
+    Identifier: uint8
+    Length: uint8
+    Version Tag: uint8
+    Version Length: uint8
+    Version: raw
+    MsgGlobal: raw
   SNMP:
     operator: |
       ident = this.ProcessSubNode("Identifier").Value

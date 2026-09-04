@@ -1,0 +1,44 @@
+endian: big
+Package:
+  CDP:
+    operator: |
+      this.ProcessSubNode("Version")
+      v = getNodeResult("Version").Value
+      if v != 1 && v != 2 {
+        panic("cdp: version must be 1 or 2")
+      }
+      this.ProcessSubNode("TTL")
+      this.ProcessSubNode("Checksum")
+      this.ProcessSubNode("TLVs")
+    Version: uint8
+    TTL: uint8
+    Checksum: uint16
+    TLVs:
+      list: true
+      TLV: CDPTLV
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          if ele.GetMaxLength() < 4 {
+            break
+          }
+          ele.Process()
+        }
+CDPTLV:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if l < 4 {
+      panic("cdp: tlv length smaller than 4")
+    }
+    if l > 4 {
+      this.GetSubNode("Value").SetMaxLength(l - 4)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint16
+  Length: uint16
+  Value: raw

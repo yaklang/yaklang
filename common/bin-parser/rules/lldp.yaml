@@ -1,0 +1,16 @@
+endian: big
+Package:
+  LLDP:
+    operator: |
+      this.ProcessSubNode("Type")
+      this.ProcessSubNode("Length")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Rest").SetMaxLength(rest)
+          this.ProcessSubNode("Rest")
+        }
+      }
+    Type: uint16,7bit
+    Length: uint16,9bit
+    Rest: raw

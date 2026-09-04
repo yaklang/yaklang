@@ -68,11 +68,77 @@ Package:
                 } else if src == 135 || dst == 135 {
                   typeNameList = ["DCERPC"]
                 } else if src == 1099 || dst == 1099 {
-                  typeNameList = ["JavaSer"]
+                  typeNameList = ["RMI", "JavaSer"]
                 } else if src == 3389 || dst == 3389 {
                   typeNameList = ["TPKT"]
                 } else if src == 389 || dst == 389 {
                   typeNameList = ["LDAPMessage"]
+                } else if src == 23 || dst == 23 {
+                  typeNameList = ["Telnet"]
+                } else if src == 110 || dst == 110 {
+                  typeNameList = ["POP3"]
+                } else if src == 143 || dst == 143 {
+                  typeNameList = ["IMAP"]
+                } else if src == 179 || dst == 179 {
+                  typeNameList = ["BGP"]
+                } else if src == 1080 || dst == 1080 {
+                  typeNameList = ["SOCKS4", "SOCKS5Req"]
+                } else if src == 1723 || dst == 1723 {
+                  typeNameList = ["PPTP"]
+                } else if src == 5900 || dst == 5900 {
+                  typeNameList = ["VNC"]
+                } else if src == 27017 || dst == 27017 {
+                  typeNameList = ["MongoDB"]
+                } else if src == 11211 || dst == 11211 {
+                  typeNameList = ["Memcached"]
+                } else if src == 5672 || dst == 5672 {
+                  typeNameList = ["AMQP"]
+                } else if src == 9092 || dst == 9092 {
+                  typeNameList = ["Kafka"]
+                } else if src == 465 || dst == 465 || src == 636 || dst == 636 || src == 853 || dst == 853 || src == 993 || dst == 993 || src == 995 || dst == 995 {
+                  typeNameList = ["TLS"]
+                } else if src == 554 || dst == 554 {
+                  typeNameList = ["RTSP"]
+                } else if src == 1935 || dst == 1935 {
+                  typeNameList = ["RTMP"]
+                } else if src == 5005 || dst == 5005 {
+                  typeNameList = ["JDWP"]
+                } else if src == 9000 || dst == 9000 {
+                  typeNameList = ["FastCGI"]
+                } else if src == 49 || dst == 49 {
+                  typeNameList = ["TACACS"]
+                } else if src == 20 || dst == 20 {
+                  typeNameList = ["FTPData", "TLS", "HTTP"]
+                } else if src == 111 || dst == 111 {
+                  typeNameList = ["ONCRPC", "TLS", "HTTP"]
+                } else if src == 2809 || dst == 2809 {
+                  typeNameList = ["GIOP", "TLS", "HTTP"]
+                } else if src == 7001 || dst == 7001 {
+                  typeNameList = ["T3", "TLS", "HTTP"]
+                } else if src == 873 || dst == 873 {
+                  typeNameList = ["Rsync", "TLS", "HTTP"]
+                } else if src == 10050 || dst == 10050 {
+                  typeNameList = ["Zabbix", "TLS", "HTTP"]
+                } else if src == 6881 || dst == 6881 {
+                  typeNameList = ["BitTorrent", "TLS", "HTTP"]
+                } else if src == 4505 || dst == 4505 {
+                  typeNameList = ["Salt", "TLS", "HTTP"]
+                } else if src == 8545 || dst == 8545 {
+                  typeNameList = ["JSONRPC", "TLS", "HTTP"]
+                } else if src == 9090 || dst == 9090 {
+                  typeNameList = ["Thrift", "TLS", "HTTP"]
+                } else if src == 8088 || dst == 8088 {
+                  typeNameList = ["NetRemoting", "TLS", "HTTP"]
+                } else if src == 50000 || dst == 50000 {
+                  typeNameList = ["Jenkins", "TLS", "HTTP", "SSH", "Redis", "MQTT", "FTP", "SMTP"]
+                } else if src == 8089 || dst == 8089 {
+                  typeNameList = ["Hessian", "TLS", "HTTP"]
+                } else if src == 7777 || dst == 7777 {
+                  typeNameList = ["PHPSer", "TLS", "HTTP"]
+                } else if src == 11312 || dst == 11312 {
+                  typeNameList = ["Pickle", "TLS", "HTTP"]
+                } else if src == 4011 || dst == 4011 {
+                  typeNameList = ["Protobuf", "TLS", "HTTP"]
                 }
                 for typeName in typeNameList{
                     res,op = this.TryProcessByType(typeName)
@@ -139,3 +205,37 @@ JavaSer: "import:application-layer/java_ser.yaml;node:JavaSer"
 SMB3Transform: "import:application-layer/smb3.yaml;node:SMB3Transform"
 TPKT: "import:application-layer/msrdp.yaml;node:TPKT"
 LDAPMessage: "import:application-layer/ldap.yaml;node:LDAPMessage"
+Telnet: "import:telnet.yaml;node:Telnet"
+POP3: "import:pop3.yaml;node:POP3"
+IMAP: "import:imap.yaml;node:IMAP"
+BGP: "import:bgp.yaml;node:BGP"
+SOCKS4: "import:socks4.yaml;node:SOCKS4"
+SOCKS5Req: "import:application-layer/socks5.yaml;node:Request"
+PPTP: "import:application-layer/pptp.yaml;node:PPTP"
+VNC: "import:vnc.yaml;node:VNC"
+MongoDB: "import:mongodb.yaml;node:MongoDB"
+Memcached: "import:memcached.yaml;node:Memcached"
+AMQP: "import:amqp.yaml;node:AMQP"
+Kafka: "import:kafka.yaml;node:Kafka"
+RTSP: "import:rtsp.yaml;node:RTSP"
+RTMP: "import:rtmp.yaml;node:RTMP"
+JDWP: "import:jdwp.yaml;node:JDWP"
+FastCGI: "import:fastcgi.yaml;node:FastCGI"
+TACACS: "import:tacacs.yaml;node:TACACS"
+FTPData: "import:ftp_data.yaml;node:FTPData"
+ONCRPC: "import:onc_rpc.yaml;node:ONCRPC"
+GIOP: "import:application-layer/iiop.yaml;node:GIOP"
+T3: "import:application-layer/t3.yaml;node:T3"
+Rsync: "import:rsync.yaml;node:Rsync"
+Zabbix: "import:zabbix.yaml;node:Zabbix"
+BitTorrent: "import:bittorrent.yaml;node:BitTorrent"
+Salt: "import:salt.yaml;node:Salt"
+JSONRPC: "import:jsonrpc.yaml;node:JSONRPC"
+Thrift: "import:thrift.yaml;node:Thrift"
+NetRemoting: "import:net_remoting.yaml;node:NetRemoting"
+Jenkins: "import:jenkins.yaml;node:Jenkins"
+Hessian: "import:hessian.yaml;node:Hessian"
+PHPSer: "import:php_ser.yaml;node:PHPSer"
+Pickle: "import:pickle.yaml;node:Pickle"
+Protobuf: "import:protobuf.yaml;node:Protobuf"
+RMI: "import:rmi.yaml;node:RMI"

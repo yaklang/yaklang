@@ -1,0 +1,19 @@
+endian: little
+Package:
+  Protobuf:
+    operator: |
+      this.ProcessSubNode("Tag")
+      tag = getNodeResult("Tag").Value
+      wt = tag & 0x07
+      if wt > 5 {
+        panic("protobuf: unknown wire type")
+      }
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Value").SetMaxLength(rest)
+          this.ProcessSubNode("Value")
+        }
+      }
+    Tag: uint8
+    Value: raw

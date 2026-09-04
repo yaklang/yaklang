@@ -1,0 +1,40 @@
+endian: big
+Package:
+  TFTP:
+    operator: |
+      this.ProcessSubNode("Opcode")
+      op = getNodeResult("Opcode").Value
+      if op < 1 || op > 6 {
+        panic("tftp: unknown opcode")
+      }
+      if op == 1 || op == 2 {
+        this.ProcessSubNode("Filename")
+        this.ProcessSubNode("Mode")
+        return
+      }
+      if op == 3 {
+        this.ProcessSubNode("Block")
+        rest = this.GetRemainingSpace()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Data").SetMaxLength(rest)
+          this.ProcessSubNode("Data")
+        }
+        return
+      }
+      if op == 4 {
+        this.ProcessSubNode("Block")
+        return
+      }
+      if op == 5 {
+        this.ProcessSubNode("Error Code")
+        this.ProcessSubNode("Error Message")
+        return
+      }
+      this.ProcessSubNode("Block")
+    Opcode: uint16
+    Filename: "del:\x00;type:string"
+    Mode: "del:\x00;type:string"
+    Block: uint16
+    Data: raw
+    Error Code: uint16
+    Error Message: "del:\x00;type:string"
