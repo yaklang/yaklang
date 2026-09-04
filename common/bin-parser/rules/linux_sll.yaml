@@ -29,6 +29,11 @@ Package:
         this.ProcessByType("LLC")
         return
       }
+      res, op = this.TryProcessByType("PeekByte")
+      op.Recovery()
+      if op.OK {
+        this.ProcessByType("Next Protocol Data")
+      }
       return
     Packet Type: uint16
     ARPHRD: uint16
@@ -40,3 +45,18 @@ IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
 LLC: "import:llc.yaml;node:LLC"
+Next Protocol Data:
+  list: true
+  Octet: uint8
+  operator: |
+    for {
+      res, op = this.TryProcessByType("PeekByte")
+      if !op.OK {
+        op.Recovery()
+        break
+      }
+      op.Recovery()
+      ele = this.NewElement()
+      ele.Process()
+    }
+PeekByte: uint8
