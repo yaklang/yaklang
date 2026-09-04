@@ -394,7 +394,12 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	reqOpts := lo.Map(imageData, func(item *aicommon.ImageData, _ int) aicommon.AIRequestOption {
 		return aicommon.WithAIRequest_ImageData(item)
 	})
-	reqOpts = append(reqOpts, aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("liteforge[%v]", forgeLabelName)))
+	// Inherited callbacks can close over the parent Agent config. Carry the
+	// invocation context on the request so its deadline reaches the Provider.
+	reqOpts = append(reqOpts,
+		aicommon.WithAIRequest_Context(ctx),
+		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("liteforge[%v]", forgeLabelName)),
+	)
 	transactionErr := aicommon.CallAITransactionWithFailureExtra(cod, rendered, aiCallback,
 		func(response *aicommon.AIResponse) error {
 			boundEmitter := response.BindEmitter(l.emitter)
