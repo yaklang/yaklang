@@ -2035,6 +2035,67 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 23, 23, raw))
 		require.Equal(t, uint64(80), uintVal(t, mustChild(t, eth, "IP", "TCP", "Telnet", "IAC").Child("Width")))
 	})
+
+	t.Run("vnc/version", func(t *testing.T) {
+		// RFC 6143 §7.1.1 ProtocolVersion "RFB 003.008\n". Wireshark vnc.version. TCP/5900.
+		raw := []byte("RFB 003.008\n")
+		n := parseRule(t, raw, "vnc", "VNC")
+		require.Equal(t, "RFB ", strVal(t, n.Child("Magic")))
+		require.Equal(t, "003", strVal(t, n.Child("Major")))
+		require.Equal(t, "008", strVal(t, n.Child("Minor")))
+		require.Nil(t, n.Child("Number of Security Types"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5900, 5900, raw))
+		require.Equal(t, "008", strVal(t, mustChild(t, eth, "IP", "TCP", "VNC").Child("Minor")))
+	})
+
+	t.Run("vnc/security", func(t *testing.T) {
+		// RFC 6143 §7.1.2: number-of-security-types=2, None (1) and VNC Authentication (2).
+		// Wireshark vnc.num_security_types / vnc.security_type. TCP/5900.
+		raw := append([]byte("RFB 003.008\n"), 0x02, 0x01, 0x02)
+		n := parseRule(t, raw, "vnc", "VNC")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Number of Security Types")))
+		types := n.Child("Security Types").Children()
+		require.Equal(t, 2, len(types))
+		require.Equal(t, uint64(1), uintVal(t, types[0]))
+		require.Equal(t, uint64(2), uintVal(t, types[1]))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 5900, 5900, raw))
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "TCP", "VNC").Child("Number of Security Types")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "VNC").Child("Security Types").Children()[0]))
+	})
+
+	t.Run("vnc/server-init", func(t *testing.T) {
+		// RFC 6143 §7.3.2 ServerInit: 800x600, 32bpp, true-colour, name "x11".
+		// Wireshark vnc.width / vnc.height / vnc.desktop_name.
+		raw := vncServerInit()
+		n := parseRule(t, raw, "vnc", "ServerInit")
+		require.Equal(t, uint64(800), uintVal(t, n.Child("Width")))
+		require.Equal(t, uint64(600), uintVal(t, n.Child("Height")))
+		require.Equal(t, uint64(32), uintVal(t, n.Child("Bits Per Pixel")))
+		require.Equal(t, uint64(24), uintVal(t, n.Child("Depth")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("True Colour")))
+		require.Equal(t, uint64(16), uintVal(t, n.Child("Red Shift")))
+		require.Equal(t, "x11", strVal(t, n.Child("Name")))
+	})
+}
+
+func vncServerInit() []byte {
+	// RFC 6143 §7.3.2 / §7.4 PIXEL_FORMAT (16 bytes) + name-length + name-string.
+	b := make([]byte, 2+2+16+4+3)
+	binary.BigEndian.PutUint16(b[0:], 800)
+	binary.BigEndian.PutUint16(b[2:], 600)
+	b[4] = 32
+	b[5] = 24
+	b[6] = 0
+	b[7] = 1
+	binary.BigEndian.PutUint16(b[8:], 0x00ff)
+	binary.BigEndian.PutUint16(b[10:], 0x00ff)
+	binary.BigEndian.PutUint16(b[12:], 0x00ff)
+	b[14] = 16
+	b[15] = 8
+	b[16] = 0
+	binary.BigEndian.PutUint32(b[20:], 3)
+	copy(b[24:], []byte("x11"))
+	return b
 }
 
 func stpConfigBPDU() []byte {
