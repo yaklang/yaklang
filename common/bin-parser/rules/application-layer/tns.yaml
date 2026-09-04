@@ -15,21 +15,37 @@ Package:
       }
       this.ProcessSubNode("Reserved")
       this.ProcessSubNode("Header Checksum")
-      if typ == 1 && l >= 34 {
+      if typ == 1 {
+        if l < 34 {
+          panic("tns: CONNECT shorter than header")
+        }
         this.GetSubNode("Connect").SetMaxLength(l - 8)
         this.ProcessSubNode("Connect")
         return
       }
+      if typ == 6 {
+        if l < 10 {
+          panic("tns: DATA shorter than data flags")
+        }
+        this.ProcessSubNode("Data Flag")
+        rest = l - 10
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Octets").SetMaxLength(rest)
+          this.ProcessSubNode("Octets")
+        }
+        return
+      }
       if l > 8 {
-        this.GetSubNode("Data").SetMaxLength(l - 8)
-        this.ProcessSubNode("Data")
+        this.GetSubNode("Octets").SetMaxLength(l - 8)
+        this.ProcessSubNode("Octets")
       }
     Packet Length: uint16
     Packet Checksum: uint16
     Packet Type: uint8
     Reserved: uint8
     Header Checksum: uint16
-    Data: raw
+    Data Flag: uint16
+    Octets: string
     Connect:
       operator: |
         this.ProcessSubNode("Version")
@@ -46,6 +62,15 @@ Package:
         this.ProcessSubNode("Flags0")
         this.ProcessSubNode("Flags1")
         cdl = getNodeResult("Connect Data Length").Value
+        off = getNodeResult("Connect Data Offset").Value
+        cur = this.Length()
+        if off > 8 {
+          skip = off - 8 - cur
+          if skip > 0 && skip < 1048576 {
+            this.GetSubNode("Offset Pad").SetMaxLength(skip)
+            this.ProcessSubNode("Offset Pad")
+          }
+        }
         if cdl > 0 {
           if cdl > 0x10000 {
             panic("tns: connect data too large")
@@ -53,6 +78,7 @@ Package:
           this.GetSubNode("Connect Data").SetMaxLength(cdl)
           this.ProcessSubNode("Connect Data")
         }
+        return
       Version: uint16
       Compat: uint16
       Service Options: uint16
@@ -66,4 +92,5 @@ Package:
       Max Connect Data: uint32
       Flags0: uint8
       Flags1: uint8
-      Connect Data: raw
+      Offset Pad: string
+      Connect Data: string

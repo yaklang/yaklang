@@ -233,14 +233,18 @@ func TestRADIUSAndEdges(t *testing.T) {
 
 func TestTNSConnectAndEdges(t *testing.T) {
 	data := []byte("(DESCRIPTION=)")
-	pkt := make([]byte, 8+len(data))
+	pkt := make([]byte, 8+26+len(data))
 	binary.BigEndian.PutUint16(pkt[0:], uint16(len(pkt)))
 	pkt[4] = 1
-	copy(pkt[8:], data)
+	binary.BigEndian.PutUint16(pkt[8:], 0x0134)
+	binary.BigEndian.PutUint16(pkt[10:], 0x0134)
+	binary.BigEndian.PutUint16(pkt[24:], uint16(len(data)))
+	binary.BigEndian.PutUint16(pkt[26:], 34)
+	copy(pkt[34:], data)
 	n := parseRule(t, pkt, "application-layer.tns", "TNS")
 	require.Equal(t, uint64(len(pkt)), uintVal(t, n.Child("Packet Length")))
 	require.Equal(t, uint64(1), uintVal(t, n.Child("Packet Type")))
-	require.Equal(t, data, bytesVal(t, n.Child("Data")))
+	require.Equal(t, "(DESCRIPTION=)", strVal(t, mustChild(t, n, "Connect").Child("Connect Data")))
 
 	accept := make([]byte, 8)
 	binary.BigEndian.PutUint16(accept[0:], 8)
@@ -253,13 +257,15 @@ func TestTNSConnectAndEdges(t *testing.T) {
 	refuse[4] = 4
 	parseRule(t, refuse, "application-layer.tns", "TNS")
 
-	dataPkt := make([]byte, 10)
-	binary.BigEndian.PutUint16(dataPkt[0:], 10)
+	dataPkt := make([]byte, 12)
+	binary.BigEndian.PutUint16(dataPkt[0:], 12)
 	dataPkt[4] = 6
-	dataPkt[8] = 'A'
-	dataPkt[9] = 'B'
+	dataPkt[10] = 'A'
+	dataPkt[11] = 'B'
 	d := parseRule(t, dataPkt, "application-layer.tns", "TNS")
 	require.Equal(t, uint64(6), uintVal(t, d.Child("Packet Type")))
+	require.Equal(t, uint64(0), uintVal(t, d.Child("Data Flag")))
+	require.Equal(t, "AB", strVal(t, d.Child("Octets")))
 
 	parseMustFail(t, nil, "application-layer.tns", "TNS")
 	parseMustFail(t, []byte{0, 7, 0, 0, 1, 0, 0}, "application-layer.tns", "TNS")
@@ -267,9 +273,14 @@ func TestTNSConnectAndEdges(t *testing.T) {
 	binary.BigEndian.PutUint16(badType[0:], 8)
 	badType[4] = 99
 	parseMustFail(t, badType, "application-layer.tns", "TNS")
+	shortConnect := make([]byte, 22)
+	binary.BigEndian.PutUint16(shortConnect[0:], 22)
+	shortConnect[4] = 1
+	parseMustFail(t, shortConnect, "application-layer.tns", "TNS")
 
 	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 1521, pkt))
 	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "TNS", "Packet Type")))
+	require.Equal(t, "(DESCRIPTION=)", strVal(t, mustChild(t, eth, "IP", "TCP", "TNS", "Connect").Child("Connect Data")))
 }
 
 func dcerpcHeader(ptype byte, frag uint16, callID uint32) []byte {

@@ -753,4 +753,18 @@ func TestP1BranchRows(t *testing.T) {
 		exts := mustChild(t, parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello"), "ClientHello", "Extensions").Children()
 		require.Equal(t, "example.com", strVal(t, mustChild(t, exts[0], "SNI").Child("Host Name")))
 	})
+
+	t.Run("tns/connect", func(t *testing.T) {
+		cdata := []byte("(DESCRIPTION=(CONNECT_DATA=(SERVICE_NAME=ORCL)))")
+		require.Equal(t, string(cdata), strVal(t, mustChild(t, parseRule(t, tnsConnectPacket(cdata), "application-layer.tns", "TNS"), "Connect").Child("Connect Data")))
+	})
+	t.Run("tns/data", func(t *testing.T) {
+		raw := make([]byte, 12)
+		binary.BigEndian.PutUint16(raw[0:], 12)
+		raw[4] = 6
+		copy(raw[10:], []byte("AB"))
+		n := parseRule(t, raw, "application-layer.tns", "TNS")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Data Flag")))
+		require.Equal(t, "AB", strVal(t, n.Child("Octets")))
+	})
 }
