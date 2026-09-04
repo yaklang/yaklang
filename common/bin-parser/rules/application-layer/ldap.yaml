@@ -42,7 +42,7 @@ Package:
         }
       MessageID Tag: uint8
       MessageID Length: uint8
-      MessageID: raw
+      MessageID: string
       ProtocolOp Tag: uint8
       ProtocolOp Length: uint8
       ProtocolOp:
@@ -52,6 +52,7 @@ Package:
             this.ProcessSubNode("BindRequest")
             return
           }
+          return
         BindRequest:
           operator: |
             this.ProcessSubNode("Version Tag")
@@ -71,19 +72,20 @@ Package:
             this.ProcessSubNode("Auth Tag")
             this.ProcessSubNode("Auth Length")
             al = getNodeResult("Auth Length").Value
-            if al > 0 {
+            if al > 0 && al < 1048576 {
               this.GetSubNode("Auth").SetMaxLength(al)
               this.ProcessSubNode("Auth")
             }
+            return
           Version Tag: uint8
           Version Length: uint8
-          Version: raw
+          Version: string
           Name Tag: uint8
           Name Length: uint8
-          Name: raw
+          Name: string
           Auth Tag: uint8
           Auth Length: uint8
-          Auth: raw
+          Auth: string
   Message: BER
   LDAP:
     parser: |

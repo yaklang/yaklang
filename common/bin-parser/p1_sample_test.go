@@ -1069,6 +1069,36 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(11), uintVal(t, mustChild(t, eth, "IP", "TCP", "DCERPC").Child("PType")))
 	})
 
+	t.Run("ldap/bind", func(t *testing.T) {
+		// Apache Directory BindRequestTest / RFC 4511 §4.2 simple bind:
+		// version 3, name uid=akarasulu,dc=example,dc=com, simple "password".
+		raw := mustHex(t, "3033020101602e020103041f"+
+			"7569643d616b61726173756c752c64633d6578616d706c652c64633d636f6d"+
+			"800870617373776f7264")
+		n := parseRule(t, raw, "application-layer.ldap", "LDAPMessage")
+		br := mustChild(t, n, "Body", "ProtocolOp", "BindRequest")
+		require.Equal(t, []byte{3}, bytesVal(t, br.Child("Version")))
+		require.Equal(t, "uid=akarasulu,dc=example,dc=com", strVal(t, br.Child("Name")))
+		require.Equal(t, uint64(0x80), uintVal(t, br.Child("Auth Tag")))
+		require.Equal(t, "password", strVal(t, br.Child("Auth")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 389, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "LDAPMessage", "Body", "ProtocolOp", "BindRequest")
+		require.Equal(t, "uid=akarasulu,dc=example,dc=com", strVal(t, wired.Child("Name")))
+		require.Equal(t, "password", strVal(t, wired.Child("Auth")))
+		cldap := parseEthernet(t, ipv4UDPBytes(t, 389, 389, raw))
+		require.Equal(t, "uid=akarasulu,dc=example,dc=com", strVal(t, mustChild(t, cldap, "IP", "UDP", "LDAPMessage", "Body", "ProtocolOp", "BindRequest").Child("Name")))
+	})
+
+	t.Run("ldap/unbind", func(t *testing.T) {
+		// RFC 4511 §4.3 UnbindRequest APPLICATION 2 NULL.
+		raw := mustHex(t, "30050201014200")
+		n := parseRule(t, raw, "application-layer.ldap", "LDAPMessage")
+		require.Equal(t, uint64(0x42), uintVal(t, mustChild(t, n, "Body").Child("ProtocolOp Tag")))
+		require.Equal(t, []byte{1}, bytesVal(t, mustChild(t, n, "Body").Child("MessageID")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 389, raw))
+		require.Equal(t, uint64(0x42), uintVal(t, mustChild(t, eth, "IP", "TCP", "LDAPMessage", "Body").Child("ProtocolOp Tag")))
+	})
+
 	t.Run("dcerpc/bind-ack", func(t *testing.T) {
 		// [MS-RPCE] 2.2.2.3 / DCE 1.1 bind_ack port_any_t; Wireshark packet-dcerpc.c
 		// dissect_dcerpc_cn_bind_ack dcerpc.cn_sec_addr FT_STRINGZ "135".

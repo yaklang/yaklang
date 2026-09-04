@@ -80,7 +80,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | RPC | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of NFS |
 | Portmap/Rpcbind | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | alias of NFS |
 | LDAPS | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of TLS |
-| CLDAP | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/ldap.yaml` |
+| CLDAP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/ldap.yaml` |
 | GSS-API | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/spnego.yaml` |
 | TACACS+ | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `tacacs.yaml` |
 | SOCKS4 | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `socks4.yaml` |
@@ -152,6 +152,6 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | Docker Registry | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | gRPC reflection | A | 90 | 20 | 20 | 20 | 20 | 10 | L2 | alias of HTTP/2 |
 | SaltStack | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `salt.yaml` |
-| LDAP paged/SASL | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `application-layer/ldap.yaml` |
+| LDAP paged/SASL | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/ldap.yaml` |
 | DHCPv6 spoof | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of DHCPv6 |
 | IPv6 RA | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of ICMPv6 NDP |
