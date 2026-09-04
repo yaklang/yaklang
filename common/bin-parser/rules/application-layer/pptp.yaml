@@ -1,11 +1,12 @@
 endian: big
 Package:
   PPTP:
-    Length: uint16
-    length-from-field: Length
-    length-from-field-multiply: 8
     operator: |
       this.ProcessSubNode("Length")
+      l = getNodeResult("Length").Value
+      if l < 12 {
+        panic("pptp: length smaller than 12")
+      }
       this.ProcessSubNode("MessageType")
       mt = getNodeResult("MessageType").Value
       if mt != 1 {
@@ -17,7 +18,12 @@ Package:
       }
       this.ProcessSubNode("ControlMessageType")
       this.ProcessSubNode("Reserved")
-      this.ProcessSubNode("Message")
+      rest = l - 12
+      if rest > 0 && rest < 1048576 {
+        this.GetSubNode("Message").SetMaxLength(rest)
+        this.ProcessSubNode("Message")
+      }
+    Length: uint16
     MessageType: uint16
     MagicCookie: uint32
     ControlMessageType: uint16
@@ -26,18 +32,31 @@ Package:
       unpack: true
       operator: |
         type = getNodeResult("../ControlMessageType").Value
-        switch type{
-          case 1:
-            this.ProcessByType("Start Control Conn Req")
-          case 2:
-            this.ProcessByType("Start Control Conn Reply")
-          case 7:
-            this.ProcessByType("Outgoing Call Req")
-          case 8:
-            this.ProcessByType("Outgoing Call Reply")
-          case 15:
-            this.ProcessByType("Set Link Info")
+        if type == 1 {
+          this.ProcessSubNode("ProtocolVersion")
+          this.ProcessSubNode("Reserved2")
+          this.ProcessSubNode("FramingCapabilities")
+          this.ProcessSubNode("BearerCapabilities")
+          this.ProcessSubNode("MaxChannels")
+          this.ProcessSubNode("FirmwareRevision")
+          this.ProcessSubNode("Hostname")
+          this.ProcessSubNode("Vendor")
+          return
         }
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Raw").SetMaxLength(rest)
+          this.ProcessSubNode("Raw")
+        }
+      ProtocolVersion: uint16
+      Reserved2: uint16
+      FramingCapabilities: uint32
+      BearerCapabilities: uint32
+      MaxChannels: uint16
+      FirmwareRevision: uint16
+      Hostname: string,64
+      Vendor: string,64
+      Raw: raw
 
 Start Control Conn Req:
     ProtocolVersion: uint16

@@ -127,7 +127,8 @@ func TestP1LinkGopacketFrames(t *testing.T) {
 		0x09, 0x00, 0x12, 0x0f, 0x01, 0x03, 0x6c, 0x00, 0x00, 0x10, 0x00, 0x00,
 	}
 	lt := mustChild(t, parseEthernet(t, lldp), "LLDP")
-	require.Equal(t, uint64(1), uintVal(t, lt.Child("Type")))
+	require.True(t, lt.Child("TLVs").IsList())
+	require.Equal(t, uint64(1), uintVal(t, lt.Child("TLVs").Children()[0].Child("Type")))
 
 	// gopacket layers/icmp6msg_test.go Router Advertisement
 	ra := []byte{

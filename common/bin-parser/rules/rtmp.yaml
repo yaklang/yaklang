@@ -8,10 +8,12 @@ Package:
       }
       if this.Length() < this.GetMaxLength() {
         rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Handshake").SetMaxLength(rest)
-          this.ProcessSubNode("Handshake")
+        if rest >= 8 && rest < 1048576 {
+          this.ProcessSubNode("C1")
         }
       }
     Version: uint8
-    Handshake: raw
+    C1:
+      Time: uint32
+      Zero: uint32
+      Random: raw

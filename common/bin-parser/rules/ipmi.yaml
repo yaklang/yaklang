@@ -13,10 +13,12 @@ Package:
       if (cls & 0x0f) != 0x06 && (cls & 0x0f) != 0x07 {
         panic("ipmi: class must be IPMI or ASF")
       }
-      rest = this.GetRemainingSpace()
-      if rest > 0 && rest < 1048576 {
-        this.GetSubNode("Body").SetMaxLength(rest)
-        this.ProcessSubNode("Body")
+      if this.Length() < this.GetMaxLength() {
+        rest = this.GetMaxLength() - this.Length()
+        if rest > 0 && rest < 1048576 {
+          this.GetSubNode("Body").SetMaxLength(rest)
+          this.ProcessSubNode("Body")
+        }
       }
     Version: uint8
     Reserved: uint8

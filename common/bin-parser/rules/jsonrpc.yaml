@@ -1,9 +1,17 @@
 Package:
   JSONRPC:
     operator: |
+      this.ProcessSubNode("Brace")
+      if getNodeResult("Brace").Value != 0x7b {
+        panic("jsonrpc: expected object")
+      }
       this.ProcessSubNode("Body")
       s = string(getNodeResult("Body").Value)
-      if !(s.HasPrefix("{\"jsonrpc") || s.HasPrefix("{\"method")) {
-        panic("jsonrpc: expected jsonrpc object")
+      if !s.HasPrefix("\"jsonrpc\":\"") {
+        panic("jsonrpc: expected jsonrpc key")
       }
+      if !s.HasPrefix("\"jsonrpc\":\"2.0\",\"method\"") && !s.HasPrefix("\"jsonrpc\":\"1.0\",\"method\"") {
+        panic("jsonrpc: expected method key")
+      }
+    Brace: uint8
     Body: "del:\n;type:string"

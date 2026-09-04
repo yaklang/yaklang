@@ -26,9 +26,9 @@ func TestP1UDPApplications(t *testing.T) {
 	// RFC 5424 syslog
 	sys := []byte("<13>Sep  4 12:00:00 host sshd: ok\n")
 	s := parseRule(t, sys, "syslog", "Syslog")
-	require.Contains(t, strVal(t, s.Child("Line")), "<13>")
+	require.Equal(t, "13", strVal(t, s.Child("PRI")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 12345, 514, sys))
-	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("Line")), "<13>")
+	require.Equal(t, "13", strVal(t, mustChild(t, eth, "IP", "UDP", "Syslog").Child("PRI")))
 
 	// RFC 2453 RIP v2 request
 	rip := make([]byte, 24)
@@ -57,7 +57,8 @@ func TestP1UDPApplications(t *testing.T) {
 
 	sdp := []byte("v=0\r\no=- 0 0 IN IP4 10.0.0.1\r\n")
 	sd := parseRule(t, sdp, "sip", "SDP")
-	require.Contains(t, strVal(t, sd.Child("Version Line")), "v=0")
+	require.True(t, sd.Child("Lines").IsList())
+	require.Equal(t, uint64('v'), uintVal(t, sd.Child("Lines").Children()[0].Child("Type")))
 
 	// RFC 3550 RTP v2
 	rtp := []byte{0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0xaa}
@@ -88,23 +89,17 @@ func TestP1UDPApplications(t *testing.T) {
 	ik := parseRule(t, ike, "ike", "IKE")
 	require.Equal(t, uint64(0x20), uintVal(t, ik.Child("Version")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 4000, 500, ike))
-	if n := mustChild(t, eth, "IP", "UDP").Child("IKE"); n != nil {
-		require.Equal(t, uint64(34), uintVal(t, n.Child("Exchange Type")))
-	}
+	require.Equal(t, uint64(34), uintVal(t, mustChild(t, eth, "IP", "UDP", "IKE").Child("Exchange Type")))
 
 	natt := parseEthernet(t, ipv4UDPBytes(t, 4500, 4500, ike))
-	if n := mustChild(t, natt, "IP", "UDP").Child("IKE"); n != nil {
-		require.Equal(t, uint64(34), uintVal(t, n.Child("Exchange Type")))
-	}
+	require.Equal(t, uint64(34), uintVal(t, mustChild(t, natt, "IP", "UDP", "NATT").Child("Exchange Type")))
 
 	openvpn := make([]byte, 13)
 	openvpn[0] = 0x20 // opcode 4 (P_CONTROL_V1) << 3
 	ov := parseRule(t, openvpn, "openvpn", "OpenVPN")
 	require.Equal(t, uint64(0x20), uintVal(t, ov.Child("OpcodeKey")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1194, 1194, openvpn))
-	if n := mustChild(t, eth, "IP", "UDP").Child("OpenVPN"); n != nil {
-		require.Equal(t, uint64(0x20), uintVal(t, n.Child("OpcodeKey")))
-	}
+	require.Equal(t, uint64(0x20), uintVal(t, mustChild(t, eth, "IP", "UDP", "OpenVPN").Child("OpcodeKey")))
 
 	wg := make([]byte, 148)
 	wg[0] = 1
@@ -127,31 +122,24 @@ func TestP1UDPApplications(t *testing.T) {
 	nb := parseRule(t, nbtdg, "nbt_dg", "NBTDG")
 	require.Equal(t, uint64(0x10), uintVal(t, nb.Child("Message Type")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 138, 138, nbtdg))
-	if n := mustChild(t, eth, "IP", "UDP").Child("NBTDG"); n != nil {
-		require.Equal(t, uint64(0x10), uintVal(t, n.Child("Message Type")))
-	}
+	require.Equal(t, uint64(0x10), uintVal(t, mustChild(t, eth, "IP", "UDP", "NBTDG").Child("Message Type")))
 
 	ipmi := []byte{0x06, 0x00, 0xff, 0x06, 0x00}
 	im := parseRule(t, ipmi, "ipmi", "IPMI")
 	require.Equal(t, uint64(6), uintVal(t, im.Child("Version")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 623, 623, ipmi))
-	if n := mustChild(t, eth, "IP", "UDP").Child("IPMI"); n != nil {
-		require.Equal(t, uint64(6), uintVal(t, n.Child("Class")))
-	}
+	require.Equal(t, uint64(6), uintVal(t, mustChild(t, eth, "IP", "UDP", "IPMI").Child("Class")))
 
 	dtls := []byte{0x16, 0xfe, 0xfd, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00}
 	dt := parseRule(t, dtls, "dtls", "DTLS")
 	require.Equal(t, uint64(0x16), uintVal(t, dt.Child("Content Type")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 443, 443, dtls))
-	if n := mustChild(t, eth, "IP", "UDP").Child("DTLS"); n != nil {
-		require.Equal(t, uint64(0xfefd), uintVal(t, n.Child("Version")))
-	}
+	require.Equal(t, uint64(0xfefd), uintVal(t, mustChild(t, eth, "IP", "UDP", "DTLS").Child("Version")))
 
 	ssdp := []byte("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: ssdp:all\r\n\r\n")
+	require.Equal(t, "M-SEARCH", strVal(t, mustChild(t, parseRule(t, ssdp, "application-layer.http", "HTTP"), "HTTP Request").Child("Method")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1900, 1900, ssdp))
-	if n := mustChild(t, eth, "IP", "UDP").Child("HTTP"); n != nil {
-		require.Equal(t, "M-SEARCH", strVal(t, mustChild(t, n, "HTTP Request").Child("Method")))
-	}
+	require.Equal(t, "M-SEARCH", strVal(t, mustChild(t, eth, "IP", "UDP", "SSDP", "HTTP Request").Child("Method")))
 }
 
 func TestP1TCPApplications(t *testing.T) {
@@ -193,9 +181,10 @@ func TestP1TCPApplications(t *testing.T) {
 
 	vnc := []byte("RFB 003.008\n")
 	vn := parseRule(t, vnc, "vnc", "VNC")
-	require.Contains(t, strVal(t, vn.Child("Protocol")), "RFB")
+	require.Equal(t, "RFB ", strVal(t, vn.Child("Magic")))
+	require.Equal(t, "003", strVal(t, vn.Child("Major")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 5900, 5900, vnc))
-	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "VNC").Child("Protocol")), "003.008")
+	require.Equal(t, "008", strVal(t, mustChild(t, eth, "IP", "TCP", "VNC").Child("Minor")))
 
 	mongo := make([]byte, 16)
 	binary.LittleEndian.PutUint32(mongo[0:], 16)
@@ -228,9 +217,10 @@ func TestP1TCPApplications(t *testing.T) {
 
 	jr := []byte("{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}\n")
 	j := parseRule(t, jr, "jsonrpc", "JSONRPC")
+	require.Contains(t, strVal(t, j.Child("Body")), "jsonrpc")
 	require.Contains(t, strVal(t, j.Child("Body")), "ping")
-	eth = parseEthernet(t, ipv4TCPFrame(t, 8545, 8545, jr))
-	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "JSONRPC").Child("Body")), "jsonrpc")
+	eth = parseEthernet(t, ipv4TCPFrame(t, 40002, 8545, jr))
+	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "JSONRPC").Child("Body")), "ping")
 
 	tac := make([]byte, 12)
 	tac[0] = 0xc0
@@ -295,9 +285,10 @@ func TestP1TCPApplications(t *testing.T) {
 
 	pb := []byte{0x08, 0x01}
 	p := parseRule(t, pb, "protobuf", "Protobuf")
-	require.Equal(t, uint64(0x08), uintVal(t, p.Child("Tag")))
+	require.True(t, p.Child("Fields").IsList())
+	require.Equal(t, uint64(0x08), uintVal(t, p.Child("Fields").Children()[0].Child("Tag")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 4011, 4011, pb))
-	require.Equal(t, uint64(0x08), uintVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf").Child("Tag")))
+	require.Equal(t, uint64(0x08), uintVal(t, mustChild(t, eth, "IP", "TCP", "Protobuf", "Fields").Children()[0].Child("Tag")))
 
 	zb := append([]byte("ZBXD"), 0x01, 0x02, 0x00, 0x00, 0x00, '{', '}')
 	z := parseRule(t, zb, "zabbix", "Zabbix")
@@ -313,9 +304,10 @@ func TestP1TCPApplications(t *testing.T) {
 
 	rs := []byte("@RSYNCD: 31.0\n")
 	ry := parseRule(t, rs, "rsync", "Rsync")
-	require.Contains(t, strVal(t, ry.Child("Banner")), "@RSYNCD")
+	require.Equal(t, "@RSYNCD:", strVal(t, ry.Child("Magic")))
+	require.Equal(t, "31.0", strVal(t, ry.Child("Version")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 873, 873, rs))
-	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Banner")), "31.0")
+	require.Equal(t, "31.0", strVal(t, mustChild(t, eth, "IP", "TCP", "Rsync").Child("Version")))
 
 	rtsp := []byte("OPTIONS rtsp://cam/stream RTSP/1.0\r\nCSeq: 1\r\n\r\n")
 	rt := parseRule(t, rtsp, "rtsp", "RTSP")
@@ -331,13 +323,14 @@ func TestP1TCPApplications(t *testing.T) {
 
 	fd := []byte("file-bytes")
 	eth = parseEthernet(t, ipv4TCPFrame(t, 20, 20, fd))
-	require.Equal(t, []byte("file-bytes"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "FTPData").Child("Data")))
+	require.Equal(t, []byte("file-bytes"), bytesVal(t, mustChild(t, eth, "IP", "TCP", "FTPData", "Records").Children()[0].Child("Data")))
 
 	jk := []byte("Protocol:HTTP11\n")
 	jn := parseRule(t, jk, "jenkins", "Jenkins")
-	require.Contains(t, strVal(t, jn.Child("Line")), "Protocol:")
+	require.Equal(t, "Protocol:", strVal(t, jn.Child("Prefix")))
+	require.Equal(t, "HTTP11", strVal(t, jn.Child("Value")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 50000, 50000, jk))
-	require.Contains(t, strVal(t, mustChild(t, eth, "IP", "TCP", "Jenkins").Child("Line")), "HTTP11")
+	require.Equal(t, "HTTP11", strVal(t, mustChild(t, eth, "IP", "TCP", "Jenkins").Child("Value")))
 
 	salt := []byte{0x00, 0x00, 0x00, 0x04, 'p', 'i', 'n', 'g'}
 	sa := parseRule(t, salt, "salt", "Salt")
@@ -360,17 +353,13 @@ func TestP1TCPApplications(t *testing.T) {
 	giop[7] = 3
 	parseMustFail(t, []byte("XXXX"), "application-layer.iiop", "GIOP")
 	eth = parseEthernet(t, ipv4TCPFrame(t, 2809, 2809, giop))
-	if n := mustChild(t, eth, "IP", "TCP").Child("GIOP"); n != nil {
-		require.Equal(t, uint64(3), uintVal(t, n.Child("Message Type")))
-	}
+	require.Equal(t, uint64(3), uintVal(t, mustChild(t, eth, "IP", "TCP", "GIOP").Child("Message Type")))
 
 	t3 := make([]byte, 19)
 	binary.BigEndian.PutUint32(t3[0:], 19)
 	t3[4] = 1
 	eth = parseEthernet(t, ipv4TCPFrame(t, 7001, 7001, t3))
-	if n := mustChild(t, eth, "IP", "TCP").Child("T3"); n != nil {
-		require.Equal(t, uint64(1), uintVal(t, n.Child("Cmd")))
-	}
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "T3").Child("Cmd")))
 
 	pptp := make([]byte, 156)
 	binary.BigEndian.PutUint16(pptp[0:], 156)
@@ -380,9 +369,7 @@ func TestP1TCPApplications(t *testing.T) {
 	pp := parseRule(t, pptp, "application-layer.pptp", "PPTP")
 	require.Equal(t, uint64(0x1a2b3c4d), uintVal(t, pp.Child("MagicCookie")))
 	eth = parseEthernet(t, ipv4TCPFrame(t, 1723, 1723, pptp))
-	if n := mustChild(t, eth, "IP", "TCP").Child("PPTP"); n != nil {
-		require.Equal(t, uint64(1), uintVal(t, n.Child("ControlMessageType")))
-	}
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "PPTP").Child("ControlMessageType")))
 
 	rtspResp := []byte("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n")
 	rr := parseRule(t, rtspResp, "rtsp", "RTSP")
@@ -445,7 +432,11 @@ func TestP1MiscAndAliases(t *testing.T) {
 	// mDNS is DNS on UDP 5353
 	dns := []byte{0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01}
 	eth = parseEthernet(t, ipv4UDPBytes(t, 5353, 5353, dns))
-	require.NotNil(t, mustChild(t, eth, "IP", "UDP", "MDNS"))
+	md := mustChild(t, eth, "IP", "UDP", "MDNS")
+	require.Equal(t, uint64(0x0100), uintVal(t, md.Child("Header").Child("Flags")))
+	llmnrQ := []byte{0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	llmnr := parseEthernet(t, ipv4UDPBytes(t, 5355, 5355, llmnrQ))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, llmnr, "IP", "UDP", "LLMNR", "Header").Child("ID")))
 
 	snmpv3 := []byte{0x30, 0x05, 0x02, 0x01, 0x03}
 	sv := parseRule(t, snmpv3, "application-layer.snmp", "SNMPv3")
@@ -460,4 +451,31 @@ func TestP1MiscAndAliases(t *testing.T) {
 	ep := parseRule(t, eap, "eapol", "EAPOL")
 	require.Equal(t, uint64(0), uintVal(t, ep.Child("Packet Type")))
 	require.Equal(t, uint64(1), uintVal(t, mustChild(t, ep, "EAPPacket").Child("Code")))
+
+	// [MS-WKST] / [MS-RPRN] / [MS-TSCH] / [MS-DCOM] bind UUID + opnum
+	wkssvc := []byte{0x98, 0xd0, 0xff, 0x6b, 0x12, 0xa1, 0x10, 0x36, 0x98, 0x33, 0x46, 0xc3, 0xf8, 0x7e, 0x34, 0x5a}
+	spoolss := []byte{0x78, 0x56, 0x34, 0x12, 0x34, 0x12, 0xcd, 0xab, 0xef, 0x00, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab}
+	atsvc := []byte{0x82, 0x06, 0xf7, 0x1f, 0x51, 0x0a, 0xe8, 0x30, 0x07, 0x6d, 0x74, 0x0b, 0xe8, 0xce, 0xe9, 0x8b}
+	iox := []byte{0xc4, 0xfe, 0xfc, 0x99, 0x60, 0x52, 0x1b, 0x10, 0xbb, 0xcb, 0x00, 0xaa, 0x00, 0x21, 0x34, 0x7a}
+	for _, tc := range []struct {
+		name  string
+		uuid  []byte
+		opnum uint16
+	}{
+		{"WKSSVC", wkssvc, 0},
+		{"SPOOLSS", spoolss, 0},
+		{"ATSVC", atsvc, 0},
+		{"IObjectExporter", iox, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bind := dcerpcBindUUID(tc.uuid)
+			n := parseRule(t, bind, "application-layer.dcerpc", "DCERPC")
+			require.Equal(t, tc.uuid, bytesVal(t, mustChild(t, n, "PDU", "Bind", "Contexts").Children()[0].Child("Abstract Syntax")))
+			req := dcerpcRequestOp(tc.opnum, []byte{1, 2, 3, 4})
+			r := parseRule(t, req, "application-layer.dcerpc", "DCERPC")
+			require.Equal(t, uint64(tc.opnum), uintVal(t, mustChild(t, r, "PDU", "Request", "OpNum")))
+			eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 135, bind))
+			require.Equal(t, tc.uuid, bytesVal(t, mustChild(t, eth, "IP", "TCP", "DCERPC", "PDU", "Bind", "Contexts").Children()[0].Child("Abstract Syntax")))
+		})
+	}
 }

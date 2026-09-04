@@ -1,16 +1,39 @@
 endian: big
 Package:
   LLDP:
-    operator: |
-      this.ProcessSubNode("Type")
-      this.ProcessSubNode("Length")
-      if this.Length() < this.GetMaxLength() {
-        rest = this.GetMaxLength() - this.Length()
-        if rest > 0 && rest < 1048576 {
-          this.GetSubNode("Rest").SetMaxLength(rest)
-          this.ProcessSubNode("Rest")
+    TLVs:
+      list: true
+      TLV: LLDPTLV
+      operator: |
+        for {
+          ele = this.NewElement()
+          if ele.GetMaxLength() == 0 {
+            break
+          }
+          if ele.GetMaxLength() < 2 {
+            break
+          }
+          ele.Process()
+          t = ele.GetSubNode("Type").Result().Value
+          if t == 0 {
+            break
+          }
         }
+LLDPTLV:
+  operator: |
+    this.ProcessSubNode("Type")
+    this.ProcessSubNode("Length")
+    l = getNodeResult("Length").Value
+    if this.Length() < this.GetMaxLength() {
+      avail = this.GetMaxLength() - this.Length()
+      if l > avail {
+        l = avail
       }
-    Type: uint16,7bit
-    Length: uint16,9bit
-    Rest: raw
+    }
+    if l > 0 && l < 512 {
+      this.GetSubNode("Value").SetMaxLength(l)
+      this.ProcessSubNode("Value")
+    }
+  Type: uint16,7bit
+  Length: uint16,9bit
+  Value: raw

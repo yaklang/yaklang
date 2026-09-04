@@ -10,8 +10,17 @@ Package:
       this.ProcessSubNode("Request ID")
       this.ProcessSubNode("Response To")
       this.ProcessSubNode("Op Code")
+      op = getNodeResult("Op Code").Value
+      if op == 2004 && l >= 32 {
+        this.ProcessSubNode("OP_QUERY")
+        return
+      }
+      if op == 2013 && l >= 21 {
+        this.ProcessSubNode("OP_MSG")
+        return
+      }
       rest = l - 16
-      if rest > 0 {
+      if rest > 0 && rest < 1048576 {
         this.GetSubNode("Body").SetMaxLength(rest)
         this.ProcessSubNode("Body")
       }
@@ -19,4 +28,14 @@ Package:
     Request ID: uint32
     Response To: uint32
     Op Code: uint32
+    OP_QUERY:
+      Flags: uint32
+      Collection: "del:\x00;type:string"
+      Skip: uint32
+      Return: uint32
+      Query: raw
+    OP_MSG:
+      Flag Bits: uint32
+      Section Kind: uint8
+      Section: raw
     Body: raw

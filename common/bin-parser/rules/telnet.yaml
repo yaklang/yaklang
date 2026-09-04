@@ -17,6 +17,9 @@ Package:
         }
         this.ProcessSubNode("Command")
         cmd = getNodeResult("Command").Value
+        if cmd < 240 {
+          panic("telnet: unknown IAC command")
+        }
         if cmd == 251 || cmd == 252 || cmd == 253 || cmd == 254 {
           this.ProcessSubNode("Option")
         }
