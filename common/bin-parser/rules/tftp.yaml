@@ -10,6 +10,15 @@ Package:
       if op == 1 || op == 2 {
         this.ProcessSubNode("Filename")
         this.ProcessSubNode("Mode")
+        for {
+          res, op2 = this.TryProcessByType("TFTPOption")
+          if op2.OK {
+            op2.Save()
+          } else {
+            op2.Recovery()
+            break
+          }
+        }
         return
       }
       if op == 3 {
@@ -32,7 +41,18 @@ Package:
         this.ProcessSubNode("Error Message")
         return
       }
-      this.ProcessSubNode("Block")
+      if op == 6 {
+        for {
+          res, op2 = this.TryProcessByType("TFTPOption")
+          if op2.OK {
+            op2.Save()
+          } else {
+            op2.Recovery()
+            break
+          }
+        }
+        return
+      }
     Opcode: uint16
     Filename: "del:\x00;type:string"
     Mode: "del:\x00;type:string"
@@ -40,3 +60,13 @@ Package:
     File Data: string
     Error Code: uint16
     Error Message: "del:\x00;type:string"
+TFTPOption:
+  operator: |
+    this.ProcessSubNode("Name")
+    n = getNodeResult("Name").Value
+    if n == "" {
+      panic("tftp: empty option name")
+    }
+    this.ProcessSubNode("Value")
+  Name: "del:\x00;type:string"
+  Value: "del:\x00;type:string"

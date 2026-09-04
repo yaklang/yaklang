@@ -595,6 +595,33 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, "abc", strVal(t, td.Child("File Data")))
 	})
 
+	t.Run("tftp/blksize", func(t *testing.T) {
+		// RFC 2347 / RFC 2348 RRQ with option blksize 512. Wireshark tftp.option.name / tftp.option.value.
+		raw := append([]byte{0x00, 0x01}, []byte("foo\x00octet\x00blksize\x00512\x00")...)
+		tf := parseRule(t, raw, "tftp", "TFTP")
+		require.Equal(t, "foo", strVal(t, tf.Child("Filename")))
+		require.Equal(t, "octet", strVal(t, tf.Child("Mode")))
+		opt := mustChild(t, tf, "TFTPOption")
+		require.Equal(t, "blksize", strVal(t, opt.Child("Name")))
+		require.Equal(t, "512", strVal(t, opt.Child("Value")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 12345, 69, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "TFTP", "TFTPOption")
+		require.Equal(t, "blksize", strVal(t, wired.Child("Name")))
+		require.Equal(t, "512", strVal(t, wired.Child("Value")))
+	})
+
+	t.Run("tftp/oack", func(t *testing.T) {
+		// RFC 2347 OACK (opcode 6) tsize 1234. Wireshark tftp.option.name=tsize.
+		raw := append([]byte{0x00, 0x06}, []byte("tsize\x001234\x00")...)
+		tf := parseRule(t, raw, "tftp", "TFTP")
+		require.Equal(t, uint64(6), uintVal(t, tf.Child("Opcode")))
+		opt := mustChild(t, tf, "TFTPOption")
+		require.Equal(t, "tsize", strVal(t, opt.Child("Name")))
+		require.Equal(t, "1234", strVal(t, opt.Child("Value")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 69, 12345, raw))
+		require.Equal(t, "tsize", strVal(t, mustChild(t, eth, "IP", "UDP", "TFTP", "TFTPOption").Child("Name")))
+	})
+
 	t.Run("pop3/rfc1939", func(t *testing.T) {
 		popGreet := []byte("+OK POP3 server ready\r\n")
 		po := parseRule(t, popGreet, "pop3", "POP3")
