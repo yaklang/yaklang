@@ -9,6 +9,45 @@ import (
 )
 
 func TestP1WiresharkAndRFCSamples(t *testing.T) {
+	t.Run("dhcp/discover", func(t *testing.T) {
+		// RFC 2131 DHCPDISCOVER + RFC 2132 §9.6 option 53 type 1, §3.14 option 12 Host Name.
+		// Wireshark dhcp.option.dhcp / dhcp.option.hostname.
+		raw := mustHex(t, "010106001234567800000000"+
+			"00000000000000000000000000000000"+
+			"123456789abc00000000000000000000"+
+			"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
+			"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
+			"638253633501010c0b6578616d706c652e636f6dff")
+		n := parseRule(t, raw, "application-layer.dhcp", "DHCP")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Operation")))
+		opts := n.Child("Options").Children()
+		require.GreaterOrEqual(t, len(opts), 2)
+		require.Equal(t, uint64(1), uintVal(t, opts[0].Child("Message Type")))
+		require.Equal(t, "example.com", strVal(t, opts[1].Child("Host Name")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 68, 67, raw))
+		wired := mustChild(t, eth, "IP", "UDP", "DHCP")
+		require.Equal(t, uint64(1), uintVal(t, wired.Child("Options").Children()[0].Child("Message Type")))
+		require.Equal(t, "example.com", strVal(t, wired.Child("Options").Children()[1].Child("Host Name")))
+	})
+
+	t.Run("dhcp/offer", func(t *testing.T) {
+		// RFC 2131 DHCPOFFER + RFC 2132 §9.6 type 2, §9.7 Server Identifier 192.168.0.1.
+		raw := mustHex(t, "02010600aabbccdd00000000"+
+			"00000000c0a8007bc0a8000100000000"+
+			"123456789abc00000000000000000000"+
+			"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
+			"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
+			"638253633501023604c0a80001ff")
+		n := parseRule(t, raw, "application-layer.dhcp", "DHCP")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Operation")))
+		require.Equal(t, []byte{192, 168, 0, 123}, bytesVal(t, n.Child("Your IP")))
+		opts := n.Child("Options").Children()
+		require.Equal(t, uint64(2), uintVal(t, opts[0].Child("Message Type")))
+		require.Equal(t, []byte{192, 168, 0, 1}, bytesVal(t, opts[1].Child("Server ID")))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 67, 68, raw))
+		require.Equal(t, uint64(2), uintVal(t, mustChild(t, eth, "IP", "UDP", "DHCP").Child("Options").Children()[0].Child("Message Type")))
+	})
+
 	t.Run("dhcpv6/solicit", func(t *testing.T) {
 		// RFC 8415 §18.2.1 Solicit: CLIENTID DUID-LL, ELAPSED_TIME 0, IA_NA, ORO DNS/DOMAIN.
 		sol := mustHex(t, ""+
