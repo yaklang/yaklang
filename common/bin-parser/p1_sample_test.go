@@ -1622,4 +1622,41 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(7), uintVal(t, wired.Child("Packet ID")))
 		require.Equal(t, "hello", strVal(t, wired.Child("Message")))
 	})
+
+	t.Run("http/post", func(t *testing.T) {
+		// RFC 9112 §6.2 Content-Length; Wireshark http.request.method / http.file_data.
+		raw := []byte("POST /submit HTTP/1.1\r\nHost: origin.example\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 7\r\n\r\nfoo=bar")
+		req := mustChild(t, parseRule(t, raw, "application-layer.http", "HTTP"), "HTTP Request")
+		require.Equal(t, "POST", strVal(t, req.Child("Method")))
+		require.Equal(t, "/submit", strVal(t, req.Child("Path")))
+		require.Equal(t, "foo=bar", strVal(t, mustChild(t, req, "Body").Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 80, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "HTTP", "HTTP Request")
+		require.Equal(t, "POST", strVal(t, wired.Child("Method")))
+		require.Equal(t, "foo=bar", strVal(t, mustChild(t, wired, "Body").Child("Octets")))
+	})
+
+	t.Run("http/chunked", func(t *testing.T) {
+		// RFC 9112 §6.3.4 / §7.1 chunked: size 5 "hello" then last-chunk 0.
+		// Wireshark http.transfer_encoding / http.chunk_size / http.file_data.
+		raw := []byte("POST / HTTP/1.1\r\nHost: example.tld\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+		chunks := mustChild(t, parseRule(t, raw, "application-layer.http", "HTTP"), "HTTP Request", "Body", "DataChunks").Children()
+		require.GreaterOrEqual(t, len(chunks), 1)
+		require.Equal(t, "5", strVal(t, chunks[0].Child("Size")))
+		require.Equal(t, "hello", strVal(t, chunks[0].Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 80, raw))
+		wired := mustChild(t, eth, "IP", "TCP", "HTTP", "HTTP Request", "Body", "DataChunks").Children()
+		require.Equal(t, "hello", strVal(t, wired[0].Child("Octets")))
+	})
+
+	t.Run("http/ok", func(t *testing.T) {
+		// RFC 9112 §4 status line + §6.2 Content-Length body.
+		raw := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\nhello")
+		resp := mustChild(t, parseRule(t, raw, "application-layer.http", "HTTP"), "HTTP Response")
+		require.Equal(t, "HTTP/1.1", strVal(t, resp.Child("Version")))
+		require.Equal(t, "200", strVal(t, resp.Child("Status")))
+		require.Equal(t, "hello", strVal(t, mustChild(t, resp, "Body").Child("Octets")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 80, 50000, raw))
+		require.Equal(t, "hello", strVal(t, mustChild(t, eth, "IP", "TCP", "HTTP", "HTTP Response", "Body").Child("Octets")))
+	})
 }

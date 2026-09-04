@@ -40,6 +40,7 @@ func TestHTTPFailPaths(t *testing.T) {
 	parseMustFail(t, nil, "application-layer.http", "HTTP")
 	parseMustFail(t, []byte{'G'}, "application-layer.http", "HTTP")
 	parseMustFail(t, []byte("GET /"), "application-layer.http", "HTTP")
+	parseMustFail(t, []byte("POST / HTTP/1.1\r\nContent-Length: 99\r\n\r\nshort"), "application-layer.http", "HTTP")
 }
 
 func TestDNSFailPaths(t *testing.T) {
