@@ -1,6 +1,9 @@
 package randomforest
 
 import (
+	"bytes"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/rpa/character"
@@ -8,6 +11,12 @@ import (
 
 	"github.com/fxsjy/RF.go/RF"
 )
+
+// rf.model.gz 是 rf.model 的 gzip 副本（2.4MB -> 76KB），随二进制一起发布。
+// 重新生成：gzip -9 -n -c rf.model > rf.model.gz
+//
+//go:embed rf.model.gz
+var embeddedRFModelGz []byte
 
 type UrlDetectSys struct {
 	X        [][]interface{}
@@ -79,8 +88,25 @@ func (sys *UrlDetectSys) DumpModel(path string) error {
 	return nil
 }
 
+// LoadModel 从磁盘路径加载模型，仅供本地调试/训练使用。
 func (sys *UrlDetectSys) LoadModel(path string) error {
 	forest := RF.LoadForest(path)
+	sys.model = forest
+	return nil
+}
+
+// LoadEmbeddedModel 加载编译进二进制的模型。
+// 之前这里用的是一个写死的开发机绝对路径，除作者机器外都会 os.Stat 失败，
+// 导致 strictUrl 实际上从来没有生效过。
+func (sys *UrlDetectSys) LoadEmbeddedModel() error {
+	raw, err := utils.GzipDeCompress(embeddedRFModelGz)
+	if err != nil {
+		return utils.Wrap(err, "decompress embedded rf model failed")
+	}
+	forest := &RF.Forest{}
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(forest); err != nil {
+		return utils.Wrap(err, "decode embedded rf model failed")
+	}
 	sys.model = forest
 	return nil
 }
