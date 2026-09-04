@@ -1,3 +1,4 @@
+endian: big
 Package:
   VNC:
     operator: |
@@ -13,8 +14,81 @@ Package:
       }
       this.ProcessSubNode("Minor")
       this.ProcessSubNode("LF")
+      if getNodeResult("LF").Value != 0x0a {
+        panic("vnc: expected version newline")
+      }
+      res, op = this.TryProcessByType("VNCSecurity")
+      if op.OK {
+        op.Save()
+      } else {
+        op.Recovery()
+      }
+      return
     Magic: string,4
     Major: string,3
     Dot: uint8
     Minor: string,3
     LF: uint8
+  ServerInit:
+    operator: |
+      this.ProcessSubNode("Width")
+      this.ProcessSubNode("Height")
+      this.ProcessSubNode("Bits Per Pixel")
+      this.ProcessSubNode("Depth")
+      this.ProcessSubNode("Big Endian")
+      this.ProcessSubNode("True Colour")
+      this.ProcessSubNode("Red Max")
+      this.ProcessSubNode("Green Max")
+      this.ProcessSubNode("Blue Max")
+      this.ProcessSubNode("Red Shift")
+      this.ProcessSubNode("Green Shift")
+      this.ProcessSubNode("Blue Shift")
+      this.ProcessSubNode("Padding")
+      this.ProcessSubNode("Name Length")
+      nlen = getNodeResult("Name Length").Value
+      if nlen > 0 && nlen < 1048576 {
+        this.GetSubNode("Name").SetMaxLength(nlen)
+        this.ProcessSubNode("Name")
+      }
+      return
+    Width: uint16
+    Height: uint16
+    Bits Per Pixel: uint8
+    Depth: uint8
+    Big Endian: uint8
+    True Colour: uint8
+    Red Max: uint16
+    Green Max: uint16
+    Blue Max: uint16
+    Red Shift: uint8
+    Green Shift: uint8
+    Blue Shift: uint8
+    Padding: raw,3
+    Name Length: uint32
+    Name: string
+VNCSecurity:
+  unpack: true
+  operator: |
+    this.ProcessSubNode("Number of Security Types")
+    nsec = getNodeResult("Number of Security Types").Value
+    if nsec > 16 {
+      panic("vnc: too many security types")
+    }
+    if nsec == 0 {
+      this.ProcessSubNode("Reason Length")
+      rlen = getNodeResult("Reason Length").Value
+      if rlen > 0 && rlen < 1048576 {
+        this.GetSubNode("Reason").SetMaxLength(rlen)
+        this.ProcessSubNode("Reason")
+      }
+      return
+    }
+    this.ProcessSubNode("Security Types")
+    return
+  Number of Security Types: uint8
+  Security Types:
+    list: true
+    list-length-from-field: "../Number of Security Types"
+    Type: uint8
+  Reason Length: uint32
+  Reason: string
