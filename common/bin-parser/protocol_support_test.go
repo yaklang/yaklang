@@ -117,6 +117,11 @@ func mustChild(t *testing.T, v *base.NodeValue, names ...string) *base.NodeValue
 	return cur
 }
 
+func vlanVID(t *testing.T, n *base.NodeValue) uint64 {
+	t.Helper()
+	return uintVal(t, n.Child("VID High"))<<8 | uintVal(t, n.Child("VID Low"))
+}
+
 func uintVal(t *testing.T, v *base.NodeValue) uint64 {
 	t.Helper()
 	require.NotNil(t, v)
@@ -377,9 +382,9 @@ func TestVLANIPv4ARPInner(t *testing.T) {
 	parsed := parseEthernet(t, frame)
 	require.Equal(t, uint64(0x8100), uintVal(t, parsed.Child("Type")))
 	q := mustChild(t, parsed, "VLAN")
-	tci := uintVal(t, q.Child("TCI"))
-	require.Equal(t, uint64(3), tci>>13)
-	require.Equal(t, uint64(100), tci&0x0fff)
+	require.Equal(t, uint64(3), uintVal(t, q.Child("PCP")))
+	require.Equal(t, uint64(0), uintVal(t, q.Child("DEI")))
+	require.Equal(t, uint64(100), vlanVID(t, q))
 	require.Equal(t, uint64(0x0806), uintVal(t, q.Child("Type")))
 	require.NotNil(t, q.Child("ARP"))
 }

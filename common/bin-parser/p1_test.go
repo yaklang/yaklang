@@ -251,8 +251,11 @@ func TestP1PPPoEQinQLoopbackCDP(t *testing.T) {
 	arp := []byte{0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 10, 0, 0, 2}
 	copy(qinq[22:], arp)
 	q := mustChild(t, parseEthernet(t, qinq), "QinQ")
+	require.Equal(t, uint64(100), vlanVID(t, q))
 	require.Equal(t, uint64(0x8100), uintVal(t, q.Child("Type")))
-	require.Equal(t, uint64(0x0806), uintVal(t, mustChild(t, q, "VLAN").Child("Type")))
+	ctag := mustChild(t, q, "CTag")
+	require.Equal(t, uint64(1), vlanVID(t, ctag))
+	require.Equal(t, uint64(0x0806), uintVal(t, ctag.Child("Type")))
 
 	// Loopback EtherType 0x9000 then IPv4 proto field 0x0800 + truncated IP is optional; use protocol 0x0800 + 20-byte IP
 	lb := make([]byte, 16)

@@ -3,29 +3,58 @@ Package:
   QinQ:
     PCP: uint8,3bit
     DEI: uint8,1bit
-    VID: uint16,12bit
+    VID High: uint8,4bit
+    VID Low: uint8
     Type: uint16
     Payload:
       unpack: true
       operator: |
-        type = getNodeResult("@QinQ/Type").Value
-        if type == 0x8100 {
-          this.ProcessByType("VLAN")
+        typ = getNodeResult("../Type").Value
+        if typ == 0x8100 {
+          this.ProcessByType("CTag")
           return
         }
-        if type == 0x0800 {
+        if typ == 0x0800 {
           this.ProcessByType("IP")
           return
         }
-        if type == 0x86dd {
+        if typ == 0x86dd {
           this.ProcessByType("IPv6")
           return
         }
-        if type == 0x0806 {
+        if typ == 0x0806 {
           this.ProcessByType("ARP")
           return
         }
-VLAN: "import:ieee_802_1q.yaml;node:IEEE 802.1Q"
+        return
+CTag:
+  PCP: uint8,3bit
+  DEI: uint8,1bit
+  VID High: uint8,4bit
+  VID Low: uint8
+  Type: uint16
+  Payload:
+    unpack: true
+    operator: |
+      typ = getNodeResult("../Type").Value
+      if typ == 0x0800 {
+        this.ProcessByType("IP")
+        return
+      }
+      if typ == 0x86dd {
+        this.ProcessByType("IPv6")
+        return
+      }
+      if typ == 0x0806 {
+        this.ProcessByType("ARP")
+        return
+      }
+      if typ == 0x888e {
+        this.ProcessByType("EAPOL")
+        return
+      }
+      return
 IP: "import:internet_protocol.yaml;node:Internet Protocol"
 IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+EAPOL: "import:eapol.yaml;node:EAPOL"
