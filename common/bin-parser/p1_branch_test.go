@@ -646,6 +646,12 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("rsync/v30", func(t *testing.T) {
 		require.Equal(t, "30", strVal(t, parseRule(t, []byte("@RSYNCD: 30.0\n"), "rsync", "Rsync").Child("Major")))
 	})
+	t.Run("rsync/module", func(t *testing.T) {
+		require.Equal(t, "public", strVal(t, parseRule(t, []byte("@RSYNCD: 31.0\npublic\n"), "rsync", "Rsync").Child("Module")))
+	})
+	t.Run("rsync/ok", func(t *testing.T) {
+		require.Equal(t, "OK", strVal(t, parseRule(t, []byte("@RSYNCD: 31.0\n@RSYNCD: OK\n"), "rsync", "Rsync").Child("Status")))
+	})
 
 	t.Run("snmp/get", func(t *testing.T) {
 		n := parseRule(t, mustHex(t, "302602010004067075626c6963a019020101020100020100300e300c06082b060102010101000500"), "application-layer.snmp", "SNMP")

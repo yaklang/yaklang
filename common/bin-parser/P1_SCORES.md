@@ -148,7 +148,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | PHP serialize | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `php_ser.yaml` |
 | Python pickle | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | `pickle.yaml` |
 | JDWP handshake | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of JDWP |
-| Rsync daemon | A | 90 | 15 | 25 | 20 | 20 | 10 | L2 | `rsync.yaml` |
+| Rsync daemon | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `rsync.yaml` |
 | Docker Registry | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of HTTP |
 | gRPC reflection | A | 90 | 20 | 20 | 20 | 20 | 10 | L2 | alias of HTTP/2 |
 | SaltStack | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `salt.yaml` |
