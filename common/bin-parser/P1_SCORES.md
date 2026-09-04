@@ -123,7 +123,7 @@ G5 要求 SampleClass ∈ {L1, L2, L3}；L4-only handmade PDU 不计分。L3 gop
 | IObjectExporter | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `application-layer/dcerpc.yaml` |
 | LLMNR-MDNS collision | A | 91 | 20 | 25 | 16 | 20 | 10 | L2 | alias of LLMNR |
 | WPAD | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
-| TPKT | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `application-layer/msrdp.yaml` |
+| TPKT | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/msrdp.yaml` |
 | BitTorrent | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `bittorrent.yaml` |
 | MinIO/S3 | A | 91 | 20 | 25 | 16 | 20 | 10 | L1 | alias of HTTP |
 | RMI | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | alias of RMI/JRMP |

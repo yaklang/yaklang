@@ -15,7 +15,7 @@ Package:
     Class: uint8
     length-from-field: Length
     length-for-start-field: Flag
-    VariableData: raw
+    VariableData: string
   Negotiation:
     endian: little
     Type: uint8
@@ -63,7 +63,7 @@ Package:
       Source: uint16
       Class: uint8
       VariableData:
-        Rest: raw
+        Octets: string
         operator: |
           gotCookie = false
           gotNeg = false
@@ -94,10 +94,10 @@ Package:
             }
           }
           if !gotCookie && !gotNeg {
-            leftover = this.GetSubNode("Rest").GetRemainingSpace()
+            leftover = this.GetSubNode("Octets").GetRemainingSpace()
             if leftover > 0 && leftover <= 0x10000 {
-              this.GetSubNode("Rest").SetMaxLength(leftover)
-              this.ProcessSubNode("Rest")
+              this.GetSubNode("Octets").SetMaxLength(leftover)
+              this.ProcessSubNode("Octets")
             }
           }
 RDPCookie:
