@@ -186,6 +186,15 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(1), uintVal(t, parseRule(t, []byte{0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0xaa}, "rtp", "RTP").Child("Sequence")))
 	})
 
+	t.Run("websocket/text", func(t *testing.T) {
+		n := parseRule(t, []byte{0x81, 0x05, 'H', 'e', 'l', 'l', 'o'}, "application-layer.websocket", "WebSocket")
+		require.Equal(t, "Hello", strVal(t, n.Child("Text")))
+	})
+	t.Run("websocket/close", func(t *testing.T) {
+		n := parseRule(t, []byte{0x88, 0x02, 0x03, 0xe8}, "application-layer.websocket", "WebSocket")
+		require.Equal(t, uint64(1000), uintVal(t, n.Child("Close Code")))
+	})
+
 	t.Run("ike/sa-init", func(t *testing.T) {
 		ike := mustHex(t, "88694881497528ad0000000000000000212022080000000000000048"+
 			"2200001400000010010100010000000802000002"+
