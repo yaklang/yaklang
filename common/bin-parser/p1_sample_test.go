@@ -2353,6 +2353,18 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, mac, bytesVal(t, mustChild(t, n, "ARP").Child("Sender MAC address")))
 	})
 
+	t.Run("linux_sll/next-type", func(t *testing.T) {
+		// LINKTYPE_LINUX_SLL (tcpdump cooked) + Linux if_ether.h ETH_P_802_EX1 0x88B5.
+		// Wireshark sll.etype: unrecognized protocol leftover is Next Protocol Data, not raw.
+		mac := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+		raw := append(linuxSLL(0, 1, 6, mac, 0x88b5), []byte("exp1")...)
+		n := parseRule(t, raw, "linux_sll", "LinuxSLL")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Packet Type")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("ARPHRD")))
+		require.Equal(t, uint64(0x88b5), uintVal(t, n.Child("Protocol")))
+		require.Equal(t, "exp1", joinUint8(t, n.Child("Next Protocol Data")))
+	})
+
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		// RFC 1112 / gopacket igmp_test.go: Type 0x12 membership report, group 224.0.1.60.
 		raw := []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}
