@@ -15,8 +15,73 @@ Package:
       this.ProcessSubNode("Reserved")
       this.ProcessSubNode("Info Hash")
       this.ProcessSubNode("Peer ID")
+      res, op = this.TryProcessByType("BTMessage")
+      if op.OK {
+        op.Recovery()
+        this.ProcessSubNode("Messages")
+      } else {
+        op.Recovery()
+      }
+      return
     Pstrlen: uint8
     Pstr: raw,19
     Reserved: raw,8
     Info Hash: raw,20
     Peer ID: raw,20
+    Messages:
+      list: true
+      Message: BTMessage
+      operator: |
+        for {
+          prev = this.Length()
+          res, op = this.TryProcessByType("BTMessage")
+          if !op.OK {
+            op.Recovery()
+            break
+          }
+          op.Save()
+          if this.Length() <= prev {
+            break
+          }
+        }
+BTMessage:
+  operator: |
+    this.ProcessSubNode("Length")
+    mlen = getNodeResult("Length").Value
+    if mlen == 0 {
+      return
+    }
+    if mlen > 65535 {
+      panic("bittorrent: message length too large")
+    }
+    this.ProcessSubNode("Message ID")
+    mid = getNodeResult("Message ID").Value
+    if mid == 4 {
+      if mlen != 5 {
+        panic("bittorrent: have length must be 5")
+      }
+      this.ProcessSubNode("Piece Index")
+      return
+    }
+    if mid == 6 {
+      if mlen != 13 {
+        panic("bittorrent: request length must be 13")
+      }
+      this.ProcessSubNode("Index")
+      this.ProcessSubNode("Begin")
+      this.ProcessSubNode("Block Length")
+      return
+    }
+    if mid == 0 || mid == 1 || mid == 2 || mid == 3 {
+      if mlen != 1 {
+        panic("bittorrent: control message length must be 1")
+      }
+      return
+    }
+    panic("bittorrent: unknown message id")
+  Length: uint32
+  Message ID: uint8
+  Piece Index: uint32
+  Index: uint32
+  Begin: uint32
+  Block Length: uint32
