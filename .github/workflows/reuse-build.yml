@@ -294,7 +294,10 @@ jobs:
             echo "::error::YAK operator binary missing; OSS download step must succeed"
             exit 1
           fi
-          "$YAK" embed-fs-hash --override --all
+          # Single entry point: new yak regenerates the per-resource hash files from the
+          # repository dirs; a published yak that predates --dir/--output-file keeps the
+          # old `embed-fs-hash --override --all` behaviour through a throw-away template.
+          YAK="$YAK" bash scripts/sync-embed-fs-hash.sh
 
       - name: Install gzip-embed tool
         run: go install ./common/utils/gzip_embed/gzip-embed
