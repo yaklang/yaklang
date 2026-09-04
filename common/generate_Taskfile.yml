@@ -29,4 +29,4 @@ tasks:
     silent: true
     dir: yak/cmd
     cmds:
-      - go run yak.go embed-fs-hash --override --all
+      - bash ../../scripts/generate-embed-fs-hash.sh

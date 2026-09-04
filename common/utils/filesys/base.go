@@ -112,6 +112,47 @@ func CreateEmbedFSHash(f embed.FS, opts ...Option) (string, error) {
 	return codec.Sha256([]byte(strings.Join(hashes, "|"))), nil
 }
 
+// CreateLocalFSHash calculates the same hash as CreateEmbedFSHash but from a
+// local directory instead of an embed.FS. It is used by embed-fs-hash to
+// generate hash files from a repository checkout without compiling the binary.
+func CreateLocalFSHash(dir string, opts ...Option) (string, error) {
+	var hashes []string
+
+	allOpts := make([]Option, 0, len(opts)+3)
+	allOpts = append(allOpts, WithFileSystem(NewLocalFs()))
+	// embed.FS excludes files and directories whose names start with "." or "_",
+	// so replicate that behavior to keep local hashes identical to embed hashes.
+	allOpts = append(allOpts, WithDirStat(func(s string, info fs.FileInfo) error {
+		if strings.HasPrefix(info.Name(), ".") || strings.HasPrefix(info.Name(), "_") {
+			return SkipDir
+		}
+		return nil
+	}))
+	allOpts = append(allOpts, WithFileStat(func(s string, info fs.FileInfo) error {
+		if strings.HasPrefix(info.Name(), ".") || strings.HasPrefix(info.Name(), "_") {
+			return nil
+		}
+		result, err := os.ReadFile(s)
+		if err != nil {
+			return err
+		}
+		hashes = append(hashes, codec.Sha256(result))
+		return nil
+	}))
+	allOpts = append(allOpts, opts...)
+
+	err := Recursive(dir, allOpts...)
+	if err != nil {
+		return "", err
+	}
+	if len(hashes) <= 0 {
+		return "", ErrNoFileFound
+	}
+
+	sort.Strings(hashes)
+	return codec.Sha256([]byte(strings.Join(hashes, "|"))), nil
+}
+
 // local FileSystem
 type LocalFs struct {
 	cache *utils.CacheWithKey[string, *bytes.Buffer]
