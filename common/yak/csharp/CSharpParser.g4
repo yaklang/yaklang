@@ -97,7 +97,8 @@ contextual_keyword
     | 'by'      | 'descending' | 'dynamic'   | 'equals'    | 'from'
     | 'get'     | 'global'     | 'group'     | 'into'      | 'join'
     | 'let'     | 'nameof'     | 'notnull'   | 'on'        | 'orderby'
-    | 'partial' | 'remove'     | 'select'    | 'set'       | 'unmanaged'
+    | 'init'    | 'partial'    | 'remove'    | 'select'
+    | 'set'     | 'unmanaged'
     | 'value'   | 'var'        | 'when'      | 'where'     | 'yield'
     ;
 
@@ -1223,6 +1224,7 @@ labeled_statement
 // Source: §13.6.1 General
 declaration_statement
     : local_variable_declaration ';'
+    | deconstruction_expression '=' expression ';'
     | local_constant_declaration ';'
     | local_function_declaration
     | using_declaration
@@ -1615,12 +1617,22 @@ yield_statement
 // Source: §14.2 Compilation units
 compilation_unit
     : extern_alias_directive* using_directive* global_attributes?
+      global_statement*
       namespace_member_declaration*
+    ;
+
+// C# 9 top-level statements. They are kept separate from namespace/type
+// declarations so the SSA frontend can compile them into the application main
+// function after the pre-handler has registered every type skeleton.
+global_statement
+    : statement
     ;
 
 // Source: §14.3 Namespace declarations
 namespace_declaration
-    : 'namespace' qualified_identifier namespace_body ';'?
+    : 'namespace' qualified_identifier
+      (namespace_body ';'?
+      | ';' extern_alias_directive* using_directive* namespace_member_declaration*)
     ;
 
 qualified_identifier
@@ -1641,9 +1653,9 @@ extern_alias_directive
 
 // Source: §14.5.1 General
 using_directive
-    : using_alias_directive
+    : 'global'? (using_alias_directive
     | using_namespace_directive
-    | using_static_directive    
+    | using_static_directive)
     ;
 
 // Source: §14.5.2 Using alias directives
@@ -1974,7 +1986,7 @@ get_accessor_declaration
     ;
 
 set_accessor_declaration
-    : attributes? accessor_modifier? 'set' accessor_body
+    : attributes? accessor_modifier? ('set' | 'init') accessor_body
     ;
 
 accessor_modifier
@@ -2518,4 +2530,3 @@ fixed_size_buffer_declarators
 fixed_size_buffer_declarator
     : identifier '[' constant_expression ']'
     ;
-

@@ -999,6 +999,10 @@ func (v *BaseCSharpParserVisitor) VisitCompilation_unit(ctx *Compilation_unitCon
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCSharpParserVisitor) VisitGlobal_statement(ctx *Global_statementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCSharpParserVisitor) VisitNamespace_declaration(ctx *Namespace_declarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }

@@ -3,7 +3,7 @@ package aspparser
 import "github.com/yaklang/antlr/v4"
 
 func GetASPParserSerializedATN() []int32 {
-	aspparserParserInit()
+	ASPParserInit()
 	return ASPParserParserStaticData.serializedATN
 }
 

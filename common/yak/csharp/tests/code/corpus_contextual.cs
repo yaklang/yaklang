@@ -1,4 +1,8 @@
 // Generated from CSharpParser.g4 contextual_keyword alternatives used as identifiers.
+global using System;
+
+modernTopLevel();
+
 public class ContextualIds {
     public void M() {
         int add = 0;
@@ -14,23 +18,24 @@ public class ContextualIds {
         int get = 10;
         int global = 11;
         int group = 12;
-        int into = 13;
-        int join = 14;
-        int let = 15;
-        int nameof = 16;
-        int notnull = 17;
-        int on = 18;
-        int orderby = 19;
-        int partial = 20;
-        int remove = 21;
-        int select = 22;
-        int set = 23;
-        int unmanaged = 24;
-        int value = 25;
-        int var = 26;
-        int when = 27;
-        int where = 28;
-        int yield = 29;
+        int init = 13;
+        int into = 14;
+        int join = 15;
+        int let = 16;
+        int nameof = 17;
+        int notnull = 18;
+        int on = 19;
+        int orderby = 20;
+        int partial = 21;
+        int remove = 22;
+        int select = 23;
+        int set = 24;
+        int unmanaged = 25;
+        int value = 26;
+        int var = 27;
+        int when = 28;
+        int where = 29;
+        int yield = 30;
         int _ = 0; // discard_token
     }
 }

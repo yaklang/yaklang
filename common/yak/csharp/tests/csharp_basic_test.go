@@ -86,3 +86,23 @@ func TestCSharp_ClassMainStaticMain_NoObjectError(t *testing.T) {
 	)
 	require.Equal(t, []string{"1"}, got)
 }
+
+func TestCSharp_UsingAliasIsolatedAcrossNamespacesAndLazyBuilds(t *testing.T) {
+	CheckAllCSharpPrintlnValue(`
+namespace First {
+    using Alias = Targets.FirstType;
+    public class Left {
+        public static void Emit() { println(new Alias()); }
+    }
+}
+namespace Second {
+    using Alias = Targets.SecondType;
+    public class Right {
+        public static void Emit() { println(new Alias()); }
+    }
+}
+`, []string{
+		"Undefined-Targets.FirstType(Undefined-Targets.FirstType)",
+		"Undefined-Targets.SecondType(Undefined-Targets.SecondType)",
+	}, t)
+}
