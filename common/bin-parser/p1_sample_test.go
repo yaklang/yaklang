@@ -1955,6 +1955,48 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0x80), uintVal(t, mustChild(t, eth, "LLC", "STP").Child("BPDU Type")))
 		require.Nil(t, mustChild(t, eth, "LLC", "STP").Child("Config"))
 	})
+
+	t.Run("socks4/connect", func(t *testing.T) {
+		// SOCKS4 CONNECT (Ying-Da Lee): VN=4 CD=1 DSTPORT=80 DSTIP=10.0.0.1 USERID "u".
+		// Wireshark socks.command / socks.dst / socks.dstport / socks.userid. TCP/1080.
+		raw := []byte{0x04, 0x01, 0x00, 0x50, 10, 0, 0, 1, 'u', 0}
+		n := parseRule(t, raw, "socks4", "SOCKS4")
+		require.Equal(t, uint64(4), uintVal(t, n.Child("Version")))
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Command")))
+		require.Equal(t, uint64(80), uintVal(t, n.Child("Port")))
+		require.Equal(t, []byte{10, 0, 0, 1}, bytesVal(t, n.Child("IP")))
+		require.Equal(t, "u", strVal(t, n.Child("UserID")))
+		require.Nil(t, n.Child("Domain"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1080, 1080, raw))
+		require.Equal(t, "u", strVal(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("UserID")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("Command")))
+	})
+
+	t.Run("socks4/4a", func(t *testing.T) {
+		// SOCKS4a: DSTIP 0.0.0.1 then USERID and DOMAIN. Wireshark socks.v4a_dns_name.
+		raw := append([]byte{0x04, 0x01, 0x00, 0x50, 0, 0, 0, 1, 'u', 0}, append([]byte("example.com"), 0)...)
+		n := parseRule(t, raw, "socks4", "SOCKS4")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Command")))
+		require.Equal(t, []byte{0, 0, 0, 1}, bytesVal(t, n.Child("IP")))
+		require.Equal(t, "u", strVal(t, n.Child("UserID")))
+		require.Equal(t, "example.com", strVal(t, n.Child("Domain")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1080, 1080, raw))
+		require.Equal(t, "example.com", strVal(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("Domain")))
+	})
+
+	t.Run("socks4/reply", func(t *testing.T) {
+		// SOCKS4 reply VN=0 CD=90 granted (Wireshark socks.results). No USERID.
+		raw := []byte{0x00, 0x5a, 0x00, 0x50, 10, 0, 0, 1}
+		n := parseRule(t, raw, "socks4", "SOCKS4")
+		require.Equal(t, uint64(0), uintVal(t, n.Child("Version")))
+		require.Equal(t, uint64(90), uintVal(t, n.Child("Command")))
+		require.Equal(t, uint64(80), uintVal(t, n.Child("Port")))
+		require.Equal(t, []byte{10, 0, 0, 1}, bytesVal(t, n.Child("IP")))
+		require.Nil(t, n.Child("UserID"))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 1080, 1080, raw))
+		require.Equal(t, uint64(90), uintVal(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("Command")))
+		require.Nil(t, mustChild(t, eth, "IP", "TCP", "SOCKS4").Child("UserID"))
+	})
 }
 
 func stpConfigBPDU() []byte {
