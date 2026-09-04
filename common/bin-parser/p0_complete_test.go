@@ -442,13 +442,17 @@ func TestTLSRecordGatesAndClientHello(t *testing.T) {
 	copy(recHello[5:], hs)
 	h := parseRule(t, recHello, "application-layer.tls", "Transport Layer Security")
 	require.Equal(t, uint64(22), uintVal(t, mustChild(t, h, "Record Layer", "ContentType")))
-	require.Equal(t, []byte{0x00, 0x2f, 0x00, 0x35}, bytesVal(t, mustChild(t, h, "Record Layer", "TLSClientHello", "ClientHello", "Cipher Suites")))
+	suites := mustChild(t, h, "Record Layer", "TLSClientHello", "ClientHello", "Cipher Suites").Children()
+	require.Equal(t, uint64(0x002f), uintVal(t, suites[0].Child("Suite")))
+	require.Equal(t, uint64(0x0035), uintVal(t, suites[1].Child("Suite")))
 	ch := parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello")
 	require.Equal(t, uint64(1), uintVal(t, ch.Child("Handshake Type")))
 
 	ethH := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, recHello))
 	require.Equal(t, uint64(22), uintVal(t, mustChild(t, ethH, "IP", "TCP", "TLS", "Record Layer", "ContentType")))
-	require.Equal(t, []byte{0x00, 0x2f, 0x00, 0x35}, bytesVal(t, mustChild(t, ethH, "IP", "TCP", "TLS", "Record Layer", "TLSClientHello", "ClientHello", "Cipher Suites")))
+	wiredSuites := mustChild(t, ethH, "IP", "TCP", "TLS", "Record Layer", "TLSClientHello", "ClientHello", "Cipher Suites").Children()
+	require.Equal(t, uint64(0x002f), uintVal(t, wiredSuites[0].Child("Suite")))
+	require.Equal(t, uint64(0x0035), uintVal(t, wiredSuites[1].Child("Suite")))
 
 	sh := make([]byte, 5+4)
 	sh[0] = 0x16

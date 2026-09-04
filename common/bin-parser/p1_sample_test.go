@@ -1696,4 +1696,35 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, raw))
 		require.Equal(t, "bye", strVal(t, mustChild(t, eth, "IP", "TCP", "HTTP2").Child("Octets")))
 	})
+
+	t.Run("tls/suites", func(t *testing.T) {
+		// RFC 5246 / RFC 8446 ClientHello cipher_suites: TLS_RSA_WITH_AES_128_CBC_SHA
+		// (0x002f) and TLS_RSA_WITH_AES_256_CBC_SHA (0x0035). Wireshark tls.handshake.ciphersuite.
+		hello := append([]byte{0x03, 0x03}, make([]byte, 32)...)
+		hello = append(hello, 0, 0x00, 0x04, 0x00, 0x2f, 0x00, 0x35, 0x01, 0x00)
+		hs := append([]byte{0x01, 0x00, 0x00, byte(len(hello))}, hello...)
+		suites := mustChild(t, parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello"), "ClientHello", "Cipher Suites").Children()
+		require.Equal(t, uint64(0x002f), uintVal(t, suites[0].Child("Suite")))
+		require.Equal(t, uint64(0x0035), uintVal(t, suites[1].Child("Suite")))
+		rec := append([]byte{0x16, 0x03, 0x03, 0x00, byte(len(hs))}, hs...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, rec))
+		wired := mustChild(t, eth, "IP", "TCP", "TLS", "Record Layer", "TLSClientHello", "ClientHello", "Cipher Suites").Children()
+		require.Equal(t, uint64(0x002f), uintVal(t, wired[0].Child("Suite")))
+	})
+
+	t.Run("tls/sni", func(t *testing.T) {
+		// RFC 6066 §3 server_name HostName example.com. Wireshark tls.handshake.extensions_server_name.
+		body := append([]byte{0x03, 0x03}, make([]byte, 32)...)
+		body = append(body, 0x00, 0x00, 0x04, 0x00, 0x2f, 0x00, 0x35, 0x01, 0x00)
+		sni := append([]byte{0x00, 0x14, 0x00, 0x00, 0x00, 0x10, 0x00, 0x0e, 0x00, 0x00, 0x0b}, []byte("example.com")...)
+		body = append(body, sni...)
+		hs := append([]byte{0x01, 0x00, 0x00, byte(len(body))}, body...)
+		exts := mustChild(t, parseRule(t, hs, "application-layer.tls_hello", "TLSClientHello"), "ClientHello", "Extensions").Children()
+		require.Equal(t, uint64(0), uintVal(t, exts[0].Child("Type")))
+		require.Equal(t, "example.com", strVal(t, mustChild(t, exts[0], "SNI").Child("Host Name")))
+		rec := append([]byte{0x16, 0x03, 0x03, 0x00, byte(len(hs))}, hs...)
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 443, rec))
+		wired := mustChild(t, eth, "IP", "TCP", "TLS", "Record Layer", "TLSClientHello", "ClientHello", "Extensions").Children()
+		require.Equal(t, "example.com", strVal(t, mustChild(t, wired[0], "SNI").Child("Host Name")))
+	})
 }

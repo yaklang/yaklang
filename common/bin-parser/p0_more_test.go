@@ -424,7 +424,9 @@ func TestTLSClientHelloJA3AndHTTPWPAD(t *testing.T) {
 	require.Equal(t, uint64(1), uintVal(t, ch.Child("Handshake Type")))
 	inner := mustChild(t, ch, "ClientHello")
 	require.Equal(t, uint64(0x0303), uintVal(t, inner.Child("Legacy Version")))
-	require.Equal(t, []byte{0x00, 0x2f, 0x00, 0x35}, bytesVal(t, inner.Child("Cipher Suites")))
+	suites := inner.Child("Cipher Suites").Children()
+	require.Equal(t, uint64(0x002f), uintVal(t, suites[0].Child("Suite")))
+	require.Equal(t, uint64(0x0035), uintVal(t, suites[1].Child("Suite")))
 
 	parseMustFail(t, []byte{0x02, 0x00, 0x00, 0x00}, "application-layer.tls_hello", "TLSClientHello")
 	parseMustFail(t, hs[:3], "application-layer.tls_hello", "TLSClientHello")
