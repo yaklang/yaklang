@@ -708,6 +708,25 @@ func TestP1BranchRows(t *testing.T) {
 		require.Equal(t, uint64(5), uintVal(t, n.Child("Opcode")))
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Acks").Children()[0]))
 	})
+	t.Run("sctp/data", func(t *testing.T) {
+		raw := mustHex(t, "40000b8000016f0a6db018820003005b280243450000a0bd000000074d454741434f2f32203c6d672d74723e3a31363338340a5265706c79203d203137343039317b0a436f6e74657874203d203235357b0a4d6f64696679203d204d55582f3235350a7d0a7d0a67")
+		n := parseRule(t, raw, "sctp", "SCTP")
+		require.Equal(t, uint64(7), uintVal(t, n.Child("Chunks").Children()[0].Child("PPI")))
+	})
+	t.Run("sctp/init", func(t *testing.T) {
+		raw := mustHex(t, "00070007000000003761a74601000020432325440000ffff001100115cfe379fc0000004000c000600050000")
+		n := parseRule(t, raw, "sctp", "SCTP")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Chunks").Children()[0].Child("Type")))
+		require.Equal(t, uint64(17), uintVal(t, n.Child("Chunks").Children()[0].Child("Outbound Streams")))
+	})
+	t.Run("sctp/sack", func(t *testing.T) {
+		raw := mustHex(t, "0b804000214415232bf2024e03000010280243450000200000000000")
+		require.Equal(t, uint64(3), uintVal(t, parseRule(t, raw, "sctp", "SCTP").Child("Chunks").Children()[0].Child("Type")))
+	})
+	t.Run("sctp/cookie-ack", func(t *testing.T) {
+		raw := mustHex(t, "0007000743232544ceec2d790b000004")
+		require.Equal(t, uint64(11), uintVal(t, parseRule(t, raw, "sctp", "SCTP").Child("Chunks").Children()[0].Child("Type")))
+	})
 	t.Run("igmp/v1-report", func(t *testing.T) {
 		n := parseRule(t, []byte{0x12, 0x00, 0x0c, 0xc3, 224, 0, 1, 60}, "igmp", "IGMP")
 		require.Equal(t, uint64(0x12), uintVal(t, n.Child("Type")))
