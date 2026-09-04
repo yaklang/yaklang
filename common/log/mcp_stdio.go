@@ -26,9 +26,9 @@ func ConfigureMCPStdioLogging(args []string) bool {
 	return true
 }
 
-// EnableMCPStdioLogging reserves stdout for MCP JSON-RPC and moves the shared
-// Yak logger to stderr. The operation is idempotent and also affects loggers
-// created later through GetLogger.
+// EnableMCPStdioLogging moves the shared Yak logger to stderr when stdout is
+// reserved for MCP JSON-RPC. The operation is idempotent and also affects
+// loggers created later through GetLogger.
 func EnableMCPStdioLogging() {
 	mcpStdioMode.Store(true)
 	SetOutput(os.Stderr)
