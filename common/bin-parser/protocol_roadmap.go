@@ -51,7 +51,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "LCP", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "PAP", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "CHAP", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
-	{Name: "EAPOL", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP1},
+	{Name: "EAPOL", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1, Notes: "802.1X Start/Logoff/EAP/Key; Key Data length-bounded"},
 	{Name: "EAP", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP1},
 	{Name: "STP", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP1},
 	{Name: "RSTP", Family: "link", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP1},

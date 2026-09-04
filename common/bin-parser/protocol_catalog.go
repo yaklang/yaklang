@@ -28,7 +28,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "LCP", Layer: "L2", RuleFile: "link_control_protocol.yaml", Status: statusStable},
 	{Name: "PAP", Layer: "L2", RuleFile: "password_authentication_protocol.yaml", Status: statusStable},
 	{Name: "CHAP", Layer: "L2", RuleFile: "challenge_handshake_authentication_protocol.yaml", Status: statusStable},
-	{Name: "EAPOL", Layer: "L2", RuleFile: "eapol.yaml", Status: statusPartial},
+	{Name: "EAPOL", Layer: "L2", RuleFile: "eapol.yaml", Status: statusNew, Notes: "802.1X Start/Logoff/EAP-Packet/Key", SampleFrom: "Wireshark wpa-Induction.pcap frame 87 (via gopacket)"},
 	{Name: "IPv4", Layer: "L3", RuleFile: "internet_protocol.yaml", Status: statusStable, SampleFrom: "existing ethernet fixtures"},
 	{Name: "IPv6", Layer: "L3", RuleFile: "internet_protocol_version_6.yaml", Status: statusStable, SampleFrom: "existing ethernet fixtures"},
 	{Name: "ICMP", Layer: "L3", RuleFile: "internet_control_message_protocol.yaml", Status: statusNew, Notes: "echo, dest-unreach, time-exceeded, redirect, timestamp"},

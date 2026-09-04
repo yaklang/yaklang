@@ -1,0 +1,220 @@
+package bin_parser
+
+// ProtocolScorecard is one delivery-standard score for a roadmap protocol.
+// Dimension points must be one of the rubric buckets in PROTOCOL_DELIVERY.md.
+type ProtocolScorecard struct {
+	Name        string
+	Rule        string
+	AliasOf     string
+	G1          bool
+	G2          bool
+	G3          bool
+	G4          bool
+	G5          bool
+	G6          bool
+	G7          bool
+	G8          bool
+	Schema      int
+	Traffic     int
+	Tests       int
+	Branches    int
+	Stack       int
+	SampleClass string
+	Evidence    string
+	OpaqueRaw   string
+}
+
+func (s ProtocolScorecard) GatesOK() bool {
+	return s.G1 && s.G2 && s.G3 && s.G4 && s.G5 && s.G6 && s.G7 && s.G8
+}
+
+func (s ProtocolScorecard) Total() int {
+	if !s.GatesOK() {
+		return 0
+	}
+	return s.Schema + s.Traffic + s.Tests + s.Branches + s.Stack
+}
+
+func (s ProtocolScorecard) Grade() string {
+	t := s.Total()
+	switch {
+	case !s.GatesOK():
+		return "F"
+	case t >= 90:
+		return "A"
+	case t >= 75:
+		return "B"
+	case t >= 60:
+		return "C"
+	default:
+		return "D"
+	}
+}
+
+func card(name, rule string, schema, traffic, tests, branches, stack int, sample, evidence, opaque string) ProtocolScorecard {
+	return ProtocolScorecard{
+		Name: name, Rule: rule,
+		G1: true, G2: true, G3: true, G4: true, G5: true, G6: true, G7: true, G8: true,
+		Schema: schema, Traffic: traffic, Tests: tests, Branches: branches, Stack: stack,
+		SampleClass: sample, Evidence: evidence, OpaqueRaw: opaque,
+	}
+}
+
+func alias(name, of string) ProtocolScorecard {
+	return ProtocolScorecard{Name: name, AliasOf: of}
+}
+
+// P0Scorecards records delivery scores for every P0 roadmap name.
+// Aliases share the target card via AliasOf; the test expands them.
+var P0Scorecards = []ProtocolScorecard{
+	card("Ethernet II", "ethernet.yaml", 20, 25, 16, 20, 10, "L1",
+		"TestBaseProtocol arp/http; TestEthernetIPARPTruncated; TestEAPOLKeyFromWPAInductionCapture", ""),
+	card("IEEE 802.1Q", "ieee_802_1q.yaml", 20, 15, 16, 14, 10, "L3",
+		"TestVLANIPv4ARPInner; TestEthernetIPARPTruncated", ""),
+	card("ARP", "address_resolution_protocol.yaml", 20, 25, 16, 14, 10, "L1",
+		"TestBaseProtocol arp; TestVLANIPv4ARPInner", ""),
+	card("IPv4", "internet_protocol.yaml", 20, 25, 16, 14, 10, "L1",
+		"TestBaseProtocol; TestEthernetIPARPTruncated", ""),
+	card("IPv6", "internet_protocol_version_6.yaml", 20, 25, 16, 14, 10, "L1",
+		"TestBaseProtocol icmp v6", ""),
+	card("ICMP", "internet_control_message_protocol.yaml", 20, 25, 20, 20, 10, "L1",
+		"TestBaseProtocol icmp; TestICMPDestinationUnreachable; TestICMPTimestampRedirectAndNBNSAnswer", "inner original datagram"),
+	card("ICMPv6", "internet_control_message_protocol_v6.yaml", 20, 25, 16, 14, 10, "L1",
+		"TestBaseProtocol icmp v6", ""),
+	card("TCP", "transmission_control_protocol.yaml", 20, 25, 16, 20, 10, "L1",
+		"TestBaseProtocol http/tls; payload TryProcessByType", "application payload"),
+	card("UDP", "user_datagram_protocol.yaml", 20, 25, 16, 14, 10, "L1",
+		"TestBaseProtocol dns; TestNTPWiresharkSample", "application payload"),
+	card("QUIC", "application-layer/quic.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestQUICHeadersAndEdges; RFC 9000 long/short header + UDP/443", "protected payload"),
+	card("NetBIOS", "application-layer/nbss.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestNBSSWrapsSMB2; TestNBNSLLMNRAndEdges", ""),
+	card("NBT NS", "application-layer/nbns.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestNBNSLLMNRAndEdges; TestICMPTimestampRedirectAndNBNSAnswer", "RDATA opaque"),
+	card("NBT SS", "application-layer/nbss.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestNBSSWrapsSMB2 RFC 1002 session header", ""),
+	card("DNS", "application-layer/dns.yaml", 20, 25, 20, 20, 10, "L1",
+		"TestBaseProtocol dns request/response; TestDNSQueryFromExistingEthernetFixture", "RDATA"),
+	card("NBNS", "application-layer/nbns.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestNBNSLLMNRAndEdges RFC 1002", "RDATA"),
+	card("DHCP", "application-layer/dhcp.yaml", 20, 15, 16, 20, 10, "L3",
+		"TestDHCPGopacketDiscover; TestDHCPOfferYourIP RFC 2131 magic cookie + option list", ""),
+	card("HTTP", "application-layer/http.yaml", 20, 25, 20, 20, 10, "L1",
+		"TestBaseProtocol http request; TestTLSClientHelloJA3AndHTTPWPAD CONNECT/WPAD", ""),
+	card("HTTP/2", "application-layer/http2.yaml", 20, 20, 20, 20, 10, "L2",
+		"TestHTTP2RFC9113SettingsTwoParams; TestHTTP2PrefaceFrameAndEdges; TestHTTP2SettingsPingGoaway", "HEADERS payload"),
+	card("WebSocket", "application-layer/websocket.yaml", 20, 20, 16, 20, 10, "L2",
+		"TestWebSocketRFC6455UnmaskedHello RFC 6455 §5.7; TestWebSocketFramesAndEdges", ""),
+	card("TLS", "application-layer/tls.yaml", 20, 25, 20, 20, 10, "L1",
+		"TestTLSClientHelloFromCapture scapy-ssl_tls; TestTLSRecordGatesAndClientHello; TestBaseProtocol tls", "app-data Payload"),
+	card("JA3/JA4", "application-layer/tls_hello.yaml", 20, 25, 16, 14, 10, "L1",
+		"TestTLSClientHelloFromCapture cipher suites + extensions", "JA3 hash not computed"),
+	card("SMTP", "application-layer/smtp.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestSMTPReply RFC 5321; TestSSHPacketAndFTPSMTPCommands EHLO", ""),
+	card("FTP", "application-layer/ftp.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestFTPReply RFC 959; TestSSHPacketAndFTPSMTPCommands USER", ""),
+	card("SMB", "application-layer/smb.yaml", 20, 15, 20, 20, 10, "L2",
+		"TestSMB1NegotiateRequest [MS-CIFS] 2.2.4.52; TestSMB1CloseTransactionLDAPJavaQUIC", ""),
+	card("SMB2", "application-layer/smb2.yaml", 20, 15, 20, 20, 10, "L2",
+		"TestSMB2NegotiateRequest [MS-SMB2] 2.2.3 \\xfeSMB; TestSMB2TreeConnectCreateReadWriteClose", ""),
+	card("SMB3", "application-layer/smb3.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestJavaSerAndSMB3AndEdges [MS-SMB2] 2.2.41 \\xfdSMB transform", "encrypted payload"),
+	alias("CIFS", "SMB"),
+	card("LDAP", "application-layer/ldap.yaml", 20, 20, 16, 14, 10, "L2",
+		"TestLDAPAnonymousBindSample RFC 4511; TestSMB1CloseTransactionLDAPJavaQUIC", "long-form BER not in this rule"),
+	card("Kerberos", "application-layer/kerberos.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestKerberosTagsAndEdges RFC 4120 APPLICATION tags; TestKerberosEmptyBodyAndTCPCap", "SEQUENCE body Content"),
+	card("NTLM", "application-layer/ntlm.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestNTLMSSPNegotiateAndEdges [MS-NLMP] NTLMSSP\\0", ""),
+	card("NTLMSSP", "application-layer/ntlm.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestNTLMSSPNegotiateAndEdges; TestNTLMSSPInsideSMB2SessionSetup", ""),
+	card("SPNEGO", "application-layer/spnego.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestSPNEGOAndEdges RFC 4178 GSS-API 0x60 + SPNEGO OID", "NegToken blob"),
+	card("RADIUS", "application-layer/radius.yaml", 25, 25, 16, 20, 10, "L1",
+		"TestRADIUSAccessRequestFromCapture radtest.pcap; TestRADIUSAccessAcceptFromCapture; TestRADIUSAndEdges", ""),
+	card("SOCKS5", "application-layer/socks5.yaml", 20, 20, 16, 20, 10, "L2",
+		"TestSOCKS5ConnectGoogleFromFixture; TestSocks5", ""),
+	card("SSH", "application-layer/ssh.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestSSHIdentification RFC 4253; TestSSHPacketAndFTPSMTPCommands", "KEXINIT Data"),
+	card("RDP", "application-layer/msrdp.yaml", 20, 20, 16, 20, 10, "L1",
+		"TestRDPTPKTFromProtocolImplCapture; TestRDPX224CookieNegotiationAndTPKTABI", "TPDU raw ABI"),
+	card("PsExec/SMB-svcctl", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums SVCCTL OpenSCManagerW opnum 15", "NDR stub"),
+	card("MySQL", "application-layer/mysql.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestMySQLHandshakeV10 internals HandshakeV10; TestMySQLQueryCommand; TestMySQLERRPacket", ""),
+	card("PostgreSQL", "application-layer/postgresql.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestPostgreSQLStartupSSLQueryAndEdges SSLRequest 80877103", ""),
+	card("MSSQL TDS", "application-layer/tds.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestTDSPreloginLoginBatchAndEdges [MS-TDS] 2.2.1", "BATCH payload"),
+	card("Oracle TNS", "application-layer/tns.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestTNSConnectAndEdges; TestTNSConnectSNMPVarbindX224AndDCERPCStub", ""),
+	card("Redis", "application-layer/redis.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestRedisPING RESP *1 $4 PING", ""),
+	card("MQTT", "application-layer/mqtt.yaml", 20, 20, 16, 20, 10, "L2",
+		"TestMQTTConnectAndConnack; TestMQTTConnectTwoByteRemainingLength; TestMQTTPublishSubscribePing", ""),
+	card("DCE/RPC", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestDCERPCBindRequestAndEdges [MS-RPCE] 2.2.2.6; TestTNSConnectSNMPVarbindX224AndDCERPCStub", "NDR stub"),
+	alias("MSRPC", "DCE/RPC"),
+	card("SNMP", "application-layer/snmp.yaml", 20, 20, 16, 14, 10, "L2",
+		"TestSNMPRFC1157GetRequestOID; TestSNMPGetRequest", ""),
+	card("MSRPC EPM", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums EPM UUID + opnum 3", "NDR stub"),
+	card("SAMR", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums SAMR UUID", "NDR stub"),
+	card("LSARPC", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums LSARPC UUID + opnum 6", "NDR stub"),
+	card("NETLOGON", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums NETLOGON UUID + opnum 26", "NDR stub"),
+	card("DRSUAPI", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums DRSUAPI UUID + opnum 0", "NDR stub"),
+	card("SRVSVC", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums SRVSVC UUID + opnum 15", "NDR stub"),
+	card("SVCCTL", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums SVCCTL UUID + opnum 15", "NDR stub"),
+	card("WINREG", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums WINREG UUID + opnum 2", "NDR stub"),
+	card("WMI", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums WMI UUID + opnum 6", "NDR stub"),
+	card("DCOM", "application-layer/dcerpc.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestMSRPCInterfaceUUIDsAndPsExecOpnums DCOM UUID + opnum 5", "NDR stub"),
+	card("Yakit MITM magic", "application-layer/http.yaml", 20, 25, 20, 20, 10, "L1",
+		"TestTLSClientHelloJA3AndHTTPWPAD CONNECT", ""),
+	card("AJP", "application-layer/ajp.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestAJPPingPongForwardAndEdges Apache AJP13 CPING 0x1234", ""),
+	card("Java serialization", "application-layer/java_ser.yaml", 20, 20, 16, 14, 10, "L2",
+		"TestSMB1CloseTransactionLDAPJavaQUIC STREAM_MAGIC ACED v5 TC_NULL", "object graph"),
+	card("Kerberos PAC", "application-layer/kerberos.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestNetNTLMv2AndPAC [MS-PAC] 2.3 PAC_INFO_BUFFER list", "buffer payload"),
+	alias("AS-REP / TGS", "Kerberos"),
+	alias("NTLM v1/v2", "NTLMSSP"),
+	card("NetNTLMv2", "application-layer/ntlm.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestNetNTLMv2AndPAC [MS-NLMP] 3.3.2", ""),
+	card("LLMNR poison", "application-layer/nbns.yaml", 20, 15, 16, 14, 10, "L2",
+		"TestNBNSLLMNRAndEdges UDP/5355", "RDATA"),
+	card("NBT-NS poison", "application-layer/nbns.yaml", 20, 15, 16, 20, 10, "L2",
+		"TestNBNSLLMNRAndEdges UDP/137", "RDATA"),
+	card("WPAD proxy", "application-layer/http.yaml", 20, 25, 20, 20, 10, "L1",
+		"TestTLSClientHelloJA3AndHTTPWPAD GET /wpad.dat", ""),
+	alias("TNS", "Oracle TNS"),
+}
+
+func ResolveP0Scorecard(name string) (ProtocolScorecard, bool) {
+	byName := make(map[string]ProtocolScorecard, len(P0Scorecards))
+	for _, s := range P0Scorecards {
+		byName[s.Name] = s
+	}
+	s, ok := byName[name]
+	if !ok {
+		return ProtocolScorecard{}, false
+	}
+	if s.AliasOf == "" {
+		return s, true
+	}
+	base, ok := byName[s.AliasOf]
+	if !ok {
+		return ProtocolScorecard{}, false
+	}
+	base.Name = name
+	base.AliasOf = s.AliasOf
+	return base, true
+}
