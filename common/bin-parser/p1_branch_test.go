@@ -204,12 +204,21 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("wireguard/init", func(t *testing.T) {
 		wg := make([]byte, 148)
 		wg[0] = 1
-		require.Equal(t, uint64(1), uintVal(t, parseRule(t, wg, "wireguard", "WireGuard").Child("Type")))
+		wg[4] = 1
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "WGInit").Child("Sender")))
 	})
 	t.Run("wireguard/response", func(t *testing.T) {
 		wg := make([]byte, 92)
 		wg[0] = 2
-		require.Equal(t, uint64(2), uintVal(t, parseRule(t, wg, "wireguard", "WireGuard").Child("Type")))
+		wg[4] = 2
+		wg[8] = 1
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Type")))
+		resp := mustChild(t, n, "WGResponse")
+		require.Equal(t, uint64(2), uintVal(t, resp.Child("Sender")))
+		require.Equal(t, uint64(1), uintVal(t, resp.Child("Receiver")))
 	})
 
 	t.Run("bgp/keepalive", func(t *testing.T) {

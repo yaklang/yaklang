@@ -282,6 +282,37 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(0x07), uintVal(t, mustChild(t, eth, "IP", "OSPF", "OSPFDBDesc").Child("Flags")))
 	})
 
+	t.Run("wireguard/init", func(t *testing.T) {
+		// wireguard.com/protocol handshake_initiation; Wireshark packet-wireguard.c wg.sender.
+		// Type 1, 148 bytes, little-endian Sender=1 (whitepaper §5.4.2).
+		wg := make([]byte, 148)
+		wg[0] = 1
+		wg[4] = 1
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		require.Equal(t, uint64(1), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, n, "WGInit").Child("Sender")))
+		require.Equal(t, 32, len(bytesVal(t, mustChild(t, n, "WGInit").Child("Ephemeral"))))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 51820, 51820, wg))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "WireGuard", "WGInit").Child("Sender")))
+	})
+
+	t.Run("wireguard/response", func(t *testing.T) {
+		// wireguard.com/protocol handshake_response 92 bytes; Wireshark wg.receiver / encrypted_empty.
+		// Type 2, Sender=2, Receiver=1 (echo of initiator sender).
+		wg := make([]byte, 92)
+		wg[0] = 2
+		wg[4] = 2
+		wg[8] = 1
+		n := parseRule(t, wg, "wireguard", "WireGuard")
+		resp := mustChild(t, n, "WGResponse")
+		require.Equal(t, uint64(2), uintVal(t, n.Child("Type")))
+		require.Equal(t, uint64(2), uintVal(t, resp.Child("Sender")))
+		require.Equal(t, uint64(1), uintVal(t, resp.Child("Receiver")))
+		require.Equal(t, 16, len(bytesVal(t, resp.Child("Encrypted Empty"))))
+		eth := parseEthernet(t, ipv4UDPBytes(t, 51820, 51820, wg))
+		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "WireGuard", "WGResponse").Child("Receiver")))
+	})
+
 	t.Run("salt/zmtp", func(t *testing.T) {
 		// ZeroMQ RFC 23 / Wireshark packet-zmtp.c greeting: 0xff…0x7f, version 3.0, mechanism NULL.
 		g := make([]byte, 64)

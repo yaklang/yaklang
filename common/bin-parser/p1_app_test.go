@@ -133,9 +133,9 @@ func TestP1UDPApplications(t *testing.T) {
 		"00000000000000000000000000000000")
 	w := parseRule(t, wg, "wireguard", "WireGuard")
 	require.Equal(t, uint64(1), uintVal(t, w.Child("Type")))
-	require.Equal(t, uint64(1), uintVal(t, w.Child("Sender")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, w, "WGInit").Child("Sender")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 51820, 51820, wg))
-	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "WireGuard").Child("Type")))
+	require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "UDP", "WireGuard", "WGInit").Child("Sender")))
 
 	// RFC 2281 default Hello: Active, hellotime 3, holdtime 10, priority 100, auth cisco
 	hsrp := mustHex(t, "000010030a640000636973636f000000c0a80101")
